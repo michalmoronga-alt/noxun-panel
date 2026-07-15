@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- korpus -->
+  <rect x="3" y="3.5" width="18" height="17" rx="1" fill="#ece7db" stroke="#455a64" stroke-width="1.4"/>
+  <!-- polica -->
+  <path d="M3.7 12 H20.3" stroke="#455a64" stroke-width="1.2"/>
+  <!-- delenie dvierok -->
+  <path d="M12 3.9 V20.1" stroke="#90a4ae" stroke-width="0.9"/>
+  <!-- uchytky -->
+  <rect x="10.4" y="13.6" width="1.1" height="3.4" rx="0.4" fill="#37474f"/>
+  <rect x="12.5" y="13.6" width="1.1" height="3.4" rx="0.4" fill="#37474f"/>
+  <!-- sokel -->
+  <path d="M4.6 20.5 V22 M19.4 20.5 V22" stroke="#455a64" stroke-width="1.3" stroke-linecap="round"/>
+</svg>

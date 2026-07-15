@@ -1,0 +1,163 @@
+<!-- Noxun Engine — panel (vanilla JS, ziadne CDN, slovensky) -->
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    font-size: 13px; color: #263238; background: #f4f5f7;
+    margin: 0; padding: 10px;
+  }
+  h1 { font-size: 15px; margin: 0 0 2px; color: #1b3a4b; }
+  .sub { font-size: 11px; color: #78909c; margin: 0 0 10px; }
+  fieldset {
+    border: 1px solid #cfd8dc; border-radius: 6px; margin: 0 0 10px; padding: 8px 10px 10px;
+    background: #fff;
+  }
+  legend { font-weight: 600; font-size: 12px; color: #37474f; padding: 0 4px; }
+  .row { display: flex; align-items: center; margin: 5px 0; }
+  .row label { flex: 0 0 118px; color: #455a64; }
+  .row input, .row select {
+    flex: 1; padding: 4px 6px; border: 1px solid #b0bec5; border-radius: 4px;
+    font-size: 13px; min-width: 0;
+  }
+  .row .unit { flex: 0 0 26px; text-align: right; color: #90a4ae; font-size: 11px; padding-left: 4px; }
+  button {
+    width: 100%; padding: 8px; border: 0; border-radius: 5px; cursor: pointer;
+    font-size: 13px; font-weight: 600; margin-top: 4px;
+  }
+  .primary { background: #2e7d32; color: #fff; }
+  .primary:hover { background: #1b5e20; }
+  .apply { background: #1565c0; color: #fff; }
+  .apply:hover { background: #0d47a1; }
+  button:disabled { background: #cfd8dc; color: #90a4ae; cursor: not-allowed; }
+  .selinfo { font-size: 11px; color: #607d8b; margin: 0 0 6px; }
+  .selinfo b { color: #1565c0; }
+  .zoneline { display: flex; align-items: center; margin: 2px 0 10px; }
+  .zoneline input { margin-right: 7px; width: 15px; height: 15px; }
+  .zoneline label { color: #455a64; }
+  #status {
+    font-size: 11px; padding: 7px 9px; border-radius: 5px; background: #eceff1;
+    color: #455a64; border: 1px solid #cfd8dc; min-height: 16px; line-height: 1.35;
+  }
+  #status.err { background: #fdecea; color: #b71c1c; border-color: #f5c6cb; }
+  #status.ok  { background: #e8f5e9; color: #1b5e20; border-color: #c8e6c9; }
+</style>
+
+<h1>Noxun Engine</h1>
+<p class="sub">V0.1 — parametricky spodny korpus</p>
+
+<fieldset>
+  <legend>Novy korpus</legend>
+  <div class="row"><label>Sirka</label><input id="n_width" type="number" step="1"><span class="unit">mm</span></div>
+  <div class="row"><label>Vyska</label><input id="n_height" type="number" step="1"><span class="unit">mm</span></div>
+  <div class="row"><label>Hlbka</label><input id="n_depth" type="number" step="1"><span class="unit">mm</span></div>
+  <div class="row"><label>Hrubka materialu</label><input id="n_thickness" type="number" step="1"><span class="unit">mm</span></div>
+  <div class="row"><label>Vyska sokla</label><input id="n_floor_height" type="number" step="1"><span class="unit">mm</span></div>
+  <div class="row"><label>Pocet polic</label>
+    <select id="n_shelves"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select><span class="unit"></span>
+  </div>
+  <div class="row"><label>Dvierka</label>
+    <select id="n_fronts">
+      <option value="none">ziadne</option>
+      <option value="1">1 kridlo</option>
+      <option value="2">2 kridla</option>
+      <option value="auto">auto</option>
+    </select><span class="unit"></span>
+  </div>
+  <button class="primary" onclick="insertCabinet()">Vloz korpus</button>
+</fieldset>
+
+<fieldset>
+  <legend>Oznaceny korpus</legend>
+  <p class="selinfo" id="selinfo">Nic nie je vybrate.</p>
+  <div class="row"><label>Sirka</label><input id="s_width" type="number" step="1" disabled><span class="unit">mm</span></div>
+  <div class="row"><label>Vyska</label><input id="s_height" type="number" step="1" disabled><span class="unit">mm</span></div>
+  <div class="row"><label>Hlbka</label><input id="s_depth" type="number" step="1" disabled><span class="unit">mm</span></div>
+  <div class="row"><label>Hrubka materialu</label><input id="s_thickness" type="number" step="1" disabled><span class="unit">mm</span></div>
+  <div class="row"><label>Vyska sokla</label><input id="s_floor_height" type="number" step="1" disabled><span class="unit">mm</span></div>
+  <div class="row"><label>Pocet polic</label>
+    <select id="s_shelves" disabled><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select><span class="unit"></span>
+  </div>
+  <div class="row"><label>Dvierka</label>
+    <select id="s_fronts" disabled>
+      <option value="none">ziadne</option>
+      <option value="1">1 kridlo</option>
+      <option value="2">2 kridla</option>
+      <option value="auto">auto</option>
+    </select><span class="unit"></span>
+  </div>
+  <button class="apply" id="applyBtn" onclick="applyChanges()" disabled>Aplikuj zmeny</button>
+</fieldset>
+
+<div class="zoneline">
+  <input id="zonesChk" type="checkbox" onchange="toggleZones()">
+  <label for="zonesChk">Zobrazit zony (ghost)</label>
+</div>
+
+<div id="status">Pripravene.</div>
+
+<script>
+  var NEW = ['width','height','depth','thickness','floor_height','shelves','fronts'];
+
+  function val(id){ return document.getElementById(id).value; }
+  function setVal(id, v){ if (v !== null && v !== undefined) document.getElementById(id).value = v; }
+
+  function collect(prefix){
+    var o = {};
+    for (var i=0;i<NEW.length;i++){ o[NEW[i]] = val(prefix + NEW[i]); }
+    return o;
+  }
+
+  function insertCabinet(){
+    if (window.sketchup && sketchup.insert_cabinet)
+      sketchup.insert_cabinet(JSON.stringify(collect('n_')));
+  }
+
+  function applyChanges(){
+    if (document.getElementById('applyBtn').disabled) return;
+    if (window.sketchup && sketchup.apply_changes)
+      sketchup.apply_changes(JSON.stringify(collect('s_')));
+  }
+
+  function toggleZones(){
+    var on = document.getElementById('zonesChk').checked;
+    if (window.sketchup && sketchup.toggle_zones)
+      sketchup.toggle_zones(on ? 'true' : 'false');
+  }
+
+  function setSelEnabled(on){
+    var ids = ['s_width','s_height','s_depth','s_thickness','s_floor_height','s_shelves','s_fronts','applyBtn'];
+    for (var i=0;i<ids.length;i++){ document.getElementById(ids[i]).disabled = !on; }
+  }
+
+  window.NX = {
+    init: function(data){
+      var d = data.defaults || {};
+      setVal('n_width', d.width); setVal('n_height', d.height); setVal('n_depth', d.depth);
+      setVal('n_thickness', d.thickness); setVal('n_floor_height', d.floor_height);
+      setVal('n_shelves', d.shelves); setVal('n_fronts', d.fronts);
+      document.getElementById('zonesChk').checked = !!data.zones_visible;
+      if (data.selected) NX.loadSelected(data.selected); else NX.clearSelected();
+    },
+    loadSelected: function(c){
+      document.getElementById('selinfo').innerHTML = 'Vybraty: <b>' + (c.cabinet_id||'?') + '</b>';
+      setVal('s_width', c.width); setVal('s_height', c.height); setVal('s_depth', c.depth);
+      setVal('s_thickness', c.thickness); setVal('s_floor_height', c.floor_height);
+      setVal('s_shelves', c.shelves); setVal('s_fronts', c.fronts);
+      setSelEnabled(true);
+    },
+    clearSelected: function(){
+      document.getElementById('selinfo').textContent = 'Nic nie je vybrate.';
+      setSelEnabled(false);
+    },
+    setStatus: function(msg, err){
+      var el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = err ? 'err' : 'ok';
+    }
+  };
+
+  window.onload = function(){
+    if (window.sketchup && sketchup.ready) sketchup.ready();
+  };
+</script>
