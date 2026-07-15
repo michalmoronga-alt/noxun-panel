@@ -40,6 +40,7 @@ Sketchup.require 'noxun_engine/core/zones'
 Sketchup.require 'noxun_engine/core/construction'
 Sketchup.require 'noxun_engine/core/scale_observer'
 Sketchup.require 'noxun_engine/core/cabinet_builder'
+Sketchup.require 'noxun_engine/core/templates'
 Sketchup.require 'noxun_engine/ui/panel'
 
 module Noxun
