@@ -3,26 +3,25 @@
 # CISTO vypoctovy modul: ziadna SketchUp geometria, ziadne .mm. Testovatelny bez modelu.
 # Kazdy dielec = { suffix, role, name, box:[sx,sy,sz], origin:[x,y,z], material:, prod:{} }.
 #
+# V0.2b: vnutro riesi ZoneTree (strom zon + priecky + police per-zona),
+#        cela riesi Fronts (fixed+auto s lockmi). Hrubka chrbta je konfigurovatelna.
+#
 # Konstrukcne varianty (standard sekcia 4.4 + domenova korekcia Michal 2026-07):
-#   dno:    under_sides (default dolna — dno pln sirka, boky stoja na dne, korpus levituje o floor_height)
-#           between_sides (default horna / variant dolna — boky po zem, dno medzi bokmi)
+#   dno:    under_sides (default dolna) / between_sides (default horna)
 #   vrch:   full / two_rails / none
-#   chrbat: overlay / inset / groove
-#   sokel:  none (default — priestor pod dnom pre nohy) / front (predny zapusteny panel)
+#   chrbat: overlay / inset / groove   (hrubka = cfg[:back_thickness], napr. 3 HDF / 18 pevny)
+#   sokel:  none (nohy) / front (predny zapusteny panel)
 module Noxun
   module Engine
     module Construction
-      BACK_THICKNESS    = 3.0    # chrbat
-      SHELF_FRONT_INSET = 20.0   # police odsadene od cela
-      RAIL_DEPTH        = 100.0  # hlbka priecok pri two_rails
-      GROOVE_OFFSET     = 10.0   # odsadenie chrbta v drazke od zadnej hrany
+      BACK_THICKNESS_DEFAULT = 3.0    # default hrubka chrbta (HDF), ak cfg neuvedie
+      RAIL_DEPTH             = 100.0  # hlbka priecok pri two_rails
+      GROOVE_OFFSET          = 10.0   # odsadenie chrbta v drazke od zadnej hrany
 
       module_function
 
-      # Hlavny vstup: cfg (symbolove kluce, mm Float) -> plan.
-      # Vrati: { parts:[deskriptory], zones:[layout], zone_box:{}, available:{}, wings:, interior:{} }.
-      # Validuje interne (raise so slovenskou hlaskou pri nezmyselnych rozmeroch).
-      def build_plan(cfg)
+      # Hlavny vstup: cfg (symbolove kluce, mm Float) + cabinet_id (pre ID zon) -> plan.
+      def build_plan(cfg, cabinet_id = 'CAB-000')
         w = cfg[:width]; h = cfg[:height]; t = cfg[:thickness]
 
         interior = interior_dims(cfg)
@@ -36,32 +35,22 @@ module Noxun
         parts << bk if bk
         parts.concat(plinth_parts(cfg))
 
-        # Police — rovnomerne vo vnutornom priestore [z_lo, z_hi].
-        sh = Shelves.layout(interior[:z_lo], interior[:z_hi], t, cfg[:shelves])
-        shelf_depth = interior[:back_front_y] - SHELF_FRONT_INSET
-        sh[:shelves].each do |shelf|
-          n = shelf[:index] + 1
-          parts << {
-            suffix: "SHELF-#{n}", role: 'shelf', name: "Polica #{n}", material: :korpus,
-            box: [w - 2 * t, shelf_depth, t], origin: [t, SHELF_FRONT_INSET, shelf[:z]],
-            prod: { length: w - 2 * t, width: shelf_depth, thickness: t }
-          }
-        end
+        # Vnutro = strom zon nad vnutornym boxom (3D). Priecky + police su dielce korpusu.
+        zbox = { x0: t, x1: w - t, y0: 0.0, y1: interior[:back_front_y],
+                 z0: interior[:z_lo], z1: interior[:z_hi] }
+        zres = ZoneTree.compute(cfg[:zone_tree], zbox, t, cabinet_id)
+        parts.concat(zres[:dividers])
+        parts.concat(zres[:shelves])
 
-        # Dvierka (cela) — pred korpusom (Y zaporne).
+        # Cela pred korpusom (fixed + auto s lockmi).
         fr = Fronts.layout(cfg[:fronts], w, h, cfg[:floor_height], t)
-        fr[:parts].each do |dr|
-          parts << {
-            suffix: dr[:suffix], role: dr[:role], name: door_name(dr[:suffix]), material: :front,
-            box: [dr[:width], t, dr[:height]], origin: [dr[:x], -t, dr[:z]],
-            prod: { length: dr[:height], width: dr[:width], thickness: t }
-          }
-        end
+        parts.concat(fr[:parts])
 
         {
           parts: parts,
-          zones: sh[:zones],
-          zone_box: { x0: t, x1: w - t, y0: 0.0, y1: interior[:back_front_y] },
+          zones: zres[:zones],
+          zone_tree: ZoneTree.sanitize(cfg[:zone_tree]),
+          front_items: fr[:items],
           available: {
             width:  (w - 2 * t),
             height: interior[:avail_h],
@@ -72,15 +61,13 @@ module Noxun
         }
       end
 
-      # Vnutorne rozmery (svetle) a poloha celnej hrany chrbta.
-      # z_lo = vrch dna (= floor_height + hrubka; rovnake pre oba varianty dna),
-      # z_hi = spodok vrchu (h-t pre full/two_rails, h pre none).
+      # Vnutorne rozmery (svetle) + poloha celnej hrany chrbta. Hrubka chrbta z configu.
       def interior_dims(cfg)
         h = cfg[:height]; d = cfg[:depth]
         t = cfg[:thickness]; s = cfg[:floor_height]
+        bt = back_thickness(cfg)
         z_lo = s + t
         z_hi = cfg[:top_mode] == 'none' ? h : h - t
-        bt = BACK_THICKNESS
         back_front_y =
           case cfg[:back_mode]
           when 'inset'  then d - bt
@@ -90,9 +77,12 @@ module Noxun
         { z_lo: z_lo, z_hi: z_hi, avail_h: (z_hi - z_lo), back_front_y: back_front_y, back_thickness: bt }
       end
 
-      # Boky — plna hlbka. Z-start podla variantu dna:
-      #   under_sides  -> boky stoja NA dne (z0 = floor_height + hrubka dna), skratene.
-      #   between_sides-> boky po zem (z0 = 0), plna vyska.
+      def back_thickness(cfg)
+        v = cfg[:back_thickness].to_f
+        v.positive? ? v : BACK_THICKNESS_DEFAULT
+      end
+
+      # Boky — plna hlbka. Z-start podla variantu dna.
       def side_parts(cfg)
         w = cfg[:width]; d = cfg[:depth]; t = cfg[:thickness]; s = cfg[:floor_height]; h = cfg[:height]
         z0 = cfg[:bottom_mode] == 'under_sides' ? (s + t) : 0.0
@@ -106,8 +96,6 @@ module Noxun
       end
 
       # Dno — vzdy na urovni Z = floor_height (priestor pod nim = nohy / sokel).
-      #   under_sides  -> pln sirka [0..w].
-      #   between_sides-> medzi bokmi [t..w-t].
       def bottom_part(cfg)
         w = cfg[:width]; d = cfg[:depth]; t = cfg[:thickness]; s = cfg[:floor_height]
         if cfg[:bottom_mode] == 'under_sides'
@@ -119,10 +107,7 @@ module Noxun
         end
       end
 
-      # Vrch — medzi bokmi na Z = h-t.
-      #   full      -> jeden pln panel (hlbka d).
-      #   two_rails -> predna + zadna vystuha (rail_depth), typicke pre dolne skrinky pod dosku.
-      #   none      -> ziadny vrch.
+      # Vrch — full / two_rails / none.
       def top_parts(cfg)
         w = cfg[:width]; d = cfg[:depth]; t = cfg[:thickness]; h = cfg[:height]
         case cfg[:top_mode]
@@ -136,17 +121,13 @@ module Noxun
         end
       end
 
-      # Dve horne vystuhy (rail_front / rail_back). Reálne prípady dolných skriniek:
-      #   rails_orientation flat    -> pás naplocho (hrúbka t zvisle, hĺbka rail_depth v Y). Default.
-      #   rails_orientation upright -> pás na hranu (hrúbka t v Y, výška rail_depth zvisle) — drezová skrinka.
-      #   rails_top_offset          -> odsadenie od hornej hrany nadol (varná doska ~20 mm).
-      # Výrobný dielec je v oboch prípadoch rovnaký rez (dĺžka w-2t, šírka rail_depth, hrúbka t).
+      # Dve horne vystuhy (rail_front / rail_back). flat = naplocho, upright = na hranu.
       def rail_parts(cfg)
         w = cfg[:width]; d = cfg[:depth]; t = cfg[:thickness]; h = cfg[:height]; s = cfg[:floor_height]
         off = cfg[:rails_top_offset].to_f
-        z_top = h - off # horna hrana vystuhy
+        z_top = h - off
         if cfg[:rails_orientation] == 'upright'
-          rdp = [cfg[:rail_depth], (h - s - t - 10.0)].min # vyska pasu, ochrana proti podlezeniu dna
+          rdp = [cfg[:rail_depth], (h - s - t - 10.0)].min
           rdp = 20.0 if rdp < 20.0
           z0 = z_top - rdp
           prod = { length: w - 2 * t, width: rdp, thickness: t }
@@ -157,7 +138,7 @@ module Noxun
               box: [w - 2 * t, t, rdp], origin: [t, d - t, z0], prod: prod }
           ]
         else # flat
-          rd = [cfg[:rail_depth], (d / 2.0 - 10.0)].min # ochrana proti prekrytiu prednej a zadnej
+          rd = [cfg[:rail_depth], (d / 2.0 - 10.0)].min
           rd = 20.0 if rd < 20.0
           z0 = z_top - t
           prod = { length: w - 2 * t, width: rd, thickness: t }
@@ -170,10 +151,7 @@ module Noxun
         end
       end
 
-      # Chrbat.
-      #   overlay -> nalozeny zozadu, pln sirka, Y = d..d+bt.
-      #   inset   -> vlozeny medzi boky, na zadnej hrane (Y = d-bt..d).
-      #   groove  -> ako inset, ale odsadeny GROOVE_OFFSET od zadnej hrany (drazka sa NEfrezuje, len poloha).
+      # Chrbat — overlay / inset / groove; hrubka z configu (interior[:back_thickness]).
       def back_part(cfg, interior)
         w = cfg[:width]; d = cfg[:depth]; h = cfg[:height]; t = cfg[:thickness]; s = cfg[:floor_height]
         bt = interior[:back_thickness]
@@ -193,7 +171,7 @@ module Noxun
         end
       end
 
-      # Sokel — len variant 'front' (predny zapusteny panel). Default 'none' = priestor pre nohy.
+      # Sokel — len variant 'front' (predny zapusteny panel).
       def plinth_parts(cfg)
         return [] unless cfg[:plinth_mode] == 'front'
         s = cfg[:floor_height]
@@ -201,14 +179,6 @@ module Noxun
         w = cfg[:width]; t = cfg[:thickness]; recess = cfg[:plinth_recess]
         [{ suffix: 'PLINTH', role: 'plinth', name: 'Sokel predny', material: :korpus,
            box: [w - 2 * t, t, s], origin: [t, recess, 0], prod: { length: w - 2 * t, width: s, thickness: t } }]
-      end
-
-      def door_name(suffix)
-        case suffix
-        when 'DOOR-L' then 'Dvierka lave'
-        when 'DOOR-R' then 'Dvierka prave'
-        else 'Dvierka'
-        end
       end
 
       def validate!(cfg, interior)

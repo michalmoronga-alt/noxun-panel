@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.2.0' unless defined?(VERSION)
+    VERSION = '0.2.1' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -29,13 +29,14 @@ module Noxun
 end
 
 # Vnutorne subory — Sketchup.require (funguje aj so sifrovanymi .rbe).
-# Poradie: construction + scale_observer musia byt pred cabinet_builderom (referuje ich za behu).
+# Poradie: pure moduly (shelves/fronts/zone_tree) pred construction; templates po builderi.
 Sketchup.require 'noxun_engine/core/units'
 Sketchup.require 'noxun_engine/core/ids'
 Sketchup.require 'noxun_engine/core/store'
-Sketchup.require 'noxun_engine/core/zones'
 Sketchup.require 'noxun_engine/modules/shelves'
 Sketchup.require 'noxun_engine/modules/fronts'
+Sketchup.require 'noxun_engine/core/zone_tree'
+Sketchup.require 'noxun_engine/core/zones'
 Sketchup.require 'noxun_engine/core/construction'
 Sketchup.require 'noxun_engine/core/scale_observer'
 Sketchup.require 'noxun_engine/core/cabinet_builder'

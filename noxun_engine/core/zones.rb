@@ -1,6 +1,8 @@
 # frozen_string_literal: true
-# Noxun Engine — zony (sloty). Ghost boxy medzi policami na tagu NOXUN_SLOTY.
-# manufactured:false, polopriehladne materialy (standard sekcia 5.1). Nikdy v kusovniku.
+# Noxun Engine — zony (ghost geometria). Standard sekcia 5.1.
+# Pre kazdu LISTOVU zonu stromu (ZoneTree) postavi polopriehladny ghost box na tagu
+# NOXUN_SLOTY. Ghost nesie NOXUN dict (kind:zone, id, cabinet_id, config) — klikatelna entita.
+# manufactured:false, nikdy v kusovniku.
 module Noxun
   module Engine
     module Zones
@@ -12,37 +14,41 @@ module Noxun
         [220, 120, 255], [255, 235, 90]
       ].freeze
 
-      # Postavi ghost zony do parent_ents (definicia korpusu). Vrati pole zone id.
-      # zones_data: pole {index, z0, z1, height} zo Shelves.layout
-      # box: { x0, x1, y0, y1 } — vnutorny priestor v mm (medzi bokmi, po chrbat)
-      def self.build_into(model, parent_ents, zones_data, box, cabinet_id)
+      # Postavi ghosty listovych zon do parent_ents (definicia korpusu).
+      # zones: ploche pole objektov zo ZoneTree.compute (symbolove kluce). Vrati pole id listov.
+      def self.build_into(model, parent_ents, zones, cabinet_id)
         tag = model.layers.add(TAG)
         mats = ensure_materials(model)
+        i = 0
         ids = []
-        zones_data.each_with_index do |z, i|
-          zid = "#{cabinet_id}-Z#{i + 1}"
+        zones.each do |z|
+          next unless z[:leaf]
           grp = parent_ents.add_group
-          grp.name = "zona_#{i + 1}"
-          draw_ghost(grp.entities, box, z[:z0], z[:z1])
+          grp.name = "zona_#{z[:id]}"
+          draw_ghost(grp.entities, z[:position], z[:width], z[:height], z[:depth])
           grp.material = mats[i % mats.length]
           grp.layer = tag
           Store.write(grp, {
-            std: Store::STD, kind: 'zone', id: zid, cabinet_id: cabinet_id,
+            std: Store::STD, kind: 'zone', id: z[:id], cabinet_id: cabinet_id,
             role: 'zone', manufactured: false, production_class: 'none',
-            config: {
-              parent_zone: nil,
-              position: [box[:x0].round(2), box[:y0].round(2), z[:z0].round(2)],
-              width:  (box[:x1] - box[:x0]).round(2),
-              height: z[:height].round(2),
-              depth:  (box[:y1] - box[:y0]).round(2),
-              state: 'free',
-              allowed_modules: %w[shelf divider_h drawer_block front_door],
-              modules: []
-            }
+            config: zone_config(z)
           })
-          ids << zid
+          ids << z[:id]
+          i += 1
         end
         ids
+      end
+
+      def self.zone_config(z)
+        {
+          parent_zone: z[:parent],
+          position: z[:position],
+          width: z[:width], height: z[:height], depth: z[:depth],
+          state: (z[:shelves].to_i.positive? ? 'occupied' : 'free'),
+          shelves: z[:shelves].to_i,
+          allowed_modules: %w[shelf divider_v divider_h drawer_block front_door],
+          modules: []
+        }
       end
 
       # Zabezpeci existenciu tagu a nastavi jeho viditelnost (checkbox v paneli).
@@ -57,17 +63,18 @@ module Noxun
         tag ? tag.visible? : true
       end
 
-      def self.draw_ghost(ents, box, z0, z1)
-        x0 = box[:x0] + INSET
-        x1 = box[:x1] - INSET
-        y0 = box[:y0] + INSET
-        y1 = box[:y1] - INSET
-        zz0 = z0 + INSET
-        h = (z1 - z0) - 2 * INSET
-        return if x1 <= x0 || y1 <= y0 || h <= 0
+      # Ghost box z pozicie (min roh) a rozmerov (mm), zmenseny o INSET.
+      def self.draw_ghost(ents, position, w, hh, d)
+        x0 = position[0] + INSET
+        y0 = position[1] + INSET
+        z0 = position[2] + INSET
+        ww = w - 2 * INSET
+        dd = d - 2 * INSET
+        h = hh - 2 * INSET
+        return if ww <= 0 || dd <= 0 || h <= 0
         pts = [
-          Units.point(x0, y0, zz0), Units.point(x1, y0, zz0),
-          Units.point(x1, y1, zz0), Units.point(x0, y1, zz0)
+          Units.point(x0, y0, z0), Units.point(x0 + ww, y0, z0),
+          Units.point(x0 + ww, y0 + dd, z0), Units.point(x0, y0 + dd, z0)
         ]
         f = ents.add_face(pts)
         f.reverse! if f.normal.z < 0

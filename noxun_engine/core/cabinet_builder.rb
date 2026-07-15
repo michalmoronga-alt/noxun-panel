@@ -13,7 +13,7 @@ module Noxun
       LOWER_DEFAULTS = {
         type: 'lower', width: 600.0, height: 720.0, depth: 510.0, thickness: 18.0,
         floor_height: 100.0, shelves: 0, fronts: 'none',
-        bottom_mode: 'under_sides', top_mode: 'full', back_mode: 'overlay',
+        bottom_mode: 'under_sides', top_mode: 'full', back_mode: 'overlay', back_thickness: 3.0,
         plinth_mode: 'none', plinth_recess: 50.0,
         rail_depth: 100.0, rails_orientation: 'flat', rails_top_offset: 0.0
       }.freeze
@@ -23,7 +23,7 @@ module Noxun
       UPPER_DEFAULTS = {
         type: 'upper', width: 600.0, height: 720.0, depth: 320.0, thickness: 18.0,
         floor_height: 0.0, shelves: 0, fronts: 'none',
-        bottom_mode: 'between_sides', top_mode: 'full', back_mode: 'groove',
+        bottom_mode: 'between_sides', top_mode: 'full', back_mode: 'groove', back_thickness: 3.0,
         plinth_mode: 'none', plinth_recess: 50.0,
         rail_depth: 100.0, rails_orientation: 'flat', rails_top_offset: 0.0
       }.freeze
@@ -93,19 +93,20 @@ module Noxun
 
         # Postavi vsetky dielce + ghost zony do cdef podla planu z Construction. Vrati doplneny config.
         def build_into(model, cdef, cfg, cid)
-          plan = Construction.build_plan(cfg) # validuje interne (raise slovensky)
+          plan = Construction.build_plan(cfg, cid) # validuje interne (raise slovensky)
           ents = cdef.entities
           mk = ensure_material(model, MAT_KORPUS, [216, 196, 160])
           mf = ensure_material(model, MAT_FRONT, [245, 245, 245])
           tid = template_id_for(cfg[:type])
 
           plan[:parts].each do |pd|
+            next unless positive_box?(pd[:box]) # ochrana proti degenerovanym dielcom (uzke zony)
             front = pd[:material] == :front
             add_part(model, ents, pd, (front ? mf : mk), (front ? MAT_FRONT : MAT_KORPUS), cid, tid)
           end
 
-          zone_ids = Zones.build_into(model, ents, plan[:zones], plan[:zone_box], cid)
-          merge_final(cfg, plan, zone_ids)
+          Zones.build_into(model, ents, plan[:zones], cid)
+          merge_final(cfg, plan)
         end
 
         # --- pomocne stavbove ----------------------------------------------
@@ -134,6 +135,10 @@ module Noxun
             }
           })
           inst
+        end
+
+        def positive_box?(box)
+          box && box.all? { |v| v.to_f > 0.01 }
         end
 
         # Box od (0,0,0) rozmerov sx,sy,sz (mm). Kontrola normaly pred pushpull.
@@ -169,9 +174,9 @@ module Noxun
             mode: 'parametric',
             width: cfg[:width], height: cfg[:height], depth: cfg[:depth],
             thickness: cfg[:thickness], floor_height: cfg[:floor_height],
-            shelves: cfg[:shelves], fronts: cfg[:fronts].to_s,
             # ploche variant kluce = zdroj pravdy pre round-trip panela
             bottom_mode: cfg[:bottom_mode], top_mode: cfg[:top_mode], back_mode: cfg[:back_mode],
+            back_thickness: cfg[:back_thickness],
             plinth_mode: cfg[:plinth_mode], plinth_recess: cfg[:plinth_recess],
             rail_depth: cfg[:rail_depth], rails_orientation: cfg[:rails_orientation],
             rails_top_offset: cfg[:rails_top_offset],
@@ -182,13 +187,18 @@ module Noxun
             top:     { mode: cfg[:top_mode], thickness: cfg[:thickness],
                        rail_depth: cfg[:rail_depth], orientation: cfg[:rails_orientation],
                        top_offset: cfg[:rails_top_offset] },
-            back:    { mode: cfg[:back_mode], thickness: Construction::BACK_THICKNESS },
+            back:    { mode: cfg[:back_mode], thickness: cfg[:back_thickness] },
             support: support_descriptor(cfg),
             available_width: cfg[:available_width],
             available_height: cfg[:available_height],
             available_depth: cfg[:available_depth],
             front_plane: cfg[:front_plane] || 0.0,
-            wings: cfg[:wings], zones: cfg[:zones]
+            wings: cfg[:wings],
+            # V0.2b: strom zon (strukturny zdroj pravdy) + ploche zony (cache) + cela
+            zone_tree: cfg[:zone_tree],
+            zones: cfg[:zones],
+            fronts: cfg[:fronts],
+            front_items: cfg[:front_items]
           }
         end
 
@@ -210,14 +220,16 @@ module Noxun
           type == 'upper' ? 'base-upper-18' : 'base-lower-18'
         end
 
-        def merge_final(cfg, plan, zone_ids)
+        def merge_final(cfg, plan)
           cfg.merge(
             available_width: plan[:available][:width].round(2),
             available_height: plan[:available][:height].round(2),
             available_depth: plan[:available][:depth].round(2),
             front_plane: 0.0,
             wings: plan[:wings],
-            zones: zone_ids
+            zones: plan[:zones],
+            zone_tree: plan[:zone_tree],
+            front_items: plan[:front_items]
           )
         end
 
@@ -238,40 +250,58 @@ module Noxun
             depth:  clampf(fetchf(p, :depth,  d[:depth]),  MIN[:depth],  2000.0),
             thickness: clampf(fetchf(p, :thickness, d[:thickness]), 6.0, 50.0),
             floor_height: type == 'upper' ? 0.0 : clampf(fetchf(p, :floor_height, d[:floor_height]), 0.0, 500.0),
-            shelves: Shelves.clamp(fetchf(p, :shelves, d[:shelves]).to_i),
-            fronts: front_mode(p, d),
             bottom_mode: enum_val(p, :bottom_mode, %w[between_sides under_sides], d[:bottom_mode]),
             top_mode:    enum_val(p, :top_mode,    %w[full two_rails none],       d[:top_mode]),
             back_mode:   enum_val(p, :back_mode,   %w[overlay inset groove],      d[:back_mode]),
+            # hrubka chrbta ako Float mm (3 HDF / 18 pevny / ine); clamp 1..50
+            back_thickness: clampf(fetchf(p, :back_thickness, d[:back_thickness]), 1.0, 50.0),
             plinth_mode: type == 'upper' ? 'none' : enum_val(p, :plinth_mode, %w[none front], d[:plinth_mode]),
             plinth_recess: clampf(fetchf(p, :plinth_recess, d[:plinth_recess]), 0.0, 300.0),
             # two_rails parametre (uplatnia sa len pri top_mode == 'two_rails')
             rail_depth: clampf(fetchf(p, :rail_depth, d[:rail_depth]), 20.0, 400.0),
             rails_orientation: enum_val(p, :rails_orientation, %w[flat upright], d[:rails_orientation]),
             rails_top_offset: clampf(fetchf(p, :rails_top_offset, d[:rails_top_offset]), 0.0, 500.0),
+            # V0.2b: strom zon (police su per-zona) + cela (fixed/auto s lockmi)
+            zone_tree: norm_zone_tree(p),
+            fronts: Fronts.normalize_config(raw(p, :fronts)),
             name: (p['name'] || p[:name])
           }
         end
 
+        # zone_tree z params; ak chyba, ale je legacy 'shelves' -> koren so shelves; inak prazdny koren.
+        def norm_zone_tree(p)
+          zt = raw(p, :zone_tree)
+          return ZoneTree.sanitize(zt) if zt.is_a?(Hash)
+          sh = raw(p, :shelves)
+          ZoneTree.default_tree(sh.nil? || sh.to_s.strip.empty? ? 0 : sh.to_i)
+        end
+
         # Config (stored, string kluce) -> params pre normalize. Doplna spatnu kompatibilitu:
-        # stare V0.1 configy (bez plochych variant klucov) sa citaju z vnorenych objektov,
-        # takze rebuild stareho korpusu reprodukuje jeho povodnu konstrukciu (between_sides + predny sokel).
+        # stare V0.1/V0.2a configy (bez zone_tree, fronts ako string, shelves top-level).
         def config_to_params(cfg)
           {
             'type' => cfg['type'] || 'lower',
             'width' => cfg['width'], 'height' => cfg['height'], 'depth' => cfg['depth'],
             'thickness' => cfg['thickness'], 'floor_height' => cfg['floor_height'],
-            'shelves' => cfg['shelves'], 'fronts' => cfg['fronts'],
             'bottom_mode' => cfg['bottom_mode'] || legacy_bottom(cfg),
             'top_mode'    => cfg['top_mode']    || legacy_top(cfg),
             'back_mode'   => cfg['back_mode']   || legacy_back(cfg),
+            'back_thickness' => cfg['back_thickness'] || legacy_back_thickness(cfg),
             'plinth_mode' => cfg['plinth_mode'] || legacy_plinth(cfg),
             'plinth_recess' => cfg['plinth_recess'] || 50.0,
             'rail_depth' => cfg['rail_depth'] || 100.0,
             'rails_orientation' => cfg['rails_orientation'] || 'flat',
             'rails_top_offset' => cfg['rails_top_offset'] || 0.0,
+            # strom zon: novy config ho ma; stary korpus -> koren so starymi policami
+            'zone_tree' => cfg['zone_tree'] || ZoneTree.default_tree((cfg['shelves'] || 0).to_i),
+            # cela: novy config = hash; stary = string ('none'/'1'/'2'/'auto') -> Fronts.normalize
+            'fronts' => cfg.key?('fronts') ? cfg['fronts'] : nil,
             'name' => cfg['name']
           }
+        end
+
+        def legacy_back_thickness(cfg)
+          (cfg['back'] && cfg['back']['thickness']) || Construction::BACK_THICKNESS_DEFAULT
         end
 
         def legacy_bottom(cfg)
@@ -307,11 +337,6 @@ module Noxun
 
         def norm_type(p)
           (raw(p, :type)).to_s == 'upper' ? 'upper' : 'lower'
-        end
-
-        def front_mode(p, d)
-          v = raw(p, :fronts).to_s
-          %w[none 1 2 auto].include?(v) ? v : d[:fronts]
         end
 
         def enum_val(p, key, allowed, default)

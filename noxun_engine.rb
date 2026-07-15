@@ -6,7 +6,7 @@ require 'extensions.rb'
 
 module Noxun
   module Engine
-    VERSION = '0.2.0'
+    VERSION = '0.2.1'
 
     class << self
       # Drzime kvoli UI::Notification (potrebuje registrovany extension objekt).
@@ -15,7 +15,7 @@ module Noxun
 
     unless defined?(@loaded)
       ex = SketchupExtension.new('Noxun Engine', 'noxun_engine/main')
-      ex.description = 'Nabytkarsky system Noxun — parametricky generator korpusov (V0.2a: dolna+horna, konstrukcne varianty, absorpcia scale).'
+      ex.description = 'Nabytkarsky system Noxun — parametricky generator korpusov (V0.2b: strom zon + priecky, cela s lockmi, sablony korpusov).'
       ex.version     = VERSION
       ex.creator     = 'Noxun Forge'
       ex.copyright   = 'Noxun Forge © 2026'
