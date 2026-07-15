@@ -1,0 +1,5 @@
+*.skb
+*.bak
+_dev/*_run_*.skp
+Thumbs.db
+desktop.ini
