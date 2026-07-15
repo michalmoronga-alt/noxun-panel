@@ -1,4 +1,4 @@
-<!-- Noxun Engine — panel (vanilla JS, ziadne CDN, slovensky) -->
+<!-- Noxun Engine — panel V0.2a (vanilla JS, ziadne CDN, slovensky) -->
 <meta charset="utf-8">
 <style>
   * { box-sizing: border-box; }
@@ -15,12 +15,15 @@
   }
   legend { font-weight: 600; font-size: 12px; color: #37474f; padding: 0 4px; }
   .row { display: flex; align-items: center; margin: 5px 0; }
-  .row label { flex: 0 0 118px; color: #455a64; }
+  .row label { flex: 0 0 128px; color: #455a64; }
   .row input, .row select {
     flex: 1; padding: 4px 6px; border: 1px solid #b0bec5; border-radius: 4px;
     font-size: 13px; min-width: 0;
   }
   .row .unit { flex: 0 0 26px; text-align: right; color: #90a4ae; font-size: 11px; padding-left: 4px; }
+  .typerow { display: flex; gap: 16px; padding: 2px 2px 0; }
+  .typerow label { display: flex; align-items: center; color: #37474f; font-weight: 600; cursor: pointer; }
+  .typerow input { margin-right: 6px; }
   button {
     width: 100%; padding: 8px; border: 0; border-radius: 5px; cursor: pointer;
     font-size: 13px; font-weight: 600; margin-top: 4px;
@@ -30,9 +33,9 @@
   .apply { background: #1565c0; color: #fff; }
   .apply:hover { background: #0d47a1; }
   button:disabled { background: #cfd8dc; color: #90a4ae; cursor: not-allowed; }
-  .selinfo { font-size: 11px; color: #607d8b; margin: 0 0 6px; }
+  .selinfo { font-size: 11px; color: #607d8b; margin: 8px 0 6px; }
   .selinfo b { color: #1565c0; }
-  .zoneline { display: flex; align-items: center; margin: 2px 0 10px; }
+  .zoneline { display: flex; align-items: center; margin: 8px 0 10px; }
   .zoneline input { margin-right: 7px; width: 15px; height: 15px; }
   .zoneline label { color: #455a64; }
   #status {
@@ -44,116 +47,187 @@
 </style>
 
 <h1>Noxun Engine</h1>
-<p class="sub">V0.1 — parametricky spodny korpus</p>
+<p class="sub">V0.2a — parametrický korpus (dolná / horná)</p>
 
 <fieldset>
-  <legend>Novy korpus</legend>
-  <div class="row"><label>Sirka</label><input id="n_width" type="number" step="1"><span class="unit">mm</span></div>
-  <div class="row"><label>Vyska</label><input id="n_height" type="number" step="1"><span class="unit">mm</span></div>
-  <div class="row"><label>Hlbka</label><input id="n_depth" type="number" step="1"><span class="unit">mm</span></div>
-  <div class="row"><label>Hrubka materialu</label><input id="n_thickness" type="number" step="1"><span class="unit">mm</span></div>
-  <div class="row"><label>Vyska sokla</label><input id="n_floor_height" type="number" step="1"><span class="unit">mm</span></div>
-  <div class="row"><label>Pocet polic</label>
-    <select id="n_shelves"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select><span class="unit"></span>
+  <legend>Typ korpusu</legend>
+  <div class="typerow">
+    <label><input type="radio" name="ctype" value="lower" onchange="onTypeChange()"> Dolná</label>
+    <label><input type="radio" name="ctype" value="upper" onchange="onTypeChange()"> Horná</label>
   </div>
-  <div class="row"><label>Dvierka</label>
-    <select id="n_fronts">
-      <option value="none">ziadne</option>
-      <option value="1">1 kridlo</option>
-      <option value="2">2 kridla</option>
-      <option value="auto">auto</option>
-    </select><span class="unit"></span>
-  </div>
-  <button class="primary" onclick="insertCabinet()">Vloz korpus</button>
 </fieldset>
 
 <fieldset>
-  <legend>Oznaceny korpus</legend>
-  <p class="selinfo" id="selinfo">Nic nie je vybrate.</p>
-  <div class="row"><label>Sirka</label><input id="s_width" type="number" step="1" disabled><span class="unit">mm</span></div>
-  <div class="row"><label>Vyska</label><input id="s_height" type="number" step="1" disabled><span class="unit">mm</span></div>
-  <div class="row"><label>Hlbka</label><input id="s_depth" type="number" step="1" disabled><span class="unit">mm</span></div>
-  <div class="row"><label>Hrubka materialu</label><input id="s_thickness" type="number" step="1" disabled><span class="unit">mm</span></div>
-  <div class="row"><label>Vyska sokla</label><input id="s_floor_height" type="number" step="1" disabled><span class="unit">mm</span></div>
-  <div class="row"><label>Pocet polic</label>
-    <select id="s_shelves" disabled><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select><span class="unit"></span>
+  <legend>Rozmery</legend>
+  <div class="row"><label>Šírka</label><input id="width" type="number" step="1"><span class="unit">mm</span></div>
+  <div class="row"><label>Výška</label><input id="height" type="number" step="1"><span class="unit">mm</span></div>
+  <div class="row"><label>Hĺbka</label><input id="depth" type="number" step="1"><span class="unit">mm</span></div>
+  <div class="row"><label>Hrúbka materiálu</label><input id="thickness" type="number" step="1"><span class="unit">mm</span></div>
+</fieldset>
+
+<fieldset>
+  <legend>Konštrukcia</legend>
+  <div class="row"><label>Dno</label>
+    <select id="bottom_mode">
+      <option value="under_sides">Boky na dne (štandard)</option>
+      <option value="between_sides">Dno medzi bokmi</option>
+    </select><span class="unit"></span>
+  </div>
+  <div class="row"><label>Vrch</label>
+    <select id="top_mode" onchange="toggleTwoRails()">
+      <option value="full">Plný panel</option>
+      <option value="two_rails">Dve priečky</option>
+      <option value="none">Bez vrchu</option>
+    </select><span class="unit"></span>
+  </div>
+  <div id="twoRailsGroup">
+    <div class="row"><label>Orientácia výstuh</label>
+      <select id="rails_orientation">
+        <option value="flat">Naplocho</option>
+        <option value="upright">Na výšku</option>
+      </select><span class="unit"></span>
+    </div>
+    <div class="row"><label>Odsadenie od hornej hrany</label><input id="rails_top_offset" type="number" step="1"><span class="unit">mm</span></div>
+    <div class="row"><label>Hĺbka/výška pásu</label><input id="rail_depth" type="number" step="1"><span class="unit">mm</span></div>
+  </div>
+  <div class="row"><label>Chrbát</label>
+    <select id="back_mode">
+      <option value="overlay">Naložený zozadu</option>
+      <option value="inset">Vložený medzi boky</option>
+      <option value="groove">V drážke</option>
+    </select><span class="unit"></span>
+  </div>
+  <div id="plinthGroup">
+    <div class="row"><label>Výška podstavca</label><input id="floor_height" type="number" step="1"><span class="unit">mm</span></div>
+    <div class="row"><label>Sokel</label>
+      <select id="plinth_mode" onchange="toggleRecess()">
+        <option value="none">Bez sokla — nohy (štandard)</option>
+        <option value="front">Predný soklový panel</option>
+      </select><span class="unit"></span>
+    </div>
+    <div class="row" id="recessRow"><label>Zapustenie sokla</label><input id="plinth_recess" type="number" step="1"><span class="unit">mm</span></div>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>Vnútro &amp; čelá</legend>
+  <div class="row"><label>Počet políc</label>
+    <select id="shelves"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select><span class="unit"></span>
   </div>
   <div class="row"><label>Dvierka</label>
-    <select id="s_fronts" disabled>
-      <option value="none">ziadne</option>
-      <option value="1">1 kridlo</option>
-      <option value="2">2 kridla</option>
+    <select id="fronts">
+      <option value="none">žiadne</option>
+      <option value="1">1 krídlo</option>
+      <option value="2">2 krídla</option>
       <option value="auto">auto</option>
     </select><span class="unit"></span>
   </div>
-  <button class="apply" id="applyBtn" onclick="applyChanges()" disabled>Aplikuj zmeny</button>
 </fieldset>
+
+<p class="selinfo" id="selinfo">Nič nie je označené.</p>
+<button class="primary" onclick="insertCabinet()">Vložiť nový korpus</button>
+<button class="apply" id="applyBtn" onclick="applyChanges()" disabled>Aplikovať na označený</button>
 
 <div class="zoneline">
   <input id="zonesChk" type="checkbox" onchange="toggleZones()">
-  <label for="zonesChk">Zobrazit zony (ghost)</label>
+  <label for="zonesChk">Zobraziť zóny (ghost)</label>
 </div>
 
-<div id="status">Pripravene.</div>
+<div id="status">Pripravené.</div>
 
 <script>
-  var NEW = ['width','height','depth','thickness','floor_height','shelves','fronts'];
+  var FIELDS = ['width','height','depth','thickness','floor_height','shelves','fronts',
+                'bottom_mode','top_mode','back_mode','plinth_recess',
+                'rail_depth','rails_orientation','rails_top_offset'];
+  var DEFAULTS = { lower: {}, upper: {} };
 
-  function val(id){ return document.getElementById(id).value; }
-  function setVal(id, v){ if (v !== null && v !== undefined) document.getElementById(id).value = v; }
+  function el(id){ return document.getElementById(id); }
+  function val(id){ var e = el(id); return e ? e.value : null; }
+  function setVal(id, v){ var e = el(id); if (e && v !== null && v !== undefined) e.value = v; }
+  function getType(){ var r = document.querySelector('input[name=ctype]:checked'); return r ? r.value : 'lower'; }
+  function setType(t){ var r = document.querySelector('input[name=ctype][value="' + t + '"]'); if (r) r.checked = true; }
 
-  function collect(prefix){
-    var o = {};
-    for (var i=0;i<NEW.length;i++){ o[NEW[i]] = val(prefix + NEW[i]); }
+  function collect(){
+    var o = { type: getType() };
+    for (var i = 0; i < FIELDS.length; i++){ o[FIELDS[i]] = val(FIELDS[i]); }
+    o.plinth_mode = val('plinth_mode');
     return o;
   }
 
+  function setDefaults(t){
+    var d = DEFAULTS[t] || {};
+    setVal('width', d.width); setVal('height', d.height); setVal('depth', d.depth); setVal('thickness', d.thickness);
+    setVal('floor_height', d.floor_height); setVal('shelves', d.shelves); setVal('fronts', d.fronts);
+    setVal('bottom_mode', d.bottom_mode); setVal('top_mode', d.top_mode); setVal('back_mode', d.back_mode);
+    setVal('plinth_mode', d.plinth_mode); setVal('plinth_recess', d.plinth_recess);
+    setVal('rails_orientation', d.rails_orientation); setVal('rails_top_offset', d.rails_top_offset);
+    setVal('rail_depth', d.rail_depth);
+    applyVisibility(t);
+  }
+
+  // Sokel a podstavec len pre dolnu skrinku; zapustenie len ked je predny soklovy panel.
+  function applyVisibility(t){
+    el('plinthGroup').style.display = (t === 'upper') ? 'none' : '';
+    toggleRecess();
+    toggleTwoRails();
+  }
+
+  function toggleRecess(){
+    el('recessRow').style.display = (val('plinth_mode') === 'front') ? '' : 'none';
+  }
+
+  // Parametre výstuh len pri výbere "Dve priečky".
+  function toggleTwoRails(){
+    el('twoRailsGroup').style.display = (val('top_mode') === 'two_rails') ? '' : 'none';
+  }
+
+  function onTypeChange(){ setDefaults(getType()); }
+
   function insertCabinet(){
     if (window.sketchup && sketchup.insert_cabinet)
-      sketchup.insert_cabinet(JSON.stringify(collect('n_')));
+      sketchup.insert_cabinet(JSON.stringify(collect()));
   }
 
   function applyChanges(){
-    if (document.getElementById('applyBtn').disabled) return;
+    if (el('applyBtn').disabled) return;
     if (window.sketchup && sketchup.apply_changes)
-      sketchup.apply_changes(JSON.stringify(collect('s_')));
+      sketchup.apply_changes(JSON.stringify(collect()));
   }
 
   function toggleZones(){
-    var on = document.getElementById('zonesChk').checked;
+    var on = el('zonesChk').checked;
     if (window.sketchup && sketchup.toggle_zones)
       sketchup.toggle_zones(on ? 'true' : 'false');
   }
 
-  function setSelEnabled(on){
-    var ids = ['s_width','s_height','s_depth','s_thickness','s_floor_height','s_shelves','s_fronts','applyBtn'];
-    for (var i=0;i<ids.length;i++){ document.getElementById(ids[i]).disabled = !on; }
-  }
-
   window.NX = {
     init: function(data){
-      var d = data.defaults || {};
-      setVal('n_width', d.width); setVal('n_height', d.height); setVal('n_depth', d.depth);
-      setVal('n_thickness', d.thickness); setVal('n_floor_height', d.floor_height);
-      setVal('n_shelves', d.shelves); setVal('n_fronts', d.fronts);
-      document.getElementById('zonesChk').checked = !!data.zones_visible;
-      if (data.selected) NX.loadSelected(data.selected); else NX.clearSelected();
+      DEFAULTS = data.defaults || { lower: {}, upper: {} };
+      el('zonesChk').checked = !!data.zones_visible;
+      if (data.selected){ NX.loadSelected(data.selected); }
+      else { setType('lower'); setDefaults('lower'); NX.clearSelected(); }
     },
     loadSelected: function(c){
-      document.getElementById('selinfo').innerHTML = 'Vybraty: <b>' + (c.cabinet_id||'?') + '</b>';
-      setVal('s_width', c.width); setVal('s_height', c.height); setVal('s_depth', c.depth);
-      setVal('s_thickness', c.thickness); setVal('s_floor_height', c.floor_height);
-      setVal('s_shelves', c.shelves); setVal('s_fronts', c.fronts);
-      setSelEnabled(true);
+      var t = c.type || 'lower';
+      setType(t);
+      setVal('width', c.width); setVal('height', c.height); setVal('depth', c.depth); setVal('thickness', c.thickness);
+      setVal('floor_height', c.floor_height); setVal('shelves', c.shelves); setVal('fronts', c.fronts);
+      setVal('bottom_mode', c.bottom_mode); setVal('top_mode', c.top_mode); setVal('back_mode', c.back_mode);
+      setVal('plinth_mode', c.plinth_mode); setVal('plinth_recess', c.plinth_recess);
+      setVal('rails_orientation', c.rails_orientation); setVal('rails_top_offset', c.rails_top_offset);
+      setVal('rail_depth', c.rail_depth);
+      applyVisibility(t);
+      el('selinfo').innerHTML = 'Označený: <b>' + (c.cabinet_id || '?') + '</b>';
+      el('applyBtn').disabled = false;
     },
     clearSelected: function(){
-      document.getElementById('selinfo').textContent = 'Nic nie je vybrate.';
-      setSelEnabled(false);
+      el('selinfo').textContent = 'Nič nie je označené.';
+      el('applyBtn').disabled = true;
     },
     setStatus: function(msg, err){
-      var el = document.getElementById('status');
-      el.textContent = msg;
-      el.className = err ? 'err' : 'ok';
+      var e = el('status');
+      e.textContent = msg;
+      e.className = err ? 'err' : 'ok';
     }
   };
 

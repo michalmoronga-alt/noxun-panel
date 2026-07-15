@@ -125,7 +125,10 @@ module Noxun
         def push_init
           model = Sketchup.active_model
           data = {
-            defaults: CabinetBuilder::DEFAULTS,
+            defaults: {
+              lower: CabinetBuilder::LOWER_DEFAULTS,
+              upper: CabinetBuilder::UPPER_DEFAULTS
+            },
             zones_visible: Zones.visible?(model),
             selected: selected_payload(model)
           }
@@ -182,13 +185,10 @@ module Noxun
           return nil unless cab
 
           cfg = Store.config(cab) || {}
-          {
-            cabinet_id: Store.get(cab, 'cabinet_id'),
-            name: cfg['name'],
-            width: cfg['width'], height: cfg['height'], depth: cfg['depth'],
-            thickness: cfg['thickness'], floor_height: cfg['floor_height'],
-            shelves: cfg['shelves'], fronts: cfg['fronts']
-          }
+          # config_to_params doplni spatnu kompatibilitu (stare V0.1 configy) a vsetky variant kluce.
+          params = CabinetBuilder.config_to_params(cfg)
+          params['cabinet_id'] = Store.get(cab, 'cabinet_id')
+          params
         end
 
         # --- SelectionObserver ----------------------------------------------
