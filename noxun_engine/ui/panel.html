@@ -1,4 +1,4 @@
-<!-- Noxun Engine — panel V0.2a (vanilla JS, ziadne CDN, slovensky) -->
+<!-- Noxun Engine — panel V0.2b (vanilla JS, ziadne CDN, slovensky) -->
 <meta charset="utf-8">
 <style>
   * { box-sizing: border-box; }
@@ -9,54 +9,89 @@
   }
   h1 { font-size: 15px; margin: 0 0 2px; color: #1b3a4b; }
   .sub { font-size: 11px; color: #78909c; margin: 0 0 10px; }
-  fieldset {
-    border: 1px solid #cfd8dc; border-radius: 6px; margin: 0 0 10px; padding: 8px 10px 10px;
-    background: #fff;
-  }
+  fieldset { border: 1px solid #cfd8dc; border-radius: 6px; margin: 0 0 10px; padding: 8px 10px 10px; background: #fff; }
   legend { font-weight: 600; font-size: 12px; color: #37474f; padding: 0 4px; }
-  .row { display: flex; align-items: center; margin: 5px 0; }
-  .row label { flex: 0 0 128px; color: #455a64; }
-  .row input, .row select {
-    flex: 1; padding: 4px 6px; border: 1px solid #b0bec5; border-radius: 4px;
-    font-size: 13px; min-width: 0;
+  details { border: 1px solid #cfd8dc; border-radius: 6px; margin: 0 0 10px; background: #fff; }
+  details > summary {
+    font-weight: 600; font-size: 12px; color: #37474f; padding: 8px 10px; cursor: pointer;
+    list-style: none; user-select: none;
   }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::before { content: '\25B8'; display: inline-block; margin-right: 6px; color: #90a4ae; transition: transform .12s; }
+  details[open] > summary::before { transform: rotate(90deg); }
+  .body { padding: 0 10px 10px; }
+  .row { display: flex; align-items: center; margin: 5px 0; }
+  .row label { flex: 0 0 130px; color: #455a64; }
+  .row input, .row select { flex: 1; padding: 4px 6px; border: 1px solid #b0bec5; border-radius: 4px; font-size: 13px; min-width: 0; }
   .row .unit { flex: 0 0 26px; text-align: right; color: #90a4ae; font-size: 11px; padding-left: 4px; }
-  .typerow { display: flex; gap: 16px; padding: 2px 2px 0; }
+  .typerow { display: flex; gap: 16px; padding: 2px 2px 6px; }
   .typerow label { display: flex; align-items: center; color: #37474f; font-weight: 600; cursor: pointer; }
   .typerow input { margin-right: 6px; }
-  button {
-    width: 100%; padding: 8px; border: 0; border-radius: 5px; cursor: pointer;
-    font-size: 13px; font-weight: 600; margin-top: 4px;
-  }
-  .primary { background: #2e7d32; color: #fff; }
-  .primary:hover { background: #1b5e20; }
-  .apply { background: #1565c0; color: #fff; }
-  .apply:hover { background: #0d47a1; }
-  button:disabled { background: #cfd8dc; color: #90a4ae; cursor: not-allowed; }
+  button { padding: 7px 8px; border: 0; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 600; }
+  .wide { width: 100%; margin-top: 4px; padding: 8px; font-size: 13px; }
+  .primary { background: #2e7d32; color: #fff; } .primary:hover { background: #1b5e20; }
+  .apply { background: #1565c0; color: #fff; } .apply:hover { background: #0d47a1; }
+  .ghostbtn { background: #eceff1; color: #37474f; border: 1px solid #cfd8dc; }
+  .ghostbtn:hover { background: #e0e4e7; }
+  button:disabled { background: #eceff1; color: #b0bec5; cursor: not-allowed; border-color: #eceff1; }
+  .btnrow { display: flex; gap: 6px; margin-top: 6px; }
+  .btnrow button { flex: 1; }
   .selinfo { font-size: 11px; color: #607d8b; margin: 8px 0 6px; }
   .selinfo b { color: #1565c0; }
-  .zoneline { display: flex; align-items: center; margin: 8px 0 10px; }
+  .muted { color: #90a4ae; font-size: 11px; padding: 4px 0; }
+  .hint { font-size: 10.5px; color: #90a4ae; margin: 2px 0 6px; }
+  /* Cela riadky */
+  .frow { display: flex; gap: 5px; align-items: center; margin: 4px 0; }
+  .frow .fnum { flex: 0 0 16px; color: #90a4ae; font-size: 11px; text-align: center; }
+  .frow select.ftype { flex: 1 1 auto; padding: 3px; border: 1px solid #b0bec5; border-radius: 4px; }
+  .frow input.fh { flex: 0 0 58px; padding: 3px 4px; border: 1px solid #b0bec5; border-radius: 4px; }
+  .frow select.fw { flex: 0 0 56px; padding: 3px; border: 1px solid #b0bec5; border-radius: 4px; }
+  .frow .flock { flex: 0 0 20px; text-align: center; }
+  .frow .fdel { flex: 0 0 22px; background: #fbe9e7; color: #c62828; border: 1px solid #ffccbc; border-radius: 4px; padding: 2px 0; }
+  /* Zony strom */
+  #zoneTree { border: 1px solid #eceff1; border-radius: 5px; margin: 6px 0; max-height: 150px; overflow: auto; }
+  .znode { padding: 4px 6px; cursor: pointer; border-bottom: 1px solid #f4f5f7; font-size: 12px; }
+  .znode:hover { background: #f1f8ff; }
+  .znode.active { background: #e3f2fd; box-shadow: inset 3px 0 0 #1565c0; }
+  .znode .dim { color: #90a4ae; font-size: 10.5px; }
+  .znode .zs { color: #607d8b; font-size: 10.5px; }
+  #zoneActive { font-size: 11px; color: #37474f; margin: 2px 0 6px; }
+  #zoneActive b { color: #1565c0; }
+  .zact { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
+  .zact label { flex: 0 0 118px; color: #455a64; }
+  .zact select { flex: 0 0 52px; padding: 3px; border: 1px solid #b0bec5; border-radius: 4px; }
+  .zact button { flex: 1; }
+  .zoneline { display: flex; align-items: center; margin: 8px 0 2px; }
   .zoneline input { margin-right: 7px; width: 15px; height: 15px; }
   .zoneline label { color: #455a64; }
-  #status {
-    font-size: 11px; padding: 7px 9px; border-radius: 5px; background: #eceff1;
-    color: #455a64; border: 1px solid #cfd8dc; min-height: 16px; line-height: 1.35;
-  }
+  #status { font-size: 11px; padding: 7px 9px; border-radius: 5px; background: #eceff1; color: #455a64; border: 1px solid #cfd8dc; min-height: 16px; line-height: 1.35; margin-top: 8px; }
   #status.err { background: #fdecea; color: #b71c1c; border-color: #f5c6cb; }
   #status.ok  { background: #e8f5e9; color: #1b5e20; border-color: #c8e6c9; }
 </style>
 
 <h1>Noxun Engine</h1>
-<p class="sub">V0.2a — parametrický korpus (dolná / horná)</p>
+<p class="sub">V0.2b — korpus, zóny, priečky, čelá, šablóny</p>
 
+<!-- ZÁKLADNÉ: typ + šablóna -->
 <fieldset>
-  <legend>Typ korpusu</legend>
+  <legend>Typ &amp; šablóna</legend>
   <div class="typerow">
     <label><input type="radio" name="ctype" value="lower" onchange="onTypeChange()"> Dolná</label>
     <label><input type="radio" name="ctype" value="upper" onchange="onTypeChange()"> Horná</label>
   </div>
+  <div class="row"><label>Šablóna</label>
+    <select id="template" onchange="onTemplateChange()"><option value="">— vyber —</option></select>
+  </div>
+  <div class="btnrow">
+    <button class="ghostbtn" onclick="saveTemplate()">Ulož ako šablónu</button>
+    <button class="ghostbtn" onclick="deleteTemplate()">Vymaž</button>
+  </div>
+  <div class="btnrow">
+    <button class="ghostbtn" id="applyTplBtn" onclick="applyTemplateToSelected()" disabled>Použi šablónu na označený</button>
+  </div>
 </fieldset>
 
+<!-- ZÁKLADNÉ: rozmery -->
 <fieldset>
   <legend>Rozmery</legend>
   <div class="row"><label>Šírka</label><input id="width" type="number" step="1"><span class="unit">mm</span></div>
@@ -65,173 +100,384 @@
   <div class="row"><label>Hrúbka materiálu</label><input id="thickness" type="number" step="1"><span class="unit">mm</span></div>
 </fieldset>
 
-<fieldset>
-  <legend>Konštrukcia</legend>
-  <div class="row"><label>Dno</label>
-    <select id="bottom_mode">
-      <option value="under_sides">Boky na dne (štandard)</option>
-      <option value="between_sides">Dno medzi bokmi</option>
-    </select><span class="unit"></span>
-  </div>
-  <div class="row"><label>Vrch</label>
-    <select id="top_mode" onchange="toggleTwoRails()">
-      <option value="full">Plný panel</option>
-      <option value="two_rails">Dve priečky</option>
-      <option value="none">Bez vrchu</option>
-    </select><span class="unit"></span>
-  </div>
-  <div id="twoRailsGroup">
-    <div class="row"><label>Orientácia výstuh</label>
-      <select id="rails_orientation">
-        <option value="flat">Naplocho</option>
-        <option value="upright">Na výšku</option>
-      </select><span class="unit"></span>
+<!-- ZÁKLADNÉ: čelá -->
+<details data-key="fronts" open>
+  <summary>Čelá</summary>
+  <div class="body">
+    <div class="hint">Poradie odspodu nahor (prvý riadok = dole). Výška prázdna = AUTO (dopočíta zvyšok). 🔒 zamkne pevnú výšku.</div>
+    <div id="frontRows"></div>
+    <div class="btnrow">
+      <button class="ghostbtn" onclick="addFrontRow()">+ riadok</button>
+      <button class="ghostbtn" onclick="removeLastFront()">− riadok</button>
     </div>
-    <div class="row"><label>Odsadenie od hornej hrany</label><input id="rails_top_offset" type="number" step="1"><span class="unit">mm</span></div>
-    <div class="row"><label>Hĺbka/výška pásu</label><input id="rail_depth" type="number" step="1"><span class="unit">mm</span></div>
+    <button class="apply wide" id="applyFrontsBtn" onclick="applyFronts()" disabled>Aplikuj čelá na označený</button>
   </div>
-  <div class="row"><label>Chrbát</label>
-    <select id="back_mode">
-      <option value="overlay">Naložený zozadu</option>
-      <option value="inset">Vložený medzi boky</option>
-      <option value="groove">V drážke</option>
-    </select><span class="unit"></span>
-  </div>
-  <div id="plinthGroup">
-    <div class="row"><label>Výška podstavca</label><input id="floor_height" type="number" step="1"><span class="unit">mm</span></div>
-    <div class="row"><label>Sokel</label>
-      <select id="plinth_mode" onchange="toggleRecess()">
-        <option value="none">Bez sokla — nohy (štandard)</option>
-        <option value="front">Predný soklový panel</option>
-      </select><span class="unit"></span>
-    </div>
-    <div class="row" id="recessRow"><label>Zapustenie sokla</label><input id="plinth_recess" type="number" step="1"><span class="unit">mm</span></div>
-  </div>
-</fieldset>
+</details>
 
-<fieldset>
-  <legend>Vnútro &amp; čelá</legend>
-  <div class="row"><label>Počet políc</label>
-    <select id="shelves"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select><span class="unit"></span>
+<!-- ZÁKLADNÉ: zóny (vnútro / police / priečky) -->
+<details data-key="zones" open>
+  <summary>Zóny (vnútro, police, priečky)</summary>
+  <div class="body">
+    <div id="zoneActive">Žiadna zóna neoznačená. Klikni na ghost v modeli alebo na zónu v strome.</div>
+    <div class="zact"><label>Rozdeliť zvislo</label>
+      <select id="splitVCount"><option>2</option><option>3</option><option>4</option></select>
+      <button class="ghostbtn zbtn" onclick="splitZone('v')" disabled>na stĺpce</button></div>
+    <div class="zact"><label>Rozdeliť vodorovne</label>
+      <select id="splitHCount"><option>2</option><option>3</option><option>4</option></select>
+      <button class="ghostbtn zbtn" onclick="splitZone('h')" disabled>na riadky</button></div>
+    <div class="zact"><label>Police v zóne</label>
+      <select id="zoneShelves"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select>
+      <button class="ghostbtn zbtn" onclick="setZoneShelves()" disabled>nastav</button></div>
+    <div class="btnrow">
+      <button class="ghostbtn zbtn" onclick="cleanZone()" disabled>Vyčistiť zónu (zruš delenie/police)</button>
+    </div>
+    <div id="zoneTree"><div class="muted">Žiadny označený korpus.</div></div>
+    <div class="zoneline">
+      <input id="zonesChk" type="checkbox" onchange="toggleZones()">
+      <label for="zonesChk">Zobraziť zóny (ghost)</label>
+    </div>
   </div>
-  <div class="row"><label>Dvierka</label>
-    <select id="fronts">
-      <option value="none">žiadne</option>
-      <option value="1">1 krídlo</option>
-      <option value="2">2 krídla</option>
-      <option value="auto">auto</option>
-    </select><span class="unit"></span>
+</details>
+
+<!-- POKROČILÉ: konštrukčné varianty (zbalené) -->
+<details data-key="construction">
+  <summary>Konštrukcia (pokročilé)</summary>
+  <div class="body">
+    <div class="row"><label>Dno</label>
+      <select id="bottom_mode">
+        <option value="under_sides">Boky na dne</option>
+        <option value="between_sides">Dno medzi bokmi</option>
+      </select><span class="unit"></span>
+    </div>
+    <div class="row"><label>Vrch</label>
+      <select id="top_mode" onchange="toggleTwoRails()">
+        <option value="full">Plný panel</option>
+        <option value="two_rails">Dve výstuhy</option>
+        <option value="none">Bez vrchu</option>
+      </select><span class="unit"></span>
+    </div>
+    <div id="twoRailsGroup">
+      <div class="row"><label>Orientácia výstuh</label>
+        <select id="rails_orientation">
+          <option value="flat">Naplocho</option>
+          <option value="upright">Na výšku</option>
+        </select><span class="unit"></span>
+      </div>
+      <div class="row"><label>Odsadenie od vrchu</label><input id="rails_top_offset" type="number" step="1"><span class="unit">mm</span></div>
+      <div class="row"><label>Hĺbka/výška pásu</label><input id="rail_depth" type="number" step="1"><span class="unit">mm</span></div>
+    </div>
+    <div class="row"><label>Chrbát</label>
+      <select id="back_mode">
+        <option value="overlay">Naložený zozadu</option>
+        <option value="inset">Vložený medzi boky</option>
+        <option value="groove">V drážke</option>
+      </select><span class="unit"></span>
+    </div>
+    <div class="row"><label>Hrúbka chrbta</label>
+      <select id="back_thickness">
+        <option value="3">HDF 3 mm</option>
+        <option value="18">Pevný 18 mm</option>
+      </select><span class="unit"></span>
+    </div>
+    <div id="plinthGroup">
+      <div class="row"><label>Výška podstavca</label><input id="floor_height" type="number" step="1"><span class="unit">mm</span></div>
+      <div class="row"><label>Sokel</label>
+        <select id="plinth_mode" onchange="toggleRecess()">
+          <option value="none">Bez sokla — nohy</option>
+          <option value="front">Predný soklový panel</option>
+        </select><span class="unit"></span>
+      </div>
+      <div class="row" id="recessRow"><label>Zapustenie sokla</label><input id="plinth_recess" type="number" step="1"><span class="unit">mm</span></div>
+    </div>
   </div>
-</fieldset>
+</details>
 
 <p class="selinfo" id="selinfo">Nič nie je označené.</p>
-<button class="primary" onclick="insertCabinet()">Vložiť nový korpus</button>
-<button class="apply" id="applyBtn" onclick="applyChanges()" disabled>Aplikovať na označený</button>
-
-<div class="zoneline">
-  <input id="zonesChk" type="checkbox" onchange="toggleZones()">
-  <label for="zonesChk">Zobraziť zóny (ghost)</label>
-</div>
+<button class="primary wide" onclick="insertCabinet()">Vložiť nový korpus</button>
+<button class="apply wide" id="applyBtn" onclick="applyChanges()" disabled>Aplikovať zmeny na označený</button>
 
 <div id="status">Pripravené.</div>
 
 <script>
-  var FIELDS = ['width','height','depth','thickness','floor_height','shelves','fronts',
-                'bottom_mode','top_mode','back_mode','plinth_recess',
-                'rail_depth','rails_orientation','rails_top_offset'];
   var DEFAULTS = { lower: {}, upper: {} };
+  var TEMPLATES = [];
+  var activeZoneId = null;
+  var selectedCabId = null;
+  var currentZoneTree = null; // strom zo sablony pri novom vklade
 
   function el(id){ return document.getElementById(id); }
   function val(id){ var e = el(id); return e ? e.value : null; }
   function setVal(id, v){ var e = el(id); if (e && v !== null && v !== undefined) e.value = v; }
+  function setNum(id, v){ var e = el(id); if (e && v !== null && v !== undefined) e.value = String(parseFloat(v)); }
   function getType(){ var r = document.querySelector('input[name=ctype]:checked'); return r ? r.value : 'lower'; }
   function setType(t){ var r = document.querySelector('input[name=ctype][value="' + t + '"]'); if (r) r.checked = true; }
 
-  function collect(){
-    var o = { type: getType() };
-    for (var i = 0; i < FIELDS.length; i++){ o[FIELDS[i]] = val(FIELDS[i]); }
-    o.plinth_mode = val('plinth_mode');
-    return o;
+  // --- zber ---
+  function collectConstruction(){
+    return {
+      type: getType(),
+      width: val('width'), height: val('height'), depth: val('depth'), thickness: val('thickness'),
+      floor_height: val('floor_height'),
+      bottom_mode: val('bottom_mode'), top_mode: val('top_mode'), back_mode: val('back_mode'),
+      back_thickness: val('back_thickness'),
+      plinth_mode: val('plinth_mode'), plinth_recess: val('plinth_recess'),
+      rail_depth: val('rail_depth'), rails_orientation: val('rails_orientation'), rails_top_offset: val('rails_top_offset')
+    };
   }
 
+  function collectFronts(){
+    var items = [];
+    var rows = el('frontRows').querySelectorAll('.frow');
+    for (var i = 0; i < rows.length; i++){
+      var r = rows[i];
+      var type = r.querySelector('.ftype').value;
+      var hv = r.querySelector('.fh').value.trim();
+      var locked = r.querySelector('.flock').checked;
+      var wings = r.querySelector('.fw').value;
+      var hasH = hv !== '';
+      items.push({
+        id: 'F' + (i + 1), type: type,
+        mode: hasH ? 'fixed' : 'auto',
+        height: hasH ? hv : null,
+        locked: hasH ? locked : false,
+        wings: (type === 'door') ? wings : '1'
+      });
+    }
+    return { split_axis: 'height', gap: 3.0, gap_top: 2.0, gap_bottom: 2.0, gap_sides: 2.0, items: items };
+  }
+
+  // --- defaulty / viditelnost ---
   function setDefaults(t){
     var d = DEFAULTS[t] || {};
-    setVal('width', d.width); setVal('height', d.height); setVal('depth', d.depth); setVal('thickness', d.thickness);
-    setVal('floor_height', d.floor_height); setVal('shelves', d.shelves); setVal('fronts', d.fronts);
+    setNum('width', d.width); setNum('height', d.height); setNum('depth', d.depth); setNum('thickness', d.thickness);
+    setNum('floor_height', d.floor_height);
     setVal('bottom_mode', d.bottom_mode); setVal('top_mode', d.top_mode); setVal('back_mode', d.back_mode);
-    setVal('plinth_mode', d.plinth_mode); setVal('plinth_recess', d.plinth_recess);
-    setVal('rails_orientation', d.rails_orientation); setVal('rails_top_offset', d.rails_top_offset);
-    setVal('rail_depth', d.rail_depth);
+    setNum('back_thickness', d.back_thickness || 3);
+    setVal('plinth_mode', d.plinth_mode); setNum('plinth_recess', d.plinth_recess);
+    setVal('rails_orientation', d.rails_orientation); setNum('rails_top_offset', d.rails_top_offset); setNum('rail_depth', d.rail_depth);
     applyVisibility(t);
   }
 
-  // Sokel a podstavec len pre dolnu skrinku; zapustenie len ked je predny soklovy panel.
   function applyVisibility(t){
     el('plinthGroup').style.display = (t === 'upper') ? 'none' : '';
     toggleRecess();
     toggleTwoRails();
   }
+  function toggleRecess(){ el('recessRow').style.display = (val('plinth_mode') === 'front') ? '' : 'none'; }
+  function toggleTwoRails(){ el('twoRailsGroup').style.display = (val('top_mode') === 'two_rails') ? '' : 'none'; }
 
-  function toggleRecess(){
-    el('recessRow').style.display = (val('plinth_mode') === 'front') ? '' : 'none';
+  function onTypeChange(){ setDefaults(getType()); el('template').value = ''; currentZoneTree = null; }
+
+  // --- sablony ---
+  function onTemplateChange(){
+    var name = val('template'); if (!name) return;
+    var t = null;
+    for (var i = 0; i < TEMPLATES.length; i++){ if (TEMPLATES[i].name === name){ t = TEMPLATES[i]; break; } }
+    if (!t) return;
+    var c = t.config || {};
+    setType(c.type || 'lower');
+    setNum('width', c.width); setNum('height', c.height); setNum('depth', c.depth); setNum('thickness', c.thickness);
+    setNum('floor_height', c.floor_height);
+    setVal('bottom_mode', c.bottom_mode); setVal('top_mode', c.top_mode); setVal('back_mode', c.back_mode);
+    setNum('back_thickness', c.back_thickness || 3);
+    setVal('plinth_mode', c.plinth_mode); setNum('plinth_recess', c.plinth_recess);
+    setVal('rails_orientation', c.rails_orientation); setNum('rails_top_offset', c.rails_top_offset); setNum('rail_depth', c.rail_depth);
+    applyVisibility(c.type || 'lower');
+    renderFronts(c.fronts);
+    currentZoneTree = c.zone_tree || null;
   }
 
-  // Parametre výstuh len pri výbere "Dve priečky".
-  function toggleTwoRails(){
-    el('twoRailsGroup').style.display = (val('top_mode') === 'two_rails') ? '' : 'none';
+  function saveTemplate(){
+    var p = collectConstruction();
+    p.fronts = collectFronts();
+    p.zone_tree = currentZoneTree;
+    if (window.sketchup && sketchup.save_template) sketchup.save_template(JSON.stringify(p));
+  }
+  function deleteTemplate(){
+    var name = val('template'); if (!name){ NX.setStatus('Vyber sablonu.', true); return; }
+    if (window.sketchup && sketchup.delete_template) sketchup.delete_template(JSON.stringify({ template: name }));
+  }
+  function applyTemplateToSelected(){
+    if (el('applyTplBtn').disabled) return;
+    var name = val('template'); if (!name){ NX.setStatus('Vyber sablonu.', true); return; }
+    if (window.sketchup && sketchup.apply_template) sketchup.apply_template(JSON.stringify({ template: name }));
   }
 
-  function onTypeChange(){ setDefaults(getType()); }
+  // --- cela riadky ---
+  function addFrontRow(item){
+    item = item || {};
+    var wrap = el('frontRows');
+    var idx = wrap.querySelectorAll('.frow').length + 1;
+    var row = document.createElement('div');
+    row.className = 'frow';
+    row.innerHTML =
+      '<span class="fnum">' + idx + '</span>' +
+      '<select class="ftype" onchange="onFrontTypeChange(this)">' +
+        '<option value="door">Dvierka</option>' +
+        '<option value="drawer_front">Zásuvkové čelo</option>' +
+      '</select>' +
+      '<input class="fh" type="number" step="1" placeholder="auto">' +
+      '<select class="fw"><option value="auto">auto</option><option value="1">1</option><option value="2">2</option></select>' +
+      '<input class="flock" type="checkbox" title="Zamknúť pevnú výšku">' +
+      '<button class="fdel" title="Odstrániť" onclick="delFrontRow(this)">✕</button>';
+    wrap.appendChild(row);
+    if (item.type) row.querySelector('.ftype').value = item.type;
+    if (item.height !== null && item.height !== undefined && item.height !== '') row.querySelector('.fh').value = item.height;
+    if (item.wings) row.querySelector('.fw').value = item.wings;
+    if (item.locked) row.querySelector('.flock').checked = true;
+    onFrontTypeChange(row.querySelector('.ftype'));
+  }
+  function onFrontTypeChange(sel){
+    var row = sel.closest('.frow');
+    row.querySelector('.fw').style.visibility = (sel.value === 'door') ? 'visible' : 'hidden';
+  }
+  function delFrontRow(btn){ btn.closest('.frow').remove(); renumberFronts(); }
+  function removeLastFront(){ var rows = el('frontRows').querySelectorAll('.frow'); if (rows.length) { rows[rows.length-1].remove(); renumberFronts(); } }
+  function renumberFronts(){ var rows = el('frontRows').querySelectorAll('.frow'); for (var i=0;i<rows.length;i++){ rows[i].querySelector('.fnum').textContent = (i+1); } }
+  function renderFronts(fronts){
+    el('frontRows').innerHTML = '';
+    var items = (fronts && fronts.items) ? fronts.items : [];
+    for (var i = 0; i < items.length; i++){ addFrontRow(items[i]); }
+  }
+  function applyFronts(){
+    if (el('applyFrontsBtn').disabled) return;
+    if (window.sketchup && sketchup.apply_fronts) sketchup.apply_fronts(JSON.stringify({ fronts: collectFronts() }));
+  }
 
+  // --- zony ---
+  function zoneShort(id){ var m = String(id).match(/-Z([\d.]+)$/); return m ? ('Z' + m[1]) : id; }
+  function renderZoneTree(zones, activeId){
+    var c = el('zoneTree'); c.innerHTML = '';
+    if (!zones || !zones.length){ c.innerHTML = '<div class="muted">Žiadny označený korpus.</div>'; return; }
+    zones.forEach(function(z){
+      var sid = zoneShort(z.id);
+      var depth = sid.split('.').length - 1;
+      var div = document.createElement('div');
+      div.className = 'znode' + (z.id === activeId ? ' active' : '');
+      div.style.paddingLeft = (6 + depth * 14) + 'px';
+      var info = z.leaf
+        ? (z.shelves > 0 ? (z.shelves + ' políc') : 'prázdna')
+        : ('delené ' + ((z.split && z.split.axis === 'h') ? 'vodorovne' : 'zvislo') + ' ×' + (z.split ? z.split.count : '?'));
+      div.innerHTML = '<b>' + sid + '</b> <span class="dim">' + Math.round(z.width) + '×' + Math.round(z.height) + '×' + Math.round(z.depth) + '</span> <span class="zs">' + info + '</span>';
+      div.onclick = function(){ selectZoneNode(z); };
+      c.appendChild(div);
+    });
+  }
+  function selectZoneNode(z){
+    activeZoneId = z.id;
+    el('zoneActive').innerHTML = 'Zóna <b>' + zoneShort(z.id) + '</b> — ' + Math.round(z.width) + '×' + Math.round(z.height) + '×' + Math.round(z.depth) + ' mm';
+    setVal('zoneShelves', (z.shelves || 0));
+    setZoneButtons(true);
+    var nodes = el('zoneTree').querySelectorAll('.znode');
+    for (var i = 0; i < nodes.length; i++) nodes[i].classList.remove('active');
+    // znovu vyrenderuj zvyraznenie
+    var zones = lastZones; if (zones) renderZoneTree(zones, activeZoneId);
+  }
+  function setZoneButtons(on){
+    var b = document.querySelectorAll('.zbtn');
+    for (var i = 0; i < b.length; i++) b[i].disabled = !on;
+  }
+  function splitZone(axis){
+    if (!activeZoneId){ NX.setStatus('Najprv označ zónu.', true); return; }
+    var count = parseInt(axis === 'h' ? val('splitHCount') : val('splitVCount'), 10);
+    if (window.sketchup && sketchup.split_zone) sketchup.split_zone(JSON.stringify({ zone_id: activeZoneId, axis: axis, count: count }));
+  }
+  function setZoneShelves(){
+    if (!activeZoneId){ NX.setStatus('Najprv označ zónu.', true); return; }
+    if (window.sketchup && sketchup.set_zone_shelves) sketchup.set_zone_shelves(JSON.stringify({ zone_id: activeZoneId, count: parseInt(val('zoneShelves'), 10) }));
+  }
+  function cleanZone(){
+    if (!activeZoneId){ NX.setStatus('Najprv označ zónu.', true); return; }
+    if (window.sketchup && sketchup.clean_zone) sketchup.clean_zone(JSON.stringify({ zone_id: activeZoneId }));
+  }
+
+  // --- korpus akcie ---
   function insertCabinet(){
-    if (window.sketchup && sketchup.insert_cabinet)
-      sketchup.insert_cabinet(JSON.stringify(collect()));
+    var p = collectConstruction();
+    p.fronts = collectFronts();
+    p.zone_tree = currentZoneTree;
+    if (window.sketchup && sketchup.insert_cabinet) sketchup.insert_cabinet(JSON.stringify(p));
   }
-
   function applyChanges(){
     if (el('applyBtn').disabled) return;
-    if (window.sketchup && sketchup.apply_changes)
-      sketchup.apply_changes(JSON.stringify(collect()));
+    if (window.sketchup && sketchup.apply_changes) sketchup.apply_changes(JSON.stringify(collectConstruction()));
   }
-
   function toggleZones(){
     var on = el('zonesChk').checked;
-    if (window.sketchup && sketchup.toggle_zones)
-      sketchup.toggle_zones(on ? 'true' : 'false');
+    if (window.sketchup && sketchup.toggle_zones) sketchup.toggle_zones(on ? 'true' : 'false');
   }
+
+  function setSelected(cid){
+    selectedCabId = cid;
+    var on = !!cid;
+    el('applyBtn').disabled = !on;
+    el('applyFrontsBtn').disabled = !on;
+    el('applyTplBtn').disabled = !on;
+  }
+
+  var lastZones = null;
 
   window.NX = {
     init: function(data){
       DEFAULTS = data.defaults || { lower: {}, upper: {} };
+      NX.setTemplates(data.templates || []);
       el('zonesChk').checked = !!data.zones_visible;
       if (data.selected){ NX.loadSelected(data.selected); }
       else { setType('lower'); setDefaults('lower'); NX.clearSelected(); }
     },
+    setTemplates: function(list){
+      TEMPLATES = list || [];
+      var sel = el('template'); var cur = sel.value;
+      sel.innerHTML = '<option value="">— vyber —</option>';
+      TEMPLATES.forEach(function(t){ var o = document.createElement('option'); o.value = t.name; o.textContent = t.name; sel.appendChild(o); });
+      sel.value = cur;
+    },
     loadSelected: function(c){
       var t = c.type || 'lower';
       setType(t);
-      setVal('width', c.width); setVal('height', c.height); setVal('depth', c.depth); setVal('thickness', c.thickness);
-      setVal('floor_height', c.floor_height); setVal('shelves', c.shelves); setVal('fronts', c.fronts);
+      setNum('width', c.width); setNum('height', c.height); setNum('depth', c.depth); setNum('thickness', c.thickness);
+      setNum('floor_height', c.floor_height);
       setVal('bottom_mode', c.bottom_mode); setVal('top_mode', c.top_mode); setVal('back_mode', c.back_mode);
-      setVal('plinth_mode', c.plinth_mode); setVal('plinth_recess', c.plinth_recess);
-      setVal('rails_orientation', c.rails_orientation); setVal('rails_top_offset', c.rails_top_offset);
-      setVal('rail_depth', c.rail_depth);
+      setNum('back_thickness', c.back_thickness || 3);
+      setVal('plinth_mode', c.plinth_mode); setNum('plinth_recess', c.plinth_recess);
+      setVal('rails_orientation', c.rails_orientation); setNum('rails_top_offset', c.rails_top_offset); setNum('rail_depth', c.rail_depth);
       applyVisibility(t);
+      renderFronts(c.fronts);
+      lastZones = c.zones || [];
+      activeZoneId = c.active_zone || null;
+      renderZoneTree(lastZones, activeZoneId);
+      currentZoneTree = null;
+      if (activeZoneId){
+        var z = lastZones.filter(function(x){ return x.id === activeZoneId; })[0];
+        if (z) selectZoneNode(z); else setZoneButtons(false);
+      } else { el('zoneActive').innerHTML = 'Žiadna zóna neoznačená. Klikni na ghost v modeli alebo na zónu v strome.'; setZoneButtons(false); }
       el('selinfo').innerHTML = 'Označený: <b>' + (c.cabinet_id || '?') + '</b>';
-      el('applyBtn').disabled = false;
+      setSelected(c.cabinet_id || '?');
     },
     clearSelected: function(){
       el('selinfo').textContent = 'Nič nie je označené.';
-      el('applyBtn').disabled = true;
+      setSelected(null);
+      activeZoneId = null; lastZones = null;
+      el('zoneActive').innerHTML = 'Žiadna zóna neoznačená.';
+      renderZoneTree(null, null);
+      setZoneButtons(false);
     },
     setStatus: function(msg, err){
-      var e = el('status');
-      e.textContent = msg;
-      e.className = err ? 'err' : 'ok';
+      var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok';
     }
   };
 
+  // Pamätanie rozbalenia sekcií (localStorage).
+  function bindDetails(){
+    document.querySelectorAll('details[data-key]').forEach(function(d){
+      var k = 'nxsec_' + d.dataset.key;
+      try { var v = localStorage.getItem(k); if (v !== null) d.open = (v === '1'); } catch(e){}
+      d.addEventListener('toggle', function(){ try { localStorage.setItem(k, d.open ? '1' : '0'); } catch(e){} });
+    });
+  }
+
   window.onload = function(){
+    bindDetails();
     if (window.sketchup && sketchup.ready) sketchup.ready();
   };
 </script>

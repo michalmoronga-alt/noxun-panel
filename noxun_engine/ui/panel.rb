@@ -1,5 +1,5 @@
 # frozen_string_literal: true
-# Noxun Engine — panel (HtmlDialog controller + SelectionObserver).
+# Noxun Engine — panel (HtmlDialog controller + SelectionObserver). V0.2b.
 # Referencia dialogu v modulovej premennej (GC); callbacky pred show;
 # Ruby->JS len cez to_json; v callbackoch 'next' (nie 'return'); begin/rescue s logom.
 require 'json'
@@ -31,10 +31,10 @@ module Noxun
             preferences_key: DLG_KEY,
             scrollable: true,
             resizable: true,
-            width: 380,
-            height: 560,
-            min_width: 340,
-            min_height: 460,
+            width: 400,
+            height: 640,
+            min_width: 360,
+            min_height: 480,
             style: UI::HtmlDialog::STYLE_DIALOG
           )
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'panel.html'))
@@ -49,46 +49,33 @@ module Noxun
 
         # --- callbacky (JS -> Ruby) -----------------------------------------
         def register_callbacks(dlg)
-          dlg.add_action_callback('ready') do |_ctx|
-            begin
-              push_init
-            rescue StandardError => e
-              Engine.log_error(e, 'cb ready')
-            end
-            next
-          end
+          cb(dlg, 'ready')          { |_p| push_init }
+          cb(dlg, 'insert_cabinet') { |p| handle_insert(p) }
+          cb(dlg, 'apply_changes')  { |p| handle_apply(p) }
+          cb(dlg, 'apply_fronts')   { |p| handle_apply_fronts(p) }
+          cb(dlg, 'split_zone')     { |p| handle_split_zone(p) }
+          cb(dlg, 'set_zone_shelves') { |p| handle_set_zone_shelves(p) }
+          cb(dlg, 'clean_zone')     { |p| handle_clean_zone(p) }
+          cb(dlg, 'save_template')  { |p| handle_save_template(p) }
+          cb(dlg, 'delete_template') { |p| handle_delete_template(p) }
+          cb(dlg, 'apply_template') { |p| handle_apply_template(p) }
+          cb(dlg, 'toggle_zones')   { |p| handle_toggle_zones(p) }
+        end
 
-          dlg.add_action_callback('insert_cabinet') do |_ctx, payload|
+        # Wrapper: begin/rescue + slovensky status pri chybe; nikdy 'return' v bloku (pouzi next).
+        def cb(dlg, name)
+          dlg.add_action_callback(name) do |_ctx, *args|
             begin
-              handle_insert(payload)
+              yield(args.first)
             rescue StandardError => e
-              Engine.log_error(e, 'cb insert_cabinet')
+              Engine.log_error(e, "cb #{name}")
               set_status("Chyba: #{e.message}", true)
-            end
-            next
-          end
-
-          dlg.add_action_callback('apply_changes') do |_ctx, payload|
-            begin
-              handle_apply(payload)
-            rescue StandardError => e
-              Engine.log_error(e, 'cb apply_changes')
-              set_status("Chyba: #{e.message}", true)
-            end
-            next
-          end
-
-          dlg.add_action_callback('toggle_zones') do |_ctx, val|
-            begin
-              handle_toggle_zones(val)
-            rescue StandardError => e
-              Engine.log_error(e, 'cb toggle_zones')
             end
             next
           end
         end
 
-        # --- akcie -----------------------------------------------------------
+        # --- akcie: korpus ---------------------------------------------------
         def handle_insert(payload)
           model = Sketchup.active_model
           params = parse(payload)
@@ -99,18 +86,124 @@ module Noxun
           push_selected(model)
         end
 
+        # Konstrukcne/rozmerove zmeny na oznaceny korpus. Zachova strom zon + cela.
         def handle_apply(payload)
           model = Sketchup.active_model
           cab = find_cabinet(model)
-          if cab.nil?
-            set_status('Najprv oznac NOXUN korpus v modeli.', true)
-            return
+          return set_status('Najprv oznac NOXUN korpus v modeli.', true) if cab.nil?
+
+          data = parse(payload)
+          params = existing_params(cab)
+          %w[type width height depth thickness floor_height bottom_mode top_mode back_mode
+             back_thickness plinth_mode plinth_recess rail_depth rails_orientation
+             rails_top_offset name].each do |k|
+            params[k] = data[k] if data.key?(k)
           end
-          params = parse(payload)
           CabinetBuilder.rebuild(model, cab, params)
-          cid = Store.get(cab, 'cabinet_id')
-          set_status("Aktualizovany #{cid} — #{part_count(cab)} dielcov.")
-          push_selected(model)
+          finish_cab(model, cab, "Aktualizovany #{Store.get(cab, 'cabinet_id')} — #{part_count(cab)} dielcov.")
+        end
+
+        # Cela na oznaceny korpus. Zachova konstrukciu + strom zon.
+        def handle_apply_fronts(payload)
+          model = Sketchup.active_model
+          cab = find_cabinet(model)
+          return set_status('Najprv oznac NOXUN korpus v modeli.', true) if cab.nil?
+
+          data = parse(payload)
+          params = existing_params(cab)
+          params['fronts'] = data['fronts'] || Fronts.empty_config
+          CabinetBuilder.rebuild(model, cab, params)
+          finish_cab(model, cab, "Cela aktualizovane — #{Store.get(cab, 'cabinet_id')}.")
+        end
+
+        # --- akcie: zony -----------------------------------------------------
+        def handle_split_zone(payload)
+          data = parse(payload)
+          zid = data['zone_id'].to_s
+          return set_status('Najprv oznac zonu (klik na ghost alebo v strome).', true) if zid.empty?
+          axis = data['axis']; count = data['count'].to_i
+          apply_zone_mod(zid) { |tree, path| ZoneTree.set_split!(tree, path, axis, count) }
+          set_status("Zona #{short_zone(zid)} rozdelena #{axis == 'h' ? 'vodorovne' : 'zvisle'} na #{count}.")
+        end
+
+        def handle_set_zone_shelves(payload)
+          data = parse(payload)
+          zid = data['zone_id'].to_s
+          return set_status('Najprv oznac zonu.', true) if zid.empty?
+          n = data['count'].to_i
+          apply_zone_mod(zid) { |tree, path| ZoneTree.set_shelves!(tree, path, n) }
+          set_status("Zona #{short_zone(zid)}: #{n} polic.")
+        end
+
+        def handle_clean_zone(payload)
+          data = parse(payload)
+          zid = data['zone_id'].to_s
+          return set_status('Najprv oznac zonu.', true) if zid.empty?
+          apply_zone_mod(zid) { |tree, path| ZoneTree.clear_zone!(tree, path) }
+          set_status("Zona #{short_zone(zid)} vycistena.")
+        end
+
+        # Spolocny postup: nacitaj korpus zony, uprav strom, rebuild, oznac korpus, pushni.
+        def apply_zone_mod(zone_id)
+          model = Sketchup.active_model
+          cid = cabinet_id_from_zone(zone_id)
+          cab = find_cabinet_by_id(model, cid)
+          raise 'Korpus zony sa nenasiel.' if cab.nil?
+
+          params = existing_params(cab)
+          tree = ZoneTree.sanitize(params['zone_tree'] || ZoneTree.default_tree(0))
+          path = zone_path(zone_id)
+          yield(tree, path)
+          params['zone_tree'] = tree
+          CabinetBuilder.rebuild(model, cab, params)
+          @active_zone_id = zone_id
+          reselect(model, cab) # klik-nuty ghost je po rebuilde zmazany -> vyber korpus nanovo
+          cab
+        end
+
+        # --- akcie: sablony --------------------------------------------------
+        def handle_save_template(payload)
+          data = parse(payload)
+          model = Sketchup.active_model
+          cab = find_cabinet(model)
+          config = cab ? template_config_from(Store.config(cab) || {}) : template_config_from_fields(data)
+
+          res = UI.inputbox(['Nazov sablony:'], [suggest_template_name(cab, data)], 'Ulozit sablonu')
+          return if res == false # zrusene
+
+          name = res[0].to_s.strip
+          return set_status('Prazdny nazov — zrusene.', true) if name.empty?
+
+          if TemplateStore.find(name) &&
+             UI.messagebox("Sablona \"#{name}\" existuje. Prepisat?", MB_YESNO) != IDYES
+            return set_status('Zrusene — sablona nezmenena.')
+          end
+          TemplateStore.upsert(name, config)
+          push_templates
+          set_status("Sablona \"#{name}\" ulozena.")
+        end
+
+        def handle_delete_template(payload)
+          name = parse(payload)['template'].to_s
+          return set_status('Vyber sablonu na vymazanie.', true) if name.empty?
+          return unless UI.messagebox("Vymazat sablonu \"#{name}\"?", MB_YESNO) == IDYES
+
+          TemplateStore.delete(name)
+          push_templates
+          set_status("Sablona \"#{name}\" vymazana.")
+        end
+
+        def handle_apply_template(payload)
+          name = parse(payload)['template'].to_s
+          tpl = TemplateStore.find(name)
+          return set_status('Sablona sa nenasla.', true) if tpl.nil?
+          model = Sketchup.active_model
+          cab = find_cabinet(model)
+          return set_status('Najprv oznac NOXUN korpus.', true) if cab.nil?
+
+          # Prepis konstrukcne kluce (+ zony/cela zo sablony), zachova id + poziciu.
+          CabinetBuilder.rebuild(model, cab, tpl['config'].dup)
+          finish_cab(model, cab, "Sablona \"#{name}\" pouzita na #{Store.get(cab, 'cabinet_id')}.")
         end
 
         def handle_toggle_zones(val)
@@ -124,24 +217,39 @@ module Noxun
         # --- Ruby -> JS ------------------------------------------------------
         def push_init
           model = Sketchup.active_model
+          cab = find_cabinet(model)
           data = {
             defaults: {
               lower: CabinetBuilder::LOWER_DEFAULTS,
               upper: CabinetBuilder::UPPER_DEFAULTS
             },
             zones_visible: Zones.visible?(model),
-            selected: selected_payload(model)
+            templates: template_list,
+            selected: cab ? cabinet_payload(cab) : nil
           }
           js("NX.init(#{data.to_json})")
         end
 
         def push_selected(model)
-          payload = selected_payload(model)
-          if payload
-            js("NX.loadSelected(#{payload.to_json})")
-          else
-            js("NX.clearSelected()")
+          zone = find_selected_zone(model)
+          cab = find_cabinet(model)
+          if cab.nil?
+            @active_zone_id = nil
+            return js('NX.clearSelected()')
           end
+          az = if zone && zone['cabinet_id'] == Store.get(cab, 'cabinet_id')
+                 zone['zone_id']
+               elsif belongs?(@active_zone_id, cab)
+                 @active_zone_id
+               end
+          @active_zone_id = az
+          payload = cabinet_payload(cab)
+          payload['active_zone'] = az
+          js("NX.loadSelected(#{payload.to_json})")
+        end
+
+        def push_templates
+          js("NX.setTemplates(#{template_list.to_json})")
         end
 
         def set_status(msg, error = false)
@@ -150,14 +258,14 @@ module Noxun
 
         def js(script)
           return unless @dialog && @dialog.visible?
+
           @dialog.execute_script(script)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.js')
         end
 
-        # --- resolver korpusu -----------------------------------------------
-        # Najde NOXUN korpus vo vybere: priamo (kind=cabinet), alebo z vybraneho
-        # dielca/zony cez cabinet_id (nezavisle od active_path).
+        # --- resolvery -------------------------------------------------------
+        # Najde NOXUN korpus vo vybere: priamo (kind=cabinet), alebo z dielca/zony cez cabinet_id.
         def find_cabinet(model)
           sel = model.selection.to_a
           return nil if sel.empty?
@@ -180,15 +288,72 @@ module Noxun
           nil
         end
 
-        def selected_payload(model)
-          cab = find_cabinet(model)
-          return nil unless cab
+        # Zona vo vybere (klik na ghost). Testovatelne aj priamo cez find_zone_in([entita]).
+        def find_selected_zone(model)
+          find_zone_in(model.selection.to_a)
+        end
 
+        def find_zone_in(entities)
+          z = entities.find { |e| Store.kind(e) == 'zone' }
+          return nil unless z
+
+          cfg = Store.config(z) || {}
+          { 'zone_id' => Store.get(z, 'id'), 'cabinet_id' => Store.get(z, 'cabinet_id'),
+            'width' => cfg['width'], 'height' => cfg['height'], 'depth' => cfg['depth'],
+            'shelves' => cfg['shelves'] }
+        end
+
+        # --- payload korpusu -------------------------------------------------
+        def cabinet_payload(cab)
           cfg = Store.config(cab) || {}
-          # config_to_params doplni spatnu kompatibilitu (stare V0.1 configy) a vsetky variant kluce.
           params = CabinetBuilder.config_to_params(cfg)
           params['cabinet_id'] = Store.get(cab, 'cabinet_id')
+          params['fronts'] = Fronts.normalize_config(cfg['fronts']) # kanonicke pre riadky cela
+          params['zones'] = cfg['zones'] || []                      # ploche zony pre strom
+          params['front_items'] = cfg['front_items'] || []
           params
+        end
+
+        def selected_payload(model)
+          cab = find_cabinet(model)
+          cab ? cabinet_payload(cab) : nil
+        end
+
+        # existujuce params korpusu (na zachovanie casti pri ciastocnej zmene)
+        def existing_params(cab)
+          CabinetBuilder.config_to_params(Store.config(cab) || {})
+        end
+
+        def template_config_from(cfg)
+          {
+            'type' => cfg['type'], 'width' => cfg['width'], 'height' => cfg['height'], 'depth' => cfg['depth'],
+            'thickness' => cfg['thickness'], 'floor_height' => cfg['floor_height'],
+            'bottom_mode' => cfg['bottom_mode'], 'top_mode' => cfg['top_mode'], 'back_mode' => cfg['back_mode'],
+            'back_thickness' => cfg['back_thickness'] || 3.0,
+            'plinth_mode' => cfg['plinth_mode'], 'plinth_recess' => cfg['plinth_recess'],
+            'rail_depth' => cfg['rail_depth'], 'rails_orientation' => cfg['rails_orientation'],
+            'rails_top_offset' => cfg['rails_top_offset'],
+            'zone_tree' => cfg['zone_tree'] || ZoneTree.default_tree((cfg['shelves'] || 0).to_i),
+            'fronts' => Fronts.normalize_config(cfg['fronts'])
+          }
+        end
+
+        def template_config_from_fields(data)
+          tc = template_config_from(data)
+          tc['zone_tree'] = data['zone_tree'] || ZoneTree.default_tree(0)
+          tc['fronts'] = Fronts.normalize_config(data['fronts'])
+          tc
+        end
+
+        def template_list
+          TemplateStore.load
+        rescue StandardError => e
+          Engine.log_error(e, 'template_list')
+          []
+        end
+
+        def suggest_template_name(cab, _data)
+          cab ? "Kopia #{Store.get(cab, 'cabinet_id')}" : 'Nova sablona'
         end
 
         # --- SelectionObserver ----------------------------------------------
@@ -212,20 +377,57 @@ module Noxun
         end
 
         def on_selection_changed
-          model = Sketchup.active_model
-          push_selected(model)
+          push_selected(Sketchup.active_model)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.on_selection_changed')
         end
 
         # --- pomocne ---------------------------------------------------------
+        def finish_cab(model, cab, msg)
+          reselect(model, cab)
+          set_status(msg)
+          push_selected(model)
+        end
+
+        # Vystup z pripadneho editu komponentu + cisty vyber korpusu (po rebuilde).
+        def reselect(model, inst)
+          model.active_path = nil
+        rescue StandardError
+          nil
+        ensure
+          select_only(model, inst) if inst && inst.valid?
+        end
+
         def parse(payload)
           return {} if payload.nil? || payload.to_s.strip.empty?
 
-          JSON.parse(payload)
-        rescue JSON::ParserError => e
-          Engine.log_error(e, 'Panel.parse')
-          {}
+          v = JSON.parse(payload)
+          v.is_a?(Hash) ? v : { 'value' => v }
+        rescue JSON::ParserError
+          { 'value' => payload }
+        end
+
+        def zone_path(zid)
+          m = zid.to_s.match(/-Z([\d.]+)$/)
+          return [1] unless m
+
+          m[1].split('.').map(&:to_i)
+        end
+
+        def cabinet_id_from_zone(zid)
+          m = zid.to_s.match(/^(CAB-\d+)-Z/)
+          m ? m[1] : nil
+        end
+
+        def short_zone(zid)
+          m = zid.to_s.match(/-Z([\d.]+)$/)
+          m ? "Z#{m[1]}" : zid
+        end
+
+        def belongs?(zid, cab)
+          return false if zid.nil? || cab.nil?
+
+          cabinet_id_from_zone(zid) == Store.get(cab, 'cabinet_id')
         end
 
         def select_only(model, inst)
