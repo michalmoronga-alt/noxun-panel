@@ -1,21 +1,39 @@
 # frozen_string_literal: true
-# Noxun Engine — generator SPODNEHO korpusu. Regenerate pattern (standard sekcia 9):
+# Noxun Engine — generator korpusu (dolna + horna). Regenerate pattern (standard sekcia 9):
 # build (novy) a rebuild (clear definicie + build_into) — vzdy 1 Undo operacia.
-# mm Float v datach; .mm sa deje LEN tu cez Units (hranica kreslenia).
+# Geometriu (deskriptory dielcov) pocita CISTO Construction; tu sa len kresli (mm -> Length cez Units).
+# Kazdy rebuild je obaleny ScaleWatch.guard, aby scale-observer neignoroval vlastne zmeny.
 require 'json'
 
 module Noxun
   module Engine
     module CabinetBuilder
-      DEFAULTS = {
-        width: 600.0, height: 720.0, depth: 510.0, thickness: 18.0,
-        floor_height: 100.0, shelves: 0, fronts: 'none'
+      # Predvolby pre novy vklad. Dolna skrinka: dno POD bokmi (boky stoja na dne),
+      # bez sokloveho panela (priestor pre nohy), korpus levituje o floor_height.
+      LOWER_DEFAULTS = {
+        type: 'lower', width: 600.0, height: 720.0, depth: 510.0, thickness: 18.0,
+        floor_height: 100.0, shelves: 0, fronts: 'none',
+        bottom_mode: 'under_sides', top_mode: 'full', back_mode: 'overlay',
+        plinth_mode: 'none', plinth_recess: 50.0,
+        rail_depth: 100.0, rails_orientation: 'flat', rails_top_offset: 0.0
       }.freeze
 
-      BACK_THICKNESS    = 3.0    # chrbat
-      PLINTH_INSET      = 50.0   # sokel zapusteny od cela
-      SHELF_FRONT_INSET = 20.0   # police odsadene od cela
-      GAP_BETWEEN_CABS  = 50.0   # medzera medzi korpusmi pri vkladani vedla seba
+      # Horna skrinka: bez sokla (floor_height 0), dno aj vrch medzi bokmi (boky plna vyska),
+      # chrbat default v drazke.
+      UPPER_DEFAULTS = {
+        type: 'upper', width: 600.0, height: 720.0, depth: 320.0, thickness: 18.0,
+        floor_height: 0.0, shelves: 0, fronts: 'none',
+        bottom_mode: 'between_sides', top_mode: 'full', back_mode: 'groove',
+        plinth_mode: 'none', plinth_recess: 50.0,
+        rail_depth: 100.0, rails_orientation: 'flat', rails_top_offset: 0.0
+      }.freeze
+
+      DEFAULTS = LOWER_DEFAULTS # spatna kompatibilita starych referencii
+
+      GAP_BETWEEN_CABS = 50.0    # medzera medzi korpusmi pri vkladani vedla seba
+      UPPER_HANG_Z     = 1400.0  # vyska zavesenia hornej skrinky (Z pri vlozeni)
+
+      MIN = { width: 200.0, height: 200.0, depth: 150.0 }.freeze
 
       MAT_KORPUS = 'NOXUN_korpus'
       MAT_FRONT  = 'NOXUN_front'
@@ -23,18 +41,19 @@ module Noxun
       class << self
         # --- verejne API ----------------------------------------------------
 
-        # Vlozi novy korpus vedla existujucich. Vrati instanciu.
+        # Vlozi novy korpus. Dolna na Z=0 vedla existujucich; horna na Z=UPPER_HANG_Z. Vrati instanciu.
         def build(model, params)
           cfg = normalize(params)
           cid = Ids.next_cabinet_id(model)
           x = next_x(model)
+          z = cfg[:type] == 'upper' ? UPPER_HANG_Z : 0.0
           inst = nil
           model.start_operation('NOXUN: Vloz korpus', true)
           begin
             cdef = model.definitions.add("NOXUN Korpus #{cid}")
             cdef.entities.clear!
             final = build_into(model, cdef, cfg, cid)
-            tr = Geom::Transformation.translation(Units.point(x, 0, 0))
+            tr = Geom::Transformation.translation(Units.point(x, 0, z))
             inst = model.active_entities.add_instance(cdef, tr)
             write_cabinet_attrs(inst, cid, final)
             model.commit_operation
@@ -42,124 +61,74 @@ module Noxun
             abort_safely(model)
             raise e
           end
+          ScaleWatch.attach_one(inst) if inst && defined?(ScaleWatch)
           inst
         end
 
-        # Prestavia existujuci korpus podla novych parametrov (rebuild).
-        def rebuild(model, inst, params)
+        # Prestavia existujuci korpus. transform: volitelne nova cista transformacia (scale absorpcia).
+        # op_name: nazov Undo operacie. Cele obalene guardom, aby scale-observer ignoroval vlastnu zmenu.
+        def rebuild(model, inst, params, transform: nil, op_name: 'NOXUN: Aplikuj zmeny')
           cid = Store.get(inst, 'cabinet_id')
           raise 'Vybrana instancia nie je NOXUN korpus.' if cid.nil?
 
           cfg = normalize(params)
-          model.start_operation('NOXUN: Aplikuj zmeny', true)
-          begin
-            cdef = inst.definition
-            cdef.entities.clear!
-            final = build_into(model, cdef, cfg, cid)
-            write_cabinet_attrs(inst, cid, final)
-            model.commit_operation
-          rescue StandardError => e
-            abort_safely(model)
-            raise e
+          guarded do
+            model.start_operation(op_name, true)
+            begin
+              cdef = inst.definition
+              cdef.entities.clear!
+              final = build_into(model, cdef, cfg, cid)
+              inst.transformation = transform if transform
+              write_cabinet_attrs(inst, cid, final)
+              model.commit_operation
+            rescue StandardError => e
+              abort_safely(model)
+              raise e
+            end
           end
           inst
         end
 
         # --- jadro stavby ---------------------------------------------------
 
-        # Postavi vsetky dielce + ghost zony do cdef. Vrati doplneny config (Hash).
+        # Postavi vsetky dielce + ghost zony do cdef podla planu z Construction. Vrati doplneny config.
         def build_into(model, cdef, cfg, cid)
-          w = cfg[:width]; h = cfg[:height]; d = cfg[:depth]
-          t = cfg[:thickness]; s = cfg[:floor_height]
-          validate!(w, h, d, t, s)
-
+          plan = Construction.build_plan(cfg) # validuje interne (raise slovensky)
           ents = cdef.entities
           mk = ensure_material(model, MAT_KORPUS, [216, 196, 160])
-          ensure_material(model, MAT_FRONT, [245, 245, 245])
+          mf = ensure_material(model, MAT_FRONT, [245, 245, 245])
+          tid = template_id_for(cfg[:type])
 
-          # Boky — pln vyska (side_left / side_right)
-          add_part(model, ents, [t, d, h], [0, 0, 0], mk, cid, 'SIDE-L', 'side_left',
-                   'Bok lavy', { length: h, width: d, thickness: t }, MAT_KORPUS)
-          add_part(model, ents, [t, d, h], [w - t, 0, 0], mk, cid, 'SIDE-R', 'side_right',
-                   'Bok pravy', { length: h, width: d, thickness: t }, MAT_KORPUS)
-
-          # Dno — medzi bokmi, na sokli
-          add_part(model, ents, [w - 2 * t, d, t], [t, 0, s], mk, cid, 'BOTTOM', 'bottom',
-                   'Dno', { length: w - 2 * t, width: d, thickness: t }, MAT_KORPUS)
-
-          # Vrch — pln, medzi bokmi
-          add_part(model, ents, [w - 2 * t, d, t], [t, 0, h - t], mk, cid, 'TOP', 'top',
-                   'Vrch', { length: w - 2 * t, width: d, thickness: t }, MAT_KORPUS)
-
-          # Chrbat — nalozeny zozadu (Y = d .. d+3)
-          add_part(model, ents, [w, BACK_THICKNESS, h - s], [0, d, s], mk, cid, 'BACK', 'back',
-                   'Chrbat', { length: w, width: h - s, thickness: BACK_THICKNESS }, MAT_KORPUS)
-
-          # Sokel — zapusteny 50 od cela
-          add_part(model, ents, [w - 2 * t, t, s], [t, PLINTH_INSET, 0], mk, cid, 'PLINTH', 'plinth',
-                   'Sokel', { length: w - 2 * t, width: s, thickness: t }, MAT_KORPUS)
-
-          # Police — rovnomerne
-          clear_z0 = s + t
-          clear_z1 = h - t
-          sh = Shelves.layout(clear_z0, clear_z1, t, cfg[:shelves])
-          shelf_depth = d - SHELF_FRONT_INSET
-          sh[:shelves].each do |shelf|
-            n = shelf[:index] + 1
-            add_part(model, ents, [w - 2 * t, shelf_depth, t], [t, SHELF_FRONT_INSET, shelf[:z]],
-                     mk, cid, "SHELF-#{n}", 'shelf', "Polica #{n}",
-                     { length: w - 2 * t, width: shelf_depth, thickness: t }, MAT_KORPUS)
+          plan[:parts].each do |pd|
+            front = pd[:material] == :front
+            add_part(model, ents, pd, (front ? mf : mk), (front ? MAT_FRONT : MAT_KORPUS), cid, tid)
           end
 
-          # Dvierka — pred korpusom (Y zaporne)
-          mf = model.materials[MAT_FRONT]
-          fr = Fronts.layout(cfg[:fronts], w, h, s, t)
-          fr[:parts].each do |dr|
-            nm = case dr[:suffix]
-                 when 'DOOR-L' then 'Dvierka lave'
-                 when 'DOOR-R' then 'Dvierka prave'
-                 else 'Dvierka'
-                 end
-            add_part(model, ents, [dr[:width], t, dr[:height]], [dr[:x], -t, dr[:z]],
-                     mf, cid, dr[:suffix], dr[:role], nm,
-                     { length: dr[:height], width: dr[:width], thickness: t }, MAT_FRONT)
-          end
-
-          # Zony (ghost) — medzi policami, po chrbat
-          box = { x0: t, x1: w - t, y0: 0.0, y1: d - BACK_THICKNESS }
-          zone_ids = Zones.build_into(model, ents, sh[:zones], box, cid)
-
-          cfg.merge(
-            available_width: (w - 2 * t).round(2),
-            available_height: (clear_z1 - clear_z0).round(2),
-            available_depth: (d - BACK_THICKNESS).round(2),
-            front_plane: 0.0,
-            wings: fr[:wings],
-            zones: zone_ids
-          )
+          zone_ids = Zones.build_into(model, ents, plan[:zones], plan[:zone_box], cid)
+          merge_final(cfg, plan, zone_ids)
         end
 
-        # --- pomocne --------------------------------------------------------
+        # --- pomocne stavbove ----------------------------------------------
 
-        # Jeden dielec = vlastny komponent s NOXUN dict. box/origin/prod v mm.
-        def add_part(model, parent_ents, box, origin, material, cid, suffix, role, name, prod, material_id)
-          # Recyklacia definicie podla mena (mena su per-korpus unikatne: obsahuju cid),
-          # aby rebuild neprodukoval osirotene definicie. NIE purge_unused (undo-safe).
-          dname = "NOXUN #{cid} #{suffix}"
+        # Jeden dielec = vlastny komponent s NOXUN dict. Recyklacia definicie podla mena
+        # (mena su per-korpus unikatne — obsahuju cid), aby rebuild neprodukoval osirotene definicie.
+        def add_part(model, parent_ents, pd, material, material_id, cid, tid)
+          dname = "NOXUN #{cid} #{pd[:suffix]}"
           pdef = model.definitions[dname] || model.definitions.add(dname)
-          pdef.entities.clear! # cerstva geometria pri kazdom rebuilde
-          draw_box(pdef.entities, box[0], box[1], box[2])
-          tr = Geom::Transformation.translation(Units.point(origin[0], origin[1], origin[2]))
-          inst = parent_ents.add_instance(pdef, tr)
+          pdef.entities.clear!
+          sx, sy, sz = pd[:box]
+          draw_box(pdef.entities, sx, sy, sz)
+          ox, oy, oz = pd[:origin]
+          inst = parent_ents.add_instance(pdef, Geom::Transformation.translation(Units.point(ox, oy, oz)))
           inst.material = material
-          pid = Ids.part_id(cid, suffix)
+          pid = Ids.part_id(cid, pd[:suffix])
           Store.write(inst, {
             std: Store::STD, kind: 'part', id: pid, part_id: pid, cabinet_id: cid,
-            template_id: 'base-lower-18', role: role, name: name,
+            template_id: tid, role: pd[:role], name: pd[:name],
             manufactured: true, production_class: 'sheet',
             config: {
-              length: prod[:length].round(2), width: prod[:width].round(2),
-              thickness: prod[:thickness].round(2), quantity: 1,
+              length: pd[:prod][:length].round(2), width: pd[:prod][:width].round(2),
+              thickness: pd[:prod][:thickness].round(2), quantity: 1,
               material_id: material_id, grain_direction: 'none',
               edges: { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil }
             }
@@ -179,11 +148,12 @@ module Noxun
           f
         end
 
-        # Config korpusu podla standardu sekcia 2.5.
+        # --- config korpusu (standard sekcia 2.5) --------------------------
+
         def write_cabinet_attrs(inst, cid, cfg)
           Store.write(inst, {
             std: Store::STD, kind: 'cabinet', id: cid, cabinet_id: cid,
-            template_id: 'base-lower-18', role: 'cabinet',
+            template_id: template_id_for(cfg[:type]), role: 'cabinet',
             manufactured: false, production_class: 'reference',
             config: cabinet_config(cfg)
           })
@@ -193,29 +163,139 @@ module Noxun
 
         def cabinet_config(cfg)
           {
-            type: 'lower',
-            name: cfg[:name] || "Spodna skrinka #{cfg[:width].round}",
-            construction_preset: 'noxun-lower-18',
+            type: cfg[:type],
+            name: cfg[:name] || default_name(cfg),
+            construction_preset: cfg[:type] == 'upper' ? 'noxun-upper-18' : 'noxun-lower-18',
             mode: 'parametric',
             width: cfg[:width], height: cfg[:height], depth: cfg[:depth],
             thickness: cfg[:thickness], floor_height: cfg[:floor_height],
             shelves: cfg[:shelves], fronts: cfg[:fronts].to_s,
+            # ploche variant kluce = zdroj pravdy pre round-trip panela
+            bottom_mode: cfg[:bottom_mode], top_mode: cfg[:top_mode], back_mode: cfg[:back_mode],
+            plinth_mode: cfg[:plinth_mode], plinth_recess: cfg[:plinth_recess],
+            rail_depth: cfg[:rail_depth], rails_orientation: cfg[:rails_orientation],
+            rails_top_offset: cfg[:rails_top_offset],
             material_id: 'K009_PW_DTDL_18', back_material_id: 'HDF_WHITE_3',
+            # vnorene standardne objekty (odvodene)
             sides:   { thickness: cfg[:thickness], construction: 'sides_wrap' },
-            bottom:  { mode: 'between_sides', thickness: cfg[:thickness] },
-            top:     { mode: 'full_panel', thickness: cfg[:thickness] },
-            back:    { mode: 'overlay', thickness: BACK_THICKNESS },
-            support: { type: 'plinth', height: cfg[:floor_height] },
+            bottom:  { mode: cfg[:bottom_mode], thickness: cfg[:thickness] },
+            top:     { mode: cfg[:top_mode], thickness: cfg[:thickness],
+                       rail_depth: cfg[:rail_depth], orientation: cfg[:rails_orientation],
+                       top_offset: cfg[:rails_top_offset] },
+            back:    { mode: cfg[:back_mode], thickness: Construction::BACK_THICKNESS },
+            support: support_descriptor(cfg),
             available_width: cfg[:available_width],
             available_height: cfg[:available_height],
             available_depth: cfg[:available_depth],
-            front_plane: cfg[:front_plane],
-            wings: cfg[:wings],
-            zones: cfg[:zones]
+            front_plane: cfg[:front_plane] || 0.0,
+            wings: cfg[:wings], zones: cfg[:zones]
           }
         end
 
-        # Nova pozicia X = prava hrana najpravejsieho korpusu + medzera (mm).
+        def support_descriptor(cfg)
+          if cfg[:type] == 'upper' || cfg[:floor_height].to_f <= 0
+            { type: 'none', height: 0.0 }
+          elsif cfg[:plinth_mode] == 'front'
+            { type: 'plinth', height: cfg[:floor_height], recess: cfg[:plinth_recess] }
+          else
+            { type: 'legs', height: cfg[:floor_height] } # nohy (geometria az neskor)
+          end
+        end
+
+        def default_name(cfg)
+          cfg[:type] == 'upper' ? "Horna skrinka #{cfg[:width].round}" : "Spodna skrinka #{cfg[:width].round}"
+        end
+
+        def template_id_for(type)
+          type == 'upper' ? 'base-upper-18' : 'base-lower-18'
+        end
+
+        def merge_final(cfg, plan, zone_ids)
+          cfg.merge(
+            available_width: plan[:available][:width].round(2),
+            available_height: plan[:available][:height].round(2),
+            available_depth: plan[:available][:depth].round(2),
+            front_plane: 0.0,
+            wings: plan[:wings],
+            zones: zone_ids
+          )
+        end
+
+        # --- normalizacia parametrov ---------------------------------------
+
+        def defaults_for(type)
+          type == 'upper' ? UPPER_DEFAULTS : LOWER_DEFAULTS
+        end
+
+        def normalize(params)
+          p = params || {}
+          type = norm_type(p)
+          d = defaults_for(type)
+          {
+            type: type,
+            width:  clampf(fetchf(p, :width,  d[:width]),  MIN[:width],  3000.0),
+            height: clampf(fetchf(p, :height, d[:height]), MIN[:height], 3000.0),
+            depth:  clampf(fetchf(p, :depth,  d[:depth]),  MIN[:depth],  2000.0),
+            thickness: clampf(fetchf(p, :thickness, d[:thickness]), 6.0, 50.0),
+            floor_height: type == 'upper' ? 0.0 : clampf(fetchf(p, :floor_height, d[:floor_height]), 0.0, 500.0),
+            shelves: Shelves.clamp(fetchf(p, :shelves, d[:shelves]).to_i),
+            fronts: front_mode(p, d),
+            bottom_mode: enum_val(p, :bottom_mode, %w[between_sides under_sides], d[:bottom_mode]),
+            top_mode:    enum_val(p, :top_mode,    %w[full two_rails none],       d[:top_mode]),
+            back_mode:   enum_val(p, :back_mode,   %w[overlay inset groove],      d[:back_mode]),
+            plinth_mode: type == 'upper' ? 'none' : enum_val(p, :plinth_mode, %w[none front], d[:plinth_mode]),
+            plinth_recess: clampf(fetchf(p, :plinth_recess, d[:plinth_recess]), 0.0, 300.0),
+            # two_rails parametre (uplatnia sa len pri top_mode == 'two_rails')
+            rail_depth: clampf(fetchf(p, :rail_depth, d[:rail_depth]), 20.0, 400.0),
+            rails_orientation: enum_val(p, :rails_orientation, %w[flat upright], d[:rails_orientation]),
+            rails_top_offset: clampf(fetchf(p, :rails_top_offset, d[:rails_top_offset]), 0.0, 500.0),
+            name: (p['name'] || p[:name])
+          }
+        end
+
+        # Config (stored, string kluce) -> params pre normalize. Doplna spatnu kompatibilitu:
+        # stare V0.1 configy (bez plochych variant klucov) sa citaju z vnorenych objektov,
+        # takze rebuild stareho korpusu reprodukuje jeho povodnu konstrukciu (between_sides + predny sokel).
+        def config_to_params(cfg)
+          {
+            'type' => cfg['type'] || 'lower',
+            'width' => cfg['width'], 'height' => cfg['height'], 'depth' => cfg['depth'],
+            'thickness' => cfg['thickness'], 'floor_height' => cfg['floor_height'],
+            'shelves' => cfg['shelves'], 'fronts' => cfg['fronts'],
+            'bottom_mode' => cfg['bottom_mode'] || legacy_bottom(cfg),
+            'top_mode'    => cfg['top_mode']    || legacy_top(cfg),
+            'back_mode'   => cfg['back_mode']   || legacy_back(cfg),
+            'plinth_mode' => cfg['plinth_mode'] || legacy_plinth(cfg),
+            'plinth_recess' => cfg['plinth_recess'] || 50.0,
+            'rail_depth' => cfg['rail_depth'] || 100.0,
+            'rails_orientation' => cfg['rails_orientation'] || 'flat',
+            'rails_top_offset' => cfg['rails_top_offset'] || 0.0,
+            'name' => cfg['name']
+          }
+        end
+
+        def legacy_bottom(cfg)
+          (cfg['bottom'] && cfg['bottom']['mode']) || 'between_sides'
+        end
+
+        def legacy_top(cfg)
+          m = cfg['top'] && cfg['top']['mode']
+          (m.nil? || m == 'full_panel') ? 'full' : m
+        end
+
+        def legacy_back(cfg)
+          (cfg['back'] && cfg['back']['mode']) || 'overlay'
+        end
+
+        # Stary V0.1 korpus mal vzdy predny sokel (support.type='plinth'); horny ziadny.
+        def legacy_plinth(cfg)
+          return 'none' if (cfg['type'] || 'lower') == 'upper'
+          sup = cfg['support']
+          sup && sup['type'] == 'plinth' ? 'front' : (cfg['floor_height'].to_f > 0 ? 'front' : 'none')
+        end
+
+        # --- pomocne --------------------------------------------------------
+
         def next_x(model)
           max_right = nil
           Ids.each_cabinet(model) do |inst|
@@ -225,30 +305,18 @@ module Noxun
           max_right.nil? ? 0.0 : max_right + GAP_BETWEEN_CABS
         end
 
-        def normalize(params)
-          p = params || {}
-          {
-            width:        clampf(fetch(p, :width, DEFAULTS[:width]), 100.0, 3000.0),
-            height:       clampf(fetch(p, :height, DEFAULTS[:height]), 100.0, 3000.0),
-            depth:        clampf(fetch(p, :depth, DEFAULTS[:depth]), 100.0, 2000.0),
-            thickness:    clampf(fetch(p, :thickness, DEFAULTS[:thickness]), 6.0, 50.0),
-            floor_height: clampf(fetch(p, :floor_height, DEFAULTS[:floor_height]), 0.0, 500.0),
-            shelves:      Shelves.clamp(fetch(p, :shelves, DEFAULTS[:shelves]).to_i),
-            fronts:       front_mode(p),
-            name:         (p['name'] || p[:name])
-          }
+        def norm_type(p)
+          (raw(p, :type)).to_s == 'upper' ? 'upper' : 'lower'
         end
 
-        def front_mode(p)
-          v = (p['fronts'] || p[:fronts] || DEFAULTS[:fronts]).to_s
-          %w[none 1 2 auto].include?(v) ? v : 'none'
+        def front_mode(p, d)
+          v = raw(p, :fronts).to_s
+          %w[none 1 2 auto].include?(v) ? v : d[:fronts]
         end
 
-        def validate!(w, h, d, t, s)
-          raise 'Sirka je prilis mala vzhladom na hrubku materialu.' if w <= 2 * t + 10
-          raise 'Vyska je prilis mala (sokel + 2x hrubka + priestor).' if h <= s + 2 * t + 10
-          raise 'Hlbka je prilis mala.' if d <= BACK_THICKNESS + 10
-          raise 'Sokel nesmie byt vyssi nez korpus.' if s >= h
+        def enum_val(p, key, allowed, default)
+          v = raw(p, key)
+          allowed.include?(v.to_s) ? v.to_s : default
         end
 
         def ensure_material(model, name, rgb)
@@ -257,9 +325,13 @@ module Noxun
           mt
         end
 
-        def fetch(p, key, default)
+        def raw(p, key)
           v = p[key.to_s]
-          v = p[key] if v.nil?
+          v.nil? ? p[key] : v
+        end
+
+        def fetchf(p, key, default)
+          v = raw(p, key)
           return default if v.nil? || v.to_s.strip.empty?
           v.to_f
         end
@@ -269,6 +341,14 @@ module Noxun
           return lo if v < lo
           return hi if v > hi
           v
+        end
+
+        def guarded
+          if defined?(ScaleWatch)
+            ScaleWatch.guard { yield }
+          else
+            yield
+          end
         end
 
         def abort_safely(model)
