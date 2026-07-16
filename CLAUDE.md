@@ -11,12 +11,17 @@ GitHub: https://github.com/michalmoronga-alt/noxun-panel
 - Commit messages: vecné, slovensky/anglicky konzistentne s históriou, trailer `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`.
 - Paralelné úlohy: každá vo vlastnej vetve (agenti: worktree izolácia), konflikty rieši integrácia pred PR.
 
-## Špecifikácia a kontext
+## Špecifikácia a kontext (všetko v tomto repe)
 
-- **Záväzný štandard dát:** `..\SYSTEM\01_STANDARD_draft.md` (dictionary NOXUN, mm Float, roly, regenerate pattern)
-- **Roadmapa a backlog postrehov:** `..\SYSTEM\04_ROADMAP.md`
-- **Pravidlá SketchUp kódu:** `..\docs\SKETCHUP_PRAVIDLA.md` (+ `..\CLAUDE.md` — konvencie rodiny Noxun)
-- Testovanie: MCP `mcp__vbo-sketchup__execute_ruby` (SketchUp 2026 + VBO SkAgent), deploy `INSTALL_noxun_engine.ps1`
+- **Záväzný štandard dát:** [SYSTEM/01_STANDARD_draft.md](SYSTEM/01_STANDARD_draft.md) (dictionary NOXUN, mm Float, roly, regenerate pattern)
+- **Roadmapa a backlog postrehov:** [SYSTEM/04_ROADMAP.md](SYSTEM/04_ROADMAP.md) · UI vízia: [SYSTEM/07_UI_VIZIA.md](SYSTEM/07_UI_VIZIA.md)
+- **Pravidlá SketchUp kódu:** [docs/SKETCHUP_PRAVIDLA.md](docs/SKETCHUP_PRAVIDLA.md) · DC pasce: [docs/DC_PRAVIDLA.md](docs/DC_PRAVIDLA.md) — kompletné a samostatné v tomto repe. (Nadradený `..\CLAUDE.md` existuje len v Michalovom lokálnom workspace `C:\APP DEV\RUBY` — mapa ostatných pluginov; pre prácu v tomto repe nie je potrebný.)
+
+## Testovanie (záväzné pravidlá)
+
+- Kanál: MCP `mcp__vbo-sketchup__execute_ruby` (SketchUp 2026 + VBO SkAgent, port 7891); fallback file-bridge (`vbo_sk_agent\bridge\command.rb` → `result.json`, pozor na mtime pascu). Deploy: `INSTALL_noxun_engine.ps1`.
+- **Testuje sa VÝHRADNE v testovacom projekte `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne) — v ňom môžu agenti tvoriť/mazať čokoľvek. `_dev/` je gitignorované.
+- **NIKDY netestovať v okne so zákazkou** — pred testami vždy overiť `model.path`/titul okna (bridge vykonáva príkazy v každom okne, kde je zapnutý — bridge zapínať len v testovacom okne).
 
 ## Architektúra (V0.2)
 
