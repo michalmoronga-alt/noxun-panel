@@ -52,6 +52,17 @@ module Noxun
       }.freeze
       EDGE_LABELS_DEFAULT = { 'L1' => 'Hrana 1', 'L2' => 'Hrana 2', 'W1' => 'Hrana 3', 'W2' => 'Hrana 4' }.freeze
 
+      # Mapovanie hrana -> STRANA v 2D karte dielca (top/bottom/left/right). JEDEN ZDROJ PRAVDY pre
+      # SVG kreslenie, labely aj klik-targety (UI si ho vytiahne cez edge_sides, neduplikuje v JS).
+      # Orientacia je odvodena z toho, kadial bezi dlzka (prod[:length]) v ramci roly:
+      #   lezace dielce (police/boky/dna/priecky/chrbat/vystuhy): dlzka VODOROVNE ->
+      #       L1/L2 (pozdlzne) su vodorovne hrany (dole/hore), W1/W2 (priecne) zvisle (vlavo/vpravo).
+      #   cela (front_door/drawer_front): dlzka = vyska cela ZVISLE ->
+      #       L1/L2 (pozdlzne) su zvisle strany (lava/prava), W1/W2 (priecne) vodorovne (dole/hore).
+      # Priradenie strany SEDI s EDGE_LABELS (napr. celo L1='Ľavá' -> 'left', W2='Horná' -> 'top').
+      EDGE_SIDES_LYING = { 'L1' => 'bottom', 'L2' => 'top', 'W1' => 'left', 'W2' => 'right' }.freeze
+      EDGE_SIDES_FRONT = { 'L1' => 'left', 'L2' => 'right', 'W1' => 'bottom', 'W2' => 'top' }.freeze
+
       # Pravidlove defaulty ABS podla roly (hodnota = HRUBKA ABS v mm; dekor sa dopocita z materialu
       # dielca). Prazdna mapa = ziadne ABS. Standard 7.5 + zadanie V0.3:
       #   celo (front_door/drawer_front) -> vsetky 4 hrany 1.0
@@ -158,6 +169,15 @@ module Noxun
       # Mapa hrana -> slovensky label pre rolu (fallback genericke Hrana 1..4).
       def edge_labels(role)
         EDGE_LABELS[role.to_s] || EDGE_LABELS_DEFAULT
+      end
+
+      # Mapa hrana -> strana v 2D karte (top/bottom/left/right) pre rolu. Cela maju L na zvislych
+      # stranach; ostatne (lezace) L na vodorovnych. UI (SVG) kresli hrany + labely + klik podla tejto mapy.
+      def edge_sides(role)
+        case role.to_s
+        when 'front_door', 'drawer_front' then EDGE_SIDES_FRONT
+        else EDGE_SIDES_LYING
+        end
       end
 
       def deep_copy(h)

@@ -203,10 +203,36 @@ module Noxun
           ov = overrides[role_key].is_a?(Hash) ? overrides[role_key] : {}
           base_mat = base_material_for(pd[:role], pd[:material], eff_body, eff_front, eff_back)
           mat_id = present(ov['material_id']) || base_mat
-          decor = defined?(Materials) ? Materials.decor_of(mat_id) : nil
+          # Jeden lookup doskoveho materialu — pouzity na dekor (ABS) aj hrubkovu kontrolu (V0.3 FIX 2).
+          sheet = (defined?(Materials) && mat_id) ? Materials.sheet(mat_id) : nil
+          warn_thickness_mismatch(mat_id, sheet, pd)
+          decor = sheet && sheet['decor']
           base_edges = defined?(AbsRules) ? AbsRules.resolve_edges(pd[:role], decor) : empty_edges
           edges = base_edges.merge(known_edges(ov['edges']))
           { role_key: role_key, material_id: mat_id, edges: edges }
+        end
+
+        # V0.3 FIX 2: hrubkova kompatibilita materialu a dielca. Ak katalogovy material dielca ma inu
+        # hrubku nez dielec, zaloguj warning — ale material do configu zapiseme AJ TAK (data NEblokujeme,
+        # nech ho validacia V0.5 najde). UI cesta nesulad uz nedovoli (thickness-filtrovane selecty).
+        # Material mimo katalogu (legacy) sa tu nekontroluje (sheet == nil).
+        def warn_thickness_mismatch(mat_id, sheet, pd)
+          return unless mat_id && sheet && defined?(Engine)
+          want = pd[:prod][:thickness].to_f
+          have = sheet['thickness'].to_f
+          return if thickness_ok_for?(pd[:role], want, have)
+          Engine.log("Nesulad hrubky materialu #{mat_id} (#{have} mm) vs dielca #{pd[:suffix]} (#{want} mm)")
+        end
+
+        # Hrubkova kompatibilita (zhoduje sa s UI filtrom selectov): cela (front) beru dosky 18 aj 19 mm
+        # (dielec cela je modelovany na FRONT_THICKNESS 19, ale bezne cela su 18) — inak presna hrubka dielca.
+        def thickness_ok_for?(role, want, have)
+          case role.to_s
+          when 'front_door', 'drawer_front'
+            (have - 18.0).abs < 0.05 || (have - 19.0).abs < 0.05 || (have - want).abs < 0.05
+          else
+            (have - want).abs < 0.05
+          end
         end
 
         # Base material dielca podla roly: cela -> front, chrbat -> back, ostatne -> body (korpus).

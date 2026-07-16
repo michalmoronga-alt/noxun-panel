@@ -289,9 +289,25 @@ module Noxun
           cab = find_cabinet(model)
           return set_status('Najprv oznac NOXUN korpus.', true) if cab.nil?
 
-          # Prepis konstrukcne kluce (+ zony/cela zo sablony), zachova id + poziciu.
-          CabinetBuilder.rebuild(model, cab, tpl['config'].dup)
+          # V0.3 FIX 1: MERGE, nie nahradenie. Konstrukcne kluce (+ zony/cela) zo sablony; ale
+          # material + part_overrides ciela ZACHOVAJ (sablona ich prepise len ak ich explicitne nesie).
+          merged = merge_template(existing_params(cab), tpl['config'])
+          CabinetBuilder.rebuild(model, cab, merged)
           finish_cab(model, cab, "Sablona \"#{name}\" pouzita na #{Store.get(cab, 'cabinet_id')}.")
+        end
+
+        # Apply sablony = MERGE cieloveho korpusu so sablonou. Konstrukcne kluce beru zo sablony
+        # (tpl_config), ale material_id/front/back + part_overrides ZOSTAVAJU z ciela — aby sa
+        # nezahodili uzivatelove ABS/materialove upravy. Materialove pole prepiseme LEN ak ho sablona
+        # explicitne nesie (non-nil); part_overrides sa berie VZDY z ciela (sablona ich nenesie).
+        def merge_template(target_params, tpl_config)
+          merged = tpl_config.dup
+          merged['part_overrides'] = target_params['part_overrides'] || {}
+          %w[material_id front_material_id back_material_id].each do |k|
+            tv = present_str(tpl_config[k])
+            merged[k] = tv || target_params[k]
+          end
+          merged
         end
 
         def handle_toggle_zones(val)
@@ -569,7 +585,7 @@ module Noxun
         end
 
         def template_config_from(cfg)
-          {
+          tc = {
             'type' => cfg['type'], 'width' => cfg['width'], 'height' => cfg['height'], 'depth' => cfg['depth'],
             'thickness' => cfg['thickness'], 'floor_height' => cfg['floor_height'],
             'bottom_mode' => cfg['bottom_mode'], 'top_mode' => cfg['top_mode'], 'back_mode' => cfg['back_mode'],
@@ -580,6 +596,14 @@ module Noxun
             'zone_tree' => cfg['zone_tree'] || ZoneTree.default_tree((cfg['shelves'] || 0).to_i),
             'fronts' => Fronts.normalize_config(cfg['fronts'])
           }
+          # V0.3 FIX 1: korpusove materialy do sablony LEN ak su na zdroji nastavene (non-nil).
+          # part_overrides do sablony NEUKLADAME — su viazane na konkretne dielce/zony zdroja
+          # (pri aplikacii sablony sa zachovaju z cieloveho korpusu).
+          %w[material_id front_material_id back_material_id].each do |k|
+            v = present_str(cfg[k])
+            tc[k] = v if v
+          end
+          tc
         end
 
         def template_config_from_fields(data)
@@ -772,6 +796,7 @@ module Noxun
             'material_id' => cfg['material_id'],
             'edges' => cfg['edges'] || AbsRules.empty_edges,
             'edge_labels' => AbsRules.edge_labels(role),
+            'edge_sides' => AbsRules.edge_sides(role), # V0.3 FIX 3: mapa hrana->strana pre SVG (1 zdroj pravdy)
             'edge_overrides' => (ov['edges'] || {}), # ktore hrany maju rucny override (UI odlisi "dedi")
             'has_material_override' => !ov['material_id'].nil?,
             'similar_count' => count_role(cab, role),

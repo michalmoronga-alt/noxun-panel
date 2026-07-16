@@ -369,12 +369,31 @@
   }
   function absColorOf(absId){ return absId ? absColorByThickness(absThicknessOf(absId)) : '#b0bec5'; }
 
-  // Naplni <select> doskovymi materialmi. includeInherit -> prva volba "(dediť z projektu)".
-  function fillSheetSelect(sel, includeInherit){
+  // FIX 2: hrubkove predikaty pre filter doskovych materialov (tolerancia 0,05 mm).
+  // Prazdny/neplatny cielovy rozmer -> nefiltruj (radsej vsetko nez nic).
+  function thMatch(target){
+    var t = parseFloat(target);
+    if (isNaN(t)) return function(){ return true; };
+    return function(s){ return Math.abs(parseFloat(s.thickness) - t) < 0.05; };
+  }
+  // Cela: standardne dosky 18 alebo 19 mm (front hrubka; pozri Fronts::FRONT_THICKNESS = 19).
+  function frontMatch(){
+    return function(s){ var t = parseFloat(s.thickness); return Math.abs(t-18)<0.05 || Math.abs(t-19)<0.05; };
+  }
+  // FIX 2: naplni <select> doskami, ale hrubkovo NEKOMPATIBILNE su disabled + oznacene "✕".
+  // Aktualne vybranu (aj legacy nesuladnu) dosku nechaj vyberatelnu, nech ju vie zobrazit. Pri
+  // prazdnom vysledku ostanu vsetky viditelne (disabled) — pouzivatel vidi katalog. Zachova hodnotu.
+  function fillSheetSelectFiltered(sel, includeInherit, matchFn, keepValue){
     if (!sel) return;
+    var cur = (keepValue !== undefined && keepValue !== null) ? keepValue : sel.value;
     var html = includeInherit ? '<option value="">(dediť z projektu)</option>' : '';
-    MATERIALS.sheets.forEach(function(s){ html += '<option value="'+esc(s.id)+'">'+esc(s.label)+'</option>'; });
+    MATERIALS.sheets.forEach(function(s){
+      var ok = matchFn ? matchFn(s) : true;
+      var keep = ok || (s.id === cur);
+      html += '<option value="'+esc(s.id)+'"'+(keep?'':' disabled')+'>'+esc(s.label)+(ok?'':' · ✕')+'</option>';
+    });
     sel.innerHTML = html;
+    sel.value = cur;
   }
   // Volby ABS pre dropdown hrany: podla pravidla / bez ABS / konkretne varianty.
   function edgeOptionsHtml(){
@@ -382,10 +401,17 @@
     MATERIALS.edges.forEach(function(a){ html += '<option value="'+esc(a.id)+'">'+esc(a.label)+'</option>'; });
     return html;
   }
-  // Naplni vsetky projektove + korpusove material selecty (po nacitani katalogu).
-  function fillMaterialSelects(){
-    fillSheetSelect(el('proj_body'), false); fillSheetSelect(el('proj_front'), false); fillSheetSelect(el('proj_back'), false);
-    fillSheetSelect(el('cab_body'), true); fillSheetSelect(el('cab_front'), true); fillSheetSelect(el('cab_back'), true);
+  // FIX 2: naplni/obnovi vsetky projektove + korpusove material selecty podla hrubky KONTEXTU
+  // (korpus = pole 'thickness', chrbat = 'back_thickness', cela = 18/19). Nekompatibilne dosky
+  // disabled. Vola sa na init, pri vybere korpusu aj po zmene hrubky (onField). Zachova hodnoty.
+  function refreshMaterialFilters(){
+    var bodyTh = numv('thickness'), backTh = numv('back_thickness');
+    fillSheetSelectFiltered(el('proj_body'), false, thMatch(bodyTh));
+    fillSheetSelectFiltered(el('proj_front'), false, frontMatch());
+    fillSheetSelectFiltered(el('proj_back'), false, thMatch(backTh));
+    fillSheetSelectFiltered(el('cab_body'), true, thMatch(bodyTh));
+    fillSheetSelectFiltered(el('cab_front'), true, frontMatch());
+    fillSheetSelectFiltered(el('cab_back'), true, thMatch(backTh));
   }
   function val(id){ var e = el(id); return e ? e.value : null; }
   function numv(id){ var e = el(id); return e ? parseFloat(e.value) : NaN; }
@@ -445,6 +471,7 @@
   // --- AUTO-APPLY (debounce 400 ms) ---
   function onField(){
     validateFields();
+    refreshMaterialFilters();              // FIX 2: hrubka sa mohla zmenit -> prefiltruj material selecty
     renderPreview();
     updateAvailable();
     if (!selectedCabId) return;            // nic oznacene -> len nahlad, ziadny rebuild
@@ -1007,7 +1034,7 @@
       DEFAULTS = data.defaults || { lower: {}, upper: {} };
       TEMPLATES = data.templates || [];
       MATERIALS = data.materials || { sheets: [], edges: [] };
-      fillMaterialSelects();
+      refreshMaterialFilters();
       setProjectMaterials(data.project_materials || {});
       el('zonesChk').checked = !!data.zones_visible;
       if (data.selected){ NX.loadSelected(data.selected); }
@@ -1030,6 +1057,7 @@
       frontItems = c.front_items || [];
       activeZoneId = c.active_zone || null;
       setSelected(c.cabinet_id || null);
+      refreshMaterialFilters(); // FIX 2: prefiltruj podla hrubok tohto korpusu (pred nastavenim hodnot)
       setCabinetMaterials(c); // V0.3 korpusove material selecty (prazdne = dedi)
       renderFilteredTemplates();
       el('selinfo').innerHTML = 'Označený: <b>' + (c.cabinet_id || '?') + '</b>';
@@ -1092,7 +1120,11 @@
     box.style.display='';
     el('pcName').innerHTML = '<b>'+esc(pc.name || roleLabel(pc.role))+'</b> · '+esc(roleLabel(pc.role));
     el('pcDim').textContent = fmtmm(pc.length)+' × '+fmtmm(pc.width)+' × '+fmtmm(pc.thickness)+' mm';
-    var ms = el('pcMaterial'); fillSheetSelect(ms, false);
+    // FIX 2: material dielca len z hrubkovo kompatibilnych dosiek (nekompatibilne disabled). Cela
+    // beru 18/19 mm (rovnako ako builder guard aj korpusovy select), ostatne presnu hrubku dielca.
+    var isFront = (pc.role === 'front_door' || pc.role === 'drawer_front');
+    var matFn = isFront ? frontMatch() : thMatch(pc.thickness);
+    var ms = el('pcMaterial'); fillSheetSelectFiltered(ms, false, matFn, pc.material_id || '');
     ms.value = pc.material_id || '';
     ms.className = pc.has_material_override ? 'ovr' : '';
     renderEdgeRows(pc);
@@ -1117,26 +1149,44 @@
       box.appendChild(row);
     });
   }
-  // 2D dielec: obdlznik length(horizontalne) x width(vertikalne). L1 dole/L2 hore (pozdlzne),
-  // W1 vlavo/W2 vpravo (priecne). Hrany farebne podla ABS. Klik na hranu -> fokus jej dropdownu.
+  // 2D dielec: obdlznik. Orientaciu aj priradenie hran riadi mapa pc.edge_sides z Ruby (AbsRules —
+  // jeden zdroj pravdy zdielany s labelmi): lezace dielce maju dlzku vodorovne (L1/L2 dole/hore,
+  // W1/W2 vlavo/vpravo); cela dlzku zvisle (L1/L2 lava/prava, W1/W2 dole/hore). Hrany farebne podla
+  // ABS; klik na hranu -> fokus jej dropdownu. Bez mapy fallback = lezaci dielec (spatna kompat).
   function renderPartSvg(pc){
     var svg = el('partSvg'); if(!svg) return;
     var L = Math.max(1, parseFloat(pc.length)||100), Wd = Math.max(1, parseFloat(pc.width)||100);
+    var sides = pc.edge_sides || { L1:'bottom', L2:'top', W1:'left', W2:'right' };
+    // L hrany na zvislej strane => dlzka sa kresli zvislo (cela); inak vodorovne (lezace dielce).
+    var lVert = (sides.L1==='left' || sides.L1==='right');
+    var horiz = lVert ? Wd : L, vert = lVert ? L : Wd;
     var pad=28, availW=300-2*pad, availH=200-2*pad;
-    var sc = Math.min(availW/L, availH/Wd); if(!isFinite(sc)||sc<=0) sc=1;
-    var rw=L*sc, rh=Wd*sc, ox=(300-rw)/2, oy=(200-rh)/2, ew=7;
+    var sc = Math.min(availW/horiz, availH/vert); if(!isFinite(sc)||sc<=0) sc=1;
+    var rw=horiz*sc, rh=vert*sc, ox=(300-rw)/2, oy=(200-rh)/2, ew=7;
     var edges = pc.edges||{}, lab = pc.edge_labels||{};
     function ecol(code){ return absColorOf(edges[code]); }
+    // Farebny bar (klik-target) danej strany obdlznika.
+    function bar(side, code, fill){
+      if (side==='top')    return '<rect class="ehit" data-edge="'+code+'" x="'+ox+'" y="'+(oy-ew/2)+'" width="'+rw+'" height="'+ew+'" fill="'+fill+'" style="cursor:pointer"/>';
+      if (side==='bottom') return '<rect class="ehit" data-edge="'+code+'" x="'+ox+'" y="'+(oy+rh-ew/2)+'" width="'+rw+'" height="'+ew+'" fill="'+fill+'" style="cursor:pointer"/>';
+      if (side==='left')   return '<rect class="ehit" data-edge="'+code+'" x="'+(ox-ew/2)+'" y="'+oy+'" width="'+ew+'" height="'+rh+'" fill="'+fill+'" style="cursor:pointer"/>';
+      return '<rect class="ehit" data-edge="'+code+'" x="'+(ox+rw-ew/2)+'" y="'+oy+'" width="'+ew+'" height="'+rh+'" fill="'+fill+'" style="cursor:pointer"/>'; // right
+    }
+    // Popis (label) strany — vodorovne hore/dole, zvisle vlavo/vpravo (rotovane).
+    function label(side, txt){
+      txt = esc(txt||'');
+      if (side==='top')    return '<text x="150" y="'+(oy-10)+'" font-size="11" fill="#78909c" text-anchor="middle" pointer-events="none">'+txt+'</text>';
+      if (side==='bottom') return '<text x="150" y="'+(oy+rh+17)+'" font-size="11" fill="#78909c" text-anchor="middle" pointer-events="none">'+txt+'</text>';
+      if (side==='left')   return '<text x="'+(ox-11)+'" y="'+(oy+rh/2)+'" font-size="11" fill="#78909c" text-anchor="middle" pointer-events="none" transform="rotate(-90 '+(ox-11)+' '+(oy+rh/2)+')">'+txt+'</text>';
+      return '<text x="'+(ox+rw+11)+'" y="'+(oy+rh/2)+'" font-size="11" fill="#78909c" text-anchor="middle" pointer-events="none" transform="rotate(90 '+(ox+rw+11)+' '+(oy+rh/2)+')">'+txt+'</text>'; // right
+    }
     var S=[];
     S.push('<rect x="'+ox+'" y="'+oy+'" width="'+rw+'" height="'+rh+'" fill="#faf6ee" stroke="#cfd8dc"/>');
-    S.push('<rect class="ehit" data-edge="L2" x="'+ox+'" y="'+(oy-ew/2)+'" width="'+rw+'" height="'+ew+'" fill="'+ecol('L2')+'" style="cursor:pointer"/>');
-    S.push('<rect class="ehit" data-edge="L1" x="'+ox+'" y="'+(oy+rh-ew/2)+'" width="'+rw+'" height="'+ew+'" fill="'+ecol('L1')+'" style="cursor:pointer"/>');
-    S.push('<rect class="ehit" data-edge="W1" x="'+(ox-ew/2)+'" y="'+oy+'" width="'+ew+'" height="'+rh+'" fill="'+ecol('W1')+'" style="cursor:pointer"/>');
-    S.push('<rect class="ehit" data-edge="W2" x="'+(ox+rw-ew/2)+'" y="'+oy+'" width="'+ew+'" height="'+rh+'" fill="'+ecol('W2')+'" style="cursor:pointer"/>');
-    S.push('<text x="150" y="'+(oy-10)+'" font-size="11" fill="#78909c" text-anchor="middle" pointer-events="none">'+esc(lab.L2||'')+'</text>');
-    S.push('<text x="150" y="'+(oy+rh+17)+'" font-size="11" fill="#78909c" text-anchor="middle" pointer-events="none">'+esc(lab.L1||'')+'</text>');
-    S.push('<text x="'+(ox-11)+'" y="'+(oy+rh/2)+'" font-size="11" fill="#78909c" text-anchor="middle" pointer-events="none" transform="rotate(-90 '+(ox-11)+' '+(oy+rh/2)+')">'+esc(lab.W1||'')+'</text>');
-    S.push('<text x="'+(ox+rw+11)+'" y="'+(oy+rh/2)+'" font-size="11" fill="#78909c" text-anchor="middle" pointer-events="none" transform="rotate(90 '+(ox+rw+11)+' '+(oy+rh/2)+')">'+esc(lab.W2||'')+'</text>');
+    ['L1','L2','W1','W2'].forEach(function(code){
+      var side = sides[code]; if(!side) return;
+      S.push(bar(side, code, ecol(code)));
+      S.push(label(side, lab[code]));
+    });
     S.push('<text x="150" y="100" font-size="12" fill="#b0bec5" text-anchor="middle" dominant-baseline="middle" pointer-events="none">'+Math.round(L)+'×'+Math.round(Wd)+'</text>');
     svg.innerHTML = S.join('');
   }
