@@ -63,6 +63,12 @@ module Noxun
           cb(dlg, 'delete_template') { |p| handle_delete_template(p) }
           cb(dlg, 'apply_template') { |p| handle_apply_template(p) }
           cb(dlg, 'toggle_zones')   { |p| handle_toggle_zones(p) }
+          # V0.3 materialy + ABS
+          cb(dlg, 'set_project_material') { |p| handle_set_project_material(p) } # projektovy default
+          cb(dlg, 'set_cabinet_material') { |p| handle_set_cabinet_material(p) } # korpusovy override
+          cb(dlg, 'set_part_material')    { |p| handle_set_part_material(p) }    # per-dielec override
+          cb(dlg, 'set_part_edge')        { |p| handle_set_part_edge(p) }        # ABS hrana dielca
+          cb(dlg, 'apply_to_similar')     { |p| handle_apply_to_similar(p) }     # na podobne diely
           # Diagnostika: JS chyby z HtmlDialogu (window.onerror) -> Engine.log. Priamo, NIE cez cb —
           # aby pripadna chyba v logovani nespustila set_status (dalsi execute_script) a slucku.
           dlg.add_action_callback('js_error') do |_ctx, msg|
@@ -296,6 +302,150 @@ module Noxun
           set_status(visible ? 'Ghost zony zapnute.' : 'Ghost zony vypnute.')
         end
 
+        # --- akcie: materialy + ABS (V0.3) ----------------------------------
+
+        # Projektovy default materialu (koren dedenia, standard 7.2). NOXUN dict na MODELI.
+        # Prejav sa hned na oznacenom korpuse (ak dedi); ostatne az pri ich najblizsom rebuilde.
+        def handle_set_project_material(payload)
+          model = Sketchup.active_model
+          data = parse(payload)
+          key = data['key'].to_s
+          value = present_str(data['value']).to_s
+          return set_status('Neznamy projektovy material.', true) unless Materials::PROJECT_KEYS.include?(key)
+          model.start_operation('NOXUN: projektovy material', true)
+          Materials.set_project_default(model, key, value)
+          model.commit_operation
+          cab = find_cabinet(model)
+          if cab
+            suspend_selection_sync do
+              CabinetBuilder.rebuild(model, cab, existing_params(cab), op_name: 'NOXUN: prepocet materialu')
+              reselect(model, cab)
+            end
+          end
+          set_status('Projektový materiál nastavený.')
+          push_selected(model)
+        end
+
+        # Korpusovy material (override projektu). which: body/front/back; prazdna hodnota = dedi.
+        def handle_set_cabinet_material(payload)
+          model = Sketchup.active_model
+          cab = find_cabinet(model)
+          return set_status('Najprv oznac NOXUN korpus.', true) if cab.nil?
+          data = parse(payload)
+          key = { 'body' => 'material_id', 'front' => 'front_material_id', 'back' => 'back_material_id' }[data['which'].to_s]
+          return set_status('Neznamy material korpusu.', true) unless key
+          value = present_str(data['value'])
+          params = existing_params(cab)
+          params[key] = value
+          suspend_selection_sync do
+            CabinetBuilder.rebuild(model, cab, params, op_name: 'NOXUN: material korpusu')
+            reselect(model, cab)
+          end
+          set_status("Materiál korpusu #{value ? 'nastavený' : 'dedí z projektu'}.")
+          push_selected(model)
+        end
+
+        # Per-dielec material (part_override, viťazi nad dedenim). role_key identifikuje dielec.
+        def handle_set_part_material(payload)
+          model = Sketchup.active_model
+          cab = find_cabinet(model)
+          return set_status('Najprv oznac dielec v korpuse.', true) if cab.nil?
+          data = parse(payload)
+          rk = data['role_key'].to_s
+          return set_status('Chyba identifikacie dielca.', true) if rk.empty?
+          mat = present_str(data['material_id'])
+          params = existing_params(cab)
+          ov = (params['part_overrides'] ||= {})
+          rec = ov[rk] || {}
+          if mat then rec['material_id'] = mat else rec.delete('material_id') end
+          store_override(ov, rk, rec)
+          rebuild_focus_part(model, cab, rk, params, "Materiál dielca #{mat ? 'nastavený' : 'zdedený'}.")
+        end
+
+        # ABS hrana dielca (part_override.edges[code]). abs_id: konkretne / '' (bez ABS) / '__inherit__' (dedi).
+        def handle_set_part_edge(payload)
+          model = Sketchup.active_model
+          cab = find_cabinet(model)
+          return set_status('Najprv oznac dielec v korpuse.', true) if cab.nil?
+          data = parse(payload)
+          rk = data['role_key'].to_s
+          code = data['edge'].to_s
+          return set_status('Chyba identifikacie dielca/hrany.', true) if rk.empty? || !%w[L1 L2 W1 W2].include?(code)
+          raw = data['abs_id']
+          params = existing_params(cab)
+          ov = (params['part_overrides'] ||= {})
+          rec = ov[rk] || {}
+          edges = rec['edges'] || {}
+          if raw.to_s == '__inherit__'
+            edges.delete(code)          # spat na pravidlovy default
+          else
+            edges[code] = present_str(raw) # nil (bez ABS) alebo abs_id — explicitny override
+          end
+          if edges.empty? then rec.delete('edges') else rec['edges'] = edges end
+          store_override(ov, rk, rec)
+          label = raw.to_s == '__inherit__' ? 'podľa pravidla' : (present_str(raw) ? 'nastavená' : 'bez ABS')
+          rebuild_focus_part(model, cab, rk, params, "Hrana #{code} — #{label}.")
+        end
+
+        # "Pouzit na podobne diely" — skopiruje material + ABS zdrojoveho dielca na vsetky dielce
+        # ROVNAKEJ ROLY. scope: 'cabinet' (ta ista skrinka) / 'model' (vsetky korpusy). Kluc = role_key.
+        def handle_apply_to_similar(payload)
+          model = Sketchup.active_model
+          cab = find_cabinet(model)
+          return set_status('Najprv oznac dielec v korpuse.', true) if cab.nil?
+          data = parse(payload)
+          rk = data['role_key'].to_s
+          scope = data['scope'].to_s == 'model' ? 'model' : 'cabinet'
+          src = find_part_by_role_key(cab, rk)
+          return set_status('Zdrojovy dielec sa nenasiel.', true) if src.nil?
+          role = Store.get(src, 'role')
+          scfg = Store.config(src) || {}
+          src_mat = scfg['material_id']
+          src_edges = dup_edges(scfg['edges'] || {})
+          cabs = scope == 'model' ? all_cabinets(model) : [cab]
+          count = 0
+          suspend_selection_sync do
+            cabs.each do |c|
+              keys = parts_of_role(c, role)
+              next if keys.empty?
+              params = existing_params(c)
+              ov = (params['part_overrides'] ||= {})
+              keys.each do |k|
+                rec = ov[k] || {}
+                rec['material_id'] = src_mat if src_mat
+                rec['edges'] = dup_edges(src_edges)
+                ov[k] = rec
+                count += 1
+              end
+              CabinetBuilder.rebuild(model, c, params, op_name: 'NOXUN: material/ABS na podobne')
+            end
+            focus_part(model, cab, rk)
+          end
+          set_status("Použité na #{count} dielcov #{scope == 'model' ? 'v celom modeli' : 'v skrinke'} (rola #{role}).")
+          push_selected(model)
+        end
+
+        # Rebuild korpusu s pripravenymi params + fokus na dielec (role_key) + resync panela.
+        def rebuild_focus_part(model, cab, rk, params, msg)
+          suspend_selection_sync do
+            CabinetBuilder.rebuild(model, cab, params, op_name: 'NOXUN: uprava dielca')
+            focus_part(model, cab, rk)
+          end
+          set_status(msg)
+          push_selected(model) # posle korpus + part_card (dielec je po fokuse vo vybere) -> karta ostane
+        end
+
+        # Po rebuilde: najdi "ten isty" dielec podla role_key a oznac ho (karta ostane na tom dielci).
+        def focus_part(model, cab, rk)
+          part = find_part_by_role_key(cab, rk)
+          reselect(model, part || cab)
+        end
+
+        # Zapis/vycisti zaznam part_override pod klucom rk (prazdny zaznam sa odstrani).
+        def store_override(ov, rk, rec)
+          if rec.nil? || rec.empty? then ov.delete(rk) else ov[rk] = rec end
+        end
+
         # --- Ruby -> JS ------------------------------------------------------
         def push_init
           model = Sketchup.active_model
@@ -307,6 +457,8 @@ module Noxun
             },
             zones_visible: Zones.visible?(model),
             templates: template_list,
+            materials: materials_payload,            # V0.3 katalog (dosky + ABS) pre selecty
+            project_materials: project_materials(model), # V0.3 projektove defaulty (koren dedenia)
             selected: cab ? cabinet_payload(cab) : nil
           }
           js("NX.init(#{data.to_json})")
@@ -330,6 +482,9 @@ module Noxun
           @active_zone_id = az
           payload = cabinet_payload(cab)
           payload['active_zone'] = az
+          # V0.3: ak je vo vybere DIELEC (kind=part), priloz kartu dielca (ABS/materialovy editor).
+          part = find_selected_part(model)
+          payload['part_card'] = part ? part_card_payload(model, cab, part) : nil
           js("NX.loadSelected(#{payload.to_json})")
         end
 
@@ -559,6 +714,122 @@ module Noxun
 
         def truthy?(val)
           %w[true 1 yes].include?(val.to_s.downcase)
+        end
+
+        # --- V0.3 materialy + ABS: payloady a resolvery ---------------------
+
+        # Katalog pre selecty: dosky (id + label) + ABS pasky (id + label + farba pre nahlad hrany).
+        def materials_payload
+          cat = Materials.load
+          {
+            'sheets' => cat['sheets'].map { |s|
+              { 'id' => s['material_id'], 'label' => sheet_label(s), 'decor' => s['decor'],
+                'thickness' => s['thickness'], 'color' => s['color'] }
+            },
+            'edges' => cat['edges'].map { |a|
+              { 'id' => a['abs_id'], 'label' => abs_label(a), 'decor' => a['decor'],
+                'thickness' => a['thickness'], 'color' => a['color'] }
+            }
+          }
+        rescue StandardError => e
+          Engine.log_error(e, 'materials_payload')
+          { 'sheets' => [], 'edges' => [] }
+        end
+
+        def sheet_label(s)
+          th = s['thickness'].to_f
+          thl = (th == th.round ? th.round : th)
+          "#{s['decor']} · #{s['type']} #{thl} mm"
+        end
+
+        def abs_label(a)
+          "#{a['decor']} #{a['thickness']} mm"
+        end
+
+        def project_materials(model)
+          Materials.project_defaults(model)
+        rescue StandardError => e
+          Engine.log_error(e, 'project_materials')
+          {}
+        end
+
+        # Dielec vo vybere (kind=part) — po dvojkliku do korpusu a kliknuti na dielec.
+        def find_selected_part(model)
+          model.selection.to_a.find { |e| Store.kind(e) == 'part' }
+        end
+
+        # Karta dielca pre UI (ABS/materialovy editor): rola, rozmery, VYSLEDNY material + ABS hrany,
+        # labely hran per rola, priznaky overridov, pocet podobnych (rovnaka rola v skrinke).
+        def part_card_payload(_model, cab, part)
+          cfg = Store.config(part) || {}
+          role = Store.get(part, 'role').to_s
+          rk = present_str(Store.get(part, 'role_key')) || fallback_role_key(cab, part)
+          cabcfg = Store.config(cab) || {}
+          ov = ((cabcfg['part_overrides'] || {})[rk] || {})
+          {
+            'role_key' => rk, 'role' => role, 'name' => Store.get(part, 'name'),
+            'length' => cfg['length'], 'width' => cfg['width'], 'thickness' => cfg['thickness'],
+            'material_id' => cfg['material_id'],
+            'edges' => cfg['edges'] || AbsRules.empty_edges,
+            'edge_labels' => AbsRules.edge_labels(role),
+            'edge_overrides' => (ov['edges'] || {}), # ktore hrany maju rucny override (UI odlisi "dedi")
+            'has_material_override' => !ov['material_id'].nil?,
+            'similar_count' => count_role(cab, role),
+            'cabinet_id' => Store.get(cab, 'cabinet_id')
+          }
+        rescue StandardError => e
+          Engine.log_error(e, 'part_card_payload')
+          nil
+        end
+
+        # role_key z plocheho atributu; fallback pre stare dielce = part_id bez cabinet_id prefixu.
+        def fallback_role_key(cab, part)
+          pid = Store.get(part, 'part_id').to_s
+          cid = Store.get(cab, 'cabinet_id').to_s
+          (!cid.empty? && pid.start_with?("#{cid}-")) ? pid[(cid.length + 1)..-1] : pid
+        end
+
+        def find_part_by_role_key(cab, rk)
+          return nil unless cab && cab.respond_to?(:definition) && cab.valid?
+          cab.definition.entities.grep(Sketchup::ComponentInstance).find do |e|
+            Store.kind(e) == 'part' && present_str(Store.get(e, 'role_key')) == rk
+          end
+        end
+
+        # role_key vsetkych dielcov danej roly v korpuse (pre "pouzit na podobne").
+        def parts_of_role(cab, role)
+          return [] unless cab && cab.respond_to?(:definition) && cab.valid?
+          cab.definition.entities.grep(Sketchup::ComponentInstance).select do |e|
+            Store.kind(e) == 'part' && Store.get(e, 'role') == role
+          end.map { |e| present_str(Store.get(e, 'role_key')) }.compact
+        end
+
+        def count_role(cab, role)
+          return 0 unless cab && cab.respond_to?(:definition) && cab.valid?
+          cab.definition.entities.grep(Sketchup::ComponentInstance).count do |e|
+            Store.kind(e) == 'part' && Store.get(e, 'role') == role
+          end
+        end
+
+        def all_cabinets(model)
+          out = []
+          Ids.each_cabinet(model) { |i| out << i }
+          out
+        end
+
+        # Plytka kopia edges mapy (len zname kluce L1/L2/W1/W2, zachova nil = bez ABS).
+        def dup_edges(edges)
+          out = {}
+          return out unless edges.is_a?(Hash)
+          %w[L1 L2 W1 W2].each { |k| out[k] = edges[k] if edges.key?(k) }
+          out
+        end
+
+        # String alebo nil (prazdny -> nil). Pre material dedenie + override cistenie.
+        def present_str(v)
+          return nil if v.nil?
+          s = v.to_s.strip
+          s.empty? ? nil : s
         end
       end
 

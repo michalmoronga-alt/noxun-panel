@@ -74,10 +74,61 @@
   #status { font-size: 11px; padding: 7px 9px; border-radius: 5px; background: #eceff1; color: #455a64; border: 1px solid #cfd8dc; min-height: 16px; line-height: 1.35; margin-top: 8px; }
   #status.err { background: #fdecea; color: #b71c1c; border-color: #f5c6cb; }
   #status.ok  { background: #e8f5e9; color: #1b5e20; border-color: #c8e6c9; }
+  /* V0.3 Materialy */
+  .matrow { display: flex; align-items: center; margin: 5px 0; }
+  .matrow label { flex: 0 0 118px; color: #455a64; font-size: 12px; }
+  .matrow select { flex: 1; padding: 4px 6px; border: 1px solid #b0bec5; border-radius: 4px; font-size: 12px; min-width: 0; }
+  .subhead { font-size: 11px; font-weight: 600; color: #607d8b; margin: 8px 0 3px; text-transform: uppercase; letter-spacing: .03em; }
+  /* V0.3 Karta dielca (ABS editor) */
+  #partCard { border: 1px solid #90caf9; background: #f5fbff; }
+  #partCard legend { color: #1565c0; }
+  .pchead { font-size: 12px; color: #37474f; margin: 0 0 2px; }
+  .pchead b { color: #1565c0; }
+  .pcdim { font-size: 11px; color: #78909c; margin: 0 0 8px; }
+  #partSvg { width: 100%; max-height: 200px; border: 1px solid #cfd8dc; border-radius: 5px; background: #fff; display: block; margin: 4px 0 6px; }
+  .absleg { display: flex; flex-wrap: wrap; gap: 8px; font-size: 10px; color: #607d8b; margin: 2px 0 8px; }
+  .absleg span { display: inline-flex; align-items: center; gap: 3px; }
+  .absleg i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
+  .edgerow { display: flex; gap: 5px; align-items: center; margin: 3px 0; }
+  .edgerow .en { flex: 0 0 78px; font-size: 12px; color: #455a64; display: flex; align-items: center; gap: 5px; }
+  .edgerow .en i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; flex: 0 0 11px; }
+  .edgerow select { flex: 1; padding: 3px 5px; border: 1px solid #b0bec5; border-radius: 4px; font-size: 12px; min-width: 0; }
+  .edgerow select.ovr { border-color: #ffb74d; background: #fff8ef; }
+  .pcmat { display: flex; align-items: center; gap: 5px; margin: 2px 0 6px; }
+  .pcmat label { flex: 0 0 78px; font-size: 12px; color: #455a64; }
+  .pcmat select { flex: 1; padding: 4px 6px; border: 1px solid #b0bec5; border-radius: 4px; font-size: 12px; min-width: 0; }
+  .pcmat select.ovr { border-color: #ffb74d; background: #fff8ef; }
+  .simline { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11px; color: #607d8b; }
 </style>
 
 <h1>Noxun Engine</h1>
-<p class="sub">V0.2c — náhľad, zóny, čelá, auto-úprava</p>
+<p class="sub">V0.3 — materiály, ABS hrany, náhľad, zóny, čelá</p>
+
+<!-- KARTA DIELCA (ABS editor) — zobrazi sa po vybere dielca (dvojklik do korpusu + klik na dielec) -->
+<fieldset id="partCard" style="display:none">
+  <legend>Dielec</legend>
+  <div class="pchead" id="pcName"></div>
+  <div class="pcdim" id="pcDim"></div>
+  <div class="pcmat"><label>Materiál</label>
+    <select id="pcMaterial" onchange="onPartMaterial()"></select>
+  </div>
+  <svg id="partSvg" viewBox="0 0 300 200" preserveAspectRatio="xMidYMid meet"></svg>
+  <div class="absleg">
+    <span><i style="background:#e53935"></i>1,0 mm</span>
+    <span><i style="background:#1e88e5"></i>0,4 mm</span>
+    <span><i style="background:#43a047"></i>2,0 mm</span>
+    <span><i style="background:#b0bec5"></i>bez ABS</span>
+    <span><i style="background:#fff8ef;border:1px solid #ffb74d"></i>ručný override</span>
+  </div>
+  <div id="edgeRows"></div>
+  <div class="simline">
+    <button class="ghostbtn" id="pcSimBtn" onclick="applyToSimilar()">Použiť na podobné diely</button>
+  </div>
+  <div class="simline">
+    <input type="checkbox" id="pcSimModel" style="width:14px;height:14px;">
+    <label for="pcSimModel">aj v celom modeli (všetky skrinky)</label>
+  </div>
+</fieldset>
 
 <!-- ZAKLADNE: typ + rozmery + svetle -->
 <fieldset>
@@ -94,6 +145,23 @@
   <div class="row"><label>Svetlá hĺbka</label><input id="av_depth" type="text" readonly><span class="unit">mm</span></div>
   <div class="row"><label>Úložná výška</label><input id="av_height" type="text" readonly><span class="unit">mm</span></div>
 </fieldset>
+
+<!-- MATERIALY (V0.3): projektove defaulty + korpusove overridy -->
+<details data-key="materials">
+  <summary>Materiály</summary>
+  <div class="body">
+    <div class="subhead">Projekt (predvolené pre všetky skrinky)</div>
+    <div class="hint">Zmena projektového materiálu sa prejaví na označenej skrinke hneď, na ostatných pri ich najbližšej úprave.</div>
+    <div class="matrow"><label>Korpus</label><select id="proj_body" onchange="onProjectMaterial('default_material_id', this.value)"></select></div>
+    <div class="matrow"><label>Čelá</label><select id="proj_front" onchange="onProjectMaterial('default_front_material_id', this.value)"></select></div>
+    <div class="matrow"><label>Chrbát</label><select id="proj_back" onchange="onProjectMaterial('default_back_material_id', this.value)"></select></div>
+    <div class="subhead">Táto skrinka (prázdne = dediť z projektu)</div>
+    <div class="hint" id="cabMatHint">Označ skrinku pre nastavenie jej materiálov.</div>
+    <div class="matrow"><label>Korpus</label><select id="cab_body" onchange="onCabinetMaterial('body', this.value)"></select></div>
+    <div class="matrow"><label>Čelá</label><select id="cab_front" onchange="onCabinetMaterial('front', this.value)"></select></div>
+    <div class="matrow"><label>Chrbát</label><select id="cab_back" onchange="onCabinetMaterial('back', this.value)"></select></div>
+  </div>
+</details>
 
 <!-- STROP -->
 <details data-key="top">
@@ -276,8 +344,49 @@
   var lastZones = null;         // ploche zony z backendu (oznaceny korpus)
   var frontItems = null;        // rozlozene cela z backendu
   var PALETTE = ['#46beff','#6eff96','#ffaf50','#dc78ff','#ffeb5a'];
+  // V0.3 materialy + ABS
+  var MATERIALS = { sheets: [], edges: [] }; // katalog z backendu
+  var partCard = null;                        // aktualna karta dielca (null = ziadny dielec)
 
   function el(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function hasOwn(o,k){ return o && Object.prototype.hasOwnProperty.call(o, k); }
+  function fmtmm(v){ return (v==null||v==='')?'?':Math.round(parseFloat(v)); }
+
+  // Farba ABS podla hrubky (standard 7.6): 1,0 cervena / 0,4 modra / 2,0 zelena / bez siva.
+  function absColorByThickness(th){
+    if (th==null) return '#b0bec5';
+    var t = parseFloat(th);
+    if (Math.abs(t-1.0)<0.05) return '#e53935';
+    if (Math.abs(t-0.4)<0.05) return '#1e88e5';
+    if (Math.abs(t-2.0)<0.05) return '#43a047';
+    return '#8e24aa'; // ina hrubka (mimo legendy)
+  }
+  function absThicknessOf(absId){
+    if (!absId) return null;
+    for (var i=0;i<MATERIALS.edges.length;i++){ if (MATERIALS.edges[i].id===absId) return MATERIALS.edges[i].thickness; }
+    return null;
+  }
+  function absColorOf(absId){ return absId ? absColorByThickness(absThicknessOf(absId)) : '#b0bec5'; }
+
+  // Naplni <select> doskovymi materialmi. includeInherit -> prva volba "(dediť z projektu)".
+  function fillSheetSelect(sel, includeInherit){
+    if (!sel) return;
+    var html = includeInherit ? '<option value="">(dediť z projektu)</option>' : '';
+    MATERIALS.sheets.forEach(function(s){ html += '<option value="'+esc(s.id)+'">'+esc(s.label)+'</option>'; });
+    sel.innerHTML = html;
+  }
+  // Volby ABS pre dropdown hrany: podla pravidla / bez ABS / konkretne varianty.
+  function edgeOptionsHtml(){
+    var html = '<option value="__inherit__">(podľa pravidla)</option><option value="">Bez ABS</option>';
+    MATERIALS.edges.forEach(function(a){ html += '<option value="'+esc(a.id)+'">'+esc(a.label)+'</option>'; });
+    return html;
+  }
+  // Naplni vsetky projektove + korpusove material selecty (po nacitani katalogu).
+  function fillMaterialSelects(){
+    fillSheetSelect(el('proj_body'), false); fillSheetSelect(el('proj_front'), false); fillSheetSelect(el('proj_back'), false);
+    fillSheetSelect(el('cab_body'), true); fillSheetSelect(el('cab_front'), true); fillSheetSelect(el('cab_back'), true);
+  }
   function val(id){ var e = el(id); return e ? e.value : null; }
   function numv(id){ var e = el(id); return e ? parseFloat(e.value) : NaN; }
   function setVal(id, v){ var e = el(id); if (e && v !== null && v !== undefined) e.value = v; }
@@ -897,6 +1006,9 @@
     init: function(data){
       DEFAULTS = data.defaults || { lower: {}, upper: {} };
       TEMPLATES = data.templates || [];
+      MATERIALS = data.materials || { sheets: [], edges: [] };
+      fillMaterialSelects();
+      setProjectMaterials(data.project_materials || {});
       el('zonesChk').checked = !!data.zones_visible;
       if (data.selected){ NX.loadSelected(data.selected); }
       else { setType('lower'); setDefaults('lower'); currentZoneTree = defaultTree(); renderFilteredTemplates(); NX.clearSelected(); onField(); }
@@ -918,12 +1030,14 @@
       frontItems = c.front_items || [];
       activeZoneId = c.active_zone || null;
       setSelected(c.cabinet_id || null);
+      setCabinetMaterials(c); // V0.3 korpusove material selecty (prazdne = dedi)
       renderFilteredTemplates();
       el('selinfo').innerHTML = 'Označený: <b>' + (c.cabinet_id || '?') + '</b>';
       // svetle rozmery presne z backendu ak su
       if (c.available_width!=null) setVal('av_width', Math.round(c.available_width));
       if (c.available_depth!=null) setVal('av_depth', Math.round(c.available_depth));
       if (c.available_height!=null) setVal('av_height', Math.round(c.available_height));
+      renderPartCard(c.part_card || null); // V0.3 karta dielca (ak je vybraty dielec)
       renderPreview();
       refreshZoneUI();
     },
@@ -931,10 +1045,128 @@
       el('selinfo').textContent = 'Nič nie je označené (náhľad z hodnôt panela).';
       setSelected(null);
       activeZoneId = null; lastZones = null; frontItems = null;
+      renderPartCard(null);      // schovaj kartu dielca
+      clearCabinetMaterials();   // korpusove material selecty na "dedi" + disabled
       refreshZoneUI(); renderPreview();
     },
     setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; }
   };
+
+  // ===================== V0.3 MATERIALY (projekt + korpus) =====================
+  function setProjectMaterials(pm){
+    setVal('proj_body', pm.default_material_id || '');
+    setVal('proj_front', pm.default_front_material_id || '');
+    setVal('proj_back', pm.default_back_material_id || '');
+  }
+  function setCabinetMaterials(c){
+    var on = !!c.cabinet_id;
+    ['cab_body','cab_front','cab_back'].forEach(function(id){ var e=el(id); if(e) e.disabled = !on; });
+    setVal('cab_body', c.material_id || '');
+    setVal('cab_front', c.front_material_id || '');
+    setVal('cab_back', c.back_material_id || '');
+    el('cabMatHint').textContent = on ? 'Prázdne = dediť z projektu.' : 'Označ skrinku pre nastavenie jej materiálov.';
+  }
+  function clearCabinetMaterials(){
+    ['cab_body','cab_front','cab_back'].forEach(function(id){ var e=el(id); if(e){ e.value=''; e.disabled=true; } });
+    el('cabMatHint').textContent = 'Označ skrinku pre nastavenie jej materiálov.';
+  }
+  function onProjectMaterial(key, value){
+    if (window.sketchup && sketchup.set_project_material) sketchup.set_project_material(JSON.stringify({ key: key, value: value }));
+  }
+  function onCabinetMaterial(which, value){
+    if (!selectedCabId){ NX.setStatus('Najprv označ skrinku.', true); return; }
+    if (window.sketchup && sketchup.set_cabinet_material) sketchup.set_cabinet_material(JSON.stringify({ which: which, value: value }));
+  }
+
+  // ===================== V0.3 KARTA DIELCA (ABS editor) =====================
+  function roleLabel(role){
+    var m = { side_left:'Bok ľavý', side_right:'Bok pravý', bottom:'Dno', top:'Vrch', back:'Chrbát',
+      shelf:'Polica', divider_v:'Priečka zvislá', divider_h:'Priečka vodorovná', front_door:'Dvierka',
+      drawer_front:'Zásuvkové čelo', plinth:'Sokel', rail_front:'Výstuha predná', rail_back:'Výstuha zadná' };
+    return m[role] || role;
+  }
+  function renderPartCard(pc){
+    partCard = pc;
+    var box = el('partCard');
+    if (!pc){ box.style.display='none'; return; }
+    box.style.display='';
+    el('pcName').innerHTML = '<b>'+esc(pc.name || roleLabel(pc.role))+'</b> · '+esc(roleLabel(pc.role));
+    el('pcDim').textContent = fmtmm(pc.length)+' × '+fmtmm(pc.width)+' × '+fmtmm(pc.thickness)+' mm';
+    var ms = el('pcMaterial'); fillSheetSelect(ms, false);
+    ms.value = pc.material_id || '';
+    ms.className = pc.has_material_override ? 'ovr' : '';
+    renderEdgeRows(pc);
+    renderPartSvg(pc);
+    el('pcSimBtn').textContent = 'Použiť na podobné diely ('+(pc.similar_count||0)+')';
+  }
+  function renderEdgeRows(pc){
+    var box = el('edgeRows'); box.innerHTML='';
+    ['L1','L2','W1','W2'].forEach(function(code){
+      var lbl = (pc.edge_labels && pc.edge_labels[code]) || code;
+      var absId = pc.edges ? pc.edges[code] : null;
+      var isOvr = hasOwn(pc.edge_overrides, code);
+      var row = document.createElement('div'); row.className='edgerow';
+      row.innerHTML = '<span class="en"><i style="background:'+absColorOf(absId)+'"></i>'+esc(lbl)+'</span>';
+      var sel = document.createElement('select');
+      sel.innerHTML = edgeOptionsHtml();
+      sel.value = isOvr ? (absId==null?'':absId) : '__inherit__';
+      if (isOvr) sel.className='ovr';
+      sel.setAttribute('data-edge', code);
+      sel.onchange = (function(cc){ return function(){ onEdgeChange(cc, sel.value); }; })(code);
+      row.appendChild(sel);
+      box.appendChild(row);
+    });
+  }
+  // 2D dielec: obdlznik length(horizontalne) x width(vertikalne). L1 dole/L2 hore (pozdlzne),
+  // W1 vlavo/W2 vpravo (priecne). Hrany farebne podla ABS. Klik na hranu -> fokus jej dropdownu.
+  function renderPartSvg(pc){
+    var svg = el('partSvg'); if(!svg) return;
+    var L = Math.max(1, parseFloat(pc.length)||100), Wd = Math.max(1, parseFloat(pc.width)||100);
+    var pad=28, availW=300-2*pad, availH=200-2*pad;
+    var sc = Math.min(availW/L, availH/Wd); if(!isFinite(sc)||sc<=0) sc=1;
+    var rw=L*sc, rh=Wd*sc, ox=(300-rw)/2, oy=(200-rh)/2, ew=7;
+    var edges = pc.edges||{}, lab = pc.edge_labels||{};
+    function ecol(code){ return absColorOf(edges[code]); }
+    var S=[];
+    S.push('<rect x="'+ox+'" y="'+oy+'" width="'+rw+'" height="'+rh+'" fill="#faf6ee" stroke="#cfd8dc"/>');
+    S.push('<rect class="ehit" data-edge="L2" x="'+ox+'" y="'+(oy-ew/2)+'" width="'+rw+'" height="'+ew+'" fill="'+ecol('L2')+'" style="cursor:pointer"/>');
+    S.push('<rect class="ehit" data-edge="L1" x="'+ox+'" y="'+(oy+rh-ew/2)+'" width="'+rw+'" height="'+ew+'" fill="'+ecol('L1')+'" style="cursor:pointer"/>');
+    S.push('<rect class="ehit" data-edge="W1" x="'+(ox-ew/2)+'" y="'+oy+'" width="'+ew+'" height="'+rh+'" fill="'+ecol('W1')+'" style="cursor:pointer"/>');
+    S.push('<rect class="ehit" data-edge="W2" x="'+(ox+rw-ew/2)+'" y="'+oy+'" width="'+ew+'" height="'+rh+'" fill="'+ecol('W2')+'" style="cursor:pointer"/>');
+    S.push('<text x="150" y="'+(oy-10)+'" font-size="11" fill="#78909c" text-anchor="middle" pointer-events="none">'+esc(lab.L2||'')+'</text>');
+    S.push('<text x="150" y="'+(oy+rh+17)+'" font-size="11" fill="#78909c" text-anchor="middle" pointer-events="none">'+esc(lab.L1||'')+'</text>');
+    S.push('<text x="'+(ox-11)+'" y="'+(oy+rh/2)+'" font-size="11" fill="#78909c" text-anchor="middle" pointer-events="none" transform="rotate(-90 '+(ox-11)+' '+(oy+rh/2)+')">'+esc(lab.W1||'')+'</text>');
+    S.push('<text x="'+(ox+rw+11)+'" y="'+(oy+rh/2)+'" font-size="11" fill="#78909c" text-anchor="middle" pointer-events="none" transform="rotate(90 '+(ox+rw+11)+' '+(oy+rh/2)+')">'+esc(lab.W2||'')+'</text>');
+    S.push('<text x="150" y="100" font-size="12" fill="#b0bec5" text-anchor="middle" dominant-baseline="middle" pointer-events="none">'+Math.round(L)+'×'+Math.round(Wd)+'</text>');
+    svg.innerHTML = S.join('');
+  }
+  function onPartMaterial(){
+    if (!partCard) return;
+    var v = el('pcMaterial').value;
+    if (window.sketchup && sketchup.set_part_material)
+      sketchup.set_part_material(JSON.stringify({ role_key: partCard.role_key, material_id: v }));
+  }
+  function onEdgeChange(code, value){
+    if (!partCard) return;
+    if (window.sketchup && sketchup.set_part_edge)
+      sketchup.set_part_edge(JSON.stringify({ role_key: partCard.role_key, edge: code, abs_id: value }));
+  }
+  function applyToSimilar(){
+    if (!partCard){ NX.setStatus('Najprv označ dielec.', true); return; }
+    var scope = el('pcSimModel').checked ? 'model' : 'cabinet';
+    if (window.sketchup && sketchup.apply_to_similar)
+      sketchup.apply_to_similar(JSON.stringify({ role_key: partCard.role_key, scope: scope }));
+  }
+  // Klik na hranu v 2D dielci -> fokus jej dropdownu (delegovane, poucenie z drag fixu).
+  function setupPartSvgDelegation(){
+    var svg = el('partSvg'); if(!svg) return;
+    svg.addEventListener('click', function(ev){
+      var t = closestClass(ev.target, 'ehit'); if(!t) return;
+      var code = t.getAttribute('data-edge');
+      var sel = el('edgeRows').querySelector('select[data-edge="'+code+'"]');
+      if (sel){ sel.focus(); sel.classList.add('ovr'); NX.setStatus('Hrana '+code+' — vyber ABS v zozname.', false); }
+    });
+  }
 
   // Pamatanie rozbalenia sekcii (localStorage).
   function bindDetails(){
@@ -944,5 +1176,5 @@
       d.addEventListener('toggle', function(){ try { localStorage.setItem(k, d.open ? '1' : '0'); } catch(e){} });
     });
   }
-  window.onload = function(){ bindDetails(); setupPreviewDelegation(); if (window.sketchup && sketchup.ready) sketchup.ready(); };
+  window.onload = function(){ bindDetails(); setupPreviewDelegation(); setupPartSvgDelegation(); if (window.sketchup && sketchup.ready) sketchup.ready(); };
 </script>
