@@ -152,17 +152,21 @@ module Noxun
 
           # fix #6 + kopie: kopia korpusu (zdielane cabinet_id) -> nove ID + vlastne ghosty, este
           # pred spracovanim dirty. Spusti sa aj z onElementAdded (kopia Ctrl+C/V), nielen z move
-          # existujuceho. Model z prvej dirty/added instancie (fix #8), inak z erase eventu.
-          sample = dirty.each_value.find { |i| i && i.valid? } ||
-                   added.each_value.find { |i| i && i.valid? }
-          sample_model = sample&.model
-          dedup_model = sample_model || erase_model || @last_model
-          CabinetBuilder.dedup_copies(dedup_model) if dedup_model && defined?(CabinetBuilder)
+          # existujuceho. Multi-model (Codex PR#6): v jednom debounce okne mozu prist instancie
+          # z viacerych dokumentov (macOS) — dedup/attach bezi pre KAZDY dotknuty model zvlast.
+          touched_models = (dirty.values + added.values)
+                           .select { |i| i && i.valid? }.map(&:model).compact.uniq
+          touched_models = [erase_model || @last_model].compact if touched_models.empty?
+          added_models = added.values.select { |i| i && i.valid? }.map(&:model).compact.uniq
 
-          # Kopie zachytene cez onElementAdded nemaju vlastny per-instancny EntityObserver (kopia
-          # ho nededi). Po dedupe (novy cabinet_id + ghosty cez rebuild->sync_ghost) im observer
-          # pripojime, aby ich buduci move/scale spustil ghost sync. attach_all je idempotentne.
-          attach_all(dedup_model) if dedup_model && !added.empty?
+          touched_models.each do |mdl|
+            CabinetBuilder.dedup_copies(mdl) if defined?(CabinetBuilder)
+            # Kopie zachytene cez onElementAdded nemaju vlastny per-instancny EntityObserver
+            # (kopia ho nededi). Po dedupe (novy cabinet_id + ghosty cez rebuild->sync_ghost)
+            # im observer pripojime, aby ich buduci move/scale spustil ghost sync.
+            # attach_all je idempotentne.
+            attach_all(mdl) if added_models.include?(mdl)
+          end
 
           dirty.each_value do |inst|
             next unless inst && inst.valid?
@@ -175,7 +179,7 @@ module Noxun
           rescue StandardError => e
             Engine.log_error(e, 'ScaleWatch.process_dirty')
           end
-          prune_ghosts(erase_model || @last_model || sample_model) if need_prune
+          prune_ghosts(erase_model || @last_model || touched_models.first) if need_prune
         end
 
         # Presun ghost zon za korpusom (bez rebuildu). TRANSPARENTNA operacia (fix #3): 4. param
