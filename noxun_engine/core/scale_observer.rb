@@ -21,6 +21,7 @@ module Noxun
         # --- instalacia -----------------------------------------------------
         def install
           @entity_observer ||= CabinetEntityObserver.new
+          @entities_observer ||= CabinetEntitiesObserver.new
           @app_observer ||= EngineAppObserver.new
           safe { Sketchup.remove_observer(@app_observer) }
           Sketchup.add_observer(@app_observer)
@@ -30,13 +31,27 @@ module Noxun
           Engine.log_error(e, 'ScaleWatch.install')
         end
 
-        # Attach entity observer na vsetky existujuce korpusy v modeli (initial scan / re-attach).
+        # Attach entity observer na vsetky existujuce korpusy v modeli + entities observer na
+        # model.entities (zachytenie kopii). Initial scan / re-attach (install, open/new/activate).
         def attach_all(model)
           return 0 unless model
           @entity_observer ||= CabinetEntityObserver.new
+          attach_entities(model)
           n = 0
           Ids.each_cabinet(model) { |inst| attach_one(inst); n += 1 }
           n
+        end
+
+        # Attach entities observer na model.entities — zachyti PRIDANIE novych entit, hlavne
+        # KOPII korpusu (Ctrl+C/V, Move+Ctrl), ktore nededia per-instancny EntityObserver.
+        # Bezpecny re-attach (remove pred add) — idempotentne, reload-safe (bez dvojiteho attachu).
+        def attach_entities(model)
+          return unless model
+          @entities_observer ||= CabinetEntitiesObserver.new
+          safe { model.entities.remove_observer(@entities_observer) } # anti-double
+          model.entities.add_observer(@entities_observer)
+        rescue StandardError => e
+          Engine.log_error(e, 'ScaleWatch.attach_entities')
         end
 
         # Attach na jednu korpus instanciu (volane aj builderom po vlozeni noveho korpusu).
@@ -88,6 +103,25 @@ module Noxun
           Engine.log_error(e, 'ScaleWatch.notify_erase')
         end
 
+        # Pridanie entity do model.entities — zachyti KOPIU korpusu (Ctrl+C/V, Move+Ctrl).
+        # Kopia dedi NOXUN atributy (kind:cabinet, zdielane cabinet_id) ale NEdedi per-instancny
+        # EntityObserver — bez neho by sa jej presun nezachytil a ghost zony by ostali na mieste
+        # originalu. Preto ju zaradime na debounced spracovanie (process_dirty): dedup (nove
+        # cabinet_id + vlastne ghosty) + attach per-instancneho observera.
+        # Guard: vlastne vlozenie korpusu (CabinetBuilder.build) je guardnute, takze onElementAdded
+        # (davkovany na commit) tu vidi @rebuilding=true a ignoruje ho — ziadne dvojite spracovanie.
+        def notify_added(entity)
+          return if @rebuilding
+          return unless entity.is_a?(Sketchup::ComponentInstance) && entity.valid?
+          return unless Store.kind(entity) == 'cabinet'
+          @added ||= {}
+          @added[entity.entityID] = entity
+          @last_model = (entity.model rescue nil) || @last_model # fix #8: model pre dedup/prune
+          schedule
+        rescue StandardError => e
+          Engine.log_error(e, 'ScaleWatch.notify_added')
+        end
+
         # Debounce + generation counter: kazda zmena posunie generaciu a restartuje timer;
         # spusti sa iba posledny naplanovany tick.
         def schedule
@@ -109,16 +143,30 @@ module Noxun
         def process_dirty
           dirty = @dirty || {}
           @dirty = {}
+          added = @added || {}
+          @added = {}
           need_prune = @need_prune
           @need_prune = false
           erase_model = @erase_model
           @erase_model = nil
 
-          # fix #6: kopia korpusu (zdielane cabinet_id) -> nove ID + vlastne ghosty, este pred
-          # spracovanim dirty. Model berieme z prvej dirty instancie (fix #8), inak z erase eventu.
-          sample_model = dirty.each_value.find { |i| i && i.valid? }&.model
-          dedup_model = sample_model || erase_model || @last_model
-          CabinetBuilder.dedup_copies(dedup_model) if dedup_model && defined?(CabinetBuilder)
+          # fix #6 + kopie: kopia korpusu (zdielane cabinet_id) -> nove ID + vlastne ghosty, este
+          # pred spracovanim dirty. Spusti sa aj z onElementAdded (kopia Ctrl+C/V), nielen z move
+          # existujuceho. Multi-model (Codex PR#6): v jednom debounce okne mozu prist instancie
+          # z viacerych dokumentov (macOS) — dedup/attach bezi pre KAZDY dotknuty model zvlast.
+          touched_models = (dirty.values + added.values)
+                           .select { |i| i && i.valid? }.map(&:model).compact.uniq
+          touched_models = [erase_model || @last_model].compact if touched_models.empty?
+          added_models = added.values.select { |i| i && i.valid? }.map(&:model).compact.uniq
+
+          touched_models.each do |mdl|
+            CabinetBuilder.dedup_copies(mdl) if defined?(CabinetBuilder)
+            # Kopie zachytene cez onElementAdded nemaju vlastny per-instancny EntityObserver
+            # (kopia ho nededi). Po dedupe (novy cabinet_id + ghosty cez rebuild->sync_ghost)
+            # im observer pripojime, aby ich buduci move/scale spustil ghost sync.
+            # attach_all je idempotentne.
+            attach_all(mdl) if added_models.include?(mdl)
+          end
 
           dirty.each_value do |inst|
             next unless inst && inst.valid?
@@ -131,7 +179,7 @@ module Noxun
           rescue StandardError => e
             Engine.log_error(e, 'ScaleWatch.process_dirty')
           end
-          prune_ghosts(erase_model || @last_model || sample_model) if need_prune
+          prune_ghosts(erase_model || @last_model || touched_models.first) if need_prune
         end
 
         # Presun ghost zon za korpusom (bez rebuildu). TRANSPARENTNA operacia (fix #3): 4. param
@@ -247,7 +295,18 @@ module Noxun
         end
       end
 
-      # AppObserver — re-attach entity observera na existujuce korpusy pri zmene modelu.
+      # EntitiesObserver na model.entities — zachyti PRIDANIE korpusu do modelu (hlavne kopie).
+      # Nova instancia z kopie (Ctrl+C/V, Move+Ctrl) nededi per-instancny EntityObserver, takze
+      # bez tohto by jej presun nespustil ghost sync a zony by ostali na mieste originalu.
+      # onElementAdded je davkovany na commit operacie -> pri vlastnom builde (guardnutom) vidi
+      # @rebuilding=true a ignoruje ho (ziadne dvojite spracovanie vlastnych vkladov).
+      class CabinetEntitiesObserver < Sketchup::EntitiesObserver
+        def onElementAdded(_entities, entity)
+          ScaleWatch.notify_added(entity)
+        end
+      end
+
+      # AppObserver — re-attach entity/entities observerov na korpusy pri zmene modelu.
       class EngineAppObserver < Sketchup::AppObserver
         def onNewModel(model)
           ScaleWatch.attach_all(model)
