@@ -129,11 +129,11 @@ module Noxun
       # Vrati: { zones:[ploche objekty s geometriou], dividers:[deskriptory], shelves:[deskriptory] }.
       def compute(tree, box, t, cabinet_id)
         acc = { zones: [], dividers: [], shelves: [] }
-        walk(sanitize(tree), [1], box, t, cabinet_id, acc)
+        walk(sanitize(tree), [1], box, t, cabinet_id, acc, 'Celé vnútro')
         acc
       end
 
-      def walk(node, path, box, t, cid, acc)
+      def walk(node, path, box, t, cid, acc, label)
         zid = "#{cid}-Z#{path.join('.')}"
         parent_id = path.size > 1 ? "#{cid}-Z#{path[0..-2].join('.')}" : nil
         split = node['split']
@@ -141,7 +141,7 @@ module Noxun
         suffix_path = path.join('_')
 
         zobj = {
-          id: zid, parent: parent_id,
+          id: zid, parent: parent_id, label: label,
           position: [r2(box[:x0]), r2(box[:y0]), r2(box[:z0])],
           width: r2(box[:x1] - box[:x0]), height: r2(box[:z1] - box[:z0]), depth: r2(box[:y1] - box[:y0]),
           split: nil, shelves: (leaf ? node['shelves'].to_i : 0), leaf: leaf
@@ -156,9 +156,14 @@ module Noxun
           acc[:zones] << zobj
           acc[:dividers].concat(divs)
           child_boxes.each_with_index do |cb, i|
-            walk(node['children'][i], path + [i + 1], cb, t, cid, acc)
+            walk(node['children'][i], path + [i + 1], cb, t, cid, acc, child_label(split['axis'], i))
           end
         end
+      end
+
+      # Citatelny nazov detskej zony podla osi delenia rodica (V0.2c UX).
+      def child_label(axis, index)
+        axis == 'h' ? "Riadok #{index + 1}" : "Stĺpec #{index + 1}"
       end
 
       # Rozdelenie boxu podla poli (split['cuts']) s (count-1) prieckami hrubky t.

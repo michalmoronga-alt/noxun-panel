@@ -51,10 +51,13 @@ module Noxun
         def register_callbacks(dlg)
           cb(dlg, 'ready')          { |_p| push_init }
           cb(dlg, 'insert_cabinet') { |p| handle_insert(p) }
-          cb(dlg, 'apply_changes')  { |p| handle_apply(p) }
+          cb(dlg, 'apply_all')      { |p| handle_apply_all(p) }   # V0.2c auto-apply (konstrukcia + cela)
+          cb(dlg, 'apply_changes')  { |p| handle_apply(p) }       # spatna kompat
           cb(dlg, 'apply_fronts')   { |p| handle_apply_fronts(p) }
           cb(dlg, 'split_zone')     { |p| handle_split_zone(p) }
           cb(dlg, 'set_zone_shelves') { |p| handle_set_zone_shelves(p) }
+          cb(dlg, 'set_zone_field') { |p| handle_set_zone_field(p) } # V0.2c split lock (rozmer pola)
+          cb(dlg, 'select_zone')    { |p| handle_select_zone(p) }    # V0.2c obojsmerna sync nahladu
           cb(dlg, 'clean_zone')     { |p| handle_clean_zone(p) }
           cb(dlg, 'save_template')  { |p| handle_save_template(p) }
           cb(dlg, 'delete_template') { |p| handle_delete_template(p) }
@@ -116,6 +119,27 @@ module Noxun
           finish_cab(model, cab, "Cela aktualizovane — #{Store.get(cab, 'cabinet_id')}.")
         end
 
+        # V0.2c AUTO-APPLY: jedna zmena poľa (konstrukcia AJ cela) -> 1 rebuild, 1 undo krok.
+        # Zachova strom zon (delenie/police/locky). Ticho ignoruje ak nie je oznaceny korpus.
+        def handle_apply_all(payload)
+          model = Sketchup.active_model
+          cab = find_cabinet(model)
+          return if cab.nil? # auto-apply bez vyberu = ticho (ziadny modal)
+
+          data = parse(payload)
+          params = existing_params(cab)
+          %w[type width height depth thickness floor_height bottom_mode top_mode back_mode
+             back_thickness plinth_mode plinth_recess rail_depth rails_orientation
+             rails_top_offset name].each do |k|
+            params[k] = data[k] if data.key?(k)
+          end
+          params['fronts'] = data['fronts'] if data.key?('fronts')
+          CabinetBuilder.rebuild(model, cab, params)
+          reselect(model, cab)
+          set_status("Prestavané ✓ — #{Store.get(cab, 'cabinet_id')} (#{part_count(cab)} dielcov).")
+          push_selected(model)
+        end
+
         # --- akcie: zony -----------------------------------------------------
         def handle_split_zone(payload)
           data = parse(payload)
@@ -141,6 +165,35 @@ module Noxun
           return set_status('Najprv oznac zonu.', true) if zid.empty?
           apply_zone_mod(zid) { |tree, path| ZoneTree.clear_zone!(tree, path) }
           set_status("Zona #{short_zone(zid)} vycistena.")
+        end
+
+        # V0.2c: nastav presny rozmer pola v delenej zone + zamok (split lock). zone_id = RODICOVSKA
+        # (delena) zona; index = poradie pola (0..count-1); size mm (prazdne = auto), locked bool.
+        def handle_set_zone_field(payload)
+          data = parse(payload)
+          zid = data['zone_id'].to_s
+          return set_status('Najprv oznac delenu zonu.', true) if zid.empty?
+          index = data['index'].to_i
+          size = data['size']
+          locked = truthy?(data['locked'])
+          apply_zone_mod(zid) { |tree, path| ZoneTree.set_field!(tree, path, index, size, locked) }
+          set_status("Pole #{index + 1}: #{size.to_s.strip.empty? ? 'auto' : "#{size.to_f.round} mm"}#{locked ? ' 🔒' : ''} — prestavané ✓.")
+        end
+
+        # V0.2c obojsmerna sync: klik na zonu v 2D nahlade -> zvyrazni jej ghost v modeli.
+        def handle_select_zone(payload)
+          model = Sketchup.active_model
+          zid = parse(payload)['zone_id'].to_s
+          @active_zone_id = zid.empty? ? nil : zid
+          return if zid.empty?
+          cid = cabinet_id_from_zone(zid)
+          sub = Zones.find_zone_group(model, cid, zid)
+          if sub && sub.valid?
+            model.selection.clear
+            model.selection.add(sub)
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'handle_select_zone')
         end
 
         # Spolocny postup: nacitaj korpus zony, uprav strom, rebuild, oznac korpus, pushni.
@@ -309,8 +362,12 @@ module Noxun
           params = CabinetBuilder.config_to_params(cfg)
           params['cabinet_id'] = Store.get(cab, 'cabinet_id')
           params['fronts'] = Fronts.normalize_config(cfg['fronts']) # kanonicke pre riadky cela
-          params['zones'] = cfg['zones'] || []                      # ploche zony pre strom
-          params['front_items'] = cfg['front_items'] || []
+          params['zones'] = cfg['zones'] || []                      # ploche zony pre strom + nahlad
+          params['front_items'] = cfg['front_items'] || []          # rozlozene cela pre nahlad
+          # svetle (available) rozmery — view-only kontrola pre pouzivatela
+          params['available_width'] = cfg['available_width']
+          params['available_height'] = cfg['available_height']
+          params['available_depth'] = cfg['available_depth']
           params
         end
 
