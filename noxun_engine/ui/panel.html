@@ -1,38 +1,34 @@
-<!-- Noxun Engine — panel V0.2b (vanilla JS, ziadne CDN, slovensky) -->
+<!-- Noxun Engine — panel V0.2c (vanilla JS, ziadne CDN, slovensky) -->
+<!-- 2D nahlad (SVG), auto-apply (debounce), split locky, sekcie podla SYSTEM/06. -->
 <meta charset="utf-8">
 <style>
   * { box-sizing: border-box; }
-  body {
-    font-family: "Segoe UI", Tahoma, sans-serif;
-    font-size: 13px; color: #263238; background: #f4f5f7;
-    margin: 0; padding: 10px;
-  }
+  body { font-family: "Segoe UI", Tahoma, sans-serif; font-size: 13px; color: #263238; background: #f4f5f7; margin: 0; padding: 10px; }
   h1 { font-size: 15px; margin: 0 0 2px; color: #1b3a4b; }
   .sub { font-size: 11px; color: #78909c; margin: 0 0 10px; }
   fieldset { border: 1px solid #cfd8dc; border-radius: 6px; margin: 0 0 10px; padding: 8px 10px 10px; background: #fff; }
   legend { font-weight: 600; font-size: 12px; color: #37474f; padding: 0 4px; }
   details { border: 1px solid #cfd8dc; border-radius: 6px; margin: 0 0 10px; background: #fff; }
-  details > summary {
-    font-weight: 600; font-size: 12px; color: #37474f; padding: 8px 10px; cursor: pointer;
-    list-style: none; user-select: none;
-  }
+  details > summary { font-weight: 600; font-size: 12px; color: #37474f; padding: 8px 10px; cursor: pointer; list-style: none; user-select: none; }
   details > summary::-webkit-details-marker { display: none; }
   details > summary::before { content: '\25B8'; display: inline-block; margin-right: 6px; color: #90a4ae; transition: transform .12s; }
   details[open] > summary::before { transform: rotate(90deg); }
   .body { padding: 0 10px 10px; }
   .row { display: flex; align-items: center; margin: 5px 0; }
-  .row label { flex: 0 0 130px; color: #455a64; }
+  .row label { flex: 0 0 128px; color: #455a64; }
   .row input, .row select { flex: 1; padding: 4px 6px; border: 1px solid #b0bec5; border-radius: 4px; font-size: 13px; min-width: 0; }
+  .row input.bad { border-color: #e53935; background: #fff5f5; }
   .row .unit { flex: 0 0 26px; text-align: right; color: #90a4ae; font-size: 11px; padding-left: 4px; }
+  .row input[readonly] { background: #f4f6f8; color: #78909c; border-style: dashed; }
   .typerow { display: flex; gap: 16px; padding: 2px 2px 6px; }
   .typerow label { display: flex; align-items: center; color: #37474f; font-weight: 600; cursor: pointer; }
   .typerow input { margin-right: 6px; }
   button { padding: 7px 8px; border: 0; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 600; }
   .wide { width: 100%; margin-top: 4px; padding: 8px; font-size: 13px; }
   .primary { background: #2e7d32; color: #fff; } .primary:hover { background: #1b5e20; }
-  .apply { background: #1565c0; color: #fff; } .apply:hover { background: #0d47a1; }
   .ghostbtn { background: #eceff1; color: #37474f; border: 1px solid #cfd8dc; }
   .ghostbtn:hover { background: #e0e4e7; }
+  .danger { background: #fbe9e7; color: #c62828; border: 1px solid #ffccbc; }
   button:disabled { background: #eceff1; color: #b0bec5; cursor: not-allowed; border-color: #eceff1; }
   .btnrow { display: flex; gap: 6px; margin-top: 6px; }
   .btnrow button { flex: 1; }
@@ -48,19 +44,30 @@
   .frow select.fw { flex: 0 0 56px; padding: 3px; border: 1px solid #b0bec5; border-radius: 4px; }
   .frow .flock { flex: 0 0 20px; text-align: center; }
   .frow .fdel { flex: 0 0 22px; background: #fbe9e7; color: #c62828; border: 1px solid #ffccbc; border-radius: 4px; padding: 2px 0; }
+  /* Nahlad */
+  .pvtabs { display: flex; gap: 6px; margin: 2px 0 6px; }
+  .pvtabs button { flex: 1; padding: 5px; font-size: 11px; }
+  .pvtabs button.on { background: #1565c0; color: #fff; }
+  #preview { width: 100%; border: 1px solid #cfd8dc; border-radius: 5px; background: #fafcff; display: block; touch-action: none; }
+  .pvhint { font-size: 10px; color: #90a4ae; text-align: center; margin: 3px 0 4px; }
   /* Zony strom */
-  #zoneTree { border: 1px solid #eceff1; border-radius: 5px; margin: 6px 0; max-height: 150px; overflow: auto; }
+  #zoneTree { border: 1px solid #eceff1; border-radius: 5px; margin: 6px 0; max-height: 140px; overflow: auto; }
   .znode { padding: 4px 6px; cursor: pointer; border-bottom: 1px solid #f4f5f7; font-size: 12px; }
   .znode:hover { background: #f1f8ff; }
   .znode.active { background: #e3f2fd; box-shadow: inset 3px 0 0 #1565c0; }
   .znode .dim { color: #90a4ae; font-size: 10.5px; }
   .znode .zs { color: #607d8b; font-size: 10.5px; }
-  #zoneActive { font-size: 11px; color: #37474f; margin: 2px 0 6px; }
+  #zoneActive { font-size: 11px; color: #37474f; margin: 4px 0 6px; }
   #zoneActive b { color: #1565c0; }
   .zact { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
   .zact label { flex: 0 0 118px; color: #455a64; }
   .zact select { flex: 0 0 52px; padding: 3px; border: 1px solid #b0bec5; border-radius: 4px; }
   .zact button { flex: 1; }
+  .fldrow { display: flex; gap: 5px; align-items: center; margin: 3px 0; font-size: 12px; }
+  .fldrow .fldn { flex: 0 0 66px; color: #455a64; }
+  .fldrow input { flex: 1; padding: 3px 5px; border: 1px solid #b0bec5; border-radius: 4px; min-width: 0; }
+  .fldrow .lockbtn { flex: 0 0 30px; cursor: pointer; text-align: center; border: 1px solid #cfd8dc; border-radius: 4px; background: #eceff1; padding: 3px 0; }
+  .fldrow .lockbtn.on { background: #fff3e0; border-color: #ffb74d; }
   .zoneline { display: flex; align-items: center; margin: 8px 0 2px; }
   .zoneline input { margin-right: 7px; width: 15px; height: 15px; }
   .zoneline label { color: #455a64; }
@@ -70,131 +77,172 @@
 </style>
 
 <h1>Noxun Engine</h1>
-<p class="sub">V0.2b — korpus, zóny, priečky, čelá, šablóny</p>
+<p class="sub">V0.2c — náhľad, zóny, čelá, auto-úprava</p>
 
-<!-- ZÁKLADNÉ: typ + šablóna -->
+<!-- ZAKLADNE: typ + rozmery + svetle -->
 <fieldset>
-  <legend>Typ &amp; šablóna</legend>
+  <legend>Základné</legend>
   <div class="typerow">
     <label><input type="radio" name="ctype" value="lower" onchange="onTypeChange()"> Dolná</label>
     <label><input type="radio" name="ctype" value="upper" onchange="onTypeChange()"> Horná</label>
   </div>
-  <div class="row"><label>Šablóna</label>
-    <select id="template" onchange="onTemplateChange()"><option value="">— vyber —</option></select>
-  </div>
-  <div class="btnrow">
-    <button class="ghostbtn" onclick="saveTemplate()">Ulož ako šablónu</button>
-    <button class="ghostbtn" onclick="deleteTemplate()">Vymaž</button>
-  </div>
-  <div class="btnrow">
-    <button class="ghostbtn" id="applyTplBtn" onclick="applyTemplateToSelected()" disabled>Použi šablónu na označený</button>
-  </div>
+  <div class="row"><label>Šírka</label><input id="width" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
+  <div class="row"><label>Výška</label><input id="height" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
+  <div class="row"><label>Hĺbka</label><input id="depth" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
+  <div class="row"><label>Hrúbka materiálu</label><input id="thickness" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
+  <div class="row"><label>Svetlá šírka</label><input id="av_width" type="text" readonly><span class="unit">mm</span></div>
+  <div class="row"><label>Svetlá hĺbka</label><input id="av_depth" type="text" readonly><span class="unit">mm</span></div>
+  <div class="row"><label>Úložná výška</label><input id="av_height" type="text" readonly><span class="unit">mm</span></div>
 </fieldset>
 
-<!-- ZÁKLADNÉ: rozmery -->
-<fieldset>
-  <legend>Rozmery</legend>
-  <div class="row"><label>Šírka</label><input id="width" type="number" step="1"><span class="unit">mm</span></div>
-  <div class="row"><label>Výška</label><input id="height" type="number" step="1"><span class="unit">mm</span></div>
-  <div class="row"><label>Hĺbka</label><input id="depth" type="number" step="1"><span class="unit">mm</span></div>
-  <div class="row"><label>Hrúbka materiálu</label><input id="thickness" type="number" step="1"><span class="unit">mm</span></div>
-</fieldset>
-
-<!-- ZÁKLADNÉ: čelá -->
-<details data-key="fronts" open>
-  <summary>Čelá</summary>
+<!-- STROP -->
+<details data-key="top">
+  <summary>Strop</summary>
   <div class="body">
-    <div class="hint">Poradie odspodu nahor (prvý riadok = dole). Výška prázdna = AUTO (dopočíta zvyšok). 🔒 zamkne pevnú výšku.</div>
-    <div id="frontRows"></div>
-    <div class="btnrow">
-      <button class="ghostbtn" onclick="addFrontRow()">+ riadok</button>
-      <button class="ghostbtn" onclick="removeLastFront()">− riadok</button>
-    </div>
-    <button class="apply wide" id="applyFrontsBtn" onclick="applyFronts()" disabled>Aplikuj čelá na označený</button>
-  </div>
-</details>
-
-<!-- ZÁKLADNÉ: zóny (vnútro / police / priečky) -->
-<details data-key="zones" open>
-  <summary>Zóny (vnútro, police, priečky)</summary>
-  <div class="body">
-    <div id="zoneActive">Žiadna zóna neoznačená. Klikni na ghost v modeli alebo na zónu v strome.</div>
-    <div class="zact"><label>Rozdeliť zvislo</label>
-      <select id="splitVCount"><option>2</option><option>3</option><option>4</option></select>
-      <button class="ghostbtn zbtn" onclick="splitZone('v')" disabled>na stĺpce</button></div>
-    <div class="zact"><label>Rozdeliť vodorovne</label>
-      <select id="splitHCount"><option>2</option><option>3</option><option>4</option></select>
-      <button class="ghostbtn zbtn" onclick="splitZone('h')" disabled>na riadky</button></div>
-    <div class="zact"><label>Police v zóne</label>
-      <select id="zoneShelves"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select>
-      <button class="ghostbtn zbtn" onclick="setZoneShelves()" disabled>nastav</button></div>
-    <div class="btnrow">
-      <button class="ghostbtn zbtn" onclick="cleanZone()" disabled>Vyčistiť zónu (zruš delenie/police)</button>
-    </div>
-    <div id="zoneTree"><div class="muted">Žiadny označený korpus.</div></div>
-    <div class="zoneline">
-      <input id="zonesChk" type="checkbox" onchange="toggleZones()">
-      <label for="zonesChk">Zobraziť zóny (ghost)</label>
-    </div>
-  </div>
-</details>
-
-<!-- POKROČILÉ: konštrukčné varianty (zbalené) -->
-<details data-key="construction">
-  <summary>Konštrukcia (pokročilé)</summary>
-  <div class="body">
-    <div class="row"><label>Dno</label>
-      <select id="bottom_mode">
-        <option value="under_sides">Boky na dne</option>
-        <option value="between_sides">Dno medzi bokmi</option>
-      </select><span class="unit"></span>
-    </div>
-    <div class="row"><label>Vrch</label>
-      <select id="top_mode" onchange="toggleTwoRails()">
+    <div class="row"><label>Konštrukcia</label>
+      <select id="top_mode" onchange="toggleTwoRails(); onField()">
         <option value="full">Plný panel</option>
         <option value="two_rails">Dve výstuhy</option>
-        <option value="none">Bez vrchu</option>
+        <option value="none">Bez stropu</option>
       </select><span class="unit"></span>
     </div>
     <div id="twoRailsGroup">
       <div class="row"><label>Orientácia výstuh</label>
-        <select id="rails_orientation">
+        <select id="rails_orientation" onchange="onField()">
           <option value="flat">Naplocho</option>
           <option value="upright">Na výšku</option>
         </select><span class="unit"></span>
       </div>
-      <div class="row"><label>Odsadenie od vrchu</label><input id="rails_top_offset" type="number" step="1"><span class="unit">mm</span></div>
-      <div class="row"><label>Hĺbka/výška pásu</label><input id="rail_depth" type="number" step="1"><span class="unit">mm</span></div>
+      <div class="row"><label>Odsadenie od vrchu</label><input id="rails_top_offset" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
+      <div class="row"><label>Hĺbka/výška pásu</label><input id="rail_depth" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
     </div>
-    <div class="row"><label>Chrbát</label>
-      <select id="back_mode">
+  </div>
+</details>
+
+<!-- DNO + PODSTAVEC -->
+<details data-key="bottom">
+  <summary>Dno &amp; podstavec</summary>
+  <div class="body">
+    <div class="row"><label>Dno</label>
+      <select id="bottom_mode" onchange="onField()">
+        <option value="under_sides">Boky na dne</option>
+        <option value="between_sides">Dno medzi bokmi</option>
+      </select><span class="unit"></span>
+    </div>
+    <div id="plinthGroup">
+      <div class="row"><label>Výška podstavca</label><input id="floor_height" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
+      <div class="row"><label>Sokel</label>
+        <select id="plinth_mode" onchange="toggleRecess(); onField()">
+          <option value="none">Bez sokla — nohy</option>
+          <option value="front">Predný soklový panel</option>
+        </select><span class="unit"></span>
+      </div>
+      <div class="row" id="recessRow"><label>Zapustenie sokla</label><input id="plinth_recess" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
+    </div>
+  </div>
+</details>
+
+<!-- BOKY -->
+<details data-key="sides">
+  <summary>Boky</summary>
+  <div class="body">
+    <div class="hint">Boky obaľujú korpus (hrúbka podľa Základné). Per-bok nastavenia (rohové spoje, odsadenia) pribudnú v ďalšej verzii.</div>
+  </div>
+</details>
+
+<!-- CHRBAT -->
+<details data-key="back">
+  <summary>Chrbát</summary>
+  <div class="body">
+    <div class="row"><label>Konštrukcia</label>
+      <select id="back_mode" onchange="onField()">
         <option value="overlay">Naložený zozadu</option>
         <option value="inset">Vložený medzi boky</option>
         <option value="groove">V drážke</option>
       </select><span class="unit"></span>
     </div>
     <div class="row"><label>Hrúbka chrbta</label>
-      <select id="back_thickness">
+      <select id="back_thickness" onchange="onField()">
         <option value="3">HDF 3 mm</option>
         <option value="18">Pevný 18 mm</option>
       </select><span class="unit"></span>
     </div>
-    <div id="plinthGroup">
-      <div class="row"><label>Výška podstavca</label><input id="floor_height" type="number" step="1"><span class="unit">mm</span></div>
-      <div class="row"><label>Sokel</label>
-        <select id="plinth_mode" onchange="toggleRecess()">
-          <option value="none">Bez sokla — nohy</option>
-          <option value="front">Predný soklový panel</option>
-        </select><span class="unit"></span>
-      </div>
-      <div class="row" id="recessRow"><label>Zapustenie sokla</label><input id="plinth_recess" type="number" step="1"><span class="unit">mm</span></div>
+  </div>
+</details>
+
+<!-- CELA -->
+<details data-key="fronts">
+  <summary>Čelá</summary>
+  <div class="body">
+    <div class="hint">Poradie odspodu nahor. Výška prázdna = AUTO (dopočíta zvyšok). 🔒 zamkne pevnú výšku.</div>
+    <div id="frontRows"></div>
+    <div class="btnrow">
+      <button class="ghostbtn" onclick="addFrontRow(); onField()">+ riadok</button>
+      <button class="ghostbtn" onclick="removeLastFront(); onField()">− riadok</button>
+    </div>
+  </div>
+</details>
+
+<!-- ZONY (NAHLAD) -->
+<details data-key="zones" open>
+  <summary>Zóny (náhľad)</summary>
+  <div class="body">
+    <div class="pvtabs">
+      <button id="tabZones" class="on" onclick="setPreviewMode('zones')">Zóny</button>
+      <button id="tabFronts" onclick="setPreviewMode('fronts')">Čelá</button>
+    </div>
+    <svg id="preview" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="pvhint">Klik na zónu = výber. Ťahaj priečku pre posun. Náhľad funguje aj pred vložením.</div>
+
+    <div id="zoneActive">Žiadna zóna neoznačená. Klikni na pole v náhľade.</div>
+
+    <!-- listova zona: delenie / police -->
+    <div id="leafActions">
+      <div class="zact"><label>Rozdeliť zvislo</label>
+        <select id="splitVCount"><option>2</option><option>3</option><option>4</option></select>
+        <button class="ghostbtn zbtn" onclick="splitZone('v')" disabled>na stĺpce</button></div>
+      <div class="zact"><label>Rozdeliť vodorovne</label>
+        <select id="splitHCount"><option>2</option><option>3</option><option>4</option></select>
+        <button class="ghostbtn zbtn" onclick="splitZone('h')" disabled>na riadky</button></div>
+      <div class="zact"><label>Police v zóne</label>
+        <select id="zoneShelves"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select>
+        <button class="ghostbtn zbtn" onclick="setZoneShelves()" disabled>nastav</button></div>
+    </div>
+
+    <!-- delena zona: rozmery poli + locky -->
+    <div id="fieldEditor"></div>
+
+    <div class="btnrow">
+      <button class="danger zbtn" onclick="cleanZone()" disabled>Vyčistiť zónu (zruš delenie/police)</button>
+    </div>
+    <div id="zoneTree"><div class="muted">Žiadny označený korpus.</div></div>
+    <div class="zoneline">
+      <input id="zonesChk" type="checkbox" onchange="toggleZones()">
+      <label for="zonesChk">Zobraziť zóny (ghost) v modeli</label>
+    </div>
+  </div>
+</details>
+
+<!-- SABLONY -->
+<details data-key="templates">
+  <summary>Šablóny</summary>
+  <div class="body">
+    <div class="hint">Šablóny sú filtrované podľa typu korpusu (dolná/horná).</div>
+    <div class="row"><label>Šablóna</label>
+      <select id="template" onchange="onTemplateChange()"><option value="">— vyber —</option></select>
+    </div>
+    <div class="btnrow">
+      <button class="ghostbtn" onclick="saveTemplate()">Ulož ako šablónu</button>
+      <button class="ghostbtn" onclick="deleteTemplate()">Vymaž</button>
+    </div>
+    <div class="btnrow">
+      <button class="ghostbtn" id="applyTplBtn" onclick="applyTemplateToSelected()" disabled>Použi šablónu na označený</button>
     </div>
   </div>
 </details>
 
 <p class="selinfo" id="selinfo">Nič nie je označené.</p>
 <button class="primary wide" onclick="insertCabinet()">Vložiť nový korpus</button>
-<button class="apply wide" id="applyBtn" onclick="applyChanges()" disabled>Aplikovať zmeny na označený</button>
 
 <div id="status">Pripravené.</div>
 
@@ -203,10 +251,16 @@
   var TEMPLATES = [];
   var activeZoneId = null;
   var selectedCabId = null;
-  var currentZoneTree = null; // strom zo sablony pri novom vklade
+  var currentZoneTree = null;   // strukturny strom zon (nový vklad aj oznaceny)
+  var previewMode = 'zones';
+  var applyTimer = null;
+  var lastZones = null;         // ploche zony z backendu (oznaceny korpus)
+  var frontItems = null;        // rozlozene cela z backendu
+  var PALETTE = ['#46beff','#6eff96','#ffaf50','#dc78ff','#ffeb5a'];
 
   function el(id){ return document.getElementById(id); }
   function val(id){ var e = el(id); return e ? e.value : null; }
+  function numv(id){ var e = el(id); return e ? parseFloat(e.value) : NaN; }
   function setVal(id, v){ var e = el(id); if (e && v !== null && v !== undefined) e.value = v; }
   function setNum(id, v){ var e = el(id); if (e && v !== null && v !== undefined) e.value = String(parseFloat(v)); }
   function getType(){ var r = document.querySelector('input[name=ctype]:checked'); return r ? r.value : 'lower'; }
@@ -224,7 +278,6 @@
       rail_depth: val('rail_depth'), rails_orientation: val('rails_orientation'), rails_top_offset: val('rails_top_offset')
     };
   }
-
   function collectFronts(){
     var items = [];
     var rows = el('frontRows').querySelectorAll('.frow');
@@ -235,15 +288,53 @@
       var locked = r.querySelector('.flock').checked;
       var wings = r.querySelector('.fw').value;
       var hasH = hv !== '';
-      items.push({
-        id: 'F' + (i + 1), type: type,
-        mode: hasH ? 'fixed' : 'auto',
-        height: hasH ? hv : null,
-        locked: hasH ? locked : false,
-        wings: (type === 'door') ? wings : '1'
-      });
+      items.push({ id: 'F' + (i + 1), type: type, mode: hasH ? 'fixed' : 'auto',
+        height: hasH ? hv : null, locked: hasH ? locked : false, wings: (type === 'door') ? wings : '1' });
     }
     return { split_axis: 'height', gap: 3.0, gap_top: 2.0, gap_bottom: 2.0, gap_sides: 2.0, items: items };
+  }
+  function collectAll(){ var c = collectConstruction(); c.fronts = collectFronts(); return c; }
+
+  // --- validacia poli (clamp + cerveny okraj, ziadne modaly) ---
+  var LIMITS = { width:[200,3000], height:[200,3000], depth:[150,2000], thickness:[6,50],
+                 floor_height:[0,500], plinth_recess:[0,300], rail_depth:[20,400], rails_top_offset:[0,500] };
+  function validateFields(){
+    var ok = true;
+    for (var id in LIMITS){
+      var e = el(id); if (!e) continue;
+      var v = parseFloat(e.value);
+      if (e.value === '' || isNaN(v)){ e.classList.remove('bad'); continue; }
+      var lo = LIMITS[id][0], hi = LIMITS[id][1];
+      if (v < lo || v > hi){ e.classList.add('bad'); ok = false; } else { e.classList.remove('bad'); }
+    }
+    return ok;
+  }
+
+  // fix #2: refresh nahladu BEZ auto-apply. Pouzity pri vybere sablony (sablona = len preview;
+  // aplikuje ju vyhradne tlacidlo "Pouzi sablonu na oznaceny", vratane zon zo sablony).
+  function refreshPreview(){ validateFields(); renderPreview(); updateAvailable(); }
+
+  // --- AUTO-APPLY (debounce 400 ms) ---
+  function onField(){
+    validateFields();
+    renderPreview();
+    updateAvailable();
+    if (!selectedCabId) return;            // nic oznacene -> len nahlad, ziadny rebuild
+    if (applyTimer) clearTimeout(applyTimer);
+    applyTimer = setTimeout(function(){
+      if (!validateFields()) { NX.setStatus('Skontroluj červené polia (mimo rozsahu).', true); return; }
+      if (window.sketchup && sketchup.apply_all) sketchup.apply_all(JSON.stringify(collectAll()));
+    }, 400);
+  }
+
+  function updateAvailable(){
+    // pri oznacenom pouzijeme presne z backendu; inak lokalny odhad
+    var t = numv('thickness') || 18, w = numv('width') || 0, h = numv('height') || 0, d = numv('depth') || 0;
+    var fh = numv('floor_height') || 0;
+    var topNone = val('top_mode') === 'none';
+    setVal('av_width', Math.max(0, Math.round(w - 2*t)));
+    setVal('av_depth', Math.round(d));
+    setVal('av_height', Math.max(0, Math.round(h - fh - t - (topNone ? 0 : t))));
   }
 
   // --- defaulty / viditelnost ---
@@ -257,24 +348,39 @@
     setVal('rails_orientation', d.rails_orientation); setNum('rails_top_offset', d.rails_top_offset); setNum('rail_depth', d.rail_depth);
     applyVisibility(t);
   }
-
   function applyVisibility(t){
     el('plinthGroup').style.display = (t === 'upper') ? 'none' : '';
-    toggleRecess();
-    toggleTwoRails();
+    toggleRecess(); toggleTwoRails();
   }
   function toggleRecess(){ el('recessRow').style.display = (val('plinth_mode') === 'front') ? '' : 'none'; }
   function toggleTwoRails(){ el('twoRailsGroup').style.display = (val('top_mode') === 'two_rails') ? '' : 'none'; }
 
-  function onTypeChange(){ setDefaults(getType()); el('template').value = ''; currentZoneTree = null; }
+  function onTypeChange(){
+    setDefaults(getType());
+    el('template').value = '';
+    currentZoneTree = defaultTree();
+    renderFilteredTemplates();
+    onField();
+  }
 
-  // --- sablony ---
+  // --- sablony (filter podla typu) ---
+  function renderFilteredTemplates(){
+    var t = getType();
+    var sel = el('template'); var cur = sel.value;
+    sel.innerHTML = '<option value="">— vyber —</option>';
+    TEMPLATES.forEach(function(tp){
+      var tt = (tp.config && tp.config.type) ? tp.config.type : 'lower';
+      if (tt !== t) return;
+      var o = document.createElement('option'); o.value = tp.name; o.textContent = tp.name; sel.appendChild(o);
+    });
+    sel.value = cur;
+  }
   function onTemplateChange(){
     var name = val('template'); if (!name) return;
-    var t = null;
-    for (var i = 0; i < TEMPLATES.length; i++){ if (TEMPLATES[i].name === name){ t = TEMPLATES[i]; break; } }
-    if (!t) return;
-    var c = t.config || {};
+    var tp = null;
+    for (var i = 0; i < TEMPLATES.length; i++){ if (TEMPLATES[i].name === name){ tp = TEMPLATES[i]; break; } }
+    if (!tp) return;
+    var c = tp.config || {};
     setType(c.type || 'lower');
     setNum('width', c.width); setNum('height', c.height); setNum('depth', c.depth); setNum('thickness', c.thickness);
     setNum('floor_height', c.floor_height);
@@ -284,22 +390,23 @@
     setVal('rails_orientation', c.rails_orientation); setNum('rails_top_offset', c.rails_top_offset); setNum('rail_depth', c.rail_depth);
     applyVisibility(c.type || 'lower');
     renderFronts(c.fronts);
-    currentZoneTree = c.zone_tree || null;
+    currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();
+    // fix #2: vyber sablony NEspusti apply_all — len naplni polia + nahlad. Korpus sa NEZMENI,
+    // kym uzivatel nestlaci "Pouzi sablonu na oznaceny".
+    refreshPreview();
+    refreshZoneUI();
   }
-
   function saveTemplate(){
-    var p = collectConstruction();
-    p.fronts = collectFronts();
-    p.zone_tree = currentZoneTree;
+    var p = collectConstruction(); p.fronts = collectFronts(); p.zone_tree = currentZoneTree;
     if (window.sketchup && sketchup.save_template) sketchup.save_template(JSON.stringify(p));
   }
   function deleteTemplate(){
-    var name = val('template'); if (!name){ NX.setStatus('Vyber sablonu.', true); return; }
+    var name = val('template'); if (!name){ NX.setStatus('Vyber šablónu.', true); return; }
     if (window.sketchup && sketchup.delete_template) sketchup.delete_template(JSON.stringify({ template: name }));
   }
   function applyTemplateToSelected(){
     if (el('applyTplBtn').disabled) return;
-    var name = val('template'); if (!name){ NX.setStatus('Vyber sablonu.', true); return; }
+    var name = val('template'); if (!name){ NX.setStatus('Vyber šablónu.', true); return; }
     if (window.sketchup && sketchup.apply_template) sketchup.apply_template(JSON.stringify({ template: name }));
   }
 
@@ -312,14 +419,12 @@
     row.className = 'frow';
     row.innerHTML =
       '<span class="fnum">' + idx + '</span>' +
-      '<select class="ftype" onchange="onFrontTypeChange(this)">' +
-        '<option value="door">Dvierka</option>' +
-        '<option value="drawer_front">Zásuvkové čelo</option>' +
-      '</select>' +
-      '<input class="fh" type="number" step="1" placeholder="auto">' +
-      '<select class="fw"><option value="auto">auto</option><option value="1">1</option><option value="2">2</option></select>' +
-      '<input class="flock" type="checkbox" title="Zamknúť pevnú výšku">' +
-      '<button class="fdel" title="Odstrániť" onclick="delFrontRow(this)">✕</button>';
+      '<select class="ftype" onchange="onFrontTypeChange(this); onField()">' +
+        '<option value="door">Dvierka</option><option value="drawer_front">Zásuvkové čelo</option></select>' +
+      '<input class="fh" type="number" step="1" placeholder="auto" oninput="onField()">' +
+      '<select class="fw" onchange="onField()"><option value="auto">auto</option><option value="1">1</option><option value="2">2</option></select>' +
+      '<input class="flock" type="checkbox" title="Zamknúť pevnú výšku" onchange="onField()">' +
+      '<button class="fdel" title="Odstrániť" onclick="delFrontRow(this); onField()">✕</button>';
     wrap.appendChild(row);
     if (item.type) row.querySelector('.ftype').value = item.type;
     if (item.height !== null && item.height !== undefined && item.height !== '') row.querySelector('.fh').value = item.height;
@@ -327,10 +432,7 @@
     if (item.locked) row.querySelector('.flock').checked = true;
     onFrontTypeChange(row.querySelector('.ftype'));
   }
-  function onFrontTypeChange(sel){
-    var row = sel.closest('.frow');
-    row.querySelector('.fw').style.visibility = (sel.value === 'door') ? 'visible' : 'hidden';
-  }
+  function onFrontTypeChange(sel){ var row = sel.closest('.frow'); row.querySelector('.fw').style.visibility = (sel.value === 'door') ? 'visible' : 'hidden'; }
   function delFrontRow(btn){ btn.closest('.frow').remove(); renumberFronts(); }
   function removeLastFront(){ var rows = el('frontRows').querySelectorAll('.frow'); if (rows.length) { rows[rows.length-1].remove(); renumberFronts(); } }
   function renumberFronts(){ var rows = el('frontRows').querySelectorAll('.frow'); for (var i=0;i<rows.length;i++){ rows[i].querySelector('.fnum').textContent = (i+1); } }
@@ -339,99 +441,423 @@
     var items = (fronts && fronts.items) ? fronts.items : [];
     for (var i = 0; i < items.length; i++){ addFrontRow(items[i]); }
   }
-  function applyFronts(){
-    if (el('applyFrontsBtn').disabled) return;
-    if (window.sketchup && sketchup.apply_fronts) sketchup.apply_fronts(JSON.stringify({ fronts: collectFronts() }));
+
+  // ===================== ZONE TREE (JS zrkadlo ZoneTree) =====================
+  function defaultTree(sh){ return { split:null, shelves: (sh||0), children:[] }; }
+  function truthy(v){ return v===true || v==='true' || v==='1' || v===1; }
+  function sanitizeTree(node){
+    if (!node || typeof node !== 'object') return defaultTree(0);
+    var sp = node.split;
+    if (sp && typeof sp === 'object'){
+      var axis = (sp.axis === 'h') ? 'h' : 'v';
+      var count = Math.min(4, Math.max(2, parseInt(sp.count || 2, 10)));
+      var cuts = sanitizeCuts(sp.cuts, count);
+      var kids = (node.children || []).map(sanitizeTree);
+      while (kids.length < count) kids.push(defaultTree(0));
+      kids = kids.slice(0, count);
+      return { split:{ axis:axis, count:count, cuts:cuts }, shelves:0, children:kids };
+    }
+    return defaultTree(parseInt(node.shelves||0,10));
+  }
+  function sanitizeCuts(cuts, count){
+    var arr = (cuts||[]).map(function(c){
+      c = c||{}; var sz = (c.size!=null?c.size:(c.at_mm!=null?c.at_mm:null));
+      return { size:(sz==null||sz===''?null:parseFloat(sz)), locked: truthy(c.locked) };
+    });
+    arr = arr.slice(0, count);
+    while (arr.length < count) arr.push({ size:null, locked:false });
+    return arr;
+  }
+  function navTree(tree, path){ var n = tree; for (var i=1;i<path.length;i++){ if(!n.children||!n.children[path[i]-1]) return null; n=n.children[path[i]-1]; } return n; }
+  // fix #4: zvladne aj lokalne draft id 'Z1.2' (pred vlozenim korpusu), nielen 'CAB-001-Z1.2'.
+  function pathOf(zid){ var s = String(zid); var m = s.match(/-Z([\d.]+)$/) || s.match(/^Z([\d.]+)$/); return m ? m[1].split('.').map(function(x){return parseInt(x,10);}) : [1]; }
+  var MINF = 20;
+  // fix #1 (zrkadlo Ruby ZoneTree.resolve_fields): kumulativny clamp zamknutych poli — Sigma(locked)
+  // nikdy nepresiahne dostupny priestor (aj po rezervovani MINF na kazde nezamknute) -> priecky/zony
+  // nevzniknu mimo rodica. Nezamknute: proporcny prepocet (nositel fix #5).
+  function resolveFields(cuts, count, span, t){
+    var clear = Math.max(0, span - (count-1)*t);
+    cuts = sanitizeCuts(cuts, count);
+    var lockedIdx = [], unlockedIdx = [];
+    for (var i=0;i<count;i++){ if (cuts[i].locked && cuts[i].size!=null) lockedIdx.push(i); else unlockedIdx.push(i); }
+    var lockedWant = lockedIdx.map(function(i){ return Math.max(cuts[i].size, MINF); });
+    var lockedSum = lockedWant.reduce(function(a,b){return a+b;}, 0);
+    var availLocked = Math.max(0, clear - MINF*unlockedIdx.length);
+    if (lockedSum > availLocked && lockedSum > 0){
+      var factor = availLocked/lockedSum;
+      lockedWant = lockedWant.map(function(s){ return s*factor; });
+      lockedSum = lockedWant.reduce(function(a,b){return a+b;}, 0);
+    }
+    var free = Math.max(0, clear - lockedSum);
+    var known = unlockedIdx.map(function(i){return cuts[i].size;}).filter(function(x){return x!=null;});
+    var avg = known.length ? known.reduce(function(a,b){return a+b;},0)/known.length : (free/Math.max(1,unlockedIdx.length));
+    var wsum = unlockedIdx.reduce(function(s,i){ return s + (cuts[i].size!=null?cuts[i].size:avg); }, 0); if (wsum<=0) wsum=1;
+    var sizes = new Array(count);
+    lockedIdx.forEach(function(i,k){ sizes[i] = lockedWant[k]; });
+    unlockedIdx.forEach(function(i){ var w = (cuts[i].size!=null?cuts[i].size:avg); sizes[i] = free*(w/wsum); });
+    return sizes;
   }
 
-  // --- zony ---
-  function zoneShort(id){ var m = String(id).match(/-Z([\d.]+)$/); return m ? ('Z' + m[1]) : id; }
-  function renderZoneTree(zones, activeId){
+  // Vypocet zon (2D: x,z) z currentZoneTree + rozmerov korpusu. Vrati pole {id,path,x,z,w,h,leaf,shelves,split,label}.
+  function computeZones(){
+    var t = numv('thickness')||18, W = numv('width')||600, H = numv('height')||720;
+    var fh = (getType()==='upper') ? 0 : (numv('floor_height')||0);
+    var topNone = val('top_mode')==='none';
+    var x0 = t, x1 = W - t;
+    var z0 = fh + t, z1 = topNone ? H : H - t;
+    var out = [];
+    walkZones(sanitizeTree(currentZoneTree||defaultTree()), [1], x0, x1, z0, z1, t, 'Celé vnútro', out);
+    return out;
+  }
+  function walkZones(node, path, x0, x1, z0, z1, t, label, out){
+    var leaf = !node.split;
+    var o = { id:'Z'+path.join('.'), path:path.slice(), x:x0, z:z0, w:(x1-x0), h:(z1-z0), leaf:leaf,
+              shelves:(leaf?node.shelves:0), split:null, label:label };
+    if (leaf){ out.push(o); return; }
+    var axis = node.split.axis, count = node.split.count;
+    var span = (axis==='v') ? (x1-x0) : (z1-z0);
+    var sizes = resolveFields(node.split.cuts, count, span, t);
+    o.split = { axis:axis, count:count, cuts:node.split.cuts, sizes:sizes };
+    out.push(o);
+    if (axis==='v'){
+      var x = x0;
+      for (var c=0;c<count;c++){ var w=sizes[c]; walkZones(node.children[c], path.concat(c+1), x, x+w, z0, z1, t, 'Stĺpec '+(c+1), out); x+=w; if(c<count-1)x+=t; }
+    } else {
+      var z = z0;
+      for (var r=0;r<count;r++){ var hh=sizes[r]; walkZones(node.children[r], path.concat(r+1), x0, x1, z, z+hh, t, 'Riadok '+(r+1), out); z+=hh; if(r<count-1)z+=t; }
+    }
+  }
+  function fullZoneId(localId){ return (selectedCabId ? selectedCabId : 'NEW') + '-' + localId; }
+  function localZoneId(fullId){ var m = String(fullId).match(/-(Z[\d.]+)$/); return m ? m[1] : fullId; }
+
+  // ===================== fix #5: PERZISTENCIA LAYOUTU POLI =====================
+  // Zisti clear-span (mm) delenej zony z aktualneho nahladu (podla osi delenia).
+  function zoneSpan(localId){
+    var span = null;
+    computeZones().forEach(function(z){ if (z.id===localId && z.split){ span = (z.split.axis==='v') ? z.w : z.h; } });
+    return span;
+  }
+  // Persistni CELY layout delenej zony ako explicitne sizes vsetkych poli. Editovane pole 'anchorIdx'
+  // sa docasne zamkne na 'anchorSize' (kotva), zvysne nezamknute sa dopocitaju okolo neho a VSETKY sa
+  // ulozia ako explicitna size (locked flag: anchor dostane 'anchorLocked', ostatne ponechaju svoj).
+  // Vysledok: zadany rozmer NEzmizne; proporcny prepocet nezamknutych az pri resize korpusu (nova span).
+  function persistLayout(localId, anchorIdx, anchorSize, anchorLocked){
+    var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localId));
+    if (!node || !node.split) return;
+    var count = node.split.count, t = numv('thickness')||18;
+    var span = zoneSpan(localId); if (span==null) return;
+    var tempCuts = node.split.cuts.map(function(c, j){
+      if (j===anchorIdx) return { size:(anchorSize==null?null:anchorSize), locked:(anchorSize!=null) };
+      return { size:c.size, locked:c.locked };
+    });
+    var sizes = resolveFields(tempCuts, count, span, t);
+    for (var j=0;j<count;j++){
+      var lk = (j===anchorIdx) ? anchorLocked : node.split.cuts[j].locked;
+      node.split.cuts[j] = { size: Math.round(sizes[j]), locked: lk };
+    }
+    currentZoneTree = tree;
+  }
+  // Zmraz aktualne resolved rozmery vsetkych poli zony do explicitnych sizes (zachovaj locky).
+  // Na zaciatku dragu priecky — aby sa pri tahani menili len 2 dotknute polia a ostatne drzali.
+  function freezeLayout(localId){
+    var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localId));
+    if (!node || !node.split) return;
+    var sizes = null;
+    computeZones().forEach(function(z){ if (z.id===localId && z.split) sizes = z.split.sizes; });
+    if (!sizes) return;
+    for (var j=0;j<node.split.count;j++){
+      node.split.cuts[j] = { size: Math.round(sizes[j]), locked: node.split.cuts[j].locked };
+    }
+    currentZoneTree = tree;
+  }
+  // Posli kompletny cuts layout zony do Ruby (ulozi sa naraz cez ZoneTree.set_field_cuts!).
+  function pushFieldCuts(localId, editedIndex){
+    var node = navTree(sanitizeTree(currentZoneTree), pathOf(localId));
+    if (!node || !node.split) return;
+    if (selectedCabId && window.sketchup && sketchup.set_zone_field)
+      sketchup.set_zone_field(JSON.stringify({ zone_id: fullZoneId(localId), index: editedIndex, cuts: node.split.cuts }));
+  }
+
+  // ===================== 2D NAHLAD (SVG) =====================
+  var dragState = null;
+  function setPreviewMode(m){ previewMode=m; el('tabZones').classList.toggle('on', m==='zones'); el('tabFronts').classList.toggle('on', m==='fronts'); renderPreview(); }
+
+  function renderPreview(){
+    var svg = el('preview'); if (!svg) return;
+    var t = numv('thickness')||18, W = numv('width')||600, H = numv('height')||720;
+    if (!(W>0 && H>0)){ svg.innerHTML=''; return; }
+    var pad = 14, vw = W + pad*2, vh = H + pad*2;
+    svg.setAttribute('viewBox', '0 0 ' + vw + ' ' + vh);
+    var fh = (getType()==='upper')?0:(numv('floor_height')||0);
+    var topNone = val('top_mode')==='none';
+    var S = [];
+    // helper: model (x,z) -> svg (flip Z). y = pad + (H - z)
+    function rx(x){ return pad + x; }
+    function ry(z){ return pad + (H - z); }
+    // obrys korpusu
+    S.push('<rect x="'+rx(0)+'" y="'+ry(H)+'" width="'+W+'" height="'+H+'" fill="#ffffff" stroke="#90a4ae" stroke-width="2"/>');
+    // dielce schematicky (boky + dno + vrch)
+    var partFill='#e5d8b8', partStroke='#c9b784';
+    S.push('<rect x="'+rx(0)+'" y="'+ry(H)+'" width="'+t+'" height="'+H+'" fill="'+partFill+'" stroke="'+partStroke+'"/>');       // bok L
+    S.push('<rect x="'+rx(W-t)+'" y="'+ry(H)+'" width="'+t+'" height="'+H+'" fill="'+partFill+'" stroke="'+partStroke+'"/>');     // bok R
+    S.push('<rect x="'+rx(0)+'" y="'+ry(fh+t)+'" width="'+W+'" height="'+t+'" fill="'+partFill+'" stroke="'+partStroke+'"/>');    // dno
+    if (!topNone) S.push('<rect x="'+rx(t)+'" y="'+ry(H)+'" width="'+(W-2*t)+'" height="'+t+'" fill="'+partFill+'" stroke="'+partStroke+'"/>'); // vrch
+    if (fh>0) S.push('<rect x="'+rx(0)+'" y="'+ry(fh)+'" width="'+W+'" height="'+fh+'" fill="#f4f5f7" stroke="#cfd8dc" stroke-dasharray="4 3"/>'); // podstavec
+
+    if (previewMode==='zones'){
+      var zones = computeZones();
+      var leafIdx = 0;
+      zones.forEach(function(z){
+        if (z.leaf){
+          var col = PALETTE[leafIdx % PALETTE.length]; leafIdx++;
+          var active = (fullZoneId(z.id) === activeZoneId);
+          S.push('<rect class="zrect" data-zid="'+z.id+'" x="'+rx(z.x)+'" y="'+ry(z.z+z.h)+'" width="'+z.w+'" height="'+z.h+'" fill="'+col+'" fill-opacity="'+(active?0.55:0.32)+'" stroke="'+(active?'#1565c0':col)+'" stroke-width="'+(active?4:1.5)+'" style="cursor:pointer"/>');
+          // police (tenke ciary)
+          if (z.shelves>0){ for (var s=1;s<=z.shelves;s++){ var zs = z.z + z.h*s/(z.shelves+1); S.push('<line x1="'+rx(z.x)+'" y1="'+ry(zs)+'" x2="'+rx(z.x+z.w)+'" y2="'+ry(zs)+'" stroke="#8d6e63" stroke-width="2"/>'); } }
+          // rozmer text
+          if (z.w>60 && z.h>30) S.push('<text x="'+rx(z.x+z.w/2)+'" y="'+ry(z.z+z.h/2)+'" font-size="'+Math.min(22,z.w/5)+'" fill="#37474f" text-anchor="middle" dominant-baseline="middle" pointer-events="none">'+Math.round(z.w)+'×'+Math.round(z.h)+'</text>');
+        } else if (z.split){
+          // priecky (hrube ciary), tahatelne
+          drawDividers(z, S, rx, ry, t, fh, topNone, H);
+        }
+      });
+    } else {
+      // cela pohlad
+      renderFrontsPreview(S, rx, ry, W, H, fh, t);
+    }
+    svg.innerHTML = S.join('');
+    bindPreviewEvents(svg);
+  }
+
+  function drawDividers(z, S, rx, ry, t, fh, topNone, H){
+    var axis = z.split.axis, sizes = z.split.sizes;
+    if (axis==='v'){
+      var x = z.x;
+      for (var c=0;c<z.split.count-1;c++){ x += sizes[c]; S.push('<rect class="divh" data-zid="'+z.id+'" data-idx="'+c+'" data-axis="v" x="'+rx(x)+'" y="'+ry(z.z+z.h)+'" width="'+t+'" height="'+z.h+'" fill="#8d6e63" stroke="#5d4037" style="cursor:ew-resize"/>'); x += t; }
+    } else {
+      var zz = z.z;
+      for (var r=0;r<z.split.count-1;r++){ zz += sizes[r]; S.push('<rect class="divh" data-zid="'+z.id+'" data-idx="'+r+'" data-axis="h" x="'+rx(z.x)+'" y="'+ry(zz+t)+'" width="'+z.w+'" height="'+t+'" fill="#8d6e63" stroke="#5d4037" style="cursor:ns-resize"/>'); zz += t; }
+    }
+  }
+
+  function renderFrontsPreview(S, rx, ry, W, H, fh, t){
+    var items = frontItems;
+    if (!items || !items.length){
+      // odhad z formulara (bez presnych vysok) — len info
+      S.push('<text x="'+rx(W/2)+'" y="'+ry(H/2)+'" font-size="20" fill="#90a4ae" text-anchor="middle">Čelá: nastav v sekcii Čelá</text>');
+      return;
+    }
+    var gs = 2;
+    items.forEach(function(it, i){
+      var z = it.z, h = it.height, col = (it.type==='drawer_front')?'#b3e5fc':'#e1f5fe';
+      S.push('<rect x="'+rx(gs)+'" y="'+ry(z+h)+'" width="'+(W-2*gs)+'" height="'+h+'" fill="'+col+'" stroke="#4fc3f7" stroke-width="1.5"/>');
+      S.push('<text x="'+rx(W/2)+'" y="'+ry(z+h/2)+'" font-size="18" fill="#0277bd" text-anchor="middle" dominant-baseline="middle">'+(it.type==='drawer_front'?'zásuvka':'dvierka')+' '+Math.round(h)+'</text>');
+    });
+  }
+
+  function bindPreviewEvents(svg){
+    svg.querySelectorAll('.zrect').forEach(function(r){
+      r.addEventListener('click', function(){ pickZone(r.getAttribute('data-zid')); });
+    });
+    svg.querySelectorAll('.divh').forEach(function(d){
+      d.addEventListener('mousedown', function(ev){ startDivDrag(ev, d, svg); });
+    });
+  }
+
+  function pickZone(localId){
+    activeZoneId = fullZoneId(localId);
+    refreshZoneUI();
+    renderPreview();
+    if (selectedCabId && window.sketchup && sketchup.select_zone) sketchup.select_zone(JSON.stringify({ zone_id: activeZoneId }));
+  }
+
+  // --- drag priecky ---
+  function startDivDrag(ev, d, svg){
+    ev.preventDefault();
+    var zid = d.getAttribute('data-zid'), idx = parseInt(d.getAttribute('data-idx'),10), axis = d.getAttribute('data-axis');
+    // najdi rodicovsku zonu v computeZones pre span
+    var zones = computeZones(); var parent = null;
+    zones.forEach(function(z){ if (z.id === zid) parent = z; });
+    if (!parent || !parent.split) return;
+    // fix #5: zmraz aktualny layout -> pri tahani sa menia len 2 dotknute polia, ostatne drzia rozmer
+    freezeLayout(zid);
+    var t = numv('thickness')||18;
+    var span = (axis==='v') ? parent.w : parent.h;
+    dragState = { zid: zid, idx: idx, axis: axis, parent: parent, span: span, t: t,
+                  sizes: parent.split.sizes.slice(), startX: ev.clientX, startY: ev.clientY, svg: svg };
+    document.addEventListener('mousemove', onDivDrag);
+    document.addEventListener('mouseup', endDivDrag);
+  }
+  function onDivDrag(ev){
+    if (!dragState) return;
+    var svg = dragState.svg; var rect = svg.getBoundingClientRect();
+    var W = (numv('width')||600) + 28; var H = (numv('height')||720) + 28;
+    var scale = rect.width / W; // px per mm (viewBox scaled)
+    var d_mm = (dragState.axis==='v') ? (ev.clientX - dragState.startX)/scale : -(ev.clientY - dragState.startY)/scale;
+    var sizes = dragState.sizes.slice();
+    var i = dragState.idx;
+    var lo = MINF, hi;
+    // presun hranice medzi polom i a i+1: zvacsi i, zmensi i+1
+    var newI = sizes[i] + d_mm, newN = sizes[i+1] - d_mm;
+    if (newI < MINF){ newN -= (MINF-newI); newI = MINF; }
+    if (newN < MINF){ newI -= (MINF-newN); newN = MINF; }
+    sizes[i] = newI; sizes[i+1] = newN;
+    // uloz do currentZoneTree (docasne, ako size hodnoty)
+    var tree = sanitizeTree(currentZoneTree);
+    var node = navTree(tree, pathOf(dragState.zid));
+    if (node && node.split){ node.split.cuts[i] = { size: Math.round(newI), locked: node.split.cuts[i].locked };
+                             node.split.cuts[i+1] = { size: Math.round(newN), locked: node.split.cuts[i+1].locked }; }
+    currentZoneTree = tree;
+    renderPreview();
+    NX.setStatus('Pole '+(i+1)+': '+Math.round(newI)+' mm · pole '+(i+2)+': '+Math.round(newN)+' mm', false);
+  }
+  function endDivDrag(ev){
+    document.removeEventListener('mousemove', onDivDrag);
+    document.removeEventListener('mouseup', endDivDrag);
+    if (!dragState) return;
+    var i = dragState.idx, zid = dragState.zid;
+    // fix #5: posli kompletny layout (vsetky polia uz maju explicitne sizes zo freeze + dragu)
+    if (selectedCabId) pushFieldCuts(zid, i);
+    dragState = null;
+  }
+
+  // ===================== ZONA UI (akcie / rozmery poli) =====================
+  function refreshZoneUI(){
+    var zones = computeZones();
+    var z = null; zones.forEach(function(x){ if (fullZoneId(x.id) === activeZoneId) z = x; });
+    var leafBox = el('leafActions'), fieldBox = el('fieldEditor');
+    if (!z){
+      el('zoneActive').innerHTML = 'Žiadna zóna neoznačená. Klikni na pole v náhľade.';
+      setZoneButtons(false); leafBox.style.display=''; fieldBox.innerHTML=''; renderZoneTree(zones); return;
+    }
+    el('zoneActive').innerHTML = '<b>' + z.label + '</b> — ' + Math.round(z.w) + '×' + Math.round(z.h) + ' mm';
+    if (z.leaf){
+      leafBox.style.display=''; fieldBox.innerHTML='';
+      setVal('zoneShelves', z.shelves||0);
+      setZoneButtons(true);
+    } else {
+      leafBox.style.display='none';
+      renderFieldEditor(z);
+      var b = document.querySelectorAll('.zbtn'); for (var i=0;i<b.length;i++) b[i].disabled=false; // clean zostava aktivne
+    }
+    renderZoneTree(zones);
+  }
+  function renderFieldEditor(z){
+    var box = el('fieldEditor'); var html = '<div class="hint">Presné rozmery polí (mm). 🔒 = drží rozmer pri zmene korpusu.</div>';
+    var axisLbl = (z.split.axis==='h') ? 'Riadok' : 'Stĺpec';
+    for (var i=0;i<z.split.count;i++){
+      var c = z.split.cuts[i] || {size:null,locked:false};
+      var sz = Math.round(z.split.sizes[i]);
+      html += '<div class="fldrow"><span class="fldn">'+axisLbl+' '+(i+1)+'</span>' +
+        '<input type="number" step="1" value="'+sz+'" onchange="setFieldSize(\''+z.id+'\','+i+', this.value)">' +
+        '<div class="lockbtn'+(c.locked?' on':'')+'" title="Zamknúť rozmer" onclick="toggleFieldLock(\''+z.id+'\','+i+', this)">'+(c.locked?'🔒':'🔓')+'</div></div>';
+    }
+    box.innerHTML = html;
+  }
+  function setFieldSize(localId, index, value){
+    var node0 = navTree(sanitizeTree(currentZoneTree), pathOf(localId));
+    if (!node0 || !node0.split) return;
+    var locked = node0.split.cuts[index] ? node0.split.cuts[index].locked : false;
+    var sz = (value===''? null : parseFloat(value));
+    if (sz==null){
+      // auto: toto pole na nil (ostatne necham; resolve ho rovnomerne dopocita)
+      var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localId));
+      node.split.cuts[index] = { size:null, locked:false }; currentZoneTree = tree;
+    } else {
+      // fix #5: kotva na zadany rozmer + persistni cely layout -> zadany rozmer nezmizne
+      persistLayout(localId, index, sz, locked);
+    }
+    renderPreview();
+    if (selectedCabId) pushFieldCuts(localId, index);
+    else refreshZoneUI();
+  }
+  function toggleFieldLock(localId, index, elBtn){
+    var node0 = navTree(sanitizeTree(currentZoneTree), pathOf(localId));
+    if (!node0 || !node0.split) return;
+    var cur = node0.split.cuts[index] || { size:null, locked:false };
+    var newLocked = !cur.locked;
+    var sizes = null; computeZones().forEach(function(z){ if(z.id===localId && z.split) sizes=z.split.sizes; });
+    var anchorSize = (cur.size!=null) ? cur.size : (sizes ? Math.round(sizes[index]) : null);
+    // fix #5: kotva na aktualny rozmer pola + persistni cely layout so zmenenym lockom
+    persistLayout(localId, index, anchorSize, newLocked);
+    renderPreview();
+    if (selectedCabId) pushFieldCuts(localId, index);
+    else refreshZoneUI();
+  }
+
+  // --- strom zon (citatelne nazvy) ---
+  function renderZoneTree(zones){
     var c = el('zoneTree'); c.innerHTML = '';
     if (!zones || !zones.length){ c.innerHTML = '<div class="muted">Žiadny označený korpus.</div>'; return; }
     zones.forEach(function(z){
-      var sid = zoneShort(z.id);
-      var depth = sid.split('.').length - 1;
+      var depth = z.path.length - 1;
       var div = document.createElement('div');
-      div.className = 'znode' + (z.id === activeId ? ' active' : '');
+      div.className = 'znode' + (fullZoneId(z.id) === activeZoneId ? ' active' : '');
       div.style.paddingLeft = (6 + depth * 14) + 'px';
-      var info = z.leaf
-        ? (z.shelves > 0 ? (z.shelves + ' políc') : 'prázdna')
-        : ('delené ' + ((z.split && z.split.axis === 'h') ? 'vodorovne' : 'zvislo') + ' ×' + (z.split ? z.split.count : '?'));
-      div.innerHTML = '<b>' + sid + '</b> <span class="dim">' + Math.round(z.width) + '×' + Math.round(z.height) + '×' + Math.round(z.depth) + '</span> <span class="zs">' + info + '</span>';
-      div.onclick = function(){ selectZoneNode(z); };
+      var info = z.leaf ? (z.shelves>0 ? (z.shelves+' políc') : 'prázdna')
+                        : ('delené ' + (z.split.axis==='h'?'vodorovne':'zvislo') + ' ×' + z.split.count);
+      div.innerHTML = '<b>' + z.label + '</b> <span class="dim">' + Math.round(z.w) + '×' + Math.round(z.h) + '</span> <span class="zs">' + info + '</span>';
+      div.onclick = (function(zz){ return function(){ pickZone(zz.id); }; })(z);
       c.appendChild(div);
     });
   }
-  function selectZoneNode(z){
-    activeZoneId = z.id;
-    el('zoneActive').innerHTML = 'Zóna <b>' + zoneShort(z.id) + '</b> — ' + Math.round(z.width) + '×' + Math.round(z.height) + '×' + Math.round(z.depth) + ' mm';
-    setVal('zoneShelves', (z.shelves || 0));
-    setZoneButtons(true);
-    var nodes = el('zoneTree').querySelectorAll('.znode');
-    for (var i = 0; i < nodes.length; i++) nodes[i].classList.remove('active');
-    // znovu vyrenderuj zvyraznenie
-    var zones = lastZones; if (zones) renderZoneTree(zones, activeZoneId);
-  }
-  function setZoneButtons(on){
-    var b = document.querySelectorAll('.zbtn');
-    for (var i = 0; i < b.length; i++) b[i].disabled = !on;
-  }
+  function setZoneButtons(on){ var b = document.querySelectorAll('.zbtn'); for (var i=0;i<b.length;i++) b[i].disabled = !on; }
+
   function splitZone(axis){
     if (!activeZoneId){ NX.setStatus('Najprv označ zónu.', true); return; }
     var count = parseInt(axis === 'h' ? val('splitHCount') : val('splitVCount'), 10);
-    if (window.sketchup && sketchup.split_zone) sketchup.split_zone(JSON.stringify({ zone_id: activeZoneId, axis: axis, count: count }));
+    if (selectedCabId){
+      if (window.sketchup && sketchup.split_zone) sketchup.split_zone(JSON.stringify({ zone_id: activeZoneId, axis: axis, count: count }));
+    } else {
+      var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localZoneId(activeZoneId)));
+      if (node){ node.split={axis:axis,count:count,cuts:sanitizeCuts(null,count)}; node.shelves=0; node.children=[]; for(var i=0;i<count;i++)node.children.push(defaultTree(0)); }
+      currentZoneTree = tree; renderPreview(); refreshZoneUI();
+    }
   }
   function setZoneShelves(){
     if (!activeZoneId){ NX.setStatus('Najprv označ zónu.', true); return; }
-    if (window.sketchup && sketchup.set_zone_shelves) sketchup.set_zone_shelves(JSON.stringify({ zone_id: activeZoneId, count: parseInt(val('zoneShelves'), 10) }));
+    var n = parseInt(val('zoneShelves'), 10);
+    if (selectedCabId){
+      if (window.sketchup && sketchup.set_zone_shelves) sketchup.set_zone_shelves(JSON.stringify({ zone_id: activeZoneId, count: n }));
+    } else {
+      var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localZoneId(activeZoneId)));
+      if (node){ node.split=null; node.children=[]; node.shelves=n; }
+      currentZoneTree = tree; renderPreview(); refreshZoneUI();
+    }
   }
   function cleanZone(){
     if (!activeZoneId){ NX.setStatus('Najprv označ zónu.', true); return; }
-    if (window.sketchup && sketchup.clean_zone) sketchup.clean_zone(JSON.stringify({ zone_id: activeZoneId }));
+    if (selectedCabId){
+      if (window.sketchup && sketchup.clean_zone) sketchup.clean_zone(JSON.stringify({ zone_id: activeZoneId }));
+    } else {
+      var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localZoneId(activeZoneId)));
+      if (node){ node.split=null; node.children=[]; node.shelves=0; }
+      currentZoneTree = tree; renderPreview(); refreshZoneUI();
+    }
   }
 
   // --- korpus akcie ---
   function insertCabinet(){
-    var p = collectConstruction();
-    p.fronts = collectFronts();
-    p.zone_tree = currentZoneTree;
+    var p = collectAll(); p.zone_tree = currentZoneTree;
     if (window.sketchup && sketchup.insert_cabinet) sketchup.insert_cabinet(JSON.stringify(p));
   }
-  function applyChanges(){
-    if (el('applyBtn').disabled) return;
-    if (window.sketchup && sketchup.apply_changes) sketchup.apply_changes(JSON.stringify(collectConstruction()));
-  }
-  function toggleZones(){
-    var on = el('zonesChk').checked;
-    if (window.sketchup && sketchup.toggle_zones) sketchup.toggle_zones(on ? 'true' : 'false');
-  }
+  function toggleZones(){ var on = el('zonesChk').checked; if (window.sketchup && sketchup.toggle_zones) sketchup.toggle_zones(on ? 'true' : 'false'); }
 
   function setSelected(cid){
-    selectedCabId = cid;
-    var on = !!cid;
-    el('applyBtn').disabled = !on;
-    el('applyFrontsBtn').disabled = !on;
+    selectedCabId = cid; var on = !!cid;
     el('applyTplBtn').disabled = !on;
   }
 
-  var lastZones = null;
-
+  // ===================== Ruby -> JS =====================
   window.NX = {
     init: function(data){
       DEFAULTS = data.defaults || { lower: {}, upper: {} };
-      NX.setTemplates(data.templates || []);
+      TEMPLATES = data.templates || [];
       el('zonesChk').checked = !!data.zones_visible;
       if (data.selected){ NX.loadSelected(data.selected); }
-      else { setType('lower'); setDefaults('lower'); NX.clearSelected(); }
+      else { setType('lower'); setDefaults('lower'); currentZoneTree = defaultTree(); renderFilteredTemplates(); NX.clearSelected(); onField(); }
     },
-    setTemplates: function(list){
-      TEMPLATES = list || [];
-      var sel = el('template'); var cur = sel.value;
-      sel.innerHTML = '<option value="">— vyber —</option>';
-      TEMPLATES.forEach(function(t){ var o = document.createElement('option'); o.value = t.name; o.textContent = t.name; sel.appendChild(o); });
-      sel.value = cur;
-    },
+    setTemplates: function(list){ TEMPLATES = list || []; renderFilteredTemplates(); },
     loadSelected: function(c){
       var t = c.type || 'lower';
       setType(t);
@@ -443,31 +869,30 @@
       setVal('rails_orientation', c.rails_orientation); setNum('rails_top_offset', c.rails_top_offset); setNum('rail_depth', c.rail_depth);
       applyVisibility(t);
       renderFronts(c.fronts);
+      currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();
       lastZones = c.zones || [];
+      frontItems = c.front_items || [];
       activeZoneId = c.active_zone || null;
-      renderZoneTree(lastZones, activeZoneId);
-      currentZoneTree = null;
-      if (activeZoneId){
-        var z = lastZones.filter(function(x){ return x.id === activeZoneId; })[0];
-        if (z) selectZoneNode(z); else setZoneButtons(false);
-      } else { el('zoneActive').innerHTML = 'Žiadna zóna neoznačená. Klikni na ghost v modeli alebo na zónu v strome.'; setZoneButtons(false); }
+      setSelected(c.cabinet_id || null);
+      renderFilteredTemplates();
       el('selinfo').innerHTML = 'Označený: <b>' + (c.cabinet_id || '?') + '</b>';
-      setSelected(c.cabinet_id || '?');
+      // svetle rozmery presne z backendu ak su
+      if (c.available_width!=null) setVal('av_width', Math.round(c.available_width));
+      if (c.available_depth!=null) setVal('av_depth', Math.round(c.available_depth));
+      if (c.available_height!=null) setVal('av_height', Math.round(c.available_height));
+      renderPreview();
+      refreshZoneUI();
     },
     clearSelected: function(){
-      el('selinfo').textContent = 'Nič nie je označené.';
+      el('selinfo').textContent = 'Nič nie je označené (náhľad z hodnôt panela).';
       setSelected(null);
-      activeZoneId = null; lastZones = null;
-      el('zoneActive').innerHTML = 'Žiadna zóna neoznačená.';
-      renderZoneTree(null, null);
-      setZoneButtons(false);
+      activeZoneId = null; lastZones = null; frontItems = null;
+      refreshZoneUI(); renderPreview();
     },
-    setStatus: function(msg, err){
-      var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok';
-    }
+    setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; }
   };
 
-  // Pamätanie rozbalenia sekcií (localStorage).
+  // Pamatanie rozbalenia sekcii (localStorage).
   function bindDetails(){
     document.querySelectorAll('details[data-key]').forEach(function(d){
       var k = 'nxsec_' + d.dataset.key;
@@ -475,9 +900,5 @@
       d.addEventListener('toggle', function(){ try { localStorage.setItem(k, d.open ? '1' : '0'); } catch(e){} });
     });
   }
-
-  window.onload = function(){
-    bindDetails();
-    if (window.sketchup && sketchup.ready) sketchup.ready();
-  };
+  window.onload = function(){ bindDetails(); if (window.sketchup && sketchup.ready) sketchup.ready(); };
 </script>

@@ -27,6 +27,29 @@ module Noxun
         end
       end
 
+      # V0.2c fix #6: najde korpus instancie zdielajuce rovnake cabinet_id (kopie skrinky).
+      # Vrati NOVSIE instancie (vyssi entityID) — tie dostanu nove cabinet_id; povodna
+      # (najnizsi entityID = original so svojimi ghostami) si cid pondrzi. Standard 2.3/9.3:
+      # "Kopia skrinky dostane nove cabinet_id."
+      def self.duplicate_cabinets(model)
+        seen = {}
+        dups = []
+        each_cabinet(model) do |inst|
+          cid = Store.get(inst, 'cabinet_id')
+          next unless cid
+          prev = seen[cid]
+          if prev.nil?
+            seen[cid] = inst
+          elsif inst.entityID > prev.entityID
+            dups << inst
+          else
+            dups << prev
+            seen[cid] = inst
+          end
+        end
+        dups
+      end
+
       # part_id = <cabinet_id>-<ROLE_SUFFIX>, napr. CAB-001-SIDE-L, CAB-001-SHELF-2.
       def self.part_id(cabinet_id, role_suffix)
         "#{cabinet_id}-#{role_suffix}"
