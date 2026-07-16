@@ -66,20 +66,24 @@ module Noxun
           x = next_x(model)
           z = cfg[:type] == 'upper' ? UPPER_HANG_Z : 0.0
           inst = nil
-          model.start_operation('NOXUN: Vloz korpus', true)
-          begin
-            cdef = model.definitions.add("NOXUN Korpus #{cid}")
-            cdef.entities.clear!
-            final = build_into(model, cdef, cfg, cid)
-            tr = Geom::Transformation.translation(Units.point(x, 0, z))
-            inst = model.entities.add_instance(cdef, tr)
-            write_cabinet_attrs(inst, cid, final)
-            apply_scale_lock(inst)
-            Zones.sync_ghost(model, inst) if defined?(Zones)
-            model.commit_operation
-          rescue StandardError => e
-            abort_safely(model)
-            raise e
+          # guarded: vlozenie je vlastna zmena pluginu. EntitiesObserver.onElementAdded (davkovany
+          # na commit) tak vidi @rebuilding=true a novy korpus nepovazuje za kopiu (ziadny extra tick).
+          guarded do
+            model.start_operation('NOXUN: Vloz korpus', true)
+            begin
+              cdef = model.definitions.add("NOXUN Korpus #{cid}")
+              cdef.entities.clear!
+              final = build_into(model, cdef, cfg, cid)
+              tr = Geom::Transformation.translation(Units.point(x, 0, z))
+              inst = model.entities.add_instance(cdef, tr)
+              write_cabinet_attrs(inst, cid, final)
+              apply_scale_lock(inst)
+              Zones.sync_ghost(model, inst) if defined?(Zones)
+              model.commit_operation
+            rescue StandardError => e
+              abort_safely(model)
+              raise e
+            end
           end
           ScaleWatch.attach_one(inst) if inst && defined?(ScaleWatch)
           inst
