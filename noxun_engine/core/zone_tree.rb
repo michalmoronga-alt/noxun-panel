@@ -105,6 +105,18 @@ module Noxun
         true
       end
 
+      # V0.2c (fix #5): nahrad CELE pole `cuts` delenej zony naraz (perzistuj kompletny layout).
+      # Pouzity pri edite rozmeru pola / drag priecky: UI dopocita rozmery vsetkych poli a
+      # ulozi ich ako explicitne sizes, aby zadany rozmer NEzmizol pri dalsom resolve.
+      # Proporcny prepocet nezamknutych sa potom deje LEN pri zmene rozmeru rodica (resize korpusu).
+      def set_field_cuts!(tree, path, cuts)
+        node = navigate(tree, path)
+        return false unless node && node['split'].is_a?(Hash)
+        count = node['split']['count'].to_i
+        node['split']['cuts'] = sanitize_cuts(cuts, count)
+        true
+      end
+
       def set_shelves!(tree, path, n)
         node = navigate(tree, path)
         return false unless node
@@ -202,41 +214,55 @@ module Noxun
       end
 
       # Rozlozi svetly priestor (span - (count-1)*t) medzi `count` poli:
-      #   locked pole -> drzi svoju size (clamp na dostupne);
+      #   locked pole -> drzi svoju size; ak sa vsetky zamknute NEzmestia (kumulativne, aj po
+      #     rezervovani MIN_FIELD na kazde nezamknute), proporcne ich zmensime (zachova pomer);
       #   nezamknute -> rozdelia zvysok PROPORCNE podla svojich size (nil size = rovnomerny podiel).
+      #
+      # V0.2c fix #1: kumulativny clamp zamknutych. Predtym sa kazde zamknute clampovalo NEzavisle
+      # na cely `clear`, takze 2x lock 500 v 600 spane vratilo [582,582] a priecky/zony vznikali
+      # MIMO rodica. Teraz Sigma(locked) nikdy nepresiahne dostupny priestor -> geometria drzi v bboxe.
       def resolve_fields(cuts, count, span, t)
         clear = span - (count - 1) * t
         clear = 0.0 if clear.negative?
         cuts = sanitize_cuts(cuts, count)
 
-        locked_sum = 0.0
-        cuts.each { |c| locked_sum += clamp_field(c['size'], clear) if c['locked'] && c['size'] }
+        locked_idx   = cuts.each_index.select { |i| cuts[i]['locked'] && cuts[i]['size'] }
+        unlocked_idx = cuts.each_index.reject { |i| cuts[i]['locked'] && cuts[i]['size'] }
+
+        # Zamknute polia ziadaju svoj rozmer (min MIN_FIELD). Kumulativna kontrola proti spanu:
+        # necham MIN_FIELD na kazde nezamknute pole; ak sa zamknute do zvysku nezmestia, zmensim ich.
+        locked_want = locked_idx.map { |i| [cuts[i]['size'].to_f, MIN_FIELD].max }
+        locked_sum  = locked_want.reduce(0.0, :+)
+        avail_locked = clear - MIN_FIELD * unlocked_idx.size
+        avail_locked = 0.0 if avail_locked.negative?
+        if locked_sum > avail_locked && locked_sum.positive?
+          factor = avail_locked / locked_sum
+          if defined?(Engine)
+            Engine.log("zone_tree: zamknute polia (#{locked_sum.round} mm) presahuju dostupny priestor " \
+                       "(#{avail_locked.round} mm) — proporcne zmensene x#{factor.round(3)}")
+          end
+          locked_want = locked_want.map { |s| s * factor }
+          locked_sum  = locked_want.reduce(0.0, :+)
+        end
+
         free = clear - locked_sum
         free = 0.0 if free.negative?
 
-        unlocked = cuts.each_index.reject { |i| cuts[i]['locked'] && cuts[i]['size'] }
-        known = unlocked.map { |i| cuts[i]['size'] }.compact
-        avg = known.empty? ? (free / [unlocked.size, 1].max) : (known.reduce(0.0, :+) / known.size)
-        weight_sum = unlocked.reduce(0.0) { |s, i| s + (cuts[i]['size'] || avg) }
+        # Nezamknute: proporcny prepocet podla svojich size (nil = priemer). Toto je zachovane z
+        # povodnej logiky a je nositelom fix #5 — pri nezmenenom spane (Sigma sizes == clear) je to
+        # identita (rozmery drzia), pri zmene spanu (resize korpusu) sa nezamknute prepocitaju.
+        known = unlocked_idx.map { |i| cuts[i]['size'] }.compact
+        avg = known.empty? ? (free / [unlocked_idx.size, 1].max) : (known.reduce(0.0, :+) / known.size)
+        weight_sum = unlocked_idx.reduce(0.0) { |s, i| s + (cuts[i]['size'] || avg) }
         weight_sum = 1.0 if weight_sum <= 0
 
         sizes = Array.new(count, 0.0)
-        cuts.each_index do |i|
-          if cuts[i]['locked'] && cuts[i]['size']
-            sizes[i] = clamp_field(cuts[i]['size'], clear)
-          else
-            w = cuts[i]['size'] || avg
-            sizes[i] = free * (w / weight_sum)
-          end
+        locked_idx.each_with_index { |i, k| sizes[i] = locked_want[k] }
+        unlocked_idx.each do |i|
+          w = cuts[i]['size'] || avg
+          sizes[i] = free * (w / weight_sum)
         end
         sizes
-      end
-
-      def clamp_field(size, clear)
-        s = size.to_f
-        s = MIN_FIELD if s < MIN_FIELD
-        s = clear if s > clear && clear.positive?
-        s
       end
 
       def field_info(cut, resolved)

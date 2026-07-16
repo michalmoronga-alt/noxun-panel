@@ -169,6 +169,8 @@ module Noxun
 
         # V0.2c: nastav presny rozmer pola v delenej zone + zamok (split lock). zone_id = RODICOVSKA
         # (delena) zona; index = poradie pola (0..count-1); size mm (prazdne = auto), locked bool.
+        # fix #5: ak UI posle kompletny 'cuts' layout (rozmery vsetkych poli), ulozime ho naraz —
+        # zadany rozmer bez locku sa tak NEstrati (proporcny prepocet az pri resize korpusu).
         def handle_set_zone_field(payload)
           data = parse(payload)
           zid = data['zone_id'].to_s
@@ -176,7 +178,12 @@ module Noxun
           index = data['index'].to_i
           size = data['size']
           locked = truthy?(data['locked'])
-          apply_zone_mod(zid) { |tree, path| ZoneTree.set_field!(tree, path, index, size, locked) }
+          cuts = data['cuts']
+          if cuts.is_a?(Array)
+            apply_zone_mod(zid) { |tree, path| ZoneTree.set_field_cuts!(tree, path, cuts) }
+          else
+            apply_zone_mod(zid) { |tree, path| ZoneTree.set_field!(tree, path, index, size, locked) }
+          end
           set_status("Pole #{index + 1}: #{size.to_s.strip.empty? ? 'auto' : "#{size.to_f.round} mm"}#{locked ? ' 🔒' : ''} — prestavané ✓.")
         end
 
@@ -284,6 +291,9 @@ module Noxun
         end
 
         def push_selected(model)
+          # fix #6: "sync tick" resolvera — ak vznikla kopia korpusu (zdielane cabinet_id),
+          # pridelí sa jej nove ID + vlastne ghosty este pred nacitanim vyberu do panela.
+          CabinetBuilder.dedup_copies(model) if defined?(CabinetBuilder)
           zone = find_selected_zone(model)
           cab = find_cabinet(model)
           if cab.nil?

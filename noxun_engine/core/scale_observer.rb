@@ -71,15 +71,18 @@ module Noxun
           return unless Store.kind(entity) == 'cabinet'
           @dirty ||= {}
           @dirty[entity.entityID] = entity
+          @last_model = (entity.model rescue nil) || @last_model # fix #8: model pre prune
           schedule
         rescue StandardError => e
           Engine.log_error(e, 'ScaleWatch.notify_change')
         end
 
         # Zmazanie entity (napr. korpusu) -> pri najblizsom tiku upraceme osirotene ghost skupiny.
-        def notify_erase
+        # fix #8: model nesieme z eventu (pri erase je Sketchup.active_model v multi-model nespolahlivy).
+        def notify_erase(model = nil)
           return if @rebuilding
           @need_prune = true
+          @erase_model = model || @erase_model || @last_model
           schedule
         rescue StandardError => e
           Engine.log_error(e, 'ScaleWatch.notify_erase')
@@ -108,24 +111,35 @@ module Noxun
           @dirty = {}
           need_prune = @need_prune
           @need_prune = false
-          model = Sketchup.active_model
+          erase_model = @erase_model
+          @erase_model = nil
+
+          # fix #6: kopia korpusu (zdielane cabinet_id) -> nove ID + vlastne ghosty, este pred
+          # spracovanim dirty. Model berieme z prvej dirty instancie (fix #8), inak z erase eventu.
+          sample_model = dirty.each_value.find { |i| i && i.valid? }&.model
+          dedup_model = sample_model || erase_model || @last_model
+          CabinetBuilder.dedup_copies(dedup_model) if dedup_model && defined?(CabinetBuilder)
+
           dirty.each_value do |inst|
             next unless inst && inst.valid?
+            m = inst.model # fix #8: model per dirty instancia (nie Sketchup.active_model)
             if scaled?(inst.transformation)
-              absorb(inst)               # scale -> rebuild (vnutri vola Zones.sync_ghost)
+              absorb(inst)          # scale -> rebuild (vnutri vola Zones.sync_ghost)
             else
-              move_ghost_op(model, inst) # move/rotate -> len presun ghost skupiny
+              move_ghost_op(m, inst) # move/rotate -> len presun ghost skupin
             end
           rescue StandardError => e
             Engine.log_error(e, 'ScaleWatch.process_dirty')
           end
-          prune_ghosts(model) if need_prune
+          prune_ghosts(erase_model || @last_model || sample_model) if need_prune
         end
 
-        # Presun ghost zon za korpusom (bez rebuildu). Vlastna kratka operacia (1 undo krok).
+        # Presun ghost zon za korpusom (bez rebuildu). TRANSPARENTNA operacia (fix #3): 4. param
+        # transparent=true pripoji tento krok k predchadzajucej (user-ovej move) operacii, takze
+        # 1x undo vrati korpus AJ ghosty naraz — nie zvlast.
         def move_ghost_op(model, inst)
           return unless defined?(Zones)
-          model.start_operation('Noxun: presun zon', true)
+          model.start_operation('Noxun: presun zon', true, false, true)
           Zones.move_ghost(model, inst)
           model.commit_operation
         rescue StandardError => e
@@ -133,9 +147,11 @@ module Noxun
           Engine.log_error(e, 'ScaleWatch.move_ghost_op')
         end
 
+        # Upratanie osirotenych ghostov po zmazani korpusu. TRANSPARENTNA operacia (fix #3):
+        # pripoji sa k user-ovej delete operacii -> 1x undo vrati korpus aj ghosty konzistentne.
         def prune_ghosts(model)
-          return unless defined?(Zones)
-          model.start_operation('Noxun: uprac zony', true)
+          return unless defined?(Zones) && model
+          model.start_operation('Noxun: uprac zony', true, false, true)
           Zones.prune_orphans(model)
           model.commit_operation
         rescue StandardError => e
@@ -223,8 +239,11 @@ module Noxun
         end
 
         # Zmazanie korpusu -> upraceme jeho ghost zony (osirotene top-level skupiny).
-        def onEraseEntity(_entity)
-          ScaleWatch.notify_erase
+        # fix #8: nesieme model z eventu. Po erase je entity uz neplatna (entity.model by hodilo),
+        # preto len ak je este valid?; inak notify_erase padne na @last_model (posledny znamy model).
+        def onEraseEntity(entity)
+          m = (entity.valid? ? entity.model : nil) rescue nil
+          ScaleWatch.notify_erase(m)
         end
       end
 

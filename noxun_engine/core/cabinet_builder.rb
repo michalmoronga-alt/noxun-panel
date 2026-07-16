@@ -101,6 +101,9 @@ module Noxun
           guarded do
             model.start_operation(op_name, true)
             begin
+              # Ak je definicia zdielana (kopia korpusu), osamostatni ju — inak by clear!/build
+              # prepisal aj original. Standard 9.3: kopia sa da upravit nezavisle od originalu.
+              inst.make_unique if inst.definition.instances.size > 1
               cdef = inst.definition
               cdef.entities.clear!
               final = build_into(model, cdef, cfg, cid)
@@ -115,6 +118,33 @@ module Noxun
             end
           end
           inst
+        end
+
+        # V0.2c fix #6: detekuje kopie korpusu (viac instancii so zdielanym cabinet_id) a kazdej
+        # NOVSEJ pridelí nove cabinet_id + prestaví ju. rebuild spraví make_unique (osamostatni
+        # zdielanu definiciu) a prepocita part_id, zony aj ghosty pod novym cid. Original zostane
+        # netknuty. Vola sa z panel resolvera a scale observera ("sync tick"). Vrati prestavane inst.
+        # Standard 2.3/9.3: "Kopia skrinky dostane nove cabinet_id."
+        def dedup_copies(model)
+          return [] unless model
+          dups = Ids.duplicate_cabinets(model)
+          return [] if dups.empty?
+          done = []
+          dups.each do |inst|
+            next unless inst && inst.valid?
+            new_cid = Ids.next_cabinet_id(model)
+            # Prepis identitu na INSTANCII (standard 2.2: autorita = instancia). Config a dielce
+            # prepise nasledny rebuild (uz nad vlastnou definiciou z make_unique).
+            Store.write(inst, { std: Store::STD, kind: 'cabinet', id: new_cid, cabinet_id: new_cid })
+            params = config_to_params(Store.config(inst) || {})
+            rebuild(model, inst, params, op_name: 'NOXUN: Kopia korpusu — nove ID')
+            done << inst
+            Engine.log("dedup: kopia korpusu dostala nove ID #{new_cid}") if defined?(Engine)
+          end
+          done
+        rescue StandardError => e
+          Engine.log_error(e, 'CabinetBuilder.dedup_copies') if defined?(Engine)
+          []
         end
 
         # Zavrie vsetky otvorene edit konteksty tak, aby model.active_entities == model.entities.

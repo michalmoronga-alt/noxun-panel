@@ -1,19 +1,22 @@
 # frozen_string_literal: true
 # Noxun Engine — zony (ghost geometria). Standard sekcia 5.1.
 #
-# V0.2c: ghost boxy zon uz NEstoja v definicii korpusu, ale ako JEDNA top-level skupina
-# `NOXUN_ZONY <cabinet_id>` priamo v model.entities. Dovod: klik na zonu = JEDEN klik
-# (bez dvojkliku do komponentu korpusu). Skupina nesie transformaciu korpusu; pod-skupiny
-# su jednotlive listove zony (NOXUN dict kind:zone + cabinet_id + config) — klikatelne entity.
-# Sync: pri rebuilde sa pregeneruju (sync_ghost); pri move/rotate korpusu sa len presunie
-# cela skupina (move_ghost, debounced z observera); pri zmazani korpusu sa zmazu (remove_ghost).
+# V0.2c (fix #6+#7): kazda listova zona = SAMOSTATNA TOP-LEVEL skupina `NOXUN_ZONA <zone_id>`
+# priamo v model.entities (uz ZIADNY wrapper). Dovod: klik na zonu = JEDEN klik a rovno vyberie
+# entitu s NOXUN dict kind:zone (top-level group sa vybera 1 klikom; wrapper by vyzadoval dvojklik).
+# Kazda skupina nesie transformaciu korpusu (clean_transform) a box zony kresli v lokalnom rame.
+# Skupiny sa hladaju cez NOXUN dict (kind+cabinet_id), NIE podla mena. Sync/move/prune/remove
+# pracuju s MNOZINOU skupin per cabinet_id.
+# Sync: pri rebuilde sa pregeneruju (sync_ghost); pri move/rotate korpusu sa len presunu
+# (move_ghost, debounced z observera); pri zmazani korpusu sa zmazu (remove_ghost/prune_orphans).
 # manufactured:false, nikdy v kusovniku. Tag `Noxun/Zóny` (migracia zo stareho NOXUN_SLOTY).
 module Noxun
   module Engine
     module Zones
       TAG          = 'Noxun/Zóny'
       OLD_TAG      = 'NOXUN_SLOTY'      # V0.2b tag — migrujeme nan
-      GROUP_PREFIX = 'NOXUN_ZONY '      # + cabinet_id
+      GROUP_PREFIX = 'NOXUN_ZONA '      # + zone_id (jedna skupina = jedna listova zona)
+      OLD_WRAP_KIND = 'zones_group'     # V0.2c-early wrapper — upratat pri sync/prune
       INSET        = 1.0  # mm — ghost je o kusok mensi nez svetly priestor
       ALPHA        = 0.35
       PALETTE = [
@@ -25,8 +28,8 @@ module Noxun
 
       # --- verejne API: sync ghost skupiny ------------------------------------
 
-      # Pregeneruje ghost skupinu korpusu zo zon v jeho configu. Volane z build/rebuild
-      # (uz vnutri otvorenej operacie). Zmaze staru skupinu a postavi novu na mieste korpusu.
+      # Pregeneruje ghost skupiny korpusu zo zon v jeho configu. Volane z build/rebuild
+      # (uz vnutri otvorenej operacie). Zmaze stare skupiny a postavi nove na mieste korpusu.
       def sync_ghost(model, inst)
         return unless inst && inst.valid?
         cid = Store.get(inst, 'cabinet_id')
@@ -40,84 +43,88 @@ module Noxun
 
         tag = model.layers[TAG] || model.layers.add(TAG)
         mats = ensure_materials(model)
-        grp = model.entities.add_group
-        grp.name = "#{GROUP_PREFIX}#{cid}"
-        grp.layer = tag
-        Store.write(grp, { std: Store::STD, kind: 'zones_group', id: "#{cid}-ZONY",
-                           cabinet_id: cid, role: 'zones_group',
-                           manufactured: false, production_class: 'none' })
+        tr = clean_transform(inst.transformation)
         leaves.each_with_index do |z, i|
-          sub = grp.entities.add_group
-          sub.name = "zona_#{z['id']}"
-          draw_ghost(sub.entities, sym_pos(z), num(z['width']), num(z['height']), num(z['depth']))
-          sub.material = mats[i % mats.length]
-          sub.layer = tag
-          Store.write(sub, {
+          grp = model.entities.add_group
+          grp.name = "#{GROUP_PREFIX}#{z['id']}"
+          draw_ghost(grp.entities, sym_pos(z), num(z['width']), num(z['height']), num(z['depth']))
+          grp.material = mats[i % mats.length]
+          grp.layer = tag
+          Store.write(grp, {
             std: Store::STD, kind: 'zone', id: z['id'], cabinet_id: cid,
             role: 'zone', manufactured: false, production_class: 'none',
             config: zone_config_from_flat(z)
           })
+          grp.transformation = tr
         end
-        grp.transformation = clean_transform(inst.transformation)
-        grp
+        true
       rescue StandardError => e
         Engine.log_error(e, 'Zones.sync_ghost') if defined?(Engine)
         nil
       end
 
-      # Len presun existujucej ghost skupiny na aktualnu poziciu korpusu (move/rotate,
-      # bez zmeny obsahu). Ak skupina chyba, spadne na plny sync_ghost.
+      # Len presun existujucich ghost skupin korpusu na aktualnu poziciu (move/rotate, bez zmeny
+      # obsahu). Ak ziadna skupina neexistuje, spadne na plny sync_ghost.
       def move_ghost(model, inst)
         return unless inst && inst.valid?
         cid = Store.get(inst, 'cabinet_id')
         return unless cid
-        grp = find_ghost_group(model, cid)
-        return sync_ghost(model, inst) unless grp
-        grp.transformation = clean_transform(inst.transformation)
-        grp
+        grps = find_ghost_groups(model, cid)
+        return sync_ghost(model, inst) if grps.empty?
+        tr = clean_transform(inst.transformation)
+        grps.each { |g| g.transformation = tr if g.valid? }
+        true
       rescue StandardError => e
         Engine.log_error(e, 'Zones.move_ghost') if defined?(Engine)
         nil
       end
 
-      # Zmaze ghost skupinu korpusu (pri zmazani korpusu / pred pregeneraciou).
+      # Zmaze vsetky ghost skupiny korpusu (pri zmazani korpusu / pred pregeneraciou).
+      # Uprace aj pripadny stary wrapper (kind zones_group) z ranej V0.2c verzie.
       def remove_ghost(model, cid)
-        grp = find_ghost_group(model, cid)
-        grp.erase! if grp && grp.valid?
+        (find_ghost_groups(model, cid) + old_wrappers(model, cid)).each do |g|
+          g.erase! if g && g.valid?
+        end
         true
       rescue StandardError => e
         Engine.log_error(e, 'Zones.remove_ghost') if defined?(Engine)
         false
       end
 
-      # Najde top-level ghost skupinu korpusu podla NOXUN markera (nie podla mena — meno je len UX).
-      def find_ghost_group(model, cid)
-        model.entities.grep(Sketchup::Group).find do |g|
-          g.valid? && Store.get(g, 'kind') == 'zones_group' && Store.get(g, 'cabinet_id') == cid
+      # Vsetky top-level ghost skupiny (listove zony) korpusu — podla NOXUN markera (nie mena).
+      def find_ghost_groups(model, cid)
+        model.entities.grep(Sketchup::Group).select do |g|
+          g.valid? && Store.get(g, 'kind') == 'zone' && Store.get(g, 'cabinet_id') == cid
+        end
+      end
+
+      # Stare wrapper skupiny (kind zones_group) — migracia z ranej V0.2c schemy.
+      def old_wrappers(model, cid = nil)
+        model.entities.grep(Sketchup::Group).select do |g|
+          g.valid? && Store.get(g, 'kind') == OLD_WRAP_KIND &&
+            (cid.nil? || Store.get(g, 'cabinet_id') == cid)
         end
       end
 
       # Zmaze ghost skupiny vsetkych korpusov, ktore uz v modeli neexistuju (upratanie po delete).
+      # Osirotene = cabinet_id, ku ktoremu uz nema ziadna korpus instancia (kind zone aj stary wrapper).
       def prune_orphans(model)
         live = {}
         Ids.each_cabinet(model) { |i| live[Store.get(i, 'cabinet_id')] = true }
         model.entities.grep(Sketchup::Group).to_a.each do |g|
-          next unless g.valid? && Store.get(g, 'kind') == 'zones_group'
-          cid = Store.get(g, 'cabinet_id')
-          g.erase! unless live[cid]
+          next unless g.valid?
+          k = Store.get(g, 'kind')
+          next unless k == 'zone' || k == OLD_WRAP_KIND
+          g.erase! unless live[Store.get(g, 'cabinet_id')]
         end
       rescue StandardError => e
         Engine.log_error(e, 'Zones.prune_orphans') if defined?(Engine)
         nil
       end
 
-      # Vyberie pod-skupinu zony podla zone_id (obojsmerna sync z panela -> zvyraznenie v modeli).
+      # Vyberie top-level ghost skupinu zony podla zone_id (obojsmerna sync z panela -> zvyraznenie).
       def find_zone_group(model, cid, zone_id)
-        grp = find_ghost_group(model, cid)
-        return nil unless grp
-        grp.entities.grep(Sketchup::Group).find do |g|
-          g.valid? && Store.get(g, 'id') == zone_id
-        end
+        find_ghost_groups(model, cid).find { |g| Store.get(g, 'id') == zone_id }
       end
 
       # --- viditelnost tagu ---------------------------------------------------

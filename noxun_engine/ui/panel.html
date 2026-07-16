@@ -310,6 +310,10 @@
     return ok;
   }
 
+  // fix #2: refresh nahladu BEZ auto-apply. Pouzity pri vybere sablony (sablona = len preview;
+  // aplikuje ju vyhradne tlacidlo "Pouzi sablonu na oznaceny", vratane zon zo sablony).
+  function refreshPreview(){ validateFields(); renderPreview(); updateAvailable(); }
+
   // --- AUTO-APPLY (debounce 400 ms) ---
   function onField(){
     validateFields();
@@ -387,7 +391,10 @@
     applyVisibility(c.type || 'lower');
     renderFronts(c.fronts);
     currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();
-    onField();
+    // fix #2: vyber sablony NEspusti apply_all — len naplni polia + nahlad. Korpus sa NEZMENI,
+    // kym uzivatel nestlaci "Pouzi sablonu na oznaceny".
+    refreshPreview();
+    refreshZoneUI();
   }
   function saveTemplate(){
     var p = collectConstruction(); p.fronts = collectFronts(); p.zone_tree = currentZoneTree;
@@ -462,26 +469,34 @@
     return arr;
   }
   function navTree(tree, path){ var n = tree; for (var i=1;i<path.length;i++){ if(!n.children||!n.children[path[i]-1]) return null; n=n.children[path[i]-1]; } return n; }
-  function pathOf(zid){ var m = String(zid).match(/-Z([\d.]+)$/); return m ? m[1].split('.').map(function(x){return parseInt(x,10);}) : [1]; }
+  // fix #4: zvladne aj lokalne draft id 'Z1.2' (pred vlozenim korpusu), nielen 'CAB-001-Z1.2'.
+  function pathOf(zid){ var s = String(zid); var m = s.match(/-Z([\d.]+)$/) || s.match(/^Z([\d.]+)$/); return m ? m[1].split('.').map(function(x){return parseInt(x,10);}) : [1]; }
   var MINF = 20;
+  // fix #1 (zrkadlo Ruby ZoneTree.resolve_fields): kumulativny clamp zamknutych poli — Sigma(locked)
+  // nikdy nepresiahne dostupny priestor (aj po rezervovani MINF na kazde nezamknute) -> priecky/zony
+  // nevzniknu mimo rodica. Nezamknute: proporcny prepocet (nositel fix #5).
   function resolveFields(cuts, count, span, t){
     var clear = Math.max(0, span - (count-1)*t);
     cuts = sanitizeCuts(cuts, count);
-    var lockedSum = 0;
-    cuts.forEach(function(c){ if (c.locked && c.size!=null) lockedSum += clampF(c.size, clear); });
-    var free = Math.max(0, clear - lockedSum);
-    var unlocked = []; for (var i=0;i<count;i++){ if (!(cuts[i].locked && cuts[i].size!=null)) unlocked.push(i); }
-    var known = unlocked.map(function(i){return cuts[i].size;}).filter(function(x){return x!=null;});
-    var avg = known.length ? known.reduce(function(a,b){return a+b;},0)/known.length : (free/Math.max(1,unlocked.length));
-    var wsum = unlocked.reduce(function(s,i){ return s + (cuts[i].size!=null?cuts[i].size:avg); }, 0); if (wsum<=0) wsum=1;
-    var sizes = [];
-    for (var j=0;j<count;j++){
-      if (cuts[j].locked && cuts[j].size!=null) sizes[j] = clampF(cuts[j].size, clear);
-      else { var w = (cuts[j].size!=null?cuts[j].size:avg); sizes[j] = free*(w/wsum); }
+    var lockedIdx = [], unlockedIdx = [];
+    for (var i=0;i<count;i++){ if (cuts[i].locked && cuts[i].size!=null) lockedIdx.push(i); else unlockedIdx.push(i); }
+    var lockedWant = lockedIdx.map(function(i){ return Math.max(cuts[i].size, MINF); });
+    var lockedSum = lockedWant.reduce(function(a,b){return a+b;}, 0);
+    var availLocked = Math.max(0, clear - MINF*unlockedIdx.length);
+    if (lockedSum > availLocked && lockedSum > 0){
+      var factor = availLocked/lockedSum;
+      lockedWant = lockedWant.map(function(s){ return s*factor; });
+      lockedSum = lockedWant.reduce(function(a,b){return a+b;}, 0);
     }
+    var free = Math.max(0, clear - lockedSum);
+    var known = unlockedIdx.map(function(i){return cuts[i].size;}).filter(function(x){return x!=null;});
+    var avg = known.length ? known.reduce(function(a,b){return a+b;},0)/known.length : (free/Math.max(1,unlockedIdx.length));
+    var wsum = unlockedIdx.reduce(function(s,i){ return s + (cuts[i].size!=null?cuts[i].size:avg); }, 0); if (wsum<=0) wsum=1;
+    var sizes = new Array(count);
+    lockedIdx.forEach(function(i,k){ sizes[i] = lockedWant[k]; });
+    unlockedIdx.forEach(function(i){ var w = (cuts[i].size!=null?cuts[i].size:avg); sizes[i] = free*(w/wsum); });
     return sizes;
   }
-  function clampF(s, clear){ s=parseFloat(s); if(s<MINF)s=MINF; if(clear>0 && s>clear)s=clear; return s; }
 
   // Vypocet zon (2D: x,z) z currentZoneTree + rozmerov korpusu. Vrati pole {id,path,x,z,w,h,leaf,shelves,split,label}.
   function computeZones(){
@@ -514,6 +529,54 @@
   }
   function fullZoneId(localId){ return (selectedCabId ? selectedCabId : 'NEW') + '-' + localId; }
   function localZoneId(fullId){ var m = String(fullId).match(/-(Z[\d.]+)$/); return m ? m[1] : fullId; }
+
+  // ===================== fix #5: PERZISTENCIA LAYOUTU POLI =====================
+  // Zisti clear-span (mm) delenej zony z aktualneho nahladu (podla osi delenia).
+  function zoneSpan(localId){
+    var span = null;
+    computeZones().forEach(function(z){ if (z.id===localId && z.split){ span = (z.split.axis==='v') ? z.w : z.h; } });
+    return span;
+  }
+  // Persistni CELY layout delenej zony ako explicitne sizes vsetkych poli. Editovane pole 'anchorIdx'
+  // sa docasne zamkne na 'anchorSize' (kotva), zvysne nezamknute sa dopocitaju okolo neho a VSETKY sa
+  // ulozia ako explicitna size (locked flag: anchor dostane 'anchorLocked', ostatne ponechaju svoj).
+  // Vysledok: zadany rozmer NEzmizne; proporcny prepocet nezamknutych az pri resize korpusu (nova span).
+  function persistLayout(localId, anchorIdx, anchorSize, anchorLocked){
+    var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localId));
+    if (!node || !node.split) return;
+    var count = node.split.count, t = numv('thickness')||18;
+    var span = zoneSpan(localId); if (span==null) return;
+    var tempCuts = node.split.cuts.map(function(c, j){
+      if (j===anchorIdx) return { size:(anchorSize==null?null:anchorSize), locked:(anchorSize!=null) };
+      return { size:c.size, locked:c.locked };
+    });
+    var sizes = resolveFields(tempCuts, count, span, t);
+    for (var j=0;j<count;j++){
+      var lk = (j===anchorIdx) ? anchorLocked : node.split.cuts[j].locked;
+      node.split.cuts[j] = { size: Math.round(sizes[j]), locked: lk };
+    }
+    currentZoneTree = tree;
+  }
+  // Zmraz aktualne resolved rozmery vsetkych poli zony do explicitnych sizes (zachovaj locky).
+  // Na zaciatku dragu priecky — aby sa pri tahani menili len 2 dotknute polia a ostatne drzali.
+  function freezeLayout(localId){
+    var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localId));
+    if (!node || !node.split) return;
+    var sizes = null;
+    computeZones().forEach(function(z){ if (z.id===localId && z.split) sizes = z.split.sizes; });
+    if (!sizes) return;
+    for (var j=0;j<node.split.count;j++){
+      node.split.cuts[j] = { size: Math.round(sizes[j]), locked: node.split.cuts[j].locked };
+    }
+    currentZoneTree = tree;
+  }
+  // Posli kompletny cuts layout zony do Ruby (ulozi sa naraz cez ZoneTree.set_field_cuts!).
+  function pushFieldCuts(localId, editedIndex){
+    var node = navTree(sanitizeTree(currentZoneTree), pathOf(localId));
+    if (!node || !node.split) return;
+    if (selectedCabId && window.sketchup && sketchup.set_zone_field)
+      sketchup.set_zone_field(JSON.stringify({ zone_id: fullZoneId(localId), index: editedIndex, cuts: node.split.cuts }));
+  }
 
   // ===================== 2D NAHLAD (SVG) =====================
   var dragState = null;
@@ -612,11 +675,12 @@
   function startDivDrag(ev, d, svg){
     ev.preventDefault();
     var zid = d.getAttribute('data-zid'), idx = parseInt(d.getAttribute('data-idx'),10), axis = d.getAttribute('data-axis');
-    var node = navTree(sanitizeTree(currentZoneTree), pathOf(zid+'')); // lokalny strom
     // najdi rodicovsku zonu v computeZones pre span
     var zones = computeZones(); var parent = null;
     zones.forEach(function(z){ if (z.id === zid) parent = z; });
     if (!parent || !parent.split) return;
+    // fix #5: zmraz aktualny layout -> pri tahani sa menia len 2 dotknute polia, ostatne drzia rozmer
+    freezeLayout(zid);
     var t = numv('thickness')||18;
     var span = (axis==='v') ? parent.w : parent.h;
     dragState = { zid: zid, idx: idx, axis: axis, parent: parent, span: span, t: t,
@@ -652,12 +716,8 @@
     document.removeEventListener('mouseup', endDivDrag);
     if (!dragState) return;
     var i = dragState.idx, zid = dragState.zid;
-    var tree = sanitizeTree(currentZoneTree);
-    var node = navTree(tree, pathOf(zid));
-    if (node && node.split && selectedCabId && window.sketchup && sketchup.set_zone_field){
-      var sz = node.split.cuts[i].size;
-      sketchup.set_zone_field(JSON.stringify({ zone_id: fullZoneId(zid), index: i, size: sz, locked: node.split.cuts[i].locked }));
-    }
+    // fix #5: posli kompletny layout (vsetky polia uz maju explicitne sizes zo freeze + dragu)
+    if (selectedCabId) pushFieldCuts(zid, i);
     dragState = null;
   }
 
@@ -695,27 +755,33 @@
     box.innerHTML = html;
   }
   function setFieldSize(localId, index, value){
-    var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localId));
-    if (!node || !node.split) return;
-    var locked = node.split.cuts[index] ? node.split.cuts[index].locked : false;
-    node.split.cuts[index] = { size: (value===''?null:parseFloat(value)), locked: locked };
-    currentZoneTree = tree;
+    var node0 = navTree(sanitizeTree(currentZoneTree), pathOf(localId));
+    if (!node0 || !node0.split) return;
+    var locked = node0.split.cuts[index] ? node0.split.cuts[index].locked : false;
+    var sz = (value===''? null : parseFloat(value));
+    if (sz==null){
+      // auto: toto pole na nil (ostatne necham; resolve ho rovnomerne dopocita)
+      var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localId));
+      node.split.cuts[index] = { size:null, locked:false }; currentZoneTree = tree;
+    } else {
+      // fix #5: kotva na zadany rozmer + persistni cely layout -> zadany rozmer nezmizne
+      persistLayout(localId, index, sz, locked);
+    }
     renderPreview();
-    if (selectedCabId && window.sketchup && sketchup.set_zone_field)
-      sketchup.set_zone_field(JSON.stringify({ zone_id: fullZoneId(localId), index: index, size: value, locked: locked }));
+    if (selectedCabId) pushFieldCuts(localId, index);
     else refreshZoneUI();
   }
   function toggleFieldLock(localId, index, elBtn){
-    var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localId));
-    if (!node || !node.split) return;
-    var cur = node.split.cuts[index] || { size:null, locked:false };
-    var sizes = null; { var zs = computeZones(); zs.forEach(function(z){ if(z.id===localId) sizes=z.split.sizes; }); }
+    var node0 = navTree(sanitizeTree(currentZoneTree), pathOf(localId));
+    if (!node0 || !node0.split) return;
+    var cur = node0.split.cuts[index] || { size:null, locked:false };
     var newLocked = !cur.locked;
-    var size = (cur.size!=null) ? cur.size : (sizes ? Math.round(sizes[index]) : null);
-    node.split.cuts[index] = { size: size, locked: newLocked };
-    currentZoneTree = tree;
-    if (selectedCabId && window.sketchup && sketchup.set_zone_field)
-      sketchup.set_zone_field(JSON.stringify({ zone_id: fullZoneId(localId), index: index, size: size, locked: newLocked }));
+    var sizes = null; computeZones().forEach(function(z){ if(z.id===localId && z.split) sizes=z.split.sizes; });
+    var anchorSize = (cur.size!=null) ? cur.size : (sizes ? Math.round(sizes[index]) : null);
+    // fix #5: kotva na aktualny rozmer pola + persistni cely layout so zmenenym lockom
+    persistLayout(localId, index, anchorSize, newLocked);
+    renderPreview();
+    if (selectedCabId) pushFieldCuts(localId, index);
     else refreshZoneUI();
   }
 
