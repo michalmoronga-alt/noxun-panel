@@ -247,6 +247,25 @@
 <div id="status">Pripravené.</div>
 
 <script>
+  // Diagnostika: chyby JS posielaj do Ruby (Engine.log). Konzolu HtmlDialogu v SketchUp konzole
+  // nevidno, preto window.onerror + unhandledrejection -> sketchup.js_error. Necha sa natrvalo.
+  window.onerror = function(msg, src, line, col, err){
+    try {
+      if (window.sketchup && sketchup.js_error)
+        sketchup.js_error(JSON.stringify({ msg: String(msg), src: src ? String(src) : null,
+          line: line, col: col, stack: (err && err.stack) ? String(err.stack) : null }));
+    } catch(e){}
+    return false;
+  };
+  window.addEventListener('unhandledrejection', function(ev){
+    try {
+      var r = ev ? ev.reason : null;
+      if (window.sketchup && sketchup.js_error)
+        sketchup.js_error(JSON.stringify({ msg: 'unhandledrejection: ' + (r && r.message ? r.message : String(r)),
+          stack: (r && r.stack) ? String(r.stack) : null }));
+    } catch(e){}
+  });
+
   var DEFAULTS = { lower: {}, upper: {} };
   var TEMPLATES = [];
   var activeZoneId = null;
@@ -626,7 +645,8 @@
       renderFrontsPreview(S, rx, ry, W, H, fh, t);
     }
     svg.innerHTML = S.join('');
-    bindPreviewEvents(svg);
+    // POZN: ziadne per-element bindovanie tu — pouzivame event delegaciu (setupPreviewDelegation),
+    // takze nove <rect> po kazdom re-renderi reaguju bez opätovného naväzovania listenerov.
   }
 
   function drawDividers(z, S, rx, ry, t, fh, topNone, H){
@@ -655,13 +675,32 @@
     });
   }
 
-  function bindPreviewEvents(svg){
-    svg.querySelectorAll('.zrect').forEach(function(r){
-      r.addEventListener('click', function(){ pickZone(r.getAttribute('data-zid')); });
+  // Event DELEGACIA: jeden listener na SVG kontajneri (nie per-element pri kazdom re-renderi).
+  // Cielovy .divh / .zrect hladame z ev.target. Predtym sa listenery bindovali na konkretne
+  // elementy v renderPreview; po prekresleni (napr. po apply) mohli byt na starych/nahradenych
+  // uzloch — jedna z pricin, preco po prvom drag-u priecka prestala reagovat.
+  var previewBound = false;
+  function setupPreviewDelegation(){
+    if (previewBound) return;
+    var svg = el('preview'); if (!svg) return;
+    svg.addEventListener('mousedown', function(ev){
+      var t = closestClass(ev.target, 'divh');
+      if (t) startDivDrag(ev, t, svg);
     });
-    svg.querySelectorAll('.divh').forEach(function(d){
-      d.addEventListener('mousedown', function(ev){ startDivDrag(ev, d, svg); });
+    svg.addEventListener('click', function(ev){
+      var t = closestClass(ev.target, 'zrect');
+      if (t) pickZone(t.getAttribute('data-zid'));
     });
+    previewBound = true;
+  }
+  // Vlastny closest (SVG elementy — spolahame sa len na getAttribute('class'), nie className).
+  function closestClass(node, cls){
+    while (node && node.getAttribute){
+      var c = ' ' + (node.getAttribute('class') || '') + ' ';
+      if (c.indexOf(' ' + cls + ' ') >= 0) return node;
+      node = node.parentNode;
+    }
+    return null;
   }
 
   function pickZone(localId){
@@ -674,6 +713,11 @@
   // --- drag priecky ---
   function startDivDrag(ev, d, svg){
     ev.preventDefault();
+    // Obrana: ak by z predchadzajuceho dragu ostali visiet listenery (napr. mouseup mimo okna),
+    // vycisti ich a zahod stary stav — inak by sa drag "zasekol" a dalsi neodstartoval cisto.
+    document.removeEventListener('mousemove', onDivDrag);
+    document.removeEventListener('mouseup', endDivDrag);
+    dragState = null;
     var zid = d.getAttribute('data-zid'), idx = parseInt(d.getAttribute('data-idx'),10), axis = d.getAttribute('data-axis');
     // najdi rodicovsku zonu v computeZones pre span
     var zones = computeZones(); var parent = null;
@@ -900,5 +944,5 @@
       d.addEventListener('toggle', function(){ try { localStorage.setItem(k, d.open ? '1' : '0'); } catch(e){} });
     });
   }
-  window.onload = function(){ bindDetails(); if (window.sketchup && sketchup.ready) sketchup.ready(); };
+  window.onload = function(){ bindDetails(); setupPreviewDelegation(); if (window.sketchup && sketchup.ready) sketchup.ready(); };
 </script>
