@@ -15,7 +15,7 @@ GitHub: https://github.com/michalmoronga-alt/noxun-panel
 
 - **Záväzný štandard dát:** [SYSTEM/01_STANDARD_draft.md](SYSTEM/01_STANDARD_draft.md) (dictionary NOXUN, mm Float, roly, regenerate pattern)
 - **Roadmapa a backlog postrehov:** [SYSTEM/04_ROADMAP.md](SYSTEM/04_ROADMAP.md) · UI vízia: [SYSTEM/07_UI_VIZIA.md](SYSTEM/07_UI_VIZIA.md)
-- **Pravidlá SketchUp kódu:** [docs/SKETCHUP_PRAVIDLA.md](docs/SKETCHUP_PRAVIDLA.md) · DC pasce: [docs/DC_PRAVIDLA.md](docs/DC_PRAVIDLA.md) (+ `..\CLAUDE.md` — konvencie rodiny Noxun v workspace)
+- **Pravidlá SketchUp kódu:** [docs/SKETCHUP_PRAVIDLA.md](docs/SKETCHUP_PRAVIDLA.md) · DC pasce: [docs/DC_PRAVIDLA.md](docs/DC_PRAVIDLA.md) — kompletné a samostatné v tomto repe. (Nadradený `..\CLAUDE.md` existuje len v Michalovom lokálnom workspace `C:\APP DEV\RUBY` — mapa ostatných pluginov; pre prácu v tomto repe nie je potrebný.)
 
 ## Testovanie (záväzné pravidlá)
 

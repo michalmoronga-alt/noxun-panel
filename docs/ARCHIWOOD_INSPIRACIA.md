@@ -45,7 +45,7 @@ Dialóg: rozmery + **3 konštrukčné typy** (boky obaľujú dno/vrch ↔ dno/vr
 ## Čo NEkopírovať
 
 - Cloud backend a licenčný server — pre interný nástroj zbytočná záťaž; lokálne JSON knižnice stačia (pattern KOVANIE CatalogStore).
-- Vlastný parametrický engine mimo DC — my staviame hybrid: DC pre geometriu korpusov + Ruby pre vkladanie, pravidlá a výstupy.
+- ~~Vlastný parametrický engine mimo DC~~ — pôvodná úvaha o hybride (DC geometria + Ruby riadenie) bola PREKONANÁ: analýza `SYSTEM/02_ANALYZA_korpus_dc_vs_ruby.md` rozhodla o čistom Ruby generovaní (žiadne DC vzorce) — teda rovnaký prístup ako ArchiWood. V tomto bode ArchiWood v skutočnosti kopírujeme, cloud backend nie.
 - Desiatky toolbarov s 81 ikonami — náš cieľ je opačný: málo vstupných bodov, automatika namiesto možností.
 
 Zdroje: archiwood.github.io, yooox.net (produktové články), sketchuppro.cn (znalostná báza), YouTube „Archiwood-cabinetdesign".

@@ -27,7 +27,7 @@ ZOSTAVA            kuchyňa / rad skriniek (voľné zoskupenie korpusov v projek
 └─ KORPUS          skrinka; cabinet_id; nesie konfiguráciu; generuje sa Ruby
    ├─ DIELCE korpusu   boky, dno, vrch, chrbát (fyzické kusy)
    ├─ ROZHRANIA        čelná rovina, čelný otvor, podopretie (dáta, nie geometria)
-   └─ ZÓNA (SLOT)      adresovateľný vnútorný priestor; ghost na tagu NOXUN_SLOTY
+   └─ ZÓNA (SLOT)      adresovateľný vnútorný priestor; ghost na tagu Noxun/Zóny
       ├─ MODUL / CHILD funkčný prvok v zóne:
       │                 čelo · polica · priečka · zásuvkový blok ·
       │                 vnútorné vybavenie (tyč, kôš, výsuv) · doplnok (LED, zásuvka 230V)
@@ -41,7 +41,7 @@ Definície pojmov:
 
 - **Zostava** — logické zoskupenie korpusov (kuchynský rad). Vo V1 len organizačná úroveň, bez vlastnej geometrie.
 - **Korpus** — skrinka. Nositeľ konfigurácie. Nie monolitický „master so všetkými variantmi", ale **obálka + konštrukcia + zóny + rozhrania** (viď sekcia 4).
-- **Zóna (slot)** — adresovateľné pole vnútra korpusu: celé vnútro, alebo časť medzi policami/priečkami. Má rozmery, pozíciu, stav (voľná/obsadená), zoznam povolených modulov. Vzniká a zaniká delením. **Vizualizácia:** polopriehľadný ghost box na tagu `NOXUN_SLOTY` — vypnutie tagu = neviditeľné; geometria zón nikdy nejde do kusovníka (viď sekcia 8, `manufactured: false`).
+- **Zóna (slot)** — adresovateľné pole vnútra korpusu: celé vnútro, alebo časť medzi policami/priečkami. Má rozmery, pozíciu, stav (voľná/obsadená), zoznam povolených modulov. Vzniká a zaniká delením. **Vizualizácia:** polopriehľadný ghost box na tagu **`Noxun/Zóny`** — vypnutie tagu = neviditeľné; geometria zón nikdy nejde do kusovníka (viď sekcia 8, `manufactured: false`). (Historický tag `NOXUN_SLOTY` z prvých prototypov bol migrovaný — nové moduly ho nesmú vytvárať.)
 - **Modul / child** — funkčný prvok vložený do zóny (čelo, polica, priečka, zásuvkový blok, vnútorné vybavenie, doplnok). Zo zóny dostane rozmery, pridá vlastné pravidlá (škáry, presahy, odsadenia).
 - **Dielec** — fyzický kus materiálu na výrobu. Vždy samostatný SketchUp komponent s NOXUN metadátami. Zdroj kusovníka.
 - **Virtuálna položka** — kovanie a spotrebný materiál, ktoré sa počítajú do súpisu, ale nemajú výrobnú geometriu. Fyzicky ich zastupuje najviac 1 generický objekt na kategóriu (viď sekcia 6).
@@ -263,7 +263,7 @@ Zóna je dátová štruktúra: rozmery (svetlé), pozícia v korpuse, stav (`fre
 
 **Delenie:** priečka alebo polica rozdelí zónu na nové zóny — **rekurzívne**, vzniká strom priestorov. Napr. horizontálna priečka rozdelí zónu na hornú a dolnú; každá je ďalej deliteľná.
 
-**Ghost vizualizácia:** zóny sú polopriehľadné boxy na tagu `NOXUN_SLOTY` (vypnutie tagu = neviditeľné). `manufactured: false` — nikdy v kusovníku.
+**Ghost vizualizácia:** zóny sú polopriehľadné boxy na tagu `Noxun/Zóny` (vypnutie tagu = neviditeľné), každá listová zóna ako samostatná top-level skupina (klikateľná 1 klikom). `manufactured: false` — nikdy v kusovníku.
 
 ### 5.2 Povolené moduly
 
@@ -440,6 +440,8 @@ Výrobný stav je **explicitne v metadátach** (`production_class` + `manufactur
 
 ### 8.2 Plný dátový model dielca (sheet)
 
+Podľa sekcie 2.1: **ploché kľúče = identita a filtre; všetko rozmerové a výrobné žije v `config` (JSON string)** — tak to ukladá aj engine (`NOXUN/config`). Exportéry čítajú rozmery VÝHRADNE z `config`.
+
 ```json
 {
   "std": 1,
@@ -449,20 +451,22 @@ Výrobný stav je **explicitne v metadátach** (`production_class` + `manufactur
   "cabinet_id": "CAB-014",
   "template_id": "base-lower-18",
   "role": "side_left",
-  "name": "Bok ľavý",
   "manufactured": true,
   "production_class": "sheet",
-  "quantity": 1,
-  "length": 720.0,
-  "width": 560.0,
-  "thickness": 18.0,
-  "material_id": "K009_PW_DTDL_18",
-  "grain_direction": "length",
-  "edges": {
-    "L1": "ABS_K009_1.0",
-    "L2": null,
-    "W1": "ABS_K009_0.4",
-    "W2": "ABS_K009_0.4"
+  "config": {
+    "name": "Bok ľavý",
+    "quantity": 1,
+    "length": 720.0,
+    "width": 560.0,
+    "thickness": 18.0,
+    "material_id": "K009_PW_DTDL_18",
+    "grain_direction": "length",
+    "edges": {
+      "L1": "ABS_K009_1.0",
+      "L2": null,
+      "W1": "ABS_K009_0.4",
+      "W2": "ABS_K009_0.4"
+    }
   }
 }
 ```
@@ -476,9 +480,9 @@ Výrobný stav je **explicitne v metadátach** (`production_class` + `manufactur
 {
   "std": 1, "kind": "part", "id": "CAB-014-GOLA-TOP",
   "part_id": "CAB-014-GOLA-TOP", "cabinet_id": "CAB-014",
-  "role": "gola_profile", "name": "Gola horná",
+  "role": "gola_profile",
   "manufactured": true, "production_class": "linear",
-  "quantity": 1, "length": 764.0, "material_id": "GOLA_C_ALU"
+  "config": { "name": "Gola horná", "quantity": 1, "length": 764.0, "material_id": "GOLA_C_ALU" }
 }
 ```
 
@@ -488,10 +492,10 @@ Výrobný stav je **explicitne v metadátach** (`production_class` + `manufactur
 {
   "std": 1, "kind": "hardware", "id": "CAB-014-HINGE",
   "part_id": "CAB-014-HINGE", "cabinet_id": "CAB-014",
-  "role": "hinge", "name": "Pánt",
+  "role": "hinge",
   "manufactured": true, "production_class": "counted",
-  "generic_type": "hinge", "quantity": 6,
-  "variant_id": "blum_clip_top_110", "catalog_code": "71B3550"
+  "config": { "name": "Pánt", "generic_type": "hinge", "quantity": 6,
+              "variant_id": "blum_clip_top_110", "catalog_code": "71B3550" }
 }
 ```
 
@@ -500,8 +504,9 @@ Výrobný stav je **explicitne v metadátach** (`production_class` + `manufactur
 ```json
 {
   "std": 1, "kind": "reference", "id": "REF-DW-01",
-  "role": "appliance", "name": "Umývačka 60",
-  "manufactured": false, "production_class": "reference"
+  "role": "appliance",
+  "manufactured": false, "production_class": "reference",
+  "config": { "name": "Umývačka 60" }
 }
 ```
 
@@ -587,7 +592,7 @@ Zámerne nerozhodnuté — overia sa na prototype/V1 v SketchUpe (SkAgent), nie 
 2. **Detailná schéma pravidiel** kovania a ABS (formát `bands`/výnimiek). Princíp (JSON v knižnici pravidiel + editačný panel, two-phase) je uzamknutý; presná štruktúra polí sa doladí pri stavbe panela.
 3. **Presné origin konvencie pre všetky typy modulov** (❓ osnova 3). Korpus, dielec a rotačné čelo sú určené (sekcia 3.2); originy zásuvkových blokov, priečok a doplnkov overiť na prototype.
 4. **Správanie pri zmene rozmeru korpusu s obsadenými zónami** (❓ osnova 5): auto-prepočet detí, kedy resize zakázať/limitovať (princíp `LARGEST/SMALLEST` — min/max rozmery pre kovanie).
-5. **Ghost zón** — vizuálne demo v SketchUpe (🔶 osnova 1) potvrdí opacity, farby, správanie prepínača tagu `NOXUN_SLOTY`.
+5. **Ghost zón** — vizuálne demo v SketchUpe (🔶 osnova 1) potvrdí opacity, farby, správanie prepínača tagu `Noxun/Zóny`. (Potvrdené V0.2b/c — ghosty fungujú, tag migrovaný z NOXUN_SLOTY.)
 6. **C2 migračný most** — existujúce DC childy (napr. Atira šuflíky) dočasne ako čierne skrinky (scale+redraw). Ich vnútorné `parent!` vzorce mimo pôvodnej skrinky nebežia — rozmery im dáva zóna (Ruby). Rozsah a trvanie mosta sa spresní pri prvej vlne childov.
 7. **Spájanie a zarovnávanie korpusov v zostave** (Michal, 15.7.2026): default = zarovnanie **čelných hrán** (hĺbky korpusov môžu byť rozdielne); voliteľne zarovnanie **zadných hrán**. Koncept jednoduchých **pripájacích bodov (kotiev)** na korpuse — vrátane špeciálnych situácií: rohová skrinka sa nepája priamo na rohový styk (potrebný dištančný/rohový princíp — viď foto reálnej kuchyne). Existujúca logika prisúvania v `snaper` (compute_gap v lokálnom ráme cieľa) je kandidát na prevzatie. Rieši sa PO V0 na reálnych zostavách — postrehy budú jasnejšie z klikania.
 

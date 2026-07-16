@@ -1,6 +1,6 @@
 # Noxun Component Standard — osnova (v0.2, 15.7.2026)
 
-> Základný kameň celého systému. GPT audit aj naša skúsenosť hovoria to isté: každý doterajší plugin čiastočne riešil ten istý problém znova, lebo chýbal jeden uzamknutý kontrakt. Legenda: ✅ = rozhodnuté/uzamknuté · 🔶 = smer daný, potvrdiť po prototype · ❓ = otvorené. Rozhodnuté veci sa postupne presunú do finálneho `01_STANDARD.md`.
+> ⚠️ **SUPERSEDED — historický pracovný dokument.** Záväzná verzia je [01_STANDARD_draft.md](01_STANDARD_draft.md); pri rozpore platí draft. Osnova sa ponecháva ako záznam rozhodovania. Legenda: ✅ = rozhodnuté · 🔶 = smer daný · ❓ = otvorené (stav k 15.7.).
 
 ## 1. Pojmy a hierarchia
 
@@ -13,7 +13,7 @@ Návrh: **Zostava** (kuchyňa/skriňa = rad korpusov) → **Korpus** (skrinka; n
 
 - Jednotný slovník: navrhujem `NOXUN` dictionary s pod-kľúčmi podľa vrstvy (`NOXUN/type`, `NOXUN/role`, `NOXUN/config…`), namiesto dnešnej zmesi (`NOXUN_CORE`, `NOXUN_KOVANIE`, DC `dynamic_attributes`).
 - **Autorita: inštancia.** Definícia nesie defaulty/šablónu; inštancia konkrétny stav (poučenie: zdieľané definície dverí v Master majú na definícii zastarané hodnoty).
-- **Identifikácia inštancie cez `persistentId`** — nie cez meno (poučenie: Noxun Tasks „Prejsť na objekt" skákal na prvý nájdený kus; KOVANIE marker už persistent_id používa).
+- ~~Identifikácia inštancie cez `persistentId`~~ — SPRESNENÉ v drafte (2.3): trvalé väzby VÝHRADNE cez logické ID + rolu (persistentId dielcov zaniká rebuildom); `persistentId` len na navigáciu v rámci session.
 - Rola dielu explicitným atribútom (`NOXUN/role = "bok_L"`), nie parsovaním názvov (poučenie: `_name` „Pbok" vs. definícia „Lbok#1").
 - **Verzia štandardu na komponente** (`NOXUN/std = 1`) — migrácie budú.
 - 🔶 Čo všetko musí niesť dielec — minimum odvodené z VEPO kontraktu (`03_VYSTUP_vepo_kontrakt.md`): názov, dĺžka×šírka×hrúbka (reálna aj obchodná), počet, materiál, **hrany per strana (l1/l2/w1/w2)**, smer dekoru/rotácia, rola, väzba na korpus. Finálny zoznam po doriešení hrán (sekcia 7 ❓).
