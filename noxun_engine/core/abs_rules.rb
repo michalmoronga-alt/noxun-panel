@@ -1,0 +1,168 @@
+# frozen_string_literal: true
+# Noxun Engine — ABS pravidla + mapovanie hran (standard sekcia 7.5). Perzistencia JSON
+# v %APPDATA%\NOXUN\Engine\abs_rules.json + .bak (pattern z templates.rb / materials.rb).
+#
+# ================== KONVENCIA HRAN L1/L2/W1/W2 (znamy pain point) ==================
+# Kazdy plosny (sheet) dielec nesie 4 hrany:
+#   L1/L2 = dvojica POZDLZNYCH hran (bezia v smere prod[:length]; ich dlzka = length)
+#   W1/W2 = dvojica PRIECNYCH  hran (bezia v smere prod[:width];  ich dlzka = width)
+# Hrany su per STRANA a su NEZAVISLE od rotacie skrinky v modeli (standard 3.3, 7.5).
+#
+# Preklad L/W -> predna/zadna/lava/prava/horna/dolna ZAVISI od ROLY (orientacie dielca v korpuse).
+# Odvodene z Construction (box + prod) — jeden zdroj pravdy je EDGE_LABELS nizsie:
+#
+#   side_left/right, divider_v : zvisla doska (length=vyska Z, width=hlbka Y)
+#       L1=Predna(Y=0)  L2=Zadna(Y=d)   W1=Dolna(Z=0)  W2=Horna(Z=max)
+#   bottom/top/shelf, divider_h: vodorovna doska (length=sirka X, width=hlbka Y)
+#       L1=Predna(Y=0)  L2=Zadna(Y=d)   W1=Lava(X=0)   W2=Prava(X=max)
+#   front_door/drawer_front    : celo pred korpusom (length=vyska Z, width=sirka X)
+#       L1=Lava(X=0)    L2=Prava(X=max) W1=Dolna(Z=0)  W2=Horna(Z=max)
+#   back/plinth/rail           : ABS sa neaplikuje (pravidlo prazdne) — labely best-effort
+#
+# DOSLEDOK: pravidlo "predna hrana" = L1 pre boky/police/dna/priecky (viditelna celna hrana).
+# Pre celo su vsetky 4 hrany rovnocenne (hranovanie dookola), preto pravidlo plni L1+L2+W1+W2.
+# ==================================================================================
+require 'json'
+require 'fileutils'
+
+module Noxun
+  module Engine
+    module AbsRules
+      STD  = 1
+      FILE = 'abs_rules.json'
+
+      EDGE_ORDER = %w[L1 L2 W1 W2].freeze
+
+      # Mapovanie hrana -> slovensky label per rola (UI karta dielca zobrazuje tieto nazvy).
+      # Poradie v poli editora (1=predna/2=zadna/3=lava/4=prava alebo horna/dolna) riesi UI z toho.
+      EDGE_LABELS = {
+        'side_left'    => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Dolná', 'W2' => 'Horná' },
+        'side_right'   => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Dolná', 'W2' => 'Horná' },
+        'divider_v'    => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Dolná', 'W2' => 'Horná' },
+        'bottom'       => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
+        'top'          => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
+        'shelf'        => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
+        'divider_h'    => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
+        'front_door'   => { 'L1' => 'Ľavá',   'L2' => 'Pravá',  'W1' => 'Dolná', 'W2' => 'Horná' },
+        'drawer_front' => { 'L1' => 'Ľavá',   'L2' => 'Pravá',  'W1' => 'Dolná', 'W2' => 'Horná' },
+        'back'         => { 'L1' => 'Dolná',  'L2' => 'Horná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
+        'plinth'       => { 'L1' => 'Dolná',  'L2' => 'Horná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
+        'rail_front'   => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
+        'rail_back'    => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Ľavá',  'W2' => 'Pravá' }
+      }.freeze
+      EDGE_LABELS_DEFAULT = { 'L1' => 'Hrana 1', 'L2' => 'Hrana 2', 'W1' => 'Hrana 3', 'W2' => 'Hrana 4' }.freeze
+
+      # Pravidlove defaulty ABS podla roly (hodnota = HRUBKA ABS v mm; dekor sa dopocita z materialu
+      # dielca). Prazdna mapa = ziadne ABS. Standard 7.5 + zadanie V0.3:
+      #   celo (front_door/drawer_front) -> vsetky 4 hrany 1.0
+      #   polica (shelf)                 -> predna 0.4 (viditelna celna hrana police)
+      #   boky (side_left/right)         -> predna 1.0
+      #   dno/vrch (bottom/top)          -> predna 0.4
+      #   priecky (divider_v/h)          -> predna (v 1.0 / h 0.4 — analog boku/police)
+      #   chrbat/sokel/vystuhy           -> nic
+      SEED_RULES = {
+        'front_door'   => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
+        'drawer_front' => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
+        'shelf'        => { 'L1' => 0.4 },
+        'side_left'    => { 'L1' => 1.0 },
+        'side_right'   => { 'L1' => 1.0 },
+        'bottom'       => { 'L1' => 0.4 },
+        'top'          => { 'L1' => 0.4 },
+        'divider_v'    => { 'L1' => 1.0 },
+        'divider_h'    => { 'L1' => 0.4 },
+        'back'         => {},
+        'plinth'       => {},
+        'rail_front'   => {},
+        'rail_back'    => {}
+      }.freeze
+
+      module_function
+
+      # --- cesty / perzistencia (pattern templates.rb) -------------------------
+
+      def dir
+        base = ENV['APPDATA'] || Dir.tmpdir
+        File.join(base, 'NOXUN', 'Engine')
+      end
+
+      def path
+        File.join(dir, FILE)
+      end
+
+      # Nacita pravidla { role => {L1:th,...} }. Pri prvom spusteni seedne SEED_RULES.
+      def load
+        ensure_seeded
+        data = JSON.parse(File.read(path))
+        r = data['rules']
+        r.is_a?(Hash) ? r : deep_copy(SEED_RULES)
+      rescue StandardError => e
+        Engine.log_error(e, 'AbsRules.load') if defined?(Engine)
+        deep_copy(SEED_RULES)
+      end
+
+      def ensure_seeded
+        return if File.exist?(path)
+        FileUtils.mkdir_p(dir)
+        write(deep_copy(SEED_RULES))
+      end
+
+      def write(rules)
+        FileUtils.mkdir_p(dir)
+        FileUtils.cp(path, "#{path}.bak") if File.exist?(path)
+        tmp = "#{path}.tmp"
+        File.write(tmp, JSON.pretty_generate({ 'std' => STD, 'rules' => rules }))
+        File.delete(path) if File.exist?(path)
+        File.rename(tmp, path)
+        true
+      rescue StandardError => e
+        Engine.log_error(e, 'AbsRules.write') if defined?(Engine)
+        false
+      end
+
+      # --- resolve edges pre dielec -------------------------------------------
+
+      # Hrubky ABS pre rolu (z pravidiel). Vrati mapu {L1:th,...} (len hrany s pravidlom).
+      def thicknesses_for(role)
+        load[role.to_s] || {}
+      end
+
+      # Vyrieši ABS hrany konkretneho sheet dielca:
+      #   role  — rola dielca (pravidlo urci KTORE hrany a AKA hrubka ABS)
+      #   decor — dekor materialu dielca (urci KTORY dekor ABS pasky)
+      # Vrati VZDY kompletnu mapu {L1,L2,W1,W2} kde hodnota = abs_id alebo nil.
+      # Ak pravidlo ziada hrubku, pre ktoru dekor nema ABS variant -> nil + info log (standard 7.5).
+      def resolve_edges(role, decor)
+        th = thicknesses_for(role)
+        out = { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil }
+        EDGE_ORDER.each do |code|
+          want = th[code]
+          next if want.nil?
+          abs_id = Materials.abs_for_decor(decor, want) if defined?(Materials)
+          if abs_id
+            out[code] = abs_id
+          elsif defined?(Engine)
+            Engine.log("abs_rules: rola #{role} ziada ABS #{want} mm dekoru '#{decor}', " \
+                       "ale variant neexistuje v katalogu — hrana #{code} bez ABS")
+          end
+        end
+        out
+      end
+
+      # Prazdne hrany (non-sheet dielce, alebo ziadne pravidlo) — kompletna nil mapa.
+      def empty_edges
+        { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil }
+      end
+
+      # --- labely hran (UI) ----------------------------------------------------
+
+      # Mapa hrana -> slovensky label pre rolu (fallback genericke Hrana 1..4).
+      def edge_labels(role)
+        EDGE_LABELS[role.to_s] || EDGE_LABELS_DEFAULT
+      end
+
+      def deep_copy(h)
+        JSON.parse(JSON.generate(h))
+      end
+    end
+  end
+end
