@@ -63,6 +63,16 @@ module Noxun
           cb(dlg, 'delete_template') { |p| handle_delete_template(p) }
           cb(dlg, 'apply_template') { |p| handle_apply_template(p) }
           cb(dlg, 'toggle_zones')   { |p| handle_toggle_zones(p) }
+          # Diagnostika: JS chyby z HtmlDialogu (window.onerror) -> Engine.log. Priamo, NIE cez cb —
+          # aby pripadna chyba v logovani nespustila set_status (dalsi execute_script) a slucku.
+          dlg.add_action_callback('js_error') do |_ctx, msg|
+            begin
+              Engine.log("JS: #{msg}")
+            rescue StandardError => e
+              Engine.log_error(e, 'js_error')
+            end
+            next
+          end
         end
 
         # Wrapper: begin/rescue + slovensky status pri chybe; nikdy 'return' v bloku (pouzi next).
@@ -134,8 +144,10 @@ module Noxun
             params[k] = data[k] if data.key?(k)
           end
           params['fronts'] = data['fronts'] if data.key?('fronts')
-          CabinetBuilder.rebuild(model, cab, params)
-          reselect(model, cab)
+          suspend_selection_sync do
+            CabinetBuilder.rebuild(model, cab, params)
+            reselect(model, cab)
+          end
           set_status("Prestavané ✓ — #{Store.get(cab, 'cabinet_id')} (#{part_count(cab)} dielcov).")
           push_selected(model)
         end
@@ -196,8 +208,12 @@ module Noxun
           cid = cabinet_id_from_zone(zid)
           sub = Zones.find_zone_group(model, cid, zid)
           if sub && sub.valid?
-            model.selection.clear
-            model.selection.add(sub)
+            # Len zvyraznenie ghostu v modeli — panel uz o aktivnej zone vie (poslal ju), preto
+            # potlacime observer, nech clear/add nevynuluje selectedCabId ani aktivnu zonu.
+            suspend_selection_sync do
+              model.selection.clear
+              model.selection.add(sub)
+            end
           end
         rescue StandardError => e
           Engine.log_error(e, 'handle_select_zone')
@@ -215,9 +231,15 @@ module Noxun
           path = zone_path(zone_id)
           yield(tree, path)
           params['zone_tree'] = tree
-          CabinetBuilder.rebuild(model, cab, params)
-          @active_zone_id = zone_id
-          reselect(model, cab) # klik-nuty ghost je po rebuilde zmazany -> vyber korpus nanovo
+          # Cela mutacia je NASA (rebuild + reselect). Observer potlacime, aby medzikroky
+          # (clear/add korpusu, erase klik-nuteho ghostu) neposlali NX.clearSelected() a nevynulovali
+          # selectedCabId v paneli. Aktivnu zonu drzime cez rebuild -> panel sa jej po resyncu drzi tiez.
+          suspend_selection_sync do
+            CabinetBuilder.rebuild(model, cab, params)
+            @active_zone_id = zone_id
+            reselect(model, cab) # klik-nuty ghost je po rebuilde zmazany -> vyber korpus nanovo
+          end
+          push_selected(model) # PRESNE jeden resync panela (loadSelected s aktivnou zonou)
           cab
         end
 
@@ -444,9 +466,26 @@ module Noxun
         end
 
         def on_selection_changed
+          return if @suspend_selection_sync # nase vlastne reselecty resyncnu panel explicitne
+
           push_selected(Sketchup.active_model)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.on_selection_changed')
+        end
+
+        # Programmaticka reselect (nas clear+add po rebuilde) NESMIE rozhodit panel.
+        # SketchUp fire pri single `selection.add` callback `onSelectionAdded` (NIE onSelectionBulkChange)
+        # a pri `selection.clear` `onSelectionCleared`. Bez potlacenia by preto medzikrok `clear`
+        # poslal NX.clearSelected() a vynuloval selectedCabId — a NASLEDNY add uz panel neobnovil
+        # (loadSelected nedosiel) -> po prvom drag-u priecky prestal fungovat kazdy dalsi (pouzivatel
+        # musel znovu kliknut na korpus). Preto pocas nasej selekcie observer potlacime a panel
+        # resyncneme PRESNE raz (push_selected) az po dokonceni. Re-entrantne bezpecne.
+        def suspend_selection_sync
+          prev = @suspend_selection_sync
+          @suspend_selection_sync = true
+          yield
+        ensure
+          @suspend_selection_sync = prev
         end
 
         # --- pomocne ---------------------------------------------------------
@@ -457,12 +496,18 @@ module Noxun
         end
 
         # Vystup z pripadneho editu komponentu + cisty vyber korpusu (po rebuilde).
+        # Cele potlacene pre observer — zavretie editu aj clear/add su NASA zmena; panel
+        # resyncne az volajuci cez push_selected (viz suspend_selection_sync).
         def reselect(model, inst)
-          model.active_path = nil
-        rescue StandardError
-          nil
-        ensure
-          select_only(model, inst) if inst && inst.valid?
+          suspend_selection_sync do
+            begin
+              model.active_path = nil
+            rescue StandardError
+              nil
+            ensure
+              select_only(model, inst) if inst && inst.valid?
+            end
+          end
         end
 
         def parse(payload)
@@ -498,8 +543,10 @@ module Noxun
         end
 
         def select_only(model, inst)
-          model.selection.clear
-          model.selection.add(inst)
+          suspend_selection_sync do
+            model.selection.clear
+            model.selection.add(inst)
+          end
         end
 
         def part_count(inst)
@@ -522,6 +569,17 @@ module Noxun
         end
 
         def onSelectionCleared(_selection)
+          Panel.on_selection_changed
+        end
+
+        # SketchUp fire pri pridani/odobrati JEDNEJ entity `onSelectionAdded`/`onSelectionRemoved`
+        # (NIE onSelectionBulkChange). Bez nich by sa panel po jednotlivom uzivatelskom pridani do
+        # vyberu neobnovil. on_selection_changed respektuje suspend guard (nase reselecty su potlacene).
+        def onSelectionAdded(_selection, _element)
+          Panel.on_selection_changed
+        end
+
+        def onSelectionRemoved(_selection, _element)
           Panel.on_selection_changed
         end
       end
