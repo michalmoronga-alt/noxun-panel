@@ -35,8 +35,9 @@ module Noxun
 
       MIN = { width: 200.0, height: 200.0, depth: 150.0 }.freeze
 
-      MAT_KORPUS = 'NOXUN_korpus'
-      MAT_FRONT  = 'NOXUN_front'
+      # Fallback farby SketchUp materialu, ak material_id nie je v katalogu (Materials preberie color).
+      FALLBACK_RGB_KORPUS = [216, 196, 160].freeze
+      FALLBACK_RGB_FRONT  = [245, 245, 245].freeze
 
       # DC scaletool bitova maska pre osove scale uchopy (X/Y/Z). Michal potvrdi vizualne;
       # ak by mala byt opacna semantika (skryt plosne+rohove), alternativa je 120.
@@ -163,22 +164,85 @@ module Noxun
         # --- jadro stavby ---------------------------------------------------
 
         # Postavi vsetky dielce + ghost zony do cdef podla planu z Construction. Vrati doplneny config.
+        #
+        # V0.3 materialy + ABS: kazdemu dielcu sa vyriesi VYSLEDNY material_id a ABS hrany cez retaz
+        # (standard 7.2): pravidlove defaulty roly -> dedenie projekt->korpus -> part_override (viťazi).
+        # Vysledok sa zapise do configu dielca (dielec vzdy nesie KONKRETNY material = "zaradeny" stav).
         def build_into(model, cdef, cfg, cid)
           plan = Construction.build_plan(cfg, cid) # validuje interne (raise slovensky)
           ents = cdef.entities
-          mk = ensure_material(model, MAT_KORPUS, [216, 196, 160])
-          mf = ensure_material(model, MAT_FRONT, [245, 245, 245])
           tid = template_id_for(cfg[:type])
+
+          # Efektivne korpusove materialy = korpus config, inak dedenie z projektovych defaultov (model).
+          defaults = defined?(Materials) ? Materials.project_defaults(model) : {}
+          eff_body  = present(cfg[:material_id])       || defaults['default_material_id']
+          eff_front = present(cfg[:front_material_id]) || defaults['default_front_material_id']
+          eff_back  = present(cfg[:back_material_id])  || defaults['default_back_material_id']
+          overrides = cfg[:part_overrides].is_a?(Hash) ? cfg[:part_overrides] : {}
 
           plan[:parts].each do |pd|
             next unless positive_box?(pd[:box]) # ochrana proti degenerovanym dielcom (uzke zony)
-            front = pd[:material] == :front
-            add_part(model, ents, pd, (front ? mf : mk), (front ? MAT_FRONT : MAT_KORPUS), cid, tid)
+            resolved = resolve_part(pd, eff_body, eff_front, eff_back, overrides)
+            add_part(model, ents, pd, resolved, cid, tid)
           end
 
           # V0.2c: ghost zony uz NEstoja v definicii korpusu, ale ako top-level skupina
           # (Zones.sync_ghost, volane z build/rebuild) — klik na zonu = 1 klik bez dvojkliku.
           merge_final(cfg, plan)
+        end
+
+        # Vyriesi material + ABS hrany + role_key jedneho dielca (retaz standardu 7.2 / part_overrides).
+        #
+        # role_key = pd[:suffix] — DETERMINISTICKY identifikator dielca v ramci korpusu:
+        #   Construction generuje suffixy cisto z konfiguracie (rovnaka konfiguracia -> rovnake suffixy),
+        #   police/priecky nesu v suffixe CESTU zony (napr. SHELF-1_2-1), takze zmena v inej zone
+        #   NEPOSUNIE kluc "tej istej" police. part_id = cabinet_id + '-' + suffix (konzistentne s Ids).
+        #   Preto override zapisany pod role_key sedi na ten isty dielec aj po rebuilde (standard 9.3).
+        def resolve_part(pd, eff_body, eff_front, eff_back, overrides)
+          role_key = pd[:suffix]
+          ov = overrides[role_key].is_a?(Hash) ? overrides[role_key] : {}
+          base_mat = base_material_for(pd[:role], pd[:material], eff_body, eff_front, eff_back)
+          mat_id = present(ov['material_id']) || base_mat
+          # Jeden lookup doskoveho materialu — pouzity na dekor (ABS) aj hrubkovu kontrolu (V0.3 FIX 2).
+          sheet = (defined?(Materials) && mat_id) ? Materials.sheet(mat_id) : nil
+          warn_thickness_mismatch(mat_id, sheet, pd)
+          decor = sheet && sheet['decor']
+          base_edges = defined?(AbsRules) ? AbsRules.resolve_edges(pd[:role], decor) : empty_edges
+          edges = base_edges.merge(known_edges(ov['edges']))
+          { role_key: role_key, material_id: mat_id, edges: edges }
+        end
+
+        # V0.3 FIX 2: hrubkova kompatibilita materialu a dielca. Ak katalogovy material dielca ma inu
+        # hrubku nez dielec, zaloguj warning — ale material do configu zapiseme AJ TAK (data NEblokujeme,
+        # nech ho validacia V0.5 najde). UI cesta nesulad uz nedovoli (thickness-filtrovane selecty).
+        # Material mimo katalogu (legacy) sa tu nekontroluje (sheet == nil).
+        def warn_thickness_mismatch(mat_id, sheet, pd)
+          return unless mat_id && sheet && defined?(Engine)
+          want = pd[:prod][:thickness].to_f
+          have = sheet['thickness'].to_f
+          return if thickness_ok_for?(pd[:role], want, have)
+          Engine.log("Nesulad hrubky materialu #{mat_id} (#{have} mm) vs dielca #{pd[:suffix]} (#{want} mm)")
+        end
+
+        # Hrubkova kompatibilita (zhoduje sa s UI filtrom selectov): cela (front) beru dosky 18 aj 19 mm
+        # (dielec cela je modelovany na FRONT_THICKNESS 19, ale bezne cela su 18) — inak presna hrubka dielca.
+        def thickness_ok_for?(role, want, have)
+          case role.to_s
+          when 'front_door', 'drawer_front'
+            (have - 18.0).abs < 0.05 || (have - 19.0).abs < 0.05 || (have - want).abs < 0.05
+          else
+            (have - want).abs < 0.05
+          end
+        end
+
+        # Base material dielca podla roly: cela -> front, chrbat -> back, ostatne -> body (korpus).
+        # pd[:material] (:front/:korpus) z Construction je sekundarny signal (cela maju :front).
+        def base_material_for(role, mat_sym, eff_body, eff_front, eff_back)
+          case role.to_s
+          when 'front_door', 'drawer_front' then eff_front
+          when 'back' then eff_back
+          else mat_sym == :front ? eff_front : eff_body
+          end
         end
 
         # V0.2c: obmedzenie Scale uchopov na osove (X/Y/Z) cez DC "scaletool" atribut.
@@ -197,7 +261,8 @@ module Noxun
 
         # Jeden dielec = vlastny komponent s NOXUN dict. Recyklacia definicie podla mena
         # (mena su per-korpus unikatne — obsahuju cid), aby rebuild neprodukoval osirotene definicie.
-        def add_part(model, parent_ents, pd, material, material_id, cid, tid)
+        # resolved: { role_key:, material_id:, edges: } — vyrieseny material + ABS (viz resolve_part).
+        def add_part(model, parent_ents, pd, resolved, cid, tid)
           dname = "NOXUN #{cid} #{pd[:suffix]}"
           pdef = model.definitions[dname] || model.definitions.add(dname)
           pdef.entities.clear!
@@ -205,21 +270,43 @@ module Noxun
           draw_box(pdef.entities, sx, sy, sz)
           ox, oy, oz = pd[:origin]
           inst = parent_ents.add_instance(pdef, Geom::Transformation.translation(Units.point(ox, oy, oz)))
-          inst.material = material
+          # SketchUp material z katalogu (nazov = material_id, farba z color) — vizual, nie vyrobna pravda.
+          fallback = pd[:material] == :front ? FALLBACK_RGB_FRONT : FALLBACK_RGB_KORPUS
+          inst.material = su_material(model, resolved[:material_id], fallback)
           inst.layer = part_tag(model, pd[:role]) # tag dielca (Korpus/Chrbát/Čelá/Vnútro)
           pid = Ids.part_id(cid, pd[:suffix])
           Store.write(inst, {
             std: Store::STD, kind: 'part', id: pid, part_id: pid, cabinet_id: cid,
             template_id: tid, role: pd[:role], name: pd[:name],
+            role_key: resolved[:role_key], # plochy kluc pre parovanie s part_overrides (UI karta dielca)
             manufactured: true, production_class: 'sheet',
             config: {
               length: pd[:prod][:length].round(2), width: pd[:prod][:width].round(2),
               thickness: pd[:prod][:thickness].round(2), quantity: 1,
-              material_id: material_id, grain_direction: 'none',
-              edges: { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil }
+              material_id: resolved[:material_id], grain_direction: 'none',
+              edges: resolved[:edges]
             }
           })
           inst
+        end
+
+        # SketchUp vizualny material z katalogu (Materials). Fallback ak katalog nedostupny.
+        def su_material(model, material_id, fallback_rgb)
+          return Materials.ensure_su_material(model, material_id, fallback_rgb) if defined?(Materials)
+          ensure_material(model, "NOXUN_#{material_id}", fallback_rgb)
+        end
+
+        def empty_edges
+          { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil }
+        end
+
+        # Z override edges vezme len zname kluce (L1/L2/W1/W2); ZACHOVA aj nil (nil = "bez ABS"
+        # explicitny override). Kluc chybajuci v override -> dedi z pravidla (base_edges).
+        def known_edges(ov)
+          out = {}
+          return out unless ov.is_a?(Hash)
+          %w[L1 L2 W1 W2].each { |k| out[k] = ov[k] if ov.key?(k) }
+          out
         end
 
         def positive_box?(box)
@@ -271,7 +358,6 @@ module Noxun
             plinth_mode: cfg[:plinth_mode], plinth_recess: cfg[:plinth_recess],
             rail_depth: cfg[:rail_depth], rails_orientation: cfg[:rails_orientation],
             rails_top_offset: cfg[:rails_top_offset],
-            material_id: 'K009_PW_DTDL_18', back_material_id: 'HDF_WHITE_3',
             # vnorene standardne objekty (odvodene)
             sides:   { thickness: cfg[:thickness], construction: 'sides_wrap' },
             bottom:  { mode: cfg[:bottom_mode], thickness: cfg[:thickness] },
@@ -280,6 +366,12 @@ module Noxun
                        top_offset: cfg[:rails_top_offset] },
             back:    { mode: cfg[:back_mode], thickness: cfg[:back_thickness] },
             support: support_descriptor(cfg),
+            # V0.3 materialy — korpusove (nil = dedi z projektoveho defaultu, standard 7.2)
+            # + part_overrides (per-dielec material/hrany, kluc = role_key, prezije rebuild).
+            material_id: cfg[:material_id],
+            front_material_id: cfg[:front_material_id],
+            back_material_id: cfg[:back_material_id],
+            part_overrides: cfg[:part_overrides].is_a?(Hash) ? cfg[:part_overrides] : {},
             available_width: cfg[:available_width],
             available_height: cfg[:available_height],
             available_depth: cfg[:available_depth],
@@ -355,8 +447,38 @@ module Noxun
             # V0.2b: strom zon (police su per-zona) + cela (fixed/auto s lockmi)
             zone_tree: norm_zone_tree(p),
             fronts: Fronts.normalize_config(raw(p, :fronts)),
+            # V0.3: korpusove materialy (nil = dedi z projektu) + part_overrides (per-dielec)
+            material_id: present(raw(p, :material_id)),
+            front_material_id: present(raw(p, :front_material_id)),
+            back_material_id: present(raw(p, :back_material_id)),
+            part_overrides: norm_overrides(raw(p, :part_overrides)),
             name: (p['name'] || p[:name])
           }
+        end
+
+        # Ocisti part_overrides na { role_key => { 'material_id'=>..|nil, 'edges'=>{L1..W2} } }.
+        # Zahodi prazdne / neplatne zaznamy. Zachova nil hrany (explicitne "bez ABS").
+        def norm_overrides(raw_ov)
+          return {} unless raw_ov.is_a?(Hash)
+          out = {}
+          raw_ov.each do |key, ov|
+            next unless ov.is_a?(Hash)
+            rec = {}
+            mat = present(ov['material_id'] || ov[:material_id])
+            rec['material_id'] = mat if mat
+            edges = ov['edges'] || ov[:edges]
+            if edges.is_a?(Hash)
+              e = {}
+              %w[L1 L2 W1 W2].each do |k|
+                next unless edges.key?(k) || edges.key?(k.to_sym)
+                v = edges.key?(k) ? edges[k] : edges[k.to_sym]
+                e[k] = present(v) # nil (bez ABS) alebo abs_id
+              end
+              rec['edges'] = e unless e.empty?
+            end
+            out[key.to_s] = rec unless rec.empty?
+          end
+          out
         end
 
         # zone_tree z params; ak chyba, ale je legacy 'shelves' -> koren so shelves; inak prazdny koren.
@@ -387,8 +509,20 @@ module Noxun
             'zone_tree' => cfg['zone_tree'] || ZoneTree.default_tree((cfg['shelves'] || 0).to_i),
             # cela: novy config = hash; stary = string ('none'/'1'/'2'/'auto') -> Fronts.normalize
             'fronts' => cfg.key?('fronts') ? cfg['fronts'] : nil,
+            # V0.3 materialy. Marker V0.3 configu = pritomnost 'part_overrides'. Legacy korpusy (V0.2)
+            # mali material_id/back_material_id ulozene NATVRDO (K009/HDF) — tie NEberieme ako korpusovy
+            # override (nechame nil = dedi z projektu), aby projektovy default fungoval aj na starych.
+            'material_id'       => v03?(cfg) ? cfg['material_id'] : nil,
+            'front_material_id' => v03?(cfg) ? cfg['front_material_id'] : nil,
+            'back_material_id'  => v03?(cfg) ? cfg['back_material_id'] : nil,
+            'part_overrides'    => cfg['part_overrides'].is_a?(Hash) ? cfg['part_overrides'] : {},
             'name' => cfg['name']
           }
+        end
+
+        # V0.3+ config sa pozna podla pritomnosti kluca 'part_overrides' (V0.2 korpusy ho nemaju).
+        def v03?(cfg)
+          cfg.key?('part_overrides')
         end
 
         def legacy_back_thickness(cfg)
@@ -444,6 +578,14 @@ module Noxun
         def raw(p, key)
           v = p[key.to_s]
           v.nil? ? p[key] : v
+        end
+
+        # String hodnota alebo nil (prazdny/whitespace string -> nil). Pouzite pri material_id
+        # dedeni (nil = "dedi z nadradenej urovne", standard 7.2).
+        def present(v)
+          return nil if v.nil?
+          s = v.to_s.strip
+          s.empty? ? nil : s
         end
 
         def fetchf(p, key, default)
