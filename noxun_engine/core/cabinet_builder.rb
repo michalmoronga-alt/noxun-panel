@@ -38,11 +38,29 @@ module Noxun
       MAT_KORPUS = 'NOXUN_korpus'
       MAT_FRONT  = 'NOXUN_front'
 
+      # DC scaletool bitova maska pre osove scale uchopy (X/Y/Z). Michal potvrdi vizualne;
+      # ak by mala byt opacna semantika (skryt plosne+rohove), alternativa je 120.
+      SCALE_TOOL_MASK = 7
+
+      # Tagy dielov (V0.2c) — hromadne hide cez nativny Tags panel. Default = Noxun/Korpus.
+      PART_TAGS = {
+        'back'         => 'Noxun/Chrbát',
+        'front_door'   => 'Noxun/Čelá',
+        'drawer_front' => 'Noxun/Čelá',
+        'shelf'        => 'Noxun/Vnútro',
+        'divider_v'    => 'Noxun/Vnútro',
+        'divider_h'    => 'Noxun/Vnútro'
+      }.freeze
+      PART_TAG_DEFAULT = 'Noxun/Korpus'
+
       class << self
         # --- verejne API ----------------------------------------------------
 
         # Vlozi novy korpus. Dolna na Z=0 vedla existujucich; horna na Z=UPPER_HANG_Z. Vrati instanciu.
+        # Korpus je VZDY top-level (model.entities) — nikdy do aktivneho edit kontextu (inak
+        # by sa korpus vlozil do cudzieho komponentu). Preto najprv zavrieme edit kontext.
         def build(model, params)
+          ensure_root_context(model)
           cfg = normalize(params)
           cid = Ids.next_cabinet_id(model)
           x = next_x(model)
@@ -54,8 +72,10 @@ module Noxun
             cdef.entities.clear!
             final = build_into(model, cdef, cfg, cid)
             tr = Geom::Transformation.translation(Units.point(x, 0, z))
-            inst = model.active_entities.add_instance(cdef, tr)
+            inst = model.entities.add_instance(cdef, tr)
             write_cabinet_attrs(inst, cid, final)
+            apply_scale_lock(inst)
+            Zones.sync_ghost(model, inst) if defined?(Zones)
             model.commit_operation
           rescue StandardError => e
             abort_safely(model)
@@ -71,6 +91,12 @@ module Noxun
           cid = Store.get(inst, 'cabinet_id')
           raise 'Vybrana instancia nie je NOXUN korpus.' if cid.nil?
 
+          # KRITICKE (V0.2c bugfix): rebuild musi bezat v ABSOLUTNOM (root) rame.
+          # Ak je uzivatel dvojklikom vnoreny v komponente, inst.transformation je
+          # interpretovana v edit rame (relativna) a commit by korpus teleportoval
+          # na origin. Zavretim edit kontextu citame/zapisujeme transformaciu spravne.
+          ensure_root_context(model)
+
           cfg = normalize(params)
           guarded do
             model.start_operation(op_name, true)
@@ -80,6 +106,8 @@ module Noxun
               final = build_into(model, cdef, cfg, cid)
               inst.transformation = transform if transform
               write_cabinet_attrs(inst, cid, final)
+              apply_scale_lock(inst)
+              Zones.sync_ghost(model, inst) if defined?(Zones)
               model.commit_operation
             rescue StandardError => e
               abort_safely(model)
@@ -87,6 +115,19 @@ module Noxun
             end
           end
           inst
+        end
+
+        # Zavrie vsetky otvorene edit konteksty tak, aby model.active_entities == model.entities.
+        # Volane pred build/rebuild — pozri bugfix poznamku v rebuild. Bezpecne aj ked sme uz v roote.
+        def ensure_root_context(model)
+          guard = 0
+          while model.active_path && model.active_path.length.positive? && guard < 20
+            model.close_active
+            guard += 1
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'ensure_root_context') if defined?(Engine)
+          nil
         end
 
         # --- jadro stavby ---------------------------------------------------
@@ -105,8 +146,21 @@ module Noxun
             add_part(model, ents, pd, (front ? mf : mk), (front ? MAT_FRONT : MAT_KORPUS), cid, tid)
           end
 
-          Zones.build_into(model, ents, plan[:zones], cid)
+          # V0.2c: ghost zony uz NEstoja v definicii korpusu, ale ako top-level skupina
+          # (Zones.sync_ghost, volane z build/rebuild) — klik na zonu = 1 klik bez dvojkliku.
           merge_final(cfg, plan)
+        end
+
+        # V0.2c: obmedzenie Scale uchopov na osove (X/Y/Z) cez DC "scaletool" atribut.
+        # DC plugin (nacitany v modeli) tuto masku respektuje. Hodnota je bitova maska;
+        # SCALE_TOOL_MASK = 7 (1+2+4) podla zadania — Michal vizualne potvrdi smer masky.
+        # Atribut NEovplyvnuje scale absorpciu (tá cita transformaciu, nie tento kluc).
+        def apply_scale_lock(inst)
+          return unless inst && inst.valid?
+          inst.set_attribute('dynamic_attributes', 'scaletool', SCALE_TOOL_MASK.to_s)
+        rescue StandardError => e
+          Engine.log_error(e, 'apply_scale_lock') if defined?(Engine)
+          nil
         end
 
         # --- pomocne stavbove ----------------------------------------------
@@ -122,6 +176,7 @@ module Noxun
           ox, oy, oz = pd[:origin]
           inst = parent_ents.add_instance(pdef, Geom::Transformation.translation(Units.point(ox, oy, oz)))
           inst.material = material
+          inst.layer = part_tag(model, pd[:role]) # tag dielca (Korpus/Chrbát/Čelá/Vnútro)
           pid = Ids.part_id(cid, pd[:suffix])
           Store.write(inst, {
             std: Store::STD, kind: 'part', id: pid, part_id: pid, cabinet_id: cid,
@@ -139,6 +194,12 @@ module Noxun
 
         def positive_box?(box)
           box && box.all? { |v| v.to_f > 0.01 }
+        end
+
+        # Tag (layer) dielca podla roly — zabezpeci jeho existenciu. Hromadne hide v Tags paneli.
+        def part_tag(model, role)
+          name = PART_TAGS[role.to_s] || PART_TAG_DEFAULT
+          model.layers[name] || model.layers.add(name)
         end
 
         # Box od (0,0,0) rozmerov sx,sy,sz (mm). Kontrola normaly pred pushpull.

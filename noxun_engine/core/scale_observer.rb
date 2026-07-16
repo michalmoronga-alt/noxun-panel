@@ -63,16 +63,26 @@ module Noxun
         end
 
         # --- volane z observera --------------------------------------------
+        # Zmena korpusu: scale -> absorpcia (rebuild), inak (move/rotate) -> presun ghost zon.
+        # Rozlisenie scale/move sa robi az v process_dirty (po ustaleni transformacie).
         def notify_change(entity)
           return if @rebuilding
           return unless entity && entity.valid?
           return unless Store.kind(entity) == 'cabinet'
-          return unless scaled?(entity.transformation)
           @dirty ||= {}
           @dirty[entity.entityID] = entity
           schedule
         rescue StandardError => e
           Engine.log_error(e, 'ScaleWatch.notify_change')
+        end
+
+        # Zmazanie entity (napr. korpusu) -> pri najblizsom tiku upraceme osirotene ghost skupiny.
+        def notify_erase
+          return if @rebuilding
+          @need_prune = true
+          schedule
+        rescue StandardError => e
+          Engine.log_error(e, 'ScaleWatch.notify_erase')
         end
 
         # Debounce + generation counter: kazda zmena posunie generaciu a restartuje timer;
@@ -96,11 +106,41 @@ module Noxun
         def process_dirty
           dirty = @dirty || {}
           @dirty = {}
+          need_prune = @need_prune
+          @need_prune = false
+          model = Sketchup.active_model
           dirty.each_value do |inst|
-            absorb(inst) if inst && inst.valid?
+            next unless inst && inst.valid?
+            if scaled?(inst.transformation)
+              absorb(inst)               # scale -> rebuild (vnutri vola Zones.sync_ghost)
+            else
+              move_ghost_op(model, inst) # move/rotate -> len presun ghost skupiny
+            end
           rescue StandardError => e
-            Engine.log_error(e, 'ScaleWatch.absorb')
+            Engine.log_error(e, 'ScaleWatch.process_dirty')
           end
+          prune_ghosts(model) if need_prune
+        end
+
+        # Presun ghost zon za korpusom (bez rebuildu). Vlastna kratka operacia (1 undo krok).
+        def move_ghost_op(model, inst)
+          return unless defined?(Zones)
+          model.start_operation('Noxun: presun zon', true)
+          Zones.move_ghost(model, inst)
+          model.commit_operation
+        rescue StandardError => e
+          model.abort_operation rescue nil
+          Engine.log_error(e, 'ScaleWatch.move_ghost_op')
+        end
+
+        def prune_ghosts(model)
+          return unless defined?(Zones)
+          model.start_operation('Noxun: uprac zony', true)
+          Zones.prune_orphans(model)
+          model.commit_operation
+        rescue StandardError => e
+          model.abort_operation rescue nil
+          Engine.log_error(e, 'ScaleWatch.prune_ghosts')
         end
 
         # --- detekcia scale -------------------------------------------------
@@ -180,6 +220,11 @@ module Noxun
       class CabinetEntityObserver < Sketchup::EntityObserver
         def onChangeEntity(entity)
           ScaleWatch.notify_change(entity)
+        end
+
+        # Zmazanie korpusu -> upraceme jeho ghost zony (osirotene top-level skupiny).
+        def onEraseEntity(_entity)
+          ScaleWatch.notify_erase
         end
       end
 

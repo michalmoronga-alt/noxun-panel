@@ -5,17 +5,22 @@
 # priecka (divider_v/divider_h) ROZDELI zonu na deti -> vzniknu nove zony (rekurzivne).
 # Police ostavaju MODUL v zone (zonu NEdelia) — rovnomerne v ramci listovej zony.
 #
-# Struktura uzla (string-keyed, round-tripuje cez JSON v configu korpusu):
-#   { 'split' => nil | { 'axis' => 'v'|'h', 'count' => 2..4 },
-#     'shelves' => 0..4,           # len listova zona (split == nil)
-#     'children' => [uzol, ...] }  # len rozdelena zona (velkost == count)
+# V0.2c — DELENIE SO ZAMKAMI ROZMEROV (split lock):
+#   split = { 'axis'=>'v'|'h', 'count'=>N, 'cuts'=>[ {'size'=>Float|nil,'locked'=>Bool}*N ] }
+#   Kazdy prvok `cuts` je JEDNO POLE (stlpec pre 'v', riadok pre 'h'), odspodu/zlava:
+#     - size   = pozadovana svetla sirka/vyska pola v mm (nil => auto, dopocita sa)
+#     - locked = pri resize korpusu drzi svoj rozmer; nezamknute sa prepocitaju proporcne
+#   Priecky (count-1) su dielce korpusu; ich pozicie sa odvodia z rozlozenia poli.
 #
-# ID zon: <cabinet_id>-Z<cesta> kde cesta = "1", "1.2", "1.2.1" ... (koren = 1).
-# Deti .1 = min suradnica (vlavo pre 'v', dole pre 'h').
+# Struktura uzla (string-keyed, round-tripuje cez JSON v configu korpusu):
+#   { 'split' => nil | {axis,count,cuts}, 'shelves' => 0..4, 'children' => [uzol,...] }
+#
+# ID zon: <cabinet_id>-Z<cesta> kde cesta = "1","1.2","1.2.1" ... (koren = 1). Deti .1 = min suradnica.
 module Noxun
   module Engine
     module ZoneTree
       SHELF_FRONT_INSET = 20.0 # police odsadene od cela (mm)
+      MIN_FIELD         = 20.0 # najmensia svetla sirka/vyska pola (mm)
 
       module_function
 
@@ -29,7 +34,7 @@ module Noxun
         default_node(shelves)
       end
 
-      # Ocisti a znormalizuje lubovolny (aj symbolovy/poskodeny) strom na kanonicku formu.
+      # Ocisti a znormalizuje lubovolny (aj symbolovy/poskodeny/legacy) strom na kanonicku formu.
       def sanitize(node)
         return default_node(0) unless node.is_a?(Hash)
         split = node['split'] || node[:split]
@@ -39,16 +44,30 @@ module Noxun
           count = (split['count'] || split[:count] || 2).to_i
           count = 2 if count < 2
           count = 4 if count > 4
+          cuts = sanitize_cuts(split['cuts'] || split[:cuts], count)
           kids = Array(node['children'] || node[:children]).map { |c| sanitize(c) }
           kids += Array.new(count - kids.size) { default_node(0) } if kids.size < count
           kids = kids[0, count] if kids.size > count
-          { 'split' => { 'axis' => axis, 'count' => count }, 'shelves' => 0, 'children' => kids }
+          { 'split' => { 'axis' => axis, 'count' => count, 'cuts' => cuts },
+            'shelves' => 0, 'children' => kids }
         else
           default_node((node['shelves'] || node[:shelves] || 0).to_i)
         end
       end
 
-      # Navigacia na uzol podla cesty [1, k2, k3, ...] (1 = koren). Vrati uzol alebo nil.
+      # Ocisti pole poli (cuts) na presne `count` prvkov {size, locked}. Legacy (bez cuts) => same auto.
+      def sanitize_cuts(cuts, count)
+        arr = Array(cuts).map do |c|
+          c = {} unless c.is_a?(Hash)
+          sz = c['size'] || c[:size] || c['at_mm'] || c[:at_mm]
+          { 'size' => (sz.nil? || sz.to_s.strip.empty? ? nil : sz.to_f),
+            'locked' => truthy(c['locked'] || c[:locked]) }
+        end
+        arr = arr[0, count]
+        arr += Array.new(count - arr.size) { { 'size' => nil, 'locked' => false } } if arr.size < count
+        arr
+      end
+
       def navigate(tree, path)
         node = tree
         Array(path)[1..-1].to_a.each do |k|
@@ -60,6 +79,7 @@ module Noxun
       end
 
       # Rozdel uzol na 'count' casti pozdlz osi. Prepise pripadny existujuci podstrom.
+      # cuts sa zalozia ako auto (rovnomerne) — konkretne rozmery/zamky nastavi set_field!.
       def set_split!(tree, path, axis, count)
         node = navigate(tree, path)
         return false unless node
@@ -67,13 +87,24 @@ module Noxun
         count = 4 if count > 4
         axis = 'h' if axis.to_s == 'h'
         axis = 'v' unless axis == 'h'
-        node['split'] = { 'axis' => axis, 'count' => count }
+        node['split'] = { 'axis' => axis, 'count' => count, 'cuts' => sanitize_cuts(nil, count) }
         node['shelves'] = 0
         node['children'] = Array.new(count) { default_node(0) }
         true
       end
 
-      # Nastav pocet polic v zone (0..4). Ak bola rozdelena, delenie sa zrusi (police = list).
+      # Nastav svetlu sirku/vysku konkretneho pola (index 0..count-1) + zamok.
+      # Susedne NEzamknute pole(ia) sa dopocitaju pri compute z volneho zvysku.
+      def set_field!(tree, path, index, size_mm, locked)
+        node = navigate(tree, path)
+        return false unless node && node['split'].is_a?(Hash)
+        cuts = node['split']['cuts']
+        return false unless cuts.is_a?(Array) && cuts[index]
+        sz = size_mm.nil? || size_mm.to_s.strip.empty? ? nil : [size_mm.to_f, MIN_FIELD].max
+        cuts[index] = { 'size' => sz, 'locked' => truthy(locked) && !sz.nil? }
+        true
+      end
+
       def set_shelves!(tree, path, n)
         node = navigate(tree, path)
         return false unless node
@@ -83,7 +114,6 @@ module Noxun
         true
       end
 
-      # Vycisti zonu: zrusi delenie aj moduly celeho podstromu -> prazdny list.
       def clear_zone!(tree, path)
         node = navigate(tree, path)
         return false unless node
@@ -95,7 +125,7 @@ module Noxun
 
       # --- vypocet geometrie ---------------------------------------------------
 
-      # tree: struktÚrny strom; box: { x0,x1,y0,y1,z0,z1 } vnutro korpusu (mm); t: hrubka; cabinet_id.
+      # tree: strukturny strom; box: { x0,x1,y0,y1,z0,z1 } vnutro korpusu (mm); t: hrubka; cabinet_id.
       # Vrati: { zones:[ploche objekty s geometriou], dividers:[deskriptory], shelves:[deskriptory] }.
       def compute(tree, box, t, cabinet_id)
         acc = { zones: [], dividers: [], shelves: [] }
@@ -121,8 +151,8 @@ module Noxun
           acc[:zones] << zobj
           add_shelves(node['shelves'].to_i, box, t, suffix_path, acc) if node['shelves'].to_i.positive?
         else
-          child_boxes, divs, ats = split_boxes(split['axis'], split['count'], box, t, suffix_path)
-          zobj[:split] = { axis: split['axis'], count: split['count'], at: ats }
+          child_boxes, divs, fields = split_boxes(split, box, t, suffix_path)
+          zobj[:split] = { axis: split['axis'], count: split['count'], fields: fields }
           acc[:zones] << zobj
           acc[:dividers].concat(divs)
           child_boxes.each_with_index do |cb, i|
@@ -131,38 +161,81 @@ module Noxun
         end
       end
 
-      # Rozdelenie boxu na 'count' stlpcov ('v') / riadkov ('h') s (count-1) prieckami hrubky t.
-      # Vrati [child_boxes, divider_deskriptory, at_pozicie].
-      def split_boxes(axis, count, box, t, suffix_path)
-        boxes = []
-        divs = []
-        ats = []
+      # Rozdelenie boxu podla poli (split['cuts']) s (count-1) prieckami hrubky t.
+      # Vrati [child_boxes, divider_deskriptory, fields_info(pre nahlad)].
+      def split_boxes(split, box, t, suffix_path)
+        axis = split['axis']; count = split['count']
+        span = axis == 'v' ? (box[:x1] - box[:x0]) : (box[:z1] - box[:z0])
+        sizes = resolve_fields(split['cuts'], count, span, t)
+        boxes = []; divs = []; fields = []
         if axis == 'v'
-          col_w = (box[:x1] - box[:x0] - (count - 1) * t) / count.to_f
           x = box[:x0]
           count.times do |c|
-            boxes << box.merge(x0: x, x1: x + col_w)
-            x += col_w
+            w = sizes[c]
+            boxes << box.merge(x0: x, x1: x + w)
+            fields << field_info(split['cuts'][c], w)
+            x += w
             if c < count - 1
               divs << divider_desc('v', x, box, t, suffix_path, c + 1)
-              ats << r2(x)
               x += t
             end
           end
         else
-          row_h = (box[:z1] - box[:z0] - (count - 1) * t) / count.to_f
           z = box[:z0]
           count.times do |r|
-            boxes << box.merge(z0: z, z1: z + row_h)
-            z += row_h
+            hh = sizes[r]
+            boxes << box.merge(z0: z, z1: z + hh)
+            fields << field_info(split['cuts'][r], hh)
+            z += hh
             if r < count - 1
               divs << divider_desc('h', z, box, t, suffix_path, r + 1)
-              ats << r2(z)
               z += t
             end
           end
         end
-        [boxes, divs, ats]
+        [boxes, divs, fields]
+      end
+
+      # Rozlozi svetly priestor (span - (count-1)*t) medzi `count` poli:
+      #   locked pole -> drzi svoju size (clamp na dostupne);
+      #   nezamknute -> rozdelia zvysok PROPORCNE podla svojich size (nil size = rovnomerny podiel).
+      def resolve_fields(cuts, count, span, t)
+        clear = span - (count - 1) * t
+        clear = 0.0 if clear.negative?
+        cuts = sanitize_cuts(cuts, count)
+
+        locked_sum = 0.0
+        cuts.each { |c| locked_sum += clamp_field(c['size'], clear) if c['locked'] && c['size'] }
+        free = clear - locked_sum
+        free = 0.0 if free.negative?
+
+        unlocked = cuts.each_index.reject { |i| cuts[i]['locked'] && cuts[i]['size'] }
+        known = unlocked.map { |i| cuts[i]['size'] }.compact
+        avg = known.empty? ? (free / [unlocked.size, 1].max) : (known.reduce(0.0, :+) / known.size)
+        weight_sum = unlocked.reduce(0.0) { |s, i| s + (cuts[i]['size'] || avg) }
+        weight_sum = 1.0 if weight_sum <= 0
+
+        sizes = Array.new(count, 0.0)
+        cuts.each_index do |i|
+          if cuts[i]['locked'] && cuts[i]['size']
+            sizes[i] = clamp_field(cuts[i]['size'], clear)
+          else
+            w = cuts[i]['size'] || avg
+            sizes[i] = free * (w / weight_sum)
+          end
+        end
+        sizes
+      end
+
+      def clamp_field(size, clear)
+        s = size.to_f
+        s = MIN_FIELD if s < MIN_FIELD
+        s = clear if s > clear && clear.positive?
+        s
+      end
+
+      def field_info(cut, resolved)
+        { size: r2(resolved), locked: !!(cut && cut['locked']), set: !(cut && cut['size'].nil?) }
       end
 
       # Priecka = dielec korpusu (manufactured, sheet). Plna hlbka/vyska zony.
@@ -199,6 +272,10 @@ module Noxun
             prod: { length: r2(w), width: r2(sd), thickness: r2(t) }
           }
         end
+      end
+
+      def truthy(v)
+        %w[true 1 yes].include?(v.to_s.downcase)
       end
 
       def r2(v)
