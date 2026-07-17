@@ -51,6 +51,11 @@ module Noxun
     module BuildPlan
       SCHEMA = 1
 
+      # Najmensi vyrobitelny rozmer (mm). JEDINY prah degenerovanosti v systeme:
+      # plan (partition v Construction.build_plan) aj builder (positive_box?) ho zdielaju —
+      # rozne epsilony by vytvorili pasmo, kde plan dielec deklaruje a builder ho preskoci.
+      MIN_DIM = 0.01
+
       # Slovnik roli dielcov (standard 2.4) — validator odmietne nezname roly.
       ROLES = %w[
         side_left side_right bottom top back shelf divider_v divider_h

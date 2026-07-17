@@ -148,6 +148,32 @@ NxTest.test('build_plan: merge_final prenasa plan_schema + warnings + hardware d
   NxTest.assert_equal([], persisted[:hardware])
 end
 
+NxTest.test('build_plan: degenerovany dielec (rozmer <= MIN_DIM) vypadne z planu s warningom, bez raise') do
+  # Scenar z adversarialnej revizie: nezamknute polia s extremnym pomerom sizes —
+  # resolve_fields prideli polu ~0.002 mm, polica v nom by mala nekladny vyrobny rozmer.
+  # Kontrakt: dielec sa vyradi UZ v plane (part_skipped_degenerate), validator nepadne
+  # a prah je zhodny s builderom (BuildPlan::MIN_DIM) — ziadne pasmo tichych preskoceni.
+  tree = {
+    'id' => 'Z1', 'generation' => 1,
+    'split' => { 'axis' => 'v', 'count' => 2,
+                 'cuts' => [{ 'size' => 0.002, 'locked' => false }, { 'size' => 600.0, 'locked' => false }] },
+    'shelves' => 0,
+    'children' => [
+      { 'id' => 'Ztiny', 'generation' => 0, 'split' => nil, 'shelves' => 1, 'children' => [] },
+      { 'id' => 'Zbig', 'generation' => 0, 'split' => nil, 'shelves' => 0, 'children' => [] }
+    ]
+  }
+  cfg = Noxun::Engine::CabinetBuilder.normalize('zone_tree' => tree)
+  plan = Noxun::Engine::Construction.build_plan(cfg, 'CAB-001')
+  NxTest.assert_equal(Noxun::Engine::BuildPlan::SCHEMA, plan[:schema], 'plan musi prejst validatorom bez raise')
+  w = plan[:warnings].find { |x| x['code'] == 'part_skipped_degenerate' }
+  NxTest.assert(!w.nil?, "cakal som part_skipped_degenerate, warnings: #{plan[:warnings].inspect}")
+  tiny_shelf = plan[:parts].find { |pd| pd[:part_key] == 'zone:Ztiny/shelf:1' }
+  NxTest.assert(tiny_shelf.nil?, 'degenerovana polica nesmie byt v parts (kusovnik = geometria)')
+  NxTest.assert(plan[:parts].all? { |pd| pd[:box].all? { |v| v > Noxun::Engine::BuildPlan::MIN_DIM } },
+                'vsetky dielce v plane su nad prahom MIN_DIM')
+end
+
 NxTest.test('build_plan: kazdy plan z matrixu variantov prejde validatorom') do
   %w[under_sides between_sides].each do |bm|
     %w[full two_rails none].each do |tm|

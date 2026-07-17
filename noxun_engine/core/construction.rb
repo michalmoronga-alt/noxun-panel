@@ -49,10 +49,12 @@ module Noxun
         fr = Fronts.layout(cfg[:fronts], w, h, cfg[:floor_height], t)
         parts.concat(fr[:parts])
 
-        # Kontrakt: parts = realne postavitelne dielce. Degenerovane (nekladny box)
+        # Kontrakt: parts = realne postavitelne dielce. Degenerovane (rozmer <= MIN_DIM)
         # sa vyradia UZ TU s warningom — kusovnik/VEPO nikdy neuvidia dielec,
         # ktory builder nepostavi (predtym ich ticho preskakoval az positive_box?).
-        parts, degenerate = parts.partition { |pd| pd[:box].all? { |v| v.to_f > 0 } }
+        # Prah MUSI byt zhodny s builderom (BuildPlan::MIN_DIM) — inak vznikne pasmo,
+        # kde plan dielec deklaruje a builder ho preskoci.
+        parts, degenerate = parts.partition { |pd| pd[:box].all? { |v| v.to_f > BuildPlan::MIN_DIM } }
         degenerate.each do |pd|
           warnings << BuildPlan.warning('part_skipped_degenerate',
                                         "Dielec #{pd[:name]} (#{pd[:suffix]}) ma nekladny rozmer — preskoceny.",

@@ -369,8 +369,10 @@ module Noxun
           out
         end
 
+        # Belt-and-braces guard — degenerovane dielce filtruje uz plan (rovnaky prah
+        # BuildPlan::MIN_DIM), sem sa dostat nemaju.
         def positive_box?(box)
-          box && box.all? { |v| v.to_f > 0.01 }
+          box && box.all? { |v| v.to_f > BuildPlan::MIN_DIM }
         end
 
         # Tag (layer) dielca podla roly — zabezpeci jeho existenciu. Hromadne hide v Tags paneli.
