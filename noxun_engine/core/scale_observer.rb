@@ -166,12 +166,16 @@ module Noxun
           added_models = added.values.select { |i| i && i.valid? }.map(&:model).compact.uniq
 
           touched_models.each do |mdl|
-            CabinetBuilder.dedup_copies(mdl) if defined?(CabinetBuilder)
+            # Transparentny dedup LEN ked v tomto ticku realne pribudla kopia (onElementAdded) —
+            # vtedy je predchadzajuca operacia jej paste/move a 1x undo vrati kopiu celu.
+            # Iny trigger (move existujuceho, prune) = samostatny undo krok (Codex review PR #21).
+            fresh_copy = added_models.include?(mdl)
+            CabinetBuilder.dedup_copies(mdl, transparent: fresh_copy) if defined?(CabinetBuilder)
             # Kopie zachytene cez onElementAdded nemaju vlastny per-instancny EntityObserver
             # (kopia ho nededi). Po dedupe (novy cabinet_id + ghosty cez rebuild->sync_ghost)
             # im observer pripojime, aby ich buduci move/scale spustil ghost sync.
             # attach_all je idempotentne.
-            attach_all(mdl) if added_models.include?(mdl)
+            attach_all(mdl) if fresh_copy
           end
 
           dirty.each_value do |inst|
@@ -265,8 +269,20 @@ module Noxun
           params['depth']  = new_d
 
           clean = clean_transform(inst.transformation)
+          # V0.3.4 undo fix (runner S1): TRANSPARENTNA operacia — absorpcia sa pripoji
+          # k pouzivatelovmu Scale kroku. 1x undo vrati scale AJ absorpciu naraz (predtym
+          # undo vratil len absorpciu, observer videl scaled transform a absorboval znova
+          # — undo "bojoval" s pouzivatelom).
+          # ZNAMY okrajovy race (Codex review PR #21): debounce bezi 0.2 s — ak pouzivatel
+          # stihne MEDZITYM commitnut inu operaciu, absorpcia sa prilepi na nu (API nevie
+          # nahliadnut do undo stacku). Dosledok pri undo tej operacie: vrati sa aj absorpcia,
+          # observer scaled stav zdetekuje a znova absorbuje TRANSPARENTNE k povodnemu Scale
+          # — system konverguje do spravneho zlucenia sam; obetou je redo historia daneho kroku.
+          # Vedome akceptovane: okno 0.2 s, zriedkave; netransparentna alternativa = trvalo
+          # rozbite undo po scale (povodny stav pred fixom).
           CabinetBuilder.rebuild(model, inst, params,
-                                 transform: clean, op_name: 'Noxun: prepočet po zmene veľkosti')
+                                 transform: clean, op_name: 'Noxun: prepočet po zmene veľkosti',
+                                 transparent: true)
           remember_transform(inst)
 
           Engine.log("scale absorb #{cid}: #{base_w.round}x#{base_h.round}x#{base_d.round} -> " \
