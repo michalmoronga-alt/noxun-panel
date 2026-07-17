@@ -6,7 +6,6 @@
   var currentZoneTree = null;   // strukturny strom zon (nový vklad aj oznaceny)
   var previewMode = 'zones';
   var applyTimer = null;
-  var lastZones = null;         // ploche zony z backendu (oznaceny korpus)
   var frontItems = null;        // rozlozene cela z backendu
   var PALETTE = ['#46beff','#6eff96','#ffaf50','#dc78ff','#ffeb5a'];
   // V0.3 materialy + ABS
@@ -89,4 +88,27 @@
   function setNum(id, v){ var e = el(id); if (e && v !== null && v !== undefined) e.value = String(parseFloat(v)); }
   function getType(){ var r = document.querySelector('input[name=ctype]:checked'); return r ? r.value : 'lower'; }
   function setType(t){ var r = document.querySelector('input[name=ctype][value="' + t + '"]'); if (r) r.checked = true; }
+
+  // JEDINY zoznam konstrukcnych poli panela (predtym duplikovany na 6 miestach:
+  // collectConstruction, setDefaults, onTemplateChange, NX.loadSelected + 2x Ruby whitelist).
+  // Nove pole (napr. kovanie) = pridat TU + <input>/<select> v HTML + kluc v Ruby PARAM_KEYS.
+  // kind: 'num' (setNum) / 'sel' (setVal); dflt = fallback pri prazdnej/falsy hodnote zdroja.
+  var CONSTRUCTION_FIELDS = [
+    { id:'width', kind:'num' }, { id:'height', kind:'num' }, { id:'depth', kind:'num' },
+    { id:'thickness', kind:'num' }, { id:'floor_height', kind:'num' },
+    { id:'bottom_mode', kind:'sel' }, { id:'top_mode', kind:'sel' },
+    { id:'back_mode', kind:'sel' }, { id:'back_thickness', kind:'num', dflt:3 },
+    { id:'plinth_mode', kind:'sel' }, { id:'plinth_recess', kind:'num' },
+    { id:'rails_orientation', kind:'sel' }, { id:'rails_top_offset', kind:'num' }, { id:'rail_depth', kind:'num' }
+  ];
+  // Zapise hodnoty zdroja (defaulty / sablona / oznaceny korpus) do formulara.
+  // Prazdne hodnoty ostavaju nedotknute (ako povodne setNum/setVal), dflt zrkadli povodne "|| 3".
+  function writeConstruction(src){
+    src = src || {};
+    CONSTRUCTION_FIELDS.forEach(function(f){
+      var v = src[f.id];
+      if (f.dflt !== undefined && !v) v = f.dflt;
+      if (f.kind === 'num') setNum(f.id, v); else setVal(f.id, v);
+    });
+  }
 

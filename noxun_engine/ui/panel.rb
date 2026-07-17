@@ -1,5 +1,6 @@
 # frozen_string_literal: true
-# Noxun Engine — panel (HtmlDialog controller + SelectionObserver). V0.2b.
+# Noxun Engine — panel (HtmlDialog controller), V0.3.4 split: logika v ui/panel/*.
+# Tento subor: konstanty, otvorenie dialogu, CENTRALNY zoznam callbackov, cb wrapper.
 # Referencia dialogu v modulovej premennej (GC); callbacky pred show;
 # Ruby->JS len cez to_json; v callbackoch 'next' (nie 'return'); begin/rescue s logom.
 require 'json'

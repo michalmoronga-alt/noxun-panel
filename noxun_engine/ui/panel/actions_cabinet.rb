@@ -5,6 +5,12 @@
 module Noxun
   module Engine
     module Panel
+      # JEDINY whitelist konstrukcnych klucov z panela (JS zrkadlo: CONSTRUCTION_FIELDS v core.js).
+      # Nove pole (napr. kovanie) = pridat TU + do CONSTRUCTION_FIELDS + <input> v HTML.
+      PARAM_KEYS = %w[type width height depth thickness floor_height bottom_mode top_mode back_mode
+                      back_thickness plinth_mode plinth_recess rail_depth rails_orientation
+                      rails_top_offset name].freeze
+
       class << self
         def handle_insert(payload)
           model = Sketchup.active_model
@@ -24,9 +30,7 @@ module Noxun
 
           data = parse(payload)
           params = existing_params(cab)
-          %w[type width height depth thickness floor_height bottom_mode top_mode back_mode
-             back_thickness plinth_mode plinth_recess rail_depth rails_orientation
-             rails_top_offset name].each do |k|
+          PARAM_KEYS.each do |k|
             params[k] = data[k] if data.key?(k)
           end
           CabinetBuilder.rebuild(model, cab, params)
@@ -55,9 +59,7 @@ module Noxun
 
           data = parse(payload)
           params = existing_params(cab)
-          %w[type width height depth thickness floor_height bottom_mode top_mode back_mode
-             back_thickness plinth_mode plinth_recess rail_depth rails_orientation
-             rails_top_offset name].each do |k|
+          PARAM_KEYS.each do |k|
             params[k] = data[k] if data.key?(k)
           end
           params['fronts'] = data['fronts'] if data.key?('fronts')

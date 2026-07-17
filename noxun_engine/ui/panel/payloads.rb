@@ -21,11 +21,6 @@ module Noxun
           params
         end
 
-        def selected_payload(model)
-          cab = find_cabinet(model)
-          cab ? cabinet_payload(cab) : nil
-        end
-
         # existujuce params korpusu (na zachovanie casti pri ciastocnej zmene)
         def existing_params(cab)
           CabinetBuilder.config_to_params(Store.config(cab) || {})

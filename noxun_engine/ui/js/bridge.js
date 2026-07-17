@@ -4,6 +4,7 @@
       DEFAULTS = data.defaults || { lower: {}, upper: {} };
       TEMPLATES = data.templates || [];
       MATERIALS = data.materials || { sheets: [], edges: [] };
+      if (data.version) el('verline').textContent = 'V' + data.version; // verzia z Ruby (jediny zdroj)
       refreshMaterialFilters();
       setProjectMaterials(data.project_materials || {});
       el('zonesChk').checked = !!data.zones_visible;
@@ -14,16 +15,10 @@
     loadSelected: function(c){
       var t = c.type || 'lower';
       setType(t);
-      setNum('width', c.width); setNum('height', c.height); setNum('depth', c.depth); setNum('thickness', c.thickness);
-      setNum('floor_height', c.floor_height);
-      setVal('bottom_mode', c.bottom_mode); setVal('top_mode', c.top_mode); setVal('back_mode', c.back_mode);
-      setNum('back_thickness', c.back_thickness || 3);
-      setVal('plinth_mode', c.plinth_mode); setNum('plinth_recess', c.plinth_recess);
-      setVal('rails_orientation', c.rails_orientation); setNum('rails_top_offset', c.rails_top_offset); setNum('rail_depth', c.rail_depth);
+      writeConstruction(c);
       applyVisibility(t);
       renderFronts(c.fronts);
       currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();
-      lastZones = c.zones || [];
       frontItems = c.front_items || [];
       activeZoneId = c.active_zone || null;
       setSelected(c.cabinet_id || null);
@@ -42,7 +37,7 @@
     clearSelected: function(){
       el('selinfo').textContent = 'Nič nie je označené (náhľad z hodnôt panela).';
       setSelected(null);
-      activeZoneId = null; lastZones = null; frontItems = null;
+      activeZoneId = null; frontItems = null;
       renderPartCard(null);      // schovaj kartu dielca
       clearCabinetMaterials();   // korpusove material selecty na "dedi" + disabled
       refreshZoneUI(); renderPreview();

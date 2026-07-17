@@ -11,6 +11,7 @@ module Noxun
           model = Sketchup.active_model
           cab = find_cabinet(model)
           data = {
+            version: Engine::VERSION, # UI zobrazuje verziu odtialto — ziadny hardcode v HTML
             defaults: {
               lower: CabinetBuilder::LOWER_DEFAULTS,
               upper: CabinetBuilder::UPPER_DEFAULTS
