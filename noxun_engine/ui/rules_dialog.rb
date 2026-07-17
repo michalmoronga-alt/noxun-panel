@@ -82,16 +82,32 @@ module Noxun
         # --- Ruby -> JS -----------------------------------------------------
 
         # Stav pre formular: projektove pravidla (ak su), inak globalne.
+        # Zapamata si BASELINE (model + nacitane pravidla) — handle_save ju overi,
+        # aby dialog otvoreny nad inym/zmenenym modelom nic ticho neprepisal.
         def push_state
           model = Sketchup.active_model
           project = HardwareRules.project_rules(model)
+          rules = project || HardwareRules.load
+          @baseline_path  = model ? model.path.to_s : ''
+          @baseline_rules = rules
           data = {
             version: Engine::VERSION,
-            rules: project || HardwareRules.load,
+            rules: rules,
             source: project ? 'project' : 'global',
             cabinets: cabinets(model).size
           }
           js("RD.init(#{data.to_json})")
+        end
+
+        # Formular je platny len pre model, z ktoreho bol naplneny (Codex review PR #25,
+        # P1): HtmlDialog prezije File > New/Open — Save nad inym modelom by ticho
+        # prepisal jeho snapshot. Kontrola = cesta modelu + ZHODA aktualnych pravidiel
+        # modelu s baseline (chyti aj novy Untitled, undo zmeny snapshotu a subezne
+        # zmeny) — pri nezhode sa formular nacita nanovo a nic sa nezapise.
+        def baseline_valid?(model)
+          return false if (model ? model.path.to_s : '') != @baseline_path.to_s
+          current = HardwareRules.project_rules(model) || HardwareRules.load
+          current == @baseline_rules
         end
 
         def push_global
@@ -115,6 +131,10 @@ module Noxun
         # Ulozi pravidla do projektu + prestavia vsetky korpusy (1 undo krok).
         def handle_save(payload)
           model = Sketchup.active_model
+          unless baseline_valid?(model)
+            push_state
+            return set_status('Aktívny model/pravidlá sa medzitým zmenili — formulár je načítaný nanovo. Skontroluj a ulož znova.', true)
+          end
           data = JSON.parse(payload.to_s)
           rules = HardwareRules.normalize_rules(data['rules'])
           return set_status('Žiadne platné pravidlá — nič sa neuložilo.', true) if rules.empty?

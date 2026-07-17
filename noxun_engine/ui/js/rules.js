@@ -68,21 +68,27 @@
   }
 
   function ruleNode(node){ return node.closest('.rrule'); }
-  function ruleOf(node){ return RULES[parseInt(ruleNode(node).dataset.i, 10)]; }
+
+  // Pred KAZDYM re-renderom prevezmi CELY formular do RULES — inak by pridanie/
+  // odobratie pasma zahodilo rozeditovane hodnoty ostatnych pravidiel (pocty,
+  // checkboxy, series/rezervu) este pred Ulozit (Codex review PR #25).
+  function syncFromForm(){ RULES = collectRules(); }
 
   function addBand(btn){
-    var r = ruleOf(btn);
-    r.bands = collectBands(ruleNode(btn)); // najprv prevezmi rozeditovane hodnoty
+    var i = parseInt(ruleNode(btn).dataset.i, 10);
+    syncFromForm();
+    var r = RULES[i];
     // nove pasmo pred "vsetko nad": max = posledny konkretny max + 500 (orientacne)
-    var maxes = r.bands.filter(function(b){ return b.max != null; }).map(function(b){ return b.max; });
+    var maxes = (r.bands || []).filter(function(b){ return b.max != null; }).map(function(b){ return b.max; });
     var nm = maxes.length ? Math.max.apply(null, maxes) + 500 : 900;
     r.bands.splice(Math.max(r.bands.length - 1, 0), 0, { max: nm, quantity: 1 });
     renderRules();
   }
   function delBand(btn){
-    var r = ruleOf(btn);
-    r.bands = collectBands(ruleNode(btn));
-    r.bands.splice(parseInt(btn.closest('.rband').dataset.bi, 10), 1);
+    var i = parseInt(ruleNode(btn).dataset.i, 10);
+    var bi = parseInt(btn.closest('.rband').dataset.bi, 10);
+    syncFromForm();
+    RULES[i].bands.splice(bi, 1);
     renderRules();
   }
   function collectBands(ruleEl){
