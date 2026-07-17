@@ -1,0 +1,15 @@
+# tests — headless sada (ruby tests/run_all.rb) na kazdy push a PR.
+name: tests
+
+on: [push, pull_request]
+
+jobs:
+  pure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+      - name: Headless testy (bez SketchUpu)
+        run: ruby tests/run_all.rb
