@@ -1,4 +1,4 @@
-# Noxun Engine — roadmapa (živý dokument, aktualizované 15.7.2026)
+# Noxun Engine — roadmapa (živý dokument, aktualizované 17.7.2026)
 
 > Princíp: **najprv všeobecný základ pre všetko, potom vyostrovanie.** Regenerate pattern robí konštrukčné zmeny lacnými — drahé je len meniť DÁTOVÝ MODEL (atribúty, identita, hrany), preto ten je uzamknutý štandardom vopred a detaily geometrie sa doladia iteráciami z klikania.
 
@@ -7,8 +7,9 @@
 - ✅ **V0.1 — Klikateľný základ** (hotové 15.7.): panel, dolný korpus (Ruby regenerácia), police 0–4, dvierka 1/2/auto, ghost zóny, rebuild označeného, 1-krok Undo
 - ✅ **V0.2a — Jadro korpusu** (hotové 16.7.): scale→automatická prestavba (celé mm, čistá transformácia, funguje aj na rotovanom) · konštrukčné varianty: dno pod bokmi (EU default) vs. medzi bokmi, vrch plný/2 výstuhy (orientácia flat/upright + offset — drezová/varná)/žiadny, chrbát naložený/vložený/drážka, sokel žiadny(nohy)/predný · **horná skrinka** (Z=1400) · spätná kompatibilita V0.1 · 18/18 kombinácií otestovaných
 - ✅ **V0.2b — Členenie, čelá, šablóny** (hotové 16.7., v0.2.1): strom zón s klikateľnými ghost boxmi + priečky divider_v/h (rekurzívne, reálne dielce) · police = modul v zóne · čelá odspodu s fixed/auto + 🔒 locky, zásuvkové čelá, konverzia starých · šablóny (4 preddefinované + vlastné, %APPDATA% + .bak) · hrúbka chrbta HDF 3/pevný 18 · panel: základné/pokročilé skladacie sekcie
-- 🔨 **V0.2c — UX panela a zón + opravy** (beží 16.7.): BUG teleport skrinky pri zmene z výberu v modeli · ghost zóny na 1 klik (top-level, bez dvojkliku do komponentu) · **2D náhľad skrinky v paneli** (čelný pohľad: klik na zónu, ťahanie priečok, presné rozmery + zámky — atypy) · auto-apply namiesto potvrdzovacích tlačidiel (rebuild je ms) · šablóny filtrované podľa typu korpusu · tagy dielov (Korpus/Čelá/Chrbát/Vnútro — hromadné hide) · scale handles len X/Y/Z (scaletool) · čitateľné názvy zón + zvýraznenie v modeli · panel per-dielec štruktúra (SYSTEM\06)
-- **V0.3 — Materiály a ABS (dáta)**: materiálový katalóg (rodina/variant, JSON) · dedenie projekt→skrinka→modul→dielec · ABS hrany per strana (L1/L2/W1/W2) s pravidlovými defaultmi podľa roly · tri stavy materiálu (zaradený/ignorovaný/nezaradený)
+- ✅ **V0.2c — UX panela a zón + opravy** (hotové 16.7., v0.2.2): oprava teleportu · ghost zóny na 1 klik · interaktívny 2D náhľad · auto-apply · filtrovanie šablón · tagy dielov · osové scale handles · čitateľné zóny
+- ✅ **V0.3 — Materiály a ABS (dáta)** (hotové 17.7., v0.3.0): materiálový katalóg (rodina/variant, JSON) · dedenie projekt→skrinka→dielec · ABS hrany L1/L2/W1/W2 s pravidlovými defaultmi podľa roly · per-dielec editor
+- ✅ **V0.3.1 — stabilizácia dát** (hotové 17.7.): zhoda katalógovej a geometrickej hrúbky · smer dekoru vo výrobných dátach · atomický projektový prepočet s jedným Undo · validácia zón/čiel · bezpečná migrácia starých podlimitných čiel · zrozumiteľné zobrazenie dedenia v karte dielca
 - **V0.4 — Kovanie fáza 1 (pravidlá a flagy)**: JSON pravidlá + editačný panel · generické flagy (pánty podľa hmotnosti čela — Blum tabuľky, výsuvy podľa hĺbky NL+3, nohy podľa šírky) · generický fyzický objekt na kategóriu
 - **V0.5 — Výstupy v0**: interný kusovník dielov · kusovník podľa materiálov (m²) · súpis ABS (bm) a kovania (ks) · celkový sumár · **VEPO CSV priamo** (podľa 03 kontraktu) · krížová validácia s OCL na reálnej zákazke · validačný semafor v0
 - **V0.6 — Kovanie fáza 2 (katalóg a ceny)**: prevzatie CatalogStore/search/Demos import z KOVANIE · mapovanie flagov na konkrétne kódy (pamätá sa) · ceny v sumári

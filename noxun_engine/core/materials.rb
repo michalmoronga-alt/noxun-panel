@@ -19,6 +19,7 @@ module Noxun
     module Materials
       STD  = 1
       FILE = 'materials.json'
+      SUPPORTED_EDGE_THICKNESSES = [1.0, 2.0].freeze
 
       # Projektove default kluce v NOXUN dict na modeli (koren dedenia projekt->korpus->dielec).
       PROJECT_KEYS = %w[default_material_id default_front_material_id default_back_material_id].freeze
@@ -59,7 +60,7 @@ module Noxun
       end
 
       def edges
-        load['edges']
+        load['edges'].select { |item| item.is_a?(Hash) && supported_edge_thickness?(item['thickness']) }
       end
 
       # Doskovy material podla material_id (alebo nil).
@@ -221,10 +222,12 @@ module Noxun
       def normalize_edge(a)
         id = (a['abs_id'] || a[:abs_id]).to_s
         return nil if id.strip.empty?
+        thickness = (a['thickness'] || a[:thickness]).to_f
+        return nil unless supported_edge_thickness?(thickness)
         {
           'abs_id'       => id,
           'decor'        => (a['decor'] || a[:decor]).to_s,
-          'thickness'    => (a['thickness'] || a[:thickness]).to_f,
+          'thickness'    => thickness,
           'price_per_bm' => (a['price_per_bm'] || a[:price_per_bm] || 0.0).to_f,
           'color'        => normalize_rgb(a['color'] || a[:color], [216, 196, 160])
         }
@@ -233,6 +236,29 @@ module Noxun
       def normalize_pair(v, dflt)
         return dflt unless v.is_a?(Array) && v.size == 2
         [v[0].to_f, v[1].to_f]
+      end
+
+      def supported_edge_thickness?(value)
+        th = value.to_f
+        SUPPORTED_EDGE_THICKNESSES.any? { |allowed| (allowed - th).abs < 0.05 }
+      end
+
+      # Stare 0,4 mm ID sa pri najblizsom rebuilde prevedie na 1 mm rovnakeho
+      # dekoru. Neznamy legacy identifikator zachovame, aby sme nestratili data.
+      def normalized_abs_id(id)
+        value = id.to_s.strip
+        return nil if value.empty?
+        raw = load['edges'].find { |item| item.is_a?(Hash) && item['abs_id'] == value }
+        return value unless raw
+        return value if supported_edge_thickness?(raw['thickness'])
+
+        if raw['thickness'].to_f < 1.0
+          replacement = edges.find do |item|
+            item['decor'] == raw['decor'] && (item['thickness'].to_f - 1.0).abs < 0.05
+          end
+          return replacement && replacement['abs_id']
+        end
+        nil
       end
 
       def normalize_rgb(v, dflt)
@@ -272,11 +298,9 @@ module Noxun
         ]
       end
 
-      # ABS pasky: K009 v 0.4/1.0/2.0; W1000 v 1.0.
+      # ABS pasky: podporujeme iba realne pouzivane hrubky 1.0 a 2.0 mm.
       def seed_edges
         [
-          { 'abs_id' => 'ABS_K009_04', 'decor' => 'K009 PW', 'thickness' => 0.4,
-            'price_per_bm' => 0.35, 'color' => [198, 168, 122] },
           { 'abs_id' => 'ABS_K009_10', 'decor' => 'K009 PW', 'thickness' => 1.0,
             'price_per_bm' => 0.55, 'color' => [198, 168, 122] },
           { 'abs_id' => 'ABS_K009_20', 'decor' => 'K009 PW', 'thickness' => 2.0,

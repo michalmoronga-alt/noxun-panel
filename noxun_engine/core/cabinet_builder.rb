@@ -42,6 +42,7 @@ module Noxun
       # DC scaletool bitova maska pre osove scale uchopy (X/Y/Z). Michal potvrdi vizualne;
       # ak by mala byt opacna semantika (skryt plosne+rohove), alternativa je 120.
       SCALE_TOOL_MASK = 7
+      FRONT_VALIDATION_VERSION = '0.3.1'
 
       # Tagy dielov (V0.2c) — hromadne hide cez nativny Tags panel. Default = Noxun/Korpus.
       PART_TAGS = {
@@ -108,20 +109,55 @@ module Noxun
             begin
               # Ak je definicia zdielana (kopia korpusu), osamostatni ju — inak by clear!/build
               # prepisal aj original. Standard 9.3: kopia sa da upravit nezavisle od originalu.
-              inst.make_unique if inst.definition.instances.size > 1
-              cdef = inst.definition
-              cdef.entities.clear!
-              final = build_into(model, cdef, cfg, cid)
-              inst.transformation = transform if transform
-              write_cabinet_attrs(inst, cid, final)
-              apply_scale_lock(inst)
-              Zones.sync_ghost(model, inst) if defined?(Zones)
+              rebuild_in_operation(model, inst, cfg, transform: transform)
               model.commit_operation
             rescue StandardError => e
               abort_safely(model)
               raise e
             end
           end
+          inst
+        end
+
+        # Prestavi viac korpusov v JEDNEJ SketchUp operacii. Volitelny blok sa
+        # vykona v tej istej operacii pred rebuildami (napr. zapis projektoveho
+        # defaultu), takze chyba vrati naspat aj data aj geometriu.
+        def rebuild_many(model, items, op_name: 'NOXUN: Hromadny prepocet')
+          prepared = Array(items).map do |entry|
+            inst, params = entry
+            cid = Store.get(inst, 'cabinet_id')
+            raise 'Jedna z instancii nie je NOXUN korpus.' if cid.nil?
+            [inst, normalize(params)]
+          end
+
+          ensure_root_context(model)
+          guarded do
+            model.start_operation(op_name, true)
+            begin
+              yield if block_given?
+              prepared.each { |inst, cfg| rebuild_in_operation(model, inst, cfg) }
+              model.commit_operation
+            rescue StandardError => e
+              abort_safely(model)
+              raise e
+            end
+          end
+          prepared.map(&:first)
+        end
+
+        # Vnutorna cast rebuildu; volajuci uz musi mat otvorenu operaciu a guard.
+        def rebuild_in_operation(model, inst, cfg, transform: nil)
+          cid = Store.get(inst, 'cabinet_id')
+          raise 'Vybrana instancia nie je NOXUN korpus.' if cid.nil?
+
+          inst.make_unique if inst.definition.instances.size > 1
+          cdef = inst.definition
+          cdef.entities.clear!
+          final = build_into(model, cdef, cfg, cid)
+          inst.transformation = transform if transform
+          write_cabinet_attrs(inst, cid, final)
+          apply_scale_lock(inst)
+          Zones.sync_ghost(model, inst) if defined?(Zones)
           inst
         end
 
@@ -209,27 +245,29 @@ module Noxun
           mat_id = present(ov['material_id']) || base_mat
           # Jeden lookup doskoveho materialu — pouzity na dekor (ABS) aj hrubkovu kontrolu (V0.3 FIX 2).
           sheet = (defined?(Materials) && mat_id) ? Materials.sheet(mat_id) : nil
-          warn_thickness_mismatch(mat_id, sheet, pd)
+          validate_material_thickness!(mat_id, sheet, pd)
           decor = sheet && sheet['decor']
           base_edges = defined?(AbsRules) ? AbsRules.resolve_edges(pd[:role], decor) : empty_edges
           edges = base_edges.merge(known_edges(ov['edges']))
-          { role_key: role_key, material_id: mat_id, edges: edges }
+          grain = sheet && sheet['grain'].to_s
+          grain = 'none' unless %w[length width none].include?(grain)
+          { role_key: role_key, material_id: mat_id, edges: edges,
+            grain_direction: grain, sheet_thickness: (sheet && sheet['thickness']) }
         end
 
-        # V0.3 FIX 2: hrubkova kompatibilita materialu a dielca. Ak katalogovy material dielca ma inu
-        # hrubku nez dielec, zaloguj warning — ale material do configu zapiseme AJ TAK (data NEblokujeme,
-        # nech ho validacia V0.5 najde). UI cesta nesulad uz nedovoli (thickness-filtrovane selecty).
-        # Material mimo katalogu (legacy) sa tu nekontroluje (sheet == nil).
-        def warn_thickness_mismatch(mat_id, sheet, pd)
-          return unless mat_id && sheet && defined?(Engine)
+        # Katalogovy material s nespravnou hrubkou nesmie vytvorit rozpor medzi
+        # geometriou a vyrobnymi datami. Legacy material mimo katalogu ponechavame.
+        # Cela su specialny pripad: povolene varianty 18/19 mm upravia aj geometriu.
+        def validate_material_thickness!(mat_id, sheet, pd)
+          return unless mat_id && sheet
           want = pd[:prod][:thickness].to_f
           have = sheet['thickness'].to_f
           return if thickness_ok_for?(pd[:role], want, have)
-          Engine.log("Nesulad hrubky materialu #{mat_id} (#{have} mm) vs dielca #{pd[:suffix]} (#{want} mm)")
+          raise "Material #{mat_id} ma #{have.round(2)} mm, ale dielec #{pd[:suffix]} potrebuje #{want.round(2)} mm."
         end
 
-        # Hrubkova kompatibilita (zhoduje sa s UI filtrom selectov): cela (front) beru dosky 18 aj 19 mm
-        # (dielec cela je modelovany na FRONT_THICKNESS 19, ale bezne cela su 18) — inak presna hrubka dielca.
+        # Cela beru katalogove varianty 18 aj 19 mm; ich geometria sa prisposobi.
+        # Ostatne dielce vyzaduju presnu zhodu s konstrukcnou hrubkou.
         def thickness_ok_for?(role, want, have)
           case role.to_s
           when 'front_door', 'drawer_front'
@@ -265,8 +303,9 @@ module Noxun
 
         # Jeden dielec = vlastny komponent s NOXUN dict. Recyklacia definicie podla mena
         # (mena su per-korpus unikatne — obsahuju cid), aby rebuild neprodukoval osirotene definicie.
-        # resolved: { role_key:, material_id:, edges: } — vyrieseny material + ABS (viz resolve_part).
+        # resolved: material, ABS, smer dekoru a katalogova hrubka (viz resolve_part).
         def add_part(model, parent_ents, pd, resolved, cid, tid)
+          pd = materialized_part(pd, resolved)
           dname = "NOXUN #{cid} #{pd[:suffix]}"
           pdef = model.definitions[dname] || model.definitions.add(dname)
           pdef.entities.clear!
@@ -287,11 +326,28 @@ module Noxun
             config: {
               length: pd[:prod][:length].round(2), width: pd[:prod][:width].round(2),
               thickness: pd[:prod][:thickness].round(2), quantity: 1,
-              material_id: resolved[:material_id], grain_direction: 'none',
+              material_id: resolved[:material_id], grain_direction: resolved[:grain_direction] || 'none',
               edges: resolved[:edges]
             }
           })
           inst
+        end
+
+        # Cela maju hrubku v osi Y. Ak katalog hovori 18/19 mm, upravime box,
+        # polohu pred korpusom aj vyrobny udaj naraz.
+        def materialized_part(pd, resolved)
+          return pd unless %w[front_door drawer_front].include?(pd[:role].to_s)
+          th = resolved[:sheet_thickness].to_f
+          return pd unless th.positive?
+
+          out = pd.dup
+          out[:box] = pd[:box].dup
+          out[:origin] = pd[:origin].dup
+          out[:prod] = pd[:prod].dup
+          out[:box][1] = th
+          out[:origin][1] = -th
+          out[:prod][:thickness] = th
+          out
         end
 
         # SketchUp vizualny material z katalogu (Materials). Fallback ak katalog nedostupny.
@@ -350,6 +406,7 @@ module Noxun
 
         def cabinet_config(cfg)
           {
+            engine_version: Engine::VERSION,
             type: cfg[:type],
             name: cfg[:name] || default_name(cfg),
             construction_preset: cfg[:type] == 'upper' ? 'noxun-upper-18' : 'noxun-lower-18',
@@ -476,7 +533,9 @@ module Noxun
               %w[L1 L2 W1 W2].each do |k|
                 next unless edges.key?(k) || edges.key?(k.to_sym)
                 v = edges.key?(k) ? edges[k] : edges[k.to_sym]
-                e[k] = present(v) # nil (bez ABS) alebo abs_id
+                v = present(v)
+                v = Materials.normalized_abs_id(v) if v && defined?(Materials)
+                e[k] = v # nil (bez ABS) alebo podporovane abs_id
               end
               rec['edges'] = e unless e.empty?
             end
@@ -494,7 +553,7 @@ module Noxun
         end
 
         # Config (stored, string kluce) -> params pre normalize. Doplna spatnu kompatibilitu:
-        # stare V0.1/V0.2a configy (bez zone_tree, fronts ako string, shelves top-level).
+        # stare configy (bez zone_tree, fronts ako string, shelves top-level).
         def config_to_params(cfg)
           {
             'type' => cfg['type'] || 'lower',
@@ -512,7 +571,7 @@ module Noxun
             # strom zon: novy config ho ma; stary korpus -> koren so starymi policami
             'zone_tree' => cfg['zone_tree'] || ZoneTree.default_tree((cfg['shelves'] || 0).to_i),
             # cela: novy config = hash; stary = string ('none'/'1'/'2'/'auto') -> Fronts.normalize
-            'fronts' => cfg.key?('fronts') ? cfg['fronts'] : nil,
+            'fronts' => cfg.key?('fronts') ? fronts_from_config(cfg) : nil,
             # V0.3 materialy. Marker V0.3 configu = pritomnost 'part_overrides'. Legacy korpusy (V0.2)
             # mali material_id/back_material_id ulozene NATVRDO (K009/HDF) — tie NEberieme ako korpusovy
             # override (nechame nil = dedi z projektu), aby projektovy default fungoval aj na starych.
@@ -524,9 +583,25 @@ module Noxun
           }
         end
 
-        # V0.3+ config sa pozna podla pritomnosti kluca 'part_overrides' (V0.2 korpusy ho nemaju).
+        # Marker V0.3 materialov. V0.2 korpusy part_overrides nemali.
         def v03?(cfg)
           cfg.key?('part_overrides')
+        end
+
+        # Pred V0.3.1 panel dovolil pevne cela nizsie ako Fronts::MIN_AUTO.
+        # part_overrides nie je dostatocna hranica migracie, pretoze ho uz mala V0.3.0.
+        def fronts_from_config(cfg)
+          raw_fronts = cfg['fronts']
+          return raw_fronts if version_at_least?(cfg['engine_version'], FRONT_VALIDATION_VERSION)
+          Fronts.migrate_legacy_config(raw_fronts)
+        end
+
+        def version_at_least?(value, minimum)
+          actual = value.to_s.split('.').first(3).map(&:to_i)
+          target = minimum.to_s.split('.').first(3).map(&:to_i)
+          actual.fill(0, actual.length...3)
+          target.fill(0, target.length...3)
+          (actual <=> target) >= 0
         end
 
         def legacy_back_thickness(cfg)

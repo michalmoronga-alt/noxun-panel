@@ -160,9 +160,11 @@ module Noxun
         }
 
         if leaf
+          validate_shelves!(node['shelves'].to_i, box, t, zid)
           acc[:zones] << zobj
           add_shelves(node['shelves'].to_i, box, t, suffix_path, acc) if node['shelves'].to_i.positive?
         else
+          validate_split!(split, box, t, zid)
           child_boxes, divs, fields = split_boxes(split, box, t, suffix_path)
           zobj[:split] = { axis: split['axis'], count: split['count'], fields: fields }
           acc[:zones] << zobj
@@ -263,6 +265,47 @@ module Noxun
           sizes[i] = free * (w / weight_sum)
         end
         sizes
+      end
+
+      # Rozdelenie nesmie vytvorit nulove ani zaporne polia. Zamknute rozmery
+      # musia ostat pravdive; ak sa nezmestia, rebuild sa odmietne namiesto
+      # ticheho zmensovania alebo dielcov mimo rodicovskej zony.
+      def validate_split!(split, box, t, zone_id)
+        count = split['count'].to_i
+        span = split['axis'] == 'v' ? (box[:x1] - box[:x0]) : (box[:z1] - box[:z0])
+        clear = span - (count - 1) * t
+        minimum = count * MIN_FIELD
+        if clear + 0.01 < minimum
+          raise "Zona #{zone_id} je prilis mala na #{count} poli. Potrebuje aspon #{minimum.round(1)} mm svetleho priestoru."
+        end
+
+        cuts = sanitize_cuts(split['cuts'], count)
+        locked = cuts.select { |c| c['locked'] && c['size'] }
+        unlocked_count = count - locked.size
+        locked_sum = locked.reduce(0.0) { |sum, c| sum + [c['size'].to_f, MIN_FIELD].max }
+        if unlocked_count.zero?
+          return if (locked_sum - clear).abs <= 0.01
+          if locked_sum > clear
+            raise "Zona #{zone_id}: zamknute polia sa nezmestia. Uvolni zamok alebo zvacsi rodicovsku zonu."
+          end
+          raise "Zona #{zone_id}: vsetky polia su zamknute, ale nevyplnia celu zonu. Uvolni aspon jeden zamok."
+        end
+
+        max_locked = clear - unlocked_count * MIN_FIELD
+        return if locked_sum <= max_locked + 0.01
+
+        raise "Zona #{zone_id}: zamknute polia sa nezmestia. Uvolni zamok alebo zvacsi rodicovsku zonu."
+      end
+
+      def validate_shelves!(count, box, t, zone_id)
+        n = Shelves.clamp(count)
+        return if n.zero?
+
+        clear_h = box[:z1] - box[:z0]
+        minimum = n * t + (n + 1) * MIN_FIELD
+        return if clear_h + 0.01 >= minimum
+
+        raise "Zona #{zone_id} je prilis nizka na #{n} polic. Potrebuje aspon #{minimum.round(1)} mm."
       end
 
       def field_info(cut, resolved)

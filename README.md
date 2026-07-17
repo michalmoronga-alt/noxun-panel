@@ -6,4 +6,4 @@ Parametrický nábytkársky systém pre SketchUp (Ruby plugin). Korpusy generova
 - **Inštalácia (dev):** `INSTALL_noxun_engine.ps1` → SketchUp 2026 → Extensions → Noxun Engine → Panel
 - **Workflow:** vetva → PR → Codex review → merge (viď `CLAUDE.md`)
 
-Stav: **v0.2.2 (V0.2c)** — jadro korpusu (dolná/horná, konštrukčné varianty, strom zón, čelá, šablóny) + UX: interaktívny 2D náhľad (klik na zónu, ťahanie priečok, zámky rozmerov), auto-apply, ghost zóny na 1 klik (top-level), tagy dielov (Korpus/Chrbát/Čelá/Vnútro). Ďalej: materiály+ABS, kovanie, výstupy (kusovník, VEPO).
+Stav: **v0.3.1** — parametrické korpusy, strom zón, čelá, šablóny a interaktívny 2D náhľad + katalóg materiálov/ABS s dedením projekt → skrinka → dielec. Stabilizačná vrstva stráži hrúbky materiálov, nezmestiteľné zóny a čelá; projektové zmeny sa prepočítajú atomicky v jednom Undo kroku. Ďalej: kovanie, kusovník a VEPO výstupy.

@@ -66,21 +66,21 @@ module Noxun
       # Pravidlove defaulty ABS podla roly (hodnota = HRUBKA ABS v mm; dekor sa dopocita z materialu
       # dielca). Prazdna mapa = ziadne ABS. Standard 7.5 + zadanie V0.3:
       #   celo (front_door/drawer_front) -> vsetky 4 hrany 1.0
-      #   polica (shelf)                 -> predna 0.4 (viditelna celna hrana police)
+      #   polica (shelf)                 -> predna 1.0 (viditelna celna hrana police)
       #   boky (side_left/right)         -> predna 1.0
-      #   dno/vrch (bottom/top)          -> predna 0.4
-      #   priecky (divider_v/h)          -> predna (v 1.0 / h 0.4 — analog boku/police)
+      #   dno/vrch (bottom/top)          -> predna 1.0
+      #   priecky (divider_v/h)          -> predna 1.0
       #   chrbat/sokel/vystuhy           -> nic
       SEED_RULES = {
         'front_door'   => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
         'drawer_front' => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
-        'shelf'        => { 'L1' => 0.4 },
+        'shelf'        => { 'L1' => 1.0 },
         'side_left'    => { 'L1' => 1.0 },
         'side_right'   => { 'L1' => 1.0 },
-        'bottom'       => { 'L1' => 0.4 },
-        'top'          => { 'L1' => 0.4 },
+        'bottom'       => { 'L1' => 1.0 },
+        'top'          => { 'L1' => 1.0 },
         'divider_v'    => { 'L1' => 1.0 },
-        'divider_h'    => { 'L1' => 0.4 },
+        'divider_h'    => { 'L1' => 1.0 },
         'back'         => {},
         'plinth'       => {},
         'rail_front'   => {},
@@ -134,7 +134,16 @@ module Noxun
 
       # Hrubky ABS pre rolu (z pravidiel). Vrati mapu {L1:th,...} (len hrany s pravidlom).
       def thicknesses_for(role)
-        load[role.to_s] || {}
+        raw = load[role.to_s] || {}
+        EDGE_ORDER.each_with_object({}) do |code, out|
+          value = raw[code]
+          next if value.nil?
+          th = value.to_f
+          # Kompatibilita so starym seed pravidlom: podlimitna paska sa sprava ako 1 mm.
+          th = 1.0 if (th - 0.4).abs < 0.05
+          next unless defined?(Materials) && Materials.supported_edge_thickness?(th)
+          out[code] = th
+        end
       end
 
       # Vyrieši ABS hrany konkretneho sheet dielca:

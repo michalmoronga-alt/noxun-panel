@@ -102,7 +102,7 @@
 </style>
 
 <h1>Noxun Engine</h1>
-<p class="sub">V0.3 — materiály, ABS hrany, náhľad, zóny, čelá</p>
+<p class="sub">V0.3.1 — stabilita materiálov, zón a čiel</p>
 
 <!-- KARTA DIELCA (ABS editor) — zobrazi sa po vybere dielca (dvojklik do korpusu + klik na dielec) -->
 <fieldset id="partCard" style="display:none">
@@ -115,7 +115,6 @@
   <svg id="partSvg" viewBox="0 0 300 200" preserveAspectRatio="xMidYMid meet"></svg>
   <div class="absleg">
     <span><i style="background:#e53935"></i>1,0 mm</span>
-    <span><i style="background:#1e88e5"></i>0,4 mm</span>
     <span><i style="background:#43a047"></i>2,0 mm</span>
     <span><i style="background:#b0bec5"></i>bez ABS</span>
     <span><i style="background:#fff8ef;border:1px solid #ffb74d"></i>ručný override</span>
@@ -353,12 +352,11 @@
   function hasOwn(o,k){ return o && Object.prototype.hasOwnProperty.call(o, k); }
   function fmtmm(v){ return (v==null||v==='')?'?':Math.round(parseFloat(v)); }
 
-  // Farba ABS podla hrubky (standard 7.6): 1,0 cervena / 0,4 modra / 2,0 zelena / bez siva.
+  // Farba ABS podla hrubky (standard 7.6): 1,0 cervena / 2,0 zelena / bez siva.
   function absColorByThickness(th){
     if (th==null) return '#b0bec5';
     var t = parseFloat(th);
     if (Math.abs(t-1.0)<0.05) return '#e53935';
-    if (Math.abs(t-0.4)<0.05) return '#1e88e5';
     if (Math.abs(t-2.0)<0.05) return '#43a047';
     return '#8e24aa'; // ina hrubka (mimo legendy)
   }
@@ -383,10 +381,10 @@
   // FIX 2: naplni <select> doskami, ale hrubkovo NEKOMPATIBILNE su disabled + oznacene "✕".
   // Aktualne vybranu (aj legacy nesuladnu) dosku nechaj vyberatelnu, nech ju vie zobrazit. Pri
   // prazdnom vysledku ostanu vsetky viditelne (disabled) — pouzivatel vidi katalog. Zachova hodnotu.
-  function fillSheetSelectFiltered(sel, includeInherit, matchFn, keepValue){
+  function fillSheetSelectFiltered(sel, includeInherit, matchFn, keepValue, inheritLabel){
     if (!sel) return;
     var cur = (keepValue !== undefined && keepValue !== null) ? keepValue : sel.value;
-    var html = includeInherit ? '<option value="">(dediť z projektu)</option>' : '';
+    var html = includeInherit ? '<option value="">'+esc(inheritLabel || '(dediť z projektu)')+'</option>' : '';
     MATERIALS.sheets.forEach(function(s){
       var ok = matchFn ? matchFn(s) : true;
       var keep = ok || (s.id === cur);
@@ -1113,6 +1111,12 @@
       drawer_front:'Zásuvkové čelo', plinth:'Sokel', rail_front:'Výstuha predná', rail_back:'Výstuha zadná' };
     return m[role] || role;
   }
+  function sheetLabelOf(id){
+    for (var i=0; i<MATERIALS.sheets.length; i++){
+      if (MATERIALS.sheets[i].id === id) return MATERIALS.sheets[i].label || id;
+    }
+    return id || 'nezaradený';
+  }
   function renderPartCard(pc){
     partCard = pc;
     var box = el('partCard');
@@ -1124,8 +1128,11 @@
     // beru 18/19 mm (rovnako ako builder guard aj korpusovy select), ostatne presnu hrubku dielca.
     var isFront = (pc.role === 'front_door' || pc.role === 'drawer_front');
     var matFn = isFront ? frontMatch() : thMatch(pc.thickness);
-    var ms = el('pcMaterial'); fillSheetSelectFiltered(ms, false, matFn, pc.material_id || '');
-    ms.value = pc.material_id || '';
+    var selectedMaterial = pc.has_material_override ? (pc.material_id || '') : '';
+    var inheritLabel = '(dedí: '+sheetLabelOf(pc.material_id)+')';
+    var ms = el('pcMaterial');
+    fillSheetSelectFiltered(ms, true, matFn, selectedMaterial, inheritLabel);
+    ms.value = selectedMaterial;
     ms.className = pc.has_material_override ? 'ovr' : '';
     renderEdgeRows(pc);
     renderPartSvg(pc);
