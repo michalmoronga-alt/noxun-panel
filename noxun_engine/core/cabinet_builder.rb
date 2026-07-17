@@ -42,6 +42,7 @@ module Noxun
       # DC scaletool bitova maska pre osove scale uchopy (X/Y/Z). Michal potvrdi vizualne;
       # ak by mala byt opacna semantika (skryt plosne+rohove), alternativa je 120.
       SCALE_TOOL_MASK = 7
+      FRONT_VALIDATION_VERSION = '0.3.1'
 
       # Tagy dielov (V0.2c) — hromadne hide cez nativny Tags panel. Default = Noxun/Korpus.
       PART_TAGS = {
@@ -405,6 +406,7 @@ module Noxun
 
         def cabinet_config(cfg)
           {
+            engine_version: Engine::VERSION,
             type: cfg[:type],
             name: cfg[:name] || default_name(cfg),
             construction_preset: cfg[:type] == 'upper' ? 'noxun-upper-18' : 'noxun-lower-18',
@@ -551,7 +553,7 @@ module Noxun
         end
 
         # Config (stored, string kluce) -> params pre normalize. Doplna spatnu kompatibilitu:
-        # stare V0.1/V0.2a configy (bez zone_tree, fronts ako string, shelves top-level).
+        # stare configy (bez zone_tree, fronts ako string, shelves top-level).
         def config_to_params(cfg)
           {
             'type' => cfg['type'] || 'lower',
@@ -581,15 +583,25 @@ module Noxun
           }
         end
 
-        # V0.3+ config sa pozna podla pritomnosti kluca 'part_overrides' (V0.2 korpusy ho nemaju).
+        # Marker V0.3 materialov. V0.2 korpusy part_overrides nemali.
         def v03?(cfg)
           cfg.key?('part_overrides')
         end
 
+        # Pred V0.3.1 panel dovolil pevne cela nizsie ako Fronts::MIN_AUTO.
+        # part_overrides nie je dostatocna hranica migracie, pretoze ho uz mala V0.3.0.
         def fronts_from_config(cfg)
           raw_fronts = cfg['fronts']
-          return raw_fronts if v03?(cfg)
+          return raw_fronts if version_at_least?(cfg['engine_version'], FRONT_VALIDATION_VERSION)
           Fronts.migrate_legacy_config(raw_fronts)
+        end
+
+        def version_at_least?(value, minimum)
+          actual = value.to_s.split('.').first(3).map(&:to_i)
+          target = minimum.to_s.split('.').first(3).map(&:to_i)
+          actual.fill(0, actual.length...3)
+          target.fill(0, target.length...3)
+          (actual <=> target) >= 0
         end
 
         def legacy_back_thickness(cfg)

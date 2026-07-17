@@ -23,6 +23,7 @@ module Noxun
           @entity_observer ||= CabinetEntityObserver.new
           @entities_observer ||= CabinetEntitiesObserver.new
           @app_observer ||= EngineAppObserver.new
+          @stable_transforms = {}
           safe { Sketchup.remove_observer(@app_observer) }
           Sketchup.add_observer(@app_observer)
           n = attach_all(Sketchup.active_model)
@@ -64,6 +65,7 @@ module Noxun
           @entity_observer ||= CabinetEntityObserver.new
           safe { inst.remove_observer(@entity_observer) } # anti-double
           inst.add_observer(@entity_observer)
+          remember_transform(inst)
         rescue StandardError => e
           Engine.log_error(e, 'ScaleWatch.attach_one')
         end
@@ -179,9 +181,14 @@ module Noxun
               absorb(inst)          # scale -> rebuild (vnutri vola Zones.sync_ghost)
             else
               move_ghost_op(m, inst) # move/rotate -> len presun ghost skupin
+              remember_transform(inst)
             end
           rescue StandardError => e
-            Engine.log_error(e, 'ScaleWatch.process_dirty')
+            if inst && inst.valid? && scaled?(inst.transformation)
+              reject_scale(inst, e)
+            else
+              Engine.log_error(e, 'ScaleWatch.process_dirty')
+            end
           end
           prune_ghosts(erase_model || @last_model || touched_models.first) if need_prune
         end
@@ -260,6 +267,7 @@ module Noxun
           clean = clean_transform(inst.transformation)
           CabinetBuilder.rebuild(model, inst, params,
                                  transform: clean, op_name: 'Noxun: prepočet po zmene veľkosti')
+          remember_transform(inst)
 
           Engine.log("scale absorb #{cid}: #{base_w.round}x#{base_h.round}x#{base_d.round} -> " \
                      "#{new_w.round}x#{new_h.round}x#{new_d.round} (f=#{sx.round(3)},#{sy.round(3)},#{sz.round(3)})")
@@ -275,6 +283,49 @@ module Noxun
         # Cisty transform: povodny origin + rotacia, BEZ scale (normalizovane osi).
         def clean_transform(tr)
           Geom::Transformation.axes(tr.origin, tr.xaxis.normalize, tr.yaxis.normalize, tr.zaxis.normalize)
+        end
+
+        # Ak validacia rebuildu odmietne Scale, vratime presne poslednu stabilnu
+        # polohu/rotaciu/velkost. Transparentna operacia sa pripoji k pouzivatelovmu
+        # Scale kroku, takze model ani vyrobne data nezostanu v rozpornom stave.
+        def reject_scale(inst, error)
+          model = inst.model
+          restore = stable_transform(inst) || clean_transform(inst.transformation)
+          guard do
+            model.start_operation('Noxun: zrusena neplatna zmena velkosti', true, false, true)
+            begin
+              inst.transformation = restore
+              Zones.move_ghost(model, inst) if defined?(Zones)
+              model.commit_operation
+            rescue StandardError => restore_error
+              model.abort_operation rescue nil
+              Engine.log_error(restore_error, 'ScaleWatch.reject_scale restore')
+              return false
+            end
+          end
+          remember_transform(inst)
+          Engine.log_error(error, 'ScaleWatch.scale rejected')
+          cid = Store.get(inst, 'cabinet_id')
+          UI.messagebox("Zmena ve\u013ekosti skrinky #{cid} bola zru\u0161en\u00e1, preto\u017ee by vytvorila neplatn\u00fa kon\u0161trukciu.\n\n#{error.message}")
+          true
+        rescue StandardError => notify_error
+          Engine.log_error(notify_error, 'ScaleWatch.reject_scale notify')
+          false
+        end
+
+        def remember_transform(inst)
+          return unless inst && inst.valid?
+          @stable_transforms ||= {}
+          @stable_transforms[transform_key(inst)] = inst.transformation.to_a.dup
+        end
+
+        def stable_transform(inst)
+          values = @stable_transforms && @stable_transforms[transform_key(inst)]
+          values && Geom::Transformation.new(values)
+        end
+
+        def transform_key(inst)
+          [inst.model.object_id, inst.entityID]
         end
 
         def safe

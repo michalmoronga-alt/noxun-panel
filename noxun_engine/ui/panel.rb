@@ -767,13 +767,12 @@ module Noxun
 
         # Katalog pre selecty: dosky (id + label) + ABS pasky (id + label + farba pre nahlad hrany).
         def materials_payload
-          cat = Materials.load
           {
-            'sheets' => cat['sheets'].map { |s|
+            'sheets' => Materials.sheets.map { |s|
               { 'id' => s['material_id'], 'label' => sheet_label(s), 'decor' => s['decor'],
                 'thickness' => s['thickness'], 'color' => s['color'] }
             },
-            'edges' => cat['edges'].map { |a|
+            'edges' => Materials.edges.map { |a|
               { 'id' => a['abs_id'], 'label' => abs_label(a), 'decor' => a['decor'],
                 'thickness' => a['thickness'], 'color' => a['color'] }
             }
