@@ -251,8 +251,7 @@ module Noxun
       end
 
       def supported_edge_thickness?(value)
-        th = value.to_f
-        SUPPORTED_EDGE_THICKNESSES.any? { |allowed| (allowed - th).abs < 0.05 }
+        SUPPORTED_EDGE_THICKNESSES.include?(value.to_f)
       end
 
       # Povoli iba ABS, ktore realne existuje v aktivnom katalogu 1/2 mm.
