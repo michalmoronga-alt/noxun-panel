@@ -88,9 +88,11 @@ module Noxun
         z0 = cfg[:bottom_mode] == 'under_sides' ? (s + t) : 0.0
         sh = h - z0
         [
-          { suffix: 'SIDE-L', role: 'side_left', name: 'Bok lavy', material: :korpus,
+          { suffix: 'SIDE-L', part_key: PartKeys.cabinet('side', 'left'),
+            role: 'side_left', name: 'Bok lavy', material: :korpus,
             box: [t, d, sh], origin: [0, 0, z0], prod: { length: sh, width: d, thickness: t } },
-          { suffix: 'SIDE-R', role: 'side_right', name: 'Bok pravy', material: :korpus,
+          { suffix: 'SIDE-R', part_key: PartKeys.cabinet('side', 'right'),
+            role: 'side_right', name: 'Bok pravy', material: :korpus,
             box: [t, d, sh], origin: [w - t, 0, z0], prod: { length: sh, width: d, thickness: t } }
         ]
       end
@@ -99,10 +101,10 @@ module Noxun
       def bottom_part(cfg)
         w = cfg[:width]; d = cfg[:depth]; t = cfg[:thickness]; s = cfg[:floor_height]
         if cfg[:bottom_mode] == 'under_sides'
-          { suffix: 'BOTTOM', role: 'bottom', name: 'Dno', material: :korpus,
+          { suffix: 'BOTTOM', part_key: PartKeys.cabinet('bottom'), role: 'bottom', name: 'Dno', material: :korpus,
             box: [w, d, t], origin: [0, 0, s], prod: { length: w, width: d, thickness: t } }
         else
-          { suffix: 'BOTTOM', role: 'bottom', name: 'Dno', material: :korpus,
+          { suffix: 'BOTTOM', part_key: PartKeys.cabinet('bottom'), role: 'bottom', name: 'Dno', material: :korpus,
             box: [w - 2 * t, d, t], origin: [t, 0, s], prod: { length: w - 2 * t, width: d, thickness: t } }
         end
       end
@@ -116,7 +118,7 @@ module Noxun
         when 'two_rails'
           rail_parts(cfg)
         else # full
-          [{ suffix: 'TOP', role: 'top', name: 'Vrch', material: :korpus,
+          [{ suffix: 'TOP', part_key: PartKeys.cabinet('top'), role: 'top', name: 'Vrch', material: :korpus,
              box: [w - 2 * t, d, t], origin: [t, 0, h - t], prod: { length: w - 2 * t, width: d, thickness: t } }]
         end
       end
@@ -132,9 +134,11 @@ module Noxun
           z0 = z_top - rdp
           prod = { length: w - 2 * t, width: rdp, thickness: t }
           [
-            { suffix: 'TOP-RAIL-F', role: 'rail_front', name: 'Vystuha predna', material: :korpus,
+            { suffix: 'TOP-RAIL-F', part_key: PartKeys.cabinet('rail', 'front'),
+              role: 'rail_front', name: 'Vystuha predna', material: :korpus,
               box: [w - 2 * t, t, rdp], origin: [t, 0, z0], prod: prod },
-            { suffix: 'TOP-RAIL-B', role: 'rail_back', name: 'Vystuha zadna', material: :korpus,
+            { suffix: 'TOP-RAIL-B', part_key: PartKeys.cabinet('rail', 'back'),
+              role: 'rail_back', name: 'Vystuha zadna', material: :korpus,
               box: [w - 2 * t, t, rdp], origin: [t, d - t, z0], prod: prod }
           ]
         else # flat
@@ -143,9 +147,11 @@ module Noxun
           z0 = z_top - t
           prod = { length: w - 2 * t, width: rd, thickness: t }
           [
-            { suffix: 'TOP-RAIL-F', role: 'rail_front', name: 'Vystuha predna', material: :korpus,
+            { suffix: 'TOP-RAIL-F', part_key: PartKeys.cabinet('rail', 'front'),
+              role: 'rail_front', name: 'Vystuha predna', material: :korpus,
               box: [w - 2 * t, rd, t], origin: [t, 0, z0], prod: prod },
-            { suffix: 'TOP-RAIL-B', role: 'rail_back', name: 'Vystuha zadna', material: :korpus,
+            { suffix: 'TOP-RAIL-B', part_key: PartKeys.cabinet('rail', 'back'),
+              role: 'rail_back', name: 'Vystuha zadna', material: :korpus,
               box: [w - 2 * t, rd, t], origin: [t, d - rd, z0], prod: prod }
           ]
         end
@@ -158,15 +164,15 @@ module Noxun
         case cfg[:back_mode]
         when 'inset'
           z0 = interior[:z_lo]; bh = interior[:z_hi] - z0
-          { suffix: 'BACK', role: 'back', name: 'Chrbat', material: :korpus,
+          { suffix: 'BACK', part_key: PartKeys.cabinet('back'), role: 'back', name: 'Chrbat', material: :korpus,
             box: [w - 2 * t, bt, bh], origin: [t, d - bt, z0], prod: { length: w - 2 * t, width: bh, thickness: bt } }
         when 'groove'
           z0 = interior[:z_lo]; bh = interior[:z_hi] - z0
           y0 = d - GROOVE_OFFSET - bt
-          { suffix: 'BACK', role: 'back', name: 'Chrbat', material: :korpus,
+          { suffix: 'BACK', part_key: PartKeys.cabinet('back'), role: 'back', name: 'Chrbat', material: :korpus,
             box: [w - 2 * t, bt, bh], origin: [t, y0, z0], prod: { length: w - 2 * t, width: bh, thickness: bt } }
         else # overlay
-          { suffix: 'BACK', role: 'back', name: 'Chrbat', material: :korpus,
+          { suffix: 'BACK', part_key: PartKeys.cabinet('back'), role: 'back', name: 'Chrbat', material: :korpus,
             box: [w, bt, h - s], origin: [0, d, s], prod: { length: w, width: h - s, thickness: bt } }
         end
       end
@@ -177,7 +183,8 @@ module Noxun
         s = cfg[:floor_height]
         return [] if s <= 0
         w = cfg[:width]; t = cfg[:thickness]; recess = cfg[:plinth_recess]
-        [{ suffix: 'PLINTH', role: 'plinth', name: 'Sokel predny', material: :korpus,
+        [{ suffix: 'PLINTH', part_key: PartKeys.cabinet('plinth', 'front'),
+           role: 'plinth', name: 'Sokel predny', material: :korpus,
            box: [w - 2 * t, t, s], origin: [t, recess, 0], prod: { length: w - 2 * t, width: s, thickness: t } }]
       end
 

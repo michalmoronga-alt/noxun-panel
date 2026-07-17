@@ -384,7 +384,7 @@ module Noxun
           push_selected(model)
         end
 
-        # Per-dielec material (part_override, viťazi nad dedenim). role_key identifikuje dielec.
+        # Per-dielec material. Payload este vola pole role_key, ale hodnota je stabilny part_key.
         def handle_set_part_material(payload)
           model = Sketchup.active_model
           cab = find_cabinet(model)
@@ -394,6 +394,7 @@ module Noxun
           return set_status('Chyba identifikacie dielca.', true) if rk.empty?
           mat = present_str(data['material_id'])
           params = existing_params(cab)
+          rk = canonical_part_key(params, rk)
           ov = (params['part_overrides'] ||= {})
           rec = ov[rk] || {}
           if mat then rec['material_id'] = mat else rec.delete('material_id') end
@@ -412,6 +413,7 @@ module Noxun
           return set_status('Chyba identifikacie dielca/hrany.', true) if rk.empty? || !%w[L1 L2 W1 W2].include?(code)
           raw = data['abs_id']
           params = existing_params(cab)
+          rk = canonical_part_key(params, rk)
           ov = (params['part_overrides'] ||= {})
           rec = ov[rk] || {}
           edges = rec['edges'] || {}
@@ -427,7 +429,7 @@ module Noxun
         end
 
         # "Pouzit na podobne diely" — skopiruje material + ABS zdrojoveho dielca na vsetky dielce
-        # ROVNAKEJ ROLY. scope: 'cabinet' (ta ista skrinka) / 'model' (vsetky korpusy). Kluc = role_key.
+        # ROVNAKEJ ROLY. scope: 'cabinet' (ta ista skrinka) / 'model' (vsetky korpusy). Kluc = part_key.
         def handle_apply_to_similar(payload)
           model = Sketchup.active_model
           cab = find_cabinet(model)
@@ -442,12 +444,13 @@ module Noxun
           src_mat = scfg['material_id']
           src_edges = dup_edges(scfg['edges'] || {})
           cabs = scope == 'model' ? all_cabinets(model) : [cab]
+          focus_key = canonical_part_key(existing_params(cab), rk)
           count = 0
           suspend_selection_sync do
             cabs.each do |c|
-              keys = parts_of_role(c, role)
-              next if keys.empty?
               params = existing_params(c)
+              keys = parts_of_role(c, role).map { |k| canonical_part_key(params, k) }
+              next if keys.empty?
               ov = (params['part_overrides'] ||= {})
               keys.each do |k|
                 rec = ov[k] || {}
@@ -458,13 +461,13 @@ module Noxun
               end
               CabinetBuilder.rebuild(model, c, params, op_name: 'NOXUN: material/ABS na podobne')
             end
-            focus_part(model, cab, rk)
+            focus_part(model, cab, focus_key)
           end
           set_status("Použité na #{count} dielcov #{scope == 'model' ? 'v celom modeli' : 'v skrinke'} (rola #{role}).")
           push_selected(model)
         end
 
-        # Rebuild korpusu s pripravenymi params + fokus na dielec (role_key) + resync panela.
+        # Rebuild korpusu s pripravenymi params + fokus na dielec (part_key) + resync panela.
         def rebuild_focus_part(model, cab, rk, params, msg)
           suspend_selection_sync do
             CabinetBuilder.rebuild(model, cab, params, op_name: 'NOXUN: uprava dielca')
@@ -474,7 +477,7 @@ module Noxun
           push_selected(model) # posle korpus + part_card (dielec je po fokuse vo vybere) -> karta ostane
         end
 
-        # Po rebuilde: najdi "ten isty" dielec podla role_key a oznac ho (karta ostane na tom dielci).
+        # Po rebuilde: najdi "ten isty" dielec podla part_key a oznac ho (karta ostane na tom dielci).
         def focus_part(model, cab, rk)
           part = find_part_by_role_key(cab, rk)
           reselect(model, part || cab)
@@ -809,9 +812,10 @@ module Noxun
         def part_card_payload(_model, cab, part)
           cfg = Store.config(part) || {}
           role = Store.get(part, 'role').to_s
-          rk = present_str(Store.get(part, 'role_key')) || fallback_role_key(cab, part)
           cabcfg = Store.config(cab) || {}
-          ov = ((cabcfg['part_overrides'] || {})[rk] || {})
+          params = CabinetBuilder.config_to_params(cabcfg)
+          rk = canonical_part_key(params, part_identity(cab, part))
+          ov = ((params['part_overrides'] || {})[rk] || {})
           {
             'role_key' => rk, 'role' => role, 'name' => Store.get(part, 'name'),
             'length' => cfg['length'], 'width' => cfg['width'], 'thickness' => cfg['thickness'],
@@ -829,8 +833,27 @@ module Noxun
           nil
         end
 
-        # role_key z plocheho atributu; fallback pre stare dielce = part_id bez cabinet_id prefixu.
+        # part_key z plocheho atributu; fallback cez legacy role_key a nakoniec part_id.
+        def part_identity(cab, part)
+          present_str(Store.get(part, 'part_key')) ||
+            present_str(Store.get(part, 'role_key')) ||
+            fallback_role_key(cab, part)
+        end
+
+        # Prelozi legacy renderovaci suffix na part_key podla povodnej konfiguracie.
+        # Nove kluce vracia bez dalsieho vypoctu.
+        def canonical_part_key(params, key)
+          value = key.to_s
+          return value if value.start_with?('cabinet/', 'zone:', 'front:')
+
+          cfg = CabinetBuilder.normalize(params)
+          pd = Construction.build_plan(cfg)[:parts].find { |part| part[:suffix].to_s == value }
+          pd ? PartKeys.for_descriptor(pd) : value
+        rescue StandardError
+          value
+        end
         def fallback_role_key(cab, part)
+
           pid = Store.get(part, 'part_id').to_s
           cid = Store.get(cab, 'cabinet_id').to_s
           (!cid.empty? && pid.start_with?("#{cid}-")) ? pid[(cid.length + 1)..-1] : pid
@@ -838,17 +861,18 @@ module Noxun
 
         def find_part_by_role_key(cab, rk)
           return nil unless cab && cab.respond_to?(:definition) && cab.valid?
+          params = existing_params(cab)
           cab.definition.entities.grep(Sketchup::ComponentInstance).find do |e|
-            Store.kind(e) == 'part' && present_str(Store.get(e, 'role_key')) == rk
+            Store.kind(e) == 'part' && canonical_part_key(params, part_identity(cab, e)) == rk
           end
         end
 
-        # role_key vsetkych dielcov danej roly v korpuse (pre "pouzit na podobne").
+        # part_key vsetkych dielcov danej roly v korpuse (pre "pouzit na podobne").
         def parts_of_role(cab, role)
           return [] unless cab && cab.respond_to?(:definition) && cab.valid?
           cab.definition.entities.grep(Sketchup::ComponentInstance).select do |e|
             Store.kind(e) == 'part' && Store.get(e, 'role') == role
-          end.map { |e| present_str(Store.get(e, 'role_key')) }.compact
+          end.map { |e| part_identity(cab, e) }.compact
         end
 
         def count_role(cab, role)
