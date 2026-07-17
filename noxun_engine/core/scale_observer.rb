@@ -26,6 +26,10 @@ module Noxun
           safe { Sketchup.remove_observer(@app_observer) }
           Sketchup.add_observer(@app_observer)
           n = attach_all(Sketchup.active_model)
+          # KRITICKE: entities observer (zachytava KOPIE) treba pripojit aj pri instale —
+          # nie len v AppObserver eventoch (open/new). Bez tohto po starte SketchUpu
+          # (alebo ak event nepride) kopie nedostanu nove ID a ich zony nesleduju presun.
+          attach_entities(Sketchup.active_model)
           Engine.log("ScaleWatch nainstalovany (attachnute korpusy: #{n})")
         rescue StandardError => e
           Engine.log_error(e, 'ScaleWatch.install')
@@ -304,20 +308,33 @@ module Noxun
         def onElementAdded(_entities, entity)
           ScaleWatch.notify_added(entity)
         end
+
+        # FALLBACK pre zmeny korpusov (move/rotate/scale) NEZAVISLY od per-instancneho
+        # EntityObservera — ten sa na kopiu nemusi stihnut/podarit attachnut (Ctrl+V, undo/redo,
+        # reload). notify_change si sam odfiltruje ne-korpusy (kind != cabinet) a ma @rebuilding
+        # guard, takze vlastne rebuildy/ghost presuny slucku nespustia.
+        def onElementModified(_entities, entity)
+          ScaleWatch.notify_change(entity)
+        end
       end
 
       # AppObserver — re-attach entity/entities observerov na korpusy pri zmene modelu.
+      # DOLEZITE: okrem per-instancnych observerov (attach_all) treba pripojit aj entities
+      # observer (attach_entities) — bez neho nefunguju kopie ani fallback zmien.
       class EngineAppObserver < Sketchup::AppObserver
         def onNewModel(model)
           ScaleWatch.attach_all(model)
+          ScaleWatch.attach_entities(model)
         end
 
         def onOpenModel(model)
           ScaleWatch.attach_all(model)
+          ScaleWatch.attach_entities(model)
         end
 
         def onActivateModel(model)
           ScaleWatch.attach_all(model)
+          ScaleWatch.attach_entities(model)
         end
       end
     end
