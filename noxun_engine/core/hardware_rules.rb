@@ -332,7 +332,11 @@ module Noxun
           next it unless ov
           next nil if ov['disabled'] == true
           q = clamp_qty(ov['quantity'])
-          next it if q.nil? || q == it['quantity']
+          next it if q.nil?
+          # ZAMERNE aj pri q == rule_quantity: kym zaznam existuje v configu, polozka
+          # MUSI byt oznacena source 'manual' (UI ukaze reset). Inak by override splynul
+          # s pravidlom, reset by zmizol a stale zaznam by necakane ozil pri buducej
+          # zmene pravidla ci rozmerov (Codex review PR #24).
           it.merge('quantity' => q, 'source' => 'manual')
         end
       end
