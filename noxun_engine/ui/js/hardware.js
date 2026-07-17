@@ -88,3 +88,6 @@
   }
   function onHwDisable(btn){ hwSend(hwPayload(btn, { disabled: true })); }
   function onHwReset(btn){ hwSend(hwPayload(btn, { reset: true })); }
+  function openRulesDialog(){
+    if (window.sketchup && sketchup.open_rules) sketchup.open_rules('');
+  }

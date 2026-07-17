@@ -1,0 +1,24 @@
+<!-- Noxun Engine — dialog Pravidla kovania (V0.4). Vanilla JS, ziadne CDN, slovensky. -->
+<!-- Otvara sa z menu Extensions > Noxun Engine > Pravidla kovania alebo z panela (sekcia Kovanie). -->
+<meta charset="utf-8">
+<link rel="stylesheet" href="css/panel.css?v=0.4.2">
+
+<h1>Pravidlá kovania</h1>
+<p class="sub" id="srcline">…</p>
+
+<div class="hint">Pravidlá platia pre <b>tento projekt</b> (ukladajú sa do .skp súboru). Nové projekty preberajú globálne predvoľby. Pásma sú „do a vrátane“ — napr. do 900 mm = 2 závesy.</div>
+
+<div id="rulesBox"><div class="muted">Načítavam…</div></div>
+
+<div class="rdsave">
+  <label class="rdchk"><input type="checkbox" id="alsoGlobal"> uložiť aj ako globálnu predvoľbu (pre nové projekty)</label>
+  <div class="btnrow">
+    <button class="primary" onclick="saveRules()">Uložiť a prestavať skrinky</button>
+    <button class="ghostbtn" onclick="loadGlobal()">Načítať globálne predvoľby</button>
+  </div>
+</div>
+
+<div id="status">Pripravené.</div>
+
+<script src="js/errors.js?v=0.4.2"></script>
+<script src="js/rules.js?v=0.4.2"></script>

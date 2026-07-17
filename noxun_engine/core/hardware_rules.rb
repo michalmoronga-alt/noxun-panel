@@ -101,16 +101,33 @@ module Noxun
       end
 
       # Nacita globalnu kniznicu ako normalizovane pole pravidiel. Poskodeny/chybajuci
-      # subor -> seed (vzor AbsRules: fallback nikdy nevrati nil).
+      # subor -> seed (vzor AbsRules: fallback nikdy nevrati nil). Seed-merge: ak subor
+      # vznikol pod starsim SEED_VERSION, doplnia sa NOVE default pravidla (podla
+      # rule_id) bez prepisu pouzivatelskych uprav — plati LEN pre globalnu kniznicu;
+      # projektovy snapshot sa NIKDY nemeni sam (reprodukovatelnost stavby z .skp).
       def load
         ensure_seeded
         doc = JsonFileStore.read(path, copy: false)
         rules = doc.is_a?(Hash) ? doc['rules'] : nil
         return deep_copy(SEED_RULES) unless rules.is_a?(Array)
-        normalize_rules(rules)
+        merged, changed = merge_seed(normalize_rules(rules), doc['seed_version'].to_i)
+        if changed && write(merged)
+          Engine.log('hardware rules: globalna kniznica doplnena o nove default pravidla') if defined?(Engine)
+        end
+        merged
       rescue StandardError => e
         Engine.log_error(e, 'HardwareRules.load') if defined?(Engine)
         deep_copy(SEED_RULES)
+      end
+
+      # Doplni seed pravidla, ktore v kniznici chybaju (podla rule_id). Vrati
+      # [rules, changed] — changed aj pri samotnom bumpe seed_version (write ulozi novu).
+      def merge_seed(rules, from_version)
+        return [rules, false] if from_version >= SEED_VERSION
+        have = {}
+        rules.each { |r| have[r['rule_id']] = true }
+        missing = SEED_RULES.reject { |r| have[r['rule_id']] }
+        [rules + normalize_rules(missing), true]
       end
 
       def ensure_seeded

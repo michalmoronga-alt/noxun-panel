@@ -319,22 +319,30 @@ Dve nezávislé vrstvy (GPT debata sekcie 16–17):
 
 ### 6.2 Two-phase: generický flag → katalógový kód
 
-**Fáza 1 — generický flag z pravidiel.** Pri vklade/zmene modulu systém pridelí generický flag (`hinge`, `slide`, `leg`…) s množstvom z pravidiel v JSON. Príklad pravidla (počet pántov podľa výšky dvierok):
+**Fáza 1 — generický flag z pravidiel.** Pri stavbe/prestavbe korpusu plánovač pridelí generické položky (`hinge`, `slide`, `leg`…) s množstvom z pravidiel v JSON (implementované V0.4, `core/hardware_rules.rb`). Žiadny univerzálny výpočtový jazyk — malý katalóg Ruby **vzorov (`kind`)** parametrizovaných JSON pravidlami: `fixed` (pevný počet), `bands` (pásma podľa vstupu, max vrátane), `fit_series` (najväčšia hodnota radu ≤ vstup − rezerva; výsledok v `params.nominal_length`). Príklad (počet závesov podľa výšky krídla):
 
 ```json
 {
-  "rule_id": "hinge-count-by-height",
-  "applies_to": "front_door",
+  "rule_id": "zavesy-podla-vysky",
+  "enabled": true,
+  "applies_to": { "role": "front_door" },
   "output": "hinge",
+  "kind": "bands",
+  "input": "height",
   "bands": [
-    { "max_height": 900,  "quantity": 2 },
-    { "max_height": 1600, "quantity": 3 },
-    { "max_height": null, "quantity": 4 }
+    { "max": 900,  "quantity": 2 },
+    { "max": 1400, "quantity": 3 },
+    { "max": 1900, "quantity": 4 },
+    { "max": null, "quantity": 5 }
   ]
 }
 ```
 
-Pravidlá sú **JSON súbory v knižnici pravidiel, editovateľné cez jednoduchý panel** (nie ručne v súbore). Michal si počty závesov / výnimky mení bez programovania.
+Pravidlá sú **JSON dáta editovateľné cez dialóg Pravidlá kovania** (nie ručne v súbore). Michal si počty závesov / výnimky mení bez programovania.
+
+**Zdroje pravidiel a reprodukovateľnosť (V0.4):** rebuild číta výhradne **projektový snapshot** pravidiel (`NOXUN` dict na modeli, kľúč `hardware_rules`) — stavba je reprodukovateľná zo samotného .skp (iné PC, zmeny globálu, kópie skriniek) a undo vracia pravidlá aj geometriu naraz. Globálna knižnica `%APPDATA%\NOXUN\Engine\hardware_rules.json` je len default pre nové projekty (so seed-merge novej verzie seedov podľa `rule_id`).
+
+**Položka kovania v pláne** (BuildPlan schema 2, string kľúče kvôli JSON round-trip): `owner_part_key` (nil = korpus; inak musí existovať v parts), `generic_type` (slovník), `quantity` (1–999), `rule_id`, `variant_id` (nil vo fáze 1), `production_class: "counted"`, `manufactured: true`, `params` (napr. výška nohy, NL výsuvu), `source` (`rule`/`manual`), `rule_quantity`. **Ručné zásahy** žijú v configu korpusu ako `hardware_overrides` — identita zásahu = trojica **(owner_part_key, generic_type, rule_id)**; `quantity` prepíše počet, `disabled` položku vyradí; šablóny korpusov zásahy zachovávajú.
 
 **Fáza 2 — mapovanie na konkrétny katalógový kód.** Na konci projektu (alebo raz v nastaveniach) sa flag `hinge` namapuje na konkrétny kód (`Blum 71B3550`). **Mapovanie sa ukladá a nabudúce prebehne automaticky.**
 
@@ -343,6 +351,8 @@ Pravidlá sú **JSON súbory v knižnici pravidiel, editovateľné cez jednoduch
 - V modeli je **najviac 1 generický fyzický objekt na kategóriu** (`hinge`, `slide`, `leg`) — slúži na vizuál, pozíciu a ako základ budúcich vylepšení.
 - Na generický objekt sa viaže **ľubovoľne veľa virtuálnych variantov** (konkrétni výrobcovia/kódy) — **čisto dátovo** v katalógu, bez ďalšej geometrie.
 - Skrutky/spojky = čisto virtuálne (žiadna geometria).
+
+**Generický objekt = vizuálna PROXY (spresnené V0.4, Codex audit):** entita nesie `kind: hardware`, ale `production_class: "none"` a `manufactured: false` (+ `config.proxy: true`). **Zdroj pravdy súpisu kovania je výhradne `config.hardware[]` korpusu** — závesy a výsuvy geometriu nemajú vôbec, takže počty musia mať jeden domov; keby proxy niesla `counted/true`, kusovník iterujúci entity by kategórie s vizuálom započítal druhýkrát. (Príklad `counted/true` entity v 8.2 zostáva ako koncept pre samostatné hardware entity bez proxy vzťahu — V0.4 ho nepoužíva.)
 
 **Vŕtanie a presné pozície kovania sú MIMO scope V1** — riešia sa len počty, typy a kódy.
 
