@@ -322,7 +322,7 @@ NxTest.test('templates: prvy load seedne 4 predvolene sablony') do
   NxTest.assert_close(600.0, dolna['width'])
   NxTest.assert_close(720.0, dolna['height'])
   NxTest.assert_equal('upright', list[1]['config']['rails_orientation'], 'Drezova ma listy nastojato')
-  NxTest.assert_close(20.0, list[2]['config']['rails_top_offset'], 'Varna doska ma odsadene listy')
+  NxTest.assert_close(20.0, list[2]['config']['rails_top_offset'], 0.01, 'Varna doska ma odsadene vystuhy')
   horna = list[3]['config']
   NxTest.assert_equal('upper', horna['type'])
   NxTest.assert_equal('groove', horna['back_mode'])

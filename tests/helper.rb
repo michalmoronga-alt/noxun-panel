@@ -155,7 +155,10 @@ module NxTest
     end
 
     # Porovnanie floatov s toleranciou (default 0.01 mm) — nikdy presne ==.
+    # POZOR na signaturu: sprava je az 4. argument (3. je tolerancia).
     def assert_close(expected, actual, tol = 0.01, msg = nil)
+      raise ArgumentError, "assert_close: tolerancia musi byt cislo, dostal #{tol.inspect} (sprava patri na 4. miesto)" unless tol.is_a?(Numeric)
+
       ok = actual.is_a?(Numeric) && (expected.to_f - actual.to_f).abs <= tol
       assert(ok, msg || "ocakavane ~#{expected} (tolerancia #{tol}), dostal #{actual.inspect}")
     end
