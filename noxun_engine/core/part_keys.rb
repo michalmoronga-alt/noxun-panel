@@ -30,6 +30,12 @@ module Noxun
         key
       end
 
+      # Formalna kontrola formatu stabilnej identity — BuildPlan.validate! nou strazi
+      # cudzie/poskodene kluce (napr. z rucne editovaneho configu).
+      def valid?(key)
+        key.to_s.match?(%r{\A(cabinet/|zone:|front:)\S+\z})
+      end
+
       # Prevedie V0.3 override kluce (renderovaci suffix) na part_key podla
       # aktualneho planu. Nezname kluce zachova, aby sa pri migracii nestratili
       # data. Ak existuje novy aj stary kluc, explicitny novy kluc vyhrava.

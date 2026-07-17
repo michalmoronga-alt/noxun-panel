@@ -73,7 +73,7 @@ module Noxun
         # --- pomocne ---------------------------------------------------------
         def finish_cab(model, cab, msg)
           reselect(model, cab)
-          set_status(msg)
+          status_with_warnings(cab, msg) # BuildPlan upozornenia priamo v statuse
           push_selected(model)
         end
 

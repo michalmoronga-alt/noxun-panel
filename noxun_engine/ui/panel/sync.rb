@@ -57,6 +57,19 @@ module Noxun
           js("NX.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})")
         end
 
+        # Status doplneny o pocet BuildPlan upozorneni z posledneho planu korpusu.
+        # Nefatalne stavy (orezane vystuhy, preskocene police...) tak uz nie su neviditelne.
+        def status_with_warnings(cab, msg)
+          warns = cab && cab.valid? ? ((Store.config(cab) || {})['warnings'] || []) : []
+          msg = "#{msg} · ⚠ #{warns.size} #{warn_word(warns.size)}" unless warns.empty?
+          set_status(msg)
+        end
+
+        def warn_word(n)
+          return 'upozornenie' if n == 1
+          n < 5 ? 'upozornenia' : 'upozorneni'
+        end
+
         def js(script)
           return unless @dialog && @dialog.visible?
 

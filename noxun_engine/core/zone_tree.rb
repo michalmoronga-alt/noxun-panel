@@ -169,9 +169,10 @@ module Noxun
       # --- vypocet geometrie ---------------------------------------------------
 
       # tree: strukturny strom; box: { x0,x1,y0,y1,z0,z1 } vnutro korpusu (mm); t: hrubka; cabinet_id.
-      # Vrati: { zones:[ploche objekty s geometriou], dividers:[deskriptory], shelves:[deskriptory] }.
+      # Vrati: { zones:[ploche objekty s geometriou], dividers:[deskriptory], shelves:[deskriptory],
+      #          warnings:[BuildPlan.warning] } — nefatalne stavy (napr. preskocene police).
       def compute(tree, box, t, cabinet_id)
-        acc = { zones: [], dividers: [], shelves: [] }
+        acc = { zones: [], dividers: [], shelves: [], warnings: [] }
         walk(sanitize(tree), [1], box, t, cabinet_id, acc, 'Celé vnútro')
         acc
       end
@@ -368,11 +369,18 @@ module Noxun
       end
 
       # Police v listovej zone — rovnomerne v z-rozsahu zony, odsadene od cela.
+      # Prilis plytka zona (hlbka <= inset) uz police nepreskakuje ticho — hlasi warning.
       def add_shelves(count, box, t, suffix_path, node_id, acc)
         layout = Shelves.layout(box[:z0], box[:z1], t, count)
         w = box[:x1] - box[:x0]
         sd = (box[:y1] - box[:y0]) - SHELF_FRONT_INSET
-        return if sd <= 0
+        if sd <= 0
+          (acc[:warnings] ||= []) << BuildPlan.warning('shelf_skipped_shallow_zone',
+                                                       "Zona #{node_id}: prilis plytka na police (#{count} ks preskocenych).",
+                                                       part_key: PartKeys.zone(node_id, 'shelf', 1),
+                                                       data: { 'count' => count, 'depth' => r2(box[:y1] - box[:y0]) })
+          return
+        end
         layout[:shelves].each_with_index do |sh, i|
           acc[:shelves] << {
             suffix: "SHELF-#{suffix_path}-#{i + 1}", part_key: PartKeys.zone(node_id, 'shelf', i + 1),

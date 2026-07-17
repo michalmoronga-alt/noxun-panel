@@ -28,8 +28,6 @@ module Noxun
         rail_depth: 100.0, rails_orientation: 'flat', rails_top_offset: 0.0
       }.freeze
 
-      DEFAULTS = LOWER_DEFAULTS # spatna kompatibilita starych referencii
-
       GAP_BETWEEN_CABS = 50.0    # medzera medzi korpusmi pri vkladani vedla seba
       UPPER_HANG_Z     = 1400.0  # vyska zavesenia hornej skrinky (Z pri vlozeni)
 
@@ -316,15 +314,18 @@ module Noxun
           inst.material = su_material(model, resolved[:material_id], fallback)
           inst.layer = part_tag(model, pd[:role]) # tag dielca (Korpus/Chrbát/Čelá/Vnútro)
           pid = Ids.part_id(cid, pd[:suffix])
+          # BuildPlan kontrakt: vyrobne zaradenie riadi DESKRIPTOR (default sheet/true/1) —
+          # builder uz nic nenatvrdzuje; buduce 'counted'/'linear' dielce neprejdu ako doska.
           Store.write(inst, {
             std: Store::STD, kind: 'part', id: pid, part_id: pid, cabinet_id: cid,
             template_id: tid, role: pd[:role], name: pd[:name],
             part_key_schema: PartKeys::SCHEMA, part_key: resolved[:part_key],
             role_key: resolved[:role_key], # kompatibilny alias pre sucasny panel
-            manufactured: true, production_class: 'sheet',
+            manufactured: pd.fetch(:manufactured, true),
+            production_class: pd.fetch(:production_class, 'sheet').to_s,
             config: {
               length: pd[:prod][:length].round(2), width: pd[:prod][:width].round(2),
-              thickness: pd[:prod][:thickness].round(2), quantity: 1,
+              thickness: pd[:prod][:thickness].round(2), quantity: pd.fetch(:quantity, 1),
               material_id: resolved[:material_id], grain_direction: resolved[:grain_direction] || 'none',
               edges: resolved[:edges]
             }
@@ -368,8 +369,10 @@ module Noxun
           out
         end
 
+        # Belt-and-braces guard — degenerovane dielce filtruje uz plan (rovnaky prah
+        # BuildPlan::MIN_DIM), sem sa dostat nemaju.
         def positive_box?(box)
-          box && box.all? { |v| v.to_f > 0.01 }
+          box && box.all? { |v| v.to_f > BuildPlan::MIN_DIM }
         end
 
         # Tag (layer) dielca podla roly — zabezpeci jeho existenciu. Hromadne hide v Tags paneli.
@@ -407,6 +410,9 @@ module Noxun
           {
             engine_version: Engine::VERSION,
             part_key_schema: PartKeys::SCHEMA,
+            plan_schema: cfg[:plan_schema] || BuildPlan::SCHEMA,
+            warnings: cfg[:warnings].is_a?(Array) ? cfg[:warnings] : [],
+            hardware: cfg[:hardware].is_a?(Array) ? cfg[:hardware] : [],
             type: cfg[:type],
             name: cfg[:name] || default_name(cfg),
             construction_preset: cfg[:type] == 'upper' ? 'noxun-upper-18' : 'noxun-lower-18',
@@ -466,6 +472,9 @@ module Noxun
 
         def merge_final(cfg, plan)
           cfg.merge(
+            plan_schema: plan[:schema],     # verzia tvaru planu (nezavisla od part_key_schema)
+            warnings: plan[:warnings],      # nefatalne upozornenia — panel/vystupy ich zobrazia
+            hardware: plan[:hardware],      # kovanie (V0.4+); tvar uz zavazny
             available_width: plan[:available][:width].round(2),
             available_height: plan[:available][:height].round(2),
             available_depth: plan[:available][:depth].round(2),

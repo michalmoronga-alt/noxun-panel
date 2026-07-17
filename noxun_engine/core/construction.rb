@@ -1,7 +1,8 @@
 # frozen_string_literal: true
-# Noxun Engine — construction planner. cfg (mm Float) -> zoznam dielcov (deskriptorov).
+# Noxun Engine — construction planner. cfg (mm Float) -> BuildPlan (zavazny kontrakt).
 # CISTO vypoctovy modul: ziadna SketchUp geometria, ziadne .mm. Testovatelny bez modelu.
-# Kazdy dielec = { suffix, role, name, box:[sx,sy,sz], origin:[x,y,z], material:, prod:{} }.
+# Kazdy dielec = { suffix, part_key, role, name, material:, box:[sx,sy,sz], origin:[x,y,z],
+#                  prod:{length,width,thickness} } — plny kontrakt viz core/build_plan.rb.
 #
 # V0.2b: vnutro riesi ZoneTree (strom zon + priecky + police per-zona),
 #        cela riesi Fronts (fixed+auto s lockmi). Hrubka chrbta je konfigurovatelna.
@@ -15,22 +16,23 @@ module Noxun
   module Engine
     module Construction
       BACK_THICKNESS_DEFAULT = 3.0    # default hrubka chrbta (HDF), ak cfg neuvedie
-      RAIL_DEPTH             = 100.0  # hlbka priecok pri two_rails
       GROOVE_OFFSET          = 10.0   # odsadenie chrbta v drazke od zadnej hrany
 
       module_function
 
       # Hlavny vstup: cfg (symbolove kluce, mm Float) + cabinet_id (pre ID zon) -> plan.
+      # Vystup MUSI prejst BuildPlan.validate! — chybny plan nikdy neopusti planovac.
       def build_plan(cfg, cabinet_id = 'CAB-000')
         w = cfg[:width]; h = cfg[:height]; t = cfg[:thickness]
 
         interior = interior_dims(cfg)
         validate!(cfg, interior)
+        warnings = []
 
         parts = []
         parts.concat(side_parts(cfg))
         parts << bottom_part(cfg)
-        parts.concat(top_parts(cfg))
+        parts.concat(top_parts(cfg, warnings))
         bk = back_part(cfg, interior)
         parts << bk if bk
         parts.concat(plinth_parts(cfg))
@@ -41,13 +43,30 @@ module Noxun
         zres = ZoneTree.compute(cfg[:zone_tree], zbox, t, cabinet_id)
         parts.concat(zres[:dividers])
         parts.concat(zres[:shelves])
+        warnings.concat(zres[:warnings] || [])
 
         # Cela pred korpusom (fixed + auto s lockmi).
         fr = Fronts.layout(cfg[:fronts], w, h, cfg[:floor_height], t)
         parts.concat(fr[:parts])
 
-        {
+        # Kontrakt: parts = realne postavitelne dielce. Degenerovane (rozmer <= MIN_DIM)
+        # sa vyradia UZ TU s warningom — kusovnik/VEPO nikdy neuvidia dielec,
+        # ktory builder nepostavi (predtym ich ticho preskakoval az positive_box?).
+        # Prah MUSI byt zhodny s builderom (BuildPlan::MIN_DIM) — inak vznikne pasmo,
+        # kde plan dielec deklaruje a builder ho preskoci.
+        parts, degenerate = parts.partition { |pd| pd[:box].all? { |v| v.to_f > BuildPlan::MIN_DIM } }
+        degenerate.each do |pd|
+          warnings << BuildPlan.warning('part_skipped_degenerate',
+                                        "Dielec #{pd[:name]} (#{pd[:suffix]}) ma nekladny rozmer — preskoceny.",
+                                        part_key: pd[:part_key].to_s,
+                                        data: { 'box' => pd[:box].map(&:to_f) })
+        end
+
+        plan = {
+          schema: BuildPlan::SCHEMA,
           parts: parts,
+          hardware: [], # tvar zavazny (build_plan.rb); plni az V0.4 rules engine
+          warnings: warnings,
           zones: zres[:zones],
           zone_tree: ZoneTree.sanitize(cfg[:zone_tree]),
           front_items: fr[:items],
@@ -59,6 +78,7 @@ module Noxun
           wings: fr[:wings],
           interior: interior
         }
+        BuildPlan.validate!(plan)
       end
 
       # Vnutorne rozmery (svetle) + poloha celnej hrany chrbta. Hrubka chrbta z configu.
@@ -109,14 +129,14 @@ module Noxun
         end
       end
 
-      # Vrch — full / two_rails / none.
-      def top_parts(cfg)
+      # Vrch — full / two_rails / none. warnings: volitelny kolektor (BuildPlan kontrakt).
+      def top_parts(cfg, warnings = nil)
         w = cfg[:width]; d = cfg[:depth]; t = cfg[:thickness]; h = cfg[:height]
         case cfg[:top_mode]
         when 'none'
           []
         when 'two_rails'
-          rail_parts(cfg)
+          rail_parts(cfg, warnings)
         else # full
           [{ suffix: 'TOP', part_key: PartKeys.cabinet('top'), role: 'top', name: 'Vrch', material: :korpus,
              box: [w - 2 * t, d, t], origin: [t, 0, h - t], prod: { length: w - 2 * t, width: d, thickness: t } }]
@@ -124,13 +144,15 @@ module Noxun
       end
 
       # Dve horne vystuhy (rail_front / rail_back). flat = naplocho, upright = na hranu.
-      def rail_parts(cfg)
+      # Orezanie hlbky/vysky vystuhy uz nie je tiche — hlasi sa do warnings (ak je kolektor).
+      def rail_parts(cfg, warnings = nil)
         w = cfg[:width]; d = cfg[:depth]; t = cfg[:thickness]; h = cfg[:height]; s = cfg[:floor_height]
         off = cfg[:rails_top_offset].to_f
         z_top = h - off
         if cfg[:rails_orientation] == 'upright'
           rdp = [cfg[:rail_depth], (h - s - t - 10.0)].min
           rdp = 20.0 if rdp < 20.0
+          rail_clamp_warning(warnings, cfg[:rail_depth], rdp, 'vyska')
           z0 = z_top - rdp
           prod = { length: w - 2 * t, width: rdp, thickness: t }
           [
@@ -144,6 +166,7 @@ module Noxun
         else # flat
           rd = [cfg[:rail_depth], (d / 2.0 - 10.0)].min
           rd = 20.0 if rd < 20.0
+          rail_clamp_warning(warnings, cfg[:rail_depth], rd, 'hlbka')
           z0 = z_top - t
           prod = { length: w - 2 * t, width: rd, thickness: t }
           [
@@ -186,6 +209,14 @@ module Noxun
         [{ suffix: 'PLINTH', part_key: PartKeys.cabinet('plinth', 'front'),
            role: 'plinth', name: 'Sokel predny', material: :korpus,
            box: [w - 2 * t, t, s], origin: [t, recess, 0], prod: { length: w - 2 * t, width: s, thickness: t } }]
+      end
+
+      # Prida warning o orezani rozmeru vystuhy (ziadany != pouzity).
+      def rail_clamp_warning(warnings, wanted, used, label)
+        return if warnings.nil? || (wanted.to_f - used.to_f).abs < 0.01
+        warnings << BuildPlan.warning('rail_depth_clamped',
+                                      "Vystuha: #{label} orezana z #{wanted.to_f.round(1)} na #{used.to_f.round(1)} mm (limit korpusu).",
+                                      data: { 'wanted' => wanted.to_f, 'used' => used.to_f })
       end
 
       def validate!(cfg, interior)
