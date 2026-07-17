@@ -44,8 +44,14 @@ module Noxun
 
       # Nacita cely katalog { 'sheets' => [...], 'edges' => [...] }. Pri prvom spusteni seedne.
       def load
+        JsonFileStore.deep_copy(catalog)
+      end
+
+      # Interny read-only pohlad pre lookupy pocas rebuildu. JsonFileStore ho drzi
+      # v pamati a subor kontroluje nanajvys raz za CHECK_INTERVAL.
+      def catalog
         ensure_seeded
-        data = JSON.parse(File.read(path))
+        data = JsonFileStore.read(path, copy: false)
         {
           'sheets' => (data['sheets'].is_a?(Array) ? data['sheets'] : seed_sheets),
           'edges'  => (data['edges'].is_a?(Array)  ? data['edges']  : seed_edges)
@@ -56,11 +62,11 @@ module Noxun
       end
 
       def sheets
-        load['sheets']
+        catalog['sheets']
       end
 
       def edges
-        load['edges'].select { |item| item.is_a?(Hash) && supported_edge_thickness?(item['thickness']) }
+        catalog['edges'].select { |item| item.is_a?(Hash) && supported_edge_thickness?(item['thickness']) }
       end
 
       # Doskovy material podla material_id (alebo nil).
@@ -83,7 +89,6 @@ module Noxun
         data = load
         data['sheets'] = data['sheets'].reject { |m| m['material_id'] == rec['material_id'] } + [rec]
         write(data)
-        true
       end
 
       def upsert_edge(attrs)
@@ -92,42 +97,37 @@ module Noxun
         data = load
         data['edges'] = data['edges'].reject { |a| a['abs_id'] == rec['abs_id'] } + [rec]
         write(data)
-        true
       end
 
       def delete_sheet(id)
         data = load
         data['sheets'] = data['sheets'].reject { |m| m['material_id'] == id }
         write(data)
-        true
       end
 
       def delete_edge(id)
         data = load
         data['edges'] = data['edges'].reject { |a| a['abs_id'] == id }
         write(data)
-        true
       end
 
       def ensure_seeded
-        return if File.exist?(path)
-        FileUtils.mkdir_p(dir)
+        return if JsonFileStore.available?(path)
         write({ 'sheets' => seed_sheets, 'edges' => seed_edges })
       end
 
       # Zapis so zalohou: existujuci subor -> .bak, novy cez .tmp + atomicky rename (ako templates.rb).
       def write(data)
-        FileUtils.mkdir_p(dir)
-        FileUtils.cp(path, "#{path}.bak") if File.exist?(path)
-        tmp = "#{path}.tmp"
         payload = { 'std' => STD, 'sheets' => data['sheets'], 'edges' => data['edges'] }
-        File.write(tmp, JSON.pretty_generate(payload))
-        File.delete(path) if File.exist?(path)
-        File.rename(tmp, path)
-        true
+        JsonFileStore.write(path, payload)
       rescue StandardError => e
         Engine.log_error(e, 'Materials.write') if defined?(Engine)
         false
+      end
+
+      def reload!
+        JsonFileStore.reload!(path)
+        load
       end
 
       # --- ABS podla dekoru (pravidlove defaulty, standard 7.5) ----------------
@@ -248,7 +248,7 @@ module Noxun
       def normalized_abs_id(id)
         value = id.to_s.strip
         return nil if value.empty?
-        raw = load['edges'].find { |item| item.is_a?(Hash) && item['abs_id'] == value }
+        raw = catalog['edges'].find { |item| item.is_a?(Hash) && item['abs_id'] == value }
         return value unless raw
         return value if supported_edge_thickness?(raw['thickness'])
 

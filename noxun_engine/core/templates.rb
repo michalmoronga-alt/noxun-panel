@@ -25,9 +25,9 @@ module Noxun
       # Nacita pole { 'name' => ..., 'config' => {...} }. Pri prvom spusteni zapise predvolene.
       def load
         ensure_seeded
-        data = JSON.parse(File.read(path))
+        data = JsonFileStore.read(path, copy: false)
         list = data['templates']
-        list.is_a?(Array) ? list : build_predefined
+        JsonFileStore.deep_copy(list.is_a?(Array) ? list : build_predefined)
       rescue StandardError => e
         Engine.log_error(e, 'TemplateStore.load')
         build_predefined
@@ -42,33 +42,30 @@ module Noxun
         list = load.reject { |t| t['name'] == name }
         list << { 'name' => name.to_s, 'config' => config }
         write_list(list)
-        true
       end
 
       def delete(name)
         write_list(load.reject { |t| t['name'] == name })
-        true
       end
 
       # --- perzistencia --------------------------------------------------------
 
       def ensure_seeded
-        return if File.exist?(path)
-        FileUtils.mkdir_p(dir)
+        return if JsonFileStore.available?(path)
         write_list(build_predefined)
       end
 
       # Zapis so zalohou: existujuci subor -> .bak, novy cez .tmp + atomicky rename.
       def write_list(list)
-        FileUtils.mkdir_p(dir)
-        FileUtils.cp(path, "#{path}.bak") if File.exist?(path)
-        tmp = "#{path}.tmp"
-        File.write(tmp, JSON.pretty_generate({ 'std' => STD, 'templates' => list }))
-        File.delete(path) if File.exist?(path)
-        File.rename(tmp, path)
+        JsonFileStore.write(path, { 'std' => STD, 'templates' => list })
       rescue StandardError => e
         Engine.log_error(e, 'TemplateStore.write_list')
         false
+      end
+
+      def reload!
+        JsonFileStore.reload!(path)
+        load
       end
 
       # --- predvolene sablony (konstrukcne presety) ---------------------------

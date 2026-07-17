@@ -102,45 +102,56 @@ module Noxun
 
       # Nacita pravidla { role => {L1:th,...} }. Pri prvom spusteni seedne SEED_RULES.
       def load
+        JsonFileStore.deep_copy(rules)
+      end
+
+      # Interny read-only pohlad; pocas generovania dielcov sa JSON neparsuje opakovane.
+      def rules
         ensure_seeded
-        data = JSON.parse(File.read(path))
-        r = data['rules']
-        r.is_a?(Hash) ? r : deep_copy(SEED_RULES)
+        data = JsonFileStore.read(path, copy: false)
+        value = data['rules']
+        return deep_copy(SEED_RULES) unless value.is_a?(Hash)
+
+        normalized = normalize_rules(value)
+        if normalized != value
+          if write(normalized)
+            Engine.log('abs rules: pravidla boli obmedzene na hrubky 1/2 mm') if defined?(Engine)
+            return JsonFileStore.read(path, copy: false)['rules']
+          end
+          return normalized
+        end
+        value
       rescue StandardError => e
         Engine.log_error(e, 'AbsRules.load') if defined?(Engine)
         deep_copy(SEED_RULES)
       end
 
       def ensure_seeded
-        return if File.exist?(path)
-        FileUtils.mkdir_p(dir)
+        return if JsonFileStore.available?(path)
         write(deep_copy(SEED_RULES))
       end
 
       def write(rules)
-        FileUtils.mkdir_p(dir)
-        FileUtils.cp(path, "#{path}.bak") if File.exist?(path)
-        tmp = "#{path}.tmp"
-        File.write(tmp, JSON.pretty_generate({ 'std' => STD, 'rules' => rules }))
-        File.delete(path) if File.exist?(path)
-        File.rename(tmp, path)
-        true
+        JsonFileStore.write(path, { 'std' => STD, 'rules' => rules })
       rescue StandardError => e
         Engine.log_error(e, 'AbsRules.write') if defined?(Engine)
         false
+      end
+
+      def reload!
+        JsonFileStore.reload!(path)
+        load
       end
 
       # --- resolve edges pre dielec -------------------------------------------
 
       # Hrubky ABS pre rolu (z pravidiel). Vrati mapu {L1:th,...} (len hrany s pravidlom).
       def thicknesses_for(role)
-        raw = load[role.to_s] || {}
+        raw = rules[role.to_s] || {}
         EDGE_ORDER.each_with_object({}) do |code, out|
           value = raw[code]
           next if value.nil?
           th = value.to_f
-          # Kompatibilita so starym seed pravidlom: podlimitna paska sa sprava ako 1 mm.
-          th = 1.0 if (th - 0.4).abs < 0.05
           next unless defined?(Materials) && Materials.supported_edge_thickness?(th)
           out[code] = th
         end
@@ -190,7 +201,22 @@ module Noxun
       end
 
       def deep_copy(h)
-        JSON.parse(JSON.generate(h))
+        JsonFileStore.deep_copy(h)
+      end
+
+      def normalize_rules(source)
+        source.each_with_object({}) do |(role, edge_map), out|
+          out[role.to_s] = {}
+          next unless edge_map.is_a?(Hash)
+
+          EDGE_ORDER.each do |code|
+            next unless edge_map.key?(code)
+            thickness = edge_map[code].to_f
+            thickness = 1.0 if (thickness - 0.4).abs < 0.05
+            next unless [1.0, 2.0].include?(thickness)
+            out[role.to_s][code] = thickness
+          end
+        end
       end
     end
   end
