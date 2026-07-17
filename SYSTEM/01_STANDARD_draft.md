@@ -453,6 +453,8 @@ Výrobný stav je **explicitne v metadátach** (`production_class` + `manufactur
 
 Podľa sekcie 2.1: **ploché kľúče = identita, názov a filtre; všetko rozmerové a výrobné žije v `config` (JSON string)** — tak to ukladá aj engine (`NOXUN/config`). Exportéry čítajú rozmery VÝHRADNE z `config`; názov dielca z plochého kľúča `name`.
 
+> **Vykonateľná podoba kontraktu (V0.3.4):** tvar plánu stavby — deskriptor dielca, `warnings[]`, `hardware[]`, verzia schémy a validátor — je záväzne definovaný v kóde: [`noxun_engine/core/build_plan.rb`](../noxun_engine/core/build_plan.rb) (`BuildPlan.validate!` beží pri každom pláne). Pri rozpore detailov platí kód + jeho testy (`tests/pure/test_build_plan.rb`); tento dokument drží princípy.
+
 ```json
 {
   "std": 1,
