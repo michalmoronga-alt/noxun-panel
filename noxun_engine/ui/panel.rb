@@ -73,7 +73,6 @@ module Noxun
           cb(dlg, 'set_cabinet_material') { |p| handle_set_cabinet_material(p) } # korpusovy override
           cb(dlg, 'set_part_material')    { |p| handle_set_part_material(p) }    # per-dielec override
           cb(dlg, 'set_part_edge')        { |p| handle_set_part_edge(p) }        # ABS hrana dielca
-          cb(dlg, 'apply_to_similar')     { |p| handle_apply_to_similar(p) }     # na podobne diely
           # Diagnostika: JS chyby z HtmlDialogu (window.onerror) -> Engine.log. Priamo, NIE cez cb —
           # aby pripadna chyba v logovani nespustila set_status (dalsi execute_script) a slucku.
           dlg.add_action_callback('js_error') do |_ctx, msg|
@@ -428,45 +427,6 @@ module Noxun
           rebuild_focus_part(model, cab, rk, params, "Hrana #{code} — #{label}.")
         end
 
-        # "Pouzit na podobne diely" — skopiruje material + ABS zdrojoveho dielca na vsetky dielce
-        # ROVNAKEJ ROLY. scope: 'cabinet' (ta ista skrinka) / 'model' (vsetky korpusy). Kluc = part_key.
-        def handle_apply_to_similar(payload)
-          model = Sketchup.active_model
-          cab = find_cabinet(model)
-          return set_status('Najprv oznac dielec v korpuse.', true) if cab.nil?
-          data = parse(payload)
-          rk = data['role_key'].to_s
-          scope = data['scope'].to_s == 'model' ? 'model' : 'cabinet'
-          src = find_part_by_role_key(cab, rk)
-          return set_status('Zdrojovy dielec sa nenasiel.', true) if src.nil?
-          role = Store.get(src, 'role')
-          scfg = Store.config(src) || {}
-          src_mat = scfg['material_id']
-          src_edges = dup_edges(scfg['edges'] || {})
-          cabs = scope == 'model' ? all_cabinets(model) : [cab]
-          focus_key = canonical_part_key(existing_params(cab), rk)
-          count = 0
-          suspend_selection_sync do
-            cabs.each do |c|
-              params = existing_params(c)
-              keys = parts_of_role(c, role).map { |k| canonical_part_key(params, k) }
-              next if keys.empty?
-              ov = (params['part_overrides'] ||= {})
-              keys.each do |k|
-                rec = ov[k] || {}
-                rec['material_id'] = src_mat if src_mat
-                rec['edges'] = dup_edges(src_edges)
-                ov[k] = rec
-                count += 1
-              end
-              CabinetBuilder.rebuild(model, c, params, op_name: 'NOXUN: material/ABS na podobne')
-            end
-            focus_part(model, cab, focus_key)
-          end
-          set_status("Použité na #{count} dielcov #{scope == 'model' ? 'v celom modeli' : 'v skrinke'} (rola #{role}).")
-          push_selected(model)
-        end
-
         # Rebuild korpusu s pripravenymi params + fokus na dielec (part_key) + resync panela.
         def rebuild_focus_part(model, cab, rk, params, msg)
           suspend_selection_sync do
@@ -808,7 +768,7 @@ module Noxun
         end
 
         # Karta dielca pre UI (ABS/materialovy editor): rola, rozmery, VYSLEDNY material + ABS hrany,
-        # labely hran per rola, priznaky overridov, pocet podobnych (rovnaka rola v skrinke).
+        # labely hran per rola, priznaky overridov.
         def part_card_payload(_model, cab, part)
           cfg = Store.config(part) || {}
           role = Store.get(part, 'role').to_s
@@ -825,7 +785,6 @@ module Noxun
             'edge_sides' => AbsRules.edge_sides(role), # V0.3 FIX 3: mapa hrana->strana pre SVG (1 zdroj pravdy)
             'edge_overrides' => (ov['edges'] || {}), # ktore hrany maju rucny override (UI odlisi "dedi")
             'has_material_override' => !ov['material_id'].nil?,
-            'similar_count' => count_role(cab, role),
             'cabinet_id' => Store.get(cab, 'cabinet_id')
           }
         rescue StandardError => e
@@ -867,32 +826,9 @@ module Noxun
           end
         end
 
-        # part_key vsetkych dielcov danej roly v korpuse (pre "pouzit na podobne").
-        def parts_of_role(cab, role)
-          return [] unless cab && cab.respond_to?(:definition) && cab.valid?
-          cab.definition.entities.grep(Sketchup::ComponentInstance).select do |e|
-            Store.kind(e) == 'part' && Store.get(e, 'role') == role
-          end.map { |e| part_identity(cab, e) }.compact
-        end
-
-        def count_role(cab, role)
-          return 0 unless cab && cab.respond_to?(:definition) && cab.valid?
-          cab.definition.entities.grep(Sketchup::ComponentInstance).count do |e|
-            Store.kind(e) == 'part' && Store.get(e, 'role') == role
-          end
-        end
-
         def all_cabinets(model)
           out = []
           Ids.each_cabinet(model) { |i| out << i }
-          out
-        end
-
-        # Plytka kopia edges mapy (len zname kluce L1/L2/W1/W2, zachova nil = bez ABS).
-        def dup_edges(edges)
-          out = {}
-          return out unless edges.is_a?(Hash)
-          %w[L1 L2 W1 W2].each { |k| out[k] = edges[k] if edges.key?(k) }
           out
         end
 
