@@ -218,7 +218,8 @@ module Noxun
           eff_body  = present(cfg[:material_id])       || defaults['default_material_id']
           eff_front = present(cfg[:front_material_id]) || defaults['default_front_material_id']
           eff_back  = present(cfg[:back_material_id])  || defaults['default_back_material_id']
-          overrides = cfg[:part_overrides].is_a?(Hash) ? cfg[:part_overrides] : {}
+          overrides = PartKeys.migrate_overrides(cfg[:part_overrides], plan[:parts])
+          cfg = cfg.merge(part_overrides: overrides, part_key_schema: PartKeys::SCHEMA)
 
           plan[:parts].each do |pd|
             next unless positive_box?(pd[:box]) # ochrana proti degenerovanym dielcom (uzke zony)
@@ -231,16 +232,13 @@ module Noxun
           merge_final(cfg, plan)
         end
 
-        # Vyriesi material + ABS hrany + role_key jedneho dielca (retaz standardu 7.2 / part_overrides).
-        #
-        # role_key = pd[:suffix] — DETERMINISTICKY identifikator dielca v ramci korpusu:
-        #   Construction generuje suffixy cisto z konfiguracie (rovnaka konfiguracia -> rovnake suffixy),
-        #   police/priecky nesu v suffixe CESTU zony (napr. SHELF-1_2-1), takze zmena v inej zone
-        #   NEPOSUNIE kluc "tej istej" police. part_id = cabinet_id + '-' + suffix (konzistentne s Ids).
-        #   Preto override zapisany pod role_key sedi na ten isty dielec aj po rebuilde (standard 9.3).
+        # Vyriesi material + ABS hrany jedneho dielca cez stabilny part_key.
+        # Renderovaci suffix a part_id ostavaju nezmenene; uz nie su datovym klucom override.
+        # part_key je stabilny pri presune cela aj pri zmenach susednych zon;
+        # role_key zostava iba kompatibilny nazov pola v sucasnom UI protokole.
         def resolve_part(pd, eff_body, eff_front, eff_back, overrides)
-          role_key = pd[:suffix]
-          ov = overrides[role_key].is_a?(Hash) ? overrides[role_key] : {}
+          part_key = PartKeys.for_descriptor(pd)
+          ov = overrides[part_key].is_a?(Hash) ? overrides[part_key] : {}
           base_mat = base_material_for(pd[:role], pd[:material], eff_body, eff_front, eff_back)
           mat_id = present(ov['material_id']) || base_mat
           # Jeden lookup doskoveho materialu — pouzity na dekor (ABS) aj hrubkovu kontrolu (V0.3 FIX 2).
@@ -251,7 +249,7 @@ module Noxun
           edges = base_edges.merge(known_edges(ov['edges']))
           grain = sheet && sheet['grain'].to_s
           grain = 'none' unless %w[length width none].include?(grain)
-          { role_key: role_key, material_id: mat_id, edges: edges,
+          { part_key: part_key, role_key: part_key, material_id: mat_id, edges: edges,
             grain_direction: grain, sheet_thickness: (sheet && sheet['thickness']) }
         end
 
@@ -321,7 +319,8 @@ module Noxun
           Store.write(inst, {
             std: Store::STD, kind: 'part', id: pid, part_id: pid, cabinet_id: cid,
             template_id: tid, role: pd[:role], name: pd[:name],
-            role_key: resolved[:role_key], # plochy kluc pre parovanie s part_overrides (UI karta dielca)
+            part_key_schema: PartKeys::SCHEMA, part_key: resolved[:part_key],
+            role_key: resolved[:role_key], # kompatibilny alias pre sucasny panel
             manufactured: true, production_class: 'sheet',
             config: {
               length: pd[:prod][:length].round(2), width: pd[:prod][:width].round(2),
@@ -396,7 +395,7 @@ module Noxun
         def write_cabinet_attrs(inst, cid, cfg)
           Store.write(inst, {
             std: Store::STD, kind: 'cabinet', id: cid, cabinet_id: cid,
-            template_id: template_id_for(cfg[:type]), role: 'cabinet',
+            template_id: template_id_for(cfg[:type]), role: 'cabinet', part_key_schema: PartKeys::SCHEMA,
             manufactured: false, production_class: 'reference',
             config: cabinet_config(cfg)
           })
@@ -407,6 +406,7 @@ module Noxun
         def cabinet_config(cfg)
           {
             engine_version: Engine::VERSION,
+            part_key_schema: PartKeys::SCHEMA,
             type: cfg[:type],
             name: cfg[:name] || default_name(cfg),
             construction_preset: cfg[:type] == 'upper' ? 'noxun-upper-18' : 'noxun-lower-18',
@@ -428,7 +428,7 @@ module Noxun
             back:    { mode: cfg[:back_mode], thickness: cfg[:back_thickness] },
             support: support_descriptor(cfg),
             # V0.3 materialy — korpusove (nil = dedi z projektoveho defaultu, standard 7.2)
-            # + part_overrides (per-dielec material/hrany, kluc = role_key, prezije rebuild).
+            # + part_overrides (per-dielec material/hrany, kluc = part_key, prezije rebuild).
             material_id: cfg[:material_id],
             front_material_id: cfg[:front_material_id],
             back_material_id: cfg[:back_material_id],
@@ -513,11 +513,12 @@ module Noxun
             front_material_id: present(raw(p, :front_material_id)),
             back_material_id: present(raw(p, :back_material_id)),
             part_overrides: norm_overrides(raw(p, :part_overrides)),
+            part_key_schema: raw(p, :part_key_schema).to_i,
             name: (p['name'] || p[:name])
           }
         end
 
-        # Ocisti part_overrides na { role_key => { 'material_id'=>..|nil, 'edges'=>{L1..W2} } }.
+        # Ocisti part_overrides na { part_key => { 'material_id'=>..|nil, 'edges'=>{L1..W2} } }.
         # Zahodi prazdne / neplatne zaznamy. Zachova nil hrany (explicitne "bez ABS").
         def norm_overrides(raw_ov)
           return {} unless raw_ov.is_a?(Hash)
@@ -555,7 +556,7 @@ module Noxun
         # Config (stored, string kluce) -> params pre normalize. Doplna spatnu kompatibilitu:
         # stare configy (bez zone_tree, fronts ako string, shelves top-level).
         def config_to_params(cfg)
-          {
+          params = {
             'type' => cfg['type'] || 'lower',
             'width' => cfg['width'], 'height' => cfg['height'], 'depth' => cfg['depth'],
             'thickness' => cfg['thickness'], 'floor_height' => cfg['floor_height'],
@@ -578,9 +579,27 @@ module Noxun
             'material_id'       => v03?(cfg) ? cfg['material_id'] : nil,
             'front_material_id' => v03?(cfg) ? cfg['front_material_id'] : nil,
             'back_material_id'  => v03?(cfg) ? cfg['back_material_id'] : nil,
+            'part_key_schema'   => cfg['part_key_schema'].to_i,
             'part_overrides'    => cfg['part_overrides'].is_a?(Hash) ? cfg['part_overrides'] : {},
             'name' => cfg['name']
           }
+          migrate_legacy_part_keys(params, cfg)
+        end
+
+        # Migracia sa robi podla POVODNEJ ulozenej konfiguracie este pred pouzivatelskou
+        # zmenou. Tak sa spravne prenesie aj override cela, ktore sa nasledne presunie
+        # alebo zostane po zmazani susedneho riadku.
+        def migrate_legacy_part_keys(params, stored_cfg)
+          return params if stored_cfg['part_key_schema'].to_i >= PartKeys::SCHEMA
+
+          normalized = normalize(params)
+          plan = Construction.build_plan(normalized)
+          params['part_overrides'] = PartKeys.migrate_overrides(params['part_overrides'], plan[:parts])
+          params['part_key_schema'] = PartKeys::SCHEMA
+          params
+        rescue StandardError => e
+          Engine.log_error(e, 'migrate_legacy_part_keys') if defined?(Engine)
+          params
         end
 
         # Marker V0.3 materialov. V0.2 korpusy part_overrides nemali.

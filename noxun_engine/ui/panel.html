@@ -346,6 +346,12 @@
   // V0.3 materialy + ABS
   var MATERIALS = { sheets: [], edges: [] }; // katalog z backendu
   var partCard = null;                        // aktualna karta dielca (null = ziadny dielec)
+  var stableIdSeq = 0;
+  function newStableId(prefix){
+    stableIdSeq += 1;
+    return prefix + Date.now().toString(36) + '-' + stableIdSeq.toString(36) + '-' +
+      Math.random().toString(36).slice(2, 8);
+  }
 
   function el(id){ return document.getElementById(id); }
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -440,7 +446,7 @@
       var locked = r.querySelector('.flock').checked;
       var wings = r.querySelector('.fw').value;
       var hasH = hv !== '';
-      items.push({ id: 'F' + (i + 1), type: type, mode: hasH ? 'fixed' : 'auto',
+      items.push({ id: r.dataset.frontId || newStableId('F'), type: type, mode: hasH ? 'fixed' : 'auto',
         height: hasH ? hv : null, locked: hasH ? locked : false, wings: (type === 'door') ? wings : '1' });
     }
     return { split_axis: 'height', gap: 3.0, gap_top: 2.0, gap_bottom: 2.0, gap_sides: 2.0, items: items };
@@ -570,6 +576,7 @@
     var idx = wrap.querySelectorAll('.frow').length + 1;
     var row = document.createElement('div');
     row.className = 'frow';
+    row.dataset.frontId = item.id || newStableId('F');
     row.innerHTML =
       '<span class="fnum">' + idx + '</span>' +
       '<select class="ftype" onchange="onFrontTypeChange(this); onField()">' +
@@ -596,21 +603,28 @@
   }
 
   // ===================== ZONE TREE (JS zrkadlo ZoneTree) =====================
-  function defaultTree(sh){ return { split:null, shelves: (sh||0), children:[] }; }
+  function defaultTree(sh, nodeId){
+    return { id:(nodeId || 'Z1'), generation:0, split:null, shelves:(sh||0), children:[] };
+  }
   function truthy(v){ return v===true || v==='true' || v==='1' || v===1; }
-  function sanitizeTree(node){
-    if (!node || typeof node !== 'object') return defaultTree(0);
+  function sanitizeTree(node, path){
+    path = Array.isArray(path) ? path : [1];
+    node = (node && typeof node === 'object') ? node : {};
+    var nodeId = String(node.id || '').trim() || ('Z' + path.join('_'));
+    var generation = Math.max(0, parseInt(node.generation || 0, 10) || 0);
     var sp = node.split;
     if (sp && typeof sp === 'object'){
       var axis = (sp.axis === 'h') ? 'h' : 'v';
       var count = Math.min(4, Math.max(2, parseInt(sp.count || 2, 10)));
       var cuts = sanitizeCuts(sp.cuts, count);
-      var kids = (node.children || []).map(sanitizeTree);
-      while (kids.length < count) kids.push(defaultTree(0));
-      kids = kids.slice(0, count);
-      return { split:{ axis:axis, count:count, cuts:cuts }, shelves:0, children:kids };
+      var rawKids = node.children || [];
+      var kids = [];
+      for (var i=0; i<count; i++) kids.push(sanitizeTree(rawKids[i], path.concat(i+1)));
+      return { id:nodeId, generation:generation,
+        split:{ axis:axis, count:count, cuts:cuts }, shelves:0, children:kids };
     }
-    return defaultTree(parseInt(node.shelves||0,10));
+    return { id:nodeId, generation:generation, split:null,
+      shelves:Math.min(4, Math.max(0, parseInt(node.shelves||0,10) || 0)), children:[] };
   }
   function sanitizeCuts(cuts, count){
     var arr = (cuts||[]).map(function(c){
@@ -988,7 +1002,13 @@
       if (window.sketchup && sketchup.split_zone) sketchup.split_zone(JSON.stringify({ zone_id: activeZoneId, axis: axis, count: count }));
     } else {
       var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localZoneId(activeZoneId)));
-      if (node){ node.split={axis:axis,count:count,cuts:sanitizeCuts(null,count)}; node.shelves=0; node.children=[]; for(var i=0;i<count;i++)node.children.push(defaultTree(0)); }
+      if (node){
+        node.generation = (node.generation || 0) + 1;
+        node.split={axis:axis,count:count,cuts:sanitizeCuts(null,count)};
+        node.shelves=0;
+        node.children=[];
+        for(var i=0;i<count;i++) node.children.push(defaultTree(0, newStableId('Z')));
+      }
       currentZoneTree = tree; renderPreview(); refreshZoneUI();
     }
   }

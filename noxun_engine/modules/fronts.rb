@@ -59,27 +59,33 @@ module Noxun
 
       # Panely jedneho cela. drawer_front = 1 panel; door = 1/2 kridla podla wings.
       def panels_for(item, idx, gs, opening_w, z, h)
+        front_id = item['id'].to_s
+        front_id = "F#{idx}" if front_id.empty?
         if item['type'] == 'drawer_front'
-          [box_desc("DRW-#{idx}", 'drawer_front', "Zasuvkove celo #{idx}", gs, opening_w, z, h)]
+          [box_desc("DRW-#{idx}", PartKeys.front(front_id, 'panel'),
+                    'drawer_front', "Zasuvkove celo #{idx}", gs, opening_w, z, h)]
         else
           wings = resolve_wings(item['wings'], opening_w)
           if wings == 2
             dw = (opening_w - GAP_DEFAULT) / 2.0
             [
-              box_desc("DOOR-#{idx}-L", 'front_door', "Dvierka #{idx} lave", gs, dw, z, h),
-              box_desc("DOOR-#{idx}-R", 'front_door', "Dvierka #{idx} prave", gs + dw + GAP_DEFAULT, dw, z, h)
+              box_desc("DOOR-#{idx}-L", PartKeys.front(front_id, 'wing', 'left'),
+                       'front_door', "Dvierka #{idx} lave", gs, dw, z, h),
+              box_desc("DOOR-#{idx}-R", PartKeys.front(front_id, 'wing', 'right'),
+                       'front_door', "Dvierka #{idx} prave", gs + dw + GAP_DEFAULT, dw, z, h)
             ]
           else
-            [box_desc("DOOR-#{idx}", 'front_door', "Dvierka #{idx}", gs, opening_w, z, h)]
+            [box_desc("DOOR-#{idx}", PartKeys.front(front_id, 'wing', 'single'),
+                      'front_door', "Dvierka #{idx}", gs, opening_w, z, h)]
           end
         end
       end
 
       # Deskriptor dielca cela — box [sirka, hrubka, vyska], origin pred korpusom (Y = -hrubka).
-      def box_desc(suffix, role, name, x, wdt, z, h)
+      def box_desc(suffix, part_key, role, name, x, wdt, z, h)
         ft = FRONT_THICKNESS
         {
-          suffix: suffix, role: role, name: name, material: :front,
+          suffix: suffix, part_key: part_key, role: role, name: name, material: :front,
           box: [wdt, ft, h], origin: [x, -ft, z],
           prod: { length: h.round(2), width: wdt.round(2), thickness: ft }
         }
@@ -147,7 +153,18 @@ module Noxun
       end
 
       def normalize_items(items)
-        Array(items).each_with_index.map do |it, i|
+        used_ids = {}
+        next_id = 1
+        Array(items).each_with_index.map do |it, _i|
+          requested_id = (it['id'] || it[:id]).to_s.strip
+          front_id = requested_id.empty? ? nil : PartKeys.segment(requested_id)
+          if front_id.nil? || used_ids[front_id]
+            next_id += 1 while used_ids["F#{next_id}"]
+            front_id = "F#{next_id}"
+            next_id += 1
+          end
+          used_ids[front_id] = true
+
           type = (it['type'] || it[:type]).to_s
           type = 'door' unless %w[door drawer_front].include?(type)
           hraw = it['height'] || it[:height]
@@ -158,7 +175,7 @@ module Noxun
           wings = (it['wings'] || it[:wings] || 'auto').to_s
           wings = 'auto' unless %w[1 2 auto].include?(wings)
           {
-            'id' => (it['id'] || it[:id] || "F#{i + 1}").to_s,
+            'id' => front_id,
             'type' => type,
             'mode' => mode,
             'height' => has_h ? hraw.to_f : nil,

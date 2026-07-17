@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+require 'securerandom'
 # Noxun Engine — strom zon (standard sekcia 1 + 5). Cisto vypoctovy modul (mm Float).
 #
 # Zona = adresovatelny vnutorny priestor korpusu. Strom: koren Z1 = cele vnutro;
@@ -13,9 +14,11 @@
 #   Priecky (count-1) su dielce korpusu; ich pozicie sa odvodia z rozlozenia poli.
 #
 # Struktura uzla (string-keyed, round-tripuje cez JSON v configu korpusu):
-#   { 'split' => nil | {axis,count,cuts}, 'shelves' => 0..4, 'children' => [uzol,...] }
+#   { 'id' => stabilne interne ID, 'generation' => revizia topologie,
+#     'split' => nil | {axis,count,cuts}, 'shelves' => 0..4, 'children' => [uzol,...] }
 #
-# ID zon: <cabinet_id>-Z<cesta> kde cesta = "1","1.2","1.2.1" ... (koren = 1). Deti .1 = min suradnica.
+# Ghost ID zon ostava <cabinet_id>-Z<cesta> pre UI. Vyrobne dielce pouzivaju interne ID uzla,
+# preto zmena cesty alebo susednej zony nepresunie material/ABS override na iny dielec.
 module Noxun
   module Engine
     module ZoneTree
@@ -26,17 +29,25 @@ module Noxun
 
       # --- konstrukcia / uprava stromu (string-keyed) -------------------------
 
-      def default_node(shelves = 0)
-        { 'split' => nil, 'shelves' => Shelves.clamp(shelves.to_i), 'children' => [] }
+      def default_node(shelves = 0, node_id = nil, generation = 0)
+        { 'id' => node_id, 'generation' => [generation.to_i, 0].max,
+          'split' => nil, 'shelves' => Shelves.clamp(shelves.to_i), 'children' => [] }
       end
 
       def default_tree(shelves = 0)
-        default_node(shelves)
+        default_node(shelves, 'Z1')
       end
 
       # Ocisti a znormalizuje lubovolny (aj symbolovy/poskodeny/legacy) strom na kanonicku formu.
+      # Legacy uzly dostanu deterministicke ID podla povodnej cesty. Po ulozeni sa ID uz nemeni.
       def sanitize(node)
-        return default_node(0) unless node.is_a?(Hash)
+        sanitize_node(node, [1], { used: {} })
+      end
+
+      def sanitize_node(node, path, state)
+        node = {} unless node.is_a?(Hash)
+        node_id = canonical_node_id(node['id'] || node[:id], path, state)
+        generation = [((node['generation'] || node[:generation]) || 0).to_i, 0].max
         split = node['split'] || node[:split]
         if split.is_a?(Hash)
           axis = (split['axis'] || split[:axis]).to_s
@@ -45,14 +56,30 @@ module Noxun
           count = 2 if count < 2
           count = 4 if count > 4
           cuts = sanitize_cuts(split['cuts'] || split[:cuts], count)
-          kids = Array(node['children'] || node[:children]).map { |c| sanitize(c) }
-          kids += Array.new(count - kids.size) { default_node(0) } if kids.size < count
-          kids = kids[0, count] if kids.size > count
-          { 'split' => { 'axis' => axis, 'count' => count, 'cuts' => cuts },
+          raw_kids = Array(node['children'] || node[:children])
+          kids = count.times.map do |i|
+            sanitize_node(raw_kids[i], path + [i + 1], state)
+          end
+          { 'id' => node_id, 'generation' => generation,
+            'split' => { 'axis' => axis, 'count' => count, 'cuts' => cuts },
             'shelves' => 0, 'children' => kids }
         else
-          default_node((node['shelves'] || node[:shelves] || 0).to_i)
+          default_node((node['shelves'] || node[:shelves] || 0).to_i, node_id, generation)
         end
+      end
+
+      def canonical_node_id(raw, path, state)
+        base = raw.to_s.strip
+        base = "Z#{path.join('_')}" if base.empty?
+        base = PartKeys.segment(base)
+        candidate = base
+        n = 2
+        while state[:used][candidate]
+          candidate = "#{base}-#{n}"
+          n += 1
+        end
+        state[:used][candidate] = true
+        candidate
       end
 
       # Ocisti pole poli (cuts) na presne `count` prvkov {size, locked}. Legacy (bez cuts) => same auto.
@@ -87,9 +114,13 @@ module Noxun
         count = 4 if count > 4
         axis = 'h' if axis.to_s == 'h'
         axis = 'v' unless axis == 'h'
+        generation = node['generation'].to_i + 1
+        node['generation'] = generation
         node['split'] = { 'axis' => axis, 'count' => count, 'cuts' => sanitize_cuts(nil, count) }
         node['shelves'] = 0
-        node['children'] = Array.new(count) { default_node(0) }
+        node['children'] = Array.new(count) do |_i|
+          default_node(0, "Z#{SecureRandom.hex(6)}")
+        end
         true
       end
 
@@ -151,9 +182,10 @@ module Noxun
         split = node['split']
         leaf = split.nil?
         suffix_path = path.join('_')
+        node_id = node['id']
 
         zobj = {
-          id: zid, parent: parent_id, label: label,
+          id: zid, stable_id: node_id, parent: parent_id, label: label,
           position: [r2(box[:x0]), r2(box[:y0]), r2(box[:z0])],
           width: r2(box[:x1] - box[:x0]), height: r2(box[:z1] - box[:z0]), depth: r2(box[:y1] - box[:y0]),
           split: nil, shelves: (leaf ? node['shelves'].to_i : 0), leaf: leaf
@@ -162,10 +194,10 @@ module Noxun
         if leaf
           validate_shelves!(node['shelves'].to_i, box, t, zid)
           acc[:zones] << zobj
-          add_shelves(node['shelves'].to_i, box, t, suffix_path, acc) if node['shelves'].to_i.positive?
+          add_shelves(node['shelves'].to_i, box, t, suffix_path, node_id, acc) if node['shelves'].to_i.positive?
         else
           validate_split!(split, box, t, zid)
-          child_boxes, divs, fields = split_boxes(split, box, t, suffix_path)
+          child_boxes, divs, fields = split_boxes(split, box, t, suffix_path, node_id)
           zobj[:split] = { axis: split['axis'], count: split['count'], fields: fields }
           acc[:zones] << zobj
           acc[:dividers].concat(divs)
@@ -182,7 +214,7 @@ module Noxun
 
       # Rozdelenie boxu podla poli (split['cuts']) s (count-1) prieckami hrubky t.
       # Vrati [child_boxes, divider_deskriptory, fields_info(pre nahlad)].
-      def split_boxes(split, box, t, suffix_path)
+      def split_boxes(split, box, t, suffix_path, node_id)
         axis = split['axis']; count = split['count']
         span = axis == 'v' ? (box[:x1] - box[:x0]) : (box[:z1] - box[:z0])
         sizes = resolve_fields(split['cuts'], count, span, t)
@@ -195,7 +227,7 @@ module Noxun
             fields << field_info(split['cuts'][c], w)
             x += w
             if c < count - 1
-              divs << divider_desc('v', x, box, t, suffix_path, c + 1)
+              divs << divider_desc('v', x, box, t, suffix_path, node_id, c + 1)
               x += t
             end
           end
@@ -207,7 +239,7 @@ module Noxun
             fields << field_info(split['cuts'][r], hh)
             z += hh
             if r < count - 1
-              divs << divider_desc('h', z, box, t, suffix_path, r + 1)
+              divs << divider_desc('h', z, box, t, suffix_path, node_id, r + 1)
               z += t
             end
           end
@@ -313,12 +345,13 @@ module Noxun
       end
 
       # Priecka = dielec korpusu (manufactured, sheet). Plna hlbka/vyska zony.
-      def divider_desc(axis, pos, box, t, suffix_path, idx)
+      def divider_desc(axis, pos, box, t, suffix_path, node_id, idx)
         if axis == 'v'
           depth = box[:y1] - box[:y0]
           height = box[:z1] - box[:z0]
           {
-            suffix: "DIVV-#{suffix_path}-#{idx}", role: 'divider_v', name: 'Priecka zvisla',
+            suffix: "DIVV-#{suffix_path}-#{idx}", part_key: PartKeys.zone(node_id, 'divider_v', idx),
+            role: 'divider_v', name: 'Priecka zvisla',
             material: :korpus, box: [t, depth, height], origin: [pos, box[:y0], box[:z0]],
             prod: { length: r2(height), width: r2(depth), thickness: r2(t) }
           }
@@ -326,7 +359,8 @@ module Noxun
           width = box[:x1] - box[:x0]
           depth = box[:y1] - box[:y0]
           {
-            suffix: "DIVH-#{suffix_path}-#{idx}", role: 'divider_h', name: 'Priecka vodorovna',
+            suffix: "DIVH-#{suffix_path}-#{idx}", part_key: PartKeys.zone(node_id, 'divider_h', idx),
+            role: 'divider_h', name: 'Priecka vodorovna',
             material: :korpus, box: [width, depth, t], origin: [box[:x0], box[:y0], pos],
             prod: { length: r2(width), width: r2(depth), thickness: r2(t) }
           }
@@ -334,14 +368,15 @@ module Noxun
       end
 
       # Police v listovej zone — rovnomerne v z-rozsahu zony, odsadene od cela.
-      def add_shelves(count, box, t, suffix_path, acc)
+      def add_shelves(count, box, t, suffix_path, node_id, acc)
         layout = Shelves.layout(box[:z0], box[:z1], t, count)
         w = box[:x1] - box[:x0]
         sd = (box[:y1] - box[:y0]) - SHELF_FRONT_INSET
         return if sd <= 0
         layout[:shelves].each_with_index do |sh, i|
           acc[:shelves] << {
-            suffix: "SHELF-#{suffix_path}-#{i + 1}", role: 'shelf', name: "Polica #{i + 1}",
+            suffix: "SHELF-#{suffix_path}-#{i + 1}", part_key: PartKeys.zone(node_id, 'shelf', i + 1),
+            role: 'shelf', name: "Polica #{i + 1}",
             material: :korpus, box: [w, sd, t], origin: [box[:x0], box[:y0] + SHELF_FRONT_INSET, sh[:z]],
             prod: { length: r2(w), width: r2(sd), thickness: r2(t) }
           }
