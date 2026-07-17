@@ -84,21 +84,55 @@ NxTest.test('build_plan: volitelne polia s defaultmi prejdu (counted hardware di
   NxTest.assert_equal(pd, Noxun::Engine::BuildPlan.validate_part!(pd))
 end
 
-NxTest.test('build_plan: validate_hardware! kontrakt kovania') do
+module NxBP
+  # Validna hardware polozka schemy 2 (string kluce — kontrakt build_plan.rb).
+  def self.valid_hw(over = {})
+    { 'owner_part_key' => 'front:F1/wing:left', 'generic_type' => 'hinge', 'quantity' => 2,
+      'rule_id' => 'zavesy-podla-vysky', 'variant_id' => nil, 'production_class' => 'counted',
+      'manufactured' => true, 'params' => {}, 'source' => 'rule', 'rule_quantity' => 2 }.merge(over)
+  end
+end
+
+NxTest.test('build_plan: validate_hardware! kontrakt kovania (schema 2, string kluce)') do
   bp = Noxun::Engine::BuildPlan
-  ok = { owner_part_key: 'front:F1/wing:left', generic_type: 'hinge', quantity: 2, rule_id: 'r1', variant_id: nil }
+  ok = NxBP.valid_hw
   NxTest.assert_equal(ok, bp.validate_hardware!(ok))
-  NxTest.assert_equal(nil, bp.validate_hardware!(ok.merge(owner_part_key: nil))[:owner_part_key], 'nil owner = korpus ako celok')
-  NxTest.assert_raise('neplatny owner_part_key') { bp.validate_hardware!(ok.merge(owner_part_key: 'HINGE-1')) }
-  NxTest.assert_raise('prazdny generic_type') { bp.validate_hardware!(ok.merge(generic_type: '')) }
-  NxTest.assert_raise('neplatnu quantity') { bp.validate_hardware!(ok.merge(quantity: 0)) }
+  NxTest.assert_equal(nil, bp.validate_hardware!(NxBP.valid_hw('owner_part_key' => nil))['owner_part_key'],
+                      'nil owner = korpus ako celok')
+  NxTest.assert_raise('neplatny owner_part_key') { bp.validate_hardware!(NxBP.valid_hw('owner_part_key' => 'HINGE-1')) }
+  NxTest.assert_raise('neznamy generic_type') { bp.validate_hardware!(NxBP.valid_hw('generic_type' => 'ufo')) }
+  NxTest.assert_raise('neplatnu quantity') { bp.validate_hardware!(NxBP.valid_hw('quantity' => 0)) }
+  NxTest.assert_raise('neplatnu quantity') { bp.validate_hardware!(NxBP.valid_hw('quantity' => 100_000)) }
+  NxTest.assert_raise('nema rule_id') { bp.validate_hardware!(NxBP.valid_hw('rule_id' => ' ')) }
+  NxTest.assert_raise("production_class 'counted'") { bp.validate_hardware!(NxBP.valid_hw('production_class' => 'sheet')) }
+  NxTest.assert_raise('manufactured true') { bp.validate_hardware!(NxBP.valid_hw('manufactured' => false)) }
+  NxTest.assert_raise('nema params Hash') { bp.validate_hardware!(NxBP.valid_hw('params' => nil)) }
+  NxTest.assert_raise('neskalarny params') { bp.validate_hardware!(NxBP.valid_hw('params' => { 'x' => [1] })) }
+  NxTest.assert_raise('ne-String kluc params') { bp.validate_hardware!(NxBP.valid_hw('params' => { height: 100.0 })) }
+  NxTest.assert_raise('neplatny source') { bp.validate_hardware!(NxBP.valid_hw('source' => 'magic')) }
+  NxTest.assert_raise('neplatnu rule_quantity') { bp.validate_hardware!(NxBP.valid_hw('rule_quantity' => nil)) }
+end
+
+NxTest.test('build_plan: hardware s neexistujucim ownerom neprejde validate! planu') do
+  bp = Noxun::Engine::BuildPlan
+  plan = NxBP.valid_plan
+  plan[:hardware] = [NxBP.valid_hw('owner_part_key' => 'front:F99/wing:left')]
+  NxTest.assert_raise('neexistujuci dielec') { bp.validate!(plan) }
+  plan[:hardware] = [NxBP.valid_hw('owner_part_key' => 'cabinet/side:left')]
+  NxTest.assert_equal(plan, bp.validate!(plan), 'owner existujuci v parts prejde')
+  plan[:hardware] = [NxBP.valid_hw('owner_part_key' => nil)]
+  NxTest.assert_equal(plan, bp.validate!(plan), 'nil owner (korpus) prejde vzdy')
 end
 
 NxTest.test('build_plan: realny plan z normalize({}) nesie schema + hardware[] + warnings[]') do
+  NxTest.skip!('build_plan default cita globalnu kniznicu pravidiel — headless only') unless NxTest.headless?
   cfg = Noxun::Engine::CabinetBuilder.normalize({})
   plan = Noxun::Engine::Construction.build_plan(cfg, 'CAB-001')
   NxTest.assert_equal(Noxun::Engine::BuildPlan::SCHEMA, plan[:schema])
-  NxTest.assert_equal([], plan[:hardware])
+  # V0.4: default dolna (floor 100, bez cel) ma zo seed pravidiel prave nohy 4 ks
+  NxTest.assert_equal(1, plan[:hardware].length, "cakal som 1 polozku, mam #{plan[:hardware].inspect}")
+  NxTest.assert_equal('leg', plan[:hardware].first['generic_type'])
+  NxTest.assert_equal(4, plan[:hardware].first['quantity'])
   NxTest.assert(plan[:warnings].is_a?(Array), 'warnings musi byt pole')
   NxTest.assert_equal([], plan[:warnings], 'default dolna skrinka nema ziadne upozornenia')
 end
@@ -140,12 +174,15 @@ NxTest.test('build_plan: merge_final prenasa plan_schema + warnings + hardware d
   plan = Noxun::Engine::Construction.build_plan(cfg, 'CAB-001')
   merged = Noxun::Engine::CabinetBuilder.merge_final(cfg, plan)
   NxTest.assert_equal(Noxun::Engine::BuildPlan::SCHEMA, merged[:plan_schema])
-  NxTest.assert_equal([], merged[:warnings])
-  NxTest.assert_equal([], merged[:hardware])
+  NxTest.assert_equal(plan[:warnings], merged[:warnings])
+  NxTest.assert_equal(plan[:hardware], merged[:hardware])
   persisted = Noxun::Engine::CabinetBuilder.cabinet_config(merged)
   NxTest.assert_equal(Noxun::Engine::BuildPlan::SCHEMA, persisted[:plan_schema])
-  NxTest.assert_equal([], persisted[:warnings])
-  NxTest.assert_equal([], persisted[:hardware])
+  NxTest.assert_equal(plan[:warnings], persisted[:warnings])
+  NxTest.assert_equal(plan[:hardware], persisted[:hardware])
+  # hardware polozky musia prezit JSON round-trip configu identicky (string kluce)
+  round = JSON.parse({ h: persisted[:hardware] }.to_json)['h']
+  NxTest.assert_equal(persisted[:hardware], round, 'hardware v configu = string-keyed, ziadna konverzia')
 end
 
 NxTest.test('build_plan: degenerovany dielec (rozmer <= MIN_DIM) vypadne z planu s warningom, bez raise') do

@@ -227,7 +227,11 @@ module Noxun
         # (standard 7.2): pravidlove defaulty roly -> dedenie projekt->korpus -> part_override (viťazi).
         # Vysledok sa zapise do configu dielca (dielec vzdy nesie KONKRETNY material = "zaradeny" stav).
         def build_into(model, cdef, cfg, cid)
-          plan = Construction.build_plan(cfg, cid) # validuje interne (raise slovensky)
+          # Pravidla kovania = PROJEKTOVY snapshot (reprodukovatelnost z .skp — audit K2).
+          # Prvy build ho zapise z globalnej kniznice; sme VNUTRI operacie volajuceho,
+          # takze undo vrati model aj snapshot naraz.
+          rules = defined?(HardwareRules) ? HardwareRules.ensure_project_rules!(model) : nil
+          plan = Construction.build_plan(cfg, cid, hardware_rules: rules) # validuje interne
           ents = cdef.entities
           tid = template_id_for(cfg[:type])
 
@@ -459,6 +463,7 @@ module Noxun
             front_material_id: cfg[:front_material_id],
             back_material_id: cfg[:back_material_id],
             part_overrides: cfg[:part_overrides].is_a?(Hash) ? cfg[:part_overrides] : {},
+            hardware_overrides: cfg[:hardware_overrides].is_a?(Array) ? cfg[:hardware_overrides] : [],
             available_width: cfg[:available_width],
             available_height: cfg[:available_height],
             available_depth: cfg[:available_depth],
@@ -472,13 +477,13 @@ module Noxun
           }
         end
 
+        # Typ podopretia urcuje Construction.support_type (1 zdroj pravdy — citaju ho
+        # aj pravidla kovania); tu sa len oblieka do config deskriptora.
         def support_descriptor(cfg)
-          if cfg[:type] == 'upper' || cfg[:floor_height].to_f <= 0
-            { type: 'none', height: 0.0 }
-          elsif cfg[:plinth_mode] == 'front'
-            { type: 'plinth', height: cfg[:floor_height], recess: cfg[:plinth_recess] }
-          else
-            { type: 'legs', height: cfg[:floor_height] } # nohy (geometria az neskor)
+          case Construction.support_type(cfg)
+          when 'none'   then { type: 'none', height: 0.0 }
+          when 'plinth' then { type: 'plinth', height: cfg[:floor_height], recess: cfg[:plinth_recess] }
+          else               { type: 'legs', height: cfg[:floor_height] }
           end
         end
 
@@ -542,6 +547,8 @@ module Noxun
             front_material_id: present(raw(p, :front_material_id)),
             back_material_id: present(raw(p, :back_material_id)),
             part_overrides: norm_overrides(raw(p, :part_overrides)),
+            # V0.4 kovanie: rucne zasahy do poctov (pravidlo = default, override vitazi)
+            hardware_overrides: norm_hardware_overrides(raw(p, :hardware_overrides)),
             part_key_schema: raw(p, :part_key_schema).to_i,
             name: (p['name'] || p[:name])
           }
@@ -572,6 +579,40 @@ module Noxun
             out[key.to_s] = rec unless rec.empty?
           end
           out
+        end
+
+        # Ocisti hardware_overrides na pole { owner_part_key(nil|String), generic_type,
+        # rule_id, quantity(1..MAX)? | disabled(true)? }. Identita = (owner, type, rule_id);
+        # duplicitny zaznam -> POSLEDNY vyhrava (deduplikovane uz tu, config je cisty).
+        # Zaznam bez quantity aj bez disabled je bezobsazny -> zahodi sa.
+        def norm_hardware_overrides(raw_ov)
+          return [] unless raw_ov.is_a?(Array)
+          out = {}
+          raw_ov.each do |ov|
+            next unless ov.is_a?(Hash)
+            owner = present(ov['owner_part_key'] || ov[:owner_part_key])
+            next if owner && !PartKeys.valid?(owner)
+            gt = (ov['generic_type'] || ov[:generic_type]).to_s.strip
+            next unless BuildPlan::GENERIC_TYPES.include?(gt)
+            rid = (ov['rule_id'] || ov[:rule_id]).to_s.strip
+            next if rid.empty?
+
+            rec = { 'owner_part_key' => owner, 'generic_type' => gt, 'rule_id' => rid }
+            if truthy_flag(ov['disabled'] || ov[:disabled])
+              rec['disabled'] = true
+            else
+              q = (ov['quantity'] || ov[:quantity])
+              qi = q.to_s.strip.empty? ? nil : q.to_i
+              next if qi.nil? || qi < 1
+              rec['quantity'] = [qi, BuildPlan::MAX_HW_QUANTITY].min
+            end
+            out[[owner, gt, rid]] = rec
+          end
+          out.values
+        end
+
+        def truthy_flag(v)
+          v == true || %w[true 1 yes].include?(v.to_s.downcase)
         end
 
         # zone_tree z params; ak chyba, ale je legacy 'shelves' -> koren so shelves; inak prazdny koren.
@@ -610,6 +651,10 @@ module Noxun
             'back_material_id'  => v03?(cfg) ? cfg['back_material_id'] : nil,
             'part_key_schema'   => cfg['part_key_schema'].to_i,
             'part_overrides'    => cfg['part_overrides'].is_a?(Hash) ? cfg['part_overrides'] : {},
+            # V0.4 kovanie (pole neexistovalo pred V0.4 -> stare configy dostanu []).
+            # POZN. buduci part_key schema bump: owner_part_key tychto zaznamov musi
+            # prejst TOU ISTOU legacy->current mapou ako part_overrides (audit D5).
+            'hardware_overrides' => cfg['hardware_overrides'].is_a?(Array) ? cfg['hardware_overrides'] : [],
             'name' => cfg['name']
           }
           migrate_legacy_part_keys(params, cfg)
