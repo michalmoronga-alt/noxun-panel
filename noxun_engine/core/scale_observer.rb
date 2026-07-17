@@ -26,6 +26,10 @@ module Noxun
           safe { Sketchup.remove_observer(@app_observer) }
           Sketchup.add_observer(@app_observer)
           n = attach_all(Sketchup.active_model)
+          # KRITICKE: entities observer (zachytava KOPIE) treba pripojit aj pri instale —
+          # nie len v AppObserver eventoch (open/new). Bez tohto po starte SketchUpu
+          # (alebo ak event nepride) kopie nedostanu nove ID a ich zony nesleduju presun.
+          attach_entities(Sketchup.active_model)
           Engine.log("ScaleWatch nainstalovany (attachnute korpusy: #{n})")
         rescue StandardError => e
           Engine.log_error(e, 'ScaleWatch.install')
