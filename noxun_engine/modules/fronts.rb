@@ -7,7 +7,9 @@
 module Noxun
   module Engine
     module Fronts
-      FRONT_THICKNESS = 19.0  # hrubka cela (standard: cela 19 mm pred korpusom)
+      # Zakladna hrubka pre cisty vypocet. Builder ju pri znamom katalogovom
+      # materiali nahradi skutocnou hrubkou variantu (18 alebo 19 mm).
+      FRONT_THICKNESS = 18.0
       GAP_DEFAULT     = 3.0   # skara medzi celami (zvislo) aj medzi kridlami dvierok
       GAP_EDGE        = 2.0   # skara hore/dole/po stranach
       AUTO_TWO_ABOVE  = 600.0 # nad touto sirkou celneho otvoru auto dvierka = 2 kridla
@@ -32,7 +34,8 @@ module Noxun
                          .map { |it| it['height'].to_f }.reduce(0.0, :+)
         auto_count = items.count { |it| it['mode'] == 'auto' }
         remaining = total_v - gt - gb - (n - 1) * gap - fixed_sum
-        auto_h = auto_count.zero? ? 0.0 : [remaining / auto_count, MIN_AUTO].max
+        validate_layout!(cfg, opening_w, total_v, fixed_sum, auto_count)
+        auto_h = auto_count.zero? ? 0.0 : remaining / auto_count
 
         parts = []
         resolved = []
@@ -90,6 +93,30 @@ module Noxun
         end
       end
 
+      # Backendova ochrana pred geometriou mimo korpusu. UI ma vlastne kontroly,
+      # ale ulozeny/legacy config alebo externy callback ich moze obist.
+      def validate_layout!(cfg, opening_w, total_v, fixed_sum, auto_count)
+        gap = cfg['gap'].to_f
+        gt = cfg['gap_top'].to_f
+        gb = cfg['gap_bottom'].to_f
+        gs = cfg['gap_sides'].to_f
+        items = cfg['items'] || []
+
+        raise 'Medzery cel musia byt nulove alebo kladne.' if [gap, gt, gb, gs].any?(&:negative?)
+        raise 'Cela sa nezmestia na sirku korpusu.' if opening_w < MIN_AUTO
+
+        items.each_with_index do |it, i|
+          next unless it['mode'] == 'fixed'
+          next if it['height'].to_f >= MIN_AUTO
+          raise "Pevna vyska cela #{i + 1} musi byt aspon #{MIN_AUTO.to_i} mm."
+        end
+
+        required = gt + gb + ([items.size - 1, 0].max * gap) + fixed_sum + (auto_count * MIN_AUTO)
+        return if required <= total_v + 0.01
+
+        raise "Cela sa nezmestia do vysky korpusu. Potrebuju aspon #{required.round(1)} mm, dostupnych je #{total_v.round(1)} mm."
+      end
+
       # --- normalizacia configu ------------------------------------------------
       # Prijme nil / legacy String / Hash. Vrati kanonicky string-keyed hash pre ulozenie.
       def normalize_config(raw)
@@ -105,6 +132,18 @@ module Noxun
           'gap_sides'  => num(h['gap_sides'] || h[:gap_sides], GAP_EDGE),
           'items'      => normalize_items(h['items'] || h[:items] || [])
         }
+      end
+
+      # Jednorazova kompatibilita pre V0.1/V0.2 korpusy. Stare konfiguracie
+      # mohli obsahovat fyzicky nepouzitelne pevne celo mensie ako MIN_AUTO.
+      # V0.3 konfiguracie tymto neprechadzaju a neplatna nova hodnota sa odmietne.
+      def migrate_legacy_config(raw)
+        cfg = normalize_config(raw)
+        cfg['items'].each do |item|
+          next unless item['mode'] == 'fixed' && item['height'].to_f < MIN_AUTO
+          item.merge!('mode' => 'auto', 'height' => nil, 'locked' => false)
+        end
+        cfg
       end
 
       def normalize_items(items)

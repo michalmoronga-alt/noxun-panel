@@ -397,10 +397,11 @@ Nezaradené materiály: 0
 Každý plošný dielec nesie hrany **per strana** ako dáta (nezávislé od vizuálnej textúry):
 
 ```json
-"edges": { "L1": "ABS_K009_1.0", "L2": null, "W1": "ABS_K009_0.4", "W2": "ABS_K009_0.4" }
+"edges": { "L1": "ABS_K009_1.0", "L2": null, "W1": "ABS_K009_1.0", "W2": "ABS_K009_1.0" }
 ```
 
 - Hodnota strany = `null` (bez hrany) alebo **ABS variant ID** (`ABS_K009_1.0` = dekor + hrúbka ABS).
+- Podporované výrobné hrúbky ABS sú výhradne **1,0 mm a 2,0 mm**.
 - `L1`/`L2` = dvojica pozdĺžnych strán, `W1`/`W2` = dvojica priečnych.
 - **UI ich prekladá** na predná/zadná/ľavá/pravá. Interný systém je odolný voči otočeniu skrinky — hrany sa držia per strana, súhrnné kódy (`—`/`=`) sa **dopočítajú až pri exporte** (VEPO nevie povedať KTORÁ strana, kusovník a CNC to potrebujú presne).
 
@@ -416,7 +417,7 @@ Každý plošný dielec nesie hrany **per strana** ako dáta (nezávislé od viz
 
 Samostatný režim na vizuálnu kontrolu hrán:
 
-- Dielce polopriehľadné (~30–50 % opacity), ABS hrany plné a **farebne podľa hrúbky** (napr. 1,0 mm červená, 0,4 mm modrá, 2,0 mm zelená, bez ABS sivá).
+- Dielce polopriehľadné (~30–50 % opacity), ABS hrany plné a **farebne podľa hrúbky** (napr. 1,0 mm červená, 2,0 mm zelená, bez ABS sivá).
 - **Konfliktné / neurčené hrany oranžové.**
 - Klik na hranu = zmena ABS. Farby používateľsky nastaviteľné.
 - Filtre: všetky hrany / iba vybraný typ / iba chyby / iba vybraná skrinka. Master korpus dá základné pravidlá, ABS editor je finálna kontrolná vrstva.
@@ -464,8 +465,8 @@ Podľa sekcie 2.1: **ploché kľúče = identita a filtre; všetko rozmerové a 
     "edges": {
       "L1": "ABS_K009_1.0",
       "L2": null,
-      "W1": "ABS_K009_0.4",
-      "W2": "ABS_K009_0.4"
+      "W1": "ABS_K009_1.0",
+      "W2": "ABS_K009_1.0"
     }
   }
 }

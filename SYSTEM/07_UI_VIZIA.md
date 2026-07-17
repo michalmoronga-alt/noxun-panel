@@ -7,10 +7,10 @@
 | Prvok | Detail | Etapa |
 |---|---|---|
 | **Strom štruktúry modelu so stavmi** | Kuchyňa → skrinky → dielce; ikony: ✓ OK, číslo (počet), ⚠ warning, oko (skrytý); search + filter | V0.5 (Výroba okno) |
-| **Info karta dielca** | typ (Plošný), materiál, rozmer, **ABS per hrana** (Predná 1.0 / Zadná bez / Ľavá 0.4 / Pravá 0.4), otočenie dekoru ↔, počet v modeli, **„Označiť v modeli"** (obojsmerná navigácia) | V0.3 (dáta) + V0.5 (karta) |
-| **ABS EDITOR** | 2D dielec s očíslovanými farebnými hranami 1–4, per-hrana dropdown (ABS K009 1.0 / Bez ABS / 0.4), **„Použiť na podobné diely (N)"** — hromadná aplikácia | **V0.3 — priamy vzor UI** |
+| **Info karta dielca** | typ (Plošný), materiál, rozmer, **ABS per hrana** (Predná 1.0 / Zadná bez / Ľavá 1.0 / Pravá 1.0), otočenie dekoru ↔, počet v modeli, **„Označiť v modeli"** (obojsmerná navigácia) | V0.3 (dáta) + V0.5 (karta) |
+| **ABS EDITOR** | 2D dielec s očíslovanými farebnými hranami 1–4, per-hrana dropdown (ABS K009 1.0 / ABS K009 2.0 / Bez ABS), **„Použiť na podobné diely (N)"** — hromadná aplikácia | **V0.3 — priamy vzor UI** |
 | **Materiálový katalóg s tabmi podľa výrobnej triedy** | Plošné / Dĺžkové / Kusové / Referenčné (= presne production_class zo štandardu!); karty s náhľadom, rozmerom tabule | **V0.3 — priamy vzor UI** |
-| **Kusovník (zoskupené dielce)** | stĺpce: diel, rozmer, hrúbka, materiál, **ABS kompakt „P:1 / L:0.4 / R:0.4"**, počet, skrinka; prepínač „Podľa skriniek"; súčtový riadok (dielcov, kusov, m²) | V0.5 |
+| **Kusovník (zoskupené dielce)** | stĺpce: diel, rozmer, hrúbka, materiál, **ABS kompakt „P:1 / L:2 / R:2"**, počet, skrinka; prepínač „Podľa skriniek"; súčtový riadok (dielcov, kusov, m²) | V0.5 |
 | **Kusovník podľa materiálu** | vrátane dĺžkových (bm/mm) a kusových položiek | V0.5 |
 | **KONTROLA MODELU karta** | Chyby 0 🔴 / Upozornenia 2 🟡 / Informácie 5 🔵 + „Najčastejšie upozornenia" (2 dielce bez ABS na viditeľných hranách, 1 komponent bez materiálu) + detail | V0.5 (semafor) |
 | **Rýchle akcie** | Aktualizovať dáta, Skontrolovať model, Kontrola ABS, Priraď materiály, Priraď kovanie | V0.5 |
