@@ -19,12 +19,13 @@ GitHub: https://github.com/michalmoronga-alt/noxun-panel
 
 ## Testovanie (záväzné pravidlá)
 
-- Kanál: MCP `mcp__vbo-sketchup__execute_ruby` (SketchUp 2026 + VBO SkAgent, port 7891); fallback file-bridge (`vbo_sk_agent\bridge\command.rb` → `result.json`, pozor na mtime pascu). Deploy: `INSTALL_noxun_engine.ps1`.
-- **Testuje sa VÝHRADNE v testovacom projekte `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne) — v ňom môžu agenti tvoriť/mazať čokoľvek. `_dev/` je gitignorované.
+- **Automatické testy (V0.3.4+):** headless sada `ruby tests/run_all.rb` beží v GitHub Actions na každý push/PR (140+ testov; lokálne `scripts\run_tests.ps1`, vyžaduje standalone Ruby). In-SketchUp runner `scripts\run_su_tests.ps1` (deploy → inštancia nad kópiou ENGINEtests.skp → poll → výsledok) — spúšťať pri zmenách builderov/observerov; overuje geometriu plán↔model a undo scenáre.
+- Interaktívny kanál: MCP `mcp__vbo-sketchup__execute_ruby` (SketchUp 2026 + VBO SkAgent, port 7891); fallback file-bridge (`vbo_sk_agent\bridge\command.rb` → `result.json`, pozor na mtime pascu); overená slučka `-RubyStartup skript + kópia modelu` (vzor v `scripts\run_su_tests.ps1`). Deploy: `INSTALL_noxun_engine.ps1`.
+- **Testuje sa VÝHRADNE v testovacom projekte `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne BEZ existujúcich NOXUN korpusov) — v ňom môžu agenti tvoriť/mazať čokoľvek. `_dev/` je gitignorované.
 - **NIKDY netestovať v okne so zákazkou** — pred testami vždy overiť `model.path`/titul okna (bridge vykonáva príkazy v každom okne, kde je zapnutý — bridge zapínať len v testovacom okne).
 
-## Architektúra (V0.3)
+## Architektúra (V0.3.4)
 
-`noxun_engine.rb` loader → `noxun_engine\main.rb` → core (units — JEDINÉ miesto mm↔Length; ids; store — NOXUN dict; part_keys — stabilná identita dielcov pre override/kovanie/výstupy; json_file_store — atomický JSON zápis + .bak + cache; materials — katalóg materiálov a dedenie projekt→skrinka→dielec; abs_rules — pravidlové ABS defaulty podľa roly; construction — plánovač cfg→dielce; cabinet_builder — regenerate; zone_tree — strom zón+priečky; zones — ghost boxy; scale_observer=ScaleWatch — absorpcia scale; templates) → modules (shelves, fronts — čelá fixed/auto s lockmi) → ui (panel.rb + panel.html).
+`noxun_engine.rb` loader → `noxun_engine\main.rb` → core (units — JEDINÉ miesto mm↔Length; ids; store — NOXUN dict; part_keys — stabilná identita dielcov + `valid?`; **build_plan — ZÁVÄZNÝ kontrakt plánu** (schema, MIN_DIM, validátor, `warnings[]`, tvar `hardware[]`) — geometria, kusovník aj VEPO čítajú TEN ISTÝ plán; json_file_store — atomický JSON zápis + .bak + cache; materials — katalóg materiálov a dedenie projekt→skrinka→dielec; abs_rules — pravidlové ABS defaulty podľa roly; construction — plánovač cfg→BuildPlan; cabinet_builder — regenerate; zone_tree — strom zón+priečky; zones — ghost boxy; scale_observer=ScaleWatch — absorpcia scale; templates) → modules (shelves, fronts — čelá fixed/auto s lockmi) → ui (panel.rb = vstup + centrálny zoznam callbackov; logika v `ui/panel/*.rb` podľa domén; JS v `ui/js/*.js` moduloch + `ui/css/panel.css`; jediný zoznam polí = `CONSTRUCTION_FIELDS` v core.js ↔ `Panel::PARAM_KEYS`).
 
-Kľúčové invarianty: dáta na inštancii v `NOXUN` dictionary (config = JSON string, mm Float); rebuild = 1 undo operácia s `@rebuilding` guardom; recyklácia definícií podľa mena; žiadne DC vzorce.
+Kľúčové invarianty: dáta na inštancii v `NOXUN` dictionary (config = JSON string, mm Float); rebuild = 1 undo operácia s `@rebuilding` guardom (observer reakcie na krok používateľa = transparentné operácie — absorpcia scale, dedup kópie, ghost presuny); recyklácia definícií podľa mena; žiadne DC vzorce; plán musí prejsť `BuildPlan.validate!`.
