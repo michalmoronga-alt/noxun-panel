@@ -166,20 +166,27 @@ module Noxun
         # zdielanu definiciu) a prepocita part_id, zony aj ghosty pod novym cid. Original zostane
         # netknuty. Vola sa z panel resolvera a scale observera ("sync tick"). Vrati prestavane inst.
         # Standard 2.3/9.3: "Kopia skrinky dostane nove cabinet_id."
-        def dedup_copies(model)
+        # transparent: true LEN ked volajuci VIE, ze predchadzajuca operacia je vlozenie kopie
+        # (observer tick s cerstvym onElementAdded) — vtedy 1x undo vrati kopiu CELU.
+        # Z panel sync cesty (push_selected) a inych kontextov = false: samostatny undo krok,
+        # aby sa dedup neprilepil na nesuvisiacu poslednu akciu (Codex review PR #21).
+        def dedup_copies(model, transparent: false)
           return [] unless model
           dups = Ids.duplicate_cabinets(model)
           return [] if dups.empty?
+          # Root kontext ako v rebuild (Codex review PR #21): dedup moze bezat aj pocas
+          # editacie komponentu — bez zatvorenia edit ramca by sa transformacia kopie
+          # citala relativne a ghost zony by vznikli na zlom mieste.
+          ensure_root_context(model)
           done = []
           dups.each do |inst|
             next unless inst && inst.valid?
             new_cid = Ids.next_cabinet_id(model)
             # V0.3.4 undo fix (runner S2): prepis identity (standard 2.2: autorita = instancia)
-            # + rebuild bezia v JEDNEJ TRANSPARENTNEJ operacii pripojenej k predchadzajucemu
-            # kroku (paste/move kopie). 1x undo tak vrati kopiu CELU — predtym sa nove cid
-            # zapisovalo MIMO operacie a po undo ostaval nekonzistentny medzistav.
+            # + rebuild bezia v JEDNEJ operacii (transparentnej len pri cerstvej kopii, viz vyssie).
+            # Predtym sa nove cid zapisovalo MIMO operacie a po undo ostaval nekonzistentny medzistav.
             guarded do
-              model.start_operation('NOXUN: Kopia korpusu — nove ID', true, false, true)
+              model.start_operation('NOXUN: Kopia korpusu — nove ID', true, false, transparent)
               begin
                 Store.write(inst, { std: Store::STD, kind: 'cabinet', id: new_cid, cabinet_id: new_cid })
                 params = config_to_params(Store.config(inst) || {})
