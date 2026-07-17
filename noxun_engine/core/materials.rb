@@ -52,9 +52,21 @@ module Noxun
       def catalog
         ensure_seeded
         data = JsonFileStore.read(path, copy: false)
+        sheet_records = data['sheets'].is_a?(Array) ? data['sheets'] : seed_sheets
+        raw_edges = data['edges'].is_a?(Array) ? data['edges'] : seed_edges
+        edge_records = raw_edges.select do |item|
+          item.is_a?(Hash) && supported_edge_thickness?(item['thickness'])
+        end
+
+        if edge_records != raw_edges
+          if write({ 'sheets' => sheet_records, 'edges' => edge_records }) && defined?(Engine)
+            Engine.log('materialy: ABS katalog bol obmedzeny na hrubky 1/2 mm')
+          end
+        end
+
         {
-          'sheets' => (data['sheets'].is_a?(Array) ? data['sheets'] : seed_sheets),
-          'edges'  => (data['edges'].is_a?(Array)  ? data['edges']  : seed_edges)
+          'sheets' => sheet_records,
+          'edges'  => edge_records
         }
       rescue StandardError => e
         Engine.log_error(e, 'Materials.load') if defined?(Engine)
@@ -66,7 +78,7 @@ module Noxun
       end
 
       def edges
-        catalog['edges'].select { |item| item.is_a?(Hash) && supported_edge_thickness?(item['thickness']) }
+        catalog['edges']
       end
 
       # Doskovy material podla material_id (alebo nil).
@@ -243,22 +255,11 @@ module Noxun
         SUPPORTED_EDGE_THICKNESSES.any? { |allowed| (allowed - th).abs < 0.05 }
       end
 
-      # Stare 0,4 mm ID sa pri najblizsom rebuilde prevedie na 1 mm rovnakeho
-      # dekoru. Neznamy legacy identifikator zachovame, aby sme nestratili data.
+      # Povoli iba ABS, ktore realne existuje v aktivnom katalogu 1/2 mm.
       def normalized_abs_id(id)
         value = id.to_s.strip
         return nil if value.empty?
-        raw = catalog['edges'].find { |item| item.is_a?(Hash) && item['abs_id'] == value }
-        return value unless raw
-        return value if supported_edge_thickness?(raw['thickness'])
-
-        if raw['thickness'].to_f < 1.0
-          replacement = edges.find do |item|
-            item['decor'] == raw['decor'] && (item['thickness'].to_f - 1.0).abs < 0.05
-          end
-          return replacement && replacement['abs_id']
-        end
-        nil
+        edge(value) ? value : nil
       end
 
       def normalize_rgb(v, dflt)

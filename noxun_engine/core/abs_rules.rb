@@ -212,7 +212,6 @@ module Noxun
           EDGE_ORDER.each do |code|
             next unless edge_map.key?(code)
             thickness = edge_map[code].to_f
-            thickness = 1.0 if (thickness - 0.4).abs < 0.05
             next unless [1.0, 2.0].include?(thickness)
             out[role.to_s][code] = thickness
           end

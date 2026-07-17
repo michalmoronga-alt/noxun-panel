@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.3.2' unless defined?(VERSION)
+    VERSION = '0.3.3' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
