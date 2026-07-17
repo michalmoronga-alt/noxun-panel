@@ -6,8 +6,9 @@
 # BEZPECNOST: bezi VYHRADNE v modeli ENGINEtests*.skp alebo v neulozenom Untitled
 # (pravidla ENGINE/CLAUDE.md). V inom modeli sa okamzite ukonci so SKIP.
 # Vystup: subor ENV['NOXUN_SU_OUT'] (default %TEMP%/noxun_su_result.txt) — riadky
-# PASS/FAIL/INFO + koncovy marker '=== KONIEC SUBORU ==='. INFO = pozorovanie
-# undo/redo scenarov (dokumentuje SUCASNE spravanie, nefailuje sadu).
+# PASS/FAIL/INFO + koncovy marker '=== KONIEC SUBORU ==='. Undo scenare S1/S2 su
+# od V0.3.4 undo fixov TVRDE asserty (transparentne operacie absorpcie a dedupu);
+# INFO ostava len pre redo pozorovania (Ruby API nema spolahlive redo na Windows).
 #
 # Struktura:
 #   SYNC cast — geometria proti BuildPlan kontraktu (plan vs. model 1:1), NOXUN data
@@ -211,20 +212,18 @@ module NoxunSuRunner
       Sketchup.undo # vrat absorpcny rebuild
     end]
     steps << [SETTLE, lambda do
+      # V0.3.4 undo fix: absorpcia je transparentna operacia pripojena k Scale kroku,
+      # takze 1x undo MUSI vratit scale aj absorpciu naraz (sirka 600, cisty transform)
+      # a observer uz nema co re-absorbovat. Tvrdy assert (predtym INFO pozorovanie).
       inst = state[:s1]
       if inst && inst.valid?
         cfg = e::Store.config(inst) || {}
         w = cfg['width'].to_f
         clean = e::ScaleWatch.scale_factors(inst.transformation).nil?
-        if (w - 900.0).abs < 0.01 && clean
-          info('S1 UNDO-SCALE: POTVRDENE audit riziko — 1x undo po absorpcii sa NEudrzi: observer scale znova absorboval (sirka opat 900). Undo bojuje s pouzivatelom.')
-        elsif (w - 600.0).abs < 0.01
-          info("S1 UNDO-SCALE: undo drzi (sirka 600, transform cisty=#{clean}) — re-absorpcia sa nekonala.")
-        else
-          info("S1 UNDO-SCALE: neocakavany stav sirka=#{w} cisty=#{clean} — preverit rucne.")
-        end
+        ok("async S1: 1x undo vratil scale AJ absorpciu (sirka #{cfg['width']}, transform cisty=#{clean})",
+           (w - 600.0).abs < 0.01 && clean)
       else
-        info('S1 UNDO-SCALE: instancia po undo neexistuje — preverit rucne.')
+        ok('async S1: instancia po undo existuje', false)
       end
       # Redo (Codex review PR #20): po undo mohli nove operacie (re-absorpcia, ghost presuny)
       # zmazat redo stack — presne 3. audit riziko. send_action je asynchronne -> pozorovanie
@@ -270,17 +269,15 @@ module NoxunSuRunner
       Sketchup.undo # vrat dedup rebuild (posledna operacia)
     end]
     steps << [SETTLE, lambda do
+      # V0.3.4 undo fix: dedup (identita + rebuild) je transparentna operacia pripojena
+      # k paste kroku — 1x undo MUSI odstranit kopiu CELU (ziadny medzistav s novym cid).
+      # Original ostava so svojim cid. Tvrdy assert (predtym INFO pozorovanie).
       copy = state[:s2_copy]
-      if copy && copy.valid?
-        cid_now = e::Store.get(copy, 'cabinet_id')
-        if cid_now == state[:s2_cid]
-          info('S2 UNDO-KOPIA: undo vratil kopii POVODNE cid — atributy aj rebuild sa vratili spolu (konzistentne).')
-        else
-          info("S2 UNDO-KOPIA: POTVRDENE audit riziko — po 1x undo ma kopia cid '#{cid_now}' (nove ID zapisane MIMO operacie undo neprejde spolu s rebuildom): nekonzistentny medzistav.")
-        end
-      else
-        info('S2 UNDO-KOPIA: kopia po undo neexistuje (undo zasiahol aj vlozenie kopie) — preverit rucne.')
-      end
+      copy_gone = copy.nil? || !copy.valid?
+      orig_ok = state[:s2] && state[:s2].valid? && e::Store.get(state[:s2], 'cabinet_id') == state[:s2_cid]
+      cids = cabinets(model).map { |i| e::Store.get(i, 'cabinet_id') }
+      ok("async S2: 1x undo vratil kopiu CELU (kopia prec=#{copy_gone}, original #{state[:s2_cid]} drzi, korpusy: #{cids.sort.join(', ')})",
+         copy_gone && orig_ok && cids == [state[:s2_cid]])
       state[:s2_redo_sent] = Sketchup.send_action('editRedo')
     end]
     steps << [SETTLE, lambda do

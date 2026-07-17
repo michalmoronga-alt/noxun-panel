@@ -91,7 +91,9 @@ module Noxun
 
         # Prestavia existujuci korpus. transform: volitelne nova cista transformacia (scale absorpcia).
         # op_name: nazov Undo operacie. Cele obalene guardom, aby scale-observer ignoroval vlastnu zmenu.
-        def rebuild(model, inst, params, transform: nil, op_name: 'NOXUN: Aplikuj zmeny')
+        # transparent: true = operacia sa pripoji k PREDCHADZAJUCEJ na undo stacku (observer reakcie
+        # na pouzivatelov krok — scale absorpcia; 1x undo potom vrati oboje naraz).
+        def rebuild(model, inst, params, transform: nil, op_name: 'NOXUN: Aplikuj zmeny', transparent: false)
           cid = Store.get(inst, 'cabinet_id')
           raise 'Vybrana instancia nie je NOXUN korpus.' if cid.nil?
 
@@ -103,7 +105,7 @@ module Noxun
 
           cfg = normalize(params)
           guarded do
-            model.start_operation(op_name, true)
+            model.start_operation(op_name, true, false, transparent)
             begin
               # Ak je definicia zdielana (kopia korpusu), osamostatni ju — inak by clear!/build
               # prepisal aj original. Standard 9.3: kopia sa da upravit nezavisle od originalu.
@@ -172,11 +174,22 @@ module Noxun
           dups.each do |inst|
             next unless inst && inst.valid?
             new_cid = Ids.next_cabinet_id(model)
-            # Prepis identitu na INSTANCII (standard 2.2: autorita = instancia). Config a dielce
-            # prepise nasledny rebuild (uz nad vlastnou definiciou z make_unique).
-            Store.write(inst, { std: Store::STD, kind: 'cabinet', id: new_cid, cabinet_id: new_cid })
-            params = config_to_params(Store.config(inst) || {})
-            rebuild(model, inst, params, op_name: 'NOXUN: Kopia korpusu — nove ID')
+            # V0.3.4 undo fix (runner S2): prepis identity (standard 2.2: autorita = instancia)
+            # + rebuild bezia v JEDNEJ TRANSPARENTNEJ operacii pripojenej k predchadzajucemu
+            # kroku (paste/move kopie). 1x undo tak vrati kopiu CELU — predtym sa nove cid
+            # zapisovalo MIMO operacie a po undo ostaval nekonzistentny medzistav.
+            guarded do
+              model.start_operation('NOXUN: Kopia korpusu — nove ID', true, false, true)
+              begin
+                Store.write(inst, { std: Store::STD, kind: 'cabinet', id: new_cid, cabinet_id: new_cid })
+                params = config_to_params(Store.config(inst) || {})
+                rebuild_in_operation(model, inst, normalize(params))
+                model.commit_operation
+              rescue StandardError => e
+                abort_safely(model)
+                raise e
+              end
+            end
             done << inst
             Engine.log("dedup: kopia korpusu dostala nove ID #{new_cid}") if defined?(Engine)
           end

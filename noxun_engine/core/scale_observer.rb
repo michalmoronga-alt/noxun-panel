@@ -265,8 +265,13 @@ module Noxun
           params['depth']  = new_d
 
           clean = clean_transform(inst.transformation)
+          # V0.3.4 undo fix (runner S1): TRANSPARENTNA operacia — absorpcia sa pripoji
+          # k pouzivatelovmu Scale kroku. 1x undo vrati scale AJ absorpciu naraz (predtym
+          # undo vratil len absorpciu, observer videl scaled transform a absorboval znova
+          # — undo "bojoval" s pouzivatelom).
           CabinetBuilder.rebuild(model, inst, params,
-                                 transform: clean, op_name: 'Noxun: prepočet po zmene veľkosti')
+                                 transform: clean, op_name: 'Noxun: prepočet po zmene veľkosti',
+                                 transparent: true)
           remember_transform(inst)
 
           Engine.log("scale absorb #{cid}: #{base_w.round}x#{base_h.round}x#{base_d.round} -> " \
