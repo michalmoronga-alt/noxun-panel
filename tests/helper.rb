@@ -109,6 +109,7 @@ end
 unless NxTest::IN_SKETCHUP
   %w[
     core/part_keys
+    core/build_plan
     core/json_file_store
     core/materials
     core/abs_rules

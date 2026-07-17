@@ -18,7 +18,7 @@ module Noxun
           inst = CabinetBuilder.build(model, params)
           select_only(model, inst)
           cid = Store.get(inst, 'cabinet_id')
-          set_status("Vlozeny #{cid} — #{part_count(inst)} dielcov.")
+          status_with_warnings(inst, "Vlozeny #{cid} — #{part_count(inst)} dielcov.")
           push_selected(model)
         end
 
@@ -67,7 +67,7 @@ module Noxun
             CabinetBuilder.rebuild(model, cab, params)
             reselect(model, cab)
           end
-          set_status("Prestavané ✓ — #{Store.get(cab, 'cabinet_id')} (#{part_count(cab)} dielcov).")
+          status_with_warnings(cab, "Prestavané ✓ — #{Store.get(cab, 'cabinet_id')} (#{part_count(cab)} dielcov).")
           push_selected(model)
         end
 

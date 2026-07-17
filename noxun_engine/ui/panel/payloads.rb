@@ -18,6 +18,7 @@ module Noxun
           params['available_width'] = cfg['available_width']
           params['available_height'] = cfg['available_height']
           params['available_depth'] = cfg['available_depth']
+          params['warnings'] = cfg['warnings'] || [] # BuildPlan upozornenia (pre buduce UI)
           params
         end
 
