@@ -94,3 +94,13 @@
   .pcmat label { flex: 0 0 78px; font-size: 12px; color: #455a64; }
   .pcmat select { flex: 1; padding: 4px 6px; border: 1px solid #b0bec5; border-radius: 4px; font-size: 12px; min-width: 0; }
   .pcmat select.ovr { border-color: #ffb74d; background: #fff8ef; }
+  /* KOVANIE (V0.4) */
+  .hwrow { display: flex; align-items: center; gap: 5px; margin: 4px 0; }
+  .hwrow .hwname { flex: 1; font-size: 12px; color: #37474f; min-width: 0; }
+  .hwrow .hwown { color: #607d8b; font-size: 11px; }
+  .hwrow .hwext { color: #90a4ae; font-size: 11px; }
+  .hwrow .hwqty { flex: 0 0 52px; width: 52px; padding: 3px 5px; border: 1px solid #b0bec5; border-radius: 4px; font-size: 12px; text-align: right; }
+  .hwrow .hwbtn { flex: 0 0 auto; padding: 2px 7px; font-size: 12px; }
+  .hwrow .hwsrc { flex: 0 0 auto; width: 20px; }
+  .hwrow.hwoff .hwname { color: #90a4ae; }
+  .hwrow .hwqty.manual, .hwrow.manual .hwqty { border-color: #ffb74d; background: #fff8ef; }

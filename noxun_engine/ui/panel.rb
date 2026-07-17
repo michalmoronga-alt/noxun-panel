@@ -74,6 +74,8 @@ module Noxun
           cb(dlg, 'set_cabinet_material') { |p| handle_set_cabinet_material(p) } # korpusovy override
           cb(dlg, 'set_part_material')    { |p| handle_set_part_material(p) }    # per-dielec override
           cb(dlg, 'set_part_edge')        { |p| handle_set_part_edge(p) }        # ABS hrana dielca
+          # V0.4 kovanie: rucny pocet / vypnutie / reset polozky
+          cb(dlg, 'set_hardware_override') { |p| handle_set_hardware_override(p) }
           # Diagnostika: JS chyby z HtmlDialogu (window.onerror) -> Engine.log. Priamo, NIE cez cb —
           # aby pripadna chyba v logovani nespustila set_status (dalsi execute_script) a slucku.
           dlg.add_action_callback('js_error') do |_ctx, msg|
@@ -110,6 +112,7 @@ Sketchup.require 'noxun_engine/ui/panel/actions_zones'
 Sketchup.require 'noxun_engine/ui/panel/actions_templates'
 Sketchup.require 'noxun_engine/ui/panel/actions_materials'
 Sketchup.require 'noxun_engine/ui/panel/actions_parts'
+Sketchup.require 'noxun_engine/ui/panel/actions_hardware'
 Sketchup.require 'noxun_engine/ui/panel/sync'
 Sketchup.require 'noxun_engine/ui/panel/resolvers'
 Sketchup.require 'noxun_engine/ui/panel/payloads'
