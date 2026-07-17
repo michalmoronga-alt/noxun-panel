@@ -219,6 +219,26 @@ NxTest.test('hardware_rules: upper skrinka nema nohy, dvierka zavesy maju') do
   NxTest.assert(types.include?('hinge'), 'dvierka hornej maju zavesy')
 end
 
+NxTest.test('hardware_rules: seed-merge doplni nove default pravidla len do globalu') do
+  NxTest.skip!('globalna kniznica (APPDATA sandbox) — headless only') unless NxTest.headless?
+  hr = Noxun::Engine::HardwareRules
+  jfs = Noxun::Engine::JsonFileStore
+  # simulacia kniznice zo starsej verzie: len 1 pravidlo, upravene pouzivatelom (7 noh)
+  custom = hr.normalize_rules([hr::SEED_RULES.first.merge('quantity' => 7)])
+  jfs.write(hr.path, { 'std' => 1, 'seed_version' => 0, 'rules' => custom })
+  jfs.reload!(hr.path)
+  merged = hr.load
+  NxTest.assert_equal(3, merged.length, 'chybajuce seed pravidla sa doplnia')
+  NxTest.assert_equal(7, merged.find { |r| r['rule_id'] == 'nohy-zakladne' }['quantity'],
+                      'pouzivatelska uprava sa pri merge NEprepise')
+  doc = jfs.read(hr.path)
+  NxTest.assert_equal(hr::SEED_VERSION, doc['seed_version'], 'subor sa po merge ulozi s novou verziou')
+  NxTest.assert_equal(3, hr.load.length, 'druhy load uz nic nemerguje (stabilny stav)')
+  # uprac: vrat cisty seed (nasledne testy citaju globalnu kniznicu)
+  hr.write(hr.normalize_rules(hr::SEED_RULES))
+  jfs.reload!(hr.path)
+end
+
 NxTest.test('hardware_rules: projektovy snapshot round-trip (FakeEntity ako model)') do
   hr = Noxun::Engine::HardwareRules
   fake_model = NxTest::FakeEntity.new
