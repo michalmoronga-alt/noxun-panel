@@ -50,11 +50,14 @@ module NoxunSuRunner
     e::Units.to_mm(len)
   end
 
-  def guard_model?
-    model = Sketchup.active_model
+  # Guard (Codex review PR #20, P1): Untitled NEstaci — neulozena moze byt aj zakazka.
+  # Povolene: (a) model ENGINEtests*.skp, alebo (b) neulozeny model BEZ jedineho NOXUN
+  # korpusu (cerstve testovacie okno; nie je co znicit, vsetko dalej vyrobi runner sam).
+  def guard_model?(model)
     path = model ? model.path.to_s : ''
     base = path.gsub('\\', '/').downcase.split('/').last.to_s
-    base.start_with?('enginetests') || path.empty?
+    return true if base.start_with?('enginetests')
+    path.empty? && cabinets(model).empty?
   end
 
   def cabinets(model)
@@ -223,6 +226,22 @@ module NoxunSuRunner
       else
         info('S1 UNDO-SCALE: instancia po undo neexistuje — preverit rucne.')
       end
+      # Redo (Codex review PR #20): po undo mohli nove operacie (re-absorpcia, ghost presuny)
+      # zmazat redo stack — presne 3. audit riziko. send_action je asynchronne -> pozorovanie
+      # v dalsom kroku. Nazov akcie je cross-platform 'editRedo'.
+      state[:s1_redo_sent] = Sketchup.send_action('editRedo')
+    end]
+    steps << [SETTLE, lambda do
+      inst = state[:s1]
+      if !state[:s1_redo_sent]
+        info('S1 REDO: send_action editRedo nedostupne na tejto platforme — redo netestovane.')
+      elsif inst && inst.valid?
+        cfg = e::Store.config(inst) || {}
+        info("S1 REDO: stav po redo — sirka #{cfg['width']}, transform cisty=#{e::ScaleWatch.scale_factors(inst.transformation).nil?}. " \
+             'Ak sa sirka nezmenila, redo stack bol zmazany operaciami observera po undo (audit riziko #3).')
+      else
+        info('S1 REDO: instancia po redo neexistuje — preverit rucne.')
+      end
       cleanup(model)
     end]
 
@@ -262,6 +281,17 @@ module NoxunSuRunner
       else
         info('S2 UNDO-KOPIA: kopia po undo neexistuje (undo zasiahol aj vlozenie kopie) — preverit rucne.')
       end
+      state[:s2_redo_sent] = Sketchup.send_action('editRedo')
+    end]
+    steps << [SETTLE, lambda do
+      copy = state[:s2_copy]
+      if !state[:s2_redo_sent]
+        info('S2 REDO: send_action editRedo nedostupne — redo netestovane.')
+      elsif copy && copy.valid?
+        info("S2 REDO: stav po redo — kopia cid '#{e::Store.get(copy, 'cabinet_id')}', original cid '#{state[:s2] && state[:s2].valid? ? e::Store.get(state[:s2], 'cabinet_id') : '?'}'.")
+      else
+        info('S2 REDO: kopia po redo neexistuje.')
+      end
       cleanup(model)
       log_line('=== KONIEC SUBORU ===')
       done.call if done
@@ -296,12 +326,12 @@ module NoxunSuRunner
       log_line('=== KONIEC SUBORU ===')
       return
     end
-    unless guard_model?
-      log_line("SKIP: nespravny model ('#{Sketchup.active_model && Sketchup.active_model.path}') — testy NEBEZALI")
+    model = Sketchup.active_model
+    unless guard_model?(model)
+      log_line("SKIP: nespravny model ('#{model && model.path}', korpusov: #{model ? cabinets(model).length : '?'}) — testy NEBEZALI")
       log_line('=== KONIEC SUBORU ===')
       return
     end
-    model = Sketchup.active_model
     log_line("INFO: verzia pluginu #{Noxun::Engine::VERSION}, model '#{File.basename(model.path.to_s)}'")
     cleanup(model) # cisty stol (zvysky z predoslych behov)
     run_sync(model)

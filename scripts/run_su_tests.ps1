@@ -19,10 +19,24 @@ Remove-Item $out -Force -ErrorAction SilentlyContinue -Confirm:$false
 $modelCopy = Join-Path $work ("ENGINEtests_run_" + (Get-Date -Format 'HHmmss') + '.skp')
 Copy-Item $model $modelCopy -Force
 
-$runner = (Join-Path $repo 'tests\sketchup\su_runner.rb') -replace '\\', '/'
-$outRb = $out -replace '\\', '/'
+# Izolacia perzistencie (Codex review PR #20): NOXUN katalogy (materials/abs_rules/templates)
+# citaju ENV['APPDATA'] pri KAZDOM volani -> presmerovanie v bootstrape ochrani realne katalogy
+# vyvojara pred seed/normalizacnymi zapismi testov. SketchUp Plugins sa nacitavaju z nativneho
+# profilu (nie z Ruby ENV), takze plugin sa nacita normalne. NEROBIT v zivej user session!
+$appdata = Join-Path $work 'AppData'
+New-Item -ItemType Directory -Force -Path $appdata | Out-Null
+
+# Escapovanie pre Ruby single-quoted literaly (Codex review PR #20): apostrof v ceste
+# (napr. C:\Users\O'Neil) by inak vygeneroval nevalidny bootstrap a 8 min timeout.
+function ConvertTo-RubySq([string]$s) {
+  return ($s -replace '\\', '/') -replace "'", "\'"
+}
+$runner = ConvertTo-RubySq (Join-Path $repo 'tests\sketchup\su_runner.rb')
+$outRb = ConvertTo-RubySq $out
+$appdataRb = ConvertTo-RubySq $appdata
 $boot = Join-Path $work 'boot.rb'
 $lines = @(
+  "ENV['APPDATA'] = '$appdataRb'",
   "ENV['NOXUN_SU_OUT'] = '$outRb'",
   "load '$runner'"
 )
@@ -36,9 +50,14 @@ while ((Get-Date) -lt $deadline) {
   if ((Test-Path $out) -and (Select-String -Path $out -Pattern 'KONIEC SUBORU' -Quiet)) {
     Write-Host ''
     Get-Content $out -Encoding UTF8 | Write-Host
+    # SKIP alebo nula PASS = zlyhanie (Codex review PR #20): beh bez testov nesmie byt zeleny.
     $failed = (Select-String -Path $out -Pattern '^FAIL:' | Measure-Object).Count
+    $skipped = (Select-String -Path $out -Pattern '^SKIP:' | Measure-Object).Count
+    $passed = (Select-String -Path $out -Pattern '^PASS:' | Measure-Object).Count
     if ($failed -gt 0) { Write-Host "VYSLEDOK: $failed FAIL"; exit 1 }
-    Write-Host 'VYSLEDOK: OK'
+    if ($skipped -gt 0) { Write-Host 'VYSLEDOK: SKIP (testy nebezali) — povazovane za zlyhanie'; exit 1 }
+    if ($passed -eq 0) { Write-Host 'VYSLEDOK: ziadny PASS — povazovane za zlyhanie'; exit 1 }
+    Write-Host "VYSLEDOK: OK ($passed PASS)"
     exit 0
   }
   Start-Sleep -Seconds 5
