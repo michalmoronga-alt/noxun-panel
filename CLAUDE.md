@@ -23,8 +23,8 @@ GitHub: https://github.com/michalmoronga-alt/noxun-panel
 - **Testuje sa VÝHRADNE v testovacom projekte `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne) — v ňom môžu agenti tvoriť/mazať čokoľvek. `_dev/` je gitignorované.
 - **NIKDY netestovať v okne so zákazkou** — pred testami vždy overiť `model.path`/titul okna (bridge vykonáva príkazy v každom okne, kde je zapnutý — bridge zapínať len v testovacom okne).
 
-## Architektúra (V0.2)
+## Architektúra (V0.3)
 
-`noxun_engine.rb` loader → `noxun_engine\main.rb` → core (units — JEDINÉ miesto mm↔Length; ids; store — NOXUN dict; construction — plánovač cfg→dielce; cabinet_builder — regenerate; zone_tree — strom zón+priečky; zones — ghost boxy; scale_observer=ScaleWatch — absorpcia scale; templates) → modules (shelves, fronts — čelá fixed/auto s lockmi) → ui (panel.rb + panel.html).
+`noxun_engine.rb` loader → `noxun_engine\main.rb` → core (units — JEDINÉ miesto mm↔Length; ids; store — NOXUN dict; part_keys — stabilná identita dielcov pre override/kovanie/výstupy; json_file_store — atomický JSON zápis + .bak + cache; materials — katalóg materiálov a dedenie projekt→skrinka→dielec; abs_rules — pravidlové ABS defaulty podľa roly; construction — plánovač cfg→dielce; cabinet_builder — regenerate; zone_tree — strom zón+priečky; zones — ghost boxy; scale_observer=ScaleWatch — absorpcia scale; templates) → modules (shelves, fronts — čelá fixed/auto s lockmi) → ui (panel.rb + panel.html).
 
 Kľúčové invarianty: dáta na inštancii v `NOXUN` dictionary (config = JSON string, mm Float); rebuild = 1 undo operácia s `@rebuilding` guardom; recyklácia definícií podľa mena; žiadne DC vzorce.
