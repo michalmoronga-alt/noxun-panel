@@ -116,13 +116,19 @@ module Noxun
         end
       end
 
-      # Prepnutie observera pri zmene aktivneho modelu (File > New / Open) — drzany v @app_observer.
+      # Prepnutie observera pri zmene aktivneho modelu — drzany v @app_observer.
+      # Tri cesty (vzor ScaleWatch::EngineAppObserver): New/Open + onActivateModel
+      # pre prepinanie medzi UZ otvorenymi dokumentmi (Codex review PR #18).
       class PanelAppObserver < Sketchup::AppObserver
         def onNewModel(model)
           Panel.on_model_switched(model)
         end
 
         def onOpenModel(model)
+          Panel.on_model_switched(model)
+        end
+
+        def onActivateModel(model)
           Panel.on_model_switched(model)
         end
       end
