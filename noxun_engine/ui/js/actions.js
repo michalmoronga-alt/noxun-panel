@@ -1,0 +1,133 @@
+  // ===================== ZONA UI (akcie / rozmery poli) =====================
+  function refreshZoneUI(){
+    var zones = computeZones();
+    var z = null; zones.forEach(function(x){ if (fullZoneId(x.id) === activeZoneId) z = x; });
+    var leafBox = el('leafActions'), fieldBox = el('fieldEditor');
+    if (!z){
+      el('zoneActive').innerHTML = 'Žiadna zóna neoznačená. Klikni na pole v náhľade.';
+      setZoneButtons(false); leafBox.style.display=''; fieldBox.innerHTML=''; renderZoneTree(zones); return;
+    }
+    el('zoneActive').innerHTML = '<b>' + z.label + '</b> — ' + Math.round(z.w) + '×' + Math.round(z.h) + ' mm';
+    if (z.leaf){
+      leafBox.style.display=''; fieldBox.innerHTML='';
+      setVal('zoneShelves', z.shelves||0);
+      setZoneButtons(true);
+    } else {
+      leafBox.style.display='none';
+      renderFieldEditor(z);
+      var b = document.querySelectorAll('.zbtn'); for (var i=0;i<b.length;i++) b[i].disabled=false; // clean zostava aktivne
+    }
+    renderZoneTree(zones);
+  }
+  function renderFieldEditor(z){
+    var box = el('fieldEditor'); var html = '<div class="hint">Presné rozmery polí (mm). 🔒 = drží rozmer pri zmene korpusu.</div>';
+    var axisLbl = (z.split.axis==='h') ? 'Riadok' : 'Stĺpec';
+    for (var i=0;i<z.split.count;i++){
+      var c = z.split.cuts[i] || {size:null,locked:false};
+      var sz = Math.round(z.split.sizes[i]);
+      html += '<div class="fldrow"><span class="fldn">'+axisLbl+' '+(i+1)+'</span>' +
+        '<input type="number" step="1" value="'+sz+'" onchange="setFieldSize(\''+z.id+'\','+i+', this.value)">' +
+        '<div class="lockbtn'+(c.locked?' on':'')+'" title="Zamknúť rozmer" onclick="toggleFieldLock(\''+z.id+'\','+i+', this)">'+(c.locked?'🔒':'🔓')+'</div></div>';
+    }
+    box.innerHTML = html;
+  }
+  function setFieldSize(localId, index, value){
+    var node0 = navTree(sanitizeTree(currentZoneTree), pathOf(localId));
+    if (!node0 || !node0.split) return;
+    var locked = node0.split.cuts[index] ? node0.split.cuts[index].locked : false;
+    var sz = (value===''? null : parseFloat(value));
+    if (sz==null){
+      // auto: toto pole na nil (ostatne necham; resolve ho rovnomerne dopocita)
+      var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localId));
+      node.split.cuts[index] = { size:null, locked:false }; currentZoneTree = tree;
+    } else {
+      // fix #5: kotva na zadany rozmer + persistni cely layout -> zadany rozmer nezmizne
+      persistLayout(localId, index, sz, locked);
+    }
+    renderPreview();
+    if (selectedCabId) pushFieldCuts(localId, index);
+    else refreshZoneUI();
+  }
+  function toggleFieldLock(localId, index, elBtn){
+    var node0 = navTree(sanitizeTree(currentZoneTree), pathOf(localId));
+    if (!node0 || !node0.split) return;
+    var cur = node0.split.cuts[index] || { size:null, locked:false };
+    var newLocked = !cur.locked;
+    var sizes = null; computeZones().forEach(function(z){ if(z.id===localId && z.split) sizes=z.split.sizes; });
+    var anchorSize = (cur.size!=null) ? cur.size : (sizes ? Math.round(sizes[index]) : null);
+    // fix #5: kotva na aktualny rozmer pola + persistni cely layout so zmenenym lockom
+    persistLayout(localId, index, anchorSize, newLocked);
+    renderPreview();
+    if (selectedCabId) pushFieldCuts(localId, index);
+    else refreshZoneUI();
+  }
+
+  // --- strom zon (citatelne nazvy) ---
+  function renderZoneTree(zones){
+    var c = el('zoneTree'); c.innerHTML = '';
+    if (!zones || !zones.length){ c.innerHTML = '<div class="muted">Žiadny označený korpus.</div>'; return; }
+    zones.forEach(function(z){
+      var depth = z.path.length - 1;
+      var div = document.createElement('div');
+      div.className = 'znode' + (fullZoneId(z.id) === activeZoneId ? ' active' : '');
+      div.style.paddingLeft = (6 + depth * 14) + 'px';
+      var info = z.leaf ? (z.shelves>0 ? (z.shelves+' políc') : 'prázdna')
+                        : ('delené ' + (z.split.axis==='h'?'vodorovne':'zvislo') + ' ×' + z.split.count);
+      div.innerHTML = '<b>' + z.label + '</b> <span class="dim">' + Math.round(z.w) + '×' + Math.round(z.h) + '</span> <span class="zs">' + info + '</span>';
+      div.onclick = (function(zz){ return function(){ pickZone(zz.id); }; })(z);
+      c.appendChild(div);
+    });
+  }
+  function setZoneButtons(on){ var b = document.querySelectorAll('.zbtn'); for (var i=0;i<b.length;i++) b[i].disabled = !on; }
+
+  function splitZone(axis){
+    if (!activeZoneId){ NX.setStatus('Najprv označ zónu.', true); return; }
+    var count = parseInt(axis === 'h' ? val('splitHCount') : val('splitVCount'), 10);
+    if (selectedCabId){
+      if (window.sketchup && sketchup.split_zone) sketchup.split_zone(JSON.stringify({ zone_id: activeZoneId, axis: axis, count: count }));
+    } else {
+      var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localZoneId(activeZoneId)));
+      if (node){
+        node.generation = (node.generation || 0) + 1;
+        node.split={axis:axis,count:count,cuts:sanitizeCuts(null,count)};
+        node.shelves=0;
+        node.children=[];
+        for(var i=0;i<count;i++) node.children.push(defaultTree(0, newStableId('Z')));
+      }
+      currentZoneTree = tree; renderPreview(); refreshZoneUI();
+    }
+  }
+  function setZoneShelves(){
+    if (!activeZoneId){ NX.setStatus('Najprv označ zónu.', true); return; }
+    var n = parseInt(val('zoneShelves'), 10);
+    if (selectedCabId){
+      if (window.sketchup && sketchup.set_zone_shelves) sketchup.set_zone_shelves(JSON.stringify({ zone_id: activeZoneId, count: n }));
+    } else {
+      var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localZoneId(activeZoneId)));
+      if (node){ node.split=null; node.children=[]; node.shelves=n; }
+      currentZoneTree = tree; renderPreview(); refreshZoneUI();
+    }
+  }
+  function cleanZone(){
+    if (!activeZoneId){ NX.setStatus('Najprv označ zónu.', true); return; }
+    if (selectedCabId){
+      if (window.sketchup && sketchup.clean_zone) sketchup.clean_zone(JSON.stringify({ zone_id: activeZoneId }));
+    } else {
+      var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localZoneId(activeZoneId)));
+      if (node){ node.split=null; node.children=[]; node.shelves=0; }
+      currentZoneTree = tree; renderPreview(); refreshZoneUI();
+    }
+  }
+
+  // --- korpus akcie ---
+  function insertCabinet(){
+    var p = collectAll(); p.zone_tree = currentZoneTree;
+    if (window.sketchup && sketchup.insert_cabinet) sketchup.insert_cabinet(JSON.stringify(p));
+  }
+  function toggleZones(){ var on = el('zonesChk').checked; if (window.sketchup && sketchup.toggle_zones) sketchup.toggle_zones(on ? 'true' : 'false'); }
+
+  function setSelected(cid){
+    selectedCabId = cid; var on = !!cid;
+    el('applyTplBtn').disabled = !on;
+  }
+
