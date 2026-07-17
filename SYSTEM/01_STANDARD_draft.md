@@ -54,6 +54,8 @@ Definície pojmov:
 
 Každá NOXUN entita nesie **jediný** attribute dictionary s názvom `NOXUN`. Žiadna dnešná zmes (`NOXUN_CORE` + `NOXUN_KOVANIE` + DC `dynamic_attributes`). Kľúče sú buď ploché skalárne hodnoty (časté čítanie, filtre, marker), alebo zložité štruktúry uložené ako **JSON string** v jednom kľúči.
 
+**Jediná povolená výnimka:** kľúč `scaletool` v dictionary `dynamic_attributes` (V0.2c — obmedzenie scale úchopov na čisté osi X/Y/Z). SketchUp číta tento atribút natívne a inde sa uložiť nedá; žiadny iný zápis mimo `NOXUN` nie je dovolený.
+
 Základný layout (ploché kľúče, čítané často):
 
 | Kľúč | Typ | Význam |
@@ -69,6 +71,8 @@ Základný layout (ploché kľúče, čítané často):
 | `role` | String | rola dielca/modulu (viď 2.4) |
 | `manufactured` | Bool | ide do výroby? (explicitne, nie podľa typu entity) |
 | `production_class` | String | `sheet` / `linear` / `counted` / `reference` / `none` (viď sekcia 8) |
+| `name` | String | ľudský názov dielca („Bok ľavý") — kusovník a VEPO čítajú názov odtiaľto, nie z `config` |
+| `role_key` | String | dočasný alias `part_key` pre panel (kompatibilita V0.3.2; časom zanikne) |
 | `config` | JSON string | celá konfigurácia entity (rozmery, konštrukcia, zóny, hrany, materiál…) |
 
 Zložité veci (rozmery + konštrukcia korpusu, zoznam hrán dielca, delenie čiel) žijú v `config` ako JSON string. Dôvod: SketchUp dictionary je plochý kľúč→hodnota; JSON je jediný spoľahlivý spôsob, ako niesť vnorenú štruktúru bez desiatok kľúčov.
@@ -97,7 +101,7 @@ Rola dielca/modulu je **explicitná hodnota** v `NOXUN/role`, nikdy sa neodvodzu
 
 ```
 side_left · side_right · bottom · top · back · shelf · divider_v · divider_h ·
-front_door · drawer_front · flap · cover_panel · false_front · rail · plinth ·
+front_door · drawer_front · flap · cover_panel · false_front · rail_front · rail_back · plinth ·
 gola_profile · hinge · slide · leg · handle · shelf_pin · connector
 ```
 
@@ -126,7 +130,7 @@ gola_profile · hinge · slide · leg · handle · shelf_pin · connector
     "sides":  { "thickness": 18.0, "construction": "sides_wrap" },
     "bottom": { "mode": "between_sides", "thickness": 18.0 },
     "top":    { "mode": "two_rails", "thickness": 18.0 },
-    "back":   { "mode": "grooved", "thickness": 3.0 },
+    "back":   { "mode": "groove", "thickness": 3.0 },
     "support":{ "type": "axilo", "height": 100.0 },
     "available_width": 764.0, "available_height": 680.0, "available_depth": 520.0,
     "front_plane": 0.0,
@@ -247,7 +251,7 @@ Konštrukčné varianty (ArchiWood vzor, dnešné `f_dno`/`f_strop`):
 - **Dno/vrch:** medzi bokmi ↔ pod/nad bokmi; naložené ↔ vložené; dvojité dno; bez dna.
 - **Boky:** obaľujú dno/vrch ↔ sú obalené (`sides_wrap` / `wrapped`).
 - **Vrch:** plný ↔ predná/zadná priečka ↔ dve priečky (`two_rails`) ↔ bez vrchu.
-- **Chrbát:** vložený medzi boky ↔ naložený zozadu ↔ v drážke (`grooved`) ↔ delený ↔ bez chrbta.
+- **Chrbát:** vložený medzi boky ↔ naložený zozadu ↔ v drážke (`groove`) ↔ delený ↔ bez chrbta.
 
 ### 4.5 Čistý priestor a rozhrania
 
@@ -264,6 +268,8 @@ Korpus **vypočíta a nesie** (v `config`, ako cache — zdroj pravdy zostáva r
 ### 5.1 Zóna (slot)
 
 Zóna je dátová štruktúra: rozmery (svetlé), pozícia v korpuse, stav (`free`/`occupied`), zoznam povolených modulov. Vloženie modulu = zápis do konfigurácie + rebuild — nie ručné modelovanie. Presne ArchiWood/CabMaker princíp (ktorý DC nepoužíva).
+
+> **Stav implementácie (V0.2–V0.3):** entity `kind: module` zatiaľ neexistujú — police žijú ako počet `shelves` priamo na zóne a čelá ako config `fronts` na korpuse. Config ghost zóny preto nesie aj kľúč `shelves` a `state` sa odvodzuje z počtu políc (`modules` je zatiaľ vždy prázdne pole). Naplní sa s príchodom skutočných modulov (V0.4+, zásuvkové bloky a kovanie).
 
 **Delenie:** priečka alebo polica rozdelí zónu na nové zóny — **rekurzívne**, vzniká strom priestorov. Napr. horizontálna priečka rozdelí zónu na hornú a dolnú; každá je ďalej deliteľná.
 
@@ -284,22 +290,21 @@ Zóna nesie `allowed_modules` — čo do nej smie. Modul pri vklade dostane rozm
 
 Čelá nie sú len „dvere". Zahŕňajú: jednokrídlové/dvojkrídlové dvierka, zásuvkové čelá, výklopy, posuvné čelá, pevné krycie panely, falošné čelá, rámové a bezúchytkové riešenia. Čelný modul rieši: typ, počet, delenie, medzery, prekrytie korpusu, materiál, ABS, smer otvárania, úchytky, požiadavky na kovanie. **Geometria čela, spôsob otvárania a konkrétne kovanie sú oddelené.**
 
-**Delenie na výšku: FIXNÉ + AUTO s lockmi** (Blum-konfigurátor princíp). Jedno čelo zamknem na fixnú výšku, ostatné sa dopočítajú automaticky z zvyšku po odčítaní zamknutých + škár:
+**Delenie na výšku: FIXNÉ + AUTO s lockmi** (Blum-konfigurátor princíp). Jedno čelo zamknem na fixnú výšku, ostatné sa dopočítajú automaticky zo zvyšku po odčítaní zamknutých + škár. Kanonický config (tak ho ukladá `Fronts.normalize_config` — pole sa volá **`items`**, poradie odspodu, F1 dole):
 
 ```json
 {
   "split_axis": "height",
-  "gap": 3.0,
-  "fronts": [
-    { "id": "F1", "mode": "fixed", "height": 140.0, "locked": true },
-    { "id": "F2", "mode": "auto" },
-    { "id": "F3", "mode": "auto" },
-    { "id": "F4", "mode": "fixed", "height": 280.0, "locked": true }
+  "gap": 3.0, "gap_top": 2.0, "gap_bottom": 2.0, "gap_sides": 2.0,
+  "items": [
+    { "id": "F1", "type": "drawer_front", "mode": "fixed", "height": 140.0, "locked": true, "wings": 1 },
+    { "id": "F2", "type": "door", "mode": "auto", "height": null, "locked": false, "wings": "auto" },
+    { "id": "F3", "type": "door", "mode": "auto", "height": null, "locked": false, "wings": "auto" }
   ]
 }
 ```
 
-`auto` čelá si rovnomerne rozdelia zvyšnú výšku. **Škáry a prekrytia sú konfigurovateľné** (`gap_top`, `gap_bottom`, `gap_between`, `overlay`).
+`auto` čelá si rovnomerne rozdelia zvyšnú výšku; `wings: "auto"` = 2 krídla nad 600 mm šírky otvoru. **Škáry sú konfigurovateľné** (`gap` medzi čelami, `gap_top`/`gap_bottom`/`gap_sides` po obvode). Prekrytia korpusu (`overlay`) a odlišná škára medzi krídlami (`gap_between`) zatiaľ nie sú implementované — doplnia sa pri kovaní (typ pántu určuje prekrytie), viď sekcia 12.
 
 ---
 
@@ -401,10 +406,10 @@ Nezaradené materiály: 0
 Každý plošný dielec nesie hrany **per strana** ako dáta (nezávislé od vizuálnej textúry):
 
 ```json
-"edges": { "L1": "ABS_K009_1.0", "L2": null, "W1": "ABS_K009_1.0", "W2": "ABS_K009_1.0" }
+"edges": { "L1": "ABS_K009_10", "L2": null, "W1": "ABS_K009_10", "W2": "ABS_K009_10" }
 ```
 
-- Hodnota strany = `null` (bez hrany) alebo **ABS variant ID** (`ABS_K009_1.0` = dekor + hrúbka ABS).
+- Hodnota strany = `null` (bez hrany) alebo **ABS variant ID** (`ABS_K009_10` = dekor + hrúbka ABS; sufix `_10`/`_20` = 1,0/2,0 mm — formát reálneho katalógu `materials.rb`).
 - Podporované výrobné hrúbky ABS sú výhradne **1,0 mm a 2,0 mm**.
 - `L1`/`L2` = dvojica pozdĺžnych strán, `W1`/`W2` = dvojica priečnych.
 - **UI ich prekladá** na predná/zadná/ľavá/pravá. Interný systém je odolný voči otočeniu skrinky — hrany sa držia per strana, súhrnné kódy (`—`/`=`) sa **dopočítajú až pri exporte** (VEPO nevie povedať KTORÁ strana, kusovník a CNC to potrebujú presne).
@@ -430,7 +435,7 @@ Samostatný režim na vizuálnu kontrolu hrán:
 
 ## 8. Výrobné triedy a dátový model dielca
 
-### 8.1 Štyri výrobné triedy
+### 8.1 Výrobné triedy
 
 Výrobný stav je **explicitne v metadátach** (`production_class` + `manufactured`), nie podľa typu SketchUp entity. **Group sa štandardne nepočíta** (dekorácie, spotrebiče, pomocná geometria).
 
@@ -440,12 +445,13 @@ Výrobný stav je **explicitne v metadátach** (`production_class` + `manufactur
 | `linear` | **výrobná dĺžka z KONFIGURÁCIE** (nie z najdlhšej hrany geometrie) | Gola profily, LED, soklové lišty, tyče |
 | `counted` | kus (produkt + kód + množstvo) | pánty, nohy, výsuvy, úchytky, spojky |
 | `reference` | nepočíta sa | spotrebiče, dekorácie, miestnosť, vizuál |
+| `none` | pomocná/servisná geometria enginu — nikdy sa nepočíta ani nereportuje | ghost boxy zón (`kind: zone`) |
 
 **Kritické pri `linear`:** dĺžka sa berie z `config.length`, ktoré nastavil engine — nie automaticky z najdlhšej hrany bboxu.
 
 ### 8.2 Plný dátový model dielca (sheet)
 
-Podľa sekcie 2.1: **ploché kľúče = identita a filtre; všetko rozmerové a výrobné žije v `config` (JSON string)** — tak to ukladá aj engine (`NOXUN/config`). Exportéry čítajú rozmery VÝHRADNE z `config`.
+Podľa sekcie 2.1: **ploché kľúče = identita, názov a filtre; všetko rozmerové a výrobné žije v `config` (JSON string)** — tak to ukladá aj engine (`NOXUN/config`). Exportéry čítajú rozmery VÝHRADNE z `config`; názov dielca z plochého kľúča `name`.
 
 ```json
 {
@@ -455,13 +461,14 @@ Podľa sekcie 2.1: **ploché kľúče = identita a filtre; všetko rozmerové a 
   "part_id": "CAB-014-SIDE-L",
   "part_key_schema": 1,
   "part_key": "cabinet/side:left",
+  "role_key": "cabinet/side:left",
   "cabinet_id": "CAB-014",
   "template_id": "base-lower-18",
   "role": "side_left",
+  "name": "Bok ľavý",
   "manufactured": true,
   "production_class": "sheet",
   "config": {
-    "name": "Bok ľavý",
     "quantity": 1,
     "length": 720.0,
     "width": 560.0,
@@ -469,10 +476,10 @@ Podľa sekcie 2.1: **ploché kľúče = identita a filtre; všetko rozmerové a 
     "material_id": "K009_PW_DTDL_18",
     "grain_direction": "length",
     "edges": {
-      "L1": "ABS_K009_1.0",
+      "L1": "ABS_K009_10",
       "L2": null,
-      "W1": "ABS_K009_1.0",
-      "W2": "ABS_K009_1.0"
+      "W1": "ABS_K009_10",
+      "W2": "ABS_K009_10"
     }
   }
 }
