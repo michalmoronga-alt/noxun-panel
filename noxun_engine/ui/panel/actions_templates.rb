@@ -54,12 +54,14 @@ module Noxun
         end
 
         # Apply sablony = MERGE cieloveho korpusu so sablonou. Konstrukcne kluce beru zo sablony
-        # (tpl_config), ale material_id/front/back + part_overrides ZOSTAVAJU z ciela — aby sa
-        # nezahodili uzivatelove ABS/materialove upravy. Materialove pole prepiseme LEN ak ho sablona
-        # explicitne nesie (non-nil); part_overrides sa berie VZDY z ciela (sablona ich nenesie).
+        # (tpl_config), ale material_id/front/back + part_overrides + hardware_overrides ZOSTAVAJU
+        # z ciela — aby sa nezahodili uzivatelove ABS/materialove upravy ani rucne pocty kovania.
+        # Materialove pole prepiseme LEN ak ho sablona explicitne nesie (non-nil); oba overrides
+        # sa beru VZDY z ciela (sablona ich nenesie — su viazane na konkretne dielce/zony zdroja).
         def merge_template(target_params, tpl_config)
           merged = tpl_config.dup
           merged['part_overrides'] = target_params['part_overrides'] || {}
+          merged['hardware_overrides'] = target_params['hardware_overrides'] || []
           %w[material_id front_material_id back_material_id].each do |k|
             tv = present_str(tpl_config[k])
             merged[k] = tv || target_params[k]

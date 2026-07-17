@@ -9,12 +9,14 @@
 #   schema      Integer  — verzia tvaru planu (SCHEMA). Bump pravidlo: aditivne volitelne
 #                          pole = bez bumpu; zmena vyznamu/povinneho pola = bump + migracia.
 #                          Verzuje sa NEZAVISLE od PartKeys::SCHEMA (format identity).
+#                          Historia: 1 = V0.3.4 (hardware vzdy []); 2 = V0.4 (hardware plni
+#                          rules engine, polozky string-keyed so sprisnenym kontraktom —
+#                          ziadna datova migracia, lebo schema 1 hardware nikdy nenieslo).
 #   parts       [dielec] — deskriptory REALNE POSTAVITELNYCH dielcov. Degenerovane dielce
 #                          (nekladny rozmer boxu, napr. z extremne uzkych zon) sa do parts
 #                          NEdostanu — plan ich vyradi s warningom part_skipped_degenerate,
 #                          aby kusovnik nikdy neobsahoval dielec, ktory v modeli nestoji.
-#   hardware    [hw]     — kovanie. Tvar zavazny uz teraz (V0.4 rules engine ho zacne plnit);
-#                          do V0.4 vzdy [].
+#   hardware    [hw]     — kovanie z pravidiel (core/hardware_rules.rb) + hardware_overrides.
 #   warnings    [w]      — nefatalne upozornenia: plan JE postaveny, ale inak nez zadanie
 #                          (orezane vystuhy, preskocene police...). Fatalne stavy ostavaju raise.
 #   zones / zone_tree / front_items / available / wings / interior — odvodene data pre UI a config.
@@ -37,11 +39,22 @@
 # Konvencia hran: L1/L2 lezia na prod[:length], W1/W2 na prod[:width];
 # pri celach prod[:length] = VYSKA cela, prod[:width] = sirka (fronts.rb box_desc).
 #
-# HARDWARE polozka: owner_part_key (String|nil — nil = korpus ako celok; NIKDY neskladat
-# cez PartKeys.segment — zmrzacil by '/' a ':'), generic_type (hinge/slide/leg/handle/
-# shelf_pin/connector), quantity (Integer > 0), rule_id (String), variant_id (nil vo faze 1 —
-# two-phase mapovanie, standard 6.2), production_class 'counted', manufactured true.
-# Identita kovania = trojica (owner_part_key, generic_type, index).
+# HARDWARE polozka (schema 2): STRING kluce (JSON round-trip cez config korpusu bez
+# konverzii — presne ako WARNING). Povinne polia:
+#   owner_part_key   String|nil — nil = korpus ako celok; ak String, MUSI existovat v parts
+#                    planu (referencna integrita); NIKDY neskladat cez PartKeys.segment
+#                    (zmrzacil by '/' a ':')
+#   generic_type     String zo slovnika GENERIC_TYPES
+#   quantity         Integer 1..MAX_HW_QUANTITY
+#   rule_id          String neprazdny (povod polozky; sucast identity override)
+#   variant_id       nil vo faze 1 (two-phase mapovanie, standard 6.2), inak String
+#   production_class 'counted' (faza 1; dlzkove kovanie pride s vlastnym kind)
+#   manufactured     true
+#   params           Hash (String kluce -> String/Numeric skalary), napr. height nohy,
+#                    nominal_length vysuvu
+#   source           'rule' | 'manual' (manual = quantity z hardware_overrides)
+#   rule_quantity    Integer — povodny pocet z pravidla (UI: "rucne (pravidlo: 4)")
+# Identita polozky = trojica (owner_part_key, generic_type, rule_id).
 #
 # WARNING polozka: { 'code', 'severity' ('warn'|'info'), 'message' (slovensky),
 # 'part_key' (nil = korpusova uroven), 'data' (Hash) } — string kluce (JSON round-trip
@@ -49,7 +62,7 @@
 module Noxun
   module Engine
     module BuildPlan
-      SCHEMA = 1
+      SCHEMA = 2
 
       # Najmensi vyrobitelny rozmer (mm). JEDINY prah degenerovanosti v systeme:
       # plan (partition v Construction.build_plan) aj builder (positive_box?) ho zdielaju —
@@ -64,6 +77,16 @@ module Noxun
       ].freeze
 
       PRODUCTION_CLASSES = %w[sheet linear counted reference none].freeze
+
+      # Slovnik generickych typov kovania (faza 1 pouziva leg/hinge/slide; zvysok
+      # rezervovany standardom 2.4). Neznamy typ = chyba kontraktu, nie nova kategoria.
+      GENERIC_TYPES = %w[leg hinge slide handle shelf_pin connector].freeze
+
+      # Horna hranica poctu jednej polozky — poistka proti poskodenym pravidlam/override
+      # (quantity priamo riadi pocet kreslenych noh; 100000 valcov nesmie byt mozne).
+      MAX_HW_QUANTITY = 999
+
+      HW_SOURCES = %w[rule manual].freeze
 
       module_function
 
@@ -84,7 +107,7 @@ module Noxun
 
         seen = {}
         plan[:parts].each { |pd| validate_part!(pd, seen) }
-        plan[:hardware].each { |hw| validate_hardware!(hw) }
+        plan[:hardware].each { |hw| validate_hardware!(hw, seen) }
         plan
       end
 
@@ -120,16 +143,53 @@ module Noxun
         pd
       end
 
-      def validate_hardware!(hw)
+      # Zvaliduje jednu hardware polozku (STRING kluce — kontrakt v hlavicke).
+      # part_keys: hash existujucich part_key planu (referencna integrita ownera);
+      # nil = kontrola vlastnika sa preskoci (izolovane unit testy poloziek).
+      def validate_hardware!(hw, part_keys = nil)
         raise 'BuildPlan: hardware polozka musi byt Hash.' unless hw.is_a?(Hash)
-        owner = hw[:owner_part_key]
+        gt = hw['generic_type'].to_s
+        raise "BuildPlan: hardware ma neznamy generic_type '#{gt}'." unless GENERIC_TYPES.include?(gt)
+
+        owner = hw['owner_part_key']
         unless owner.nil? || PartKeys.valid?(owner.to_s)
           raise "BuildPlan: hardware ma neplatny owner_part_key '#{owner}'."
         end
-        raise 'BuildPlan: hardware ma prazdny generic_type.' if hw[:generic_type].to_s.strip.empty?
-        qty = hw[:quantity]
-        raise "BuildPlan: hardware #{hw[:generic_type]} ma neplatnu quantity (#{qty.inspect})." unless qty.is_a?(Integer) && qty.positive?
+        if owner && part_keys && !part_keys[owner.to_s]
+          raise "BuildPlan: hardware #{gt} ukazuje na neexistujuci dielec '#{owner}'."
+        end
+
+        qty = hw['quantity']
+        unless qty.is_a?(Integer) && qty >= 1 && qty <= MAX_HW_QUANTITY
+          raise "BuildPlan: hardware #{gt} ma neplatnu quantity (#{qty.inspect})."
+        end
+        raise "BuildPlan: hardware #{gt} nema rule_id." if hw['rule_id'].to_s.strip.empty?
+        unless hw['variant_id'].nil? || hw['variant_id'].is_a?(String)
+          raise "BuildPlan: hardware #{gt} ma neplatny variant_id (#{hw['variant_id'].inspect})."
+        end
+        unless hw['production_class'] == 'counted'
+          raise "BuildPlan: hardware #{gt} musi byt production_class 'counted' (faza 1)."
+        end
+        raise "BuildPlan: hardware #{gt} musi byt manufactured true." unless hw['manufactured'] == true
+        validate_hw_params!(gt, hw['params'])
+        unless HW_SOURCES.include?(hw['source'].to_s)
+          raise "BuildPlan: hardware #{gt} ma neplatny source (#{hw['source'].inspect})."
+        end
+        rq = hw['rule_quantity']
+        unless rq.is_a?(Integer) && rq >= 1 && rq <= MAX_HW_QUANTITY
+          raise "BuildPlan: hardware #{gt} ma neplatnu rule_quantity (#{rq.inspect})."
+        end
         hw
+      end
+
+      # params: plochy Hash so String klucmi a skalarnymi hodnotami (JSON round-trip).
+      def validate_hw_params!(gt, params)
+        raise "BuildPlan: hardware #{gt} nema params Hash." unless params.is_a?(Hash)
+        params.each do |k, v|
+          raise "BuildPlan: hardware #{gt} ma ne-String kluc params (#{k.inspect})." unless k.is_a?(String)
+          next if v.is_a?(String) || v.is_a?(Numeric)
+          raise "BuildPlan: hardware #{gt} ma neskalarny params['#{k}'] (#{v.inspect})."
+        end
       end
 
       def validate_triplet!(key, label, v, positive:)

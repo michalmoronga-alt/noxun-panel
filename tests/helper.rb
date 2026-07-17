@@ -113,6 +113,7 @@ unless NxTest::IN_SKETCHUP
     core/json_file_store
     core/materials
     core/abs_rules
+    core/hardware_rules
     modules/shelves
     modules/fronts
     core/zone_tree

@@ -410,6 +410,54 @@ NxTest.test('builder: norm_overrides zahodi prazdne a neplatne zaznamy') do
 end
 
 # ---------------------------------------------------------------------------
+# norm_hardware_overrides (V0.4 kovanie — cisto vypoctove, bez katalogu)
+# ---------------------------------------------------------------------------
+
+NxTest.test('builder: norm_hardware_overrides cisti tvar a zahadzuje neplatne') do
+  cb = Noxun::Engine::CabinetBuilder
+  NxTest.assert_equal([], cb.norm_hardware_overrides(nil))
+  NxTest.assert_equal([], cb.norm_hardware_overrides('nie pole'))
+  out = cb.norm_hardware_overrides([
+    { 'owner_part_key' => nil, 'generic_type' => 'leg', 'rule_id' => 'nohy-zakladne', 'quantity' => 6 },
+    { owner_part_key: 'front:F1/wing:left', generic_type: 'hinge', rule_id: 'r1', disabled: 'true' },
+    { 'generic_type' => 'ufo', 'rule_id' => 'r2', 'quantity' => 2 },       # neznamy typ -> von
+    { 'generic_type' => 'leg', 'rule_id' => '', 'quantity' => 2 },          # bez rule_id -> von
+    { 'generic_type' => 'leg', 'rule_id' => 'r3' },                         # bez quantity/disabled -> von
+    { 'owner_part_key' => 'SIDE-L', 'generic_type' => 'leg', 'rule_id' => 'r4', 'quantity' => 2 }, # zly owner
+    { 'generic_type' => 'slide', 'rule_id' => 'r5', 'quantity' => 100_000 } # clamp na max
+  ])
+  NxTest.assert_equal(3, out.length, "cakal som 3 platne zaznamy, mam #{out.inspect}")
+  NxTest.assert_equal({ 'owner_part_key' => nil, 'generic_type' => 'leg',
+                        'rule_id' => 'nohy-zakladne', 'quantity' => 6 }, out[0])
+  NxTest.assert_equal({ 'owner_part_key' => 'front:F1/wing:left', 'generic_type' => 'hinge',
+                        'rule_id' => 'r1', 'disabled' => true }, out[1], 'symbolove kluce sa znormalizuju')
+  NxTest.assert_equal(Noxun::Engine::BuildPlan::MAX_HW_QUANTITY, out[2]['quantity'])
+end
+
+NxTest.test('builder: norm_hardware_overrides — posledny duplicitny zaznam vyhrava') do
+  cb = Noxun::Engine::CabinetBuilder
+  out = cb.norm_hardware_overrides([
+    { 'owner_part_key' => nil, 'generic_type' => 'leg', 'rule_id' => 'r', 'quantity' => 5 },
+    { 'owner_part_key' => nil, 'generic_type' => 'leg', 'rule_id' => 'r', 'disabled' => true }
+  ])
+  NxTest.assert_equal(1, out.length, 'duplicitna identita sa deduplikuje')
+  NxTest.assert_equal(true, out[0]['disabled'], 'posledny zaznam vyhrava')
+end
+
+NxTest.test('builder: hardware_overrides preziju round-trip config_to_params -> normalize') do
+  cb = Noxun::Engine::CabinetBuilder
+  ov = [{ 'owner_part_key' => nil, 'generic_type' => 'leg',
+          'rule_id' => 'nohy-zakladne', 'quantity' => 6 }]
+  cfg = cb.normalize('hardware_overrides' => ov)
+  NxTest.assert_equal(ov, cfg[:hardware_overrides])
+  stored = JSON.parse(JSON.generate(cb.cabinet_config(cfg)))
+  NxTest.assert_equal(ov, stored['hardware_overrides'], 'zapis do configu bez zmeny')
+  params = cb.config_to_params(stored.merge('part_key_schema' => Noxun::Engine::PartKeys::SCHEMA))
+  NxTest.assert_equal(ov, params['hardware_overrides'], 'citanie z configu bez zmeny')
+  NxTest.assert_equal(ov, cb.normalize(params)[:hardware_overrides], 'druhy normalize identicky')
+end
+
+# ---------------------------------------------------------------------------
 # cabinet_config + merge_final
 # ---------------------------------------------------------------------------
 

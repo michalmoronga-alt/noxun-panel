@@ -22,7 +22,10 @@ module Noxun
 
       # Hlavny vstup: cfg (symbolove kluce, mm Float) + cabinet_id (pre ID zon) -> plan.
       # Vystup MUSI prejst BuildPlan.validate! — chybny plan nikdy neopusti planovac.
-      def build_plan(cfg, cabinet_id = 'CAB-000')
+      # hardware_rules: normalizovane pole pravidiel kovania. Builder posiela PROJEKTOVY
+      # snapshot (HardwareRules.ensure_project_rules!); nil = globalna kniznica (headless
+      # testy a pomocne volania bez modelu — migracia identity, panel resolvery).
+      def build_plan(cfg, cabinet_id = 'CAB-000', hardware_rules: nil)
         w = cfg[:width]; h = cfg[:height]; t = cfg[:thickness]
 
         interior = interior_dims(cfg)
@@ -62,10 +65,23 @@ module Noxun
                                         data: { 'box' => pd[:box].map(&:to_f) })
         end
 
+        # Kovanie z pravidiel — az PO vyradeni degenerovanych dielcov (na dielec,
+        # ktory v modeli nestoji, nesmie vzniknut polozka). Kontext string-keyed.
+        hw_ctx = {
+          'width' => w, 'height' => h, 'depth' => cfg[:depth],
+          'floor_height' => cfg[:floor_height],
+          'available_width' => (w - 2 * t),
+          'available_height' => interior[:avail_h],
+          'available_depth' => interior[:back_front_y],
+          'support' => support_type(cfg)
+        }
+        hw = HardwareRules.evaluate(cfg, parts, hw_ctx, rules: hardware_rules || HardwareRules.load)
+        warnings.concat(hw[:warnings])
+
         plan = {
           schema: BuildPlan::SCHEMA,
           parts: parts,
-          hardware: [], # tvar zavazny (build_plan.rb); plni az V0.4 rules engine
+          hardware: hw[:items],
           warnings: warnings,
           zones: zres[:zones],
           zone_tree: ZoneTree.sanitize(cfg[:zone_tree]),
@@ -79,6 +95,14 @@ module Noxun
           interior: interior
         }
         BuildPlan.validate!(plan)
+      end
+
+      # Typ podopretia korpusu (JEDEN zdroj pravdy — builder support_descriptor aj
+      # pravidla kovania citaju tuto funkciu): horna/na zemi = none, predny sokel =
+      # plinth (nohy pod nim aj tak su — pravidlo noh berie legs AJ plinth), inak legs.
+      def support_type(cfg)
+        return 'none' if cfg[:type] == 'upper' || cfg[:floor_height].to_f <= 0
+        cfg[:plinth_mode] == 'front' ? 'plinth' : 'legs'
       end
 
       # Vnutorne rozmery (svetle) + poloha celnej hrany chrbta. Hrubka chrbta z configu.
