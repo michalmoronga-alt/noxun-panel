@@ -131,6 +131,18 @@ NxTest.test('hardware_rules: override quantity -> manual + rule_quantity; disabl
   NxTest.assert_equal(0, NxHW.items_of(NxHW.evaluate([], {}, cfg_off), 'leg').length)
 end
 
+NxTest.test('hardware_rules: override zhodny s pravidlom ostava manual (reset viditelny)') do
+  # Codex review PR #24: 4 -> 5 -> 4 zapise override quantity 4; kym existuje,
+  # polozka je 'manual' — inak by UI skrylo reset a stale zaznam by ozil neskor.
+  cfg = { hardware_overrides: [
+    { 'owner_part_key' => nil, 'generic_type' => 'leg', 'rule_id' => 'nohy-zakladne', 'quantity' => 4 }
+  ] }
+  legs = NxHW.items_of(NxHW.evaluate([], {}, cfg), 'leg')
+  NxTest.assert_equal(4, legs.first['quantity'])
+  NxTest.assert_equal('manual', legs.first['source'], 'aj zhodny override = manual')
+  NxTest.assert_equal(4, legs.first['rule_quantity'])
+end
+
 NxTest.test('hardware_rules: override je viazany na rule_id — cudzi rule_id nezasiahne') do
   cfg = { hardware_overrides: [
     { 'owner_part_key' => nil, 'generic_type' => 'leg', 'rule_id' => 'ine-pravidlo', 'quantity' => 9 }
