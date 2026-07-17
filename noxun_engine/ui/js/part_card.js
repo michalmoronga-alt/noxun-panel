@@ -108,7 +108,8 @@
       var t = closestClass(ev.target, 'ehit'); if(!t) return;
       var code = t.getAttribute('data-edge');
       var sel = el('edgeRows').querySelector('select[data-edge="'+code+'"]');
-      if (sel){ sel.focus(); sel.classList.add('ovr'); NX.setStatus('Hrana '+code+' — vyber ABS v zozname.', false); }
+      // len fokus + status; class 'ovr' (vizual override) patri az realnemu overridu z onEdgeChange
+      if (sel){ sel.focus(); NX.setStatus('Hrana '+code+' — vyber ABS v zozname.', false); }
     });
   }
 

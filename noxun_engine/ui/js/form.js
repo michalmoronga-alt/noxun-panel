@@ -1,14 +1,8 @@
   // --- zber ---
   function collectConstruction(){
-    return {
-      type: getType(),
-      width: val('width'), height: val('height'), depth: val('depth'), thickness: val('thickness'),
-      floor_height: val('floor_height'),
-      bottom_mode: val('bottom_mode'), top_mode: val('top_mode'), back_mode: val('back_mode'),
-      back_thickness: val('back_thickness'),
-      plinth_mode: val('plinth_mode'), plinth_recess: val('plinth_recess'),
-      rail_depth: val('rail_depth'), rails_orientation: val('rails_orientation'), rails_top_offset: val('rails_top_offset')
-    };
+    var out = { type: getType() };
+    CONSTRUCTION_FIELDS.forEach(function(f){ out[f.id] = val(f.id); });
+    return out;
   }
   function collectFronts(){
     var items = [];
@@ -72,13 +66,7 @@
 
   // --- defaulty / viditelnost ---
   function setDefaults(t){
-    var d = DEFAULTS[t] || {};
-    setNum('width', d.width); setNum('height', d.height); setNum('depth', d.depth); setNum('thickness', d.thickness);
-    setNum('floor_height', d.floor_height);
-    setVal('bottom_mode', d.bottom_mode); setVal('top_mode', d.top_mode); setVal('back_mode', d.back_mode);
-    setNum('back_thickness', d.back_thickness || 3);
-    setVal('plinth_mode', d.plinth_mode); setNum('plinth_recess', d.plinth_recess);
-    setVal('rails_orientation', d.rails_orientation); setNum('rails_top_offset', d.rails_top_offset); setNum('rail_depth', d.rail_depth);
+    writeConstruction(DEFAULTS[t] || {});
     applyVisibility(t);
   }
   function applyVisibility(t){
@@ -115,12 +103,7 @@
     if (!tp) return;
     var c = tp.config || {};
     setType(c.type || 'lower');
-    setNum('width', c.width); setNum('height', c.height); setNum('depth', c.depth); setNum('thickness', c.thickness);
-    setNum('floor_height', c.floor_height);
-    setVal('bottom_mode', c.bottom_mode); setVal('top_mode', c.top_mode); setVal('back_mode', c.back_mode);
-    setNum('back_thickness', c.back_thickness || 3);
-    setVal('plinth_mode', c.plinth_mode); setNum('plinth_recess', c.plinth_recess);
-    setVal('rails_orientation', c.rails_orientation); setNum('rails_top_offset', c.rails_top_offset); setNum('rail_depth', c.rail_depth);
+    writeConstruction(c);
     applyVisibility(c.type || 'lower');
     renderFronts(c.fronts);
     currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();

@@ -19,6 +19,8 @@
     }
     renderZoneTree(zones);
   }
+  // Riadky poli cez data-atributy + delegaciu (setupFieldEditorDelegation) — ziadne inline
+  // handlery na prerendrovanych elementoch (poucenie z drag bugu).
   function renderFieldEditor(z){
     var box = el('fieldEditor'); var html = '<div class="hint">Presné rozmery polí (mm). 🔒 = drží rozmer pri zmene korpusu.</div>';
     var axisLbl = (z.split.axis==='h') ? 'Riadok' : 'Stĺpec';
@@ -26,10 +28,27 @@
       var c = z.split.cuts[i] || {size:null,locked:false};
       var sz = Math.round(z.split.sizes[i]);
       html += '<div class="fldrow"><span class="fldn">'+axisLbl+' '+(i+1)+'</span>' +
-        '<input type="number" step="1" value="'+sz+'" onchange="setFieldSize(\''+z.id+'\','+i+', this.value)">' +
-        '<div class="lockbtn'+(c.locked?' on':'')+'" title="Zamknúť rozmer" onclick="toggleFieldLock(\''+z.id+'\','+i+', this)">'+(c.locked?'🔒':'🔓')+'</div></div>';
+        '<input type="number" step="1" value="'+sz+'" data-zid="'+esc(z.id)+'" data-idx="'+i+'">' +
+        '<div class="lockbtn'+(c.locked?' on':'')+'" title="Zamknúť rozmer" data-zid="'+esc(z.id)+'" data-idx="'+i+'">'+(c.locked?'🔒':'🔓')+'</div></div>';
     }
     box.innerHTML = html;
+  }
+  // Jeden listener na kontajneri — prezije kazdy re-render riadkov.
+  var fieldEditorBound = false;
+  function setupFieldEditorDelegation(){
+    if (fieldEditorBound) return;
+    var box = el('fieldEditor'); if (!box) return;
+    box.addEventListener('change', function(ev){
+      var t = ev.target;
+      if (t && t.tagName === 'INPUT' && t.getAttribute('data-zid'))
+        setFieldSize(t.getAttribute('data-zid'), parseInt(t.getAttribute('data-idx'), 10), t.value);
+    });
+    box.addEventListener('click', function(ev){
+      var t = closestClass(ev.target, 'lockbtn');
+      if (t && t.getAttribute('data-zid'))
+        toggleFieldLock(t.getAttribute('data-zid'), parseInt(t.getAttribute('data-idx'), 10), t);
+    });
+    fieldEditorBound = true;
   }
   function setFieldSize(localId, index, value){
     var node0 = navTree(sanitizeTree(currentZoneTree), pathOf(localId));

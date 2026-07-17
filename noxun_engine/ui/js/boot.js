@@ -6,4 +6,4 @@
       d.addEventListener('toggle', function(){ try { localStorage.setItem(k, d.open ? '1' : '0'); } catch(e){} });
     });
   }
-  window.onload = function(){ bindDetails(); setupPreviewDelegation(); setupPartSvgDelegation(); if (window.sketchup && sketchup.ready) sketchup.ready(); };
+  window.onload = function(){ bindDetails(); setupPreviewDelegation(); setupPartSvgDelegation(); setupFieldEditorDelegation(); if (window.sketchup && sketchup.ready) sketchup.ready(); };

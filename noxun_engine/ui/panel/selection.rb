@@ -12,8 +12,29 @@ module Noxun
           @observer ||= SelObserver.new
           model.selection.add_observer(@observer)
           @observer_model = model
+          ensure_app_observer
         rescue StandardError => e
           Engine.log_error(e, 'Panel.attach_observer')
+        end
+
+        # V0.3.4 fix: po File > New / Open panel zil dalej, ale SelectionObserver visel na
+        # STAROM modeli — panel sa prestal syncovat s vyberom az do zavretia dialogu.
+        # AppObserver (vzor ScaleWatch) pri zmene aktivneho modelu observer prepne a resyncne.
+        def ensure_app_observer
+          return if @app_observer
+
+          @app_observer = PanelAppObserver.new
+          Sketchup.add_observer(@app_observer)
+        end
+
+        def on_model_switched(model)
+          return unless @dialog # panel zavrety — observer prepne az dalsie otvorenie
+
+          detach_observer
+          attach_observer
+          push_selected(model || Sketchup.active_model)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.on_model_switched')
         end
 
         def detach_observer
@@ -92,6 +113,17 @@ module Noxun
 
         def onSelectionRemoved(_selection, _element)
           Panel.on_selection_changed
+        end
+      end
+
+      # Prepnutie observera pri zmene aktivneho modelu (File > New / Open) — drzany v @app_observer.
+      class PanelAppObserver < Sketchup::AppObserver
+        def onNewModel(model)
+          Panel.on_model_switched(model)
+        end
+
+        def onOpenModel(model)
+          Panel.on_model_switched(model)
         end
       end
     end

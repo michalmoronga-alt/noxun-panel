@@ -1,4 +1,5 @@
   // ===================== 2D NAHLAD (SVG) =====================
+  var PV_PAD = 14; // padding viewBoxu nahladu (mm) — zdielaju ho renderPreview aj prevod px->mm v dragu
   var dragState = null;
   function setPreviewMode(m){ previewMode=m; el('tabZones').classList.toggle('on', m==='zones'); el('tabFronts').classList.toggle('on', m==='fronts'); renderPreview(); }
 
@@ -6,7 +7,7 @@
     var svg = el('preview'); if (!svg) return;
     var t = numv('thickness')||18, W = numv('width')||600, H = numv('height')||720;
     if (!(W>0 && H>0)){ svg.innerHTML=''; return; }
-    var pad = 14, vw = W + pad*2, vh = H + pad*2;
+    var pad = PV_PAD, vw = W + pad*2, vh = H + pad*2;
     svg.setAttribute('viewBox', '0 0 ' + vw + ' ' + vh);
     var fh = (getType()==='upper')?0:(numv('floor_height')||0);
     var topNone = val('top_mode')==='none';
@@ -136,12 +137,11 @@
   function onDivDrag(ev){
     if (!dragState) return;
     var svg = dragState.svg; var rect = svg.getBoundingClientRect();
-    var W = (numv('width')||600) + 28; var H = (numv('height')||720) + 28;
+    var W = (numv('width')||600) + 2*PV_PAD;
     var scale = rect.width / W; // px per mm (viewBox scaled)
     var d_mm = (dragState.axis==='v') ? (ev.clientX - dragState.startX)/scale : -(ev.clientY - dragState.startY)/scale;
     var sizes = dragState.sizes.slice();
     var i = dragState.idx;
-    var lo = MINF, hi;
     // presun hranice medzi polom i a i+1: zvacsi i, zmensi i+1
     var newI = sizes[i] + d_mm, newN = sizes[i+1] - d_mm;
     if (newI < MINF){ newN -= (MINF-newI); newI = MINF; }
