@@ -11,6 +11,33 @@
   // V0.3 materialy + ABS
   var MATERIALS = { sheets: [], edges: [] }; // katalog z backendu
   var partCard = null;                        // aktualna karta dielca (null = ziadny dielec)
+  // D3: mapa front_id -> texty kovania ("4× záves", "NL 500") pre badge v riadkoch ciel.
+  var HW_FRONT_BADGES = {};
+  function buildFrontHwBadges(hardware){
+    HW_FRONT_BADGES = {};
+    var hinges = {}; // front_id -> sucet zavesov cez vsetky kridla
+    (hardware || []).forEach(function(it){
+      var m = String(it.owner_part_key || '').match(/^front:([^\/]+)\//);
+      if (!m) return;
+      var fid = m[1];
+      if (it.generic_type === 'hinge'){
+        hinges[fid] = (hinges[fid] || 0) + (it.quantity || 0);
+      } else if (it.generic_type === 'slide'){
+        var nl = (it.params || {}).nominal_length;
+        (HW_FRONT_BADGES[fid] = HW_FRONT_BADGES[fid] || [])
+          .push(nl != null ? ('výsuv NL ' + Math.round(nl)) : (it.quantity + '× výsuv'));
+      }
+    });
+    for (var fid in hinges){
+      var n = hinges[fid];
+      (HW_FRONT_BADGES[fid] = HW_FRONT_BADGES[fid] || [])
+        .unshift(n + '× ' + (n === 1 ? 'záves' : 'závesy'));
+    }
+  }
+  function frontHwBadge(fid){
+    var arr = HW_FRONT_BADGES[fid];
+    return arr && arr.length ? arr.join(' · ') : null;
+  }
   var stableIdSeq = 0;
   function newStableId(prefix){
     stableIdSeq += 1;

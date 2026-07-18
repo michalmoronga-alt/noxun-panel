@@ -123,6 +123,7 @@
     var row = document.createElement('div');
     row.className = 'frow';
     row.dataset.frontId = item.id || newStableId('F');
+    var badge = frontHwBadge(row.dataset.frontId); // D3: kovanie cela (zavesy/vysuv) z planu
     row.innerHTML =
       '<span class="fnum">' + idx + '</span>' +
       '<select class="ftype" onchange="onFrontTypeChange(this); onField()">' +
@@ -130,7 +131,8 @@
       '<input class="fh" type="number" step="1" placeholder="auto" oninput="onField()">' +
       '<select class="fw" onchange="onField()"><option value="auto">auto</option><option value="1">1</option><option value="2">2</option></select>' +
       '<input class="flock" type="checkbox" title="Zamknúť pevnú výšku" onchange="onField()">' +
-      '<button class="fdel" title="Odstrániť" onclick="delFrontRow(this); onField()">✕</button>';
+      '<button class="fdel" title="Odstrániť" onclick="delFrontRow(this); onField()">✕</button>' +
+      (badge ? '<span class="fhw" title="Kovanie tohto čela (sekcia Kovanie)">🔗 ' + esc(badge) + '</span>' : '');
     wrap.appendChild(row);
     if (item.type) row.querySelector('.ftype').value = item.type;
     if (item.height !== null && item.height !== undefined && item.height !== '') row.querySelector('.fh').value = item.height;
