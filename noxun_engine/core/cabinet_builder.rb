@@ -179,12 +179,15 @@ module Noxun
         # (observer tick s cerstvym onElementAdded) — vtedy 1x undo vrati kopiu CELU.
         # Z panel sync cesty (push_selected) a inych kontextov = false: samostatny undo krok,
         # aby sa dedup neprilepil na nesuvisiacu poslednu akciu (Codex review PR #21).
-        # fresh_ids (V0.4.7b, Codex audit): entityID mnozina PRAVE pridanych entit — ak je
-        # dana, transparentnost sa urcuje PER DUPLIKAT (stara nesuvisiaca duplicita v tom
-        # istom ticku dostane samostatny undo krok, nie prilepenie na cudzi paste).
+        # fresh_ids (V0.4.7b, Codex audit + GH review P2): entityID mnozina PRAVE
+        # pridanych entit. Ak je dana, spracuju sa IBA tieto duplikaty (transparentne
+        # k pouzivatelovmu paste kroku); STARE duplicity sa v tomto ticku NEDOTKNU —
+        # observer si na ne naplanuje follow-up tick (samostatne undo kroky). Inak by
+        # miesana davka stale+fresh rozbila vazbu transparentneho undo na paste.
         def dedup_copies(model, transparent: false, fresh_ids: nil)
           return [] unless model
           dups = Ids.duplicate_cabinets(model)
+          dups = dups.select { |i| i && i.valid? && fresh_ids.include?(i.entityID) } if fresh_ids
           return [] if dups.empty?
           # Root kontext ako v rebuild (Codex review PR #21): dedup moze bezat aj pocas
           # editacie komponentu — bez zatvorenia edit ramca by sa transformacia kopie
@@ -194,7 +197,7 @@ module Noxun
           dups.each do |inst|
             next unless inst && inst.valid?
             new_cid = Ids.next_cabinet_id(model)
-            trans = fresh_ids ? fresh_ids.include?(inst.entityID) : transparent
+            trans = fresh_ids ? true : transparent
             # V0.3.4 undo fix (runner S2): prepis identity (standard 2.2: autorita = instancia)
             # + rebuild bezia v JEDNEJ operacii (transparentnej len pri cerstvej kopii, viz vyssie).
             # Predtym sa nove cid zapisovalo MIMO operacie a po undo ostaval nekonzistentny medzistav.

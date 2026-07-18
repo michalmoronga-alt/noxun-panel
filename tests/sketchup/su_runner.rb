@@ -19,6 +19,7 @@
 #     S1 scale -> absorpcia -> Ctrl+Z (audit riziko: re-absorpcia po undo)
 #     S2 kopia -> observer dedup -> Ctrl+Z (audit riziko: zapis ID mimo operacie)
 #     S3 kopia DOSKY -> observer dedup (nove BRD id) -> Ctrl+Z (V0.4.7b)
+#     S4 miesana davka stale+fresh duplicit -> fresh v paste ticku, stale follow-up
 #
 # Cistenie: kazdy scenar maze svoje korpusy v ScaleWatch.guard (inak by debounce
 # timer po skonceni testu vykonal dedup/prune nekontrolovane) + purge_unused.
@@ -420,6 +421,44 @@ module NoxunSuRunner
       bids = boards(model).map { |i| e::Store.get(i, 'id') }
       ok("async S3: 1x undo vratil kopiu dosky CELU (kopia prec=#{copy_gone}, dosky: #{bids.sort.join(', ')})",
          copy_gone && orig_ok && bids == [state[:s3_bid]])
+      cleanup(model)
+    end]
+
+    # S4 (Codex GH review PR #32, P2): MIESANA davka — stara duplicita (vytvorena
+    # v guarde, observer ju nevidel) + cerstva kopia v jednom debounce okne.
+    # Paste tick spracuje LEN cerstvu (transparent na paste); staru prevezme
+    # follow-up tick ako samostatny krok. Assert = konvergencia identity
+    # (3 dosky -> 3 unikatne ID); undo poradie mixed davky je dokumentovany
+    # kompromis a netestuje sa.
+    steps << [0.5, lambda do
+      b1 = e::BoardBuilder.build(model, { 'material_id' => 'K009_PW_DTDL_18',
+                                          'length' => 350.0, 'width' => 250.0 })
+      state[:s4] = b1
+      state[:s4_bid] = e::Store.get(b1, 'id')
+      attrs = %w[std kind id part_id part_key part_key_schema role name manufactured production_class config]
+      # STALA duplicita: kopia v guarde — observer tick nepribehne, zdielane ID ostava
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST stale copy board', true)
+        sc = model.entities.add_instance(b1.definition,
+                                         b1.transformation * Geom::Transformation.translation(e::Units.vector(450, 0, 0)))
+        attrs.each { |k| v = e::Store.get(b1, k); sc.set_attribute('NOXUN', k, v) unless v.nil? }
+        state[:s4_stale] = sc
+        model.commit_operation
+      end
+      # CERSTVA kopia: user operacia BEZ guardu -> observer tick s fresh_ids
+      model.start_operation('SU-TEST user copy board 2', true)
+      fc = model.entities.add_instance(b1.definition,
+                                       b1.transformation * Geom::Transformation.translation(e::Units.vector(900, 0, 0)))
+      attrs.each { |k| v = e::Store.get(b1, k); fc.set_attribute('NOXUN', k, v) unless v.nil? }
+      state[:s4_fresh] = fc
+      model.commit_operation
+    end]
+    steps << [SETTLE, lambda do
+      # SETTLE (1.2 s) pokryva paste tick (0.2 s) aj follow-up tick (0.4 s).
+      trio = [state[:s4], state[:s4_stale], state[:s4_fresh]]
+      ids = trio.map { |i| i && i.valid? ? e::Store.get(i, 'id') : nil }
+      ok("async S4: mixed stale+fresh — konvergencia na 3 unikatne ID (#{ids.compact.sort.join(', ')})",
+         ids.compact.length == 3 && ids.uniq.length == 3 && ids.include?(state[:s4_bid]))
       cleanup(model)
       log_line('=== KONIEC SUBORU ===')
       done.call if done

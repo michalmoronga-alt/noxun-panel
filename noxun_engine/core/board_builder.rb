@@ -209,17 +209,20 @@ module Noxun
         # + nove id + premenovanie definicie. Geometria a config kopie sa NEmenia
         # (ziaden normalize round-trip — zmena katalogu nesmie pri kopirovani
         # menit geometriu a chybajuci material nesmie dedup zablokovat).
-        # fresh_ids: entityID mnozina PRAVE pridanych entit (observer tick) —
-        # transparentny undo LEN pre ne; stara duplicita = samostatny undo krok.
+        # fresh_ids: entityID mnozina PRAVE pridanych entit (observer tick). Ak je
+        # dana, spracuju sa IBA tieto duplikaty (transparentne k paste kroku); stare
+        # duplicity necha na follow-up tick observera (samostatne undo kroky) —
+        # rovnaky kontrakt ako CabinetBuilder.dedup_copies (Codex GH review P2).
         def dedup_copies(model, transparent: false, fresh_ids: nil)
           return [] unless model
           dups = Ids.duplicate_boards(model)
+          dups = dups.select { |i| i && i.valid? && fresh_ids.include?(i.entityID) } if fresh_ids
           return [] if dups.empty?
           done = []
           dups.each do |inst|
             next unless inst && inst.valid?
             new_id = Ids.next_board_id(model)
-            trans = fresh_ids ? fresh_ids.include?(inst.entityID) : transparent
+            trans = fresh_ids ? true : transparent
             guarded do
               model.start_operation('NOXUN: Kopia dosky — nove ID', true, false, trans)
               begin

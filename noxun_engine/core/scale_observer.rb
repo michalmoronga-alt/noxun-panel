@@ -170,14 +170,27 @@ module Noxun
           touched_models.each do |mdl|
             # Transparentny dedup LEN pre entity, ktore v TOMTO ticku realne pribudli
             # (onElementAdded) — vtedy je predchadzajuca operacia ich paste/move a 1x undo
-            # vrati kopiu celu. V0.4.7b (Codex audit): fresh sa urcuje PER ENTITA (mnozina
-            # entityID), nie per model — stara nesuvisiaca duplicita v tom istom ticku
-            # dostane samostatny undo krok namiesto prilepenia na cudzi paste.
+            # vrati kopiu celu. V0.4.7b (Codex audit + GH review P2): pri cerstvych
+            # entitach sa v tomto ticku spracuju VYHRADNE ony (transparent drzi priamo
+            # na paste operacii); pripadne STARE duplicity v tom istom okne sa odlozia
+            # na follow-up tick (schedule) a spracuju sa ako samostatne undo kroky.
             fresh_copy = added_models.include?(mdl)
             fresh_ids = added.values.select { |i| i && i.valid? && (i.model rescue nil) == mdl }
                              .map(&:entityID)
-            CabinetBuilder.dedup_copies(mdl, fresh_ids: fresh_ids) if defined?(CabinetBuilder)
-            BoardBuilder.dedup_copies(mdl, fresh_ids: fresh_ids) if defined?(BoardBuilder)
+            if fresh_ids.empty?
+              CabinetBuilder.dedup_copies(mdl) if defined?(CabinetBuilder)
+              BoardBuilder.dedup_copies(mdl) if defined?(BoardBuilder)
+            else
+              CabinetBuilder.dedup_copies(mdl, fresh_ids: fresh_ids) if defined?(CabinetBuilder)
+              BoardBuilder.dedup_copies(mdl, fresh_ids: fresh_ids) if defined?(BoardBuilder)
+              stale = defined?(Ids) &&
+                      (Ids.duplicate_cabinets(mdl) + Ids.duplicate_boards(mdl))
+                      .any? { |i| i && i.valid? }
+              # Follow-up bezpecny proti slucke: dalsi tick pride s prazdnym added
+              # (fresh_ids prazdne) -> stale sa spracuju vetvou vyssie a schedule
+              # sa uz nevola.
+              schedule if stale
+            end
             # Kopie zachytene cez onElementAdded nemaju vlastny per-instancny EntityObserver
             # (kopia ho nededi). Po dedupe (novy cabinet_id + ghosty cez rebuild->sync_ghost)
             # im observer pripojime, aby ich buduci move/scale spustil ghost sync.
