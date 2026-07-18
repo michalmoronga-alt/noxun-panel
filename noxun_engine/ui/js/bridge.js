@@ -78,6 +78,7 @@
       setIdbar(null);
       setUiMode('insert');
       setSelected(null);
+      buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
       activeZoneId = null; frontItems = null;
       if (lastCabForFit !== null){ lastCabForFit = null; fitPreview(); }
       renderPartCard(null);      // schovaj kartu dielca

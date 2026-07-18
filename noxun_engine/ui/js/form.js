@@ -105,6 +105,7 @@
     setType(c.type || 'lower');
     writeConstruction(c);
     applyVisibility(c.type || 'lower');
+    buildFrontHwBadges([]); // Codex PR #30: sablonovy nahlad nema kovanie (F1 sablony != F1 skrinky)
     renderFronts(c.fronts);
     currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();
     // fix #2: vyber sablony NEspusti apply_all — len naplni polia + nahlad. Korpus sa NEZMENI,
