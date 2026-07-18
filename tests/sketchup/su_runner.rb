@@ -20,6 +20,8 @@
 #     S2 kopia -> observer dedup -> Ctrl+Z (audit riziko: zapis ID mimo operacie)
 #     S3 kopia DOSKY -> observer dedup (nove BRD id) -> Ctrl+Z (V0.4.7b)
 #     S4 miesana davka stale+fresh duplicit -> fresh v paste ticku, stale follow-up
+#     S5 scale DOSKY (V0.4.7d): X absorpcia+undo, vertikalna doska (global Z =
+#        lokalna sirka), X+Z kombinacia (hrubka drzi material), reject bez materialu
 #
 # Cistenie: kazdy scenar maze svoje korpusy v ScaleWatch.guard (inak by debounce
 # timer po skonceni testu vykonal dedup/prune nekontrolovane) + purge_unused.
@@ -491,6 +493,82 @@ module NoxunSuRunner
       ids = trio.map { |i| i && i.valid? ? e::Store.get(i, 'id') : nil }
       ok("async S4: mixed stale+fresh — konvergencia na 3 unikatne ID (#{ids.compact.sort.join(', ')})",
          ids.compact.length == 3 && ids.uniq.length == 3 && ids.include?(state[:s4_bid]))
+      cleanup(model)
+    end]
+
+    # S5 (V0.4.7d): scale absorpcia DOSKY — X/Y sa preberaju do length/width,
+    # hrubku RIADI material (Z faktor sa zahadzuje), reject pri neplatnom rebuilde.
+    steps << [0.5, lambda do
+      b = e::BoardBuilder.build(model, { 'material_id' => 'K009_PW_DTDL_18',
+                                         'length' => 400.0, 'width' => 300.0 })
+      state[:s5] = b
+      model.start_operation('SU-TEST user scale board X', true)
+      b.transformation = b.transformation * Geom::Transformation.scaling(ORIGIN, 1.5, 1.0, 1.0)
+      model.commit_operation
+    end]
+    steps << [SETTLE, lambda do
+      b = state[:s5]
+      cfg = e::Store.config(b) || {}
+      clean = e::ScaleWatch.scale_factors(b.transformation).nil?
+      ok("async S5: absorpcia X scale dosky (400 -> #{cfg['length']}, sirka #{cfg['width']}, hrubka #{cfg['thickness']}, transform cisty=#{clean})",
+         (cfg['length'].to_f - 600.0).abs < 0.01 && (cfg['width'].to_f - 300.0).abs < 0.01 &&
+         (cfg['thickness'].to_f - 18.0).abs < 0.01 && clean)
+      Sketchup.undo
+    end]
+    steps << [SETTLE, lambda do
+      b = state[:s5]
+      cfg = e::Store.config(b) || {}
+      clean = e::ScaleWatch.scale_factors(b.transformation).nil?
+      ok("async S5: 1x undo vratil scale AJ absorpciu dosky (dlzka #{cfg['length']}, cisty=#{clean})",
+         (cfg['length'].to_f - 400.0).abs < 0.01 && clean)
+      # postav dosku NAVISLO (rotacia 90° okolo X — lokalna Y mieri do globalnej Z)
+      model.start_operation('SU-TEST rotate board upright', true)
+      b.transformation = b.transformation * Geom::Transformation.rotation(ORIGIN, Geom::Vector3d.new(1, 0, 0), 90.degrees)
+      model.commit_operation
+    end]
+    steps << [SETTLE, lambda do
+      b = state[:s5]
+      # GLOBALNY Z scale vertikalnej dosky = tah za jej lokalnu Y (sirku)
+      model.start_operation('SU-TEST user scale board global Z', true)
+      b.transformation = Geom::Transformation.scaling(ORIGIN, 1.0, 1.0, 1.4) * b.transformation
+      model.commit_operation
+    end]
+    steps << [SETTLE, lambda do
+      b = state[:s5]
+      cfg = e::Store.config(b) || {}
+      ok("async S5: globalny Z scale VERTIKALNEJ dosky = lokalna sirka (300 -> #{cfg['width']}, dlzka #{cfg['length']})",
+         (cfg['width'].to_f - 420.0).abs < 0.01 && (cfg['length'].to_f - 400.0).abs < 0.01)
+      # kombinovany lokalny X+Z scale: dlzka sa preberie, hrubka NIE (riadi ju material)
+      model.start_operation('SU-TEST user scale board X+Z', true)
+      b.transformation = b.transformation * Geom::Transformation.scaling(ORIGIN, 1.25, 1.0, 2.0)
+      model.commit_operation
+    end]
+    steps << [SETTLE, lambda do
+      b = state[:s5]
+      cfg = e::Store.config(b) || {}
+      tb = b.definition.bounds
+      ok("async S5: X+Z scale — dlzka prevzata (#{cfg['length']}), hrubka drzi material (cfg #{cfg['thickness']}, geo #{mm(tb.depth).round(1)})",
+         (cfg['length'].to_f - 500.0).abs < 0.01 && (cfg['thickness'].to_f - 18.0).abs < 0.01 &&
+         (mm(tb.depth) - 18.0).abs <= TOL)
+      # REJECT scenar (Codex audit d, blocker 1): material zmizne z katalogu ->
+      # absorpcia musi scale VRATIT (nie absorbovat ani nechat skoseny stav).
+      # PRESNY povodny zaznam si odlozime a vratime (Codex GH #34): pri manualnom
+      # spusteni runnera z konzoly bezi test nad REALNYM %APPDATA% katalogom —
+      # hardcoded seed by prepisal pouzivatelske upravy (ceny, formaty...).
+      state[:s5_saved_sheet] = e::JsonFileStore.deep_copy(e::Materials.sheet('K009_PW_DTDL_18'))
+      e::Materials.delete_sheet('K009_PW_DTDL_18')
+      model.start_operation('SU-TEST user scale board no-material', true)
+      b.transformation = b.transformation * Geom::Transformation.scaling(ORIGIN, 1.5, 1.0, 1.0)
+      model.commit_operation
+    end]
+    steps << [SETTLE, lambda do
+      b = state[:s5]
+      cfg = e::Store.config(b) || {}
+      clean = e::ScaleWatch.scale_factors(b.transformation).nil?
+      ok("async S5: reject bez katalogoveho materialu — config drzi (#{cfg['length']}) a transform je vrateny cisty (#{clean})",
+         (cfg['length'].to_f - 500.0).abs < 0.01 && clean && b.valid?)
+      # obnov PRESNY povodny zaznam (nie seed — respektuje pouzivatelske upravy)
+      e::Materials.upsert_sheet(state[:s5_saved_sheet]) if state[:s5_saved_sheet]
       cleanup(model)
       log_line('=== KONIEC SUBORU ===')
       done.call if done
