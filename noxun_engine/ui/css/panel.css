@@ -151,3 +151,10 @@
   /* Codex PR #27: karta dielca sa sustredi LEN na dielec — karta zony aj strom zon
      su v mode-part skryte (CSS vitazi aj nad inline style.display='' z refreshZoneUI);
      klik na zonu v nahlade ostava moznym VEDOMYM odchodom z dielca (oznaci zonu v modeli). */
+  /* V0.4.5 D2: quick-pick sablony + okno Sablony */
+  .tplmng { flex: 0 0 30px; padding: 3px 0; }
+  .tplrow { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  .tplrow .tpln { flex: 1; font-size: 12.5px; color: #263238; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tplrow .tplt { color: #90a4ae; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
+  .tplrow .tplbtn { flex: 0 0 auto; padding: 3px 10px; font-size: 11.5px; }
+  .tplrow .tpldel { flex: 0 0 28px; padding: 3px 0; color: #c62828; }

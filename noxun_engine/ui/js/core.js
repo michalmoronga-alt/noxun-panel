@@ -74,10 +74,9 @@
   // (korpus = pole 'thickness', chrbat = 'back_thickness', cela = 18/19). Nekompatibilne dosky
   // disabled. Vola sa na init, pri vybere korpusu aj po zmene hrubky (onField). Zachova hodnoty.
   function refreshMaterialFilters(){
+    // D2: projektove selecty (proj_*) su v okne Materialy projektu — panel filtruje
+    // uz len korpusove selecty podla hrubok aktualneho formulara.
     var bodyTh = numv('thickness'), backTh = numv('back_thickness');
-    fillSheetSelectFiltered(el('proj_body'), false, thMatch(bodyTh));
-    fillSheetSelectFiltered(el('proj_front'), false, frontMatch());
-    fillSheetSelectFiltered(el('proj_back'), false, thMatch(backTh));
     fillSheetSelectFiltered(el('cab_body'), true, thMatch(bodyTh));
     fillSheetSelectFiltered(el('cab_front'), true, frontMatch());
     fillSheetSelectFiltered(el('cab_back'), true, thMatch(backTh));

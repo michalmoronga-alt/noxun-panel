@@ -112,19 +112,8 @@
     refreshPreview();
     refreshZoneUI();
   }
-  function saveTemplate(){
-    var p = collectConstruction(); p.fronts = collectFronts(); p.zone_tree = currentZoneTree;
-    if (window.sketchup && sketchup.save_template) sketchup.save_template(JSON.stringify(p));
-  }
-  function deleteTemplate(){
-    var name = val('template'); if (!name){ NX.setStatus('Vyber šablónu.', true); return; }
-    if (window.sketchup && sketchup.delete_template) sketchup.delete_template(JSON.stringify({ template: name }));
-  }
-  function applyTemplateToSelected(){
-    if (el('applyTplBtn').disabled) return;
-    var name = val('template'); if (!name){ NX.setStatus('Vyber šablónu.', true); return; }
-    if (window.sketchup && sketchup.apply_template) sketchup.apply_template(JSON.stringify({ template: name }));
-  }
+  // (saveTemplate/deleteTemplate/applyTemplateToSelected sa V0.4.5 D2 presunuli
+  //  do okna Sablony — js/templates_dialog.js; panel drzi len quick-pick vyber.)
 
   // --- cela riadky ---
   function addFrontRow(item){

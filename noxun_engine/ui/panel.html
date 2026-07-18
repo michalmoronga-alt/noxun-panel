@@ -1,9 +1,11 @@
 <!-- Noxun Engine — panel (vanilla JS, ziadne CDN, slovensky). Verziu zobrazuje NX.init z Ruby. -->
-<!-- V0.4.5 D1 kostra: Inspector pattern — identita hore, nahlad ako fixne OKNO so zoom/pan,
-     kontextove karty (nic=vkladacia / korpus=nastavenia / zona=karta pod nahladom / dielec=karta
-     s omrvinkou). Rezimy riadi body class mode-insert / mode-cab / mode-part (bridge.js). -->
+<!-- V0.4.5 Inspector: identita hore, nahlad = fixne OKNO so zoom/pan, kontextove karty
+     (nic=vkladacia / korpus=nastavenia / zona=karta pod nahladom / dielec=karta s omrvinkou);
+     rezimy = body class mode-insert/cab/part (bridge.js). D2: projektove materialy a sprava
+     sablon ziju v satelitnych oknach (proj_materials.html, templates.html) — panel ma len
+     quick-pick sablony a materialy oznacenej skrinky. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.4">
+<link rel="stylesheet" href="css/panel.css?v=0.4.5">
 
 <div class="hdr"><h1>Noxun Engine</h1><span class="sub" id="verline">…</span></div>
 
@@ -64,13 +66,17 @@
   <div id="edgeRows"></div>
 </fieldset>
 
-<!-- VKLADACIA KARTA (len ked nic nie je oznacene). Vyber sablony zije v sekcii
-     Sablony (funguje pre vklad AJ pre "Pouzi na oznaceny"); quick-pick sem pride v D2. -->
+<!-- VKLADACIA KARTA (len ked nic nie je oznacene). D2: quick-pick sablony priamo tu;
+     sprava sablon (ulozit/vymazat/pouzit na oznaceny) = okno Sablony (tlacidlo ⚙). -->
 <fieldset id="insertCard">
   <legend>Nový korpus</legend>
   <div class="typerow">
     <label><input type="radio" name="ctype" value="lower" onchange="onTypeChange()"> Dolná</label>
     <label><input type="radio" name="ctype" value="upper" onchange="onTypeChange()"> Horná</label>
+  </div>
+  <div class="row"><label>Šablóna</label>
+    <select id="template" onchange="onTemplateChange()"><option value="">— vyber —</option></select>
+    <button class="ghostbtn tplmng" onclick="openTemplatesDialog()" title="Šablóny — uložiť / vymazať / použiť na označený">⚙</button>
   </div>
   <button class="primary wide" onclick="insertCabinet()">Vložiť korpus</button>
 </fieldset>
@@ -183,20 +189,18 @@
   </div>
 </details>
 
-<!-- MATERIALY (V0.3): projektove defaulty + korpusove overridy (projektova cast ide v D2 do okna) -->
+<!-- MATERIALY (V0.3): materialy TEJTO skrinky. Projektove predvolby = okno
+     Materialy projektu (V0.4.5 D2 — sprava mimo Inspectora, vzor SYSTEM/07). -->
 <details data-key="materials">
   <summary>Materiály</summary>
   <div class="body">
-    <div class="subhead">Projekt (predvolené pre všetky skrinky)</div>
-    <div class="hint">Zmena projektového materiálu sa prejaví na označenej skrinke hneď, na ostatných pri ich najbližšej úprave.</div>
-    <div class="matrow"><label>Korpus</label><select id="proj_body" onchange="onProjectMaterial('default_material_id', this.value)"></select></div>
-    <div class="matrow"><label>Čelá</label><select id="proj_front" onchange="onProjectMaterial('default_front_material_id', this.value)"></select></div>
-    <div class="matrow"><label>Chrbát</label><select id="proj_back" onchange="onProjectMaterial('default_back_material_id', this.value)"></select></div>
-    <div class="subhead">Táto skrinka (prázdne = dediť z projektu)</div>
-    <div class="hint" id="cabMatHint">Označ skrinku pre nastavenie jej materiálov.</div>
+    <div class="hint" id="cabMatHint">Materiály tejto skrinky — prázdne = dediť z projektu. Označ skrinku pre nastavenie.</div>
     <div class="matrow"><label>Korpus</label><select id="cab_body" onchange="onCabinetMaterial('body', this.value)"></select></div>
     <div class="matrow"><label>Čelá</label><select id="cab_front" onchange="onCabinetMaterial('front', this.value)"></select></div>
     <div class="matrow"><label>Chrbát</label><select id="cab_back" onchange="onCabinetMaterial('back', this.value)"></select></div>
+    <div class="btnrow">
+      <button class="ghostbtn" onclick="openProjectMaterialsDialog()">⚙ Materiály projektu…</button>
+    </div>
   </div>
 </details>
 
@@ -208,24 +212,6 @@
   </div>
 </details>
 
-<!-- SABLONY: sprava (v D2 sa presunie do vlastneho okna; rychly vyber je vo vkladacej karte) -->
-<details data-key="templates">
-  <summary>Šablóny</summary>
-  <div class="body">
-    <div class="hint">Výber šablóny naplní panel (vklad = tlačidlo hore); na označený korpus sa použije až tlačidlom nižšie. Filtrované podľa typu.</div>
-    <div class="row"><label>Šablóna</label>
-      <select id="template" onchange="onTemplateChange()"><option value="">— vyber —</option></select>
-    </div>
-    <div class="btnrow">
-      <button class="ghostbtn" onclick="saveTemplate()">Ulož ako šablónu</button>
-      <button class="ghostbtn" onclick="deleteTemplate()">Vymaž</button>
-    </div>
-    <div class="btnrow">
-      <button class="ghostbtn" id="applyTplBtn" onclick="applyTemplateToSelected()" disabled>Použi šablónu na označený</button>
-    </div>
-  </div>
-</details>
-
 <!-- pri oznacenom korpuse: vlozenie dalsieho s aktualnymi hodnotami (sekundarna akcia) -->
 <button class="ghostbtn wide insertmore" onclick="insertCabinet()">+ Vložiť ďalší korpus s týmito hodnotami</button>
 
@@ -234,14 +220,14 @@
 <!-- Poradie skriptov je kontrakt: errors prvy (chytac), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.4.4"></script>
-<script src="js/core.js?v=0.4.4"></script>
-<script src="js/form.js?v=0.4.4"></script>
-<script src="js/zone_tree.js?v=0.4.4"></script>
-<script src="js/preview.js?v=0.4.4"></script>
-<script src="js/actions.js?v=0.4.4"></script>
-<script src="js/bridge.js?v=0.4.4"></script>
-<script src="js/materials.js?v=0.4.4"></script>
-<script src="js/part_card.js?v=0.4.4"></script>
-<script src="js/hardware.js?v=0.4.4"></script>
-<script src="js/boot.js?v=0.4.4"></script>
+<script src="js/errors.js?v=0.4.5"></script>
+<script src="js/core.js?v=0.4.5"></script>
+<script src="js/form.js?v=0.4.5"></script>
+<script src="js/zone_tree.js?v=0.4.5"></script>
+<script src="js/preview.js?v=0.4.5"></script>
+<script src="js/actions.js?v=0.4.5"></script>
+<script src="js/bridge.js?v=0.4.5"></script>
+<script src="js/materials.js?v=0.4.5"></script>
+<script src="js/part_card.js?v=0.4.5"></script>
+<script src="js/hardware.js?v=0.4.5"></script>
+<script src="js/boot.js?v=0.4.5"></script>

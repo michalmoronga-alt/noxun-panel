@@ -1,0 +1,19 @@
+<!-- Noxun Engine — dialog Sablony (V0.4.5 D2). Vanilla JS, ziadne CDN, slovensky.
+     "Pouzit" je aktivne len pri oznacenom korpuse ROVNAKEHO typu (dolna/horna). -->
+<!-- Otvara sa z panela (vkladacia karta) alebo z menu Extensions > Noxun Engine. -->
+<meta charset="utf-8">
+<link rel="stylesheet" href="css/panel.css?v=0.4.5">
+
+<h1>Šablóny</h1>
+<p class="sub" id="tdline">…</p>
+
+<div class="hint">Šablóny sú spoločné pre všetky projekty. „Použiť“ prestavia označenú skrinku (materiály a ručné zásahy skrinky zostávajú); vloženie novej skrinky zo šablóny rob cez panel (výber šablóny + Vložiť).</div>
+
+<button class="primary wide" onclick="tplSave()">Uložiť označený korpus ako šablónu</button>
+
+<div id="tplRows" style="margin-top:10px"><div class="muted">Načítavam…</div></div>
+
+<div id="status">Pripravené.</div>
+
+<script src="js/errors.js?v=0.4.5"></script>
+<script src="js/templates_dialog.js?v=0.4.5"></script>

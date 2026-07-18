@@ -149,7 +149,7 @@
   function toggleZones(){ var on = el('zonesChk').checked; if (window.sketchup && sketchup.toggle_zones) sketchup.toggle_zones(on ? 'true' : 'false'); }
 
   function setSelected(cid){
-    selectedCabId = cid; var on = !!cid;
-    el('applyTplBtn').disabled = !on;
+    selectedCabId = cid;
+    // (applyTplBtn zije v okne Sablony — disabled stav riesi TemplatesDialog.push_state)
   }
 

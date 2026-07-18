@@ -409,6 +409,7 @@ module Noxun
           ScaleWatch.attach_all(model)
           ScaleWatch.attach_entities(model)
           RulesDialog.on_model_changed(model) if defined?(RulesDialog)
+          MaterialsDialog.on_model_changed(model) if defined?(MaterialsDialog)
         end
       end
     end

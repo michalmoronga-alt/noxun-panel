@@ -18,8 +18,8 @@ module Noxun
             },
             zones_visible: Zones.visible?(model),
             templates: template_list,
-            materials: materials_payload,            # V0.3 katalog (dosky + ABS) pre selecty
-            project_materials: project_materials(model), # V0.3 projektove defaulty (koren dedenia)
+            materials: materials_payload, # V0.3 katalog (dosky + ABS) pre selecty
+            # (projektove predvolby zobrazuje okno MaterialsDialog — D2)
             selected: cab ? cabinet_payload(cab) : nil
           }
           js("NX.init(#{data.to_json})")
@@ -29,6 +29,8 @@ module Noxun
           # fix #6: "sync tick" resolvera — ak vznikla kopia korpusu (zdielane cabinet_id),
           # pridelí sa jej nove ID + vlastne ghosty este pred nacitanim vyberu do panela.
           CabinetBuilder.dedup_copies(model) if defined?(CabinetBuilder)
+          # V0.4.5 D2: dialog Sablony sleduje vyber (disabled stav "Pouzit na oznaceny")
+          TemplatesDialog.on_selection_changed if defined?(TemplatesDialog)
           zone = find_selected_zone(model)
           cab = find_cabinet(model)
           if cab.nil?

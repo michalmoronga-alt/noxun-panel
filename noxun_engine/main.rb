@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.4.4' unless defined?(VERSION)
+    VERSION = '0.4.5' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -48,7 +48,9 @@ Sketchup.require 'noxun_engine/core/scale_observer'
 Sketchup.require 'noxun_engine/core/cabinet_builder'
 Sketchup.require 'noxun_engine/core/templates'
 Sketchup.require 'noxun_engine/ui/panel'
-Sketchup.require 'noxun_engine/ui/rules_dialog' # V0.4 editor pravidiel kovania
+Sketchup.require 'noxun_engine/ui/rules_dialog'     # V0.4 editor pravidiel kovania
+Sketchup.require 'noxun_engine/ui/materials_dialog' # V0.4.5 D2 projektove predvolby materialov
+Sketchup.require 'noxun_engine/ui/templates_dialog' # V0.4.5 D2 sprava sablon
 
 module Noxun
   module Engine
@@ -70,6 +72,8 @@ module Noxun
         menu = UI.menu('Extensions').add_submenu('Noxun Engine')
         menu.add_item('Panel') { Panel.show }
         menu.add_item('Pravidlá kovania') { RulesDialog.show }
+        menu.add_item('Materiály projektu') { MaterialsDialog.show }
+        menu.add_item('Šablóny') { TemplatesDialog.show }
 
         # Scale observer — attach na existujuce korpusy + AppObserver pre buduce modely.
         ScaleWatch.install

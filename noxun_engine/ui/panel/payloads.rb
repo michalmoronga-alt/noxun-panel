@@ -100,12 +100,7 @@ module Noxun
           "#{a['decor']} #{a['thickness']} mm"
         end
 
-        def project_materials(model)
-          Materials.project_defaults(model)
-        rescue StandardError => e
-          Engine.log_error(e, 'project_materials')
-          {}
-        end
+        # (project_materials payload sa V0.4.5 D2 presunul do MaterialsDialog.push_state)
 
         # Dielec vo vybere (kind=part) — po dvojkliku do korpusu a kliknuti na dielec.
         def find_selected_part(model)

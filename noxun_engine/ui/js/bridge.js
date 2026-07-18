@@ -24,8 +24,7 @@
       TEMPLATES = data.templates || [];
       MATERIALS = data.materials || { sheets: [], edges: [] };
       if (data.version) el('verline').textContent = 'V' + data.version; // verzia z Ruby (jediny zdroj)
-      refreshMaterialFilters();
-      setProjectMaterials(data.project_materials || {});
+      refreshMaterialFilters(); // (projektove predvolby zobrazi okno Materialy projektu)
       el('zonesChk').checked = !!data.zones_visible;
       if (data.selected){ NX.loadSelected(data.selected); }
       else { setType('lower'); setDefaults('lower'); currentZoneTree = defaultTree(); renderFilteredTemplates(); NX.clearSelected(); onField(); }
