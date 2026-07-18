@@ -146,4 +146,8 @@
   body.mode-part details[data-key="sides"], body.mode-part details[data-key="back"],
   body.mode-part details[data-key="fronts"], body.mode-part details[data-key="hardware"],
   body.mode-part details[data-key="materials"], body.mode-part details[data-key="templates"],
+  body.mode-part #zoneCard, body.mode-part details[data-key="zones"],
   body.mode-part .insertmore { display: none; }
+  /* Codex PR #27: karta dielca sa sustredi LEN na dielec — karta zony aj strom zon
+     su v mode-part skryte (CSS vitazi aj nad inline style.display='' z refreshZoneUI);
+     klik na zonu v nahlade ostava moznym VEDOMYM odchodom z dielca (oznaci zonu v modeli). */
