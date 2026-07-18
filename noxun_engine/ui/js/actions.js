@@ -151,6 +151,9 @@
 
   // --- korpus akcie ---
   function insertCabinet(){
+    // V0.4.7e (Codex GH #35): vlozenie MUSI prejst validaciou — neplatny rozmer
+    // ('650mm') by sa inak ticho zmenil na default a neplatna vyska cela na auto.
+    if (!validateFields()){ NX.setStatus('Skontroluj červené polia (neplatný rozmer).', true); return; }
     var p = collectAll(); p.zone_tree = currentZoneTree;
     if (window.sketchup && sketchup.insert_cabinet) sketchup.insert_cabinet(JSON.stringify(p));
   }

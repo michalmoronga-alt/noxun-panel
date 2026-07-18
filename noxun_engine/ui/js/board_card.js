@@ -27,11 +27,30 @@
     flushBoardEdits();
   }
   // Obycajne polia (name/length/width/quantity/grain_direction): akumulacia + debounce 400 ms.
-  // V0.4.7e: rozmerove polia s ROZPISANYM vyrazom sa NEakumuluju (surovy string by
-  // Ruby to_f orezalo) — hodnota pride az z Enter/blur commitu ako ciste cislo.
+  // V0.4.7e + Codex GH #35: rozmery sa queue-uju VZDY az VYHODNOTENE cez evalDim
+  // ('10,5' by Ruby to_f ulozilo ako 10.0; '650mm' ako 650); rozpisany vyraz sa
+  // nequeue-uje a STIAHNE aj svoj skorsi ciselny prefix z pendingu (pauza po
+  // '650-' nesmie flushnut 650); neplatny vstup = cerveny okraj, nic sa neposle.
+  function withdrawPending(key){
+    if (!boardPending) return;
+    delete boardPending.fields[key];
+    if (!Object.keys(boardPending.fields).length) cancelBoardEdits();
+  }
   function onBoardField(key, value){
     if (!boardCard) return;
-    if ((key === 'length' || key === 'width') && isExprStr(value)) return;
+    var isDim = (key === 'length' || key === 'width');
+    if (isDim){
+      var elm = el(key === 'length' ? 'bc_length' : 'bc_width');
+      if (isExprStr(value)){ withdrawPending(key); return; } // zivy nahlad; commit az Enter/blur
+      var v = String(value).trim() === '' ? NaN : evalDim(value);
+      if (isNaN(v)){
+        if (elm && String(value).trim() !== '') elm.classList.add('bad');
+        withdrawPending(key);
+        return;
+      }
+      if (elm) elm.classList.remove('bad');
+      value = v;
+    }
     if (!boardPending || boardPending.board_id !== boardCard.board_id){
       boardPending = { board_id: boardCard.board_id, fields: {} };
     }
