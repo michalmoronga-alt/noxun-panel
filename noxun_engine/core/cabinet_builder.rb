@@ -37,9 +37,10 @@ module Noxun
       FALLBACK_RGB_KORPUS = [216, 196, 160].freeze
       FALLBACK_RGB_FRONT  = [245, 245, 245].freeze
 
-      # DC scaletool bitova maska pre osove scale uchopy (X/Y/Z). Michal potvrdi vizualne;
-      # ak by mala byt opacna semantika (skryt plosne+rohove), alternativa je 120.
-      SCALE_TOOL_MASK = 7
+      # DC scaletool bitova maska = uchopy na SKRYTIE (dogfood D-06, potvrdene 19.7.):
+      # 120 = 8+16+32+64 (roviny XY/XZ/YZ + rohy) -> ostavaju CISTE osi X/Y/Z (1+2+4).
+      # Povodna hodnota 7 z V0.2c skryvala presne opacne (osi prec, rohy ostali).
+      SCALE_TOOL_MASK = 120
       FRONT_VALIDATION_VERSION = '0.3.1'
 
       # Tagy dielov (V0.2c) — hromadne hide cez nativny Tags panel. Default = Noxun/Korpus.
@@ -325,13 +326,15 @@ module Noxun
           end
         end
 
-        # V0.2c: obmedzenie Scale uchopov na osove (X/Y/Z) cez DC "scaletool" atribut.
-        # DC plugin (nacitany v modeli) tuto masku respektuje. Hodnota je bitova maska;
-        # SCALE_TOOL_MASK = 7 (1+2+4) podla zadania — Michal vizualne potvrdi smer masky.
+        # V0.2c + D-06 fix: obmedzenie Scale uchopov na osove (X/Y/Z) cez DC "scaletool".
+        # Zapisuje sa na instanciu AJ definiciu — SketchUp scale tool cita atribut
+        # z DEFINICIE (dogfood pozorovanie: prvy Scale bez masky, druhy s nou).
         # Atribut NEovplyvnuje scale absorpciu (tá cita transformaciu, nie tento kluc).
         def apply_scale_lock(inst)
           return unless inst && inst.valid?
           inst.set_attribute('dynamic_attributes', 'scaletool', SCALE_TOOL_MASK.to_s)
+          d = inst.respond_to?(:definition) ? inst.definition : nil
+          d.set_attribute('dynamic_attributes', 'scaletool', SCALE_TOOL_MASK.to_s) if d && d.valid?
         rescue StandardError => e
           Engine.log_error(e, 'apply_scale_lock') if defined?(Engine)
           nil
