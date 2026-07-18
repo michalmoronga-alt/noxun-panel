@@ -315,9 +315,21 @@ module Noxun
                                  transform: clean, op_name: 'Noxun: prepočet po zmene veľkosti',
                                  transparent: true)
           remember_transform(inst)
+          refresh_panel(model) # V0.4.7e: karta uz neukazuje stare rozmery do reselect-u
 
           Engine.log("scale absorb #{cid}: #{base_w.round}x#{base_h.round}x#{base_d.round} -> " \
                      "#{new_w.round}x#{new_h.round}x#{new_d.round} (f=#{sx.round(3)},#{sy.round(3)},#{sz.round(3)})")
+        end
+
+        # Panel po absorpcii ukazoval STARE rozmery az do reselect-u (znama medzera
+        # od V0.4.5) — obnovi sa standardnym sync tickom; bez otvoreneho panela no-op.
+        # Multi-model guard (Codex GH #36): debounced absorpcia na POZADOVOM modeli
+        # (macOS viac dokumentov) nesmie prepisat Inspector aktivneho dokumentu.
+        def refresh_panel(model)
+          return unless model == Sketchup.active_model
+          Panel.push_selected(model) if defined?(Panel)
+        rescue StandardError => e
+          Engine.log_error(e, 'ScaleWatch.refresh_panel')
         end
 
         def clamp_min(key, val, cid)
@@ -359,6 +371,7 @@ module Noxun
                                transform: clean, op_name: 'NOXUN: Prepocet dosky po zmene velkosti',
                                transparent: true)
           remember_transform(inst)
+          refresh_panel(model) # V0.4.7e: karta dosky sa obnovi hned po absorpcii
 
           if (sz - 1.0).abs >= SCALE_TOL
             notify_user("Hrúbku dosky #{bid} určuje materiál — ostáva #{cfg['thickness'].to_f.round(1)} mm.")
