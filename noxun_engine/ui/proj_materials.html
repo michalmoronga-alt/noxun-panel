@@ -1,0 +1,22 @@
+<!-- Noxun Engine — dialog Materialy projektu (V0.4.5 D2). Vanilla JS, ziadne CDN, slovensky.
+     Predvolby su per MODEL (dedenie projekt -> skrinka -> dielec, standard 7.2). -->
+<!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
+<meta charset="utf-8">
+<link rel="stylesheet" href="css/panel.css?v=0.4.5">
+
+<h1>Materiály projektu</h1>
+<p class="sub" id="mdline">…</p>
+
+<div class="hint">Predvolené materiály pre <b>všetky skrinky projektu</b>, ktoré nemajú vlastný materiál (dedenie projekt → skrinka → dielec). Zmena sa hneď premietne do všetkých dediacich skriniek (1 krok Späť). Materiály konkrétnej skrinky nastavíš v paneli, dielca v jeho karte.</div>
+
+<fieldset>
+  <legend>Predvolby</legend>
+  <div class="matrow"><label>Korpus</label><select id="md_body" onchange="onProjMaterial('default_material_id', this.value)"></select></div>
+  <div class="matrow"><label>Čelá</label><select id="md_front" onchange="onProjMaterial('default_front_material_id', this.value)"></select></div>
+  <div class="matrow"><label>Chrbát</label><select id="md_back" onchange="onProjMaterial('default_back_material_id', this.value)"></select></div>
+</fieldset>
+
+<div id="status">Pripravené.</div>
+
+<script src="js/errors.js?v=0.4.5"></script>
+<script src="js/proj_materials.js?v=0.4.5"></script>

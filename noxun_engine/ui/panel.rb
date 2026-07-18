@@ -9,11 +9,7 @@ module Noxun
   module Engine
     module Panel
       DLG_KEY = 'noxun_engine_panel'
-      PROJECT_MATERIAL_TARGETS = {
-        'default_material_id' => ['material_id', 'side_left', 'thickness'],
-        'default_front_material_id' => ['front_material_id', 'front_door', nil],
-        'default_back_material_id' => ['back_material_id', 'back', 'back_thickness']
-      }.freeze
+      # (PROJECT_MATERIAL_TARGETS sa V0.4.5 D2 presunuli do MaterialsDialog::TARGETS)
 
       class << self
         # --- otvorenie ------------------------------------------------------
@@ -65,12 +61,8 @@ module Noxun
           cb(dlg, 'set_zone_field') { |p| handle_set_zone_field(p) } # V0.2c split lock (rozmer pola)
           cb(dlg, 'select_zone')    { |p| handle_select_zone(p) }    # V0.2c obojsmerna sync nahladu
           cb(dlg, 'clean_zone')     { |p| handle_clean_zone(p) }
-          cb(dlg, 'save_template')  { |p| handle_save_template(p) }
-          cb(dlg, 'delete_template') { |p| handle_delete_template(p) }
-          cb(dlg, 'apply_template') { |p| handle_apply_template(p) }
           cb(dlg, 'toggle_zones')   { |p| handle_toggle_zones(p) }
-          # V0.3 materialy + ABS
-          cb(dlg, 'set_project_material') { |p| handle_set_project_material(p) } # projektovy default
+          # V0.3 materialy + ABS (materialy TEJTO skrinky; projektove = MaterialsDialog)
           cb(dlg, 'set_cabinet_material') { |p| handle_set_cabinet_material(p) } # korpusovy override
           cb(dlg, 'set_part_material')    { |p| handle_set_part_material(p) }    # per-dielec override
           cb(dlg, 'set_part_edge')        { |p| handle_set_part_edge(p) }        # ABS hrana dielca
@@ -79,6 +71,9 @@ module Noxun
           cb(dlg, 'open_rules')            { |_p| RulesDialog.show }
           # V0.4.5 D1: omrvinka karty dielca — spat na korpus (oznaci ho v modeli)
           cb(dlg, 'select_cabinet')        { |p| handle_select_cabinet(p) }
+          # V0.4.5 D2: satelitne okna (projektove predvolby a sprava sablon mimo panela)
+          cb(dlg, 'open_project_materials') { |_p| MaterialsDialog.show }
+          cb(dlg, 'open_templates')         { |_p| TemplatesDialog.show }
           # Diagnostika: JS chyby z HtmlDialogu (window.onerror) -> Engine.log. Priamo, NIE cez cb —
           # aby pripadna chyba v logovani nespustila set_status (dalsi execute_script) a slucku.
           dlg.add_action_callback('js_error') do |_ctx, msg|
