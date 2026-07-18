@@ -151,6 +151,34 @@
   /* Codex PR #27: karta dielca sa sustredi LEN na dielec — karta zony aj strom zon
      su v mode-part skryte (CSS vitazi aj nad inline style.display='' z refreshZoneUI);
      klik na zonu v nahlade ostava moznym VEDOMYM odchodom z dielca (oznaci zonu v modeli). */
+  /* ===== V0.4.7c: rezim DOSKA (mode-board) + vkladaci prepinac Korpus/Doska ===== */
+  /* mode-board: LEN identita + karta dosky (ako mode-part, navyse bez nahladu —
+     preview kresli zony/cela korpusu, pre dosku je irelevantny). */
+  body.mode-board #insertCard, body.mode-board #basicCard, body.mode-board .pvbox,
+  body.mode-board details[data-key="top"], body.mode-board details[data-key="bottom"],
+  body.mode-board details[data-key="sides"], body.mode-board details[data-key="back"],
+  body.mode-board details[data-key="fronts"], body.mode-board details[data-key="hardware"],
+  body.mode-board details[data-key="materials"], body.mode-board details[data-key="zones"],
+  body.mode-board #zoneCard, body.mode-board #partCard,
+  body.mode-board .insertmore { display: none; }
+  /* kartu dosky riadi renderBoardCard (inline display) — mimo mode-board ju CSS drzi skrytu */
+  body.mode-insert #boardCard, body.mode-cab #boardCard, body.mode-part #boardCard { display: none; }
+  /* Vkladaci prepinac: data-insert-kind atribut na <body> (PREZIJE setUiMode className
+     prepis — Codex audit c, blocker G). Rezim Doska skryje korpusovy vkladaci formular
+     AJ vsetky korpusove sekcie pod kartou (basicCard, nahlad, akordeony). */
+  body:not([data-insert-kind="board"]) #insertBoardForm { display: none; }
+  body[data-insert-kind="board"].mode-insert #insertCabForm { display: none; }
+  body[data-insert-kind="board"].mode-insert #basicCard,
+  body[data-insert-kind="board"].mode-insert .pvbox,
+  body[data-insert-kind="board"].mode-insert details[data-key="top"],
+  body[data-insert-kind="board"].mode-insert details[data-key="bottom"],
+  body[data-insert-kind="board"].mode-insert details[data-key="sides"],
+  body[data-insert-kind="board"].mode-insert details[data-key="back"],
+  body[data-insert-kind="board"].mode-insert details[data-key="fronts"],
+  body[data-insert-kind="board"].mode-insert details[data-key="hardware"],
+  body[data-insert-kind="board"].mode-insert details[data-key="materials"],
+  body[data-insert-kind="board"].mode-insert details[data-key="zones"] { display: none; }
+  #insertKindRow { border-bottom: 1px dashed #cfd8dc; padding-bottom: 6px; margin-bottom: 8px; }
   /* V0.4.5 D2: quick-pick sablony + okno Sablony */
   .tplmng { flex: 0 0 30px; padding: 3px 0; }
   .tplrow { display: flex; align-items: center; gap: 6px; margin: 4px 0; }

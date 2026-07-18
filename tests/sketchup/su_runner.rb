@@ -278,6 +278,38 @@ module NoxunSuRunner
        e::Store.get(binst, 'id') == bid && bchanged.first.definition != binst.definition &&
        bchanged.first.definition.name.start_with?('NOXUN Doska BRD-'))
 
+    # 10) V0.4.7c panel vrstva: payload kontrakt + guard oneskoreneho zapisu.
+    #     Dialog nie je otvoreny — Panel.js() je no-op, handlery bezia naplno.
+    pay = e::Panel.board_payload(binst)
+    ok('sync-board: board_payload nesie kompletny kontrakt karty',
+       %w[board_id name role role_label length width thickness material_id
+          grain_direction edges edge_labels edge_sides quantity].all? { |k| pay.key?(k) })
+    e::Panel.select_only(model, binst)
+    e::Panel.handle_set_board_fields({ 'board_id' => 'BRD-999', 'fields' => { 'width' => 555.0 } }.to_json)
+    ok('sync-board: guard zahodil zapis s nespravnym echo board_id',
+       ((e::Store.config(binst) || {})['width'].to_f - 580.0).abs < 0.01)
+    e::Panel.handle_set_board_fields({ 'board_id' => bid, 'fields' => { 'width' => 555.0 } }.to_json)
+    ok('sync-board: panel zapis presiel (width 555)',
+       ((e::Store.config(binst) || {})['width'].to_f - 555.0).abs < 0.01)
+    e::Panel.handle_set_board_edge({ 'board_id' => bid, 'edge' => 'W1', 'abs_id' => 'ABS_K009_20' }.to_json)
+    ecfg = (e::Store.config(binst) || {})['edges'] || {}
+    ok('sync-board: ABS hrana W1 cez panel, L1 default drzi (read-modify-write)',
+       ecfg['W1'] == 'ABS_K009_20' && ecfg['L1'] == 'ABS_K009_10')
+    # Codex GH #33: materials_payload nesie grain (vkladacia karta predvyplna smer)
+    mp = e::Panel.materials_payload
+    ok('sync-board: materials_payload sheets nesu grain',
+       mp['sheets'].is_a?(Array) && mp['sheets'].all? { |s| s.key?('grain') })
+    # Codex GH #33: zmena materialu prevedie ABS stareho dekoru (1mm ma variant,
+    # 2mm v W1000 nema -> nil) a material bez dekoru zhodi smer dekoru na none
+    e::Panel.handle_set_board_material({ 'board_id' => bid, 'material_id' => 'W1000_DTDL_18' }.to_json)
+    mcfg = e::Store.config(binst) || {}
+    mecfg = mcfg['edges'] || {}
+    ok('sync-board: zmena materialu K009->W1000 previedla ABS dekor (L1 1mm remap, W1 2mm -> nil)',
+       mcfg['material_id'] == 'W1000_DTDL_18' && mecfg['L1'] == 'ABS_W1000_10' && mecfg['W1'].nil?)
+    ok('sync-board: material bez dekoroveho smeru zhodil grain na none',
+       mcfg['grain_direction'] == 'none')
+    model.selection.clear
+
     cleanup(model)
     ok('sync: cleanup (0 korpusov, 0 dosiek)', cabinets(model).empty? && boards(model).empty?)
   rescue StandardError => ex
