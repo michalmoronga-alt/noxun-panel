@@ -4,18 +4,35 @@
   // kartu dielca a skryje korpusove sekcie). Identita hore = setIdbar.
   var lastCabForFit = null;
   function setUiMode(mode){ document.body.className = 'mode-' + mode; }
+  // D3: klik na ⚠ chip rozbali/zbali zoznam upozorneni stavby pod identitou.
   function setIdbar(c){
-    var bar = el('idbar'); if (!bar) return;
+    var bar = el('idbar'), list = el('warnList');
+    if (!bar) return;
     if (!c){
       bar.innerHTML = '<span class="free">Nič nie je označené — návrh nového korpusu</span>';
+      if (list){ list.style.display = 'none'; list.innerHTML = ''; }
       return;
     }
     var warns = c.warnings || [];
     var wHtml = warns.length
-      ? ' <span class="warnchip" title="' + esc(warns.map(function(w){ return w.message; }).join('\n')) + '">⚠ ' + warns.length + '</span>'
+      ? ' <span class="warnchip" onclick="toggleWarnList()" title="Zobraziť upozornenia stavby">⚠ ' + warns.length + '</span>'
       : '';
     bar.innerHTML = '<span class="cid">' + esc(c.cabinet_id || '?') + '</span>' +
       '<span class="cname">' + esc(c.name || '') + '</span>' + wHtml;
+    if (list){
+      if (warns.length){
+        var html = '';
+        warns.forEach(function(w){ html += '<div class="warnrow">' + esc(w.message || '') + '</div>'; });
+        list.innerHTML = html; // viditelnost necha na pouzivatelovi (toggle drzi stav)
+        if (!warns.length) list.style.display = 'none';
+      } else {
+        list.style.display = 'none'; list.innerHTML = '';
+      }
+    }
+  }
+  function toggleWarnList(){
+    var list = el('warnList'); if (!list || !list.innerHTML) return;
+    list.style.display = (list.style.display === 'none' || !list.style.display) ? 'block' : 'none';
   }
 
   window.NX = {
@@ -35,6 +52,7 @@
       setType(t);
       writeConstruction(c);
       applyVisibility(t);
+      buildFrontHwBadges(c.hardware || []); // D3: badge kovania PRED renderom riadkov ciel
       renderFronts(c.fronts);
       currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();
       frontItems = c.front_items || [];
@@ -60,6 +78,7 @@
       setIdbar(null);
       setUiMode('insert');
       setSelected(null);
+      buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
       activeZoneId = null; frontItems = null;
       if (lastCabForFit !== null){ lastCabForFit = null; fitPreview(); }
       renderPartCard(null);      // schovaj kartu dielca
