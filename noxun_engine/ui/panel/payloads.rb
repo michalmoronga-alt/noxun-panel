@@ -19,6 +19,10 @@ module Noxun
           params['available_height'] = cfg['available_height']
           params['available_depth'] = cfg['available_depth']
           params['warnings'] = cfg['warnings'] || [] # BuildPlan upozornenia (pre buduce UI)
+          # V0.4 kovanie: vypocitane polozky (vystup planu) + rucne zasahy (identita
+          # owner+type+rule_id). hardware_overrides su aj v params (config_to_params),
+          # tu explicitne — UI paruje disabled zaznamy na vypnute kategorie.
+          params['hardware'] = cfg['hardware'].is_a?(Array) ? cfg['hardware'] : []
           params
         end
 

@@ -164,7 +164,37 @@ module NoxunSuRunner
     cfg3 = e::Store.config(inst) || {}
     ok("sync: 1x undo vratil rebuild (sirka #{cfg3['width']})", (cfg3['width'].to_f - 600.0).abs < 0.01)
 
-    # 7) dedup kopie (priame volanie, synchronne): kopia dostane nove cid, original drzi
+    # 7) V0.4 kovanie: data v configu + vizual noh (proxy) + rucny zasah a reset
+    cfgh = e::Store.config(inst) || {}
+    hw = cfgh['hardware'] || []
+    leg = hw.find { |h| h['generic_type'] == 'leg' }
+    hinge = hw.find { |h| h['generic_type'] == 'hinge' }
+    ok('sync: config.hardware — nohy 4 ks na korpuse (owner nil)',
+       !leg.nil? && leg['quantity'] == 4 && leg['owner_part_key'].nil?)
+    ok('sync: config.hardware — zavesy 2 ks na kridle front:F1/wing:single',
+       !hinge.nil? && hinge['quantity'] == 2 && hinge['owner_part_key'] == 'front:F1/wing:single')
+    legs_inst = inst.definition.entities.grep(Sketchup::ComponentInstance)
+                    .find { |i| e::Store.kind(i) == 'hardware' }
+    lb = legs_inst && legs_inst.definition.bounds
+    ok('sync: vizual noh = proxy (kind=hardware, none/false, vyska = sokel 100)',
+       !legs_inst.nil? && e::Store.get(legs_inst, 'production_class') == 'none' &&
+       e::Store.get(legs_inst, 'manufactured') == false &&
+       !lb.nil? && (mm(lb.depth) - 100.0).abs <= TOL)
+    p3 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    p3['hardware_overrides'] = [{ 'owner_part_key' => nil, 'generic_type' => 'leg',
+                                  'rule_id' => 'nohy-zakladne', 'quantity' => 6 }]
+    e::CabinetBuilder.rebuild(model, inst, p3)
+    leg2 = ((e::Store.config(inst) || {})['hardware'] || []).find { |h| h['generic_type'] == 'leg' }
+    ok('sync: rucny pocet noh 6 (source manual, rule_quantity 4)',
+       !leg2.nil? && leg2['quantity'] == 6 && leg2['source'] == 'manual' && leg2['rule_quantity'] == 4)
+    p4 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    p4['hardware_overrides'] = []
+    e::CabinetBuilder.rebuild(model, inst, p4)
+    leg3 = ((e::Store.config(inst) || {})['hardware'] || []).find { |h| h['generic_type'] == 'leg' }
+    ok('sync: reset zasahu — plati zas pravidlo (4 ks, source rule)',
+       !leg3.nil? && leg3['quantity'] == 4 && leg3['source'] == 'rule')
+
+    # 8) dedup kopie (priame volanie, synchronne): kopia dostane nove cid, original drzi
     e::ScaleWatch.guard do
       model.start_operation('SU-TEST kopia', true)
       tr = inst.transformation * Geom::Transformation.translation(e::Units.vector(800, 0, 0))

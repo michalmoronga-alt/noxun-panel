@@ -52,6 +52,15 @@ module Noxun
         'divider_h'    => 'Noxun/Vnútro'
       }.freeze
       PART_TAG_DEFAULT = 'Noxun/Korpus'
+      HARDWARE_TAG     = 'Noxun/Kovanie'
+
+      # Vizual noh (V0.4): generic valec — priemer/segmenty/odsadenie od hran korpusu.
+      LEG_DIAMETER   = 50.0
+      LEG_SEGMENTS   = 12
+      LEG_INSET      = 60.0
+      # Vizualny strop kreslenych noh — quantity v DATACH plati vzdy (supis), geometria
+      # je proxy a nesmie polozit SketchUp pri poskodenom/extremnom pocte (audit D7).
+      LEG_RENDER_MAX = 16
 
       class << self
         # --- verejne API ----------------------------------------------------
@@ -249,6 +258,8 @@ module Noxun
             add_part(model, ents, pd, resolved, cid, tid)
           end
 
+          render_hardware(model, ents, plan[:hardware], cfg, cid)
+
           # V0.2c: ghost zony uz NEstoja v definicii korpusu, ale ako top-level skupina
           # (Zones.sync_ghost, volane z build/rebuild) — klik na zonu = 1 klik bez dvojkliku.
           merge_final(cfg, plan)
@@ -355,6 +366,81 @@ module Noxun
             }
           })
           inst
+        end
+
+        # --- vizual kovania (V0.4: zatial len nohy) --------------------------
+
+        # Nakresli genericky vizual kategorii kovania s geometriou. PROXY kontrakt
+        # (standard 6.3 + audit D6): zdroj pravdy supisu je config.hardware[] korpusu;
+        # entita je len vizual — production_class 'none', manufactured false, aby ju
+        # buduci kusovnik iterujuci entity NIKDY nezapocital (zavesy/vysuvy geometriu
+        # nemaju vobec, cisla musia mat jeden domov).
+        def render_hardware(model, parent_ents, hardware, cfg, cid)
+          legs = Array(hardware).select { |h| h['generic_type'] == 'leg' }
+          qty = legs.sum { |h| h['quantity'].to_i }
+          return if qty < 1 || cfg[:floor_height].to_f <= 0
+
+          dname = "NOXUN #{cid} LEGS"
+          ldef = model.definitions[dname] || model.definitions.add(dname)
+          ldef.entities.clear!
+          draw_legs(ldef.entities, cfg, qty)
+          inst = parent_ents.add_instance(ldef, Geom::Transformation.new)
+          inst.layer = hardware_tag(model)
+          Store.write(inst, {
+            std: Store::STD, kind: 'hardware', id: "#{cid}-HW-LEG", part_id: "#{cid}-HW-LEG",
+            cabinet_id: cid, role: 'leg',
+            manufactured: false, production_class: 'none',
+            config: { generic_type: 'leg', proxy: true, quantity: qty,
+                      params: (legs.first ? legs.first['params'] : {}),
+                      rule_id: (legs.first ? legs.first['rule_id'] : nil) }
+          })
+          inst
+        rescue StandardError => e
+          # Vizual nesmie zhodit rebuild — data (config.hardware) su uz ulozene.
+          Engine.log_error(e, 'render_hardware') if defined?(Engine)
+          nil
+        end
+
+        # Rozmiestnenie valcov pod dnom: 2 rady (predny/zadny) s odsadenim LEG_INSET;
+        # plytky korpus / 1 ks -> 1 rad v strede hlbky. Predny rad berie prebytok
+        # (ceil), rovnomerne po sirke. Kresli sa najviac LEG_RENDER_MAX valcov.
+        def draw_legs(ents, cfg, qty)
+          w = cfg[:width]; d = cfg[:depth]; h = cfg[:floor_height]
+          r = LEG_DIAMETER / 2.0
+          count = [qty, LEG_RENDER_MAX].min
+          two_rows = count > 1 && d > 2 * (LEG_INSET + r)
+          rows =
+            if two_rows
+              front = (count / 2.0).ceil
+              [[LEG_INSET, front], [d - LEG_INSET, count - front]].reject { |_, n| n < 1 }
+            else
+              [[d / 2.0, count]]
+            end
+          rows.each do |y, n|
+            xs = leg_xs(w, n)
+            xs.each { |x| draw_leg_cylinder(ents, x, y, r, h) }
+          end
+        end
+
+        # X pozicie n noh v rade: 1 ks stred; inak rovnomerne od insetu po sirku-inset.
+        def leg_xs(width, n)
+          return [width / 2.0] if n == 1
+          inset = [LEG_INSET, width / 2.0].min
+          span = width - 2 * inset
+          (0...n).map { |i| inset + span * i / (n - 1.0) }
+        end
+
+        def draw_leg_cylinder(ents, x, y, radius, height)
+          edges = ents.add_circle(Units.point(x, y, 0), Geom::Vector3d.new(0, 0, 1),
+                                  Units.mm(radius), LEG_SEGMENTS)
+          face = ents.add_face(edges)
+          return unless face
+          face.reverse! if face.normal.z < 0
+          face.pushpull(Units.mm(height))
+        end
+
+        def hardware_tag(model)
+          model.layers[HARDWARE_TAG] || model.layers.add(HARDWARE_TAG)
         end
 
         # Cela maju hrubku v osi Y. Ak katalog hovori 18/19 mm, upravime box,

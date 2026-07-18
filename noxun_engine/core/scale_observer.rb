@@ -388,20 +388,27 @@ module Noxun
       # AppObserver — re-attach entity/entities observerov na korpusy pri zmene modelu.
       # DOLEZITE: okrem per-instancnych observerov (attach_all) treba pripojit aj entities
       # observer (attach_entities) — bez neho nefunguju kopie ani fallback zmien.
+      # Navyse notifikuje otvorene dialogy viazane na model (RulesDialog) — formular
+      # sa nad novym aktivnym modelom nacita nanovo (Codex review PR #26, P1).
       class EngineAppObserver < Sketchup::AppObserver
         def onNewModel(model)
-          ScaleWatch.attach_all(model)
-          ScaleWatch.attach_entities(model)
+          model_switched(model)
         end
 
         def onOpenModel(model)
-          ScaleWatch.attach_all(model)
-          ScaleWatch.attach_entities(model)
+          model_switched(model)
         end
 
         def onActivateModel(model)
+          model_switched(model)
+        end
+
+        private
+
+        def model_switched(model)
           ScaleWatch.attach_all(model)
           ScaleWatch.attach_entities(model)
+          RulesDialog.on_model_changed(model) if defined?(RulesDialog)
         end
       end
     end

@@ -31,6 +31,7 @@
       if (c.available_depth!=null) setVal('av_depth', Math.round(c.available_depth));
       if (c.available_height!=null) setVal('av_height', Math.round(c.available_height));
       renderPartCard(c.part_card || null); // V0.3 karta dielca (ak je vybraty dielec)
+      renderHardware(c.hardware || [], c.hardware_overrides || []); // V0.4 kovanie
       renderPreview();
       refreshZoneUI();
     },
@@ -39,6 +40,7 @@
       setSelected(null);
       activeZoneId = null; frontItems = null;
       renderPartCard(null);      // schovaj kartu dielca
+      renderHardware(null, []);  // kovanie len pre oznacenu skrinku
       clearCabinetMaterials();   // korpusove material selecty na "dedi" + disabled
       refreshZoneUI(); renderPreview();
     },
