@@ -5,7 +5,7 @@
      sablon ziju v satelitnych oknach (proj_materials.html, templates.html) — panel ma len
      quick-pick sablony a materialy oznacenej skrinky. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.6">
+<link rel="stylesheet" href="css/panel.css?v=0.4.7">
 
 <div class="hdr"><h1>Noxun Engine</h1><span class="sub" id="verline">…</span></div>
 
@@ -68,18 +68,74 @@
 </fieldset>
 
 <!-- VKLADACIA KARTA (len ked nic nie je oznacene). D2: quick-pick sablony priamo tu;
-     sprava sablon (ulozit/vymazat/pouzit na oznaceny) = okno Sablony (tlacidlo ⚙). -->
+     sprava sablon (ulozit/vymazat/pouzit na oznaceny) = okno Sablony (tlacidlo ⚙).
+     V0.4.7c: prepinac Korpus/Doska — rezim drzi atribut data-insert-kind na <body>
+     (NIE body class; setUiMode prepisuje cely className — Codex audit c). -->
 <fieldset id="insertCard">
-  <legend>Nový korpus</legend>
-  <div class="typerow">
-    <label><input type="radio" name="ctype" value="lower" onchange="onTypeChange()"> Dolná</label>
-    <label><input type="radio" name="ctype" value="upper" onchange="onTypeChange()"> Horná</label>
+  <legend>Nový objekt</legend>
+  <div class="typerow" id="insertKindRow">
+    <label><input type="radio" name="ikind" value="cabinet" checked onchange="onInsertKindChange()"> Korpus</label>
+    <label><input type="radio" name="ikind" value="board" onchange="onInsertKindChange()"> Doska</label>
   </div>
-  <div class="row"><label>Šablóna</label>
-    <select id="template" onchange="onTemplateChange()"><option value="">— vyber —</option></select>
-    <button class="ghostbtn tplmng" onclick="openTemplatesDialog()" title="Šablóny — uložiť / vymazať / použiť na označený">⚙</button>
+  <div id="insertCabForm">
+    <div class="typerow">
+      <label><input type="radio" name="ctype" value="lower" onchange="onTypeChange()"> Dolná</label>
+      <label><input type="radio" name="ctype" value="upper" onchange="onTypeChange()"> Horná</label>
+    </div>
+    <div class="row"><label>Šablóna</label>
+      <select id="template" onchange="onTemplateChange()"><option value="">— vyber —</option></select>
+      <button class="ghostbtn tplmng" onclick="openTemplatesDialog()" title="Šablóny — uložiť / vymazať / použiť na označený">⚙</button>
+    </div>
+    <button class="primary wide" onclick="insertCabinet()">Vložiť korpus</button>
   </div>
-  <button class="primary wide" onclick="insertCabinet()">Vložiť korpus</button>
+  <div id="insertBoardForm">
+    <div class="hint">Samostatný výrobný dielec — krycia doska, blenda, výplň… Hrúbka sa riadi materiálom; ABS nastavíš po vložení na karte dosky.</div>
+    <div class="row"><label>Názov</label><input id="ib_name" type="text" placeholder="Doska"><span class="unit"></span></div>
+    <div class="row"><label>Dĺžka</label><input id="ib_length" type="number" step="1" value="800"><span class="unit">mm</span></div>
+    <div class="row"><label>Šírka</label><input id="ib_width" type="number" step="1" value="600"><span class="unit">mm</span></div>
+    <div class="row"><label>Materiál</label><select id="ib_material" onchange="onInsertBoardMaterial()"></select><span class="unit"></span></div>
+    <div class="row"><label>Hrúbka</label><input id="ib_thickness" type="text" readonly><span class="unit">mm</span></div>
+    <div class="row"><label>Smer dekoru</label>
+      <select id="ib_grain">
+        <option value="length">Po dĺžke</option>
+        <option value="width">Po šírke</option>
+        <option value="none">Bez smeru</option>
+      </select><span class="unit"></span>
+    </div>
+    <button class="primary wide" onclick="insertBoard()">Vložiť dosku</button>
+  </div>
+</fieldset>
+
+<!-- KARTA DOSKY (V0.4.7c, mode-board) — editor samostatneho vyrobneho dielca -->
+<fieldset id="boardCard" style="display:none">
+  <div class="pchead" id="bcHead"></div>
+  <div class="row"><label>Názov</label><input id="bc_name" type="text" oninput="onBoardField('name', this.value)"><span class="unit"></span></div>
+  <div class="row"><label>Dĺžka</label><input id="bc_length" type="number" step="1" oninput="onBoardField('length', this.value)"><span class="unit">mm</span></div>
+  <div class="row"><label>Šírka</label><input id="bc_width" type="number" step="1" oninput="onBoardField('width', this.value)"><span class="unit">mm</span></div>
+  <div class="row"><label>Materiál</label><select id="bc_material" onchange="onBoardMaterial(this.value)"></select><span class="unit"></span></div>
+  <div class="row"><label>Hrúbka</label><input id="bc_thickness" type="text" readonly><span class="unit">mm</span></div>
+  <div class="row"><label>Smer dekoru</label>
+    <select id="bc_grain" onchange="onBoardField('grain_direction', this.value)">
+      <option value="length">Po dĺžke</option>
+      <option value="width">Po šírke</option>
+      <option value="none">Bez smeru</option>
+    </select><span class="unit"></span>
+  </div>
+  <svg id="boardSvg" viewBox="0 0 300 200" preserveAspectRatio="xMidYMid meet"></svg>
+  <div class="absleg">
+    <span><i style="background:#e53935"></i>1,0 mm</span>
+    <span><i style="background:#43a047"></i>2,0 mm</span>
+    <span><i style="background:#b0bec5"></i>bez ABS</span>
+  </div>
+  <div id="boardEdgeRows"></div>
+  <details data-key="board_adv">
+    <summary>Pokročilé</summary>
+    <div class="body">
+      <div class="row"><label>Počet</label><input id="bc_quantity" type="number" step="1" min="1" oninput="onBoardField('quantity', this.value)"><span class="unit">ks</span></div>
+      <div class="row"><label>Rola</label><input id="bc_role" type="text" readonly><span class="unit"></span></div>
+      <div class="hint" id="bc_diag"></div>
+    </div>
+  </details>
 </fieldset>
 
 <!-- ZAKLADNE: rozmery + svetle (spolocne pre navrh aj oznaceny korpus) -->
@@ -221,14 +277,15 @@
 <!-- Poradie skriptov je kontrakt: errors prvy (chytac), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.4.6"></script>
-<script src="js/core.js?v=0.4.6"></script>
-<script src="js/form.js?v=0.4.6"></script>
-<script src="js/zone_tree.js?v=0.4.6"></script>
-<script src="js/preview.js?v=0.4.6"></script>
-<script src="js/actions.js?v=0.4.6"></script>
-<script src="js/bridge.js?v=0.4.6"></script>
-<script src="js/materials.js?v=0.4.6"></script>
-<script src="js/part_card.js?v=0.4.6"></script>
-<script src="js/hardware.js?v=0.4.6"></script>
-<script src="js/boot.js?v=0.4.6"></script>
+<script src="js/errors.js?v=0.4.7"></script>
+<script src="js/core.js?v=0.4.7"></script>
+<script src="js/form.js?v=0.4.7"></script>
+<script src="js/zone_tree.js?v=0.4.7"></script>
+<script src="js/preview.js?v=0.4.7"></script>
+<script src="js/actions.js?v=0.4.7"></script>
+<script src="js/bridge.js?v=0.4.7"></script>
+<script src="js/materials.js?v=0.4.7"></script>
+<script src="js/part_card.js?v=0.4.7"></script>
+<script src="js/board_card.js?v=0.4.7"></script>
+<script src="js/hardware.js?v=0.4.7"></script>
+<script src="js/boot.js?v=0.4.7"></script>

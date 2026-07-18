@@ -30,6 +30,21 @@ module Noxun
           nil
         end
 
+        # Samostatna doska vo vybere (V0.4.7c). Korpus ma v Inspectore prednost —
+        # volajuci najprv skusa find_cabinet; doska sa riesi az ked je nil.
+        def find_board(model)
+          model.selection.to_a.find { |e| Store.kind(e) == 'board' }
+        end
+
+        def find_board_by_id(model, bid)
+          return nil if bid.nil?
+
+          Ids.each_board(model) do |inst|
+            return inst if Store.get(inst, 'id') == bid
+          end
+          nil
+        end
+
         # Zona vo vybere (klik na ghost). Testovatelne aj priamo cez find_zone_in([entita]).
         def find_selected_zone(model)
           find_zone_in(model.selection.to_a)

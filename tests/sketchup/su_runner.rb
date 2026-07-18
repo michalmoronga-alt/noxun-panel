@@ -278,6 +278,25 @@ module NoxunSuRunner
        e::Store.get(binst, 'id') == bid && bchanged.first.definition != binst.definition &&
        bchanged.first.definition.name.start_with?('NOXUN Doska BRD-'))
 
+    # 10) V0.4.7c panel vrstva: payload kontrakt + guard oneskoreneho zapisu.
+    #     Dialog nie je otvoreny — Panel.js() je no-op, handlery bezia naplno.
+    pay = e::Panel.board_payload(binst)
+    ok('sync-board: board_payload nesie kompletny kontrakt karty',
+       %w[board_id name role role_label length width thickness material_id
+          grain_direction edges edge_labels edge_sides quantity].all? { |k| pay.key?(k) })
+    e::Panel.select_only(model, binst)
+    e::Panel.handle_set_board_fields({ 'board_id' => 'BRD-999', 'fields' => { 'width' => 555.0 } }.to_json)
+    ok('sync-board: guard zahodil zapis s nespravnym echo board_id',
+       ((e::Store.config(binst) || {})['width'].to_f - 580.0).abs < 0.01)
+    e::Panel.handle_set_board_fields({ 'board_id' => bid, 'fields' => { 'width' => 555.0 } }.to_json)
+    ok('sync-board: panel zapis presiel (width 555)',
+       ((e::Store.config(binst) || {})['width'].to_f - 555.0).abs < 0.01)
+    e::Panel.handle_set_board_edge({ 'board_id' => bid, 'edge' => 'W1', 'abs_id' => 'ABS_K009_20' }.to_json)
+    ecfg = (e::Store.config(binst) || {})['edges'] || {}
+    ok('sync-board: ABS hrana W1 cez panel, L1 default drzi (read-modify-write)',
+       ecfg['W1'] == 'ABS_K009_20' && ecfg['L1'] == 'ABS_K009_10')
+    model.selection.clear
+
     cleanup(model)
     ok('sync: cleanup (0 korpusov, 0 dosiek)', cabinets(model).empty? && boards(model).empty?)
   rescue StandardError => ex

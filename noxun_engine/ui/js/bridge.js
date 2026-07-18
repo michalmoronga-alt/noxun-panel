@@ -43,11 +43,16 @@
       if (data.version) el('verline').textContent = 'V' + data.version; // verzia z Ruby (jediny zdroj)
       refreshMaterialFilters(); // (projektove predvolby zobrazi okno Materialy projektu)
       el('zonesChk').checked = !!data.zones_visible;
-      if (data.selected){ NX.loadSelected(data.selected); }
+      // V0.4.7c: uz oznacena DOSKA pri otvoreni panela (selected_kind z Ruby)
+      if (data.selected_kind === 'board' && data.selected){ setType('lower'); setDefaults('lower'); currentZoneTree = defaultTree(); renderFilteredTemplates(); NX.loadBoard(data.selected); }
+      else if (data.selected){ NX.loadSelected(data.selected); }
       else { setType('lower'); setDefaults('lower'); currentZoneTree = defaultTree(); renderFilteredTemplates(); NX.clearSelected(); onField(); }
     },
     setTemplates: function(list){ TEMPLATES = list || []; renderFilteredTemplates(); },
     loadSelected: function(c){
+      // V0.4.7c: odchod z kontextu dosky — zrus cakajuce board edity + kartu
+      cancelBoardEdits();
+      renderBoardCard(null);
       var t = c.type || 'lower';
       setType(t);
       writeConstruction(c);
@@ -74,7 +79,27 @@
       renderPreview();
       refreshZoneUI();
     },
+    // V0.4.7c: karta dosky. VYCISTI cely korpusovy stav (Codex audit c) — zonove
+    // akcie a preview sa rozhoduju podla selectedCabId aj ked su skryte CSS.
+    loadBoard: function(b){
+      if (boardCard && b && boardCard.board_id !== b.board_id) cancelBoardEdits(); // ina doska
+      if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; } // korpusovy debounce nesmie strielat v kontexte dosky
+      setSelected(null);
+      activeZoneId = null; frontItems = null;
+      buildFrontHwBadges([]);
+      renderPartCard(null);
+      renderHardware(null, []);
+      clearCabinetMaterials();
+      if (lastCabForFit !== null){ lastCabForFit = null; }
+      renderBoardCard(b);
+      setBoardIdbar(b);
+      setUiMode('board');
+      refreshZoneUI(); renderPreview();
+    },
     clearSelected: function(){
+      cancelBoardEdits();                    // V0.4.7c: koniec kontextu dosky
+      renderBoardCard(null);
+      if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; }
       setIdbar(null);
       setUiMode('insert');
       setSelected(null);
@@ -88,4 +113,14 @@
     },
     setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; }
   };
+
+  // Identita dosky v idbar (BRD-xxx + nazov; bez warnchipu — dosky warnings zatial nemaju).
+  function setBoardIdbar(b){
+    var bar = el('idbar'), list = el('warnList');
+    if (!bar) return;
+    if (list){ list.style.display = 'none'; list.innerHTML = ''; }
+    if (!b){ setIdbar(null); return; }
+    bar.innerHTML = '<span class="cid">' + esc(b.board_id || '?') + '</span>' +
+      '<span class="cname">' + esc(b.name || '') + '</span>';
+  }
 

@@ -10,6 +10,9 @@ module Noxun
         def push_init
           model = Sketchup.active_model
           cab = find_cabinet(model)
+          # V0.4.7c: aj uz oznacena DOSKA pri otvoreni panela (Codex audit c, blocker B) —
+          # priorita korpus -> doska -> nic, rovnaka ako push_selected.
+          board = cab.nil? ? find_board(model) : nil
           data = {
             version: Engine::VERSION, # UI zobrazuje verziu odtialto — ziadny hardcode v HTML
             defaults: {
@@ -20,21 +23,26 @@ module Noxun
             templates: template_list,
             materials: materials_payload, # V0.3 katalog (dosky + ABS) pre selecty
             # (projektove predvolby zobrazuje okno MaterialsDialog — D2)
-            selected: cab ? cabinet_payload(cab) : nil
+            selected: cab ? cabinet_payload(cab) : (board ? board_payload(board) : nil),
+            selected_kind: cab ? 'cabinet' : (board ? 'board' : 'none')
           }
           js("NX.init(#{data.to_json})")
         end
 
         def push_selected(model)
-          # fix #6: "sync tick" resolvera — ak vznikla kopia korpusu (zdielane cabinet_id),
-          # pridelí sa jej nove ID + vlastne ghosty este pred nacitanim vyberu do panela.
+          # fix #6: "sync tick" resolvera — ak vznikla kopia korpusu/dosky (zdielane id),
+          # pridelí sa jej nove ID (+ korpusu vlastne ghosty) este pred nacitanim vyberu.
           CabinetBuilder.dedup_copies(model) if defined?(CabinetBuilder)
+          BoardBuilder.dedup_copies(model) if defined?(BoardBuilder)
           # V0.4.5 D2: dialog Sablony sleduje vyber (disabled stav "Pouzit na oznaceny")
           TemplatesDialog.on_selection_changed if defined?(TemplatesDialog)
           zone = find_selected_zone(model)
           cab = find_cabinet(model)
           if cab.nil?
             @active_zone_id = nil
+            # V0.4.7c: doska ma vlastnu kartu; korpus ma v Inspectore prednost.
+            board = find_board(model)
+            return js("NX.loadBoard(#{board_payload(board).to_json})") if board
             return js('NX.clearSelected()')
           end
           az = if zone && zone['cabinet_id'] == Store.get(cab, 'cabinet_id')

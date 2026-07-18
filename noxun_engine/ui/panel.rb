@@ -74,6 +74,11 @@ module Noxun
           # V0.4.5 D2: satelitne okna (projektove predvolby a sprava sablon mimo panela)
           cb(dlg, 'open_project_materials') { |_p| MaterialsDialog.show }
           cb(dlg, 'open_templates')         { |_p| TemplatesDialog.show }
+          # V0.4.7c: samostatna doska — vlozenie + karta (fields/material/ABS hrana)
+          cb(dlg, 'insert_board')       { |p| handle_insert_board(p) }
+          cb(dlg, 'set_board_fields')   { |p| handle_set_board_fields(p) }
+          cb(dlg, 'set_board_material') { |p| handle_set_board_material(p) }
+          cb(dlg, 'set_board_edge')     { |p| handle_set_board_edge(p) }
           # Diagnostika: JS chyby z HtmlDialogu (window.onerror) -> Engine.log. Priamo, NIE cez cb —
           # aby pripadna chyba v logovani nespustila set_status (dalsi execute_script) a slucku.
           dlg.add_action_callback('js_error') do |_ctx, msg|
@@ -111,6 +116,7 @@ Sketchup.require 'noxun_engine/ui/panel/actions_templates'
 Sketchup.require 'noxun_engine/ui/panel/actions_materials'
 Sketchup.require 'noxun_engine/ui/panel/actions_parts'
 Sketchup.require 'noxun_engine/ui/panel/actions_hardware'
+Sketchup.require 'noxun_engine/ui/panel/actions_board' # V0.4.7c samostatna doska
 Sketchup.require 'noxun_engine/ui/panel/sync'
 Sketchup.require 'noxun_engine/ui/panel/resolvers'
 Sketchup.require 'noxun_engine/ui/panel/payloads'

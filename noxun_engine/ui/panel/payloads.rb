@@ -7,6 +7,30 @@ module Noxun
     module Panel
       class << self
         # --- payload korpusu -------------------------------------------------
+        # Slovenske labely roli dosky (jediny zdroj — JS ich NEduplikuje, Codex audit c).
+        BOARD_ROLE_LABELS = { 'free_panel' => 'Voľná doska' }.freeze
+
+        # Karta samostatnej dosky (V0.4.7c). Zdroj = ploche atributy + config na
+        # instancii (autoritativny vyrobny zaznam, standard 8.3). edge_labels/sides
+        # z AbsRules — jeden zdroj pravdy ako pri karte dielca.
+        def board_payload(inst)
+          cfg = Store.config(inst) || {}
+          role = (Store.get(inst, 'role') || cfg['role']).to_s
+          {
+            'board_id' => Store.get(inst, 'id'),
+            'name' => cfg['name'] || Store.get(inst, 'name'),
+            'role' => role,
+            'role_label' => BOARD_ROLE_LABELS[role] || role,
+            'length' => cfg['length'], 'width' => cfg['width'], 'thickness' => cfg['thickness'],
+            'material_id' => cfg['material_id'],
+            'grain_direction' => cfg['grain_direction'] || 'none',
+            'edges' => cfg['edges'].is_a?(Hash) ? cfg['edges'] : {},
+            'edge_labels' => AbsRules.edge_labels(role),
+            'edge_sides' => AbsRules.edge_sides(role),
+            'quantity' => cfg['quantity'] || 1
+          }
+        end
+
         def cabinet_payload(cab)
           cfg = Store.config(cab) || {}
           params = CabinetBuilder.config_to_params(cfg)
