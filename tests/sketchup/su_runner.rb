@@ -13,10 +13,13 @@
 # Struktura:
 #   SYNC cast — geometria proti BuildPlan kontraktu (plan vs. model 1:1), NOXUN data
 #     dielcov, ghost zony, rebuild identita + prezitie part_overrides, dedup kopie
-#     (priame volanie), undo rebuildu = presne 1 krok.
+#     (priame volanie), undo rebuildu = presne 1 krok; V0.4.7b sync-board sekcia
+#     (build/rebuild/undo/dedup samostatnej dosky, standard 8.3).
 #   ASYNC cast — retaz UI.start_timer krokov (observer debounce = 0.2 s):
 #     S1 scale -> absorpcia -> Ctrl+Z (audit riziko: re-absorpcia po undo)
 #     S2 kopia -> observer dedup -> Ctrl+Z (audit riziko: zapis ID mimo operacie)
+#     S3 kopia DOSKY -> observer dedup (nove BRD id) -> Ctrl+Z (V0.4.7b)
+#     S4 miesana davka stale+fresh duplicit -> fresh v paste ticku, stale follow-up
 #
 # Cistenie: kazdy scenar maze svoje korpusy v ScaleWatch.guard (inak by debounce
 # timer po skonceni testu vykonal dedup/prune nekontrolovane) + purge_unused.
@@ -51,14 +54,15 @@ module NoxunSuRunner
     e::Units.to_mm(len)
   end
 
-  # Guard (Codex review PR #20, P1): Untitled NEstaci — neulozena moze byt aj zakazka.
-  # Povolene: (a) model ENGINEtests*.skp, alebo (b) neulozeny model BEZ jedineho NOXUN
-  # korpusu (cerstve testovacie okno; nie je co znicit, vsetko dalej vyrobi runner sam).
+  # Guard (Codex review PR #20, P1 + V0.4.7b): Untitled NEstaci — neulozena moze byt
+  # aj zakazka. Povolene: (a) model ENGINEtests*.skp, alebo (b) neulozeny model BEZ
+  # jedineho NOXUN vlastnickeho objektu (korpus AJ doska — cerstve testovacie okno;
+  # nie je co znicit, vsetko dalej vyrobi runner sam).
   def guard_model?(model)
     path = model ? model.path.to_s : ''
     base = path.gsub('\\', '/').downcase.split('/').last.to_s
     return true if base.start_with?('enginetests')
-    path.empty? && cabinets(model).empty?
+    path.empty? && cabinets(model).empty? && boards(model).empty?
   end
 
   def cabinets(model)
@@ -67,11 +71,18 @@ module NoxunSuRunner
     out
   end
 
-  # Zmaze vsetky NOXUN korpusy + ghosty v guarde (observer nedostane vlastne upratovanie).
+  def boards(model)
+    out = []
+    e::Ids.each_board(model) { |i| out << i }
+    out
+  end
+
+  # Zmaze vsetky NOXUN korpusy, dosky + ghosty v guarde (observer nedostane vlastne upratovanie).
   def cleanup(model)
     e::ScaleWatch.guard do
       model.start_operation('SU-TEST cleanup', true)
       cabinets(model).each { |i| i.erase! if i.valid? }
+      boards(model).each { |i| i.erase! if i.valid? }
       e::Zones.prune_orphans(model) if defined?(e::Zones)
       model.commit_operation
       model.definitions.purge_unused
@@ -211,8 +222,64 @@ module NoxunSuRunner
        changed.length == 1 && ids.uniq.length == 2 && ids.include?(cid))
     ok('sync: original si drzi povodne cid', e::Store.get(inst, 'cabinet_id') == cid)
 
+    # 9) V0.4.7b samostatna doska: build -> atributy/geometria, rebuild identita,
+    #    undo = 1 krok, dedup kopie (priame volanie). Standard 8.3.
+    binst = e::BoardBuilder.build(model, { 'material_id' => 'K009_PW_DTDL_18',
+                                           'length' => 720.0, 'width' => 580.0,
+                                           'name' => 'Testovacia doska' })
+    return ok('sync-board: vlozenie dosky', false) unless binst
+
+    bid = e::Store.get(binst, 'id')
+    ok("sync-board: identita a ploche atributy (#{bid})",
+       bid.to_s.match?(/\ABRD-\d+\z/) && e::Store.kind(binst) == 'board' &&
+       e::Store.get(binst, 'part_key') == 'board/main' &&
+       e::Store.get(binst, 'manufactured') == true &&
+       e::Store.get(binst, 'production_class') == 'sheet' &&
+       e::Store.get(binst, 'role') == 'free_panel')
+    bcfg = e::Store.config(binst) || {}
+    ok('sync-board: config nesie vyrobne polia (rozmery/material/edges/quantity)',
+       (bcfg['length'].to_f - 720.0).abs < 0.01 && (bcfg['width'].to_f - 580.0).abs < 0.01 &&
+       (bcfg['thickness'].to_f - 18.0).abs < 0.01 && bcfg['material_id'] == 'K009_PW_DTDL_18' &&
+       bcfg['edges'].is_a?(Hash) && bcfg['edges'].key?('L1') && bcfg['quantity'] == 1)
+    ok('sync-board: ABS default free_panel (1 pozdlzna 1.0)',
+       bcfg['edges']['L1'] == 'ABS_K009_10' && bcfg['edges']['L2'].nil?)
+    bb = binst.definition.bounds
+    ok('sync-board: geometria = config (720x580x18, length=X width=Y thickness=Z)',
+       (mm(bb.width) - 720.0).abs <= TOL && (mm(bb.height) - 580.0).abs <= TOL &&
+       (mm(bb.depth) - 18.0).abs <= TOL)
+    ok("sync-board: meno definicie 'NOXUN Doska #{bid}'",
+       binst.definition.name == "NOXUN Doska #{bid}")
+
+    e::BoardBuilder.rebuild(model, binst, { 'width' => 600.0 })
+    bcfg2 = e::Store.config(binst) || {}
+    ok('sync-board: rebuild (580->600) zachoval identitu, zmenil sirku, drzi material',
+       e::Store.get(binst, 'id') == bid && (bcfg2['width'].to_f - 600.0).abs < 0.01 &&
+       bcfg2['material_id'] == 'K009_PW_DTDL_18')
+    Sketchup.undo
+    bcfg3 = e::Store.config(binst) || {}
+    ok("sync-board: 1x undo vratil rebuild (sirka #{bcfg3['width']})",
+       (bcfg3['width'].to_f - 580.0).abs < 0.01)
+
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST kopia dosky', true)
+      tr2 = binst.transformation * Geom::Transformation.translation(e::Units.vector(900, 0, 0))
+      bcopy = model.entities.add_instance(binst.definition, tr2)
+      %w[std kind id part_id part_key part_key_schema role name manufactured production_class config].each do |k|
+        v = e::Store.get(binst, k)
+        bcopy.set_attribute('NOXUN', k, v) unless v.nil?
+      end
+      model.commit_operation
+    end
+    bchanged = e::BoardBuilder.dedup_copies(model)
+    bids = boards(model).map { |i| e::Store.get(i, 'id') }
+    ok("sync-board: dedup kopie — nove ID bez prekreslenia (#{bids.sort.join(', ')})",
+       bchanged.length == 1 && bids.uniq.length == 2 && bids.include?(bid))
+    ok('sync-board: original drzi id, kopia ma vlastnu definiciu s novym menom',
+       e::Store.get(binst, 'id') == bid && bchanged.first.definition != binst.definition &&
+       bchanged.first.definition.name.start_with?('NOXUN Doska BRD-'))
+
     cleanup(model)
-    ok('sync: cleanup (0 korpusov)', cabinets(model).empty?)
+    ok('sync: cleanup (0 korpusov, 0 dosiek)', cabinets(model).empty? && boards(model).empty?)
   rescue StandardError => ex
     log_line("FAIL: sync vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
     cleanup(model)
@@ -319,6 +386,79 @@ module NoxunSuRunner
       else
         info('S2 REDO: kopia po redo neexistuje.')
       end
+      cleanup(model)
+    end]
+
+    # S3 (V0.4.7b): kopia DOSKY -> observer dedup (nove BRD id, transparent) -> undo
+    steps << [0.5, lambda do
+      binst = e::BoardBuilder.build(model, { 'material_id' => 'K009_PW_DTDL_18',
+                                             'length' => 400.0, 'width' => 300.0 })
+      state[:s3] = binst
+      state[:s3_bid] = e::Store.get(binst, 'id')
+      # simulacia Ctrl+C/V: nova instancia + NOXUN atributy v JEDNEJ operacii (observer NIE je guardnuty)
+      model.start_operation('SU-TEST user copy board', true)
+      tr = binst.transformation * Geom::Transformation.translation(e::Units.vector(500, 0, 0))
+      bcopy = model.entities.add_instance(binst.definition, tr)
+      %w[std kind id part_id part_key part_key_schema role name manufactured production_class config].each do |k|
+        v = e::Store.get(binst, k)
+        bcopy.set_attribute('NOXUN', k, v) unless v.nil?
+      end
+      state[:s3_copy] = bcopy
+      model.commit_operation
+    end]
+    steps << [SETTLE, lambda do
+      copy = state[:s3_copy]
+      new_id = copy && copy.valid? ? e::Store.get(copy, 'id') : nil
+      orig_ok = state[:s3] && state[:s3].valid? && e::Store.get(state[:s3], 'id') == state[:s3_bid]
+      ok("async S3: observer dedup kopie dosky (#{state[:s3_bid]} -> #{new_id})",
+         !new_id.nil? && new_id != state[:s3_bid] && orig_ok)
+      Sketchup.undo # dedup je transparentny k paste kroku -> 1x undo ma vratit kopiu celu
+    end]
+    steps << [SETTLE, lambda do
+      copy = state[:s3_copy]
+      copy_gone = copy.nil? || !copy.valid?
+      orig_ok = state[:s3] && state[:s3].valid? && e::Store.get(state[:s3], 'id') == state[:s3_bid]
+      bids = boards(model).map { |i| e::Store.get(i, 'id') }
+      ok("async S3: 1x undo vratil kopiu dosky CELU (kopia prec=#{copy_gone}, dosky: #{bids.sort.join(', ')})",
+         copy_gone && orig_ok && bids == [state[:s3_bid]])
+      cleanup(model)
+    end]
+
+    # S4 (Codex GH review PR #32, P2): MIESANA davka — stara duplicita (vytvorena
+    # v guarde, observer ju nevidel) + cerstva kopia v jednom debounce okne.
+    # Paste tick spracuje LEN cerstvu (transparent na paste); staru prevezme
+    # follow-up tick ako samostatny krok. Assert = konvergencia identity
+    # (3 dosky -> 3 unikatne ID); undo poradie mixed davky je dokumentovany
+    # kompromis a netestuje sa.
+    steps << [0.5, lambda do
+      b1 = e::BoardBuilder.build(model, { 'material_id' => 'K009_PW_DTDL_18',
+                                          'length' => 350.0, 'width' => 250.0 })
+      state[:s4] = b1
+      state[:s4_bid] = e::Store.get(b1, 'id')
+      attrs = %w[std kind id part_id part_key part_key_schema role name manufactured production_class config]
+      # STALA duplicita: kopia v guarde — observer tick nepribehne, zdielane ID ostava
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST stale copy board', true)
+        sc = model.entities.add_instance(b1.definition,
+                                         b1.transformation * Geom::Transformation.translation(e::Units.vector(450, 0, 0)))
+        attrs.each { |k| v = e::Store.get(b1, k); sc.set_attribute('NOXUN', k, v) unless v.nil? }
+        state[:s4_stale] = sc
+        model.commit_operation
+      end
+      # CERSTVA kopia: user operacia BEZ guardu -> observer tick s fresh_ids
+      model.start_operation('SU-TEST user copy board 2', true)
+      fc = model.entities.add_instance(b1.definition,
+                                       b1.transformation * Geom::Transformation.translation(e::Units.vector(900, 0, 0)))
+      attrs.each { |k| v = e::Store.get(b1, k); fc.set_attribute('NOXUN', k, v) unless v.nil? }
+      state[:s4_fresh] = fc
+      model.commit_operation
+    end]
+    steps << [SETTLE, lambda do
+      # SETTLE (1.2 s) pokryva paste tick (0.2 s) aj follow-up tick (0.4 s).
+      trio = [state[:s4], state[:s4_stale], state[:s4_fresh]]
+      ids = trio.map { |i| i && i.valid? ? e::Store.get(i, 'id') : nil }
+      ok("async S4: mixed stale+fresh — konvergencia na 3 unikatne ID (#{ids.compact.sort.join(', ')})",
+         ids.compact.length == 3 && ids.uniq.length == 3 && ids.include?(state[:s4_bid]))
       cleanup(model)
       log_line('=== KONIEC SUBORU ===')
       done.call if done

@@ -179,9 +179,15 @@ module Noxun
         # (observer tick s cerstvym onElementAdded) — vtedy 1x undo vrati kopiu CELU.
         # Z panel sync cesty (push_selected) a inych kontextov = false: samostatny undo krok,
         # aby sa dedup neprilepil na nesuvisiacu poslednu akciu (Codex review PR #21).
-        def dedup_copies(model, transparent: false)
+        # fresh_ids (V0.4.7b, Codex audit + GH review P2): entityID mnozina PRAVE
+        # pridanych entit. Ak je dana, spracuju sa IBA tieto duplikaty (transparentne
+        # k pouzivatelovmu paste kroku); STARE duplicity sa v tomto ticku NEDOTKNU —
+        # observer si na ne naplanuje follow-up tick (samostatne undo kroky). Inak by
+        # miesana davka stale+fresh rozbila vazbu transparentneho undo na paste.
+        def dedup_copies(model, transparent: false, fresh_ids: nil)
           return [] unless model
           dups = Ids.duplicate_cabinets(model)
+          dups = dups.select { |i| i && i.valid? && fresh_ids.include?(i.entityID) } if fresh_ids
           return [] if dups.empty?
           # Root kontext ako v rebuild (Codex review PR #21): dedup moze bezat aj pocas
           # editacie komponentu — bez zatvorenia edit ramca by sa transformacia kopie
@@ -191,11 +197,12 @@ module Noxun
           dups.each do |inst|
             next unless inst && inst.valid?
             new_cid = Ids.next_cabinet_id(model)
+            trans = fresh_ids ? true : transparent
             # V0.3.4 undo fix (runner S2): prepis identity (standard 2.2: autorita = instancia)
             # + rebuild bezia v JEDNEJ operacii (transparentnej len pri cerstvej kopii, viz vyssie).
             # Predtym sa nove cid zapisovalo MIMO operacie a po undo ostaval nekonzistentny medzistav.
             guarded do
-              model.start_operation('NOXUN: Kopia korpusu — nove ID', true, false, transparent)
+              model.start_operation('NOXUN: Kopia korpusu — nove ID', true, false, trans)
               begin
                 Store.write(inst, { std: Store::STD, kind: 'cabinet', id: new_cid, cabinet_id: new_cid })
                 params = config_to_params(Store.config(inst) || {})
@@ -809,13 +816,10 @@ module Noxun
 
         # --- pomocne --------------------------------------------------------
 
+        # V0.4.7b: pravy okraj pocita Placement (top-level cabinet + board, nikdy
+        # ghost zony) — novy korpus sa vlozi aj vedla dosky, nie cez nu.
         def next_x(model)
-          max_right = nil
-          Ids.each_cabinet(model) do |inst|
-            r = Units.to_mm(inst.bounds.max.x)
-            max_right = r if max_right.nil? || r > max_right
-          end
-          max_right.nil? ? 0.0 : max_right + GAP_BETWEEN_CABS
+          Placement.next_x(model, gap: GAP_BETWEEN_CABS)
         end
 
         def norm_type(p)
