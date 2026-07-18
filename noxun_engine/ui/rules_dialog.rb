@@ -104,10 +104,24 @@ module Noxun
         # prepisal jeho snapshot. Kontrola = cesta modelu + ZHODA aktualnych pravidiel
         # modelu s baseline (chyti aj novy Untitled, undo zmeny snapshotu a subezne
         # zmeny) — pri nezhode sa formular nacita nanovo a nic sa nezapise.
+        # PRIMARNA ochrana je vsak on_model_changed (AppObserver refresh) — baseline
+        # ostava ako druha vrstva; samotna cesta nestaci pre dva neulozene modely
+        # s prazdnym path (Codex review PR #26, P1).
         def baseline_valid?(model)
           return false if (model ? model.path.to_s : '') != @baseline_path.to_s
           current = HardwareRules.project_rules(model) || HardwareRules.load
           current == @baseline_rules
+        end
+
+        # Volane z EngineAppObserver pri File > New/Open/Activate: otvoreny formular
+        # sa VZDY nanovo naplni z prave aktivneho modelu — dialog tak nikdy nedrzi
+        # pravidla predchadzajuceho dokumentu (principialne riesenie P1 z PR #26).
+        def on_model_changed(_model)
+          return unless @dialog && @dialog.visible?
+          push_state
+          set_status('Aktívny model sa zmenil — pravidlá načítané z tohto modelu.')
+        rescue StandardError => e
+          Engine.log_error(e, 'RulesDialog.on_model_changed')
         end
 
         def push_global
