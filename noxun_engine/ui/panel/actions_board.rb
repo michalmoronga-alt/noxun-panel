@@ -47,13 +47,50 @@ module Noxun
         end
 
         # Zmena materialu — hrubka nasleduje katalog (BoardBuilder.normalize).
+        # ABS hrany STAREHO dekoru sa prevedu na novy dekor pri ZACHOVANI hrubky
+        # (Codex GH #33 P2): dekor hran nasleduje material dielca — presne ako
+        # korpusove pravidlove defaulty. Hrany bez ABS, cudzieho dekoru (vedoma
+        # volba) alebo mimo katalogu sa nedotknu; chybajuci variant hrubky -> nil.
+        # Smer dekoru: material bez dekoru (grain none) nemoze mat smer.
         def handle_set_board_material(payload)
           data = parse(payload)
           model, board = guarded_board(data)
           return unless board
           mat = data['material_id'].to_s.strip
           return set_status('Doska potrebuje konkrétny materiál.', true) if mat.empty?
-          apply_board(model, board, { 'material_id' => mat }, 'Materiál dosky nastavený.')
+          cfg = Store.config(board) || {}
+          params = { 'material_id' => mat }
+          remap, lost = remap_edges_for_material(cfg, mat)
+          params['edges'] = remap if remap
+          new_sheet = Materials.sheet(mat)
+          params['grain_direction'] = 'none' if new_sheet && new_sheet['grain'].to_s == 'none'
+          msg = 'Materiál dosky nastavený.'
+          msg += ' ABS hrany prevedené na nový dekor.' if remap
+          msg += " Hrany #{lost.join(', ')} bez ABS (nový dekor nemá variant hrúbky)." unless lost.empty?
+          apply_board(model, board, params, msg)
+        end
+
+        # Prevod ABS hran stareho dekoru na novy (rovnaka hrubka). Vrati
+        # [nova_edges_mapa alebo nil (nic na prevod), pole hran bez variantu].
+        def remap_edges_for_material(cfg, new_mat)
+          old_decor = Materials.decor_of(cfg['material_id'])
+          new_decor = Materials.decor_of(new_mat)
+          return [nil, []] unless old_decor && new_decor && old_decor != new_decor
+          edges = cfg['edges'].is_a?(Hash) ? cfg['edges'].dup : nil
+          return [nil, []] unless edges
+          changed = false
+          lost = []
+          %w[L1 L2 W1 W2].each do |code|
+            aid = edges[code]
+            next if aid.nil?
+            rec = Materials.edge(aid)
+            next unless rec && rec['decor'] == old_decor # cudzi dekor = vedoma volba, nechaj
+            new_aid = Materials.abs_for_decor(new_decor, rec['thickness'])
+            lost << code if new_aid.nil?
+            edges[code] = new_aid
+            changed = true
+          end
+          [changed ? edges : nil, lost]
         end
 
         # ABS hrana dosky — server-side read-modify-write (Codex audit c, D):

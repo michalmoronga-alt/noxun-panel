@@ -295,6 +295,19 @@ module NoxunSuRunner
     ecfg = (e::Store.config(binst) || {})['edges'] || {}
     ok('sync-board: ABS hrana W1 cez panel, L1 default drzi (read-modify-write)',
        ecfg['W1'] == 'ABS_K009_20' && ecfg['L1'] == 'ABS_K009_10')
+    # Codex GH #33: materials_payload nesie grain (vkladacia karta predvyplna smer)
+    mp = e::Panel.materials_payload
+    ok('sync-board: materials_payload sheets nesu grain',
+       mp['sheets'].is_a?(Array) && mp['sheets'].all? { |s| s.key?('grain') })
+    # Codex GH #33: zmena materialu prevedie ABS stareho dekoru (1mm ma variant,
+    # 2mm v W1000 nema -> nil) a material bez dekoru zhodi smer dekoru na none
+    e::Panel.handle_set_board_material({ 'board_id' => bid, 'material_id' => 'W1000_DTDL_18' }.to_json)
+    mcfg = e::Store.config(binst) || {}
+    mecfg = mcfg['edges'] || {}
+    ok('sync-board: zmena materialu K009->W1000 previedla ABS dekor (L1 1mm remap, W1 2mm -> nil)',
+       mcfg['material_id'] == 'W1000_DTDL_18' && mecfg['L1'] == 'ABS_W1000_10' && mecfg['W1'].nil?)
+    ok('sync-board: material bez dekoroveho smeru zhodil grain na none',
+       mcfg['grain_direction'] == 'none')
     model.selection.clear
 
     cleanup(model)

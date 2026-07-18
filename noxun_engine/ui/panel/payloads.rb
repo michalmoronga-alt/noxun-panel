@@ -101,8 +101,10 @@ module Noxun
         def materials_payload
           {
             'sheets' => Materials.sheets.map { |s|
+              # grain (V0.4.7c, Codex GH #33): vkladacia karta dosky predvyplna smer
+              # dekoru z katalogu — bez grain by formular posielal nespravny default.
               { 'id' => s['material_id'], 'label' => sheet_label(s), 'decor' => s['decor'],
-                'thickness' => s['thickness'], 'color' => s['color'] }
+                'thickness' => s['thickness'], 'color' => s['color'], 'grain' => s['grain'] }
             },
             'edges' => Materials.edges.map { |a|
               { 'id' => a['abs_id'], 'label' => abs_label(a), 'decor' => a['decor'],
