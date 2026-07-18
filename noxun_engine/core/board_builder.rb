@@ -124,6 +124,206 @@ module Noxun
           stored.is_a?(Hash) ? stored.dup : {}
         end
 
+        # ====================================================================
+        # SketchUp cast (V0.4.7b) — build/rebuild/dedup. Vzor CabinetBuilder:
+        # guarded operacie (observer ignoruje vlastne zmeny), 1 akcia = 1 Undo,
+        # recyklacia definicie, root kontext. PORADIE v build/rebuild je zamerne:
+        # normalize + validacia CISTO PRED ensure_root! — chybny vstup nesmie mat
+        # ziadny vedlajsi ucinok (ani zatvorenie editovaneho komponentu).
+        # ====================================================================
+
+        FALLBACK_RGB = [216, 196, 160].freeze
+        BOARD_TAG = 'Noxun/Dosky'
+        # DC scaletool maska osovych uchopov — rovnaka hodnota ako CabinetBuilder
+        # (Michal potvrdi vizualne; alternativa 120 pri opacnej semantike).
+        SCALE_TOOL_MASK = 7
+
+        # Vlozi novu dosku nalezato na Z=0 vedla najpravejsieho NOXUN objektu.
+        # Bez material_id v params sa doplni projektovy default (snapshot!).
+        # Vrati instanciu.
+        def build(model, params)
+          p = stringify(params)
+          if present(p['material_id']).nil? && defined?(Materials)
+            p['material_id'] = Materials.project_defaults(model)['default_material_id']
+          end
+          cfg = normalize(p)
+          validate_config!(cfg)
+          ensure_root!(model)
+          bid = Ids.next_board_id(model)
+          x = Placement.next_x(model)
+          inst = nil
+          guarded do
+            model.start_operation('NOXUN: Vloz dosku', true)
+            begin
+              bdef = model.definitions.add(definition_name(bid))
+              bdef.entities.clear!
+              draw_board(bdef.entities, cfg)
+              inst = model.entities.add_instance(bdef, Geom::Transformation.translation(Units.point(x, 0, 0)))
+              write_board_attrs(model, inst, bid, cfg)
+              apply_scale_lock(inst)
+              model.commit_operation
+            rescue StandardError => e
+              abort_safely(model)
+              raise e
+            end
+          end
+          inst
+        end
+
+        # Prestavia existujucu dosku. params sa MERGUJU do ulozeneho configu
+        # (chybajuce polia drzi snapshot). transform: volitelna cista transformacia
+        # (scale absorpcia V0.4.7d). transparent: pripoji operaciu k predchadzajucej.
+        def rebuild(model, inst, params, transform: nil, op_name: 'NOXUN: Uprav dosku', transparent: false)
+          bid = board_id!(inst)
+          merged = config_to_params(Store.config(inst) || {}).merge(stringify(params))
+          cfg = normalize(merged)
+          validate_config!(cfg)
+          ensure_root!(model)
+          guarded do
+            model.start_operation(op_name, true, false, transparent)
+            begin
+              rebuild_in_operation(model, inst, bid, cfg, transform: transform)
+              model.commit_operation
+            rescue StandardError => e
+              abort_safely(model)
+              raise e
+            end
+          end
+          inst
+        end
+
+        # Vnutro rebuildu; volajuci drzi operaciu aj guard.
+        def rebuild_in_operation(model, inst, bid, cfg, transform: nil)
+          inst.make_unique if inst.definition.instances.size > 1
+          bdef = inst.definition
+          bdef.name = definition_name(bid) unless bdef.name == definition_name(bid)
+          bdef.entities.clear!
+          draw_board(bdef.entities, cfg)
+          inst.transformation = transform if transform
+          write_board_attrs(model, inst, bid, cfg)
+          apply_scale_lock(inst)
+          inst
+        end
+
+        # Kopia dosky (zdielane id) -> nova identita BEZ prekreslenia: make_unique
+        # + nove id + premenovanie definicie. Geometria a config kopie sa NEmenia
+        # (ziaden normalize round-trip — zmena katalogu nesmie pri kopirovani
+        # menit geometriu a chybajuci material nesmie dedup zablokovat).
+        # fresh_ids: entityID mnozina PRAVE pridanych entit (observer tick) —
+        # transparentny undo LEN pre ne; stara duplicita = samostatny undo krok.
+        def dedup_copies(model, transparent: false, fresh_ids: nil)
+          return [] unless model
+          dups = Ids.duplicate_boards(model)
+          return [] if dups.empty?
+          done = []
+          dups.each do |inst|
+            next unless inst && inst.valid?
+            new_id = Ids.next_board_id(model)
+            trans = fresh_ids ? fresh_ids.include?(inst.entityID) : transparent
+            guarded do
+              model.start_operation('NOXUN: Kopia dosky — nove ID', true, false, trans)
+              begin
+                inst.make_unique if inst.definition.instances.size > 1
+                inst.definition.name = definition_name(new_id)
+                Store.write(inst, { std: Store::STD, kind: 'board', id: new_id, part_id: new_id })
+                inst.name = "Doska #{new_id}"
+                model.commit_operation
+              rescue StandardError => e
+                abort_safely(model)
+                raise e
+              end
+            end
+            done << inst
+            Engine.log("dedup: kopia dosky dostala nove ID #{new_id}") if defined?(Engine)
+          end
+          done
+        rescue StandardError => e
+          Engine.log_error(e, 'BoardBuilder.dedup_copies') if defined?(Engine)
+          []
+        end
+
+        # --- SketchUp pomocne -----------------------------------------------
+
+        def definition_name(bid)
+          "NOXUN Doska #{bid}"
+        end
+
+        # Guard identity pre rebuild: kind board + platne BRD id (poskodena doska
+        # bez identity sa nesmie prestavat).
+        def board_id!(inst)
+          raise 'Vybrana instancia nie je NOXUN doska.' unless Store.kind(inst) == 'board'
+          bid = Store.get(inst, 'id').to_s
+          raise "Doska ma neplatnu identitu '#{bid}'." unless bid.match?(/\ABRD-\d+\z/)
+          bid
+        end
+
+        # Zavrie edit kontexty a OVERI, ze sme naozaj v roote (close_active moze
+        # ticho zlyhat — nesmie sa zacat operacia nad zlym ramcom).
+        def ensure_root!(model)
+          CabinetBuilder.ensure_root_context(model) if defined?(CabinetBuilder)
+          ap = model.active_path
+          raise 'Zatvor editaciu komponentu a skus znova.' if ap && !ap.empty?
+        end
+
+        # Box dosky: length = X, width = Y, thickness = Z (lokalne osi = vyrobna
+        # pravda, standard 3.3). Lokalny helper — ziadna vazba na CabinetBuilder.
+        def draw_board(ents, cfg)
+          l = cfg[:length]; w = cfg[:width]
+          pts = [
+            Units.point(0, 0, 0), Units.point(l, 0, 0),
+            Units.point(l, w, 0), Units.point(0, w, 0)
+          ]
+          f = ents.add_face(pts)
+          f.reverse! if f.normal.z < 0
+          f.pushpull(Units.mm(cfg[:thickness]))
+          f
+        end
+
+        def write_board_attrs(model, inst, bid, cfg)
+          Store.write(inst, {
+            std: Store::STD, kind: 'board', id: bid, part_id: bid,
+            part_key: PART_KEY, part_key_schema: PartKeys::SCHEMA,
+            role: cfg[:role], name: cfg[:name],
+            manufactured: true, production_class: 'sheet',
+            config: board_config(cfg)
+          })
+          inst.name = "Doska #{bid}"
+          inst.material = Materials.ensure_su_material(model, cfg[:material_id], FALLBACK_RGB) if defined?(Materials)
+          inst.layer = board_tag(model)
+          inst
+        end
+
+        def board_tag(model)
+          model.layers[BOARD_TAG] || model.layers.add(BOARD_TAG)
+        end
+
+        def apply_scale_lock(inst)
+          return unless inst && inst.valid?
+          inst.set_attribute('dynamic_attributes', 'scaletool', SCALE_TOOL_MASK.to_s)
+        rescue StandardError => e
+          Engine.log_error(e, 'BoardBuilder.apply_scale_lock') if defined?(Engine)
+          nil
+        end
+
+        def guarded
+          if defined?(ScaleWatch)
+            ScaleWatch.guard { yield }
+          else
+            yield
+          end
+        end
+
+        def abort_safely(model)
+          model.abort_operation
+        rescue StandardError
+          nil
+        end
+
+        def stringify(h)
+          return {} unless h.is_a?(Hash)
+          h.each_with_object({}) { |(k, v), o| o[k.to_s] = v }
+        end
+
         # --- pomocne --------------------------------------------------------
 
         def norm_role(p)

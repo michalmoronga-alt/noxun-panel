@@ -45,8 +45,9 @@ Sketchup.require 'noxun_engine/core/zone_tree'
 Sketchup.require 'noxun_engine/core/zones'
 Sketchup.require 'noxun_engine/core/construction'
 Sketchup.require 'noxun_engine/core/scale_observer'
+Sketchup.require 'noxun_engine/core/placement'      # V0.4.7b umiestnovanie (top-level cabinet+board)
 Sketchup.require 'noxun_engine/core/cabinet_builder'
-Sketchup.require 'noxun_engine/core/board_builder' # V0.4.7 samostatna doska (cista cast)
+Sketchup.require 'noxun_engine/core/board_builder' # V0.4.7 samostatna doska
 Sketchup.require 'noxun_engine/core/templates'
 Sketchup.require 'noxun_engine/ui/panel'
 Sketchup.require 'noxun_engine/ui/rules_dialog'     # V0.4 editor pravidiel kovania

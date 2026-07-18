@@ -109,17 +109,19 @@ module Noxun
           Engine.log_error(e, 'ScaleWatch.notify_erase')
         end
 
-        # Pridanie entity do model.entities — zachyti KOPIU korpusu (Ctrl+C/V, Move+Ctrl).
-        # Kopia dedi NOXUN atributy (kind:cabinet, zdielane cabinet_id) ale NEdedi per-instancny
-        # EntityObserver — bez neho by sa jej presun nezachytil a ghost zony by ostali na mieste
-        # originalu. Preto ju zaradime na debounced spracovanie (process_dirty): dedup (nove
-        # cabinet_id + vlastne ghosty) + attach per-instancneho observera.
-        # Guard: vlastne vlozenie korpusu (CabinetBuilder.build) je guardnute, takze onElementAdded
-        # (davkovany na commit) tu vidi @rebuilding=true a ignoruje ho — ziadne dvojite spracovanie.
+        # Pridanie entity do model.entities — zachyti KOPIU korpusu alebo DOSKY
+        # (Ctrl+C/V, Move+Ctrl). Kopia dedi NOXUN atributy (zdielane id) ale NEdedi
+        # per-instancny EntityObserver — bez spracovania by ostala so zdielanou identitou.
+        # Debounced spracovanie (process_dirty): dedup (nove id; korpus aj vlastne ghosty)
+        # + attach per-instancneho observera (len korpusy; dosky ho v b nemaju).
+        # Guard: vlastne vlozenie (CabinetBuilder/BoardBuilder.build) je guardnute, takze
+        # onElementAdded (davkovany na commit) tu vidi @rebuilding=true a ignoruje ho.
+        DEDUP_KINDS = %w[cabinet board].freeze
+
         def notify_added(entity)
           return if @rebuilding
           return unless entity.is_a?(Sketchup::ComponentInstance) && entity.valid?
-          return unless Store.kind(entity) == 'cabinet'
+          return unless DEDUP_KINDS.include?(Store.kind(entity).to_s)
           @added ||= {}
           @added[entity.entityID] = entity
           @last_model = (entity.model rescue nil) || @last_model # fix #8: model pre dedup/prune
@@ -166,15 +168,20 @@ module Noxun
           added_models = added.values.select { |i| i && i.valid? }.map(&:model).compact.uniq
 
           touched_models.each do |mdl|
-            # Transparentny dedup LEN ked v tomto ticku realne pribudla kopia (onElementAdded) —
-            # vtedy je predchadzajuca operacia jej paste/move a 1x undo vrati kopiu celu.
-            # Iny trigger (move existujuceho, prune) = samostatny undo krok (Codex review PR #21).
+            # Transparentny dedup LEN pre entity, ktore v TOMTO ticku realne pribudli
+            # (onElementAdded) — vtedy je predchadzajuca operacia ich paste/move a 1x undo
+            # vrati kopiu celu. V0.4.7b (Codex audit): fresh sa urcuje PER ENTITA (mnozina
+            # entityID), nie per model — stara nesuvisiaca duplicita v tom istom ticku
+            # dostane samostatny undo krok namiesto prilepenia na cudzi paste.
             fresh_copy = added_models.include?(mdl)
-            CabinetBuilder.dedup_copies(mdl, transparent: fresh_copy) if defined?(CabinetBuilder)
+            fresh_ids = added.values.select { |i| i && i.valid? && (i.model rescue nil) == mdl }
+                             .map(&:entityID)
+            CabinetBuilder.dedup_copies(mdl, fresh_ids: fresh_ids) if defined?(CabinetBuilder)
+            BoardBuilder.dedup_copies(mdl, fresh_ids: fresh_ids) if defined?(BoardBuilder)
             # Kopie zachytene cez onElementAdded nemaju vlastny per-instancny EntityObserver
             # (kopia ho nededi). Po dedupe (novy cabinet_id + ghosty cez rebuild->sync_ghost)
             # im observer pripojime, aby ich buduci move/scale spustil ghost sync.
-            # attach_all je idempotentne.
+            # attach_all je idempotentne (iteruje len korpusy — dosky observer v b nemaju).
             attach_all(mdl) if fresh_copy
           end
 

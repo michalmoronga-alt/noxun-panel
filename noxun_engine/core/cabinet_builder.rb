@@ -179,7 +179,10 @@ module Noxun
         # (observer tick s cerstvym onElementAdded) — vtedy 1x undo vrati kopiu CELU.
         # Z panel sync cesty (push_selected) a inych kontextov = false: samostatny undo krok,
         # aby sa dedup neprilepil na nesuvisiacu poslednu akciu (Codex review PR #21).
-        def dedup_copies(model, transparent: false)
+        # fresh_ids (V0.4.7b, Codex audit): entityID mnozina PRAVE pridanych entit — ak je
+        # dana, transparentnost sa urcuje PER DUPLIKAT (stara nesuvisiaca duplicita v tom
+        # istom ticku dostane samostatny undo krok, nie prilepenie na cudzi paste).
+        def dedup_copies(model, transparent: false, fresh_ids: nil)
           return [] unless model
           dups = Ids.duplicate_cabinets(model)
           return [] if dups.empty?
@@ -191,11 +194,12 @@ module Noxun
           dups.each do |inst|
             next unless inst && inst.valid?
             new_cid = Ids.next_cabinet_id(model)
+            trans = fresh_ids ? fresh_ids.include?(inst.entityID) : transparent
             # V0.3.4 undo fix (runner S2): prepis identity (standard 2.2: autorita = instancia)
             # + rebuild bezia v JEDNEJ operacii (transparentnej len pri cerstvej kopii, viz vyssie).
             # Predtym sa nove cid zapisovalo MIMO operacie a po undo ostaval nekonzistentny medzistav.
             guarded do
-              model.start_operation('NOXUN: Kopia korpusu — nove ID', true, false, transparent)
+              model.start_operation('NOXUN: Kopia korpusu — nove ID', true, false, trans)
               begin
                 Store.write(inst, { std: Store::STD, kind: 'cabinet', id: new_cid, cabinet_id: new_cid })
                 params = config_to_params(Store.config(inst) || {})
@@ -809,13 +813,10 @@ module Noxun
 
         # --- pomocne --------------------------------------------------------
 
+        # V0.4.7b: pravy okraj pocita Placement (top-level cabinet + board, nikdy
+        # ghost zony) — novy korpus sa vlozi aj vedla dosky, nie cez nu.
         def next_x(model)
-          max_right = nil
-          Ids.each_cabinet(model) do |inst|
-            r = Units.to_mm(inst.bounds.max.x)
-            max_right = r if max_right.nil? || r > max_right
-          end
-          max_right.nil? ? 0.0 : max_right + GAP_BETWEEN_CABS
+          Placement.next_x(model, gap: GAP_BETWEEN_CABS)
         end
 
         def norm_type(p)
