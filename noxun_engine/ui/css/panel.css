@@ -117,3 +117,37 @@
   .rband .bdel { flex: 0 0 auto; width: 26px; padding: 2px 0; }
   .rdsave { margin-top: 10px; }
   .rdchk { display: block; font-size: 12px; color: #455a64; margin-bottom: 6px; }
+  /* ===== V0.4.5 D1: Inspector kostra ===== */
+  .hdr { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+  .hdr h1 { margin: 0; }
+  .hdr .sub { margin: 0; }
+  /* identita oznaceneho */
+  .idbar { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; min-height: 20px; }
+  .idbar .cid { font-weight: 700; font-size: 14px; color: #1565c0; }
+  .idbar .cname { color: #37474f; font-size: 12px; }
+  .idbar .free { color: #78909c; font-size: 12px; }
+  .idbar .warnchip { margin-left: auto; font-size: 11px; color: #b26a00; background: #fff3e0;
+                     border: 1px solid #ffcc80; border-radius: 99px; padding: 0 8px; cursor: help; }
+  /* nahlad = fixne okno (zoom/pan v preview.js) */
+  .pvbox { padding-top: 8px; }
+  #preview { height: 210px; }
+  .pvtabs .pvfit { flex: 0 0 34px; font-size: 13px; }
+  .zoneline { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #607d8b; margin-top: 4px; }
+  /* omrvinka karty dielca */
+  .crumb { font-size: 11.5px; color: #607d8b; margin-bottom: 6px; }
+  .crumb b { color: #263238; }
+  .crumb .backlink { color: #1565c0; cursor: pointer; text-decoration: underline; }
+  /* rezimy Inspectora (body class z bridge.js) */
+  .insertmore { display: none; }
+  body.mode-cab .insertmore { display: block; }
+  body.mode-cab #insertCard { display: none; }
+  body.mode-part #insertCard, body.mode-part #basicCard,
+  body.mode-part details[data-key="top"], body.mode-part details[data-key="bottom"],
+  body.mode-part details[data-key="sides"], body.mode-part details[data-key="back"],
+  body.mode-part details[data-key="fronts"], body.mode-part details[data-key="hardware"],
+  body.mode-part details[data-key="materials"], body.mode-part details[data-key="templates"],
+  body.mode-part #zoneCard, body.mode-part details[data-key="zones"],
+  body.mode-part .insertmore { display: none; }
+  /* Codex PR #27: karta dielca sa sustredi LEN na dielec — karta zony aj strom zon
+     su v mode-part skryte (CSS vitazi aj nad inline style.display='' z refreshZoneUI);
+     klik na zonu v nahlade ostava moznym VEDOMYM odchodom z dielca (oznaci zonu v modeli). */

@@ -1,12 +1,15 @@
   // ===================== ZONA UI (akcie / rozmery poli) =====================
+  // V0.4.5 D1: karta zony (#zoneCard) sa zobrazuje LEN pri kliknutej zone — hned pod
+  // nahladom, kde na nu pouzivatel klikol. Bez vyberu je cela karta skryta.
   function refreshZoneUI(){
     var zones = computeZones();
     var z = null; zones.forEach(function(x){ if (fullZoneId(x.id) === activeZoneId) z = x; });
-    var leafBox = el('leafActions'), fieldBox = el('fieldEditor');
+    var card = el('zoneCard'), leafBox = el('leafActions'), fieldBox = el('fieldEditor');
     if (!z){
-      el('zoneActive').innerHTML = 'Žiadna zóna neoznačená. Klikni na pole v náhľade.';
-      setZoneButtons(false); leafBox.style.display=''; fieldBox.innerHTML=''; renderZoneTree(zones); return;
+      if (card) card.style.display = 'none';
+      setZoneButtons(false); fieldBox.innerHTML=''; renderZoneTree(zones); return;
     }
+    if (card) card.style.display = '';
     el('zoneActive').innerHTML = '<b>' + z.label + '</b> — ' + Math.round(z.w) + '×' + Math.round(z.h) + ' mm';
     if (z.leaf){
       leafBox.style.display=''; fieldBox.innerHTML='';
