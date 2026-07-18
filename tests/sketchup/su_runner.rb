@@ -312,6 +312,33 @@ module NoxunSuRunner
        mcfg['grain_direction'] == 'none')
     model.selection.clear
 
+    # 11) Davka 2 (D-05): sprava katalogu end-to-end — novy 38mm material cez
+    #     dialogovy handler, doska ho prevezme (hrubka z katalogu), delete guardy.
+    begin
+      e::MaterialsDialog.handle_save_sheet({ 'decor' => 'Runner Pracovna', 'type' => 'DTDL',
+                                             'thickness' => '38', 'grain' => 'length',
+                                             'price_per_m2' => '20', 'color' => [50, 60, 70] }.to_json, create: true)
+      wt = e::Materials.sheet('RUNNER_PRACOVNA_DTDL_38')
+      ok('katalog: novy 38mm material vytvoreny (server-generovane ID)', !wt.nil? && (wt['thickness'].to_f - 38.0).abs < 0.01)
+      e::BoardBuilder.rebuild(model, binst, { 'material_id' => 'RUNNER_PRACOVNA_DTDL_38' })
+      kcfg = e::Store.config(binst) || {}
+      kb = binst.definition.bounds
+      ok("katalog: doska prevzala novu hrubku 38 (cfg #{kcfg['thickness']}, geo #{mm(kb.depth).round(1)})",
+         (kcfg['thickness'].to_f - 38.0).abs < 0.01 && (mm(kb.depth) - 38.0).abs <= TOL)
+      e::MaterialsDialog.handle_delete_sheet({ 'material_id' => 'RUNNER_PRACOVNA_DTDL_38' }.to_json)
+      ok('katalog: delete POUZITEHO materialu odmietnuty (doska ho drzi)',
+         !e::Materials.sheet('RUNNER_PRACOVNA_DTDL_38').nil?)
+      e::MaterialsDialog.handle_delete_sheet({ 'material_id' => 'K009_PW_DTDL_18' }.to_json)
+      ok('katalog: chranena predvolba sa neda zmazat',
+         !e::Materials.sheet('K009_PW_DTDL_18').nil?)
+    ensure
+      # uprac: dosku vrat na seed material a testovaci zaznam zmaz (uz nepouzity)
+      e::BoardBuilder.rebuild(model, binst, { 'material_id' => 'K009_PW_DTDL_18' }) rescue nil
+      e::Materials.delete_sheet('RUNNER_PRACOVNA_DTDL_38')
+    end
+    ok('katalog: nepouzity testovaci material zmazany (cleanup)',
+       e::Materials.sheet('RUNNER_PRACOVNA_DTDL_38').nil?)
+
     cleanup(model)
     ok('sync: cleanup (0 korpusov, 0 dosiek)', cabinets(model).empty? && boards(model).empty?)
   rescue StandardError => ex
