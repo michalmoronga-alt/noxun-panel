@@ -36,14 +36,17 @@ module Noxun
           Engine.log_error(e, 'ScaleWatch.install')
         end
 
-        # Attach entity observer na vsetky existujuce korpusy v modeli + entities observer na
-        # model.entities (zachytenie kopii). Initial scan / re-attach (install, open/new/activate).
+        # Attach entity observer na vsetky existujuce korpusy A DOSKY v modeli (V0.4.7d)
+        # + entities observer na model.entities (zachytenie kopii). Initial scan /
+        # re-attach (install, open/new/activate).
         def attach_all(model)
           return 0 unless model
           @entity_observer ||= CabinetEntityObserver.new
           attach_entities(model)
           n = 0
-          Ids.each_cabinet(model) { |inst| attach_one(inst); n += 1 }
+          DEDUP_KINDS.each do |kind|
+            Ids.each_of_kind(model, kind) { |inst| attach_one(inst); n += 1 }
+          end
           n
         end
 
@@ -59,13 +62,17 @@ module Noxun
           Engine.log_error(e, 'ScaleWatch.attach_entities')
         end
 
-        # Attach na jednu korpus instanciu (volane aj builderom po vlozeni noveho korpusu).
+        # Attach na jednu instanciu (korpus/doska; volane aj buildermi po vlozeni).
+        # V0.4.7d (Codex audit d, blocker 1): transform sa NEuklada ako stabilny,
+        # ak uz nesie scale — cerstvo attachnuta ESTE NEabsorbovana kopia (paste +
+        # scale v jednom ticku) by inak pri neskorsom rejecte obnovila skalovany
+        # stav. Stabilny transform zapise az uspesna absorpcia / cisty stav.
         def attach_one(inst)
           return unless inst && inst.valid?
           @entity_observer ||= CabinetEntityObserver.new
           safe { inst.remove_observer(@entity_observer) } # anti-double
           inst.add_observer(@entity_observer)
-          remember_transform(inst)
+          remember_transform(inst) unless scaled?(inst.transformation)
         rescue StandardError => e
           Engine.log_error(e, 'ScaleWatch.attach_one')
         end
@@ -84,12 +91,13 @@ module Noxun
         end
 
         # --- volane z observera --------------------------------------------
-        # Zmena korpusu: scale -> absorpcia (rebuild), inak (move/rotate) -> presun ghost zon.
+        # Zmena korpusu/dosky (V0.4.7d): scale -> absorpcia (rebuild), inak
+        # (move/rotate) -> korpus presunie ghost zony, doska si len zapamata transform.
         # Rozlisenie scale/move sa robi az v process_dirty (po ustaleni transformacie).
         def notify_change(entity)
           return if @rebuilding
           return unless entity && entity.valid?
-          return unless Store.kind(entity) == 'cabinet'
+          return unless DEDUP_KINDS.include?(Store.kind(entity).to_s)
           @dirty ||= {}
           @dirty[entity.entityID] = entity
           @last_model = (entity.model rescue nil) || @last_model # fix #8: model pre prune
@@ -201,10 +209,13 @@ module Noxun
           dirty.each_value do |inst|
             next unless inst && inst.valid?
             m = inst.model # fix #8: model per dirty instancia (nie Sketchup.active_model)
+            board = Store.kind(inst) == 'board'
             if scaled?(inst.transformation)
-              absorb(inst)          # scale -> rebuild (vnutri vola Zones.sync_ghost)
+              board ? absorb_board(inst) : absorb(inst) # scale -> rebuild (korpus aj sync ghostov)
+            elsif board
+              remember_transform(inst) # move/rotate dosky — ziadne ghosty
             else
-              move_ghost_op(m, inst) # move/rotate -> len presun ghost skupin
+              move_ghost_op(m, inst) # move/rotate korpusu -> len presun ghost skupin
               remember_transform(inst)
             end
           rescue StandardError => e
@@ -316,6 +327,65 @@ module Noxun
           m
         end
 
+        # --- absorpcia scale DOSKY (V0.4.7d) --------------------------------
+        # Lokalne osi dosky su vyrobna pravda: X=length, Y=width, Z=thickness.
+        # Absorbuju sa LEN X/Y; hrubku RIADI katalogovy material — Z faktor sa
+        # zahodi a rebuild vrati geometriu hrubky na config hodnotu (pouzivatel
+        # dostane nemodalny status, ziadny messagebox z observera).
+        # POZOR (Codex audit d): pri neuniformnom GLOBALNOM scale sikmo natocenej
+        # dosky vznika shear — stlpce matice prestanu byt kolme a osi sa miesaju.
+        # Taky transform sa NEabsorbuje (reject) — absorpcia by vyrobila nezmysel.
+        def absorb_board(inst)
+          model = inst.model
+          cfg = Store.config(inst)
+          return unless cfg
+          tr = inst.transformation
+          f = scale_factors(tr)
+          return unless f
+          raise 'Doska je skosena neuniformnym scale — zmena velkosti sa neda prevziat.' if sheared?(tr)
+          sx, sy, sz = f
+          bid = Store.get(inst, 'id')
+
+          lim = BoardBuilder::LIMITS
+          new_l = (cfg['length'].to_f * sx).round.to_f.clamp(lim[:length][0], lim[:length][1])
+          new_w = (cfg['width'].to_f * sy).round.to_f.clamp(lim[:width][0], lim[:width][1])
+          clamped = ((cfg['length'].to_f * sx).round.to_f != new_l) || ((cfg['width'].to_f * sy).round.to_f != new_w)
+
+          clean = clean_transform(tr)
+          # TRANSPARENTNA operacia — absorpcia sa pripoji k pouzivatelovmu Scale
+          # kroku (1x undo vrati oboje; rovnaky vzor + debounce kompromis ako
+          # korpusova absorb, viz komentar tam).
+          BoardBuilder.rebuild(model, inst, { 'length' => new_l, 'width' => new_w },
+                               transform: clean, op_name: 'NOXUN: Prepocet dosky po zmene velkosti',
+                               transparent: true)
+          remember_transform(inst)
+
+          if (sz - 1.0).abs >= SCALE_TOL
+            notify_user("Hrúbku dosky #{bid} určuje materiál — ostáva #{cfg['thickness'].to_f.round(1)} mm.")
+          elsif clamped
+            notify_user("Rozmer dosky #{bid} bol orezaný na povolený rozsah.")
+          end
+          Engine.log("scale absorb #{bid}: #{cfg['length'].to_f.round}x#{cfg['width'].to_f.round} -> " \
+                     "#{new_l.round}x#{new_w.round} (f=#{sx.round(3)},#{sy.round(3)},#{sz.round(3)})")
+        end
+
+        # Shear detekcia: ocistene (normalizovane) osi musia byt navzajom kolme.
+        def sheared?(tr, tol = 0.001)
+          x = tr.xaxis.normalize
+          y = tr.yaxis.normalize
+          z = tr.zaxis.normalize
+          x.dot(y).abs > tol || x.dot(z).abs > tol || y.dot(z).abs > tol
+        end
+
+        # Nemodalne oznamenie z observera: SketchUp status bar (vzdy) + panel status
+        # (ak je otvoreny). Modal z asynchronneho observera je zle UX.
+        def notify_user(msg)
+          Sketchup.status_text = msg
+          Panel.set_status(msg) if defined?(Panel)
+        rescue StandardError
+          nil
+        end
+
         # Cisty transform: povodny origin + rotacia, BEZ scale (normalizovane osi).
         def clean_transform(tr)
           Geom::Transformation.axes(tr.origin, tr.xaxis.normalize, tr.yaxis.normalize, tr.zaxis.normalize)
@@ -324,14 +394,17 @@ module Noxun
         # Ak validacia rebuildu odmietne Scale, vratime presne poslednu stabilnu
         # polohu/rotaciu/velkost. Transparentna operacia sa pripoji k pouzivatelovmu
         # Scale kroku, takze model ani vyrobne data nezostanu v rozpornom stave.
+        # V0.4.7d: typove rozvetvenie \u2014 doska nema ghosty a identita je v 'id';
+        # doskova hlaska je NEMODALNA (status), korpusovy messagebox ostava.
         def reject_scale(inst, error)
           model = inst.model
+          board = Store.kind(inst) == 'board'
           restore = stable_transform(inst) || clean_transform(inst.transformation)
           guard do
             model.start_operation('Noxun: zrusena neplatna zmena velkosti', true, false, true)
             begin
               inst.transformation = restore
-              Zones.move_ghost(model, inst) if defined?(Zones)
+              Zones.move_ghost(model, inst) if !board && defined?(Zones)
               model.commit_operation
             rescue StandardError => restore_error
               model.abort_operation rescue nil
@@ -341,8 +414,12 @@ module Noxun
           end
           remember_transform(inst)
           Engine.log_error(error, 'ScaleWatch.scale rejected')
-          cid = Store.get(inst, 'cabinet_id')
-          UI.messagebox("Zmena ve\u013ekosti skrinky #{cid} bola zru\u0161en\u00e1, preto\u017ee by vytvorila neplatn\u00fa kon\u0161trukciu.\n\n#{error.message}")
+          if board
+            notify_user("Zmena ve\u013ekosti dosky #{Store.get(inst, 'id')} bola zru\u0161en\u00e1: #{error.message}")
+          else
+            cid = Store.get(inst, 'cabinet_id')
+            UI.messagebox("Zmena ve\u013ekosti skrinky #{cid} bola zru\u0161en\u00e1, preto\u017ee by vytvorila neplatn\u00fa kon\u0161trukciu.\n\n#{error.message}")
+          end
           true
         rescue StandardError => notify_error
           Engine.log_error(notify_error, 'ScaleWatch.reject_scale notify')

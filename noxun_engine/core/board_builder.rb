@@ -167,6 +167,8 @@ module Noxun
               raise e
             end
           end
+          # V0.4.7d: per-instancny observer — scale absorpcia dosky (vzor korpus).
+          ScaleWatch.attach_one(inst) if inst && defined?(ScaleWatch)
           inst
         end
 
