@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.4.6' unless defined?(VERSION)
+    VERSION = '0.4.7' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -46,6 +46,7 @@ Sketchup.require 'noxun_engine/core/zones'
 Sketchup.require 'noxun_engine/core/construction'
 Sketchup.require 'noxun_engine/core/scale_observer'
 Sketchup.require 'noxun_engine/core/cabinet_builder'
+Sketchup.require 'noxun_engine/core/board_builder' # V0.4.7 samostatna doska (cista cast)
 Sketchup.require 'noxun_engine/core/templates'
 Sketchup.require 'noxun_engine/ui/panel'
 Sketchup.require 'noxun_engine/ui/rules_dialog'     # V0.4 editor pravidiel kovania

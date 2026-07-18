@@ -29,6 +29,11 @@ module Noxun
   module Engine
     module AbsRules
       STD  = 1
+      # Verzia seed sady (vzor hardware_rules): subor vzniknuty pod starsim SEED_VERSION
+      # dostane pri loade NOVE default roly (seed-merge) — bez toho by sa nova rola
+      # (free_panel, V0.4.7) na existujucich instalaciach nikdy neobjavila
+      # (ensure_seeded zapisuje len ked subor chyba). Uz ulozene roly sa NEPREPISUJU.
+      SEED_VERSION = 1
       FILE = 'abs_rules.json'
 
       EDGE_ORDER = %w[L1 L2 W1 W2].freeze
@@ -48,7 +53,10 @@ module Noxun
         'back'         => { 'L1' => 'Dolná',  'L2' => 'Horná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
         'plinth'       => { 'L1' => 'Dolná',  'L2' => 'Horná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
         'rail_front'   => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
-        'rail_back'    => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Ľavá',  'W2' => 'Pravá' }
+        'rail_back'    => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
+        # Samostatna doska (V0.4.7): nema prirodzene predna/zadna — neutralne labely,
+        # orientaciu ukazuje 2D karta (edge_sides -> lying mapa).
+        'free_panel'   => { 'L1' => 'Pozdĺžna 1', 'L2' => 'Pozdĺžna 2', 'W1' => 'Priečna 1', 'W2' => 'Priečna 2' }
       }.freeze
       EDGE_LABELS_DEFAULT = { 'L1' => 'Hrana 1', 'L2' => 'Hrana 2', 'W1' => 'Hrana 3', 'W2' => 'Hrana 4' }.freeze
 
@@ -84,7 +92,8 @@ module Noxun
         'back'         => {},
         'plinth'       => {},
         'rail_front'   => {},
-        'rail_back'    => {}
+        'rail_back'    => {},
+        'free_panel'   => { 'L1' => 1.0 } # doska: 1 pozdlzna hrana 1.0 (Michal 18.7.2026)
       }.freeze
 
       module_function
@@ -106,6 +115,8 @@ module Noxun
       end
 
       # Interny read-only pohlad; pocas generovania dielcov sa JSON neparsuje opakovane.
+      # Seed-merge (vzor hardware_rules): pri starsom seed_version sa doplnia CHYBAJUCE
+      # default roly; existujuce roly (aj vedome prazdne = "bez ABS") sa nikdy neprepisu.
       def rules
         ensure_seeded
         data = JsonFileStore.read(path, copy: false)
@@ -113,17 +124,30 @@ module Noxun
         return deep_copy(SEED_RULES) unless value.is_a?(Hash)
 
         normalized = normalize_rules(value)
-        if normalized != value
-          if write(normalized)
-            Engine.log('abs rules: pravidla boli obmedzene na hrubky 1/2 mm') if defined?(Engine)
+        merged, seed_stale = merge_seed_roles(normalized, data['seed_version'].to_i)
+        if merged != value || seed_stale
+          if write(merged)
+            Engine.log('abs rules: pravidla znormalizovane / doplnene nove default roly') if defined?(Engine)
             return JsonFileStore.read(path, copy: false)['rules']
           end
-          return normalized
+          return merged
         end
         value
       rescue StandardError => e
         Engine.log_error(e, 'AbsRules.load') if defined?(Engine)
         deep_copy(SEED_RULES)
+      end
+
+      # Dopln CHYBAJUCE roly zo SEED_RULES, ak subor vznikol pod starsim SEED_VERSION.
+      # Vrati [pravidla, seed_stale] — seed_stale=true si vynuti zapis (bump verzie
+      # v subore), aj ked ziadna rola nepribudla, aby sa merge nespustal pri kazdom loade.
+      def merge_seed_roles(rules, file_version)
+        return [rules, false] if file_version >= SEED_VERSION
+        out = deep_copy(rules)
+        SEED_RULES.each do |role, edges|
+          out[role] = deep_copy(edges) unless out.key?(role)
+        end
+        [out, true]
       end
 
       def ensure_seeded
@@ -132,7 +156,7 @@ module Noxun
       end
 
       def write(rules)
-        JsonFileStore.write(path, { 'std' => STD, 'rules' => rules })
+        JsonFileStore.write(path, { 'std' => STD, 'seed_version' => SEED_VERSION, 'rules' => rules })
       rescue StandardError => e
         Engine.log_error(e, 'AbsRules.write') if defined?(Engine)
         false
