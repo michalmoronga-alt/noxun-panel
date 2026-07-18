@@ -1,14 +1,54 @@
 <!-- Noxun Engine — panel (vanilla JS, ziadne CDN, slovensky). Verziu zobrazuje NX.init z Ruby. -->
-<!-- 2D nahlad (SVG), auto-apply (debounce), split locky, sekcie podla SYSTEM/06. -->
+<!-- V0.4.5 D1 kostra: Inspector pattern — identita hore, nahlad ako fixne OKNO so zoom/pan,
+     kontextove karty (nic=vkladacia / korpus=nastavenia / zona=karta pod nahladom / dielec=karta
+     s omrvinkou). Rezimy riadi body class mode-insert / mode-cab / mode-part (bridge.js). -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.2">
+<link rel="stylesheet" href="css/panel.css?v=0.4.4">
 
-<h1>Noxun Engine</h1>
-<p class="sub" id="verline">…</p>
+<div class="hdr"><h1>Noxun Engine</h1><span class="sub" id="verline">…</span></div>
 
-<!-- KARTA DIELCA (ABS editor) — zobrazi sa po vybere dielca (dvojklik do korpusu + klik na dielec) -->
+<!-- IDENTITA: co prave upravujem (bridge.js setIdbar) -->
+<div id="idbar" class="idbar"><span class="free">Nič nie je označené — návrh nového korpusu</span></div>
+
+<!-- NAHLAD: fixne okno + zoom/pan/fit (hlavny vizual panela) -->
+<fieldset class="pvbox">
+  <div class="pvtabs">
+    <button id="tabZones" class="on" onclick="setPreviewMode('zones')">Zóny</button>
+    <button id="tabFronts" onclick="setPreviewMode('fronts')">Čelá</button>
+    <button class="pvfit" onclick="fitPreview()" title="Prispôsobiť pohľad (reset zoomu)">⛶</button>
+  </div>
+  <svg id="preview" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet"></svg>
+  <div class="pvhint">Klik na zónu = výber · ťahaj priečku = posun · koliesko = zoom · ťahaj plochu = posun pohľadu</div>
+  <div class="zoneline">
+    <input id="zonesChk" type="checkbox" onchange="toggleZones()">
+    <label for="zonesChk">Zobraziť zóny (ghost) v modeli</label>
+  </div>
+</fieldset>
+
+<!-- KARTA ZONY: akcie kliknutej zony hned pod nahladom (actions.js refreshZoneUI) -->
+<fieldset id="zoneCard" style="display:none">
+  <legend>Zóna</legend>
+  <div id="zoneActive"></div>
+  <div id="leafActions">
+    <div class="zact"><label>Rozdeliť zvislo</label>
+      <select id="splitVCount"><option>2</option><option>3</option><option>4</option></select>
+      <button class="ghostbtn zbtn" onclick="splitZone('v')" disabled>na stĺpce</button></div>
+    <div class="zact"><label>Rozdeliť vodorovne</label>
+      <select id="splitHCount"><option>2</option><option>3</option><option>4</option></select>
+      <button class="ghostbtn zbtn" onclick="splitZone('h')" disabled>na riadky</button></div>
+    <div class="zact"><label>Police v zóne</label>
+      <select id="zoneShelves"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select>
+      <button class="ghostbtn zbtn" onclick="setZoneShelves()" disabled>nastav</button></div>
+  </div>
+  <div id="fieldEditor"></div>
+  <div class="btnrow">
+    <button class="danger zbtn" onclick="cleanZone()" disabled>Vyčistiť zónu (zruš delenie/police)</button>
+  </div>
+</fieldset>
+
+<!-- KARTA DIELCA (ABS editor) — plny kontext s omrvinkou spat na korpus -->
 <fieldset id="partCard" style="display:none">
-  <legend>Dielec</legend>
+  <div class="crumb"><span class="backlink" onclick="backToCabinet()" title="Späť na skrinku">‹ <span id="pcCab">—</span></span> › <b id="pcName2"></b></div>
   <div class="pchead" id="pcName"></div>
   <div class="pcdim" id="pcDim"></div>
   <div class="pcmat"><label>Materiál</label>
@@ -24,13 +64,20 @@
   <div id="edgeRows"></div>
 </fieldset>
 
-<!-- ZAKLADNE: typ + rozmery + svetle -->
-<fieldset>
-  <legend>Základné</legend>
+<!-- VKLADACIA KARTA (len ked nic nie je oznacene). Vyber sablony zije v sekcii
+     Sablony (funguje pre vklad AJ pre "Pouzi na oznaceny"); quick-pick sem pride v D2. -->
+<fieldset id="insertCard">
+  <legend>Nový korpus</legend>
   <div class="typerow">
     <label><input type="radio" name="ctype" value="lower" onchange="onTypeChange()"> Dolná</label>
     <label><input type="radio" name="ctype" value="upper" onchange="onTypeChange()"> Horná</label>
   </div>
+  <button class="primary wide" onclick="insertCabinet()">Vložiť korpus</button>
+</fieldset>
+
+<!-- ZAKLADNE: rozmery + svetle (spolocne pre navrh aj oznaceny korpus) -->
+<fieldset id="basicCard">
+  <legend>Základné</legend>
   <div class="row"><label>Šírka</label><input id="width" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
   <div class="row"><label>Výška</label><input id="height" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
   <div class="row"><label>Hĺbka</label><input id="depth" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
@@ -40,24 +87,7 @@
   <div class="row"><label>Úložná výška</label><input id="av_height" type="text" readonly><span class="unit">mm</span></div>
 </fieldset>
 
-<!-- MATERIALY (V0.3): projektove defaulty + korpusove overridy -->
-<details data-key="materials">
-  <summary>Materiály</summary>
-  <div class="body">
-    <div class="subhead">Projekt (predvolené pre všetky skrinky)</div>
-    <div class="hint">Zmena projektového materiálu sa prejaví na označenej skrinke hneď, na ostatných pri ich najbližšej úprave.</div>
-    <div class="matrow"><label>Korpus</label><select id="proj_body" onchange="onProjectMaterial('default_material_id', this.value)"></select></div>
-    <div class="matrow"><label>Čelá</label><select id="proj_front" onchange="onProjectMaterial('default_front_material_id', this.value)"></select></div>
-    <div class="matrow"><label>Chrbát</label><select id="proj_back" onchange="onProjectMaterial('default_back_material_id', this.value)"></select></div>
-    <div class="subhead">Táto skrinka (prázdne = dediť z projektu)</div>
-    <div class="hint" id="cabMatHint">Označ skrinku pre nastavenie jej materiálov.</div>
-    <div class="matrow"><label>Korpus</label><select id="cab_body" onchange="onCabinetMaterial('body', this.value)"></select></div>
-    <div class="matrow"><label>Čelá</label><select id="cab_front" onchange="onCabinetMaterial('front', this.value)"></select></div>
-    <div class="matrow"><label>Chrbát</label><select id="cab_back" onchange="onCabinetMaterial('back', this.value)"></select></div>
-  </div>
-</details>
-
-<!-- STROP -->
+<!-- KONSTRUKCIA per dielec (akordeony podla SYSTEM/06) -->
 <details data-key="top">
   <summary>Strop</summary>
   <div class="body">
@@ -81,7 +111,6 @@
   </div>
 </details>
 
-<!-- DNO + PODSTAVEC -->
 <details data-key="bottom">
   <summary>Dno &amp; podstavec</summary>
   <div class="body">
@@ -104,7 +133,6 @@
   </div>
 </details>
 
-<!-- BOKY -->
 <details data-key="sides">
   <summary>Boky</summary>
   <div class="body">
@@ -112,7 +140,6 @@
   </div>
 </details>
 
-<!-- CHRBAT -->
 <details data-key="back">
   <summary>Chrbát</summary>
   <div class="body">
@@ -132,7 +159,6 @@
   </div>
 </details>
 
-<!-- CELA -->
 <details data-key="fronts">
   <summary>Čelá</summary>
   <div class="body">
@@ -145,7 +171,7 @@
   </div>
 </details>
 
-<!-- KOVANIE (V0.4 faza 1) -->
+<!-- KOVANIE (V0.4) -->
 <details data-key="hardware">
   <summary>Kovanie</summary>
   <div class="body">
@@ -157,51 +183,36 @@
   </div>
 </details>
 
-<!-- ZONY (NAHLAD) -->
-<details data-key="zones" open>
-  <summary>Zóny (náhľad)</summary>
+<!-- MATERIALY (V0.3): projektove defaulty + korpusove overridy (projektova cast ide v D2 do okna) -->
+<details data-key="materials">
+  <summary>Materiály</summary>
   <div class="body">
-    <div class="pvtabs">
-      <button id="tabZones" class="on" onclick="setPreviewMode('zones')">Zóny</button>
-      <button id="tabFronts" onclick="setPreviewMode('fronts')">Čelá</button>
-    </div>
-    <svg id="preview" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet"></svg>
-    <div class="pvhint">Klik na zónu = výber. Ťahaj priečku pre posun. Náhľad funguje aj pred vložením.</div>
-
-    <div id="zoneActive">Žiadna zóna neoznačená. Klikni na pole v náhľade.</div>
-
-    <!-- listova zona: delenie / police -->
-    <div id="leafActions">
-      <div class="zact"><label>Rozdeliť zvislo</label>
-        <select id="splitVCount"><option>2</option><option>3</option><option>4</option></select>
-        <button class="ghostbtn zbtn" onclick="splitZone('v')" disabled>na stĺpce</button></div>
-      <div class="zact"><label>Rozdeliť vodorovne</label>
-        <select id="splitHCount"><option>2</option><option>3</option><option>4</option></select>
-        <button class="ghostbtn zbtn" onclick="splitZone('h')" disabled>na riadky</button></div>
-      <div class="zact"><label>Police v zóne</label>
-        <select id="zoneShelves"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select>
-        <button class="ghostbtn zbtn" onclick="setZoneShelves()" disabled>nastav</button></div>
-    </div>
-
-    <!-- delena zona: rozmery poli + locky -->
-    <div id="fieldEditor"></div>
-
-    <div class="btnrow">
-      <button class="danger zbtn" onclick="cleanZone()" disabled>Vyčistiť zónu (zruš delenie/police)</button>
-    </div>
-    <div id="zoneTree"><div class="muted">Žiadny označený korpus.</div></div>
-    <div class="zoneline">
-      <input id="zonesChk" type="checkbox" onchange="toggleZones()">
-      <label for="zonesChk">Zobraziť zóny (ghost) v modeli</label>
-    </div>
+    <div class="subhead">Projekt (predvolené pre všetky skrinky)</div>
+    <div class="hint">Zmena projektového materiálu sa prejaví na označenej skrinke hneď, na ostatných pri ich najbližšej úprave.</div>
+    <div class="matrow"><label>Korpus</label><select id="proj_body" onchange="onProjectMaterial('default_material_id', this.value)"></select></div>
+    <div class="matrow"><label>Čelá</label><select id="proj_front" onchange="onProjectMaterial('default_front_material_id', this.value)"></select></div>
+    <div class="matrow"><label>Chrbát</label><select id="proj_back" onchange="onProjectMaterial('default_back_material_id', this.value)"></select></div>
+    <div class="subhead">Táto skrinka (prázdne = dediť z projektu)</div>
+    <div class="hint" id="cabMatHint">Označ skrinku pre nastavenie jej materiálov.</div>
+    <div class="matrow"><label>Korpus</label><select id="cab_body" onchange="onCabinetMaterial('body', this.value)"></select></div>
+    <div class="matrow"><label>Čelá</label><select id="cab_front" onchange="onCabinetMaterial('front', this.value)"></select></div>
+    <div class="matrow"><label>Chrbát</label><select id="cab_back" onchange="onCabinetMaterial('back', this.value)"></select></div>
   </div>
 </details>
 
-<!-- SABLONY -->
+<!-- STRUKTURA ZON (strom — prehlad a vyber; akcie su v karte zony pod nahladom) -->
+<details data-key="zones">
+  <summary>Štruktúra zón</summary>
+  <div class="body">
+    <div id="zoneTree"><div class="muted">Žiadny označený korpus.</div></div>
+  </div>
+</details>
+
+<!-- SABLONY: sprava (v D2 sa presunie do vlastneho okna; rychly vyber je vo vkladacej karte) -->
 <details data-key="templates">
   <summary>Šablóny</summary>
   <div class="body">
-    <div class="hint">Šablóny sú filtrované podľa typu korpusu (dolná/horná).</div>
+    <div class="hint">Výber šablóny naplní panel (vklad = tlačidlo hore); na označený korpus sa použije až tlačidlom nižšie. Filtrované podľa typu.</div>
     <div class="row"><label>Šablóna</label>
       <select id="template" onchange="onTemplateChange()"><option value="">— vyber —</option></select>
     </div>
@@ -215,22 +226,22 @@
   </div>
 </details>
 
-<p class="selinfo" id="selinfo">Nič nie je označené.</p>
-<button class="primary wide" onclick="insertCabinet()">Vložiť nový korpus</button>
+<!-- pri oznacenom korpuse: vlozenie dalsieho s aktualnymi hodnotami (sekundarna akcia) -->
+<button class="ghostbtn wide insertmore" onclick="insertCabinet()">+ Vložiť ďalší korpus s týmito hodnotami</button>
 
 <div id="status">Pripravené.</div>
 
 <!-- Poradie skriptov je kontrakt: errors prvy (chytac), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.4.2"></script>
-<script src="js/core.js?v=0.4.2"></script>
-<script src="js/form.js?v=0.4.2"></script>
-<script src="js/zone_tree.js?v=0.4.2"></script>
-<script src="js/preview.js?v=0.4.2"></script>
-<script src="js/actions.js?v=0.4.2"></script>
-<script src="js/bridge.js?v=0.4.2"></script>
-<script src="js/materials.js?v=0.4.2"></script>
-<script src="js/part_card.js?v=0.4.2"></script>
-<script src="js/hardware.js?v=0.4.2"></script>
-<script src="js/boot.js?v=0.4.2"></script>
+<script src="js/errors.js?v=0.4.4"></script>
+<script src="js/core.js?v=0.4.4"></script>
+<script src="js/form.js?v=0.4.4"></script>
+<script src="js/zone_tree.js?v=0.4.4"></script>
+<script src="js/preview.js?v=0.4.4"></script>
+<script src="js/actions.js?v=0.4.4"></script>
+<script src="js/bridge.js?v=0.4.4"></script>
+<script src="js/materials.js?v=0.4.4"></script>
+<script src="js/part_card.js?v=0.4.4"></script>
+<script src="js/hardware.js?v=0.4.4"></script>
+<script src="js/boot.js?v=0.4.4"></script>
