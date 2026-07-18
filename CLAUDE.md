@@ -10,7 +10,7 @@ GitHub: https://github.com/michalmoronga-alt/noxun-panel
 - PR popis po slovensky: čo sa mení z pohľadu používateľa + ako testované (SkAgent/MCP výsledky). Malé PR > obrie PR — deliť po celkoch.
 - Commit messages: vecné, slovensky/anglicky konzistentne s históriou, trailer `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`.
 - Paralelné úlohy: každá vo vlastnej vetve (agenti: worktree izolácia), konflikty rieši integrácia pred PR.
-- **Codex kontrolné body (povinné):** PRED implementáciou dávky = skill `codex-audit` (adversarial audit návrhu cez lokálny Codex CLI); PO odoslaní PR = skill `codex-po-pr` (budík ~10 min → review thready → oprava → reply s hashom → „môžeš mergovať"). Oba v `.claude/skills/`.
+- **Codex kontrolné body:** PRED implementáciou dávky = skill `codex-audit` (adversarial audit návrhu cez Codex CLI — povinný na Michalovom lokálnom prostredí; v prostredí bez Codex CLI/companion runtime krok NEblokuje — ohlás, že audit treba spustiť lokálne, a pokračuj); PO odoslaní PR = skill `codex-po-pr` (budík ~10 min → review thready → oprava → reply s hashom → „môžeš mergovať"). Oba v `.claude/skills/`.
 
 ## Špecifikácia a kontext (všetko v tomto repe)
 
@@ -20,7 +20,7 @@ GitHub: https://github.com/michalmoronga-alt/noxun-panel
 
 ## Testovanie (záväzné pravidlá)
 
-- **Automatické testy (V0.3.4+):** headless sada `ruby tests/run_all.rb` beží v GitHub Actions na každý push/PR (190+ testov; lokálne `scripts\run_tests.ps1`, vyžaduje standalone Ruby v `C:\Ruby32-x64`) + JS testy výrazov `node tests/js/run_expr_tests.mjs` (CI krok node). In-SketchUp runner `scripts\run_su_tests.ps1` (deploy → inštancia nad kópiou ENGINEtests.skp → poll → výsledok; ~50 scenárov, ~2,5 min; výsledkový grep až PO dobehu — output sa dopisuje) — spúšťať pri zmenách builderov/observerov; overuje geometriu plán↔model a undo scenáre.
+- **Automatické testy (V0.3.4+):** headless sada `ruby tests/run_all.rb` beží v GitHub Actions na každý push/PR (190+ testov; lokálne `scripts\run_tests.ps1`, vyžaduje standalone Ruby v `C:\Ruby32-x64`) + JS testy výrazov `node tests/js/test_expr.js` (CI krok node). In-SketchUp runner `scripts\run_su_tests.ps1` (deploy → inštancia nad kópiou ENGINEtests.skp → poll → výsledok; ~50 scenárov, ~2,5 min; výsledkový grep až PO dobehu — output sa dopisuje) — spúšťať pri zmenách builderov/observerov; overuje geometriu plán↔model a undo scenáre.
 - Interaktívny kanál: MCP `mcp__vbo-sketchup__execute_ruby` (SketchUp 2026 + VBO SkAgent, port 7891); fallback file-bridge (`vbo_sk_agent\bridge\command.rb` → `result.json`, pozor na mtime pascu); overená slučka `-RubyStartup skript + kópia modelu` (vzor v `scripts\run_su_tests.ps1`). Deploy: `INSTALL_noxun_engine.ps1`.
 - **Testuje sa VÝHRADNE v testovacom projekte `_dev\ENGINEtests.skp`** (alebo neuloženom Untitled okne BEZ existujúcich NOXUN korpusov) — v ňom môžu agenti tvoriť/mazať čokoľvek. `_dev/` je gitignorované.
 - **NIKDY netestovať v okne so zákazkou** — pred testami vždy overiť `model.path`/titul okna (bridge vykonáva príkazy v každom okne, kde je zapnutý — bridge zapínať len v testovacom okne).
