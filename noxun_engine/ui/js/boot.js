@@ -6,4 +6,12 @@
       d.addEventListener('toggle', function(){ try { localStorage.setItem(k, d.open ? '1' : '0'); } catch(e){} });
     });
   }
-  window.onload = function(){ bindDetails(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupFieldEditorDelegation(); document.body.setAttribute('data-insert-kind', getInsertKind()); if (window.sketchup && sketchup.ready) sketchup.ready(); };
+  // V0.4.7e: staticke rozmerove polia s vyrazovou podporou (dynamicke — cela .fh
+  // a polia zon — pripajaju ich rendery; bc_quantity je POCET, vyrazy nema).
+  function bindExprFields(){
+    ['width','height','depth','thickness','floor_height','plinth_recess','rails_top_offset','rail_depth']
+      .forEach(function(id){ attachExprField(el(id), { flushFn: flushCabinetEditsNow }); });
+    ['ib_length','ib_width'].forEach(function(id){ attachExprField(el(id)); });
+    ['bc_length','bc_width'].forEach(function(id){ attachExprField(el(id), { flushFn: flushBoardEditsNow }); });
+  }
+  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupFieldEditorDelegation(); document.body.setAttribute('data-insert-kind', getInsertKind()); if (window.sketchup && sketchup.ready) sketchup.ready(); };

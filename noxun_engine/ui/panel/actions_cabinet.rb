@@ -52,12 +52,20 @@ module Noxun
 
         # V0.2c AUTO-APPLY: jedna zmena poľa (konstrukcia AJ cela) -> 1 rebuild, 1 undo krok.
         # Zachova strom zon (delenie/police/locky). Ticho ignoruje ak nie je oznaceny korpus.
+        # V0.4.7e (Codex expr audit, blocker): payload nesie snapshot cabinet_id z casu
+        # naplanovania debounce — oneskoreny zapis po prekliknuti na INY korpus sa ticho
+        # zahodi namiesto zasiahnutia nespravneho objektu (rovnaky guard ako doska).
         def handle_apply_all(payload)
           model = Sketchup.active_model
           cab = find_cabinet(model)
           return if cab.nil? # auto-apply bez vyberu = ticho (ziadny modal)
 
           data = parse(payload)
+          echo = data['cabinet_id'].to_s
+          if !echo.empty? && echo != Store.get(cab, 'cabinet_id').to_s
+            Engine.log("apply_all zahodeny — echo #{echo} nesedi s vyberom #{Store.get(cab, 'cabinet_id')}")
+            return
+          end
           params = existing_params(cab)
           PARAM_KEYS.each do |k|
             params[k] = data[k] if data.key?(k)

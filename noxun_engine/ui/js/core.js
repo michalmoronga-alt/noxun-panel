@@ -109,7 +109,9 @@
     fillSheetSelectFiltered(el('cab_back'), true, thMatch(backTh));
   }
   function val(id){ var e = el(id); return e ? e.value : null; }
-  function numv(id){ var e = el(id); return e ? parseFloat(e.value) : NaN; }
+  // V0.4.7e: numv cita cez evalDim — nahlad/svetle rozmery/filtre vidia hodnotu
+  // vyrazu, nie parseFloat orezanie ('650-36' NIE JE 650).
+  function numv(id){ var e = el(id); return e ? evalDim(e.value) : NaN; }
   function setVal(id, v){ var e = el(id); if (e && v !== null && v !== undefined) e.value = v; }
   function setNum(id, v){ var e = el(id); if (e && v !== null && v !== undefined) e.value = String(parseFloat(v)); }
   function getType(){ var r = document.querySelector('input[name=ctype]:checked'); return r ? r.value : 'lower'; }

@@ -31,10 +31,15 @@
       var c = z.split.cuts[i] || {size:null,locked:false};
       var sz = Math.round(z.split.sizes[i]);
       html += '<div class="fldrow"><span class="fldn">'+axisLbl+' '+(i+1)+'</span>' +
-        '<input type="number" step="1" value="'+sz+'" data-zid="'+esc(z.id)+'" data-idx="'+i+'">' +
+        '<input type="text" value="'+sz+'" data-zid="'+esc(z.id)+'" data-idx="'+i+'">' +
         '<div class="lockbtn'+(c.locked?' on':'')+'" title="Zamknúť rozmer" data-zid="'+esc(z.id)+'" data-idx="'+i+'">'+(c.locked?'🔒':'🔓')+'</div></div>';
     }
     box.innerHTML = html;
+    // V0.4.7e: vyrazy v poliach zon — commit (Enter/blur) prepise pole cislom
+    // a dispatchne 'change', ktory chyti delegacia nizsie.
+    box.querySelectorAll('input[data-zid]').forEach(function(inp){
+      attachExprField(inp, { commitEv: 'change' });
+    });
   }
   // Jeden listener na kontajneri — prezije kazdy re-render riadkov.
   var fieldEditorBound = false;
@@ -57,7 +62,10 @@
     var node0 = navTree(sanitizeTree(currentZoneTree), pathOf(localId));
     if (!node0 || !node0.split) return;
     var locked = node0.split.cuts[index] ? node0.split.cuts[index].locked : false;
-    var sz = (value===''? null : parseFloat(value));
+    // V0.4.7e: evalDim (vyraz uz je commitnuty na cislo, toto je belt-and-braces);
+    // neplatny vstup NEmeni strom (parseFloat by '650-36' orezal na 650)
+    var sz = (value===''? null : evalDim(value));
+    if (sz !== null && isNaN(sz)) return;
     if (sz==null){
       // auto: toto pole na nil (ostatne necham; resolve ho rovnomerne dopocita)
       var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localId));
@@ -143,6 +151,9 @@
 
   // --- korpus akcie ---
   function insertCabinet(){
+    // V0.4.7e (Codex GH #35): vlozenie MUSI prejst validaciou — neplatny rozmer
+    // ('650mm') by sa inak ticho zmenil na default a neplatna vyska cela na auto.
+    if (!validateFields()){ NX.setStatus('Skontroluj červené polia (neplatný rozmer).', true); return; }
     var p = collectAll(); p.zone_tree = currentZoneTree;
     if (window.sketchup && sketchup.insert_cabinet) sketchup.insert_cabinet(JSON.stringify(p));
   }
