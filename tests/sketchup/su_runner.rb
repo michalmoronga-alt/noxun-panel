@@ -551,7 +551,11 @@ module NoxunSuRunner
          (cfg['length'].to_f - 500.0).abs < 0.01 && (cfg['thickness'].to_f - 18.0).abs < 0.01 &&
          (mm(tb.depth) - 18.0).abs <= TOL)
       # REJECT scenar (Codex audit d, blocker 1): material zmizne z katalogu ->
-      # absorpcia musi scale VRATIT (nie absorbovat ani nechat skoseny stav)
+      # absorpcia musi scale VRATIT (nie absorbovat ani nechat skoseny stav).
+      # PRESNY povodny zaznam si odlozime a vratime (Codex GH #34): pri manualnom
+      # spusteni runnera z konzoly bezi test nad REALNYM %APPDATA% katalogom —
+      # hardcoded seed by prepisal pouzivatelske upravy (ceny, formaty...).
+      state[:s5_saved_sheet] = e::JsonFileStore.deep_copy(e::Materials.sheet('K009_PW_DTDL_18'))
       e::Materials.delete_sheet('K009_PW_DTDL_18')
       model.start_operation('SU-TEST user scale board no-material', true)
       b.transformation = b.transformation * Geom::Transformation.scaling(ORIGIN, 1.5, 1.0, 1.0)
@@ -563,13 +567,8 @@ module NoxunSuRunner
       clean = e::ScaleWatch.scale_factors(b.transformation).nil?
       ok("async S5: reject bez katalogoveho materialu — config drzi (#{cfg['length']}) a transform je vrateny cisty (#{clean})",
          (cfg['length'].to_f - 500.0).abs < 0.01 && clean && b.valid?)
-      # obnov katalogovy zaznam (seed tvar) pre pripadne dalsie kroky
-      e::Materials.upsert_sheet(
-        'material_id' => 'K009_PW_DTDL_18', 'family' => 'Kronospan K009 PW',
-        'manufacturer' => 'Kronospan', 'decor' => 'K009 PW', 'type' => 'DTDL',
-        'thickness' => 18.0, 'grain' => 'length', 'price_per_m2' => 12.5,
-        'sheet_size' => [2800.0, 2070.0], 'color' => [198, 168, 122]
-      )
+      # obnov PRESNY povodny zaznam (nie seed — respektuje pouzivatelske upravy)
+      e::Materials.upsert_sheet(state[:s5_saved_sheet]) if state[:s5_saved_sheet]
       cleanup(model)
       log_line('=== KONIEC SUBORU ===')
       done.call if done
