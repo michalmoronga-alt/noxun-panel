@@ -41,7 +41,14 @@ module Noxun
         leaves = zones.select { |z| leaf?(z) }
         return if leaves.empty?
 
-        tag = model.layers[TAG] || model.layers.add(TAG)
+        # D-04 (19.7.): novy tag vznika VYPNUTY — ghosty v novom modeli nezavadzaju
+        # (klik na zony primarne cez 2D nahlad panela); checkbox ich kedykolvek zapne.
+        # Existujuci tag drzi pouzivatelovu volbu.
+        tag = model.layers[TAG] || begin
+          t = model.layers.add(TAG)
+          t.visible = false
+          t
+        end
         mats = ensure_materials(model)
         tr = clean_transform(inst.transformation)
         leaves.each_with_index do |z, i|
@@ -136,9 +143,10 @@ module Noxun
         tag.visible?
       end
 
+      # D-04: bez tagu (cerstvy model) je default VYPNUTE.
       def visible?(model)
         tag = model.layers[TAG] || model.layers[OLD_TAG]
-        tag ? tag.visible? : true
+        tag ? tag.visible? : false
       end
 
       # Migracia: stary tag NOXUN_SLOTY -> Noxun/Zóny. Ak novy neexistuje, premenuje stary

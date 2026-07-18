@@ -128,9 +128,10 @@
   .idbar .free { color: #78909c; font-size: 12px; }
   .idbar .warnchip { margin-left: auto; font-size: 11px; color: #b26a00; background: #fff3e0;
                      border: 1px solid #ffcc80; border-radius: 99px; padding: 0 8px; cursor: help; }
-  /* nahlad = fixne okno (zoom/pan v preview.js) */
+  /* nahlad = fixne okno (zoom/pan v preview.js). D-01a: vyska rastie s oknom
+     panela (38vh), min 210 px / max 640 px — velke okno = velky nahlad. */
   .pvbox { padding-top: 8px; }
-  #preview { height: 210px; }
+  #preview { height: clamp(210px, 38vh, 640px); }
   .pvtabs .pvfit { flex: 0 0 34px; font-size: 13px; }
   .zoneline { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #607d8b; margin-top: 4px; }
   /* omrvinka karty dielca */

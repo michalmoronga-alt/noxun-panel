@@ -66,6 +66,14 @@
   // aplikuje ju vyhradne tlacidlo "Pouzi sablonu na oznaceny", vratane zon zo sablony).
   function refreshPreview(){ validateFields(); renderPreview(); updateAvailable(); }
 
+  // D-02: debounce prekreslenia nahladu pri pisani (500 ms) — kazde pismeno uz
+  // netrha 2D nahlad; ostatne cesty (vyber, sablona, zony) kreslia okamzite.
+  var previewTimer = null;
+  function schedulePreview(){
+    if (previewTimer) clearTimeout(previewTimer);
+    previewTimer = setTimeout(function(){ previewTimer = null; renderPreview(); }, 500);
+  }
+
   // --- AUTO-APPLY (debounce 400 ms) ---
   // V0.4.7e: rozpisany VYRAZ vo fokusovanom poli nikdy nespusti apply ani nahlad
   // (medzistav '650-3' je validny vyraz s inou hodnotou) — aplikuje az Enter/blur
@@ -79,7 +87,7 @@
     }
     validateFields();
     refreshMaterialFilters();              // FIX 2: hrubka sa mohla zmenit -> prefiltruj material selecty
-    renderPreview();
+    schedulePreview();                     // D-02: nahlad sa neprekresluje pri kazdom pismene
     updateAvailable();
     if (!selectedCabId) return;            // nic oznacene -> len nahlad, ziadny rebuild
     if (applyTimer) clearTimeout(applyTimer);

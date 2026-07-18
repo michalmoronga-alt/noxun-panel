@@ -134,9 +134,9 @@ module Noxun
 
         FALLBACK_RGB = [216, 196, 160].freeze
         BOARD_TAG = 'Noxun/Dosky'
-        # DC scaletool maska osovych uchopov — rovnaka hodnota ako CabinetBuilder
-        # (Michal potvrdi vizualne; alternativa 120 pri opacnej semantike).
-        SCALE_TOOL_MASK = 7
+        # DC scaletool maska = uchopy na SKRYTIE (D-06): 120 skryje roviny+rohy,
+        # ostavaju ciste osi X/Y/Z. Rovnaka hodnota ako CabinetBuilder.
+        SCALE_TOOL_MASK = 120
 
         # Vlozi novu dosku nalezato na Z=0 vedla najpravejsieho NOXUN objektu.
         # Bez material_id v params sa doplni projektovy default (snapshot!).
@@ -302,9 +302,12 @@ module Noxun
           model.layers[BOARD_TAG] || model.layers.add(BOARD_TAG)
         end
 
+        # Zapis na instanciu AJ definiciu — scale tool cita atribut z definicie (D-06).
         def apply_scale_lock(inst)
           return unless inst && inst.valid?
           inst.set_attribute('dynamic_attributes', 'scaletool', SCALE_TOOL_MASK.to_s)
+          d = inst.respond_to?(:definition) ? inst.definition : nil
+          d.set_attribute('dynamic_attributes', 'scaletool', SCALE_TOOL_MASK.to_s) if d && d.valid?
         rescue StandardError => e
           Engine.log_error(e, 'BoardBuilder.apply_scale_lock') if defined?(Engine)
           nil
