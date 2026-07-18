@@ -104,7 +104,8 @@ module NxTest
   end
 end
 
-# --- Nacitanie testovanych modulov (poradie podla main.rb, bez SketchUp suborov).
+# --- Nacitanie testovanych modulov (zavislosti pred zavislymi; NIE presne poradie
+# main.rb — store/ids su tu az za vypoctovymi modulmi). Bez SketchUp suborov.
 # V SketchUpe su uz nacitane pluginom — nenacitavame druhykrat.
 unless NxTest::IN_SKETCHUP
   %w[
@@ -122,6 +123,7 @@ unless NxTest::IN_SKETCHUP
     core/ids
     core/templates
     core/cabinet_builder
+    core/board_builder
   ].each { |rel| require File.join(NxTest::ROOT, 'noxun_engine', rel) }
 end
 

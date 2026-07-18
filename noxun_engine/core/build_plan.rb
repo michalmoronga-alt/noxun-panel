@@ -1,8 +1,13 @@
 # frozen_string_literal: true
 # Noxun Engine — BuildPlan kontrakt (V0.3.4, plan stabilizacie). CISTO Ruby, ziadne SketchUp API.
 #
-# JEDINY zavazny tvar planu stavby: geometria (cabinet_builder), buduci kusovnik (V0.5)
-# aj VEPO export (SYSTEM/03) citaju TEN ISTY plan — ziadne samostatne pravdy.
+# JEDINY zavazny tvar PLANU STAVBY KORPUSU: builder z neho kresli geometriu a NA ENTITY
+# zapisuje vyrobny snapshot dielca (config s finalnym materialom/ABS po resolve_part).
+# AUTORITATIVNY VYROBNY ZAZNAM pre vystupy V0.5 (kusovnik, VEPO) je SNAPSHOT NA ENTITE
+# (standard 8.2/11.1) — plan je medzikrok stavby korpusu, nie zdroj exportu: finalny
+# material/ABS vznikaju az resolve_part a samostatne dosky (kind board) v plane korpusu
+# vobec nie su. Per-dielec kontrakt (validate_part!) je spolocny pre dielce korpusu AJ
+# dosky — jeden tvar vyrobnych dat, jeden validator.
 # Plan, ktory nepreide validate!, sa NIKDY nedostane do buildera ani do vystupov.
 #
 # PLAN (vystup Construction.build_plan):
@@ -70,10 +75,12 @@ module Noxun
       MIN_DIM = 0.01
 
       # Slovnik roli dielcov (standard 2.4) — validator odmietne nezname roly.
+      # free_panel = samostatna doska (V0.4.7, kind board); buduce roly dosiek
+      # (cover_side/cover_top/filler/worktop/plinth_board) pribudnu pri implementacii.
       ROLES = %w[
         side_left side_right bottom top back shelf divider_v divider_h
         front_door drawer_front flap cover_panel false_front rail_front rail_back
-        plinth gola_profile
+        plinth gola_profile free_panel
       ].freeze
 
       PRODUCTION_CLASSES = %w[sheet linear counted reference none].freeze
@@ -123,7 +130,10 @@ module Noxun
         role = pd[:role].to_s
         raise "BuildPlan: dielec #{key} ma neznamu rolu '#{role}'." unless ROLES.include?(role)
         raise "BuildPlan: dielec #{key} nema nazov." if pd[:name].to_s.strip.empty?
-        unless %i[korpus front].include?(pd[:material])
+        # :korpus/:front = signal dedenia materialu v korpuse (resolve_part);
+        # :concrete (V0.4.7) = material je uz KONKRETNY v configu (samostatne dosky,
+        # snapshot bez dedenia) — descriptor s :concrete NIKDY nejde cez resolve_part.
+        unless %i[korpus front concrete].include?(pd[:material])
           raise "BuildPlan: dielec #{key} ma neplatny material #{pd[:material].inspect}."
         end
         validate_triplet!(key, 'box', pd[:box], positive: true)
