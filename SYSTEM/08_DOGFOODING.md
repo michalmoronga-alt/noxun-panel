@@ -23,15 +23,21 @@
 
 - **D-04 · Ghost zóny vo viewporte zavadzajú** — neustále omylom klikané, dielce sa na ne prichytávajú. Rozmer ghostu je menší než skrinka ZÁMERNE (ghost = vnútorný svetlý priestor zóny, nie obrys korpusu). **Nápad Michal:** v SketchUp viewporte ghost len viditeľný, ale neklikateľný; klikanie na zóny nechať na 2D náhľad v paneli. **Technická poznámka:** SketchUp nevie „viditeľné ale nepreklikateľné" čisto (locked skupina sa stále vyberá); reálne možnosti: (a) predvolene ghosty vypnúť (checkbox „Zobraziť zóny" už existuje — stačí zmeniť default a klik na zónu ostáva v 2D náhľade), (b) nechať ako je, (c) locked ghost (klik ho vyberie, ale nič nerozbije — prichytávanie však ostáva). Súvisí s D-01/D-03 (2D náhľad musí byť dosť dobrý, aby zónové klikanie unieslo). *Stav: otázka na rozhodnutie.*
 
-## Otvorené otázky (čakajú na Michala)
+## Návrhy väčších celkov (na rozpracovanie)
 
-1. **D-05 materiály:** stačí navrhnutý rozsah (dosky + ABS pásky, pridať/upraviť/zmazať v okne Materiály projektu)? Alebo len rýchle „pridať dosku" a zvyšok neskôr?
-2. **D-01 náhľad:** preferuješ (a) náhľad rastúci s oknom, (b) samostatné veľké okno náhľadu, alebo (c) nastaviteľnú výšku?
-3. **D-04 ghosty:** vypnúť predvolene (klik na zóny primárne cez 2D náhľad) — áno/nie?
+- **D-08 · Režimové taby Inspectora: Korpus · Zóny · Čelá** (návrh Michal 19.7.) — dnešné taby nad náhľadom prepínajú LEN kresbu (Zóny/Čelá) a nastavenia sú nezávisle v 8 akordeónoch pod tým; návrh: taby = REŽIMY PRÁCE, ktoré prepínajú náhľad AJ zobrazené nastavenia. **Korpus** = kótovaný náhľad vonkajších rozmerov + konštrukčné sekcie; **Zóny** = zónový náhľad s drag priečkami (existuje — „čistá 🚀") + karta zóny/štruktúra; **Čelá** = náhľad čiel + riadky čiel; neskôr možný tab **Materiály** (prehľad použitých materiálov + ABS pod jednou strechou). Mimo tabov ostávajú režimy vkladania/dielca/dosky. *Stav: koncept schválený obojstranne, konkrétne rozdelenie sekcií do tabov = návrh na schválenie (dávka 3).*
+- **D-09 · Snap body pri presúvaní priečok** (1/4, 1/2, 3/4…) v zónovom náhľade. *Stav: nápad, po D-08.*
+- **D-10 · Presúvanie/úprava čiel priamo v náhľade** (ako drag priečok). *Stav: nápad, po D-08.*
+
+## Rozhodnuté 19.7. (Michal)
+
+1. **D-05 materiály:** plná správa katalógu (dosky + ABS, pridať/upraviť/zmazať) v okne Materiály projektu. → **dávka 2**
+2. **D-01 náhľad:** (a) náhľad rastie s veľkosťou okna panela. → **dávka 1**
+3. **D-04 ghosty:** vypnúť predvolene; klik na zóny primárne cez 2D náhľad (checkbox na zapnutie ostáva). → **dávka 1**
 
 ## Vyriešené
 
-- **D-03 (čiastočne)** — police fungujú cez kartu zóny; howto odovzdané 19.7., ostáva UX discoverability (viď vyššie).
+- **D-03 · Police** — falošný poplach, funkcia existuje (karta zóny), Michal našiel. Discoverability nápady ostávajú v UX sekcii ako nízka priorita.
 
 ## Postrehy, ktoré potešili (nechávame tak)
 
