@@ -323,7 +323,10 @@ module Noxun
 
         # Panel po absorpcii ukazoval STARE rozmery az do reselect-u (znama medzera
         # od V0.4.5) — obnovi sa standardnym sync tickom; bez otvoreneho panela no-op.
+        # Multi-model guard (Codex GH #36): debounced absorpcia na POZADOVOM modeli
+        # (macOS viac dokumentov) nesmie prepisat Inspector aktivneho dokumentu.
         def refresh_panel(model)
+          return unless model == Sketchup.active_model
           Panel.push_selected(model) if defined?(Panel)
         rescue StandardError => e
           Engine.log_error(e, 'ScaleWatch.refresh_panel')
