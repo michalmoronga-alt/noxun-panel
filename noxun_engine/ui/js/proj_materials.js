@@ -94,6 +94,7 @@
     mdEditing = { kind: 'edge', id: id };
     el('me_decor').value = a ? (a.decor || '') : '';
     el('me_thickness').value = a ? String(parseFloat(a.thickness).toFixed(1)) : '1.0';
+    el('me_thickness').disabled = !!a; // hrubka = variant (ID _10/_20), pri edite nemenna
     el('me_price').value = a ? (a.price_per_bm || 0) : '0';
     el('me_color').value = rgbToHex(a ? a.color : null);
     el('mdEdgeForm').style.display = '';

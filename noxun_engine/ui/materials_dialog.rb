@@ -254,7 +254,14 @@ module Noxun
             id = Materials.generate_edge_id(data['decor'], th)
           else
             id = data['abs_id'].to_s
-            return set_status('ABS páska sa nenašla — obnov okno.', true) unless Materials.edge(id)
+            existing = Materials.edge(id)
+            return set_status('ABS páska sa nenašla — obnov okno.', true) unless existing
+            # Hrubka ABS je pri edite NEMENNA (zrkadlo sheet guardu, Codex GH #39):
+            # ID nesie hrubku (_10/_20) a dielce ju drzia len cez ID — zmena by ich
+            # potichu prepla na inu hranu a ID by klamalo.
+            if (existing['thickness'].to_f - th).abs > 0.01
+              return set_status('Hrúbka definuje ABS variant — pre inú hrúbku pridaj novú pásku.', true)
+            end
           end
           rec = data.merge('abs_id' => id, 'thickness' => th)
           return set_status('Uloženie katalógu zlyhalo.', true) unless Materials.upsert_edge(rec)

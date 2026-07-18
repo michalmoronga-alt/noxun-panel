@@ -331,6 +331,12 @@ module NoxunSuRunner
       e::MaterialsDialog.handle_delete_sheet({ 'material_id' => 'K009_PW_DTDL_18' }.to_json)
       ok('katalog: chranena predvolba sa neda zmazat',
          !e::Materials.sheet('K009_PW_DTDL_18').nil?)
+      # Codex GH #39: hrubka ABS pri edite nemenna (ID _10 nesmie zacat znamenat 2mm)
+      e::MaterialsDialog.handle_save_edge({ 'abs_id' => 'ABS_K009_10', 'decor' => 'K009 PW',
+                                            'thickness' => '2.0', 'price_per_bm' => '1' }.to_json, create: false)
+      abs10 = e::Materials.edge('ABS_K009_10')
+      ok('katalog: zmena hrubky existujucej ABS odmietnuta (ostava 1.0)',
+         !abs10.nil? && (abs10['thickness'].to_f - 1.0).abs < 0.01)
     ensure
       # uprac: dosku vrat na seed material a testovaci zaznam zmaz (uz nepouzity)
       e::BoardBuilder.rebuild(model, binst, { 'material_id' => 'K009_PW_DTDL_18' }) rescue nil
