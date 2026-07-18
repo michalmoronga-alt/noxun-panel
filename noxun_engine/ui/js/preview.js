@@ -3,12 +3,39 @@
   var dragState = null;
   function setPreviewMode(m){ previewMode=m; el('tabZones').classList.toggle('on', m==='zones'); el('tabFronts').classList.toggle('on', m==='fronts'); renderPreview(); }
 
+  // --- POHLAD (V0.4.5 D1): nahlad je fixne OKNO — SVG ma pevnu vysku (CSS) a viewBox
+  // je posuvatelne/zoomovatelne okno nad scenou v mm. Kym pouzivatel nezoomuje/nepanuje
+  // (pvUserView=false), pohlad automaticky sleduje celu skrinku (fit). Po manualnom
+  // zasahu pohlad DRZI (Michalov "lock") — reset tlacidlom ⛶ alebo pri zmene skrinky.
+  var pvView = null;        // {x,y,w,h} v mm sceny
+  var pvUserView = false;   // true = pouzivatel si pohlad nastavil sam
+  function sceneSize(){
+    var W = numv('width')||600, H = numv('height')||720;
+    return { w: W + 2*PV_PAD, h: H + 2*PV_PAD };
+  }
+  function fitPreview(){ pvUserView = false; pvView = null; renderPreview(); }
+  function applyViewBox(svg){
+    var base = sceneSize();
+    if (!pvUserView || !pvView) pvView = { x: 0, y: 0, w: base.w, h: base.h };
+    svg.setAttribute('viewBox', pvView.x + ' ' + pvView.y + ' ' + pvView.w + ' ' + pvView.h);
+  }
+  // Mapovanie px<->mm pri preserveAspectRatio meet (letterbox offsety).
+  function viewMapping(rect){
+    var s = Math.min(rect.width / pvView.w, rect.height / pvView.h);
+    return { s: s, ox: (rect.width - pvView.w * s) / 2, oy: (rect.height - pvView.h * s) / 2 };
+  }
+  function clientToScene(ev, rect){
+    var m = viewMapping(rect);
+    return { x: pvView.x + (ev.clientX - rect.left - m.ox) / m.s,
+             y: pvView.y + (ev.clientY - rect.top - m.oy) / m.s };
+  }
+
   function renderPreview(){
     var svg = el('preview'); if (!svg) return;
     var t = numv('thickness')||18, W = numv('width')||600, H = numv('height')||720;
     if (!(W>0 && H>0)){ svg.innerHTML=''; return; }
-    var pad = PV_PAD, vw = W + pad*2, vh = H + pad*2;
-    svg.setAttribute('viewBox', '0 0 ' + vw + ' ' + vh);
+    var pad = PV_PAD;
+    applyViewBox(svg);
     var fh = (getType()==='upper')?0:(numv('floor_height')||0);
     var topNone = val('top_mode')==='none';
     var S = [];
@@ -82,18 +109,62 @@
   // elementy v renderPreview; po prekresleni (napr. po apply) mohli byt na starych/nahradenych
   // uzloch — jedna z pricin, preco po prvom drag-u priecka prestala reagovat.
   var previewBound = false;
+  var panState = null, panMoved = false;
   function setupPreviewDelegation(){
     if (previewBound) return;
     var svg = el('preview'); if (!svg) return;
     svg.addEventListener('mousedown', function(ev){
       var t = closestClass(ev.target, 'divh');
-      if (t) startDivDrag(ev, t, svg);
+      if (t){ startDivDrag(ev, t, svg); return; }
+      startPan(ev); // pan pohladu (aj nad zonou — kratky tah bez pohybu ostava klikom)
     });
     svg.addEventListener('click', function(ev){
+      if (panMoved){ panMoved = false; return; } // tah pohladu nie je klik na zonu
       var t = closestClass(ev.target, 'zrect');
       if (t) pickZone(t.getAttribute('data-zid'));
     });
+    // Zoom kolieskom k bodu pod kurzorom. Limity: detail max 8x, oddialenie max 3x sceny.
+    svg.addEventListener('wheel', function(ev){
+      ev.preventDefault();
+      if (!pvView) return;
+      var rect = svg.getBoundingClientRect();
+      var base = sceneSize();
+      var k = ev.deltaY > 0 ? 1.2 : 1/1.2;
+      var nw = Math.min(Math.max(pvView.w * k, base.w / 8), base.w * 3);
+      var ratio = nw / pvView.w;
+      var pt = clientToScene(ev, rect);
+      pvView = { x: pt.x - (pt.x - pvView.x) * ratio, y: pt.y - (pt.y - pvView.y) * ratio,
+                 w: nw, h: pvView.h * ratio };
+      pvUserView = true;
+      svg.setAttribute('viewBox', pvView.x + ' ' + pvView.y + ' ' + pvView.w + ' ' + pvView.h);
+    }, { passive: false });
     previewBound = true;
+  }
+
+  // --- pan pohladu (tah prazdnej plochy / zony; priecky maju vlastny drag) ---
+  function startPan(ev){
+    panState = { sx: ev.clientX, sy: ev.clientY, vx: pvView ? pvView.x : 0, vy: pvView ? pvView.y : 0 };
+    panMoved = false;
+    document.addEventListener('mousemove', onPanMove);
+    document.addEventListener('mouseup', endPan);
+  }
+  function onPanMove(ev){
+    if (!panState || !pvView) return;
+    var dx = ev.clientX - panState.sx, dy = ev.clientY - panState.sy;
+    if (!panMoved && Math.abs(dx) + Math.abs(dy) < 5) return; // prah: klik ostava klikom
+    panMoved = true;
+    var svg = el('preview'); if (!svg) return;
+    var m = viewMapping(svg.getBoundingClientRect());
+    pvView.x = panState.vx - dx / m.s;
+    pvView.y = panState.vy - dy / m.s;
+    pvUserView = true;
+    svg.setAttribute('viewBox', pvView.x + ' ' + pvView.y + ' ' + pvView.w + ' ' + pvView.h);
+  }
+  function endPan(){
+    document.removeEventListener('mousemove', onPanMove);
+    document.removeEventListener('mouseup', endPan);
+    panState = null;
+    // panMoved necha nastavene — najblizsi click handler ho skonzumuje (potlaci pick zony)
   }
   // Vlastny closest (SVG elementy — spolahame sa len na getAttribute('class'), nie className).
   function closestClass(node, cls){
@@ -137,8 +208,9 @@
   function onDivDrag(ev){
     if (!dragState) return;
     var svg = dragState.svg; var rect = svg.getBoundingClientRect();
-    var W = (numv('width')||600) + 2*PV_PAD;
-    var scale = rect.width / W; // px per mm (viewBox scaled)
+    // px->mm cez aktualne view okno (D1 fix: povodny prepocet cez sirku korpusu by bol
+    // pri zoomnutom/panovanom pohlade nespravny — priecka by "utekala" kurzoru)
+    var scale = viewMapping(rect).s; // px per mm
     var d_mm = (dragState.axis==='v') ? (ev.clientX - dragState.startX)/scale : -(ev.clientY - dragState.startY)/scale;
     var sizes = dragState.sizes.slice();
     var i = dragState.idx;

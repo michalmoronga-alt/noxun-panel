@@ -1,4 +1,23 @@
   // ===================== Ruby -> JS =====================
+  // V0.4.5 D1: rezimy Inspectora — body class riadi viditelnost kontextovych kariet
+  // (CSS: mode-insert zobrazi vkladaciu kartu; mode-cab nastavenia korpusu; mode-part
+  // kartu dielca a skryje korpusove sekcie). Identita hore = setIdbar.
+  var lastCabForFit = null;
+  function setUiMode(mode){ document.body.className = 'mode-' + mode; }
+  function setIdbar(c){
+    var bar = el('idbar'); if (!bar) return;
+    if (!c){
+      bar.innerHTML = '<span class="free">Nič nie je označené — návrh nového korpusu</span>';
+      return;
+    }
+    var warns = c.warnings || [];
+    var wHtml = warns.length
+      ? ' <span class="warnchip" title="' + esc(warns.map(function(w){ return w.message; }).join('\n')) + '">⚠ ' + warns.length + '</span>'
+      : '';
+    bar.innerHTML = '<span class="cid">' + esc(c.cabinet_id || '?') + '</span>' +
+      '<span class="cname">' + esc(c.name || '') + '</span>' + wHtml;
+  }
+
   window.NX = {
     init: function(data){
       DEFAULTS = data.defaults || { lower: {}, upper: {} };
@@ -25,7 +44,10 @@
       refreshMaterialFilters(); // FIX 2: prefiltruj podla hrubok tohto korpusu (pred nastavenim hodnot)
       setCabinetMaterials(c); // V0.3 korpusove material selecty (prazdne = dedi)
       renderFilteredTemplates();
-      el('selinfo').innerHTML = 'Označený: <b>' + (c.cabinet_id || '?') + '</b>';
+      setIdbar(c);
+      setUiMode(c.part_card ? 'part' : 'cab');
+      // pohlad: ina skrinka -> fit; ta ista (auto-apply rebuild) -> pohlad DRZI
+      if (c.cabinet_id !== lastCabForFit){ lastCabForFit = c.cabinet_id; fitPreview(); }
       // svetle rozmery presne z backendu ak su
       if (c.available_width!=null) setVal('av_width', Math.round(c.available_width));
       if (c.available_depth!=null) setVal('av_depth', Math.round(c.available_depth));
@@ -36,9 +58,11 @@
       refreshZoneUI();
     },
     clearSelected: function(){
-      el('selinfo').textContent = 'Nič nie je označené (náhľad z hodnôt panela).';
+      setIdbar(null);
+      setUiMode('insert');
       setSelected(null);
       activeZoneId = null; frontItems = null;
+      if (lastCabForFit !== null){ lastCabForFit = null; fitPreview(); }
       renderPartCard(null);      // schovaj kartu dielca
       renderHardware(null, []);  // kovanie len pre oznacenu skrinku
       clearCabinetMaterials();   // korpusove material selecty na "dedi" + disabled

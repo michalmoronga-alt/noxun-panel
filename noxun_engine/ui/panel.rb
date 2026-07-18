@@ -77,6 +77,8 @@ module Noxun
           # V0.4 kovanie: rucny pocet / vypnutie / reset polozky + editor pravidiel
           cb(dlg, 'set_hardware_override') { |p| handle_set_hardware_override(p) }
           cb(dlg, 'open_rules')            { |_p| RulesDialog.show }
+          # V0.4.5 D1: omrvinka karty dielca — spat na korpus (oznaci ho v modeli)
+          cb(dlg, 'select_cabinet')        { |p| handle_select_cabinet(p) }
           # Diagnostika: JS chyby z HtmlDialogu (window.onerror) -> Engine.log. Priamo, NIE cez cb —
           # aby pripadna chyba v logovani nespustila set_status (dalsi execute_script) a slucku.
           dlg.add_action_callback('js_error') do |_ctx, msg|

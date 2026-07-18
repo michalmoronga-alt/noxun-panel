@@ -92,6 +92,17 @@ module Noxun
           end
         end
 
+        # V0.4.5 D1: omrvinka karty dielca ("‹ CAB-003") — oznaci korpus v modeli
+        # (vyjde z editu komponentu) a panel sa prepne na kontext skrinky.
+        def handle_select_cabinet(payload)
+          model = Sketchup.active_model
+          cid = parse(payload)['cabinet_id'].to_s
+          cab = find_cabinet_by_id(model, cid)
+          return set_status('Skrinka sa nenasla.', true) if cab.nil?
+          reselect(model, cab)
+          push_selected(model)
+        end
+
       end
 
       # Observer musi zit ako objekt s referenciou (Panel modul ju drzi v @observer).

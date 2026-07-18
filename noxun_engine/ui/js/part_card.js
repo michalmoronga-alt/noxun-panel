@@ -16,6 +16,9 @@
     var box = el('partCard');
     if (!pc){ box.style.display='none'; return; }
     box.style.display='';
+    // V0.4.5 D1: omrvinka "‹ CAB-003 › Bok lavy" — klik na CAB = spat na skrinku
+    if (el('pcCab')) el('pcCab').textContent = pc.cabinet_id || '?';
+    if (el('pcName2')) el('pcName2').textContent = pc.name || roleLabel(pc.role);
     el('pcName').innerHTML = '<b>'+esc(pc.name || roleLabel(pc.role))+'</b> · '+esc(roleLabel(pc.role));
     el('pcDim').textContent = fmtmm(pc.length)+' × '+fmtmm(pc.width)+' × '+fmtmm(pc.thickness)+' mm';
     // FIX 2: material dielca len z hrubkovo kompatibilnych dosiek (nekompatibilne disabled). Cela
@@ -95,6 +98,12 @@
     var v = el('pcMaterial').value;
     if (window.sketchup && sketchup.set_part_material)
       sketchup.set_part_material(JSON.stringify({ role_key: partCard.role_key, material_id: v }));
+  }
+  // Spat z karty dielca na skrinku (omrvinka) — Ruby oznaci korpus a poslе novy stav.
+  function backToCabinet(){
+    if (!partCard) return;
+    if (window.sketchup && sketchup.select_cabinet)
+      sketchup.select_cabinet(JSON.stringify({ cabinet_id: partCard.cabinet_id }));
   }
   function onEdgeChange(code, value){
     if (!partCard) return;
