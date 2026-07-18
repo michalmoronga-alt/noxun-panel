@@ -20,9 +20,18 @@
     if (!p || !p.board_id) return;
     if (window.sketchup && sketchup.set_board_fields) sketchup.set_board_fields(JSON.stringify(p));
   }
+  // Okamzity flush (Enter commit) — VZDY najprv zrusi bezaici timeout, inak by
+  // stary timer predcasne flushol nasledujuci novy edit (Codex expr audit).
+  function flushBoardEditsNow(){
+    if (boardTimer){ clearTimeout(boardTimer); boardTimer = null; }
+    flushBoardEdits();
+  }
   // Obycajne polia (name/length/width/quantity/grain_direction): akumulacia + debounce 400 ms.
+  // V0.4.7e: rozmerove polia s ROZPISANYM vyrazom sa NEakumuluju (surovy string by
+  // Ruby to_f orezalo) — hodnota pride az z Enter/blur commitu ako ciste cislo.
   function onBoardField(key, value){
     if (!boardCard) return;
+    if ((key === 'length' || key === 'width') && isExprStr(value)) return;
     if (!boardPending || boardPending.board_id !== boardCard.board_id){
       boardPending = { board_id: boardCard.board_id, fields: {} };
     }
@@ -49,6 +58,12 @@
     var e = el(id);
     if (e && document.activeElement !== e) e.value = (v === null || v === undefined) ? '' : v;
   }
+  // Editovatelny rozmer: zaokruhlenie na 2 des. miesta bez straty desatin.
+  function fmtdim(v){
+    if (v === null || v === undefined || v === '') return '';
+    var n = parseFloat(v);
+    return isNaN(n) ? '' : String(Math.round(n * 100) / 100);
+  }
 
   function renderBoardCard(bc){
     boardCard = bc;
@@ -58,8 +73,10 @@
     box.style.display = '';
     if (el('bcHead')) el('bcHead').innerHTML = '<b>' + esc(bc.name || 'Doska') + '</b> · ' + esc(bc.role_label || bc.role || '');
     bset('bc_name', bc.name || '');
-    bset('bc_length', fmtmm(bc.length));
-    bset('bc_width', fmtmm(bc.width));
+    // fmtdim (nie fmtmm): editovatelny rozmer nesmie vizualne stratit desatiny
+    // (10/4 = 2.5 sa nesmie ukazat ako 3, ked ulozene je 2.5)
+    bset('bc_length', fmtdim(bc.length));
+    bset('bc_width', fmtdim(bc.width));
     bset('bc_quantity', bc.quantity || 1);
     if (el('bc_role')) el('bc_role').value = bc.role_label || bc.role || '';
     if (el('bc_thickness')) el('bc_thickness').value = fmtmm(bc.thickness);
@@ -175,10 +192,20 @@
     if (el('ib_grain') && sheet && sheet.grain) el('ib_grain').value = sheet.grain;
   }
   function insertBoard(){
+    // V0.4.7e: rozmery cez evalDim — vyraz sa vyhodnoti, nezmysel sa odmietne
+    // (surovy '650-36' by Ruby to_f orezalo na 650)
+    var lRaw = el('ib_length') ? el('ib_length').value : '';
+    var wRaw = el('ib_width') ? el('ib_width').value : '';
+    var l = String(lRaw).trim() === '' ? '' : evalDim(lRaw);
+    var w = String(wRaw).trim() === '' ? '' : evalDim(wRaw);
+    if ((l !== '' && isNaN(l)) || (w !== '' && isNaN(w))){
+      NX.setStatus('Skontroluj rozmery dosky (neplatný výraz).', true);
+      return;
+    }
     var payload = {
       name: (el('ib_name') ? el('ib_name').value : ''),
-      length: (el('ib_length') ? el('ib_length').value : ''),
-      width: (el('ib_width') ? el('ib_width').value : ''),
+      length: l,
+      width: w,
       material_id: (el('ib_material') ? el('ib_material').value : ''),
       grain_direction: (el('ib_grain') ? el('ib_grain').value : '')
     };

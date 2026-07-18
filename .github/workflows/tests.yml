@@ -13,3 +13,5 @@ jobs:
           ruby-version: '3.2'
       - name: Headless testy (bez SketchUpu)
         run: ruby tests/run_all.rb
+      - name: JS testy (evalDim parser vyrazovych poli)
+        run: node tests/js/test_expr.js

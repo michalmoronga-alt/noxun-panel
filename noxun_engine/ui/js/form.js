@@ -1,7 +1,18 @@
   // --- zber ---
+  // V0.4.7e: ciselne polia sa citaju cez evalDim — surovy vyrazovy string NIKDY
+  // neodide do Ruby (to_f/parseFloat by '650-36' ticho orezali na 650).
   function collectConstruction(){
     var out = { type: getType() };
-    CONSTRUCTION_FIELDS.forEach(function(f){ out[f.id] = val(f.id); });
+    CONSTRUCTION_FIELDS.forEach(function(f){
+      if (f.kind === 'num'){
+        var raw = val(f.id);
+        if (raw === null || String(raw).trim() === ''){ out[f.id] = ''; return; }
+        var v = evalDim(raw);
+        out[f.id] = isNaN(v) ? '' : v; // NaN neprejde validaciou; '' = Ruby default
+      } else {
+        out[f.id] = val(f.id);
+      }
+    });
     return out;
   }
   function collectFronts(){
@@ -14,24 +25,39 @@
       var locked = r.querySelector('.flock').checked;
       var wings = r.querySelector('.fw').value;
       var hasH = hv !== '';
+      var hNum = hasH ? evalDim(hv) : NaN; // vyraz vo vyske cela -> cislo (NaN blokuje apply cez validateFields)
       items.push({ id: r.dataset.frontId || newStableId('F'), type: type, mode: hasH ? 'fixed' : 'auto',
-        height: hasH ? hv : null, locked: hasH ? locked : false, wings: (type === 'door') ? wings : '1' });
+        height: hasH ? (isNaN(hNum) ? null : hNum) : null, locked: hasH ? locked : false, wings: (type === 'door') ? wings : '1' });
     }
     return { split_axis: 'height', gap: 3.0, gap_top: 2.0, gap_bottom: 2.0, gap_sides: 2.0, items: items };
   }
   function collectAll(){ var c = collectConstruction(); c.fronts = collectFronts(); return c; }
 
-  // --- validacia poli (clamp + cerveny okraj, ziadne modaly) ---
+  // --- validacia poli (cerveny okraj, ziadne modaly) ---
+  // V0.4.7e: cita cez evalDim (vyraz = hodnota); ROZPISANY vyraz vo fokusovanom
+  // poli sa preskoci (ani apply, ani cervene — hint bezi); COMMITNUTY neprazdny
+  // nezmysel je PO NOVOM chyba (predtym NaN ticho presiel) a blokuje apply.
   var LIMITS = { width:[200,3000], height:[200,3000], depth:[150,2000], thickness:[6,50],
                  floor_height:[0,500], plinth_recess:[0,300], rail_depth:[20,400], rails_top_offset:[0,500] };
   function validateFields(){
     var ok = true;
+    var ae = document.activeElement;
     for (var id in LIMITS){
       var e = el(id); if (!e) continue;
-      var v = parseFloat(e.value);
-      if (e.value === '' || isNaN(v)){ e.classList.remove('bad'); continue; }
+      if (e === ae && isExprStr(e.value)) continue; // rozpisany vyraz — nechaj tak
+      if (e.value === ''){ e.classList.remove('bad'); continue; }
+      var v = evalDim(e.value);
+      if (isNaN(v)){ e.classList.add('bad'); ok = false; continue; }
       var lo = LIMITS[id][0], hi = LIMITS[id][1];
       if (v < lo || v > hi){ e.classList.add('bad'); ok = false; } else { e.classList.remove('bad'); }
+    }
+    // vysky ciel (.fh) — vyraz sa vyhodnoti, committnuty nezmysel blokuje apply
+    var fhs = el('frontRows') ? el('frontRows').querySelectorAll('.fh') : [];
+    for (var i = 0; i < fhs.length; i++){
+      var f = fhs[i];
+      if (f === ae && isExprStr(f.value)) continue;
+      if (f.value.trim() === ''){ f.classList.remove('bad'); continue; }
+      if (isNaN(evalDim(f.value))){ f.classList.add('bad'); ok = false; } else { f.classList.remove('bad'); }
     }
     return ok;
   }
@@ -41,17 +67,42 @@
   function refreshPreview(){ validateFields(); renderPreview(); updateAvailable(); }
 
   // --- AUTO-APPLY (debounce 400 ms) ---
+  // V0.4.7e: rozpisany VYRAZ vo fokusovanom poli nikdy nespusti apply ani nahlad
+  // (medzistav '650-3' je validny vyraz s inou hodnotou) — aplikuje az Enter/blur
+  // commit, ktory pole prepise cistym cislom a onField zavola znova.
   function onField(){
+    var ae = document.activeElement;
+    if (ae && isExprInput(ae) && isExprStr(ae.value)){
+      if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; }
+      ae.classList.remove('bad');
+      return; // zivy nahlad "= X" kresli listener v expr.js
+    }
     validateFields();
     refreshMaterialFilters();              // FIX 2: hrubka sa mohla zmenit -> prefiltruj material selecty
     renderPreview();
     updateAvailable();
     if (!selectedCabId) return;            // nic oznacene -> len nahlad, ziadny rebuild
     if (applyTimer) clearTimeout(applyTimer);
-    applyTimer = setTimeout(function(){
-      if (!validateFields()) { NX.setStatus('Skontroluj červené polia (mimo rozsahu).', true); return; }
-      if (window.sketchup && sketchup.apply_all) sketchup.apply_all(JSON.stringify(collectAll()));
-    }, 400);
+    var cabSnapshot = selectedCabId;       // Codex expr audit BLOCKER: identita z casu naplanovania
+    applyTimer = setTimeout(function(){ flushCabinetEdits(cabSnapshot); }, 400);
+  }
+
+  // Okamzity/odlozeny apply korpusu. Snapshot cabinet_id ide s payloadom — Ruby
+  // handler ho overi proti aktualnemu vyberu (oneskoreny zapis po prekliknuti
+  // na iny korpus sa ticho zahodi namiesto zasiahnutia nespravneho objektu).
+  function flushCabinetEdits(cabSnapshot){
+    applyTimer = null;
+    var ae = document.activeElement;
+    if (ae && isExprInput(ae) && isExprStr(ae.value)) return; // vyraz stale rozpisany
+    if (!selectedCabId) return;
+    if (!validateFields()) { NX.setStatus('Skontroluj červené polia (mimo rozsahu).', true); return; }
+    var payload = collectAll();
+    payload.cabinet_id = cabSnapshot || selectedCabId;
+    if (window.sketchup && sketchup.apply_all) sketchup.apply_all(JSON.stringify(payload));
+  }
+  function flushCabinetEditsNow(){
+    if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; }
+    flushCabinetEdits(selectedCabId);
   }
 
   function updateAvailable(){
@@ -129,7 +180,7 @@
       '<span class="fnum">' + idx + '</span>' +
       '<select class="ftype" onchange="onFrontTypeChange(this); onField()">' +
         '<option value="door">Dvierka</option><option value="drawer_front">Zásuvkové čelo</option></select>' +
-      '<input class="fh" type="number" step="1" placeholder="auto" oninput="onField()">' +
+      '<input class="fh" type="text" placeholder="auto" oninput="onField()">' +
       '<select class="fw" onchange="onField()"><option value="auto">auto</option><option value="1">1</option><option value="2">2</option></select>' +
       '<input class="flock" type="checkbox" title="Zamknúť pevnú výšku" onchange="onField()">' +
       '<button class="fdel" title="Odstrániť" onclick="delFrontRow(this); onField()">✕</button>' +
@@ -139,6 +190,7 @@
     if (item.height !== null && item.height !== undefined && item.height !== '') row.querySelector('.fh').value = item.height;
     if (item.wings) row.querySelector('.fw').value = item.wings;
     if (item.locked) row.querySelector('.flock').checked = true;
+    attachExprField(row.querySelector('.fh'), { flushFn: flushCabinetEditsNow }); // V0.4.7e vyrazy vo vyske cela
     onFrontTypeChange(row.querySelector('.ftype'));
   }
   function onFrontTypeChange(sel){ var row = sel.closest('.frow'); row.querySelector('.fw').style.visibility = (sel.value === 'door') ? 'visible' : 'hidden'; }

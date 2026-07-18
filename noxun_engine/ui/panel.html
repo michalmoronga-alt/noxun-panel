@@ -5,7 +5,7 @@
      sablon ziju v satelitnych oknach (proj_materials.html, templates.html) — panel ma len
      quick-pick sablony a materialy oznacenej skrinky. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.7">
+<link rel="stylesheet" href="css/panel.css?v=0.4.7e">
 
 <div class="hdr"><h1>Noxun Engine</h1><span class="sub" id="verline">…</span></div>
 
@@ -91,8 +91,8 @@
   <div id="insertBoardForm">
     <div class="hint">Samostatný výrobný dielec — krycia doska, blenda, výplň… Hrúbka sa riadi materiálom; ABS nastavíš po vložení na karte dosky.</div>
     <div class="row"><label>Názov</label><input id="ib_name" type="text" placeholder="Doska"><span class="unit"></span></div>
-    <div class="row"><label>Dĺžka</label><input id="ib_length" type="number" step="1" value="800"><span class="unit">mm</span></div>
-    <div class="row"><label>Šírka</label><input id="ib_width" type="number" step="1" value="600"><span class="unit">mm</span></div>
+    <div class="row"><label>Dĺžka</label><input id="ib_length" type="text" value="800"><span class="unit">mm</span></div>
+    <div class="row"><label>Šírka</label><input id="ib_width" type="text" value="600"><span class="unit">mm</span></div>
     <div class="row"><label>Materiál</label><select id="ib_material" onchange="onInsertBoardMaterial()"></select><span class="unit"></span></div>
     <div class="row"><label>Hrúbka</label><input id="ib_thickness" type="text" readonly><span class="unit">mm</span></div>
     <div class="row"><label>Smer dekoru</label>
@@ -110,8 +110,8 @@
 <fieldset id="boardCard" style="display:none">
   <div class="pchead" id="bcHead"></div>
   <div class="row"><label>Názov</label><input id="bc_name" type="text" oninput="onBoardField('name', this.value)"><span class="unit"></span></div>
-  <div class="row"><label>Dĺžka</label><input id="bc_length" type="number" step="1" oninput="onBoardField('length', this.value)"><span class="unit">mm</span></div>
-  <div class="row"><label>Šírka</label><input id="bc_width" type="number" step="1" oninput="onBoardField('width', this.value)"><span class="unit">mm</span></div>
+  <div class="row"><label>Dĺžka</label><input id="bc_length" type="text" oninput="onBoardField('length', this.value)"><span class="unit">mm</span></div>
+  <div class="row"><label>Šírka</label><input id="bc_width" type="text" oninput="onBoardField('width', this.value)"><span class="unit">mm</span></div>
   <div class="row"><label>Materiál</label><select id="bc_material" onchange="onBoardMaterial(this.value)"></select><span class="unit"></span></div>
   <div class="row"><label>Hrúbka</label><input id="bc_thickness" type="text" readonly><span class="unit">mm</span></div>
   <div class="row"><label>Smer dekoru</label>
@@ -141,10 +141,10 @@
 <!-- ZAKLADNE: rozmery + svetle (spolocne pre navrh aj oznaceny korpus) -->
 <fieldset id="basicCard">
   <legend>Základné</legend>
-  <div class="row"><label>Šírka</label><input id="width" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
-  <div class="row"><label>Výška</label><input id="height" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
-  <div class="row"><label>Hĺbka</label><input id="depth" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
-  <div class="row"><label>Hrúbka materiálu</label><input id="thickness" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
+  <div class="row"><label>Šírka</label><input id="width" type="text" oninput="onField()"><span class="unit">mm</span></div>
+  <div class="row"><label>Výška</label><input id="height" type="text" oninput="onField()"><span class="unit">mm</span></div>
+  <div class="row"><label>Hĺbka</label><input id="depth" type="text" oninput="onField()"><span class="unit">mm</span></div>
+  <div class="row"><label>Hrúbka materiálu</label><input id="thickness" type="text" oninput="onField()"><span class="unit">mm</span></div>
   <div class="row"><label>Svetlá šírka</label><input id="av_width" type="text" readonly><span class="unit">mm</span></div>
   <div class="row"><label>Svetlá hĺbka</label><input id="av_depth" type="text" readonly><span class="unit">mm</span></div>
   <div class="row"><label>Úložná výška</label><input id="av_height" type="text" readonly><span class="unit">mm</span></div>
@@ -168,8 +168,8 @@
           <option value="upright">Na výšku</option>
         </select><span class="unit"></span>
       </div>
-      <div class="row"><label>Odsadenie od vrchu</label><input id="rails_top_offset" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
-      <div class="row"><label>Hĺbka/výška pásu</label><input id="rail_depth" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
+      <div class="row"><label>Odsadenie od vrchu</label><input id="rails_top_offset" type="text" oninput="onField()"><span class="unit">mm</span></div>
+      <div class="row"><label>Hĺbka/výška pásu</label><input id="rail_depth" type="text" oninput="onField()"><span class="unit">mm</span></div>
     </div>
   </div>
 </details>
@@ -184,14 +184,14 @@
       </select><span class="unit"></span>
     </div>
     <div id="plinthGroup">
-      <div class="row"><label>Výška podstavca</label><input id="floor_height" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
+      <div class="row"><label>Výška podstavca</label><input id="floor_height" type="text" oninput="onField()"><span class="unit">mm</span></div>
       <div class="row"><label>Sokel</label>
         <select id="plinth_mode" onchange="toggleRecess(); onField()">
           <option value="none">Bez sokla — nohy</option>
           <option value="front">Predný soklový panel</option>
         </select><span class="unit"></span>
       </div>
-      <div class="row" id="recessRow"><label>Zapustenie sokla</label><input id="plinth_recess" type="number" step="1" oninput="onField()"><span class="unit">mm</span></div>
+      <div class="row" id="recessRow"><label>Zapustenie sokla</label><input id="plinth_recess" type="text" oninput="onField()"><span class="unit">mm</span></div>
     </div>
   </div>
 </details>
@@ -277,15 +277,16 @@
 <!-- Poradie skriptov je kontrakt: errors prvy (chytac), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.4.7"></script>
-<script src="js/core.js?v=0.4.7"></script>
-<script src="js/form.js?v=0.4.7"></script>
-<script src="js/zone_tree.js?v=0.4.7"></script>
-<script src="js/preview.js?v=0.4.7"></script>
-<script src="js/actions.js?v=0.4.7"></script>
-<script src="js/bridge.js?v=0.4.7"></script>
-<script src="js/materials.js?v=0.4.7"></script>
-<script src="js/part_card.js?v=0.4.7"></script>
-<script src="js/board_card.js?v=0.4.7"></script>
-<script src="js/hardware.js?v=0.4.7"></script>
-<script src="js/boot.js?v=0.4.7"></script>
+<script src="js/errors.js?v=0.4.7e"></script>
+<script src="js/core.js?v=0.4.7e"></script>
+<script src="js/expr.js?v=0.4.7e"></script>
+<script src="js/form.js?v=0.4.7e"></script>
+<script src="js/zone_tree.js?v=0.4.7e"></script>
+<script src="js/preview.js?v=0.4.7e"></script>
+<script src="js/actions.js?v=0.4.7e"></script>
+<script src="js/bridge.js?v=0.4.7e"></script>
+<script src="js/materials.js?v=0.4.7e"></script>
+<script src="js/part_card.js?v=0.4.7e"></script>
+<script src="js/board_card.js?v=0.4.7e"></script>
+<script src="js/hardware.js?v=0.4.7e"></script>
+<script src="js/boot.js?v=0.4.7e"></script>
