@@ -133,6 +133,26 @@ module Noxun
           return set_status('Vybraný materiál sa nenašiel v katalógu.', true) unless sheet
 
           cfg_key, role, thickness_key = target
+
+          # Predvolba musi sediet aj s hrubkami NOVEJ skrinky (Codex PR #29): kontrola
+          # nizsie prejde len existujuce dediace skrinky — v novom modeli (alebo ked
+          # vsetky maju override) by presiel nekompatibilny default (napr. HDF 3 ako
+          # korpus) a najblizsi vklad by spadol pri stavbe. Ine hrubky = material na
+          # konkretnej skrinke (override), nie projektova predvolba.
+          have = sheet['thickness'].to_f
+          new_ok =
+            case key
+            when 'default_material_id'
+              CabinetBuilder.thickness_ok_for?(role, CabinetBuilder::LOWER_DEFAULTS[:thickness].to_f, have)
+            when 'default_back_material_id'
+              # chrbat ma v UI dve podporovane hrubky (HDF 3 / pevny 18) — obe legalne
+              [3.0, 18.0].any? { |t| CabinetBuilder.thickness_ok_for?(role, t, have) }
+            else
+              CabinetBuilder.thickness_ok_for?(role, Fronts::FRONT_THICKNESS.to_f, have)
+            end
+          unless new_ok
+            return set_status("Materiál #{value} (#{have.round(1)} mm) nesedí s hrúbkou novej skrinky — najbližší vklad by sa nepostavil. Pre iné hrúbky nastav materiál konkrétnej skrinke.", true)
+          end
           selected = Panel.find_cabinet(model)
           affected = Panel.all_cabinets(model).select do |cabinet|
             Panel.present_str(Panel.existing_params(cabinet)[cfg_key]).nil?

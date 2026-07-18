@@ -145,6 +145,16 @@ module Noxun
           cab = Panel.find_cabinet(model)
           return set_status('Najprv označ NOXUN korpus.', true) if cab.nil?
 
+          # Typovy guard aj TU, nie len v HTML disabled (Codex PR #29): pri zavretom
+          # paneli sa zmeny vyberu nesleduju a stale enabled riadok by prestavil
+          # dolnu skrinku na hornu (ci naopak).
+          cab_type = (Store.config(cab) || {})['type'] || 'lower'
+          tpl_type = (tpl['config'] || {})['type'] || 'lower'
+          if tpl_type != cab_type
+            push_state # obnov disabled stav podla aktualneho vyberu
+            return set_status("Šablóna je pre iný typ (#{tpl_type == 'upper' ? 'horná' : 'dolná'}) než označená skrinka — nepoužitá.", true)
+          end
+
           merged = merge_template(Panel.existing_params(cab), tpl['config'])
           Panel.suspend_selection_sync do
             CabinetBuilder.rebuild(model, cab, merged)
