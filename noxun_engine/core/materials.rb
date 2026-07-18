@@ -28,6 +28,10 @@ module Noxun
         'default_front_material_id' => 'W1000_DTDL_18',   # cela (biela celova 18)
         'default_back_material_id'  => 'HDF_WHITE_3'       # chrbat (HDF 3)
       }.freeze
+      # Davka 2 (Codex audit, blocker 1): fallback ID su NEDELETOVATELNE — novy model
+      # ich pouzije aj bez ulozenych atributov; zmazanie by rozbilo prvy vklad.
+      PROTECTED_SHEET_IDS = PROJECT_FALLBACK.values.freeze
+      GRAINS = %w[length width none].freeze
 
       module_function
 
@@ -209,6 +213,150 @@ module Noxun
       rescue StandardError => e
         Engine.log_error(e, 'Materials.set_project_default') if defined?(Engine)
         false
+      end
+
+      # --- davka 2: validacia + generovanie ID + scan pouzitia -----------------
+      # (Codex audit: normalize NIE je validator — server-side vrstva pre CRUD UI.)
+
+      # Zvaliduje atributy doskoveho materialu z formulara. Vrati [ok, chyba].
+      def validate_sheet_attrs(a)
+        decor = (a['decor'] || a[:decor]).to_s.strip
+        type  = (a['type'] || a[:type]).to_s.strip
+        return [false, 'Dekor je povinný.'] if decor.empty?
+        return [false, 'Typ dosky je povinný (DTDL/MDF/HDF…).'] if type.empty?
+        th = a['thickness'] || a[:thickness]
+        return [false, 'Hrúbka musí byť kladné číslo.'] unless th.is_a?(Numeric) ? th.positive? : th.to_s.strip.match?(/\A\d+([.,]\d+)?\z/) && th.to_s.tr(',', '.').to_f.positive?
+        grain = (a['grain'] || a[:grain] || 'none').to_s
+        return [false, 'Smer dekoru musí byť length/width/none.'] unless GRAINS.include?(grain)
+        price = a['price_per_m2'] || a[:price_per_m2] || 0
+        return [false, 'Cena nesmie byť záporná.'] if price.to_s.tr(',', '.').to_f.negative?
+        rgb = a['color'] || a[:color]
+        if rgb && !(rgb.is_a?(Array) && rgb.size == 3 && rgb.all? { |c| c.to_i.between?(0, 255) })
+          return [false, 'Farba musí byť RGB 0–255.']
+        end
+        [true, nil]
+      end
+
+      def validate_edge_attrs(a)
+        decor = (a['decor'] || a[:decor]).to_s.strip
+        return [false, 'Dekor ABS je povinný.'] if decor.empty?
+        th = (a['thickness'] || a[:thickness]).to_s.tr(',', '.').to_f
+        return [false, 'Hrúbka ABS musí byť 1,0 alebo 2,0 mm.'] unless supported_edge_thickness?(th)
+        price = a['price_per_bm'] || a[:price_per_bm] || 0
+        return [false, 'Cena nesmie byť záporná.'] if price.to_s.tr(',', '.').to_f.negative?
+        [true, nil]
+      end
+
+      # Slug pre technicke ID: transliteracia diakritiky (NFD + odstranenie znamienok),
+      # upcase, [A-Z0-9] bloky spojene '_'. 'Dub Halifax prírodný' -> 'DUB_HALIFAX_PRIRODNY'.
+      def slug(value)
+        s = value.to_s.unicode_normalize(:nfd).gsub(/\p{Mn}/, '')
+        s.upcase.gsub(/[^A-Z0-9]+/, '_').gsub(/\A_+|_+\z/, '')
+      end
+
+      # Token hrubky do ID: cele mm ako '18'; desatinne '18P5' (18.5 nesmie vyzerat ako 19).
+      def thickness_token(th)
+        f = th.to_s.tr(',', '.').to_f
+        (f % 1).zero? ? f.to_i.to_s : format('%gP%d', f.floor, ((f % 1) * 10).round).sub('P0', '')
+      end
+
+      # Vygeneruje volne material_id: SLUG(decor)_SLUG(type)_TOKEN(th); kolizie
+      # (case-insensitive) dostanu -2/-3... ID sa NIKDY negeneruje pri edite.
+      def generate_sheet_id(decor, type, thickness)
+        base = "#{slug(decor)}_#{slug(type)}_#{thickness_token(thickness)}"
+        unique_id(base, sheets.map { |s| s['material_id'].to_s.upcase })
+      end
+
+      def generate_edge_id(decor, thickness)
+        base = "ABS_#{slug(decor)}_#{(thickness.to_s.tr(',', '.').to_f * 10).round}"
+        unique_id(base, edges.map { |a| a['abs_id'].to_s.upcase })
+      end
+
+      def unique_id(base, taken_upcased)
+        return base unless taken_upcased.include?(base.upcase)
+        n = 2
+        n += 1 while taken_upcased.include?("#{base.upcase}-#{n}")
+        "#{base}-#{n}"
+      end
+
+      # --- scan pouzitia (delete/edit guard; Codex audit blocker 2) -------------
+      # Prejde AKTIVNY model (defaulty na modeli, configy korpusov vratane
+      # part_overrides, instancie dielcov, dosky) + GLOBALNE SABLONY. Zatvorene
+      # .skp subory sa skontrolovat NEDAJU — hlaska pouzivatela na to upozorni;
+      # korpus so zmiznutym materialom prezije ako legacy (data ostanu), doska
+      # by pri rebuilde spadla — preto je guard prisny.
+      def used_material_ids(model)
+        used = Hash.new { |h, k| h[k] = [] }
+        PROJECT_KEYS.each do |k|
+          v = model_default(model, k)
+          used[v.to_s] << 'projektová predvoľba' if v && !v.to_s.empty?
+        end
+        collect_model_usage(model, used) if model && defined?(Ids)
+        collect_template_usage(used)
+        used
+      end
+
+      def collect_model_usage(model, used)
+        Ids.each_of_kind(model, 'cabinet') do |inst|
+          cid = Store.get(inst, 'cabinet_id') || Store.get(inst, 'id')
+          cfg = Store.config(inst) || {}
+          %w[material_id front_material_id back_material_id].each do |k|
+            v = cfg[k]
+            used[v.to_s] << cid if v && !v.to_s.empty?
+          end
+          ov = cfg['part_overrides']
+          next unless ov.is_a?(Hash)
+          ov.each_value do |rec|
+            next unless rec.is_a?(Hash)
+            v = rec['material_id']
+            used[v.to_s] << cid if v && !v.to_s.empty?
+          end
+        end
+        %w[part board].each do |kind|
+          Ids.each_of_kind(model, kind) do |inst|
+            cfg = Store.config(inst) || {}
+            v = cfg['material_id']
+            used[v.to_s] << (Store.get(inst, 'id') || kind) if v && !v.to_s.empty?
+          end
+        end
+      end
+
+      def collect_template_usage(used)
+        return unless defined?(TemplateStore)
+        TemplateStore.load.each do |t|
+          cfg = t['config'] || {}
+          %w[material_id front_material_id back_material_id].each do |k|
+            v = cfg[k]
+            used[v.to_s] << "šablóna #{t['name']}" if v && !v.to_s.empty?
+          end
+        end
+      rescue StandardError
+        nil
+      end
+
+      # ABS pouzitie: edges v configoch dielcov a dosiek + part_overrides korpusov.
+      def used_abs_ids(model)
+        used = Hash.new { |h, k| h[k] = [] }
+        return used unless model && defined?(Ids)
+        %w[part board].each do |kind|
+          Ids.each_of_kind(model, kind) do |inst|
+            cfg = Store.config(inst) || {}
+            e = cfg['edges']
+            next unless e.is_a?(Hash)
+            e.each_value { |v| used[v.to_s] << (Store.get(inst, 'id') || kind) if v && !v.to_s.empty? }
+          end
+        end
+        Ids.each_of_kind(model, 'cabinet') do |inst|
+          cid = Store.get(inst, 'cabinet_id') || Store.get(inst, 'id')
+          ov = (Store.config(inst) || {})['part_overrides']
+          next unless ov.is_a?(Hash)
+          ov.each_value do |rec|
+            e = rec.is_a?(Hash) ? rec['edges'] : nil
+            next unless e.is_a?(Hash)
+            e.each_value { |v| used[v.to_s] << cid if v && !v.to_s.empty? }
+          end
+        end
+        used
       end
 
       # --- normalizacia zaznamov ----------------------------------------------

@@ -49,6 +49,15 @@
       else { setType('lower'); setDefaults('lower'); currentZoneTree = defaultTree(); renderFilteredTemplates(); NX.clearSelected(); onField(); }
     },
     setTemplates: function(list){ TEMPLATES = list || []; renderFilteredTemplates(); },
+    // D-05: zivy katalog materialov po CRUD v okne Materialy projektu. Obnovi
+    // vsetky selecty s materialmi BEZ resetu formulara; zachovava vybrane hodnoty.
+    setMaterials: function(data){
+      MATERIALS = data || { sheets: [], edges: [] };
+      refreshMaterialFilters();
+      if (typeof refreshInsertBoardMaterials === 'function') refreshInsertBoardMaterials();
+      if (typeof partCard !== 'undefined' && partCard) renderPartCard(partCard);
+      if (typeof boardCard !== 'undefined' && boardCard) renderBoardCard(boardCard);
+    },
     loadSelected: function(c){
       // V0.4.7c: odchod z kontextu dosky — zrus cakajuce board edity + kartu
       cancelBoardEdits();

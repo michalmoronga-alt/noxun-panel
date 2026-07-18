@@ -59,6 +59,14 @@ module Noxun
         def register_callbacks(dlg)
           cb(dlg, 'ready')                { |_p| push_state }
           cb(dlg, 'set_project_material') { |p| handle_set_project_material(p) }
+          # Davka 2 (D-05): sprava katalogu — create/edit ODDELENE (edit nikdy
+          # nemeni ID a negeneruje ho; create ID generuje server, JS mu never).
+          cb(dlg, 'add_sheet')    { |p| handle_save_sheet(p, create: true) }
+          cb(dlg, 'update_sheet') { |p| handle_save_sheet(p, create: false) }
+          cb(dlg, 'delete_sheet') { |p| handle_delete_sheet(p) }
+          cb(dlg, 'add_edge')     { |p| handle_save_edge(p, create: true) }
+          cb(dlg, 'update_edge')  { |p| handle_save_edge(p, create: false) }
+          cb(dlg, 'delete_edge')  { |p| handle_delete_edge(p) }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(materials): #{msg}")
@@ -88,10 +96,22 @@ module Noxun
           data = {
             version: Engine::VERSION,
             materials: Panel.materials_payload,               # katalog dosiek pre selecty
+            catalog: full_catalog_payload,                    # D-05: plne zaznamy pre spravu
+            protected_ids: Materials::PROTECTED_SHEET_IDS,
             project: Materials.project_defaults(model),       # aktualne predvolby modelu
             cabinets: Panel.all_cabinets(model).size
           }
           js("MD.init(#{data.to_json})")
+        end
+
+        # Plne zaznamy katalogu (sprava potrebuje vsetky polia — panelovy
+        # materials_payload je zamerne zuzeny). label = ten isty odvodeny text.
+        def full_catalog_payload
+          cat = Materials.load
+          {
+            'sheets' => cat['sheets'].map { |s| s.merge('label' => Panel.sheet_label(s)) },
+            'edges'  => cat['edges'].map { |a| a.merge('label' => Panel.abs_label(a)) }
+          }
         end
 
         def set_status(msg, error = false)
@@ -178,6 +198,95 @@ module Noxun
           set_status("Predvoľba uložená — prepočítaných #{affected.size} skriniek.")
           push_state
           Panel.push_selected(model) # refresh Inspectora (korpusove selecty, karta dielca)
+        end
+
+        # --- D-05: sprava katalogu (Codex audit davky 2 zapracovany) ----------
+        # Zapis je single-writer kompromis (atomicky rename + .bak; bez locku medzi
+        # SketchUp procesmi — vedome akceptovane, katalog edituje jeden pouzivatel).
+
+        def handle_save_sheet(payload, create:)
+          data = JSON.parse(payload.to_s)
+          ok, err = Materials.validate_sheet_attrs(data)
+          return set_status(err, true) unless ok
+          th = data['thickness'].to_s.tr(',', '.').to_f
+
+          if create
+            id = Materials.generate_sheet_id(data['decor'], data['type'], th)
+          else
+            id = data['material_id'].to_s
+            existing = Materials.sheet(id)
+            return set_status('Materiál sa nenašiel — obnov okno.', true) unless existing
+            # Hrubka existujuceho variantu je NEMENNA (hrubka definuje variant;
+            # zatvorene projekty sa neskontroluju — zmena by im rozbila rebuild).
+            if (existing['thickness'].to_f - th).abs > 0.01
+              return set_status('Hrúbka definuje variant — pre inú hrúbku pridaj nový materiál.', true)
+            end
+          end
+
+          rec = data.merge('material_id' => id, 'thickness' => th)
+          return set_status('Uloženie katalógu zlyhalo.', true) unless Materials.upsert_sheet(rec)
+          after_catalog_change
+          set_status(create ? "Materiál pridaný (#{id})." : "Materiál #{id} upravený.")
+        end
+
+        def handle_delete_sheet(payload)
+          data = JSON.parse(payload.to_s)
+          id = data['material_id'].to_s
+          if Materials::PROTECTED_SHEET_IDS.include?(id)
+            return set_status('Tento materiál je systémová predvoľba nových projektov — nedá sa zmazať.', true)
+          end
+          used = Materials.used_material_ids(Sketchup.active_model)[id]
+          if used && !used.empty?
+            sample = used.uniq.first(3).join(', ')
+            return set_status("Materiál #{id} sa používa (#{used.size}×: #{sample}…) — chráni výrobné dáta, nemažem. Pozor: zatvorené projekty sa nedajú skontrolovať.", true)
+          end
+          return set_status('Zmazanie zlyhalo.', true) unless Materials.delete_sheet(id)
+          after_catalog_change
+          set_status("Materiál #{id} zmazaný. (Zatvorené projekty sa nedajú skontrolovať — ak ho niektorý používal, dielec oň príde pri najbližšom prepočte.)")
+        end
+
+        def handle_save_edge(payload, create:)
+          data = JSON.parse(payload.to_s)
+          ok, err = Materials.validate_edge_attrs(data)
+          return set_status(err, true) unless ok
+          th = data['thickness'].to_s.tr(',', '.').to_f
+          if create
+            id = Materials.generate_edge_id(data['decor'], th)
+          else
+            id = data['abs_id'].to_s
+            existing = Materials.edge(id)
+            return set_status('ABS páska sa nenašla — obnov okno.', true) unless existing
+            # Hrubka ABS je pri edite NEMENNA (zrkadlo sheet guardu, Codex GH #39):
+            # ID nesie hrubku (_10/_20) a dielce ju drzia len cez ID — zmena by ich
+            # potichu prepla na inu hranu a ID by klamalo.
+            if (existing['thickness'].to_f - th).abs > 0.01
+              return set_status('Hrúbka definuje ABS variant — pre inú hrúbku pridaj novú pásku.', true)
+            end
+          end
+          rec = data.merge('abs_id' => id, 'thickness' => th)
+          return set_status('Uloženie katalógu zlyhalo.', true) unless Materials.upsert_edge(rec)
+          after_catalog_change
+          set_status(create ? "ABS páska pridaná (#{id})." : "ABS #{id} upravená.")
+        end
+
+        def handle_delete_edge(payload)
+          data = JSON.parse(payload.to_s)
+          id = data['abs_id'].to_s
+          used = Materials.used_abs_ids(Sketchup.active_model)[id]
+          if used && !used.empty?
+            sample = used.uniq.first(3).join(', ')
+            return set_status("ABS #{id} sa používa (#{used.size}×: #{sample}…) — nemažem.", true)
+          end
+          return set_status('Zmazanie zlyhalo.', true) unless Materials.delete_edge(id)
+          after_catalog_change
+          set_status("ABS #{id} zmazaná.")
+        end
+
+        # Po kazdej zmene katalogu: refresh tohto okna + zivy katalog v paneli
+        # (NX.setMaterials — BEZ resetu formulara panela).
+        def after_catalog_change
+          push_state
+          Panel.push_materials if defined?(Panel)
         end
       end
     end

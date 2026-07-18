@@ -200,6 +200,18 @@
       if (ms && !ms.options.length){ fillBoardMaterialSelect(ms, ''); onInsertBoardMaterial(); }
     }
   }
+  // D-05: po zmene katalogu (NX.setMaterials) sa vkladaci select NEplni "iba raz" —
+  // force refill so zachovanim platneho vyberu + prepocet hrubky/grainu. Fokusovany
+  // select sa nechava tak (nerozbit rozkliknuty dropdown).
+  function refreshInsertBoardMaterials(){
+    var ms = el('ib_material');
+    if (!ms || !ms.options.length) return; // este nenaplneny — naplni onInsertKindChange
+    if (document.activeElement === ms) return;
+    var keep = ms.value;
+    fillBoardMaterialSelect(ms, keep);
+    if (ms.value !== keep || !ms.value){ ms.selectedIndex = ms.selectedIndex < 0 ? 0 : ms.selectedIndex; }
+    onInsertBoardMaterial();
+  }
   // Zmena materialu vo vkladacej karte: dosad hrubku + default smer dekoru z katalogu.
   function onInsertBoardMaterial(){
     var ms = el('ib_material'); if (!ms) return;

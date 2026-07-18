@@ -63,6 +63,12 @@ module Noxun
           js("NX.setTemplates(#{template_list.to_json})")
         end
 
+        # D-05: zivy refresh katalogu materialov v paneli po CRUD v satelitnom okne
+        # (BEZ push_init — nesmie resetovat rozpisany formular).
+        def push_materials
+          js("NX.setMaterials(#{materials_payload.to_json})")
+        end
+
         def set_status(msg, error = false)
           js("NX.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})")
         end
