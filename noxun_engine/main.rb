@@ -50,6 +50,7 @@ Sketchup.require 'noxun_engine/core/cabinet_builder'
 Sketchup.require 'noxun_engine/core/board_builder' # V0.4.7 samostatna doska
 Sketchup.require 'noxun_engine/core/templates'
 Sketchup.require 'noxun_engine/core/bom'           # V0.5 A kusovnik/supisy zo snapshotov
+Sketchup.require 'noxun_engine/core/usage_stats'   # D-25 merac pouzivania panela (lokalne pocitadla)
 Sketchup.require 'noxun_engine/ui/production_dialog' # V0.5 B okno Vyroba
 Sketchup.require 'noxun_engine/ui/panel'
 Sketchup.require 'noxun_engine/ui/rules_dialog'     # V0.4 editor pravidiel kovania

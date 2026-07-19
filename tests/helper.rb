@@ -122,6 +122,7 @@ unless NxTest::IN_SKETCHUP
     core/store
     core/ids
     core/templates
+    core/usage_stats
     core/cabinet_builder
     core/board_builder
     core/bom
