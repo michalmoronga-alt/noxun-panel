@@ -42,6 +42,8 @@ module Noxun
         end
 
         # Vstup pre relay z panela (B1): panel uz flushol edity, mozeme vyberat.
+        # Klik nesie KLUC riadku, nie pids (Codex GH #48 P2: flush mohol korpus
+        # rebuildnut a stare pids zomreli) — refs sa hladaju v CERSTVOM zbere.
         def do_select(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           unless data['gen'].to_i == @generation.to_i # B4: stale klik (iny model/stary DOM)
@@ -50,13 +52,17 @@ module Noxun
           end
 
           model = Sketchup.active_model
-          pids = Array(data['pids']).map(&:to_i).uniq
+          bom = fresh_bom(model)
+          pids = refs_for(bom, data)
           targets = pids.filter_map do |pid|
-            ent = model.find_entity_by_persistent_id(pid)
+            ent = model.find_entity_by_persistent_id(pid.to_i)
             ent if ent && ent.valid? && ent.respond_to?(:definition)
           end
           if targets.empty?
-            return set_status('Dielce sa v modeli nenašli — Obnov zoznam.', true)
+            # riadok medzitym zanikol (flush editov zmenil rozmery/model) —
+            # obnov data, nech pouzivatel klikne na aktualny riadok
+            push_state
+            return set_status('Zoznam sa medzitým zmenil — obnovené, klikni znova.', true)
           end
 
           Panel.suspend_selection_sync do
@@ -65,7 +71,7 @@ module Noxun
             targets.each { |t| sel.add(t) }
           end
           Panel.push_selected(model, dedup: false) # B2: ziadna mutacia pri selecte
-          set_status("Vybraných #{targets.length} z #{pids.length} položiek v modeli.")
+          set_status("Vybraných #{targets.length} položiek v modeli.")
         rescue StandardError => e
           Engine.log_error(e, 'ProductionDialog.do_select')
           set_status("Chyba výberu: #{e.message}", true)
@@ -129,10 +135,32 @@ module Noxun
           end
         end
 
+        # Cerstvy zber s dedup tickom (Codex GH #48 P2: cerstve kopie mozu
+        # zdielat ID — rovnaky sync tick ako push_selected, inak BOM zlieva
+        # vlastnikov a klik-select je nejednoznacny).
+        def fresh_bom(model)
+          CabinetBuilder.dedup_copies(model) if defined?(CabinetBuilder)
+          BoardBuilder.dedup_copies(model) if defined?(BoardBuilder)
+          Bom.compute(Bom.collect(model))
+        end
+
+        # Refs podla kluca z CERSTVEHO bomu; fallback pids (SU testy/kompat).
+        def refs_for(bom, data)
+          if data['parts_key']
+            row = bom[:rows].find { |r| r['key'] == data['parts_key'] }
+            row ? row['refs'].map { |x| x['pid'] } : []
+          elsif data['hw_key']
+            g = bom[:hardware].find { |x| x['key'] == data['hw_key'] }
+            g ? g['breakdown'].map { |b| b['owner_pid'] } : []
+          else
+            Array(data['pids'])
+          end.compact.uniq
+        end
+
         def push_state
           @generation = @generation.to_i + 1
           model = Sketchup.active_model
-          bom = Bom.compute(Bom.collect(model))
+          bom = fresh_bom(model)
           data = {
             version: Engine::VERSION,
             gen: @generation,

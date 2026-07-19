@@ -108,10 +108,9 @@ module Noxun
       def aggregate_rows(records)
         groups = {}
         records.each do |r|
-          key = [dmm(r['length']), dmm(r['width']), dmm(r['thickness']),
-                 r['material_id'], EDGE_ORDER.map { |c| r['edges'][c].to_s },
-                 r['grain_direction']]
-          g = groups[key] ||= { 'length' => r['length'], 'width' => r['width'],
+          key = row_key(r)
+          g = groups[key] ||= { 'key' => key,
+                                'length' => r['length'], 'width' => r['width'],
                                 'thickness' => r['thickness'], 'material_id' => r['material_id'],
                                 'edges' => r['edges'], 'grain_direction' => r['grain_direction'],
                                 'quantity' => 0, 'names' => [], 'kde' => {}, 'refs' => [] }
@@ -123,6 +122,15 @@ module Noxun
         groups.values.map do |g|
           g.merge('kde' => g['kde'].map { |oid, q| { 'owner_id' => oid, 'quantity' => q } })
         end.sort_by { |g| [g['material_id'], -g['length'], -g['width']] }
+      end
+
+      # Deterministicky kluc riadku — klik-select ho posiela NAMIESTO pids
+      # (Codex GH #48 P2: flush editov rebuildne korpus a pids zomru; Ruby si
+      # podla kluca najde CERSTVE refs po flushi).
+      def row_key(r)
+        [dmm(r['length']), dmm(r['width']), dmm(r['thickness']),
+         r['material_id'], EDGE_ORDER.map { |c| r['edges'][c].to_s },
+         r['grain_direction']]
       end
 
       # m2 per doskovy material — scitane z KAZDEHO zdrojoveho dielca (F6).
@@ -159,8 +167,9 @@ module Noxun
         out = {}
         items.each do |h|
           params = h['params'].is_a?(Hash) ? h['params'] : {}
-          key = [h['generic_type'].to_s, h['variant_id'].to_s, params_signature(params)]
-          g = out[key] ||= { 'generic_type' => h['generic_type'].to_s,
+          key = hw_key(h)
+          g = out[key] ||= { 'key' => key,
+                             'generic_type' => h['generic_type'].to_s,
                              'variant_id' => h['variant_id'],
                              'params' => params, 'quantity' => 0, 'breakdown' => [] }
           q = h['quantity'].to_i
@@ -175,6 +184,11 @@ module Noxun
 
       def params_signature(params)
         params.sort_by { |k, _| k.to_s }.map { |k, v| "#{k}=#{v.is_a?(Float) ? v.round(2) : v}" }.join('|')
+      end
+
+      def hw_key(h)
+        params = h['params'].is_a?(Hash) ? h['params'] : {}
+        [h['generic_type'].to_s, h['variant_id'].to_s, params_signature(params)]
       end
 
       # summary.rows = agregovane riadky; summary.quantity = suma kusov (N8).

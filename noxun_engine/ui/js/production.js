@@ -121,22 +121,23 @@
     box.innerHTML = h + '</tbody></table>';
   }
 
-  // Delegovany klik: kusovnik -> pids dielcov riadku; kovanie -> pids korpusov.
+  // Delegovany klik: posiela KLUC riadku (nie pids) — Ruby si po flushi editov
+  // najde cerstve refs (Codex GH #48 P2: rebuild po flushi meni persistent id).
   document.addEventListener('click', function(ev){
     var tr = ev.target && ev.target.closest ? ev.target.closest('tr.bomrow, tr.hwrow') : null;
     if (!tr || !BOM || !window.sketchup || !sketchup.select_row) return;
     var i = parseInt(tr.getAttribute('data-i'), 10);
-    var pids = [];
+    var payload = { gen: BOM.gen };
     if (tr.className.indexOf('bomrow') >= 0){
       var r = (BOM.rows || [])[i];
-      pids = (r && r.refs ? r.refs : []).map(function(x){ return x.pid; });
+      if (!r || !r.key) return;
+      payload.parts_key = r.key;
     } else {
       var g = (BOM.hardware || [])[i];
-      pids = (g && g.breakdown ? g.breakdown : []).map(function(b){ return b.owner_pid; });
+      if (!g || !g.key) return;
+      payload.hw_key = g.key;
     }
-    pids = pids.filter(function(p){ return p != null; });
-    if (!pids.length) return;
-    sketchup.select_row(JSON.stringify({ gen: BOM.gen, pids: pids }));
+    sketchup.select_row(JSON.stringify(payload));
   });
 
   window.onload = function(){ if (window.sketchup && sketchup.ready) sketchup.ready(''); };

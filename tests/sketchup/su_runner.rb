@@ -419,8 +419,8 @@ module NoxunSuRunner
     ok('sync-vyroba: riadok kusovnika nesie refs s pid',
        !row.nil? && row['refs'].all? { |r| r['pid'].is_a?(Integer) })
     cfg_before = (e::Store.config(inst) || {})['width']
-    e::ProductionDialog.do_select({ 'gen' => 0, 'pids' => row['refs'].map { |r| r['pid'] } })
-    ok("sync-vyroba: select oznacil #{model.selection.size} dielcov riadku (#{row['refs'].length} refs)",
+    e::ProductionDialog.do_select({ 'gen' => 0, 'parts_key' => row['key'] })
+    ok("sync-vyroba: select cez KLUC riadku oznacil #{model.selection.size} dielcov (#{row['refs'].length} refs)",
        model.selection.size == row['refs'].length)
     ok('sync-vyroba: select NEzmutoval model (config drzi, ziadny dedup)',
        ((e::Store.config(inst) || {})['width'] == cfg_before))
@@ -428,8 +428,8 @@ module NoxunSuRunner
     ok('sync-vyroba: stale generacia odmietnuta — selection sa nezmenil',
        model.selection.size == row['refs'].length)
     hwrow = bom3[:hardware].find { |g| g['generic_type'] == 'leg' }
-    e::ProductionDialog.do_select({ 'gen' => 0, 'pids' => hwrow['breakdown'].map { |b| b['owner_pid'] } })
-    ok('sync-vyroba: klik na kovanie oznacil oba korpusy',
+    e::ProductionDialog.do_select({ 'gen' => 0, 'hw_key' => hwrow['key'] })
+    ok('sync-vyroba: klik na kovanie (hw_key) oznacil oba korpusy',
        model.selection.size == 2 && model.selection.all? { |s| e::Store.kind(s) == 'cabinet' })
 
     cleanup(model)
