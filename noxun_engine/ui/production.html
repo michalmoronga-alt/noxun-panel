@@ -1,0 +1,27 @@
+<!-- Noxun Engine — okno VYROBA (V0.5 B): kusovnik + supisy + klik-select.
+     Vanilla JS, ziadne CDN, slovensky. READ-ONLY nad modelom — klik iba vybera.
+     Data: NX.setBom push z production_dialog.rb. -->
+<meta charset="utf-8">
+<link rel="stylesheet" href="css/panel.css?v=0.4.7m">
+
+<div class="prodhead">
+  <h1>Výroba</h1>
+  <span class="sub" id="prodModel">…</span>
+  <button class="ghostbtn" onclick="requestRefresh()">↻ Obnoviť</button>
+</div>
+<div id="prodSummary" class="prodsum">…</div>
+
+<div class="pvtabs prodtabs">
+  <button id="pt_rows" class="on" onclick="setProdTab('rows')">Kusovník</button>
+  <button id="pt_sheets" onclick="setProdTab('sheets')">Materiály</button>
+  <button id="pt_edging" onclick="setProdTab('edging')">ABS</button>
+  <button id="pt_hardware" onclick="setProdTab('hardware')">Kovanie</button>
+  <button id="pt_warnings" onclick="setProdTab('warnings')">Upozornenia <span id="warnBadge" class="wbadge" style="display:none">0</span></button>
+</div>
+
+<div class="hint" id="prodHint">Klik na riadok kusovníka alebo kovania označí dielce/skrinky v modeli.</div>
+<div id="prodBody" class="prodbody"><div class="muted">Načítavam…</div></div>
+<div id="status">Pripravené.</div>
+
+<script src="js/errors.js?v=0.4.7m"></script>
+<script src="js/production.js?v=0.4.7m"></script>

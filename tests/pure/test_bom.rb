@@ -39,6 +39,10 @@ NxTest.test('bom: zrkadlove dielce rovnakych parametrov sa zluia, kde je struktu
   kde = boky['kde'].sort_by { |k| k['owner_id'] }
   NxTest.assert_equal([{ 'owner_id' => 'CAB-001', 'quantity' => 2 },
                        { 'owner_id' => 'CAB-002', 'quantity' => 2 }], kde)
+  # V0.5 B: klik-select adresy — 1 ref na kazdy zdrojovy zaznam + deterministicky kluc
+  NxTest.assert_equal(4, boky['refs'].length)
+  NxTest.assert(boky['refs'].all? { |r| r.key?('pid') && r.key?('owner_id') }, 'refs nesu pid+owner')
+  NxTest.assert_equal(Noxun::Engine::Bom.row_key(recs.first), boky['key'])
 end
 
 NxTest.test('bom: rozdielne hrany alebo hrubka NEzluia (vyrobne parametre v kluci)') do

@@ -29,11 +29,15 @@ module Noxun
           js("NX.init(#{data.to_json})")
         end
 
-        def push_selected(model)
+        # dedup: false = refresh po programovom selecte z okna Vyroba (V0.5 B,
+        # Codex B2) — vyber NESMIE mutovat model (dedup meni ID a stavia).
+        def push_selected(model, dedup: true)
           # fix #6: "sync tick" resolvera — ak vznikla kopia korpusu/dosky (zdielane id),
           # pridelí sa jej nove ID (+ korpusu vlastne ghosty) este pred nacitanim vyberu.
-          CabinetBuilder.dedup_copies(model) if defined?(CabinetBuilder)
-          BoardBuilder.dedup_copies(model) if defined?(BoardBuilder)
+          if dedup
+            CabinetBuilder.dedup_copies(model) if defined?(CabinetBuilder)
+            BoardBuilder.dedup_copies(model) if defined?(BoardBuilder)
+          end
           # V0.4.5 D2: dialog Sablony sleduje vyber (disabled stav "Pouzit na oznaceny")
           TemplatesDialog.on_selection_changed if defined?(TemplatesDialog)
           zone = find_selected_zone(model)
@@ -92,6 +96,11 @@ module Noxun
           @dialog.execute_script(script)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.js')
+        end
+
+        # V0.5 B: relay handshake okna Vyroba potrebuje vediet, ci panel zije.
+        def dialog_alive?
+          !!(@dialog && @dialog.visible?)
         end
 
       end

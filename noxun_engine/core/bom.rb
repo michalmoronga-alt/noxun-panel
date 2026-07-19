@@ -35,7 +35,7 @@ module Noxun
             cabinets += 1
             cid = Store.get(inst, 'cabinet_id').to_s
             ccfg = Store.config(inst) || {}
-            Array(ccfg['hardware']).each { |h| hardware << h.merge('owner_id' => cid) }
+            Array(ccfg['hardware']).each { |h| hardware << h.merge('owner_id' => cid, 'owner_pid' => inst.persistent_id) }
             Array(ccfg['warnings']).each { |w| warnings << (w.is_a?(Hash) ? w.merge('owner_id' => cid) : { 'message' => w.to_s, 'owner_id' => cid }) }
             inst.definition.entities.grep(Sketchup::ComponentInstance).each do |pi|
               next unless Store.kind(pi) == 'part'
@@ -43,7 +43,8 @@ module Noxun
               next unless Store.get(pi, 'production_class').to_s == 'sheet'
               records << record(Store.config(pi) || {}, owner_id: cid,
                                 name: Store.get(pi, 'name').to_s,
-                                part_key: Store.get(pi, 'part_key').to_s)
+                                part_key: Store.get(pi, 'part_key').to_s,
+                                pid: pi.persistent_id)
             end
           when 'board'
             boards += 1
@@ -51,7 +52,8 @@ module Noxun
             bcfg = Store.config(inst) || {}
             records << record(bcfg, owner_id: Store.get(inst, 'id').to_s,
                               name: (bcfg['name'] || 'Doska').to_s,
-                              part_key: Store.get(inst, 'part_key').to_s)
+                              part_key: Store.get(inst, 'part_key').to_s,
+                              pid: inst.persistent_id)
           when 'part'
             # Codex GH #47 P2: odpojeny/vytiahnuty vyrobny dielec priamo v modeli
             # (standard 01: detached dielce ostavaju citatelne pre BOM). Vlastnika
@@ -61,7 +63,8 @@ module Noxun
             records << record(Store.config(inst) || {},
                               owner_id: Store.get(inst, 'cabinet_id').to_s,
                               name: Store.get(inst, 'name').to_s,
-                              part_key: Store.get(inst, 'part_key').to_s)
+                              part_key: Store.get(inst, 'part_key').to_s,
+                              pid: inst.persistent_id)
           end
         end
         { records: records, hardware: hardware, warnings: warnings,
@@ -69,10 +72,13 @@ module Noxun
       end
 
       # Normalizovany zaznam zo snapshot configu (mm Float; edges mapa L1..W2 -> abs_id|nil).
-      def record(cfg, owner_id:, name:, part_key:)
+      # pid = SketchUp persistent_id zdrojovej instancie (Codex B3 — jednoznacna adresa
+      # pre klik-select aj pri docasne zdielanych ID pred dedup tickom); v headless
+      # fixtures moze byt nil.
+      def record(cfg, owner_id:, name:, part_key:, pid: nil)
         edges = cfg['edges'].is_a?(Hash) ? cfg['edges'] : {}
         {
-          'name' => name, 'part_key' => part_key, 'owner_id' => owner_id,
+          'name' => name, 'part_key' => part_key, 'owner_id' => owner_id, 'pid' => pid,
           'length' => cfg['length'].to_f, 'width' => cfg['width'].to_f,
           'thickness' => cfg['thickness'].to_f,
           'quantity' => [cfg['quantity'].to_i, 1].max,
@@ -102,20 +108,29 @@ module Noxun
       def aggregate_rows(records)
         groups = {}
         records.each do |r|
-          key = [dmm(r['length']), dmm(r['width']), dmm(r['thickness']),
-                 r['material_id'], EDGE_ORDER.map { |c| r['edges'][c].to_s },
-                 r['grain_direction']]
-          g = groups[key] ||= { 'length' => r['length'], 'width' => r['width'],
+          key = row_key(r)
+          g = groups[key] ||= { 'key' => key,
+                                'length' => r['length'], 'width' => r['width'],
                                 'thickness' => r['thickness'], 'material_id' => r['material_id'],
                                 'edges' => r['edges'], 'grain_direction' => r['grain_direction'],
-                                'quantity' => 0, 'names' => [], 'kde' => {} }
+                                'quantity' => 0, 'names' => [], 'kde' => {}, 'refs' => [] }
           g['quantity'] += r['quantity']
           g['names'] << r['name'] unless r['name'].empty? || g['names'].include?(r['name'])
           g['kde'][r['owner_id']] = (g['kde'][r['owner_id']] || 0) + r['quantity']
+          g['refs'] << { 'pid' => r['pid'], 'owner_id' => r['owner_id'] } # klik-select adresy (davka B)
         end
         groups.values.map do |g|
           g.merge('kde' => g['kde'].map { |oid, q| { 'owner_id' => oid, 'quantity' => q } })
         end.sort_by { |g| [g['material_id'], -g['length'], -g['width']] }
+      end
+
+      # Deterministicky kluc riadku — klik-select ho posiela NAMIESTO pids
+      # (Codex GH #48 P2: flush editov rebuildne korpus a pids zomru; Ruby si
+      # podla kluca najde CERSTVE refs po flushi).
+      def row_key(r)
+        [dmm(r['length']), dmm(r['width']), dmm(r['thickness']),
+         r['material_id'], EDGE_ORDER.map { |c| r['edges'][c].to_s },
+         r['grain_direction']]
       end
 
       # m2 per doskovy material — scitane z KAZDEHO zdrojoveho dielca (F6).
@@ -152,13 +167,15 @@ module Noxun
         out = {}
         items.each do |h|
           params = h['params'].is_a?(Hash) ? h['params'] : {}
-          key = [h['generic_type'].to_s, h['variant_id'].to_s, params_signature(params)]
-          g = out[key] ||= { 'generic_type' => h['generic_type'].to_s,
+          key = hw_key(h)
+          g = out[key] ||= { 'key' => key,
+                             'generic_type' => h['generic_type'].to_s,
                              'variant_id' => h['variant_id'],
                              'params' => params, 'quantity' => 0, 'breakdown' => [] }
           q = h['quantity'].to_i
           g['quantity'] += q
-          g['breakdown'] << { 'owner_id' => h['owner_id'].to_s, 'rule_id' => h['rule_id'].to_s,
+          g['breakdown'] << { 'owner_id' => h['owner_id'].to_s, 'owner_pid' => h['owner_pid'],
+                              'rule_id' => h['rule_id'].to_s,
                               'source' => h['source'].to_s, 'quantity' => q,
                               'owner_part_key' => h['owner_part_key'] }
         end
@@ -167,6 +184,11 @@ module Noxun
 
       def params_signature(params)
         params.sort_by { |k, _| k.to_s }.map { |k, v| "#{k}=#{v.is_a?(Float) ? v.round(2) : v}" }.join('|')
+      end
+
+      def hw_key(h)
+        params = h['params'].is_a?(Hash) ? h['params'] : {}
+        [h['generic_type'].to_s, h['variant_id'].to_s, params_signature(params)]
       end
 
       # summary.rows = agregovane riadky; summary.quantity = suma kusov (N8).

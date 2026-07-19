@@ -1,3 +1,12 @@
+  // V0.5 B: otvorenie okna Vyroba (kusovnik/supisy). Najprv flush cakajucich
+  // editov korpusu/dosky (Codex GH #48 P2) — BOM sa pocita az z cerstveho stavu
+  // (callbacky sa spracuju v poradi: apply -> open -> push_state).
+  function openProductionDialog(){
+    if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+    if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
+    if (window.sketchup && sketchup.open_production) sketchup.open_production('');
+  }
+
   // ===================== ZONA UI (akcie / rozmery poli) =====================
   // V0.4.5 D1: karta zony (#zoneCard) sa zobrazuje LEN pri kliknutej zone — hned pod
   // nahladom, kde na nu pouzivatel klikol. Bez vyberu je cela karta skryta.
