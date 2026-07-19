@@ -171,6 +171,7 @@
   body[data-insert-kind="board"].mode-insert #insertCabForm { display: none; }
   body[data-insert-kind="board"].mode-insert #basicCard,
   body[data-insert-kind="board"].mode-insert .pvbox,
+  body[data-insert-kind="board"].mode-insert #zoneCard,
   body[data-insert-kind="board"].mode-insert details[data-key="top"],
   body[data-insert-kind="board"].mode-insert details[data-key="bottom"],
   body[data-insert-kind="board"].mode-insert details[data-key="sides"],

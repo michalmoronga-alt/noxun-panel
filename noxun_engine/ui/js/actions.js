@@ -12,8 +12,11 @@
     }
     // D-03: jednozonova skrinka = karta rovno (discoverability polic). Podmienka !z
     // pokryva prazdne AJ neplatne stale ID (Codex F3). Lokalny vyber — select_zone
-    // do modelu sa neposiela (to robi len klik v pickZone).
-    if (!z && zones.length === 1 && zones[0].leaf){
+    // do modelu sa neposiela (to robi len klik v pickZone). Pri vkladani DOSKY sa
+    // auto-select nespusta (Codex GH #42: zoneCard by visela nad board formularom
+    // a ovladala skryty korpusovy draft — CSS skrytie nie je ochrana stavu).
+    if (!z && zones.length === 1 && zones[0].leaf &&
+        !(!selectedCabId && getInsertKind() === 'board')){
       activeZoneId = fullZoneId(zones[0].id);
       z = zones[0];
       renderPreview(); // nahlad sa kreslil pred auto-selectom — zvyrazni zonu (Codex F1)
