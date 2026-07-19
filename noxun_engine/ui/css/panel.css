@@ -141,6 +141,17 @@
   /* rezimy Inspectora (body class z bridge.js) */
   .insertmore { display: none; }
   body.mode-cab .insertmore { display: block; }
+  /* D-14: ulozit ako sablonu — rovnake pravidlo ako insertmore (len oznaceny korpus) */
+  .savetpl { display: none; }
+  body.mode-cab .savetpl { display: block; }
+  /* D-14/D-15: genericky in-panel modal pre "pridavacie" akcie */
+  .nxmodal { position: fixed; inset: 0; background: rgba(38,50,56,0.45); z-index: 60;
+             display: flex; align-items: center; justify-content: center; }
+  .nxmodal-card { background: #fff; border: 1px solid #cfd8dc; border-radius: 8px;
+                  box-shadow: 0 8px 28px rgba(0,0,0,0.25); padding: 14px; width: min(92%, 340px); }
+  .nxmodal-title { font-weight: 600; font-size: 14px; margin-bottom: 10px; color: #263238; }
+  .nxmodal-warn { background: #fff8ef; border: 1px solid #ffb74d; color: #8d5a00;
+                  border-radius: 4px; padding: 6px 8px; font-size: 12px; margin: 8px 0; }
   body.mode-cab #insertCard { display: none; }
   body.mode-part #insertCard, body.mode-part #basicCard,
   body.mode-part details[data-key="top"], body.mode-part details[data-key="bottom"],

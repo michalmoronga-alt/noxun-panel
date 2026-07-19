@@ -183,6 +183,61 @@
   // (saveTemplate/deleteTemplate/applyTemplateToSelected sa V0.4.5 D2 presunuli
   //  do okna Sablony — js/templates_dialog.js; panel drzi len quick-pick vyber.)
 
+  // --- D-14: ulozit oznaceny korpus ako sablonu (in-panel modal, vzor D-15) ---
+  // Input NIE JE vyrazove pole (ziadny onField/attachExprField — Codex F6);
+  // Enter uklada, Esc zatvara, Tab ostava v modale (focus trap).
+  var tplModalBound = false;
+  function openSaveTemplateModal(){
+    if (!selectedCabId){ NX.setStatus('Najprv označ korpus.', true); return; }
+    var m = el('tplModal'); if (!m) return;
+    el('tplSaveName').value = (typeof tplNameSuggestion === 'string' && tplNameSuggestion) ? tplNameSuggestion : '';
+    m.style.display = 'flex';
+    refreshTplModalWarn();
+    bindTplModal();
+    var inp = el('tplSaveName'); inp.focus(); inp.select();
+  }
+  function closeSaveTemplateModal(){
+    var m = el('tplModal'); if (m) m.style.display = 'none';
+  }
+  function tplModalOpen(){ var m = el('tplModal'); return !!(m && m.style.display !== 'none'); }
+  // Kolizia nazvu: CELE pole TEMPLATES (nie typovy filter selectu), trim,
+  // case-sensitive presne ako Ruby store (Codex N8). Vola sa aj z NX.setTemplates,
+  // aby varovanie zilo pri zmene kniznice pocas otvoreneho modalu (Codex F3).
+  function refreshTplModalWarn(){
+    if (!tplModalOpen()) return;
+    var name = el('tplSaveName').value.trim();
+    var exists = TEMPLATES.some(function(t){ return t.name === name; });
+    el('tplSaveWarn').style.display = exists ? '' : 'none';
+  }
+  function saveTemplateAs(){
+    var inp = el('tplSaveName');
+    var name = inp.value.trim();
+    if (!name){ inp.classList.add('bad'); inp.focus(); return; }
+    inp.classList.remove('bad');
+    if (window.sketchup && sketchup.save_template_as){
+      sketchup.save_template_as(JSON.stringify({ name: name, cabinet_id: selectedCabId }));
+    }
+    closeSaveTemplateModal();
+  }
+  function bindTplModal(){
+    if (tplModalBound) return; tplModalBound = true;
+    var m = el('tplModal');
+    el('tplSaveName').addEventListener('input', function(){ this.classList.remove('bad'); refreshTplModalWarn(); });
+    m.addEventListener('keydown', function(ev){
+      if (ev.key === 'Escape'){ ev.preventDefault(); closeSaveTemplateModal(); return; }
+      if (ev.key === 'Enter'){ ev.preventDefault(); saveTemplateAs(); return; }
+      if (ev.key === 'Tab'){
+        var f = m.querySelectorAll('input, button');
+        if (!f.length) return;
+        var first = f[0], last = f[f.length - 1];
+        if (ev.shiftKey && document.activeElement === first){ ev.preventDefault(); last.focus(); }
+        else if (!ev.shiftKey && document.activeElement === last){ ev.preventDefault(); first.focus(); }
+      }
+    });
+    // klik na tmave pozadie = zrusit (klik v karte nie)
+    m.addEventListener('mousedown', function(ev){ if (ev.target === m) closeSaveTemplateModal(); });
+  }
+
   // --- cela riadky ---
   function addFrontRow(item){
     item = item || {};

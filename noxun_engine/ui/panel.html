@@ -5,7 +5,7 @@
      sablon ziju v satelitnych oknach (proj_materials.html, templates.html) — panel ma len
      quick-pick sablony a materialy oznacenej skrinky. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.7k">
+<link rel="stylesheet" href="css/panel.css?v=0.4.7l">
 
 <div class="hdr"><h1>Noxun Engine</h1><span class="sub" id="verline">…</span></div>
 
@@ -284,22 +284,37 @@
 
 <!-- pri oznacenom korpuse: vlozenie dalsieho s aktualnymi hodnotami (sekundarna akcia) -->
 <button class="ghostbtn wide insertmore" onclick="insertCabinet()">+ Vložiť ďalší korpus s týmito hodnotami</button>
+<!-- D-14: ulozenie oznaceneho korpusu do kniznice sablon (in-panel modal — vzor D-15) -->
+<button class="ghostbtn wide savetpl" onclick="openSaveTemplateModal()">★ Uložiť ako šablónu do knižnice</button>
+
+<div id="tplModal" class="nxmodal" style="display:none">
+  <div class="nxmodal-card">
+    <div class="nxmodal-title">Uložiť ako šablónu</div>
+    <div class="row"><label>Názov</label><input id="tplSaveName" type="text"><span class="unit"></span></div>
+    <div class="hint">Uloží sa konštrukcia, zóny, čelá s medzerami a nastavené materiály skrinky. Úpravy jednotlivých dielcov (materiál/ABS) a kovanie sa neukladajú — viažu sa na konkrétnu skrinku.</div>
+    <div class="nxmodal-warn" id="tplSaveWarn" style="display:none">Šablóna s týmto názvom už existuje — Uložiť ju prepíše.</div>
+    <div class="btnrow">
+      <button class="primary" onclick="saveTemplateAs()">Uložiť</button>
+      <button class="ghostbtn" onclick="closeSaveTemplateModal()">Zrušiť</button>
+    </div>
+  </div>
+</div>
 
 <div id="status">Pripravené.</div>
 
 <!-- Poradie skriptov je kontrakt: errors prvy (chytac), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.4.7k"></script>
-<script src="js/core.js?v=0.4.7k"></script>
-<script src="js/expr.js?v=0.4.7k"></script>
-<script src="js/form.js?v=0.4.7k"></script>
-<script src="js/zone_tree.js?v=0.4.7k"></script>
-<script src="js/preview.js?v=0.4.7k"></script>
-<script src="js/actions.js?v=0.4.7k"></script>
-<script src="js/bridge.js?v=0.4.7k"></script>
-<script src="js/materials.js?v=0.4.7k"></script>
-<script src="js/part_card.js?v=0.4.7k"></script>
-<script src="js/board_card.js?v=0.4.7k"></script>
-<script src="js/hardware.js?v=0.4.7k"></script>
-<script src="js/boot.js?v=0.4.7k"></script>
+<script src="js/errors.js?v=0.4.7l"></script>
+<script src="js/core.js?v=0.4.7l"></script>
+<script src="js/expr.js?v=0.4.7l"></script>
+<script src="js/form.js?v=0.4.7l"></script>
+<script src="js/zone_tree.js?v=0.4.7l"></script>
+<script src="js/preview.js?v=0.4.7l"></script>
+<script src="js/actions.js?v=0.4.7l"></script>
+<script src="js/bridge.js?v=0.4.7l"></script>
+<script src="js/materials.js?v=0.4.7l"></script>
+<script src="js/part_card.js?v=0.4.7l"></script>
+<script src="js/board_card.js?v=0.4.7l"></script>
+<script src="js/hardware.js?v=0.4.7l"></script>
+<script src="js/boot.js?v=0.4.7l"></script>
