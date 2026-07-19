@@ -22,12 +22,16 @@
 
 ## Návrhy väčších celkov (na rozpracovanie)
 
-- **D-08 · Režimové taby Inspectora: Korpus · Zóny · Čelá** (návrh Michal 19.7.) — dnešné taby nad náhľadom prepínajú LEN kresbu (Zóny/Čelá) a nastavenia sú nezávisle v 8 akordeónoch pod tým; návrh: taby = REŽIMY PRÁCE, ktoré prepínajú náhľad AJ zobrazené nastavenia. **Korpus** = kótovaný náhľad vonkajších rozmerov + konštrukčné sekcie; **Zóny** = zónový náhľad s drag priečkami (existuje — „čistá 🚀") + karta zóny/štruktúra; **Čelá** = náhľad čiel + riadky čiel; neskôr možný tab **Materiály** (prehľad použitých materiálov + ABS pod jednou strechou). Mimo tabov ostávajú režimy vkladania/dielca/dosky. Dohodnuté detaily 19.7.: kovanie sa NErozdeľuje — jeden akordeón v tabe Korpus (vlastný tab až V0.6); materiály pri Korpuse; aktívny tab sa pamätá pri zmene výberu. *Stav: koncept schválený obojstranne = **dávka 3**; konkrétne rozdelenie sekcií do tabov = návrh na odklep pred kódom.*
-- **D-09 · Snap body pri presúvaní priečok** (1/4, 1/2, 3/4…) v zónovom náhľade. *Stav: nápad, po D-08.*
-- **D-10 · Presúvanie/úprava čiel priamo v náhľade** (ako drag priečok). *Stav: nápad, po D-08.*
+- **D-09 · Snap body pri presúvaní priečok** (1/4, 1/2, 3/4…) v zónovom náhľade. *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
+- **D-10 · Presúvanie/úprava čiel priamo v náhľade** (ako drag priečok). *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
+
+## Otvorené otázky (na Michalovo posúdenie pri teste)
+
+- **D-08 vs D-03:** karta Zóna jednozónovej skrinky sa ukáže až v tabe Zóny (predvolený tab je Korpus). Ak bude chýbať hneď pri označení, možnosť: novo vložená skrinka štartuje v tabe Zóny.
 
 ## Vyriešené
 
+- **D-08 · Režimové taby Inspectora** → **vyriešené v dávke 3 (PR #43)**: taby Korpus · Zóny · Čelá = režimy práce — prepínajú náhľad AJ sekcie. Korpus (default) = kótovaný obrys (Š/V/hĺbka) + Základné/Strop/Dno/Boky/Chrbát/Kovanie/Materiály; Zóny = zónový náhľad + ghost checkbox + karta Zóna + strom; Čelá = náhľad čiel + riadky + medzery/presahy. Tab sa pamätá cez zmeny výberu; dielec vynúti zónový náhľad (klik na zónu = odchod z dielca) a po návrate sa tab obnoví; prepnutie tabu = čistý fit. Čelá na drafte pred vložením ostávajú hláškou (vedomé). Codex audit 0 blockerov / 6 fixov; DOM smoke test PASS.
 - **D-07 · Medzery/presahy čiel** → **vyriešené v dávke „noc na 19.7." (PR #41)**: sekcia Čelá má polia *Medzi čelami / Okraj hore / dole / po stranách* (+ Reset 3/2 mm); záporný okraj = presah cez obrys korpusu (limity 0–50 / ±100 mm); výrazy fungujú; šablóny hodnoty ukladajú; medzera dvojkrídlových poslúcha nastavenie (bola natvrdo) a náhľad ich kreslí ako 2 panely; fit náhľadu zahrnie presahy. Sémantika: čelá sa kladú odspodu — „Okraj hore" posúva geometriu cez AUTO čelo, pri samých pevných výškach je rezervou (vysvetlené v hinte).
 - **D-03 · Police sa hľadajú ťažko** → **vyriešené (PR #42)**: jednozónová skrinka zobrazí kartu Zóna rovno pri označení (auto-výber, náhľad zvýrazní); hint pod náhľadom spomína police; vysvetlenie v akordeóne Štruktúra zón; karta Zóna sa už neplietie do režimu Čelá. (Pôvodne evidované ako falošný poplach + nápady — nápady zrealizované.)
 - **D-05 · Vlastný materiál sa nedá pridať** → **vyriešené v dávke 2 (PR #39)**: okno Materiály projektu = plná správa katalógu — pridať/upraviť/zmazať doskový materiál aj ABS pásku; ID generuje server (transliterácia, kolízie -2/-3); **hrúbka existujúceho materiálu je nemenná** (iná hrúbka = nový variant); mazanie s guardom — PROTECTED_SHEET_IDS (fallbacky) + scan použitia v modeli, overridoch, dielcoch, doskách aj šablónach; živý sync do panela bez resetu formulára. Michal: „materiál editor je bomba."
