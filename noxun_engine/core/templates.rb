@@ -88,7 +88,7 @@ module Noxun
         base = {
           'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0, 'thickness' => 18.0,
           'floor_height' => 100.0, 'bottom_mode' => 'under_sides', 'top_mode' => 'full',
-          'back_mode' => 'overlay', 'back_thickness' => 3.0, 'plinth_mode' => 'none', 'plinth_recess' => 50.0,
+          'back_mode' => 'overlay', 'back_thickness' => 3.0, 'plinth_mode' => 'none', 'plinth_recess' => 40.0,
           'rail_depth' => 100.0, 'rails_orientation' => 'flat', 'rails_top_offset' => 0.0,
           'zone_tree' => ZoneTree.default_tree(0), 'fronts' => Fronts.empty_config
         }
@@ -99,7 +99,7 @@ module Noxun
         base = {
           'type' => 'upper', 'width' => 600.0, 'height' => 720.0, 'depth' => 320.0, 'thickness' => 18.0,
           'floor_height' => 0.0, 'bottom_mode' => 'between_sides', 'top_mode' => 'full',
-          'back_mode' => 'groove', 'back_thickness' => 3.0, 'plinth_mode' => 'none', 'plinth_recess' => 50.0,
+          'back_mode' => 'groove', 'back_thickness' => 3.0, 'plinth_mode' => 'none', 'plinth_recess' => 40.0,
           'rail_depth' => 100.0, 'rails_orientation' => 'flat', 'rails_top_offset' => 0.0,
           'zone_tree' => ZoneTree.default_tree(0), 'fronts' => Fronts.empty_config
         }

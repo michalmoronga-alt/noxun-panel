@@ -10,20 +10,24 @@
 
 ## Spomaľovače (vysoká priorita)
 
-*(momentálne žiadne)*
+- **D-17 · BUG: sokel o 36 mm kratší ako skrinka** (Michal 19.7. večer) — soklový panel sa stavia medzi boky (`šírka − 2×hrúbka`); výrobný štandard = plná šírka skrinky, lícuje s bokmi. *Stav: fix v dávke 4.*
+- **D-12 · Zoom náhľadu pri scrollovaní panela** — čistý scroll nad náhľadom nechtiac zoomuje pri scrollovaní pluginu. Riešenie: **Ctrl+koliesko = zoom**, čistý scroll = scroll panela (štandard máp/CAD; hint to napíše). *Stav: dávka 4.*
 
 ## UX drobnosti (nízka priorita)
 
-*(momentálne žiadne)*
+- **D-11 · Kóty sokla a tela + pole Výška sokla** — do kótovaného náhľadu Korpus pridať vľavo kóty výšky sokla a výšky tela korpusu; pole „Výška podstavca" presunúť do Základných. *Stav: dávka 4.*
+- **D-13 · Default zapustenia sokla 40 mm** — soklový panel predvolene 40 mm od prednej hrany (uľahčí neskoršie výpočty — nohy pod prednou hranou); doteraz 50. Nové skrinky; existujúce bez zmeny. *Stav: dávka 4.*
 
 ## Nápady na zváženie (nerozhodnuté)
 
-*(momentálne žiadne)*
+- **D-15 · UX vzor: „pridávačky" ako modal** (Michal 19.7.) — všetky akcie „pridať niečo" (šablóna, materiál, …) zjednotiť na modal s formulárom. Napĺňa sa postupne (prvý bude D-14; materiál formulár sa prerobí neskôr).
 
 ## Návrhy väčších celkov (na rozpracovanie)
 
 - **D-09 · Snap body pri presúvaní priečok** (1/4, 1/2, 3/4…) v zónovom náhľade. *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
 - **D-10 · Presúvanie/úprava čiel priamo v náhľade** (ako drag priečok). *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
+- **D-14 · Uložiť korpus do knižnice priamo z panela** (Michal 19.7.) — dnes sa šablóna ukladá v satelitnom okne Šablóny (nenájditeľné pri práci). Návrh: tlačidlo „★ Uložiť ako šablónu" dole vedľa „+ Vložiť ďalší korpus" → **modal** s názvom a potrebnými údajmi (prvý kus vzoru D-15). *Stav: dávka 5.*
+- **D-16 · Autocomplete dekoru** (Michal 19.7.) — pri výbere materiálu/ABS písať názov z katalógu, návrhy sa dopĺňajú za každým písmenom, → a Enter potvrdí. *Stav: dávka 5.*
 
 ## Otvorené otázky (na Michalovo posúdenie pri teste)
 
@@ -41,6 +45,9 @@
 - **D-04 · Ghost zóny zavadzajú** → **vyriešené v dávke 1 (PR #38)** variantom (a): ghosty predvolene VYPNUTÉ (aj novo vzniknutý tag je neviditeľný); klik na zóny primárne cez 2D náhľad; checkbox „Zobraziť zóny" na zapnutie ostáva.
 
 ## Postrehy, ktoré potešili (nechávame tak)
+
+- D-08 taby (19.7.): „na prvý pohľad je to omnoho prehľadnejšie."
+- **Prvá zákazka dokončená BEZ blokov (19.7.)** — vrátane pridania vlastného materiálu a celého workflow: „zatiaľ super."
 
 - Výrazy v poliach: „650-36 → super, nemusím rátať z pamäti a preklikávať kalkulačku — bomba." Medzivýpočet 950-28=922 prehľadný, Enter potvrdenie sedí.
 - Blokovanie nezmyselnej hrúbky materiálu (20 mm bez katalógového materiálu → červený blok) funguje.

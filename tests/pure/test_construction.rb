@@ -51,7 +51,7 @@ module NxConsHelp
     {
       width: 600.0, height: 720.0, depth: 510.0, thickness: 18.0, floor_height: 100.0,
       bottom_mode: 'under_sides', top_mode: 'full', back_mode: 'overlay', back_thickness: 3.0,
-      plinth_mode: 'none', plinth_recess: 50.0,
+      plinth_mode: 'none', plinth_recess: 40.0,
       rail_depth: 100.0, rails_orientation: 'flat', rails_top_offset: 0.0
     }.merge(over)
   end
@@ -180,6 +180,24 @@ NxTest.test('construction: golden plan horneho korpusu (normalize type upper)') 
 end
 
 # --- Matrix smoke: vsetky konstrukcne varianty --------------------------------
+
+NxTest.test('construction: D-17 sokel — plna sirka pri dne pod bokmi, medzi boky pri between_sides') do
+  h = NxConsHelp
+  # EU default (under_sides): boky zacinaju nad soklom -> sokel plna sirka, licuje s bokmi
+  cfg = h.cb.normalize('plinth_mode' => 'front')
+  pl = h.cn.build_plan(cfg, 'CAB-D17')[:parts].find { |p| p[:part_key].to_s == 'cabinet/plinth:front' }
+  NxTest.assert(!pl.nil?, 'sokel existuje (under_sides)')
+  NxTest.assert_close(600.0, pl[:box][0])
+  NxTest.assert_close(0.0, pl[:origin][0])
+  NxTest.assert_close(40.0, pl[:origin][1], 0.01, 'D-13: novy default recess 40')
+  NxTest.assert_close(600.0, pl[:prod][:length])
+  # between_sides: boky siahaju na zem -> sokel ostava MEDZI bokmi (ziadna kolizia)
+  cfg2 = h.cb.normalize('plinth_mode' => 'front', 'bottom_mode' => 'between_sides')
+  pl2 = h.cn.build_plan(cfg2, 'CAB-D17B')[:parts].find { |p| p[:part_key].to_s == 'cabinet/plinth:front' }
+  NxTest.assert_close(564.0, pl2[:box][0]) # 600 - 2*18
+  NxTest.assert_close(18.0, pl2[:origin][0])
+  NxTest.assert_close(564.0, pl2[:prod][:length])
+end
 
 NxTest.test('construction: matrix smoke bottom x top x back x plinth') do
   h = NxConsHelp

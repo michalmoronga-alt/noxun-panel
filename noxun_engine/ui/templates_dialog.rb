@@ -168,6 +168,9 @@ module Noxun
           merged = tpl_config.dup
           merged['part_overrides'] = target_params['part_overrides'] || {}
           merged['hardware_overrides'] = target_params['hardware_overrides'] || []
+          # D-13 (Codex F3): legacy sablona BEZ plinth_recess nesmie cielovy korpus
+          # ticho stiahnut na novy default — chybajuci kluc = zachovaj hodnotu ciela.
+          merged['plinth_recess'] = target_params['plinth_recess'] unless tpl_config.key?('plinth_recess')
           %w[material_id front_material_id back_material_id].each do |k|
             tv = Panel.present_str(tpl_config[k])
             merged[k] = tv || target_params[k]
