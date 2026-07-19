@@ -52,6 +52,16 @@ module Noxun
             records << record(bcfg, owner_id: Store.get(inst, 'id').to_s,
                               name: (bcfg['name'] || 'Doska').to_s,
                               part_key: Store.get(inst, 'part_key').to_s)
+          when 'part'
+            # Codex GH #47 P2: odpojeny/vytiahnuty vyrobny dielec priamo v modeli
+            # (standard 01: detached dielce ostavaju citatelne pre BOM). Vlastnika
+            # drzi povodne cabinet_id v atributoch.
+            next unless Store.get(inst, 'manufactured') == true
+            next unless Store.get(inst, 'production_class').to_s == 'sheet'
+            records << record(Store.config(inst) || {},
+                              owner_id: Store.get(inst, 'cabinet_id').to_s,
+                              name: Store.get(inst, 'name').to_s,
+                              part_key: Store.get(inst, 'part_key').to_s)
           end
         end
         { records: records, hardware: hardware, warnings: warnings,

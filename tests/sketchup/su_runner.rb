@@ -334,6 +334,26 @@ module NoxunSuRunner
     ok('sync-bom: m2 supis nenulovy a summary sedi s poctami',
        bom[:summary]['m2_total'] > 0.5 && bom[:summary]['cabinets'] == 2 &&
        bom[:summary]['boards'] == 2 && bom[:summary]['rows'] <= bom[:summary]['records'])
+    # Codex GH #47 P2: odpojeny vyrobny dielec priamo v model.entities sa zbiera tiez
+    src_part = inst.definition.entities.grep(Sketchup::ComponentInstance)
+                   .find { |i| e::Store.get(i, 'part_key') == 'cabinet/side:left' }
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST detached part', true)
+      det = model.entities.add_instance(src_part.definition,
+                                        Geom::Transformation.translation(e::Units.vector(1600, 0, 0)))
+      %w[std kind id part_id cabinet_id role name part_key part_key_schema
+         manufactured production_class config].each do |k|
+        v = e::Store.get(src_part, k)
+        det.set_attribute('NOXUN', k, v) unless v.nil?
+      end
+      model.commit_operation
+      col2 = e::Bom.collect(model)
+      ok("sync-bom: odpojeny dielec v modeli sa zbiera (#{col2[:records].length} records)",
+         col2[:records].length == col[:records].length + 1)
+      model.start_operation('SU-TEST detached cleanup', true)
+      det.erase!
+      model.commit_operation
+    end
     e::Panel.handle_set_board_fields({ 'board_id' => bid, 'fields' => { 'width' => 555.0 } }.to_json)
     ok('sync-board: panel zapis presiel (width 555)',
        ((e::Store.config(binst) || {})['width'].to_f - 555.0).abs < 0.01)
