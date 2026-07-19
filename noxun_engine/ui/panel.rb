@@ -75,6 +75,9 @@ module Noxun
           cb(dlg, 'open_project_materials') { |_p| MaterialsDialog.show }
           cb(dlg, 'open_templates')         { |_p| TemplatesDialog.show }
           cb(dlg, 'save_template_as')       { |p| handle_save_template_as(p) } # D-14 modal
+          cb(dlg, 'open_production')        { |_p| ProductionDialog.show }      # V0.5 B
+          # V0.5 B relay (Codex B1): panel JS uz flushol edity — vyber vykona Vyroba
+          cb(dlg, 'production_do_select')   { |p| ProductionDialog.do_select(p) }
           # V0.4.7c: samostatna doska — vlozenie + karta (fields/material/ABS hrana)
           cb(dlg, 'insert_board')       { |p| handle_insert_board(p) }
           cb(dlg, 'set_board_fields')   { |p| handle_set_board_fields(p) }

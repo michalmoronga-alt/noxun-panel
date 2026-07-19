@@ -1,3 +1,6 @@
+  // V0.5 B: otvorenie okna Vyroba (kusovnik/supisy)
+  function openProductionDialog(){ if (window.sketchup && sketchup.open_production) sketchup.open_production(''); }
+
   // ===================== ZONA UI (akcie / rozmery poli) =====================
   // V0.4.5 D1: karta zony (#zoneCard) sa zobrazuje LEN pri kliknutej zone — hned pod
   // nahladom, kde na nu pouzivatel klikol. Bez vyberu je cela karta skryta.

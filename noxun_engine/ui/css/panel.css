@@ -152,6 +152,24 @@
   .nxmodal-title { font-weight: 600; font-size: 14px; margin-bottom: 10px; color: #263238; }
   .nxmodal-warn { background: #fff8ef; border: 1px solid #ffb74d; color: #8d5a00;
                   border-radius: 4px; padding: 6px 8px; font-size: 12px; margin: 8px 0; }
+  /* ===== V0.5 B: okno Vyroba (kusovnik/supisy) ===== */
+  .prodhead { display: flex; align-items: center; gap: 10px; }
+  .prodhead h1 { margin: 0; }
+  .prodhead .sub { flex: 1; }
+  .prodsum { background: #eceff1; border: 1px solid #cfd8dc; border-radius: 6px;
+             padding: 7px 10px; font-size: 12.5px; margin: 8px 0; color: #37474f; }
+  .prodtabs { margin-bottom: 6px; }
+  .prodbody { max-height: calc(100vh - 220px); overflow: auto; border: 1px solid #cfd8dc; border-radius: 6px; }
+  .bomtab { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .bomtab th { position: sticky; top: 0; background: #f5f7f8; text-align: left;
+               padding: 6px 8px; border-bottom: 2px solid #cfd8dc; z-index: 2; }
+  .bomtab td { padding: 5px 8px; border-bottom: 1px solid #eceff1; vertical-align: top; }
+  .bomtab tr.bomrow, .bomtab tr.hwrow { cursor: pointer; }
+  .bomtab tr.bomrow:hover, .bomtab tr.hwrow:hover { background: #e3f2fd; }
+  .wbadge { background: #ffb74d; color: #4e2e00; border-radius: 9px; padding: 0 6px;
+            font-size: 11px; font-weight: 600; }
+  /* tlacidlo Vyroba v paneli — globalna akcia pod identitou (vzdy viditelne) */
+  .prodopen { margin: 4px 0 8px; }
   body.mode-cab #insertCard { display: none; }
   body.mode-part #insertCard, body.mode-part #basicCard,
   body.mode-part details[data-key="top"], body.mode-part details[data-key="bottom"],

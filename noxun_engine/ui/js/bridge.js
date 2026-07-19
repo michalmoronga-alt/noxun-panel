@@ -53,6 +53,12 @@
       else { setType('lower'); setDefaults('lower'); currentZoneTree = defaultTree(); renderFilteredTemplates(); NX.clearSelected(); onField(); }
     },
     setTemplates: function(list){ TEMPLATES = list || []; renderFilteredTemplates(); refreshTplModalWarn(); }, // D-14: varovanie kolizie zije aj pri otvorenom modale
+    // V0.5 B (Codex B1): okno Vyroba pyta select cez panel — najprv flush
+    // rozpisanych editov (400 ms debounce), az potom sa meni selection.
+    productionRelay: function(p){
+      if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+      if (window.sketchup && sketchup.production_do_select) sketchup.production_do_select(JSON.stringify(p));
+    },
     // D-05: zivy katalog materialov po CRUD v okne Materialy projektu. Obnovi
     // vsetky selecty s materialmi BEZ resetu formulara; zachovava vybrane hodnoty.
     setMaterials: function(data){
