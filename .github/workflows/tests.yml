@@ -15,3 +15,5 @@ jobs:
         run: ruby tests/run_all.rb
       - name: JS testy (evalDim parser vyrazovych poli)
         run: node tests/js/test_expr.js
+      - name: JS testy (klasifikacia klucov meraca D-25)
+        run: node tests/js/test_usage.js

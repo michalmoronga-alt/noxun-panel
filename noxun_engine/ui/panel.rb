@@ -83,6 +83,10 @@ module Noxun
           cb(dlg, 'set_board_fields')   { |p| handle_set_board_fields(p) }
           cb(dlg, 'set_board_material') { |p| handle_set_board_material(p) }
           cb(dlg, 'set_board_edge')     { |p| handle_set_board_edge(p) }
+          # D-25: merac pouzivania panela — lokalne pocitadla interakcii (len
+          # identifikatory prvkov a pocty). Handler chyby NIKDY nepusti von
+          # (vlastny rescue bez set_status) — merac musi ostat neviditelny.
+          cb(dlg, 'usage_flush')        { |p| handle_usage_flush(p) }
           # Diagnostika: JS chyby z HtmlDialogu (window.onerror) -> Engine.log. Priamo, NIE cez cb —
           # aby pripadna chyba v logovani nespustila set_status (dalsi execute_script) a slucku.
           dlg.add_action_callback('js_error') do |_ctx, msg|
@@ -121,6 +125,7 @@ Sketchup.require 'noxun_engine/ui/panel/actions_materials'
 Sketchup.require 'noxun_engine/ui/panel/actions_parts'
 Sketchup.require 'noxun_engine/ui/panel/actions_hardware'
 Sketchup.require 'noxun_engine/ui/panel/actions_board' # V0.4.7c samostatna doska
+Sketchup.require 'noxun_engine/ui/panel/actions_usage' # D-25 merac pouzivania panela
 Sketchup.require 'noxun_engine/ui/panel/sync'
 Sketchup.require 'noxun_engine/ui/panel/resolvers'
 Sketchup.require 'noxun_engine/ui/panel/payloads'
