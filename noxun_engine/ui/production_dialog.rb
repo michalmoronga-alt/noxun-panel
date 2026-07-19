@@ -34,11 +34,66 @@ module Noxun
 
         # EngineAppObserver: prepnutie/otvorenie modelu = nove data + nova generacia
         # (stary DOM klik sa odmietne genom aj keby ID sedeli — dva Untitled apod.)
+        # @model_epoch: stabilna identita "ineho modelu" pre JS lifecycle nazvu
+        # projektu (GH P2: dva modely s rovnakym titulom/nazvom suboru).
         def on_model_changed(_model)
+          @model_epoch = @model_epoch.to_i + 1
           return unless @dialog && @dialog.visible?
           push_state
         rescue StandardError => e
           Engine.log_error(e, 'ProductionDialog.on_model_changed')
+        end
+
+        # V0.5 C: export VEPO — vstup po relay z panela (edity flushnute) alebo
+        # priamo (panel nezije). Poradie: gen check -> flush guard -> vyber
+        # priecinka -> CERSTVY BOM -> build -> atomicky zapis -> ulozit settings.
+        def do_export(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          unless data['gen'].to_i == @generation.to_i
+            push_state if @dialog && @dialog.visible?
+            return set_status('Dáta okna sa medzitým zmenili — skús export znova.', true)
+          end
+          if data['flush_blocked']
+            return set_status('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
+          end
+
+          settings = vepo_settings
+          last = settings['last_dir']
+          start_dir = last.is_a?(String) && File.directory?(last) ? last : nil
+          dir = UI.select_directory(title: 'Priečinok pre VEPO export', directory: start_dir)
+          return set_status('Export zrušený.') if dir.nil? || dir.to_s.empty?
+
+          model = Sketchup.active_model
+          bom = fresh_bom(model)
+          merge = data['merge'] != false
+          result = VepoExport.build(
+            bom[:rows],
+            project: data['project'].to_s,
+            materials: vepo_materials,
+            edge_thicknesses: vepo_edge_thicknesses,
+            warnings: bom[:warnings],
+            version: Engine::VERSION,
+            generated_at: Time.now.strftime('%Y-%m-%d %H:%M'),
+            merge_18_36: merge
+          )
+          if result['groups'].empty? && result['errors'].empty?
+            return set_status('Niet čo exportovať — model nemá výrobné dielce.', true)
+          end
+          # GH P2: aj ked su VSETKY riadky chybne, LOG s dovodmi sa MUSI zapisat
+          # (inak by diagnostika chybala presne pri uplne zlyhanom exporte).
+          target = VepoExport.write(result, dir)
+          if result['groups'].empty?
+            save_vepo_settings('last_dir' => dir, 'merge_18_36' => merge)
+            return set_status("Export nevytvoril žiadny CSV — #{result['errors'].length} chybných riadkov. Dôvody v LOGu: #{target}", true)
+          end
+          save_vepo_settings('last_dir' => dir, 'merge_18_36' => merge)
+          err  = result['errors'].empty? ? '' : " · #{result['errors'].length} chýb (viď LOG)"
+          warn = Array(bom[:warnings]).empty? ? '' : " · #{Array(bom[:warnings]).length} upozornení stavby (v LOGu)"
+          set_status("VEPO export hotový: #{result['groups'].length} súborov, #{result['total_rows']} riadkov " \
+                     "(#{result['total_pieces']} ks) → #{target}#{err}#{warn}", !result['errors'].empty?)
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.do_export')
+          set_status("Chyba exportu: #{e.message}", true)
         end
 
         # Vstup pre relay z panela (B1): panel uz flushol edity, mozeme vyberat.
@@ -103,6 +158,7 @@ module Noxun
           cb(dlg, 'ready')       { |_p| push_state }
           cb(dlg, 'refresh_bom') { |_p| push_state }
           cb(dlg, 'select_row')  { |p| handle_select(p) }
+          cb(dlg, 'vepo_export') { |p| handle_export(p) } # V0.5 C
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(production): #{msg}")
@@ -133,6 +189,59 @@ module Noxun
           else
             do_select(data)
           end
+        end
+
+        # Export: rovnaky flush handshake ako select (V0.5 C).
+        def handle_export(payload)
+          data = JSON.parse(payload.to_s)
+          if Panel.dialog_alive?
+            Panel.js("NX.productionRelayExport(#{data.to_json})")
+          else
+            do_export(data)
+          end
+        end
+
+        # --- VEPO pomocnici (V0.5 C) ---------------------------------------
+
+        VEPO_SETTINGS_FILE = 'vepo_settings.json'
+
+        # Fallback na defaulty pri poskodenom subore (audit F9) — export nikdy
+        # nesmie zablokovat okno Vyroba kvoli nastaveniam.
+        def vepo_settings
+          path = File.join(Materials.dir, VEPO_SETTINGS_FILE)
+          return {} unless JsonFileStore.available?(path)
+          data = JsonFileStore.read(path)
+          data.is_a?(Hash) ? data : {}
+        rescue StandardError
+          {}
+        end
+
+        def save_vepo_settings(attrs)
+          path = File.join(Materials.dir, VEPO_SETTINGS_FILE)
+          JsonFileStore.write(path, vepo_settings.merge(attrs))
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.save_vepo_settings')
+        end
+
+        # VEPO stlpec material: dekor + typ (hrubka je vlastny stlpec); fallback
+        # family, fallback material_id. Tvar mapy definuje audit F7.
+        def vepo_materials
+          Materials.sheets.each_with_object({}) do |s, out|
+            label = "#{s['decor']} #{s['type']}".strip
+            label = s['family'].to_s.strip if label.empty?
+            label = s['material_id'].to_s if label.empty?
+            out[s['material_id']] = { 'label' => label }
+          end
+        end
+
+        def vepo_edge_thicknesses
+          Materials.edges.each_with_object({}) { |a, out| out[a['abs_id']] = a['thickness'].to_f }
+        end
+
+        # Default nazvu projektu z ULOZENEHO suboru (audit F10 — nie z titulku).
+        def default_project_name(model)
+          p = model.path.to_s
+          p.empty? ? 'projekt' : File.basename(p, '.*')
         end
 
         # Cerstvy zber s dedup tickom (Codex GH #48 P2: cerstve kopie mozu
@@ -166,7 +275,12 @@ module Noxun
             gen: @generation,
             model_title: (model.title.to_s.empty? ? 'Bez názvu' : model.title.to_s),
             rows: bom[:rows], sheets: bom[:sheets], edging: bom[:edging],
-            hardware: bom[:hardware], warnings: bom[:warnings], summary: bom[:summary]
+            hardware: bom[:hardware], warnings: bom[:warnings], summary: bom[:summary],
+            # V0.5 C: default projektu + zapamatany merge (JS input lifecycle F10);
+            # model_key = epocha prepnuti + cesta (GH P2: rovnake tituly nestacia)
+            vepo: { default_project: default_project_name(model),
+                    model_key: "#{@model_epoch.to_i}:#{model.path}",
+                    merge_18_36: vepo_settings['merge_18_36'] != false }
           }
           js("NX.setBom(#{data.to_json})")
         end

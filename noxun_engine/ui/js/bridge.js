@@ -61,6 +61,27 @@
       if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
       if (window.sketchup && sketchup.production_do_select) sketchup.production_do_select(JSON.stringify(p));
     },
+    // V0.5 C: export VEPO cez panel — flush ako pri selecte, ALE pri neplatnych
+    // poliach sa export zastavi (flushCabinetEdits by edity ticho neaplikoval
+    // a exportoval by sa stary model = zla objednavka).
+    productionRelayExport: function(p){
+      var blocked = false;
+      try {
+        if (typeof validateFields === 'function' && typeof selectedCabId !== 'undefined' &&
+            selectedCabId && !validateFields()) blocked = true;
+        // GH P1: board karta neplatne hodnoty NEqueue-uje (pole .bad) — flush by
+        // ich ticho obisiel a export by sol zo starych rozmerov. Cervene board
+        // pole = export stoji rovnako ako pri korpuse.
+        var badBoard = document.querySelector('#boardCard input.bad, #boardCard .bad');
+        if (badBoard) blocked = true;
+      } catch (e) { blocked = false; }
+      if (!blocked){
+        if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+        if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
+      }
+      p.flush_blocked = blocked;
+      if (window.sketchup && sketchup.production_do_export) sketchup.production_do_export(JSON.stringify(p));
+    },
     // D-05: zivy katalog materialov po CRUD v okne Materialy projektu. Obnovi
     // vsetky selecty s materialmi BEZ resetu formulara; zachovava vybrane hodnoty.
     setMaterials: function(data){
