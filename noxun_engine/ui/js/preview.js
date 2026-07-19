@@ -1,7 +1,9 @@
   // ===================== 2D NAHLAD (SVG) =====================
   var PV_PAD = 14; // padding viewBoxu nahladu (mm) — zdielaju ho renderPreview aj prevod px->mm v dragu
   var dragState = null;
-  function setPreviewMode(m){ previewMode=m; el('tabZones').classList.toggle('on', m==='zones'); el('tabFronts').classList.toggle('on', m==='fronts'); renderPreview(); }
+  // D-03 (Codex F2): prepnutie rezimu aktualizuje aj kartu zony (skryt v Celach,
+  // obnovit/auto-select pri navrate na Zony) — refreshZoneUI ma mode guard.
+  function setPreviewMode(m){ previewMode=m; el('tabZones').classList.toggle('on', m==='zones'); el('tabFronts').classList.toggle('on', m==='fronts'); renderPreview(); refreshZoneUI(); }
 
   // --- POHLAD (V0.4.5 D1): nahlad je fixne OKNO — SVG ma pevnu vysku (CSS) a viewBox
   // je posuvatelne/zoomovatelne okno nad scenou v mm. Kym pouzivatel nezoomuje/nepanuje
