@@ -31,9 +31,12 @@
   function vepoSync(){
     if (!BOM || !BOM.vepo) return;
     var inp = el('vepoProject');
-    if (inp && BOM.model_title !== vepoModelSeen){
+    // identita modelu = epocha prepnuti + cesta (GH P2: dva "Bez nazvu" modely
+    // maju rovnaky titul — nazov projektu sa musi resetnut aj vtedy)
+    var mkey = BOM.vepo.model_key || BOM.model_title;
+    if (inp && mkey !== vepoModelSeen){
       inp.value = BOM.vepo.default_project || 'projekt';
-      vepoModelSeen = BOM.model_title;
+      vepoModelSeen = mkey;
     }
     if (!vepoInited){
       var chk = el('vepoMerge');

@@ -34,7 +34,10 @@ module Noxun
 
         # EngineAppObserver: prepnutie/otvorenie modelu = nove data + nova generacia
         # (stary DOM klik sa odmietne genom aj keby ID sedeli — dva Untitled apod.)
+        # @model_epoch: stabilna identita "ineho modelu" pre JS lifecycle nazvu
+        # projektu (GH P2: dva modely s rovnakym titulom/nazvom suboru).
         def on_model_changed(_model)
+          @model_epoch = @model_epoch.to_i + 1
           return unless @dialog && @dialog.visible?
           push_state
         rescue StandardError => e
@@ -73,16 +76,16 @@ module Noxun
             generated_at: Time.now.strftime('%Y-%m-%d %H:%M'),
             merge_18_36: merge
           )
-          if result['groups'].empty?
-            msg = if result['errors'].empty?
-                    'Niet čo exportovať — model nemá výrobné dielce.'
-                  else
-                    "Export nevytvoril žiadny súbor — #{result['errors'].length} chybných riadkov (viď panel Upozornenia)."
-                  end
-            return set_status(msg, true)
+          if result['groups'].empty? && result['errors'].empty?
+            return set_status('Niet čo exportovať — model nemá výrobné dielce.', true)
           end
-
+          # GH P2: aj ked su VSETKY riadky chybne, LOG s dovodmi sa MUSI zapisat
+          # (inak by diagnostika chybala presne pri uplne zlyhanom exporte).
           target = VepoExport.write(result, dir)
+          if result['groups'].empty?
+            save_vepo_settings('last_dir' => dir, 'merge_18_36' => merge)
+            return set_status("Export nevytvoril žiadny CSV — #{result['errors'].length} chybných riadkov. Dôvody v LOGu: #{target}", true)
+          end
           save_vepo_settings('last_dir' => dir, 'merge_18_36' => merge)
           err  = result['errors'].empty? ? '' : " · #{result['errors'].length} chýb (viď LOG)"
           warn = Array(bom[:warnings]).empty? ? '' : " · #{Array(bom[:warnings]).length} upozornení stavby (v LOGu)"
@@ -273,8 +276,10 @@ module Noxun
             model_title: (model.title.to_s.empty? ? 'Bez názvu' : model.title.to_s),
             rows: bom[:rows], sheets: bom[:sheets], edging: bom[:edging],
             hardware: bom[:hardware], warnings: bom[:warnings], summary: bom[:summary],
-            # V0.5 C: default projektu + zapamatany merge (JS input lifecycle F10)
+            # V0.5 C: default projektu + zapamatany merge (JS input lifecycle F10);
+            # model_key = epocha prepnuti + cesta (GH P2: rovnake tituly nestacia)
             vepo: { default_project: default_project_name(model),
+                    model_key: "#{@model_epoch.to_i}:#{model.path}",
                     merge_18_36: vepo_settings['merge_18_36'] != false }
           }
           js("NX.setBom(#{data.to_json})")

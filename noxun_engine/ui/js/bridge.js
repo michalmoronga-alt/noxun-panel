@@ -69,6 +69,11 @@
       try {
         if (typeof validateFields === 'function' && typeof selectedCabId !== 'undefined' &&
             selectedCabId && !validateFields()) blocked = true;
+        // GH P1: board karta neplatne hodnoty NEqueue-uje (pole .bad) — flush by
+        // ich ticho obisiel a export by sol zo starych rozmerov. Cervene board
+        // pole = export stoji rovnako ako pri korpuse.
+        var badBoard = document.querySelector('#boardCard input.bad, #boardCard .bad');
+        if (badBoard) blocked = true;
       } catch (e) { blocked = false; }
       if (!blocked){
         if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();

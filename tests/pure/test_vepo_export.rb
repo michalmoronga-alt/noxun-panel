@@ -212,5 +212,48 @@ NxTest.test('vepo: write — atomicka davka, re-export vymeni obsah, guard cudzi
     NxTest.assert_raise('cudzie súbory') { NxVepo.vepo.write(out, dir) }
     NxTest.assert(File.exist?(File.join(target, 'FOTKA.jpg')), 'cudzi subor prezil')
     NxTest.assert(Dir.children(dir).none? { |c| c.include?('.tmp-') }, 'staging upratany')
+    NxTest.assert(Dir.children(dir).none? { |c| c.include?('.old-') }, 'old swap upratany')
+  end
+end
+
+NxTest.test('vepo: guard chrani aj CUDZIE csv/log bez nasho prefixu (GH P2)') do
+  Dir.mktmpdir('vepo-test-') do |dir|
+    out = NxVepo.build([NxVepo.vrow])
+    target = NxVepo.vepo.write(out, dir)
+    File.write(File.join(target, 'supplier.csv'), 'cudzi dodavatelsky subor')
+    NxTest.assert_raise('cudzie súbory') { NxVepo.vepo.write(out, dir) }
+    NxTest.assert(File.exist?(File.join(target, 'supplier.csv')), 'cudzi csv prezil')
+    # nas subor s prefixom projektu guardom prejde
+    File.delete(File.join(target, 'supplier.csv'))
+    NxVepo.vepo.write(out, dir)
+    NxTest.assert(File.exist?(File.join(target, 'kuchyna_novak_k009_pw_dtdl_18_36.csv')))
+  end
+end
+
+NxTest.test('vepo: kolizia nazvov po slugu dostane sufix _2 — ziadny tichy prepis (GH P1)') do
+  # dva ROZNE materialy, ktorych labely sa po slugu zleju ('Dub-A' aj 'Dub A'
+  # -> 'dub_a') a rovnaka hrubka = rovnaky tag -> bez dedupu by druhy subor
+  # prepisal prvy
+  mats = { 'MAT_A' => { 'label' => 'Dub-A' }, 'MAT_B' => { 'label' => 'Dub A' } }
+  rows = [
+    NxVepo.vrow('material_id' => 'MAT_A', 'edges' => { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil }),
+    NxVepo.vrow('material_id' => 'MAT_B', 'edges' => { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil })
+  ]
+  out = NxVepo.build(rows, materials: mats, merge_18_36: false)
+  fns = out['groups'].map { |g| g['filename'] }
+  NxTest.assert_equal(2, out['groups'].length, 'dva materialy = dve skupiny')
+  NxTest.assert_equal(fns.uniq.length, fns.length, "nazvy suborov musia byt unikatne: #{fns}")
+  NxTest.assert(fns.any? { |f| f.end_with?('_2.csv') }, "kolizia dostane _2 sufix: #{fns}")
+end
+
+NxTest.test('vepo: 0 platnych riadkov -> write vytvori LEN LOG s dovodmi (GH P2)') do
+  Dir.mktmpdir('vepo-test-') do |dir|
+    out = NxVepo.build([NxVepo.vrow('names' => ['Rozbity'], 'quantity' => 0)])
+    NxTest.assert_equal([], out['groups'])
+    target = NxVepo.vepo.write(out, dir)
+    files = Dir.children(target)
+    NxTest.assert_equal(['kuchyna_novak_export.log'], files, 'len LOG subor')
+    log = File.binread(File.join(target, 'kuchyna_novak_export.log'))
+    NxTest.assert(log.include?('Rozbity'), 'LOG menuje chybny dielec')
   end
 end

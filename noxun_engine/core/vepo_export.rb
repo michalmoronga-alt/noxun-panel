@@ -150,6 +150,7 @@ module Noxun
             'rows' => b[:rows].length, 'pieces' => b[:pieces],
             'material_ids' => b[:material_ids], 'material_label' => b[:label], 'tag' => b[:tag] }
         end.sort_by { |g| g['filename'] }
+        dedup_filenames!(groups)
 
         total_rows = groups.sum { |g| g['rows'] }
         {
@@ -162,16 +163,20 @@ module Noxun
 
       # --- zapis na disk (atomicka vymena davky, Codex B5) -------------------
 
-      # Zapise CELU davku do staging podpriecinka a atomicky vymeni cielovy
-      # <dir>/<project_slug>. Cielovy priecinok sa NAHRADI len ak obsahuje
-      # vyhradne nase vystupy (*.csv/*.log) — inak zapis odmietne (ochrana
-      # pred zmazanim cudzieho priecinka s rovnakym menom).
+      # Zapise CELU davku do staging podpriecinka a vymeni cielovy
+      # <dir>/<project_slug> dvojkrokovym swapom (GH P2: stary export prezije,
+      # kym novy nie je NA MIESTE — pri zlyhani rename sa stary vrati spat).
+      # Cielovy priecinok sa NAHRADI len ak obsahuje vyhradne NASE vystupy
+      # (presny vzor <slug>_*.csv/.log — GH P2: cudzi supplier.csv nezhori).
       def write(result, dir)
-        target = File.join(dir, result['project_slug'])
-        staging = File.join(dir, ".#{result['project_slug']}.tmp-#{Process.pid}")
+        pslug = result['project_slug']
+        target = File.join(dir, pslug)
+        staging = File.join(dir, ".#{pslug}.tmp-#{Process.pid}")
+        old = File.join(dir, ".#{pslug}.old-#{Process.pid}")
+        ours = /\A#{Regexp.escape(pslug)}_.*\.(csv|log)\z/i
         if File.exist?(target)
           foreign = Dir.children(target).reject do |c|
-            File.file?(File.join(target, c)) && c =~ /\.(csv|log)\z/i
+            File.file?(File.join(target, c)) && c.match?(ours)
           end
           unless foreign.empty?
             raise "Priečinok #{target} obsahuje cudzie súbory (#{foreign.first(3).join(', ')}) — vyber iný cieľ."
@@ -182,14 +187,40 @@ module Noxun
         result['groups'].each do |g|
           File.open(File.join(staging, g['filename']), 'wb') { |f| f.write(g['csv']) }
         end
-        File.open(File.join(staging, "#{result['project_slug']}_export.log"), 'wb') do |f|
+        File.open(File.join(staging, "#{pslug}_export.log"), 'wb') do |f|
           f.write(result['log_text'])
         end
-        FileUtils.rm_rf(target)
-        File.rename(staging, target)
+        FileUtils.rm_rf(old)
+        File.rename(target, old) if File.exist?(target)
+        begin
+          File.rename(staging, target)
+        rescue StandardError
+          # rollback: stary export sa vrati na miesto, ak novy nedosadol
+          File.rename(old, target) if File.exist?(old) && !File.exist?(target)
+          raise
+        end
+        FileUtils.rm_rf(old)
         target
       ensure
         FileUtils.rm_rf(staging) if staging && File.exist?(staging)
+      end
+
+      # Unikatne nazvy suborov aj po slugu (GH P1: 'Dub-A' a 'Dub A' by sa
+      # zliali do jedneho suboru a druhy zapis by prepisal prvy).
+      def dedup_filenames!(groups)
+        used = {}
+        groups.each do |g|
+          fn = g['filename']
+          if used[fn]
+            base = fn.sub(/\.csv\z/i, '')
+            n = 2
+            n += 1 while used["#{base}_#{n}.csv"]
+            fn = "#{base}_#{n}.csv"
+            g['filename'] = fn
+          end
+          used[fn] = true
+        end
+        groups
       end
 
       # --- pomocne -----------------------------------------------------------
