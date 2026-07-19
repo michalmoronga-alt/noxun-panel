@@ -15,10 +15,41 @@
     setBom: function(data){
       BOM = data || null;
       el('prodModel').textContent = BOM ? ('model: ' + BOM.model_title + ' · v' + BOM.version) : '…';
-      renderSummary(); renderBadge(); renderBody();
+      vepoSync(); renderSummary(); renderBadge(); renderBody();
     },
     setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; }
   };
+
+  // ===================== VEPO export (V0.5 C) =====================
+  // Lifecycle inputu (Codex F10): nazov projektu sa predvyplni z Ruby LEN pri
+  // zmene modelu (novy model = novy default); pocas prace na tom istom modeli
+  // sa pouzivatelova uprava NIKDY neprepise. Merge checkbox sa inicializuje
+  // raz zo zapamataneho nastavenia.
+  var vepoModelSeen = null;
+  var vepoInited = false;
+
+  function vepoSync(){
+    if (!BOM || !BOM.vepo) return;
+    var inp = el('vepoProject');
+    if (inp && BOM.model_title !== vepoModelSeen){
+      inp.value = BOM.vepo.default_project || 'projekt';
+      vepoModelSeen = BOM.model_title;
+    }
+    if (!vepoInited){
+      var chk = el('vepoMerge');
+      if (chk) chk.checked = BOM.vepo.merge_18_36 !== false;
+      vepoInited = true;
+    }
+  }
+
+  function vepoExport(){
+    if (!BOM || !window.sketchup || !sketchup.vepo_export) return;
+    var p = { gen: BOM.gen,
+              project: (el('vepoProject') ? el('vepoProject').value : '').trim(),
+              merge: el('vepoMerge') ? el('vepoMerge').checked : true };
+    NX.setStatus('Exportujem VEPO…', false);
+    sketchup.vepo_export(JSON.stringify(p));
+  }
 
   function requestRefresh(){ if (window.sketchup && sketchup.refresh_bom) sketchup.refresh_bom(''); }
 

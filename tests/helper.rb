@@ -126,6 +126,7 @@ unless NxTest::IN_SKETCHUP
     core/cabinet_builder
     core/board_builder
     core/bom
+    core/vepo_export
   ].each { |rel| require File.join(NxTest::ROOT, 'noxun_engine', rel) }
 end
 
