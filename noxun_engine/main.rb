@@ -49,6 +49,7 @@ Sketchup.require 'noxun_engine/core/placement'      # V0.4.7b umiestnovanie (top
 Sketchup.require 'noxun_engine/core/cabinet_builder'
 Sketchup.require 'noxun_engine/core/board_builder' # V0.4.7 samostatna doska
 Sketchup.require 'noxun_engine/core/templates'
+Sketchup.require 'noxun_engine/core/bom'           # V0.5 A kusovnik/supisy zo snapshotov
 Sketchup.require 'noxun_engine/ui/panel'
 Sketchup.require 'noxun_engine/ui/rules_dialog'     # V0.4 editor pravidiel kovania
 Sketchup.require 'noxun_engine/ui/materials_dialog' # V0.4.5 D2 projektove predvolby materialov
