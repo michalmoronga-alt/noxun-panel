@@ -1,5 +1,7 @@
 # DILEMA: Architektúra UI — ako logicky rozdeliť panely (v0.1, 16.7.2026)
 
+> **ROZHODNUTÉ 18.7.2026 (Michal + Fable, implementované vo V0.4.5, PR #27–#30): variant „Inspector-first"** — jeden hlavný panel = kontextový **Inspector** (obsah podľa výberu: vkladacia karta / korpus / zóna / dielec s omrvinkou; identita + ⚠ hore; náhľad so zoom/pan) + **satelitné malé okná** pre projektové veci (Pravidlá kovania, Materiály projektu, Šablóny — vzor sa osvedčil na Pravidlách kovania). **Vkladač (Picker 2.0) sa odkladá**, kým knižnica nie je väčšia než „dolná/horná + šablóny" — teda s knižnicou modulov (zásuvkové bloky, vybavenie po V1); vkladanie zatiaľ rieši vkladacia karta s quick-pick šablónou. Tretí pilier „Výroba" (veľké okno) príde s V0.5 podľa SYSTEM/07. Funkcie na vyoperovanie z Noxun Pick (thumby, ghost placement, draw-to-size) zostávajú v zozname pre budúci Vkladač. Pôvodný rozbor nižšie ponechaný pre kontext.
+
 > Otvorená dilema na hlbší rozbor (Michal + GPT + Fable). Zapísané po V0.2a teste. Nie je to blokér — V0.2b pokračuje v jednom paneli; rozhodnutie sa aplikuje refaktorom UI vrstvy (dátové jadro sa nemení).
 
 ## Kontext a dôvod
