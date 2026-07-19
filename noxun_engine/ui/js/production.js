@@ -115,11 +115,23 @@
   function renderSheets(box){
     var list = BOM.sheets || [];
     if (!list.length){ box.innerHTML = '<div class="muted">Žiadne doskové materiály.</div>'; return; }
-    var h = '<table class="bomtab"><thead><tr><th>Materiál</th><th>m²</th><th>dielcov</th></tr></thead><tbody>';
+    // D-19: odhad platni — parovanie VYHRADNE mapou podla material_id (Codex F7:
+    // indexy sa rozidu, ak material vypadol z katalogu; taky dostane fallback)
+    var est = {};
+    (BOM.sheet_estimate || []).forEach(function(e){ est[e.material_id] = e; });
+    var h = '<table class="bomtab"><thead><tr><th>Materiál</th><th>m²</th><th>dielcov</th><th>Formát</th><th>Platne (odhad)</th></tr></thead><tbody>';
     list.forEach(function(s){
-      h += '<tr><td>' + esc(s.material_id) + '</td><td><b>' + num(s.m2, 2) + '</b></td><td>' + num(s.quantity) + '</td></tr>';
+      var e = est[s.material_id];
+      var fb = e && e.fallback;
+      var fmt = e ? (num(e.sheet_size[0]) + '×' + num(e.sheet_size[1])) : '—';
+      var pl = e ? (num(e.count_min, 1) + ' – ' + num(e.count_max, 1)) : '—';
+      var cls = 'estcell' + (fb ? ' estfb' : '');
+      var tt = fb ? ' title="Materiál nemá formát v katalógu — použitý 2800×2070"' : '';
+      h += '<tr><td>' + esc(s.material_id) + '</td><td><b>' + num(s.m2, 2) + '</b></td><td>' + num(s.quantity) + '</td>' +
+           '<td class="' + cls + '"' + tt + '>' + fmt + '</td><td class="' + cls + '"' + tt + '><b>' + pl + '</b></td></tr>';
     });
-    box.innerHTML = h + '</tbody></table>';
+    box.innerHTML = h + '</tbody></table>' +
+      '<div class="hint">Odhad = plocha × prerez 10–25 % ÷ platňa. Orientačný rozsah, NIE nárezový plán. Formát platne sa nastavuje v katalógu materiálov (okno Materiály projektu).</div>';
   }
 
   function renderEdging(box){

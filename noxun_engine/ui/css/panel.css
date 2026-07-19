@@ -249,6 +249,12 @@
   .warnlist .warnrow + .warnrow { border-top: 1px dashed #ffe0b2; }
   .frow { flex-wrap: wrap; }
   .frow .fhw { flex: 1 0 100%; font-size: 10.5px; color: #607d8b; padding: 1px 0 0 22px; }
+  /* D-19: odhad platni v tabe Materialy — nowrap, fallback stisene LEN tieto bunky */
+  .bomtab td.estcell { white-space: nowrap; }
+  .bomtab td.estfb { color: #90a4ae; }
+  /* D-19: dvojica poli formatu platne v editore materialov */
+  .row input.sheetdim { flex: 1 1 0; min-width: 0; }
+  .row .sheetx { flex: 0 0 auto; color: #90a4ae; padding: 0 2px; }
   /* V0.5 C: VEPO export lista v okne Vyroba */
   .vepobar { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; }
   .vepobar #vepoProject { flex: 1; min-width: 0; padding: 4px 8px; font-size: 12px;

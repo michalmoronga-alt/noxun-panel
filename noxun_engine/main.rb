@@ -52,6 +52,7 @@ Sketchup.require 'noxun_engine/core/templates'
 Sketchup.require 'noxun_engine/core/bom'           # V0.5 A kusovnik/supisy zo snapshotov
 Sketchup.require 'noxun_engine/core/usage_stats'   # D-25 merac pouzivania panela (lokalne pocitadla)
 Sketchup.require 'noxun_engine/core/vepo_export'   # V0.5 C VEPO CSV export (prirezy z BOM)
+Sketchup.require 'noxun_engine/core/sheet_estimate' # D-19 orientacny odhad platni
 Sketchup.require 'noxun_engine/ui/production_dialog' # V0.5 B okno Vyroba
 Sketchup.require 'noxun_engine/ui/panel'
 Sketchup.require 'noxun_engine/ui/rules_dialog'     # V0.4 editor pravidiel kovania

@@ -223,7 +223,11 @@ module Noxun
             end
           end
 
-          rec = data.merge('material_id' => id, 'thickness' => th)
+          # D-19 (Codex F5): pri edite sa payload MERGUJE s existujucim zaznamom —
+          # klient, ktory nove pole (napr. sheet_size) neposle, ho nesmie ticho
+          # resetnut na default cez normalize_sheet.
+          base = create ? {} : existing
+          rec = base.merge(data).merge('material_id' => id, 'thickness' => th)
           return set_status('Uloženie katalógu zlyhalo.', true) unless Materials.upsert_sheet(rec)
           after_catalog_change
           set_status(create ? "Materiál pridaný (#{id})." : "Materiál #{id} upravený.")
@@ -287,6 +291,9 @@ module Noxun
         def after_catalog_change
           push_state
           Panel.push_materials if defined?(Panel)
+          # D-19 (Codex F3): otvorene okno Vyroba by inak drzalo stary odhad
+          # platni (format sa prave mohol zmenit)
+          ProductionDialog.refresh_if_open if defined?(ProductionDialog)
         end
       end
     end

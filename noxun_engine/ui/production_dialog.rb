@@ -32,6 +32,15 @@ module Noxun
           Engine.log_error(e, 'ProductionDialog.show')
         end
 
+        # D-19 (Codex F3): verejny bezpecny refresh — vola ho editor materialov
+        # po zmene katalogu (format platne meni odhad v otvorenom okne).
+        def refresh_if_open
+          return unless @dialog && @dialog.visible?
+          push_state
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.refresh_if_open')
+        end
+
         # EngineAppObserver: prepnutie/otvorenie modelu = nove data + nova generacia
         # (stary DOM klik sa odmietne genom aj keby ID sedeli — dva Untitled apod.)
         # @model_epoch: stabilna identita "ineho modelu" pre JS lifecycle nazvu
@@ -270,12 +279,20 @@ module Noxun
           @generation = @generation.to_i + 1
           model = Sketchup.active_model
           bom = fresh_bom(model)
+          # D-19: JEDEN snapshot katalogu pre mapu formatov (Codex F3 — ziadne
+          # opakovane lookupy per material)
+          sheet_sizes = Materials.sheets.each_with_object({}) do |s, out|
+            out[s['material_id']] = s['sheet_size']
+          end
           data = {
             version: Engine::VERSION,
             gen: @generation,
             model_title: (model.title.to_s.empty? ? 'Bez názvu' : model.title.to_s),
             rows: bom[:rows], sheets: bom[:sheets], edging: bom[:edging],
             hardware: bom[:hardware], warnings: bom[:warnings], summary: bom[:summary],
+            # D-19: odhad platni per material (rozsah 10-25 %; JS paruje mapou
+            # podla material_id — nie indexom, Codex F7)
+            sheet_estimate: SheetEstimate.estimate(bom[:rows], sheet_sizes: sheet_sizes),
             # V0.5 C: default projektu + zapamatany merge (JS input lifecycle F10);
             # model_key = epocha prepnuti + cesta (GH P2: rovnake tituly nestacia)
             vepo: { default_project: default_project_name(model),
