@@ -187,9 +187,11 @@
   // Input NIE JE vyrazove pole (ziadny onField/attachExprField — Codex F6);
   // Enter uklada, Esc zatvara, Tab ostava v modale (focus trap).
   var tplModalBound = false;
+  var tplModalCabId = null; // Codex GH #46 P2: identita ZACHYTENA pri otvoreni modalu
   function openSaveTemplateModal(){
     if (!selectedCabId){ NX.setStatus('Najprv označ korpus.', true); return; }
     var m = el('tplModal'); if (!m) return;
+    tplModalCabId = selectedCabId;
     el('tplSaveName').value = (typeof tplNameSuggestion === 'string' && tplNameSuggestion) ? tplNameSuggestion : '';
     m.style.display = 'flex';
     refreshTplModalWarn();
@@ -214,8 +216,12 @@
     var name = inp.value.trim();
     if (!name){ inp.classList.add('bad'); inp.focus(); return; }
     inp.classList.remove('bad');
+    // Codex GH #46 P2: rozpisane edity (400 ms debounce) najprv flushnut — callbacky
+    // sa spracuju v poradi, takze apply_all prebehne PRED save a config je cerstvy.
+    if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
     if (window.sketchup && sketchup.save_template_as){
-      sketchup.save_template_as(JSON.stringify({ name: name, cabinet_id: selectedCabId }));
+      // identita z casu OTVORENIA modalu — preklik na inu skrinku server odmietne
+      sketchup.save_template_as(JSON.stringify({ name: name, cabinet_id: tplModalCabId || selectedCabId }));
     }
     closeSaveTemplateModal();
   }

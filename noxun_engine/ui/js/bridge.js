@@ -79,6 +79,10 @@
       currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();
       frontItems = c.front_items || [];
       tplNameSuggestion = c.template_name_suggestion || ''; // D-14 modal prefill
+      // Codex GH #46 P2: preklik na INY korpus pri otvorenom modale = zavriet
+      // (mode ostava cab, setUiMode guard nezabera; identitu navyse strazi server)
+      if (typeof tplModalOpen === 'function' && tplModalOpen() &&
+          tplModalCabId && c.cabinet_id !== tplModalCabId) closeSaveTemplateModal();
       activeZoneId = c.active_zone || null;
       setSelected(c.cabinet_id || null);
       refreshMaterialFilters(); // FIX 2: prefiltruj podla hrubok tohto korpusu (pred nastavenim hodnot)
