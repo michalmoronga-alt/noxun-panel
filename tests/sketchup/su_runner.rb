@@ -318,6 +318,22 @@ module NoxunSuRunner
     e::Panel.handle_set_board_fields({ 'board_id' => 'BRD-999', 'fields' => { 'width' => 555.0 } }.to_json)
     ok('sync-board: guard zahodil zapis s nespravnym echo board_id',
        ((e::Store.config(binst) || {})['width'].to_f - 580.0).abs < 0.01)
+
+    # 11) V0.5 A: BOM zo snapshotov — collect nad realnym modelom (2 korpusy z
+    #     dedup bodu 8 + 2 dosky z bodu 9) a compute supisy. Kovanie z configu.
+    col = e::Bom.collect(model)
+    bom = e::Bom.compute(col)
+    ok("sync-bom: collect vidi 2 korpusy a 2 dosky (records #{col[:records].length})",
+       col[:cabinets] == 2 && col[:boards] == 2 && col[:records].length > 10)
+    side = col[:records].find { |r| r['part_key'] == 'cabinet/side:left' }
+    ok('sync-bom: snapshot dielca nesie material a realnu hrubku',
+       !side.nil? && side['material_id'].to_s != '' && (side['thickness'] - 18.0).abs < 0.01)
+    legs = bom[:hardware].find { |g| g['generic_type'] == 'leg' }
+    ok("sync-bom: nohy agregovane z config.hardware[] oboch korpusov (#{legs ? legs['quantity'] : 0} ks)",
+       !legs.nil? && legs['quantity'] == 8 && legs['breakdown'].length == 2)
+    ok('sync-bom: m2 supis nenulovy a summary sedi s poctami',
+       bom[:summary]['m2_total'] > 0.5 && bom[:summary]['cabinets'] == 2 &&
+       bom[:summary]['boards'] == 2 && bom[:summary]['rows'] <= bom[:summary]['records'])
     e::Panel.handle_set_board_fields({ 'board_id' => bid, 'fields' => { 'width' => 555.0 } }.to_json)
     ok('sync-board: panel zapis presiel (width 555)',
        ((e::Store.config(binst) || {})['width'].to_f - 555.0).abs < 0.01)
