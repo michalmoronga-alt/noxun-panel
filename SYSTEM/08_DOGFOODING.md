@@ -22,6 +22,10 @@
 
 ## Návrhy väčších celkov (na rozpracovanie)
 
+- **D-18 · Čelo „BEZ" — otvorený priestor** (Michal 19.7. neskoro večer) — do riadkov čiel pridať typ „BEZ/NIE": pozícia zaberie výšku ako čelo, ale panel sa negeneruje = otvorená nika v rade čiel (medzery/presahy na to nestačia). **Premyslieť logiku pred kódom:** dopad na závesy (pásma čítajú čelá — BEZ nesmie generovať kovanie), auto-výšky (BEZ sa správa ako auto/fixed?), VEPO/kusovník (nič sa neexportuje), badge kovania, dvojkrídlové. Pozor, či „bez dielca" varianty z V0.4.8 (otvorené niky konštrukcie) nie sú príbuzná téma — riešiť koordinovane. *Stav: na rozbor + Codex audit logiky, potom dávka.*
+- **D-19 · Orientačný prepočet na platne** (Michal 19.7.) — v okne Výroba k m² doplniť odhad počtu platní na materiál (plocha / plocha platne s koeficientom prerezu; NIE nárezové plány). *Stav: nápad na V0.5+ (po C/D).*
+- **D-20 · Quick actions — bezpečný move plugin** (Michal 19.7., „pre budúceho Michala a Fable, keď bude základ top 😉") — zlúčiť funkčné pluginy noxun_mower + Snaper do jedného toolbar pluginu (rýchly pohyb, kopírovanie, rotácie, prisunutie na doraz). **Známy poznatok:** mower „rýchla kópia skrinky vedľa" vytvorí kópiu LEN ako geometriu — bez NOXUN identity kabinetu (kópia mimo observer/dedup flow). Pri stavbe quick actions kopírovanie prerobiť tak, aby kópia prešla štandardným dedup tickom (plná identita + config). *Stav: budúcnosť (po V1 / pri zostavách).*
+
 - **D-09 · Snap body pri presúvaní priečok** (1/4, 1/2, 3/4…) v zónovom náhľade. *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
 - **D-10 · Presúvanie/úprava čiel priamo v náhľade** (ako drag priečok). *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
 - **D-14 · Uložiť korpus do knižnice priamo z panela** (Michal 19.7.) — dnes sa šablóna ukladá v satelitnom okne Šablóny (nenájditeľné pri práci). Návrh: tlačidlo „★ Uložiť ako šablónu" dole vedľa „+ Vložiť ďalší korpus" → **modal** s názvom a potrebnými údajmi (prvý kus vzoru D-15). *Stav: dávka 5.*
@@ -50,6 +54,7 @@
 
 - D-08 taby (19.7.): „na prvý pohľad je to omnoho prehľadnejšie."
 - **Prvá zákazka dokončená BEZ blokov (19.7.)** — vrátane pridania vlastného materiálu a celého workflow: „zatiaľ super."
+- **Okno Výroba (19.7. neskoro večer): „kusovník funguje tip top — nenašiel som chyby, funguje aj preklikávanie na diely."** Bonus: pri klik-selecte okamžite vidno olepenie v 2D náhľade panela = rýchla orientácia a kontrola ABS. Po posledných úpravách žiadne blockery ani bugy; viac menších zákaziek — „začína to byť funkčné a použiteľné."
 
 - Výrazy v poliach: „650-36 → super, nemusím rátať z pamäti a preklikávať kalkulačku — bomba." Medzivýpočet 950-28=922 prehľadný, Enter potvrdenie sedí.
 - Blokovanie nezmyselnej hrúbky materiálu (20 mm bez katalógového materiálu → červený blok) funguje.
