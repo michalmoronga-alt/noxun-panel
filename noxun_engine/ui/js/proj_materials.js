@@ -134,7 +134,7 @@
     var sl = mdSheetDim(el('ms_sheet_l').value);
     var sw = mdSheetDim(el('ms_sheet_w').value);
     if ((sl === null) !== (sw === null) || (sl !== null && (isNaN(sl) || isNaN(sw)))){
-      NX.setStatus('Formát platne: vyplň obe čísla (mm), alebo nechaj obe prázdne.', true);
+      MD.setStatus('Formát platne: vyplň obe čísla (mm), alebo nechaj obe prázdne.', true); // GH P3: toto okno ma MD, nie NX
       return;
     }
     if (sl !== null) payload.sheet_size = [sl, sw];
