@@ -310,6 +310,8 @@ Zóna nesie `allowed_modules` — čo do nej smie. Modul pri vklade dostane rozm
 
 `auto` čelá si rovnomerne rozdelia zvyšnú výšku; `wings: "auto"` = 2 krídla nad 600 mm šírky otvoru. **Škáry sú konfigurovateľné** (`gap` medzi čelami, `gap_top`/`gap_bottom`/`gap_sides` po obvode). Prekrytia korpusu (`overlay`) a odlišná škára medzi krídlami (`gap_between`) zatiaľ nie sú implementované — doplnia sa pri kovaní (typ pántu určuje prekrytie), viď sekcia 12.
 
+`items[].type` nadobúda `door` · `drawer_front` · `none` (D-18 „Bez čela"): riadok `none` drží výšku v rade presne ako čelo (fixed/auto/lock, rovnaká matematika), ale panel sa negeneruje = otvorená nika v rade čiel. Medzery voči susedom ostávajú ako pri skutočnom čele (reálny otvor je opticky väčší o susedné škáry — vedomé rozhodnutie); `wings` je pre `none` neutrálne 1. Bez dielca nevzniká kovanie ani položka kusovníka/VEPO. **POZOR:** štruktúrovaný `items[].type: "none"` ≠ legacy STRING config `fronts: "none"` (V0.1/V0.2 — znamená žiadne čelá, normalizuje sa na prázdne `items`).
+
 ---
 
 ## 6. Kovanie

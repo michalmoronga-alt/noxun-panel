@@ -457,6 +457,33 @@ NxTest.test('builder: hardware_overrides preziju round-trip config_to_params -> 
   NxTest.assert_equal(ov, cb.normalize(params)[:hardware_overrides], 'druhy normalize identicky')
 end
 
+NxTest.test('builder: D-18 normalize odstrani hardware_overrides cela typu none (Codex F1)') do
+  cb = Noxun::Engine::CabinetBuilder
+  ov = [
+    { 'owner_part_key' => 'front:F1/wing:single', 'generic_type' => 'hinge',
+      'rule_id' => 'zavesy-podla-vysky', 'disabled' => true },              # F1 -> none = von
+    { 'owner_part_key' => 'front:F1/panel', 'generic_type' => 'slide',
+      'rule_id' => 'vysuvy-nl-podla-hlbky', 'quantity' => 2 },              # F1 -> none = von (aj panel tvar)
+    { 'owner_part_key' => 'front:F2/wing:left', 'generic_type' => 'hinge',
+      'rule_id' => 'zavesy-podla-vysky', 'quantity' => 3 },                 # F2 je door = ostava
+    { 'owner_part_key' => nil, 'generic_type' => 'leg',
+      'rule_id' => 'nohy-zakladne', 'quantity' => 6 }                       # korpusovy = ostava
+  ]
+  fronts = { 'items' => [
+    { 'id' => 'F1', 'type' => 'none', 'mode' => 'fixed', 'height' => 200 },
+    { 'id' => 'F2', 'type' => 'door', 'wings' => '2' }
+  ] }
+  cfg = cb.normalize('fronts' => fronts, 'hardware_overrides' => ov)
+  owners = cfg[:hardware_overrides].map { |o| o['owner_part_key'] }
+  NxTest.assert_equal(['front:F2/wing:left', nil], owners,
+                      "zasahy none riadku maju byt prec, mam: #{cfg[:hardware_overrides].inspect}")
+
+  # Bez none riadkov prune nezasahuje (stare configy nezmenene).
+  cfg2 = cb.normalize('fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door' }] },
+                      'hardware_overrides' => ov)
+  NxTest.assert_equal(4, cfg2[:hardware_overrides].length, 'bez none ostava vsetko')
+end
+
 # ---------------------------------------------------------------------------
 # cabinet_config + merge_final
 # ---------------------------------------------------------------------------
