@@ -5,7 +5,7 @@
      sablon ziju v satelitnych oknach (proj_materials.html, templates.html) — panel ma len
      quick-pick sablony a materialy oznacenej skrinky. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.7h">
+<link rel="stylesheet" href="css/panel.css?v=0.4.7i">
 
 <div class="hdr"><h1>Noxun Engine</h1><span class="sub" id="verline">…</span></div>
 
@@ -21,7 +21,7 @@
     <button class="pvfit" onclick="fitPreview()" title="Prispôsobiť pohľad (reset zoomu)">⛶</button>
   </div>
   <svg id="preview" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet"></svg>
-  <div class="pvhint">Klik na zónu = výber · ťahaj priečku = posun · koliesko = zoom · ťahaj plochu = posun pohľadu</div>
+  <div class="pvhint">Klik na zónu = výber (police, delenie) · ťahaj priečku = posun · koliesko = zoom · ťahaj plochu = posun pohľadu</div>
   <div class="zoneline">
     <input id="zonesChk" type="checkbox" onchange="toggleZones()">
     <label for="zonesChk">Zobraziť zóny (ghost) v modeli</label>
@@ -274,6 +274,7 @@
 <details data-key="zones">
   <summary>Štruktúra zón</summary>
   <div class="body">
+    <div class="hint">Police a delenie nastavíš klikom na zónu v náhľade — otvorí sa karta Zóna.</div>
     <div id="zoneTree"><div class="muted">Žiadny označený korpus.</div></div>
   </div>
 </details>
@@ -286,16 +287,16 @@
 <!-- Poradie skriptov je kontrakt: errors prvy (chytac), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.4.7h"></script>
-<script src="js/core.js?v=0.4.7h"></script>
-<script src="js/expr.js?v=0.4.7h"></script>
-<script src="js/form.js?v=0.4.7h"></script>
-<script src="js/zone_tree.js?v=0.4.7h"></script>
-<script src="js/preview.js?v=0.4.7h"></script>
-<script src="js/actions.js?v=0.4.7h"></script>
-<script src="js/bridge.js?v=0.4.7h"></script>
-<script src="js/materials.js?v=0.4.7h"></script>
-<script src="js/part_card.js?v=0.4.7h"></script>
-<script src="js/board_card.js?v=0.4.7h"></script>
-<script src="js/hardware.js?v=0.4.7h"></script>
-<script src="js/boot.js?v=0.4.7h"></script>
+<script src="js/errors.js?v=0.4.7i"></script>
+<script src="js/core.js?v=0.4.7i"></script>
+<script src="js/expr.js?v=0.4.7i"></script>
+<script src="js/form.js?v=0.4.7i"></script>
+<script src="js/zone_tree.js?v=0.4.7i"></script>
+<script src="js/preview.js?v=0.4.7i"></script>
+<script src="js/actions.js?v=0.4.7i"></script>
+<script src="js/bridge.js?v=0.4.7i"></script>
+<script src="js/materials.js?v=0.4.7i"></script>
+<script src="js/part_card.js?v=0.4.7i"></script>
+<script src="js/board_card.js?v=0.4.7i"></script>
+<script src="js/hardware.js?v=0.4.7i"></script>
+<script src="js/boot.js?v=0.4.7i"></script>

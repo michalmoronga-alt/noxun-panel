@@ -5,6 +5,19 @@
     var zones = computeZones();
     var z = null; zones.forEach(function(x){ if (fullZoneId(x.id) === activeZoneId) z = x; });
     var card = el('zoneCard'), leafBox = el('leafActions'), fieldBox = el('fieldEditor');
+    // D-03 (Codex F2): karta zony patri k zonovemu nahladu — v rezime Cela sa skryva
+    if (previewMode !== 'zones'){
+      if (card) card.style.display = 'none';
+      setZoneButtons(false); fieldBox.innerHTML=''; renderZoneTree(zones); return;
+    }
+    // D-03: jednozonova skrinka = karta rovno (discoverability polic). Podmienka !z
+    // pokryva prazdne AJ neplatne stale ID (Codex F3). Lokalny vyber — select_zone
+    // do modelu sa neposiela (to robi len klik v pickZone).
+    if (!z && zones.length === 1 && zones[0].leaf){
+      activeZoneId = fullZoneId(zones[0].id);
+      z = zones[0];
+      renderPreview(); // nahlad sa kreslil pred auto-selectom — zvyrazni zonu (Codex F1)
+    }
     if (!z){
       if (card) card.style.display = 'none';
       setZoneButtons(false); fieldBox.innerHTML=''; renderZoneTree(zones); return;
