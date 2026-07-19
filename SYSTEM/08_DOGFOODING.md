@@ -10,11 +10,11 @@
 
 ## Spomaľovače (vysoká priorita)
 
-- **D-07 · Medzery/presahy čiel sa nedajú nastaviť** — gap hodnoty (3 mm medzi čelami, 2 mm okraje) sú natvrdo; pri reálnych dvierkach treba kontrolu. Plánované vo V0.4.8 (konštrukčné možnosti z 06) — dogfooding potvrdzuje vysokú prioritu. *Stav: evidované, priorita ↑.*
+*(momentálne žiadne)*
 
 ## UX drobnosti (nízka priorita)
 
-- **D-03 · Police sa hľadajú ťažko** — funkcia EXISTUJE (klik na zónu v 2D náhľade alebo na ghost v modeli → karta „Zóna" pod náhľadom → „Police v zóne" → nastav), ale pri prvom použití ju Michal nenašiel = discoverability problém. **Nápady:** pri jednozónovej skrinke zobraziť kartu zóny rovno; hint „klikni na zónu pre police/delenie" v prázdnom stave; police spomenúť v akordeóne Štruktúra zón. *Stav: nápady, nie blok (howto odovzdané).*
+*(momentálne žiadne)*
 
 ## Nápady na zváženie (nerozhodnuté)
 
@@ -28,12 +28,13 @@
 
 ## Vyriešené
 
+- **D-07 · Medzery/presahy čiel** → **vyriešené v dávke „noc na 19.7." (PR #41)**: sekcia Čelá má polia *Medzi čelami / Okraj hore / dole / po stranách* (+ Reset 3/2 mm); záporný okraj = presah cez obrys korpusu (limity 0–50 / ±100 mm); výrazy fungujú; šablóny hodnoty ukladajú; medzera dvojkrídlových poslúcha nastavenie (bola natvrdo) a náhľad ich kreslí ako 2 panely; fit náhľadu zahrnie presahy. Sémantika: čelá sa kladú odspodu — „Okraj hore" posúva geometriu cez AUTO čelo, pri samých pevných výškach je rezervou (vysvetlené v hinte).
+- **D-03 · Police sa hľadajú ťažko** → **vyriešené (PR #42)**: jednozónová skrinka zobrazí kartu Zóna rovno pri označení (auto-výber, náhľad zvýrazní); hint pod náhľadom spomína police; vysvetlenie v akordeóne Štruktúra zón; karta Zóna sa už neplietie do režimu Čelá. (Pôvodne evidované ako falošný poplach + nápady — nápady zrealizované.)
 - **D-05 · Vlastný materiál sa nedá pridať** → **vyriešené v dávke 2 (PR #39)**: okno Materiály projektu = plná správa katalógu — pridať/upraviť/zmazať doskový materiál aj ABS pásku; ID generuje server (transliterácia, kolízie -2/-3); **hrúbka existujúceho materiálu je nemenná** (iná hrúbka = nový variant); mazanie s guardom — PROTECTED_SHEET_IDS (fallbacky) + scan použitia v modeli, overridoch, dielcoch, doskách aj šablónach; živý sync do panela bez resetu formulára. Michal: „materiál editor je bomba."
 - **D-06 · Scale úchopy fungujú opačne** → **vyriešené v dávke 1 (PR #38)**: `scaletool` maska 7→**120** (roviny+rohy skryté, čisté osi X/Y/Z ostávajú) + zápis aj na definíciu (odstránený rozdiel prvý/druhý beh).
 - **D-02 · Náhľad prepočítava pri každom písmene** → **vyriešené v dávke 1 (PR #38)**: debounce prekreslenia náhľadu 500 ms; výrazy ostávajú na Enter.
 - **D-01 · Náhľad je malý** → **vyriešené v dávke 1 (PR #38)** variantom (a): náhľad rastie s veľkosťou okna panela (clamp 38 % výšky okna). Varianty (b) satelitný veľký náhľad / (c) nastaviteľná výška ostávajú v zálohe, ak to nebude stačiť.
 - **D-04 · Ghost zóny zavadzajú** → **vyriešené v dávke 1 (PR #38)** variantom (a): ghosty predvolene VYPNUTÉ (aj novo vzniknutý tag je neviditeľný); klik na zóny primárne cez 2D náhľad; checkbox „Zobraziť zóny" na zapnutie ostáva.
-- **D-03 · Police** — falošný poplach, funkcia existuje (karta zóny), Michal našiel. Discoverability nápady ostávajú v UX sekcii ako nízka priorita.
 
 ## Postrehy, ktoré potešili (nechávame tak)
 
