@@ -81,6 +81,10 @@
       renderFilteredTemplates();
       setIdbar(c);
       setUiMode(c.part_card ? 'part' : 'cab');
+      // D-08 (Codex F3): dielec = vzdy ZONOVY nahlad (klik na zonu = vedomy odchod
+      // z dielca, povodne spravanie); currentCabTab sa NEMENI — navrat do cab
+      // obnovi pracovny tab. Atribut prezije setUiMode (className prepis).
+      previewMode = c.part_card ? 'zones' : cabTabPreview(currentCabTab);
       // pohlad: ina skrinka -> fit; ta ista (auto-apply rebuild) -> pohlad DRZI
       if (c.cabinet_id !== lastCabForFit){ lastCabForFit = c.cabinet_id; fitPreview(); }
       // svetle rozmery presne z backendu ak su
@@ -115,6 +119,7 @@
       if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; }
       setIdbar(null);
       setUiMode('insert');
+      previewMode = cabTabPreview(currentCabTab); // D-08: taby funguju aj na navrhu (draft)
       setSelected(null);
       buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
       activeZoneId = null; frontItems = null;

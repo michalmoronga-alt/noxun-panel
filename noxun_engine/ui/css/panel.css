@@ -181,6 +181,25 @@
   body[data-insert-kind="board"].mode-insert details[data-key="materials"],
   body[data-insert-kind="board"].mode-insert details[data-key="zones"] { display: none; }
   #insertKindRow { border-bottom: 1px dashed #cfd8dc; padding-bottom: 6px; margin-bottom: 8px; }
+  /* ===== D-08: rezimove taby Korpus/Zony/Cela — data-cab-tab atribut na <body>
+     (vzor data-insert-kind, PREZIJE setUiMode className prepis). Pravidla su BEZ
+     mode prefixu: part/board rezimy skryvaju svoje sekcie vlastnymi pravidlami
+     (nadmnozina), takze atribut realne riadi len mode-cab a mode-insert (korpus).
+     BEZ atributu (pred boot initom) ostava vsetko viditelne — ziadny flash. */
+  body[data-cab-tab="zony"] #basicCard, body[data-cab-tab="cela"] #basicCard,
+  body[data-cab-tab="zony"] details[data-key="top"], body[data-cab-tab="cela"] details[data-key="top"],
+  body[data-cab-tab="zony"] details[data-key="bottom"], body[data-cab-tab="cela"] details[data-key="bottom"],
+  body[data-cab-tab="zony"] details[data-key="sides"], body[data-cab-tab="cela"] details[data-key="sides"],
+  body[data-cab-tab="zony"] details[data-key="back"], body[data-cab-tab="cela"] details[data-key="back"],
+  body[data-cab-tab="zony"] details[data-key="hardware"], body[data-cab-tab="cela"] details[data-key="hardware"],
+  body[data-cab-tab="zony"] details[data-key="materials"], body[data-cab-tab="cela"] details[data-key="materials"] { display: none; }
+  body[data-cab-tab="korpus"] #zoneCard, body[data-cab-tab="cela"] #zoneCard,
+  body[data-cab-tab="korpus"] details[data-key="zones"], body[data-cab-tab="cela"] details[data-key="zones"],
+  body[data-cab-tab="korpus"] .zoneline, body[data-cab-tab="cela"] .zoneline { display: none; }
+  body[data-cab-tab="korpus"] details[data-key="fronts"], body[data-cab-tab="zony"] details[data-key="fronts"] { display: none; }
+  /* mode-part: tab tlacidla prec — preview ostava ZONOVY (klik na zonu = vedomy
+     odchod z dielca, povodne spravanie); fit ⛶ ostava. */
+  body.mode-part .cabtab { display: none; }
   /* ===== V0.4.7e: zivy nahlad vyrazu "= 614" (expr.js injektuje span za input) =====
      Pevna rezerva + nowrap, aby hint neposuval .unit a nelamal .row/.frow/.fldrow. */
   .exprhint { flex: 0 0 auto; min-width: 44px; font-size: 10.5px; color: #90a4ae;

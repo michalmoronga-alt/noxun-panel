@@ -15,4 +15,4 @@
     ['ib_length','ib_width'].forEach(function(id){ attachExprField(el(id)); });
     ['bc_length','bc_width'].forEach(function(id){ attachExprField(el(id), { flushFn: flushBoardEditsNow }); });
   }
-  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupFieldEditorDelegation(); document.body.setAttribute('data-insert-kind', getInsertKind()); if (window.sketchup && sketchup.ready) sketchup.ready(); };
+  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupFieldEditorDelegation(); document.body.setAttribute('data-insert-kind', getInsertKind()); setCabTab('korpus'); /* D-08 Codex F2: atribut+preview+tlacidla jednym volanim */ if (window.sketchup && sketchup.ready) sketchup.ready(); };

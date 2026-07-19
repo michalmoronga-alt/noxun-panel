@@ -1,9 +1,20 @@
   // ===================== 2D NAHLAD (SVG) =====================
   var PV_PAD = 14; // padding viewBoxu nahladu (mm) — zdielaju ho renderPreview aj prevod px->mm v dragu
   var dragState = null;
-  // D-03 (Codex F2): prepnutie rezimu aktualizuje aj kartu zony (skryt v Celach,
-  // obnovit/auto-select pri navrate na Zony) — refreshZoneUI ma mode guard.
-  function setPreviewMode(m){ previewMode=m; el('tabZones').classList.toggle('on', m==='zones'); el('tabFronts').classList.toggle('on', m==='fronts'); renderPreview(); refreshZoneUI(); }
+  // ===== D-08: rezimove taby — tab prepina nahlad AJ viditelne sekcie (CSS cez
+  // data-cab-tab na <body>). refreshZoneUI ma mode guard (D-03 Codex F2 — karta
+  // zony sa mimo tabu Zony skryva a pri navrate obnovi vratane auto-selectu).
+  function cabTabPreview(t){ return t === 'zony' ? 'zones' : (t === 'cela' ? 'fronts' : 'cab'); }
+  function setCabTab(t){
+    currentCabTab = t;
+    document.body.setAttribute('data-cab-tab', t);
+    el('tabCab').classList.toggle('on', t === 'korpus');
+    el('tabZones').classList.toggle('on', t === 'zony');
+    el('tabFronts').classList.toggle('on', t === 'cela');
+    previewMode = cabTabPreview(t);
+    pvUserView = false; pvView = null; // D-08 Codex F4: novy vyjav = cisty fit (stale zoom by ho minul)
+    renderPreview(); refreshZoneUI();
+  }
 
   // --- POHLAD (V0.4.5 D1): nahlad je fixne OKNO — SVG ma pevnu vysku (CSS) a viewBox
   // je posuvatelne/zoomovatelne okno nad scenou v mm. Kym pouzivatel nezoomuje/nepanuje
@@ -25,11 +36,14 @@
   }
   // Scena = korpus ∪ cela (fit ukaze aj presahy — Codex F3). Bez presahov je
   // vysledok identicky s povodnym {0,0,W+2p,H+2p}, drag prepocty sa nemenia.
+  // D-08: v rezime 'cab' scenu rozsiruje rezerva na koty (dole a vpravo, Codex F5).
+  var DIM_EXT = 70; // mm sceny pre kotovacie ciary a texty
   function sceneSize(){
     var W = numv('width')||600, H = numv('height')||720;
-    var e = frontsExtent();
+    var e = (previewMode === 'cab') ? null : frontsExtent();
     var minX = e ? e.minX : 0, maxX = e ? e.maxX : W;
     var minZ = e ? e.minZ : 0, maxZ = e ? e.maxZ : H;
+    if (previewMode === 'cab'){ maxX = W + DIM_EXT; minZ = -DIM_EXT; }
     return { x: minX, y: H - maxZ,
              w: (maxX - minX) + 2*PV_PAD, h: (maxZ - minZ) + 2*PV_PAD };
   }
@@ -89,9 +103,12 @@
           drawDividers(z, S, rx, ry, t, fh, topNone, H);
         }
       });
-    } else {
+    } else if (previewMode === 'fronts'){
       // cela pohlad
       renderFrontsPreview(S, rx, ry, W, H, fh, t);
+    } else {
+      // D-08: tab Korpus — kotovany obrys (Š/V koty + hlbka textom)
+      renderCabOutline(S, rx, ry, W, H);
     }
     svg.innerHTML = S.join('');
     // POZN: ziadne per-element bindovanie tu — pouzivame event delegaciu (setupPreviewDelegation),
@@ -137,6 +154,25 @@
       }
       S.push('<text x="'+rx(W/2)+'" y="'+ry(z+h/2)+'" font-size="18" fill="#0277bd" text-anchor="middle" dominant-baseline="middle">'+(it.type==='drawer_front'?'zásuvka':'dvierka')+' '+Math.round(h)+'</text>');
     });
+  }
+
+  // D-08: koty pre tab Korpus — sirka dole, vyska vpravo, hlbka textom v strede.
+  // Obrys + schematicke dielce kresli spolocna cast renderPreview.
+  function renderCabOutline(S, rx, ry, W, H){
+    var D = numv('depth') || 0;
+    var dline = '#546e7a', dtxt = '#37474f';
+    function tick(x, z){ return '<line x1="'+rx(x)+'" y1="'+(ry(z)-7)+'" x2="'+rx(x)+'" y2="'+(ry(z)+7)+'" stroke="'+dline+'" stroke-width="2"/>'; }
+    function tickH(x, z){ return '<line x1="'+(rx(x)-7)+'" y1="'+ry(z)+'" x2="'+(rx(x)+7)+'" y2="'+ry(z)+'" stroke="'+dline+'" stroke-width="2"/>'; }
+    // sirka (pod korpusom)
+    S.push('<line x1="'+rx(0)+'" y1="'+ry(-26)+'" x2="'+rx(W)+'" y2="'+ry(-26)+'" stroke="'+dline+'" stroke-width="2"/>');
+    S.push(tick(0, -26)); S.push(tick(W, -26));
+    S.push('<text x="'+rx(W/2)+'" y="'+ry(-48)+'" font-size="22" fill="'+dtxt+'" text-anchor="middle">Š '+Math.round(W)+' mm</text>');
+    // vyska (vpravo od korpusu)
+    S.push('<line x1="'+rx(W+26)+'" y1="'+ry(0)+'" x2="'+rx(W+26)+'" y2="'+ry(H)+'" stroke="'+dline+'" stroke-width="2"/>');
+    S.push(tickH(W+26, 0)); S.push(tickH(W+26, H));
+    S.push('<text x="'+rx(W+38)+'" y="'+ry(H/2)+'" font-size="22" fill="'+dtxt+'" text-anchor="start" dominant-baseline="middle">V '+Math.round(H)+'</text>');
+    // hlbka (informativne v strede)
+    if (D > 0) S.push('<text x="'+rx(W/2)+'" y="'+ry(H/2)+'" font-size="20" fill="#78909c" text-anchor="middle" dominant-baseline="middle">hĺbka '+Math.round(D)+' mm</text>');
   }
 
   // Event DELEGACIA: jeden listener na SVG kontajneri (nie per-element pri kazdom re-renderi).
