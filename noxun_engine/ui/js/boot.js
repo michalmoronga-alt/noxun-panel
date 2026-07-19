@@ -9,7 +9,8 @@
   // V0.4.7e: staticke rozmerove polia s vyrazovou podporou (dynamicke — cela .fh
   // a polia zon — pripajaju ich rendery; bc_quantity je POCET, vyrazy nema).
   function bindExprFields(){
-    ['width','height','depth','thickness','floor_height','plinth_recess','rails_top_offset','rail_depth']
+    ['width','height','depth','thickness','floor_height','plinth_recess','rails_top_offset','rail_depth',
+     'fr_gap','fr_gap_top','fr_gap_bottom','fr_gap_sides'] // D-07 medzery/presahy cel
       .forEach(function(id){ attachExprField(el(id), { flushFn: flushCabinetEditsNow }); });
     ['ib_length','ib_width'].forEach(function(id){ attachExprField(el(id)); });
     ['bc_length','bc_width'].forEach(function(id){ attachExprField(el(id), { flushFn: flushBoardEditsNow }); });

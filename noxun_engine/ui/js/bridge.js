@@ -67,7 +67,11 @@
       writeConstruction(c);
       applyVisibility(t);
       buildFrontHwBadges(c.hardware || []); // D3: badge kovania PRED renderom riadkov ciel
-      renderFronts(c.fronts);
+      // D-07 Codex B2: echo apply toho isteho korpusu s dalsimi cakajucimi editmi
+      // nesmie prepisat gap polia (selectedCabId sa meni az nizsie v setSelected).
+      var keepGaps = (c.cabinet_id && c.cabinet_id === selectedCabId) && !!(applyTimer || cabEditsInFlight);
+      cabEditsInFlight = false;
+      renderFronts(c.fronts, keepGaps);
       currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();
       frontItems = c.front_items || [];
       activeZoneId = c.active_zone || null;

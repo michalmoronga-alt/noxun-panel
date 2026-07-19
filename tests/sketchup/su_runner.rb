@@ -207,6 +207,34 @@ module NoxunSuRunner
     ok('sync: reset zasahu — plati zas pravidlo (4 ks, source rule)',
        !leg3.nil? && leg3['quantity'] == 4 && leg3['source'] == 'rule')
 
+    # 7b) D-07 medzery a presahy cel: zaporne okraje = celo presahuje obrys.
+    #     Asserty VOCI floor_height (Codex N9): z = floor + gap_bottom, nie globalna 0.
+    p5 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    p5['fronts'] = (p5['fronts'] || {}).merge('gap' => 10.0, 'gap_top' => -15.0,
+                                              'gap_bottom' => -30.0, 'gap_sides' => -20.0)
+    e::CabinetBuilder.rebuild(model, inst, p5)
+    cfg5 = e::Store.config(inst) || {}
+    fh5 = cfg5['floor_height'].to_f
+    front5 = inst.definition.entities.grep(Sketchup::ComponentInstance)
+                 .find { |i| e::Store.get(i, 'part_key') == 'front:F1/wing:single' }
+    fo = front5 && front5.transformation.origin
+    fb = front5 && front5.definition.bounds
+    exp_z = fh5 - 30.0                                   # floor + gap_bottom
+    exp_h = (720.0 - fh5) + 15.0 + 30.0                  # total_v - gt - gb
+    ok("sync: D-07 presah dole — celo z=#{fo ? mm(fo.z).round(1) : 'nil'} (floor #{fh5} - 30)",
+       !front5.nil? && (mm(fo.z) - exp_z).abs <= TOL)
+    ok('sync: D-07 presah do stran — celo x=-20, sirka 640',
+       !front5.nil? && (mm(fo.x) - (-20.0)).abs <= TOL && (mm(fb.width) - 640.0).abs <= TOL)
+    ok("sync: D-07 vyska cela #{fb ? mm(fb.depth).round(1) : 'nil'} = #{exp_h} (presah hore aj dole)",
+       !front5.nil? && (mm(fb.depth) - exp_h).abs <= TOL)
+    fi5 = (cfg5['front_items'] || []).first
+    ok('sync: D-07 resolved front_items nesie wings_n',
+       !fi5.nil? && fi5['wings_n'] == 1)
+    p6 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    p6['fronts'] = (p6['fronts'] || {}).merge('gap' => 3.0, 'gap_top' => 2.0,
+                                              'gap_bottom' => 2.0, 'gap_sides' => 2.0)
+    e::CabinetBuilder.rebuild(model, inst, p6)
+
     # 8) dedup kopie (priame volanie, synchronne): kopia dostane nove cid, original drzi
     e::ScaleWatch.guard do
       model.start_operation('SU-TEST kopia', true)

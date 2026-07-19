@@ -29,8 +29,12 @@
       items.push({ id: r.dataset.frontId || newStableId('F'), type: type, mode: hasH ? 'fixed' : 'auto',
         height: hasH ? (isNaN(hNum) ? null : hNum) : null, locked: hasH ? locked : false, wings: (type === 'door') ? wings : '1' });
     }
-    return { split_axis: 'height', gap: 3.0, gap_top: 2.0, gap_bottom: 2.0, gap_sides: 2.0, items: items };
+    return { split_axis: 'height', gap: frontGapVal('fr_gap', 3.0), gap_top: frontGapVal('fr_gap_top', 2.0),
+             gap_bottom: frontGapVal('fr_gap_bottom', 2.0), gap_sides: frontGapVal('fr_gap_sides', 2.0), items: items };
   }
+  // D-07: hodnota gap pola cez evalDim (vyrazy); prazdne/nezmysel = default.
+  function frontGapVal(id, dflt){ var v = numv(id); return isNaN(v) ? dflt : v; }
+  function resetFrontGaps(){ setNum('fr_gap', 3); setNum('fr_gap_top', 2); setNum('fr_gap_bottom', 2); setNum('fr_gap_sides', 2); onField(); }
   function collectAll(){ var c = collectConstruction(); c.fronts = collectFronts(); return c; }
 
   // --- validacia poli (cerveny okraj, ziadne modaly) ---
@@ -38,7 +42,9 @@
   // poli sa preskoci (ani apply, ani cervene — hint bezi); COMMITNUTY neprazdny
   // nezmysel je PO NOVOM chyba (predtym NaN ticho presiel) a blokuje apply.
   var LIMITS = { width:[200,3000], height:[200,3000], depth:[150,2000], thickness:[6,50],
-                 floor_height:[0,500], plinth_recess:[0,300], rail_depth:[20,400], rails_top_offset:[0,500] };
+                 floor_height:[0,500], plinth_recess:[0,300], rail_depth:[20,400], rails_top_offset:[0,500],
+                 // D-07: medzery/presahy cel — zaporny okraj = presah cez obrys (limit zhodny s Fronts::EDGE_LIMIT)
+                 fr_gap:[0,50], fr_gap_top:[-100,100], fr_gap_bottom:[-100,100], fr_gap_sides:[-100,100] };
   function validateFields(){
     var ok = true;
     var ae = document.activeElement;
@@ -106,6 +112,7 @@
     if (!validateFields()) { NX.setStatus('Skontroluj červené polia (mimo rozsahu).', true); return; }
     var payload = collectAll();
     payload.cabinet_id = cabSnapshot || selectedCabId;
+    cabEditsInFlight = true; // D-07 Codex B2: echo tohto apply nesmie prepisat novsi vstup
     if (window.sketchup && sketchup.apply_all) sketchup.apply_all(JSON.stringify(payload));
   }
   function flushCabinetEditsNow(){
@@ -205,9 +212,19 @@
   function delFrontRow(btn){ btn.closest('.frow').remove(); renumberFronts(); }
   function removeLastFront(){ var rows = el('frontRows').querySelectorAll('.frow'); if (rows.length) { rows[rows.length-1].remove(); renumberFronts(); } }
   function renumberFronts(){ var rows = el('frontRows').querySelectorAll('.frow'); for (var i=0;i<rows.length;i++){ rows[i].querySelector('.fnum').textContent = (i+1); } }
-  function renderFronts(fronts){
+  // D-07 Codex B2: keepGaps=true pri echu apply toho isteho korpusu s cakajucimi
+  // editmi — gap polia sa NEprepisu (lokalne hodnoty su novsie nez in-flight echo;
+  // fokus guard nestaci — Reset presuva fokus na tlacidlo). Sablony/vyber = prepis.
+  function renderFronts(fronts, keepGaps){
     el('frontRows').innerHTML = '';
     var items = (fronts && fronts.items) ? fronts.items : [];
     for (var i = 0; i < items.length; i++){ addFrontRow(items[i]); }
+    if (keepGaps) return;
+    // Gap polia su STATICKE (mimo frontRows) — plnia sa z kanonickeho configu;
+    // 0 je platna hodnota, preto != null test (setNum by cez dflt finty 0 stratil).
+    setNum('fr_gap', (fronts && fronts.gap != null) ? fronts.gap : 3);
+    setNum('fr_gap_top', (fronts && fronts.gap_top != null) ? fronts.gap_top : 2);
+    setNum('fr_gap_bottom', (fronts && fronts.gap_bottom != null) ? fronts.gap_bottom : 2);
+    setNum('fr_gap_sides', (fronts && fronts.gap_sides != null) ? fronts.gap_sides : 2);
   }
 

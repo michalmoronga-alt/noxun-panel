@@ -183,7 +183,7 @@ NxTest.test('fronts: layout 2 auto dvierka — auto_h, z postupnost, origin, box
   NxTest.assert_close(411.5, p2[:origin][2], 0.01, 'z2 = 102 + 306.5 + gap 3')
 
   i1 = out[:items][0]
-  NxTest.assert_equal(%w[id type mode height locked wings z], i1.keys)
+  NxTest.assert_equal(%w[id type mode height locked wings wings_n z], i1.keys)
   NxTest.assert_equal('F1', i1['id'])
   NxTest.assert_equal('door', i1['type'])
   NxTest.assert_equal('auto', i1['mode'])
@@ -288,7 +288,7 @@ end
 NxTest.test('fronts: validate — zaporna medzera') do
   f = Noxun::Engine::Fronts
   cfg = { 'gap' => -1, 'items' => [{ 'id' => 'F1' }] }
-  NxTest.assert_raise('Medzery') { f.layout(cfg, 600.0, 720.0, 100.0, 18.0) }
+  NxTest.assert_raise('Medzera medzi celami') { f.layout(cfg, 600.0, 720.0, 100.0, 18.0) }
 end
 
 NxTest.test('fronts: validate — otvor uzsi ako MIN_AUTO') do
