@@ -3,7 +3,11 @@
   // (CSS: mode-insert zobrazi vkladaciu kartu; mode-cab nastavenia korpusu; mode-part
   // kartu dielca a skryje korpusove sekcie). Identita hore = setIdbar.
   var lastCabForFit = null;
-  function setUiMode(mode){ document.body.className = 'mode-' + mode; }
+  function setUiMode(mode){
+    document.body.className = 'mode-' + mode;
+    // D-14 (Codex F5): modal patri k oznacenemu korpusu — mimo mode-cab sa zatvara
+    if (mode !== 'cab' && typeof closeSaveTemplateModal === 'function') closeSaveTemplateModal();
+  }
   // D3: klik na ⚠ chip rozbali/zbali zoznam upozorneni stavby pod identitou.
   function setIdbar(c){
     var bar = el('idbar'), list = el('warnList');
@@ -48,7 +52,7 @@
       else if (data.selected){ NX.loadSelected(data.selected); }
       else { setType('lower'); setDefaults('lower'); currentZoneTree = defaultTree(); renderFilteredTemplates(); NX.clearSelected(); onField(); }
     },
-    setTemplates: function(list){ TEMPLATES = list || []; renderFilteredTemplates(); },
+    setTemplates: function(list){ TEMPLATES = list || []; renderFilteredTemplates(); refreshTplModalWarn(); }, // D-14: varovanie kolizie zije aj pri otvorenom modale
     // D-05: zivy katalog materialov po CRUD v okne Materialy projektu. Obnovi
     // vsetky selecty s materialmi BEZ resetu formulara; zachovava vybrane hodnoty.
     setMaterials: function(data){
@@ -74,6 +78,11 @@
       renderFronts(c.fronts, keepGaps);
       currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();
       frontItems = c.front_items || [];
+      tplNameSuggestion = c.template_name_suggestion || ''; // D-14 modal prefill
+      // Codex GH #46 P2: preklik na INY korpus pri otvorenom modale = zavriet
+      // (mode ostava cab, setUiMode guard nezabera; identitu navyse strazi server)
+      if (typeof tplModalOpen === 'function' && tplModalOpen() &&
+          tplModalCabId && c.cabinet_id !== tplModalCabId) closeSaveTemplateModal();
       activeZoneId = c.active_zone || null;
       setSelected(c.cabinet_id || null);
       refreshMaterialFilters(); // FIX 2: prefiltruj podla hrubok tohto korpusu (pred nastavenim hodnot)

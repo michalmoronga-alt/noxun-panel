@@ -10,13 +10,11 @@
 
 ## Spomaľovače (vysoká priorita)
 
-- **D-17 · BUG: sokel o 36 mm kratší ako skrinka** (Michal 19.7. večer) — soklový panel sa stavia medzi boky (`šírka − 2×hrúbka`); výrobný štandard = plná šírka skrinky, lícuje s bokmi. *Stav: fix v dávke 4.*
-- **D-12 · Zoom náhľadu pri scrollovaní panela** — čistý scroll nad náhľadom nechtiac zoomuje pri scrollovaní pluginu. Riešenie: **Ctrl+koliesko = zoom**, čistý scroll = scroll panela (štandard máp/CAD; hint to napíše). *Stav: dávka 4.*
+*(momentálne žiadne)*
 
 ## UX drobnosti (nízka priorita)
 
-- **D-11 · Kóty sokla a tela + pole Výška sokla** — do kótovaného náhľadu Korpus pridať vľavo kóty výšky sokla a výšky tela korpusu; pole „Výška podstavca" presunúť do Základných. *Stav: dávka 4.*
-- **D-13 · Default zapustenia sokla 40 mm** — soklový panel predvolene 40 mm od prednej hrany (uľahčí neskoršie výpočty — nohy pod prednou hranou); doteraz 50. Nové skrinky; existujúce bez zmeny. *Stav: dávka 4.*
+*(momentálne žiadne)*
 
 ## Nápady na zváženie (nerozhodnuté)
 
@@ -27,14 +25,18 @@
 - **D-09 · Snap body pri presúvaní priečok** (1/4, 1/2, 3/4…) v zónovom náhľade. *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
 - **D-10 · Presúvanie/úprava čiel priamo v náhľade** (ako drag priečok). *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
 - **D-14 · Uložiť korpus do knižnice priamo z panela** (Michal 19.7.) — dnes sa šablóna ukladá v satelitnom okne Šablóny (nenájditeľné pri práci). Návrh: tlačidlo „★ Uložiť ako šablónu" dole vedľa „+ Vložiť ďalší korpus" → **modal** s názvom a potrebnými údajmi (prvý kus vzoru D-15). *Stav: dávka 5.*
-- **D-16 · Autocomplete dekoru** (Michal 19.7.) — pri výbere materiálu/ABS písať názov z katalógu, návrhy sa dopĺňajú za každým písmenom, → a Enter potvrdí. *Stav: dávka 5.*
+- **D-16 · Autocomplete dekoru** (Michal 19.7.) — pri výbere materiálu/ABS písať názov z katalógu, návrhy sa dopĺňajú za každým písmenom, → a Enter potvrdí. *Stav: ODLOŽENÉ (Michal 19.7. večer — „nice to have"), v zásobe.*
 
 ## Otvorené otázky (na Michalovo posúdenie pri teste)
 
-- **D-08 vs D-03:** karta Zóna jednozónovej skrinky sa ukáže až v tabe Zóny (predvolený tab je Korpus). Ak bude chýbať hneď pri označení, možnosť: novo vložená skrinka štartuje v tabe Zóny.
+*(momentálne žiadne — D-08 default tab Korpus potvrdený 19.7. večer: „jednoznačne vyhovuje")*
 
 ## Vyriešené
 
+- **D-17 · Sokel o 36 mm kratší** → **vyriešené v dávke 4 (PR #45)**: plná šírka skrinky, lícuje s bokmi; výnimka „dno medzi bokmi" (boky na zem) — sokel ostáva medzi nimi (kolíziu chytil Codex audit ako blocker). Predný rad proxy nôh sa kreslí za soklom.
+- **D-13 · Default zapustenia sokla** → **vyriešené v dávke 4 (PR #45)**: 40 mm pre nové skrinky aj seed šablóny; existujúce korpusy a legacy šablóny chránené (fallback 50 ostáva).
+- **D-12 · Zoom pri scrollovaní panela** → **vyriešené v dávke 4 (PR #45)**: zoom len Ctrl+koliesko, čistý scroll scrolluje panel; hint aktualizovaný.
+- **D-11 · Kóty sokla/tela + pole** → **vyriešené v dávke 4 (PR #45)**: kóty vľavo v tabe Korpus (len keď sokel existuje); Výška sokla v Základných, pri hornej sa skrýva.
 - **D-08 · Režimové taby Inspectora** → **vyriešené v dávke 3 (PR #43)**: taby Korpus · Zóny · Čelá = režimy práce — prepínajú náhľad AJ sekcie. Korpus (default) = kótovaný obrys (Š/V/hĺbka) + Základné/Strop/Dno/Boky/Chrbát/Kovanie/Materiály; Zóny = zónový náhľad + ghost checkbox + karta Zóna + strom; Čelá = náhľad čiel + riadky + medzery/presahy. Tab sa pamätá cez zmeny výberu; dielec vynúti zónový náhľad (klik na zónu = odchod z dielca) a po návrate sa tab obnoví; prepnutie tabu = čistý fit. Čelá na drafte pred vložením ostávajú hláškou (vedomé). Codex audit 0 blockerov / 6 fixov; DOM smoke test PASS.
 - **D-07 · Medzery/presahy čiel** → **vyriešené v dávke „noc na 19.7." (PR #41)**: sekcia Čelá má polia *Medzi čelami / Okraj hore / dole / po stranách* (+ Reset 3/2 mm); záporný okraj = presah cez obrys korpusu (limity 0–50 / ±100 mm); výrazy fungujú; šablóny hodnoty ukladajú; medzera dvojkrídlových poslúcha nastavenie (bola natvrdo) a náhľad ich kreslí ako 2 panely; fit náhľadu zahrnie presahy. Sémantika: čelá sa kladú odspodu — „Okraj hore" posúva geometriu cez AUTO čelo, pri samých pevných výškach je rezervou (vysvetlené v hinte).
 - **D-03 · Police sa hľadajú ťažko** → **vyriešené (PR #42)**: jednozónová skrinka zobrazí kartu Zóna rovno pri označení (auto-výber, náhľad zvýrazní); hint pod náhľadom spomína police; vysvetlenie v akordeóne Štruktúra zón; karta Zóna sa už neplietie do režimu Čelá. (Pôvodne evidované ako falošný poplach + nápady — nápady zrealizované.)

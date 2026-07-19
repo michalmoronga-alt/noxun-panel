@@ -29,6 +29,15 @@ module Noxun
           Engine.log_error(e, 'TemplatesDialog.show')
         end
 
+        # D-14 (Codex F3): refresh zoznamu zvonka (ulozenie sablony z panela),
+        # aby otvorene okno Sablony hned ukazalo novu polozku.
+        def refresh_if_open
+          return unless @dialog && @dialog.visible?
+          push_state
+        rescue StandardError => e
+          Engine.log_error(e, 'TemplatesDialog.refresh_if_open')
+        end
+
         def ensure_dialog
           return @dialog if @dialog
 
