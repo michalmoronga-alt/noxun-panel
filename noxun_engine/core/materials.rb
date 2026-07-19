@@ -234,6 +234,14 @@ module Noxun
         if rgb && !(rgb.is_a?(Array) && rgb.size == 3 && rgb.all? { |c| c.to_i.between?(0, 255) })
           return [false, 'Farba musí byť RGB 0–255.']
         end
+        # D-19: format platne je volitelny — ak je poslany, musia to byt dve
+        # cisla 500..5000 mm (striktne — nie ticha oprava, Codex F4).
+        ss = a['sheet_size'] || a[:sheet_size]
+        if ss
+          valid = ss.is_a?(Array) && ss.size == 2 &&
+                  ss.all? { |x| (n = pair_num(x)) && n.between?(500.0, 5000.0) }
+          return [false, 'Formát platne musí byť dve čísla 500–5000 mm.'] unless valid
+        end
         [true, nil]
       end
 
@@ -393,9 +401,22 @@ module Noxun
         }
       end
 
+      # D-19 (Codex F4): to_f by z "abc" spravilo 0.0 a odhad platni by delil
+      # nulou — nekladny/nečíselny prvok znamena CELY par default.
       def normalize_pair(v, dflt)
         return dflt unless v.is_a?(Array) && v.size == 2
-        [v[0].to_f, v[1].to_f]
+        l = pair_num(v[0])
+        w = pair_num(v[1])
+        l && w ? [l, w] : dflt
+      end
+
+      def pair_num(v)
+        f = begin
+          Float(v)
+        rescue StandardError, TypeError
+          nil
+        end
+        f && f.positive? && f.finite? ? f : nil
       end
 
       def supported_edge_thickness?(value)

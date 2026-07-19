@@ -3,7 +3,7 @@
      (%APPDATA%). -->
 <!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.7m">
+<link rel="stylesheet" href="css/panel.css?v=0.4.7p">
 
 <h1>Materiály projektu</h1>
 <p class="sub" id="mdline">…</p>
@@ -39,6 +39,8 @@
     <div class="row"><label>Farba</label><input id="ms_color" type="color" value="#d8c4a0"><span class="unit"></span></div>
     <div class="row"><label>Rodina</label><input id="ms_family" type="text" placeholder="voliteľné"><span class="unit"></span></div>
     <div class="row"><label>Výrobca</label><input id="ms_manufacturer" type="text" placeholder="voliteľné"><span class="unit"></span></div>
+    <!-- D-19: format platne pre odhad poctu platni (okno Vyroba, tab Materialy) -->
+    <div class="row"><label>Formát platne</label><input id="ms_sheet_l" type="text" placeholder="2800" class="sheetdim"><span class="sheetx">×</span><input id="ms_sheet_w" type="text" placeholder="2070" class="sheetdim"><span class="unit">mm</span></div>
     <div class="btnrow">
       <button class="primary" onclick="mdSaveSheet()">Uložiť</button>
       <button class="ghostbtn" onclick="mdCloseForms()">Zrušiť</button>
@@ -67,5 +69,5 @@
 
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.4.7m"></script>
-<script src="js/proj_materials.js?v=0.4.7m"></script>
+<script src="js/errors.js?v=0.4.7p"></script>
+<script src="js/proj_materials.js?v=0.4.7p"></script>

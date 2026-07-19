@@ -86,6 +86,10 @@
     el('ms_color').value = rgbToHex(s ? s.color : null);
     el('ms_family').value = s ? (s.family || '') : '';
     el('ms_manufacturer').value = s ? (s.manufacturer || '') : '';
+    // D-19: format platne — prazdne pri novom materiali = serverovy default 2800x2070
+    var ss = s && s.sheet_size;
+    el('ms_sheet_l').value = ss ? ss[0] : '';
+    el('ms_sheet_w').value = ss ? ss[1] : '';
     el('mdSheetForm').style.display = '';
   }
   function mdOpenEdgeForm(id){
@@ -105,6 +109,14 @@
     if (el('mdEdgeForm')) el('mdEdgeForm').style.display = 'none';
   }
 
+  // D-19: parse rozmeru platne — cislo s ciarkou/bodkou, inak null (NIE 0).
+  function mdSheetDim(v){
+    var s = String(v == null ? '' : v).trim().replace(',', '.');
+    if (!s) return null;
+    var n = Number(s);
+    return isFinite(n) && n > 0 ? n : NaN; // NaN = vyplnene ale neplatne
+  }
+
   function mdSaveSheet(){
     var payload = {
       material_id: mdEditing && mdEditing.id ? mdEditing.id : null,
@@ -117,6 +129,15 @@
       family: el('ms_family').value,
       manufacturer: el('ms_manufacturer').value
     };
+    // D-19: format platne sa posiela LEN ako kompletny platny par; polovicny
+    // alebo neplatny vstup zastavi ulozenie (ziadne tiche 0/reset — Codex F4).
+    var sl = mdSheetDim(el('ms_sheet_l').value);
+    var sw = mdSheetDim(el('ms_sheet_w').value);
+    if ((sl === null) !== (sw === null) || (sl !== null && (isNaN(sl) || isNaN(sw)))){
+      NX.setStatus('Formát platne: vyplň obe čísla (mm), alebo nechaj obe prázdne.', true);
+      return;
+    }
+    if (sl !== null) payload.sheet_size = [sl, sw];
     var fn = mdEditing && mdEditing.id ? 'update_sheet' : 'add_sheet';
     if (window.sketchup && sketchup[fn]) sketchup[fn](JSON.stringify(payload));
     mdCloseForms();
