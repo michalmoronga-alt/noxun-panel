@@ -14,11 +14,11 @@ Povinný krok pred implementáciou každej dávky/iterácie (pravidlo z 18.7.202
 1. **Nájdi companion runtime** (Glob v home adresári; cesta sa mení s verziou pluginu):
    `~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs`
    (fallback: `~/.claude/plugins/marketplaces/openai-codex/plugins/codex/scripts/codex-companion.mjs`).
-2. **Zostav adversarial prompt** (vzor nižšie) a ulož do scratchpad súboru v UTF-8. NIE inline shell argument — slovenčina a úvodzovky sa rozsypú. Do promptu dosaď skutočný repo root aktuálneho checkoutu (napr. výstup `git rev-parse --show-toplevel`).
-3. **Odošli úlohu** (Bash tool):
-   `node "<companion>" task "$(cat '<prompt-file>')"` → výstup obsahuje **task-id**.
-   (Alternatíva, ak priame volanie zlyhá: Agent `codex:codex-rescue` ako čistý forwarder — má spraviť LEN toto jedno volanie a vrátiť task-id; výsledok si ťahá hlavný agent sám.)
-4. **Počkaj na dobehnutie:** opakovane `node "<companion>" status <task-id>` — úloha beží, kým je v tabuľke `| running |`. Typicky 3–10 min pri effort high. Čakanie rieš cez Monitor tool (načítať cez ToolSearch) alebo background sleep + jednorazový check; **nikdy nereťaziť** kontrolný grep s ďalšími príkazmi (race na dopisujúci sa output).
+2. **Zostav adversarial prompt** (vzor nižšie) a ulož do scratchpad súboru v UTF-8. NIE inline shell argument — slovenčina a úvodzovky sa rozsypú. Do promptu dosaď skutočný repo root aktuálneho checkoutu (napr. výstup `git rev-parse --show-toplevel`). **Prompt drž ŠTÍHLY** (5–6 files-to-read, „known facts" sekcia namiesto ďalších súborov) — obrí rozsah predlžuje beh a zvyšuje riziko stallu.
+3. **Odošli úlohu — VŽDY cez PowerShell tool a VŽDY s `--background`** (bez neho volanie blokuje do konca behu a vytimeoutuje; companion navyše interne volá `taskkill /PID`, ktorý Git Bash MSYS manglingom rozbije):
+   `$prompt = Get-Content -Raw '<prompt-file>'; node "<companion>" task --background $prompt` → výstup obsahuje **task-id**.
+4. **Počkaj na dobehnutie:** opakovane `node "<companion>" status <task-id>` — úloha beží, kým je `| running |`. Typicky 3–10 min pri effort high. Čakanie rieš cez background sleep + jednorazový check; **nikdy nereťaziť** kontrolný grep s ďalšími príkazmi.
+   **STALL GUARD (povinný):** status vypisuje cestu `Log:` — pri každom checku over `tail` logu. Ak sa log **>15 min nehýbe** (alebo Elapsed presiahne ~25 min), task je zaseknutý: `cancel <task-id>` (PowerShell!), over/dobi PID z chybovej hlášky a **1× retry** s ešte štíhlejším promptom. Ak stalne aj retry, pokračuj bez auditu — výslovne to ohlás a audit nech sa spustí neskôr lokálne.
 5. **Vytiahni výsledok:** `node "<companion>" result <task-id>`.
 6. **Spracuj nálezy:** BLOCKER = zastav, vyrieš v návrhu pred kódom; FIX-IN-X = zapracuj do plánu iterácie; NOTE = zváž/zapíš. Michalovi zhrň po slovensky: počty nálezov + čo sa v návrhu mení.
 

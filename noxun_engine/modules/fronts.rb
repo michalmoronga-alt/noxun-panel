@@ -12,6 +12,8 @@ module Noxun
       FRONT_THICKNESS = 18.0
       GAP_DEFAULT     = 3.0   # skara medzi celami (zvislo) aj medzi kridlami dvierok
       GAP_EDGE        = 2.0   # skara hore/dole/po stranach
+      GAP_MAX         = 50.0  # D-07: medzera medzi celami 0..GAP_MAX
+      EDGE_LIMIT      = 100.0 # D-07: okraje v -EDGE_LIMIT..+EDGE_LIMIT (zaporne = presah cez obrys)
       AUTO_TWO_ABOVE  = 600.0 # nad touto sirkou celneho otvoru auto dvierka = 2 kridla
       MIN_AUTO        = 10.0  # ochrana: auto celo nikdy < 10 mm
 
@@ -22,6 +24,9 @@ module Noxun
       # Vrati: { parts:[deskriptory], items:[resolved s reÁlnymi vyskami], wings:Integer }.
       def layout(fronts_cfg, width, height, floor_height, _thickness)
         cfg = normalize_config(fronts_cfg)
+        # D-07: rozsahy medzier platia VZDY (aj bez ciel) — neplatne hodnoty sa
+        # nesmu ulozit cez externy callback a vybuchnut az po pridani cela.
+        validate_gap_ranges!(cfg)
         items = cfg['items']
         return { parts: [], items: [], wings: 0 } if items.nil? || items.empty?
 
@@ -44,12 +49,13 @@ module Noxun
         items.each_with_index do |it, i|
           idx = i + 1
           h = it['mode'] == 'fixed' ? it['height'].to_f : auto_h
-          panels = panels_for(it, idx, gs, opening_w, z, h)
+          panels = panels_for(it, idx, gs, opening_w, z, h, gap)
           total_wings += panels.size if it['type'] == 'door'
           parts.concat(panels)
           resolved << {
             'id' => it['id'] || "F#{idx}", 'type' => it['type'], 'mode' => it['mode'],
             'height' => h.round(2), 'locked' => !!it['locked'], 'wings' => it['wings'],
+            'wings_n' => (it['type'] == 'door' ? panels.size : 1), # D-07: efektivny pocet kridiel pre nahlad
             'z' => z.round(2)
           }
           z += h + gap
@@ -58,7 +64,8 @@ module Noxun
       end
 
       # Panely jedneho cela. drawer_front = 1 panel; door = 1/2 kridla podla wings.
-      def panels_for(item, idx, gs, opening_w, z, h)
+      # D-07: medzera medzi kridlami = cfg gap (predtym natvrdo GAP_DEFAULT).
+      def panels_for(item, idx, gs, opening_w, z, h, gap = GAP_DEFAULT)
         front_id = item['id'].to_s
         front_id = "F#{idx}" if front_id.empty?
         if item['type'] == 'drawer_front'
@@ -67,12 +74,12 @@ module Noxun
         else
           wings = resolve_wings(item['wings'], opening_w)
           if wings == 2
-            dw = (opening_w - GAP_DEFAULT) / 2.0
+            dw = (opening_w - gap) / 2.0
             [
               box_desc("DOOR-#{idx}-L", PartKeys.front(front_id, 'wing', 'left'),
                        'front_door', "Dvierka #{idx} lave", gs, dw, z, h),
               box_desc("DOOR-#{idx}-R", PartKeys.front(front_id, 'wing', 'right'),
-                       'front_door', "Dvierka #{idx} prave", gs + dw + GAP_DEFAULT, dw, z, h)
+                       'front_door', "Dvierka #{idx} prave", gs + dw + gap, dw, z, h)
             ]
           else
             [box_desc("DOOR-#{idx}", PartKeys.front(front_id, 'wing', 'single'),
@@ -99,6 +106,23 @@ module Noxun
         end
       end
 
+      # D-07: rozsahy medzier — medzera medzi celami 0..GAP_MAX; okraje
+      # +-EDGE_LIMIT (zaporne = presah cez obrys korpusu). POZN. semantika
+      # okraja hore: cela sa kladu ODSPODU (z = floor + gap_bottom); gap_top
+      # posuva geometriu len cez AUTO cela (dopocitavaju zvysok) a pri
+      # fixed-only zostave funguje ako rezerva/limit vo fit validacii.
+      def validate_gap_ranges!(cfg)
+        gap = cfg['gap'].to_f
+        if gap.negative? || gap > GAP_MAX
+          raise "Medzera medzi celami musi byt 0 az #{GAP_MAX.to_i} mm."
+        end
+        [['hore', cfg['gap_top'].to_f], ['dole', cfg['gap_bottom'].to_f],
+         ['po stranach', cfg['gap_sides'].to_f]].each do |label, v|
+          next if v.abs <= EDGE_LIMIT
+          raise "Okraj cel #{label} musi byt v rozsahu -#{EDGE_LIMIT.to_i} az +#{EDGE_LIMIT.to_i} mm."
+        end
+      end
+
       # Backendova ochrana pred geometriou mimo korpusu. UI ma vlastne kontroly,
       # ale ulozeny/legacy config alebo externy callback ich moze obist.
       def validate_layout!(cfg, opening_w, total_v, fixed_sum, auto_count)
@@ -108,8 +132,15 @@ module Noxun
         gs = cfg['gap_sides'].to_f
         items = cfg['items'] || []
 
-        raise 'Medzery cel musia byt nulove alebo kladne.' if [gap, gt, gb, gs].any?(&:negative?)
         raise 'Cela sa nezmestia na sirku korpusu.' if opening_w < MIN_AUTO
+        # D-07 (Codex GH P2): dvojkridlove dvierka — kridlo nesmie klesnut pod
+        # MIN_AUTO (velka medzera/okraje by inak dali zaporne kridlo, ktore by
+        # construction ticho vyradil a korpus by sa ulozil bez dvierok).
+        items.each_with_index do |it, i|
+          next unless it['type'] == 'door' && resolve_wings(it['wings'], opening_w) == 2
+          next if (opening_w - gap) / 2.0 >= MIN_AUTO
+          raise "Kridla dvierok #{i + 1} sa nezmestia — zmensi medzeru medzi celami alebo bocne okraje."
+        end
 
         items.each_with_index do |it, i|
           next unless it['mode'] == 'fixed'

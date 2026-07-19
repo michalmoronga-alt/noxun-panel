@@ -5,7 +5,7 @@
      sablon ziju v satelitnych oknach (proj_materials.html, templates.html) — panel ma len
      quick-pick sablony a materialy oznacenej skrinky. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.7f">
+<link rel="stylesheet" href="css/panel.css?v=0.4.7h">
 
 <div class="hdr"><h1>Noxun Engine</h1><span class="sub" id="verline">…</span></div>
 
@@ -231,6 +231,15 @@
       <button class="ghostbtn" onclick="addFrontRow(); onField()">+ riadok</button>
       <button class="ghostbtn" onclick="removeLastFront(); onField()">− riadok</button>
     </div>
+    <!-- D-07: medzery a presahy — hodnoty ziju vo fronts configu (nie construction params) -->
+    <div class="hint">Medzery a presahy (mm). Záporný okraj = čelo presahuje obrys korpusu. Čelá sa kladú odspodu — okraj hore sa prejaví cez AUTO čelo (pri samých pevných výškach je len rezervou).</div>
+    <div class="row"><label>Medzi čelami</label><input id="fr_gap" type="text" oninput="onField()"><span class="unit">mm</span></div>
+    <div class="row"><label>Okraj hore</label><input id="fr_gap_top" type="text" oninput="onField()"><span class="unit">mm</span></div>
+    <div class="row"><label>Okraj dole</label><input id="fr_gap_bottom" type="text" oninput="onField()"><span class="unit">mm</span></div>
+    <div class="row"><label>Okraj po stranách</label><input id="fr_gap_sides" type="text" oninput="onField()"><span class="unit">mm</span></div>
+    <div class="btnrow">
+      <button class="ghostbtn" onclick="resetFrontGaps()">↺ Predvolené (3 / 2 mm)</button>
+    </div>
   </div>
 </details>
 
@@ -277,16 +286,16 @@
 <!-- Poradie skriptov je kontrakt: errors prvy (chytac), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.4.7f"></script>
-<script src="js/core.js?v=0.4.7f"></script>
-<script src="js/expr.js?v=0.4.7f"></script>
-<script src="js/form.js?v=0.4.7f"></script>
-<script src="js/zone_tree.js?v=0.4.7f"></script>
-<script src="js/preview.js?v=0.4.7f"></script>
-<script src="js/actions.js?v=0.4.7f"></script>
-<script src="js/bridge.js?v=0.4.7f"></script>
-<script src="js/materials.js?v=0.4.7f"></script>
-<script src="js/part_card.js?v=0.4.7f"></script>
-<script src="js/board_card.js?v=0.4.7f"></script>
-<script src="js/hardware.js?v=0.4.7f"></script>
-<script src="js/boot.js?v=0.4.7f"></script>
+<script src="js/errors.js?v=0.4.7h"></script>
+<script src="js/core.js?v=0.4.7h"></script>
+<script src="js/expr.js?v=0.4.7h"></script>
+<script src="js/form.js?v=0.4.7h"></script>
+<script src="js/zone_tree.js?v=0.4.7h"></script>
+<script src="js/preview.js?v=0.4.7h"></script>
+<script src="js/actions.js?v=0.4.7h"></script>
+<script src="js/bridge.js?v=0.4.7h"></script>
+<script src="js/materials.js?v=0.4.7h"></script>
+<script src="js/part_card.js?v=0.4.7h"></script>
+<script src="js/board_card.js?v=0.4.7h"></script>
+<script src="js/hardware.js?v=0.4.7h"></script>
+<script src="js/boot.js?v=0.4.7h"></script>

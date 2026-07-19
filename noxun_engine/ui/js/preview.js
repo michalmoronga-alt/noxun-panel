@@ -9,14 +9,32 @@
   // zasahu pohlad DRZI (Michalov "lock") — reset tlacidlom ⛶ alebo pri zmene skrinky.
   var pvView = null;        // {x,y,w,h} v mm sceny
   var pvUserView = false;   // true = pouzivatel si pohlad nastavil sam
+  // D-07: rozsah ciel v modelovych mm (presahy mozu ist mimo obrys korpusu).
+  function frontsExtent(){
+    var items = frontItems; if (!items || !items.length) return null;
+    var W = numv('width')||600, H = numv('height')||720;
+    var gs = 2; var gsv = numv('fr_gap_sides'); if (!isNaN(gsv)) gs = gsv;
+    var e = { minX: Math.min(0, gs), maxX: Math.max(W, W - gs), minZ: 0, maxZ: H };
+    items.forEach(function(it){
+      e.minZ = Math.min(e.minZ, it.z);
+      e.maxZ = Math.max(e.maxZ, it.z + it.height);
+    });
+    return e;
+  }
+  // Scena = korpus ∪ cela (fit ukaze aj presahy — Codex F3). Bez presahov je
+  // vysledok identicky s povodnym {0,0,W+2p,H+2p}, drag prepocty sa nemenia.
   function sceneSize(){
     var W = numv('width')||600, H = numv('height')||720;
-    return { w: W + 2*PV_PAD, h: H + 2*PV_PAD };
+    var e = frontsExtent();
+    var minX = e ? e.minX : 0, maxX = e ? e.maxX : W;
+    var minZ = e ? e.minZ : 0, maxZ = e ? e.maxZ : H;
+    return { x: minX, y: H - maxZ,
+             w: (maxX - minX) + 2*PV_PAD, h: (maxZ - minZ) + 2*PV_PAD };
   }
   function fitPreview(){ pvUserView = false; pvView = null; renderPreview(); }
   function applyViewBox(svg){
     var base = sceneSize();
-    if (!pvUserView || !pvView) pvView = { x: 0, y: 0, w: base.w, h: base.h };
+    if (!pvUserView || !pvView) pvView = { x: base.x, y: base.y, w: base.w, h: base.h };
     svg.setAttribute('viewBox', pvView.x + ' ' + pvView.y + ' ' + pvView.w + ' ' + pvView.h);
   }
   // Mapovanie px<->mm pri preserveAspectRatio meet (letterbox offsety).
@@ -96,10 +114,25 @@
       S.push('<text x="'+rx(W/2)+'" y="'+ry(H/2)+'" font-size="20" fill="#90a4ae" text-anchor="middle">Čelá: nastav v sekcii Čelá</text>');
       return;
     }
-    var gs = 2;
+    // D-07: okraje/medzera z poli (0 je platna hodnota — NIE || default);
+    // zaporny bocny okraj = cela sirsie nez korpus (presah).
+    var gs = 2; var gsv = numv('fr_gap_sides'); if (!isNaN(gsv)) gs = gsv;
+    var gap = 3; var gv = numv('fr_gap'); if (!isNaN(gv)) gap = gv;
+    var ow = W - 2*gs;
     items.forEach(function(it, i){
       var z = it.z, h = it.height, col = (it.type==='drawer_front')?'#b3e5fc':'#e1f5fe';
-      S.push('<rect x="'+rx(gs)+'" y="'+ry(z+h)+'" width="'+(W-2*gs)+'" height="'+h+'" fill="'+col+'" stroke="#4fc3f7" stroke-width="1.5"/>');
+      // Codex GH P2: legacy cache front_items (pred D-07) nema wings_n —
+      // fallback zrkadli Ruby resolve_wings (explicitne '2'/'1', auto nad 600).
+      var wn = it.wings_n;
+      if (wn == null) wn = (it.wings === '2') ? 2 : ((it.wings === '1') ? 1 : (ow > 600 ? 2 : 1));
+      if (it.type === 'door' && wn === 2){
+        // dvojkridlove dvierka = 2 panely s medzerou gap (Codex F5)
+        var dw = (ow - gap) / 2;
+        S.push('<rect x="'+rx(gs)+'" y="'+ry(z+h)+'" width="'+dw+'" height="'+h+'" fill="'+col+'" stroke="#4fc3f7" stroke-width="1.5"/>');
+        S.push('<rect x="'+rx(gs+dw+gap)+'" y="'+ry(z+h)+'" width="'+dw+'" height="'+h+'" fill="'+col+'" stroke="#4fc3f7" stroke-width="1.5"/>');
+      } else {
+        S.push('<rect x="'+rx(gs)+'" y="'+ry(z+h)+'" width="'+ow+'" height="'+h+'" fill="'+col+'" stroke="#4fc3f7" stroke-width="1.5"/>');
+      }
       S.push('<text x="'+rx(W/2)+'" y="'+ry(z+h/2)+'" font-size="18" fill="#0277bd" text-anchor="middle" dominant-baseline="middle">'+(it.type==='drawer_front'?'zásuvka':'dvierka')+' '+Math.round(h)+'</text>');
     });
   }

@@ -2,6 +2,7 @@
   var DEFAULTS = { lower: {}, upper: {} };
   var TEMPLATES = [];
   var activeZoneId = null;
+  var cabEditsInFlight = false; // D-07 Codex B2: apply odoslany, echo este nedoslo
   var selectedCabId = null;
   var currentZoneTree = null;   // strukturny strom zon (nový vklad aj oznaceny)
   var previewMode = 'zones';
