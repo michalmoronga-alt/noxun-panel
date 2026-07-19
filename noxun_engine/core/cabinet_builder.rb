@@ -14,7 +14,7 @@ module Noxun
         type: 'lower', width: 600.0, height: 720.0, depth: 510.0, thickness: 18.0,
         floor_height: 100.0, shelves: 0, fronts: 'none',
         bottom_mode: 'under_sides', top_mode: 'full', back_mode: 'overlay', back_thickness: 3.0,
-        plinth_mode: 'none', plinth_recess: 50.0,
+        plinth_mode: 'none', plinth_recess: 40.0,
         rail_depth: 100.0, rails_orientation: 'flat', rails_top_offset: 0.0
       }.freeze
 
@@ -24,7 +24,7 @@ module Noxun
         type: 'upper', width: 600.0, height: 720.0, depth: 320.0, thickness: 18.0,
         floor_height: 0.0, shelves: 0, fronts: 'none',
         bottom_mode: 'between_sides', top_mode: 'full', back_mode: 'groove', back_thickness: 3.0,
-        plinth_mode: 'none', plinth_recess: 50.0,
+        plinth_mode: 'none', plinth_recess: 40.0,
         rail_depth: 100.0, rails_orientation: 'flat', rails_top_offset: 0.0
       }.freeze
 
@@ -418,11 +418,17 @@ module Noxun
           w = cfg[:width]; d = cfg[:depth]; h = cfg[:floor_height]
           r = LEG_DIAMETER / 2.0
           count = [qty, LEG_RENDER_MAX].min
-          two_rows = count > 1 && d > 2 * (LEG_INSET + r)
+          # D-13/D-17 (Codex F4): pri prednom sokli predny rad noh posunut ZA dosku
+          # sokla (recess + hrubka + polomer + vola) — proxy sa nesmie pretinat.
+          front_y = LEG_INSET
+          if cfg[:plinth_mode] == 'front'
+            front_y = [front_y, cfg[:plinth_recess].to_f + cfg[:thickness].to_f + r + 5.0].max
+          end
+          two_rows = count > 1 && d > front_y + LEG_INSET + 2 * r
           rows =
             if two_rows
               front = (count / 2.0).ceil
-              [[LEG_INSET, front], [d - LEG_INSET, count - front]].reject { |_, n| n < 1 }
+              [[front_y, front], [d - LEG_INSET, count - front]].reject { |_, n| n < 1 }
             else
               [[d / 2.0, count]]
             end

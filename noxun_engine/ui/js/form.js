@@ -137,6 +137,7 @@
   }
   function applyVisibility(t){
     el('plinthGroup').style.display = (t === 'upper') ? 'none' : '';
+    el('fhRow').style.display = (t === 'upper') ? 'none' : ''; // D-11: vyska sokla v Zakladnych, horna ju nema
     toggleRecess(); toggleTwoRails();
   }
   function toggleRecess(){ el('recessRow').style.display = (val('plinth_mode') === 'front') ? '' : 'none'; }

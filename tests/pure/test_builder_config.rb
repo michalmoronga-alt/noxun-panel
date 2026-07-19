@@ -21,7 +21,7 @@ NxTest.test('builder: normalize bez params vrati lower defaulty') do
   NxTest.assert_equal('overlay', cfg[:back_mode])
   NxTest.assert_close(3.0, cfg[:back_thickness])
   NxTest.assert_equal('none', cfg[:plinth_mode])
-  NxTest.assert_close(50.0, cfg[:plinth_recess])
+  NxTest.assert_close(40.0, cfg[:plinth_recess])
   NxTest.assert_close(100.0, cfg[:rail_depth])
   NxTest.assert_equal('flat', cfg[:rails_orientation])
   NxTest.assert_close(0.0, cfg[:rails_top_offset])
@@ -503,7 +503,7 @@ NxTest.test('builder: cabinet_config upper - preset, meno a support none') do
   c2 = cb.cabinet_config(cb.normalize('plinth_mode' => 'front'))
   NxTest.assert_equal('plinth', c2[:support][:type])
   NxTest.assert_close(100.0, c2[:support][:height])
-  NxTest.assert_close(50.0, c2[:support][:recess])
+  NxTest.assert_close(40.0, c2[:support][:recess])
 end
 
 # ---------------------------------------------------------------------------

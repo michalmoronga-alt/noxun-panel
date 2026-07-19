@@ -230,9 +230,15 @@ module Noxun
         s = cfg[:floor_height]
         return [] if s <= 0
         w = cfg[:width]; t = cfg[:thickness]; recess = cfg[:plinth_recess]
+        # D-17: sokel na PLNU sirku skrinky (vyrobny standard — licuje s bokmi).
+        # Vynimka: dno medzi bokmi = boky siahaju na zem (side_parts z0=0),
+        # plny sokel by sa s nimi objemovo pretal -> ostava medzi bokmi.
+        between = cfg[:bottom_mode] == 'between_sides'
+        px = between ? t : 0.0
+        pw = between ? (w - 2 * t) : w
         [{ suffix: 'PLINTH', part_key: PartKeys.cabinet('plinth', 'front'),
            role: 'plinth', name: 'Sokel predny', material: :korpus,
-           box: [w - 2 * t, t, s], origin: [t, recess, 0], prod: { length: w - 2 * t, width: s, thickness: t } }]
+           box: [pw, t, s], origin: [px, recess, 0], prod: { length: pw, width: s, thickness: t } }]
       end
 
       # Prida warning o orezani rozmeru vystuhy (ziadany != pouzity).

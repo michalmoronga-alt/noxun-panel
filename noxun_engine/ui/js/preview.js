@@ -43,7 +43,7 @@
     var e = (previewMode === 'cab') ? null : frontsExtent();
     var minX = e ? e.minX : 0, maxX = e ? e.maxX : W;
     var minZ = e ? e.minZ : 0, maxZ = e ? e.maxZ : H;
-    if (previewMode === 'cab'){ maxX = W + DIM_EXT; minZ = -DIM_EXT; }
+    if (previewMode === 'cab'){ maxX = W + DIM_EXT; minZ = -DIM_EXT; minX = -DIM_EXT; } // D-11: vlavo koty sokla/tela
     return { x: minX, y: H - maxZ,
              w: (maxX - minX) + 2*PV_PAD, h: (maxZ - minZ) + 2*PV_PAD };
   }
@@ -108,7 +108,7 @@
       renderFrontsPreview(S, rx, ry, W, H, fh, t);
     } else {
       // D-08: tab Korpus — kotovany obrys (Š/V koty + hlbka textom)
-      renderCabOutline(S, rx, ry, W, H);
+      renderCabOutline(S, rx, ry, W, H, fh);
     }
     svg.innerHTML = S.join('');
     // POZN: ziadne per-element bindovanie tu — pouzivame event delegaciu (setupPreviewDelegation),
@@ -158,7 +158,7 @@
 
   // D-08: koty pre tab Korpus — sirka dole, vyska vpravo, hlbka textom v strede.
   // Obrys + schematicke dielce kresli spolocna cast renderPreview.
-  function renderCabOutline(S, rx, ry, W, H){
+  function renderCabOutline(S, rx, ry, W, H, fh){
     var D = numv('depth') || 0;
     var dline = '#546e7a', dtxt = '#37474f';
     function tick(x, z){ return '<line x1="'+rx(x)+'" y1="'+(ry(z)-7)+'" x2="'+rx(x)+'" y2="'+(ry(z)+7)+'" stroke="'+dline+'" stroke-width="2"/>'; }
@@ -171,6 +171,15 @@
     S.push('<line x1="'+rx(W+26)+'" y1="'+ry(0)+'" x2="'+rx(W+26)+'" y2="'+ry(H)+'" stroke="'+dline+'" stroke-width="2"/>');
     S.push(tickH(W+26, 0)); S.push(tickH(W+26, H));
     S.push('<text x="'+rx(W+38)+'" y="'+ry(H/2)+'" font-size="22" fill="'+dtxt+'" text-anchor="start" dominant-baseline="middle">V '+Math.round(H)+'</text>');
+    // D-11: vlavo koty sokla (0..fh) a tela (fh..H) — len ked sokel existuje
+    if (fh > 0){
+      S.push('<line x1="'+rx(-26)+'" y1="'+ry(0)+'" x2="'+rx(-26)+'" y2="'+ry(fh)+'" stroke="'+dline+'" stroke-width="2"/>');
+      S.push(tickH(-26, 0)); S.push(tickH(-26, fh));
+      S.push('<text x="'+rx(-38)+'" y="'+ry(fh/2)+'" font-size="18" fill="'+dtxt+'" text-anchor="end" dominant-baseline="middle">sokel '+Math.round(fh)+'</text>');
+      S.push('<line x1="'+rx(-26)+'" y1="'+ry(fh)+'" x2="'+rx(-26)+'" y2="'+ry(H)+'" stroke="'+dline+'" stroke-width="2"/>');
+      S.push(tickH(-26, H));
+      S.push('<text x="'+rx(-38)+'" y="'+ry(fh + (H-fh)/2)+'" font-size="18" fill="'+dtxt+'" text-anchor="end" dominant-baseline="middle">telo '+Math.round(H-fh)+'</text>');
+    }
     // hlbka (informativne v strede)
     if (D > 0) S.push('<text x="'+rx(W/2)+'" y="'+ry(H/2)+'" font-size="20" fill="#78909c" text-anchor="middle" dominant-baseline="middle">hĺbka '+Math.round(D)+' mm</text>');
   }
@@ -196,6 +205,9 @@
     });
     // Zoom kolieskom k bodu pod kurzorom. Limity: detail max 8x, oddialenie max 3x sceny.
     svg.addEventListener('wheel', function(ev){
+      // D-12: zoom LEN s Ctrl — cisty scroll necha scrollovat panel (ziadny
+      // preventDefault), Ctrl+koliesko zoomuje a blokuje CEF zoom stranky.
+      if (!ev.ctrlKey) return;
       ev.preventDefault();
       if (!pvView) return;
       var rect = svg.getBoundingClientRect();

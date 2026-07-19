@@ -5,7 +5,7 @@
      sablon ziju v satelitnych oknach (proj_materials.html, templates.html) — panel ma len
      quick-pick sablony a materialy oznacenej skrinky. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.7j">
+<link rel="stylesheet" href="css/panel.css?v=0.4.7k">
 
 <div class="hdr"><h1>Noxun Engine</h1><span class="sub" id="verline">…</span></div>
 
@@ -23,7 +23,7 @@
     <button class="pvfit" onclick="fitPreview()" title="Prispôsobiť pohľad (reset zoomu)">⛶</button>
   </div>
   <svg id="preview" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet"></svg>
-  <div class="pvhint">Klik na zónu = výber (police, delenie) · ťahaj priečku = posun · koliesko = zoom · ťahaj plochu = posun pohľadu</div>
+  <div class="pvhint">Klik na zónu = výber (police, delenie) · ťahaj priečku = posun · Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu</div>
   <div class="zoneline">
     <input id="zonesChk" type="checkbox" onchange="toggleZones()">
     <label for="zonesChk">Zobraziť zóny (ghost) v modeli</label>
@@ -147,6 +147,8 @@
   <div class="row"><label>Výška</label><input id="height" type="text" oninput="onField()"><span class="unit">mm</span></div>
   <div class="row"><label>Hĺbka</label><input id="depth" type="text" oninput="onField()"><span class="unit">mm</span></div>
   <div class="row"><label>Hrúbka materiálu</label><input id="thickness" type="text" oninput="onField()"><span class="unit">mm</span></div>
+  <!-- D-11: vyska sokla patri k zakladnym rozmerom (pre hornu skrinku sa skryva — applyVisibility) -->
+  <div class="row" id="fhRow"><label>Výška sokla</label><input id="floor_height" type="text" oninput="onField()"><span class="unit">mm</span></div>
   <div class="row"><label>Svetlá šírka</label><input id="av_width" type="text" readonly><span class="unit">mm</span></div>
   <div class="row"><label>Svetlá hĺbka</label><input id="av_depth" type="text" readonly><span class="unit">mm</span></div>
   <div class="row"><label>Úložná výška</label><input id="av_height" type="text" readonly><span class="unit">mm</span></div>
@@ -186,7 +188,6 @@
       </select><span class="unit"></span>
     </div>
     <div id="plinthGroup">
-      <div class="row"><label>Výška podstavca</label><input id="floor_height" type="text" oninput="onField()"><span class="unit">mm</span></div>
       <div class="row"><label>Sokel</label>
         <select id="plinth_mode" onchange="toggleRecess(); onField()">
           <option value="none">Bez sokla — nohy</option>
@@ -289,16 +290,16 @@
 <!-- Poradie skriptov je kontrakt: errors prvy (chytac), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.4.7j"></script>
-<script src="js/core.js?v=0.4.7j"></script>
-<script src="js/expr.js?v=0.4.7j"></script>
-<script src="js/form.js?v=0.4.7j"></script>
-<script src="js/zone_tree.js?v=0.4.7j"></script>
-<script src="js/preview.js?v=0.4.7j"></script>
-<script src="js/actions.js?v=0.4.7j"></script>
-<script src="js/bridge.js?v=0.4.7j"></script>
-<script src="js/materials.js?v=0.4.7j"></script>
-<script src="js/part_card.js?v=0.4.7j"></script>
-<script src="js/board_card.js?v=0.4.7j"></script>
-<script src="js/hardware.js?v=0.4.7j"></script>
-<script src="js/boot.js?v=0.4.7j"></script>
+<script src="js/errors.js?v=0.4.7k"></script>
+<script src="js/core.js?v=0.4.7k"></script>
+<script src="js/expr.js?v=0.4.7k"></script>
+<script src="js/form.js?v=0.4.7k"></script>
+<script src="js/zone_tree.js?v=0.4.7k"></script>
+<script src="js/preview.js?v=0.4.7k"></script>
+<script src="js/actions.js?v=0.4.7k"></script>
+<script src="js/bridge.js?v=0.4.7k"></script>
+<script src="js/materials.js?v=0.4.7k"></script>
+<script src="js/part_card.js?v=0.4.7k"></script>
+<script src="js/board_card.js?v=0.4.7k"></script>
+<script src="js/hardware.js?v=0.4.7k"></script>
+<script src="js/boot.js?v=0.4.7k"></script>
