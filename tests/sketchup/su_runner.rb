@@ -235,6 +235,42 @@ module NoxunSuRunner
                                               'gap_bottom' => 2.0, 'gap_sides' => 2.0)
     e::CabinetBuilder.rebuild(model, inst, p6)
 
+    # 7c) D-18 celo BEZ: prepnutie dvierok na 'none' odstrani front dielec (autorita
+    #     BOM/VEPO = snapshoty na entitach) aj zavesy; 1x undo vrati oboje; opakovany
+    #     rebuild na none = deterministicka dopredna cesta (redo cez send_action je
+    #     asynchronne — sync sekcia drzi synchronne kroky, redo pokryva async S1).
+    front_parts = lambda do
+      inst.definition.entities.grep(Sketchup::ComponentInstance)
+          .select { |i| e::Store.kind(i) == 'part' && e::Store.get(i, 'part_key').to_s.start_with?('front:') }
+    end
+    p7 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    p7['fronts'] = (p7['fronts'] || {}).merge('items' => [
+      { 'id' => 'F1', 'type' => 'none', 'mode' => 'auto', 'wings' => 1 }
+    ])
+    e::CabinetBuilder.rebuild(model, inst, p7)
+    cfg7 = e::Store.config(inst) || {}
+    hw7 = cfg7['hardware'] || []
+    ok('sync: D-18 none — ziadny front dielec v modeli (nika)', front_parts.call.empty?)
+    ok('sync: D-18 none — ziadne kovanie frontu (hinge prec, nohy ostavaju)',
+       hw7.none? { |h| h['owner_part_key'].to_s.start_with?('front:') } &&
+       hw7.none? { |h| h['generic_type'] == 'hinge' } &&
+       hw7.any? { |h| h['generic_type'] == 'leg' })
+    fi7 = (cfg7['front_items'] || []).first
+    ok("sync: D-18 none — front_items nesie niku (type none, vyska #{fi7 ? fi7['height'] : 'nil'})",
+       !fi7.nil? && fi7['type'] == 'none' && fi7['height'].to_f > 0)
+    Sketchup.undo
+    cfg7u = e::Store.config(inst) || {}
+    ok('sync: D-18 1x undo vratil dvierka (front dielec + zavesy v configu)',
+       front_parts.call.length == 1 &&
+       (cfg7u['hardware'] || []).any? { |h| h['generic_type'] == 'hinge' })
+    e::CabinetBuilder.rebuild(model, inst, p7)
+    ok('sync: D-18 opatovny rebuild na none znovu odstranil front dielec', front_parts.call.empty?)
+    p8 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    p8['fronts'] = (p8['fronts'] || {}).merge('items' => [
+      { 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => '1' }
+    ])
+    e::CabinetBuilder.rebuild(model, inst, p8) # navrat na dvierka pre dalsie kroky
+
     # 8) dedup kopie (priame volanie, synchronne): kopia dostane nove cid, original drzi
     e::ScaleWatch.guard do
       model.start_operation('SU-TEST kopia', true)

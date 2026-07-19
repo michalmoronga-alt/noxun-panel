@@ -623,6 +623,7 @@ module Noxun
           p = params || {}
           type = norm_type(p)
           d = defaults_for(type)
+          fronts_cfg = Fronts.normalize_config(raw(p, :fronts))
           {
             type: type,
             width:  clampf(fetchf(p, :width,  d[:width]),  MIN[:width],  3000.0),
@@ -643,14 +644,15 @@ module Noxun
             rails_top_offset: clampf(fetchf(p, :rails_top_offset, d[:rails_top_offset]), 0.0, 500.0),
             # V0.2b: strom zon (police su per-zona) + cela (fixed/auto s lockmi)
             zone_tree: norm_zone_tree(p),
-            fronts: Fronts.normalize_config(raw(p, :fronts)),
+            fronts: fronts_cfg,
             # V0.3: korpusove materialy (nil = dedi z projektu) + part_overrides (per-dielec)
             material_id: present(raw(p, :material_id)),
             front_material_id: present(raw(p, :front_material_id)),
             back_material_id: present(raw(p, :back_material_id)),
             part_overrides: norm_overrides(raw(p, :part_overrides)),
             # V0.4 kovanie: rucne zasahy do poctov (pravidlo = default, override vitazi)
-            hardware_overrides: norm_hardware_overrides(raw(p, :hardware_overrides)),
+            hardware_overrides: prune_none_front_overrides(
+              norm_hardware_overrides(raw(p, :hardware_overrides)), fronts_cfg),
             part_key_schema: raw(p, :part_key_schema).to_i,
             name: (p['name'] || p[:name])
           }
@@ -711,6 +713,22 @@ module Noxun
             out[[owner, gt, rid]] = rec
           end
           out.values
+        end
+
+        # D-18 (Codex audit F1): celo typu 'none' nema dielce — rucne zasahy kovania
+        # viazane na jeho front id su mrtve zaznamy (UI by ukazovalo „vypnute" polozky
+        # bez existujuceho dielca a pri neskorsom navrate na dvierka by zasah necakane
+        # ozil). Pri normalizacii sa odstrania; zasahy ostatnych riadkov a korpusove
+        # (owner nil) ostavaju nedotknute. Prune sa persistne prejavi cez merge_final.
+        def prune_none_front_overrides(overrides, fronts_cfg)
+          none_ids = (fronts_cfg['items'] || [])
+                     .select { |it| it['type'] == 'none' }
+                     .map { |it| it['id'].to_s }
+          return overrides if none_ids.empty?
+          overrides.reject do |ov|
+            m = ov['owner_part_key'].to_s.match(%r{\Afront:([^/]+)/})
+            m && none_ids.include?(m[1])
+          end
         end
 
         def truthy_flag(v)

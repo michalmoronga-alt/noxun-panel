@@ -219,6 +219,66 @@ NxTest.test('hardware_rules: degenerovane celo nedostane kovanie') do
   end
 end
 
+NxTest.test('hardware_rules: D-18 none riadok nedostane ziadne kovanie (build_plan)') do
+  NxTest.skip!('build_plan default cita globalnu kniznicu — headless only') unless NxTest.headless?
+  # Default seed pravidla (hinge na front_door, slide na drawer_front, leg na korpus).
+  # Garancia je strukturalna: none riadok nevytvori dielec, pravidla iteruju dielce
+  # planu podla roly — overujeme cez ownera KAZDEJ polozky (Codex audit N7).
+  cfg = Noxun::Engine::CabinetBuilder.normalize(
+    'fronts' => { 'items' => [
+      { 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => '1' },
+      { 'id' => 'F2', 'type' => 'none', 'mode' => 'fixed', 'height' => 200.0 },
+      { 'id' => 'F3', 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 140.0 }
+    ] }
+  )
+  plan = Noxun::Engine::Construction.build_plan(cfg, 'CAB-001')
+  NxTest.assert_equal(%w[hinge leg slide], plan[:hardware].map { |h| h['generic_type'] }.sort,
+                      'kategorie: zavesy dvierok + nohy + vysuv zasuvky')
+  owners = plan[:hardware].map { |h| h['owner_part_key'] }
+  NxTest.assert(owners.none? { |o| o.to_s.start_with?('front:F2') },
+                "none riadok F2 nesmie vlastnit kovanie, owneri: #{owners.inspect}")
+  NxTest.assert(plan[:parts].none? { |pd| pd[:part_key].to_s.start_with?('front:F2') },
+                'none riadok nema ani dielec v plane')
+  NxTest.assert_equal('none', plan[:front_items][1]['type'], 'front_items nesie none riadok')
+end
+
+NxTest.test('hardware_rules: D-18 pocet zavesov suseda sa s none surodencom nemeni') do
+  NxTest.skip!('build_plan default cita globalnu kniznicu — headless only') unless NxTest.headless?
+  door = { 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed', 'height' => 500.0, 'wings' => '1' }
+  cb = Noxun::Engine::CabinetBuilder
+  cn = Noxun::Engine::Construction
+  plan_a = cn.build_plan(cb.normalize('fronts' => { 'items' => [door] }), 'CAB-001')
+  plan_b = cn.build_plan(cb.normalize('fronts' => { 'items' => [door, { 'id' => 'F2', 'type' => 'none' }] }), 'CAB-001')
+  ha = plan_a[:hardware].find { |h| h['generic_type'] == 'hinge' }
+  hb = plan_b[:hardware].find { |h| h['generic_type'] == 'hinge' }
+  NxTest.assert_equal(ha['quantity'], hb['quantity'], 'rovnaka vyska dvierok = rovnake zavesy')
+  NxTest.assert_equal(2, hb['quantity'], '500 mm -> 2 zavesy (pasmo <= 900)')
+  NxTest.assert_equal('front:F1/wing:single', hb['owner_part_key'])
+  da = plan_a[:parts].find { |p| p[:suffix] == 'DOOR-1' }
+  db = plan_b[:parts].find { |p| p[:suffix] == 'DOOR-1' }
+  NxTest.assert_equal(da[:box], db[:box], 'geometria dvierok nezavisla od none suseda')
+  NxTest.assert_equal(da[:origin], db[:origin])
+end
+
+NxTest.test('hardware_rules: D-18 none-only korpus — ziadne frontove kovanie, ziadne frontove dielce') do
+  NxTest.skip!('build_plan default cita globalnu kniznicu — headless only') unless NxTest.headless?
+  # Dokaz pre kusovnik/BOM/VEPO: citaju TEN ISTY plan (parts -> vyrobne snapshoty);
+  # ziadny front dielec v parts = ziadny riadok vo vystupoch. Seed pravidla.
+  cfg = Noxun::Engine::CabinetBuilder.normalize(
+    'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'none' }] }
+  )
+  plan = Noxun::Engine::Construction.build_plan(cfg, 'CAB-001')
+  NxTest.assert(plan[:parts].none? { |pd| pd[:part_key].to_s.start_with?('front:') },
+                'plan nema ziadny front dielec')
+  NxTest.assert(plan[:hardware].none? { |h| h['owner_part_key'].to_s.start_with?('front:') },
+                'ziadna polozka kovania nepatri frontu')
+  NxTest.assert_equal(%w[leg], plan[:hardware].map { |h| h['generic_type'] }.uniq.sort,
+                      'so seed pravidlami ostavaju len nohy korpusu')
+  NxTest.assert_equal(1, plan[:front_items].length)
+  NxTest.assert_equal('none', plan[:front_items][0]['type'])
+  NxTest.assert_close(616.0, plan[:front_items][0]['height'], 0.01, 'nika drzi vysku radu')
+end
+
 NxTest.test('hardware_rules: upper skrinka nema nohy, dvierka zavesy maju') do
   NxTest.skip!('build_plan default cita globalnu kniznicu — headless only') unless NxTest.headless?
   cfg = Noxun::Engine::CabinetBuilder.normalize(

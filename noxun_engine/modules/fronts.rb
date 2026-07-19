@@ -3,6 +3,9 @@
 # Cela stoja PRED korpusom (zaporne Y), delene na vysku, poradie ODSPODU nahor (F1 dole).
 # Rezim polozky: 'fixed' (pevna vyska) alebo 'auto' (rovnomerne si rozdelia zvysok).
 # 'locked' = fixed, ktore sa nemeni pri auto prepocte (priznak pre UI a buduci auto-fit).
+# Typy riadkov: 'door' / 'drawer_front' / 'none' (D-18 „Bez cela" — riadok drzi vysku
+# v rade ako celo, ale panel sa NEgeneruje = otvorena nika; POZOR: structured
+# items[].type 'none' != legacy STRING config fronts='none', ktory znamena ziadne cela).
 # Cisto vypoctovy modul (mm Float) — vrati hotove deskriptory dielcov (box/origin/material).
 module Noxun
   module Engine
@@ -65,7 +68,14 @@ module Noxun
 
       # Panely jedneho cela. drawer_front = 1 panel; door = 1/2 kridla podla wings.
       # D-07: medzera medzi kridlami = cfg gap (predtym natvrdo GAP_DEFAULT).
+      # D-18 'none' (Bez cela) = ZIADNE panely: riadok drzi vysku v rade presne ako
+      # skutocne celo (rovnaka matematika fixed/auto/lock, z-postup pokracuje), ale
+      # dielec nevznikne — otvorena nika v rade ciel. VEDOME ROZHODNUTIE: medzery
+      # voci susedom ostavaju ako pri cele (ziadna specialna vetva), takze realny
+      # otvor je opticky vacsi o susedne skary. Bez dielcov nevznikne ani kovanie
+      # (HardwareRules iteruje dielce planu podla roly) ani polozky kusovnika/VEPO.
       def panels_for(item, idx, gs, opening_w, z, h, gap = GAP_DEFAULT)
+        return [] if item['type'] == 'none'
         front_id = item['id'].to_s
         front_id = "F#{idx}" if front_id.empty?
         if item['type'] == 'drawer_front'
@@ -132,7 +142,11 @@ module Noxun
         gs = cfg['gap_sides'].to_f
         items = cfg['items'] || []
 
-        raise 'Cela sa nezmestia na sirku korpusu.' if opening_w < MIN_AUTO
+        # D-18 (Codex audit F2): sirkovy limit plati len pre riadky, ktore realne
+        # generuju panely — none-only zostava zaberie iba vysku (nika), extremne
+        # bocne okraje ju nesmu zhodit.
+        has_panels = items.any? { |it| it['type'] != 'none' }
+        raise 'Cela sa nezmestia na sirku korpusu.' if has_panels && opening_w < MIN_AUTO
         # D-07 (Codex GH P2): dvojkridlove dvierka — kridlo nesmie klesnut pod
         # MIN_AUTO (velka medzera/okraje by inak dali zaporne kridlo, ktore by
         # construction ticho vyradil a korpus by sa ulozil bez dvierok).
@@ -197,7 +211,7 @@ module Noxun
           used_ids[front_id] = true
 
           type = (it['type'] || it[:type]).to_s
-          type = 'door' unless %w[door drawer_front].include?(type)
+          type = 'door' unless %w[door drawer_front none].include?(type) # D-18: + none
           hraw = it['height'] || it[:height]
           has_h = !(hraw.nil? || hraw.to_s.strip.empty?)
           mode = (it['mode'] || it[:mode]).to_s

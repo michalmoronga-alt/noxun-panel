@@ -93,15 +93,30 @@ NxTest.test('fronts: normalize_items cisti id cez PartKeys.segment') do
   NxTest.assert_equal('moje_celo_', items.first['id'])
 end
 
-NxTest.test('fronts: normalize_items type whitelist door/drawer_front') do
+NxTest.test('fronts: normalize_items type whitelist door/drawer_front/none') do
   f = Noxun::Engine::Fronts
   items = f.normalize_items([
     { 'id' => 'A', 'type' => 'drawer_front' },
     { 'id' => 'B', 'type' => 'door' },
     { 'id' => 'C', 'type' => 'polica' },
-    { 'id' => 'D' }
+    { 'id' => 'D' },
+    { 'id' => 'E', 'type' => 'none' } # D-18: Bez cela je platny typ
   ])
-  NxTest.assert_equal(%w[drawer_front door door door], items.map { |it| it['type'] })
+  NxTest.assert_equal(%w[drawer_front door door door none], items.map { |it| it['type'] })
+end
+
+NxTest.test('fronts: D-18 normalize none — wings neutralne 1, locked/fixed funguje') do
+  f = Noxun::Engine::Fronts
+  items = f.normalize_items([
+    { 'id' => 'A', 'type' => 'none', 'wings' => '2' },                     # wings sa ignoruje -> 1
+    { 'id' => 'B', 'type' => 'none', 'mode' => 'fixed', 'height' => 250, 'locked' => true },
+    { 'id' => 'C', 'type' => 'none' }                                      # bez vysky -> auto
+  ])
+  NxTest.assert_equal([1, 1, 1], items.map { |it| it['wings'] }, 'none ma wings vzdy 1 (neutral)')
+  NxTest.assert_equal('fixed', items[1]['mode'])
+  NxTest.assert_close(250.0, items[1]['height'])
+  NxTest.assert_equal(true, items[1]['locked'], 'lock plati aj pre none fixed')
+  NxTest.assert_equal('auto', items[2]['mode'])
 end
 
 NxTest.test('fronts: normalize_items mode — fixed bez vysky pada na auto, neznamy mode podla vysky') do
@@ -279,6 +294,106 @@ NxTest.test('fronts: layout prijme legacy string priamo') do
   NxTest.assert_equal(2, out[:wings])
   NxTest.assert_equal(1, out[:items].size)
   NxTest.assert_close(616.0, out[:items][0]['height'], 0.01, 'auto_h = 620 - 2 - 2')
+end
+
+# ---------------------------------------------------------------------------
+# Fronts — D-18 'none' (Bez cela): vyska v rade ano, panel nie
+# ---------------------------------------------------------------------------
+
+NxTest.test('fronts: D-18 panels_for none vrati ziadne panely') do
+  f = Noxun::Engine::Fronts
+  item = { 'id' => 'F1', 'type' => 'none', 'mode' => 'fixed', 'height' => 300.0, 'wings' => 1 }
+  NxTest.assert_equal([], f.panels_for(item, 1, 2.0, 596.0, 102.0, 300.0))
+end
+
+NxTest.test('fronts: D-18 layout mix door + none fixed + drawer auto — susedia sa neposunu') do
+  f = Noxun::Engine::Fronts
+  cfg = { 'items' => [
+    { 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed', 'height' => 200, 'wings' => '1' },
+    { 'id' => 'F2', 'type' => 'none', 'mode' => 'fixed', 'height' => 300, 'locked' => true },
+    { 'id' => 'F3', 'type' => 'drawer_front' }
+  ] }
+  out = f.layout(cfg, 600.0, 720.0, 100.0, 18.0)
+  # auto_h = 620 - 2 - 2 - 2*3 - 500 = 110 (none sa pocita do fixed_sum aj do medzier)
+  NxTest.assert_equal(2, out[:parts].size, 'none negeneruje dielec — len DOOR-1 a DRW-3')
+  NxTest.assert_equal(%w[DOOR-1 DRW-3], out[:parts].map { |p| p[:suffix] })
+
+  door, drw = out[:parts]
+  NxTest.assert_close(102.0, door[:origin][2], 0.01, 'dolne celo zacina na floor + gap_bottom')
+  NxTest.assert_close(200.0, door[:box][2])
+  # z-postup cez pasmo none NORMALNE pokracuje: 102 + 200 + 3 (none 305..605) + 300 + 3 = 608
+  NxTest.assert_close(608.0, drw[:origin][2], 0.01, 'drawer nad none pasmom sa NEposunul')
+  NxTest.assert_close(110.0, drw[:box][2])
+  NxTest.assert_close(718.0, drw[:origin][2] + drw[:box][2], 0.01, 'vrch = H - gap_top')
+
+  i2 = out[:items][1]
+  NxTest.assert_equal('none', i2['type'])
+  NxTest.assert_equal('fixed', i2['mode'])
+  NxTest.assert_close(300.0, i2['height'])
+  NxTest.assert_close(305.0, i2['z'], 0.01, 'none pasmo drzi presnu poziciu v rade')
+  NxTest.assert_equal(true, i2['locked'], 'lock funguje aj na none riadku')
+  NxTest.assert_equal(1, i2['wings_n'], 'none ma wings_n neutralne 1 pre nahlad')
+  NxTest.assert_equal(1, out[:wings], 'none sa nepocita do kridiel')
+end
+
+NxTest.test('fronts: D-18 none auto berie rovny podiel zvysku ako ine auto riadky') do
+  f = Noxun::Engine::Fronts
+  cfg = { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'wings' => '1' },
+                      { 'id' => 'F2', 'type' => 'none' }] }
+  out = f.layout(cfg, 600.0, 720.0, 100.0, 18.0)
+  # auto_h = (620 - 2 - 2 - 3) / 2 = 306.5 pre OBA riadky (rovnaka matematika)
+  NxTest.assert_close(306.5, out[:items][0]['height'])
+  NxTest.assert_close(306.5, out[:items][1]['height'], 0.01, 'none auto = rovny podiel')
+  NxTest.assert_equal(1, out[:parts].size, 'len dvierka maju panel')
+  NxTest.assert_close(411.5, out[:items][1]['z'], 0.01, 'none pasmo nad dvierkami')
+end
+
+NxTest.test('fronts: D-18 vymena suseda drawer->none nemeni geometriu dvierok') do
+  f = Noxun::Engine::Fronts
+  base = { 'id' => 'F1', 'type' => 'door', 'wings' => '1' }
+  a = f.layout({ 'items' => [base, { 'id' => 'F2', 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 140 }] },
+               600.0, 720.0, 100.0, 18.0)
+  b = f.layout({ 'items' => [base, { 'id' => 'F2', 'type' => 'none', 'mode' => 'fixed', 'height' => 140 }] },
+               600.0, 720.0, 100.0, 18.0)
+  da = a[:parts].find { |p| p[:suffix] == 'DOOR-1' }
+  db = b[:parts].find { |p| p[:suffix] == 'DOOR-1' }
+  NxTest.assert_equal(da[:box], db[:box], 'box dvierok identicky (rovnaky rezim a vyska suseda)')
+  NxTest.assert_equal(da[:origin], db[:origin], 'origin dvierok identicky')
+  NxTest.assert_equal(1, b[:parts].size, 'none sused nema panel')
+end
+
+NxTest.test('fronts: D-18 none-only zostava — ziadne dielce, sirkovy limit neplati (Codex F2)') do
+  f = Noxun::Engine::Fronts
+  out = f.layout({ 'items' => [{ 'id' => 'F1', 'type' => 'none' }] }, 600.0, 720.0, 100.0, 18.0)
+  NxTest.assert_equal([], out[:parts])
+  NxTest.assert_equal(0, out[:wings])
+  NxTest.assert_close(616.0, out[:items][0]['height'], 0.01, 'auto = 620 - 2 - 2')
+
+  # Extremne bocne okraje: opening_w = 200 - 2*100 = 0 < MIN_AUTO. none-only PREJDE
+  # (nika zabera len vysku), skutocne celo v tej istej zostave uz NIE.
+  narrow = { 'gap_sides' => 100, 'items' => [{ 'id' => 'F1', 'type' => 'none' }] }
+  out2 = f.layout(narrow, 200.0, 720.0, 100.0, 18.0)
+  NxTest.assert_equal([], out2[:parts], 'none-only pri nulovom otvore nesmie spadnut')
+  with_door = { 'gap_sides' => 100, 'items' => [{ 'id' => 'F1', 'type' => 'none' },
+                                                { 'id' => 'F2', 'type' => 'door' }] }
+  NxTest.assert_raise('nezmestia na sirku') { f.layout(with_door, 200.0, 720.0, 100.0, 18.0) }
+end
+
+NxTest.test('fronts: D-18 validate — pevna vyska none pod MIN_AUTO pada rovnako') do
+  f = Noxun::Engine::Fronts
+  cfg = { 'items' => [{ 'id' => 'F1', 'type' => 'none', 'mode' => 'fixed', 'height' => 5 }] }
+  NxTest.assert_raise('Pevna vyska') { f.layout(cfg, 600.0, 720.0, 100.0, 18.0) }
+end
+
+NxTest.test('fronts: D-18 config s none prezije JSON round-trip (sablony) a je idempotentny') do
+  f = Noxun::Engine::Fronts
+  cfg = f.normalize_config('items' => [
+    { 'id' => 'F1', 'type' => 'door' },
+    { 'id' => 'F2', 'type' => 'none', 'mode' => 'fixed', 'height' => 200, 'locked' => true }
+  ])
+  round = f.normalize_config(JSON.parse(cfg.to_json))
+  NxTest.assert_equal(cfg, round, 'normalize po JSON round-tripe identicky (sablona/ulozeny config)')
+  NxTest.assert_equal('none', round['items'][1]['type'])
 end
 
 # ---------------------------------------------------------------------------

@@ -140,6 +140,14 @@
     var ow = W - 2*gs;
     items.forEach(function(it, i){
       var z = it.z, h = it.height, col = (it.type==='drawer_front')?'#b3e5fc':'#e1f5fe';
+      if (it.type === 'none'){
+        // D-18: pásmo Bez čela = čiarkovaný obrys bez výplne (otvorená nika v rade).
+        // Klik: náhľad čiel dnes nemá klik-interakciu (delegácia rieši len zóny
+        // a priečky) — none pásmo je konzistentne neklikateľné ako ostatné čelá.
+        S.push('<rect x="'+rx(gs)+'" y="'+ry(z+h)+'" width="'+ow+'" height="'+h+'" fill="none" stroke="#90a4ae" stroke-width="1.5" stroke-dasharray="7 5"/>');
+        S.push('<text x="'+rx(W/2)+'" y="'+ry(z+h/2)+'" font-size="18" fill="#90a4ae" text-anchor="middle" dominant-baseline="middle">bez čela '+Math.round(h)+'</text>');
+        return;
+      }
       // Codex GH P2: legacy cache front_items (pred D-07) nema wings_n —
       // fallback zrkadli Ruby resolve_wings (explicitne '2'/'1', auto nad 600).
       var wn = it.wings_n;

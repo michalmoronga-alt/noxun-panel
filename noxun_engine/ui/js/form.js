@@ -256,7 +256,8 @@
     row.innerHTML =
       '<span class="fnum">' + idx + '</span>' +
       '<select class="ftype" onchange="onFrontTypeChange(this); onField()">' +
-        '<option value="door">Dvierka</option><option value="drawer_front">Zásuvkové čelo</option></select>' +
+        '<option value="door">Dvierka</option><option value="drawer_front">Zásuvkové čelo</option>' +
+        '<option value="none">Bez čela</option></select>' +
       '<input class="fh" type="text" placeholder="auto" oninput="onField()">' +
       '<select class="fw" onchange="onField()"><option value="auto">auto</option><option value="1">1</option><option value="2">2</option></select>' +
       '<input class="flock" type="checkbox" title="Zamknúť pevnú výšku" onchange="onField()">' +
@@ -270,7 +271,15 @@
     attachExprField(row.querySelector('.fh'), { flushFn: flushCabinetEditsNow }); // V0.4.7e vyrazy vo vyske cela
     onFrontTypeChange(row.querySelector('.ftype'));
   }
-  function onFrontTypeChange(sel){ var row = sel.closest('.frow'); row.querySelector('.fw').style.visibility = (sel.value === 'door') ? 'visible' : 'hidden'; }
+  // D-18: pri 'none' (Bez čela) sa skryje výber krídel (ako pri drawer_front) a hneď
+  // aj badge kovania (dátovo zmizne až po echu apply — bez dielcov niet kovania).
+  // Badge span nemusí existovať (vzniká len pri neprázdnom badge) — null guard (Codex F3).
+  function onFrontTypeChange(sel){
+    var row = sel.closest('.frow');
+    row.querySelector('.fw').style.visibility = (sel.value === 'door') ? 'visible' : 'hidden';
+    var hw = row.querySelector('.fhw');
+    if (hw) hw.style.display = (sel.value === 'none') ? 'none' : '';
+  }
   function delFrontRow(btn){ btn.closest('.frow').remove(); renumberFronts(); }
   function removeLastFront(){ var rows = el('frontRows').querySelectorAll('.frow'); if (rows.length) { rows[rows.length-1].remove(); renumberFronts(); } }
   function renumberFronts(){ var rows = el('frontRows').querySelectorAll('.frow'); for (var i=0;i<rows.length;i++){ rows[i].querySelector('.fnum').textContent = (i+1); } }
