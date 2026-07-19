@@ -121,7 +121,11 @@
     var ow = W - 2*gs;
     items.forEach(function(it, i){
       var z = it.z, h = it.height, col = (it.type==='drawer_front')?'#b3e5fc':'#e1f5fe';
-      if (it.type === 'door' && it.wings_n === 2){
+      // Codex GH P2: legacy cache front_items (pred D-07) nema wings_n —
+      // fallback zrkadli Ruby resolve_wings (explicitne '2'/'1', auto nad 600).
+      var wn = it.wings_n;
+      if (wn == null) wn = (it.wings === '2') ? 2 : ((it.wings === '1') ? 1 : (ow > 600 ? 2 : 1));
+      if (it.type === 'door' && wn === 2){
         // dvojkridlove dvierka = 2 panely s medzerou gap (Codex F5)
         var dw = (ow - gap) / 2;
         S.push('<rect x="'+rx(gs)+'" y="'+ry(z+h)+'" width="'+dw+'" height="'+h+'" fill="'+col+'" stroke="#4fc3f7" stroke-width="1.5"/>');

@@ -133,6 +133,14 @@ module Noxun
         items = cfg['items'] || []
 
         raise 'Cela sa nezmestia na sirku korpusu.' if opening_w < MIN_AUTO
+        # D-07 (Codex GH P2): dvojkridlove dvierka — kridlo nesmie klesnut pod
+        # MIN_AUTO (velka medzera/okraje by inak dali zaporne kridlo, ktore by
+        # construction ticho vyradil a korpus by sa ulozil bez dvierok).
+        items.each_with_index do |it, i|
+          next unless it['type'] == 'door' && resolve_wings(it['wings'], opening_w) == 2
+          next if (opening_w - gap) / 2.0 >= MIN_AUTO
+          raise "Kridla dvierok #{i + 1} sa nezmestia — zmensi medzeru medzi celami alebo bocne okraje."
+        end
 
         items.each_with_index do |it, i|
           next unless it['mode'] == 'fixed'

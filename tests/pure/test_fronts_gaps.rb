@@ -110,6 +110,18 @@ NxTest.test('fronts gaps: mixed fixed+auto na hranici MIN_AUTO so zapornymi okra
   end
 end
 
+NxTest.test('fronts gaps: 2 kridla + velka medzera/okraje = zrozumitelna chyba, nie tichy zanik (Codex GH P2)') do
+  f = Noxun::Engine::Fronts
+  two = [{ 'type' => 'door', 'mode' => 'auto', 'wings' => '2' }]
+  # opening_w = 200 - 2*95 = 10; dw = (10-50)/2 zaporne -> raise
+  NxTest.assert_raise(/Kridla dvierok/) do
+    f.layout({ 'gap' => 50.0, 'gap_sides' => 95.0, 'items' => two }, 200, 720, 100, 18.0)
+  end
+  # hranica: dw presne MIN_AUTO (ow=30, gap=10 -> dw=10) prejde
+  r = f.layout({ 'gap' => 10.0, 'gap_sides' => 85.0, 'items' => two }, 200, 720, 100, 18.0)
+  NxTest.assert_close(10.0, r[:parts].first[:box][0])
+end
+
 NxTest.test('fronts gaps: resolved items nesu wings_n pre nahlad (1 vs 2 kridla)') do
   f = Noxun::Engine::Fronts
   cfg = { 'items' => [{ 'type' => 'door', 'mode' => 'auto', 'wings' => '2' },
