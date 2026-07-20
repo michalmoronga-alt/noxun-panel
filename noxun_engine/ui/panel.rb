@@ -53,6 +53,8 @@ module Noxun
         def register_callbacks(dlg)
           cb(dlg, 'ready')          { |_p| push_init }
           cb(dlg, 'insert_cabinet') { |p| handle_insert(p) }
+          cb(dlg, 'insert_copy')    { |p| handle_insert_copy(p) } # B3: presna serverova kopia oznacenej skrinky
+          cb(dlg, 'set_insert_locks') { |p| handle_set_insert_locks(p) } # D-39: zamky vkladacej karty (Ruby pamat)
           cb(dlg, 'apply_all')      { |p| handle_apply_all(p) }   # V0.2c auto-apply (konstrukcia + cela)
           cb(dlg, 'apply_changes')  { |p| handle_apply(p) }       # spatna kompat
           cb(dlg, 'apply_fronts')   { |p| handle_apply_fronts(p) }

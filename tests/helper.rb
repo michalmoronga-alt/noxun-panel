@@ -66,6 +66,11 @@ module NxTest
     def get_attribute(dict, key, default = nil)
       @dicts[dict].fetch(key, default)
     end
+
+    # D-34: Ids/resolvery filtruju neplatne entity (valid?); fake je vzdy ziva.
+    def valid?
+      true
+    end
   end
 
   class FakeInstance < FakeEntity
@@ -92,6 +97,11 @@ module NxTest
 
     def group?
       @group
+    end
+
+    # D-34: Ids.each_of_kind preskakuje neplatne definicie (valid? guard).
+    def valid?
+      true
     end
   end
 

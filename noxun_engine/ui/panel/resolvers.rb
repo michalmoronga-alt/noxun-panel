@@ -8,8 +8,10 @@ module Noxun
       class << self
         # --- resolvery -------------------------------------------------------
         # Najde NOXUN korpus vo vybere: priamo (kind=cabinet), alebo z dielca/zony cez cabinet_id.
+        # D-34 (audit B4a): vyber moze pocas erase okna niest NEPLATNE entity —
+        # citanie atributov zmazanej entity pada (TypeError), preto valid? filter.
         def find_cabinet(model)
-          sel = model.selection.to_a
+          sel = model.selection.to_a.select(&:valid?)
           return nil if sel.empty?
 
           direct = sel.find { |e| Store.kind(e) == 'cabinet' }
@@ -33,7 +35,7 @@ module Noxun
         # Samostatna doska vo vybere (V0.4.7c). Korpus ma v Inspectore prednost —
         # volajuci najprv skusa find_cabinet; doska sa riesi az ked je nil.
         def find_board(model)
-          model.selection.to_a.find { |e| Store.kind(e) == 'board' }
+          model.selection.to_a.find { |e| e.valid? && Store.kind(e) == 'board' }
         end
 
         def find_board_by_id(model, bid)
@@ -51,7 +53,7 @@ module Noxun
         end
 
         def find_zone_in(entities)
-          z = entities.find { |e| Store.kind(e) == 'zone' }
+          z = entities.find { |e| e.valid? && Store.kind(e) == 'zone' }
           return nil unless z
 
           cfg = Store.config(z) || {}

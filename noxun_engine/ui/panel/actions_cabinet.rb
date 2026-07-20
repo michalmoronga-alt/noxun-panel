@@ -7,11 +7,52 @@ module Noxun
     module Panel
       # JEDINY whitelist konstrukcnych klucov z panela (JS zrkadlo: CONSTRUCTION_FIELDS v core.js).
       # Nove pole (napr. kovanie) = pridat TU + do CONSTRUCTION_FIELDS + <input> v HTML.
+      # POZN. D-33/F6: materialy (material_id/front_material_id/back_material_id) tu VEDOME
+      # nie su — PARAM_KEYS je zaroven apply whitelist a materialy maju vlastny kanal
+      # set_cabinet_material; insert ich nesie explicitne v payloade (build/normalize ich pozna).
       PARAM_KEYS = %w[type width height depth thickness floor_height bottom_mode top_mode back_mode
                       back_thickness plinth_mode plinth_recess rail_depth rails_orientation
                       rails_top_offset name].freeze
 
+      # D-39: polia vkladacej karty, ktore mozu niest zamok (JS zrkadlo: NXInsert.LOCK_FIELDS).
+      INSERT_LOCK_FIELDS = %w[width height depth thickness floor_height].freeze
+      INSERT_LOCK_LABELS = { 'width' => 'šírka', 'height' => 'výška', 'depth' => 'hĺbka',
+                             'thickness' => 'hrúbka', 'floor_height' => 'výška sokla' }.freeze
+
       class << self
+        # D-39 (audit B5): zamky vkladacej karty ziju v PAMATI Panel modulu — preziju
+        # zatvorenie panela, zomru s restartom SketchUpu. Ziadny zapis do modelu ani
+        # na disk (zamok je pracovna pomôcka navrhu, nie vyrobny zaznam). Sanitizacia:
+        # whitelist poli + konecne cisla; ostatne sa zahodi.
+        def handle_set_insert_locks(payload)
+          raw = parse(payload)['locks']
+          raw = {} unless raw.is_a?(Hash)
+          clean = {}
+          INSERT_LOCK_FIELDS.each do |k|
+            v = raw[k]
+            next if v.nil?
+            f = begin
+              Float(v)
+            rescue ArgumentError, TypeError
+              nil # neplatny vstup = ziadny zamok (validacia, nie tichy rescue logiky)
+            end
+            clean[k] = f if f && f.finite?
+          end
+          @insert_locks = clean
+        end
+
+        def insert_locks
+          @insert_locks.is_a?(Hash) ? @insert_locks : {}
+        end
+
+        # F8: pri odmietnutom vklade status VYMENUJE aktivne zamky — konflikt
+        # sablona x zamok (vyska x pevne cela, hrubka x material) je hned citatelny.
+        def insert_locks_hint
+          return '' if insert_locks.empty?
+          list = insert_locks.map { |k, v| "#{INSERT_LOCK_LABELS[k] || k} #{fmt_mm(v)}" }.join(', ')
+          " · aktívne zámky 🔒: #{list}"
+        end
+
         # D-38: zmena hrubky chrbta potrebuje materal tej hrubky — bez preflightu
         # rebuild spadol na hrubkovej kontrole (3 != 18), poslal cervenu hlasku a UI
         # ostalo rozsynchronizovane (select 18, model 3). Preflight material vybera
@@ -59,11 +100,38 @@ module Noxun
           model = Sketchup.active_model
           params = parse(payload)
           pf = back_preflight(params, model)
-          return set_status(pf[:error], true) if pf && pf[:error]
-          inst = CabinetBuilder.build(model, params)
+          return set_status("#{pf[:error]}#{insert_locks_hint}", true) if pf && pf[:error]
+          begin
+            inst = CabinetBuilder.build(model, params)
+          rescue StandardError => e
+            # F8: konflikt sablona x zamok NIC ticho neupravuje — vklad odmietnu
+            # existujuce guardy stavby (Fronts.validate_layout!, hrubkova kontrola
+            # materialu, interior validacie) a status vymenuje aktivne zamky.
+            Engine.log_error(e, 'Panel.handle_insert')
+            return set_status("Chyba: #{e.message}#{insert_locks_hint}", true)
+          end
           select_only(model, inst)
           cid = Store.get(inst, 'cabinet_id')
           status_with_warnings(inst, "Vlozeny #{cid} — #{part_count(inst)} dielcov.#{pf ? pf[:note] : ''}")
+          push_selected(model)
+        end
+
+        # B3 „Vlozit kopiu": PRESNA serverova kopia — config sa cita z MODELU
+        # (Store.config -> config_to_params), nie z DOM formulara. Kopia nesie
+        # materialy, part_overrides, hardware_overrides, cela, zony aj nazov;
+        # build jej prideli nove CAB id. Zamky vkladacej karty sa VEDOME
+        # neaplikuju (kopia = verny duplikat oznacenej skrinky).
+        def handle_insert_copy(payload)
+          model = Sketchup.active_model
+          cid = parse(payload)['cabinet_id'].to_s
+          cab = cid.empty? ? find_cabinet(model) : find_cabinet_by_id(model, cid)
+          return set_status('Skrinka na kopírovanie sa nenašla.', true) if cab.nil?
+
+          params = CabinetBuilder.config_to_params(Store.config(cab) || {})
+          inst = CabinetBuilder.build(model, params)
+          select_only(model, inst)
+          status_with_warnings(inst, "Vložená kópia #{Store.get(cab, 'cabinet_id')} → " \
+                                     "#{Store.get(inst, 'cabinet_id')} — #{part_count(inst)} dielcov.")
           push_selected(model)
         end
 

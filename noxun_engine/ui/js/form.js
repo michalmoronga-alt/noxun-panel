@@ -120,6 +120,20 @@
     refreshMaterialFilters();              // FIX 2: hrubka sa mohla zmenit -> prefiltruj material selecty
     schedulePreview();                     // D-02: nahlad sa neprekresluje pri kazdom pismene
     updateAvailable();
+    // D-39: edit ZAMKNUTEHO pola vo vkladacej karte aktualizuje hodnotu zamku
+    // (zamok drzi to, co pouzivatel vidi). GH P3: NIE cez activeElement — pri
+    // expr commite na blur uz fokus odisiel; synchronizuju sa VSETKY zamknute
+    // polia z DOM (5 poli, lacne a deterministicke).
+    if (!selectedCabId && NXInsert.state.lastMode === 'insert'){
+      var changedLock = false;
+      NXInsert.lockedFields().forEach(function(fid){
+        var fe = el(fid);
+        if (!fe) return;
+        var lv = evalDim(fe.value);
+        if (!isNaN(lv) && NXInsert.updateLockValue(fid, lv)) changedLock = true;
+      });
+      if (changedLock) pushInsertLocks();
+    }
     if (!selectedCabId) return;            // nic oznacene -> len nahlad, ziadny rebuild
     if (applyTimer) clearTimeout(applyTimer);
     var cabSnapshot = selectedCabId;       // Codex expr audit BLOCKER: identita z casu naplanovania
@@ -179,11 +193,11 @@
   function toggleBackTh(){ var r = el('backThRow'); if (r) r.style.display = (val('back_mode') === 'none') ? 'none' : ''; }
 
   function onTypeChange(){
-    setDefaults(getType());
-    el('template').value = '';
-    currentZoneTree = defaultTree();
-    renderFilteredTemplates();
-    onField();
+    // D-32: typ patri do insert STAVU; zmena typu zahadzuje sablonu (zoznam je
+    // typovo filtrovany) a karta sa materializuje nanovo — zamky preziju (D-39).
+    NXInsert.state.type = getType();
+    NXInsert.state.template = '';
+    materializeInsertCard();
   }
 
   // --- sablony (filter podla typu) ---
@@ -199,24 +213,110 @@
     sel.value = cur;
   }
   function onTemplateChange(){
-    var name = val('template'); if (!name) return;
-    var tp = null;
-    for (var i = 0; i < TEMPLATES.length; i++){ if (TEMPLATES[i].name === name){ tp = TEMPLATES[i]; break; } }
-    if (!tp) return;
-    var c = tp.config || {};
-    setType(c.type || 'lower');
-    writeConstruction(c);
-    applyVisibility(c.type || 'lower');
-    buildFrontHwBadges([]); // Codex PR #30: sablonovy nahlad nema kovanie (F1 sablony != F1 skrinky)
-    renderFronts(c.fronts);
-    currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();
-    // fix #2: vyber sablony NEspusti apply_all — len naplni polia + nahlad. Korpus sa NEZMENI,
-    // kym uzivatel nestlaci "Pouzi sablonu na oznaceny".
-    refreshPreview();
-    refreshZoneUI();
+    // D-33: vyber sablony = zapis do insert STAVU + plna materializacia karty
+    // (konstrukcia + cela + medzery + zamok presahov + zony + MATERIALY — audit F6).
+    // Prazdna volba "— vyber —" vrati defaulty typu. Zamky prebiju sablonu (D-39).
+    // fix #2 plati dalej: ziadny apply_all — sablona meni len navrh karty.
+    NXInsert.state.template = val('template') || '';
+    materializeInsertCard();
   }
   // (saveTemplate/deleteTemplate/applyTemplateToSelected sa V0.4.5 D2 presunuli
   //  do okna Sablony — js/templates_dialog.js; panel drzi len quick-pick vyber.)
+
+  // ===== D-32/D-33/D-39: materializacia vkladacej karty z insert STAVU =====
+  // Jedina cesta, ktorou sa vkladacia karta plni (reset pri prechode do insert,
+  // zmena typu, vyber sablony). Poradie krokov = audit F7:
+  //   1) CELY zdroj naraz: defaulty typu + sablona NAD nimi (konstrukcia, cela
+  //      s medzerami a zamkom presahov, strom zon, materialy) — ziadne zvysky
+  //      naposledy oznacenej skrinky (D-32),
+  //   2) zamknute hodnoty prebiju zdroj (D-39),
+  //   3) viditelnost + validacia + nahlad.
+  function findTemplateFor(name, type){
+    if (!name) return null;
+    for (var i = 0; i < TEMPLATES.length; i++){
+      var tp = TEMPLATES[i];
+      if (tp.name !== name) continue;
+      var tt = (tp.config && tp.config.type) ? tp.config.type : 'lower';
+      return tt === type ? tp : null;
+    }
+    return null;
+  }
+  // Cela zdroja: objekt s items = sablonove cela; inak null (defaulty maju
+  // legacy string 'none' -> prazdny zoznam + predvolene medzery 3/2/2/2).
+  function insertFrontsOf(src){
+    var f = src && src.fronts;
+    return (f && typeof f === 'object' && f.items) ? f : null;
+  }
+  function materializeInsertCard(){
+    var st = NXInsert.state;
+    var tp = findTemplateFor(st.template, st.type);
+    if (!tp && st.template) st.template = ''; // zmazana/inotypova sablona -> defaulty
+    setType(st.type);
+    renderFilteredTemplates();
+    setVal('template', st.template);
+    var src = NXInsert.composeSource(DEFAULTS[st.type] || {}, tp ? tp.config : null);
+    writeConstruction(src);                  // krok 1: konstrukcia (plny obraz)
+    buildFrontHwBadges([]);                  // navrh nema kovanie (Codex PR #30)
+    frontItems = null;                       // ani resolved ≈ vysky
+    renderFronts(insertFrontsOf(src));       //         cela + medzery + edge_limit_off
+    currentZoneTree = src.zone_tree ? sanitizeTree(src.zone_tree) : defaultTree();
+    activeZoneId = null;
+    NXInsert.setMaterials(src);              //         materialy zo sablony (F6)
+    applyInsertLockValues();                 // krok 2: zamky prebiju zdroj
+    renderInsertLocks();
+    applyVisibility(st.type);                // krok 3: viditelnost + validacia + nahlad
+    refreshMaterialFilters();
+    validateFields();
+    updateAvailable();
+    renderPreview();
+    refreshZoneUI();
+  }
+
+  // --- D-39: zamky poli vkladacej karty (sirka/vyska/hlbka/hrubka/sokel) ---
+  // Ikony 🔒 ziju v EXISTUJUCICH riadkoch poli (.inslock, CSS ich mimo
+  // mode-insert skryva); stav drzi NXInsert a zrkadli sa do Ruby pamate
+  // Panel modulu (audit B5 — prezije zatvorenie panela, zomrie s restartom SU).
+  function applyInsertLockValues(){
+    var flat = NXInsert.locksFlat();
+    for (var f in flat){ if (Object.prototype.hasOwnProperty.call(flat, f)) setNum(f, flat[f]); }
+  }
+  function renderInsertLocks(){
+    var btns = document.querySelectorAll('.inslock');
+    for (var i = 0; i < btns.length; i++){
+      var f = btns[i].getAttribute('data-lock');
+      var on = NXInsert.isLocked(f);
+      btns[i].textContent = on ? '🔒' : '🔓';
+      btns[i].classList.toggle('on', on);
+      btns[i].title = on
+        ? 'Hodnota je zamknutá — prežije výber šablóny aj reset karty. Klik odomkne.'
+        : 'Zamknúť hodnotu pre ďalšie vklady (prežije výber šablóny aj reset karty).';
+    }
+  }
+  function toggleInsertLock(field){
+    if (NXInsert.isLocked(field)){
+      NXInsert.clearLock(field);
+    } else {
+      var v = evalDim(val(field));
+      if (isNaN(v)){ NX.setStatus('Zamknúť sa dá len platná hodnota (mm).', true); return; }
+      // (hodnota sa nastavi v NXInsert.setLock nizsie)
+      NXInsert.setLock(field, v);
+    }
+    renderInsertLocks();
+    pushInsertLocksNow(); // GH P3: klik na zamok = okamzity zapis do Ruby
+  }
+  var insertLocksTimer = null;
+  function pushInsertLocksNow(){
+    if (insertLocksTimer){ clearTimeout(insertLocksTimer); insertLocksTimer = null; }
+    if (window.sketchup && sketchup.set_insert_locks)
+      sketchup.set_insert_locks(JSON.stringify({ locks: NXInsert.locksFlat() }));
+  }
+  function pushInsertLocks(){
+    if (insertLocksTimer) clearTimeout(insertLocksTimer);
+    insertLocksTimer = setTimeout(function(){
+      insertLocksTimer = null;
+      pushInsertLocksNow();
+    }, 200);
+  }
 
   // --- D-14: ulozit oznaceny korpus ako sablonu (in-panel modal, vzor D-15) ---
   // Input NIE JE vyrazove pole (ziadny onField/attachExprField — Codex F6);

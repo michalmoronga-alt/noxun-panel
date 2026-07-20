@@ -52,12 +52,16 @@ module Noxun
       # model.definitions (najde aj instancie vnorene v cudzich komponentoch;
       # preskoci definicie group/image). Ci vnorene entity patria do vystupov,
       # rozhodne kusovnik (V0.5) — tu sa nefiltruje.
+      # D-34 (audit B4a): pocas erase okna mozu kolekcie niest NEPLATNE entity —
+      # citanie atributov zmazanej entity pada (TypeError). valid? guard na
+      # definicii aj instancii; headless fakes maju valid? v tests/helper.rb.
       def self.each_of_kind(model, kind)
         want = kind.to_s
         model.definitions.each do |dfn|
+          next unless dfn.valid?
           next if dfn.image? || dfn.group?
           dfn.instances.each do |inst|
-            yield inst if Store.kind(inst) == want
+            yield inst if inst.valid? && Store.kind(inst) == want
           end
         end
       end
