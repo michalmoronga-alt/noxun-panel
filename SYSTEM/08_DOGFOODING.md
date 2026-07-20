@@ -10,11 +10,15 @@
 
 ## Spomaľovače (vysoká priorita)
 
-*(momentálne žiadne)*
+- **D-30 · Nadnože/výstuhy bez defaultnej ABS** (smoke test 20.7., B1) — `abs_rules` má pre roly `rail_front`/`rail_back` prázdne pravidlo (vedomé v V0.3, komentár v kóde). Michal: každá výstuha má mať default aspoň 1 čelnú pozdĺžnu 1,0 mm z materiálu (v teste ich olepoval ručne — export ich už má). *Fix: default pravidlo pre obe rail roly; existujúce korpusy cez seed-merge NEprepisovať, len nové.*
+- **D-31 · Chýba „skrinka bez chrbta"** (smoke test 20.7., B2) — overené v kóde: `back_mode` má len overlay/inset/groove, `none` neexistuje. Blokuje reálny use-case (otvorené regály a pod.). *Fix: back_mode `none` = žiadny BACK dielec, vnútro po zadnú stenu (ako overlay); UI option v sekcii Chrbát. Koncepčne predsunutý kúsok V0.4.8 „bez dielca".*
+- **D-32 · Nový korpus preberá nastavenia posledného editovaného** (smoke test 20.7., B3) — diagnóza z kódu: NIE je to Ruby cache/singleton — `insertCabinet()` vkladá AKTUÁLNY obsah formulára (`collectAll()` + `currentZoneTree`), a formulár po označení korpusu A drží hodnoty A (zóny aj čelá). „Vlož ďalší" = kópia naposledy zobrazeného. Je to aj feature (rýchle množenie rovnakých skriniek — používané), aj pasca (nečakané dedenie). *Návrh na rozhodnutie: vkladacia karta dostane viditeľný prepínač zdroja — „z defaultov typu / kópia označeného / zo šablóny" — žiadne tiché dedenie.*
+- **D-33 · Šablóna nepreberá rozmery / polia držia staré hodnoty** (smoke test 20.7., B4) — rovnaký root cause ako D-32 (formulár sa pri výbere šablóny prepíše len čiastočne). Príklad: po chladničke 2500×600 šablóna „skriňa+šuflík" natiahla staré rozmery. *Rieši sa spolu s D-32 (definovať, ktoré polia šablóna VŽDY nastavuje).*
+- **D-34 · Panel „visí" na zmazanej skrinke** (smoke test 20.7., B5) — po Delete skrinky panel ďalej zobrazuje jej dáta; ESC/cancel nefunguje, treba prekliknúť inam. *Fix: observer zmazania/deselection → clearSelected + mode-insert; overiť prečo onSelectionCleared po Delete nechodí.*
 
 ## UX drobnosti (nízka priorita)
 
-*(momentálne žiadne)*
+- **D-29 · Hlavička panela — reorganizácia** (smoke test 20.7., A1) — názov pluginu + verziu presunúť dole/do nastavení; hore fixný sticky obsah relevantný pre aktuálny kontext (označený korpus), viditeľný aj pri scrollovaní. *Stav: návrh, stredná priorita.*
 
 ## Nápady na zváženie (nerozhodnuté)
 
@@ -22,6 +26,8 @@
 - **D-26 · Režim Jednoduchý/Rozšírený** (Michal 19.7. večer, debata) — prepínač v UI: jednoduchý = najčastejšie polia, rozšírený = všetko (tvorba šablón, špeciálne zostavy). Rozhodnuté MIESTO samostatného okna Nastavenia (nastavenie ostáva pri svojom poli). *Stav: čaká na dáta z merača D-25 (čo reálne skrývať) — pár týždňov zberu.*
 - **D-27 · Rýchle zobraziť/skryť tagy z panela** (Michal 19.7. večer) — mini prepínače priamo v paneli (Čelá 👁 · Chrbát 👁 …) v logike Ghost checkboxu, nech sa nepreklikáva do SketchUp Tags. *Stav: zápis bokom, kandidát na budúcu UX dávku.*
 - **D-28 · Textúry materiálov (render)** (Michal 19.7. večer) — katalóg rozšíriť o textúru (obrázok dekoru) + mierku rapportu; builder ich aplikuje pri rebuilde → model pripravený na render (Lucia). Fáza 2: orientácia textúry podľa smeru dekoru dielca. Michal má kompletnú knižnicu textúr; **injecting dát (kódy, materiály, kovania, spotrebiče, vybavenie) príde v dávkach po uzavretí V1** — dovtedy pripraviť architektúru. *Stav: zaradené po V0.6.*
+- **D-35 · ABS — olepiť všetky 4 hrany jedným klikom** (smoke test 20.7., C1) — tlačidlo v ABS editore dielca (a karte dosky). *Stav: malý UX kúsok, kandidát do najbližšej dávky.*
+- **D-36 · ABS — logická väzba na materiál** (smoke test 20.7., C2) — pri výbere materiálu dielca ponúknuť „odporúčanú" ABS k dekoru navrchu zoznamu / jedným klikom (v ~95 % sa používa jedna konkrétna hrana k materiálu). So škálovaním katalógu plochý zoznam neobstojí. *Poznámka: párovanie dekorov už robí abs_rules (ABS s rovnakým dekorom ako materiál) — využiť; súvisí s D-16 autocomplete. Priorita rastie s počtom materiálov.*
 
 ## Návrhy väčších celkov (na rozpracovanie)
 
@@ -34,7 +40,11 @@
 
 ## Otvorené otázky (na Michalovo posúdenie pri teste)
 
-*(momentálne žiadne — D-08 default tab Korpus potvrdený 19.7. večer: „jednoznačne vyhovuje")*
+- **Z porovnania VEPO exportov (test 8, 20.7.):** (a) polica v Engine vychádza o 8 mm plytšia než v starej DC kuchyni (prírez 499 vs 507) — ktorá hĺbka police je správna? (b) spodné boky v Engine o 2 mm vyššie (746 vs 744) — sedí výška tela/sokla? (c) stará kuchyňa olepovala aj PRIEČNE hrany dna a stropu (kód `=`), Engine defaulty nie — chceš ich do defaultov? (d) korpusové šírky majú systematicky −2 mm v starom exporte — vyzerá na 2 mm ABS v starej vs 1 mm v Engine defaultoch — ktorá hrúbka je tvoj štandard na korpus?
+
+## Smoke test 20.7. — výsledok (testy 1–11)
+
+Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len prvky+počty, žiadne hodnoty) · test 8 = porovnanie VEPO exportov Engine vs. OCL+vepo_exporter na zrkadlovej kuchyni: **26 = 26 dielcov, materiálové skupiny sedia** (1 bok v inom materiáli = známy Michalov rozdiel). Formát CSV byte-kompatibilný. Rozdiely: systematické ABS delty (viď otázky vyššie), škárové rozdiely na čelách (staré defaulty vs. Engine 3/2), orientation swap pri dekore `none` (výrobne neškodné), **stará linka NEodpočítavala ABS z 36 mm dosky (1618×600) — Engine odpočítava správne (1616×598)**, 1 nespárovaný pomocný dielec v každom teste (rôzne krycie prvky). Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt` — neinterpolované). Nálezy A1/B1–B5/C1/C2 zapísané ako **D-29 až D-36**.
 
 ## Vyriešené
 
