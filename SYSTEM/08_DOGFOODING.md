@@ -10,9 +10,8 @@
 
 ## Spomaľovače (vysoká priorita)
 
-- **D-32 · Nový korpus preberá nastavenia posledného editovaného** (smoke test 20.7., B3) — diagnóza z kódu: NIE je to Ruby cache/singleton — `insertCabinet()` vkladá AKTUÁLNY obsah formulára (`collectAll()` + `currentZoneTree`), a formulár po označení korpusu A drží hodnoty A (zóny aj čelá). „Vlož ďalší" = kópia naposledy zobrazeného. Je to aj feature (rýchle množenie rovnakých skriniek — používané), aj pasca (nečakané dedenie). *Návrh na rozhodnutie: vkladacia karta dostane viditeľný prepínač zdroja — „z defaultov typu / kópia označeného / zo šablóny" — žiadne tiché dedenie.*
-- **D-33 · Šablóna nepreberá rozmery / polia držia staré hodnoty** (smoke test 20.7., B4) — rovnaký root cause ako D-32 (formulár sa pri výbere šablóny prepíše len čiastočne). Príklad: po chladničke 2500×600 šablóna „skriňa+šuflík" natiahla staré rozmery. *Rieši sa spolu s D-32 (definovať, ktoré polia šablóna VŽDY nastavuje).*
-- **D-34 · Panel „visí" na zmazanej skrinke** (smoke test 20.7., B5) — po Delete skrinky panel ďalej zobrazuje jej dáta; ESC/cancel nefunguje, treba prekliknúť inam. *Fix: observer zmazania/deselection → clearSelected + mode-insert; overiť prečo onSelectionCleared po Delete nechodí.*
+- **D-40 · Bug pri vložení novej skrinky — podobný D-34** (Michal 21.7., avizované) — detaily doplní Michal v novom okne pri rozbore; prvý bod nočnej fronty/rannej debaty.
+
 
 ## UX drobnosti (nízka priorita)
 
@@ -51,6 +50,9 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené
 
+- **D-32/D-33 · Vkladanie bez tichého dedenia + šablóna aplikuje všetko** → **vyriešené v dávke Vkladanie (PR #61)**: vkladacia karta sa pri každom príchode (z korpusu/dielca/dosky) resetuje na defaulty alebo kompletnú šablónu — vrátane rozmerov A MATERIÁLOV (skrytá diera — šablóna ich ukladala, vklad neaplikoval); insert stav žije mimo DOM. „Vložiť kópiu" pri označenom korpuse = presná SERVEROVÁ kópia z configu modelu (materiály, ručné zásahy kovania, per-dielec overridy, názov — formulárová cesta ich strácala). Garancia testom: uložené šablóny sa insertom/editom NIKDY nemenia.
+- **D-39 · Zámky vkladacej karty** → **vyriešené (PR #61)**: 🔒 pri Š/V/H/hrúbke/výške sokla — zamknutá hodnota prežije výber šablóny aj reset (use-case: linka s výškou 950, sokel 150). Stav v Ruby pamäti (prežije zatvorenie panela, zomrie s reštartom SU). Konflikt so šablónou nič ticho neupravuje — vklad sa odmietne a hláška vymenuje aktívne zámky. Kópia zámky vedome ignoruje.
+- **D-34 · Panel „visí" na zmazanej skrinke** → **vyriešené (PR #61)**: po zmazaní označenej skrinky panel korektne nabehne na vkladaciu kartu (resolvery ignorujú neplatné entity; po ustálení erase vždy resync panela; fallback na aktívny model pri čistom delete).
 - **D-37 · Hĺbka korpusu = CELKOVÁ vrátane chrbta** → **vyriešené v dávke Chrbát (PR #59)**: nový invariant — zadaná hĺbka platí celkovo vo VŠETKÝCH režimoch chrbta; naložený chrbát skracuje telo o svoju hrúbku (vložený/drážka už celkovú spĺňali), zóny/svetlá hĺbka/kovanie idú tou istou logikou (výsuv pri naloženom 510/3 správne NL 470). BEZ migrácie (rozhodnutie Michala) — SU test: stará geometria → rebuild = nová pravda → 1× undo vráti starú. 281/0 + 88/0 SU.
 - **D-38 · Chrbát „pevný 18" nefunguje** → **vyriešené (PR #59)**: skutočná príčina — rebuild padal na hrúbkovej kontrole materiálu chrbta (HDF 3 ≠ 18) a UI ostalo rozsynchronizované. Nový preflight materiál vyberie automaticky (korpusový materiál hrúbky > rovnaký dekor > jediný kandidát) a oznámi v statuse; bez kandidáta jasná hláška + resync selectu. Pri „Bez chrbta" sa nekontroluje nič; skrinka bez chrbta neblokuje zmenu projektového chrbta (GH P2).
 - **D-31 · Skrinka bez chrbta** → **vyriešené (PR #59)**: voľba „Bez chrbta" — BACK dielec sa negeneruje, telo aj vnútro na plnú hĺbku, kusovník/VEPO nič; riadok hrúbky sa skryje, hodnota sa pamätá (návrat režimu aj šablóny ju obnovia).
