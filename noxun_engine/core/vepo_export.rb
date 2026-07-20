@@ -2,12 +2,14 @@
 # Noxun Engine — V0.5 C: VEPO CSV export PRIAMO z BOM riadkov (bez OCL medzikroku).
 # Zdroj pravdy formatu: SYSTEM/03_VYSTUP_vepo_kontrakt.md (reverz funkcneho vepo_exporter).
 #
-# SEMANTIKA ROZMEROV (build_plan.rb, zavazne): BOM nesie HOTOVE rozmery dielca
-# (s nalepenym ABS). VEPO dostava CISTY PRIREZ — odpocet hrubok ABS pasok:
-#   L1/L2 (pozdlzne hrany, lezia na dlzke)  -> odpocet zo SIRKY
-#   W1/W2 (priecne hrany, lezia na sirke)   -> odpocet z DLZKY
-# Rotacia dekoru (grain 'width') sa robi PRED odpoctom: swap dlzka<->sirka
-# A ZAROVEN swap dvojic hran (L<->W) — odpocty ostanu na spravnych stranach.
+# SEMANTIKA ROZMEROV (oprava 20.7. po smoke teste — Michal, vlastnik VEPO flow):
+# CSV nesie HOTOVE rozmery dielca (presne ako BOM). VEPO system si odpocet
+# hrubky ABS robi SAM na zaklade kodov hran (—/=) — preto sa hrany posielaju.
+# Ziadna rozmerova aritmetika sa tu NESMIE robit (povodny odpocet z prveho
+# navrhu bol omyl standardu — stara linka OCL->vepo_exporter tiez posielala
+# hotove/finalne rozmery).
+# Rotacia dekoru (grain 'width'): swap dlzka<->sirka A ZAROVEN swap dvojic
+# hran (L<->W) — VEPO dostane dlzku pozdlz dekoru so spravnymi kodmi.
 #
 # Byte-kompatibilita so starym exporterom (Codex audit F6): CSV cez CSV.generate
 # s force_quotes + ';' + CRLF (stary CSV.open v textovom mode na Windows pisal
@@ -62,24 +64,18 @@ module Noxun
         )
       end
 
-      # Cisty prirez [dlzka, sirka] po odpocte ABS hrubok; [nil, dovod] pri chybe.
-      def cut_dimensions(row, edge_thicknesses)
+      # HOTOVE rozmery [dlzka, sirka] — ziadny odpocet (VEPO si ABS odratava
+      # sam z kodov hran). edge_thicknesses sluzi uz LEN ako integrity check:
+      # hrana odkazujuca na ABS mimo katalogu = spinave data -> riadok von
+      # s dovodom (radsej neobjednat nez objednat s neistym olepenim).
+      def finished_dimensions(row, edge_thicknesses)
         e = row['edges'] || {}
-        take = lambda do |code|
+        %w[L1 L2 W1 W2].each do |code|
           id = e[code]
-          next 0.0 if id.nil? || id.to_s.empty?
-          th = edge_thicknesses[id]
-          return nil if th.nil?
-          th.to_f
+          next if id.nil? || id.to_s.empty?
+          return [nil, "neznáma ABS #{id}"] unless edge_thicknesses.key?(id)
         end
-        l1 = take.call('L1'); return [nil, "neznáma ABS #{e['L1']}"] if l1.nil?
-        l2 = take.call('L2'); return [nil, "neznáma ABS #{e['L2']}"] if l2.nil?
-        w1 = take.call('W1'); return [nil, "neznáma ABS #{e['W1']}"] if w1.nil?
-        w2 = take.call('W2'); return [nil, "neznáma ABS #{e['W2']}"] if w2.nil?
-        len = row['length'].to_f - w1 - w2
-        wid = row['width'].to_f - l1 - l2
-        return [nil, 'prírez po odpočte ABS vychádza nekladný'] if len <= 0 || wid <= 0
-        [[len, wid], nil]
+        [[row['length'].to_f, row['width'].to_f], nil]
       end
 
       # Lowercase slug pre nazvy suborov (vzor Materials.slug, ale lowercase):
@@ -116,9 +112,9 @@ module Noxun
             next
           end
           row = oriented(raw)
-          dims, cut_err = cut_dimensions(row, edge_thicknesses)
-          if cut_err
-            errors << error_entry(raw, cut_err)
+          dims, dim_err = finished_dimensions(row, edge_thicknesses)
+          if dim_err
+            errors << error_entry(raw, dim_err)
             next
           end
           commercial = commercial_thickness(row['thickness'])
