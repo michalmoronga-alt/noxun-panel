@@ -6,7 +6,7 @@
 
 - **Stĺpce v presnom poradí (bez hlavičky):** `nazov ; dlzka ; hrana_pozdlz ; sirka ; hrana_naprieč ; hrubka ; pocet_ks ; material`
 - **Oddeľovač:** `;` (bodkočiarka), **všetky polia v úvodzovkách** (force_quotes)
-- **Rozmery:** celé čísla v mm (zaokrúhlené `.round`)
+- **Rozmery:** celé čísla v mm (zaokrúhlené `.round`) — **HOTOVÉ/finálne rozmery dielca, ŽIADEN odpočet ABS** (potvrdené 20.7., Michal: VEPO si hrúbku pásky odratáva samo na základe kódov hrán — presne preto sa kódy posielajú; stará linka OCL→vepo_exporter posielala tiež finálne rozmery)
 - **Kódovanie hrán (ABS):**
   - `""` (prázdne) = bez hrany na tejto dvojici strán
   - `—` (em-dash) = hrana na JEDNEJ strane z dvojice
@@ -34,4 +34,4 @@ Pôvodný reťazec: OCL export CSV (BOM UTF-8, oddeľovač `;` alebo `,` auto-de
 
 ## Čo z toho vyplýva pre dátový model dielca v novom systéme
 
-Dielec musí niesť minimálne: **názov, dĺžka, šírka, hrúbka (reálna aj obchodná), počet, materiál (názov pre VEPO), hrany 4× samostatne (l1, l2, w1, w2 — nie len súhrnný kód!), príznak rotácie/orientácie dekoru**. Súhrnné kódy `—`/`=` sa DOPOČÍTAJÚ pri exporte — v modeli držíme plné info per strana (lebo `—` nevie povedať KTORÁ strana; pre CNC a kusovník to potrebujeme presne).
+Dielec musí niesť minimálne: **názov, dĺžka, šírka, hrúbka (reálna aj obchodná), počet, materiál (názov pre VEPO), hrany 4× samostatne (l1, l2, w1, w2 — nie len súhrnný kód!), príznak rotácie/orientácie dekoru**. Súhrnné kódy `—`/`=` sa DOPOČÍTAJÚ pri exporte — v modeli držíme plné info per strana (lebo `—` nevie povedať KTORÁ strana; pre CNC a kusovník to potrebujeme presne). **Rozmery v exporte = hotové rozmery bez úprav** — ABS hrúbky sa NIKDY neodratávajú (robí to VEPO); plné per-strana info o hranách ostáva v modeli pre budúce CNC/nárezové výstupy.

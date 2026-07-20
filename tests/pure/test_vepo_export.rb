@@ -73,34 +73,26 @@ NxTest.test('vepo: rotacia dekoru width prehodi rozmery AJ dvojice hran') do
   NxTest.refute(same['edges'].equal?(NxVepo.vrow['edges']))
 end
 
-NxTest.test('vepo: prirez = hotovy rozmer minus ABS (L hrany beru sirku, W hrany dlzku)') do
+NxTest.test('vepo: rozmery su HOTOVE — ziadny odpocet ABS (oprava 20.7.); neznama ABS = chyba') do
   v = NxVepo.vepo
   r = NxVepo.vrow('edges' => { 'L1' => 'ABS1', 'L2' => 'ABS2', 'W1' => 'ABS2', 'W2' => nil })
-  dims, err = v.cut_dimensions(r, NxVepo::EDGES)
+  dims, err = v.finished_dimensions(r, NxVepo::EDGES)
   NxTest.assert_equal(nil, err)
-  NxTest.assert_close(718.0, dims[0], 0.001, 'dlzka 720 - W1(2) - W2(0)')
-  NxTest.assert_close(557.0, dims[1], 0.001, 'sirka 560 - L1(1) - L2(2)')
+  NxTest.assert_close(720.0, dims[0], 0.001, 'dlzka NEZMENENA aj s hranami — VEPO si odratava sam')
+  NxTest.assert_close(560.0, dims[1], 0.001, 'sirka NEZMENENA')
 
-  _, err2 = v.cut_dimensions(NxVepo.vrow('edges' => { 'L1' => 'NEZNAMA', 'L2' => nil, 'W1' => nil, 'W2' => nil }), NxVepo::EDGES)
-  NxTest.assert(err2 && err2.include?('neznáma ABS'), "neznama ABS musi byt chyba, dostal #{err2.inspect}")
-
-  _, err3 = v.cut_dimensions(NxVepo.vrow('width' => 2.0, 'edges' => { 'L1' => 'ABS2', 'L2' => 'ABS1', 'W1' => nil, 'W2' => nil }), NxVepo::EDGES)
-  NxTest.assert(err3 && err3.include?('nekladný'), 'prirez <= 0 musi byt chyba')
+  _, err2 = v.finished_dimensions(NxVepo.vrow('edges' => { 'L1' => 'NEZNAMA', 'L2' => nil, 'W1' => nil, 'W2' => nil }), NxVepo::EDGES)
+  NxTest.assert(err2 && err2.include?('neznáma ABS'), "neznama ABS je integrity chyba, dostal #{err2.inspect}")
 end
 
-NxTest.test('vepo: rotacia + odpocet spolu — odpocty ostanu na spravnych stranach (audit B1)') do
-  # grain width: L1=ABS1(1mm) na povodnej dlzke, W1=ABS2(2mm) na povodnej sirke.
-  # Po rotacii: dlzka=560 s hranou ABS2 na L1 (odpocet zo SIRKY), sirka=720 s ABS1 na W1
-  # (odpocet z DLZKY). Prirez: dlzka 560-1(W:ABS1)=559 ... prepocitane cez oriented+cut.
+NxTest.test('vepo: rotacia dekoru vymeni rozmery aj kody hran — hodnoty ostanu hotove') do
   r = NxVepo.vrow('grain_direction' => 'width',
                   'edges' => { 'L1' => 'ABS1', 'L2' => nil, 'W1' => 'ABS2', 'W2' => nil })
   o = NxVepo.vepo.oriented(r)
-  dims, err = NxVepo.vepo.cut_dimensions(o, NxVepo::EDGES)
+  dims, err = NxVepo.vepo.finished_dimensions(o, NxVepo::EDGES)
   NxTest.assert_equal(nil, err)
-  # po rotacii: length=560, W-hrany = stare L-hrany = ABS1(1) -> dlzka 560-1 = 559
-  NxTest.assert_close(559.0, dims[0], 0.001)
-  # sirka=720, L-hrany = stare W-hrany = ABS2(2) -> sirka 720-2 = 718
-  NxTest.assert_close(718.0, dims[1], 0.001)
+  NxTest.assert_close(560.0, dims[0], 0.001, 'po rotacii dlzka = povodna sirka, bez odpoctu')
+  NxTest.assert_close(720.0, dims[1], 0.001, 'po rotacii sirka = povodna dlzka, bez odpoctu')
 end
 
 NxTest.test('vepo: slug a project_slug (diakritika, prazdne, Windows rezervovane)') do
@@ -118,7 +110,8 @@ NxTest.test('vepo: CSV riadok — presne bajty (force quotes, ;, CRLF, bez hlavi
   NxTest.assert_equal(1, out['groups'].length)
   g = out['groups'].first
   NxTest.assert_equal('kuchyna_novak_k009_pw_dtdl_18_36.csv', g['filename'])
-  expected = "\"Bok\";\"720\";\"—\";\"559\";\"\";\"18\";\"2\";\"K009 PW DTDL\"\r\n"
+  # sirka 560 = HOTOVY rozmer (ABS 1mm na L1 sa NEodratava — kod — to nesie)
+  expected = "\"Bok\";\"720\";\"—\";\"560\";\"\";\"18\";\"2\";\"K009 PW DTDL\"\r\n"
   NxTest.assert_equal(expected, g['csv'], 'byte-for-byte format riadku')
   NxTest.assert_equal('UTF-8', g['csv'].encoding.name)
   NxTest.refute(g['csv'].start_with?("﻿"), 'ziadny BOM')

@@ -39,8 +39,9 @@
 #             grain_lock false (zakaz rotacie dekoru pri nestingu/VEPO)
 #
 # SEMANTIKA prod (zavazna pre vystupy): prod = HOTOVY rozmer dielca (s nalepenym ABS).
-# Cisty prirez sa DOPOCITA pri exporte odpoctom hrubok ABS z edges (1.0/2.0 mm per strana);
-# obchodna hrubka (18/36) a suhrnne kody hran (—/=) tiez az pri exporte (SYSTEM/03).
+# VYSTUPY POSIELAJU HOTOVY ROZMER BEZ UPRAV — VEPO si odpocet ABS robi SAM z kodov
+# hran (oprava 20.7., Michal — povodna veta o odpocte pri exporte bola omyl);
+# obchodna hrubka (18/36) a suhrnne kody hran (—/=) sa dopocitaju pri exporte (SYSTEM/03).
 # Konvencia hran: L1/L2 lezia na prod[:length], W1/W2 na prod[:width];
 # pri celach prod[:length] = VYSKA cela, prod[:width] = sirka (fronts.rb box_desc).
 #

@@ -110,6 +110,23 @@ module Noxun
           apply_board(model, board, { 'edges' => edges }, "Hrana #{code} — #{label}.")
         end
 
+        # D-35: olepenie VSETKYCH 4 hran dosky jednym klikom — ABS 1.0 mm dekoru
+        # materialu dosky, JEDEN rebuild = JEDEN undo krok (audit FIX 7). Echo
+        # board_id guard ako ostatne board akcie; JS pred volanim flushuje pending
+        # debounce edity (flushBoardEditsNow — audit FIX 6), takze bulk pracuje
+        # nad cerstvym configom. Nenajdena ABS = atomicky no-op (audit FIX 5):
+        # ziadna zmena configu, ziadny rebuild, ziadny undo krok — NIKDY sa
+        # neuklada mapa 4x nil (zmazala by existujuce hrany).
+        def handle_set_board_edges_all(payload)
+          data = parse(payload)
+          model, board = guarded_board(data)
+          return unless board
+          abs_id, decor = bulk_abs_for(Store.config(board) || {})
+          return set_status(missing_bulk_abs_msg(decor), true) if abs_id.nil?
+          apply_board(model, board, { 'edges' => AbsRules.uniform_edges(abs_id) },
+                      "Všetky 4 hrany — ABS #{decor} 1,0 mm.")
+        end
+
         # --- pomocne --------------------------------------------------------
 
         # Rebuild + resync panela. Vyber sa nemeni (rebuild drzi tu istu instanciu);

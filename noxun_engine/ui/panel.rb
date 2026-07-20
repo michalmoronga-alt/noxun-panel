@@ -66,6 +66,7 @@ module Noxun
           cb(dlg, 'set_cabinet_material') { |p| handle_set_cabinet_material(p) } # korpusovy override
           cb(dlg, 'set_part_material')    { |p| handle_set_part_material(p) }    # per-dielec override
           cb(dlg, 'set_part_edge')        { |p| handle_set_part_edge(p) }        # ABS hrana dielca
+          cb(dlg, 'set_part_edges_all')   { |p| handle_set_part_edges_all(p) }   # D-35 olep vsetky 4 hrany (1 undo)
           # V0.4 kovanie: rucny pocet / vypnutie / reset polozky + editor pravidiel
           cb(dlg, 'set_hardware_override') { |p| handle_set_hardware_override(p) }
           cb(dlg, 'open_rules')            { |_p| RulesDialog.show }
@@ -85,6 +86,7 @@ module Noxun
           cb(dlg, 'set_board_fields')   { |p| handle_set_board_fields(p) }
           cb(dlg, 'set_board_material') { |p| handle_set_board_material(p) }
           cb(dlg, 'set_board_edge')     { |p| handle_set_board_edge(p) }
+          cb(dlg, 'set_board_edges_all') { |p| handle_set_board_edges_all(p) } # D-35 olep vsetky 4 hrany (1 undo)
           # D-25: merac pouzivania panela — lokalne pocitadla interakcii (len
           # identifikatory prvkov a pocty). Handler chyby NIKDY nepusti von
           # (vlastny rescue bez set_status) — merac musi ostat neviditelny.

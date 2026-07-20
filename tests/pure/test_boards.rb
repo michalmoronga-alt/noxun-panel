@@ -220,15 +220,21 @@ NxTest.test('board: seed-merge doplni free_panel do existujuceho suboru bez prep
   ar.reload!
   rules = ar.load
   NxTest.assert_equal({ 'L1' => 1.0 }, rules['free_panel'], 'nova rola sa doplni zo seedu')
+  NxTest.assert_equal({ 'L1' => 1.0 }, rules['rail_front'], 'chybajuca rail rola sa doplni zo seedu (D-30)')
   NxTest.assert_equal({ 'L1' => 2.0 }, rules['shelf'], 'pouzivatelska uprava ostava')
   # subor s aktualnym seed_version: nic sa nedoplna
   js.write(ar.path, { 'std' => 1, 'seed_version' => ar::SEED_VERSION, 'rules' => { 'shelf' => { 'L1' => 2.0 } } })
   ar.reload!
   NxTest.refute(ar.load.key?('free_panel'), 'aktualny seed_version = ziadny dalsi merge')
-  # pouzivatelov vlastny free_panel (aj prazdny) sa NIKDY neprepise
-  js.write(ar.path, { 'std' => 1, 'rules' => { 'free_panel' => {} } })
+  # Garancia (upravena pre D-30): NEPRAZDNE pravidlo sa neprepise NIKDY; prazdne
+  # pravidlo sa neprepise TIEZ — jedina vynimka je jednorazova rail migracia pri
+  # bumpe na SEED_VERSION 2 (PRESNE prazdne rail_front/rail_back — pokryva
+  # test 'abs_rules: D-30 rail migracia'). free_panel nie je rail rola, takze
+  # pouzivatelov prazdny free_panel ostava prazdny aj pri starom subore.
+  js.write(ar.path, { 'std' => 1, 'rules' => { 'free_panel' => {}, 'shelf' => { 'L2' => 2.0 } } })
   ar.reload!
-  NxTest.assert_equal({}, ar.load['free_panel'], 'vedome prazdne pravidlo ostava')
+  NxTest.assert_equal({}, ar.load['free_panel'], 'vedome prazdne ne-rail pravidlo ostava')
+  NxTest.assert_equal({ 'L2' => 2.0 }, ar.load['shelf'], 'neprazdne pravidlo sa neprepise nikdy')
   # cleanup: vrat plny seed pre dalsie testy v tomto procese
   js.write(ar.path, { 'std' => 1, 'seed_version' => ar::SEED_VERSION,
                       'rules' => js.deep_copy(ar::SEED_RULES) })

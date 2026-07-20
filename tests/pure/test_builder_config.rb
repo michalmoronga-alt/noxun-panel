@@ -356,6 +356,31 @@ NxTest.test('builder: resolve_part - explicitny nil v override hrane vypne ABS z
   NxTest.assert_equal(nil, res2[:sheet_thickness])
 end
 
+NxTest.test('builder: resolve_part - vystuha D-30: default dlha hrana L1, override prezije') do
+  NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
+  cb = Noxun::Engine::CabinetBuilder
+  pd = { part_key: 'cabinet/rail:front', suffix: 'TOP-RAIL-F', role: 'rail_front', material: :korpus,
+         prod: { length: 564.0, width: 80.0, thickness: 18.0 } }
+  # D-30: vystuha bez override dostane default ABS na dlhej hrane L1 — BEZ vetvenia
+  # podla rails_orientation (flat aj upright rovnako; prod tvar je totozny).
+  res = cb.resolve_part(pd, 'K009_PW_DTDL_18', 'W1000_DTDL_18', 'HDF_WHITE_3', {})
+  NxTest.assert_equal({ 'L1' => 'ABS_K009_10', 'L2' => nil, 'W1' => nil, 'W2' => nil }, res[:edges])
+  # Rucny override prebije novy default (nil = vedome bez ABS). resolve_part bezi pri
+  # KAZDOM rebuilde nad part_overrides z configu — cim je zarucene, ze rucne hrany
+  # prezivaju rebuild aj po zavedeni D-30 defaultu.
+  ov = { 'cabinet/rail:front' => { 'edges' => { 'L1' => nil, 'W1' => 'ABS_K009_20' } } }
+  res2 = cb.resolve_part(pd, 'K009_PW_DTDL_18', 'W1000_DTDL_18', 'HDF_WHITE_3', ov)
+  NxTest.assert_equal(nil, res2[:edges]['L1'], 'explicitne "bez ABS" vypne D-30 default')
+  NxTest.assert(res2[:edges].key?('L1'), 'explicitny nil musi ostat ako kluc')
+  NxTest.assert_equal('ABS_K009_20', res2[:edges]['W1'])
+  NxTest.assert_equal(nil, res2[:edges]['L2'])
+  # rail_back ma rovnaky default
+  pdb = { part_key: 'cabinet/rail:back', suffix: 'TOP-RAIL-B', role: 'rail_back', material: :korpus,
+          prod: { length: 564.0, width: 80.0, thickness: 18.0 } }
+  res3 = cb.resolve_part(pdb, 'K009_PW_DTDL_18', 'W1000_DTDL_18', 'HDF_WHITE_3', {})
+  NxTest.assert_equal({ 'L1' => 'ABS_K009_10', 'L2' => nil, 'W1' => nil, 'W2' => nil }, res3[:edges])
+end
+
 NxTest.test('builder: resolve_part - projektovy fallback cez Materials.project_defaults') do
   NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
   cb = Noxun::Engine::CabinetBuilder
@@ -569,7 +594,7 @@ NxTest.test('builder: cabinet_config nesie verziu, schemu a je JSON-ovatelny') d
   # merge_final zapisal vysledky planu
   NxTest.assert_close(564.0, c[:available_width])   # 600 - 2*18
   NxTest.assert_close(584.0, c[:available_height])  # 702 - 118
-  NxTest.assert_close(510.0, c[:available_depth])   # overlay -> plna hlbka
+  NxTest.assert_close(507.0, c[:available_depth])   # D-37 overlay: d - bt (hlbka je celkova)
   NxTest.assert_close(0.0, c[:front_plane])
   NxTest.assert_equal(0, c[:wings])
   NxTest.assert_equal([], c[:front_items])

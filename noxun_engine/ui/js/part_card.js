@@ -110,6 +110,14 @@
     if (window.sketchup && sketchup.set_part_edge)
       sketchup.set_part_edge(JSON.stringify({ role_key: partCard.role_key, edge: code, abs_id: value }));
   }
+  // D-35: olep vsetky 4 hrany ABS 1.0 dekoru materialu dielca — JEDEN callback,
+  // Ruby spravi JEDEN rebuild (1 undo). Identity guard: payload nesie cabinet_id
+  // AJ role_key, Ruby overi oboje proti aktualne oznacenemu dielcu.
+  function onEdgesAll(){
+    if (!partCard) return;
+    if (window.sketchup && sketchup.set_part_edges_all)
+      sketchup.set_part_edges_all(JSON.stringify({ cabinet_id: partCard.cabinet_id, role_key: partCard.role_key }));
+  }
   // Klik na hranu v 2D dielci -> fokus jej dropdownu (delegovane, poucenie z drag fixu).
   function setupPartSvgDelegation(){
     var svg = el('partSvg'); if(!svg) return;
