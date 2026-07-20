@@ -15,9 +15,10 @@
   var counts = {};
   var FLUSH_MS = 30000;
   // Delegovane klikatelne prvky panela BEZ <button>/onclick atributu (lockbtn a
-  // znode maju click cez delegaciu/property; zrect/divh/ehit/behit su SVG hit
-  // plochy). Prazdna plocha SVG (pan/zoom) sa NEpocita — nie je to pouzitie prvku.
-  var HIT_CLASSES = ['zrect', 'divh', 'ehit', 'behit', 'lockbtn', 'znode'];
+  // znode maju click cez delegaciu/property; zrect/divh/ehit/behit/fgrp su SVG
+  // hit plochy — fgrp je celo v nahlade, D-23 klik-sync na riadok zoznamu).
+  // Prazdna plocha SVG (pan/zoom) sa NEpocita — nie je to pouzitie prvku.
+  var HIT_CLASSES = ['zrect', 'divh', 'ehit', 'behit', 'lockbtn', 'znode', 'fgrp'];
 
   // --- klasifikacia (cista logika, testovatelna v Node cez module.exports) ---
 

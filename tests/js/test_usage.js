@@ -93,6 +93,11 @@ eq(usage.clickKey(elm('DIV', { parent: fieldEditor, attrs: { class: 'lockbtn on'
 const zoneTree = elm('DIV', { id: 'zoneTree' });
 eq(usage.clickKey(elm('DIV', { parent: zoneTree, attrs: { class: 'znode active' } }), 'zony'),
   'zoneTree/znode', 'uzol stromu zon');
+// D-23: celo v nahlade — cely <g class="fgrp"> je jeden hit (kridla aj text)
+const fgrpG = elm('g', { parent: g, attrs: { class: 'fgrp hov', 'data-front-id': 'F1abc-2-x' } });
+eq(usage.clickKey(elm('rect', { parent: fgrpG }), 'cela'), 'preview/fgrp', 'klik na kridlo cela');
+eq(usage.clickKey(elm('text', { parent: fgrpG }), 'cela'), 'preview/fgrp', 'klik na text cela = ten isty item');
+eq(String(usage.clickKey(elm('rect', { parent: fgrpG }), 'cela')).indexOf('F1abc'), -1, 'data-front-id NESMIE preniknut');
 
 // --- changeKey: len formularove prvky; id ma prednost ---
 eq(usage.changeKey(elm('SELECT', { id: 'template' })), 'template', 'select s id');

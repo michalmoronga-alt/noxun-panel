@@ -100,15 +100,18 @@
       writeConstruction(c);
       applyVisibility(t);
       buildFrontHwBadges(c.hardware || []); // D3: badge kovania PRED renderom riadkov ciel
+      // D-23 (audit F5/4): frontItems PRED renderFronts — placeholder ≈ vysky
+      // paruje s CERSTVYM payloadom (povodne poradie by parovalo so starou skrinkou).
+      frontItems = c.front_items || [];
       // D-07 Codex B2: echo apply toho isteho korpusu s dalsimi cakajucimi editmi
       // nesmie prepisat gap polia (selectedCabId sa meni az nizsie v setSelected).
       // D-22: pod tym istym guardom je aj zamok presahov (edge_limit_off) —
       // starsie echo nesmie vratit novsi klik na zamok (renderFronts vo form.js).
+      // D-23: a aj riadky ciel — pri keepGaps sa NEprestavaju (light-update).
       var keepGaps = (c.cabinet_id && c.cabinet_id === selectedCabId) && !!(applyTimer || cabEditsInFlight);
       cabEditsInFlight = false;
       renderFronts(c.fronts, keepGaps);
       currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();
-      frontItems = c.front_items || [];
       tplNameSuggestion = c.template_name_suggestion || ''; // D-14 modal prefill
       // Codex GH #46 P2: preklik na INY korpus pri otvorenom modale = zavriet
       // (mode ostava cab, setUiMode guard nezabera; identitu navyse strazi server)
@@ -143,6 +146,7 @@
       if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; } // korpusovy debounce nesmie strielat v kontexte dosky
       setSelected(null);
       activeZoneId = null; frontItems = null;
+      invalidateFrontPlaceholders(); // D-23: bez resolved dat ziadne ≈ odhady
       buildFrontHwBadges([]);
       renderPartCard(null);
       renderHardware(null, []);
@@ -163,6 +167,7 @@
       setSelected(null);
       buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
       activeZoneId = null; frontItems = null;
+      invalidateFrontPlaceholders(); // D-23: navrhovy rezim nema resolved vysky
       if (lastCabForFit !== null){ lastCabForFit = null; fitPreview(); }
       renderPartCard(null);      // schovaj kartu dielca
       renderHardware(null, []);  // kovanie len pre oznacenu skrinku
