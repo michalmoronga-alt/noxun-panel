@@ -279,6 +279,31 @@ NxTest.test('hardware_rules: D-18 none-only korpus — ziadne frontove kovanie, 
   NxTest.assert_close(616.0, plan[:front_items][0]['height'], 0.01, 'nika drzi vysku radu')
 end
 
+NxTest.test('hardware_rules: D-24 tri kridla = 3x zavesy oproti 1 kridlu (build_plan, BEZ zmeny kodu kovania)') do
+  NxTest.skip!('build_plan default cita globalnu kniznicu — headless only') unless NxTest.headless?
+  # Dokaz: HardwareRules iteruje dielce planu podla roly (apply_rule) — kazde
+  # kridlo front_door je samostatny dielec, takze 3 kridla = 3 polozky zavesov
+  # automaticky. Ziadna specialna vetva pre pocet kridiel neexistuje.
+  cb = Noxun::Engine::CabinetBuilder
+  cn = Noxun::Engine::Construction
+  door = { 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed', 'height' => 500.0 }
+  plan1 = cn.build_plan(cb.normalize('fronts' => { 'items' => [door.merge('wings' => '1')] }), 'CAB-001')
+  plan3 = cn.build_plan(cb.normalize('fronts' => { 'items' => [door.merge('wings' => '3')] }), 'CAB-001')
+  h1 = plan1[:hardware].select { |h| h['generic_type'] == 'hinge' }
+  h3 = plan3[:hardware].select { |h| h['generic_type'] == 'hinge' }
+  NxTest.assert_equal(1, h1.length, '1 kridlo = 1 polozka zavesov')
+  NxTest.assert_equal(3, h3.length, '3 kridla = 3 polozky zavesov (per dielec)')
+  NxTest.assert_equal(%w[front:F1/wing:p1 front:F1/wing:p2 front:F1/wing:p3],
+                      h3.map { |h| h['owner_part_key'] }.sort)
+  NxTest.assert(h3.all? { |h| h['quantity'] == h1.first['quantity'] },
+                'rovnaka vyska cela = rovnake pasmo pre kazde kridlo')
+  NxTest.assert_equal(3 * h1.first['quantity'], h3.sum { |h| h['quantity'] },
+                      'spolu presne 3x tolko zavesov')
+  # referencna integrita: validate! vnutri build_plan uz overil, ze owneri existuju
+  keys3 = plan3[:parts].map { |p| p[:part_key].to_s }
+  NxTest.assert(h3.all? { |h| keys3.include?(h['owner_part_key']) })
+end
+
 NxTest.test('hardware_rules: upper skrinka nema nohy, dvierka zavesy maju') do
   NxTest.skip!('build_plan default cita globalnu kniznicu — headless only') unless NxTest.headless?
   cfg = Noxun::Engine::CabinetBuilder.normalize(

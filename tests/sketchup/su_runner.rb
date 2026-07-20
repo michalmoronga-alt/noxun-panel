@@ -271,6 +271,62 @@ module NoxunSuRunner
     ])
     e::CabinetBuilder.rebuild(model, inst, p8) # navrat na dvierka pre dalsie kroky
 
+    # 7d) D-24 kridla dvierok: 3 kridla = 3 fyzicke dielce s unikatnymi part_id
+    #     a definiciami (suffix DOOR-1-P1..P3 recykluje definicie per kridlo),
+    #     spravne sirky a 3 polozky zavesov v config.hardware[] (autorita supisu).
+    p9 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    p9['fronts'] = (p9['fronts'] || {}).merge('items' => [
+      { 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => '3' }
+    ])
+    e::CabinetBuilder.rebuild(model, inst, p9)
+    cfg9 = e::Store.config(inst) || {}
+    wings9 = front_parts.call
+    keys9 = wings9.map { |i| e::Store.get(i, 'part_key') }.sort
+    ok('sync: D-24 tri kridla = 3 fyzicke dielce (wing:p1..p3)',
+       wings9.length == 3 && keys9 == %w[front:F1/wing:p1 front:F1/wing:p2 front:F1/wing:p3])
+    pids9 = wings9.map { |i| e::Store.get(i, 'part_id') }
+    defs9 = wings9.map(&:definition)
+    exp_defs = (1..3).map { |i| "NOXUN #{cid} DOOR-1-P#{i}" }.sort
+    ok("sync: D-24 unikatne part_id a definicie (#{pids9.sort.join(', ')})",
+       pids9.uniq.length == 3 && defs9.uniq.length == 3 && defs9.map(&:name).sort == exp_defs)
+    exp_dw = ((600.0 - 2 * 2.0) - 2 * 3.0) / 3.0 # (opening 596 - 2x gap 3) / 3
+    widths9 = wings9.map { |i| mm(i.definition.bounds.width) }
+    ok("sync: D-24 sirky kridiel #{widths9.map { |v| v.round(1) }.join('/')} = #{exp_dw.round(2)}",
+       widths9.length == 3 && widths9.all? { |w| (w - exp_dw).abs <= TOL })
+    hinges9 = (cfg9['hardware'] || []).select { |h| h['generic_type'] == 'hinge' }
+    ok('sync: D-24 tri polozky zavesov v config.hardware[] (per kridlo)',
+       hinges9.length == 3 &&
+       hinges9.map { |h| h['owner_part_key'] }.sort == %w[front:F1/wing:p1 front:F1/wing:p2 front:F1/wing:p3])
+
+    # 7e) D-24 identita: ABS override na wing:left prezije 2->2 rebuild (zmena
+    #     sirky nemeni topologiu kridiel — kluce left/right ostavaju).
+    p10 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    p10['fronts'] = (p10['fronts'] || {}).merge('items' => [
+      { 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => '2' }
+    ])
+    p10['part_overrides'] = (p10['part_overrides'] || {})
+                            .merge('front:F1/wing:left' => { 'edges' => { 'L1' => nil } })
+    e::CabinetBuilder.rebuild(model, inst, p10)
+    p11 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    p11['width'] = 650.0
+    e::CabinetBuilder.rebuild(model, inst, p11) # 2->2 rebuild so zmenou sirky
+    cfg11 = e::Store.config(inst) || {}
+    left11 = inst.definition.entities.grep(Sketchup::ComponentInstance)
+                 .find { |i| e::Store.get(i, 'part_key') == 'front:F1/wing:left' }
+    lcfg11 = left11 ? (e::Store.config(left11) || {}) : {}
+    ok('sync: D-24 ABS override wing:left prezil 2->2 rebuild (config aj dielec)',
+       (cfg11['part_overrides'] || {}).key?('front:F1/wing:left') &&
+       !left11.nil? && lcfg11['edges'].is_a?(Hash) &&
+       lcfg11['edges'].key?('L1') && lcfg11['edges']['L1'].nil?)
+    # navrat na stav pred 7d (sirka 600, 1 kridlo, bez overridov) pre sekciu 8
+    p12 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    p12['width'] = 600.0
+    p12['fronts'] = (p12['fronts'] || {}).merge('items' => [
+      { 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => '1' }
+    ])
+    p12['part_overrides'] = {}
+    e::CabinetBuilder.rebuild(model, inst, p12)
+
     # 8) dedup kopie (priame volanie, synchronne): kopia dostane nove cid, original drzi
     e::ScaleWatch.guard do
       model.start_operation('SU-TEST kopia', true)

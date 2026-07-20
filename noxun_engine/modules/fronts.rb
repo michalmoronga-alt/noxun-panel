@@ -17,8 +17,12 @@ module Noxun
       GAP_EDGE        = 2.0   # skara hore/dole/po stranach
       GAP_MAX         = 50.0  # D-07: medzera medzi celami 0..GAP_MAX
       EDGE_LIMIT      = 100.0 # D-07: okraje v -EDGE_LIMIT..+EDGE_LIMIT (zaporne = presah cez obrys)
+      # D-22: odomknuty limit okrajov (edge_limit_off=true) — velke presahy pre
+      # obklady/pilastre. Medzera medzi celami (0..GAP_MAX) sa NEODOMYKA.
+      EDGE_LIMIT_UNLOCKED = 2000.0
       AUTO_TWO_ABOVE  = 600.0 # nad touto sirkou celneho otvoru auto dvierka = 2 kridla
       MIN_AUTO        = 10.0  # ochrana: auto celo nikdy < 10 mm
+      WING_MAX        = 4     # D-24: max pocet kridiel dvierok (3/4 len rucna volba)
 
       module_function
 
@@ -66,8 +70,13 @@ module Noxun
         { parts: parts, items: resolved, wings: total_wings }
       end
 
-      # Panely jedneho cela. drawer_front = 1 panel; door = 1/2 kridla podla wings.
+      # Panely jedneho cela. drawer_front = 1 panel; door = 1..WING_MAX kridiel podla wings.
       # D-07: medzera medzi kridlami = cfg gap (predtym natvrdo GAP_DEFAULT).
+      # D-24 IDENTITA (audit blocker): suffix recykluje SketchUp definiciu a tvori
+      # part_id (cabinet_builder add_part); part_key nesie overridy a kovanie.
+      # Stare tvary MUSIA ostat byte-identicke: 1 kridlo DOOR-N + wing:single,
+      # 2 kridla DOOR-N-L/R + wing:left/right ("lave/prave"). NOVE 3/4 kridla maju
+      # vlastny rad DOOR-N-P1..P4 + wing:p1..p4 (unikatne suffixy aj kluce).
       # D-18 'none' (Bez cela) = ZIADNE panely: riadok drzi vysku v rade presne ako
       # skutocne celo (rovnaka matematika fixed/auto/lock, z-postup pokracuje), ale
       # dielec nevznikne — otvorena nika v rade ciel. VEDOME ROZHODNUTIE: medzery
@@ -83,7 +92,8 @@ module Noxun
                     'drawer_front', "Zasuvkove celo #{idx}", gs, opening_w, z, h)]
         else
           wings = resolve_wings(item['wings'], opening_w)
-          if wings == 2
+          case wings
+          when 2
             dw = (opening_w - gap) / 2.0
             [
               box_desc("DOOR-#{idx}-L", PartKeys.front(front_id, 'wing', 'left'),
@@ -91,6 +101,14 @@ module Noxun
               box_desc("DOOR-#{idx}-R", PartKeys.front(front_id, 'wing', 'right'),
                        'front_door', "Dvierka #{idx} prave", gs + dw + gap, dw, z, h)
             ]
+          when 3, 4
+            # sirka kridla = (otvor - medzery medzi kridlami) / n; x postupuje o (dw + gap)
+            dw = (opening_w - (wings - 1) * gap) / wings
+            (1..wings).map do |i|
+              box_desc("DOOR-#{idx}-P#{i}", PartKeys.front(front_id, 'wing', "p#{i}"),
+                       'front_door', "Dvierka #{idx} kridlo #{i}/#{wings}",
+                       gs + (i - 1) * (dw + gap), dw, z, h)
+            end
           else
             [box_desc("DOOR-#{idx}", PartKeys.front(front_id, 'wing', 'single'),
                       'front_door', "Dvierka #{idx}", gs, opening_w, z, h)]
@@ -108,10 +126,14 @@ module Noxun
         }
       end
 
+      # D-24: '3'/'4' su vyhradne RUCNA volba — auto ostava 1/2 podla AUTO_TWO_ABOVE
+      # (automatika nikdy nevyrobi 3/4 kridla, stare skrinky sa nemenia).
       def resolve_wings(wings, opening_w)
         case wings.to_s
         when '1' then 1
         when '2' then 2
+        when '3' then 3
+        when '4' then 4
         else opening_w > AUTO_TWO_ABOVE ? 2 : 1
         end
       end
@@ -121,15 +143,19 @@ module Noxun
       # okraja hore: cela sa kladu ODSPODU (z = floor + gap_bottom); gap_top
       # posuva geometriu len cez AUTO cela (dopocitavaju zvysok) a pri
       # fixed-only zostave funguje ako rezerva/limit vo fit validacii.
+      # D-22: edge_limit_off=true odomkne okraje na +-EDGE_LIMIT_UNLOCKED
+      # (obklady/pilastre). Backend je AUTORITA — UI limity su len pohodlie;
+      # medzera medzi celami ostava 0..GAP_MAX bez ohladu na zamok.
       def validate_gap_ranges!(cfg)
         gap = cfg['gap'].to_f
         if gap.negative? || gap > GAP_MAX
           raise "Medzera medzi celami musi byt 0 az #{GAP_MAX.to_i} mm."
         end
+        limit = truthy(cfg['edge_limit_off']) ? EDGE_LIMIT_UNLOCKED : EDGE_LIMIT
         [['hore', cfg['gap_top'].to_f], ['dole', cfg['gap_bottom'].to_f],
          ['po stranach', cfg['gap_sides'].to_f]].each do |label, v|
-          next if v.abs <= EDGE_LIMIT
-          raise "Okraj cel #{label} musi byt v rozsahu -#{EDGE_LIMIT.to_i} az +#{EDGE_LIMIT.to_i} mm."
+          next if v.abs <= limit
+          raise "Okraj cel #{label} musi byt v rozsahu -#{limit.to_i} az +#{limit.to_i} mm."
         end
       end
 
@@ -147,12 +173,16 @@ module Noxun
         # bocne okraje ju nesmu zhodit.
         has_panels = items.any? { |it| it['type'] != 'none' }
         raise 'Cela sa nezmestia na sirku korpusu.' if has_panels && opening_w < MIN_AUTO
-        # D-07 (Codex GH P2): dvojkridlove dvierka — kridlo nesmie klesnut pod
-        # MIN_AUTO (velka medzera/okraje by inak dali zaporne kridlo, ktore by
+        # D-07 (Codex GH P2) + D-24: viackridlove dvierka — kridlo nesmie klesnut
+        # pod MIN_AUTO (velka medzera/okraje by inak dali zaporne kridlo, ktore by
         # construction ticho vyradil a korpus by sa ulozil bez dvierok).
+        # Sirka kridla pre resolved n: (opening_w - (n-1)*gap) / n; n=1 pokryva
+        # uz sirkovy limit vyssie (kridlo = cely otvor).
         items.each_with_index do |it, i|
-          next unless it['type'] == 'door' && resolve_wings(it['wings'], opening_w) == 2
-          next if (opening_w - gap) / 2.0 >= MIN_AUTO
+          next unless it['type'] == 'door'
+          n = resolve_wings(it['wings'], opening_w)
+          next if n < 2
+          next if (opening_w - (n - 1) * gap) / n >= MIN_AUTO
           raise "Kridla dvierok #{i + 1} sa nezmestia — zmensi medzeru medzi celami alebo bocne okraje."
         end
 
@@ -181,6 +211,9 @@ module Noxun
           'gap_top'    => num(h['gap_top'] || h[:gap_top], GAP_EDGE),
           'gap_bottom' => num(h['gap_bottom'] || h[:gap_bottom], GAP_EDGE),
           'gap_sides'  => num(h['gap_sides'] || h[:gap_sides], GAP_EDGE),
+          # D-22: stav zamku okrajov je sucast kanonickeho configu (round-trip cez
+          # ulozeny korpus AJ sablony); default false = zamknute +-EDGE_LIMIT.
+          'edge_limit_off' => truthy(h['edge_limit_off'] || h[:edge_limit_off]),
           'items'      => normalize_items(h['items'] || h[:items] || [])
         }
       end
@@ -218,7 +251,7 @@ module Noxun
           mode = has_h ? 'fixed' : 'auto' unless %w[fixed auto].include?(mode)
           mode = 'auto' if mode == 'fixed' && !has_h # fixed bez vysky nema zmysel -> auto
           wings = (it['wings'] || it[:wings] || 'auto').to_s
-          wings = 'auto' unless %w[1 2 auto].include?(wings)
+          wings = 'auto' unless %w[1 2 3 4 auto].include?(wings) # D-24: + 3/4 (rucna volba)
           {
             'id' => front_id,
             'type' => type,
@@ -242,7 +275,8 @@ module Noxun
 
       def empty_config
         { 'split_axis' => 'height', 'gap' => GAP_DEFAULT, 'gap_top' => GAP_EDGE,
-          'gap_bottom' => GAP_EDGE, 'gap_sides' => GAP_EDGE, 'items' => [] }
+          'gap_bottom' => GAP_EDGE, 'gap_sides' => GAP_EDGE,
+          'edge_limit_off' => false, 'items' => [] }
       end
 
       def num(v, dflt)

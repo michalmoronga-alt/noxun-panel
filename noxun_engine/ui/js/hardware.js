@@ -10,12 +10,23 @@
   }
   function hwUnit(t){ return t === 'slide' ? 'sada' : 'ks'; }
   // Ludsky popis vlastnika: front:F2/wing:left -> "F2 · ľavé krídlo".
+  // D-24: wing:p1..p4 (3/4-kridlove dvierka) -> "F1 · krídlo 1/3"; celkovy pocet
+  // kridiel berie z frontItems (wings_n z Ruby), bez neho aspon "krídlo 1".
   function hwOwnerDesc(owner){
     if (!owner) return '';
-    var m = owner.match(/^front:([^\/]+)\/wing:(left|right|single)$/);
+    var m = owner.match(/^front:([^\/]+)\/wing:(left|right|single|p[1-4])$/);
     if (m){
-      var side = m[2]==='left' ? ' · ľavé krídlo' : (m[2]==='right' ? ' · pravé krídlo' : '');
-      return m[1] + side;
+      var wkey = m[2];
+      if (wkey === 'left') return m[1] + ' · ľavé krídlo';
+      if (wkey === 'right') return m[1] + ' · pravé krídlo';
+      if (wkey === 'single') return m[1];
+      var i = parseInt(wkey.slice(1), 10);
+      var n = null;
+      var fis = (typeof frontItems !== 'undefined' && frontItems) ? frontItems : [];
+      for (var k = 0; k < fis.length; k++){
+        if (String(fis[k].id) === m[1]){ n = fis[k].wings_n; break; }
+      }
+      return m[1] + ' · krídlo ' + i + ((n && n >= i) ? '/' + n : '');
     }
     var p = owner.match(/^front:([^\/]+)\/panel$/);
     if (p) return p[1] + ' · zásuvka';

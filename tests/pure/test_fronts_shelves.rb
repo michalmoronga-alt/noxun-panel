@@ -10,12 +10,13 @@ require_relative '../helper' unless defined?(NxTest)
 NxTest.test('fronts: empty_config ma kanonicky tvar a defaultne medzery') do
   f = Noxun::Engine::Fronts
   cfg = f.empty_config
-  NxTest.assert_equal(%w[split_axis gap gap_top gap_bottom gap_sides items], cfg.keys)
+  NxTest.assert_equal(%w[split_axis gap gap_top gap_bottom gap_sides edge_limit_off items], cfg.keys)
   NxTest.assert_equal('height', cfg['split_axis'])
   NxTest.assert_close(3.0, cfg['gap'])
   NxTest.assert_close(2.0, cfg['gap_top'])
   NxTest.assert_close(2.0, cfg['gap_bottom'])
   NxTest.assert_close(2.0, cfg['gap_sides'])
+  NxTest.assert_equal(false, cfg['edge_limit_off'], 'D-22: zamok okrajov default zamknuty')
   NxTest.assert_equal([], cfg['items'])
 end
 
@@ -146,16 +147,19 @@ NxTest.test('fronts: normalize_items locked len pri fixed, truthy varianty') do
   NxTest.assert_equal([true, true, true, false, false], items.map { |it| it['locked'] })
 end
 
-NxTest.test('fronts: normalize_items wings whitelist 1/2/auto, drawer_front vzdy wings=1') do
+NxTest.test('fronts: normalize_items wings whitelist 1/2/3/4/auto, drawer_front vzdy wings=1') do
   f = Noxun::Engine::Fronts
   items = f.normalize_items([
     { 'id' => 'A', 'type' => 'door', 'wings' => '2' },
     { 'id' => 'B', 'type' => 'door', 'wings' => 2 },     # integer -> string '2'
-    { 'id' => 'C', 'type' => 'door', 'wings' => '3' },   # mimo whitelist -> auto
+    { 'id' => 'C', 'type' => 'door', 'wings' => '3' },   # D-24: platna rucna volba
     { 'id' => 'D', 'type' => 'door' },                   # default auto
-    { 'id' => 'E', 'type' => 'drawer_front', 'wings' => '2' }
+    { 'id' => 'E', 'type' => 'drawer_front', 'wings' => '2' },
+    { 'id' => 'G', 'type' => 'door', 'wings' => '4' },   # D-24: platna rucna volba
+    { 'id' => 'H', 'type' => 'door', 'wings' => '5' },   # mimo whitelist -> auto
+    { 'id' => 'I', 'type' => 'none', 'wings' => '3' }    # none ma wings vzdy 1 (neutral)
   ])
-  NxTest.assert_equal(['2', '2', 'auto', 'auto', 1], items.map { |it| it['wings'] })
+  NxTest.assert_equal(['2', '2', '3', 'auto', 1, '4', 'auto', 1], items.map { |it| it['wings'] })
 end
 
 # ---------------------------------------------------------------------------
@@ -294,6 +298,116 @@ NxTest.test('fronts: layout prijme legacy string priamo') do
   NxTest.assert_equal(2, out[:wings])
   NxTest.assert_equal(1, out[:items].size)
   NxTest.assert_close(616.0, out[:items][0]['height'], 0.01, 'auto_h = 620 - 2 - 2')
+end
+
+# ---------------------------------------------------------------------------
+# Fronts — D-24 kridla dvierok 1/2/3/4/auto
+# ---------------------------------------------------------------------------
+
+NxTest.test('fronts: D-24 byte-identicke suffixy/kluce/nazvy pre 1 a 2 kridla (LITERALY)') do
+  # AUDIT BLOCKER identita: suffix recykluje SketchUp definiciu a tvori part_id,
+  # part_key nesie overridy + kovanie. Stare tvary sa NESMU zmenit ani o bajt.
+  f = Noxun::Engine::Fronts
+  one = f.layout({ 'items' => [{ 'id' => 'F1', 'type' => 'door', 'wings' => '1' }] },
+                 600.0, 720.0, 100.0, 18.0)
+  NxTest.assert_equal(['DOOR-1'], one[:parts].map { |p| p[:suffix] })
+  NxTest.assert_equal(['front:F1/wing:single'], one[:parts].map { |p| p[:part_key] })
+  NxTest.assert_equal(['Dvierka 1'], one[:parts].map { |p| p[:name] })
+
+  two = f.layout({ 'items' => [{ 'id' => 'F1', 'type' => 'door', 'wings' => '2' }] },
+                 600.0, 720.0, 100.0, 18.0)
+  NxTest.assert_equal(%w[DOOR-1-L DOOR-1-R], two[:parts].map { |p| p[:suffix] })
+  NxTest.assert_equal(%w[front:F1/wing:left front:F1/wing:right], two[:parts].map { |p| p[:part_key] })
+  NxTest.assert_equal(['Dvierka 1 lave', 'Dvierka 1 prave'], two[:parts].map { |p| p[:name] })
+end
+
+NxTest.test('fronts: D-24 tri kridla — geometria, kluce, nazvy (sucet sirok + medzery = otvor)') do
+  f = Noxun::Engine::Fronts
+  out = f.layout({ 'items' => [{ 'id' => 'F1', 'type' => 'door', 'wings' => '3' }] },
+                 600.0, 720.0, 100.0, 18.0)
+  NxTest.assert_equal(3, out[:parts].size)
+  NxTest.assert_equal(3, out[:wings])
+  NxTest.assert_equal(%w[DOOR-1-P1 DOOR-1-P2 DOOR-1-P3], out[:parts].map { |p| p[:suffix] })
+  NxTest.assert_equal(%w[front:F1/wing:p1 front:F1/wing:p2 front:F1/wing:p3],
+                      out[:parts].map { |p| p[:part_key] })
+  NxTest.assert_equal(['Dvierka 1 kridlo 1/3', 'Dvierka 1 kridlo 2/3', 'Dvierka 1 kridlo 3/3'],
+                      out[:parts].map { |p| p[:name] })
+  NxTest.assert_equal(out[:parts].map { |p| p[:part_key] }.uniq.size, out[:parts].size,
+                      'part_key kridiel su unikatne')
+  # opening = 596, gap 3 -> dw = (596 - 2*3) / 3
+  dw = (596.0 - 6.0) / 3.0
+  out[:parts].each { |p| NxTest.assert_close(dw, p[:box][0]) }
+  NxTest.assert_close(2.0, out[:parts][0][:origin][0])
+  NxTest.assert_close(2.0 + dw + 3.0, out[:parts][1][:origin][0])
+  NxTest.assert_close(2.0 + 2 * (dw + 3.0), out[:parts][2][:origin][0])
+  # sucet sirok + medzier = otvor; prave kridlo konci presne na hrane otvoru
+  NxTest.assert_close(596.0, 3 * dw + 2 * 3.0)
+  NxTest.assert_close(2.0 + 596.0, out[:parts][2][:origin][0] + out[:parts][2][:box][0])
+  NxTest.assert_equal(3, out[:items][0]['wings_n'], 'resolved wings_n = 3 pre nahlad')
+end
+
+NxTest.test('fronts: D-24 styri kridla — geometria a kluce, medzera kridiel = cfg gap') do
+  f = Noxun::Engine::Fronts
+  out = f.layout({ 'gap' => 10.0, 'items' => [{ 'id' => 'F1', 'type' => 'door', 'wings' => '4' }] },
+                 800.0, 720.0, 100.0, 18.0)
+  NxTest.assert_equal(4, out[:parts].size)
+  NxTest.assert_equal(4, out[:wings])
+  NxTest.assert_equal(%w[DOOR-1-P1 DOOR-1-P2 DOOR-1-P3 DOOR-1-P4], out[:parts].map { |p| p[:suffix] })
+  NxTest.assert_equal(%w[front:F1/wing:p1 front:F1/wing:p2 front:F1/wing:p3 front:F1/wing:p4],
+                      out[:parts].map { |p| p[:part_key] })
+  # opening = 796, gap 10 -> dw = (796 - 3*10) / 4 = 191.5
+  dw = (796.0 - 30.0) / 4.0
+  out[:parts].each_with_index do |p, i|
+    NxTest.assert_close(dw, p[:box][0])
+    NxTest.assert_close(2.0 + i * (dw + 10.0), p[:origin][0])
+  end
+  NxTest.assert_close(796.0, 4 * dw + 3 * 10.0, 0.01, 'sucet sirok + medzier = otvor')
+  NxTest.assert_close(2.0 + 796.0, out[:parts][3][:origin][0] + out[:parts][3][:box][0])
+end
+
+NxTest.test('fronts: D-24 auto hranica 600 nezmenena — 599 -> 1, 601 -> 2, auto NIKDY 3/4') do
+  f = Noxun::Engine::Fronts
+  door = [{ 'id' => 'F1', 'type' => 'door', 'wings' => 'auto' }]
+  under = f.layout({ 'gap_sides' => 0.0, 'items' => door }, 599.0, 720.0, 100.0, 18.0)
+  NxTest.assert_equal(1, under[:parts].size, 'otvor 599 <= 600 -> 1 kridlo')
+  NxTest.assert_equal(['DOOR-1'], under[:parts].map { |p| p[:suffix] })
+  over = f.layout({ 'gap_sides' => 0.0, 'items' => door }, 601.0, 720.0, 100.0, 18.0)
+  NxTest.assert_equal(2, over[:parts].size, 'otvor 601 > 600 -> 2 kridla')
+  NxTest.assert_equal(%w[DOOR-1-L DOOR-1-R], over[:parts].map { |p| p[:suffix] })
+  # extremne siroky otvor: auto ostava 2 (3/4 su VYHRADNE rucna volba)
+  huge = f.layout({ 'gap_sides' => 0.0, 'items' => door }, 2500.0, 720.0, 100.0, 18.0)
+  NxTest.assert_equal(2, huge[:parts].size, 'auto sa nikdy nerozhodne pre 3/4 kridla')
+  NxTest.assert_equal(2, huge[:items][0]['wings_n'])
+end
+
+NxTest.test('fronts: D-24 uzke 3/4 kridla -> validate_layout! raise, hranica MIN_AUTO prejde') do
+  f = Noxun::Engine::Fronts
+  three = [{ 'id' => 'F1', 'type' => 'door', 'wings' => '3' }]
+  # ow = 200 - 2*85 = 30; dw = (30 - 2*3)/3 = 8 < MIN_AUTO -> raise
+  NxTest.assert_raise('Kridla dvierok') do
+    f.layout({ 'gap_sides' => 85.0, 'items' => three }, 200.0, 720.0, 100.0, 18.0)
+  end
+  # hranica: gap 0 -> dw = 30/3 = 10 = MIN_AUTO prejde
+  ok3 = f.layout({ 'gap' => 0.0, 'gap_sides' => 85.0, 'items' => three }, 200.0, 720.0, 100.0, 18.0)
+  NxTest.assert_close(10.0, ok3[:parts].first[:box][0])
+
+  four = [{ 'id' => 'F1', 'type' => 'door', 'wings' => '4' }]
+  # ow = 200 - 2*77 = 46; dw = (46 - 3*3)/4 = 9.25 < MIN_AUTO -> raise
+  NxTest.assert_raise('Kridla dvierok') do
+    f.layout({ 'gap_sides' => 77.0, 'items' => four }, 200.0, 720.0, 100.0, 18.0)
+  end
+end
+
+NxTest.test('fronts: D-24 none riadok s wings 3 — ziadne panely, ziadna chyba') do
+  f = Noxun::Engine::Fronts
+  out = f.layout({ 'items' => [{ 'id' => 'F1', 'type' => 'none', 'wings' => '3' }] },
+                 600.0, 720.0, 100.0, 18.0)
+  NxTest.assert_equal([], out[:parts], 'none negeneruje panely bez ohladu na wings')
+  NxTest.assert_equal(0, out[:wings])
+  NxTest.assert_equal(1, out[:items][0]['wings'], 'normalize drzi none wings neutralne 1')
+  # panels_for priamo (bez normalize) tiez nevrati nic
+  NxTest.assert_equal([], f.panels_for({ 'id' => 'F1', 'type' => 'none', 'wings' => '3' },
+                                       1, 2.0, 596.0, 102.0, 300.0))
 end
 
 # ---------------------------------------------------------------------------
