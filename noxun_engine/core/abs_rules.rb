@@ -17,7 +17,11 @@
 #       L1=Predna(Y=0)  L2=Zadna(Y=d)   W1=Lava(X=0)   W2=Prava(X=max)
 #   front_door/drawer_front    : celo pred korpusom (length=vyska Z, width=sirka X)
 #       L1=Lava(X=0)    L2=Prava(X=max) W1=Dolna(Z=0)  W2=Horna(Z=max)
-#   back/plinth/rail           : ABS sa neaplikuje (pravidlo prazdne) — labely best-effort
+#   back/plinth                : ABS sa neaplikuje (pravidlo prazdne) — labely best-effort
+#   rail_front/rail_back       : vystuhy maju DVE orientacie (flat naplocho / upright na hranu)
+#       a fyzicky vyznam hran sa medzi nimi meni (flat L1=predna dolu, upright L1=dolna/horna).
+#       Pravidlo aj labely su preto ORIENTACNE NEUTRALNE: L1 = dlha (pozdlzna) hrana,
+#       ziadne vetvenie podla rails_orientation (D-30, audit FIX 4 — labely nesmu klamat).
 #
 # DOSLEDOK: pravidlo "predna hrana" = L1 pre boky/police/dna/priecky (viditelna celna hrana).
 # Pre celo su vsetky 4 hrany rovnocenne (hranovanie dookola), preto pravidlo plni L1+L2+W1+W2.
@@ -32,8 +36,13 @@ module Noxun
       # Verzia seed sady (vzor hardware_rules): subor vzniknuty pod starsim SEED_VERSION
       # dostane pri loade NOVE default roly (seed-merge) — bez toho by sa nova rola
       # (free_panel, V0.4.7) na existujucich instalaciach nikdy neobjavila
-      # (ensure_seeded zapisuje len ked subor chyba). Uz ulozene roly sa NEPREPISUJU.
-      SEED_VERSION = 1
+      # (ensure_seeded zapisuje len ked subor chyba). Uz ulozene roly sa NEPREPISUJU;
+      # jedina vynimka je jednorazova rail migracia pri bumpe na 2 (viz merge_seed_roles).
+      # Historia: 1 = free_panel; 2 = D-30 default dlhej hrany vystuh (rail_front/rail_back).
+      SEED_VERSION = 2
+      # Roly, ktore pri bumpe na SEED_VERSION 2 dostanu novy default aj v EXISTUJUCOM
+      # subore, ale IBA ak su tam ulozene ako PRESNE prazdny hash {} (povodny stock stav).
+      RAIL_MIGRATION_ROLES = %w[rail_front rail_back].freeze
       FILE = 'abs_rules.json'
 
       EDGE_ORDER = %w[L1 L2 W1 W2].freeze
@@ -52,8 +61,10 @@ module Noxun
         'drawer_front' => { 'L1' => 'Ľavá',   'L2' => 'Pravá',  'W1' => 'Dolná', 'W2' => 'Horná' },
         'back'         => { 'L1' => 'Dolná',  'L2' => 'Horná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
         'plinth'       => { 'L1' => 'Dolná',  'L2' => 'Horná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
-        'rail_front'   => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
-        'rail_back'    => { 'L1' => 'Predná', 'L2' => 'Zadná',  'W1' => 'Ľavá',  'W2' => 'Pravá' },
+        # Vystuhy: labely NEUTRALNE (ako free_panel) — pri upright orientacii L1 NIE JE
+        # fyzicka predna hrana, "Predná" by klamala (D-30, audit FIX 4). L = dlha hrana.
+        'rail_front'   => { 'L1' => 'Pozdĺžna 1', 'L2' => 'Pozdĺžna 2', 'W1' => 'Priečna 1', 'W2' => 'Priečna 2' },
+        'rail_back'    => { 'L1' => 'Pozdĺžna 1', 'L2' => 'Pozdĺžna 2', 'W1' => 'Priečna 1', 'W2' => 'Priečna 2' },
         # Samostatna doska (V0.4.7): nema prirodzene predna/zadna — neutralne labely,
         # orientaciu ukazuje 2D karta (edge_sides -> lying mapa).
         'free_panel'   => { 'L1' => 'Pozdĺžna 1', 'L2' => 'Pozdĺžna 2', 'W1' => 'Priečna 1', 'W2' => 'Priečna 2' }
@@ -72,13 +83,17 @@ module Noxun
       EDGE_SIDES_FRONT = { 'L1' => 'left', 'L2' => 'right', 'W1' => 'bottom', 'W2' => 'top' }.freeze
 
       # Pravidlove defaulty ABS podla roly (hodnota = HRUBKA ABS v mm; dekor sa dopocita z materialu
-      # dielca). Prazdna mapa = ziadne ABS. Standard 7.5 + zadanie V0.3:
-      #   celo (front_door/drawer_front) -> vsetky 4 hrany 1.0
+      # dielca). Prazdna mapa = ziadne ABS. Standard 7.5 + zadanie V0.3 + D-30:
+      #   celo (front_door/drawer_front) -> vsetky 4 hrany 1.0 (olepenie dookola OSTAVA —
+      #                                     Michalove exporty: dvierka vzdy so 4 hranami)
       #   polica (shelf)                 -> predna 1.0 (viditelna celna hrana police)
       #   boky (side_left/right)         -> predna 1.0
       #   dno/vrch (bottom/top)          -> predna 1.0
       #   priecky (divider_v/h)          -> predna 1.0
-      #   chrbat/sokel/vystuhy           -> nic
+      #   vystuhy (rail_front/rail_back) -> dlha hrana L1 1.0 (D-30; plati pre flat AJ
+      #                                     upright BEZ vetvenia — pri upright nejde
+      #                                     o fyzicku prednu hranu, preto "dlha hrana")
+      #   chrbat/sokel                   -> nic
       SEED_RULES = {
         'front_door'   => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
         'drawer_front' => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
@@ -91,8 +106,8 @@ module Noxun
         'divider_h'    => { 'L1' => 1.0 },
         'back'         => {},
         'plinth'       => {},
-        'rail_front'   => {},
-        'rail_back'    => {},
+        'rail_front'   => { 'L1' => 1.0 }, # D-30: dlha hrana vystuhy
+        'rail_back'    => { 'L1' => 1.0 }, # D-30: dlha hrana vystuhy
         'free_panel'   => { 'L1' => 1.0 } # doska: 1 pozdlzna hrana 1.0 (Michal 18.7.2026)
       }.freeze
 
@@ -124,7 +139,7 @@ module Noxun
         return deep_copy(SEED_RULES) unless value.is_a?(Hash)
 
         normalized = normalize_rules(value)
-        merged, seed_stale = merge_seed_roles(normalized, data['seed_version'].to_i)
+        merged, seed_stale = merge_seed_roles(normalized, data['seed_version'].to_i, value)
         if merged != value || seed_stale
           if write(merged)
             Engine.log('abs rules: pravidla znormalizovane / doplnene nove default roly') if defined?(Engine)
@@ -141,11 +156,29 @@ module Noxun
       # Dopln CHYBAJUCE roly zo SEED_RULES, ak subor vznikol pod starsim SEED_VERSION.
       # Vrati [pravidla, seed_stale] — seed_stale=true si vynuti zapis (bump verzie
       # v subore), aj ked ziadna rola nepribudla, aby sa merge nespustal pri kazdom loade.
-      def merge_seed_roles(rules, file_version)
+      #
+      # D-30 JEDNORAZOVA MIGRACIA (SEED_VERSION 2): vystuhy dostali novy default
+      # {'L1' => 1.0}. Seed-merge doplna len CHYBAJUCE roly — lenze existujuce subory
+      # rail roly UZ MAJU (od seedu v1 ako {}), takze novy default by sa k pouzivatelom
+      # nikdy nedostal. Preto sa pri bumpe na v2 rail pravidlo prepise seedom IBA ak je
+      # v SUBORE ulozene ako PRESNE prazdny hash {} (povodny stock stav — pouzivatel si
+      # rail pravidla nikdy sam nevyprazdnoval). AKYKOLVEK neprazdny obsah sa NEDOTKNE
+      # — a to ani taky, ktory by normalize_rules vyprazdnila (napr. legacy hrubky);
+      # preto sa rozhoduje podla RAW mapy zo suboru, nie podla normalizovanej.
+      # Po zapise nesie subor seed_version 2, cize migracia sa uz NIKDY nezopakuje —
+      # ak si pouzivatel rail pravidlo nasledne vyprazdni, prazdne uz ostane.
+      def merge_seed_roles(rules, file_version, raw = rules)
         return [rules, false] if file_version >= SEED_VERSION
         out = deep_copy(rules)
         SEED_RULES.each do |role, edges|
           out[role] = deep_copy(edges) unless out.key?(role)
+        end
+        if file_version < 2
+          RAIL_MIGRATION_ROLES.each do |role|
+            raw_val = raw.is_a?(Hash) ? raw[role] : nil
+            next unless raw_val.is_a?(Hash) && raw_val.empty?
+            out[role] = deep_copy(SEED_RULES[role])
+          end
         end
         [out, true]
       end
@@ -206,6 +239,14 @@ module Noxun
       # Prazdne hrany (non-sheet dielce, alebo ziadne pravidlo) — kompletna nil mapa.
       def empty_edges
         { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil }
+      end
+
+      # D-35: kompletna mapa so VSETKYMI 4 hranami na jednom abs_id (bulk "olep vsetko").
+      # Volajuci je povinny abs_id vopred overit — nil by zmazal existujuce hrany,
+      # preto ho tato mapa odmieta (bulk nenajdenej ABS musi byt atomicky no-op).
+      def uniform_edges(abs_id)
+        raise ArgumentError, 'uniform_edges vyzaduje konkretne abs_id' if abs_id.nil? || abs_id.to_s.strip.empty?
+        { 'L1' => abs_id, 'L2' => abs_id, 'W1' => abs_id, 'W2' => abs_id }
       end
 
       # --- labely hran (UI) ----------------------------------------------------
