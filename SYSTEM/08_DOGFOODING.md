@@ -40,11 +40,13 @@
 
 ## Otvorené otázky (na Michalovo posúdenie pri teste)
 
-- **Z porovnania VEPO exportov (test 8, 20.7.):** (a) polica v Engine vychádza o 8 mm plytšia než v starej DC kuchyni (prírez 499 vs 507) — ktorá hĺbka police je správna? (b) spodné boky v Engine o 2 mm vyššie (746 vs 744) — sedí výška tela/sokla? (c) stará kuchyňa olepovala aj PRIEČNE hrany dna a stropu (kód `=`), Engine defaulty nie — chceš ich do defaultov? (d) korpusové šírky majú systematicky −2 mm v starom exporte — vyzerá na 2 mm ABS v starej vs 1 mm v Engine defaultoch — ktorá hrúbka je tvoj štandard na korpus?
+- **Priečne hrany dna a stropu** (z VEPO porovnania 20.7.): stará kuchyňa ich olepovala (kód `=`), Engine defaulty nie — chceš ich doplniť do ABS defaultov rolí bottom/top?
 
-## Smoke test 20.7. — výsledok (testy 1–11)
+## Smoke test 20.7. — výsledok (testy 1–11) + VEPO validácia
 
-Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len prvky+počty, žiadne hodnoty) · test 8 = porovnanie VEPO exportov Engine vs. OCL+vepo_exporter na zrkadlovej kuchyni: **26 = 26 dielcov, materiálové skupiny sedia** (1 bok v inom materiáli = známy Michalov rozdiel). Formát CSV byte-kompatibilný. Rozdiely: systematické ABS delty (viď otázky vyššie), škárové rozdiely na čelách (staré defaulty vs. Engine 3/2), orientation swap pri dekore `none` (výrobne neškodné), **stará linka NEodpočítavala ABS z 36 mm dosky (1618×600) — Engine odpočítava správne (1616×598)**, 1 nespárovaný pomocný dielec v každom teste (rôzne krycie prvky). Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt` — neinterpolované). Nálezy A1/B1–B5/C1/C2 zapísané ako **D-29 až D-36**.
+Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len prvky+počty, žiadne hodnoty) · nálezy A1/B1–B5/C1/C2 zapísané ako **D-29 až D-36**.
+
+**Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené
 
