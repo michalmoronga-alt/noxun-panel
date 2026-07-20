@@ -145,9 +145,10 @@ NxTest.test('build_plan: orezana vystuha hlasi rail_depth_clamped warning') do
   w = plan[:warnings].find { |x| x['code'] == 'rail_depth_clamped' }
   NxTest.assert(!w.nil?, "cakal som rail_depth_clamped, warnings: #{plan[:warnings].inspect}")
   NxTest.assert_close(400.0, w['data']['wanted'])
-  NxTest.assert_close(65.0, w['data']['used'], 0.01, 'depth 150 -> d/2-10 = 65 mm')
+  # D-37: konstrukcna hlbka pri overlay 3 mm = 147 -> 147/2 - 10 = 63.5
+  NxTest.assert_close(63.5, w['data']['used'], 0.01, 'depth 150 (carcass 147) -> cd/2-10 = 63.5 mm')
   rail = plan[:parts].find { |pd| pd[:role] == 'rail_front' }
-  NxTest.assert_close(65.0, rail[:prod][:width], 0.01, 'plan aj warning musia hovorit to iste')
+  NxTest.assert_close(63.5, rail[:prod][:width], 0.01, 'plan aj warning musia hovorit to iste')
 end
 
 NxTest.test('build_plan: nechcene orezanie sa nehlasi (rail_depth v limite)') do

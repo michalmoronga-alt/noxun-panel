@@ -180,6 +180,9 @@ module Noxun
 
           incompatible = affected.select do |cabinet|
             params = Panel.existing_params(cabinet)
+            # D-31 (GH P2): skrinka BEZ chrbta dielec back vobec nema — jej ulozena
+            # hrubka (napr. HDF 3) nesmie blokovat zmenu projektoveho chrbta na 18.
+            next false if key == 'default_back_material_id' && params['back_mode'] == 'none'
             want = thickness_key ? params[thickness_key].to_f : Fronts::FRONT_THICKNESS
             !CabinetBuilder.thickness_ok_for?(role, want, sheet['thickness'].to_f)
           end

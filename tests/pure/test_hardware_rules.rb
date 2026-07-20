@@ -196,8 +196,9 @@ NxTest.test('hardware_rules: build_plan naplni hardware (nohy + zavesy + vysuvy 
   hinge = plan[:hardware].find { |h| h['generic_type'] == 'hinge' }
   NxTest.assert_equal('front:F2/wing:single', hinge['owner_part_key'])
   slide = plan[:hardware].find { |h| h['generic_type'] == 'slide' }
-  # svetla hlbka pri overlay chrbte = 510 -> budget 500 -> NL 500
-  NxTest.assert_close(500.0, slide['params']['nominal_length'], 0.01)
+  # D-37: svetla hlbka pri overlay 3 mm = 510 - 3 = 507 -> budget 497 -> NL rad 470
+  # (viditelny VYROBNE SPRAVNY dosledok celkovej hlbky — vysuv sa nesmie opriet o chrbat)
+  NxTest.assert_close(470.0, slide['params']['nominal_length'], 0.01)
   leg = plan[:hardware].find { |h| h['generic_type'] == 'leg' }
   NxTest.assert_close(100.0, leg['params']['height'], 0.01)
 end

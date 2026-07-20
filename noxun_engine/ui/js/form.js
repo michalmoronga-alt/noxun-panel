@@ -151,7 +151,14 @@
     var fh = numv('floor_height') || 0;
     var topNone = val('top_mode') === 'none';
     setVal('av_width', Math.max(0, Math.round(w - 2*t)));
-    setVal('av_depth', Math.round(d));
+    // D-37: svetla hlbka zrkadli interior_dims — hlbka je CELKOVA vratane chrbta:
+    // overlay/inset: d - bt; groove: d - 10 - bt; none: d (audit FIX 5 — bez tohto
+    // by navrh noveho korpusu ukazoval zlu hodnotu az do prveho rebuildu).
+    var bm = val('back_mode'), bt = numv('back_thickness') || 3;
+    var ad = d;
+    if (bm === 'overlay' || bm === 'inset') ad = d - bt;
+    else if (bm === 'groove') ad = d - 10 - bt;
+    setVal('av_depth', Math.max(0, Math.round(ad)));
     setVal('av_height', Math.max(0, Math.round(h - fh - t - (topNone ? 0 : t))));
   }
 
@@ -163,10 +170,13 @@
   function applyVisibility(t){
     el('plinthGroup').style.display = (t === 'upper') ? 'none' : '';
     el('fhRow').style.display = (t === 'upper') ? 'none' : ''; // D-11: vyska sokla v Zakladnych, horna ju nema
-    toggleRecess(); toggleTwoRails();
+    toggleRecess(); toggleTwoRails(); toggleBackTh(); // D-31: pokryva vyber korpusu, defaulty aj sablonu
   }
   function toggleRecess(){ el('recessRow').style.display = (val('plinth_mode') === 'front') ? '' : 'none'; }
   function toggleTwoRails(){ el('twoRailsGroup').style.display = (val('top_mode') === 'two_rails') ? '' : 'none'; }
+  // D-31: Bez chrbta skryje riadok hrubky — HODNOTA selectu sa NEMENI (navrat
+  // rezimu ju obnovi; sablony a config ju drzia dalej).
+  function toggleBackTh(){ var r = el('backThRow'); if (r) r.style.display = (val('back_mode') === 'none') ? 'none' : ''; }
 
   function onTypeChange(){
     setDefaults(getType());

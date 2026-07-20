@@ -12,13 +12,58 @@ module Noxun
                       rails_top_offset name].freeze
 
       class << self
+        # D-38: zmena hrubky chrbta potrebuje materal tej hrubky — bez preflightu
+        # rebuild spadol na hrubkovej kontrole (3 != 18), poslal cervenu hlasku a UI
+        # ostalo rozsynchronizovane (select 18, model 3). Preflight material vybera
+        # automaticky a NAHLAS: 1) korpusovy material rovnakej hrubky, 2) material
+        # rovnakeho dekoru ako doterajsi chrbat, 3) jediny kandidat hrubky; inak
+        # zmenu odmietne s jasnou hlaskou (ziadne tiche prepisanie). Pri back_mode
+        # 'none' sa material/hrubka nekontroluje vobec (D-31).
+        def back_preflight(params, model)
+          return nil if params['back_mode'] == 'none'
+          want = params['back_thickness'].to_f
+          return nil unless want.positive?
+          return nil unless defined?(Materials)
+          defaults = Materials.project_defaults(model)
+          back_id = str_or_nil(params['back_material_id']) || defaults['default_back_material_id']
+          sheet = back_id && Materials.sheet(back_id)
+          return nil if sheet.nil? # legacy material mimo katalogu — stary rezim
+          return nil if (sheet['thickness'].to_f - want).abs <= 0.01
+
+          body_id = str_or_nil(params['material_id']) || defaults['default_material_id']
+          body_sheet = body_id && Materials.sheet(body_id)
+          pick = body_sheet if body_sheet && (body_sheet['thickness'].to_f - want).abs <= 0.01
+          unless pick
+            cands = Materials.sheets.select { |s| (s['thickness'].to_f - want).abs <= 0.01 }
+            same_decor = cands.select { |s| s['decor'] == sheet['decor'] }
+            pick = same_decor.first || (cands.length == 1 ? cands.first : nil)
+          end
+          if pick.nil?
+            return { error: "Chrbát #{fmt_mm(want)} mm: v katalógu nie je jednoznačný materiál tejto hrúbky — " \
+                            'vyber materiál chrbta ručne (sekcia Materiály), potom zmeň hrúbku.' }
+          end
+          params['back_material_id'] = pick['material_id']
+          { note: " · chrbát: #{pick['decor']} #{pick['type']} #{fmt_mm(want)} mm (auto)" }
+        end
+
+        def str_or_nil(v)
+          s = v.to_s.strip
+          s.empty? ? nil : s
+        end
+
+        def fmt_mm(v)
+          (v % 1).zero? ? v.to_i : v.round(1)
+        end
+
         def handle_insert(payload)
           model = Sketchup.active_model
           params = parse(payload)
+          pf = back_preflight(params, model)
+          return set_status(pf[:error], true) if pf && pf[:error]
           inst = CabinetBuilder.build(model, params)
           select_only(model, inst)
           cid = Store.get(inst, 'cabinet_id')
-          status_with_warnings(inst, "Vlozeny #{cid} — #{part_count(inst)} dielcov.")
+          status_with_warnings(inst, "Vlozeny #{cid} — #{part_count(inst)} dielcov.#{pf ? pf[:note] : ''}")
           push_selected(model)
         end
 
@@ -33,8 +78,14 @@ module Noxun
           PARAM_KEYS.each do |k|
             params[k] = data[k] if data.key?(k)
           end
+          pf = back_preflight(params, model)
+          if pf && pf[:error]
+            set_status(pf[:error], true)
+            push_selected(model) # UI resync — select hrubky sa vrati na ulozeny stav
+            return
+          end
           CabinetBuilder.rebuild(model, cab, params)
-          finish_cab(model, cab, "Aktualizovany #{Store.get(cab, 'cabinet_id')} — #{part_count(cab)} dielcov.")
+          finish_cab(model, cab, "Aktualizovany #{Store.get(cab, 'cabinet_id')} — #{part_count(cab)} dielcov.#{pf ? pf[:note] : ''}")
         end
 
         # Cela na oznaceny korpus. Zachova konstrukciu + strom zon.
@@ -71,11 +122,17 @@ module Noxun
             params[k] = data[k] if data.key?(k)
           end
           params['fronts'] = data['fronts'] if data.key?('fronts')
+          pf = back_preflight(params, model)
+          if pf && pf[:error]
+            set_status(pf[:error], true)
+            push_selected(model) # UI resync (auto-apply nesmie nechat select 18 nad modelom 3)
+            return
+          end
           suspend_selection_sync do
             CabinetBuilder.rebuild(model, cab, params)
             reselect(model, cab)
           end
-          status_with_warnings(cab, "Prestavané ✓ — #{Store.get(cab, 'cabinet_id')} (#{part_count(cab)} dielcov).")
+          status_with_warnings(cab, "Prestavané ✓ — #{Store.get(cab, 'cabinet_id')} (#{part_count(cab)} dielcov).#{pf ? pf[:note] : ''}")
           push_selected(model)
         end
 
