@@ -102,6 +102,8 @@
       buildFrontHwBadges(c.hardware || []); // D3: badge kovania PRED renderom riadkov ciel
       // D-07 Codex B2: echo apply toho isteho korpusu s dalsimi cakajucimi editmi
       // nesmie prepisat gap polia (selectedCabId sa meni az nizsie v setSelected).
+      // D-22: pod tym istym guardom je aj zamok presahov (edge_limit_off) —
+      // starsie echo nesmie vratit novsi klik na zamok (renderFronts vo form.js).
       var keepGaps = (c.cabinet_id && c.cabinet_id === selectedCabId) && !!(applyTimer || cabEditsInFlight);
       cabEditsInFlight = false;
       renderFronts(c.fronts, keepGaps);

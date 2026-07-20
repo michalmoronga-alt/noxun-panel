@@ -40,6 +40,9 @@
   .frow select.fw { flex: 0 0 56px; padding: 3px; border: 1px solid #b0bec5; border-radius: 4px; }
   .frow .flock { flex: 0 0 20px; text-align: center; }
   .frow .fdel { flex: 0 0 22px; background: #fbe9e7; color: #c62828; border: 1px solid #ffccbc; border-radius: 4px; padding: 2px 0; }
+  /* D-22: zamok limitu presahov (v riadku medzier sekcie Cela) */
+  .row .lockbtn { flex: 1; text-align: left; padding: 4px 8px; font-weight: 600; }
+  .row .lockbtn.unlocked { background: #fff8ef; border-color: #ffb74d; color: #e65100; }
   /* Nahlad */
   .pvtabs { display: flex; gap: 6px; margin: 2px 0 6px; }
   .pvtabs button { flex: 1; padding: 5px; font-size: 11px; }

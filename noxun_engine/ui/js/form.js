@@ -30,7 +30,25 @@
         height: hasH ? (isNaN(hNum) ? null : hNum) : null, locked: hasH ? locked : false, wings: (type === 'door') ? wings : '1' });
     }
     return { split_axis: 'height', gap: frontGapVal('fr_gap', 3.0), gap_top: frontGapVal('fr_gap_top', 2.0),
-             gap_bottom: frontGapVal('fr_gap_bottom', 2.0), gap_sides: frontGapVal('fr_gap_sides', 2.0), items: items };
+             gap_bottom: frontGapVal('fr_gap_bottom', 2.0), gap_sides: frontGapVal('fr_gap_sides', 2.0),
+             edge_limit_off: edgeLimitOff, items: items };
+  }
+  // --- D-22: zamok limitu presahov (okraje +-100 zamknute / +-2000 odomknute) ---
+  // Stav zije v JS premennej (nie v DOM triede) — collectFronts ho posiela s configom,
+  // renderFronts ho obnovuje z kanonickeho configu pod TYM ISTYM echo-guardom ako
+  // gap polia (keepGaps): starsie echo apply nesmie prepisat novsi klik na zamok.
+  var edgeLimitOff = false;
+  function setEdgeLimitOff(off){
+    edgeLimitOff = !!off;
+    var b = el('edgeLimitLock');
+    if (b){
+      b.textContent = edgeLimitOff ? '🔓 ±2000 mm' : '🔒 ±100 mm';
+      b.classList.toggle('unlocked', edgeLimitOff);
+    }
+  }
+  function toggleEdgeLimit(){
+    setEdgeLimitOff(!edgeLimitOff);
+    onField(); // apply pre oznaceny korpus + prevalidovanie okrajovych poli
   }
   // D-07: hodnota gap pola cez evalDim (vyrazy); prazdne/nezmysel = default.
   function frontGapVal(id, dflt){ var v = numv(id); return isNaN(v) ? dflt : v; }
@@ -45,6 +63,9 @@
                  floor_height:[0,500], plinth_recess:[0,300], rail_depth:[20,400], rails_top_offset:[0,500],
                  // D-07: medzery/presahy cel — zaporny okraj = presah cez obrys (limit zhodny s Fronts::EDGE_LIMIT)
                  fr_gap:[0,50], fr_gap_top:[-100,100], fr_gap_bottom:[-100,100], fr_gap_sides:[-100,100] };
+  // D-22: okraje cel maju dynamicky limit podla zamku (Fronts::EDGE_LIMIT_UNLOCKED);
+  // fr_gap (medzera medzi celami) ostava 0..50 VZDY.
+  var EDGE_LIMIT_FIELDS = { fr_gap_top:1, fr_gap_bottom:1, fr_gap_sides:1 };
   function validateFields(){
     var ok = true;
     var ae = document.activeElement;
@@ -55,6 +76,7 @@
       var v = evalDim(e.value);
       if (isNaN(v)){ e.classList.add('bad'); ok = false; continue; }
       var lo = LIMITS[id][0], hi = LIMITS[id][1];
+      if (EDGE_LIMIT_FIELDS[id] && edgeLimitOff){ lo = -2000; hi = 2000; }
       if (v < lo || v > hi){ e.classList.add('bad'); ok = false; } else { e.classList.remove('bad'); }
     }
     // vysky ciel (.fh) — vyraz sa vyhodnoti, committnuty nezmysel blokuje apply
@@ -259,7 +281,7 @@
         '<option value="door">Dvierka</option><option value="drawer_front">Zásuvkové čelo</option>' +
         '<option value="none">Bez čela</option></select>' +
       '<input class="fh" type="text" placeholder="auto" oninput="onField()">' +
-      '<select class="fw" onchange="onField()"><option value="auto">auto</option><option value="1">1</option><option value="2">2</option></select>' +
+      '<select class="fw" onchange="onField()"><option value="auto">auto</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>' +
       '<input class="flock" type="checkbox" title="Zamknúť pevnú výšku" onchange="onField()">' +
       '<button class="fdel" title="Odstrániť" onclick="delFrontRow(this); onField()">✕</button>' +
       (badge ? '<span class="fhw" title="Kovanie tohto čela (sekcia Kovanie)">🔗 ' + esc(badge) + '</span>' : '');
@@ -286,6 +308,8 @@
   // D-07 Codex B2: keepGaps=true pri echu apply toho isteho korpusu s cakajucimi
   // editmi — gap polia sa NEprepisu (lokalne hodnoty su novsie nez in-flight echo;
   // fokus guard nestaci — Reset presuva fokus na tlacidlo). Sablony/vyber = prepis.
+  // D-22: zamok presahov (edge_limit_off) je pod TYM ISTYM guardom — klik na zamok
+  // pocas in-flight apply nesmie starsie echo vratit spat.
   function renderFronts(fronts, keepGaps){
     el('frontRows').innerHTML = '';
     var items = (fronts && fronts.items) ? fronts.items : [];
@@ -297,5 +321,6 @@
     setNum('fr_gap_top', (fronts && fronts.gap_top != null) ? fronts.gap_top : 2);
     setNum('fr_gap_bottom', (fronts && fronts.gap_bottom != null) ? fronts.gap_bottom : 2);
     setNum('fr_gap_sides', (fronts && fronts.gap_sides != null) ? fronts.gap_sides : 2);
+    setEdgeLimitOff(!!(fronts && fronts.edge_limit_off));
   }
 

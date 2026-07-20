@@ -171,3 +171,64 @@ NxTest.test('fronts gaps: normalize_config drzi explicitne zaporne okraje') do
   NxTest.assert_close(0.0, cfg['gap_bottom'])
   NxTest.assert_close(-12.0, cfg['gap_sides'])
 end
+
+# ---------------------------------------------------------------------------
+# D-22: odomykatelny limit presahov (edge_limit_off) — backend autorita
+# ---------------------------------------------------------------------------
+
+NxTest.test('fronts gaps: D-22 edge_limit_off default false, truthy normalizacia') do
+  f = Noxun::Engine::Fronts
+  NxTest.assert_equal(false, f.normalize_config(nil)['edge_limit_off'])
+  NxTest.assert_equal(false, f.normalize_config({})['edge_limit_off'])
+  NxTest.assert_equal(false, f.normalize_config('none')['edge_limit_off'], 'legacy string -> default')
+  [true, 'true', '1', 'yes'].each do |v|
+    NxTest.assert_equal(true, f.normalize_config('edge_limit_off' => v)['edge_limit_off'],
+                        "truthy #{v.inspect} ma dat true")
+  end
+  [false, 'false', '0', nil, '', 'nie'].each do |v|
+    NxTest.assert_equal(false, f.normalize_config('edge_limit_off' => v)['edge_limit_off'],
+                        "falsy #{v.inspect} ma dat false")
+  end
+  # symbolovy kluc funguje ako pri gapoch
+  NxTest.assert_equal(true, f.normalize_config(edge_limit_off: true)['edge_limit_off'])
+end
+
+NxTest.test('fronts gaps: D-22 round-trip cez JSON (sablony/ulozeny config) je idempotentny') do
+  f = Noxun::Engine::Fronts
+  cfg = f.normalize_config('edge_limit_off' => true, 'gap_top' => -500.0,
+                           'items' => [{ 'id' => 'F1', 'type' => 'door', 'wings' => '1' }])
+  NxTest.assert_equal(true, cfg['edge_limit_off'])
+  round = f.normalize_config(JSON.parse(cfg.to_json))
+  NxTest.assert_equal(cfg, round, 'normalize po JSON round-tripe identicky (zamok sa nesmie stratit)')
+  NxTest.assert_equal(true, round['edge_limit_off'])
+  # odomknuty config s velkym presahom PREJDE layoutom aj po round-tripe
+  r = f.layout(round, 600.0, 720.0, 100.0, 18.0)
+  NxTest.assert_equal(1, r[:parts].size)
+end
+
+NxTest.test('fronts gaps: D-22 zamknute (default) — 101 pada presne ako doteraz') do
+  f = Noxun::Engine::Fronts
+  base = { 'items' => [{ 'type' => 'door', 'mode' => 'auto', 'wings' => '1' }] }
+  NxTest.assert_raise(/Okraj/) { f.layout(base.merge('gap_top' => 101.0), 600, 2000, 100, 18.0) }
+  NxTest.assert_raise(/Okraj/) { f.layout(base.merge('gap_sides' => -101.0), 600, 720, 100, 18.0) }
+  NxTest.assert_raise(/Okraj/) { f.layout(base.merge('gap_bottom' => 101.0), 600, 2000, 100, 18.0) }
+  f.layout(base.merge('gap_top' => 100.0), 600, 2000, 100, 18.0) # hranica prejde
+end
+
+NxTest.test('fronts gaps: D-22 odomknute — 500 prejde s geometriou presahu, 2001 pada') do
+  f = Noxun::Engine::Fronts
+  base = { 'edge_limit_off' => true,
+           'items' => [{ 'type' => 'door', 'mode' => 'auto', 'wings' => '1' }] }
+  r = f.layout(base.merge('gap_sides' => -500.0), 600, 720, 100, 18.0)
+  part = r[:parts].first
+  NxTest.assert_close(-500.0, part[:origin][0], 0.01, 'celo zacina 500 mm pred lavym bokom')
+  NxTest.assert_close(1600.0, part[:box][0], 0.01, 'sirka = 600 + 2*500 (obklad/pilaster)')
+  # kladny odomknuty okraj nad stary limit tiez prejde (500 vnutorne)
+  f.layout(base.merge('gap_top' => 500.0), 600, 2000, 100, 18.0)
+  # tvrdy strop EDGE_LIMIT_UNLOCKED = 2000
+  NxTest.assert_raise(/Okraj/) { f.layout(base.merge('gap_sides' => 2001.0), 600, 720, 100, 18.0) }
+  NxTest.assert_raise(/Okraj/) { f.layout(base.merge('gap_bottom' => -2000.5), 600, 720, 100, 18.0) }
+  f.layout(base.merge('gap_top' => -2000.0), 600, 720, 100, 18.0) # hranica prejde
+  # medzera medzi celami sa NEODOMYKA — 0..50 plati aj pri odomknutom zamku
+  NxTest.assert_raise(/Medzera medzi celami/) { f.layout(base.merge('gap' => 51.0), 600, 720, 100, 18.0) }
+end

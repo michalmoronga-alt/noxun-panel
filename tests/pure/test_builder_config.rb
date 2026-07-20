@@ -457,6 +457,69 @@ NxTest.test('builder: hardware_overrides preziju round-trip config_to_params -> 
   NxTest.assert_equal(ov, cb.normalize(params)[:hardware_overrides], 'druhy normalize identicky')
 end
 
+NxTest.test('builder: D-24 material/ABS + hardware overridy preziju rebuild 1->1 (round-trip configu)') do
+  NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
+  cb = Noxun::Engine::CabinetBuilder
+  cn = Noxun::Engine::Construction
+  params = {
+    'type' => 'lower',
+    'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'wings' => '1' }] },
+    'part_overrides' => { 'front:F1/wing:single' => { 'material_id' => 'W1000_DTDL_18',
+                                                      'edges' => { 'L1' => nil } } },
+    'hardware_overrides' => [{ 'owner_part_key' => 'front:F1/wing:single', 'generic_type' => 'hinge',
+                               'rule_id' => 'zavesy-podla-vysky', 'quantity' => 5 }],
+    'part_key_schema' => Noxun::Engine::PartKeys::SCHEMA
+  }
+  cfg = cb.normalize(params)
+  plan = cn.build_plan(cfg, 'CAB-001')
+  # simulacia rebuildu: merge_final -> cabinet_config -> JSON (NOXUN dict) ->
+  # config_to_params -> normalize -> novy plan. Identita wing:single sa NEMENI,
+  # takze overridy najdu svoj dielec aj po druhom kole.
+  stored = JSON.parse(JSON.generate(cb.cabinet_config(cb.merge_final(cfg, plan))))
+  cfg2 = cb.normalize(cb.config_to_params(stored))
+  NxTest.assert_equal({ 'material_id' => 'W1000_DTDL_18', 'edges' => { 'L1' => nil } },
+                      cfg2[:part_overrides]['front:F1/wing:single'], 'part_override prezil round-trip')
+  plan2 = cn.build_plan(cfg2, 'CAB-001')
+  hinge = plan2[:hardware].find { |h| h['generic_type'] == 'hinge' }
+  NxTest.assert_equal(5, hinge['quantity'], 'manualny pocet zavesov prezil rebuild')
+  NxTest.assert_equal('manual', hinge['source'])
+  NxTest.assert_equal('front:F1/wing:single', hinge['owner_part_key'])
+  pd = plan2[:parts].find { |p| p[:part_key] == 'front:F1/wing:single' }
+  res = cb.resolve_part(pd, 'K009_PW_DTDL_18', 'K009_PW_DTDL_18', 'HDF_WHITE_3', cfg2[:part_overrides])
+  NxTest.assert_equal('W1000_DTDL_18', res[:material_id], 'material override sa aplikuje na kridlo')
+  NxTest.assert_equal(nil, res[:edges]['L1'], 'ABS override (bez ABS) drzi')
+  NxTest.assert_equal('ABS_W1000_10', res[:edges]['L2'], 'ostatne hrany dedia z pravidla cela')
+end
+
+NxTest.test('builder: D-24 material/ABS + hardware overridy preziju rebuild 2->2 (wing:left)') do
+  NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
+  cb = Noxun::Engine::CabinetBuilder
+  cn = Noxun::Engine::Construction
+  params = {
+    'type' => 'lower', 'width' => 900.0,
+    'fronts' => { 'edge_limit_off' => true,
+                  'items' => [{ 'id' => 'F1', 'type' => 'door', 'wings' => '2' }] },
+    'part_overrides' => { 'front:F1/wing:left' => { 'material_id' => 'W1000_DTDL_18' } },
+    'hardware_overrides' => [{ 'owner_part_key' => 'front:F1/wing:left', 'generic_type' => 'hinge',
+                               'rule_id' => 'zavesy-podla-vysky', 'disabled' => true }],
+    'part_key_schema' => Noxun::Engine::PartKeys::SCHEMA
+  }
+  cfg = cb.normalize(params)
+  stored = JSON.parse(JSON.generate(cb.cabinet_config(cb.merge_final(cfg, cn.build_plan(cfg, 'CAB-001')))))
+  cfg2 = cb.normalize(cb.config_to_params(stored))
+  NxTest.assert_equal({ 'material_id' => 'W1000_DTDL_18' },
+                      cfg2[:part_overrides]['front:F1/wing:left'], 'override laveho kridla prezil')
+  NxTest.assert_equal(true, cfg2[:fronts]['edge_limit_off'],
+                      'D-22: zamok presahov prezil builder round-trip (sablony/rebuild)')
+  plan2 = cn.build_plan(cfg2, 'CAB-002')
+  hinges = plan2[:hardware].select { |h| h['generic_type'] == 'hinge' }
+  NxTest.assert_equal(['front:F1/wing:right'], hinges.map { |h| h['owner_part_key'] },
+                      'disabled override laveho kridla drzi, prave kridlo ma zavesy')
+  keys = plan2[:parts].map { |p| p[:part_key] }
+  NxTest.assert(keys.include?('front:F1/wing:left') && keys.include?('front:F1/wing:right'),
+                'obidve kridla existuju s povodnou identitou')
+end
+
 NxTest.test('builder: D-18 normalize odstrani hardware_overrides cela typu none (Codex F1)') do
   cb = Noxun::Engine::CabinetBuilder
   ov = [
