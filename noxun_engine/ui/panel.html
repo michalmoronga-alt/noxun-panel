@@ -5,7 +5,7 @@
      sablon ziju v satelitnych oknach (proj_materials.html, templates.html) — panel ma len
      quick-pick sablony a materialy oznacenej skrinky. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.7r">
+<link rel="stylesheet" href="css/panel.css?v=0.4.7s">
 
 <div class="hdr"><h1>Noxun Engine</h1><span class="sub" id="verline">…</span></div>
 
@@ -65,11 +65,14 @@
     <select id="pcMaterial" onchange="onPartMaterial()"></select>
   </div>
   <svg id="partSvg" viewBox="0 0 300 200" preserveAspectRatio="xMidYMid meet"></svg>
+  <!-- D-35: kompaktna ikona v EXISTUJUCOM riadku legendy (ziadny novy riadok — pravidlo
+       vertikalneho priestoru); ramik ikony = "olepene dookola" vo farbe ABS 1,0 mm -->
   <div class="absleg">
     <span><i style="background:#e53935"></i>1,0 mm</span>
     <span><i style="background:#43a047"></i>2,0 mm</span>
     <span><i style="background:#b0bec5"></i>bez ABS</span>
     <span><i style="background:#fff8ef;border:1px solid #ffb74d"></i>ručný override</span>
+    <button class="absall" onclick="onEdgesAll()" title="Olepiť všetky 4 hrany páskou k materiálu"><i></i></button>
   </div>
   <div id="edgeRows"></div>
 </fieldset>
@@ -133,6 +136,7 @@
     <span><i style="background:#e53935"></i>1,0 mm</span>
     <span><i style="background:#43a047"></i>2,0 mm</span>
     <span><i style="background:#b0bec5"></i>bez ABS</span>
+    <button class="absall" onclick="onBoardEdgesAll()" title="Olepiť všetky 4 hrany páskou k materiálu"><i></i></button>
   </div>
   <div id="boardEdgeRows"></div>
   <details data-key="board_adv">
@@ -315,17 +319,17 @@
 <!-- Poradie skriptov je kontrakt: errors prvy (chytac), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.4.7r"></script>
-<script src="js/core.js?v=0.4.7r"></script>
-<script src="js/expr.js?v=0.4.7r"></script>
-<script src="js/form.js?v=0.4.7r"></script>
-<script src="js/zone_tree.js?v=0.4.7r"></script>
-<script src="js/preview.js?v=0.4.7r"></script>
-<script src="js/actions.js?v=0.4.7r"></script>
-<script src="js/bridge.js?v=0.4.7r"></script>
-<script src="js/materials.js?v=0.4.7r"></script>
-<script src="js/part_card.js?v=0.4.7r"></script>
-<script src="js/board_card.js?v=0.4.7r"></script>
-<script src="js/hardware.js?v=0.4.7r"></script>
-<script src="js/usage.js?v=0.4.7r"></script>
-<script src="js/boot.js?v=0.4.7r"></script>
+<script src="js/errors.js?v=0.4.7s"></script>
+<script src="js/core.js?v=0.4.7s"></script>
+<script src="js/expr.js?v=0.4.7s"></script>
+<script src="js/form.js?v=0.4.7s"></script>
+<script src="js/zone_tree.js?v=0.4.7s"></script>
+<script src="js/preview.js?v=0.4.7s"></script>
+<script src="js/actions.js?v=0.4.7s"></script>
+<script src="js/bridge.js?v=0.4.7s"></script>
+<script src="js/materials.js?v=0.4.7s"></script>
+<script src="js/part_card.js?v=0.4.7s"></script>
+<script src="js/board_card.js?v=0.4.7s"></script>
+<script src="js/hardware.js?v=0.4.7s"></script>
+<script src="js/usage.js?v=0.4.7s"></script>
+<script src="js/boot.js?v=0.4.7s"></script>
