@@ -15,6 +15,8 @@
 - **D-32 · Nový korpus preberá nastavenia posledného editovaného** (smoke test 20.7., B3) — diagnóza z kódu: NIE je to Ruby cache/singleton — `insertCabinet()` vkladá AKTUÁLNY obsah formulára (`collectAll()` + `currentZoneTree`), a formulár po označení korpusu A drží hodnoty A (zóny aj čelá). „Vlož ďalší" = kópia naposledy zobrazeného. Je to aj feature (rýchle množenie rovnakých skriniek — používané), aj pasca (nečakané dedenie). *Návrh na rozhodnutie: vkladacia karta dostane viditeľný prepínač zdroja — „z defaultov typu / kópia označeného / zo šablóny" — žiadne tiché dedenie.*
 - **D-33 · Šablóna nepreberá rozmery / polia držia staré hodnoty** (smoke test 20.7., B4) — rovnaký root cause ako D-32 (formulár sa pri výbere šablóny prepíše len čiastočne). Príklad: po chladničke 2500×600 šablóna „skriňa+šuflík" natiahla staré rozmery. *Rieši sa spolu s D-32 (definovať, ktoré polia šablóna VŽDY nastavuje).*
 - **D-34 · Panel „visí" na zmazanej skrinke** (smoke test 20.7., B5) — po Delete skrinky panel ďalej zobrazuje jej dáta; ESC/cancel nefunguje, treba prekliknúť inam. *Fix: observer zmazania/deselection → clearSelected + mode-insert; overiť prečo onSelectionCleared po Delete nechodí.*
+- **D-37 · Hĺbka korpusu = CELKOVÁ hĺbka vrátane chrbta** (Michal 20.7. po VEPO validácii) — dnes pri naloženom chrbte (overlay) majú dielce plnú zadanú hĺbku a chrbát sa pridáva ZA ňu → reálna celková hĺbka = zadaná + hrúbka chrbta. Michal: logika celkovej hĺbky tým padá — zadaných 510 má byť 510 CELKOVO, dielce sa skrátia o chrbát (ako staré DC; pri pevnom 18 mm chrbte je rozdiel zásadný). **Pozor pri implementácii:** rovnakou logikou sa musia riadiť vnútorné zóny pri rebuilde + POZOR na existujúce korpusy — rebuild by im zmenil geometriu (treba vedomé rozhodnutie o migrácii, Codex audit povinný). *Priorita: vysoká (výrobná správnosť rozmerov).*
+- **D-38 · Chrbát „pevný 18" nefunguje** (Michal 20.7.) — select hrúbky chrbta (HDF 3 / pevný 18) pri prepnutí na 18 nič nezmení. Predbežná diagnóza z kódu: hodnota ide cez CONSTRUCTION_FIELDS a builder ju normalizuje korektne — podozrenie na hrúbkový guard back MATERIÁLU (zmena hrúbky vyžaduje aj 18 mm back materiál; projektový default je HDF 3 → apply sa ticho neaplikuje/zablokuje). Overiť presný mechanizmus + zrozumiteľná hláška alebo auto-ponuka 18 mm materiálu. *Priorita: vysoká (blokuje D-37 use-case).*
 
 ## UX drobnosti (nízka priorita)
 
@@ -40,7 +42,7 @@
 
 ## Otvorené otázky (na Michalovo posúdenie pri teste)
 
-- **Priečne hrany dna a stropu** (z VEPO porovnania 20.7.): stará kuchyňa ich olepovala (kód `=`), Engine defaulty nie — chceš ich doplniť do ABS defaultov rolí bottom/top?
+- **Priečne hrany dna a stropu — rozsah** (Michal 20.7.: „áno, vždy jedna dlhá aj na strope s výstuhou"): potvrdené = dno aj strop (vrátane variantu s výstuhami — tam per výstuha, D-30) majú mať default aspoň 1 dlhú (prednú) hranu. **Doladiť: priečne (krátke) hrany dna/stropu — stará kuchyňa mala na niektorých OBE (`=`) — pridať do defaultov obe, jednu, alebo nechať bez?**
 
 ## Smoke test 20.7. — výsledok (testy 1–11) + VEPO validácia
 
