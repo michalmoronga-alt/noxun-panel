@@ -121,11 +121,18 @@
     schedulePreview();                     // D-02: nahlad sa neprekresluje pri kazdom pismene
     updateAvailable();
     // D-39: edit ZAMKNUTEHO pola vo vkladacej karte aktualizuje hodnotu zamku
-    // (zamok drzi to, co pouzivatel vidi; nie starsiu zachytenu hodnotu).
-    if (!selectedCabId && NXInsert.state.lastMode === 'insert' &&
-        ae && ae.id && NXInsert.isLocked(ae.id)){
-      var lv = evalDim(ae.value);
-      if (!isNaN(lv) && NXInsert.updateLockValue(ae.id, lv)) pushInsertLocks();
+    // (zamok drzi to, co pouzivatel vidi). GH P3: NIE cez activeElement — pri
+    // expr commite na blur uz fokus odisiel; synchronizuju sa VSETKY zamknute
+    // polia z DOM (5 poli, lacne a deterministicke).
+    if (!selectedCabId && NXInsert.state.lastMode === 'insert'){
+      var changedLock = false;
+      NXInsert.lockedFields().forEach(function(fid){
+        var fe = el(fid);
+        if (!fe) return;
+        var lv = evalDim(fe.value);
+        if (!isNaN(lv) && NXInsert.updateLockValue(fid, lv)) changedLock = true;
+      });
+      if (changedLock) pushInsertLocks();
     }
     if (!selectedCabId) return;            // nic oznacene -> len nahlad, ziadny rebuild
     if (applyTimer) clearTimeout(applyTimer);
@@ -291,18 +298,23 @@
     } else {
       var v = evalDim(val(field));
       if (isNaN(v)){ NX.setStatus('Zamknúť sa dá len platná hodnota (mm).', true); return; }
+      // (hodnota sa nastavi v NXInsert.setLock nizsie)
       NXInsert.setLock(field, v);
     }
     renderInsertLocks();
-    pushInsertLocks();
+    pushInsertLocksNow(); // GH P3: klik na zamok = okamzity zapis do Ruby
   }
   var insertLocksTimer = null;
+  function pushInsertLocksNow(){
+    if (insertLocksTimer){ clearTimeout(insertLocksTimer); insertLocksTimer = null; }
+    if (window.sketchup && sketchup.set_insert_locks)
+      sketchup.set_insert_locks(JSON.stringify({ locks: NXInsert.locksFlat() }));
+  }
   function pushInsertLocks(){
     if (insertLocksTimer) clearTimeout(insertLocksTimer);
     insertLocksTimer = setTimeout(function(){
       insertLocksTimer = null;
-      if (window.sketchup && sketchup.set_insert_locks)
-        sketchup.set_insert_locks(JSON.stringify({ locks: NXInsert.locksFlat() }));
+      pushInsertLocksNow();
     }, 200);
   }
 

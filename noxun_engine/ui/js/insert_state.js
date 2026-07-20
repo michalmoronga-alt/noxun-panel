@@ -58,6 +58,9 @@
     }
     // Serializacia pre Ruby (audit B5: zamky ziju v pamati Panel modulu):
     // plochy tvar { width: 950 } LEN zamknutych poli.
+    function lockedFields(){
+      return Object.keys(state.locks);
+    }
     function locksFlat(){
       var out = {};
       LOCK_FIELDS.forEach(function(f){ if (isLocked(f)) out[f] = state.locks[f].value; });
@@ -116,6 +119,7 @@
       clearLock: clearLock,
       updateLockValue: updateLockValue,
       locksFlat: locksFlat,
+      lockedFields: lockedFields,
       setLocksFlat: setLocksFlat,
       composeSource: composeSource,
       applyLocks: applyLocks,

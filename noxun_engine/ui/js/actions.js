@@ -197,6 +197,12 @@
   // aby kopia zachytila aj posledne zmeny (callbacky sa spracuju v poradi).
   function insertCopySelected(){
     if (!selectedCabId){ NX.setStatus('Najprv označ korpus.', true); return; }
+    // GH P2: neplatne rozpisane pole by flush ticho NEaplikoval a kopia by
+    // vznikla zo starsieho stavu — kopirovanie stoji, kym pole neopravis.
+    if (typeof validateFields === 'function' && !validateFields()){
+      NX.setStatus('Skontroluj červené polia — kópia by nezachytila rozpísanú úpravu.', true);
+      return;
+    }
     if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
     if (window.sketchup && sketchup.insert_copy)
       sketchup.insert_copy(JSON.stringify({ cabinet_id: selectedCabId }));

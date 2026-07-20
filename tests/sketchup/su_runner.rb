@@ -735,25 +735,37 @@ module NoxunSuRunner
                 'material_id' => 'K009_PW_DTDL_18',
                 'zone_tree' => { 'id' => 'Z1', 'shelves' => 2, 'children' => [] },
                 'fronts' => { 'items' => [] } }
-    e::TemplateStore.upsert('Runner Vklad', tpl_cfg)
-    tpl_snapshot = File.binread(e::TemplateStore.path) # snapshot AZ PO seede (N11)
-    payload = (e::TemplateStore.find('Runner Vklad') || {})['config'].merge('height' => 950.0)
-    e::Panel.handle_insert(payload.to_json)
-    inst = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
-    cfg = inst ? (e::Store.config(inst) || {}) : {}
-    ok("vklad D-39: zamknuta vyska prebila sablonu (950, sirka zo sablony #{cfg['width']})",
-       inst && (cfg['height'].to_f - 950.0).abs < 0.01 && (cfg['width'].to_f - 450.0).abs < 0.01)
-    ok('vklad F6: material sablony zapisany do configu korpusu',
-       cfg['material_id'] == 'K009_PW_DTDL_18')
-    ok('vklad D-33: zony zo sablony (2 police v koreni)',
-       ((cfg['zone_tree'] || {})['shelves']).to_i == 2)
+    # GH P2: NIKDY nesiahat na pouzivatelske sablony — exoticky nazov, ktory
+    # pouzivatel nema; ak by predsa existoval, scenar sa preskoci (nic nemazeme).
+    tpl_name = '__SU_TEST_VKLAD__'
+    if e::TemplateStore.find(tpl_name)
+      info("vklad: sablona #{tpl_name} uz existuje — sablonovy scenar preskoceny (chranime pouzivatelske data)")
+      tpl_snapshot = nil
+    else
+      e::TemplateStore.upsert(tpl_name, tpl_cfg)
+      tpl_snapshot = File.binread(e::TemplateStore.path) # snapshot AZ PO seede (N11)
+    end
+    payload = tpl_snapshot ? (e::TemplateStore.find(tpl_name) || {})['config'].merge('height' => 950.0) : nil
+    if payload
+      e::Panel.handle_insert(payload.to_json)
+      inst = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
+      cfg = inst ? (e::Store.config(inst) || {}) : {}
+      ok("vklad D-39: zamknuta vyska prebila sablonu (950, sirka zo sablony #{cfg['width']})",
+         inst && (cfg['height'].to_f - 950.0).abs < 0.01 && (cfg['width'].to_f - 450.0).abs < 0.01)
+      ok('vklad F6: material sablony zapisany do configu korpusu',
+         cfg['material_id'] == 'K009_PW_DTDL_18')
+      ok('vklad D-33: zony zo sablony (2 police v koreni)',
+         ((cfg['zone_tree'] || {})['shelves']).to_i == 2)
+    end
 
-    # modify korpusu po vklade — sablona sa NIKDY nemeni (N11)
-    e::CabinetBuilder.rebuild(model, inst,
-                              e::CabinetBuilder.config_to_params(cfg).merge('width' => 650.0)) if inst
-    ok('vklad N11: subor sablon byte-nezmeneny po inserte + edite korpusu',
-       File.binread(e::TemplateStore.path) == tpl_snapshot)
-    e::TemplateStore.delete('Runner Vklad') # cleanup kniznice (realny %APPDATA%)
+    if tpl_snapshot
+      # modify korpusu po vklade — sablona sa NIKDY nemeni (N11)
+      e::CabinetBuilder.rebuild(model, inst,
+                                e::CabinetBuilder.config_to_params(cfg).merge('width' => 650.0)) if inst
+      ok('vklad N11: subor sablon byte-nezmeneny po inserte + edite korpusu',
+         File.binread(e::TemplateStore.path) == tpl_snapshot)
+      e::TemplateStore.delete(tpl_name) # cleanup VLASTNEJ testovacej sablony
+    end
 
     # 2) F8 konflikt A: zamknuta vyska + vysoke pevne cela -> vklad ODMIETNUTY
     #    backend hlaskou; status vymenuje aktivne zamky (recorder na Panel.js)

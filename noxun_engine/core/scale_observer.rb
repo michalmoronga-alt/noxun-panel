@@ -226,7 +226,10 @@ module Noxun
             end
           end
           if need_prune
-            prune_model = erase_model || @last_model || touched_models.first
+            # GH P2: cisty delete (bez predoslych change/add eventov) moze mat vsetky
+            # tri zdroje nil — fallback na aktivny model (Windows = jediny dokument;
+            # refresh_panel aj prune maju vlastne multi-model guardy).
+            prune_model = erase_model || @last_model || touched_models.first || Sketchup.active_model
             prune_ghosts(prune_model)
             # D-34 (audit B4b): po ustaleni erase VZDY resync panela — zmazanie
             # oznacenej skrinky nemusi vystrelit selection event a Inspector by
