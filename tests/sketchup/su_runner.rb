@@ -695,6 +695,157 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- Recorder Panel.js (audit F9): zatvoreny panel je no-op — dokaz volania
+  # NX.clearSelected/NX.setStatus sa zbiera docasnym obalenim Panel.js. Vzdy
+  # parovat install/remove; remove je idempotentny (bezpecny aj po FAIL ceste).
+
+  def install_js_recorder(rec)
+    e::Panel.singleton_class.class_eval do
+      alias_method :nx_js_orig_vkl, :js
+      define_method(:js) { |script| rec << script.to_s; nil }
+    end
+  end
+
+  def remove_js_recorder
+    sc = e::Panel.singleton_class
+    return unless sc.method_defined?(:nx_js_orig_vkl)
+    sc.class_eval do
+      alias_method :js, :nx_js_orig_vkl
+      remove_method :nx_js_orig_vkl
+    end
+  end
+
+  # --- SYNC-VKLADANIE: D-32/D-33 sablona+materialy, D-39 zamky/F8 konflikty,
+  # B3 presna kopia, N11 imutabilita sablon (davka Vkladanie) ------------------
+
+  def run_insert_batch(model)
+    # 0) D-39: sanitizacia zamkov v Ruby pamati (whitelist poli + cisla)
+    e::Panel.handle_set_insert_locks({ 'locks' => { 'height' => 950.0, 'bogus' => 5,
+                                                    'width' => 'abc' } }.to_json)
+    ok('vklad D-39: sanitizacia zamkov (whitelist + cisla)',
+       e::Panel.insert_locks == { 'height' => 950.0 })
+
+    # 1) D-33 + N11: seed sablony DOKONCENY pred snapshotom; insert zo sablony
+    #    so zamknutou vyskou (payload uz nesie lock hodnotu — JS krok F7/2)
+    tpl_cfg = { 'type' => 'lower', 'width' => 450.0, 'height' => 720.0, 'depth' => 510.0,
+                'thickness' => 18.0, 'floor_height' => 100.0,
+                'bottom_mode' => 'under_sides', 'top_mode' => 'full', 'back_mode' => 'overlay',
+                'back_thickness' => 3.0, 'plinth_mode' => 'none', 'plinth_recess' => 40.0,
+                'rail_depth' => 100.0, 'rails_orientation' => 'flat', 'rails_top_offset' => 0.0,
+                'material_id' => 'K009_PW_DTDL_18',
+                'zone_tree' => { 'id' => 'Z1', 'shelves' => 2, 'children' => [] },
+                'fronts' => { 'items' => [] } }
+    e::TemplateStore.upsert('Runner Vklad', tpl_cfg)
+    tpl_snapshot = File.binread(e::TemplateStore.path) # snapshot AZ PO seede (N11)
+    payload = (e::TemplateStore.find('Runner Vklad') || {})['config'].merge('height' => 950.0)
+    e::Panel.handle_insert(payload.to_json)
+    inst = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
+    cfg = inst ? (e::Store.config(inst) || {}) : {}
+    ok("vklad D-39: zamknuta vyska prebila sablonu (950, sirka zo sablony #{cfg['width']})",
+       inst && (cfg['height'].to_f - 950.0).abs < 0.01 && (cfg['width'].to_f - 450.0).abs < 0.01)
+    ok('vklad F6: material sablony zapisany do configu korpusu',
+       cfg['material_id'] == 'K009_PW_DTDL_18')
+    ok('vklad D-33: zony zo sablony (2 police v koreni)',
+       ((cfg['zone_tree'] || {})['shelves']).to_i == 2)
+
+    # modify korpusu po vklade — sablona sa NIKDY nemeni (N11)
+    e::CabinetBuilder.rebuild(model, inst,
+                              e::CabinetBuilder.config_to_params(cfg).merge('width' => 650.0)) if inst
+    ok('vklad N11: subor sablon byte-nezmeneny po inserte + edite korpusu',
+       File.binread(e::TemplateStore.path) == tpl_snapshot)
+    e::TemplateStore.delete('Runner Vklad') # cleanup kniznice (realny %APPDATA%)
+
+    # 2) F8 konflikt A: zamknuta vyska + vysoke pevne cela -> vklad ODMIETNUTY
+    #    backend hlaskou; status vymenuje aktivne zamky (recorder na Panel.js)
+    e::Panel.handle_set_insert_locks({ 'locks' => { 'height' => 300.0 } }.to_json)
+    before = cabinets(model).length
+    rec = []
+    install_js_recorder(rec)
+    begin
+      e::Panel.handle_insert({ 'type' => 'lower', 'width' => 600.0, 'height' => 300.0,
+                               'depth' => 510.0,
+                               'fronts' => { 'items' => [
+                                 { 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed', 'height' => 250.0, 'wings' => '1', 'locked' => true },
+                                 { 'id' => 'F2', 'type' => 'door', 'mode' => 'fixed', 'height' => 250.0, 'wings' => '1', 'locked' => true }
+                               ] } }.to_json)
+    ensure
+      remove_js_recorder
+    end
+    ok('vklad F8: zamknuta vyska x pevne cela — vklad odmietnuty (nic sa nevlozilo)',
+       cabinets(model).length == before)
+    ok('vklad F8: status pomenoval aktivne zamky (vyska)',
+       rec.any? { |s| s.include?('NX.setStatus') && s.include?('aktívne zámky') && s.include?('výška') })
+
+    # 3) F8 konflikt B: zamknuta hrubka + material inej hrubky -> odmietnute
+    if e::Materials.sheet('HDF_WHITE_3')
+      e::Panel.handle_set_insert_locks({ 'locks' => { 'thickness' => 18.0 } }.to_json)
+      before2 = cabinets(model).length
+      rec2 = []
+      install_js_recorder(rec2)
+      begin
+        e::Panel.handle_insert({ 'type' => 'lower', 'width' => 600.0, 'height' => 720.0,
+                                 'depth' => 510.0, 'thickness' => 18.0,
+                                 'material_id' => 'HDF_WHITE_3' }.to_json)
+      ensure
+        remove_js_recorder
+      end
+      ok('vklad F8: zamknuta hrubka x material 3 mm — vklad odmietnuty hrubkovym guardom',
+         cabinets(model).length == before2)
+      ok('vklad F8: hlaska nesie hrubkovy konflikt + zamky',
+         rec2.any? { |s| s.include?('NX.setStatus') && s.include?('mm') && s.include?('aktívne zámky') })
+    else
+      info('vklad F8: katalog nema HDF_WHITE_3 — hrubkovy konflikt preskoceny')
+    end
+    e::Panel.handle_set_insert_locks({ 'locks' => {} }.to_json) # zamky uprace
+
+    # 4) B3 presna kopia: zdroj s materialmi + part_override + hardware_override
+    #    + cela + zony + nazov -> insert_copy -> config_to_params IDENTICKE
+    src_params = { 'type' => 'lower', 'width' => 640.0, 'height' => 720.0, 'depth' => 510.0,
+                   'name' => 'Kopia zdroj',
+                   'material_id' => 'K009_PW_DTDL_18', 'front_material_id' => 'K009_PW_DTDL_18',
+                   'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => '1' }] },
+                   'zone_tree' => { 'id' => 'Z1', 'shelves' => 2, 'children' => [] },
+                   'part_overrides' => { 'cabinet/side:left' => { 'material_id' => 'K009_PW_DTDL_18',
+                                                                 'edges' => { 'L1' => 'ABS_K009_10' } } } }
+    src = e::CabinetBuilder.build(model, src_params)
+    leg = ((e::Store.config(src) || {})['hardware'] || []).find { |h| h['generic_type'] == 'leg' }
+    if leg
+      e::CabinetBuilder.rebuild(model, src,
+                                e::CabinetBuilder.config_to_params(e::Store.config(src)).merge(
+                                  'hardware_overrides' => [{ 'owner_part_key' => nil, 'generic_type' => 'leg',
+                                                             'rule_id' => leg['rule_id'], 'quantity' => 6 }]
+                                ))
+    else
+      info('kopia: plan nema nohy — hardware_override cast preskocena')
+    end
+    src_cid = e::Store.get(src, 'cabinet_id')
+    e::Panel.handle_insert_copy({ 'cabinet_id' => src_cid }.to_json)
+    copy = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
+    ok('kopia B3: kopia vlozena a oznacena s NOVYM CAB id',
+       copy && copy != src && e::Store.get(copy, 'cabinet_id') != src_cid)
+    if copy
+      pa = e::CabinetBuilder.config_to_params(e::Store.config(src) || {})
+      pb = e::CabinetBuilder.config_to_params(e::Store.config(copy) || {})
+      ok('kopia B3: config_to_params IDENTICKE (materialy, part_overrides, hardware_overrides, cela, zony, nazov)',
+         pa == pb)
+      leg_copy = ((e::Store.config(copy) || {})['hardware'] || []).find { |h| h['generic_type'] == 'leg' }
+      ok('kopia B3: rucny pocet noh 6 preneseny (config.hardware zo snapshotu kopie)',
+         leg.nil? || (leg_copy && leg_copy['quantity'] == 6))
+      ok('kopia B3: ABS override boku prezil kopiu',
+         ((pb['part_overrides'] || {}).dig('cabinet/side:left', 'edges') || {})['L1'] == 'ABS_K009_10')
+    end
+    e::Panel.handle_insert_copy({ 'cabinet_id' => 'CAB-999' }.to_json)
+    ok('kopia B3: neexistujuce id = ziadna nova skrinka',
+       cabinets(model).length == (copy ? before + 2 : before + 1))
+
+    cleanup(model)
+    ok('vklad: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: sync-vkladanie vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    remove_js_recorder
+    cleanup(model)
+  end
+
   # --- ASYNC: undo/redo scenare (retaz timerov, observer debounce 0.2 s) -----
 
   def run_async(model, done)
@@ -872,6 +1023,32 @@ module NoxunSuRunner
       cleanup(model)
     end]
 
+    # D-34 (davka Vkladanie, audit F9): zmazanie OZNACENEJ skrinky -> observer
+    # erase tick (notify_erase -> process_dirty po prune) -> Panel.push_selected
+    # -> NX.clearSelected. Dokaz VYHRADNE cez recorder na Panel.js — zatvoreny
+    # panel je no-op a prazdny SketchUp vyber NIE JE dokaz.
+    steps << [0.5, lambda do
+      inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
+                                              'height' => 720.0, 'depth' => 510.0 })
+      state[:d34] = inst
+      e::Panel.select_only(model, inst)
+      state[:d34_rec] = []
+      install_js_recorder(state[:d34_rec])
+      # simulacia pouzivatelskeho Delete: erase v JEDNEJ operacii BEZ guardu
+      model.start_operation('SU-TEST user delete', true)
+      inst.erase!
+      model.commit_operation
+    end]
+    steps << [SETTLE, lambda do
+      remove_js_recorder
+      rec = state[:d34_rec] || []
+      cleared = rec.any? { |s| s.include?('NX.clearSelected') }
+      ok("async D34: erase oznacenej skrinky poslal NX.clearSelected (#{rec.length} js volani)", cleared)
+      ok('async D34: skrinka je prec a resolvery nepadli na mrtvej entite',
+         cabinets(model).empty?)
+      cleanup(model)
+    end]
+
     # S5 (V0.4.7d): scale absorpcia DOSKY — X/Y sa preberaju do length/width,
     # hrubku RIADI material (Z faktor sa zahadzuje), reject pri neplatnom rebuilde.
     steps << [0.5, lambda do
@@ -959,6 +1136,7 @@ module NoxunSuRunner
         rescue StandardError => ex
           log_line("FAIL: async krok #{idx} vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
           begin
+            remove_js_recorder # idempotentne — D-34 recorder nesmie prezit FAIL
             cleanup(model)
           rescue StandardError
             nil
@@ -988,7 +1166,8 @@ module NoxunSuRunner
     log_line("INFO: verzia pluginu #{Noxun::Engine::VERSION}, model '#{File.basename(model.path.to_s)}'")
     cleanup(model) # cisty stol (zvysky z predoslych behov)
     run_sync(model)
-    run_sync_back(model) # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
+    run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
+    run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

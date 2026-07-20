@@ -17,3 +17,5 @@ jobs:
         run: node tests/js/test_expr.js
       - name: JS testy (klasifikacia klucov meraca D-25)
         run: node tests/js/test_usage.js
+      - name: JS testy (stav vkladacej karty D-32/D-33/D-39)
+        run: node tests/js/test_insert_state.js
