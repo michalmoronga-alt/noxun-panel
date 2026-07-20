@@ -279,3 +279,8 @@
   body[data-cab-tab="cela"] .pvhint .ph-fronts { display: inline; }
   body[data-cab-tab="cela"] .pvhint .ph-zones,
   body[data-cab-tab="korpus"] .pvhint .ph-zones { display: none; }
+  /* GH P3: oznaceny DIELEC ma nahlad NUTENE zonovy (bridge previewMode='zones',
+     data-cab-tab sa vedome NEMENI kvoli navratu) — hint musi nasledovat realny
+     nahlad, nie tab. Za tabovymi pravidlami = vyhrava pri rovnakej specificite. */
+  body.mode-part .pvhint .ph-zones { display: inline; }
+  body.mode-part .pvhint .ph-fronts { display: none; }
