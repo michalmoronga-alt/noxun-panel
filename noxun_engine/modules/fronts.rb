@@ -22,7 +22,6 @@ module Noxun
       EDGE_LIMIT_UNLOCKED = 2000.0
       AUTO_TWO_ABOVE  = 600.0 # nad touto sirkou celneho otvoru auto dvierka = 2 kridla
       MIN_AUTO        = 10.0  # ochrana: auto celo nikdy < 10 mm
-      WING_MAX        = 4     # D-24: max pocet kridiel dvierok (3/4 len rucna volba)
 
       module_function
 
@@ -70,7 +69,7 @@ module Noxun
         { parts: parts, items: resolved, wings: total_wings }
       end
 
-      # Panely jedneho cela. drawer_front = 1 panel; door = 1..WING_MAX kridiel podla wings.
+      # Panely jedneho cela. drawer_front = 1 panel; door = 1..4 kridla podla wings (D-24).
       # D-07: medzera medzi kridlami = cfg gap (predtym natvrdo GAP_DEFAULT).
       # D-24 IDENTITA (audit blocker): suffix recykluje SketchUp definiciu a tvori
       # part_id (cabinet_builder add_part); part_key nesie overridy a kovanie.
