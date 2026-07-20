@@ -17,8 +17,10 @@
   }
   function collectFronts(){
     var items = [];
+    // D-23: DOM zoznam je OBRATENY (najvyssie celo hore) — citame ODSPODU,
+    // aby items[0] = F1 = spodne celo. Datove poradie sa NEMENI, len prezentacia.
     var rows = el('frontRows').querySelectorAll('.frow');
-    for (var i = 0; i < rows.length; i++){
+    for (var i = rows.length - 1; i >= 0; i--){
       var r = rows[i];
       var type = r.querySelector('.ftype').value;
       var hv = r.querySelector('.fh').value.trim();
@@ -107,6 +109,7 @@
   // (medzistav '650-3' je validny vyraz s inou hodnotou) — aplikuje az Enter/blur
   // commit, ktory pole prepise cistym cislom a onField zavola znova.
   function onField(){
+    invalidateFrontPlaceholders(); // D-23: lokalna zmena -> stare ≈ vysky neplatia (doplni az cerstve echo)
     var ae = document.activeElement;
     if (ae && isExprInput(ae) && isExprStr(ae.value)){
       if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; }
@@ -267,16 +270,25 @@
   }
 
   // --- cela riadky ---
+  // D-23: zoznam je OBRATENY oproti datam — data items[0]=F1=SPODNE celo, zoznam
+  // zobrazuje skrinku pred sebou (najvyssie celo hore). Kontrakt cyklu:
+  // data [F1,F2,F3] -> DOM [F3,F2,F1] -> collectFronts [F1,F2,F3]; po pridani
+  // [F1,F2,F3,X]. Render ide datovo odspodu a KAZDY novy riadok PREDRADI navrch;
+  // pouzivatelske "+ riadok" prida datovo NA KONIEC = tiez DOM navrch — obe cesty
+  // maju jedinu vkladaciu operaciu (insertBefore firstChild).
+  // .fnum je kanonicka pozicia v DATACH (F1 dole) — sync bezi VYHRADNE cez
+  // dataset.frontId; cislo sa NIKDY neparsuje z ID a ID sa pri precislovani neprepisuje.
   function addFrontRow(item){
+    var userAdd = (item == null); // "+ riadok" (bez argumentu) vs render s datami
     item = item || {};
     var wrap = el('frontRows');
-    var idx = wrap.querySelectorAll('.frow').length + 1;
+    var idx = wrap.querySelectorAll('.frow').length + 1; // novy riadok = datovo posledny = najvyssia pozicia
     var row = document.createElement('div');
     row.className = 'frow';
     row.dataset.frontId = item.id || newStableId('F');
     var badge = frontHwBadge(row.dataset.frontId); // D3: kovanie cela (zavesy/vysuv) z planu
     row.innerHTML =
-      '<span class="fnum">' + idx + '</span>' +
+      '<span class="fnum">F' + idx + '</span>' +
       '<select class="ftype" onchange="onFrontTypeChange(this); onField()">' +
         '<option value="door">Dvierka</option><option value="drawer_front">Zásuvkové čelo</option>' +
         '<option value="none">Bez čela</option></select>' +
@@ -285,13 +297,18 @@
       '<input class="flock" type="checkbox" title="Zamknúť pevnú výšku" onchange="onField()">' +
       '<button class="fdel" title="Odstrániť" onclick="delFrontRow(this); onField()">✕</button>' +
       (badge ? '<span class="fhw" title="Kovanie tohto čela (sekcia Kovanie)">🔗 ' + esc(badge) + '</span>' : '');
-    wrap.appendChild(row);
+    wrap.insertBefore(row, wrap.firstChild); // D-23: navrch — DOM je obrateny
     if (item.type) row.querySelector('.ftype').value = item.type;
     if (item.height !== null && item.height !== undefined && item.height !== '') row.querySelector('.fh').value = item.height;
     if (item.wings) row.querySelector('.fw').value = item.wings;
     if (item.locked) row.querySelector('.flock').checked = true;
     attachExprField(row.querySelector('.fh'), { flushFn: flushCabinetEditsNow }); // V0.4.7e vyrazy vo vyske cela
     onFrontTypeChange(row.querySelector('.ftype'));
+    if (userAdd){
+      // D-23: novy riadok vznika NAVRCHU zoznamu — dotiahni ho do pohladu a fokusni vysku
+      row.scrollIntoView({ block: 'nearest' });
+      var fh0 = row.querySelector('.fh'); if (fh0) fh0.focus();
+    }
   }
   // D-18: pri 'none' (Bez čela) sa skryje výber krídel (ako pri drawer_front) a hneď
   // aj badge kovania (dátovo zmizne až po echu apply — bez dielcov niet kovania).
@@ -303,18 +320,41 @@
     if (hw) hw.style.display = (sel.value === 'none') ? 'none' : '';
   }
   function delFrontRow(btn){ btn.closest('.frow').remove(); renumberFronts(); }
-  function removeLastFront(){ var rows = el('frontRows').querySelectorAll('.frow'); if (rows.length) { rows[rows.length-1].remove(); renumberFronts(); } }
-  function renumberFronts(){ var rows = el('frontRows').querySelectorAll('.frow'); for (var i=0;i<rows.length;i++){ rows[i].querySelector('.fnum').textContent = (i+1); } }
+  // D-23: datovo posledne celo = HORNY riadok DOM (zoznam je obrateny); po
+  // odobrati udrz kontext — novy horny riadok dotiahni do pohladu.
+  function removeLastFront(){
+    var rows = el('frontRows').querySelectorAll('.frow');
+    if (!rows.length) return;
+    rows[0].remove();
+    renumberFronts();
+    var first = el('frontRows').querySelector('.frow');
+    if (first) first.scrollIntoView({ block: 'nearest' });
+  }
+  // D-23: cislo = kanonicka pozicia v datach — SPODNY DOM riadok je F1.
+  function renumberFronts(){ var rows = el('frontRows').querySelectorAll('.frow'); for (var i=0;i<rows.length;i++){ rows[i].querySelector('.fnum').textContent = 'F' + (rows.length - i); } }
   // D-07 Codex B2: keepGaps=true pri echu apply toho isteho korpusu s cakajucimi
   // editmi — gap polia sa NEprepisu (lokalne hodnoty su novsie nez in-flight echo;
   // fokus guard nestaci — Reset presuva fokus na tlacidlo). Sablony/vyber = prepis.
   // D-22: zamok presahov (edge_limit_off) je pod TYM ISTYM guardom — klik na zamok
   // pocas in-flight apply nesmie starsie echo vratit spat.
+  // D-23 (audit B1): pod TYM ISTYM guardom su aj RIADKY ciel — echo pocas
+  // rozpisaneho editu ich uz NEprestavia (rebuild by zahodil pisany vstup aj
+  // prave pridany/odobrany riadok — DOM s cakajucimi editmi je novsi nez echo).
+  // Obnovia sa len bezpecne udaje viazane cez ID: placeholder ≈ vysky a badge
+  // kovania. Plny rebuild riadkov = zmena vyberu alebo echo bez cakajucich editov.
   function renderFronts(fronts, keepGaps){
+    if (keepGaps){
+      updateFrontRowBadges();
+      // applyTimer = pouzivatel pisal AJ PO flushi, ktory toto echo vyvolal —
+      // jeho ≈ vysky su uz stare; placeholder doplni az echo najnovsieho editu.
+      if (!applyTimer) updateFrontPlaceholders();
+      return;
+    }
+    if (typeof clearFrontHover === 'function') clearFrontHover(); // D-23: riadky idu prec — hover stav s nimi
     el('frontRows').innerHTML = '';
     var items = (fronts && fronts.items) ? fronts.items : [];
     for (var i = 0; i < items.length; i++){ addFrontRow(items[i]); }
-    if (keepGaps) return;
+    updateFrontPlaceholders();
     // Gap polia su STATICKE (mimo frontRows) — plnia sa z kanonickeho configu;
     // 0 je platna hodnota, preto != null test (setNum by cez dflt finty 0 stratil).
     setNum('fr_gap', (fronts && fronts.gap != null) ? fronts.gap : 3);
@@ -322,5 +362,72 @@
     setNum('fr_gap_bottom', (fronts && fronts.gap_bottom != null) ? fronts.gap_bottom : 2);
     setNum('fr_gap_sides', (fronts && fronts.gap_sides != null) ? fronts.gap_sides : 2);
     setEdgeLimitOff(!!(fronts && fronts.edge_limit_off));
+  }
+
+  // --- D-23: placeholder ≈ dopocitanej vysky v AUTO poliach --------------------
+  // Zdroj: resolved front_items z Ruby (globalna frontItems — bridge ju plni PRED
+  // renderom). Parovanie VYHRADNE cez dataset.frontId; sivy odhad LEN pre PRAZDNE
+  // pole, ktoreho resolved zaznam ma mode:'auto'. Pri lokalnej zmene (onField) sa
+  // odhady zneplatnia — nove dopocty plati az cerstve echo (stare vysky by klamali).
+  function updateFrontPlaceholders(){
+    var wrap = el('frontRows'); if (!wrap) return;
+    var byId = {};
+    (frontItems || []).forEach(function(it){ if (it && it.id) byId[it.id] = it; });
+    var rows = wrap.querySelectorAll('.frow');
+    for (var i = 0; i < rows.length; i++){
+      var inp = rows[i].querySelector('.fh'); if (!inp) continue;
+      var it = byId[rows[i].dataset.frontId];
+      inp.placeholder = (inp.value.trim() === '' && it && it.mode === 'auto' && it.height != null)
+        ? ('≈ ' + Math.round(it.height)) : 'auto';
+    }
+  }
+  function invalidateFrontPlaceholders(){
+    var wrap = el('frontRows'); if (!wrap) return;
+    var rows = wrap.querySelectorAll('.frow');
+    for (var i = 0; i < rows.length; i++){
+      var inp = rows[i].querySelector('.fh'); if (inp) inp.placeholder = 'auto';
+    }
+  }
+  // D-23: obnova badge kovania podla ID bez prestavby riadkov (light-update pri
+  // echu). .fhw sa VZDY hlada/vklada cez triedu a appendChild na koniec riadku —
+  // NIKDY nie cez nextElementSibling/indexy deti (.exprhint zije hned za .fh).
+  function updateFrontRowBadges(){
+    var wrap = el('frontRows'); if (!wrap) return;
+    var rows = wrap.querySelectorAll('.frow');
+    for (var i = 0; i < rows.length; i++){
+      var row = rows[i];
+      var badge = frontHwBadge(row.dataset.frontId);
+      var span = row.querySelector('.fhw');
+      if (badge){
+        if (!span){
+          span = document.createElement('span');
+          span.className = 'fhw';
+          span.title = 'Kovanie tohto čela (sekcia Kovanie)';
+          row.appendChild(span);
+        }
+        span.textContent = '🔗 ' + badge;
+        var tsel = row.querySelector('.ftype'); // D-18: pri 'none' badge skryty
+        span.style.display = (tsel && tsel.value === 'none') ? 'none' : '';
+      } else if (span){
+        span.remove();
+      }
+    }
+  }
+  // D-23: klik na celo v nahlade — otvor sekciu Cela, riadok do pohladu, fokus
+  // pola vysky. Riadok sa hlada cez dataset.frontId (nie cez cislo).
+  function focusFrontRow(fid){
+    if (!fid) return;
+    var wrap = el('frontRows'); if (!wrap) return;
+    var rows = wrap.querySelectorAll('.frow');
+    var row = null;
+    for (var i = 0; i < rows.length; i++){
+      if (rows[i].dataset.frontId === fid){ row = rows[i]; break; }
+    }
+    if (!row) return;
+    var det = document.querySelector('details[data-key="fronts"]');
+    if (det) det.open = true; // zbalena sekcia by fokus/scroll zhltla
+    row.scrollIntoView({ block: 'nearest' });
+    var fh = row.querySelector('.fh');
+    if (fh) fh.focus();
   }
 

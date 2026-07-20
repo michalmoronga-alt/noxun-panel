@@ -66,6 +66,7 @@
 
   function renderPreview(){
     var svg = el('preview'); if (!svg) return;
+    clearFrontHover(); // D-23: rerender/tab/vyber rusi hover uzly — stav ide s nimi
     var t = numv('thickness')||18, W = numv('width')||600, H = numv('height')||720;
     if (!(W>0 && H>0)){ svg.innerHTML=''; return; }
     var pad = PV_PAD;
@@ -126,6 +127,10 @@
     }
   }
 
+  // D-23: kazdy item je obaleny do <g class="fgrp" data-front-id> — VSETKY kridla,
+  // none ciarkovany pas AJ text su jeden interakcny ciel (klik/hover na hocaku
+  // cast = ten isty item; pri viacerych kridlach sa zvyraznuju vsetky naraz).
+  // F-cislo (kanonicka pozicia v datach, F1 dole) sa kresli raz per item.
   function renderFrontsPreview(S, rx, ry, W, H, fh, t){
     var items = frontItems;
     if (!items || !items.length){
@@ -140,12 +145,14 @@
     var ow = W - 2*gs;
     items.forEach(function(it, i){
       var z = it.z, h = it.height, col = (it.type==='drawer_front')?'#b3e5fc':'#e1f5fe';
+      var fnum = 'F' + (i + 1);
+      S.push('<g class="fgrp" data-front-id="'+esc(it.id || '')+'">');
       if (it.type === 'none'){
         // D-18: pásmo Bez čela = čiarkovaný obrys bez výplne (otvorená nika v rade).
-        // Klik: náhľad čiel dnes nemá klik-interakciu (delegácia rieši len zóny
-        // a priečky) — none pásmo je konzistentne neklikateľné ako ostatné čelá.
+        // D-23: aj none pás je súčasťou skupiny — klik vedie na jeho riadok v zozname.
         S.push('<rect x="'+rx(gs)+'" y="'+ry(z+h)+'" width="'+ow+'" height="'+h+'" fill="none" stroke="#90a4ae" stroke-width="1.5" stroke-dasharray="7 5"/>');
-        S.push('<text x="'+rx(W/2)+'" y="'+ry(z+h/2)+'" font-size="18" fill="#90a4ae" text-anchor="middle" dominant-baseline="middle">bez čela '+Math.round(h)+'</text>');
+        S.push('<text x="'+rx(W/2)+'" y="'+ry(z+h/2)+'" font-size="18" fill="#90a4ae" text-anchor="middle" dominant-baseline="middle">'+fnum+' · bez čela '+Math.round(h)+'</text>');
+        S.push('</g>');
         return;
       }
       // Codex GH P2: legacy cache front_items (pred D-07) nema wings_n —
@@ -164,7 +171,8 @@
       } else {
         S.push('<rect x="'+rx(gs)+'" y="'+ry(z+h)+'" width="'+ow+'" height="'+h+'" fill="'+col+'" stroke="#4fc3f7" stroke-width="1.5"/>');
       }
-      S.push('<text x="'+rx(W/2)+'" y="'+ry(z+h/2)+'" font-size="18" fill="#0277bd" text-anchor="middle" dominant-baseline="middle">'+(it.type==='drawer_front'?'zásuvka':'dvierka')+' '+Math.round(h)+'</text>');
+      S.push('<text x="'+rx(W/2)+'" y="'+ry(z+h/2)+'" font-size="18" fill="#0277bd" text-anchor="middle" dominant-baseline="middle">'+fnum+' · '+(it.type==='drawer_front'?'zásuvka':'dvierka')+' '+Math.round(h)+'</text>');
+      S.push('</g>');
     });
   }
 
@@ -212,9 +220,43 @@
     });
     svg.addEventListener('click', function(ev){
       if (panMoved){ panMoved = false; return; } // tah pohladu nie je klik na zonu
+      // D-23: klik na celo (cely <g> item — kridla, none pas aj text) -> jeho
+      // riadok v zozname. .fgrp existuje LEN vo fronts nahlade, takze zone klik
+      // (.zrect) v tabe Zony bezi nedotknuty.
+      var f = closestClass(ev.target, 'fgrp');
+      if (f){ focusFrontRow(f.getAttribute('data-front-id')); return; }
       var t = closestClass(ev.target, 'zrect');
       if (t) pickZone(t.getAttribute('data-zid'));
     });
+    // D-23: hover sync celo <-> riadok VYHRADNE CSS triedou. renderPreview sa
+    // pocas hoveru NEVOLA (zmazal by hoverovany uzol — blikanie, kolizia s
+    // pan/drag aj 500 ms debounce); relatedTarget guard ignoruje presuny
+    // v ramci toho isteho <g>.
+    svg.addEventListener('mouseover', function(ev){
+      var g = closestClass(ev.target, 'fgrp');
+      if (g) setFrontHover(g.getAttribute('data-front-id'));
+    });
+    svg.addEventListener('mouseout', function(ev){
+      var g = closestClass(ev.target, 'fgrp');
+      if (!g) return;
+      if (ev.relatedTarget && closestClass(ev.relatedTarget, 'fgrp') === g) return;
+      clearFrontHover();
+    });
+    // Druha strana synku: riadky ciel. Kontajner #frontRows je staticky (riadky
+    // v nom sa menia) — delegacia prezije kazdy rebuild zoznamu.
+    var fr = el('frontRows');
+    if (fr){
+      fr.addEventListener('mouseover', function(ev){
+        var r = frowOf(ev.target);
+        if (r) setFrontHover(r.dataset.frontId);
+      });
+      fr.addEventListener('mouseout', function(ev){
+        var r = frowOf(ev.target);
+        if (!r) return;
+        if (ev.relatedTarget && frowOf(ev.relatedTarget) === r) return;
+        clearFrontHover();
+      });
+    }
     // Zoom kolieskom k bodu pod kurzorom. Limity: detail max 8x, oddialenie max 3x sceny.
     svg.addEventListener('wheel', function(ev){
       // D-12: zoom LEN s Ctrl — cisty scroll necha scrollovat panel (ziadny
@@ -269,6 +311,50 @@
       node = node.parentNode;
     }
     return null;
+  }
+
+  // ===== D-23: sync riadok <-> celo (hover) ==================================
+  // Zvyraznenie je VYHRADNE CSS trieda 'hov' na oboch stranach naraz (riadok
+  // .frow v #frontRows + <g class="fgrp"> v nahlade); stav drzi hoverFrontId.
+  // Po rerenderi/zmene tabu/vyberu stav cisti renderPreview (nove uzly triedu
+  // nemaju) a plny rebuild riadkov (renderFronts).
+  var hoverFrontId = null;
+  // Striktne priamy potomok #frontRows s triedou .frow (audit: ziadne cudzie .frow).
+  function frowOf(node){
+    var wrap = el('frontRows');
+    while (node && node !== wrap && node.getAttribute){
+      var c = ' ' + (node.getAttribute('class') || '') + ' ';
+      if (c.indexOf(' frow ') >= 0) return (node.parentNode === wrap) ? node : null;
+      node = node.parentNode;
+    }
+    return null;
+  }
+  function setFrontHover(fid){
+    if (!fid || fid === hoverFrontId) return; // presun v ramci itemu = ziadne blikanie
+    clearFrontHover();
+    hoverFrontId = fid;
+    var svg = el('preview');
+    if (svg){
+      var gs = svg.querySelectorAll('g.fgrp');
+      for (var i = 0; i < gs.length; i++){
+        if (gs[i].getAttribute('data-front-id') === fid){ gs[i].classList.add('hov'); break; }
+      }
+    }
+    var wrap = el('frontRows');
+    if (wrap){
+      var rows = wrap.querySelectorAll('.frow');
+      for (var j = 0; j < rows.length; j++){
+        if (rows[j].dataset.frontId === fid){ rows[j].classList.add('hov'); break; }
+      }
+    }
+  }
+  function clearFrontHover(){
+    if (hoverFrontId === null) return;
+    hoverFrontId = null;
+    var svg = el('preview');
+    if (svg){ var g = svg.querySelector('g.fgrp.hov'); if (g) g.classList.remove('hov'); }
+    var wrap = el('frontRows');
+    if (wrap){ var r = wrap.querySelector('.frow.hov'); if (r) r.classList.remove('hov'); }
   }
 
   function pickZone(localId){

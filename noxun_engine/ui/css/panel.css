@@ -34,7 +34,7 @@
   .hint { font-size: 10.5px; color: #90a4ae; margin: 2px 0 6px; }
   /* Cela riadky */
   .frow { display: flex; gap: 5px; align-items: center; margin: 4px 0; }
-  .frow .fnum { flex: 0 0 16px; color: #90a4ae; font-size: 11px; text-align: center; }
+  .frow .fnum { flex: 0 0 24px; color: #90a4ae; font-size: 11px; text-align: center; } /* D-23: "F1" namiesto "1" */
   .frow select.ftype { flex: 1 1 auto; padding: 3px; border: 1px solid #b0bec5; border-radius: 4px; }
   .frow input.fh { flex: 0 0 58px; padding: 3px 4px; border: 1px solid #b0bec5; border-radius: 4px; }
   .frow select.fw { flex: 0 0 56px; padding: 3px; border: 1px solid #b0bec5; border-radius: 4px; }
@@ -265,3 +265,22 @@
   .vepobar .vepomerge { flex: 0 0 auto; display: flex; align-items: center; gap: 4px;
                         font-size: 11.5px; color: #455a64; white-space: nowrap; }
   .vepobar .vepobtn { flex: 0 0 auto; padding: 4px 12px; font-size: 12px; font-weight: 600; }
+  /* ===== D-23: sync riadok <-> celo (hover trieda 'hov' na oboch stranach).
+     Zvyraznenie bezi CISTO cez CSS — ziadny renderPreview pocas hoveru. CSS
+     pravidla prebiju prezentacne ATRIBUTY rectov/textov (stroke/fill). */
+  #preview g.fgrp { cursor: pointer; }
+  #preview g.fgrp.hov rect { stroke: #01579b; stroke-width: 3.5; }
+  #preview g.fgrp.hov text { fill: #01579b; }
+  .frow.hov { background: #e1f5fe; border-radius: 4px; }
+  .frow.hov .fnum { color: #0277bd; font-weight: 600; }
+  /* D-23: hint pod nahladom podla aktivneho tabu (data-cab-tab z D-08) —
+     klik na celo sa ukazuje LEN v tabe Cela; zonovy hint LEN v tabe Zony. */
+  .pvhint .ph-fronts { display: none; }
+  body[data-cab-tab="cela"] .pvhint .ph-fronts { display: inline; }
+  body[data-cab-tab="cela"] .pvhint .ph-zones,
+  body[data-cab-tab="korpus"] .pvhint .ph-zones { display: none; }
+  /* GH P3: oznaceny DIELEC ma nahlad NUTENE zonovy (bridge previewMode='zones',
+     data-cab-tab sa vedome NEMENI kvoli navratu) — hint musi nasledovat realny
+     nahlad, nie tab. Za tabovymi pravidlami = vyhrava pri rovnakej specificite. */
+  body.mode-part .pvhint .ph-zones { display: inline; }
+  body.mode-part .pvhint .ph-fronts { display: none; }
