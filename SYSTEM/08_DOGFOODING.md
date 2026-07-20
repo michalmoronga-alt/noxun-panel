@@ -10,11 +10,13 @@
 
 ## Spomaľovače (vysoká priorita)
 
-*(momentálne žiadne)*
+- **D-32 · Nový korpus preberá nastavenia posledného editovaného** (smoke test 20.7., B3) — diagnóza z kódu: NIE je to Ruby cache/singleton — `insertCabinet()` vkladá AKTUÁLNY obsah formulára (`collectAll()` + `currentZoneTree`), a formulár po označení korpusu A drží hodnoty A (zóny aj čelá). „Vlož ďalší" = kópia naposledy zobrazeného. Je to aj feature (rýchle množenie rovnakých skriniek — používané), aj pasca (nečakané dedenie). *Návrh na rozhodnutie: vkladacia karta dostane viditeľný prepínač zdroja — „z defaultov typu / kópia označeného / zo šablóny" — žiadne tiché dedenie.*
+- **D-33 · Šablóna nepreberá rozmery / polia držia staré hodnoty** (smoke test 20.7., B4) — rovnaký root cause ako D-32 (formulár sa pri výbere šablóny prepíše len čiastočne). Príklad: po chladničke 2500×600 šablóna „skriňa+šuflík" natiahla staré rozmery. *Rieši sa spolu s D-32 (definovať, ktoré polia šablóna VŽDY nastavuje).*
+- **D-34 · Panel „visí" na zmazanej skrinke** (smoke test 20.7., B5) — po Delete skrinky panel ďalej zobrazuje jej dáta; ESC/cancel nefunguje, treba prekliknúť inam. *Fix: observer zmazania/deselection → clearSelected + mode-insert; overiť prečo onSelectionCleared po Delete nechodí.*
 
 ## UX drobnosti (nízka priorita)
 
-*(momentálne žiadne)*
+- **D-29 · Hlavička panela — reorganizácia** (smoke test 20.7., A1; spresnené Michalom 20.7. večer) — hlavička STICKY s hlavnými tlačidlami-tabmi **KORPUS/ZÓNY/ČELÁ** (neskôr ďalšie) + tlačidlo **Výroba** v tom istom rade; **⛶ fit/reset zoomu presunúť do pravého horného rohu náhľadu**; názov pluginu + verziu dole/do nastavení. Riadi sa trvalým pravidlom vertikálneho priestoru (viď hore). *Stav: pripravené na dávku, stredná priorita.*
 
 ## Nápady na zváženie (nerozhodnuté)
 
@@ -22,6 +24,7 @@
 - **D-26 · Režim Jednoduchý/Rozšírený** (Michal 19.7. večer, debata) — prepínač v UI: jednoduchý = najčastejšie polia, rozšírený = všetko (tvorba šablón, špeciálne zostavy). Rozhodnuté MIESTO samostatného okna Nastavenia (nastavenie ostáva pri svojom poli). *Stav: čaká na dáta z merača D-25 (čo reálne skrývať) — pár týždňov zberu.*
 - **D-27 · Rýchle zobraziť/skryť tagy z panela** (Michal 19.7. večer) — mini prepínače priamo v paneli (Čelá 👁 · Chrbát 👁 …) v logike Ghost checkboxu, nech sa nepreklikáva do SketchUp Tags. *Stav: zápis bokom, kandidát na budúcu UX dávku.*
 - **D-28 · Textúry materiálov (render)** (Michal 19.7. večer) — katalóg rozšíriť o textúru (obrázok dekoru) + mierku rapportu; builder ich aplikuje pri rebuilde → model pripravený na render (Lucia). Fáza 2: orientácia textúry podľa smeru dekoru dielca. Michal má kompletnú knižnicu textúr; **injecting dát (kódy, materiály, kovania, spotrebiče, vybavenie) príde v dávkach po uzavretí V1** — dovtedy pripraviť architektúru. *Stav: zaradené po V0.6.*
+- **D-36 · ABS — logická väzba na materiál** (smoke test 20.7., C2) — pri výbere materiálu dielca ponúknuť „odporúčanú" ABS k dekoru navrchu zoznamu / jedným klikom (v ~95 % sa používa jedna konkrétna hrana k materiálu). So škálovaním katalógu plochý zoznam neobstojí. *Poznámka: párovanie dekorov už robí abs_rules (ABS s rovnakým dekorom ako materiál) — využiť; súvisí s D-16 autocomplete. Priorita rastie s počtom materiálov.*
 
 ## Návrhy väčších celkov (na rozpracovanie)
 
@@ -34,10 +37,25 @@
 
 ## Otvorené otázky (na Michalovo posúdenie pri teste)
 
-*(momentálne žiadne — D-08 default tab Korpus potvrdený 19.7. večer: „jednoznačne vyhovuje")*
+*(momentálne žiadne)*
+
+## Trvalé UI/UX pravidlo (Michal 20.7. — platí pre všetku ďalšiu prácu na paneli)
+
+**VERTIKÁLNY priestor panela je vzácny.** Pred umiestnením každého nového tlačidla/poľa/funkcie sa POVINNE zamyslieť, či sa nedá umiestniť inak a rozumnejšie (do existujúceho radu, do rohu náhľadu, ako ikona, kontextovo) — rast do výšky len v krajných prípadoch. Inak panel skončí ako scrollovanie cez 20 tlačidiel a 30 sekcií.
+
+## Smoke test 20.7. — výsledok (testy 1–11) + VEPO validácia
+
+Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len prvky+počty, žiadne hodnoty) · nálezy A1/B1–B5/C1/C2 zapísané ako **D-29 až D-36**.
+
+**Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené
 
+- **D-37 · Hĺbka korpusu = CELKOVÁ vrátane chrbta** → **vyriešené v dávke Chrbát (PR #59)**: nový invariant — zadaná hĺbka platí celkovo vo VŠETKÝCH režimoch chrbta; naložený chrbát skracuje telo o svoju hrúbku (vložený/drážka už celkovú spĺňali), zóny/svetlá hĺbka/kovanie idú tou istou logikou (výsuv pri naloženom 510/3 správne NL 470). BEZ migrácie (rozhodnutie Michala) — SU test: stará geometria → rebuild = nová pravda → 1× undo vráti starú. 281/0 + 88/0 SU.
+- **D-38 · Chrbát „pevný 18" nefunguje** → **vyriešené (PR #59)**: skutočná príčina — rebuild padal na hrúbkovej kontrole materiálu chrbta (HDF 3 ≠ 18) a UI ostalo rozsynchronizované. Nový preflight materiál vyberie automaticky (korpusový materiál hrúbky > rovnaký dekor > jediný kandidát) a oznámi v statuse; bez kandidáta jasná hláška + resync selectu. Pri „Bez chrbta" sa nekontroluje nič; skrinka bez chrbta neblokuje zmenu projektového chrbta (GH P2).
+- **D-31 · Skrinka bez chrbta** → **vyriešené (PR #59)**: voľba „Bez chrbta" — BACK dielec sa negeneruje, telo aj vnútro na plnú hĺbku, kusovník/VEPO nič; riadok hrúbky sa skryje, hodnota sa pamätá (návrat režimu aj šablóny ju obnovia).
+- **D-30 · Výstuhy bez defaultnej ABS** → **vyriešené v dávke ABS (PR #60)**: rail_front aj rail_back default 1 pozdĺžna (predná) 1,0 mm podľa Michalovho pravidla „každá predná pohľadová hrana olepená; priečne do defaultov nie". Jednorazová migrácia prepíše IBA presne prázdne stock pravidlá (užívateľský obsah nedotknutý); test uzamyká celú mapu defaultov rolí (čelá zostávajú 4 hrany — olepujú sa dookola).
+- **D-35 · ABS — olepiť všetky 4 hrany klikom** → **vyriešené (PR #60)**: kompaktná ikona v riadku legendy ABS editora (dielec aj doska, žiadny nový riadok — pravidlo vertikálneho priestoru); 1 klik = 4 hrany páskou k dekóru materiálu = 1 undo krok; bez pásky k dekóru = atomický no-op s hláškou; identity guardy (cabinet_id+kľúč / board echo). 9 živých SU scenárov.
 - **D-18 · Čelo „BEZ"** → **vyriešené v nočnej fronte 19.→20.7. (PR #52)**: typ riadku „Bez čela" — drží výšku v rade ako čelo (fixed aj auto, locky), panel sa negeneruje = otvorená nika. Rozhodnutia z debaty 19.7.: pásmo ako čelo (reálny otvor = pásmo + susedné škáry, žiadna špeciálna vetva); kovanie nevznikne (štrukturálne — pravidlá iterujú dielce plánu, dokázané testami + prune mŕtvych hardware_overridov); kusovník/VEPO nič; náhľad čiarkovaný obrys s výškou; voľba krídel sa skryje; oddelené od V0.4.8 konštrukčných ník. 70/0 SU scenárov.
 - **D-19 · Orientačný prepočet na platne** → **vyriešené (PR #53)**: tab Materiály okna Výroba — stĺpce Formát a Platne (odhad) ako rozsah 10–25 % prerezu („4,5 – 5,5"); formát platne per materiál v katalógu (editor materiálov, default 2800×2070). **Stabilný základ:** výpočet dostáva jednotlivé dielce → budúci nárezový prepočet (fáza 2: guillotine, kerf, orezky, orientácia dekoru — inšpirácia OpenCutList algoritmami, kód GPL neprebrať) vymení len vnútro. 
 - **D-21 · Výrazy vo výškach čiel** → **bez kódu — UŽ EXISTOVALO**: výšky čiel majú výrazy od V0.4.7e, medzery/presahy od D-07. Zistené pri príprave dávky 20.7.
