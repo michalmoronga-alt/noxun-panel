@@ -594,7 +594,7 @@ NxTest.test('builder: cabinet_config nesie verziu, schemu a je JSON-ovatelny') d
   # merge_final zapisal vysledky planu
   NxTest.assert_close(564.0, c[:available_width])   # 600 - 2*18
   NxTest.assert_close(584.0, c[:available_height])  # 702 - 118
-  NxTest.assert_close(510.0, c[:available_depth])   # overlay -> plna hlbka
+  NxTest.assert_close(507.0, c[:available_depth])   # D-37 overlay: d - bt (hlbka je celkova)
   NxTest.assert_close(0.0, c[:front_plane])
   NxTest.assert_equal(0, c[:wings])
   NxTest.assert_equal([], c[:front_items])

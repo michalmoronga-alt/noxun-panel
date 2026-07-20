@@ -599,6 +599,102 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- SYNC-BACK: D-37 celkova hlbka + D-31 bez chrbta + D-38 pevny chrbat ---
+  # (davka Chrbat 20.7. — hlbka cfg = CELKOVA vratane chrbta; bez migracie:
+  # rebuild starej geometrie ju VEDOME prepocita — rozhodnutie Michala)
+
+  def find_part(inst, key)
+    inst.definition.entities.grep(Sketchup::ComponentInstance)
+        .find { |i| e::Store.kind(i) == 'part' && e::Store.get(i, 'part_key') == key }
+  end
+
+  # bounds instancie dielca su v suradniciach definicie KORPUSU (parent space)
+  def part_y_end(pi)
+    mm(pi.bounds.max.y)
+  end
+
+  def part_depth(pi)
+    mm(pi.bounds.max.y) - mm(pi.bounds.min.y)
+  end
+
+  def carcass_max_y(inst)
+    parts = inst.definition.entities.grep(Sketchup::ComponentInstance)
+                .select { |i| e::Store.kind(i) == 'part' }
+    parts.map { |i| part_y_end(i) }.max
+  end
+
+  def run_sync_back(model)
+    params = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0 }
+
+    # 1) D-37: novy overlay korpus (bt 3) — telo 507, zadna hrana chrbta PRESNE 510
+    inst = e::CabinetBuilder.build(model, params)
+    return ok('back: vlozenie korpusu', false) unless inst
+    side = find_part(inst, 'cabinet/side:left')
+    back = find_part(inst, 'cabinet/back')
+    ok('back D-37: bok ma konstrukcnu hlbku 507', side && (part_depth(side) - 507.0).abs < TOL)
+    ok('back D-37: chrbat konci PRESNE na celkovej hlbke 510',
+       back && (part_y_end(back) - 510.0).abs < TOL)
+    ok('back D-37: max Y vsetkych dielcov = 510 (nic netrci za celkovu hlbku)',
+       (carcass_max_y(inst) - 510.0).abs < TOL)
+
+    # 2) D-37 bez migracie: STARA overlay geometria = telo 510 + chrbat [510,513]
+    #    so stored depth 510 (nasimulovane buildom 513 + prepisom configu).
+    old = e::CabinetBuilder.build(model, params.merge('depth' => 513.0))
+    model.start_operation('SU-TEST sim old', true)
+    old.set_attribute('NOXUN', 'config',
+                      JSON.generate((e::Store.config(old) || {}).merge('depth' => 510.0)))
+    model.commit_operation
+    ok('back D-37: simulacia starej geometrie (chrbat do 513, stored 510)',
+       (carcass_max_y(old) - 513.0).abs < TOL)
+    e::CabinetBuilder.rebuild(model, old,
+                              e::CabinetBuilder.config_to_params(e::Store.config(old)))
+    old_side = find_part(old, 'cabinet/side:left')
+    ok('back D-37: rebuild starej geometrie = nova pravda (telo 507, max Y 510)',
+       old_side && (part_depth(old_side) - 507.0).abs < TOL &&
+       (carcass_max_y(old) - 510.0).abs < TOL)
+    Sketchup.undo
+    ok('back D-37: 1x undo vratil staru geometriu (chrbat do 513)',
+       old.valid? && (carcass_max_y(old) - 513.0).abs < TOL)
+
+    # 3) D-31 prechody na TEJ ISTEJ instancii: overlay -> none -> groove
+    base = e::CabinetBuilder.config_to_params(e::Store.config(inst))
+    e::CabinetBuilder.rebuild(model, inst, base.merge('back_mode' => 'none'))
+    ok('back D-31: none — BACK dielec neexistuje', find_part(inst, 'cabinet/back').nil?)
+    n_side = find_part(inst, 'cabinet/side:left')
+    ok('back D-31: none — bok na PLNU hlbku 510', n_side && (part_depth(n_side) - 510.0).abs < TOL)
+    cid = e::Store.get(inst, 'cabinet_id').to_s
+    bom = e::Bom.collect(model)
+    ok('back D-31: BOM nema chrbat korpusu bez chrbta',
+       bom[:records].none? { |r| r['owner_id'] == cid && r['part_key'] == 'cabinet/back' })
+    e::CabinetBuilder.rebuild(model, inst, base.merge('back_mode' => 'groove'))
+    g_back = find_part(inst, 'cabinet/back')
+    ok('back D-31: navrat none -> groove obnovil chrbat (hrubka zachovana)',
+       g_back && ((e::Store.config(inst) || {})['back_thickness'].to_f - 3.0).abs < 0.01)
+
+    # 4) D-38: preflight pevneho chrbta — auto-pick materialu hrubky (zavisi od katalogu)
+    m18 = defined?(e::Materials) ? e::Materials.sheets.find { |s| (s['thickness'].to_f - 18.0).abs < 0.01 } : nil
+    if m18
+      pf_params = e::CabinetBuilder.config_to_params(e::Store.config(inst))
+                                   .merge('back_mode' => 'overlay', 'back_thickness' => 18.0)
+      pf = e::Panel.send(:back_preflight, pf_params, model)
+      ok('back D-38: preflight vybral 18 mm material (note + back_material_id)',
+         pf && pf[:error].nil? && pf[:note] && !pf_params['back_material_id'].to_s.empty?)
+      e::CabinetBuilder.rebuild(model, inst, pf_params)
+      s18 = find_part(inst, 'cabinet/side:left')
+      ok('back D-38: rebuild s pevnym 18 PRESIEL — telo 492, chrbat konci na 510',
+         s18 && (part_depth(s18) - 492.0).abs < TOL &&
+         (part_y_end(find_part(inst, 'cabinet/back')) - 510.0).abs < TOL)
+    else
+      info('back D-38: katalog nema 18 mm material — preflight scenar preskoceny')
+    end
+
+    cleanup(model)
+    ok('back: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: sync-back vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
   # --- ASYNC: undo/redo scenare (retaz timerov, observer debounce 0.2 s) -----
 
   def run_async(model, done)
@@ -892,6 +988,7 @@ module NoxunSuRunner
     log_line("INFO: verzia pluginu #{Noxun::Engine::VERSION}, model '#{File.basename(model.path.to_s)}'")
     cleanup(model) # cisty stol (zvysky z predoslych behov)
     run_sync(model)
+    run_sync_back(model) # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
