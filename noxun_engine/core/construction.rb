@@ -105,6 +105,16 @@ module Noxun
         cfg[:plinth_mode] == 'front' ? 'plinth' : 'legs'
       end
 
+      # D-37 (zavazne, Michal 20.7.): cfg[:depth] = CELKOVA hlbka korpusu VRATANE
+      # chrbta vo VSETKYCH rezimoch. Konstrukcna hlbka (boky/dno/vrch/vystuhy/nohy):
+      #   overlay -> d - bt (chrbat NALOZENY zozadu zabera zadnych bt z celkovej d)
+      #   inset / groove -> d (chrbat je VNUTRI obrysu — uz dnes splnaju celkovu d)
+      #   none -> d (ziadny chrbat)
+      # POZOR: inset/groove sa tymto helperom NESMU skratit (audit NOTE 9).
+      def carcass_depth(cfg)
+        cfg[:back_mode] == 'overlay' ? cfg[:depth] - back_thickness(cfg) : cfg[:depth]
+      end
+
       # Vnutorne rozmery (svetle) + poloha celnej hrany chrbta. Hrubka chrbta z configu.
       def interior_dims(cfg)
         h = cfg[:height]; d = cfg[:depth]
@@ -114,9 +124,10 @@ module Noxun
         z_hi = cfg[:top_mode] == 'none' ? h : h - t
         back_front_y =
           case cfg[:back_mode]
+          when 'none'   then d # D-31: ziadny chrbat — vnutro az po zadnu rovinu
           when 'inset'  then d - bt
           when 'groove' then d - GROOVE_OFFSET - bt
-          else d # overlay — chrbat je za korpusom, vnutro po zadnu stenu
+          else d - bt # D-37 overlay: chrbat zabera zadnych bt CELKOVEJ hlbky
           end
         { z_lo: z_lo, z_hi: z_hi, avail_h: (z_hi - z_lo), back_front_y: back_front_y, back_thickness: bt }
       end
@@ -126,9 +137,9 @@ module Noxun
         v.positive? ? v : BACK_THICKNESS_DEFAULT
       end
 
-      # Boky — plna hlbka. Z-start podla variantu dna.
+      # Boky — KONSTRUKCNA hlbka (D-37). Z-start podla variantu dna.
       def side_parts(cfg)
-        w = cfg[:width]; d = cfg[:depth]; t = cfg[:thickness]; s = cfg[:floor_height]; h = cfg[:height]
+        w = cfg[:width]; d = carcass_depth(cfg); t = cfg[:thickness]; s = cfg[:floor_height]; h = cfg[:height]
         z0 = cfg[:bottom_mode] == 'under_sides' ? (s + t) : 0.0
         sh = h - z0
         [
@@ -143,7 +154,7 @@ module Noxun
 
       # Dno — vzdy na urovni Z = floor_height (priestor pod nim = nohy / sokel).
       def bottom_part(cfg)
-        w = cfg[:width]; d = cfg[:depth]; t = cfg[:thickness]; s = cfg[:floor_height]
+        w = cfg[:width]; d = carcass_depth(cfg); t = cfg[:thickness]; s = cfg[:floor_height]
         if cfg[:bottom_mode] == 'under_sides'
           { suffix: 'BOTTOM', part_key: PartKeys.cabinet('bottom'), role: 'bottom', name: 'Dno', material: :korpus,
             box: [w, d, t], origin: [0, 0, s], prod: { length: w, width: d, thickness: t } }
@@ -155,7 +166,7 @@ module Noxun
 
       # Vrch — full / two_rails / none. warnings: volitelny kolektor (BuildPlan kontrakt).
       def top_parts(cfg, warnings = nil)
-        w = cfg[:width]; d = cfg[:depth]; t = cfg[:thickness]; h = cfg[:height]
+        w = cfg[:width]; d = carcass_depth(cfg); t = cfg[:thickness]; h = cfg[:height]
         case cfg[:top_mode]
         when 'none'
           []
@@ -169,8 +180,9 @@ module Noxun
 
       # Dve horne vystuhy (rail_front / rail_back). flat = naplocho, upright = na hranu.
       # Orezanie hlbky/vysky vystuhy uz nie je tiche — hlasi sa do warnings (ak je kolektor).
+      # D-37: zadna vystuha sedi na KONSTRUKCNEJ hlbke (pri overlay pred chrbtom).
       def rail_parts(cfg, warnings = nil)
-        w = cfg[:width]; d = cfg[:depth]; t = cfg[:thickness]; h = cfg[:height]; s = cfg[:floor_height]
+        w = cfg[:width]; d = carcass_depth(cfg); t = cfg[:thickness]; h = cfg[:height]; s = cfg[:floor_height]
         off = cfg[:rails_top_offset].to_f
         z_top = h - off
         if cfg[:rails_orientation] == 'upright'
@@ -204,8 +216,11 @@ module Noxun
         end
       end
 
-      # Chrbat — overlay / inset / groove; hrubka z configu (interior[:back_thickness]).
+      # Chrbat — overlay / inset / groove / none (D-31: none = ziadny dielec).
+      # D-37: VSETKY rezimy koncia najneskor na celkovej hlbke d — overlay chrbat
+      # lezi v pasme [d-bt, d] ZA skratenym korpusom (uz nie za celkovou hlbkou).
       def back_part(cfg, interior)
+        return nil if cfg[:back_mode] == 'none' # D-31: explicitne (else vetva by vyrobila overlay!)
         w = cfg[:width]; d = cfg[:depth]; h = cfg[:height]; t = cfg[:thickness]; s = cfg[:floor_height]
         bt = interior[:back_thickness]
         case cfg[:back_mode]
@@ -220,7 +235,7 @@ module Noxun
             box: [w - 2 * t, bt, bh], origin: [t, y0, z0], prod: { length: w - 2 * t, width: bh, thickness: bt } }
         else # overlay
           { suffix: 'BACK', part_key: PartKeys.cabinet('back'), role: 'back', name: 'Chrbat', material: :korpus,
-            box: [w, bt, h - s], origin: [0, d, s], prod: { length: w, width: h - s, thickness: bt } }
+            box: [w, bt, h - s], origin: [0, d - bt, s], prod: { length: w, width: h - s, thickness: bt } }
         end
       end
 

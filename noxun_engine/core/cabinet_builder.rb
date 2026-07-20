@@ -415,7 +415,9 @@ module Noxun
         # plytky korpus / 1 ks -> 1 rad v strede hlbky. Predny rad berie prebytok
         # (ceil), rovnomerne po sirke. Kresli sa najviac LEG_RENDER_MAX valcov.
         def draw_legs(ents, cfg, qty)
-          w = cfg[:width]; d = cfg[:depth]; h = cfg[:floor_height]
+          # D-37: nohy patria pod NOSNE dno (konstrukcna hlbka) — zadny rad nesmie
+          # trcat pod nalozenym chrbtom (pri hrubke az 50 mm by visel vo vzduchu).
+          w = cfg[:width]; d = Construction.carcass_depth(cfg); h = cfg[:floor_height]
           r = LEG_DIAMETER / 2.0
           count = [qty, LEG_RENDER_MAX].min
           # D-13/D-17 (Codex F4): pri prednom sokli predny rad noh posunut ZA dosku
@@ -633,7 +635,7 @@ module Noxun
             floor_height: type == 'upper' ? 0.0 : clampf(fetchf(p, :floor_height, d[:floor_height]), 0.0, 500.0),
             bottom_mode: enum_val(p, :bottom_mode, %w[between_sides under_sides], d[:bottom_mode]),
             top_mode:    enum_val(p, :top_mode,    %w[full two_rails none],       d[:top_mode]),
-            back_mode:   enum_val(p, :back_mode,   %w[overlay inset groove],      d[:back_mode]),
+            back_mode:   enum_val(p, :back_mode,   %w[overlay inset groove none], d[:back_mode]), # D-31: + none
             # hrubka chrbta ako Float mm (3 HDF / 18 pevny / ine); clamp 1..50
             back_thickness: clampf(fetchf(p, :back_thickness, d[:back_thickness]), 1.0, 50.0),
             plinth_mode: type == 'upper' ? 'none' : enum_val(p, :plinth_mode, %w[none front], d[:plinth_mode]),

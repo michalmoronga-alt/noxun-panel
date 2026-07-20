@@ -87,39 +87,40 @@ NxTest.test('construction: golden plan dolneho korpusu (normalize({}))') do
   # Boky: under_sides -> stoja NA dne (z0 = floor + t), vyska h - z0.
   sl = h.part(plan, 'cabinet/side:left')
   NxTest.assert_equal('side_left', sl[:role])
-  h.assert_vec([18.0, 510.0, 602.0], sl[:box], 'SIDE-L box')
+  # D-37: hlbka 510 je CELKOVA — konstrukcna pri overlay 3 mm = 507
+  h.assert_vec([18.0, 507.0, 602.0], sl[:box], 'SIDE-L box')
   h.assert_vec([0.0, 0.0, 118.0], sl[:origin], 'SIDE-L origin')
-  h.assert_prod(602.0, 510.0, 18.0, sl[:prod], 'SIDE-L')
+  h.assert_prod(602.0, 507.0, 18.0, sl[:prod], 'SIDE-L')
 
   sr = h.part(plan, 'cabinet/side:right')
   NxTest.assert_equal('side_right', sr[:role])
-  h.assert_vec([18.0, 510.0, 602.0], sr[:box], 'SIDE-R box')
+  h.assert_vec([18.0, 507.0, 602.0], sr[:box], 'SIDE-R box')
   h.assert_vec([582.0, 0.0, 118.0], sr[:origin], 'SIDE-R origin')
 
   # Dno: under_sides -> plna sirka, na Z = floor_height.
   bo = h.part(plan, 'cabinet/bottom')
   NxTest.assert_equal('bottom', bo[:role])
-  h.assert_vec([600.0, 510.0, 18.0], bo[:box], 'BOTTOM box')
+  h.assert_vec([600.0, 507.0, 18.0], bo[:box], 'BOTTOM box')
   h.assert_vec([0.0, 0.0, 100.0], bo[:origin], 'BOTTOM origin')
-  h.assert_prod(600.0, 510.0, 18.0, bo[:prod], 'BOTTOM')
+  h.assert_prod(600.0, 507.0, 18.0, bo[:prod], 'BOTTOM')
 
   # Vrch full: medzi bokmi.
   tp = h.part(plan, 'cabinet/top')
   NxTest.assert_equal('top', tp[:role])
-  h.assert_vec([564.0, 510.0, 18.0], tp[:box], 'TOP box')
+  h.assert_vec([564.0, 507.0, 18.0], tp[:box], 'TOP box')
   h.assert_vec([18.0, 0.0, 702.0], tp[:origin], 'TOP origin')
 
-  # Chrbat overlay: ZA korpusom (y = d), plna sirka, vyska h - floor.
+  # Chrbat overlay: v pasme [d-bt, d] ZA skratenym korpusom (D-37 — celkova hlbka = d).
   bk = h.part(plan, 'cabinet/back')
   NxTest.assert_equal('back', bk[:role])
   h.assert_vec([600.0, 3.0, 620.0], bk[:box], 'BACK box')
-  h.assert_vec([0.0, 510.0, 100.0], bk[:origin], 'BACK origin')
+  h.assert_vec([0.0, 507.0, 100.0], bk[:origin], 'BACK origin')
   h.assert_prod(600.0, 620.0, 3.0, bk[:prod], 'BACK')
 
-  # Available: sirka w-2t, vyska z_hi-z_lo, hlbka po celnu hranu chrbta (overlay = d).
+  # Available: sirka w-2t, vyska z_hi-z_lo, hlbka po celnu hranu chrbta (D-37 overlay = d - bt).
   NxTest.assert_close(564.0, plan[:available][:width])
   NxTest.assert_close(584.0, plan[:available][:height])
-  NxTest.assert_close(510.0, plan[:available][:depth])
+  NxTest.assert_close(507.0, plan[:available][:depth])
 
   # Vnutro: jedina listova zona s ID podla cabinet_id.
   NxTest.assert_equal(1, plan[:zones].size)
@@ -128,7 +129,7 @@ NxTest.test('construction: golden plan dolneho korpusu (normalize({}))') do
   NxTest.assert(zone[:leaf], 'koren bez splitu ma byt leaf')
   NxTest.assert_close(564.0, zone[:width])
   NxTest.assert_close(584.0, zone[:height])
-  NxTest.assert_close(510.0, zone[:depth])
+  NxTest.assert_close(507.0, zone[:depth])
   NxTest.assert_equal([], plan[:front_items])
   NxTest.assert_equal(0, plan[:wings])
 end
@@ -204,7 +205,7 @@ NxTest.test('construction: matrix smoke bottom x top x back x plinth') do
   tol = 0.01
   %w[between_sides under_sides].each do |bm|
     %w[full two_rails none].each do |tm|
-      %w[overlay inset groove].each do |bkm|
+      %w[overlay inset groove none].each do |bkm|
         %w[none front].each do |pm|
           label = "#{bm}/#{tm}/#{bkm}/#{pm}"
           cfg = h.cb.normalize('bottom_mode' => bm, 'top_mode' => tm,
@@ -221,18 +222,18 @@ NxTest.test('construction: matrix smoke bottom x top x back x plinth') do
           NxTest.assert_equal(tm == 'two_rails', keys.include?('cabinet/rail:front'), "#{label}: rail front")
           NxTest.assert_equal(tm == 'two_rails', keys.include?('cabinet/rail:back'), "#{label}: rail back")
           NxTest.assert_equal(pm == 'front', keys.include?('cabinet/plinth:front'), "#{label}: plinth")
-          NxTest.assert(keys.include?('cabinet/back'), "#{label}: chrbat chyba")
+          NxTest.assert_equal(bkm != 'none', keys.include?('cabinet/back'), "#{label}: chrbat podla rezimu (D-31)")
 
           # Essential invarianty kazdeho dielca: kladny box + obalka korpusu.
-          # Obalka: X 0..600, Z 0..720, Y 0..510; overlay chrbat smie za d (po d + bt).
-          bt = h.cn.back_thickness(cfg)
+          # Obalka: X 0..600, Z 0..720, Y 0..510 — D-37: NIC nesmie za celkovu hlbku
+          # (ani overlay chrbat; predtym smel po d + bt).
           plan[:parts].each do |pd|
             pd[:box].each_with_index do |v, i|
               NxTest.assert(v.to_f > 0.0, "#{label} #{pd[:part_key]}: box[#{i}] = #{v.inspect} nie je > 0")
             end
             x0, y0, z0 = pd[:origin]
             sx, sy, sz = pd[:box]
-            y_max = pd[:role] == 'back' ? 510.0 + bt : 510.0
+            y_max = 510.0
             NxTest.assert(x0 >= -tol && x0 + sx <= 600.0 + tol, "#{label} #{pd[:part_key]}: X mimo obalky")
             NxTest.assert(y0 >= -tol && y0 + sy <= y_max + tol, "#{label} #{pd[:part_key]}: Y mimo obalky")
             NxTest.assert(z0 >= -tol && z0 + sz <= 720.0 + tol, "#{label} #{pd[:part_key]}: Z mimo obalky")
@@ -248,9 +249,9 @@ end
 NxTest.test('construction: interior_dims varianty chrbta a vrchu') do
   h = NxConsHelp
 
-  # overlay: vnutro po zadnu stenu (back_front_y = d).
+  # overlay (D-37): vnutro po celnu hranu chrbta (back_front_y = d - bt).
   i1 = h.cn.interior_dims(h.raw_cfg(back_mode: 'overlay'))
-  NxTest.assert_close(510.0, i1[:back_front_y])
+  NxTest.assert_close(507.0, i1[:back_front_y])
   NxTest.assert_close(118.0, i1[:z_lo], 0.01, 'z_lo = floor + t')
   NxTest.assert_close(702.0, i1[:z_hi], 0.01, 'z_hi = h - t pri top full')
   NxTest.assert_close(584.0, i1[:avail_h])
@@ -304,18 +305,18 @@ NxTest.test('construction: rail_parts flat geometria a clamp minima') do
   h.assert_vec([564.0, 100.0, 18.0], rf[:box], 'RAIL-F flat box')
   h.assert_vec([18.0, 0.0, 702.0], rf[:origin], 'RAIL-F flat origin')
   h.assert_vec([564.0, 100.0, 18.0], rb[:box], 'RAIL-B flat box')
-  h.assert_vec([18.0, 410.0, 702.0], rb[:origin], 'RAIL-B flat origin (d - rd)')
+  h.assert_vec([18.0, 407.0, 702.0], rb[:origin], 'RAIL-B flat origin (carcass d - rd, D-37)')
   h.assert_prod(564.0, 100.0, 18.0, rf[:prod], 'RAIL-F flat')
 
   # Clamp minima: rail_depth 5 -> hlbka vystuhy min 20.
   small = h.cn.rail_parts(h.raw_cfg(rails_orientation: 'flat', rail_depth: 5.0))
   h.assert_vec([564.0, 20.0, 18.0], small[0][:box], 'RAIL-F clamp box')
-  h.assert_vec([18.0, 490.0, 702.0], small[1][:origin], 'RAIL-B clamp origin (d - 20)')
+  h.assert_vec([18.0, 487.0, 702.0], small[1][:origin], 'RAIL-B clamp origin (carcass d - 20, D-37)')
 
   # rails_top_offset posuva vystuhy nadol: z0 = h - off - t.
   off = h.cn.rail_parts(h.raw_cfg(rails_orientation: 'flat', rails_top_offset: 50.0))
   h.assert_vec([18.0, 0.0, 652.0], off[0][:origin], 'RAIL-F offset origin')
-  h.assert_vec([18.0, 410.0, 652.0], off[1][:origin], 'RAIL-B offset origin')
+  h.assert_vec([18.0, 407.0, 652.0], off[1][:origin], 'RAIL-B offset origin')
 end
 
 NxTest.test('construction: rail_parts upright geometria a clamp na vysku') do
@@ -327,7 +328,7 @@ NxTest.test('construction: rail_parts upright geometria a clamp na vysku') do
   rf, rb = rails
   h.assert_vec([564.0, 18.0, 100.0], rf[:box], 'RAIL-F upright box')
   h.assert_vec([18.0, 0.0, 620.0], rf[:origin], 'RAIL-F upright origin (z = h - rdp)')
-  h.assert_vec([18.0, 492.0, 620.0], rb[:origin], 'RAIL-B upright origin (y = d - t)')
+  h.assert_vec([18.0, 489.0, 620.0], rb[:origin], 'RAIL-B upright origin (y = carcass d - t, D-37)')
   h.assert_prod(564.0, 100.0, 18.0, rf[:prod], 'RAIL-F upright')
 
   # Clamp hlbky na vysku: h=200, s=100 -> rdp = min(100, 200-100-18-10=72) = 72.
@@ -395,4 +396,60 @@ NxTest.test('construction: zmena width/height nemeni mnozinu part_keys') do
                   h.cb.normalize(h.identity_params.merge('height' => 900.0)), 'CAB-006'
                 )).sort
   NxTest.assert_equal(base, tall, 'zmena vysky nesmie zmenit mnozinu part_keys')
+end
+
+# --- D-37 celkova hlbka + D-31 bez chrbta --------------------------------------
+
+NxTest.test('construction: D-37 carcass_depth — overlay skracuje, inset/groove/none nie') do
+  h = NxConsHelp
+  NxTest.assert_close(507.0, h.cn.carcass_depth(h.cb.normalize('back_mode' => 'overlay')))
+  NxTest.assert_close(492.0, h.cn.carcass_depth(h.cb.normalize('back_mode' => 'overlay', 'back_thickness' => 18.0)),
+                      0.01, 'pevny 18 mm chrbat skrati telo o 18')
+  NxTest.assert_close(510.0, h.cn.carcass_depth(h.cb.normalize('back_mode' => 'inset')))
+  NxTest.assert_close(510.0, h.cn.carcass_depth(h.cb.normalize('back_mode' => 'groove')))
+  NxTest.assert_close(510.0, h.cn.carcass_depth(h.cb.normalize('back_mode' => 'none')))
+end
+
+NxTest.test('construction: D-37 INVARIANT — ziadny dielec neprekroci celkovu hlbku, overlay chrbat konci PRESNE na d') do
+  h = NxConsHelp
+  %w[overlay inset groove none].each do |bkm|
+    [3.0, 18.0].each do |bt|
+      cfg = h.cb.normalize('back_mode' => bkm, 'back_thickness' => bt)
+      plan = h.cn.build_plan(cfg, 'CAB-D37')
+      plan[:parts].each do |pd|
+        next if pd[:part_key].to_s.start_with?('front:') # cela stoja PRED korpusom (zaporne Y)
+        y_end = pd[:origin][1] + pd[:box][1]
+        NxTest.assert(y_end <= 510.0 + 0.01, "#{bkm}/#{bt} #{pd[:part_key]}: konci na #{y_end}, max 510")
+      end
+      next if bkm == 'none'
+      bk = h.part(plan, 'cabinet/back')
+      NxTest.assert_close(510.0 - (bkm == 'groove' ? 10.0 : 0.0), bk[:origin][1] + bk[:box][1], 0.01,
+                          "#{bkm}/#{bt}: zadna hrana chrbta (groove konci 10 pred zadnou rovinou)")
+    end
+  end
+end
+
+NxTest.test('construction: D-31 golden bez chrbta — ziadny BACK, telo aj vnutro na plnu hlbku') do
+  h = NxConsHelp
+  cfg = h.cb.normalize('back_mode' => 'none')
+  NxTest.assert_equal('none', cfg[:back_mode], 'normalize akceptuje none')
+  plan = h.cn.build_plan(cfg, 'CAB-D31')
+  NxTest.refute(h.keys(plan).include?('cabinet/back'), 'BACK dielec nesmie existovat')
+  sl = h.part(plan, 'cabinet/side:left')
+  NxTest.assert_close(510.0, sl[:box][1], 0.01, 'bok na plnu hlbku')
+  NxTest.assert_close(510.0, plan[:available][:depth], 0.01, 'vnutro az po zadnu rovinu')
+  NxTest.assert_equal(1, plan[:zones].size)
+  NxTest.assert_close(510.0, plan[:zones].first[:depth], 0.01, 'zona na plnu hlbku (D-37 logika zon)')
+end
+
+NxTest.test('construction: D-31 round-trip — none prezije JSON config -> params -> normalize (sablony)') do
+  h = NxConsHelp
+  cfg = h.cb.normalize('back_mode' => 'none', 'back_thickness' => 18.0)
+  # Verny realny flow: config zije v NOXUN dict ako JSON STRING (string kluce) —
+  # config_to_params cita string kluce (symbol hash by padol na legacy fallback).
+  stored = JSON.parse(JSON.generate(h.cb.merge_final(cfg, h.cn.build_plan(cfg, 'CAB-RT'))))
+  cfg2 = h.cb.normalize(h.cb.config_to_params(stored))
+  NxTest.assert_equal('none', cfg2[:back_mode], 'none prezil round-trip')
+  NxTest.assert_close(18.0, cfg2[:back_thickness], 0.01,
+                      'hrubka sa pri none ZACHOVAVA (navrat rezimu ju obnovi)')
 end
