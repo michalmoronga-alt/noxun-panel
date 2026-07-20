@@ -50,6 +50,59 @@ module Noxun
           rebuild_focus_part(model, cab, rk, params, "Hrana #{code} — #{label}.")
         end
 
+        # D-35: olepenie VSETKYCH 4 hran dielca jednym klikom — ABS 1.0 mm dekoru
+        # materialu dielca, JEDEN rebuild = JEDEN undo krok (audit FIX 7: nikdy
+        # slucka 4x set_edge). Identity guard (audit BLOCKER 3): payload nesie
+        # cabinet_id AJ role_key a OBOJE sa overuje proti aktualne oznacenemu
+        # dielcu — preklik medzi klikom a callbackom nesmie zasiahnut iny korpus.
+        # Stale echo sa TICHO zahodi (len log, vzor board guardu) — pouzivatel uz
+        # medzitym robi nieco ine, chybova hlaska by matla.
+        def handle_set_part_edges_all(payload)
+          model = Sketchup.active_model
+          cab = find_cabinet(model)
+          return set_status('Najprv oznac dielec v korpuse.', true) if cab.nil?
+          data = parse(payload)
+          rk = data['role_key'].to_s
+          return set_status('Chyba identifikacie dielca.', true) if rk.empty?
+          unless data['cabinet_id'].to_s == Store.get(cab, 'cabinet_id').to_s
+            Engine.log("bulk hrany zahodene — echo #{data['cabinet_id']} nesedi s vyberom #{Store.get(cab, 'cabinet_id')}")
+            return
+          end
+          part = find_selected_part(model)
+          if part.nil?
+            Engine.log('bulk hrany zahodene — vo vybere nie je dielec')
+            return
+          end
+          params = existing_params(cab)
+          rk = canonical_part_key(params, rk)
+          unless canonical_part_key(params, part_identity(cab, part)) == rk
+            Engine.log("bulk hrany zahodene — echo kluca #{rk} nesedi s oznacenym dielcom")
+            return
+          end
+          abs_id, decor = bulk_abs_for(Store.config(part) || {})
+          return set_status(missing_bulk_abs_msg(decor), true) if abs_id.nil? # atomicky no-op (audit FIX 5)
+          ov = (params['part_overrides'] ||= {})
+          rec = ov[rk] || {}
+          rec['edges'] = AbsRules.uniform_edges(abs_id)
+          store_override(ov, rk, rec)
+          rebuild_focus_part(model, cab, rk, params, "Všetky 4 hrany — ABS #{decor} 1,0 mm.")
+        end
+
+        # ABS 1.0 mm k dekoru materialu dielca/dosky. Vrati [abs_id alebo nil, dekor].
+        # Zdroj materialu = config na entite (resolved snapshot, standard 8.3) — to iste,
+        # co zobrazuje karta. Nenajdena paska => volajuci NESMIE nic menit (ziadna mapa
+        # 4x nil — zmazala by existujuce hrany), len status s navodom.
+        def bulk_abs_for(cfg)
+          mat = cfg['material_id']
+          decor = defined?(Materials) ? Materials.decor_of(mat) : nil
+          return [nil, decor || mat] if decor.nil?
+          [Materials.abs_for_decor(decor, 1.0), decor]
+        end
+
+        def missing_bulk_abs_msg(decor)
+          "Ku dekóru #{decor || 'materiálu dielca'} nie je v katalógu 1,0 mm ABS — pridaj ju v Materiáloch projektu."
+        end
+
         # Rebuild korpusu s pripravenymi params + fokus na dielec (part_key) + resync panela.
         def rebuild_focus_part(model, cab, rk, params, msg)
           suspend_selection_sync do

@@ -239,30 +239,111 @@ end
 
 # ============================ AbsRules =========================================
 
-NxTest.test('abs_rules: seed pravidla — cela dookola, ostatne predna, chrbat nic') do
+NxTest.test('abs_rules: seed pravidla — ZAMOK presnej mapy VSETKYCH roli (D-30)') do
   NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
   rules = Noxun::Engine::AbsRules
   nx_reset_catalog_file(rules.path)
-  # Cela (front_door/drawer_front): vsetky 4 hrany 1.0 mm.
+  # Rozhodnutie vlastnika (D-30): CELA sa olepuju DOOKOLA (4 hrany — dvierka v
+  # Michalovych exportoch vzdy so 4 hranami), KORPUSOVE roly vratane vystuh presne
+  # 1 dlha hrana L1 1.0 mm, chrbat a sokel NIC. Test drzi CELU mapu — zmena
+  # ktorejkolvek roly musi byt vedome rozhodnutie, nie vedlajsi efekt.
+  expected = {
+    'front_door'   => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
+    'drawer_front' => { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 },
+    'shelf'        => { 'L1' => 1.0 },
+    'side_left'    => { 'L1' => 1.0 },
+    'side_right'   => { 'L1' => 1.0 },
+    'bottom'       => { 'L1' => 1.0 },
+    'top'          => { 'L1' => 1.0 },
+    'divider_v'    => { 'L1' => 1.0 },
+    'divider_h'    => { 'L1' => 1.0 },
+    'back'         => {},
+    'plinth'       => {},
+    'rail_front'   => { 'L1' => 1.0 },
+    'rail_back'    => { 'L1' => 1.0 },
+    'free_panel'   => { 'L1' => 1.0 }
+  }
+  NxTest.assert_equal(expected, rules::SEED_RULES, 'SEED_RULES sa lisia od zamknutej mapy')
+  NxTest.assert_equal(expected, rules.load, 'cerstvy subor musi vratit presne seed mapu')
+  # Funkcny pohlad cez thicknesses_for (rovnake skupiny ako mapa vyssie).
   %w[front_door drawer_front].each do |role|
     th = rules.thicknesses_for(role)
     NxTest.assert_equal(%w[L1 L2 W1 W2], th.keys.sort, "rola #{role}")
     th.each_value { |v| NxTest.assert_close(1.0, v) }
   end
-  # Lezace/zvisle dielce: len predna hrana (L1) 1.0 mm.
-  %w[shelf side_left side_right bottom top divider_v divider_h].each do |role|
-    th = rules.thicknesses_for(role)
-    NxTest.assert_equal(%w[L1], th.keys, "rola #{role} ma mat len L1")
-    NxTest.assert_close(1.0, th['L1'])
+  %w[shelf side_left side_right bottom top divider_v divider_h
+     rail_front rail_back free_panel].each do |role|
+    NxTest.assert_equal({ 'L1' => 1.0 }, rules.thicknesses_for(role), "rola #{role} ma mat len L1 1.0")
   end
-  # Chrbat, sokel a vystuhy: ziadne ABS.
-  %w[back plinth rail_front rail_back].each do |role|
+  %w[back plinth].each do |role|
     NxTest.assert_equal({}, rules.thicknesses_for(role), "rola #{role} nema mat ABS")
   end
   # Neznama rola -> prazdna mapa, ziadna vynimka.
   NxTest.assert_equal({}, rules.thicknesses_for('neznama_rola'))
+  # D-30 audit FIX 4: labely vystuh su orientacne NEUTRALNE ("Predná" by pri
+  # upright orientacii klamala) — L = dlha (pozdlzna) hrana.
+  %w[rail_front rail_back].each do |role|
+    NxTest.assert_equal('Pozdĺžna 1', rules.edge_labels(role)['L1'], "label L1 roly #{role}")
+    NxTest.assert_equal('Priečna 2', rules.edge_labels(role)['W2'], "label W2 roly #{role}")
+  end
   parsed = JSON.parse(File.binread(rules.path))
   NxTest.assert_equal(1, parsed['std'])
+  NxTest.assert_equal(rules::SEED_VERSION, parsed['seed_version'])
+end
+
+NxTest.test('abs_rules: D-30 rail migracia — presne prazdne prepise, neprazdne NIKDY') do
+  NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
+  ar = Noxun::Engine::AbsRules
+  js = Noxun::Engine::JsonFileStore
+  # (a) subor spred SEED_VERSION 2 so STOCK prazdnymi railmi ({} zo seedu v1):
+  #     jednorazova migracia ich prepise na novy default {'L1'=>1.0}; ine roly nedotknute.
+  js.write(ar.path, { 'std' => 1, 'seed_version' => 1,
+                      'rules' => { 'rail_front' => {}, 'rail_back' => {},
+                                   'shelf' => { 'L1' => 2.0 } } })
+  ar.reload!
+  rules = ar.load
+  NxTest.assert_equal({ 'L1' => 1.0 }, rules['rail_front'], 'stock prazdny rail_front sa migruje')
+  NxTest.assert_equal({ 'L1' => 1.0 }, rules['rail_back'], 'stock prazdny rail_back sa migruje')
+  NxTest.assert_equal({ 'L1' => 2.0 }, rules['shelf'], 'pouzivatelska uprava inej roly ostava')
+  parsed = JSON.parse(File.binread(ar.path))
+  NxTest.assert_equal(ar::SEED_VERSION, parsed['seed_version'], 'subor po migracii nesie novu verziu')
+  # (b) NEPRAZDNY obsah railu sa neprepise NIKDY — ani neplatny (normalizacia ho
+  #     sice vyprazdni, ale migracia rozhoduje podla RAW obsahu suboru).
+  js.write(ar.path, { 'std' => 1, 'seed_version' => 1,
+                      'rules' => { 'rail_front' => { 'L2' => 2.0 },
+                                   'rail_back' => { 'L1' => 0.8 } } })
+  ar.reload!
+  rules2 = ar.load
+  NxTest.assert_equal({ 'L2' => 2.0 }, rules2['rail_front'], 'pouzivatelska uprava railu ostava')
+  NxTest.assert_equal({}, rules2['rail_back'], 'neplatny obsah sa znormalizuje na prazdno, ale NEmigruje')
+  # (c) subor UZ na aktualnom SEED_VERSION: vedome vyprazdneny rail ostava prazdny
+  #     navzdy — migracia je jednorazova, nikdy sa nezopakuje.
+  js.write(ar.path, { 'std' => 1, 'seed_version' => ar::SEED_VERSION,
+                      'rules' => { 'rail_front' => {}, 'rail_back' => {} } })
+  ar.reload!
+  rules3 = ar.load
+  NxTest.assert_equal({}, rules3['rail_front'], 'po migracii si pouzivatel smie rail vyprazdnit')
+  NxTest.assert_equal({}, rules3['rail_back'])
+  # cleanup: cisty seed pre dalsie testy v tomto procese
+  nx_reset_catalog_file(ar.path)
+end
+
+NxTest.test('abs_rules: uniform_edges — kompletna 4-mapa, nil/prazdne odmieta (bulk kontrakt)') do
+  ar = Noxun::Engine::AbsRules
+  NxTest.assert_equal({ 'L1' => 'ABS_K009_10', 'L2' => 'ABS_K009_10',
+                        'W1' => 'ABS_K009_10', 'W2' => 'ABS_K009_10' },
+                      ar.uniform_edges('ABS_K009_10'))
+  # D-35 audit FIX 5: bulk bez najdenej ABS musi byt no-op — mapa 4x nil by zmazala
+  # existujuce hrany, preto uniform_edges nil/prazdne abs_id tvrdo odmieta.
+  [nil, '', '   '].each do |bad|
+    raised = false
+    begin
+      ar.uniform_edges(bad)
+    rescue ArgumentError
+      raised = true
+    end
+    NxTest.assert(raised, "uniform_edges(#{bad.inspect}) musi vyhodit ArgumentError")
+  end
 end
 
 NxTest.test('abs_rules: nepodporovane hrubky a nezname hrany sa pri citani normalizuju') do
@@ -293,6 +374,12 @@ NxTest.test('abs_rules: resolve_edges spoji pravidla s ABS katalogom podla dekor
   # Polica: pravidlo len L1 (predna) -> ABS dekoru K009 PW hrubky 1.0.
   NxTest.assert_equal({ 'L1' => 'ABS_K009_10', 'L2' => nil, 'W1' => nil, 'W2' => nil },
                       rules.resolve_edges('shelf', 'K009 PW'))
+  # D-30 (audit NOTE 11): vystuhy cez CELU resolve cestu — znamy dekor s existujucou
+  # 1.0 mm ABS musi dat konkretny abs_id na dlhej hrane L1 (nie len thicknesses_for).
+  %w[rail_front rail_back].each do |role|
+    NxTest.assert_equal({ 'L1' => 'ABS_K009_10', 'L2' => nil, 'W1' => nil, 'W2' => nil },
+                        rules.resolve_edges(role, 'K009 PW'), "resolve_edges #{role}")
+  end
   # Celo: vsetky 4 hrany rovnaky ABS variant.
   NxTest.assert_equal({ 'L1' => 'ABS_W1000_10', 'L2' => 'ABS_W1000_10',
                         'W1' => 'ABS_W1000_10', 'W2' => 'ABS_W1000_10' },

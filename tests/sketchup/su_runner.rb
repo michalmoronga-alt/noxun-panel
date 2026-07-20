@@ -14,7 +14,8 @@
 #   SYNC cast — geometria proti BuildPlan kontraktu (plan vs. model 1:1), NOXUN data
 #     dielcov, ghost zony, rebuild identita + prezitie part_overrides, dedup kopie
 #     (priame volanie), undo rebuildu = presne 1 krok; V0.4.7b sync-board sekcia
-#     (build/rebuild/undo/dedup samostatnej dosky, standard 8.3).
+#     (build/rebuild/undo/dedup samostatnej dosky, standard 8.3); D-35 sync-abs
+#     sekcia (bulk olepenie 4 hran = 1 undo, echo guardy, no-op bez ABS variantu).
 #   ASYNC cast — retaz UI.start_timer krokov (observer debounce = 0.2 s):
 #     S1 scale -> absorpcia -> Ctrl+Z (audit riziko: re-absorpcia po undo)
 #     S2 kopia -> observer dedup -> Ctrl+Z (audit riziko: zapis ID mimo operacie)
@@ -523,6 +524,73 @@ module NoxunSuRunner
     e::ProductionDialog.do_select({ 'gen' => 0, 'hw_key' => hwrow['key'] })
     ok('sync-vyroba: klik na kovanie (hw_key) oznacil oba korpusy',
        model.selection.size == 2 && model.selection.all? { |s| e::Store.kind(s) == 'cabinet' })
+
+    # 14) D-35 bulk ABS (audit FIX 8): olepenie vsetkych 4 hran JEDNYM callbackom
+    #     = 1 undo krok; identity guard (zle echo nic nezmeni); nenajdena ABS =
+    #     atomicky no-op BEZ undo kroku (mapa 4x nil sa NIKDY nesmie ulozit).
+    shelf14 = inst.definition.entities.grep(Sketchup::ComponentInstance)
+                  .find { |i| e::Store.get(i, 'role') == 'shelf' }
+    rk14 = e::Store.get(shelf14, 'part_key').to_s
+    cid14 = e::Store.get(inst, 'cabinet_id').to_s
+    e::Panel.select_only(model, shelf14)
+    # zle echo cabinet_id -> ticho zahodene, ziadna zmena
+    e::Panel.handle_set_part_edges_all({ 'cabinet_id' => 'CAB-999', 'role_key' => rk14 }.to_json)
+    ov14 = (e::Store.config(inst) || {})['part_overrides'] || {}
+    ok('sync-abs: part bulk so zlym echo cabinet_id nic nezmenil', !ov14.key?(rk14))
+    # kluc INEHO dielca nez oznaceneho -> ticho zahodene
+    e::Panel.handle_set_part_edges_all({ 'cabinet_id' => cid14, 'role_key' => 'cabinet/side:left' }.to_json)
+    ov14b = (e::Store.config(inst) || {})['part_overrides'] || {}
+    ok('sync-abs: part bulk s klucom ineho dielca nic nezmenil', !ov14b.key?('cabinet/side:left'))
+    # spravne echo: VSETKY 4 hrany jednym callbackom (ABS dekoru materialu dielca)
+    e::Panel.handle_set_part_edges_all({ 'cabinet_id' => cid14, 'role_key' => rk14 }.to_json)
+    find_part14 = lambda do
+      inst.definition.entities.grep(Sketchup::ComponentInstance)
+          .find { |i| e::Store.get(i, 'part_key').to_s == rk14 }
+    end
+    ecfg14 = (e::Store.config(find_part14.call) || {})['edges'] || {}
+    ov14c = ((e::Store.config(inst) || {})['part_overrides'] || {})[rk14] || {}
+    ok('sync-abs: part bulk olepil vsetky 4 hrany jednym callbackom (ABS_K009_10)',
+       %w[L1 L2 W1 W2].all? { |c| ecfg14[c] == 'ABS_K009_10' } &&
+       %w[L1 L2 W1 W2].all? { |c| (ov14c['edges'] || {})[c] == 'ABS_K009_10' })
+    # JEDNO undo vrati vsetky 4 hrany naraz (bulk = 1 operacia)
+    Sketchup.undo
+    ecfg14u = (e::Store.config(find_part14.call) || {})['edges'] || {}
+    ov14u = (e::Store.config(inst) || {})['part_overrides'] || {}
+    ok('sync-abs: 1x undo vratil vsetky 4 hrany naraz (override prec, default L1 drzi)',
+       !ov14u.key?(rk14) && ecfg14u['L1'] == 'ABS_K009_10' && ecfg14u['L2'].nil? &&
+       ecfg14u['W1'].nil? && ecfg14u['W2'].nil?)
+
+    # board bulk: poradie flush -> bulk (JS flushBoardEditsNow simulovane volanim
+    # set_board_fields tesne pred bulkom — bulk musi pracovat nad cerstvym configom)
+    e::Panel.select_only(model, binst)
+    bid14 = e::Store.get(binst, 'id').to_s
+    e::Panel.handle_set_board_fields({ 'board_id' => bid14, 'fields' => { 'width' => 590.0 } }.to_json)
+    e::Panel.handle_set_board_edges_all({ 'board_id' => bid14 }.to_json)
+    bcfg14 = e::Store.config(binst) || {}
+    ok('sync-abs: board bulk po flushi poli — sirka 590 drzi a 4 hrany olepene',
+       (bcfg14['width'].to_f - 590.0).abs < 0.01 &&
+       %w[L1 L2 W1 W2].all? { |c| (bcfg14['edges'] || {})[c] == 'ABS_K009_10' })
+    Sketchup.undo
+    bcfg14u = e::Store.config(binst) || {}
+    ok('sync-abs: board bulk 1x undo vratil hrany, flush poli bol samostatny krok (sirka 590)',
+       (bcfg14u['width'].to_f - 590.0).abs < 0.01 &&
+       (bcfg14u['edges'] || {})['L2'].nil?)
+    e::Panel.handle_set_board_edges_all({ 'board_id' => 'BRD-999' }.to_json)
+    ok('sync-abs: board bulk so zlym echo board_id nic nezmenil',
+       ((e::Store.config(binst) || {})['edges'] || {})['L2'].nil?)
+    # nenajdena ABS (HDF nema 1.0 mm pasku): atomicky no-op — hrany NEDOTKNUTE
+    # (ziadne 4x nil!) a ZIADEN undo krok (marker width 570 sa musi undo-nut prvy)
+    e::Panel.handle_set_board_material({ 'board_id' => bid14, 'material_id' => 'HDF_WHITE_3' }.to_json)
+    edges_before14 = ((e::Store.config(binst) || {})['edges'] || {}).dup
+    e::Panel.handle_set_board_fields({ 'board_id' => bid14, 'fields' => { 'width' => 570.0 } }.to_json)
+    e::Panel.handle_set_board_edges_all({ 'board_id' => bid14 }.to_json)
+    bcfg14n = e::Store.config(binst) || {}
+    ok('sync-abs: bulk bez ABS variantu = atomicky no-op (hrany nedotknute, ziadne 4x nil)',
+       (bcfg14n['edges'] || {}) == edges_before14 && (bcfg14n['width'].to_f - 570.0).abs < 0.01)
+    Sketchup.undo
+    bcfg14z = e::Store.config(binst) || {}
+    ok('sync-abs: bulk bez ABS nevytvoril undo krok (1x undo vratil marker 570 -> 590)',
+       (bcfg14z['width'].to_f - 590.0).abs < 0.01)
 
     cleanup(model)
     ok('sync: cleanup (0 korpusov, 0 dosiek)', cabinets(model).empty? && boards(model).empty?)

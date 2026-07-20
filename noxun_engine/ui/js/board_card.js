@@ -70,6 +70,15 @@
     if (window.sketchup && sketchup.set_board_edge)
       sketchup.set_board_edge(JSON.stringify({ board_id: boardCard.board_id, edge: code, abs_id: value }));
   }
+  // D-35: olep vsetky 4 hrany ABS 1.0 dekoru materialu dosky (1 rebuild = 1 undo).
+  // PRED bulkom flush pending debounce editov (audit FIX 6) — cakajuci zapis poli
+  // nesmie prist AZ PO bulku (callbacky sa vykonavaju v poradi odoslania).
+  function onBoardEdgesAll(){
+    if (!boardCard) return;
+    flushBoardEditsNow();
+    if (window.sketchup && sketchup.set_board_edges_all)
+      sketchup.set_board_edges_all(JSON.stringify({ board_id: boardCard.board_id }));
+  }
 
   // Zapis hodnoty len ked pole NEMA fokus — refresh z backendu nesmie prepisat
   // rozpisanu hodnotu pouzivatela (echo po auto-apply).
