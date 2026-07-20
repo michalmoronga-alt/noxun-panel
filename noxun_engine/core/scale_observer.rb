@@ -225,7 +225,17 @@ module Noxun
               Engine.log_error(e, 'ScaleWatch.process_dirty')
             end
           end
-          prune_ghosts(erase_model || @last_model || touched_models.first) if need_prune
+          if need_prune
+            prune_model = erase_model || @last_model || touched_models.first
+            prune_ghosts(prune_model)
+            # D-34 (audit B4b): po ustaleni erase VZDY resync panela — zmazanie
+            # oznacenej skrinky nemusi vystrelit selection event a Inspector by
+            # visel na mrtvych datach. push_selected pri prazdnom/neplatnom vybere
+            # posle NX.clearSelected -> rezim vkladania + reset karty (audit B2).
+            # Model je zachyteny z eventu PRED invalidaciou entity (fix #8);
+            # refresh_panel ma multi-model guard (len aktivny dokument).
+            refresh_panel(prune_model)
+          end
         end
 
         # Presun ghost zon za korpusom (bez rebuildu). TRANSPARENTNA operacia (fix #3): 4. param

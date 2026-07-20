@@ -130,8 +130,9 @@ module Noxun
         # (project_materials payload sa V0.4.5 D2 presunul do MaterialsDialog.push_state)
 
         # Dielec vo vybere (kind=part) — po dvojkliku do korpusu a kliknuti na dielec.
+        # D-34 (audit B4a): valid? filter — atributy zmazanej entity sa nesmu citat.
         def find_selected_part(model)
-          model.selection.to_a.find { |e| Store.kind(e) == 'part' }
+          model.selection.to_a.find { |e| e.valid? && Store.kind(e) == 'part' }
         end
 
         # Karta dielca pre UI (ABS/materialovy editor): rola, rozmery, VYSLEDNY material + ABS hrany,

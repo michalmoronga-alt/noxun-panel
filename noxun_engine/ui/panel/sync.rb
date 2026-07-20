@@ -24,7 +24,10 @@ module Noxun
             materials: materials_payload, # V0.3 katalog (dosky + ABS) pre selecty
             # (projektove predvolby zobrazuje okno MaterialsDialog — D2)
             selected: cab ? cabinet_payload(cab) : (board ? board_payload(board) : nil),
-            selected_kind: cab ? 'cabinet' : (board ? 'board' : 'none')
+            selected_kind: cab ? 'cabinet' : (board ? 'board' : 'none'),
+            # D-39 (audit B5): zamky vkladacej karty z Ruby pamate — preziju
+            # zatvorenie panela; JS ich obnovi pri kazdom otvoreni (push_init).
+            insert_locks: insert_locks
           }
           js("NX.init(#{data.to_json})")
         end
