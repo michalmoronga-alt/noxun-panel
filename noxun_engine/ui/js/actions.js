@@ -180,7 +180,26 @@
     // ('650mm') by sa inak ticho zmenil na default a neplatna vyska cela na auto.
     if (!validateFields()){ NX.setStatus('Skontroluj červené polia (neplatný rozmer).', true); return; }
     var p = collectAll(); p.zone_tree = currentZoneTree;
+    // D-33/F6: materialy zo sablony idu do insert payloadu EXPLICITNE (drzi ich
+    // insert stav, nie disabled selecty). Vedome MIMO PARAM_KEYS/CONSTRUCTION_FIELDS:
+    // PARAM_KEYS je zaroven apply whitelist a materialy maju vlastny kanal
+    // set_cabinet_material — rozsirenie whitelistu by nechalo auto-apply prepisovat
+    // materialy zo stavu formulara. Ruby handle_insert ich cez build/normalize
+    // zapise do configu (normalize materialy pozna od V0.3).
+    var mats = NXInsert.state.materials || {};
+    NXInsert.MATERIAL_KEYS.forEach(function(k){ if (mats[k]) p[k] = mats[k]; });
     if (window.sketchup && sketchup.insert_cabinet) sketchup.insert_cabinet(JSON.stringify(p));
+  }
+  // B3 „Vlozit kopiu": PRESNA SERVEROVA kopia oznacenej skrinky — config sa cita
+  // z modelu (nie z DOM formulara), takze kopia nesie aj materialy, part_overrides,
+  // hardware_overrides, cela, zony aj nazov. Zamky vkladacej karty sa NEaplikuju
+  // (vedome — kopia je verny duplikat). Pred odoslanim flush rozpisanych editov,
+  // aby kopia zachytila aj posledne zmeny (callbacky sa spracuju v poradi).
+  function insertCopySelected(){
+    if (!selectedCabId){ NX.setStatus('Najprv označ korpus.', true); return; }
+    if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+    if (window.sketchup && sketchup.insert_copy)
+      sketchup.insert_copy(JSON.stringify({ cabinet_id: selectedCabId }));
   }
   function toggleZones(){ var on = el('zonesChk').checked; if (window.sketchup && sketchup.toggle_zones) sketchup.toggle_zones(on ? 'true' : 'false'); }
 

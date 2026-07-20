@@ -43,6 +43,13 @@
   /* D-22: zamok limitu presahov (v riadku medzier sekcie Cela) */
   .row .lockbtn { flex: 1; text-align: left; padding: 4px 8px; font-weight: 600; }
   .row .lockbtn.unlocked { background: #fff8ef; border-color: #ffb74d; color: #e65100; }
+  /* D-39: zamky vkladacej karty — PEVNA sirka v existujucich riadkoch poli
+     (audit F10: vlastna trieda, NIE .row .lockbtn — ta je flex cez celu sirku;
+     ziadny novy riadok — pravidlo vertikalneho priestoru). Mimo mode-insert skryte. */
+  .inslock { display: none; flex: 0 0 26px; margin-left: 4px; padding: 3px 0; text-align: center;
+             border: 1px solid #cfd8dc; border-radius: 4px; background: #eceff1; cursor: pointer; font-size: 12px; }
+  body.mode-insert .inslock { display: block; }
+  .inslock.on { background: #fff3e0; border-color: #ffb74d; }
   /* Nahlad */
   .pvtabs { display: flex; gap: 6px; margin: 2px 0 6px; }
   .pvtabs button { flex: 1; padding: 5px; font-size: 11px; }

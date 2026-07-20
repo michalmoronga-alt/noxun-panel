@@ -7,6 +7,11 @@
     document.body.className = 'mode-' + mode;
     // D-14 (Codex F5): modal patri k oznacenemu korpusu — mimo mode-cab sa zatvara
     if (mode !== 'cab' && typeof closeSaveTemplateModal === 'function') closeSaveTemplateModal();
+    // D-32 (audit B2): SKUTOCNY prechod cab|part|board -> insert = reset karty
+    // z insert stavu (typ + sablona + zamky); insert -> insert sync NEresetuje,
+    // rozpisane upravy v karte preziju. Jedine miesto zmeny rezimu = jedine
+    // miesto resetu — plati pre kazdu buducu cestu do mode-insert.
+    if (NXInsert.trackMode(mode)) materializeInsertCard();
   }
   // D3: klik na ⚠ chip rozbali/zbali zoznam upozorneni stavby pod identitou.
   function setIdbar(c){
@@ -44,6 +49,9 @@
       DEFAULTS = data.defaults || { lower: {}, upper: {} };
       TEMPLATES = data.templates || [];
       MATERIALS = data.materials || { sheets: [], edges: [] };
+      // D-39 (audit B5): zamky z Ruby pamate Panel modulu — PRED vetvami nizsie,
+      // aby ich prvy reset karty (clearSelected -> materializeInsertCard) aplikoval.
+      NXInsert.setLocksFlat(data.insert_locks);
       if (data.version) el('verline').textContent = 'V' + data.version; // verzia z Ruby (jediny zdroj)
       refreshMaterialFilters(); // (projektove predvolby zobrazi okno Materialy projektu)
       el('zonesChk').checked = !!data.zones_visible;
@@ -161,12 +169,14 @@
       cancelBoardEdits();                    // V0.4.7c: koniec kontextu dosky
       renderBoardCard(null);
       if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; }
+      // D-32: identita prec PRED setUiMode — reset karty (materializeInsertCard
+      // vnutri setUiMode) nesmie bezat nad zvyskami stareho vyberu.
+      setSelected(null);
+      activeZoneId = null; frontItems = null;
+      buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
       setIdbar(null);
       setUiMode('insert');
       previewMode = cabTabPreview(currentCabTab); // D-08: taby funguju aj na navrhu (draft)
-      setSelected(null);
-      buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
-      activeZoneId = null; frontItems = null;
       invalidateFrontPlaceholders(); // D-23: navrhovy rezim nema resolved vysky
       if (lastCabForFit !== null){ lastCabForFit = null; fitPreview(); }
       renderPartCard(null);      // schovaj kartu dielca
