@@ -592,6 +592,60 @@ module NoxunSuRunner
     ok('sync-abs: bulk bez ABS nevytvoril undo krok (1x undo vratil marker 570 -> 590)',
        (bcfg14z['width'].to_f - 590.0).abs < 0.01)
 
+    # 15) V0.5 D: KONTROLNY SEMAFOR — raw hardware_overrides (nalez 2), Validation
+    #     nad CERSTVYM zberom, klik-select semaforovej polozky cez STABILNY kluc
+    #     (prezije rebuild — nalez 4), stale generacia. NESPUSTA sa tu (spusti hlavny
+    #     agent pri review — konflikt SketchUp instancii); scenar je pripraveny.
+    cid15 = e::Store.get(inst, 'cabinet_id').to_s
+    smap15 = e::Materials.sheets.each_with_object({}) { |s, o| o[s['material_id']] = s }
+    e::Panel.select_only(model, inst)
+    colH = e::Bom.collect(model)
+    legH = colH[:hardware].find { |h| h['owner_id'] == cid15 && h['generic_type'] == 'leg' }
+    if legH
+      e::Panel.handle_set_hardware_override({ 'owner_part_key' => legH['owner_part_key'],
+                                              'generic_type' => 'leg', 'rule_id' => legH['rule_id'],
+                                              'disabled' => true }.to_json)
+      col15 = e::Bom.collect(model)
+      # raw hardware_overrides nesie disabled zaznam; v config.hardware[] uz NIE je (nalez 2)
+      ok('sync-semafor: raw hardware_overrides zbiera disabled zaznam (owner_id/owner_pid)',
+         col15[:hardware_overrides].any? { |o| o['owner_id'] == cid15 && o['disabled'] == true } &&
+         col15[:hardware].none? { |h| h['owner_id'] == cid15 && h['generic_type'] == 'leg' })
+      val15 = e::Validation.run(col15, sheets: smap15)
+      hwitem = val15['items'].find { |i| i['category'] == 'hardware' && i['owner_id'] == cid15 }
+      ok('sync-semafor: vypnute kovanie = ORANGE polozka so stabilnym klucom',
+         !hwitem.nil? && hwitem['severity'] == 'orange' && !hwitem['stable_key'].to_s.empty?)
+      # klik-select semaforovej polozky (bez part_key = korpus ako celok) oznaci OWNER korpus
+      e::ProductionDialog.do_select({ 'gen' => 0, 'problem_key' => hwitem['stable_key'] })
+      ok('sync-semafor: klik na semafor polozku oznacil owner korpus',
+         model.selection.size == 1 && e::Store.get(model.selection.first, 'cabinet_id').to_s == cid15)
+      # STABILNY kluc prezije rebuild (pending-edit flush simulovany zmenou sirky):
+      # kovanie stale disabled -> ten isty stable_key znova vyberie korpus (nalez 4)
+      base15 = e::CabinetBuilder.config_to_params(e::Store.config(inst))
+      w15 = (e::Store.config(inst) || {})['width'].to_f
+      e::CabinetBuilder.rebuild(model, inst, base15.merge('width' => w15 + 20.0))
+      val15b = e::Validation.run(e::Bom.collect(model), sheets: smap15)
+      hwitem2 = val15b['items'].find { |i| i['category'] == 'hardware' && i['owner_id'] == cid15 }
+      ok('sync-semafor: semafor polozka prezila rebuild (stabilny kluc nezmeneny)',
+         !hwitem2.nil? && hwitem2['stable_key'] == hwitem['stable_key'])
+      model.selection.clear
+      e::ProductionDialog.do_select({ 'gen' => 0, 'problem_key' => hwitem2['stable_key'] })
+      ok('sync-semafor: klik po rebuilde znova oznacil korpus (dohladanie podla identity, nie PID)',
+         model.selection.size == 1 && e::Store.get(model.selection.first, 'cabinet_id').to_s == cid15)
+      # stale generacia (iny model / stary DOM) sa odmietne — selection nezmeneny
+      sz15 = model.selection.size
+      e::ProductionDialog.do_select({ 'gen' => -99, 'problem_key' => hwitem2['stable_key'] })
+      ok('sync-semafor: stale generacia odmietnuta — selection nezmeneny', model.selection.size == sz15)
+      # reset kovania: ORANGE polozka zmizne z CERSTVEHO zberu (kanon je aktualny stav)
+      e::Panel.select_only(model, inst)
+      e::Panel.handle_set_hardware_override({ 'owner_part_key' => legH['owner_part_key'],
+                                              'generic_type' => 'leg', 'rule_id' => legH['rule_id'] }.to_json)
+      val15c = e::Validation.run(e::Bom.collect(model), sheets: smap15)
+      ok('sync-semafor: reset kovania -> ORANGE polozka zmizla',
+         val15c['items'].none? { |i| i['category'] == 'hardware' && i['owner_id'] == cid15 })
+    else
+      info('sync-semafor: korpus nema nohy (leg) — semafor kovania scenar preskoceny')
+    end
+
     cleanup(model)
     ok('sync: cleanup (0 korpusov, 0 dosiek)', cabinets(model).empty? && boards(model).empty?)
   rescue StandardError => ex

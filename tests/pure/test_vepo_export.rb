@@ -161,16 +161,37 @@ NxTest.test('vepo: prazdne rows = ziadne skupiny; LOG existuje aj tak') do
   NxTest.assert(out['log_text'].include?('Skupiny exportu (0)'))
 end
 
-NxTest.test('vepo: LOG nesie projekt, verziu, datum, skupiny s ID, chyby aj warnings, CRLF') do
-  out = NxVepo.build([NxVepo.vrow], warnings: [{ 'message' => 'testovacie varovanie', 'owner_id' => 'CAB-9' }])
+NxTest.test('vepo: LOG nesie projekt, verziu, datum, skupiny s ID, chyby aj KONTROLA, CRLF') do
+  # V0.5 D: warnings param nahradeny validation (Validation.run vysledok). Sekcia
+  # KONTROLA vypisuje message_sk poloziek + counts (nalez 5/9).
+  validation = {
+    'items' => [
+      { 'severity' => 'red', 'category' => 'material', 'owner_id' => 'CAB-9',
+        'part_key' => 'cabinet/side:left', 'message_sk' => 'Dielec „Bok“ (CAB-9) — materiál XY nie je v aktuálnom katalógu.',
+        'stable_key' => 'material|CAB-9|cabinet/side:left' },
+      { 'severity' => 'orange', 'category' => 'build', 'owner_id' => 'CAB-9',
+        'part_key' => nil, 'message_sk' => 'CAB-9: testovacie varovanie',
+        'stable_key' => 'build|CAB-9||orezane' }
+    ],
+    'counts' => { 'red' => 1, 'orange' => 1, 'total' => 2 }
+  }
+  out = NxVepo.build([NxVepo.vrow], validation: validation)
   log = out['log_text']
   ['Kuchyňa Novák', 'kuchyna_novak', '9.9.9', 'TEST-CAS',
    'kuchyna_novak_k009_pw_dtdl_18_36.csv', 'K009_PW_DTDL_18',
-   'testovacie varovanie', 'CAB-9'].each do |part|
+   'KONTROLA', '1 kritických', 'testovacie varovanie', 'CAB-9',
+   'nie je v aktuálnom katalógu', '[RED]', '[ORANGE]'].each do |part|
     NxTest.assert(log.include?(part), "LOG ma obsahovat #{part.inspect}")
   end
+  NxTest.assert(log.include?('neblokuje'), 'LOG pomenuje ze RED neblokuje export')
   NxTest.assert(log.include?("\r\n"), 'LOG konci riadky CRLF')
   NxTest.refute(log.gsub("\r\n", '').include?("\n"), 'ziadne osamele LF')
+end
+
+NxTest.test('vepo: LOG bez validacie = KONTROLA sekcia bez nalezov (headless kompat)') do
+  out = NxVepo.build([NxVepo.vrow])
+  NxTest.assert(out['log_text'].include?('KONTROLA'), 'sekcia KONTROLA je aj bez validacie')
+  NxTest.assert(out['log_text'].include?('bez nálezov'), 'prazdna validacia = bez nalezov')
 end
 
 NxTest.test('vepo: nazov riadku — join mien, orezanie, fallback dielec; label fallback id') do
