@@ -269,6 +269,12 @@
   .prodhead .sub { flex: 1; }
   .prodsum { background: var(--nx-surface-sunken); border: 1px solid var(--nx-border); border-radius: 6px;
              padding: 7px 10px; font-size: 12.5px; margin: 8px 0; color: var(--nx-ink-strong); }
+  /* Codex GH #66 P2: .pvtabs pravidla POUZIVA aj okno Vyroba (production.html
+     ma <div class="pvtabs prodtabs">) — panel ich po presune tabov do hlavicky
+     uz nepotrebuje, ale zdielane CSS ich musi drzat pre produkcne taby. */
+  .pvtabs { display: flex; gap: 6px; margin: 2px 0 6px; }
+  .pvtabs button { flex: 1; padding: 5px; font-size: 11px; }
+  .pvtabs button.on { background: var(--nx-select); color: var(--nx-on-accent); }
   .prodtabs { margin-bottom: 6px; }
   .prodbody { max-height: calc(100vh - 220px); overflow: auto; border: 1px solid var(--nx-border); border-radius: 6px; }
   .bomtab { width: 100%; border-collapse: collapse; font-size: 12px; }
