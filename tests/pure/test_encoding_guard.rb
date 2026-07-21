@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 # Guard kodovania (incident 21.7.: panel.html s mojibake priamo v bajtoch —
 # UTF-8 texty prehnane cez cp1250 zapis pocas nocnej fronty; pouzivatel videl
-# "ZĂłny" namiesto "Zóny"). Tento test SKENUJE zdrojove subory a spadne, ak:
-#   1. subor obsahuje typicke double-encoding signatury (Ă/Ĺ/â€ sekvencie),
+# "Z-o-acute-mangled" namiesto "Zóny"). Tento test SKENUJE zdrojove subory a spadne, ak:
+#   1. subor obsahuje typicke double-encoding signatury (bajtove sekvencie,
+#      pozri regex nizsie — DOSLOVNE priklady sem NEpatria, guard by chytil sam seba),
 #   2. subor obsahuje C1 kontrolne znaky U+0080..U+009F (zvysky passthrough),
 #   3. .html subor nema <meta charset="utf-8">,
 #   4. subor nie je validne UTF-8.
