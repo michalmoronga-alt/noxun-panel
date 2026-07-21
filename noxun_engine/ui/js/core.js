@@ -94,11 +94,66 @@
     sel.innerHTML = html;
     sel.value = cur;
   }
-  // Volby ABS pre dropdown hrany: podla pravidla / bez ABS / konkretne varianty.
-  function edgeOptionsHtml(){
-    var html = '<option value="__inherit__">(podľa pravidla)</option><option value="">Bez ABS</option>';
-    MATERIALS.edges.forEach(function(a){ html += '<option value="'+esc(a.id)+'">'+esc(a.label)+'</option>'; });
-    return html;
+  // D-36: normalizacia dekoru pre zoskupenie ABS — orez whitespace (legacy/prazdny),
+  // NIE lowercase (B2: presna case-sensitive zhoda ako drzi katalog). nil/prazdny => ''.
+  function normDecor(d){ return String(d==null?'':d).trim(); }
+  // D-36: resolved dekor doskoveho materialu podla id z AKTUALNEHO katalogu MATERIALS
+  // (B1: odvodene PRI RENDERI zo zivého katalogu, nie z payloadu). Neznamy id => ''.
+  function decorOfSheet(materialId){
+    if (!materialId) return '';
+    for (var i=0;i<MATERIALS.sheets.length;i++){
+      if (MATERIALS.sheets[i].id===materialId) return normDecor(MATERIALS.sheets[i].decor);
+    }
+    return '';
+  }
+  // D-36 (cista funkcia — JEDEN zdroj pravdy pre dielec aj dosku): rozdeli ABS pasky na
+  // skupiny podla zhody dekoru. Vstup: edges (katalog), decor (resolved dekor materialu
+  // dielca/dosky), currentValue (aktualne vybrana ABS hodnota). Vystup:
+  //   { recommended:[edge...], others:[edge...], preserve: value|null }.
+  // B2 owner decision: recommended = VSETKY pasky s presne zhodnym (trim, case-sensitive)
+  // dekorom, zoradene hrubkou VZOSTUPNE (1,0 -> 2,0). F4: prazdny dekor => recommended
+  // prazdny (renderer da plochy fallback bez optgroup). F5: currentValue mimo katalogu
+  // => preserve (zachovavacia volba, nech aktualna hodnota prezije regrouping).
+  function groupAbsEdges(edges, decor, currentValue){
+    edges = edges || [];
+    var nd = normDecor(decor);
+    var recommended = [], others = [], seen = {};
+    edges.forEach(function(a){
+      seen[a.id] = true;
+      if (nd!=='' && normDecor(a.decor)===nd) recommended.push(a); else others.push(a);
+    });
+    // stabilne zoradenie odporucanych hrubkou vzostupne (Array.sort je v CEF stabilny)
+    recommended.sort(function(x,y){ return (parseFloat(x.thickness)||0)-(parseFloat(y.thickness)||0); });
+    // F5: '' (Bez ABS) a '__inherit__' su fixne volby, nie ABS id — tie nezachovavaj
+    var preserve = (currentValue && currentValue!=='__inherit__' && !seen[currentValue]) ? currentValue : null;
+    return { recommended: recommended, others: others, preserve: preserve };
+  }
+  // D-36: zlozi HTML <option> zo skupin. prefixHtml = fixne volby PRED skupinami
+  // (inherit/Bez ABS). Ak NIE su odporucane (prazdny dekor ALEBO ziadna zhoda) => plochy
+  // zoznam bez optgroup (F4 cisty fallback). F5 zachovavacia volba ide do "Ostatne".
+  function absOptionsHtml(prefixHtml, groups){
+    function opt(a){ return '<option value="'+esc(a.id)+'">'+esc(a.label)+'</option>'; }
+    function keep(v){ return '<option value="'+esc(v)+'">'+esc(v)+'</option>'; }
+    var body;
+    if (groups.recommended.length){
+      var oth = groups.others.map(opt).join('') + (groups.preserve ? keep(groups.preserve) : '');
+      body = '<optgroup label="Odporúčané k dekoru">'+groups.recommended.map(opt).join('')+'</optgroup>';
+      if (oth) body += '<optgroup label="Ostatné">'+oth+'</optgroup>';
+    } else {
+      body = groups.others.map(opt).join('') + (groups.preserve ? keep(groups.preserve) : '');
+    }
+    return (prefixHtml||'') + body;
+  }
+  // Volby ABS pre dropdown hrany DIELCA: fixne (podla pravidla / Bez ABS) + D-36 skupiny
+  // (Odporucane k dekoru / Ostatne). decor = resolved dekor materialu dielca,
+  // currentValue = aktualna ABS hodnota tejto hrany (zachova sa aj mimo katalogu — F5).
+  function edgeOptionsHtml(decor, currentValue){
+    var prefix = '<option value="__inherit__">(podľa pravidla)</option><option value="">Bez ABS</option>';
+    return absOptionsHtml(prefix, groupAbsEdges(MATERIALS.edges, decor, currentValue));
+  }
+  // Volby ABS pre dropdown hrany DOSKY: doska nema override vrstvu (fixne len Bez ABS).
+  function boardEdgeOptionsHtml(decor, currentValue){
+    return absOptionsHtml('<option value="">Bez ABS</option>', groupAbsEdges(MATERIALS.edges, decor, currentValue));
   }
   // FIX 2: naplni/obnovi vsetky projektove + korpusove material selecty podla hrubky KONTEXTU
   // (korpus = pole 'thickness', chrbat = 'back_thickness', cela = 18/19). Nekompatibilne dosky
@@ -141,5 +196,11 @@
       if (f.dflt !== undefined && !v) v = f.dflt;
       if (f.kind === 'num') setNum(f.id, v); else setVal(f.id, v);
     });
+  }
+
+  // D-36 Node testy (tests/js/test_abs_groups.js) — v CEF je module undefined, vetva
+  // sa preskoci. Exportuju sa len CISTE grouping funkcie (bez DOM/MATERIALS zavislosti).
+  if (typeof module !== 'undefined' && module.exports){
+    module.exports = { groupAbsEdges: groupAbsEdges, absOptionsHtml: absOptionsHtml, normDecor: normDecor };
   }
 

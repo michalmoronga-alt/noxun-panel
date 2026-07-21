@@ -61,8 +61,21 @@
   // Material: okamzity zapis (select) — hrubka nasleduje katalog na Ruby strane.
   function onBoardMaterial(v){
     if (!boardCard) return;
+    // F3: pregrupuj ABS hrany dosky LOKALNE podla noveho dekoru — doska ma vzdy
+    // konkretny material (ziadne dedenie => vzdy ratame). N7: ziadny change event.
+    regroupBoardEdges(decorOfSheet(v));
     if (window.sketchup && sketchup.set_board_material)
       sketchup.set_board_material(JSON.stringify({ board_id: boardCard.board_id, material_id: v }));
+  }
+  // F3/N7: prekresli options ABS selectov dosky podla dekoru, zachova hodnotu (aj F5).
+  function regroupBoardEdges(decor){
+    var box = el('boardEdgeRows'); if (!box) return;
+    var sels = box.querySelectorAll('select[data-edge]');
+    for (var i=0;i<sels.length;i++){
+      var cur = sels[i].value;
+      sels[i].innerHTML = boardEdgeOptionsHtml(decor, cur);
+      sels[i].value = cur;
+    }
   }
   // ABS hrana: okamzity zapis JEDNEJ hrany; kompletnu mapu sklada Ruby (read-modify-write).
   function onBoardEdgeChange(code, value){
@@ -137,11 +150,11 @@
       var row = document.createElement('div'); row.className = 'edgerow';
       row.innerHTML = '<span class="en"><i style="background:' + absColorOf(absId) + '"></i>' + esc(lbl) + '</span>';
       var sel = document.createElement('select');
-      // 2 stavy (bez inherit — doska nema override vrstvu): Bez ABS / konkretny variant
-      var html = '<option value="">Bez ABS</option>';
-      MATERIALS.edges.forEach(function(a){ html += '<option value="' + esc(a.id) + '">' + esc(a.label) + '</option>'; });
-      sel.innerHTML = html;
-      sel.value = absId == null ? '' : absId;
+      // D-36: skupiny podla resolved dekoru materialu dosky (bez inherit — doska nema
+      // override vrstvu). curVal drzi hodnotu hrany aj legacy mimo katalogu (F5).
+      var curVal = absId == null ? '' : absId;
+      sel.innerHTML = boardEdgeOptionsHtml(decorOfSheet(bc.material_id), curVal);
+      sel.value = curVal;
       sel.setAttribute('data-edge', code);
       sel.onchange = (function(cc, ss){ return function(){ onBoardEdgeChange(cc, ss.value); }; })(code, sel);
       row.appendChild(sel);
