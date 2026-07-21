@@ -160,12 +160,14 @@ module Noxun
               draw_board(bdef.entities, cfg)
               inst = model.entities.add_instance(bdef, Geom::Transformation.translation(Units.point(x, 0, 0)))
               write_board_attrs(model, inst, bid, cfg)
-              apply_scale_lock(inst)
               model.commit_operation
             rescue StandardError => e
               abort_safely(model)
               raise e
             end
+            # D-40: scale zamok az PO commite vlozenia, v transparentnom follow-upe
+            # (viz apply_scale_lock_op; rovnaky vzor ako CabinetBuilder).
+            apply_scale_lock_op(model, inst)
           end
           # V0.4.7d: per-instancny observer — scale absorpcia dosky (vzor korpus).
           ScaleWatch.attach_one(inst) if inst && defined?(ScaleWatch)
@@ -303,14 +305,36 @@ module Noxun
         end
 
         # Zapis na instanciu AJ definiciu — scale tool cita atribut z definicie (D-06).
+        # D-40 (Codex audit F3): definicia PRVA (autorita) a kazdy zapis s vlastnym
+        # rescue — zlyhanie jedneho nesmie zhodit druhy.
         def apply_scale_lock(inst)
           return unless inst && inst.valid?
-          inst.set_attribute('dynamic_attributes', 'scaletool', SCALE_TOOL_MASK.to_s)
           d = inst.respond_to?(:definition) ? inst.definition : nil
-          d.set_attribute('dynamic_attributes', 'scaletool', SCALE_TOOL_MASK.to_s) if d && d.valid?
+          begin
+            d.set_attribute('dynamic_attributes', 'scaletool', SCALE_TOOL_MASK.to_s) if d && d.valid?
+          rescue StandardError => e
+            Engine.log_error(e, 'BoardBuilder.apply_scale_lock def') if defined?(Engine)
+          end
+          inst.set_attribute('dynamic_attributes', 'scaletool', SCALE_TOOL_MASK.to_s)
         rescue StandardError => e
           Engine.log_error(e, 'BoardBuilder.apply_scale_lock') if defined?(Engine)
           nil
+        end
+
+        # D-40: zamok v SAMOSTATNEJ TRANSPARENTNEJ operacii hned za vlozenim — DC
+        # atribut nesmie vzniknut v operacii, ktora entity vytvara (DC observer by
+        # pri commite vypol selection eventy celeho modelu). Transparent NIKDY
+        # neabortovat (Codex audit B1) — pri chybe commit aj ciastocneho zapisu;
+        # zamok dopise najblizsi rebuild. Vzor zhodny s CabinetBuilder.
+        def apply_scale_lock_op(model, inst)
+          return unless inst && inst.valid?
+          return unless model.start_operation('NOXUN: Zamok scale', true, false, true)
+
+          begin
+            apply_scale_lock(inst)
+          ensure
+            model.commit_operation
+          end
         end
 
         def guarded

@@ -10,7 +10,7 @@
 
 ## Spomaľovače (vysoká priorita)
 
-- **D-40 · Bug pri vložení novej skrinky — podobný D-34** (Michal 21.7., avizované) — detaily doplní Michal v novom okne pri rozbore; prvý bod nočnej fronty/rannej debaty.
+*(momentálne žiadne)*
 
 
 ## UX drobnosti (nízka priorita)
@@ -50,6 +50,7 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené
 
+- **D-40 · Po vložení skrinky/dosky panel „visel" na starom výbere** → **vyriešené (PR #64)**: príčina — zápis DC atribútu `scaletool` (maska Scale úchopov, D-06) v tej istej operácii, v ktorej vzniká nová definícia+inštancia; observer oficiálneho DC pluginu pri commite vypol modelu doručovanie výberových udalostí (pomohol len preklik do komponentu — ten notifikácie resetuje). Nájdené živou MCP bisekciou v sandbox okne. Fix: zámok sa zapisuje v samostatnej transparentnej operácii hneď za vložením — 1× undo aj redo vracia vloženie VRÁTANE zámku; transparentná operácia sa nikdy neabortuje (Codex audit). Kópie/rebuildy boli merané ako bezpečné a nemenia sa. + SU scenáre D40 (živosť eventov, undo/redo), pasca v DC_PRAVIDLA.md bod 8.
 - **D-32/D-33 · Vkladanie bez tichého dedenia + šablóna aplikuje všetko** → **vyriešené v dávke Vkladanie (PR #61)**: vkladacia karta sa pri každom príchode (z korpusu/dielca/dosky) resetuje na defaulty alebo kompletnú šablónu — vrátane rozmerov A MATERIÁLOV (skrytá diera — šablóna ich ukladala, vklad neaplikoval); insert stav žije mimo DOM. „Vložiť kópiu" pri označenom korpuse = presná SERVEROVÁ kópia z configu modelu (materiály, ručné zásahy kovania, per-dielec overridy, názov — formulárová cesta ich strácala). Garancia testom: uložené šablóny sa insertom/editom NIKDY nemenia.
 - **D-39 · Zámky vkladacej karty** → **vyriešené (PR #61)**: 🔒 pri Š/V/H/hrúbke/výške sokla — zamknutá hodnota prežije výber šablóny aj reset (use-case: linka s výškou 950, sokel 150). Stav v Ruby pamäti (prežije zatvorenie panela, zomrie s reštartom SU). Konflikt so šablónou nič ticho neupravuje — vklad sa odmietne a hláška vymenuje aktívne zámky. Kópia zámky vedome ignoruje.
 - **D-34 · Panel „visí" na zmazanej skrinke** → **vyriešené (PR #61)**: po zmazaní označenej skrinky panel korektne nabehne na vkladaciu kartu (resolvery ignorujú neplatné entity; po ustálení erase vždy resync panela; fallback na aktívny model pri čistom delete).

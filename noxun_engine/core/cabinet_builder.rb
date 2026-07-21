@@ -87,13 +87,17 @@ module Noxun
               tr = Geom::Transformation.translation(Units.point(x, 0, z))
               inst = model.entities.add_instance(cdef, tr)
               write_cabinet_attrs(inst, cid, final)
-              apply_scale_lock(inst)
               Zones.sync_ghost(model, inst) if defined?(Zones)
               model.commit_operation
             rescue StandardError => e
               abort_safely(model)
               raise e
             end
+            # D-40: scale zamok az PO commite vlozenia, v transparentnom follow-upe.
+            # DC atribut v operacii, ktora entity VYTVARA, by pri commite cez DC
+            # extension observer vypol dorucovanie selection eventov celemu modelu
+            # (Inspector by visel na starom vybere az do zmeny edit kontextu).
+            apply_scale_lock_op(model, inst)
           end
           ScaleWatch.attach_one(inst) if inst && defined?(ScaleWatch)
           inst
@@ -330,14 +334,40 @@ module Noxun
         # Zapisuje sa na instanciu AJ definiciu — SketchUp scale tool cita atribut
         # z DEFINICIE (dogfood pozorovanie: prvy Scale bez masky, druhy s nou).
         # Atribut NEovplyvnuje scale absorpciu (tá cita transformaciu, nie tento kluc).
+        # D-40 (Codex audit F3): definicia PRVA (autorita pre Scale tool) a kazdy zapis
+        # s vlastnym rescue — zlyhanie jedneho nesmie zhodit druhy.
         def apply_scale_lock(inst)
           return unless inst && inst.valid?
-          inst.set_attribute('dynamic_attributes', 'scaletool', SCALE_TOOL_MASK.to_s)
           d = inst.respond_to?(:definition) ? inst.definition : nil
-          d.set_attribute('dynamic_attributes', 'scaletool', SCALE_TOOL_MASK.to_s) if d && d.valid?
+          begin
+            d.set_attribute('dynamic_attributes', 'scaletool', SCALE_TOOL_MASK.to_s) if d && d.valid?
+          rescue StandardError => e
+            Engine.log_error(e, 'apply_scale_lock def') if defined?(Engine)
+          end
+          inst.set_attribute('dynamic_attributes', 'scaletool', SCALE_TOOL_MASK.to_s)
         rescue StandardError => e
           Engine.log_error(e, 'apply_scale_lock') if defined?(Engine)
           nil
+        end
+
+        # D-40: zamok v SAMOSTATNEJ TRANSPARENTNEJ operacii hned za vlozenim (prilepi
+        # sa k nemu na undo stacku — 1x undo aj redo vrati oboje naraz). Overene
+        # meranim (MCP bisekcia 21.7.2026): zapis dynamic_attributes v tej istej
+        # operacii ako vznik definicie/instancie = mrtve selection eventy; zapis
+        # v transparentnom follow-upe aj kopie/rebuildy existujucich entit = bezpecne.
+        # POZOR (Codex audit B1): transparentnu operaciu NIKDY neabortovat — abort by
+        # zrusil aj prilepene vlozenie (SketchUp API). Pri chybe sa commitne aj
+        # ciastocny zapis; zamok dopise najblizsi rebuild (apply_scale_lock je
+        # sucastou rebuild_in_operation).
+        def apply_scale_lock_op(model, inst)
+          return unless inst && inst.valid?
+          return unless model.start_operation('NOXUN: Zamok scale', true, false, true)
+
+          begin
+            apply_scale_lock(inst)
+          ensure
+            model.commit_operation
+          end
         end
 
         # --- pomocne stavbove ----------------------------------------------
