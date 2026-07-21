@@ -12,10 +12,16 @@ require_relative '../helper' unless defined?(NxTest)
 
 NxTest.test('encoding: ziadne mojibake/C1 bajty v UI a docs suboroch + html charset') do
   root = NxTest::ROOT
+  # GH P3: aj root-level zdroje a skripty — mojibake sa nesmie schovat nikde.
   targets = Dir[File.join(root, 'noxun_engine', '**', '*.{html,js,css,rb}')] +
             Dir[File.join(root, 'SYSTEM', '*.md')] +
-            Dir[File.join(root, 'docs', '*.md')]
-  sig = /\xC3\xA2[\xC2\xE2]|\xC4\x82[\xCB\xC2\xC4\xC5]|\xC4\xB9[\xCB\xC2\xA0-\xBF]|\xC4\x8C\xCB\x87|\xC3\x84[\xC2\xC4\xC5]|\xC3\x85[\xC2\xC4\xC5]/n
+            Dir[File.join(root, 'docs', '*.md')] +
+            Dir[File.join(root, '*.{md,rb}')] +
+            Dir[File.join(root, 'scripts', '*.{ps1,rb}')] +
+            Dir[File.join(root, 'tests', '**', '*.{rb,js}')]
+  # GH P2 doplnok: \xC3\x82\xC2 = double-encoded C2-xx znaky (±, ·, °...) — presne
+  # tato medzera nechala prekĺznuť "Â±" v prvej verzii opravy.
+  sig = /\xC3\xA2[\xC2\xE2]|\xC4\x82[\xCB\xC2\xC4\xC5]|\xC4\xB9[\xCB\xC2\xA0-\xBF]|\xC4\x8C\xCB\x87|\xC3\x84[\xC2\xC4\xC5]|\xC3\x85[\xC2\xC4\xC5]|\xC3\x82\xC2/n
   c1 = /\xC2[\x80-\x9F]/n
   bad = []
   targets.each do |p|
