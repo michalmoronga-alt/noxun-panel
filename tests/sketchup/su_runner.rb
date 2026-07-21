@@ -858,6 +858,100 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- D-40: selection eventy po builde musia zit (DC observer pasca) --------
+  # Bug: zapis dynamic_attributes (scaletool) v operacii, ktora VYTVARA definiciu/
+  # instanciu, pri commite cez DC extension observer vypne dorucovanie selection
+  # eventov celemu modelu (panel "visi" na starom vybere; reset az zmenou edit
+  # kontextu). Fix: zamok v transparentnom follow-upe (apply_scale_lock_op).
+
+  class D40Probe < Sketchup::SelectionObserver
+    def initialize
+      super
+      @n = 0
+    end
+    attr_reader :n
+
+    def onSelectionBulkChange(_s); @n += 1; end
+    def onSelectionCleared(_s); @n += 1; end
+    def onSelectionAdded(_s, _e); @n += 1; end
+    def onSelectionRemoved(_s, _e); @n += 1; end
+  end
+
+  # Ziju selection observer eventy? (add+clear s cerstvym observerom, count > 0)
+  def selection_alive?(model, inst)
+    return false unless inst && inst.valid?
+    probe = D40Probe.new
+    model.selection.add_observer(probe)
+    model.selection.add(inst)
+    model.selection.clear
+    probe.n > 0
+  ensure
+    begin
+      model.selection.remove_observer(probe) if probe
+    rescue StandardError
+      nil
+    end
+  end
+
+  def run_d40(model)
+    # D40-1: korpus — eventy + atributy zamku
+    cab = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0 })
+    ok('D40: build korpusu vrati instanciu', !cab.nil?)
+    ok('D40: selection eventy ziju po vlozeni korpusu', selection_alive?(model, cab))
+    ok('D40: scaletool na instancii po vlozeni', cab.get_attribute('dynamic_attributes', 'scaletool') == '120')
+    ok('D40: scaletool na definicii po vlozeni', cab.definition.get_attribute('dynamic_attributes', 'scaletool') == '120')
+
+    # D40-2: doska — eventy po vlozeni
+    brd = e::BoardBuilder.build(model, { 'length' => 800.0, 'width' => 400.0 })
+    ok('D40: selection eventy ziju po vlozeni dosky', !brd.nil? && selection_alive?(model, brd))
+
+    # D40-3: paste kopia s DC atributmi netriggeruje pascu (Codex audit B2 poistka).
+    # Guard: simulovana kopia nesmie pocas testu spustit dedup tick observera.
+    copy = nil
+    e::ScaleWatch.guard do
+      model.start_operation('D40 paste sim', false)
+      copy = model.entities.add_instance(cab.definition,
+                                         cab.transformation * Geom::Transformation.translation([mm(900), 0, 0]))
+      src = cab.attribute_dictionary('dynamic_attributes')
+      src && src.each_pair { |k, v| copy.set_attribute('dynamic_attributes', k, v) }
+      model.commit_operation
+    end
+    ok('D40: selection eventy ziju po paste kopie', selection_alive?(model, copy))
+    e::ScaleWatch.guard do
+      model.start_operation('D40 paste cleanup', true)
+      copy.erase! if copy && copy.valid?
+      model.commit_operation
+    end
+
+    # D40-4: undo/redo — 1x undo odstrani CELE vlozenie (vratane transparent zamku);
+    # redo (ak je synchronne API dostupne) obnovi objekt AJ oba zamky.
+    n_before = cabinets(model).length
+    c2 = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 500.0, 'height' => 700.0, 'depth' => 500.0 })
+    c2_cid = e::Store.get(c2, 'cabinet_id')
+    ok('D40: undo baseline — korpus pribudol', cabinets(model).length == n_before + 1)
+    Sketchup.undo
+    ok('D40: 1x undo odstrani cele vlozenie (vratane zamku)', cabinets(model).length == n_before)
+    if Sketchup.respond_to?(:redo)
+      Sketchup.redo
+      c2r = nil
+      e::Ids.each_cabinet(model) { |i| c2r = i if e::Store.get(i, 'cabinet_id') == c2_cid }
+      ok('D40: redo vrati vlozeny korpus', !c2r.nil?)
+      if c2r
+        ok('D40: redo obnovi scaletool na instancii', c2r.get_attribute('dynamic_attributes', 'scaletool') == '120')
+        ok('D40: redo obnovi scaletool na definicii', c2r.definition.get_attribute('dynamic_attributes', 'scaletool') == '120')
+        ok('D40: selection eventy ziju po redo', selection_alive?(model, c2r))
+      end
+    else
+      info('D40 REDO: Sketchup.redo nedostupne — redo vetva netestovana (async send_action vzor viz S1).')
+    end
+
+    cleanup(model)
+    ok('D40: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: D40 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
   # --- ASYNC: undo/redo scenare (retaz timerov, observer debounce 0.2 s) -----
 
   def run_async(model, done)
@@ -1180,6 +1274,7 @@ module NoxunSuRunner
     run_sync(model)
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
+    run_d40(model)           # D-40: selection eventy po builde (DC observer pasca)
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
