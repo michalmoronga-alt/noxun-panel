@@ -206,3 +206,30 @@ NxTest.test('validation: chybajuci format platne = oversize sa NEhlasi (bez form
   out = f.run(records: [f.rec('material_id' => 'NO_FMT', 'length' => 9999.0)], sheets: sheets)
   NxTest.assert(f.cats(out).none? { |c| c == 'oversize' }, 'bez sheet_size sa zmestenie nekontroluje')
 end
+
+NxTest.test('validation: vypnute kovanie na DVOCH dielcoch = DVE polozky s part_key (Codex GH #65 P2)') do
+  f = NxValFix
+  ovs = [
+    { 'owner_id' => 'CAB-1', 'owner_part_key' => 'front/wing:p1', 'generic_type' => 'hinge', 'rule_id' => 'zavesy', 'disabled' => true },
+    { 'owner_id' => 'CAB-1', 'owner_part_key' => 'front/wing:p2', 'generic_type' => 'hinge', 'rule_id' => 'zavesy', 'disabled' => true }
+  ]
+  out = f.run(hardware_overrides: ovs)
+  hw = out['items'].select { |i| i['category'] == 'hardware' }
+  NxTest.assert_equal(2, hw.length)
+  NxTest.assert_equal(%w[front/wing:p1 front/wing:p2], hw.map { |i| i['part_key'] }.sort)
+  NxTest.assert_equal(2, hw.map { |i| i['stable_key'] }.uniq.length, 'stable_key musi rozlisit owner_part_key')
+end
+
+NxTest.test('validation: dva owner-level build warnings bez code = DVE polozky (Codex GH #65 P2)') do
+  f = NxValFix
+  ws = [
+    { 'owner_id' => 'CAB-1', 'message' => 'Prve upozornenie stavby.' },
+    { 'owner_id' => 'CAB-1', 'message' => 'Druhe upozornenie stavby.' }
+  ]
+  out = f.run(warnings: ws)
+  build = out['items'].select { |i| i['category'] == 'build' }
+  NxTest.assert_equal(2, build.length, 'rozne spravy sa nesmu dedupnut')
+  # identicke spravy = 1 polozka (dedup dalej plati)
+  out2 = f.run(warnings: [ws[0], ws[0].dup])
+  NxTest.assert_equal(1, out2['items'].count { |i| i['category'] == 'build' })
+end

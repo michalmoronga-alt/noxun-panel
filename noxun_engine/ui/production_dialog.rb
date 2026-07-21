@@ -316,15 +316,21 @@ module Noxun
               if pkey.empty?
                 out << inst.persistent_id
               else
+                found = []
                 inst.definition.entities.grep(Sketchup::ComponentInstance).each do |pi|
                   next unless Store.kind(pi) == 'part'
-                  out << pi.persistent_id if Store.get(pi, 'part_key').to_s == pkey
+                  found << pi.persistent_id if Store.get(pi, 'part_key').to_s == pkey
                 end
+                # Codex GH #65 P2: build warning moze mierit na dielec, ktory NEBOL
+                # postaveny (part_skipped_degenerate, shelf_skipped_shallow_zone) —
+                # ziadna entita s tym klucom neexistuje. Fallback: oznac vlastnika
+                # (cely korpus), nie prazdny vyber s hlaskou o zmene zoznamu.
+                out.concat(found.empty? ? [inst.persistent_id] : found)
               end
             when 'board'
-              if Store.get(inst, 'id').to_s == oid && (pkey.empty? || Store.get(inst, 'part_key').to_s == pkey)
-                out << inst.persistent_id
-              end
+              # Doska JE vlastnik — part_key sa nefiltruje (warning na dosku
+              # oznaci dosku aj pri kluci nepostaveneho detailu).
+              out << inst.persistent_id if Store.get(inst, 'id').to_s == oid
             when 'part'
               if Store.get(inst, 'cabinet_id').to_s == oid && (pkey.empty? || Store.get(inst, 'part_key').to_s == pkey)
                 out << inst.persistent_id

@@ -182,13 +182,18 @@ module Noxun
         oid = ov['owner_id'].to_s
         gt  = ov['generic_type'].to_s
         rid = ov['rule_id'].to_s
+        # Codex GH #65 P2: owner_part_key MUSI byt v identite — dva vypnute
+        # overridy s rovnakym generic_type+rule_id na roznych dielcoch (panty
+        # dvoch kridel) su DVA problemy a klik ma oznacit konkretne celo.
+        opk = ov['owner_part_key'].to_s
         label = HW_LABELS[gt] || (gt.empty? ? 'kovanie' : gt)
+        where = oid.empty? ? '—' : oid
+        where += " · #{opk}" unless opk.empty?
         items << {
           'severity' => ORANGE, 'category' => CAT_HARDWARE,
-          'owner_id' => oid, 'part_key' => nil, 'hw_key' => nil,
-          'message_sk' => "Kovanie „#{label}“ je v korpuse #{oid.empty? ? '—' : oid} vypnuté — " \
-                          'skontroluj, či zámerne.',
-          'stable_key' => "#{CAT_HARDWARE}|#{oid}|#{gt}|#{rid}"
+          'owner_id' => oid, 'part_key' => (opk.empty? ? nil : opk), 'hw_key' => nil,
+          'message_sk' => "Kovanie „#{label}“ (#{where}) je vypnuté — skontroluj, či zámerne.",
+          'stable_key' => "#{CAT_HARDWARE}|#{oid}|#{opk}|#{gt}|#{rid}"
         }
       end
 
@@ -207,7 +212,11 @@ module Noxun
           'severity' => ORANGE, 'category' => CAT_BUILD,
           'owner_id' => oid, 'part_key' => (pkey.empty? ? nil : pkey), 'hw_key' => nil,
           'message_sk' => text,
-          'stable_key' => "#{CAT_BUILD}|#{oid}|#{pkey}|#{code}"
+          # Codex GH #65 P2: sprava je sucastou kluca — viacero owner-level
+          # warningov bez part_key/code (legacy string tvar) su ROZNE problemy;
+          # dedup smie zlucit len uplne identicke. Sprava je deterministicka
+          # (vznika z build planu), kluc ostava stabilny medzi prepoctami.
+          'stable_key' => "#{CAT_BUILD}|#{oid}|#{pkey}|#{code}|#{msg}"
         }
       end
 
