@@ -43,8 +43,11 @@
       var row = document.createElement('div'); row.className='edgerow';
       row.innerHTML = '<span class="en"><i style="background:'+absColorOf(absId)+'"></i>'+esc(lbl)+'</span>';
       var sel = document.createElement('select');
-      sel.innerHTML = edgeOptionsHtml();
-      sel.value = isOvr ? (absId==null?'':absId) : '__inherit__';
+      // D-36: skupiny podla resolved dekoru materialu dielca; curVal drzi hodnotu tejto
+      // hrany (aj legacy mimo katalogu — F5) a NEsmie ju prebit prva odporucana paska.
+      var curVal = isOvr ? (absId==null?'':absId) : '__inherit__';
+      sel.innerHTML = edgeOptionsHtml(decorOfSheet(pc.material_id), curVal);
+      sel.value = curVal;
       if (isOvr) sel.className='ovr';
       sel.setAttribute('data-edge', code);
       sel.onchange = (function(cc){ return function(){ onEdgeChange(cc, sel.value); }; })(code);
@@ -96,8 +99,23 @@
   function onPartMaterial(){
     if (!partCard) return;
     var v = el('pcMaterial').value;
+    // F3: pri zmene materialu (override) pregrupuj ABS selecty LOKALNE podla noveho
+    // dekoru — netreba cakat na Ruby echo. Pri ZRUSENI override (v==='' = navrat na
+    // dedenie) NErataj: JS zdedeny material nevie, necha skupiny a pocka na payload.
+    if (v) regroupPartEdges(decorOfSheet(v));
     if (window.sketchup && sketchup.set_part_material)
       sketchup.set_part_material(JSON.stringify({ role_key: partCard.role_key, material_id: v }));
+  }
+  // F3/N7: prekresli options KAZDEHO ABS selectu dielca podla dekoru, zachova hodnotu
+  // (aj mimo katalogu — F5). Programove nastavenie value NEstriela change event.
+  function regroupPartEdges(decor){
+    var box = el('edgeRows'); if (!box) return;
+    var sels = box.querySelectorAll('select[data-edge]');
+    for (var i=0;i<sels.length;i++){
+      var cur = sels[i].value;
+      sels[i].innerHTML = edgeOptionsHtml(decor, cur);
+      sels[i].value = cur;
+    }
   }
   // Spat z karty dielca na skrinku (omrvinka) — Ruby oznaci korpus a poslе novy stav.
   function backToCabinet(){

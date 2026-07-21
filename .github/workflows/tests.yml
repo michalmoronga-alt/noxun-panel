@@ -19,3 +19,5 @@ jobs:
         run: node tests/js/test_usage.js
       - name: JS testy (stav vkladacej karty D-32/D-33/D-39)
         run: node tests/js/test_insert_state.js
+      - name: JS testy (zoskupenie ABS pasok k dekoru D-36)
+        run: node tests/js/test_abs_groups.js
