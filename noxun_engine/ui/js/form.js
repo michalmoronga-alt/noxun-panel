@@ -44,7 +44,12 @@
     edgeLimitOff = !!off;
     var b = el('edgeLimitLock');
     if (b){
-      b.textContent = edgeLimitOff ? '🔓 ±2000 mm' : '🔒 ±100 mm';
+      // B3: NEprepisovat cely obsah tlacidla textContentom (zmazal by ikonu) —
+      // meni sa len symbol v <use> a textovy label; aria-pressed drzi stav (B11).
+      if (window.NXIcons) NXIcons.set(b, edgeLimitOff ? 'lock-open' : 'lock');
+      var lbl = b.querySelector('.lblLimit');
+      if (lbl) lbl.textContent = edgeLimitOff ? '±2000 mm' : '±100 mm';
+      b.setAttribute('aria-pressed', edgeLimitOff ? 'false' : 'true'); // pressed = zamknuty limit
       b.classList.toggle('unlocked', edgeLimitOff);
     }
   }
@@ -285,8 +290,10 @@
     for (var i = 0; i < btns.length; i++){
       var f = btns[i].getAttribute('data-lock');
       var on = NXInsert.isLocked(f);
-      btns[i].textContent = on ? '🔒' : '🔓';
+      // B3: meni sa len symbol v <use>, nie textContent celeho tlacidla (zmazal by SVG).
+      if (window.NXIcons) NXIcons.set(btns[i], on ? 'lock' : 'lock-open');
       btns[i].classList.toggle('on', on);
+      btns[i].setAttribute('aria-pressed', on ? 'true' : 'false'); // B11
       btns[i].title = on
         ? 'Hodnota je zamknutá — prežije výber šablóny aj reset karty. Klik odomkne.'
         : 'Zamknúť hodnotu pre ďalšie vklady (prežije výber šablóny aj reset karty).';
@@ -405,8 +412,8 @@
       '<input class="fh" type="text" placeholder="auto" oninput="onField()">' +
       '<select class="fw" onchange="onField()"><option value="auto">auto</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>' +
       '<input class="flock" type="checkbox" title="Zamknúť pevnú výšku" onchange="onField()">' +
-      '<button class="fdel" title="Odstrániť" onclick="delFrontRow(this); onField()">✕</button>' +
-      (badge ? '<span class="fhw" title="Kovanie tohto čela (sekcia Kovanie)">🔗 ' + esc(badge) + '</span>' : '');
+      '<button class="fdel" title="Odstrániť" aria-label="Odstrániť čelo" onclick="delFrontRow(this); onField()">' + NXIcons.svg('x') + '</button>' +
+      (badge ? '<span class="fhw" title="Kovanie tohto čela (sekcia Kovanie)">' + NXIcons.svg('link') + esc(badge) + '</span>' : '');
     wrap.insertBefore(row, wrap.firstChild); // D-23: navrch — DOM je obrateny
     if (item.type) row.querySelector('.ftype').value = item.type;
     if (item.height !== null && item.height !== undefined && item.height !== '') row.querySelector('.fh').value = item.height;
@@ -515,7 +522,7 @@
           span.title = 'Kovanie tohto čela (sekcia Kovanie)';
           row.appendChild(span);
         }
-        span.textContent = '🔗 ' + badge;
+        span.innerHTML = NXIcons.svg('link') + esc(badge); // B3/B9: ikona staticka, badge cez esc
         var tsel = row.querySelector('.ftype'); // D-18: pri 'none' badge skryty
         span.style.display = (tsel && tsel.value === 'none') ? 'none' : '';
       } else if (span){

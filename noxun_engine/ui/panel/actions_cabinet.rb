@@ -50,7 +50,7 @@ module Noxun
         def insert_locks_hint
           return '' if insert_locks.empty?
           list = insert_locks.map { |k, v| "#{INSERT_LOCK_LABELS[k] || k} #{fmt_mm(v)}" }.join(', ')
-          " · aktívne zámky 🔒: #{list}"
+          " · aktívne zámky (zamknuté hodnoty): #{list}"
         end
 
         # D-38: zmena hrubky chrbta potrebuje materal tej hrubky — bez preflightu
@@ -200,7 +200,7 @@ module Noxun
             CabinetBuilder.rebuild(model, cab, params)
             reselect(model, cab)
           end
-          status_with_warnings(cab, "Prestavané ✓ — #{Store.get(cab, 'cabinet_id')} (#{part_count(cab)} dielcov).#{pf ? pf[:note] : ''}")
+          status_with_warnings(cab, "Prestavané — #{Store.get(cab, 'cabinet_id')} (#{part_count(cab)} dielcov).#{pf ? pf[:note] : ''}")
           push_selected(model)
         end
 
