@@ -58,10 +58,11 @@
 
   function setProdTab(t){
     prodTab = t;
-    ['rows','sheets','edging','hardware','warnings'].forEach(function(k){
+    ['rows','sheets','edging','hardware','control'].forEach(function(k){
       el('pt_' + k).classList.toggle('on', k === t);
     });
-    el('prodHint').style.display = (t === 'rows' || t === 'hardware') ? '' : 'none';
+    // klik na riadok vybera v modeli v kusovniku, kovani AJ kontrole
+    el('prodHint').style.display = (t === 'rows' || t === 'hardware' || t === 'control') ? '' : 'none';
     renderBody();
   }
 
@@ -75,11 +76,24 @@
       '<b>' + num(s.hardware_quantity) + '</b> ks kovania';
   }
 
+  // V0.5 D: semafor badge — cisla PRIAMO zo servera (BOM.counts), JS ich NIKDY
+  // neprepocitava z control poloziek (nalez 11: header, status aj LOG rovnake cisla).
   function renderBadge(){
-    var n = BOM && BOM.warnings ? BOM.warnings.length : 0;
-    var b = el('warnBadge');
-    b.style.display = n ? '' : 'none';
-    b.textContent = n;
+    var c = (BOM && BOM.counts) ? BOM.counts : { red: 0, orange: 0, total: 0 };
+    var red = c.red || 0, orange = c.orange || 0, total = red + orange;
+    var b = el('ctrlBadge');
+    if (b){
+      b.style.display = total ? '' : 'none';
+      b.innerHTML = (red ? '<span class="cb-red">🔴 ' + red + '</span>' : '') +
+                    (red && orange ? ' ' : '') +
+                    (orange ? '<span class="cb-orange">🟠 ' + orange + '</span>' : '');
+    }
+    var tb = el('ctrlTabBadge');
+    if (tb){
+      tb.style.display = total ? '' : 'none';
+      tb.textContent = total;
+      tb.className = 'wbadge' + (red ? ' wbadge-red' : '');
+    }
   }
 
   function edgesLabel(edges){
@@ -95,7 +109,7 @@
     if (prodTab === 'sheets') return renderSheets(box);
     if (prodTab === 'edging') return renderEdging(box);
     if (prodTab === 'hardware') return renderHardware(box);
-    renderWarnings(box);
+    renderControl(box);
   }
 
   function renderRows(box){
@@ -157,12 +171,19 @@
     box.innerHTML = h + '</tbody></table>';
   }
 
-  function renderWarnings(box){
-    var list = BOM.warnings || [];
-    if (!list.length){ box.innerHTML = '<div class="muted">Žiadne upozornenia — stavba čistá.</div>'; return; }
-    var h = '<table class="bomtab"><thead><tr><th>Skrinka</th><th>Upozornenie</th></tr></thead><tbody>';
-    list.forEach(function(w){
-      h += '<tr><td>' + esc(w.owner_id || '—') + '</td><td>' + esc(w.message || w.code || '') + '</td></tr>';
+  // V0.5 D: KONTROLA — deterministicky zoznam problemov (RED/ORANGE). Klik na
+  // riadok oznaci problemovy dielec/korpus v modeli (relay cez stabilny kluc).
+  // Poradie a dedup robi server; JS len renderuje.
+  function renderControl(box){
+    var list = (BOM && BOM.control) ? BOM.control : [];
+    if (!list.length){ box.innerHTML = '<div class="muted">Kontrola bez nálezov — dáta výroby čisté.</div>'; return; }
+    var h = '<table class="bomtab ctrltab"><thead><tr><th>!</th><th>Problém</th><th>Kde</th></tr></thead><tbody>';
+    list.forEach(function(it, i){
+      var red = it.severity === 'red';
+      h += '<tr class="ctrlrow ' + (red ? 'ctrl-red' : 'ctrl-orange') + '" data-i="' + i + '">' +
+           '<td class="ctrlicon">' + (red ? '🔴' : '🟠') + '</td>' +
+           '<td>' + esc(it.message_sk) + '</td>' +
+           '<td>' + esc(it.owner_id || '—') + '</td></tr>';
     });
     box.innerHTML = h + '</tbody></table>';
   }
@@ -170,7 +191,7 @@
   // Delegovany klik: posiela KLUC riadku (nie pids) — Ruby si po flushi editov
   // najde cerstve refs (Codex GH #48 P2: rebuild po flushi meni persistent id).
   document.addEventListener('click', function(ev){
-    var tr = ev.target && ev.target.closest ? ev.target.closest('tr.bomrow, tr.hwrow') : null;
+    var tr = ev.target && ev.target.closest ? ev.target.closest('tr.bomrow, tr.hwrow, tr.ctrlrow') : null;
     if (!tr || !BOM || !window.sketchup || !sketchup.select_row) return;
     var i = parseInt(tr.getAttribute('data-i'), 10);
     var payload = { gen: BOM.gen };
@@ -178,6 +199,12 @@
       var r = (BOM.rows || [])[i];
       if (!r || !r.key) return;
       payload.parts_key = r.key;
+    } else if (tr.className.indexOf('ctrlrow') >= 0){
+      // V0.5 D: semafor klik nesie STABILNY kluc problemu (nie pids) — Ruby po
+      // flushi editov prepocita validaciu a najde entity podla identity (nalez 4).
+      var it = (BOM.control || [])[i];
+      if (!it || !it.stable_key) return;
+      payload.problem_key = it.stable_key;
     } else {
       var g = (BOM.hardware || [])[i];
       if (!g || !g.key) return;
