@@ -101,3 +101,14 @@ NxTest.test('debug: report je JSON-safe aj pri symbolovych/:absent hodnotach') d
   data = JSON.parse(json)
   NxTest.assert(data['panel'].is_a?(Hash), 'panel sekcia je hash')
 end
+
+NxTest.test('debug: noxun_free? chodi cez definitions ako runner guard (Codex GH #63)') do
+  dict = Noxun::Engine::Store::DICT
+  inst = NxTest::FakeInstance.new(11)
+  inst.set_attribute(dict, 'kind', 'cabinet')
+  model = NxTest::FakeModel.new([NxTest::FakeDefinition.new([inst])])
+  NxTest.assert_equal(false, Noxun::Engine::Debug.send(:noxun_free?, model))
+
+  empty = NxTest::FakeModel.new([])
+  NxTest.assert_equal(true, Noxun::Engine::Debug.send(:noxun_free?, empty))
+end

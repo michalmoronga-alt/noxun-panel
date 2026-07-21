@@ -151,6 +151,10 @@ module Noxun
       # su_runner.rb): testovaci je (a) model ENGINEtests*.skp, alebo (b) NEULOZENY
       # model BEZ jedineho NOXUN korpusu/dosky. Pri nemoznosti overit -> false
       # (radsej falosne "nie sandbox" nez falosne zelena na zakazke).
+      # POZOR na rozdiel voci doktorovi: skagent_doctor.ps1 posudzuje OKNO pre bridge
+      # (whitelist titulov vratane 'untitled test'); tento flag posudzuje MODEL pre
+      # destruktivne testy podla runner pravidiel — vedome prisnejsi, takze ULOZENY
+      # ad-hoc sandbox (napr. 'Untitled test 1.skp') hlasi false. Nie je to chyba.
       def sandbox?(model, path)
         base = path.to_s.tr('\\', '/').downcase.split('/').last.to_s
         return true if base.start_with?('enginetests')
@@ -161,16 +165,15 @@ module Noxun
         false
       end
 
-      # Nema model (top-level) ziadny NOXUN korpus ani dosku? Lacny scan model.entities.
+      # Nema model ziadny NOXUN korpus ani dosku? Rovnaka traverzia ako runner guard
+      # (Codex GH #63 P2: Ids.each_of_kind ide cez model.definitions, takze chyti aj
+      # instancie VNORENE v inych komponentoch — top-level scan model.entities by ich
+      # minul a flag by povolil destruktivne cistenie v pracovnom modeli).
       def noxun_free?(model)
-        return false unless model.respond_to?(:entities)
+        return false unless model.respond_to?(:definitions)
 
-        model.entities.each do |e|
-          next unless e.respond_to?(:get_attribute)
-
-          k = e.get_attribute(dict_name, 'kind')
-          return false if k == 'cabinet' || k == 'board'
-        end
+        Ids.each_cabinet(model) { |_i| return false }
+        Ids.each_board(model) { |_i| return false }
         true
       rescue StandardError
         false

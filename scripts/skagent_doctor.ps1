@@ -112,7 +112,13 @@ function Get-Health([int]$p) {
 function Test-HealthValid($h, [int]$p) {
   if ($null -eq $h) { return $false }
   $okFlag = ($h.ok -eq $true) -or ($h.running -eq $true)
-  $portOk = ($null -eq $h.port) -or ([int]$h.port -eq $p) # ak port v payloade chyba, netrestaj
+  # Codex GH #63 P2: cudzia sluzba moze vratit nenumericky 'port' -> [int] cast by
+  # zhodil skript PRED exit 3 vetvou. TryParse: neparsovatelny port = NEvalidny bridge.
+  $portOk = $true
+  if ($null -ne $h.port) {
+    $n = 0
+    if ([int]::TryParse([string]$h.port, [ref]$n)) { $portOk = ($n -eq $p) } else { $portOk = $false }
+  }
   return ($okFlag -and $portOk)
 }
 
@@ -196,6 +202,14 @@ if ($null -ne $health) {
 SayAlways ""
 SayAlways ("PROBLEM: port {0} drzi PID {1}, ale /health NEODPOVEDA (mrtvy/zamrznuty bridge)." -f $Port, $procId) Red
 SayAlways "Nova instancia VBO by si vzala nahodny port -> MCP na fixnom $Port ostane mrtve." Yellow
+
+# Codex GH #63 P2: aj MRTVY drzitel musi vyzerat ako SketchUp (healthy vetva to uz
+# overuje). Inak je to cudzi proces na porte a kill by zabil nesuvisiacu aplikaciu.
+if ($proc.ProcessName -notlike '*SketchUp*') {
+  SayAlways ("Drzitel '{0}' (PID {1}) NIE JE SketchUp - cudzi proces, NIC sa nezabija." -f $proc.ProcessName, $procId) Yellow
+  SayAlways "Over rucne, co bezi na porte, a uvolni ho manualne (alebo zmen mcp_port v Dashboarde VBO)." Yellow
+  exit 3
+}
 
 $looksTest = Test-IsTestWindow $title
 $interactive = Test-Interactive
