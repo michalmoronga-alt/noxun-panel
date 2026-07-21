@@ -20,7 +20,8 @@ NxTest.test('encoding: ziadne mojibake/C1 bajty v UI a docs suboroch + html char
             Dir[File.join(root, 'scripts', '*.{ps1,rb}')] +
             Dir[File.join(root, 'tests', '**', '*.{rb,js}')]
   # GH P2 doplnok: \xC3\x82\xC2 = double-encoded C2-xx znaky (±, ·, °...) — presne
-  # tato medzera nechala prekĺznuť "Â±" v prvej verzii opravy.
+  # tato medzera nechala v prvej verzii opravy prejst poskodeny znak ± (bez
+  # doslovneho prikladu tu — guard by chytil sam seba).
   sig = /\xC3\xA2[\xC2\xE2]|\xC4\x82[\xCB\xC2\xC4\xC5]|\xC4\xB9[\xCB\xC2\xA0-\xBF]|\xC4\x8C\xCB\x87|\xC3\x84[\xC2\xC4\xC5]|\xC3\x85[\xC2\xC4\xC5]|\xC3\x82\xC2/n
   c1 = /\xC2[\x80-\x9F]/n
   bad = []
