@@ -2,11 +2,31 @@
      Vanilla JS, ziadne CDN, slovensky. READ-ONLY nad modelom — klik iba vybera.
      Data: NX.setBom push z production_dialog.rb. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.7p">
+<link rel="stylesheet" href="css/panel.css?v=0.5d">
+<!-- V0.5 D: styly semaforu ZAMERNE inline v production.html (NIE v zdielanom
+     panel.css — paralelna davka D-29 ho meni; ziadny cache-bust konflikt). -->
+<style>
+  .ctrlbadge { background: #fff; border: 1px solid #cfd8dc; border-radius: 9px;
+               padding: 1px 8px; font-size: 12px; font-weight: 600; cursor: pointer;
+               white-space: nowrap; line-height: 1.6; color: #37474f; }
+  .ctrlbadge:hover { background: #f5f7f8; }
+  .ctrlbadge .cb-red { color: #c62828; }
+  .ctrlbadge .cb-orange { color: #e65100; }
+  .wbadge.wbadge-red { background: #ef9a9a; color: #7f1d1d; }
+  .bomtab tr.ctrlrow { cursor: pointer; }
+  .bomtab tr.ctrlrow:hover { background: #e3f2fd; }
+  .bomtab td.ctrlicon { text-align: center; width: 20px; }
+  .bomtab tr.ctrl-red td:first-child { box-shadow: inset 3px 0 0 #c62828; }
+  .bomtab tr.ctrl-orange td:first-child { box-shadow: inset 3px 0 0 #ffb74d; }
+</style>
 
 <div class="prodhead">
   <h1>Výroba</h1>
   <span class="sub" id="prodModel">…</span>
+  <!-- V0.5 D: semafor badge (🔴 kritické, 🟠 na kontrolu) — cisla zo servera,
+       klik skoci na tab Kontrola. Skryty ak je vsetko ciste. -->
+  <button id="ctrlBadge" class="ctrlbadge" style="display:none" onclick="setProdTab('control')"
+          title="Kontrola výroby — klikni pre zoznam"></button>
   <button class="ghostbtn" onclick="requestRefresh()">↻ Obnoviť</button>
 </div>
 <div id="prodSummary" class="prodsum">…</div>
@@ -23,12 +43,12 @@
   <button id="pt_sheets" onclick="setProdTab('sheets')">Materiály</button>
   <button id="pt_edging" onclick="setProdTab('edging')">ABS</button>
   <button id="pt_hardware" onclick="setProdTab('hardware')">Kovanie</button>
-  <button id="pt_warnings" onclick="setProdTab('warnings')">Upozornenia <span id="warnBadge" class="wbadge" style="display:none">0</span></button>
+  <button id="pt_control" onclick="setProdTab('control')">Kontrola <span id="ctrlTabBadge" class="wbadge" style="display:none">0</span></button>
 </div>
 
-<div class="hint" id="prodHint">Klik na riadok kusovníka alebo kovania označí dielce/skrinky v modeli.</div>
+<div class="hint" id="prodHint">Klik na riadok (kusovník, kovanie, kontrola) označí dielec/skrinku v modeli.</div>
 <div id="prodBody" class="prodbody"><div class="muted">Načítavam…</div></div>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.4.7p"></script>
-<script src="js/production.js?v=0.4.7p"></script>
+<script src="js/errors.js?v=0.5d"></script>
+<script src="js/production.js?v=0.5d"></script>

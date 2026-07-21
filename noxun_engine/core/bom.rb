@@ -10,9 +10,14 @@
 # novy build_plan by pouzil globalne pravidla namiesto projektovych (F4).
 #
 # API (Codex F5 — collector oddeleny od cisteho vypoctu):
-#   Bom.collect(model) -> {records:, hardware:, warnings:, cabinets:, boards:}
+#   Bom.collect(model) -> {records:, hardware:, hardware_overrides:, warnings:, cabinets:, boards:}
 #   Bom.compute(collected) -> {rows:, sheets:, edging:, hardware:, warnings:, summary:}
 # Headless testy krmia compute() zaznamami priamo (collect je tenky a vyzaduje SketchUp).
+#
+# V0.5 D (kontrolny semafor): collect ADITIVNE nesie `role` v kazdom zazname (z entity)
+# a raw `hardware_overrides` (owner_id/owner_pid + disabled) — Validation.run z toho
+# stavia zoznam problemov. compute() tieto polia IGNORUJE (tvar vystupu nezmeneny,
+# BuildPlan SCHEMA nedotknuta, ziadna migracia).
 module Noxun
   module Engine
     module Bom
@@ -26,6 +31,7 @@ module Noxun
       def collect(model)
         records = []
         hardware = []
+        hardware_overrides = []
         warnings = []
         cabinets = 0
         boards = 0
@@ -36,6 +42,14 @@ module Noxun
             cid = Store.get(inst, 'cabinet_id').to_s
             ccfg = Store.config(inst) || {}
             Array(ccfg['hardware']).each { |h| hardware << h.merge('owner_id' => cid, 'owner_pid' => inst.persistent_id) }
+            # V0.5 D (nalez 2): RAW hardware_overrides — disabled:true polozka je
+            # UZ VYRADENA z config.hardware[] pri vyhodnoteni pravidiel, takze semafor
+            # "vypnute kovanie" ju vie zistit LEN z povodneho zaznamu. owner_id/owner_pid
+            # = adresa korpusu pre klik-select.
+            Array(ccfg['hardware_overrides']).each do |ov|
+              next unless ov.is_a?(Hash)
+              hardware_overrides << ov.merge('owner_id' => cid, 'owner_pid' => inst.persistent_id)
+            end
             Array(ccfg['warnings']).each { |w| warnings << (w.is_a?(Hash) ? w.merge('owner_id' => cid) : { 'message' => w.to_s, 'owner_id' => cid }) }
             inst.definition.entities.grep(Sketchup::ComponentInstance).each do |pi|
               next unless Store.kind(pi) == 'part'
@@ -44,6 +58,7 @@ module Noxun
               records << record(Store.config(pi) || {}, owner_id: cid,
                                 name: Store.get(pi, 'name').to_s,
                                 part_key: Store.get(pi, 'part_key').to_s,
+                                role: Store.get(pi, 'role').to_s,
                                 pid: pi.persistent_id)
             end
           when 'board'
@@ -53,6 +68,7 @@ module Noxun
             records << record(bcfg, owner_id: Store.get(inst, 'id').to_s,
                               name: (bcfg['name'] || 'Doska').to_s,
                               part_key: Store.get(inst, 'part_key').to_s,
+                              role: (Store.get(inst, 'role') || bcfg['role']).to_s,
                               pid: inst.persistent_id)
           when 'part'
             # Codex GH #47 P2: odpojeny/vytiahnuty vyrobny dielec priamo v modeli
@@ -64,21 +80,26 @@ module Noxun
                               owner_id: Store.get(inst, 'cabinet_id').to_s,
                               name: Store.get(inst, 'name').to_s,
                               part_key: Store.get(inst, 'part_key').to_s,
+                              role: Store.get(inst, 'role').to_s,
                               pid: inst.persistent_id)
           end
         end
-        { records: records, hardware: hardware, warnings: warnings,
-          cabinets: cabinets, boards: boards }
+        { records: records, hardware: hardware, hardware_overrides: hardware_overrides,
+          warnings: warnings, cabinets: cabinets, boards: boards }
       end
 
       # Normalizovany zaznam zo snapshot configu (mm Float; edges mapa L1..W2 -> abs_id|nil).
       # pid = SketchUp persistent_id zdrojovej instancie (Codex B3 — jednoznacna adresa
       # pre klik-select aj pri docasne zdielanych ID pred dedup tickom); v headless
       # fixtures moze byt nil.
-      def record(cfg, owner_id:, name:, part_key:, pid: nil)
+      # role (V0.5 D, nalez 1): rola dielca sa CITA Z ENTITY (na instancii dielca aj
+      # dosky existuje ploche NOXUN/role) — kontrola ciel/dosiek bez ABS ju potrebuje.
+      # Odvodenie z nazvu/part_key by bolo krehke a je zakazane.
+      def record(cfg, owner_id:, name:, part_key:, role: '', pid: nil)
         edges = cfg['edges'].is_a?(Hash) ? cfg['edges'] : {}
         {
           'name' => name, 'part_key' => part_key, 'owner_id' => owner_id, 'pid' => pid,
+          'role' => role.to_s,
           'length' => cfg['length'].to_f, 'width' => cfg['width'].to_f,
           'thickness' => cfg['thickness'].to_f,
           'quantity' => [cfg['quantity'].to_i, 1].max,

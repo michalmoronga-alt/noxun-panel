@@ -99,7 +99,11 @@ module Noxun
       # Vrati: { 'project_slug', 'groups' => [{filename, csv, rows, pieces, material_ids,
       #          material_label, tag}], 'errors' => [{name, reason, owners}],
       #          'log_text', 'total_rows', 'total_pieces' }
-      def build(rows, project:, materials: {}, edge_thicknesses: {}, warnings: [],
+      # validation: vysledok Validation.run ({ 'items' => [...], 'counts' => {...} })
+      # — sekcia KONTROLA v LOGu vznika z NEHO (nalez 5: ten isty cerstvy vysledok
+      # ako status okna). Nahrada za povodny `warnings:` param a sekciu "Upozornenia
+      # stavby" (nalez 9: KONTROLA je JEDINY kanonicky zoznam vratane build warnings).
+      def build(rows, project:, materials: {}, edge_thicknesses: {}, validation: nil,
                 version: '', generated_at: nil, merge_18_36: true)
         pslug = project_slug(project)
         errors = []
@@ -152,7 +156,7 @@ module Noxun
         {
           'project_slug' => pslug, 'groups' => groups, 'errors' => errors,
           'total_rows' => total_rows, 'total_pieces' => groups.sum { |g| g['pieces'] },
-          'log_text' => log_text(pslug, project, groups, errors, Array(warnings),
+          'log_text' => log_text(pslug, project, groups, errors, validation,
                                  version, generated_at)
         }
       end
@@ -250,7 +254,7 @@ module Noxun
         label.nil? || label.empty? ? material_id.to_s : label
       end
 
-      def log_text(pslug, project, groups, errors, warnings, version, generated_at)
+      def log_text(pslug, project, groups, errors, validation, version, generated_at)
         lines = []
         lines << 'Noxun Engine — VEPO export LOG'
         lines << "Projekt: #{project} (#{pslug})"
@@ -262,22 +266,35 @@ module Noxun
           ids = g['material_ids'].join(', ')
           lines << "  - #{g['filename']} (#{g['rows']} riadkov, #{g['pieces']} ks) [#{ids}]"
         end
+        # Chyby = riadky VYRADENE z CSV (chybny material/neznama ABS/hrubka). Ostavaju
+        # samostatne od KONTROLY — su o STRATE riadku v exporte, nie o semafore. Nalez 6:
+        # ziadna ticha strata riadku, dovod je tu explicitne pomenovany.
         lines << ('-' * 60)
-        lines << "Chyby (#{errors.length}):"
+        lines << "Riadky vyradené z CSV (#{errors.length}):"
         errors.each do |e|
           owners = e['owners'].empty? ? '' : " @ #{e['owners'].join(', ')}"
           lines << "  ! #{e['name']} (#{e['material_id']})#{owners}: #{e['reason']}"
         end
-        unless warnings.empty?
-          lines << ('-' * 60)
-          lines << "Upozornenia stavby (#{warnings.length}):"
-          warnings.each do |w|
-            msg = w.is_a?(Hash) ? (w['message'] || w['code']) : w
-            owner = w.is_a?(Hash) && w['owner_id'] ? " @ #{w['owner_id']}" : ''
-            lines << "  ~ #{msg}#{owner}"
-          end
-        end
+        log_control(lines, validation)
         lines.join(CRLF) + CRLF
+      end
+
+      # Sekcia KONTROLA — semafor vyroby (nalez 5/9). Vypisuje TEN ISTY cerstvy
+      # vysledok Validation.run ako badge/status okna. RED nikdy neblokuje export.
+      def log_control(lines, validation)
+        items = validation.is_a?(Hash) ? Array(validation['items']) : []
+        counts = (validation.is_a?(Hash) && validation['counts'].is_a?(Hash)) ? validation['counts'] : {}
+        lines << ('-' * 60)
+        lines << "KONTROLA — #{counts['red'].to_i} kritických (RED), #{counts['orange'].to_i} na kontrolu (ORANGE):"
+        if items.empty?
+          lines << '  (bez nálezov — dáta výroby čisté)'
+          return
+        end
+        items.each do |it|
+          mark = it['severity'] == 'red' ? '[RED]   ' : '[ORANGE]'
+          lines << "  #{mark} #{it['message_sk']}"
+        end
+        lines << '  Pozn.: RED je varovanie, export sa neblokuje.'
       end
     end
   end

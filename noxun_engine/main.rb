@@ -54,6 +54,7 @@ Sketchup.require 'noxun_engine/core/usage_stats'   # D-25 merac pouzivania panel
 Sketchup.require 'noxun_engine/core/vepo_export'   # V0.5 C VEPO CSV export (prirezy z BOM)
 Sketchup.require 'noxun_engine/core/sheet_estimate' # D-19 orientacny odhad platni
 Sketchup.require 'noxun_engine/core/debug'         # read-only diagnostika stavu (bugcatch cez MCP)
+Sketchup.require 'noxun_engine/core/validation'    # V0.5 D kontrolny semafor vyroby (RED/ORANGE)
 Sketchup.require 'noxun_engine/ui/production_dialog' # V0.5 B okno Vyroba
 Sketchup.require 'noxun_engine/ui/panel'
 Sketchup.require 'noxun_engine/ui/rules_dialog'     # V0.4 editor pravidiel kovania

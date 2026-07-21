@@ -138,6 +138,7 @@ unless NxTest::IN_SKETCHUP
     core/bom
     core/vepo_export
     core/sheet_estimate
+    core/validation
   ].each { |rel| require File.join(NxTest::ROOT, 'noxun_engine', rel) }
 end
 
