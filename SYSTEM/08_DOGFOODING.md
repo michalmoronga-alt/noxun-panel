@@ -15,7 +15,7 @@
 
 ## UX drobnosti (nízka priorita)
 
-- **D-29 · Hlavička panela — reorganizácia** (smoke test 20.7., A1; spresnené Michalom 20.7. večer) — hlavička STICKY s hlavnými tlačidlami-tabmi **KORPUS/ZÓNY/ČELÁ** (neskôr ďalšie) + tlačidlo **Výroba** v tom istom rade; **⛶ fit/reset zoomu presunúť do pravého horného rohu náhľadu**; názov pluginu + verziu dole/do nastavení. Riadi sa trvalým pravidlom vertikálneho priestoru (viď hore). *Stav: pripravené na dávku, stredná priorita.*
+*(momentálne žiadne)*
 
 ## Nápady na zváženie (nerozhodnuté)
 
@@ -23,7 +23,6 @@
 - **D-26 · Režim Jednoduchý/Rozšírený** (Michal 19.7. večer, debata) — prepínač v UI: jednoduchý = najčastejšie polia, rozšírený = všetko (tvorba šablón, špeciálne zostavy). Rozhodnuté MIESTO samostatného okna Nastavenia (nastavenie ostáva pri svojom poli). *Stav: čaká na dáta z merača D-25 (čo reálne skrývať) — pár týždňov zberu.*
 - **D-27 · Rýchle zobraziť/skryť tagy z panela** (Michal 19.7. večer) — mini prepínače priamo v paneli (Čelá 👁 · Chrbát 👁 …) v logike Ghost checkboxu, nech sa nepreklikáva do SketchUp Tags. *Stav: zápis bokom, kandidát na budúcu UX dávku.*
 - **D-28 · Textúry materiálov (render)** (Michal 19.7. večer) — katalóg rozšíriť o textúru (obrázok dekoru) + mierku rapportu; builder ich aplikuje pri rebuilde → model pripravený na render (Lucia). Fáza 2: orientácia textúry podľa smeru dekoru dielca. Michal má kompletnú knižnicu textúr; **injecting dát (kódy, materiály, kovania, spotrebiče, vybavenie) príde v dávkach po uzavretí V1** — dovtedy pripraviť architektúru. *Stav: zaradené po V0.6.*
-- **D-36 · ABS — logická väzba na materiál** (smoke test 20.7., C2) — pri výbere materiálu dielca ponúknuť „odporúčanú" ABS k dekoru navrchu zoznamu / jedným klikom (v ~95 % sa používa jedna konkrétna hrana k materiálu). So škálovaním katalógu plochý zoznam neobstojí. *Poznámka: párovanie dekorov už robí abs_rules (ABS s rovnakým dekorom ako materiál) — využiť; súvisí s D-16 autocomplete. Priorita rastie s počtom materiálov.*
 
 ## Návrhy väčších celkov (na rozpracovanie)
 
@@ -31,7 +30,6 @@
 
 - **D-09 · Snap body pri presúvaní priečok** (1/4, 1/2, 3/4…) v zónovom náhľade. *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
 - **D-10 · Presúvanie/úprava čiel priamo v náhľade** (ako drag priečok). *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
-- **D-14 · Uložiť korpus do knižnice priamo z panela** (Michal 19.7.) — dnes sa šablóna ukladá v satelitnom okne Šablóny (nenájditeľné pri práci). Návrh: tlačidlo „★ Uložiť ako šablónu" dole vedľa „+ Vložiť ďalší korpus" → **modal** s názvom a potrebnými údajmi (prvý kus vzoru D-15). *Stav: dávka 5.*
 - **D-16 · Autocomplete dekoru** (Michal 19.7.) — pri výbere materiálu/ABS písať názov z katalógu, návrhy sa dopĺňajú za každým písmenom, → a Enter potvrdí. *Stav: ODLOŽENÉ (Michal 19.7. večer — „nice to have"), v zásobe.*
 
 ## Otvorené otázky (na Michalovo posúdenie pri teste)
@@ -50,6 +48,9 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené
 
+- **D-29 · Hlavička panela — reorganizácia** → **vyriešené (PR #66, nočná fronta 21.7.)**: sticky dvojradová hlavička — rad 1 firemné logo + identita objektu (`CAB-002 · názov`, ⚠ chip ako tlačidlo), rad 2 taby Korpus·Zóny·Čelá + tlačidlo Výroba vpravo; ⛶ fit presunutý do rohu náhľadu (overlay, neblokuje pan/zoom); názov pluginu z tela preč, verzia v pätičke. K tomu základ design systemu: CSS tokeny `--nx-*` (1:1 dnešné farby, semafor tokeny rezervované), ikonový sprite `icons.js` (Lucide subset + vlastné + logo, ISC/MIT v THIRD_PARTY_NOTICES), náhrada emoji v UI chrome ikonami (trvalé pravidlo Michala), `docs/UI_DIZAJN.md`. Cache-bust 0.4.7x.
+- **D-36 · ABS — logická väzba na materiál** → **vyriešené (PR #67)**: ABS selecty hrán (dielec aj doska) zoskupené na „Odporúčané k dekoru" (pásky zhodného dekoru s výsledným materiálom, zoradené hrúbkou 1,0 → 2,0) a „Ostatné". Čisto prezentačné — nič sa nemení samo; po zmene materiálu v karte okamžitý lokálny prepočet; legacy dekor bez skupiny; hodnota mimo katalógu prežije. Jednoklikový use-case naďalej rieši D-35 ikona.
+- **D-14 · Uložiť korpus do knižnice priamo z panela** → **vyriešené bez kódu — UŽ EXISTOVALO** (zistené pri príprave nočnej fronty 21.7.): tlačidlo „★ Uložiť ako šablónu do knižnice" + modal s kolíznym varovaním a identity guardom je v paneli od dávky 5 (PR #46 éra). Zápisník len nebol aktualizovaný.
 - **D-40 · Po vložení skrinky/dosky panel „visel" na starom výbere** → **vyriešené (PR #64)**: príčina — zápis DC atribútu `scaletool` (maska Scale úchopov, D-06) v tej istej operácii, v ktorej vzniká nová definícia+inštancia; observer oficiálneho DC pluginu pri commite vypol modelu doručovanie výberových udalostí (pomohol len preklik do komponentu — ten notifikácie resetuje). Nájdené živou MCP bisekciou v sandbox okne. Fix: zámok sa zapisuje v samostatnej transparentnej operácii hneď za vložením — 1× undo aj redo vracia vloženie VRÁTANE zámku; transparentná operácia sa nikdy neabortuje (Codex audit). Kópie/rebuildy boli merané ako bezpečné a nemenia sa. + SU scenáre D40 (živosť eventov, undo/redo), pasca v DC_PRAVIDLA.md bod 8.
 - **D-32/D-33 · Vkladanie bez tichého dedenia + šablóna aplikuje všetko** → **vyriešené v dávke Vkladanie (PR #61)**: vkladacia karta sa pri každom príchode (z korpusu/dielca/dosky) resetuje na defaulty alebo kompletnú šablónu — vrátane rozmerov A MATERIÁLOV (skrytá diera — šablóna ich ukladala, vklad neaplikoval); insert stav žije mimo DOM. „Vložiť kópiu" pri označenom korpuse = presná SERVEROVÁ kópia z configu modelu (materiály, ručné zásahy kovania, per-dielec overridy, názov — formulárová cesta ich strácala). Garancia testom: uložené šablóny sa insertom/editom NIKDY nemenia.
 - **D-39 · Zámky vkladacej karty** → **vyriešené (PR #61)**: 🔒 pri Š/V/H/hrúbke/výške sokla — zamknutá hodnota prežije výber šablóny aj reset (use-case: linka s výškou 950, sokel 150). Stav v Ruby pamäti (prežije zatvorenie panela, zomrie s reštartom SU). Konflikt so šablónou nič ticho neupravuje — vklad sa odmietne a hláška vymenuje aktívne zámky. Kópia zámky vedome ignoruje.
