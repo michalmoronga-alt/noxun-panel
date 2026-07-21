@@ -1,158 +1,254 @@
+  :root{
+    /* ===== Noxun Engine — DESIGN TOKENY (D-29). Mapovanie 1:1 na doterajsie hex —
+       ZIADNA vizualna zmena. Tabulka token -> hex je v docs/UI_DIZAJN.md.
+       Farba nesie vyznam: action (zelena) != select (modra) != stavy != ABS. ===== */
+    /* povrchy */
+    --nx-bg:#f4f5f7;               /* pozadie panela, sticky hlavicka */
+    --nx-surface:#fff;             /* karty, fieldset, details */
+    --nx-surface-sunken:#eceff1;   /* status, ghost, disabled, zamky */
+    --nx-surface-readonly:#f4f6f8; /* readonly input */
+    --nx-surface-preview:#fafcff;  /* pozadie 2D nahladu */
+    --nx-surface-th:#f5f7f8;       /* hlavicka tabulky (okno Vyroba) */
+    --nx-part-bg:#f5fbff;          /* karta dielca (bledomodra) */
+    /* text / ink */
+    --nx-ink:#263238;              /* zakladny text */
+    --nx-ink-title:#1b3a4b;        /* h1 (okno Vyroba) */
+    --nx-ink-strong:#37474f;       /* nadpisy, legendy */
+    --nx-ink-label:#455a64;        /* labely poli */
+    --nx-ink-muted:#607d8b;        /* sekundarny text */
+    --nx-ink-soft:#78909c;         /* tlmeny text, logo */
+    --nx-ink-faint:#90a4ae;        /* placeholder, marker, paticka, disabled text */
+    /* borders */
+    --nx-border:#cfd8dc;           /* zakladny ramik */
+    --nx-border-strong:#b0bec5;    /* ramik inputov */
+    --nx-border-soft:#eceff1;      /* jemny rozdelovnik */
+    /* akcia (zelena) — primarne tlacidla */
+    --nx-action:#2e7d32;
+    --nx-action-hover:#1b5e20;
+    --nx-on-accent:#fff;
+    /* vyber / aktivny (modra) — taby, oznacenie */
+    --nx-select:#1565c0;
+    --nx-select-strong:#01579b;
+    --nx-select-accent:#0277bd;
+    --nx-select-bg:#e3f2fd;
+    --nx-select-bg-soft:#f1f8ff;
+    --nx-select-bg-hover:#e1f5fe;
+    --nx-part-border:#90caf9;
+    /* stav OK (zelena rodina — vlastne tokeny, NIE action) */
+    --nx-ok-bg:#e8f5e9; --nx-ok-fg:#1b5e20; --nx-ok-border:#c8e6c9;
+    /* stav CHYBA (cervena rodina) */
+    --nx-err-bg:#fdecea; --nx-err-fg:#b71c1c; --nx-err-border:#f5c6cb;
+    /* nebezpecie / mazanie (cervena) */
+    --nx-danger:#c62828; --nx-danger-bg:#fbe9e7; --nx-danger-border:#ffccbc;
+    --nx-danger-line:#e53935;      /* cerveny okraj chybneho pola */
+    --nx-danger-bg-soft:#fff5f5;
+    /* upozornenie / override (jantar) */
+    --nx-warn:#ffb74d; --nx-warn-bg:#fff8ef; --nx-warn-bg-soft:#fff3e0; --nx-warn-fg:#e65100;
+    --nx-warnchip-fg:#b26a00; --nx-warnchip-border:#ffcc80;
+    --nx-warnrow-fg:#7a5000; --nx-warnrow-border:#ffe0b2;
+    --nx-modalwarn-fg:#8d5a00; --nx-wbadge-fg:#4e2e00;
+    /* ghost tlacidlo hover */
+    --nx-ghost-hover:#e0e4e7;
+    /* ABS hrany (vlastne tokeny — B7; oddelene od stavov aj akcii) */
+    --nx-abs-1mm:#e53935; --nx-abs-2mm:#43a047; --nx-abs-none:#b0bec5; --nx-abs-tape-bg:#faf6ee;
+    /* prekrytia */
+    --nx-scrim:rgba(38,50,56,0.45); --nx-modal-shadow:rgba(0,0,0,0.25);
+    /* ===== SEMAFOR — REZERVOVANE (B6). NIKDE sa nepouzivaju; vyhradene pre stavovy
+       semafor (paralelna davka). Vyznamy sa NESMU miesat s ABS ani stavmi OK/CHYBA. ===== */
+    --nx-state-red:#d32f2f; --nx-state-orange:#f9a825; --nx-state-green:#388e3c;
+    /* ===== D-29 sticky hlavicka + ikony ===== */
+    --nx-logo:#78909c;             /* firemne logo — tlmene */
+    --nx-header-h:80px;            /* orientacna vyska sticky hlavicky (scroll-padding-top) */
+  }
   * { box-sizing: border-box; }
-  body { font-family: "Segoe UI", Tahoma, sans-serif; font-size: 13px; color: #263238; background: #f4f5f7; margin: 0; padding: 10px; }
-  h1 { font-size: 15px; margin: 0 0 2px; color: #1b3a4b; }
-  .sub { font-size: 11px; color: #78909c; margin: 0 0 10px; }
-  fieldset { border: 1px solid #cfd8dc; border-radius: 6px; margin: 0 0 10px; padding: 8px 10px 10px; background: #fff; }
-  legend { font-weight: 600; font-size: 12px; color: #37474f; padding: 0 4px; }
-  details { border: 1px solid #cfd8dc; border-radius: 6px; margin: 0 0 10px; background: #fff; }
-  details > summary { font-weight: 600; font-size: 12px; color: #37474f; padding: 8px 10px; cursor: pointer; list-style: none; user-select: none; }
+  html { scroll-padding-top: var(--nx-header-h); } /* D-29 A11: fokus nesmie skoncit pod sticky hlavickou */
+  body { font-family: "Segoe UI", Tahoma, sans-serif; font-size: 13px; color: var(--nx-ink); background: var(--nx-bg); margin: 0; padding: 10px; }
+  h1 { font-size: 15px; margin: 0 0 2px; color: var(--nx-ink-title); }
+  .sub { font-size: 11px; color: var(--nx-ink-soft); margin: 0 0 10px; }
+  fieldset { border: 1px solid var(--nx-border); border-radius: 6px; margin: 0 0 10px; padding: 8px 10px 10px; background: var(--nx-surface); }
+  legend { font-weight: 600; font-size: 12px; color: var(--nx-ink-strong); padding: 0 4px; }
+  details { border: 1px solid var(--nx-border); border-radius: 6px; margin: 0 0 10px; background: var(--nx-surface); }
+  details > summary { font-weight: 600; font-size: 12px; color: var(--nx-ink-strong); padding: 8px 10px; cursor: pointer; list-style: none; user-select: none; }
   details > summary::-webkit-details-marker { display: none; }
-  details > summary::before { content: '\25B8'; display: inline-block; margin-right: 6px; color: #90a4ae; transition: transform .12s; }
-  details[open] > summary::before { transform: rotate(90deg); }
+  /* D-29 B4: disclosure chevron (nahrada unicode trojuholnika \25B8) — CSS sipka
+     konzistentna s ikonou chevron-right; rotuje pri otvoreni. */
+  details > summary::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 8px;
+    border-right: 2px solid var(--nx-ink-faint); border-bottom: 2px solid var(--nx-ink-faint);
+    transform: rotate(-45deg); transition: transform .12s; position: relative; top: -2px; }
+  details[open] > summary::before { transform: rotate(45deg); top: -1px; }
   .body { padding: 0 10px 10px; }
   .row { display: flex; align-items: center; margin: 5px 0; }
-  .row label { flex: 0 0 128px; color: #455a64; }
-  .row input, .row select { flex: 1; padding: 4px 6px; border: 1px solid #b0bec5; border-radius: 4px; font-size: 13px; min-width: 0; }
-  .row input.bad { border-color: #e53935; background: #fff5f5; }
-  .row .unit { flex: 0 0 26px; text-align: right; color: #90a4ae; font-size: 11px; padding-left: 4px; }
-  .row input[readonly] { background: #f4f6f8; color: #78909c; border-style: dashed; }
+  .row label { flex: 0 0 128px; color: var(--nx-ink-label); }
+  .row input, .row select { flex: 1; padding: 4px 6px; border: 1px solid var(--nx-border-strong); border-radius: 4px; font-size: 13px; min-width: 0; }
+  .row input.bad { border-color: var(--nx-danger-line); background: var(--nx-danger-bg-soft); }
+  .row .unit { flex: 0 0 26px; text-align: right; color: var(--nx-ink-faint); font-size: 11px; padding-left: 4px; }
+  .row input[readonly] { background: var(--nx-surface-readonly); color: var(--nx-ink-soft); border-style: dashed; }
   .typerow { display: flex; gap: 16px; padding: 2px 2px 6px; }
-  .typerow label { display: flex; align-items: center; color: #37474f; font-weight: 600; cursor: pointer; }
+  .typerow label { display: flex; align-items: center; color: var(--nx-ink-strong); font-weight: 600; cursor: pointer; }
   .typerow input { margin-right: 6px; }
   button { padding: 7px 8px; border: 0; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 600; }
   .wide { width: 100%; margin-top: 4px; padding: 8px; font-size: 13px; }
-  .primary { background: #2e7d32; color: #fff; } .primary:hover { background: #1b5e20; }
-  .ghostbtn { background: #eceff1; color: #37474f; border: 1px solid #cfd8dc; }
-  .ghostbtn:hover { background: #e0e4e7; }
-  .danger { background: #fbe9e7; color: #c62828; border: 1px solid #ffccbc; }
-  button:disabled { background: #eceff1; color: #b0bec5; cursor: not-allowed; border-color: #eceff1; }
+  .primary { background: var(--nx-action); color: var(--nx-on-accent); } .primary:hover { background: var(--nx-action-hover); }
+  .ghostbtn { background: var(--nx-surface-sunken); color: var(--nx-ink-strong); border: 1px solid var(--nx-border); }
+  .ghostbtn:hover { background: var(--nx-ghost-hover); }
+  .danger { background: var(--nx-danger-bg); color: var(--nx-danger); border: 1px solid var(--nx-danger-border); }
+  button:disabled { background: var(--nx-surface-sunken); color: var(--nx-ink-faint); cursor: not-allowed; border-color: var(--nx-surface-sunken); }
   .btnrow { display: flex; gap: 6px; margin-top: 6px; }
   .btnrow button { flex: 1; }
-  .selinfo { font-size: 11px; color: #607d8b; margin: 8px 0 6px; }
-  .selinfo b { color: #1565c0; }
-  .muted { color: #90a4ae; font-size: 11px; padding: 4px 0; }
-  .hint { font-size: 10.5px; color: #90a4ae; margin: 2px 0 6px; }
+  .selinfo { font-size: 11px; color: var(--nx-ink-muted); margin: 8px 0 6px; }
+  .selinfo b { color: var(--nx-select); }
+  .muted { color: var(--nx-ink-faint); font-size: 11px; padding: 4px 0; }
+  .hint { font-size: 10.5px; color: var(--nx-ink-faint); margin: 2px 0 6px; }
   /* Cela riadky */
   .frow { display: flex; gap: 5px; align-items: center; margin: 4px 0; }
-  .frow .fnum { flex: 0 0 24px; color: #90a4ae; font-size: 11px; text-align: center; } /* D-23: "F1" namiesto "1" */
-  .frow select.ftype { flex: 1 1 auto; padding: 3px; border: 1px solid #b0bec5; border-radius: 4px; }
-  .frow input.fh { flex: 0 0 58px; padding: 3px 4px; border: 1px solid #b0bec5; border-radius: 4px; }
-  .frow select.fw { flex: 0 0 56px; padding: 3px; border: 1px solid #b0bec5; border-radius: 4px; }
+  .frow .fnum { flex: 0 0 24px; color: var(--nx-ink-faint); font-size: 11px; text-align: center; } /* D-23: "F1" namiesto "1" */
+  .frow select.ftype { flex: 1 1 auto; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 4px; }
+  .frow input.fh { flex: 0 0 58px; padding: 3px 4px; border: 1px solid var(--nx-border-strong); border-radius: 4px; }
+  .frow select.fw { flex: 0 0 56px; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 4px; }
   .frow .flock { flex: 0 0 20px; text-align: center; }
-  .frow .fdel { flex: 0 0 22px; background: #fbe9e7; color: #c62828; border: 1px solid #ffccbc; border-radius: 4px; padding: 2px 0; }
-  /* D-22: zamok limitu presahov (v riadku medzier sekcie Cela) */
-  .row .lockbtn { flex: 1; text-align: left; padding: 4px 8px; font-weight: 600; }
-  .row .lockbtn.unlocked { background: #fff8ef; border-color: #ffb74d; color: #e65100; }
+  .frow .fdel { flex: 0 0 22px; background: var(--nx-danger-bg); color: var(--nx-danger); border: 1px solid var(--nx-danger-border); border-radius: 4px; padding: 2px 0; }
+  /* D-22: zamok limitu presahov (v riadku medzier sekcie Cela) — ikona + text v rade */
+  .row .lockbtn { flex: 1; text-align: left; padding: 4px 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+  .row .lockbtn.unlocked { background: var(--nx-warn-bg); border-color: var(--nx-warn); color: var(--nx-warn-fg); }
   /* D-39: zamky vkladacej karty — PEVNA sirka v existujucich riadkoch poli
      (audit F10: vlastna trieda, NIE .row .lockbtn — ta je flex cez celu sirku;
      ziadny novy riadok — pravidlo vertikalneho priestoru). Mimo mode-insert skryte. */
   .inslock { display: none; flex: 0 0 26px; margin-left: 4px; padding: 3px 0; text-align: center;
-             border: 1px solid #cfd8dc; border-radius: 4px; background: #eceff1; cursor: pointer; font-size: 12px; }
-  body.mode-insert .inslock { display: block; }
-  .inslock.on { background: #fff3e0; border-color: #ffb74d; }
-  /* Nahlad */
-  .pvtabs { display: flex; gap: 6px; margin: 2px 0 6px; }
-  .pvtabs button { flex: 1; padding: 5px; font-size: 11px; }
-  .pvtabs button.on { background: #1565c0; color: #fff; }
-  #preview { width: 100%; border: 1px solid #cfd8dc; border-radius: 5px; background: #fafcff; display: block; touch-action: none; }
-  .pvhint { font-size: 10px; color: #90a4ae; text-align: center; margin: 3px 0 4px; }
+             border: 1px solid var(--nx-border); border-radius: 4px; background: var(--nx-surface-sunken); cursor: pointer; font-size: 12px; }
+  body.mode-insert .inslock { display: inline-flex; align-items: center; justify-content: center; }
+  .inslock.on { background: var(--nx-warn-bg-soft); border-color: var(--nx-warn); }
+  /* Nahlad (fit ⛶ presunuty do overlaya nahladu — D-29; rezimove taby su v sticky hlavicke) */
+  #preview { width: 100%; border: 1px solid var(--nx-border); border-radius: 5px; background: var(--nx-surface-preview); display: block; touch-action: none; }
+  .pvhint { font-size: 10px; color: var(--nx-ink-faint); text-align: center; margin: 3px 0 4px; }
   /* Zony strom */
-  #zoneTree { border: 1px solid #eceff1; border-radius: 5px; margin: 6px 0; max-height: 140px; overflow: auto; }
-  .znode { padding: 4px 6px; cursor: pointer; border-bottom: 1px solid #f4f5f7; font-size: 12px; }
-  .znode:hover { background: #f1f8ff; }
-  .znode.active { background: #e3f2fd; box-shadow: inset 3px 0 0 #1565c0; }
-  .znode .dim { color: #90a4ae; font-size: 10.5px; }
-  .znode .zs { color: #607d8b; font-size: 10.5px; }
-  #zoneActive { font-size: 11px; color: #37474f; margin: 4px 0 6px; }
-  #zoneActive b { color: #1565c0; }
+  #zoneTree { border: 1px solid var(--nx-border-soft); border-radius: 5px; margin: 6px 0; max-height: 140px; overflow: auto; }
+  .znode { padding: 4px 6px; cursor: pointer; border-bottom: 1px solid var(--nx-bg); font-size: 12px; }
+  .znode:hover { background: var(--nx-select-bg-soft); }
+  .znode.active { background: var(--nx-select-bg); box-shadow: inset 3px 0 0 var(--nx-select); }
+  .znode .dim { color: var(--nx-ink-faint); font-size: 10.5px; }
+  .znode .zs { color: var(--nx-ink-muted); font-size: 10.5px; }
+  #zoneActive { font-size: 11px; color: var(--nx-ink-strong); margin: 4px 0 6px; }
+  #zoneActive b { color: var(--nx-select); }
   .zact { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
-  .zact label { flex: 0 0 118px; color: #455a64; }
-  .zact select { flex: 0 0 52px; padding: 3px; border: 1px solid #b0bec5; border-radius: 4px; }
+  .zact label { flex: 0 0 118px; color: var(--nx-ink-label); }
+  .zact select { flex: 0 0 52px; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 4px; }
   .zact button { flex: 1; }
   .fldrow { display: flex; gap: 5px; align-items: center; margin: 3px 0; font-size: 12px; }
-  .fldrow .fldn { flex: 0 0 66px; color: #455a64; }
-  .fldrow input { flex: 1; padding: 3px 5px; border: 1px solid #b0bec5; border-radius: 4px; min-width: 0; }
-  .fldrow .lockbtn { flex: 0 0 30px; cursor: pointer; text-align: center; border: 1px solid #cfd8dc; border-radius: 4px; background: #eceff1; padding: 3px 0; }
-  .fldrow .lockbtn.on { background: #fff3e0; border-color: #ffb74d; }
+  .fldrow .fldn { flex: 0 0 66px; color: var(--nx-ink-label); }
+  .fldrow input { flex: 1; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 4px; min-width: 0; }
+  .fldrow .lockbtn { flex: 0 0 30px; cursor: pointer; text-align: center; border: 1px solid var(--nx-border); border-radius: 4px; background: var(--nx-surface-sunken); padding: 3px 0; display: inline-flex; align-items: center; justify-content: center; }
+  .fldrow .lockbtn.on { background: var(--nx-warn-bg-soft); border-color: var(--nx-warn); }
   .zoneline { display: flex; align-items: center; margin: 8px 0 2px; }
   .zoneline input { margin-right: 7px; width: 15px; height: 15px; }
-  .zoneline label { color: #455a64; }
-  #status { font-size: 11px; padding: 7px 9px; border-radius: 5px; background: #eceff1; color: #455a64; border: 1px solid #cfd8dc; min-height: 16px; line-height: 1.35; margin-top: 8px; }
-  #status.err { background: #fdecea; color: #b71c1c; border-color: #f5c6cb; }
-  #status.ok  { background: #e8f5e9; color: #1b5e20; border-color: #c8e6c9; }
+  .zoneline label { color: var(--nx-ink-label); }
+  #status { font-size: 11px; padding: 7px 9px; border-radius: 5px; background: var(--nx-surface-sunken); color: var(--nx-ink-label); border: 1px solid var(--nx-border); min-height: 16px; line-height: 1.35; margin-top: 8px; }
+  #status.err { background: var(--nx-err-bg); color: var(--nx-err-fg); border-color: var(--nx-err-border); }
+  #status.ok  { background: var(--nx-ok-bg); color: var(--nx-ok-fg); border-color: var(--nx-ok-border); }
   /* V0.3 Materialy */
   .matrow { display: flex; align-items: center; margin: 5px 0; }
-  .matrow label { flex: 0 0 118px; color: #455a64; font-size: 12px; }
-  .matrow select { flex: 1; padding: 4px 6px; border: 1px solid #b0bec5; border-radius: 4px; font-size: 12px; min-width: 0; }
-  .subhead { font-size: 11px; font-weight: 600; color: #607d8b; margin: 8px 0 3px; text-transform: uppercase; letter-spacing: .03em; }
+  .matrow label { flex: 0 0 118px; color: var(--nx-ink-label); font-size: 12px; }
+  .matrow select { flex: 1; padding: 4px 6px; border: 1px solid var(--nx-border-strong); border-radius: 4px; font-size: 12px; min-width: 0; }
+  .subhead { font-size: 11px; font-weight: 600; color: var(--nx-ink-muted); margin: 8px 0 3px; text-transform: uppercase; letter-spacing: .03em; }
   /* V0.3 Karta dielca (ABS editor) */
-  #partCard { border: 1px solid #90caf9; background: #f5fbff; }
-  #partCard legend { color: #1565c0; }
-  .pchead { font-size: 12px; color: #37474f; margin: 0 0 2px; }
-  .pchead b { color: #1565c0; }
-  .pcdim { font-size: 11px; color: #78909c; margin: 0 0 8px; }
-  #partSvg { width: 100%; max-height: 200px; border: 1px solid #cfd8dc; border-radius: 5px; background: #fff; display: block; margin: 4px 0 6px; }
-  .absleg { display: flex; flex-wrap: wrap; gap: 8px; font-size: 10px; color: #607d8b; margin: 2px 0 8px; align-items: center; }
+  #partCard { border: 1px solid var(--nx-part-border); background: var(--nx-part-bg); }
+  #partCard legend { color: var(--nx-select); }
+  .pchead { font-size: 12px; color: var(--nx-ink-strong); margin: 0 0 2px; }
+  .pchead b { color: var(--nx-select); }
+  .pcdim { font-size: 11px; color: var(--nx-ink-soft); margin: 0 0 8px; }
+  #partSvg { width: 100%; max-height: 200px; border: 1px solid var(--nx-border); border-radius: 5px; background: var(--nx-surface); display: block; margin: 4px 0 6px; }
+  .absleg { display: flex; flex-wrap: wrap; gap: 8px; font-size: 10px; color: var(--nx-ink-muted); margin: 2px 0 8px; align-items: center; }
   .absleg span { display: inline-flex; align-items: center; gap: 3px; }
   .absleg i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
   /* D-35 "olep vsetky 4 hrany": kompaktna ikona v riadku legendy (ziadny novy riadok
-     — pravidlo vertikalneho priestoru). Ramik = paska dookola vo farbe ABS 1,0 mm. */
-  .absall { margin-left: auto; flex: 0 0 auto; width: 22px; height: 15px; padding: 0; border: 1px solid #b0bec5; border-radius: 3px; background: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
-  .absall i { width: 12px; height: 8px; border: 2px solid #e53935; border-radius: 2px; display: block; box-sizing: border-box; background: #faf6ee; }
-  .absall:hover { border-color: #e53935; background: #fff5f5; }
+     — pravidlo vertikalneho priestoru). Ramik = paska dookola vo farbe ABS 1,0 mm
+     (vlastne ABS tokeny — B7, oddelene od stavovych farieb). */
+  .absall { margin-left: auto; flex: 0 0 auto; width: 22px; height: 15px; padding: 0; border: 1px solid var(--nx-border-strong); border-radius: 3px; background: var(--nx-surface); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+  .absall i { width: 12px; height: 8px; border: 2px solid var(--nx-abs-1mm); border-radius: 2px; display: block; box-sizing: border-box; background: var(--nx-abs-tape-bg); }
+  .absall:hover { border-color: var(--nx-abs-1mm); background: var(--nx-danger-bg-soft); }
   .edgerow { display: flex; gap: 5px; align-items: center; margin: 3px 0; }
-  .edgerow .en { flex: 0 0 78px; font-size: 12px; color: #455a64; display: flex; align-items: center; gap: 5px; }
+  .edgerow .en { flex: 0 0 78px; font-size: 12px; color: var(--nx-ink-label); display: flex; align-items: center; gap: 5px; }
   .edgerow .en i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; flex: 0 0 11px; }
-  .edgerow select { flex: 1; padding: 3px 5px; border: 1px solid #b0bec5; border-radius: 4px; font-size: 12px; min-width: 0; }
-  .edgerow select.ovr { border-color: #ffb74d; background: #fff8ef; }
+  .edgerow select { flex: 1; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 4px; font-size: 12px; min-width: 0; }
+  .edgerow select.ovr { border-color: var(--nx-warn); background: var(--nx-warn-bg); }
   .pcmat { display: flex; align-items: center; gap: 5px; margin: 2px 0 6px; }
-  .pcmat label { flex: 0 0 78px; font-size: 12px; color: #455a64; }
-  .pcmat select { flex: 1; padding: 4px 6px; border: 1px solid #b0bec5; border-radius: 4px; font-size: 12px; min-width: 0; }
-  .pcmat select.ovr { border-color: #ffb74d; background: #fff8ef; }
+  .pcmat label { flex: 0 0 78px; font-size: 12px; color: var(--nx-ink-label); }
+  .pcmat select { flex: 1; padding: 4px 6px; border: 1px solid var(--nx-border-strong); border-radius: 4px; font-size: 12px; min-width: 0; }
+  .pcmat select.ovr { border-color: var(--nx-warn); background: var(--nx-warn-bg); }
   /* KOVANIE (V0.4) */
   .hwrow { display: flex; align-items: center; gap: 5px; margin: 4px 0; }
-  .hwrow .hwname { flex: 1; font-size: 12px; color: #37474f; min-width: 0; }
-  .hwrow .hwown { color: #607d8b; font-size: 11px; }
-  .hwrow .hwext { color: #90a4ae; font-size: 11px; }
-  .hwrow .hwqty { flex: 0 0 52px; width: 52px; padding: 3px 5px; border: 1px solid #b0bec5; border-radius: 4px; font-size: 12px; text-align: right; }
-  .hwrow .hwbtn { flex: 0 0 auto; padding: 2px 7px; font-size: 12px; }
+  .hwrow .hwname { flex: 1; font-size: 12px; color: var(--nx-ink-strong); min-width: 0; }
+  .hwrow .hwown { color: var(--nx-ink-muted); font-size: 11px; }
+  .hwrow .hwext { color: var(--nx-ink-faint); font-size: 11px; }
+  .hwrow .hwqty { flex: 0 0 52px; width: 52px; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 4px; font-size: 12px; text-align: right; }
+  .hwrow .hwbtn { flex: 0 0 auto; padding: 2px 7px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
   .hwrow .hwsrc { flex: 0 0 auto; width: 20px; }
-  .hwrow.hwoff .hwname { color: #90a4ae; }
-  .hwrow .hwqty.manual, .hwrow.manual .hwqty { border-color: #ffb74d; background: #fff8ef; }
+  .hwrow.hwoff .hwname { color: var(--nx-ink-faint); }
+  .hwrow .hwqty.manual, .hwrow.manual .hwqty { border-color: var(--nx-warn); background: var(--nx-warn-bg); }
   /* PRAVIDLA KOVANIA (dialog) */
-  .rrule { border: 1px solid #cfd8dc; border-radius: 6px; padding: 8px 10px; margin: 8px 0; background: #fff; }
+  .rrule { border: 1px solid var(--nx-border); border-radius: 6px; padding: 8px 10px; margin: 8px 0; background: var(--nx-surface); }
   .rrule .rhead { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-  .rrule .rhead .rid { color: #90a4ae; font-size: 11px; }
+  .rrule .rhead .rid { color: var(--nx-ink-faint); font-size: 11px; }
   .rrow { display: flex; align-items: center; gap: 5px; margin: 4px 0; }
-  .rrow label { flex: 0 0 auto; min-width: 64px; color: #455a64; font-size: 12px; }
-  .rrow .rnum { width: 64px; padding: 3px 5px; border: 1px solid #b0bec5; border-radius: 4px; font-size: 12px; text-align: right; }
-  .rrow .rseries { flex: 1; padding: 3px 5px; border: 1px solid #b0bec5; border-radius: 4px; font-size: 12px; min-width: 0; }
-  .rband .arrow { color: #90a4ae; }
+  .rrow label { flex: 0 0 auto; min-width: 64px; color: var(--nx-ink-label); font-size: 12px; }
+  .rrow .rnum { width: 64px; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 4px; font-size: 12px; text-align: right; }
+  .rrow .rseries { flex: 1; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 4px; font-size: 12px; min-width: 0; }
+  .rband .arrow { color: var(--nx-ink-faint); }
   .rband .bmaxfill { width: 64px; display: inline-block; }
   .rband .bdel { flex: 0 0 auto; width: 26px; padding: 2px 0; }
   .rdsave { margin-top: 10px; }
-  .rdchk { display: block; font-size: 12px; color: #455a64; margin-bottom: 6px; }
-  /* ===== V0.4.5 D1: Inspector kostra ===== */
-  .hdr { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
-  .hdr h1 { margin: 0; }
-  .hdr .sub { margin: 0; }
-  /* identita oznaceneho */
-  .idbar { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; min-height: 20px; }
-  .idbar .cid { font-weight: 700; font-size: 14px; color: #1565c0; }
-  .idbar .cname { color: #37474f; font-size: 12px; }
-  .idbar .free { color: #78909c; font-size: 12px; }
-  .idbar .warnchip { margin-left: auto; font-size: 11px; color: #b26a00; background: #fff3e0;
-                     border: 1px solid #ffcc80; border-radius: 99px; padding: 0 8px; cursor: help; }
+  .rdchk { display: block; font-size: 12px; color: var(--nx-ink-label); margin-bottom: 6px; }
+  /* ===== V0.4.5 D1 / D-29: Inspector kostra — STICKY dvojradova hlavicka ===== */
+  /* D-29 A4: kompenzacia body paddingu (10px) negativnymi marginmi — plna sirka
+     bez horizontalneho scrollbaru. A5: z-index POD modalom (60), nepriehladne pozadie. */
+  .nxhdr { position: sticky; top: 0; z-index: 50; margin: -10px -10px 8px; padding: 8px 10px;
+           background: var(--nx-bg); border-bottom: 1px solid var(--nx-border); }
+  /* rad 1: logo + identita + warn chip */
+  .nxhdr-id { display: flex; align-items: center; gap: 8px; min-height: 20px; }
+  .nx-logo { flex: 0 0 auto; width: 16px; height: 16px; color: var(--nx-logo); } /* FILL vynimka — NEdedi .ic stroke */
+  /* rad 2: rezimove taby vlavo + Vyroba vpravo (oddelene, otvara satelit) */
+  .nxhdr-modes { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .cabtabs { display: flex; gap: 6px; flex: 1 1 auto; min-width: 0; }
+  .cabtab { flex: 1 1 auto; padding: 5px; font-size: 11px; background: var(--nx-surface-sunken); color: var(--nx-ink-strong); border: 1px solid var(--nx-border); }
+  .cabtab.on { background: var(--nx-select); color: var(--nx-on-accent); border-color: var(--nx-select); }
+  .prodbtn { flex: 0 0 auto; padding: 5px 10px; font-size: 11px; background: var(--nx-surface-sunken);
+             color: var(--nx-ink-strong); border: 1px solid var(--nx-border); display: inline-flex; align-items: center; gap: 5px; }
+  .prodbtn:hover { background: var(--nx-ghost-hover); }
+  /* identita oznaceneho (A6: bez vlastneho margin-bottom — hlavicka ho riesi; A7: cname ellipsis) */
+  .idbar { display: flex; align-items: baseline; gap: 8px; margin: 0; min-width: 0; flex: 1 1 auto; }
+  .idbar .cid { flex: 0 0 auto; font-weight: 700; font-size: 14px; color: var(--nx-select); }
+  .idbar .cname { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--nx-ink-strong); font-size: 12px; }
+  .idbar .free { color: var(--nx-ink-soft); font-size: 12px; }
+  /* warn chip = skutocne <button> (A10): fokusovatelne, klavesova aktivacia */
+  .idbar .warnchip { margin-left: auto; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px;
+                     font-size: 11px; font-weight: 600; color: var(--nx-warnchip-fg); background: var(--nx-warn-bg-soft);
+                     border: 1px solid var(--nx-warnchip-border); border-radius: 99px; padding: 1px 8px; cursor: pointer; }
+  .idbar .warnchip .ic { width: 13px; height: 13px; }
   /* nahlad = fixne okno (zoom/pan v preview.js). D-01a: vyska rastie s oknom
      panela (38vh), min 210 px / max 640 px — velke okno = velky nahlad. */
   .pvbox { padding-top: 8px; }
+  /* D-29 A8: fit overlay — bezvyskovy wrapper okolo SVG (position:relative);
+     overlay pointer-events:none, tlacidlo pointer-events:auto -> nesmie blokovat
+     pan/zoom/drag priecky v nahlade. */
+  .pvwrap { position: relative; line-height: 0; }
   #preview { height: clamp(210px, 38vh, 640px); }
-  .pvtabs .pvfit { flex: 0 0 34px; font-size: 13px; }
-  .zoneline { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #607d8b; margin-top: 4px; }
+  .pvfitwrap { position: absolute; top: 6px; right: 6px; pointer-events: none; }
+  .pvfit { pointer-events: auto; width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+           background: var(--nx-surface); color: var(--nx-ink-strong); border: 1px solid var(--nx-border); border-radius: 5px;
+           box-shadow: 0 1px 2px var(--nx-modal-shadow); opacity: .9; }
+  .pvfit:hover { opacity: 1; background: var(--nx-surface-sunken); }
+  .pvfit .ic { width: 16px; height: 16px; }
+  .zoneline { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--nx-ink-muted); margin-top: 4px; }
+  /* paticka v normalnom toku (A12: #verline PRESUNUTY sem, nie fixed, nie duplikat) */
+  .nxfoot { margin: 10px 0 0; padding-top: 8px; border-top: 1px solid var(--nx-border-soft);
+            font-size: 11px; color: var(--nx-ink-faint); text-align: center; }
+  /* ===== D-29: ikony (Lucide sprite, stroke-2 currentColor) — icons.js ===== */
+  .ic { width: 15px; height: 15px; flex: 0 0 auto; vertical-align: middle; fill: none; stroke: currentColor;
+        stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+  .ic-inline { width: 1em; height: 1em; vertical-align: -0.15em; } /* ikona v prose hintu */
   /* omrvinka karty dielca */
-  .crumb { font-size: 11.5px; color: #607d8b; margin-bottom: 6px; }
-  .crumb b { color: #263238; }
-  .crumb .backlink { color: #1565c0; cursor: pointer; text-decoration: underline; }
+  .crumb { font-size: 11.5px; color: var(--nx-ink-muted); margin-bottom: 6px; }
+  .crumb b { color: var(--nx-ink); }
+  .crumb .backlink { color: var(--nx-select); cursor: pointer; text-decoration: underline; }
   /* rezimy Inspectora (body class z bridge.js) */
   .insertmore { display: none; }
   body.mode-cab .insertmore { display: block; }
@@ -160,31 +256,29 @@
   .savetpl { display: none; }
   body.mode-cab .savetpl { display: block; }
   /* D-14/D-15: genericky in-panel modal pre "pridavacie" akcie */
-  .nxmodal { position: fixed; inset: 0; background: rgba(38,50,56,0.45); z-index: 60;
+  .nxmodal { position: fixed; inset: 0; background: var(--nx-scrim); z-index: 60;
              display: flex; align-items: center; justify-content: center; }
-  .nxmodal-card { background: #fff; border: 1px solid #cfd8dc; border-radius: 8px;
-                  box-shadow: 0 8px 28px rgba(0,0,0,0.25); padding: 14px; width: min(92%, 340px); }
-  .nxmodal-title { font-weight: 600; font-size: 14px; margin-bottom: 10px; color: #263238; }
-  .nxmodal-warn { background: #fff8ef; border: 1px solid #ffb74d; color: #8d5a00;
+  .nxmodal-card { background: var(--nx-surface); border: 1px solid var(--nx-border); border-radius: 8px;
+                  box-shadow: 0 8px 28px var(--nx-modal-shadow); padding: 14px; width: min(92%, 340px); }
+  .nxmodal-title { font-weight: 600; font-size: 14px; margin-bottom: 10px; color: var(--nx-ink); }
+  .nxmodal-warn { background: var(--nx-warn-bg); border: 1px solid var(--nx-warn); color: var(--nx-modalwarn-fg);
                   border-radius: 4px; padding: 6px 8px; font-size: 12px; margin: 8px 0; }
   /* ===== V0.5 B: okno Vyroba (kusovnik/supisy) ===== */
   .prodhead { display: flex; align-items: center; gap: 10px; }
   .prodhead h1 { margin: 0; }
   .prodhead .sub { flex: 1; }
-  .prodsum { background: #eceff1; border: 1px solid #cfd8dc; border-radius: 6px;
-             padding: 7px 10px; font-size: 12.5px; margin: 8px 0; color: #37474f; }
+  .prodsum { background: var(--nx-surface-sunken); border: 1px solid var(--nx-border); border-radius: 6px;
+             padding: 7px 10px; font-size: 12.5px; margin: 8px 0; color: var(--nx-ink-strong); }
   .prodtabs { margin-bottom: 6px; }
-  .prodbody { max-height: calc(100vh - 220px); overflow: auto; border: 1px solid #cfd8dc; border-radius: 6px; }
+  .prodbody { max-height: calc(100vh - 220px); overflow: auto; border: 1px solid var(--nx-border); border-radius: 6px; }
   .bomtab { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .bomtab th { position: sticky; top: 0; background: #f5f7f8; text-align: left;
-               padding: 6px 8px; border-bottom: 2px solid #cfd8dc; z-index: 2; }
-  .bomtab td { padding: 5px 8px; border-bottom: 1px solid #eceff1; vertical-align: top; }
+  .bomtab th { position: sticky; top: 0; background: var(--nx-surface-th); text-align: left;
+               padding: 6px 8px; border-bottom: 2px solid var(--nx-border); z-index: 2; }
+  .bomtab td { padding: 5px 8px; border-bottom: 1px solid var(--nx-border-soft); vertical-align: top; }
   .bomtab tr.bomrow, .bomtab tr.hwrow { cursor: pointer; }
-  .bomtab tr.bomrow:hover, .bomtab tr.hwrow:hover { background: #e3f2fd; }
-  .wbadge { background: #ffb74d; color: #4e2e00; border-radius: 9px; padding: 0 6px;
+  .bomtab tr.bomrow:hover, .bomtab tr.hwrow:hover { background: var(--nx-select-bg); }
+  .wbadge { background: var(--nx-warn); color: var(--nx-wbadge-fg); border-radius: 9px; padding: 0 6px;
             font-size: 11px; font-weight: 600; }
-  /* tlacidlo Vyroba v paneli — globalna akcia pod identitou (vzdy viditelne) */
-  .prodopen { margin: 4px 0 8px; }
   body.mode-cab #insertCard { display: none; }
   body.mode-part #insertCard, body.mode-part #basicCard,
   body.mode-part details[data-key="top"], body.mode-part details[data-key="bottom"],
@@ -224,7 +318,7 @@
   body[data-insert-kind="board"].mode-insert details[data-key="hardware"],
   body[data-insert-kind="board"].mode-insert details[data-key="materials"],
   body[data-insert-kind="board"].mode-insert details[data-key="zones"] { display: none; }
-  #insertKindRow { border-bottom: 1px dashed #cfd8dc; padding-bottom: 6px; margin-bottom: 8px; }
+  #insertKindRow { border-bottom: 1px dashed var(--nx-border); padding-bottom: 6px; margin-bottom: 8px; }
   /* ===== D-08: rezimove taby Korpus/Zony/Cela — data-cab-tab atribut na <body>
      (vzor data-insert-kind, PREZIJE setUiMode className prepis). Pravidla su BEZ
      mode prefixu: part/board rezimy skryvaju svoje sekcie vlastnymi pravidlami
@@ -241,50 +335,53 @@
   body[data-cab-tab="korpus"] details[data-key="zones"], body[data-cab-tab="cela"] details[data-key="zones"],
   body[data-cab-tab="korpus"] .zoneline, body[data-cab-tab="cela"] .zoneline { display: none; }
   body[data-cab-tab="korpus"] details[data-key="fronts"], body[data-cab-tab="zony"] details[data-key="fronts"] { display: none; }
-  /* mode-part: tab tlacidla prec — preview ostava ZONOVY (klik na zonu = vedomy
-     odchod z dielca, povodne spravanie); fit ⛶ ostava. */
-  body.mode-part .cabtab { display: none; }
+  /* D-29 A3: po presune tabov do hlavicky — .cabtab skryte v rezimoch bez korpusoveho
+     nahladu (dielec, doska, vkladanie dosky); tlacidlo Vyroba (.prodbtn) ostava viditelne. */
+  body.mode-part .cabtab,
+  body.mode-board .cabtab,
+  body[data-insert-kind="board"].mode-insert .cabtab { display: none; }
   /* ===== V0.4.7e: zivy nahlad vyrazu "= 614" (expr.js injektuje span za input) =====
      Pevna rezerva + nowrap, aby hint neposuval .unit a nelamal .row/.frow/.fldrow. */
-  .exprhint { flex: 0 0 auto; min-width: 44px; font-size: 10.5px; color: #90a4ae;
+  .exprhint { flex: 0 0 auto; min-width: 44px; font-size: 10.5px; color: var(--nx-ink-faint);
               white-space: nowrap; padding-left: 4px; }
   .frow .exprhint, .fldrow .exprhint { min-width: 38px; }
   /* V0.4.5 D2: quick-pick sablony + okno Sablony */
   .tplmng { flex: 0 0 30px; padding: 3px 0; }
   .tplrow { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
-  .tplrow .tpln { flex: 1; font-size: 12.5px; color: #263238; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .tplrow .tplt { color: #90a4ae; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
+  .tplrow .tpln { flex: 1; font-size: 12.5px; color: var(--nx-ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tplrow .tplt { color: var(--nx-ink-faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
   .tplrow .tplbtn { flex: 0 0 auto; padding: 3px 10px; font-size: 11.5px; }
-  .tplrow .tpldel { flex: 0 0 28px; padding: 3px 0; color: #c62828; }
+  .tplrow .tpldel { flex: 0 0 28px; padding: 3px 0; color: var(--nx-danger); }
   /* V0.4.5 D3: vypis upozorneni + badge kovania pri celach */
-  .idbar .warnchip { cursor: pointer; }
-  .warnlist { background: #fff8ef; border: 1px solid #ffcc80; border-radius: 6px;
-              padding: 4px 9px; margin: -4px 0 8px; }
-  .warnlist .warnrow { font-size: 11.5px; color: #7a5000; padding: 2px 0; }
-  .warnlist .warnrow + .warnrow { border-top: 1px dashed #ffe0b2; }
+  /* D-29 A1: warnlist ukotveny hned pod sticky hlavickou (toggle robi scroll-to-top,
+     aby bol viditelny aj po odscrollovani). */
+  .warnlist { background: var(--nx-warn-bg); border: 1px solid var(--nx-warnchip-border); border-radius: 6px;
+              padding: 4px 9px; margin: 0 0 8px; }
+  .warnlist .warnrow { font-size: 11.5px; color: var(--nx-warnrow-fg); padding: 2px 0; }
+  .warnlist .warnrow + .warnrow { border-top: 1px dashed var(--nx-warnrow-border); }
   .frow { flex-wrap: wrap; }
-  .frow .fhw { flex: 1 0 100%; font-size: 10.5px; color: #607d8b; padding: 1px 0 0 22px; }
+  .frow .fhw { flex: 1 0 100%; font-size: 10.5px; color: var(--nx-ink-muted); padding: 1px 0 0 22px; display: inline-flex; align-items: center; gap: 4px; }
   /* D-19: odhad platni v tabe Materialy — nowrap, fallback stisene LEN tieto bunky */
   .bomtab td.estcell { white-space: nowrap; }
-  .bomtab td.estfb { color: #90a4ae; }
+  .bomtab td.estfb { color: var(--nx-ink-faint); }
   /* D-19: dvojica poli formatu platne v editore materialov */
   .row input.sheetdim { flex: 1 1 0; min-width: 0; }
-  .row .sheetx { flex: 0 0 auto; color: #90a4ae; padding: 0 2px; }
+  .row .sheetx { flex: 0 0 auto; color: var(--nx-ink-faint); padding: 0 2px; }
   /* V0.5 C: VEPO export lista v okne Vyroba */
   .vepobar { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; }
   .vepobar #vepoProject { flex: 1; min-width: 0; padding: 4px 8px; font-size: 12px;
-                          border: 1px solid #cfd8dc; border-radius: 5px; }
+                          border: 1px solid var(--nx-border); border-radius: 5px; }
   .vepobar .vepomerge { flex: 0 0 auto; display: flex; align-items: center; gap: 4px;
-                        font-size: 11.5px; color: #455a64; white-space: nowrap; }
+                        font-size: 11.5px; color: var(--nx-ink-label); white-space: nowrap; }
   .vepobar .vepobtn { flex: 0 0 auto; padding: 4px 12px; font-size: 12px; font-weight: 600; }
   /* ===== D-23: sync riadok <-> celo (hover trieda 'hov' na oboch stranach).
      Zvyraznenie bezi CISTO cez CSS — ziadny renderPreview pocas hoveru. CSS
      pravidla prebiju prezentacne ATRIBUTY rectov/textov (stroke/fill). */
   #preview g.fgrp { cursor: pointer; }
-  #preview g.fgrp.hov rect { stroke: #01579b; stroke-width: 3.5; }
-  #preview g.fgrp.hov text { fill: #01579b; }
-  .frow.hov { background: #e1f5fe; border-radius: 4px; }
-  .frow.hov .fnum { color: #0277bd; font-weight: 600; }
+  #preview g.fgrp.hov rect { stroke: var(--nx-select-strong); stroke-width: 3.5; }
+  #preview g.fgrp.hov text { fill: var(--nx-select-strong); }
+  .frow.hov { background: var(--nx-select-bg-hover); border-radius: 4px; }
+  .frow.hov .fnum { color: var(--nx-select-accent); font-weight: 600; }
   /* D-23: hint pod nahladom podla aktivneho tabu (data-cab-tab z D-08) —
      klik na celo sa ukazuje LEN v tabe Cela; zonovy hint LEN v tabe Zony. */
   .pvhint .ph-fronts { display: none; }

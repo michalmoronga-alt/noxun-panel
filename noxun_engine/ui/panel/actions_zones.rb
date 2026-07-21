@@ -50,7 +50,7 @@ module Noxun
           else
             apply_zone_mod(zid) { |tree, path| ZoneTree.set_field!(tree, path, index, size, locked) }
           end
-          set_status("Pole #{index + 1}: #{size.to_s.strip.empty? ? 'auto' : "#{size.to_f.round} mm"}#{locked ? ' 🔒' : ''} — prestavané ✓.")
+          set_status("Pole #{index + 1}: #{size.to_s.strip.empty? ? 'auto' : "#{size.to_f.round} mm"}#{locked ? ' (zamknuté)' : ''} — prestavané.")
         end
 
         # V0.2c obojsmerna sync: klik na zonu v 2D nahlade -> zvyrazni jej ghost v modeli.

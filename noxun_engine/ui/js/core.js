@@ -79,7 +79,7 @@
   function frontMatch(){
     return function(s){ var t = parseFloat(s.thickness); return Math.abs(t-18)<0.05 || Math.abs(t-19)<0.05; };
   }
-  // FIX 2: naplni <select> doskami, ale hrubkovo NEKOMPATIBILNE su disabled + oznacene "✕".
+  // FIX 2: naplni <select> doskami, ale hrubkovo NEKOMPATIBILNE su disabled + oznacene "(nekompatibilné)".
   // Aktualne vybranu (aj legacy nesuladnu) dosku nechaj vyberatelnu, nech ju vie zobrazit. Pri
   // prazdnom vysledku ostanu vsetky viditelne (disabled) — pouzivatel vidi katalog. Zachova hodnotu.
   function fillSheetSelectFiltered(sel, includeInherit, matchFn, keepValue, inheritLabel){
@@ -89,7 +89,7 @@
     MATERIALS.sheets.forEach(function(s){
       var ok = matchFn ? matchFn(s) : true;
       var keep = ok || (s.id === cur);
-      html += '<option value="'+esc(s.id)+'"'+(keep?'':' disabled')+'>'+esc(s.label)+(ok?'':' · ✕')+'</option>';
+      html += '<option value="'+esc(s.id)+'"'+(keep?'':' disabled')+'>'+esc(s.label)+(ok?'':' · (nekompatibilné)')+'</option>';
     });
     sel.innerHTML = html;
     sel.value = cur;

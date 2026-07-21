@@ -50,14 +50,14 @@
   // Riadky poli cez data-atributy + delegaciu (setupFieldEditorDelegation) — ziadne inline
   // handlery na prerendrovanych elementoch (poucenie z drag bugu).
   function renderFieldEditor(z){
-    var box = el('fieldEditor'); var html = '<div class="hint">Presné rozmery polí (mm). 🔒 = drží rozmer pri zmene korpusu.</div>';
+    var box = el('fieldEditor'); var html = '<div class="hint">Presné rozmery polí (mm). ' + NXIcons.svg('lock', 'ic-inline') + ' = drží rozmer pri zmene korpusu.</div>';
     var axisLbl = (z.split.axis==='h') ? 'Riadok' : 'Stĺpec';
     for (var i=0;i<z.split.count;i++){
       var c = z.split.cuts[i] || {size:null,locked:false};
       var sz = Math.round(z.split.sizes[i]);
       html += '<div class="fldrow"><span class="fldn">'+axisLbl+' '+(i+1)+'</span>' +
         '<input type="text" value="'+sz+'" data-zid="'+esc(z.id)+'" data-idx="'+i+'">' +
-        '<div class="lockbtn'+(c.locked?' on':'')+'" title="Zamknúť rozmer" data-zid="'+esc(z.id)+'" data-idx="'+i+'">'+(c.locked?'🔒':'🔓')+'</div></div>';
+        '<div class="lockbtn'+(c.locked?' on':'')+'" title="Zamknúť rozmer" role="button" aria-label="Zamknúť rozmer" aria-pressed="'+(c.locked?'true':'false')+'" data-zid="'+esc(z.id)+'" data-idx="'+i+'">'+NXIcons.svg(c.locked?'lock':'lock-open')+'</div></div>';
     }
     box.innerHTML = html;
     // V0.4.7e: vyrazy v poliach zon — commit (Enter/blur) prepise pole cislom

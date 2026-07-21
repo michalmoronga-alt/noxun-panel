@@ -61,9 +61,9 @@
         + '<input class="hwqty'+(manual?' manual':'')+'" type="number" min="1" max="999" step="1" value="'+esc(it.quantity)+'" onchange="onHwQty(this)">'
         + '<span class="unit">'+hwUnit(it.generic_type)+'</span>'
         + (manual
-            ? '<button class="ghostbtn hwbtn" title="Vrátiť na pravidlo ('+esc(it.rule_quantity)+')" onclick="onHwReset(this)">↺</button>'
+            ? '<button class="ghostbtn hwbtn" title="Vrátiť na pravidlo ('+esc(it.rule_quantity)+')" aria-label="Vrátiť na pravidlo" onclick="onHwReset(this)">'+NXIcons.svg('rotate-ccw')+'</button>'
             : '<span class="hwsrc" title="Počet z pravidla"></span>')
-        + '<button class="ghostbtn hwbtn" title="Vypnúť položku" onclick="onHwDisable(this)">✕</button>'
+        + '<button class="ghostbtn hwbtn" title="Vypnúť položku" aria-label="Vypnúť položku" onclick="onHwDisable(this)">'+NXIcons.svg('x')+'</button>'
         + '</div>';
     });
     // Vypnute kategorie: disabled override bez zodpovedajucej polozky (evaluate ju vyradil).
@@ -74,7 +74,7 @@
       html += '<div class="hwrow hwoff" data-owner="'+esc(ov.owner_part_key||'')+'" data-type="'+esc(ov.generic_type)+'" data-rule="'+esc(ov.rule_id)+'">'
         + '<span class="hwname">'+esc(hwLabel(ov.generic_type))+(owner?' <span class="hwown">'+esc(owner)+'</span>':'')
         + ' <span class="hwext">vypnuté</span></span>'
-        + '<button class="ghostbtn hwbtn" title="Obnoviť (platí pravidlo)" onclick="onHwReset(this)">↺ obnoviť</button>'
+        + '<button class="ghostbtn hwbtn" title="Obnoviť (platí pravidlo)" onclick="onHwReset(this)">'+NXIcons.svg('rotate-ccw')+' obnoviť</button>'
         + '</div>';
     });
     if (!html) html = '<div class="muted">Skrinka nemá žiadne kovanie (bez čiel, bez podstavca).</div>';
@@ -94,7 +94,7 @@
   }
   function onHwQty(inp){
     var q = parseInt(inp.value, 10);
-    if (isNaN(q) || q < 1){ NX.setStatus('Počet musí byť aspoň 1 (alebo položku vypni ✕).', true); return; }
+    if (isNaN(q) || q < 1){ NX.setStatus('Počet musí byť aspoň 1 (alebo položku vypni).', true); return; }
     hwSend(hwPayload(inp, { quantity: q }));
   }
   function onHwDisable(btn){ hwSend(hwPayload(btn, { disabled: true })); }

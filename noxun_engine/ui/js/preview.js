@@ -8,12 +8,18 @@
   function setCabTab(t){
     currentCabTab = t;
     document.body.setAttribute('data-cab-tab', t);
-    el('tabCab').classList.toggle('on', t === 'korpus');
-    el('tabZones').classList.toggle('on', t === 'zony');
-    el('tabFronts').classList.toggle('on', t === 'cela');
+    // A10: taby drzia stav aj cez aria-pressed (nie len triedu .on).
+    setCabTabState(el('tabCab'), t === 'korpus');
+    setCabTabState(el('tabZones'), t === 'zony');
+    setCabTabState(el('tabFronts'), t === 'cela');
     previewMode = cabTabPreview(t);
     pvUserView = false; pvView = null; // D-08 Codex F4: novy vyjav = cisty fit (stale zoom by ho minul)
     renderPreview(); refreshZoneUI();
+  }
+  function setCabTabState(node, on){
+    if (!node) return;
+    node.classList.toggle('on', on);
+    node.setAttribute('aria-pressed', on ? 'true' : 'false');
   }
 
   // --- POHLAD (V0.4.5 D1): nahlad je fixne OKNO — SVG ma pevnu vysku (CSS) a viewBox

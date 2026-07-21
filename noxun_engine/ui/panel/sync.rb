@@ -84,7 +84,7 @@ module Noxun
         # Nefatalne stavy (orezane vystuhy, preskocene police...) tak uz nie su neviditelne.
         def status_with_warnings(cab, msg)
           warns = cab && cab.valid? ? ((Store.config(cab) || {})['warnings'] || []) : []
-          msg = "#{msg} · ⚠ #{warns.size} #{warn_word(warns.size)}" unless warns.empty?
+          msg = "#{msg} · #{warns.size} #{warn_word(warns.size)}" unless warns.empty?
           set_status(msg)
         end
 

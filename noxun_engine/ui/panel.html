@@ -5,27 +5,39 @@
      sablon ziju v satelitnych oknach (proj_materials.html, templates.html) — panel ma len
      quick-pick sablony a materialy oznacenej skrinky. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.7v">
+<link rel="stylesheet" href="css/panel.css?v=0.4.7w">
 
-<div class="hdr"><h1>Noxun Engine</h1><span class="sub" id="verline">…</span></div>
+<!-- D-29: STICKY dvojradova hlavicka Inspectora. Rad 1 = firemne logo + identita
+     objektu (bridge.js setIdbar) + warn chip. Rad 2 = rezimove taby (setCabTab,
+     data-cab-tab na <body>) vlavo + tlacidlo Vyroba vpravo (oddelene — otvara
+     satelitne okno, NIE je to tab). Nazov pluginu je v paticke, nie tu. -->
+<header class="nxhdr">
+  <div class="nxhdr-id">
+    <svg class="nx-logo" viewBox="0 0 100 100" aria-hidden="true"><use href="#i-logo"/></svg>
+    <div id="idbar" class="idbar"><span class="free">Nič nie je označené — návrh nového objektu</span></div>
+  </div>
+  <div class="nxhdr-modes">
+    <div class="cabtabs">
+      <button id="tabCab" class="cabtab on" onclick="setCabTab('korpus')" aria-pressed="true">Korpus</button>
+      <button id="tabZones" class="cabtab" onclick="setCabTab('zony')" aria-pressed="false">Zóny</button>
+      <button id="tabFronts" class="cabtab" onclick="setCabTab('cela')" aria-pressed="false">Čelá</button>
+    </div>
+    <button class="prodbtn" onclick="openProductionDialog()" title="Výroba — kusovník a súpisy" aria-label="Výroba — kusovník a súpisy"><svg class="ic" aria-hidden="true"><use href="#i-factory"/></svg><span>Výroba</span></button>
+  </div>
+</header>
 
-<!-- IDENTITA: co prave upravujem (bridge.js setIdbar) + rozbalitelne upozornenia stavby -->
-<div id="idbar" class="idbar"><span class="free">Nič nie je označené — návrh nového korpusu</span></div>
+<!-- warnlist ukotveny hned pod sticky hlavickou (A1) — toggle robi scroll-to-top -->
 <div id="warnList" class="warnlist" style="display:none"></div>
 
-<!-- V0.5 B: Vyroba je projektova akcia — viditelna v kazdom rezime (Codex F8) -->
-<button class="ghostbtn wide prodopen" onclick="openProductionDialog()">📋 Výroba — kusovník a súpisy…</button>
-
-<!-- NAHLAD: fixne okno + zoom/pan/fit (hlavny vizual panela) -->
+<!-- NAHLAD: fixne okno + zoom/pan; fit (⛶ -> ikona maximize) je overlay v pravom
+     hornom rohu nahladu (A8 — pointer-events len na tlacidle, nesmie blokovat pan/zoom). -->
 <fieldset class="pvbox">
-  <!-- D-08: taby = REZIMY PRACE (prepinaju nahlad AJ sekcie); stav drzi data-cab-tab na <body> -->
-  <div class="pvtabs">
-    <button id="tabCab" class="cabtab on" onclick="setCabTab('korpus')">Korpus</button>
-    <button id="tabZones" class="cabtab" onclick="setCabTab('zony')">Zóny</button>
-    <button id="tabFronts" class="cabtab" onclick="setCabTab('cela')">Čelá</button>
-    <button class="pvfit" onclick="fitPreview()" title="Prispôsobiť pohľad (reset zoomu)">⛶</button>
+  <div class="pvwrap">
+    <svg id="preview" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="pvfitwrap">
+      <button class="pvfit" onclick="fitPreview()" title="Prispôsobiť pohľad (reset zoomu)" aria-label="Prispôsobiť pohľad (reset zoomu)"><svg class="ic" aria-hidden="true"><use href="#i-maximize"/></svg></button>
+    </div>
   </div>
-  <svg id="preview" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet"></svg>
   <!-- D-23: hint podla aktivneho tabu (CSS cez data-cab-tab na <body>) — v tabe
        Cela pribudol klik na celo, zonova cast sa mimo tabu Zony skryva -->
   <div class="pvhint"><span class="ph-zones">Klik na zónu = výber (police, delenie) · ťahaj priečku = posun · </span><span class="ph-fronts">Klik na čelo = jeho riadok v zozname · </span>Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu</div>
@@ -68,10 +80,10 @@
   <!-- D-35: kompaktna ikona v EXISTUJUCOM riadku legendy (ziadny novy riadok — pravidlo
        vertikalneho priestoru); ramik ikony = "olepene dookola" vo farbe ABS 1,0 mm -->
   <div class="absleg">
-    <span><i style="background:#e53935"></i>1,0 mm</span>
-    <span><i style="background:#43a047"></i>2,0 mm</span>
-    <span><i style="background:#b0bec5"></i>bez ABS</span>
-    <span><i style="background:#fff8ef;border:1px solid #ffb74d"></i>ručný override</span>
+    <span><i style="background:var(--nx-abs-1mm)"></i>1,0 mm</span>
+    <span><i style="background:var(--nx-abs-2mm)"></i>2,0 mm</span>
+    <span><i style="background:var(--nx-abs-none)"></i>bez ABS</span>
+    <span><i style="background:var(--nx-warn-bg);border:1px solid var(--nx-warn)"></i>ručný override</span>
     <button class="absall" onclick="onEdgesAll()" title="Olepiť všetky 4 hrany páskou k materiálu"><i></i></button>
   </div>
   <div id="edgeRows"></div>
@@ -94,7 +106,7 @@
     </div>
     <div class="row"><label>Šablóna</label>
       <select id="template" onchange="onTemplateChange()"><option value="">— vyber —</option></select>
-      <button class="ghostbtn tplmng" onclick="openTemplatesDialog()" title="Šablóny — uložiť / vymazať / použiť na označený">⚙</button>
+      <button class="ghostbtn tplmng" onclick="openTemplatesDialog()" title="Šablóny — uložiť / vymazať / použiť na označený" aria-label="Šablóny — uložiť / vymazať / použiť na označený"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg></button>
     </div>
     <button class="primary wide" onclick="insertCabinet()">Vložiť korpus</button>
   </div>
@@ -133,9 +145,9 @@
   </div>
   <svg id="boardSvg" viewBox="0 0 300 200" preserveAspectRatio="xMidYMid meet"></svg>
   <div class="absleg">
-    <span><i style="background:#e53935"></i>1,0 mm</span>
-    <span><i style="background:#43a047"></i>2,0 mm</span>
-    <span><i style="background:#b0bec5"></i>bez ABS</span>
+    <span><i style="background:var(--nx-abs-1mm)"></i>1,0 mm</span>
+    <span><i style="background:var(--nx-abs-2mm)"></i>2,0 mm</span>
+    <span><i style="background:var(--nx-abs-none)"></i>bez ABS</span>
     <button class="absall" onclick="onBoardEdgesAll()" title="Olepiť všetky 4 hrany páskou k materiálu"><i></i></button>
   </div>
   <div id="boardEdgeRows"></div>
@@ -154,12 +166,12 @@
      vertikalneho priestoru); CSS ich zobrazuje LEN v mode-insert. -->
 <fieldset id="basicCard">
   <legend>Základné</legend>
-  <div class="row"><label>Šírka</label><input id="width" type="text" oninput="onField()"><button class="inslock" data-lock="width" onclick="toggleInsertLock('width')">🔓</button><span class="unit">mm</span></div>
-  <div class="row"><label>Výška</label><input id="height" type="text" oninput="onField()"><button class="inslock" data-lock="height" onclick="toggleInsertLock('height')">🔓</button><span class="unit">mm</span></div>
-  <div class="row"><label>Hĺbka</label><input id="depth" type="text" oninput="onField()"><button class="inslock" data-lock="depth" onclick="toggleInsertLock('depth')">🔓</button><span class="unit">mm</span></div>
-  <div class="row"><label>Hrúbka materiálu</label><input id="thickness" type="text" oninput="onField()"><button class="inslock" data-lock="thickness" onclick="toggleInsertLock('thickness')">🔓</button><span class="unit">mm</span></div>
+  <div class="row"><label>Šírka</label><input id="width" type="text" oninput="onField()"><button class="inslock" data-lock="width" onclick="toggleInsertLock('width')" aria-label="Zamknúť šírku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
+  <div class="row"><label>Výška</label><input id="height" type="text" oninput="onField()"><button class="inslock" data-lock="height" onclick="toggleInsertLock('height')" aria-label="Zamknúť výšku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
+  <div class="row"><label>Hĺbka</label><input id="depth" type="text" oninput="onField()"><button class="inslock" data-lock="depth" onclick="toggleInsertLock('depth')" aria-label="Zamknúť hĺbku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
+  <div class="row"><label>Hrúbka materiálu</label><input id="thickness" type="text" oninput="onField()"><button class="inslock" data-lock="thickness" onclick="toggleInsertLock('thickness')" aria-label="Zamknúť hrúbku materiálu" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
   <!-- D-11: vyska sokla patri k zakladnym rozmerom (pre hornu skrinku sa skryva — applyVisibility) -->
-  <div class="row" id="fhRow"><label>Výška sokla</label><input id="floor_height" type="text" oninput="onField()"><button class="inslock" data-lock="floor_height" onclick="toggleInsertLock('floor_height')">🔓</button><span class="unit">mm</span></div>
+  <div class="row" id="fhRow"><label>Výška sokla</label><input id="floor_height" type="text" oninput="onField()"><button class="inslock" data-lock="floor_height" onclick="toggleInsertLock('floor_height')" aria-label="Zamknúť výšku sokla" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
   <div class="row"><label>Svetlá šírka</label><input id="av_width" type="text" readonly><span class="unit">mm</span></div>
   <div class="row"><label>Svetlá hĺbka</label><input id="av_depth" type="text" readonly><span class="unit">mm</span></div>
   <div class="row"><label>Úložná výška</label><input id="av_height" type="text" readonly><span class="unit">mm</span></div>
@@ -243,7 +255,7 @@
 <details data-key="fronts">
   <summary>Čelá</summary>
   <div class="body">
-    <div class="hint">Zoznam zodpovedá pohľadu na skrinku — F1 je spodné čelo. Výška prázdna = AUTO (sivé ≈ je dopočítaná výška). 🔒 zamkne pevnú výšku.</div>
+    <div class="hint">Zoznam zodpovedá pohľadu na skrinku — F1 je spodné čelo. Výška prázdna = AUTO (sivé ≈ je dopočítaná výška). <svg class="ic ic-inline" aria-hidden="true"><use href="#i-lock"/></svg> zamkne pevnú výšku.</div>
     <div id="frontRows"></div>
     <div class="btnrow">
       <button class="ghostbtn" onclick="addFrontRow(); onField()">+ riadok</button>
@@ -257,11 +269,11 @@
     <div class="row"><label>Okraj po stranách</label><input id="fr_gap_sides" type="text" oninput="onField()"><span class="unit">mm</span></div>
     <!-- D-22: zamok limitu presahov — odomknutie povoli okraje az ±2000 mm (obklady, pilastre) -->
     <div class="row"><label>Limit presahov</label>
-      <button id="edgeLimitLock" class="ghostbtn lockbtn" onclick="toggleEdgeLimit()"
-        title="Zamknuté: okraje max ±100 mm. Odomkni pre veľké presahy čiel — obklady, pilastre (až ±2000 mm).">🔒 ±100 mm</button>
+      <button id="edgeLimitLock" class="ghostbtn lockbtn" onclick="toggleEdgeLimit()" aria-pressed="true"
+        title="Zamknuté: okraje max ±100 mm. Odomkni pre veľké presahy čiel — obklady, pilastre (až ±2000 mm)."><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg><span class="lblLimit">±100 mm</span></button>
       <span class="unit"></span></div>
     <div class="btnrow">
-      <button class="ghostbtn" onclick="resetFrontGaps()">↺ Predvolené (3 / 2 mm)</button>
+      <button class="ghostbtn" onclick="resetFrontGaps()"><svg class="ic" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> Predvolené (3 / 2 mm)</button>
     </div>
   </div>
 </details>
@@ -270,10 +282,10 @@
 <details data-key="hardware">
   <summary>Kovanie</summary>
   <div class="body">
-    <div class="hint">Počty z pravidiel (nohy, závesy, výsuvy). Zmena počtu = ručný zásah pre túto skrinku; ↺ vráti pravidlo.</div>
+    <div class="hint">Počty z pravidiel (nohy, závesy, výsuvy). Zmena počtu = ručný zásah pre túto skrinku; <svg class="ic ic-inline" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> vráti pravidlo.</div>
     <div id="hwRows"><div class="muted">Označ skrinku v modeli.</div></div>
     <div class="btnrow">
-      <button class="ghostbtn" onclick="openRulesDialog()">⚙ Pravidlá kovania…</button>
+      <button class="ghostbtn" onclick="openRulesDialog()"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Pravidlá kovania…</button>
     </div>
   </div>
 </details>
@@ -288,7 +300,7 @@
     <div class="matrow"><label>Čelá</label><select id="cab_front" onchange="onCabinetMaterial('front', this.value)"></select></div>
     <div class="matrow"><label>Chrbát</label><select id="cab_back" onchange="onCabinetMaterial('back', this.value)"></select></div>
     <div class="btnrow">
-      <button class="ghostbtn" onclick="openProjectMaterialsDialog()">⚙ Materiály projektu…</button>
+      <button class="ghostbtn" onclick="openProjectMaterialsDialog()"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Materiály projektu…</button>
     </div>
   </div>
 </details>
@@ -304,9 +316,9 @@
 
 <!-- pri oznacenom korpuse: PRESNA serverova kopia oznacenej skrinky (B3) — config
      z modelu, nie z formulara: nesie aj materialy, upravy dielcov a kovania, nazov -->
-<button class="ghostbtn wide insertmore" onclick="insertCopySelected()" title="Vloží presnú kópiu označenej skrinky — vrátane materiálov, úprav dielcov (ABS) a kovania">⧉ Vložiť kópiu</button>
+<button class="ghostbtn wide insertmore" onclick="insertCopySelected()" title="Vloží presnú kópiu označenej skrinky — vrátane materiálov, úprav dielcov (ABS) a kovania"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg> Vložiť kópiu</button>
 <!-- D-14: ulozenie oznaceneho korpusu do kniznice sablon (in-panel modal — vzor D-15) -->
-<button class="ghostbtn wide savetpl" onclick="openSaveTemplateModal()">★ Uložiť ako šablónu do knižnice</button>
+<button class="ghostbtn wide savetpl" onclick="openSaveTemplateModal()"><svg class="ic" aria-hidden="true"><use href="#i-star"/></svg> Uložiť ako šablónu do knižnice</button>
 
 <div id="tplModal" class="nxmodal" style="display:none">
   <div class="nxmodal-card">
@@ -323,21 +335,28 @@
 
 <div id="status">Pripravené.</div>
 
-<!-- Poradie skriptov je kontrakt: errors prvy (chytac), boot posledny (onload + ready).
+<!-- D-29 A12/A2: paticka v normalnom toku (NIE fixed). #verline je PRESUNUTY sem
+     (jediny vyskyt — bridge.js NX.init pise 'V'+Engine::VERSION); cache-bust priponu
+     (v/w) sem NIKDY nedopisovat natvrdo. -->
+<footer class="nxfoot">Noxun Engine <span id="verline">…</span></footer>
+
+<!-- Poradie skriptov je kontrakt: errors prvy (chytac), icons hned za nim (sprite
+     musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.4.7v"></script>
-<script src="js/core.js?v=0.4.7v"></script>
-<script src="js/expr.js?v=0.4.7v"></script>
-<script src="js/insert_state.js?v=0.4.7v"></script>
-<script src="js/form.js?v=0.4.7v"></script>
-<script src="js/zone_tree.js?v=0.4.7v"></script>
-<script src="js/preview.js?v=0.4.7v"></script>
-<script src="js/actions.js?v=0.4.7v"></script>
-<script src="js/bridge.js?v=0.4.7v"></script>
-<script src="js/materials.js?v=0.4.7v"></script>
-<script src="js/part_card.js?v=0.4.7v"></script>
-<script src="js/board_card.js?v=0.4.7v"></script>
-<script src="js/hardware.js?v=0.4.7v"></script>
-<script src="js/usage.js?v=0.4.7v"></script>
-<script src="js/boot.js?v=0.4.7v"></script>
+<script src="js/errors.js?v=0.4.7w"></script>
+<script src="js/icons.js?v=0.4.7w"></script>
+<script src="js/core.js?v=0.4.7w"></script>
+<script src="js/expr.js?v=0.4.7w"></script>
+<script src="js/insert_state.js?v=0.4.7w"></script>
+<script src="js/form.js?v=0.4.7w"></script>
+<script src="js/zone_tree.js?v=0.4.7w"></script>
+<script src="js/preview.js?v=0.4.7w"></script>
+<script src="js/actions.js?v=0.4.7w"></script>
+<script src="js/bridge.js?v=0.4.7w"></script>
+<script src="js/materials.js?v=0.4.7w"></script>
+<script src="js/part_card.js?v=0.4.7w"></script>
+<script src="js/board_card.js?v=0.4.7w"></script>
+<script src="js/hardware.js?v=0.4.7w"></script>
+<script src="js/usage.js?v=0.4.7w"></script>
+<script src="js/boot.js?v=0.4.7w"></script>

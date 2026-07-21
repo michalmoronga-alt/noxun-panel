@@ -18,13 +18,15 @@
     var bar = el('idbar'), list = el('warnList');
     if (!bar) return;
     if (!c){
-      bar.innerHTML = '<span class="free">Nič nie je označené — návrh nového korpusu</span>';
+      bar.innerHTML = '<span class="free">Nič nie je označené — návrh nového objektu</span>';
       if (list){ list.style.display = 'none'; list.innerHTML = ''; }
       return;
     }
     var warns = c.warnings || [];
+    // A10: warn chip = skutocne <button> (fokusovatelne, klavesova aktivacia).
+    // Ikona zo spritu (staticky markup); pocet je cislo — bezpecne (B9).
     var wHtml = warns.length
-      ? ' <span class="warnchip" onclick="toggleWarnList()" title="Zobraziť upozornenia stavby">⚠ ' + warns.length + '</span>'
+      ? ' <button type="button" class="warnchip" onclick="toggleWarnList()" title="Zobraziť upozornenia stavby" aria-label="Zobraziť upozornenia stavby">' + NXIcons.svg('alert') + ' ' + warns.length + '</button>'
       : '';
     bar.innerHTML = '<span class="cid">' + esc(c.cabinet_id || '?') + '</span>' +
       '<span class="cname">' + esc(c.name || '') + '</span>' + wHtml;
@@ -41,7 +43,12 @@
   }
   function toggleWarnList(){
     var list = el('warnList'); if (!list || !list.innerHTML) return;
-    list.style.display = (list.style.display === 'none' || !list.style.display) ? 'block' : 'none';
+    var willOpen = (list.style.display === 'none' || !list.style.display);
+    list.style.display = willOpen ? 'block' : 'none';
+    // A1: warnlist je ukotveny hned pod sticky hlavickou — pri rozbaleni sa vratime
+    // hore, aby bol viditelny aj po odscrollovani (klik na sticky ⚠ chip nesmie
+    // rozbalit zoznam mimo viewportu).
+    if (willOpen){ try { window.scrollTo(0, 0); } catch (e) {} }
   }
 
   window.NX = {
