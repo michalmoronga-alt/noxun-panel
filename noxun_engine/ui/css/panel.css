@@ -358,6 +358,14 @@
   .tplrow .tplt { color: var(--nx-ink-faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
   .tplrow .tplbtn { flex: 0 0 auto; padding: 3px 10px; font-size: 11.5px; }
   .tplrow .tpldel { flex: 0 0 28px; padding: 3px 0; color: var(--nx-danger); }
+  /* D-41 PR B: dekorove karty katalogu (okno Materialy) — kompaktne, chips wrapuju */
+  .mdcard { border: 1px solid var(--nx-border-soft); border-radius: 6px; padding: 4px 8px; margin: 6px 0; background: var(--nx-surface); }
+  .mdcard .mdhead { margin: 2px 0; }
+  .mdcard .mdline { flex-wrap: wrap; row-gap: 4px; margin: 2px 0 4px; }
+  .mdcard .mdline > .tplt { flex: 0 0 42px; }
+  .mdchip { display: inline-flex; align-items: center; border: 1px solid var(--nx-border); border-radius: 4px; overflow: hidden; }
+  .mdchip .ghostbtn { border: 0; border-radius: 0; padding: 2px 8px; font-size: 11.5px; }
+  .mdchip .tpldel { flex: 0 0 22px; border-left: 1px solid var(--nx-border-soft); }
   /* V0.4.5 D3: vypis upozorneni + badge kovania pri celach */
   /* D-29 A1: warnlist ukotveny hned pod sticky hlavickou (toggle robi scroll-to-top,
      aby bol viditelny aj po odscrollovani). */

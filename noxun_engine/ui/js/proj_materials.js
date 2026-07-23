@@ -41,35 +41,114 @@
     return m ? [parseInt(m[1],16), parseInt(m[2],16), parseInt(m[3],16)] : [216,196,160];
   }
 
-  // --- zoznamy katalogu ---
+  // --- D-41 PR B: katalog zoskupeny podla DEKOROV -------------------------
+  // Cista funkcia (Node test): catalog {sheets,edges} -> pole skupin
+  // [{decor, manufacturer, color, sheets:[...], edges:[...]}] zoradene dekorom.
+  // Dosky v skupine: typ+hrubka vzostupne; ABS: hrubka, potom sirka (legacy
+  // bez sirky na konci — rovnaka logika ako D-41 sort v core.js).
+  function groupCatalogByDecor(catalog){
+    var map = {}, order = [];
+    function grp(decor){
+      var key = (decor == null || String(decor).trim() === '') ? '' : String(decor).trim();
+      if (!map[key]){ map[key] = { decor: key, manufacturer: '', color: null, sheets: [], edges: [] }; order.push(key); }
+      return map[key];
+    }
+    (catalog.sheets || []).forEach(function(s){
+      var g = grp(s.decor);
+      g.sheets.push(s);
+      if (!g.manufacturer && s.manufacturer) g.manufacturer = s.manufacturer;
+      if (!g.color && s.color) g.color = s.color;
+    });
+    (catalog.edges || []).forEach(function(a){
+      var g = grp(a.decor);
+      g.edges.push(a);
+      if (!g.color && a.color) g.color = a.color;
+    });
+    order.sort(function(x, y){ return x === '' ? 1 : y === '' ? -1 : x.localeCompare(y); });
+    return order.map(function(k){
+      var g = map[k];
+      g.sheets.sort(function(x, y){
+        var t = String(x.type || '').localeCompare(String(y.type || ''));
+        return t || (parseFloat(x.thickness) || 0) - (parseFloat(y.thickness) || 0);
+      });
+      g.edges.sort(function(x, y){
+        var t = (parseFloat(x.thickness) || 0) - (parseFloat(y.thickness) || 0);
+        if (t) return t;
+        var xw = (x.width === null || x.width === undefined) ? null : parseFloat(x.width);
+        var yw = (y.width === null || y.width === undefined) ? null : parseFloat(y.width);
+        if (xw === null && yw === null) return 0;
+        if (xw === null) return 1;
+        if (yw === null) return -1;
+        return xw - yw;
+      });
+      return g;
+    });
+  }
+  function fmtNum(v){ var f = parseFloat(v); return (f === Math.round(f)) ? String(Math.round(f)) : String(f); }
+  function sheetChipLabel(s){ return (s.type ? s.type + ' ' : '') + fmtNum(s.thickness); }
+  function edgeChipLabel(a){
+    return (a.width === null || a.width === undefined) ? fmtNum(a.thickness) + ' mm' : fmtNum(a.width) + '/' + fmtNum(a.thickness);
+  }
+
+  var mdRenaming = null; // dekor s otvorenym inline rename inputom
   function mdRenderLists(){
-    var sl = el('mdSheetList');
-    if (sl){
-      var html = '';
-      MD_CATALOG.sheets.forEach(function(s){
-        var prot = MD_PROTECTED.indexOf(s.material_id) >= 0;
-        html += '<div class="tplrow">' +
-          '<i style="flex:0 0 14px;height:14px;border-radius:3px;background:'+esc(rgbToHex(s.color))+'"></i>' +
-          '<span class="tpln">'+esc(s.label)+(prot ? ' <span class="tplt">predvoľba</span>' : '')+'</span>' +
-          '<button class="ghostbtn tplbtn" onclick="mdOpenSheetForm(\''+esc(s.material_id)+'\')">Upraviť</button>' +
-          (prot ? '' : '<button class="ghostbtn tpldel" title="Zmazať" onclick="mdDeleteSheet(\''+esc(s.material_id)+'\')">✕</button>') +
-          '</div>';
-      });
-      sl.innerHTML = html || '<div class="muted">Katalóg je prázdny.</div>';
-    }
-    var elist = el('mdEdgeList');
-    if (elist){
-      var h2 = '';
-      MD_CATALOG.edges.forEach(function(a){
-        h2 += '<div class="tplrow">' +
-          '<i style="flex:0 0 14px;height:14px;border-radius:3px;background:'+esc(rgbToHex(a.color))+'"></i>' +
-          '<span class="tpln">'+esc(a.label)+'</span>' +
-          '<button class="ghostbtn tplbtn" onclick="mdOpenEdgeForm(\''+esc(a.abs_id)+'\')">Upraviť</button>' +
-          '<button class="ghostbtn tpldel" title="Zmazať" onclick="mdDeleteEdge(\''+esc(a.abs_id)+'\')">✕</button>' +
-          '</div>';
-      });
-      elist.innerHTML = h2 || '<div class="muted">Žiadne ABS pásky.</div>';
-    }
+    var box = el('mdDecorList');
+    if (!box) return;
+    var groups = groupCatalogByDecor(MD_CATALOG);
+    var html = '';
+    groups.forEach(function(g){
+      var name = g.decor === '' ? '(bez dekoru)' : g.decor;
+      html += '<div class="mdcard">';
+      html += '<div class="tplrow mdhead">' +
+        '<i style="flex:0 0 14px;height:14px;border-radius:3px;background:' + esc(rgbToHex(g.color)) + '"></i>' +
+        '<span class="tpln"><b>' + esc(name) + '</b>' + (g.manufacturer ? ' <span class="tplt">' + esc(g.manufacturer) + '</span>' : '') + '</span>' +
+        (g.decor === '' ? '' :
+          '<button class="ghostbtn tplbtn" onclick="mdOpenDecorForm(' + esc(JSON.stringify(g.decor)) + ')">+ variant</button>' +
+          '<button class="ghostbtn tplbtn" onclick="mdRenameOpen(' + esc(JSON.stringify(g.decor)) + ')">Premenovať</button>') +
+        '</div>';
+      if (mdRenaming === g.decor){
+        html += '<div class="tplrow"><input id="md_rename_input" type="text" value="' + esc(g.decor) + '" style="flex:1">' +
+          '<button class="primary tplbtn" onclick="mdRenameSave(' + esc(JSON.stringify(g.decor)) + ')">Uložiť</button>' +
+          '<button class="ghostbtn tplbtn" onclick="mdRenameOpen(null)">Zrušiť</button></div>';
+      }
+      if (g.sheets.length){
+        html += '<div class="tplrow mdline"><span class="tplt">Dosky</span>';
+        g.sheets.forEach(function(s){
+          var prot = MD_PROTECTED.indexOf(s.material_id) >= 0;
+          html += '<span class="mdchip">' +
+            '<button class="ghostbtn" title="' + esc(s.label) + '" onclick="mdOpenSheetForm(\'' + esc(s.material_id) + '\')">' + esc(sheetChipLabel(s)) + '</button>' +
+            (prot ? '<span class="tplt">predvoľba</span>'
+                  : '<button class="ghostbtn tpldel" title="Zmazať ' + esc(s.label) + '" onclick="mdDeleteSheet(\'' + esc(s.material_id) + '\')">✕</button>') +
+            '</span>';
+        });
+        html += '</div>';
+      }
+      if (g.edges.length){
+        html += '<div class="tplrow mdline"><span class="tplt">ABS</span>';
+        g.edges.forEach(function(a){
+          html += '<span class="mdchip">' +
+            '<button class="ghostbtn" title="' + esc(a.label) + '" onclick="mdOpenEdgeForm(\'' + esc(a.abs_id) + '\')">' + esc(edgeChipLabel(a)) + '</button>' +
+            '<button class="ghostbtn tpldel" title="Zmazať ' + esc(a.label) + '" onclick="mdDeleteEdge(\'' + esc(a.abs_id) + '\')">✕</button>' +
+            '</span>';
+        });
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+    box.innerHTML = html || '<div class="muted">Katalóg je prázdny.</div>';
+    var ri = el('md_rename_input');
+    if (ri){ ri.focus(); ri.select(); }
+  }
+  function mdRenameOpen(decor){
+    mdRenaming = decor;
+    mdRenderLists();
+  }
+  function mdRenameSave(oldDecor){
+    var input = el('md_rename_input');
+    if (!input) return;
+    if (window.sketchup && sketchup.rename_decor)
+      sketchup.rename_decor(JSON.stringify({ old_decor: oldDecor, new_decor: input.value, catalog_rev: MD_REV }));
+    mdRenaming = null;
   }
 
   // --- formulare (create: id=null; edit: id zaznamu) ---
@@ -78,6 +157,9 @@
     var s = id ? MD_CATALOG.sheets.find(function(x){ return x.material_id === id; }) : null;
     mdEditing = { kind: 'sheet', id: id };
     el('ms_decor').value = s ? (s.decor || '') : '';
+    // D-41: dekor = identita skupiny — pri edite nemenny (server guard + disabled)
+    el('ms_decor').disabled = !!s;
+    el('ms_decor_hint').style.display = s ? '' : 'none';
     el('ms_type').value = s ? (s.type || '') : 'DTDL';
     el('ms_thickness').value = s ? s.thickness : '';
     el('ms_thickness').disabled = !!s;                       // hrubka = variant, pri edite nemenna
@@ -98,20 +180,53 @@
     var a = id ? MD_CATALOG.edges.find(function(x){ return x.abs_id === id; }) : null;
     mdEditing = { kind: 'edge', id: id };
     el('me_decor').value = a ? (a.decor || '') : '';
-    // D-41: sirka = variant identity — zadava sa pri vytvoreni, pri edite nemenna
-    // (server ju aj tak berie z existujuceho zaznamu; input len informuje).
-    el('me_width').value = (a && a.width !== null && a.width !== undefined) ? a.width : '';
-    el('me_width').disabled = !!a;
+    el('me_decor').disabled = !!a; // D-41: dekor pri edite nemenny
+    el('me_decor_hint').style.display = a ? '' : 'none';
+    // D-41: sirka = variant identity (vznika v batchi), iba informativne
+    // zobrazenie — input je disabled v HTML, server ju drzi z existujuceho zaznamu.
+    el('me_width').value = (a && a.width !== null && a.width !== undefined) ? fmtNum(a.width) : '';
     el('me_thickness').value = a ? String(parseFloat(a.thickness).toFixed(1)) : '1.0';
     el('me_thickness').disabled = !!a; // hrubka = variant (ID _10/_20), pri edite nemenna
     el('me_price').value = a ? (a.price_per_bm || 0) : '0';
     el('me_color').value = rgbToHex(a ? a.color : null);
     el('mdEdgeForm').style.display = '';
   }
+  // D-41: batch "Novy dekor" / "+ variant" (decor predvyplneny a zamknuty —
+  // doplna sa DO skupiny; server preskoci existujuce varianty).
+  function mdOpenDecorForm(decor){
+    mdCloseForms();
+    var g = decor ? groupCatalogByDecor(MD_CATALOG).find(function(x){ return x.decor === decor; }) : null;
+    mdEditing = { kind: 'decor', id: decor };
+    el('nd_decor').value = g ? g.decor : '';
+    el('nd_decor').disabled = !!g;
+    el('nd_manufacturer').value = g ? (g.manufacturer || '') : '';
+    var firstSheet = g && g.sheets.length ? g.sheets[0] : null;
+    el('nd_type').value = firstSheet ? (firstSheet.type || 'DTDL') : 'DTDL';
+    el('nd_grain').value = firstSheet ? (firstSheet.grain || 'length') : 'length';
+    el('nd_color').value = rgbToHex(g ? g.color : null);
+    el('nd_ths').value = '';
+    el('nd_abs').value = '';
+    el('mdDecorForm').style.display = '';
+  }
+  function mdSaveDecorBatch(){
+    var payload = {
+      catalog_rev: MD_REV,
+      decor: el('nd_decor').value,
+      manufacturer: el('nd_manufacturer').value,
+      type: el('nd_type').value,
+      grain: el('nd_grain').value,
+      color: hexToRgb(el('nd_color').value),
+      thicknesses: el('nd_ths').value,
+      abs_tokens: el('nd_abs').value
+    };
+    if (window.sketchup && sketchup.add_decor_batch) sketchup.add_decor_batch(JSON.stringify(payload));
+    mdCloseForms();
+  }
   function mdCloseForms(){
     mdEditing = null;
     if (el('mdSheetForm')) el('mdSheetForm').style.display = 'none';
     if (el('mdEdgeForm')) el('mdEdgeForm').style.display = 'none';
+    if (el('mdDecorForm')) el('mdDecorForm').style.display = 'none';
   }
 
   // D-19: parse rozmeru platne — cislo s ciarkou/bodkou, inak null (NIE 0).
@@ -169,7 +284,8 @@
     if (window.sketchup && sketchup.delete_edge) sketchup.delete_edge(JSON.stringify({ abs_id: id, catalog_rev: MD_REV }));
   }
 
-  window.MD = {
+  // Top-level var v script tagu = window.MD v CEF; v Node require nepada na window.
+  var MD = {
     init: function(data){
       MD_SHEETS = (data.materials && data.materials.sheets) ? data.materials.sheets : [];
       MD_CATALOG = data.catalog || { sheets: [], edges: [] };
@@ -190,4 +306,9 @@
       sketchup.set_project_material(JSON.stringify({ key: key, value: value }));
   }
 
-  if (window.sketchup && sketchup.ready) sketchup.ready('');
+  // D-41 Node testy (tests/js/test_decor_groups.js) — v CEF je module undefined.
+  // Exportuju sa len CISTE funkcie (bez DOM); ready() sa vola len v CEF (window).
+  if (typeof module !== 'undefined' && module.exports){
+    module.exports = { groupCatalogByDecor: groupCatalogByDecor, sheetChipLabel: sheetChipLabel, edgeChipLabel: edgeChipLabel };
+  }
+  if (typeof window !== 'undefined' && window.sketchup && sketchup.ready) sketchup.ready('');

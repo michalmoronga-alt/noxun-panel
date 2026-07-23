@@ -3,7 +3,7 @@
      (%APPDATA%). -->
 <!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.7za">
+<link rel="stylesheet" href="css/panel.css?v=0.4.7zb">
 
 <h1>Materiály projektu</h1>
 <p class="sub" id="mdline">…</p>
@@ -17,14 +17,41 @@
   <div class="matrow"><label>Chrbát</label><select id="md_back" onchange="onProjMaterial('default_back_material_id', this.value)"></select></div>
 </fieldset>
 
-<!-- D-05: sprava GLOBALNEHO katalogu (dosky + ABS). ID generuje server; hrubka
-     existujuceho materialu je NEMENNA (hrubka definuje variant). -->
+<!-- D-05 + D-41 PR B: sprava GLOBALNEHO katalogu ZOSKUPENA PODLA DEKOROV.
+     Karta dekoru = hlavicka (swatch, nazov, vyrobca, premenovat, + variant)
+     + chips dosiek (typ+hrubka) a ABS (sirka/hrubka); klik na chip = edit.
+     ID generuje server; hrubka aj sirka su pri edite NEMENNE (variant identity);
+     dekor sa meni len premenovanim CELEJ skupiny. -->
 <fieldset>
-  <legend>Katalóg — doskové materiály</legend>
-  <div id="mdSheetList"></div>
-  <div class="btnrow"><button class="ghostbtn" onclick="mdOpenSheetForm(null)">+ Pridať materiál</button></div>
+  <legend>Katalóg podľa dekorov</legend>
+  <div id="mdDecorList"></div>
+  <div class="btnrow"><button class="ghostbtn" onclick="mdOpenDecorForm(null)">+ Nový dekor</button></div>
+  <!-- D-41: batch formular — dekor + vlastnosti RAZ, hrubky a ABS ako zoznamy.
+       Server (add_decor_batch) parsuje, validuje VSETKO a zapise naraz. -->
+  <div id="mdDecorForm" style="display:none">
+    <div class="row"><label>Dekor *</label><input id="nd_decor" type="text" placeholder="napr. U702 ST9 Kašmírovo šedá"><span class="unit"></span></div>
+    <div class="row"><label>Výrobca</label><input id="nd_manufacturer" type="text" placeholder="napr. Egger"><span class="unit"></span></div>
+    <div class="row"><label>Typ dosiek</label><input id="nd_type" type="text" value="DTDL"><span class="unit"></span></div>
+    <div class="row"><label>Smer dekoru</label>
+      <select id="nd_grain">
+        <option value="length">Po dĺžke</option>
+        <option value="width">Po šírke</option>
+        <option value="none">Bez smeru</option>
+      </select><span class="unit"></span>
+    </div>
+    <div class="row"><label>Farba</label><input id="nd_color" type="color" value="#d8c4a0"><span class="unit"></span></div>
+    <div class="row"><label>Hrúbky dosiek</label><input id="nd_ths" type="text" placeholder="18, 36"><span class="unit">mm</span></div>
+    <div class="row"><label>ABS pásky</label><input id="nd_abs" type="text" placeholder="22/1, 43/1, 43/2"><span class="unit">š/hr</span></div>
+    <div class="hint">Položky oddeľuj čiarkami, desatiny píš bodkou (18.5). ABS ako šírka/hrúbka. Ceny doplníš úpravou jednotlivých položiek.</div>
+    <div class="btnrow">
+      <button class="primary" onclick="mdSaveDecorBatch()">Vytvoriť</button>
+      <button class="ghostbtn" onclick="mdCloseForms()">Zrušiť</button>
+    </div>
+  </div>
+  <!-- Edit dosky (create bezi cez Novy dekor / + variant) -->
   <div id="mdSheetForm" style="display:none">
-    <div class="row"><label>Dekor *</label><input id="ms_decor" type="text" placeholder="napr. Dub Halifax prírodný"><span class="unit"></span></div>
+    <div class="row"><label>Dekor</label><input id="ms_decor" type="text" placeholder="napr. Dub Halifax prírodný"><span class="unit"></span></div>
+    <div class="hint" id="ms_decor_hint" style="display:none">Dekor je identita skupiny — premení sa tlačidlom Premenovať na karte dekoru.</div>
     <div class="row"><label>Typ *</label><input id="ms_type" type="text" placeholder="DTDL / MDF / HDF / kompakt"><span class="unit"></span></div>
     <div class="row"><label>Hrúbka *</label><input id="ms_thickness" type="text"><span class="unit">mm</span></div>
     <div class="hint" id="ms_thick_hint" style="display:none">Hrúbka definuje variant — pre inú hrúbku pridaj nový materiál.</div>
@@ -46,18 +73,13 @@
       <button class="ghostbtn" onclick="mdCloseForms()">Zrušiť</button>
     </div>
   </div>
-</fieldset>
-
-<fieldset>
-  <legend>Katalóg — ABS pásky</legend>
-  <div class="hint">Hrúbky iba 1,0 a 2,0 mm. Dekor píš ROVNAKO ako pri doske — pravidlové defaulty párujú ABS s materiálom podľa dekoru.</div>
-  <div id="mdEdgeList"></div>
-  <div class="btnrow"><button class="ghostbtn" onclick="mdOpenEdgeForm(null)">+ Pridať ABS</button></div>
+  <!-- Edit ABS pasky (sirka je informativna — variant identity, nemenna) -->
   <div id="mdEdgeForm" style="display:none">
-    <div class="row"><label>Dekor *</label><input id="me_decor" type="text"><span class="unit"></span></div>
-    <!-- D-41: sirka pasky (22/43) = sucast variant identity; volitelna (prazdna =
-         univerzalna legacy paska), pri edite NEMENNA (server guard). -->
-    <div class="row"><label>Šírka</label><input id="me_width" type="text" placeholder="napr. 22"><span class="unit">mm</span></div>
+    <div class="row"><label>Dekor</label><input id="me_decor" type="text"><span class="unit"></span></div>
+    <div class="hint" id="me_decor_hint" style="display:none">Dekor je identita skupiny — premení sa tlačidlom Premenovať na karte dekoru.</div>
+    <!-- D-41: sirka pasky (22/43) = sucast variant identity — vznika v batchi
+         Novy dekor / + variant; pri edite NEMENNA (server guard), input informuje. -->
+    <div class="row"><label>Šírka</label><input id="me_width" type="text" disabled placeholder="—"><span class="unit">mm</span></div>
     <div class="row"><label>Hrúbka *</label>
       <select id="me_thickness"><option value="1.0">1,0</option><option value="2.0">2,0</option></select><span class="unit">mm</span>
     </div>
@@ -73,4 +95,4 @@
 <div id="status">Pripravené.</div>
 
 <script src="js/errors.js?v=0.4.7za"></script>
-<script src="js/proj_materials.js?v=0.4.7za"></script>
+<script src="js/proj_materials.js?v=0.4.7zb"></script>
