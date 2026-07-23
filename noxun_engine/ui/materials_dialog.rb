@@ -251,6 +251,15 @@ module Noxun
             if data.key?('decor') && data['decor'].to_s.strip != existing['decor'].to_s
               return set_status('Dekor je identita skupiny — premenuj celú skupinu (Premenovať dekor), nie jeden záznam.', true)
             end
+            # D-41 (Codex GH #70): typ je tiez sucast variant identity — zmena typu
+            # pri edite nesmie vytvorit duplicitny variant (dekor+typ+hrubka).
+            new_type = data.key?('type') ? data['type'].to_s.strip : existing['type'].to_s
+            if new_type.upcase != existing['type'].to_s.strip.upcase
+              dup = Materials.find_sheet_variant(existing['decor'], new_type, th)
+              if dup && dup['material_id'] != id
+                return set_status("Variant #{existing['decor']} #{new_type} už existuje (#{dup['material_id']}).", true)
+              end
+            end
           end
 
           # D-19 (Codex F5): pri edite sa payload MERGUJE s existujucim zaznamom —

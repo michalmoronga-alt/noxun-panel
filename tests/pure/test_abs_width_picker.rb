@@ -94,6 +94,9 @@ NxTest.test('abs-width: decor_conflict chyta case/whitespace preklepy, presnu zh
   NxTest.assert_equal(nil, PMAT.decor_conflict('K009 PW'), 'presna zhoda nie je konflikt')
   NxTest.assert_equal('K009 PW', PMAT.decor_conflict('k009 pw'))
   NxTest.assert_equal('K009 PW', PMAT.decor_conflict('K009  PW'))
+  # Codex GH #70: aj CHYBAJUCA medzera je preklep tej istej skupiny.
+  NxTest.assert_equal('K009 PW', PMAT.decor_conflict('K009PW'))
+  NxTest.assert_equal('K009 PW', PMAT.decor_conflict('K 009 PW'))
   NxTest.assert_equal(nil, PMAT.decor_conflict('Uplne novy dekor'))
 end
 

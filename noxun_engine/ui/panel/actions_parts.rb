@@ -92,11 +92,14 @@ module Noxun
         # Zdroj materialu = config na entite (resolved snapshot, standard 8.3) — to iste,
         # co zobrazuje karta. Nenajdena paska => volajuci NESMIE nic menit (ziadna mapa
         # 4x nil — zmazala by existujuce hrany), len status s navodom.
+        # D-41 (Codex GH #70): hrubka dielca z configu ide do vyberu SIRKY pasky —
+        # 18 mm dielec dostane 22-ku, nie najsirsiu.
         def bulk_abs_for(cfg)
           mat = cfg['material_id']
           decor = defined?(Materials) ? Materials.decor_of(mat) : nil
           return [nil, decor || mat] if decor.nil?
-          [Materials.abs_for_decor(decor, 1.0), decor]
+          part_th = cfg['thickness'].to_f
+          [Materials.abs_for_decor(decor, 1.0, part_th.positive? ? part_th : nil), decor]
         end
 
         def missing_bulk_abs_msg(decor)

@@ -98,6 +98,10 @@
     var a = id ? MD_CATALOG.edges.find(function(x){ return x.abs_id === id; }) : null;
     mdEditing = { kind: 'edge', id: id };
     el('me_decor').value = a ? (a.decor || '') : '';
+    // D-41: sirka = variant identity — zadava sa pri vytvoreni, pri edite nemenna
+    // (server ju aj tak berie z existujuceho zaznamu; input len informuje).
+    el('me_width').value = (a && a.width !== null && a.width !== undefined) ? a.width : '';
+    el('me_width').disabled = !!a;
     el('me_thickness').value = a ? String(parseFloat(a.thickness).toFixed(1)) : '1.0';
     el('me_thickness').disabled = !!a; // hrubka = variant (ID _10/_20), pri edite nemenna
     el('me_price').value = a ? (a.price_per_bm || 0) : '0';
@@ -149,6 +153,7 @@
       abs_id: mdEditing && mdEditing.id ? mdEditing.id : null,
       catalog_rev: MD_REV,
       decor: el('me_decor').value,
+      width: el('me_width').value,   // D-41: prazdna = univerzalna paska bez sirky
       thickness: el('me_thickness').value,
       price_per_bm: el('me_price').value,
       color: hexToRgb(el('me_color').value)

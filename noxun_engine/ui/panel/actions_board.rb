@@ -74,10 +74,14 @@ module Noxun
         # [nova_edges_mapa alebo nil (nic na prevod), pole hran bez variantu].
         def remap_edges_for_material(cfg, new_mat)
           old_decor = Materials.decor_of(cfg['material_id'])
-          new_decor = Materials.decor_of(new_mat)
+          new_sheet = Materials.sheet(new_mat)
+          new_decor = new_sheet && new_sheet['decor']
           return [nil, []] unless old_decor && new_decor && old_decor != new_decor
           edges = cfg['edges'].is_a?(Hash) ? cfg['edges'].dup : nil
           return [nil, []] unless edges
+          # D-41 (Codex GH #70 + audit FIX 10): sirka pasky sa vybera podla CIELOVEJ
+          # hrubky dosky = hrubka noveho sheetu (hrubka dosky VZDY nasleduje material).
+          target_th = new_sheet['thickness'].to_f
           changed = false
           lost = []
           %w[L1 L2 W1 W2].each do |code|
@@ -85,7 +89,7 @@ module Noxun
             next if aid.nil?
             rec = Materials.edge(aid)
             next unless rec && rec['decor'] == old_decor # cudzi dekor = vedoma volba, nechaj
-            new_aid = Materials.abs_for_decor(new_decor, rec['thickness'])
+            new_aid = Materials.abs_for_decor(new_decor, rec['thickness'], target_th.positive? ? target_th : nil)
             lost << code if new_aid.nil?
             edges[code] = new_aid
             changed = true

@@ -211,9 +211,11 @@ module Noxun
       # normalize_*). Preklepy chytame near-match guardom: novy dekor, ktory sa od
       # existujuceho lisi len velkostou pismen/medzerami, sa odmietne s presnym tvarom.
 
-      # Normalizovany kluc na porovnanie "skoro rovnakych" dekorov.
+      # Normalizovany kluc na porovnanie "skoro rovnakych" dekorov. Medzery sa
+      # odstranuju UPLNE (Codex GH #70: "U702ST9" vs "U702 ST9" je ten isty
+      # preklep ako dvojita medzera — kolaps na jednu by ho prepustil).
       def decor_norm_key(d)
-        d.to_s.strip.gsub(/\s+/, ' ').downcase
+        d.to_s.gsub(/\s+/, '').downcase
       end
 
       # Existujuci dekor, ktory sa s danym zhoduje na norm kluci, ale NIE presne
