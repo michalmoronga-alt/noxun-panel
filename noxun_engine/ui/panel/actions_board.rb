@@ -72,29 +72,18 @@ module Noxun
 
         # Prevod ABS hran stareho dekoru na novy (rovnaka hrubka). Vrati
         # [nova_edges_mapa alebo nil (nic na prevod), pole hran bez variantu].
+        # D-41 PR C: len tenky obal nad spolocnym jadrom Materials.remap_edges
+        # (to iste pouzivaju dielcove overridy — audit FIX 5). Cielova hrubka =
+        # hrubka NOVEHO sheetu (hrubka dosky VZDY nasleduje material; FIX 10).
         def remap_edges_for_material(cfg, new_mat)
-          old_decor = Materials.decor_of(cfg['material_id'])
           new_sheet = Materials.sheet(new_mat)
-          new_decor = new_sheet && new_sheet['decor']
-          return [nil, []] unless old_decor && new_decor && old_decor != new_decor
-          edges = cfg['edges'].is_a?(Hash) ? cfg['edges'].dup : nil
-          return [nil, []] unless edges
-          # D-41 (Codex GH #70 + audit FIX 10): sirka pasky sa vybera podla CIELOVEJ
-          # hrubky dosky = hrubka noveho sheetu (hrubka dosky VZDY nasleduje material).
-          target_th = new_sheet['thickness'].to_f
-          changed = false
-          lost = []
-          %w[L1 L2 W1 W2].each do |code|
-            aid = edges[code]
-            next if aid.nil?
-            rec = Materials.edge(aid)
-            next unless rec && rec['decor'] == old_decor # cudzi dekor = vedoma volba, nechaj
-            new_aid = Materials.abs_for_decor(new_decor, rec['thickness'], target_th.positive? ? target_th : nil)
-            lost << code if new_aid.nil?
-            edges[code] = new_aid
-            changed = true
-          end
-          [changed ? edges : nil, lost]
+          target_th = new_sheet && new_sheet['thickness'].to_f
+          Materials.remap_edges(
+            cfg['edges'].is_a?(Hash) ? cfg['edges'] : nil,
+            Materials.decor_of(cfg['material_id']),
+            new_sheet && new_sheet['decor'],
+            target_th && target_th.positive? ? target_th : nil
+          )
         end
 
         # ABS hrana dosky — server-side read-modify-write (Codex audit c, D):

@@ -103,8 +103,9 @@
     // dekoru — netreba cakat na Ruby echo. Pri ZRUSENI override (v==='' = navrat na
     // dedenie) NErataj: JS zdedeny material nevie, necha skupiny a pocka na payload.
     if (v) regroupPartEdges(decorOfSheet(v));
+    // D-41: cabinet_id = identity guard (Ruby zahodi echo po prekliknuti na iny korpus)
     if (window.sketchup && sketchup.set_part_material)
-      sketchup.set_part_material(JSON.stringify({ role_key: partCard.role_key, material_id: v }));
+      sketchup.set_part_material(JSON.stringify({ role_key: partCard.role_key, material_id: v, cabinet_id: partCard.cabinet_id }));
   }
   // F3/N7: prekresli options KAZDEHO ABS selectu dielca podla dekoru, zachova hodnotu
   // (aj mimo katalogu — F5). Programove nastavenie value NEstriela change event.
@@ -126,7 +127,7 @@
   function onEdgeChange(code, value){
     if (!partCard) return;
     if (window.sketchup && sketchup.set_part_edge)
-      sketchup.set_part_edge(JSON.stringify({ role_key: partCard.role_key, edge: code, abs_id: value }));
+      sketchup.set_part_edge(JSON.stringify({ role_key: partCard.role_key, edge: code, abs_id: value, cabinet_id: partCard.cabinet_id }));
   }
   // D-35: olep vsetky 4 hrany ABS 1.0 dekoru materialu dielca — JEDEN callback,
   // Ruby spravi JEDEN rebuild (1 undo). Identity guard: payload nesie cabinet_id
