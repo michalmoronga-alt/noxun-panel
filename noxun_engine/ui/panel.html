@@ -333,6 +333,23 @@
   </div>
 </div>
 
+<!-- D-41 C2: modal "dekor nema pouzitelnu ABS pasku" — otvara sa PRED odoslanim
+     zmeny materialu / bulk olepu, ked lokalny katalog nema pouzitelny 1,0 mm
+     variant (absUsableExists). Rozhodnutie posle povodny callback s flagom
+     create_missing_abs (server vsetko overi znova); Zrusit = revert selectu. -->
+<div id="absModal" class="nxmodal" style="display:none">
+  <div class="nxmodal-card">
+    <div class="nxmodal-title">Chýba ABS páska</div>
+    <div class="hint" id="absModalText">…</div>
+    <div class="nxmodal-warn">Páska sa vytvorí natrvalo v globálnom katalógu (pre všetky projekty) s cenou 0 — krok Späť ju neodstráni. Cenu doplníš v Materiáloch projektu.</div>
+    <div class="btnrow">
+      <button class="primary" onclick="absModalChoose('create')">Vytvoriť a pokračovať</button>
+      <button class="ghostbtn" onclick="absModalChoose('without')">Bez ABS</button>
+      <button class="ghostbtn" onclick="absModalChoose('cancel')">Zrušiť</button>
+    </div>
+  </div>
+</div>
+
 <div id="status">Pripravené.</div>
 
 <!-- D-29 A12/A2: paticka v normalnom toku (NIE fixed). #verline je PRESUNUTY sem
@@ -346,17 +363,17 @@
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
 <script src="js/errors.js?v=0.4.7za"></script>
 <script src="js/icons.js?v=0.4.7za"></script>
-<script src="js/core.js?v=0.4.7za"></script>
+<script src="js/core.js?v=0.4.7zc"></script>
 <script src="js/expr.js?v=0.4.7za"></script>
 <script src="js/insert_state.js?v=0.4.7za"></script>
-<script src="js/form.js?v=0.4.7za"></script>
+<script src="js/form.js?v=0.4.7zc"></script>
 <script src="js/zone_tree.js?v=0.4.7za"></script>
 <script src="js/preview.js?v=0.4.7za"></script>
 <script src="js/actions.js?v=0.4.7za"></script>
-<script src="js/bridge.js?v=0.4.7za"></script>
+<script src="js/bridge.js?v=0.4.7zc"></script>
 <script src="js/materials.js?v=0.4.7za"></script>
-<script src="js/part_card.js?v=0.4.7za"></script>
-<script src="js/board_card.js?v=0.4.7za"></script>
+<script src="js/part_card.js?v=0.4.7zc"></script>
+<script src="js/board_card.js?v=0.4.7zc"></script>
 <script src="js/hardware.js?v=0.4.7za"></script>
 <script src="js/usage.js?v=0.4.7za"></script>
 <script src="js/boot.js?v=0.4.7za"></script>

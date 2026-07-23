@@ -207,14 +207,32 @@ module Noxun
             return set_status("Materiál #{value} má nekompatibilnú hrúbku pre: #{ids}.", true)
           end
 
-          jobs = affected.map { |cabinet| [cabinet, Panel.existing_params(cabinet)] }
+          # D-41 PR C (audit FIX 5): projektova predvolba meni efektivny material
+          # VSETKYCH dediacich skriniek — rucne ABS overridy zladene so starym
+          # dekorom sa preladia (stary default este plati, novy je len v `value`).
+          eff_key = { 'default_material_id' => 'body', 'default_front_material_id' => 'front',
+                      'default_back_material_id' => 'back' }[key]
+          remap_changed = 0
+          remap_lost = []
+          jobs = affected.map do |cabinet|
+            p = Panel.existing_params(cabinet)
+            old_eff = Panel.effective_materials(model, p)
+            new_eff = old_eff.merge(eff_key => value)
+            remap = CabinetBuilder.remap_part_edge_overrides!(p, old_eff, new_eff)
+            remap_changed += remap['changed'].to_i
+            remap_lost.concat(remap['lost'])
+            [cabinet, p]
+          end
           Panel.suspend_selection_sync do
             CabinetBuilder.rebuild_many(model, jobs, op_name: 'NOXUN: projektovy material') do
               raise 'Projektový materiál sa nepodarilo uložiť.' unless Materials.set_project_default(model, key, value)
             end
             Panel.reselect(model, selected) if selected && selected.valid?
           end
-          set_status("Predvoľba uložená — prepočítaných #{affected.size} skriniek.")
+          msg = "Predvoľba uložená — prepočítaných #{affected.size} skriniek."
+          msg += " ABS hrany prevedené na nový dekor (#{remap_changed}× dielec)." if remap_changed.positive?
+          msg += " Bez náhrady: #{remap_lost.join(', ')}." unless remap_lost.empty?
+          set_status(msg)
           push_state
           Panel.push_selected(model) # refresh Inspectora (korpusove selecty, karta dielca)
         end

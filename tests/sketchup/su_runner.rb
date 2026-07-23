@@ -592,6 +592,49 @@ module NoxunSuRunner
     ok('sync-abs: bulk bez ABS nevytvoril undo krok (1x undo vratil marker 570 -> 590)',
        (bcfg14z['width'].to_f - 590.0).abs < 0.01)
 
+    # 14b) D-41 C2: create_missing_abs (modal "Vytvorit a pokracovat") — server
+    #      dovytvori 1,0 mm pasku dekoru a rucne zladene hrany nasleduju novy
+    #      dekor (centralny remap). Katalogovy zapis je MIMO model undo — po
+    #      undo materialu paska v globalnom katalogu OSTAVA (NOTE 9). Docasny
+    #      dekor sa po scenari z katalogu uprace.
+    ok41, res41 = e::Materials.add_decor_batch('decor' => 'SU D41 Dekor', 'thicknesses' => '18')
+    if ok41
+      sid41 = res41['sheets'][0]
+      shelf41 = inst.definition.entities.grep(Sketchup::ComponentInstance)
+                    .find { |i| e::Store.get(i, 'role') == 'shelf' }
+      rk41 = e::Store.get(shelf41, 'part_key').to_s
+      cid41 = e::Store.get(inst, 'cabinet_id').to_s
+      e::Panel.select_only(model, shelf41)
+      # rucna hrana zladena s POVODNYM dekorom (K009) — remap ju musi previest
+      e::Panel.handle_set_part_edge({ 'cabinet_id' => cid41, 'role_key' => rk41,
+                                      'edge' => 'L1', 'abs_id' => 'ABS_K009_10' }.to_json)
+      e::Panel.handle_set_part_material({ 'cabinet_id' => cid41, 'role_key' => rk41,
+                                          'material_id' => sid41, 'create_missing_abs' => true }.to_json)
+      created41 = e::Materials.abs_for_decor('SU D41 Dekor', 1.0, 18.0)
+      part41 = inst.definition.entities.grep(Sketchup::ComponentInstance)
+                   .find { |i| e::Store.get(i, 'part_key').to_s == rk41 }
+      pcfg41 = e::Store.config(part41) || {}
+      ov41 = ((e::Store.config(inst) || {})['part_overrides'] || {})[rk41] || {}
+      ok('sync-abs C2: create_missing_abs vytvoril pasku 22/1 noveho dekoru',
+         created41 == 'ABS_SU_D41_DEKOR_22X10')
+      ok('sync-abs C2: material nastaveny a rucna hrana L1 prevedena na novu pasku',
+         pcfg41['material_id'] == sid41 && (ov41['edges'] || {})['L1'] == created41 &&
+         (pcfg41['edges'] || {})['L1'] == created41)
+      Sketchup.undo
+      ov41u = ((e::Store.config(inst) || {})['part_overrides'] || {})[rk41] || {}
+      ok('sync-abs C2: 1x undo vratil material aj hranu, paska v katalogu OSTAVA (NOTE 9)',
+         (ov41u['edges'] || {})['L1'] == 'ABS_K009_10' && !e::Materials.edge(created41).nil?)
+      # upratanie: override hrany prec + docasne katalogove zaznamy prec
+      e::Panel.handle_set_part_edge({ 'cabinet_id' => cid41, 'role_key' => rk41,
+                                      'edge' => 'L1', 'abs_id' => '__inherit__' }.to_json)
+      e::Materials.delete_edge(created41) if created41
+      e::Materials.delete_sheet(sid41)
+      ok('sync-abs C2: cleanup docasneho dekoru (katalog bez SU D41 zaznamov)',
+         e::Materials.sheet(sid41).nil? && e::Materials.abs_for_decor('SU D41 Dekor', 1.0).nil?)
+    else
+      ok("sync-abs C2: seed docasneho dekoru zlyhal (#{res41.inspect})", false)
+    end
+
     # 15) V0.5 D: KONTROLNY SEMAFOR — raw hardware_overrides (nalez 2), Validation
     #     nad CERSTVYM zberom, klik-select semaforovej polozky cez STABILNY kluc
     #     (prezije rebuild — nalez 4), stale generacia. NESPUSTA sa tu (spusti hlavny

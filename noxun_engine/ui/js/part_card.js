@@ -99,12 +99,27 @@
   function onPartMaterial(){
     if (!partCard) return;
     var v = el('pcMaterial').value;
+    // D-41 C2: novy dekor bez pouzitelnej 1,0 mm pasky -> modal (vytvorit / bez
+    // ABS / zrusit) PRED odoslanim. Server check je autorita, toto je len UX.
+    if (v && !absUsableExists(MATERIALS.edges, decorOfSheet(v), 1.0, sheetThicknessOf(v))){
+      var prev = partCard.has_material_override ? (partCard.material_id || '') : '';
+      openAbsModal('Dekor „' + decorOfSheet(v) + '" nemá použiteľnú 1,0 mm ABS pásku pre túto hrúbku — hrany podľa pravidla by ostali bez ABS.',
+        function(create){ sendPartMaterial(v, create); },
+        function(){ el('pcMaterial').value = prev; regroupPartEdges(decorOfSheet(prev || partCard.material_id)); });
+      return;
+    }
+    sendPartMaterial(v, false);
+  }
+  function sendPartMaterial(v, createAbs){
+    if (!partCard) return;
     // F3: pri zmene materialu (override) pregrupuj ABS selecty LOKALNE podla noveho
     // dekoru — netreba cakat na Ruby echo. Pri ZRUSENI override (v==='' = navrat na
     // dedenie) NErataj: JS zdedeny material nevie, necha skupiny a pocka na payload.
     if (v) regroupPartEdges(decorOfSheet(v));
+    // D-41: cabinet_id = identity guard (Ruby zahodi echo po prekliknuti na iny korpus)
     if (window.sketchup && sketchup.set_part_material)
-      sketchup.set_part_material(JSON.stringify({ role_key: partCard.role_key, material_id: v }));
+      sketchup.set_part_material(JSON.stringify({ role_key: partCard.role_key, material_id: v,
+        cabinet_id: partCard.cabinet_id, create_missing_abs: !!createAbs }));
   }
   // F3/N7: prekresli options KAZDEHO ABS selectu dielca podla dekoru, zachova hodnotu
   // (aj mimo katalogu — F5). Programove nastavenie value NEstriela change event.
@@ -126,15 +141,28 @@
   function onEdgeChange(code, value){
     if (!partCard) return;
     if (window.sketchup && sketchup.set_part_edge)
-      sketchup.set_part_edge(JSON.stringify({ role_key: partCard.role_key, edge: code, abs_id: value }));
+      sketchup.set_part_edge(JSON.stringify({ role_key: partCard.role_key, edge: code, abs_id: value, cabinet_id: partCard.cabinet_id }));
   }
   // D-35: olep vsetky 4 hrany ABS 1.0 dekoru materialu dielca — JEDEN callback,
   // Ruby spravi JEDEN rebuild (1 undo). Identity guard: payload nesie cabinet_id
   // AJ role_key, Ruby overi oboje proti aktualne oznacenemu dielcu.
   function onEdgesAll(){
     if (!partCard) return;
+    // D-41 C2: dekor bez pouzitelnej pasky -> ponuka dovytvorenia; "Bez ABS" tu
+    // znamena poslat bez flagu (server vrati dnesnu hlasku s navodom).
+    var decor = decorOfSheet(partCard.material_id);
+    if (!absUsableExists(MATERIALS.edges, decor, 1.0, parseFloat(partCard.thickness))){
+      openAbsModal('Dekor „' + decor + '" nemá použiteľnú 1,0 mm ABS pásku — bez nej sa hrany nedajú olepiť.',
+        function(create){ sendEdgesAll(create); }, null);
+      return;
+    }
+    sendEdgesAll(false);
+  }
+  function sendEdgesAll(createAbs){
+    if (!partCard) return;
     if (window.sketchup && sketchup.set_part_edges_all)
-      sketchup.set_part_edges_all(JSON.stringify({ cabinet_id: partCard.cabinet_id, role_key: partCard.role_key }));
+      sketchup.set_part_edges_all(JSON.stringify({ cabinet_id: partCard.cabinet_id, role_key: partCard.role_key,
+        create_missing_abs: !!createAbs }));
   }
   // Klik na hranu v 2D dielci -> fokus jej dropdownu (delegovane, poucenie z drag fixu).
   function setupPartSvgDelegation(){

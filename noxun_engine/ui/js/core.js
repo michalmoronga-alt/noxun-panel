@@ -155,6 +155,32 @@
     }
     return (prefixHtml||'') + body;
   }
+  // D-41 C2: existuje k dekoru POUZITELNY variant danej hrubky ABS pre dielec
+  // hrubky partTh? Zrkadlo Ruby pickera (sirka >= partTh+2 alebo univerzalna bez
+  // sirky) — LEN boolean pre modal "chyba paska"; vyber aj tvorbu robi VZDY server.
+  // Bez dekoru/hrubky sa NEvylucuje (true) — modal nesmie vyskakovat naprazdno.
+  function absUsableExists(edges, decor, absTh, partTh){
+    var nd = normDecor(decor);
+    if (nd === '') return true;
+    edges = edges || [];
+    for (var i=0;i<edges.length;i++){
+      var a = edges[i];
+      if (normDecor(a.decor) !== nd) continue;
+      if (Math.abs((parseFloat(a.thickness)||0) - absTh) > 0.01) continue;
+      var w = (a.width===null || a.width===undefined) ? null : parseFloat(a.width);
+      if (w === null) return true;
+      if (partTh === null || partTh === undefined || !isFinite(partTh)) return true;
+      if (w >= partTh + 2 - 0.001) return true;
+    }
+    return false;
+  }
+  // Hrubka doskoveho materialu z katalogu (pre absUsableExists check).
+  function sheetThicknessOf(materialId){
+    for (var i=0;i<MATERIALS.sheets.length;i++){
+      if (MATERIALS.sheets[i].id===materialId) return parseFloat(MATERIALS.sheets[i].thickness);
+    }
+    return null;
+  }
   // Volby ABS pre dropdown hrany DIELCA: fixne (podla pravidla / Bez ABS) + D-36 skupiny
   // (Odporucane k dekoru / Ostatne). decor = resolved dekor materialu dielca,
   // currentValue = aktualna ABS hodnota tejto hrany (zachova sa aj mimo katalogu — F5).
@@ -212,6 +238,7 @@
   // D-36 Node testy (tests/js/test_abs_groups.js) — v CEF je module undefined, vetva
   // sa preskoci. Exportuju sa len CISTE grouping funkcie (bez DOM/MATERIALS zavislosti).
   if (typeof module !== 'undefined' && module.exports){
-    module.exports = { groupAbsEdges: groupAbsEdges, absOptionsHtml: absOptionsHtml, normDecor: normDecor };
+    module.exports = { groupAbsEdges: groupAbsEdges, absOptionsHtml: absOptionsHtml, normDecor: normDecor,
+      absUsableExists: absUsableExists };
   }
 

@@ -61,11 +61,25 @@
   // Material: okamzity zapis (select) — hrubka nasleduje katalog na Ruby strane.
   function onBoardMaterial(v){
     if (!boardCard) return;
+    // D-41 C2: dekor bez pouzitelnej 1,0 mm pasky pre NOVU hrubku dosky -> modal
+    // pred odoslanim (server check je autorita, toto je len UX vrstva).
+    if (v && !absUsableExists(MATERIALS.edges, decorOfSheet(v), 1.0, sheetThicknessOf(v))){
+      var prev = boardCard.material_id || '';
+      openAbsModal('Dekor „' + decorOfSheet(v) + '" nemá použiteľnú 1,0 mm ABS pásku pre túto hrúbku — prevedené hrany by ostali bez ABS.',
+        function(create){ sendBoardMaterial(v, create); },
+        function(){ if (el('bc_material')) el('bc_material').value = prev; regroupBoardEdges(decorOfSheet(prev)); });
+      return;
+    }
+    sendBoardMaterial(v, false);
+  }
+  function sendBoardMaterial(v, createAbs){
+    if (!boardCard) return;
     // F3: pregrupuj ABS hrany dosky LOKALNE podla noveho dekoru — doska ma vzdy
     // konkretny material (ziadne dedenie => vzdy ratame). N7: ziadny change event.
     regroupBoardEdges(decorOfSheet(v));
     if (window.sketchup && sketchup.set_board_material)
-      sketchup.set_board_material(JSON.stringify({ board_id: boardCard.board_id, material_id: v }));
+      sketchup.set_board_material(JSON.stringify({ board_id: boardCard.board_id, material_id: v,
+        create_missing_abs: !!createAbs }));
   }
   // F3/N7: prekresli options ABS selectov dosky podla dekoru, zachova hodnotu (aj F5).
   function regroupBoardEdges(decor){
@@ -88,9 +102,21 @@
   // nesmie prist AZ PO bulku (callbacky sa vykonavaju v poradi odoslania).
   function onBoardEdgesAll(){
     if (!boardCard) return;
+    // D-41 C2: chybajuca pouzitelna paska -> ponuka dovytvorenia pred bulkom.
+    var decor = decorOfSheet(boardCard.material_id);
+    var th = sheetThicknessOf(boardCard.material_id);
+    if (!absUsableExists(MATERIALS.edges, decor, 1.0, th === null ? parseFloat(boardCard.thickness) : th)){
+      openAbsModal('Dekor „' + decor + '" nemá použiteľnú 1,0 mm ABS pásku — bez nej sa hrany nedajú olepiť.',
+        function(create){ sendBoardEdgesAll(create); }, null);
+      return;
+    }
+    sendBoardEdgesAll(false);
+  }
+  function sendBoardEdgesAll(createAbs){
+    if (!boardCard) return;
     flushBoardEditsNow();
     if (window.sketchup && sketchup.set_board_edges_all)
-      sketchup.set_board_edges_all(JSON.stringify({ board_id: boardCard.board_id }));
+      sketchup.set_board_edges_all(JSON.stringify({ board_id: boardCard.board_id, create_missing_abs: !!createAbs }));
   }
 
   // Zapis hodnoty len ked pole NEMA fokus — refresh z backendu nesmie prepisat

@@ -334,6 +334,62 @@ module Noxun
           end
         end
 
+        # --- D-41 PR C (audit FIX 5/7): centralne preladenie ABS overridov ------
+        # Vola sa pri KAZDEJ zmene efektivneho materialu dielcov (material dielca,
+        # material korpusu, projektova predvolba) PRED rebuildom. Pravidlove hrany
+        # sa preladia samy (resolve_edges); toto riesi RUCNE overridy: paska
+        # zladena so STARYM efektivnym dekorom nasleduje novy dekor, vedome
+        # kontrastna/nil ostava.
+        #
+        # params      — NOVE params korpusu (part_overrides sa mutuju in-place)
+        # old_eff/new_eff — {'body'=>id,'front'=>id,'back'=>id} efektivne materialy
+        #   PRED/PO zmene (po dedeni projekt->korpus; audit FIX 7 — stary stav sa
+        #   NEODVODZUJE z rec['material_id'], ale z base+override pred zmenou)
+        # old_overrides — deep kopia overridov PRED zmenou (part material case);
+        #   default = aktualne overridy (korpus/projekt case ich nemenia)
+        # Vrati {'changed'=>pocet dielcov, 'lost'=>['Bok lavy L1', ...]}.
+        def remap_part_edge_overrides!(params, old_eff, new_eff, old_overrides: nil)
+          result = { 'changed' => 0, 'lost' => [] }
+          ov = params['part_overrides']
+          return result unless ov.is_a?(Hash) && !ov.empty? && defined?(Materials)
+          old_ov = old_overrides.is_a?(Hash) ? old_overrides : ov
+          parts = plan_parts_by_key(params)
+          ov.each do |rk, rec|
+            next unless rec.is_a?(Hash) && rec['edges'].is_a?(Hash)
+            pd = parts[rk]
+            next unless pd
+            old_rec = old_ov[rk].is_a?(Hash) ? old_ov[rk] : {}
+            old_mat = present(old_rec['material_id']) ||
+                      base_material_for(pd[:role], pd[:material], old_eff['body'], old_eff['front'], old_eff['back'])
+            new_mat = present(rec['material_id']) ||
+                      base_material_for(pd[:role], pd[:material], new_eff['body'], new_eff['front'], new_eff['back'])
+            new_sheet = Materials.sheet(new_mat)
+            # Cielova hrubka: katalogova hrubka noveho sheetu (cela 18/19 sa jej
+            # prisposobia — FIX 10), fallback konstrukcna hrubka dielca.
+            target = new_sheet ? new_sheet['thickness'].to_f : pd[:prod][:thickness].to_f
+            remapped, lost = Materials.remap_edges(
+              rec['edges'], Materials.decor_of(old_mat), new_sheet && new_sheet['decor'],
+              target.positive? ? target : nil
+            )
+            next unless remapped
+            rec['edges'] = remapped
+            result['changed'] += 1
+            lost.each { |code| result['lost'] << "#{pd[:name] || rk} #{code}" }
+          end
+          result
+        end
+
+        # Mapa part_key -> deskriptor dielca z planu (rola, hrubka, nazov).
+        def plan_parts_by_key(params)
+          cfg = normalize(params)
+          Construction.build_plan(cfg)[:parts].each_with_object({}) do |pd, map|
+            map[PartKeys.for_descriptor(pd)] = pd
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'plan_parts_by_key') if defined?(Engine)
+          {}
+        end
+
         # V0.2c + D-06 fix: obmedzenie Scale uchopov na osove (X/Y/Z) cez DC "scaletool".
         # Zapisuje sa na instanciu AJ definiciu — SketchUp scale tool cita atribut
         # z DEFINICIE (dogfood pozorovanie: prvy Scale bez masky, druhy s nou).

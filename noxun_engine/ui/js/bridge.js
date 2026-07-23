@@ -132,6 +132,9 @@
       // (mode ostava cab, setUiMode guard nezabera; identitu navyse strazi server)
       if (typeof tplModalOpen === 'function' && tplModalOpen() &&
           tplModalCabId && c.cabinet_id !== tplModalCabId) closeSaveTemplateModal();
+      // D-41 C2: novy vyber pocas otvoreneho ABS modalu = tiche zatvorenie bez
+      // akcie (rozhodnutie by zasiahlo inu kartu; identitu navyse strazi server).
+      if (typeof absModalCloseSilent === 'function') absModalCloseSilent();
       activeZoneId = c.active_zone || null;
       setSelected(c.cabinet_id || null);
       refreshMaterialFilters(); // FIX 2: prefiltruj podla hrubok tohto korpusu (pred nastavenim hodnot)
