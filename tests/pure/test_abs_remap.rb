@@ -146,6 +146,54 @@ NxTest.test('abs-remap: chybajuci variant -> nil + lost s menom dielca; neznamy 
   end
 end
 
+# ---------------------------------------------------------------------------
+# D-41 C2: auto_width_for + ensure_edge_for_sheet (dovytvorenie chybajucej pasky)
+# ---------------------------------------------------------------------------
+
+NxTest.test('abs-c2: auto_width_for — najmensia standardna sirka s presahom, inak nil') do
+  NxTest.assert_equal(22.0, RMAT.auto_width_for(18.0))
+  NxTest.assert_equal(22.0, RMAT.auto_width_for(20.0), '20+2=22 presne sedi')
+  NxTest.assert_equal(43.0, RMAT.auto_width_for(25.0), '25+2=27 > 22 -> 43')
+  NxTest.assert_equal(43.0, RMAT.auto_width_for(36.0))
+  NxTest.assert_equal(nil, RMAT.auto_width_for(42.0), '42+2=44 > 43 -> nil (audit BLOCKER 4)')
+  NxTest.assert_equal(22.0, RMAT.auto_width_for(3.0), 'HDF 3 -> 22')
+end
+
+NxTest.test('abs-c2: ensure_edge_for_sheet vytvori pasku raz, potom hlasi exists') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  ok, res = RMAT.add_decor_batch('decor' => 'EnsureTest', 'thicknesses' => '18')
+  NxTest.assert(ok)
+  begin
+    sheet_id = res['sheets'][0]
+    status, abs_id = RMAT.ensure_edge_for_sheet(sheet_id)
+    NxTest.assert_equal(:created, status)
+    NxTest.assert_equal('ABS_ENSURETEST_22X10', abs_id)
+    rec = RMAT.edge(abs_id)
+    NxTest.assert_equal(22.0, rec['width'])
+    NxTest.assert_equal('EnsureTest', rec['decor'])
+    status2, abs_id2 = RMAT.ensure_edge_for_sheet(sheet_id)
+    NxTest.assert_equal(:exists, status2, 'druhe volanie nic nevytvara')
+    NxTest.assert_equal(abs_id, abs_id2)
+    RMAT.delete_edge(abs_id)
+  ensure
+    rm_cleanup(res)
+  end
+end
+
+NxTest.test('abs-c2: ensure_edge_for_sheet guardy — neznamy sheet, nestandardna hrubka') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  NxTest.assert_equal([:no_sheet, nil], RMAT.ensure_edge_for_sheet('NEEXISTUJE'))
+  ok, res = RMAT.add_decor_batch('decor' => 'EnsureWide', 'thicknesses' => '60')
+  NxTest.assert(ok)
+  begin
+    status, = RMAT.ensure_edge_for_sheet(res['sheets'][0])
+    NxTest.assert_equal(:no_standard_width, status, '60 mm nema standardnu sirku')
+    NxTest.assert_equal(nil, RMAT.abs_for_decor('EnsureWide', 1.0), 'nic sa nevytvorilo')
+  ensure
+    rm_cleanup(res)
+  end
+end
+
 NxTest.test('abs-remap: celo berie cielovu hrubku z noveho sheetu (18->36 target 43-ka)') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   res = rm_seed_decor('RemapFront')

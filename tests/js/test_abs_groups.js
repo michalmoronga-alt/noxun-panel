@@ -7,7 +7,7 @@
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
-const { groupAbsEdges, absOptionsHtml, normDecor } =
+const { groupAbsEdges, absOptionsHtml, normDecor, absUsableExists } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'core.js'));
 
 let n = 0;
@@ -103,5 +103,19 @@ ok(htmlKeep.indexOf('LEGACY_X') > htmlKeep.indexOf('<optgroup label="Ostatné'),
 // --- absOptionsHtml: escapovanie HTML v zachovavacej hodnote (XSS guard cez esc) ---
 const htmlEsc = absOptionsHtml('', groupAbsEdges(EDGES, 'K009 PW', '<x>&"'));
 ok(htmlEsc.indexOf('&lt;x&gt;&amp;&quot;') >= 0, 'F5 HTML: zachovavacia hodnota je escapovana');
+
+// --- D-41 C2: absUsableExists — zrkadlo Ruby pickera pre modal "chyba paska" ---
+const EDGES_U = [
+  { id: 'A22', decor: 'U702 ST9', thickness: 1.0, width: 22.0 },
+  { id: 'A43_2', decor: 'U702 ST9', thickness: 2.0, width: 43.0 },
+  { id: 'LEG', decor: 'K009 PW', thickness: 1.0 }
+];
+eq(absUsableExists(EDGES_U, 'U702 ST9', 1.0, 18), true, 'C2: 22-ka vyhovuje 18 mm');
+eq(absUsableExists(EDGES_U, 'U702 ST9', 1.0, 21), false, 'C2: 21+2=23 > 22 -> nepouzitelna');
+eq(absUsableExists(EDGES_U, 'U702 ST9', 1.0, 36), false, 'C2: 1,0 mm 43-ka neexistuje (len 2,0)');
+eq(absUsableExists(EDGES_U, 'K009 PW', 1.0, 36), true, 'C2: univerzalna bez sirky vyhovuje vzdy');
+eq(absUsableExists(EDGES_U, 'Neznamy', 1.0, 18), false, 'C2: dekor bez pasok');
+eq(absUsableExists(EDGES_U, '', 1.0, 18), true, 'C2: prazdny dekor sa nevylucuje (modal nevyskoci)');
+eq(absUsableExists(EDGES_U, 'U702 ST9', 1.0, null), true, 'C2: bez hrubky sa sirka nevylucuje');
 
 console.log(JSON.stringify({ passed: n, failed: 0 }));

@@ -325,6 +325,32 @@
     }, 200);
   }
 
+  // --- D-41 C2: modal "chyba ABS paska" (vzor D-15) ---------------------------
+  // Otvara sa PRED odoslanim zmeny materialu/bulk olepu, ked absUsableExists
+  // nenajde pouzitelny 1,0 mm variant. Rozhodnutie vola POVODNY callback s
+  // flagom create_missing_abs — server vsetko overi znova (JS sa neveri).
+  var absModalPending = null; // {send: fn(createBool), revert: fn()|null}
+  function openAbsModal(text, send, revert){
+    var m = el('absModal'); if (!m){ send(false); return; }
+    absModalPending = { send: send, revert: revert };
+    el('absModalText').textContent = text;
+    m.style.display = 'flex';
+  }
+  function absModalChoose(choice){
+    var p = absModalPending;
+    absModalCloseSilent();
+    if (!p) return;
+    if (choice === 'create') p.send(true);
+    else if (choice === 'without') p.send(false);
+    else if (p.revert) p.revert();
+  }
+  // Tiche zatvorenie BEZ akcie — vola sa aj pri zmene vyberu (bridge), aby
+  // oneskorene rozhodnutie nezasiahlo inu kartu.
+  function absModalCloseSilent(){
+    absModalPending = null;
+    var m = el('absModal'); if (m) m.style.display = 'none';
+  }
+
   // --- D-14: ulozit oznaceny korpus ako sablonu (in-panel modal, vzor D-15) ---
   // Input NIE JE vyrazove pole (ziadny onField/attachExprField — Codex F6);
   // Enter uklada, Esc zatvara, Tab ostava v modale (focus trap).

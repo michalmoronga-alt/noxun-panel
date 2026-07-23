@@ -323,6 +323,37 @@ module Noxun
         Digest::SHA1.hexdigest(JSON.generate(catalog))[0, 12]
       end
 
+      # --- D-41 PR C2: dovytvorenie chybajucej pasky (modal "Vytvorit a pokracovat") --
+
+      # Standardna sirka pasky pre hrubku dielca: najmensia z AUTO_WIDTHS s presahom
+      # >= WIDTH_MARGIN; mimo standardov nil (audit BLOCKER 4 — ziadne porusenie
+      # presahu, auto-tvorba sa radsej odmietne).
+      def auto_width_for(thickness)
+        th = thickness.to_f
+        AUTO_WIDTHS.find { |w| w >= th + WIDTH_MARGIN - 0.001 }
+      end
+
+      # Zabezpeci 1,0 mm pasku dekoru daneho sheetu pouzitelnu pre jeho hrubku.
+      # SERVEROVA autorita modalu (JS checku sa neveri — audit BLOCKER 3): stav sa
+      # overi znova a zapis bezi az po vsetkych kontrolach (audit FIX 8). Katalogovy
+      # zapis je MIMO model undo — volajuci to hlasi pouzivatelovi (NOTE 9).
+      # Vrati [:exists|:created, abs_id] alebo [:no_sheet|:no_standard_width|:write_failed, nil].
+      def ensure_edge_for_sheet(material_id)
+        s = sheet(material_id)
+        return [:no_sheet, nil] unless s
+        th = s['thickness'].to_f
+        existing = abs_for_decor(s['decor'], 1.0, th.positive? ? th : nil)
+        return [:exists, existing] if existing
+        width = auto_width_for(th)
+        return [:no_standard_width, nil] unless width
+        rec = {
+          'abs_id' => generate_edge_id(s['decor'], 1.0, width), 'decor' => s['decor'],
+          'thickness' => 1.0, 'width' => width, 'price_per_bm' => 0.0, 'color' => s['color']
+        }
+        return [:write_failed, nil] unless upsert_edge(rec)
+        [:created, rec['abs_id']]
+      end
+
       # --- D-41 PR B: batch "Novy dekor" (audit FIX 14) -------------------------
       # Cely vstup sa NAJPRV parsuje a validuje do pamate; JEDINY chybny token
       # zrusi celu davku BEZ zapisu. Existujuce IDENTICKE varianty sa preskocia

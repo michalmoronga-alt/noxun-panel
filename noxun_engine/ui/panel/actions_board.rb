@@ -58,6 +58,13 @@ module Noxun
           return unless board
           mat = data['material_id'].to_s.strip
           return set_status('Doska potrebuje konkrétny materiál.', true) if mat.empty?
+          # D-41 C2: modal "Vytvorit a pokracovat" — dovytvorenie pasky pred
+          # remapom (hrubka dosky nasleduje novy sheet, kompat kontrola netreba).
+          abs_note = ''
+          if data['create_missing_abs']
+            ok_abs, abs_note = ensure_missing_abs(mat)
+            return set_status(abs_note, true) unless ok_abs
+          end
           cfg = Store.config(board) || {}
           params = { 'material_id' => mat }
           remap, lost = remap_edges_for_material(cfg, mat)
@@ -67,7 +74,7 @@ module Noxun
           msg = 'Materiál dosky nastavený.'
           msg += ' ABS hrany prevedené na nový dekor.' if remap
           msg += " Hrany #{lost.join(', ')} bez ABS (nový dekor nemá variant hrúbky)." unless lost.empty?
-          apply_board(model, board, params, msg)
+          apply_board(model, board, params, "#{msg}#{abs_note}")
         end
 
         # Prevod ABS hran stareho dekoru na novy (rovnaka hrubka). Vrati
@@ -114,10 +121,17 @@ module Noxun
           data = parse(payload)
           model, board = guarded_board(data)
           return unless board
-          abs_id, decor = bulk_abs_for(Store.config(board) || {})
+          cfgb = Store.config(board) || {}
+          abs_note = ''
+          # D-41 C2: dovytvorenie pasky pred bulkom (modal flag; server overi znova).
+          if data['create_missing_abs'] && cfgb['material_id']
+            ok_abs, abs_note = ensure_missing_abs(cfgb['material_id'])
+            return set_status(abs_note, true) unless ok_abs
+          end
+          abs_id, decor = bulk_abs_for(cfgb)
           return set_status(missing_bulk_abs_msg(decor), true) if abs_id.nil?
           apply_board(model, board, { 'edges' => AbsRules.uniform_edges(abs_id) },
-                      "Všetky 4 hrany — ABS #{decor} 1,0 mm.")
+                      "Všetky 4 hrany — ABS #{decor} 1,0 mm.#{abs_note}")
         end
 
         # --- pomocne --------------------------------------------------------

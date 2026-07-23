@@ -22,6 +22,19 @@ module Noxun
           params = existing_params(cab)
           old_overrides = JsonFileStore.deep_copy(params['part_overrides'] || {})
           rk = canonical_part_key(params, rk)
+          # D-41 C2: modal "Vytvorit a pokracovat" — VSETKY kontroly PRED katalogovym
+          # zapisom (audit FIX 8): hrubkova kompatibilita materialu s dielcom by
+          # zhodila rebuild AZ PO vytvoreni pasky; tu sa overi vopred a nic sa nemeni.
+          abs_note = ''
+          if data['create_missing_abs'] && mat
+            pd = CabinetBuilder.plan_parts_by_key(params)[rk]
+            sh = Materials.sheet(mat)
+            if pd && sh && !CabinetBuilder.thickness_ok_for?(pd[:role], pd[:prod][:thickness].to_f, sh['thickness'].to_f)
+              return set_status('Materiál má nekompatibilnú hrúbku pre tento dielec — páska sa nevytvorila, materiál sa nezmenil.', true)
+            end
+            ok_abs, abs_note = ensure_missing_abs(mat)
+            return set_status(abs_note, true) unless ok_abs
+          end
           ov = (params['part_overrides'] ||= {})
           rec = ov[rk] || {}
           if mat then rec['material_id'] = mat else rec.delete('material_id') end
@@ -29,7 +42,31 @@ module Noxun
           eff = effective_materials(model, params) # base sa nemeni — rozdiel robi override
           remap = CabinetBuilder.remap_part_edge_overrides!(params, eff, eff, old_overrides: old_overrides)
           rebuild_focus_part(model, cab, rk, params,
-                             "Materiál dielca #{mat ? 'nastavený' : 'zdedený'}.#{remap_note(remap)}")
+                             "Materiál dielca #{mat ? 'nastavený' : 'zdedený'}.#{remap_note(remap)}#{abs_note}")
+        end
+
+        # D-41 C2: serverova autorita modalu — dovytvori 1,0 mm pasku k dekoru
+        # sheetu (Materials.ensure_edge_for_sheet). Katalogovy zapis je MIMO model
+        # undo — pouzivatel bol upozorneny v modale (NOTE 9); hlaska to zopakuje.
+        # Vrati [true, note] alebo [false, chyba].
+        def ensure_missing_abs(material_id)
+          status, abs_id = Materials.ensure_edge_for_sheet(material_id)
+          case status
+          when :exists
+            [true, '']
+          when :created
+            push_materials
+            MaterialsDialog.push_state if defined?(MaterialsDialog)
+            rec = Materials.edge(abs_id)
+            w = rec && rec['width'] ? rec['width'].to_f.round : '?'
+            [true, " Vytvorená ABS #{rec && rec['decor']} #{w}/1 mm (globálny katalóg, cena 0 — Späť ju neodstráni)."]
+          when :no_sheet
+            [false, 'Materiál sa nenašiel v katalógu — páska sa nevytvorila.']
+          when :no_standard_width
+            [false, 'Hrúbka je mimo štandardných šírok pások (22/43 mm) — pridaj pásku ručne v Materiáloch projektu.']
+          else
+            [false, 'Vytvorenie ABS pásky zlyhalo.']
+          end
         end
 
         # D-41 (audit FIX 6): oneskoreny callback po prekliknuti nesmie zasiahnut
@@ -99,13 +136,21 @@ module Noxun
             Engine.log("bulk hrany zahodene — echo kluca #{rk} nesedi s oznacenym dielcom")
             return
           end
-          abs_id, decor = bulk_abs_for(Store.config(part) || {})
+          cfgp = Store.config(part) || {}
+          abs_note = ''
+          # D-41 C2: modal "Vytvorit a pokracovat" pri bulk olepe — dovytvorenie
+          # pred vyberom pasky (server overi vsetko znova, JS checku sa neveri).
+          if data['create_missing_abs'] && cfgp['material_id']
+            ok_abs, abs_note = ensure_missing_abs(cfgp['material_id'])
+            return set_status(abs_note, true) unless ok_abs
+          end
+          abs_id, decor = bulk_abs_for(cfgp)
           return set_status(missing_bulk_abs_msg(decor), true) if abs_id.nil? # atomicky no-op (audit FIX 5)
           ov = (params['part_overrides'] ||= {})
           rec = ov[rk] || {}
           rec['edges'] = AbsRules.uniform_edges(abs_id)
           store_override(ov, rk, rec)
-          rebuild_focus_part(model, cab, rk, params, "Všetky 4 hrany — ABS #{decor} 1,0 mm.")
+          rebuild_focus_part(model, cab, rk, params, "Všetky 4 hrany — ABS #{decor} 1,0 mm.#{abs_note}")
         end
 
         # ABS 1.0 mm k dekoru materialu dielca/dosky. Vrati [abs_id alebo nil, dekor].
