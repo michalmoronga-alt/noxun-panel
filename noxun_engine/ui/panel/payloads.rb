@@ -109,7 +109,7 @@ module Noxun
             },
             'edges' => Materials.edges.map { |a|
               { 'id' => a['abs_id'], 'label' => abs_label(a), 'decor' => a['decor'],
-                'thickness' => a['thickness'], 'color' => a['color'] }
+                'thickness' => a['thickness'], 'width' => a['width'], 'color' => a['color'] }
             }
           }
         rescue StandardError => e
@@ -123,8 +123,18 @@ module Noxun
           "#{s['decor']} · #{s['type']} #{thl} mm"
         end
 
+        # D-41: paska so sirkou "dekor 22/1 mm" (sirka/hrubka — Michalov zapis),
+        # legacy bez sirky ostava "dekor 1.0 mm".
         def abs_label(a)
-          "#{a['decor']} #{a['thickness']} mm"
+          w = a['width']
+          return "#{a['decor']} #{a['thickness']} mm" if w.nil?
+          "#{a['decor']} #{fmt_num(w)}/#{fmt_num(a['thickness'])} mm"
+        end
+
+        # Cele cislo bez desatin (22.0 -> "22"), inak s nimi (22.5 -> "22.5").
+        def fmt_num(v)
+          f = v.to_f
+          f == f.round ? f.round.to_s : f.to_s
         end
 
         # (project_materials payload sa V0.4.5 D2 presunul do MaterialsDialog.push_state)

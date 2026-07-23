@@ -217,20 +217,24 @@ module Noxun
       # Vyrieši ABS hrany konkretneho sheet dielca:
       #   role  — rola dielca (pravidlo urci KTORE hrany a AKA hrubka ABS)
       #   decor — dekor materialu dielca (urci KTORY dekor ABS pasky)
+      #   part_thickness — hrubka dielca v mm (D-41: vyber SIRKY pasky; nil =
+      #     legacy volanie, picker preferuje univerzalnu pasku bez sirky)
       # Vrati VZDY kompletnu mapu {L1,L2,W1,W2} kde hodnota = abs_id alebo nil.
-      # Ak pravidlo ziada hrubku, pre ktoru dekor nema ABS variant -> nil + info log (standard 7.5).
-      def resolve_edges(role, decor)
+      # Ak pravidlo ziada hrubku, pre ktoru dekor nema pouzitelny variant -> nil + info log (standard 7.5).
+      def resolve_edges(role, decor, part_thickness = nil)
         th = thicknesses_for(role)
         out = { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil }
         EDGE_ORDER.each do |code|
           want = th[code]
           next if want.nil?
-          abs_id = Materials.abs_for_decor(decor, want) if defined?(Materials)
+          abs_id = Materials.abs_for_decor(decor, want, part_thickness) if defined?(Materials)
           if abs_id
             out[code] = abs_id
           elsif defined?(Engine)
-            Engine.log("abs_rules: rola #{role} ziada ABS #{want} mm dekoru '#{decor}', " \
-                       "ale variant neexistuje v katalogu — hrana #{code} bez ABS")
+            Engine.log("abs_rules: rola #{role} ziada ABS #{want} mm dekoru '#{decor}'" \
+                       "#{part_thickness ? " (dielec #{part_thickness} mm)" : ''}, " \
+                       'ale pouzitelny variant neexistuje v katalogu — hrana ' \
+                       "#{code} bez ABS")
           end
         end
         out

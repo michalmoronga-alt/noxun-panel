@@ -122,8 +122,19 @@
       seen[a.id] = true;
       if (nd!=='' && normDecor(a.decor)===nd) recommended.push(a); else others.push(a);
     });
-    // stabilne zoradenie odporucanych hrubkou vzostupne (Array.sort je v CEF stabilny)
-    recommended.sort(function(x,y){ return (parseFloat(x.thickness)||0)-(parseFloat(y.thickness)||0); });
+    // stabilne zoradenie odporucanych hrubkou vzostupne (Array.sort je v CEF stabilny);
+    // D-41 sekundarne SIRKOU vzostupne — sirkove varianty (konkretne) pred legacy
+    // paskou bez sirky (univerzalna ide na koniec skupiny rovnakej hrubky).
+    recommended.sort(function(x,y){
+      var t = (parseFloat(x.thickness)||0)-(parseFloat(y.thickness)||0);
+      if (t) return t;
+      var xw = (x.width===null || x.width===undefined) ? null : parseFloat(x.width);
+      var yw = (y.width===null || y.width===undefined) ? null : parseFloat(y.width);
+      if (xw===null && yw===null) return 0;
+      if (xw===null) return 1;
+      if (yw===null) return -1;
+      return xw-yw;
+    });
     // F5: '' (Bez ABS) a '__inherit__' su fixne volby, nie ABS id — tie nezachovavaj
     var preserve = (currentValue && currentValue!=='__inherit__' && !seen[currentValue]) ? currentValue : null;
     return { recommended: recommended, others: others, preserve: preserve };

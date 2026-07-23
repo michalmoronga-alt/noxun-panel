@@ -3,7 +3,7 @@
      (%APPDATA%). -->
 <!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.7p">
+<link rel="stylesheet" href="css/panel.css?v=0.4.7za">
 
 <h1>Materiály projektu</h1>
 <p class="sub" id="mdline">…</p>
@@ -55,6 +55,9 @@
   <div class="btnrow"><button class="ghostbtn" onclick="mdOpenEdgeForm(null)">+ Pridať ABS</button></div>
   <div id="mdEdgeForm" style="display:none">
     <div class="row"><label>Dekor *</label><input id="me_decor" type="text"><span class="unit"></span></div>
+    <!-- D-41: sirka pasky (22/43) = sucast variant identity; volitelna (prazdna =
+         univerzalna legacy paska), pri edite NEMENNA (server guard). -->
+    <div class="row"><label>Šírka</label><input id="me_width" type="text" placeholder="napr. 22"><span class="unit">mm</span></div>
     <div class="row"><label>Hrúbka *</label>
       <select id="me_thickness"><option value="1.0">1,0</option><option value="2.0">2,0</option></select><span class="unit">mm</span>
     </div>
@@ -69,5 +72,5 @@
 
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.4.7p"></script>
-<script src="js/proj_materials.js?v=0.4.7p"></script>
+<script src="js/errors.js?v=0.4.7za"></script>
+<script src="js/proj_materials.js?v=0.4.7za"></script>

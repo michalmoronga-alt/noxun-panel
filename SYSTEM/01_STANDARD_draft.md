@@ -393,6 +393,18 @@ Záznam variantu:
 
 Kusovník podľa materiálov sa delí podľa **material_id (variant) + hrúbka**.
 
+**Dekor = kľúč skupiny (D-41):** pole `decor` viaže materiály a ABS pásky do dekorovej
+skupiny (napr. `U702 ST9 Kašmírovo šedá: dosky 18/36 + ABS 22/1, 43/1`). Pravidlá:
+
+- Väzba beží cez **presnú (case-sensitive) zhodu** stringu `decor`; server ho pri každom
+  zápise **trimuje** (Ruby zhoda = JS zhoda).
+- **Near-match guard:** nový dekor, ktorý sa od existujúceho líši len veľkosťou písmen
+  alebo medzerami, sa odmietne s návrhom presného tvaru (preklep nesmie rozbiť skupinu).
+- **Dekor je pri edite záznamu nemenný** — premenovanie je atomická akcia nad CELOU
+  skupinou (`rename_decor`: sheets + edges, 1 zápis; ID záznamov sa nemenia).
+- **Duplicitné variant identity sú zakázané** (sheet: dekor+typ+hrúbka; ABS:
+  dekor+šírka+hrúbka) — create aj rename ich odmietnu.
+
 ### 7.2 Materiálové dedenie
 
 ```
@@ -427,6 +439,12 @@ Každý plošný dielec nesie hrany **per strana** ako dáta (nezávislé od viz
 
 - Hodnota strany = `null` (bez hrany) alebo **ABS variant ID** (`ABS_K009_10` = dekor + hrúbka ABS; sufix `_10`/`_20` = 1,0/2,0 mm — formát reálneho katalógu `materials.rb`).
 - Podporované výrobné hrúbky ABS sú výhradne **1,0 mm a 2,0 mm**.
+- **Šírka pásky (D-41):** voliteľné pole `width` (mm, 10–200) — ABS variant = **dekor +
+  šírka + hrúbka** (`22/1`, `43/1`, `43/2`; ID napr. `ABS_U702_ST9_22X10`). Záznam bez
+  šírky = legacy „univerzálna" páska. Výber pásky pre dielec (deterministický picker,
+  tie-break `abs_id`): najmenšia šírka ≥ hrúbka dielca + 2 mm → univerzálna → žiadna
+  (**nikdy užšia páska než dielec**). Šírka je pri edite nemenná (identita variantu).
+  Pre VEPO je šírka nepodstatná (hotové rozmery) — význam má pre kusovník a cenovú ponuku.
 - `L1`/`L2` = dvojica pozdĺžnych strán, `W1`/`W2` = dvojica priečnych.
 - **UI ich prekladá** na predná/zadná/ľavá/pravá. Interný systém je odolný voči otočeniu skrinky — hrany sa držia per strana, súhrnné kódy (`—`/`=`) sa **dopočítajú až pri exporte** (VEPO nevie povedať KTORÁ strana, kusovník a CNC to potrebujú presne).
 

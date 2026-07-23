@@ -13,6 +13,7 @@
 # Projektove defaulty (dedenie, standard 7.2) ziju v NOXUN dict na MODELI (project_defaults).
 require 'json'
 require 'fileutils'
+require 'digest'
 
 module Noxun
   module Engine
@@ -20,6 +21,14 @@ module Noxun
       STD  = 1
       FILE = 'materials.json'
       SUPPORTED_EDGE_THICKNESSES = [1.0, 2.0].freeze
+      # D-41: sirka ABS pasky (mm). Volitelne pole 'width' na edge zazname —
+      # legacy pasky bez sirky su "univerzalne" (pouzitelne pre kazdu hrubku).
+      # Picker vyzaduje presah sirky nad hrubku dielca (olep + orez).
+      EDGE_WIDTH_RANGE = (10.0..200.0)
+      WIDTH_MARGIN = 2.0
+      # Standardne sirky pre automaticke dovytvorenie pasky (PR C create-missing):
+      # najmensia >= hrubka+MARGIN; mimo standardov sa auto-tvorba odmietne.
+      AUTO_WIDTHS = [22.0, 43.0].freeze
 
       # Projektove default kluce v NOXUN dict na modeli (koren dedenia projekt->korpus->dielec).
       PROJECT_KEYS = %w[default_material_id default_front_material_id default_back_material_id].freeze
@@ -148,19 +157,146 @@ module Noxun
 
       # --- ABS podla dekoru (pravidlove defaulty, standard 7.5) ----------------
 
-      # Najde ABS variant daneho dekoru a hrubky (mm). Pouzite pri pravidlovych defaultoch:
-      # hrubka ABS podla roly, dekor podla materialu dielca. Vrati abs_id alebo nil.
-      def abs_for_decor(decor, thickness)
-        return nil if decor.nil?
+      # Najde ABS variant daneho dekoru a hrubky ABS (mm), volitelne pre cielovu
+      # hrubku dielca (vyber sirky pasky). Vrati abs_id alebo nil.
+      # D-41: deterministicky picker (audit BLOCKER 2 — NIKDY uzsia paska):
+      #   s hrubkou dielca: najmensia sirka >= hrubka+WIDTH_MARGIN -> legacy bez
+      #     sirky (univerzalna) -> nil (ziadna vyhovujuca; volajuci ohlasi).
+      #   bez hrubky (defenzivny fallback): legacy bez sirky -> najsirsia
+      #     (siroku mozno orezat, uzka nepokryje).
+      # Tie-break vzdy abs_id vzostupne (audit FIX 11 — stabilne poradie nezavisle
+      # od poradia zaznamov v subore).
+      def abs_for_decor(decor, thickness, part_thickness = nil)
+        rec = pick_edge_variant(edge_candidates(decor, thickness), part_thickness)
+        rec && rec['abs_id']
+      end
+
+      # Kandidati: pasky presne zhodneho dekoru a hrubky ABS, zoradene abs_id.
+      def edge_candidates(decor, thickness)
+        return [] if decor.nil?
         th = thickness.to_f
-        match = edges.find { |a| a['decor'] == decor && (a['thickness'].to_f - th).abs < 0.01 }
-        match && match['abs_id']
+        edges.select { |a| a['decor'] == decor && (a['thickness'].to_f - th).abs < 0.01 }
+             .sort_by { |a| a['abs_id'].to_s }
+      end
+
+      # Cisty vyber varianty z kandidatov (testovatelne bez katalogu).
+      def pick_edge_variant(cands, part_thickness = nil)
+        return nil if cands.empty?
+        widthless = cands.select { |a| edge_width(a).nil? }
+        widthed   = cands.reject { |a| edge_width(a).nil? }
+        if part_thickness
+          need = part_thickness.to_f + WIDTH_MARGIN
+          fit = widthed.select { |a| edge_width(a) >= need - 0.001 }
+                       .min_by { |a| [edge_width(a), a['abs_id'].to_s] }
+          fit || widthless.first
+        else
+          widthless.first || widthed.max_by { |a| [edge_width(a), a['abs_id'].to_s] }
+        end
+      end
+
+      # Sirka pasky ako Float alebo nil (legacy univerzalna).
+      def edge_width(rec)
+        v = rec && rec['width']
+        v.nil? ? nil : v.to_f
       end
 
       # Dekor doskoveho materialu (pre napojenie ABS na rovnaky dekor). nil ak material nie je v katalogu.
       def decor_of(material_id)
         s = sheet(material_id)
         s && s['decor']
+      end
+
+      # --- D-41: dekor = kluc skupiny (audit BLOCKER 1) -------------------------
+      # Vazba material<->ABS bezi cez PRESNY string 'decor' (trim pri zapise robi
+      # normalize_*). Preklepy chytame near-match guardom: novy dekor, ktory sa od
+      # existujuceho lisi len velkostou pismen/medzerami, sa odmietne s presnym tvarom.
+
+      # Normalizovany kluc na porovnanie "skoro rovnakych" dekorov. Medzery sa
+      # odstranuju UPLNE (Codex GH #70: "U702ST9" vs "U702 ST9" je ten isty
+      # preklep ako dvojita medzera — kolaps na jednu by ho prepustil).
+      def decor_norm_key(d)
+        d.to_s.gsub(/\s+/, '').downcase
+      end
+
+      # Existujuci dekor, ktory sa s danym zhoduje na norm kluci, ale NIE presne
+      # (preklep/iny zapis). Vrati existujuci string alebo nil.
+      def decor_conflict(decor)
+        want = decor.to_s.strip
+        key = decor_norm_key(want)
+        return nil if key.empty?
+        all_decors.find { |d| d != want && decor_norm_key(d) == key }
+      end
+
+      def all_decors
+        (sheets.map { |s| s['decor'].to_s } + edges.map { |a| a['decor'].to_s }).uniq
+      end
+
+      # Variant identity lookupy (dup guard pri create; audit FIX 16):
+      # sheet = dekor + typ (case-insensitive) + hrubka; edge = dekor + sirka + hrubka.
+      def find_sheet_variant(decor, type, thickness)
+        d = decor.to_s.strip
+        t = type.to_s.strip.upcase
+        th = thickness.to_f
+        sheets.find do |s|
+          s['decor'].to_s == d && s['type'].to_s.strip.upcase == t &&
+            (s['thickness'].to_f - th).abs < 0.01
+        end
+      end
+
+      def find_edge_variant(decor, width, thickness)
+        d = decor.to_s.strip
+        th = thickness.to_f
+        w = width.nil? || width.to_s.strip.empty? ? nil : width.to_s.tr(',', '.').to_f
+        edges.find do |a|
+          next false unless a['decor'].to_s == d && (a['thickness'].to_f - th).abs < 0.01
+          aw = edge_width(a)
+          w.nil? ? aw.nil? : (aw && (aw - w).abs < 0.01)
+        end
+      end
+
+      # Atomicke premenovanie dekoru CELEJ skupiny (sheets + edges, 1 zapis).
+      # ID zaznamov sa NIKDY nemenia (modely drzia vazbu cez id) — meni sa len text.
+      # Merge do existujucej skupiny je povoleny, len ak nevzniknu duplicitne
+      # varianty. Vrati [true, pocet] alebo [false, chyba].
+      def rename_decor(old_decor, new_decor)
+        from = old_decor.to_s.strip
+        to = new_decor.to_s.strip
+        return [false, 'Dekor je povinný.'] if from.empty? || to.empty?
+        return [false, 'Nový názov je rovnaký.'] if from == to
+        conflict = decor_conflict(to)
+        if conflict && conflict != from
+          return [false, "Názov sa líši od existujúceho „#{conflict}“ len zápisom — použi presný tvar."]
+        end
+        data = load
+        changed = 0
+        %w[sheets edges].each do |k|
+          data[k].each do |r|
+            next unless r['decor'].to_s == from
+            r['decor'] = to
+            changed += 1
+          end
+        end
+        return [false, 'Dekor sa nenašiel.'] if changed.zero?
+        dup = dup_variant_in(data)
+        return [false, "Premenovaním by vznikli duplicitné varianty (#{dup}) — zlúčenie nie je možné."] if dup
+        return [false, 'Zápis katalógu zlyhal.'] unless write(data)
+        [true, changed]
+      end
+
+      # Prva duplicitna variant identity v datach (popis) alebo nil.
+      def dup_variant_in(data)
+        s = data['sheets'].group_by { |r| [r['decor'].to_s, r['type'].to_s.strip.upcase, r['thickness'].to_f.round(2)] }
+                          .find { |_, v| v.size > 1 }
+        return "#{s[0][0]} #{s[0][1]} #{s[0][2]} mm" if s
+        e = data['edges'].group_by { |r| [r['decor'].to_s, edge_width(r)&.round(2), r['thickness'].to_f.round(2)] }
+                         .find { |_, v| v.size > 1 }
+        e && "ABS #{e[0][0]} #{e[0][1] ? "#{e[0][1]}/" : ''}#{e[0][2]} mm"
+      end
+
+      # Kratky odtlacok obsahu katalogu — baseline guard okna (audit FIX 15):
+      # formular ulozeny nad starsim stavom sa odmietne, klient si vypyta refresh.
+      def catalog_revision
+        Digest::SHA1.hexdigest(JSON.generate(catalog))[0, 12]
       end
 
       # --- SketchUp vizualny material z katalogu -------------------------------
@@ -252,6 +388,19 @@ module Noxun
         return [false, 'Hrúbka ABS musí byť 1,0 alebo 2,0 mm.'] unless supported_edge_thickness?(th)
         price = a['price_per_bm'] || a[:price_per_bm] || 0
         return [false, 'Cena nesmie byť záporná.'] if price.to_s.tr(',', '.').to_f.negative?
+        # D-41: sirka volitelna (legacy univerzalna paska); ak je zadana, musi byt
+        # konecne cislo v EDGE_WIDTH_RANGE (audit FIX 13).
+        w_raw = a['width'] || a[:width]
+        unless w_raw.nil? || w_raw.to_s.strip.empty?
+          w = begin
+            Float(w_raw.to_s.tr(',', '.'))
+          rescue StandardError
+            nil
+          end
+          unless w && w.finite? && EDGE_WIDTH_RANGE.cover?(w)
+            return [false, 'Šírka ABS musí byť číslo 10–200 mm (alebo prázdna).']
+          end
+        end
         [true, nil]
       end
 
@@ -275,8 +424,16 @@ module Noxun
         unique_id(base, sheets.map { |s| s['material_id'].to_s.upcase })
       end
 
-      def generate_edge_id(decor, thickness)
-        base = "ABS_#{slug(decor)}_#{(thickness.to_s.tr(',', '.').to_f * 10).round}"
+      # D-41: paska so sirkou dostane ID s tokenom sirky PRED hrubkou
+      # (ABS_U702_ST9_22X10 = sirka 22, hrubka 1,0). Bez sirky stary format
+      # (ABS_U702_ST9_10). Existujuce ID sa NIKDY negeneruju znova.
+      def generate_edge_id(decor, thickness, width = nil)
+        th_token = (thickness.to_s.tr(',', '.').to_f * 10).round.to_s
+        base = if width.nil? || width.to_s.strip.empty?
+                 "ABS_#{slug(decor)}_#{th_token}"
+               else
+                 "ABS_#{slug(decor)}_#{thickness_token(width)}X#{th_token}"
+               end
         unique_id(base, edges.map { |a| a['abs_id'].to_s.upcase })
       end
 
@@ -369,15 +526,17 @@ module Noxun
 
       # --- normalizacia zaznamov ----------------------------------------------
 
+      # D-41 (audit BLOCKER 1): 'decor' je kluc vazby material<->ABS — pri KAZDOM
+      # zapise sa trimuje, aby Ruby presna zhoda sedela s JS zhodou (normDecor trim).
       def normalize_sheet(a)
         id = (a['material_id'] || a[:material_id]).to_s
         return nil if id.strip.empty?
         {
           'material_id' => id,
-          'family'      => (a['family'] || a[:family]).to_s,
-          'manufacturer' => (a['manufacturer'] || a[:manufacturer]).to_s,
-          'decor'       => (a['decor'] || a[:decor]).to_s,
-          'type'        => (a['type'] || a[:type]).to_s,
+          'family'      => (a['family'] || a[:family]).to_s.strip,
+          'manufacturer' => (a['manufacturer'] || a[:manufacturer]).to_s.strip,
+          'decor'       => (a['decor'] || a[:decor]).to_s.strip,
+          'type'        => (a['type'] || a[:type]).to_s.strip,
           'thickness'   => (a['thickness'] || a[:thickness]).to_f,
           'grain'       => (a['grain'] || a[:grain] || 'none').to_s,
           'price_per_m2' => (a['price_per_m2'] || a[:price_per_m2] || 0.0).to_f,
@@ -392,13 +551,25 @@ module Noxun
         return nil if id.strip.empty?
         thickness = (a['thickness'] || a[:thickness]).to_f
         return nil unless supported_edge_thickness?(thickness)
-        {
+        out = {
           'abs_id'       => id,
-          'decor'        => (a['decor'] || a[:decor]).to_s,
+          'decor'        => (a['decor'] || a[:decor]).to_s.strip,
           'thickness'    => thickness,
           'price_per_bm' => (a['price_per_bm'] || a[:price_per_bm] || 0.0).to_f,
           'color'        => normalize_rgb(a['color'] || a[:color], [216, 196, 160])
         }
+        # D-41: 'width' kluc sa uklada LEN ked ma hodnotu — legacy zaznam bez
+        # kluca = univerzalna paska (ziadne nil kluce v JSON).
+        w_raw = a['width'] || a[:width]
+        unless w_raw.nil? || w_raw.to_s.strip.empty?
+          w = begin
+            Float(w_raw.to_s.tr(',', '.'))
+          rescue StandardError
+            nil
+          end
+          out['width'] = w if w && w.finite? && w.positive?
+        end
+        out
       end
 
       # D-19 (Codex F4): to_f by z "abc" spravilo 0.0 a odhad platni by delil

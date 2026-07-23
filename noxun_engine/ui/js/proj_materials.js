@@ -10,6 +10,7 @@
   var MD_SHEETS = [];      // zuzeny payload pre selecty predvolieb (id/label/thickness)
   var MD_CATALOG = { sheets: [], edges: [] }; // plne zaznamy pre spravu
   var MD_PROTECTED = [];
+  var MD_REV = '';         // D-41: baseline katalogu — server odmietne zapis nad starsim stavom
   var mdEditing = null;    // null | {kind:'sheet'|'edge', id:null|'...'}
 
   function el(id){ return document.getElementById(id); }
@@ -97,6 +98,10 @@
     var a = id ? MD_CATALOG.edges.find(function(x){ return x.abs_id === id; }) : null;
     mdEditing = { kind: 'edge', id: id };
     el('me_decor').value = a ? (a.decor || '') : '';
+    // D-41: sirka = variant identity — zadava sa pri vytvoreni, pri edite nemenna
+    // (server ju aj tak berie z existujuceho zaznamu; input len informuje).
+    el('me_width').value = (a && a.width !== null && a.width !== undefined) ? a.width : '';
+    el('me_width').disabled = !!a;
     el('me_thickness').value = a ? String(parseFloat(a.thickness).toFixed(1)) : '1.0';
     el('me_thickness').disabled = !!a; // hrubka = variant (ID _10/_20), pri edite nemenna
     el('me_price').value = a ? (a.price_per_bm || 0) : '0';
@@ -120,6 +125,7 @@
   function mdSaveSheet(){
     var payload = {
       material_id: mdEditing && mdEditing.id ? mdEditing.id : null,
+      catalog_rev: MD_REV,
       decor: el('ms_decor').value,
       type: el('ms_type').value,
       thickness: el('ms_thickness').value,
@@ -145,7 +151,9 @@
   function mdSaveEdge(){
     var payload = {
       abs_id: mdEditing && mdEditing.id ? mdEditing.id : null,
+      catalog_rev: MD_REV,
       decor: el('me_decor').value,
+      width: el('me_width').value,   // D-41: prazdna = univerzalna paska bez sirky
       thickness: el('me_thickness').value,
       price_per_bm: el('me_price').value,
       color: hexToRgb(el('me_color').value)
@@ -155,10 +163,10 @@
     mdCloseForms();
   }
   function mdDeleteSheet(id){
-    if (window.sketchup && sketchup.delete_sheet) sketchup.delete_sheet(JSON.stringify({ material_id: id }));
+    if (window.sketchup && sketchup.delete_sheet) sketchup.delete_sheet(JSON.stringify({ material_id: id, catalog_rev: MD_REV }));
   }
   function mdDeleteEdge(id){
-    if (window.sketchup && sketchup.delete_edge) sketchup.delete_edge(JSON.stringify({ abs_id: id }));
+    if (window.sketchup && sketchup.delete_edge) sketchup.delete_edge(JSON.stringify({ abs_id: id, catalog_rev: MD_REV }));
   }
 
   window.MD = {
@@ -166,6 +174,7 @@
       MD_SHEETS = (data.materials && data.materials.sheets) ? data.materials.sheets : [];
       MD_CATALOG = data.catalog || { sheets: [], edges: [] };
       MD_PROTECTED = data.protected_ids || [];
+      MD_REV = data.catalog_rev || '';
       el('mdline').textContent = 'V' + (data.version || '') + ' · skriniek v modeli: ' + (data.cabinets || 0);
       var p = data.project || {};
       fillSelect(el('md_body'), MD_SHEETS, p.default_material_id);

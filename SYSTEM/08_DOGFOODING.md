@@ -26,6 +26,8 @@
 
 ## Návrhy väčších celkov (na rozpracovanie)
 
+- **D-41 · Inteligentné previazanie materiál ↔ ABS (dekorové skupiny)** (Michal 23.7.) — katalógy materiálov aj ABS budú veľké (každá hrúbka/šírka = samostatný variant); UI aj dáta zorganizovať okolo DEKORU: karta dekoru v správe katalógu (napr. `U702 ST9 Kašmírovo šedá: hrúbky 18/36/PD 38 · ABS 22/1, 43/1, 43/2`), „Nový dekor" vytvorí všetky varianty naraz; nové pole šírka ABS (22/43 — dnes chýba, podstatné pre cenovú ponuku); pri zmene materiálu sa ABS preladí na nový dekor (zladené hrany áno, vedome kontrastné nie — vzor dosky z PR #55 éry rozšíriť na dielec korpusu); dekor bez pásky → ponuka dovytvorenia (modal, vzor D-15). Pre VEPO nepodstatné (hotové rozmery), podstatné pre cenovú ponuku. *Stav: rozhodnuté 23.7. — ide PRED V0.6, dávka 2 PR.*
+
 - **D-20 · Quick actions — bezpečný move plugin** (Michal 19.7., „pre budúceho Michala a Fable, keď bude základ top 😉") — zlúčiť funkčné pluginy noxun_mower + Snaper do jedného toolbar pluginu (rýchly pohyb, kopírovanie, rotácie, prisunutie na doraz). **Známy poznatok:** mower „rýchla kópia skrinky vedľa" vytvorí kópiu LEN ako geometriu — bez NOXUN identity kabinetu (kópia mimo observer/dedup flow). Pri stavbe quick actions kopírovanie prerobiť tak, aby kópia prešla štandardným dedup tickom (plná identita + config). *Stav: budúcnosť (po V1 / pri zostavách).*
 
 - **D-09 · Snap body pri presúvaní priečok** (1/4, 1/2, 3/4…) v zónovom náhľade. *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
