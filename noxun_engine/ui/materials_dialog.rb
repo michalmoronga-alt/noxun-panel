@@ -67,6 +67,9 @@ module Noxun
           cb(dlg, 'add_edge')     { |p| handle_save_edge(p, create: true) }
           cb(dlg, 'update_edge')  { |p| handle_save_edge(p, create: false) }
           cb(dlg, 'delete_edge')  { |p| handle_delete_edge(p) }
+          # D-41 PR B: dekorove karty — batch "Novy dekor" + atomicke premenovanie skupiny.
+          cb(dlg, 'add_decor_batch') { |p| handle_add_decor_batch(p) }
+          cb(dlg, 'rename_decor')    { |p| handle_rename_decor(p) }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(materials): #{msg}")
@@ -347,6 +350,35 @@ module Noxun
           return set_status('Zmazanie zlyhalo.', true) unless Materials.delete_edge(id)
           after_catalog_change
           set_status("ABS #{id} zmazaná.")
+        end
+
+        # D-41 PR B: batch "Novy dekor" — parse+validacia+zapis su CELE na serveri
+        # (Materials.add_decor_batch, 1 atomicky write; audit FIX 14). JS len
+        # posiela surove texty poli.
+        def handle_add_decor_batch(payload)
+          data = JSON.parse(payload.to_s)
+          return unless revision_ok?(data)
+          ok, result = Materials.add_decor_batch(data)
+          return set_status(result, true) unless ok
+          after_catalog_change
+          parts = []
+          parts << "#{result['sheets'].size}× doska" unless result['sheets'].empty?
+          parts << "#{result['edges'].size}× ABS" unless result['edges'].empty?
+          msg = "Dekor #{data['decor'].to_s.strip}: vytvorené #{parts.join(' + ')}."
+          msg += " Preskočené (už existujú): #{result['skipped'].join(', ')}." unless result['skipped'].empty?
+          msg += ' Ceny doplň úpravou jednotlivých položiek.'
+          set_status(msg)
+        end
+
+        # D-41 PR B: premenovanie dekoru CELEJ skupiny (audit FIX 12 — edit
+        # jednotlivca dekor nemeni; ID zaznamov sa nemenia, modely o nic neprídu).
+        def handle_rename_decor(payload)
+          data = JSON.parse(payload.to_s)
+          return unless revision_ok?(data)
+          ok, result = Materials.rename_decor(data['old_decor'], data['new_decor'])
+          return set_status(result, true) unless ok
+          after_catalog_change
+          set_status("Dekor premenovaný na #{data['new_decor'].to_s.strip} (#{result} záznamov).")
         end
 
         # Po kazdej zmene katalogu: refresh tohto okna + zivy katalog v paneli

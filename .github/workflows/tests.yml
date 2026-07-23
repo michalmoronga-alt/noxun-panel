@@ -21,3 +21,5 @@ jobs:
         run: node tests/js/test_insert_state.js
       - name: JS testy (zoskupenie ABS pasok k dekoru D-36)
         run: node tests/js/test_abs_groups.js
+      - name: JS testy (dekorove karty katalogu D-41)
+        run: node tests/js/test_decor_groups.js
