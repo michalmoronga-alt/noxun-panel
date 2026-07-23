@@ -92,6 +92,30 @@ NxTest.test('decor-batch: dedup v ramci davky (18, 18 = jedna doska)') do
   bt_cleanup(res)
 end
 
+NxTest.test('decor-batch: dedup s toleranciou 0.01 mm (Codex GH #71 — 18 vs 18.004)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  ok, res = BMAT.add_decor_batch('decor' => 'Dedup Tol', 'thicknesses' => '18, 18.004',
+                                 'abs_tokens' => '22/1, 22.004/1')
+  NxTest.assert(ok)
+  NxTest.assert_equal(1, res['sheets'].size, 'numericky ekvivalentne hrubky = 1 variant')
+  NxTest.assert_equal(1, res['edges'].size, 'numericky ekvivalentne sirky = 1 paska')
+  bt_cleanup(res)
+end
+
+NxTest.test('decor-batch: kompaktne zoznamy bez medzier su legalne (Codex GH #71)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  ok, res = BMAT.add_decor_batch('decor' => 'Kompakt Test', 'thicknesses' => '18.5,36',
+                                 'abs_tokens' => '22/1,43/1,43/2')
+  NxTest.assert(ok, "kompaktny zapis mal prejst: #{res.inspect}")
+  NxTest.assert_equal(2, res['sheets'].size)
+  NxTest.assert_equal(3, res['edges'].size)
+  ok2, res2 = BMAT.add_decor_batch('decor' => 'Kompakt Test 2', 'thicknesses' => '18,36')
+  NxTest.assert(ok2, 'ciarka bez medzery medzi VIACCIFERNYMI cislami = oddelovac')
+  NxTest.assert_equal(2, res2['sheets'].size)
+  bt_cleanup(res)
+  bt_cleanup(res2)
+end
+
 NxTest.test('decor-batch: near-match dekor a konflikt vyrobcu sa odmietnu') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   ok, err = BMAT.add_decor_batch('decor' => 'k009 pw', 'thicknesses' => '18')

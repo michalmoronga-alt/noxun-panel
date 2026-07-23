@@ -340,7 +340,12 @@ module Noxun
         created_edges = []
         skipped = []
 
-        ths.uniq.each do |th|
+        # Dedup v ramci davky s TOLERANCIOU 0.01 mm (Codex GH #71: 18 a 18.004 su
+        # ten isty variant — exact uniq by pustil duplicitne zaznamy s -2 ID).
+        seen_ths = []
+        ths.each do |th|
+          next if seen_ths.any? { |t| (t - th).abs < 0.01 }
+          seen_ths << th
           if find_sheet_variant(decor, type, th)
             skipped << "#{type} #{fmt_mm(th)}"
             next
@@ -356,7 +361,10 @@ module Noxun
           created_sheets << id
         end
 
-        abs_list.uniq.each do |(w, th)|
+        seen_abs = []
+        abs_list.each do |(w, th)|
+          next if seen_abs.any? { |(pw, pt)| (pw - w).abs < 0.01 && (pt - th).abs < 0.01 }
+          seen_abs << [w, th]
           if find_edge_variant(decor, w, th)
             skipped << "ABS #{fmt_mm(w)}/#{fmt_mm(th)}"
             next
@@ -378,14 +386,16 @@ module Noxun
         [true, { 'sheets' => created_sheets, 'edges' => created_edges, 'skipped' => skipped }]
       end
 
-      # "18, 36" -> [18.0, 36.0]. Desatiny LEN bodkou — ciarka je oddelovac poloziek;
-      # vzor cislo,cislo BEZ medzery (18,5) je nejednoznacny a vrati JASNU chybu
-      # (ziadna ticha interpretacia — vzor D-19).
+      # "18, 36" -> [18.0, 36.0]. Desatiny LEN bodkou — ciarka je oddelovac poloziek.
+      # NEJEDNOZNACNY je iba vzor cislo,JEDNA cifra bez medzery a bez pokracovania
+      # (18,5) — to je takmer iste desatinna ciarka a vrati JASNU chybu (ziadna
+      # ticha interpretacia — vzor D-19). Kompaktne zoznamy 18,36 aj 18.5,36 su
+      # legalne (Codex GH #71: oddelovac bez medzery nesmie zhodit davku).
       def parse_number_list(raw)
         s = raw.to_s.strip
         return [true, []] if s.empty?
-        if s.match?(/\d,\d/)
-          return [false, 'Desatiny píš bodkou (18.5) — čiarka oddeľuje položky.']
+        if (amb = s[/\d+,\d(?![\d.])/])
+          return [false, "Nejednoznačný zápis „#{amb}“ — desatiny píš bodkou (18.5), položky oddeľuj čiarkou."]
         end
         out = []
         s.split(',').each do |tok|
@@ -404,19 +414,18 @@ module Noxun
 
       # "22/1, 43/1, 43/2" -> [[22.0, 1.0], [43.0, 1.0], [43.0, 2.0]].
       # Sirka povinna (nove pasky su sirkove; univerzalne = legacy zaznamy),
-      # hrubka ABS len 1/2 mm, desatiny bodkou.
+      # hrubka ABS len 1/2 mm, desatiny bodkou. Ziadny predbezny ciarkovy guard
+      # (Codex GH #71: 22/1,43/1 je legalny kompakt) — desatinnu ciarku chyti
+      # formatova kontrola tokenu (22,5/1 -> tokeny "22" a "5/1", oba bez zmyslu).
       def parse_abs_tokens(raw)
         s = raw.to_s.strip
         return [true, []] if s.empty?
-        if s.match?(/\d,\d/)
-          return [false, 'Desatiny píš bodkou (22.5/1) — čiarka oddeľuje položky.']
-        end
         out = []
         s.split(',').each do |tok|
           t = tok.strip
           next if t.empty?
           m = t.match(%r{\A(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)\z})
-          return [false, "ABS „#{t}“ zapíš ako šírka/hrúbka (napr. 22/1)."] unless m
+          return [false, "ABS „#{t}“ zapíš ako šírka/hrúbka (napr. 22/1, desatiny bodkou)."] unless m
           w = m[1].to_f
           th = m[2].to_f
           return [false, "Šírka ABS „#{t}“ musí byť 10–200 mm."] unless EDGE_WIDTH_RANGE.cover?(w)
