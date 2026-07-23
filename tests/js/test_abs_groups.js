@@ -58,6 +58,17 @@ const gNoMatch = groupAbsEdges(EDGES, 'Neexistujuci Dekor', '');
 eq(gNoMatch.recommended.length, 0, 'ziadna zhoda => recommended prazdny');
 eq(gNoMatch.others.length, 3, 'ziadna zhoda => vsetko v others');
 
+// --- D-41: sekundarne zoradenie SIRKOU vzostupne, legacy bez sirky na koniec skupiny ---
+const EDGES_W = [
+  { id: 'ABS_U702_LEG',   decor: 'U702 ST9', thickness: 1.0 },                 // legacy bez sirky
+  { id: 'ABS_U702_43X10', decor: 'U702 ST9', thickness: 1.0, width: 43.0 },
+  { id: 'ABS_U702_22X10', decor: 'U702 ST9', thickness: 1.0, width: 22.0 },
+  { id: 'ABS_U702_43X20', decor: 'U702 ST9', thickness: 2.0, width: 43.0 }
+];
+eq(ids(groupAbsEdges(EDGES_W, 'U702 ST9', '').recommended),
+  ['ABS_U702_22X10', 'ABS_U702_43X10', 'ABS_U702_LEG', 'ABS_U702_43X20'],
+  'D-41: hrubka vzostupne, v ramci hrubky sirka vzostupne, legacy bez sirky za sirkovymi');
+
 // --- F5: aktualna hodnota mimo katalogu (legacy/zmazana) => preserve ---
 eq(groupAbsEdges(EDGES, 'K009 PW', 'ABS_LEGACY_ZMAZANA').preserve, 'ABS_LEGACY_ZMAZANA',
   'F5: hodnota mimo katalogu sa zachova');

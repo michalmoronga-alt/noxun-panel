@@ -290,7 +290,11 @@ module Noxun
           sheet = (defined?(Materials) && mat_id) ? Materials.sheet(mat_id) : nil
           validate_material_thickness!(mat_id, sheet, pd)
           decor = sheet && sheet['decor']
-          base_edges = defined?(AbsRules) ? AbsRules.resolve_edges(pd[:role], decor) : empty_edges
+          # D-41 (audit FIX 10): picker sirky pasky dostava CIELOVU hrubku dielca —
+          # katalogova hrubka sheetu ma prednost (cela 18/19 sa geometricky prisposobia
+          # sheetu az v materialized_part, resolve_edges bezi skor).
+          part_th = (sheet && sheet['thickness']) || pd[:prod][:thickness]
+          base_edges = defined?(AbsRules) ? AbsRules.resolve_edges(pd[:role], decor, part_th) : empty_edges
           edges = base_edges.merge(known_edges(ov['edges']))
           grain = sheet && sheet['grain'].to_s
           grain = 'none' unless %w[length width none].include?(grain)

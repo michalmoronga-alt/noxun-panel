@@ -99,9 +99,22 @@ module Noxun
             catalog: full_catalog_payload,                    # D-05: plne zaznamy pre spravu
             protected_ids: Materials::PROTECTED_SHEET_IDS,
             project: Materials.project_defaults(model),       # aktualne predvolby modelu
-            cabinets: Panel.all_cabinets(model).size
+            cabinets: Panel.all_cabinets(model).size,
+            catalog_rev: Materials.catalog_revision           # D-41: baseline guard formularov
           }
           js("MD.init(#{data.to_json})")
+        end
+
+        # D-41 (audit FIX 15): zapis nad starsim stavom katalogu sa odmietne —
+        # klient posiela catalog_rev z posledneho init; nesulad = medzitym pisal
+        # niekto iny (batch, druhe okno). Prazdny rev = stary klient (CEF cache),
+        # guard sa preskoci (spatna kompatibilita, single-writer limit trva).
+        def revision_ok?(data)
+          rev = data['catalog_rev'].to_s
+          return true if rev.empty? || rev == Materials.catalog_revision
+          set_status('Katalóg sa medzitým zmenil — zoznamy sa obnovili, over a ulož znova.', true)
+          push_state
+          false
         end
 
         # Plne zaznamy katalogu (sprava potrebuje vsetky polia — panelovy
@@ -209,11 +222,20 @@ module Noxun
 
         def handle_save_sheet(payload, create:)
           data = JSON.parse(payload.to_s)
+          return unless revision_ok?(data)
           ok, err = Materials.validate_sheet_attrs(data)
           return set_status(err, true) unless ok
           th = data['thickness'].to_s.tr(',', '.').to_f
 
           if create
+            # D-41 (audit BLOCKER 1 + FIX 16): near-match dekor = preklep, dup
+            # variant identity (dekor+typ+hrubka) = duplicitny zaznam. Oboje stop.
+            if (near = Materials.decor_conflict(data['decor']))
+              return set_status("Dekor sa líši od existujúceho „#{near}“ len zápisom — použi presný tvar.", true)
+            end
+            if (dup = Materials.find_sheet_variant(data['decor'], data['type'], th))
+              return set_status("Variant už v katalógu je (#{dup['material_id']}).", true)
+            end
             id = Materials.generate_sheet_id(data['decor'], data['type'], th)
           else
             id = data['material_id'].to_s
@@ -223,6 +245,11 @@ module Noxun
             # zatvorene projekty sa neskontroluju — zmena by im rozbila rebuild).
             if (existing['thickness'].to_f - th).abs > 0.01
               return set_status('Hrúbka definuje variant — pre inú hrúbku pridaj nový materiál.', true)
+            end
+            # D-41 (audit FIX 12): dekor je identita skupiny a riadi vazbu na ABS —
+            # pri edite je NEMENNY; premenovanie celej skupiny je samostatna akcia.
+            if data.key?('decor') && data['decor'].to_s.strip != existing['decor'].to_s
+              return set_status('Dekor je identita skupiny — premenuj celú skupinu (Premenovať dekor), nie jeden záznam.', true)
             end
           end
 
@@ -238,6 +265,7 @@ module Noxun
 
         def handle_delete_sheet(payload)
           data = JSON.parse(payload.to_s)
+          return unless revision_ok?(data)
           id = data['material_id'].to_s
           if Materials::PROTECTED_SHEET_IDS.include?(id)
             return set_status('Tento materiál je systémová predvoľba nových projektov — nedá sa zmazať.', true)
@@ -254,11 +282,20 @@ module Noxun
 
         def handle_save_edge(payload, create:)
           data = JSON.parse(payload.to_s)
+          return unless revision_ok?(data)
           ok, err = Materials.validate_edge_attrs(data)
           return set_status(err, true) unless ok
           th = data['thickness'].to_s.tr(',', '.').to_f
           if create
-            id = Materials.generate_edge_id(data['decor'], th)
+            # D-41: near-match dekor + dup variant (dekor+sirka+hrubka) guardy.
+            if (near = Materials.decor_conflict(data['decor']))
+              return set_status("Dekor sa líši od existujúceho „#{near}“ len zápisom — použi presný tvar.", true)
+            end
+            if (dup = Materials.find_edge_variant(data['decor'], data['width'], th))
+              return set_status("ABS variant už v katalógu je (#{dup['abs_id']}).", true)
+            end
+            id = Materials.generate_edge_id(data['decor'], th, data['width'])
+            rec = data.merge('abs_id' => id, 'thickness' => th)
           else
             id = data['abs_id'].to_s
             existing = Materials.edge(id)
@@ -269,8 +306,21 @@ module Noxun
             if (existing['thickness'].to_f - th).abs > 0.01
               return set_status('Hrúbka definuje ABS variant — pre inú hrúbku pridaj novú pásku.', true)
             end
+            # D-41 (audit FIX 12): dekor nemenny pri edite (identita skupiny).
+            if data.key?('decor') && data['decor'].to_s.strip != existing['decor'].to_s
+              return set_status('Dekor je identita skupiny — premenuj celú skupinu (Premenovať dekor), nie jeden záznam.', true)
+            end
+            # D-41 (audit FIX 12+13): sirka je sucast variant identity — pri edite
+            # NEMENNA a payload ju nesmie ani ticho zmazat (stary CEF klient bez
+            # pola width): MERGE s existujucim zaznamom (vzor sheet D-19) + sirka
+            # sa VZDY berie z existujuceho zaznamu.
+            rec = existing.merge(data).merge('abs_id' => id, 'thickness' => th)
+            if existing.key?('width')
+              rec['width'] = existing['width']
+            else
+              rec.delete('width')
+            end
           end
-          rec = data.merge('abs_id' => id, 'thickness' => th)
           return set_status('Uloženie katalógu zlyhalo.', true) unless Materials.upsert_edge(rec)
           after_catalog_change
           set_status(create ? "ABS páska pridaná (#{id})." : "ABS #{id} upravená.")
@@ -278,6 +328,7 @@ module Noxun
 
         def handle_delete_edge(payload)
           data = JSON.parse(payload.to_s)
+          return unless revision_ok?(data)
           id = data['abs_id'].to_s
           used = Materials.used_abs_ids(Sketchup.active_model)[id]
           if used && !used.empty?

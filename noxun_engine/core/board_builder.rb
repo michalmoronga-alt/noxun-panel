@@ -393,7 +393,8 @@ module Noxun
           input = raw(p, :edges)
           unless input.is_a?(Hash)
             decor = sheet && sheet['decor']
-            return defined?(AbsRules) ? AbsRules.resolve_edges(ROLE, decor) : empty_edges
+            # D-41: hrubka dosky je VZDY z materialu — picker sirky dostava tu istu.
+            return defined?(AbsRules) ? AbsRules.resolve_edges(ROLE, decor, sheet && sheet['thickness']) : empty_edges
           end
           out = {}
           EDGE_KEYS.each do |k|
