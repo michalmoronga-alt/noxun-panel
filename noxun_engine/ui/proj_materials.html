@@ -3,7 +3,7 @@
      (%APPDATA%). -->
 <!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.7zf">
+<link rel="stylesheet" href="css/panel.css?v=0.4.7zg">
 
 <h1>Materiály projektu</h1>
 <p class="sub" id="mdline">…</p>
@@ -59,9 +59,29 @@
       </select><span class="unit"></span>
     </div>
     <div class="row"><label>Farba</label><input id="nd_color" type="color" value="#d8c4a0"><span class="unit"></span></div>
-    <div class="row"><label>Hrúbky dosiek</label><input id="nd_ths" type="text" placeholder="18, 36"><span class="unit">mm</span></div>
-    <div class="row"><label>ABS pásky</label><input id="nd_abs" type="text" placeholder="22/1, 43/1, 43/2"><span class="unit">š/hr</span></div>
-    <div class="hint">Položky oddeľuj čiarkami, desatiny píš bodkou (18.5). ABS ako šírka/hrúbka. Ceny doplníš úpravou jednotlivých položiek.</div>
+    <!-- D-42 PR C (audit BLOCKER 5): preset CIPY = strukturovane varianty (typ per
+         variant — PD 38 vedla DTDL v jednej davke); textove polia = vlastne hodnoty.
+         Posledna pouzita sada sa pamata a predvyplna pri novom dekore. -->
+    <div class="row"><label>Dosky</label>
+      <div class="mdpcrow" id="nd_sheet_chips">
+        <span class="mdpc" data-th="18">18</span>
+        <span class="mdpc" data-th="36">36</span>
+        <span class="mdpc" data-type="PD" data-th="38">PD 38</span>
+        <span class="mdpc" data-th="16">16</span>
+        <span class="mdpc" data-th="25">25</span>
+      </div><span class="unit"></span>
+    </div>
+    <div class="row"><label>ABS</label>
+      <div class="mdpcrow" id="nd_edge_chips">
+        <span class="mdpc" data-w="22" data-t="1">22/1</span>
+        <span class="mdpc" data-w="23" data-t="1">23/1</span>
+        <span class="mdpc" data-w="43" data-t="1">43/1</span>
+        <span class="mdpc" data-w="43" data-t="2">43/2</span>
+      </div><span class="unit"></span>
+    </div>
+    <div class="row"><label>Ďalšie hrúbky</label><input id="nd_ths" type="text" placeholder="voliteľné, napr. 18.5"><span class="unit">mm</span></div>
+    <div class="row"><label>Ďalšie ABS</label><input id="nd_abs" type="text" placeholder="voliteľné, napr. 28/2"><span class="unit">š/hr</span></div>
+    <div class="hint">Klikaj čipy, výnimky dopíš (čiarkami, desatiny bodkou). Ceny a kódy doplníš v detaile dekoru.</div>
     <div class="btnrow">
       <button class="primary" onclick="mdSaveDecorBatch()">Vytvoriť</button>
       <button class="ghostbtn" onclick="mdCloseForms()">Zrušiť</button>
@@ -123,4 +143,4 @@
 <!-- icons.js prvy (sprite musi existovat pred prvym renderom mdRenderLists) -->
 <script src="js/errors.js?v=0.4.7zf"></script>
 <script src="js/icons.js?v=0.4.7zf"></script>
-<script src="js/proj_materials.js?v=0.4.7zf"></script>
+<script src="js/proj_materials.js?v=0.4.7zg"></script>

@@ -394,13 +394,34 @@
   .vchip { display: inline-block; padding: 1px 7px; border-radius: 5px; font-size: 11px; background: var(--nx-surface-sunken);
            color: var(--nx-ink-label); border: 1px solid var(--nx-border-soft); }
   .vchip-abs { background: var(--nx-abs-tape-bg); }
-  /* Detail dekoru: riadky variantov rozmer · kod · cena · dodavatel + akcie */
+  /* Detail dekoru: riadky variantov rozmer · kod · cena · dodavatel + akcie.
+     D-42 PR C (audit FIX 15): detail ma vlastny overflow-x — pri uzsom okne
+     scrolluje TABULKA, nie cela stranka; riadky maju min-width. */
+  .mdet { overflow-x: auto; }
   .mdet .mdsec { margin: 10px 2px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--nx-ink-muted); }
-  .mdvrow { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-top: 1px solid var(--nx-border-soft); min-width: 0; }
+  .mdvhead { display: flex; align-items: center; gap: 8px; padding: 0 6px; min-width: 430px;
+             font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--nx-ink-faint); }
+  .mdvhead .mdvact { flex: 0 0 58px; }
+  .mdvrow { display: flex; align-items: center; gap: 8px; padding: 3px 6px; border-top: 1px solid var(--nx-border-soft); min-width: 430px; }
   .mdvrow:hover { background: var(--nx-select-bg-soft); }
   .mdvdim { flex: 0 0 92px; font-size: 12.5px; font-weight: 600; color: var(--nx-ink-strong); }
   .mdvi { flex: 1 1 0; min-width: 0; font-size: 12px; color: var(--nx-ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .mdvp { flex: 0 0 84px; text-align: right; color: var(--nx-ink); }
+  /* Editovatelne bunky (kod/cena/dodavatel) — nenapadne inputy, ramik az na fokus */
+  .mdvrow .mdcell { flex: 1 1 0; min-width: 0; padding: 3px 5px; font-size: 12px; border: 1px solid transparent;
+                    border-radius: 4px; background: transparent; color: var(--nx-ink); }
+  .mdvrow .mdcell:hover { border-color: var(--nx-border-soft); background: var(--nx-surface); }
+  .mdvrow .mdcell:focus { border-color: var(--nx-border-strong); background: var(--nx-surface); outline: none; }
+  .mdvrow .mdcell.mdvp { flex: 0 0 84px; text-align: right; }
+  .mdvrow .mdcell::placeholder { color: var(--nx-ink-faint); }
+  .mdvact { flex: 0 0 58px; display: inline-flex; gap: 4px; justify-content: flex-end; }
+  .mdvact .tplbtn { padding: 3px 6px; }
+  /* Preset cipy batchu Novy dekor (BLOCKER 5 — strukturovane varianty na klik) */
+  .mdpcrow { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; }
+  .mdpc { display: inline-block; padding: 3px 11px; border: 1px solid var(--nx-border-strong); border-radius: 12px;
+          font-size: 12px; background: var(--nx-surface-sunken); color: var(--nx-ink-strong); cursor: pointer; user-select: none; }
+  .mdpc:hover { background: var(--nx-ghost-hover); }
+  .mdpc.on { background: var(--nx-select-bg); color: var(--nx-select-strong); border-color: var(--nx-select-accent); }
   /* V0.4.5 D3: vypis upozorneni + badge kovania pri celach */
   /* D-29 A1: warnlist ukotveny hned pod sticky hlavickou (toggle robi scroll-to-top,
      aby bol viditelny aj po odscrollovani). */

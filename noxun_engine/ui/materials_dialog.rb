@@ -77,6 +77,10 @@ module Noxun
           cb(dlg, 'rename_decor')    { |p| handle_rename_decor(p) }
           # D-42: vyrobca je vlastnost dekoru — zmena atomicky pre celu skupinu.
           cb(dlg, 'set_decor_manufacturer') { |p| handle_set_decor_manufacturer(p) }
+          # D-42 PR C (audit BLOCKER 1): inline bunky detailu — patch protokol
+          # (whitelist poli, merge s cerstvym zaznamom, baseline per RIADOK).
+          cb(dlg, 'patch_sheet') { |p| handle_patch(p, 'sheet') }
+          cb(dlg, 'patch_edge')  { |p| handle_patch(p, 'edge') }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(materials): #{msg}")
@@ -154,12 +158,51 @@ module Noxun
 
         # Plne zaznamy katalogu (sprava potrebuje vsetky polia — panelovy
         # materials_payload je zamerne zuzeny). label = ten isty odvodeny text.
+        # D-42 PR C: row_rev = odtlacok SUROVEHO zaznamu (bez labelu) — baseline
+        # inline patchu per riadok. Pocita sa PRED merge labelu (server porovnava
+        # proti zaznamu v katalogu, nie proti payloadovej ozdobe).
         def full_catalog_payload
           cat = Materials.load
           {
-            'sheets' => cat['sheets'].map { |s| s.merge('label' => Panel.sheet_label(s)) },
-            'edges'  => cat['edges'].map { |a| a.merge('label' => Panel.abs_label(a)) }
+            'sheets' => cat['sheets'].map { |s|
+              s.merge('label' => Panel.sheet_label(s), 'row_rev' => Materials.record_rev(s))
+            },
+            'edges' => cat['edges'].map { |a|
+              a.merge('label' => Panel.abs_label(a), 'row_rev' => Materials.record_rev(a))
+            }
           }
+        end
+
+        # D-42 PR C (audit BLOCKER 1): inline patch bunky. Konflikt riadku =
+        # cerstve data + hlaska (rozpisana bunka sa NEuklada nad cudziu zmenu);
+        # duplicitny kod = flag do JS, dalsi flush tej istej bunky posle
+        # potvrdenie (zrkadlo formularoveho allow_duplicate_code).
+        def handle_patch(payload, kind)
+          data = JSON.parse(payload.to_s)
+          patch = data['patch'].is_a?(Hash) ? data['patch'] : {}
+          status, extra = Materials.patch_record(
+            kind, data['id'].to_s, patch,
+            row_rev: data['row_rev'], allow_duplicate_code: !!data['allow_duplicate_code']
+          )
+          case status
+          when :ok
+            after_catalog_change
+            set_status('Uložené.')
+          when :conflict
+            set_status('Riadok medzitým zmenil niekto iný — hodnoty sa obnovili, uprav znova.', true)
+            push_catalog
+          when :code_conflict
+            set_status("Kód už používa #{extra.size}× (#{extra.first(3).join(', ')}…). Ulož znova pre potvrdenie duplicity.", true)
+            js("MD.flagDuplicatePatch(#{kind.to_json}, #{data['id'].to_json})")
+          when :not_found
+            set_status('Záznam sa nenašiel — katalóg sa obnovil.', true)
+            push_catalog
+          when :invalid
+            set_status(extra || 'Neplatná hodnota.', true)
+            push_catalog
+          else
+            set_status('Uloženie zlyhalo.', true)
+          end
         end
 
         def set_status(msg, error = false)
