@@ -108,6 +108,130 @@ NxTest.test('mat-fields: code_conflicts — rovnaky kod+dodavatel, iny dodavatel
 end
 
 # ---------------------------------------------------------------------------
+# D-42 PR C: patch protokol inline buniek (audit BLOCKER 1)
+# ---------------------------------------------------------------------------
+
+NxTest.test('mat-patch: ok — whitelist pole sa zapise, identita a ostatne polia nedotknute') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  FMAT.upsert_sheet('material_id' => 'PT_18', 'decor' => 'Patch Test', 'type' => 'DTDL',
+                    'thickness' => 18, 'grain' => 'width', 'code' => 'STARY')
+  begin
+    rev = FMAT.record_rev(FMAT.sheet('PT_18'))
+    status, = FMAT.patch_record('sheet', 'PT_18', { 'code' => 'NOVY', 'thickness' => 99, 'decor' => 'Hack' }, row_rev: rev)
+    NxTest.assert_equal(:ok, status)
+    back = FMAT.sheet('PT_18')
+    NxTest.assert_equal('NOVY', back['code'])
+    NxTest.assert_close(18.0, back['thickness'], 0.01, 'identita sa patchom NIKDY nemeni')
+    NxTest.assert_equal('Patch Test', back['decor'])
+    NxTest.assert_equal('width', back['grain'], 'nepatchovane pole prezilo')
+  ensure
+    FMAT.delete_sheet('PT_18')
+  end
+end
+
+NxTest.test('mat-patch: conflict pri starom row_rev; bez row_rev prejde (stary klient)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  FMAT.upsert_edge('abs_id' => 'PT_E10', 'decor' => 'Patch Test E', 'thickness' => 1.0, 'width' => 22)
+  begin
+    stary_rev = FMAT.record_rev(FMAT.edge('PT_E10'))
+    FMAT.patch_record('edge', 'PT_E10', { 'supplier' => 'Demos' }, row_rev: stary_rev)
+    status, = FMAT.patch_record('edge', 'PT_E10', { 'code' => 'X' }, row_rev: stary_rev)
+    NxTest.assert_equal(:conflict, status, 'riadok sa medzitym zmenil')
+    NxTest.assert_equal(nil, FMAT.edge('PT_E10')['code'], 'konfliktny patch sa NEzapisal')
+    status2, = FMAT.patch_record('edge', 'PT_E10', { 'code' => 'X' })
+    NxTest.assert_equal(:ok, status2, 'bez row_rev guard preskoceny (spatna kompatibilita)')
+  ensure
+    FMAT.delete_edge('PT_E10')
+  end
+end
+
+NxTest.test('mat-patch: invalid cena / prazdny patch / neznamy zaznam / vymazanie hodnoty') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  FMAT.upsert_sheet('material_id' => 'PT2_18', 'decor' => 'Patch Test 2', 'type' => 'DTDL',
+                    'thickness' => 18, 'code' => 'MAZAT', 'price_per_m2' => 5)
+  begin
+    NxTest.assert_equal(:invalid, FMAT.patch_record('sheet', 'PT2_18', { 'price_per_m2' => 'abc' })[0])
+    NxTest.assert_equal(:invalid, FMAT.patch_record('sheet', 'PT2_18', { 'thickness' => 20 })[0], 'len identita = ziadne editovatelne pole')
+    NxTest.assert_equal(:not_found, FMAT.patch_record('sheet', 'NEEXISTUJE', { 'code' => 'X' })[0])
+    NxTest.assert_equal(:ok, FMAT.patch_record('sheet', 'PT2_18', { 'code' => '', 'price_per_m2' => '' })[0])
+    back = FMAT.sheet('PT2_18')
+    NxTest.refute(back.key?('code'), 'prazdna hodnota pole VYMAZE')
+    NxTest.refute(back.key?('price_per_m2'), 'prazdna cena = nezadana (kluc prec)')
+  ensure
+    FMAT.delete_sheet('PT2_18')
+  end
+end
+
+NxTest.test('mat-patch: duplicitny kod vyzaduje potvrdenie (allow_duplicate_code)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  FMAT.upsert_sheet('material_id' => 'PD1_18', 'decor' => 'PatchDup A', 'type' => 'DTDL',
+                    'thickness' => 18, 'code' => 'SPOLOCNY', 'supplier' => 'Demos')
+  FMAT.upsert_sheet('material_id' => 'PD2_18', 'decor' => 'PatchDup B', 'type' => 'DTDL',
+                    'thickness' => 18, 'supplier' => 'Demos')
+  begin
+    status, hits = FMAT.patch_record('sheet', 'PD2_18', { 'code' => 'spolocny' })
+    NxTest.assert_equal(:code_conflict, status)
+    NxTest.assert_equal(['PD1_18'], hits)
+    NxTest.assert_equal(nil, FMAT.sheet('PD2_18')['code'], 'bez potvrdenia sa nezapisal')
+    status2, = FMAT.patch_record('sheet', 'PD2_18', { 'code' => 'spolocny' }, allow_duplicate_code: true)
+    NxTest.assert_equal(:ok, status2)
+    NxTest.assert_equal('spolocny', FMAT.sheet('PD2_18')['code'])
+  ensure
+    FMAT.delete_sheet('PD1_18')
+    FMAT.delete_sheet('PD2_18')
+  end
+end
+
+# ---------------------------------------------------------------------------
+# D-42 PR C: strukturovana davka (audit BLOCKER 5 — typ per variant)
+# ---------------------------------------------------------------------------
+
+NxTest.test('mat-batch-c: sheet_variants s typom per variant (PD 38 vedla DTDL) + edge_variants') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  ok, res = FMAT.add_decor_batch(
+    'decor' => 'ChipBatch', 'type' => 'DTDL',
+    'sheet_variants' => [{ 'thickness' => '18' }, { 'type' => 'PD', 'thickness' => '38' }],
+    'edge_variants' => [{ 'width' => '22', 'thickness' => '1' }, { 'width' => '43', 'thickness' => '2' }]
+  )
+  begin
+    NxTest.assert(ok, "batch mal prejst: #{res.inspect}")
+    NxTest.assert_equal(2, res['sheets'].size)
+    NxTest.assert_equal(2, res['edges'].size)
+    types = res['sheets'].map { |id| FMAT.sheet(id)['type'] }.sort
+    NxTest.assert_equal(%w[DTDL PD], types, 'typ per variant v JEDNEJ davke')
+    NxTest.assert_equal(22.0, FMAT.edge(res['edges'][0])['width'])
+  ensure
+    bt = res.is_a?(Hash) ? res : {}
+    (bt['sheets'] || []).each { |id| FMAT.delete_sheet(id) }
+    (bt['edges'] || []).each { |id| FMAT.delete_edge(id) }
+  end
+end
+
+NxTest.test('mat-batch-c: mix cipov a textu sa zluci, dedup cez identitu, zla hodnota rusi davku') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  ok, res = FMAT.add_decor_batch(
+    'decor' => 'ChipMix', 'type' => 'DTDL', 'thicknesses' => '18, 36',
+    'sheet_variants' => [{ 'thickness' => 18 }],   # duplicita s textom -> 1 zaznam
+    'edge_variants' => [{ 'width' => 22, 'thickness' => 1 }]
+  )
+  begin
+    NxTest.assert(ok)
+    NxTest.assert_equal(2, res['sheets'].size, '18 z cipu aj textu = jeden variant')
+    ok2, err2 = FMAT.add_decor_batch('decor' => 'ChipBad',
+                                     'edge_variants' => [{ 'width' => 5, 'thickness' => 1 }])
+    NxTest.refute(ok2, 'sirka mimo rozsahu rusi CELU davku')
+    NxTest.assert(err2.include?('10–200'), err2.to_s)
+    ok3, = FMAT.add_decor_batch('decor' => 'ChipBad2',
+                                'sheet_variants' => [{ 'thickness' => 0 }])
+    NxTest.refute(ok3, 'nulova hrubka variantu rusi davku')
+  ensure
+    bt = res.is_a?(Hash) ? res : {}
+    (bt['sheets'] || []).each { |id| FMAT.delete_sheet(id) }
+    (bt['edges'] || []).each { |id| FMAT.delete_edge(id) }
+  end
+end
+
+# ---------------------------------------------------------------------------
 # D-42 PR B: dekory pouzite v aktivnom modeli (pas "Pouzite v projekte")
 # ---------------------------------------------------------------------------
 

@@ -401,7 +401,12 @@ module Noxun
       # proti kumulativnemu taken zoznamu (katalog + uz pripravene polozky davky).
       #
       # attrs: decor, manufacturer, type, grain, color([r,g,b]),
-      #        thicknesses (string "18, 36"), abs_tokens (string "22/1, 43/1, 43/2")
+      #        thicknesses (string "18, 36"), abs_tokens (string "22/1, 43/1, 43/2"),
+      #        D-42 PR C (audit BLOCKER 5) navyse STRUKTUROVANE varianty z preset
+      #        cipov: sheet_variants [{type?, thickness}] (typ per variant — "PD 38"
+      #        vedla DTDL 18 v JEDNEJ validate-all davke) a edge_variants
+      #        [{width, thickness}]. Stringove polia ostavaju (vlastne hodnoty);
+      #        vsetko sa zluci a deduplikuje TOLERANCNE podla variant identity.
       # Vrati [true, {sheets:[id...], edges:[id...], skipped:[popis...]}] alebo [false, chyba].
       def add_decor_batch(attrs)
         decor = (attrs['decor'] || attrs[:decor]).to_s.strip
@@ -426,7 +431,27 @@ module Noxun
         return [false, ths] unless ok_th
         ok_abs, abs_list = parse_abs_tokens(attrs['abs_tokens'] || attrs[:abs_tokens])
         return [false, abs_list] unless ok_abs
-        return [false, 'Zadaj aspoň jednu hrúbku dosky alebo ABS pásku.'] if ths.empty? && abs_list.empty?
+
+        # BLOCKER 5: strukturovane varianty — dosky ako [typ, hrubka] pary (typ
+        # per variant, default = spolocny typ formulara), ABS ako [sirka, hrubka].
+        sheet_pairs = ths.map { |th| [type, th] }
+        Array(attrs['sheet_variants'] || attrs[:sheet_variants]).each do |v|
+          next unless v.is_a?(Hash)
+          vt = (v['type'] || v[:type]).to_s.strip
+          vt = type if vt.empty?
+          th = (v['thickness'] || v[:thickness]).to_s.tr(',', '.').to_f
+          return [false, "Hrúbka variantu #{vt} musí byť kladné číslo."] unless th.positive? && th.finite?
+          sheet_pairs << [vt, th]
+        end
+        Array(attrs['edge_variants'] || attrs[:edge_variants]).each do |v|
+          next unless v.is_a?(Hash)
+          w = (v['width'] || v[:width]).to_s.tr(',', '.').to_f
+          th = (v['thickness'] || v[:thickness]).to_s.tr(',', '.').to_f
+          return [false, "Šírka ABS #{fmt_mm(w)} musí byť 10–200 mm."] unless EDGE_WIDTH_RANGE.cover?(w)
+          return [false, "Hrúbka ABS #{fmt_mm(th)} musí byť 1 alebo 2 mm."] unless supported_edge_thickness?(th)
+          abs_list << [w, th]
+        end
+        return [false, 'Zadaj aspoň jednu hrúbku dosky alebo ABS pásku.'] if sheet_pairs.empty? && abs_list.empty?
 
         data = load
         taken = (data['sheets'].map { |s| s['material_id'].to_s.upcase } +
@@ -437,21 +462,22 @@ module Noxun
 
         # Dedup v ramci davky s TOLERANCIOU 0.01 mm (Codex GH #71: 18 a 18.004 su
         # ten isty variant — exact uniq by pustil duplicitne zaznamy s -2 ID).
-        seen_ths = []
-        ths.each do |th|
-          next if seen_ths.any? { |t| (t - th).abs < 0.01 }
-          seen_ths << th
-          if find_sheet_variant(decor, type, th)
-            skipped << "#{type} #{fmt_mm(th)}"
+        # BLOCKER 5: identita dosky = TYP + hrubka (PD 38 a DTDL 38 su dva varianty).
+        seen_sheets = []
+        sheet_pairs.each do |(vt, th)|
+          next if seen_sheets.any? { |(pt, pth)| pt == vt.upcase && (pth - th).abs < 0.01 }
+          seen_sheets << [vt.upcase, th]
+          if find_sheet_variant(decor, vt, th)
+            skipped << "#{vt} #{fmt_mm(th)}"
             next
           end
-          base = "#{slug(decor)}_#{slug(type)}_#{thickness_token(th)}"
+          base = "#{slug(decor)}_#{slug(vt)}_#{thickness_token(th)}"
           id = unique_id(base, taken)
           taken << id.upcase
           # D-42: batch NEuklada cenu (nezadana) — doplni sa v tabulke variantov.
           data['sheets'] << normalize_sheet(
             'material_id' => id, 'family' => "#{manufacturer} #{decor}".strip,
-            'manufacturer' => manufacturer, 'decor' => decor, 'type' => type,
+            'manufacturer' => manufacturer, 'decor' => decor, 'type' => vt,
             'thickness' => th, 'grain' => grain, 'color' => color
           )
           created_sheets << id
@@ -788,6 +814,47 @@ module Noxun
           end
         end
         used
+      end
+
+      # --- D-42 PR C: bezpecny PATCH protokol inline buniek (audit BLOCKER 1) --
+      # Bunka posiela LEN menene pole + row_rev (odtlacok riadku z payloadu).
+      # Server: whitelist mutable poli (identita sa patchom NIKDY nemeni),
+      # merge s CERSTVYM zaznamom pred validaciou, baseline per RIADOK (nie
+      # globalny catalog_rev — ina bunka/iny zaznam nekoliduje zbytocne).
+      PATCHABLE = {
+        'sheet' => %w[code supplier price_per_m2],
+        'edge'  => %w[code supplier price_per_bm]
+      }.freeze
+
+      # Odtlacok JEDNEHO zaznamu (baseline dirty riadku; posiela sa v payloade).
+      def record_rev(rec)
+        Digest::SHA1.hexdigest(JSON.generate(rec))[0, 12]
+      end
+
+      # Aplikuje patch na zaznam. Vrati [:ok, nil] | [:not_found, nil] |
+      # [:conflict, nil] (riadok sa medzitym zmenil) | [:invalid, chyba] |
+      # [:code_conflict, [id...]] (duplicitny kod bez potvrdenia) | [:write_failed, nil].
+      def patch_record(kind, id, patch, row_rev: nil, allow_duplicate_code: false)
+        records = kind == 'edge' ? edges : sheets
+        idk = kind == 'edge' ? 'abs_id' : 'material_id'
+        existing = records.find { |r| r[idk] == id }
+        return [:not_found, nil] unless existing
+        if row_rev && !row_rev.to_s.empty? && row_rev.to_s != record_rev(existing)
+          return [:conflict, nil]
+        end
+        clean = patch.is_a?(Hash) ? patch.select { |k, _| PATCHABLE.fetch(kind, []).include?(k) } : {}
+        return [:invalid, 'Žiadne editovateľné pole.'] if clean.empty?
+        merged = existing.merge(clean)
+        ok, err = kind == 'edge' ? validate_edge_attrs(merged) : validate_sheet_attrs(merged)
+        return [:invalid, err] unless ok
+        if clean.key?('code') && !allow_duplicate_code
+          sup = clean.key?('supplier') ? clean['supplier'] : existing['supplier']
+          hits = code_conflicts(clean['code'], sup, kind, id)
+          return [:code_conflict, hits] unless hits.empty?
+        end
+        saved = kind == 'edge' ? upsert_edge(merged) : upsert_sheet(merged)
+        return [:write_failed, nil] unless saved
+        [:ok, nil]
       end
 
       # D-42 PR B (audit FIX 12): dekory POUZITE v aktivnom modeli — jeden
