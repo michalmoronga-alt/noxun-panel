@@ -370,6 +370,37 @@
   .mdchip { display: inline-flex; align-items: center; border: 1px solid var(--nx-border); border-radius: 4px; overflow: hidden; }
   .mdchip .ghostbtn { border: 0; border-radius: 0; padding: 2px 8px; font-size: 11.5px; }
   .mdchip .tpldel { flex: 0 0 22px; border-left: 1px solid var(--nx-border-soft); }
+  /* D-42 PR B: top bar + mriezka dlazdic + detail dekoru (okno Materialy 640px) */
+  .mdbar { display: flex; gap: 6px; align-items: center; margin: 2px 0 8px; }
+  .mdbar .mdsearch { flex: 1; margin: 0; }
+  .mdbar select { flex: 0 0 auto; padding: 5px 6px; border: 1px solid var(--nx-border-strong); border-radius: 5px; font-size: 12px; }
+  .mdbar .ghostbtn { flex: 0 0 auto; white-space: nowrap; padding: 5px 10px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+  .mdsechead { display: flex; align-items: center; gap: 6px; margin: 10px 2px 5px; font-size: 11px; font-weight: 600;
+               text-transform: uppercase; letter-spacing: .05em; color: var(--nx-ink-muted); }
+  .mdsechead:first-child { margin-top: 2px; }
+  .mdsechead .ic { width: 13px; height: 13px; }
+  .mdgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+  .mdtile { background: var(--nx-surface); border: 1px solid var(--nx-border); border-radius: 8px; padding: 8px 9px; cursor: pointer; min-width: 0; }
+  .mdtile:hover { border-color: var(--nx-border-strong); background: var(--nx-select-bg-soft); }
+  .mdtile-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; min-width: 0; }
+  .mdsw { flex: 0 0 26px; width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--nx-border-strong); }
+  .mdsw-lg { flex: 0 0 34px; width: 34px; height: 34px; border-radius: 7px; }
+  .mdtile-name { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+  .mdtile-name b { font-size: 12.5px; color: var(--nx-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mdtile-name .mans { font-size: 10px; }
+  .mans { color: var(--nx-ink-faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
+  .mdused { flex: 0 0 auto; font-size: 10.5px; color: var(--nx-select); background: var(--nx-select-bg); border-radius: 8px; padding: 1px 7px; }
+  .mdtile-chips { display: flex; flex-wrap: wrap; gap: 3px; min-height: 18px; }
+  .vchip { display: inline-block; padding: 1px 7px; border-radius: 5px; font-size: 11px; background: var(--nx-surface-sunken);
+           color: var(--nx-ink-label); border: 1px solid var(--nx-border-soft); }
+  .vchip-abs { background: var(--nx-abs-tape-bg); }
+  /* Detail dekoru: riadky variantov rozmer · kod · cena · dodavatel + akcie */
+  .mdet .mdsec { margin: 10px 2px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--nx-ink-muted); }
+  .mdvrow { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-top: 1px solid var(--nx-border-soft); min-width: 0; }
+  .mdvrow:hover { background: var(--nx-select-bg-soft); }
+  .mdvdim { flex: 0 0 92px; font-size: 12.5px; font-weight: 600; color: var(--nx-ink-strong); }
+  .mdvi { flex: 1 1 0; min-width: 0; font-size: 12px; color: var(--nx-ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mdvp { flex: 0 0 84px; text-align: right; color: var(--nx-ink); }
   /* V0.4.5 D3: vypis upozorneni + badge kovania pri celach */
   /* D-29 A1: warnlist ukotveny hned pod sticky hlavickou (toggle robi scroll-to-top,
      aby bol viditelny aj po odscrollovani). */

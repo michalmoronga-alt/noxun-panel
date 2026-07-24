@@ -790,6 +790,29 @@ module Noxun
         used
       end
 
+      # D-42 PR B (audit FIX 12): dekory POUZITE v aktivnom modeli — jeden
+      # read-only scan vyrobnych part/board snapshotov (resolved material_id
+      # na entite, standard 8.3). VEDOME bez sablon (globalna kniznica nie je
+      # "pouzitie v projekte") a bez projektovych predvolieb. Nikdy nezapisuje.
+      # Vrati {decor => pocet dielcov} pre pas "Pouzite v projekte".
+      def model_decor_usage(model)
+        usage = Hash.new(0)
+        return {} unless model && defined?(Ids)
+        decor_by_id = {}
+        sheets.each { |s| decor_by_id[s['material_id']] = s['decor'].to_s }
+        %w[part board].each do |kind|
+          Ids.each_of_kind(model, kind) do |inst|
+            cfg = Store.config(inst) || {}
+            d = decor_by_id[cfg['material_id']]
+            usage[d] += 1 if d && !d.empty?
+          end
+        end
+        usage
+      rescue StandardError => e
+        Engine.log_error(e, 'Materials.model_decor_usage') if defined?(Engine)
+        {}
+      end
+
       # --- normalizacia zaznamov ----------------------------------------------
 
       # D-41 (audit BLOCKER 1): 'decor' je kluc vazby material<->ABS — pri KAZDOM

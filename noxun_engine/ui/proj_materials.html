@@ -3,19 +3,22 @@
      (%APPDATA%). -->
 <!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.7zd">
+<link rel="stylesheet" href="css/panel.css?v=0.4.7zf">
 
 <h1>Materiály projektu</h1>
 <p class="sub" id="mdline">…</p>
 
-<div class="hint">Predvolené materiály pre <b>všetky skrinky projektu</b>, ktoré nemajú vlastný materiál (dedenie projekt → skrinka → dielec). Zmena sa hneď premietne do všetkých dediacich skriniek (1 krok Späť).</div>
-
-<fieldset>
-  <legend>Predvolby</legend>
-  <div class="matrow"><label>Korpus</label><select id="md_body" onchange="onProjMaterial('default_material_id', this.value)"></select></div>
-  <div class="matrow"><label>Čelá</label><select id="md_front" onchange="onProjMaterial('default_front_material_id', this.value)"></select></div>
-  <div class="matrow"><label>Chrbát</label><select id="md_back" onchange="onProjMaterial('default_back_material_id', this.value)"></select></div>
-</fieldset>
+<!-- D-42 PR B: predvolby zbalene do <details> — okno je primarne KATALOG,
+     projektove predvolby sa nastavuju obcas (setri vertikalny priestor gridu). -->
+<details>
+  <summary>Predvoľby projektu (korpus · čelá · chrbát)</summary>
+  <div class="body">
+    <div class="hint">Predvolené materiály pre <b>všetky skrinky projektu</b>, ktoré nemajú vlastný materiál (dedenie projekt → skrinka → dielec). Zmena sa hneď premietne do všetkých dediacich skriniek (1 krok Späť).</div>
+    <div class="matrow"><label>Korpus</label><select id="md_body" onchange="onProjMaterial('default_material_id', this.value)"></select></div>
+    <div class="matrow"><label>Čelá</label><select id="md_front" onchange="onProjMaterial('default_front_material_id', this.value)"></select></div>
+    <div class="matrow"><label>Chrbát</label><select id="md_back" onchange="onProjMaterial('default_back_material_id', this.value)"></select></div>
+  </div>
+</details>
 
 <!-- D-05 + D-41 PR B: sprava GLOBALNEHO katalogu ZOSKUPENA PODLA DEKOROV.
      Karta dekoru = hlavicka (swatch, nazov, vyrobca, premenovat, + variant)
@@ -24,14 +27,24 @@
      dekor sa meni len premenovanim CELEJ skupiny. -->
 <fieldset>
   <legend>Katalóg podľa dekorov</legend>
-  <!-- D-42 (audit FIX 9): hladanie podla nazvu dekoru / vyrobcu / kodu / dodavatela.
-       Kod je variantovy — dekor matchne, ak ho ma ktorykolvek jeho variant. -->
-  <div class="mdsearch">
-    <svg class="ic mdsearch-ic" aria-hidden="true"><use href="#i-search"/></svg>
-    <input id="mdSearch" type="text" placeholder="Hľadať dekor, výrobcu alebo kód" oninput="mdRenderLists()">
+  <!-- D-42 PR B: top bar — hladanie (audit FIX 9: nazov/vyrobca/kod/dodavatel;
+       kod je variantovy, dekor matchne cez ktorykolvek variant) + prepinac
+       zoskupenia + Novy dekor v JEDNOM rade (vertikalny priestor). -->
+  <div class="mdbar">
+    <div class="mdsearch">
+      <svg class="ic mdsearch-ic" aria-hidden="true"><use href="#i-search"/></svg>
+      <input id="mdSearch" type="text" placeholder="Hľadať dekor, výrobcu alebo kód" oninput="mdSearchInput()">
+    </div>
+    <select id="mdGroupMode" onchange="mdRenderLists()" title="Zoskupenie dlaždíc">
+      <option value="man">Podľa výrobcu</option>
+      <option value="az">A–Z</option>
+    </select>
+    <button class="ghostbtn" onclick="mdOpenDecorForm(null)"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nový dekor</button>
   </div>
+  <!-- Mriezka dlazdic (sekcie: Pouzite v projekte / vyrobcovia) ALEBO detail
+       dekoru (drill-in) — prepina mdView v JS. Editovacie formulare ostavaju
+       dostupne z detailu (audit BLOCKER 6: grid nesmie vziat spravu variantov). -->
   <div id="mdDecorList"></div>
-  <div class="btnrow"><button class="ghostbtn" onclick="mdOpenDecorForm(null)"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nový dekor</button></div>
   <!-- D-41: batch formular — dekor + vlastnosti RAZ, hrubky a ABS ako zoznamy.
        Server (add_decor_batch) parsuje, validuje VSETKO a zapise naraz. -->
   <div id="mdDecorForm" style="display:none">
@@ -108,6 +121,6 @@
 <div id="status">Pripravené.</div>
 
 <!-- icons.js prvy (sprite musi existovat pred prvym renderom mdRenderLists) -->
-<script src="js/errors.js?v=0.4.7ze"></script>
-<script src="js/icons.js?v=0.4.7ze"></script>
-<script src="js/proj_materials.js?v=0.4.7ze"></script>
+<script src="js/errors.js?v=0.4.7zf"></script>
+<script src="js/icons.js?v=0.4.7zf"></script>
+<script src="js/proj_materials.js?v=0.4.7zf"></script>

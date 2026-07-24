@@ -25,3 +25,5 @@ jobs:
         run: node tests/js/test_decor_groups.js
       - name: JS testy (hladanie katalogu D-42)
         run: node tests/js/test_material_search.js
+      - name: JS testy (sekcie mriezky dekorov D-42 B)
+        run: node tests/js/test_decor_sections.js

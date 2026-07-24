@@ -107,6 +107,39 @@ NxTest.test('mat-fields: code_conflicts — rovnaky kod+dodavatel, iny dodavatel
   FMAT.delete_sheet('CC1'); FMAT.delete_sheet('CC2')
 end
 
+# ---------------------------------------------------------------------------
+# D-42 PR B: dekory pouzite v aktivnom modeli (pas "Pouzite v projekte")
+# ---------------------------------------------------------------------------
+
+NxTest.test('mat-fields: model_decor_usage cita part/board snapshoty, BEZ sablon a predvolieb') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  st = Noxun::Engine::Store
+  FMAT.upsert_sheet('material_id' => 'MDU_18', 'decor' => 'MDU Dekor', 'type' => 'DTDL', 'thickness' => 18)
+  begin
+    p1 = NxTest::FakeInstance.new(11)
+    st.write(p1, { kind: 'part', id: 'CAB-001-A', config: { 'material_id' => 'MDU_18' } })
+    p2 = NxTest::FakeInstance.new(12)
+    st.write(p2, { kind: 'part', id: 'CAB-001-B', config: { 'material_id' => 'MDU_18' } })
+    board = NxTest::FakeInstance.new(13)
+    st.write(board, { kind: 'board', id: 'BRD-001', config: { 'material_id' => 'MDU_18' } })
+    cudzi = NxTest::FakeInstance.new(14)
+    st.write(cudzi, { kind: 'part', id: 'CAB-001-C', config: { 'material_id' => 'MIMO_KATALOGU' } })
+    cab = NxTest::FakeInstance.new(15)
+    st.write(cab, { kind: 'cabinet', cabinet_id: 'CAB-001', config: { 'material_id' => 'MDU_18' } })
+    model = NxTest::FakeModel.new([NxTest::FakeDefinition.new([p1, p2, board, cudzi, cab])])
+    # sablona s tym istym materialom NESMIE zvysit pocet (nie je "pouzitie v projekte")
+    Noxun::Engine::TemplateStore.upsert('mdu-test-tpl', 'material_id' => 'MDU_18')
+    usage = FMAT.model_decor_usage(model)
+    NxTest.assert_equal(3, usage['MDU Dekor'], '2 dielce + 1 doska (korpus/cudzi material sa neratahju)')
+    NxTest.assert_equal(0, usage['MIMO_KATALOGU'], 'material mimo katalogu nema dekor (default 0)')
+    NxTest.refute(usage.keys.include?('MIMO_KATALOGU'), 'a nevytvara kluc v mape')
+    NxTest.assert_equal({}, FMAT.model_decor_usage(nil), 'bez modelu prazdna mapa')
+  ensure
+    Noxun::Engine::TemplateStore.delete('mdu-test-tpl')
+    FMAT.delete_sheet('MDU_18')
+  end
+end
+
 NxTest.test('mat-fields: batch NEuklada cenu (nezadana), farbu ano') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   ok, res = FMAT.add_decor_batch('decor' => 'NoPriceBatch', 'thicknesses' => '18', 'abs_tokens' => '22/1')
