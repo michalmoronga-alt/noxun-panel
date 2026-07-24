@@ -337,6 +337,9 @@
   // (mdLastAttempt) a nastavime mdDupAllow — druhe Ulozit posle potvrdenie.
   var mdDupAllow = null;
   var mdLastAttempt = null;
+  // Codex GH #74: obnov VSETKY polia z ulozeneho payloadu (nie len cast) — druhe
+  // ulozenie po potvrdeni duplicity nesmie ticho ulozit default grain/farby/
+  // rodiny/vyrobcu/formatu namiesto povodnej upravy.
   function mdReopenFromAttempt(){
     var at = mdLastAttempt; if (!at) return;
     var p = at.payload;
@@ -345,10 +348,18 @@
       el('ms_decor').value = p.decor || ''; el('ms_type').value = p.type || '';
       el('ms_thickness').value = p.thickness || ''; el('ms_price').value = p.price_per_m2 || '';
       el('ms_code').value = p.code || ''; el('ms_supplier').value = p.supplier || '';
+      el('ms_grain').value = p.grain || 'none'; el('ms_family').value = p.family || '';
+      el('ms_manufacturer').value = p.manufacturer || '';
+      if (p.color) el('ms_color').value = rgbToHex(p.color);
+      el('ms_sheet_l').value = p.sheet_size ? p.sheet_size[0] : '';
+      el('ms_sheet_w').value = p.sheet_size ? p.sheet_size[1] : '';
     } else {
       mdOpenEdgeForm(p.abs_id || null);
       el('me_decor').value = p.decor || ''; el('me_price').value = p.price_per_bm || '';
       el('me_code').value = p.code || ''; el('me_supplier').value = p.supplier || '';
+      el('me_width').value = (p.width === null || p.width === undefined) ? '' : p.width;
+      el('me_thickness').value = p.thickness || '1.0';
+      if (p.color) el('me_color').value = rgbToHex(p.color);
     }
   }
   function mdDeleteSheet(id){
