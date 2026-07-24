@@ -1,6 +1,6 @@
-# Noxun Component Standard v1.0-draft (15.7.2026)
+# Noxun Component Standard v1.0 (15.7.2026, potvrdený praxou — premenovaný z draftu 24.7.2026)
 
-> Záväzný kontrakt dátového modelu a princípov nového SketchUp plugin systému pre nábytkárstvo na mieru (korpusy, čelá, kovanie, ABS, výstupy). Nadväzuje na `00_VIZIA.md`, uzamknuté rozhodnutia z `01_STANDARD_osnova.md`, analýzu `02_ANALYZA_korpus_dc_vs_ruby.md`, VEPO kontrakt `03_VYSTUP_vepo_kontrakt.md` a technické pasce v `docs/DC_PRAVIDLA.md`. Draft = pripravené na revíziu a prototypové overenie; po potvrdení sa premenuje na `01_STANDARD.md`.
+> Záväzný kontrakt dátového modelu a princípov nového SketchUp plugin systému pre nábytkárstvo na mieru (korpusy, čelá, kovanie, ABS, výstupy). Nadväzuje na `00_VIZIA.md`, uzamknuté rozhodnutia z `archiv/01_STANDARD_osnova.md`, analýzu `archiv/02_ANALYZA_korpus_dc_vs_ruby.md`, VEPO kontrakt `03_VYSTUP_vepo_kontrakt.md` a technické pasce v `docs/DC_PRAVIDLA.md`. Štandard bol overený implementáciou V0.1–V0.5 (vrátane krížovej validácie VEPO výstupov s OCL flow 20.7.2026) a z „draftu" sa stal potvrdeným kontraktom.
 
 ---
 
@@ -600,7 +600,7 @@ Samostatný výrobný dielec **bez korpusu** (krycia doska, blenda, výplň, aty
   "manufactured": true,
   "production_class": "sheet",
   "config": {
-    "engine_version": "0.4.7",
+    "engine_version": "0.5.0",
     "name": "Krycia doska ľavá",
     "role": "free_panel",
     "quantity": 1,

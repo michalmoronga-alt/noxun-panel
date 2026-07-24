@@ -1,6 +1,8 @@
 # Návrh štruktúry nastavení korpusu (Michal, 16.7.2026) + rozbor
 
-> Michalova vízia organizácie nastavení (Blum inšpirácia, screenshoty referenčného panela s akordeónmi). Status: **schválený smer pre Inspector** (viď 05_DILEMA) — implementácia V0.2c.
+> Michalova vízia organizácie nastavení (Blum inšpirácia, screenshoty referenčného panela s akordeónmi). Status: **schválený smer pre Inspector** (viď [archiv/05_DILEMA_ui_architektura.md](archiv/05_DILEMA_ui_architektura.md)) — implementácia V0.2c.
+>
+> **Stav k 24.7.2026:** organizácia panela per dielec (akordeóny STROP/DNO/BOKY/CHRBÁT, medzery/presahov čiel, view-only svetlé rozmery, chrbát vrátane „bez") je IMPLEMENTOVANÁ (V0.2b–V0.4.7 + D-07/D-22/D-31/D-37/D-38). **Otvorené zostáva = zadanie etapy V0.4.8:** rohové spoje per strana (bod 1), per-dielec hrúbky a odsadenia (bod 2), „bez dielca" boky/dno/strop (bod 3), chrbát s poldrážkou (z bodu 4). Viď roadmapa.
 
 ## Michalov návrh (doslovne štruktúra)
 
