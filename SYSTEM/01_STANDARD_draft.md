@@ -387,11 +387,28 @@ Záznam variantu:
   "price_per_m2": 12.50,
   "sheet_size": [2800.0, 2070.0],
   "texture": "K009_PW.jpg",
-  "production_class": "sheet"
+  "production_class": "sheet",
+  "code": "K009 PW 18",
+  "supplier": "Demos"
 }
 ```
 
 Kusovník podľa materiálov sa delí podľa **material_id (variant) + hrúbka**.
+
+**Dodávateľské polia (D-42):** `code` (dodávateľský/katalógový kód) a `supplier`
+(jeden **preferovaný** dodávateľ — vedomé rozhodnutie, žiadne pole ponúk) sú
+**voliteľné** na doske aj ABS. Nie sú súčasťou variant identity ani interného ID
+(modely sa viažu výhradne cez `material_id`/`abs_id`); kľúč sa ukladá len keď má
+hodnotu (trim; prázdna hodnota pole odstráni). Duplicitný pár kód+dodávateľ v tom
+istom druhu záznamu sa nezapíše potichu — vyžaduje explicitné potvrdenie. Kód je
+hľadateľný (dekor nájde zhoda kódu ktoréhokoľvek jeho variantu). `manufacturer`
+(výrobca dekoru) je **vlastnosť skupiny** — mení sa atomicky pre celý dekor, nie
+per variant.
+
+**Cena (D-42):** chýbajúci kľúč `price_per_m2`/`price_per_bm` = **„nezadaná"** —
+odlišný stav od explicitnej `0.0`. Hromadné vytváranie cenu neukladá (doplní sa
+v katalógu); nečíselný vstup sa odmieta (nikdy tichá 0 z `to_f`). Cenová ponuka
+má na nezadané ceny upozorniť, nie ich rátať ako nulu.
 
 **Dekor = kľúč skupiny (D-41):** pole `decor` viaže materiály a ABS pásky do dekorovej
 skupiny (napr. `U702 ST9 Kašmírovo šedá: dosky 18/36 + ABS 22/1, 43/1`). Pravidlá:
@@ -445,6 +462,10 @@ Každý plošný dielec nesie hrany **per strana** ako dáta (nezávislé od viz
   tie-break `abs_id`): najmenšia šírka ≥ hrúbka dielca + 2 mm → univerzálna → žiadna
   (**nikdy užšia páska než dielec**). Šírka je pri edite nemenná (identita variantu).
   Pre VEPO je šírka nepodstatná (hotové rozmery) — význam má pre kusovník a cenovú ponuku.
+- **Dodávateľské polia a cena (D-42):** ABS páska nesie voliteľné `code` + `supplier`
+  a cenu `price_per_bm` s rovnakou sémantikou ako doska (7.1): chýbajúca cena =
+  „nezadaná" ≠ 0; kód+dodávateľ nie sú identita variantu; duplicitný pár vyžaduje
+  potvrdenie. ABS nemá výrobcu (výrobca je vlastnosť dekorovej skupiny cez dosky).
 - `L1`/`L2` = dvojica pozdĺžnych strán, `W1`/`W2` = dvojica priečnych.
 - **UI ich prekladá** na predná/zadná/ľavá/pravá. Interný systém je odolný voči otočeniu skrinky — hrany sa držia per strana, súhrnné kódy (`—`/`=`) sa **dopočítajú až pri exporte** (VEPO nevie povedať KTORÁ strana, kusovník a CNC to potrebujú presne).
 
