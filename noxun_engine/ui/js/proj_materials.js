@@ -90,11 +90,26 @@
     return (a.width === null || a.width === undefined) ? fmtNum(a.thickness) + ' mm' : fmtNum(a.width) + '/' + fmtNum(a.thickness);
   }
 
+  // D-42 (audit FIX 9): dekor matchne hladanie, ak sa dotaz najde v nazve,
+  // vyrobcovi, ALEBO v kode/dodavatelovi KTOREHOKOLVEK jeho variantu (kod je
+  // variantovy). Prazdny dotaz = vsetko.
+  function mdMatchGroup(g, q){
+    if (!q) return true;
+    if (String(g.decor).toLowerCase().indexOf(q) >= 0) return true;
+    if (String(g.manufacturer || '').toLowerCase().indexOf(q) >= 0) return true;
+    var vs = g.sheets.concat(g.edges);
+    for (var i = 0; i < vs.length; i++){
+      if (String(vs[i].code || '').toLowerCase().indexOf(q) >= 0) return true;
+      if (String(vs[i].supplier || '').toLowerCase().indexOf(q) >= 0) return true;
+    }
+    return false;
+  }
   var mdRenaming = null; // dekor s otvorenym inline rename inputom
   function mdRenderLists(){
     var box = el('mdDecorList');
     if (!box) return;
-    var groups = groupCatalogByDecor(MD_CATALOG);
+    var q = (el('mdSearch') && el('mdSearch').value || '').trim().toLowerCase();
+    var groups = groupCatalogByDecor(MD_CATALOG).filter(function(g){ return mdMatchGroup(g, q); });
     var html = '';
     groups.forEach(function(g){
       var name = g.decor === '' ? '(bez dekoru)' : g.decor;
@@ -104,8 +119,14 @@
         '<span class="tpln"><b>' + esc(name) + '</b>' + (g.manufacturer ? ' <span class="tplt">' + esc(g.manufacturer) + '</span>' : '') + '</span>' +
         (g.decor === '' ? '' :
           '<button class="ghostbtn tplbtn" onclick="mdOpenDecorForm(' + esc(JSON.stringify(g.decor)) + ')">+ variant</button>' +
+          '<button class="ghostbtn tplbtn" onclick="mdManufacturerOpen(' + esc(JSON.stringify(g.decor)) + ')">Výrobca</button>' +
           '<button class="ghostbtn tplbtn" onclick="mdRenameOpen(' + esc(JSON.stringify(g.decor)) + ')">Premenovať</button>') +
         '</div>';
+      if (mdManufacturing === g.decor){
+        html += '<div class="tplrow"><input id="md_man_input" type="text" value="' + esc(g.manufacturer || '') + '" placeholder="Výrobca (napr. Egger)" style="flex:1">' +
+          '<button class="primary tplbtn" onclick="mdManufacturerSave(' + esc(JSON.stringify(g.decor)) + ')">Uložiť</button>' +
+          '<button class="ghostbtn tplbtn" onclick="mdManufacturerOpen(null)">Zrušiť</button></div>';
+      }
       if (mdRenaming === g.decor){
         html += '<div class="tplrow"><input id="md_rename_input" type="text" value="' + esc(g.decor) + '" style="flex:1">' +
           '<button class="primary tplbtn" onclick="mdRenameSave(' + esc(JSON.stringify(g.decor)) + ')">Uložiť</button>' +
@@ -118,7 +139,7 @@
           html += '<span class="mdchip">' +
             '<button class="ghostbtn" title="' + esc(s.label) + '" onclick="mdOpenSheetForm(\'' + esc(s.material_id) + '\')">' + esc(sheetChipLabel(s)) + '</button>' +
             (prot ? '<span class="tplt">predvoľba</span>'
-                  : '<button class="ghostbtn tpldel" title="Zmazať ' + esc(s.label) + '" onclick="mdDeleteSheet(\'' + esc(s.material_id) + '\')">✕</button>') +
+                  : '<button class="ghostbtn tpldel" title="Zmazať ' + esc(s.label) + '" onclick="mdDeleteSheet(\'' + esc(s.material_id) + '\')"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>') +
             '</span>';
         });
         html += '</div>';
@@ -128,7 +149,7 @@
         g.edges.forEach(function(a){
           html += '<span class="mdchip">' +
             '<button class="ghostbtn" title="' + esc(a.label) + '" onclick="mdOpenEdgeForm(\'' + esc(a.abs_id) + '\')">' + esc(edgeChipLabel(a)) + '</button>' +
-            '<button class="ghostbtn tpldel" title="Zmazať ' + esc(a.label) + '" onclick="mdDeleteEdge(\'' + esc(a.abs_id) + '\')">✕</button>' +
+            '<button class="ghostbtn tpldel" title="Zmazať ' + esc(a.label) + '" onclick="mdDeleteEdge(\'' + esc(a.abs_id) + '\')"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>' +
             '</span>';
         });
         html += '</div>';
@@ -140,7 +161,7 @@
     if (ri){ ri.focus(); ri.select(); }
   }
   function mdRenameOpen(decor){
-    mdRenaming = decor;
+    mdRenaming = decor; mdManufacturing = null;
     mdRenderLists();
   }
   function mdRenameSave(oldDecor){
@@ -149,6 +170,20 @@
     if (window.sketchup && sketchup.rename_decor)
       sketchup.rename_decor(JSON.stringify({ old_decor: oldDecor, new_decor: input.value, catalog_rev: MD_REV }));
     mdRenaming = null;
+  }
+  // D-42 (audit FIX 7): vyrobca je vlastnost dekoru — inline editor nad celou skupinou.
+  var mdManufacturing = null;
+  function mdManufacturerOpen(decor){
+    mdManufacturing = decor; mdRenaming = null;
+    mdRenderLists();
+    var mi = el('md_man_input'); if (mi){ mi.focus(); mi.select(); }
+  }
+  function mdManufacturerSave(decor){
+    var input = el('md_man_input');
+    if (!input) return;
+    if (window.sketchup && sketchup.set_decor_manufacturer)
+      sketchup.set_decor_manufacturer(JSON.stringify({ decor: decor, manufacturer: input.value, catalog_rev: MD_REV }));
+    mdManufacturing = null;
   }
 
   // --- formulare (create: id=null; edit: id zaznamu) ---
@@ -165,16 +200,25 @@
     el('ms_thickness').disabled = !!s;                       // hrubka = variant, pri edite nemenna
     el('ms_thick_hint').style.display = s ? '' : 'none';
     el('ms_grain').value = s ? (s.grain || 'none') : 'length';
-    el('ms_price').value = s ? (s.price_per_m2 || 0) : '0';
+    // D-42: cena rozlisuje nezadana (prazdne) vs 0 — nil/undefined => prazdny input.
+    el('ms_price').value = mdPriceVal(s && s.price_per_m2);
+    el('ms_code').value = s ? (s.code || '') : '';
+    el('ms_supplier').value = s ? (s.supplier || '') : '';
     el('ms_color').value = rgbToHex(s ? s.color : null);
     el('ms_family').value = s ? (s.family || '') : '';
     el('ms_manufacturer').value = s ? (s.manufacturer || '') : '';
+    // D-42: vyrobca je group-level — pri edite disabled + hint (mrekt cez kartu).
+    el('ms_manufacturer').disabled = !!s;
+    if (el('ms_man_hint')) el('ms_man_hint').style.display = s ? '' : 'none';
     // D-19: format platne — prazdne pri novom materiali = serverovy default 2800x2070
     var ss = s && s.sheet_size;
     el('ms_sheet_l').value = ss ? ss[0] : '';
     el('ms_sheet_w').value = ss ? ss[1] : '';
     el('mdSheetForm').style.display = '';
   }
+  // D-42: prazdny string ak cena nie je zadana (nil/undefined), inak hodnota
+  // (aj 0 = zadana nula). Rozlisuje "nezadana" od "0".
+  function mdPriceVal(v){ return (v === null || v === undefined || v === '') ? '' : String(v); }
   function mdOpenEdgeForm(id){
     mdCloseForms();
     var a = id ? MD_CATALOG.edges.find(function(x){ return x.abs_id === id; }) : null;
@@ -187,7 +231,9 @@
     el('me_width').value = (a && a.width !== null && a.width !== undefined) ? fmtNum(a.width) : '';
     el('me_thickness').value = a ? String(parseFloat(a.thickness).toFixed(1)) : '1.0';
     el('me_thickness').disabled = !!a; // hrubka = variant (ID _10/_20), pri edite nemenna
-    el('me_price').value = a ? (a.price_per_bm || 0) : '0';
+    el('me_price').value = mdPriceVal(a && a.price_per_bm);
+    el('me_code').value = a ? (a.code || '') : '';
+    el('me_supplier').value = a ? (a.supplier || '') : '';
     el('me_color').value = rgbToHex(a ? a.color : null);
     el('mdEdgeForm').style.display = '';
   }
@@ -224,6 +270,7 @@
   }
   function mdCloseForms(){
     mdEditing = null;
+    mdDupAllow = null; // nove otvorenie formulara rusi potvrdenie duplicity
     if (el('mdSheetForm')) el('mdSheetForm').style.display = 'none';
     if (el('mdEdgeForm')) el('mdEdgeForm').style.display = 'none';
     if (el('mdDecorForm')) el('mdDecorForm').style.display = 'none';
@@ -245,10 +292,13 @@
       type: el('ms_type').value,
       thickness: el('ms_thickness').value,
       grain: el('ms_grain').value,
-      price_per_m2: el('ms_price').value,
+      price_per_m2: el('ms_price').value,   // D-42: prazdne = nezadana (nie 0)
+      code: el('ms_code').value,             // D-42 dodavatelsky kod
+      supplier: el('ms_supplier').value,     // D-42 preferovany dodavatel
       color: hexToRgb(el('ms_color').value),
       family: el('ms_family').value,
-      manufacturer: el('ms_manufacturer').value
+      manufacturer: el('ms_manufacturer').value,
+      allow_duplicate_code: mdDupAllow === 'sheet' // potvrdenie duplicitneho kodu (2. ulozenie)
     };
     // D-19: format platne sa posiela LEN ako kompletny platny par; polovicny
     // alebo neplatny vstup zastavi ulozenie (ziadne tiche 0/reset — Codex F4).
@@ -259,6 +309,7 @@
       return;
     }
     if (sl !== null) payload.sheet_size = [sl, sw];
+    mdLastAttempt = { kind: 'sheet', payload: payload };
     var fn = mdEditing && mdEditing.id ? 'update_sheet' : 'add_sheet';
     if (window.sketchup && sketchup[fn]) sketchup[fn](JSON.stringify(payload));
     mdCloseForms();
@@ -270,12 +321,35 @@
       decor: el('me_decor').value,
       width: el('me_width').value,   // D-41: prazdna = univerzalna paska bez sirky
       thickness: el('me_thickness').value,
-      price_per_bm: el('me_price').value,
-      color: hexToRgb(el('me_color').value)
+      price_per_bm: el('me_price').value,  // D-42: prazdne = nezadana (nie 0)
+      code: el('me_code').value,
+      supplier: el('me_supplier').value,
+      color: hexToRgb(el('me_color').value),
+      allow_duplicate_code: mdDupAllow === 'edge'
     };
+    mdLastAttempt = { kind: 'edge', payload: payload };
     var fn = mdEditing && mdEditing.id ? 'update_edge' : 'add_edge';
     if (window.sketchup && sketchup[fn]) sketchup[fn](JSON.stringify(payload));
     mdCloseForms();
+  }
+  // D-42 (audit FIX 8): server pri duplicitnom kode odmietne 1. ulozenie a zavola
+  // MD.flagDuplicateCode(kind); znovu otvorime formular s ROZPISANYMI hodnotami
+  // (mdLastAttempt) a nastavime mdDupAllow — druhe Ulozit posle potvrdenie.
+  var mdDupAllow = null;
+  var mdLastAttempt = null;
+  function mdReopenFromAttempt(){
+    var at = mdLastAttempt; if (!at) return;
+    var p = at.payload;
+    if (at.kind === 'sheet'){
+      mdOpenSheetForm(p.material_id || null);
+      el('ms_decor').value = p.decor || ''; el('ms_type').value = p.type || '';
+      el('ms_thickness').value = p.thickness || ''; el('ms_price').value = p.price_per_m2 || '';
+      el('ms_code').value = p.code || ''; el('ms_supplier').value = p.supplier || '';
+    } else {
+      mdOpenEdgeForm(p.abs_id || null);
+      el('me_decor').value = p.decor || ''; el('me_price').value = p.price_per_bm || '';
+      el('me_code').value = p.code || ''; el('me_supplier').value = p.supplier || '';
+    }
   }
   function mdDeleteSheet(id){
     if (window.sketchup && sketchup.delete_sheet) sketchup.delete_sheet(JSON.stringify({ material_id: id, catalog_rev: MD_REV }));
@@ -285,12 +359,14 @@
   }
 
   // Top-level var v script tagu = window.MD v CEF; v Node require nepada na window.
+  var MD_MODEL_GUID = ''; // D-42: identita modelu pre projektove predvolby (blocker 4)
   var MD = {
     init: function(data){
       MD_SHEETS = (data.materials && data.materials.sheets) ? data.materials.sheets : [];
       MD_CATALOG = data.catalog || { sheets: [], edges: [] };
       MD_PROTECTED = data.protected_ids || [];
       MD_REV = data.catalog_rev || '';
+      MD_MODEL_GUID = data.model_guid || '';
       el('mdline').textContent = 'V' + (data.version || '') + ' · skriniek v modeli: ' + (data.cabinets || 0);
       var p = data.project || {};
       fillSelect(el('md_body'), MD_SHEETS, p.default_material_id);
@@ -298,17 +374,23 @@
       fillSelect(el('md_back'), MD_SHEETS, p.default_back_material_id);
       mdRenderLists(); // rozpisany formular sa NECHAVA (mdEditing drzi stav)
     },
-    setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; }
+    setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; },
+    // D-42 (audit FIX 8): server odmietol duplicitny kod — znovu otvor formular
+    // s rozpisanymi hodnotami a nastav potvrdenie na druhe Ulozit.
+    flagDuplicateCode: function(kind){ mdReopenFromAttempt(); mdDupAllow = kind; }
   };
 
   function onProjMaterial(key, value){
+    // D-42 (audit BLOCKER 4): posli identitu modelu — server odmietne zapis do
+    // ineho modelu, ak sa medzitym prepol dokument.
     if (window.sketchup && sketchup.set_project_material)
-      sketchup.set_project_material(JSON.stringify({ key: key, value: value }));
+      sketchup.set_project_material(JSON.stringify({ key: key, value: value, model_guid: MD_MODEL_GUID }));
   }
 
   // D-41 Node testy (tests/js/test_decor_groups.js) — v CEF je module undefined.
   // Exportuju sa len CISTE funkcie (bez DOM); ready() sa vola len v CEF (window).
   if (typeof module !== 'undefined' && module.exports){
-    module.exports = { groupCatalogByDecor: groupCatalogByDecor, sheetChipLabel: sheetChipLabel, edgeChipLabel: edgeChipLabel };
+    module.exports = { groupCatalogByDecor: groupCatalogByDecor, sheetChipLabel: sheetChipLabel,
+      edgeChipLabel: edgeChipLabel, mdMatchGroup: mdMatchGroup };
   }
   if (typeof window !== 'undefined' && window.sketchup && sketchup.ready) sketchup.ready('');

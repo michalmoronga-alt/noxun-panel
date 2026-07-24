@@ -70,6 +70,8 @@ module Noxun
           # D-41 PR B: dekorove karty — batch "Novy dekor" + atomicke premenovanie skupiny.
           cb(dlg, 'add_decor_batch') { |p| handle_add_decor_batch(p) }
           cb(dlg, 'rename_decor')    { |p| handle_rename_decor(p) }
+          # D-42: vyrobca je vlastnost dekoru — zmena atomicky pre celu skupinu.
+          cb(dlg, 'set_decor_manufacturer') { |p| handle_set_decor_manufacturer(p) }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(materials): #{msg}")
@@ -103,9 +105,19 @@ module Noxun
             protected_ids: Materials::PROTECTED_SHEET_IDS,
             project: Materials.project_defaults(model),       # aktualne predvolby modelu
             cabinets: Panel.all_cabinets(model).size,
-            catalog_rev: Materials.catalog_revision           # D-41: baseline guard formularov
+            catalog_rev: Materials.catalog_revision,          # D-41: baseline guard formularov
+            model_guid: model_guid(model)                     # D-42: identita modelu pre projektove predvolby
           }
           js("MD.init(#{data.to_json})")
+        end
+
+        # D-42 (audit BLOCKER 4): stabilna identita modelu (guid). Projektove
+        # predvolby su per-MODEL; oneskoreny callback po prepnuti dokumentu nesmie
+        # ulozit predvolbu vybranu v modeli A do prave aktivneho modelu B.
+        def model_guid(model)
+          model && model.respond_to?(:guid) ? model.guid.to_s : ''
+        rescue StandardError
+          ''
         end
 
         # D-41 (audit FIX 15): zapis nad starsim stavom katalogu sa odmietne —
@@ -160,6 +172,14 @@ module Noxun
         def handle_set_project_material(payload)
           model = Sketchup.active_model
           data = JSON.parse(payload.to_s)
+          # D-42 (audit BLOCKER 4): predvolba patri modelu, z ktoreho ju pouzivatel
+          # vybral. Ak sa medzitym prepol dokument, echo s cudzim guidom sa zahodi
+          # (UI sa uz obnovilo cez on_model_changed) — nie ticho do zleho modelu.
+          if data.key?('model_guid') && !data['model_guid'].to_s.empty? &&
+             data['model_guid'].to_s != model_guid(model)
+            Engine.log("projektova predvolba zahodena — echo modelu #{data['model_guid']} nesedi s aktivnym")
+            return push_state
+          end
           key = data['key'].to_s
           value = Panel.present_str(data['value'])
           target = TARGETS[key]
@@ -237,6 +257,17 @@ module Noxun
           Panel.push_selected(model) # refresh Inspectora (korpusove selecty, karta dielca)
         end
 
+        # D-42: zmena vyrobcu CELEJ dekorovej skupiny (audit FIX 7 — vyrobca nie je
+        # per-variant). Atomicky, ID zaznamov sa nemenia.
+        def handle_set_decor_manufacturer(payload)
+          data = JSON.parse(payload.to_s)
+          return unless revision_ok?(data)
+          ok, result = Materials.set_decor_manufacturer(data['decor'], data['manufacturer'])
+          return set_status(result, true) unless ok
+          after_catalog_change
+          set_status("Výrobca dekoru #{data['decor'].to_s.strip} nastavený (#{result} dosiek).")
+        end
+
         # --- D-05: sprava katalogu (Codex audit davky 2 zapracovany) ----------
         # Zapis je single-writer kompromis (atomicky rename + .bak; bez locku medzi
         # SketchUp procesmi — vedome akceptovane, katalog edituje jeden pouzivatel).
@@ -272,16 +303,23 @@ module Noxun
             if data.key?('decor') && data['decor'].to_s.strip != existing['decor'].to_s
               return set_status('Dekor je identita skupiny — premenuj celú skupinu (Premenovať dekor), nie jeden záznam.', true)
             end
-            # D-41 (Codex GH #70): typ je tiez sucast variant identity — zmena typu
-            # pri edite nesmie vytvorit duplicitny variant (dekor+typ+hrubka).
-            new_type = data.key?('type') ? data['type'].to_s.strip : existing['type'].to_s
-            if new_type.upcase != existing['type'].to_s.strip.upcase
-              dup = Materials.find_sheet_variant(existing['decor'], new_type, th)
-              if dup && dup['material_id'] != id
-                return set_status("Variant #{existing['decor']} #{new_type} už existuje (#{dup['material_id']}).", true)
-              end
+            # D-42 (audit BLOCKER 3): typ je sucast variant identity — pri edite je
+            # NEMENNY (zrkadlo hrubky/dekoru). Iny typ = novy variant. Duplicitna
+            # kontrola uz NESTACI — zmena typu sa vobec nepripusti.
+            if data.key?('type') && data['type'].to_s.strip.upcase != existing['type'].to_s.strip.upcase
+              return set_status('Typ dosky definuje variant — pre iný typ pridaj nový materiál.', true)
+            end
+            # D-42 (audit FIX 7): vyrobca je vlastnost DEKORU (skupiny) — jednotlivy
+            # variant ho nemeni; zmena celej skupiny je samostatna akcia.
+            if data.key?('manufacturer') && data['manufacturer'].to_s.strip != existing['manufacturer'].to_s.strip
+              return set_status('Výrobca je vlastnosť dekoru — zmeň ho pre celú skupinu, nie jeden záznam.', true)
             end
           end
+
+          # D-42 (audit FIX 8): duplicitny kod v ramci dosiek a rovnakeho dodavatela
+          # sa nezapise potichu — vyzaduje potvrdenie (allow_duplicate_code).
+          conflict = maybe_code_conflict(data, 'sheet', create ? nil : id)
+          return conflict if conflict
 
           # D-19 (Codex F5): pri edite sa payload MERGUJE s existujucim zaznamom —
           # klient, ktory nove pole (napr. sheet_size) neposle, ho nesmie ticho
@@ -291,6 +329,20 @@ module Noxun
           return set_status('Uloženie katalógu zlyhalo.', true) unless Materials.upsert_sheet(rec)
           after_catalog_change
           set_status(create ? "Materiál pridaný (#{id})." : "Materiál #{id} upravený.")
+        end
+
+        # D-42 (audit FIX 8): ak payload nesie kod a existuje kolizia (rovnaky kod
+        # + dodavatel v tom istom druhu) a klient nepotvrdil allow_duplicate_code,
+        # vrati status-hlasku (a NEuklada). Inak nil (pokracuj). JS warning sa da
+        # obist, autorita je server.
+        def maybe_code_conflict(data, kind, self_id)
+          code = data['code'].to_s.strip
+          return nil if code.empty? || data['allow_duplicate_code']
+          hits = Materials.code_conflicts(code, data['supplier'], kind, self_id)
+          return nil if hits.empty?
+          set_status("Kód „#{code}“ už používa #{hits.size}× (#{hits.first(3).join(', ')}…). Ulož znova pre potvrdenie duplicity.", true)
+          js("MD.flagDuplicateCode(#{kind.to_json})")
+          'CONFLICT'
         end
 
         def handle_delete_sheet(payload)
@@ -351,6 +403,9 @@ module Noxun
               rec.delete('width')
             end
           end
+          # D-42 (audit FIX 8): duplicitny kod ABS (rovnaky dodavatel) -> potvrdenie.
+          conflict = maybe_code_conflict(data, 'edge', create ? nil : id)
+          return conflict if conflict
           return set_status('Uloženie katalógu zlyhalo.', true) unless Materials.upsert_edge(rec)
           after_catalog_change
           set_status(create ? "ABS páska pridaná (#{id})." : "ABS #{id} upravená.")
