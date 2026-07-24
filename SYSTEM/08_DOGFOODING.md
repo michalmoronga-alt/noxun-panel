@@ -39,7 +39,7 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ### Seed katalógu — podklad na ručné vloženie (zoznam Michal 25.7., jednorazová sekcia)
 
-**Odporúčaný postup:** vkladať RUČNE cez batch „Nový dekor" (preset-čipy) — zároveň otestuje D-42 UI na reálnych dátach (18,6 mm; formát 2800×2050; PD 38). Demos import (V0.6) potom záznamy len obohatí — DK kódy už budú sedieť. Ku každému dekoru vlož aspoň ABS 22/1,0 (nech funguje picker a olep); ABS kódy doplníme po vyriešení mapovania (09_POJMY otázka 2).
+**Odporúčaný postup:** vkladať RUČNE cez batch „Nový dekor" (preset-čipy) — zároveň otestuje D-42 UI na reálnych dátach (18,6 mm; PD 38). Demos import (V0.6) potom záznamy len obohatí — DK kódy už budú sedieť. Ku každému dekoru vlož aspoň ABS 22/1,0 (nech funguje picker a olep); ABS kódy doplníme po vyriešení mapovania (09_POJMY otázka 2). **POZOR — formát platne (Codex P2):** batch formát nezadáva a všetko založí s defaultom 2800×2070 — po batchi otvor cez ceruzku varianty s iným formátom a ulož skutočný: obe MG dekory → **2800×2050**, PD 38 → **4100×600** (inak bude odhad platní aj semafor „nezmestí sa" počítať zle).
 
 | Výrobca | Dekor (kľúč) | Názov | Doskové varianty | DK kód (code; supplier = Demos) | Poznámka |
 |---|---|---|---|---|---|

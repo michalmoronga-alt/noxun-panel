@@ -11,7 +11,7 @@
 | **Zóna** | adresovateľný vnútorný priestor korpusu; vzniká delením priečkami (strom zón); klik cez 2D náhľad |
 | **Čelo** | predný panel v rade čiel (dvierka/zásuvkové čelo/výplň/„bez čela" = nika); výška fixed alebo auto s 🔒 lockmi, kladie sa odspodu |
 | **Dielec** | fyzický kus materiálu na výrobu; stabilná identita `part_key` (prežije rebuild) |
-| **Rola** | funkcia dielca (bok_L, dno, polica, celo, rail_front, free_panel…) — určuje ABS defaulty a pravidlá kovania |
+| **Rola** | funkcia dielca — určuje ABS defaulty a pravidlá kovania. **Kanonické hodnoty** (BuildPlan::ROLES, štandard §2.4): `side_left`/`side_right` (boky), `bottom` (dno), `top` (strop), `back` (chrbát), `shelf` (polica), `divider_v`/`divider_h` (priečky), `front_door` (dvierka), `drawer_front` (zásuvkové čelo), `flap`, `cover_panel`, `false_front`, `rail_front`/`rail_back` (výstuhy), `plinth` (sokel), `gola_profile`, `free_panel` (voľná doska). Do configov/pravidiel VŽDY kanonický identifikátor, nie slovenský názov |
 | **Dekor** | kľúč dekorovej skupiny materiál↔ABS (napr. „F800 ST9") — viaže dosky a pásky rovnakého vzoru; strážený (immutable pri edite, rename atomicky) |
 | **Variant** | konkrétny záznam v dekorovej skupine: doska = typ+hrúbka (DTDL 18, PD 38…), ABS = šírka+hrúbka (22/1,0) |
 | **Snapshot** | výrobný záznam materiálu/ABS uložený NA entite (autorita — štandard 8.3); katalóg je len zdroj pri výbere |
