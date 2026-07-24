@@ -32,10 +32,29 @@
 
 ## Uzáver V0.5 — hardening a slovné sedenia (od 24.7.)
 
-Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jasných krokoch**: ujasnenie pojmov a špecifických funkcií naprieč sedeniami, podstatné veci sa dopĺňajú do dokumentácie (štandard/roadmapa/CLAUDE.md). K tomu:
+Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jasných krokoch**: ujasnenie pojmov a špecifických funkcií naprieč sedeniami, podstatné veci sa dopĺňajú do dokumentácie (glosár + poznatky: [09_POJMY.md](09_POJMY.md)). Plán sedení: ① vkladanie+korpus · ② zóny+čelá · ③ materiály+ABS+dekory (aj otvorené otázky z 09_POJMY) · ④ kovanie · ⑤ Výroba+VEPO+semafor. K tomu:
 
-- **Katalóg materiálov (Demos):** Michal pripravil základný zoznam materiálov (dodá dokument); 90 % materiálu/kovania/ABS ide z demos-trade.sk. Otvorená debata: „zadaj kód → plugin načíta dáta" (verejné vyhľadávanie kód→položka aj dekor→celá skupina s cenami; Konfigurátor cenníkov za loginom) + **pracovné dosky v dekorovej skupine** (PD 4100×600/920/38, HPDB hrana š.45, DTDL 36 = 2× zlepená 18). Zaradenie: V0.6.
+- **Katalóg materiálov (Demos):** Michalov zoznam (25.7.) spracovaný do seed podkladu nižšie; 90 % materiálu/kovania/ABS ide z demos-trade.sk. Otvorená debata V0.6: „zadaj kód → plugin načíta dáta" (verejné vyhľadávanie kód→položka aj dekor→celá skupina s cenami; Konfigurátor cenníkov za loginom) + **pracovné dosky v dekorovej skupine** (otázky 1–3 v 09_POJMY).
 - **Hardening zoznam:** manuálne overiť redo (Ctrl+Y) po zlúčených transparentných operáciách (pozorovanie zo 17.7.).
+
+### Seed katalógu — podklad na ručné vloženie (zoznam Michal 25.7., jednorazová sekcia)
+
+**Odporúčaný postup:** vkladať RUČNE cez batch „Nový dekor" (preset-čipy) — zároveň otestuje D-42 UI na reálnych dátach (18,6 mm; formát 2800×2050; PD 38). Demos import (V0.6) potom záznamy len obohatí — DK kódy už budú sedieť. Ku každému dekoru vlož aspoň ABS 22/1,0 (nech funguje picker a olep); ABS kódy doplníme po vyriešení mapovania (09_POJMY otázka 2).
+
+| Výrobca | Dekor (kľúč) | Názov | Doskové varianty | DK kód (code; supplier = Demos) | Poznámka |
+|---|---|---|---|---|---|
+| Egger | U750 ST9 | Taupe šedá | DTDL 18 | 175726 | |
+| Egger | H3303 ST10 | Dub Hamilton prírodný | DTDL 18 | 175718 | |
+| Egger | F800 ST9 | Mramor krištáľový | DTDL 18 + PD 38 | DTDL 514269 · PD 514485 | PD 920 (514486) čaká na otázku 3; overené na webe — skupina má aj 8 ABS pások |
+| Egger | H1180 ST37 | Dub Halifax prírodný | DTDL **18,6** | 275848 | test guardu hrúbky |
+| Kronospan | K097 SU BU | Dusk Blue | DTDL 18 | 353854 | |
+| Kronospan | 164 PE BU | Antracit | DTDL 18 | 142438 | |
+| Kronospan | 5981 MG | Cashmere | DTDL 18 | 473933 | formát **2800×2050** |
+| Kronospan | 191 MG | Cool grey | DTDL 18 | 457973 | formát **2800×2050** |
+| Kronospan | K350 RT BU | Flow betónový | DTDL 18 | 402872 | |
+| Kronospan | K2738 PW BU | Torro Cremona Oak | DTDL 18 | 532848 | PD 38 „FP" (532772) — otázka 1 (kľúč skupiny) |
+| Falco | Y121 FS01 | Biela hladká | DTDL 18 | — (bez DK) | dodávateľ? |
+| Kastamonu | A860 PS29 | Dub Korona | DTDL 18 | — (bez DK) | formát overiť |
 
 ## Otvorené otázky (na Michalovo posúdenie pri teste)
 
