@@ -1,6 +1,6 @@
 # Noxun Component Standard — osnova (v0.2, 15.7.2026)
 
-> ⚠️ **SUPERSEDED — historický pracovný dokument.** Záväzná verzia je [01_STANDARD_draft.md](01_STANDARD_draft.md); pri rozpore platí draft. Osnova sa ponecháva ako záznam rozhodovania. Legenda: ✅ = rozhodnuté · 🔶 = smer daný · ❓ = otvorené (stav k 15.7.).
+> ⚠️ **ARCHÍV — historický pracovný dokument (presunuté 24.7.2026).** Záväzná verzia je [../01_STANDARD.md](../01_STANDARD.md); pri rozpore platí štandard. Osnova sa ponecháva ako záznam rozhodovania. Legenda: ✅ = rozhodnuté · 🔶 = smer daný · ❓ = otvorené (stav k 15.7.).
 
 ## 1. Pojmy a hierarchia
 

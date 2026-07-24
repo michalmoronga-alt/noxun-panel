@@ -179,6 +179,9 @@ alebo status v `textContent` ceste do Ruby), použije sa **čistý text**, nie g
 
 ## 6. Cache-busting
 
-CEF cachuje externé CSS/JS. Pri každej zmene po vydaní verzie bump `?v=` na VŠETKÝCH
-odkazoch v `panel.html` jednotne (napr. `0.4.7v` → `0.4.7w`). Prípona cache-bustu
-sa NIKDY nepremieta do zobrazenej verzie v pätičke.
+CEF cachuje externé CSS/JS. Konvencia od v0.5.0: `?v=` suffix = **presne verzia
+pluginu** (VERSION z loadera) na VŠETKÝCH css/js odkazoch vo VŠETKÝCH ui/*.html —
+stráži to guard test v `tests/pure/test_guards.rb`. Zmena css/js po vydaní teda
+znamená: bump patch VERSION (noxun_engine.rb + main.rb) a prepísať všetky `?v=`
+na novú hodnotu (viď pravidlo verzie v CLAUDE.md). Verzia v pätičke ide z Ruby
+a s cache-bustom sa nikdy needituje ručne zvlášť.

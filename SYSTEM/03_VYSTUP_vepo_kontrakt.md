@@ -1,6 +1,8 @@
 # VEPO výstupný kontrakt (v1.0 — extrahované z vepo_exporter, 15.7.2026)
 
-> Presný formát tabuľky pre objednávkový systém VEPO, zreverzovaný z Michalovho pluginu `vepo_exporter` (Plugins\vepo_exporter\core\*). Nový systém bude tento výstup generovať PRIAMO z dielcov — bez medzikroku OCL CSV → vepo_exporter. Tento dokument je od teraz zdroj pravdy formátu.
+> Presný formát tabuľky pre objednávkový systém VEPO, zreverzovaný z Michalovho pluginu `vepo_exporter` (Plugins\vepo_exporter\core\*). Nový systém tento výstup generuje PRIAMO z dielcov — bez medzikroku OCL CSV → vepo_exporter. Tento dokument je zdroj pravdy formátu.
+>
+> ✅ **Implementované a VALIDOVANÉ:** export V0.5-C (PR #51) prešiel 20.7.2026 dvojkolovou krížovou validáciou proti starému OCL→vepo_exporter flow (26 = 26 dielcov, presné zhody; 1. kolo chytilo omyl s odpočtom ABS → fix PR #58). Plný záznam: [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md).
 
 ## Výstupný CSV súbor (to, čo VEPO potrebuje)
 

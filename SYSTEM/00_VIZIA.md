@@ -1,6 +1,8 @@
 # Noxun System — vízia (v0.1, 15.7.2026)
 
 > Plánovací dokument nového komplexného systému. Toto je živý dokument — dopĺňa sa pri každom plánovacom sedení.
+>
+> **Stav k 24.7.2026 (v0.5.0):** vrstvy 1–3 a 5 stavebného poradia STOJA (štandard → referenčný korpus → zóny/čelá/childy → výstupy s VEPO validáciou a semaforom); vrstva 4 (kovania engine) má hotovú fázu 1 (pravidlá/flagy), katalóg a ceny = V0.6. Princíp „Hybrid DC + Ruby" bol prekonaný praxou — korpusy aj childy generuje čistý Ruby (regenerate pattern), DC most ostáva len pre budúce čierne skrinky (Atira). Meradlo úspechu (manželka dostane výstupy bez SketchUpu) čaká na cenovú vrstvu V0.6.
 
 ## Cieľ jednou vetou
 
@@ -31,7 +33,7 @@ Z modelu skrinky v SketchUpe sa **bez ručného prepisovania** dostanem ku kompl
 
 ## Vrstvy nového systému (stavebné poradie)
 
-1. **ŠTANDARD** — Noxun Component Standard: jednotný kontrakt komponentu, dielca, atribútov, osí, hrán, identity, slotov. → `01_STANDARD_osnova.md`
+1. **ŠTANDARD** — Noxun Component Standard: jednotný kontrakt komponentu, dielca, atribútov, osí, hrán, identity, slotov. → `01_STANDARD.md` (osnova v `archiv/`)
 2. **REFERENČNÝ KORPUS** — jedna „nudná", dokonale definovaná skrinka podľa štandardu; validácia proti OpenCutList a VEPO. Až keď funguje, škáluje sa na typy.
 3. **CHILDY + PRIPÁJANIE** — šuflíky, dvierka, police, priečky ako moduly pripájané do vnútorných priestorov (ArchiWood princíp); panel na vkladanie a nastavovanie.
 4. **KOVANIA ENGINE (nový plugin)** — pravidlá ako dáta (JSON): flagy automaticky z konfigurácie skrinky; two-phase: generický flag → konkrétny kód; katalóg a ceny z KOVANIE blokov.

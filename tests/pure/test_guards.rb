@@ -10,6 +10,23 @@ NxTest.test('guard: VERSION v loaderi a main.rb su synchronne') do
                       "VERSION drift: loader '#{NxTest::LOADER_VERSION}' vs main.rb '#{main_version}' — bump treba na oboch miestach")
 end
 
+NxTest.test('guard: kazdy ?v= cache-bust v ui/*.html sedi s VERSION') do
+  # Konvencia od v0.5.0: jednotny suffix = verzia pluginu. Zmena css/js po
+  # vydani = bump patch VERSION (loader + main.rb) — tym sa bumpne aj ?v=.
+  offenders = []
+  Dir[File.join(NxTest::ROOT, 'noxun_engine', 'ui', '*.html')].sort.each do |path|
+    File.readlines(path, encoding: 'UTF-8').each_with_index do |line, i|
+      line.scan(/\?v=([0-9A-Za-z.]+)/).each do |(ver)|
+        next if ver == NxTest::LOADER_VERSION
+
+        offenders << "#{File.basename(path)}:#{i + 1} (?v=#{ver})"
+      end
+    end
+  end
+  NxTest.assert(offenders.empty?,
+                "?v= cache-bust nesedi s VERSION '#{NxTest::LOADER_VERSION}': #{offenders.join(', ')}")
+end
+
 NxTest.test('guard: Numeric#mm sa nepouziva mimo units.rb') do
   offenders = []
   Dir[File.join(NxTest::ROOT, 'noxun_engine', '**', '*.rb')].sort.each do |path|

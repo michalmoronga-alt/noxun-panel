@@ -1,31 +1,65 @@
-# Noxun Engine — roadmapa (živý dokument, aktualizované 19.7.2026)
+# Noxun Engine — roadmapa (živý dokument, aktualizované 24.7.2026)
 
 > Princíp: **najprv všeobecný základ pre všetko, potom vyostrovanie.** Regenerate pattern robí konštrukčné zmeny lacnými — drahé je len meniť DÁTOVÝ MODEL (atribúty, identita, hrany), preto ten je uzamknutý štandardom vopred a detaily geometrie sa doladia iteráciami z klikania.
 
-## Etapy
+## Kde sme (24.7.2026)
 
-- ✅ **V0.1 — Klikateľný základ** (hotové 15.7.): panel, dolný korpus (Ruby regenerácia), police 0–4, dvierka 1/2/auto, ghost zóny, rebuild označeného, 1-krok Undo
-- ✅ **V0.2a — Jadro korpusu** (hotové 16.7.): scale→automatická prestavba (celé mm, čistá transformácia, funguje aj na rotovanom) · konštrukčné varianty: dno pod bokmi (EU default) vs. medzi bokmi, vrch plný/2 výstuhy (orientácia flat/upright + offset — drezová/varná)/žiadny, chrbát naložený/vložený/drážka, sokel žiadny(nohy)/predný · **horná skrinka** (Z=1400) · spätná kompatibilita V0.1 · 18/18 kombinácií otestovaných
-- ✅ **V0.2b — Členenie, čelá, šablóny** (hotové 16.7., v0.2.1): strom zón s klikateľnými ghost boxmi + priečky divider_v/h (rekurzívne, reálne dielce) · police = modul v zóne · čelá odspodu s fixed/auto + 🔒 locky, zásuvkové čelá, konverzia starých · šablóny (4 preddefinované + vlastné, %APPDATA% + .bak) · hrúbka chrbta HDF 3/pevný 18 · panel: základné/pokročilé skladacie sekcie
-- ✅ **V0.2c — UX panela a zón + opravy** (hotové 16.7., v0.2.2): oprava teleportu · ghost zóny na 1 klik · interaktívny 2D náhľad · auto-apply · filtrovanie šablón · tagy dielov · osové scale handles · čitateľné zóny
-- ✅ **V0.3 — Materiály a ABS (dáta)** (hotové 17.7., v0.3.0): materiálový katalóg (rodina/variant, JSON) · dedenie projekt→skrinka→dielec · ABS hrany L1/L2/W1/W2 s pravidlovými defaultmi podľa roly · per-dielec editor
-- ✅ **V0.3.1 — stabilizácia dát** (hotové 17.7.): zhoda katalógovej a geometrickej hrúbky · smer dekoru vo výrobných dátach · atomický projektový prepočet s jedným Undo · validácia zón/čiel · bezpečná migrácia starých podlimitných čiel · zrozumiteľné zobrazenie dedenia v karte dielca
-- ✅ **V0.3.2 — stabilná identita dielcov** (hotové 17.7.): trvalý `part_key` pre pevné dielce, zóny a čelá · migrácia starých override kľúčov bez straty neznámych údajov · materiál/ABS zostane na správnom čele po zmazaní susedného riadku a na správnej polici po úprave susednej zóny
-- ✅ **V0.3.3 — ABS iba 1/2 mm** (hotové 17.7.): samočistenie aktívneho katalógu od nepodporovaných hrúbok · neplatné ABS priradenia sa zahodia bez tichej náhrady · pravidlá akceptujú iba 1 alebo 2 mm
-- ✅ **V0.3.4 — Stabilizácia pred kovaním** (hotové 17.7., v0.3.4; PR #13–#21): docs sync štandardu s kódom · odstránené „Použiť na podobné" · **140 automatických testov + GitHub Actions CI** (headless sada, guard testy VERSION/mm, APPDATA sandbox) · **panel split** (panel.html → css + 10 JS modulov; panel.rb → 9 doménových súborov; CONSTRUCTION_FIELDS + PARAM_KEYS = nové pole na 1+1 mieste; verzia v UI z Ruby; AppObserver po File>New/Open/Activate) · **BuildPlan kontrakt** (`core/build_plan.rb`: schema 1, MIN_DIM, validátor s unikátnosťou part_key, `warnings[]` kanál, tvar `hardware[]` pre V0.4, prod sémantika) · **in-SketchUp runner** (`tests/sketchup/su_runner.rb` + `scripts/run_su_tests.ps1`, geometria plán↔model 1:1 + undo scenáre) · **undo fixy** (scale absorpcia aj dedup kópie = transparentné operácie → 1× undo vráti celý krok; S1/S2 tvrdé asserty)
-- 🔨 **V0.4 — Kovanie fáza 1 (pravidlá a flagy)** (beží 18.7., PR #23/#24/#25): rules engine s Ruby vzormi fixed/bands/fit_series parametrizovanými JSON pravidlami · seed: nohy 4 ks (sokel bez vplyvu, výška v params), závesy podľa výšky krídla ≤900:2/≤1400:3/≤1900:4/inak 5, výsuvy NL z radu podľa svetlej hĺbky −10 · **projektový snapshot pravidiel** (reprodukovateľnosť z .skp, undo drží pravidlá aj geometriu; globál = default nových projektov, seed-merge) · hardware_overrides (identita owner+typ+rule_id, šablóny ich zachovávajú) · BuildPlan schema 2 (string-keyed, sprísnený validátor) · vizuál nôh ako proxy (none/false — súpis číta config.hardware[]) · panel sekcia Kovanie (počty, ručný zásah, vypnutie) · dialóg Pravidlá kovania (pásma/rady, uložiť do projektu + globálne) · odložené na ďalšie fázy: hmotnostné Blum tabuľky (chýba hustota materiálu), smer otvárania a typ závesu (naložené/vložené/tip-on), automatika počtu nôh podľa šírky (zmena JSON pravidla)
-- ✅ **V0.4.5 — UI konsolidácia (Inspector + satelity)** (hotové 18.7., v0.4.6; PR #27–#30, implementuje 05+06+07): panel = **Inspector** — obsah podľa výberu (vkladacia karta / korpus / zóna / dielec s omrvinkou ‹CAB›), identita + ⚠ upozornenia hore (klik = výpis) · **náhľad = fixné okno** so zoom kolieskom, posunom ťahaním a ⛶ fit (pohľad drží pri úpravách — koniec scrollovania cez vysoké skrine) · karta zóny hneď pod náhľadom · **satelitné okná**: Pravidlá kovania, Materiály projektu (predvoľby dedenia + guard hrúbok novej skrinky), Šablóny (typový guard, správa) · quick-pick šablóny vo vkladacej karte · badge kovania pri čelách · dilema 05 rozhodnutá: Inspector-first, Vkladač až s knižnicou modulov
-- ✅ **V0.4.7 — Dogfooding: samostatná doska** (hotové 18.–19.7., v0.4.7; PR #31–#35): samostatný výrobný dielec `kind: board` (krycia doska, blenda, výplň, atypický prírez) — identita BRD-xxx + `part_key` `board/main`, rola `free_panel`, config = superset dielca korpusu (kusovník/VEPO budú mať jeden svet), materiál = snapshot z katalógu (hrúbka sa riadi materiálom; zmena materiálu prevedie ABS na nový dekor), ABS default 1 pozdĺžna 1,0 mm (seed-merge do existujúcich inštalácií) · **a)** dátový základ · **b)** builder + dedup kópií bez prekreslenia + Placement (top-level umiestňovanie) + per-entity transparent dedup (opravený aj korpusový undo bug) · **c)** UI karta Doska (prepínač Korpus/Doska, ABS editor s 2D náhľadom, guard oneskorených zápisov) · **d)** scale absorpcia (lokálne osi = výrobná pravda; hrúbka vždy z materiálu; shear guard; nemodálne hlásenia) · **e)** **matematické výrazy v rozmerových poliach** (`650-36` + Enter, živý náhľad `= 614`, JS parser s CI testami; identity guard auto-apply korpusu) + panel refresh po scale absorpcii. Autorita výrobného záznamu = snapshot na entite (štandard 8.3). NEobsahuje (V1.0): attachment/segmenty, auto krycie dosky, pracovné dosky cez segment. Proces: Codex devil's advocate pred každou iteráciou + GH review po každom PR (5×; chytené o.i. 2 reálne bugy existujúceho správania)
-- ✅ **V0.4.7 dogfood — dávky postrehov 1–2** (hotové 19.7., stále v0.4.7; PR #37–#39): **veľké dogfood testovanie beží** — postrehy sa evidujú v živom zápisníku [08_DOGFOODING.md](08_DOGFOODING.md) (trvalé D-čísla, PR #37) a riešia sa v malých dávkach · **dávka 1** (PR #38): scale úchopy len čisté osi — maska 120 + zápis na definíciu (D-06) · debounce 2D náhľadu 500 ms pri písaní (D-02) · náhľad rastie s veľkosťou okna panela (D-01) · ghost zóny predvolene vypnuté, klik na zóny cez 2D náhľad (D-04) · **dávka 2** (PR #39): plná správa katalógu materiálov v okne Materiály projektu (D-05, bloker reálnej zákazky) — CRUD dosiek aj ABS pások, serverom generované ID, hrúbka existujúceho materiálu nemenná (= nový variant), mazanie s guardom (chránené fallbacky + scan použitia v modeli/overridoch/dielcoch/doskách/šablónach), živý sync do panela · **dávka „noc na 19.7."** (PR #41 D-07 + #42 D-03): nastaviteľné medzery a presahy čiel (záporný okraj = presah, ±100 mm; medzera krídel z configu; fit náhľadu s presahmi) · police discoverability (jednozónová skrinka = karta Zóna rovno) · **dávka 3** (PR #43): **D-08 režimové taby Inspectora** — Korpus (kótovaný obrys Š/V/hĺbka) · Zóny · Čelá = režimy práce prepínajúce náhľad aj sekcie; tab sa pamätá cez zmeny výberu; dielec vynúti zónový náhľad · proces: repo skilly codex-audit/codex-po-pr (PR #40) + **auto-merge infra** (required CI check na maine, auto-delete vetiev) · ďalej: D-09 snap priečok, D-10 drag čiel
-- ✅ **V0.4.7 dogfood — nočná fronta 19.→20.7.** (PR #50/#52/#54/#55): D-25 merač používania panela (lokálne počítadlá → podklad pre budúci režim Rozšírené) · D-18 čelo „BEZ" (otvorená nika v rade čiel, kovanie/výstupy nič) · D-24 krídla dvierok 1–4 (identita byte-stabilná, auto nemenené) · D-22 odomykateľný limit presahov (±100 → 🔓 ±2000 per korpus) · D-23 orientácia riadkov čiel (zoznam ako skrinka, sivé ≈ výšky, klik-sync s náhľadom) · D-21 výrazy v čelách = zistené ako už existujúce (V0.4.7e + D-07) · proces: Codex audit pred každou dávkou (spolu 12 auditov/review, 11 blockerov + 20 fixov zapracovaných), merge po zelenom review, `@codex review` mention pri nespustenom review
-- **V0.4.8 — Konštrukčné možnosti z 06** (po doskách; pôvodne značené V0.4.6): rohové spoje dna/stropu per strana (vľavo/vpravo vložené/naložené) · chrbát s poldrážkou · „bez dielca" varianty (bez boku/dna/stropu — otvorené niky s validáciou) · per-dielec hrúbky a odsadenia (vpredu/vzadu) · medzery/presahy čiel na úrovni korpusu
-- ✅ **V0.5 — Výstupy v0** (hotové 19.–21.7.; PR #47/#48/#51/#53/#65): ✅ A interný kusovník + súpisy m²/bm/ks zo snapshotov (#47) · ✅ B okno Výroba s klik-selectom (#48) · ✅ C **VEPO CSV priamo** (#51 — HOTOVÉ rozmery, rotácia dekoru, merge 18+36, atomická dávka + LOG, byte-kompatibilné so starým exportérom) · ✅ D-19 odhad platní ako rozsah 10–25 % (#53) · ✅ **krížová validácia s OCL splnená** (20.7., 2-kolový zrkadlový test — 1. kolo chytilo omyl štandardu s odpočtom ABS, fix PR #58: VEPO dostáva HOTOVÉ rozmery; 2. kolo 26=26 s presnými zhodami) · ✅ **D semafor v0** (#65, nočná fronta 21.7.): KONTROLA tab v okne Výroba — 🔴 materiál mimo katalógu/hrúbkový drift/nezmestí sa na platňu · 🟠 čelo bez ABS/vypnuté kovanie/build warnings · klik-select cez stabilnú identitu, sekcia KONTROLA vo VEPO LOGu, **RED nikdy neblokuje export**
-- ✅ **V0.4.7 dogfood — nočná fronta 21.7.** (PR #63–#69): MCP diagnostika (`skagent_doctor.ps1` + `Debug.report`) · D-40 fix DC observer pasce (scaletool zámok v transparentnej operácii ZA vložením) · D-29 sticky dvojradová hlavička + **design tokeny `--nx-*`** + **ikonový sprite icons.js** (Lucide subset, žiadne emoji v UI chrome) + `docs/UI_DIZAJN.md` · D-36 ABS optgroup „Odporúčané k dekoru" · #69 hotfix diakritiky panel.html + **encoding guard v CI**
-- ✅ **V0.5-E — D-41 dekorové skupiny materiál↔ABS** (hotové 23.7.; PR #70–#73, návrh cez Codex audit 17 nálezov): **šírka ABS** (variant = dekor+šírka+hrúbka, ID `..._22X10`) + **deterministický picker** (najmenšia šírka ≥ hrúbka dielca +2 → univerzálna → nič, NIKDY užšia) · **dekor = strážený kľúč skupiny** (trim, near-match guard, immutable pri edite, `rename_decor` atomicky, dup zákaz, revision guard okna) · okno Materiály ako dekorové karty + batch „Nový dekor" · **centrálny remap ručných ABS pri KAŽDEJ zmene efektívneho materiálu** (dielec/korpus/projektová predvoľba; kontrast a „bez ABS" nedotknuté) · modal dovytvorenia chýbajúcej pásky (AUTO_WIDTHS 22/43, katalóg mimo undo = vedomý kontrakt) · SU runner 138/138
-- ✅ **V0.5-F — D-42 dekorový katalóg UI** (hotové 24.7.; PR #74–#77, návrh cez vizuálne mockupy + Codex audit 6 blockerov): okno Materiály 640×560 = **mriežka dlaždíc** podľa výrobcu + pás **„Použité v projekte"** (kusy z aktívneho modelu) + hľadanie (názov/výrobca/kód/dodávateľ) · **kód + dodávateľ** na doske aj ABS (jeden preferovaný; merge-safe, duplicitný pár s potvrdením) · **cena „nezadaná" ≠ 0** (nil kontrakt pre budúcu cenovú ponuku) · detail dekoru s **inline bunkami** (patch protokol: whitelist polí, row_rev baseline per riadok — žiadny tichý prepis cudzej zmeny) · batch cez **preset-čipy** (typ per variant — PD 38) + zapamätaná posledná sada · **seed reálnych dekorov dodá Michal pri testovaní**
-- **V0.6 — Kovanie fáza 2 (katalóg a ceny)**: prevzatie CatalogStore/search/Demos import z KOVANIE · mapovanie flagov na konkrétne kódy (pamätá sa) · ceny v sumári
-- **V1.0 — Zostavy a stabilizácia**: spájanie/zarovnávanie korpusov (čelné/zadné hrany, pripájacie body, rohové situácie — snaper logika) · **soklová lišta v celku pre celý segment** · **obklady a krycie prvky segmentu**: pilastre (priznaný/skrytý + rýchly nástroj), pracovné dosky a horné krycie dosky na pár klikov na označený segment · ABS vizuálny režim (farebné hrany, klik-edit) · migrácia/oprava starých modelov · test na kompletnej reálnej zákazke
-- **Neskôr (po V1)**: zásuvkové bloky (dočasne DC Atira most) · vnútorné vybavenie (koše, tyče…) · doplnky (LED, gola) · dĺžkové materiály naplno · odpojený režim UI · výkresy/etikety · CNC
+- Plugin **v0.5.0** — etapa **V0.5 KOMPLET**: výstupy (kusovník, okno Výroba, VEPO CSV validovaný proti OCL flow, odhad platní), kontrolný semafor, dekorové skupiny materiál↔ABS (V0.5-E) a dekorový katalóg UI (V0.5-F).
+- Testy: **372 headless + 200 JS (CI na každý push) + ~140 in-SketchUp scenárov**.
+- Práve beží: **uzáver V0.5** — cleanup, dokumentácia, hardening, slovné prechádzky systémom (ujasnenie pojmov), príprava katalógu materiálov (Demos).
+- Ďalej: **V0.6 KOVANIE fáza 2** (štart ~28.7.) · V0.4.8 otvorená/neplánovaná · V1.0 zostavy.
+
+## Hotové etapy (kompakt)
+
+Plné pôvodné texty: [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md).
+
+| Etapa | Hotové | Obsah v skratke | PR |
+|---|---|---|---|
+| V0.1 klikateľný základ | 15.7. | panel, dolný korpus z Ruby, police, dvierka, ghost zóny, 1-krok Undo | — |
+| V0.2a jadro korpusu | 16.7. | scale→prestavba, konštrukčné varianty, horná skrinka | — |
+| V0.2b členenie/čelá/šablóny | 16.7. | strom zón + priečky, čelá fixed/auto s lockmi, šablóny | — |
+| V0.2c UX panela | 16.7. | 2D náhľad, auto-apply, tagy, osové scale, opravy | #2–#5 |
+| V0.3 materiály a ABS | 17.7. | katalóg, dedenie projekt→skrinka→dielec, hrany L1/L2/W1/W2 | #6–#9 |
+| V0.3.1–.3 stabilizácia dát | 17.7. | hrúbky, identita part_key, ABS 1/2 mm | #10–#12 |
+| V0.3.4 stabilizácia pred kovaním | 17.7. | testy+CI, panel split, BuildPlan kontrakt, SU runner, undo fixy | #13–#21 |
+| V0.4 kovanie fáza 1 | 18.7. | pravidlá fixed/bands/fit_series, projektový snapshot, overrides | #23–#26 |
+| V0.4.5 Inspector + satelity | 18.7. | kontextový Inspector, náhľad zoom/pan/fit, satelitné okná | #27–#30 |
+| V0.4.7 samostatná doska | 19.7. | kind board, ABS editor, scale absorpcia, výrazy v poliach | #31–#35 |
+| V0.4.7 dogfood dávky | 19.–21.7. | D-01…D-40 (zápisník), režimové taby, hlavička+tokeny+ikony, MCP diagnostika | #37–#69 |
+| V0.5 výstupy v0 | 19.–21.7. | kusovník, okno Výroba, VEPO CSV (validovaný 2-kolovo s OCL), odhad platní, semafor | #47–#65 |
+| V0.5-E dekorové skupiny | 23.7. | šírka ABS + deterministický picker, dekor = kľúč skupiny, remap pri zmene materiálu | #70–#73 |
+| V0.5-F dekorový katalóg UI | 24.7. | mriežka dlaždíc, kód+dodávateľ, cena „nezadaná", inline bunky s patch protokolom, preset-čipy | #74–#77 |
+| **Uzáver V0.5** | 24.7. | verzia 0.5.0, hooky, docs reštruktúra + archív, hardening | #79+ |
+
+## Pred nami
+
+### V0.6 — Kovanie fáza 2 (katalóg a ceny) — štart ~28.7.
+
+- Prevzatie CatalogStore/search/Demos import z KOVANIE · mapovanie flagov na konkrétne kódy (pamätá sa) · ceny v sumári.
+- **Otvorená otázka (debata 24.7., rozpracovať pred štartom):** „zadaj kód → načítaj dáta" — demos-trade.sk má verejné vyhľadávanie (kód → 1 položka aj dekor → celá skupina s cenami bez loginu) + Konfigurátor cenníkov na Démos24Plus (hromadný export za loginom). Zvážiť hybrid: hromadný seed z cenníka + per-kód dohľadanie. Viď zápisník uzáveru.
+- **Pracovné dosky ako súčasť dekorovej skupiny** (Michal 24.7.): rovnaké dekory, iný rozmer/typ (PD 4100×600/920/38, HPDB hrana š.45, DTDL 36 = 2× zlepená 18) — dátovo pripravené cez `sheet_variants` s typom per variant (D-42); doriešiť pri katalógu.
+- Z prenesených záväzkov zvážiť: smer otvárania + typ závesu, hmotnostné tabuľky, „použiť na podobné" pre kovanie.
+
+### V0.4.8 — Konštrukčné možnosti z 06 (otvorená, neplánovaná)
+
+Zostávajúce zadanie z [06_PANEL_NASTAVENIA_navrh.md](06_PANEL_NASTAVENIA_navrh.md): rohové spoje dna/stropu per strana (vľavo/vpravo vložené/naložené) · chrbát s poldrážkou · „bez dielca" varianty (bez boku/dna/stropu — otvorené niky s validáciou) · per-dielec hrúbky a odsadenia (vpredu/vzadu). *(Medzery/presahy čiel z pôvodného rozsahu sú hotové — D-07 + D-22.)* Zaradenie rozhodne Michal (kandidát: po V0.6).
+
+### V1.0 — Zostavy a stabilizácia
+
+Spájanie/zarovnávanie korpusov (čelné/zadné hrany, pripájacie body, rohové situácie — snaper logika) · **soklová lišta v celku pre celý segment** · **obklady a krycie prvky segmentu**: pilastre (priznaný/skrytý + rýchly nástroj), pracovné dosky a horné krycie dosky na pár klikov na označený segment · ABS vizuálny režim (farebné hrany, klik-edit) · migrácia/oprava starých modelov · test na kompletnej reálnej zákazke.
+
+### Neskôr (po V1)
+
+Zásuvkové bloky (dočasne DC Atira most) · vnútorné vybavenie (koše, tyče…) · doplnky (LED, gola) · dĺžkové materiály naplno · odpojený režim UI · výkresy/etikety · CNC · injecting dát do knižníc v dávkach (kódy, materiály, kovania, spotrebiče — architektúru pripraviť skôr).
+
+## Prenesené záväzky (z uzavretých etáp — nestratiť)
+
+- **Seed reálnych dekorov** do katalógu dodá Michal pri testovaní D-42 (zoznam materiálov pripravuje — debata 24.7.).
+- **V0.4 odložené kovanie témy:** hmotnostné Blum tabuľky (chýba hustota materiálu) · smer otvárania a typ závesu (naložené/vložené/tip-on) · automatika počtu nôh podľa šírky (zmena JSON pravidla). → zvážiť vo V0.6.
+- **„Použiť na podobné"** (odstránené PR #14) — vráti sa premyslené až s kovaním (V0.6+).
+- **V0.4.7 vedome neobsahuje** (→ V1.0 zostavy): attachment/segmenty, automatické krycie dosky, pracovné dosky cez segment.
+- **Nárezový plán fáza 2** (guillotine, kerf, orezky, orientácia dekoru): OpenCutList je GPL (kód neprebrať, algoritmus áno); D-19 kontrakt pripravený (vstup = dielce). → po V0.6.
+- **Redo správanie zlúčených operácií** — Ruby API nemá na Windows spoľahlivú redo akciu; manuálne overiť Ctrl+Y pri hardeningu (otvorené pozorovanie zo 17.7.).
 
 ## Pravidlo pre postrehy (Michal)
 
@@ -39,42 +73,21 @@ Tri úrovne — odpoveď na otázku „kedy nový typ korpusu":
 3. **PARAMETER** = individuálna hodnota konkrétnej skrinky.
 Pravidlo: kým sa dá vec vyjadriť hodnotou/variantom existujúceho dielca → parameter/šablóna. Nový typ až keď sa mení topológia.
 
-## Backlog postrehov
+## Backlog postrehov (otvorené)
+
+Vyriešené riadky sú v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md); operatívne postrehy z dogfoodingu žijú ako D-čísla v [08_DOGFOODING.md](08_DOGFOODING.md).
 
 | Dátum | Postreh | Zaradenie |
 |---|---|---|
-| 15.7. | EU konštrukcia: boky NA dne (váha na dno), nohy pod dnom, soklová lišta v celku pre segment; dno medzi boky = horné skrinky a špeciálne | ✅ poslané do V0.2a (default) + lišta segmentu → V1.0 zostavy |
 | 15.7. | Spájanie korpusov: zarovnanie čelných hrán (default), voliteľne zadných; pripájacie body; rohová sa nepája na rohový styk | V1.0 zostavy (štandard otvorený bod 7) |
-| 15.7. | Scale nástroj → automatická prestavba s korektnými hrúbkami | ✅ V0.2a (beží) |
-| 15.7. | Drezová: horné výstuhy NA VÝŠKU (max priestor pre umývadlo) | ✅ poslané do V0.2a (rails_orientation) |
-| 15.7. | Varná doska: výstuhy 20 mm pod hornou hranou (zapustenie dosky) | ✅ poslané do V0.2a (rails_top_offset) |
-| 15.7. | 3–4 typy pokryjú väčšinu projektov; rohová = určite samostatný typ; šatníky/atypy mimo | **Šablónový systém korpusov → V0.2b** (uložiteľné predvoľby: drezová, varná, klasik); rohová+vysoká → po V1.0 |
-| 16.7. | **Pilaster** (bočná krycia/obkladová doska): skrutkuje sa zvnútra ako pohľadová, zakrýva biely korpus a vonkajšie spoje. Variant **priznaný** (z čelnej hrany viditeľný) vs. **skrytý** (čelá ho presahujú). Ideálne inteligentný rýchly nástroj. | V1.0 zostavy — obklady segmentu; rola `pilaster` do štandardu pri implementácii |
-| 16.7. | **Pracovné dosky + horné krycie dosky** („priznaná horná doska"): vloženie na pár klikov na OZNAČENÝ SEGMENT (cez viac skriniek — zostavová úroveň, ako soklová lišta) | V1.0 zostavy — obklady segmentu; production_class sheet, dĺžka zo segmentu |
-| 16.7. | Scale test rukou: funguje super, prestavba presne na mm | ✅ V0.2a potvrdená používateľom |
-| 16.7. | Hrúbka chrbta ako nastavenie (HDF 3 / pevný 18) | ✅ poslané do V0.2b |
-| 16.7. | Panel: len relevantné pre typ + rozmery označeného (sedí); pokročilé skrývať, nastavenia budú pribúdať | ✅ V0.2b (skladacie sekcie) + trvalá zásada |
-| 16.7. | **DILEMA UI:** rozdeliť na A) Vkladanie (Picker 2.0 — dedič Noxun Pick, ktorý už nebude použiteľný — vyoperovať: thumby, ghost, draw-to-size, obľúbené) vs. B) Nastavenia („Component Options 2.0") — ako logicky? | Zapísané v **05_DILEMA_ui_architektura.md** (návrh Fable: Vkladač+Inspector+neskôr Výstupy) — rozobrať s GPT, rozhodnúť pred V0.3 UI |
-| 16.7. | Test V0.2b: funkčnosť super, ale UI „džungľa" — veľa potvrdzovacích tlačidiel, zlá orientácia v zónach, chaos šablón (horná ponúka drezovú), BUG: teleport skrinky pri zmene z výberu v modeli | ✅ V0.2c (beží) |
-| 16.7. | Zóny vízia: A) 2D náhľad v paneli (klik, drag priečok, rozmery+zámky, aj PRED vložením) vs. B) priamo vo viewporte | Hodnotenie: A najprv (SVG náhľad — nižšie riziko, funguje aj pred vložením), B neskôr ako nadstavba; 1-klik ghosty ako rýchly medzikrok → V0.2c |
-| 16.7. | **Stráž kolízií** — diely sa prekrývajú / vyskočia mimo box → upozorniť kde a prečo | Validačná vrstva → V0.5 semafor (základný bbox check možno skôr) |
-| 16.7. | **Tagy dielov** (korpus/čelá/chrbty/PD a zásteny…) — hromadné operácie, dočasné HIDE dverí | ✅ V0.2c |
-| 16.7. | **Scale len čisté osi X/Y/Z** (bez kombinácií) — DC malo ScaleTool behavior | ✅ V0.2c (scaletool atribút test) |
-| 16.7. | **Zložka pluginu** — konsolidovať súbory „rozliate" po RUBY zložke pod jednu strechu | ✅ hotové (PR #4, 16.7. — SYSTEM + docs + zdroje v repe) |
-| 16.7. | **Interact pre čelá** (na neskôr): dráhy otvárania dvierok/šuflíkov, klik = otvorenie, merač kolízií pri otvorení — prezentácia, kontrola, pohľad dnu | Po V1.0 (dáta máme: origin čiel na hrane pántu; premyslieť pri kovaní — typ pántu = dráha) |
-| 16.7. | **Vyhradený testovací projekt `ENGINEtests.skp`** (Michal vytvorí prázdny) — agenti v ňom testujú/mažú podľa uváženia; oddelenie od zákaziek (incident: 2 okná + zombie proces na porte 7891) | Umiestniť do `ENGINE\_dev\` · pridať `_dev/` do .gitignore · pravidlo do ENGINE\CLAUDE.md (bridge len v test okne/projekte) → docs PR po V0.2c |
-| 16.7. | **BUG: drag priečky funguje len raz** — ďalšie ťahy vyžadujú re-klik na objekt (objekt pritom ostáva označený) | ✅ opravené (PR #2 + #3, 16.7. — suspend_selection_sync) |
-| 16.7. | **Náhľad povýšiť na „otvárací náhľad"** panela + zobrazovanie zvolených elementov (dvere, korpus, dielec) | Neskoršie verzie — SYSTEM\07 |
-| 16.7. | **UI mockup „NOXUN Furniture Engine"** — taby MODEL/VÝROBA/MATERIÁLY/KOVANIE, strom so stavmi, info karta dielca, ABS editor s „Použiť na podobné diely", katalóg podľa výrobných tried, kusovníky, kontrola, exporty lišta | Rozpísané v **SYSTEM\07_UI_VIZIA.md** (čo preberáme a kedy); syntéza s dilemou 05: kompaktný Inspector pri kreslení + veľké okno „Výroba" na kontrolu/výstupy |
-| 16.7. | **Materiály: povolené hrúbky na rodine** — vyberať dekor/typ (K009 DTDL), hrúbka je vlastnosť dielca; rodina definuje povolené hrúbky (3/16/18); dielec mimo povolených → okamžitý „!" v kusovníku + preklik na dielec | V0.5 (výroba/validácia) — mení model výberu materiálu v UI |
-| 16.7. | **ABS UX v2**: hrúbky stačia 1/2 mm; ABS sa nevyberá osobitne — odvodené od materiálu dielca; **predvolená ABS pre celú skrinku + výnimky per dielec**; v UI zjednotiť (žiadny nekonečný zoznam), interné delenie per hrana ostáva | V0.4/V0.5 — pred kusovníkom |
-| 16.7. | Prepínanie typu HORNÁ/DOLNÁ na označenom korpuse občas zle funguje — zatiaľ neriešiť, vyžiada si komplexnejšie riešenie (knižnica/editor typov) | odložené — rieši sa s knižnicou typov |
-| 17.7. | **Undo/redo riziká** (audit kódu): po Undo scale sa absorpcia pravdepodobne spustí znova (observer bez undo guardu — Undo „bojuje" s používateľom); kópia skrinky dostáva nové ID mimo undo operácie a spúšťa sa aj z kliknutia (selection event mutuje model); transparentné ghost operácie po Undo mažú Redo stack | ✅ **undo OPRAVENÉ 17.7.** (potvrdené runnerom, fix = transparentné operácie: absorpcia prilepená k Scale kroku, dedup identita+rebuild v 1 op prilepené k paste; S1/S2 v runneri sú odteraz tvrdé asserty). Redo: Ruby API nemá na Windows spoľahlivú redo akciu — správanie zlúčených operácií overiť manuálne (Ctrl+Y), otvorené pozorovanie |
-| 17.7. | **Zmazanie ABS záznamu z katalógu ticho mení výrobné dáta** — existujúce priradenia sa pri najbližšom rebuilde premenia na explicitné „bez hrany", bez upozornenia | V0.3.4 — PR15 warnings kanál |
-| 17.7. | **Tichá migrácia part_key môže ticho zlyhať** — rescue v migrate_legacy_part_keys vráti nemigrované dáta bez hlásenia (strata override mapovania) | V0.3.4 — PR15 warnings + PR16 fixture test starého modelu |
-| 17.7. | `SCALE_TOOL_MASK = 7` — bitová maska osových scale úchopov nepotvrdená (alternatíva 120); TODO žije len v komentári kódu | otvorené — Michal potvrdí vizuálne pri testoch |
-| 17.7. | **„Použiť na podobné" úplne odstrániť** (rozhodnutie Michala — nefixovať N-undo správanie, funkcia ide von; vráti sa premyslená až s kovaním) | ✅ hotové (PR #14, 17.7.) |
-| 19.7. | **Toggle tagov z panela** (Čelá/Chrbát 👁 v logike Ghost checkboxu — nepreklikávať do SketchUp Tags) | D-27 v zápisníku — budúca UX dávka |
-| 19.7. | **Textúry materiálov pre render** (Lucia; katalóg + mierka rapportu, fáza 2 orientácia dekoru); Michal má kompletnú knižnicu textúr | D-28 v zápisníku — po V0.6; súvisí s ABS vizuálnym režimom V1.0 |
-| 19.7. | **Injecting dát po V1**: často používané kódy, materiály, kovania, spotrebiče, vybavenie do knižníc v postupných dávkach — dovtedy pripraviť architektúru | po V1.0 — plán napĺňania knižníc |
-| 20.7. | **Nárezový plán fáza 2** (guillotine, kerf, orezky, orientácia dekoru): OpenCutList je open source (GPL — kód neprebrať, algoritmus áno), vlastná heuristika v čistom Ruby zvládnuteľná; D-19 kontrakt na to pripravený (vstup = dielce) | V0.5+ backlog — po semafore |
+| 15.7. | Rohová a vysoká/potravinová skrinka ako nové TYPY builderov | po V1.0 (odvodia sa od dolnej/hornej) |
+| 16.7. | **Pilaster** (bočná krycia/obkladová doska): skrutkuje sa zvnútra, zakrýva biely korpus a spoje; variant **priznaný** vs. **skrytý** (čelá presahujú); ideálne rýchly nástroj | V1.0 zostavy — obklady segmentu; rola `pilaster` do štandardu pri implementácii |
+| 16.7. | **Pracovné dosky + horné krycie dosky**: vloženie na pár klikov na OZNAČENÝ SEGMENT (cez viac skriniek, ako soklová lišta) | V1.0 zostavy; production_class sheet, dĺžka zo segmentu; katalógová stránka PD sa rieši už vo V0.6 (dekorové skupiny) |
+| 16.7. | Zóny priamo vo viewporte (variant B vízie) — nadstavba 2D náhľadu | neskoršie verzie (A = 2D náhľad hotový) |
+| 16.7. | **Stráž kolízií** — diely sa prekrývajú / vyskočia mimo box → upozorniť kde a prečo | validačná vrstva semaforu (bbox check dielcov zatiaľ neimplementovaný) |
+| 16.7. | **Interact pre čelá**: dráhy otvárania, klik = otvorenie, merač kolízií pri otvorení — prezentácia, kontrola | po V1.0 (dáta máme: origin čiel na hrane pántu; premyslieť pri kovaní — typ pántu = dráha) |
+| 16.7. | Náhľad povýšiť na „otvárací náhľad" panela so zobrazovaním zvolených elementov | neskoršie verzie — [07_UI_VIZIA.md](07_UI_VIZIA.md) |
+| 16.7. | Prepínanie typu HORNÁ/DOLNÁ na označenom korpuse občas zle funguje | odložené — rieši sa s knižnicou/editorom typov |
+| 17.7. | Redo po zlúčených transparentných operáciách overiť manuálne (Ctrl+Y) | hardening uzáveru V0.5 (viď prenesené záväzky) |
+| 19.7. | Injecting dát po V1: kódy, materiály, kovania, spotrebiče, vybavenie do knižníc v dávkach — dovtedy pripraviť architektúru | po V1.0 — plán napĺňania knižníc (súvisí s Demos konektorom V0.6) |
+| 20.7. | Nárezový plán fáza 2 (guillotine, kerf, orezky, orientácia dekoru) — vlastná heuristika v čistom Ruby | po V0.6 (D-19 kontrakt pripravený) |

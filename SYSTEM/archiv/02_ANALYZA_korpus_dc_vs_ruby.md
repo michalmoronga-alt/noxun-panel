@@ -1,5 +1,7 @@
 # Analýza: Korpus cez DC engine vs. Ruby generovanie (v1.0, 15.7.2026)
 
+> ✅ **ARCHÍV — UZAVRETÉ (presunuté 24.7.2026):** rozhodnutie B (Ruby generovanie) potvrdené prakticky 15.7.2026 a odvtedy overené celou implementáciou V0.1–V0.5. Dokument sa ponecháva ako záznam analýzy a dôkazov.
+
 > Kľúčové architektonické rozhodnutie nového systému — určí, ako sa budú korpusy a dielce tvoriť, meniť a čítať. Podklady: stovky hodín Michalovej praxe s DC, `STARE\_dev\DC_SCHEMA.md` (pitva Master komponentu), GPT audit (ročná história problémov), ArchiWood research, docs\DC_PRAVIDLA.md.
 
 ## Otázka

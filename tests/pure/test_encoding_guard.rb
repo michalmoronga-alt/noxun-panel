@@ -15,7 +15,7 @@ NxTest.test('encoding: ziadne mojibake/C1 bajty v UI a docs suboroch + html char
   root = NxTest::ROOT
   # GH P3: aj root-level zdroje a skripty — mojibake sa nesmie schovat nikde.
   targets = Dir[File.join(root, 'noxun_engine', '**', '*.{html,js,css,rb}')] +
-            Dir[File.join(root, 'SYSTEM', '*.md')] +
+            Dir[File.join(root, 'SYSTEM', '**', '*.md')] +
             Dir[File.join(root, 'docs', '*.md')] +
             Dir[File.join(root, '*.{md,rb}')] +
             Dir[File.join(root, 'scripts', '*.{ps1,rb}')] +

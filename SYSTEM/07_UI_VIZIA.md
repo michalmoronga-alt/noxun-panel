@@ -1,6 +1,8 @@
 # UI vízia — „NOXUN Furniture Engine" mockup (Michal, 16.7.2026)
 
-> Michal dodal mockup celoobrazovkového UI ako **základné smerovanie** („páči sa mi, nie doslovne — kopec užitočných detailov a UI/UX prvkov"). Tu je rozpis prvkov + syntéza s dilemou 05. Screenshot: hlavné taby PROJEKT · MODEL · VÝROBA · MATERIÁLY · KOVANIE · NASTAVENIA.
+> Michal dodal mockup celoobrazovkového UI ako **základné smerovanie** („páči sa mi, nie doslovne — kopec užitočných detailov a UI/UX prvkov"). Tu je rozpis prvkov + syntéza s dilemou 05 (v archíve). Screenshot: hlavné taby PROJEKT · MODEL · VÝROBA · MATERIÁLY · KOVANIE · NASTAVENIA.
+>
+> **Stav k 24.7.2026 (v0.5.0):** HOTOVÉ z tabuľky — ABS editor (V0.3+, per-hrana s 2D náhľadom), materiálový katalóg (D-42 mriežka dlaždíc; taby podľa výrobnej triedy nahradené sekciami podľa výrobcu), kusovníky + podľa materiálu (okno Výroba V0.5), KONTROLA karta (semafor V0.5-D), VEPO CSV export. OTVORENÉ — strom štruktúry modelu so stavmi, info karta dielca v okne Výroba, rýchle akcie, plná lišta exportov (XLSX/PDF/kovanie), „Použiť na podobné" (vráti sa s kovaním V0.6+). Syntéza s dilemou platí: Inspector pri kreslení + veľké okno Výroba na kontrolu/výstupy.
 
 ## Prvky mockupu, ktoré PREBERÁME (a kedy)
 
