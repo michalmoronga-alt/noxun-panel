@@ -804,7 +804,11 @@ module Noxun
           Ids.each_of_kind(model, kind) do |inst|
             cfg = Store.config(inst) || {}
             d = decor_by_id[cfg['material_id']]
-            usage[d] += 1 if d && !d.empty?
+            next unless d && !d.empty?
+            # Codex GH #75: doska nesie pocet kusov v configu (quantity) — pas
+            # musi ratat KUSY ako BOM, nie entity (fallback 1 pre dielce/legacy).
+            qty = cfg['quantity'].to_i
+            usage[d] += qty.positive? ? qty : 1
           end
         end
         usage
