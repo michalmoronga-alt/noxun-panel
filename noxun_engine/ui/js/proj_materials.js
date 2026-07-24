@@ -104,61 +104,151 @@
     }
     return false;
   }
-  var mdRenaming = null; // dekor s otvorenym inline rename inputom
+  // D-42 PR B (cista funkcia, Node test): rozdeli dekorove skupiny do SEKCII
+  // mriezky. query aktivne => jedina plocha sekcia "Vysledky". Rezim 'man' =>
+  // pas "Pouzite v projekte" (podla poctu dielcov v modeli, zostupne) + sekcie
+  // podla vyrobcu (abecedne, "Bez vyrobcu" posledna — patri sem aj edge-only
+  // dekor bez dosky a legacy "(bez dekoru)"). Rezim 'az' => plochy zoznam.
+  function mdBuildSections(groups, used, mode, query){
+    if (query) return [{ title: 'Výsledky', kind: 'flat', groups: groups }];
+    if (mode !== 'man') return [{ title: '', kind: 'flat', groups: groups }];
+    var out = [];
+    used = used || {};
+    var usedGroups = groups.filter(function(g){ return (used[g.decor] || 0) > 0; })
+      .slice().sort(function(a, b){
+        return (used[b.decor] || 0) - (used[a.decor] || 0) || a.decor.localeCompare(b.decor);
+      });
+    if (usedGroups.length) out.push({ title: 'Použité v projekte', kind: 'used', groups: usedGroups });
+    var byMan = {}, order = [];
+    groups.forEach(function(g){
+      var key = g.decor === '' ? '' : (g.manufacturer || '');
+      if (!byMan[key]){ byMan[key] = []; order.push(key); }
+      byMan[key].push(g);
+    });
+    order.sort(function(x, y){ return x === '' ? 1 : y === '' ? -1 : x.localeCompare(y); });
+    order.forEach(function(m){ out.push({ title: m || 'Bez výrobcu', kind: 'man', groups: byMan[m] }); });
+    return out;
+  }
+
+  var mdRenaming = null;      // dekor s otvorenym inline rename inputom
+  var mdView = null;          // null = mriezka | dekor = otvoreny detail (drill-in)
+  function mdSearchInput(){
+    mdView = null; // pisanie do hladania vzdy vracia do mriezky (vysledky)
+    mdRenderLists();
+  }
+  function mdOpenDetail(decor){ mdView = decor; mdRenderLists(); }
+  function mdCloseDetail(){ mdView = null; mdRenderLists(); }
+
   function mdRenderLists(){
     var box = el('mdDecorList');
     if (!box) return;
     var q = (el('mdSearch') && el('mdSearch').value || '').trim().toLowerCase();
+    // detail drzi len existujuci dekor (po rename/zmazani spadne na mriezku)
+    if (mdView !== null){
+      var dg = groupCatalogByDecor(MD_CATALOG).find(function(g){ return g.decor === mdView; });
+      if (dg){ box.innerHTML = mdDetailHtml(dg); mdFocusInline(); return; }
+      mdView = null;
+    }
     var groups = groupCatalogByDecor(MD_CATALOG).filter(function(g){ return mdMatchGroup(g, q); });
+    var mode = (el('mdGroupMode') && el('mdGroupMode').value) || 'man';
+    var sections = mdBuildSections(groups, MD_USED, mode, q);
     var html = '';
-    groups.forEach(function(g){
-      var name = g.decor === '' ? '(bez dekoru)' : g.decor;
-      html += '<div class="mdcard">';
-      html += '<div class="tplrow mdhead">' +
-        '<i style="flex:0 0 14px;height:14px;border-radius:3px;background:' + esc(rgbToHex(g.color)) + '"></i>' +
-        '<span class="tpln"><b>' + esc(name) + '</b>' + (g.manufacturer ? ' <span class="tplt">' + esc(g.manufacturer) + '</span>' : '') + '</span>' +
-        (g.decor === '' ? '' :
-          '<button class="ghostbtn tplbtn" onclick="mdOpenDecorForm(' + esc(JSON.stringify(g.decor)) + ')">+ variant</button>' +
-          '<button class="ghostbtn tplbtn" onclick="mdManufacturerOpen(' + esc(JSON.stringify(g.decor)) + ')">Výrobca</button>' +
-          '<button class="ghostbtn tplbtn" onclick="mdRenameOpen(' + esc(JSON.stringify(g.decor)) + ')">Premenovať</button>') +
-        '</div>';
-      if (mdManufacturing === g.decor){
-        html += '<div class="tplrow"><input id="md_man_input" type="text" value="' + esc(g.manufacturer || '') + '" placeholder="Výrobca (napr. Egger)" style="flex:1">' +
-          '<button class="primary tplbtn" onclick="mdManufacturerSave(' + esc(JSON.stringify(g.decor)) + ')">Uložiť</button>' +
-          '<button class="ghostbtn tplbtn" onclick="mdManufacturerOpen(null)">Zrušiť</button></div>';
+    sections.forEach(function(sec){
+      if (sec.title){
+        html += '<div class="mdsechead">' +
+          (sec.kind === 'used' ? '<svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>'
+                               : '<svg class="ic" aria-hidden="true"><use href="#i-factory"/></svg>') +
+          ' ' + esc(sec.title) + '</div>';
       }
-      if (mdRenaming === g.decor){
-        html += '<div class="tplrow"><input id="md_rename_input" type="text" value="' + esc(g.decor) + '" style="flex:1">' +
-          '<button class="primary tplbtn" onclick="mdRenameSave(' + esc(JSON.stringify(g.decor)) + ')">Uložiť</button>' +
-          '<button class="ghostbtn tplbtn" onclick="mdRenameOpen(null)">Zrušiť</button></div>';
-      }
-      if (g.sheets.length){
-        html += '<div class="tplrow mdline"><span class="tplt">Dosky</span>';
-        g.sheets.forEach(function(s){
-          var prot = MD_PROTECTED.indexOf(s.material_id) >= 0;
-          html += '<span class="mdchip">' +
-            '<button class="ghostbtn" title="' + esc(s.label) + '" onclick="mdOpenSheetForm(\'' + esc(s.material_id) + '\')">' + esc(sheetChipLabel(s)) + '</button>' +
-            (prot ? '<span class="tplt">predvoľba</span>'
-                  : '<button class="ghostbtn tpldel" title="Zmazať ' + esc(s.label) + '" onclick="mdDeleteSheet(\'' + esc(s.material_id) + '\')"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>') +
-            '</span>';
-        });
-        html += '</div>';
-      }
-      if (g.edges.length){
-        html += '<div class="tplrow mdline"><span class="tplt">ABS</span>';
-        g.edges.forEach(function(a){
-          html += '<span class="mdchip">' +
-            '<button class="ghostbtn" title="' + esc(a.label) + '" onclick="mdOpenEdgeForm(\'' + esc(a.abs_id) + '\')">' + esc(edgeChipLabel(a)) + '</button>' +
-            '<button class="ghostbtn tpldel" title="Zmazať ' + esc(a.label) + '" onclick="mdDeleteEdge(\'' + esc(a.abs_id) + '\')"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>' +
-            '</span>';
-        });
-        html += '</div>';
-      }
+      html += '<div class="mdgrid">';
+      sec.groups.forEach(function(g){ html += mdTileHtml(g, sec.kind === 'used' ? (MD_USED[g.decor] || 0) : 0); });
       html += '</div>';
     });
-    box.innerHTML = html || '<div class="muted">Katalóg je prázdny.</div>';
+    box.innerHTML = html || '<div class="muted">' + (q ? 'Nič sa nenašlo.' : 'Katalóg je prázdny.') + '</div>';
+  }
+
+  // Dlazdica dekoru: swatch + nazov + vyrobca + suhrn variantov (chips su len
+  // prehlad — sprava variantov zije v detaile po rozkliku, audit BLOCKER 6).
+  function mdTileHtml(g, usedCount){
+    var name = g.decor === '' ? '(bez dekoru)' : g.decor;
+    var chips = '';
+    g.sheets.forEach(function(s){ chips += '<span class="vchip">' + esc(sheetChipLabel(s)) + '</span>'; });
+    g.edges.forEach(function(a){ chips += '<span class="vchip vchip-abs">' + esc(edgeChipLabel(a)) + '</span>'; });
+    return '<div class="mdtile" onclick="mdOpenDetail(' + esc(JSON.stringify(g.decor)) + ')">' +
+      '<div class="mdtile-head">' +
+      '<i class="mdsw" style="background:' + esc(rgbToHex(g.color)) + '"></i>' +
+      '<span class="mdtile-name"><b>' + esc(name) + '</b>' +
+      '<span class="mans">' + esc(g.manufacturer || 'vlastný') + '</span></span>' +
+      (usedCount ? '<span class="mdused">' + usedCount + '×</span>' : '') +
+      '</div><div class="mdtile-chips">' + (chips || '<span class="muted">bez variantov</span>') + '</div></div>';
+  }
+
+  // Detail dekoru (drill-in): hlavicka s akciami skupiny + riadky variantov
+  // (rozmer · kod · cena · dodavatel) s Upravit/zmazat — EXISTUJUCE formulare
+  // (audit BLOCKER 6: sprava variantov ostava plne dostupna).
+  function mdDetailHtml(g){
+    var name = g.decor === '' ? '(bez dekoru)' : g.decor;
+    var h = '<div class="mdcard mdet">';
+    h += '<div class="tplrow mdhead">' +
+      '<button class="ghostbtn tplbtn" onclick="mdCloseDetail()" title="Späť na katalóg" aria-label="Späť na katalóg"><svg class="ic" aria-hidden="true"><use href="#i-arrow-left"/></svg></button>' +
+      '<i class="mdsw mdsw-lg" style="background:' + esc(rgbToHex(g.color)) + '"></i>' +
+      '<span class="tpln"><b>' + esc(name) + '</b>' + (g.manufacturer ? ' <span class="tplt">' + esc(g.manufacturer) + '</span>' : '') + '</span>' +
+      (g.decor === '' ? '' :
+        '<button class="ghostbtn tplbtn" onclick="mdOpenDecorForm(' + esc(JSON.stringify(g.decor)) + ')">+ variant</button>' +
+        '<button class="ghostbtn tplbtn" onclick="mdManufacturerOpen(' + esc(JSON.stringify(g.decor)) + ')">Výrobca</button>' +
+        '<button class="ghostbtn tplbtn" onclick="mdRenameOpen(' + esc(JSON.stringify(g.decor)) + ')">Premenovať</button>') +
+      '</div>';
+    if (mdManufacturing === g.decor){
+      h += '<div class="tplrow"><input id="md_man_input" type="text" value="' + esc(g.manufacturer || '') + '" placeholder="Výrobca (napr. Egger)" style="flex:1">' +
+        '<button class="primary tplbtn" onclick="mdManufacturerSave(' + esc(JSON.stringify(g.decor)) + ')">Uložiť</button>' +
+        '<button class="ghostbtn tplbtn" onclick="mdManufacturerOpen(null)">Zrušiť</button></div>';
+    }
+    if (mdRenaming === g.decor){
+      h += '<div class="tplrow"><input id="md_rename_input" type="text" value="' + esc(g.decor) + '" style="flex:1">' +
+        '<button class="primary tplbtn" onclick="mdRenameSave(' + esc(JSON.stringify(g.decor)) + ')">Uložiť</button>' +
+        '<button class="ghostbtn tplbtn" onclick="mdRenameOpen(null)">Zrušiť</button></div>';
+    }
+    h += '<div class="mdsec">Dosky</div>';
+    if (g.sheets.length){
+      g.sheets.forEach(function(s){
+        var prot = MD_PROTECTED.indexOf(s.material_id) >= 0;
+        h += mdVariantRow(sheetChipLabel(s), s.code, s.price_per_m2, '€/m²', s.supplier, s.label,
+          'mdOpenSheetForm(\'' + esc(s.material_id) + '\')',
+          prot ? null : 'mdDeleteSheet(\'' + esc(s.material_id) + '\')', prot);
+      });
+    } else { h += '<div class="muted">žiadne dosky</div>'; }
+    h += '<div class="mdsec">ABS pásky</div>';
+    if (g.edges.length){
+      g.edges.forEach(function(a){
+        h += mdVariantRow(edgeChipLabel(a), a.code, a.price_per_bm, '€/bm', a.supplier, a.label,
+          'mdOpenEdgeForm(\'' + esc(a.abs_id) + '\')',
+          'mdDeleteEdge(\'' + esc(a.abs_id) + '\')', false);
+      });
+    } else { h += '<div class="muted">žiadne ABS pásky</div>'; }
+    h += '</div>';
+    return h;
+  }
+
+  // Riadok variantu v detaile: rozmer · kod · cena · dodavatel + akcie.
+  // Cena NEZADANA (nil) sa ukazuje ako "—" (rozlisenie od 0 — audit FIX 11).
+  function mdVariantRow(dim, code, price, unit, supplier, title, editCall, delCall, prot){
+    var priceTxt = (price === null || price === undefined || price === '') ? '—' : fmtNum(price) + ' ' + unit;
+    return '<div class="mdvrow" title="' + esc(title || '') + '">' +
+      '<span class="mdvdim">' + esc(dim) + '</span>' +
+      '<span class="mdvi">' + esc(code || '—') + '</span>' +
+      '<span class="mdvi mdvp">' + esc(priceTxt) + '</span>' +
+      '<span class="mdvi">' + esc(supplier || '—') + '</span>' +
+      '<button class="ghostbtn tplbtn" onclick="' + editCall + '">Upraviť</button>' +
+      (prot ? '<span class="tplt">predvoľba</span>'
+            : '<button class="ghostbtn tpldel" title="Zmazať" aria-label="Zmazať" onclick="' + delCall + '"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>') +
+      '</div>';
+  }
+
+  function mdFocusInline(){
     var ri = el('md_rename_input');
-    if (ri){ ri.focus(); ri.select(); }
+    if (ri){ ri.focus(); ri.select(); return; }
+    var mi = el('md_man_input');
+    if (mi){ mi.focus(); mi.select(); }
   }
   function mdRenameOpen(decor){
     mdRenaming = decor; mdManufacturing = null;
@@ -371,20 +461,31 @@
 
   // Top-level var v script tagu = window.MD v CEF; v Node require nepada na window.
   var MD_MODEL_GUID = ''; // D-42: identita modelu pre projektove predvolby (blocker 4)
+  var MD_USED = {};       // D-42 PR B: {dekor => pocet dielcov v aktivnom modeli}
+  var MD_PROJECT = {};    // posledne projektove predvolby (pre refill selectov pri setCatalog)
+  // Spolocna katalogova cast init/setCatalog (audit FIX 13: katalogove echo
+  // NEnesie modelovy kontext — ten ostava z posledneho MD.init).
+  function mdApplyCatalog(data){
+    MD_SHEETS = (data.materials && data.materials.sheets) ? data.materials.sheets : [];
+    MD_CATALOG = data.catalog || { sheets: [], edges: [] };
+    MD_PROTECTED = data.protected_ids || [];
+    MD_REV = data.catalog_rev || '';
+    fillSelect(el('md_body'), MD_SHEETS, MD_PROJECT.default_material_id);
+    fillSelect(el('md_front'), frontSheets(), MD_PROJECT.default_front_material_id);
+    fillSelect(el('md_back'), MD_SHEETS, MD_PROJECT.default_back_material_id);
+    mdRenderLists(); // rozpisany formular sa NECHAVA (mdEditing drzi stav)
+  }
   var MD = {
     init: function(data){
-      MD_SHEETS = (data.materials && data.materials.sheets) ? data.materials.sheets : [];
-      MD_CATALOG = data.catalog || { sheets: [], edges: [] };
-      MD_PROTECTED = data.protected_ids || [];
-      MD_REV = data.catalog_rev || '';
       MD_MODEL_GUID = data.model_guid || '';
+      MD_USED = data.used || {};
+      MD_PROJECT = data.project || {};
       el('mdline').textContent = 'V' + (data.version || '') + ' · skriniek v modeli: ' + (data.cabinets || 0);
-      var p = data.project || {};
-      fillSelect(el('md_body'), MD_SHEETS, p.default_material_id);
-      fillSelect(el('md_front'), frontSheets(), p.default_front_material_id);
-      fillSelect(el('md_back'), MD_SHEETS, p.default_back_material_id);
-      mdRenderLists(); // rozpisany formular sa NECHAVA (mdEditing drzi stav)
+      mdApplyCatalog(data);
     },
+    // D-42 (audit FIX 13): echo po zapise do katalogu — bez scanu modelu,
+    // modelovy kontext (predvolby/pouzite/guid) ostava.
+    setCatalog: function(data){ mdApplyCatalog(data); },
     setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; },
     // D-42 (audit FIX 8): server odmietol duplicitny kod — znovu otvor formular
     // s rozpisanymi hodnotami a nastav potvrdenie na druhe Ulozit.
@@ -402,6 +503,6 @@
   // Exportuju sa len CISTE funkcie (bez DOM); ready() sa vola len v CEF (window).
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { groupCatalogByDecor: groupCatalogByDecor, sheetChipLabel: sheetChipLabel,
-      edgeChipLabel: edgeChipLabel, mdMatchGroup: mdMatchGroup };
+      edgeChipLabel: edgeChipLabel, mdMatchGroup: mdMatchGroup, mdBuildSections: mdBuildSections };
   }
   if (typeof window !== 'undefined' && window.sketchup && sketchup.ready) sketchup.ready('');

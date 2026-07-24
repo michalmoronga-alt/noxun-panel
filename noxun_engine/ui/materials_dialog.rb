@@ -13,7 +13,10 @@ require 'json'
 module Noxun
   module Engine
     module MaterialsDialog
-      DLG_KEY = 'noxun_engine_materials'
+      # D-42 PR B: kluc bumpnuty (v2) — preferences_key drzi ulozenu geometriu
+      # okna a stara 420x360 by mriezku dlazdic stlacila (audit FIX 14). Bump =
+      # jednorazovo cerstvy default 640x560; layout ostava responzivny.
+      DLG_KEY = 'noxun_engine_materials_v2'
 
       # key -> [config kluc korpusu, rola pre hrubkovu kontrolu, pole hrubky]
       # (presunute z Panel::PROJECT_MATERIAL_TARGETS — jediny pouzivatel je tento dialog)
@@ -39,15 +42,17 @@ module Noxun
         def ensure_dialog
           return @dialog if @dialog
 
+          # D-42 PR B: sirsie okno pre mriezku dlazdic + detail (Michal: ~640 px);
+          # vyssi default, aby pod predvolbami a top barom ostal priestor gridu.
           @dialog = UI::HtmlDialog.new(
             dialog_title: 'Noxun Engine — Materiály projektu',
             preferences_key: DLG_KEY,
             scrollable: true,
             resizable: true,
-            width: 420,
-            height: 360,
-            min_width: 360,
-            min_height: 280,
+            width: 640,
+            height: 560,
+            min_width: 500,
+            min_height: 400,
             style: UI::HtmlDialog::STYLE_DIALOG
           )
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'proj_materials.html'))
@@ -96,19 +101,34 @@ module Noxun
 
         # --- Ruby -> JS -----------------------------------------------------
 
+        # PLNY stav: katalog + modelovy kontext (predvolby, pocty, pouzite dekory).
+        # Vola sa pri ready a pri prepnuti modelu. Katalogove echa po zapisoch idu
+        # cez push_catalog — model sa pri nich NEskenuje (audit FIX 13).
         def push_state
           model = Sketchup.active_model
-          data = {
+          data = catalog_payload.merge(
             version: Engine::VERSION,
+            project: Materials.project_defaults(model),       # aktualne predvolby modelu
+            cabinets: Panel.all_cabinets(model).size,
+            model_guid: model_guid(model),                    # D-42: identita modelu pre projektove predvolby
+            used: Materials.model_decor_usage(model)          # D-42 PR B: pas "Pouzite v projekte"
+          )
+          js("MD.init(#{data.to_json})")
+        end
+
+        # LEN katalogova cast (po zapise do katalogu) — ziadny scan modelu,
+        # modelovy kontext (predvolby/pouzite) v JS ostava (audit FIX 13).
+        def push_catalog
+          js("MD.setCatalog(#{catalog_payload.to_json})")
+        end
+
+        def catalog_payload
+          {
             materials: Panel.materials_payload,               # katalog dosiek pre selecty
             catalog: full_catalog_payload,                    # D-05: plne zaznamy pre spravu
             protected_ids: Materials::PROTECTED_SHEET_IDS,
-            project: Materials.project_defaults(model),       # aktualne predvolby modelu
-            cabinets: Panel.all_cabinets(model).size,
-            catalog_rev: Materials.catalog_revision,          # D-41: baseline guard formularov
-            model_guid: model_guid(model)                     # D-42: identita modelu pre projektove predvolby
+            catalog_rev: Materials.catalog_revision           # D-41: baseline guard formularov
           }
-          js("MD.init(#{data.to_json})")
         end
 
         # D-42 (audit BLOCKER 4): stabilna identita modelu (guid). Projektove
@@ -457,7 +477,10 @@ module Noxun
         # Po kazdej zmene katalogu: refresh tohto okna + zivy katalog v paneli
         # (NX.setMaterials — BEZ resetu formulara panela).
         def after_catalog_change
-          push_state
+          # D-42 (audit FIX 13): katalogovy zapis NEskenuje model — pouzite dekory
+          # a predvolby sa zapisom do katalogu nemenia; plny push_state ostava pre
+          # ready/on_model_changed/projektove predvolby.
+          push_catalog
           Panel.push_materials if defined?(Panel)
           # D-19 (Codex F3): otvorene okno Vyroba by inak drzalo stary odhad
           # platni (format sa prave mohol zmenit)
