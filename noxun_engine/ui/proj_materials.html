@@ -3,7 +3,7 @@
      (%APPDATA%). -->
 <!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.4.7zb">
+<link rel="stylesheet" href="css/panel.css?v=0.4.7zd">
 
 <h1>Materiály projektu</h1>
 <p class="sub" id="mdline">…</p>
@@ -24,8 +24,14 @@
      dekor sa meni len premenovanim CELEJ skupiny. -->
 <fieldset>
   <legend>Katalóg podľa dekorov</legend>
+  <!-- D-42 (audit FIX 9): hladanie podla nazvu dekoru / vyrobcu / kodu / dodavatela.
+       Kod je variantovy — dekor matchne, ak ho ma ktorykolvek jeho variant. -->
+  <div class="mdsearch">
+    <svg class="ic mdsearch-ic" aria-hidden="true"><use href="#i-search"/></svg>
+    <input id="mdSearch" type="text" placeholder="Hľadať dekor, výrobcu alebo kód" oninput="mdRenderLists()">
+  </div>
   <div id="mdDecorList"></div>
-  <div class="btnrow"><button class="ghostbtn" onclick="mdOpenDecorForm(null)">+ Nový dekor</button></div>
+  <div class="btnrow"><button class="ghostbtn" onclick="mdOpenDecorForm(null)"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nový dekor</button></div>
   <!-- D-41: batch formular — dekor + vlastnosti RAZ, hrubky a ABS ako zoznamy.
        Server (add_decor_batch) parsuje, validuje VSETKO a zapise naraz. -->
   <div id="mdDecorForm" style="display:none">
@@ -62,10 +68,15 @@
         <option value="none">Bez smeru</option>
       </select><span class="unit"></span>
     </div>
-    <div class="row"><label>Cena</label><input id="ms_price" type="text" value="0"><span class="unit">€/m²</span></div>
+    <!-- D-42: cena VOLITELNA — prazdna = nezadana (nie 0); doplnis v tabulke variantov -->
+    <div class="row"><label>Cena</label><input id="ms_price" type="text" placeholder="nezadaná"><span class="unit">€/m²</span></div>
+    <!-- D-42: kod (dodavatelsky/katalogovy) + preferovany dodavatel — volitelne -->
+    <div class="row"><label>Kód</label><input id="ms_code" type="text" placeholder="dodávateľský kód"><span class="unit"></span></div>
+    <div class="row"><label>Dodávateľ</label><input id="ms_supplier" type="text" placeholder="napr. Demos"><span class="unit"></span></div>
     <div class="row"><label>Farba</label><input id="ms_color" type="color" value="#d8c4a0"><span class="unit"></span></div>
     <div class="row"><label>Rodina</label><input id="ms_family" type="text" placeholder="voliteľné"><span class="unit"></span></div>
-    <div class="row"><label>Výrobca</label><input id="ms_manufacturer" type="text" placeholder="voliteľné"><span class="unit"></span></div>
+    <div class="row"><label>Výrobca</label><input id="ms_manufacturer" type="text" placeholder="voliteľné" disabled><span class="unit"></span></div>
+    <div class="hint" id="ms_man_hint" style="display:none">Výrobca je vlastnosť dekoru — mení sa pre celú skupinu (tlačidlo Výrobca na karte).</div>
     <!-- D-19: format platne pre odhad poctu platni (okno Vyroba, tab Materialy) -->
     <div class="row"><label>Formát platne</label><input id="ms_sheet_l" type="text" placeholder="2800" class="sheetdim"><span class="sheetx">×</span><input id="ms_sheet_w" type="text" placeholder="2070" class="sheetdim"><span class="unit">mm</span></div>
     <div class="btnrow">
@@ -83,7 +94,9 @@
     <div class="row"><label>Hrúbka *</label>
       <select id="me_thickness"><option value="1.0">1,0</option><option value="2.0">2,0</option></select><span class="unit">mm</span>
     </div>
-    <div class="row"><label>Cena</label><input id="me_price" type="text" value="0"><span class="unit">€/bm</span></div>
+    <div class="row"><label>Cena</label><input id="me_price" type="text" placeholder="nezadaná"><span class="unit">€/bm</span></div>
+    <div class="row"><label>Kód</label><input id="me_code" type="text" placeholder="dodávateľský kód"><span class="unit"></span></div>
+    <div class="row"><label>Dodávateľ</label><input id="me_supplier" type="text" placeholder="napr. Demos"><span class="unit"></span></div>
     <div class="row"><label>Farba</label><input id="me_color" type="color" value="#d8c4a0"><span class="unit"></span></div>
     <div class="btnrow">
       <button class="primary" onclick="mdSaveEdge()">Uložiť</button>
@@ -94,5 +107,7 @@
 
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.4.7za"></script>
-<script src="js/proj_materials.js?v=0.4.7zb"></script>
+<!-- icons.js prvy (sprite musi existovat pred prvym renderom mdRenderLists) -->
+<script src="js/errors.js?v=0.4.7ze"></script>
+<script src="js/icons.js?v=0.4.7ze"></script>
+<script src="js/proj_materials.js?v=0.4.7ze"></script>

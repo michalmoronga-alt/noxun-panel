@@ -23,3 +23,5 @@ jobs:
         run: node tests/js/test_abs_groups.js
       - name: JS testy (dekorove karty katalogu D-41)
         run: node tests/js/test_decor_groups.js
+      - name: JS testy (hladanie katalogu D-42)
+        run: node tests/js/test_material_search.js

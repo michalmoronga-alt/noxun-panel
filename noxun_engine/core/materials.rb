@@ -323,6 +323,44 @@ module Noxun
         Digest::SHA1.hexdigest(JSON.generate(catalog))[0, 12]
       end
 
+      # D-42 (audit FIX 7): vyrobca je vlastnost DEKORU (skupiny), nie variantu —
+      # meni sa atomicky pre celu skupinu (dosky; ABS vyrobcu nema). Update
+      # jednotliveho sheetu vyrobcu NEMENI (guard v handle_save_sheet). Vrati
+      # [true, pocet] alebo [false, chyba].
+      def set_decor_manufacturer(decor, manufacturer)
+        d = decor.to_s.strip
+        return [false, 'Dekor je povinný.'] if d.empty?
+        man = manufacturer.to_s.strip
+        data = load
+        changed = 0
+        data['sheets'].each do |s|
+          next unless s['decor'].to_s == d
+          s['manufacturer'] = man
+          s['family'] = "#{man} #{d}".strip
+          changed += 1
+        end
+        return [false, 'Dekor nemá dosky (výrobcu nesie doska).'] if changed.zero?
+        return [false, 'Zápis katalógu zlyhal.'] unless write(data)
+        [true, changed]
+      end
+
+      # D-42 (audit FIX 8): duplicitny KOD nie je tvrda chyba, ale nakupne riziko —
+      # presna (normalizovana) zhoda kodu v ramci ROVNAKEHO druhu (sheet/edge) a
+      # dodavatela sa hlasi a vyzaduje potvrdenie (allow_duplicate_code). Kod NIE
+      # je variant identity. Vrati pole ID kolidujucich zaznamov (bez self_id).
+      def code_conflicts(code, supplier, kind, self_id = nil)
+        c = code.to_s.strip.downcase
+        return [] if c.empty?
+        sup = supplier.to_s.strip.downcase
+        records = kind == 'edge' ? edges : sheets
+        idk = kind == 'edge' ? 'abs_id' : 'material_id'
+        records.select do |r|
+          r[idk] != self_id &&
+            r['code'].to_s.strip.downcase == c &&
+            r['supplier'].to_s.strip.downcase == sup
+        end.map { |r| r[idk] }
+      end
+
       # --- D-41 PR C2: dovytvorenie chybajucej pasky (modal "Vytvorit a pokracovat") --
 
       # Standardna sirka pasky pre hrubku dielca: najmensia z AUTO_WIDTHS s presahom
@@ -346,9 +384,11 @@ module Noxun
         return [:exists, existing] if existing
         width = auto_width_for(th)
         return [:no_standard_width, nil] unless width
+        # D-42: cena sa NEuvadza (nezadana) — dovytvorena paska caka na doplnenie
+        # ceny (rozlisenie nezadana vs 0), nie ticha 0.
         rec = {
           'abs_id' => generate_edge_id(s['decor'], 1.0, width), 'decor' => s['decor'],
-          'thickness' => 1.0, 'width' => width, 'price_per_bm' => 0.0, 'color' => s['color']
+          'thickness' => 1.0, 'width' => width, 'color' => s['color']
         }
         return [:write_failed, nil] unless upsert_edge(rec)
         [:created, rec['abs_id']]
@@ -408,10 +448,11 @@ module Noxun
           base = "#{slug(decor)}_#{slug(type)}_#{thickness_token(th)}"
           id = unique_id(base, taken)
           taken << id.upcase
+          # D-42: batch NEuklada cenu (nezadana) — doplni sa v tabulke variantov.
           data['sheets'] << normalize_sheet(
             'material_id' => id, 'family' => "#{manufacturer} #{decor}".strip,
             'manufacturer' => manufacturer, 'decor' => decor, 'type' => type,
-            'thickness' => th, 'grain' => grain, 'price_per_m2' => 0.0, 'color' => color
+            'thickness' => th, 'grain' => grain, 'color' => color
           )
           created_sheets << id
         end
@@ -429,7 +470,7 @@ module Noxun
           taken << id.upcase
           data['edges'] << normalize_edge(
             'abs_id' => id, 'decor' => decor, 'thickness' => th,
-            'width' => w, 'price_per_bm' => 0.0, 'color' => color
+            'width' => w, 'color' => color
           )
           created_edges << id
         end
@@ -561,8 +602,10 @@ module Noxun
         return [false, 'Hrúbka musí byť kladné číslo.'] unless th.is_a?(Numeric) ? th.positive? : th.to_s.strip.match?(/\A\d+([.,]\d+)?\z/) && th.to_s.tr(',', '.').to_f.positive?
         grain = (a['grain'] || a[:grain] || 'none').to_s
         return [false, 'Smer dekoru musí byť length/width/none.'] unless GRAINS.include?(grain)
-        price = a['price_per_m2'] || a[:price_per_m2] || 0
-        return [false, 'Cena nesmie byť záporná.'] if price.to_s.tr(',', '.').to_f.negative?
+        ok_p, err_p = validate_price(a['price_per_m2'] || a[:price_per_m2])
+        return [false, err_p] unless ok_p
+        ok_t, err_t = validate_text_fields(a)
+        return [false, err_t] unless ok_t
         rgb = a['color'] || a[:color]
         if rgb && !(rgb.is_a?(Array) && rgb.size == 3 && rgb.all? { |c| c.to_i.between?(0, 255) })
           return [false, 'Farba musí byť RGB 0–255.']
@@ -578,13 +621,39 @@ module Noxun
         [true, nil]
       end
 
+      # D-42: cena je VOLITELNA (nezadana = prazdna/nil). Ak je zadana, musi byt
+      # nezaporne konecne cislo — necislo ("abc") sa ODMIETNE (nie ticha 0).
+      CODE_MAX = 120
+      def validate_price(raw)
+        return [true, nil] if raw.nil? || raw.to_s.strip.empty?
+        f = begin
+          Float(raw.to_s.tr(',', '.'))
+        rescue StandardError
+          nil
+        end
+        return [false, 'Cena musí byť číslo (alebo prázdna).'] unless f && f.finite?
+        return [false, 'Cena nesmie byť záporná.'] if f.negative?
+        [true, nil]
+      end
+
+      # D-42: kod a dodavatel su volitelne kratke texty (limit proti zneuzitiu).
+      def validate_text_fields(a)
+        %w[code supplier].each do |k|
+          v = (a[k] || a[k.to_sym]).to_s
+          return [false, "Pole #{k == 'code' ? 'Kód' : 'Dodávateľ'} je príliš dlhé (max #{CODE_MAX})."] if v.length > CODE_MAX
+        end
+        [true, nil]
+      end
+
       def validate_edge_attrs(a)
         decor = (a['decor'] || a[:decor]).to_s.strip
         return [false, 'Dekor ABS je povinný.'] if decor.empty?
         th = (a['thickness'] || a[:thickness]).to_s.tr(',', '.').to_f
         return [false, 'Hrúbka ABS musí byť 1,0 alebo 2,0 mm.'] unless supported_edge_thickness?(th)
-        price = a['price_per_bm'] || a[:price_per_bm] || 0
-        return [false, 'Cena nesmie byť záporná.'] if price.to_s.tr(',', '.').to_f.negative?
+        ok_p, err_p = validate_price(a['price_per_bm'] || a[:price_per_bm])
+        return [false, err_p] unless ok_p
+        ok_t, err_t = validate_text_fields(a)
+        return [false, err_t] unless ok_t
         # D-41: sirka volitelna (legacy univerzalna paska); ak je zadana, musi byt
         # konecne cislo v EDGE_WIDTH_RANGE (audit FIX 13).
         w_raw = a['width'] || a[:width]
@@ -728,7 +797,7 @@ module Noxun
       def normalize_sheet(a)
         id = (a['material_id'] || a[:material_id]).to_s
         return nil if id.strip.empty?
-        {
+        out = {
           'material_id' => id,
           'family'      => (a['family'] || a[:family]).to_s.strip,
           'manufacturer' => (a['manufacturer'] || a[:manufacturer]).to_s.strip,
@@ -736,11 +805,17 @@ module Noxun
           'type'        => (a['type'] || a[:type]).to_s.strip,
           'thickness'   => (a['thickness'] || a[:thickness]).to_f,
           'grain'       => (a['grain'] || a[:grain] || 'none').to_s,
-          'price_per_m2' => (a['price_per_m2'] || a[:price_per_m2] || 0.0).to_f,
+          'price_per_m2' => normalize_price(a['price_per_m2'] || a[:price_per_m2]),
           'sheet_size'  => normalize_pair(a['sheet_size'] || a[:sheet_size], [2800.0, 2070.0]),
           'color'       => normalize_rgb(a['color'] || a[:color], [216, 196, 160]),
           'production_class' => 'sheet'
         }
+        # D-42: cena ako nil-alebo-Float — kluc sa uklada LEN ked je cena ZADANA
+        # (rozlisenie "nezadana" vs "0", audit FIX 11). Nil sa do JSON neuklada.
+        out.delete('price_per_m2') if out['price_per_m2'].nil?
+        put_opt(out, 'code', a['code'] || a[:code])
+        put_opt(out, 'supplier', a['supplier'] || a[:supplier])
+        out
       end
 
       def normalize_edge(a)
@@ -752,9 +827,10 @@ module Noxun
           'abs_id'       => id,
           'decor'        => (a['decor'] || a[:decor]).to_s.strip,
           'thickness'    => thickness,
-          'price_per_bm' => (a['price_per_bm'] || a[:price_per_bm] || 0.0).to_f,
+          'price_per_bm' => normalize_price(a['price_per_bm'] || a[:price_per_bm]),
           'color'        => normalize_rgb(a['color'] || a[:color], [216, 196, 160])
         }
+        out.delete('price_per_bm') if out['price_per_bm'].nil?
         # D-41: 'width' kluc sa uklada LEN ked ma hodnotu — legacy zaznam bez
         # kluca = univerzalna paska (ziadne nil kluce v JSON).
         w_raw = a['width'] || a[:width]
@@ -766,7 +842,27 @@ module Noxun
           end
           out['width'] = w if w && w.finite? && w.positive?
         end
+        put_opt(out, 'code', a['code'] || a[:code])       # D-42 dodavatelsky/katalogovy kod
+        put_opt(out, 'supplier', a['supplier'] || a[:supplier]) # D-42 preferovany dodavatel
         out
+      end
+
+      # D-42: volitelne string pole (code/supplier) — ulozi sa LEN ked ma hodnotu
+      # (trim). Prazdne/nil sa NEpridava do hashu — legacy zaznam bez kluca ostava
+      # cisty a "vymazane" pole (prazdny string z UI) sa realne odstrani.
+      def put_opt(out, key, raw)
+        v = raw.to_s.strip
+        out[key] = v unless v.empty?
+      end
+
+      # D-42 (audit FIX 11): cena rozlisuje "nezadana" (nil) od "0". Nil/prazdny
+      # vstup -> nil (kluc sa neulozi). Necislo -> nil (NIE ticha 0 z "abc".to_f).
+      # Cislo (aj 0) -> Float. Zaporne prejde tvarom, odmietne ho validator.
+      def normalize_price(raw)
+        return nil if raw.nil? || raw.to_s.strip.empty?
+        Float(raw.to_s.tr(',', '.'))
+      rescue StandardError
+        nil
       end
 
       # D-19 (Codex F4): to_f by z "abc" spravilo 0.0 a odhad platni by delil
