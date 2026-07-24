@@ -24,7 +24,7 @@ Destilát z „Výskumná správa pre kódera SketchUp pluginov" (deep research,
 - **`AttributeDictionary` podporuje len:** Boolean, Integer, Float, Length, nil, String, Time, Array, Point3d, Vector3d. Zložitejšie štruktúry ukladať ako JSON String (tak to robí KOVANIE — `NOXUN_KOVANIE/items`).
 - Pozor: Point3d/Vector3d na vertexoch sa transformujú s geometriou — surové súradnice ukladať ako obyčajné pole čísel.
 - **`Sketchup.write_default`/`read_default`** pre malé nastavenia — ukladať Float (Length nefunguje spoľahlivo), pri čítaní previesť `.mm`.
-- Konvencia slovníkov v modeli: **v Noxun Engine výhradne jediný dictionary `NOXUN`** (záväzné — [SYSTEM/01_STANDARD_draft.md](../SYSTEM/01_STANDARD_draft.md) §2.1, vrátane jedinej výnimky `dynamic_attributes/scaletool`). Prefix `NOXUN_*` je konvencia starších pluginov mimo tohto repa (KOVANIE) — v Engine nezakladať nové slovníky.
+- Konvencia slovníkov v modeli: **v Noxun Engine výhradne jediný dictionary `NOXUN`** (záväzné — [SYSTEM/01_STANDARD.md](../SYSTEM/01_STANDARD.md) §2.1, vrátane jedinej výnimky `dynamic_attributes/scaletool`). Prefix `NOXUN_*` je konvencia starších pluginov mimo tohto repa (KOVANIE) — v Engine nezakladať nové slovníky.
 
 ## HtmlDialog
 
