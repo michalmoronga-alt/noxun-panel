@@ -434,21 +434,23 @@ module Noxun
 
         # BLOCKER 5: strukturovane varianty — dosky ako [typ, hrubka] pary (typ
         # per variant, default = spolocny typ formulara), ABS ako [sirka, hrubka].
+        # Codex GH #76: STRIKTNE Float parsovanie ("18abc" NIE JE 18) — jedna
+        # pokazena strukturovana hodnota rusi CELU davku bez zapisu (validate-all).
         sheet_pairs = ths.map { |th| [type, th] }
         Array(attrs['sheet_variants'] || attrs[:sheet_variants]).each do |v|
           next unless v.is_a?(Hash)
           vt = (v['type'] || v[:type]).to_s.strip
           vt = type if vt.empty?
-          th = (v['thickness'] || v[:thickness]).to_s.tr(',', '.').to_f
-          return [false, "Hrúbka variantu #{vt} musí byť kladné číslo."] unless th.positive? && th.finite?
+          th = strict_num(v['thickness'] || v[:thickness])
+          return [false, "Hrúbka variantu #{vt} musí byť kladné číslo."] unless th && th.positive?
           sheet_pairs << [vt, th]
         end
         Array(attrs['edge_variants'] || attrs[:edge_variants]).each do |v|
           next unless v.is_a?(Hash)
-          w = (v['width'] || v[:width]).to_s.tr(',', '.').to_f
-          th = (v['thickness'] || v[:thickness]).to_s.tr(',', '.').to_f
-          return [false, "Šírka ABS #{fmt_mm(w)} musí byť 10–200 mm."] unless EDGE_WIDTH_RANGE.cover?(w)
-          return [false, "Hrúbka ABS #{fmt_mm(th)} musí byť 1 alebo 2 mm."] unless supported_edge_thickness?(th)
+          w = strict_num(v['width'] || v[:width])
+          th = strict_num(v['thickness'] || v[:thickness])
+          return [false, "Šírka ABS „#{v['width'] || v[:width]}“ musí byť 10–200 mm."] unless w && EDGE_WIDTH_RANGE.cover?(w)
+          return [false, "Hrúbka ABS „#{v['thickness'] || v[:thickness]}“ musí byť 1 alebo 2 mm."] unless th && supported_edge_thickness?(th)
           abs_list << [w, th]
         end
         return [false, 'Zadaj aspoň jednu hrúbku dosky alebo ABS pásku.'] if sheet_pairs.empty? && abs_list.empty?
@@ -555,6 +557,15 @@ module Noxun
           out << [w, th]
         end
         [true, out]
+      end
+
+      # Codex GH #76: striktne cislo z lubovolneho vstupu — Float() namiesto to_f
+      # ("18abc" -> nil, NIE 18.0). Ciarka ako desatina povolena. nil pri chybe.
+      def strict_num(raw)
+        f = Float(raw.to_s.tr(',', '.'))
+        f.finite? ? f : nil
+      rescue StandardError
+        nil
       end
 
       # 18.0 -> "18", 18.5 -> "18.5" (labely/reporty).
@@ -847,10 +858,15 @@ module Noxun
         merged = existing.merge(clean)
         ok, err = kind == 'edge' ? validate_edge_attrs(merged) : validate_sheet_attrs(merged)
         return [:invalid, err] unless ok
-        if clean.key?('code') && !allow_duplicate_code
-          sup = clean.key?('supplier') ? clean['supplier'] : existing['supplier']
-          hits = code_conflicts(clean['code'], sup, kind, id)
-          return [:code_conflict, hits] unless hits.empty?
+        # Codex GH #76: dup kontrola bezi pri zmene kodu AJ dodavatela — patch
+        # LEN dodavatela vie inak vytvorit existujuci par kod+dodavatel potichu.
+        if (clean.key?('code') || clean.key?('supplier')) && !allow_duplicate_code
+          code_val = clean.key?('code') ? clean['code'] : existing['code']
+          unless code_val.to_s.strip.empty?
+            sup = clean.key?('supplier') ? clean['supplier'] : existing['supplier']
+            hits = code_conflicts(code_val, sup, kind, id)
+            return [:code_conflict, hits] unless hits.empty?
+          end
         end
         saved = kind == 'edge' ? upsert_edge(merged) : upsert_sheet(merged)
         return [:write_failed, nil] unless saved

@@ -182,6 +182,27 @@ NxTest.test('mat-patch: duplicitny kod vyzaduje potvrdenie (allow_duplicate_code
   end
 end
 
+NxTest.test('mat-patch: zmena LEN dodavatela prejde dup kontrolou kodu (Codex GH #76)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  FMAT.upsert_sheet('material_id' => 'SD1_18', 'decor' => 'SupDup A', 'type' => 'DTDL',
+                    'thickness' => 18, 'code' => 'KOD-X', 'supplier' => 'DodavatelB')
+  FMAT.upsert_sheet('material_id' => 'SD2_18', 'decor' => 'SupDup B', 'type' => 'DTDL',
+                    'thickness' => 18, 'code' => 'KOD-X', 'supplier' => 'DodavatelA')
+  begin
+    status, hits = FMAT.patch_record('sheet', 'SD2_18', { 'supplier' => 'DodavatelB' })
+    NxTest.assert_equal(:code_conflict, status, 'patch dodavatela vytvara existujuci par kod+dodavatel')
+    NxTest.assert_equal(['SD1_18'], hits)
+    NxTest.assert_equal('DodavatelA', FMAT.sheet('SD2_18')['supplier'], 'bez potvrdenia sa nezapisal')
+    status2, = FMAT.patch_record('sheet', 'SD2_18', { 'supplier' => 'DodavatelB' }, allow_duplicate_code: true)
+    NxTest.assert_equal(:ok, status2)
+    status3, = FMAT.patch_record('sheet', 'SD2_18', { 'supplier' => 'Treti' })
+    NxTest.assert_equal(:ok, status3, 'zmena na NEkolidujuceho dodavatela bez potvrdenia')
+  ensure
+    FMAT.delete_sheet('SD1_18')
+    FMAT.delete_sheet('SD2_18')
+  end
+end
+
 # ---------------------------------------------------------------------------
 # D-42 PR C: strukturovana davka (audit BLOCKER 5 — typ per variant)
 # ---------------------------------------------------------------------------
@@ -224,6 +245,14 @@ NxTest.test('mat-batch-c: mix cipov a textu sa zluci, dedup cez identitu, zla ho
     ok3, = FMAT.add_decor_batch('decor' => 'ChipBad2',
                                 'sheet_variants' => [{ 'thickness' => 0 }])
     NxTest.refute(ok3, 'nulova hrubka variantu rusi davku')
+    # Codex GH #76: strikte parsovanie — "18abc" NIE JE 18 (to_f by preslo)
+    ok4, = FMAT.add_decor_batch('decor' => 'ChipBad3',
+                                'sheet_variants' => [{ 'thickness' => '18abc' }])
+    NxTest.refute(ok4, 'pokazena strukturovana hrubka rusi davku')
+    ok5, = FMAT.add_decor_batch('decor' => 'ChipBad4',
+                                'edge_variants' => [{ 'width' => '22abc', 'thickness' => '1' }])
+    NxTest.refute(ok5, 'pokazena strukturovana sirka rusi davku')
+    NxTest.assert_equal(nil, FMAT.abs_for_decor('ChipBad4', 1.0), 'nic sa nezapisalo')
   ensure
     bt = res.is_a?(Hash) ? res : {}
     (bt['sheets'] || []).each { |id| FMAT.delete_sheet(id) }

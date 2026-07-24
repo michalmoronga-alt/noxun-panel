@@ -581,6 +581,7 @@
       keep = { kind: ae.getAttribute('data-kind'), id: ae.getAttribute('data-id'),
                field: ae.getAttribute('data-field'), value: ae.value,
                dirty: ae.value !== (ae.getAttribute('data-orig') || ''),
+               rev: ae.getAttribute('data-rev') || '', orig: ae.getAttribute('data-orig') || '',
                s: ae.selectionStart, e: ae.selectionEnd };
     }
     fillSelect(el('md_body'), MD_SHEETS, MD_PROJECT.default_material_id);
@@ -591,7 +592,15 @@
       var sel = '.mdcell[data-kind="' + keep.kind + '"][data-id="' + keep.id + '"][data-field="' + keep.field + '"]';
       var inp = document.querySelector(sel);
       if (inp){
-        if (keep.dirty) inp.value = keep.value;
+        if (keep.dirty){
+          // Codex GH #76: dirty bunka si drzi POVODNY baseline (rev + orig) —
+          // cerstvy data-rev z refreshu by jej blur nechal prepisat zmenu ineho
+          // okna bez konfliktu. So starym rev server pri cudzej zmene vrati
+          // :conflict a hodnoty sa obnovia (ziadny tichy prepis).
+          inp.value = keep.value;
+          inp.setAttribute('data-rev', keep.rev);
+          inp.setAttribute('data-orig', keep.orig);
+        }
         inp.focus();
         try { inp.setSelectionRange(keep.s, keep.e); } catch (e2) { /* select nepodporene */ }
       }
