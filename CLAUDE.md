@@ -23,6 +23,7 @@ GitHub: https://github.com/michalmoronga-alt/noxun-panel
 
 - **Záväzný štandard dát:** [SYSTEM/01_STANDARD.md](SYSTEM/01_STANDARD.md) (dictionary NOXUN, mm Float, roly, regenerate pattern)
 - **Roadmapa a backlog postrehov:** [SYSTEM/04_ROADMAP.md](SYSTEM/04_ROADMAP.md) · dogfooding zápisník: [SYSTEM/08_DOGFOODING.md](SYSTEM/08_DOGFOODING.md) · UI vízia: [SYSTEM/07_UI_VIZIA.md](SYSTEM/07_UI_VIZIA.md)
+- **Glosár pojmov + stolárske poznatky:** [SYSTEM/09_POJMY.md](SYSTEM/09_POJMY.md) — jednotný jazyk sedení a fakty domény (postforming, formáty, hrúbky, ABS obchodné hodnoty); trvalé poznatky z hlásení zapisovať SEM
 - **Historické dokumenty (uzavreté rozhodnutia, plné texty hotových etáp a vyriešených postrehov):** [SYSTEM/archiv/](SYSTEM/archiv/)
 - **Pravidlá SketchUp kódu:** [docs/SKETCHUP_PRAVIDLA.md](docs/SKETCHUP_PRAVIDLA.md) · DC pasce: [docs/DC_PRAVIDLA.md](docs/DC_PRAVIDLA.md) · UI dizajn: [docs/UI_DIZAJN.md](docs/UI_DIZAJN.md) — kompletné a samostatné v tomto repe. (Nadradený `..\CLAUDE.md` existuje len v Michalovom lokálnom workspace `C:\APP DEV\RUBY` — mapa ostatných pluginov; pre prácu v tomto repe nie je potrebný.)
 
