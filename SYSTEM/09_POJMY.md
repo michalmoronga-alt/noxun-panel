@@ -27,7 +27,7 @@
 - **Postforming** = laminát plynulo prechádza z plochy cez zaoblenú hranu pod dosku (uzavreté UV lakom); skladba: laminát 0,6 + nosič DTD + protiťahový papier.
 - **PD šírky 600: postforming LEN z prednej pozdĺžnej hrany. Šírky 900/920/1100: postforming na OBOCH pozdĺžnych hranách** (Michal 25.7.). Dôsledok pre ABS logiku: postforming hrany sa NEolepujú.
 - **Rezané konce PD** sa lepia hranou š.45 (Demos „HPDB š.45" — laminátová hrana; pribalená len k objednávke CELEJ dosky).
-- Štandard PD: hrúbka 38, dĺžka 4100 (Demos: 4100/600 a 4100/920).
+- **Reálny sortiment (prieskum 29.7., plné dáta: [zdroje/DEMOS_PD_prieskum_2026-07.md](zdroje/DEMOS_PD_prieskum_2026-07.md)):** šírky 600/635/650/900/920/1200 (+ zásteny 640), hrúbka 38 dominuje + **nové línie 20 mm (ABS rovná hrana, Egger 7/2026) a kompakt 12 mm** — šírka a hrúbka sú atribúty variantu, nie typy. **Tri podtypy hranovej úpravy: postforming / ABS rovná hrana (páska 1,5) / kompakt (monolitická)** — riadi ABS logiku prednej hrany. **PD existuje len pre „veľké" dekory** (drevo/kameň/betón) — uni a lesklé MG dekory PD spravidla nemajú.
 - Pri spotrebičoch pod PD (umývačka, rúra) treba spodok prelepiť hliníkovou páskou (ochrana proti pare) — poznámka z Demos popisu.
 
 ### Dosky (DTDL)
@@ -42,7 +42,7 @@
 
 - **Zástena** = doska medzi PD a hornými skrinkami; **hrúbka zvyčajne 10–12 mm**, dĺžky ako pracovné dosky (4100) (Michal 29.7.).
 - **Obojstranné dekory:** zástena máva občas KAŽDÚ stranu úplne iný dekor (šetrenie výroby — na stenu sa lepí nepohľadovou stranou, pohľadová ostáva von). Dátový dôsledok: variant môže niesť dva dekory (líce/rub) — doriešiť pri PD/zástena modeli vo V0.6.
-- Demos príklad z mailov: „Zástena K551/K552 4100/640/10" — dvojité označenie dekoru v názve = líce/rub.
+- **Potvrdené prieskumom (29.7., 102 položiek):** konzistentný vzor 4100×640, hrúbka **9,2 (Egger) / 10 (Kronospan)**, dva dekory VŽDY v názve — obojstranný dekor je štandard sortimentu, nie výnimka. Demos príklad: „Zástena K551/K552 4100/640/10".
 
 ### ABS hrany
 
