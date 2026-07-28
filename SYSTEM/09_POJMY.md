@@ -55,6 +55,8 @@
 
 ### Dodávatelia a zdroje cien (29.7. — mail research + Disk prieskum)
 
+- ⚠️ **STRATEGICKÁ ZMENA (Michal 29.7.): na VEPO sa NEVIAZAŤ.** Spolupráca s VEPO sa pravdepodobne bude ukončovať (zmena vedenia) — objednávky sa budú postupne presmerúvať na EN DANIELI; z VEPO možno len časť materiálu alebo nič. **Dizajnový princíp: katalóg aj výstupy sú supplier-agnostické** — `supplier` per variant (D-42 model to už vie), sadzby služieb (porez/olep) ako dáta per dodávateľ, a popri VEPO CSV exporte počítať s **exportom výrobného zadania pre EN DANIELI** (textová gramatika `<n> ks – A × B – ABS: …` — zdokumentovaná v internom podklade). VEPO cenník na Disku ostáva dobrý zdroj HISTORICKÝCH cien pre seed.
+
 - **VEPO** (Ružomberok) = plošný materiál + porez + olep + kovanie; objednávky cez webformulár, CP s parsovateľnou tabuľkou. **Na firemnom Disku existuje `Cenník_Vepo_19` (XLSX, verzie 07/2024 a 10/2024)** — Egger/Kronospan/Getalit/Pfleiderer DTD + Velvet MDF fronty + ABS hrany; stĺpce značka/kategória/názov/MJ/cenníková vs. individuálna cena → **primárny zdroj nákupných cien pre seed katalógu** (čítať cez download+openpyxl, nie plain read). Sadzby služieb (porez/olep/lepenie) = vstup kalkulácie ponuky; konkrétne hodnoty v internom podklade mimo repa.
 - **EN DANIELI** (Lipt. Mikuláš, od 04/2026) = alternatívny porez/olep/kovanie; POZOR: ceny uvádza s DPH (VEPO bez DPH) — pri porovnávaní vždy zjednotiť režim.
 - **Falco a Kastamonu dosky sa kupujú cez VEPO** (nie Demos) — rieši otvorený bod seedu; `supplier` pole per variant.
