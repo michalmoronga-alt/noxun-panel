@@ -45,7 +45,7 @@
 - **Šírky v praxi:** takmer sa neriešia — hlavná je **23**; **28** na hrubšie materiály (20 mm+).
 - **Hĺbka odfrezovania sa u nás NErieši** — to spracúva VEPO; na našej strane ide len o výber hrúbky pásky a priradenie kódu.
 - ABS sa objednáva na metre (bal. 25/75 m).
-- **Prieskum Demos per dekor (29.7., plné tabuľky s kódmi: [zdroje/DEMOS_ABS_prieskum_2026-07.md](zdroje/DEMOS_ABS_prieskum_2026-07.md)):** bežné dekory majú 23+43 v 0,8 aj 2,0 takmer vždy skladom (default model „jednotka+dvojka" platí) — ALE **lesklé MG dekory majú JEDINÚ hrúbku 1 mm** (0,8 ani 2 neexistujú → pravidlá potrebujú fallback „najbližšia hrúbka, ktorú dekor má"), **Halifax má dvojku len ako 22/2** (nie 23), existuje aj mikro-hrana 22/0,4 a Raukantex 1,2. Guard hrúbok ABS → povoliť {0,4 · 0,8 · 1,0 · 1,2 · 1,5 · 2,0}. Dvojka je ~1,4–1,8× drahšia než 0,8. Falco a Kastamonu na Demose neexistujú (iný dodávateľ — otvorené).
+- **Prieskum Demos per dekor (29.7., plné tabuľky s kódmi: [zdroje/DEMOS_ABS_prieskum_2026-07.md](zdroje/DEMOS_ABS_prieskum_2026-07.md)):** bežné dekory majú 23+43 v 0,8 aj 2,0 takmer vždy skladom (default model „jednotka+dvojka" platí) — ALE **lesklé MG dekory majú JEDINÚ hrúbku 1 mm** (0,8 ani 2 neexistujú → pravidlá potrebujú fallback „najbližšia hrúbka, ktorú dekor má"), **Halifax má dvojku len ako 22/2** (nie 23), existuje aj mikro-hrana 22/0,4 a Raukantex 1,2. Guard hrúbok ABS → povoliť {0,4 · 0,8 · 1,0 · 1,2 · 1,5 · 2,0} — **potvrdené (Michal 29.7.):** mikro-hrana 0,4 sa takmer nepoužíva, ale zaradí sa rovno („nech máme pokryté spektrum") — šum vo výbere vyrieši inteligentné UI/UX zobrazovanie (odporúčané hore, exotika zbalená). Dvojka je ~1,4–1,8× drahšia než 0,8. **Falco a Kastamonu:** iní dodávatelia, zatiaľ sa neriešia — pár dekorov a cien sa vyplní ručne (mimo Demos flow).
 
 ### Demos (hlavný dodávateľ ~90 % materiálu)
 
@@ -55,7 +55,7 @@
 
 ## Otvorené otázky (na slovné sedenia)
 
-1. **Kľúč dekorovej skupiny naprieč typmi:** K2738 „PW BU" (DTDL) vs „FP" (PD) — jedna skupina „K2738 Torro Cremona Oak"? Dnes je dekor jeden string; ak má PD inú štruktúru, kľúč bez štruktúry? (sedenie ③)
+1. ~~Kľúč dekorovej skupiny naprieč typmi~~ — **ROZHODNUTÉ (sedenie ③, 29.7.):** kľúč skupiny = **výrobca + číslo dekoru** (K2738, F800); **štruktúra povrchu (ST9, PW BU, FP, MG…) sa presúva na VARIANT**. U Eggera sa prakticky nič nemení, u Kronospanu to spája DTDL+PD do jednej skupiny a rieši aj viacero povrchov pod jedným číslom (5981 MG vs BS/PD). Realizácia v dávke 2A (malá migrácia názvov seedu).
 2. ~~ABS obchodné vs nominálne hodnoty~~ — **ROZHODNUTÉ (sedenie ③, 29.7.):** katalóg prechádza na **reálne obchodné hrúbky** (0,8 / 1 / 1,5 / 2 — guard V0.3.3 sa uvoľní na tieto hodnoty) a auto-šírky 22→**23** (+43). UI môže „jednotku" ukazovať s obchodným aliasom. Realizácia v dávke 2A (V0.6); prieskum dostupných ABS per dekor zo seedu beží (subagent 29.7.).
-3. **PD varianty rovnakej hrúbky s rôznou šírkou** (F800: PD 38×600 DK 514485 + PD 38×920 DK 514486): identita variantu = typ+hrúbka → dve šírky sa nezmestia. Model potrebuje šírku/formát v identite PD variantu (V0.6 bod „PD v dekorovej skupine").
+3. ~~PD varianty rovnakej hrúbky s rôznou šírkou~~ — **ROZHODNUTÉ (sedenie ③, 29.7.):** PD sa **NErámcuje na pevné šírkové typy** („PD 600/PD 920" nebudú typy) — šírok je veľa a závisia od výrobcu a typu (600, 650, 920, 950, 1200…). **Šírka/formát = atribút variantu**: identita PD variantu = typ „PD" + hrúbka + formát. D-44 pickery: typ zostáva krátky zoznam (DTDL, PD, HDF…), formát je samostatné pole. Prieskum reálnych PD šírok na Demose beží (subagent 29.7.).
 4. **Hrúbka 18,6** (Halifax) v hrúbkových guardoch, dedení a semafore — overiť, či nikde nie je natvrdo 18/19.
