@@ -2,7 +2,7 @@
 # Noxun Engine — materialovy katalog (standard sekcia 7). Perzistencia JSON v
 # %APPDATA%\NOXUN\Engine\materials.json + .bak zaloha pri zapise (pattern z templates.rb).
 #
-# Dve triedy zaznamov v jednom subore:
+# Dve triedy zaznamov v jednom katalogu:
 #   sheets — doskove materialy (variant = dekor + typ + hrubka; standard 7.1). production_class sheet.
 #   edges  — ABS pasky (variant = dekor + hrubka ABS; standard 7.5).
 #
@@ -11,6 +11,17 @@
 # Vyrobny material dielca je ulozeny v jeho NOXUN/config['material_id'] (standard 7.3).
 #
 # Projektove defaulty (dedenie, standard 7.2) ziju v NOXUN dict na MODELI (project_defaults).
+#
+# Modul Materials je od V0.5.1 rozdeleny (mechanicky split) do 5 suborov — vsetky
+# otvaraju ten isty `module Noxun::Engine::Materials` s module_function, takze
+# volania Materials.xyz ostavaju rovnake bez ohladu na fyzicky subor:
+#   materials.rb          — TENTO subor: cesty/perzistencia, citanie katalogu,
+#                            SketchUp vizualny material, normalizacia zaznamov
+#                            a zdielane helpery pouzivane vo viacerych ostatnych suboroch.
+#   materials_catalog.rb  — CRUD, validacia + generovanie ID, scan pouzitia, D-42 patch protokol, seed.
+#   materials_decor.rb    — D-41 dekor = kluc skupiny, dovytvorenie ABS pasky, batch "Novy dekor".
+#   materials_abs.rb      — ABS podla dekoru (picker, pravidlove defaulty, remap).
+#   materials_project.rb  — projektove defaulty na modeli + pouzitie dekorov v projekte.
 require 'json'
 require 'fileutils'
 require 'digest'
@@ -106,41 +117,6 @@ module Noxun
         edges.find { |a| a['abs_id'] == id }
       end
 
-      # --- CRUD (UI sprava katalogu je V0.5; teraz staci citanie + seed + zaklad zapisu) -------
-
-      def upsert_sheet(attrs)
-        rec = normalize_sheet(attrs)
-        return false if rec.nil?
-        data = load
-        data['sheets'] = data['sheets'].reject { |m| m['material_id'] == rec['material_id'] } + [rec]
-        write(data)
-      end
-
-      def upsert_edge(attrs)
-        rec = normalize_edge(attrs)
-        return false if rec.nil?
-        data = load
-        data['edges'] = data['edges'].reject { |a| a['abs_id'] == rec['abs_id'] } + [rec]
-        write(data)
-      end
-
-      def delete_sheet(id)
-        data = load
-        data['sheets'] = data['sheets'].reject { |m| m['material_id'] == id }
-        write(data)
-      end
-
-      def delete_edge(id)
-        data = load
-        data['edges'] = data['edges'].reject { |a| a['abs_id'] == id }
-        write(data)
-      end
-
-      def ensure_seeded
-        return if JsonFileStore.available?(path)
-        write({ 'sheets' => seed_sheets, 'edges' => seed_edges })
-      end
-
       # Zapis so zalohou: existujuci subor -> .bak, novy cez .tmp + atomicky rename (ako templates.rb).
       def write(data)
         payload = { 'std' => STD, 'sheets' => data['sheets'], 'edges' => data['edges'] }
@@ -153,425 +129,6 @@ module Noxun
       def reload!
         JsonFileStore.reload!(path)
         load
-      end
-
-      # --- ABS podla dekoru (pravidlove defaulty, standard 7.5) ----------------
-
-      # Najde ABS variant daneho dekoru a hrubky ABS (mm), volitelne pre cielovu
-      # hrubku dielca (vyber sirky pasky). Vrati abs_id alebo nil.
-      # D-41: deterministicky picker (audit BLOCKER 2 — NIKDY uzsia paska):
-      #   s hrubkou dielca: najmensia sirka >= hrubka+WIDTH_MARGIN -> legacy bez
-      #     sirky (univerzalna) -> nil (ziadna vyhovujuca; volajuci ohlasi).
-      #   bez hrubky (defenzivny fallback): legacy bez sirky -> najsirsia
-      #     (siroku mozno orezat, uzka nepokryje).
-      # Tie-break vzdy abs_id vzostupne (audit FIX 11 — stabilne poradie nezavisle
-      # od poradia zaznamov v subore).
-      def abs_for_decor(decor, thickness, part_thickness = nil)
-        rec = pick_edge_variant(edge_candidates(decor, thickness), part_thickness)
-        rec && rec['abs_id']
-      end
-
-      # Kandidati: pasky presne zhodneho dekoru a hrubky ABS, zoradene abs_id.
-      def edge_candidates(decor, thickness)
-        return [] if decor.nil?
-        th = thickness.to_f
-        edges.select { |a| a['decor'] == decor && (a['thickness'].to_f - th).abs < 0.01 }
-             .sort_by { |a| a['abs_id'].to_s }
-      end
-
-      # Cisty vyber varianty z kandidatov (testovatelne bez katalogu).
-      def pick_edge_variant(cands, part_thickness = nil)
-        return nil if cands.empty?
-        widthless = cands.select { |a| edge_width(a).nil? }
-        widthed   = cands.reject { |a| edge_width(a).nil? }
-        if part_thickness
-          need = part_thickness.to_f + WIDTH_MARGIN
-          fit = widthed.select { |a| edge_width(a) >= need - 0.001 }
-                       .min_by { |a| [edge_width(a), a['abs_id'].to_s] }
-          fit || widthless.first
-        else
-          widthless.first || widthed.max_by { |a| [edge_width(a), a['abs_id'].to_s] }
-        end
-      end
-
-      # Sirka pasky ako Float alebo nil (legacy univerzalna).
-      def edge_width(rec)
-        v = rec && rec['width']
-        v.nil? ? nil : v.to_f
-      end
-
-      # D-41 PR C (audit FIX 5): JEDNO jadro preladenia mapy hran {code=>abs_id|nil}
-      # zo stareho dekoru na novy — pouzivaju ho doska AJ dielcove overridy.
-      # Meni LEN pasky presne zhodne so starym dekorom; cudzi dekor = vedoma
-      # kontrastna volba a nil = vedome "bez ABS" — tie sa NIKDY nedotknu.
-      # target_thickness = cielova hrubka dielca (vyber sirky novej pasky).
-      # Vrati [nova_mapa alebo nil (nic na prevod), pole hran bez nahrady].
-      def remap_edges(edges_hash, old_decor, new_decor, target_thickness = nil)
-        return [nil, []] unless edges_hash.is_a?(Hash) && old_decor && new_decor && old_decor != new_decor
-        out = edges_hash.dup
-        changed = false
-        lost = []
-        out.each_key do |code|
-          aid = out[code]
-          next if aid.nil?
-          rec = edge(aid)
-          next unless rec && rec['decor'] == old_decor
-          new_aid = abs_for_decor(new_decor, rec['thickness'], target_thickness)
-          lost << code if new_aid.nil?
-          out[code] = new_aid
-          changed = true
-        end
-        [changed ? out : nil, lost]
-      end
-
-      # Dekor doskoveho materialu (pre napojenie ABS na rovnaky dekor). nil ak material nie je v katalogu.
-      def decor_of(material_id)
-        s = sheet(material_id)
-        s && s['decor']
-      end
-
-      # --- D-41: dekor = kluc skupiny (audit BLOCKER 1) -------------------------
-      # Vazba material<->ABS bezi cez PRESNY string 'decor' (trim pri zapise robi
-      # normalize_*). Preklepy chytame near-match guardom: novy dekor, ktory sa od
-      # existujuceho lisi len velkostou pismen/medzerami, sa odmietne s presnym tvarom.
-
-      # Normalizovany kluc na porovnanie "skoro rovnakych" dekorov. Medzery sa
-      # odstranuju UPLNE (Codex GH #70: "U702ST9" vs "U702 ST9" je ten isty
-      # preklep ako dvojita medzera — kolaps na jednu by ho prepustil).
-      def decor_norm_key(d)
-        d.to_s.gsub(/\s+/, '').downcase
-      end
-
-      # Existujuci dekor, ktory sa s danym zhoduje na norm kluci, ale NIE presne
-      # (preklep/iny zapis). Vrati existujuci string alebo nil.
-      def decor_conflict(decor)
-        want = decor.to_s.strip
-        key = decor_norm_key(want)
-        return nil if key.empty?
-        all_decors.find { |d| d != want && decor_norm_key(d) == key }
-      end
-
-      def all_decors
-        (sheets.map { |s| s['decor'].to_s } + edges.map { |a| a['decor'].to_s }).uniq
-      end
-
-      # Variant identity lookupy (dup guard pri create; audit FIX 16):
-      # sheet = dekor + typ (case-insensitive) + hrubka; edge = dekor + sirka + hrubka.
-      def find_sheet_variant(decor, type, thickness)
-        d = decor.to_s.strip
-        t = type.to_s.strip.upcase
-        th = thickness.to_f
-        sheets.find do |s|
-          s['decor'].to_s == d && s['type'].to_s.strip.upcase == t &&
-            (s['thickness'].to_f - th).abs < 0.01
-        end
-      end
-
-      def find_edge_variant(decor, width, thickness)
-        d = decor.to_s.strip
-        th = thickness.to_f
-        w = width.nil? || width.to_s.strip.empty? ? nil : width.to_s.tr(',', '.').to_f
-        edges.find do |a|
-          next false unless a['decor'].to_s == d && (a['thickness'].to_f - th).abs < 0.01
-          aw = edge_width(a)
-          w.nil? ? aw.nil? : (aw && (aw - w).abs < 0.01)
-        end
-      end
-
-      # Atomicke premenovanie dekoru CELEJ skupiny (sheets + edges, 1 zapis).
-      # ID zaznamov sa NIKDY nemenia (modely drzia vazbu cez id) — meni sa len text.
-      # Merge do existujucej skupiny je povoleny, len ak nevzniknu duplicitne
-      # varianty. Vrati [true, pocet] alebo [false, chyba].
-      def rename_decor(old_decor, new_decor)
-        from = old_decor.to_s.strip
-        to = new_decor.to_s.strip
-        return [false, 'Dekor je povinný.'] if from.empty? || to.empty?
-        return [false, 'Nový názov je rovnaký.'] if from == to
-        conflict = decor_conflict(to)
-        if conflict && conflict != from
-          return [false, "Názov sa líši od existujúceho „#{conflict}“ len zápisom — použi presný tvar."]
-        end
-        data = load
-        changed = 0
-        %w[sheets edges].each do |k|
-          data[k].each do |r|
-            next unless r['decor'].to_s == from
-            r['decor'] = to
-            changed += 1
-          end
-        end
-        return [false, 'Dekor sa nenašiel.'] if changed.zero?
-        dup = dup_variant_in(data)
-        return [false, "Premenovaním by vznikli duplicitné varianty (#{dup}) — zlúčenie nie je možné."] if dup
-        return [false, 'Zápis katalógu zlyhal.'] unless write(data)
-        [true, changed]
-      end
-
-      # Prva duplicitna variant identity v datach (popis) alebo nil.
-      def dup_variant_in(data)
-        s = data['sheets'].group_by { |r| [r['decor'].to_s, r['type'].to_s.strip.upcase, r['thickness'].to_f.round(2)] }
-                          .find { |_, v| v.size > 1 }
-        return "#{s[0][0]} #{s[0][1]} #{s[0][2]} mm" if s
-        e = data['edges'].group_by { |r| [r['decor'].to_s, edge_width(r)&.round(2), r['thickness'].to_f.round(2)] }
-                         .find { |_, v| v.size > 1 }
-        e && "ABS #{e[0][0]} #{e[0][1] ? "#{e[0][1]}/" : ''}#{e[0][2]} mm"
-      end
-
-      # Kratky odtlacok obsahu katalogu — baseline guard okna (audit FIX 15):
-      # formular ulozeny nad starsim stavom sa odmietne, klient si vypyta refresh.
-      def catalog_revision
-        Digest::SHA1.hexdigest(JSON.generate(catalog))[0, 12]
-      end
-
-      # D-42 (audit FIX 7): vyrobca je vlastnost DEKORU (skupiny), nie variantu —
-      # meni sa atomicky pre celu skupinu (dosky; ABS vyrobcu nema). Update
-      # jednotliveho sheetu vyrobcu NEMENI (guard v handle_save_sheet). Vrati
-      # [true, pocet] alebo [false, chyba].
-      def set_decor_manufacturer(decor, manufacturer)
-        d = decor.to_s.strip
-        return [false, 'Dekor je povinný.'] if d.empty?
-        man = manufacturer.to_s.strip
-        data = load
-        changed = 0
-        data['sheets'].each do |s|
-          next unless s['decor'].to_s == d
-          s['manufacturer'] = man
-          s['family'] = "#{man} #{d}".strip
-          changed += 1
-        end
-        return [false, 'Dekor nemá dosky (výrobcu nesie doska).'] if changed.zero?
-        return [false, 'Zápis katalógu zlyhal.'] unless write(data)
-        [true, changed]
-      end
-
-      # D-42 (audit FIX 8): duplicitny KOD nie je tvrda chyba, ale nakupne riziko —
-      # presna (normalizovana) zhoda kodu v ramci ROVNAKEHO druhu (sheet/edge) a
-      # dodavatela sa hlasi a vyzaduje potvrdenie (allow_duplicate_code). Kod NIE
-      # je variant identity. Vrati pole ID kolidujucich zaznamov (bez self_id).
-      def code_conflicts(code, supplier, kind, self_id = nil)
-        c = code.to_s.strip.downcase
-        return [] if c.empty?
-        sup = supplier.to_s.strip.downcase
-        records = kind == 'edge' ? edges : sheets
-        idk = kind == 'edge' ? 'abs_id' : 'material_id'
-        records.select do |r|
-          r[idk] != self_id &&
-            r['code'].to_s.strip.downcase == c &&
-            r['supplier'].to_s.strip.downcase == sup
-        end.map { |r| r[idk] }
-      end
-
-      # --- D-41 PR C2: dovytvorenie chybajucej pasky (modal "Vytvorit a pokracovat") --
-
-      # Standardna sirka pasky pre hrubku dielca: najmensia z AUTO_WIDTHS s presahom
-      # >= WIDTH_MARGIN; mimo standardov nil (audit BLOCKER 4 — ziadne porusenie
-      # presahu, auto-tvorba sa radsej odmietne).
-      def auto_width_for(thickness)
-        th = thickness.to_f
-        AUTO_WIDTHS.find { |w| w >= th + WIDTH_MARGIN - 0.001 }
-      end
-
-      # Zabezpeci 1,0 mm pasku dekoru daneho sheetu pouzitelnu pre jeho hrubku.
-      # SERVEROVA autorita modalu (JS checku sa neveri — audit BLOCKER 3): stav sa
-      # overi znova a zapis bezi az po vsetkych kontrolach (audit FIX 8). Katalogovy
-      # zapis je MIMO model undo — volajuci to hlasi pouzivatelovi (NOTE 9).
-      # Vrati [:exists|:created, abs_id] alebo [:no_sheet|:no_standard_width|:write_failed, nil].
-      def ensure_edge_for_sheet(material_id)
-        s = sheet(material_id)
-        return [:no_sheet, nil] unless s
-        th = s['thickness'].to_f
-        existing = abs_for_decor(s['decor'], 1.0, th.positive? ? th : nil)
-        return [:exists, existing] if existing
-        width = auto_width_for(th)
-        return [:no_standard_width, nil] unless width
-        # D-42: cena sa NEuvadza (nezadana) — dovytvorena paska caka na doplnenie
-        # ceny (rozlisenie nezadana vs 0), nie ticha 0.
-        rec = {
-          'abs_id' => generate_edge_id(s['decor'], 1.0, width), 'decor' => s['decor'],
-          'thickness' => 1.0, 'width' => width, 'color' => s['color']
-        }
-        return [:write_failed, nil] unless upsert_edge(rec)
-        [:created, rec['abs_id']]
-      end
-
-      # --- D-41 PR B: batch "Novy dekor" (audit FIX 14) -------------------------
-      # Cely vstup sa NAJPRV parsuje a validuje do pamate; JEDINY chybny token
-      # zrusi celu davku BEZ zapisu. Existujuce IDENTICKE varianty sa preskocia
-      # (report), vsetko nove sa zapise JEDNYM Materials.write. ID sa generuju
-      # proti kumulativnemu taken zoznamu (katalog + uz pripravene polozky davky).
-      #
-      # attrs: decor, manufacturer, type, grain, color([r,g,b]),
-      #        thicknesses (string "18, 36"), abs_tokens (string "22/1, 43/1, 43/2"),
-      #        D-42 PR C (audit BLOCKER 5) navyse STRUKTUROVANE varianty z preset
-      #        cipov: sheet_variants [{type?, thickness}] (typ per variant — "PD 38"
-      #        vedla DTDL 18 v JEDNEJ validate-all davke) a edge_variants
-      #        [{width, thickness}]. Stringove polia ostavaju (vlastne hodnoty);
-      #        vsetko sa zluci a deduplikuje TOLERANCNE podla variant identity.
-      # Vrati [true, {sheets:[id...], edges:[id...], skipped:[popis...]}] alebo [false, chyba].
-      def add_decor_batch(attrs)
-        decor = (attrs['decor'] || attrs[:decor]).to_s.strip
-        return [false, 'Dekor je povinný.'] if decor.empty?
-        # Preklep guard: near-match s INYM presnym tvarom = stop. Presna zhoda =
-        # legitimne doplnanie variantov do existujucej skupiny ("+ variant").
-        if (near = decor_conflict(decor))
-          return [false, "Dekor sa líši od existujúceho „#{near}“ len zápisom — použi presný tvar."]
-        end
-        manufacturer = (attrs['manufacturer'] || attrs[:manufacturer]).to_s.strip
-        existing_man = sheets.find { |s| s['decor'] == decor && !s['manufacturer'].to_s.strip.empty? }
-        if existing_man && !manufacturer.empty? && existing_man['manufacturer'].to_s.strip != manufacturer
-          return [false, "Skupina #{decor} už má výrobcu #{existing_man['manufacturer']} — dva výrobcovia v jednej skupine nie sú dovolené."]
-        end
-        type = (attrs['type'] || attrs[:type]).to_s.strip
-        type = 'DTDL' if type.empty?
-        grain = (attrs['grain'] || attrs[:grain] || 'length').to_s
-        return [false, 'Smer dekoru musí byť length/width/none.'] unless GRAINS.include?(grain)
-        color = normalize_rgb(attrs['color'] || attrs[:color], [216, 196, 160])
-
-        ok_th, ths = parse_number_list(attrs['thicknesses'] || attrs[:thicknesses])
-        return [false, ths] unless ok_th
-        ok_abs, abs_list = parse_abs_tokens(attrs['abs_tokens'] || attrs[:abs_tokens])
-        return [false, abs_list] unless ok_abs
-
-        # BLOCKER 5: strukturovane varianty — dosky ako [typ, hrubka] pary (typ
-        # per variant, default = spolocny typ formulara), ABS ako [sirka, hrubka].
-        # Codex GH #76: STRIKTNE Float parsovanie ("18abc" NIE JE 18) — jedna
-        # pokazena strukturovana hodnota rusi CELU davku bez zapisu (validate-all).
-        sheet_pairs = ths.map { |th| [type, th] }
-        Array(attrs['sheet_variants'] || attrs[:sheet_variants]).each do |v|
-          next unless v.is_a?(Hash)
-          vt = (v['type'] || v[:type]).to_s.strip
-          vt = type if vt.empty?
-          th = strict_num(v['thickness'] || v[:thickness])
-          return [false, "Hrúbka variantu #{vt} musí byť kladné číslo."] unless th && th.positive?
-          sheet_pairs << [vt, th]
-        end
-        Array(attrs['edge_variants'] || attrs[:edge_variants]).each do |v|
-          next unless v.is_a?(Hash)
-          w = strict_num(v['width'] || v[:width])
-          th = strict_num(v['thickness'] || v[:thickness])
-          return [false, "Šírka ABS „#{v['width'] || v[:width]}“ musí byť 10–200 mm."] unless w && EDGE_WIDTH_RANGE.cover?(w)
-          return [false, "Hrúbka ABS „#{v['thickness'] || v[:thickness]}“ musí byť 1 alebo 2 mm."] unless th && supported_edge_thickness?(th)
-          abs_list << [w, th]
-        end
-        return [false, 'Zadaj aspoň jednu hrúbku dosky alebo ABS pásku.'] if sheet_pairs.empty? && abs_list.empty?
-
-        data = load
-        taken = (data['sheets'].map { |s| s['material_id'].to_s.upcase } +
-                 data['edges'].map { |a| a['abs_id'].to_s.upcase })
-        created_sheets = []
-        created_edges = []
-        skipped = []
-
-        # Dedup v ramci davky s TOLERANCIOU 0.01 mm (Codex GH #71: 18 a 18.004 su
-        # ten isty variant — exact uniq by pustil duplicitne zaznamy s -2 ID).
-        # BLOCKER 5: identita dosky = TYP + hrubka (PD 38 a DTDL 38 su dva varianty).
-        seen_sheets = []
-        sheet_pairs.each do |(vt, th)|
-          next if seen_sheets.any? { |(pt, pth)| pt == vt.upcase && (pth - th).abs < 0.01 }
-          seen_sheets << [vt.upcase, th]
-          if find_sheet_variant(decor, vt, th)
-            skipped << "#{vt} #{fmt_mm(th)}"
-            next
-          end
-          base = "#{slug(decor)}_#{slug(vt)}_#{thickness_token(th)}"
-          id = unique_id(base, taken)
-          taken << id.upcase
-          # D-42: batch NEuklada cenu (nezadana) — doplni sa v tabulke variantov.
-          data['sheets'] << normalize_sheet(
-            'material_id' => id, 'family' => "#{manufacturer} #{decor}".strip,
-            'manufacturer' => manufacturer, 'decor' => decor, 'type' => vt,
-            'thickness' => th, 'grain' => grain, 'color' => color
-          )
-          created_sheets << id
-        end
-
-        seen_abs = []
-        abs_list.each do |(w, th)|
-          next if seen_abs.any? { |(pw, pt)| (pw - w).abs < 0.01 && (pt - th).abs < 0.01 }
-          seen_abs << [w, th]
-          if find_edge_variant(decor, w, th)
-            skipped << "ABS #{fmt_mm(w)}/#{fmt_mm(th)}"
-            next
-          end
-          base = "ABS_#{slug(decor)}_#{thickness_token(w)}X#{(th * 10).round}"
-          id = unique_id(base, taken)
-          taken << id.upcase
-          data['edges'] << normalize_edge(
-            'abs_id' => id, 'decor' => decor, 'thickness' => th,
-            'width' => w, 'color' => color
-          )
-          created_edges << id
-        end
-
-        if created_sheets.empty? && created_edges.empty?
-          return [false, "Všetky zadané varianty už v katalógu sú (#{skipped.join(', ')})."]
-        end
-        return [false, 'Zápis katalógu zlyhal.'] unless write(data)
-        [true, { 'sheets' => created_sheets, 'edges' => created_edges, 'skipped' => skipped }]
-      end
-
-      # "18, 36" -> [18.0, 36.0]. Desatiny LEN bodkou — ciarka je oddelovac poloziek.
-      # NEJEDNOZNACNY je iba vzor cislo,JEDNA cifra bez medzery a bez pokracovania
-      # (18,5) — to je takmer iste desatinna ciarka a vrati JASNU chybu (ziadna
-      # ticha interpretacia — vzor D-19). Kompaktne zoznamy 18,36 aj 18.5,36 su
-      # legalne (Codex GH #71: oddelovac bez medzery nesmie zhodit davku).
-      def parse_number_list(raw)
-        s = raw.to_s.strip
-        return [true, []] if s.empty?
-        if (amb = s[/\d+,\d(?![\d.])/])
-          return [false, "Nejednoznačný zápis „#{amb}“ — desatiny píš bodkou (18.5), položky oddeľuj čiarkou."]
-        end
-        out = []
-        s.split(',').each do |tok|
-          t = tok.strip
-          next if t.empty?
-          f = begin
-            Float(t)
-          rescue StandardError
-            nil
-          end
-          return [false, "Hrúbka „#{t}“ nie je kladné číslo."] unless f && f.finite? && f.positive?
-          out << f
-        end
-        [true, out]
-      end
-
-      # "22/1, 43/1, 43/2" -> [[22.0, 1.0], [43.0, 1.0], [43.0, 2.0]].
-      # Sirka povinna (nove pasky su sirkove; univerzalne = legacy zaznamy),
-      # hrubka ABS len 1/2 mm, desatiny bodkou. Ziadny predbezny ciarkovy guard
-      # (Codex GH #71: 22/1,43/1 je legalny kompakt) — desatinnu ciarku chyti
-      # formatova kontrola tokenu (22,5/1 -> tokeny "22" a "5/1", oba bez zmyslu).
-      def parse_abs_tokens(raw)
-        s = raw.to_s.strip
-        return [true, []] if s.empty?
-        out = []
-        s.split(',').each do |tok|
-          t = tok.strip
-          next if t.empty?
-          m = t.match(%r{\A(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)\z})
-          return [false, "ABS „#{t}“ zapíš ako šírka/hrúbka (napr. 22/1, desatiny bodkou)."] unless m
-          w = m[1].to_f
-          th = m[2].to_f
-          return [false, "Šírka ABS „#{t}“ musí byť 10–200 mm."] unless EDGE_WIDTH_RANGE.cover?(w)
-          return [false, "Hrúbka ABS „#{t}“ musí byť 1 alebo 2 mm."] unless supported_edge_thickness?(th)
-          out << [w, th]
-        end
-        [true, out]
-      end
-
-      # Codex GH #76: striktne cislo z lubovolneho vstupu — Float() namiesto to_f
-      # ("18abc" -> nil, NIE 18.0). Ciarka ako desatina povolena. nil pri chybe.
-      def strict_num(raw)
-        f = Float(raw.to_s.tr(',', '.'))
-        f.finite? ? f : nil
-      rescue StandardError
-        nil
-      end
-
-      # 18.0 -> "18", 18.5 -> "18.5" (labely/reporty).
-      def fmt_mm(v)
-        f = v.to_f
-        f == f.round ? f.round.to_s : f.to_s
       end
 
       # --- SketchUp vizualny material z katalogu -------------------------------
@@ -594,310 +151,6 @@ module Noxun
         s = sheet(material_id)
         return nil unless s && s['color'].is_a?(Array) && s['color'].size == 3
         s['color'].map(&:to_i)
-      end
-
-      # --- projektove defaulty (dedenie: koren; NOXUN dict na modeli) -----------
-
-      # Vrati 3 projektove defaulty (default/front/back material_id). Chybajuce -> PROJECT_FALLBACK.
-      def project_defaults(model)
-        out = {}
-        PROJECT_KEYS.each do |k|
-          v = model_default(model, k)
-          out[k] = (v.nil? || v.to_s.strip.empty?) ? PROJECT_FALLBACK[k] : v.to_s
-        end
-        out
-      end
-
-      def model_default(model, key)
-        return nil unless model
-        model.get_attribute(Store::DICT, key)
-      rescue StandardError
-        nil
-      end
-
-      # Nastavi jeden projektovy default na modeli (1 undo krok obali volajuci).
-      def set_project_default(model, key, value)
-        return false unless model && PROJECT_KEYS.include?(key.to_s)
-        v = value.to_s.strip
-        model.set_attribute(Store::DICT, key.to_s, v)
-        true
-      rescue StandardError => e
-        Engine.log_error(e, 'Materials.set_project_default') if defined?(Engine)
-        false
-      end
-
-      # --- davka 2: validacia + generovanie ID + scan pouzitia -----------------
-      # (Codex audit: normalize NIE je validator — server-side vrstva pre CRUD UI.)
-
-      # Zvaliduje atributy doskoveho materialu z formulara. Vrati [ok, chyba].
-      def validate_sheet_attrs(a)
-        decor = (a['decor'] || a[:decor]).to_s.strip
-        type  = (a['type'] || a[:type]).to_s.strip
-        return [false, 'Dekor je povinný.'] if decor.empty?
-        return [false, 'Typ dosky je povinný (DTDL/MDF/HDF…).'] if type.empty?
-        th = a['thickness'] || a[:thickness]
-        return [false, 'Hrúbka musí byť kladné číslo.'] unless th.is_a?(Numeric) ? th.positive? : th.to_s.strip.match?(/\A\d+([.,]\d+)?\z/) && th.to_s.tr(',', '.').to_f.positive?
-        grain = (a['grain'] || a[:grain] || 'none').to_s
-        return [false, 'Smer dekoru musí byť length/width/none.'] unless GRAINS.include?(grain)
-        ok_p, err_p = validate_price(a['price_per_m2'] || a[:price_per_m2])
-        return [false, err_p] unless ok_p
-        ok_t, err_t = validate_text_fields(a)
-        return [false, err_t] unless ok_t
-        rgb = a['color'] || a[:color]
-        if rgb && !(rgb.is_a?(Array) && rgb.size == 3 && rgb.all? { |c| c.to_i.between?(0, 255) })
-          return [false, 'Farba musí byť RGB 0–255.']
-        end
-        # D-19: format platne je volitelny — ak je poslany, musia to byt dve
-        # cisla 500..5000 mm (striktne — nie ticha oprava, Codex F4).
-        ss = a['sheet_size'] || a[:sheet_size]
-        if ss
-          valid = ss.is_a?(Array) && ss.size == 2 &&
-                  ss.all? { |x| (n = pair_num(x)) && n.between?(500.0, 5000.0) }
-          return [false, 'Formát platne musí byť dve čísla 500–5000 mm.'] unless valid
-        end
-        [true, nil]
-      end
-
-      # D-42: cena je VOLITELNA (nezadana = prazdna/nil). Ak je zadana, musi byt
-      # nezaporne konecne cislo — necislo ("abc") sa ODMIETNE (nie ticha 0).
-      CODE_MAX = 120
-      def validate_price(raw)
-        return [true, nil] if raw.nil? || raw.to_s.strip.empty?
-        f = begin
-          Float(raw.to_s.tr(',', '.'))
-        rescue StandardError
-          nil
-        end
-        return [false, 'Cena musí byť číslo (alebo prázdna).'] unless f && f.finite?
-        return [false, 'Cena nesmie byť záporná.'] if f.negative?
-        [true, nil]
-      end
-
-      # D-42: kod a dodavatel su volitelne kratke texty (limit proti zneuzitiu).
-      def validate_text_fields(a)
-        %w[code supplier].each do |k|
-          v = (a[k] || a[k.to_sym]).to_s
-          return [false, "Pole #{k == 'code' ? 'Kód' : 'Dodávateľ'} je príliš dlhé (max #{CODE_MAX})."] if v.length > CODE_MAX
-        end
-        [true, nil]
-      end
-
-      def validate_edge_attrs(a)
-        decor = (a['decor'] || a[:decor]).to_s.strip
-        return [false, 'Dekor ABS je povinný.'] if decor.empty?
-        th = (a['thickness'] || a[:thickness]).to_s.tr(',', '.').to_f
-        return [false, 'Hrúbka ABS musí byť 1,0 alebo 2,0 mm.'] unless supported_edge_thickness?(th)
-        ok_p, err_p = validate_price(a['price_per_bm'] || a[:price_per_bm])
-        return [false, err_p] unless ok_p
-        ok_t, err_t = validate_text_fields(a)
-        return [false, err_t] unless ok_t
-        # D-41: sirka volitelna (legacy univerzalna paska); ak je zadana, musi byt
-        # konecne cislo v EDGE_WIDTH_RANGE (audit FIX 13).
-        w_raw = a['width'] || a[:width]
-        unless w_raw.nil? || w_raw.to_s.strip.empty?
-          w = begin
-            Float(w_raw.to_s.tr(',', '.'))
-          rescue StandardError
-            nil
-          end
-          unless w && w.finite? && EDGE_WIDTH_RANGE.cover?(w)
-            return [false, 'Šírka ABS musí byť číslo 10–200 mm (alebo prázdna).']
-          end
-        end
-        [true, nil]
-      end
-
-      # Slug pre technicke ID: transliteracia diakritiky (NFD + odstranenie znamienok),
-      # upcase, [A-Z0-9] bloky spojene '_'. 'Dub Halifax prírodný' -> 'DUB_HALIFAX_PRIRODNY'.
-      def slug(value)
-        s = value.to_s.unicode_normalize(:nfd).gsub(/\p{Mn}/, '')
-        s.upcase.gsub(/[^A-Z0-9]+/, '_').gsub(/\A_+|_+\z/, '')
-      end
-
-      # Token hrubky do ID: cele mm ako '18'; desatinne '18P5' (18.5 nesmie vyzerat ako 19).
-      def thickness_token(th)
-        f = th.to_s.tr(',', '.').to_f
-        (f % 1).zero? ? f.to_i.to_s : format('%gP%d', f.floor, ((f % 1) * 10).round).sub('P0', '')
-      end
-
-      # Vygeneruje volne material_id: SLUG(decor)_SLUG(type)_TOKEN(th); kolizie
-      # (case-insensitive) dostanu -2/-3... ID sa NIKDY negeneruje pri edite.
-      def generate_sheet_id(decor, type, thickness)
-        base = "#{slug(decor)}_#{slug(type)}_#{thickness_token(thickness)}"
-        unique_id(base, sheets.map { |s| s['material_id'].to_s.upcase })
-      end
-
-      # D-41: paska so sirkou dostane ID s tokenom sirky PRED hrubkou
-      # (ABS_U702_ST9_22X10 = sirka 22, hrubka 1,0). Bez sirky stary format
-      # (ABS_U702_ST9_10). Existujuce ID sa NIKDY negeneruju znova.
-      def generate_edge_id(decor, thickness, width = nil)
-        th_token = (thickness.to_s.tr(',', '.').to_f * 10).round.to_s
-        base = if width.nil? || width.to_s.strip.empty?
-                 "ABS_#{slug(decor)}_#{th_token}"
-               else
-                 "ABS_#{slug(decor)}_#{thickness_token(width)}X#{th_token}"
-               end
-        unique_id(base, edges.map { |a| a['abs_id'].to_s.upcase })
-      end
-
-      def unique_id(base, taken_upcased)
-        return base unless taken_upcased.include?(base.upcase)
-        n = 2
-        n += 1 while taken_upcased.include?("#{base.upcase}-#{n}")
-        "#{base}-#{n}"
-      end
-
-      # --- scan pouzitia (delete/edit guard; Codex audit blocker 2) -------------
-      # Prejde AKTIVNY model (defaulty na modeli, configy korpusov vratane
-      # part_overrides, instancie dielcov, dosky) + GLOBALNE SABLONY. Zatvorene
-      # .skp subory sa skontrolovat NEDAJU — hlaska pouzivatela na to upozorni;
-      # korpus so zmiznutym materialom prezije ako legacy (data ostanu), doska
-      # by pri rebuilde spadla — preto je guard prisny.
-      def used_material_ids(model)
-        used = Hash.new { |h, k| h[k] = [] }
-        PROJECT_KEYS.each do |k|
-          v = model_default(model, k)
-          used[v.to_s] << 'projektová predvoľba' if v && !v.to_s.empty?
-        end
-        collect_model_usage(model, used) if model && defined?(Ids)
-        collect_template_usage(used)
-        used
-      end
-
-      def collect_model_usage(model, used)
-        Ids.each_of_kind(model, 'cabinet') do |inst|
-          cid = Store.get(inst, 'cabinet_id') || Store.get(inst, 'id')
-          cfg = Store.config(inst) || {}
-          %w[material_id front_material_id back_material_id].each do |k|
-            v = cfg[k]
-            used[v.to_s] << cid if v && !v.to_s.empty?
-          end
-          ov = cfg['part_overrides']
-          next unless ov.is_a?(Hash)
-          ov.each_value do |rec|
-            next unless rec.is_a?(Hash)
-            v = rec['material_id']
-            used[v.to_s] << cid if v && !v.to_s.empty?
-          end
-        end
-        %w[part board].each do |kind|
-          Ids.each_of_kind(model, kind) do |inst|
-            cfg = Store.config(inst) || {}
-            v = cfg['material_id']
-            used[v.to_s] << (Store.get(inst, 'id') || kind) if v && !v.to_s.empty?
-          end
-        end
-      end
-
-      def collect_template_usage(used)
-        return unless defined?(TemplateStore)
-        TemplateStore.load.each do |t|
-          cfg = t['config'] || {}
-          %w[material_id front_material_id back_material_id].each do |k|
-            v = cfg[k]
-            used[v.to_s] << "šablóna #{t['name']}" if v && !v.to_s.empty?
-          end
-        end
-      rescue StandardError
-        nil
-      end
-
-      # ABS pouzitie: edges v configoch dielcov a dosiek + part_overrides korpusov.
-      def used_abs_ids(model)
-        used = Hash.new { |h, k| h[k] = [] }
-        return used unless model && defined?(Ids)
-        %w[part board].each do |kind|
-          Ids.each_of_kind(model, kind) do |inst|
-            cfg = Store.config(inst) || {}
-            e = cfg['edges']
-            next unless e.is_a?(Hash)
-            e.each_value { |v| used[v.to_s] << (Store.get(inst, 'id') || kind) if v && !v.to_s.empty? }
-          end
-        end
-        Ids.each_of_kind(model, 'cabinet') do |inst|
-          cid = Store.get(inst, 'cabinet_id') || Store.get(inst, 'id')
-          ov = (Store.config(inst) || {})['part_overrides']
-          next unless ov.is_a?(Hash)
-          ov.each_value do |rec|
-            e = rec.is_a?(Hash) ? rec['edges'] : nil
-            next unless e.is_a?(Hash)
-            e.each_value { |v| used[v.to_s] << cid if v && !v.to_s.empty? }
-          end
-        end
-        used
-      end
-
-      # --- D-42 PR C: bezpecny PATCH protokol inline buniek (audit BLOCKER 1) --
-      # Bunka posiela LEN menene pole + row_rev (odtlacok riadku z payloadu).
-      # Server: whitelist mutable poli (identita sa patchom NIKDY nemeni),
-      # merge s CERSTVYM zaznamom pred validaciou, baseline per RIADOK (nie
-      # globalny catalog_rev — ina bunka/iny zaznam nekoliduje zbytocne).
-      PATCHABLE = {
-        'sheet' => %w[code supplier price_per_m2],
-        'edge'  => %w[code supplier price_per_bm]
-      }.freeze
-
-      # Odtlacok JEDNEHO zaznamu (baseline dirty riadku; posiela sa v payloade).
-      def record_rev(rec)
-        Digest::SHA1.hexdigest(JSON.generate(rec))[0, 12]
-      end
-
-      # Aplikuje patch na zaznam. Vrati [:ok, nil] | [:not_found, nil] |
-      # [:conflict, nil] (riadok sa medzitym zmenil) | [:invalid, chyba] |
-      # [:code_conflict, [id...]] (duplicitny kod bez potvrdenia) | [:write_failed, nil].
-      def patch_record(kind, id, patch, row_rev: nil, allow_duplicate_code: false)
-        records = kind == 'edge' ? edges : sheets
-        idk = kind == 'edge' ? 'abs_id' : 'material_id'
-        existing = records.find { |r| r[idk] == id }
-        return [:not_found, nil] unless existing
-        if row_rev && !row_rev.to_s.empty? && row_rev.to_s != record_rev(existing)
-          return [:conflict, nil]
-        end
-        clean = patch.is_a?(Hash) ? patch.select { |k, _| PATCHABLE.fetch(kind, []).include?(k) } : {}
-        return [:invalid, 'Žiadne editovateľné pole.'] if clean.empty?
-        merged = existing.merge(clean)
-        ok, err = kind == 'edge' ? validate_edge_attrs(merged) : validate_sheet_attrs(merged)
-        return [:invalid, err] unless ok
-        # Codex GH #76: dup kontrola bezi pri zmene kodu AJ dodavatela — patch
-        # LEN dodavatela vie inak vytvorit existujuci par kod+dodavatel potichu.
-        if (clean.key?('code') || clean.key?('supplier')) && !allow_duplicate_code
-          code_val = clean.key?('code') ? clean['code'] : existing['code']
-          unless code_val.to_s.strip.empty?
-            sup = clean.key?('supplier') ? clean['supplier'] : existing['supplier']
-            hits = code_conflicts(code_val, sup, kind, id)
-            return [:code_conflict, hits] unless hits.empty?
-          end
-        end
-        saved = kind == 'edge' ? upsert_edge(merged) : upsert_sheet(merged)
-        return [:write_failed, nil] unless saved
-        [:ok, nil]
-      end
-
-      # D-42 PR B (audit FIX 12): dekory POUZITE v aktivnom modeli — jeden
-      # read-only scan vyrobnych part/board snapshotov (resolved material_id
-      # na entite, standard 8.3). VEDOME bez sablon (globalna kniznica nie je
-      # "pouzitie v projekte") a bez projektovych predvolieb. Nikdy nezapisuje.
-      # Vrati {decor => pocet dielcov} pre pas "Pouzite v projekte".
-      def model_decor_usage(model)
-        usage = Hash.new(0)
-        return {} unless model && defined?(Ids)
-        decor_by_id = {}
-        sheets.each { |s| decor_by_id[s['material_id']] = s['decor'].to_s }
-        %w[part board].each do |kind|
-          Ids.each_of_kind(model, kind) do |inst|
-            cfg = Store.config(inst) || {}
-            d = decor_by_id[cfg['material_id']]
-            next unless d && !d.empty?
-            # Codex GH #75: doska nesie pocet kusov v configu (quantity) — pas
-            # musi ratat KUSY ako BOM, nie entity (fallback 1 pre dielce/legacy).
-            qty = cfg['quantity'].to_i
-            usage[d] += qty.positive? ? qty : 1
-          end
-        end
-        usage
-      rescue StandardError => e
-        Engine.log_error(e, 'Materials.model_decor_usage') if defined?(Engine)
-        {}
       end
 
       # --- normalizacia zaznamov ----------------------------------------------
@@ -1009,48 +262,54 @@ module Noxun
         v.map(&:to_i)
       end
 
-      # --- seed (predvolene zaznamy podla zadania V0.3) ------------------------
+      # --- zdielane helpery (pouzivane vo viacerych materials_*.rb suboroch) ---
+      # Davka split V0.5.1: tieto nizkourovnove helpery vola CRUD/validacia AJ
+      # dekorova/batch logika (v roznych suboroch) — ostavaju spolocne v jadre.
 
-      # Doskove materialy: K009 PW dub 18/16, HDF biela 3, W1000 biela celova 18.
-      def seed_sheets
-        [
-          {
-            'material_id' => 'K009_PW_DTDL_18', 'family' => 'Kronospan K009 PW',
-            'manufacturer' => 'Kronospan', 'decor' => 'K009 PW', 'type' => 'DTDL',
-            'thickness' => 18.0, 'grain' => 'length', 'price_per_m2' => 12.5,
-            'sheet_size' => [2800.0, 2070.0], 'color' => [198, 168, 122], 'production_class' => 'sheet'
-          },
-          {
-            'material_id' => 'K009_PW_DTDL_16', 'family' => 'Kronospan K009 PW',
-            'manufacturer' => 'Kronospan', 'decor' => 'K009 PW', 'type' => 'DTDL',
-            'thickness' => 16.0, 'grain' => 'length', 'price_per_m2' => 11.8,
-            'sheet_size' => [2800.0, 2070.0], 'color' => [198, 168, 122], 'production_class' => 'sheet'
-          },
-          {
-            'material_id' => 'HDF_WHITE_3', 'family' => 'HDF biela',
-            'manufacturer' => 'Kronospan', 'decor' => 'Biela HDF', 'type' => 'HDF',
-            'thickness' => 3.0, 'grain' => 'none', 'price_per_m2' => 3.2,
-            'sheet_size' => [2800.0, 2070.0], 'color' => [238, 236, 230], 'production_class' => 'sheet'
-          },
-          {
-            'material_id' => 'W1000_DTDL_18', 'family' => 'Egger W1000 ST9',
-            'manufacturer' => 'Egger', 'decor' => 'W1000 ST9 Biela', 'type' => 'DTDL',
-            'thickness' => 18.0, 'grain' => 'none', 'price_per_m2' => 13.9,
-            'sheet_size' => [2800.0, 2070.0], 'color' => [246, 246, 244], 'production_class' => 'sheet'
-          }
-        ]
+      # Sirka pasky ako Float alebo nil (legacy univerzalna).
+      def edge_width(rec)
+        v = rec && rec['width']
+        v.nil? ? nil : v.to_f
       end
 
-      # ABS pasky: podporujeme iba realne pouzivane hrubky 1.0 a 2.0 mm.
-      def seed_edges
-        [
-          { 'abs_id' => 'ABS_K009_10', 'decor' => 'K009 PW', 'thickness' => 1.0,
-            'price_per_bm' => 0.55, 'color' => [198, 168, 122] },
-          { 'abs_id' => 'ABS_K009_20', 'decor' => 'K009 PW', 'thickness' => 2.0,
-            'price_per_bm' => 0.85, 'color' => [198, 168, 122] },
-          { 'abs_id' => 'ABS_W1000_10', 'decor' => 'W1000 ST9 Biela', 'thickness' => 1.0,
-            'price_per_bm' => 0.60, 'color' => [246, 246, 244] }
-        ]
+      # Slug pre technicke ID: transliteracia diakritiky (NFD + odstranenie znamienok),
+      # upcase, [A-Z0-9] bloky spojene '_'. 'Dub Halifax prírodný' -> 'DUB_HALIFAX_PRIRODNY'.
+      def slug(value)
+        s = value.to_s.unicode_normalize(:nfd).gsub(/\p{Mn}/, '')
+        s.upcase.gsub(/[^A-Z0-9]+/, '_').gsub(/\A_+|_+\z/, '')
+      end
+
+      # Token hrubky do ID: cele mm ako '18'; desatinne '18P5' (18.5 nesmie vyzerat ako 19).
+      def thickness_token(th)
+        f = th.to_s.tr(',', '.').to_f
+        (f % 1).zero? ? f.to_i.to_s : format('%gP%d', f.floor, ((f % 1) * 10).round).sub('P0', '')
+      end
+
+      # Vygeneruje volne material_id: SLUG(decor)_SLUG(type)_TOKEN(th); kolizie
+      # (case-insensitive) dostanu -2/-3... ID sa NIKDY negeneruje pri edite.
+      def generate_sheet_id(decor, type, thickness)
+        base = "#{slug(decor)}_#{slug(type)}_#{thickness_token(thickness)}"
+        unique_id(base, sheets.map { |s| s['material_id'].to_s.upcase })
+      end
+
+      # D-41: paska so sirkou dostane ID s tokenom sirky PRED hrubkou
+      # (ABS_U702_ST9_22X10 = sirka 22, hrubka 1,0). Bez sirky stary format
+      # (ABS_U702_ST9_10). Existujuce ID sa NIKDY negeneruju znova.
+      def generate_edge_id(decor, thickness, width = nil)
+        th_token = (thickness.to_s.tr(',', '.').to_f * 10).round.to_s
+        base = if width.nil? || width.to_s.strip.empty?
+                 "ABS_#{slug(decor)}_#{th_token}"
+               else
+                 "ABS_#{slug(decor)}_#{thickness_token(width)}X#{th_token}"
+               end
+        unique_id(base, edges.map { |a| a['abs_id'].to_s.upcase })
+      end
+
+      def unique_id(base, taken_upcased)
+        return base unless taken_upcased.include?(base.upcase)
+        n = 2
+        n += 1 while taken_upcased.include?("#{base.upcase}-#{n}")
+        "#{base}-#{n}"
       end
     end
   end

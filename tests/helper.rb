@@ -123,6 +123,10 @@ unless NxTest::IN_SKETCHUP
     core/build_plan
     core/json_file_store
     core/materials
+    core/materials_catalog
+    core/materials_decor
+    core/materials_abs
+    core/materials_project
     core/abs_rules
     core/hardware_rules
     modules/shelves
