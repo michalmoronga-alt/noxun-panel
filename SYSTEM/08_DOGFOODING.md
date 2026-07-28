@@ -6,7 +6,7 @@
 
 ## Blokery (bránia dokončeniu zákazky)
 
-*(momentálne žiadne)*
+- **D-45 · Slučka hrúbka ↔ materiál pri 18,6 (Halifax)** (Michal 27.7., test seedu) — materiál s hrúbkou 18,6 sa nedá reálne použiť: hrúbka v nastaveniach korpusu sa nedá zmeniť (blokuje ju guard zhody s materiálom 18,0) a materiál sa nedá zmeniť (blokuje ho hrúbka dielca) — **deadlock z dvoch guardov**; vkladaciu kartu s projektovým defaultom 18,0 zastaví „najbližší vklad by sa nepostavil". Presne potvrdená otázka 4 z [09_POJMY.md](09_POJMY.md). *Návrh riešenia (na opravnú dávku): zmena materiálu s inou hrúbkou ponúkne „prevziať hrúbku materiálu" (hrúbku riadi materiál — rovnaká filozofia ako pri doske); vo vkladacej karte hrúbka auto-nasleduje zvolený materiál. Stav: ZAPÍSANÉ, bloker testovania hrubších/tenších materiálov.*
 
 ## Spomaľovače (vysoká priorita)
 
@@ -25,6 +25,9 @@
 
 ## Návrhy väčších celkov (na rozpracovanie)
 
+- **D-43 · Zdvojené dosky (duplák 36 = 2× 18)** (Michal 27.7.) — **(a) overené v kóde (Fable 27.7.):** logika „36 = 2×18" dnes NEEXISTUJE nikde — kusovník aj odhad platní (`sheet_estimate.rb`) zoskupujú podľa `material_id`, takže dielec 36 spotrebuje 1× svoju plochu z platne varianty „36"; VEPO merge 18+36 je len spoločný SÚBOR (dielec ide 1× s hrúbkou 36 — zhodné so starou linkou). Dôsledok: ak sa duplák lepí z 2×18, interný odhad platní podhodnocuje spotrebu 18-tky. **(b) návrh modelu:** variant 36 označený ako „zdvojený z 18" (odkaz na zdrojový variant + multiplikátor ×2, BEZ vlastného DK kódu — kupuje sa 18-ka) → odhad platní pripočíta 2× plochu do skupiny 18; pri pridaní 18 varianty auto-ponúknuť vytvorenie zdvojenej 36 (Halifax: 18,6 → 37,2). **Dôležité (Codex P2):** vzťah `source_material_id` + multiplikátor musí byť súčasťou výrobného SNAPSHOTU na entite/BOM kontraktu (štandard 8.3 — autorita je snapshot), nie len katalógu — inak sa odhad nedá reprodukovať na inom stroji či po zmene katalógu. *Stav: na návrhovú dávku (sedenie ③ / V0.6).*
+- **D-44 · Rýchly výber výrobcu a typu pri zadávaní** (Michal 27.7.) — pri batchi/edite materiálu vyberať výrobcu rozkliknutím z už zadaných + možnosť dopísať nového; to isté pre TYP dosiek — úsporne (pravidlo vertikálneho priestoru). **Aktualizované rozhodnutím 29.7. (09_POJMY otázka 3):** typ zostáva krátky zoznam (DTDL, PD, HDF…) BEZ šírky — **šírka/formát je samostatný atribút variantu** (šírok PD je 6+ a líšia sa per výrobca); pickery teda: výrobca + typ + formát pole. *Stav: na UX dávku (spolu s D-15 vzorom).*
+
 - **D-20 · Quick actions — bezpečný move plugin** (Michal 19.7., „pre budúceho Michala a Fable, keď bude základ top 😉") — zlúčiť funkčné pluginy noxun_mower + Snaper do jedného toolbar pluginu (rýchly pohyb, kopírovanie, rotácie, prisunutie na doraz). **Známy poznatok:** mower „rýchla kópia skrinky vedľa" vytvorí kópiu LEN ako geometriu — bez NOXUN identity kabinetu (kópia mimo observer/dedup flow). Pri stavbe quick actions kopírovanie prerobiť tak, aby kópia prešla štandardným dedup tickom (plná identita + config). *Stav: budúcnosť (po V1 / pri zostavách).*
 - **D-09 · Snap body pri presúvaní priečok** (1/4, 1/2, 3/4…) v zónovom náhľade. *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
 - **D-10 · Presúvanie/úprava čiel priamo v náhľade** (ako drag priečok). *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
@@ -36,6 +39,7 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 - **Katalóg materiálov (Demos):** Michalov zoznam (25.7.) spracovaný do seed podkladu nižšie; 90 % materiálu/kovania/ABS ide z demos-trade.sk. Otvorená debata V0.6: „zadaj kód → plugin načíta dáta" (verejné vyhľadávanie kód→položka aj dekor→celá skupina s cenami; Konfigurátor cenníkov za loginom) + **pracovné dosky v dekorovej skupine** (otázky 1–3 v 09_POJMY).
 - **Hardening zoznam:** manuálne overiť redo (Ctrl+Y) po zlúčených transparentných operáciách (pozorovanie zo 17.7.).
+- **Priebeh testovania seedu (27.7.):** beží — nové D-43 (duplák), D-44 (výber výrobcu/typu), D-45 (bloker 18,6). Funguje: zmena formátu platne podľa postupu (MG Cashmere → 2800×2050 ✓).
 
 ### Seed katalógu — podklad na ručné vloženie (zoznam Michal 25.7., jednorazová sekcia)
 
