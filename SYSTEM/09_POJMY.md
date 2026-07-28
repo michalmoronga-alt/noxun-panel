@@ -38,6 +38,12 @@
 - **Hrúbka nie je vždy 18,0:** Egger H1180 Dub Halifax = **18,6 mm** (hlboká synchrónna štruktúra). Guardy hrúbok a semafor s tým musia rátať.
 - **Rovnaký dekor existuje ako DTDL aj PD s INOU štruktúrou povrchu:** Kronospan K2738 Torro Cremona Oak = DTDL „PW BU" (DK 532848) + PD „FP" (DK 532772). → otvorená otázka kľúča skupiny (nižšie).
 
+### Zásteny
+
+- **Zástena** = doska medzi PD a hornými skrinkami; **hrúbka zvyčajne 10–12 mm**, dĺžky ako pracovné dosky (4100) (Michal 29.7.).
+- **Obojstranné dekory:** zástena máva občas KAŽDÚ stranu úplne iný dekor (šetrenie výroby — na stenu sa lepí nepohľadovou stranou, pohľadová ostáva von). Dátový dôsledok: variant môže niesť dva dekory (líce/rub) — doriešiť pri PD/zástena modeli vo V0.6.
+- Demos príklad z mailov: „Zástena K551/K552 4100/640/10" — dvojité označenie dekoru v názve = líce/rub.
+
 ### ABS hrany
 
 - **Demos reálne šírky: 23 / 28 / 43 / 54 / 100 (Jumbo); hrúbky 0,8 / 1 / 1,5 / 2 mm** (existuje aj skutočná 1,0 — podľa dodávateľa/dekoru).
@@ -47,11 +53,27 @@
 - ABS sa objednáva na metre (bal. 25/75 m).
 - **Prieskum Demos per dekor (29.7., plné tabuľky s kódmi: [zdroje/DEMOS_ABS_prieskum_2026-07.md](zdroje/DEMOS_ABS_prieskum_2026-07.md)):** bežné dekory majú 23+43 v 0,8 aj 2,0 takmer vždy skladom (default model „jednotka+dvojka" platí) — ALE **lesklé MG dekory majú JEDINÚ hrúbku 1 mm** (0,8 ani 2 neexistujú → pravidlá potrebujú fallback „najbližšia hrúbka, ktorú dekor má"), **Halifax má dvojku len ako 22/2** (nie 23), existuje aj mikro-hrana 22/0,4 a Raukantex 1,2. Guard hrúbok ABS → povoliť {0,4 · 0,8 · 1,0 · 1,2 · 1,5 · 2,0} — **potvrdené (Michal 29.7.):** mikro-hrana 0,4 sa takmer nepoužíva, ale zaradí sa rovno („nech máme pokryté spektrum") — šum vo výbere vyrieši inteligentné UI/UX zobrazovanie (odporúčané hore, exotika zbalená). Dvojka je ~1,4–1,8× drahšia než 0,8. **Falco a Kastamonu:** iní dodávatelia, zatiaľ sa neriešia — pár dekorov a cien sa vyplní ručne (mimo Demos flow).
 
+### Dodávatelia a zdroje cien (29.7. — mail research + Disk prieskum)
+
+- **VEPO** (Ružomberok) = plošný materiál + porez + olep + kovanie; objednávky cez webformulár, CP s parsovateľnou tabuľkou. **Na firemnom Disku existuje `Cenník_Vepo_19` (XLSX, verzie 07/2024 a 10/2024)** — Egger/Kronospan/Getalit/Pfleiderer DTD + Velvet MDF fronty + ABS hrany; stĺpce značka/kategória/názov/MJ/cenníková vs. individuálna cena → **primárny zdroj nákupných cien pre seed katalógu** (čítať cez download+openpyxl, nie plain read). Sadzby služieb (porez/olep/lepenie) = vstup kalkulácie ponuky; konkrétne hodnoty v internom podklade mimo repa.
+- **EN DANIELI** (Lipt. Mikuláš, od 04/2026) = alternatívny porez/olep/kovanie; POZOR: ceny uvádza s DPH (VEPO bez DPH) — pri porovnávaní vždy zjednotiť režim.
+- **Falco a Kastamonu dosky sa kupujú cez VEPO** (nie Demos) — rieši otvorený bod seedu; `supplier` pole per variant.
+- **AREDO** (od 05/2026) = lakované dvierka, má konfigurátor + SketchUp knižnice — kandidát na integráciu čiel po V1.
+- Vizuálna knižnica dekorov (JPG per výrobca) žije na Disku v `NOXUN PROJEKTY/METERIÁLY` — pripravený zdroj pre D-28 textúry/render.
+
 ### Demos (hlavný dodávateľ ~90 % materiálu)
 
 - **DK kód** = Demos kód sortimentu → presne D-42 pole `code` (+ `supplier` = Demos). 1 kód = 1 položka.
 - Verejné vyhľadávanie `demos-trade.sk/vyhledavani?q=<kód|dekor>` funguje bez loginu a vracia ceny bez/s DPH; detail má štruktúrovanú tabuľku parametrov; „Súvisiaci sortiment" = hotová dekorová skupina. Konfigurátor cenníkov (hromadný export) je za loginom na Démos24Plus.
 - Falco a Kastamonu položky v Michalovom zozname sú bez DK — iný zdroj/doplniť (sedenie ③).
+
+### Výstupy zákazky (Disk prieskum 29.7. — vzory z reálnych CP/Rozpočtov)
+
+- **Dva paralelné dokumenty z jedných dát:** interný **Rozpočet** (granulárny — dodávateľské ceny a kódy per položka, XLSX; pri dome delený po zónach) vs klientská **Cenová ponuka** (lump-sum rollup ~6–9 riadkov: nábytková zostava / výsuvy / montáž / doprava + špecifikačná tabuľka „z čoho" s konkrétnymi produktmi BEZ cien + master šablóna VOP/zmluvných bodov/financovania). Revízie sa nikdy neprepisujú — nové dátumované súbory „AKT. DD.MM.RRRR".
+- **Montáž sa kalkuluje vzorcom: počet platní × 5,8 m² × sadzba/m²** — z počtu NAKÚPENÝCH platní (5,8 = plocha 2800×2070), nie z plochy dielcov → náš odhad platní (D-19) je priamy vstup montážnej kalkulácie.
+- **VEPO CSV je konečný produkt pipeline** — nesting/nárez robí dodávateľ; vizuálny nárezový plán u nás neexistuje (potvrdzuje D-19 rozsah).
+- Revízie modelov: **písmená** (A,B,…K,L,M) = dizajnové; **čísla** (1,2,3) = produkčné vo `Výroba/`. Kovanie sa občas drží v samostatnom .skp.
+- Plná anatómia CP šablóny (sekcie 1–9) v internom podklade mimo repa.
 
 ## Otvorené otázky (na slovné sedenia)
 
