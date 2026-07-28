@@ -40,7 +40,7 @@
 
 ### Zásteny
 
-- **Zástena** = doska medzi PD a hornými skrinkami; **hrúbka zvyčajne 10–12 mm**, dĺžky ako pracovné dosky (4100) (Michal 29.7.).
+- **Zástena** = doska medzi PD a hornými skrinkami; **hrúbka 9,2–12 mm** (9,2 = dominantný Egger štandard — 63 položiek; 10 = Kronospan; do 12 podľa Michala), dĺžky ako pracovné dosky (4100).
 - **Obojstranné dekory:** zástena máva občas KAŽDÚ stranu úplne iný dekor (šetrenie výroby — na stenu sa lepí nepohľadovou stranou, pohľadová ostáva von). Dátový dôsledok: variant môže niesť dva dekory (líce/rub) — doriešiť pri PD/zástena modeli vo V0.6.
 - **Potvrdené prieskumom (29.7., 102 položiek):** konzistentný vzor 4100×640, hrúbka **9,2 (Egger) / 10 (Kronospan)**, dva dekory VŽDY v názve — obojstranný dekor je štandard sortimentu, nie výnimka. Demos príklad: „Zástena K551/K552 4100/640/10".
 
@@ -58,7 +58,8 @@
 - ⚠️ **STRATEGICKÁ ZMENA (Michal 29.7.): na VEPO sa NEVIAZAŤ.** Spolupráca s VEPO sa pravdepodobne bude ukončovať (zmena vedenia) — objednávky sa budú postupne presmerúvať na EN DANIELI; z VEPO možno len časť materiálu alebo nič. **Dizajnový princíp: katalóg aj výstupy sú supplier-agnostické** — `supplier` per variant (D-42 model to už vie), sadzby služieb (porez/olep) ako dáta per dodávateľ, a popri VEPO CSV exporte počítať s **exportom výrobného zadania pre EN DANIELI** (textová gramatika `<n> ks – A × B – ABS: …` — zdokumentovaná v internom podklade). VEPO cenník na Disku ostáva dobrý zdroj HISTORICKÝCH cien pre seed.
 
 - **VEPO** (Ružomberok) = plošný materiál + porez + olep + kovanie; objednávky cez webformulár, CP s parsovateľnou tabuľkou. **Na firemnom Disku existuje `Cenník_Vepo_19` (XLSX, verzie 07/2024 a 10/2024)** — Egger/Kronospan/Getalit/Pfleiderer DTD + Velvet MDF fronty + ABS hrany; stĺpce značka/kategória/názov/MJ/cenníková vs. individuálna cena → **primárny zdroj nákupných cien pre seed katalógu** (čítať cez download+openpyxl, nie plain read). Sadzby služieb (porez/olep/lepenie) = vstup kalkulácie ponuky; konkrétne hodnoty v internom podklade mimo repa.
-- **EN DANIELI** (Lipt. Mikuláš, od 04/2026) = alternatívny porez/olep/kovanie; POZOR: ceny uvádza s DPH (VEPO bez DPH) — pri porovnávaní vždy zjednotiť režim.
+- **EN DANIELI** (Lipt. Mikuláš, od 04/2026) = alternatívny porez/olep/kovanie; POZOR: ceny uvádza s DPH (VEPO bez DPH).
+- **Kanonický daňový základ cien (rozhodnutie 29.7., Codex P2):** katalóg ukladá ceny **BEZ DPH** (B2B logika — Rozpočty aj VEPO sú bez DPH). Zdroj s DPH sa prepočíta pri vstupe (SK sadzba 23 % od 2025; pri importe/ručnom zápise voľba „cena je s DPH" → systém uloží ÷1,23). UI môže zobrazovať oboje. Bez tohto by mix zdrojov (Demos s DPH v tabuľkách, VEPO bez) ticho miešal základy v ponukách.
 - **Falco a Kastamonu dosky sa kupujú cez VEPO** (nie Demos) — rieši otvorený bod seedu; `supplier` pole per variant.
 - **AREDO** (od 05/2026) = lakované dvierka, má konfigurátor + SketchUp knižnice — kandidát na integráciu čiel po V1.
 - Vizuálna knižnica dekorov (JPG per výrobca) žije na Disku v `NOXUN PROJEKTY/METERIÁLY` — pripravený zdroj pre D-28 textúry/render.
@@ -72,14 +73,14 @@
 ### Výstupy zákazky (Disk prieskum 29.7. — vzory z reálnych CP/Rozpočtov)
 
 - **Dva paralelné dokumenty z jedných dát:** interný **Rozpočet** (granulárny — dodávateľské ceny a kódy per položka, XLSX; pri dome delený po zónach) vs klientská **Cenová ponuka** (lump-sum rollup ~6–9 riadkov: nábytková zostava / výsuvy / montáž / doprava + špecifikačná tabuľka „z čoho" s konkrétnymi produktmi BEZ cien + master šablóna VOP/zmluvných bodov/financovania). Revízie sa nikdy neprepisujú — nové dátumované súbory „AKT. DD.MM.RRRR".
-- **Montáž sa kalkuluje vzorcom: počet platní × 5,8 m² × sadzba/m²** — z počtu NAKÚPENÝCH platní (5,8 = plocha 2800×2070), nie z plochy dielcov → náš odhad platní (D-19) je priamy vstup montážnej kalkulácie.
+- **Montáž sa kalkuluje vzorcom: počet platní × 5,8 m² × sadzba/m²** — z počtu NAKÚPENÝCH platní (5,8 = plocha 2800×2070), nie z plochy dielcov. **Pozor (Codex P2):** náš D-19 dáva ODHAD ako rozsah min–max v desatinách (vedome nie nárezový plán) — nie je to priamo počet kúpených platní; pre montážnu kalkuláciu vo V0.6-E treba definovať pravidlo (napr. horný odhad zaokrúhlený na celé platne NAHOR, prepísateľný reálnym nákupom).
 - **VEPO CSV je konečný produkt pipeline** — nesting/nárez robí dodávateľ; vizuálny nárezový plán u nás neexistuje (potvrdzuje D-19 rozsah).
 - Revízie modelov: **písmená** (A,B,…K,L,M) = dizajnové; **čísla** (1,2,3) = produkčné vo `Výroba/`. Kovanie sa občas drží v samostatnom .skp.
 - Plná anatómia CP šablóny (sekcie 1–9) v internom podklade mimo repa.
 
 ## Otvorené otázky (na slovné sedenia)
 
-1. ~~Kľúč dekorovej skupiny naprieč typmi~~ — **ROZHODNUTÉ (sedenie ③, 29.7.):** kľúč skupiny = **výrobca + číslo dekoru** (K2738, F800); **štruktúra povrchu (ST9, PW BU, FP, MG…) sa presúva na VARIANT**. U Eggera sa prakticky nič nemení, u Kronospanu to spája DTDL+PD do jednej skupiny a rieši aj viacero povrchov pod jedným číslom (5981 MG vs BS/PD). Realizácia v dávke 2A (malá migrácia názvov seedu).
-2. ~~ABS obchodné vs nominálne hodnoty~~ — **ROZHODNUTÉ (sedenie ③, 29.7.):** katalóg prechádza na **reálne obchodné hrúbky** (0,8 / 1 / 1,5 / 2 — guard V0.3.3 sa uvoľní na tieto hodnoty) a auto-šírky 22→**23** (+43). UI môže „jednotku" ukazovať s obchodným aliasom. Realizácia v dávke 2A (V0.6); prieskum dostupných ABS per dekor zo seedu beží (subagent 29.7.).
+1. ~~Kľúč dekorovej skupiny naprieč typmi~~ — **ROZHODNUTÉ (sedenie ③, 29.7.):** kľúč skupiny = **výrobca + číslo dekoru** (K2738, F800); **štruktúra povrchu (ST9, PW BU, FP, MG…) sa presúva na VARIANT — a stáva sa SÚČASŤOU IDENTITY/unikátnosti variantu** (Codex P2: dnešná ABS identita dekor+šírka+hrúbka nestačí — 5981 má DVE rôzne 23/1 pásky: MG 374929 vs UM/AF 492080; bez štruktúry v identite by sa odmietli ako duplicita). U Eggera sa prakticky nič nemení, u Kronospanu to spája DTDL+PD do jednej skupiny a rozlišuje povrchy pod jedným číslom. Realizácia v dávke 2A vrátane **migračného kontraktu** (štandard §identita variantov + migrácia seedu).
+2. ~~ABS obchodné vs nominálne hodnoty~~ — **ROZHODNUTÉ (sedenie ③, 29.7.):** katalóg prechádza na **reálne obchodné hrúbky — plné spektrum {0,4 · 0,8 · 1 · 1,2 · 1,5 · 2}** (guard V0.3.3 sa uvoľní; 0,4 mikro-hrana a 1,2 Raukantex zaradené rovno — potvrdil Michal, šum rieši UI zobrazovanie) a auto-šírky 22→**23** (+43). UI môže „jednotku" ukazovať s obchodným aliasom. Realizácia v dávke 2A (V0.6); prieskum per dekor hotový ([zdroje/DEMOS_ABS_prieskum_2026-07.md](zdroje/DEMOS_ABS_prieskum_2026-07.md)).
 3. ~~PD varianty rovnakej hrúbky s rôznou šírkou~~ — **ROZHODNUTÉ (sedenie ③, 29.7.):** PD sa **NErámcuje na pevné šírkové typy** („PD 600/PD 920" nebudú typy) — šírok je veľa a závisia od výrobcu a typu (600, 650, 920, 950, 1200…). **Šírka/formát = atribút variantu**: identita PD variantu = typ „PD" + hrúbka + formát. D-44 pickery: typ zostáva krátky zoznam (DTDL, PD, HDF…), formát je samostatné pole. Prieskum reálnych PD šírok na Demose beží (subagent 29.7.).
 4. **Hrúbka 18,6** (Halifax) v hrúbkových guardoch, dedení a semafore — overiť, či nikde nie je natvrdo 18/19.

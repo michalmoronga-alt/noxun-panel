@@ -22,7 +22,7 @@
 ## Reálne šírky/hrúbky/dĺžky sortimentu (facety, 533 položiek)
 
 - **Šírky (D×Š, počet):** 4100×600 — 117 · 4100×640 — 97 (*takmer výhradne zásteny*) · 4100×920 — 89 · 4100×900 — 73 · 4100×635 — 59 · 4100×1200 — 53 · 4100×650 — 17 · 4200×640/900 — 12+12 · 3020×1200 — 4.
-- **Hrúbky:** 38 — 372 (dominuje) · 9,2 — 63 (zásteny Egger) · **20 — 41 (nová Egger tenká línia, od 3.7.2026)** · 10 — 36 (zásteny Kronospan) · 38,8 — 11 (Getacore solid surface 38,3) · 16 — 8 · 9,6 — 2. Mimo kategórie: kompaktné 12 mm (KD-IN).
+- **Hrúbky:** 38 — 372 (dominuje) · 9,2 — 63 (zásteny Egger) · **20 — 41 (nová Egger tenká línia, od 3.7.2026)** · 10 — 36 (zásteny Kronospan) · 38,8 — 11 (Getacore solid surface; ⚠ facet uvádza 38,8, produktový príklad 38,3 — **presnú hodnotu overiť na produkte pri seede**, do katalógu nezapisovať bez overenia) · 16 — 8 · 9,6 — 2. Mimo kategórie: kompaktné 12 mm (KD-IN).
 - **Dĺžky:** 4100 ~95 %+, 4200 okrajovo, 3020 výnimočne.
 - **Značky:** Egger 257 · Kronospan 238 · Arpa 18 (HPL/kompakt) · Pfleiderer 18 · Fenix 6 · SM'art 4 · Getacore mimo facetu.
 
