@@ -24,10 +24,14 @@
     sel.innerHTML = html;
     if (current) sel.value = current;
   }
+  // D-45: predvolba ciel uz NIE JE natvrdo 18/19 — celo prevezme katalogovu
+  // hrubku sveho materialu (geometriu prisposobi server). Ostava rozsah dosky
+  // (zrkadlo Ruby CabinetBuilder::THICKNESS_RANGE); hrubkovy guard drzi server.
+  var MD_TH_RANGE = [6, 50];
   function frontSheets(){
     return MD_SHEETS.filter(function(s){
       var t = parseFloat(s.thickness);
-      return Math.abs(t-18) < 0.05 || Math.abs(t-19) < 0.05;
+      return !isNaN(t) && t >= MD_TH_RANGE[0]-0.001 && t <= MD_TH_RANGE[1]+0.001;
     });
   }
 

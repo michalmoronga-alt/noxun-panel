@@ -21,8 +21,9 @@
     if (el('pcName2')) el('pcName2').textContent = pc.name || roleLabel(pc.role);
     el('pcName').innerHTML = '<b>'+esc(pc.name || roleLabel(pc.role))+'</b> · '+esc(roleLabel(pc.role));
     el('pcDim').textContent = fmtmm(pc.length)+' × '+fmtmm(pc.width)+' × '+fmtmm(pc.thickness)+' mm';
-    // FIX 2: material dielca len z hrubkovo kompatibilnych dosiek (nekompatibilne disabled). Cela
-    // beru 18/19 mm (rovnako ako builder guard aj korpusovy select), ostatne presnu hrubku dielca.
+    // FIX 2: material dielca len z hrubkovo kompatibilnych dosiek (nekompatibilne disabled).
+    // D-45: cela beru KATALOGOVU hrubku sveho materialu (frontMatch = rozsah dosky),
+    // ostatne dielce presnu hrubku dielca — tu ju meni material/hrubka celej skrinky.
     var isFront = (pc.role === 'front_door' || pc.role === 'drawer_front');
     var matFn = isFront ? frontMatch() : thMatch(pc.thickness);
     var selectedMaterial = pc.has_material_override ? (pc.material_id || '') : '';

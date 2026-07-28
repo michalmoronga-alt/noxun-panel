@@ -118,7 +118,11 @@ module Noxun
                              "nesedí s hrúbkou materiálu #{r['material_id']} (#{fmt(have)} mm).")
       end
 
+      # D-45: pravidlo je JEDNO (CabinetBuilder) — semafor nesmie oznacit za chybne
+      # to, co builder legitimne postavi (18,6 mm celo). Fallback (builder
+      # nedostupny) drzi povodnu logiku vratane starych 18/19 variantov.
       def thickness_ok?(role, want, have)
+        return CabinetBuilder.thickness_ok_for?(role, want, have) if defined?(CabinetBuilder)
         if FRONT_ROLES.include?(role)
           (have - 18.0).abs < THICKNESS_TOL || (have - 19.0).abs < THICKNESS_TOL ||
             (have - want).abs < THICKNESS_TOL

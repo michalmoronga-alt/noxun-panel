@@ -165,12 +165,36 @@ module Noxun
           end
 
           merged = merge_template(Panel.existing_params(cab), tpl['config'])
+          # D-45 (audit B4): sablona nesie hrubku aj (nepovinne) material — dvojica
+          # sa musi zladit PRED rebuildom, inak by stavba spadla surovou hrubkovou
+          # hlaskou. Explicitny material sablony vyhrava (hrubka sa prevezme z neho),
+          # inak material dobera body_preflight; nejednoznacnost = odmietnutie.
+          pf = template_material_preflight(merged, model)
+          return set_status(pf[:error], true) if pf && pf[:error]
           Panel.suspend_selection_sync do
             CabinetBuilder.rebuild(model, cab, merged)
             Panel.reselect(model, cab)
           end
-          set_status("Šablóna \"#{name}\" použitá na #{Store.get(cab, 'cabinet_id')}.")
+          set_status("Šablóna \"#{name}\" použitá na #{Store.get(cab, 'cabinet_id')}.#{pf ? pf[:note] : ''}")
           Panel.push_selected(model)
+        end
+
+        # D-45: zladenie hrubka<->material pre MERGED params sablony.
+        # Vrati nil / { error: } / { note: } (rovnaky kontrakt ako Panel preflighty).
+        def template_material_preflight(merged, model)
+          note = ''
+          if defined?(Materials)
+            sheet = Materials.sheet(CabinetBuilder.effective_materials(model, merged)['body'])
+            if sheet && Panel.present_str(merged['material_id'])
+              adopt = Panel.adopt_body_thickness!(merged, sheet)
+              return adopt if adopt && adopt[:error]
+              note += adopt[:note].to_s if adopt
+            end
+          end
+          pf = Panel.material_preflight(merged, model)
+          return pf if pf && pf[:error]
+          note += pf[:note].to_s if pf
+          note.empty? ? nil : { note: note }
         end
 
         def merge_template(target_params, tpl_config)
