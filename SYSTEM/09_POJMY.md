@@ -40,7 +40,10 @@
 
 ### ABS hrany
 
-- **Demos reálne šírky: 23 / 28 / 43 / 54 / 100 (Jumbo); hrúbky 0,8 / 1,5 / 2 mm.** Obchodná „1 mm" v praxi = 0,8. Náš katalóg drží nominály 1,0/2,0 a AUTO_WIDTHS 22/43 → mapovanie treba doriešiť (nižšie).
+- **Demos reálne šírky: 23 / 28 / 43 / 54 / 100 (Jumbo); hrúbky 0,8 / 1 / 1,5 / 2 mm** (existuje aj skutočná 1,0 — podľa dodávateľa/dekoru).
+- **Pravidlá použitia (Michal 29.7.):** pred objednávkou sa reálne rieši len „jednotka" vs „dvojka" — **„jednotka" (0,8–1,0)** = menej namáhané hrany, korpusy (najčastejšia) · **„dvojka" (2,0)** = silno namáhané hrany: stolové a pracovné dosky, duplované dielce, stropy skriniek. **1,5 sa takmer nepoužíva** (často nie je skladom), ale môže existovať ako variant — niekedy výhodná cena/dostupnosť.
+- **Šírky v praxi:** takmer sa neriešia — hlavná je **23**; **28** na hrubšie materiály (20 mm+).
+- **Hĺbka odfrezovania sa u nás NErieši** — to spracúva VEPO; na našej strane ide len o výber hrúbky pásky a priradenie kódu.
 - ABS sa objednáva na metre (bal. 25/75 m).
 
 ### Demos (hlavný dodávateľ ~90 % materiálu)
@@ -52,6 +55,6 @@
 ## Otvorené otázky (na slovné sedenia)
 
 1. **Kľúč dekorovej skupiny naprieč typmi:** K2738 „PW BU" (DTDL) vs „FP" (PD) — jedna skupina „K2738 Torro Cremona Oak"? Dnes je dekor jeden string; ak má PD inú štruktúru, kľúč bez štruktúry? (sedenie ③)
-2. **ABS obchodné vs nominálne hodnoty:** 0,8→1,0? čo s 1,5? šírka 23 vs naše AUTO_WIDTHS 22 (zladiť so skutočnými Demos šírkami?). Dnes guard V0.3.3 akceptuje len 1/2 mm.
+2. ~~ABS obchodné vs nominálne hodnoty~~ — **ROZHODNUTÉ (sedenie ③, 29.7.):** katalóg prechádza na **reálne obchodné hrúbky** (0,8 / 1 / 1,5 / 2 — guard V0.3.3 sa uvoľní na tieto hodnoty) a auto-šírky 22→**23** (+43). UI môže „jednotku" ukazovať s obchodným aliasom. Realizácia v dávke 2A (V0.6); prieskum dostupných ABS per dekor zo seedu beží (subagent 29.7.).
 3. **PD varianty rovnakej hrúbky s rôznou šírkou** (F800: PD 38×600 DK 514485 + PD 38×920 DK 514486): identita variantu = typ+hrúbka → dve šírky sa nezmestia. Model potrebuje šírku/formát v identite PD variantu (V0.6 bod „PD v dekorovej skupine").
 4. **Hrúbka 18,6** (Halifax) v hrúbkových guardoch, dedení a semafore — overiť, či nikde nie je natvrdo 18/19.
