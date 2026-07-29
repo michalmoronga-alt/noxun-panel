@@ -170,8 +170,11 @@ module Noxun
         # tela), potom chrbat; nakoniec JEDEN remap rucnych ABS overridov na nove
         # efektivne materialy — vsetko pred JEDINYM rebuildom (1 undo krok).
         # Vrati nil / { error: } / { note: }.
-        def material_preflight(params, model)
-          old_eff = CabinetBuilder.effective_materials(model, params)
+        # old_eff: volitelny snapshot efektivnych materialov PRED zmenou — sablonovy
+        # flow ho dodava z CIELOVEJ skrinky (merged params uz nesu novy material,
+        # takze default by remapu ukazal "ziadnu zmenu" — GH P1).
+        def material_preflight(params, model, old_eff: nil)
+          old_eff ||= CabinetBuilder.effective_materials(model, params)
           note = ''
           # POSTUPNE, nie naraz: pri odmietnutom tele sa chrbat uz neriesi (jeho
           # picker cita material tela — musi vidiet finalny stav, nie polovicny).

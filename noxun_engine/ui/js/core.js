@@ -73,10 +73,12 @@
   // D-45 (audit F10): mm s desatinnou CIARKOU pre UI texty — cele cisla bez
   // desatin ('18'), inak jedno desatinne miesto ('18,6'). Zrkadlo Panel.fmt_mm.
   function mmLabel(v){
+    // GH P2: 2 desatinne miesta — zhodne s Materials.fmt_mm (18,65 nesmie byt 18,7).
     var n = parseFloat(v);
     if (isNaN(n)) return '';
-    var r = Math.round(n*10)/10;
-    return (Math.abs(r - Math.round(r)) < 0.001 ? String(Math.round(r)) : r.toFixed(1)).replace('.', ',');
+    var r = Math.round(n*100)/100;
+    if (Math.abs(r - Math.round(r)) < 0.001) return String(Math.round(r));
+    return String(r).replace('.', ',');
   }
   // FIX 2: hrubkove predikaty pre filter doskovych materialov (tolerancia 0,05 mm).
   // Prazdny/neplatny cielovy rozmer -> nefiltruj (radsej vsetko nez nic).

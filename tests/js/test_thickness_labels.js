@@ -22,6 +22,8 @@ eq(mmLabel(18.0), '18', '18.0 = 18');
 eq(mmLabel(18.6), '18,6', 'desatiny s CIARKOU');
 eq(mmLabel('18.6'), '18,6', 'string z payloadu');
 eq(mmLabel(0.5), '0,5', 'polovica milimetra');
+eq(mmLabel(18.65), '18,65', 'GH P2: stotiny sa NEzaokruhluju na desatiny (zhoda s Materials.fmt_mm)');
+eq(mmLabel('18.65'), '18,65', 'GH P2: stotiny zo stringu');
 eq(mmLabel(50), '50', 'horna hranica rozsahu');
 eq(mmLabel('abc'), '', 'necislo = prazdny label (ziadne NaN v UI)');
 eq(mmLabel(null), '', 'null = prazdny label');

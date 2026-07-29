@@ -380,13 +380,16 @@ module Noxun
         # dosky hladanej hrubky, zoradene material_id — zoznam do hlasky).
         def pick_body_sheet(want, current, pool)
           w = want.to_f
+          # GH P2: v tolerancii 0,05 moze byt viac roznych hrubok (18,56 vs 18,60) —
+          # prve kriterium je NAJMENSI rozdiel od want, material_id je az tie-break.
           cands = Array(pool).select { |s| s.is_a?(Hash) && thickness_eq?(s['thickness'], w) }
-                             .sort_by { |s| s['material_id'].to_s }
+                             .sort_by { |s| [(s['thickness'].to_f - w).abs, s['material_id'].to_s] }
           return { pick: nil, candidates: cands } if cands.empty?
-          type  = current ? current['type'].to_s.strip : ''
-          decor = current ? current['decor'].to_s.strip : ''
-          same_type = type.empty? ? [] : cands.select { |s| s['type'].to_s.strip == type }
-          same_decor = decor.empty? ? [] : same_type.select { |s| s['decor'].to_s.strip == decor }
+          # GH P2: identita typu je case-insensitive (ako pri variantoch katalogu).
+          type  = current ? current['type'].to_s.strip.upcase : ''
+          decor = current ? current['decor'].to_s.strip.upcase : ''
+          same_type = type.empty? ? [] : cands.select { |s| s['type'].to_s.strip.upcase == type }
+          same_decor = decor.empty? ? [] : same_type.select { |s| s['decor'].to_s.strip.upcase == decor }
           pick = same_decor.first || (same_type.length == 1 ? same_type.first : nil)
           { pick: pick, candidates: cands }
         end
