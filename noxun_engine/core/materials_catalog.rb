@@ -66,12 +66,13 @@ module Noxun
           return [false, 'Farba musí byť RGB 0–255.']
         end
         # D-19: format platne je volitelny — ak je poslany, musia to byt dve
-        # cisla 500..5000 mm (striktne — nie ticha oprava, Codex F4).
+        # cisla v SHEET_SIZE_RANGE (striktne — nie ticha oprava, Codex F4).
+        # D-44 (audit F6): rozsah zdiela s batchom cez konstantu.
         ss = a['sheet_size'] || a[:sheet_size]
         if ss
           valid = ss.is_a?(Array) && ss.size == 2 &&
-                  ss.all? { |x| (n = pair_num(x)) && n.between?(500.0, 5000.0) }
-          return [false, 'Formát platne musí byť dve čísla 500–5000 mm.'] unless valid
+                  ss.all? { |x| (n = pair_num(x)) && SHEET_SIZE_RANGE.cover?(n) }
+          return [false, "Formát platne musí byť dve čísla #{sheet_size_range_label} mm."] unless valid
         end
         [true, nil]
       end

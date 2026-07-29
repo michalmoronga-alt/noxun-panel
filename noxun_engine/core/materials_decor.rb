@@ -106,10 +106,16 @@ module Noxun
       # meni sa atomicky pre celu skupinu (dosky; ABS vyrobcu nema). Update
       # jednotliveho sheetu vyrobcu NEMENI (guard v handle_save_sheet). Vrati
       # [true, pocet] alebo [false, chyba].
-      def set_decor_manufacturer(decor, manufacturer)
+      def set_decor_manufacturer(decor, manufacturer, clear: false)
         d = decor.to_s.strip
         return [false, 'Dekor je povinný.'] if d.empty?
         man = manufacturer.to_s.strip
+        # D-44 (audit F9): prazdna hodnota by ticho vymazala vyrobcu CELEJ skupine
+        # — pri naseptavaci je omyl (vymazanie textu) lahky. Vymazanie musi byt
+        # VEDOMY krok s vlastnym tlacidlom, ktore posle clear_manufacturer.
+        if man.empty? && !clear
+          return [false, 'Prázdny výrobca — na vymazanie použi tlačidlo „Zmazať výrobcu“.']
+        end
         data = load
         changed = 0
         data['sheets'].each do |s|
@@ -169,6 +175,12 @@ module Noxun
       #        vedla DTDL 18 v JEDNEJ validate-all davke) a edge_variants
       #        [{width, thickness}]. Stringove polia ostavaju (vlastne hodnoty);
       #        vsetko sa zluci a deduplikuje TOLERANCNE podla variant identity.
+      #        D-44: batch_schema=2 zapina format platne na variante
+      #        (sheet_variants[i].sheet_size = [dlzka, sirka] mm, volitelny) +
+      #        striktny parse (poskodena polozka/format = chyba celej davky) a
+      #        konflikt rovnakeho typ+hrubka. Identita variantu sa NEMENI —
+      #        ostava dekor+typ+hrubka, takze dva "PD 38" s roznym formatom NIE
+      #        SU dva zaznamy, ale chyba davky (viac sirok = V0.6).
       # Vrati [true, {sheets:[id...], edges:[id...], skipped:[popis...]}] alebo [false, chyba].
       def add_decor_batch(attrs)
         decor = (attrs['decor'] || attrs[:decor]).to_s.strip
@@ -198,23 +210,18 @@ module Noxun
         # per variant, default = spolocny typ formulara), ABS ako [sirka, hrubka].
         # Codex GH #76: STRIKTNE Float parsovanie ("18abc" NIE JE 18) — jedna
         # pokazena strukturovana hodnota rusi CELU davku bez zapisu (validate-all).
-        sheet_pairs = ths.map { |th| [type, th] }
-        Array(attrs['sheet_variants'] || attrs[:sheet_variants]).each do |v|
-          next unless v.is_a?(Hash)
-          vt = (v['type'] || v[:type]).to_s.strip
-          vt = type if vt.empty?
-          th = strict_num(v['thickness'] || v[:thickness])
-          return [false, "Hrúbka variantu #{vt} musí byť kladné číslo."] unless th && th.positive?
-          sheet_pairs << [vt, th]
-        end
-        Array(attrs['edge_variants'] || attrs[:edge_variants]).each do |v|
-          next unless v.is_a?(Hash)
-          w = strict_num(v['width'] || v[:width])
-          th = strict_num(v['thickness'] || v[:thickness])
-          return [false, "Šírka ABS „#{v['width'] || v[:width]}“ musí byť 10–200 mm."] unless w && EDGE_WIDTH_RANGE.cover?(w)
-          return [false, "Hrúbka ABS „#{v['thickness'] || v[:thickness]}“ musí byť 1 alebo 2 mm."] unless th && supported_edge_thickness?(th)
-          abs_list << [w, th]
-        end
+        #
+        # D-44 (audit F7): schema payloadu. 2 = klient pozna format platne pri
+        # variantoch a znasa STRIKTNY parse; chybajuca/ina schema = LEGACY vetva
+        # (stary klient z CEF cache ani ulozena sada nesmie dostat chybu).
+        strict = (attrs['batch_schema'] || attrs[:batch_schema]).to_i >= 2
+
+        ok_sheets, sheet_entries = parse_sheet_entries(attrs, type, ths, strict)
+        return [false, sheet_entries] unless ok_sheets
+        ok_edges, abs_list = parse_edge_entries(attrs, abs_list, strict)
+        return [false, abs_list] unless ok_edges
+        ok_dedup, sheet_pairs = dedup_sheet_entries(sheet_entries, strict)
+        return [false, sheet_pairs] unless ok_dedup
         return [false, 'Zadaj aspoň jednu hrúbku dosky alebo ABS pásku.'] if sheet_pairs.empty? && abs_list.empty?
 
         data = load
@@ -224,13 +231,9 @@ module Noxun
         created_edges = []
         skipped = []
 
-        # Dedup v ramci davky s TOLERANCIOU 0.01 mm (Codex GH #71: 18 a 18.004 su
-        # ten isty variant — exact uniq by pustil duplicitne zaznamy s -2 ID).
-        # BLOCKER 5: identita dosky = TYP + hrubka (PD 38 a DTDL 38 su dva varianty).
-        seen_sheets = []
-        sheet_pairs.each do |(vt, th)|
-          next if seen_sheets.any? { |(pt, pth)| pt == vt.upcase && (pth - th).abs < 0.01 }
-          seen_sheets << [vt.upcase, th]
+        # Dedup a konflikt riesi dedup_sheet_entries (identita dosky = TYP +
+        # hrubka; BLOCKER 5: PD 38 a DTDL 38 su dva varianty).
+        sheet_pairs.each do |(vt, th, size)|
           if find_sheet_variant(decor, vt, th)
             skipped << "#{vt} #{fmt_mm(th)}"
             next
@@ -239,10 +242,12 @@ module Noxun
           id = unique_id(base, taken)
           taken << id.upcase
           # D-42: batch NEuklada cenu (nezadana) — doplni sa v tabulke variantov.
+          # D-44 (audit B2): format ide do zaznamu LEN ked ho pouzivatel zadal —
+          # bez neho normalize_sheet kluc vobec neulozi (ziadny neovereny default).
           data['sheets'] << normalize_sheet(
             'material_id' => id, 'family' => "#{manufacturer} #{decor}".strip,
             'manufacturer' => manufacturer, 'decor' => decor, 'type' => vt,
-            'thickness' => th, 'grain' => grain, 'color' => color
+            'thickness' => th, 'grain' => grain, 'color' => color, 'sheet_size' => size
           )
           created_sheets << id
         end
@@ -270,6 +275,89 @@ module Noxun
         end
         return [false, 'Zápis katalógu zlyhal.'] unless write(data)
         [true, { 'sheets' => created_sheets, 'edges' => created_edges, 'skipped' => skipped }]
+      end
+
+      # --- D-44: polozky davky (zdroj, format platne, konflikty) ---------------
+
+      # Polozky dosiek davky ako [typ, hrubka, format|nil, zdroj]. ZDROJ (:text
+      # z pola "Dalsie hrubky" / :chip zo strukturovaneho variantu) rozlisuje
+      # ticha duplicita vs konflikt (audit F4). Vrati [ok, polozky|chyba].
+      def parse_sheet_entries(attrs, type, ths, strict)
+        entries = ths.map { |th| [type, th, nil, :text] }
+        Array(attrs['sheet_variants'] || attrs[:sheet_variants]).each do |v|
+          unless v.is_a?(Hash)
+            # D-44 (audit B3): v schema 2 je poskodena polozka CHYBA celej davky
+            # — ticho ju preskocit znamena zapisat menej, nez pouzivatel videl.
+            return [false, 'Poškodená položka variantov dosky — obnov okno a skús znova.'] if strict
+            next
+          end
+          vt = (v['type'] || v[:type]).to_s.strip
+          vt = type if vt.empty?
+          th = strict_num(v['thickness'] || v[:thickness])
+          return [false, "Hrúbka variantu #{vt} musí byť kladné číslo."] unless th && th.positive?
+          size = nil
+          if strict
+            ok_size, size = parse_variant_size(v['sheet_size'] || v[:sheet_size], vt, th)
+            return [false, size] unless ok_size
+          end
+          entries << [vt, th, size, :chip]
+        end
+        [true, entries]
+      end
+
+      # Volitelny format platne variantu. Chybajuci/prazdny = nil (zaznam vznikne
+      # BEZ formatu, audit B2). Ak je zadany, musi to byt DVOJICA kladnych cisel
+      # v SHEET_SIZE_RANGE — ziadny tichy normalize fallback (audit B3/F6).
+      # Vrati [true, par|nil] alebo [false, chyba].
+      def parse_variant_size(raw, vt, th)
+        return [true, nil] if raw.nil?
+        return [true, nil] if raw.is_a?(Array) && raw.empty?
+        return [true, nil] if raw.is_a?(String) && raw.strip.empty?
+        bad = "Formát platne pre #{vt} #{fmt_mm(th)}: zadaj dve čísla #{sheet_size_range_label} mm (alebo nechaj prázdne)."
+        return [false, bad] unless raw.is_a?(Array) && raw.size == 2
+        pair = raw.map { |x| strict_num(x) }
+        return [false, bad] unless pair.all? { |n| n && n.positive? && SHEET_SIZE_RANGE.cover?(n) }
+        [true, pair]
+      end
+
+      # ABS varianty z cipov — v schema 2 je nehashova polozka CHYBA (audit B3).
+      # Vrati [ok, zoznam|chyba]; zoznam je ten isty (mutovany) ako z textoveho pola.
+      def parse_edge_entries(attrs, abs_list, strict)
+        Array(attrs['edge_variants'] || attrs[:edge_variants]).each do |v|
+          unless v.is_a?(Hash)
+            return [false, 'Poškodená položka variantov ABS — obnov okno a skús znova.'] if strict
+            next
+          end
+          w = strict_num(v['width'] || v[:width])
+          th = strict_num(v['thickness'] || v[:thickness])
+          return [false, "Šírka ABS „#{v['width'] || v[:width]}“ musí byť 10–200 mm."] unless w && EDGE_WIDTH_RANGE.cover?(w)
+          return [false, "Hrúbka ABS „#{v['thickness'] || v[:thickness]}“ musí byť 1 alebo 2 mm."] unless th && supported_edge_thickness?(th)
+          abs_list << [w, th]
+        end
+        [true, abs_list]
+      end
+
+      # Dedup s TOLERANCIOU 0.01 mm (Codex GH #71: 18 a 18.004 su ten isty
+      # variant). D-44 (audit F4): v schema 2 je ten isty typ+hrubka DVAKRAT
+      # CHYBA davky — formaty by boli nejednoznacne a "vyhral by prvy" ticho.
+      # Dva zapisy z TEXTOVEHO pola ("18, 18") ostavaju tichym dedupom (format
+      # nenesu, historicke spravanie). Vrati [ok, [[typ, hrubka, format]]|chyba].
+      def dedup_sheet_entries(entries, strict)
+        seen = []
+        out = []
+        entries.each do |(vt, th, size, src)|
+          prev = seen.find { |p| p[0] == vt.upcase && (p[1] - th).abs < 0.01 }
+          if prev
+            if strict && !(prev[2] == :text && src == :text)
+              return [false, "Variant #{vt} #{fmt_mm(th)} mm je v dávke dvakrát — nechaj len jeden " \
+                             '(inak by bolo nejasné, ktorý formát platne platí).']
+            end
+            next
+          end
+          seen << [vt.upcase, th, src]
+          out << [vt, th, size]
+        end
+        [true, out]
       end
 
       # "18, 36" -> [18.0, 36.0]. Desatiny LEN bodkou — ciarka je oddelovac poloziek.

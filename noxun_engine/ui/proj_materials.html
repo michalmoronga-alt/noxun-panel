@@ -3,7 +3,7 @@
      (%APPDATA%). -->
 <!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.5.2">
+<link rel="stylesheet" href="css/panel.css?v=0.5.3">
 
 <h1>Materiály projektu</h1>
 <p class="sub" id="mdline">…</p>
@@ -49,8 +49,10 @@
        Server (add_decor_batch) parsuje, validuje VSETKO a zapise naraz. -->
   <div id="mdDecorForm" style="display:none">
     <div class="row"><label>Dekor *</label><input id="nd_decor" type="text" placeholder="napr. U702 ST9 Kašmírovo šedá"><span class="unit"></span></div>
-    <div class="row"><label>Výrobca</label><input id="nd_manufacturer" type="text" placeholder="napr. Egger"><span class="unit"></span></div>
-    <div class="row"><label>Typ dosiek</label><input id="nd_type" type="text" value="DTDL"><span class="unit"></span></div>
+    <!-- D-44 (audit F10): našepkávače výrobcu a typu = datalist na EXISTUJÚCOM
+         poli (žiadny nový riadok ani čipy); návrhy stavia server (payload suggest). -->
+    <div class="row"><label>Výrobca</label><input id="nd_manufacturer" type="text" list="mdManList" placeholder="napr. Egger"><span class="unit"></span></div>
+    <div class="row"><label>Typ dosiek</label><input id="nd_type" type="text" list="mdTypeList" value="DTDL" onchange="mdTypeChanged()"><span class="unit"></span></div>
     <div class="row"><label>Smer dekoru</label>
       <select id="nd_grain">
         <option value="length">Po dĺžke</option>
@@ -62,26 +64,34 @@
     <!-- D-42 PR C (audit BLOCKER 5): preset CIPY = strukturovane varianty (typ per
          variant — PD 38 vedla DTDL v jednej davke); textove polia = vlastne hodnoty.
          Posledna pouzita sada sa pamata a predvyplna pri novom dekore. -->
+    <!-- D-44 (audit F5): data-key = STABILNA identita čipu (toggle aj zapamätaná
+         sada idú cezeň, NIE cez textContent) — popis čipu sa smie zmeniť, kľúč NIE. -->
     <div class="row"><label>Dosky</label>
       <div class="mdpcrow" id="nd_sheet_chips">
-        <span class="mdpc" data-th="18">18</span>
-        <span class="mdpc" data-th="36">36</span>
-        <span class="mdpc" data-type="PD" data-th="38">PD 38</span>
-        <span class="mdpc" data-th="16">16</span>
-        <span class="mdpc" data-th="25">25</span>
+        <span class="mdpc" data-key="18" data-th="18">18</span>
+        <span class="mdpc" data-key="36" data-th="36">36</span>
+        <span class="mdpc" data-key="PD 38" data-type="PD" data-th="38">PD 38</span>
+        <span class="mdpc" data-key="16" data-th="16">16</span>
+        <span class="mdpc" data-key="25" data-th="25">25</span>
       </div><span class="unit"></span>
+    </div>
+    <!-- D-44: formát platne pre PRÁVE AKTÍVNE čipy — jeden kompaktný pruh pod
+         čipmi (vertikálny priestor), mimo klikacej plochy čipu. Predvyplnené =
+         viditeľné (potvrdí sa odoslaním); prázdne = záznam vznikne bez formátu. -->
+    <div class="row" id="nd_fmt_row" style="display:none"><label>Formát platne</label>
+      <div class="mdfmtrow" id="nd_fmt_fields"></div><span class="unit">mm</span>
     </div>
     <div class="row"><label>ABS</label>
       <div class="mdpcrow" id="nd_edge_chips">
-        <span class="mdpc" data-w="22" data-t="1">22/1</span>
-        <span class="mdpc" data-w="23" data-t="1">23/1</span>
-        <span class="mdpc" data-w="43" data-t="1">43/1</span>
-        <span class="mdpc" data-w="43" data-t="2">43/2</span>
+        <span class="mdpc" data-key="22/1" data-w="22" data-t="1">22/1</span>
+        <span class="mdpc" data-key="23/1" data-w="23" data-t="1">23/1</span>
+        <span class="mdpc" data-key="43/1" data-w="43" data-t="1">43/1</span>
+        <span class="mdpc" data-key="43/2" data-w="43" data-t="2">43/2</span>
       </div><span class="unit"></span>
     </div>
     <div class="row"><label>Ďalšie hrúbky</label><input id="nd_ths" type="text" placeholder="voliteľné, napr. 18.5"><span class="unit">mm</span></div>
     <div class="row"><label>Ďalšie ABS</label><input id="nd_abs" type="text" placeholder="voliteľné, napr. 28/2"><span class="unit">š/hr</span></div>
-    <div class="hint">Klikaj čipy, výnimky dopíš (čiarkami, desatiny bodkou). Ceny a kódy doplníš v detaile dekoru.</div>
+    <div class="hint">Klikaj čipy, výnimky dopíš (čiarkami, desatiny bodkou). Formát platne uprav pri čipe (PD ho má prázdny — zadaj skutočný). Ceny a kódy doplníš v detaile dekoru.</div>
     <div class="btnrow">
       <button class="primary" onclick="mdSaveDecorBatch()">Vytvoriť</button>
       <button class="ghostbtn" onclick="mdCloseForms()">Zrušiť</button>
@@ -138,9 +148,14 @@
   </div>
 </fieldset>
 
+<!-- D-44: zoznamy návrhov pre našepkávače (výrobca, typ dosky). Nerenderujú sa —
+     napĺňa ich JS z payloadu servera; používa ich batch aj inline editor výrobcu. -->
+<datalist id="mdManList"></datalist>
+<datalist id="mdTypeList"></datalist>
+
 <div id="status">Pripravené.</div>
 
 <!-- icons.js prvy (sprite musi existovat pred prvym renderom mdRenderLists) -->
-<script src="js/errors.js?v=0.5.2"></script>
-<script src="js/icons.js?v=0.5.2"></script>
-<script src="js/proj_materials.js?v=0.5.2"></script>
+<script src="js/errors.js?v=0.5.3"></script>
+<script src="js/icons.js?v=0.5.3"></script>
+<script src="js/proj_materials.js?v=0.5.3"></script>

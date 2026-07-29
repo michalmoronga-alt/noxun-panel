@@ -26,8 +26,6 @@
 ## Návrhy väčších celkov (na rozpracovanie)
 
 - **D-43 · Zdvojené dosky (duplák 36 = 2× 18)** (Michal 27.7.) — **(a) overené v kóde (Fable 27.7.):** logika „36 = 2×18" dnes NEEXISTUJE nikde — kusovník aj odhad platní (`sheet_estimate.rb`) zoskupujú podľa `material_id`, takže dielec 36 spotrebuje 1× svoju plochu z platne varianty „36"; VEPO merge 18+36 je len spoločný SÚBOR (dielec ide 1× s hrúbkou 36 — zhodné so starou linkou). Dôsledok: ak sa duplák lepí z 2×18, interný odhad platní podhodnocuje spotrebu 18-tky. **(b) návrh modelu:** variant 36 označený ako „zdvojený z 18" (odkaz na zdrojový variant + multiplikátor ×2, BEZ vlastného DK kódu — kupuje sa 18-ka) → odhad platní pripočíta 2× plochu do skupiny 18; pri pridaní 18 varianty auto-ponúknuť vytvorenie zdvojenej 36 (Halifax: 18,6 → 37,2). **Dôležité (Codex P2):** vzťah `source_material_id` + multiplikátor musí byť súčasťou výrobného SNAPSHOTU na entite/BOM kontraktu (štandard 8.3 — autorita je snapshot), nie len katalógu — inak sa odhad nedá reprodukovať na inom stroji či po zmene katalógu. *Stav: na návrhovú dávku (sedenie ③ / V0.6).*
-- **D-44 · Rýchly výber výrobcu a typu pri zadávaní** (Michal 27.7.) — pri batchi/edite materiálu vyberať výrobcu rozkliknutím z už zadaných + možnosť dopísať nového; to isté pre TYP dosiek — úsporne (pravidlo vertikálneho priestoru). **Aktualizované rozhodnutím 29.7. (09_POJMY otázka 3):** typ zostáva krátky zoznam (DTDL, PD, HDF…) BEZ šírky — **šírka/formát je samostatný atribút variantu** (šírok PD je 6+ a líšia sa per výrobca); pickery teda: výrobca + typ + formát pole. *Stav: na UX dávku (spolu s D-15 vzorom).*
-
 - **D-20 · Quick actions — bezpečný move plugin** (Michal 19.7., „pre budúceho Michala a Fable, keď bude základ top 😉") — zlúčiť funkčné pluginy noxun_mower + Snaper do jedného toolbar pluginu (rýchly pohyb, kopírovanie, rotácie, prisunutie na doraz). **Známy poznatok:** mower „rýchla kópia skrinky vedľa" vytvorí kópiu LEN ako geometriu — bez NOXUN identity kabinetu (kópia mimo observer/dedup flow). Pri stavbe quick actions kopírovanie prerobiť tak, aby kópia prešla štandardným dedup tickom (plná identita + config). *Stav: budúcnosť (po V1 / pri zostavách).*
 - **D-09 · Snap body pri presúvaní priečok** (1/4, 1/2, 3/4…) v zónovom náhľade. *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
 - **D-10 · Presúvanie/úprava čiel priamo v náhľade** (ako drag priečok). *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
@@ -43,7 +41,7 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ### Seed katalógu — podklad na ručné vloženie (zoznam Michal 25.7., jednorazová sekcia)
 
-**Odporúčaný postup:** vkladať RUČNE cez batch „Nový dekor" (preset-čipy) — zároveň otestuje D-42 UI na reálnych dátach (18,6 mm; PD 38). Demos import (V0.6) potom záznamy len obohatí — DK kódy už budú sedieť. Ku každému dekoru vlož aspoň ABS 22/1,0 (nech funguje picker a olep); ABS kódy doplníme po vyriešení mapovania (09_POJMY otázka 2). **POZOR — formát platne (Codex P2):** batch formát nezadáva a všetko založí s defaultom 2800×2070 — po batchi otvor cez ceruzku varianty s iným formátom a ulož skutočný: obe MG dekory → **2800×2050**, PD 38 → **4100×600** (inak bude odhad platní aj semafor „nezmestí sa" počítať zle).
+**Odporúčaný postup:** vkladať RUČNE cez batch „Nový dekor" (preset-čipy) — zároveň otestuje D-42 UI na reálnych dátach (18,6 mm; PD 38). Demos import (V0.6) potom záznamy len obohatí — DK kódy už budú sedieť. Ku každému dekoru vlož aspoň ABS 22/1,0 (nech funguje picker a olep); ABS kódy doplníme po vyriešení mapovania (09_POJMY otázka 2). **Formát platne (od D-44, PR #84):** zadávaš ho rovno v dávke — pod čipmi dosiek je pruh `dĺžka × šírka` pre zapnuté čipy (DTDL/MDF/HDF predvyplnené 2800×2070, PD prázdne zámerne). Prepíš tam: obe MG dekory → **2800×2050**, PD 38 → **4100×600**. Ak formát nevyplníš, záznam ostane bez neho a odhad platní to viditeľne označí ako núdzový (semafor „nezmestí sa" mlčí) — dodatočne sa dopĺňa ceruzkou pri variante.
 
 | Výrobca | Dekor (kľúč) | Názov | Doskové varianty | DK kód (code; supplier = Demos) | Poznámka |
 |---|---|---|---|---|---|
@@ -70,6 +68,7 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ## Vyriešené — index (plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md))
 
+- **D-44** rýchle zadávanie materiálov (našepkávač výrobcu/typu, formát platne rovno v dávke „Nový dekor", nezadaný formát sa neukladá) — PR #84
 - **D-45** slučka hrúbka ↔ materiál pri 18,6 (materiál prevezme hrúbku · hrúbka si doberie materiál · vklad sa prispôsobí) — PR #83
 - **D-42** dekorový katalóg UI (mriežka, kód+dodávateľ, cena „nezadaná", inline bunky, preset-čipy) — PR #74–#76
 - **D-41** dekorové skupiny materiál↔ABS (šírka ABS, picker, remap, modal chýbajúcej pásky) — PR #70–#72

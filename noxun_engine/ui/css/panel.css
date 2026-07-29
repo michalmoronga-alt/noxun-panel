@@ -422,6 +422,16 @@
           font-size: 12px; background: var(--nx-surface-sunken); color: var(--nx-ink-strong); cursor: pointer; user-select: none; }
   .mdpc:hover { background: var(--nx-ghost-hover); }
   .mdpc.on { background: var(--nx-select-bg); color: var(--nx-select-strong); border-color: var(--nx-select-accent); }
+  /* D-44: format platne aktivnych cipov — jeden kompaktny pruh pod cipmi
+     (mini-pole na cip, wrapuje az pri velkom pocte; MIMO klikacej plochy cipu) */
+  .mdfmtrow { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .mdfmt { display: inline-flex; align-items: center; gap: 3px; padding: 2px 5px; border-radius: 6px;
+           background: var(--nx-surface-sunken); border: 1px solid var(--nx-border-soft); }
+  .mdfmt i { font-style: normal; font-size: 10px; letter-spacing: .04em; text-transform: uppercase;
+             color: var(--nx-ink-faint); white-space: nowrap; }
+  .mdfmt input.fmtdim { width: 54px; padding: 2px 4px; font-size: 11.5px; text-align: right;
+                        border: 1px solid var(--nx-border); border-radius: 4px; background: var(--nx-surface); color: var(--nx-ink); }
+  .mdfmt input.fmtdim::placeholder { color: var(--nx-ink-faint); }
   /* V0.4.5 D3: vypis upozorneni + badge kovania pri celach */
   /* D-29 A1: warnlist ukotveny hned pod sticky hlavickou (toggle robi scroll-to-top,
      aby bol viditelny aj po odscrollovani). */

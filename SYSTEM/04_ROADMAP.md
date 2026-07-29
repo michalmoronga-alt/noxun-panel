@@ -4,8 +4,8 @@
 
 ## Kde sme (29.7.2026)
 
-- Plugin **v0.5.2** — etapa **V0.5 KOMPLET**: výstupy (kusovník, okno Výroba, VEPO CSV validovaný proti OCL flow, odhad platní), kontrolný semafor, dekorové skupiny materiál↔ABS (V0.5-E) a dekorový katalóg UI (V0.5-F). Po uzávere: split materials.rb (v0.5.1) a **D-45 — hrúbka a materiál sa už neblokujú** (v0.5.2, PR #83): materiál prevezme hrúbku, hrúbka si doberie materiál, vklad sa prispôsobí predvoľbe; čelá berú katalógovú hrúbku (koniec natvrdo 18/19).
-- Testy: **384 headless + 232 JS (CI na každý push) + 151 in-SketchUp scenárov**.
+- Plugin **v0.5.3** — etapa **V0.5 KOMPLET**: výstupy (kusovník, okno Výroba, VEPO CSV validovaný proti OCL flow, odhad platní), kontrolný semafor, dekorové skupiny materiál↔ABS (V0.5-E) a dekorový katalóg UI (V0.5-F). Po uzávere: split materials.rb (v0.5.1), **D-45 — hrúbka a materiál sa už neblokujú** (v0.5.2, PR #83): materiál prevezme hrúbku, hrúbka si doberie materiál, vklad sa prispôsobí predvoľbe, čelá berú katalógovú hrúbku (koniec natvrdo 18/19); **D-44 — rýchle zadávanie materiálov** (v0.5.3, PR #84): našepkávač výrobcu a typu, formát platne rovno v dávke „Nový dekor" (PD zámerne prázdne), nezadaný formát sa neukladá ako overený.
+- Testy: **397 headless + 262 JS v 9 sadách (CI na každý push) + 151 in-SketchUp scenárov**.
 - Práve beží: **uzáver V0.5** — cleanup, dokumentácia, hardening, slovné prechádzky systémom (ujasnenie pojmov), príprava katalógu materiálov (Demos).
 - Ďalej: **V0.6 KOVANIE fáza 2** (štart ~28.7.) · V0.4.8 otvorená/neplánovaná · V1.0 zostavy.
 

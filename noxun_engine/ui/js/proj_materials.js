@@ -11,6 +11,10 @@
   var MD_CATALOG = { sheets: [], edges: [] }; // plne zaznamy pre spravu
   var MD_PROTECTED = [];
   var MD_REV = '';         // D-41: baseline katalogu — server odmietne zapis nad starsim stavom
+  // D-44: navrhy naseptavacov a navrhy formatu platne — obe STAVIA SERVER
+  // (payload suggest/format_hints), JS ich len renderuje.
+  var MD_SUGGEST = { manufacturers: [], types: [] };
+  var MD_FORMAT_HINTS = {};
   var mdEditing = null;    // null | {kind:'sheet'|'edge', id:null|'...'}
 
   function el(id){ return document.getElementById(id); }
@@ -203,8 +207,11 @@
         '<button class="ghostbtn tplbtn" onclick="mdRenameOpen(' + esc(JSON.stringify(g.decor)) + ')">Premenovať</button>') +
       '</div>';
     if (mdManufacturing === g.decor){
-      h += '<div class="tplrow"><input id="md_man_input" type="text" value="' + esc(g.manufacturer || '') + '" placeholder="Výrobca (napr. Egger)" style="flex:1">' +
+      // D-44: naseptavac (datalist mdManList) + VLASTNE tlacidlo na vymazanie —
+      // prazdny input uz vyrobcu nezmaze (server odmietne bez flagu, audit F9).
+      h += '<div class="tplrow"><input id="md_man_input" type="text" list="mdManList" value="' + esc(g.manufacturer || '') + '" placeholder="Výrobca (napr. Egger)" style="flex:1">' +
         '<button class="primary tplbtn" onclick="mdManufacturerSave(' + esc(JSON.stringify(g.decor)) + ')">Uložiť</button>' +
+        (g.manufacturer ? '<button class="ghostbtn tpldel" title="Zmazať výrobcu" aria-label="Zmazať výrobcu" onclick="mdManufacturerClear(' + esc(JSON.stringify(g.decor)) + ')"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>' : '') +
         '<button class="ghostbtn tplbtn" onclick="mdManufacturerOpen(null)">Zrušiť</button></div>';
     }
     if (mdRenaming === g.decor){
@@ -315,6 +322,14 @@
       sketchup.set_decor_manufacturer(JSON.stringify({ decor: decor, manufacturer: input.value, catalog_rev: MD_REV }));
     mdManufacturing = null;
   }
+  // D-44 (audit F9): vymazanie vyrobcu CELEJ skupiny je vedomy krok s flagom —
+  // prazdne pole samo o sebe je omyl a server ho odmietne.
+  function mdManufacturerClear(decor){
+    if (window.sketchup && sketchup.set_decor_manufacturer)
+      sketchup.set_decor_manufacturer(JSON.stringify({ decor: decor, manufacturer: '',
+        clear_manufacturer: true, catalog_rev: MD_REV }));
+    mdManufacturing = null;
+  }
 
   // --- formulare (create: id=null; edit: id zaznamu) ---
   function mdOpenSheetForm(id){
@@ -371,7 +386,37 @@
   // doplna sa DO skupiny; server preskoci existujuce varianty).
   // D-42 PR C: preset cipy = strukturovane varianty (BLOCKER 5). Toggle .on;
   // payload sa sklada z aktivnych cipov (sheet_variants/edge_variants) + textov.
-  function mdChipToggle(chip){ chip.classList.toggle('on'); }
+  // D-44 (audit F5): toggle bezi cez STABILNY data-key (nie textContent — popis
+  // cipu sa smie zmenit, kluc nie) a format platne sa edituje v pruhu POD cipmi,
+  // nie v klikacej ploche cipu (klik do inputu nesmie cip preplo).
+  var mdFmt = {};  // {kluc_cipu: {l, w, auto}} — auto = hodnota z navrhu, nie od pouzivatela
+
+  function mdChipKey(chip){ return chip.getAttribute('data-key') || chip.textContent.trim(); }
+  // Efektivny typ cipu: vlastny data-type (PD 38) alebo spolocny typ formulara.
+  function mdChipType(chip){
+    var t = chip.getAttribute('data-type');
+    if (t && t.trim()) return t.trim();
+    return ((el('nd_type') && el('nd_type').value) || '').trim();
+  }
+  function mdActiveChips(rid){
+    var row = el(rid), out = [];
+    if (!row) return out;
+    var cs = row.querySelectorAll('.mdpc.on');
+    for (var i = 0; i < cs.length; i++) out.push(cs[i]);
+    return out;
+  }
+  function mdActiveSheetChips(){
+    return mdActiveChips('nd_sheet_chips').map(function(c){
+      return { key: mdChipKey(c), type: c.getAttribute('data-type') || '',
+               th: c.getAttribute('data-th'), label: c.textContent.trim(),
+               hintType: mdChipType(c) };
+    });
+  }
+  function mdActiveEdgeChips(){
+    return mdActiveChips('nd_edge_chips').map(function(c){
+      return { key: mdChipKey(c), width: c.getAttribute('data-w'), thickness: c.getAttribute('data-t') };
+    });
+  }
   function mdBindChips(){
     ['nd_sheet_chips', 'nd_edge_chips'].forEach(function(rid){
       var row = el(rid);
@@ -379,34 +424,145 @@
       row.setAttribute('data-bound', '1');
       row.addEventListener('click', function(ev){
         var c = ev.target.closest ? ev.target.closest('.mdpc') : null;
-        if (c) mdChipToggle(c);
+        if (!c) return;
+        c.classList.toggle('on');
+        if (rid !== 'nd_sheet_chips') return;
+        if (c.classList.contains('on')) mdFmtPrefill(mdChipKey(c), mdChipType(c));
+        mdRenderFmtRow();
       });
     });
-  }
-  function mdChipsRead(rid, map){
-    var out = [];
-    var row = el(rid);
-    if (!row) return out;
-    var cs = row.querySelectorAll('.mdpc.on');
-    for (var i = 0; i < cs.length; i++) out.push(map(cs[i]));
-    return out;
   }
   function mdChipsSet(rid, keys){
     var row = el(rid);
     if (!row) return;
     var cs = row.querySelectorAll('.mdpc');
-    for (var i = 0; i < cs.length; i++){
-      var key = cs[i].textContent.trim();
-      cs[i].classList.toggle('on', keys.indexOf(key) >= 0);
-    }
+    for (var i = 0; i < cs.length; i++) cs[i].classList.toggle('on', keys.indexOf(mdChipKey(cs[i])) >= 0);
   }
+
+  // --- D-44: format platne pri novych variantoch ---------------------------
+  // Navrh podla typu je AUTORITA SERVERA (TYPE_FORMAT_HINTS v payloade) — JS ho
+  // len predvyplni do VIDITELNEHO pola (viditelne = potvrdene odoslanim).
+  // Vrati [dlzka, sirka] alebo null (PD aj neznamy typ = vedome prazdne).
+  function mdFormatHint(type, hints){
+    var t = String(type == null ? '' : type).trim().toUpperCase();
+    if (!t || !hints) return null;
+    for (var k in hints){
+      if (!Object.prototype.hasOwnProperty.call(hints, k)) continue;
+      if (String(k).trim().toUpperCase() !== t) continue;
+      var v = hints[k];
+      return (v && v.length === 2) ? [v[0], v[1]] : null;
+    }
+    return null;
+  }
+  function mdFmtStr(v){ return (v === null || v === undefined) ? '' : String(v); }
+  function mdFmtState(key){
+    if (!mdFmt[key]) mdFmt[key] = { l: '', w: '', auto: true };
+    return mdFmt[key];
+  }
+  // Predvyplni format cipu z navrhu — LEN ak ho pouzivatel sam nezadal (auto).
+  function mdFmtPrefill(key, type){
+    var f = mdFmtState(key);
+    if (!f.auto) return;
+    var hint = mdFormatHint(type, MD_FORMAT_HINTS);
+    f.l = hint ? mdFmtStr(hint[0]) : '';
+    f.w = hint ? mdFmtStr(hint[1]) : '';
+  }
+  function mdFmtInput(inp){
+    var f = mdFmtState(inp.getAttribute('data-key'));
+    f[inp.getAttribute('data-dim')] = inp.value;
+    f.auto = false; // rucna hodnota — navrh ju uz neprepise
+  }
+  // GH P2: do zapamatanej sady iba MANUALNE formaty — auto-navrh sa pri obnove
+  // deterministicky dopocita z hintov (mdFmtPrefill), takze ulozeny auto-format
+  // by po zmene typu (DTDL -> PD) chybne prezil ako "rucny".
+  function mdManualFormats(chips, fmtMap){
+    var out = {};
+    (chips || []).forEach(function(c){
+      var f = fmtMap ? fmtMap[c.key] : null;
+      if (f && !f.auto && (f.l || f.w)) out[c.key] = { l: f.l, w: f.w };
+    });
+    return out;
+  }
+  // Zmena spolocneho typu prepocita NAVRHY (PD navrh nema, takze DTDL -> PD
+  // pole vyprazdni — inak by odoslal 2800x2070 pre pracovnu dosku).
+  function mdTypeChanged(){
+    mdActiveSheetChips().forEach(function(c){ if (!c.type) mdFmtPrefill(c.key, c.hintType); });
+    mdRenderFmtRow();
+  }
+  // Kompaktny pruh: 1 riadok, LEN prave aktivne cipy (viac cipov = mini-polia
+  // vedla seba so skratkou typu). Ziadny aktivny cip = riadok je skryty.
+  function mdRenderFmtRow(){
+    var row = el('nd_fmt_row'), box = el('nd_fmt_fields');
+    if (!row || !box) return;
+    var chips = mdActiveSheetChips();
+    if (!chips.length){ box.innerHTML = ''; row.style.display = 'none'; return; }
+    var html = '';
+    chips.forEach(function(c){
+      var f = mdFmtState(c.key);
+      var lbl = c.type ? c.label : ((c.hintType ? c.hintType + ' ' : '') + c.label);
+      html += '<span class="mdfmt">' +
+        '<i>' + esc(lbl) + '</i>' +
+        '<input type="text" class="fmtdim" data-key="' + esc(c.key) + '" data-dim="l" value="' + esc(f.l) + '"' +
+        ' placeholder="dĺžka" title="Formát platne — dĺžka (mm)" oninput="mdFmtInput(this)">' +
+        '<span class="sheetx">×</span>' +
+        '<input type="text" class="fmtdim" data-key="' + esc(c.key) + '" data-dim="w" value="' + esc(f.w) + '"' +
+        ' placeholder="šírka" title="Formát platne — šírka (mm)" oninput="mdFmtInput(this)">' +
+        '</span>';
+    });
+    box.innerHTML = html;
+    row.style.display = '';
+  }
+  // D-44 (cista funkcia, Node test): aktivne cipy + stav formatov -> payload
+  // sheet_variants. Format ide LEN ako KOMPLETNY par; polovicny/neplatny vstup
+  // zastavi odoslanie s hlaskou (vzor mdSaveSheet) — server ma vlastnu striktnu
+  // kontrolu, toto je len rychla spatna vazba.
+  function mdBuildSheetVariants(chips, fmt){
+    var out = [], err = null;
+    (chips || []).forEach(function(c){
+      if (err) return;
+      var f = (fmt && fmt[c.key]) || {};
+      var l = mdSheetDim(f.l), w = mdSheetDim(f.w);
+      if ((l === null) !== (w === null) || (l !== null && (isNaN(l) || isNaN(w)))){
+        err = 'Formát platne pre ' + (c.label || c.key) + ': vyplň obe čísla (mm), alebo nechaj obe prázdne.';
+        return;
+      }
+      var v = { type: c.type || '', thickness: c.th };
+      if (l !== null) v.sheet_size = [l, w];
+      out.push(v);
+    });
+    return { variants: out, error: err };
+  }
+
   // Posledna pouzita sada (Michal: "zapamatat poslednu sadu") — localStorage je
   // len UX pohodlie (try/catch: CEF/file: ho moze zakazat), autorita je server.
+  // D-44: verziovany format (schema 2 + formaty). Stara sada (v1) formaty nemala
+  // a kluce v nej boli LABELY cipov — data-key je s labelmi zamerne zhodny,
+  // takze migracia = prevzatie klucov BEZ formatov (ziadne rozbitie, ziadny
+  // vymysleny format).
+  var MD_SET_KEY = 'nx_decor_last_set_v2';
+  var MD_SET_KEY_V1 = 'nx_decor_last_set';
+  function mdMigrateLastSet(v1){
+    if (!v1 || typeof v1 !== 'object') return null;
+    return { schema: 2,
+             sheet_keys: Array.isArray(v1.sheet_keys) ? v1.sheet_keys : [],
+             edge_keys: Array.isArray(v1.edge_keys) ? v1.edge_keys : [],
+             ths: typeof v1.ths === 'string' ? v1.ths : '',
+             abs: typeof v1.abs === 'string' ? v1.abs : '',
+             formats: {} };
+  }
   function mdLoadLastSet(){
-    try { return JSON.parse(localStorage.getItem('nx_decor_last_set') || 'null'); } catch (e2) { return null; }
+    try {
+      var raw = localStorage.getItem(MD_SET_KEY);
+      if (raw){
+        var s = JSON.parse(raw);
+        return (s && s.schema === 2) ? s : mdMigrateLastSet(s);
+      }
+      var old = localStorage.getItem(MD_SET_KEY_V1);
+      return old ? mdMigrateLastSet(JSON.parse(old)) : null;
+    } catch (e2) { return null; }
   }
   function mdStoreLastSet(set){
-    try { localStorage.setItem('nx_decor_last_set', JSON.stringify(set)); } catch (e2) { /* bez perzistencie */ }
+    try { localStorage.setItem(MD_SET_KEY, JSON.stringify(set)); } catch (e2) { /* bez perzistencie */ }
   }
   function mdOpenDecorForm(decor){
     mdCloseForms();
@@ -424,26 +580,33 @@
     el('nd_abs').value = '';
     // NOVY dekor = predvyplnit poslednou sadou; "+ variant" zacina prazdny
     // (doplna sa konkretna vec do existujucej skupiny).
+    mdFmt = {};
     var last = decor ? null : mdLoadLastSet();
     mdChipsSet('nd_sheet_chips', last && last.sheet_keys ? last.sheet_keys : []);
     mdChipsSet('nd_edge_chips', last && last.edge_keys ? last.edge_keys : []);
     if (last && !decor){
       el('nd_ths').value = last.ths || '';
       el('nd_abs').value = last.abs || '';
+      // Ulozeny format = vedome zadany (auto=false) — navrh ho neprepise.
+      var fmts = (last.formats && typeof last.formats === 'object') ? last.formats : {};
+      Object.keys(fmts).forEach(function(k){
+        var f = fmts[k] || {};
+        mdFmt[k] = { l: mdFmtStr(f.l), w: mdFmtStr(f.w), auto: false };
+      });
     }
+    // Cipy bez ulozeneho formatu dostanu NAVRH podla typu (viditelne v poli).
+    mdActiveSheetChips().forEach(function(c){ mdFmtPrefill(c.key, c.hintType); });
+    mdRenderFmtRow();
     el('mdDecorForm').style.display = '';
   }
   function mdSaveDecorBatch(){
-    var sheetKeys = [], edgeKeys = [];
-    var sheetVariants = mdChipsRead('nd_sheet_chips', function(c){
-      sheetKeys.push(c.textContent.trim());
-      return { type: c.getAttribute('data-type') || '', thickness: c.getAttribute('data-th') };
-    });
-    var edgeVariants = mdChipsRead('nd_edge_chips', function(c){
-      edgeKeys.push(c.textContent.trim());
-      return { width: c.getAttribute('data-w'), thickness: c.getAttribute('data-t') };
-    });
+    var sheetChips = mdActiveSheetChips();
+    var edgeChips = mdActiveEdgeChips();
+    var built = mdBuildSheetVariants(sheetChips, mdFmt);
+    // Polovicny format = formular OSTAVA otvoreny (hodnoty sa nestratia).
+    if (built.error){ MD.setStatus(built.error, true); return; }
     var payload = {
+      batch_schema: 2, // D-44: klient posiela format platne a znasa striktny parse
       catalog_rev: MD_REV,
       decor: el('nd_decor').value,
       manufacturer: el('nd_manufacturer').value,
@@ -452,12 +615,14 @@
       color: hexToRgb(el('nd_color').value),
       thicknesses: el('nd_ths').value,
       abs_tokens: el('nd_abs').value,
-      sheet_variants: sheetVariants,
-      edge_variants: edgeVariants
+      sheet_variants: built.variants,
+      edge_variants: edgeChips.map(function(c){ return { width: c.width, thickness: c.thickness }; })
     };
     if (!mdEditing || !mdEditing.id){
-      mdStoreLastSet({ sheet_keys: sheetKeys, edge_keys: edgeKeys,
-                       ths: el('nd_ths').value, abs: el('nd_abs').value });
+      var formats = mdManualFormats(sheetChips, mdFmt);
+      mdStoreLastSet({ schema: 2, sheet_keys: sheetChips.map(function(c){ return c.key; }),
+                       edge_keys: edgeChips.map(function(c){ return c.key; }),
+                       ths: el('nd_ths').value, abs: el('nd_abs').value, formats: formats });
     }
     if (window.sketchup && sketchup.add_decor_batch) sketchup.add_decor_batch(JSON.stringify(payload));
     mdCloseForms();
@@ -503,6 +668,9 @@
       return;
     }
     if (sl !== null) payload.sheet_size = [sl, sw];
+    // GH P2: edit s OBOMA prazdnymi polami = vedome VYMAZANIE ulozeneho formatu
+    // (server inak merge-om stary par podrzi a "bez formatu" sa neda dosiahnut).
+    else if (mdEditing && mdEditing.id) payload.clear_sheet_size = true;
     mdLastAttempt = { kind: 'sheet', payload: payload };
     var fn = mdEditing && mdEditing.id ? 'update_sheet' : 'add_sheet';
     if (window.sketchup && sketchup[fn]) sketchup[fn](JSON.stringify(payload));
@@ -573,11 +741,25 @@
   // renderom sa zachyti fokus + ROZPISANA (dirty) hodnota a po renderi obnovi.
   // Cista bunka (value == orig) dostane cerstvu hodnotu z payloadu, dirty drzi
   // pouzivatelov text; server aj tak strazi row_rev.
+  // D-44: naplni <datalist> navrhmi zo servera (poradie aj dedup su serverove).
+  function mdFillDatalist(id, items){
+    var dl = el(id);
+    if (!dl) return;
+    var html = '';
+    (items || []).forEach(function(v){ html += '<option value="' + esc(v) + '"></option>'; });
+    dl.innerHTML = html;
+  }
+
   function mdApplyCatalog(data){
     MD_SHEETS = (data.materials && data.materials.sheets) ? data.materials.sheets : [];
     MD_CATALOG = data.catalog || { sheets: [], edges: [] };
     MD_PROTECTED = data.protected_ids || [];
     MD_REV = data.catalog_rev || '';
+    // D-44: naseptavace + navrhy formatu — jedna autorita (server), JS renderuje.
+    MD_SUGGEST = data.suggest || { manufacturers: [], types: [] };
+    MD_FORMAT_HINTS = data.format_hints || {};
+    mdFillDatalist('mdManList', MD_SUGGEST.manufacturers);
+    mdFillDatalist('mdTypeList', MD_SUGGEST.types);
     mdPatchDup = null; // uspesny zapis/refresh rusi pending potvrdenie duplicity
     var keep = null;
     var ae = document.activeElement;
@@ -641,6 +823,10 @@
   // Exportuju sa len CISTE funkcie (bez DOM); ready() sa vola len v CEF (window).
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { groupCatalogByDecor: groupCatalogByDecor, sheetChipLabel: sheetChipLabel,
-      edgeChipLabel: edgeChipLabel, mdMatchGroup: mdMatchGroup, mdBuildSections: mdBuildSections };
+      edgeChipLabel: edgeChipLabel, mdMatchGroup: mdMatchGroup, mdBuildSections: mdBuildSections,
+      // D-44 (tests/js/test_decor_formats.js) — ciste funkcie bez DOM
+      mdFormatHint: mdFormatHint, mdBuildSheetVariants: mdBuildSheetVariants,
+      mdMigrateLastSet: mdMigrateLastSet, mdSheetDim: mdSheetDim,
+      mdManualFormats: mdManualFormats };
   }
   if (typeof window !== 'undefined' && window.sketchup && sketchup.ready) sketchup.ready('');
