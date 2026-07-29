@@ -1,11 +1,11 @@
-# Noxun Engine — roadmapa (živý dokument, aktualizované 24.7.2026)
+# Noxun Engine — roadmapa (živý dokument, aktualizované 29.7.2026)
 
 > Princíp: **najprv všeobecný základ pre všetko, potom vyostrovanie.** Regenerate pattern robí konštrukčné zmeny lacnými — drahé je len meniť DÁTOVÝ MODEL (atribúty, identita, hrany), preto ten je uzamknutý štandardom vopred a detaily geometrie sa doladia iteráciami z klikania.
 
-## Kde sme (24.7.2026)
+## Kde sme (29.7.2026)
 
-- Plugin **v0.5.0** — etapa **V0.5 KOMPLET**: výstupy (kusovník, okno Výroba, VEPO CSV validovaný proti OCL flow, odhad platní), kontrolný semafor, dekorové skupiny materiál↔ABS (V0.5-E) a dekorový katalóg UI (V0.5-F).
-- Testy: **372 headless + 200 JS (CI na každý push) + ~140 in-SketchUp scenárov**.
+- Plugin **v0.5.2** — etapa **V0.5 KOMPLET**: výstupy (kusovník, okno Výroba, VEPO CSV validovaný proti OCL flow, odhad platní), kontrolný semafor, dekorové skupiny materiál↔ABS (V0.5-E) a dekorový katalóg UI (V0.5-F). Po uzávere: split materials.rb (v0.5.1) a **D-45 — hrúbka a materiál sa už neblokujú** (v0.5.2, PR #83): materiál prevezme hrúbku, hrúbka si doberie materiál, vklad sa prispôsobí predvoľbe; čelá berú katalógovú hrúbku (koniec natvrdo 18/19).
+- Testy: **384 headless + 232 JS (CI na každý push) + 151 in-SketchUp scenárov**.
 - Práve beží: **uzáver V0.5** — cleanup, dokumentácia, hardening, slovné prechádzky systémom (ujasnenie pojmov), príprava katalógu materiálov (Demos).
 - Ďalej: **V0.6 KOVANIE fáza 2** (štart ~28.7.) · V0.4.8 otvorená/neplánovaná · V1.0 zostavy.
 
