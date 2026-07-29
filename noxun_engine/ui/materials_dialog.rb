@@ -131,7 +131,13 @@ module Noxun
             materials: Panel.materials_payload,               # katalog dosiek pre selecty
             catalog: full_catalog_payload,                    # D-05: plne zaznamy pre spravu
             protected_ids: Materials::PROTECTED_SHEET_IDS,
-            catalog_rev: Materials.catalog_revision           # D-41: baseline guard formularov
+            catalog_rev: Materials.catalog_revision,          # D-41: baseline guard formularov
+            # D-44: naseptavace (vyrobca/typ) a navrhy formatu platne stavia
+            # SERVER — JS ich len renderuje. Ide s KAZDYM katalogovym echom,
+            # takze novy vyrobca/typ je v navrhoch hned po zapise.
+            suggest: { manufacturers: Materials.manufacturer_suggestions,
+                       types: Materials.type_suggestions },
+            format_hints: Materials::TYPE_FORMAT_HINTS
           }
         end
 
@@ -346,10 +352,15 @@ module Noxun
         def handle_set_decor_manufacturer(payload)
           data = JSON.parse(payload.to_s)
           return unless revision_ok?(data)
-          ok, result = Materials.set_decor_manufacturer(data['decor'], data['manufacturer'])
+          # D-44 (audit F9): prazdna hodnota vymaze vyrobcu LEN s explicitnym
+          # flagom z tlacidla "Zmazať výrobcu" — omyl pri naseptavaci sa odmietne.
+          clear = !!data['clear_manufacturer']
+          ok, result = Materials.set_decor_manufacturer(data['decor'], data['manufacturer'], clear: clear)
           return set_status(result, true) unless ok
           after_catalog_change
-          set_status("Výrobca dekoru #{data['decor'].to_s.strip} nastavený (#{result} dosiek).")
+          decor = data['decor'].to_s.strip
+          set_status(clear ? "Výrobca dekoru #{decor} zmazaný (#{result} dosiek)."
+                           : "Výrobca dekoru #{decor} nastavený (#{result} dosiek).")
         end
 
         # --- D-05: sprava katalogu (Codex audit davky 2 zapracovany) ----------

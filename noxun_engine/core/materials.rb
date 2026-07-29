@@ -41,6 +41,25 @@ module Noxun
       # najmensia >= hrubka+MARGIN; mimo standardov sa auto-tvorba odmietne.
       AUTO_WIDTHS = [22.0, 43.0].freeze
 
+      # D-44 (audit F6): povoleny rozsah rozmeru platne (mm) — JEDINA autorita
+      # pouzivana formularom (validate_sheet_attrs) AJ batchom "Novy dekor".
+      # Dva rozne rozsahy = dva rozne pravdy, preto konstanta.
+      SHEET_SIZE_RANGE = (500.0..5000.0)
+      # D-44 (audit B2): NAVRH formatu platne podla typu dosky pre nove varianty
+      # v batchi. DTDL/MDF/HDF maju de facto standard 2800x2070; PD (pracovna
+      # doska) ma sirok vela a lisia sa per vyrobca -> ziadny navrh = vedome
+      # zadanie. Neznamy typ = nil. Navrh je len PREDVYPLNENIE viditelneho pola
+      # (viditelne = potvrdene odoslanim) — server neuklada neovereny default.
+      TYPE_FORMAT_HINTS = {
+        'DTDL' => [2800.0, 2070.0],
+        'MDF'  => [2800.0, 2070.0],
+        'HDF'  => [2800.0, 2070.0],
+        'PD'   => nil
+      }.freeze
+      # D-44: typy ponukane v naseptavaci aj ked ich katalog este neobsahuje
+      # (typ ostava volny string — toto NIE JE enum, len navrhy).
+      SEED_TYPES = %w[DTDL PD MDF HDF kompakt].freeze
+
       # Projektove default kluce v NOXUN dict na modeli (koren dedenia projekt->korpus->dielec).
       PROJECT_KEYS = %w[default_material_id default_front_material_id default_back_material_id].freeze
       PROJECT_FALLBACK = {
@@ -169,13 +188,18 @@ module Noxun
           'thickness'   => (a['thickness'] || a[:thickness]).to_f,
           'grain'       => (a['grain'] || a[:grain] || 'none').to_s,
           'price_per_m2' => normalize_price(a['price_per_m2'] || a[:price_per_m2]),
-          'sheet_size'  => normalize_pair(a['sheet_size'] || a[:sheet_size], [2800.0, 2070.0]),
+          'sheet_size'  => normalize_pair(a['sheet_size'] || a[:sheet_size]),
           'color'       => normalize_rgb(a['color'] || a[:color], [216, 196, 160]),
           'production_class' => 'sheet'
         }
         # D-42: cena ako nil-alebo-Float — kluc sa uklada LEN ked je cena ZADANA
         # (rozlisenie "nezadana" vs "0", audit FIX 11). Nil sa do JSON neuklada.
         out.delete('price_per_m2') if out['price_per_m2'].nil?
+        # D-44 (audit B2): format platne je rovnako VOLITELNY — server nikdy
+        # neuklada neovereny default 2800x2070 ako DATA. Chybajuci format =
+        # odhad platni pouzije fallback A OZNACI ho, semafor "nezmesti sa" o nom
+        # mlci (namiesto merania proti vymyslenemu formatu).
+        out.delete('sheet_size') if out['sheet_size'].nil?
         put_opt(out, 'code', a['code'] || a[:code])
         put_opt(out, 'supplier', a['supplier'] || a[:supplier])
         out
@@ -229,12 +253,13 @@ module Noxun
       end
 
       # D-19 (Codex F4): to_f by z "abc" spravilo 0.0 a odhad platni by delil
-      # nulou — nekladny/nečíselny prvok znamena CELY par default.
-      def normalize_pair(v, dflt)
-        return dflt unless v.is_a?(Array) && v.size == 2
+      # nulou — nekladny/neciselny prvok znamena, ze format NIE JE zadany.
+      # D-44: vracia nil (nie default) — kluc sa potom vobec neulozi (audit B2).
+      def normalize_pair(v)
+        return nil unless v.is_a?(Array) && v.size == 2
         l = pair_num(v[0])
         w = pair_num(v[1])
-        l && w ? [l, w] : dflt
+        l && w ? [l, w] : nil
       end
 
       def pair_num(v)
@@ -303,6 +328,41 @@ module Noxun
                  "ABS_#{slug(decor)}_#{thickness_token(width)}X#{th_token}"
                end
         unique_id(base, edges.map { |a| a['abs_id'].to_s.upcase })
+      end
+
+      # --- D-44: navrhy do naseptavacov (datalist) -----------------------------
+      # Zoznam stavia SERVER a posiela ho v payloade (push_state/push_catalog) —
+      # JS ho len renderuje (jedna autorita, ziadne zbieranie z DOM).
+
+      # Trim, prazdne von, dedup CASE-INSENSITIVE (prvy vyskyt urcuje tvar —
+      # do katalogu sa zapisuje AS-TYPED, navrh len ponuka existujuci zapis),
+      # stabilne zoradene abecedne case-insensitive (tie-break presnym tvarom,
+      # aby poradie neviselo na poradi zaznamov v subore).
+      def string_suggestions(values)
+        seen = {}
+        values.each do |raw|
+          v = raw.to_s.strip
+          next if v.empty?
+          k = v.downcase
+          seen[k] = v unless seen.key?(k)
+        end
+        seen.values.sort_by { |v| [v.downcase, v] }
+      end
+
+      # Vyrobcovia pouzivani v katalogu (vyrobca je vlastnost dekoru = dosky).
+      def manufacturer_suggestions
+        string_suggestions(sheets.map { |s| s['manufacturer'] })
+      end
+
+      # Typy dosiek z katalogu + seed typy (katalog ide prvy, takze si drzi
+      # vlastny zapis tvaru pri kolizii velkosti pismen).
+      def type_suggestions
+        string_suggestions(sheets.map { |s| s['type'] } + SEED_TYPES)
+      end
+
+      # Hranice formatu platne do hlasky — z JEDNEJ konstanty (formular aj batch).
+      def sheet_size_range_label
+        "#{fmt_mm(SHEET_SIZE_RANGE.first)}–#{fmt_mm(SHEET_SIZE_RANGE.last)}"
       end
 
       def unique_id(base, taken_upcased)

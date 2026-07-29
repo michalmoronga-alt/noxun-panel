@@ -29,3 +29,5 @@ jobs:
         run: node tests/js/test_decor_sections.js
       - name: JS testy (hrubkove filtre a labely D-45)
         run: node tests/js/test_thickness_labels.js
+      - name: JS testy (format platne pri cipoch + zapamatana sada D-44)
+        run: node tests/js/test_decor_formats.js
