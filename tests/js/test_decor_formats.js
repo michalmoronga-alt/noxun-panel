@@ -6,7 +6,7 @@
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
-const { mdFormatHint, mdBuildSheetVariants, mdMigrateLastSet, mdSheetDim } =
+const { mdFormatHint, mdBuildSheetVariants, mdMigrateLastSet, mdSheetDim, mdManualFormats } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'proj_materials.js'));
 
 let n = 0;
@@ -78,5 +78,18 @@ eq(mdMigrateLastSet({ sheet_keys: 'nezoznam', ths: 42 }),
   'poskodene typy sa zahodia (localStorage je len UX, nie autorita)');
 eq(mdMigrateLastSet(null), null, 'ziadna ulozena sada = null');
 eq(mdMigrateLastSet('retazec'), null, 'nepouzitelny obsah = null');
+
+// --- mdManualFormats (GH P2): do zapamatanej sady iba RUCNE formaty — auto
+//     navrh sa pri obnove dopocita z hintov a nesmie prezit zmenu typu ---
+const MF_CHIPS = [{ key: 'DTDL|18' }, { key: 'PD|38' }, { key: 'HDF|3' }];
+eq(mdManualFormats(MF_CHIPS, {
+  'DTDL|18': { l: '2800', w: '2070', auto: true },   // auto navrh — NEuklada sa
+  'PD|38':   { l: '4100', w: '600',  auto: false },  // rucne zadany — uklada sa
+  'HDF|3':   { l: '', w: '', auto: false }           // prazdny — nema co ulozit
+}), { 'PD|38': { l: '4100', w: '600' } }, 'auto navrhy sa nepamataju, rucne ano');
+eq(mdManualFormats(MF_CHIPS, {}), {}, 'ziadne formaty = prazdna mapa');
+eq(mdManualFormats([], { 'DTDL|18': { l: '1', w: '2', auto: false } }), {},
+  'format bez aktivneho cipu sa neuklada');
+eq(mdManualFormats(null, null), {}, 'null vstupy = prazdna mapa, ziadny pad');
 
 console.log(JSON.stringify({ passed: n, failed: 0 }));

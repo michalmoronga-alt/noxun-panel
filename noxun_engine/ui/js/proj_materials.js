@@ -472,6 +472,17 @@
     f[inp.getAttribute('data-dim')] = inp.value;
     f.auto = false; // rucna hodnota — navrh ju uz neprepise
   }
+  // GH P2: do zapamatanej sady iba MANUALNE formaty — auto-navrh sa pri obnove
+  // deterministicky dopocita z hintov (mdFmtPrefill), takze ulozeny auto-format
+  // by po zmene typu (DTDL -> PD) chybne prezil ako "rucny".
+  function mdManualFormats(chips, fmtMap){
+    var out = {};
+    (chips || []).forEach(function(c){
+      var f = fmtMap ? fmtMap[c.key] : null;
+      if (f && !f.auto && (f.l || f.w)) out[c.key] = { l: f.l, w: f.w };
+    });
+    return out;
+  }
   // Zmena spolocneho typu prepocita NAVRHY (PD navrh nema, takze DTDL -> PD
   // pole vyprazdni — inak by odoslal 2800x2070 pre pracovnu dosku).
   function mdTypeChanged(){
@@ -608,11 +619,7 @@
       edge_variants: edgeChips.map(function(c){ return { width: c.width, thickness: c.thickness }; })
     };
     if (!mdEditing || !mdEditing.id){
-      var formats = {};
-      sheetChips.forEach(function(c){
-        var f = mdFmt[c.key];
-        if (f && (f.l || f.w)) formats[c.key] = { l: f.l, w: f.w };
-      });
+      var formats = mdManualFormats(sheetChips, mdFmt);
       mdStoreLastSet({ schema: 2, sheet_keys: sheetChips.map(function(c){ return c.key; }),
                        edge_keys: edgeChips.map(function(c){ return c.key; }),
                        ths: el('nd_ths').value, abs: el('nd_abs').value, formats: formats });
@@ -661,6 +668,9 @@
       return;
     }
     if (sl !== null) payload.sheet_size = [sl, sw];
+    // GH P2: edit s OBOMA prazdnymi polami = vedome VYMAZANIE ulozeneho formatu
+    // (server inak merge-om stary par podrzi a "bez formatu" sa neda dosiahnut).
+    else if (mdEditing && mdEditing.id) payload.clear_sheet_size = true;
     mdLastAttempt = { kind: 'sheet', payload: payload };
     var fn = mdEditing && mdEditing.id ? 'update_sheet' : 'add_sheet';
     if (window.sketchup && sketchup[fn]) sketchup[fn](JSON.stringify(payload));
@@ -816,6 +826,7 @@
       edgeChipLabel: edgeChipLabel, mdMatchGroup: mdMatchGroup, mdBuildSections: mdBuildSections,
       // D-44 (tests/js/test_decor_formats.js) — ciste funkcie bez DOM
       mdFormatHint: mdFormatHint, mdBuildSheetVariants: mdBuildSheetVariants,
-      mdMigrateLastSet: mdMigrateLastSet, mdSheetDim: mdSheetDim };
+      mdMigrateLastSet: mdMigrateLastSet, mdSheetDim: mdSheetDim,
+      mdManualFormats: mdManualFormats };
   }
   if (typeof window !== 'undefined' && window.sketchup && sketchup.ready) sketchup.ready('');

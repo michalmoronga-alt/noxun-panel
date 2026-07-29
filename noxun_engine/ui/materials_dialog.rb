@@ -421,6 +421,11 @@ module Noxun
           # resetnut na default cez normalize_sheet.
           base = create ? {} : existing
           rec = base.merge(data).merge('material_id' => id, 'thickness' => th)
+          # D-44 (GH P2): edit s prazdnymi polami formatu = vedome VYMAZANIE —
+          # bez explicitneho flagu by merge stary sheet_size ticho podrzal a stav
+          # "bez overeneho formatu" by sa pri existujucom zazname nedal dosiahnut.
+          rec.delete('sheet_size') if !create && data['clear_sheet_size']
+          rec.delete('clear_sheet_size')
           return set_status('Uloženie katalógu zlyhalo.', true) unless Materials.upsert_sheet(rec)
           after_catalog_change
           set_status(create ? "Materiál pridaný (#{id})." : "Materiál #{id} upravený.")
