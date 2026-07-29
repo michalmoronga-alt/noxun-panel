@@ -164,13 +164,44 @@ module Noxun
             return set_status("Šablóna je pre iný typ (#{tpl_type == 'upper' ? 'horná' : 'dolná'}) než označená skrinka — nepoužitá.", true)
           end
 
-          merged = merge_template(Panel.existing_params(cab), tpl['config'])
+          target = Panel.existing_params(cab)
+          merged = merge_template(target, tpl['config'])
+          # D-45 (audit B4): sablona nesie hrubku aj (nepovinne) material — dvojica
+          # sa musi zladit PRED rebuildom, inak by stavba spadla surovou hrubkovou
+          # hlaskou. Explicitny material sablony vyhrava (hrubka sa prevezme z neho),
+          # inak material dobera body_preflight; nejednoznacnost = odmietnutie.
+          pf = template_material_preflight(merged, tpl['config'], target, model)
+          return set_status(pf[:error], true) if pf && pf[:error]
           Panel.suspend_selection_sync do
             CabinetBuilder.rebuild(model, cab, merged)
             Panel.reselect(model, cab)
           end
-          set_status("Šablóna \"#{name}\" použitá na #{Store.get(cab, 'cabinet_id')}.")
+          set_status("Šablóna \"#{name}\" použitá na #{Store.get(cab, 'cabinet_id')}.#{pf ? pf[:note] : ''}")
           Panel.push_selected(model)
+        end
+
+        # D-45: zladenie hrubka<->material pre MERGED params sablony.
+        # Vrati nil / { error: } / { note: } (rovnaky kontrakt ako Panel preflighty).
+        # GH P1: hrubku smie prevzat LEN material, ktory dodala SAMOTNA SABLONA —
+        # merge_template kopiruje do merged aj material CIELA, takze test musi ist
+        # na tpl_config (inak by sablona bez materialu zdedila staru hrubku ciela).
+        # GH P1 (remap): old_eff sa cita z CIELA pred merge — merged uz nesie novy
+        # material a remap rucnych ABS by inak ziadnu zmenu nevidel.
+        def template_material_preflight(merged, tpl_config, target, model)
+          note = ''
+          if defined?(Materials) && Panel.present_str((tpl_config || {})['material_id'])
+            sheet = Materials.sheet(CabinetBuilder.effective_materials(model, merged)['body'])
+            if sheet
+              adopt = Panel.adopt_body_thickness!(merged, sheet)
+              return adopt if adopt && adopt[:error]
+              note += adopt[:note].to_s if adopt
+            end
+          end
+          pf = Panel.material_preflight(merged, model,
+                                        old_eff: CabinetBuilder.effective_materials(model, target))
+          return pf if pf && pf[:error]
+          note += pf[:note].to_s if pf
+          note.empty? ? nil : { note: note }
         end
 
         def merge_template(target_params, tpl_config)

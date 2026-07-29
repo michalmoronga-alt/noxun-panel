@@ -32,6 +32,9 @@ module Noxun
       UPPER_HANG_Z     = 1400.0  # vyska zavesenia hornej skrinky (Z pri vlozeni)
 
       MIN = { width: 200.0, height: 200.0, depth: 150.0 }.freeze
+      # D-45: povoleny rozsah hrubky korpusu (mm) — JEDINY zdroj pravdy pre clamp
+      # v normalize, pre prevzatie hrubky z materialu aj pre projektovy guard.
+      THICKNESS_RANGE = [6.0, 50.0].freeze
 
       # Fallback farby SketchUp materialu, ak material_id nie je v katalogu (Materials preberie color).
       FALLBACK_RGB_KORPUS = [216, 196, 160].freeze
@@ -257,10 +260,10 @@ module Noxun
           tid = template_id_for(cfg[:type])
 
           # Efektivne korpusove materialy = korpus config, inak dedenie z projektovych defaultov (model).
-          defaults = defined?(Materials) ? Materials.project_defaults(model) : {}
-          eff_body  = present(cfg[:material_id])       || defaults['default_material_id']
-          eff_front = present(cfg[:front_material_id]) || defaults['default_front_material_id']
-          eff_back  = present(cfg[:back_material_id])  || defaults['default_back_material_id']
+          eff = effective_materials(model, cfg)
+          eff_body  = eff['body']
+          eff_front = eff['front']
+          eff_back  = eff['back']
           overrides = PartKeys.migrate_overrides(cfg[:part_overrides], plan[:parts])
           cfg = cfg.merge(part_overrides: overrides, part_key_schema: PartKeys::SCHEMA)
 
@@ -310,18 +313,110 @@ module Noxun
           want = pd[:prod][:thickness].to_f
           have = sheet['thickness'].to_f
           return if thickness_ok_for?(pd[:role], want, have)
-          raise "Material #{mat_id} ma #{have.round(2)} mm, ale dielec #{pd[:suffix]} potrebuje #{want.round(2)} mm."
+          # D-45: hlaska je posledna zachrana (bezne ju predbehnu panelove preflighty)
+          # — pise sa v mm s ciarkou a NAVIGUJE, kde sa hrubka realne meni.
+          raise "Materiál #{mat_id} má #{mm_txt(have)} mm, ale dielec #{pd[:suffix]} potrebuje #{mm_txt(want)} mm " \
+                '— zmeň materiál celej skrinky (prevezme hrúbku) alebo hrúbku korpusu.'
         end
 
-        # Cela beru katalogove varianty 18 aj 19 mm; ich geometria sa prisposobi.
+        # mm do hlasky (desatinna ciarka). Materials je jediny formatovac; bez neho
+        # (teoreticky ciastocny load) sa pouzije surove cislo.
+        def mm_txt(v)
+          defined?(Materials) ? Materials.fmt_mm(v) : v.to_f.round(2).to_s
+        end
+
+        # Cela beru KATALOGOVU hrubku sveho materialu — geometriu, polohu pred
+        # korpusom aj vyrobny udaj prepise materialized_part (D-45: 18,6 mm celo
+        # je legitimne, natvrdo 18/19 bola pricina blokovaneho materialu). Hranicou
+        # ostava rozumny rozsah doskoveho materialu; presna zhoda s konstrukcnou
+        # hrubkou prejde vzdy (fallback pre nekatalogove/legacy hodnoty).
         # Ostatne dielce vyzaduju presnu zhodu s konstrukcnou hrubkou.
         def thickness_ok_for?(role, want, have)
           case role.to_s
           when 'front_door', 'drawer_front'
-            (have - 18.0).abs < 0.05 || (have - 19.0).abs < 0.05 || (have - want).abs < 0.05
+            thickness_in_range?(have) || (have - want).abs < 0.05
           else
             (have - want).abs < 0.05
           end
+        end
+
+        # --- D-45: hrubka <-> material tela ---------------------------------
+        # Deadlock „hrubka blokuje material, material blokuje hrubku" sa rozbija
+        # dvoma smermi (oba pouzivaju TIETO ciste funkcie; Panel je len obalka):
+        #   material -> hrubka: adopcia katalogovej hrubky (filozofia dosky)
+        #   hrubka -> material: deterministicky auto-pick nahradneho materialu
+
+        # Efektivne materialy korpusu po dedeni projekt->korpus (standard 7.2).
+        # JEDINY zdroj pravdy — build_into aj Panel (remap, preflighty) citaju
+        # toto. Params s string aj symbol klucmi (raw riesi oboje).
+        def effective_materials(model, params)
+          defaults = defined?(Materials) ? Materials.project_defaults(model) : {}
+          {
+            'body'  => present(raw(params, :material_id))       || defaults['default_material_id'],
+            'front' => present(raw(params, :front_material_id)) || defaults['default_front_material_id'],
+            'back'  => present(raw(params, :back_material_id))  || defaults['default_back_material_id']
+          }
+        end
+
+        # Je hrubka v povolenom rozsahu korpusu (6–50 mm)? nil/necislo = nie.
+        def thickness_in_range?(th)
+          f = th.to_f
+          return false unless f.finite? && f.positive?
+          f >= THICKNESS_RANGE[0] - 0.001 && f <= THICKNESS_RANGE[1] + 0.001
+        end
+
+        # Zhoda hrubok v tolerancii dielca (rovnaka ako thickness_ok_for?).
+        def thickness_eq?(a, b)
+          (a.to_f - b.to_f).abs < 0.05
+        end
+
+        # D-45 (audit B6): DETERMINISTICKY vyber nahradnej dosky tela pre pozadovanu
+        # hrubku `want`. `current` = katalogovy zaznam doterajsieho efektivneho
+        # materialu (dekor + typ su kotva), `pool` = katalog dosiek.
+        # Poradie: (a) rovnaky dekor A rovnaky typ (viac kandidatov = tie-break
+        # material_id vzostupne), (b) PRAVE JEDEN kandidat rovnakeho typu,
+        # (c) inak nic — volajuci odmietne zmenu a vypise kandidatov.
+        # Vrati { pick: sheet|nil, candidates: [sheet...] } (kandidati = vsetky
+        # dosky hladanej hrubky, zoradene material_id — zoznam do hlasky).
+        def pick_body_sheet(want, current, pool)
+          w = want.to_f
+          # GH P2: v tolerancii 0,05 moze byt viac roznych hrubok (18,56 vs 18,60) —
+          # prve kriterium je NAJMENSI rozdiel od want, material_id je az tie-break.
+          cands = Array(pool).select { |s| s.is_a?(Hash) && thickness_eq?(s['thickness'], w) }
+                             .sort_by { |s| [(s['thickness'].to_f - w).abs, s['material_id'].to_s] }
+          return { pick: nil, candidates: cands } if cands.empty?
+          # GH P2: identita typu je case-insensitive (ako pri variantoch katalogu).
+          type  = current ? current['type'].to_s.strip.upcase : ''
+          decor = current ? current['decor'].to_s.strip.upcase : ''
+          same_type = type.empty? ? [] : cands.select { |s| s['type'].to_s.strip.upcase == type }
+          same_decor = decor.empty? ? [] : same_type.select { |s| s['decor'].to_s.strip.upcase == decor }
+          pick = same_decor.first || (same_type.length == 1 ? same_type.first : nil)
+          { pick: pick, candidates: cands }
+        end
+
+        # D-45 (audit F8): dielce, ktore maju VLASTNY katalogovy material a ten by
+        # pri aktualnych params (uz s novou hrubkou) hrubkovo nesedel. Nic sa
+        # nemaze ani neprepisuje — volajuci zmenu ODMIETNE a dielce vymenuje.
+        # Cela sem nespadnu (thickness_ok_for? im katalogovu hrubku povoluje).
+        # Vrati pole mien dielcov (fallback part_key).
+        def parts_blocking_thickness(params)
+          ov = params.is_a?(Hash) ? params['part_overrides'] : nil
+          return [] unless ov.is_a?(Hash) && !ov.empty? && defined?(Materials)
+          return [] unless ov.any? { |_k, rec| rec.is_a?(Hash) && present(rec['material_id']) }
+          parts = plan_parts_by_key(params)
+          out = []
+          ov.each do |rk, rec|
+            next unless rec.is_a?(Hash)
+            mid = present(rec['material_id'])
+            next unless mid
+            pd = parts[rk]
+            next unless pd
+            sheet = Materials.sheet(mid)
+            next unless sheet # legacy material mimo katalogu sa nekontroluje
+            next if thickness_ok_for?(pd[:role], pd[:prod][:thickness].to_f, sheet['thickness'].to_f)
+            out << (pd[:name] || rk).to_s
+          end
+          out
         end
 
         # Base material dielca podla roly: cela -> front, chrbat -> back, ostatne -> body (korpus).
@@ -721,7 +816,7 @@ module Noxun
             width:  clampf(fetchf(p, :width,  d[:width]),  MIN[:width],  3000.0),
             height: clampf(fetchf(p, :height, d[:height]), MIN[:height], 3000.0),
             depth:  clampf(fetchf(p, :depth,  d[:depth]),  MIN[:depth],  2000.0),
-            thickness: clampf(fetchf(p, :thickness, d[:thickness]), 6.0, 50.0),
+            thickness: clampf(fetchf(p, :thickness, d[:thickness]), *THICKNESS_RANGE),
             floor_height: type == 'upper' ? 0.0 : clampf(fetchf(p, :floor_height, d[:floor_height]), 0.0, 500.0),
             bottom_mode: enum_val(p, :bottom_mode, %w[between_sides under_sides], d[:bottom_mode]),
             top_mode:    enum_val(p, :top_mode,    %w[full two_rails none],       d[:top_mode]),

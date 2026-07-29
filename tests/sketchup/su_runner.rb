@@ -13,7 +13,9 @@
 # Struktura:
 #   SYNC cast — geometria proti BuildPlan kontraktu (plan vs. model 1:1), NOXUN data
 #     dielcov, ghost zony, rebuild identita + prezitie part_overrides, dedup kopie
-#     (priame volanie), undo rebuildu = presne 1 krok; V0.4.7b sync-board sekcia
+#     (priame volanie), undo rebuildu = presne 1 krok; D-45 sekcia (hrubka <->
+#     material tela: adopcia hrubky, auto-pick materialu, vklad, zamok x sablona —
+#     bezi nad DOCASNYM testovacim dekorom, ktory po sebe upratuje); V0.4.7b sync-board sekcia
 #     (build/rebuild/undo/dedup samostatnej dosky, standard 8.3); D-35 sync-abs
 #     sekcia (bulk olepenie 4 hran = 1 undo, echo guardy, no-op bez ABS variantu).
 #   ASYNC cast — retaz UI.start_timer krokov (observer debounce = 0.2 s):
@@ -955,6 +957,183 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- SYNC-D45: hrubka <-> material tela (deadlock 18,6 mm) -----------------
+  # Bloker z testovania: katalogovy material 18,6 mm sa nedal pouzit. Tu sa overuju
+  # VSETKY tri cesty von + odmietnutia. Katalog: docasny testovaci dekor (18 + 18,6),
+  # ktory sa na konci ZMAZE; ak by uz existoval, sekcia sa preskoci (pouzivatelske
+  # data sa nikdy nemazu). Projektova predvolba modelu sa odklada a vracia.
+
+  D45_DECOR = 'SU TEST D45'
+
+  def d45_sheets
+    [e::Materials.sheets.find { |s| s['decor'] == D45_DECOR && (s['thickness'].to_f - 18.0).abs < 0.01 },
+     e::Materials.sheets.find { |s| s['decor'] == D45_DECOR && (s['thickness'].to_f - 18.6).abs < 0.01 }]
+  end
+
+  # X rozmer dielca (hrubka boku) v suradniciach definicie korpusu
+  def part_width_x(pi)
+    mm(pi.bounds.max.x) - mm(pi.bounds.min.x)
+  end
+
+  def run_d45(model)
+    if e::Materials.sheets.any? { |s| s['decor'] == D45_DECOR }
+      return info("D-45: dekor #{D45_DECOR} uz v katalogu existuje — sekcia preskocena (chranime pouzivatelske data)")
+    end
+    seeded, res = e::Materials.add_decor_batch(
+      'decor' => D45_DECOR, 'manufacturer' => 'SU TEST', 'type' => 'DTDL', 'thicknesses' => '18, 18.6'
+    )
+    return info("D-45: seed katalogu zlyhal (#{res.inspect}) — sekcia preskocena") unless seeded
+    m18, m186 = d45_sheets
+    unless m18 && m186
+      d45_cleanup_catalog(res)
+      return info('D-45: seed nema oba varianty — sekcia preskocena')
+    end
+    id18 = m18['material_id']
+    id186 = m186['material_id']
+    saved_default = e::Materials.project_defaults(model)['default_material_id']
+
+    begin
+      # (a) MATERIAL -> HRUBKA: zmena materialu tela na 18,6 prevezme hrubku,
+      #     geometria sedi a 1x undo vrati VSETKO naraz (jeden rebuild = 1 krok).
+      inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0,
+                                              'depth' => 510.0, 'thickness' => 18.0, 'material_id' => id18 })
+      cid = e::Store.get(inst, 'cabinet_id')
+      model.selection.clear
+      model.selection.add(inst)
+      rec = []
+      install_js_recorder(rec)
+      begin
+        e::Panel.handle_set_cabinet_material({ 'which' => 'body', 'value' => id186,
+                                               'cabinet_id' => cid }.to_json)
+      ensure
+        remove_js_recorder
+      end
+      cfg = e::Store.config(inst) || {}
+      side = find_part(inst, 'cabinet/side:left')
+      ok('D-45 (a): zmena materialu tela prevzala hrubku 18,6 do configu',
+         (cfg['thickness'].to_f - 18.6).abs < 0.01 && cfg['material_id'] == id186)
+      ok('D-45 (a): geometria boku sedi s novou hrubkou (18,6 mm)',
+         side && (part_width_x(side) - 18.6).abs < TOL)
+      ok('D-45 (a): status oznamil prevzatie hrubky',
+         rec.any? { |s| s.include?('NX.setStatus') && s.include?('18,6') })
+      Sketchup.undo
+      cfg_u = e::Store.config(inst) || {}
+      side_u = find_part(inst, 'cabinet/side:left')
+      ok('D-45 (a): 1x undo vratil hrubku AJ material naraz',
+         inst.valid? && (cfg_u['thickness'].to_f - 18.0).abs < 0.01 && cfg_u['material_id'] == id18 &&
+         side_u && (part_width_x(side_u) - 18.0).abs < TOL)
+
+      # (b) HRUBKA -> MATERIAL: zmena hrubky na 18,6 si doberie material
+      #     ROVNAKEHO dekoru (deterministicky pick, ziadny nahodny material).
+      e::Panel.handle_apply_all({ 'cabinet_id' => cid, 'thickness' => 18.6 }.to_json)
+      cfg_b = e::Store.config(inst) || {}
+      ok('D-45 (b): zmena hrubky si dobrala material rovnakeho dekoru',
+         (cfg_b['thickness'].to_f - 18.6).abs < 0.01 && cfg_b['material_id'] == id186)
+
+      # (b2) per-dielec konflikt (audit F8): polica s VLASTNYM materialom 18,6
+      #      musi navrat hrubky na 18 ODMIETNUT (nic sa nemaze, nic sa neprestavi).
+      params_sh = e::CabinetBuilder.config_to_params(e::Store.config(inst))
+                                   .merge('zone_tree' => { 'id' => 'Z1', 'shelves' => 1, 'children' => [] })
+      shelf_key = e::CabinetBuilder.plan_parts_by_key(params_sh)
+                                   .find { |_k, pd| pd[:role].to_s == 'shelf' }&.first
+      if shelf_key
+        e::CabinetBuilder.rebuild(model, inst,
+                                  params_sh.merge('part_overrides' => { shelf_key => { 'material_id' => id186 } }))
+        rec2 = []
+        install_js_recorder(rec2)
+        begin
+          e::Panel.handle_apply_all({ 'cabinet_id' => cid, 'thickness' => 18.0 }.to_json)
+        ensure
+          remove_js_recorder
+        end
+        cfg_c = e::Store.config(inst) || {}
+        ok('D-45 (F8): polica s vlastnym materialom zmenu hrubky odmietla (drzi 18,6)',
+           (cfg_c['thickness'].to_f - 18.6).abs < 0.01)
+        ok('D-45 (F8): hlaska vymenovala blokujuci dielec',
+           rec2.any? { |s| s.include?('NX.setStatus') && s.include?('blokujú dielce') })
+      else
+        info('D-45 (F8): plan nema policu — scenar per-dielec konfliktu preskoceny')
+      end
+
+      # (c) VKLAD: projektova predvolba 18,6 -> nova skrinka sa postavi s 18,6
+      e::Panel.handle_set_insert_locks({ 'locks' => {} }.to_json)
+      model.start_operation('SU-TEST D45 predvolba', true)
+      e::Materials.set_project_default(model, 'default_material_id', id186)
+      model.commit_operation
+      before = cabinets(model).length
+      e::Panel.handle_insert({ 'type' => 'lower', 'width' => 600.0, 'height' => 720.0,
+                               'depth' => 510.0, 'thickness' => 18.0 }.to_json)
+      fresh = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
+      cfg_i = fresh ? (e::Store.config(fresh) || {}) : {}
+      ok('D-45 (c): vklad prevzal hrubku 18,6 z projektovej predvolby',
+         cabinets(model).length == before + 1 && (cfg_i['thickness'].to_f - 18.6).abs < 0.01)
+      ok('D-45 (c): dielce noveho korpusu su realne 18,6 mm',
+         fresh && (part_width_x(find_part(fresh, 'cabinet/side:left')) - 18.6).abs < TOL)
+
+      # (d) ZAMOK x SABLONA: zamknuta hrubka 18 + material sablony 18,6 =
+      #     ODMIETNUTIE (D-39 kontrakt — konflikt so sablonou sa NIC neupravuje)
+      e::Panel.handle_set_insert_locks({ 'locks' => { 'thickness' => 18.0 } }.to_json)
+      before2 = cabinets(model).length
+      rec3 = []
+      install_js_recorder(rec3)
+      begin
+        e::Panel.handle_insert({ 'type' => 'lower', 'width' => 600.0, 'height' => 720.0,
+                                 'depth' => 510.0, 'thickness' => 18.0, 'material_id' => id186 }.to_json)
+      ensure
+        remove_js_recorder
+      end
+      ok('D-45 (d): zamknuta hrubka x material sablony 18,6 — vklad odmietnuty',
+         cabinets(model).length == before2)
+      ok('D-45 (d): hlaska pomenovala zamok aj material sablony',
+         rec3.any? { |s| s.include?('NX.setStatus') && s.include?('Zamknutá hrúbka') && s.include?('aktívne zámky') })
+      e::Panel.handle_set_insert_locks({ 'locks' => {} }.to_json)
+
+      # (e) SABLONA na EXISTUJUCU skrinku (audit B4): sablona s materialom 18,6
+      #     zladi hrubku ciela; typovy guard aj merge ostavaju nedotknute.
+      tpl_name = '__SU_TEST_D45__'
+      if e::TemplateStore.find(tpl_name)
+        info("D-45 (e): sablona #{tpl_name} uz existuje — scenar preskoceny")
+      else
+        e::TemplateStore.upsert(tpl_name, { 'type' => 'lower', 'width' => 500.0, 'height' => 720.0,
+                                            'depth' => 510.0, 'thickness' => 18.6, 'material_id' => id186,
+                                            'back_thickness' => 3.0 })
+        target = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0,
+                                                  'depth' => 510.0, 'thickness' => 18.0, 'material_id' => id18 })
+        model.selection.clear
+        model.selection.add(target)
+        e::TemplatesDialog.handle_apply({ 'template' => tpl_name }.to_json)
+        cfg_t = e::Store.config(target) || {}
+        ok('D-45 (e): sablona s materialom 18,6 prestavala skrinku na 18,6',
+           (cfg_t['thickness'].to_f - 18.6).abs < 0.01 && cfg_t['material_id'] == id186 &&
+           (part_width_x(find_part(target, 'cabinet/side:left')) - 18.6).abs < TOL)
+        e::TemplateStore.delete(tpl_name)
+      end
+    ensure
+      # poradie: model spat na povodnu predvolbu, potom katalog (mazanie dosky
+      # kontroluje jej pouzitie — korpusy uz musia byt prec)
+      model.start_operation('SU-TEST D45 obnova predvolby', true)
+      e::Materials.set_project_default(model, 'default_material_id', saved_default.to_s)
+      model.commit_operation
+      cleanup(model)
+      d45_cleanup_catalog(res)
+    end
+    ok('D-45: cleanup (0 korpusov, testovaci dekor prec)',
+       cabinets(model).empty? && e::Materials.sheets.none? { |s| s['decor'] == D45_DECOR })
+  rescue StandardError => ex
+    log_line("FAIL: D-45 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    remove_js_recorder
+    cleanup(model)
+    d45_cleanup_catalog(res) if defined?(res) && res.is_a?(Hash)
+  end
+
+  def d45_cleanup_catalog(res)
+    return unless res.is_a?(Hash)
+    Array(res['sheets']).each { |id| e::Materials.delete_sheet(id) }
+    Array(res['edges']).each { |id| e::Materials.delete_edge(id) }
+  rescue StandardError => ex
+    log_line("INFO: D-45 cleanup katalogu: #{ex.class}: #{ex.message}")
+  end
+
   # --- D-40: selection eventy po builde musia zit (DC observer pasca) --------
   # Bug: zapis dynamic_attributes (scaletool) v operacii, ktora VYTVARA definiciu/
   # instanciu, pri commite cez DC extension observer vypne dorucovanie selection
@@ -1371,6 +1550,7 @@ module NoxunSuRunner
     run_sync(model)
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
+    run_d45(model)           # D-45: hrubka <-> material tela (18,6 mm deadlock)
     run_d40(model)           # D-40: selection eventy po builde (DC observer pasca)
     run_async(model, nil)
   rescue StandardError => ex

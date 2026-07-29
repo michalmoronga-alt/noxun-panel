@@ -240,13 +240,17 @@ end
 # thickness / material pomocniky (cisto vypoctove, bez katalogu)
 # ---------------------------------------------------------------------------
 
-NxTest.test('builder: thickness_ok_for? cela 18/19, ostatne presna zhoda') do
+NxTest.test('builder: thickness_ok_for? cela katalogovy rozsah, ostatne presna zhoda') do
   cb = Noxun::Engine::CabinetBuilder
   # cela: katalogove varianty 18 aj 19 mm prejdu vzdy
   NxTest.assert(cb.thickness_ok_for?('front_door', 18.0, 18.0))
   NxTest.assert(cb.thickness_ok_for?('front_door', 18.0, 19.0))
   NxTest.assert(cb.thickness_ok_for?('drawer_front', 19.0, 18.0))
-  NxTest.refute(cb.thickness_ok_for?('front_door', 18.0, 16.0))
+  # D-45 (vedoma zmena): celo berie KAZDU katalogovu hrubku v rozsahu dosky —
+  # natvrdo 18/19 bola pricina, preco sa 18,6 mm material nedal pouzit.
+  # Geometriu aj vyrobny udaj prepise materialized_part; mimo rozsahu = stop.
+  NxTest.assert(cb.thickness_ok_for?('front_door', 18.0, 16.0))
+  NxTest.refute(cb.thickness_ok_for?('front_door', 18.0, 3.0))
   # ostatne roly: tolerancia len 0.05 mm
   NxTest.assert(cb.thickness_ok_for?('shelf', 18.0, 18.0))
   NxTest.assert(cb.thickness_ok_for?('shelf', 18.0, 18.04))
@@ -262,10 +266,13 @@ NxTest.test('builder: validate_material_thickness! raise pri rozpore, legacy pre
   NxTest.assert_equal(nil, cb.validate_material_thickness!(nil, nil, pd))
   NxTest.assert_equal(nil, cb.validate_material_thickness!('LEGACY_X', nil, pd))
   # katalogovy material s inou hrubkou -> slovenska chyba
-  e = NxTest.assert_raise('potrebuje 18.0 mm') do
+  # D-45 (vedoma zmena textu): mm s desatinnou ciarkou bez zbytocnej '.0' + navigacia,
+  # kde sa hrubka realne meni (hlaska islo o jednu z dvoch, ktore blokovali 18,6).
+  e = NxTest.assert_raise('potrebuje 18 mm') do
     cb.validate_material_thickness!('K009_PW_DTDL_16', { 'thickness' => 16.0 }, pd)
   end
-  NxTest.assert(e.message.include?('ma 16.0 mm'), 'sprava ma obsahovat realnu hrubku')
+  NxTest.assert(e.message.include?('má 16 mm'), 'sprava ma obsahovat realnu hrubku')
+  NxTest.assert(e.message.include?('hrúbku korpusu'), 'sprava naviguje na riesenie (D-45)')
   # celo s 19 mm variantom prejde (geometria sa prisposobi)
   fpd = { suffix: 'DOOR-1', role: 'front_door', prod: { thickness: 18.0 } }
   NxTest.assert_equal(nil, cb.validate_material_thickness!('X_19', { 'thickness' => 19.0 }, fpd))

@@ -6,7 +6,7 @@
 
 ## Blokery (bránia dokončeniu zákazky)
 
-- **D-45 · Slučka hrúbka ↔ materiál pri 18,6 (Halifax)** (Michal 27.7., test seedu) — materiál s hrúbkou 18,6 sa nedá reálne použiť: hrúbka v nastaveniach korpusu sa nedá zmeniť (blokuje ju guard zhody s materiálom 18,0) a materiál sa nedá zmeniť (blokuje ho hrúbka dielca) — **deadlock z dvoch guardov**; vkladaciu kartu s projektovým defaultom 18,0 zastaví „najbližší vklad by sa nepostavil". Presne potvrdená otázka 4 z [09_POJMY.md](09_POJMY.md). *Návrh riešenia (na opravnú dávku): zmena materiálu s inou hrúbkou ponúkne „prevziať hrúbku materiálu" (hrúbku riadi materiál — rovnaká filozofia ako pri doske); vo vkladacej karte hrúbka auto-nasleduje zvolený materiál. Stav: ZAPÍSANÉ, bloker testovania hrubších/tenších materiálov.*
+*(momentálne žiadne — D-45 vyriešené PR #83)*
 
 ## Spomaľovače (vysoká priorita)
 
@@ -70,6 +70,7 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ## Vyriešené — index (plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md))
 
+- **D-45** slučka hrúbka ↔ materiál pri 18,6 (materiál prevezme hrúbku · hrúbka si doberie materiál · vklad sa prispôsobí) — PR #83
 - **D-42** dekorový katalóg UI (mriežka, kód+dodávateľ, cena „nezadaná", inline bunky, preset-čipy) — PR #74–#76
 - **D-41** dekorové skupiny materiál↔ABS (šírka ABS, picker, remap, modal chýbajúcej pásky) — PR #70–#72
 - **D-40** panel visel po vložení (DC observer pasca scaletool) — PR #64 · **D-39** zámky vkladacej karty — PR #61 · **D-38** chrbát „pevný 18" preflight — PR #59 · **D-37** hĺbka = celková vrátane chrbta — PR #59 · **D-36** ABS odporúčané k dekoru — PR #67 · **D-35** olep 4 hrán klikom — PR #60 · **D-34** panel po zmazaní skrinky — PR #61 · **D-33/D-32** šablóna aplikuje všetko + serverová kópia — PR #61 · **D-31** skrinka bez chrbta — PR #59 · **D-30** výstuhy default ABS predná — PR #60

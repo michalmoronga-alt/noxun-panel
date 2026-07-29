@@ -68,6 +68,18 @@
   }
   function absColorOf(absId){ return absId ? absColorByThickness(absThicknessOf(absId)) : '#b0bec5'; }
 
+  // D-45: rozsah hrubky korpusu/cela — zrkadlo Ruby CabinetBuilder::THICKNESS_RANGE.
+  var TH_RANGE = [6, 50];
+  // D-45 (audit F10): mm s desatinnou CIARKOU pre UI texty — cele cisla bez
+  // desatin ('18'), inak jedno desatinne miesto ('18,6'). Zrkadlo Panel.fmt_mm.
+  function mmLabel(v){
+    // GH P2: 2 desatinne miesta — zhodne s Materials.fmt_mm (18,65 nesmie byt 18,7).
+    var n = parseFloat(v);
+    if (isNaN(n)) return '';
+    var r = Math.round(n*100)/100;
+    if (Math.abs(r - Math.round(r)) < 0.001) return String(Math.round(r));
+    return String(r).replace('.', ',');
+  }
   // FIX 2: hrubkove predikaty pre filter doskovych materialov (tolerancia 0,05 mm).
   // Prazdny/neplatny cielovy rozmer -> nefiltruj (radsej vsetko nez nic).
   function thMatch(target){
@@ -75,21 +87,38 @@
     if (isNaN(t)) return function(){ return true; };
     return function(s){ return Math.abs(parseFloat(s.thickness) - t) < 0.05; };
   }
-  // Cela: standardne dosky 18 alebo 19 mm (front hrubka; pozri Fronts::FRONT_THICKNESS = 19).
-  function frontMatch(){
-    return function(s){ var t = parseFloat(s.thickness); return Math.abs(t-18)<0.05 || Math.abs(t-19)<0.05; };
+  // D-45: doska je pouzitelna ako korpus/celo, ked je jej hrubka v rozsahu dosky —
+  // konkretnu hrubku prevezme dielec z materialu (server), nie naopak.
+  function rangeMatch(){
+    return function(s){ var t = parseFloat(s.thickness); return !isNaN(t) && t >= TH_RANGE[0]-0.001 && t <= TH_RANGE[1]+0.001; };
+  }
+  // D-45: cela uz NIE su natvrdo 18/19 — beru katalogovu hrubku sveho materialu
+  // (geometriu prisposobi server, materialized_part). Filter drzi len rozsah dosky.
+  function frontMatch(){ return rangeMatch(); }
+  // D-45: dopad vyberu dosky KORPUSU na hrubku — inohrubkova doska sa NEZAKAZUJE,
+  // len dopredu povie, ze hrubku korpusu prevezme (autorita je server). Vrati ''
+  // ked sa hrubky zhoduju alebo je vstup neplatny.
+  function bodyThicknessNote(sheetThickness, currentThickness){
+    var t = parseFloat(sheetThickness), c = parseFloat(currentThickness);
+    if (isNaN(t) || isNaN(c) || Math.abs(t-c) < 0.05) return '';
+    if (t < TH_RANGE[0]-0.001 || t > TH_RANGE[1]+0.001) return ' · (mimo rozsahu ' + mmLabel(TH_RANGE[0]) + '–' + mmLabel(TH_RANGE[1]) + ' mm)';
+    return ' · (prevezme hrúbku ' + mmLabel(t) + ')';
   }
   // FIX 2: naplni <select> doskami, ale hrubkovo NEKOMPATIBILNE su disabled + oznacene "(nekompatibilné)".
   // Aktualne vybranu (aj legacy nesuladnu) dosku nechaj vyberatelnu, nech ju vie zobrazit. Pri
   // prazdnom vysledku ostanu vsetky viditelne (disabled) — pouzivatel vidi katalog. Zachova hodnotu.
-  function fillSheetSelectFiltered(sel, includeInherit, matchFn, keepValue, inheritLabel){
+  // D-45: matchFn rozhoduje o DISABLED (co server odmietne), noteFn o texte pripony
+  // pri KAZDEJ volbe (napr. „prevezme hrúbku 18,6" — legitimna volba, ktora len
+  // zmeni hrubku). Bez noteFn ostava povodne spravanie „(nekompatibilné)".
+  function fillSheetSelectFiltered(sel, includeInherit, matchFn, keepValue, inheritLabel, noteFn){
     if (!sel) return;
     var cur = (keepValue !== undefined && keepValue !== null) ? keepValue : sel.value;
     var html = includeInherit ? '<option value="">'+esc(inheritLabel || '(dediť z projektu)')+'</option>' : '';
     MATERIALS.sheets.forEach(function(s){
       var ok = matchFn ? matchFn(s) : true;
       var keep = ok || (s.id === cur);
-      html += '<option value="'+esc(s.id)+'"'+(keep?'':' disabled')+'>'+esc(s.label)+(ok?'':' · (nekompatibilné)')+'</option>';
+      var note = noteFn ? noteFn(s) : (ok ? '' : ' · (nekompatibilné)');
+      html += '<option value="'+esc(s.id)+'"'+(keep?'':' disabled')+'>'+esc(s.label)+esc(note)+'</option>';
     });
     sel.innerHTML = html;
     sel.value = cur;
@@ -193,13 +222,18 @@
     return absOptionsHtml('<option value="">Bez ABS</option>', groupAbsEdges(MATERIALS.edges, decor, currentValue));
   }
   // FIX 2: naplni/obnovi vsetky projektove + korpusove material selecty podla hrubky KONTEXTU
-  // (korpus = pole 'thickness', chrbat = 'back_thickness', cela = 18/19). Nekompatibilne dosky
-  // disabled. Vola sa na init, pri vybere korpusu aj po zmene hrubky (onField). Zachova hodnoty.
+  // (korpus = pole 'thickness', chrbat = 'back_thickness', cela = rozsah dosky). Nekompatibilne
+  // dosky disabled — OKREM korpusu (D-45: ten hrubku prevezme). Vola sa na init, pri vybere
+  // korpusu aj po zmene hrubky (onField). Zachova hodnoty.
   function refreshMaterialFilters(){
     // D2: projektove selecty (proj_*) su v okne Materialy projektu — panel filtruje
     // uz len korpusove selecty podla hrubok aktualneho formulara.
     var bodyTh = numv('thickness'), backTh = numv('back_thickness');
-    fillSheetSelectFiltered(el('cab_body'), true, thMatch(bodyTh));
+    // D-45: korpusove dosky inej hrubky ostavaju VYBERATELNE (disabled je uz len
+    // to, co server odmietne — hrubka mimo rozsahu dosky); hrubku korpusu po
+    // vybere prevezme materiál a label to hovori dopredu.
+    fillSheetSelectFiltered(el('cab_body'), true, rangeMatch(), undefined, undefined,
+      function(s){ return bodyThicknessNote(s.thickness, bodyTh); });
     fillSheetSelectFiltered(el('cab_front'), true, frontMatch());
     fillSheetSelectFiltered(el('cab_back'), true, thMatch(backTh));
   }
@@ -239,6 +273,9 @@
   // sa preskoci. Exportuju sa len CISTE grouping funkcie (bez DOM/MATERIALS zavislosti).
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { groupAbsEdges: groupAbsEdges, absOptionsHtml: absOptionsHtml, normDecor: normDecor,
-      absUsableExists: absUsableExists };
+      absUsableExists: absUsableExists,
+      // D-45 (tests/js/test_thickness_labels.js) — ciste funkcie hrubkovych filtrov/labelov
+      mmLabel: mmLabel, bodyThicknessNote: bodyThicknessNote, frontMatch: frontMatch,
+      rangeMatch: rangeMatch, thMatch: thMatch, TH_RANGE: TH_RANGE };
   }
 

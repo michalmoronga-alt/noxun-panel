@@ -22,16 +22,16 @@ module Noxun
           params = existing_params(cab)
           old_overrides = JsonFileStore.deep_copy(params['part_overrides'] || {})
           rk = canonical_part_key(params, rk)
+          # D-45: hrubkovy guard PRED akymkolvek zapisom (aj pred pripadnou tvorbou
+          # ABS — audit FIX 8 kontrakt ostava). Predtym padol az rebuild surovou
+          # hlaskou; teraz hlaska NAVIGUJE, kde sa hrubka realne meni.
+          conflict = part_material_conflict(params, rk, mat)
+          return set_status(conflict, true) if conflict
           # D-41 C2: modal "Vytvorit a pokracovat" — VSETKY kontroly PRED katalogovym
           # zapisom (audit FIX 8): hrubkova kompatibilita materialu s dielcom by
           # zhodila rebuild AZ PO vytvoreni pasky; tu sa overi vopred a nic sa nemeni.
           abs_note = ''
           if data['create_missing_abs'] && mat
-            pd = CabinetBuilder.plan_parts_by_key(params)[rk]
-            sh = Materials.sheet(mat)
-            if pd && sh && !CabinetBuilder.thickness_ok_for?(pd[:role], pd[:prod][:thickness].to_f, sh['thickness'].to_f)
-              return set_status('Materiál má nekompatibilnú hrúbku pre tento dielec — páska sa nevytvorila, materiál sa nezmenil.', true)
-            end
             ok_abs, abs_note = ensure_missing_abs(mat)
             return set_status(abs_note, true) unless ok_abs
           end
@@ -43,6 +43,23 @@ module Noxun
           remap = CabinetBuilder.remap_part_edge_overrides!(params, eff, eff, old_overrides: old_overrides)
           rebuild_focus_part(model, cab, rk, params,
                              "Materiál dielca #{mat ? 'nastavený' : 'zdedený'}.#{remap_note(remap)}#{abs_note}")
+        end
+
+        # D-45: nekompatibilna hrubka per-dielec materialu — vrati hlasku alebo nil.
+        # Dielec korpusu hrubku NEMA vlastnu (dedi ju po korpuse), takze hlaska
+        # posiela pouzivatela tam, kde sa hrubka realne meni: material celej
+        # skrinky (prevezme hrubku) alebo pole Hrúbka v Zakladnych udajoch.
+        def part_material_conflict(params, rk, mat)
+          return nil unless mat && defined?(Materials)
+          sheet = Materials.sheet(mat)
+          return nil unless sheet # legacy material mimo katalogu — stary rezim
+          pd = CabinetBuilder.plan_parts_by_key(params)[rk]
+          return nil unless pd
+          want = pd[:prod][:thickness].to_f
+          have = sheet['thickness'].to_f
+          return nil if CabinetBuilder.thickness_ok_for?(pd[:role], want, have)
+          "Materiál #{mat_name(sheet)} má #{fmt_mm(have)} mm, dielec #{pd[:name] || rk} potrebuje #{fmt_mm(want)} mm " \
+            '— dielec hrúbku dedí po korpuse. Zmeň materiál celej skrinky (prevezme hrúbku) alebo hrúbku korpusu (Základné).'
         end
 
         # D-41 C2: serverova autorita modalu — dovytvori 1,0 mm pasku k dekoru

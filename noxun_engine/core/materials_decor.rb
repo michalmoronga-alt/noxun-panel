@@ -330,10 +330,13 @@ module Noxun
         nil
       end
 
-      # 18.0 -> "18", 18.5 -> "18.5" (labely/reporty).
+      # D-45 (audit F10): JEDINY formatovac mm pre TEXTY (labely, reporty, hlasky
+      # panela — Panel.fmt_mm deleguje sem). Cele cislo bez desatin, inak
+      # desatinna CIARKA: 18.0 -> "18", 18.6 -> "18,6", 1.0 -> "1".
       def fmt_mm(v)
-        f = v.to_f
-        f == f.round ? f.round.to_s : f.to_s
+        f = v.to_f.round(2)
+        return f.round.to_s if f == f.round
+        f.to_s.tr('.', ',')
       end
     end
   end

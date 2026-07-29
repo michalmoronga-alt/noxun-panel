@@ -262,7 +262,10 @@ module Noxun
           new_ok =
             case key
             when 'default_material_id'
-              CabinetBuilder.thickness_ok_for?(role, CabinetBuilder::LOWER_DEFAULTS[:thickness].to_f, have)
+              # D-45: korpusova predvolba sa uz NEPOROVNAVA s konstantou 18 —
+              # vklad sa hrubke materialu prisposobi (insert_thickness_preflight).
+              # Strazi sa uz len rozsah, v ktorom korpus vie stat (HDF 3 = stop).
+              CabinetBuilder.thickness_in_range?(have)
             when 'default_back_material_id'
               # chrbat ma v UI dve podporovane hrubky (HDF 3 / pevny 18) — obe legalne
               [3.0, 18.0].any? { |t| CabinetBuilder.thickness_ok_for?(role, t, have) }
@@ -270,7 +273,7 @@ module Noxun
               CabinetBuilder.thickness_ok_for?(role, Fronts::FRONT_THICKNESS.to_f, have)
             end
           unless new_ok
-            return set_status("Materiál #{value} (#{have.round(1)} mm) nesedí s hrúbkou novej skrinky — najbližší vklad by sa nepostavil. Pre iné hrúbky nastav materiál konkrétnej skrinke.", true)
+            return set_status(project_thickness_msg(key, value, have), true)
           end
           selected = Panel.find_cabinet(model)
           affected = Panel.all_cabinets(model).select do |cabinet|
@@ -286,8 +289,11 @@ module Noxun
             !CabinetBuilder.thickness_ok_for?(role, want, sheet['thickness'].to_f)
           end
           unless incompatible.empty?
+            # D-45: hrubka existujucich DEDIACICH skriniek sa NESMIE zmenit ticho
+            # (predvolba by prepisala hotovu vyrobu) — hlaska navedie, co s tym.
             ids = incompatible.map { |cabinet| Store.get(cabinet, 'cabinet_id') }.join(', ')
-            return set_status("Materiál #{value} má nekompatibilnú hrúbku pre: #{ids}.", true)
+            return set_status("Materiál #{value} (#{Panel.fmt_mm(have)} mm) má nekompatibilnú hrúbku pre: #{ids}. " \
+                              'Nastav ho priamo tým skrinkám (prevezmú hrúbku) alebo im najprv zmeň hrúbku korpusu.', true)
           end
 
           # D-41 PR C (audit FIX 5): projektova predvolba meni efektivny material
@@ -318,6 +324,21 @@ module Noxun
           set_status(msg)
           push_state
           Panel.push_selected(model) # refresh Inspectora (korpusove selecty, karta dielca)
+        end
+
+        # D-45: hlaska odmietnutej projektovej predvolby — per rolu (vysvetli PRECO).
+        def project_thickness_msg(key, value, have)
+          lo = Panel.fmt_mm(CabinetBuilder::THICKNESS_RANGE[0])
+          hi = Panel.fmt_mm(CabinetBuilder::THICKNESS_RANGE[1])
+          case key
+          when 'default_material_id'
+            "Materiál #{value} (#{Panel.fmt_mm(have)} mm) je mimo rozsahu hrúbky korpusu (#{lo}–#{hi} mm) — " \
+              'ako predvoľbu korpusu ho nastaviť nejde. Tenké dosky sú materiál chrbta alebo konkrétneho dielca.'
+          when 'default_back_material_id'
+            "Materiál #{value} (#{Panel.fmt_mm(have)} mm) nesedí s podporovanými hrúbkami chrbta (3 alebo 18 mm)."
+          else
+            "Materiál #{value} (#{Panel.fmt_mm(have)} mm) je mimo rozsahu hrúbky čela (#{lo}–#{hi} mm)."
+          end
         end
 
         # D-42: zmena vyrobcu CELEJ dekorovej skupiny (audit FIX 7 — vyrobca nie je

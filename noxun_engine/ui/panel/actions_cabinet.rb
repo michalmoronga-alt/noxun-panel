@@ -65,14 +65,14 @@ module Noxun
           want = params['back_thickness'].to_f
           return nil unless want.positive?
           return nil unless defined?(Materials)
-          defaults = Materials.project_defaults(model)
-          back_id = str_or_nil(params['back_material_id']) || defaults['default_back_material_id']
-          sheet = back_id && Materials.sheet(back_id)
+          # D-45: efektivne materialy citame PO body_preflighte (audit F7) — picker
+          # chrbta tak vidi uz dobrany material tela, nie ten povodny.
+          eff = CabinetBuilder.effective_materials(model, params)
+          sheet = Materials.sheet(eff['back'])
           return nil if sheet.nil? # legacy material mimo katalogu — stary rezim
           return nil if (sheet['thickness'].to_f - want).abs <= 0.01
 
-          body_id = str_or_nil(params['material_id']) || defaults['default_material_id']
-          body_sheet = body_id && Materials.sheet(body_id)
+          body_sheet = Materials.sheet(eff['body'])
           pick = body_sheet if body_sheet && (body_sheet['thickness'].to_f - want).abs <= 0.01
           unless pick
             cands = Materials.sheets.select { |s| (s['thickness'].to_f - want).abs <= 0.01 }
@@ -84,7 +84,111 @@ module Noxun
                             'vyber materiál chrbta ručne (sekcia Materiály), potom zmeň hrúbku.' }
           end
           params['back_material_id'] = pick['material_id']
-          { note: " · chrbát: #{pick['decor']} #{pick['type']} #{fmt_mm(want)} mm (auto)" }
+          { note: " · chrbát: #{mat_name(pick)} #{fmt_mm(want)} mm (auto)" }
+        end
+
+        # --- D-45: hrubka <-> material tela ---------------------------------
+        # Bloker z testovania: katalogovy material 18,6 mm sa nedal pouzit —
+        # hrubku blokoval material a material blokovala hrubka. Deadlock rozbijaju
+        # DVA smery, oba PRED rebuildom a oba NAHLAS (ziadna ticha uprava):
+        #   1) zmena materialu tela  -> hrubka korpusu sa prevezme z katalogu
+        #      (filozofia dosky; adopt_body_thickness!)
+        #   2) zmena hrubky korpusu  -> doberie sa material tej hrubky
+        #      (body_preflight, deterministicky vyber CabinetBuilder.pick_body_sheet)
+
+        # Kratky nazov materialu do hlasok (dekor + typ; hrubka sa pise zvlast).
+        def mat_name(sheet)
+          return '' unless sheet.is_a?(Hash)
+          [sheet['decor'], sheet['type']].map { |v| v.to_s.strip }.reject(&:empty?).join(' ')
+        end
+
+        # Hrubka korpusu sa RIADI katalogovym materialom (vzor BoardBuilder).
+        # Vrati nil (nic sa nemeni), { error: } alebo { note: } a v params
+        # prepise 'thickness'. Guardy PRED zapisom (audit B1 rozsah, F8 dielce).
+        def adopt_body_thickness!(params, sheet)
+          have = sheet['thickness'].to_f
+          return nil unless have.positive?
+          old = params['thickness']
+          return nil if CabinetBuilder.thickness_eq?(old, have)
+          unless CabinetBuilder.thickness_in_range?(have)
+            return { error: "Materiál #{mat_name(sheet)} má #{fmt_mm(have)} mm — mimo rozsahu hrúbky korpusu " \
+                            "(#{fmt_mm(CabinetBuilder::THICKNESS_RANGE[0])}–#{fmt_mm(CabinetBuilder::THICKNESS_RANGE[1])} mm). " \
+                            'Materiál sa nezmenil.' }
+          end
+          params['thickness'] = have
+          blocked = CabinetBuilder.parts_blocking_thickness(params)
+          unless blocked.empty?
+            params['thickness'] = old # nic sa nemeni, kym konflikt trva
+            return { error: blocked_parts_msg(have, blocked) }
+          end
+          { note: " Hrúbka korpusu prevzatá z materiálu: #{fmt_mm(have)} mm." }
+        end
+
+        def blocked_parts_msg(want, blocked)
+          list = blocked.first(3).join(', ')
+          list += " a ďalšie (#{blocked.length - 3})" if blocked.length > 3
+          "Hrúbku #{fmt_mm(want)} mm blokujú dielce s vlastným materiálom inej hrúbky: #{list}. " \
+            'Vráť im materiál na dedený (alebo im vyber materiál tejto hrúbky) a skús znova.'
+        end
+
+        # D-45 (audit B6): zmena hrubky tela potrebuje material tej hrubky.
+        # Efektivny material (korpus > projekt) mimo katalogu = stary rezim, nic
+        # sa nekontroluje (rovnako ako back_preflight). Vyber je deterministicky:
+        # rovnaky dekor+typ -> jediny kandidat rovnakeho typu -> inak ODMIETNUTIE
+        # s vymenovanim kandidatov (nikdy nahodny material).
+        def body_preflight(params, model)
+          want = params['thickness'].to_f
+          return nil unless want.positive?
+          return nil unless defined?(Materials)
+          sheet = Materials.sheet(CabinetBuilder.effective_materials(model, params)['body'])
+          return nil if sheet.nil? # legacy material mimo katalogu — stary rezim
+          return nil if CabinetBuilder.thickness_eq?(sheet['thickness'], want)
+
+          blocked = CabinetBuilder.parts_blocking_thickness(params) # audit F8
+          return { error: blocked_parts_msg(want, blocked) } unless blocked.empty?
+
+          res = CabinetBuilder.pick_body_sheet(want, sheet, Materials.sheets)
+          pick = res[:pick]
+          return { error: no_body_pick_msg(want, res[:candidates]) } if pick.nil?
+          params['material_id'] = pick['material_id']
+          { note: " · korpus: #{mat_name(pick)} #{fmt_mm(want)} mm (auto)" }
+        end
+
+        def no_body_pick_msg(want, candidates)
+          if candidates.empty?
+            return "Hrúbka korpusu #{fmt_mm(want)} mm: v katalógu nie je doska tejto hrúbky — " \
+                   'pridaj ju v Materiáloch projektu, potom zmeň hrúbku.'
+          end
+          list = candidates.first(3).map { |s| mat_name(s) }.join(', ')
+          list += ' …' if candidates.length > 3
+          "Hrúbka korpusu #{fmt_mm(want)} mm: materiál sa nedá vybrať jednoznačne — " \
+            "vyber materiál ručne (Materiály skrinky). Kandidáti: #{list}."
+        end
+
+        # D-45: JEDEN vstupny bod materialovych preflightov pred rebuildom.
+        # Poradie (audit F7): TELO PRVE (picker chrbta kontroluje vysledny material
+        # tela), potom chrbat; nakoniec JEDEN remap rucnych ABS overridov na nove
+        # efektivne materialy — vsetko pred JEDINYM rebuildom (1 undo krok).
+        # Vrati nil / { error: } / { note: }.
+        # old_eff: volitelny snapshot efektivnych materialov PRED zmenou — sablonovy
+        # flow ho dodava z CIELOVEJ skrinky (merged params uz nesu novy material,
+        # takze default by remapu ukazal "ziadnu zmenu" — GH P1).
+        def material_preflight(params, model, old_eff: nil)
+          old_eff ||= CabinetBuilder.effective_materials(model, params)
+          note = ''
+          # POSTUPNE, nie naraz: pri odmietnutom tele sa chrbat uz neriesi (jeho
+          # picker cita material tela — musi vidiet finalny stav, nie polovicny).
+          body = body_preflight(params, model)
+          return body if body && body[:error]
+          note += body[:note].to_s if body
+          back = back_preflight(params, model)
+          return back if back && back[:error]
+          note += back[:note].to_s if back
+          new_eff = CabinetBuilder.effective_materials(model, params)
+          # ziadna zmena materialu = ziadny remap (auto-apply bezi na kazdu zmenu
+          # pola — plan by sa staval zbytocne)
+          note += remap_note(CabinetBuilder.remap_part_edge_overrides!(params, old_eff, new_eff)) if old_eff != new_eff
+          note.empty? ? nil : { note: note }
         end
 
         def str_or_nil(v)
@@ -92,15 +196,53 @@ module Noxun
           s.empty? ? nil : s
         end
 
+        # D-45 (audit F10): mm s desatinnou CIARKOU do UI hlasok; cele cisla bez
+        # desatin ("18 mm", "18,6 mm"). Vzdy String — nikdy Float do interpolacie.
+        # Implementacia je JEDNA (Materials.fmt_mm) — tu len meno, ktore pozna panel.
         def fmt_mm(v)
-          (v % 1).zero? ? v.to_i : v.round(1)
+          Materials.fmt_mm(v)
+        end
+
+        # D-45 (audit B3): vklad sa prisposobi materialu tela. Efektivny material
+        # = sablona/draft karty > projektova predvolba > fallback.
+        #   hrubka NIE JE zamknuta -> prevezme sa katalogova hrubka materialu
+        #   hrubka JE zamknuta a nesedi:
+        #     material EXPLICITNY zo sablony -> ODMIETNUTIE (D-39 kontrakt: konflikt
+        #       so sablonou sa NIKDY ticho neupravuje — ani material, ani zamok)
+        #     material len DEDENY z predvolby -> rieši ho body_preflight (auto-pick
+        #       materialu k zamknutej hrubke, inak odmietnutie)
+        # Vrati nil / { error: } / { note: }.
+        def insert_thickness_preflight(params, model)
+          return nil unless defined?(Materials)
+          explicit = str_or_nil(params['material_id'])
+          sheet = Materials.sheet(CabinetBuilder.effective_materials(model, params)['body'])
+          return nil if sheet.nil? # legacy material mimo katalogu — stary rezim
+          have = sheet['thickness'].to_f
+          return nil if CabinetBuilder.thickness_eq?(params['thickness'], have)
+
+          unless insert_locks.key?('thickness')
+            unless CabinetBuilder.thickness_in_range?(have)
+              return { error: "Materiál #{mat_name(sheet)} má #{fmt_mm(have)} mm — mimo rozsahu hrúbky korpusu " \
+                              "(#{fmt_mm(CabinetBuilder::THICKNESS_RANGE[0])}–#{fmt_mm(CabinetBuilder::THICKNESS_RANGE[1])} mm). " \
+                              'Vyber iný materiál korpusu.' }
+            end
+            params['thickness'] = have
+            return { note: " · hrúbka #{fmt_mm(have)} mm prevzatá z materiálu #{mat_name(sheet)}" }
+          end
+          return nil unless explicit # dedeny default rieši body_preflight
+
+          { error: "Zamknutá hrúbka #{fmt_mm(params['thickness'])} mm nesedí s materiálom šablóny " \
+                   "#{mat_name(sheet)} (#{fmt_mm(have)} mm) — odomkni hrúbku alebo zmeň materiál. Nič sa neupravilo." }
         end
 
         def handle_insert(payload)
           model = Sketchup.active_model
           params = parse(payload)
-          pf = back_preflight(params, model)
+          tf = insert_thickness_preflight(params, model) # D-45
+          return set_status("#{tf[:error]}#{insert_locks_hint}", true) if tf && tf[:error]
+          pf = material_preflight(params, model)
           return set_status("#{pf[:error]}#{insert_locks_hint}", true) if pf && pf[:error]
+          pf = { note: "#{tf ? tf[:note] : ''}#{pf ? pf[:note] : ''}" }
           begin
             inst = CabinetBuilder.build(model, params)
           rescue StandardError => e
@@ -146,7 +288,7 @@ module Noxun
           PARAM_KEYS.each do |k|
             params[k] = data[k] if data.key?(k)
           end
-          pf = back_preflight(params, model)
+          pf = material_preflight(params, model) # D-45: telo + chrbat + ABS remap
           if pf && pf[:error]
             set_status(pf[:error], true)
             push_selected(model) # UI resync — select hrubky sa vrati na ulozeny stav
@@ -190,7 +332,7 @@ module Noxun
             params[k] = data[k] if data.key?(k)
           end
           params['fronts'] = data['fronts'] if data.key?('fronts')
-          pf = back_preflight(params, model)
+          pf = material_preflight(params, model) # D-45: telo + chrbat + ABS remap
           if pf && pf[:error]
             set_status(pf[:error], true)
             push_selected(model) # UI resync (auto-apply nesmie nechat select 18 nad modelom 3)

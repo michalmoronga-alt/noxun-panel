@@ -15,9 +15,13 @@
     ['cab_body','cab_front','cab_back'].forEach(function(id){ var e=el(id); if(e){ e.value=''; e.disabled=true; } });
     el('cabMatHint').textContent = 'Označ skrinku pre nastavenie jej materiálov.';
   }
+  // D-45 (audit F9): payload nesie cabinet_id z casu kliku — server ho overi proti
+  // aktualnemu vyberu (preklik medzi klikom a callbackom nesmie zasiahnut iny
+  // korpus; zmena materialu tela navyse meni hrubku, tam je zamena drahá).
   function onCabinetMaterial(which, value){
     if (!selectedCabId){ NX.setStatus('Najprv označ skrinku.', true); return; }
-    if (window.sketchup && sketchup.set_cabinet_material) sketchup.set_cabinet_material(JSON.stringify({ which: which, value: value }));
+    if (window.sketchup && sketchup.set_cabinet_material)
+      sketchup.set_cabinet_material(JSON.stringify({ which: which, value: value, cabinet_id: selectedCabId }));
   }
   function openProjectMaterialsDialog(){
     if (window.sketchup && sketchup.open_project_materials) sketchup.open_project_materials('');
