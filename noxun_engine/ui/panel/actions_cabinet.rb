@@ -105,23 +105,21 @@ module Noxun
         # Hrubka korpusu sa RIADI katalogovym materialom (vzor BoardBuilder).
         # Vrati nil (nic sa nemeni), { error: } alebo { note: } a v params
         # prepise 'thickness'. Guardy PRED zapisom (audit B1 rozsah, F8 dielce).
+        # D-46: rozhodovanie zije v CabinetBuilder.adopt_thickness (JEDNA
+        # implementacia s davkou projektovej predvolby) — tu ostavaju HLASKY.
         def adopt_body_thickness!(params, sheet)
           have = sheet['thickness'].to_f
-          return nil unless have.positive?
-          old = params['thickness']
-          return nil if CabinetBuilder.thickness_eq?(old, have)
-          unless CabinetBuilder.thickness_in_range?(have)
-            return { error: "Materiál #{mat_name(sheet)} má #{fmt_mm(have)} mm — mimo rozsahu hrúbky korpusu " \
-                            "(#{fmt_mm(CabinetBuilder::THICKNESS_RANGE[0])}–#{fmt_mm(CabinetBuilder::THICKNESS_RANGE[1])} mm). " \
-                            'Materiál sa nezmenil.' }
+          state, blocked = CabinetBuilder.adopt_thickness(params, sheet)
+          case state
+          when :adopted
+            { note: " Hrúbka korpusu prevzatá z materiálu: #{fmt_mm(have)} mm." }
+          when :range
+            { error: "Materiál #{mat_name(sheet)} má #{fmt_mm(have)} mm — mimo rozsahu hrúbky korpusu " \
+                     "(#{fmt_mm(CabinetBuilder::THICKNESS_RANGE[0])}–#{fmt_mm(CabinetBuilder::THICKNESS_RANGE[1])} mm). " \
+                     'Materiál sa nezmenil.' }
+          when :blocked
+            { error: blocked_parts_msg(have, blocked) }
           end
-          params['thickness'] = have
-          blocked = CabinetBuilder.parts_blocking_thickness(params)
-          unless blocked.empty?
-            params['thickness'] = old # nic sa nemeni, kym konflikt trva
-            return { error: blocked_parts_msg(have, blocked) }
-          end
-          { note: " Hrúbka korpusu prevzatá z materiálu: #{fmt_mm(have)} mm." }
         end
 
         def blocked_parts_msg(want, blocked)

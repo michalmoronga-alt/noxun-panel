@@ -31,3 +31,5 @@ jobs:
         run: node tests/js/test_thickness_labels.js
       - name: JS testy (format platne pri cipoch + zapamatana sada D-44)
         run: node tests/js/test_decor_formats.js
+      - name: JS testy (potvrdzovacia lista projektovej predvolby D-46)
+        run: node tests/js/test_proj_confirm.js

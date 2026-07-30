@@ -15,7 +15,9 @@
 #     dielcov, ghost zony, rebuild identita + prezitie part_overrides, dedup kopie
 #     (priame volanie), undo rebuildu = presne 1 krok; D-45 sekcia (hrubka <->
 #     material tela: adopcia hrubky, auto-pick materialu, vklad, zamok x sablona —
-#     bezi nad DOCASNYM testovacim dekorom, ktory po sebe upratuje); V0.4.7b sync-board sekcia
+#     bezi nad DOCASNYM testovacim dekorom, ktory po sebe upratuje); D-46 sekcia
+#     (projektova predvolba korpusu s inou hrubkou: ponuka -> potvrdenie -> 1 undo
+#     krok, blokujuce dielce, zastaraly suhlas); V0.4.7b sync-board sekcia
 #     (build/rebuild/undo/dedup samostatnej dosky, standard 8.3); D-35 sync-abs
 #     sekcia (bulk olepenie 4 hran = 1 undo, echo guardy, no-op bez ABS variantu).
 #   ASYNC cast — retaz UI.start_timer krokov (observer debounce = 0.2 s):
@@ -1134,6 +1136,215 @@ module NoxunSuRunner
     log_line("INFO: D-45 cleanup katalogu: #{ex.class}: #{ex.message}")
   end
 
+  # --- SYNC-D46: projektova predvolba KORPUSU s inou hrubkou ------------------
+  # Bloker z testovania (Halifax 18,6): predvolba sa nedala zmenit, kym existovali
+  # dediace skrinky — tvrdy abort. Teraz: dry-run -> ponuka -> jedno potvrdenie ->
+  # vsetky dediace skrinky prevezmu hrubku v JEDNOM undo kroku. Overuje sa aj to,
+  # co sa VEDOME odmieta (blokujuce dielce, zastaraly suhlas).
+  # Katalog: docasny dekor (DTDL 18 + DTDL 18,6 + MDF 18), na konci sa ZMAZE.
+
+  D46_DECOR = 'SU TEST D46'
+
+  def install_md_recorder(rec)
+    e::MaterialsDialog.singleton_class.class_eval do
+      alias_method :nx_js_orig_md, :js
+      define_method(:js) { |script| rec << script.to_s; nil }
+    end
+  end
+
+  def remove_md_recorder
+    sc = e::MaterialsDialog.singleton_class
+    return unless sc.method_defined?(:nx_js_orig_md)
+    sc.class_eval do
+      alias_method :js, :nx_js_orig_md
+      remove_method :nx_js_orig_md
+    end
+  end
+
+  # Poziadavka do okna Materialy projektu; vrati ZAZNAM JS volani (okno nebezi).
+  def md_call(payload)
+    rec = []
+    install_md_recorder(rec)
+    begin
+      e::MaterialsDialog.handle_set_project_material(payload.to_json)
+    ensure
+      remove_md_recorder
+    end
+    rec
+  end
+
+  # Pending kontrakt z poslednej ponuky MD.confirmDefault({...}) alebo nil.
+  def md_pending(rec)
+    line = rec.reverse.find { |s| s.start_with?('MD.confirmDefault(') }
+    return nil unless line
+    JSON.parse(line[(line.index('(') + 1)...line.rindex(')')])['pending']
+  rescue StandardError => ex
+    log_line("INFO: D-46 parse pendingu: #{ex.class}: #{ex.message}")
+    nil
+  end
+
+  def md_status?(rec, *fragments)
+    rec.any? { |s| s.include?('MD.setStatus') && fragments.all? { |f| s.include?(f) } }
+  end
+
+  def d46_default(model)
+    e::Materials.project_defaults(model)['default_material_id']
+  end
+
+  def d46_th(inst)
+    (e::Store.config(inst) || {})['thickness'].to_f
+  end
+
+  def run_d46(model)
+    if e::Materials.sheets.any? { |s| s['decor'] == D46_DECOR }
+      return info("D-46: dekor #{D46_DECOR} uz v katalogu existuje — sekcia preskocena (chranime pouzivatelske data)")
+    end
+    seeded, res = e::Materials.add_decor_batch('decor' => D46_DECOR, 'manufacturer' => 'SU TEST',
+                                               'type' => 'DTDL', 'thicknesses' => '18, 18.6')
+    return info("D-46: seed katalogu zlyhal (#{res.inspect}) — sekcia preskocena") unless seeded
+    # druhy material hrubky 18 (iny TYP) — potrebny na scenar zastaraleho suhlasu
+    seeded2, res2 = e::Materials.add_decor_batch('decor' => D46_DECOR, 'manufacturer' => 'SU TEST',
+                                                 'type' => 'MDF', 'thicknesses' => '18')
+    sh = ->(type, th) {
+      s = e::Materials.sheets.find do |x|
+        x['decor'] == D46_DECOR && x['type'].to_s.upcase == type && (x['thickness'].to_f - th).abs < 0.01
+      end
+      s && s['material_id']
+    }
+    id18 = sh.call('DTDL', 18.0)
+    id186 = sh.call('DTDL', 18.6)
+    id18b = seeded2 ? sh.call('MDF', 18.0) : nil
+    unless id18 && id186 && id18b
+      d46_cleanup_catalog(res, res2)
+      return info('D-46: seed nema vsetky varianty — sekcia preskocena')
+    end
+    saved_default = d46_default(model)
+    guid = e::MaterialsDialog.model_guid(model)
+    base = { 'type' => 'lower', 'height' => 720.0, 'depth' => 510.0, 'thickness' => 18.0 }
+
+    begin
+      model.start_operation('SU-TEST D46 predvolba', true)
+      e::Materials.set_project_default(model, 'default_material_id', id18)
+      model.commit_operation
+
+      a = e::CabinetBuilder.build(model, base.merge('width' => 600.0))            # dedi
+      b = e::CabinetBuilder.build(model, base.merge('width' => 500.0))            # dedi
+      own = e::CabinetBuilder.build(model, base.merge('width' => 450.0, 'material_id' => id18))
+      cid_a = e::Store.get(a, 'cabinet_id')
+      cid_b = e::Store.get(b, 'cabinet_id')
+
+      # (a) PRVY POKUS = len ponuka. Do modelu sa nesmie zapisat NIC.
+      rec = md_call('key' => 'default_material_id', 'value' => id186, 'model_guid' => guid)
+      pending = md_pending(rec)
+      ok('D-46 (a): prvy pokus vratil ponuku s pendingom pre obe dediace skrinky',
+         !pending.nil? && pending['adopting_ids'].sort == [cid_a, cid_b].sort)
+      ok('D-46 (a): ponuka NIC nezapisala (predvolba aj hrubky drzia 18)',
+         d46_default(model) == id18 && (d46_th(a) - 18.0).abs < 0.01 && (d46_th(b) - 18.0).abs < 0.01)
+      ok('D-46 (a): status pomenoval pocet skriniek aj novu hrubku',
+         md_status?(rec, 'skrinky prevezmú', '18,6'))
+      ok('D-46 (c): skrinka s VLASTNYM materialom v ponuke vobec nie je',
+         !pending.nil? &&
+         !(pending['adopting_ids'] + pending['recompute_ids']).include?(e::Store.get(own, 'cabinet_id')))
+
+      # (e) ZASTARALY SUHLAS: predvolba sa medzitym zmeni na iny material rovnakej
+      #     hrubky (ziadne potvrdenie netreba) — stary pending uz nesedi.
+      md_call('key' => 'default_material_id', 'value' => id18b, 'model_guid' => guid)
+      ok('D-46 (e): material rovnakej hrubky sa ulozil BEZ potvrdenia',
+         d46_default(model) == id18b && (d46_th(a) - 18.0).abs < 0.01)
+      rec_e = md_call('key' => 'default_material_id', 'value' => id186,
+                      'model_guid' => guid, 'confirm' => pending)
+      ok('D-46 (e): zastaraly suhlas sa NEVYKONAL (predvolba drzi, hrubky drzia)',
+         d46_default(model) == id18b && (d46_th(a) - 18.0).abs < 0.01)
+      ok('D-46 (e): namiesto zapisu prisla NOVA ponuka',
+         rec_e.any? { |s| s.start_with?('MD.confirmDefault(') } && md_status?(rec_e, 'medzitým'))
+
+      # (a2) POTVRDENIE cerstvym kontraktom — 1 undo krok vrati vsetko naraz.
+      pending2 = md_pending(rec_e)
+      md_call('key' => 'default_material_id', 'value' => id186, 'model_guid' => guid,
+              'confirm' => pending2)
+      side_a = find_part(a, 'cabinet/side:left')
+      ok('D-46 (a): potvrdenie prevzalo hrubku OBOM dediacim skrinkam + ulozilo predvolbu',
+         d46_default(model) == id186 && (d46_th(a) - 18.6).abs < 0.01 && (d46_th(b) - 18.6).abs < 0.01)
+      ok('D-46 (a): geometria bokov sedi s novou hrubkou (18,6 mm)',
+         !side_a.nil? && (part_width_x(side_a) - 18.6).abs < TOL &&
+         (part_width_x(find_part(b, 'cabinet/side:left')) - 18.6).abs < TOL)
+      ok('D-46 (c): skrinka s vlastnym materialom ostala nedotknuta (18 mm)',
+         (d46_th(own) - 18.0).abs < 0.01 && (e::Store.config(own) || {})['material_id'] == id18)
+      Sketchup.undo
+      ok('D-46 (a): 1x undo vratil OBE skrinky AJ modelovu predvolbu',
+         d46_default(model) == id18b && (d46_th(a) - 18.0).abs < 0.01 && (d46_th(b) - 18.0).abs < 0.01 &&
+         (part_width_x(find_part(a, 'cabinet/side:left')) - 18.0).abs < TOL)
+
+      # (d) MIESANA DAVKA: skrinka s hrubkovym driftom (dedi, ale uz stoji na 18,6)
+      #     sa len prepocita — pocty v ponuke to musia rozlisit.
+      c = e::CabinetBuilder.build(model, base.merge('width' => 400.0, 'thickness' => 18.6,
+                                                    'material_id' => id186))
+      cid_c = e::Store.get(c, 'cabinet_id')
+      model.start_operation('SU-TEST D46 drift', true)
+      cfg_c = e::Store.config(c) || {}
+      cfg_c.delete('material_id') # dedi, ale hrubku uz ma novu (stav z praxe: drift)
+      e::Store.write_config(c, cfg_c)
+      model.commit_operation
+      rec_d = md_call('key' => 'default_material_id', 'value' => id186, 'model_guid' => guid)
+      pending_d = md_pending(rec_d)
+      ok('D-46 (d): miesana davka — 2 prevezmu hrubku, 1 sa len prepocita',
+         !pending_d.nil? && pending_d['adopting_ids'].sort == [cid_a, cid_b].sort &&
+         pending_d['recompute_ids'] == [cid_c])
+      ok('D-46 (d): ponuka vypisala aj pocet prepocitanych',
+         md_status?(rec_d, 'prepočítajú sa aj ďalšie: 1'))
+      rec_d2 = md_call('key' => 'default_material_id', 'value' => id186, 'model_guid' => guid,
+                       'confirm' => pending_d)
+      ok('D-46 (d): potvrdenie prestavalo vsetky tri (2 prevzali hrubku, 1 prepocitana)',
+         d46_default(model) == id186 && (d46_th(a) - 18.6).abs < 0.01 &&
+         (d46_th(c) - 18.6).abs < 0.01 && md_status?(rec_d2, 'Predvoľba uložená', 'prevzali'))
+
+      # (b) BLOKUJUCE DIELCE: polica skrinky A ma vlastny material 18,6 — navrat
+      #     predvolby na 18 sa odmietne CELY, bez ponuky a bez zapisu.
+      params_sh = e::CabinetBuilder.config_to_params(e::Store.config(a))
+                                   .merge('zone_tree' => { 'id' => 'Z1', 'shelves' => 1, 'children' => [] })
+      shelf_key = e::CabinetBuilder.plan_parts_by_key(params_sh)
+                                   .find { |_k, pd| pd[:role].to_s == 'shelf' }&.first
+      if shelf_key
+        e::CabinetBuilder.rebuild(model, a,
+                                  params_sh.merge('part_overrides' => { shelf_key => { 'material_id' => id186 } }))
+        rec_b = md_call('key' => 'default_material_id', 'value' => id18, 'model_guid' => guid)
+        ok('D-46 (b): blokujuci dielec zrusil CELU davku — ziadna ponuka',
+           rec_b.none? { |s| s.start_with?('MD.confirmDefault(') })
+        ok('D-46 (b): hlaska vymenovala skrinku aj blokujuci dielec',
+           md_status?(rec_b, 'blokujú dielce', cid_a.to_s))
+        ok('D-46 (b): predvolba ani konfiguracie sa nezmenili',
+           d46_default(model) == id186 && (d46_th(a) - 18.6).abs < 0.01 && (d46_th(b) - 18.6).abs < 0.01)
+        ok('D-46 (b): select sa vratil na skutocnu predvolbu',
+           rec_b.any? { |s| s.start_with?('MD.resetProject(') && s.include?(id186) })
+      else
+        info('D-46 (b): plan nema policu — scenar blokujuceho dielca preskoceny')
+      end
+    ensure
+      model.start_operation('SU-TEST D46 obnova predvolby', true)
+      e::Materials.set_project_default(model, 'default_material_id', saved_default.to_s)
+      model.commit_operation
+      cleanup(model)
+      d46_cleanup_catalog(res, res2)
+    end
+    ok('D-46: cleanup (0 korpusov, testovaci dekor prec)',
+       cabinets(model).empty? && e::Materials.sheets.none? { |s| s['decor'] == D46_DECOR })
+  rescue StandardError => ex
+    log_line("FAIL: D-46 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    remove_md_recorder
+    cleanup(model)
+    d46_cleanup_catalog(res, res2) if defined?(res)
+  end
+
+  def d46_cleanup_catalog(*results)
+    results.each do |res|
+      next unless res.is_a?(Hash)
+      Array(res['sheets']).each { |id| e::Materials.delete_sheet(id) }
+      Array(res['edges']).each { |id| e::Materials.delete_edge(id) }
+    end
+  rescue StandardError => ex
+    log_line("INFO: D-46 cleanup katalogu: #{ex.class}: #{ex.message}")
+  end
+
   # --- D-40: selection eventy po builde musia zit (DC observer pasca) --------
   # Bug: zapis dynamic_attributes (scaletool) v operacii, ktora VYTVARA definiciu/
   # instanciu, pri commite cez DC extension observer vypne dorucovanie selection
@@ -1551,6 +1762,7 @@ module NoxunSuRunner
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_d45(model)           # D-45: hrubka <-> material tela (18,6 mm deadlock)
+    run_d46(model)           # D-46: projektova predvolba korpusu s inou hrubkou (potvrdenie)
     run_d40(model)           # D-40: selection eventy po builde (DC observer pasca)
     run_async(model, nil)
   rescue StandardError => ex
