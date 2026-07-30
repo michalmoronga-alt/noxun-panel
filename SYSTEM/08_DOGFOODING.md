@@ -14,7 +14,7 @@
 
 ## UX drobnosti (nízka priorita)
 
-*(momentálne žiadne)*
+- **D-46 · Previazanie hrúbky a materiálu — dotiahnuť zvyšné cesty** (Michal 30.7., test Halifax na v0.5.3) — pri prepínaní Halifaxu „cez materiál v CAB-001" systém vyzval najskôr prepísať hrúbku korpusu (ručné preklikávanie). Očakávanie: obojsmerné previazanie všade — materiál → hrúbka automaticky, hrúbka → upozornenie/dobratie materiálu. *Stav: D-45 toto rieši pre korpusový select, vkladanie aj šablóny — treba ZISTIŤ presnú cestu, ktorou Michal šiel (podozrenie: select materiálu na KARTE DIELCA — tam je zmena hrúbky vedome blokovaná, per-dielec hrúbky sú V0.7). Návrh dotiahnutia: per-dielec výber materiálu inej hrúbky namiesto suchej hlášky PONÚKNE akciu „Zmeniť materiál celej skrinky (prevezme hrúbku 18,6)?" — 1 klik namiesto preklikávania. Čaká na spresnenie hlášky od Michala.*
 
 ## Nápady na zváženie (nerozhodnuté)
 

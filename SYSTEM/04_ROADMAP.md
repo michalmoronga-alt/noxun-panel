@@ -36,7 +36,8 @@ Plné pôvodné texty: [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_et
 ### V0.6 — Kovanie fáza 2 (katalóg a ceny) — štart ~28.7.
 
 - Prevzatie CatalogStore/search/Demos import z KOVANIE · mapovanie flagov na konkrétne kódy (pamätá sa) · ceny v sumári.
-- **Otvorená otázka (debata 24.7., rozpracovať pred štartom):** „zadaj kód → načítaj dáta" — demos-trade.sk má verejné vyhľadávanie (kód → 1 položka aj dekor → celá skupina s cenami bez loginu) + Konfigurátor cenníkov na Démos24Plus (hromadný export za loginom). Zvážiť hybrid: hromadný seed z cenníka + per-kód dohľadanie. Viď zápisník uzáveru.
+- **Otvorená otázka (debata 24.7., rozpracovať pred štartom):** „zadaj kód → načítaj dáta" — demos-trade.sk má verejné vyhľadávanie (kód → 1 položka aj dekor → celá skupina s cenami bez loginu) + Konfigurátor cenníkov na Démos24Plus (hromadný export za loginom). Zvážiť hybrid: hromadný seed z cenníka + per-kód dohľadanie. Viď zápisník uzáveru. *(Pozn. 29.7.: /vyhledavani je v robots.txt disallowed — lookup pôjde cez produktové stránky.)*
+- **Knižnica z reálnych objednávok (Michal 30.7.):** po napojení Gmailu vytiahnuť z mailov NAJOBJEDNÁVANEJŠIE materiály a postaviť ostrú knižnicu podľa nich (aktuálny katalóg je len testovací — migrácia 2A ho smie pokojne preskladať). Zaradenie: seed 2.0 po 2A migrácii.
 - **Pracovné dosky ako súčasť dekorovej skupiny** (Michal 24.7.): rovnaké dekory, iný rozmer/typ (PD 4100×600/920/38, HPDB hrana š.45, DTDL 36 = 2× zlepená 18) — dátovo pripravené cez `sheet_variants` s typom per variant (D-42); doriešiť pri katalógu.
 - Z prenesených záväzkov zvážiť: smer otvárania + typ závesu, hmotnostné tabuľky, „použiť na podobné" pre kovanie.
 
