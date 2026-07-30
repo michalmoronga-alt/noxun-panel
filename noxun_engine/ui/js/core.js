@@ -126,6 +126,27 @@
   // D-36: normalizacia dekoru pre zoskupenie ABS — orez whitespace (legacy/prazdny),
   // NIE lowercase (B2: presna case-sensitive zhoda ako drzi katalog). nil/prazdny => ''.
   function normDecor(d){ return String(d==null?'':d).trim(); }
+  // 2A-3b (audit F11): rezim katalogu VYHRADNE z payloadu servera
+  // (materials_payload.catalog_schema) — ziadne inferovanie z pritomnosti
+  // group_id. Chybajuci/nezmyselny udaj = legacy 1 (stary payload z CEF cache).
+  function catalogSchemaOf(m){
+    var n = parseInt(m && m.catalog_schema, 10);
+    return isNaN(n) ? 1 : n;
+  }
+  function catalogSchemaNow(){ return catalogSchemaOf(MATERIALS); }
+  // 2A-3b: cely zaznam dosky z katalogu (group_id/structure pre zrkadlo). null = neznamy.
+  function sheetRecOf(materialId){
+    if (!materialId) return null;
+    for (var i=0;i<MATERIALS.sheets.length;i++){
+      if (MATERIALS.sheets[i].id===materialId) return MATERIALS.sheets[i];
+    }
+    return null;
+  }
+  // 2A-3b: zrkadlo Ruby identity_norm (trim, viacnasobne medzery na jednu, upcase)
+  // pre porovnanie struktury povrchu. Prazdna/nil => ''.
+  function identityNorm(s){ return String(s==null?'':s).trim().replace(/\s+/g,' ').toUpperCase(); }
+  // 2A-3b: group_id zaznamu ako trimnuty string ('' = ziadny/hybrid).
+  function groupIdOf(rec){ return rec ? String(rec.group_id==null?'':rec.group_id).trim() : ''; }
   // D-36: resolved dekor doskoveho materialu podla id z AKTUALNEHO katalogu MATERIALS
   // (B1: odvodene PRI RENDERI zo zivého katalogu, nie z payloadu). Neznamy id => ''.
   function decorOfSheet(materialId){
@@ -154,19 +175,51 @@
     // stabilne zoradenie odporucanych hrubkou vzostupne (Array.sort je v CEF stabilny);
     // D-41 sekundarne SIRKOU vzostupne — sirkove varianty (konkretne) pred legacy
     // paskou bez sirky (univerzalna ide na koniec skupiny rovnakej hrubky).
-    recommended.sort(function(x,y){
-      var t = (parseFloat(x.thickness)||0)-(parseFloat(y.thickness)||0);
-      if (t) return t;
-      var xw = (x.width===null || x.width===undefined) ? null : parseFloat(x.width);
-      var yw = (y.width===null || y.width===undefined) ? null : parseFloat(y.width);
-      if (xw===null && yw===null) return 0;
-      if (xw===null) return 1;
-      if (yw===null) return -1;
-      return xw-yw;
-    });
+    recommended.sort(absEdgeSortAsc);
     // F5: '' (Bez ABS) a '__inherit__' su fixne volby, nie ABS id — tie nezachovavaj
     var preserve = (currentValue && currentValue!=='__inherit__' && !seen[currentValue]) ? currentValue : null;
     return { recommended: recommended, others: others, preserve: preserve };
+  }
+  // Zoradenie odporucanych pasok (zdielane schema 1 aj 2): hrubka vzostupne,
+  // v ramci hrubky sirka vzostupne, legacy bez sirky na koniec skupiny hrubky.
+  function absEdgeSortAsc(x,y){
+    var t = (parseFloat(x.thickness)||0)-(parseFloat(y.thickness)||0);
+    if (t) return t;
+    var xw = (x.width===null || x.width===undefined) ? null : parseFloat(x.width);
+    var yw = (y.width===null || y.width===undefined) ? null : parseFloat(y.width);
+    if (xw===null && yw===null) return 0;
+    if (xw===null) return 1;
+    if (yw===null) return -1;
+    return xw-yw;
+  }
+  // 2A-3b (audit F12): skupiny pri katalogu SCHEMA 2 — Odporucane = pasky
+  // ROVNAKEJ skupiny (group_id dosky) s presnou NEPRAZDNOU strukturou dosky
+  // ALEBO vedomym universal:true. Pasky CUDZEJ struktury tej istej skupiny idu
+  // do "Ostatne" (vedoma manualna volba — picker cez struktury NIKDY neprechadza,
+  // dve prazdne struktury NIE su zhoda). Zoradenie a preserve ako v schema 1.
+  function groupAbsEdgesV2(edges, sheetRec, currentValue){
+    edges = edges || [];
+    var gid = groupIdOf(sheetRec);
+    var st = identityNorm(sheetRec ? sheetRec.structure : '');
+    var recommended = [], others = [], seen = {};
+    edges.forEach(function(a){
+      seen[a.id] = true;
+      var sameGroup = gid!=='' && groupIdOf(a)===gid;
+      var stMatch = st!=='' && identityNorm(a.structure)===st;
+      if (sameGroup && (stMatch || a.universal===true)) recommended.push(a); else others.push(a);
+    });
+    recommended.sort(absEdgeSortAsc);
+    var preserve = (currentValue && currentValue!=='__inherit__' && !seen[currentValue]) ? currentValue : null;
+    return { recommended: recommended, others: others, preserve: preserve };
+  }
+  // 2A-3b: dispatcher skupin — SCHEMA >= 2 A doska nesie group_id => nova
+  // logika; inak PRESNE dnesna (decor text). Hybridny zaznam bez group_id
+  // v schema 2 katalogu drzi legacy vztah dekoru (zrkadlo servera —
+  // ensure_edge_for_sheet). JS je LEN UX zrkadlo, autorita je server.
+  function groupAbsForSheet(edges, sheetRec, catalogSchema, currentValue){
+    if (catalogSchema >= 2 && groupIdOf(sheetRec) !== '')
+      return groupAbsEdgesV2(edges, sheetRec, currentValue);
+    return groupAbsEdges(edges, sheetRec ? sheetRec.decor : '', currentValue);
   }
   // D-36: zlozi HTML <option> zo skupin. prefixHtml = fixne volby PRED skupinami
   // (inherit/Bez ABS). Ak NIE su odporucane (prazdny dekor ALEBO ziadna zhoda) => plochy
@@ -196,14 +249,57 @@
       var a = edges[i];
       if (normDecor(a.decor) !== nd) continue;
       if (Math.abs((parseFloat(a.thickness)||0) - absTh) > 0.01) continue;
-      var w = (a.width===null || a.width===undefined) ? null : parseFloat(a.width);
-      if (w === null) return true;
-      if (partTh === null || partTh === undefined || !isFinite(partTh)) return true;
-      if (w >= partTh + 2 - 0.001) return true;
+      if (absEdgeWidthOk(a, partTh)) return true;
     }
     return false;
   }
-  // Hrubka doskoveho materialu z katalogu (pre absUsableExists check).
+  // Sirkovy check pasky (zdielany schema 1 aj 2): bez sirky = univerzalna sirka;
+  // bez hrubky dielca sa nevylucuje; inak sirka >= hrubka+2 (presah na olep+orez).
+  function absEdgeWidthOk(a, partTh){
+    var w = (a.width===null || a.width===undefined) ? null : parseFloat(a.width);
+    if (w === null) return true;
+    if (partTh === null || partTh === undefined || !isFinite(partTh)) return true;
+    return w >= partTh + 2 - 0.001;
+  }
+  // 2A-3b: nominalna trieda jednotka {0,8; 1; 1,2} — zrkadlo Ruby
+  // EDGE_CLASS_PREFERENCE[:jednotka] (0,4 ani 1,5/2 sem NIKDY nepatria).
+  function absUnitClass(th){
+    var t = parseFloat(th)||0;
+    return Math.abs(t-0.8)<0.01 || Math.abs(t-1.0)<0.01 || Math.abs(t-1.2)<0.01;
+  }
+  // 2A-3b (audit F11): zrkadlo Ruby abs_for_sheet(:jednotka) pre modal "chyba
+  // paska" pri SCHEMA 2 — kandidati podla group_id dosky, vetva presnej
+  // NEPRAZDNEJ struktury, potom vedomy universal:true (dve prazdne struktury
+  // NIE su zhoda); nominalna trieda jednotka namiesto natvrdo 1,0; sirkovy
+  // check plati v oboch vetvach. LEN boolean pre modal — vyber, tvorbu aj
+  // konecne rozhodnutie robi VZDY server (create_missing_abs kontrakt bez zmeny).
+  function absUsableExistsV2(edges, sheetRec, partTh){
+    if (!sheetRec) return true; // neznamy material sa nevylucuje (modal nesmie vyskakovat naprazdno)
+    edges = edges || [];
+    var gid = groupIdOf(sheetRec);
+    var st = identityNorm(sheetRec.structure);
+    for (var i=0;i<edges.length;i++){
+      var a = edges[i];
+      if (gid==='' || groupIdOf(a) !== gid) continue;
+      if (!absUnitClass(a.thickness) || !absEdgeWidthOk(a, partTh)) continue;
+      if (st !== '' && identityNorm(a.structure) === st) return true;
+      if (a.universal === true) return true;
+    }
+    return false;
+  }
+  // 2A-3b: dispatcher zrkadla modalu — schema VYHRADNE z payloadu (F11);
+  // hybrid bez group_id = legacy dekor logika (zrkadlo servera).
+  function absUsableForSheet(edges, sheetRec, catalogSchema, partTh){
+    if (catalogSchema >= 2 && groupIdOf(sheetRec) !== '')
+      return absUsableExistsV2(edges, sheetRec, partTh);
+    return absUsableExists(edges, sheetRec ? sheetRec.decor : '', 1.0, partTh);
+  }
+  // 2A-3b: text chybajucej pasky do absModal hlasok — schema 1 presne dnesny
+  // text, schema 2 nominalna trieda (hlaska s natvrdo "1,0" by klamala).
+  function absMissingLabel(catalogSchema){
+    return catalogSchema >= 2 ? 'jednotkovú ABS pásku (0,8–1,2 mm)' : '1,0 mm ABS pásku';
+  }
+  // Hrubka doskoveho materialu z katalogu (pre absUsable* check).
   function sheetThicknessOf(materialId){
     for (var i=0;i<MATERIALS.sheets.length;i++){
       if (MATERIALS.sheets[i].id===materialId) return parseFloat(MATERIALS.sheets[i].thickness);
@@ -211,15 +307,16 @@
     return null;
   }
   // Volby ABS pre dropdown hrany DIELCA: fixne (podla pravidla / Bez ABS) + D-36 skupiny
-  // (Odporucane k dekoru / Ostatne). decor = resolved dekor materialu dielca,
+  // (Odporucane k dekoru / Ostatne). 2A-3b: parameter je ID materialu dielca
+  // (skupinu urcuje cely zaznam dosky — group_id/structure podla schemy),
   // currentValue = aktualna ABS hodnota tejto hrany (zachova sa aj mimo katalogu — F5).
-  function edgeOptionsHtml(decor, currentValue){
+  function edgeOptionsHtml(materialId, currentValue){
     var prefix = '<option value="__inherit__">(podľa pravidla)</option><option value="">Bez ABS</option>';
-    return absOptionsHtml(prefix, groupAbsEdges(MATERIALS.edges, decor, currentValue));
+    return absOptionsHtml(prefix, groupAbsForSheet(MATERIALS.edges, sheetRecOf(materialId), catalogSchemaNow(), currentValue));
   }
   // Volby ABS pre dropdown hrany DOSKY: doska nema override vrstvu (fixne len Bez ABS).
-  function boardEdgeOptionsHtml(decor, currentValue){
-    return absOptionsHtml('<option value="">Bez ABS</option>', groupAbsEdges(MATERIALS.edges, decor, currentValue));
+  function boardEdgeOptionsHtml(materialId, currentValue){
+    return absOptionsHtml('<option value="">Bez ABS</option>', groupAbsForSheet(MATERIALS.edges, sheetRecOf(materialId), catalogSchemaNow(), currentValue));
   }
   // FIX 2: naplni/obnovi vsetky projektove + korpusove material selecty podla hrubky KONTEXTU
   // (korpus = pole 'thickness', chrbat = 'back_thickness', cela = rozsah dosky). Nekompatibilne
@@ -274,6 +371,11 @@
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { groupAbsEdges: groupAbsEdges, absOptionsHtml: absOptionsHtml, normDecor: normDecor,
       absUsableExists: absUsableExists,
+      // 2A-3b (tests/js/test_abs_mirror.js) — ciste funkcie zrkadla SCHEMA 2
+      identityNorm: identityNorm, catalogSchemaOf: catalogSchemaOf,
+      groupAbsEdgesV2: groupAbsEdgesV2, groupAbsForSheet: groupAbsForSheet,
+      absUsableExistsV2: absUsableExistsV2, absUsableForSheet: absUsableForSheet,
+      absMissingLabel: absMissingLabel, absUnitClass: absUnitClass,
       // D-45 (tests/js/test_thickness_labels.js) — ciste funkcie hrubkovych filtrov/labelov
       mmLabel: mmLabel, bodyThicknessNote: bodyThicknessNote, frontMatch: frontMatch,
       rangeMatch: rangeMatch, thMatch: thMatch, TH_RANGE: TH_RANGE };
