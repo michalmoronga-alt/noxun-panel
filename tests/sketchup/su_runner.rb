@@ -432,12 +432,28 @@ module NoxunSuRunner
     ok('sync-board: materials_payload sheets nesu grain',
        mp['sheets'].is_a?(Array) && mp['sheets'].all? { |s| s.key?('grain') })
     # Codex GH #33: zmena materialu prevedie ABS stareho dekoru (1mm ma variant,
-    # 2mm v W1000 nema -> nil) a material bez dekoru zhodi smer dekoru na none
+    # 2mm v W1000 nema -> nil) a material bez dekoru zhodi smer dekoru na none.
+    # 2A-3 rider (environmentalny FAIL 30.7.): zivy katalog nemusi obsahovat
+    # seed pasku ABS_W1000_10 — ak W1000 nema jednotkovu pasku, docasne sa
+    # vytvori (presny seed tvar) a na KONCI run_sync sa katalog vrati do
+    # povodneho stavu. Ocakavania sa citaju z pickera PRED zmenou materialu —
+    # ked paska existuje (seed stav), asserty su presne povodne.
+    w1000_seeded = false
+    if e::Materials.abs_for_decor('W1000 ST9 Biela', 1.0, 18.0).nil?
+      w1000_seeded = e::Materials.upsert_edge(
+        'abs_id' => 'ABS_W1000_10', 'decor' => 'W1000 ST9 Biela',
+        'thickness' => 1.0, 'price_per_bm' => 0.60, 'color' => [246, 246, 244]
+      )
+      info('sync-board: ABS_W1000_10 chybala v zivom katalogu — docasne doseedovana') if w1000_seeded
+    end
+    exp_l1 = e::Materials.abs_for_decor('W1000 ST9 Biela', 1.0, 18.0)
+    exp_w1 = e::Materials.abs_for_decor('W1000 ST9 Biela', 2.0, 18.0)
     e::Panel.handle_set_board_material({ 'board_id' => bid, 'material_id' => 'W1000_DTDL_18' }.to_json)
     mcfg = e::Store.config(binst) || {}
     mecfg = mcfg['edges'] || {}
-    ok('sync-board: zmena materialu K009->W1000 previedla ABS dekor (L1 1mm remap, W1 2mm -> nil)',
-       mcfg['material_id'] == 'W1000_DTDL_18' && mecfg['L1'] == 'ABS_W1000_10' && mecfg['W1'].nil?)
+    ok("sync-board: zmena materialu K009->W1000 previedla ABS dekor (L1 -> #{exp_l1 || 'nil'}, W1 2mm -> #{exp_w1 || 'nil'})",
+       mcfg['material_id'] == 'W1000_DTDL_18' && !exp_l1.nil? &&
+       mecfg['L1'] == exp_l1 && mecfg['W1'] == exp_w1)
     ok('sync-board: material bez dekoroveho smeru zhodil grain na none',
        mcfg['grain_direction'] == 'none')
     model.selection.clear
@@ -697,10 +713,18 @@ module NoxunSuRunner
       info('sync-semafor: korpus nema nohy (leg) — semafor kovania scenar preskoceny')
     end
 
+    # 2A-3 rider: vratenie presneho stavu katalogu (docasne doseedovana paska
+    # prec — board hrany na nu po HDF remape uz neukazuju).
+    e::Materials.delete_edge('ABS_W1000_10') if w1000_seeded
     cleanup(model)
     ok('sync: cleanup (0 korpusov, 0 dosiek)', cabinets(model).empty? && boards(model).empty?)
   rescue StandardError => ex
     log_line("FAIL: sync vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    begin
+      e::Materials.delete_edge('ABS_W1000_10') if defined?(w1000_seeded) && w1000_seeded
+    rescue StandardError
+      nil
+    end
     cleanup(model)
   end
 
@@ -1466,6 +1490,169 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- SYNC-2A3: vyberove cesty ABS so strukturou (SCHEMA 2 sandbox) ---------
+  # Cely scenar bezi nad IZOLOVANYM katalogom SCHEMA 2 (Materials.test_dir_override
+  # — vzor run_2a2; realny %APPDATA% katalog sa NIKDY necita ani nezapisuje).
+  # ABS pravidla NEMAJU override — sekcia si ich docasne upravi (dvojka na
+  # side_left) a v ensure VZDY vrati bajt-presny povodny subor + reload.
+  # Scenare (2A-3a): korpus + celo dostanu pasky spravnej struktury; 5981
+  # s dvoma 23/1 roznych struktur sa nikdy nemiesa; dvojka fallback 1,5 je
+  # viditelny v KONTROLE (ORANGE); ensure vytvori 23/1 so strukturou dosky;
+  # warning dosky prezije retaz config -> Bom.collect -> Validation.run.
+
+  def a3_catalog_json
+    sheet = lambda do |id, gid, decor, structure, th|
+      { 'material_id' => id, 'manufacturer' => 'Egger', 'decor' => decor,
+        'type' => 'DTDL', 'thickness' => th, 'grain' => 'length',
+        'sheet_size' => [2800.0, 2070.0], 'color' => [200, 190, 170],
+        'production_class' => 'sheet', 'group_id' => gid, 'structure' => structure }
+    end
+    edge = lambda do |id, gid, decor, structure, th, w|
+      { 'abs_id' => id, 'decor' => decor, 'thickness' => th, 'width' => w,
+        'color' => [200, 190, 170], 'group_id' => gid, 'structure' => structure }
+    end
+    {
+      'std' => 1, 'schema' => 2,
+      'sheets' => [
+        sheet.call('A3KORP18', 'GRP-A3K009', 'K009', 'PW', 18.0),
+        sheet.call('A35981MG18', 'GRP-A35981', '5981', 'MG', 18.0),
+        sheet.call('A35981AF18', 'GRP-A35981', '5981', 'AF', 18.0),
+        sheet.call('A3DVOJ18', 'GRP-A3DVOJ', 'DVOJ', 'ST', 18.0),
+        sheet.call('A3ENS18', 'GRP-A3ENS', 'ENS', 'XA', 18.0),
+        sheet.call('A3NOABS18', 'GRP-A3NOABS', 'NOABS', 'SM', 18.0)
+      ],
+      'edges' => [
+        edge.call('A3E_K009_PW_23X10', 'GRP-A3K009', 'K009', 'PW', 1.0, 23.0),
+        edge.call('A3E_5981_MG_23X10', 'GRP-A35981', '5981', 'MG', 1.0, 23.0),
+        edge.call('A3E_5981_AF_23X10', 'GRP-A35981', '5981', 'AF', 1.0, 23.0),
+        edge.call('A3E_DVOJ_15', 'GRP-A3DVOJ', 'DVOJ', 'ST', 1.5, 23.0)
+      ]
+    }
+  end
+
+  def a3_part_by_role(inst, role)
+    inst.definition.entities.grep(Sketchup::ComponentInstance)
+        .find { |i| e::Store.kind(i) == 'part' && e::Store.get(i, 'role').to_s == role }
+  end
+
+  def run_2a3(model)
+    tmp = File.join(Dir.tmpdir, "noxun_2a3_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(a3_catalog_json))
+    e::Materials.test_dir_override = tmp
+    e::Materials.reload!
+    rules_path = e::AbsRules.path
+    rules_before = File.exist?(rules_path) ? File.binread(rules_path) : nil
+    begin
+      ok('2A-3: override katalogu aktivny + marker SCHEMA 2',
+         e::Materials.path == File.join(tmp, 'materials.json') &&
+         e::Materials.catalog_schema == 2 && !e::Materials.sheet('A3KORP18').nil?)
+
+      # 1) korpus + celo: pasky SPRAVNEJ struktury (telo PW, celo 5981 MG)
+      inst = e::CabinetBuilder.build(model, {
+        'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0,
+        'thickness' => 18.0, 'material_id' => 'A3KORP18',
+        'front_material_id' => 'A35981MG18', 'fronts' => '1'
+      })
+      side = a3_part_by_role(inst, 'side_left')
+      scfg = e::Store.config(side) || {}
+      ok('2A-3: bok dostal pasku struktury PW (skupina tela)',
+         (scfg['edges'] || {})['L1'] == 'A3E_K009_PW_23X10')
+      front = a3_part_by_role(inst, 'front_door')
+      fcfg = e::Store.config(front) || {}
+      ok('2A-3: celo dostalo 4x pasku PRESNE svojej struktury MG',
+         %w[L1 L2 W1 W2].all? { |c| (fcfg['edges'] || {})[c] == 'A3E_5981_MG_23X10' })
+
+      # 2) 5981: dve 23/1 roznych struktur sa NIKDY nemiesaju — prepnutie cela
+      #    MG -> AF preladi pravidlove hrany vyhradne na AF pasku
+      p2 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+      p2['front_material_id'] = 'A35981AF18'
+      e::CabinetBuilder.rebuild(model, inst, p2)
+      front2 = a3_part_by_role(inst, 'front_door')
+      f2cfg = e::Store.config(front2) || {}
+      ok('2A-3: celo po zmene MG -> AF nesie vyhradne AF pasku (struktury sa nemiesaju)',
+         %w[L1 L2 W1 W2].all? { |c| (f2cfg['edges'] || {})[c] == 'A3E_5981_AF_23X10' })
+
+      # 3) dvojka fallback 1,5 az do KONTROLY (ORANGE): docasne pravidlo
+      #    side_left L1 = 2,0 nad skupinou, ktora ma LEN 1,5
+      rules = e::AbsRules.load
+      rules['side_left'] = { 'L1' => 2.0 }
+      e::AbsRules.write(rules)
+      inst3 = e::CabinetBuilder.build(model, {
+        'type' => 'lower', 'width' => 500.0, 'height' => 720.0, 'depth' => 510.0,
+        'thickness' => 18.0, 'material_id' => 'A3DVOJ18'
+      })
+      cid3 = e::Store.get(inst3, 'cabinet_id').to_s
+      side3 = a3_part_by_role(inst3, 'side_left')
+      s3cfg = e::Store.config(side3) || {}
+      ok('2A-3: dvojka rozriesena na 1,5 pasku skupiny (resolver fallback)',
+         (s3cfg['edges'] || {})['L1'] == 'A3E_DVOJ_15')
+      c3cfg = e::Store.config(inst3) || {}
+      w3 = Array(c3cfg['warnings'])
+      ok('2A-3: config korpusu nesie warning abs_15_fallback s part_key boku',
+         w3.any? { |w| w['code'] == 'abs_15_fallback' && w['part_key'] == 'cabinet/side:left' })
+      smap = e::Materials.sheets.each_with_object({}) { |s, o| o[s['material_id']] = s }
+      val3 = e::Validation.run(e::Bom.collect(model), sheets: smap)
+      item3 = val3['items'].find do |i|
+        i['category'] == 'build' && i['owner_id'] == cid3 &&
+          i['stable_key'].include?('abs_15_fallback')
+      end
+      ok('2A-3: dvojka fallback 1,5 viditelny v KONTROLE (ORANGE)',
+         !item3.nil? && item3['severity'] == 'orange' && item3['part_key'] == 'cabinet/side:left')
+
+      # 4) ensure vytvori 23/1 so strukturou dosky (skupina ENS bez pasok)
+      st4, aid4 = e::Materials.ensure_edge_for_sheet('A3ENS18', client_schema: 2)
+      rec4 = e::Materials.edge(aid4)
+      ok('2A-3: ensure vytvoril 23/1 so strukturou dosky + group_id skupiny',
+         st4 == :created && !rec4.nil? && (rec4['width'].to_f - 23.0).abs < 0.01 &&
+         (rec4['thickness'].to_f - 1.0).abs < 0.01 && rec4['structure'] == 'XA' &&
+         rec4['group_id'] == 'GRP-A3ENS')
+
+      # 5) warning DOSKY prezije retaz config -> Bom.collect -> Validation.run
+      board = e::BoardBuilder.build(model, { 'material_id' => 'A3NOABS18',
+                                             'length' => 400.0, 'width' => 300.0 })
+      bid5 = e::Store.get(board, 'id').to_s
+      bcfg5 = e::Store.config(board) || {}
+      ok('2A-3: doska nad skupinou bez pasok nesie warning abs_structure_missing v configu',
+         Array(bcfg5['warnings']).any? { |w| w['code'] == 'abs_structure_missing' })
+      col5 = e::Bom.collect(model)
+      ok('2A-3: Bom.collect zbiera warnings aj z dosky (board vetva)',
+         col5[:warnings].any? { |w| w['code'] == 'abs_structure_missing' && w['owner_id'] == bid5 })
+      val5 = e::Validation.run(col5, sheets: smap)
+      ok('2A-3: warning dosky je ORANGE polozka KONTROLY',
+         val5['items'].any? do |i|
+           i['category'] == 'build' && i['owner_id'] == bid5 &&
+             i['stable_key'].include?('abs_structure_missing') && i['severity'] == 'orange'
+         end)
+    ensure
+      if rules_before
+        File.binwrite(rules_path, rules_before)
+      else
+        begin
+          File.delete(rules_path) if File.exist?(rules_path)
+        rescue StandardError
+          nil
+        end
+      end
+      e::AbsRules.reload!
+      e::Materials.test_dir_override = nil
+      e::Materials.reload!
+      cleanup(model)
+      begin
+        FileUtils.rm_rf(tmp)
+      rescue StandardError
+        nil
+      end
+    end
+    ok('2A-3: cleanup (override prec, pravidla vratene, model prazdny)',
+       e::Materials.test_dir_override.nil? && cabinets(model).empty? && boards(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: 2A-3 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    e::Materials.test_dir_override = nil
+    e::Materials.reload!
+    cleanup(model)
+  end
+
   # --- D-40: selection eventy po builde musia zit (DC observer pasca) --------
   # Bug: zapis dynamic_attributes (scaletool) v operacii, ktora VYTVARA definiciu/
   # instanciu, pri commite cez DC extension observer vypne dorucovanie selection
@@ -1885,6 +2072,7 @@ module NoxunSuRunner
     run_d45(model)           # D-45: hrubka <-> material tela (18,6 mm deadlock)
     run_d46(model)           # D-46: projektova predvolba korpusu s inou hrubkou (potvrdenie)
     run_2a2(model)           # 2A-2: migracia katalogu na SCHEMA 2 (izolovany katalog cez override)
+    run_2a3(model)           # 2A-3: vyberove cesty ABS so strukturou (SCHEMA 2 sandbox katalog)
     run_d40(model)           # D-40: selection eventy po builde (DC observer pasca)
     run_async(model, nil)
   rescue StandardError => ex
