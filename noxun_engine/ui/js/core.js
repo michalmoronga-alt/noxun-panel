@@ -380,6 +380,8 @@
       // catalogSchemaNow: GH #91 P2 — modal callbacky posielaju client schemu
       // (server ensure inak drzi legacy default a v SCHEMA 2 odmietne tvorbu).
       identityNorm: identityNorm, catalogSchemaOf: catalogSchemaOf,
+      // (testovaci export; runtime callbacky citaju PRIAMO global konstantu —
+      // GH #91 kolo 3: window.NX stavia bridge.js a tuto vlastnost nema)
       catalogSchemaNow: catalogSchemaNow, PANEL_CLIENT_SCHEMA: PANEL_CLIENT_SCHEMA,
       groupAbsEdgesV2: groupAbsEdgesV2, groupAbsForSheet: groupAbsForSheet,
       absUsableExistsV2: absUsableExistsV2, absUsableForSheet: absUsableForSheet,

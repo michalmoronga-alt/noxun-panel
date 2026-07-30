@@ -33,3 +33,5 @@ jobs:
         run: node tests/js/test_decor_formats.js
       - name: JS testy (potvrdzovacia lista projektovej predvolby D-46)
         run: node tests/js/test_proj_confirm.js
+      - name: JS testy — abs mirror (2A-3b)
+        run: node tests/js/test_abs_mirror.js

@@ -289,8 +289,13 @@ module Noxun
       def add_decor_batch(attrs)
         batch_schema = (attrs['batch_schema'] || attrs[:batch_schema]).to_i
         if catalog_schema >= SCHEMA_GROUPS
-          unless batch_schema >= 3
+          # GH #91 P2 (3. kolo): PRESNE 3 — buducu schemu 4 nesmieme "ciastocne"
+          # interpretovat ako v3 (nove polia by sa ticho ignorovali).
+          if batch_schema < 3
             return [false, 'Katalóg je v novom formáte — obnov okno „Materiály“ a skús znova.']
+          end
+          if batch_schema > 3
+            return [false, 'Dávka je v novšom formáte, než tento katalóg podporuje — obnov okno „Materiály“.']
           end
           return add_decor_batch_v3(attrs)
         end

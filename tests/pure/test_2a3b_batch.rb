@@ -426,3 +426,12 @@ NxTest.test('2a3b: GH P1 kolo 2 — ensure RMW pod zamkom vidi cerstvy obsah (cu
     NxTest.assert_equal('ABS_CUDZIA_ENS', abs_id)
   end
 end
+
+NxTest.test('2a3b: GH P2 kolo 3 — batch_schema 4 sa odmieta (ziadna ciastocna interpretacia ako v3)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  b3_with_catalog([], []) do
+    ok, err = B3MAT.add_decor_batch(b3_attrs('batch_schema' => 4))
+    NxTest.refute(ok, 'buduca schema davky sa nesmie tvarit ako v3')
+    NxTest.assert(err.include?('novšom formáte'), err.to_s)
+  end
+end
