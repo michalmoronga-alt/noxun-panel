@@ -19,7 +19,10 @@
 #     (projektova predvolba korpusu s inou hrubkou: ponuka -> potvrdenie -> 1 undo
 #     krok, blokujuce dielce, zastaraly suhlas); V0.4.7b sync-board sekcia
 #     (build/rebuild/undo/dedup samostatnej dosky, standard 8.3); D-35 sync-abs
-#     sekcia (bulk olepenie 4 hran = 1 undo, echo guardy, no-op bez ABS variantu).
+#     sekcia (bulk olepenie 4 hran = 1 undo, echo guardy, no-op bez ABS variantu);
+#     2A-2 sekcia (migracia katalogu na SCHEMA 2 nad IZOLOVANYM katalogom cez
+#     Materials.test_dir_override — dry_run/ostry beh, rebuild, BOM, semafor
+#     abs_missing, remap; realny %APPDATA% katalog sa necita ani nezapisuje).
 #   ASYNC cast — retaz UI.start_timer krokov (observer debounce = 0.2 s):
 #     S1 scale -> absorpcia -> Ctrl+Z (audit riziko: re-absorpcia po undo)
 #     S2 kopia -> observer dedup -> Ctrl+Z (audit riziko: zapis ID mimo operacie)
@@ -32,6 +35,7 @@
 # timer po skonceni testu vykonal dedup/prune nekontrolovane) + purge_unused.
 
 require 'tmpdir'
+require 'fileutils'
 
 module NoxunSuRunner
   OUT = (ENV['NOXUN_SU_OUT'] && !ENV['NOXUN_SU_OUT'].empty? ? ENV['NOXUN_SU_OUT'] : File.join(Dir.tmpdir, 'noxun_su_result.txt'))
@@ -1345,6 +1349,117 @@ module NoxunSuRunner
     log_line("INFO: D-46 cleanup katalogu: #{ex.class}: #{ex.message}")
   end
 
+  # --- SYNC-2A2: migracia katalogu na SCHEMA 2 nad IZOLOVANYM katalogom -------
+  # Cely scenar bezi cez Materials.test_dir_override (docasny priecinok s legacy
+  # fixture) — REALNY %APPDATA% katalog sa NIKDY necita ani nezapisuje; overuje
+  # sa len, ze override cesta je aktivna. Override sa VZDY vracia na nil
+  # (aj vo FAIL vetve) + Materials.reload!, inak by dalsie sekcie citali cudzi
+  # katalog. Tok: fixture -> korpus + doska so starymi ID -> dry_run (subor
+  # nedotknuty) -> ostra migracia -> rebuild + BOM + semafor (RED abs_missing
+  # LEN pre zmazanu pasku) -> remap_edges nad novym dekorom -> cleanup.
+
+  A2_FIXTURE = File.expand_path('../fixtures/materials_legacy_v1.json', __dir__)
+
+  def run_2a2(model)
+    unless File.exist?(A2_FIXTURE)
+      return info("2A-2: fixture #{A2_FIXTURE} chyba — sekcia preskocena")
+    end
+    tmp = File.join(Dir.tmpdir, "noxun_2a2_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    fixture = File.binread(A2_FIXTURE)
+    File.binwrite(File.join(tmp, 'materials.json'), fixture)
+    e::Materials.test_dir_override = tmp
+    e::Materials.reload!
+    begin
+      ok('2A-2: override cesty katalogu je aktivny (realny katalog sa nedotkne)',
+         e::Materials.path == File.join(tmp, 'materials.json') &&
+         e::Materials.sheet('K009_PW_DTDL_18') != nil)
+
+      # korpus so starym ID + rucne ABS overridy (jedna hrana na pasku, ktoru
+      # migracia zmaze) + samostatna doska so starym ID
+      inst = e::CabinetBuilder.build(model, {
+        'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0,
+        'thickness' => 18.0, 'material_id' => 'K009_PW_DTDL_18',
+        'part_overrides' => {
+          'cabinet/side:left'  => { 'edges' => { 'L1' => 'ABS_K009_10' } },
+          'cabinet/side:right' => { 'edges' => { 'L1' => 'ABS_PRACOVNA_DOSKA_10' } }
+        }
+      })
+      board = e::BoardBuilder.build(model, { 'material_id' => 'K009_PW_DTDL_18',
+                                             'length' => 400.0, 'width' => 300.0,
+                                             'edges' => { 'L1' => 'ABS_K009_10' } })
+      ok('2A-2: korpus + doska so starymi ID stoja', !inst.nil? && !board.nil?)
+
+      before = File.binread(e::Materials.path)
+      rep_dry = e::Materials.migrate_to_schema2!(dry_run: true)
+      ok("2A-2: dry_run report ok (skupiny #{rep_dry[:groups].length}, mazane #{rep_dry[:deleted].inspect})",
+         rep_dry[:status] == :ok && rep_dry[:groups].length == 9 &&
+         rep_dry[:deleted] == ['ABS_PRACOVNA_DOSKA_10'] &&
+         rep_dry[:retyped] == ['HALIFAX_TABAKOVY_PD_DTDL_38'])
+      ok('2A-2: dry_run subor bajtovo nezmenil (ani zalohu nevytvoril)',
+         File.binread(e::Materials.path).b == before.b &&
+         !File.exist?(e::Materials.pre_schema2_backup_path))
+      ok('2A-2: dry_run report vie o pouziti mazanej pasky v modeli (O7 varovanie)',
+         rep_dry[:warnings].any? { |w| w.include?('ABS_PRACOVNA_DOSKA_10') })
+
+      rep = e::Materials.migrate_to_schema2!
+      ok("2A-2: ostra migracia presla (#{rep[:status].inspect})", rep[:status] == :ok)
+      e::Materials.reload!
+      ok('2A-2: katalog nesie SCHEMA 2 + predmigracna zaloha je bajtova kopia povodiny',
+         e::Materials.catalog_schema == 2 &&
+         File.binread(e::Materials.pre_schema2_backup_path).b == fixture.b)
+      k18 = e::Materials.sheet('K009_PW_DTDL_18')
+      ke = e::Materials.edge('ABS_K009_10')
+      ok('2A-2: K009 zachovane ID, spolocny group_id dosky a pasky, dekor K009/PW',
+         !k18.nil? && !ke.nil? && k18['group_id'].to_s.start_with?('GRP-') &&
+         k18['group_id'] == ke['group_id'] && k18['decor'] == 'K009' && k18['structure'] == 'PW')
+      ok('2A-2: zmazana paska uz v katalogu nie je',
+         e::Materials.edge('ABS_PRACOVNA_DOSKA_10').nil?)
+
+      # rebuild korpusu nad SCHEMA 2 katalogom — stare ID funguju dalej
+      p2 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+      e::CabinetBuilder.rebuild(model, inst, p2)
+      cfg = e::Store.config(inst) || {}
+      ok('2A-2: rebuild po migracii OK a material drzi povodne ID',
+         inst.valid? && cfg['material_id'] == 'K009_PW_DTDL_18')
+
+      collected = e::Bom.collect(model)
+      mats = collected[:records].map { |r| r['material_id'] }.uniq
+      ok('2A-2: BOM cita zachovane ID dielcov aj dosky', mats.include?('K009_PW_DTDL_18'))
+      smap = e::Materials.sheets.each_with_object({}) { |s, out| out[s['material_id']] = s }
+      emap = e::Materials.edges.each_with_object({}) { |a, out| out[a['abs_id']] = a }
+      control = e::Validation.run(collected, sheets: smap, edges: emap)
+      missing = control['items'].select { |i| i['category'] == 'abs_missing' }
+      ok('2A-2: semafor RED abs_missing PRESNE pre zmazanu pasku (side:right)',
+         missing.length == 1 && missing.first['severity'] == 'red' &&
+         missing.first['message_sk'].include?('ABS_PRACOVNA_DOSKA_10') &&
+         missing.first['part_key'] == 'cabinet/side:right')
+      ok('2A-2: ziadny RED material pre zachovane ID',
+         control['items'].none? { |i| i['category'] == 'material' })
+
+      # remap_edges nad migrovanym katalogom (nove dekory skupin)
+      remapped, lost = e::Materials.remap_edges({ 'L1' => 'ABS_K009_10' }, 'K009', 'U750', 18.0)
+      ok('2A-2: remap_edges bezi nad novymi dekormi (K009 -> U750 23/1)',
+         !remapped.nil? && remapped['L1'] == 'ABS_U750_ST9_TAUPE_SEDA_23X10' && lost.empty?)
+    ensure
+      e::Materials.test_dir_override = nil
+      e::Materials.reload!
+      cleanup(model)
+      begin
+        FileUtils.rm_rf(tmp)
+      rescue StandardError
+        nil
+      end
+    end
+    ok('2A-2: cleanup (override prec, realny katalog cita zas z APPDATA)',
+       e::Materials.test_dir_override.nil? && cabinets(model).empty? && boards(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: 2A-2 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    e::Materials.test_dir_override = nil
+    e::Materials.reload!
+    cleanup(model)
+  end
+
   # --- D-40: selection eventy po builde musia zit (DC observer pasca) --------
   # Bug: zapis dynamic_attributes (scaletool) v operacii, ktora VYTVARA definiciu/
   # instanciu, pri commite cez DC extension observer vypne dorucovanie selection
@@ -1763,6 +1878,7 @@ module NoxunSuRunner
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_d45(model)           # D-45: hrubka <-> material tela (18,6 mm deadlock)
     run_d46(model)           # D-46: projektova predvolba korpusu s inou hrubkou (potvrdenie)
+    run_2a2(model)           # 2A-2: migracia katalogu na SCHEMA 2 (izolovany katalog cez override)
     run_d40(model)           # D-40: selection eventy po builde (DC observer pasca)
     run_async(model, nil)
   rescue StandardError => ex

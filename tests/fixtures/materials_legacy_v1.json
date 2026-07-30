@@ -1,0 +1,351 @@
+{
+  "std": 1,
+  "sheets": [
+    {
+      "material_id": "K009_PW_DTDL_18",
+      "family": "Kronospan K009 PW",
+      "manufacturer": "Kronospan",
+      "decor": "K009 PW",
+      "type": "DTDL",
+      "thickness": 18.0,
+      "grain": "length",
+      "price_per_m2": 12.5,
+      "sheet_size": [
+        2800.0,
+        2070.0
+      ],
+      "color": [
+        198,
+        168,
+        122
+      ],
+      "production_class": "sheet"
+    },
+    {
+      "material_id": "K009_PW_DTDL_16",
+      "family": "Kronospan K009 PW",
+      "manufacturer": "Kronospan",
+      "decor": "K009 PW",
+      "type": "DTDL",
+      "thickness": 16.0,
+      "grain": "length",
+      "price_per_m2": 11.8,
+      "sheet_size": [
+        2800.0,
+        2070.0
+      ],
+      "color": [
+        198,
+        168,
+        122
+      ],
+      "production_class": "sheet"
+    },
+    {
+      "material_id": "HDF_WHITE_3",
+      "family": "HDF biela",
+      "manufacturer": "Kronospan",
+      "decor": "Biela HDF",
+      "type": "HDF",
+      "thickness": 3.0,
+      "grain": "none",
+      "price_per_m2": 3.2,
+      "sheet_size": [
+        2800.0,
+        2070.0
+      ],
+      "color": [
+        238,
+        236,
+        230
+      ],
+      "production_class": "sheet"
+    },
+    {
+      "material_id": "W1000_DTDL_18",
+      "family": "Egger W1000 ST9",
+      "manufacturer": "Egger",
+      "decor": "W1000 ST9 Biela",
+      "type": "DTDL",
+      "thickness": 18.0,
+      "grain": "none",
+      "price_per_m2": 13.9,
+      "sheet_size": [
+        2800.0,
+        2070.0
+      ],
+      "color": [
+        246,
+        246,
+        244
+      ],
+      "production_class": "sheet"
+    },
+    {
+      "material_id": "HALIFAX_TABAKOVY_PD_DTDL_38",
+      "family": "",
+      "manufacturer": "",
+      "decor": "Halifax Tabakový PD ",
+      "type": "DTDL",
+      "thickness": 38.0,
+      "grain": "length",
+      "price_per_m2": 0.0,
+      "sheet_size": [
+        4200.0,
+        600.0
+      ],
+      "color": [
+        156,
+        129,
+        79
+      ],
+      "production_class": "sheet"
+    },
+    {
+      "material_id": "BIELA_KORPUS_DTDL_18",
+      "family": "",
+      "manufacturer": "",
+      "decor": "Biela korpus",
+      "type": "DTDL",
+      "thickness": 18.0,
+      "grain": "none",
+      "price_per_m2": 0.0,
+      "sheet_size": [
+        2800.0,
+        2070.0
+      ],
+      "color": [
+        255,
+        255,
+        255
+      ],
+      "production_class": "sheet"
+    },
+    {
+      "material_id": "UNI_DTDL_18",
+      "family": "",
+      "manufacturer": "",
+      "decor": "UNI",
+      "type": "DTDL",
+      "thickness": 18.0,
+      "grain": "length",
+      "price_per_m2": 0.0,
+      "sheet_size": [
+        2800.0,
+        2070.0
+      ],
+      "color": [
+        162,
+        161,
+        217
+      ],
+      "production_class": "sheet"
+    },
+    {
+      "material_id": "U750_ST9_TAUPE_SEDA_DTDL_18",
+      "family": "Egger U750 ST9 Taupe šedá",
+      "manufacturer": "Egger",
+      "decor": "U750 ST9 Taupe šedá",
+      "type": "DTDL",
+      "thickness": 18.0,
+      "grain": "length",
+      "sheet_size": [
+        2800.0,
+        2070.0
+      ],
+      "color": [
+        199,
+        199,
+        199
+      ],
+      "production_class": "sheet",
+      "code": "175726",
+      "supplier": "Egger"
+    },
+    {
+      "material_id": "H1180_ST37_DUB_HALIFAX_PRIRODNY_DTDL_18P6",
+      "family": "Egger H1180 ST37 Dub Halifax prírodný",
+      "manufacturer": "Egger",
+      "decor": "H1180 ST37 Dub Halifax prírodný",
+      "type": "DTDL",
+      "thickness": 18.6,
+      "grain": "length",
+      "sheet_size": [
+        2800.0,
+        2070.0
+      ],
+      "color": [
+        216,
+        196,
+        160
+      ],
+      "production_class": "sheet",
+      "code": "275848"
+    },
+    {
+      "material_id": "5981_MG_CASHMERE_DTDL_18",
+      "family": "Kronospan 5981 MG Cashmere",
+      "manufacturer": "Kronospan",
+      "decor": "5981 MG Cashmere",
+      "type": "DTDL",
+      "thickness": 18.0,
+      "grain": "length",
+      "sheet_size": [
+        2800.0,
+        2050.0
+      ],
+      "color": [
+        201,
+        193,
+        182
+      ],
+      "production_class": "sheet",
+      "code": "473933"
+    }
+  ],
+  "edges": [
+    {
+      "abs_id": "ABS_K009_10",
+      "decor": "K009 PW",
+      "thickness": 1.0,
+      "price_per_bm": 0.55,
+      "color": [
+        198,
+        168,
+        122
+      ]
+    },
+    {
+      "abs_id": "ABS_K009_20",
+      "decor": "K009 PW",
+      "thickness": 2.0,
+      "price_per_bm": 0.85,
+      "color": [
+        198,
+        168,
+        122
+      ]
+    },
+    {
+      "abs_id": "ABS_PRACOVNA_DOSKA_10",
+      "decor": "Pracovna doska",
+      "thickness": 1.0,
+      "price_per_bm": 0.0,
+      "color": [
+        115,
+        115,
+        115
+      ]
+    },
+    {
+      "abs_id": "ABS_HALIFAX_TABAKOVY_10",
+      "decor": "Halifax Tabakový ",
+      "thickness": 1.0,
+      "price_per_bm": 0.0,
+      "color": [
+        216,
+        196,
+        160
+      ]
+    },
+    {
+      "abs_id": "ABS_BIELA_KORPUS_10",
+      "decor": "Biela korpus",
+      "thickness": 1.0,
+      "price_per_bm": 0.0,
+      "color": [
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "abs_id": "ABS_UNI_10",
+      "decor": "UNI",
+      "thickness": 1.0,
+      "price_per_bm": 0.0,
+      "color": [
+        161,
+        190,
+        217
+      ]
+    },
+    {
+      "abs_id": "ABS_U750_ST9_TAUPE_SEDA_23X10",
+      "decor": "U750 ST9 Taupe šedá",
+      "thickness": 1.0,
+      "color": [
+        199,
+        199,
+        199
+      ],
+      "width": 23.0
+    },
+    {
+      "abs_id": "ABS_U750_ST9_TAUPE_SEDA_43X20",
+      "decor": "U750 ST9 Taupe šedá",
+      "thickness": 2.0,
+      "color": [
+        199,
+        199,
+        199
+      ],
+      "width": 43.0
+    },
+    {
+      "abs_id": "ABS_H1180_ST37_DUB_HALIFAX_PRIRODNY_23X10",
+      "decor": "H1180 ST37 Dub Halifax prírodný",
+      "thickness": 1.0,
+      "color": [
+        216,
+        196,
+        160
+      ],
+      "width": 23.0
+    },
+    {
+      "abs_id": "ABS_H1180_ST37_DUB_HALIFAX_PRIRODNY_43X20",
+      "decor": "H1180 ST37 Dub Halifax prírodný",
+      "thickness": 2.0,
+      "color": [
+        216,
+        196,
+        160
+      ],
+      "width": 43.0
+    },
+    {
+      "abs_id": "ABS_5981_MG_CASHMERE_23X10",
+      "decor": "5981 MG Cashmere",
+      "thickness": 1.0,
+      "color": [
+        201,
+        193,
+        182
+      ],
+      "width": 23.0
+    },
+    {
+      "abs_id": "ABS_5981_MG_CASHMERE_43X10",
+      "decor": "5981 MG Cashmere",
+      "thickness": 1.0,
+      "color": [
+        201,
+        193,
+        182
+      ],
+      "width": 43.0
+    },
+    {
+      "abs_id": "ABS_5981_MG_CASHMERE_43X20",
+      "decor": "5981 MG Cashmere",
+      "thickness": 2.0,
+      "color": [
+        201,
+        193,
+        182
+      ],
+      "width": 43.0
+    }
+  ]
+}
