@@ -61,7 +61,23 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ## Otvorené otázky (na Michalovo posúdenie pri teste)
 
-*(momentálne žiadne)*
+### 2A migračná mapa (z tvojho ŽIVÉHO katalógu 30.7. — odklepni/uprav v chate)
+
+| Dnes (kľúč skupiny) | Po migrácii: výrobca · číslo · názov | Štruktúra variantov | Poznámka |
+|---|---|---|---|
+| K009 PW (Kronospan) | Kronospan · **K009** | PW | dosky 16+18 aj obe pásky |
+| Biela HDF (Kronospan) | Kronospan · **Biela HDF** | — | vlastný kľúč bez čísla/štruktúry |
+| W1000 ST9 Biela (Egger) | Egger · **W1000** · Biela | ST9 | |
+| U750 ST9 Taupe šedá (Egger) | Egger · **U750** · Taupe šedá | ST9 | |
+| H1180 ST37 Dub Halifax prírodný (Egger) | Egger · **H1180** · Dub Halifax prírodný | ST37 | |
+| 5981 MG Cashmere (Kronospan) | Kronospan · **5981** · Cashmere | MG | |
+| Biela korpus (vlastný) | vlastný · **Biela korpus** | — | |
+| UNI (vlastný) | vlastný · **UNI** | — | |
+| „Halifax Tabakový PD␣" (DTDL 38, 4200×600!) | **ZLÚČIŤ** do skupiny **Halifax Tabakový** ako variant **typ PD, 38 mm, 4200×600** | — | trailing space preč; typ DTDL→PD (bola obchádzka pred D-44) |
+| „Halifax Tabakový␣" (len ABS 1,0) | vlastný · **Halifax Tabakový** | — | trailing space preč; skupina spoločná s PD variantom vyššie |
+| Pracovna doska (len osirotená ABS páska) | **NAVRHUJEM ZMAZAŤ** (testovací zvyšok bez dosky) | — | alebo povedz, kam patrí |
+
+*(ID záznamov sa NEmenia — modely ostanú platné; menia sa len skupinové polia. Legacy „univerzálne" pásky bez šírky dostanú `universal` až keď ich tak označíš — default = neznáma štruktúra.)*
 
 ## Trvalé UI/UX pravidlo (Michal 20.7. — platí pre všetku ďalšiu prácu na paneli)
 

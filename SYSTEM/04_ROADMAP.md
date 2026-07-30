@@ -33,7 +33,20 @@ Plné pôvodné texty: [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_et
 
 ## Pred nami
 
-### V0.6 — Kovanie fáza 2 (katalóg a ceny) — štart ~28.7.
+### V0.6 — KATALÓGY A CENY (štart 30.7. dávkou 2A)
+
+**Dávka 2A — identita variantov a skupín (dizajn cez Codex audit 6B+7F+2N, 30.7.; štandard §7.1/§7.5 aktualizovaný — SCHEMA 2):**
+- **2A-0** dizajn do dokumentov (štandard, roadmapa, pojmy, migračná mapa) — *tento PR*
+- **2A-1** jadro identity: `group_id` na doskách aj ABS, `structure`/`decor_name` polia, kanonické identity helpery (group/sheet/edge_identity_key — jedna normalizácia), register kanonických typov (dvojvrstvové typy — rozhodnuté 30.7.), PD formát v identite + mutabilita, nové ID generovanie (opaque kontrakt), catalog SCHEMA marker + nemenná záloha `materials.pre-schema-2.json`, `catalog_schema` guard mutácií
+- **2A-2** migrácia: explicitná mapa (odklepnutá Michalom — katalóg je testovací) + heuristika len fallback s reportom, fail-safe (pri chybe žiadny seed fallback), fixtures testy, kompatibilita starých modelov = 1:1 zachovanie ID + lookup test (starý .skp → BOM/validácia/rebuild/remap)
+- **2A-3** výberové cesty so štruktúrou: ABS picker (presná štruktúra → `universal` príznak → nič+warning; NIKDY cross-structure), resolver obchodnej hrúbky (jednotka 0,8→1→1,2 · dvojka 2→1,5 s upozornením · 0,4 nikdy automaticky), pick_body_sheet/back preflight/remap/AbsRules/JS Odporúčané dostávajú štruktúru, batch schema 3
+- **2A-4** UI: štruktúra v labeloch/selectoch/hľadaní/výrobných výpisoch, karta skupiny (výrobca·číslo·názov + varianty per štruktúra), **D-47** hlavička panela (tlačidlo Materiály + konzistencia tabov — ikony, šírky)
+- Verzie: 0.5.4+ per PR; **0.6.0 až pri uzávere celej etapy V0.6**
+
+**Ďalšie dávky V0.6 (po 2A):**
+- **2B** duplák (D-43: „zdvojený z 18" cez `source_material_id` + multiplikátor — aj vo výrobnom snapshote) + zástena typ (dva dekory líce/rub)
+- **B** Demos lookup („zadaj kód" cez produktové stránky) · **C** kovanie katalóg (prevzatie z KOVANIE) · **D** mapovanie flagov→kódy · **E** ceny v sumári = prvá kompletná cenová ponuka (materiál+ABS+kovanie+VEPO/EN DANIELI sadzby; montáž = platne×5,8×sadzba s pravidlom zaokrúhlenia)
+- **Seed 2.0:** knižnica z najobjednávanejších materiálov z Gmailu (po 2A migrácii)
 
 - Prevzatie CatalogStore/search/Demos import z KOVANIE · mapovanie flagov na konkrétne kódy (pamätá sa) · ceny v sumári.
 - **Otvorená otázka (debata 24.7., rozpracovať pred štartom):** „zadaj kód → načítaj dáta" — demos-trade.sk má verejné vyhľadávanie (kód → 1 položka aj dekor → celá skupina s cenami bez loginu) + Konfigurátor cenníkov na Démos24Plus (hromadný export za loginom). Zvážiť hybrid: hromadný seed z cenníka + per-kód dohľadanie. Viď zápisník uzáveru. *(Pozn. 29.7.: /vyhledavani je v robots.txt disallowed — lookup pôjde cez produktové stránky.)*

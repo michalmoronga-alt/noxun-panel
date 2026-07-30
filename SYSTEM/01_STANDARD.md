@@ -368,19 +368,22 @@ Pravidlá sú **JSON dáta editovateľné cez dialóg Pravidlá kovania** (nie r
 
 ### 7.1 Materiálový katalóg — rodina vs. variant
 
-Materiál nie je SketchUp textúra. Je to katalógový záznam. Rozlišujeme:
+Materiál nie je SketchUp textúra. Je to katalógový záznam. Rozlišujeme (SCHEMA 2 — dávka 2A, 30.7.2026):
 
-- **Rodina** — napr. „Kronospan K009 PW".
-- **Variant** — **dekor + typ materiálu + hrúbka = samostatný výrobný materiál a samostatný kusovník.** `K009 PW / DTDL / 18 mm` a `K009 PW / DTDL / 16 mm` sú dva rôzne varianty, hoci majú rovnaký dekor.
+- **Skupina (dekor)** — obchodná identita vzoru: **výrobca + číslo dekoru + názov** (Kronospan · K009 · —; Egger · H1180 · Dub Halifax prírodný). Interná kotva skupiny je stabilné **`group_id`** — nesú ho dosky AJ ABS pásky (výrobca je len na skupine; samotné číslo nestačí — rovnaké číslo dvoch výrobcov sú dve rôzne skupiny). Pre vlastné/neznačkové materiály je „číslo" ľubovoľný názov („Biela korpus").
+- **Variant** — samostatný výrobný materiál a samostatný kusovník. **Identita variantu dosky = skupina + typ + hrúbka + štruktúra povrchu** (`structure` — ST9, PW, FP, MG…; voliteľná, trimovaná, porovnávaná case-insensitive s normalizovanými medzerami). **Pre typ PD navyše formát** (`sheet_size` ako usporiadaná dvojica dĺžka×šírka) — F800 PD 38 4100×600 a 4100×920 sú dva varianty. `K009/DTDL/18/PW` a `K009/DTDL/16/PW` sú dva varianty; `5981/DTDL/18/MG` a `5981/DTDL/18/BS` tiež (rovnaké rozmery, iný povrch).
+- **Typ** — dvojvrstvový: **kanonické typy** (DTDL · MDF · HDF · PD · Zástena · Kompakt) žijú v Ruby registri s parametrami (default formát, ponuka hrúbok, hranová logika/PD podtyp postforming|ABS rovná|kompakt, kandidát pre telo korpusu) + **„iný"** = voľný string s generickým správaním. Identita typu je case-insensitive.
 
 Záznam variantu:
 
 ```json
 {
   "material_id": "K009_PW_DTDL_18",
-  "family": "Kronospan K009 PW",
+  "group_id": "GRP-A1B2C3",
   "manufacturer": "Kronospan",
-  "decor": "K009 PW",
+  "decor": "K009",
+  "decor_name": "",
+  "structure": "PW",
   "type": "DTDL",
   "thickness": 18.0,
   "grain": "length",
@@ -394,6 +397,8 @@ Záznam variantu:
 ```
 
 Kusovník podľa materiálov sa delí podľa **material_id (variant) + hrúbka**.
+
+**Nemennosť ID a migrácia (2A):** `material_id`/`abs_id` sú **opaque a navždy nemenné** (modely sa viažu výhradne na ne — snapshot na entite drží ID, štandard 8.3); legacy ID s vloženou štruktúrou v texte sa NEparsujú. Nové ID zahŕňajú skupinu+štruktúru (+formát pri PD) len pre čitateľnosť. Migrácia na SCHEMA 2 beží raz: **nemenná záloha** `materials.pre-schema-2.json` (mimo bežného `.bak`, ktorý sa prepisuje) → transformácia podľa **explicitnej mapy** (heuristika len fallback s reportom; nerozhodnuteľné položky migráciu NEoznačia za hotovú) → atomický zápis so schema markerom; mutácie zo starých okien server po migrácii odmieta (`catalog_schema` v payloade). Ceny sa ukladajú **bez DPH** (zdroj s DPH sa prepočíta pri vstupe).
 
 **Dodávateľské polia (D-42):** `code` (dodávateľský/katalógový kód) a `supplier`
 (jeden **preferovaný** dodávateľ — vedomé rozhodnutie, žiadne pole ponúk) sú
@@ -410,17 +415,22 @@ odlišný stav od explicitnej `0.0`. Hromadné vytváranie cenu neukladá (dopln
 v katalógu); nečíselný vstup sa odmieta (nikdy tichá 0 z `to_f`). Cenová ponuka
 má na nezadané ceny upozorniť, nie ich rátať ako nulu.
 
-**Dekor = kľúč skupiny (D-41):** pole `decor` viaže materiály a ABS pásky do dekorovej
-skupiny (napr. `U702 ST9 Kašmírovo šedá: dosky 18/36 + ABS 22/1, 43/1`). Pravidlá:
+**Dekorová skupina (D-41 → SCHEMA 2 v 2A):** dosky a ABS pásky viaže do skupiny
+**`group_id`** (stabilný interný identifikátor; obchodná identita skupiny = výrobca +
+číslo dekoru + názov). Pravidlá:
 
-- Väzba beží cez **presnú (case-sensitive) zhodu** stringu `decor`; server ho pri každom
-  zápise **trimuje** (Ruby zhoda = JS zhoda).
-- **Near-match guard:** nový dekor, ktorý sa od existujúceho líši len veľkosťou písmen
+- Väzba beží cez `group_id` — nikdy cez textovú zhodu názvov; polia skupiny
+  (`manufacturer`, `decor`, `decor_name`) sa menia **atomicky pre celú skupinu**.
+- **Kanonické identity helpery:** `group_identity_key` / `sheet_identity_key` /
+  `edge_identity_key` sú JEDINÁ normalizácia (trim, case-insensitive, zrazené viacnásobné
+  medzery, hrúbky round(2)) používaná create/edit/batch/rename/migráciou — žiadne lokálne
+  porovnávania s vlastnou toleranciou.
+- **Near-match guard:** nová skupina, ktorá sa od existujúcej líši len veľkosťou písmen
   alebo medzerami, sa odmietne s návrhom presného tvaru (preklep nesmie rozbiť skupinu).
-- **Dekor je pri edite záznamu nemenný** — premenovanie je atomická akcia nad CELOU
-  skupinou (`rename_decor`: sheets + edges, 1 zápis; ID záznamov sa nemenia).
-- **Duplicitné variant identity sú zakázané** (sheet: dekor+typ+hrúbka; ABS:
-  dekor+šírka+hrúbka) — create aj rename ich odmietnu.
+- **Identita variantu je pri edite nemenná** (typ, hrúbka, štruktúra; pri PD aj formát —
+  jeho edit prejde atomickou kolíznou kontrolou identity) — iná hodnota = nový variant.
+- **Duplicitné variant identity sú zakázané** (sheet: skupina+typ+hrúbka+štruktúra, PD
+  +formát; ABS: skupina+šírka+hrúbka+štruktúra) — create, rename aj migrácia ich odmietnu.
 
 ### 7.2 Materiálové dedenie
 
@@ -454,13 +464,22 @@ Každý plošný dielec nesie hrany **per strana** ako dáta (nezávislé od viz
 "edges": { "L1": "ABS_K009_10", "L2": null, "W1": "ABS_K009_10", "W2": "ABS_K009_10" }
 ```
 
-- Hodnota strany = `null` (bez hrany) alebo **ABS variant ID** (`ABS_K009_10` = dekor + hrúbka ABS; sufix `_10`/`_20` = 1,0/2,0 mm — formát reálneho katalógu `materials.rb`).
-- Podporované výrobné hrúbky ABS sú výhradne **1,0 mm a 2,0 mm**.
-- **Šírka pásky (D-41):** voliteľné pole `width` (mm, 10–200) — ABS variant = **dekor +
-  šírka + hrúbka** (`22/1`, `43/1`, `43/2`; ID napr. `ABS_U702_ST9_22X10`). Záznam bez
-  šírky = legacy „univerzálna" páska. Výber pásky pre dielec (deterministický picker,
-  tie-break `abs_id`): najmenšia šírka ≥ hrúbka dielca + 2 mm → univerzálna → žiadna
-  (**nikdy užšia páska než dielec**). Šírka je pri edite nemenná (identita variantu).
+- Hodnota strany = `null` (bez hrany) alebo **ABS variant ID** (opaque, navždy nemenné —
+  legacy formáty `ABS_K009_10`, `ABS_U702_ST9_22X10` ostávajú platné bez parsovania).
+- **Obchodné hrúbky ABS (2A):** povolené sú reálne hodnoty **{0,4 · 0,8 · 1,0 · 1,2 ·
+  1,5 · 2,0} mm** (koniec nominálov 1/2-only). Pravidlá rolí ostávajú NOMINÁLNE
+  („jednotka"/„dvojka"); **resolver obchodnej hrúbky** ich prekladá na dostupné pásky
+  skupiny: jednotka = 0,8 → 1,0 → 1,2 (podľa toho, čo dekor má — lesklé MG majú len 1,0);
+  dvojka = 2,0 (→ 1,5 s viditeľným upozornením). **0,4 sa nikdy nevyberá automaticky.**
+- **Šírka pásky (D-41):** voliteľné pole `width` (mm, 10–200); auto-šírky {23, 43}.
+  Výber šírky (deterministický, tie-break `abs_id`): najmenšia šírka ≥ hrúbka dielca +
+  2 mm → univerzálna → žiadna (**nikdy užšia páska než dielec**).
+- **Štruktúra povrchu (2A):** `structure` je súčasť identity ABS variantu (5981 má DVE
+  rôzne 23/1 pásky — MG vs UM/AF). Picker pásky **NIKDY neprechádza cez štruktúry
+  automaticky**: presná zhoda štruktúry s doskou → páska s explicitným príznakom
+  **`universal: true`** (vedomé označenie „pasuje na všetko" — prázdna štruktúra ho
+  NEnahrádza, prázdna = neznáma) → žiadna páska + upozornenie semaforu.
+- Identita ABS variantu (skupina+šírka+hrúbka+štruktúra) je pri edite nemenná.
   Pre VEPO je šírka nepodstatná (hotové rozmery) — význam má pre kusovník a cenovú ponuku.
 - **Dodávateľské polia a cena (D-42):** ABS páska nesie voliteľné `code` + `supplier`
   a cenu `price_per_bm` s rovnakou sémantikou ako doska (7.1): chýbajúca cena =
