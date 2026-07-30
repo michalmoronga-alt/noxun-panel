@@ -58,9 +58,7 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 | Falco | Y121 FS01 | Biela hladká | DTDL 18 | — (bez DK) | dodávateľ? |
 | Kastamonu | A860 PS29 | Dub Korona | DTDL 18 | — (bez DK) | formát overiť |
 
-## Otvorené otázky (na Michalovo posúdenie pri teste)
-
-### 2A migračná mapa (z tvojho ŽIVÉHO katalógu 30.7. — odklepni/uprav v chate)
+## 2A migračná mapa — ✅ SCHVÁLENÁ, kanonický podklad pre 2A-2 (Michal 30.7.: „mapa OK — Pracovná doska zmaž, Halifax zlúč")
 
 | Dnes (kľúč skupiny) | Po migrácii: výrobca · číslo · názov | Štruktúra variantov | Poznámka |
 |---|---|---|---|
@@ -74,9 +72,13 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 | UNI (vlastný) | vlastný · **UNI** | — | |
 | „Halifax Tabakový PD␣" (DTDL 38, 4200×600!) | **ZLÚČIŤ** do skupiny **Halifax Tabakový** ako variant **typ PD, 38 mm, 4200×600** | — | trailing space preč; typ DTDL→PD (bola obchádzka pred D-44) |
 | „Halifax Tabakový␣" (len ABS 1,0) | vlastný · **Halifax Tabakový** | — | trailing space preč; skupina spoločná s PD variantom vyššie |
-| Pracovna doska (len osirotená ABS páska) | **NAVRHUJEM ZMAZAŤ** (testovací zvyšok bez dosky) | — | alebo povedz, kam patrí |
+| Pracovna doska (len osirotená ABS páska) | **ZMAZAŤ — SCHVÁLENÉ** (testovací zvyšok bez dosky) | — | jediné zmazané ID migrácie |
 
-*(ID záznamov sa NEmenia — modely ostanú platné; menia sa len skupinové polia. Legacy „univerzálne" pásky bez šírky dostanú `universal` až keď ich tak označíš — default = neznáma štruktúra.)*
+*(ID záznamov sa NEmenia — s výnimkou schváleného zmazania vyššie ostanú modely platné; menia sa len skupinové polia. Legacy „univerzálne" pásky bez šírky dostanú `universal` až keď ich tak označíš — default = neznáma štruktúra.)*
+
+## Otvorené otázky (na Michalovo posúdenie pri teste)
+
+*(momentálne žiadne)*
 
 ## Trvalé UI/UX pravidlo (Michal 20.7. — platí pre všetku ďalšiu prácu na paneli)
 
