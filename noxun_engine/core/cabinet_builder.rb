@@ -332,6 +332,25 @@ module Noxun
               abs_issues << it.merge(part_key: part_key, name: pd[:name].to_s)
             end
           end
+          # Codex GH #90 P1: sticky remapove dovody overridov (edge_warnings od
+          # remap_part_edge_overrides!) — platia, kym hodnota hrany zodpoveda
+          # zaznamu (uspesny fallback drzi svoje abs_id, stratena hrana nil);
+          # uzivatelova zmena hrany zaznam zneplatni a TU sa aj uprace (prune
+          # in-place — override hash ide do configu, upratanie prezije rebuild).
+          ew = ov['edge_warnings']
+          if ew.is_a?(Hash)
+            ew.keys.each do |code|
+              entry = ew[code]
+              want = entry.is_a?(Hash) ? entry['abs_id'] : nil
+              if ov_edges.key?(code) && ov_edges[code] == want
+                abs_issues << { code: code, reason: entry['reason'].to_s,
+                                part_key: part_key, name: pd[:name].to_s } if abs_issues
+              else
+                ew.delete(code)
+              end
+            end
+            ov.delete('edge_warnings') if ew.empty?
+          end
           edges = base_edges.merge(known_edges(ov_edges))
           grain = sheet && sheet['grain'].to_s
           grain = 'none' unless %w[length width none].include?(grain)
@@ -585,16 +604,30 @@ module Noxun
             target = new_sheet ? new_sheet['thickness'].to_f : pd[:prod][:thickness].to_f
             target = target.positive? ? target : nil
             if schema2
-              remapped, notes = Materials.remap_edges_v2(rec['edges'], Materials.sheet(old_mat),
-                                                         new_sheet, target)
-              lost = notes.map { |n| "#{n[:code]}#{lost_suffix(n[:reason])}" }
+              remapped, issues = Materials.remap_edges_v2(rec['edges'], Materials.sheet(old_mat),
+                                                          new_sheet, target)
+              lost = issues.reject { |n| n[:abs_id] }
+                           .map { |n| "#{n[:code]}#{lost_suffix(n[:reason])}" }
             else
               remapped, lost = Materials.remap_edges(
                 rec['edges'], Materials.decor_of(old_mat), new_sheet && new_sheet['decor'], target
               )
+              issues = []
             end
             next unless remapped
             rec['edges'] = remapped
+            # Codex GH #90 P1: remapove dovody (stratena hrana AJ uspesny 1,5
+            # fallback) sa ZAPISU k overridu — resolve_part ich emituje do
+            # KONTROLY, kym hodnota hrany zodpoveda zaznamu (stale_edge_warning?);
+            # uzivatelova zmena hrany ich prirodzene zmaze. Prazdny vysledok
+            # kluc odstrani (config bez zbytocnych poli).
+            if issues.empty?
+              rec.delete('edge_warnings')
+            else
+              rec['edge_warnings'] = issues.each_with_object({}) do |n, m|
+                m[n[:code]] = { 'reason' => n[:reason].to_s, 'abs_id' => n[:abs_id] }
+              end
+            end
             result['changed'] += 1
             lost.each { |code| result['lost'] << "#{pd[:name] || rk} #{code}" }
           end
@@ -1000,6 +1033,23 @@ module Noxun
                 e[k] = v # nil (bez ABS) alebo podporovane abs_id
               end
               rec['edges'] = e unless e.empty?
+            end
+            # Codex GH #90 P1: sticky remapove dovody (remap_part_edge_overrides!)
+            # musia prezit normalize round-trip — bez passthrough by ich kazdy
+            # rebuild zahodil. Sanitizacia: zname hrany, neprazdny reason,
+            # abs_id string alebo nil (lost).
+            ew = ov['edge_warnings'] || ov[:edge_warnings]
+            if ew.is_a?(Hash)
+              w = {}
+              %w[L1 L2 W1 W2].each do |k|
+                entry = ew[k] || ew[k.to_sym]
+                next unless entry.is_a?(Hash)
+                reason = (entry['reason'] || entry[:reason]).to_s
+                next if reason.empty?
+                w[k] = { 'reason' => reason,
+                         'abs_id' => present(entry['abs_id'] || entry[:abs_id]) }
+              end
+              rec['edge_warnings'] = w unless w.empty?
             end
             out[key.to_s] = rec unless rec.empty?
           end

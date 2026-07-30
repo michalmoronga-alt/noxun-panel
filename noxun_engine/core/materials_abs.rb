@@ -178,7 +178,11 @@ module Noxun
       # Ak sa skupina ANI struktura nemenia, pasky ostavaju kompatibilne
       # a rucny vyber sirky/hrubky sa NEPREPISUJE (verny ekvivalent stareho
       # "rovnaky dekor = nic na prevod").
-      # Vrati [nova_mapa alebo nil (nic na prevod), lost = [{code:, reason:}]].
+      # Vrati [nova_mapa alebo nil (nic na prevod), issues]:
+      #   {code:, reason:}            = hrana BEZ nahrady (stratena)
+      #   {code:, reason:, abs_id:}   = USPESNA nahrada s dovodom (Codex GH #90
+      #     P1: dvojka rozriesena na 1,5 NESMIE zmiznut len preto, ze nahrada
+      #     uspela — fallback musi doputovat do statusu aj KONTROLY).
       def remap_edges_v2(edges_hash, old_sheet, new_sheet, target_thickness = nil)
         return [nil, []] unless edges_hash.is_a?(Hash) && old_sheet.is_a?(Hash) && new_sheet.is_a?(Hash)
         old_group = record_group_key(old_sheet, SCHEMA_GROUPS)
@@ -187,7 +191,7 @@ module Noxun
         return [nil, []] if same_group && old_st == identity_norm(new_sheet['structure'])
         out = edges_hash.dup
         changed = false
-        lost = []
+        issues = []
         out.each_key do |code|
           aid = out[code]
           next if aid.nil?
@@ -199,17 +203,21 @@ module Noxun
           next unless compatible
           klass = edge_thickness_class(rec['thickness'])
           if klass == :nula4
-            lost << { code: code, reason: REASON_ABS_04_MANUAL }
+            issues << { code: code, reason: REASON_ABS_04_MANUAL }
             out[code] = nil
             changed = true
             next
           end
           new_aid, why = abs_for_sheet(new_sheet, klass, target_thickness)
-          lost << { code: code, reason: why } if new_aid.nil?
+          if new_aid.nil?
+            issues << { code: code, reason: why }
+          elsif why
+            issues << { code: code, reason: why, abs_id: new_aid }
+          end
           out[code] = new_aid
           changed = true
         end
-        [changed ? out : nil, lost]
+        [changed ? out : nil, issues]
       end
 
       # Dekor doskoveho materialu (pre napojenie ABS na rovnaky dekor). nil ak material nie je v katalogu.

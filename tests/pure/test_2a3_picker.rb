@@ -455,10 +455,13 @@ NxTest.test('2a3: remap v2 — dvojka drzi triedu (2,0 -> 1,5 novej skupiny), un
   a3_with_catalog(sheets, edges, schema: 2) do
     old_s = A3MAT.sheet('OLD18')
     new_s = A3MAT.sheet('NEW18')
-    out, lost = A3MAT.remap_edges_v2({ 'L1' => 'EO20', 'W1' => 'EOUNI' }, old_s, new_s, 18.0)
+    out, issues = A3MAT.remap_edges_v2({ 'L1' => 'EO20', 'W1' => 'EOUNI' }, old_s, new_s, 18.0)
     NxTest.assert_equal('EN15', out['L1'], '2,0 -> dvojka novej skupiny (len 1,5)')
     NxTest.assert_equal('EN08', out['W1'], 'universal starej skupiny je kompatibilna — nasleduje material')
-    NxTest.assert_equal([], lost, '1,5 fallback nie je strata hrany')
+    # Codex GH #90 P1: uspesny fallback NIE JE strata, ale dovod NESMIE zmiznut —
+    # issue nesie abs_id vybranej pasky (odlisenie od lost, kde abs_id chyba).
+    NxTest.assert_equal([{ code: 'L1', reason: A3MAT::REASON_ABS_15, abs_id: 'EN15' }], issues,
+                        'uspesny 1,5 fallback ide do issues s abs_id')
   end
 end
 
@@ -510,7 +513,62 @@ NxTest.test('2a3: remap v2 cez remap_part_edge_overrides! — traversal so schem
     NxTest.assert_equal(1, result['lost'].length)
     NxTest.assert(result['lost'][0].include?('W1') && result['lost'][0].include?('0,4'),
                   "lost label nesie 0,4 dovetok (#{result['lost'].inspect})")
+    # Codex GH #90 P1: remapove dovody sa ZAPISU k overridu (sticky pre KONTROLU)
+    ew = params['part_overrides'][side]['edge_warnings']
+    NxTest.assert(ew.is_a?(Hash) && ew.key?('W1'), "edge_warnings nesie W1 (#{ew.inspect})")
+    NxTest.assert_equal({ 'reason' => 'abs_04_manual', 'abs_id' => nil }, ew['W1'])
+    NxTest.refute(ew.key?('L1'), 'uspesny vyber BEZ dovodu warning nedostava')
     _cfg = cfg
+  end
+end
+
+NxTest.test('2a3: sticky remap warnings — resolve emituje kym hodnota sedi, zmena hrany ich uprace (GH #90 P1)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets, edges = a3_remap_catalog
+  a3_with_catalog(sheets, edges, schema: 2) do
+    params = a3_cab_params('NEW18')
+    side = A3CB.plan_parts_by_key(params).find { |_k, pd| pd[:role].to_s == 'side_left' }&.first
+    NxTest.refute(side.nil?)
+    params['part_overrides'] = { side => {
+      'edges' => { 'L1' => 'EN15', 'W1' => nil },
+      'edge_warnings' => { 'L1' => { 'reason' => A3MAT::REASON_ABS_15, 'abs_id' => 'EN15' },
+                           'W1' => { 'reason' => 'abs_04_manual', 'abs_id' => nil } }
+    } }
+    _plan, issues, cfg = a3_resolve_all(params)
+    NxTest.assert(cfg[:part_overrides][side].key?('edge_warnings'),
+                  'norm_overrides passthrough drzi edge_warnings (round-trip)')
+    mine = issues.select { |it| it[:part_key] == side }
+    NxTest.assert_equal(%w[abs_04_manual abs_15_fallback], mine.map { |it| it[:reason].to_s }.sort,
+                        "sticky dovody sa emituju do kolektora (#{mine.inspect})")
+    # pouzivatel zmeni L1 na inu pasku a W1 olepi -> zaznamy su neplatne
+    params['part_overrides'][side]['edges'] = { 'L1' => 'EN08', 'W1' => 'EN08' }
+    _plan2, issues2, cfg2 = a3_resolve_all(params)
+    NxTest.assert_equal([], issues2.select { |it| it[:part_key] == side },
+                        'po zmene hodnot ziadne sticky warnings')
+    NxTest.refute(cfg2[:part_overrides][side].key?('edge_warnings'),
+                  'neplatne zaznamy sa upratali z overridu (prune prezije do configu)')
+  end
+end
+
+NxTest.test('2a3: board carry-over — rebuild s edges v configu NEZAHADZUJE ulozene warnings (GH #90 P2)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets, edges = a3_remap_catalog
+  a3_with_catalog(sheets, edges, schema: 2) do
+    stored = [{ 'code' => A3MAT::REASON_ABS_15, 'message' => 'test', 'part_key' => 'board/main',
+                'data' => { 'edges' => ['L1'] } }]
+    cfg = Noxun::Engine::BoardBuilder.normalize(
+      'material_id' => 'NEW18', 'length' => 400.0, 'width' => 300.0,
+      'edges' => { 'L1' => 'EN15' }, 'warnings' => stored
+    )
+    NxTest.assert_equal(stored, cfg[:warnings], 'ulozene warnings prezili rebuild bez zmeny hran')
+    out = Noxun::Engine::BoardBuilder.board_config(cfg)
+    NxTest.assert_equal(stored, out[:warnings], 'board_config ich uklada dalej')
+    # cerstvy pravidlovy beh (bez edges) warnings NAHRADZA vysledkom pickera
+    cfg2 = Noxun::Engine::BoardBuilder.normalize(
+      'material_id' => 'NEW18', 'length' => 400.0, 'width' => 300.0, 'warnings' => stored
+    )
+    fresh = cfg2[:warnings]
+    NxTest.refute(fresh == stored, 'picker beh stare warnings neprenasa (nahradza ich cerstvymi)')
   end
 end
 

@@ -438,13 +438,18 @@ module NoxunSuRunner
     # vytvori (presny seed tvar) a na KONCI run_sync sa katalog vrati do
     # povodneho stavu. Ocakavania sa citaju z pickera PRED zmenou materialu —
     # ked paska existuje (seed stav), asserty su presne povodne.
+    # Codex GH #90 P1: rename dekoru ID zamerne zachovava — zaznam s tymto ID
+    # moze zit pod inym dekorom, decor-lookup ho nevidi a seed by ho PREPISAL.
+    # Preto snapshot PODLA ID pred zasahom a navrat presneho zaznamu v cleanupe
+    # (delete len ked predtym neexistoval).
     w1000_seeded = false
+    w1000_saved = e::JsonFileStore.deep_copy(e::Materials.edge('ABS_W1000_10'))
     if e::Materials.abs_for_decor('W1000 ST9 Biela', 1.0, 18.0).nil?
       w1000_seeded = e::Materials.upsert_edge(
         'abs_id' => 'ABS_W1000_10', 'decor' => 'W1000 ST9 Biela',
         'thickness' => 1.0, 'price_per_bm' => 0.60, 'color' => [246, 246, 244]
       )
-      info('sync-board: ABS_W1000_10 chybala v zivom katalogu — docasne doseedovana') if w1000_seeded
+      info('sync-board: ABS_W1000_10 nemala pouzitelnu jednotku — docasne doseedovana') if w1000_seeded
     end
     exp_l1 = e::Materials.abs_for_decor('W1000 ST9 Biela', 1.0, 18.0)
     exp_w1 = e::Materials.abs_for_decor('W1000 ST9 Biela', 2.0, 18.0)
@@ -713,15 +718,24 @@ module NoxunSuRunner
       info('sync-semafor: korpus nema nohy (leg) — semafor kovania scenar preskoceny')
     end
 
-    # 2A-3 rider: vratenie presneho stavu katalogu (docasne doseedovana paska
-    # prec — board hrany na nu po HDF remape uz neukazuju).
-    e::Materials.delete_edge('ABS_W1000_10') if w1000_seeded
+    # 2A-3 rider (Codex GH #90 P1): navrat PRESNEHO stavu katalogu — existujuci
+    # zaznam pod tymto ID sa obnovi (rename dekoru ID drzi!), inak sa docasny
+    # seed zmaze. Board hrany na pasku po HDF remape uz neukazuju.
+    if w1000_seeded
+      w1000_saved ? e::Materials.upsert_edge(w1000_saved) : e::Materials.delete_edge('ABS_W1000_10')
+    end
     cleanup(model)
     ok('sync: cleanup (0 korpusov, 0 dosiek)', cabinets(model).empty? && boards(model).empty?)
   rescue StandardError => ex
     log_line("FAIL: sync vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
     begin
-      e::Materials.delete_edge('ABS_W1000_10') if defined?(w1000_seeded) && w1000_seeded
+      if defined?(w1000_seeded) && w1000_seeded
+        if defined?(w1000_saved) && w1000_saved
+          e::Materials.upsert_edge(w1000_saved)
+        else
+          e::Materials.delete_edge('ABS_W1000_10')
+        end
+      end
     rescue StandardError
       nil
     end

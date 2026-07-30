@@ -69,10 +69,23 @@ module Noxun
             edges: norm_edges(p, sheet, picker_issues),
             quantity: norm_quantity(p)
           }
-          unless picker_issues.empty?
+          if raw(p, :edges).is_a?(Hash)
+            # Codex GH #90 P2: picker NEBEZAL (edges prisli v configu — bezny
+            # rebuild po zmene mena/rozmerov) => ulozene warnings sa PRENASAJU,
+            # inak by kazdy nesuvisiaci edit vymazal fallback/lost polozky z
+            # KONTROLY. Stalenes riesia akcie, ktore hrany/material REALNE menia
+            # (prune per hrana v actions_board; remap ich nahradza novymi).
+            carried = raw(p, :warnings)
+            if carried.is_a?(Array)
+              keep = carried.select { |w| w.is_a?(Hash) }
+              out[:warnings] = keep unless keep.empty?
+            end
+          elsif !picker_issues.empty?
             entries = picker_issues.map { |it| it.merge(part_key: PART_KEY, name: name) }
             out[:warnings] = AbsRules.pick_warnings(entries)
           end
+          # picker bezal cisto (edges chybali, ziadne issues) -> ziadne warnings
+          # (cerstvy pravidlovy stav stare polozky NAHRADZA)
           out
         end
 

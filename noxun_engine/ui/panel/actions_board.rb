@@ -67,8 +67,12 @@ module Noxun
           end
           cfg = Store.config(board) || {}
           params = { 'material_id' => mat }
-          remap, lost = remap_edges_for_material(cfg, mat)
+          remap, lost, remap_warnings = remap_edges_for_material(cfg, mat)
           params['edges'] = remap if remap
+          # Codex GH #90 P1/P2: zmena materialu robi stare pick warnings
+          # neplatnymi — v SCHEMA 2 sa NAHRADIA cerstvymi z remapu (aj uspesny
+          # 1,5 fallback, aj stratene hrany); prazdne pole stare polozky zmaze.
+          params['warnings'] = remap_warnings unless remap_warnings.nil?
           new_sheet = Materials.sheet(mat)
           params['grain_direction'] = 'none' if new_sheet && new_sheet['grain'].to_s == 'none'
           msg = 'Materiál dosky nastavený.'
@@ -85,18 +89,28 @@ module Noxun
         # 2A-3 (audit F6/F7): pri katalogu SCHEMA 2 ide remap so ZAZNAMAMI
         # (stary aj novy sheet — skupina + struktura + universal, 0,4 do lost
         # s "vyber rucne"); SCHEMA 1 = dnesny textovy remap BEZ ZMENY.
+        # Vrati [mapa|nil, lost_texty, warnings|nil] — warnings LEN v SCHEMA 2
+        # (Codex GH #90 P1: aj USPESNY 1,5 fallback ide do KONTROLY; nil = legacy
+        # rezim, stare warnings sa nemenia).
         def remap_edges_for_material(cfg, new_mat)
           new_sheet = Materials.sheet(new_mat)
           target_th = new_sheet && new_sheet['thickness'].to_f
           target = target_th && target_th.positive? ? target_th : nil
           edges = cfg['edges'].is_a?(Hash) ? cfg['edges'] : nil
           if Materials.catalog_schema >= Materials::SCHEMA_GROUPS
-            map, notes = Materials.remap_edges_v2(edges, Materials.sheet(cfg['material_id']),
-                                                  new_sheet, target)
-            [map, notes.map { |n| "#{n[:code]}#{CabinetBuilder.lost_suffix(n[:reason])}" }]
+            map, issues = Materials.remap_edges_v2(edges, Materials.sheet(cfg['material_id']),
+                                                   new_sheet, target)
+            lost = issues.reject { |n| n[:abs_id] }
+                         .map { |n| "#{n[:code]}#{CabinetBuilder.lost_suffix(n[:reason])}" }
+            entries = issues.map do |n|
+              { code: n[:code], reason: n[:reason],
+                part_key: BoardBuilder::PART_KEY, name: cfg['name'].to_s }
+            end
+            [map, lost, AbsRules.pick_warnings(entries)]
           else
-            Materials.remap_edges(edges, Materials.decor_of(cfg['material_id']),
-                                  new_sheet && new_sheet['decor'], target)
+            map, lost = Materials.remap_edges(edges, Materials.decor_of(cfg['material_id']),
+                                              new_sheet && new_sheet['decor'], target)
+            [map, lost, nil]
           end
         end
 
@@ -114,7 +128,23 @@ module Noxun
           edges = cfg['edges'].is_a?(Hash) ? cfg['edges'].dup : { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil }
           edges[code] = present_str(data['abs_id']) # nil = bez ABS
           label = edges[code] ? 'nastavená' : 'bez ABS'
-          apply_board(model, board, { 'edges' => edges }, "Hrana #{code} — #{label}.")
+          params = { 'edges' => edges }
+          # Codex GH #90 P2: vedoma zmena hrany zneplatni ulozene pick warnings
+          # tejto hrany (ostatne polozky ostavaju — carry-over v normalize).
+          pruned = prune_edge_warnings(cfg['warnings'], [code])
+          params['warnings'] = pruned unless pruned.nil?
+          apply_board(model, board, params, "Hrana #{code} — #{label}.")
+        end
+
+        # Odstrani z ulozenych warnings polozky viazane na dane hrany (podla
+        # data.edges z pick_warnings). nil = nebolo co menit (kluc sa neposiela).
+        def prune_edge_warnings(stored, codes)
+          return nil unless stored.is_a?(Array) && !stored.empty?
+          keep = stored.reject do |w|
+            edges = w.is_a?(Hash) ? (w['data'].is_a?(Hash) ? w['data']['edges'] : nil) : nil
+            Array(edges).any? { |c| codes.include?(c.to_s) }
+          end
+          keep.length == stored.length ? nil : keep
         end
 
         # D-35: olepenie VSETKYCH 4 hran dosky jednym klikom — ABS 1.0 mm dekoru
@@ -137,8 +167,12 @@ module Noxun
           end
           abs_id, decor = bulk_abs_for(cfgb)
           return set_status(missing_bulk_abs_msg(decor), true) if abs_id.nil?
-          apply_board(model, board, { 'edges' => AbsRules.uniform_edges(abs_id) },
-                      "#{bulk_done_msg(abs_id, decor)}#{abs_note}")
+          params = { 'edges' => AbsRules.uniform_edges(abs_id) }
+          # Codex GH #90 P2: bulk vedome prepisuje VSETKY 4 hrany — stare pick
+          # warnings hran su neplatne (prune vsetkych EDGE_KEYS polozek).
+          pruned = prune_edge_warnings(cfgb['warnings'], %w[L1 L2 W1 W2])
+          params['warnings'] = pruned unless pruned.nil?
+          apply_board(model, board, params, "#{bulk_done_msg(abs_id, decor)}#{abs_note}")
         end
 
         # --- pomocne --------------------------------------------------------
