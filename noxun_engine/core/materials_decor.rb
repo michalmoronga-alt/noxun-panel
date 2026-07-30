@@ -182,9 +182,12 @@ module Noxun
       # abs_for_sheet (vetva A aj B); ak treba TVORIT: hrubka = preferovana
       # jednotkova hrubka UZ POUZIVANA skupinou (0,8 -> 1 -> 1,2 podla toho, co
       # skupina ma; bez jednotkovej pasky -> kanonicka 1,0; NIKDY 0,4),
-      # structure = struktura dosky (universal sa NENASTAVUJE — je to vedomy
-      # priznak), sirka z AUTO_WIDTHS, group_id z dosky. SCHEMA 1 vetva =
-      # dnesne spravanie (tvorba 1,0) + nove AUTO_WIDTHS.
+      # structure = struktura dosky, sirka z AUTO_WIDTHS, group_id z dosky.
+      # GH #90 P2 (3. kolo, O-ensure): doska BEZ struktury dava dovytvorenej
+      # paske universal:true — v skupine bez struktur je to jedina cesta k jej
+      # pouzitelnosti (prazdna != zhoda) a "vedomost" priznaku nesie modal
+      # potvrdeny pouzivatelom; doska SO strukturou universal NENASTAVUJE
+      # (dedi strukturu). SCHEMA 1 vetva = dnesne spravanie + nove AUTO_WIDTHS.
       # Vrati [:exists|:created, abs_id] alebo
       # [:schema_read_only|:no_sheet|:no_standard_width|:write_failed, nil].
       def ensure_edge_for_sheet(material_id, client_schema: SCHEMA_LEGACY)
@@ -226,7 +229,14 @@ module Noxun
           gid = s['group_id'].to_s.strip
           rec['group_id'] = gid unless gid.empty?
           st = s['structure'].to_s.strip
-          rec['structure'] = st unless st.empty?
+          if st.empty?
+            # GH #90 P2 (3. kolo): bezstrukturna doska — universal je jedina
+            # cesta, ktorou picker novu pasku vobec najde (prazdna != zhoda);
+            # bez neho by kazdy retry zakladal dalsie nepouzitelne zaznamy.
+            rec['universal'] = true
+          else
+            rec['structure'] = st
+          end
         end
         return [:write_failed, nil] unless upsert_edge(rec)
         [:created, rec['abs_id']]

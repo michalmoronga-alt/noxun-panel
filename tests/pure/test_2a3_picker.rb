@@ -730,6 +730,20 @@ NxTest.test('2a3: ensure v2 — skupina bez jednotkovej pasky -> kanonicka 1,0 (
   end
 end
 
+NxTest.test('2a3: ensure v2 — bezstrukturna doska dava paske universal:true a picker ju hned najde (GH #90 P2 3. kolo)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets = [a3_sheet('VLASTNA18', 'G9', '')]
+  a3_with_catalog(sheets, [], schema: 2) do
+    status, abs_id = A3MAT.ensure_edge_for_sheet('VLASTNA18', client_schema: 2)
+    NxTest.assert_equal(:created, status)
+    created = A3MAT.edge(abs_id)
+    NxTest.assert_equal(true, created['universal'], 'bezstrukturna doska -> universal:true')
+    NxTest.refute(created.key?('structure'), 'struktura sa nezapisuje')
+    found, why = A3MAT.abs_for_sheet(A3MAT.sheet('VLASTNA18'), :jednotka, 18.0)
+    NxTest.assert_equal(abs_id, found, "picker novu pasku hned najde (#{why.inspect})")
+  end
+end
+
 NxTest.test('2a3: ensure v2 — stary klient pri SCHEMA 2 katalogu stale read-only (2A-2 kontrakt)') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   a3_with_catalog([a3_sheet('S18', 'G1', 'ST9')], [], schema: 2) do
