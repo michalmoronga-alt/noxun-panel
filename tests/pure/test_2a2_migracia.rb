@@ -529,6 +529,62 @@ NxTest.test('2A-2: paska s hrubkou mimo {1;2} = undecidable, ziadna ticha strata
   end
 end
 
+NxTest.test('2A-2: hranicne hodnoty = undecidable (GH 4. kolo — presna hrubka, rozsah formatu a sirky)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  [
+    [a2_variant { |d| a2_edge_of(d, 'ABS_UNI_10')['thickness'] = 1.005 }, 'hrubka pasky'],
+    [a2_variant { |d| a2_sheet_of(d, 'UNI_DTDL_18')['sheet_size'] = [100.0, 100.0] }, 'sheet_size mimo rozsahu'],
+    [a2_variant { |d| a2_edge_of(d, 'ABS_U750_ST9_TAUPE_SEDA_23X10')['width'] = 5.0 }, 'width mimo rozsahu'],
+    [a2_variant { |d| a2_edge_of(d, 'ABS_U750_ST9_TAUPE_SEDA_23X10')['width'] = 250.0 }, 'width mimo rozsahu']
+  ].each do |bytes, expected|
+    a2_with_catalog(bytes) do
+      rep = A2MAT.migrate_to_schema2!
+      NxTest.assert_equal(:undecidable, rep[:status], "ocakavany no-op pre: #{expected}")
+      NxTest.assert(rep[:reasons].any? { |r| r.include?(expected) },
+                    "dovod '#{expected}' chyba v #{rep[:reasons].inspect}")
+      NxTest.assert_equal(bytes, File.binread(A2MAT.path), 'atomicky no-op')
+    end
+  end
+end
+
+NxTest.test('2A-2: marker fallback na .bak (GH P1 4. kolo) — poskodeny primar neotvori legacy zapis') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  a2_with_catalog(a2_fixture_bytes) do
+    stale = A2MAT.catalog # legacy pohlad mutatora
+    rep = A2MAT.migrate_to_schema2!
+    NxTest.assert_equal(:ok, rep[:status], rep[:reasons].inspect)
+    migrated = File.binread(A2MAT.path)
+    bak = "#{A2MAT.path}.bak"
+    begin
+      File.binwrite(bak, migrated)          # validna schema 2 zaloha
+      File.binwrite(A2MAT.path, 'xx{rozbite') # poskodeny primar
+      NxTest.refute(A2MAT.write(stale),
+                    'legacy zapis sa odmietne aj s poskodenym primarom (marker z .bak)')
+      NxTest.assert_equal('xx{rozbite', File.binread(A2MAT.path), 'primar ostal nedotknuty')
+      FileUtils.rm_f(A2MAT.path)            # primar uplne chyba, .bak schema 2
+      NxTest.refute(A2MAT.write(stale), 'legacy zapis sa odmietne aj bez primaru')
+    ensure
+      FileUtils.rm_f(bak)
+    end
+  end
+end
+
+NxTest.test('2A-2: dry_run neseeduje subor sablon (GH P2 4. kolo)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  tpl = Noxun::Engine::TemplateStore
+  tpl_path = tpl.path
+  before = File.exist?(tpl_path) ? File.binread(tpl_path) : nil
+  begin
+    FileUtils.rm_f(tpl_path)
+    NxTest.assert_equal([], A2MAT.migration_template_edge_usage('ABS_X'),
+                        'scan bez suboru sablon vrati prazdno')
+    NxTest.refute(File.exist?(tpl_path), 'scan subor sablon NEVYTVORIL (dry_run kontrakt)')
+  ensure
+    File.binwrite(tpl_path, before) if before
+    tpl.reload! if tpl.respond_to?(:reload!)
+  end
+end
+
 NxTest.test('2A-2: pad zapisu = :write_failed s reportom, ziadna uletena vynimka (GH P2 2. kolo)') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   a2_with_catalog(a2_fixture_bytes) do

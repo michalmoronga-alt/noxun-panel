@@ -215,24 +215,37 @@ module Noxun
             # Codex GH P2 (3. kolo): prazdny/whitespace typ by presiel len na
             # triedu String a vyrobil neplatny schema 2 variant.
             reasons << "#{label}: typ musi byt neprazdny text" unless r['type'].is_a?(String) && !r['type'].strip.empty?
-            if r.key?('sheet_size') && !migration_pair?(r['sheet_size'])
-              reasons << "#{label}: sheet_size musi byt dvojica kladnych cisel"
+            # Codex GH P2 (4. kolo): rozsah formatu ako bezny zapis katalogu —
+            # mimo rozsahu by vznikla nemenna (identitna pri PD) neopravitelna
+            # hodnota, ktoru editor odmieta.
+            if r.key?('sheet_size')
+              if !migration_pair?(r['sheet_size'])
+                reasons << "#{label}: sheet_size musi byt dvojica kladnych cisel"
+              elsif !r['sheet_size'].all? { |x| SHEET_SIZE_RANGE.cover?(x.to_f) }
+                reasons << "#{label}: sheet_size mimo rozsahu #{SHEET_SIZE_RANGE.first.to_i}-#{SHEET_SIZE_RANGE.last.to_i} mm"
+              end
             end
           end
         end
         seen = {}
         edges_raw.each_with_index do |rec, i|
           validate_legacy_record(rec, "edges[#{i}]", 'abs_id', seen, reasons) do |r, label|
-            if r.key?('width') && !migration_positive?(r['width'])
-              reasons << "#{label}: width musi byt kladne cislo"
+            # Codex GH P2 (4. kolo): rozsah sirky ako create/batch cesty (10-200)
+            # — sirka je pri edite nemenna, mimo rozsahu by bola neopravitelna.
+            if r.key?('width')
+              if !migration_positive?(r['width'])
+                reasons << "#{label}: width musi byt kladne cislo"
+              elsif !EDGE_WIDTH_RANGE.cover?(r['width'].to_f)
+                reasons << "#{label}: width mimo rozsahu #{EDGE_WIDTH_RANGE.first.to_i}-#{EDGE_WIDTH_RANGE.last.to_i} mm"
+              end
             end
-            # Codex GH P2 (3. kolo): hrubka mimo dnesnych podporovanych hodnot
-            # by migraciu presla, ale reload! po zapise by pasku vyfiltroval a
-            # katalog prepisal — TICHA strata ID mimo report[:deleted]. Kym
-            # obchodne hrubky nezavedie 2A-3 (schema-aware mnozina), je taka
-            # polozka nerozhodnutelna.
+            # Codex GH P2 (3.+4. kolo): hrubka mimo podporovanych hodnot by
+            # migraciu presla, ale reload! po zapise by pasku vyfiltroval a
+            # katalog prepisal — TICHA strata ID mimo report[:deleted]. Predikat
+            # PRESNE zhodny s reloadom (supported_edge_thickness? — ziadna
+            # tolerancia; 1.005 by reload zahodil). Obchodne hrubky = 2A-3.
             th = r['thickness']
-            if migration_positive?(th) && SUPPORTED_EDGE_THICKNESSES.none? { |t| (th.to_f - t).abs < 0.01 }
+            if migration_positive?(th) && !supported_edge_thickness?(th)
               reasons << "#{label}: hrubka pasky #{th} mm zatial nie je podporovana (obchodne hrubky = davka 2A-3)"
             end
           end
@@ -525,6 +538,10 @@ module Noxun
 
       def migration_template_edge_usage(abs_id)
         return [] unless defined?(TemplateStore)
+        # Codex GH P2 (4. kolo): TemplateStore.load seeduje chybajuci subor —
+        # dry_run NESMIE zapisat NIC (ani nesuvisiaci produkcny subor). Bez
+        # existujuceho suboru sablon nie je co prehladavat.
+        return [] unless File.exist?(TemplateStore.path)
         hits = []
         TemplateStore.load.each do |t|
           ov = (t['config'] || {})['part_overrides']

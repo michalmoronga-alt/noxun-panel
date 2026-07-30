@@ -230,14 +230,24 @@ module Noxun
         n <= current ? current : n
       end
 
-      # Marker priamo zo suboru, mimo cache. Chybajuci/poskodeny = legacy 1.
+      # Marker priamo z disku, mimo cache — semantika primar-alebo-.bak ako
+      # JsonFileStore recovery (Codex GH P1 4. kolo): poskodeny/chybajuci primar
+      # s validnou SCHEMA 2 zalohou NESMIE otvorit dvere stale legacy zapisu,
+      # ktory by obnovitelny katalog prepisal markerom 1. Nic citatelne = 1.
       def catalog_schema_on_disk
-        return SCHEMA_LEGACY unless File.exist?(path)
-        data = JSON.parse(File.binread(path))
-        n = data.is_a?(Hash) ? data['schema'].to_i : 0
+        marker_from_file(path) || marker_from_file("#{path}.bak") || SCHEMA_LEGACY
+      end
+
+      # Marker jedneho suboru, alebo nil (chybajuci/necitatelny/poskodeny —
+      # volajuci skusi dalsi zdroj). Citatelny subor BEZ markera = legacy 1.
+      def marker_from_file(file)
+        return nil unless File.exist?(file)
+        data = JSON.parse(File.binread(file))
+        return nil unless data.is_a?(Hash)
+        n = data['schema'].to_i
         n >= SCHEMA_LEGACY ? n : SCHEMA_LEGACY
       rescue StandardError
-        SCHEMA_LEGACY
+        nil
       end
 
       # Marker 2 je poctivy len vtedy, ked KAZDY zaznam nesie group_id (zdielaju
