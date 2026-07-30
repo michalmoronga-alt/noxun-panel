@@ -412,13 +412,21 @@ module Noxun
         # (c) inak nic — volajuci odmietne zmenu a vypise kandidatov.
         # Vrati { pick: sheet|nil, candidates: [sheet...] } (kandidati = vsetky
         # dosky hladanej hrubky, zoradene material_id — zoznam do hlasky).
-        def pick_body_sheet(want, current, pool)
+        # 2A-3 (audit F10): `schema` je PARAMETER (cista funkcia, ziadne
+        # ambientne citanie katalogu — volajuci ju doda). Pri schema >= 2 su
+        # kandidati LEN rovnaky group_id + rovnaka normalizovana NEPRAZDNA
+        # struktura ako current; prazdna struktura = ZIADEN automaticky vyber;
+        # bez zhody sa zmena odmietne (ziadny tichy skok na cudzi material).
+        def pick_body_sheet(want, current, pool, schema: 1)
           w = want.to_f
           # GH P2: v tolerancii 0,05 moze byt viac roznych hrubok (18,56 vs 18,60) —
           # prve kriterium je NAJMENSI rozdiel od want, material_id je az tie-break.
           cands = Array(pool).select { |s| s.is_a?(Hash) && thickness_eq?(s['thickness'], w) }
                              .sort_by { |s| [(s['thickness'].to_f - w).abs, s['material_id'].to_s] }
           return { pick: nil, candidates: cands } if cands.empty?
+          if defined?(Materials) && schema.to_i >= Materials::SCHEMA_GROUPS
+            return { pick: pick_body_sheet_v2(cands, current), candidates: cands }
+          end
           # GH P2: identita typu je case-insensitive (ako pri variantoch katalogu).
           type  = current ? current['type'].to_s.strip.upcase : ''
           decor = current ? current['decor'].to_s.strip.upcase : ''
@@ -426,6 +434,23 @@ module Noxun
           same_decor = decor.empty? ? [] : same_type.select { |s| s['decor'].to_s.strip.upcase == decor }
           pick = same_decor.first || (same_type.length == 1 ? same_type.first : nil)
           { pick: pick, candidates: cands }
+        end
+
+        # 2A-3 (audit F10): SCHEMA 2 vyber — tvrdy guard skupina + NEPRAZDNA
+        # struktura; v ramci zhody preferencia rovnakeho typu, inak PRAVE JEDEN
+        # kandidat (ziadny nahodny vyber). Vrati sheet alebo nil.
+        def pick_body_sheet_v2(cands, current)
+          return nil unless current.is_a?(Hash)
+          st = Materials.identity_norm(current['structure'])
+          return nil if st.empty? # prazdna struktura = neznama, ziadny auto vyber
+          gk = Materials.record_group_key(current, Materials::SCHEMA_GROUPS)
+          matches = cands.select do |s|
+            Materials.record_group_key(s, Materials::SCHEMA_GROUPS) == gk &&
+              Materials.identity_norm(s['structure']) == st
+          end
+          type = current['type'].to_s.strip.upcase
+          same_type = matches.select { |s| s['type'].to_s.strip.upcase == type }
+          same_type.first || (matches.length == 1 ? matches.first : nil)
         end
 
         # D-45/D-46: prevzatie KATALOGOVEJ hrubky materialu tela do params
@@ -539,6 +564,10 @@ module Noxun
           result = { 'changed' => 0, 'lost' => [] }
           ov = params['part_overrides']
           return result unless ov.is_a?(Hash) && !ov.empty? && defined?(Materials)
+          # 2A-3 (audit F7): pri katalogu SCHEMA 2 ide remap so ZAZNAMAMI (stary
+          # AJ novy sheet — skupina + struktura + universal); SCHEMA 1 = dnesny
+          # textovy remap BEZ ZMENY.
+          schema2 = Materials.catalog_schema >= Materials::SCHEMA_GROUPS
           old_ov = old_overrides.is_a?(Hash) ? old_overrides : ov
           parts = plan_parts_by_key(params)
           ov.each do |rk, rec|
@@ -554,16 +583,29 @@ module Noxun
             # Cielova hrubka: katalogova hrubka noveho sheetu (cela 18/19 sa jej
             # prisposobia — FIX 10), fallback konstrukcna hrubka dielca.
             target = new_sheet ? new_sheet['thickness'].to_f : pd[:prod][:thickness].to_f
-            remapped, lost = Materials.remap_edges(
-              rec['edges'], Materials.decor_of(old_mat), new_sheet && new_sheet['decor'],
-              target.positive? ? target : nil
-            )
+            target = target.positive? ? target : nil
+            if schema2
+              remapped, notes = Materials.remap_edges_v2(rec['edges'], Materials.sheet(old_mat),
+                                                         new_sheet, target)
+              lost = notes.map { |n| "#{n[:code]}#{lost_suffix(n[:reason])}" }
+            else
+              remapped, lost = Materials.remap_edges(
+                rec['edges'], Materials.decor_of(old_mat), new_sheet && new_sheet['decor'], target
+              )
+            end
             next unless remapped
             rec['edges'] = remapped
             result['changed'] += 1
             lost.each { |code| result['lost'] << "#{pd[:name] || rk} #{code}" }
           end
           result
+        end
+
+        # 2A-3 (F8): dovetok k stratenej hrane v hlaske — kontrakt 0,4 vyzaduje
+        # jasne "vyber rucne" (paska sa vedome NEnahradila automaticky).
+        def lost_suffix(reason)
+          return '' unless defined?(Materials)
+          reason.to_s == Materials::REASON_ABS_04_MANUAL ? ' (0,4 mm — vyber ručne)' : ''
         end
 
         # Mapa part_key -> deskriptor dielca z planu (rola, hrubka, nazov).

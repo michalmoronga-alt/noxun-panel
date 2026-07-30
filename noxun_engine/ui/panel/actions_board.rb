@@ -77,20 +77,27 @@ module Noxun
           apply_board(model, board, params, "#{msg}#{abs_note}")
         end
 
-        # Prevod ABS hran stareho dekoru na novy (rovnaka hrubka). Vrati
+        # Prevod ABS hran stareho dekoru na novy (drzi nominalnu triedu). Vrati
         # [nova_edges_mapa alebo nil (nic na prevod), pole hran bez variantu].
         # D-41 PR C: len tenky obal nad spolocnym jadrom Materials.remap_edges
         # (to iste pouzivaju dielcove overridy — audit FIX 5). Cielova hrubka =
         # hrubka NOVEHO sheetu (hrubka dosky VZDY nasleduje material; FIX 10).
+        # 2A-3 (audit F6/F7): pri katalogu SCHEMA 2 ide remap so ZAZNAMAMI
+        # (stary aj novy sheet — skupina + struktura + universal, 0,4 do lost
+        # s "vyber rucne"); SCHEMA 1 = dnesny textovy remap BEZ ZMENY.
         def remap_edges_for_material(cfg, new_mat)
           new_sheet = Materials.sheet(new_mat)
           target_th = new_sheet && new_sheet['thickness'].to_f
-          Materials.remap_edges(
-            cfg['edges'].is_a?(Hash) ? cfg['edges'] : nil,
-            Materials.decor_of(cfg['material_id']),
-            new_sheet && new_sheet['decor'],
-            target_th && target_th.positive? ? target_th : nil
-          )
+          target = target_th && target_th.positive? ? target_th : nil
+          edges = cfg['edges'].is_a?(Hash) ? cfg['edges'] : nil
+          if Materials.catalog_schema >= Materials::SCHEMA_GROUPS
+            map, notes = Materials.remap_edges_v2(edges, Materials.sheet(cfg['material_id']),
+                                                  new_sheet, target)
+            [map, notes.map { |n| "#{n[:code]}#{CabinetBuilder.lost_suffix(n[:reason])}" }]
+          else
+            Materials.remap_edges(edges, Materials.decor_of(cfg['material_id']),
+                                  new_sheet && new_sheet['decor'], target)
+          end
         end
 
         # ABS hrana dosky — server-side read-modify-write (Codex audit c, D):
@@ -131,7 +138,7 @@ module Noxun
           abs_id, decor = bulk_abs_for(cfgb)
           return set_status(missing_bulk_abs_msg(decor), true) if abs_id.nil?
           apply_board(model, board, { 'edges' => AbsRules.uniform_edges(abs_id) },
-                      "Všetky 4 hrany — ABS #{decor} 1,0 mm.#{abs_note}")
+                      "#{bulk_done_msg(abs_id, decor)}#{abs_note}")
         end
 
         # --- pomocne --------------------------------------------------------

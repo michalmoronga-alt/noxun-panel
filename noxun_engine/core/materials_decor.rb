@@ -169,7 +169,7 @@ module Noxun
         AUTO_WIDTHS.find { |w| w >= th + WIDTH_MARGIN - 0.001 }
       end
 
-      # Zabezpeci 1,0 mm pasku dekoru daneho sheetu pouzitelnu pre jeho hrubku.
+      # Zabezpeci jednotkovu pasku dekoru daneho sheetu pouzitelnu pre jeho hrubku.
       # SERVEROVA autorita modalu (JS checku sa neveri — audit BLOCKER 3): stav sa
       # overi znova a zapis bezi az po vsetkych kontrolach (audit FIX 8). Katalogovy
       # zapis je MIMO model undo — volajuci to hlasi pouzivatelovi (NOTE 9).
@@ -178,6 +178,13 @@ module Noxun
       # stary klient pasku NEVYTVORI — dostal by legacy zapis bez identitnych
       # poli (rovnaky kontrakt ako schema_write_allowed?). Pri katalogu SCHEMA 1
       # sa spravanie NEMENI ani o chlp (dormantnost davky 2A-2).
+      # 2A-3 (audit F14): SCHEMA 2 vetva — najprv pouzitelna EXISTUJUCA paska cez
+      # abs_for_sheet (vetva A aj B); ak treba TVORIT: hrubka = preferovana
+      # jednotkova hrubka UZ POUZIVANA skupinou (0,8 -> 1 -> 1,2 podla toho, co
+      # skupina ma; bez jednotkovej pasky -> kanonicka 1,0; NIKDY 0,4),
+      # structure = struktura dosky (universal sa NENASTAVUJE — je to vedomy
+      # priznak), sirka z AUTO_WIDTHS, group_id z dosky. SCHEMA 1 vetva =
+      # dnesne spravanie (tvorba 1,0) + nove AUTO_WIDTHS.
       # Vrati [:exists|:created, abs_id] alebo
       # [:schema_read_only|:no_sheet|:no_standard_width|:write_failed, nil].
       def ensure_edge_for_sheet(material_id, client_schema: SCHEMA_LEGACY)
@@ -188,21 +195,34 @@ module Noxun
         s = sheet(material_id)
         return [:no_sheet, nil] unless s
         th = s['thickness'].to_f
-        existing = abs_for_decor(s['decor'], 1.0, th.positive? ? th : nil)
+        part_th = th.positive? ? th : nil
+        # Sheet-aware cesta LEN pre migrovany zaznam (nesie group_id). Zaznam
+        # bez group_id v marker-2 katalogu je hybridny medzistav (realne len
+        # testove/rucne ohnute subory — write guard kompletnost vynucuje):
+        # strukturne pravidla sa nan neaplikuju, plati legacy vztah dekoru.
+        schema2 = server >= SCHEMA_GROUPS && !s['group_id'].to_s.strip.empty?
+        existing = if schema2
+                     abs_for_sheet(s, :jednotka, part_th).first
+                   else
+                     abs_for_decor(s['decor'], 1.0, part_th)
+                   end
         return [:exists, existing] if existing
         width = auto_width_for(th)
         return [:no_standard_width, nil] unless width
+        create_th = schema2 ? ensure_edge_thickness_for_group(s) : 1.0
         # D-42: cena sa NEuvadza (nezadana) — dovytvorena paska caka na doplnenie
         # ceny (rozlisenie nezadana vs 0), nie ticha 0.
         rec = {
-          'abs_id' => generate_edge_id(s['decor'], 1.0, width), 'decor' => s['decor'],
-          'thickness' => 1.0, 'width' => width, 'color' => s['color']
+          'abs_id' => generate_edge_id(s['decor'], create_th, width,
+                                       structure: (schema2 ? s['structure'] : nil)),
+          'decor' => s['decor'],
+          'thickness' => create_th, 'width' => width, 'color' => s['color']
         }
         # Codex GH P2 (3. kolo): v SCHEMA 2 katalogu MUSI nova paska niest
         # identitu skupiny dosky (group_id + struktura, prazdne sa vynechavaju)
         # — inak by ju write_unlocked completeness guard odmietol a ensure by
-        # vzdy koncil :write_failed. Plne strukturne pravidla vyberu = 2A-3.
-        if catalog_schema >= SCHEMA_GROUPS
+        # vzdy koncil :write_failed.
+        if schema2
           gid = s['group_id'].to_s.strip
           rec['group_id'] = gid unless gid.empty?
           st = s['structure'].to_s.strip
@@ -210,6 +230,17 @@ module Noxun
         end
         return [:write_failed, nil] unless upsert_edge(rec)
         [:created, rec['abs_id']]
+      end
+
+      # 2A-3 (audit F14 / O2): hrubka dovytvaranej pasky = prva preferencia
+      # jednotky, ktoru skupina UZ POUZIVA (leskle MG maju len 1,0 — nova paska
+      # nesmie zaviest 0,8, ktoru dekor realne nema); skupina bez jednotkovej
+      # pasky -> kanonicka 1,0. NIKDY 0,4.
+      def ensure_edge_thickness_for_group(s)
+        group_edges = edges_of_group(s)
+        EDGE_CLASS_PREFERENCE[:jednotka].find do |t|
+          group_edges.any? { |a| (a['thickness'].to_f - t).abs < 0.01 }
+        end || 1.0
       end
 
       # --- D-41 PR B: batch "Novy dekor" (audit FIX 14) -------------------------

@@ -411,3 +411,184 @@ NxTest.test('2a3: dual-mode — doska pri schema 1 bez warnings kluca (config id
     NxTest.refute(A3BB.board_config(cfg).key?(:warnings), 'config bez noveho kluca')
   end
 end
+
+# ---------------------------------------------------------------------------
+# F7/F8: remap_edges_v2 — stary AJ novy sheet, kompatibilita, 0,4 kontrakt
+# ---------------------------------------------------------------------------
+
+# Standardna remap zostava: stara skupina G1/ST9 -> nova skupina G2/XM.
+def a3_remap_catalog
+  sheets = [a3_sheet('OLD18', 'G1', 'ST9'), a3_sheet('NEW18', 'G2', 'XM')]
+  edges = [
+    a3_edge('EO10', 'G1', 'ST9', 1.0, 23.0),                       # zladena so starym sheetom
+    a3_edge('EO20', 'G1', 'ST9', 2.0, 23.0),                       # dvojka zladena
+    a3_edge('EO04', 'G1', 'ST9', 0.4, 23.0),                       # 0,4 zladena (kontrakt: nikdy auto)
+    a3_edge('EOMG', 'G1', 'MG', 1.0, 23.0),                        # cudzia struktura V RAMCI skupiny
+    a3_edge('EOUNI', 'G1', '', 1.0, 23.0, 'universal' => true),    # universal starej skupiny
+    a3_edge('ECUDZI', 'G3', 'ST9', 1.0, 23.0),                     # cudzia skupina (kontrast)
+    a3_edge('EN08', 'G2', 'XM', 0.8, 23.0),                        # nova skupina jednotka
+    a3_edge('EN15', 'G2', 'XM', 1.5, 23.0)                         # nova skupina dvojka len 1,5
+  ]
+  [sheets, edges]
+end
+
+NxTest.test('2a3: remap v2 — meni LEN kompatibilne pasky, drzi triedu, kontrast/cudzia struktura/nil nedotknute') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets, edges = a3_remap_catalog
+  a3_with_catalog(sheets, edges, schema: 2) do
+    old_s = A3MAT.sheet('OLD18')
+    new_s = A3MAT.sheet('NEW18')
+    map = { 'L1' => 'EO10', 'L2' => nil, 'W1' => 'EOMG', 'W2' => 'ECUDZI' }
+    out, lost = A3MAT.remap_edges_v2(map, old_s, new_s, 18.0)
+    NxTest.assert_equal('EN08', out['L1'], 'jednotka 1,0 -> jednotka novej skupiny (0,8 preferencia)')
+    NxTest.assert_equal(nil, out['L2'], 'nil (vedome bez ABS) sa nedotyka')
+    NxTest.assert_equal('EOMG', out['W1'], 'cudzia struktura V RAMCI skupiny = vedoma volba — nedotknuta')
+    NxTest.assert_equal('ECUDZI', out['W2'], 'cudzia skupina (kontrast) — nedotknuta')
+    NxTest.assert_equal([], lost)
+    NxTest.assert_equal(%w[L1 L2 W1 W2], out.keys, 'kompletna mapa ostava')
+  end
+end
+
+NxTest.test('2a3: remap v2 — dvojka drzi triedu (2,0 -> 1,5 novej skupiny), universal sa remapuje') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets, edges = a3_remap_catalog
+  a3_with_catalog(sheets, edges, schema: 2) do
+    old_s = A3MAT.sheet('OLD18')
+    new_s = A3MAT.sheet('NEW18')
+    out, lost = A3MAT.remap_edges_v2({ 'L1' => 'EO20', 'W1' => 'EOUNI' }, old_s, new_s, 18.0)
+    NxTest.assert_equal('EN15', out['L1'], '2,0 -> dvojka novej skupiny (len 1,5)')
+    NxTest.assert_equal('EN08', out['W1'], 'universal starej skupiny je kompatibilna — nasleduje material')
+    NxTest.assert_equal([], lost, '1,5 fallback nie je strata hrany')
+  end
+end
+
+NxTest.test('2a3: remap v2 — 0,4 sa NIKDY nenahradza automaticky: nil + lost abs_04_manual') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets, edges = a3_remap_catalog
+  a3_with_catalog(sheets, edges, schema: 2) do
+    out, lost = A3MAT.remap_edges_v2({ 'L1' => 'EO04' }, A3MAT.sheet('OLD18'), A3MAT.sheet('NEW18'), 18.0)
+    NxTest.assert_equal(nil, out['L1'])
+    NxTest.assert_equal([{ code: 'L1', reason: 'abs_04_manual' }], lost)
+  end
+end
+
+NxTest.test('2a3: remap v2 — rovnaka skupina + struktura = nic na prevod (rucny vyber sa neprepisuje)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets = [a3_sheet('OLD18', 'G1', 'ST9'), a3_sheet('OLD36', 'G1', 'ST9', 'thickness' => 36.0)]
+  edges = [a3_edge('E43', 'G1', 'ST9', 1.0, 43.0), a3_edge('E23', 'G1', 'ST9', 1.0, 23.0)]
+  a3_with_catalog(sheets, edges, schema: 2) do
+    out, lost = A3MAT.remap_edges_v2({ 'L1' => 'E43' }, A3MAT.sheet('OLD18'), A3MAT.sheet('OLD36'), 36.0)
+    NxTest.assert_equal([nil, []], [out, lost], '18 -> 36 v ramci skupiny+struktury necha rucnu 43-ku')
+  end
+end
+
+NxTest.test('2a3: remap v2 — chybajuci zaznam/nil sheety = nic na prevod (defenziva)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets, edges = a3_remap_catalog
+  a3_with_catalog(sheets, edges, schema: 2) do
+    NxTest.assert_equal([nil, []], A3MAT.remap_edges_v2({ 'L1' => 'EO10' }, nil, A3MAT.sheet('NEW18'), 18.0))
+    NxTest.assert_equal([nil, []], A3MAT.remap_edges_v2(nil, A3MAT.sheet('OLD18'), A3MAT.sheet('NEW18'), 18.0))
+  end
+end
+
+NxTest.test('2a3: remap v2 cez remap_part_edge_overrides! — traversal so schema 2 katalogom') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets, edges = a3_remap_catalog
+  a3_with_catalog(sheets, edges, schema: 2) do
+    params = a3_cab_params('OLD18')
+    cfg = A3CB.normalize(params)
+    side = A3CB.plan_parts_by_key(params).find { |_k, pd| pd[:role].to_s == 'side_left' }&.first
+    NxTest.refute(side.nil?)
+    params['part_overrides'] = { side => { 'edges' => { 'L1' => 'EO10', 'W1' => 'EO04' } } }
+    old_eff = { 'body' => 'OLD18', 'front' => nil, 'back' => nil }
+    new_eff = old_eff.merge('body' => 'NEW18')
+    result = A3CB.remap_part_edge_overrides!(params, old_eff, new_eff)
+    NxTest.assert_equal(1, result['changed'])
+    ov = params['part_overrides'][side]['edges']
+    NxTest.assert_equal('EN08', ov['L1'])
+    NxTest.assert_equal(nil, ov['W1'], '0,4 zhodena na nil')
+    NxTest.assert_equal(1, result['lost'].length)
+    NxTest.assert(result['lost'][0].include?('W1') && result['lost'][0].include?('0,4'),
+                  "lost label nesie 0,4 dovetok (#{result['lost'].inspect})")
+    _cfg = cfg
+  end
+end
+
+# ---------------------------------------------------------------------------
+# F10: pick_body_sheet so schemou ako parametrom + prazdna struktura
+# ---------------------------------------------------------------------------
+
+NxTest.test('2a3: pick_body_sheet — schema 2 vyzaduje skupinu + NEPRAZDNU strukturu') do
+  s_cur = a3_sheet('CUR18', 'G1', 'ST9')
+  pool = [a3_sheet('C36A', 'G1', 'ST9', 'thickness' => 36.0),
+          a3_sheet('C36B', 'G1', 'MG', 'thickness' => 36.0),
+          a3_sheet('C36C', 'G2', 'ST9', 'thickness' => 36.0)]
+  res = A3CB.pick_body_sheet(36.0, s_cur, pool, schema: 2)
+  NxTest.assert_equal('C36A', res[:pick] && res[:pick]['material_id'],
+                      'vybera sa LEN rovnaka skupina + struktura')
+  NxTest.assert_equal(3, res[:candidates].length, 'kandidati do hlasky = vsetky hrubkovo vyhovujuce')
+  # bez strukturnej zhody = ziadny pick (ani ked je jediny kandidat hrubky)
+  res2 = A3CB.pick_body_sheet(36.0, s_cur, [pool[1]], schema: 2)
+  NxTest.assert_equal(nil, res2[:pick], 'cudzia struktura sa NIKDY nevybera automaticky')
+  res3 = A3CB.pick_body_sheet(36.0, s_cur, [pool[2]], schema: 2)
+  NxTest.assert_equal(nil, res3[:pick], 'cudzia skupina sa NIKDY nevybera automaticky')
+end
+
+NxTest.test('2a3: pick_body_sheet — prazdna struktura current = ZIADEN auto vyber (schema 2)') do
+  s_cur = a3_sheet('CUR18', 'G1', '')
+  pool = [a3_sheet('C36A', 'G1', '', 'thickness' => 36.0)]
+  res = A3CB.pick_body_sheet(36.0, s_cur, pool, schema: 2)
+  NxTest.assert_equal(nil, res[:pick], 'prazdna struktura = neznama — zmena sa odmietne')
+  NxTest.assert_equal(1, res[:candidates].length)
+  # schema 1 to iste vyberie po starom (rovnaky dekor+typ) — dual-mode
+  res1 = A3CB.pick_body_sheet(36.0, s_cur, pool)
+  NxTest.assert_equal('C36A', res1[:pick] && res1[:pick]['material_id'], 'default schema: 1 = dnesok')
+end
+
+# ---------------------------------------------------------------------------
+# F14: ensure_edge_for_sheet — SCHEMA 2 tvorba resolverom
+# ---------------------------------------------------------------------------
+
+NxTest.test('2a3: ensure v2 — existujucu najde cez abs_for_sheet (aj universal vetvou)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets = [a3_sheet('S18', 'G1', 'ST9')]
+  edges = [a3_edge('EU10', 'G1', '', 1.0, 23.0, 'universal' => true)]
+  a3_with_catalog(sheets, edges, schema: 2) do
+    NxTest.assert_equal([:exists, 'EU10'], A3MAT.ensure_edge_for_sheet('S18', client_schema: 2))
+  end
+end
+
+NxTest.test('2a3: ensure v2 — tvorba preberie jednotkovu hrubku POUZIVANU skupinou (0,8)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets = [a3_sheet('S18', 'G1', 'ST9')]
+  edges = [a3_edge('EMG08', 'G1', 'MG', 0.8, 23.0)] # ina struktura => picker nic, ale skupina MA 0,8
+  a3_with_catalog(sheets, edges, schema: 2) do
+    status, abs_id = A3MAT.ensure_edge_for_sheet('S18', client_schema: 2)
+    NxTest.assert_equal(:created, status)
+    rec = A3MAT.edge(abs_id)
+    NxTest.assert_equal(0.8, rec['thickness'], 'skupina pouziva 0,8 -> nova paska 0,8')
+    NxTest.assert_equal('ST9', rec['structure'], 'struktura dosky (universal sa NEnastavuje)')
+    NxTest.refute(rec.key?('universal'))
+    NxTest.assert_equal('GRP-G1', rec['group_id'])
+    NxTest.assert_equal(23.0, rec['width'])
+    NxTest.assert(abs_id.include?('ST9'), "ID nesie strukturu (#{abs_id})")
+  end
+end
+
+NxTest.test('2a3: ensure v2 — skupina bez jednotkovej pasky -> kanonicka 1,0 (nikdy 0,4)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets = [a3_sheet('S18', 'G1', 'ST9')]
+  edges = [a3_edge('E04', 'G1', 'ST9', 0.4, 23.0), a3_edge('E15', 'G1', 'ST9', 1.5, 23.0)]
+  a3_with_catalog(sheets, edges, schema: 2) do
+    status, abs_id = A3MAT.ensure_edge_for_sheet('S18', client_schema: 2)
+    NxTest.assert_equal(:created, status)
+    NxTest.assert_equal(1.0, A3MAT.edge(abs_id)['thickness'])
+  end
+end
+
+NxTest.test('2a3: ensure v2 — stary klient pri SCHEMA 2 katalogu stale read-only (2A-2 kontrakt)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  a3_with_catalog([a3_sheet('S18', 'G1', 'ST9')], [], schema: 2) do
+    NxTest.assert_equal([:schema_read_only, nil], A3MAT.ensure_edge_for_sheet('S18'))
+  end
+end

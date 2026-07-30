@@ -146,6 +146,8 @@ module Noxun
       # kontrastna volba a nil = vedome "bez ABS" — tie sa NIKDY nedotknu.
       # target_thickness = cielova hrubka dielca (vyber sirky novej pasky).
       # Vrati [nova_mapa alebo nil (nic na prevod), pole hran bez nahrady].
+      # 2A-3: pouziva sa VYHRADNE pri SCHEMA 1 (textovy remap BEZ ZMENY);
+      # SCHEMA 2 volajuci idu cez remap_edges_v2 so zaznamami.
       def remap_edges(edges_hash, old_decor, new_decor, target_thickness = nil)
         return [nil, []] unless edges_hash.is_a?(Hash) && old_decor && new_decor && old_decor != new_decor
         out = edges_hash.dup
@@ -158,6 +160,52 @@ module Noxun
           next unless rec && rec['decor'] == old_decor
           new_aid = abs_for_decor(new_decor, rec['thickness'], target_thickness)
           lost << code if new_aid.nil?
+          out[code] = new_aid
+          changed = true
+        end
+        [changed ? out : nil, lost]
+      end
+
+      # --- 2A-3 (audit F7/F8): remap pri SCHEMA 2 — stary AJ novy sheet --------
+      # Podpis berie ZAZNAMY (nie texty). Meni LEN pasku kompatibilnu so STARYM
+      # sheetom: rovnaka skupina A (presna NEPRAZDNA zhoda struktury ALEBO
+      # universal:true). Nedotyka sa: nil (vedome "bez ABS"), cudzia skupina
+      # (vedomy kontrast), cudzia struktura V RAMCI skupiny (vedoma volba).
+      # Nahrada drzi NOMINALNU TRIEDU starej pasky cez resolver (1,0 -> jednotka
+      # novej skupiny, 2,0 -> dvojka). Kontrakt 0,4 (rozhodnute 30.7., standard
+      # 7.5): stara 0,4 sa NIKDY automaticky nenahradza — hrana ide na nil
+      # a do lost s reasonom abs_04_manual (pouzivatel vybera vedome znova).
+      # Ak sa skupina ANI struktura nemenia, pasky ostavaju kompatibilne
+      # a rucny vyber sirky/hrubky sa NEPREPISUJE (verny ekvivalent stareho
+      # "rovnaky dekor = nic na prevod").
+      # Vrati [nova_mapa alebo nil (nic na prevod), lost = [{code:, reason:}]].
+      def remap_edges_v2(edges_hash, old_sheet, new_sheet, target_thickness = nil)
+        return [nil, []] unless edges_hash.is_a?(Hash) && old_sheet.is_a?(Hash) && new_sheet.is_a?(Hash)
+        old_group = record_group_key(old_sheet, SCHEMA_GROUPS)
+        old_st = identity_norm(old_sheet['structure'])
+        same_group = old_group == record_group_key(new_sheet, SCHEMA_GROUPS)
+        return [nil, []] if same_group && old_st == identity_norm(new_sheet['structure'])
+        out = edges_hash.dup
+        changed = false
+        lost = []
+        out.each_key do |code|
+          aid = out[code]
+          next if aid.nil?
+          rec = edge(aid)
+          next unless rec
+          next unless record_group_key(rec, SCHEMA_GROUPS) == old_group
+          compatible = rec['universal'] == true ||
+                       (!old_st.empty? && identity_norm(rec['structure']) == old_st)
+          next unless compatible
+          klass = edge_thickness_class(rec['thickness'])
+          if klass == :nula4
+            lost << { code: code, reason: REASON_ABS_04_MANUAL }
+            out[code] = nil
+            changed = true
+            next
+          end
+          new_aid, why = abs_for_sheet(new_sheet, klass, target_thickness)
+          lost << { code: code, reason: why } if new_aid.nil?
           out[code] = new_aid
           changed = true
         end
