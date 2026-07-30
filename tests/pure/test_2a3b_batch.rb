@@ -391,3 +391,38 @@ NxTest.test('2a3b: GH P1 — batch bezi nad CERSTVYM obsahom (cudzi zapis pred z
                   'cudzi zapis prezil davku')
   end
 end
+
+NxTest.test('2a3b: GH P2 kolo 2 — existujuci variant s opacnym universal = konflikt davky, nie tichy skip') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  b3_with_catalog([], []) do
+    ok, = B3MAT.add_decor_batch(b3_attrs)
+    NxTest.assert(ok)
+    # rovnaka identita (sirka+hrubka+struktura), OPACNY universal -> chyba
+    ok2, err = B3MAT.add_decor_batch(b3_attrs('sheet_variants' => [],
+                                              'edge_variants' => [{ 'width' => 23.0, 'thickness' => 1.0,
+                                                                    'structure' => 'ST9', 'universal' => true }]))
+    NxTest.refute(ok2, 'opacny universal sa nesmie ticho skipnut')
+    NxTest.assert(err.include?('univerzálna'), err)
+    # zhodny universal (false) -> normalny skip
+    ok3, res3 = B3MAT.add_decor_batch(b3_attrs('sheet_variants' => [],
+                                               'edge_variants' => [{ 'width' => 23.0, 'thickness' => 1.0,
+                                                                     'structure' => 'ST9' }]))
+    NxTest.refute(ok3, 'vsetko existuje')
+    NxTest.assert(res3.include?('už v katalógu'), res3.to_s)
+  end
+end
+
+NxTest.test('2a3b: GH P1 kolo 2 — ensure RMW pod zamkom vidi cerstvy obsah (cudzi zapis prezije)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets = [b3_sheet('ENS18', 'K222', 'ST9')]
+  b3_with_catalog(sheets, []) do
+    # "iny proces" zapise pasku PRIAMO do suboru (cache o nej nevie)
+    raw = JSON.parse(File.binread(B3MAT.path))
+    raw['edges'] << { 'abs_id' => 'ABS_CUDZIA_ENS', 'decor' => 'K222', 'thickness' => 1.0,
+                      'width' => 23.0, 'group_id' => 'GRP-K222', 'structure' => 'ST9' }
+    File.binwrite(B3MAT.path, JSON.pretty_generate(raw))
+    status, abs_id = B3MAT.ensure_edge_for_sheet('ENS18', client_schema: 2)
+    NxTest.assert_equal(:exists, status, 'fresh load pod zamkom vidi cudziu pasku (ziadna dupla tvorba)')
+    NxTest.assert_equal('ABS_CUDZIA_ENS', abs_id)
+  end
+end

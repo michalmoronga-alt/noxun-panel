@@ -134,6 +134,11 @@
     return isNaN(n) ? 1 : n;
   }
   function catalogSchemaNow(){ return catalogSchemaOf(MATERIALS); }
+  // GH #91 P1 (2. kolo): CAPABILITY panela — FIXNA konstanta (vzor
+  // MD_CLIENT_SCHEMA), NIE echo serveroveho markera. Echo by buducu schemu 3
+  // falosne vydavalo za podporovanu a stary panel by smel mutovat novsi
+  // katalog. Zdvihnut az ked panel novsi format REALNE podporuje.
+  var PANEL_CLIENT_SCHEMA = 2;
   // 2A-3b: cely zaznam dosky z katalogu (group_id/structure pre zrkadlo). null = neznamy.
   function sheetRecOf(materialId){
     if (!materialId) return null;
@@ -375,7 +380,7 @@
       // catalogSchemaNow: GH #91 P2 — modal callbacky posielaju client schemu
       // (server ensure inak drzi legacy default a v SCHEMA 2 odmietne tvorbu).
       identityNorm: identityNorm, catalogSchemaOf: catalogSchemaOf,
-      catalogSchemaNow: catalogSchemaNow,
+      catalogSchemaNow: catalogSchemaNow, PANEL_CLIENT_SCHEMA: PANEL_CLIENT_SCHEMA,
       groupAbsEdgesV2: groupAbsEdgesV2, groupAbsForSheet: groupAbsForSheet,
       absUsableExistsV2: absUsableExistsV2, absUsableForSheet: absUsableForSheet,
       absMissingLabel: absMissingLabel, absUnitClass: absUnitClass,

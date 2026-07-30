@@ -195,6 +195,11 @@ module Noxun
         if server >= SCHEMA_GROUPS && client_schema.to_i < server
           return [:schema_read_only, nil]
         end
+        # GH #91 P1 (2. kolo): CELE read-modify-write pod zamkom s cerstvym
+        # loadom — ensure z ineho procesu uz nemoze prepisat cudzi cerstvy
+        # zapis (napr. prave dobehnuty batch) svojim predzamkovym snapshotom.
+        with_catalog_lock do
+        JsonFileStore.invalidate(path)
         s = sheet(material_id)
         return [:no_sheet, nil] unless s
         th = s['thickness'].to_f
@@ -240,6 +245,7 @@ module Noxun
         end
         return [:write_failed, nil] unless upsert_edge(rec)
         [:created, rec['abs_id']]
+        end
       end
 
       # 2A-3 (audit F14 / O2): hrubka dovytvaranej pasky = prva preferencia
@@ -474,7 +480,14 @@ module Noxun
         end
 
         edge_items.each do |it|
-          if find_edge_variant(decor, it['width'], it['thickness'], it['structure'], group_id: gid)
+          existing = find_edge_variant(decor, it['width'], it['thickness'], it['structure'], group_id: gid)
+          if existing
+            # GH #91 P2 (2. kolo): universal NIE JE identita — existujuci variant
+            # s OPACNYM priznakom nie je "skip", ale konflikt (tichy skip by
+            # pouzivatelovi klamal, ze universal paska existuje / neexistuje).
+            if (existing['universal'] == true) != (it['universal'] == true)
+              return [false, "ABS #{v3_edge_label(it)} už existuje s opačným príznakom „univerzálna“ — príznak sa mení v katalógu, nie dávkou."]
+            end
             skipped << "ABS #{v3_edge_label(it)}"
             next
           end
