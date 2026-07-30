@@ -12,6 +12,9 @@
 #            - drift hrubky: hrubka dielca nesedi s katalogovou hrubkou materialu
 #              (tolerancia ako builder ~0,05 mm; cela beru 18/19 mm variant)
 #            - dielec sa NEZMESTI na format platne materialu (respektuje smer dekoru)
+#            - ABS paska hrany MIMO KATALOGU (2A-2 audit F6: hrana referencuje
+#              abs_id, ktore v aktualnom katalogu nie je — napr. po zmazani pri
+#              migracii; kontrola bezi LEN ked volajuci ABS katalog dodal)
 #   ORANGE — podozrenie na prehliadnutie:
 #            - celo/dvierka (front_door/drawer_front) bez JEDINEJ ABS hrany
 #            - volna doska (free_panel) bez ABS ("skontroluj — moze byt zamer")
@@ -46,6 +49,7 @@ module Noxun
       CAT_MATERIAL  = 'material'   # RED
       CAT_THICKNESS = 'thickness'  # RED
       CAT_OVERSIZE  = 'oversize'   # RED
+      CAT_ABS       = 'abs_missing' # RED — ABS paska hrany mimo katalogu (2A-2, F6)
       CAT_FRONT_ABS = 'front_abs'  # ORANGE
       CAT_PANEL_ABS = 'panel_abs'  # ORANGE
       CAT_HARDWARE  = 'hardware'   # ORANGE
@@ -69,14 +73,19 @@ module Noxun
       #   warnings: [ {code, message, owner_id, part_key} ... ]
       # sheets: { material_id => { 'thickness' => Float, 'sheet_size' => [l, w] } }
       #   (katalog dosiek; headless testy krmia mapu priamo, v SketchUpe Materials.sheets)
+      # edges: { abs_id => zaznam } — katalog ABS pasok pre kontrolu abs_missing
+      #   (2A-2, F6). nil = katalog NEDODANY, kontrola sa cela preskoci (legacy
+      #   volania a existujuce testy bez zmeny spravania); prazdna mapa = kazde
+      #   pouzite abs_id je mimo katalogu.
       #
       # Vrati: { 'items' => [...deterministicky zoradene, deduplikovane...],
       #          'counts' => { 'red' => N, 'orange' => M, 'total' => N+M } }
-      def run(collected, sheets: {})
+      def run(collected, sheets: {}, edges: nil)
         collected = {} unless collected.is_a?(Hash)
         smap = sheets.is_a?(Hash) ? sheets : {}
+        emap = edges.is_a?(Hash) ? edges : nil
         items = []
-        Array(collected[:records]).each { |r| check_record(r, smap, items) }
+        Array(collected[:records]).each { |r| check_record(r, smap, emap, items) }
         Array(collected[:hardware_overrides]).each { |ov| check_hardware(ov, items) }
         Array(collected[:warnings]).each { |w| check_build(w, items) }
         items = sort_items(dedup(items))
@@ -85,7 +94,7 @@ module Noxun
 
       # --- kontroly dielca ---------------------------------------------------
 
-      def check_record(r, sheets, items)
+      def check_record(r, sheets, edges_catalog, items)
         return unless r.is_a?(Hash)
         mat  = r['material_id'].to_s
         role = r['role'].to_s
@@ -103,7 +112,27 @@ module Noxun
           check_oversize(r, sheet, items)
         end
 
+        check_abs_catalog(r, edges_catalog, items) if edges_catalog
         check_abs(r, role, items)
+      end
+
+      # RED (2A-2, F6): hrana referencuje abs_id, ktore v aktualnom katalogu nie
+      # je (napr. paska zmazana migraciou). Hodnoty edges su abs_id alebo nil
+      # (builders/overridy ine tvary nezapisuju) — kontroluje sa LEN neprazdny
+      # string; jedna polozka NA DIELEC (stable_key drzi vzor record_item).
+      def check_abs_catalog(r, edges_catalog, items)
+        edges = r['edges'].is_a?(Hash) ? r['edges'] : {}
+        missing = EDGE_CODES.filter_map do |code|
+          v = edges[code].to_s.strip
+          v unless v.empty? || edges_catalog.key?(v)
+        end.uniq.sort
+        return if missing.empty?
+        label = missing.map { |id| "„#{id}“" }.join(', ')
+        noun = missing.length == 1 ? 'ABS páska' : 'ABS pásky'
+        verb = missing.length == 1 ? 'nie je' : 'nie sú'
+        items << record_item(RED, CAT_ABS, r,
+                             "Dielec „#{disp_name(r)}“ (#{disp_owner(r)}) — #{noun} #{label} " \
+                             "#{verb} v katalógu — skontroluj olepenie.")
       end
 
       # RED: hrubka dielca vs katalogova hrubka materialu (drift). Tolerancia a

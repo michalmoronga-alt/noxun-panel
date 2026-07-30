@@ -109,7 +109,21 @@ module Noxun
 
       # --- cesty / perzistencia ------------------------------------------------
 
+      # VYHRADNE TESTY (SU scenar migracie 2A-2; produkcia NIKDY): presmeruje
+      # CELY katalog (materials.json + predmigracna zaloha) do izolovaneho
+      # priecinka. Runner ho po scenari VZDY vracia na nil (aj vo FAIL vetve)
+      # + Materials.reload!, inak by dalsie casti citali cudzi katalog.
+      def test_dir_override
+        @test_dir_override
+      end
+
+      def test_dir_override=(value)
+        @test_dir_override = value
+      end
+
       def dir
+        override = test_dir_override
+        return override.to_s if override && !override.to_s.empty?
         base = ENV['APPDATA'] || Dir.tmpdir
         File.join(base, 'NOXUN', 'Engine')
       end
@@ -173,13 +187,111 @@ module Noxun
       # 2A-1: kazdy zapis nesie SCHEMA marker. Bez explicitnej hodnoty sa preberie
       # schema zo suboru (chybajuca = 1), takze bezne mutacie ju nikdy nestratia;
       # explicitne ju posiela LEN migracia (2A-2).
+      # 2A-2 (Codex GH P1): KAZDY zapis katalogu bezi pod medziprocesovym flock
+      # zamkom — migracia drzi TEN ISTY zamok cez CAS kontrolu aj vymenu suboru,
+      # takze subezny zapis z ineho SketchUp procesu sa nemoze stratit v TOCTOU
+      # okne. V ramci zamku sa vola write_unlocked (flock na tom istom subore
+      # nie je v jednom procese reentrantny — druhe otvorenie by sa zablokovalo).
       def write(data)
-        payload = { 'std' => STD, 'schema' => target_schema(data['schema']),
-                    'sheets' => data['sheets'], 'edges' => data['edges'] }
-        JsonFileStore.write(path, payload)
+        with_catalog_lock { write_unlocked(data) }
       rescue StandardError => e
         Engine.log_error(e, 'Materials.write') if defined?(Engine)
         false
+      end
+
+      # Telo zapisu BEZ zamku — volat VYHRADNE zvnutra with_catalog_lock.
+      # Codex GH P1 (2. kolo): dve poistky proti hybridu marker-2-s-legacy-datami
+      # od mutatora, ktory si nacital data este pred migraciou (upsert/rename/
+      # patch robia data = load PRED vstupom do zamku):
+      #   1. cielova schema sa cita CERSTVO z disku (cache by pod zamkom mohla
+      #      drzat predmigracny marker a zapis by schemu 2 zhodil spat),
+      #   2. payload do suboru SCHEMA >= 2 musi byt UPLNY (kazdy zaznam nesie
+      #      group_id) — stale legacy pole sa odmietne, mutacia sa nestrati
+      #      potichu (vrati false, volajuci ohlasi neuspech).
+      def write_unlocked(data)
+        target = target_schema_fresh(data['schema'])
+        if target >= SCHEMA_GROUPS && !schema2_complete?(data['sheets'], data['edges'])
+          if defined?(Engine)
+            Engine.log_error(StandardError.new('payload bez group_id do katalogu SCHEMA 2'),
+                             'Materials.write_unlocked')
+          end
+          return false
+        end
+        payload = { 'std' => STD, 'schema' => target,
+                    'sheets' => data['sheets'], 'edges' => data['edges'] }
+        JsonFileStore.write(path, payload)
+      end
+
+      # Schema pre zapis podla CERSTVEHO markera z disku (downgrade zakazany —
+      # rovnaka semantika ako target_schema, ale bez JsonFileStore cache).
+      def target_schema_fresh(wanted)
+        current = catalog_schema_on_disk
+        n = wanted.to_i
+        n <= current ? current : n
+      end
+
+      # Marker priamo z disku, mimo cache — semantika primar-alebo-.bak ako
+      # JsonFileStore recovery (Codex GH P1 4. kolo): poskodeny/chybajuci primar
+      # s validnou SCHEMA 2 zalohou NESMIE otvorit dvere stale legacy zapisu,
+      # ktory by obnovitelny katalog prepisal markerom 1. Nic citatelne = 1.
+      def catalog_schema_on_disk
+        marker_from_file(path) || marker_from_file("#{path}.bak") || SCHEMA_LEGACY
+      end
+
+      # Marker jedneho suboru, alebo nil (chybajuci/necitatelny/poskodeny —
+      # volajuci skusi dalsi zdroj). Citatelny subor BEZ markera = legacy 1.
+      def marker_from_file(file)
+        return nil unless File.exist?(file)
+        data = JSON.parse(File.binread(file))
+        return nil unless data.is_a?(Hash)
+        n = data['schema'].to_i
+        n >= SCHEMA_LEGACY ? n : SCHEMA_LEGACY
+      rescue StandardError
+        nil
+      end
+
+      # Marker 2 je poctivy len vtedy, ked KAZDY zaznam nesie group_id (zdielaju
+      # write_unlocked guard aj migracna schema brana).
+      def schema2_complete?(sheets_raw, edges_raw)
+        return false unless sheets_raw.is_a?(Array) && edges_raw.is_a?(Array)
+        (sheets_raw + edges_raw).all? do |rec|
+          rec.is_a?(Hash) && !rec['group_id'].to_s.strip.empty?
+        end
+      end
+
+      # Medziprocesovy zamok katalogu (samostatny .lock subor v dir — NIKDY nie
+      # samotny materials.json, jeho rename by zamok stratil). Blokujuce LOCK_EX;
+      # kriticke sekcie su kratke (ms). test_dir_override presmeruje aj zamok,
+      # takze izolovane testy nikdy nesutazia so zivym katalogom.
+      def catalog_lock_path
+        File.join(dir, 'materials.lock')
+      end
+
+      # REENTRANTNY (Codex GH P1 2. kolo): flock toho isteho suboru cez druhy
+      # handle by sa v JEDNOM procese zablokoval sam o seba — vnorene volanie
+      # (napr. buduci mutator drziaci zamok cez load+write) preto len zvysi
+      # hlbku. SketchUp Ruby aj headless testy bezia na jednom vlakne.
+      def with_catalog_lock
+        depth = @catalog_lock_depth.to_i
+        if depth.positive?
+          @catalog_lock_depth = depth + 1
+          begin
+            return yield
+          ensure
+            @catalog_lock_depth -= 1
+          end
+        end
+        FileUtils.mkdir_p(dir)
+        File.open(catalog_lock_path, 'a') do |f|
+          f.flock(File::LOCK_EX)
+          @catalog_lock_depth = 1
+          begin
+            yield
+          ensure
+            @catalog_lock_depth = 0
+            f.flock(File::LOCK_UN)
+          end
+        end
       end
 
       # SCHEMA katalogu v subore. Chybajuci/poskodeny marker = 1 (legacy).

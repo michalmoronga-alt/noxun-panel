@@ -77,6 +77,10 @@ module Noxun
             rec = Materials.edge(abs_id)
             w = rec && rec['width'] ? rec['width'].to_f.round : '?'
             [true, " Vytvorená ABS #{rec && rec['decor']} #{w}/1 mm (globálny katalóg, cena 0 — Späť ju neodstráni)."]
+          when :schema_read_only
+            # 2A-2 (audit BLOCKER 2): katalog uz bezi na novsej scheme, nez pozna
+            # toto okno (CEF cache) — legacy zapis by stratil identitne polia.
+            [false, 'Katalóg má novší formát — obnov okno (nová verzia).']
           when :no_sheet
             [false, 'Materiál sa nenašiel v katalógu — páska sa nevytvorila.']
           when :no_standard_width

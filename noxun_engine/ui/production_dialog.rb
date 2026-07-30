@@ -78,7 +78,7 @@ module Noxun
           # v LOGu z TOHO ISTEHO vysledku). Vysledok z DOM je po flushi zastaraly.
           collected = fresh_collect(model)
           bom = Bom.compute(collected)
-          control = Validation.run(collected, sheets: sheets_map)
+          control = Validation.run(collected, sheets: sheets_map, edges: edges_map)
           merge = data['merge'] != false
           result = VepoExport.build(
             bom[:rows],
@@ -127,7 +127,7 @@ module Noxun
           # flushi editov PREPOCITA NANOVO a entity sa dohladaju podla identity
           # (owner_id + part_key), nie podla PID (rebuild ho meni).
           if data['problem_key']
-            item = Validation.run(collected, sheets: sheets_map)['items']
+            item = Validation.run(collected, sheets: sheets_map, edges: edges_map)['items']
                              .find { |it| it['stable_key'] == data['problem_key'] }
             if item.nil?
               push_state
@@ -292,6 +292,19 @@ module Noxun
           {}
         end
 
+        # Katalog ABS pasok ako mapa pre Validation.run ({ abs_id => zaznam }) —
+        # 2A-2 (F6): kontrola abs_missing (hrana s paskou mimo katalogu). Pri
+        # chybe vraciame nil (= kontrola sa preskoci), NIE prazdnu mapu — tá by
+        # falosne oznacila vsetky olepene hrany.
+        def edges_map
+          return nil unless defined?(Materials)
+
+          Materials.edges.each_with_object({}) { |a, out| out[a['abs_id']] = a }
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.edges_map')
+          nil
+        end
+
         # Suhrn KONTROLY do statusu okna/exportu (nalez 6: RED neblokuje export).
         def control_suffix(control)
           c = control.is_a?(Hash) ? (control['counts'] || {}) : {}
@@ -363,7 +376,7 @@ module Noxun
           smap = sheets_map
           sheet_sizes = smap.each_with_object({}) { |(id, s), out| out[id] = s['sheet_size'] }
           # V0.5 D: KONTROLA z TOHO ISTEHO cerstveho zberu (nalez 5).
-          control = Validation.run(collected, sheets: smap)
+          control = Validation.run(collected, sheets: smap, edges: edges_map)
           data = {
             version: Engine::VERSION,
             gen: @generation,
