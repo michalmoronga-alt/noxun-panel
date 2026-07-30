@@ -12,6 +12,11 @@ require 'fileutils'
 
 A3MAT = Noxun::Engine::Materials
 A3STORE = Noxun::Engine::JsonFileStore
+A3CB  = Noxun::Engine::CabinetBuilder
+A3BB  = Noxun::Engine::BoardBuilder
+A3CON = Noxun::Engine::Construction
+A3VAL = Noxun::Engine::Validation
+A3ABS = Noxun::Engine::AbsRules
 
 # Docasne nainstaluje CELY katalog (sheets + edges + schema marker) a po bloku
 # vrati bajt-presny povodny stav. Zapis ide priamo cez JsonFileStore (obchadza
@@ -258,5 +263,151 @@ NxTest.test('2a3: picker — 5981 s dvoma 23/1 roznych struktur sa nikdy nemiesa
   a3_with_catalog(sheets, edges, schema: 2) do
     NxTest.assert_equal(['EMG', nil], A3MAT.abs_for_sheet(A3MAT.sheet('SMG'), :jednotka, 18.0))
     NxTest.assert_equal(['EAF', nil], A3MAT.abs_for_sheet(A3MAT.sheet('SAF'), :jednotka, 18.0))
+  end
+end
+
+# ---------------------------------------------------------------------------
+# B2: warnings plumbing — zber pri resolve, agregacia, retaz do semaforu
+# ---------------------------------------------------------------------------
+
+# Params spodnej skrinky nad sandbox materialom.
+def a3_cab_params(mat_id, overrides = {})
+  { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 500.0,
+    'thickness' => 18.0, 'material_id' => mat_id, 'part_overrides' => overrides }
+end
+
+# Rozriesi vsetky dielce planu (ako build_into) a vrati [plan, issues].
+def a3_resolve_all(params)
+  cfg = A3CB.normalize(params)
+  plan = A3CON.build_plan(cfg)
+  overrides = cfg[:part_overrides] || {}
+  issues = []
+  eff = { 'body' => cfg[:material_id], 'front' => cfg[:front_material_id],
+          'back' => cfg[:back_material_id] }
+  plan[:parts].each do |pd|
+    A3CB.resolve_part(pd, eff['body'], eff['front'], eff['back'], overrides, abs_issues: issues)
+  end
+  [plan, issues, cfg]
+end
+
+NxTest.test('2a3: warnings — resolve_part zbiera reason + attach do planu + re-validacia') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  a3_with_catalog([a3_sheet('S18', 'G1', 'ST9')], [], schema: 2) do
+    plan, issues, = a3_resolve_all(a3_cab_params('S18'))
+    NxTest.assert(issues.length >= 4, "boky/dno/vrch maju pravidlo L1 — cakam zber (#{issues.length})")
+    NxTest.assert(issues.all? { |i| i[:reason] == 'abs_structure_missing' && i[:code] == 'L1' })
+    before = plan[:warnings].length
+    A3CB.attach_abs_warnings!(plan, issues)
+    added = plan[:warnings][before..]
+    NxTest.assert_equal(issues.length, added.length, 'jeden warning na (part_key, reason)')
+    w = added.find { |x| x['part_key'] == 'cabinet/side:left' }
+    NxTest.refute(w.nil?, 'warning nesie part_key dielca')
+    NxTest.assert_equal('abs_structure_missing', w['code'])
+    NxTest.assert_equal(['L1'], w['data']['edges'])
+    NxTest.assert(w['message'].include?('L1'), 'sprava vymenuje hrany')
+  end
+end
+
+NxTest.test('2a3: warnings — hrany prepisane overridom sa NEHLASIA (override vitazi)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  a3_with_catalog([a3_sheet('S18', 'G1', 'ST9')], [], schema: 2) do
+    ov = { 'cabinet/side:left' => { 'edges' => { 'L1' => nil } } } # vedome "bez ABS"
+    _plan, issues, = a3_resolve_all(a3_cab_params('S18', ov))
+    NxTest.refute(issues.any? { |i| i[:part_key] == 'cabinet/side:left' },
+                  'vedomy override nesmie vyrobit warning')
+    NxTest.assert(issues.any? { |i| i[:part_key] == 'cabinet/side:right' },
+                  'ostatne dielce hlasia dalej')
+  end
+end
+
+NxTest.test('2a3: warnings — agregacia (part_key, reason) vymenuje hrany, nezlieva reasony') do
+  entries = [
+    { part_key: 'cabinet/front:1', name: 'Dvierka', code: 'L1', reason: 'abs_15_fallback' },
+    { part_key: 'cabinet/front:1', name: 'Dvierka', code: 'W2', reason: 'abs_15_fallback' },
+    { part_key: 'cabinet/front:1', name: 'Dvierka', code: 'W1', reason: 'abs_width_missing' }
+  ]
+  out = A3ABS.pick_warnings(entries)
+  NxTest.assert_equal(2, out.length, 'dva reasony = dve polozky (nie 3, nie 1)')
+  fb = out.find { |w| w['code'] == 'abs_15_fallback' }
+  NxTest.assert_equal(%w[L1 W2], fb['data']['edges'], 'hrany vymenovane v poradi EDGE_ORDER')
+  NxTest.assert(fb['message'].include?('L1, W2') && fb['message'].include?('1,5'))
+  NxTest.assert_equal('warn', fb['severity'])
+end
+
+NxTest.test('2a3: warnings — retaz config -> collect tvar -> Validation.run = ORANGE polozka') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  a3_with_catalog([a3_sheet('S18', 'G1', 'ST9')], [], schema: 2) do
+    plan, issues, cfg = a3_resolve_all(a3_cab_params('S18'))
+    A3CB.attach_abs_warnings!(plan, issues)
+    stored = A3CB.merge_final(cfg, plan) # config korpusu (Bom.collect cita 'warnings')
+    collected = {
+      records: [],
+      hardware_overrides: [],
+      warnings: stored[:warnings].map { |w| w.merge('owner_id' => 'CAB-T1') }
+    }
+    control = A3VAL.run(collected)
+    items = control['items'].select { |i| i['category'] == 'build' && i['stable_key'].include?('abs_structure_missing') }
+    NxTest.assert(items.length >= 4, "semafor ma ORANGE polozky vyberu ABS (#{items.length})")
+    NxTest.assert(items.all? { |i| i['severity'] == 'orange' && i['owner_id'] == 'CAB-T1' })
+    side = items.find { |i| i['part_key'] == 'cabinet/side:left' }
+    NxTest.refute(side.nil?, 'klik-select identita (part_key) prezila retaz')
+  end
+end
+
+NxTest.test('2a3: warnings — doska: normalize -> board_config -> Validation.run (ORANGE)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  a3_with_catalog([a3_sheet('S18', 'G1', 'ST9')], [], schema: 2) do
+    cfg = A3BB.normalize('material_id' => 'S18', 'length' => 400.0, 'width' => 300.0)
+    NxTest.assert(cfg[:warnings].is_a?(Array) && cfg[:warnings].length == 1,
+                  "free_panel pravidlo L1 -> 1 warning (#{cfg[:warnings].inspect})")
+    w = cfg[:warnings][0]
+    NxTest.assert_equal('abs_structure_missing', w['code'])
+    NxTest.assert_equal('board/main', w['part_key'])
+    bcfg = A3BB.board_config(cfg)
+    NxTest.assert(bcfg[:warnings].is_a?(Array), 'config dosky nesie warnings poslednej stavby')
+    collected = { records: [], hardware_overrides: [],
+                  warnings: bcfg[:warnings].map { |x| x.merge('owner_id' => 'BRD-T1') } }
+    control = A3VAL.run(collected)
+    NxTest.assert_equal(1, control['counts']['orange'])
+    NxTest.assert(control['items'][0]['message_sk'].include?('L1'))
+  end
+end
+
+NxTest.test('2a3: dual-mode — identicke vstupy: schema 1 presne dnesok, schema 2 rovnaky vysledok') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  legacy_sheet = { 'material_id' => 'S18', 'manufacturer' => 'Egger', 'decor' => 'G1',
+                   'type' => 'DTDL', 'thickness' => 18.0, 'grain' => 'length',
+                   'color' => [1, 2, 3], 'production_class' => 'sheet' }
+  legacy_edge = { 'abs_id' => 'E10', 'decor' => 'G1', 'thickness' => 1.0,
+                  'width' => 23.0, 'color' => [1, 2, 3] }
+  run_case = lambda do
+    plan, issues, cfg = a3_resolve_all(a3_cab_params('S18'))
+    resolved = A3CB.resolve_part(plan[:parts].find { |pd| pd[:role] == 'side_left' },
+                                 cfg[:material_id], nil, nil, {})
+    [resolved[:edges], issues]
+  end
+  a3_with_catalog([legacy_sheet], [legacy_edge], schema: 1) do
+    edges1, issues1 = run_case.call
+    NxTest.assert_equal('E10', edges1['L1'], 'schema 1: abs_for_decor presne ako dnes')
+    NxTest.assert_equal([], issues1, 'schema 1 NIKDY nezbiera warnings (dual-mode)')
+  end
+  s2_sheet = legacy_sheet.merge('group_id' => 'GRP-G1', 'structure' => 'ST9')
+  s2_edge = legacy_edge.merge('group_id' => 'GRP-G1', 'structure' => 'ST9')
+  a3_with_catalog([s2_sheet], [s2_edge], schema: 2) do
+    edges2, issues2 = run_case.call
+    NxTest.assert_equal('E10', edges2['L1'], 'schema 2: abs_for_sheet vybral tu istu pasku')
+    NxTest.assert_equal([], issues2)
+  end
+end
+
+NxTest.test('2a3: dual-mode — doska pri schema 1 bez warnings kluca (config identicky s dneskom)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  legacy_sheet = { 'material_id' => 'S18', 'decor' => 'G1', 'type' => 'DTDL',
+                   'thickness' => 18.0, 'grain' => 'length', 'color' => [1, 2, 3],
+                   'production_class' => 'sheet' }
+  a3_with_catalog([legacy_sheet], [], schema: 1) do
+    cfg = A3BB.normalize('material_id' => 'S18', 'length' => 400.0, 'width' => 300.0)
+    NxTest.refute(cfg.key?(:warnings), 'schema 1: ziadny zber (legacy log-only cesta)')
+    NxTest.refute(A3BB.board_config(cfg).key?(:warnings), 'config bez noveho kluca')
   end
 end

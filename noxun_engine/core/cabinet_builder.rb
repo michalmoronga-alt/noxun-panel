@@ -267,11 +267,18 @@ module Noxun
           overrides = PartKeys.migrate_overrides(cfg[:part_overrides], plan[:parts])
           cfg = cfg.merge(part_overrides: overrides, part_key_schema: PartKeys::SCHEMA)
 
+          # 2A-3 (audit B2): pocas resolve_part sa zbieraju neuspechy/fallbacky
+          # ABS pickera; po rozrieseni materialov sa PRIPOJA do planu a plan sa
+          # RE-VALIDUJE — warning tak prezije retaz config -> Bom.collect ->
+          # Validation.run (ORANGE KONTROLA). Pri SCHEMA 1 kolektor ostava
+          # prazdny (resolve_edges legacy cesta nic nezbiera — dual-mode).
+          abs_issues = []
           plan[:parts].each do |pd|
             next unless positive_box?(pd[:box]) # ochrana proti degenerovanym dielcom (uzke zony)
-            resolved = resolve_part(pd, eff_body, eff_front, eff_back, overrides)
+            resolved = resolve_part(pd, eff_body, eff_front, eff_back, overrides, abs_issues: abs_issues)
             add_part(model, ents, pd, resolved, cid, tid)
           end
+          attach_abs_warnings!(plan, abs_issues)
 
           render_hardware(model, ents, plan[:hardware], cfg, cid)
 
@@ -280,11 +287,25 @@ module Noxun
           merge_final(cfg, plan)
         end
 
+        # 2A-3 (audit B2): kanonicke warnings z vyberu ABS do planu + re-validacia.
+        # Volane az PO resolve slucke — Construction.build_plan validuje warnings
+        # PRED resolve_part, taketo polozky by inak nikdy nepresli kontraktom.
+        def attach_abs_warnings!(plan, issues)
+          return plan if issues.nil? || issues.empty?
+          plan[:warnings].concat(AbsRules.pick_warnings(issues))
+          BuildPlan.validate!(plan)
+          plan
+        end
+
         # Vyriesi material + ABS hrany jedneho dielca cez stabilny part_key.
         # Renderovaci suffix a part_id ostavaju nezmenene; uz nie su datovym klucom override.
         # part_key je stabilny pri presune cela aj pri zmenach susednych zon;
         # role_key zostava iba kompatibilny nazov pola v sucasnom UI protokole.
-        def resolve_part(pd, eff_body, eff_front, eff_back, overrides)
+        # abs_issues (2A-3, audit B2): kolektor neuspechov ABS pickera — polozky
+        # {part_key:, name:, code:, reason:} pre agregaciu do plan[:warnings].
+        # Hrany PREPISANE overridom (aj vedome nil) sa NEHLASIA — override je
+        # rozhodnutie pouzivatela, warning by klamal.
+        def resolve_part(pd, eff_body, eff_front, eff_back, overrides, abs_issues: nil)
           part_key = PartKeys.for_descriptor(pd)
           ov = overrides[part_key].is_a?(Hash) ? overrides[part_key] : {}
           base_mat = base_material_for(pd[:role], pd[:material], eff_body, eff_front, eff_back)
@@ -297,8 +318,21 @@ module Noxun
           # katalogova hrubka sheetu ma prednost (cela 18/19 sa geometricky prisposobia
           # sheetu az v materialized_part, resolve_edges bezi skor).
           part_th = (sheet && sheet['thickness']) || pd[:prod][:thickness]
-          base_edges = defined?(AbsRules) ? AbsRules.resolve_edges(pd[:role], decor, part_th) : empty_edges
-          edges = base_edges.merge(known_edges(ov['edges']))
+          picker_issues = abs_issues.nil? ? nil : []
+          base_edges = if defined?(AbsRules)
+                         AbsRules.resolve_edges(pd[:role], decor, part_th,
+                                                sheet: sheet, collector: picker_issues)
+                       else
+                         empty_edges
+                       end
+          ov_edges = ov['edges'].is_a?(Hash) ? ov['edges'] : {}
+          if picker_issues && !picker_issues.empty?
+            picker_issues.each do |it|
+              next if ov_edges.key?(it[:code]) # override vitazi — ziadny warning
+              abs_issues << it.merge(part_key: part_key, name: pd[:name].to_s)
+            end
+          end
+          edges = base_edges.merge(known_edges(ov_edges))
           grain = sheet && sheet['grain'].to_s
           grain = 'none' unless %w[length width none].include?(grain)
           { part_key: part_key, role_key: part_key, material_id: mat_id, edges: edges,

@@ -50,9 +50,15 @@ module Noxun
           role = norm_role(p)
           mat = present(raw(p, :material_id))
           sheet = catalog_sheet(mat)
-          {
+          name = norm_name(p)
+          # 2A-3 (audit B2): zber neuspechov ABS pickera pri pravidlovom defaulte
+          # (SCHEMA 2 cesta) — kanonicke warnings putuju cez board_config ->
+          # Bom.collect -> Validation.run (ORANGE). Pri SCHEMA 1 ostava kolektor
+          # prazdny a vysledny cfg je identicky s dneskom (dual-mode).
+          picker_issues = []
+          out = {
             role: role,
-            name: norm_name(p),
+            name: name,
             length: clampf(fetchf(p, :length, DEFAULTS[:length]), *LIMITS[:length]),
             width:  clampf(fetchf(p, :width,  DEFAULTS[:width]),  *LIMITS[:width]),
             # Hrubka sa riadi katalogovym materialom; bez materialu (docasny stav
@@ -60,9 +66,14 @@ module Noxun
             thickness: sheet ? sheet['thickness'].to_f : clampf(fetchf(p, :thickness, DEFAULTS[:thickness]), *LIMITS[:thickness]),
             material_id: mat,
             grain_direction: norm_grain(p, sheet),
-            edges: norm_edges(p, sheet),
+            edges: norm_edges(p, sheet, picker_issues),
             quantity: norm_quantity(p)
           }
+          unless picker_issues.empty?
+            entries = picker_issues.map { |it| it.merge(part_key: PART_KEY, name: name) }
+            out[:warnings] = AbsRules.pick_warnings(entries)
+          end
+          out
         end
 
         # Obsahova validacia cfg (po normalize). Prisna materialova politika dosky:
@@ -103,7 +114,7 @@ module Noxun
 
         # --- config na Store (JSON round-trip tvar) --------------------------
         def board_config(cfg)
-          {
+          out = {
             engine_version: Engine::VERSION,
             name: cfg[:name].to_s,
             role: cfg[:role].to_s,
@@ -115,6 +126,11 @@ module Noxun
             grain_direction: cfg[:grain_direction],
             edges: cfg[:edges]
           }
+          # 2A-3 (audit B2): warnings POSLEDNEJ stavby — kluc sa uklada LEN ked
+          # nieco vzniklo (SCHEMA 1 config ostava bajtovo identicky s dneskom).
+          w = cfg[:warnings]
+          out[:warnings] = w if w.is_a?(Array) && !w.empty?
+          out
         end
 
         # Ulozeny config (string kluce) -> params pre normalize. Tenka vrstva —
@@ -389,12 +405,18 @@ module Noxun
         # pravidlovy default (key?-preserve, ziadne `||`, standard 7.5).
         # Neplatne abs_id sa zahodi na nil (Materials.normalized_abs_id — rovnake
         # spravanie ako korpusove part_overrides). Vzdy vracia CERSTVU kompletnu mapu.
-        def norm_edges(p, sheet)
+        # collector (2A-3, audit B2/F6): zber neuspechov pickera pri SCHEMA 2
+        # defaulte (resolve_edges dostava sheet — sheet-aware cesta dosky).
+        def norm_edges(p, sheet, collector = nil)
           input = raw(p, :edges)
           unless input.is_a?(Hash)
             decor = sheet && sheet['decor']
             # D-41: hrubka dosky je VZDY z materialu — picker sirky dostava tu istu.
-            return defined?(AbsRules) ? AbsRules.resolve_edges(ROLE, decor, sheet && sheet['thickness']) : empty_edges
+            unless defined?(AbsRules)
+              return empty_edges
+            end
+            return AbsRules.resolve_edges(ROLE, decor, sheet && sheet['thickness'],
+                                          sheet: sheet, collector: collector)
           end
           out = {}
           EDGE_KEYS.each do |k|

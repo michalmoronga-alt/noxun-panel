@@ -65,7 +65,14 @@ module Noxun
             boards += 1
             next unless Store.get(inst, 'manufactured') == true
             bcfg = Store.config(inst) || {}
-            records << record(bcfg, owner_id: Store.get(inst, 'id').to_s,
+            bid = Store.get(inst, 'id').to_s
+            # 2A-3 (audit B2): warnings poslednej stavby DOSKY — doteraz sa
+            # zbierali len z korpusov a warning vyberu ABS by sa pri samostatnej
+            # doske stratil pred semaforom (config -> collect -> Validation.run).
+            Array(bcfg['warnings']).each do |w|
+              warnings << (w.is_a?(Hash) ? w.merge('owner_id' => bid) : { 'message' => w.to_s, 'owner_id' => bid })
+            end
+            records << record(bcfg, owner_id: bid,
                               name: (bcfg['name'] || 'Doska').to_s,
                               part_key: Store.get(inst, 'part_key').to_s,
                               role: (Store.get(inst, 'role') || bcfg['role']).to_s,
