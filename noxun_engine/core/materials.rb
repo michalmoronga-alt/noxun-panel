@@ -41,7 +41,13 @@ module Noxun
       # Nemenna PREDMIGRACNA zaloha (standard 7.1) — mimo bezneho .bak, ktory sa
       # pri kazdom zapise prepisuje. Vznikne raz a NIKDY sa neprepise.
       PRE_SCHEMA2_FILE = 'materials.pre-schema-2.json'
+      # 2A-3 (audit BLOCKER 1): povolene hrubky ABS su SCHEMA-AWARE. SCHEMA 1
+      # drzi presne dnesny whitelist {1;2}; SCHEMA 2 povoluje realne obchodne
+      # hodnoty (standard 7.5). Vsetky miesta (load filter, normalize, CRUD,
+      # batch) rozhoduju VYHRADNE cez supported_edge_thickness? — globalne
+      # rozsirenie whitelistu by bolo porusenie dark launch.
       SUPPORTED_EDGE_THICKNESSES = [1.0, 2.0].freeze
+      SUPPORTED_EDGE_THICKNESSES_V2 = [0.4, 0.8, 1.0, 1.2, 1.5, 2.0].freeze
       # D-41: sirka ABS pasky (mm). Volitelne pole 'width' na edge zazname —
       # legacy pasky bez sirky su "univerzalne" (pouzitelne pre kazdu hrubku).
       # Picker vyzaduje presah sirky nad hrubku dielca (olep + orez).
@@ -49,7 +55,11 @@ module Noxun
       WIDTH_MARGIN = 2.0
       # Standardne sirky pre automaticke dovytvorenie pasky (PR C create-missing):
       # najmensia >= hrubka+MARGIN; mimo standardov sa auto-tvorba odmietne.
-      AUTO_WIDTHS = [22.0, 43.0].freeze
+      # 2A-3 (audit N16, JEDINA vedoma vynimka z dual-mode): 22 -> 23 GLOBALNE —
+      # Demos siroku jednotkovu pasku predava ako 23 mm (oprava chybneho
+      # obchodneho udaju). Existujuce 22 mm pasky ostavaju platne a picker ich
+      # dalej smie vyberat; meni sa LEN auto-tvorba novych pasok.
+      AUTO_WIDTHS = [23.0, 43.0].freeze
 
       # D-44 (audit F6): povoleny rozsah rozmeru platne (mm) — JEDINA autorita
       # pouzivana formularom (validate_sheet_attrs) AJ batchom "Novy dekor".
@@ -142,15 +152,20 @@ module Noxun
       def catalog
         ensure_seeded
         data = JsonFileStore.read(path, copy: false)
+        # 2A-3 (audit B1): filter hrubok rozhoduje podla schemy SUBORU, ktory
+        # prave nacitavame (marker je v data — ziadne dalsie citanie, ziadna
+        # rekurzia cez catalog_schema). SCHEMA 2 katalog s obchodnymi hrubkami
+        # (0,4/0,8/1,2/1,5) sa NESMIE pri loade fyzicky orezat na {1;2}.
+        schema = data.is_a?(Hash) ? schema_of(data) : SCHEMA_LEGACY
         sheet_records = data['sheets'].is_a?(Array) ? data['sheets'] : seed_sheets
         raw_edges = data['edges'].is_a?(Array) ? data['edges'] : seed_edges
         edge_records = raw_edges.select do |item|
-          item.is_a?(Hash) && supported_edge_thickness?(item['thickness'])
+          item.is_a?(Hash) && supported_edge_thickness?(item['thickness'], schema)
         end
 
         if edge_records != raw_edges
           if write({ 'sheets' => sheet_records, 'edges' => edge_records }) && defined?(Engine)
-            Engine.log('materialy: ABS katalog bol obmedzeny na hrubky 1/2 mm')
+            Engine.log('materialy: ABS zaznamy s nepovolenou hrubkou boli odstranene z katalogu')
           end
         end
 
@@ -299,11 +314,16 @@ module Noxun
       def catalog_schema
         return SCHEMA_LEGACY unless JsonFileStore.available?(path)
         data = JsonFileStore.read(path, copy: false)
-        raw = data.is_a?(Hash) ? data['schema'] : nil
-        n = raw.to_i
-        n >= SCHEMA_LEGACY ? n : SCHEMA_LEGACY
+        data.is_a?(Hash) ? schema_of(data) : SCHEMA_LEGACY
       rescue StandardError
         SCHEMA_LEGACY
+      end
+
+      # Marker z UZ NACITANYCH dat katalogu (2A-3): jedna interpretacia markera
+      # pre catalog_schema aj load filter (ktory schemu cita z dat v ruke).
+      def schema_of(data)
+        n = data['schema'].to_i
+        n >= SCHEMA_LEGACY ? n : SCHEMA_LEGACY
       end
 
       # Schema pre zapis: bez zelania (a pri neplatnej/nizsej hodnote) sa drzi
@@ -497,11 +517,23 @@ module Noxun
         f && f.positive? && f.finite? ? f : nil
       end
 
-      def supported_edge_thickness?(value)
-        SUPPORTED_EDGE_THICKNESSES.include?(value.to_f)
+      # 2A-3 (audit B1): JEDINA autorita povolenych hrubok ABS — schema-aware.
+      # Default je schema aktualneho katalogu; load filter posiela schemu suboru,
+      # ktory prave nacitava (data v ruke, ziadna rekurzia).
+      def supported_edge_thickness?(value, schema = catalog_schema)
+        edge_thickness_whitelist(schema).include?(value.to_f)
       end
 
-      # Povoli iba ABS, ktore realne existuje v aktivnom katalogu 1/2 mm.
+      def edge_thickness_whitelist(schema = catalog_schema)
+        schema.to_i >= SCHEMA_GROUPS ? SUPPORTED_EDGE_THICKNESSES_V2 : SUPPORTED_EDGE_THICKNESSES
+      end
+
+      # Povolene hrubky do hlasok ("1/2" resp. "0,4/0,8/1/1,2/1,5/2").
+      def edge_thickness_options_label(schema = catalog_schema)
+        edge_thickness_whitelist(schema).map { |t| fmt_mm(t) }.join('/')
+      end
+
+      # Povoli iba ABS, ktore realne existuje v aktivnom katalogu.
       def normalized_abs_id(id)
         value = id.to_s.strip
         return nil if value.empty?

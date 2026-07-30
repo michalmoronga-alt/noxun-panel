@@ -472,6 +472,9 @@ Každý plošný dielec nesie hrany **per strana** ako dáta (nezávislé od viz
   („jednotka"/„dvojka"); **resolver obchodnej hrúbky** ich prekladá na dostupné pásky
   skupiny: jednotka = 0,8 → 1,0 → 1,2 (podľa toho, čo dekor má — lesklé MG majú len 1,0);
   dvojka = 2,0 (→ 1,5 s viditeľným upozornením). **0,4 sa nikdy nevyberá automaticky.**
+  **Remap 0,4 (2A-3):** pri zmene materiálu sa ručná 0,4 páska **nikdy nenahrádza
+  automaticky** — hrana ide na „bez ABS" a hlási sa ako stratená s dôvodom
+  `abs_04_manual` (používateľ vyberie novú pásku vedome).
 - **Šírka pásky (D-41):** voliteľné pole `width` (mm, 10–200); auto-šírky {23, 43}.
   Výber šírky (deterministický, tie-break `abs_id`): najmenšia šírka ≥ hrúbka dielca +
   2 mm → univerzálna → žiadna (**nikdy užšia páska než dielec**).

@@ -267,11 +267,18 @@ module Noxun
           overrides = PartKeys.migrate_overrides(cfg[:part_overrides], plan[:parts])
           cfg = cfg.merge(part_overrides: overrides, part_key_schema: PartKeys::SCHEMA)
 
+          # 2A-3 (audit B2): pocas resolve_part sa zbieraju neuspechy/fallbacky
+          # ABS pickera; po rozrieseni materialov sa PRIPOJA do planu a plan sa
+          # RE-VALIDUJE — warning tak prezije retaz config -> Bom.collect ->
+          # Validation.run (ORANGE KONTROLA). Pri SCHEMA 1 kolektor ostava
+          # prazdny (resolve_edges legacy cesta nic nezbiera — dual-mode).
+          abs_issues = []
           plan[:parts].each do |pd|
             next unless positive_box?(pd[:box]) # ochrana proti degenerovanym dielcom (uzke zony)
-            resolved = resolve_part(pd, eff_body, eff_front, eff_back, overrides)
+            resolved = resolve_part(pd, eff_body, eff_front, eff_back, overrides, abs_issues: abs_issues)
             add_part(model, ents, pd, resolved, cid, tid)
           end
+          attach_abs_warnings!(plan, abs_issues)
 
           render_hardware(model, ents, plan[:hardware], cfg, cid)
 
@@ -280,11 +287,25 @@ module Noxun
           merge_final(cfg, plan)
         end
 
+        # 2A-3 (audit B2): kanonicke warnings z vyberu ABS do planu + re-validacia.
+        # Volane az PO resolve slucke — Construction.build_plan validuje warnings
+        # PRED resolve_part, taketo polozky by inak nikdy nepresli kontraktom.
+        def attach_abs_warnings!(plan, issues)
+          return plan if issues.nil? || issues.empty?
+          plan[:warnings].concat(AbsRules.pick_warnings(issues))
+          BuildPlan.validate!(plan)
+          plan
+        end
+
         # Vyriesi material + ABS hrany jedneho dielca cez stabilny part_key.
         # Renderovaci suffix a part_id ostavaju nezmenene; uz nie su datovym klucom override.
         # part_key je stabilny pri presune cela aj pri zmenach susednych zon;
         # role_key zostava iba kompatibilny nazov pola v sucasnom UI protokole.
-        def resolve_part(pd, eff_body, eff_front, eff_back, overrides)
+        # abs_issues (2A-3, audit B2): kolektor neuspechov ABS pickera — polozky
+        # {part_key:, name:, code:, reason:} pre agregaciu do plan[:warnings].
+        # Hrany PREPISANE overridom (aj vedome nil) sa NEHLASIA — override je
+        # rozhodnutie pouzivatela, warning by klamal.
+        def resolve_part(pd, eff_body, eff_front, eff_back, overrides, abs_issues: nil)
           part_key = PartKeys.for_descriptor(pd)
           ov = overrides[part_key].is_a?(Hash) ? overrides[part_key] : {}
           base_mat = base_material_for(pd[:role], pd[:material], eff_body, eff_front, eff_back)
@@ -297,8 +318,40 @@ module Noxun
           # katalogova hrubka sheetu ma prednost (cela 18/19 sa geometricky prisposobia
           # sheetu az v materialized_part, resolve_edges bezi skor).
           part_th = (sheet && sheet['thickness']) || pd[:prod][:thickness]
-          base_edges = defined?(AbsRules) ? AbsRules.resolve_edges(pd[:role], decor, part_th) : empty_edges
-          edges = base_edges.merge(known_edges(ov['edges']))
+          picker_issues = abs_issues.nil? ? nil : []
+          base_edges = if defined?(AbsRules)
+                         AbsRules.resolve_edges(pd[:role], decor, part_th,
+                                                sheet: sheet, collector: picker_issues)
+                       else
+                         empty_edges
+                       end
+          ov_edges = ov['edges'].is_a?(Hash) ? ov['edges'] : {}
+          if picker_issues && !picker_issues.empty?
+            picker_issues.each do |it|
+              next if ov_edges.key?(it[:code]) # override vitazi — ziadny warning
+              abs_issues << it.merge(part_key: part_key, name: pd[:name].to_s)
+            end
+          end
+          # Codex GH #90 P1: sticky remapove dovody overridov (edge_warnings od
+          # remap_part_edge_overrides!) — platia, kym hodnota hrany zodpoveda
+          # zaznamu (uspesny fallback drzi svoje abs_id, stratena hrana nil);
+          # uzivatelova zmena hrany zaznam zneplatni a TU sa aj uprace (prune
+          # in-place — override hash ide do configu, upratanie prezije rebuild).
+          ew = ov['edge_warnings']
+          if ew.is_a?(Hash)
+            ew.keys.each do |code|
+              entry = ew[code]
+              want = entry.is_a?(Hash) ? entry['abs_id'] : nil
+              if ov_edges.key?(code) && ov_edges[code] == want
+                abs_issues << { code: code, reason: entry['reason'].to_s,
+                                part_key: part_key, name: pd[:name].to_s } if abs_issues
+              else
+                ew.delete(code)
+              end
+            end
+            ov.delete('edge_warnings') if ew.empty?
+          end
+          edges = base_edges.merge(known_edges(ov_edges))
           grain = sheet && sheet['grain'].to_s
           grain = 'none' unless %w[length width none].include?(grain)
           { part_key: part_key, role_key: part_key, material_id: mat_id, edges: edges,
@@ -378,13 +431,21 @@ module Noxun
         # (c) inak nic — volajuci odmietne zmenu a vypise kandidatov.
         # Vrati { pick: sheet|nil, candidates: [sheet...] } (kandidati = vsetky
         # dosky hladanej hrubky, zoradene material_id — zoznam do hlasky).
-        def pick_body_sheet(want, current, pool)
+        # 2A-3 (audit F10): `schema` je PARAMETER (cista funkcia, ziadne
+        # ambientne citanie katalogu — volajuci ju doda). Pri schema >= 2 su
+        # kandidati LEN rovnaky group_id + rovnaka normalizovana NEPRAZDNA
+        # struktura ako current; prazdna struktura = ZIADEN automaticky vyber;
+        # bez zhody sa zmena odmietne (ziadny tichy skok na cudzi material).
+        def pick_body_sheet(want, current, pool, schema: 1)
           w = want.to_f
           # GH P2: v tolerancii 0,05 moze byt viac roznych hrubok (18,56 vs 18,60) —
           # prve kriterium je NAJMENSI rozdiel od want, material_id je az tie-break.
           cands = Array(pool).select { |s| s.is_a?(Hash) && thickness_eq?(s['thickness'], w) }
                              .sort_by { |s| [(s['thickness'].to_f - w).abs, s['material_id'].to_s] }
           return { pick: nil, candidates: cands } if cands.empty?
+          if defined?(Materials) && schema.to_i >= Materials::SCHEMA_GROUPS
+            return { pick: pick_body_sheet_v2(cands, current), candidates: cands }
+          end
           # GH P2: identita typu je case-insensitive (ako pri variantoch katalogu).
           type  = current ? current['type'].to_s.strip.upcase : ''
           decor = current ? current['decor'].to_s.strip.upcase : ''
@@ -392,6 +453,23 @@ module Noxun
           same_decor = decor.empty? ? [] : same_type.select { |s| s['decor'].to_s.strip.upcase == decor }
           pick = same_decor.first || (same_type.length == 1 ? same_type.first : nil)
           { pick: pick, candidates: cands }
+        end
+
+        # 2A-3 (audit F10): SCHEMA 2 vyber — tvrdy guard skupina + NEPRAZDNA
+        # struktura; v ramci zhody preferencia rovnakeho typu, inak PRAVE JEDEN
+        # kandidat (ziadny nahodny vyber). Vrati sheet alebo nil.
+        def pick_body_sheet_v2(cands, current)
+          return nil unless current.is_a?(Hash)
+          st = Materials.identity_norm(current['structure'])
+          return nil if st.empty? # prazdna struktura = neznama, ziadny auto vyber
+          gk = Materials.record_group_key(current, Materials::SCHEMA_GROUPS)
+          matches = cands.select do |s|
+            Materials.record_group_key(s, Materials::SCHEMA_GROUPS) == gk &&
+              Materials.identity_norm(s['structure']) == st
+          end
+          type = current['type'].to_s.strip.upcase
+          same_type = matches.select { |s| s['type'].to_s.strip.upcase == type }
+          same_type.first || (matches.length == 1 ? matches.first : nil)
         end
 
         # D-45/D-46: prevzatie KATALOGOVEJ hrubky materialu tela do params
@@ -505,6 +583,10 @@ module Noxun
           result = { 'changed' => 0, 'lost' => [] }
           ov = params['part_overrides']
           return result unless ov.is_a?(Hash) && !ov.empty? && defined?(Materials)
+          # 2A-3 (audit F7): pri katalogu SCHEMA 2 ide remap so ZAZNAMAMI (stary
+          # AJ novy sheet — skupina + struktura + universal); SCHEMA 1 = dnesny
+          # textovy remap BEZ ZMENY.
+          schema2 = Materials.catalog_schema >= Materials::SCHEMA_GROUPS
           old_ov = old_overrides.is_a?(Hash) ? old_overrides : ov
           parts = plan_parts_by_key(params)
           ov.each do |rk, rec|
@@ -520,16 +602,49 @@ module Noxun
             # Cielova hrubka: katalogova hrubka noveho sheetu (cela 18/19 sa jej
             # prisposobia — FIX 10), fallback konstrukcna hrubka dielca.
             target = new_sheet ? new_sheet['thickness'].to_f : pd[:prod][:thickness].to_f
-            remapped, lost = Materials.remap_edges(
-              rec['edges'], Materials.decor_of(old_mat), new_sheet && new_sheet['decor'],
-              target.positive? ? target : nil
-            )
+            target = target.positive? ? target : nil
+            if schema2
+              remapped, issues = Materials.remap_edges_v2(rec['edges'], Materials.sheet(old_mat),
+                                                          new_sheet, target)
+              lost = issues.reject { |n| n[:abs_id] }
+                           .map { |n| "#{n[:code]}#{lost_suffix(n[:reason])}" }
+            else
+              remapped, lost = Materials.remap_edges(
+                rec['edges'], Materials.decor_of(old_mat), new_sheet && new_sheet['decor'], target
+              )
+              issues = []
+            end
             next unless remapped
+            # GH #90 P2 (2. kolo): sticky zaznamy sa aktualizuju PER SPRACOVANA
+            # hrana — nil hrany remap preskakuje a ich lost-warningy MUSIA
+            # prezit (celoplosne delete by ich zahodilo, hoci hrana ostava
+            # nevyriesena). Spracovana = mala hodnotu a zmenila sa / dostala issue.
+            processed = rec['edges'].keys.select do |c|
+              old_v = rec['edges'][c]
+              !old_v.nil? && (remapped[c] != old_v || issues.any? { |n| n[:code] == c })
+            end
             rec['edges'] = remapped
+            ew = rec['edge_warnings'].is_a?(Hash) ? rec['edge_warnings'].dup : {}
+            processed.each { |c| ew.delete(c) }
+            issues.each do |n|
+              ew[n[:code]] = { 'reason' => n[:reason].to_s, 'abs_id' => n[:abs_id] }
+            end
+            if ew.empty?
+              rec.delete('edge_warnings')
+            else
+              rec['edge_warnings'] = ew
+            end
             result['changed'] += 1
             lost.each { |code| result['lost'] << "#{pd[:name] || rk} #{code}" }
           end
           result
+        end
+
+        # 2A-3 (F8): dovetok k stratenej hrane v hlaske — kontrakt 0,4 vyzaduje
+        # jasne "vyber rucne" (paska sa vedome NEnahradila automaticky).
+        def lost_suffix(reason)
+          return '' unless defined?(Materials)
+          reason.to_s == Materials::REASON_ABS_04_MANUAL ? ' (0,4 mm — vyber ručne)' : ''
         end
 
         # Mapa part_key -> deskriptor dielca z planu (rola, hrubka, nazov).
@@ -924,6 +1039,23 @@ module Noxun
                 e[k] = v # nil (bez ABS) alebo podporovane abs_id
               end
               rec['edges'] = e unless e.empty?
+            end
+            # Codex GH #90 P1: sticky remapove dovody (remap_part_edge_overrides!)
+            # musia prezit normalize round-trip — bez passthrough by ich kazdy
+            # rebuild zahodil. Sanitizacia: zname hrany, neprazdny reason,
+            # abs_id string alebo nil (lost).
+            ew = ov['edge_warnings'] || ov[:edge_warnings]
+            if ew.is_a?(Hash)
+              w = {}
+              %w[L1 L2 W1 W2].each do |k|
+                entry = ew[k] || ew[k.to_sym]
+                next unless entry.is_a?(Hash)
+                reason = (entry['reason'] || entry[:reason]).to_s
+                next if reason.empty?
+                w[k] = { 'reason' => reason,
+                         'abs_id' => present(entry['abs_id'] || entry[:abs_id]) }
+              end
+              rec['edge_warnings'] = w unless w.empty?
             end
             out[key.to_s] = rec unless rec.empty?
           end

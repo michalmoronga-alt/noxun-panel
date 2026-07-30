@@ -216,17 +216,34 @@ module Noxun
 
       # Vyrieši ABS hrany konkretneho sheet dielca:
       #   role  — rola dielca (pravidlo urci KTORE hrany a AKA hrubka ABS)
-      #   decor — dekor materialu dielca (urci KTORY dekor ABS pasky)
+      #   decor — dekor materialu dielca (urci KTORY dekor ABS pasky; SCHEMA 1)
       #   part_thickness — hrubka dielca v mm (D-41: vyber SIRKY pasky; nil =
       #     legacy volanie, picker preferuje univerzalnu pasku bez sirky)
+      #   sheet — katalogovy zaznam dosky (2A-3, audit F6): pri katalogu SCHEMA 2
+      #     ide vyber cez Materials.abs_for_sheet (skupina + struktura + resolver
+      #     nominalnej triedy — hodnota pravidla 1,0/2,0 sa INTERPRETUJE ako
+      #     trieda jednotka/dvojka; pravidla na disku sa NIKDY neprepisuju, F9).
+      #     Bez sheetu alebo pri SCHEMA 1 plati dnesna cesta abs_for_decor 1:1.
+      #   collector — pole pre zber neuspechov/falibackov pickera (2A-3, audit
+      #     B2): kazdy strojovy reason sa prida ako {code:, reason:, want:};
+      #     caller doplna part_key/nazov a agreguje cez pick_warnings.
       # Vrati VZDY kompletnu mapu {L1,L2,W1,W2} kde hodnota = abs_id alebo nil.
       # Ak pravidlo ziada hrubku, pre ktoru dekor nema pouzitelny variant -> nil + info log (standard 7.5).
-      def resolve_edges(role, decor, part_thickness = nil)
+      def resolve_edges(role, decor, part_thickness = nil, sheet: nil, collector: nil)
         th = thicknesses_for(role)
         out = { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil }
+        schema2 = sheet.is_a?(Hash) && defined?(Materials) &&
+                  Materials.catalog_schema >= Materials::SCHEMA_GROUPS
         EDGE_ORDER.each do |code|
           want = th[code]
           next if want.nil?
+          if schema2
+            abs_id, reason = Materials.abs_for_sheet(sheet, Materials.edge_thickness_class(want),
+                                                     part_thickness)
+            out[code] = abs_id if abs_id
+            collector << { code: code, reason: reason, want: want } if collector && reason
+            next
+          end
           abs_id = Materials.abs_for_decor(decor, want, part_thickness) if defined?(Materials)
           if abs_id
             out[code] = abs_id
@@ -238,6 +255,42 @@ module Noxun
           end
         end
         out
+      end
+
+      # --- 2A-3 (audit B2): agregacia zberu pickera do kanonickych warnings ----
+      # entries: [{part_key:, name:, code:, reason:}]. Dedup kontrakt: JEDEN
+      # warning na (part_key, reason) s VYMENOVANYMI hranami v sprave aj v data
+      # — 4 hrany dielca nevyrobia 4 polozky, ale ani sa nezleju do jednej bez
+      # informacie. Tvar = BuildPlan.warning (string kluce, JSON round-trip).
+      def pick_warnings(entries)
+        Array(entries).group_by { |e| [e[:part_key].to_s, e[:reason].to_s] }
+                      .map do |(pkey, reason), list|
+          codes = list.map { |e| e[:code].to_s }.uniq
+                      .sort_by { |c| EDGE_ORDER.index(c) || EDGE_ORDER.length }
+          BuildPlan.warning(reason, pick_warning_message(reason, list.first[:name], codes),
+                            part_key: pkey.empty? ? nil : pkey,
+                            data: { 'edges' => codes })
+        end
+      end
+
+      # Slovenska sprava warningu vyberu ABS (dielec + vymenovane hrany).
+      def pick_warning_message(reason, name, codes)
+        who = name.to_s.strip.empty? ? 'Dielec' : "Dielec „#{name}“"
+        edges_txt = codes.join(', ')
+        case reason.to_s
+        when Materials::REASON_ABS_15
+          "#{who}: hrany #{edges_txt} — ABS 1,5 mm namiesto 2 mm (skupina nemá dvojku), skontroluj."
+        when Materials::REASON_ABS_WIDTH
+          "#{who}: hrany #{edges_txt} bez ABS — žiadna páska skupiny nemá použiteľnú šírku."
+        when Materials::REASON_ABS_NOMINAL
+          "#{who}: hrany #{edges_txt} bez ABS — skupina nemá pásku žiadanej triedy hrúbky."
+        when Materials::REASON_ABS_04_MANUAL
+          # GH #90 P2 (2. kolo): 0,4 remap NIE JE chyba struktury — paska sa
+          # vedome nenahradza automaticky, naprava je rucny vyber.
+          "#{who}: hrany #{edges_txt} bez ABS — pôvodná 0,4 mm páska sa nenahrádza automaticky, vyber ručne."
+        else
+          "#{who}: hrany #{edges_txt} bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu)."
+        end
       end
 
       # Prazdne hrany (non-sheet dielce, alebo ziadne pravidlo) — kompletna nil mapa.

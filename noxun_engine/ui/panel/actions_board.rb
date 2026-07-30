@@ -67,9 +67,18 @@ module Noxun
           end
           cfg = Store.config(board) || {}
           params = { 'material_id' => mat }
-          remap, lost = remap_edges_for_material(cfg, mat)
-          params['edges'] = remap if remap
           new_sheet = Materials.sheet(mat)
+          remap, lost, remap_issues = remap_edges_for_material(cfg, mat)
+          params['edges'] = remap if remap
+          # Codex GH #90 P1/P2 (kola 1-4): v SCHEMA 2 stavia hrany + warnings
+          # JEDNA kompozicia (BoardBuilder.material_change_outcome): remap ->
+          # repick zlyhanych defaultov (nie 0,4 kontraktu) -> zachovanie
+          # warnings nespracovanych hran -> cerstve warnings.
+          unless remap_issues.nil?
+            edges_final, warnings_final = BoardBuilder.material_change_outcome(cfg, remap, remap_issues, new_sheet)
+            params['edges'] = edges_final
+            params['warnings'] = warnings_final
+          end
           params['grain_direction'] = 'none' if new_sheet && new_sheet['grain'].to_s == 'none'
           msg = 'Materiál dosky nastavený.'
           msg += ' ABS hrany prevedené na nový dekor.' if remap
@@ -77,20 +86,34 @@ module Noxun
           apply_board(model, board, params, "#{msg}#{abs_note}")
         end
 
-        # Prevod ABS hran stareho dekoru na novy (rovnaka hrubka). Vrati
+        # Prevod ABS hran stareho dekoru na novy (drzi nominalnu triedu). Vrati
         # [nova_edges_mapa alebo nil (nic na prevod), pole hran bez variantu].
         # D-41 PR C: len tenky obal nad spolocnym jadrom Materials.remap_edges
         # (to iste pouzivaju dielcove overridy — audit FIX 5). Cielova hrubka =
         # hrubka NOVEHO sheetu (hrubka dosky VZDY nasleduje material; FIX 10).
+        # 2A-3 (audit F6/F7): pri katalogu SCHEMA 2 ide remap so ZAZNAMAMI
+        # (stary aj novy sheet — skupina + struktura + universal, 0,4 do lost
+        # s "vyber rucne"); SCHEMA 1 = dnesny textovy remap BEZ ZMENY.
+        # Vrati [mapa|nil, lost_texty, issues|nil] — issues (surove z
+        # remap_edges_v2, vratane uspesneho 1,5 fallbacku) LEN v SCHEMA 2;
+        # nil = legacy rezim, stare warnings sa nemenia. Kompoziciu warnings
+        # robi BoardBuilder.material_change_outcome (GH #90 kola 1-4).
         def remap_edges_for_material(cfg, new_mat)
           new_sheet = Materials.sheet(new_mat)
           target_th = new_sheet && new_sheet['thickness'].to_f
-          Materials.remap_edges(
-            cfg['edges'].is_a?(Hash) ? cfg['edges'] : nil,
-            Materials.decor_of(cfg['material_id']),
-            new_sheet && new_sheet['decor'],
-            target_th && target_th.positive? ? target_th : nil
-          )
+          target = target_th && target_th.positive? ? target_th : nil
+          edges = cfg['edges'].is_a?(Hash) ? cfg['edges'] : nil
+          if Materials.catalog_schema >= Materials::SCHEMA_GROUPS
+            map, issues = Materials.remap_edges_v2(edges, Materials.sheet(cfg['material_id']),
+                                                   new_sheet, target)
+            lost = issues.reject { |n| n[:abs_id] }
+                         .map { |n| "#{n[:code]}#{CabinetBuilder.lost_suffix(n[:reason])}" }
+            [map, lost, issues]
+          else
+            map, lost = Materials.remap_edges(edges, Materials.decor_of(cfg['material_id']),
+                                              new_sheet && new_sheet['decor'], target)
+            [map, lost, nil]
+          end
         end
 
         # ABS hrana dosky — server-side read-modify-write (Codex audit c, D):
@@ -107,7 +130,12 @@ module Noxun
           edges = cfg['edges'].is_a?(Hash) ? cfg['edges'].dup : { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil }
           edges[code] = present_str(data['abs_id']) # nil = bez ABS
           label = edges[code] ? 'nastavená' : 'bez ABS'
-          apply_board(model, board, { 'edges' => edges }, "Hrana #{code} — #{label}.")
+          params = { 'edges' => edges }
+          # Codex GH #90 P2: vedoma zmena hrany zneplatni ulozene pick warnings
+          # LEN tejto hrany (agregat sa deli, zvysne hrany ostavaju — 2. kolo).
+          pruned = BoardBuilder.prune_edge_warnings(cfg['warnings'], [code], cfg['name'])
+          params['warnings'] = pruned unless pruned.nil?
+          apply_board(model, board, params, "Hrana #{code} — #{label}.")
         end
 
         # D-35: olepenie VSETKYCH 4 hran dosky jednym klikom — ABS 1.0 mm dekoru
@@ -130,8 +158,12 @@ module Noxun
           end
           abs_id, decor = bulk_abs_for(cfgb)
           return set_status(missing_bulk_abs_msg(decor), true) if abs_id.nil?
-          apply_board(model, board, { 'edges' => AbsRules.uniform_edges(abs_id) },
-                      "Všetky 4 hrany — ABS #{decor} 1,0 mm.#{abs_note}")
+          params = { 'edges' => AbsRules.uniform_edges(abs_id) }
+          # Codex GH #90 P2: bulk vedome prepisuje VSETKY 4 hrany — stare pick
+          # warnings hran su neplatne (prune vsetkych EDGE_KEYS polozek).
+          pruned = BoardBuilder.prune_edge_warnings(cfgb['warnings'], %w[L1 L2 W1 W2], cfgb['name'])
+          params['warnings'] = pruned unless pruned.nil?
+          apply_board(model, board, params, "#{bulk_done_msg(abs_id, decor)}#{abs_note}")
         end
 
         # --- pomocne --------------------------------------------------------

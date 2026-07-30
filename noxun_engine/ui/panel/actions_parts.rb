@@ -75,8 +75,11 @@ module Noxun
             push_materials
             MaterialsDialog.push_state if defined?(MaterialsDialog)
             rec = Materials.edge(abs_id)
-            w = rec && rec['width'] ? rec['width'].to_f.round : '?'
-            [true, " Vytvorená ABS #{rec && rec['decor']} #{w}/1 mm (globálny katalóg, cena 0 — Späť ju neodstráni)."]
+            # 2A-3 (audit F15): hlaska cita SKUTOCNY zaznam (sirka aj hrubka) —
+            # ziadne natvrdo "/1"; cena je "nezadana" (D-42), nie 0.
+            w = rec && rec['width'] ? fmt_mm(rec['width']) : '?'
+            t = rec ? fmt_mm(rec['thickness']) : '1'
+            [true, " Vytvorená ABS #{rec && rec['decor']} #{w}/#{t} mm (globálny katalóg, cena nezadaná — Späť ju neodstráni)."]
           when :schema_read_only
             # 2A-2 (audit BLOCKER 2): katalog uz bezi na novsej scheme, nez pozna
             # toto okno (CEF cache) — legacy zapis by stratil identitne polia.
@@ -84,7 +87,8 @@ module Noxun
           when :no_sheet
             [false, 'Materiál sa nenašiel v katalógu — páska sa nevytvorila.']
           when :no_standard_width
-            [false, 'Hrúbka je mimo štandardných šírok pások (22/43 mm) — pridaj pásku ručne v Materiáloch projektu.']
+            widths = Materials::AUTO_WIDTHS.map { |w| fmt_mm(w) }.join('/')
+            [false, "Hrúbka je mimo štandardných šírok pások (#{widths} mm) — pridaj pásku ručne v Materiáloch projektu."]
           else
             [false, 'Vytvorenie ABS pásky zlyhalo.']
           end
@@ -171,25 +175,49 @@ module Noxun
           rec = ov[rk] || {}
           rec['edges'] = AbsRules.uniform_edges(abs_id)
           store_override(ov, rk, rec)
-          rebuild_focus_part(model, cab, rk, params, "Všetky 4 hrany — ABS #{decor} 1,0 mm.#{abs_note}")
+          rebuild_focus_part(model, cab, rk, params, "#{bulk_done_msg(abs_id, decor)}#{abs_note}")
         end
 
-        # ABS 1.0 mm k dekoru materialu dielca/dosky. Vrati [abs_id alebo nil, dekor].
+        # Jednotkova ABS k dekoru materialu dielca/dosky. Vrati [abs_id alebo nil, dekor].
         # Zdroj materialu = config na entite (resolved snapshot, standard 8.3) — to iste,
         # co zobrazuje karta. Nenajdena paska => volajuci NESMIE nic menit (ziadna mapa
         # 4x nil — zmazala by existujuce hrany), len status s navodom.
         # D-41 (Codex GH #70): hrubka dielca z configu ide do vyberu SIRKY pasky —
-        # 18 mm dielec dostane 22-ku, nie najsirsiu.
+        # 18 mm dielec dostane uzku pasku, nie najsirsiu.
+        # 2A-3 (audit F6): pri katalogu SCHEMA 2 ide vyber cez abs_for_sheet
+        # (skupina + struktura + resolver triedy :jednotka); SCHEMA 1 = dnesna
+        # cesta abs_for_decor 1,0 BEZ ZMENY.
         def bulk_abs_for(cfg)
           mat = cfg['material_id']
-          decor = defined?(Materials) ? Materials.decor_of(mat) : nil
+          return [nil, mat] unless defined?(Materials)
+          decor = Materials.decor_of(mat)
           return [nil, decor || mat] if decor.nil?
           part_th = cfg['thickness'].to_f
-          [Materials.abs_for_decor(decor, 1.0, part_th.positive? ? part_th : nil), decor]
+          th = part_th.positive? ? part_th : nil
+          if Materials.catalog_schema >= Materials::SCHEMA_GROUPS
+            abs_id, = Materials.abs_for_sheet(Materials.sheet(mat), :jednotka, th)
+            [abs_id, decor]
+          else
+            [Materials.abs_for_decor(decor, 1.0, th), decor]
+          end
+        end
+
+        # 2A-3 (audit F15): hlaska bulku cita SKUTOCNU vybranu pasku (hrubka moze
+        # byt 0,8/1/1,2 podla skupiny) — ziadne natvrdo "1,0 mm".
+        def bulk_done_msg(abs_id, decor)
+          rec = defined?(Materials) ? Materials.edge(abs_id) : nil
+          th = rec ? fmt_mm(rec['thickness']) : '1'
+          "Všetky 4 hrany — ABS #{decor} #{th} mm."
         end
 
         def missing_bulk_abs_msg(decor)
-          "Ku dekóru #{decor || 'materiálu dielca'} nie je v katalógu 1,0 mm ABS — pridaj ju v Materiáloch projektu."
+          who = decor || 'materiálu dielca'
+          if defined?(Materials) && Materials.catalog_schema >= Materials::SCHEMA_GROUPS
+            "Ku dekóru #{who} nie je v katalógu použiteľná jednotková ABS " \
+              '(rovnaká štruktúra alebo univerzálna) — pridaj ju v Materiáloch projektu.'
+          else
+            "Ku dekóru #{who} nie je v katalógu 1,0 mm ABS — pridaj ju v Materiáloch projektu."
+          end
         end
 
         # Rebuild korpusu s pripravenymi params + fokus na dielec (part_key) + resync panela.

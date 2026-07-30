@@ -73,15 +73,32 @@ module Noxun
           return nil if (sheet['thickness'].to_f - want).abs <= 0.01
 
           body_sheet = Materials.sheet(eff['body'])
-          pick = body_sheet if body_sheet && (body_sheet['thickness'].to_f - want).abs <= 0.01
-          unless pick
-            cands = Materials.sheets.select { |s| (s['thickness'].to_f - want).abs <= 0.01 }
-            same_decor = cands.select { |s| s['decor'] == sheet['decor'] }
-            pick = same_decor.first || (cands.length == 1 ? cands.first : nil)
-          end
-          if pick.nil?
-            return { error: "Chrbát #{fmt_mm(want)} mm: v katalógu nie je jednoznačný materiál tejto hrúbky — " \
-                            'vyber materiál chrbta ručne (sekcia Materiály), potom zmeň hrúbku.' }
+          schema = Materials.catalog_schema
+          if schema >= Materials::SCHEMA_GROUPS
+            # 2A-3 (audit F10): kandidat MUSI drzat skupinu + NEPRAZDNU strukturu
+            # STAREHO chrbta (pick_body_sheet v2 guard) — plati aj pre skusany
+            # material tela; bez zhody sa zmena ODMIETNE (ziadny tichy skok).
+            pick = nil
+            if body_sheet && (body_sheet['thickness'].to_f - want).abs <= 0.01
+              pick = CabinetBuilder.pick_body_sheet(want, sheet, [body_sheet], schema: schema)[:pick]
+            end
+            pick ||= CabinetBuilder.pick_body_sheet(want, sheet, Materials.sheets, schema: schema)[:pick]
+            if pick.nil?
+              return { error: "Chrbát #{fmt_mm(want)} mm: v katalógu nie je materiál tejto hrúbky " \
+                              'v rovnakej skupine a štruktúre — vyber materiál chrbta ručne ' \
+                              '(sekcia Materiály), potom zmeň hrúbku.' }
+            end
+          else
+            pick = body_sheet if body_sheet && (body_sheet['thickness'].to_f - want).abs <= 0.01
+            unless pick
+              cands = Materials.sheets.select { |s| (s['thickness'].to_f - want).abs <= 0.01 }
+              same_decor = cands.select { |s| s['decor'] == sheet['decor'] }
+              pick = same_decor.first || (cands.length == 1 ? cands.first : nil)
+            end
+            if pick.nil?
+              return { error: "Chrbát #{fmt_mm(want)} mm: v katalógu nie je jednoznačný materiál tejto hrúbky — " \
+                              'vyber materiál chrbta ručne (sekcia Materiály), potom zmeň hrúbku.' }
+            end
           end
           params['back_material_id'] = pick['material_id']
           { note: " · chrbát: #{mat_name(pick)} #{fmt_mm(want)} mm (auto)" }
@@ -145,7 +162,10 @@ module Noxun
           blocked = CabinetBuilder.parts_blocking_thickness(params) # audit F8
           return { error: blocked_parts_msg(want, blocked) } unless blocked.empty?
 
-          res = CabinetBuilder.pick_body_sheet(want, sheet, Materials.sheets)
+          # 2A-3 (audit F10): schema ako parameter — pri SCHEMA 2 kandidat drzi
+          # skupinu + strukturu; prazdna struktura = ziadny auto vyber.
+          res = CabinetBuilder.pick_body_sheet(want, sheet, Materials.sheets,
+                                               schema: Materials.catalog_schema)
           pick = res[:pick]
           return { error: no_body_pick_msg(want, res[:candidates]) } if pick.nil?
           params['material_id'] = pick['material_id']

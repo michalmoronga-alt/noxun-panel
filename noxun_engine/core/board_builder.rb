@@ -50,9 +50,15 @@ module Noxun
           role = norm_role(p)
           mat = present(raw(p, :material_id))
           sheet = catalog_sheet(mat)
-          {
+          name = norm_name(p)
+          # 2A-3 (audit B2): zber neuspechov ABS pickera pri pravidlovom defaulte
+          # (SCHEMA 2 cesta) — kanonicke warnings putuju cez board_config ->
+          # Bom.collect -> Validation.run (ORANGE). Pri SCHEMA 1 ostava kolektor
+          # prazdny a vysledny cfg je identicky s dneskom (dual-mode).
+          picker_issues = []
+          out = {
             role: role,
-            name: norm_name(p),
+            name: name,
             length: clampf(fetchf(p, :length, DEFAULTS[:length]), *LIMITS[:length]),
             width:  clampf(fetchf(p, :width,  DEFAULTS[:width]),  *LIMITS[:width]),
             # Hrubka sa riadi katalogovym materialom; bez materialu (docasny stav
@@ -60,9 +66,27 @@ module Noxun
             thickness: sheet ? sheet['thickness'].to_f : clampf(fetchf(p, :thickness, DEFAULTS[:thickness]), *LIMITS[:thickness]),
             material_id: mat,
             grain_direction: norm_grain(p, sheet),
-            edges: norm_edges(p, sheet),
+            edges: norm_edges(p, sheet, picker_issues),
             quantity: norm_quantity(p)
           }
+          if raw(p, :edges).is_a?(Hash)
+            # Codex GH #90 P2: picker NEBEZAL (edges prisli v configu — bezny
+            # rebuild po zmene mena/rozmerov) => ulozene warnings sa PRENASAJU,
+            # inak by kazdy nesuvisiaci edit vymazal fallback/lost polozky z
+            # KONTROLY. Stalenes riesia akcie, ktore hrany/material REALNE menia
+            # (prune per hrana v actions_board; remap ich nahradza novymi).
+            carried = raw(p, :warnings)
+            if carried.is_a?(Array)
+              keep = carried.select { |w| w.is_a?(Hash) }
+              out[:warnings] = keep unless keep.empty?
+            end
+          elsif !picker_issues.empty?
+            entries = picker_issues.map { |it| it.merge(part_key: PART_KEY, name: name) }
+            out[:warnings] = AbsRules.pick_warnings(entries)
+          end
+          # picker bezal cisto (edges chybali, ziadne issues) -> ziadne warnings
+          # (cerstvy pravidlovy stav stare polozky NAHRADZA)
+          out
         end
 
         # Obsahova validacia cfg (po normalize). Prisna materialova politika dosky:
@@ -103,7 +127,7 @@ module Noxun
 
         # --- config na Store (JSON round-trip tvar) --------------------------
         def board_config(cfg)
-          {
+          out = {
             engine_version: Engine::VERSION,
             name: cfg[:name].to_s,
             role: cfg[:role].to_s,
@@ -115,6 +139,11 @@ module Noxun
             grain_direction: cfg[:grain_direction],
             edges: cfg[:edges]
           }
+          # 2A-3 (audit B2): warnings POSLEDNEJ stavby — kluc sa uklada LEN ked
+          # nieco vzniklo (SCHEMA 1 config ostava bajtovo identicky s dneskom).
+          w = cfg[:warnings]
+          out[:warnings] = w if w.is_a?(Array) && !w.empty?
+          out
         end
 
         # Ulozeny config (string kluce) -> params pre normalize. Tenka vrstva —
@@ -389,12 +418,18 @@ module Noxun
         # pravidlovy default (key?-preserve, ziadne `||`, standard 7.5).
         # Neplatne abs_id sa zahodi na nil (Materials.normalized_abs_id — rovnake
         # spravanie ako korpusove part_overrides). Vzdy vracia CERSTVU kompletnu mapu.
-        def norm_edges(p, sheet)
+        # collector (2A-3, audit B2/F6): zber neuspechov pickera pri SCHEMA 2
+        # defaulte (resolve_edges dostava sheet — sheet-aware cesta dosky).
+        def norm_edges(p, sheet, collector = nil)
           input = raw(p, :edges)
           unless input.is_a?(Hash)
             decor = sheet && sheet['decor']
             # D-41: hrubka dosky je VZDY z materialu — picker sirky dostava tu istu.
-            return defined?(AbsRules) ? AbsRules.resolve_edges(ROLE, decor, sheet && sheet['thickness']) : empty_edges
+            unless defined?(AbsRules)
+              return empty_edges
+            end
+            return AbsRules.resolve_edges(ROLE, decor, sheet && sheet['thickness'],
+                                          sheet: sheet, collector: collector)
           end
           out = {}
           EDGE_KEYS.each do |k|
@@ -408,6 +443,92 @@ module Noxun
             end
           end
           out
+        end
+
+        # GH #90 P2 (2. kolo): odstrani z ulozenych warnings LEN dane hrany —
+        # agregovana polozka (data.edges [L1, W1]) sa NEzahodi cela, zvysne
+        # hrany dostanu preformatovany zaznam (rovnaky pick_warnings kanal).
+        # Vrati nove pole, alebo nil = nebolo co menit.
+        def prune_edge_warnings(stored, codes, name)
+          return nil unless stored.is_a?(Array) && !stored.empty?
+          changed = false
+          keep = stored.filter_map do |w|
+            d = w.is_a?(Hash) ? w['data'] : nil
+            edges = d.is_a?(Hash) ? d['edges'] : nil
+            next w unless edges.is_a?(Array)
+            remaining = edges.map(&:to_s) - codes.map(&:to_s)
+            if remaining.length == edges.length
+              w
+            else
+              changed = true
+              next nil if remaining.empty?
+              entries = remaining.map do |c|
+                { code: c, reason: w['code'].to_s, part_key: (w['part_key'] || PART_KEY).to_s, name: name.to_s }
+              end
+              AbsRules.pick_warnings(entries).first
+            end
+          end
+          changed ? keep : nil
+        end
+
+        # GH #90 P1 (4. kolo): repick smie doplnat LEN hrany so ZLYHANYM vyberom
+        # — abs_04_manual je vedomy kontrakt (nahradu vybera POUZIVATEL, hrana
+        # ostava nil) a abs_15_fallback pasku ma. Genericky predikat by 0,4
+        # kontrakt ticho porusil pri druhej zmene materialu.
+        PICK_FAIL_REASONS = %w[abs_structure_missing abs_nominal_missing abs_width_missing].freeze
+
+        # GH #90 P2 (2. kolo): nil hrana s ulozenym PICK-FAIL warningom = ZLYHANY
+        # DEFAULT (nie vedome "bez ABS" — to warning nema). Pri zmene materialu
+        # sa pre tieto hrany picker spusti nad NOVYM sheetom: najde pasku =
+        # hrana sa doplni, nenajde = cerstvy warning k novemu sheetu (stary by
+        # klamal o starej skupine). Vrati [refill mapa, fresh warnings].
+        def repick_failed_defaults(cfg, edges_map, new_sheet)
+          stored = cfg['warnings'].is_a?(Array) ? cfg['warnings'] : []
+          failed = EDGE_KEYS.select do |c|
+            (edges_map.is_a?(Hash) ? edges_map[c] : nil).nil? &&
+              stored.any? do |w|
+                d = w.is_a?(Hash) ? w['data'] : nil
+                d.is_a?(Hash) && Array(d['edges']).map(&:to_s).include?(c) &&
+                  PICK_FAIL_REASONS.include?(w['code'].to_s)
+              end
+          end
+          return [{}, []] if failed.empty? || new_sheet.nil? || !defined?(AbsRules)
+          collector = []
+          fresh = AbsRules.resolve_edges(cfg['role'], new_sheet['decor'], new_sheet['thickness'],
+                                         sheet: new_sheet, collector: collector)
+          refill = {}
+          failed.each { |c| refill[c] = fresh.is_a?(Hash) ? fresh[c] : nil }
+          entries = collector.select { |it| failed.include?(it[:code]) }
+                             .map { |it| it.merge(part_key: PART_KEY, name: cfg['name'].to_s) }
+          [refill, AbsRules.pick_warnings(entries)]
+        end
+
+        # GH #90 P2 (4. kolo): JEDNA kompozicia hran + warnings po zmene
+        # materialu (SCHEMA 2). Stavia: remap vysledok -> repick zlyhanych
+        # defaultov -> zachovanie ulozenych warnings NESPRACOVANYCH hran
+        # (same-identity zmena variantu s vyhovujucou 1,5 paskou NESMIE zmazat
+        # jej abs_15 zaznam) -> cerstve warnings remapu aj repicku.
+        # Vrati [edges mapa, warnings pole].
+        def material_change_outcome(cfg, remap_map, remap_issues, new_sheet)
+          old_edges = cfg['edges'].is_a?(Hash) ? cfg['edges'] : {}
+          base = remap_map || old_edges.dup
+          processed = []
+          if remap_map
+            processed += remap_map.keys.select { |c| remap_map[c] != old_edges[c] }
+          end
+          processed += remap_issues.map { |n| n[:code].to_s }
+          refill, refill_warnings = repick_failed_defaults(cfg, base, new_sheet)
+          base = base.merge(refill) unless refill.empty?
+          processed += refill.keys
+          remap_entries = remap_issues.map do |n|
+            { code: n[:code], reason: n[:reason], part_key: PART_KEY, name: cfg['name'].to_s }
+          end
+          fresh = AbsRules.pick_warnings(remap_entries) + refill_warnings
+          kept = prune_edge_warnings(cfg['warnings'], processed.uniq, cfg['name'])
+          if kept.nil?
+            kept = cfg['warnings'].is_a?(Array) ? cfg['warnings'].select { |w| w.is_a?(Hash) } : []
+          end
+          [base, kept + fresh]
         end
 
         def norm_quantity(p)

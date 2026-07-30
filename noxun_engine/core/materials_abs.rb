@@ -2,11 +2,111 @@
 # Noxun Engine — materialovy katalog: ABS podla dekoru (deterministicky picker
 # abs_for_decor, kandidati/vyber varianty, remap pri zmene dekoru). Cast modulu
 # Materials (mechanicky split materials.rb, V0.5.1) — pozri materials.rb pre prehlad.
+#
+# 2A-3 (standard 7.5): pri katalogu SCHEMA 2 vyberaju VSETCI volajuci cez nove
+# jadro abs_for_sheet (skupina -> presna NEPRAZDNA struktura -> universal ->
+# nic + strojovy reason). Legacy abs_for_decor/edge_candidates/pick_edge_variant
+# OSTAVAJU NEZMENENE a pouzivaju sa VYHRADNE pri SCHEMA 1 (dual-mode).
 
 module Noxun
   module Engine
     module Materials
+      # --- 2A-3 (audit N17): strojove reasons vyberu ABS -----------------------
+      # Konstanty, nie volne texty — putuju ako warning['code'] cez config ->
+      # Bom.collect -> Validation.run (ORANGE). Caller doplna part_key/rolu/hranu.
+      REASON_ABS_STRUCTURE = 'abs_structure_missing' # skupina nema pasku struktury dosky ani universal
+      REASON_ABS_NOMINAL   = 'abs_nominal_missing'   # kandidati su, ale ziadny v ziadanej triede hrubky
+      REASON_ABS_WIDTH     = 'abs_width_missing'     # trieda je, ale ziadna paska nema pouzitelnu sirku
+      REASON_ABS_15        = 'abs_15_fallback'       # dvojka rozriesena na 1,5 mm (viditelne upozornenie)
+      # Remap kontrakt 0,4 (rozhodnute 30.7.): stara 0,4 sa NIKDY automaticky
+      # nenahradza — hrana ide do lost s tymto reasonom, pouzivatel vybera vedome.
+      REASON_ABS_04_MANUAL = 'abs_04_manual'
+
+      # Nominalne triedy (standard 7.5): pravidla roli ziadaju TRIEDU, resolver
+      # ju preklada na dostupne pasky skupiny v tomto poradi preferencie.
+      EDGE_CLASS_PREFERENCE = {
+        jednotka: [0.8, 1.0, 1.2].freeze,
+        dvojka:   [2.0, 1.5].freeze
+      }.freeze
+
       module_function
+
+      # --- 2A-3: nominalne triedy + resolver obchodnej hrubky (standard 7.5) --
+
+      # Trieda obchodnej hrubky: 0,4 -> :nula4; 0,8/1/1,2 -> :jednotka;
+      # 1,5/2 -> :dvojka; ine -> nil. :nula4 sa NIKDY nevoli automaticky.
+      def edge_thickness_class(th)
+        v = th.to_f
+        return :nula4 if (v - 0.4).abs < 0.01
+        return :jednotka if [0.8, 1.0, 1.2].any? { |t| (t - v).abs < 0.01 }
+        return :dvojka if [1.5, 2.0].any? { |t| (t - v).abs < 0.01 }
+        nil
+      end
+
+      # Resolver obchodnej hrubky (standard 7.5): z kandidatov (UZ zuzenych na
+      # skupinu + strukturnu vetvu — hierarchiu drzi abs_for_sheet) vyberie pasku
+      # ziadanej NOMINALNEJ triedy. Poradie: najprv trieda hrubky (jednotka
+      # 0,8 -> 1 -> 1,2; dvojka 2 -> 1,5), az potom sirka (pick_edge_variant —
+      # najmensia >= hrubka+2 -> bez sirky -> nic; NIKDY uzsia). Hrubka, ktorej
+      # ziadna paska sirkovo nevyhovuje, NEBLOKUJE dalsiu preferenciu.
+      # Vrati [rec|nil, reason|nil]; reason moze sprevadzat aj USPECH
+      # (REASON_ABS_15 pri dvojke rozriesenej na 1,5). 0,4 sa nevolia NIKDY
+      # (trieda :nula4 nema preferencie — [nil, REASON_ABS_NOMINAL]).
+      def resolve_edge_thickness(cands, nominal, part_thickness = nil)
+        prefs = EDGE_CLASS_PREFERENCE[nominal.to_s.to_sym]
+        return [nil, REASON_ABS_NOMINAL] if prefs.nil? || !cands.is_a?(Array)
+        found_class = false
+        prefs.each do |th|
+          sub = cands.select { |a| (a['thickness'].to_f - th).abs < 0.01 }
+          next if sub.empty?
+          found_class = true
+          rec = pick_edge_variant(sub, part_thickness)
+          next if rec.nil?
+          reason = nominal.to_s.to_sym == :dvojka && (th - 1.5).abs < 0.01 ? REASON_ABS_15 : nil
+          return [rec, reason]
+        end
+        [nil, found_class ? REASON_ABS_WIDTH : REASON_ABS_NOMINAL]
+      end
+
+      # --- 2A-3 (audit B3): picker SCHEMA 2 — hierarchia NEMENNA ---------------
+      # 1. kandidati = pasky s ROVNAKYM group_id ako sheet_rec,
+      # 2. vetva A: presna zhoda NEPRAZDNEJ normalizovanej struktury (identity_norm;
+      #    dve prazdne NIKDY nie su zhoda — prazdna = neznama, nie "rovnaka"),
+      # 3. vnutri vetvy: resolver triedy + sirkovy vyber (poradie: trieda, sirka),
+      # 4. vetva B: pasky s explicitnym universal:true (universalnost STRUKTURY,
+      #    nie sirky — sirkova kontrola plati aj tu; rovnaky resolver),
+      # 5. nic -> [nil, strojovy reason].
+      # Vrati [abs_id|nil, reason|nil] — reason aj pri uspechu (abs_15_fallback).
+      def abs_for_sheet(sheet_rec, nominal, part_thickness = nil)
+        return [nil, REASON_ABS_STRUCTURE] unless sheet_rec.is_a?(Hash)
+        cands = edges_of_group(sheet_rec)
+        st = identity_norm(sheet_rec['structure'])
+        exact = st.empty? ? [] : cands.select { |a| identity_norm(a['structure']) == st }
+        rec, reason = resolve_edge_thickness(exact, nominal, part_thickness)
+        return [rec['abs_id'], reason] if rec
+        reason_a = exact.empty? ? nil : reason
+        universal = cands.select { |a| a['universal'] == true }
+        rec_b, reason_b = resolve_edge_thickness(universal, nominal, part_thickness)
+        return [rec_b['abs_id'], reason_b] if rec_b
+        return [nil, REASON_ABS_STRUCTURE] if exact.empty? && universal.empty?
+        return [nil, REASON_ABS_WIDTH] if [reason_a, reason_b].include?(REASON_ABS_WIDTH)
+        [nil, REASON_ABS_NOMINAL]
+      end
+
+      # Sirkova pouzitelnost pasky pre cielovu hrubku dielca (bez sirky =
+      # univerzalna; inak presah WIDTH_MARGIN ako pick_edge_variant).
+      def edge_fits_width?(rec, part_thickness)
+        w = edge_width(rec)
+        w.nil? || w >= part_thickness.to_f + WIDTH_MARGIN - 0.001
+      end
+
+      # Pasky rovnakej skupiny ako dany zaznam (SCHEMA 2 kluc: group_id, fallback
+      # obchodna identita vyrobca+dekor), deterministicky zoradene abs_id.
+      def edges_of_group(rec)
+        want = record_group_key(rec, SCHEMA_GROUPS)
+        edges.select { |a| record_group_key(a, SCHEMA_GROUPS) == want }
+             .sort_by { |a| a['abs_id'].to_s }
+      end
 
       # --- ABS podla dekoru (pravidlove defaulty, standard 7.5) ----------------
 
@@ -53,6 +153,8 @@ module Noxun
       # kontrastna volba a nil = vedome "bez ABS" — tie sa NIKDY nedotknu.
       # target_thickness = cielova hrubka dielca (vyber sirky novej pasky).
       # Vrati [nova_mapa alebo nil (nic na prevod), pole hran bez nahrady].
+      # 2A-3: pouziva sa VYHRADNE pri SCHEMA 1 (textovy remap BEZ ZMENY);
+      # SCHEMA 2 volajuci idu cez remap_edges_v2 so zaznamami.
       def remap_edges(edges_hash, old_decor, new_decor, target_thickness = nil)
         return [nil, []] unless edges_hash.is_a?(Hash) && old_decor && new_decor && old_decor != new_decor
         out = edges_hash.dup
@@ -69,6 +171,68 @@ module Noxun
           changed = true
         end
         [changed ? out : nil, lost]
+      end
+
+      # --- 2A-3 (audit F7/F8): remap pri SCHEMA 2 — stary AJ novy sheet --------
+      # Podpis berie ZAZNAMY (nie texty). Meni LEN pasku kompatibilnu so STARYM
+      # sheetom: rovnaka skupina A (presna NEPRAZDNA zhoda struktury ALEBO
+      # universal:true). Nedotyka sa: nil (vedome "bez ABS"), cudzia skupina
+      # (vedomy kontrast), cudzia struktura V RAMCI skupiny (vedoma volba).
+      # Nahrada drzi NOMINALNU TRIEDU starej pasky cez resolver (1,0 -> jednotka
+      # novej skupiny, 2,0 -> dvojka). Kontrakt 0,4 (rozhodnute 30.7., standard
+      # 7.5): stara 0,4 sa NIKDY automaticky nenahradza — hrana ide na nil
+      # a do lost s reasonom abs_04_manual (pouzivatel vybera vedome znova).
+      # Ak sa skupina ANI struktura nemenia, pasky ostavaju kompatibilne
+      # a rucny vyber sirky/hrubky sa NEPREPISUJE (verny ekvivalent stareho
+      # "rovnaky dekor = nic na prevod").
+      # Vrati [nova_mapa alebo nil (nic na prevod), issues]:
+      #   {code:, reason:}            = hrana BEZ nahrady (stratena)
+      #   {code:, reason:, abs_id:}   = USPESNA nahrada s dovodom (Codex GH #90
+      #     P1: dvojka rozriesena na 1,5 NESMIE zmiznut len preto, ze nahrada
+      #     uspela — fallback musi doputovat do statusu aj KONTROLY).
+      def remap_edges_v2(edges_hash, old_sheet, new_sheet, target_thickness = nil)
+        return [nil, []] unless edges_hash.is_a?(Hash) && old_sheet.is_a?(Hash) && new_sheet.is_a?(Hash)
+        old_group = record_group_key(old_sheet, SCHEMA_GROUPS)
+        old_st = identity_norm(old_sheet['structure'])
+        # GH #90 P1 (2. kolo): rovnaka skupina + struktura uz NIE JE plosny no-op
+        # — zmena HRUBKOVEHO variantu (18 -> 36) moze rucnu pasku sirkovo vyradit
+        # (23 mm paska na 36 mm dielci by presla az do exportu). Paska, ktora
+        # cielovej hrubke sirkovo vyhovuje, sa NEPREPISUJE (rucny vyber drzi);
+        # uzka sa pre-resolvuje v ramci svojej triedy.
+        same_identity = old_group == record_group_key(new_sheet, SCHEMA_GROUPS) &&
+                        old_st == identity_norm(new_sheet['structure'])
+        out = edges_hash.dup
+        changed = false
+        issues = []
+        out.each_key do |code|
+          aid = out[code]
+          next if aid.nil?
+          rec = edge(aid)
+          next unless rec
+          next unless record_group_key(rec, SCHEMA_GROUPS) == old_group
+          compatible = rec['universal'] == true ||
+                       (!old_st.empty? && identity_norm(rec['structure']) == old_st)
+          next unless compatible
+          if same_identity
+            next if target_thickness.nil? || edge_fits_width?(rec, target_thickness)
+          end
+          klass = edge_thickness_class(rec['thickness'])
+          if klass == :nula4
+            issues << { code: code, reason: REASON_ABS_04_MANUAL }
+            out[code] = nil
+            changed = true
+            next
+          end
+          new_aid, why = abs_for_sheet(new_sheet, klass, target_thickness)
+          if new_aid.nil?
+            issues << { code: code, reason: why }
+          elsif why
+            issues << { code: code, reason: why, abs_id: new_aid }
+          end
+          out[code] = new_aid
+          changed = true
+        end
+        [changed ? out : nil, issues]
       end
 
       # Dekor doskoveho materialu (pre napojenie ABS na rovnaky dekor). nil ak material nie je v katalogu.

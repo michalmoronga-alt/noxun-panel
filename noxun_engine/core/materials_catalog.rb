@@ -150,7 +150,11 @@ module Noxun
         decor = (a['decor'] || a[:decor]).to_s.strip
         return [false, 'Dekor ABS je povinný.'] if decor.empty?
         th = (a['thickness'] || a[:thickness]).to_s.tr(',', '.').to_f
-        return [false, 'Hrúbka ABS musí byť 1,0 alebo 2,0 mm.'] unless supported_edge_thickness?(th)
+        # 2A-3 (audit B1): povolene hrubky su schema-aware (SCHEMA 1 = {1;2},
+        # SCHEMA 2 = obchodne hodnoty) — hlaska ich vymenuje z jednej autority.
+        unless supported_edge_thickness?(th)
+          return [false, "Hrúbka ABS musí byť #{edge_thickness_options_label} mm."]
+        end
         ok_p, err_p = validate_price(a['price_per_bm'] || a[:price_per_bm])
         return [false, err_p] unless ok_p
         ok_t, err_t = validate_text_fields(a)
