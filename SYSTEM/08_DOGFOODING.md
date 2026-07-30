@@ -60,7 +60,7 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ## Otvorené otázky (na Michalovo posúdenie pri teste)
 
-### 2A migračná mapa (z tvojho ŽIVÉHO katalógu 30.7. — odklepni/uprav v chate)
+### 2A migračná mapa — ✅ SCHVÁLENÁ (Michal 30.7.: „mapa OK — Pracovná doska zmaž, Halifax zlúč")
 
 | Dnes (kľúč skupiny) | Po migrácii: výrobca · číslo · názov | Štruktúra variantov | Poznámka |
 |---|---|---|---|
