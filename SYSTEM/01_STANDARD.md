@@ -370,9 +370,9 @@ Pravidlá sú **JSON dáta editovateľné cez dialóg Pravidlá kovania** (nie r
 
 Materiál nie je SketchUp textúra. Je to katalógový záznam. Rozlišujeme (SCHEMA 2 — dávka 2A, 30.7.2026):
 
-- **Skupina (dekor)** — obchodná identita vzoru: **výrobca + číslo dekoru + názov** (Kronospan · K009 · —; Egger · H1180 · Dub Halifax prírodný). Interná kotva skupiny je stabilné **`group_id`** — nesú ho dosky AJ ABS pásky (výrobca je len na skupine; samotné číslo nestačí — rovnaké číslo dvoch výrobcov sú dve rôzne skupiny). Pre vlastné/neznačkové materiály je „číslo" ľubovoľný názov („Biela korpus").
+- **Skupina (dekor)** — **identita skupiny = výrobca + číslo dekoru** (Kronospan·K009, Egger·H1180); `decor_name` („Dub Halifax prírodný") je len ZOBRAZOVACIA vlastnosť skupiny — jej oprava/preklad identitu nemení. Interná kotva skupiny je stabilné **`group_id`** — nesú ho dosky AJ ABS pásky (výrobca je len na skupine; samotné číslo nestačí — rovnaké číslo dvoch výrobcov sú dve rôzne skupiny). Pre vlastné/neznačkové materiály je „číslo" ľubovoľný názov („Biela korpus").
 - **Variant** — samostatný výrobný materiál a samostatný kusovník. **Identita variantu dosky = skupina + typ + hrúbka + štruktúra povrchu** (`structure` — ST9, PW, FP, MG…; voliteľná, trimovaná, porovnávaná case-insensitive s normalizovanými medzerami). **Pre typ PD navyše formát** (`sheet_size` ako usporiadaná dvojica dĺžka×šírka) — F800 PD 38 4100×600 a 4100×920 sú dva varianty. `K009/DTDL/18/PW` a `K009/DTDL/16/PW` sú dva varianty; `5981/DTDL/18/MG` a `5981/DTDL/18/BS` tiež (rovnaké rozmery, iný povrch).
-- **Typ** — dvojvrstvový: **kanonické typy** (DTDL · MDF · HDF · PD · Zástena · Kompakt) žijú v Ruby registri s parametrami (default formát, ponuka hrúbok, hranová logika/PD podtyp postforming|ABS rovná|kompakt, kandidát pre telo korpusu) + **„iný"** = voľný string s generickým správaním. Identita typu je case-insensitive.
+- **Typ** — dvojvrstvový: **kanonické typy** (DTDL · MDF · HDF · PD · Zástena · Kompakt) žijú v Ruby registri s parametrami (default formát, ponuka hrúbok, hranová logika, kandidát pre telo korpusu) + **„iný"** = voľný string s generickým správaním. Identita typu je case-insensitive. **Kompaktná doska = výhradne kanonický typ `Kompakt`** (nikdy „PD s podtypom kompakt" — jedno kódovanie); PD podtypy hranovej úpravy sú len **postforming | ABS rovná hrana**.
 
 Záznam variantu:
 
@@ -398,7 +398,7 @@ Záznam variantu:
 
 Kusovník podľa materiálov sa delí podľa **material_id (variant) + hrúbka**.
 
-**Nemennosť ID a migrácia (2A):** `material_id`/`abs_id` sú **opaque a navždy nemenné** (modely sa viažu výhradne na ne — snapshot na entite drží ID, štandard 8.3); legacy ID s vloženou štruktúrou v texte sa NEparsujú. Nové ID zahŕňajú skupinu+štruktúru (+formát pri PD) len pre čitateľnosť. Migrácia na SCHEMA 2 beží raz: **nemenná záloha** `materials.pre-schema-2.json` (mimo bežného `.bak`, ktorý sa prepisuje) → transformácia podľa **explicitnej mapy** (heuristika len fallback s reportom; nerozhodnuteľné položky migráciu NEoznačia za hotovú) → atomický zápis so schema markerom; mutácie zo starých okien server po migrácii odmieta (`catalog_schema` v payloade). Ceny sa ukladajú **bez DPH** (zdroj s DPH sa prepočíta pri vstupe).
+**Nemennosť ID a migrácia (2A):** `material_id`/`abs_id` sú **opaque a navždy nemenné** (modely sa viažu výhradne na ne — snapshot na entite drží ID, štandard 8.3); legacy ID s vloženou štruktúrou v texte sa NEparsujú. Nové ID zahŕňajú skupinu+štruktúru (+formát pri PD) len pre čitateľnosť. Migrácia na SCHEMA 2 beží raz: **nemenná záloha** `materials.pre-schema-2.json` (mimo bežného `.bak`, ktorý sa prepisuje) → transformácia podľa **explicitnej mapy** (heuristika len fallback s reportom) → atomický zápis so schema markerom. **Čo i len jedna nerozhodnuteľná položka = atomický NO-OP celej migrácie** (katalóg sa NEnahradí ani čiastočne — žiadny hybridný stav; report vypíše, čo treba rozhodnúť); mutácie zo starých okien server po migrácii odmieta (`catalog_schema` v payloade). Ceny sa ukladajú **bez DPH** (zdroj s DPH sa prepočíta pri vstupe).
 
 **Dodávateľské polia (D-42):** `code` (dodávateľský/katalógový kód) a `supplier`
 (jeden **preferovaný** dodávateľ — vedomé rozhodnutie, žiadne pole ponúk) sú
@@ -427,8 +427,9 @@ má na nezadané ceny upozorniť, nie ich rátať ako nulu.
   porovnávania s vlastnou toleranciou.
 - **Near-match guard:** nová skupina, ktorá sa od existujúcej líši len veľkosťou písmen
   alebo medzerami, sa odmietne s návrhom presného tvaru (preklep nesmie rozbiť skupinu).
-- **Identita variantu je pri edite nemenná** (typ, hrúbka, štruktúra; pri PD aj formát —
-  jeho edit prejde atomickou kolíznou kontrolou identity) — iná hodnota = nový variant.
+- **Identita variantu je pri edite nemenná** (typ, hrúbka, štruktúra; **pri PD aj formát**)
+  — iná hodnota = nový variant, žiadne in-place zmeny identity polí. (Formát NEPD typov
+  identitou nie je a ostáva editovateľný ceruzkou ako doteraz.)
 - **Duplicitné variant identity sú zakázané** (sheet: skupina+typ+hrúbka+štruktúra, PD
   +formát; ABS: skupina+šírka+hrúbka+štruktúra) — create, rename aj migrácia ich odmietnu.
 
@@ -476,9 +477,16 @@ Každý plošný dielec nesie hrany **per strana** ako dáta (nezávislé od viz
   2 mm → univerzálna → žiadna (**nikdy užšia páska než dielec**).
 - **Štruktúra povrchu (2A):** `structure` je súčasť identity ABS variantu (5981 má DVE
   rôzne 23/1 pásky — MG vs UM/AF). Picker pásky **NIKDY neprechádza cez štruktúry
-  automaticky**: presná zhoda štruktúry s doskou → páska s explicitným príznakom
-  **`universal: true`** (vedomé označenie „pasuje na všetko" — prázdna štruktúra ho
-  NEnahrádza, prázdna = neznáma) → žiadna páska + upozornenie semaforu.
+  automaticky**: presná zhoda NEPRÁZDNEJ štruktúry s doskou (**dve prázdne štruktúry sa
+  ako presná zhoda NIKDY nepočítajú** — prázdna = neznáma, nie „rovnaká") → páska
+  s explicitným príznakom **`universal: true`** (vedomé „pasuje na všetko"; jediná cesta
+  pre pásky bez štruktúry) → žiadna páska + upozornenie semaforu.
+- **Nominálne defaulty rolí:** pravidlá rolí žiadajú TRIEDU („jednotka"/„dvojka"), nie
+  konkrétnu hodnotu — všade, kde staršie znenie tohto dokumentu uvádza „1,0 mm" ako
+  default (vrátane kontraktu voľnej dosky §8.x), sa tým odteraz myslí trieda „jednotka"
+  rozriešená resolverom na dostupnú pásku skupiny. `ensure_edge_for_sheet` (dovytvorenie
+  chýbajúcej pásky) tvorí zo štandardných šírok AUTO_WIDTHS {23, 43} a hrúbku volí
+  rovnakým resolverom (0,8 → 1,0 → 1,2; nikdy 0,4).
 - Identita ABS variantu (skupina+šírka+hrúbka+štruktúra) je pri edite nemenná.
   Pre VEPO je šírka nepodstatná (hotové rozmery) — význam má pre kusovník a cenovú ponuku.
 - **Dodávateľské polia a cena (D-42):** ABS páska nesie voliteľné `code` + `supplier`

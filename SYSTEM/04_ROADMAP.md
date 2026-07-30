@@ -35,13 +35,15 @@ Plné pôvodné texty: [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_et
 
 ### V0.6 — KATALÓGY A CENY (štart 30.7. dávkou 2A)
 
-**Dávka 2A — identita variantov a skupín (dizajn cez Codex audit 6B+7F+2N, 30.7.; štandard §7.1/§7.5 aktualizovaný — SCHEMA 2):**
+**Pred 2A: D-46 — projektová predvoľba s inou hrúbkou (v0.5.4)** — potvrdzovacia lišta Potvrdiť/Zrušiť namiesto tvrdého stopu; dediace skrinky prevezmú hrúbku v 1 undo kroku (návrh cez Codex audit 2B+5F+2N, 30.7.).
+
+**Dávka 2A — identita variantov a skupín (dizajn cez Codex audit 6B+7F+2N, 30.7.; štandard §7.1/§7.5 aktualizovaný — SCHEMA 2). Verzie: 2A-1 = 0.5.5 a ďalej per PR:**
 - **2A-0** dizajn do dokumentov (štandard, roadmapa, pojmy, migračná mapa) — *tento PR*
 - **2A-1** jadro identity: `group_id` na doskách aj ABS, `structure`/`decor_name` polia, kanonické identity helpery (group/sheet/edge_identity_key — jedna normalizácia), register kanonických typov (dvojvrstvové typy — rozhodnuté 30.7.), PD formát v identite + mutabilita, nové ID generovanie (opaque kontrakt), catalog SCHEMA marker + nemenná záloha `materials.pre-schema-2.json`, `catalog_schema` guard mutácií
-- **2A-2** migrácia: explicitná mapa (odklepnutá Michalom — katalóg je testovací) + heuristika len fallback s reportom, fail-safe (pri chybe žiadny seed fallback), fixtures testy, kompatibilita starých modelov = 1:1 zachovanie ID + lookup test (starý .skp → BOM/validácia/rebuild/remap)
-- **2A-3** výberové cesty so štruktúrou: ABS picker (presná štruktúra → `universal` príznak → nič+warning; NIKDY cross-structure), resolver obchodnej hrúbky (jednotka 0,8→1→1,2 · dvojka 2→1,5 s upozornením · 0,4 nikdy automaticky), pick_body_sheet/back preflight/remap/AbsRules/JS Odporúčané dostávajú štruktúru, batch schema 3
+- **2A-2** migrácia: explicitná mapa (**ČAKÁ na Michalovo odklepnutie** — zápisník „2A migračná mapa", vrátane návrhu zmazať osirotenú pásku „Pracovna doska" a zlúčiť „Halifax Tabakový PD"; do schválenia sa 2A-2 nezačína) + heuristika len fallback s reportom, nerozhodnuteľná položka = atomický NO-OP celej migrácie, fixtures testy, kompatibilita starých modelov = zachovanie VŠETKÝCH nezmazaných ID + lookup test (starý .skp → BOM/validácia/rebuild/remap)
+- **2A-3** výberové cesty so štruktúrou: ABS picker (presná NEPRÁZDNA štruktúra → `universal` príznak → nič+warning; NIKDY cross-structure, prázdna≠zhoda), resolver obchodnej hrúbky (jednotka 0,8→1→1,2 · dvojka 2→1,5 s upozornením · 0,4 nikdy automaticky; defaulty rolí = nominálne triedy), **`ensure_edge_for_sheet` + AUTO_WIDTHS 22→23** (dovytvorenie pásky ide resolverom), pick_body_sheet/back preflight/remap/AbsRules/JS Odporúčané dostávajú štruktúru, batch schema 3
 - **2A-4** UI: štruktúra v labeloch/selectoch/hľadaní/výrobných výpisoch, karta skupiny (výrobca·číslo·názov + varianty per štruktúra), **D-47** hlavička panela (tlačidlo Materiály + konzistencia tabov — ikony, šírky)
-- Verzie: 0.5.4+ per PR; **0.6.0 až pri uzávere celej etapy V0.6**
+- Verzie: D-46 = 0.5.4 · 2A-1+ = 0.5.5 a ďalej per PR; **0.6.0 až pri uzávere celej etapy V0.6**
 
 **Ďalšie dávky V0.6 (po 2A):**
 - **2B** duplák (D-43: „zdvojený z 18" cez `source_material_id` + multiplikátor — aj vo výrobnom snapshote) + zástena typ (dva dekory líce/rub)
