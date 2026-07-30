@@ -384,19 +384,23 @@ end
 # CAS (BLOCKER 3) + zaloha (FIX 4)
 # ---------------------------------------------------------------------------
 
-NxTest.test('2A-2: CAS — subezna zmena suboru medzi citanim a zapisom = :conflict bez zapisu') do
+NxTest.test('2A-2: CAS — subezna legacy zmena sa NEPREPISE starym planom, retry ju zmigruje (F6)') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   original = a2_fixture_bytes
   competitor = a2_variant { |d| a2_sheet_of(d, 'UNI_DTDL_18')['price_per_m2'] = 9.9 }
   a2_with_catalog(original) do
     rep = A2MAT.migrate_to_schema2!(before_write: -> { File.binwrite(A2MAT.path, competitor) })
-    NxTest.assert_equal(:conflict, rep[:status])
-    NxTest.assert_equal(competitor, File.binread(A2MAT.path),
-                        'subezna zmena NESMIE byt prepisana migraciou')
-    NxTest.assert_equal(1, A2MAT.catalog_schema, 'marker ostal legacy')
-    # Codex GH P1: CAS bezi pod zamkom PRED zalohou — neuspesny beh (:conflict)
-    # nevytvori ZIADEN subor (ani zalohu; zalohovat cudzi novsi stav by bolo zle)
-    NxTest.refute(File.exist?(A2MAT.pre_schema2_backup_path), ':conflict zalohu nevytvara')
+    # 2A-4a (audit F6): konflikt so STALE legacy suborom uz nie je tvrdy stop —
+    # migracia spravi JEDEN retry nad cerstvym obsahom. Subezna zmena sa
+    # nestrati (9.9 dorazi do vysledku), stary plan sa nikdy nerecykluje.
+    # Tvrdy :conflict ostava pre opakovany konflikt (test_2a4a_hardening.rb).
+    NxTest.assert_equal(:ok, rep[:status], rep.inspect)
+    out = JSON.parse(File.binread(A2MAT.path))
+    NxTest.assert_equal(2, out['schema'], 'retry zmigroval cerstvy obsah')
+    NxTest.assert_equal(9.9, a2_sheet_of(out, 'UNI_DTDL_18')['price_per_m2'],
+                        'subezna zmena NESMIE byt prepisana starym planom — je vo vysledku')
+    NxTest.assert_equal(competitor, File.binread(A2MAT.pre_schema2_backup_path),
+                        'predmigracna zaloha = obsah, ktory sa realne migroval')
   end
 end
 
