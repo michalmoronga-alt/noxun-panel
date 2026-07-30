@@ -132,6 +132,9 @@ module Noxun
             catalog: full_catalog_payload,                    # D-05: plne zaznamy pre spravu
             protected_ids: Materials::PROTECTED_SHEET_IDS,
             catalog_rev: Materials.catalog_revision,          # D-41: baseline guard formularov
+            # 2A-1 (audit F10): SCHEMA katalogu. Klient ju vracia v KAZDEJ mutacii
+            # — po migracii na SCHEMA 2 server odmietne zapis zo stareho okna.
+            catalog_schema: Materials.catalog_schema,
             # D-44: naseptavace (vyrobca/typ) a navrhy formatu platne stavia
             # SERVER — JS ich len renderuje. Ide s KAZDYM katalogovym echom,
             # takze novy vyrobca/typ je v navrhoch hned po zapise.
@@ -162,6 +165,24 @@ module Noxun
           false
         end
 
+        # 2A-1 (audit F10): guard mutacii proti STAREMU oknu. Po migracii katalogu
+        # na SCHEMA 2 (dekorove skupiny, struktura) nesmie zapisovat klient, ktory
+        # o novych poliach nevie — jeho payload by identitu variantu zahodil.
+        # V SCHEMA 1 sa nedeje NIC (spatna kompatibilita: prazdna hodnota prejde).
+        # Rozhodnutie je na serveri (Materials.schema_write_allowed?) — tu ostava
+        # len hlaska a refresh okna.
+        def schema_ok?(data)
+          return true if Materials.schema_write_allowed?(data['catalog_schema'])
+          set_status('Katalóg je v novom formáte — zavri a znova otvor okno Materiály, potom ulož.', true)
+          push_state
+          false
+        end
+
+        # Spolocny vstupny guard katalogovych mutacii (schema pred baseline).
+        def catalog_write_ok?(data)
+          schema_ok?(data) && revision_ok?(data)
+        end
+
         # Plne zaznamy katalogu (sprava potrebuje vsetky polia — panelovy
         # materials_payload je zamerne zuzeny). label = ten isty odvodeny text.
         # D-42 PR C: row_rev = odtlacok SUROVEHO zaznamu (bez labelu) — baseline
@@ -185,6 +206,9 @@ module Noxun
         # potvrdenie (zrkadlo formularoveho allow_duplicate_code).
         def handle_patch(payload, kind)
           data = JSON.parse(payload.to_s)
+          # 2A-1: baseline riadku (row_rev) strazi cudziu zmenu ZAZNAMU, nie
+          # prepnutie schemy katalogu — schema guard preto plati aj pre bunky.
+          return unless schema_ok?(data)
           patch = data['patch'].is_a?(Hash) ? data['patch'] : {}
           status, extra = Materials.patch_record(
             kind, data['id'].to_s, patch,
@@ -455,7 +479,7 @@ module Noxun
         # per-variant). Atomicky, ID zaznamov sa nemenia.
         def handle_set_decor_manufacturer(payload)
           data = JSON.parse(payload.to_s)
-          return unless revision_ok?(data)
+          return unless catalog_write_ok?(data)
           # D-44 (audit F9): prazdna hodnota vymaze vyrobcu LEN s explicitnym
           # flagom z tlacidla "Zmazať výrobcu" — omyl pri naseptavaci sa odmietne.
           clear = !!data['clear_manufacturer']
@@ -473,7 +497,7 @@ module Noxun
 
         def handle_save_sheet(payload, create:)
           data = JSON.parse(payload.to_s)
-          return unless revision_ok?(data)
+          return unless catalog_write_ok?(data)
           ok, err = Materials.validate_sheet_attrs(data)
           return set_status(err, true) unless ok
           th = data['thickness'].to_s.tr(',', '.').to_f
@@ -484,10 +508,15 @@ module Noxun
             if (near = Materials.decor_conflict(data['decor']))
               return set_status("Dekor sa líši od existujúceho „#{near}“ len zápisom — použi presný tvar.", true)
             end
-            if (dup = Materials.find_sheet_variant(data['decor'], data['type'], th))
+            # 2A-1: struktura (a pri PD format) su v SCHEMA 2 sucastou identity
+            # variantu — v SCHEMA 1 ich kluc ignoruje, takze ich posielame vzdy.
+            if (dup = Materials.find_sheet_variant(data['decor'], data['type'], th, data['structure'],
+                                                   data['sheet_size'], group_id: data['group_id'],
+                                                   manufacturer: data['manufacturer']))
               return set_status("Variant už v katalógu je (#{dup['material_id']}).", true)
             end
-            id = Materials.generate_sheet_id(data['decor'], data['type'], th)
+            id = Materials.generate_sheet_id(data['decor'], data['type'], th,
+                                             structure: data['structure'], sheet_size: data['sheet_size'])
           else
             id = data['material_id'].to_s
             existing = Materials.sheet(id)
@@ -512,6 +541,13 @@ module Noxun
             # variant ho nemeni; zmena celej skupiny je samostatna akcia.
             if data.key?('manufacturer') && data['manufacturer'].to_s.strip != existing['manufacturer'].to_s.strip
               return set_status('Výrobca je vlastnosť dekoru — zmeň ho pre celú skupinu, nie jeden záznam.', true)
+            end
+            # 2A-1 (standard 7.1): v SCHEMA 2 je identita variantu pri edite
+            # NEMENNA aj v novych poliach — struktura, kotva skupiny a pri type
+            # PD aj FORMAT platne. Iny format = novy variant (F800 PD 38 4100x600
+            # a 4100x920 su dve rozne dosky), nie prepis existujuceho.
+            if (err = Materials.identity_edit_error(data, existing))
+              return set_status(err, true)
             end
           end
 
@@ -551,7 +587,7 @@ module Noxun
 
         def handle_delete_sheet(payload)
           data = JSON.parse(payload.to_s)
-          return unless revision_ok?(data)
+          return unless catalog_write_ok?(data)
           id = data['material_id'].to_s
           if Materials::PROTECTED_SHEET_IDS.include?(id)
             return set_status('Tento materiál je systémová predvoľba nových projektov — nedá sa zmazať.', true)
@@ -568,7 +604,7 @@ module Noxun
 
         def handle_save_edge(payload, create:)
           data = JSON.parse(payload.to_s)
-          return unless revision_ok?(data)
+          return unless catalog_write_ok?(data)
           ok, err = Materials.validate_edge_attrs(data)
           return set_status(err, true) unless ok
           th = data['thickness'].to_s.tr(',', '.').to_f
@@ -577,10 +613,13 @@ module Noxun
             if (near = Materials.decor_conflict(data['decor']))
               return set_status("Dekor sa líši od existujúceho „#{near}“ len zápisom — použi presný tvar.", true)
             end
-            if (dup = Materials.find_edge_variant(data['decor'], data['width'], th))
+            # 2A-1: struktura je v SCHEMA 2 sucastou identity pasky (5981 ma DVE
+            # rozne 23/1 pasky — MG vs UM/AF); v SCHEMA 1 ju kluc ignoruje.
+            if (dup = Materials.find_edge_variant(data['decor'], data['width'], th,
+                                                  data['structure'], group_id: data['group_id']))
               return set_status("ABS variant už v katalógu je (#{dup['abs_id']}).", true)
             end
-            id = Materials.generate_edge_id(data['decor'], th, data['width'])
+            id = Materials.generate_edge_id(data['decor'], th, data['width'], structure: data['structure'])
             rec = data.merge('abs_id' => id, 'thickness' => th)
           else
             id = data['abs_id'].to_s
@@ -595,6 +634,10 @@ module Noxun
             # D-41 (audit FIX 12): dekor nemenny pri edite (identita skupiny).
             if data.key?('decor') && data['decor'].to_s.strip != existing['decor'].to_s
               return set_status('Dekor je identita skupiny — premenuj celú skupinu (Premenovať dekor), nie jeden záznam.', true)
+            end
+            # 2A-1: struktura/skupina su v SCHEMA 2 identita — pri edite nemenne.
+            if (err = Materials.identity_edit_error(data, existing))
+              return set_status(err, true)
             end
             # D-41 (audit FIX 12+13): sirka je sucast variant identity — pri edite
             # NEMENNA a payload ju nesmie ani ticho zmazat (stary CEF klient bez
@@ -617,7 +660,7 @@ module Noxun
 
         def handle_delete_edge(payload)
           data = JSON.parse(payload.to_s)
-          return unless revision_ok?(data)
+          return unless catalog_write_ok?(data)
           id = data['abs_id'].to_s
           used = Materials.used_abs_ids(Sketchup.active_model)[id]
           if used && !used.empty?
@@ -634,7 +677,7 @@ module Noxun
         # posiela surove texty poli.
         def handle_add_decor_batch(payload)
           data = JSON.parse(payload.to_s)
-          return unless revision_ok?(data)
+          return unless catalog_write_ok?(data)
           ok, result = Materials.add_decor_batch(data)
           return set_status(result, true) unless ok
           after_catalog_change
@@ -651,7 +694,7 @@ module Noxun
         # jednotlivca dekor nemeni; ID zaznamov sa nemenia, modely o nic neprídu).
         def handle_rename_decor(payload)
           data = JSON.parse(payload.to_s)
-          return unless revision_ok?(data)
+          return unless catalog_write_ok?(data)
           ok, result = Materials.rename_decor(data['old_decor'], data['new_decor'])
           return set_status(result, true) unless ok
           after_catalog_change

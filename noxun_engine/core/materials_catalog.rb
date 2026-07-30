@@ -92,6 +92,51 @@ module Noxun
         [true, nil]
       end
 
+      # --- 2A-1: guardy SCHEMA 2 (rozhodnutie na SERVERI, dialog je len obal) --
+
+      # Smie klient s danou schemou zapisovat do katalogu? Po migracii na
+      # SCHEMA 2 nie — stare okno (CEF cache) o novych identitnych poliach nevie
+      # a jeho payload by ich zahodil. V SCHEMA 1 prejde vsetko (spatna
+      # kompatibilita: prazdna/chybajuca hodnota od stareho klienta).
+      def schema_write_allowed?(client_schema)
+        server = catalog_schema
+        return true if server < SCHEMA_GROUPS
+        client_schema.to_i >= server
+      end
+
+      # Identitne polia SCHEMA 2 su pri EDITE nemenne (standard 7.1/7.5):
+      # struktura povrchu, kotva skupiny a pri type PD aj FORMAT platne
+      # (F800 PD 38 4100x600 a 4100x920 su dva varianty, nie jeden prepisany).
+      # V SCHEMA 1 vracia VZDY nil — polia sa vtedy len nesu (dual-mode).
+      # Vrati hlasku pre pouzivatela alebo nil.
+      def identity_edit_error(attrs, existing)
+        return nil if catalog_schema < SCHEMA_GROUPS
+        return nil unless attrs.is_a?(Hash) && existing.is_a?(Hash)
+        if attrs.key?('structure') &&
+           identity_norm(attrs['structure']) != identity_norm(existing['structure'])
+          return 'Štruktúra povrchu definuje variant — pre inú štruktúru pridaj nový variant.'
+        end
+        if attrs.key?('group_id')
+          new_gid = attrs['group_id'].to_s.strip
+          old_gid = existing['group_id'].to_s.strip
+          # GH P2: prazdna hodnota NEsmie kotvu ticho vymazat (merge+normalize
+          # by kluc zahodili) — clear group_id je rovnaka zmena identity ako presun.
+          if new_gid != old_gid && !(new_gid.empty? && old_gid.empty?)
+            return 'Dekorová skupina je identita záznamu — presun medzi skupinami sa nerobí úpravou variantu.'
+          end
+        end
+        return nil unless pd_type?(existing['type'])
+        changed_size = attrs.key?('sheet_size') &&
+                       size_key(attrs['sheet_size']) != size_key(existing['sheet_size'])
+        # GH P2: clear na zazname BEZ formatu je no-op (editor posiela flag pri
+        # prazdnych poliach vzdy) — odmietat len skutocnu zmenu identity.
+        clear_real = attrs['clear_sheet_size'] && !size_key(existing['sheet_size']).nil?
+        if clear_real || changed_size
+          return 'Formát PD definuje variant — pre iný formát pridaj nový variant.'
+        end
+        nil
+      end
+
       # D-42: kod a dodavatel su volitelne kratke texty (limit proti zneuzitiu).
       def validate_text_fields(a)
         %w[code supplier].each do |k|

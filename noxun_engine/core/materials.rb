@@ -31,6 +31,16 @@ module Noxun
     module Materials
       STD  = 1
       FILE = 'materials.json'
+      # 2A-1: SCHEMA katalogu. 1 = legacy (skupina = presny text dekoru, variant
+      # = dekor+typ+hrubka). 2 = skupinova identita (group_id, struktura povrchu,
+      # pri PD aj format v identite; standard 7.1/7.5). Cely aparat SCHEMA 2 je
+      # pripraveny uz teraz, ale AKTIVUJE ho az migracia (2A-2) prepnutim markera
+      # v subore — do vtedy sa spravanie nemeni ani o vlas (dual-mode).
+      SCHEMA_LEGACY = 1
+      SCHEMA_GROUPS = 2
+      # Nemenna PREDMIGRACNA zaloha (standard 7.1) — mimo bezneho .bak, ktory sa
+      # pri kazdom zapise prepisuje. Vznikne raz a NIKDY sa neprepise.
+      PRE_SCHEMA2_FILE = 'materials.pre-schema-2.json'
       SUPPORTED_EDGE_THICKNESSES = [1.0, 2.0].freeze
       # D-41: sirka ABS pasky (mm). Volitelne pole 'width' na edge zazname —
       # legacy pasky bez sirky su "univerzalne" (pouzitelne pre kazdu hrubku).
@@ -45,20 +55,43 @@ module Noxun
       # pouzivana formularom (validate_sheet_attrs) AJ batchom "Novy dekor".
       # Dva rozne rozsahy = dva rozne pravdy, preto konstanta.
       SHEET_SIZE_RANGE = (500.0..5000.0)
+
+      # --- 2A-1: register kanonickych typov dosiek (standard 7.1) --------------
+      # Typ je DVOJVRSTVOVY: kanonicke typy ziju tu s parametrami, cokolvek mimo
+      # registra je "iny" typ = volny string s generickym spravanim (ziadny navrh
+      # formatu, ziadne navrhy hrubok). Identita typu je case-insensitive.
+      # Kompaktna doska je VLASTNY kanonicky typ (nikdy "PD s podtypom kompakt").
+      #   format_hint           — navrh formatu platne (nil = vedome zadanie)
+      #   thickness_suggestions — bezne hrubky do naseptavaca (NIE enum)
+      #   pd_edge_subtypes      — len PD: hranova uprava (postforming | ABS rovna hrana)
+      #   body_candidate        — typ, z ktoreho sa realne stava telo korpusu
+      TYPE_REGISTRY = {
+        'DTDL' => { 'label' => 'DTD laminovaná', 'format_hint' => [2800.0, 2070.0].freeze,
+                    'thickness_suggestions' => [18.0, 19.0, 36.0].freeze, 'body_candidate' => true },
+        'MDF' => { 'label' => 'MDF', 'format_hint' => [2800.0, 2070.0].freeze,
+                   'thickness_suggestions' => [18.0, 19.0].freeze, 'body_candidate' => true },
+        'HDF' => { 'label' => 'HDF', 'format_hint' => [2800.0, 2070.0].freeze,
+                   'thickness_suggestions' => [3.0].freeze, 'body_candidate' => false },
+        'PD' => { 'label' => 'Pracovná doska', 'format_hint' => nil,
+                  'thickness_suggestions' => [38.0, 20.0].freeze,
+                  'pd_edge_subtypes' => %w[postforming abs].freeze, 'body_candidate' => false },
+        'ZASTENA' => { 'label' => 'Zástena', 'format_hint' => [4100.0, 640.0].freeze,
+                       'thickness_suggestions' => [9.2, 10.0].freeze, 'body_candidate' => false },
+        'KOMPAKT' => { 'label' => 'Kompaktná doska', 'format_hint' => nil,
+                       'thickness_suggestions' => [12.0].freeze, 'body_candidate' => false }
+      }.freeze
+
       # D-44 (audit B2): NAVRH formatu platne podla typu dosky pre nove varianty
       # v batchi. DTDL/MDF/HDF maju de facto standard 2800x2070; PD (pracovna
       # doska) ma sirok vela a lisia sa per vyrobca -> ziadny navrh = vedome
       # zadanie. Neznamy typ = nil. Navrh je len PREDVYPLNENIE viditelneho pola
       # (viditelne = potvrdene odoslanim) — server neuklada neovereny default.
-      TYPE_FORMAT_HINTS = {
-        'DTDL' => [2800.0, 2070.0],
-        'MDF'  => [2800.0, 2070.0],
-        'HDF'  => [2800.0, 2070.0],
-        'PD'   => nil
-      }.freeze
+      # 2A-1: derivat TYPE_REGISTRY (hodnoty existujucich typov nezmenene).
+      TYPE_FORMAT_HINTS = TYPE_REGISTRY.each_with_object({}) { |(k, v), h| h[k] = v['format_hint'] }.freeze
       # D-44: typy ponukane v naseptavaci aj ked ich katalog este neobsahuje
       # (typ ostava volny string — toto NIE JE enum, len navrhy).
-      SEED_TYPES = %w[DTDL PD MDF HDF kompakt].freeze
+      # 2A-1: navrhy = kanonicke typy z registra.
+      SEED_TYPES = TYPE_REGISTRY.keys.freeze
 
       # Projektove default kluce v NOXUN dict na modeli (koren dedenia projekt->korpus->dielec).
       PROJECT_KEYS = %w[default_material_id default_front_material_id default_back_material_id].freeze
@@ -137,11 +170,68 @@ module Noxun
       end
 
       # Zapis so zalohou: existujuci subor -> .bak, novy cez .tmp + atomicky rename (ako templates.rb).
+      # 2A-1: kazdy zapis nesie SCHEMA marker. Bez explicitnej hodnoty sa preberie
+      # schema zo suboru (chybajuca = 1), takze bezne mutacie ju nikdy nestratia;
+      # explicitne ju posiela LEN migracia (2A-2).
       def write(data)
-        payload = { 'std' => STD, 'sheets' => data['sheets'], 'edges' => data['edges'] }
+        payload = { 'std' => STD, 'schema' => target_schema(data['schema']),
+                    'sheets' => data['sheets'], 'edges' => data['edges'] }
         JsonFileStore.write(path, payload)
       rescue StandardError => e
         Engine.log_error(e, 'Materials.write') if defined?(Engine)
+        false
+      end
+
+      # SCHEMA katalogu v subore. Chybajuci/poskodeny marker = 1 (legacy).
+      # NESEEDUJE (volane aj z write cez target_schema — seed by sa zacyklil).
+      def catalog_schema
+        return SCHEMA_LEGACY unless JsonFileStore.available?(path)
+        data = JsonFileStore.read(path, copy: false)
+        raw = data.is_a?(Hash) ? data['schema'] : nil
+        n = raw.to_i
+        n >= SCHEMA_LEGACY ? n : SCHEMA_LEGACY
+      rescue StandardError
+        SCHEMA_LEGACY
+      end
+
+      # Schema pre zapis: bez zelania (a pri neplatnej/nizsej hodnote) sa drzi
+      # schema suboru. DOWNGRADE je zakazany — oneskoreny payload zo stareho
+      # okna nesmie katalog prepnut spat a vyrobit hybridny stav (standard 7.1).
+      def target_schema(wanted)
+        current = catalog_schema
+        n = wanted.to_i
+        return current if n <= current
+        n
+      end
+
+      # --- 2A-1: nemenna predmigracna zaloha (standard 7.1) --------------------
+
+      def pre_schema2_backup_path
+        File.join(dir, PRE_SCHEMA2_FILE)
+      end
+
+      # Odlozi BAJT-PRESNU kopiu aktualneho katalogu pred migraciou na SCHEMA 2.
+      # Existujucu zalohu NIKDY neprepise (druhy beh migracie by inak zahodil
+      # posledny predmigracny stav). Vrati cestu k zalohe, alebo false
+      # (uz existuje / nie je co zalohovat / zapis zlyhal).
+      def write_pre_schema2_backup!
+        target = pre_schema2_backup_path
+        return false if File.exist?(target)
+        return false unless File.exist?(path)
+        content = File.binread(path)
+        JSON.parse(content) # poskodeny subor sa ako zaloha nezapise
+        FileUtils.mkdir_p(dir)
+        tmp = "#{target}.tmp-#{Process.pid}"
+        File.binwrite(tmp, content)
+        File.rename(tmp, target)
+        target
+      rescue StandardError => e
+        Engine.log_error(e, 'Materials.write_pre_schema2_backup!') if defined?(Engine)
+        begin
+          File.delete(tmp) if tmp && File.exist?(tmp)
+        rescue StandardError
+          nil
+        end
         false
       end
 
@@ -202,7 +292,18 @@ module Noxun
         out.delete('sheet_size') if out['sheet_size'].nil?
         put_opt(out, 'code', a['code'] || a[:code])
         put_opt(out, 'supplier', a['supplier'] || a[:supplier])
+        put_schema2_fields(out, a)
         out
+      end
+
+      # 2A-1 (SCHEMA 2 polia): kotva skupiny + zobrazovaci nazov dekoru +
+      # struktura povrchu. V SCHEMA 1 sa NIKDE nevyhodnocuju — len sa NESU
+      # (merge-safe ako code/supplier: trim, prazdna hodnota kluc odstrani),
+      # aby ich vedeli zapisat migracia (2A-2) aj buduce UI (2A-4).
+      def put_schema2_fields(out, a)
+        put_opt(out, 'group_id', a['group_id'] || a[:group_id])
+        put_opt(out, 'decor_name', a['decor_name'] || a[:decor_name])
+        put_opt(out, 'structure', a['structure'] || a[:structure])
       end
 
       def normalize_edge(a)
@@ -231,7 +332,20 @@ module Noxun
         end
         put_opt(out, 'code', a['code'] || a[:code])       # D-42 dodavatelsky/katalogovy kod
         put_opt(out, 'supplier', a['supplier'] || a[:supplier]) # D-42 preferovany dodavatel
+        put_schema2_fields(out, a)
+        # 2A-1: 'universal' = VEDOMY priznak "paska pasuje na vsetku strukturu"
+        # (standard 7.5 — jedina cesta pre pasky bez struktury; prazdna struktura
+        # sa NIKDY nepocita ako zhoda). Uklada sa LEN ked je true; false/prazdne
+        # kluc ODSTRANI (merge-safe, ziadne nil kluce v JSON).
+        out['universal'] = true if flag_true?(a['universal'] || a[:universal])
         out
+      end
+
+      # Priznak z payloadu: true len pri skutocnom true / "true" / "1".
+      # Vsetko ostatne (nil, false, "", "0", "nie") = vypnute.
+      def flag_true?(raw)
+        return true if raw == true
+        %w[true 1].include?(raw.to_s.strip.downcase)
       end
 
       # D-42: volitelne string pole (code/supplier) — ulozi sa LEN ked ma hodnotu
@@ -297,6 +411,136 @@ module Noxun
         v.nil? ? nil : v.to_f
       end
 
+      # --- 2A-1: kanonicke identity helpery (standard 7.1 — JEDINA normalizacia) --
+      # Vsetky porovnania identity (create, edit, batch, rename, migracia) idu
+      # VYHRADNE cez tieto helpery — ziadne lokalne porovnavanie s vlastnou
+      # toleranciou. Kluce su OPAQUE: porovnavaju sa, nikdy sa z nich necita.
+      #
+      # Schema-aware:
+      #   SCHEMA 1 = presne dnesne porovnania (skupina = trimnuty text dekoru;
+      #              doska dekor+typ+hrubka, ABS dekor+sirka+hrubka),
+      #   SCHEMA 2 = skupina cez group_id (fallback vyrobca+dekor) + STRUKTURA,
+      #              pri type PD navyse FORMAT ako usporiadana dvojica.
+
+      # Normalizacia textovej casti identity: trim, viacnasobne medzery na jednu,
+      # case-insensitive. POZOR: medzery sa NEODSTRANUJU — 'ST9' a 'ST 9' su dva
+      # ROZNE zapisy (preklepy chyta near-match guard decor_conflict, ktory je
+      # zamerne prisnejsi a medzery ignoruje uplne).
+      def identity_norm(value)
+        value.to_s.strip.gsub(/\s+/, ' ').upcase
+      end
+
+      # Obchodna identita dekorovej skupiny: vyrobca + cislo dekoru (standard 7.1
+      # — rovnake cislo dvoch vyrobcov su DVE skupiny). Pouziva migracia 2A-2 aj
+      # zaznamy bez group_id.
+      def group_identity_key(manufacturer, decor)
+        [identity_norm(manufacturer), identity_norm(decor)]
+      end
+
+      # Skupinova cast kluca zaznamu. Symbolove znacky drzia tvary oddelene
+      # (Symbol sa nikdy nerovna Stringu), takze sa kluce roznych rezimov
+      # nemozu nahodou stretnut.
+      def record_group_key(rec, schema = catalog_schema)
+        return [:decor, rec['decor'].to_s.strip] if schema < SCHEMA_GROUPS
+        gid = rec['group_id'].to_s.strip
+        return [:group_id, identity_norm(gid)] unless gid.empty?
+        group_identity_key(rec['manufacturer'], rec['decor'])
+      end
+
+      # Hrubka do kluca: mm zaokruhlene na 2 desatiny (standard 7.1). Nahradza
+      # doterajsie porovnanie s toleranciou 0.01 — pre kazdu realne zadatelnu
+      # hodnotu je vysledok rovnaky (18 vs 18.004 ostava jeden variant).
+      def thickness_key(value)
+        value.to_f.round(2)
+      end
+
+      # Sirka pasky do kluca: nil (univerzalna bez sirky) alebo mm na 2 desatiny.
+      # Desatinna ciarka je povolena (formular ju posiela ako text).
+      def width_key(value)
+        return nil if value.nil? || value.to_s.strip.empty?
+        value.to_s.tr(',', '.').to_f.round(2)
+      end
+
+      # Format platne do kluca ako USPORIADANA dvojica (dlzka >= sirka), takze
+      # 4100x600 a 600x4100 su ten isty format. Nezadany/poskodeny = nil.
+      def size_key(value)
+        pair = normalize_pair(value)
+        return nil unless pair
+        pair.map { |x| x.round(2) }.sort.reverse
+      end
+
+      # Typ PD (pracovna doska) — pri nom je format sucastou identity variantu.
+      def pd_type?(type)
+        identity_norm(type) == 'PD'
+      end
+
+      # GH P2: kluc kvantizuje mm na 0,01 — HRANICNA dvojica (18.004 vs 18.006)
+      # by sa v kluci rozisla, hoci legacy tolerancia (abs < 0.01) ju drzala ako
+      # jeden variant. Duplicitne guardy preto porovnavaju kluce s toleranciou
+      # na Float zlozkach (hrubka/sirka); ostatne zlozky presne.
+      def identity_keys_tolerant?(a, b)
+        return false unless a.is_a?(Array) && b.is_a?(Array) && a.length == b.length
+        a.each_with_index.all? do |av, i|
+          bv = b[i]
+          if av.is_a?(Float) && bv.is_a?(Float)
+            (av - bv).abs < 0.011
+          else
+            av == bv
+          end
+        end
+      end
+
+      # Identita variantu DOSKY. rec = katalogovy zaznam alebo hash atributov.
+      def sheet_identity_key(rec, schema = catalog_schema)
+        key = [record_group_key(rec, schema), identity_norm(rec['type']), thickness_key(rec['thickness'])]
+        return key if schema < SCHEMA_GROUPS
+        key << identity_norm(rec['structure'])
+        key << size_key(rec['sheet_size']) if pd_type?(rec['type'])
+        key
+      end
+
+      # Identita variantu ABS PASKY (sirka je sucast identity; 'universal' NIE
+      # JE identita — je to vlastnost vyberu, standard 7.5).
+      def edge_identity_key(rec, schema = catalog_schema)
+        key = [record_group_key(rec, schema), width_key(rec['width']), thickness_key(rec['thickness'])]
+        return key if schema < SCHEMA_GROUPS
+        key << identity_norm(rec['structure'])
+        key
+      end
+
+      # --- 2A-1: register typov — dotazy (typ mimo registra = "iny") -----------
+
+      # Zaznam registra pre napisany typ (case-insensitive, trim) alebo nil.
+      def type_registry_entry(type)
+        TYPE_REGISTRY[identity_norm(type)]
+      end
+
+      # Kanonicky zapis typu (kluc registra), alebo trimnuty text tak, ako ho
+      # pouzivatel napisal ("iny" typ ostava volny string — NIE JE to enum).
+      def canonical_type(type)
+        key = identity_norm(type)
+        TYPE_REGISTRY.key?(key) ? key : type.to_s.strip
+      end
+
+      # Bezne hrubky typu do naseptavaca ([] pre typ mimo registra).
+      def type_thickness_suggestions(type)
+        entry = type_registry_entry(type)
+        entry ? entry['thickness_suggestions'] : []
+      end
+
+      # Hranove podtypy PD (postforming | ABS rovna hrana). Iny typ = [] —
+      # Kompakt je VLASTNY kanonicky typ, nie podtyp PD (standard 7.1).
+      def pd_edge_subtypes(type)
+        entry = type_registry_entry(type)
+        (entry && entry['pd_edge_subtypes']) || []
+      end
+
+      # Typ, z ktoreho realne vznika telo korpusu (DTDL/MDF).
+      def body_candidate_type?(type)
+        entry = type_registry_entry(type)
+        entry ? !!entry['body_candidate'] : false
+      end
+
       # Slug pre technicke ID: transliteracia diakritiky (NFD + odstranenie znamienok),
       # upcase, [A-Z0-9] bloky spojene '_'. 'Dub Halifax prírodný' -> 'DUB_HALIFAX_PRIRODNY'.
       def slug(value)
@@ -312,22 +556,43 @@ module Noxun
 
       # Vygeneruje volne material_id: SLUG(decor)_SLUG(type)_TOKEN(th); kolizie
       # (case-insensitive) dostanu -2/-3... ID sa NIKDY negeneruje pri edite.
-      def generate_sheet_id(decor, type, thickness)
-        base = "#{slug(decor)}_#{slug(type)}_#{thickness_token(thickness)}"
-        unique_id(base, sheets.map { |s| s['material_id'].to_s.upcase })
+      #
+      # 2A-1 (standard 7.1): ID je OPAQUE a navzdy NEMENNE — nikdy sa neparsuje
+      # a existujuce ID sa nikdy neprepocitavaju. Skupina a struktura su v nom
+      # LEN pre citatelnost:
+      #   struktura sa vklada za dekor (K009 + PW + DTDL + 18 = K009_PW_DTDL_18),
+      #   pri type PD sa v SCHEMA 2 pridava token formatu (..._4100X600), lebo
+      #   format je vtedy sucastou identity variantu.
+      # Prazdna struktura (= cely stav SCHEMA 1) da PRESNE dnesne ID.
+      # `taken` = vlastny zoznam obsadenych ID (batch ich zbiera kumulativne,
+      # aby si polozky jednej davky ID neprepisali); nil = zoznam z katalogu.
+      def generate_sheet_id(decor, type, thickness, structure: nil, sheet_size: nil,
+                            taken: nil, schema: catalog_schema)
+        parts = [slug(decor)]
+        st = slug(structure)
+        parts << st unless st.empty?
+        parts << slug(type)
+        parts << thickness_token(thickness)
+        fmt = schema >= SCHEMA_GROUPS && pd_type?(type) ? size_key(sheet_size) : nil
+        parts << "#{thickness_token(fmt[0])}X#{thickness_token(fmt[1])}" if fmt
+        unique_id(parts.join('_'), taken || sheets.map { |s| s['material_id'].to_s.upcase })
       end
 
       # D-41: paska so sirkou dostane ID s tokenom sirky PRED hrubkou
       # (ABS_U702_ST9_22X10 = sirka 22, hrubka 1,0). Bez sirky stary format
       # (ABS_U702_ST9_10). Existujuce ID sa NIKDY negeneruju znova.
-      def generate_edge_id(decor, thickness, width = nil)
+      # 2A-1: struktura ide (ak je zadana) hned za dekor — rovnaky vzor ako doska.
+      def generate_edge_id(decor, thickness, width = nil, structure: nil, taken: nil)
         th_token = (thickness.to_s.tr(',', '.').to_f * 10).round.to_s
-        base = if width.nil? || width.to_s.strip.empty?
-                 "ABS_#{slug(decor)}_#{th_token}"
-               else
-                 "ABS_#{slug(decor)}_#{thickness_token(width)}X#{th_token}"
-               end
-        unique_id(base, edges.map { |a| a['abs_id'].to_s.upcase })
+        parts = ["ABS_#{slug(decor)}"]
+        st = slug(structure)
+        parts << st unless st.empty?
+        parts << if width.nil? || width.to_s.strip.empty?
+                   th_token
+                 else
+                   "#{thickness_token(width)}X#{th_token}"
+                 end
+        unique_id(parts.join('_'), taken || edges.map { |a| a['abs_id'].to_s.upcase })
       end
 
       # --- D-44: navrhy do naseptavacov (datalist) -----------------------------

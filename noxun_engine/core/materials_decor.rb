@@ -34,27 +34,33 @@ module Noxun
         (sheets.map { |s| s['decor'].to_s } + edges.map { |a| a['decor'].to_s }).uniq
       end
 
-      # Variant identity lookupy (dup guard pri create; audit FIX 16):
-      # sheet = dekor + typ (case-insensitive) + hrubka; edge = dekor + sirka + hrubka.
-      def find_sheet_variant(decor, type, thickness)
-        d = decor.to_s.strip
-        t = type.to_s.strip.upcase
-        th = thickness.to_f
-        sheets.find do |s|
-          s['decor'].to_s == d && s['type'].to_s.strip.upcase == t &&
-            (s['thickness'].to_f - th).abs < 0.01
-        end
+      # Variant identity lookupy (dup guard pri create; audit FIX 16).
+      # 2A-1 (audit F8): porovnanie bezi VYHRADNE cez kanonicke identity kluce
+      # (Materials.sheet_identity_key / edge_identity_key) — v SCHEMA 1 su to
+      # presne dnesne pravidla (doska dekor+typ+hrubka, ABS dekor+sirka+hrubka),
+      # v SCHEMA 2 pribuda struktura (a pri PD format). Volitelne argumenty
+      # SCHEMA 2 su v SCHEMA 1 ignorovane, takze volajuci ich smie posielat vzdy.
+      #
+      # SCHEMA 2 kontrakt volajuceho: kotvou skupiny je `group_id` (migracia 2A-2
+      # ho zapise KAZDEMU zaznamu, UI ho pri praci s dekorom drzi). Bez neho sa
+      # dotaz opiera o obchodnu identitu skupiny (vyrobca + dekor).
+      def find_sheet_variant(decor, type, thickness, structure = nil, sheet_size = nil,
+                             group_id: nil, manufacturer: nil)
+        schema = catalog_schema
+        want = sheet_identity_key({ 'decor' => decor, 'type' => type, 'thickness' => thickness,
+                                    'structure' => structure, 'sheet_size' => sheet_size,
+                                    'group_id' => group_id, 'manufacturer' => manufacturer }, schema)
+        # GH P2: tolerancne porovnanie klucov — hranicne hrubky drzia legacy spravanie.
+        sheets.find { |s| identity_keys_tolerant?(sheet_identity_key(s, schema), want) }
       end
 
-      def find_edge_variant(decor, width, thickness)
-        d = decor.to_s.strip
-        th = thickness.to_f
-        w = width.nil? || width.to_s.strip.empty? ? nil : width.to_s.tr(',', '.').to_f
-        edges.find do |a|
-          next false unless a['decor'].to_s == d && (a['thickness'].to_f - th).abs < 0.01
-          aw = edge_width(a)
-          w.nil? ? aw.nil? : (aw && (aw - w).abs < 0.01)
-        end
+      def find_edge_variant(decor, width, thickness, structure = nil, group_id: nil, manufacturer: nil)
+        schema = catalog_schema
+        want = edge_identity_key({ 'decor' => decor, 'width' => width, 'thickness' => thickness,
+                                   'structure' => structure, 'group_id' => group_id,
+                                   'manufacturer' => manufacturer }, schema)
+        # GH P2: tolerancne porovnanie klucov — hranicne hrubky/sirky drzia legacy spravanie.
+        edges.find { |a| identity_keys_tolerant?(edge_identity_key(a, schema), want) }
       end
 
       # Atomicke premenovanie dekoru CELEJ skupiny (sheets + edges, 1 zapis).
@@ -87,13 +93,37 @@ module Noxun
       end
 
       # Prva duplicitna variant identity v datach (popis) alebo nil.
+      # 2A-1: zoskupenie ide cez kanonicke identity kluce (kluc je OPAQUE, popis
+      # sa preto sklada z PRVEHO kolidujuceho zaznamu, nie z kluca).
       def dup_variant_in(data)
-        s = data['sheets'].group_by { |r| [r['decor'].to_s, r['type'].to_s.strip.upcase, r['thickness'].to_f.round(2)] }
-                          .find { |_, v| v.size > 1 }
-        return "#{s[0][0]} #{s[0][1]} #{s[0][2]} mm" if s
-        e = data['edges'].group_by { |r| [r['decor'].to_s, edge_width(r)&.round(2), r['thickness'].to_f.round(2)] }
-                         .find { |_, v| v.size > 1 }
-        e && "ABS #{e[0][0]} #{e[0][1] ? "#{e[0][1]}/" : ''}#{e[0][2]} mm"
+        schema = catalog_schema
+        # GH P2: group_by by hranicne dvojice (18.004 vs 18.006) nespojil —
+        # duplicitny sken porovnava kluce tolerancne (male n, O(n^2) je ok).
+        s = tolerant_dup(data['sheets']) { |r| sheet_identity_key(r, schema) }
+        return sheet_variant_label(s) if s
+        e = tolerant_dup(data['edges']) { |r| edge_identity_key(r, schema) }
+        e && edge_variant_label(e)
+      end
+
+      def tolerant_dup(rows)
+        keyed = Array(rows).map { |r| [r, yield(r)] }
+        keyed.each_with_index do |(rec, key), i|
+          keyed[(i + 1)..].each do |(_, other)|
+            return rec if identity_keys_tolerant?(key, other)
+          end
+        end
+        nil
+      end
+
+      def sheet_variant_label(rec)
+        parts = [rec['decor'].to_s, rec['structure'].to_s, rec['type'].to_s].reject(&:empty?)
+        "#{parts.join(' ')} #{fmt_mm(rec['thickness'])} mm"
+      end
+
+      def edge_variant_label(rec)
+        parts = [rec['decor'].to_s, rec['structure'].to_s].reject(&:empty?)
+        w = edge_width(rec)
+        "ABS #{parts.join(' ')} #{w ? "#{fmt_mm(w)}/" : ''}#{fmt_mm(rec['thickness'])} mm"
       end
 
       # Kratky odtlacok obsahu katalogu — baseline guard okna (audit FIX 15):
@@ -234,12 +264,14 @@ module Noxun
         # Dedup a konflikt riesi dedup_sheet_entries (identita dosky = TYP +
         # hrubka; BLOCKER 5: PD 38 a DTDL 38 su dva varianty).
         sheet_pairs.each do |(vt, th, size)|
-          if find_sheet_variant(decor, vt, th)
+          if find_sheet_variant(decor, vt, th, nil, size, manufacturer: manufacturer)
             skipped << "#{vt} #{fmt_mm(th)}"
             next
           end
-          base = "#{slug(decor)}_#{slug(vt)}_#{thickness_token(th)}"
-          id = unique_id(base, taken)
+          # 2A-1 (audit F12): ID sklada VYHRADNE spolocny generator — davka mu
+          # len podava vlastny kumulativny zoznam obsadenych ID (polozky jednej
+          # davky si tak ID neprepisu).
+          id = generate_sheet_id(decor, vt, th, sheet_size: size, taken: taken)
           taken << id.upcase
           # D-42: batch NEuklada cenu (nezadana) — doplni sa v tabulke variantov.
           # D-44 (audit B2): format ide do zaznamu LEN ked ho pouzivatel zadal —
@@ -252,16 +284,20 @@ module Noxun
           created_sheets << id
         end
 
+        # 2A-1: dedup v ramci davky ide cez rovnaky kluc ako identita variantu
+        # (sirka+hrubka na 2 desatiny) — 22 a 22.004 ostavaju jedna paska.
         seen_abs = []
         abs_list.each do |(w, th)|
-          next if seen_abs.any? { |(pw, pt)| (pw - w).abs < 0.01 && (pt - th).abs < 0.01 }
-          seen_abs << [w, th]
+          pair_key = [width_key(w), thickness_key(th)]
+          next if seen_abs.include?(pair_key)
+          seen_abs << pair_key
+          # ABS zaznam vyrobcu NENESIE (vyrobca je vlastnost dekorovej skupiny
+          # cez dosky, standard 7.5) — dotaz ho preto tiez neposiela.
           if find_edge_variant(decor, w, th)
             skipped << "ABS #{fmt_mm(w)}/#{fmt_mm(th)}"
             next
           end
-          base = "ABS_#{slug(decor)}_#{thickness_token(w)}X#{(th * 10).round}"
-          id = unique_id(base, taken)
+          id = generate_edge_id(decor, th, w, taken: taken)
           taken << id.upcase
           data['edges'] << normalize_edge(
             'abs_id' => id, 'decor' => decor, 'thickness' => th,
@@ -345,8 +381,18 @@ module Noxun
       def dedup_sheet_entries(entries, strict)
         seen = []
         out = []
+        pd_formats = catalog_schema >= SCHEMA_GROUPS
         entries.each do |(vt, th, size, src)|
-          prev = seen.find { |p| p[0] == vt.upcase && (p[1] - th).abs < 0.01 }
+          # 2A-1: ten isty kluc identity ako pri variantoch (typ case-insensitive,
+          # hrubka na 2 desatiny, tolerancne — GH P2). V SCHEMA 2 je pri PD
+          # sucastou kluca aj FORMAT (GH P2: PD 38 4100x600 + 4100x920 v jednej
+          # davke su dva legalne varianty, nie duplicita).
+          skey = (pd_formats && pd_type?(vt)) ? size_key(size) : nil
+          prev = seen.find do |p|
+            p[0] == identity_norm(vt) &&
+              (p[1] - thickness_key(th)).abs < 0.011 &&
+              p[3] == skey
+          end
           if prev
             if strict && !(prev[2] == :text && src == :text)
               return [false, "Variant #{vt} #{fmt_mm(th)} mm je v dávke dvakrát — nechaj len jeden " \
@@ -354,7 +400,7 @@ module Noxun
             end
             next
           end
-          seen << [vt.upcase, th, src]
+          seen << [identity_norm(vt), thickness_key(th), src, skey]
           out << [vt, th, size]
         end
         [true, out]
