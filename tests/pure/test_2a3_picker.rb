@@ -111,3 +111,152 @@ end
 NxTest.test('2a3: AUTO_WIDTHS = {23; 43} (N16 — jedina vedoma vynimka z dual-mode)') do
   NxTest.assert_equal([23.0, 43.0], A3MAT::AUTO_WIDTHS)
 end
+
+# ---------------------------------------------------------------------------
+# B3/N17: nominalne triedy + resolver obchodnej hrubky (ciste funkcie)
+# ---------------------------------------------------------------------------
+
+NxTest.test('2a3: edge_thickness_class — nula4/jednotka/dvojka/nil') do
+  NxTest.assert_equal(:nula4, A3MAT.edge_thickness_class(0.4))
+  [0.8, 1.0, 1.2].each { |t| NxTest.assert_equal(:jednotka, A3MAT.edge_thickness_class(t), t.to_s) }
+  [1.5, 2.0].each { |t| NxTest.assert_equal(:dvojka, A3MAT.edge_thickness_class(t), t.to_s) }
+  NxTest.assert_equal(nil, A3MAT.edge_thickness_class(3.0))
+  NxTest.assert_equal(nil, A3MAT.edge_thickness_class(0.5))
+end
+
+NxTest.test('2a3: resolver — jednotka preferuje 0,8 -> 1 -> 1,2') do
+  cands = [a3_edge('E12', 'G', 'ST', 1.2, 23.0), a3_edge('E10', 'G', 'ST', 1.0, 23.0),
+           a3_edge('E08', 'G', 'ST', 0.8, 23.0)]
+  rec, reason = A3MAT.resolve_edge_thickness(cands, :jednotka, 18.0)
+  NxTest.assert_equal('E08', rec['abs_id'])
+  NxTest.assert_equal(nil, reason)
+  rec2, = A3MAT.resolve_edge_thickness(cands.reject { |a| a['abs_id'] == 'E08' }, :jednotka, 18.0)
+  NxTest.assert_equal('E10', rec2['abs_id'], 'bez 0,8 pada na 1,0')
+end
+
+NxTest.test('2a3: resolver — dvojka 2,0 -> 1,5 s reasonom abs_15_fallback') do
+  full = [a3_edge('E20', 'G', 'ST', 2.0, 23.0), a3_edge('E15', 'G', 'ST', 1.5, 23.0)]
+  rec, reason = A3MAT.resolve_edge_thickness(full, :dvojka, 18.0)
+  NxTest.assert_equal('E20', rec['abs_id'])
+  NxTest.assert_equal(nil, reason, '2,0 je plnohodnotna dvojka — bez warningu')
+  rec2, reason2 = A3MAT.resolve_edge_thickness([a3_edge('E15', 'G', 'ST', 1.5, 23.0)], :dvojka, 18.0)
+  NxTest.assert_equal('E15', rec2['abs_id'])
+  NxTest.assert_equal('abs_15_fallback', reason2, 'vyber 1,5 = viditelne upozornenie')
+end
+
+NxTest.test('2a3: resolver — siroka prednostna hrubka nepada, uzka NEBLOKUJE dalsiu preferenciu') do
+  cands = [a3_edge('E08', 'G', 'ST', 0.8, 23.0), a3_edge('E10', 'G', 'ST', 1.0, 43.0)]
+  rec, reason = A3MAT.resolve_edge_thickness(cands, :jednotka, 38.0)
+  NxTest.assert_equal('E10', rec['abs_id'], '38+2=40 > 23 -> preferovana 0,8 sirkovo nevyhovuje, berie sa 1,0/43')
+  NxTest.assert_equal(nil, reason)
+end
+
+NxTest.test('2a3: resolver — reason rozlisuje chybajucu triedu od chybajucej sirky') do
+  NxTest.assert_equal([nil, 'abs_nominal_missing'],
+                      A3MAT.resolve_edge_thickness([a3_edge('E04', 'G', 'ST', 0.4, 23.0)], :jednotka, 18.0),
+                      'skupina len 0,4 — jednotka sa NIKDY nerozriesi na 0,4')
+  NxTest.assert_equal([nil, 'abs_nominal_missing'],
+                      A3MAT.resolve_edge_thickness([a3_edge('E15', 'G', 'ST', 1.5, 23.0)], :jednotka, 18.0),
+                      '1,5 je dvojka, nie jednotka')
+  cands = [a3_edge('E10', 'G', 'ST', 1.0, 23.0)]
+  NxTest.assert_equal([nil, 'abs_width_missing'], A3MAT.resolve_edge_thickness(cands, :jednotka, 38.0),
+                      'trieda existuje, sirka nevyhovuje')
+  NxTest.assert_equal([nil, 'abs_nominal_missing'], A3MAT.resolve_edge_thickness([], :jednotka, 18.0))
+  NxTest.assert_equal([nil, 'abs_nominal_missing'], A3MAT.resolve_edge_thickness(cands, :nula4, 18.0),
+                      'trieda :nula4 sa nikdy nevoli automaticky')
+end
+
+NxTest.test('2a3: resolver — tie-break abs_id v ramci hrubky') do
+  cands = [a3_edge('B10', 'G', 'ST', 1.0, 23.0), a3_edge('A10', 'G', 'ST', 1.0, 23.0)]
+  rec, = A3MAT.resolve_edge_thickness(cands.sort_by { |a| a['abs_id'] }, :jednotka, 18.0)
+  NxTest.assert_equal('A10', rec['abs_id'])
+end
+
+# ---------------------------------------------------------------------------
+# B3: abs_for_sheet — hierarchia skupina -> presna struktura -> universal -> nic
+# ---------------------------------------------------------------------------
+
+# Matica bezi nad sandbox katalogom SCHEMA 2 (abs_for_sheet cita Materials.edges).
+def a3_pick(sheets, edges, sheet_id, nominal, part_th)
+  a3_with_catalog(sheets, edges, schema: 2) do
+    return A3MAT.abs_for_sheet(A3MAT.sheet(sheet_id), nominal, part_th)
+  end
+end
+
+NxTest.test('2a3: picker — skupina bez ABS = abs_structure_missing') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  out = a3_pick([a3_sheet('S1', 'G1', 'ST9')], [], 'S1', :jednotka, 18.0)
+  NxTest.assert_equal([nil, 'abs_structure_missing'], out)
+end
+
+NxTest.test('2a3: picker — cudzia struktura sa NIKDY nevybera, presna vyhrava aj s horsou preferenciou') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets = [a3_sheet('S1', 'G1', 'ST9')]
+  edges = [a3_edge('EMG08', 'G1', 'MG', 0.8, 23.0),   # cudzia struktura, lepsia preferencia
+           a3_edge('EST10', 'G1', 'ST9', 1.0, 23.0)]  # presna struktura, horsia preferencia
+  out = a3_pick(sheets, edges, 'S1', :jednotka, 18.0)
+  NxTest.assert_equal(['EST10', nil], out, 'struktura ma prednost pred preferenciou hrubky')
+end
+
+NxTest.test('2a3: picker — presna prilis uzka, pouzitelna hrubsia tej istej struktury') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets = [a3_sheet('S1', 'G1', 'ST9', 'thickness' => 38.0)]
+  edges = [a3_edge('E08', 'G1', 'ST9', 0.8, 23.0), a3_edge('E10', 'G1', 'ST9', 1.0, 43.0)]
+  out = a3_pick(sheets, edges, 'S1', :jednotka, 38.0)
+  NxTest.assert_equal(['E10', nil], out)
+end
+
+NxTest.test('2a3: picker — exact vetva vyhrava nad universal (1,2 exact > 0,8 universal)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets = [a3_sheet('S1', 'G1', 'ST9')]
+  edges = [a3_edge('EU08', 'G1', '', 0.8, 23.0, 'universal' => true),
+           a3_edge('EX12', 'G1', 'ST9', 1.2, 23.0)]
+  out = a3_pick(sheets, edges, 'S1', :jednotka, 18.0)
+  NxTest.assert_equal(['EX12', nil], out, 'universal je az zachranna vetva')
+end
+
+NxTest.test('2a3: picker — dve prazdne struktury NIE su zhoda; universal je jedina cesta') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets = [a3_sheet('S1', 'G1', '')] # doska BEZ struktury
+  plain = [a3_edge('E10', 'G1', '', 1.0, 23.0)] # paska bez struktury, BEZ universal
+  out = a3_pick(sheets, plain, 'S1', :jednotka, 18.0)
+  NxTest.assert_equal([nil, 'abs_structure_missing'], out, 'prazdna=neznama, nie "rovnaka"')
+  uni = [a3_edge('EU10', 'G1', '', 1.0, 23.0, 'universal' => true)]
+  out2 = a3_pick(sheets, uni, 'S1', :jednotka, 18.0)
+  NxTest.assert_equal(['EU10', nil], out2, 'universal:true je vedome "pasuje na vsetko"')
+end
+
+NxTest.test('2a3: picker — universal s malou sirkou = nic + abs_width_missing (sirka plati aj tu)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets = [a3_sheet('S1', 'G1', 'ST9', 'thickness' => 38.0)]
+  edges = [a3_edge('EU10', 'G1', '', 1.0, 23.0, 'universal' => true)]
+  out = a3_pick(sheets, edges, 'S1', :jednotka, 38.0)
+  NxTest.assert_equal([nil, 'abs_width_missing'], out)
+end
+
+NxTest.test('2a3: picker — skupina len 0,4 = abs_nominal_missing; dvojka -> 1,5 s fallback reasonom') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets = [a3_sheet('S1', 'G1', 'ST9')]
+  only04 = [a3_edge('E04', 'G1', 'ST9', 0.4, 23.0)]
+  NxTest.assert_equal([nil, 'abs_nominal_missing'], a3_pick(sheets, only04, 'S1', :jednotka, 18.0))
+  only15 = [a3_edge('E15', 'G1', 'ST9', 1.5, 23.0)]
+  NxTest.assert_equal(['E15', 'abs_15_fallback'], a3_pick(sheets, only15, 'S1', :dvojka, 18.0))
+end
+
+NxTest.test('2a3: picker — cudzia skupina nie je kandidat (ani presna struktura)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets = [a3_sheet('S1', 'G1', 'ST9')]
+  edges = [a3_edge('ECUDZI', 'G2', 'ST9', 1.0, 23.0)]
+  out = a3_pick(sheets, edges, 'S1', :jednotka, 18.0)
+  NxTest.assert_equal([nil, 'abs_structure_missing'], out)
+end
+
+NxTest.test('2a3: picker — 5981 s dvoma 23/1 roznych struktur sa nikdy nemiesa') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  sheets = [a3_sheet('SMG', '5981', 'MG'), a3_sheet('SAF', '5981', 'AF')]
+  edges = [a3_edge('EMG', '5981', 'MG', 1.0, 23.0), a3_edge('EAF', '5981', 'AF', 1.0, 23.0)]
+  a3_with_catalog(sheets, edges, schema: 2) do
+    NxTest.assert_equal(['EMG', nil], A3MAT.abs_for_sheet(A3MAT.sheet('SMG'), :jednotka, 18.0))
+    NxTest.assert_equal(['EAF', nil], A3MAT.abs_for_sheet(A3MAT.sheet('SAF'), :jednotka, 18.0))
+  end
+end
