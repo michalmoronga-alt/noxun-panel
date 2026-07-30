@@ -33,10 +33,26 @@ Plné pôvodné texty: [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_et
 
 ## Pred nami
 
-### V0.6 — Kovanie fáza 2 (katalóg a ceny) — štart ~28.7.
+### V0.6 — KATALÓGY A CENY (štart 30.7. dávkou 2A)
+
+**Pred 2A: D-46 — projektová predvoľba s inou hrúbkou (v0.5.4)** — potvrdzovacia lišta Potvrdiť/Zrušiť namiesto tvrdého stopu; dediace skrinky prevezmú hrúbku v 1 undo kroku (návrh cez Codex audit 2B+5F+2N, 30.7.).
+
+**Dávka 2A — identita variantov a skupín (dizajn cez Codex audit 6B+7F+2N, 30.7.; štandard §7.1/§7.5 aktualizovaný — SCHEMA 2). Verzie: 2A-1 = 0.5.5 a ďalej per PR:**
+- **2A-0** dizajn do dokumentov (štandard, roadmapa, pojmy, migračná mapa) — *tento PR*
+- **2A-1** jadro identity: `group_id` na doskách aj ABS, `structure`/`decor_name` polia, kanonické identity helpery (group/sheet/edge_identity_key — jedna normalizácia), register kanonických typov (dvojvrstvové typy — rozhodnuté 30.7.), PD formát v identite + mutabilita, nové ID generovanie (opaque kontrakt), catalog SCHEMA marker + nemenná záloha `materials.pre-schema-2.json`, `catalog_schema` guard mutácií
+- **2A-2** migrácia: explicitná mapa (**ČAKÁ na Michalovo odklepnutie** — zápisník „2A migračná mapa", vrátane návrhu zmazať osirotenú pásku „Pracovna doska" a zlúčiť „Halifax Tabakový PD"; do schválenia sa 2A-2 nezačína) + heuristika len fallback s reportom, nerozhodnuteľná položka = atomický NO-OP celej migrácie, fixtures testy, kompatibilita starých modelov = zachovanie VŠETKÝCH nezmazaných ID + lookup test (starý .skp → BOM/validácia/rebuild/remap)
+- **2A-3** výberové cesty so štruktúrou: ABS picker (presná NEPRÁZDNA štruktúra → `universal` príznak → nič+warning; NIKDY cross-structure, prázdna≠zhoda), resolver obchodnej hrúbky (jednotka 0,8→1→1,2 · dvojka 2→1,5 s upozornením · 0,4 nikdy automaticky; defaulty rolí = nominálne triedy), **`ensure_edge_for_sheet` + AUTO_WIDTHS 22→23** (dovytvorenie pásky ide resolverom), pick_body_sheet/back preflight/remap/AbsRules/JS Odporúčané dostávajú štruktúru, batch schema 3
+- **2A-4** UI: štruktúra v labeloch/selectoch/hľadaní/výrobných výpisoch, karta skupiny (výrobca·číslo·názov + varianty per štruktúra), **D-47** hlavička panela (tlačidlo Materiály + konzistencia tabov — ikony, šírky)
+- Verzie: D-46 = 0.5.4 · 2A-1+ = 0.5.5 a ďalej per PR; **0.6.0 až pri uzávere celej etapy V0.6**
+
+**Ďalšie dávky V0.6 (po 2A):**
+- **2B** duplák (D-43: „zdvojený z 18" cez `source_material_id` + multiplikátor — aj vo výrobnom snapshote) + zástena typ (dva dekory líce/rub)
+- **B** Demos lookup („zadaj kód" cez produktové stránky) · **C** kovanie katalóg (prevzatie z KOVANIE) · **D** mapovanie flagov→kódy · **E** ceny v sumári = prvá kompletná cenová ponuka (materiál+ABS+kovanie+VEPO/EN DANIELI sadzby; montáž = platne×5,8×sadzba s pravidlom zaokrúhlenia)
+- **Seed 2.0:** knižnica z najobjednávanejších materiálov z Gmailu (po 2A migrácii)
 
 - Prevzatie CatalogStore/search/Demos import z KOVANIE · mapovanie flagov na konkrétne kódy (pamätá sa) · ceny v sumári.
-- **Otvorená otázka (debata 24.7., rozpracovať pred štartom):** „zadaj kód → načítaj dáta" — demos-trade.sk má verejné vyhľadávanie (kód → 1 položka aj dekor → celá skupina s cenami bez loginu) + Konfigurátor cenníkov na Démos24Plus (hromadný export za loginom). Zvážiť hybrid: hromadný seed z cenníka + per-kód dohľadanie. Viď zápisník uzáveru.
+- **Otvorená otázka (debata 24.7., rozpracovať pred štartom):** „zadaj kód → načítaj dáta" — demos-trade.sk má verejné vyhľadávanie (kód → 1 položka aj dekor → celá skupina s cenami bez loginu) + Konfigurátor cenníkov na Démos24Plus (hromadný export za loginom). Zvážiť hybrid: hromadný seed z cenníka + per-kód dohľadanie. Viď zápisník uzáveru. *(Pozn. 29.7.: /vyhledavani je v robots.txt disallowed — lookup pôjde cez produktové stránky.)*
+- **Knižnica z reálnych objednávok (Michal 30.7.):** po napojení Gmailu vytiahnuť z mailov NAJOBJEDNÁVANEJŠIE materiály a postaviť ostrú knižnicu podľa nich (aktuálny katalóg je len testovací — migrácia 2A ho smie pokojne preskladať). Zaradenie: seed 2.0 po 2A migrácii.
 - **Pracovné dosky ako súčasť dekorovej skupiny** (Michal 24.7.): rovnaké dekory, iný rozmer/typ (PD 4100×600/920/38, HPDB hrana š.45, DTDL 36 = 2× zlepená 18) — dátovo pripravené cez `sheet_variants` s typom per variant (D-42); doriešiť pri katalógu.
 - Z prenesených záväzkov zvážiť: smer otvárania + typ závesu, hmotnostné tabuľky, „použiť na podobné" pre kovanie.
 
