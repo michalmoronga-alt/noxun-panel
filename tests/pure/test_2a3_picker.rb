@@ -636,6 +636,62 @@ NxTest.test('2a3: board repick zlyhanych defaultov pri zmene materialu (GH #90 P
   end
 end
 
+NxTest.test('2a3: repick NEdoplna 0,4 kontraktne nil hrany (GH #90 P1 4. kolo)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  bb = Noxun::Engine::BoardBuilder
+  sheets = [a3_sheet('GOOD18', 'G2', 'XM')]
+  edges = [a3_edge('EG08', 'G2', 'XM', 0.8, 23.0)]
+  a3_with_catalog(sheets, edges, schema: 2) do
+    stored04 = Noxun::Engine::AbsRules.pick_warnings([
+      { code: 'L1', reason: 'abs_04_manual', part_key: 'board/main', name: 'Doska X' }
+    ])
+    cfg = { 'role' => 'free_panel', 'name' => 'Doska X', 'warnings' => stored04 }
+    refill, fresh = bb.repick_failed_defaults(cfg, { 'L1' => nil }, A3MAT.sheet('GOOD18'))
+    NxTest.assert_equal({}, refill, '0,4 kontrakt: hrana ostava nil aj ked skupina ma jednotku')
+    NxTest.assert_equal([], fresh)
+  end
+end
+
+NxTest.test('2a3: material_change_outcome — same-identity variant DRZI ulozeny abs_15 zaznam (GH #90 P2 4. kolo)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  bb = Noxun::Engine::BoardBuilder
+  sheets = [a3_sheet('V18', 'G1', 'ST9'), a3_sheet('V36', 'G1', 'ST9', 'thickness' => 36.0)]
+  edges = [a3_edge('E15', 'G1', 'ST9', 1.5, 43.0)]
+  a3_with_catalog(sheets, edges, schema: 2) do
+    stored = Noxun::Engine::AbsRules.pick_warnings([
+      { code: 'L1', reason: A3MAT::REASON_ABS_15, part_key: 'board/main', name: 'Doska X' }
+    ])
+    cfg = { 'role' => 'free_panel', 'name' => 'Doska X', 'material_id' => 'V18',
+            'edges' => { 'L1' => 'E15', 'L2' => nil, 'W1' => nil, 'W2' => nil }, 'warnings' => stored }
+    # zmena variantu V18 -> V36 (rovnaka skupina+struktura, 43-ka sedi aj na 36):
+    # remap = nil map, ziadne issues — ulozeny abs_15 MUSI prezit
+    map, issues = A3MAT.remap_edges_v2(cfg['edges'], A3MAT.sheet('V18'), A3MAT.sheet('V36'), 36.0)
+    NxTest.assert_equal([nil, []], [map, issues], 'sanity: vyhovujuca paska = nic na prevod')
+    edges_out, warnings_out = bb.material_change_outcome(cfg, map, issues, A3MAT.sheet('V36'))
+    NxTest.assert_equal('E15', edges_out['L1'])
+    NxTest.assert_equal(stored, warnings_out, 'abs_15 zaznam nespracovanej hrany prezil zmenu variantu')
+  end
+end
+
+NxTest.test('2a3: material_change_outcome — spracovane hrany prune + cerstve warnings (GH #90 4. kolo)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  bb = Noxun::Engine::BoardBuilder
+  sheets, edges = a3_remap_catalog
+  a3_with_catalog(sheets, edges, schema: 2) do
+    stored = Noxun::Engine::AbsRules.pick_warnings([
+      { code: 'L1', reason: A3MAT::REASON_ABS_15, part_key: 'board/main', name: 'Doska X' }
+    ])
+    cfg = { 'role' => 'free_panel', 'name' => 'Doska X', 'material_id' => 'OLD18',
+            'edges' => { 'L1' => 'EO20', 'L2' => nil, 'W1' => nil, 'W2' => nil }, 'warnings' => stored }
+    map, issues = A3MAT.remap_edges_v2(cfg['edges'], A3MAT.sheet('OLD18'), A3MAT.sheet('NEW18'), 18.0)
+    edges_out, warnings_out = bb.material_change_outcome(cfg, map, issues, A3MAT.sheet('NEW18'))
+    NxTest.assert_equal('EN15', edges_out['L1'], '2,0 -> 1,5 novej skupiny')
+    codes = warnings_out.map { |w| w['code'] }
+    NxTest.assert_equal([A3MAT::REASON_ABS_15], codes.uniq, 'stary zaznam pruned, cerstvy abs_15 pridany (ziadna duplicita)')
+    NxTest.assert_equal(1, warnings_out.length)
+  end
+end
+
 NxTest.test('2a3: board carry-over — rebuild s edges v configu NEZAHADZUJE ulozene warnings (GH #90 P2)') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   sheets, edges = a3_remap_catalog

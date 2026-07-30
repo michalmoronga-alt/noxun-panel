@@ -68,21 +68,16 @@ module Noxun
           cfg = Store.config(board) || {}
           params = { 'material_id' => mat }
           new_sheet = Materials.sheet(mat)
-          remap, lost, remap_warnings = remap_edges_for_material(cfg, mat)
+          remap, lost, remap_issues = remap_edges_for_material(cfg, mat)
           params['edges'] = remap if remap
-          # Codex GH #90 P1/P2: zmena materialu robi stare pick warnings
-          # neplatnymi — v SCHEMA 2 sa NAHRADIA cerstvymi z remapu (aj uspesny
-          # 1,5 fallback, aj stratene hrany). NAVYSE (2. kolo): nil hrany so
-          # ulozenym warningom = zlyhane defaulty — picker sa pre ne spusti nad
-          # NOVYM sheetom (doplni pasku alebo da cerstvy warning).
-          unless remap_warnings.nil?
-            base_edges = remap || (cfg['edges'].is_a?(Hash) ? cfg['edges'].dup : nil)
-            refill, refill_warnings = BoardBuilder.repick_failed_defaults(cfg, base_edges, new_sheet)
-            unless refill.empty?
-              base_edges = (base_edges || {}).merge(refill)
-              params['edges'] = base_edges
-            end
-            params['warnings'] = remap_warnings + refill_warnings
+          # Codex GH #90 P1/P2 (kola 1-4): v SCHEMA 2 stavia hrany + warnings
+          # JEDNA kompozicia (BoardBuilder.material_change_outcome): remap ->
+          # repick zlyhanych defaultov (nie 0,4 kontraktu) -> zachovanie
+          # warnings nespracovanych hran -> cerstve warnings.
+          unless remap_issues.nil?
+            edges_final, warnings_final = BoardBuilder.material_change_outcome(cfg, remap, remap_issues, new_sheet)
+            params['edges'] = edges_final
+            params['warnings'] = warnings_final
           end
           params['grain_direction'] = 'none' if new_sheet && new_sheet['grain'].to_s == 'none'
           msg = 'Materiál dosky nastavený.'
@@ -99,9 +94,10 @@ module Noxun
         # 2A-3 (audit F6/F7): pri katalogu SCHEMA 2 ide remap so ZAZNAMAMI
         # (stary aj novy sheet — skupina + struktura + universal, 0,4 do lost
         # s "vyber rucne"); SCHEMA 1 = dnesny textovy remap BEZ ZMENY.
-        # Vrati [mapa|nil, lost_texty, warnings|nil] — warnings LEN v SCHEMA 2
-        # (Codex GH #90 P1: aj USPESNY 1,5 fallback ide do KONTROLY; nil = legacy
-        # rezim, stare warnings sa nemenia).
+        # Vrati [mapa|nil, lost_texty, issues|nil] — issues (surove z
+        # remap_edges_v2, vratane uspesneho 1,5 fallbacku) LEN v SCHEMA 2;
+        # nil = legacy rezim, stare warnings sa nemenia. Kompoziciu warnings
+        # robi BoardBuilder.material_change_outcome (GH #90 kola 1-4).
         def remap_edges_for_material(cfg, new_mat)
           new_sheet = Materials.sheet(new_mat)
           target_th = new_sheet && new_sheet['thickness'].to_f
@@ -112,11 +108,7 @@ module Noxun
                                                    new_sheet, target)
             lost = issues.reject { |n| n[:abs_id] }
                          .map { |n| "#{n[:code]}#{CabinetBuilder.lost_suffix(n[:reason])}" }
-            entries = issues.map do |n|
-              { code: n[:code], reason: n[:reason],
-                part_key: BoardBuilder::PART_KEY, name: cfg['name'].to_s }
-            end
-            [map, lost, AbsRules.pick_warnings(entries)]
+            [map, lost, issues]
           else
             map, lost = Materials.remap_edges(edges, Materials.decor_of(cfg['material_id']),
                                               new_sheet && new_sheet['decor'], target)

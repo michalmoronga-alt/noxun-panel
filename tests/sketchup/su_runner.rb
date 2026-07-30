@@ -442,17 +442,35 @@ module NoxunSuRunner
     # moze zit pod inym dekorom, decor-lookup ho nevidi a seed by ho PREPISAL.
     # Preto snapshot PODLA ID pred zasahom a navrat presneho zaznamu v cleanupe
     # (delete len ked predtym neexistoval).
+    # GH #90 P2 (4. kolo): rider je SCHEMA-AWARE — v marker-2 katalogu docasna
+    # paska dedi group_id + strukturu sheetu (legacy tvar by write guard
+    # odmietol) a ocakavania sa citaju rovnakym pickerom ako server.
     w1000_seeded = false
     w1000_saved = e::JsonFileStore.deep_copy(e::Materials.edge('ABS_W1000_10'))
-    if e::Materials.abs_for_decor('W1000 ST9 Biela', 1.0, 18.0).nil?
-      w1000_seeded = e::Materials.upsert_edge(
-        'abs_id' => 'ABS_W1000_10', 'decor' => 'W1000 ST9 Biela',
-        'thickness' => 1.0, 'price_per_bm' => 0.60, 'color' => [246, 246, 244]
-      )
+    w_sheet = e::Materials.sheet('W1000_DTDL_18')
+    w_schema2 = e::Materials.catalog_schema >= e::Materials::SCHEMA_GROUPS &&
+                w_sheet && !w_sheet['group_id'].to_s.strip.empty?
+    w_pick_l1 = lambda do
+      w_schema2 ? e::Materials.abs_for_sheet(w_sheet, :jednotka, 18.0).first
+                : e::Materials.abs_for_decor('W1000 ST9 Biela', 1.0, 18.0)
+    end
+    if w_sheet && w_pick_l1.call.nil?
+      seed = { 'abs_id' => 'ABS_W1000_10', 'decor' => w_sheet['decor'].to_s,
+               'thickness' => 1.0, 'price_per_bm' => 0.60, 'color' => [246, 246, 244] }
+      if w_schema2
+        seed['group_id'] = w_sheet['group_id']
+        st = w_sheet['structure'].to_s.strip
+        seed['structure'] = st unless st.empty?
+      end
+      w1000_seeded = e::Materials.upsert_edge(seed)
       info('sync-board: ABS_W1000_10 nemala pouzitelnu jednotku — docasne doseedovana') if w1000_seeded
     end
-    exp_l1 = e::Materials.abs_for_decor('W1000 ST9 Biela', 1.0, 18.0)
-    exp_w1 = e::Materials.abs_for_decor('W1000 ST9 Biela', 2.0, 18.0)
+    exp_l1 = w_pick_l1.call
+    exp_w1 = if w_schema2
+               e::Materials.abs_for_sheet(w_sheet, :dvojka, 18.0).first
+             else
+               e::Materials.abs_for_decor('W1000 ST9 Biela', 2.0, 18.0)
+             end
     e::Panel.handle_set_board_material({ 'board_id' => bid, 'material_id' => 'W1000_DTDL_18' }.to_json)
     mcfg = e::Store.config(binst) || {}
     mecfg = mcfg['edges'] || {}
