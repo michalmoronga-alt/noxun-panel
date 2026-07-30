@@ -116,14 +116,22 @@ module Noxun
            identity_norm(attrs['structure']) != identity_norm(existing['structure'])
           return 'Štruktúra povrchu definuje variant — pre inú štruktúru pridaj nový variant.'
         end
-        if attrs.key?('group_id') && !attrs['group_id'].to_s.strip.empty? &&
-           attrs['group_id'].to_s.strip != existing['group_id'].to_s.strip
-          return 'Dekorová skupina je identita záznamu — presun medzi skupinami sa nerobí úpravou variantu.'
+        if attrs.key?('group_id')
+          new_gid = attrs['group_id'].to_s.strip
+          old_gid = existing['group_id'].to_s.strip
+          # GH P2: prazdna hodnota NEsmie kotvu ticho vymazat (merge+normalize
+          # by kluc zahodili) — clear group_id je rovnaka zmena identity ako presun.
+          if new_gid != old_gid && !(new_gid.empty? && old_gid.empty?)
+            return 'Dekorová skupina je identita záznamu — presun medzi skupinami sa nerobí úpravou variantu.'
+          end
         end
         return nil unless pd_type?(existing['type'])
         changed_size = attrs.key?('sheet_size') &&
                        size_key(attrs['sheet_size']) != size_key(existing['sheet_size'])
-        if attrs['clear_sheet_size'] || changed_size
+        # GH P2: clear na zazname BEZ formatu je no-op (editor posiela flag pri
+        # prazdnych poliach vzdy) — odmietat len skutocnu zmenu identity.
+        clear_real = attrs['clear_sheet_size'] && !size_key(existing['sheet_size']).nil?
+        if clear_real || changed_size
           return 'Formát PD definuje variant — pre iný formát pridaj nový variant.'
         end
         nil

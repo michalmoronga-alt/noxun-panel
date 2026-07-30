@@ -416,3 +416,43 @@ NxTest.test('2A-1: lookup variantov v SCHEMA 1 strukturu ignoruje (dual-mode)') 
   A1MAT.delete_sheet(id)
   A1MAT.delete_edge(eid)
 end
+
+NxTest.test('2A-1 GH P2: hranicna tolerancia hrubky drzi legacy spravanie (18.004 vs 18.006)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  id = A1MAT.generate_sheet_id('A1 Tol', 'DTDL', 18.004)
+  A1MAT.upsert_sheet('material_id' => id, 'decor' => 'A1 Tol', 'type' => 'DTDL', 'thickness' => 18.004)
+  found = A1MAT.find_sheet_variant('A1 Tol', 'DTDL', 18.006)
+  NxTest.assert_equal(id, found && found['material_id'],
+                      'kluc kvantizuje na 0,01, ale dup guard porovnava tolerancne (legacy abs<0.01)')
+  NxTest.assert(A1MAT.identity_keys_tolerant?([:x, 18.0], [:x, 18.004]), 'tolerantne kluce')
+  NxTest.refute(A1MAT.identity_keys_tolerant?([:x, 18.0], [:x, 18.02]), 'mimo tolerancie = rozne')
+  NxTest.refute(A1MAT.identity_keys_tolerant?([:a, 18.0], [:b, 18.0]), 'nefloat zlozky presne')
+  A1MAT.delete_sheet(id)
+end
+
+NxTest.test('2A-1 GH P2: SCHEMA 2 guardy — group_id clear, PD clear no-op, PD format v batch dedupe') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  a1_with_schema2 do
+    # (a) prazdny group_id NEsmie ticho vymazat kotvu skupiny
+    existing = { 'type' => 'DTDL', 'group_id' => 'GRP-X', 'structure' => 'ST9' }
+    err = A1MAT.identity_edit_error({ 'group_id' => '' }, existing)
+    NxTest.assert(err && err.include?('skupina'), 'clear group_id = zmena identity')
+    NxTest.assert_equal(nil, A1MAT.identity_edit_error({ 'group_id' => 'GRP-X' }, existing),
+                        'rovnaka hodnota prejde')
+    # (b) clear_sheet_size na PD BEZ formatu je no-op (editor flag posiela vzdy)
+    pd_bez = { 'type' => 'PD', 'structure' => '' }
+    NxTest.assert_equal(nil, A1MAT.identity_edit_error({ 'clear_sheet_size' => true }, pd_bez),
+                        'no-op clear prejde')
+    pd_s = { 'type' => 'PD', 'sheet_size' => [4100.0, 600.0] }
+    NxTest.assert(A1MAT.identity_edit_error({ 'clear_sheet_size' => true }, pd_s),
+                  'skutocny clear formatu = zmena identity')
+    # (c) batch dedup: dva PD 38 s ROZNYM formatom su v SCHEMA 2 dva varianty
+    ok, out = A1MAT.dedup_sheet_entries([['PD', 38.0, [4100.0, 600.0], :chip],
+                                         ['PD', 38.0, [4100.0, 920.0], :chip]], true)
+    NxTest.assert(ok, 'rozne formaty PD nie su duplicita')
+    NxTest.assert_equal(2, out.length)
+    ok2, = A1MAT.dedup_sheet_entries([['PD', 38.0, [4100.0, 600.0], :chip],
+                                      ['PD', 38.0, [600.0, 4100.0], :chip]], true)
+    NxTest.refute(ok2, 'rovnaky format (usporiadana dvojica) = duplicita')
+  end
+end

@@ -474,6 +474,22 @@ module Noxun
         identity_norm(type) == 'PD'
       end
 
+      # GH P2: kluc kvantizuje mm na 0,01 — HRANICNA dvojica (18.004 vs 18.006)
+      # by sa v kluci rozisla, hoci legacy tolerancia (abs < 0.01) ju drzala ako
+      # jeden variant. Duplicitne guardy preto porovnavaju kluce s toleranciou
+      # na Float zlozkach (hrubka/sirka); ostatne zlozky presne.
+      def identity_keys_tolerant?(a, b)
+        return false unless a.is_a?(Array) && b.is_a?(Array) && a.length == b.length
+        a.each_with_index.all? do |av, i|
+          bv = b[i]
+          if av.is_a?(Float) && bv.is_a?(Float)
+            (av - bv).abs < 0.011
+          else
+            av == bv
+          end
+        end
+      end
+
       # Identita variantu DOSKY. rec = katalogovy zaznam alebo hash atributov.
       def sheet_identity_key(rec, schema = catalog_schema)
         key = [record_group_key(rec, schema), identity_norm(rec['type']), thickness_key(rec['thickness'])]

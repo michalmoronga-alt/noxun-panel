@@ -11,10 +11,11 @@
   var MD_CATALOG = { sheets: [], edges: [] }; // plne zaznamy pre spravu
   var MD_PROTECTED = [];
   var MD_REV = '';         // D-41: baseline katalogu — server odmietne zapis nad starsim stavom
-  // 2A-1: SCHEMA katalogu z posledneho payloadu. Vracia sa v KAZDEJ mutacii —
-  // po migracii na SCHEMA 2 server odmietne zapis z okna, ktore este bezi na
-  // starom kode (CEF cache). 1 = legacy, pokial server nepovie inak.
-  var MD_SCHEMA = 1;
+  // 2A-1 (GH P1): klient hlasi SVOJU podporovanu schemu katalogu — KONSTANTU
+  // tejto verzie kodu, NIE echo servera. UI v0.5.5 nema polia group_id ani
+  // structure, takze po migracii na SCHEMA 2 ho server spravne odmietne
+  // ("obnov okno"). 2A-4 (UI so strukturou) konstantu zdvihne na 2.
+  var MD_CLIENT_SCHEMA = 1;
   // D-44: navrhy naseptavacov a navrhy formatu platne — obe STAVIA SERVER
   // (payload suggest/format_hints), JS ich len renderuje.
   var MD_SUGGEST = { manufacturers: [], types: [] };
@@ -289,7 +290,7 @@
     patch[inp.getAttribute('data-field')] = value;
     var payload = {
       id: id, patch: patch, row_rev: inp.getAttribute('data-rev') || '',
-      catalog_schema: MD_SCHEMA, // 2A-1: row_rev strazi riadok, schema strazi format katalogu
+      catalog_schema: MD_CLIENT_SCHEMA, // 2A-1: row_rev strazi riadok, schema strazi format katalogu
       allow_duplicate_code: !!(mdPatchDup && mdPatchDup.kind === kind && mdPatchDup.id === id)
     };
     var fn = kind === 'edge' ? 'patch_edge' : 'patch_sheet';
@@ -310,7 +311,7 @@
     var input = el('md_rename_input');
     if (!input) return;
     if (window.sketchup && sketchup.rename_decor)
-      sketchup.rename_decor(JSON.stringify({ old_decor: oldDecor, new_decor: input.value, catalog_rev: MD_REV, catalog_schema: MD_SCHEMA }));
+      sketchup.rename_decor(JSON.stringify({ old_decor: oldDecor, new_decor: input.value, catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA }));
     mdRenaming = null;
   }
   // D-42 (audit FIX 7): vyrobca je vlastnost dekoru — inline editor nad celou skupinou.
@@ -324,7 +325,7 @@
     var input = el('md_man_input');
     if (!input) return;
     if (window.sketchup && sketchup.set_decor_manufacturer)
-      sketchup.set_decor_manufacturer(JSON.stringify({ decor: decor, manufacturer: input.value, catalog_rev: MD_REV, catalog_schema: MD_SCHEMA }));
+      sketchup.set_decor_manufacturer(JSON.stringify({ decor: decor, manufacturer: input.value, catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA }));
     mdManufacturing = null;
   }
   // D-44 (audit F9): vymazanie vyrobcu CELEJ skupiny je vedomy krok s flagom —
@@ -332,7 +333,7 @@
   function mdManufacturerClear(decor){
     if (window.sketchup && sketchup.set_decor_manufacturer)
       sketchup.set_decor_manufacturer(JSON.stringify({ decor: decor, manufacturer: '',
-        clear_manufacturer: true, catalog_rev: MD_REV, catalog_schema: MD_SCHEMA }));
+        clear_manufacturer: true, catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA }));
     mdManufacturing = null;
   }
 
@@ -612,7 +613,7 @@
     if (built.error){ MD.setStatus(built.error, true); return; }
     var payload = {
       batch_schema: 2, // D-44: klient posiela format platne a znasa striktny parse
-      catalog_rev: MD_REV, catalog_schema: MD_SCHEMA,
+      catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA,
       decor: el('nd_decor').value,
       manufacturer: el('nd_manufacturer').value,
       type: el('nd_type').value,
@@ -651,7 +652,7 @@
   function mdSaveSheet(){
     var payload = {
       material_id: mdEditing && mdEditing.id ? mdEditing.id : null,
-      catalog_rev: MD_REV, catalog_schema: MD_SCHEMA,
+      catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA,
       decor: el('ms_decor').value,
       type: el('ms_type').value,
       thickness: el('ms_thickness').value,
@@ -684,7 +685,7 @@
   function mdSaveEdge(){
     var payload = {
       abs_id: mdEditing && mdEditing.id ? mdEditing.id : null,
-      catalog_rev: MD_REV, catalog_schema: MD_SCHEMA,
+      catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA,
       decor: el('me_decor').value,
       width: el('me_width').value,   // D-41: prazdna = univerzalna paska bez sirky
       thickness: el('me_thickness').value,
@@ -730,10 +731,10 @@
     }
   }
   function mdDeleteSheet(id){
-    if (window.sketchup && sketchup.delete_sheet) sketchup.delete_sheet(JSON.stringify({ material_id: id, catalog_rev: MD_REV, catalog_schema: MD_SCHEMA }));
+    if (window.sketchup && sketchup.delete_sheet) sketchup.delete_sheet(JSON.stringify({ material_id: id, catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA }));
   }
   function mdDeleteEdge(id){
-    if (window.sketchup && sketchup.delete_edge) sketchup.delete_edge(JSON.stringify({ abs_id: id, catalog_rev: MD_REV, catalog_schema: MD_SCHEMA }));
+    if (window.sketchup && sketchup.delete_edge) sketchup.delete_edge(JSON.stringify({ abs_id: id, catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA }));
   }
 
   // Top-level var v script tagu = window.MD v CEF; v Node require nepada na window.
@@ -800,7 +801,9 @@
     MD_CATALOG = data.catalog || { sheets: [], edges: [] };
     MD_PROTECTED = data.protected_ids || [];
     MD_REV = data.catalog_rev || '';
-    MD_SCHEMA = data.catalog_schema || 1; // 2A-1: schema katalogu (guard mutacii)
+    // GH P1: serverova schema sa NEpreberá — klient posiela vlastnu
+    // MD_CLIENT_SCHEMA konstantu (echo servera by po migracii falosne
+    // "povysilo" stare okno na SCHEMA 2 bez novych poli).
     // D-44: naseptavace + navrhy formatu — jedna autorita (server), JS renderuje.
     MD_SUGGEST = data.suggest || { manufacturers: [], types: [] };
     MD_FORMAT_HINTS = data.format_hints || {};
