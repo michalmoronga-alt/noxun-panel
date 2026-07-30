@@ -99,7 +99,10 @@ module Noxun
         return report.merge(status: :not_found) unless File.exist?(file)
 
         original_bytes = File.binread(file)
-        parsed = parse_migration_json(original_bytes, report)
+        # POZOR (json gem >= 2.x): JSON.parse force-encoduje VSTUPNY string
+        # in-place (BINARY -> UTF-8) — parsuje sa preto KOPIA, aby original_bytes
+        # ostali nedotknute pre CAS porovnanie.
+        parsed = parse_migration_json(original_bytes.dup, report)
         return report unless parsed
 
         gate = migration_schema_gate(parsed)
@@ -140,8 +143,9 @@ module Noxun
 
         before_write.call if before_write # VYHRADNE testy — CAS scenar
         # b) CAS kontrola (BLOCKER 3): subezna zmena z CEF/druheho procesu sa
-        #    NESMIE prepisat — bajty musia sediet s prvym citanim.
-        return report.merge(status: :conflict) if File.binread(file) != original_bytes
+        #    NESMIE prepisat — bajty musia sediet s prvym citanim. Porovnanie
+        #    cez .b (kopie v BINARY) — encoding nikdy nesmie rozhodovat.
+        return report.merge(status: :conflict) if File.binread(file).b != original_bytes.b
 
         # c) atomicky zapis so schema markerom 2 (write cita schemu z hashu,
         #    FIX 10) + invalidacia cache.
