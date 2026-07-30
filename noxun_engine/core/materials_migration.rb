@@ -143,19 +143,27 @@ module Noxun
         # (Materials.write) beru TEN ISTY zamok, takze cudzi zapis sa bud cely
         # dokonci pred nasou CAS kontrolou (a ta ho chyti), alebo caka za nami —
         # ziadne TOCTOU okno medzi porovnanim bajtov a rename.
-        status = with_catalog_lock do
-          # CAS kontrola (BLOCKER 3): subezna zmena z CEF/druheho procesu sa
-          # NESMIE prepisat — bajty musia sediet s prvym citanim. Porovnanie
-          # cez .b (kopie v BINARY) — encoding nikdy nesmie rozhodovat.
-          next :conflict if File.binread(file).b != original_bytes.b
-          # nemenna predmigracna zaloha (FIX 4) az PO CAS — :conflict zalohu
-          # ani nevytvori (ziadne subory pri neuspesnom behu).
-          backup = ensure_pre_schema2_backup
-          next backup unless backup == :ok
-          # atomicky zapis so schema markerom 2 (write_unlocked — zamok uz
-          # drzime, flock nie je reentrantny; FIX 10) + invalidacia cache.
-          write_unlocked('sheets' => plan[:sheets], 'edges' => plan[:edges],
-                         'schema' => SCHEMA_GROUPS) ? :ok : :write_failed
+        status = begin
+          with_catalog_lock do
+            # CAS kontrola (BLOCKER 3): subezna zmena z CEF/druheho procesu sa
+            # NESMIE prepisat — bajty musia sediet s prvym citanim. Porovnanie
+            # cez .b (kopie v BINARY) — encoding nikdy nesmie rozhodovat.
+            next :conflict if File.binread(file).b != original_bytes.b
+            # nemenna predmigracna zaloha (FIX 4) az PO CAS — :conflict zalohu
+            # ani nevytvori (ziadne subory pri neuspesnom behu).
+            backup = ensure_pre_schema2_backup
+            next backup unless backup == :ok
+            # atomicky zapis so schema markerom 2 (write_unlocked — zamok uz
+            # drzime; FIX 10) + invalidacia cache.
+            write_unlocked('sheets' => plan[:sheets], 'edges' => plan[:edges],
+                           'schema' => SCHEMA_GROUPS) ? :ok : :write_failed
+          end
+        rescue StandardError => e
+          # Codex GH P2 (2. kolo): I/O pad zapisu (plny disk, odmietnuty rename)
+          # NESMIE uletiet ako vynimka bez reportu — volajuci vzdy dostane
+          # migracny report so statusom.
+          Engine.log_error(e, 'Materials.migrate_to_schema2!') if defined?(Engine)
+          :write_failed
         end
         return report.merge(status: status) unless status == :ok
         reload!
@@ -195,13 +203,8 @@ module Noxun
         SCHEMA_LEGACY
       end
 
-      # Marker 2 je poctivy len vtedy, ked KAZDY zaznam nesie group_id.
-      def schema2_complete?(sheets_raw, edges_raw)
-        return false unless sheets_raw.is_a?(Array) && edges_raw.is_a?(Array)
-        (sheets_raw + edges_raw).all? do |rec|
-          rec.is_a?(Hash) && !rec['group_id'].to_s.strip.empty?
-        end
-      end
+      # (schema2_complete? zije v materials.rb — zdiela ho migracna brana aj
+      # write_unlocked guard proti hybridnym zapisom, Codex GH P1 2. kolo.)
 
       # --- krok 3: surova validacia zaznamov (FIX 5, BEZ normalize_*) --------
 
@@ -272,15 +275,19 @@ module Noxun
         end
       end
 
+      # Codex GH P1 (2. kolo): rename skupiny ID zamerne zachovava — samotna
+      # zhoda opaque ID preto nestaci, overuje sa AJ zdrojovy dekor. Premenovany
+      # zaznam s tym istym ID = undecidable, nie tichy retype cudzieho materialu.
       def check_retype_expectations(sheets_raw, reasons)
         MIGRATION_RETYPE.each_key do |id|
           rec = sheets_raw.find { |r| r.is_a?(Hash) && r['material_id'].to_s == id }
           next unless rec
           ok = identity_norm(rec['type']) == 'DTDL' &&
+               identity_norm(rec['decor']) == 'HALIFAX TABAKOVÝ PD' &&
                migration_close?(rec['thickness'], 38.0) &&
                identity_keys_tolerant?(size_key(rec['sheet_size']), size_key([4200.0, 600.0]))
           next if ok
-          reasons << "#{id}: obsah nesedi s ocakavanim retype DTDL->PD (38 mm, format 4200x600)"
+          reasons << "#{id}: obsah nesedi s ocakavanim retype DTDL->PD (dekor 'Halifax Tabakový PD', 38 mm, format 4200x600)"
         end
       end
 

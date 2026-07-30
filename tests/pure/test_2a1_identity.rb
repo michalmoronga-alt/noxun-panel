@@ -282,9 +282,15 @@ NxTest.test('2A-1: SCHEMA marker — default 1, zapis ho nesie a NEZNIZUJE') do
   NxTest.assert_equal(1, parsed['std'], 'std ostava (spatna kompatibilita)')
   a1_with_schema2 do
     NxTest.assert_equal(2, A1MAT.catalog_schema)
-    NxTest.assert(A1MAT.write(A1MAT.load), 'zapis bez zelanej schemy')
+    # 2A-2 GH P1 (2. kolo): stale LEGACY payload (zaznamy bez group_id) sa do
+    # SCHEMA 2 suboru uz nezapise — hybrid marker-2-s-legacy-datami odmietnuty.
+    NxTest.refute(A1MAT.write(A1MAT.load), 'legacy payload bez group_id sa do schema 2 odmietne')
+    NxTest.assert_equal(2, A1MAT.catalog_schema, 'odmietnuty zapis subor nezmenil')
+    full = A1MAT.load
+    (full['sheets'] + full['edges']).each { |r| r['group_id'] = 'GRP-A1TESTMARKER01' }
+    NxTest.assert(A1MAT.write(full), 'UPLNY schema 2 payload (group_id vsade) prejde')
     NxTest.assert_equal(2, A1MAT.catalog_schema, 'bezna mutacia schemu NESTRATI')
-    NxTest.assert(A1MAT.write(A1MAT.load.merge('schema' => 1)))
+    NxTest.assert(A1MAT.write(full.merge('schema' => 1)))
     NxTest.assert_equal(2, A1MAT.catalog_schema, 'downgrade na 1 sa odmietne (ziadny hybridny stav)')
   end
   NxTest.assert_equal(1, A1MAT.catalog_schema, 'fixture sa upratala')

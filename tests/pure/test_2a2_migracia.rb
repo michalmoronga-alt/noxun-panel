@@ -435,6 +435,73 @@ NxTest.test('2A-2: zamok katalogu (GH P1) — migracia aj bezny zapis bezia pod 
   end
 end
 
+NxTest.test('2A-2: write guard (GH P1 2. kolo) — stale legacy payload sa do SCHEMA 2 suboru nezapise') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  a2_with_catalog(a2_fixture_bytes) do
+    stale = A2MAT.catalog # mutatorov load PRED migraciou (legacy, bez group_id)
+    rep = A2MAT.migrate_to_schema2!
+    NxTest.assert_equal(:ok, rep[:status], rep[:reasons].inspect)
+    migrated = File.binread(A2MAT.path)
+    NxTest.refute(A2MAT.write(stale), 'zapis legacy poli do katalogu SCHEMA 2 sa odmietne')
+    NxTest.assert_equal(migrated, File.binread(A2MAT.path), 'subor ostal bajtovo migrovany (ziadny hybrid)')
+    NxTest.assert(A2MAT.write(A2MAT.catalog), 'UPLNY schema 2 payload (po reload) prejde')
+  end
+end
+
+NxTest.test('2A-2: write guard — cerstvy marker z disku bije stale cache (ziadny downgrade markera)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  a2_with_catalog(a2_fixture_bytes) do
+    stale = A2MAT.catalog # cache drzi legacy pohlad
+    # "iny proces" zmigruje subor NA DISKU — cache o tom nevie (ziadny invalidate)
+    migrated = a2_variant do |d|
+      d['schema'] = 2
+      (d['sheets'] + d['edges']).each { |r| r['group_id'] = 'GRP-TESTCACHE0000001' }
+    end
+    File.binwrite(A2MAT.path, migrated)
+    NxTest.refute(A2MAT.write(stale), 'stale legacy payload odmietnuty aj so stale cache')
+    NxTest.assert_equal(2, JSON.parse(File.binread(A2MAT.path))['schema'],
+                        'marker na disku ostal 2 (cache ho nezhodila na 1)')
+  end
+end
+
+NxTest.test('2A-2: zamok je reentrantny (vnorene volanie sa nezablokuje samo o seba)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  a2_with_catalog(a2_fixture_bytes) do
+    inner = A2MAT.with_catalog_lock { A2MAT.with_catalog_lock { :vnorene_ok } }
+    NxTest.assert_equal(:vnorene_ok, inner)
+    NxTest.assert(A2MAT.with_catalog_lock { A2MAT.write(A2MAT.catalog) },
+                  'write vnutri drzaneho zamku prejde (depth counter)')
+  end
+end
+
+NxTest.test('2A-2: retype vyzaduje aj zdrojovy dekor (GH P1 2. kolo) — premenovany zaznam = undecidable') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  original = a2_variant { |d| a2_sheet_of(d, 'HALIFAX_TABAKOVY_PD_DTDL_38')['decor'] = 'Premenovany dekor PD' }
+  a2_with_catalog(original) do
+    rep = A2MAT.migrate_to_schema2!
+    NxTest.assert_equal(:undecidable, rep[:status])
+    NxTest.assert(rep[:reasons].any? { |r| r.include?('HALIFAX_TABAKOVY_PD_DTDL_38') && r.include?('retype') },
+                  "dovod menuje retype ocakavanie: #{rep[:reasons].inspect}")
+    NxTest.assert_equal(original, File.binread(A2MAT.path), 'atomicky no-op')
+  end
+end
+
+NxTest.test('2A-2: pad zapisu = :write_failed s reportom, ziadna uletena vynimka (GH P2 2. kolo)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  a2_with_catalog(a2_fixture_bytes) do
+    store = Noxun::Engine::JsonFileStore
+    orig = store.method(:write)
+    begin
+      store.define_singleton_method(:write) { |*_a| raise IOError, 'disk full (test)' }
+      rep = A2MAT.migrate_to_schema2!
+      NxTest.assert_equal(:write_failed, rep[:status], 'I/O pad sa prelozi na status, nie vynimku')
+    ensure
+      store.define_singleton_method(:write, orig)
+    end
+    NxTest.assert_equal(a2_fixture_bytes, File.binread(A2MAT.path), 'katalog ostal legacy nedotknuty')
+  end
+end
+
 # ---------------------------------------------------------------------------
 # BLOCKER 2: guard ensure cesty (schema klienta vs schema katalogu)
 # ---------------------------------------------------------------------------

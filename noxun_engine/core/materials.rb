@@ -200,10 +200,53 @@ module Noxun
       end
 
       # Telo zapisu BEZ zamku — volat VYHRADNE zvnutra with_catalog_lock.
+      # Codex GH P1 (2. kolo): dve poistky proti hybridu marker-2-s-legacy-datami
+      # od mutatora, ktory si nacital data este pred migraciou (upsert/rename/
+      # patch robia data = load PRED vstupom do zamku):
+      #   1. cielova schema sa cita CERSTVO z disku (cache by pod zamkom mohla
+      #      drzat predmigracny marker a zapis by schemu 2 zhodil spat),
+      #   2. payload do suboru SCHEMA >= 2 musi byt UPLNY (kazdy zaznam nesie
+      #      group_id) — stale legacy pole sa odmietne, mutacia sa nestrati
+      #      potichu (vrati false, volajuci ohlasi neuspech).
       def write_unlocked(data)
-        payload = { 'std' => STD, 'schema' => target_schema(data['schema']),
+        target = target_schema_fresh(data['schema'])
+        if target >= SCHEMA_GROUPS && !schema2_complete?(data['sheets'], data['edges'])
+          if defined?(Engine)
+            Engine.log_error(StandardError.new('payload bez group_id do katalogu SCHEMA 2'),
+                             'Materials.write_unlocked')
+          end
+          return false
+        end
+        payload = { 'std' => STD, 'schema' => target,
                     'sheets' => data['sheets'], 'edges' => data['edges'] }
         JsonFileStore.write(path, payload)
+      end
+
+      # Schema pre zapis podla CERSTVEHO markera z disku (downgrade zakazany —
+      # rovnaka semantika ako target_schema, ale bez JsonFileStore cache).
+      def target_schema_fresh(wanted)
+        current = catalog_schema_on_disk
+        n = wanted.to_i
+        n <= current ? current : n
+      end
+
+      # Marker priamo zo suboru, mimo cache. Chybajuci/poskodeny = legacy 1.
+      def catalog_schema_on_disk
+        return SCHEMA_LEGACY unless File.exist?(path)
+        data = JSON.parse(File.binread(path))
+        n = data.is_a?(Hash) ? data['schema'].to_i : 0
+        n >= SCHEMA_LEGACY ? n : SCHEMA_LEGACY
+      rescue StandardError
+        SCHEMA_LEGACY
+      end
+
+      # Marker 2 je poctivy len vtedy, ked KAZDY zaznam nesie group_id (zdielaju
+      # write_unlocked guard aj migracna schema brana).
+      def schema2_complete?(sheets_raw, edges_raw)
+        return false unless sheets_raw.is_a?(Array) && edges_raw.is_a?(Array)
+        (sheets_raw + edges_raw).all? do |rec|
+          rec.is_a?(Hash) && !rec['group_id'].to_s.strip.empty?
+        end
       end
 
       # Medziprocesovy zamok katalogu (samostatny .lock subor v dir — NIKDY nie
@@ -214,13 +257,28 @@ module Noxun
         File.join(dir, 'materials.lock')
       end
 
+      # REENTRANTNY (Codex GH P1 2. kolo): flock toho isteho suboru cez druhy
+      # handle by sa v JEDNOM procese zablokoval sam o seba — vnorene volanie
+      # (napr. buduci mutator drziaci zamok cez load+write) preto len zvysi
+      # hlbku. SketchUp Ruby aj headless testy bezia na jednom vlakne.
       def with_catalog_lock
+        depth = @catalog_lock_depth.to_i
+        if depth.positive?
+          @catalog_lock_depth = depth + 1
+          begin
+            return yield
+          ensure
+            @catalog_lock_depth -= 1
+          end
+        end
         FileUtils.mkdir_p(dir)
         File.open(catalog_lock_path, 'a') do |f|
           f.flock(File::LOCK_EX)
+          @catalog_lock_depth = 1
           begin
             yield
           ensure
+            @catalog_lock_depth = 0
             f.flock(File::LOCK_UN)
           end
         end
