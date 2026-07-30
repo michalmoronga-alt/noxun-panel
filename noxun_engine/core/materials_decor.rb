@@ -198,6 +198,16 @@ module Noxun
           'abs_id' => generate_edge_id(s['decor'], 1.0, width), 'decor' => s['decor'],
           'thickness' => 1.0, 'width' => width, 'color' => s['color']
         }
+        # Codex GH P2 (3. kolo): v SCHEMA 2 katalogu MUSI nova paska niest
+        # identitu skupiny dosky (group_id + struktura, prazdne sa vynechavaju)
+        # — inak by ju write_unlocked completeness guard odmietol a ensure by
+        # vzdy koncil :write_failed. Plne strukturne pravidla vyberu = 2A-3.
+        if catalog_schema >= SCHEMA_GROUPS
+          gid = s['group_id'].to_s.strip
+          rec['group_id'] = gid unless gid.empty?
+          st = s['structure'].to_s.strip
+          rec['structure'] = st unless st.empty?
+        end
         return [:write_failed, nil] unless upsert_edge(rec)
         [:created, rec['abs_id']]
       end

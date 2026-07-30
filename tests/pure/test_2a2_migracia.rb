@@ -486,6 +486,49 @@ NxTest.test('2A-2: retype vyzaduje aj zdrojovy dekor (GH P1 2. kolo) — premeno
   end
 end
 
+NxTest.test('2A-2: ensure v SCHEMA 2 katalogu nesie group_id + strukturu dosky (GH P2 3. kolo)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  a2_with_catalog(a2_fixture_bytes) do
+    rep = A2MAT.migrate_to_schema2!
+    NxTest.assert_equal(:ok, rep[:status], rep[:reasons].inspect)
+    # W1000: struktura ST9 a ZIADNA paska v skupine -> ensure musi tvorit
+    status, abs_id = A2MAT.ensure_edge_for_sheet('W1000_DTDL_18', client_schema: 2)
+    NxTest.assert_equal(:created, status, 'v schema 2 katalogu ensure tvori (nie :write_failed)')
+    created = A2MAT.edge(abs_id)
+    sheet = A2MAT.sheet('W1000_DTDL_18')
+    NxTest.assert_equal(sheet['group_id'], created['group_id'], 'paska dedi group_id dosky')
+    NxTest.assert_equal('ST9', created['structure'], 'paska dedi strukturu dosky')
+    # HDF: bez struktury -> kluc structure sa nezapisuje
+    status2, abs_id2 = A2MAT.ensure_edge_for_sheet('HDF_WHITE_3', client_schema: 2)
+    NxTest.assert_equal(:created, status2)
+    created2 = A2MAT.edge(abs_id2)
+    NxTest.assert_equal(A2MAT.sheet('HDF_WHITE_3')['group_id'], created2['group_id'])
+    NxTest.refute(created2.key?('structure'), 'prazdna struktura sa nezapisuje')
+  end
+end
+
+NxTest.test('2A-2: prazdny typ dosky = undecidable (GH P2 3. kolo)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  original = a2_variant { |d| a2_sheet_of(d, 'UNI_DTDL_18')['type'] = '   ' }
+  a2_with_catalog(original) do
+    rep = A2MAT.migrate_to_schema2!
+    NxTest.assert_equal(:undecidable, rep[:status])
+    NxTest.assert(rep[:reasons].any? { |r| r.include?('typ musi byt neprazdny') }, rep[:reasons].inspect)
+    NxTest.assert_equal(original, File.binread(A2MAT.path), 'atomicky no-op')
+  end
+end
+
+NxTest.test('2A-2: paska s hrubkou mimo {1;2} = undecidable, ziadna ticha strata pri reload (GH P2 3. kolo)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  original = a2_variant { |d| a2_edge_of(d, 'ABS_UNI_10')['thickness'] = 0.8 }
+  a2_with_catalog(original) do
+    rep = A2MAT.migrate_to_schema2!
+    NxTest.assert_equal(:undecidable, rep[:status])
+    NxTest.assert(rep[:reasons].any? { |r| r.include?('0.8') && r.include?('2A-3') }, rep[:reasons].inspect)
+    NxTest.assert_equal(original, File.binread(A2MAT.path), 'atomicky no-op — ID sa nesmie ticho stratit')
+  end
+end
+
 NxTest.test('2A-2: pad zapisu = :write_failed s reportom, ziadna uletena vynimka (GH P2 2. kolo)') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   a2_with_catalog(a2_fixture_bytes) do

@@ -212,7 +212,9 @@ module Noxun
         seen = {}
         sheets_raw.each_with_index do |rec, i|
           validate_legacy_record(rec, "sheets[#{i}]", 'material_id', seen, reasons) do |r, label|
-            reasons << "#{label}: typ nie je text" unless r['type'].is_a?(String)
+            # Codex GH P2 (3. kolo): prazdny/whitespace typ by presiel len na
+            # triedu String a vyrobil neplatny schema 2 variant.
+            reasons << "#{label}: typ musi byt neprazdny text" unless r['type'].is_a?(String) && !r['type'].strip.empty?
             if r.key?('sheet_size') && !migration_pair?(r['sheet_size'])
               reasons << "#{label}: sheet_size musi byt dvojica kladnych cisel"
             end
@@ -223,6 +225,15 @@ module Noxun
           validate_legacy_record(rec, "edges[#{i}]", 'abs_id', seen, reasons) do |r, label|
             if r.key?('width') && !migration_positive?(r['width'])
               reasons << "#{label}: width musi byt kladne cislo"
+            end
+            # Codex GH P2 (3. kolo): hrubka mimo dnesnych podporovanych hodnot
+            # by migraciu presla, ale reload! po zapise by pasku vyfiltroval a
+            # katalog prepisal — TICHA strata ID mimo report[:deleted]. Kym
+            # obchodne hrubky nezavedie 2A-3 (schema-aware mnozina), je taka
+            # polozka nerozhodnutelna.
+            th = r['thickness']
+            if migration_positive?(th) && SUPPORTED_EDGE_THICKNESSES.none? { |t| (th.to_f - t).abs < 0.01 }
+              reasons << "#{label}: hrubka pasky #{th} mm zatial nie je podporovana (obchodne hrubky = davka 2A-3)"
             end
           end
         end
