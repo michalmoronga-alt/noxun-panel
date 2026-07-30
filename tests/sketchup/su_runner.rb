@@ -2066,6 +2066,11 @@ module NoxunSuRunner
     end
     log_line("INFO: verzia pluginu #{Noxun::Engine::VERSION}, model '#{File.basename(model.path.to_s)}'")
     cleanup(model) # cisty stol (zvysky z predoslych behov)
+    # Opakovany beh v TOM ISTOM okne (MCP replay): predosly beh mohol cez
+    # observer/push_state zdvihnut generation counter okna Vyroba — klik testy
+    # posielaju gen 0 a stale guard by ich falosne odmietol (nalez 30.7.:
+    # 4x FAIL select-cez-kluc bez realnej regresie). Cerstva instancia ma nil.
+    e::ProductionDialog.instance_variable_set(:@generation, 0) if defined?(e::ProductionDialog)
     run_sync(model)
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
