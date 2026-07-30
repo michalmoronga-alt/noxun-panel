@@ -187,13 +187,43 @@ module Noxun
       # 2A-1: kazdy zapis nesie SCHEMA marker. Bez explicitnej hodnoty sa preberie
       # schema zo suboru (chybajuca = 1), takze bezne mutacie ju nikdy nestratia;
       # explicitne ju posiela LEN migracia (2A-2).
+      # 2A-2 (Codex GH P1): KAZDY zapis katalogu bezi pod medziprocesovym flock
+      # zamkom — migracia drzi TEN ISTY zamok cez CAS kontrolu aj vymenu suboru,
+      # takze subezny zapis z ineho SketchUp procesu sa nemoze stratit v TOCTOU
+      # okne. V ramci zamku sa vola write_unlocked (flock na tom istom subore
+      # nie je v jednom procese reentrantny — druhe otvorenie by sa zablokovalo).
       def write(data)
-        payload = { 'std' => STD, 'schema' => target_schema(data['schema']),
-                    'sheets' => data['sheets'], 'edges' => data['edges'] }
-        JsonFileStore.write(path, payload)
+        with_catalog_lock { write_unlocked(data) }
       rescue StandardError => e
         Engine.log_error(e, 'Materials.write') if defined?(Engine)
         false
+      end
+
+      # Telo zapisu BEZ zamku — volat VYHRADNE zvnutra with_catalog_lock.
+      def write_unlocked(data)
+        payload = { 'std' => STD, 'schema' => target_schema(data['schema']),
+                    'sheets' => data['sheets'], 'edges' => data['edges'] }
+        JsonFileStore.write(path, payload)
+      end
+
+      # Medziprocesovy zamok katalogu (samostatny .lock subor v dir — NIKDY nie
+      # samotny materials.json, jeho rename by zamok stratil). Blokujuce LOCK_EX;
+      # kriticke sekcie su kratke (ms). test_dir_override presmeruje aj zamok,
+      # takze izolovane testy nikdy nesutazia so zivym katalogom.
+      def catalog_lock_path
+        File.join(dir, 'materials.lock')
+      end
+
+      def with_catalog_lock
+        FileUtils.mkdir_p(dir)
+        File.open(catalog_lock_path, 'a') do |f|
+          f.flock(File::LOCK_EX)
+          begin
+            yield
+          ensure
+            f.flock(File::LOCK_UN)
+          end
+        end
       end
 
       # SCHEMA katalogu v subore. Chybajuci/poskodeny marker = 1 (legacy).

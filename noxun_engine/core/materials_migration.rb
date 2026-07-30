@@ -137,21 +137,27 @@ module Noxun
         report[:warnings] = deleted_usage_warnings(plan[:deleted])
         return report if dry_run
 
-        # a) nemenna predmigracna zaloha (FIX 4): existujuca PLATNA sa neprepisuje.
-        backup = ensure_pre_schema2_backup
-        return report.merge(status: backup) unless backup == :ok
-
-        before_write.call if before_write # VYHRADNE testy — CAS scenar
-        # b) CAS kontrola (BLOCKER 3): subezna zmena z CEF/druheho procesu sa
-        #    NESMIE prepisat — bajty musia sediet s prvym citanim. Porovnanie
-        #    cez .b (kopie v BINARY) — encoding nikdy nesmie rozhodovat.
-        return report.merge(status: :conflict) if File.binread(file).b != original_bytes.b
-
-        # c) atomicky zapis so schema markerom 2 (write cita schemu z hashu,
-        #    FIX 10) + invalidacia cache.
-        ok = write('sheets' => plan[:sheets], 'edges' => plan[:edges],
-                   'schema' => SCHEMA_GROUPS)
-        return report.merge(status: :write_failed) unless ok
+        before_write.call if before_write # VYHRADNE testy — simulacia cudzieho zapisu
+        # a+b+c pod JEDNYM medziprocesovym zamkom (Codex GH P1): CAS kontrola,
+        # zaloha aj atomicka vymena suboru su jedna kriticka sekcia. Bezne zapisy
+        # (Materials.write) beru TEN ISTY zamok, takze cudzi zapis sa bud cely
+        # dokonci pred nasou CAS kontrolou (a ta ho chyti), alebo caka za nami —
+        # ziadne TOCTOU okno medzi porovnanim bajtov a rename.
+        status = with_catalog_lock do
+          # CAS kontrola (BLOCKER 3): subezna zmena z CEF/druheho procesu sa
+          # NESMIE prepisat — bajty musia sediet s prvym citanim. Porovnanie
+          # cez .b (kopie v BINARY) — encoding nikdy nesmie rozhodovat.
+          next :conflict if File.binread(file).b != original_bytes.b
+          # nemenna predmigracna zaloha (FIX 4) az PO CAS — :conflict zalohu
+          # ani nevytvori (ziadne subory pri neuspesnom behu).
+          backup = ensure_pre_schema2_backup
+          next backup unless backup == :ok
+          # atomicky zapis so schema markerom 2 (write_unlocked — zamok uz
+          # drzime, flock nie je reentrantny; FIX 10) + invalidacia cache.
+          write_unlocked('sheets' => plan[:sheets], 'edges' => plan[:edges],
+                         'schema' => SCHEMA_GROUPS) ? :ok : :write_failed
+        end
+        return report.merge(status: status) unless status == :ok
         reload!
         report
       end

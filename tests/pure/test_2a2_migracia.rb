@@ -394,8 +394,9 @@ NxTest.test('2A-2: CAS — subezna zmena suboru medzi citanim a zapisom = :confl
     NxTest.assert_equal(competitor, File.binread(A2MAT.path),
                         'subezna zmena NESMIE byt prepisana migraciou')
     NxTest.assert_equal(1, A2MAT.catalog_schema, 'marker ostal legacy')
-    # zaloha vznika PRED CAS kontrolou (poradie a->b zo zadania) a drzi povodne bajty
-    NxTest.assert_equal(original, File.binread(A2MAT.pre_schema2_backup_path))
+    # Codex GH P1: CAS bezi pod zamkom PRED zalohou — neuspesny beh (:conflict)
+    # nevytvori ZIADEN subor (ani zalohu; zalohovat cudzi novsi stav by bolo zle)
+    NxTest.refute(File.exist?(A2MAT.pre_schema2_backup_path), ':conflict zalohu nevytvara')
   end
 end
 
@@ -418,6 +419,19 @@ NxTest.test('2A-2: zaloha — existujuca platna sa NEPREPISE; poskodena = :backu
     NxTest.assert_equal(original, File.binread(A2MAT.path), 'stop bez zapisu')
     NxTest.assert_equal('xx{poskodene', File.binread(A2MAT.pre_schema2_backup_path),
                         'poskodena zaloha sa neprepisuje (posledny predmigracny stav)')
+  end
+end
+
+NxTest.test('2A-2: zamok katalogu (GH P1) — migracia aj bezny zapis bezia pod flock v dir katalogu') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  a2_with_catalog(a2_fixture_bytes) do
+    FileUtils.rm_f(A2MAT.catalog_lock_path)
+    rep = A2MAT.migrate_to_schema2!
+    NxTest.assert_equal(:ok, rep[:status], rep[:reasons].inspect)
+    NxTest.assert(File.exist?(A2MAT.catalog_lock_path), 'kriticka sekcia vytvorila zamkovy subor')
+    NxTest.assert_equal(A2MAT.dir, File.dirname(A2MAT.catalog_lock_path),
+                        'zamok zije vedla katalogu (test_dir_override presmeruje aj jeho)')
+    NxTest.assert(A2MAT.write(A2MAT.catalog), 'bezny zapis pod zamkom funguje dalej')
   end
 end
 
