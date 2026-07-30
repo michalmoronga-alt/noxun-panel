@@ -4,8 +4,8 @@
 
 ## Kde sme (29.7.2026)
 
-- Plugin **v0.5.3** — etapa **V0.5 KOMPLET**: výstupy (kusovník, okno Výroba, VEPO CSV validovaný proti OCL flow, odhad platní), kontrolný semafor, dekorové skupiny materiál↔ABS (V0.5-E) a dekorový katalóg UI (V0.5-F). Po uzávere: split materials.rb (v0.5.1), **D-45 — hrúbka a materiál sa už neblokujú** (v0.5.2, PR #83): materiál prevezme hrúbku, hrúbka si doberie materiál, vklad sa prispôsobí predvoľbe, čelá berú katalógovú hrúbku (koniec natvrdo 18/19); **D-44 — rýchle zadávanie materiálov** (v0.5.3, PR #84): našepkávač výrobcu a typu, formát platne rovno v dávke „Nový dekor" (PD zámerne prázdne), nezadaný formát sa neukladá ako overený.
-- Testy: **397 headless + 262 JS v 9 sadách (CI na každý push) + 151 in-SketchUp scenárov**.
+- Plugin **v0.5.4** — etapa **V0.5 KOMPLET**: výstupy (kusovník, okno Výroba, VEPO CSV validovaný proti OCL flow, odhad platní), kontrolný semafor, dekorové skupiny materiál↔ABS (V0.5-E) a dekorový katalóg UI (V0.5-F). Po uzávere: split materials.rb (v0.5.1), **D-45 — hrúbka a materiál sa už neblokujú** (v0.5.2, PR #83): materiál prevezme hrúbku, hrúbka si doberie materiál, vklad sa prispôsobí predvoľbe, čelá berú katalógovú hrúbku (koniec natvrdo 18/19); **D-44 — rýchle zadávanie materiálov** (v0.5.3, PR #84): našepkávač výrobcu a typu, formát platne rovno v dávke „Nový dekor" (PD zámerne prázdne), nezadaný formát sa neukladá ako overený; **D-46 — projektová predvoľba korpusu s inou hrúbkou** (v0.5.4, PR #86): dry-run + potvrdzovacia lišta, dediace skrinky prevezmú hrúbku v 1 kroku Späť, blokujúce dielce odmietnu celú dávku, zastaraný súhlas dostane novú ponuku.
+- Testy: **408 headless + 279 JS v 10 sadách (CI na každý push) + 170 in-SketchUp scenárov**.
 - Práve beží: **uzáver V0.5** — cleanup, dokumentácia, hardening, slovné prechádzky systémom (ujasnenie pojmov), príprava katalógu materiálov (Demos).
 - Ďalej: **V0.6 KOVANIE fáza 2** (štart ~28.7.) · V0.4.8 otvorená/neplánovaná · V1.0 zostavy.
 
@@ -35,7 +35,7 @@ Plné pôvodné texty: [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_et
 
 ### V0.6 — KATALÓGY A CENY (štart 30.7. dávkou 2A)
 
-**Pred 2A: D-46 — projektová predvoľba s inou hrúbkou (v0.5.4)** — potvrdzovacia lišta Potvrdiť/Zrušiť namiesto tvrdého stopu; dediace skrinky prevezmú hrúbku v 1 undo kroku (návrh cez Codex audit 2B+5F+2N, 30.7.).
+**Pred 2A: D-46 — projektová predvoľba s inou hrúbkou (v0.5.4) — HOTOVÉ (PR #86, 30.7.)** — potvrdzovacia lišta Potvrdiť/Zrušiť namiesto tvrdého stopu; dediace skrinky prevezmú hrúbku v 1 undo kroku (návrh cez Codex audit 2B+5F+2N, 30.7.).
 
 **Dávka 2A — identita variantov a skupín (dizajn cez Codex audit 6B+7F+2N, 30.7.; štandard §7.1/§7.5 aktualizovaný — SCHEMA 2). Verzie: 2A-1 = 0.5.5 a ďalej per PR:**
 - **2A-0** dizajn do dokumentov (štandard, roadmapa, pojmy, migračná mapa) — *tento PR*

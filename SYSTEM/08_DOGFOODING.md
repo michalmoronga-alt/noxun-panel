@@ -14,7 +14,6 @@
 
 ## UX drobnosti (nízka priorita)
 
-- **D-46 · Previazanie hrúbky a materiálu — PROJEKTOVÁ PREDVOĽBA** (Michal 30.7., test Halifax na v0.5.3; presná cesta potvrdená screenshotom) — okno Materiály projektu → Predvoľby → Korpus → Halifax 18,6 = tvrdý abort „má nekompatibilnú hrúbku pre: CAB-001. Nastav ho priamo tým skrinkám (prevezmú hrúbku) alebo im najprv zmeň hrúbku korpusu." — ručné preklikávanie per skrinka. (D-45 túto vetvu VEDOME blokol — dediacim skrinkám sa hrúbka nesmie meniť TICHO; korpusový select, vklad aj šablóny už previazané sú.) *Návrh riešenia: namiesto abortu POTVRDZOVACÍ flow (vzor allow_duplicate_code): „N dediacich skriniek prevezme hrúbku 18,6 mm — ulož znova pre potvrdenie" → druhé uloženie = predvoľba + rebuild všetkých dediacich skriniek s prevzatou hrúbkou v 1 undo kroku (per-skrinka body/back preflight + ABS remap ako pri priamej zmene; skrinky s blokujúcimi per-dielec overridmi sa vymenujú a dávka sa odmietne celá). Sekundárne (hypotéza z debaty, nižšia priorita): karta dielca pri materiáli inej hrúbky ponúkne „Zmeniť materiál celej skrinky?". Stav: na okamžitú opravnú dávku (v0.5.4).*
 - **D-47 · Materiály — vlastný vstup v hlavičke + konzistencia tabov** (Michal 30.7.) — materiály si čoraz viac pýtajú osobitnú sekciu s tlačidlom v hornom paneli (dnes sú na spodku poradia pri úpravách); hlavička panela je nekonzistentná: rôzne šírky tlačidiel, ikonu má len Výroba (Korpus·Zóny·Čelá bez ikon). *Stav: zaradiť do najbližšej UI dávky — prirodzený blok = 2A-4 (UI štruktúry variantov), kde sa hlavička aj tak otvorí.*
 
 ## Nápady na zváženie (nerozhodnuté)
@@ -85,6 +84,7 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ## Vyriešené — index (plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md))
 
+- **D-46** projektová predvoľba korpusu s inou hrúbkou (potvrdzovacia lišta namiesto tvrdého stopu — dediace skrinky prevezmú hrúbku v 1 kroku Späť) — PR #86
 - **D-44** rýchle zadávanie materiálov (našepkávač výrobcu/typu, formát platne rovno v dávke „Nový dekor", nezadaný formát sa neukladá) — PR #84
 - **D-45** slučka hrúbka ↔ materiál pri 18,6 (materiál prevezme hrúbku · hrúbka si doberie materiál · vklad sa prispôsobí) — PR #83
 - **D-42** dekorový katalóg UI (mriežka, kód+dodávateľ, cena „nezadaná", inline bunky, preset-čipy) — PR #74–#76
