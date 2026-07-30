@@ -394,6 +394,64 @@ module Noxun
           { pick: pick, candidates: cands }
         end
 
+        # D-45/D-46: prevzatie KATALOGOVEJ hrubky materialu tela do params
+        # (filozofia dosky). JEDINA implementacia — panel (adopt_body_thickness!)
+        # aj projektova predvolba (classify_body_default_change) volaju TOTO;
+        # hlasky si skladaju volajuci. params sa mutuju LEN pri :adopted.
+        # Vrati [:same, nil] (netreba nic) / [:adopted, nil] /
+        #       [:range, nil] (hrubka mimo 6–50) / [:blocked, [nazvy dielcov]].
+        def adopt_thickness(params, sheet)
+          have = sheet.is_a?(Hash) ? sheet['thickness'].to_f : 0.0
+          return [:same, nil] unless have.positive?
+          old = params['thickness']
+          return [:same, nil] if thickness_eq?(old, have)
+          return [:range, nil] unless thickness_in_range?(have)
+          params['thickness'] = have
+          blocked = parts_blocking_thickness(params)
+          unless blocked.empty?
+            params['thickness'] = old # nic sa nemeni, kym konflikt trva
+            return [:blocked, blocked]
+          end
+          [:adopted, nil]
+        end
+
+        # --- D-46: projektova predvolba TELA nad DEDIACIMI skrinkami ----------
+        # Cista klasifikacia bez modelu a bez zapisu. TA ISTA funkcia stavia
+        # dry-run ponuku aj finalne params davky — ponuka teda nemoze slubit nic
+        # ine, nez apply spravi (audit F3).
+        #
+        # entries — [[cid, params, old_eff, ref], ...]; params su CERSTVE KOPIE
+        #   (mutuju sa in-place: prevzata hrubka + preladene ABS overridy),
+        #   old_eff = efektivne materialy skrinky PRED zmenou (dedenie este so
+        #   STARYM defaultom), ref = referencia volajuceho (instancia) do jobs.
+        # sheet / new_body_id — katalogovy zaznam a id NOVEHO materialu tela.
+        #
+        # params['material_id'] sa NIKDY nenastavuje — skrinka dalej DEDI.
+        # Vrati { 'adopting' => [cid], 'recompute' => [cid],
+        #         'blocked' => [[cid, :parts|:range, [nazvy dielcov]]],
+        #         'jobs' => [[ref, params]], 'remap' => {'changed'=>n,'lost'=>[]} }
+        def classify_body_default_change(entries, sheet, new_body_id)
+          out = { 'adopting' => [], 'recompute' => [], 'blocked' => [], 'jobs' => [],
+                  'remap' => { 'changed' => 0, 'lost' => [] } }
+          Array(entries).each do |cid, params, old_eff, ref|
+            id = cid.to_s
+            state, blocked = adopt_thickness(params, sheet)
+            if state == :blocked || state == :range
+              out['blocked'] << [id, state == :blocked ? :parts : :range, Array(blocked)]
+              next
+            end
+            (state == :adopted ? out['adopting'] : out['recompute']) << id
+            eff = old_eff.is_a?(Hash) ? old_eff : {}
+            # Dekor sa meni aj skrinkam, ktorym hrubka sedi — rucne ABS overridy
+            # nasleduju material rovnako ako pri priamej zmene (D-41 FIX 5).
+            remap = remap_part_edge_overrides!(params, eff, eff.merge('body' => new_body_id))
+            out['remap']['changed'] += remap['changed'].to_i
+            out['remap']['lost'].concat(Array(remap['lost']))
+            out['jobs'] << [ref, params]
+          end
+          out
+        end
+
         # D-45 (audit F8): dielce, ktore maju VLASTNY katalogovy material a ten by
         # pri aktualnych params (uz s novou hrubkou) hrubkovo nesedel. Nic sa
         # nemaze ani neprepisuje — volajuci zmenu ODMIETNE a dielce vymenuje.

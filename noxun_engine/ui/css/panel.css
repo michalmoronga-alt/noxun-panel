@@ -148,6 +148,14 @@
   .matrow { display: flex; align-items: center; margin: 5px 0; }
   .matrow label { flex: 0 0 118px; color: var(--nx-ink-label); font-size: 12px; }
   .matrow select { flex: 1; padding: 4px 6px; border: 1px solid var(--nx-border-strong); border-radius: 4px; font-size: 12px; min-width: 0; }
+  /* D-46: potvrdzovacia lista projektovej predvolby — JEDEN riadok pod selectom
+     (vertikalny priestor). Jantar = rozhodnutie/upozornenie, nie chyba. */
+  .mdconfirm { display: flex; align-items: center; gap: 6px; margin: 2px 0 5px;
+               padding: 4px 6px; font-size: 11px; line-height: 1.3;
+               background: var(--nx-warn-bg); color: var(--nx-warnrow-fg);
+               border: 1px solid var(--nx-warnchip-border); border-radius: 4px; }
+  .mdconfirm span { flex: 1; min-width: 0; }
+  .mdconfirm button { flex: 0 0 auto; padding: 3px 8px; font-size: 11px; }
   .subhead { font-size: 11px; font-weight: 600; color: var(--nx-ink-muted); margin: 8px 0 3px; text-transform: uppercase; letter-spacing: .03em; }
   /* V0.3 Karta dielca (ABS editor) */
   #partCard { border: 1px solid var(--nx-part-border); background: var(--nx-part-bg); }

@@ -3,7 +3,7 @@
      (%APPDATA%). -->
 <!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.5.3">
+<link rel="stylesheet" href="css/panel.css?v=0.5.4">
 
 <h1>Materiály projektu</h1>
 <p class="sub" id="mdline">…</p>
@@ -15,6 +15,15 @@
   <div class="body">
     <div class="hint">Predvolené materiály pre <b>všetky skrinky projektu</b>, ktoré nemajú vlastný materiál (dedenie projekt → skrinka → dielec). Zmena sa hneď premietne do všetkých dediacich skriniek (1 krok Späť).</div>
     <div class="matrow"><label>Korpus</label><select id="md_body" onchange="onProjMaterial('default_material_id', this.value)"></select></div>
+    <!-- D-46: potvrdzovacia lista — material s inou hrubkou (napr. Halifax 18,6)
+         uz nie je tvrdy stop: server vypise, kolko dediacich skriniek prevezme
+         hrubku, a jedno Potvrdiť to spravi v 1 kroku Späť. Ukazuje ju VYHRADNE
+         server (MD.confirmDefault); select je medzitym spat na skutocnom defaulte. -->
+    <div class="mdconfirm" id="mdConfirmBar" style="display:none">
+      <span id="mdConfirmText"></span>
+      <button class="primary" onclick="mdConfirmProject()">Potvrdiť</button>
+      <button class="ghostbtn" onclick="mdCancelProject()">Zrušiť</button>
+    </div>
     <div class="matrow"><label>Čelá</label><select id="md_front" onchange="onProjMaterial('default_front_material_id', this.value)"></select></div>
     <div class="matrow"><label>Chrbát</label><select id="md_back" onchange="onProjMaterial('default_back_material_id', this.value)"></select></div>
   </div>
@@ -156,6 +165,6 @@
 <div id="status">Pripravené.</div>
 
 <!-- icons.js prvy (sprite musi existovat pred prvym renderom mdRenderLists) -->
-<script src="js/errors.js?v=0.5.3"></script>
-<script src="js/icons.js?v=0.5.3"></script>
-<script src="js/proj_materials.js?v=0.5.3"></script>
+<script src="js/errors.js?v=0.5.4"></script>
+<script src="js/icons.js?v=0.5.4"></script>
+<script src="js/proj_materials.js?v=0.5.4"></script>

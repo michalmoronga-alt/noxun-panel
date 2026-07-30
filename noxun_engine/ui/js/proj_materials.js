@@ -750,7 +750,47 @@
     dl.innerHTML = html;
   }
 
+  // --- D-46: potvrdzovacia lista projektovej predvolby KORPUSU ------------
+  // Projektove selecty nemaju Ulozit (onchange = zapis), takze suhlas so zmenou
+  // hrubky dediacich skriniek pyta server: vrati ponuku, JS vrati select na
+  // SKUTOCNY default a pod nim ukaze 1-riadkovu listu Potvrdiť/Zrušiť.
+  // Autorita je server — pending sa mu posiela CELY spat a on ho znovu overi.
+  var MD_PENDING = null;
+
+  // Cista funkcia (Node test): kluc projektovej predvolby -> id selectu.
+  function mdProjectSelectId(key){
+    return { default_material_id: 'md_body', default_front_material_id: 'md_front',
+             default_back_material_id: 'md_back' }[String(key || '')] || null;
+  }
+  // Cista funkcia (Node test): payload potvrdenia. Nesie CELY pending kontrakt
+  // spat (key/value z NEHO, nie z DOM selectu — ten je uz vrateny na default).
+  function mdConfirmPayload(pending, guid){
+    if (!pending || !pending.key) return null;
+    return { key: pending.key, value: pending.value, model_guid: guid, confirm: pending };
+  }
+
+  function mdSetProjectSelect(key, id){
+    var sel = el(mdProjectSelectId(key)); // programovy zapis onchange NEspusti
+    if (sel && id) sel.value = id;
+  }
+  function mdClearPending(){
+    MD_PENDING = null;
+    var bar = el('mdConfirmBar');
+    if (bar) bar.style.display = 'none';
+  }
+  function mdConfirmProject(){
+    var payload = mdConfirmPayload(MD_PENDING, MD_MODEL_GUID);
+    mdClearPending();
+    if (payload && window.sketchup && sketchup.set_project_material)
+      sketchup.set_project_material(JSON.stringify(payload));
+  }
+  function mdCancelProject(){
+    mdClearPending();
+    MD.setStatus('Zmena predvoľby zrušená — nič sa nezmenilo.');
+  }
+
   function mdApplyCatalog(data){
+    mdClearPending(); // refresh (init aj katalogove echo) rusi nepotvrdenu ponuku
     MD_SHEETS = (data.materials && data.materials.sheets) ? data.materials.sheets : [];
     MD_CATALOG = data.catalog || { sheets: [], edges: [] };
     MD_PROTECTED = data.protected_ids || [];
@@ -809,10 +849,26 @@
     flagDuplicateCode: function(kind){ mdReopenFromAttempt(); mdDupAllow = kind; },
     // D-42 PR C: duplicitny kod z inline bunky — bunka OSTAVA rozpisana (server
     // neposlal refresh), dalsi flush tej istej bunky posle potvrdenie.
-    flagDuplicatePatch: function(kind, id){ mdPatchDup = { kind: kind, id: id }; }
+    flagDuplicatePatch: function(kind, id){ mdPatchDup = { kind: kind, id: id }; },
+    // D-46: server pyta potvrdenie zmeny predvolby korpusu. Select sa VRATI na
+    // skutocny default (nesmie vizualne zostat na nepotvrdenom materiali) a pod
+    // nim sa ukaze lista s presnym rozpisom.
+    confirmDefault: function(p){
+      MD_PENDING = p.pending || null;
+      mdSetProjectSelect(p.key, p.current);
+      var bar = el('mdConfirmBar'), txt = el('mdConfirmText');
+      if (txt) txt.textContent = p.message || '';
+      if (bar) bar.style.display = MD_PENDING ? '' : 'none';
+      MD.setStatus(p.message || '', false);
+    },
+    // D-46: odmietnutie (blokujuce dielce) — select spat na default, ziadna ponuka.
+    resetProject: function(p){ mdClearPending(); mdSetProjectSelect(p.key, p.current); }
   };
 
   function onProjMaterial(key, value){
+    // D-46: iny vyber v KTOROMKOLVEK projektovom selecte zahadzuje nepotvrdenu
+    // ponuku — suhlas vzdy patri prave jednej zmene.
+    mdClearPending();
     // D-42 (audit BLOCKER 4): posli identitu modelu — server odmietne zapis do
     // ineho modelu, ak sa medzitym prepol dokument.
     if (window.sketchup && sketchup.set_project_material)
@@ -827,6 +883,8 @@
       // D-44 (tests/js/test_decor_formats.js) — ciste funkcie bez DOM
       mdFormatHint: mdFormatHint, mdBuildSheetVariants: mdBuildSheetVariants,
       mdMigrateLastSet: mdMigrateLastSet, mdSheetDim: mdSheetDim,
-      mdManualFormats: mdManualFormats };
+      mdManualFormats: mdManualFormats,
+      // D-46 (tests/js/test_proj_confirm.js) — ciste funkcie listy bez DOM
+      mdProjectSelectId: mdProjectSelectId, mdConfirmPayload: mdConfirmPayload };
   }
   if (typeof window !== 'undefined' && window.sketchup && sketchup.ready) sketchup.ready('');

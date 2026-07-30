@@ -39,6 +39,25 @@ module Noxun
         false
       end
 
+      # D-46: kontrakt POTVRDENIA projektovej predvolby. Prvy pokus vrati ponuku
+      # s presnym rozpisom (co sa stane), klient posiela SPAT cely pending objekt
+      # a server ho porovna s CERSTVE prepocitanym stavom. Nesulad v comkolvek
+      # (iny model, iny material, medzitym zmeneny default, ina mnozina skriniek)
+      # = suhlas patri INEMU stavu -> nova ponuka, ziadny zapis (audit B2/F5).
+      # pending/fresh su ploche hashe so string klucmi; poradie ID nerozhoduje.
+      PENDING_KEYS = %w[model_guid key value old_default].freeze
+      PENDING_ID_KEYS = %w[adopting_ids recompute_ids].freeze
+
+      def pending_default_ok?(pending, fresh)
+        return false unless pending.is_a?(Hash) && fresh.is_a?(Hash)
+        PENDING_KEYS.all? { |k| pending[k].to_s == fresh[k].to_s } &&
+          PENDING_ID_KEYS.all? { |k| pending_ids(pending[k]) == pending_ids(fresh[k]) }
+      end
+
+      def pending_ids(list)
+        Array(list).map { |v| v.to_s }.sort
+      end
+
       # D-42 PR B (audit FIX 12): dekory POUZITE v aktivnom modeli — jeden
       # read-only scan vyrobnych part/board snapshotov (resolved material_id
       # na entite, standard 8.3). VEDOME bez sablon (globalna kniznica nie je

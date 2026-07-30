@@ -286,50 +286,154 @@ module Noxun
             Panel.present_str(Panel.existing_params(cabinet)[cfg_key]).nil?
           end
 
-          incompatible = affected.select do |cabinet|
-            params = Panel.existing_params(cabinet)
-            # D-31 (GH P2): skrinka BEZ chrbta dielec back vobec nema — jej ulozena
-            # hrubka (napr. HDF 3) nesmie blokovat zmenu projektoveho chrbta na 18.
-            next false if key == 'default_back_material_id' && params['back_mode'] == 'none'
-            want = thickness_key ? params[thickness_key].to_f : Fronts::FRONT_THICKNESS
-            !CabinetBuilder.thickness_ok_for?(role, want, sheet['thickness'].to_f)
-          end
-          unless incompatible.empty?
-            # D-45: hrubka existujucich DEDIACICH skriniek sa NESMIE zmenit ticho
-            # (predvolba by prepisala hotovu vyrobu) — hlaska navedie, co s tym.
-            ids = incompatible.map { |cabinet| Store.get(cabinet, 'cabinet_id') }.join(', ')
-            return set_status("Materiál #{value} (#{Panel.fmt_mm(have)} mm) má nekompatibilnú hrúbku pre: #{ids}. " \
-                              'Nastav ho priamo tým skrinkám (prevezmú hrúbku) alebo im najprv zmeň hrúbku korpusu.', true)
-          end
-
           # D-41 PR C (audit FIX 5): projektova predvolba meni efektivny material
           # VSETKYCH dediacich skriniek — rucne ABS overridy zladene so starym
           # dekorom sa preladia (stary default este plati, novy je len v `value`).
           eff_key = { 'default_material_id' => 'body', 'default_front_material_id' => 'front',
                       'default_back_material_id' => 'back' }[key]
-          remap_changed = 0
-          remap_lost = []
-          jobs = affected.map do |cabinet|
-            p = Panel.existing_params(cabinet)
-            old_eff = Panel.effective_materials(model, p)
-            new_eff = old_eff.merge(eff_key => value)
-            remap = CabinetBuilder.remap_part_edge_overrides!(p, old_eff, new_eff)
-            remap_changed += remap['changed'].to_i
-            remap_lost.concat(remap['lost'])
-            [cabinet, p]
+          # Snapshot PRED zapisom: baseline kontraktu potvrdenia aj hodnota, na
+          # ktoru sa vrati select pri odmietnuti/ponuke.
+          old_default = Materials.project_defaults(model)[key].to_s
+
+          if key == 'default_material_id'
+            # --- D-46: KORPUS. Dediacim skrinkam sa hrubka nemeni ticho, ale ani
+            # sa uz neodmieta natvrdo — pouzivatel dostane presny rozpis a jedno
+            # potvrdenie; vsetko potom prebehne v JEDNOM undo kroku.
+            plan = body_change_plan(model, affected, sheet, value)
+            unless plan['blocked'].empty?
+              # Blokujuce dielce sa neprelozia ani potvrdenim — ziadna ponuka
+              # (audit F3: nesluboval by sa krok, ktory sa neda vykonat).
+              set_status(blocked_cabs_msg(have, plan['blocked']), true)
+              return reset_project_select(key, old_default)
+            end
+            unless plan['adopting'].empty?
+              fresh = { 'model_guid' => model_guid(model), 'key' => key, 'value' => value,
+                        'old_default' => old_default,
+                        'adopting_ids' => plan['adopting'], 'recompute_ids' => plan['recompute'] }
+              unless Materials.pending_default_ok?(data['confirm'], fresh)
+                return offer_body_change(fresh, have, stale: !data['confirm'].nil?)
+              end
+            end
+            jobs = plan['jobs']
+            remap_changed = plan['remap']['changed'].to_i
+            remap_lost = plan['remap']['lost']
+            adopted_n = plan['adopting'].size
+            recomputed_n = plan['recompute'].size
+          else
+            incompatible = affected.select do |cabinet|
+              params = Panel.existing_params(cabinet)
+              # D-31 (GH P2): skrinka BEZ chrbta dielec back vobec nema — jej ulozena
+              # hrubka (napr. HDF 3) nesmie blokovat zmenu projektoveho chrbta na 18.
+              next false if key == 'default_back_material_id' && params['back_mode'] == 'none'
+              want = thickness_key ? params[thickness_key].to_f : Fronts::FRONT_THICKNESS
+              !CabinetBuilder.thickness_ok_for?(role, want, sheet['thickness'].to_f)
+            end
+            unless incompatible.empty?
+              # D-45: hrubka existujucich DEDIACICH skriniek sa NESMIE zmenit ticho
+              # (predvolba by prepisala hotovu vyrobu) — hlaska navedie, co s tym.
+              ids = incompatible.map { |cabinet| Store.get(cabinet, 'cabinet_id') }.join(', ')
+              return set_status("Materiál #{value} (#{Panel.fmt_mm(have)} mm) má nekompatibilnú hrúbku pre: #{ids}. " \
+                                'Nastav ho priamo tým skrinkám (prevezmú hrúbku) alebo im najprv zmeň hrúbku korpusu.', true)
+            end
+
+            remap_changed = 0
+            remap_lost = []
+            adopted_n = 0
+            recomputed_n = affected.size
+            jobs = affected.map do |cabinet|
+              p = Panel.existing_params(cabinet)
+              old_eff = Panel.effective_materials(model, p)
+              new_eff = old_eff.merge(eff_key => value)
+              remap = CabinetBuilder.remap_part_edge_overrides!(p, old_eff, new_eff)
+              remap_changed += remap['changed'].to_i
+              remap_lost.concat(remap['lost'])
+              [cabinet, p]
+            end
           end
+
           Panel.suspend_selection_sync do
+            # Zapis predvolby je VNUTRI operacie rebuildov (audit N8) — 1 undo
+            # vrati geometriu skriniek AJ modelovy default naraz.
             CabinetBuilder.rebuild_many(model, jobs, op_name: 'NOXUN: projektovy material') do
               raise 'Projektový materiál sa nepodarilo uložiť.' unless Materials.set_project_default(model, key, value)
             end
             Panel.reselect(model, selected) if selected && selected.valid?
           end
-          msg = "Predvoľba uložená — prepočítaných #{affected.size} skriniek."
+          msg = saved_msg(adopted_n, recomputed_n, have)
           msg += " ABS hrany prevedené na nový dekor (#{remap_changed}× dielec)." if remap_changed.positive?
           msg += " Bez náhrady: #{remap_lost.join(', ')}." unless remap_lost.empty?
           set_status(msg)
           push_state
           Panel.push_selected(model) # refresh Inspectora (korpusove selecty, karta dielca)
+        end
+
+        # --- D-46: predvolba korpusu s inou hrubkou ---------------------------
+
+        # PLNY dry-run nad CERSTVYMI kopiami params vsetkych dediacich skriniek.
+        # Ta ista funkcia stavia ponuku aj finalne params davky (CabinetBuilder
+        # .classify_body_default_change) — pri ponuke sa vysledok len zahodi,
+        # do modelu sa nezapisuje NIC.
+        def body_change_plan(model, affected, sheet, value)
+          entries = affected.map do |cab|
+            params = Panel.existing_params(cab) # cerstva kopia z modelu
+            [Store.get(cab, 'cabinet_id').to_s, params,
+             Panel.effective_materials(model, params), cab]
+          end
+          CabinetBuilder.classify_body_default_change(entries, sheet, value)
+        end
+
+        # Ponuka na potvrdenie: select sa v UI VRATI na skutocny default a pod nim
+        # sa zobrazi lista Potvrdiť/Zrušiť. Pending kontrakt (fresh) sa posiela
+        # klientovi a pri potvrdeni pride CELY spat — server ho znovu overi.
+        def offer_body_change(fresh, have, stale: false)
+          msg = confirm_msg(fresh['adopting_ids'].size, fresh['recompute_ids'].size, have)
+          msg = "Stav sa medzitým zmenil — #{msg}" if stale
+          set_status(msg)
+          js("MD.confirmDefault(#{{ 'key' => fresh['key'], 'current' => fresh['old_default'],
+                                    'message' => msg, 'pending' => fresh }.to_json})")
+        end
+
+        # UI resync po odmietnuti: select nesmie zostat na materiali, ktory sa
+        # neulozil (JS ho vrati na skutocny default a zahodi pending).
+        def reset_project_select(key, current)
+          js("MD.resetProject(#{{ 'key' => key, 'current' => current }.to_json})")
+        end
+
+        # Pocty skriniek v spravnom slovenskom tvare (1 / 2–4 / 5+).
+        def cabs_phrase(count, tense)
+          few = count >= 2 && count <= 4
+          noun = count == 1 ? 'skrinka' : (few ? 'skrinky' : 'skriniek')
+          verb = if tense == :future
+                   few ? 'prevezmú' : 'prevezme'
+                 else
+                   count == 1 ? 'prevzala' : (few ? 'prevzali' : 'prevzalo')
+                 end
+          "#{count} #{noun} #{verb}"
+        end
+
+        def confirm_msg(adopting, recompute, have)
+          msg = "#{cabs_phrase(adopting, :future)} hrúbku #{Panel.fmt_mm(have)} mm"
+          msg += " (prepočítajú sa aj ďalšie: #{recompute})" if recompute.positive?
+          "#{msg} — potvrď nižšie."
+        end
+
+        def saved_msg(adopted, recomputed, have)
+          return "Predvoľba uložená — prepočítaných #{recomputed} skriniek." if adopted.zero?
+          msg = "Predvoľba uložená — #{cabs_phrase(adopted, :past)} hrúbku #{Panel.fmt_mm(have)} mm"
+          msg += ", prepočítaných #{recomputed}" if recomputed.positive?
+          "#{msg}."
+        end
+
+        # Blokujuce skrinky: "CAB-001: Polica 1, Bok Ľ; CAB-003: Bok P"
+        # (konzistentne s D-45 Panel.blocked_parts_msg).
+        def blocked_cabs_msg(have, blocked)
+          list = blocked.first(3).map do |cid, reason, parts|
+            reason == :range ? "#{cid}: mimo rozsahu hrúbky korpusu" : "#{cid}: #{parts.first(4).join(', ')}"
+          end.join('; ')
+          list += " a ďalšie (#{blocked.length - 3})" if blocked.length > 3
+          "Hrúbku #{Panel.fmt_mm(have)} mm blokujú dielce s vlastným materiálom inej hrúbky — #{list}. " \
+            'Vráť im materiál na dedený (alebo im vyber materiál tejto hrúbky) a skús znova. ' \
+            'Predvoľba sa nezmenila.'
         end
 
         # D-45: hlaska odmietnutej projektovej predvolby — per rolu (vysvetli PRECO).
