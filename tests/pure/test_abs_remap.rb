@@ -151,12 +151,14 @@ end
 # ---------------------------------------------------------------------------
 
 NxTest.test('abs-c2: auto_width_for — najmensia standardna sirka s presahom, inak nil') do
-  NxTest.assert_equal(22.0, RMAT.auto_width_for(18.0))
-  NxTest.assert_equal(22.0, RMAT.auto_width_for(20.0), '20+2=22 presne sedi')
-  NxTest.assert_equal(43.0, RMAT.auto_width_for(25.0), '25+2=27 > 22 -> 43')
+  # 2A-3 (audit N16): standard 22 -> 23 GLOBALNE (Demos predava 23) — jedina
+  # vedoma vynimka z dual-mode; existujuce 22 pasky ostavaju platne pre VYBER.
+  NxTest.assert_equal(23.0, RMAT.auto_width_for(18.0))
+  NxTest.assert_equal(23.0, RMAT.auto_width_for(21.0), '21+2=23 presne sedi')
+  NxTest.assert_equal(43.0, RMAT.auto_width_for(25.0), '25+2=27 > 23 -> 43')
   NxTest.assert_equal(43.0, RMAT.auto_width_for(36.0))
   NxTest.assert_equal(nil, RMAT.auto_width_for(42.0), '42+2=44 > 43 -> nil (audit BLOCKER 4)')
-  NxTest.assert_equal(22.0, RMAT.auto_width_for(3.0), 'HDF 3 -> 22')
+  NxTest.assert_equal(23.0, RMAT.auto_width_for(3.0), 'HDF 3 -> 23')
 end
 
 NxTest.test('abs-c2: ensure_edge_for_sheet vytvori pasku raz, potom hlasi exists') do
@@ -167,9 +169,9 @@ NxTest.test('abs-c2: ensure_edge_for_sheet vytvori pasku raz, potom hlasi exists
     sheet_id = res['sheets'][0]
     status, abs_id = RMAT.ensure_edge_for_sheet(sheet_id)
     NxTest.assert_equal(:created, status)
-    NxTest.assert_equal('ABS_ENSURETEST_22X10', abs_id)
+    NxTest.assert_equal('ABS_ENSURETEST_23X10', abs_id, '2A-3 N16: auto-sirka 23 (nie 22)')
     rec = RMAT.edge(abs_id)
-    NxTest.assert_equal(22.0, rec['width'])
+    NxTest.assert_equal(23.0, rec['width'])
     NxTest.assert_equal('EnsureTest', rec['decor'])
     status2, abs_id2 = RMAT.ensure_edge_for_sheet(sheet_id)
     NxTest.assert_equal(:exists, status2, 'druhe volanie nic nevytvara')

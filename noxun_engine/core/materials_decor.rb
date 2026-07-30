@@ -387,7 +387,9 @@ module Noxun
           w = strict_num(v['width'] || v[:width])
           th = strict_num(v['thickness'] || v[:thickness])
           return [false, "Šírka ABS „#{v['width'] || v[:width]}“ musí byť 10–200 mm."] unless w && EDGE_WIDTH_RANGE.cover?(w)
-          return [false, "Hrúbka ABS „#{v['thickness'] || v[:thickness]}“ musí byť 1 alebo 2 mm."] unless th && supported_edge_thickness?(th)
+          unless th && supported_edge_thickness?(th)
+            return [false, "Hrúbka ABS „#{v['thickness'] || v[:thickness]}“ musí byť #{edge_thickness_options_label} mm."]
+          end
           abs_list << [w, th]
         end
         [true, abs_list]
@@ -452,9 +454,9 @@ module Noxun
         [true, out]
       end
 
-      # "22/1, 43/1, 43/2" -> [[22.0, 1.0], [43.0, 1.0], [43.0, 2.0]].
+      # "23/1, 43/1, 43/2" -> [[23.0, 1.0], [43.0, 1.0], [43.0, 2.0]].
       # Sirka povinna (nove pasky su sirkove; univerzalne = legacy zaznamy),
-      # hrubka ABS len 1/2 mm, desatiny bodkou. Ziadny predbezny ciarkovy guard
+      # hrubka ABS zo schema-aware whitelistu, desatiny bodkou. Ziadny predbezny ciarkovy guard
       # (Codex GH #71: 22/1,43/1 je legalny kompakt) — desatinnu ciarku chyti
       # formatova kontrola tokenu (22,5/1 -> tokeny "22" a "5/1", oba bez zmyslu).
       def parse_abs_tokens(raw)
@@ -465,11 +467,13 @@ module Noxun
           t = tok.strip
           next if t.empty?
           m = t.match(%r{\A(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)\z})
-          return [false, "ABS „#{t}“ zapíš ako šírka/hrúbka (napr. 22/1, desatiny bodkou)."] unless m
+          return [false, "ABS „#{t}“ zapíš ako šírka/hrúbka (napr. 23/1, desatiny bodkou)."] unless m
           w = m[1].to_f
           th = m[2].to_f
           return [false, "Šírka ABS „#{t}“ musí byť 10–200 mm."] unless EDGE_WIDTH_RANGE.cover?(w)
-          return [false, "Hrúbka ABS „#{t}“ musí byť 1 alebo 2 mm."] unless supported_edge_thickness?(th)
+          unless supported_edge_thickness?(th)
+            return [false, "Hrúbka ABS „#{t}“ musí byť #{edge_thickness_options_label} mm."]
+          end
           out << [w, th]
         end
         [true, out]

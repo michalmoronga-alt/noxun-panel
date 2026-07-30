@@ -84,7 +84,8 @@ module Noxun
           when :no_sheet
             [false, 'Materiál sa nenašiel v katalógu — páska sa nevytvorila.']
           when :no_standard_width
-            [false, 'Hrúbka je mimo štandardných šírok pások (22/43 mm) — pridaj pásku ručne v Materiáloch projektu.']
+            widths = Materials::AUTO_WIDTHS.map { |w| fmt_mm(w) }.join('/')
+            [false, "Hrúbka je mimo štandardných šírok pások (#{widths} mm) — pridaj pásku ručne v Materiáloch projektu."]
           else
             [false, 'Vytvorenie ABS pásky zlyhalo.']
           end

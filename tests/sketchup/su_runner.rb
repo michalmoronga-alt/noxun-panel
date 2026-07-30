@@ -623,8 +623,8 @@ module NoxunSuRunner
                    .find { |i| e::Store.get(i, 'part_key').to_s == rk41 }
       pcfg41 = e::Store.config(part41) || {}
       ov41 = ((e::Store.config(inst) || {})['part_overrides'] || {})[rk41] || {}
-      ok('sync-abs C2: create_missing_abs vytvoril pasku 22/1 noveho dekoru',
-         created41 == 'ABS_SU_D41_DEKOR_22X10')
+      ok('sync-abs C2: create_missing_abs vytvoril pasku 23/1 noveho dekoru',
+         created41 == 'ABS_SU_D41_DEKOR_23X10')
       ok('sync-abs C2: material nastaveny a rucna hrana L1 prevedena na novu pasku',
          pcfg41['material_id'] == sid41 && (ov41['edges'] || {})['L1'] == created41 &&
          (pcfg41['edges'] || {})['L1'] == created41)
