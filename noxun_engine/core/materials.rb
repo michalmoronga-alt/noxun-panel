@@ -109,7 +109,21 @@ module Noxun
 
       # --- cesty / perzistencia ------------------------------------------------
 
+      # VYHRADNE TESTY (SU scenar migracie 2A-2; produkcia NIKDY): presmeruje
+      # CELY katalog (materials.json + predmigracna zaloha) do izolovaneho
+      # priecinka. Runner ho po scenari VZDY vracia na nil (aj vo FAIL vetve)
+      # + Materials.reload!, inak by dalsie casti citali cudzi katalog.
+      def test_dir_override
+        @test_dir_override
+      end
+
+      def test_dir_override=(value)
+        @test_dir_override = value
+      end
+
       def dir
+        override = test_dir_override
+        return override.to_s if override && !override.to_s.empty?
         base = ENV['APPDATA'] || Dir.tmpdir
         File.join(base, 'NOXUN', 'Engine')
       end

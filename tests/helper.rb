@@ -127,6 +127,7 @@ unless NxTest::IN_SKETCHUP
     core/materials_decor
     core/materials_abs
     core/materials_project
+    core/materials_migration
     core/abs_rules
     core/hardware_rules
     modules/shelves
