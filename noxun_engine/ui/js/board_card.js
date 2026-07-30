@@ -80,7 +80,8 @@
     regroupBoardEdges(v);
     if (window.sketchup && sketchup.set_board_material)
       sketchup.set_board_material(JSON.stringify({ board_id: boardCard.board_id, material_id: v,
-        create_missing_abs: !!createAbs }));
+        create_missing_abs: !!createAbs,
+        catalog_schema: NX.catalogSchemaNow ? NX.catalogSchemaNow() : 1 }));
   }
   // F3/N7: prekresli options ABS selectov dosky podla materialu (2A-3b:
   // parameter je material_id), zachova hodnotu (aj F5).
@@ -119,7 +120,8 @@
     if (!boardCard) return;
     flushBoardEditsNow();
     if (window.sketchup && sketchup.set_board_edges_all)
-      sketchup.set_board_edges_all(JSON.stringify({ board_id: boardCard.board_id, create_missing_abs: !!createAbs }));
+      sketchup.set_board_edges_all(JSON.stringify({ board_id: boardCard.board_id, create_missing_abs: !!createAbs,
+        catalog_schema: NX.catalogSchemaNow ? NX.catalogSchemaNow() : 1 }));
   }
 
   // Zapis hodnoty len ked pole NEMA fokus — refresh z backendu nesmie prepisat

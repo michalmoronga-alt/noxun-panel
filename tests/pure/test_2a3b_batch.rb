@@ -344,3 +344,50 @@ NxTest.test('2a3b: ensure — doska SO strukturou dedi strukturu, universal sa N
     NxTest.refute(rec.key?('universal'))
   end
 end
+
+# ---------------------------------------------------------------------------
+# GH #91 kolo 1: zamok + fresh load, branded edge-only zakaz
+# ---------------------------------------------------------------------------
+
+NxTest.test('2a3b: GH P2 — NOVA znackova skupina bez dosky sa nezaklada (edge-only si zamkne identitu)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  b3_with_catalog([], []) do
+    ok, err = B3MAT.add_decor_batch(b3_attrs('sheet_variants' => []))
+    NxTest.refute(ok, 'znackova edge-only davka sa odmietne')
+    NxTest.assert(err.include?('aspoň jednu dosku'), err)
+    # vlastna (bez vyrobcu) edge-only skupina je legalna
+    ok2, res2 = B3MAT.add_decor_batch(b3_attrs('sheet_variants' => [], 'manufacturer' => '',
+                                               'decor' => 'VlastnaPaska', 'decor_name' => ''))
+    NxTest.assert(ok2, res2.inspect)
+    NxTest.assert_equal(1, res2['edges'].length)
+    # pridanie pasky do EXISTUJUCEJ znackovej skupiny (doska uz stoji) funguje
+    ok3, res3 = B3MAT.add_decor_batch(b3_attrs)
+    NxTest.assert(ok3, res3.inspect)
+    ok4, res4 = B3MAT.add_decor_batch(b3_attrs('sheet_variants' => [],
+                                               'edge_variants' => [{ 'width' => 43.0, 'thickness' => 1.0, 'structure' => 'ST9' }]))
+    NxTest.assert(ok4, res4.inspect)
+    NxTest.assert_equal(1, res4['edges'].length, 'edge-only do existujucej znackovej skupiny presiel')
+  end
+end
+
+NxTest.test('2a3b: GH P1 — batch bezi nad CERSTVYM obsahom (cudzi zapis pred zamkom sa neprepise)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  b3_with_catalog([], []) do
+    ok, res = B3MAT.add_decor_batch(b3_attrs)
+    NxTest.assert(ok, res.inspect)
+    # "iny proces": zapise dalsi zaznam PRIAMO do suboru (cache o nom nevie)
+    raw = JSON.parse(File.binread(B3MAT.path))
+    cudzia = raw['edges'].first.merge('abs_id' => 'ABS_CUDZIA_43X10', 'width' => 43.0)
+    raw['edges'] << cudzia
+    File.binwrite(B3MAT.path, JSON.pretty_generate(raw))
+    # batch s TOU ISTOU 43-kou: fresh load pod zamkom ju musi vidiet -> skip,
+    # a cudzi zaznam NESMIE zmiznut zo suboru
+    ok2, res2 = B3MAT.add_decor_batch(b3_attrs('sheet_variants' => [],
+                                               'edge_variants' => [{ 'width' => 43.0, 'thickness' => 1.0, 'structure' => 'ST9' }]))
+    NxTest.refute(ok2, 'vsetko uz existuje = davka nic nevytvorila')
+    NxTest.assert(res2.include?('už v katalógu'), res2.to_s)
+    after = JSON.parse(File.binread(B3MAT.path))
+    NxTest.assert(after['edges'].any? { |a| a['abs_id'] == 'ABS_CUDZIA_43X10' },
+                  'cudzi zapis prezil davku')
+  end
+end

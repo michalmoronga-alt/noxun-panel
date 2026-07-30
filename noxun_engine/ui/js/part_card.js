@@ -122,7 +122,8 @@
     // D-41: cabinet_id = identity guard (Ruby zahodi echo po prekliknuti na iny korpus)
     if (window.sketchup && sketchup.set_part_material)
       sketchup.set_part_material(JSON.stringify({ role_key: partCard.role_key, material_id: v,
-        cabinet_id: partCard.cabinet_id, create_missing_abs: !!createAbs }));
+        cabinet_id: partCard.cabinet_id, create_missing_abs: !!createAbs,
+        catalog_schema: NX.catalogSchemaNow ? NX.catalogSchemaNow() : 1 }));
   }
   // F3/N7: prekresli options KAZDEHO ABS selectu dielca podla materialu (2A-3b:
   // parameter je material_id), zachova hodnotu (aj mimo katalogu — F5).
@@ -166,7 +167,8 @@
     if (!partCard) return;
     if (window.sketchup && sketchup.set_part_edges_all)
       sketchup.set_part_edges_all(JSON.stringify({ cabinet_id: partCard.cabinet_id, role_key: partCard.role_key,
-        create_missing_abs: !!createAbs }));
+        create_missing_abs: !!createAbs,
+        catalog_schema: NX.catalogSchemaNow ? NX.catalogSchemaNow() : 1 }));
   }
   // Klik na hranu v 2D dielci -> fokus jej dropdownu (delegovane, poucenie z drag fixu).
   function setupPartSvgDelegation(){

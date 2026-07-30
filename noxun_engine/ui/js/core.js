@@ -372,7 +372,10 @@
     module.exports = { groupAbsEdges: groupAbsEdges, absOptionsHtml: absOptionsHtml, normDecor: normDecor,
       absUsableExists: absUsableExists,
       // 2A-3b (tests/js/test_abs_mirror.js) — ciste funkcie zrkadla SCHEMA 2
+      // catalogSchemaNow: GH #91 P2 — modal callbacky posielaju client schemu
+      // (server ensure inak drzi legacy default a v SCHEMA 2 odmietne tvorbu).
       identityNorm: identityNorm, catalogSchemaOf: catalogSchemaOf,
+      catalogSchemaNow: catalogSchemaNow,
       groupAbsEdgesV2: groupAbsEdgesV2, groupAbsForSheet: groupAbsForSheet,
       absUsableExistsV2: absUsableExistsV2, absUsableForSheet: absUsableForSheet,
       absMissingLabel: absMissingLabel, absUnitClass: absUnitClass,

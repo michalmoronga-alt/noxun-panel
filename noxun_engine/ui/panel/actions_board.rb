@@ -62,7 +62,7 @@ module Noxun
           # remapom (hrubka dosky nasleduje novy sheet, kompat kontrola netreba).
           abs_note = ''
           if data['create_missing_abs']
-            ok_abs, abs_note = ensure_missing_abs(mat)
+            ok_abs, abs_note = ensure_missing_abs(mat, client_schema: data['catalog_schema'])
             return set_status(abs_note, true) unless ok_abs
           end
           cfg = Store.config(board) || {}
@@ -153,7 +153,7 @@ module Noxun
           abs_note = ''
           # D-41 C2: dovytvorenie pasky pred bulkom (modal flag; server overi znova).
           if data['create_missing_abs'] && cfgb['material_id']
-            ok_abs, abs_note = ensure_missing_abs(cfgb['material_id'])
+            ok_abs, abs_note = ensure_missing_abs(cfgb['material_id'], client_schema: data['catalog_schema'])
             return set_status(abs_note, true) unless ok_abs
           end
           abs_id, decor = bulk_abs_for(cfgb)

@@ -414,8 +414,6 @@ module Noxun
         return [false, 'Smer dekoru musí byť length/width/none.'] unless GRAINS.include?(grain)
         color = normalize_rgb(attrs['color'] || attrs[:color], [216, 196, 160])
 
-        ok_g, group = resolve_batch_group(manufacturer, decor, decor_name)
-        return [false, group] unless ok_g
         ok_s, sheet_entries = parse_sheet_entries_v3(attrs, type)
         return [false, sheet_entries] unless ok_s
         ok_e, edge_entries = parse_edge_entries_v3(attrs)
@@ -426,6 +424,23 @@ module Noxun
         return [false, edge_items] unless ok_de
         if sheet_items.empty? && edge_items.empty?
           return [false, 'Zadaj aspoň jeden variant dosky alebo ABS pásku.']
+        end
+
+        # GH #91 P1: CELE read-modify-write pod JEDNYM medziprocesovym zamkom
+        # (reentrantny with_catalog_lock z 2A-2) + cerstvy load (invalidate —
+        # cache by mohla drzat ~1 s stary obsah spred cudzieho zapisu). Dva
+        # sucasne batche z dvoch SketchUpov sa serializuju; neskorsi vidi
+        # zapisy skorsieho (dup checky aj resolve skupiny bezia nad cerstvym).
+        with_catalog_lock do
+        JsonFileStore.invalidate(path)
+        ok_g, group = resolve_batch_group(manufacturer, decor, decor_name)
+        return [false, group] unless ok_g
+        # GH #91 P2: NOVA znackova skupina bez jedinej dosky sa zaklada NESMIE —
+        # vyrobcu nesie doska (standard 7.5), edge-only zapis by identitu
+        # skupiny stratil a group_id by ostal navzdy zablokovany koliziou.
+        # Pridavanie pasok do EXISTUJUCEJ znackovej skupiny funguje normalne.
+        if group['new'] && !manufacturer.empty? && sheet_items.empty?
+          return [false, 'Značková skupina potrebuje pri založení aspoň jednu dosku (výrobcu nesie doska) — pridaj dosku alebo výrobcu vynechaj.']
         end
 
         gid = group['group_id']
@@ -478,8 +493,11 @@ module Noxun
         if created_sheets.empty? && created_edges.empty?
           return [false, "Všetky zadané varianty už v katalógu sú (#{skipped.join(', ')})."]
         end
-        return [false, 'Zápis katalógu zlyhal.'] unless write(data)
+        # write_unlocked — zamok uz drzime (with_catalog_lock je reentrantny,
+        # ale priama cesta je bez zbytocneho druheho handle).
+        return [false, 'Zápis katalógu zlyhal.'] unless write_unlocked(data)
         [true, { 'sheets' => created_sheets, 'edges' => created_edges, 'skipped' => skipped }]
+        end
       end
 
       # 2A-3b (audit B4): skupina davky. NAJPRV presna obchodna identita
@@ -511,7 +529,9 @@ module Noxun
         if reg.key?(gid)
           return [false, "Kolízia identifikátora skupiny (#{gid}) s inou skupinou — nahlás tento stav."]
         end
-        [true, { 'group_id' => gid, 'decor_name' => decor_name }]
+        # 'new' => true: skupina davkou VZNIKA (GH #91 P2 — znackova nova
+        # skupina vyzaduje aspon jednu dosku, vid guard v add_decor_batch_v3).
+        [true, { 'group_id' => gid, 'decor_name' => decor_name, 'new' => true }]
       end
 
       # Existujuce skupiny katalogu: group_id => {manufacturer, decor, decor_name}.
