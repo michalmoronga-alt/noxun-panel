@@ -1416,13 +1416,10 @@ module NoxunSuRunner
       ok('2A-2: zmazana paska uz v katalogu nie je',
          e::Materials.edge('ABS_PRACOVNA_DOSKA_10').nil?)
 
-      # rebuild korpusu nad SCHEMA 2 katalogom — stare ID funguju dalej
-      p2 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
-      e::CabinetBuilder.rebuild(model, inst, p2)
-      cfg = e::Store.config(inst) || {}
-      ok('2A-2: rebuild po migracii OK a material drzi povodne ID',
-         inst.valid? && cfg['material_id'] == 'K009_PW_DTDL_18')
-
+      # BOM + semafor NAD STARYMI SNAPSHOTMI (pred rebuildom — presne stav
+      # "stary .skp otvoreny po migracii"): zachovane ID citaju dalej, zmazana
+      # paska = RED abs_missing. (Rebuild by referenciu cez normalized_abs_id
+      # legalne zmenil na "bez ABS" — preto sa semafor overuje PRED nim.)
       collected = e::Bom.collect(model)
       mats = collected[:records].map { |r| r['material_id'] }.uniq
       ok('2A-2: BOM cita zachovane ID dielcov aj dosky', mats.include?('K009_PW_DTDL_18'))
@@ -1436,6 +1433,15 @@ module NoxunSuRunner
          missing.first['part_key'] == 'cabinet/side:right')
       ok('2A-2: ziadny RED material pre zachovane ID',
          control['items'].none? { |i| i['category'] == 'material' })
+
+      # rebuild korpusu nad SCHEMA 2 katalogom — stare ID funguju dalej
+      p2 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+      e::CabinetBuilder.rebuild(model, inst, p2)
+      cfg = e::Store.config(inst) || {}
+      ok('2A-2: rebuild po migracii OK a material drzi povodne ID',
+         inst.valid? && cfg['material_id'] == 'K009_PW_DTDL_18')
+      mats2 = e::Bom.collect(model)[:records].map { |r| r['material_id'] }.uniq
+      ok('2A-2: BOM po rebuilde stale cita zachovane ID', mats2.include?('K009_PW_DTDL_18'))
 
       # remap_edges nad migrovanym katalogom (nove dekory skupin)
       remapped, lost = e::Materials.remap_edges({ 'L1' => 'ABS_K009_10' }, 'K009', 'U750', 18.0)
