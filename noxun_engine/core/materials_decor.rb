@@ -173,8 +173,18 @@ module Noxun
       # SERVEROVA autorita modalu (JS checku sa neveri — audit BLOCKER 3): stav sa
       # overi znova a zapis bezi az po vsetkych kontrolach (audit FIX 8). Katalogovy
       # zapis je MIMO model undo — volajuci to hlasi pouzivatelovi (NOTE 9).
-      # Vrati [:exists|:created, abs_id] alebo [:no_sheet|:no_standard_width|:write_failed, nil].
-      def ensure_edge_for_sheet(material_id)
+      # 2A-2 (audit BLOCKER 2): client_schema = schema KLIENTA (panel z CEF cache
+      # ju zatial neposiela => default legacy). Po migracii katalogu na SCHEMA 2
+      # stary klient pasku NEVYTVORI — dostal by legacy zapis bez identitnych
+      # poli (rovnaky kontrakt ako schema_write_allowed?). Pri katalogu SCHEMA 1
+      # sa spravanie NEMENI ani o chlp (dormantnost davky 2A-2).
+      # Vrati [:exists|:created, abs_id] alebo
+      # [:schema_read_only|:no_sheet|:no_standard_width|:write_failed, nil].
+      def ensure_edge_for_sheet(material_id, client_schema: SCHEMA_LEGACY)
+        server = catalog_schema
+        if server >= SCHEMA_GROUPS && client_schema.to_i < server
+          return [:schema_read_only, nil]
+        end
         s = sheet(material_id)
         return [:no_sheet, nil] unless s
         th = s['thickness'].to_f
