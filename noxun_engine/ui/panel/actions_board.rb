@@ -67,13 +67,23 @@ module Noxun
           end
           cfg = Store.config(board) || {}
           params = { 'material_id' => mat }
+          new_sheet = Materials.sheet(mat)
           remap, lost, remap_warnings = remap_edges_for_material(cfg, mat)
           params['edges'] = remap if remap
           # Codex GH #90 P1/P2: zmena materialu robi stare pick warnings
           # neplatnymi — v SCHEMA 2 sa NAHRADIA cerstvymi z remapu (aj uspesny
-          # 1,5 fallback, aj stratene hrany); prazdne pole stare polozky zmaze.
-          params['warnings'] = remap_warnings unless remap_warnings.nil?
-          new_sheet = Materials.sheet(mat)
+          # 1,5 fallback, aj stratene hrany). NAVYSE (2. kolo): nil hrany so
+          # ulozenym warningom = zlyhane defaulty — picker sa pre ne spusti nad
+          # NOVYM sheetom (doplni pasku alebo da cerstvy warning).
+          unless remap_warnings.nil?
+            base_edges = remap || (cfg['edges'].is_a?(Hash) ? cfg['edges'].dup : nil)
+            refill, refill_warnings = BoardBuilder.repick_failed_defaults(cfg, base_edges, new_sheet)
+            unless refill.empty?
+              base_edges = (base_edges || {}).merge(refill)
+              params['edges'] = base_edges
+            end
+            params['warnings'] = remap_warnings + refill_warnings
+          end
           params['grain_direction'] = 'none' if new_sheet && new_sheet['grain'].to_s == 'none'
           msg = 'Materiál dosky nastavený.'
           msg += ' ABS hrany prevedené na nový dekor.' if remap
@@ -130,21 +140,10 @@ module Noxun
           label = edges[code] ? 'nastavená' : 'bez ABS'
           params = { 'edges' => edges }
           # Codex GH #90 P2: vedoma zmena hrany zneplatni ulozene pick warnings
-          # tejto hrany (ostatne polozky ostavaju — carry-over v normalize).
-          pruned = prune_edge_warnings(cfg['warnings'], [code])
+          # LEN tejto hrany (agregat sa deli, zvysne hrany ostavaju — 2. kolo).
+          pruned = BoardBuilder.prune_edge_warnings(cfg['warnings'], [code], cfg['name'])
           params['warnings'] = pruned unless pruned.nil?
           apply_board(model, board, params, "Hrana #{code} — #{label}.")
-        end
-
-        # Odstrani z ulozenych warnings polozky viazane na dane hrany (podla
-        # data.edges z pick_warnings). nil = nebolo co menit (kluc sa neposiela).
-        def prune_edge_warnings(stored, codes)
-          return nil unless stored.is_a?(Array) && !stored.empty?
-          keep = stored.reject do |w|
-            edges = w.is_a?(Hash) ? (w['data'].is_a?(Hash) ? w['data']['edges'] : nil) : nil
-            Array(edges).any? { |c| codes.include?(c.to_s) }
-          end
-          keep.length == stored.length ? nil : keep
         end
 
         # D-35: olepenie VSETKYCH 4 hran dosky jednym klikom — ABS 1.0 mm dekoru
@@ -170,7 +169,7 @@ module Noxun
           params = { 'edges' => AbsRules.uniform_edges(abs_id) }
           # Codex GH #90 P2: bulk vedome prepisuje VSETKY 4 hrany — stare pick
           # warnings hran su neplatne (prune vsetkych EDGE_KEYS polozek).
-          pruned = prune_edge_warnings(cfgb['warnings'], %w[L1 L2 W1 W2])
+          pruned = BoardBuilder.prune_edge_warnings(cfgb['warnings'], %w[L1 L2 W1 W2], cfgb['name'])
           params['warnings'] = pruned unless pruned.nil?
           apply_board(model, board, params, "#{bulk_done_msg(abs_id, decor)}#{abs_note}")
         end

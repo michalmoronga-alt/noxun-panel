@@ -615,18 +615,24 @@ module Noxun
               issues = []
             end
             next unless remapped
+            # GH #90 P2 (2. kolo): sticky zaznamy sa aktualizuju PER SPRACOVANA
+            # hrana — nil hrany remap preskakuje a ich lost-warningy MUSIA
+            # prezit (celoplosne delete by ich zahodilo, hoci hrana ostava
+            # nevyriesena). Spracovana = mala hodnotu a zmenila sa / dostala issue.
+            processed = rec['edges'].keys.select do |c|
+              old_v = rec['edges'][c]
+              !old_v.nil? && (remapped[c] != old_v || issues.any? { |n| n[:code] == c })
+            end
             rec['edges'] = remapped
-            # Codex GH #90 P1: remapove dovody (stratena hrana AJ uspesny 1,5
-            # fallback) sa ZAPISU k overridu — resolve_part ich emituje do
-            # KONTROLY, kym hodnota hrany zodpoveda zaznamu (stale_edge_warning?);
-            # uzivatelova zmena hrany ich prirodzene zmaze. Prazdny vysledok
-            # kluc odstrani (config bez zbytocnych poli).
-            if issues.empty?
+            ew = rec['edge_warnings'].is_a?(Hash) ? rec['edge_warnings'].dup : {}
+            processed.each { |c| ew.delete(c) }
+            issues.each do |n|
+              ew[n[:code]] = { 'reason' => n[:reason].to_s, 'abs_id' => n[:abs_id] }
+            end
+            if ew.empty?
               rec.delete('edge_warnings')
             else
-              rec['edge_warnings'] = issues.each_with_object({}) do |n, m|
-                m[n[:code]] = { 'reason' => n[:reason].to_s, 'abs_id' => n[:abs_id] }
-              end
+              rec['edge_warnings'] = ew
             end
             result['changed'] += 1
             lost.each { |code| result['lost'] << "#{pd[:name] || rk} #{code}" }

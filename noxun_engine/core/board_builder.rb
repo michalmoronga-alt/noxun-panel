@@ -445,6 +445,57 @@ module Noxun
           out
         end
 
+        # GH #90 P2 (2. kolo): odstrani z ulozenych warnings LEN dane hrany —
+        # agregovana polozka (data.edges [L1, W1]) sa NEzahodi cela, zvysne
+        # hrany dostanu preformatovany zaznam (rovnaky pick_warnings kanal).
+        # Vrati nove pole, alebo nil = nebolo co menit.
+        def prune_edge_warnings(stored, codes, name)
+          return nil unless stored.is_a?(Array) && !stored.empty?
+          changed = false
+          keep = stored.filter_map do |w|
+            d = w.is_a?(Hash) ? w['data'] : nil
+            edges = d.is_a?(Hash) ? d['edges'] : nil
+            next w unless edges.is_a?(Array)
+            remaining = edges.map(&:to_s) - codes.map(&:to_s)
+            if remaining.length == edges.length
+              w
+            else
+              changed = true
+              next nil if remaining.empty?
+              entries = remaining.map do |c|
+                { code: c, reason: w['code'].to_s, part_key: (w['part_key'] || PART_KEY).to_s, name: name.to_s }
+              end
+              AbsRules.pick_warnings(entries).first
+            end
+          end
+          changed ? keep : nil
+        end
+
+        # GH #90 P2 (2. kolo): nil hrana s ulozenym pick warningom = ZLYHANY
+        # DEFAULT (nie vedome "bez ABS" — to warning nema). Pri zmene materialu
+        # sa pre tieto hrany picker spusti nad NOVYM sheetom: najde pasku =
+        # hrana sa doplni, nenajde = cerstvy warning k novemu sheetu (stary by
+        # klamal o starej skupine). Vrati [refill mapa, fresh warnings].
+        def repick_failed_defaults(cfg, edges_map, new_sheet)
+          stored = cfg['warnings'].is_a?(Array) ? cfg['warnings'] : []
+          failed = EDGE_KEYS.select do |c|
+            (edges_map.is_a?(Hash) ? edges_map[c] : nil).nil? &&
+              stored.any? do |w|
+                d = w.is_a?(Hash) ? w['data'] : nil
+                d.is_a?(Hash) && Array(d['edges']).map(&:to_s).include?(c)
+              end
+          end
+          return [{}, []] if failed.empty? || new_sheet.nil? || !defined?(AbsRules)
+          collector = []
+          fresh = AbsRules.resolve_edges(cfg['role'], new_sheet['decor'], new_sheet['thickness'],
+                                         sheet: new_sheet, collector: collector)
+          refill = {}
+          failed.each { |c| refill[c] = fresh.is_a?(Hash) ? fresh[c] : nil }
+          entries = collector.select { |it| failed.include?(it[:code]) }
+                             .map { |it| it.merge(part_key: PART_KEY, name: cfg['name'].to_s) }
+          [refill, AbsRules.pick_warnings(entries)]
+        end
+
         def norm_quantity(p)
           v = raw(p, :quantity)
           n = v.to_s.strip.empty? ? DEFAULTS[:quantity] : v.to_i

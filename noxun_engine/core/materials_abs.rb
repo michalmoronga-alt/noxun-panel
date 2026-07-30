@@ -93,6 +93,13 @@ module Noxun
         [nil, REASON_ABS_NOMINAL]
       end
 
+      # Sirkova pouzitelnost pasky pre cielovu hrubku dielca (bez sirky =
+      # univerzalna; inak presah WIDTH_MARGIN ako pick_edge_variant).
+      def edge_fits_width?(rec, part_thickness)
+        w = edge_width(rec)
+        w.nil? || w >= part_thickness.to_f + WIDTH_MARGIN - 0.001
+      end
+
       # Pasky rovnakej skupiny ako dany zaznam (SCHEMA 2 kluc: group_id, fallback
       # obchodna identita vyrobca+dekor), deterministicky zoradene abs_id.
       def edges_of_group(rec)
@@ -187,8 +194,13 @@ module Noxun
         return [nil, []] unless edges_hash.is_a?(Hash) && old_sheet.is_a?(Hash) && new_sheet.is_a?(Hash)
         old_group = record_group_key(old_sheet, SCHEMA_GROUPS)
         old_st = identity_norm(old_sheet['structure'])
-        same_group = old_group == record_group_key(new_sheet, SCHEMA_GROUPS)
-        return [nil, []] if same_group && old_st == identity_norm(new_sheet['structure'])
+        # GH #90 P1 (2. kolo): rovnaka skupina + struktura uz NIE JE plosny no-op
+        # — zmena HRUBKOVEHO variantu (18 -> 36) moze rucnu pasku sirkovo vyradit
+        # (23 mm paska na 36 mm dielci by presla az do exportu). Paska, ktora
+        # cielovej hrubke sirkovo vyhovuje, sa NEPREPISUJE (rucny vyber drzi);
+        # uzka sa pre-resolvuje v ramci svojej triedy.
+        same_identity = old_group == record_group_key(new_sheet, SCHEMA_GROUPS) &&
+                        old_st == identity_norm(new_sheet['structure'])
         out = edges_hash.dup
         changed = false
         issues = []
@@ -201,6 +213,9 @@ module Noxun
           compatible = rec['universal'] == true ||
                        (!old_st.empty? && identity_norm(rec['structure']) == old_st)
           next unless compatible
+          if same_identity
+            next if target_thickness.nil? || edge_fits_width?(rec, target_thickness)
+          end
           klass = edge_thickness_class(rec['thickness'])
           if klass == :nula4
             issues << { code: code, reason: REASON_ABS_04_MANUAL }

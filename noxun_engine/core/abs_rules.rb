@@ -284,6 +284,10 @@ module Noxun
           "#{who}: hrany #{edges_txt} bez ABS — žiadna páska skupiny nemá použiteľnú šírku."
         when Materials::REASON_ABS_NOMINAL
           "#{who}: hrany #{edges_txt} bez ABS — skupina nemá pásku žiadanej triedy hrúbky."
+        when Materials::REASON_ABS_04_MANUAL
+          # GH #90 P2 (2. kolo): 0,4 remap NIE JE chyba struktury — paska sa
+          # vedome nenahradza automaticky, naprava je rucny vyber.
+          "#{who}: hrany #{edges_txt} bez ABS — pôvodná 0,4 mm páska sa nenahrádza automaticky, vyber ručne."
         else
           "#{who}: hrany #{edges_txt} bez ABS — skupina nemá pásku so štruktúrou dosky (ani univerzálnu)."
         end
