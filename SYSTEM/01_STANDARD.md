@@ -489,7 +489,10 @@ Každý plošný dielec nesie hrany **per strana** ako dáta (nezávislé od viz
   default (vrátane kontraktu voľnej dosky §8.x), sa tým odteraz myslí trieda „jednotka"
   rozriešená resolverom na dostupnú pásku skupiny. `ensure_edge_for_sheet` (dovytvorenie
   chýbajúcej pásky) tvorí zo štandardných šírok AUTO_WIDTHS {23, 43} a hrúbku volí
-  rovnakým resolverom (0,8 → 1,0 → 1,2; nikdy 0,4).
+  rovnakým resolverom (0,8 → 1,0 → 1,2; nikdy 0,4). Pri doske **bez štruktúry** dostáva
+  dovytvorená páska **`universal: true`** (v skupine bez štruktúr je to jediná cesta k jej
+  použiteľnosti — „vedomosť" príznaku nesie modal potvrdený používateľom); doska so
+  štruktúrou štruktúru dedí a universal sa nenastavuje (2A-3b).
 - Identita ABS variantu (skupina+šírka+hrúbka+štruktúra) je pri edite nemenná.
   Pre VEPO je šírka nepodstatná (hotové rozmery) — význam má pre kusovník a cenovú ponuku.
 - **Dodávateľské polia a cena (D-42):** ABS páska nesie voliteľné `code` + `supplier`
