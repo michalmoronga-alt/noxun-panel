@@ -215,6 +215,25 @@ module Noxun
             # Codex GH P2 (3. kolo): prazdny/whitespace typ by presiel len na
             # triedu String a vyrobil neplatny schema 2 variant.
             reasons << "#{label}: typ musi byt neprazdny text" unless r['type'].is_a?(String) && !r['type'].strip.empty?
+            # Codex GH P2 (5. kolo): neplatny grain by resolve_part ticho zhodil
+            # na none => povolena rotacia = zla orientacia rezu. Enum ako bezny
+            # zapis (GRAINS).
+            if r.key?('grain') && !GRAINS.include?(r['grain'].to_s)
+              reasons << "#{label}: grain musi byt #{GRAINS.join('/')}"
+            end
+            # Codex GH P2 (5. kolo): vyrobca je sucast SCHEMA 2 identity skupiny
+            # — ak si pouzivatel PRED cutoverom zmenil vyrobcu mapovaneho dekoru,
+            # mapa ho nesmie ticho prepisat (preradenie do inej obchodnej
+            # skupiny). Nesulad zaznamu s mapou = nerozhodnutelna polozka.
+            map_target = MIGRATION_MAP[identity_norm(r['decor'])]
+            if map_target
+              rec_man = r['manufacturer'].to_s.strip
+              map_man = map_target['manufacturer'].to_s
+              if !rec_man.empty? && identity_norm(rec_man) != identity_norm(map_man)
+                reasons << "#{label}: vyrobca '#{rec_man}' nesedi s mapou" \
+                           " ('#{map_man.empty? ? 'vlastny (bez vyrobcu)' : map_man}') — zosulad pred migraciou"
+              end
+            end
             # Codex GH P2 (4. kolo): rozsah formatu ako bezny zapis katalogu —
             # mimo rozsahu by vznikla nemenna (identitna pri PD) neopravitelna
             # hodnota, ktoru editor odmieta.
@@ -503,8 +522,13 @@ module Noxun
         target = pre_schema2_backup_path
         if File.exist?(target)
           begin
-            JSON.parse(File.binread(target))
-            return :ok
+            # Codex GH P2 (5. kolo): "platna zaloha" = LEGACY katalogovy objekt
+            # (sheets+edges polia, marker < 2). null/{}/schema 2 payload nie je
+            # predmigracny stav — spoliehat sa nan by zrusilo rollback garanciu.
+            data = JSON.parse(File.binread(target))
+            legacy = data.is_a?(Hash) && data['sheets'].is_a?(Array) &&
+                     data['edges'].is_a?(Array) && data['schema'].to_i < SCHEMA_GROUPS
+            return legacy ? :ok : :backup_corrupt
           rescue StandardError
             return :backup_corrupt
           end

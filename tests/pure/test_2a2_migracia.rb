@@ -404,7 +404,8 @@ NxTest.test('2A-2: zaloha — existujuca platna sa NEPREPISE; poskodena = :backu
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   original = a2_fixture_bytes
   a2_with_catalog(original) do
-    stara = '{"note": "stara predmigracna zaloha"}'
+    # platna zaloha = LEGACY katalogovy objekt (GH 5. kolo — nie lubovolny JSON)
+    stara = a2_variant { |d| a2_sheet_of(d, 'UNI_DTDL_18')['price_per_m2'] = 1.23 }
     File.binwrite(A2MAT.pre_schema2_backup_path, stara)
     rep = A2MAT.migrate_to_schema2!
     NxTest.assert_equal(:ok, rep[:status], rep[:reasons].inspect)
@@ -419,6 +420,35 @@ NxTest.test('2A-2: zaloha — existujuca platna sa NEPREPISE; poskodena = :backu
     NxTest.assert_equal(original, File.binread(A2MAT.path), 'stop bez zapisu')
     NxTest.assert_equal('xx{poskodene', File.binread(A2MAT.pre_schema2_backup_path),
                         'poskodena zaloha sa neprepisuje (posledny predmigracny stav)')
+  end
+  # GH P2 (5. kolo): syntakticky platny NE-katalog (null/{}/schema 2 payload)
+  # nie je predmigracny stav — spoliehat sa nan by zrusilo rollback garanciu.
+  ['null', '{}',
+   '{"schema": 2, "sheets": [], "edges": []}'].each do |zly|
+    a2_with_catalog(original) do
+      File.binwrite(A2MAT.pre_schema2_backup_path, zly)
+      rep = A2MAT.migrate_to_schema2!
+      NxTest.assert_equal(:backup_corrupt, rep[:status], "zaloha '#{zly[0, 20]}' nie je legacy katalog")
+      NxTest.assert_equal(original, File.binread(A2MAT.path), 'stop bez zapisu')
+      NxTest.assert_equal(zly, File.binread(A2MAT.pre_schema2_backup_path), 'zaloha sa neprepisuje')
+    end
+  end
+end
+
+NxTest.test('2A-2: grain enum + drift vyrobcu mapovaneho dekoru = undecidable (GH 5. kolo)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  [
+    [a2_variant { |d| a2_sheet_of(d, 'UNI_DTDL_18')['grain'] = 'diagonal' }, 'grain musi byt'],
+    [a2_variant { |d| a2_sheet_of(d, 'K009_PW_DTDL_18')['manufacturer'] = 'Egger' }, 'nesedi s mapou'],
+    [a2_variant { |d| a2_sheet_of(d, 'UNI_DTDL_18')['manufacturer'] = 'Egger' }, 'nesedi s mapou']
+  ].each do |bytes, expected|
+    a2_with_catalog(bytes) do
+      rep = A2MAT.migrate_to_schema2!
+      NxTest.assert_equal(:undecidable, rep[:status], "ocakavany no-op pre: #{expected}")
+      NxTest.assert(rep[:reasons].any? { |r| r.include?(expected) },
+                    "dovod '#{expected}' chyba v #{rep[:reasons].inspect}")
+      NxTest.assert_equal(bytes, File.binread(A2MAT.path), 'atomicky no-op')
+    end
   end
 end
 
