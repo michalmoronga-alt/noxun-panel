@@ -62,16 +62,25 @@ module Noxun
       # read-only scan vyrobnych part/board snapshotov (resolved material_id
       # na entite, standard 8.3). VEDOME bez sablon (globalna kniznica nie je
       # "pouzitie v projekte") a bez projektovych predvolieb. Nikdy nezapisuje.
-      # Vrati {decor => pocet dielcov} pre pas "Pouzite v projekte".
+      # Vrati mapu {kluc skupiny => pocet kusov} pre pas "Pouzite v projekte".
+      #
+      # 2A-4a (audit B3): kluc mapy je SCHEMA-AWARE — SCHEMA 1 = text dekoru
+      # (dnesne UI), SCHEMA 2 = group_id (rovnake cislo dekoru dvoch vyrobcov
+      # su DVE skupiny a ich pocty sa nesmu zliat; klienta karty skupiny doda
+      # 2A-4b). Zaznam bez group_id (hybridny medzistav) padne na text dekoru.
       def model_decor_usage(model)
         usage = Hash.new(0)
         return {} unless model && defined?(Ids)
-        decor_by_id = {}
-        sheets.each { |s| decor_by_id[s['material_id']] = s['decor'].to_s }
+        schema2 = catalog_schema >= SCHEMA_GROUPS
+        key_by_id = {}
+        sheets.each do |s|
+          gid = schema2 ? s['group_id'].to_s.strip : ''
+          key_by_id[s['material_id']] = gid.empty? ? s['decor'].to_s : gid
+        end
         %w[part board].each do |kind|
           Ids.each_of_kind(model, kind) do |inst|
             cfg = Store.config(inst) || {}
-            d = decor_by_id[cfg['material_id']]
+            d = key_by_id[cfg['material_id']]
             next unless d && !d.empty?
             # Codex GH #75: doska nesie pocet kusov v configu (quantity) — pas
             # musi ratat KUSY ako BOM, nie entity (fallback 1 pre dielce/legacy).

@@ -91,7 +91,26 @@ module Noxun
       # Statusy: :ok | :not_found | :empty | :already | :invalid_schema2 |
       #   :newer_schema | :undecidable | :backup_corrupt | :backup_failed |
       #   :conflict | :write_failed
+      #
+      # 2A-4a (audit F6): CAS konflikt sa POD zamkom reklasifikuje podla
+      # cerstveho obsahu disku — platna kompletna SCHEMA 2 znamena, ze druhy
+      # proces uz zmigroval (= :already, ziadny zapis); cokolvek ine dostane
+      # JEDEN retry celej transformacie nad cerstvym obsahom (novy raw read,
+      # nova validacia — ziadna recyklacia stareho planu). Druhy konflikt po
+      # sebe = :conflict ako doteraz.
       def migrate_to_schema2!(dry_run: false, before_write: nil)
+        report = migrate_schema2_attempt(dry_run: dry_run, before_write: before_write)
+        return report unless report[:status] == :conflict_retry
+        retry_report = migrate_schema2_attempt(dry_run: dry_run, before_write: before_write)
+        retry_report[:status] = :conflict if retry_report[:status] == :conflict_retry
+        retry_report
+      end
+
+      # Jeden pokus migracie (cely: raw read -> brany -> validacia -> plan ->
+      # CAS -> zaloha -> zapis). Interny status :conflict_retry znamena "subor
+      # sa pod nami zmenil na ne-schema-2 obsah" — verejny wrapper vyssie z
+      # neho sprav jeden retry alebo finalny :conflict.
+      def migrate_schema2_attempt(dry_run:, before_write:)
         report = { status: :ok, dry_run: !!dry_run, groups: [], fallback: [],
                    deleted: [], retyped: [], reasons: [], warnings: [] }
         file = path
@@ -148,7 +167,10 @@ module Noxun
             # CAS kontrola (BLOCKER 3): subezna zmena z CEF/druheho procesu sa
             # NESMIE prepisat — bajty musia sediet s prvym citanim. Porovnanie
             # cez .b (kopie v BINARY) — encoding nikdy nesmie rozhodovat.
-            next :conflict if File.binread(file).b != original_bytes.b
+            # 2A-4a (audit F6): nesulad sa klasifikuje POD zamkom podla
+            # cerstveho obsahu (:conflict_already | :conflict_retry).
+            fresh = File.binread(file)
+            next migration_conflict_class(fresh) if fresh.b != original_bytes.b
             # nemenna predmigracna zaloha (FIX 4) az PO CAS — :conflict zalohu
             # ani nevytvori (ziadne subory pri neuspesnom behu).
             backup = ensure_pre_schema2_backup
@@ -165,9 +187,36 @@ module Noxun
           Engine.log_error(e, 'Materials.migrate_to_schema2!') if defined?(Engine)
           :write_failed
         end
+        if status == :conflict_already
+          # Druhy proces uz katalog zmigroval — nie je co robit; cache sa
+          # obnovi na cudzi (novsi) stav a volajuci dostane :already.
+          reload!
+          return report.merge(status: :already)
+        end
+        if status == :conflict_retry
+          # Subor sa pod nami zmenil — cache klame, invalidovat pred retry.
+          JsonFileStore.invalidate(path)
+          return report.merge(status: :conflict_retry)
+        end
         return report.merge(status: status) unless status == :ok
         reload!
         report
+      end
+
+      # Klasifikacia CAS konfliktu POD zamkom (F6): cudzi obsah = platna
+      # KOMPLETNA schema 2 -> :conflict_already (druhy proces uz zmigroval);
+      # cokolvek ine (legacy/hybrid/novsia schema/poskodene) -> :conflict_retry
+      # (retry si obsah precita nanovo a jeho brany daju presny status).
+      def migration_conflict_class(fresh_bytes)
+        parsed = JSON.parse(fresh_bytes.dup)
+        if parsed.is_a?(Hash) && migration_schema_marker(parsed) == SCHEMA_GROUPS &&
+           schema2_complete?(parsed['sheets'], parsed['edges'])
+          :conflict_already
+        else
+          :conflict_retry
+        end
+      rescue StandardError
+        :conflict_retry
       end
 
       # --- krok 1: surove citanie -------------------------------------------
@@ -525,10 +574,10 @@ module Noxun
             # Codex GH P2 (5. kolo): "platna zaloha" = LEGACY katalogovy objekt
             # (sheets+edges polia, marker < 2). null/{}/schema 2 payload nie je
             # predmigracny stav — spoliehat sa nan by zrusilo rollback garanciu.
+            # 2A-4a: jedna autorita tvaru = legacy_catalog_object? (zdiela ju
+            # restore_pre_schema2! v materials_health.rb).
             data = JSON.parse(File.binread(target))
-            legacy = data.is_a?(Hash) && data['sheets'].is_a?(Array) &&
-                     data['edges'].is_a?(Array) && data['schema'].to_i < SCHEMA_GROUPS
-            return legacy ? :ok : :backup_corrupt
+            return legacy_catalog_object?(data) ? :ok : :backup_corrupt
           rescue StandardError
             return :backup_corrupt
           end

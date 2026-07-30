@@ -10,8 +10,12 @@ module Noxun
       module_function
 
       # --- CRUD (UI sprava katalogu je V0.5; teraz staci citanie + seed + zaklad zapisu) -------
+      # 2A-4a (audit B4): kazdy vstup ma vlastny read-only guard (rychle NIE bez
+      # loadu); hlbkova poistka je v write_unlocked — aj cesta, ktora by guard
+      # obisla, konci na zapisovej ceste.
 
       def upsert_sheet(attrs)
+        return false if catalog_read_only?
         rec = normalize_sheet(attrs)
         return false if rec.nil?
         data = load
@@ -20,6 +24,7 @@ module Noxun
       end
 
       def upsert_edge(attrs)
+        return false if catalog_read_only?
         rec = normalize_edge(attrs)
         return false if rec.nil?
         data = load
@@ -28,19 +33,27 @@ module Noxun
       end
 
       def delete_sheet(id)
+        return false if catalog_read_only?
         data = load
         data['sheets'] = data['sheets'].reject { |m| m['material_id'] == id }
         write(data)
       end
 
       def delete_edge(id)
+        return false if catalog_read_only?
         data = load
         data['edges'] = data['edges'].reject { |a| a['abs_id'] == id }
         write(data)
       end
 
+      # 2A-4a (audit B1/B4): seed smie LEN skutocne panensky stav. Poskodeny
+      # primar (existuje -> available?), zaloha .bak alebo predmigracna zaloha
+      # znamenaju OBNOVITELNE data — seed by ich zamaskoval. Read-only rezim
+      # seed tiez nikdy nespusta.
       def ensure_seeded
         return if JsonFileStore.available?(path)
+        return if catalog_read_only?
+        return if File.exist?(pre_schema2_backup_path)
         write({ 'sheets' => seed_sheets, 'edges' => seed_edges })
       end
 
@@ -290,33 +303,50 @@ module Noxun
 
       # Aplikuje patch na zaznam. Vrati [:ok, nil] | [:not_found, nil] |
       # [:conflict, nil] (riadok sa medzitym zmenil) | [:invalid, chyba] |
-      # [:code_conflict, [id...]] (duplicitny kod bez potvrdenia) | [:write_failed, nil].
+      # [:code_conflict, [id...]] (duplicitny kod bez potvrdenia) |
+      # [:write_failed, nil] | [:catalog_read_only, nil] (nudzovy rezim 2A-4a).
+      #
+      # 2A-4a (audit F7): CELY read-compare-modify-write bezi pod JEDNYM
+      # with_catalog_lock nad CERSTVYM obsahom disku — dva procesy s tym istym
+      # row_rev sa uz nemozu navzajom prepisat (druhy dostane :conflict).
+      # Invalidate PRED citanim, aby cache (CHECK_INTERVAL ~1 s) neklamala
+      # o cudzom zapise tesne pred zamkom; record_rev porovnanie bezi vnutri.
       def patch_record(kind, id, patch, row_rev: nil, allow_duplicate_code: false)
-        records = kind == 'edge' ? edges : sheets
+        return [:catalog_read_only, nil] if catalog_read_only?
         idk = kind == 'edge' ? 'abs_id' : 'material_id'
-        existing = records.find { |r| r[idk] == id }
-        return [:not_found, nil] unless existing
-        if row_rev && !row_rev.to_s.empty? && row_rev.to_s != record_rev(existing)
-          return [:conflict, nil]
-        end
-        clean = patch.is_a?(Hash) ? patch.select { |k, _| PATCHABLE.fetch(kind, []).include?(k) } : {}
-        return [:invalid, 'Žiadne editovateľné pole.'] if clean.empty?
-        merged = existing.merge(clean)
-        ok, err = kind == 'edge' ? validate_edge_attrs(merged) : validate_sheet_attrs(merged)
-        return [:invalid, err] unless ok
-        # Codex GH #76: dup kontrola bezi pri zmene kodu AJ dodavatela — patch
-        # LEN dodavatela vie inak vytvorit existujuci par kod+dodavatel potichu.
-        if (clean.key?('code') || clean.key?('supplier')) && !allow_duplicate_code
-          code_val = clean.key?('code') ? clean['code'] : existing['code']
-          unless code_val.to_s.strip.empty?
-            sup = clean.key?('supplier') ? clean['supplier'] : existing['supplier']
-            hits = code_conflicts(code_val, sup, kind, id)
-            return [:code_conflict, hits] unless hits.empty?
+        listk = kind == 'edge' ? 'edges' : 'sheets'
+        with_catalog_lock do
+          JsonFileStore.invalidate(path)
+          data = load
+          records = data[listk]
+          existing = records.find { |r| r[idk] == id }
+          return [:not_found, nil] unless existing
+          if row_rev && !row_rev.to_s.empty? && row_rev.to_s != record_rev(existing)
+            return [:conflict, nil]
           end
+          clean = patch.is_a?(Hash) ? patch.select { |k, _| PATCHABLE.fetch(kind, []).include?(k) } : {}
+          return [:invalid, 'Žiadne editovateľné pole.'] if clean.empty?
+          merged = existing.merge(clean)
+          ok, err = kind == 'edge' ? validate_edge_attrs(merged) : validate_sheet_attrs(merged)
+          return [:invalid, err] unless ok
+          # Codex GH #76: dup kontrola bezi pri zmene kodu AJ dodavatela — patch
+          # LEN dodavatela vie inak vytvorit existujuci par kod+dodavatel potichu.
+          if (clean.key?('code') || clean.key?('supplier')) && !allow_duplicate_code
+            code_val = clean.key?('code') ? clean['code'] : existing['code']
+            unless code_val.to_s.strip.empty?
+              sup = clean.key?('supplier') ? clean['supplier'] : existing['supplier']
+              hits = code_conflicts(code_val, sup, kind, id)
+              return [:code_conflict, hits] unless hits.empty?
+            end
+          end
+          # Zapis priamo do dat v ruke (ziadny druhy load cez upsert) — rovnaka
+          # semantika ako upsert: normalize + reject stareho ID + append.
+          rec = kind == 'edge' ? normalize_edge(merged) : normalize_sheet(merged)
+          return [:invalid, 'Záznam sa nedá uložiť.'] if rec.nil?
+          data[listk] = records.reject { |r| r[idk] == id } + [rec]
+          return [:write_failed, nil] unless write(data)
+          [:ok, nil]
         end
-        saved = kind == 'edge' ? upsert_edge(merged) : upsert_sheet(merged)
-        return [:write_failed, nil] unless saved
-        [:ok, nil]
       end
 
       # --- seed (predvolene zaznamy podla zadania V0.3) ------------------------
