@@ -64,6 +64,10 @@ NxTest.test('demos b1: sanitize_url — allowlist, https, zakaz /vyhledavani aj 
   NxTest.assert_equal(nil, DMS.sanitize_url('https://www.demos-trade.sk/%76yhledavani?q=x')[0],
                       'percent-encoded obideniu zabrani decode (B2)')
   NxTest.assert_equal(nil, DMS.sanitize_url('https://www.demos-trade.sk//vyhledavani')[0], 'dvojita lomka')
+  NxTest.assert_equal(nil, DMS.sanitize_url('https://www.demos-trade.sk/a/../vyhledavani')[0],
+                      'dot segmenty sa rozlisia PRED kontrolou (GH #96 P2)')
+  NxTest.assert_equal(nil, DMS.sanitize_url('https://www.demos-trade.sk/a/%2e%2e/vyhledavani')[0],
+                      'enkodovane dot segmenty tiez')
   NxTest.assert_equal(nil, DMS.sanitize_url('')[0], 'prazdna adresa')
   NxTest.assert_equal(nil, DMS.sanitize_url('nie je url')[0], 'neplatna adresa')
 end
@@ -193,6 +197,24 @@ NxTest.test('demos b1: sitemap refresh — uspech publikuje, zlyhanie child NECH
     NxTest.assert_equal(2, DSC.urls.length, 'stary cache ostal (F11)')
     NxTest.assert_equal(111.0, DSC.load['fetched_at'], 'timestamp povodny')
   end
+  # GH #96 P2: RAISE pri zapise NEsmie nechat refresh visiet — done dostane chybu.
+  db1_with_transport(
+    DSC::INDEX_URL => [200, {}, index_xml],
+    'https://www.demos-trade.sk/content/sitemaps/domain_8_sitemap.8.xml' => [200, {}, child_xml]
+  ) do
+    orig = Noxun::Engine::JsonFileStore.method(:write)
+    begin
+      Noxun::Engine::JsonFileStore.define_singleton_method(:write) { |*_| raise IOError, 'disk full (test)' }
+      got = nil
+      DSC.refresh!(now: 333.0) { |r| got = r }
+      NxTest.refute(got.nil?, 'done sa MUSI zavolat aj pri zapisovej vynimke')
+      NxTest.refute(got['ok'])
+      NxTest.assert(got['error'].to_s.include?('cache'), got.inspect)
+    ensure
+      Noxun::Engine::JsonFileStore.define_singleton_method(:write, orig)
+    end
+    NxTest.assert_equal(111.0, DSC.load['fetched_at'], 'stary cache neporuseny')
+  end
 ensure
   File.delete(DSC.path) if File.exist?(DSC.path)
   Noxun::Engine::JsonFileStore.invalidate(DSC.path)
@@ -267,6 +289,13 @@ NxTest.test('demos b1: parser PD fixture — kod, ceny s/bez DPH, parametre, 21 
   NxTest.assert_close(110.08, dtdl18['price_vat'], 0.001, 'mobil kopia doplnila s DPH')
   NxTest.assert_close(89.49, dtdl18['price_no_vat'], 0.001)
   NxTest.assert(dtdl18['url'].include?('dtdl-h3303-st10'), 'URL pre retazenie fetchov')
+  # GH #96 P1: jednotka pri related cene (dosky ks, ABS m) — bez nej sa cena
+  # neda bezpecne prepocitat na katalogovu.
+  NxTest.assert_equal('ks', dtdl18['unit'], 'doska za kus')
+  abs43 = r['related'].find { |x| x['code'] == '311204' }
+  NxTest.assert_equal('m', abs43 && abs43['unit'], 'ABS za meter')
+  # GH #96 P2: znacka z itemprop markup-u.
+  NxTest.assert_equal('Egger', r['brand'])
 end
 
 NxTest.test('demos b1: parser DTDL fixture + neprodukova stranka') do
@@ -305,6 +334,25 @@ NxTest.test('demos b1: identity_match? — dekor/struktura/hrubka/format proti z
   dtdl = rec.merge('type' => 'DTDL', 'sheet_size' => [9999.0, 1.0])
   NxTest.assert(DPP.identity_match?(parsed, dtdl.merge('thickness' => 38.0)),
                 'format sa NEporovnava pri type bez formatu v identite')
+  # GH #96 P1: CHYBAJUCI parameter na stranke NIE JE zhoda — kazdy komponent,
+  # ktory zaznam ma, musi byt na stranke pritomny.
+  bare = { 'ok' => true, 'params' => { 'decor' => 'H3303' } }
+  NxTest.refute(DPP.identity_match?(bare, rec), 'stranka bez struktury/hrubky/formatu nematchne')
+  NxTest.refute(DPP.identity_match?(bare, rec.reject { |k, _| k == 'structure' }),
+                'chybajuca hrubka na stranke nematchne')
+  norec = { 'decor' => 'H3303', 'type' => 'DTDL' }
+  NxTest.assert(DPP.identity_match?(bare, norec),
+                'zaznam BEZ struktury/hrubky matchne na dekore (nema co overovat)')
+end
+
+NxTest.test('demos b1: matcher — dva identity-satisfying slugy = ambiguous (GH #96 P2)') do
+  urls = ['https://www.demos-trade.sk/dtdl-k009-pw-dub-kratky-2800-2070-18/',
+          'https://www.demos-trade.sk/dtdl-k009-pw-dub-s-dlhsim-nazvom-line-2800-2070-18/']
+  rec = { 'material_id' => 'X', 'decor' => 'K009', 'structure' => 'PW', 'type' => 'DTDL',
+          'thickness' => 18.0, 'sheet_size' => [2800.0, 2070.0] }
+  r = DSM.match(rec, urls)
+  NxTest.assert_equal('ambiguous', r['status'], 'dlzka slugu nie je dokaz ekvivalencie')
+  NxTest.assert_equal(2, r['candidates'].length)
 end
 
 NxTest.test('demos b1: normalize_html — entity, NBSP, mojibake nezhodi parser') do

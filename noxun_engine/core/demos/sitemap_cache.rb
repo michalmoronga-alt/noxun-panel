@@ -77,8 +77,16 @@ module Noxun
           if products.empty?
             return done.call('ok' => false, 'error' => 'sitemap bez URL — cache ostáva pôvodná')
           end
-          ok = JsonFileStore.write(path, 'fetched_at' => now, 'urls' => products)
-          return done.call('ok' => false, 'error' => 'zápis cache zlyhal') unless ok
+          # GH #96 P2: zapisova chyba (read-only profil, plny disk) RAISNE — bez
+          # rescue by ju spolkol HTTP callback wrapper a done by sa NIKDY
+          # nezavolal (visiaci refresh bez hlasky).
+          ok = begin
+            JsonFileStore.write(path, 'fetched_at' => now, 'urls' => products)
+          rescue StandardError => e
+            Engine.log_error(e, 'DemosSitemapCache.write') if defined?(Engine)
+            false
+          end
+          return done.call('ok' => false, 'error' => 'zápis cache zlyhal — stará cache ostáva') unless ok
           return done.call('ok' => true, 'count' => products.length)
         end
         current = remaining.first

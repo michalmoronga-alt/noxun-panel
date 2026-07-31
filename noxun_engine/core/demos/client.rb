@@ -55,11 +55,21 @@ module Noxun
         [uri.to_s, nil]
       end
 
-      # Percent-decode + kolaps lomiek — guard nesmie obist %2F/%76 zapisy.
+      # Percent-decode + kolaps lomiek + ROZLISENIE dot segmentov (GH #96 P2:
+      # /a/../vyhledavani by po normalizacii na origine skoncil na zakazanom
+      # endpointe) — guard nesmie obist %2F/%76/%2e zapisy ani "..".
       def decoded_path(uri)
         path = uri.path.to_s
         decoded = path.gsub(/%([0-9a-fA-F]{2})/) { [Regexp.last_match(1)].pack('H2') }
-        decoded.squeeze('/').downcase
+        stack = []
+        decoded.squeeze('/').split('/').each do |seg|
+          case seg
+          when '', '.' then next
+          when '..' then stack.pop
+          else stack << seg
+          end
+        end
+        "/#{stack.join('/')}".downcase
       end
 
       # Redirect location -> absolutna URL (relativne dopln z povodnej).
@@ -179,14 +189,32 @@ module Noxun
         return finish(block, 'ok' => false, 'url' => url.to_s, 'error' => err) unless clean
         t = transport
         return finish(block, 'ok' => false, 'url' => clean, 'error' => 'sieťový transport nie je dostupný') unless t
-        wait = reserve_slot!
-        run_after(wait) do
-          bytes = limit == :sitemap ? MAX_SITEMAP_BYTES : MAX_BODY_BYTES
-          t.start(clean, bytes) do |status, headers, body, terr|
-            handle_response(clean, status, headers, body, terr, limit, redirects_left, block)
-          end
-        end
+        start_when_slot_free(t, clean, limit, redirects_left, block)
         true
+      end
+
+      # GH #96 P2: rezervovany slot sa pri ODPALENI timera znovu overi — busy
+      # UI thread vie nahromadene timery vystrelit naraz a bez re-checku by
+      # requesty isli burstom pod crawl-delay. Realny start caka, kym nadide
+      # JEHO slot (wall clock), pripadne sa preplanuje o zvysok.
+      def start_when_slot_free(t, url, limit, redirects_left, block, slot_at = nil)
+        now = monotonic_now
+        slot_at ||= now + reserve_slot!(now)
+        remaining = slot_at - now
+        # Cakat sa da len s UI timerom (SketchUp); headless testy startuju hned
+        # (fake transport, throttle aritmetiku kryje vlastny test).
+        if remaining > 0.05 && timers_available?
+          run_after(remaining) { start_when_slot_free(t, url, limit, redirects_left, block, slot_at) }
+          return
+        end
+        bytes = limit == :sitemap ? MAX_SITEMAP_BYTES : MAX_BODY_BYTES
+        t.start(url, bytes) do |status, headers, body, terr|
+          handle_response(url, status, headers, body, terr, limit, redirects_left, block)
+        end
+      end
+
+      def timers_available?
+        defined?(UI) && UI.respond_to?(:start_timer)
       end
 
       def handle_response(url, status, headers, body, terr, limit, redirects_left, block)
@@ -218,7 +246,7 @@ module Noxun
 
       # Async cakanie: SketchUp UI.start_timer; headless (testy) synchronne.
       def run_after(seconds)
-        if seconds.positive? && defined?(UI) && UI.respond_to?(:start_timer)
+        if seconds.positive? && timers_available?
           UI.start_timer(seconds, false) { yield }
         else
           yield

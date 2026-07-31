@@ -98,8 +98,10 @@ module Noxun
           return nil unless contains_seq?(parts, toks['back_decor'])
           return nil if toks['back_structure'] && !contains_seq?(parts, toks['back_structure'])
         end
-        # Vsetko sedi — kratsi slug (bez dedup sufixu) ma prednost.
-        100 - parts.length
+        # GH #96 P2: dlzka slugu NIE JE dokaz ekvivalencie (iny nazvovy usek /
+        # dedup sufix moze byt INY produkt) — vsetci identity-satisfying su
+        # ROVNOCENNI kandidati; 2+ = ambiguous a vybera pouzivatel.
+        1
       end
 
       # --- normalizacia -------------------------------------------------------

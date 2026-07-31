@@ -44,8 +44,8 @@ module Noxun
         out['title'] = capture(html, /<h1[^>]*>\s*([^<]+?)\s*<\/h1>/m)
         parse_main_price(html, out)
         out['params'] = parse_params(html)
-        out['brand'] = capture(html, /Značka\s*<\/t[dh]>\s*<td[^>]*>\s*([^<]+?)\s*</m) ||
-                       capture(html, /Značka<\/dt>\s*<dd[^>]*>\s*([^<]+?)\s*</m)
+        # GH #96 P2: znacka je vnorena (<span itemprop="brand">Egger</span>).
+        out['brand'] = capture(html, /itemprop="brand"[^>]*>\s*([^<]+?)\s*</m)
         out['related'] = parse_related(html, out['warnings'])
         out
       end
@@ -121,6 +121,9 @@ module Noxun
           name_m = row.match(%r{__cell--title[^>]*>\s*(?:<a[^>]*>)?\s*([^<]{3,180}?)\s*<}m)
           prices = row.scan(/(\d[\d ]*,\d+|\d[\d ]*)\s*EUR/).flatten.map { |v| num(v) }.compact
           vat_flag = row.include?('s DPH')
+          # GH #96 P1: related riadky miesaju EUR/ks (dosky) a EUR/m (ABS) —
+          # jednotka sa MUSI niest, inak sa cena neda bezpecne prepocitat.
+          unit_m = row.match(%r{EUR\s*(?:<br\s*/?>)?\s*/\s*(ks|m2|m|bal)\b}m)
           # Desktop kopia riadku ma OBE ceny (bez + s DPH), mobilna len jednu
           # (s DPH) — jedina cena s priznakom s DPH NEsmie skoncit v no_vat.
           no_vat, vat = if prices.length >= 2
@@ -135,6 +138,7 @@ module Noxun
           # Title bunka byva graficky link — citatelny nazov sa vezme zo slugu.
           name = url.split('/').reject(&:empty?).last.to_s.tr('-', ' ') if name.empty?
           rec = { 'name' => name, 'code' => code_m[2], 'url' => url,
+                  'unit' => (unit_m ? unit_m[1] : nil),
                   'price_no_vat' => no_vat, 'price_vat' => vat }
           key = "#{rec['code']}|#{rec['url']}"
           if (prev = rows[key])
@@ -146,6 +150,11 @@ module Noxun
               elsif rec[f] && prev[f].nil?
                 prev[f] = rec[f]
               end
+            end
+            if rec['unit'] && prev['unit'] && rec['unit'] != prev['unit']
+              conflicted[key] = true
+            elsif rec['unit'] && prev['unit'].nil?
+              prev['unit'] = rec['unit']
             end
           else
             rows[key] = rec
@@ -168,21 +177,26 @@ module Noxun
       # typoch s formatom v identite) — cez kanonicke normalizacie Materials.
       # Zastena rub a ABS strukturu nad RELATED polozkami riesi B-2 apply; TU
       # sa overuje HLAVNY produkt stranky proti cielovemu zaznamu.
+      # GH #96 P1: kazdy identity komponent, ktory ma CIELOVY zaznam, musi byt
+      # na stranke PRITOMNY a ZHODNY — chybajuci parameter (Demos zmeni markup)
+      # NIE JE zhoda, inak by stacil spravny dekor a kod/cena ineho variantu by
+      # presli guardom.
       def identity_match?(parsed, sheet_record)
         p = parsed['params'] || {}
         return false unless p['decor'] &&
                             Materials.identity_norm(p['decor']) == Materials.identity_norm(sheet_record['decor'])
-        if p['structure'] && !sheet_record['structure'].to_s.strip.empty? &&
-           Materials.identity_norm(p['structure']) != Materials.identity_norm(sheet_record['structure'])
-          return false
+        unless sheet_record['structure'].to_s.strip.empty?
+          return false unless p['structure'] &&
+                              Materials.identity_norm(p['structure']) == Materials.identity_norm(sheet_record['structure'])
         end
-        if p['thickness'] && sheet_record['thickness'] &&
-           (Materials.thickness_key(p['thickness']) - Materials.thickness_key(sheet_record['thickness'])).abs > 0.011
-          return false
+        if sheet_record['thickness']
+          return false unless p['thickness'] &&
+                              (Materials.thickness_key(p['thickness']) -
+                               Materials.thickness_key(sheet_record['thickness'])).abs <= 0.011
         end
-        if Materials.format_in_identity?(sheet_record['type']) && p['format'] &&
+        if Materials.format_in_identity?(sheet_record['type']) &&
            (want = Materials.size_key(sheet_record['sheet_size']))
-          return false unless Materials.size_key(p['format']) == want
+          return false unless p['format'] && Materials.size_key(p['format']) == want
         end
         true
       end
