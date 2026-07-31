@@ -93,6 +93,13 @@ module Noxun
           if duplak?(source)
             return [:invalid, 'Zdroj je sám duplák — reťazenie duplákov nie je povolené.']
           end
+          # 2B-2 (GH #95 P2): duplak je korpusovy koncept (lepene DTDL/MDF) —
+          # typy s formatom v identite (PD, zastena) sa nelepia; duplak by
+          # navyse nezvladol first-fill rubu zdroja (immutable kopie by sa
+          # rozisli s identitou zdroja). Server zakazuje, UI to ani neponuka.
+          if format_in_identity?(source['type']) || double_sided_type?(source['type'])
+            return [:invalid, 'Duplák sa robí z korpusových dosiek (DTDL/MDF) — PD a zástena sa nelepia.']
+          end
           rec = duplak_record_from(source, mult)
           if (dup = data['sheets'].find { |s| identity_keys_tolerant?(sheet_identity_key(rec), sheet_identity_key(s)) })
             return [:duplicate, dup['material_id']]

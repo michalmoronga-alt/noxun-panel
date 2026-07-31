@@ -204,7 +204,12 @@ module Noxun
         def sheet_label(s, ctx = label_ctx)
           th = s['thickness'].to_f
           thl = (th == th.round ? th.round : th)
-          "#{label_base(s, s['manufacturer'], ctx)} · #{s['type']} #{thl} mm"
+          # 2B-2 (GH #95 P1): varianty s formatom v identite (PD/zastena) sa mozu
+          # lisit LEN formatom alebo rubom — selecty (Inspector, projektove
+          # predvolby) musia rozdiel ukazat, inak sa da vybrat nespravny vyrobny
+          # material. Pripona (format + rub) je core helper — VZDY, nie len pri
+          # kolizii (deterministicke texty; testovatelne headless).
+          "#{label_base(s, s['manufacturer'], ctx)} · #{s['type']} #{thl} mm#{Materials.sheet_label_suffix(s)}"
         end
 
         # D-41: paska so sirkou "dekor 22/1 mm" (sirka/hrubka — Michalov zapis),

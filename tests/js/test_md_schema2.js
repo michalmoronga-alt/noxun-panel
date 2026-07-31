@@ -195,4 +195,12 @@ ok(zdl.sub.indexOf('rub K552 RT') >= 0, 'sub riadok nesie rub');
 const zdl2 = M.sheetDimLabel({ type: 'ZASTENA', thickness: 10, back_decor: 'K552' });
 ok(zdl2.sub === 'rub K552', 'rub bez formatu aj bez struktury');
 
+// --- GH #95 P2: rub je hladatelny (mdMatchGroup) -----------------------------
+const ZG = { decor: 'K551', decor_name: '', manufacturer: 'Kronospan',
+  sheets: [{ material_id: 'Z1', type: 'ZASTENA', thickness: 10, back_decor: 'K552', back_structure: 'RT' }],
+  edges: [] };
+ok(M.mdMatchGroup(ZG, 'k552'), 'hladanie podla rubu najde skupinu');
+ok(M.mdMatchGroup(ZG, 'rt') || M.mdMatchGroup(ZG, 'RT'.toLowerCase()), 'hladanie podla struktury rubu');
+ok(!M.mdMatchGroup(ZG, 'k999'), 'nezname cislo nematchne');
+
 console.log(JSON.stringify({ passed: n, failed: 0 }));

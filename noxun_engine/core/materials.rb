@@ -754,6 +754,24 @@ module Noxun
         entry ? entry['double_sided'] == true : false
       end
 
+      # 2B-2 (GH #95 P1): pripona labelu variantu pre selecty — format pre typy
+      # s formatom v identite + rub zasteny. Varianty lisiace sa LEN formatom
+      # alebo rubom by inak boli v selecte nerozlisitelne a dal by sa vybrat
+      # nespravny vyrobny material. Core helper (headless testovatelny) —
+      # Panel.sheet_label ho appenduje k zakladu s koliznym aparatom.
+      def sheet_label_suffix(s)
+        out = +''
+        if format_in_identity?(s['type']) && (fmt = size_key(s['sheet_size']))
+          out << " #{fmt.map { |x| x == x.round ? x.round.to_s : x.to_s }.join('×')}"
+        end
+        back = s['back_decor'].to_s.strip
+        unless back.empty?
+          bs = s['back_structure'].to_s.strip
+          out << " /#{back}#{bs.empty? ? '' : " #{bs}"}"
+        end
+        out
+      end
+
       # GH P2: kluc kvantizuje mm na 0,01 — HRANICNA dvojica (18.004 vs 18.006)
       # by sa v kluci rozisla, hoci legacy tolerancia (abs < 0.01) ju drzala ako
       # jeden variant. Duplicitne guardy preto porovnavaju kluce s toleranciou

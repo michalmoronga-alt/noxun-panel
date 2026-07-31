@@ -148,6 +148,33 @@ NxTest.test('2b2: required_schema_for — obsah urcuje minimalnu schemu') do
   ))
 end
 
+# --- GH #95 review fixy ------------------------------------------------------
+
+NxTest.test('2b2 gh95: duplak sa NEvyraba z PD ani zasteny (format-identity typy)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  zs_with_catalog([zs_sheet,
+                   zs_sheet('material_id' => 'F800_PD_38', 'type' => 'PD', 'thickness' => 38.0,
+                            'sheet_size' => [4100.0, 600.0], 'group_id' => 'GRP-F800', 'decor' => 'F800')]) do
+    state, msg = ZMAT.create_duplak_sheet('K551_ZASTENA_10', 2)
+    NxTest.assert_equal(:invalid, state, 'zastena nie je zdroj duplaku')
+    NxTest.assert(msg.to_s.include?('nelepia'), msg.inspect)
+    state2, = ZMAT.create_duplak_sheet('F800_PD_38', 2)
+    NxTest.assert_equal(:invalid, state2, 'PD nie je zdroj duplaku')
+  end
+end
+
+NxTest.test('2b2 gh95: sheet_label_suffix — format (PD/zastena) a rub rozlisia varianty v selecte') do
+  a = ZMAT.sheet_label_suffix(zs_sheet('back_decor' => 'K552', 'back_structure' => 'RT'))
+  b = ZMAT.sheet_label_suffix(zs_sheet('back_decor' => 'K553'))
+  NxTest.refute(a == b, 'rozny rub = rozna pripona labelu (P1)')
+  NxTest.assert(a.include?('/K552 RT'), "pripona nesie rub (#{a})")
+  NxTest.assert(a.include?('4100×640'), "pripona nesie format (#{a})")
+  pd = ZMAT.sheet_label_suffix('type' => 'PD', 'thickness' => 38.0, 'sheet_size' => [4100.0, 600.0])
+  NxTest.assert_equal(' 4100×600', pd, 'PD pripona = format')
+  dtdl = ZMAT.sheet_label_suffix('type' => 'DTDL', 'thickness' => 18.0, 'sheet_size' => [2800.0, 2070.0])
+  NxTest.assert_equal('', dtdl, 'DTDL priponu nema (format nie je identita)')
+end
+
 NxTest.test('2b2: batch parse — ZASTENA variant bez formatu = chyba davky (F10)') do
   ok, err = ZMAT.send(:parse_sheet_entries_v3, { 'sheet_variants' => [
     { 'type' => 'ZASTENA', 'thickness' => 10 }

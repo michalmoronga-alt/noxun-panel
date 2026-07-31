@@ -551,6 +551,13 @@ module Noxun
           data.delete('source_multiplier')
           ok, err = Materials.validate_sheet_attrs(data)
           return set_status(err, true) unless ok
+          # 2B-2 (GH #95 P2): rub vyzaduje skupinovu schemu — v legacy katalogu
+          # (hold/nerozhodnutelna migracia) by zapis so SCHEMA 4 targetom padol
+          # na group_id kontrole s generickou hlaskou. Jasne NIE s navodom.
+          if !data['back_decor'].to_s.strip.empty? &&
+             Materials.catalog_schema < Materials::SCHEMA_GROUPS
+            return set_status('Rub zásteny vyžaduje katalóg po migrácii na skupiny (2A) — dokonči migráciu, potom rub doplň.', true)
+          end
           th = data['thickness'].to_s.tr(',', '.').to_f
 
           if create

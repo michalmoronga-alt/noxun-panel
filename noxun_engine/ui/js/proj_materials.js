@@ -180,6 +180,10 @@
     for (var i = 0; i < vs.length; i++){
       if (String(vs[i].code || '').toLowerCase().indexOf(q) >= 0) return true;
       if (String(vs[i].supplier || '').toLowerCase().indexOf(q) >= 0) return true;
+      // 2B-2 (GH #95 P2): rub zasteny je objednavkova identita — "K552" musi
+      // najst skupinu K551/K552 (aj struktura rubu).
+      if (String(vs[i].back_decor || '').toLowerCase().indexOf(q) >= 0) return true;
+      if (String(vs[i].back_structure || '').toLowerCase().indexOf(q) >= 0) return true;
       if (String(vs[i].structure || '').toLowerCase().indexOf(q) >= 0) return true;
     }
     return false;
@@ -1127,12 +1131,15 @@
       color: hexToRgb(el('ms_color').value),
       family: el('ms_family').value,
       manufacturer: el('ms_manufacturer').value,
-      // 2B-2: rub zasteny — posiela sa vzdy (server typovu platnost strazi;
-      // pre ne-zastenu su polia skryte a prazdne).
-      back_decor: el('ms_back_decor').value,
-      back_structure: el('ms_back_structure').value,
       allow_duplicate_code: mdDupAllow === 'sheet' // potvrdenie duplicitneho kodu (2. ulozenie)
     };
+    // 2B-2 (GH #95 P2): rub polia idu do payloadu LEN pri type Zastena —
+    // zmena typu formular len skryje, hodnoty by inak leteli na server a ten
+    // by save odmietal kvoli poliam, ktore uz nie su vidiet.
+    if (mdZastena(payload.type)){
+      payload.back_decor = el('ms_back_decor').value;
+      payload.back_structure = el('ms_back_structure').value;
+    }
     // D-19: format platne sa posiela LEN ako kompletny platny par; polovicny
     // alebo neplatny vstup zastavi ulozenie (ziadne tiche 0/reset — Codex F4).
     var sl = mdSheetDim(el('ms_sheet_l').value);
