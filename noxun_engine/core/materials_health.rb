@@ -123,7 +123,14 @@ module Noxun
       # hybrid bez group_id NESMIE bezat ako zapisovatelny katalog).
       def assess_catalog_schema(data)
         marker = schema_of(data)
-        return [:ok, nil] if marker < SCHEMA_GROUPS
+        if marker < SCHEMA_GROUPS
+          # GH #92 P1: platny JSON s NEVALIDNYM legacy tvarom ({}, sheets nie je
+          # pole) NESMIE byt :ok — catalog by ho ticho nahradil seedmi a CRUD
+          # by obnovitelny subor prepisal.
+          return [:ok, nil] if legacy_catalog_object?(data)
+          return [:read_only,
+                  'katalóg má poškodený tvar (sheets/edges nie sú polia) — oprav súbor alebo obnov zálohu']
+        end
         if marker == SCHEMA_GROUPS
           return [:ok, nil] if schema2_complete?(data['sheets'], data['edges'])
           return [:read_only,
@@ -278,6 +285,14 @@ module Noxun
             deploy_bytes(rolled, File.binread(path))
           end
           deploy_bytes(path, bytes)
+          # GH #92 P1: aj .bak je sucastou rollback transakcie — stale SCHEMA 2
+          # zaloha by pri najblizsom probleme primaru "obnovila" migrovany stav
+          # a potichu zvratila rollback napriek hold flagu.
+          bak = "#{path}.bak"
+          if File.exist?(bak)
+            deploy_bytes(timestamped_free_path('materials.json.bak.pre-rollback'), File.binread(bak))
+          end
+          deploy_bytes(bak, bytes)
           JsonFileStore.invalidate(path)
           assess_catalog! # reentrantny zamok; obnoveny legacy katalog = :ok
           if defined?(Engine)

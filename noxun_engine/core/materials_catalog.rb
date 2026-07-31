@@ -14,36 +14,50 @@ module Noxun
       # loadu); hlbkova poistka je v write_unlocked — aj cesta, ktora by guard
       # obisla, konci na zapisovej ceste.
 
+      # GH #92 P1: kazdy RMW mutator bezi CELY pod zamkom s cerstvym loadom
+      # (stale snapshot by prepisal subezny cudzi zapis — vzor batch v3/ensure).
       def upsert_sheet(attrs)
         return false if catalog_read_only?
         rec = normalize_sheet(attrs)
         return false if rec.nil?
-        data = load
-        data['sheets'] = data['sheets'].reject { |m| m['material_id'] == rec['material_id'] } + [rec]
-        write(data)
+        with_catalog_lock do
+          JsonFileStore.invalidate(path)
+          data = load
+          data['sheets'] = data['sheets'].reject { |m| m['material_id'] == rec['material_id'] } + [rec]
+          write_unlocked(data)
+        end
       end
 
       def upsert_edge(attrs)
         return false if catalog_read_only?
         rec = normalize_edge(attrs)
         return false if rec.nil?
-        data = load
-        data['edges'] = data['edges'].reject { |a| a['abs_id'] == rec['abs_id'] } + [rec]
-        write(data)
+        with_catalog_lock do
+          JsonFileStore.invalidate(path)
+          data = load
+          data['edges'] = data['edges'].reject { |a| a['abs_id'] == rec['abs_id'] } + [rec]
+          write_unlocked(data)
+        end
       end
 
       def delete_sheet(id)
         return false if catalog_read_only?
-        data = load
-        data['sheets'] = data['sheets'].reject { |m| m['material_id'] == id }
-        write(data)
+        with_catalog_lock do
+          JsonFileStore.invalidate(path)
+          data = load
+          data['sheets'] = data['sheets'].reject { |m| m['material_id'] == id }
+          write_unlocked(data)
+        end
       end
 
       def delete_edge(id)
         return false if catalog_read_only?
-        data = load
-        data['edges'] = data['edges'].reject { |a| a['abs_id'] == id }
-        write(data)
+        with_catalog_lock do
+          JsonFileStore.invalidate(path)
+          data = load
+          data['edges'] = data['edges'].reject { |a| a['abs_id'] == id }
+          write_unlocked(data)
+        end
       end
 
       # 2A-4a (audit B1/B4): seed smie LEN skutocne panensky stav. Poskodeny

@@ -539,3 +539,63 @@ NxTest.test('2A-4a F6: dvojity konflikt = :conflict, posledna cudzia zmena nedot
     NxTest.refute(File.exist?(A4MAT.pre_schema2_backup_path), 'konflikt zalohu nevytvara')
   end
 end
+
+# ---------------------------------------------------------------------------
+# GH #92 kolo 1 (3x P1)
+# ---------------------------------------------------------------------------
+
+NxTest.test('2a4a: GH P1 — platny JSON s nevalidnym legacy tvarom = :read_only (ziadne tiche seedy)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  ['{}', '{"std": 1, "sheets": "nie-pole", "edges": []}'].each do |zly|
+    a4_with_catalog(zly.b) do
+      state, reason = A4MAT.assess_catalog!
+      NxTest.assert_equal(:read_only, state, "tvar '#{zly[0, 25]}' nesmie byt :ok")
+      NxTest.assert(reason.to_s.include?('tvar'), reason.to_s)
+      NxTest.refute(A4MAT.upsert_sheet('material_id' => 'X', 'decor' => 'X', 'type' => 'DTDL',
+                                       'thickness' => 18.0), 'mutacie zamknute')
+      NxTest.assert_equal(zly, File.binread(A4MAT.path), 'subor bajtovo nedotknuty (ziadne seedy)')
+    end
+  end
+end
+
+NxTest.test('2a4a: GH P1 — mutator vidi cerstvy obsah (cudzi zapis pred zamkom prezije upsert)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  a4_with_catalog(a4_legacy_bytes) do
+    A4MAT.catalog # warm cache
+    raw = JSON.parse(File.binread(A4MAT.path))
+    raw['sheets'] << { 'material_id' => 'CUDZI_18', 'decor' => 'Cudzi Dekor', 'type' => 'DTDL',
+                       'thickness' => 18.0, 'grain' => 'length', 'color' => [9, 9, 9],
+                       'production_class' => 'sheet' }
+    File.binwrite(A4MAT.path, JSON.pretty_generate(raw))
+    NxTest.assert(A4MAT.upsert_sheet('material_id' => 'NOVY_18', 'decor' => 'Novy Dekor',
+                                     'type' => 'DTDL', 'thickness' => 18.0, 'grain' => 'length',
+                                     'color' => [1, 1, 1]), 'upsert presiel')
+    after = JSON.parse(File.binread(A4MAT.path))
+    ids = after['sheets'].map { |s| s['material_id'] }
+    NxTest.assert(ids.include?('CUDZI_18'), 'cudzi zapis PREZIL upsert (fresh load pod zamkom)')
+    NxTest.assert(ids.include?('NOVY_18'))
+  end
+end
+
+NxTest.test('2a4a: GH P1 — rollback obnovi aj .bak (stale SCHEMA 2 zaloha nemoze zvratit rollback)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  s2 = JSON.pretty_generate(a4_schema2_data).b
+  a4_with_catalog(s2) do
+    File.binwrite(A4MAT.pre_schema2_backup_path, a4_legacy_bytes)
+    File.binwrite("#{A4MAT.path}.bak", s2) # stale post-migracna zaloha
+    ok, rep = A4MAT.restore_pre_schema2!
+    NxTest.assert(ok, rep.inspect)
+    NxTest.assert_equal(a4_legacy_bytes, File.binread("#{A4MAT.path}.bak"),
+                        '.bak je po rollbacku legacy (sucast transakcie)')
+    quarantined = Dir[File.join(A4MAT.dir, 'materials.json.bak.pre-rollback-*.json')]
+    NxTest.assert_equal(1, quarantined.length, 'stara .bak odlozena, nie zmazana')
+    NxTest.assert_equal(s2, File.binread(quarantined[0]))
+    # a assess po "strate" primaru uz NEobnovi schema 2
+    FileUtils.rm_f(A4MAT.path)
+    A4STORE.invalidate(A4MAT.path)
+    state, = A4MAT.assess_catalog!
+    NxTest.assert_equal(:ok, state, 'obnova z .bak da LEGACY katalog (rollback drzi)')
+    NxTest.assert(A4MAT.catalog_schema < 2, 'primar obnoveny z legacy .bak')
+    quarantined.each { |f| FileUtils.rm_f(f) }
+  end
+end

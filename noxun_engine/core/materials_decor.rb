@@ -76,6 +76,11 @@ module Noxun
       # spravanie (group_id sa ignoruje).
       def rename_decor(old_decor, new_decor, group_id: nil)
         return [false, catalog_read_only_message] if catalog_read_only?
+        # GH #92 P1: CELA transakcia (resolve + load + validacie + zapis) pod
+        # zamkom nad CERSTVYM obsahom — stale whole-catalog snapshot uz nemoze
+        # prepisat subezny cudzi zapis (patch/ensure/batch z ineho procesu).
+        with_catalog_lock do
+        JsonFileStore.invalidate(path)
         return rename_decor_group(old_decor, new_decor, group_id) if catalog_schema >= SCHEMA_GROUPS
         from = old_decor.to_s.strip
         to = new_decor.to_s.strip
@@ -99,6 +104,7 @@ module Noxun
         return [false, "Premenovaním by vznikli duplicitné varianty (#{dup}) — zlúčenie nie je možné."] if dup
         return [false, 'Zápis katalógu zlyhal.'] unless write(data)
         [true, changed]
+        end
       end
 
       # 2A-4a (audit B3): cielova skupina operacie v SCHEMA 2 katalogu.
@@ -212,6 +218,9 @@ module Noxun
       # len jednoznacny fallback) — rovnaky dispatch ako rename_decor.
       def set_decor_manufacturer(decor, manufacturer, clear: false, group_id: nil)
         return [false, catalog_read_only_message] if catalog_read_only?
+        # GH #92 P1: rovnaka kriticka sekcia ako rename (viz komentar tam).
+        with_catalog_lock do
+        JsonFileStore.invalidate(path)
         if catalog_schema >= SCHEMA_GROUPS
           return set_decor_manufacturer_group(decor, manufacturer, clear: clear, group_id: group_id)
         end
@@ -233,8 +242,9 @@ module Noxun
           changed += 1
         end
         return [false, 'Dekor nemá dosky (výrobcu nesie doska).'] if changed.zero?
-        return [false, 'Zápis katalógu zlyhal.'] unless write(data)
+        return [false, 'Zápis katalógu zlyhal.'] unless write_unlocked(data)
         [true, changed]
+        end
       end
 
       # SCHEMA 2 vetva set_decor_manufacturer: meni vyrobcu VYHRADNE doskam
