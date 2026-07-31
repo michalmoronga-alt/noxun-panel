@@ -135,9 +135,14 @@
     (BOM.sheet_estimate || []).forEach(function(e){ est[e.material_id] = e; });
     // 2B-1 (D-43): duplak vazby z BOM riadkov — duplak material nema vlastnu
     // platnu (kupuje sa zdroj), jeho bunka odhadu to povie namiesto pomlcky.
+    // GH #94 P2: rovnaky material moze niest ROZNE vazby (katalog zmeneny medzi
+    // rebuildmi — BOM ich drzi oddelene v kluci), preto zoznam, nie posledna.
     var dupSrc = {};
     (BOM.rows || []).forEach(function(r){
-      if (r.material_source) dupSrc[r.material_id] = r.material_source;
+      if (!r.material_source) return;
+      var lbl = 'lepí sa ' + r.material_source.multiplier + '× z ' + esc(r.material_source.material_id);
+      var list = dupSrc[r.material_id] = dupSrc[r.material_id] || [];
+      if (list.indexOf(lbl) < 0) list.push(lbl);
     });
     var seen = {};
     var h = '<table class="bomtab"><thead><tr><th>Materiál</th><th>m²</th><th>dielcov</th><th>Formát</th><th>Platne (odhad)</th></tr></thead><tbody>';
@@ -150,7 +155,7 @@
       var ds = dupSrc[s.material_id];
       if (!e && ds){
         fmt = '—';
-        pl = 'lepí sa ' + ds.multiplier + '× z ' + esc(ds.material_id);
+        pl = ds.join(' · ');
       }
       var m2cell = '<b>' + num(s.m2, 2) + '</b>';
       if (e && e.doubled_m2){

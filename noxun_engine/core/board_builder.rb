@@ -69,6 +69,16 @@ module Noxun
             edges: norm_edges(p, sheet, picker_issues),
             quantity: norm_quantity(p)
           }
+          # 2B-1 (GH #94 P2): duplak vazba zo SNAPSHOTU sa nesie cez normalize —
+          # board_config ju pouzije ako carry-over, ked katalog vazbu pre tento
+          # material uz nema (iny stroj / kolizia mien). Len uplny tvar.
+          ms = raw(p, :material_source)
+          if ms.is_a?(Hash)
+            src = (ms['material_id'] || ms[:material_id]).to_s
+            mult = ms['multiplier'] || ms[:multiplier]
+            out[:material_source] = { 'material_id' => src, 'multiplier' => mult.to_i } if
+              !src.strip.empty? && mult.is_a?(Integer) && mult >= 2
+          end
           if raw(p, :edges).is_a?(Hash)
             # Codex GH #90 P2: picker NEBEZAL (edges prisli v configu — bezny
             # rebuild po zmene mena/rozmerov) => ulozene warnings sa PRENASAJU,
@@ -139,16 +149,20 @@ module Noxun
             grain_direction: cfg[:grain_direction],
             edges: cfg[:edges]
           }
-          # 2B-1 (D-43): duplak vazba do vyrobneho snapshotu dosky. Doska vzdy
-          # vyzaduje katalogovy material (validate_config!), takze autorita je
-          # VYHRADNE katalog — ziadny legacy carry-over ako pri korpuse.
+          # 2B-1 (D-43): duplak vazba do vyrobneho snapshotu dosky. Ked katalog
+          # material POZNA ako duplak, je autoritou (aktualne hodnoty vazby);
+          # inak sa zachova vazba z predosleho snapshotu TOHO ISTEHO materialu
+          # (GH #94 P2 — iny stroj / katalog s rovnakym ID bez duplaku nesmie
+          # snapshot ticho znicit; vazbu odstrani az vedoma zmena materialu,
+          # ktora ju v update ceste zahodi).
           sheet = catalog_sheet(cfg[:material_id])
-          if defined?(Materials) && Materials.duplak?(sheet)
-            out[:material_source] = BuildPlan.validate_material_source!(
-              { 'material_id' => sheet['source_material_id'].to_s,
-                'multiplier' => sheet['source_multiplier'].to_i }, where: 'doska'
-            )
-          end
+          ms = if defined?(Materials) && Materials.duplak?(sheet)
+                 { 'material_id' => sheet['source_material_id'].to_s,
+                   'multiplier' => sheet['source_multiplier'].to_i }
+               else
+                 cfg[:material_source]
+               end
+          out[:material_source] = BuildPlan.validate_material_source!(ms, where: 'doska') if ms
           # 2A-3 (audit B2): warnings POSLEDNEJ stavby — kluc sa uklada LEN ked
           # nieco vzniklo (SCHEMA 1 config ostava bajtovo identicky s dneskom).
           w = cfg[:warnings]
@@ -218,7 +232,15 @@ module Noxun
         # (scale absorpcia V0.4.7d). transparent: pripoji operaciu k predchadzajucej.
         def rebuild(model, inst, params, transform: nil, op_name: 'NOXUN: Uprav dosku', transparent: false)
           bid = board_id!(inst)
-          merged = config_to_params(Store.config(inst) || {}).merge(stringify(params))
+          stored = config_to_params(Store.config(inst) || {})
+          incoming = stringify(params)
+          merged = stored.merge(incoming)
+          # 2B-1 (GH #94 P2): vedoma zmena materialu = stara duplak vazba patri
+          # STAREMU materialu a nesmie sa preniest — nova sa odvodi z katalogu.
+          if incoming.key?('material_id') &&
+             present(incoming['material_id']).to_s != stored['material_id'].to_s
+            merged.delete('material_source')
+          end
           cfg = normalize(merged)
           validate_config!(cfg)
           ensure_root!(model)

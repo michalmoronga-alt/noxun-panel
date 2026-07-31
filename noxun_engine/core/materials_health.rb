@@ -297,9 +297,17 @@ module Noxun
         # 2B-1: marker 2 aj 3 (duplak) su zname schemy tejto verzie — obe stoja
         # na skupinovej identite, hybrid bez group_id je read-only pre obe.
         if marker <= SCHEMA_CURRENT
-          return [:ok, nil] if schema2_complete?(data['sheets'], data['edges'])
-          return [:read_only,
-                  "katalóg má marker SCHEMA #{marker}, ale záznamy nie sú kompletné (hybrid bez group_id) — oprav súbor alebo obnov zálohu"]
+          unless schema2_complete?(data['sheets'], data['edges'])
+            return [:read_only,
+                    "katalóg má marker SCHEMA #{marker}, ale záznamy nie sú kompletné (hybrid bez group_id) — oprav súbor alebo obnov zálohu"]
+          end
+          # GH #94 P2: nekonzistentne duplak vazby (chybajuci zdroj, zly nasobic,
+          # retaz) = read-only — buildery by ich interpretovali naslepo a odhad
+          # platni by ucotoval plochu zlemu materialu.
+          if (dup_err = duplak_integrity_error(data['sheets']))
+            return [:read_only, "katalóg má nekonzistentné duplák väzby (#{dup_err}) — oprav súbor alebo obnov zálohu"]
+          end
+          return [:ok, nil]
         end
         [:read_only, "katalóg je v novšej schéme (#{marker}), než pozná táto verzia pluginu"]
       end

@@ -364,14 +364,15 @@ module Noxun
             material_source: mat_source }
         end
 
-        # 2B-1 (D-43): duplak vazba do snapshotu dielca. Katalog je autorita, ked
-        # material POZNA (vratane odobratia vazby, ak uz nie je duplak); pri
-        # materiali MIMO katalogu (legacy vynimka korpusov) sa zachova vazba z
-        # predchadzajuceho snapshotu ROVNAKEHO materialu — rebuild na stroji bez
-        # duplaku v katalogu nesmie snapshot ticho zniciť (audit F8).
+        # 2B-1 (D-43): duplak vazba do snapshotu dielca. Ked katalog material
+        # POZNA ako duplak, je autoritou (aktualne hodnoty vazby); inak sa
+        # zachova vazba z predchadzajuceho snapshotu ROVNAKEHO materialu —
+        # rebuild na stroji bez duplaku v katalogu (material mimo katalogu ALEBO
+        # rovnake ID ako non-duplak — GH #94 P2 zrkadlo board cesty) nesmie
+        # snapshot ticho zniciť (audit F8). Vazbu odstrani az vedoma zmena
+        # materialu dielca (iny mat_id => legacy sa nepouzije).
         def material_source_for(mat_id, sheet, legacy)
-          if sheet
-            return nil unless defined?(Materials) && Materials.duplak?(sheet)
+          if defined?(Materials) && sheet && Materials.duplak?(sheet)
             return { 'material_id' => sheet['source_material_id'].to_s,
                      'multiplier' => sheet['source_multiplier'].to_i }
           end

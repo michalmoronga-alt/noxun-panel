@@ -158,6 +158,77 @@ NxTest.test('2b1: write_unlocked drzi marker 3; novsi marker (4) zapis odmietne'
   end
 end
 
+# --- GH #94 review fixy ------------------------------------------------------
+
+NxTest.test('2b1 gh94: duplak_integrity_error — neuplna vazba, visiaci zdroj, retaz') do
+  NxTest.assert_equal(nil, DPMAT.duplak_integrity_error([dp_sheet]), 'katalog bez duplakov OK')
+  ok_dup = dp_sheet('material_id' => 'D36', 'thickness' => 36.0,
+                    'source_material_id' => 'TK_PW_DTDL_18', 'source_multiplier' => 2)
+  NxTest.assert_equal(nil, DPMAT.duplak_integrity_error([dp_sheet, ok_dup]), 'konzistentny duplak OK')
+  half = dp_sheet('material_id' => 'D36', 'source_material_id' => 'TK_PW_DTDL_18')
+  NxTest.assert(DPMAT.duplak_integrity_error([dp_sheet, half]).to_s.include?('neúplnú'), 'vazba bez nasobica')
+  dangling = dp_sheet('material_id' => 'D36', 'source_material_id' => 'NIET', 'source_multiplier' => 2)
+  NxTest.assert(DPMAT.duplak_integrity_error([dp_sheet, dangling]).to_s.include?('neexistujúci'), 'visiaci zdroj')
+  chain_src = dp_sheet('material_id' => 'D36', 'thickness' => 36.0,
+                       'source_material_id' => 'TK_PW_DTDL_18', 'source_multiplier' => 2)
+  chain = dp_sheet('material_id' => 'D72', 'thickness' => 72.0,
+                   'source_material_id' => 'D36', 'source_multiplier' => 2)
+  NxTest.assert(DPMAT.duplak_integrity_error([dp_sheet, chain_src, chain]).to_s.include?('iný duplák'), 'retaz')
+end
+
+NxTest.test('2b1 gh94: assess marker 3 s visiacou vazbou = read-only; write branu neprejde') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  bad = dp_sheet('material_id' => 'D36', 'source_material_id' => 'NIET', 'source_multiplier' => 2)
+  dp_with_catalog([dp_sheet, bad], schema: 3) do
+    state, reason = DPMAT.assess_catalog!
+    NxTest.assert_equal(:read_only, state)
+    NxTest.assert(reason.to_s.include?('duplák'), reason.inspect)
+  end
+  dp_with_catalog([dp_sheet]) do
+    NxTest.refute(DPMAT.upsert_sheet(bad), 'zapis nekonzistentneho duplaku brana odmietne')
+    NxTest.assert_equal(nil, DPMAT.sheet('D36'), 'nic sa nezapisalo')
+  end
+ensure
+  DPMAT.assess_catalog!
+end
+
+NxTest.test('2b1 gh94: board carry-over — katalog non-duplak NEznici snapshot; zmenu vazby riadi katalog') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  bb = Noxun::Engine::BoardBuilder
+  dp_with_catalog([dp_sheet]) do
+    _, rec = DPMAT.create_duplak_sheet('TK_PW_DTDL_18', 2)
+    # (a) katalogovy duplak = autorita vazby
+    cfg = bb.normalize('material_id' => rec['material_id'], 'length' => 700, 'width' => 500)
+    out = bb.board_config(cfg)
+    NxTest.assert_equal({ 'material_id' => 'TK_PW_DTDL_18', 'multiplier' => 2 },
+                        out[:material_source], 'vazba z katalogu')
+    # (b) katalog material pozna ako NON-duplak (iny stroj) — stored vazba prezije
+    cfg2 = bb.normalize('material_id' => 'TK_PW_DTDL_18', 'length' => 700, 'width' => 500,
+                        'material_source' => { 'material_id' => 'INY_SRC', 'multiplier' => 2 })
+    out2 = bb.board_config(cfg2)
+    NxTest.assert_equal({ 'material_id' => 'INY_SRC', 'multiplier' => 2 },
+                        out2[:material_source], 'carry-over zo snapshotu (GH #94 P2)')
+    # (c) bez stored vazby non-duplak material vazbu nema
+    cfg3 = bb.normalize('material_id' => 'TK_PW_DTDL_18', 'length' => 700, 'width' => 500)
+    NxTest.refute(bb.board_config(cfg3).key?(:material_source), 'bezny material bez vazby')
+  end
+end
+
+NxTest.test('2b1 gh94: cabinet material_source_for — non-duplak sheet uz vazbu NEmaze (carry-over)') do
+  cb = Noxun::Engine::CabinetBuilder
+  legacy = { 'material_id' => 'DUP36', 'material_source' => { 'material_id' => 'SRC18', 'multiplier' => 2 } }
+  non_dup_sheet = dp_sheet('material_id' => 'DUP36')
+  NxTest.assert_equal({ 'material_id' => 'SRC18', 'multiplier' => 2 },
+                      cb.send(:material_source_for, 'DUP36', non_dup_sheet, legacy),
+                      'sheet bez duplak vazby = stored vazba prezije')
+  dup_sheet = dp_sheet('material_id' => 'DUP36', 'source_material_id' => 'NOVY_SRC', 'source_multiplier' => 3)
+  NxTest.assert_equal({ 'material_id' => 'NOVY_SRC', 'multiplier' => 3 },
+                      cb.send(:material_source_for, 'DUP36', dup_sheet, legacy),
+                      'katalogovy duplak vazbu aktualizuje')
+  NxTest.assert_equal(nil, cb.send(:material_source_for, 'INY_MAT', nil, legacy),
+                      'zmena materialu dielca = vazba sa neprenasa')
+end
+
 NxTest.test('2b1: assess — marker 3 kompletny je :ok, marker 4 read-only') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   dp_with_catalog([dp_sheet], schema: 3) do

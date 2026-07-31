@@ -262,6 +262,12 @@ module Noxun
           end
           return false
         end
+        # 2B-1 (GH #94 P2): nekonzistentne duplak vazby sa do suboru nedostanu
+        # — rovnaka filozofia ako group_id uplnost vyssie.
+        if target >= SCHEMA_GROUPS && (dup_err = duplak_integrity_error(data['sheets']))
+          Engine.log_error(StandardError.new(dup_err), 'Materials.write_unlocked') if defined?(Engine)
+          return false
+        end
         payload = { 'std' => STD, 'schema' => target,
                     'sheets' => data['sheets'], 'edges' => data['edges'] }
         JsonFileStore.write(path, payload)
@@ -302,6 +308,32 @@ module Noxun
         (sheets_raw + edges_raw).all? do |rec|
           rec.is_a?(Hash) && !rec['group_id'].to_s.strip.empty?
         end
+      end
+
+      # 2B-1 (GH #94 P2): konzistencia duplak vazieb v SUROVYCH zaznamoch —
+      # zdielaju ju assess (zdravie katalogu) aj write_unlocked (brana zapisu).
+      # Nekonzistentny duplak (chybajuci/neplatny nasobic, neexistujuci zdroj,
+      # zdroj sam duplak) by buildery interpretovali naslepo a odhad platni by
+      # ucotoval plochu zlemu materialu. Vrati nil (OK) alebo text problemu.
+      def duplak_integrity_error(sheets_raw)
+        return nil unless sheets_raw.is_a?(Array)
+        by_id = {}
+        sheets_raw.each { |s| by_id[s['material_id'].to_s] = s if s.is_a?(Hash) }
+        sheets_raw.each do |s|
+          next unless s.is_a?(Hash)
+          src_id = s['source_material_id'].to_s.strip
+          mult = s['source_multiplier']
+          next if src_id.empty? && mult.nil?
+          unless !src_id.empty? && mult.is_a?(Integer) && DUPLAK_MULTIPLIERS.include?(mult)
+            return "duplák #{s['material_id']} má neúplnú väzbu na zdroj"
+          end
+          src = by_id[src_id]
+          return "duplák #{s['material_id']} ukazuje na neexistujúci zdroj #{src_id}" unless src
+          unless src['source_material_id'].to_s.strip.empty?
+            return "duplák #{s['material_id']} má za zdroj iný duplák (#{src_id})"
+          end
+        end
+        nil
       end
 
       # Medziprocesovy zamok katalogu (samostatny .lock subor v dir — NIKDY nie
