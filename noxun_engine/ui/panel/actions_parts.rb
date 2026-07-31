@@ -32,7 +32,7 @@ module Noxun
           # zhodila rebuild AZ PO vytvoreni pasky; tu sa overi vopred a nic sa nemeni.
           abs_note = ''
           if data['create_missing_abs'] && mat
-            ok_abs, abs_note = ensure_missing_abs(mat)
+            ok_abs, abs_note = ensure_missing_abs(mat, client_schema: data['catalog_schema'])
             return set_status(abs_note, true) unless ok_abs
           end
           ov = (params['part_overrides'] ||= {})
@@ -66,8 +66,14 @@ module Noxun
         # sheetu (Materials.ensure_edge_for_sheet). Katalogovy zapis je MIMO model
         # undo — pouzivatel bol upozorneny v modale (NOTE 9); hlaska to zopakuje.
         # Vrati [true, note] alebo [false, chyba].
-        def ensure_missing_abs(material_id)
-          status, abs_id = Materials.ensure_edge_for_sheet(material_id)
+        # GH #91 P2: client_schema z payloadu (JS posiela NX.catalogSchemaNow)
+        # — bez neho by ensure v SCHEMA 2 katalogu drzal legacy default a modal
+        # "Vytvorit a pokracovat" by NIKDY nevytvoril pasku (:schema_read_only).
+        # Server schemu overuje sam (ensure_edge_for_sheet guard) — JS sa neveri.
+        def ensure_missing_abs(material_id, client_schema: nil)
+          status, abs_id = Materials.ensure_edge_for_sheet(
+            material_id, client_schema: client_schema.to_i
+          )
           case status
           when :exists
             [true, '']
@@ -166,7 +172,7 @@ module Noxun
           # D-41 C2: modal "Vytvorit a pokracovat" pri bulk olepe — dovytvorenie
           # pred vyberom pasky (server overi vsetko znova, JS checku sa neveri).
           if data['create_missing_abs'] && cfgp['material_id']
-            ok_abs, abs_note = ensure_missing_abs(cfgp['material_id'])
+            ok_abs, abs_note = ensure_missing_abs(cfgp['material_id'], client_schema: data['catalog_schema'])
             return set_status(abs_note, true) unless ok_abs
           end
           abs_id, decor = bulk_abs_for(cfgp)

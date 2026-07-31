@@ -44,10 +44,11 @@
       var row = document.createElement('div'); row.className='edgerow';
       row.innerHTML = '<span class="en"><i style="background:'+absColorOf(absId)+'"></i>'+esc(lbl)+'</span>';
       var sel = document.createElement('select');
-      // D-36: skupiny podla resolved dekoru materialu dielca; curVal drzi hodnotu tejto
+      // D-36: skupiny podla resolved materialu dielca (2A-3b: cez material_id —
+      // schema 2 grupuje group_id+strukturou); curVal drzi hodnotu tejto
       // hrany (aj legacy mimo katalogu — F5) a NEsmie ju prebit prva odporucana paska.
       var curVal = isOvr ? (absId==null?'':absId) : '__inherit__';
-      sel.innerHTML = edgeOptionsHtml(decorOfSheet(pc.material_id), curVal);
+      sel.innerHTML = edgeOptionsHtml(pc.material_id, curVal);
       sel.value = curVal;
       if (isOvr) sel.className='ovr';
       sel.setAttribute('data-edge', code);
@@ -100,13 +101,14 @@
   function onPartMaterial(){
     if (!partCard) return;
     var v = el('pcMaterial').value;
-    // D-41 C2: novy dekor bez pouzitelnej 1,0 mm pasky -> modal (vytvorit / bez
-    // ABS / zrusit) PRED odoslanim. Server check je autorita, toto je len UX.
-    if (v && !absUsableExists(MATERIALS.edges, decorOfSheet(v), 1.0, sheetThicknessOf(v))){
+    // D-41 C2: novy dekor bez pouzitelnej jednotkovej pasky -> modal (vytvorit /
+    // bez ABS / zrusit) PRED odoslanim. Server check je autorita, toto je len UX
+    // (2A-3b: dispatcher zrkadli schema 2 hierarchiu group/structure/universal).
+    if (v && !absUsableForSheet(MATERIALS.edges, sheetRecOf(v), catalogSchemaNow(), sheetThicknessOf(v))){
       var prev = partCard.has_material_override ? (partCard.material_id || '') : '';
-      openAbsModal('Dekor „' + decorOfSheet(v) + '" nemá použiteľnú 1,0 mm ABS pásku pre túto hrúbku — hrany podľa pravidla by ostali bez ABS.',
+      openAbsModal('Dekor „' + decorOfSheet(v) + '" nemá použiteľnú ' + absMissingLabel(catalogSchemaNow()) + ' pre túto hrúbku — hrany podľa pravidla by ostali bez ABS.',
         function(create){ sendPartMaterial(v, create); },
-        function(){ el('pcMaterial').value = prev; regroupPartEdges(decorOfSheet(prev || partCard.material_id)); });
+        function(){ el('pcMaterial').value = prev; regroupPartEdges(prev || partCard.material_id); });
       return;
     }
     sendPartMaterial(v, false);
@@ -114,22 +116,24 @@
   function sendPartMaterial(v, createAbs){
     if (!partCard) return;
     // F3: pri zmene materialu (override) pregrupuj ABS selecty LOKALNE podla noveho
-    // dekoru — netreba cakat na Ruby echo. Pri ZRUSENI override (v==='' = navrat na
+    // materialu — netreba cakat na Ruby echo. Pri ZRUSENI override (v==='' = navrat na
     // dedenie) NErataj: JS zdedeny material nevie, necha skupiny a pocka na payload.
-    if (v) regroupPartEdges(decorOfSheet(v));
+    if (v) regroupPartEdges(v);
     // D-41: cabinet_id = identity guard (Ruby zahodi echo po prekliknuti na iny korpus)
     if (window.sketchup && sketchup.set_part_material)
       sketchup.set_part_material(JSON.stringify({ role_key: partCard.role_key, material_id: v,
-        cabinet_id: partCard.cabinet_id, create_missing_abs: !!createAbs }));
+        cabinet_id: partCard.cabinet_id, create_missing_abs: !!createAbs,
+        catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) }));
   }
-  // F3/N7: prekresli options KAZDEHO ABS selectu dielca podla dekoru, zachova hodnotu
-  // (aj mimo katalogu — F5). Programove nastavenie value NEstriela change event.
-  function regroupPartEdges(decor){
+  // F3/N7: prekresli options KAZDEHO ABS selectu dielca podla materialu (2A-3b:
+  // parameter je material_id), zachova hodnotu (aj mimo katalogu — F5).
+  // Programove nastavenie value NEstriela change event.
+  function regroupPartEdges(materialId){
     var box = el('edgeRows'); if (!box) return;
     var sels = box.querySelectorAll('select[data-edge]');
     for (var i=0;i<sels.length;i++){
       var cur = sels[i].value;
-      sels[i].innerHTML = edgeOptionsHtml(decor, cur);
+      sels[i].innerHTML = edgeOptionsHtml(materialId, cur);
       sels[i].value = cur;
     }
   }
@@ -152,8 +156,8 @@
     // D-41 C2: dekor bez pouzitelnej pasky -> ponuka dovytvorenia; "Bez ABS" tu
     // znamena poslat bez flagu (server vrati dnesnu hlasku s navodom).
     var decor = decorOfSheet(partCard.material_id);
-    if (!absUsableExists(MATERIALS.edges, decor, 1.0, parseFloat(partCard.thickness))){
-      openAbsModal('Dekor „' + decor + '" nemá použiteľnú 1,0 mm ABS pásku — bez nej sa hrany nedajú olepiť.',
+    if (!absUsableForSheet(MATERIALS.edges, sheetRecOf(partCard.material_id), catalogSchemaNow(), parseFloat(partCard.thickness))){
+      openAbsModal('Dekor „' + decor + '" nemá použiteľnú ' + absMissingLabel(catalogSchemaNow()) + ' — bez nej sa hrany nedajú olepiť.',
         function(create){ sendEdgesAll(create); }, null);
       return;
     }
@@ -163,7 +167,8 @@
     if (!partCard) return;
     if (window.sketchup && sketchup.set_part_edges_all)
       sketchup.set_part_edges_all(JSON.stringify({ cabinet_id: partCard.cabinet_id, role_key: partCard.role_key,
-        create_missing_abs: !!createAbs }));
+        create_missing_abs: !!createAbs,
+        catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) }));
   }
   // Klik na hranu v 2D dielci -> fokus jej dropdownu (delegovane, poucenie z drag fixu).
   function setupPartSvgDelegation(){

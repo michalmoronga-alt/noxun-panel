@@ -195,6 +195,11 @@ module Noxun
         if server >= SCHEMA_GROUPS && client_schema.to_i < server
           return [:schema_read_only, nil]
         end
+        # GH #91 P1 (2. kolo): CELE read-modify-write pod zamkom s cerstvym
+        # loadom — ensure z ineho procesu uz nemoze prepisat cudzi cerstvy
+        # zapis (napr. prave dobehnuty batch) svojim predzamkovym snapshotom.
+        with_catalog_lock do
+        JsonFileStore.invalidate(path)
         s = sheet(material_id)
         return [:no_sheet, nil] unless s
         th = s['thickness'].to_f
@@ -240,6 +245,7 @@ module Noxun
         end
         return [:write_failed, nil] unless upsert_edge(rec)
         [:created, rec['abs_id']]
+        end
       end
 
       # 2A-3 (audit F14 / O2): hrubka dovytvaranej pasky = prva preferencia
@@ -273,7 +279,29 @@ module Noxun
       #        ostava dekor+typ+hrubka, takze dva "PD 38" s roznym formatom NIE
       #        SU dva zaznamy, ale chyba davky (viac sirok = V0.6).
       # Vrati [true, {sheets:[id...], edges:[id...], skipped:[popis...]}] alebo [false, chyba].
+      #
+      # 2A-3b (audit B5): kompatibilna matica davky — rozhoduje SERVER podla
+      # schemy CIELA (marker katalogu), klientovi sa neveri. Katalog SCHEMA 1
+      # prijima len batch 1/2 (dnesne spravanie, nizsie); SCHEMA 2 prijima LEN
+      # plne validny batch 3 (add_decor_batch_v3). Klientovu schemu okna strazi
+      # nad tym existujuci catalog_schema guard (schema_write_allowed? v dialogu)
+      # — obe osi su kontrolovane.
       def add_decor_batch(attrs)
+        batch_schema = (attrs['batch_schema'] || attrs[:batch_schema]).to_i
+        if catalog_schema >= SCHEMA_GROUPS
+          # GH #91 P2 (3. kolo): PRESNE 3 — buducu schemu 4 nesmieme "ciastocne"
+          # interpretovat ako v3 (nove polia by sa ticho ignorovali).
+          if batch_schema < 3
+            return [false, 'Katalóg je v novom formáte — obnov okno „Materiály“ a skús znova.']
+          end
+          if batch_schema > 3
+            return [false, 'Dávka je v novšom formáte, než tento katalóg podporuje — obnov okno „Materiály“.']
+          end
+          return add_decor_batch_v3(attrs)
+        end
+        if batch_schema >= 3
+          return [false, 'Katalóg ešte nie je prepnutý na nový formát — dávka v novom formáte sa nedá uložiť.']
+        end
         decor = (attrs['decor'] || attrs[:decor]).to_s.strip
         return [false, 'Dekor je povinný.'] if decor.empty?
         # Preklep guard: near-match s INYM presnym tvarom = stop. Presna zhoda =
@@ -372,6 +400,283 @@ module Noxun
         end
         return [false, 'Zápis katalógu zlyhal.'] unless write(data)
         [true, { 'sheets' => created_sheets, 'edges' => created_edges, 'skipped' => skipped }]
+      end
+
+      # --- 2A-3b: batch schema 3 (audit B4 + B5 + F13) -------------------------
+      # Davka pre katalog SCHEMA 2: 'decor' = CISLO dekoru (K009), 'decor_name'
+      # = volitelny zobrazovaci nazov skupiny, 'structure' per variant (doska aj
+      # ABS), 'universal' per ABS variant (vedomy priznak, default false).
+      # Stringove polia (thicknesses/abs_tokens) su VYHRADNE batch 1/2 — tu sa
+      # odmietnu (strukturu nenesu, ticha interpretacia by zalozila zle varianty).
+      # Identity porovnania idu VYHRADNE cez kanonicke helpery so schemou CIELA
+      # (sheet/edge_identity_key(rec, 2) + identity_keys_tolerant?).
+      def add_decor_batch_v3(attrs)
+        decor = (attrs['decor'] || attrs[:decor]).to_s.strip
+        return [false, 'Číslo dekoru je povinné.'] if decor.empty?
+        unless (attrs['thicknesses'] || attrs[:thicknesses]).to_s.strip.empty? &&
+               (attrs['abs_tokens'] || attrs[:abs_tokens]).to_s.strip.empty?
+          return [false, 'Nový formát dávky zadáva varianty štruktúrovane — textové polia hrúbok/ABS už neplatia.']
+        end
+        manufacturer = (attrs['manufacturer'] || attrs[:manufacturer]).to_s.strip
+        decor_name = (attrs['decor_name'] || attrs[:decor_name]).to_s.strip
+        type = (attrs['type'] || attrs[:type]).to_s.strip
+        type = 'DTDL' if type.empty?
+        grain = (attrs['grain'] || attrs[:grain] || 'length').to_s
+        return [false, 'Smer dekoru musí byť length/width/none.'] unless GRAINS.include?(grain)
+        color = normalize_rgb(attrs['color'] || attrs[:color], [216, 196, 160])
+
+        ok_s, sheet_entries = parse_sheet_entries_v3(attrs, type)
+        return [false, sheet_entries] unless ok_s
+        ok_e, edge_entries = parse_edge_entries_v3(attrs)
+        return [false, edge_entries] unless ok_e
+        ok_ds, sheet_items = dedup_sheet_entries_v3(sheet_entries)
+        return [false, sheet_items] unless ok_ds
+        ok_de, edge_items = dedup_edge_entries_v3(edge_entries)
+        return [false, edge_items] unless ok_de
+        if sheet_items.empty? && edge_items.empty?
+          return [false, 'Zadaj aspoň jeden variant dosky alebo ABS pásku.']
+        end
+
+        # GH #91 P1: CELE read-modify-write pod JEDNYM medziprocesovym zamkom
+        # (reentrantny with_catalog_lock z 2A-2) + cerstvy load (invalidate —
+        # cache by mohla drzat ~1 s stary obsah spred cudzieho zapisu). Dva
+        # sucasne batche z dvoch SketchUpov sa serializuju; neskorsi vidi
+        # zapisy skorsieho (dup checky aj resolve skupiny bezia nad cerstvym).
+        with_catalog_lock do
+        JsonFileStore.invalidate(path)
+        ok_g, group = resolve_batch_group(manufacturer, decor, decor_name)
+        return [false, group] unless ok_g
+        # GH #91 P2: NOVA znackova skupina bez jedinej dosky sa zaklada NESMIE —
+        # vyrobcu nesie doska (standard 7.5), edge-only zapis by identitu
+        # skupiny stratil a group_id by ostal navzdy zablokovany koliziou.
+        # Pridavanie pasok do EXISTUJUCEJ znackovej skupiny funguje normalne.
+        if group['new'] && !manufacturer.empty? && sheet_items.empty?
+          return [false, 'Značková skupina potrebuje pri založení aspoň jednu dosku (výrobcu nesie doska) — pridaj dosku alebo výrobcu vynechaj.']
+        end
+
+        gid = group['group_id']
+        gname = group['decor_name']
+        data = load
+        taken = (data['sheets'].map { |s| s['material_id'].to_s.upcase } +
+                 data['edges'].map { |a| a['abs_id'].to_s.upcase })
+        created_sheets = []
+        created_edges = []
+        skipped = []
+
+        sheet_items.each do |it|
+          if find_sheet_variant(decor, it['type'], it['thickness'], it['structure'],
+                                it['sheet_size'], group_id: gid, manufacturer: manufacturer)
+            skipped << v3_sheet_label(it)
+            next
+          end
+          id = generate_sheet_id(decor, it['type'], it['thickness'], structure: it['structure'],
+                                 sheet_size: it['sheet_size'], taken: taken, schema: SCHEMA_GROUPS)
+          taken << id.upcase
+          # B4: group_id (+ decor_name skupiny) nesie KAZDY zaznam davky — dosky
+          # aj pasky sa stretnu v jednej skupine bez textovej zhody.
+          data['sheets'] << normalize_sheet(
+            'material_id' => id, 'family' => "#{manufacturer} #{decor}".strip,
+            'manufacturer' => manufacturer, 'decor' => decor, 'type' => it['type'],
+            'thickness' => it['thickness'], 'grain' => grain, 'color' => color,
+            'sheet_size' => it['sheet_size'], 'group_id' => gid,
+            'decor_name' => gname, 'structure' => it['structure']
+          )
+          created_sheets << id
+        end
+
+        edge_items.each do |it|
+          existing = find_edge_variant(decor, it['width'], it['thickness'], it['structure'], group_id: gid)
+          if existing
+            # GH #91 P2 (2. kolo): universal NIE JE identita — existujuci variant
+            # s OPACNYM priznakom nie je "skip", ale konflikt (tichy skip by
+            # pouzivatelovi klamal, ze universal paska existuje / neexistuje).
+            if (existing['universal'] == true) != (it['universal'] == true)
+              return [false, "ABS #{v3_edge_label(it)} už existuje s opačným príznakom „univerzálna“ — príznak sa mení v katalógu, nie dávkou."]
+            end
+            skipped << "ABS #{v3_edge_label(it)}"
+            next
+          end
+          id = generate_edge_id(decor, it['thickness'], it['width'],
+                                structure: it['structure'], taken: taken)
+          taken << id.upcase
+          data['edges'] << normalize_edge(
+            'abs_id' => id, 'decor' => decor, 'thickness' => it['thickness'],
+            'width' => it['width'], 'color' => color, 'group_id' => gid,
+            'decor_name' => gname, 'structure' => it['structure'],
+            'universal' => it['universal']
+          )
+          created_edges << id
+        end
+
+        if created_sheets.empty? && created_edges.empty?
+          return [false, "Všetky zadané varianty už v katalógu sú (#{skipped.join(', ')})."]
+        end
+        # write_unlocked — zamok uz drzime (with_catalog_lock je reentrantny,
+        # ale priama cesta je bez zbytocneho druheho handle).
+        return [false, 'Zápis katalógu zlyhal.'] unless write_unlocked(data)
+        [true, { 'sheets' => created_sheets, 'edges' => created_edges, 'skipped' => skipped }]
+        end
+      end
+
+      # 2A-3b (audit B4): skupina davky. NAJPRV presna obchodna identita
+      # (vyrobca + cislo, presne texty) -> existujuci group_id sa PREVEZME;
+      # near-match (vzor decor_conflict — rozdiel len pismom/medzerami) = chyba
+      # s presnym tvarom; inak NOVY deterministicky group_id_for (rovnaka
+      # autorita ako migracia 2A-2) s koliznou kontrolou proti obsadenym gid.
+      # decor_name je vlastnost skupiny: existujucej sa davkou NEMENI (iny
+      # neprazdny nazov = chyba, prazdny = zdedi sa). Vrati [true, hash]/[false, chyba].
+      def resolve_batch_group(manufacturer, decor, decor_name)
+        reg = v3_groups_registry
+        exact = reg.values.find { |g| g['manufacturer'] == manufacturer && g['decor'] == decor }
+        if exact
+          if !decor_name.empty? && decor_name != exact['decor_name']
+            return [false, "Skupina #{decor} už má názov „#{exact['decor_name']}“ — názov sa mení v katalógu, nie dávkou."] unless exact['decor_name'].empty?
+            return [false, "Skupina #{decor} zatiaľ nemá názov — názov sa dopĺňa v katalógu, nie dávkou."]
+          end
+          return [true, { 'group_id' => exact['group_id'], 'decor_name' => exact['decor_name'] }]
+        end
+        near = reg.values.find do |g|
+          decor_norm_key(g['manufacturer']) == decor_norm_key(manufacturer) &&
+            decor_norm_key(g['decor']) == decor_norm_key(decor)
+        end
+        if near
+          label = [near['manufacturer'], near['decor']].reject(&:empty?).join(' ')
+          return [false, "Skupina sa líši od existujúcej „#{label}“ len zápisom — použi presný tvar."]
+        end
+        gid = group_id_for(manufacturer, decor)
+        if reg.key?(gid)
+          return [false, "Kolízia identifikátora skupiny (#{gid}) s inou skupinou — nahlás tento stav."]
+        end
+        # 'new' => true: skupina davkou VZNIKA (GH #91 P2 — znackova nova
+        # skupina vyzaduje aspon jednu dosku, vid guard v add_decor_batch_v3).
+        [true, { 'group_id' => gid, 'decor_name' => decor_name, 'new' => true }]
+      end
+
+      # Existujuce skupiny katalogu: group_id => {manufacturer, decor, decor_name}.
+      # Vyrobcu nesie DOSKA (standard 7.5) — zaznam skupiny sa preto klucuje
+      # z prvej dosky; skupina len s paskami ma vyrobcu prazdny. decor_name =
+      # prvy neprazdny v skupine (konzistentny katalog ich ma zhodne vsade).
+      def v3_groups_registry
+        reg = {}
+        entry = lambda do |gid|
+          reg[gid] ||= { 'group_id' => gid, 'manufacturer' => '', 'decor' => '',
+                         'decor_name' => '', 'has_sheet' => false }
+        end
+        sheets.each do |s|
+          gid = s['group_id'].to_s.strip
+          next if gid.empty?
+          e = entry.call(gid)
+          next if e['has_sheet']
+          e['manufacturer'] = s['manufacturer'].to_s.strip
+          e['decor'] = s['decor'].to_s.strip
+          e['has_sheet'] = true
+          name = s['decor_name'].to_s.strip
+          e['decor_name'] = name unless name.empty?
+        end
+        edges.each do |a|
+          gid = a['group_id'].to_s.strip
+          next if gid.empty?
+          e = entry.call(gid)
+          e['decor'] = a['decor'].to_s.strip if e['decor'].empty?
+          name = a['decor_name'].to_s.strip
+          e['decor_name'] = name if e['decor_name'].empty? && !name.empty?
+        end
+        reg
+      end
+
+      # Polozky dosiek batch 3 — VYHRADNE strukturovane varianty
+      # [{type?, thickness, structure?, sheet_size?}]; striktny parse (jedna
+      # pokazena polozka = chyba celej davky). PD variant MUSI niest format —
+      # v SCHEMA 2 je format sucast identity (vzor migracie O8: PD bez formatu
+      # je nerozhodnutelny variant). Vrati [ok, polozky|chyba].
+      def parse_sheet_entries_v3(attrs, default_type)
+        entries = []
+        Array(attrs['sheet_variants'] || attrs[:sheet_variants]).each do |v|
+          return [false, 'Poškodená položka variantov dosky — obnov okno a skús znova.'] unless v.is_a?(Hash)
+          vt = (v['type'] || v[:type]).to_s.strip
+          vt = default_type if vt.empty?
+          th = strict_num(v['thickness'] || v[:thickness])
+          return [false, "Hrúbka variantu #{vt} musí byť kladné číslo."] unless th && th.positive?
+          ok_size, size = parse_variant_size(v['sheet_size'] || v[:sheet_size], vt, th)
+          return [false, size] unless ok_size
+          if pd_type?(vt) && size.nil?
+            return [false, "Variant #{vt} #{fmt_mm(th)} potrebuje formát platne (pri PD je súčasťou identity)."]
+          end
+          entries << { 'type' => vt, 'thickness' => th, 'sheet_size' => size,
+                       'structure' => (v['structure'] || v[:structure]).to_s.strip }
+        end
+        [true, entries]
+      end
+
+      # ABS varianty batch 3: sirka povinna, hrubka zo whitelistu CIELA
+      # (SCHEMA 2 = obchodne hodnoty vratane 0,4 — zalozenie zaznamu je vedome,
+      # picker ju len nikdy nevyberie sam), struktura volitelna, universal bool.
+      def parse_edge_entries_v3(attrs)
+        entries = []
+        Array(attrs['edge_variants'] || attrs[:edge_variants]).each do |v|
+          return [false, 'Poškodená položka variantov ABS — obnov okno a skús znova.'] unless v.is_a?(Hash)
+          w = strict_num(v['width'] || v[:width])
+          return [false, "Šírka ABS „#{v['width'] || v[:width]}“ musí byť 10–200 mm."] unless w && EDGE_WIDTH_RANGE.cover?(w)
+          th = strict_num(v['thickness'] || v[:thickness])
+          unless th && supported_edge_thickness?(th, SCHEMA_GROUPS)
+            return [false, "Hrúbka ABS „#{v['thickness'] || v[:thickness]}“ musí byť #{edge_thickness_options_label(SCHEMA_GROUPS)} mm."]
+          end
+          entries << { 'width' => w, 'thickness' => th,
+                       'structure' => (v['structure'] || v[:structure]).to_s.strip,
+                       'universal' => flag_true?(v['universal'] || v[:universal]) }
+        end
+        [true, entries]
+      end
+
+      # Dedup dosiek batch 3 cez kanonicky kluc CIELA (typ+hrubka+struktura,
+      # pri PD aj format). Vsetky polozky su strukturovane cipy — rovnaka
+      # identita dvakrat je CHYBA davky (ziadny tichy prvy-vyhrava).
+      def dedup_sheet_entries_v3(entries)
+        seen = []
+        out = []
+        entries.each do |it|
+          key = [identity_norm(it['type']), thickness_key(it['thickness']),
+                 identity_norm(it['structure']),
+                 pd_type?(it['type']) ? size_key(it['sheet_size']) : nil]
+          if seen.any? { |p| identity_keys_tolerant?(p, key) }
+            return [false, "Variant #{v3_sheet_label(it)} je v dávke dvakrát — nechaj len jeden."]
+          end
+          seen << key
+          out << it
+        end
+        [true, out]
+      end
+
+      # 2A-3b (audit F13): dedup ABS batch 3 — rovnaka identita variantu
+      # (sirka+hrubka+struktura) s ROVNAKYM universal = tichy dedup (ako
+      # doteraz); s ROZNYM universal = chyba CELEJ davky (validate-all —
+      # priznak vyberu nesmie rozhodnut tichy prvy-vyhrava).
+      def dedup_edge_entries_v3(entries)
+        seen = []
+        out = []
+        entries.each do |it|
+          key = [width_key(it['width']), thickness_key(it['thickness']), identity_norm(it['structure'])]
+          prev = seen.find { |p| identity_keys_tolerant?(p[0], key) }
+          if prev
+            if prev[1] != it['universal']
+              return [false, "ABS #{v3_edge_label(it)} je v dávke raz ako univerzálna a raz nie — rozhodni jedno."]
+            end
+            next
+          end
+          seen << [key, it['universal']]
+          out << it
+        end
+        [true, out]
+      end
+
+      def v3_sheet_label(it)
+        parts = [it['type'], it['structure']].map(&:to_s).reject(&:empty?)
+        "#{parts.join(' ')} #{fmt_mm(it['thickness'])}"
+      end
+
+      def v3_edge_label(it)
+        st = it['structure'].to_s
+        "#{fmt_mm(it['width'])}/#{fmt_mm(it['thickness'])}#{st.empty? ? '' : " #{st}"}"
       end
 
       # --- D-44: polozky davky (zdroj, format platne, konflikty) ---------------

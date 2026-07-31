@@ -99,22 +99,41 @@ module Noxun
         # --- V0.3 materialy + ABS: payloady a resolvery ---------------------
 
         # Katalog pre selecty: dosky (id + label) + ABS pasky (id + label + farba pre nahlad hrany).
+        # 2A-3b (audit F11): catalog_schema = rezim katalogu pre JS zrkadlo
+        # (absUsableExists/Odporucane) — JS sa o SCHEMA 2 dozveda VYHRADNE
+        # odtialto, nikdy z pritomnosti group_id. Zaznamy nesu group_id/
+        # structure (+universal pri ABS) LEN ked existuju (prazdne kluce sa
+        # neposielaju — zrkadlo katalogovej semantiky).
         def materials_payload
           {
+            'catalog_schema' => Materials.catalog_schema,
             'sheets' => Materials.sheets.map { |s|
               # grain (V0.4.7c, Codex GH #33): vkladacia karta dosky predvyplna smer
               # dekoru z katalogu — bez grain by formular posielal nespravny default.
               { 'id' => s['material_id'], 'label' => sheet_label(s), 'decor' => s['decor'],
                 'thickness' => s['thickness'], 'color' => s['color'], 'grain' => s['grain'] }
+                .merge(schema2_mirror_fields(s))
             },
             'edges' => Materials.edges.map { |a|
               { 'id' => a['abs_id'], 'label' => abs_label(a), 'decor' => a['decor'],
                 'thickness' => a['thickness'], 'width' => a['width'], 'color' => a['color'] }
+                .merge(schema2_mirror_fields(a, universal: true))
             }
           }
         rescue StandardError => e
           Engine.log_error(e, 'materials_payload')
           { 'sheets' => [], 'edges' => [] }
+        end
+
+        # 2A-3b (F11): SCHEMA 2 polia zaznamu do payloadu — bez prazdnych klucov.
+        def schema2_mirror_fields(rec, universal: false)
+          out = {}
+          gid = rec['group_id'].to_s.strip
+          out['group_id'] = gid unless gid.empty?
+          st = rec['structure'].to_s.strip
+          out['structure'] = st unless st.empty?
+          out['universal'] = true if universal && rec['universal'] == true
+          out
         end
 
         def sheet_label(s)

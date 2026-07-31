@@ -61,33 +61,36 @@
   // Material: okamzity zapis (select) — hrubka nasleduje katalog na Ruby strane.
   function onBoardMaterial(v){
     if (!boardCard) return;
-    // D-41 C2: dekor bez pouzitelnej 1,0 mm pasky pre NOVU hrubku dosky -> modal
-    // pred odoslanim (server check je autorita, toto je len UX vrstva).
-    if (v && !absUsableExists(MATERIALS.edges, decorOfSheet(v), 1.0, sheetThicknessOf(v))){
+    // D-41 C2: dekor bez pouzitelnej jednotkovej pasky pre NOVU hrubku dosky ->
+    // modal pred odoslanim (server check je autorita, toto je len UX vrstva;
+    // 2A-3b: dispatcher zrkadli schema 2 hierarchiu group/structure/universal).
+    if (v && !absUsableForSheet(MATERIALS.edges, sheetRecOf(v), catalogSchemaNow(), sheetThicknessOf(v))){
       var prev = boardCard.material_id || '';
-      openAbsModal('Dekor „' + decorOfSheet(v) + '" nemá použiteľnú 1,0 mm ABS pásku pre túto hrúbku — prevedené hrany by ostali bez ABS.',
+      openAbsModal('Dekor „' + decorOfSheet(v) + '" nemá použiteľnú ' + absMissingLabel(catalogSchemaNow()) + ' pre túto hrúbku — prevedené hrany by ostali bez ABS.',
         function(create){ sendBoardMaterial(v, create); },
-        function(){ if (el('bc_material')) el('bc_material').value = prev; regroupBoardEdges(decorOfSheet(prev)); });
+        function(){ if (el('bc_material')) el('bc_material').value = prev; regroupBoardEdges(prev); });
       return;
     }
     sendBoardMaterial(v, false);
   }
   function sendBoardMaterial(v, createAbs){
     if (!boardCard) return;
-    // F3: pregrupuj ABS hrany dosky LOKALNE podla noveho dekoru — doska ma vzdy
-    // konkretny material (ziadne dedenie => vzdy ratame). N7: ziadny change event.
-    regroupBoardEdges(decorOfSheet(v));
+    // F3: pregrupuj ABS hrany dosky LOKALNE podla noveho materialu — doska ma
+    // vzdy konkretny material (ziadne dedenie => vzdy ratame). N7: ziadny change event.
+    regroupBoardEdges(v);
     if (window.sketchup && sketchup.set_board_material)
       sketchup.set_board_material(JSON.stringify({ board_id: boardCard.board_id, material_id: v,
-        create_missing_abs: !!createAbs }));
+        create_missing_abs: !!createAbs,
+        catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) }));
   }
-  // F3/N7: prekresli options ABS selectov dosky podla dekoru, zachova hodnotu (aj F5).
-  function regroupBoardEdges(decor){
+  // F3/N7: prekresli options ABS selectov dosky podla materialu (2A-3b:
+  // parameter je material_id), zachova hodnotu (aj F5).
+  function regroupBoardEdges(materialId){
     var box = el('boardEdgeRows'); if (!box) return;
     var sels = box.querySelectorAll('select[data-edge]');
     for (var i=0;i<sels.length;i++){
       var cur = sels[i].value;
-      sels[i].innerHTML = boardEdgeOptionsHtml(decor, cur);
+      sels[i].innerHTML = boardEdgeOptionsHtml(materialId, cur);
       sels[i].value = cur;
     }
   }
@@ -105,8 +108,9 @@
     // D-41 C2: chybajuca pouzitelna paska -> ponuka dovytvorenia pred bulkom.
     var decor = decorOfSheet(boardCard.material_id);
     var th = sheetThicknessOf(boardCard.material_id);
-    if (!absUsableExists(MATERIALS.edges, decor, 1.0, th === null ? parseFloat(boardCard.thickness) : th)){
-      openAbsModal('Dekor „' + decor + '" nemá použiteľnú 1,0 mm ABS pásku — bez nej sa hrany nedajú olepiť.',
+    if (!absUsableForSheet(MATERIALS.edges, sheetRecOf(boardCard.material_id), catalogSchemaNow(),
+                           th === null ? parseFloat(boardCard.thickness) : th)){
+      openAbsModal('Dekor „' + decor + '" nemá použiteľnú ' + absMissingLabel(catalogSchemaNow()) + ' — bez nej sa hrany nedajú olepiť.',
         function(create){ sendBoardEdgesAll(create); }, null);
       return;
     }
@@ -116,7 +120,8 @@
     if (!boardCard) return;
     flushBoardEditsNow();
     if (window.sketchup && sketchup.set_board_edges_all)
-      sketchup.set_board_edges_all(JSON.stringify({ board_id: boardCard.board_id, create_missing_abs: !!createAbs }));
+      sketchup.set_board_edges_all(JSON.stringify({ board_id: boardCard.board_id, create_missing_abs: !!createAbs,
+        catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) }));
   }
 
   // Zapis hodnoty len ked pole NEMA fokus — refresh z backendu nesmie prepisat
@@ -176,10 +181,11 @@
       var row = document.createElement('div'); row.className = 'edgerow';
       row.innerHTML = '<span class="en"><i style="background:' + absColorOf(absId) + '"></i>' + esc(lbl) + '</span>';
       var sel = document.createElement('select');
-      // D-36: skupiny podla resolved dekoru materialu dosky (bez inherit — doska nema
-      // override vrstvu). curVal drzi hodnotu hrany aj legacy mimo katalogu (F5).
+      // D-36: skupiny podla resolved materialu dosky (2A-3b: cez material_id;
+      // bez inherit — doska nema override vrstvu). curVal drzi hodnotu hrany
+      // aj legacy mimo katalogu (F5).
       var curVal = absId == null ? '' : absId;
-      sel.innerHTML = boardEdgeOptionsHtml(decorOfSheet(bc.material_id), curVal);
+      sel.innerHTML = boardEdgeOptionsHtml(bc.material_id, curVal);
       sel.value = curVal;
       sel.setAttribute('data-edge', code);
       sel.onchange = (function(cc, ss){ return function(){ onBoardEdgeChange(cc, ss.value); }; })(code, sel);
