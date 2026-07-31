@@ -144,27 +144,61 @@ module Noxun
         # ctx nil a labely su PRESNE dnesne (dual-mode). Hot loops si ctx
         # postavia RAZ a posielaju ho dalej (default je pre pohodlie volajucich
         # s jednym zaznamom).
+        # GH #93 P2 (8. kolo): kolizie sa detegujú z PLNE ZLOZENEHO zakladu
+        # (cislo+struktura+nazov), nie zo sameho cisla — "K009 PW"+"" a
+        # "K009"+"PW" skladaju rovnaky text z ROZNYCH skupin. Dve urovne:
+        # 'collisions' (zaklad zdielaju rozne skupiny -> pridaj vyrobcu),
+        # 'hard' (aj s vyrobcom zhodny -> pridaj [group_id]).
         def label_ctx
           return nil unless Materials.catalog_schema >= Materials::SCHEMA_GROUPS
           reg = Materials.v3_groups_registry
-          counts = Hash.new(0)
-          reg.each_value { |g| counts[Materials.identity_norm(g['decor'])] += 1 }
+          group_man = reg.transform_values { |g| g['manufacturer'] }
+          num_groups = Hash.new { |h, k| h[k] = [] }
+          base_groups = Hash.new { |h, k| h[k] = [] }
+          man_groups = Hash.new { |h, k| h[k] = [] }
+          (Materials.sheets + Materials.edges).each do |r|
+            gid = r['group_id'].to_s.strip
+            gkey = gid.empty? ? "man:#{r['manufacturer'].to_s.strip}" : gid
+            nkey = Materials.identity_norm(r['decor'])
+            num_groups[nkey] << gkey unless num_groups[nkey].include?(gkey)
+            base = raw_label_base(r)
+            bkey = Materials.identity_norm(base)
+            base_groups[bkey] << gkey unless base_groups[bkey].include?(gkey)
+            man = gid.empty? ? r['manufacturer'].to_s.strip : group_man[gid].to_s.strip
+            mkey = Materials.identity_norm(man.empty? ? base : "#{man} #{base}")
+            man_groups[mkey] << gkey unless man_groups[mkey].include?(gkey)
+          end
           {
-            'collisions' => counts.select { |_, n| n > 1 },
-            'group_man' => reg.transform_values { |g| g['manufacturer'] }
+            # F10 povodna uroven: rovnake CISLO z viacerych skupin -> vyrobca.
+            'num' => num_groups.select { |_, v| v.length > 1 },
+            # 8. kolo: rovnaky ZLOZENY zaklad z viacerych skupin -> vyrobca.
+            'base' => base_groups.select { |_, v| v.length > 1 },
+            'hard' => man_groups.select { |_, v| v.length > 1 },
+            'group_man' => group_man
           }
         end
 
-        # Zaklad labelu zaznamu: [vyrobca pri kolizii] cislo struktura nazov.
-        # V SCHEMA 1 (ctx nil, polia chybaju) = presne dnesny text dekoru.
+        # Zlozeny zaklad BEZ kolizneho aparatu (zdiela ho ctx aj label_base).
+        def raw_label_base(rec)
+          [rec['decor'], rec['structure'], rec['decor_name']]
+            .map { |v| v.to_s.strip }.reject(&:empty?).join(' ')
+        end
+
+        # Zaklad labelu zaznamu: [vyrobca pri kolizii [+group_id pri tvrdej]]
+        # cislo struktura nazov. V SCHEMA 1 (ctx nil) = presne dnesny text.
         def label_base(rec, manufacturer, ctx)
-          parts = [rec['decor'], rec['structure'], rec['decor_name']]
-                  .map { |v| v.to_s.strip }.reject(&:empty?)
-          if ctx && ctx['collisions'].key?(Materials.identity_norm(rec['decor']))
-            man = manufacturer.to_s.strip
-            parts.unshift(man) unless man.empty?
+          base = raw_label_base(rec)
+          return base unless ctx
+          ambiguous = ctx['num'].key?(Materials.identity_norm(rec['decor'])) ||
+                      ctx['base'].key?(Materials.identity_norm(base))
+          return base unless ambiguous
+          man = manufacturer.to_s.strip
+          out = man.empty? ? base : "#{man} #{base}"
+          if ctx['hard'].key?(Materials.identity_norm(out))
+            gid = rec['group_id'].to_s.strip
+            out = "#{out} [#{gid}]" unless gid.empty?
           end
-          parts.join(' ')
+          out
         end
 
         def sheet_label(s, ctx = label_ctx)

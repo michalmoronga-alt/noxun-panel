@@ -409,6 +409,15 @@ module Noxun
                          fallback: fallback, retyped: retyped, reasons: reasons)
         end
         migration_near_match_guard(registry, reasons)
+        # GH #93 P2 (8. kolo): ZNACKOVA skupina len s paskami by vyrobcu
+        # nenavratne stratila (migracia ho pise LEN na dosky a registry/UI ho
+        # vie obnovit len z dosky) — nerozhodnutelna polozka, nie tichy zasah.
+        registry.each_value do |g|
+          next if g[:manufacturer].to_s.strip.empty?
+          next if g[:sheets].positive?
+          reasons << "znackova skupina '#{[g[:manufacturer], g[:decor]].reject(&:empty?).join(' ')}'" \
+                     ' ma len ABS pasky — dopln aspon jednu dosku pred migraciou (vyrobcu nesie doska)'
+        end
         check_variant_identities(out_sheets, out_edges, reasons)
         {
           sheets: out_sheets, edges: out_edges, deleted: deleted, retyped: retyped,

@@ -534,3 +534,40 @@ NxTest.test('2a4b: GH P2 kolo 6 — necakany pad cutoveru = viditelny issue + re
     NxTest.assert(B4MAT.cutover_issue.nil?)
   end
 end
+
+NxTest.test('2a4b: GH kolo 8 — panel labely deteguju koliziu zo ZLOZENEHO textu (+group sufix pri tvrdej)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  data = JSON.pretty_generate(
+    'std' => 1, 'schema' => 2,
+    'sheets' => [
+      { 'material_id' => 'A1', 'group_id' => 'GRP-AAA', 'manufacturer' => 'Egger',
+        'decor' => 'K009 PW', 'type' => 'DTDL', 'thickness' => 18.0,
+        'grain' => 'length', 'color' => [1, 1, 1], 'production_class' => 'sheet' },
+      { 'material_id' => 'A2', 'group_id' => 'GRP-BBB', 'manufacturer' => 'Egger',
+        'decor' => 'K009', 'structure' => 'PW', 'type' => 'DTDL', 'thickness' => 18.0,
+        'grain' => 'length', 'color' => [1, 1, 1], 'production_class' => 'sheet' }
+    ],
+    'edges' => []
+  ).b
+  b4_with_catalog(data) do
+    ctx = B4PANEL.send(:label_ctx)
+    l1 = B4PANEL.send(:sheet_label, B4MAT.sheet('A1'), ctx)
+    l2 = B4PANEL.send(:sheet_label, B4MAT.sheet('A2'), ctx)
+    NxTest.refute(l1 == l2, "zlozeny text z roznych skupin sa musi rozlisit (#{l1})")
+    NxTest.assert(l1.include?('GRP-AAA') || l2.include?('GRP-BBB'),
+                  'tvrda kolizia (rovnaky vyrobca) nesie group sufix')
+  end
+end
+
+NxTest.test('2a4b: GH kolo 8 — migracia odmieta znackovu skupinu len s paskami (vyrobca by sa stratil)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  data = JSON.parse(JSON.generate(NxTest::LEGACY_SEED_CATALOG))
+  data['sheets'] = data['sheets'].reject { |s| s['decor'] == 'K009 PW' } # K009 ostane edge-only
+  bytes = JSON.pretty_generate(data).b
+  b4_with_catalog(bytes) do
+    NxTest.assert_equal(:undecidable, B4MAT.boot_cutover!)
+    NxTest.assert(B4MAT.cutover_issue.to_s.include?('len ABS pásky') || B4MAT.cutover_issue.to_s.include?('len ABS pasky'),
+                  "dovod menuje edge-only znackovu skupinu: #{B4MAT.cutover_issue.inspect}")
+    NxTest.assert_equal(bytes, File.binread(B4MAT.path).b, 'atomicky NO-OP')
+  end
+end
