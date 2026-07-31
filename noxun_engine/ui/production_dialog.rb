@@ -270,13 +270,7 @@ module Noxun
         # vyrobcov — len SCHEMA 2 stav bez legacy precedensu) dostava prefix
         # vyrobcu, aby sa buckety nezliali.
         def vepo_materials
-          labeled = Materials.sheets.map do |s|
-            label = [s['decor'], s['structure'], s['decor_name'], s['type']]
-                    .map { |v| v.to_s.strip }.reject(&:empty?).join(' ')
-            label = s['family'].to_s.strip if label.empty?
-            label = s['material_id'].to_s if label.empty?
-            [s, label]
-          end
+          labeled = Materials.sheets.map { |s| [s, vepo_base_label(s)] }
           # 1. kolo: kolizia medzi skupinami -> prefix vyrobcu.
           labeled = vepo_disambiguate(labeled) do |s, l|
             [s['manufacturer'].to_s.strip, l].reject(&:empty?).join(' ')
@@ -294,7 +288,25 @@ module Noxun
           # Finalna poistka (GH #93 5. kolo): ak by po vsetkych kolach ostala
           # kolizia, rozhodne material_id — bucket sa NIKDY nesmie zliat.
           labeled = vepo_disambiguate(labeled) { |s, l| "#{l} [#{s['material_id']}]" }
-          labeled.each_with_object({}) { |(s, l), out| out[s['material_id']] = { 'label' => l } }
+          labeled.each_with_object({}) do |(s, l), out|
+            entry = { 'label' => l }
+            # GH #93 P2 (9. kolo): ked label nesie technicke disambiguatory
+            # (vyrobca/skupina/format/ID), LOG ukazuje LUDSKY zaklad cez
+            # 'display' — inak by display_labels cesta VepoExportu nikdy nezila.
+            human = vepo_base_label(s)
+            entry['display'] = human unless human.empty? || human == l
+            out[s['material_id']] = entry
+          end
+        end
+
+        # Ludsky zaklad labelu (cislo struktura nazov typ; fallback family/id) —
+        # zdiela ho kompozicia exportneho labelu aj 'display' pre LOG.
+        def vepo_base_label(s)
+          label = [s['decor'], s['structure'], s['decor_name'], s['type']]
+                  .map { |v| v.to_s.strip }.reject(&:empty?).join(' ')
+          label = s['family'].to_s.strip if label.empty?
+          label = s['material_id'].to_s if label.empty?
+          label
         end
 
         # Kolizia labelu medzi VARIANTMI (rovnaka skupina): PD zaznamu s formatom

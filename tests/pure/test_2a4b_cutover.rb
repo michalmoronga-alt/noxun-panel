@@ -571,3 +571,30 @@ NxTest.test('2a4b: GH kolo 8 — migracia odmieta znackovu skupinu len s paskami
     NxTest.assert_equal(bytes, File.binread(B4MAT.path).b, 'atomicky NO-OP')
   end
 end
+
+NxTest.test('2a4b: GH kolo 9 — display nesie ludsky zaklad, ked label ma disambiguator') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  require_relative '../../noxun_engine/ui/production_dialog' unless defined?(Noxun::Engine::ProductionDialog)
+  data = JSON.pretty_generate(
+    'std' => 1, 'schema' => 2,
+    'sheets' => [
+      { 'material_id' => 'C1', 'group_id' => 'GRP-EG', 'manufacturer' => 'Egger',
+        'decor' => 'K111', 'structure' => 'ST9', 'type' => 'DTDL', 'thickness' => 18.0,
+        'grain' => 'length', 'color' => [1, 1, 1], 'production_class' => 'sheet' },
+      { 'material_id' => 'C2', 'group_id' => 'GRP-KR', 'manufacturer' => 'Kronospan',
+        'decor' => 'K111', 'structure' => 'ST9', 'type' => 'DTDL', 'thickness' => 18.0,
+        'grain' => 'length', 'color' => [1, 1, 1], 'production_class' => 'sheet' },
+      { 'material_id' => 'U1', 'group_id' => 'GRP-U', 'manufacturer' => 'Egger',
+        'decor' => 'U750', 'structure' => 'ST9', 'type' => 'DTDL', 'thickness' => 18.0,
+        'grain' => 'length', 'color' => [1, 1, 1], 'production_class' => 'sheet' }
+    ],
+    'edges' => []
+  ).b
+  b4_with_catalog(data) do
+    mats = Noxun::Engine::ProductionDialog.send(:vepo_materials)
+    NxTest.assert_equal('K111 ST9 DTDL', mats['C1']['display'],
+                        'disambiguovany label nesie ludsky display')
+    NxTest.assert(mats['C1']['label'].include?('Egger'))
+    NxTest.refute(mats['U1'].key?('display'), 'bez disambiguatora display netreba (label = ludsky)')
+  end
+end
