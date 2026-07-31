@@ -148,6 +148,72 @@ unless NxTest::IN_SKETCHUP
   ].each { |rel| require File.join(NxTest::ROOT, 'noxun_engine', rel) }
 end
 
+# --- 2A-4b: legacy (SCHEMA 1) katalog pre dual-mode testy ----------------------
+# Seedy su od cutoveru NATIVNE SCHEMA 2 — testy LEGACY spravania (batch 1/2,
+# textovy picker, rename podla textu, patch/CRUD bez group_id) si instaluju
+# PRESNU predcutoverovu podobu seedov. VYHRADNE headless (v SketchUpe by zapis
+# siel do ziveho %APPDATA% katalogu — tam sa katalogove testy skipuju).
+module NxTest
+  LEGACY_SEED_CATALOG = {
+    'std' => 1,
+    'sheets' => [
+      { 'material_id' => 'K009_PW_DTDL_18', 'family' => 'Kronospan K009 PW',
+        'manufacturer' => 'Kronospan', 'decor' => 'K009 PW', 'type' => 'DTDL',
+        'thickness' => 18.0, 'grain' => 'length', 'price_per_m2' => 12.5,
+        'sheet_size' => [2800.0, 2070.0], 'color' => [198, 168, 122], 'production_class' => 'sheet' },
+      { 'material_id' => 'K009_PW_DTDL_16', 'family' => 'Kronospan K009 PW',
+        'manufacturer' => 'Kronospan', 'decor' => 'K009 PW', 'type' => 'DTDL',
+        'thickness' => 16.0, 'grain' => 'length', 'price_per_m2' => 11.8,
+        'sheet_size' => [2800.0, 2070.0], 'color' => [198, 168, 122], 'production_class' => 'sheet' },
+      { 'material_id' => 'HDF_WHITE_3', 'family' => 'HDF biela',
+        'manufacturer' => 'Kronospan', 'decor' => 'Biela HDF', 'type' => 'HDF',
+        'thickness' => 3.0, 'grain' => 'none', 'price_per_m2' => 3.2,
+        'sheet_size' => [2800.0, 2070.0], 'color' => [238, 236, 230], 'production_class' => 'sheet' },
+      { 'material_id' => 'W1000_DTDL_18', 'family' => 'Egger W1000 ST9',
+        'manufacturer' => 'Egger', 'decor' => 'W1000 ST9 Biela', 'type' => 'DTDL',
+        'thickness' => 18.0, 'grain' => 'none', 'price_per_m2' => 13.9,
+        'sheet_size' => [2800.0, 2070.0], 'color' => [246, 246, 244], 'production_class' => 'sheet' }
+    ],
+    'edges' => [
+      { 'abs_id' => 'ABS_K009_10', 'decor' => 'K009 PW', 'thickness' => 1.0,
+        'price_per_bm' => 0.55, 'color' => [198, 168, 122] },
+      { 'abs_id' => 'ABS_K009_20', 'decor' => 'K009 PW', 'thickness' => 2.0,
+        'price_per_bm' => 0.85, 'color' => [198, 168, 122] },
+      { 'abs_id' => 'ABS_W1000_10', 'decor' => 'W1000 ST9 Biela', 'thickness' => 1.0,
+        'price_per_bm' => 0.60, 'color' => [246, 246, 244] }
+    ]
+  }.freeze
+
+  # Nainstaluje LEGACY seed katalog (marker 1) do APPDATA sandboxu — testy
+  # dual-mode spravania bezia presne nad predcutoverovym stavom. Vola sa na
+  # ZACIATKU test suboru (subory su sekvencne; kazdy si stav deklaruje sam).
+  def self.install_legacy_catalog!
+    return unless headless?
+    mat = Noxun::Engine::Materials
+    FileUtils.mkdir_p(mat.dir)
+    payload = JSON.parse(JSON.generate(LEGACY_SEED_CATALOG))
+    Noxun::Engine::JsonFileStore.write(mat.path, payload)
+    FileUtils.rm_f("#{mat.path}.bak") # .bak z predoslych zapisov nesmie drzat marker 2
+    Noxun::Engine::JsonFileStore.invalidate(mat.path)
+    mat.reset_catalog_state!
+    true
+  end
+
+  # Cerstvy SEED stav (od 2A-4b nativne SCHEMA 2) — zmaze katalog aj zalohy
+  # v sandboxe a necha ho znovu seednut. Pre testy seed kontraktu.
+  def self.install_fresh_seed_catalog!
+    return unless headless?
+    mat = Noxun::Engine::Materials
+    FileUtils.rm_f(mat.path)
+    FileUtils.rm_f("#{mat.path}.bak")
+    FileUtils.rm_f(mat.pre_schema2_backup_path)
+    Noxun::Engine::JsonFileStore.invalidate(mat.path)
+    mat.reset_catalog_state!
+    mat.reload! # prvy pristup seedne (SCHEMA 2)
+    true
+  end
+end
+
 # --- Mini assert framework -----------------------------------------------------
 module NxTest
   Failure = Class.new(StandardError)

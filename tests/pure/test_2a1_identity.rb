@@ -9,6 +9,15 @@
 # pravidla zo standardu 7.1/7.5. Vsetko headless (APPDATA sandbox).
 require_relative '../helper' unless defined?(NxTest)
 
+# 2A-4b: seedy su nativne SCHEMA 2 — tento subor overuje DUAL-MODE (legacy)
+# spravanie, preto si ako prvy krok instaluje predcutoverovy legacy katalog
+# (registrovany setup test — testy bezia sekvencne v poradi registracie).
+NxTest.test('2a1 setup: legacy SCHEMA 1 katalog (dual-mode)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  NxTest.assert(NxTest.install_legacy_catalog!, 'legacy katalog sa nenainstaloval')
+  NxTest.assert_equal(1, Noxun::Engine::Materials.catalog_schema, 'sandbox ma byt SCHEMA 1')
+end
+
 A1MAT = Noxun::Engine::Materials
 A1STORE = Noxun::Engine::JsonFileStore
 
@@ -392,15 +401,19 @@ NxTest.test('2A-1: normalize prenasa group_id/decor_name/structure/universal') d
   end
 end
 
-NxTest.test('2A-1: PATCHABLE sa NEROZSIRUJE — identita nikdy cez inline patch') do
+NxTest.test('2A-1: PATCHABLE — identita nikdy cez inline patch (universal = vlastnost vyberu, 2A-4b)') do
   %w[sheet edge].each do |kind|
     fields = A1MAT::PATCHABLE[kind]
-    %w[group_id structure decor_name universal decor type thickness width sheet_size].each do |f|
+    # Identitne polia sa patchom NIKDY nemenia. 'universal' NIE JE identita —
+    # je to vlastnost VYBERU (standard 7.5) a 2A-4b ju vedome pridava na edge
+    # (toggle v karte skupiny); na sheete nema zmysel.
+    %w[group_id structure decor_name decor type thickness width sheet_size].each do |f|
       NxTest.refute(fields.include?(f), "#{kind}: #{f} nesmie byt patchovatelne")
     end
   end
+  NxTest.refute(A1MAT::PATCHABLE['sheet'].include?('universal'), 'sheet universal nema')
   NxTest.assert_equal(%w[code supplier price_per_m2], A1MAT::PATCHABLE['sheet'])
-  NxTest.assert_equal(%w[code supplier price_per_bm], A1MAT::PATCHABLE['edge'])
+  NxTest.assert_equal(%w[code supplier price_per_bm universal], A1MAT::PATCHABLE['edge'])
 end
 
 NxTest.test('2A-1: lookup variantov v SCHEMA 1 strukturu ignoruje (dual-mode)') do

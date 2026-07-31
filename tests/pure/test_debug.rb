@@ -36,10 +36,14 @@ NxTest.test('debug: selection_state headless je error-safe') do
   NxTest.assert(st.key?(:error), 'headless selection_state ma :error')
 end
 
-NxTest.test('debug: panel_state headless hlasi nenacitany Panel') do
+NxTest.test('debug: panel_state headless — bezpecny bez SketchUpu (error alebo neaktivny dialog)') do
   st = Noxun::Engine::Debug.panel_state
   NxTest.assert(st.is_a?(Hash), 'panel_state je Hash')
-  NxTest.assert(st.key?(:error), 'headless panel_state ma :error (Panel nenacitany)')
+  # 2A-4b: label testy nacitavaju ui/panel/payloads.rb (reopen modulu Panel) —
+  # panel_state preto uz headless nemusi koncit :error. Kontrakt ostava:
+  # NIKDY nepadnut; bez dialogu hlasi dialog_present false.
+  NxTest.assert(st.key?(:error) || st[:dialog_present] == false,
+                'headless: :error (Panel nenacitany) alebo neaktivny dialog')
 end
 
 NxTest.test('debug: entity_state cita NOXUN dict cez get_attribute fallback + config parse') do
