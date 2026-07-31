@@ -580,7 +580,12 @@ module Noxun
             merged = existing.merge(patch)
             ok, verr = kind == 'edge' ? validate_edge_attrs(merged) : validate_sheet_attrs(merged)
             return [:invalid, { 'id' => id, 'detail' => verr }] unless ok
-            merged_by_key[[kind, id]] = { 'merged' => merged, 'fields' => patch.length }
+            # GH #97 P2: duplicitny par sa vycita LEN polozkam, ktore par
+            # code+supplier realne MENIA — price-only refresh na zazname s
+            # existujucou (vedome povolenou) duplicitou nesmie zamrznut.
+            pair = ->(r) { [r['code'].to_s.strip.downcase, r['supplier'].to_s.strip.downcase] }
+            merged_by_key[[kind, id]] = { 'merged' => merged, 'fields' => patch.length,
+                                          'pair_changed' => pair.call(existing) != pair.call(merged) }
           end
           # Preflight 2 (FIX 12): duplicity kod+dodavatel v SIMULOVANOM stave —
           # menene zaznamy s kodom sa porovnaju proti vsetkym ostatnym (vratane
@@ -599,6 +604,7 @@ module Noxun
             end
             merged_by_key.each do |(mkind, mid), entry|
               next unless mkind == kind
+              next unless entry['pair_changed'] # GH #97 P2: nedotknuty par sa nevycita
               rec = entry['merged']
               c = rec['code'].to_s.strip.downcase
               next if c.empty?

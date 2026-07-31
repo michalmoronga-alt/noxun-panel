@@ -36,7 +36,7 @@ end
 def db2_dtdl_rec(over = {})
   { 'material_id' => 'B2_DTDL_18', 'decor' => 'H3303', 'structure' => 'ST10', 'type' => 'DTDL',
     'thickness' => 18.0, 'sheet_size' => [2800.0, 2070.0], 'price_per_m2' => 15.0,
-    'group_id' => 'GRP-TEST' }.merge(over)
+    'manufacturer' => 'Egger', 'group_id' => 'GRP-TEST' }.merge(over)
 end
 
 # Zozbiera eventy jedneho behu; alive cez mutovatelny box (cancel testy).
@@ -104,6 +104,48 @@ NxTest.test('demos b2: lookup happy path — match s kodom a cenou, miss zaznam,
   NxTest.refute(acc_codes.include?('175718'), 'navrhnuty kod nie je v prislusenstve')
 ensure
   db2_clear_sitemap!
+end
+
+NxTest.test('demos b2: lookup — iny VYROBCA toho isteho dekoru = identity_fail (GH #97 P1)') do
+  db2_sitemap!([DB2_DTDL18_URL])
+  # Egger H3303 fixture proti inak IDENTICKEMU zaznamu Kronospanu — cislo
+  # dekoru bez vyrobcu nie je identita skupiny (standard 7.1).
+  events, = db2_run([db2_dtdl_rec('manufacturer' => 'Kronospan')],
+                    DB2_DTDL18_URL => [200, {}, db2_fixture('h3303_dtdl18_product.html')])
+  NxTest.assert_equal('identity_fail', db2_proposals(events).first['status'])
+  # skupina BEZ vyrobcu (vlastny dekor) brand neoveruje — match prejde
+  events2, = db2_run([db2_dtdl_rec('manufacturer' => '')],
+                     DB2_DTDL18_URL => [200, {}, db2_fixture('h3303_dtdl18_product.html')])
+  NxTest.assert_equal('match', db2_proposals(events2).first['status'])
+ensure
+  db2_clear_sitemap!
+end
+
+NxTest.test('demos b2: lookup — completed retaz uz NEfetchuje (watchdog guard, GH #97 P2)') do
+  ctx = DL2.new_ctx(-> { true }, ->(_e) {})
+  ctx['completed'] = true
+  fake = Db1Transport.new({})
+  Noxun::Engine::Demos.transport = fake
+  DL2.fetch_chain(ctx, [[db2_dtdl_rec, 'sheet', DB2_DTDL18_URL]])
+  NxTest.assert_equal(0, fake.calls.length, 'po complete sa dalsi request nespusti')
+ensure
+  Noxun::Engine::Demos.transport = nil
+end
+
+NxTest.test('demos b2: lookup — same skipy dokoncia BEZ sitemap (fresh install, GH #97 P2)') do
+  db2_clear_sitemap!
+  DL2.refresh_state_reset!
+  recs = [db2_dtdl_rec('material_id' => 'B2_DUP', 'source_material_id' => 'X',
+                       'source_multiplier' => 2),
+          db2_dtdl_rec('material_id' => 'B2_ALIEN', 'type' => 'MOJTYP')]
+  events, fake = db2_run(recs, {})
+  NxTest.assert_equal(0, fake.calls.length, 'ani sitemap fetch')
+  done = db2_complete(events)
+  NxTest.assert_equal(1, done.length)
+  NxTest.assert(done.first['ok'], 'skipy nie su chyba behu')
+  NxTest.assert_equal(2, db2_proposals(events).length)
+ensure
+  DL2.refresh_state_reset!
 end
 
 NxTest.test('demos b2: lookup — cudzi obsah stranky = identity_fail bez kodu a ceny') do
@@ -259,6 +301,7 @@ NxTest.test('demos b2: cena len bez DPH sa NEnavrhne (F9), kod ano; nezmenena ce
   db2_sitemap!([DB2_DTDL18_URL])
   no_vat_html = <<~HTML
     <html><h1>DTDL H3303 ST10 Dub Hamilton</h1>
+    <span itemprop="brand">Egger</span>
     <span>Kód sortimentu</span> <strong>175718</strong>
     <dl><dt>Základná cena za ks</dt><dd>89,49 EUR</dd></dl>
     <table>
@@ -405,6 +448,25 @@ NxTest.test('demos b2: apply — duplicitny kod v SIMULOVANOM stave (dve polozky
   st2, = MAT2.apply_demos_batch([db2_sheet_item('K009_PW_DTDL_16', 'code' => 'OBSADENY')],
                                 catalog_rev: MAT2.catalog_revision)
   NxTest.assert_equal(:code_conflict, st2, 'kolizia s nedotknutym zaznamom (supplier Demos na oboch)')
+end
+
+NxTest.test('demos b2: apply — price-only na zazname s VEDOME povolenou duplicitou prejde (GH #97 P2)') do
+  db2_seed!
+  # vedome povoleny duplicitny par (vzor allow_duplicate_code) — upsert guard nema
+  s18 = MAT2.sheet('K009_PW_DTDL_18').merge('code' => 'SPOLOCNY', 'supplier' => 'Demos')
+  s16 = MAT2.sheet('K009_PW_DTDL_16').merge('code' => 'SPOLOCNY', 'supplier' => 'Demos')
+  NxTest.assert(MAT2.upsert_sheet(s18) && MAT2.upsert_sheet(s16))
+  status, = MAT2.apply_demos_batch(
+    [db2_sheet_item('K009_PW_DTDL_18', 'price' => 19.5)],
+    catalog_rev: MAT2.catalog_revision
+  )
+  NxTest.assert_equal(:ok, status, 'nedotknuty par sa nevycita')
+  # zmena kodu na kolidujuci par sa ale stale chyti
+  status2, = MAT2.apply_demos_batch(
+    [db2_sheet_item('HDF_WHITE_3', 'code' => 'SPOLOCNY')],
+    catalog_rev: MAT2.catalog_revision
+  )
+  NxTest.assert_equal(:code_conflict, status2, 'novy kolidujuci par sa chyti')
 end
 
 NxTest.test('demos b2: demos polia preziju cudzi patch (merge-safe normalize) a nesu SCHEMA 5') do

@@ -42,6 +42,11 @@ module Noxun
       # emit: proc(event) — vola sa LEN kym alive vracia true.
       def run(records, alive:, emit:)
         ctx = new_ctx(alive, emit)
+        # GH #97 P1: vyrobca je sucast identity skupiny (standard 7.1 — skupina
+        # = vyrobca + cislo dekoru). Odvodi sa zo sheet zaznamov skupiny (ABS
+        # pasky pole nemaju) a overuje sa proti itemprop brand stranky.
+        ctx['manufacturer'] = Array(records).map { |r| r['manufacturer'].to_s.strip }
+                                            .find { |m| !m.empty? }
         pre = []
         work = []
         Array(records).each do |rec|
@@ -51,6 +56,13 @@ module Noxun
           else
             work << [rec, kind]
           end
+        end
+        # GH #97 P2: vsetko preskocene = ziadna URL netreba — complete HNED,
+        # bez sitemap (fresh install by zbytocne stahoval 9,5 MB a pripadny
+        # nesuvisiaci fail refreshu by zhodil ok=false).
+        if work.empty?
+          pre.each { |p| deliver_proposal(ctx, p) }
+          return complete(ctx, true, nil)
         end
         ensure_urls(ctx) do |urls, stale_warning, err|
           next unless ctx['alive'].call
@@ -79,8 +91,12 @@ module Noxun
       # Manualna URL pre JEDEN zaznam (fallback pri miss/ambiguous). Ziadna
       # sitemap — sanitize + fetch + PLNE verify (slug finalnej URL musi sediet
       # s identitou zaznamu rovnako tvrdo ako pri automatickom matchi).
-      def manual(rec, url, alive:, emit:)
+      # manufacturer: vyrobca SKUPINY (ABS zaznam ho nenesie — dodava volajuci,
+      # ktory skupinu pozna); nil = zaznam/skupina bez vyrobcu, brand sa neoveri.
+      def manual(rec, url, alive:, emit:, manufacturer: nil)
         ctx = new_ctx(alive, emit)
+        ctx['manufacturer'] = manufacturer.to_s.strip.empty? ? rec['manufacturer'].to_s.strip : manufacturer.to_s.strip
+        ctx['manufacturer'] = nil if ctx['manufacturer'].empty?
         kind = rec['abs_id'].to_s.empty? ? 'sheet' : 'edge'
         if (skip = skip_reason(rec, kind))
           deliver_proposal(ctx, base_proposal(rec, kind).merge('status' => skip[0], 'warnings' => [skip[1]]))
@@ -172,12 +188,17 @@ module Noxun
 
       # Sekvencne (throttle 3 s ma zmysel len v rade); alive sa kontroluje PRED
       # kazdym dalsim fetchom — cancel znamena ziadne dalsie requesty.
+      # GH #97 P2: 'completed' (watchdog timeout uz ohlasil koniec) zastavuje
+      # retaz ROVNAKO ako mrtvy alive — neskoro dosla odpoved visiaceho
+      # requestu nesmie potichu rozbehnut zvysne fetche popri novom pokuse.
       def fetch_chain(ctx, queue)
+        return if ctx['completed']
         return complete(ctx, true, nil) if queue.empty?
         return unless ctx['alive'].call
         rec, kind, url = queue.shift
         reset_watchdog(ctx)
         Demos.fetch(url) do |res|
+          next if ctx['completed']
           next unless ctx['alive'].call
           reset_watchdog(ctx)
           deliver_proposal(ctx, proposal_from_fetch(ctx, rec, kind, res))
@@ -194,7 +215,7 @@ module Noxun
         end
         parsed = DemosProductParser.parse(res['body'])
         final_url = res['url'].to_s
-        unless parsed['ok'] && verified?(rec, kind, parsed, final_url)
+        unless parsed['ok'] && verified?(ctx, rec, kind, parsed, final_url)
           return p.merge('status' => 'identity_fail', 'url' => final_url,
                          'warnings' => Array(parsed['warnings']) +
                                        ['stránka nesedí s identitou záznamu — kód a cena sa nepreberajú'])
@@ -208,11 +229,20 @@ module Noxun
       # sirku+hrubku; identity_match? dokazuje parametre stranky (dekor,
       # struktura, hrubka, format). Pri ABS sa navyse porovna sirka z tabulky
       # parametrov, ak ju stranka uvadza (slug ostava autoritou).
-      def verified?(rec, kind, parsed, final_url)
+      # GH #97 P1: vyrobca — skupina S vyrobcom vyzaduje ZHODNY brand stranky
+      # (H3303 existuje u Eggera aj inde; cislo dekoru bez vyrobcu nie je
+      # identita, standard 7.1). Chybajuci brand pri zaznamenom vyrobcovi =
+      # NIE zhoda (vzor identity_match? — chybajuci komponent nie je dokaz).
+      def verified?(ctx, rec, kind, parsed, final_url)
         slug = DemosSlugMatcher.slug_of(final_url)
         toks = DemosSlugMatcher.record_tokens(rec)
         return false unless DemosSlugMatcher.score(slug, toks)
         return false unless DemosProductParser.identity_match?(parsed, rec)
+        if ctx['manufacturer']
+          brand = parsed['brand'].to_s
+          return false if brand.strip.empty?
+          return false unless Materials.identity_norm(brand) == Materials.identity_norm(ctx['manufacturer'])
+        end
         if kind == 'edge'
           pw = parsed['params'] && parsed['params']['width']
           return false if pw && (pw.to_f - rec['width'].to_f).abs > 0.011
