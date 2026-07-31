@@ -2,11 +2,11 @@
 
 > Princíp: **najprv všeobecný základ pre všetko, potom vyostrovanie.** Regenerate pattern robí konštrukčné zmeny lacnými — drahé je len meniť DÁTOVÝ MODEL (atribúty, identita, hrany), preto ten je uzamknutý štandardom vopred a detaily geometrie sa doladia iteráciami z klikania.
 
-## Kde sme (31.7.2026)
+## Kde sme (1.8.2026)
 
-- Plugin **v0.5.10** — **dávka 2A KOMPLET (2A-0 … 2A-4b)**: katalóg materiálov beží na **SCHEMA 2** (skupina = výrobca + číslo dekoru cez `group_id`; variant = + typ + hrúbka + štruktúra povrchu, pri PD aj formát). **2A-4b (ostrý cutover)**: migrácia sa spúšťa pri každom štarte SketchUpu (`boot_cutover!` — bezpečný blok, žiadny modal; nemenná záloha `materials.pre-schema-2.json` + rollback tlačidlo s jednorazovým holdom), seedy natívne SCHEMA 2, okno Materiály na skupinách (dlaždice výrobca·číslo·názov, detail per štruktúra, universal toggle, banner nepoužiteľných pások, read-only banner s obnovou zálohy), batch „Nový dekor" v3 (číslo + názov + štruktúra per variant + universal), labely so štruktúrou a výrobcom pri kolízii čísla, VEPO exportný label bajtovo NEMENNÝ (zlatý test), **D-47** hlavička panela (taby s ikonami + Materiály·Výroba).
-- Testy: **585 headless + 386 JS v 13 sadách (CI na každý push) + ~150 in-SketchUp scenárov** (nová sekcia run_2a4).
-- Práve beží: dokončenie V0.6 vetvy — po 2A nasleduje 2B (duplák/zástena) a B–E (Demos lookup, kovanie katalóg, mapovanie, ceny).
+- Plugin **v0.5.15** — v rámci V0.6 hotové: **2A (SCHEMA 2 skupiny + cutover, PR #89–#93)**, **2B (duplák #94 / zástena #95 — SCHEMA 3/4 lazy)** a **dávka B Demos lookup KOMPLET**: **B-1 core** (#96 — klient s allowlist/robots/throttle 3 s, sitemap cache 48k URL, slug matcher s plnou identitou, parser produktovej stránky), **B-2a server** (#97 — orchestrátor lookupu s fetch-om každého variantu a overením slug+parametre+výrobca, atomický `apply_demos_batch`, **SCHEMA 5** = pohyblivá cenová cache `demos_url`+`price_checked_at`), **B-2b UI** (okno Materiály: tlačidlo „Aktualizovať z Demosu" v detaile dekoru, diff modal s checkboxami — predvolene ON len prázdne polia, ručná URL pre nenájdené, XSS-safe DOM render, ruby session token).
+- Testy: **672 headless + 449 JS v 13 sadách (CI na každý push) + ~140 in-SketchUp scenárov**.
+- Práve beží: **V0.6 dávka C — kovanie katalóg** (prevzatie CatalogStore/SearchEngine vzorov z KOVANIE; ceny S DPH), potom D (flag→ZOZNAM kódov setov) a E (ceny v sumári + „Prepočítať ceny").
 - Ďalej: **V0.6 KOVANIE fáza 2** · V0.4.8 otvorená/neplánovaná · V1.0 zostavy.
 
 ## Hotové etapy (kompakt)

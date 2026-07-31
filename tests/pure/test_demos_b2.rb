@@ -469,6 +469,49 @@ NxTest.test('demos b2: apply — price-only na zazname s VEDOME povolenou duplic
   NxTest.assert_equal(:code_conflict, status2, 'novy kolidujuci par sa chyti')
 end
 
+NxTest.test('demos b2b: demos_items_from_accepts — hodnoty VYHRADNE zo server store, flagy z UI') do
+  store = {
+    ['sheet', 'M1'] => { 'record_id' => 'M1', 'kind' => 'sheet', 'status' => 'match',
+                         'url' => DB2_DTDL18_URL,
+                         'code' => { 'old' => nil, 'new' => '175718' },
+                         'price' => { 'old' => nil, 'new' => 18.99, 'unchanged' => false } },
+    ['edge', 'E1'] => { 'record_id' => 'E1', 'kind' => 'edge', 'status' => 'match',
+                        'url' => DB2_DTDL18_URL,
+                        'code' => { 'old' => 'A', 'new' => 'A' },
+                        'price' => { 'old' => 0.55, 'new' => 0.55, 'unchanged' => true } }
+  }
+  items = MAT2.demos_items_from_accepts(
+    [{ 'kind' => 'sheet', 'id' => 'M1', 'code' => true, 'price' => true, 'row_rev' => 'r1' },
+     { 'kind' => 'edge', 'id' => 'E1', 'price' => true, 'row_rev' => 'r2' },
+     { 'kind' => 'sheet', 'id' => 'NEZNAMY', 'code' => true, 'row_rev' => 'r3' }],
+    store
+  )
+  NxTest.assert_equal(2, items.length, 'polozka bez proposalu sa VYNECHA')
+  m1 = items.find { |i| i['id'] == 'M1' }
+  NxTest.assert_equal('175718', m1['fields']['code'], 'kod zo STORE, nie z payloadu')
+  NxTest.assert_close(18.99, m1['fields']['price'], 0.001)
+  NxTest.assert_equal(DB2_DTDL18_URL, m1['fields']['demos_url'])
+  NxTest.assert_equal('r1', m1['row_rev'])
+  e1 = items.find { |i| i['id'] == 'E1' }
+  NxTest.assert_equal(true, e1['fields']['price_confirmed'], 'unchanged cena -> len potvrdenie datumu')
+  NxTest.refute(e1['fields'].key?('price'), 'hodnota sa pri unchanged NEposiela')
+  # code flag na zazname so ZHODNYM kodom nic nemeni — polozka bez realneho
+  # pola sa VYNECHA cela (apply by ju odmietol ako "nic nemeni")
+  items2 = MAT2.demos_items_from_accepts(
+    [{ 'kind' => 'edge', 'id' => 'E1', 'code' => true, 'row_rev' => 'r2' }], store
+  )
+  NxTest.assert_equal(0, items2.length, 'zhodny kod bez dalsieho pola = polozka vypadne')
+  # GH #98 P2: base_revs (baseline z casu lookupu) ma prednost pred klientskym
+  # row_rev; zaznam bez baseline sa vynecha (navrh nema dokazany povod).
+  items3 = MAT2.demos_items_from_accepts(
+    [{ 'kind' => 'sheet', 'id' => 'M1', 'code' => true, 'row_rev' => 'KLIENTSKE' },
+     { 'kind' => 'edge', 'id' => 'E1', 'price' => true, 'row_rev' => 'KLIENTSKE' }],
+    store, { %w[sheet M1] => 'BASE-LOOKUP' }
+  )
+  NxTest.assert_equal(1, items3.length, 'polozka bez server baseline vypadla')
+  NxTest.assert_equal('BASE-LOOKUP', items3[0]['row_rev'], 'row_rev zo SERVER baseline, nie z klienta')
+end
+
 NxTest.test('demos b2: demos polia preziju cudzi patch (merge-safe normalize) a nesu SCHEMA 5') do
   db2_seed!
   st, = MAT2.apply_demos_batch(

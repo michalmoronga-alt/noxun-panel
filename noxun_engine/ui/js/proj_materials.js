@@ -350,7 +350,10 @@
         '<button class="ghostbtn tplbtn"' + dis + ' onclick="mdOpenDecorForm(' + esc(JSON.stringify(g.key)) + ')">+ variant</button>' +
         '<button class="ghostbtn tplbtn"' + dis + ' onclick="mdManufacturerOpen(' + esc(JSON.stringify(g.key)) + ')">Výrobca</button>' +
         (MD_SCHEMA2 ? '<button class="ghostbtn tplbtn"' + dis + ' onclick="mdNameOpen(' + esc(JSON.stringify(g.key)) + ')">Názov</button>' : '') +
-        '<button class="ghostbtn tplbtn"' + dis + ' onclick="mdRenameOpen(' + esc(JSON.stringify(g.key)) + ')">Premenovať</button>') +
+        '<button class="ghostbtn tplbtn"' + dis + ' onclick="mdRenameOpen(' + esc(JSON.stringify(g.key)) + ')">Premenovať</button>' +
+        // V0.6 B-2b (N17): ikonove tlacidlo v EXISTUJUCOM rade akcii (vertikalny
+        // priestor) — lookup kodov a cien celej dekorovej skupiny na Demose.
+        '<button class="ghostbtn tplbtn"' + dis + ' title="Aktualizovať kódy a ceny z Demosu" aria-label="Aktualizovať z Demosu" onclick="mddLookup(' + esc(JSON.stringify(g.key)) + ')"><svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg></button>') +
       '</div>';
     // GH #93 P2: editacia NAZVU skupiny (decor_name — zobrazovacia vlastnost,
     // meni sa atomicky celej skupine cez group_id; prazdny nazov = vymazanie).

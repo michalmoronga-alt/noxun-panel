@@ -284,6 +284,21 @@
   .nxmodal-title { font-weight: 600; font-size: 14px; margin-bottom: 10px; color: var(--nx-ink); }
   .nxmodal-warn { background: var(--nx-warn-bg); border: 1px solid var(--nx-warn); color: var(--nx-modalwarn-fg);
                   border-radius: 4px; padding: 6px 8px; font-size: 12px; margin: 8px 0; }
+  /* ===== V0.6 B-2b: Demos diff modal (okno Materialy) ===== */
+  .nxmodal-wide { width: min(94%, 560px); max-height: 86vh; display: flex; flex-direction: column; }
+  .mddbody { overflow-y: auto; flex: 1; min-height: 60px; margin: 6px 0; }
+  .mddrow { display: flex; gap: 8px; align-items: flex-start; padding: 5px 6px;
+            border-bottom: 1px solid var(--nx-border); font-size: 12px; }
+  .mddrow.mdderr { outline: 1px solid var(--nx-warn); background: var(--nx-warn-bg); }
+  .mddlbl { flex: 0 0 38%; color: var(--nx-ink); overflow-wrap: anywhere; }
+  .mddoffers { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+  .mddoffer { display: flex; gap: 6px; align-items: baseline; cursor: pointer; }
+  .mddsame { color: var(--nx-ink-soft); }
+  .mddwarn { color: var(--nx-modalwarn-fg); font-size: 11px; }
+  .mddcand { color: var(--nx-ink-soft); font-size: 11px; overflow-wrap: anywhere; }
+  .mddacc { color: var(--nx-ink-soft); font-size: 11px; padding: 2px 6px; }
+  .mddmanual { display: flex; gap: 6px; margin-top: 3px; }
+  .mddmanual input { flex: 1; min-width: 0; }
   /* ===== V0.5 B: okno Vyroba (kusovnik/supisy) ===== */
   .prodhead { display: flex; align-items: center; gap: 10px; }
   .prodhead h1 { margin: 0; }
