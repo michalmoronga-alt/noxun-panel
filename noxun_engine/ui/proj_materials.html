@@ -3,7 +3,7 @@
      (%APPDATA%). -->
 <!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.5.14">
+<link rel="stylesheet" href="css/panel.css?v=0.5.15">
 
 <h1>Materiály projektu</h1>
 <p class="sub" id="mdline">…</p>
@@ -214,6 +214,22 @@
   </div>
 </div>
 
+<!-- V0.6 B-2b: Demos diff modal — lookup a apply kódov/cien dekorovej skupiny.
+     Obsah stavia demos_diff.js VÝHRADNE cez DOM API (textContent — XSS audit
+     BLOCKER 6); ovládanie cez data-action delegáciu, žiadne inline handlery
+     s dátami. Server (Ruby) je autorita hodnôt — apply posiela len flagy. -->
+<div id="demosModal" class="nxmodal" style="display:none">
+  <div class="nxmodal-card nxmodal-wide">
+    <div class="nxmodal-title">Aktualizovať z Demosu</div>
+    <div class="hint" id="mddStatus">…</div>
+    <div id="mddBody" class="mddbody"></div>
+    <div class="btnrow">
+      <button class="primary" id="mddApplyBtn" data-action="mdd-apply" disabled>Zapísať vybrané</button>
+      <button class="ghostbtn" data-action="mdd-cancel">Zavrieť</button>
+    </div>
+  </div>
+</div>
+
 <!-- D-44: zoznamy návrhov pre našepkávače (výrobca, typ dosky). Nerenderujú sa —
      napĺňa ich JS z payloadu servera; používa ich batch aj inline editor výrobcu. -->
 <datalist id="mdManList"></datalist>
@@ -221,7 +237,10 @@
 
 <div id="status">Pripravené.</div>
 
-<!-- icons.js prvy (sprite musi existovat pred prvym renderom mdRenderLists) -->
-<script src="js/errors.js?v=0.5.14"></script>
-<script src="js/icons.js?v=0.5.14"></script>
-<script src="js/proj_materials.js?v=0.5.14"></script>
+<!-- icons.js prvy (sprite musi existovat pred prvym renderom mdRenderLists);
+     demos_diff.js pred proj_materials.js (mddLookup pouzivaju onclick handlery
+     detailu; ready() bezi az na konci proj_materials.js). -->
+<script src="js/errors.js?v=0.5.15"></script>
+<script src="js/icons.js?v=0.5.15"></script>
+<script src="js/demos_diff.js?v=0.5.15"></script>
+<script src="js/proj_materials.js?v=0.5.15"></script>

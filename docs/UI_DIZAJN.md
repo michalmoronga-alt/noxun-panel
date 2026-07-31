@@ -150,7 +150,8 @@ Aktuálny set: `maximize` (fit), `alert`, `lock` / `lock-open`, `eye` / `eye-off
 `copy`, `factory` (Výroba), `settings`, `star`, `rotate-ccw` (reset), `x`, `plus`,
 `check`, `chevron-right` (disclosure), `link`, `search`, `arrow-left`, `trash`,
 `pencil`, `box` (tab Korpus), `layout-grid` (tab Zóny), `columns-2` (tab Čelá),
-`layers` (Materiály), `globe` (universal ABS), `info` (banner), `logo`.
+`layers` (Materiály), `globe` (universal ABS), `info` (banner),
+`refresh-cw` (Aktualizovať z Demosu — detail dekoru), `logo`.
 
 ### D-47: hlavička panela (rad 2)
 Tri režimové taby (Korpus·Zóny·Čelá) sú **rovnako široké** (`flex: 1 1 0`)

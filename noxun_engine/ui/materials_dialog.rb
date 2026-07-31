@@ -57,7 +57,13 @@ module Noxun
           )
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'proj_materials.html'))
           register_callbacks(@dialog) # pred show!
-          @dialog.set_on_closed { @dialog = nil }
+          # B-2b (audit BLOCKER 5): zatvorenie okna zneplatni bezaci Demos
+          # lookup (session bump) — nova instancia okna nesmie dostat eventy
+          # starej (ABA: visible? by po reopene patrilo NOVEMU oknu).
+          @dialog.set_on_closed do
+            demos_bump_session
+            @dialog = nil
+          end
           @dialog
         end
 
@@ -86,6 +92,11 @@ module Noxun
           cb(dlg, 'patch_edge')  { |p| handle_patch(p, 'edge') }
           # 2A-4b (audit B2): rollback na predmigracnu zalohu z read-only banneru.
           cb(dlg, 'restore_pre_schema2') { |p| handle_restore_backup(p) }
+          # V0.6 B-2b: Demos lookup + apply dekorovej skupiny (diff modal).
+          cb(dlg, 'demos_lookup')     { |p| handle_demos_lookup(p) }
+          cb(dlg, 'demos_manual_url') { |p| handle_demos_manual(p) }
+          cb(dlg, 'demos_apply')      { |p| handle_demos_apply(p) }
+          cb(dlg, 'demos_cancel')     { |_p| handle_demos_cancel }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(materials): #{msg}")
@@ -292,11 +303,153 @@ module Noxun
         # Volane z EngineAppObserver: predvolby su per model — otvoreny formular
         # sa pri File > New/Open/Activate naplni z prave aktivneho modelu.
         def on_model_changed(_model)
+          demos_bump_session # B-2b: prepnuty model rusi bezaci Demos lookup
           return unless @dialog && @dialog.visible?
           push_state
           set_status('Aktívny model sa zmenil — predvoľby načítané z tohto modelu.')
         rescue StandardError => e
           Engine.log_error(e, 'MaterialsDialog.on_model_changed')
+        end
+
+        # --- V0.6 B-2b: Demos lookup / apply (audit BLOCKER 5/6, FIX 13/14) ---
+        # Session token je MONOTONNE Ruby cislo — jedina autorita zivotnosti
+        # lookupu. Bump: novy lookup, cancel, zatvorenie okna, prepnuty model.
+        # JS generation sa NEpouziva (close/reopen ABA). Proposal store zije
+        # TU (server) — apply berie hodnoty z neho, JS posiela len flagy.
+
+        def demos_bump_session
+          @demos_session = @demos_session.to_i + 1
+        end
+
+        # Zaznamy skupiny podla kluca dlazdice ('g:<group_id>' | 'd:<decor>' —
+        # zrkadlo mdGroupKeyOf v JS; server filtruje SVOJ katalog, klientskym
+        # zoznamom ID sa neveri).
+        def demos_group_records(group_key)
+          key = group_key.to_s
+          cat = Materials.load
+          sel =
+            if key.start_with?('g:')
+              gid = key[2..]
+              ->(r) { r['group_id'].to_s == gid }
+            elsif key.start_with?('d:')
+              dec = key[2..]
+              ->(r) { r['decor'].to_s.strip == dec }
+            end
+          return [] unless sel
+          cat['sheets'].select(&sel) + cat['edges'].select(&sel)
+        end
+
+        def demos_alive_proc(session, dlg)
+          -> { @demos_session.to_i == session && @dialog && @dialog.equal?(dlg) && @dialog.visible? }
+        end
+
+        # Emit: proposal matche sa odkladaju do @demos_proposals (apply z nich
+        # cita hodnoty); kazdy event ide do MDD.event so session echom.
+        def demos_emit_proc(session)
+          lambda do |event|
+            if event['type'] == 'proposal'
+              p = event['proposal']
+              if p.is_a?(Hash) && p['status'] == 'match'
+                (@demos_proposals ||= {})[[p['kind'].to_s, p['record_id'].to_s]] = p
+              end
+            end
+            js("MDD.event(#{event.merge('session' => session).to_json})")
+          end
+        end
+
+        def handle_demos_lookup(payload)
+          data = JSON.parse(payload.to_s)
+          return unless schema_ok?(data) # okno musi poznat format katalogu (GH #97 P1)
+          recs = demos_group_records(data['group_key'])
+          return set_status('Skupina sa nenašla — katalóg sa obnovil.', true) if recs.empty?
+          demos_bump_session
+          @demos_proposals = {}
+          session = @demos_session
+          DemosLookup.run(recs, alive: demos_alive_proc(session, @dialog),
+                                emit: demos_emit_proc(session))
+        end
+
+        # FIX 13: manualna URL je priama cesta (bez sitemap). NEbumpuje session
+        # — doplna proposal do BEZIACEHO kontextu modalu (miss/ambiguous riadok).
+        def handle_demos_manual(payload)
+          data = JSON.parse(payload.to_s)
+          return unless schema_ok?(data)
+          kind = data['kind'].to_s == 'edge' ? 'edge' : 'sheet'
+          rec = demos_find_record(kind, data['record_id'].to_s)
+          return set_status('Záznam sa nenašiel — katalóg sa obnovil.', true) unless rec
+          session = @demos_session.to_i
+          manufacturer = demos_group_manufacturer(rec)
+          DemosLookup.manual(rec, data['url'].to_s,
+                             alive: demos_alive_proc(session, @dialog),
+                             emit: demos_emit_proc(session),
+                             manufacturer: manufacturer)
+        end
+
+        def demos_find_record(kind, id)
+          cat = Materials.load
+          if kind == 'edge'
+            cat['edges'].find { |e| e['abs_id'] == id }
+          else
+            cat['sheets'].find { |s| s['material_id'] == id }
+          end
+        end
+
+        # Vyrobca SKUPINY zaznamu (GH #97 P1) — ABS paska ho nenesie, odvodi sa
+        # zo sheet clenov jej skupiny (group_id, fallback decor).
+        def demos_group_manufacturer(rec)
+          man = rec['manufacturer'].to_s.strip
+          return man unless man.empty?
+          cat = Materials.load
+          gid = rec['group_id'].to_s
+          dec = rec['decor'].to_s.strip
+          member = cat['sheets'].find do |s|
+            if !gid.empty?
+              s['group_id'].to_s == gid && !s['manufacturer'].to_s.strip.empty?
+            else
+              s['decor'].to_s.strip == dec && !s['manufacturer'].to_s.strip.empty?
+            end
+          end
+          member ? member['manufacturer'].to_s.strip : nil
+        end
+
+        def handle_demos_apply(payload)
+          data = JSON.parse(payload.to_s)
+          return js('MDD.fail({})') unless catalog_write_ok?(data)
+          items = Materials.demos_items_from_accepts(data['accepts'], @demos_proposals || {})
+          if items.empty?
+            set_status('Nie je čo zapísať — nič nie je zaškrtnuté.', true)
+            return js('MDD.fail({})')
+          end
+          status, report = Materials.apply_demos_batch(items, catalog_rev: data['catalog_rev'].to_s)
+          case status
+          when :ok
+            demos_bump_session
+            @demos_proposals = {}
+            after_catalog_change
+            js("MDD.done(#{report.to_json})")
+            set_status("Aktualizované z Demosu: #{report['applied'].length} záznamov.")
+          when :stale_catalog, :conflict, :not_found
+            # FIX 14: atomicky rezim — modal OSTAVA, vinnik sa oznaci, cerstve
+            # hodnoty pridu cez push_catalog (dalsi pokus ma nove row_rev).
+            js("MDD.fail(#{{ 'status' => status.to_s, 'id' => report['id'] }.to_json})")
+            set_status('Neaktualizované nič — katalóg sa medzitým zmenil, skontroluj riadky a skús znova.', true)
+            push_catalog
+          when :code_conflict
+            js("MDD.fail(#{{ 'status' => 'code_conflict', 'id' => report['id'] }.to_json})")
+            set_status("Neaktualizované nič — kód by sa zdvojil (#{Array(report['detail']).first(3).join(', ')}).", true)
+          when :catalog_read_only
+            js('MDD.fail({})')
+            set_status(Materials.catalog_read_only_message, true)
+          else # :invalid, :duplak, :write_failed
+            js("MDD.fail(#{{ 'status' => status.to_s, 'id' => report['id'] }.to_json})")
+            set_status("Neaktualizované nič — #{report['detail'] || 'položka sa nedá zapísať'}.", true)
+            push_catalog
+          end
+        end
+
+        def handle_demos_cancel
+          demos_bump_session
+          set_status('Aktualizácia z Demosu zrušená.')
         end
 
         # --- akcia ----------------------------------------------------------
