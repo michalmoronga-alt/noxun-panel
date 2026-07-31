@@ -253,12 +253,24 @@ module Noxun
 
         # VEPO stlpec material: dekor + typ (hrubka je vlastny stlpec); fallback
         # family, fallback material_id. Tvar mapy definuje audit F7.
+        #
+        # 2A-4b (audit F8): 'label' je EXPORTNY label — grouping + nazov suboru
+        # + CSV stlpec. Jeho tvar sa NEMENI (dogfooding kontrakt: rovnake data
+        # = bajtovo zhodny CSV vystup; strazi ho zlaty test). Struktura ide
+        # VYHRADNE do 'display' (zobrazovaci/LOG label) — po migracii sklada
+        # cislo + strukturu + nazov + typ, co pre zmigrovany zaznam da presne
+        # citatelny tvar ("K009 PW DTDL"), zatial co 'label' ostava derivat
+        # POLI zaznamu ako doteraz.
         def vepo_materials
           Materials.sheets.each_with_object({}) do |s, out|
             label = "#{s['decor']} #{s['type']}".strip
             label = s['family'].to_s.strip if label.empty?
             label = s['material_id'].to_s if label.empty?
-            out[s['material_id']] = { 'label' => label }
+            display = [s['decor'], s['structure'], s['decor_name'], s['type']]
+                      .map { |v| v.to_s.strip }.reject(&:empty?).join(' ')
+            entry = { 'label' => label }
+            entry['display'] = display unless display.empty? || display == label
+            out[s['material_id']] = entry
           end
         end
 

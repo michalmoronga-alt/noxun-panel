@@ -64,11 +64,13 @@ module Noxun
       # primar (existuje -> available?), zaloha .bak alebo predmigracna zaloha
       # znamenaju OBNOVITELNE data — seed by ich zamaskoval. Read-only rezim
       # seed tiez nikdy nespusta.
+      # 2A-4b (audit F9): panensky stav sa seeduje NATIVNE v SCHEMA 2 (marker 2)
+      # — fresh install uz nikdy nemigruje.
       def ensure_seeded
         return if JsonFileStore.available?(path)
         return if catalog_read_only?
         return if File.exist?(pre_schema2_backup_path)
-        write({ 'sheets' => seed_sheets, 'edges' => seed_edges })
+        write({ 'sheets' => seed_sheets, 'edges' => seed_edges, 'schema' => SCHEMA_GROUPS })
       end
 
       # --- davka 2: validacia + generovanie ID + scan pouzitia -----------------
@@ -305,9 +307,12 @@ module Noxun
       # Server: whitelist mutable poli (identita sa patchom NIKDY nemeni),
       # merge s CERSTVYM zaznamom pred validaciou, baseline per RIADOK (nie
       # globalny catalog_rev — ina bunka/iny zaznam nekoliduje zbytocne).
+      # 2A-4b: 'universal' na ABS je VLASTNOST VYBERU, nie identita (standard
+      # 7.5) — toggle v karte skupiny ho meni patchom; false hodnotu
+      # normalize_edge kluc odstrani (merge-safe).
       PATCHABLE = {
         'sheet' => %w[code supplier price_per_m2],
-        'edge'  => %w[code supplier price_per_bm]
+        'edge'  => %w[code supplier price_per_bm universal]
       }.freeze
 
       # Odtlacok JEDNEHO zaznamu (baseline dirty riadku; posiela sa v payloade).
@@ -363,46 +368,73 @@ module Noxun
         end
       end
 
-      # --- seed (predvolene zaznamy podla zadania V0.3) ------------------------
+      # --- seed (predvolene zaznamy; 2A-4b = nativne SCHEMA 2, audit F9) -------
+      # ID ostavaju PRESNE povodne (opaque, navzdy nemenne — PROJECT_FALLBACK aj
+      # existujuce modely sa viazu na ne). Skupinove polia podla standardu 7.1:
+      # decor = cislo, structure z nazvu (K009 -> PW, W1000 -> ST9, HDF biela
+      # bez struktury), decor_name kde dava zmysel, manufacturer na doskach,
+      # group_id deterministicky cez group_id_for (ta ista autorita ako
+      # migracia 2A-2 — cerstvy seed a zmigrovany katalog daju rovnake skupiny).
+
+      def seed_group_kronospan_k009
+        group_id_for('Kronospan', 'K009')
+      end
+
+      def seed_group_egger_w1000
+        group_id_for('Egger', 'W1000')
+      end
 
       # Doskove materialy: K009 PW dub 18/16, HDF biela 3, W1000 biela celova 18.
       def seed_sheets
         [
           {
             'material_id' => 'K009_PW_DTDL_18', 'family' => 'Kronospan K009 PW',
-            'manufacturer' => 'Kronospan', 'decor' => 'K009 PW', 'type' => 'DTDL',
+            'manufacturer' => 'Kronospan', 'decor' => 'K009', 'structure' => 'PW',
+            'group_id' => seed_group_kronospan_k009, 'type' => 'DTDL',
             'thickness' => 18.0, 'grain' => 'length', 'price_per_m2' => 12.5,
             'sheet_size' => [2800.0, 2070.0], 'color' => [198, 168, 122], 'production_class' => 'sheet'
           },
           {
             'material_id' => 'K009_PW_DTDL_16', 'family' => 'Kronospan K009 PW',
-            'manufacturer' => 'Kronospan', 'decor' => 'K009 PW', 'type' => 'DTDL',
+            'manufacturer' => 'Kronospan', 'decor' => 'K009', 'structure' => 'PW',
+            'group_id' => seed_group_kronospan_k009, 'type' => 'DTDL',
             'thickness' => 16.0, 'grain' => 'length', 'price_per_m2' => 11.8,
             'sheet_size' => [2800.0, 2070.0], 'color' => [198, 168, 122], 'production_class' => 'sheet'
           },
           {
             'material_id' => 'HDF_WHITE_3', 'family' => 'HDF biela',
-            'manufacturer' => 'Kronospan', 'decor' => 'Biela HDF', 'type' => 'HDF',
+            'manufacturer' => 'Kronospan', 'decor' => 'Biela HDF',
+            'group_id' => group_id_for('Kronospan', 'Biela HDF'), 'type' => 'HDF',
             'thickness' => 3.0, 'grain' => 'none', 'price_per_m2' => 3.2,
             'sheet_size' => [2800.0, 2070.0], 'color' => [238, 236, 230], 'production_class' => 'sheet'
           },
           {
             'material_id' => 'W1000_DTDL_18', 'family' => 'Egger W1000 ST9',
-            'manufacturer' => 'Egger', 'decor' => 'W1000 ST9 Biela', 'type' => 'DTDL',
+            'manufacturer' => 'Egger', 'decor' => 'W1000', 'decor_name' => 'Biela',
+            'structure' => 'ST9', 'group_id' => seed_group_egger_w1000, 'type' => 'DTDL',
             'thickness' => 18.0, 'grain' => 'none', 'price_per_m2' => 13.9,
             'sheet_size' => [2800.0, 2070.0], 'color' => [246, 246, 244], 'production_class' => 'sheet'
           }
         ]
       end
 
-      # ABS pasky: podporujeme iba realne pouzivane hrubky 1.0 a 2.0 mm.
+      # ABS pasky nesu PRESNU strukturu svojej dosky (PW/ST9) — picker
+      # abs_for_sheet ich najde hned po fresh installe (vetva A). Priznak
+      # universal seedy NENESU (audit O3): universal je VEDOMY priznak pre
+      # jednofarebne pasky bez struktury (Biela korpus, UNI — v Michalovom
+      # zivom katalogu, NIE v seedoch) a oznacuje sa v katalogu togglom;
+      # strukturna paska ho nikdy nepotrebuje. Seed set ziadnu bezstrukturnu
+      # pasku nema, takze fresh install nema co oznacovat (0 v banneri).
       def seed_edges
         [
-          { 'abs_id' => 'ABS_K009_10', 'decor' => 'K009 PW', 'thickness' => 1.0,
+          { 'abs_id' => 'ABS_K009_10', 'decor' => 'K009', 'structure' => 'PW',
+            'group_id' => seed_group_kronospan_k009, 'thickness' => 1.0,
             'price_per_bm' => 0.55, 'color' => [198, 168, 122] },
-          { 'abs_id' => 'ABS_K009_20', 'decor' => 'K009 PW', 'thickness' => 2.0,
+          { 'abs_id' => 'ABS_K009_20', 'decor' => 'K009', 'structure' => 'PW',
+            'group_id' => seed_group_kronospan_k009, 'thickness' => 2.0,
             'price_per_bm' => 0.85, 'color' => [198, 168, 122] },
-          { 'abs_id' => 'ABS_W1000_10', 'decor' => 'W1000 ST9 Biela', 'thickness' => 1.0,
+          { 'abs_id' => 'ABS_W1000_10', 'decor' => 'W1000', 'decor_name' => 'Biela',
+            'structure' => 'ST9', 'group_id' => seed_group_egger_w1000, 'thickness' => 1.0,
             'price_per_bm' => 0.60, 'color' => [246, 246, 244] }
         ]
       end

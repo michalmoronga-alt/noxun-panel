@@ -105,17 +105,18 @@ module Noxun
         # structure (+universal pri ABS) LEN ked existuju (prazdne kluce sa
         # neposielaju — zrkadlo katalogovej semantiky).
         def materials_payload
+          ctx = label_ctx # 2A-4b: kolizie cisla dekoru raz pre cely payload
           {
             'catalog_schema' => Materials.catalog_schema,
             'sheets' => Materials.sheets.map { |s|
               # grain (V0.4.7c, Codex GH #33): vkladacia karta dosky predvyplna smer
               # dekoru z katalogu — bez grain by formular posielal nespravny default.
-              { 'id' => s['material_id'], 'label' => sheet_label(s), 'decor' => s['decor'],
+              { 'id' => s['material_id'], 'label' => sheet_label(s, ctx), 'decor' => s['decor'],
                 'thickness' => s['thickness'], 'color' => s['color'], 'grain' => s['grain'] }
                 .merge(schema2_mirror_fields(s))
             },
             'edges' => Materials.edges.map { |a|
-              { 'id' => a['abs_id'], 'label' => abs_label(a), 'decor' => a['decor'],
+              { 'id' => a['abs_id'], 'label' => abs_label(a, ctx), 'decor' => a['decor'],
                 'thickness' => a['thickness'], 'width' => a['width'], 'color' => a['color'] }
                 .merge(schema2_mirror_fields(a, universal: true))
             }
@@ -136,18 +137,53 @@ module Noxun
           out
         end
 
-        def sheet_label(s)
+        # 2A-4b (audit F10): kontext labelov. V SCHEMA 2 sa rovnake cislo dekoru
+        # moze LEGALNE opakovat u dvoch vyrobcov (dve skupiny) — label vtedy
+        # MUSI niest vyrobcu, inak su selecty nejednoznacne. Vyrobca sa pridava
+        # VYHRADNE pri kolizii (bezny katalog ostava kratky). V SCHEMA 1 je
+        # ctx nil a labely su PRESNE dnesne (dual-mode). Hot loops si ctx
+        # postavia RAZ a posielaju ho dalej (default je pre pohodlie volajucich
+        # s jednym zaznamom).
+        def label_ctx
+          return nil unless Materials.catalog_schema >= Materials::SCHEMA_GROUPS
+          reg = Materials.v3_groups_registry
+          counts = Hash.new(0)
+          reg.each_value { |g| counts[Materials.identity_norm(g['decor'])] += 1 }
+          {
+            'collisions' => counts.select { |_, n| n > 1 },
+            'group_man' => reg.transform_values { |g| g['manufacturer'] }
+          }
+        end
+
+        # Zaklad labelu zaznamu: [vyrobca pri kolizii] cislo struktura nazov.
+        # V SCHEMA 1 (ctx nil, polia chybaju) = presne dnesny text dekoru.
+        def label_base(rec, manufacturer, ctx)
+          parts = [rec['decor'], rec['structure'], rec['decor_name']]
+                  .map { |v| v.to_s.strip }.reject(&:empty?)
+          if ctx && ctx['collisions'].key?(Materials.identity_norm(rec['decor']))
+            man = manufacturer.to_s.strip
+            parts.unshift(man) unless man.empty?
+          end
+          parts.join(' ')
+        end
+
+        def sheet_label(s, ctx = label_ctx)
           th = s['thickness'].to_f
           thl = (th == th.round ? th.round : th)
-          "#{s['decor']} · #{s['type']} #{thl} mm"
+          "#{label_base(s, s['manufacturer'], ctx)} · #{s['type']} #{thl} mm"
         end
 
         # D-41: paska so sirkou "dekor 22/1 mm" (sirka/hrubka — Michalov zapis),
-        # legacy bez sirky ostava "dekor 1.0 mm".
-        def abs_label(a)
+        # legacy bez sirky ostava "dekor 1.0 mm". 2A-4b: struktura v labeli
+        # ("K009 PW 23/1 mm"), vyrobca pri kolizii (cez skupinu — ABS zaznam
+        # vyrobcu nenesie), "univ." priznak LEN v SCHEMA 2 (vlastnost vyberu).
+        def abs_label(a, ctx = label_ctx)
+          man = ctx ? ctx['group_man'][a['group_id'].to_s.strip].to_s : ''
+          base = label_base(a, man, ctx)
+          uni = ctx && a['universal'] == true ? ' · univ.' : ''
           w = a['width']
-          return "#{a['decor']} #{a['thickness']} mm" if w.nil?
-          "#{a['decor']} #{fmt_num(w)}/#{fmt_num(a['thickness'])} mm"
+          return "#{base} #{a['thickness']} mm#{uni}" if w.nil?
+          "#{base} #{fmt_num(w)}/#{fmt_num(a['thickness'])} mm#{uni}"
         end
 
         # Cele cislo bez desatin (22.0 -> "22"), inak s nimi (22.5 -> "22.5").

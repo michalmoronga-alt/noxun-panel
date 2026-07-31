@@ -130,12 +130,17 @@ module Noxun
           label = material_label(row['material_id'], materials)
           tag = merge_18_36 && [18, 36].include?(commercial) ? '18_36' : commercial.to_s
           key = [label, tag]
-          b = buckets[key] ||= { rows: [], material_ids: [], label: label, tag: tag, pieces: 0 }
+          b = buckets[key] ||= { rows: [], material_ids: [], label: label, tag: tag,
+                                 pieces: 0, displays: [] }
           e = row['edges'] || {}
           qty = row['quantity'].to_i
           b[:rows] << [row_name(raw), dims[0].round, edge_code(e['L1'], e['L2']),
                        dims[1].round, edge_code(e['W1'], e['W2']), commercial, qty, label]
           b[:material_ids] << row['material_id'] unless b[:material_ids].include?(row['material_id'])
+          # 2A-4b (audit F8): zobrazovaci label so strukturou ide VYHRADNE do
+          # LOGu — exportny label (grouping/subor/CSV stlpec) sa NEMENI.
+          disp = material_display(row['material_id'], materials)
+          b[:displays] << disp if disp && !b[:displays].include?(disp)
           b[:pieces] += qty
         end
 
@@ -148,7 +153,8 @@ module Noxun
           end
           { 'filename' => "#{pslug}_#{base}_#{b[:tag]}.csv", 'csv' => csv,
             'rows' => b[:rows].length, 'pieces' => b[:pieces],
-            'material_ids' => b[:material_ids], 'material_label' => b[:label], 'tag' => b[:tag] }
+            'material_ids' => b[:material_ids], 'material_label' => b[:label], 'tag' => b[:tag],
+            'display_labels' => b[:displays] }
         end.sort_by { |g| g['filename'] }
         dedup_filenames!(groups)
 
@@ -254,6 +260,15 @@ module Noxun
         label.nil? || label.empty? ? material_id.to_s : label
       end
 
+      # 2A-4b (audit F8): zobrazovaci label so strukturou — LEN pre LOG.
+      # nil = mapa display nema (legacy volajuci / zhodny s exportnym labelom)
+      # a LOG riadok ostava bajtovo presne dnesny.
+      def material_display(material_id, materials)
+        rec = materials[material_id]
+        disp = rec && rec['display'].to_s.strip
+        disp.nil? || disp.empty? ? nil : disp
+      end
+
       def log_text(pslug, project, groups, errors, validation, version, generated_at)
         lines = []
         lines << 'Noxun Engine — VEPO export LOG'
@@ -264,7 +279,11 @@ module Noxun
         lines << "Skupiny exportu (#{groups.length}):"
         groups.each do |g|
           ids = g['material_ids'].join(', ')
-          lines << "  - #{g['filename']} (#{g['rows']} riadkov, #{g['pieces']} ks) [#{ids}]"
+          # 2A-4b (audit F8): zobrazovaci label so strukturou LEN v LOGu —
+          # bez display map (legacy data) je riadok bajtovo presne dnesny.
+          disp = Array(g['display_labels'])
+          suffix = disp.empty? ? '' : " — #{disp.join('; ')}"
+          lines << "  - #{g['filename']} (#{g['rows']} riadkov, #{g['pieces']} ks) [#{ids}]#{suffix}"
         end
         # Chyby = riadky VYRADENE z CSV (chybny material/neznama ABS/hrubka). Ostavaju
         # samostatne od KONTROLY — su o STRATE riadku v exporte, nie o semafore. Nalez 6:
