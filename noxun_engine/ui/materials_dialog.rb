@@ -146,6 +146,10 @@ module Noxun
             # picker ich nevyberie. Pocita VYHRADNE server; banner sa ukazuje
             # pri KAZDOM otvoreni/refreshi, kym pocet nie je 0.
             unusable_edges: Materials.unusable_edges_count,
+            # GH #93 P2 (4. kolo): dovod nevykonaneho cutoveru (poskodena
+            # predmigracna zaloha / nerozhodnutelne polozky) — VIDITELNY banner,
+            # nie len log; katalog pritom bezi dalej (nie read-only).
+            cutover_issue: Materials.respond_to?(:cutover_issue) ? Materials.cutover_issue.to_s : '',
             # D-44: naseptavace (vyrobca/typ) a navrhy formatu platne stavia
             # SERVER — JS ich len renderuje. Ide s KAZDYM katalogovym echom,
             # takze novy vyrobca/typ je v navrhoch hned po zapise.
@@ -261,6 +265,10 @@ module Noxun
         def handle_restore_backup(_payload)
           ok, result = Materials.restore_pre_schema2!
           return set_status(result, true) unless ok
+          # GH #93 P2 (4. kolo): rollback meni CELY katalog — refresh musia
+          # dostat aj panel a otvorene okno Vyroba (rovnako ako bezna mutacia),
+          # inak by drzali predrollbackovy SCHEMA 2 obsah.
+          after_catalog_change
           push_state
           set_status('Katalóg obnovený z predmigračnej zálohy. Pri najbližšom štarte SketchUpu sa migrácia jednorazovo preskočí.')
         end

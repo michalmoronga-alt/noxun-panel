@@ -425,3 +425,53 @@ NxTest.test('2a4b: GH P2 — set_decor_name meni nazov atomicky celej skupine (i
     NxTest.assert(err.include?('nenašla'), err.to_s)
   end
 end
+
+NxTest.test('2a4b: GH P1 kolo 4 — PD varianty s inym formatom maju ODDELENE VEPO buckety') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  require_relative '../../noxun_engine/ui/production_dialog' unless defined?(Noxun::Engine::ProductionDialog)
+  data = JSON.pretty_generate(
+    'std' => 1, 'schema' => 2,
+    'sheets' => [
+      { 'material_id' => 'PD1', 'group_id' => 'GRP-F', 'manufacturer' => 'Egger',
+        'decor' => 'F800', 'type' => 'PD', 'thickness' => 38.0, 'sheet_size' => [4100.0, 600.0],
+        'grain' => 'length', 'color' => [1, 1, 1], 'production_class' => 'sheet' },
+      { 'material_id' => 'PD2', 'group_id' => 'GRP-F', 'manufacturer' => 'Egger',
+        'decor' => 'F800', 'type' => 'PD', 'thickness' => 38.0, 'sheet_size' => [4100.0, 920.0],
+        'grain' => 'length', 'color' => [1, 1, 1], 'production_class' => 'sheet' }
+    ],
+    'edges' => []
+  ).b
+  b4_with_catalog(data) do
+    mats = Noxun::Engine::ProductionDialog.send(:vepo_materials)
+    NxTest.refute(mats['PD1']['label'] == mats['PD2']['label'],
+                  "PD formaty sa nesmu zliat (#{mats['PD1']['label']})")
+    NxTest.assert(mats['PD1']['label'].include?('4100') && mats['PD1']['label'].include?('600'))
+    NxTest.assert(mats['PD2']['label'].include?('920'))
+  end
+end
+
+NxTest.test('2a4b: GH P2 kolo 4 — prazdny legacy katalog sa pri boote povysi na SCHEMA 2') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  empty_legacy = JSON.pretty_generate('std' => 1, 'sheets' => [], 'edges' => []).b
+  b4_with_catalog(empty_legacy) do
+    NxTest.assert_equal(:empty_promoted, B4MAT.boot_cutover!)
+    NxTest.assert_equal(2, B4MAT.catalog_schema, 'marker 2 zapisany')
+    NxTest.assert_equal(:schema2, B4MAT.boot_cutover!, 'dalsi boot uz nic nerobi')
+  end
+end
+
+NxTest.test('2a4b: GH P2 kolo 4 — poskodena predmigracna zaloha = viditelny cutover_issue (nie len log)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  b4_with_catalog(b4_legacy_seed_bytes) do
+    File.binwrite(B4MAT.pre_schema2_backup_path, 'xx{poskodene')
+    NxTest.assert_equal(:backup_corrupt, B4MAT.boot_cutover!)
+    NxTest.assert(B4MAT.cutover_issue.to_s.include?('poškodená'),
+                  "cutover_issue nesie dovod: #{B4MAT.cutover_issue.inspect}")
+    state, = B4MAT.assess_catalog!
+    NxTest.assert_equal(:ok, state, 'katalog bezi dalej (nie read-only)')
+    # uspesny boot dovod cisti
+    FileUtils.rm_f(B4MAT.pre_schema2_backup_path)
+    NxTest.assert_equal(:migrated, B4MAT.boot_cutover!)
+    NxTest.assert(B4MAT.cutover_issue.nil?, 'uspesny cutover dovod vycisti')
+  end
+end

@@ -51,7 +51,18 @@ module Noxun
       #      ine statusy = log + assess_catalog! znova (skutocne poskodenie
       #        konci :read_only; prechodny stav necha katalog legacy).
       # Vrati symbol vykonanej vetvy (diagnostika + testy).
+      # GH #93 P2 (4. kolo): dovod, preco cutover NEprebehol, VIDITELNY pre
+      # okno Materialy (banner) — nie len log. nil = ziadny problem.
+      def cutover_issue
+        @cutover_issue
+      end
+
+      def cutover_issue=(value)
+        @cutover_issue = value
+      end
+
       def boot_cutover!
+        self.cutover_issue = nil
         if consume_migration_hold!
           if defined?(Engine)
             Engine.log('materialy: migracia jednorazovo potlacena po rollbacku (migration_hold zmazany)')
@@ -67,18 +78,39 @@ module Noxun
         when :ok
           log_migration_summary(report)
           :migrated
-        when :not_found, :empty, :already
+        when :not_found, :already
           report[:status]
+        when :empty
+          # GH #93 P2 (4. kolo): platny PRAZDNY legacy katalog by inak ostal
+          # navzdy v legacy rezime (ensure_seeded existujuci subor preskakuje) —
+          # povysi sa na prazdny SCHEMA 2 katalog (vedomy zapis, log).
+          if write('sheets' => [], 'edges' => [], 'schema' => SCHEMA_GROUPS)
+            Engine.log('materialy: prazdny katalog povyseny na SCHEMA 2') if defined?(Engine)
+            reload!
+            :empty_promoted
+          else
+            self.cutover_issue = 'Prázdny katalóg sa nepodarilo povýšiť na nový formát — pozri log.'
+            :empty
+          end
         when :undecidable
           if defined?(Engine)
             Engine.log('materialy: migracia neprebehla — nerozhodnutelne polozky, katalog bezi dalej v povodnom formate:')
             report[:reasons].each { |r| Engine.log("  - #{r}") }
           end
+          self.cutover_issue = 'Migrácia katalógu neprebehla — nerozhodnuteľné položky: '                                "#{report[:reasons].join(' · ')}. Oprav dáta a reštartuj SketchUp."
           :undecidable
+        when :backup_corrupt
+          if defined?(Engine)
+            Engine.log('materialy: migracia zablokovana — poskodena predmigracna zaloha')
+          end
+          self.cutover_issue = 'Migrácia je zablokovaná: predmigračná záloha '                                "(#{pre_schema2_backup_path}) je poškodená a nepoužiteľná. "                                'Premenuj/odstráň ju a reštartuj SketchUp.'
+          assess_catalog!
+          :backup_corrupt
         else
           if defined?(Engine)
             Engine.log("materialy: migracia zlyhala (#{report[:status]}) — katalog sa znovu posudi")
           end
+          self.cutover_issue = "Migrácia katalógu zlyhala (#{report[:status]}) — pozri log a reštartuj SketchUp."
           assess_catalog!
           report[:status]
         end

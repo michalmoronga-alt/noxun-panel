@@ -287,7 +287,23 @@ module Noxun
           labeled = vepo_disambiguate(labeled) do |s, l|
             "#{l} [#{vepo_group_key(s)}]"
           end
+          # GH #93 P1 (4. kolo): kolizia VNUTRI skupiny — dva PD varianty s inym
+          # formatom (4100×600 vs 4100×920) maju rovnaky label aj group_key;
+          # format je sucast identity PD variantu, do labelu ide pri kolizii.
+          labeled = vepo_disambiguate_variants(labeled)
           labeled.each_with_object({}) { |(s, l), out| out[s['material_id']] = { 'label' => l } }
+        end
+
+        # Kolizia labelu medzi VARIANTMI (rovnaka skupina): PD zaznamu s formatom
+        # sa prida "D×S" (cele mm) — identita zakazuje uplne duplicity, takze
+        # vysledok je unikatny.
+        def vepo_disambiguate_variants(labeled)
+          by_label = labeled.group_by { |(_s, l)| l }
+          labeled.map do |(s, l)|
+            next [s, l] unless by_label[l].length > 1 && Materials.pd_type?(s['type'])
+            fmt = Materials.size_key(s['sheet_size'])
+            fmt ? [s, "#{l} #{fmt.map { |x| x.round }.join('×')}"] : [s, l]
+          end
         end
 
         # Jedno kolo rozlisenia labelov: label zdielany VIACERYMI skupinami sa

@@ -23,6 +23,7 @@
   // 2A-4b (audit B4/O1): nudzovy read-only rezim + dovod + pocet nepouzitelnych
   // pasok (VYHRADNE zo servera — JS nikdy nepocita sam).
   var MD_RO = false;
+  var MD_CUTOVER_ISSUE = '';  // GH #93 P2: dovod nevykonaneho cutoveru (banner)
   var MD_RO_REASON = '';
   var MD_UNUSABLE = 0;
   // D-44: navrhy naseptavacov a navrhy formatu platne — obe STAVIA SERVER
@@ -224,6 +225,13 @@
     if (eb){
       eb.style.display = MD_UNUSABLE > 0 ? 'flex' : 'none';
       if (et && MD_UNUSABLE > 0) et.textContent = mdEdgeBannerText(MD_UNUSABLE);
+    }
+    // GH #93 P2 (4. kolo): cutover problem (poskodena zaloha / nerozhodnutelne
+    // polozky) — zlty informacny pas; katalog bezi dalej, mutacie NEblokuje.
+    var cb2 = el('mdCutoverBanner'), ct2 = el('mdCutoverBannerText');
+    if (cb2){
+      cb2.style.display = MD_CUTOVER_ISSUE ? 'flex' : 'none';
+      if (ct2 && MD_CUTOVER_ISSUE) ct2.textContent = MD_CUTOVER_ISSUE;
     }
     var nb = el('mdNewDecorBtn');
     if (nb) nb.disabled = MD_RO;
@@ -1161,6 +1169,7 @@
     MD_RO = data.catalog_state === 'read_only';
     MD_RO_REASON = data.catalog_state_reason || '';
     MD_UNUSABLE = parseInt(data.unusable_edges, 10) || 0;
+    MD_CUTOVER_ISSUE = (data.cutover_issue || '').toString();
     mdRenderBanners();
     // GH P1: serverova schema sa NEpreberá do mutacii — klient posiela vlastnu
     // MD_CLIENT_SCHEMA konstantu (echo servera by falosne "povysilo" stare
