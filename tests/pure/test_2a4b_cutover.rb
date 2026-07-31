@@ -375,6 +375,27 @@ NxTest.test('2a4b: GH P1 — VEPO exportny label je stabilny cez migraciu a NEZL
     NxTest.assert_equal('Egger K111 ST9 DTDL', mats['C1']['label'], 'kolizia = prefix vyrobcu')
     NxTest.assert_equal('Kronospan K111 ST9 DTDL', mats['C2']['label'])
   end
+  # GH #93 P2 (3. kolo): dve skupiny TOHO ISTEHO vyrobcu zlozia rovnaky text
+  # ("K009 PW"+"" vs "K009"+"PW") — druhe kolo pridava skupinovy sufix.
+  patological = JSON.pretty_generate(
+    'std' => 1, 'schema' => 2,
+    'sheets' => [
+      { 'material_id' => 'P1', 'group_id' => 'GRP-AAA', 'manufacturer' => 'Egger',
+        'decor' => 'K009 PW', 'type' => 'DTDL', 'thickness' => 18.0,
+        'grain' => 'length', 'color' => [1, 1, 1], 'production_class' => 'sheet' },
+      { 'material_id' => 'P2', 'group_id' => 'GRP-BBB', 'manufacturer' => 'Egger',
+        'decor' => 'K009', 'structure' => 'PW', 'type' => 'DTDL', 'thickness' => 18.0,
+        'grain' => 'length', 'color' => [1, 1, 1], 'production_class' => 'sheet' }
+    ],
+    'edges' => []
+  ).b
+  b4_with_catalog(patological) do
+    mats = pd.send(:vepo_materials)
+    NxTest.refute(mats['P1']['label'] == mats['P2']['label'],
+                  "ani rovnaky vyrobca nesmie zliat buckety (#{mats['P1']['label']})")
+    NxTest.assert(mats['P1']['label'].include?('GRP-AAA'))
+    NxTest.assert(mats['P2']['label'].include?('GRP-BBB'))
+  end
 end
 
 NxTest.test('2a4b: GH P2 — set_decor_name meni nazov atomicky celej skupine (identita nedotknuta)') do

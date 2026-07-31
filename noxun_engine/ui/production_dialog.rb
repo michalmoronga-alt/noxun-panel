@@ -270,23 +270,35 @@ module Noxun
         # vyrobcov — len SCHEMA 2 stav bez legacy precedensu) dostava prefix
         # vyrobcu, aby sa buckety nezliali.
         def vepo_materials
-          sheets = Materials.sheets
-          labeled = sheets.map do |s|
+          labeled = Materials.sheets.map do |s|
             label = [s['decor'], s['structure'], s['decor_name'], s['type']]
                     .map { |v| v.to_s.strip }.reject(&:empty?).join(' ')
             label = s['family'].to_s.strip if label.empty?
             label = s['material_id'].to_s if label.empty?
             [s, label]
           end
-          groups_per_label = labeled.group_by { |(_s, l)| l }.transform_values do |same|
+          # 1. kolo: kolizia medzi skupinami -> prefix vyrobcu.
+          labeled = vepo_disambiguate(labeled) do |s, l|
+            [s['manufacturer'].to_s.strip, l].reject(&:empty?).join(' ')
+          end
+          # GH #93 P2 (3. kolo): aj PO prefixe mozu dve skupiny TOHO ISTEHO
+          # vyrobcu zlozit rovnaky text ("K009 PW"+"" vs "K009"+"PW") — druhe
+          # kolo pridava stabilny skupinovy sufix, aby sa VEPO buckety nezliali.
+          labeled = vepo_disambiguate(labeled) do |s, l|
+            "#{l} [#{vepo_group_key(s)}]"
+          end
+          labeled.each_with_object({}) { |(s, l), out| out[s['material_id']] = { 'label' => l } }
+        end
+
+        # Jedno kolo rozlisenia labelov: label zdielany VIACERYMI skupinami sa
+        # prepise blokom (zaznamy tej istej skupiny dostanu rovnaky vysledok),
+        # unikatne labely sa nemenia.
+        def vepo_disambiguate(labeled)
+          groups_per = labeled.group_by { |(_s, l)| l }.transform_values do |same|
             same.map { |(r, _l)| vepo_group_key(r) }.uniq
           end
-          labeled.each_with_object({}) do |(s, label), out|
-            if groups_per_label[label].length > 1
-              man = s['manufacturer'].to_s.strip
-              label = [man, label].reject(&:empty?).join(' ')
-            end
-            out[s['material_id']] = { 'label' => label }
+          labeled.map do |(s, l)|
+            groups_per[l].length > 1 ? [s, yield(s, l)] : [s, l]
           end
         end
 
