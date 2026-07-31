@@ -133,6 +133,7 @@ unless NxTest::IN_SKETCHUP
     core/demos/sitemap_cache
     core/demos/slug_matcher
     core/demos/product_parser
+    core/demos/lookup
     core/abs_rules
     core/hardware_rules
     modules/shelves

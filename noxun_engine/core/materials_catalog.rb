@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 # Noxun Engine — materialovy katalog: CRUD sekcia dosiek/pasok, validacia +
 # generovanie ID, scan pouzitia (delete/edit guard), D-42 patch protokol
-# inline buniek a seed predvolenych zaznamov. Cast modulu Materials
-# (mechanicky split materials.rb, V0.5.1) — pozri materials.rb pre prehlad.
+# inline buniek, V0.6 B-2a atomicky Demos apply a seed predvolenych zaznamov.
+# Cast modulu Materials (mechanicky split materials.rb, V0.5.1) — pozri
+# materials.rb pre prehlad.
+
+require 'time' # B-2a: price_checked_at (ISO8601) — vlastny require, nie tranzitivny
 
 module Noxun
   module Engine
@@ -507,6 +510,148 @@ module Noxun
           return [:write_failed, nil] unless write(data)
           [:ok, nil]
         end
+      end
+
+      # --- V0.6 B-2a: atomicky zapis Demos aktualizacie (audit B6) -------------
+      # items: [{'kind'=>'sheet'|'edge','id'=>,'row_rev'=>,
+      #          'fields'=>{'code'=>?, 'price'=>?, 'price_confirmed'=>bool?,
+      #                     'demos_url'=>?}}]
+      # Polia SKLADA Ruby dialog z VLASTNEHO proposal store (server autorita —
+      # JS posiela len accept flagy); tu sa aj tak vsetko znovu validuje.
+      # Kontrakty:
+      #   - ALL-OR-NOTHING: preflight VSETKYCH poloziek pred prvym zapisom;
+      #     akykolvek fail = ziadny zapis, report menuje vinnika (NOTE 17).
+      #   - catalog_rev sa porovnava VNUTRI zamku nad cerstvym diskom.
+      #   - supplier 'Demos' sa zapisuje LEN spolu s prijatym kodom (FIX 11 —
+      #     price-only aktualizacia nesmie ticho prepisat dodavatela).
+      #   - price_checked_at generuje SERVER a LEN pri potvrdenej cene: prijata
+      #     nova hodnota ALEBO 'price_confirmed' (cena na strane Demosu
+      #     nezmenena). Kod-only apply datum overenia NEMENI (FIX 10).
+      #   - demos_url prechadza Demos.sanitize_url (vazba kod+URL, standard 7.1).
+      #   - duplicity kod+dodavatel sa kontroluju v SIMULOVANOM FINALNOM stave
+      #     (FIX 12): dve polozky davky s rovnakym novym kodom sa uvidia; parom
+      #     nedotknutym touto davkou sa existujuce duplicity nevycitaju.
+      # -> [:ok, {'applied'=>[id...],'fields_written'=>n}]
+      #  | [:catalog_read_only|:stale_catalog|:invalid|:not_found|:conflict|
+      #     :code_conflict|:duplak|:write_failed, {'id'=>?, 'detail'=>?}]
+      def apply_demos_batch(items, catalog_rev:)
+        return [:catalog_read_only, {}] if catalog_read_only?
+        list = items.is_a?(Array) ? items : nil
+        return [:invalid, { 'detail' => 'prázdna dávka' }] if list.nil? || list.empty?
+        seen = {}
+        list.each do |it|
+          return [:invalid, { 'detail' => 'neplatná položka dávky' }] unless it.is_a?(Hash)
+          kind = it['kind'].to_s
+          # Neznamy kind sa NIKDY neinterpretuje implicitne ako sheet (FIX 12).
+          return [:invalid, { 'detail' => "neznámy druh záznamu „#{kind}“" }] unless %w[sheet edge].include?(kind)
+          id = it['id'].to_s
+          return [:invalid, { 'detail' => 'položka bez id' }] if id.empty?
+          key = "#{kind}|#{id}"
+          return [:invalid, { 'id' => id, 'detail' => 'duplicitná položka dávky' }] if seen[key]
+          seen[key] = true
+          f = it['fields']
+          return [:invalid, { 'id' => id, 'detail' => 'položka bez polí' }] unless f.is_a?(Hash)
+        end
+        with_catalog_lock do
+          JsonFileStore.invalidate(path)
+          unless catalog_rev.to_s == catalog_revision
+            return [:stale_catalog, { 'detail' => 'katalóg sa medzitým zmenil' }]
+          end
+          data = load
+          stamp = Time.now.utc.iso8601
+          merged_by_key = {}
+          # Preflight 1: existencia, row_rev, duplak, validacia zluceneho zaznamu.
+          list.each do |it|
+            kind = it['kind'].to_s
+            idk = kind == 'edge' ? 'abs_id' : 'material_id'
+            records = data[kind == 'edge' ? 'edges' : 'sheets']
+            id = it['id'].to_s
+            existing = records.find { |r| r[idk] == id }
+            return [:not_found, { 'id' => id }] unless existing
+            if it['row_rev'].to_s.empty? || it['row_rev'].to_s != record_rev(existing)
+              return [:conflict, { 'id' => id }]
+            end
+            if kind == 'sheet' && duplak?(existing)
+              return [:duplak, { 'id' => id, 'detail' => 'duplák nemá nákupné polia' }]
+            end
+            patch, err = demos_patch_for(existing, it['fields'], kind, stamp)
+            return [:invalid, { 'id' => id, 'detail' => err }] if err
+            return [:invalid, { 'id' => id, 'detail' => 'položka nič nemení' }] if patch.empty?
+            merged = existing.merge(patch)
+            ok, verr = kind == 'edge' ? validate_edge_attrs(merged) : validate_sheet_attrs(merged)
+            return [:invalid, { 'id' => id, 'detail' => verr }] unless ok
+            merged_by_key[[kind, id]] = { 'merged' => merged, 'fields' => patch.length }
+          end
+          # Preflight 2 (FIX 12): duplicity kod+dodavatel v SIMULOVANOM stave —
+          # menene zaznamy s kodom sa porovnaju proti vsetkym ostatnym (vratane
+          # ostatnych poloziek davky po zmene).
+          %w[sheet edge].each do |kind|
+            idk = kind == 'edge' ? 'abs_id' : 'material_id'
+            final = data[kind == 'edge' ? 'edges' : 'sheets'].map do |r|
+              entry = merged_by_key[[kind, r[idk].to_s]]
+              entry ? entry['merged'] : r
+            end
+            pairs = {}
+            final.each do |r|
+              c = r['code'].to_s.strip.downcase
+              next if c.empty?
+              (pairs["#{c}|#{r['supplier'].to_s.strip.downcase}"] ||= []) << r[idk].to_s
+            end
+            merged_by_key.each do |(mkind, mid), entry|
+              next unless mkind == kind
+              rec = entry['merged']
+              c = rec['code'].to_s.strip.downcase
+              next if c.empty?
+              hits = pairs["#{c}|#{rec['supplier'].to_s.strip.downcase}"].reject { |x| x == mid }
+              return [:code_conflict, { 'id' => mid, 'detail' => hits }] unless hits.empty?
+            end
+          end
+          # Zapis: normalize + reject + append, VSETKO naraz, jeden write.
+          fields_written = 0
+          merged_by_key.each do |(kind, id), entry|
+            idk = kind == 'edge' ? 'abs_id' : 'material_id'
+            listk = kind == 'edge' ? 'edges' : 'sheets'
+            rec = kind == 'edge' ? normalize_edge(entry['merged']) : normalize_sheet(entry['merged'])
+            return [:invalid, { 'id' => id, 'detail' => 'záznam sa nedá uložiť' }] if rec.nil?
+            data[listk] = data[listk].reject { |r| r[idk] == id } + [rec]
+            fields_written += entry['fields']
+          end
+          return [:write_failed, {}] unless write_unlocked(data)
+          [:ok, { 'applied' => merged_by_key.keys.map { |(_, id)| id },
+                  'fields_written' => fields_written }]
+        end
+      end
+
+      # Patch JEDNEJ polozky z accept poli. -> [patch, nil] | [nil, chyba].
+      # code -> code + supplier 'Demos' (vazba FIX 11); price -> price_per_*;
+      # price alebo price_confirmed -> price_checked_at (server stamp);
+      # demos_url -> po sanitize (kazdy uspesny apply drzi vazbu na produkt).
+      def demos_patch_for(existing, fields, kind, stamp)
+        patch = {}
+        price_key = kind == 'edge' ? 'price_per_bm' : 'price_per_m2'
+        if fields.key?('code')
+          code = fields['code'].to_s.strip
+          return [nil, 'prijatý kód je prázdny'] if code.empty?
+          patch['code'] = code
+          patch['supplier'] = 'Demos'
+        end
+        price_confirmed = fields['price_confirmed'] == true
+        if fields.key?('price')
+          price = normalize_price(fields['price'])
+          return [nil, 'prijatá cena nie je číslo'] if price.nil?
+          return [nil, 'prijatá cena musí byť kladná'] unless price.positive?
+          patch[price_key] = price
+          price_confirmed = true
+        end
+        patch['price_checked_at'] = stamp if price_confirmed
+        if fields.key?('demos_url')
+          clean, err = Demos.sanitize_url(fields['demos_url'])
+          return [nil, "adresa produktu: #{err}"] unless clean
+          patch['demos_url'] = clean
+        end
+        # price_confirmed bez zmeny ceny: povoleny patch len s timestampom
+        # (cena na Demose nezmenena — obnovuje sa datum overenia, FIX 10).
+        [patch, nil]
       end
 
       # --- seed (predvolene zaznamy; 2A-4b = nativne SCHEMA 2, audit F9) -------
