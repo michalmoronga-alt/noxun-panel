@@ -75,6 +75,7 @@ module Noxun
           # D-41 PR B: dekorove karty — batch "Novy dekor" + atomicke premenovanie skupiny.
           cb(dlg, 'add_decor_batch') { |p| handle_add_decor_batch(p) }
           cb(dlg, 'rename_decor')    { |p| handle_rename_decor(p) }
+          cb(dlg, 'set_decor_name')  { |p| handle_set_decor_name(p) }
           # D-42: vyrobca je vlastnost dekoru — zmena atomicky pre celu skupinu.
           cb(dlg, 'set_decor_manufacturer') { |p| handle_set_decor_manufacturer(p) }
           # D-42 PR C (audit BLOCKER 1): inline bunky detailu — patch protokol
@@ -724,6 +725,18 @@ module Noxun
 
         # D-41 PR B: premenovanie dekoru CELEJ skupiny (audit FIX 12 — edit
         # jednotlivca dekor nemeni; ID zaznamov sa nemenia, modely o nic neprídu).
+        # GH #93 P2: nazov skupiny (decor_name) — zobrazovacia vlastnost,
+        # atomicky celej skupine cez group_id.
+        def handle_set_decor_name(payload)
+          data = JSON.parse(payload.to_s)
+          return unless catalog_write_ok?(data)
+          ok, result = Materials.set_decor_name(data['group_id'], data['name'])
+          return set_status(result, true) unless ok
+          after_catalog_change
+          label = data['name'].to_s.strip
+          set_status(label.empty? ? "Názov skupiny vymazaný (#{result} záznamov)." : "Názov skupiny: #{label} (#{result} záznamov).")
+        end
+
         def handle_rename_decor(payload)
           data = JSON.parse(payload.to_s)
           return unless catalog_write_ok?(data)

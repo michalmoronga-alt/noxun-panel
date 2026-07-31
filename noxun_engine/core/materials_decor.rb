@@ -251,6 +251,37 @@ module Noxun
       # danej group_id. Vyrobca je sucast obchodnej identity skupiny (standard
       # 7.1) — zmena, ktora by zdvojila identitu s inou skupinou (rovnaky
       # vyrobca + cislo, aj len zapisom odlisne), sa odmietne.
+      # GH #93 P2: NAZOV skupiny (decor_name) je zobrazovacia vlastnost (standard
+      # 7.1 — oprava/preklad identitu nemeni), doteraz vsak nemal editacnu cestu.
+      # Meni sa atomicky celej skupine cez group_id (SCHEMA 2 only); prazdny
+      # nazov kluc odstrani. RMW pod zamkom nad cerstvym obsahom (vzor rename).
+      def set_decor_name(group_id, name)
+        return [false, catalog_read_only_message] if catalog_read_only?
+        return [false, 'Katalóg ešte nie je v novom formáte.'] if catalog_schema < SCHEMA_GROUPS
+        gid = group_id.to_s.strip
+        return [false, 'Chýba identifikátor skupiny.'] if gid.empty?
+        to = name.to_s.strip
+        with_catalog_lock do
+        JsonFileStore.invalidate(path)
+        data = load
+        changed = 0
+        %w[sheets edges].each do |k|
+          data[k].each do |r|
+            next unless identity_norm(r['group_id']) == identity_norm(gid)
+            if to.empty?
+              r.delete('decor_name')
+            else
+              r['decor_name'] = to
+            end
+            changed += 1
+          end
+        end
+        return [false, 'Dekorová skupina sa nenašla.'] if changed.zero?
+        return [false, 'Zápis katalógu zlyhal.'] unless write(data)
+        [true, changed]
+        end
+      end
+
       def set_decor_manufacturer_group(decor, manufacturer, clear:, group_id:)
         man = manufacturer.to_s.strip
         if man.empty? && !clear

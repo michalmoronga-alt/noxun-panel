@@ -312,3 +312,71 @@ NxTest.test('2a4b banner: unusable_edges_count — SCHEMA 1 vzdy 0; SCHEMA 2 bez
                         'bez struktury a bez universal = 2 (ABS_BEZ_1, ABS_BEZ_2); universal sa nerata')
   end
 end
+
+# ---------------------------------------------------------------------------
+# GH #93 kolo 1
+# ---------------------------------------------------------------------------
+
+NxTest.test('2a4b: GH P1 — VEPO exportny label je stabilny cez migraciu a NEZLIEVA struktury') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  legacy = JSON.pretty_generate(
+    'std' => 1,
+    'sheets' => [{ 'material_id' => 'K1', 'decor' => 'K009 PW', 'type' => 'DTDL',
+                   'thickness' => 18.0, 'grain' => 'length', 'color' => [1, 1, 1],
+                   'production_class' => 'sheet' }],
+    'edges' => []
+  ).b
+  migrated = JSON.pretty_generate(
+    'std' => 1, 'schema' => 2,
+    'sheets' => [
+      { 'material_id' => 'K1', 'group_id' => 'GRP-A', 'manufacturer' => 'Kronospan',
+        'decor' => 'K009', 'structure' => 'PW', 'type' => 'DTDL', 'thickness' => 18.0,
+        'grain' => 'length', 'color' => [1, 1, 1], 'production_class' => 'sheet' },
+      { 'material_id' => 'K2', 'group_id' => 'GRP-A', 'manufacturer' => 'Kronospan',
+        'decor' => 'K009', 'structure' => 'BS', 'type' => 'DTDL', 'thickness' => 18.0,
+        'grain' => 'length', 'color' => [1, 1, 1], 'production_class' => 'sheet' }
+    ],
+    'edges' => []
+  ).b
+  require_relative '../../noxun_engine/ui/production_dialog' unless defined?(Noxun::Engine::ProductionDialog)
+  pd = Noxun::Engine::ProductionDialog
+  b4_with_catalog(legacy) do
+    NxTest.assert_equal('K009 PW DTDL', pd.send(:vepo_materials)['K1']['label'],
+                        'legacy label = presne dnesny tvar')
+  end
+  b4_with_catalog(migrated) do
+    mats = pd.send(:vepo_materials)
+    NxTest.assert_equal('K009 PW DTDL', mats['K1']['label'],
+                        'zmigrovany zaznam reprodukuje POVODNY exportny text (cutover nemeni CSV/subory)')
+    NxTest.assert_equal('K009 BS DTDL', mats['K2']['label'],
+                        'ina struktura = INY bucket (nezlievaju sa)')
+  end
+end
+
+NxTest.test('2a4b: GH P2 — set_decor_name meni nazov atomicky celej skupine (identita nedotknuta)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  data = JSON.pretty_generate(
+    'std' => 1, 'schema' => 2,
+    'sheets' => [{ 'material_id' => 'S1', 'group_id' => 'GRP-N', 'manufacturer' => 'Egger',
+                   'decor' => 'H1180', 'decor_name' => 'Preklep', 'structure' => 'ST37',
+                   'type' => 'DTDL', 'thickness' => 18.0, 'grain' => 'length',
+                   'color' => [1, 1, 1], 'production_class' => 'sheet' }],
+    'edges' => [{ 'abs_id' => 'E1', 'group_id' => 'GRP-N', 'decor' => 'H1180',
+                  'decor_name' => 'Preklep', 'structure' => 'ST37', 'thickness' => 1.0,
+                  'width' => 23.0, 'color' => [1, 1, 1] }]
+  ).b
+  b4_with_catalog(data) do
+    ok, n = B4MAT.set_decor_name('GRP-N', 'Dub Halifax prírodný')
+    NxTest.assert(ok, n.inspect)
+    NxTest.assert_equal(2, n, 'doska aj paska atomicky')
+    NxTest.assert_equal('Dub Halifax prírodný', B4MAT.sheet('S1')['decor_name'])
+    NxTest.assert_equal('Dub Halifax prírodný', B4MAT.edge('E1')['decor_name'])
+    NxTest.assert_equal('H1180', B4MAT.sheet('S1')['decor'], 'identita (cislo) nedotknuta')
+    ok2, = B4MAT.set_decor_name('GRP-N', '')
+    NxTest.assert(ok2)
+    NxTest.refute(B4MAT.sheet('S1').key?('decor_name'), 'prazdny nazov kluc odstrani')
+    okx, err = B4MAT.set_decor_name('GRP-CHYBA', 'X')
+    NxTest.refute(okx)
+    NxTest.assert(err.include?('nenašla'), err.to_s)
+  end
+end

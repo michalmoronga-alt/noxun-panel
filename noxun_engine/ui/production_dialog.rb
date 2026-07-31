@@ -254,16 +254,19 @@ module Noxun
         # VEPO stlpec material: dekor + typ (hrubka je vlastny stlpec); fallback
         # family, fallback material_id. Tvar mapy definuje audit F7.
         #
-        # 2A-4b (audit F8): 'label' je EXPORTNY label — grouping + nazov suboru
-        # + CSV stlpec. Jeho tvar sa NEMENI (dogfooding kontrakt: rovnake data
-        # = bajtovo zhodny CSV vystup; strazi ho zlaty test). Struktura ide
-        # VYHRADNE do 'display' (zobrazovaci/LOG label) — po migracii sklada
-        # cislo + strukturu + nazov + typ, co pre zmigrovany zaznam da presne
-        # citatelny tvar ("K009 PW DTDL"), zatial co 'label' ostava derivat
-        # POLI zaznamu ako doteraz.
+        # 2A-4b (audit F8 + GH #93 P1): 'label' je EXPORTNY label — grouping +
+        # nazov suboru + CSV stlpec. INVARIANT nie je "decor+typ", ale STABILNY
+        # TEXT pre te iste realne data: migracia rozdelila "K009 PW" na cislo
+        # "K009" + strukturu "PW", takze exportny label MUSI byt zlozeny
+        # decor+structure+typ — zmigrovany zaznam da presne povodny text
+        # ("K009 PW DTDL") a dve struktury toho isteho cisla sa NEZLEJU do
+        # jedneho VEPO bucketu. Legacy zaznam (bez struktury) = dnesny tvar.
+        # Strazi zlaty test (legacy fixture == zmigrovana fixture, bajtovo).
+        # decor_name ide VYHRADNE do 'display' (zobrazovaci/LOG label).
         def vepo_materials
           Materials.sheets.each_with_object({}) do |s, out|
-            label = "#{s['decor']} #{s['type']}".strip
+            label = [s['decor'], s['structure'], s['type']]
+                    .map { |v| v.to_s.strip }.reject(&:empty?).join(' ')
             label = s['family'].to_s.strip if label.empty?
             label = s['material_id'].to_s if label.empty?
             display = [s['decor'], s['structure'], s['decor_name'], s['type']]

@@ -196,6 +196,7 @@
   }
 
   var mdRenaming = null;      // kluc skupiny s otvorenym inline rename inputom
+  var mdNaming = null;        // kluc skupiny s otvorenym inline editom NAZVU (GH #93 P2)
   var mdView = null;          // null = mriezka | kluc skupiny = otvoreny detail (drill-in)
   function mdSearchInput(){
     mdView = null; // pisanie do hladania vzdy vracia do mriezky (vysledky)
@@ -314,8 +315,16 @@
       (g.decor === '' ? '' :
         '<button class="ghostbtn tplbtn"' + dis + ' onclick="mdOpenDecorForm(' + esc(JSON.stringify(g.key)) + ')">+ variant</button>' +
         '<button class="ghostbtn tplbtn"' + dis + ' onclick="mdManufacturerOpen(' + esc(JSON.stringify(g.key)) + ')">Výrobca</button>' +
+        (MD_SCHEMA2 ? '<button class="ghostbtn tplbtn"' + dis + ' onclick="mdNameOpen(' + esc(JSON.stringify(g.key)) + ')">Názov</button>' : '') +
         '<button class="ghostbtn tplbtn"' + dis + ' onclick="mdRenameOpen(' + esc(JSON.stringify(g.key)) + ')">Premenovať</button>') +
       '</div>';
+    // GH #93 P2: editacia NAZVU skupiny (decor_name — zobrazovacia vlastnost,
+    // meni sa atomicky celej skupine cez group_id; prazdny nazov = vymazanie).
+    if (mdNaming === g.key && MD_SCHEMA2){
+      h += '<div class="tplrow"><input id="md_gname_input" type="text" value="' + esc(g.decor_name || '') + '" placeholder="Názov skupiny (napr. Dub Halifax)" style="flex:1">' +
+        '<button class="primary tplbtn" onclick="mdNameSave(' + esc(JSON.stringify(g.key)) + ')">Uložiť</button>' +
+        '<button class="ghostbtn tplbtn" onclick="mdNameOpen(null)">Zrušiť</button></div>';
+    }
     if (mdManufacturing === g.key){
       // D-44: naseptavac (datalist mdManList) + VLASTNE tlacidlo na vymazanie —
       // prazdny input uz vyrobcu nezmaze (server odmietne bez flagu, audit F9).
@@ -444,12 +453,27 @@
   function mdFocusInline(){
     var ri = el('md_rename_input');
     if (ri){ ri.focus(); ri.select(); return; }
+    var gi = el('md_gname_input');
+    if (gi){ gi.focus(); gi.select(); return; }
     var mi = el('md_man_input');
     if (mi){ mi.focus(); mi.select(); }
   }
   function mdRenameOpen(key){
-    mdRenaming = key; mdManufacturing = null;
+    mdRenaming = key; mdManufacturing = null; mdNaming = null;
     mdRenderLists();
+  }
+  function mdNameOpen(key){
+    mdNaming = key; mdRenaming = null; mdManufacturing = null;
+    mdRenderLists();
+  }
+  function mdNameSave(key){
+    var input = el('md_gname_input');
+    var g = mdGroupByKey(key);
+    if (!input || !g) return;
+    if (window.sketchup && sketchup.set_decor_name)
+      sketchup.set_decor_name(JSON.stringify({ group_id: g.gid || '', name: input.value,
+        catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA }));
+    mdNaming = null;
   }
   // 2A-4b (audit B3): skupinove operacie nesu group_id — server v SCHEMA 2
   // meni VYHRADNE zaznamy danej skupiny (text dekoru je len legacy fallback).
@@ -465,7 +489,7 @@
   // D-42 (audit FIX 7): vyrobca je vlastnost dekoru — inline editor nad celou skupinou.
   var mdManufacturing = null;
   function mdManufacturerOpen(key){
-    mdManufacturing = key; mdRenaming = null;
+    mdManufacturing = key; mdRenaming = null; mdNaming = null;
     mdRenderLists();
     var mi = el('md_man_input'); if (mi){ mi.focus(); mi.select(); }
   }
@@ -890,9 +914,11 @@
     mdRenderAbsRow();
     el('mdDecorForm').style.display = '';
   }
-  // 2A-4b: davka VZDY batch_schema 3 (klient pozna skupiny/strukturu/universal).
-  // Pri katalogu SCHEMA 1 (nerozhodnutelna migracia) ju server odmietne
-  // s hlaskou a UI ju zobrazi — ziadny tichy fallback na legacy tvar.
+  // 2A-4b: pri SCHEMA 2 katalogu davka batch_schema 3 (skupiny/struktura/
+  // universal). GH #93 P1: pri LEGACY katalogu (:undecidable fallback —
+  // dokumentovany rezim, mutacie bezia) klient posiela povodny D-44 tvar
+  // (batch_schema 2 BEZ struktur/universal/nazvu) — server batch 3 do
+  // katalogu 1 spravne odmieta a bez fallbacku by sa nedalo NIC zalozit.
   function mdSaveDecorBatch(){
     var sheetChips = mdActiveSheetChips();
     var edgeChips = mdActiveEdgeChips();
@@ -904,18 +930,42 @@
     if (extraS.error){ MD.setStatus(extraS.error, true); return; }
     var extraE = mdParseExtraAbs(el('nd_abs').value, commonSt);
     if (extraE.error){ MD.setStatus(extraE.error, true); return; }
-    var payload = {
-      batch_schema: 3,
-      catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA,
-      decor: el('nd_decor').value,
-      decor_name: el('nd_decor_name') ? el('nd_decor_name').value : '',
-      manufacturer: el('nd_manufacturer').value,
-      type: el('nd_type').value,
-      grain: el('nd_grain').value,
-      color: hexToRgb(el('nd_color').value),
-      sheet_variants: built.variants.concat(extraS.variants),
-      edge_variants: mdBuildEdgeVariants(edgeChips, mdStE, mdUni).concat(extraE.variants)
-    };
+    var sheetVars = built.variants.concat(extraS.variants);
+    var edgeVars = mdBuildEdgeVariants(edgeChips, mdStE, mdUni).concat(extraE.variants);
+    var payload;
+    if (MD_SCHEMA2){
+      payload = {
+        batch_schema: 3,
+        catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA,
+        decor: el('nd_decor').value,
+        decor_name: el('nd_decor_name') ? el('nd_decor_name').value : '',
+        manufacturer: el('nd_manufacturer').value,
+        type: el('nd_type').value,
+        grain: el('nd_grain').value,
+        color: hexToRgb(el('nd_color').value),
+        sheet_variants: sheetVars,
+        edge_variants: edgeVars
+      };
+    } else {
+      payload = {
+        batch_schema: 2,
+        catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA,
+        decor: el('nd_decor').value,
+        manufacturer: el('nd_manufacturer').value,
+        type: el('nd_type').value,
+        grain: el('nd_grain').value,
+        color: hexToRgb(el('nd_color').value),
+        sheet_variants: sheetVars.map(function(v){
+          var o = { thickness: v.thickness };
+          if (v.type) o.type = v.type;
+          if (v.sheet_size) o.sheet_size = v.sheet_size;
+          return o;
+        }),
+        edge_variants: edgeVars.map(function(v){
+          return { width: v.width, thickness: v.thickness };
+        })
+      };
+    }
     if (!mdEditing || !mdEditing.id){
       var formats = mdManualFormats(sheetChips, mdFmt);
       mdStoreLastSet({ schema: 2, sheet_keys: sheetChips.map(function(c){ return c.key; }),
