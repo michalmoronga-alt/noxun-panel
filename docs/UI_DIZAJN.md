@@ -148,7 +148,16 @@ natvrdo hex. Nedefinovaný token = zahodená vlastnosť (skontroluj preklepy).
 
 Aktuálny set: `maximize` (fit), `alert`, `lock` / `lock-open`, `eye` / `eye-off`,
 `copy`, `factory` (Výroba), `settings`, `star`, `rotate-ccw` (reset), `x`, `plus`,
-`check`, `chevron-right` (disclosure), `link`, `logo`.
+`check`, `chevron-right` (disclosure), `link`, `search`, `arrow-left`, `trash`,
+`pencil`, `box` (tab Korpus), `layout-grid` (tab Zóny), `columns-2` (tab Čelá),
+`layers` (Materiály), `globe` (universal ABS), `info` (banner), `logo`.
+
+### D-47: hlavička panela (rad 2)
+Tri režimové taby (Korpus·Zóny·Čelá) sú **rovnako široké** (`flex: 1 1 0`)
+s ikonou + textom; satelitné akcie **Materiály · Výroba** sú rovnako široké
+(inline-grid `1fr 1fr`) a pri šírke panela pod ~400 px sa prepnú na
+**icon-only** (media query skryje `.prodbtn span`; `title`/`aria-label`
+ostávajú) — žiadny tretí riadok, vertikálny priestor panela sa nemení.
 
 ### Pravidlo: žiadne emoji v UI chrome
 Emoji/unicode glyfy (🔒 ✕ ↺ ⚙ 📋 ★ ⧉ ⛶ ⚠ 🔗 …) sa v ovládacích prvkoch panela

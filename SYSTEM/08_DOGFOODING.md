@@ -14,7 +14,7 @@
 
 ## UX drobnosti (nízka priorita)
 
-- **D-47 · Materiály — vlastný vstup v hlavičke + konzistencia tabov** (Michal 30.7.) — materiály si čoraz viac pýtajú osobitnú sekciu s tlačidlom v hornom paneli (dnes sú na spodku poradia pri úpravách); hlavička panela je nekonzistentná: rôzne šírky tlačidiel, ikonu má len Výroba (Korpus·Zóny·Čelá bez ikon). *Stav: zaradiť do najbližšej UI dávky — prirodzený blok = 2A-4 (UI štruktúry variantov), kde sa hlavička aj tak otvorí.*
+*(momentálne žiadne — D-47 vyriešené v 2A-4b)*
 
 ## Nápady na zváženie (nerozhodnuté)
 
@@ -78,7 +78,11 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ## Otvorené otázky (na Michalovo posúdenie pri teste)
 
-*(momentálne žiadne)*
+- **Cutover katalógu na SCHEMA 2 (2A-4b) — čo uvidíš po merge + INSTALL + reštarte SketchUpu:**
+  1. Pri prvom štarte sa katalóg materiálov **sám jednorazovo zmigruje** (žiadne okno nevyskočí — priebeh je v Ruby konzole ako `[NOXUN::Engine] materialy: katalog zmigrovany...`). Zmigrujú sa len skupinové polia — **ID záznamov sa nemenia**, existujúce projekty bežia ďalej; zmaže sa jedine schválená osirotená páska „Pracovna doska".
+  2. **Záloha:** pôvodný katalóg je bajtovo odložený v `%APPDATA%\NOXUN\Engine\materials.pre-schema-2.json` (nikdy sa neprepisuje). Ak by bolo treba späť: okno Materiály → červený pás → tlačidlo **„Obnoviť predmigračnú zálohu"** (aktuálny súbor sa odloží bokom, nič sa nemaže; najbližší štart migráciu preskočí, aby si mal čas na opravu — ďalší už migruje normálne).
+  3. V okne Materiály uvidíš žltý pás **„3 pásky nemajú štruktúru ani príznak univerzálna"** — to sú Halifax Tabakový / Biela korpus / UNI (jednofarebné bez štruktúry). Otvor ich skupiny a na páskach zapni **prepínač „univerzálna"** (ikona glóbusu pri páske) — picker ich potom začne vyberať; kým to nespravíš, tie dekory hlásia ORANGE „bez ABS" a pásku vyberieš ručne.
+  4. Dlaždice katalógu sú po novom **skupiny: výrobca · číslo · názov** (rovnaké číslo u dvoch výrobcov = dve dlaždice) a detail je členený podľa štruktúry povrchu; batch „Nový dekor" má polia číslo + názov + štruktúra pri variante.
 
 ## Trvalé UI/UX pravidlo (Michal 20.7. — platí pre všetku ďalšiu prácu na paneli)
 
@@ -86,6 +90,7 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ## Vyriešené — index (plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md))
 
+- **D-47** hlavička panela — tlačidlo Materiály vedľa Výroby (rovnako široké), 3 taby rovnako široké s ikonami, pod 400 px akcie icon-only — PR 2A-4b (TBD)
 - **D-46** projektová predvoľba korpusu s inou hrúbkou (potvrdzovacia lišta namiesto tvrdého stopu — dediace skrinky prevezmú hrúbku v 1 kroku Späť) — PR #86
 - **D-44** rýchle zadávanie materiálov (našepkávač výrobcu/typu, formát platne rovno v dávke „Nový dekor", nezadaný formát sa neukladá) — PR #84
 - **D-45** slučka hrúbka ↔ materiál pri 18,6 (materiál prevezme hrúbku · hrúbka si doberie materiál · vklad sa prispôsobí) — PR #83
