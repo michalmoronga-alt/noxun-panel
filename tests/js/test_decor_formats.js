@@ -59,8 +59,11 @@ eq(out.variants, [{ type: '', thickness: '18', structure: '', sheet_size: [2800,
   'format per cip ide do payloadu (MG 2800x2050, PD 4100x600)');
 
 // 2A-4b: struktura per cip (auto zo spolocneho pola / rucny prepis) ide do payloadu.
-out = mdBuildSheetVariants(CHIPS, {}, { '18': { st: 'PW', auto: true }, 'PD 38': { st: ' ST9 ', auto: false } });
-eq(out.variants, [{ type: '', thickness: '18', structure: 'PW' }, { type: 'PD', thickness: '38', structure: 'ST9' }],
+// (GH #93 kolo 7: PD cip potrebuje format — inak klientska chyba.)
+out = mdBuildSheetVariants(CHIPS, { 'PD 38': { l: '4100', w: '600' } },
+                           { '18': { st: 'PW', auto: true }, 'PD 38': { st: ' ST9 ', auto: false } });
+eq(out.variants, [{ type: '', thickness: '18', structure: 'PW' },
+                  { type: 'PD', thickness: '38', structure: 'ST9', sheet_size: [4100, 600] }],
   'structure per cip (trim) ide do payloadu batch 3');
 
 out = mdBuildSheetVariants(CHIPS, { '18': { l: '2800', w: '' } });
