@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.5.12' unless defined?(VERSION)
+    VERSION = '0.5.13' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -43,6 +43,10 @@ Sketchup.require 'noxun_engine/core/materials_abs'      # V0.5.1 split: ABS podl
 Sketchup.require 'noxun_engine/core/materials_project'  # V0.5.1 split: projektove defaulty + usage
 Sketchup.require 'noxun_engine/core/materials_migration' # 2A-2: dormantna migracia na SCHEMA 2 (standard 7.1)
 Sketchup.require 'noxun_engine/core/materials_health'   # 2A-4a: stav katalogu (read-only rezim), obnova z .bak, rollback
+Sketchup.require 'noxun_engine/core/demos/client'        # V0.6-B: async siet (allowlist, robots, throttle)
+Sketchup.require 'noxun_engine/core/demos/sitemap_cache' # V0.6-B: cache produktovych URL (48k, refresh na pokyn)
+Sketchup.require 'noxun_engine/core/demos/slug_matcher'  # V0.6-B: identita zaznamu -> produktova URL
+Sketchup.require 'noxun_engine/core/demos/product_parser' # V0.6-B: HTML -> kod/ceny/parametre/rodina
 Sketchup.require 'noxun_engine/core/abs_rules'   # V0.3 ABS pravidla (pouziva Materials)
 Sketchup.require 'noxun_engine/core/hardware_rules' # V0.4 pravidla kovania (pred construction)
 Sketchup.require 'noxun_engine/modules/shelves'

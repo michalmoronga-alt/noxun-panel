@@ -398,7 +398,17 @@ Záznam variantu:
 
 Kusovník podľa materiálov sa delí podľa **material_id (variant) + hrúbka**.
 
-**Nemennosť ID a migrácia (2A):** `material_id`/`abs_id` sú **opaque a navždy nemenné** (modely sa viažu výhradne na ne — snapshot na entite drží ID, štandard 8.3); legacy ID s vloženou štruktúrou v texte sa NEparsujú. Nové ID zahŕňajú skupinu+štruktúru (+formát pri PD) len pre čitateľnosť. Migrácia na SCHEMA 2 beží raz: **nemenná záloha** `materials.pre-schema-2.json` (mimo bežného `.bak`, ktorý sa prepisuje) → transformácia podľa **explicitnej mapy** (heuristika len fallback s reportom) → atomický zápis so schema markerom. **Čo i len jedna nerozhodnuteľná položka = atomický NO-OP celej migrácie** (katalóg sa NEnahradí ani čiastočne — žiadny hybridný stav; report vypíše, čo treba rozhodnúť); mutácie zo starých okien server po migrácii odmieta (`catalog_schema` v payloade). Ceny sa ukladajú **bez DPH** (zdroj s DPH sa prepočíta pri vstupe).
+**Nemennosť ID a migrácia (2A):** `material_id`/`abs_id` sú **opaque a navždy nemenné** (modely sa viažu výhradne na ne — snapshot na entite drží ID, štandard 8.3); legacy ID s vloženou štruktúrou v texte sa NEparsujú. Nové ID zahŕňajú skupinu+štruktúru (+formát pri PD) len pre čitateľnosť. Migrácia na SCHEMA 2 beží raz: **nemenná záloha** `materials.pre-schema-2.json` (mimo bežného `.bak`, ktorý sa prepisuje) → transformácia podľa **explicitnej mapy** (heuristika len fallback s reportom) → atomický zápis so schema markerom. **Čo i len jedna nerozhodnuteľná položka = atomický NO-OP celej migrácie** (katalóg sa NEnahradí ani čiastočne — žiadny hybridný stav; report vypíše, čo treba rozhodnúť); mutácie zo starých okien server po migrácii odmieta (`catalog_schema` v payloade).
+
+**Daňový základ cien (ZMENA 31.7.2026, Michal — ruší rozhodnutie z 29.7.):**
+katalóg eviduje ceny **S DPH, presne ako ich zobrazuje Demos** (90 % zdrojov);
+výsledný výpočet/ponuka má **prepínač „s DPH / bez DPH"** (÷ aktuálna sadzba
+1,23 na zobrazenie). Zdroj bez DPH (historický VEPO cenník) sa pri vstupe
+prepočíta ×1,23. Ceny sú **pohyblivá cache** — katalóg drží väzbu na produkt
+(kód + URL) a „poslednú známu cenu + dátum overenia"; autorita pre ponuku je
+„Prepočítať ceny" (živý fetch, dávka E). Existujúce ručne zadané ceny
+testovacieho katalógu sa pri seede 2.0 preveria/nahradia — tax-basis marker sa
+nezavádza (jednotný základ = s DPH).
 
 **Boot cutover (2A-4b):** migráciu spúšťa **každý štart SketchUpu** (`Materials.boot_cutover!` z main.rb vo vlastnom chránenom bloku — zlyhanie nikdy nezhodí inicializáciu; žiadny modálny dialóg, výsledok ide do logu a stav ukazuje okno Materiály). Poradie: jednorazový **hold flag** `migration_hold.json` (zapisuje ho rollback `restore_pre_schema2!`) sa skonzumuje a migrácia sa RAZ preskočí (ďalší štart už migruje normálne) → posúdenie katalógu (obnova primáru z `.bak`; poškodený/hybridný/novší katalóg = **read-only režim** mutácií do opravy) → marker < 2 = ostrá migrácia (`:undecidable` = katalóg beží ďalej legacy dual-mode, mutácie sa NEzamykajú). Čerstvá inštalácia sa **seeduje natívne v SCHEMA 2** (nikdy nemigruje).
 

@@ -129,6 +129,10 @@ unless NxTest::IN_SKETCHUP
     core/materials_project
     core/materials_migration
     core/materials_health
+    core/demos/client
+    core/demos/sitemap_cache
+    core/demos/slug_matcher
+    core/demos/product_parser
     core/abs_rules
     core/hardware_rules
     modules/shelves
