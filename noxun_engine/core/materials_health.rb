@@ -107,7 +107,10 @@ module Noxun
               log_migration_summary(retry_report)
               :migrated
             else
+              # GH #93 P2 (10. kolo): neuspech RETRY musi byt viditelny rovnako
+              # ako neuspech hlavneho behu (banner, nie len log).
               Engine.log("materialy: katalog sa pod bootom zmenil, opakovana migracia: #{retry_report[:status]}") if defined?(Engine)
+              set_cutover_issue_for(retry_report)
               assess_catalog!
               retry_report[:status]
             end
@@ -120,20 +123,20 @@ module Noxun
             Engine.log('materialy: migracia neprebehla — nerozhodnutelne polozky, katalog bezi dalej v povodnom formate:')
             report[:reasons].each { |r| Engine.log("  - #{r}") }
           end
-          self.cutover_issue = 'Migrácia katalógu neprebehla — nerozhodnuteľné položky: '                                "#{report[:reasons].join(' · ')}. Oprav dáta a reštartuj SketchUp."
+          set_cutover_issue_for(report)
           :undecidable
         when :backup_corrupt
           if defined?(Engine)
             Engine.log('materialy: migracia zablokovana — poskodena predmigracna zaloha')
           end
-          self.cutover_issue = 'Migrácia je zablokovaná: predmigračná záloha '                                "(#{pre_schema2_backup_path}) je poškodená a nepoužiteľná. "                                'Premenuj/odstráň ju a reštartuj SketchUp.'
+          set_cutover_issue_for(report)
           assess_catalog!
           :backup_corrupt
         else
           if defined?(Engine)
             Engine.log("materialy: migracia zlyhala (#{report[:status]}) — katalog sa znovu posudi")
           end
-          self.cutover_issue = "Migrácia katalógu zlyhala (#{report[:status]}) — pozri log a reštartuj SketchUp."
+          set_cutover_issue_for(report)
           assess_catalog!
           report[:status]
         end
@@ -149,6 +152,21 @@ module Noxun
           nil
         end
         :error
+      end
+
+      # JEDNA autorita textov cutover_issue (hlavny beh AJ retry — GH #93
+      # 10. kolo). Uspesne/neutralne statusy dovod NEnastavuju.
+      def set_cutover_issue_for(report)
+        case report[:status]
+        when :ok, :already, :not_found, :empty, :empty_promoted, :hold, :schema2
+          nil
+        when :undecidable
+          self.cutover_issue = 'Migrácia katalógu neprebehla — nerozhodnuteľné položky: '                                "#{Array(report[:reasons]).join(' · ')}. Oprav dáta a reštartuj SketchUp."
+        when :backup_corrupt
+          self.cutover_issue = 'Migrácia je zablokovaná: predmigračná záloha '                                "(#{pre_schema2_backup_path}) je poškodená a nepoužiteľná. "                                'Premenuj/odstráň ju a reštartuj SketchUp.'
+        else
+          self.cutover_issue = "Migrácia katalógu zlyhala (#{report[:status]}) — pozri log a reštartuj SketchUp."
+        end
       end
 
       # Suhrn uspesnej migracie do logu (O1: ziadny modal pri boote).

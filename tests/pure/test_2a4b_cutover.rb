@@ -598,3 +598,32 @@ NxTest.test('2a4b: GH kolo 9 — display nesie ludsky zaklad, ked label ma disam
     NxTest.refute(mats['U1'].key?('display'), 'bez disambiguatora display netreba (label = ludsky)')
   end
 end
+
+NxTest.test('2a4b: GH kolo 10 — retry neuspech je viditelny + batch v3 marker re-check pod zamkom') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  # a) retry po zmene pod bootom vrati :undecidable -> cutover_issue nastaveny
+  empty_legacy = JSON.pretty_generate('std' => 1, 'sheets' => [], 'edges' => []).b
+  b4_with_catalog(empty_legacy) do
+    bad = JSON.parse(JSON.generate(NxTest::LEGACY_SEED_CATALOG))
+    bad['sheets'][0]['structure'] = 'PW' # hybrid v legacy = undecidable
+    B4MAT.catalog # warm cache nad prazdnym
+    File.binwrite(B4MAT.path, JSON.pretty_generate(bad).b)
+    NxTest.assert_equal(:undecidable, B4MAT.boot_cutover!)
+    NxTest.assert(B4MAT.cutover_issue.to_s.include?('nerozhodnuteľné'),
+                  "retry neuspech je viditelny: #{B4MAT.cutover_issue.inspect}")
+  end
+  # b) batch v3 odmietne zapis, ked sa katalog POD zamkom vratil na legacy
+  b4_with_catalog(JSON.pretty_generate(b4_schema2_data).b) do
+    B4MAT.catalog # warm cache (schema 2 pohlad)
+    File.binwrite(B4MAT.path, b4_legacy_seed_bytes) # "rollback z ineho procesu"
+    ok, err = B4MAT.add_decor_batch(
+      'batch_schema' => 3, 'decor' => 'K999', 'manufacturer' => 'Egger',
+      'type' => 'DTDL', 'grain' => 'length', 'color' => [1, 2, 3],
+      'sheet_variants' => [{ 'thickness' => 18.0, 'structure' => 'ST9' }],
+      'edge_variants' => []
+    )
+    NxTest.refute(ok, 'v3 zapis do legacy suboru sa odmietne (ziadny hybrid)')
+    NxTest.assert(err.include?('vrátil na pôvodný formát'), err.to_s)
+    NxTest.assert_equal(b4_legacy_seed_bytes, File.binread(B4MAT.path).b, 'subor nedotknuty')
+  end
+end

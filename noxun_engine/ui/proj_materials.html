@@ -71,6 +71,10 @@
       <option value="az">A–Z</option>
     </select>
     <button class="ghostbtn" id="mdNewDecorBtn" onclick="mdOpenDecorForm(null)"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nový dekor</button>
+    <!-- GH #93 P2 (10. kolo): rollback dostupny aj pri ZDRAVOM katalogu (nie
+         len z nudzoveho banneru) — ukazuje sa len so SCHEMA 2 + existujucou
+         predmigracnou zalohou; potvrdenie robi ten isty modal. -->
+    <button class="ghostbtn" id="mdRestoreBtn" style="display:none" title="Vráti katalóg do stavu pred migráciou (jednorazovo preskočí ďalšiu migráciu)" onclick="mdRestoreOpen()"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg> Obnoviť zálohu</button>
   </div>
   <!-- Mriezka dlazdic (sekcie: Pouzite v projekte / vyrobcovia) ALEBO detail
        dekoru (drill-in) — prepina mdView v JS. Editovacie formulare ostavaju

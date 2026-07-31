@@ -600,6 +600,13 @@ module Noxun
         # zapisy skorsieho (dup checky aj resolve skupiny bezia nad cerstvym).
         with_catalog_lock do
         JsonFileStore.invalidate(path)
+        # GH #93 P2 (10. kolo): rollback z ineho procesu mohol katalog POD nami
+        # vratit na legacy — v3 zapis s group_id zaznamami by vyrobil hybridny
+        # subor (marker 1 + schema2 polia). Marker sa preto overuje CERSTVO
+        # az pod zamkom.
+        if catalog_schema_on_disk < SCHEMA_GROUPS
+          return [false, 'Katalóg sa medzitým vrátil na pôvodný formát — obnov okno „Materiály“ a skús znova.']
+        end
         ok_g, group = resolve_batch_group(manufacturer, decor, decor_name)
         return [false, group] unless ok_g
         # GH #91 P2: NOVA znackova skupina bez jedinej dosky sa zaklada NESMIE —

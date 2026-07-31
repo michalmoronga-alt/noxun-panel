@@ -150,6 +150,9 @@ module Noxun
             # predmigracna zaloha / nerozhodnutelne polozky) — VIDITELNY banner,
             # nie len log; katalog pritom bezi dalej (nie read-only).
             cutover_issue: Materials.respond_to?(:cutover_issue) ? Materials.cutover_issue.to_s : '',
+            # GH #93 P2 (10. kolo): rollback tlacidlo aj pri zdravom katalogu —
+            # ukazuje sa len ked predmigracna zaloha realne existuje.
+            pre_schema2_backup: File.exist?(Materials.pre_schema2_backup_path),
             # D-44: naseptavace (vyrobca/typ) a navrhy formatu platne stavia
             # SERVER — JS ich len renderuje. Ide s KAZDYM katalogovym echom,
             # takze novy vyrobca/typ je v navrhoch hned po zapise.

@@ -24,6 +24,7 @@
   // pasok (VYHRADNE zo servera — JS nikdy nepocita sam).
   var MD_RO = false;
   var MD_CUTOVER_ISSUE = '';  // GH #93 P2: dovod nevykonaneho cutoveru (banner)
+  var MD_HAS_BACKUP = false;  // GH #93 P2 (10. kolo): existuje predmigracna zaloha
   var MD_RO_REASON = '';
   var MD_UNUSABLE = 0;
   // D-44: navrhy naseptavacov a navrhy formatu platne — obe STAVIA SERVER
@@ -235,6 +236,10 @@
     }
     var nb = el('mdNewDecorBtn');
     if (nb) nb.disabled = MD_RO;
+    // GH #93 P2 (10. kolo): rollback aj pri zdravej SCHEMA 2 (zaloha existuje);
+    // v read-only stave ho nesie nudzovy banner, tu by bol duplicitny.
+    var rb = el('mdRestoreBtn');
+    if (rb) rb.style.display = (MD_SCHEMA2 && !MD_RO && MD_HAS_BACKUP) ? '' : 'none';
   }
   // Cista funkcia (Node test): text banneru so slovenskym sklonovanim.
   function mdEdgeBannerText(n){
@@ -1195,6 +1200,7 @@
     MD_RO_REASON = data.catalog_state_reason || '';
     MD_UNUSABLE = parseInt(data.unusable_edges, 10) || 0;
     MD_CUTOVER_ISSUE = (data.cutover_issue || '').toString();
+    MD_HAS_BACKUP = data.pre_schema2_backup === true;
     mdRenderBanners();
     // GH P1: serverova schema sa NEpreberá do mutacii — klient posiela vlastnu
     // MD_CLIENT_SCHEMA konstantu (echo servera by falosne "povysilo" stare
