@@ -417,6 +417,27 @@ odlišný stav od explicitnej `0.0`. Hromadné vytváranie cenu neukladá (dopln
 v katalógu); nečíselný vstup sa odmieta (nikdy tichá 0 z `to_f`). Cenová ponuka
 má na nezadané ceny upozorniť, nie ich rátať ako nulu.
 
+**Duplák (D-43, dávka 2B-1 — SCHEMA 3):** variant dosky „zdvojený zo zdroja"
+(36 = 2× zlepená 18). Vlastné vstupy sú **výhradne** `source_material_id`
+(doska TEJ ISTEJ skupiny, sama nesmie byť duplák — žiadne reťazenie) a
+`source_multiplier` (Integer 2–3); **všetko ostatné sa KOPÍRUJE zo zdroja**
+(typ, štruktúra, grain, farba, formát platne; hrúbka = násobič × hrúbka
+zdroja) a na dupláku je **nemenné** — edit zdroja propaguje zdieľané
+editovateľné polia (formát non-PD, grain, farba) na jeho dupláky v jednom
+atomickom zápise. Duplák **nenesie nákupné polia** (`code`/`supplier`/cena) —
+kupuje sa zdroj; kupovaná hotová doska väčšej hrúbky s vlastným DK kódom je
+bežný variant, nie duplák. Zdroj dupláku sa nesmie zmazať (guard pod zámkom).
+Väzba je súčasťou **výrobného snapshotu** na dielci/doske
+(`config.material_source = {material_id, multiplier}` — zapisujú buildery,
+validuje `BuildPlan.validate_material_source!` tesne pred zápisom; rebuild na
+stroji s katalógom bez dupláku vazbu z predošlého snapshotu zachová). Odhad
+platní prelieva plochu dupláku ×násobič do **zdrojového** materiálu
+(`doubled_m2`/`doubled_quantity` na zdrojovom riadku; duplák vlastný riadok
+nákupu nemá); kusovník a VEPO ostávajú bez zmeny (dielec 1× s hrúbkou 36).
+**Marker SCHEMA 3 sa dvíha LAZY** — prvým zápisom katalógu s duplák záznamom;
+staršie verzie pluginu katalóg s marker 3 čítajú, ale mutácie odmietnu
+(write backstop + assess read-only), inak by väzby ticho zahodili.
+
 **Dekorová skupina (D-41 → SCHEMA 2 v 2A):** dosky a ABS pásky viaže do skupiny
 **`group_id`** (stabilný interný identifikátor; obchodná identita skupiny = výrobca +
 číslo dekoru + názov). Pravidlá:

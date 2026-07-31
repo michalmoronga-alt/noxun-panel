@@ -139,6 +139,16 @@ module Noxun
             grain_direction: cfg[:grain_direction],
             edges: cfg[:edges]
           }
+          # 2B-1 (D-43): duplak vazba do vyrobneho snapshotu dosky. Doska vzdy
+          # vyzaduje katalogovy material (validate_config!), takze autorita je
+          # VYHRADNE katalog — ziadny legacy carry-over ako pri korpuse.
+          sheet = catalog_sheet(cfg[:material_id])
+          if defined?(Materials) && Materials.duplak?(sheet)
+            out[:material_source] = BuildPlan.validate_material_source!(
+              { 'material_id' => sheet['source_material_id'].to_s,
+                'multiplier' => sheet['source_multiplier'].to_i }, where: 'doska'
+            )
+          end
           # 2A-3 (audit B2): warnings POSLEDNEJ stavby — kluc sa uklada LEN ked
           # nieco vzniklo (SCHEMA 1 config ostava bajtovo identicky s dneskom).
           w = cfg[:warnings]

@@ -154,6 +154,24 @@ module Noxun
         pd
       end
 
+      # 2B-1 (D-43): kontrakt duplak vazby vo VYROBNOM SNAPSHOTE dielca/dosky
+      # (config['material_source']). Vola sa bezprostredne pred zapisom snapshotu
+      # na entitu (audit F6 — plan sa validuje PRED resolve_part, snapshot preto
+      # potrebuje vlastnu branu). nil = bezny material (ziadna vazba); cokolvek
+      # ine musi byt uplna vazba — polovicny tvar by rozbil odhad platni.
+      DUPLAK_SNAPSHOT_MULTIPLIERS = [2, 3].freeze
+      def validate_material_source!(ms, where: 'dielec')
+        return nil if ms.nil?
+        raise "BuildPlan: #{where} ma neplatny material_source (#{ms.inspect})." unless ms.is_a?(Hash)
+        src = ms['material_id'] || ms[:material_id]
+        raise "BuildPlan: #{where} ma material_source bez material_id." if src.to_s.strip.empty?
+        mult = ms['multiplier'] || ms[:multiplier]
+        unless mult.is_a?(Integer) && DUPLAK_SNAPSHOT_MULTIPLIERS.include?(mult)
+          raise "BuildPlan: #{where} ma neplatny material_source multiplier (#{mult.inspect})."
+        end
+        { 'material_id' => src.to_s, 'multiplier' => mult }
+      end
+
       # Zvaliduje jednu hardware polozku (STRING kluce — kontrakt v hlavicke).
       # part_keys: hash existujucich part_key planu (referencna integrita ownera);
       # nil = kontrola vlastnika sa preskoci (izolovane unit testy poloziek).

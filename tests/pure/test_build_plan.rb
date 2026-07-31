@@ -225,3 +225,29 @@ NxTest.test('build_plan: kazdy plan z matrixu variantov prejde validatorom') do
     end
   end
 end
+
+# --- 2B-1 (D-43): kontrakt duplak vazby v snapshote (validate_material_source!)
+
+NxTest.test('build_plan 2b1: validate_material_source! — nil ok, uplny tvar normalizuje, zvysok raise') do
+  bp = Noxun::Engine::BuildPlan
+  NxTest.assert_equal(nil, bp.validate_material_source!(nil), 'nil = bezny material')
+  out = bp.validate_material_source!({ 'material_id' => 'SRC18', 'multiplier' => 2 })
+  NxTest.assert_equal({ 'material_id' => 'SRC18', 'multiplier' => 2 }, out)
+  sym = bp.validate_material_source!({ material_id: 'SRC18', multiplier: 3 }, where: 'doska')
+  NxTest.assert_equal({ 'material_id' => 'SRC18', 'multiplier' => 3 }, sym, 'symbolove kluce prejdu normalizovane')
+  [{ 'material_id' => '', 'multiplier' => 2 },
+   { 'multiplier' => 2 },
+   { 'material_id' => 'SRC18' },
+   { 'material_id' => 'SRC18', 'multiplier' => 1 },
+   { 'material_id' => 'SRC18', 'multiplier' => 4 },
+   { 'material_id' => 'SRC18', 'multiplier' => '2' },
+   'SRC18'].each do |bad|
+    raised = begin
+      bp.validate_material_source!(bad)
+      false
+    rescue StandardError
+      true
+    end
+    NxTest.assert(raised, "neplatny material_source musi raisnut: #{bad.inspect}")
+  end
+end

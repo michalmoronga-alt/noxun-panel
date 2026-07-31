@@ -75,3 +75,42 @@ NxTest.test('sheet_estimate: neplatne koeficienty a prazdny vstup') do
   NxTest.assert_equal([], NxSE.se.estimate([NxSE.row('quantity' => 0)]), 'nulove kusy = nic')
   NxTest.assert_equal([], NxSE.se.estimate([NxSE.row('material_id' => '')]), 'bez materialu = nic')
 end
+
+# --- 2B-1 (D-43): duplak — plocha x nasobic ide ZDROJU, duplak nema riadok ----
+
+NxTest.test('sheet_estimate 2b1: duplak riadok sa preleje do zdroja (m2 x mult, doubled_*)') do
+  rows = [
+    NxSE.row('material_id' => 'SRC18'),                                    # 1.0 m2 vlastne
+    NxSE.row('material_id' => 'DUP36', 'quantity' => 1,                    # 0.5 m2 dielec
+             'material_source' => { 'material_id' => 'SRC18', 'multiplier' => 2 })
+  ]
+  out = NxSE.se.estimate(rows, sheet_sizes: { 'SRC18' => [2800, 2070] })
+  NxTest.assert_equal(%w[SRC18], out.map { |g| g['material_id'] }, 'duplak nema vlastny riadok')
+  g = out.first
+  NxTest.assert_close(2.0, g['m2'], 0.001, 'm2 = 1.0 vlastne + 0.5x2 duplak')
+  NxTest.assert_equal(2, g['quantity'], 'quantity = LEN vlastne dielce (kontrakt NOTE 13)')
+  NxTest.assert_close(1.0, g['doubled_m2'], 0.001, 'doubled_m2 = kupovana plocha duplakov (po x mult)')
+  NxTest.assert_equal(1, g['doubled_quantity'], 'doubled_quantity = kusy duplak dielcov')
+  NxTest.assert_equal(false, g['fallback'], 'format zdroja z katalogu')
+end
+
+NxTest.test('sheet_estimate 2b1: zdroj bez vlastnych dielcov vznikne len z duplakov') do
+  rows = [NxSE.row('material_id' => 'DUP36',
+                   'material_source' => { 'material_id' => 'SRC18', 'multiplier' => 2 })]
+  out = NxSE.se.estimate(rows, sheet_sizes: { 'SRC18' => [2800, 2070] })
+  NxTest.assert_equal(%w[SRC18], out.map { |g| g['material_id'] })
+  g = out.first
+  NxTest.assert_close(2.0, g['m2'], 0.001, '2x (1.0 x 0.5) x mult 2')
+  NxTest.assert_equal(0, g['quantity'], 'ziadne vlastne dielce')
+  NxTest.assert_close(2.0, g['doubled_m2'], 0.001)
+  NxTest.assert(g['count_min'].positive?, 'nakup platni sa pocita z celkoveho m2')
+end
+
+NxTest.test('sheet_estimate 2b1: polovicna/neplatna vazba = bezny riadok (ziadne prelievanie)') do
+  rows = [NxSE.row('material_id' => 'DUP36', 'material_source' => { 'material_id' => '', 'multiplier' => 2 }),
+          NxSE.row('material_id' => 'DUP54', 'material_source' => { 'material_id' => 'SRC18' })]
+  out = NxSE.se.estimate(rows)
+  NxTest.assert_equal(%w[DUP36 DUP54], out.map { |g| g['material_id'] },
+                      'neuplna vazba sa ignoruje — material ostava sam sebou')
+  NxTest.refute(out.first.key?('doubled_m2'), 'bez duplakov ziadne doubled polia')
+end

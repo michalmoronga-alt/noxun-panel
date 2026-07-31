@@ -67,6 +67,37 @@ NxTest.test('bom: float drift v ramci 0.1 mm sa zluci (kluc v desatinach mm)') d
   NxTest.assert_equal(2, out[:rows].first['quantity'])
 end
 
+# --- 2B-1 (D-43): duplak vazba (material_source) cez record/kluc/riadok -------
+
+NxTest.test('bom 2b1: record nesie LEN uplnu duplak vazbu, riadok ju zrkadli') do
+  cfg = { 'length' => 720.0, 'width' => 510.0, 'thickness' => 36.0, 'quantity' => 1,
+          'material_id' => 'DUP36', 'grain_direction' => 'length',
+          'edges' => {}, 'material_source' => { 'material_id' => 'SRC18', 'multiplier' => 2 } }
+  r = Noxun::Engine::Bom.record(cfg, owner_id: 'BRD-001', name: 'Duplak', part_key: 'board/main')
+  NxTest.assert_equal({ 'material_id' => 'SRC18', 'multiplier' => 2 }, r['material_source'])
+  half = Noxun::Engine::Bom.record(cfg.merge('material_source' => { 'material_id' => 'SRC18' }),
+                                   owner_id: 'BRD-001', name: 'X', part_key: 'board/main')
+  NxTest.refute(half.key?('material_source'), 'vazba bez nasobica sa nenesie')
+  out = Noxun::Engine::Bom.compute(records: [r], hardware: [], warnings: [], cabinets: 0, boards: 1)
+  NxTest.assert_equal({ 'material_id' => 'SRC18', 'multiplier' => 2 },
+                      out[:rows].first['material_source'], 'agregovany riadok vazbu zrkadli')
+end
+
+NxTest.test('bom 2b1: rozdielna duplak vazba NEzluci riadky (kluc — audit F7)') do
+  f = NxBomFix
+  a = f.rec('CAB-001', 'Dvered', 720, 510, 36, 'DUP36')
+  b = f.rec('CAB-002', 'Dvered', 720, 510, 36, 'DUP36')
+  a['material_source'] = { 'material_id' => 'SRC18', 'multiplier' => 2 }
+  b['material_source'] = { 'material_id' => 'SRC18_OLD', 'multiplier' => 2 }
+  out = Noxun::Engine::Bom.compute(records: [a, b], hardware: [], warnings: [], cabinets: 2, boards: 0)
+  NxTest.assert_equal(2, out[:rows].length, 'rozne snapshoty vazby = 2 riadky')
+  same = f.rec('CAB-003', 'Dvered', 720, 510, 36, 'DUP36')
+  same['material_source'] = { 'material_id' => 'SRC18', 'multiplier' => 2 }
+  out2 = Noxun::Engine::Bom.compute(records: [a, same], hardware: [], warnings: [], cabinets: 2, boards: 0)
+  NxTest.assert_equal(1, out2[:rows].length, 'zhodna vazba sa zluci')
+  NxTest.assert_equal(2, out2[:rows].first['quantity'])
+end
+
 NxTest.test('bom: m2 a bm sa scitavaju zo VSETKYCH zdrojovych dielcov') do
   f = NxBomFix
   recs = [

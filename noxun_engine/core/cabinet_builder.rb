@@ -169,8 +169,11 @@ module Noxun
 
           inst.make_unique if inst.definition.instances.size > 1
           cdef = inst.definition
+          # 2B-1 (audit F8): duplak vazby zo SUCASNYCH snapshotov dielcov — na
+          # stroji, ktoreho katalog duplak nepozna, by rebuild vazbu stratil.
+          legacy_sources = collect_part_sources(cdef)
           cdef.entities.clear!
-          final = build_into(model, cdef, cfg, cid)
+          final = build_into(model, cdef, cfg, cid, legacy_sources: legacy_sources)
           inst.transformation = transform if transform
           write_cabinet_attrs(inst, cid, final)
           apply_scale_lock(inst)
@@ -250,7 +253,7 @@ module Noxun
         # V0.3 materialy + ABS: kazdemu dielcu sa vyriesi VYSLEDNY material_id a ABS hrany cez retaz
         # (standard 7.2): pravidlove defaulty roly -> dedenie projekt->korpus -> part_override (viťazi).
         # Vysledok sa zapise do configu dielca (dielec vzdy nesie KONKRETNY material = "zaradeny" stav).
-        def build_into(model, cdef, cfg, cid)
+        def build_into(model, cdef, cfg, cid, legacy_sources: {})
           # Pravidla kovania = PROJEKTOVY snapshot (reprodukovatelnost z .skp — audit K2).
           # Prvy build ho zapise z globalnej kniznice; sme VNUTRI operacie volajuceho,
           # takze undo vrati model aj snapshot naraz.
@@ -275,7 +278,8 @@ module Noxun
           abs_issues = []
           plan[:parts].each do |pd|
             next unless positive_box?(pd[:box]) # ochrana proti degenerovanym dielcom (uzke zony)
-            resolved = resolve_part(pd, eff_body, eff_front, eff_back, overrides, abs_issues: abs_issues)
+            resolved = resolve_part(pd, eff_body, eff_front, eff_back, overrides,
+                                    abs_issues: abs_issues, legacy_sources: legacy_sources)
             add_part(model, ents, pd, resolved, cid, tid)
           end
           attach_abs_warnings!(plan, abs_issues)
@@ -305,7 +309,7 @@ module Noxun
         # {part_key:, name:, code:, reason:} pre agregaciu do plan[:warnings].
         # Hrany PREPISANE overridom (aj vedome nil) sa NEHLASIA — override je
         # rozhodnutie pouzivatela, warning by klamal.
-        def resolve_part(pd, eff_body, eff_front, eff_back, overrides, abs_issues: nil)
+        def resolve_part(pd, eff_body, eff_front, eff_back, overrides, abs_issues: nil, legacy_sources: {})
           part_key = PartKeys.for_descriptor(pd)
           ov = overrides[part_key].is_a?(Hash) ? overrides[part_key] : {}
           base_mat = base_material_for(pd[:role], pd[:material], eff_body, eff_front, eff_back)
@@ -313,6 +317,7 @@ module Noxun
           # Jeden lookup doskoveho materialu — pouzity na dekor (ABS) aj hrubkovu kontrolu (V0.3 FIX 2).
           sheet = (defined?(Materials) && mat_id) ? Materials.sheet(mat_id) : nil
           validate_material_thickness!(mat_id, sheet, pd)
+          mat_source = material_source_for(mat_id, sheet, legacy_sources[part_key])
           decor = sheet && sheet['decor']
           # D-41 (audit FIX 10): picker sirky pasky dostava CIELOVU hrubku dielca —
           # katalogova hrubka sheetu ma prednost (cela 18/19 sa geometricky prisposobia
@@ -355,7 +360,43 @@ module Noxun
           grain = sheet && sheet['grain'].to_s
           grain = 'none' unless %w[length width none].include?(grain)
           { part_key: part_key, role_key: part_key, material_id: mat_id, edges: edges,
-            grain_direction: grain, sheet_thickness: (sheet && sheet['thickness']) }
+            grain_direction: grain, sheet_thickness: (sheet && sheet['thickness']),
+            material_source: mat_source }
+        end
+
+        # 2B-1 (D-43): duplak vazba do snapshotu dielca. Katalog je autorita, ked
+        # material POZNA (vratane odobratia vazby, ak uz nie je duplak); pri
+        # materiali MIMO katalogu (legacy vynimka korpusov) sa zachova vazba z
+        # predchadzajuceho snapshotu ROVNAKEHO materialu — rebuild na stroji bez
+        # duplaku v katalogu nesmie snapshot ticho zniciť (audit F8).
+        def material_source_for(mat_id, sheet, legacy)
+          if sheet
+            return nil unless defined?(Materials) && Materials.duplak?(sheet)
+            return { 'material_id' => sheet['source_material_id'].to_s,
+                     'multiplier' => sheet['source_multiplier'].to_i }
+          end
+          return nil unless legacy.is_a?(Hash) && legacy['material_id'].to_s == mat_id.to_s
+          legacy['material_source']
+        end
+
+        # 2B-1 (audit F8): mapa part_key -> {material_id, material_source} zo
+        # SUCASNYCH dielcov definicie (pred clear!). Cita sa LEN uplna vazba.
+        def collect_part_sources(cdef)
+          out = {}
+          cdef.entities.grep(Sketchup::ComponentInstance).each do |e|
+            next unless Store.kind(e) == 'part'
+            cfg = Store.config(e)
+            next unless cfg.is_a?(Hash)
+            ms = cfg['material_source']
+            next unless ms.is_a?(Hash) && !ms['material_id'].to_s.empty?
+            key = Store.get(e, 'part_key').to_s
+            next if key.empty?
+            out[key] = { 'material_id' => cfg['material_id'].to_s, 'material_source' => ms }
+          end
+          out
+        rescue StandardError => e
+          Engine.log_error(e, 'collect_part_sources') if defined?(Engine)
+          {}
         end
 
         # Katalogovy material s nespravnou hrubkou nesmie vytvorit rozpor medzi
@@ -719,6 +760,18 @@ module Noxun
           pid = Ids.part_id(cid, pd[:suffix])
           # BuildPlan kontrakt: vyrobne zaradenie riadi DESKRIPTOR (default sheet/true/1) —
           # builder uz nic nenatvrdzuje; buduce 'counted'/'linear' dielce neprejdu ako doska.
+          cfg_out = {
+            length: pd[:prod][:length].round(2), width: pd[:prod][:width].round(2),
+            thickness: pd[:prod][:thickness].round(2), quantity: pd.fetch(:quantity, 1),
+            material_id: resolved[:material_id], grain_direction: resolved[:grain_direction] || 'none',
+            edges: resolved[:edges]
+          }
+          # 2B-1 (D-43): duplak vazba je sucast VYROBNEHO snapshotu (standard 8.3)
+          # — validacia bezi na materializovanom configu tesne pred zapisom
+          # (audit F6: plan sa validuje pred resolve_part, tade vazba neprejde).
+          if (ms = BuildPlan.validate_material_source!(resolved[:material_source], where: pd[:suffix].to_s))
+            cfg_out[:material_source] = ms
+          end
           Store.write(inst, {
             std: Store::STD, kind: 'part', id: pid, part_id: pid, cabinet_id: cid,
             template_id: tid, role: pd[:role], name: pd[:name],
@@ -726,12 +779,7 @@ module Noxun
             role_key: resolved[:role_key], # kompatibilny alias pre sucasny panel
             manufactured: pd.fetch(:manufactured, true),
             production_class: pd.fetch(:production_class, 'sheet').to_s,
-            config: {
-              length: pd[:prod][:length].round(2), width: pd[:prod][:width].round(2),
-              thickness: pd[:prod][:thickness].round(2), quantity: pd.fetch(:quantity, 1),
-              material_id: resolved[:material_id], grain_direction: resolved[:grain_direction] || 'none',
-              edges: resolved[:edges]
-            }
+            config: cfg_out
           })
           inst
         end

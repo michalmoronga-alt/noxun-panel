@@ -229,8 +229,8 @@ module Noxun
       #   subor + .bak chybaju                  -> :ok (panensky stav, seed smie)
       #   primar chyba, .bak citatelna (F5)     -> obnova z .bak, potom posudenie
       #   marker 1                              -> :ok (legacy dual-mode)
-      #   marker 2 + schema2_complete?          -> :ok
-      #   marker 2 hybridny / marker > 2        -> :read_only s dovodom
+      #   marker 2..CURRENT + schema2_complete? -> :ok (2B-1: 3 = duplak polia)
+      #   hybrid bez group_id / marker novsi    -> :read_only s dovodom
       #   poskodeny JSON (aj po pokuse o .bak)  -> :read_only s dovodom
       # Zlyhanie samotneho posudenia = :read_only (bezpecny smer).
       def assess_catalog!
@@ -294,10 +294,12 @@ module Noxun
           return [:read_only,
                   'katalóg má poškodený tvar (sheets/edges nie sú polia) — oprav súbor alebo obnov zálohu']
         end
-        if marker == SCHEMA_GROUPS
+        # 2B-1: marker 2 aj 3 (duplak) su zname schemy tejto verzie — obe stoja
+        # na skupinovej identite, hybrid bez group_id je read-only pre obe.
+        if marker <= SCHEMA_CURRENT
           return [:ok, nil] if schema2_complete?(data['sheets'], data['edges'])
           return [:read_only,
-                  'katalóg má marker SCHEMA 2, ale záznamy nie sú kompletné (hybrid bez group_id) — oprav súbor alebo obnov zálohu']
+                  "katalóg má marker SCHEMA #{marker}, ale záznamy nie sú kompletné (hybrid bez group_id) — oprav súbor alebo obnov zálohu"]
         end
         [:read_only, "katalóg je v novšej schéme (#{marker}), než pozná táto verzia pluginu"]
       end

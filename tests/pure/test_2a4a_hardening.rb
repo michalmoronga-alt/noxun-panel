@@ -122,7 +122,7 @@ NxTest.test('2A-4a assess: legacy marker 1 aj kompletna SCHEMA 2 = :ok') do
   end
 end
 
-NxTest.test('2A-4a assess: hybrid marker 2 aj marker 3 = :read_only s dovodom') do
+NxTest.test('2A-4a assess: hybrid marker 2 aj novsi marker = :read_only s dovodom') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   a4_with_catalog(a4_hybrid_bytes) do
     state, reason = A4MAT.assess_catalog!
@@ -130,7 +130,8 @@ NxTest.test('2A-4a assess: hybrid marker 2 aj marker 3 = :read_only s dovodom') 
     NxTest.assert(reason.include?('hybrid'), reason.inspect)
     NxTest.assert_equal(reason, A4MAT.catalog_state_reason)
   end
-  newer = JSON.parse(a4_legacy_bytes).merge('schema' => 3)
+  # 2B-1: marker 3 (duplak) uz tato verzia POZNA — "novsia neznama" je 4.
+  newer = JSON.parse(a4_legacy_bytes).merge('schema' => A4MAT::SCHEMA_CURRENT + 1)
   a4_with_catalog(JSON.pretty_generate(newer).b) do
     state, reason = A4MAT.assess_catalog!
     NxTest.assert_equal(:read_only, state)
@@ -602,13 +603,14 @@ end
 
 NxTest.test('2a4a: GH P1 kolo 2 — zapis do novsej schemy sa odmieta aj BEZ behu assess (backstop v write)') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
-  s3 = JSON.pretty_generate(a4_schema2_data.merge('schema' => 3)).b
-  a4_with_catalog(s3) do
+  # 2B-1: marker 3 uz tato verzia pozna a pise don — backstop chrani od 4 vyssie.
+  s4 = JSON.pretty_generate(a4_schema2_data.merge('schema' => A4MAT::SCHEMA_CURRENT + 1)).b
+  a4_with_catalog(s4) do
     # ZIADNY assess — stav je :ok default (proces, ktory o novsej scheme nevie)
     NxTest.refute(A4MAT.upsert_sheet('material_id' => 'X18', 'decor' => 'X', 'type' => 'DTDL',
                                      'thickness' => 18.0, 'grain' => 'length', 'group_id' => 'GX'),
-                  'mutacia do schema 3 katalogu sa odmietne backstopom v zapise')
-    NxTest.assert_equal(s3, File.binread(A4MAT.path), 'subor bajtovo nedotknuty')
+                  'mutacia do novsej schemy katalogu sa odmietne backstopom v zapise')
+    NxTest.assert_equal(s4, File.binread(A4MAT.path), 'subor bajtovo nedotknuty')
   end
 end
 
