@@ -3,10 +3,26 @@
      (%APPDATA%). -->
 <!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.5.9">
+<link rel="stylesheet" href="css/panel.css?v=0.5.10">
 
 <h1>Materiály projektu</h1>
 <p class="sub" id="mdline">…</p>
+
+<!-- 2A-4b (audit B4/O1): READ-ONLY banner — katalog v nudzovom rezime (poskodeny/
+     hybrid/novsia schema). Jedine aktivne ovladanie je obnova predmigracnej
+     zalohy (potvrdenie robi modal nizsie, NIE UI.messagebox); mutacne prvky su
+     disabled len ako UX — autorita odmietnutia je server. -->
+<div id="mdRoBanner" class="mdbanner mdbanner-ro" style="display:none">
+  <svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>
+  <span id="mdRoText">…</span>
+  <button class="ghostbtn" id="mdRoRestoreBtn" onclick="mdRestoreOpen()">Obnoviť predmigračnú zálohu</button>
+</div>
+<!-- 2A-4b (audit O2): banner nepouzitelnych ABS pasok (bez struktury a bez
+     universal) — pri KAZDOM otvoreni/refreshi, kym pocet zo SERVERA nie je 0. -->
+<div id="mdEdgeBanner" class="mdbanner" style="display:none">
+  <svg class="ic" aria-hidden="true"><use href="#i-info"/></svg>
+  <span id="mdEdgeBannerText">…</span>
+</div>
 
 <!-- D-42 PR B: predvolby zbalene do <details> — okno je primarne KATALOG,
      projektove predvolby sa nastavuju obcas (setri vertikalny priestor gridu). -->
@@ -48,7 +64,7 @@
       <option value="man">Podľa výrobcu</option>
       <option value="az">A–Z</option>
     </select>
-    <button class="ghostbtn" onclick="mdOpenDecorForm(null)"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nový dekor</button>
+    <button class="ghostbtn" id="mdNewDecorBtn" onclick="mdOpenDecorForm(null)"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nový dekor</button>
   </div>
   <!-- Mriezka dlazdic (sekcie: Pouzite v projekte / vyrobcovia) ALEBO detail
        dekoru (drill-in) — prepina mdView v JS. Editovacie formulare ostavaju
@@ -57,10 +73,15 @@
   <!-- D-41: batch formular — dekor + vlastnosti RAZ, hrubky a ABS ako zoznamy.
        Server (add_decor_batch) parsuje, validuje VSETKO a zapise naraz. -->
   <div id="mdDecorForm" style="display:none">
-    <div class="row"><label>Dekor *</label><input id="nd_decor" type="text" placeholder="napr. U702 ST9 Kašmírovo šedá"><span class="unit"></span></div>
+    <!-- 2A-4b (batch 3): dekor = CISLO (K009), nazov = zobrazovacia vlastnost
+         skupiny (decor_name), struktura = spolocna predvolba variantov (per
+         variant sa da prepisat v pruhu pri cipe). -->
+    <div class="row"><label>Číslo dekoru *</label><input id="nd_decor" type="text" placeholder="napr. K009 (alebo vlastný názov)"><span class="unit"></span></div>
+    <div class="row"><label>Názov</label><input id="nd_decor_name" type="text" placeholder="napr. Dub Halifax prírodný — voliteľné"><span class="unit"></span></div>
     <!-- D-44 (audit F10): našepkávače výrobcu a typu = datalist na EXISTUJÚCOM
          poli (žiadny nový riadok ani čipy); návrhy stavia server (payload suggest). -->
     <div class="row"><label>Výrobca</label><input id="nd_manufacturer" type="text" list="mdManList" placeholder="napr. Egger"><span class="unit"></span></div>
+    <div class="row"><label>Štruktúra</label><input id="nd_structure" type="text" placeholder="napr. PW / ST9 — voliteľné" oninput="mdCommonStructureChanged()"><span class="unit"></span></div>
     <div class="row"><label>Typ dosiek</label><input id="nd_type" type="text" list="mdTypeList" value="DTDL" onchange="mdTypeChanged()"><span class="unit"></span></div>
     <div class="row"><label>Smer dekoru</label>
       <select id="nd_grain">
@@ -84,10 +105,11 @@
         <span class="mdpc" data-key="25" data-th="25">25</span>
       </div><span class="unit"></span>
     </div>
-    <!-- D-44: formát platne pre PRÁVE AKTÍVNE čipy — jeden kompaktný pruh pod
-         čipmi (vertikálny priestor), mimo klikacej plochy čipu. Predvyplnené =
-         viditeľné (potvrdí sa odoslaním); prázdne = záznam vznikne bez formátu. -->
-    <div class="row" id="nd_fmt_row" style="display:none"><label>Formát platne</label>
+    <!-- D-44 + 2A-4b: detail PRÁVE AKTÍVNYCH čipov dosiek — jeden kompaktný pruh
+         pod čipmi (vertikálny priestor), mimo klikacej plochy čipu: štruktúra
+         (predvyplnená zo spoločného poľa, per variant prepísateľná) + formát
+         platne. Predvyplnené = viditeľné (potvrdí sa odoslaním). -->
+    <div class="row" id="nd_fmt_row" style="display:none"><label>Detail dosiek</label>
       <div class="mdfmtrow" id="nd_fmt_fields"></div><span class="unit">mm</span>
     </div>
     <div class="row"><label>ABS</label>
@@ -97,9 +119,14 @@
         <span class="mdpc" data-key="43/2" data-w="43" data-t="2">43/2</span>
       </div><span class="unit"></span>
     </div>
+    <!-- 2A-4b: detail aktívnych ABS čipov — štruktúra + vedomý príznak
+         „univerzálna" (páska bez štruktúry, ktorá pasuje na všetko). -->
+    <div class="row" id="nd_abs_row" style="display:none"><label>Detail ABS</label>
+      <div class="mdfmtrow" id="nd_abs_fields"></div><span class="unit"></span>
+    </div>
     <div class="row"><label>Ďalšie hrúbky</label><input id="nd_ths" type="text" placeholder="voliteľné, napr. 18.5"><span class="unit">mm</span></div>
     <div class="row"><label>Ďalšie ABS</label><input id="nd_abs" type="text" placeholder="voliteľné, napr. 28/2"><span class="unit">š/hr</span></div>
-    <div class="hint">Klikaj čipy, výnimky dopíš (čiarkami, desatiny bodkou). Formát platne uprav pri čipe (PD ho má prázdny — zadaj skutočný). Ceny a kódy doplníš v detaile dekoru.</div>
+    <div class="hint">Klikaj čipy, výnimky dopíš (čiarkami, desatiny bodkou). Štruktúru a formát uprav pri čipe (PD formát zadaj — je súčasť identity). Dopísané výnimky preberú spoločnú štruktúru. Ceny a kódy doplníš v detaile dekoru.</div>
     <div class="btnrow">
       <button class="primary" onclick="mdSaveDecorBatch()">Vytvoriť</button>
       <button class="ghostbtn" onclick="mdCloseForms()">Zrušiť</button>
@@ -142,8 +169,11 @@
     <!-- D-41: sirka pasky (23/43) = sucast variant identity — vznika v batchi
          Novy dekor / + variant; pri edite NEMENNA (server guard), input informuje. -->
     <div class="row"><label>Šírka</label><input id="me_width" type="text" disabled placeholder="—"><span class="unit">mm</span></div>
+    <!-- 2A-4b: obchodne hrubky (standard 7.5) — select je pri edite disabled
+         (hrubka = identita variantu), superset volieb len spravne ZOBRAZI
+         existujuce 0,4-1,5 pasky z batchu. -->
     <div class="row"><label>Hrúbka *</label>
-      <select id="me_thickness"><option value="1.0">1,0</option><option value="2.0">2,0</option></select><span class="unit">mm</span>
+      <select id="me_thickness"><option value="0.4">0,4</option><option value="0.8">0,8</option><option value="1.0">1,0</option><option value="1.2">1,2</option><option value="1.5">1,5</option><option value="2.0">2,0</option></select><span class="unit">mm</span>
     </div>
     <div class="row"><label>Cena</label><input id="me_price" type="text" placeholder="nezadaná"><span class="unit">€/bm</span></div>
     <div class="row"><label>Kód</label><input id="me_code" type="text" placeholder="dodávateľský kód"><span class="unit"></span></div>
@@ -156,6 +186,21 @@
   </div>
 </fieldset>
 
+<!-- 2A-4b (audit B2): potvrdenie obnovy predmigracnej zalohy — modal vzor
+     tplModal/absModal (NIE UI.messagebox). Rozpis co sa stane + kde konci
+     aktualny katalog; potvrdenie posle restore_pre_schema2 callback. -->
+<div id="mdRestoreModal" class="nxmodal" style="display:none">
+  <div class="nxmodal-card">
+    <div class="nxmodal-title">Obnoviť predmigračnú zálohu</div>
+    <div class="hint">Aktuálny katalóg sa odloží bokom (materials.rolledback-…) a nasadí sa záloha <b>materials.pre-schema-2.json</b> z času pred migráciou. Nič sa nemaže.</div>
+    <div class="nxmodal-warn">Pri najbližšom štarte SketchUpu sa migrácia jednorazovo preskočí — katalóg ostane v pôvodnom formáte na opravu. Ďalší štart už migruje normálne.</div>
+    <div class="btnrow">
+      <button class="primary" onclick="mdRestoreConfirm()">Obnoviť</button>
+      <button class="ghostbtn" onclick="mdRestoreClose()">Zrušiť</button>
+    </div>
+  </div>
+</div>
+
 <!-- D-44: zoznamy návrhov pre našepkávače (výrobca, typ dosky). Nerenderujú sa —
      napĺňa ich JS z payloadu servera; používa ich batch aj inline editor výrobcu. -->
 <datalist id="mdManList"></datalist>
@@ -164,6 +209,6 @@
 <div id="status">Pripravené.</div>
 
 <!-- icons.js prvy (sprite musi existovat pred prvym renderom mdRenderLists) -->
-<script src="js/errors.js?v=0.5.9"></script>
-<script src="js/icons.js?v=0.5.9"></script>
-<script src="js/proj_materials.js?v=0.5.9"></script>
+<script src="js/errors.js?v=0.5.10"></script>
+<script src="js/icons.js?v=0.5.10"></script>
+<script src="js/proj_materials.js?v=0.5.10"></script>
