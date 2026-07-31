@@ -67,7 +67,21 @@ module Noxun
       # ID zaznamov sa NIKDY nemenia (modely drzia vazbu cez id) — meni sa len text.
       # Merge do existujucej skupiny je povoleny, len ak nevzniknu duplicitne
       # varianty. Vrati [true, pocet] alebo [false, chyba].
-      def rename_decor(old_decor, new_decor)
+      #
+      # 2A-4a (audit B3): v SCHEMA 2 sa skupina identifikuje cez group_id
+      # (kwarg ma prednost; text dekoru je len fallback pre legacy volania
+      # s JEDNOZNACNYM mapovanim — klient 1 group_id zatial neposiela) a zapis
+      # meni VYHRADNE zaznamy danej skupiny. group_id sa pri rename NIKDY
+      # neprepocitava (navzdy zmrazeny hash). SCHEMA 1 = presne dnesne
+      # spravanie (group_id sa ignoruje).
+      def rename_decor(old_decor, new_decor, group_id: nil)
+        return [false, catalog_read_only_message] if catalog_read_only?
+        # GH #92 P1: CELA transakcia (resolve + load + validacie + zapis) pod
+        # zamkom nad CERSTVYM obsahom — stale whole-catalog snapshot uz nemoze
+        # prepisat subezny cudzi zapis (patch/ensure/batch z ineho procesu).
+        with_catalog_lock do
+        JsonFileStore.invalidate(path)
+        return rename_decor_group(old_decor, new_decor, group_id) if catalog_schema >= SCHEMA_GROUPS
         from = old_decor.to_s.strip
         to = new_decor.to_s.strip
         return [false, 'Dekor je povinný.'] if from.empty? || to.empty?
@@ -81,6 +95,70 @@ module Noxun
         %w[sheets edges].each do |k|
           data[k].each do |r|
             next unless r['decor'].to_s == from
+            r['decor'] = to
+            changed += 1
+          end
+        end
+        return [false, 'Dekor sa nenašiel.'] if changed.zero?
+        dup = dup_variant_in(data)
+        return [false, "Premenovaním by vznikli duplicitné varianty (#{dup}) — zlúčenie nie je možné."] if dup
+        return [false, 'Zápis katalógu zlyhal.'] unless write(data)
+        [true, changed]
+        end
+      end
+
+      # 2A-4a (audit B3): cielova skupina operacie v SCHEMA 2 katalogu.
+      # group_id ma prednost; textovy dekor je fallback LEN pri jednoznacnom
+      # mapovani — text matchujuci viac skupin (rovnake cislo u dvoch vyrobcov)
+      # sa odmietne s dovodom, ziadny tichy zasah do cudzej skupiny.
+      # Vrati [true, zaznam registra] alebo [false, hlaska].
+      def resolve_group_target(decor, group_id)
+        reg = v3_groups_registry
+        gid = group_id.to_s.strip
+        unless gid.empty?
+          entry = reg[gid] || reg.values.find { |g| identity_norm(g['group_id']) == identity_norm(gid) }
+          return [false, 'Dekorová skupina sa nenašla.'] unless entry
+          return [true, entry]
+        end
+        d = decor.to_s.strip
+        return [false, 'Dekor je povinný.'] if d.empty?
+        matches = reg.values.select { |g| g['decor'] == d }
+        return [false, 'Dekor sa nenašiel.'] if matches.empty?
+        if matches.length > 1
+          mans = matches.map { |g| g['manufacturer'].empty? ? 'bez výrobcu' : g['manufacturer'] }.sort
+          return [false, "Číslo dekoru „#{d}“ majú viaceré skupiny (#{mans.join(', ')}) — operácia potrebuje konkrétnu skupinu."]
+        end
+        [true, matches.first]
+      end
+
+      # SCHEMA 2 vetva rename_decor: meni text dekoru VYHRADNE zaznamom danej
+      # group_id. Kolizne guardy su SKUPINOVE (standard 7.1): rovnaky vyrobca
+      # nesmie mat dve skupiny s rovnakym (ani len zapisom odlisnym) cislom;
+      # rovnake cislo u INEHO vyrobcu je legalne (dve skupiny). Zlucenie
+      # skupin sa premenovanim nerobi — group_id ostava zmrazeny.
+      def rename_decor_group(old_decor, new_decor, group_id)
+        to = new_decor.to_s.strip
+        return [false, 'Dekor je povinný.'] if to.empty?
+        ok, entry = resolve_group_target(old_decor, group_id)
+        return [false, entry] unless ok
+        return [false, 'Nový názov je rovnaký.'] if entry['decor'] == to
+        gid = entry['group_id']
+        man_key = decor_norm_key(entry['manufacturer'])
+        v3_groups_registry.each_value do |g|
+          next if g['group_id'] == gid
+          next unless decor_norm_key(g['manufacturer']) == man_key
+          if g['decor'] == to
+            return [false, "Výrobca už má skupinu „#{to}“ — zlúčenie skupín sa premenovaním nerobí."]
+          end
+          if decor_norm_key(g['decor']) == decor_norm_key(to)
+            return [false, "Názov sa líši od existujúcej skupiny „#{g['decor']}“ len zápisom — použi presný tvar."]
+          end
+        end
+        data = load
+        changed = 0
+        %w[sheets edges].each do |k|
+          data[k].each do |r|
+            next unless identity_norm(r['group_id']) == identity_norm(gid)
             r['decor'] = to
             changed += 1
           end
@@ -136,7 +214,16 @@ module Noxun
       # meni sa atomicky pre celu skupinu (dosky; ABS vyrobcu nema). Update
       # jednotliveho sheetu vyrobcu NEMENI (guard v handle_save_sheet). Vrati
       # [true, pocet] alebo [false, chyba].
-      def set_decor_manufacturer(decor, manufacturer, clear: false)
+      # 2A-4a (audit B3): v SCHEMA 2 identifikacia skupiny cez group_id (text
+      # len jednoznacny fallback) — rovnaky dispatch ako rename_decor.
+      def set_decor_manufacturer(decor, manufacturer, clear: false, group_id: nil)
+        return [false, catalog_read_only_message] if catalog_read_only?
+        # GH #92 P1: rovnaka kriticka sekcia ako rename (viz komentar tam).
+        with_catalog_lock do
+        JsonFileStore.invalidate(path)
+        if catalog_schema >= SCHEMA_GROUPS
+          return set_decor_manufacturer_group(decor, manufacturer, clear: clear, group_id: group_id)
+        end
         d = decor.to_s.strip
         return [false, 'Dekor je povinný.'] if d.empty?
         man = manufacturer.to_s.strip
@@ -152,6 +239,41 @@ module Noxun
           next unless s['decor'].to_s == d
           s['manufacturer'] = man
           s['family'] = "#{man} #{d}".strip
+          changed += 1
+        end
+        return [false, 'Dekor nemá dosky (výrobcu nesie doska).'] if changed.zero?
+        return [false, 'Zápis katalógu zlyhal.'] unless write_unlocked(data)
+        [true, changed]
+        end
+      end
+
+      # SCHEMA 2 vetva set_decor_manufacturer: meni vyrobcu VYHRADNE doskam
+      # danej group_id. Vyrobca je sucast obchodnej identity skupiny (standard
+      # 7.1) — zmena, ktora by zdvojila identitu s inou skupinou (rovnaky
+      # vyrobca + cislo, aj len zapisom odlisne), sa odmietne.
+      def set_decor_manufacturer_group(decor, manufacturer, clear:, group_id:)
+        man = manufacturer.to_s.strip
+        if man.empty? && !clear
+          return [false, 'Prázdny výrobca — na vymazanie použi tlačidlo „Zmazať výrobcu“.']
+        end
+        ok, entry = resolve_group_target(decor, group_id)
+        return [false, entry] unless ok
+        gid = entry['group_id']
+        clash = v3_groups_registry.values.find do |g|
+          g['group_id'] != gid &&
+            decor_norm_key(g['manufacturer']) == decor_norm_key(man) &&
+            decor_norm_key(g['decor']) == decor_norm_key(entry['decor'])
+        end
+        if clash
+          label = [man, entry['decor']].reject { |v| v.to_s.empty? }.join(' ')
+          return [false, "Skupina „#{label}“ už existuje — dve skupiny nemôžu mať rovnakého výrobcu aj číslo dekoru."]
+        end
+        data = load
+        changed = 0
+        data['sheets'].each do |s|
+          next unless identity_norm(s['group_id']) == identity_norm(gid)
+          s['manufacturer'] = man
+          s['family'] = "#{man} #{s['decor']}".strip
           changed += 1
         end
         return [false, 'Dekor nemá dosky (výrobcu nesie doska).'] if changed.zero?
@@ -188,9 +310,11 @@ module Noxun
       # pouzitelnosti (prazdna != zhoda) a "vedomost" priznaku nesie modal
       # potvrdeny pouzivatelom; doska SO strukturou universal NENASTAVUJE
       # (dedi strukturu). SCHEMA 1 vetva = dnesne spravanie + nove AUTO_WIDTHS.
-      # Vrati [:exists|:created, abs_id] alebo
-      # [:schema_read_only|:no_sheet|:no_standard_width|:write_failed, nil].
+      # Vrati [:exists|:created, abs_id] alebo [:schema_read_only|:no_sheet|
+      # :no_standard_width|:write_failed|:catalog_read_only, nil]
+      # (:catalog_read_only = nudzovy rezim 2A-4a, audit B4).
       def ensure_edge_for_sheet(material_id, client_schema: SCHEMA_LEGACY)
+        return [:catalog_read_only, nil] if catalog_read_only?
         server = catalog_schema
         if server >= SCHEMA_GROUPS && client_schema.to_i < server
           return [:schema_read_only, nil]
@@ -287,6 +411,7 @@ module Noxun
       # nad tym existujuci catalog_schema guard (schema_write_allowed? v dialogu)
       # — obe osi su kontrolovane.
       def add_decor_batch(attrs)
+        return [false, catalog_read_only_message] if catalog_read_only? # 2A-4a (audit B4)
         batch_schema = (attrs['batch_schema'] || attrs[:batch_schema]).to_i
         if catalog_schema >= SCHEMA_GROUPS
           # GH #91 P2 (3. kolo): PRESNE 3 — buducu schemu 4 nesmieme "ciastocne"

@@ -223,8 +223,26 @@ module Noxun
       #   2. payload do suboru SCHEMA >= 2 musi byt UPLNY (kazdy zaznam nesie
       #      group_id) — stale legacy pole sa odmietne, mutacia sa nestrati
       #      potichu (vrati false, volajuci ohlasi neuspech).
+      # 2A-4a (audit B4): read-only rezim strazi PRIAMO zapisovu cestu — pri
+      # poskodenom katalogu vracia catalog seedy a lubovolny CRUD load+write
+      # by zivy subor NAHRADIL seedmi. Guardy vo verejnych vstupoch nestacia,
+      # kazda mutacia konci tu.
       def write_unlocked(data)
+        if catalog_read_only?
+          Engine.log("materialy: zapis odmietnuty — #{catalog_read_only_message}") if defined?(Engine)
+          return false
+        end
         target = target_schema_fresh(data['schema'])
+        # GH #92 P1 (2. kolo): marker NOVSI nez tato verzia pozna sa NIKDY
+        # neprepisuje — payload nesie len nam zname polia a zapis by schema-3
+        # metadata ticho zahodil (proces bez behu assess ma stav :ok, tento
+        # backstop preto NESMIE chybat).
+        if target > SCHEMA_GROUPS
+          if defined?(Engine)
+            Engine.log("materialy: zapis odmietnuty — katalog je v novsej scheme (#{target})")
+          end
+          return false
+        end
         if target >= SCHEMA_GROUPS && !schema2_complete?(data['sheets'], data['edges'])
           if defined?(Engine)
             Engine.log_error(StandardError.new('payload bez group_id do katalogu SCHEMA 2'),
