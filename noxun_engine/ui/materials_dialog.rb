@@ -69,6 +69,8 @@ module Noxun
           cb(dlg, 'add_sheet')    { |p| handle_save_sheet(p, create: true) }
           cb(dlg, 'update_sheet') { |p| handle_save_sheet(p, create: false) }
           cb(dlg, 'delete_sheet') { |p| handle_delete_sheet(p) }
+          # 2B-1 (D-43): duplak — jedina cesta vzniku (guardy zdroja pod zamkom).
+          cb(dlg, 'create_duplak') { |p| handle_create_duplak(p) }
           cb(dlg, 'add_edge')     { |p| handle_save_edge(p, create: true) }
           cb(dlg, 'update_edge')  { |p| handle_save_edge(p, create: false) }
           cb(dlg, 'delete_edge')  { |p| handle_delete_edge(p) }
@@ -542,6 +544,11 @@ module Noxun
         def handle_save_sheet(payload, create:)
           data = JSON.parse(payload.to_s)
           return unless catalog_write_ok?(data)
+          # 2B-1 (audit F4): duplak vznika VYHRADNE cez create_duplak (vlastne
+          # validacie zdroja) — podvrhnute source_* polia v beznom save sa
+          # zahadzuju, inak by vytvorili "duplak" bez kompatibilnych guardov.
+          data.delete('source_material_id')
+          data.delete('source_multiplier')
           ok, err = Materials.validate_sheet_attrs(data)
           return set_status(err, true) unless ok
           th = data['thickness'].to_s.tr(',', '.').to_f
@@ -565,6 +572,10 @@ module Noxun
             id = data['material_id'].to_s
             existing = Materials.sheet(id)
             return set_status('Materiál sa nenašiel — obnov okno.', true) unless existing
+            # 2B-1: duplak nema editovatelne polia — vsetko derivuje zo zdroja.
+            if (dup_err = Materials.duplak_edit_error(existing))
+              return set_status(dup_err, true)
+            end
             # Hrubka existujuceho variantu je NEMENNA (hrubka definuje variant;
             # zatvorene projekty sa neskontroluju — zmena by im rozbila rebuild).
             if (existing['thickness'].to_f - th).abs > 0.01
@@ -610,7 +621,10 @@ module Noxun
           # "bez overeneho formatu" by sa pri existujucom zazname nedal dosiahnut.
           rec.delete('sheet_size') if !create && data['clear_sheet_size']
           rec.delete('clear_sheet_size')
-          return set_status('Uloženie katalógu zlyhalo.', true) unless Materials.upsert_sheet(rec)
+          # 2B-1: edit zdroja drzi zdielane polia duplakov v synchre (format/
+          # grain/farba) v JEDNOM atomickom zapise; create nema co synchrovat.
+          saved = create ? Materials.upsert_sheet(rec) : Materials.upsert_sheet_with_duplak_sync(rec)
+          return set_status('Uloženie katalógu zlyhalo.', true) unless saved
           after_catalog_change
           set_status(create ? "Materiál pridaný (#{id})." : "Materiál #{id} upravený.")
         end
@@ -641,9 +655,36 @@ module Noxun
             sample = used.uniq.first(3).join(', ')
             return set_status("Materiál #{id} sa používa (#{used.size}×: #{sample}…) — chráni výrobné dáta, nemažem. Pozor: zatvorené projekty sa nedajú skontrolovať.", true)
           end
+          # 2B-1: zdroj duplaku sa nemaze (hlaska tu, server backstop v
+          # delete_sheet pod zamkom — audit F3).
+          deps = Materials.duplak_dependents(id)
+          unless deps.empty?
+            return set_status("Na dosku sa odkazuje duplák #{deps.first(3).join(', ')} — najprv zmaž duplák.", true)
+          end
           return set_status('Zmazanie zlyhalo.', true) unless Materials.delete_sheet(id)
           after_catalog_change
           set_status("Materiál #{id} zmazaný. (Zatvorené projekty sa nedajú skontrolovať — ak ho niektorý používal, dielec oň príde pri najbližšom prepočte.)")
+        end
+
+        # 2B-1 (D-43): vytvorenie duplaku — server berie LEN zdroj + nasobic,
+        # vsetko ostatne deriva create_duplak_sheet pod zamkom (audit F3/F4).
+        def handle_create_duplak(payload)
+          data = JSON.parse(payload.to_s)
+          return unless catalog_write_ok?(data)
+          state, info = Materials.create_duplak_sheet(data['source_material_id'], data['source_multiplier'])
+          case state
+          when :ok
+            after_catalog_change
+            set_status("Duplák pridaný (#{info['material_id']}) — kupuje sa zdrojová #{info['source_material_id']}.")
+          when :duplicate
+            set_status("Variant s touto identitou už v katalógu je (#{info}).", true)
+          when :catalog_read_only
+            set_status('Katalóg je len na čítanie — mutácie sú zamknuté.', true)
+          when :write_failed
+            set_status('Uloženie katalógu zlyhalo.', true)
+          else
+            set_status(info.to_s, true)
+          end
         end
 
         def handle_save_edge(payload, create:)

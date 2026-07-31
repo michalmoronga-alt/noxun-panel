@@ -12,11 +12,12 @@
   var MD_PROTECTED = [];
   var MD_REV = '';         // D-41: baseline katalogu — server odmietne zapis nad starsim stavom
   // 2A-1 (GH P1): klient hlasi SVOJU podporovanu schemu katalogu — KONSTANTU
-  // tejto verzie kodu, NIE echo servera. 2A-4b: toto okno uz pozna skupiny
-  // (group_id), strukturu aj universal => konstanta je 2. Pri katalogu, ktory
-  // je este SCHEMA 1 (nerozhodnutelna migracia), server batch 3 odmietne
-  // s hlaskou a UI ju zobrazi — ine mutacie prejdu (dual-mode).
-  var MD_CLIENT_SCHEMA = 2;
+  // tejto verzie kodu, NIE echo servera. 2B-1: toto okno uz pozna aj duplak
+  // polia (source_material_id/source_multiplier) => konstanta je 3; katalog
+  // s marker 3 by okno so schemou 2 pri zapise odmietol (stare okno by duplak
+  // vazby zahodilo). Pri katalogu, ktory je este SCHEMA 1 (nerozhodnutelna
+  // migracia), server batch 3 odmietne s hlaskou — ine mutacie prejdu.
+  var MD_CLIENT_SCHEMA = 3;
   // 2A-4b: rezim SERVEROVEHO katalogu (payload catalog_schema) — riadi
   // zoskupenie dlazdic (group_id vs text dekoru), universal toggle a banner.
   var MD_SCHEMA2 = false;
@@ -371,10 +372,17 @@
       sec.sheets.forEach(function(s){
         var prot = MD_PROTECTED.indexOf(s.material_id) >= 0;
         var dl = sheetDimLabel(s);
-        h += mdVariantRow('sheet', s.material_id, s.row_rev, esc(dl.dim) + (dl.sub ? '<small>' + esc(dl.sub) + '</small>' : ''),
-          s.code, s.price_per_m2, s.supplier, s.label,
-          'mdOpenSheetForm(\'' + esc(s.material_id) + '\')',
-          prot ? null : 'mdDeleteSheet(\'' + esc(s.material_id) + '\')', prot, '');
+        var dim = esc(dl.dim) + (dl.sub ? '<small>' + esc(dl.sub) + '</small>' : '');
+        // 2B-1 (D-43): duplak nema editovatelne bunky — vsetko derivuje zo
+        // zdroja (server edit/patch odmietne); riadok ukazuje vazbu + delete.
+        if (s.source_material_id){
+          h += mdDuplakRow(s, dim);
+        } else {
+          h += mdVariantRow('sheet', s.material_id, s.row_rev, dim,
+            s.code, s.price_per_m2, s.supplier, s.label,
+            'mdOpenSheetForm(\'' + esc(s.material_id) + '\')',
+            prot ? null : 'mdDeleteSheet(\'' + esc(s.material_id) + '\')', prot, mdDuplakBtn(s));
+        }
       });
     }
     if (sec.edges.length){
@@ -408,6 +416,38 @@
     var payload = { id: id, patch: { universal: value }, row_rev: rev || '',
                     catalog_schema: MD_CLIENT_SCHEMA };
     if (window.sketchup && sketchup.patch_edge) sketchup.patch_edge(JSON.stringify(payload));
+  }
+
+  // 2B-1 (D-43): riadok duplaku — bez inline buniek (kod/cena/dodavatel patria
+  // ZDROJU, duplak sa nekupuje), namiesto nich vazba. Ceruzka nie je (nema co
+  // editovat), delete ostava.
+  function mdDuplakRow(s, dimHtml){
+    var dis = MD_RO ? ' disabled' : '';
+    return '<div class="mdvrow" title="' + esc(s.label || '') + '">' +
+      '<span class="mdvdim">' + dimHtml + '</span>' +
+      '<span class="mdvi mdvdup" title="Duplák: lepí sa z ' + s.source_multiplier + '× zdrojovej dosky — nakupuje a oceňuje sa zdroj">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg> lepené ' + s.source_multiplier + '× z ' + esc(s.source_material_id) + '</span>' +
+      '<span class="mdvact">' +
+      '<button class="ghostbtn tpldel"' + dis + ' title="Zmazať duplák" aria-label="Zmazať duplák" onclick="mdDeleteSheet(\'' + esc(s.material_id) + '\')"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>' +
+      '</span></div>';
+  }
+
+  // 2B-1: akcia "+duplak" pri beznej doske (DTDL/MDF — telove typy; PD/zastena
+  // sa nelepia). Vytvori variant 2x hrubka viazany na tuto dosku (server
+  // create_duplak_sheet — vsetky guardy tam).
+  function mdDuplakBtn(s){
+    if (!MD_SCHEMA2 || MD_RO) return '';
+    var t = String(s.type || '').toUpperCase();
+    if (t !== 'DTDL' && t !== 'MDF') return '';
+    return '<button class="mduni" title="Vytvoriť duplák (' + fmtNum(s.thickness * 2) + ' mm lepené z 2× tejto dosky)"' +
+      ' aria-label="Vytvoriť duplák" onclick="mdCreateDuplak(\'' + esc(s.material_id) + '\')">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg></button>';
+  }
+  function mdCreateDuplak(id){
+    if (MD_RO) return;
+    if (window.sketchup && sketchup.create_duplak)
+      sketchup.create_duplak(JSON.stringify({ source_material_id: id, source_multiplier: 2,
+        catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA }));
   }
 
   // Riadok variantu v detaile — kod/cena/dodavatel su EDITOVATELNE bunky
@@ -1300,6 +1340,8 @@
       mdGroupKeyOf: mdGroupKeyOf, mdStructureSections: mdStructureSections,
       mdBuildEdgeVariants: mdBuildEdgeVariants, mdParseExtraThs: mdParseExtraThs,
       mdParseExtraAbs: mdParseExtraAbs, mdEdgeBannerText: mdEdgeBannerText,
-      sheetDimLabel: sheetDimLabel, mdGroupCommonStructure: mdGroupCommonStructure };
+      sheetDimLabel: sheetDimLabel, mdGroupCommonStructure: mdGroupCommonStructure,
+      // 2B-1 (tests/js/test_md_schema2.js) — duplak render bez DOM
+      mdDuplakRow: mdDuplakRow, mdDuplakBtn: mdDuplakBtn, mdSectionRows: mdSectionRows };
   }
   if (typeof window !== 'undefined' && window.sketchup && sketchup.ready) sketchup.ready('');

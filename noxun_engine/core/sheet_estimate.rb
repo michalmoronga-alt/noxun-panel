@@ -16,11 +16,23 @@ module Noxun
 
       module_function
 
-      # rows: Bom.compute[:rows] (staci length/width/quantity/material_id).
+      # rows: Bom.compute[:rows] (staci length/width/quantity/material_id;
+      # volitelne material_source = duplak vazba zo snapshotu, D-43).
       # sheet_sizes: {material_id => [dlzka, sirka] mm} zo snapshotu katalogu.
-      # Vrati pole per material (sorted podla material_id — poradie vstupu nehra
-      # rolu, kontraktovy test N10): {material_id, m2, quantity, sheet_size,
-      # sheet_m2, count_min, count_max, fallback}.
+      # Vrati pole per NAKUPNY material (sorted podla material_id — poradie
+      # vstupu nehra rolu, kontraktovy test N10): {material_id, m2, quantity,
+      # sheet_size, sheet_m2, count_min, count_max, fallback} + pri duplak
+      # prispevkoch doubled_m2/doubled_quantity.
+      #
+      # 2B-1 KONTRAKT duplaku (audit NOTE 13 — na tejto sematike stoji montazna
+      # kalkulacia davky E): riadok s material_source sa NIKDY neobjavi ako
+      # vlastna platna — jeho plocha x multiplier sa pripocita ZDROJOVEMU
+      # material_id (kupuje sa zdroj). Na zdrojovom riadku:
+      #   m2               = celkova KUPOVANA plocha (vlastne dielce + duplaky x mult)
+      #   quantity         = pocet KUSOV len vlastnych dielcov (duplak kusy NIE)
+      #   doubled_m2       = cast m2 pridana duplakmi (uz po x mult)
+      #   doubled_quantity = pocet kusov duplak dielcov (informativny)
+      # count_min/max sa pocitaju z celkoveho m2 (nakup zdrojovych platni).
       def estimate(rows, sheet_sizes: {}, k_min: K_MIN, k_max: K_MAX)
         kmin, kmax = valid_coeffs(k_min, k_max)
         per = {}
@@ -29,20 +41,35 @@ module Noxun
           next if mid.empty?
           area = r['length'].to_f * r['width'].to_f * r['quantity'].to_i / 1_000_000.0
           next if area <= 0
-          g = per[mid] ||= { 'm2' => 0.0, 'quantity' => 0 }
-          g['m2'] += area
-          g['quantity'] += r['quantity'].to_i
+          ms = r['material_source']
+          if ms.is_a?(Hash) && !ms['material_id'].to_s.empty? && ms['multiplier'].to_i >= 2
+            src = ms['material_id'].to_s
+            g = per[src] ||= { 'm2' => 0.0, 'quantity' => 0, 'doubled_m2' => 0.0, 'doubled_quantity' => 0 }
+            add = area * ms['multiplier'].to_i
+            g['m2'] += add
+            g['doubled_m2'] = g.fetch('doubled_m2', 0.0) + add
+            g['doubled_quantity'] = g.fetch('doubled_quantity', 0) + r['quantity'].to_i
+          else
+            g = per[mid] ||= { 'm2' => 0.0, 'quantity' => 0 }
+            g['m2'] += area
+            g['quantity'] += r['quantity'].to_i
+          end
         end
         per.map do |mid, g|
           size, fallback = sheet_size_for(sheet_sizes[mid])
           sheet_m2 = size[0] * size[1] / 1_000_000.0
-          {
+          out = {
             'material_id' => mid, 'm2' => g['m2'].round(3), 'quantity' => g['quantity'],
             'sheet_size' => size, 'sheet_m2' => sheet_m2.round(3),
             'count_min' => ceil_tenth(g['m2'] * kmin / sheet_m2),
             'count_max' => ceil_tenth(g['m2'] * kmax / sheet_m2),
             'fallback' => fallback
           }
+          if g['doubled_m2'].to_f.positive?
+            out['doubled_m2'] = g['doubled_m2'].round(3)
+            out['doubled_quantity'] = g['doubled_quantity'].to_i
+          end
+          out
         end.sort_by { |g| g['material_id'] }
       end
 

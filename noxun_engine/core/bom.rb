@@ -104,7 +104,7 @@ module Noxun
       # Odvodenie z nazvu/part_key by bolo krehke a je zakazane.
       def record(cfg, owner_id:, name:, part_key:, role: '', pid: nil)
         edges = cfg['edges'].is_a?(Hash) ? cfg['edges'] : {}
-        {
+        out = {
           'name' => name, 'part_key' => part_key, 'owner_id' => owner_id, 'pid' => pid,
           'role' => role.to_s,
           'length' => cfg['length'].to_f, 'width' => cfg['width'].to_f,
@@ -112,8 +112,16 @@ module Noxun
           'quantity' => [cfg['quantity'].to_i, 1].max,
           'material_id' => cfg['material_id'].to_s,
           'grain_direction' => (cfg['grain_direction'] || 'none').to_s,
-          'edges' => EDGE_ORDER.each_with_object({}) { |c, out| out[c] = edges[c] }
+          'edges' => EDGE_ORDER.each_with_object({}) { |c, out2| out2[c] = edges[c] }
         }
+        # 2B-1 (D-43): duplak vazba zo snapshotu — odhad platni cez nu preleje
+        # plochu do ZDROJOVEHO materialu (nakupny pohlad). Cita sa LEN uplny tvar.
+        ms = cfg['material_source']
+        if ms.is_a?(Hash) && !ms['material_id'].to_s.empty? && ms['multiplier'].to_i >= 2
+          out['material_source'] = { 'material_id' => ms['material_id'].to_s,
+                                     'multiplier' => ms['multiplier'].to_i }
+        end
+        out
       end
 
       # --- cisty vypocet (headless) ----------------------------------------
@@ -142,6 +150,9 @@ module Noxun
                                 'thickness' => r['thickness'], 'material_id' => r['material_id'],
                                 'edges' => r['edges'], 'grain_direction' => r['grain_direction'],
                                 'quantity' => 0, 'names' => [], 'kde' => {}, 'refs' => [] }
+          # 2B-1: vazba je v kluci — riadok skupiny ju len zrkadli (vsetky zdrojove
+          # zaznamy skupiny ju maju zhodnu).
+          g['material_source'] = r['material_source'] if r['material_source']
           g['quantity'] += r['quantity']
           g['names'] << r['name'] unless r['name'].empty? || g['names'].include?(r['name'])
           g['kde'][r['owner_id']] = (g['kde'][r['owner_id']] || 0) + r['quantity']
@@ -156,9 +167,15 @@ module Noxun
       # (Codex GH #48 P2: flush editov rebuildne korpus a pids zomru; Ruby si
       # podla kluca najde CERSTVE refs po flushi).
       def row_key(r)
+        # 2B-1 (audit F7): duplak vazba patri do kluca — dielce s rovnakym
+        # material_id ale roznym snapshotom vazby (katalog sa zmenil medzi
+        # rebuildmi) sa NESMU zmiesat do jedneho riadku, odhad by ich nevedel
+        # rozpocitat. Bez vazby je prvok nil = klucovo neutralny.
+        ms = r['material_source']
         [dmm(r['length']), dmm(r['width']), dmm(r['thickness']),
          r['material_id'], EDGE_ORDER.map { |c| r['edges'][c].to_s },
-         r['grain_direction']]
+         r['grain_direction'],
+         ms ? [ms['material_id'].to_s, ms['multiplier'].to_i] : nil]
       end
 
       # m2 per doskovy material — scitane z KAZDEHO zdrojoveho dielca (F6).

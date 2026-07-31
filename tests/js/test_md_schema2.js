@@ -132,8 +132,6 @@ eq(M.mdGroupCommonStructure({ sheets: [{ structure: 'PW' }], edges: [{ structure
   'zmiesane struktury = ziadna predvolba');
 eq(M.mdGroupCommonStructure({ sheets: [{}], edges: [] }), '', 'bez struktur = prazdne');
 
-console.log(JSON.stringify({ passed: n, failed: 0 }));
-
 // --- GH #93 kolo 5: PD vlastna hrubka s inline formatom ---------------------
 eq(M.mdParseExtraThs('20/4100x600', 'PW', 'PD'),
    { variants: [{ type: '', thickness: '20', structure: 'PW', sheet_size: [4100, 600] }], error: null },
@@ -159,3 +157,21 @@ eq(M.mdBuildSheetVariants([{ key: 'g18', label: '18', type: '', th: '18' }], {},
 eq(M.mdBuildSheetVariants([{ key: 'pd38', label: 'PD 38', type: 'PD', th: '38' }],
                           { pd38: { l: '4100', w: '600' } }, {}).error, null,
    'PD s formatom prejde');
+
+// --- 2B-1 (D-43): duplak render — riadok bez inline buniek, vazba viditelna --
+const DUP = { material_id: 'TK_PW_DTDL_36', source_material_id: 'TK_PW_DTDL_18',
+  source_multiplier: 2, type: 'DTDL', thickness: 36, row_rev: 'r1', label: 'Duplak 36' };
+const dupRow = M.mdDuplakRow(DUP, '36');
+ok(dupRow.indexOf('lep') >= 0 && dupRow.indexOf('TK_PW_DTDL_18') >= 0, 'duplak riadok ukazuje vazbu na zdroj');
+ok(dupRow.indexOf('mdcell') < 0, 'duplak riadok NEMA inline bunky (kod/cena/dodavatel patria zdroju)');
+ok(dupRow.indexOf('mdDeleteSheet') >= 0, 'duplak sa da zmazat');
+ok(dupRow.indexOf('mdOpenSheetForm') < 0, 'duplak nema ceruzku (nic sa needituje)');
+
+const secDup = M.mdSectionRows({ title: '', sheets: [DUP], edges: [] });
+ok(secDup.indexOf('mdcell') < 0, 'sekcia s duplakom renderuje duplak vetvu (bez buniek)');
+const SRC = { material_id: 'TK_PW_DTDL_18', type: 'DTDL', thickness: 18, row_rev: 'r2', label: '18' };
+const secSrc = M.mdSectionRows({ title: '', sheets: [SRC], edges: [] });
+ok(secSrc.indexOf('mdcell') >= 0, 'bezna doska ma inline bunky');
+ok(secSrc.indexOf('mdCreateDuplak') < 0, 'duplak tlacidlo len v SCHEMA 2 rezime (MD_SCHEMA2 default false)');
+
+console.log(JSON.stringify({ passed: n, failed: 0 }));

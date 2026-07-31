@@ -46,7 +46,8 @@ Plné pôvodné texty: [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_et
 - Verzie: D-46 = 0.5.4 · 2A-1+ = 0.5.5 a ďalej per PR; **0.6.0 až pri uzávere celej etapy V0.6**
 
 **Ďalšie dávky V0.6 (po 2A):**
-- **2B** duplák (D-43: „zdvojený z 18" cez `source_material_id` + multiplikátor — aj vo výrobnom snapshote) + zástena typ (dva dekory líce/rub)
+- **2B-1 duplák — HOTOVÉ (v0.5.11, PR #94, 31.7.)** — D-43: variant „zdvojený zo zdroja" (`source_material_id` + násobič 2–3, všetko ostatné derivované zo zdroja a nemenné, bez nákupných polí); väzba vo výrobnom snapshote (`config.material_source`, carry-over pri rebuilde bez katalógu); odhad platní prelieva plochu ×násobič do zdroja (`doubled_m2`), kusovník/VEPO bez zmeny; katalóg SCHEMA 3 LAZY (staré plugin verzie od prvého dupláku read-only); UI: tlačidlo vrstvičiek pri DTDL/MDF doske + riadok väzby v detaile. Návrh cez Codex audit 2B+10F+1N (31.7.) — batch čip „+duplák" vedome odložený (pridá sa, ak si ho dogfooding vypýta).
+- **2B-2** zástena typ (dva dekory líce/rub `back_decor`+`back_structure` vo variant identite, formát v identite ako PD cez register flag `format_in_identity`, first-fill existujúcich zásten — Codex audit nálezy F10–F12)
 - **B** Demos lookup („zadaj kód" cez produktové stránky) · **C** kovanie katalóg (prevzatie z KOVANIE) · **D** mapovanie flagov→kódy · **E** ceny v sumári = prvá kompletná cenová ponuka (materiál+ABS+kovanie+VEPO/EN DANIELI sadzby; montáž = platne×5,8×sadzba s pravidlom zaokrúhlenia)
 - **Seed 2.0:** knižnica z najobjednávanejších materiálov z Gmailu (po 2A migrácii)
 

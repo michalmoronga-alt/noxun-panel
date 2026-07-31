@@ -133,19 +133,54 @@
     // indexy sa rozidu, ak material vypadol z katalogu; taky dostane fallback)
     var est = {};
     (BOM.sheet_estimate || []).forEach(function(e){ est[e.material_id] = e; });
+    // 2B-1 (D-43): duplak vazby z BOM riadkov — duplak material nema vlastnu
+    // platnu (kupuje sa zdroj), jeho bunka odhadu to povie namiesto pomlcky.
+    // GH #94 P2: rovnaky material moze niest ROZNE vazby (katalog zmeneny medzi
+    // rebuildmi — BOM ich drzi oddelene v kluci), preto zoznam, nie posledna.
+    var dupSrc = {};
+    (BOM.rows || []).forEach(function(r){
+      if (!r.material_source) return;
+      var lbl = 'lepí sa ' + r.material_source.multiplier + '× z ' + esc(r.material_source.material_id);
+      var list = dupSrc[r.material_id] = dupSrc[r.material_id] || [];
+      if (list.indexOf(lbl) < 0) list.push(lbl);
+    });
+    var seen = {};
     var h = '<table class="bomtab"><thead><tr><th>Materiál</th><th>m²</th><th>dielcov</th><th>Formát</th><th>Platne (odhad)</th></tr></thead><tbody>';
     list.forEach(function(s){
+      seen[s.material_id] = true;
       var e = est[s.material_id];
       var fb = e && e.fallback;
       var fmt = e ? (num(e.sheet_size[0]) + '×' + num(e.sheet_size[1])) : '—';
       var pl = e ? (num(e.count_min, 1) + ' – ' + num(e.count_max, 1)) : '—';
+      var ds = dupSrc[s.material_id];
+      if (!e && ds){
+        fmt = '—';
+        pl = ds.join(' · ');
+      }
+      var m2cell = '<b>' + num(s.m2, 2) + '</b>';
+      if (e && e.doubled_m2){
+        m2cell = '<b>' + num(e.m2, 2) + '</b> <span class="muted" title="Nákup vrátane duplákov: vlastné dielce + ' +
+                 num(e.doubled_m2, 2) + ' m² z ' + num(e.doubled_quantity) + ' ks duplákov">(+' + num(e.doubled_m2, 2) + ' dupl.)</span>';
+      }
       var cls = 'estcell' + (fb ? ' estfb' : '');
       var tt = fb ? ' title="Materiál nemá formát v katalógu — použitý 2800×2070"' : '';
-      h += '<tr><td>' + esc(s.material_id) + '</td><td><b>' + num(s.m2, 2) + '</b></td><td>' + num(s.quantity) + '</td>' +
+      h += '<tr><td>' + esc(s.material_id) + '</td><td>' + m2cell + '</td><td>' + num(s.quantity) + '</td>' +
            '<td class="' + cls + '"' + tt + '>' + fmt + '</td><td class="' + cls + '"' + tt + '><b>' + pl + '</b></td></tr>';
     });
+    // 2B-1: nakupny riadok zdroja, ktory NEMA vlastne dielce (odhad ho pozna,
+    // vyrobny zoznam nie) — bez neho by nakup zdrojovych platni z tabulky zmizol.
+    (BOM.sheet_estimate || []).forEach(function(e){
+      if (seen[e.material_id]) return;
+      var fb = e.fallback;
+      var cls = 'estcell' + (fb ? ' estfb' : '');
+      var tt = fb ? ' title="Materiál nemá formát v katalógu — použitý 2800×2070"' : '';
+      h += '<tr><td>' + esc(e.material_id) + ' <span class="muted">(nákup pre dupláky)</span></td>' +
+           '<td><b>' + num(e.m2, 2) + '</b></td><td>—</td>' +
+           '<td class="' + cls + '"' + tt + '>' + num(e.sheet_size[0]) + '×' + num(e.sheet_size[1]) + '</td>' +
+           '<td class="' + cls + '"' + tt + '><b>' + num(e.count_min, 1) + ' – ' + num(e.count_max, 1) + '</b></td></tr>';
+    });
     box.innerHTML = h + '</tbody></table>' +
-      '<div class="hint">Odhad = plocha × prerez 10–25 % ÷ platňa. Orientačný rozsah, NIE nárezový plán. Formát platne sa nastavuje v katalógu materiálov (okno Materiály projektu).</div>';
+      '<div class="hint">Odhad = plocha × prerez 10–25 % ÷ platňa. Orientačný rozsah, NIE nárezový plán. Duplák sa lepí zo zdrojových platní — jeho plocha sa počíta do nákupu zdroja. Formát platne sa nastavuje v katalógu materiálov (okno Materiály projektu).</div>';
   }
 
   function renderEdging(box){

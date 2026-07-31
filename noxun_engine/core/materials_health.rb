@@ -229,8 +229,8 @@ module Noxun
       #   subor + .bak chybaju                  -> :ok (panensky stav, seed smie)
       #   primar chyba, .bak citatelna (F5)     -> obnova z .bak, potom posudenie
       #   marker 1                              -> :ok (legacy dual-mode)
-      #   marker 2 + schema2_complete?          -> :ok
-      #   marker 2 hybridny / marker > 2        -> :read_only s dovodom
+      #   marker 2..CURRENT + schema2_complete? -> :ok (2B-1: 3 = duplak polia)
+      #   hybrid bez group_id / marker novsi    -> :read_only s dovodom
       #   poskodeny JSON (aj po pokuse o .bak)  -> :read_only s dovodom
       # Zlyhanie samotneho posudenia = :read_only (bezpecny smer).
       def assess_catalog!
@@ -294,10 +294,20 @@ module Noxun
           return [:read_only,
                   'katalóg má poškodený tvar (sheets/edges nie sú polia) — oprav súbor alebo obnov zálohu']
         end
-        if marker == SCHEMA_GROUPS
-          return [:ok, nil] if schema2_complete?(data['sheets'], data['edges'])
-          return [:read_only,
-                  'katalóg má marker SCHEMA 2, ale záznamy nie sú kompletné (hybrid bez group_id) — oprav súbor alebo obnov zálohu']
+        # 2B-1: marker 2 aj 3 (duplak) su zname schemy tejto verzie — obe stoja
+        # na skupinovej identite, hybrid bez group_id je read-only pre obe.
+        if marker <= SCHEMA_CURRENT
+          unless schema2_complete?(data['sheets'], data['edges'])
+            return [:read_only,
+                    "katalóg má marker SCHEMA #{marker}, ale záznamy nie sú kompletné (hybrid bez group_id) — oprav súbor alebo obnov zálohu"]
+          end
+          # GH #94 P2: nekonzistentne duplak vazby (chybajuci zdroj, zly nasobic,
+          # retaz) = read-only — buildery by ich interpretovali naslepo a odhad
+          # platni by ucotoval plochu zlemu materialu.
+          if (dup_err = duplak_integrity_error(data['sheets']))
+            return [:read_only, "katalóg má nekonzistentné duplák väzby (#{dup_err}) — oprav súbor alebo obnov zálohu"]
+          end
+          return [:ok, nil]
         end
         [:read_only, "katalóg je v novšej schéme (#{marker}), než pozná táto verzia pluginu"]
       end

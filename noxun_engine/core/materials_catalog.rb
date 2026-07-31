@@ -45,6 +45,10 @@ module Noxun
         with_catalog_lock do
           JsonFileStore.invalidate(path)
           data = load
+          # 2B-1 (audit F3): zdroj duplaku sa nemaze — kontrola POD zamkom nad
+          # cerstvymi datami (UI hlasku stavia duplak_dependents, toto je
+          # server backstop proti TOCTOU okno medzi kontrolou a zapisom).
+          return false if data['sheets'].any? { |m| m['source_material_id'].to_s == id.to_s }
           data['sheets'] = data['sheets'].reject { |m| m['material_id'] == id }
           write_unlocked(data)
         end
@@ -56,6 +60,100 @@ module Noxun
           JsonFileStore.invalidate(path)
           data = load
           data['edges'] = data['edges'].reject { |a| a['abs_id'] == id }
+          write_unlocked(data)
+        end
+      end
+
+      # --- 2B-1 (D-43): duplak — variant zdvojeny zo zdrojovej dosky -----------
+      # Duplak ma JEDINE vlastne vstupy: zdroj + nasobic. Vsetko ostatne (typ,
+      # struktura, grain, farba, format platne, skupina) sa KOPIRUJE zo zdroja
+      # pri vytvoreni a na duplaku je nemenne; editovatelne zdielane polia
+      # (format non-PD, grain, farba) drzi v synchre upsert_sheet_with_duplak_sync.
+      # Hrubka = nasobic x hrubka zdroja (derivovana, ziadny volny vstup).
+      # code/supplier/cena sa NEprenasaju — duplak sa nekupuje (kupuje sa zdroj);
+      # kupovana hotova doska rovnakej hrubky je BEZNY variant, nie duplak.
+
+      # Atomicke vytvorenie duplaku (audit F3: vsetky guardy POD zamkom nad
+      # cerstvym obsahom disku). Vrati [:ok, rec] | [:invalid, msg] |
+      # [:duplicate, id] | [:write_failed, nil] | [:catalog_read_only, nil].
+      def create_duplak_sheet(source_id, multiplier)
+        return [:catalog_read_only, nil] if catalog_read_only?
+        mult = multiplier.to_s.match?(/\A\d+\z/) ? multiplier.to_i : nil
+        unless mult && DUPLAK_MULTIPLIERS.include?(mult)
+          return [:invalid, "Násobič dupláku musí byť #{DUPLAK_MULTIPLIERS.join(' alebo ')}."]
+        end
+        with_catalog_lock do
+          JsonFileStore.invalidate(path)
+          if catalog_schema < SCHEMA_GROUPS
+            return [:invalid, 'Duplák vyžaduje katalóg v skupinovej schéme (po migrácii 2A).']
+          end
+          data = load
+          source = data['sheets'].find { |s| s['material_id'] == source_id.to_s }
+          return [:invalid, 'Zdrojová doska sa v katalógu nenašla — obnov okno.'] unless source
+          if duplak?(source)
+            return [:invalid, 'Zdroj je sám duplák — reťazenie duplákov nie je povolené.']
+          end
+          rec = duplak_record_from(source, mult)
+          if (dup = data['sheets'].find { |s| identity_keys_tolerant?(sheet_identity_key(rec), sheet_identity_key(s)) })
+            return [:duplicate, dup['material_id']]
+          end
+          rec['material_id'] = generate_sheet_id(rec['decor'], rec['type'], rec['thickness'],
+                                                 structure: rec['structure'], sheet_size: rec['sheet_size'],
+                                                 taken: data['sheets'].map { |s| s['material_id'].to_s.upcase })
+          data['sheets'] += [normalize_sheet(rec)]
+          # Prvy duplak LAZY zdvihne marker na 3 — starsie verzie pluginu by
+          # source_* polia pri zapise zahodili (write_unlocked ich odmietne).
+          data['schema'] = SCHEMA_DUPLAK
+          return [:write_failed, nil] unless write_unlocked(data)
+          [:ok, rec]
+        end
+      end
+
+      # Derivovany zaznam duplaku zo zdroja (bez ID — to prideluje volajuci
+      # pod zamkom). Kopiruje sa vsetko zdielane; nakupne polia sa vynechaju.
+      def duplak_record_from(source, mult)
+        rec = source.reject { |k, _| %w[material_id code supplier price_per_m2].include?(k) }
+        rec['thickness'] = (source['thickness'].to_f * mult).round(2)
+        rec['source_material_id'] = source['material_id'].to_s
+        rec['source_multiplier'] = mult
+        rec
+      end
+
+      # Duplaky ukazujuce na dany zdroj (delete guard + UI vypis). Cita katalog.
+      def duplak_dependents(source_id)
+        sheets.select { |s| s['source_material_id'].to_s == source_id.to_s }
+              .map { |s| s['material_id'] }
+      end
+
+      # Edit hlaska pre duplak (save_sheet aj patch): duplak nema editovatelne
+      # polia — vsetko je derivovane zo zdroja alebo zakazane (nakupne polia).
+      def duplak_edit_error(existing)
+        return nil unless duplak?(existing)
+        "Duplák sa odvodzuje zo zdrojovej dosky #{existing['source_material_id']} — uprav zdrojovú (alebo duplák zmaž a vytvor nový)."
+      end
+
+      # Upsert zdrojovej dosky + synchro zdielanych editovatelnych poli na jej
+      # duplakoch (format platne, grain, farba) v JEDNOM atomickom zapise.
+      # Identity polia (typ/struktura/hrubka/skupina) su na zdroji nemenne,
+      # takze duplaky sa nikdy nerozidu v identite.
+      def upsert_sheet_with_duplak_sync(attrs)
+        rec = normalize_sheet(attrs)
+        return false if rec.nil?
+        return false if catalog_read_only?
+        with_catalog_lock do
+          JsonFileStore.invalidate(path)
+          data = load
+          data['sheets'] = data['sheets'].reject { |m| m['material_id'] == rec['material_id'] } + [rec]
+          data['sheets'] = data['sheets'].map do |s|
+            next s unless s['source_material_id'].to_s == rec['material_id']
+            synced = s.merge('grain' => rec['grain'], 'color' => rec['color'])
+            if rec.key?('sheet_size')
+              synced['sheet_size'] = rec['sheet_size']
+            else
+              synced.delete('sheet_size')
+            end
+            synced
+          end
           write_unlocked(data)
         end
       end
@@ -342,6 +440,11 @@ module Noxun
           return [:not_found, nil] unless existing
           if row_rev && !row_rev.to_s.empty? && row_rev.to_s != record_rev(existing)
             return [:conflict, nil]
+          end
+          # 2B-1 (audit F4): duplak nema ANI patchovatelne polia — nakupny kod,
+          # dodavatel a cena patria zdroju (duplak sa nekupuje).
+          if kind == 'sheet' && (dup_err = duplak_edit_error(existing))
+            return [:invalid, dup_err]
           end
           clean = patch.is_a?(Hash) ? patch.select { |k, _| PATCHABLE.fetch(kind, []).include?(k) } : {}
           return [:invalid, 'Žiadne editovateľné pole.'] if clean.empty?

@@ -25,7 +25,6 @@
 
 ## Návrhy väčších celkov (na rozpracovanie)
 
-- **D-43 · Zdvojené dosky (duplák 36 = 2× 18)** (Michal 27.7.) — **(a) overené v kóde (Fable 27.7.):** logika „36 = 2×18" dnes NEEXISTUJE nikde — kusovník aj odhad platní (`sheet_estimate.rb`) zoskupujú podľa `material_id`, takže dielec 36 spotrebuje 1× svoju plochu z platne varianty „36"; VEPO merge 18+36 je len spoločný SÚBOR (dielec ide 1× s hrúbkou 36 — zhodné so starou linkou). Dôsledok: ak sa duplák lepí z 2×18, interný odhad platní podhodnocuje spotrebu 18-tky. **(b) návrh modelu:** variant 36 označený ako „zdvojený z 18" (odkaz na zdrojový variant + multiplikátor ×2, BEZ vlastného DK kódu — kupuje sa 18-ka) → odhad platní pripočíta 2× plochu do skupiny 18; pri pridaní 18 varianty auto-ponúknuť vytvorenie zdvojenej 36 (Halifax: 18,6 → 37,2). **Dôležité (Codex P2):** vzťah `source_material_id` + multiplikátor musí byť súčasťou výrobného SNAPSHOTU na entite/BOM kontraktu (štandard 8.3 — autorita je snapshot), nie len katalógu — inak sa odhad nedá reprodukovať na inom stroji či po zmene katalógu. *Stav: na návrhovú dávku (sedenie ③ / V0.6).*
 - **D-20 · Quick actions — bezpečný move plugin** (Michal 19.7., „pre budúceho Michala a Fable, keď bude základ top 😉") — zlúčiť funkčné pluginy noxun_mower + Snaper do jedného toolbar pluginu (rýchly pohyb, kopírovanie, rotácie, prisunutie na doraz). **Známy poznatok:** mower „rýchla kópia skrinky vedľa" vytvorí kópiu LEN ako geometriu — bez NOXUN identity kabinetu (kópia mimo observer/dedup flow). Pri stavbe quick actions kopírovanie prerobiť tak, aby kópia prešla štandardným dedup tickom (plná identita + config). *Stav: budúcnosť (po V1 / pri zostavách).*
 - **D-09 · Snap body pri presúvaní priečok** (1/4, 1/2, 3/4…) v zónovom náhľade. *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
 - **D-10 · Presúvanie/úprava čiel priamo v náhľade** (ako drag priečok). *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
@@ -90,6 +89,7 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ## Vyriešené — index (plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md))
 
+- **D-43** duplák 36 = 2×18 (väzba na zdroj + násobič, všetko ostatné derivované; väzba vo výrobnom snapshote; odhad platní prelieva plochu do zdroja; katalóg SCHEMA 3 lazy; batch čip vedome odložený) — PR #94
 - **D-47** hlavička panela — tlačidlo Materiály vedľa Výroby (rovnako široké), 3 taby rovnako široké s ikonami, pod 400 px akcie icon-only — PR 2A-4b (TBD)
 - **D-46** projektová predvoľba korpusu s inou hrúbkou (potvrdzovacia lišta namiesto tvrdého stopu — dediace skrinky prevezmú hrúbku v 1 kroku Späť) — PR #86
 - **D-44** rýchle zadávanie materiálov (našepkávač výrobcu/typu, formát platne rovno v dávke „Nový dekor", nezadaný formát sa neukladá) — PR #84

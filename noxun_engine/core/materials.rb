@@ -38,6 +38,18 @@ module Noxun
       # v subore — do vtedy sa spravanie nemeni ani o vlas (dual-mode).
       SCHEMA_LEGACY = 1
       SCHEMA_GROUPS = 2
+      # 2B-1 (D-43): duplak — variant "zdvojeny zo zdroja" (source_material_id +
+      # source_multiplier). Marker 3 sa NEzapisuje pri boote, ale LAZY: prvym
+      # zapisom katalogu, ktory duplak zaznam obsahuje. Katalog bez duplakov
+      # ostava marker 2 (starsi plugin smie pisat); od prveho duplaku starsie
+      # verzie odmietnu zapis (write_unlocked backstop + assess :read_only) —
+      # inak by ich normalize whitelist source_* polia ticho zahodil (audit B1).
+      SCHEMA_DUPLAK = 3
+      # Najnovsia schema, ktorej tvar tato verzia pluginu POZNA (write guard +
+      # assess). Bump VYHRADNE spolu s kodom, ktory nove polia nesie.
+      SCHEMA_CURRENT = SCHEMA_DUPLAK
+      # Povoleny nasobic duplaku (2 = bezny pripad "36 z 2x18"; 3 = rezerva).
+      DUPLAK_MULTIPLIERS = [2, 3].freeze
       # Nemenna PREDMIGRACNA zaloha (standard 7.1) — mimo bezneho .bak, ktory sa
       # pri kazdom zapise prepisuje. Vznikne raz a NIKDY sa neprepise.
       PRE_SCHEMA2_FILE = 'materials.pre-schema-2.json'
@@ -234,10 +246,10 @@ module Noxun
         end
         target = target_schema_fresh(data['schema'])
         # GH #92 P1 (2. kolo): marker NOVSI nez tato verzia pozna sa NIKDY
-        # neprepisuje — payload nesie len nam zname polia a zapis by schema-3
+        # neprepisuje — payload nesie len nam zname polia a zapis by novsie
         # metadata ticho zahodil (proces bez behu assess ma stav :ok, tento
-        # backstop preto NESMIE chybat).
-        if target > SCHEMA_GROUPS
+        # backstop preto NESMIE chybat). 2B-1: hranica je SCHEMA_CURRENT.
+        if target > SCHEMA_CURRENT
           if defined?(Engine)
             Engine.log("materialy: zapis odmietnuty — katalog je v novsej scheme (#{target})")
           end
@@ -248,6 +260,12 @@ module Noxun
             Engine.log_error(StandardError.new('payload bez group_id do katalogu SCHEMA 2'),
                              'Materials.write_unlocked')
           end
+          return false
+        end
+        # 2B-1 (GH #94 P2): nekonzistentne duplak vazby sa do suboru nedostanu
+        # — rovnaka filozofia ako group_id uplnost vyssie.
+        if target >= SCHEMA_GROUPS && (dup_err = duplak_integrity_error(data['sheets']))
+          Engine.log_error(StandardError.new(dup_err), 'Materials.write_unlocked') if defined?(Engine)
           return false
         end
         payload = { 'std' => STD, 'schema' => target,
@@ -290,6 +308,32 @@ module Noxun
         (sheets_raw + edges_raw).all? do |rec|
           rec.is_a?(Hash) && !rec['group_id'].to_s.strip.empty?
         end
+      end
+
+      # 2B-1 (GH #94 P2): konzistencia duplak vazieb v SUROVYCH zaznamoch —
+      # zdielaju ju assess (zdravie katalogu) aj write_unlocked (brana zapisu).
+      # Nekonzistentny duplak (chybajuci/neplatny nasobic, neexistujuci zdroj,
+      # zdroj sam duplak) by buildery interpretovali naslepo a odhad platni by
+      # ucotoval plochu zlemu materialu. Vrati nil (OK) alebo text problemu.
+      def duplak_integrity_error(sheets_raw)
+        return nil unless sheets_raw.is_a?(Array)
+        by_id = {}
+        sheets_raw.each { |s| by_id[s['material_id'].to_s] = s if s.is_a?(Hash) }
+        sheets_raw.each do |s|
+          next unless s.is_a?(Hash)
+          src_id = s['source_material_id'].to_s.strip
+          mult = s['source_multiplier']
+          next if src_id.empty? && mult.nil?
+          unless !src_id.empty? && mult.is_a?(Integer) && DUPLAK_MULTIPLIERS.include?(mult)
+            return "duplák #{s['material_id']} má neúplnú väzbu na zdroj"
+          end
+          src = by_id[src_id]
+          return "duplák #{s['material_id']} ukazuje na neexistujúci zdroj #{src_id}" unless src
+          unless src['source_material_id'].to_s.strip.empty?
+            return "duplák #{s['material_id']} má za zdroj iný duplák (#{src_id})"
+          end
+        end
+        nil
       end
 
       # Medziprocesovy zamok katalogu (samostatny .lock subor v dir — NIKDY nie
@@ -443,7 +487,31 @@ module Noxun
         put_opt(out, 'code', a['code'] || a[:code])
         put_opt(out, 'supplier', a['supplier'] || a[:supplier])
         put_schema2_fields(out, a)
+        put_duplak_fields(out, a)
         out
+      end
+
+      # 2B-1 (D-43): duplak vazba sa NESIE pri kazdej normalizacii (merge-safe
+      # ako code/supplier) — bez toho by ju upsert/patch inych poli ticho
+      # zahodil. Multiplier je Integer (nikdy string z payloadu); neplatna
+      # hodnota kluc vynecha — zapisova cesta duplaku ma vlastnu validaciu.
+      def put_duplak_fields(out, a)
+        put_opt(out, 'source_material_id', a['source_material_id'] || a[:source_material_id])
+        mult = a['source_multiplier'] || a[:source_multiplier]
+        if mult.to_s.match?(/\A\d+\z/) && DUPLAK_MULTIPLIERS.include?(mult.to_i)
+          out['source_multiplier'] = mult.to_i
+        end
+        # Vazba sa uklada len CELA (zdroj + nasobic) — polovicna je nezmysel.
+        return out if out.key?('source_material_id') && out.key?('source_multiplier')
+        out.delete('source_material_id')
+        out.delete('source_multiplier')
+        out
+      end
+
+      # Duplak = variant s vazbou "zdvojeny zo zdroja" (D-43). Jedina autorita
+      # rozpoznania — vsetky miesta (guardy, estimate, UI payload) sa pytaju tu.
+      def duplak?(rec)
+        rec.is_a?(Hash) && !rec['source_material_id'].to_s.strip.empty?
       end
 
       # 2A-1 (SCHEMA 2 polia): kotva skupiny + zobrazovaci nazov dekoru +
