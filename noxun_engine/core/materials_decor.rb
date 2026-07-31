@@ -45,11 +45,12 @@ module Noxun
       # ho zapise KAZDEMU zaznamu, UI ho pri praci s dekorom drzi). Bez neho sa
       # dotaz opiera o obchodnu identitu skupiny (vyrobca + dekor).
       def find_sheet_variant(decor, type, thickness, structure = nil, sheet_size = nil,
-                             group_id: nil, manufacturer: nil)
+                             group_id: nil, manufacturer: nil, back_decor: nil, back_structure: nil)
         schema = catalog_schema
         want = sheet_identity_key({ 'decor' => decor, 'type' => type, 'thickness' => thickness,
                                     'structure' => structure, 'sheet_size' => sheet_size,
-                                    'group_id' => group_id, 'manufacturer' => manufacturer }, schema)
+                                    'group_id' => group_id, 'manufacturer' => manufacturer,
+                                    'back_decor' => back_decor, 'back_structure' => back_structure }, schema)
         # GH P2: tolerancne porovnanie klucov — hranicne hrubky drzia legacy spravanie.
         sheets.find { |s| identity_keys_tolerant?(sheet_identity_key(s, schema), want) }
       end
@@ -762,8 +763,9 @@ module Noxun
           return [false, "Hrúbka variantu #{vt} musí byť kladné číslo."] unless th && th.positive?
           ok_size, size = parse_variant_size(v['sheet_size'] || v[:sheet_size], vt, th)
           return [false, size] unless ok_size
-          if pd_type?(vt) && size.nil?
-            return [false, "Variant #{vt} #{fmt_mm(th)} potrebuje formát platne (pri PD je súčasťou identity)."]
+          # 2B-2 (F10): povinnost formatu riadi register flag (PD + ZASTENA).
+          if format_in_identity?(vt) && size.nil?
+            return [false, "Variant #{vt} #{fmt_mm(th)} potrebuje formát platne (pri tomto type je súčasťou identity)."]
           end
           entries << { 'type' => vt, 'thickness' => th, 'sheet_size' => size,
                        'structure' => (v['structure'] || v[:structure]).to_s.strip }
@@ -800,7 +802,7 @@ module Noxun
         entries.each do |it|
           key = [identity_norm(it['type']), thickness_key(it['thickness']),
                  identity_norm(it['structure']),
-                 pd_type?(it['type']) ? size_key(it['sheet_size']) : nil]
+                 format_in_identity?(it['type']) ? size_key(it['sheet_size']) : nil]
           if seen.any? { |p| identity_keys_tolerant?(p, key) }
             return [false, "Variant #{v3_sheet_label(it)} je v dávke dvakrát — nechaj len jeden."]
           end
@@ -918,7 +920,7 @@ module Noxun
           # hrubka na 2 desatiny, tolerancne — GH P2). V SCHEMA 2 je pri PD
           # sucastou kluca aj FORMAT (GH P2: PD 38 4100x600 + 4100x920 v jednej
           # davke su dva legalne varianty, nie duplicita).
-          skey = (pd_formats && pd_type?(vt)) ? size_key(size) : nil
+          skey = (pd_formats && format_in_identity?(vt)) ? size_key(size) : nil
           prev = seen.find do |p|
             p[0] == identity_norm(vt) &&
               (p[1] - thickness_key(th)).abs < 0.011 &&

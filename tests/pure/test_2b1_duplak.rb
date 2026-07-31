@@ -152,9 +152,10 @@ NxTest.test('2b1: write_unlocked drzi marker 3; novsi marker (4) zapis odmietne'
     NxTest.assert_equal(3, DPMAT.catalog_schema, 'bezna mutacia marker 3 nezhodi')
     NxTest.assert(DPMAT.sheet(rec['material_id'])['source_material_id'], 'duplak vazba prezila mutaciu')
   end
-  dp_with_catalog([dp_sheet], schema: 4) do
+  # 2B-2: marker 4 (zastena) uz tato verzia pozna — "novsi neznamy" je CURRENT+1.
+  dp_with_catalog([dp_sheet], schema: DPMAT::SCHEMA_CURRENT + 1) do
     NxTest.refute(DPMAT.upsert_sheet(dp_sheet('material_id' => 'NOVA', 'thickness' => 19.0)),
-                  'zapis do novsej schemy (4) sa odmietne')
+                  'zapis do novsej schemy sa odmietne')
   end
 end
 
@@ -229,13 +230,14 @@ NxTest.test('2b1 gh94: cabinet material_source_for — non-duplak sheet uz vazbu
                       'zmena materialu dielca = vazba sa neprenasa')
 end
 
-NxTest.test('2b1: assess — marker 3 kompletny je :ok, marker 4 read-only') do
+NxTest.test('2b1: assess — marker 3 kompletny je :ok, novsi neznamy read-only') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   dp_with_catalog([dp_sheet], schema: 3) do
     state, reason = DPMAT.assess_catalog!
     NxTest.assert_equal(:ok, state, "marker 3 s group_id vsade = :ok (#{reason})")
   end
-  dp_with_catalog([dp_sheet], schema: 4) do
+  # 2B-2: marker 4 uz je nas — "novsi neznamy" je CURRENT+1.
+  dp_with_catalog([dp_sheet], schema: DPMAT::SCHEMA_CURRENT + 1) do
     state, reason = DPMAT.assess_catalog!
     NxTest.assert_equal(:read_only, state)
     NxTest.assert(reason.to_s.include?('novšej'), 'dovod = novsia schema')

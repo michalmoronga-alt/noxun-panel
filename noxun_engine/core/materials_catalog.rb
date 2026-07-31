@@ -201,6 +201,16 @@ module Noxun
                   ss.all? { |x| (n = pair_num(x)) && SHEET_SIZE_RANGE.cover?(n) }
           return [false, "Formát platne musí byť dve čísla #{sheet_size_range_label} mm."] unless valid
         end
+        # 2B-2 (F12): rub patri VYHRADNE obojstrannemu typu (ZASTENA) a
+        # struktura rubu nesmie prist bez cisla rubu — server, nie UI.
+        bd = (a['back_decor'] || a[:back_decor]).to_s.strip
+        bs = (a['back_structure'] || a[:back_structure]).to_s.strip
+        if (!bd.empty? || !bs.empty?) && !double_sided_type?(type)
+          return [false, 'Rubový dekor má len zástena — pre iné typy pole nepatrí.']
+        end
+        return [false, 'Štruktúra rubu vyžaduje číslo rubového dekoru.'] if bd.empty? && !bs.empty?
+        return [false, "Rubový dekor je príliš dlhý (max #{CODE_MAX})."] if bd.length > CODE_MAX
+        return [false, "Štruktúra rubu je príliš dlhá (max #{CODE_MAX})."] if bs.length > CODE_MAX
         [true, nil]
       end
 
@@ -252,14 +262,35 @@ module Noxun
             return 'Dekorová skupina je identita záznamu — presun medzi skupinami sa nerobí úpravou variantu.'
           end
         end
-        return nil unless pd_type?(existing['type'])
+        # 2B-2 (F11): rub zasteny je identita — VYPLNENY je nemenny; PRAZDNY na
+        # existujucom zazname smie byt doplneny jednorazovo (first-fill —
+        # legacy zasteny spred 2B-2 by sa inak nedali nikdy skompletizovat).
+        # Dup kontrolu first-fillu robi volajuci (handle_save_sheet) — tu sa
+        # posudzuje len nemennost.
+        if double_sided_type?(existing['type'])
+          old_bd = identity_norm(existing['back_decor'])
+          if attrs.key?('back_decor') && !old_bd.empty? &&
+             identity_norm(attrs['back_decor']) != old_bd
+            return 'Rubový dekor definuje variant — pre iný rub pridaj nový variant.'
+          end
+          old_bs = identity_norm(existing['back_structure'])
+          if attrs.key?('back_structure') && !old_bs.empty? &&
+             identity_norm(attrs['back_structure']) != old_bs
+            return 'Štruktúra rubu definuje variant — pre inú pridaj nový variant.'
+          end
+        end
+        # 2B-2 (F10): format v identite riadi register flag (PD + ZASTENA).
+        return nil unless format_in_identity?(existing['type'])
         changed_size = attrs.key?('sheet_size') &&
                        size_key(attrs['sheet_size']) != size_key(existing['sheet_size'])
         # GH P2: clear na zazname BEZ formatu je no-op (editor posiela flag pri
         # prazdnych poliach vzdy) — odmietat len skutocnu zmenu identity.
         clear_real = attrs['clear_sheet_size'] && !size_key(existing['sheet_size']).nil?
-        if clear_real || changed_size
-          return 'Formát PD definuje variant — pre iný formát pridaj nový variant.'
+        # 2B-2 (F11): doplnenie formatu na zazname BEZ formatu je first-fill
+        # (povoleny), zmena/clear existujuceho formatu je zmena identity.
+        changed_real = changed_size && !size_key(existing['sheet_size']).nil?
+        if clear_real || changed_real
+          return 'Formát platne definuje variant — pre iný formát pridaj nový variant.'
         end
         nil
       end

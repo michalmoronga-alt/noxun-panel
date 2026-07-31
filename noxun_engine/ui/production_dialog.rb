@@ -302,20 +302,24 @@ module Noxun
         # Ludsky zaklad labelu (cislo struktura nazov typ; fallback family/id) —
         # zdiela ho kompozicia exportneho labelu aj 'display' pre LOG.
         def vepo_base_label(s)
-          label = [s['decor'], s['structure'], s['decor_name'], s['type']]
+          # 2B-2: rub zasteny patri do labelu VZDY (obchodna identita produktu
+          # — Demos vzor "Zastena K551/K552"; bez neho by sa dva ruby zliali).
+          back = s['back_decor'].to_s.strip
+          back = "/#{[back, s['back_structure'].to_s.strip].reject(&:empty?).join(' ')}" unless back.empty?
+          label = [s['decor'], s['structure'], s['decor_name'], s['type'], back]
                   .map { |v| v.to_s.strip }.reject(&:empty?).join(' ')
           label = s['family'].to_s.strip if label.empty?
           label = s['material_id'].to_s if label.empty?
           label
         end
 
-        # Kolizia labelu medzi VARIANTMI (rovnaka skupina): PD zaznamu s formatom
-        # sa prida "D×S" (cele mm) — identita zakazuje uplne duplicity, takze
-        # vysledok je unikatny.
+        # Kolizia labelu medzi VARIANTMI (rovnaka skupina): zaznamu s formatom
+        # v identite (PD + ZASTENA — 2B-2 flag F10) sa prida "D×S" (cele mm) —
+        # identita zakazuje uplne duplicity, takze vysledok je unikatny.
         def vepo_disambiguate_variants(labeled)
           by_label = labeled.group_by { |(_s, l)| l }
           labeled.map do |(s, l)|
-            next [s, l] unless by_label[l].length > 1 && Materials.pd_type?(s['type'])
+            next [s, l] unless by_label[l].length > 1 && Materials.format_in_identity?(s['type'])
             fmt = Materials.size_key(s['sheet_size'])
             # GH #93 P1 (5. kolo): format su mm Floaty — .round by zlial 4100.1
             # a 4100.2; %g drzi normalizovanu presnost size_key (round(2)) a
