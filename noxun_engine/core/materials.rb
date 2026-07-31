@@ -49,9 +49,15 @@ module Noxun
       # identite; format v identite cez register flag). Marker 4 sa dviha LAZY
       # prvym zapisom zaznamu s back_decor — rovnaka filozofia ako duplak 3.
       SCHEMA_ZASTENA = 4
+      # V0.6 B-2a: pohyblivá cenova cache (standard 7.1) — demos_url +
+      # price_checked_at na zazname (sheet AJ edge). Marker 5 LAZY prvym
+      # zapisom zaznamu s tymito polami. Audit B-2 BLOCKER 4: bez markera by
+      # starsi klient polia normalize whitelistom zahodil, ale STALE cenu
+      # ponechal — cena bez vazby a datumu overenia je horsia nez read-only.
+      SCHEMA_DEMOS = 5
       # Najnovsia schema, ktorej tvar tato verzia pluginu POZNA (write guard +
       # assess). Bump VYHRADNE spolu s kodom, ktory nove polia nesie.
-      SCHEMA_CURRENT = SCHEMA_ZASTENA
+      SCHEMA_CURRENT = SCHEMA_DEMOS
       # Povoleny nasobic duplaku (2 = bezny pripad "36 z 2x18"; 3 = rezerva).
       DUPLAK_MULTIPLIERS = [2, 3].freeze
       # Nemenna PREDMIGRACNA zaloha (standard 7.1) — mimo bezneho .bak, ktory sa
@@ -254,7 +260,7 @@ module Noxun
         # vyzaduje marker 3, s rubom zasteny marker 4. Centralne TU (jedina
         # zapisova cesta), aby ziaden mutator nemohol nove pole zapisat pod
         # starym markerom (starsi plugin by ho pri dalsom zapise zahodil).
-        wanted = [data['schema'].to_i, required_schema_for(data['sheets'])].max
+        wanted = [data['schema'].to_i, required_schema_for(data['sheets'], data['edges'])].max
         target = target_schema_fresh(wanted)
         # GH #92 P1 (2. kolo): marker NOVSI nez tato verzia pozna sa NIKDY
         # neprepisuje — payload nesie len nam zname polia a zapis by novsie
@@ -285,14 +291,26 @@ module Noxun
       end
 
       # 2B-2: minimalna schema, ktoru OBSAH payloadu vyzaduje (duplak vazba = 3,
-      # rub zasteny = 4). Bez novych poli 0 = marker drzi subor.
-      def required_schema_for(sheets_raw)
-        return 0 unless sheets_raw.is_a?(Array)
+      # rub zasteny = 4, demos cache polia = 5 — aj na ABS zaznamoch).
+      # Bez novych poli 0 = marker drzi subor.
+      def required_schema_for(sheets_raw, edges_raw = nil)
         need = 0
-        sheets_raw.each do |s|
-          next unless s.is_a?(Hash)
-          need = SCHEMA_DUPLAK if need < SCHEMA_DUPLAK && !s['source_material_id'].to_s.empty?
-          need = SCHEMA_ZASTENA if need < SCHEMA_ZASTENA && !s['back_decor'].to_s.empty?
+        if sheets_raw.is_a?(Array)
+          sheets_raw.each do |s|
+            next unless s.is_a?(Hash)
+            need = SCHEMA_DUPLAK if need < SCHEMA_DUPLAK && !s['source_material_id'].to_s.empty?
+            need = SCHEMA_ZASTENA if need < SCHEMA_ZASTENA && !s['back_decor'].to_s.empty?
+          end
+        end
+        [sheets_raw, edges_raw].each do |list|
+          next unless list.is_a?(Array)
+          list.each do |r|
+            next unless r.is_a?(Hash)
+            if need < SCHEMA_DEMOS &&
+               (!r['demos_url'].to_s.empty? || !r['price_checked_at'].to_s.empty?)
+              need = SCHEMA_DEMOS
+            end
+          end
         end
         need
       end
@@ -513,6 +531,19 @@ module Noxun
         put_schema2_fields(out, a)
         put_duplak_fields(out, a)
         put_zastena_fields(out, a)
+        put_demos_fields(out, a)
+        out
+      end
+
+      # V0.6 B-2a: pohybliva cenova cache (standard 7.1) — vazba na produkt
+      # Demosu (URL) + datum posledneho overenia ceny. Merge-safe ako code/
+      # supplier (trim, prazdna hodnota kluc odstrani); hodnoty samotne
+      # validuje a generuje VYHRADNE apply_demos_batch (URL cez sanitize,
+      # timestamp server) — normalize ich len nesie, aby ich upsert/patch
+      # inych poli ticho nezahodil.
+      def put_demos_fields(out, a)
+        put_opt(out, 'demos_url', a['demos_url'] || a[:demos_url])
+        put_opt(out, 'price_checked_at', a['price_checked_at'] || a[:price_checked_at])
         out
       end
 
@@ -586,6 +617,7 @@ module Noxun
         put_opt(out, 'code', a['code'] || a[:code])       # D-42 dodavatelsky/katalogovy kod
         put_opt(out, 'supplier', a['supplier'] || a[:supplier]) # D-42 preferovany dodavatel
         put_schema2_fields(out, a)
+        put_demos_fields(out, a) # V0.6 B-2a: cenova cache aj na ABS paskach
         # 2A-1: 'universal' = VEDOMY priznak "paska pasuje na vsetku strukturu"
         # (standard 7.5 — jedina cesta pre pasky bez struktury; prazdna struktura
         # sa NIKDY nepocita ako zhoda). Uklada sa LEN ked je true; false/prazdne

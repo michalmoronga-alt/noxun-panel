@@ -13,11 +13,12 @@
   var MD_REV = '';         // D-41: baseline katalogu — server odmietne zapis nad starsim stavom
   // 2A-1 (GH P1): klient hlasi SVOJU podporovanu schemu katalogu — KONSTANTU
   // tejto verzie kodu, NIE echo servera. 2B-2: toto okno pozna duplak polia
-  // (schema 3) AJ rub zasteny (back_decor/back_structure — schema 4) =>
-  // konstanta je 4; katalog s novsim markerom by staremu oknu zapis odmietol
+  // (schema 3) AJ rub zasteny (back_decor/back_structure — schema 4);
+  // V0.6 B-2b navyse demos polia (demos_url/price_checked_at — schema 5) =>
+  // konstanta je 5; katalog s novsim markerom by staremu oknu zapis odmietol
   // (nove polia by ticho zahodilo). Pri katalogu, ktory je este SCHEMA 1
   // (nerozhodnutelna migracia), server batch 3 odmietne — ine mutacie prejdu.
-  var MD_CLIENT_SCHEMA = 4;
+  var MD_CLIENT_SCHEMA = 5;
   // 2B-2 (F10 zrkadlo registra): typy s formatom v identite — batch/formular
   // format VYZADUJU. Server je autorita (format_in_identity?), toto je UX.
   var MD_FORMAT_TYPES = ['PD', 'ZASTENA'];

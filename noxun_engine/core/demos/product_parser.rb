@@ -92,6 +92,9 @@ module Noxun
           'structure' => map['Štruktúra materiálu'],
           'format' => parse_format(map['Formát materiálu (mm)']),
           'thickness' => num(map['Hrúbka materiálu (mm)']),
+          # B-2a: sirka ABS pasky (identita variantu) — best effort, autoritou
+          # overenia sirky ostava slug finalnej URL (absb-...-sirka-hrubka).
+          'width' => num(map['Šírka materiálu (mm)']),
           'pd_type' => map['Typ pracovnej dosky']
         }
       end

@@ -84,9 +84,12 @@ module Noxun
         end
         return nil if toks['structure'] && !contains_seq?(parts, toks['structure'])
         if toks['edge']
-          # ABS slug konci sirka-hrubka (absb-...-43-2).
-          return nil if toks['width'] && toks['thickness'] &&
-                        !contains_seq?(parts, toks['width'] + toks['thickness'])
+          # ABS slug konci sirka-hrubka (absb-...-43-2). B-2a audit BLOCKER 3:
+          # paska BEZ sirky sa NIKDY neparuje automaticky (sirka je identita
+          # variantu; bez nej by sa nekontrolovala ani hrubka) — legacy/
+          # univerzalne pasky vyzaduju doplnenie sirky, nie tichy match.
+          return nil unless toks['width'] && toks['thickness']
+          return nil unless contains_seq?(parts, toks['width'] + toks['thickness'])
         elsif toks['thickness']
           return nil unless tail_has?(parts, toks['thickness'])
         end
@@ -95,7 +98,12 @@ module Noxun
         end
         if toks['back_decor']
           # Zastena: slug nesie oba dekory (zastena-h3303-st10-f620-st87-...).
-          return nil unless contains_seq?(parts, toks['back_decor'])
+          # B-2a audit BLOCKER 3: PORADIE je sucast identity — licovy dekor je
+          # v slugu PRED rubovym (zamena stran K552/H3303 vs H3303/K552 obsahuje
+          # tie iste tokeny, contains_seq? by ju pustil).
+          front_i = seq_index(parts, toks['decor'])
+          back_i = seq_index(parts, toks['back_decor'], front_i.to_i + toks['decor'].length)
+          return nil unless back_i
           return nil if toks['back_structure'] && !contains_seq?(parts, toks['back_structure'])
         end
         # GH #96 P2: dlzka slugu NIE JE dokaz ekvivalencie (iny nazvovy usek /
@@ -131,10 +139,17 @@ module Noxun
 
       # Sekvencia tokenov sa nachadza v parts ako SUVISLY usek.
       def contains_seq?(parts, seq)
-        return false if seq.nil? || seq.empty?
+        !seq_index(parts, seq).nil?
+      end
+
+      # Index PRVEHO vyskytu suvislej sekvencie od pozicie `from` (nil = nie je).
+      # B-2a: poradie dekorov zasteny (lice pred rubom) sa overuje indexmi.
+      def seq_index(parts, seq, from = 0)
+        return nil if seq.nil? || seq.empty?
         limit = parts.length - seq.length
-        return false if limit.negative?
-        (0..limit).any? { |i| parts[i, seq.length] == seq }
+        return nil if limit.negative?
+        (from..limit).each { |i| return i if parts[i, seq.length] == seq }
+        nil
       end
 
       # Format dlzka x sirka — sekvencie hned za sebou (…-4100-600-…).
