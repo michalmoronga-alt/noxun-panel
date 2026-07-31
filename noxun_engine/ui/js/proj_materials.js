@@ -12,12 +12,21 @@
   var MD_PROTECTED = [];
   var MD_REV = '';         // D-41: baseline katalogu — server odmietne zapis nad starsim stavom
   // 2A-1 (GH P1): klient hlasi SVOJU podporovanu schemu katalogu — KONSTANTU
-  // tejto verzie kodu, NIE echo servera. 2B-1: toto okno uz pozna aj duplak
-  // polia (source_material_id/source_multiplier) => konstanta je 3; katalog
-  // s marker 3 by okno so schemou 2 pri zapise odmietol (stare okno by duplak
-  // vazby zahodilo). Pri katalogu, ktory je este SCHEMA 1 (nerozhodnutelna
-  // migracia), server batch 3 odmietne s hlaskou — ine mutacie prejdu.
-  var MD_CLIENT_SCHEMA = 3;
+  // tejto verzie kodu, NIE echo servera. 2B-2: toto okno pozna duplak polia
+  // (schema 3) AJ rub zasteny (back_decor/back_structure — schema 4) =>
+  // konstanta je 4; katalog s novsim markerom by staremu oknu zapis odmietol
+  // (nove polia by ticho zahodilo). Pri katalogu, ktory je este SCHEMA 1
+  // (nerozhodnutelna migracia), server batch 3 odmietne — ine mutacie prejdu.
+  var MD_CLIENT_SCHEMA = 4;
+  // 2B-2 (F10 zrkadlo registra): typy s formatom v identite — batch/formular
+  // format VYZADUJU. Server je autorita (format_in_identity?), toto je UX.
+  var MD_FORMAT_TYPES = ['PD', 'ZASTENA'];
+  function mdFormatRequired(type){
+    return MD_FORMAT_TYPES.indexOf(String(type || '').trim().toUpperCase()) >= 0;
+  }
+  function mdZastena(type){
+    return String(type || '').trim().toUpperCase() === 'ZASTENA';
+  }
   // 2A-4b: rezim SERVEROVEHO katalogu (payload catalog_schema) — riadi
   // zoskupenie dlazdic (group_id vs text dekoru), universal toggle a banner.
   var MD_SCHEMA2 = false;
@@ -149,6 +158,12 @@
   function sheetDimLabel(s){
     var ss = s.sheet_size;
     var fmt = (ss && ss.length === 2) ? fmtNum(ss[0]) + '×' + fmtNum(ss[1]) : '';
+    // 2B-2: rub zasteny do sub riadku ("4100×640 · rub K552 RT") — obchodna
+    // identita produktu musi byt v detaile citatelna.
+    if (s.back_decor){
+      var back = 'rub ' + [s.back_decor, s.back_structure || ''].filter(Boolean).join(' ');
+      fmt = fmt ? fmt + ' · ' + back : back;
+    }
     return { dim: sheetChipLabel(s), sub: fmt };
   }
 
@@ -165,6 +180,10 @@
     for (var i = 0; i < vs.length; i++){
       if (String(vs[i].code || '').toLowerCase().indexOf(q) >= 0) return true;
       if (String(vs[i].supplier || '').toLowerCase().indexOf(q) >= 0) return true;
+      // 2B-2 (GH #95 P2): rub zasteny je objednavkova identita — "K552" musi
+      // najst skupinu K551/K552 (aj struktura rubu).
+      if (String(vs[i].back_decor || '').toLowerCase().indexOf(q) >= 0) return true;
+      if (String(vs[i].back_structure || '').toLowerCase().indexOf(q) >= 0) return true;
       if (String(vs[i].structure || '').toLowerCase().indexOf(q) >= 0) return true;
     }
     return false;
@@ -595,7 +614,22 @@
     var ss = s && s.sheet_size;
     el('ms_sheet_l').value = ss ? ss[0] : '';
     el('ms_sheet_w').value = ss ? ss[1] : '';
+    // 2B-2: rub zasteny — pole len pre typ ZASTENA; vyplneny rub je identita
+    // (nemenny — server guard, input len readonly zrkadlo). Prazdny rub na
+    // existujucej zastene = first-fill (dovoleny, s dup kontrolou servera).
+    el('ms_back_decor').value = s ? (s.back_decor || '') : '';
+    el('ms_back_structure').value = s ? (s.back_structure || '') : '';
+    var backFilled = !!(s && s.back_decor);
+    el('ms_back_decor').readOnly = backFilled;
+    el('ms_back_structure').readOnly = !!(s && s.back_structure);
+    mdSheetTypeChanged();
     el('mdSheetForm').style.display = '';
+  }
+  // 2B-2: viditelnost rub polí podla typu vo formulari (create aj edit).
+  function mdSheetTypeChanged(){
+    var show = mdZastena(el('ms_type').value);
+    el('ms_back_row').style.display = show ? '' : 'none';
+    el('ms_back_hint').style.display = show ? '' : 'none';
   }
   // D-42: prazdny string ak cena nie je zadana (nil/undefined), inak hodnota
   // (aj 0 = zadana nula). Rozlisuje "nezadana" od "0".
@@ -822,12 +856,13 @@
       var st = (sts && sts[c.key]) ? String(sts[c.key].st || '').trim() : '';
       var v = { type: c.type || '', thickness: c.th, structure: st };
       if (l !== null) v.sheet_size = [l, w];
-      // GH #93 P2 (7. kolo): PD variant BEZ formatu by server odmietol az PO
-      // zavreti formulara (strata celej davky) — efektivny typ PD (cip alebo
-      // zdielany typ) vyzaduje format uz na klientovi; formular ostava otvoreny.
-      var effType = String(v.type || sharedType || '').trim().toUpperCase();
-      if (effType === 'PD' && l === null){
-        err = 'Formát platne pre ' + (c.label || c.key) + ' je pri PD povinný (napr. 4100 × 600).';
+      // GH #93 P2 (7. kolo): variant s formatom v identite BEZ formatu by
+      // server odmietol az PO zavreti formulara (strata celej davky) —
+      // efektivny typ (cip alebo zdielany) vyzaduje format uz na klientovi;
+      // formular ostava otvoreny. 2B-2 (F10): PD + ZASTENA cez helper.
+      var effType = String(v.type || sharedType || '').trim();
+      if (mdFormatRequired(effType) && l === null){
+        err = 'Formát platne pre ' + (c.label || c.key) + ' je pri tomto type povinný (napr. 4100 × 600).';
         return;
       }
       out.push(v);
@@ -857,7 +892,8 @@
     if (!s) return { variants: [], error: null };
     var amb = s.match(/\d+,\d(?![\d.])/);
     if (amb) return { variants: [], error: 'Nejednoznačný zápis „' + amb[0] + '“ — desatiny píš bodkou (18.5), položky oddeľuj čiarkou.' };
-    var isPd = String(sharedType || '').trim().toUpperCase() === 'PD';
+    // 2B-2 (F10): povinnost formatu cez helper (PD + ZASTENA).
+    var needFmt = mdFormatRequired(sharedType);
     var out = [];
     var toks = s.split(',');
     for (var i = 0; i < toks.length; i++){
@@ -874,8 +910,8 @@
           return { variants: [], error: 'Formát pri hrúbke „' + t + '“ zapíš ako DĺžkaxŠírka (napr. 20/4100x600).' };
         }
         v.sheet_size = [d, w];
-      } else if (isPd){
-        return { variants: [], error: 'PD hrúbka „' + t + '“ potrebuje formát platne — zapíš 20/4100x600.' };
+      } else if (needFmt){
+        return { variants: [], error: 'Hrúbka „' + t + '“ pri tomto type potrebuje formát platne — zapíš 20/4100x600.' };
       }
       out.push(v);
     }
@@ -1097,6 +1133,13 @@
       manufacturer: el('ms_manufacturer').value,
       allow_duplicate_code: mdDupAllow === 'sheet' // potvrdenie duplicitneho kodu (2. ulozenie)
     };
+    // 2B-2 (GH #95 P2): rub polia idu do payloadu LEN pri type Zastena —
+    // zmena typu formular len skryje, hodnoty by inak leteli na server a ten
+    // by save odmietal kvoli poliam, ktore uz nie su vidiet.
+    if (mdZastena(payload.type)){
+      payload.back_decor = el('ms_back_decor').value;
+      payload.back_structure = el('ms_back_structure').value;
+    }
     // D-19: format platne sa posiela LEN ako kompletny platny par; polovicny
     // alebo neplatny vstup zastavi ulozenie (ziadne tiche 0/reset — Codex F4).
     var sl = mdSheetDim(el('ms_sheet_l').value);
@@ -1342,6 +1385,8 @@
       mdParseExtraAbs: mdParseExtraAbs, mdEdgeBannerText: mdEdgeBannerText,
       sheetDimLabel: sheetDimLabel, mdGroupCommonStructure: mdGroupCommonStructure,
       // 2B-1 (tests/js/test_md_schema2.js) — duplak render bez DOM
-      mdDuplakRow: mdDuplakRow, mdDuplakBtn: mdDuplakBtn, mdSectionRows: mdSectionRows };
+      mdDuplakRow: mdDuplakRow, mdDuplakBtn: mdDuplakBtn, mdSectionRows: mdSectionRows,
+      // 2B-2 — zastena (format-required helper, ciste funkcie)
+      mdFormatRequired: mdFormatRequired, mdZastena: mdZastena };
   }
   if (typeof window !== 'undefined' && window.sketchup && sketchup.ready) sketchup.ready('');

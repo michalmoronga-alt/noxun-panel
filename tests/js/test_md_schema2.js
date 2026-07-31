@@ -174,4 +174,33 @@ const secSrc = M.mdSectionRows({ title: '', sheets: [SRC], edges: [] });
 ok(secSrc.indexOf('mdcell') >= 0, 'bezna doska ma inline bunky');
 ok(secSrc.indexOf('mdCreateDuplak') < 0, 'duplak tlacidlo len v SCHEMA 2 rezime (MD_SCHEMA2 default false)');
 
+// --- 2B-2: zastena — format required helper + rub v labeloch ----------------
+ok(M.mdFormatRequired('PD') && M.mdFormatRequired('zastena'), 'PD aj ZASTENA vyzaduju format');
+ok(!M.mdFormatRequired('DTDL') && !M.mdFormatRequired(''), 'ine typy nie');
+ok(M.mdZastena(' Zastena ') && !M.mdZastena('PD'), 'mdZastena trim + case-insensitive');
+
+assert(M.mdBuildSheetVariants([{ key: 'z10', label: 'Zastena 10', type: 'ZASTENA', th: '10' }], {}, {}).error !== null,
+       'zastena cip bez formatu = klientska chyba');
+eq(M.mdBuildSheetVariants([{ key: 'z10', label: 'Zastena 10', type: 'ZASTENA', th: '10' }],
+                          { z10: { l: '4100', w: '640' } }, {}).error, null,
+   'zastena s formatom prejde');
+assert(M.mdParseExtraThs('10', '', 'ZASTENA').error !== null, 'extra hrubka zasteny bez formatu = chyba');
+eq(M.mdParseExtraThs('10/4100x640', 'RT', 'ZASTENA'),
+   { variants: [{ type: '', thickness: '10', structure: 'RT', sheet_size: [4100, 640] }], error: null },
+   'extra hrubka zasteny s formatom prejde');
+
+const zdl = M.sheetDimLabel({ type: 'ZASTENA', thickness: 10, sheet_size: [4100, 640],
+  back_decor: 'K552', back_structure: 'RT' });
+ok(zdl.sub.indexOf('rub K552 RT') >= 0, 'sub riadok nesie rub');
+const zdl2 = M.sheetDimLabel({ type: 'ZASTENA', thickness: 10, back_decor: 'K552' });
+ok(zdl2.sub === 'rub K552', 'rub bez formatu aj bez struktury');
+
+// --- GH #95 P2: rub je hladatelny (mdMatchGroup) -----------------------------
+const ZG = { decor: 'K551', decor_name: '', manufacturer: 'Kronospan',
+  sheets: [{ material_id: 'Z1', type: 'ZASTENA', thickness: 10, back_decor: 'K552', back_structure: 'RT' }],
+  edges: [] };
+ok(M.mdMatchGroup(ZG, 'k552'), 'hladanie podla rubu najde skupinu');
+ok(M.mdMatchGroup(ZG, 'rt') || M.mdMatchGroup(ZG, 'RT'.toLowerCase()), 'hladanie podla struktury rubu');
+ok(!M.mdMatchGroup(ZG, 'k999'), 'nezname cislo nematchne');
+
 console.log(JSON.stringify({ passed: n, failed: 0 }));

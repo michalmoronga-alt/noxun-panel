@@ -3,7 +3,7 @@
      (%APPDATA%). -->
 <!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.5.11">
+<link rel="stylesheet" href="css/panel.css?v=0.5.12">
 
 <h1>Materiály projektu</h1>
 <p class="sub" id="mdline">…</p>
@@ -146,7 +146,7 @@
   <div id="mdSheetForm" style="display:none">
     <div class="row"><label>Dekor</label><input id="ms_decor" type="text" placeholder="napr. Dub Halifax prírodný"><span class="unit"></span></div>
     <div class="hint" id="ms_decor_hint" style="display:none">Dekor je identita skupiny — premení sa tlačidlom Premenovať na karte dekoru.</div>
-    <div class="row"><label>Typ *</label><input id="ms_type" type="text" placeholder="DTDL / MDF / HDF / kompakt"><span class="unit"></span></div>
+    <div class="row"><label>Typ *</label><input id="ms_type" type="text" placeholder="DTDL / MDF / HDF / kompakt" oninput="mdSheetTypeChanged()"><span class="unit"></span></div>
     <div class="row"><label>Hrúbka *</label><input id="ms_thickness" type="text"><span class="unit">mm</span></div>
     <div class="hint" id="ms_thick_hint" style="display:none">Hrúbka definuje variant — pre inú hrúbku pridaj nový materiál.</div>
     <div class="row"><label>Smer dekoru</label>
@@ -167,6 +167,9 @@
     <div class="hint" id="ms_man_hint" style="display:none">Výrobca je vlastnosť dekoru — mení sa pre celú skupinu (tlačidlo Výrobca na karte).</div>
     <!-- D-19: format platne pre odhad poctu platni (okno Vyroba, tab Materialy) -->
     <div class="row"><label>Formát platne</label><input id="ms_sheet_l" type="text" placeholder="2800" class="sheetdim"><span class="sheetx">×</span><input id="ms_sheet_w" type="text" placeholder="2070" class="sheetdim"><span class="unit">mm</span></div>
+    <!-- 2B-2: rub zasteny (len typ Zastena; identita variantu — po vyplneni nemenny) -->
+    <div class="row" id="ms_back_row" style="display:none"><label>Rubový dekor</label><input id="ms_back_decor" type="text" placeholder="napr. K552" class="sheetdim"><input id="ms_back_structure" type="text" placeholder="štruktúra" class="sheetdim"><span class="unit"></span></div>
+    <div class="hint" id="ms_back_hint" style="display:none">Zástena máva každú stranu iný dekor (líce/rub). Rub je identita variantu — po vyplnení sa nemení.</div>
     <div class="btnrow">
       <button class="primary" onclick="mdSaveSheet()">Uložiť</button>
       <button class="ghostbtn" onclick="mdCloseForms()">Zrušiť</button>
@@ -219,6 +222,6 @@
 <div id="status">Pripravené.</div>
 
 <!-- icons.js prvy (sprite musi existovat pred prvym renderom mdRenderLists) -->
-<script src="js/errors.js?v=0.5.11"></script>
-<script src="js/icons.js?v=0.5.11"></script>
-<script src="js/proj_materials.js?v=0.5.11"></script>
+<script src="js/errors.js?v=0.5.12"></script>
+<script src="js/icons.js?v=0.5.12"></script>
+<script src="js/proj_materials.js?v=0.5.12"></script>

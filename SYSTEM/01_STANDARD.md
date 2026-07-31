@@ -438,6 +438,24 @@ nákupu nemá); kusovník a VEPO ostávajú bez zmeny (dielec 1× s hrúbkou 36)
 staršie verzie pluginu katalóg s marker 3 čítajú, ale mutácie odmietnu
 (write backstop + assess read-only), inak by väzby ticho zahodili.
 
+**Zástena — obojstranný dekor (dávka 2B-2 — SCHEMA 4):** variant kanonického
+typu `Zástena` nesie voliteľný **rub** (`back_decor` = číslo dekoru rubovej
+strany + voliteľná `back_structure`) — obojstranný dekor je štandard sortimentu
+(Demos „Zástena K551/K552"), výrobca rubu = výrobca skupiny. Rub je **súčasť
+identity variantu** (K551/K552 a K551/K553 sú dve položky) a po vyplnení je
+nemenný; ukladá sa ako normalizovaný text BEZ väzby na inú skupinu (rub sa
+výrobne nepoužíva — model, kusovník aj VEPO idú cez primárny variant; rub je
+objednávková informácia a ide do VEPO labelu). Štruktúra rubu bez čísla rubu
+sa odmieta; back polia na inom type než zástena tiež. **Formát platne je
+súčasťou identity aj pre zástenu** (4100×640 a 4200×640 koexistujú) — riadi to
+register flag `format_in_identity` (PD + Zástena, jeden helper na všetkých
+identity miestach; nové varianty týchto typov formát VYŽADUJÚ). **First-fill:**
+PRÁZDNE identity pole (formát/rub) na existujúcom zázname sa smie doplniť
+jednorazovo (s duplicitnou kontrolou novej identity) — legacy záznamy spred
+2B-2 sa inak nedajú skompletizovať; vyplnené hodnoty sú nemenné. **Marker
+SCHEMA 4 sa dvíha LAZY** prvým zápisom záznamu s rubom (centrálne v zápisovej
+ceste podľa OBSAHU — rovnako marker 3 pri duplák väzbe).
+
 **Dekorová skupina (D-41 → SCHEMA 2 v 2A):** dosky a ABS pásky viaže do skupiny
 **`group_id`** (stabilný interný identifikátor; obchodná identita skupiny = výrobca +
 číslo dekoru + názov). Pravidlá:

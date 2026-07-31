@@ -45,9 +45,13 @@ module Noxun
       # verzie odmietnu zapis (write_unlocked backstop + assess :read_only) —
       # inak by ich normalize whitelist source_* polia ticho zahodil (audit B1).
       SCHEMA_DUPLAK = 3
+      # 2B-2: zastena — obojstranny dekor (back_decor/back_structure vo variant
+      # identite; format v identite cez register flag). Marker 4 sa dviha LAZY
+      # prvym zapisom zaznamu s back_decor — rovnaka filozofia ako duplak 3.
+      SCHEMA_ZASTENA = 4
       # Najnovsia schema, ktorej tvar tato verzia pluginu POZNA (write guard +
       # assess). Bump VYHRADNE spolu s kodom, ktory nove polia nesie.
-      SCHEMA_CURRENT = SCHEMA_DUPLAK
+      SCHEMA_CURRENT = SCHEMA_ZASTENA
       # Povoleny nasobic duplaku (2 = bezny pripad "36 z 2x18"; 3 = rezerva).
       DUPLAK_MULTIPLIERS = [2, 3].freeze
       # Nemenna PREDMIGRACNA zaloha (standard 7.1) — mimo bezneho .bak, ktory sa
@@ -96,9 +100,11 @@ module Noxun
                    'thickness_suggestions' => [3.0].freeze, 'body_candidate' => false },
         'PD' => { 'label' => 'Pracovná doska', 'format_hint' => nil,
                   'thickness_suggestions' => [38.0, 20.0].freeze,
-                  'pd_edge_subtypes' => %w[postforming abs].freeze, 'body_candidate' => false },
+                  'pd_edge_subtypes' => %w[postforming abs].freeze, 'body_candidate' => false,
+                  'format_in_identity' => true },
         'ZASTENA' => { 'label' => 'Zástena', 'format_hint' => [4100.0, 640.0].freeze,
-                       'thickness_suggestions' => [9.2, 10.0].freeze, 'body_candidate' => false },
+                       'thickness_suggestions' => [9.2, 10.0].freeze, 'body_candidate' => false,
+                       'format_in_identity' => true, 'double_sided' => true },
         'KOMPAKT' => { 'label' => 'Kompaktná doska', 'format_hint' => nil,
                        'thickness_suggestions' => [12.0].freeze, 'body_candidate' => false }
       }.freeze
@@ -244,7 +250,12 @@ module Noxun
           Engine.log("materialy: zapis odmietnuty — #{catalog_read_only_message}") if defined?(Engine)
           return false
         end
-        target = target_schema_fresh(data['schema'])
+        # 2B-1/2B-2: LAZY schema bump podla OBSAHU — zaznam s duplak vazbou
+        # vyzaduje marker 3, s rubom zasteny marker 4. Centralne TU (jedina
+        # zapisova cesta), aby ziaden mutator nemohol nove pole zapisat pod
+        # starym markerom (starsi plugin by ho pri dalsom zapise zahodil).
+        wanted = [data['schema'].to_i, required_schema_for(data['sheets'])].max
+        target = target_schema_fresh(wanted)
         # GH #92 P1 (2. kolo): marker NOVSI nez tato verzia pozna sa NIKDY
         # neprepisuje — payload nesie len nam zname polia a zapis by novsie
         # metadata ticho zahodil (proces bez behu assess ma stav :ok, tento
@@ -271,6 +282,19 @@ module Noxun
         payload = { 'std' => STD, 'schema' => target,
                     'sheets' => data['sheets'], 'edges' => data['edges'] }
         JsonFileStore.write(path, payload)
+      end
+
+      # 2B-2: minimalna schema, ktoru OBSAH payloadu vyzaduje (duplak vazba = 3,
+      # rub zasteny = 4). Bez novych poli 0 = marker drzi subor.
+      def required_schema_for(sheets_raw)
+        return 0 unless sheets_raw.is_a?(Array)
+        need = 0
+        sheets_raw.each do |s|
+          next unless s.is_a?(Hash)
+          need = SCHEMA_DUPLAK if need < SCHEMA_DUPLAK && !s['source_material_id'].to_s.empty?
+          need = SCHEMA_ZASTENA if need < SCHEMA_ZASTENA && !s['back_decor'].to_s.empty?
+        end
+        need
       end
 
       # Schema pre zapis podla CERSTVEHO markera z disku (downgrade zakazany —
@@ -488,6 +512,17 @@ module Noxun
         put_opt(out, 'supplier', a['supplier'] || a[:supplier])
         put_schema2_fields(out, a)
         put_duplak_fields(out, a)
+        put_zastena_fields(out, a)
+        out
+      end
+
+      # 2B-2: rub zasteny sa NESIE pri kazdej normalizacii (merge-safe ako
+      # duplak vazba). Struktura rubu bez cisla rubu je nezmysel — zahodi sa
+      # (F12); typovu platnost (len ZASTENA) strazi validate_sheet_attrs.
+      def put_zastena_fields(out, a)
+        put_opt(out, 'back_decor', a['back_decor'] || a[:back_decor])
+        put_opt(out, 'back_structure', a['back_structure'] || a[:back_structure])
+        out.delete('back_structure') unless out.key?('back_decor')
         out
       end
 
@@ -704,6 +739,39 @@ module Noxun
         identity_norm(type) == 'PD'
       end
 
+      # 2B-2 (F10): format platne je sucastou variant identity — riadi VYHRADNE
+      # register (PD aj ZASTENA), ziadne dalsie hardcoded pd_type? vetvy na
+      # identity-citlivych miestach (identity kluc, edit guard, batch parse/
+      # dedup, ID generator, migracna kontrola, disambiguacia labelov).
+      def format_in_identity?(type)
+        entry = type_registry_entry(type)
+        entry ? entry['format_in_identity'] == true : false
+      end
+
+      # 2B-2: typ s obojstrannym dekorom (rub) — len kanonicka ZASTENA.
+      def double_sided_type?(type)
+        entry = type_registry_entry(type)
+        entry ? entry['double_sided'] == true : false
+      end
+
+      # 2B-2 (GH #95 P1): pripona labelu variantu pre selecty — format pre typy
+      # s formatom v identite + rub zasteny. Varianty lisiace sa LEN formatom
+      # alebo rubom by inak boli v selecte nerozlisitelne a dal by sa vybrat
+      # nespravny vyrobny material. Core helper (headless testovatelny) —
+      # Panel.sheet_label ho appenduje k zakladu s koliznym aparatom.
+      def sheet_label_suffix(s)
+        out = +''
+        if format_in_identity?(s['type']) && (fmt = size_key(s['sheet_size']))
+          out << " #{fmt.map { |x| x == x.round ? x.round.to_s : x.to_s }.join('×')}"
+        end
+        back = s['back_decor'].to_s.strip
+        unless back.empty?
+          bs = s['back_structure'].to_s.strip
+          out << " /#{back}#{bs.empty? ? '' : " #{bs}"}"
+        end
+        out
+      end
+
       # GH P2: kluc kvantizuje mm na 0,01 — HRANICNA dvojica (18.004 vs 18.006)
       # by sa v kluci rozisla, hoci legacy tolerancia (abs < 0.01) ju drzala ako
       # jeden variant. Duplicitne guardy preto porovnavaju kluce s toleranciou
@@ -725,7 +793,13 @@ module Noxun
         key = [record_group_key(rec, schema), identity_norm(rec['type']), thickness_key(rec['thickness'])]
         return key if schema < SCHEMA_GROUPS
         key << identity_norm(rec['structure'])
-        key << size_key(rec['sheet_size']) if pd_type?(rec['type'])
+        # 2B-2 (F10): format v identite riadi register flag (PD + ZASTENA —
+        # 4100x640 a 4200x640 toho isteho dekoru su dva varianty).
+        key << size_key(rec['sheet_size']) if format_in_identity?(rec['type'])
+        # 2B-2: rub zasteny je identita (K551/K552 vs K551/K553 = dve polozky).
+        if double_sided_type?(rec['type'])
+          key << [identity_norm(rec['back_decor']), identity_norm(rec['back_structure'])]
+        end
         key
       end
 
@@ -797,14 +871,19 @@ module Noxun
       # `taken` = vlastny zoznam obsadenych ID (batch ich zbiera kumulativne,
       # aby si polozky jednej davky ID neprepisali); nil = zoznam z katalogu.
       def generate_sheet_id(decor, type, thickness, structure: nil, sheet_size: nil,
-                            taken: nil, schema: catalog_schema)
+                            back_decor: nil, taken: nil, schema: catalog_schema)
         parts = [slug(decor)]
         st = slug(structure)
         parts << st unless st.empty?
         parts << slug(type)
         parts << thickness_token(thickness)
-        fmt = schema >= SCHEMA_GROUPS && pd_type?(type) ? size_key(sheet_size) : nil
+        # 2B-2 (F10): format token cez register flag (PD + ZASTENA).
+        fmt = schema >= SCHEMA_GROUPS && format_in_identity?(type) ? size_key(sheet_size) : nil
         parts << "#{thickness_token(fmt[0])}X#{thickness_token(fmt[1])}" if fmt
+        # 2B-2: rub zasteny do ID pre citatelnost (identita ho ma tiez; bez
+        # neho by kolizie riesil len -2 sufix). ID ostavaju opaque.
+        bd = slug(back_decor)
+        parts << "R#{bd}" unless bd.empty?
         unique_id(parts.join('_'), taken || sheets.map { |s| s['material_id'].to_s.upcase })
       end
 

@@ -332,10 +332,12 @@ NxTest.test('2A-1: identita pri edite — schema 1 mlci, schema 2 strazi PD form
     NxTest.assert_equal(nil, A1MAT.identity_edit_error({ 'code' => 'X' }, pd), 'payload bez identitnych poli')
     NxTest.assert_equal(nil, A1MAT.identity_edit_error(pd.merge('sheet_size' => [600.0, 4100.0]), pd),
                         'otocena dvojica je ten isty format')
+    # 2B-2: hlaska je typovo neutralna (flag format_in_identity kryje PD aj
+    # zastenu) — kontrakt "zmena/clear formatu = zmena identity" trva.
     err = A1MAT.identity_edit_error(pd.merge('sheet_size' => [4100.0, 920.0]), pd)
-    NxTest.assert(err.to_s.include?('Formát PD'), err.to_s)
+    NxTest.assert(err.to_s.include?('Formát'), err.to_s)
     clr = A1MAT.identity_edit_error(pd.merge('clear_sheet_size' => true), pd)
-    NxTest.assert(clr.to_s.include?('Formát PD'), 'vymazanie formatu PD je tiez zmena identity')
+    NxTest.assert(clr.to_s.include?('Formát'), 'vymazanie formatu PD je tiez zmena identity')
     st = A1MAT.identity_edit_error(pd.merge('structure' => 'ST9'), pd)
     NxTest.assert(st.to_s.include?('Štruktúra'), st.to_s)
     NxTest.assert_equal(nil, A1MAT.identity_edit_error(pd.merge('structure' => ' mat '), pd),

@@ -537,6 +537,9 @@ module Noxun
       # Krok 8: identity variantov EXPLICITNE v SCHEMA 2 (schema parameter
       # NAPEVNO — dup_variant_in cita schemu SUBORU, ktora je este 1, preto sa
       # tu NESMIE pouzit). PD bez formatu je nerozhodnutelny variant (O8).
+      # 2B-2 (F10 vedoma vynimka): ZASTENA bez formatu migraciu NEblokuje —
+      # legacy zastena sa doplni first-fillom v katalogu (F11); pripadnu koliziu
+      # dvoch bezformatovych zasten chyti dup check identit nizsie.
       def check_variant_identities(out_sheets, out_edges, reasons)
         out_sheets.each do |r|
           next unless r.is_a?(Hash) && pd_type?(r['type'])

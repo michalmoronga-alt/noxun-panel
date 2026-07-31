@@ -551,6 +551,13 @@ module Noxun
           data.delete('source_multiplier')
           ok, err = Materials.validate_sheet_attrs(data)
           return set_status(err, true) unless ok
+          # 2B-2 (GH #95 P2): rub vyzaduje skupinovu schemu — v legacy katalogu
+          # (hold/nerozhodnutelna migracia) by zapis so SCHEMA 4 targetom padol
+          # na group_id kontrole s generickou hlaskou. Jasne NIE s navodom.
+          if !data['back_decor'].to_s.strip.empty? &&
+             Materials.catalog_schema < Materials::SCHEMA_GROUPS
+            return set_status('Rub zásteny vyžaduje katalóg po migrácii na skupiny (2A) — dokonči migráciu, potom rub doplň.', true)
+          end
           th = data['thickness'].to_s.tr(',', '.').to_f
 
           if create
@@ -559,15 +566,25 @@ module Noxun
             if (near = Materials.decor_conflict(data['decor']))
               return set_status("Dekor sa líši od existujúceho „#{near}“ len zápisom — použi presný tvar.", true)
             end
-            # 2A-1: struktura (a pri PD format) su v SCHEMA 2 sucastou identity
-            # variantu — v SCHEMA 1 ich kluc ignoruje, takze ich posielame vzdy.
+            # 2B-2: novy variant typu s formatom v identite (PD + ZASTENA)
+            # format VYZADUJE — bez neho by identita bola trvalo neuplna
+            # (first-fill je vynimka pre LEGACY zaznamy, nie novy zapis).
+            if Materials.format_in_identity?(data['type']) && Materials.size_key(data['sheet_size']).nil? &&
+               Materials.catalog_schema >= Materials::SCHEMA_GROUPS
+              return set_status('Tento typ potrebuje formát platne (je súčasťou identity variantu).', true)
+            end
+            # 2A-1: struktura (a pri PD/zastene format + rub) su v SCHEMA 2
+            # sucastou identity variantu — v SCHEMA 1 ich kluc ignoruje.
             if (dup = Materials.find_sheet_variant(data['decor'], data['type'], th, data['structure'],
                                                    data['sheet_size'], group_id: data['group_id'],
-                                                   manufacturer: data['manufacturer']))
+                                                   manufacturer: data['manufacturer'],
+                                                   back_decor: data['back_decor'],
+                                                   back_structure: data['back_structure']))
               return set_status("Variant už v katalógu je (#{dup['material_id']}).", true)
             end
             id = Materials.generate_sheet_id(data['decor'], data['type'], th,
-                                             structure: data['structure'], sheet_size: data['sheet_size'])
+                                             structure: data['structure'], sheet_size: data['sheet_size'],
+                                             back_decor: data['back_decor'])
           else
             id = data['material_id'].to_s
             existing = Materials.sheet(id)
@@ -603,6 +620,20 @@ module Noxun
             # a 4100x920 su dve rozne dosky), nie prepis existujuceho.
             if (err = Materials.identity_edit_error(data, existing))
               return set_status(err, true)
+            end
+            # 2B-2 (F11): first-fill MENI identitu (prazdne -> hodnota) — nova
+            # identita nesmie narazit na existujuci variant (dup check, ktory
+            # pri bezych editoch nebezi, lebo identita je nemenna).
+            candidate = existing.merge(data)
+            if Materials.catalog_schema >= Materials::SCHEMA_GROUPS &&
+               (dup = Materials.find_sheet_variant(candidate['decor'], candidate['type'], th,
+                                                   candidate['structure'], candidate['sheet_size'],
+                                                   group_id: candidate['group_id'],
+                                                   manufacturer: candidate['manufacturer'],
+                                                   back_decor: candidate['back_decor'],
+                                                   back_structure: candidate['back_structure'])) &&
+               dup['material_id'] != id
+              return set_status("Doplnená identita koliduje s existujúcim variantom (#{dup['material_id']}).", true)
             end
           end
 
