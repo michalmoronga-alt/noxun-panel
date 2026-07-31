@@ -279,20 +279,23 @@ module Noxun
           unless write_migration_hold!
             return [false, 'Zápis poistky migration_hold.json zlyhal — obnova sa nespustila (katalóg nezmenený).']
           end
+          # GH #92 P1 (2. kolo): PORADIE = najprv VSETKY pripravne kroky (kopia
+          # aktualneho primaru, karantena starej .bak, legacy .bak), primar sa
+          # vymiena AZ POSLEDNY. Pad kdekolvek pred tym necha migrovany stav
+          # neporuseny (hold flag bez rollbacku = 1 preskocena migracia — bezpecne);
+          # pad PO vymene primaru uz nema stale SCHEMA 2 .bak, ktora by rollback
+          # neskor potichu zvratila.
           rolled = nil
           if File.exist?(path)
             rolled = timestamped_free_path('materials.rolledback')
             deploy_bytes(rolled, File.binread(path))
           end
-          deploy_bytes(path, bytes)
-          # GH #92 P1: aj .bak je sucastou rollback transakcie — stale SCHEMA 2
-          # zaloha by pri najblizsom probleme primaru "obnovila" migrovany stav
-          # a potichu zvratila rollback napriek hold flagu.
           bak = "#{path}.bak"
           if File.exist?(bak)
             deploy_bytes(timestamped_free_path('materials.json.bak.pre-rollback'), File.binread(bak))
           end
           deploy_bytes(bak, bytes)
+          deploy_bytes(path, bytes)
           JsonFileStore.invalidate(path)
           assess_catalog! # reentrantny zamok; obnoveny legacy katalog = :ok
           if defined?(Engine)

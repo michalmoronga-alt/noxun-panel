@@ -599,3 +599,43 @@ NxTest.test('2a4a: GH P1 — rollback obnovi aj .bak (stale SCHEMA 2 zaloha nemo
     quarantined.each { |f| FileUtils.rm_f(f) }
   end
 end
+
+NxTest.test('2a4a: GH P1 kolo 2 — zapis do novsej schemy sa odmieta aj BEZ behu assess (backstop v write)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  s3 = JSON.pretty_generate(a4_schema2_data.merge('schema' => 3)).b
+  a4_with_catalog(s3) do
+    # ZIADNY assess — stav je :ok default (proces, ktory o novsej scheme nevie)
+    NxTest.refute(A4MAT.upsert_sheet('material_id' => 'X18', 'decor' => 'X', 'type' => 'DTDL',
+                                     'thickness' => 18.0, 'grain' => 'length', 'group_id' => 'GX'),
+                  'mutacia do schema 3 katalogu sa odmietne backstopom v zapise')
+    NxTest.assert_equal(s3, File.binread(A4MAT.path), 'subor bajtovo nedotknuty')
+  end
+end
+
+NxTest.test('2a4a: GH P1 kolo 2 — pad PRED vymenou primaru necha migrovany stav neporuseny (staging poradie)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  s2 = JSON.pretty_generate(a4_schema2_data).b
+  a4_with_catalog(s2) do
+    File.binwrite(A4MAT.pre_schema2_backup_path, a4_legacy_bytes)
+    File.binwrite("#{A4MAT.path}.bak", s2)
+    orig = A4MAT.method(:deploy_bytes)
+    begin
+      # pad presne pri nasadzovani PRIMARU (posledny krok)
+      A4MAT.define_singleton_method(:deploy_bytes) do |target, bytes|
+        raise IOError, 'disk full (test)' if target == A4MAT.path
+        orig.call(target, bytes)
+      end
+      ok, msg = A4MAT.restore_pre_schema2!
+      NxTest.refute(ok, "rollback musi ohlasit neuspech: #{msg.inspect}")
+    ensure
+      A4MAT.define_singleton_method(:deploy_bytes, orig)
+    end
+    NxTest.assert_equal(s2, File.binread(A4MAT.path), 'primar OSTAL migrovany (pad pred vymenou)')
+    NxTest.assert_equal(a4_legacy_bytes, File.binread("#{A4MAT.path}.bak"),
+                        '.bak uz je legacy — smer rollbacku, nie zvrat')
+    state, = A4MAT.assess_catalog!
+    NxTest.assert_equal(:ok, state, 'migrovany katalog bezi dalej')
+    Dir[File.join(A4MAT.dir, 'materials.json.bak.pre-rollback-*.json')].each { |f| FileUtils.rm_f(f) }
+    Dir[File.join(A4MAT.dir, 'materials.rolledback-*.json')].each { |f| FileUtils.rm_f(f) }
+  end
+end

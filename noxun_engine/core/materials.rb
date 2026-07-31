@@ -233,6 +233,16 @@ module Noxun
           return false
         end
         target = target_schema_fresh(data['schema'])
+        # GH #92 P1 (2. kolo): marker NOVSI nez tato verzia pozna sa NIKDY
+        # neprepisuje — payload nesie len nam zname polia a zapis by schema-3
+        # metadata ticho zahodil (proces bez behu assess ma stav :ok, tento
+        # backstop preto NESMIE chybat).
+        if target > SCHEMA_GROUPS
+          if defined?(Engine)
+            Engine.log("materialy: zapis odmietnuty — katalog je v novsej scheme (#{target})")
+          end
+          return false
+        end
         if target >= SCHEMA_GROUPS && !schema2_complete?(data['sheets'], data['edges'])
           if defined?(Engine)
             Engine.log_error(StandardError.new('payload bez group_id do katalogu SCHEMA 2'),
