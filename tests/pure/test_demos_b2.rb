@@ -501,6 +501,15 @@ NxTest.test('demos b2b: demos_items_from_accepts — hodnoty VYHRADNE zo server 
     [{ 'kind' => 'edge', 'id' => 'E1', 'code' => true, 'row_rev' => 'r2' }], store
   )
   NxTest.assert_equal(0, items2.length, 'zhodny kod bez dalsieho pola = polozka vypadne')
+  # GH #98 P2: base_revs (baseline z casu lookupu) ma prednost pred klientskym
+  # row_rev; zaznam bez baseline sa vynecha (navrh nema dokazany povod).
+  items3 = MAT2.demos_items_from_accepts(
+    [{ 'kind' => 'sheet', 'id' => 'M1', 'code' => true, 'row_rev' => 'KLIENTSKE' },
+     { 'kind' => 'edge', 'id' => 'E1', 'price' => true, 'row_rev' => 'KLIENTSKE' }],
+    store, { %w[sheet M1] => 'BASE-LOOKUP' }
+  )
+  NxTest.assert_equal(1, items3.length, 'polozka bez server baseline vypadla')
+  NxTest.assert_equal('BASE-LOOKUP', items3[0]['row_rev'], 'row_rev zo SERVER baseline, nie z klienta')
 end
 
 NxTest.test('demos b2: demos polia preziju cudzi patch (merge-safe normalize) a nesu SCHEMA 5') do

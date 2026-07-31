@@ -34,6 +34,10 @@
       var key = p.kind + '|' + p.record_id;
       if (!model.byKey[key]) model.order.push(key);
       model.byKey[key] = p;
+    } else if (e.type === 'manual_done'){
+      // GH #98 P2: koniec MANUALNEHO fetchu NIE JE koniec skupinoveho lookupu
+      // — terminalny stav (complete/Apply) patri vyhradne behu skupiny; navrh
+      // manualu uz prisiel proposal eventom, netreba nic menit.
     } else if (e.type === 'complete'){
       model.complete = { ok: e.ok === true, error: e.error || null };
       model.warnings = (model.warnings || []).concat(e.warnings || []);
@@ -322,11 +326,15 @@
                                                  url: url, catalog_schema: MD_CLIENT_SCHEMA }));
   }
 
-  // FIX 14: konflikt NEZATVARA modal — vinny riadok sa oznaci, hodnoty pridu
-  // cerstve cez push_catalog (row_rev v dalsom pokuse uz nove z MD_CATALOG).
+  // FIX 14: konflikt NEZATVARA modal — vinny riadok sa oznaci a dovod sa
+  // ukaze V modale (GH #98 P2: #status stranky je pod scrimom). Server pri
+  // konflikte zneplatnil navrhy (baseline z casu lookupu) — dalsi zapis
+  // vyzaduje novy lookup, hlaska to hovori.
   function mddFail(r){
     var apply = el('mddApplyBtn');
     if (apply) apply.disabled = false;
+    var status = el('mddStatus');
+    if (status && r && r.msg) status.textContent = r.msg;
     if (r && r.id){
       document.querySelectorAll('#mddBody .mddrow').forEach(function(row){
         var key = row.getAttribute('data-mdd-key') || '';

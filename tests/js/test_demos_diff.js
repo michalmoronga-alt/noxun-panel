@@ -49,6 +49,12 @@ eq(m.complete, null, 'complete sa resetol');
 // sitemap refreshing flag
 m = mddApplyEvent(m, { type: 'sitemap', session: 4, state: 'refreshing' });
 eq(m.refreshing, true, 'refreshing flag');
+// GH #98 P2: manual_done NEkompletuje model — terminalny stav patri skupine
+m = mddApplyEvent(m, { type: 'manual_done', session: 4, ok: true });
+eq(m.complete, null, 'manual complete neoznaci skupinovy beh za hotovy');
+m = mddApplyEvent(m, { type: 'proposal', session: 4,
+                       proposal: prop({ record_id: 'MANUAL', status: 'match' }) });
+ok(m.byKey['sheet|MANUAL'], 'manual proposal sa ale doplni normalne');
 
 // --- mddOffers: checkbox defaulty (F16) --------------------------------------
 let o = mddOffers(prop());

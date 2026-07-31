@@ -364,6 +364,16 @@ module Noxun
           return set_status('Skupina sa nenašla — katalóg sa obnovil.', true) if recs.empty?
           demos_bump_session
           @demos_proposals = {}
+          # GH #98 P2: baseline riadkov z CASU LOOKUPU — apply pouzije TIETO
+          # row_rev (nie cerstve z klienta): proposal overeny proti staremu
+          # zaznamu nesmie po push_catalog refreshi potichu prepisat cudziu
+          # zmenu; kolizia skonci :conflict a treba novy lookup.
+          @demos_base_revs = {}
+          recs.each do |r|
+            kind = r['abs_id'].to_s.empty? ? 'sheet' : 'edge'
+            id = kind == 'edge' ? r['abs_id'].to_s : r['material_id'].to_s
+            @demos_base_revs[[kind, id]] = Materials.record_rev(r)
+          end
           session = @demos_session
           DemosLookup.run(recs, alive: demos_alive_proc(session, @dialog),
                                 emit: demos_emit_proc(session))
@@ -371,6 +381,9 @@ module Noxun
 
         # FIX 13: manualna URL je priama cesta (bez sitemap). NEbumpuje session
         # — doplna proposal do BEZIACEHO kontextu modalu (miss/ambiguous riadok).
+        # GH #98 P2: complete MANUALU sa preklada na 'manual_done' — terminalny
+        # stav modalu patri VYHRADNE skupinovemu behu (manual popri bezacej
+        # retazi nesmie zapnut Apply a tvarit sa, ze skupina je hotova).
         def handle_demos_manual(payload)
           data = JSON.parse(payload.to_s)
           return unless schema_ok?(data)
@@ -378,10 +391,17 @@ module Noxun
           rec = demos_find_record(kind, data['record_id'].to_s)
           return set_status('Záznam sa nenašiel — katalóg sa obnovil.', true) unless rec
           session = @demos_session.to_i
+          id = kind == 'edge' ? rec['abs_id'].to_s : rec['material_id'].to_s
+          (@demos_base_revs ||= {})[[kind, id]] = Materials.record_rev(rec)
           manufacturer = demos_group_manufacturer(rec)
+          group_emit = demos_emit_proc(session)
+          manual_emit = lambda do |event|
+            event = event.merge('type' => 'manual_done') if event['type'] == 'complete'
+            group_emit.call(event)
+          end
           DemosLookup.manual(rec, data['url'].to_s,
                              alive: demos_alive_proc(session, @dialog),
-                             emit: demos_emit_proc(session),
+                             emit: manual_emit,
                              manufacturer: manufacturer)
         end
 
@@ -412,37 +432,51 @@ module Noxun
           member ? member['manufacturer'].to_s.strip : nil
         end
 
+        # GH #98 P2: chybova hlaska ide AJ do modalu ('msg' -> #mddStatus) —
+        # #status stranky je pod fixed scrimom modalu a pouzivatel by dovod
+        # neuspesneho zapisu nevidel; set_status ostava pre stav po zavreti.
+        def demos_fail(payload_hash, msg)
+          js("MDD.fail(#{payload_hash.merge('msg' => msg).to_json})")
+          set_status(msg, true)
+        end
+
         def handle_demos_apply(payload)
           data = JSON.parse(payload.to_s)
-          return js('MDD.fail({})') unless catalog_write_ok?(data)
-          items = Materials.demos_items_from_accepts(data['accepts'], @demos_proposals || {})
+          unless catalog_write_ok?(data)
+            return js("MDD.fail(#{{ 'msg' => 'Katalóg sa zmenil — zavri okno a skús znova.' }.to_json})")
+          end
+          # GH #98 P2: row_rev VYHRADNE zo serveroveho baseline z casu lookupu
+          # (@demos_base_revs) — klientske row_rev sa ignoruju. Zaznam zmeneny
+          # od lookupu = :conflict a treba NOVY lookup (proposal bol overeny
+          # proti staremu stavu; cerstvy rev z push_catalog ho nesmie ozivit).
+          items = Materials.demos_items_from_accepts(data['accepts'], @demos_proposals || {},
+                                                     @demos_base_revs || {})
           if items.empty?
-            set_status('Nie je čo zapísať — nič nie je zaškrtnuté.', true)
-            return js('MDD.fail({})')
+            return demos_fail({}, 'Nie je čo zapísať — nič nie je zaškrtnuté.')
           end
           status, report = Materials.apply_demos_batch(items, catalog_rev: data['catalog_rev'].to_s)
           case status
           when :ok
             demos_bump_session
             @demos_proposals = {}
+            @demos_base_revs = {}
             after_catalog_change
             js("MDD.done(#{report.to_json})")
             set_status("Aktualizované z Demosu: #{report['applied'].length} záznamov.")
           when :stale_catalog, :conflict, :not_found
-            # FIX 14: atomicky rezim — modal OSTAVA, vinnik sa oznaci, cerstve
-            # hodnoty pridu cez push_catalog (dalsi pokus ma nove row_rev).
-            js("MDD.fail(#{{ 'status' => status.to_s, 'id' => report['id'] }.to_json})")
-            set_status('Neaktualizované nič — katalóg sa medzitým zmenil, skontroluj riadky a skús znova.', true)
+            # FIX 14: atomicky rezim — modal OSTAVA, vinnik sa oznaci; zaznamy
+            # sa medzitym zmenili => navrhy su neplatne, treba NOVY lookup.
+            demos_fail({ 'status' => status.to_s, 'id' => report['id'] },
+                       'Neaktualizované nič — záznamy sa medzitým zmenili. Spusti Aktualizovať z Demosu znova.')
             push_catalog
           when :code_conflict
-            js("MDD.fail(#{{ 'status' => 'code_conflict', 'id' => report['id'] }.to_json})")
-            set_status("Neaktualizované nič — kód by sa zdvojil (#{Array(report['detail']).first(3).join(', ')}).", true)
+            demos_fail({ 'status' => 'code_conflict', 'id' => report['id'] },
+                       "Neaktualizované nič — kód by sa zdvojil (#{Array(report['detail']).first(3).join(', ')}).")
           when :catalog_read_only
-            js('MDD.fail({})')
-            set_status(Materials.catalog_read_only_message, true)
+            demos_fail({}, Materials.catalog_read_only_message)
           else # :invalid, :duplak, :write_failed
-            js("MDD.fail(#{{ 'status' => status.to_s, 'id' => report['id'] }.to_json})")
-            set_status("Neaktualizované nič — #{report['detail'] || 'položka sa nedá zapísať'}.", true)
+            demos_fail({ 'status' => status.to_s, 'id' => report['id'] },
+                       "Neaktualizované nič — #{report['detail'] || 'položka sa nedá zapísať'}.")
             push_catalog
           end
         end

@@ -633,7 +633,11 @@ module Noxun
       # kod, ani cena, ani URL (audit BLOCKER 6 / server autorita). Polozka bez
       # proposalu alebo bez realneho pola sa VYNECHA (nie je chyba — UI mohlo
       # ukazat checkbox, ktory server medzicasom nevie podlozit).
-      def demos_items_from_accepts(accepts, store)
+      # GH #98 P2: row_rev VYHRADNE z base_revs (baseline z CASU LOOKUPU, drzi
+      # ho dialog) — klientske row_rev sa nepouziva: proposal overeny proti
+      # staremu zaznamu by s cerstvym rev po refreshi potichu prepisal cudziu
+      # zmenu. Polozka bez baseline sa vynecha.
+      def demos_items_from_accepts(accepts, store, base_revs = nil)
         items = []
         Array(accepts).each do |a|
           next unless a.is_a?(Hash)
@@ -641,6 +645,8 @@ module Noxun
           id = a['id'].to_s
           p = store.is_a?(Hash) ? store[[kind, id]] : nil
           next unless p.is_a?(Hash)
+          base_rev = base_revs.is_a?(Hash) ? base_revs[[kind, id]].to_s : a['row_rev'].to_s
+          next if base_rev.empty?
           fields = {}
           if a['code'] == true
             code_new = p.dig('code', 'new').to_s
@@ -657,7 +663,7 @@ module Noxun
           end
           next if fields.empty?
           fields['demos_url'] = p['url'] unless p['url'].to_s.empty?
-          items << { 'kind' => kind, 'id' => id, 'row_rev' => a['row_rev'].to_s,
+          items << { 'kind' => kind, 'id' => id, 'row_rev' => base_rev,
                      'fields' => fields }
         end
         items
