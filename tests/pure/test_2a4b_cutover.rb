@@ -515,3 +515,22 @@ NxTest.test('2a4b: GH kolo 5 — PD sufix drzi desatiny (%g) a empty promote je 
     NxTest.refute(B4MAT.sheet('C1').nil?, 'cudzi zaznam PREZIL (zmigrovany, nie zahodeny)')
   end
 end
+
+NxTest.test('2a4b: GH P2 kolo 6 — necakany pad cutoveru = viditelny issue + reassess (:error, nie len log)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  b4_with_catalog(b4_legacy_seed_bytes) do
+    orig = B4MAT.method(:migrate_to_schema2!)
+    begin
+      B4MAT.define_singleton_method(:migrate_to_schema2!) { |**_k| raise IOError, 'subor zmizol (test)' }
+      NxTest.assert_equal(:error, B4MAT.boot_cutover!)
+    ensure
+      B4MAT.define_singleton_method(:migrate_to_schema2!, orig)
+    end
+    NxTest.assert(B4MAT.cutover_issue.to_s.include?('neočakávane'),
+                  "issue nesie dovod: #{B4MAT.cutover_issue.inspect}")
+    NxTest.assert_equal(:ok, B4MAT.catalog_state, 'katalog (nedotknuty legacy) bezi dalej')
+    # dalsi boot bez stubu funguje normalne a issue vycisti
+    NxTest.assert_equal(:migrated, B4MAT.boot_cutover!)
+    NxTest.assert(B4MAT.cutover_issue.nil?)
+  end
+end

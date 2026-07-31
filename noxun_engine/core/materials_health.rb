@@ -137,6 +137,18 @@ module Noxun
           assess_catalog!
           report[:status]
         end
+      rescue StandardError => e
+        # GH #93 P2 (6. kolo): necakany pad POCAS cutoveru (subor zmizol/
+        # nahradeny inym procesom medzi assess a migraciou) — dovod MUSI byt
+        # viditelny (banner) a stav katalogu sa znovu posudi; nie len log.
+        Engine.log_error(e, 'Materials.boot_cutover!') if defined?(Engine)
+        self.cutover_issue = "Prepnutie katalógu zlyhalo neočakávane (#{e.class}: #{e.message}) — pozri log a reštartuj SketchUp."
+        begin
+          assess_catalog!
+        rescue StandardError
+          nil
+        end
+        :error
       end
 
       # Suhrn uspesnej migracie do logu (O1: ziadny modal pri boote).
