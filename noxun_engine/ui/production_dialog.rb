@@ -291,6 +291,9 @@ module Noxun
           # formatom (4100×600 vs 4100×920) maju rovnaky label aj group_key;
           # format je sucast identity PD variantu, do labelu ide pri kolizii.
           labeled = vepo_disambiguate_variants(labeled)
+          # Finalna poistka (GH #93 5. kolo): ak by po vsetkych kolach ostala
+          # kolizia, rozhodne material_id — bucket sa NIKDY nesmie zliat.
+          labeled = vepo_disambiguate(labeled) { |s, l| "#{l} [#{s['material_id']}]" }
           labeled.each_with_object({}) { |(s, l), out| out[s['material_id']] = { 'label' => l } }
         end
 
@@ -302,7 +305,10 @@ module Noxun
           labeled.map do |(s, l)|
             next [s, l] unless by_label[l].length > 1 && Materials.pd_type?(s['type'])
             fmt = Materials.size_key(s['sheet_size'])
-            fmt ? [s, "#{l} #{fmt.map { |x| x.round }.join('×')}"] : [s, l]
+            # GH #93 P1 (5. kolo): format su mm Floaty — .round by zlial 4100.1
+            # a 4100.2; %g drzi normalizovanu presnost size_key (round(2)) a
+            # rozne kluce daju VZDY rozny text.
+            fmt ? [s, "#{l} #{fmt.map { |x| format('%g', x) }.join('×')}"] : [s, l]
           end
         end
 

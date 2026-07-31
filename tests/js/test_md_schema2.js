@@ -133,3 +133,17 @@ eq(M.mdGroupCommonStructure({ sheets: [{ structure: 'PW' }], edges: [{ structure
 eq(M.mdGroupCommonStructure({ sheets: [{}], edges: [] }), '', 'bez struktur = prazdne');
 
 console.log(JSON.stringify({ passed: n, failed: 0 }));
+
+// --- GH #93 kolo 5: PD vlastna hrubka s inline formatom ---------------------
+eq(M.mdParseExtraThs('20/4100x600', 'PW', 'PD'),
+   { variants: [{ type: '', thickness: '20', structure: 'PW', sheet_size: [4100, 600] }], error: null },
+   'PD extra hrubka s formatom prejde');
+assert(M.mdParseExtraThs('20', '', 'PD').error !== null, 'PD extra hrubka BEZ formatu = chyba s navodom');
+assert(M.mdParseExtraThs('20', '', 'PD').error.indexOf('4100x600') !== -1, 'chyba obsahuje priklad');
+eq(M.mdParseExtraThs('19', 'ST9', 'DTDL'),
+   { variants: [{ type: '', thickness: '19', structure: 'ST9' }], error: null },
+   'ne-PD typ format nepotrebuje');
+eq(M.mdParseExtraThs('19/2800x2070', '', 'DTDL'),
+   { variants: [{ type: '', thickness: '19', structure: '', sheet_size: [2800, 2070] }], error: null },
+   'volitelny format aj pri inych typoch');
+assert(M.mdParseExtraThs('20/zle', '', 'PD').error !== null, 'pokazeny format = chyba');

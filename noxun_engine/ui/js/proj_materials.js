@@ -795,19 +795,36 @@
   // hrubky/ABS" parsuje KLIENT do strukturovanych variantov so SPOLOCNOU
   // strukturou. Zrkadli serverove pravidla (desatinna ciarka, sirka/hrubka
   // tvar) v miere potrebnej na prevod — server vsetko validuje znova.
-  function mdParseExtraThs(text, commonSt){
+  // GH #93 P2 (5. kolo): PD typ vyzaduje format v identite — vlastna hrubka
+  // (mimo preset cipov) ho zapise INLINE: "20/4100x600". Pri zdielanom type PD
+  // je format povinny (server by variant bez formatu odmietol a dialog nema
+  // inu create cestu); pri inych typoch je "/DxS" volitelny.
+  function mdParseExtraThs(text, commonSt, sharedType){
     var s = String(text == null ? '' : text).trim();
     if (!s) return { variants: [], error: null };
     var amb = s.match(/\d+,\d(?![\d.])/);
     if (amb) return { variants: [], error: 'Nejednoznačný zápis „' + amb[0] + '“ — desatiny píš bodkou (18.5), položky oddeľuj čiarkou.' };
+    var isPd = String(sharedType || '').trim().toUpperCase() === 'PD';
     var out = [];
     var toks = s.split(',');
     for (var i = 0; i < toks.length; i++){
       var t = toks[i].trim();
       if (!t) continue;
-      var f = Number(t);
+      var parts = t.split('/');
+      var f = Number(parts[0]);
       if (!isFinite(f) || f <= 0) return { variants: [], error: 'Hrúbka „' + t + '“ nie je kladné číslo.' };
-      out.push({ type: '', thickness: t, structure: commonSt || '' });
+      var v = { type: '', thickness: parts[0].trim(), structure: commonSt || '' };
+      if (parts.length > 1){
+        var fm = parts.slice(1).join('/').trim().toLowerCase().split(/[x×]/);
+        var d = Number(fm[0]), w = Number(fm[1]);
+        if (fm.length !== 2 || !isFinite(d) || d <= 0 || !isFinite(w) || w <= 0){
+          return { variants: [], error: 'Formát pri hrúbke „' + t + '“ zapíš ako DĺžkaxŠírka (napr. 20/4100x600).' };
+        }
+        v.sheet_size = [d, w];
+      } else if (isPd){
+        return { variants: [], error: 'PD hrúbka „' + t + '“ potrebuje formát platne — zapíš 20/4100x600.' };
+      }
+      out.push(v);
     }
     return { variants: out, error: null };
   }
@@ -934,7 +951,7 @@
     // Polovicny format = formular OSTAVA otvoreny (hodnoty sa nestratia).
     if (built.error){ MD.setStatus(built.error, true); return; }
     var commonSt = mdCommonSt();
-    var extraS = mdParseExtraThs(el('nd_ths').value, commonSt);
+    var extraS = mdParseExtraThs(el('nd_ths').value, commonSt, el('nd_type').value);
     if (extraS.error){ MD.setStatus(extraS.error, true); return; }
     var extraE = mdParseExtraAbs(el('nd_abs').value, commonSt);
     if (extraE.error){ MD.setStatus(extraE.error, true); return; }

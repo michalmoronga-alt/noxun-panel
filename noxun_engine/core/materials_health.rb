@@ -81,13 +81,36 @@ module Noxun
         when :not_found, :already
           report[:status]
         when :empty
-          # GH #93 P2 (4. kolo): platny PRAZDNY legacy katalog by inak ostal
-          # navzdy v legacy rezime (ensure_seeded existujuci subor preskakuje) —
-          # povysi sa na prazdny SCHEMA 2 katalog (vedomy zapis, log).
-          if write('sheets' => [], 'edges' => [], 'schema' => SCHEMA_GROUPS)
+          # GH #93 P2 (4. kolo) + P1 (5. kolo): platny PRAZDNY legacy katalog sa
+          # povysi na prazdny SCHEMA 2 — ale POD ZAMKOM s cerstvym re-readom
+          # (CAS): iny proces mohol medzitym zapisat prvy zaznam a prazdny
+          # payload by ho zahodil. Zmena pod nami = jeden retry migracie.
+          promoted = with_catalog_lock do
+            JsonFileStore.invalidate(path)
+            fresh = parse_catalog_file(path)
+            still_empty = fresh && Array(fresh['sheets']).empty? &&
+                          Array(fresh['edges']).empty? && schema_of(fresh) < SCHEMA_GROUPS
+            if still_empty
+              write_unlocked('sheets' => [], 'edges' => [], 'schema' => SCHEMA_GROUPS) ? :ok : :fail
+            else
+              :changed
+            end
+          end
+          case promoted
+          when :ok
             Engine.log('materialy: prazdny katalog povyseny na SCHEMA 2') if defined?(Engine)
             reload!
             :empty_promoted
+          when :changed
+            retry_report = migrate_to_schema2!
+            if retry_report[:status] == :ok
+              log_migration_summary(retry_report)
+              :migrated
+            else
+              Engine.log("materialy: katalog sa pod bootom zmenil, opakovana migracia: #{retry_report[:status]}") if defined?(Engine)
+              assess_catalog!
+              retry_report[:status]
+            end
           else
             self.cutover_issue = 'Prázdny katalóg sa nepodarilo povýšiť na nový formát — pozri log.'
             :empty

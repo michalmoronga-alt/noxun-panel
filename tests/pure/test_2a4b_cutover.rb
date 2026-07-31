@@ -475,3 +475,43 @@ NxTest.test('2a4b: GH P2 kolo 4 — poskodena predmigracna zaloha = viditelny cu
     NxTest.assert(B4MAT.cutover_issue.nil?, 'uspesny cutover dovod vycisti')
   end
 end
+
+NxTest.test('2a4b: GH kolo 5 — PD sufix drzi desatiny (%g) a empty promote je CAS-chraneny') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  require_relative '../../noxun_engine/ui/production_dialog' unless defined?(Noxun::Engine::ProductionDialog)
+  data = JSON.pretty_generate(
+    'std' => 1, 'schema' => 2,
+    'sheets' => [
+      { 'material_id' => 'PDA', 'group_id' => 'GRP-F', 'manufacturer' => 'Egger',
+        'decor' => 'F800', 'type' => 'PD', 'thickness' => 38.0, 'sheet_size' => [4100.1, 600.0],
+        'grain' => 'length', 'color' => [1, 1, 1], 'production_class' => 'sheet' },
+      { 'material_id' => 'PDB', 'group_id' => 'GRP-F', 'manufacturer' => 'Egger',
+        'decor' => 'F800', 'type' => 'PD', 'thickness' => 38.0, 'sheet_size' => [4100.2, 600.0],
+        'grain' => 'length', 'color' => [1, 1, 1], 'production_class' => 'sheet' }
+    ],
+    'edges' => []
+  ).b
+  b4_with_catalog(data) do
+    mats = Noxun::Engine::ProductionDialog.send(:vepo_materials)
+    NxTest.refute(mats['PDA']['label'] == mats['PDB']['label'],
+                  "sub-mm formaty sa nesmu zliat (#{mats['PDA']['label']})")
+    NxTest.assert(mats['PDA']['label'].include?('4100.1'), mats['PDA']['label'])
+  end
+  # empty promote CAS: cudzi zapis medzi :empty reportom a zamkom prezije
+  empty_legacy = JSON.pretty_generate('std' => 1, 'sheets' => [], 'edges' => []).b
+  b4_with_catalog(empty_legacy) do
+    # simulacia: pred bootom niekto zapisal prvy zaznam (cache o nom nevie)
+    filled = JSON.pretty_generate(
+      'std' => 1,
+      'sheets' => [{ 'material_id' => 'C1', 'decor' => 'Cudzi Dekor', 'type' => 'DTDL',
+                     'thickness' => 18.0, 'grain' => 'length', 'color' => [1, 1, 1],
+                     'production_class' => 'sheet' }],
+      'edges' => []
+    ).b
+    B4MAT.catalog # warm cache nad prazdnym
+    File.binwrite(B4MAT.path, filled)
+    status = B4MAT.boot_cutover!
+    NxTest.assert_equal(:migrated, status, 'zmena pod bootom = retry migracia, nie prazdny prepis')
+    NxTest.refute(B4MAT.sheet('C1').nil?, 'cudzi zaznam PREZIL (zmigrovany, nie zahodeny)')
+  end
+end
