@@ -7,6 +7,15 @@
 # batch 3 (B5 matica). Vsetko headless (APPDATA sandbox helpera).
 require_relative '../helper' unless defined?(NxTest)
 
+# 2A-4b: seedy su nativne SCHEMA 2 — tento subor overuje DUAL-MODE (legacy)
+# spravanie, preto si ako prvy krok instaluje predcutoverovy legacy katalog
+# (registrovany setup test — testy bezia sekvencne v poradi registracie).
+NxTest.test('2a3b setup: legacy SCHEMA 1 katalog (dual-mode)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  NxTest.assert(NxTest.install_legacy_catalog!, 'legacy katalog sa nenainstaloval')
+  NxTest.assert_equal(1, Noxun::Engine::Materials.catalog_schema, 'sandbox ma byt SCHEMA 1')
+end
+
 B3MAT = Noxun::Engine::Materials
 B3STORE = Noxun::Engine::JsonFileStore
 

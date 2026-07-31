@@ -75,12 +75,15 @@ module Noxun
           # D-41 PR B: dekorove karty — batch "Novy dekor" + atomicke premenovanie skupiny.
           cb(dlg, 'add_decor_batch') { |p| handle_add_decor_batch(p) }
           cb(dlg, 'rename_decor')    { |p| handle_rename_decor(p) }
+          cb(dlg, 'set_decor_name')  { |p| handle_set_decor_name(p) }
           # D-42: vyrobca je vlastnost dekoru — zmena atomicky pre celu skupinu.
           cb(dlg, 'set_decor_manufacturer') { |p| handle_set_decor_manufacturer(p) }
           # D-42 PR C (audit BLOCKER 1): inline bunky detailu — patch protokol
           # (whitelist poli, merge s cerstvym zaznamom, baseline per RIADOK).
           cb(dlg, 'patch_sheet') { |p| handle_patch(p, 'sheet') }
           cb(dlg, 'patch_edge')  { |p| handle_patch(p, 'edge') }
+          # 2A-4b (audit B2): rollback na predmigracnu zalohu z read-only banneru.
+          cb(dlg, 'restore_pre_schema2') { |p| handle_restore_backup(p) }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(materials): #{msg}")
@@ -135,6 +138,21 @@ module Noxun
             # 2A-1 (audit F10): SCHEMA katalogu. Klient ju vracia v KAZDEJ mutacii
             # — po migracii na SCHEMA 2 server odmietne zapis zo stareho okna.
             catalog_schema: Materials.catalog_schema,
+            # 2A-4b (audit B4/O1): nudzovy rezim katalogu — okno ukaze vyrazny
+            # read-only banner s dovodom + tlacidlo obnovy predmigracnej zalohy.
+            catalog_state: Materials.catalog_state.to_s,
+            catalog_state_reason: Materials.catalog_state_reason.to_s,
+            # 2A-4b (audit O2): pocet ABS pasok bez struktury a bez universal —
+            # picker ich nevyberie. Pocita VYHRADNE server; banner sa ukazuje
+            # pri KAZDOM otvoreni/refreshi, kym pocet nie je 0.
+            unusable_edges: Materials.unusable_edges_count,
+            # GH #93 P2 (4. kolo): dovod nevykonaneho cutoveru (poskodena
+            # predmigracna zaloha / nerozhodnutelne polozky) — VIDITELNY banner,
+            # nie len log; katalog pritom bezi dalej (nie read-only).
+            cutover_issue: Materials.respond_to?(:cutover_issue) ? Materials.cutover_issue.to_s : '',
+            # GH #93 P2 (10. kolo): rollback tlacidlo aj pri zdravom katalogu —
+            # ukazuje sa len ked predmigracna zaloha realne existuje.
+            pre_schema2_backup: File.exist?(Materials.pre_schema2_backup_path),
             # D-44: naseptavace (vyrobca/typ) a navrhy formatu platne stavia
             # SERVER — JS ich len renderuje. Ide s KAZDYM katalogovym echom,
             # takze novy vyrobca/typ je v navrhoch hned po zapise.
@@ -190,12 +208,13 @@ module Noxun
         # proti zaznamu v katalogu, nie proti payloadovej ozdobe).
         def full_catalog_payload
           cat = Materials.load
+          ctx = Panel.label_ctx # 2A-4b: kolizie cisla dekoru raz pre cely payload
           {
             'sheets' => cat['sheets'].map { |s|
-              s.merge('label' => Panel.sheet_label(s), 'row_rev' => Materials.record_rev(s))
+              s.merge('label' => Panel.sheet_label(s, ctx), 'row_rev' => Materials.record_rev(s))
             },
             'edges' => cat['edges'].map { |a|
-              a.merge('label' => Panel.abs_label(a), 'row_rev' => Materials.record_rev(a))
+              a.merge('label' => Panel.abs_label(a, ctx), 'row_rev' => Materials.record_rev(a))
             }
           }
         end
@@ -230,9 +249,31 @@ module Noxun
           when :invalid
             set_status(extra || 'Neplatná hodnota.', true)
             push_catalog
+          when :catalog_read_only
+            # 2A-4b (audit F7 UI): aj nudzovy rezim vrati UI podla SERVERA —
+            # universal toggle/bunka sa nesmie tvarit, ze zapis presiel.
+            set_status(Materials.catalog_read_only_message, true)
+            push_catalog
           else
+            # :write_failed — checkbox/bunka sa VRATI podla servera (F7).
             set_status('Uloženie zlyhalo.', true)
+            push_catalog
           end
+        end
+
+        # --- 2A-4b (audit B2/B4): obnova predmigracnej zalohy -----------------
+        # Tlacidlo v read-only banneri (potvrdenie robi modal v okne — NIE
+        # UI.messagebox). Uspech = katalog je spat legacy + hold flag zabezpeci,
+        # ze najblizsi start SketchUpu migraciu RAZ preskoci.
+        def handle_restore_backup(_payload)
+          ok, result = Materials.restore_pre_schema2!
+          return set_status(result, true) unless ok
+          # GH #93 P2 (4. kolo): rollback meni CELY katalog — refresh musia
+          # dostat aj panel a otvorene okno Vyroba (rovnako ako bezna mutacia),
+          # inak by drzali predrollbackovy SCHEMA 2 obsah.
+          after_catalog_change
+          push_state
+          set_status('Katalóg obnovený z predmigračnej zálohy. Pri najbližšom štarte SketchUpu sa migrácia jednorazovo preskočí.')
         end
 
         def set_status(msg, error = false)
@@ -483,7 +524,10 @@ module Noxun
           # D-44 (audit F9): prazdna hodnota vymaze vyrobcu LEN s explicitnym
           # flagom z tlacidla "Zmazať výrobcu" — omyl pri naseptavaci sa odmietne.
           clear = !!data['clear_manufacturer']
-          ok, result = Materials.set_decor_manufacturer(data['decor'], data['manufacturer'], clear: clear)
+          # 2A-4b (audit B3): klient posiela group_id — v SCHEMA 2 sa skupina
+          # identifikuje nim (text dekoru je len fallback pre stare okna).
+          ok, result = Materials.set_decor_manufacturer(data['decor'], data['manufacturer'],
+                                                        clear: clear, group_id: data['group_id'])
           return set_status(result, true) unless ok
           after_catalog_change
           decor = data['decor'].to_s.strip
@@ -692,10 +736,25 @@ module Noxun
 
         # D-41 PR B: premenovanie dekoru CELEJ skupiny (audit FIX 12 — edit
         # jednotlivca dekor nemeni; ID zaznamov sa nemenia, modely o nic neprídu).
+        # GH #93 P2: nazov skupiny (decor_name) — zobrazovacia vlastnost,
+        # atomicky celej skupine cez group_id.
+        def handle_set_decor_name(payload)
+          data = JSON.parse(payload.to_s)
+          return unless catalog_write_ok?(data)
+          ok, result = Materials.set_decor_name(data['group_id'], data['name'])
+          return set_status(result, true) unless ok
+          after_catalog_change
+          label = data['name'].to_s.strip
+          set_status(label.empty? ? "Názov skupiny vymazaný (#{result} záznamov)." : "Názov skupiny: #{label} (#{result} záznamov).")
+        end
+
         def handle_rename_decor(payload)
           data = JSON.parse(payload.to_s)
           return unless catalog_write_ok?(data)
-          ok, result = Materials.rename_decor(data['old_decor'], data['new_decor'])
+          # 2A-4b (audit B3): group_id od klienta — SCHEMA 2 meni VYHRADNE
+          # zaznamy danej skupiny (rovnake cislo u ineho vyrobcu sa nedotkne).
+          ok, result = Materials.rename_decor(data['old_decor'], data['new_decor'],
+                                              group_id: data['group_id'])
           return set_status(result, true) unless ok
           after_catalog_change
           set_status("Dekor premenovaný na #{data['new_decor'].to_s.strip} (#{result} záznamov).")

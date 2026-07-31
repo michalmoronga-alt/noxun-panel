@@ -158,7 +158,9 @@ NxTest.test('materials: sheet/edge lookup, decor_of a color_of') do
   s = mat.sheet('K009_PW_DTDL_18')
   NxTest.assert(s, 'seed sheet K009_PW_DTDL_18 sa nenasiel')
   NxTest.assert_close(18.0, s['thickness'])
-  NxTest.assert_equal('K009 PW', s['decor'])
+  # 2A-4b: seedy su nativne SCHEMA 2 — dekor = CISLO, struktura samostatne.
+  NxTest.assert_equal('K009', s['decor'])
+  NxTest.assert_equal('PW', s['structure'])
   e = mat.edge('ABS_K009_20')
   NxTest.assert(e, 'seed edge ABS_K009_20 sa nenasiel')
   NxTest.assert_close(2.0, e['thickness'])
@@ -166,26 +168,36 @@ NxTest.test('materials: sheet/edge lookup, decor_of a color_of') do
   NxTest.assert_equal(nil, mat.sheet('NEEXISTUJE'))
   NxTest.assert_equal(nil, mat.edge(nil))
   NxTest.assert_equal(nil, mat.edge('NEEXISTUJE'))
-  NxTest.assert_equal('W1000 ST9 Biela', mat.decor_of('W1000_DTDL_18'))
+  NxTest.assert_equal('W1000', mat.decor_of('W1000_DTDL_18'))
   NxTest.assert_equal(nil, mat.decor_of('NEEXISTUJE'))
   NxTest.assert_equal([238, 236, 230], mat.color_of('HDF_WHITE_3'))
   NxTest.assert_equal(nil, mat.color_of('NEEXISTUJE'))
 end
 
-NxTest.test('materials: supported_edge_thickness? presne 1.0 a 2.0 bez tolerancie') do
+NxTest.test('materials: supported_edge_thickness? — SCHEMA 1 presne {1;2}, SCHEMA 2 obchodne hodnoty') do
   NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
   mat = Noxun::Engine::Materials
-  NxTest.assert(mat.supported_edge_thickness?(1.0))
-  NxTest.assert(mat.supported_edge_thickness?(2.0))
-  NxTest.assert(mat.supported_edge_thickness?(1), 'Integer 1 sa cez to_f ma uznat')
-  NxTest.assert(mat.supported_edge_thickness?('2'), 'String "2" sa cez to_f ma uznat')
-  NxTest.refute(mat.supported_edge_thickness?(0.4), 'legacy 0.4 uz nie je podporovana')
-  NxTest.refute(mat.supported_edge_thickness?(0.8), 'legacy 0.8 uz nie je podporovana')
-  NxTest.refute(mat.supported_edge_thickness?(1.5))
-  NxTest.refute(mat.supported_edge_thickness?(3.0))
-  NxTest.refute(mat.supported_edge_thickness?(1.001), 'v0.3.3 BEZ tolerancie — presna zhoda')
-  NxTest.refute(mat.supported_edge_thickness?(0.999), 'v0.3.3 BEZ tolerancie — presna zhoda')
-  NxTest.refute(mat.supported_edge_thickness?(nil), 'nil.to_f = 0.0 -> nepodporovana')
+  # 2A-4b: default katalog je uz SCHEMA 2 — SCHEMA 1 semantika sa overuje
+  # EXPLICITNYM parametrom (dual-mode pre nerozhodnutelne legacy katalogy).
+  legacy = mat::SCHEMA_LEGACY
+  NxTest.assert(mat.supported_edge_thickness?(1.0, legacy))
+  NxTest.assert(mat.supported_edge_thickness?(2.0, legacy))
+  NxTest.assert(mat.supported_edge_thickness?(1, legacy), 'Integer 1 sa cez to_f ma uznat')
+  NxTest.assert(mat.supported_edge_thickness?('2', legacy), 'String "2" sa cez to_f ma uznat')
+  NxTest.refute(mat.supported_edge_thickness?(0.4, legacy), 'legacy whitelist 0.4 nepodporuje')
+  NxTest.refute(mat.supported_edge_thickness?(0.8, legacy), 'legacy whitelist 0.8 nepodporuje')
+  NxTest.refute(mat.supported_edge_thickness?(1.5, legacy))
+  NxTest.refute(mat.supported_edge_thickness?(3.0, legacy))
+  NxTest.refute(mat.supported_edge_thickness?(1.001, legacy), 'v0.3.3 BEZ tolerancie — presna zhoda')
+  NxTest.refute(mat.supported_edge_thickness?(0.999, legacy), 'v0.3.3 BEZ tolerancie — presna zhoda')
+  NxTest.refute(mat.supported_edge_thickness?(nil, legacy), 'nil.to_f = 0.0 -> nepodporovana')
+  # SCHEMA 2 (default seedovaneho katalogu): obchodne hodnoty (2A-3), 3.0 nie.
+  nx_reset_catalog_file(mat.path)
+  mat.catalog
+  NxTest.assert_equal(2, mat.catalog_schema, 'cerstvy seed je SCHEMA 2')
+  NxTest.assert(mat.supported_edge_thickness?(0.8), 'SCHEMA 2 pusti 0.8')
+  NxTest.assert(mat.supported_edge_thickness?(1.5), 'SCHEMA 2 pusti 1.5')
+  NxTest.refute(mat.supported_edge_thickness?(3.0), '3.0 nie je obchodna hodnota')
 end
 
 NxTest.test('materials: normalized_abs_id pusti len id existujuce v katalogu') do
@@ -207,13 +219,15 @@ NxTest.test('materials: abs_for_decor toleruje hrubku len do 0.01 mm') do
   NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
   mat = Noxun::Engine::Materials
   nx_reset_catalog_file(mat.path)
-  NxTest.assert_equal('ABS_K009_10', mat.abs_for_decor('K009 PW', 1.0))
-  NxTest.assert_equal('ABS_K009_20', mat.abs_for_decor('K009 PW', 2.0))
+  # 2A-4b: seed dekory su cisla (K009/W1000) — abs_for_decor je textovy legacy
+  # picker, semantika tolerancie sa nemeni.
+  NxTest.assert_equal('ABS_K009_10', mat.abs_for_decor('K009', 1.0))
+  NxTest.assert_equal('ABS_K009_20', mat.abs_for_decor('K009', 2.0))
   # Tolerancia v kode je STRIKTNE < 0.01 mm.
-  NxTest.assert_equal('ABS_K009_10', mat.abs_for_decor('K009 PW', 1.005))
-  NxTest.assert_equal(nil, mat.abs_for_decor('K009 PW', 1.02))
-  NxTest.assert_equal(nil, mat.abs_for_decor('K009 PW', 0.4), 'legacy hrubka nema variant')
-  NxTest.assert_equal(nil, mat.abs_for_decor('W1000 ST9 Biela', 2.0), 'W1000 ma len 1.0 mm')
+  NxTest.assert_equal('ABS_K009_10', mat.abs_for_decor('K009', 1.005))
+  NxTest.assert_equal(nil, mat.abs_for_decor('K009', 1.02))
+  NxTest.assert_equal(nil, mat.abs_for_decor('K009', 0.4), 'hrubka bez variantu nema pasku')
+  NxTest.assert_equal(nil, mat.abs_for_decor('W1000', 2.0), 'W1000 ma len 1.0 mm')
   NxTest.assert_equal(nil, mat.abs_for_decor('NeznamyDekor', 1.0))
   NxTest.assert_equal(nil, mat.abs_for_decor(nil, 1.0))
 end
@@ -371,19 +385,21 @@ NxTest.test('abs_rules: resolve_edges spoji pravidla s ABS katalogom podla dekor
   mat = Noxun::Engine::Materials
   nx_reset_catalog_file(rules.path)
   nx_reset_catalog_file(mat.path)
-  # Polica: pravidlo len L1 (predna) -> ABS dekoru K009 PW hrubky 1.0.
+  # Polica: pravidlo len L1 (predna) -> ABS dekoru K009 hrubky 1.0.
+  # (2A-4b: seed dekory su cisla — textova legacy cesta resolve_edges bez
+  # sheet zaznamu bezi dalej, len s novym textom dekoru.)
   NxTest.assert_equal({ 'L1' => 'ABS_K009_10', 'L2' => nil, 'W1' => nil, 'W2' => nil },
-                      rules.resolve_edges('shelf', 'K009 PW'))
+                      rules.resolve_edges('shelf', 'K009'))
   # D-30 (audit NOTE 11): vystuhy cez CELU resolve cestu — znamy dekor s existujucou
   # 1.0 mm ABS musi dat konkretny abs_id na dlhej hrane L1 (nie len thicknesses_for).
   %w[rail_front rail_back].each do |role|
     NxTest.assert_equal({ 'L1' => 'ABS_K009_10', 'L2' => nil, 'W1' => nil, 'W2' => nil },
-                        rules.resolve_edges(role, 'K009 PW'), "resolve_edges #{role}")
+                        rules.resolve_edges(role, 'K009'), "resolve_edges #{role}")
   end
   # Celo: vsetky 4 hrany rovnaky ABS variant.
   NxTest.assert_equal({ 'L1' => 'ABS_W1000_10', 'L2' => 'ABS_W1000_10',
                         'W1' => 'ABS_W1000_10', 'W2' => 'ABS_W1000_10' },
-                      rules.resolve_edges('front_door', 'W1000 ST9 Biela'))
+                      rules.resolve_edges('front_door', 'W1000'))
   # Dekor bez ABS variantu -> hrany bez ABS (nil), ziadna vynimka.
   NxTest.assert_equal(rules.empty_edges, rules.resolve_edges('front_door', 'Biela HDF'))
   # Chrbat nema pravidlo -> kompletna nil mapa.

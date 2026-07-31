@@ -42,15 +42,29 @@ const CHIPS = [
   { key: 'PD 38', type: 'PD', th: '38', label: 'PD 38' }
 ];
 
-let out = mdBuildSheetVariants(CHIPS, {});
-eq(out.error, null, 'bez formatov ziadna chyba');
-eq(out.variants, [{ type: '', thickness: '18' }, { type: 'PD', thickness: '38' }],
+// 2A-4b: builder VZDY nesie structure (batch 3) — bez stavu struktur prazdnu.
+// GH #93 P2 (7. kolo): PD cip BEZ formatu je klientska chyba (server by variant
+// odmietol az po zavreti formulara a cela davka by sa stratila) — ne-PD cipy
+// bez formatu ostavaju legalne.
+let out = mdBuildSheetVariants([CHIPS[0]], {});
+eq(out.error, null, 'ne-PD cip bez formatu ziadna chyba');
+eq(out.variants, [{ type: '', thickness: '18', structure: '' }],
   'bez formatu sa sheet_size vobec neposiela (server ho neulozi)');
+out = mdBuildSheetVariants(CHIPS, {});
+if (out.error === null) throw new Error('PD cip bez formatu MUSI byt klientska chyba');
 
 out = mdBuildSheetVariants(CHIPS, { '18': { l: '2800', w: '2050' }, 'PD 38': { l: '4100', w: '600' } });
-eq(out.variants, [{ type: '', thickness: '18', sheet_size: [2800, 2050] },
-                  { type: 'PD', thickness: '38', sheet_size: [4100, 600] }],
+eq(out.variants, [{ type: '', thickness: '18', structure: '', sheet_size: [2800, 2050] },
+                  { type: 'PD', thickness: '38', structure: '', sheet_size: [4100, 600] }],
   'format per cip ide do payloadu (MG 2800x2050, PD 4100x600)');
+
+// 2A-4b: struktura per cip (auto zo spolocneho pola / rucny prepis) ide do payloadu.
+// (GH #93 kolo 7: PD cip potrebuje format — inak klientska chyba.)
+out = mdBuildSheetVariants(CHIPS, { 'PD 38': { l: '4100', w: '600' } },
+                           { '18': { st: 'PW', auto: true }, 'PD 38': { st: ' ST9 ', auto: false } });
+eq(out.variants, [{ type: '', thickness: '18', structure: 'PW' },
+                  { type: 'PD', thickness: '38', structure: 'ST9', sheet_size: [4100, 600] }],
+  'structure per cip (trim) ide do payloadu batch 3');
 
 out = mdBuildSheetVariants(CHIPS, { '18': { l: '2800', w: '' } });
 eq(out.error !== null, true, 'polovicny format zastavi odoslanie');
@@ -64,7 +78,7 @@ eq(out, { variants: [], error: null }, 'ziadny aktivny cip = prazdny payload (be
 
 // Stav formatu neaktivneho cipu payload neovplyvni (mdFmt si pamata aj vypnute).
 out = mdBuildSheetVariants([CHIPS[0]], { '18': { l: '2800', w: '2050' }, '36': { l: '9', w: '9' } });
-eq(out.variants, [{ type: '', thickness: '18', sheet_size: [2800, 2050] }],
+eq(out.variants, [{ type: '', thickness: '18', structure: '', sheet_size: [2800, 2050] }],
   'do payloadu ide LEN to, co je zapnute');
 
 // --- mdMigrateLastSet: stara sada (v1) prezije, ale BEZ vymyslenych formatov ---

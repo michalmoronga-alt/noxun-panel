@@ -1720,6 +1720,104 @@ module NoxunSuRunner
     end
   end
 
+  # --- SYNC-2A4: OSTRY CUTOVER — boot_cutover! nad legacy fixture (2A-4b) ----
+  # Vzor run_2a2: cely scenar bezi nad IZOLOVANYM katalogom (test_dir_override
+  # + kopia fixture) — zivy %APPDATA% katalog sa NIKDY necita ani nezapisuje.
+  # Scenar: legacy fixture -> boot_cutover! (ostra migracia + zaloha + log) ->
+  # korpus dostane pasky strukturne (picker SCHEMA 2) -> universal patch cez
+  # SKUTOCNY handler okna Materialy -> restore_pre_schema2! (rollback + hold)
+  # -> druhy boot preskoci (hold sa konzumuje) -> treti boot migruje znova.
+  def run_2a4(model)
+    unless File.exist?(A2_FIXTURE)
+      return info("2A-4: fixture #{A2_FIXTURE} chyba — sekcia preskocena")
+    end
+    tmp = File.join(Dir.tmpdir, "noxun_2a4_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    fixture = File.binread(A2_FIXTURE)
+    File.binwrite(File.join(tmp, 'materials.json'), fixture)
+    e::Materials.test_dir_override = tmp
+    e::Materials.reload!
+    begin
+      ok('2A-4: override cesty katalogu je aktivny (realny katalog sa nedotkne)',
+         e::Materials.path == File.join(tmp, 'materials.json'))
+
+      # 1. BOOT CUTOVER: legacy katalog sa OSTRO zmigruje (to iste, co spravi
+      # main.rb pri starte SketchUpu po merge + INSTALL).
+      branch = e::Materials.boot_cutover!
+      e::Materials.reload!
+      ok("2A-4: boot_cutover! zmigroval legacy katalog (#{branch.inspect})",
+         branch == :migrated && e::Materials.catalog_schema == 2)
+      ok('2A-4: predmigracna zaloha je bajtova kopia povodiny',
+         File.exist?(e::Materials.pre_schema2_backup_path) &&
+         File.binread(e::Materials.pre_schema2_backup_path).b == fixture.b)
+      ok('2A-4: NOTE12 — po cutoveri su presne 3 pasky bez struktury a bez universal (banner)',
+         e::Materials.unusable_edges_count == 3)
+      k = e::Materials.sheet('K009_PW_DTDL_18')
+      ok('2A-4: K009 nesie skupinu + strukturu PW (ID nezmenene)',
+         !k.nil? && k['decor'] == 'K009' && k['structure'] == 'PW' &&
+         k['group_id'].to_s.start_with?('GRP-'))
+
+      # 2. Korpus nad zmigrovanym katalogom: picker vybera STRUKTURNE
+      # (abs_for_sheet vetva A — PW doska dostane PW pasku).
+      inst = e::CabinetBuilder.build(model, {
+        'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0,
+        'thickness' => 18.0, 'material_id' => 'K009_PW_DTDL_18'
+      })
+      ok('2A-4: korpus nad SCHEMA 2 katalogom stoji', !inst.nil? && inst.valid?)
+      # ABS defaulty sa citaju zo SNAPSHOTU dielca (standard 8.3) — bok nesie
+      # edges v configu na instancii (side_left ma default L1 jednotku).
+      side = inst.definition.entities.grep(Sketchup::ComponentInstance)
+                 .find { |i| e::Store.kind(i) == 'part' && e::Store.get(i, 'role').to_s == 'side_left' }
+      sedges = side ? (e::Store.config(side) || {})['edges'] : nil
+      ok('2A-4: bok dostal strukturnu 1,0 pasku K009 PW (picker vetva A)',
+         sedges.is_a?(Hash) && sedges['L1'] == 'ABS_K009_10')
+
+      # 3. Universal patch cez SKUTOCNY handler okna Materialy (patch_edge cesta;
+      # dialog nie je otvoreny — js() je no-op, zapis bezi naplno).
+      rec = e::Materials.edge('ABS_BIELA_KORPUS_10')
+      payload = { 'id' => 'ABS_BIELA_KORPUS_10', 'patch' => { 'universal' => true },
+                  'row_rev' => e::Materials.record_rev(rec), 'catalog_schema' => 2 }.to_json
+      e::MaterialsDialog.handle_patch(payload, 'edge')
+      e::Materials.reload!
+      ok('2A-4: universal toggle cez handler zapisal priznak',
+         e::Materials.edge('ABS_BIELA_KORPUS_10')['universal'] == true)
+      ok('2A-4: banner pocet klesol na 2 (Halifax + UNI ostavaju)',
+         e::Materials.unusable_edges_count == 2)
+      # Universal paska je teraz pouzitelna pre bezstrukturnu Biela korpus dosku.
+      bk = e::Materials.sheets.find { |s| s['decor'] == 'Biela korpus' }
+      ok('2A-4: universal paska je hned pouzitelna pre bezstrukturnu dosku (vetva B)',
+         !bk.nil? && e::Materials.abs_for_sheet(bk, :jednotka, 18.0).first == 'ABS_BIELA_KORPUS_10')
+
+      # 4. ROLLBACK: restore_pre_schema2! nasadi zalohu + hold flag; druhy boot
+      # migraciu RAZ preskoci (hold sa konzumuje), treti migruje znova.
+      ok_res, report = e::Materials.restore_pre_schema2!
+      e::Materials.reload!
+      ok("2A-4: restore_pre_schema2! nasadil zalohu (#{report.inspect})",
+         ok_res && e::Materials.catalog_schema == 1 && e::Materials.migration_hold?)
+      ok('2A-4: boot po rollbacku = :hold (migracia preskocena, flag zmazany)',
+         e::Materials.boot_cutover! == :hold && !e::Materials.migration_hold? &&
+         e::Materials.catalog_schema == 1)
+      ok('2A-4: dalsi boot migruje znova (jednorazovost holdu)',
+         e::Materials.boot_cutover! == :migrated && e::Materials.catalog_schema == 2)
+    ensure
+      e::Materials.test_dir_override = nil
+      e::Materials.reload!
+      cleanup(model)
+      begin
+        FileUtils.rm_rf(tmp)
+      rescue StandardError
+        nil
+      end
+    end
+    ok('2A-4: cleanup (override prec, realny katalog cita zas z APPDATA)',
+       e::Materials.test_dir_override.nil? && cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: 2A-4 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    e::Materials.test_dir_override = nil
+    e::Materials.reload!
+    cleanup(model)
+  end
+
   def run_d40(model)
     # D40-1: korpus — eventy + atributy zamku
     cab = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0 })
@@ -2110,6 +2208,7 @@ module NoxunSuRunner
     run_d46(model)           # D-46: projektova predvolba korpusu s inou hrubkou (potvrdenie)
     run_2a2(model)           # 2A-2: migracia katalogu na SCHEMA 2 (izolovany katalog cez override)
     run_2a3(model)           # 2A-3: vyberove cesty ABS so strukturou (SCHEMA 2 sandbox katalog)
+    run_2a4(model)           # 2A-4b: OSTRY cutover — boot_cutover!, picker, universal, rollback+hold
     run_d40(model)           # D-40: selection eventy po builde (DC observer pasca)
     run_async(model, nil)
   rescue StandardError => ex

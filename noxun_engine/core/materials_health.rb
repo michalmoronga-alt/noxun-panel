@@ -16,9 +16,9 @@
 #      supress flag migration_hold.json, ktory buduci boot auto-run (2A-4b)
 #      preskoci a zmaze (2. restart uz migruje normalne).
 #
-# KONTRAKT DAVKY 2A-4a: ziadna produkcna cesta assess_catalog! ani
-# restore_pre_schema2! zatial NEVOLA (boot flow + UI tlacidlo = 2A-4b).
-# Bez volania assess je stav :ok a spravanie sa nemeni ani o vlas (dual-mode).
+# 2A-4b: OSTRY CUTOVER — boot_cutover! (nizsie) vola main.rb pri kazdom
+# starte SketchUpu vo vlastnom chranenom bloku; restore_pre_schema2! spusta
+# tlacidlo "Obnovit predmigracnu zalohu" v okne Materialy (read-only banner).
 
 module Noxun
   module Engine
@@ -28,6 +28,169 @@ module Noxun
       MIGRATION_HOLD_FILE = 'migration_hold.json'
 
       module_function
+
+      # --- 2A-4b: boot cutover (audit O4 + F11) --------------------------------
+
+      # Jednorazovy cutover katalogu pri starte SketchUpu. Vola ho VYHRADNE
+      # main.rb vo vlastnom begin/rescue MIMO hlavnej inicializacie a NIKDY
+      # nezobrazuje messagebox (O1) — vsetko ide do logu; pouzivatelsky stav
+      # nesie okno Materialy (read-only banner / banner nepouzitelnych pasok).
+      # Poradie (zavazne):
+      #   1. consume_migration_hold! — hold po rollbacku (B2) migraciu RAZ
+      #      preskoci (flag sa zmaze -> dalsi start uz migruje normalne);
+      #      hold sa konzumuje IBA tu, nikdy pri beznom behu.
+      #   2. assess_catalog! — obnova primaru z .bak (F5) + posudenie;
+      #      :read_only konci (mutacie zamknute, banner ukaze dialog).
+      #   3. marker < 2 -> migrate_to_schema2! (ostry):
+      #      :ok = log suhrn (ZIADNY messagebox);
+      #      :not_found/:empty = nic (seed flow — seedy su uz SCHEMA 2);
+      #      :already = nic (druhy proces/okno uz zmigrovali);
+      #      :undecidable = log dovodov, katalog OSTAVA legacy a plugin bezi
+      #        dual-mode dalej — mutacie sa NEZAMYKAJU (standard 7.1:
+      #        nerozhodnutelne = atomicky NO-OP, nie porucha);
+      #      ine statusy = log + assess_catalog! znova (skutocne poskodenie
+      #        konci :read_only; prechodny stav necha katalog legacy).
+      # Vrati symbol vykonanej vetvy (diagnostika + testy).
+      # GH #93 P2 (4. kolo): dovod, preco cutover NEprebehol, VIDITELNY pre
+      # okno Materialy (banner) — nie len log. nil = ziadny problem.
+      def cutover_issue
+        @cutover_issue
+      end
+
+      def cutover_issue=(value)
+        @cutover_issue = value
+      end
+
+      def boot_cutover!
+        self.cutover_issue = nil
+        if consume_migration_hold!
+          if defined?(Engine)
+            Engine.log('materialy: migracia jednorazovo potlacena po rollbacku (migration_hold zmazany)')
+          end
+          assess_catalog!
+          return :hold
+        end
+        state, = assess_catalog!
+        return :read_only if state == :read_only
+        return :schema2 if catalog_schema_on_disk >= SCHEMA_GROUPS
+        report = migrate_to_schema2!
+        case report[:status]
+        when :ok
+          log_migration_summary(report)
+          :migrated
+        when :not_found, :already
+          report[:status]
+        when :empty
+          # GH #93 P2 (4. kolo) + P1 (5. kolo): platny PRAZDNY legacy katalog sa
+          # povysi na prazdny SCHEMA 2 — ale POD ZAMKOM s cerstvym re-readom
+          # (CAS): iny proces mohol medzitym zapisat prvy zaznam a prazdny
+          # payload by ho zahodil. Zmena pod nami = jeden retry migracie.
+          promoted = with_catalog_lock do
+            JsonFileStore.invalidate(path)
+            fresh = parse_catalog_file(path)
+            still_empty = fresh && Array(fresh['sheets']).empty? &&
+                          Array(fresh['edges']).empty? && schema_of(fresh) < SCHEMA_GROUPS
+            if still_empty
+              write_unlocked('sheets' => [], 'edges' => [], 'schema' => SCHEMA_GROUPS) ? :ok : :fail
+            else
+              :changed
+            end
+          end
+          case promoted
+          when :ok
+            Engine.log('materialy: prazdny katalog povyseny na SCHEMA 2') if defined?(Engine)
+            reload!
+            :empty_promoted
+          when :changed
+            retry_report = migrate_to_schema2!
+            if retry_report[:status] == :ok
+              log_migration_summary(retry_report)
+              :migrated
+            else
+              # GH #93 P2 (10. kolo): neuspech RETRY musi byt viditelny rovnako
+              # ako neuspech hlavneho behu (banner, nie len log).
+              Engine.log("materialy: katalog sa pod bootom zmenil, opakovana migracia: #{retry_report[:status]}") if defined?(Engine)
+              set_cutover_issue_for(retry_report)
+              assess_catalog!
+              retry_report[:status]
+            end
+          else
+            self.cutover_issue = 'Prázdny katalóg sa nepodarilo povýšiť na nový formát — pozri log.'
+            :empty
+          end
+        when :undecidable
+          if defined?(Engine)
+            Engine.log('materialy: migracia neprebehla — nerozhodnutelne polozky, katalog bezi dalej v povodnom formate:')
+            report[:reasons].each { |r| Engine.log("  - #{r}") }
+          end
+          set_cutover_issue_for(report)
+          :undecidable
+        when :backup_corrupt
+          if defined?(Engine)
+            Engine.log('materialy: migracia zablokovana — poskodena predmigracna zaloha')
+          end
+          set_cutover_issue_for(report)
+          assess_catalog!
+          :backup_corrupt
+        else
+          if defined?(Engine)
+            Engine.log("materialy: migracia zlyhala (#{report[:status]}) — katalog sa znovu posudi")
+          end
+          set_cutover_issue_for(report)
+          assess_catalog!
+          report[:status]
+        end
+      rescue StandardError => e
+        # GH #93 P2 (6. kolo): necakany pad POCAS cutoveru (subor zmizol/
+        # nahradeny inym procesom medzi assess a migraciou) — dovod MUSI byt
+        # viditelny (banner) a stav katalogu sa znovu posudi; nie len log.
+        Engine.log_error(e, 'Materials.boot_cutover!') if defined?(Engine)
+        self.cutover_issue = "Prepnutie katalógu zlyhalo neočakávane (#{e.class}: #{e.message}) — pozri log a reštartuj SketchUp."
+        begin
+          assess_catalog!
+        rescue StandardError
+          nil
+        end
+        :error
+      end
+
+      # JEDNA autorita textov cutover_issue (hlavny beh AJ retry — GH #93
+      # 10. kolo). Uspesne/neutralne statusy dovod NEnastavuju.
+      def set_cutover_issue_for(report)
+        case report[:status]
+        when :ok, :already, :not_found, :empty, :empty_promoted, :hold, :schema2
+          nil
+        when :undecidable
+          self.cutover_issue = 'Migrácia katalógu neprebehla — nerozhodnuteľné položky: '                                "#{Array(report[:reasons]).join(' · ')}. Oprav dáta a reštartuj SketchUp."
+        when :backup_corrupt
+          self.cutover_issue = 'Migrácia je zablokovaná: predmigračná záloha '                                "(#{pre_schema2_backup_path}) je poškodená a nepoužiteľná. "                                'Premenuj/odstráň ju a reštartuj SketchUp.'
+        else
+          self.cutover_issue = "Migrácia katalógu zlyhala (#{report[:status]}) — pozri log a reštartuj SketchUp."
+        end
+      end
+
+      # Suhrn uspesnej migracie do logu (O1: ziadny modal pri boote).
+      def log_migration_summary(report)
+        return unless defined?(Engine)
+        Engine.log('materialy: katalog zmigrovany na SCHEMA 2 — ' \
+                   "#{report[:groups].length} skupin, " \
+                   "zmazane: #{report[:deleted].empty? ? 'nic' : report[:deleted].join(', ')}, " \
+                   "retyp: #{report[:retyped].empty? ? 'nic' : report[:retyped].join(', ')}; " \
+                   "predmigracna zaloha: #{pre_schema2_backup_path}")
+        report[:warnings].each { |w| Engine.log("  ! #{w}") }
+      end
+
+      # --- 2A-4b: banner nepouzitelnych pasok (audit O2) -----------------------
+
+      # Pocet ABS pasok, ktore picker v SCHEMA 2 NIKDY nevyberie — bez struktury
+      # a bez priznaku universal (prazdna struktura nie je zhoda, standard 7.5).
+      # V SCHEMA 1 vzdy 0 (legacy picker strukturu nepozna — banner by len
+      # strasil). JEDNA autorita banneru okna Materialy — JS pocet NIKDY
+      # nepocita sam (server-side count v payloade).
+      def unusable_edges_count
+        return 0 if catalog_schema < SCHEMA_GROUPS
+        edges.count { |a| a['structure'].to_s.strip.empty? && a['universal'] != true }
+      end
 
       # --- stav katalogu (B1 + B4) --------------------------------------------
 

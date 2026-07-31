@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.5.9' unless defined?(VERSION)
+    VERSION = '0.5.10' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -70,6 +70,17 @@ Sketchup.require 'noxun_engine/ui/templates_dialog' # V0.4.5 D2 sprava sablon
 module Noxun
   module Engine
     unless file_loaded?(__FILE__)
+      # 2A-4b (audit O4 + F11): jednorazovy boot cutover katalogu materialov na
+      # SCHEMA 2 — VLASTNY chraneny blok MIMO hlavneho begin/rescue inicializacie
+      # (zlyhanie migracie NESMIE zhodit menu/toolbar/observer). Ziadny
+      # UI.messagebox (O1) — vysledok ide do logu, pouzivatelsky stav ukazuje
+      # okno Materialy (read-only banner / banner nepouzitelnych pasok).
+      begin
+        Materials.boot_cutover!
+      rescue StandardError => e
+        log_error(e, 'boot_cutover')
+      end
+
       begin
         cmd = UI::Command.new('Noxun Engine — Panel') { Panel.show }
         cmd.tooltip = 'Noxun Engine — Panel'

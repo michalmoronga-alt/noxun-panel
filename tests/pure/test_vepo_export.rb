@@ -271,3 +271,53 @@ NxTest.test('vepo: 0 platnych riadkov -> write vytvori LEN LOG s dovodmi (GH P2)
     NxTest.assert(log.include?('Rozbity'), 'LOG menuje chybny dielec')
   end
 end
+
+# ---------------------------------------------------------------------------
+# 2A-4b (audit F8): bajtova stabilita CSV + oddeleny zobrazovaci label
+# ---------------------------------------------------------------------------
+
+# Zlata vzorka: PRESNE bajty CSV (force quotes, ';', CRLF, em-dash) pre fixne
+# vstupne data. Kazda zmena exportneho formatu tento test zhodi — VEPO CSV a
+# nazvy suborov sa NEMENIA (dogfooding kontrakt).
+NxTest.test('vepo 2A-4b: zlata vzorka — CSV bajty a nazvy suborov su NEMENNE (F8)') do
+  rows = [
+    NxVepo.vrow('edges' => { 'L1' => 'ABS1', 'L2' => nil, 'W1' => 'ABS2', 'W2' => 'ABS2' }),
+    NxVepo.vrow('names' => ['Polica'], 'length' => 964.0, 'width' => 500.0, 'thickness' => 36.0,
+                'quantity' => 1, 'material_id' => 'K009_PW_DTDL_36', 'grain_direction' => 'width',
+                'edges' => { 'L1' => 'ABS1', 'L2' => nil, 'W1' => nil, 'W2' => nil },
+                'kde' => [{ 'owner_id' => 'CAB-2', 'quantity' => 1 }]),
+    NxVepo.vrow('names' => ['Chrbát'], 'length' => 764.0, 'width' => 564.0, 'thickness' => 3.0,
+                'quantity' => 1, 'material_id' => 'HDF_WHITE_3', 'grain_direction' => 'none',
+                'edges' => {}, 'kde' => [{ 'owner_id' => 'CAB-1', 'quantity' => 1 }])
+  ]
+  out = NxVepo.build(rows)
+  NxTest.assert_equal(%w[kuchyna_novak_biela_hdf_3.csv kuchyna_novak_k009_pw_dtdl_18_36.csv],
+                      out['groups'].map { |g| g['filename'] })
+  hdf = out['groups'][0]
+  k009 = out['groups'][1]
+  NxTest.assert_equal("\"Chrbát\";\"764\";\"\";\"564\";\"\";\"3\";\"1\";\"Biela HDF\"\r\n".b,
+                      hdf['csv'].b, 'HDF CSV bajty')
+  NxTest.assert_equal(
+    "\"Bok\";\"720\";\"—\";\"560\";\"=\";\"18\";\"2\";\"K009 PW DTDL\"\r\n" \
+    "\"Polica\";\"500\";\"\";\"964\";\"—\";\"36\";\"1\";\"K009 PW DTDL\"\r\n".b,
+    k009['csv'].b, 'K009 CSV bajty (vratane rotacie dekoru a merge 18/36)'
+  )
+end
+
+NxTest.test('vepo 2A-4b: display label ide LEN do LOGu — CSV/subory bajtovo zhodne s mapou bez display') do
+  mats_display = {
+    'K009_PW_DTDL_18' => { 'label' => 'K009 PW DTDL', 'display' => 'K009 PW DTDL' },
+    'K009_PW_DTDL_36' => { 'label' => 'K009 PW DTDL', 'display' => 'K009 PW DTDL' },
+    'HDF_WHITE_3'     => { 'label' => 'Biela HDF', 'display' => 'Biela HDF krycia' }
+  }
+  rows = [NxVepo.vrow, NxVepo.vrow('names' => ['Chrbát'], 'thickness' => 3.0, 'quantity' => 1,
+                                   'material_id' => 'HDF_WHITE_3', 'grain_direction' => 'none',
+                                   'edges' => {})]
+  plain = NxVepo.build(rows)
+  disp = NxVepo.build(rows, materials: mats_display)
+  NxTest.assert_equal(plain['groups'].map { |g| [g['filename'], g['csv']] },
+                      disp['groups'].map { |g| [g['filename'], g['csv']] },
+                      'display NEMENI grouping, nazvy suborov ani CSV bajty')
+  NxTest.assert(disp['log_text'].include?('— Biela HDF krycia'), 'LOG nesie display label')
+  NxTest.refute(plain['log_text'].include?('— Biela HDF'), 'bez display mapy je LOG riadok presne dnesny')
+end
