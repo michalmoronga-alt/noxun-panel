@@ -263,18 +263,37 @@ module Noxun
         # jedneho VEPO bucketu. Legacy zaznam (bez struktury) = dnesny tvar.
         # Strazi zlaty test (legacy fixture == zmigrovana fixture, bajtovo).
         # decor_name ide VYHRADNE do 'display' (zobrazovaci/LOG label).
+        # GH #93 P1 (2. kolo): label sklada AJ decor_name — legacy "W1000 ST9
+        # Biela" sa migruje na cislo+strukturu+NAZOV, takze bez nazvu by sa
+        # export zmenil ("W1000 ST9 DTDL" != "W1000 ST9 Biela DTDL"). Kolizia
+        # labelu MEDZI roznymi skupinami (rovnake cislo+struktura+typ dvoch
+        # vyrobcov — len SCHEMA 2 stav bez legacy precedensu) dostava prefix
+        # vyrobcu, aby sa buckety nezliali.
         def vepo_materials
-          Materials.sheets.each_with_object({}) do |s, out|
-            label = [s['decor'], s['structure'], s['type']]
+          sheets = Materials.sheets
+          labeled = sheets.map do |s|
+            label = [s['decor'], s['structure'], s['decor_name'], s['type']]
                     .map { |v| v.to_s.strip }.reject(&:empty?).join(' ')
             label = s['family'].to_s.strip if label.empty?
             label = s['material_id'].to_s if label.empty?
-            display = [s['decor'], s['structure'], s['decor_name'], s['type']]
-                      .map { |v| v.to_s.strip }.reject(&:empty?).join(' ')
-            entry = { 'label' => label }
-            entry['display'] = display unless display.empty? || display == label
-            out[s['material_id']] = entry
+            [s, label]
           end
+          groups_per_label = labeled.group_by { |(_s, l)| l }.transform_values do |same|
+            same.map { |(r, _l)| vepo_group_key(r) }.uniq
+          end
+          labeled.each_with_object({}) do |(s, label), out|
+            if groups_per_label[label].length > 1
+              man = s['manufacturer'].to_s.strip
+              label = [man, label].reject(&:empty?).join(' ')
+            end
+            out[s['material_id']] = { 'label' => label }
+          end
+        end
+
+        # Kluc skupiny pre koliznu kontrolu labelu (group_id, fallback vyrobca).
+        def vepo_group_key(s)
+          gid = s['group_id'].to_s.strip
+          gid.empty? ? "man:#{s['manufacturer'].to_s.strip}" : gid
         end
 
         def vepo_edge_thicknesses

@@ -351,6 +351,30 @@ NxTest.test('2a4b: GH P1 — VEPO exportny label je stabilny cez migraciu a NEZL
     NxTest.assert_equal('K009 BS DTDL', mats['K2']['label'],
                         'ina struktura = INY bucket (nezlievaju sa)')
   end
+  # GH #93 P1 (2. kolo): decor_name je SUCAST povodneho textu — bez neho by sa
+  # export W1000 zmenil; kolizia labelu dvoch skupin dostava prefix vyrobcu.
+  named = JSON.pretty_generate(
+    'std' => 1, 'schema' => 2,
+    'sheets' => [
+      { 'material_id' => 'W1', 'group_id' => 'GRP-W', 'manufacturer' => 'Egger',
+        'decor' => 'W1000', 'structure' => 'ST9', 'decor_name' => 'Biela', 'type' => 'DTDL',
+        'thickness' => 18.0, 'grain' => 'length', 'color' => [1, 1, 1], 'production_class' => 'sheet' },
+      { 'material_id' => 'C1', 'group_id' => 'GRP-EG', 'manufacturer' => 'Egger',
+        'decor' => 'K111', 'structure' => 'ST9', 'type' => 'DTDL', 'thickness' => 18.0,
+        'grain' => 'length', 'color' => [1, 1, 1], 'production_class' => 'sheet' },
+      { 'material_id' => 'C2', 'group_id' => 'GRP-KR', 'manufacturer' => 'Kronospan',
+        'decor' => 'K111', 'structure' => 'ST9', 'type' => 'DTDL', 'thickness' => 18.0,
+        'grain' => 'length', 'color' => [1, 1, 1], 'production_class' => 'sheet' }
+    ],
+    'edges' => []
+  ).b
+  b4_with_catalog(named) do
+    mats = pd.send(:vepo_materials)
+    NxTest.assert_equal('W1000 ST9 Biela DTDL', mats['W1']['label'],
+                        'decor_name je sucast exportneho labelu (legacy text drzi)')
+    NxTest.assert_equal('Egger K111 ST9 DTDL', mats['C1']['label'], 'kolizia = prefix vyrobcu')
+    NxTest.assert_equal('Kronospan K111 ST9 DTDL', mats['C2']['label'])
+  end
 end
 
 NxTest.test('2a4b: GH P2 — set_decor_name meni nazov atomicky celej skupine (identita nedotknuta)') do
