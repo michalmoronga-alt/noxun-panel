@@ -43,10 +43,15 @@ const CHIPS = [
 ];
 
 // 2A-4b: builder VZDY nesie structure (batch 3) — bez stavu struktur prazdnu.
-let out = mdBuildSheetVariants(CHIPS, {});
-eq(out.error, null, 'bez formatov ziadna chyba');
-eq(out.variants, [{ type: '', thickness: '18', structure: '' }, { type: 'PD', thickness: '38', structure: '' }],
+// GH #93 P2 (7. kolo): PD cip BEZ formatu je klientska chyba (server by variant
+// odmietol az po zavreti formulara a cela davka by sa stratila) — ne-PD cipy
+// bez formatu ostavaju legalne.
+let out = mdBuildSheetVariants([CHIPS[0]], {});
+eq(out.error, null, 'ne-PD cip bez formatu ziadna chyba');
+eq(out.variants, [{ type: '', thickness: '18', structure: '' }],
   'bez formatu sa sheet_size vobec neposiela (server ho neulozi)');
+out = mdBuildSheetVariants(CHIPS, {});
+if (out.error === null) throw new Error('PD cip bez formatu MUSI byt klientska chyba');
 
 out = mdBuildSheetVariants(CHIPS, { '18': { l: '2800', w: '2050' }, 'PD 38': { l: '4100', w: '600' } });
 eq(out.variants, [{ type: '', thickness: '18', structure: '', sheet_size: [2800, 2050] },

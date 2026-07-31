@@ -147,3 +147,15 @@ eq(M.mdParseExtraThs('19/2800x2070', '', 'DTDL'),
    { variants: [{ type: '', thickness: '19', structure: '', sheet_size: [2800, 2070] }], error: null },
    'volitelny format aj pri inych typoch');
 assert(M.mdParseExtraThs('20/zle', '', 'PD').error !== null, 'pokazeny format = chyba');
+
+// --- GH #93 kolo 7: PD cip bez formatu = klientska chyba (formular ostava) --
+assert(M.mdBuildSheetVariants([{ key: 'pd38', label: 'PD 38', type: 'PD', th: '38' }], {}, {}).error !== null,
+       'PD cip bez formatu = chyba uz na klientovi');
+assert(M.mdBuildSheetVariants([{ key: 'g18', label: '18', type: '', th: '18' }], {}, {}, 'PD').error !== null,
+       'genericky cip so zdielanym typom PD bez formatu = chyba');
+eq(M.mdBuildSheetVariants([{ key: 'g18', label: '18', type: '', th: '18' }], {}, {}, 'DTDL'),
+   { variants: [{ type: '', thickness: '18', structure: '' }], error: null },
+   'ne-PD typ format nepotrebuje');
+eq(M.mdBuildSheetVariants([{ key: 'pd38', label: 'PD 38', type: 'PD', th: '38' }],
+                          { pd38: { l: '4100', w: '600' } }, {}).error, null,
+   'PD s formatom prejde');

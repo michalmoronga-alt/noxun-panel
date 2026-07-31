@@ -764,7 +764,7 @@
   // KOMPLETNY par; polovicny/neplatny vstup zastavi odoslanie s hlaskou (vzor
   // mdSaveSheet) — server ma vlastnu striktnu kontrolu, toto je len rychla
   // spatna vazba.
-  function mdBuildSheetVariants(chips, fmt, sts){
+  function mdBuildSheetVariants(chips, fmt, sts, sharedType){
     var out = [], err = null;
     (chips || []).forEach(function(c){
       if (err) return;
@@ -777,6 +777,14 @@
       var st = (sts && sts[c.key]) ? String(sts[c.key].st || '').trim() : '';
       var v = { type: c.type || '', thickness: c.th, structure: st };
       if (l !== null) v.sheet_size = [l, w];
+      // GH #93 P2 (7. kolo): PD variant BEZ formatu by server odmietol az PO
+      // zavreti formulara (strata celej davky) — efektivny typ PD (cip alebo
+      // zdielany typ) vyzaduje format uz na klientovi; formular ostava otvoreny.
+      var effType = String(v.type || sharedType || '').trim().toUpperCase();
+      if (effType === 'PD' && l === null){
+        err = 'Formát platne pre ' + (c.label || c.key) + ' je pri PD povinný (napr. 4100 × 600).';
+        return;
+      }
       out.push(v);
     });
     return { variants: out, error: err };
@@ -947,7 +955,7 @@
   function mdSaveDecorBatch(){
     var sheetChips = mdActiveSheetChips();
     var edgeChips = mdActiveEdgeChips();
-    var built = mdBuildSheetVariants(sheetChips, mdFmt, mdStS);
+    var built = mdBuildSheetVariants(sheetChips, mdFmt, mdStS, el('nd_type').value);
     // Polovicny format = formular OSTAVA otvoreny (hodnoty sa nestratia).
     if (built.error){ MD.setStatus(built.error, true); return; }
     var commonSt = mdCommonSt();
