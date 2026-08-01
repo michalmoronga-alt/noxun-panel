@@ -147,6 +147,48 @@ ensure
   db2_clear_sitemap!
 end
 
+NxTest.test('demos b2: lookup D-64 (GH #106 P2) — paska tretej strany sa aktualizuje cez slug dekoru') do
+  # Realny Rehau tvar: vlastny brand, vlastne "Cislo dekoru" (79098/LPE05),
+  # parametre v poliach "Hrubka (mm)"/"Sirka (mm)" (parser ich necita) — dekor
+  # dosky 5981 nesie len slug. Pred fixom koncilo identity_fail a cena sa
+  # NIKDY neaktualizovala; teraz edge overenie zrkadli create pravidla.
+  rehau_url = 'https://www.demos-trade.sk/absb-79098-ohne-lpe05-cashmere-5981-bs-5981-pd-23-0-8/'
+  rehau_html = <<~HTML
+    <html><body>
+    <h1>ABSB 79098/OHNE/LPE05 Cashmere 5981 BS/5981 PD 23/0,8</h1>
+    <span>Kód sortimentu</span> <strong>356427</strong>
+    <span itemprop="brand">Rehau</span>
+    <dl><dt>Základná cena za m</dt><dd>0,43 EUR<br>0,52 EUR s DPH</dd></dl>
+    <table>
+      <tr><td>Číslo dekoru</td><td>79098/LPE05</td></tr>
+      <tr><td>Hrúbka (mm)</td><td>0,8</td></tr>
+      <tr><td>Šírka (mm)</td><td>23</td></tr>
+      <tr><td>Štruktúra hrán</td><td>BS</td></tr>
+    </table>
+    </body></html>
+  HTML
+  rec = { 'abs_id' => 'B2_REHAU', 'decor' => '5981', 'structure' => 'MG',
+          'width' => 23.0, 'thickness' => 0.8, 'group_id' => 'GRP-5981' }
+  events = []
+  fake = Db1Transport.new(rehau_url => [200, {}, rehau_html])
+  Noxun::Engine::Demos.transport = fake
+  DL2.manual(rec, rehau_url, alive: -> { true }, emit: ->(e) { events << e },
+             manufacturer: 'Kronospan')
+  p = db2_proposals(events).first
+  NxTest.assert_equal('match', p['status'], p.inspect)
+  NxTest.assert_equal('356427', p['code']['new'])
+  NxTest.assert_close(0.52, p['price']['new'], 0.001, 'EUR/m s DPH')
+  # dekor mimo slugu = identity_fail ostava (ziadne zoslabenie na cudzie pasky)
+  events2 = []
+  fake2 = Db1Transport.new(rehau_url => [200, {}, rehau_html])
+  Noxun::Engine::Demos.transport = fake2
+  DL2.manual(rec.merge('decor' => 'K350'), rehau_url,
+             alive: -> { true }, emit: ->(e) { events2 << e }, manufacturer: 'Kronospan')
+  NxTest.assert_equal('identity_fail', db2_proposals(events2).first['status'])
+ensure
+  Noxun::Engine::Demos.transport = nil
+end
+
 NxTest.test('demos b2: lookup — completed retaz uz NEfetchuje (watchdog guard, GH #97 P2)') do
   ctx = DL2.new_ctx(-> { true }, ->(_e) {})
   ctx['completed'] = true

@@ -57,6 +57,64 @@ module Noxun
         EDGE_PREFIXES.any? { |p| prefix_match?(slug, p) }
       end
 
+      # --- rozmery a dekor ABS slugu (D-64; jedno miesto pravdy) --------------
+      # ABS slug konci sirka-hrubka (absb-...-23-1, ...-43-2) alebo pri
+      # desatinnej hrubke sirka-cele-desatina (...-23-0-8 = 23x0,8;
+      # ...-43-1-5 = 43x1,5). Vrati [width, thickness] alebo [nil, nil].
+      def edge_dims_from_slug(slug)
+        nums = trailing_numbers(slug)
+        return [nil, nil] if nums.length < 2
+        # Kandidat 1: posledne DVA tokeny ako desatinna hrubka (X-Y = X.Y) —
+        # plati len pre realne obchodne desatinne hrubky (0,4/0,8/1,2/1,5).
+        if nums.length >= 3
+          dec = "#{nums[-2]}.#{nums[-1]}".to_f
+          if decimal_edge_thickness?(dec)
+            return [nums[-3].to_f, dec]
+          end
+        end
+        [nums[-2].to_f, nums[-1].to_f]
+      end
+
+      # Kolko koncovych tokenov slugu tvori sirka×hrubka (2 cele / 3 desatinna)
+      # — presne zrkadlo edge_dims_from_slug. GH #106 P2: ciselny dekor tesne
+      # pred rozmermi (absb-5981-23-1) NESMIE byt odseknuty s nimi.
+      def edge_dims_token_count(slug)
+        nums = trailing_numbers(slug)
+        return nums.length if nums.length < 2
+        if nums.length >= 3
+          dec = "#{nums[-2]}.#{nums[-1]}".to_f
+          return 3 if decimal_edge_thickness?(dec)
+        end
+        2
+      end
+
+      # D-64: dekor rodiny ako suvisla sekvencia tokenov slugu PRED koncovymi
+      # rozmermi (absb-79098-ohne-lpe05-cashmere-5981-bs-...-23-0-8 ma dekor
+      # 5981 v tele; koncove 23-0-8 su sirka×hrubka a do dokazu nepatria —
+      # dekor '23' nesmie matchnut sirku 23).
+      def edge_slug_decor?(slug, decor)
+        seq = norm_token(decor)
+        return false if seq.nil? || seq.empty?
+        parts = slug.split('-')
+        tail = edge_dims_token_count(slug)
+        body = tail.positive? ? parts[0...-tail] : parts
+        contains_seq?(body, seq)
+      end
+
+      # Neprerusene ciselne tokeny z KONCA slugu.
+      def trailing_numbers(slug)
+        out = []
+        slug.split('-').reverse_each do |t|
+          break unless t.match?(/\A\d+\z/)
+          out.unshift(t)
+        end
+        out
+      end
+
+      def decimal_edge_thickness?(value)
+        Materials::SUPPORTED_EDGE_THICKNESSES_V2.include?(value) && value != value.round
+      end
+
       # rec: katalogovy zaznam (sheet alebo edge — edge s 'abs_id').
       # urls: pole produktovych URL zo sitemap cache.
       # -> {status: :match|:ambiguous|:miss, url:, candidates: []}

@@ -153,21 +153,10 @@ module Noxun
         DemosSlugMatcher.sheet_type_of(slug)
       end
 
-      # ABS slug konci sirka-hrubka (absb-...-23-1, ...-43-2) alebo pri
-      # desatinnej hrubke sirka-cele-desatina (...-23-0-8 = 23x0,8;
-      # ...-43-1-5 = 43x1,5). Vrati [width, thickness] alebo [nil, nil].
+      # ABS rozmery zo slugu — jedno miesto pravdy je DemosSlugMatcher (D-64:
+      # tu ostava delegacia pre klasifikaciu aj verify).
       def edge_dims_from_slug(slug)
-        nums = trailing_numbers(slug)
-        return [nil, nil] if nums.length < 2
-        # Kandidat 1: posledne DVA tokeny ako desatinna hrubka (X-Y = X.Y) —
-        # plati len pre realne obchodne desatinne hrubky (0,4/0,8/1,2/1,5).
-        if nums.length >= 3
-          dec = "#{nums[-2]}.#{nums[-1]}".to_f
-          if decimal_edge_thickness?(dec)
-            return [nums[-3].to_f, dec]
-          end
-        end
-        [nums[-2].to_f, nums[-1].to_f]
+        DemosSlugMatcher.edge_dims_from_slug(slug)
       end
 
       # Cela hrubka dosky byva posledny token (…-2800-2070-18); desatinna ma
@@ -183,7 +172,8 @@ module Noxun
         v.positive? && v < 100 ? v : nil
       end
 
-      # Neprerusene ciselne tokeny z KONCA slugu.
+      # Neprerusene ciselne tokeny z KONCA slugu (sheet hint; ABS verziu vlastni
+      # DemosSlugMatcher).
       def trailing_numbers(slug)
         out = []
         slug.split('-').reverse_each do |t|
@@ -191,10 +181,6 @@ module Noxun
           out.unshift(t)
         end
         out
-      end
-
-      def decimal_edge_thickness?(value)
-        Materials::SUPPORTED_EDGE_THICKNESSES_V2.include?(value) && value != value.round
       end
 
       # --- zalozenie skupiny (sekvencne fetche + 1 zapis) ----------------------
@@ -334,16 +320,10 @@ module Noxun
         }
       end
 
-      # Dekor rodiny ako suvisla sekvencia tokenov slugu PRED koncovymi
-      # rozmermi (absb-79098-ohne-lpe05-cashmere-5981-bs-5981-pd-23-0-8 ma
-      # dekor 5981 v tele; koncove 23-0-8 su sirka×hrubka a do dokazu nepatria).
+      # Dekor rodiny v slugu pasky (GH #106 P2: odseknu sa LEN tokeny realne
+      # parsovane ako sirka×hrubka — ciselny dekor tesne pred nimi prezije).
       def edge_slug_decor?(slug, decor)
-        seq = DemosSlugMatcher.norm_token(decor)
-        return false if seq.nil? || seq.empty?
-        parts = slug.split('-')
-        tail = trailing_numbers(slug).length
-        body = tail.positive? ? parts[0...-tail] : parts
-        DemosSlugMatcher.contains_seq?(body, seq)
+        DemosSlugMatcher.edge_slug_decor?(slug, decor)
       end
 
       # Po dobehnuti vsetkych fetchov: all-or-nothing zapis + obrazok.

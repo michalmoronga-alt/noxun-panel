@@ -385,6 +385,14 @@ NxTest.test('ma1 create D-64: paska bez dekoru rodiny v adrese aj parametroch = 
   NxTest.assert(DFA.edge_slug_decor?('absb-23-nieco-42-2', '23'), 'dekor v tele slugu plati')
   NxTest.assert(DFA.edge_slug_decor?('absb-79098-ohne-lpe05-cashmere-5981-bs-5981-pd-23-0-8', '5981'),
                 'realny Rehau slug s dekorom 5981 v tele')
+  # GH #106 P2: ciselny dekor TESNE pred rozmermi — odsekavaju sa LEN tokeny
+  # realne parsovane ako sirka×hrubka (2 cele / 3 desatinna), nie vsetky cisla.
+  NxTest.assert(DFA.edge_slug_decor?('absb-5981-23-1', '5981'),
+                'dekor hned pred sirka-hrubka prezije (cele)')
+  NxTest.assert(DFA.edge_slug_decor?('absb-5981-23-0-8', '5981'),
+                'dekor hned pred sirka-desatinna-hrubka prezije')
+  NxTest.refute(DFA.edge_slug_decor?('absb-5981-23-1', '23'),
+                'sirka sa ani tak nestane dekorom')
 ensure
   NxTest.install_fresh_seed_catalog!
 end

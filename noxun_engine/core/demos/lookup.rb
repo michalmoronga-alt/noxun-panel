@@ -256,8 +256,17 @@ module Noxun
       # (H3303 existuje u Eggera aj inde; cislo dekoru bez vyrobcu nie je
       # identita, standard 7.1). Chybajuci brand pri zaznamenom vyrobcovi =
       # NIE zhoda (vzor identity_match? — chybajuci komponent nie je dokaz).
+      # D-64 (GH #106 P2): PASKY vyrabaju tretie strany — ich stranka nesie
+      # vlastnu znacku, vlastne "Cislo dekoru" a parametre v inych poliach,
+      # dekor dosky je len v slugu. Edge overenie preto zrkadli create pravidla
+      # (DemosFamily.verify_edge): score slugu (prefix + sirka×hrubka) + dekor
+      # zaznamu v tele slugu pred rozmermi ALEBO zhodny parameter stranky;
+      # brand/struktura/hrubka sa zo stranky NEoveruju (nie su tam, resp. patria
+      # vyrobcovi pasky). Bez tohto by "Aktualizovat z Demosu" na paskach
+      # zalozenych cez D-64 vzdy koncilo identity_fail.
       def verified?(ctx, rec, kind, parsed, final_url)
         slug = DemosSlugMatcher.slug_of(final_url)
+        return verified_edge?(rec, parsed, slug) if kind == 'edge'
         toks = DemosSlugMatcher.record_tokens(rec)
         return false unless DemosSlugMatcher.score(slug, toks)
         return false unless DemosProductParser.identity_match?(parsed, rec)
@@ -266,10 +275,29 @@ module Noxun
           return false if brand.strip.empty?
           return false unless Materials.identity_norm(brand) == Materials.identity_norm(ctx['manufacturer'])
         end
-        if kind == 'edge'
-          pw = parsed['params'] && parsed['params']['width']
-          return false if pw && (pw.to_f - rec['width'].to_f).abs > 0.011
-        end
+        true
+      end
+
+      # Edge overenie BEZ score — score vyzaduje strukturu zaznamu v slugu,
+      # ale paska tretej strany nesie struktury VYROBCU PASKY (Rehau bs), kym
+      # zaznam ma zdedenu strukturu rodiny (D-58). Dokaz = absb/absl prefix +
+      # dekor (slug pred rozmermi / parameter stranky) + presna sirka×hrubka
+      # zo slugu (autorita ako pri create); tabulkova sirka len potvrdzuje.
+      # Sitemap match tretostranovych pasok ostava vedome MISS (struktura v
+      # match() dalej filtruje kandidatov vlastnych pasok vyrobcu) — cesta k
+      # nim je manual URL / ulozena vazba.
+      def verified_edge?(rec, parsed, slug)
+        return false unless DemosSlugMatcher.edge_slug?(slug)
+        params = parsed['params'] || {}
+        page_decor_ok = params['decor'] &&
+                        Materials.identity_norm(params['decor']) == Materials.identity_norm(rec['decor'])
+        return false unless page_decor_ok || DemosSlugMatcher.edge_slug_decor?(slug, rec['decor'])
+        w, th = DemosSlugMatcher.edge_dims_from_slug(slug)
+        return false unless w && th && rec['width'] && rec['thickness']
+        return false if (w - rec['width'].to_f).abs > 0.011
+        return false if (th - rec['thickness'].to_f).abs > 0.011
+        pw = params['width']
+        return false if pw && (pw.to_f - rec['width'].to_f).abs > 0.011
         true
       end
 
