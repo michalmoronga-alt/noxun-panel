@@ -10,7 +10,7 @@
 
 ## Spomaľovače (vysoká priorita)
 
-- **D-70 · Aktualizácia cien má ísť cez uloženú väzbu** (Michal 1.8. neskoro večer, smoke aktualizácie H3176) — „Aktualizovať z Demosu“ hľadá adresu KAŽDÉHO variantu nanovo v sitemap podľa identity a uloženú `demos_url` väzbu vôbec nečíta → pri páskach „viac kandidátov“ (čelná hrana Q3176 RO zdieľa dekor aj rozmery s bežnou páskou) a zbytočné fetche. Súvisiaci nález: 4/7 pások padlo na „stránka nesedí s identitou“ — bug identity checku pások (stránky pások majú iné názvy parametrov), **opravený v PR #106** (v0.5.20 ho ešte mala). *Návrh (mini dávka M-A3d — čaká na Michalovo finálne slovo z debaty 1.8.): variant s väzbou sa fetchuje PRIAMO z demos_url (plné verify beží aj tak), sitemap match len pre nezviazané varianty; mechanika = základ „Prepočítať ceny“ dávky E.*
+*(momentálne žiadne — D-70 vyriešené PR #111)*
 
 ## UX drobnosti (nízka priorita)
 
@@ -98,6 +98,7 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ## Vyriešené — index (plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md))
 
+- **D-70** „Aktualizovať z Demosu“ číta uloženú väzbu — variant s demos_url sa fetchuje priamo (žiadne „viac kandidátov“ pri čelných hranách, funguje aj bez sitemap cache); hľadanie len pre nezviazané; zastaraná väzba = jasná hláška; základ „Prepočítať ceny“ dávky E — PR #111
 - **D-67** výber typu/výrobcu z ponuky nereagoval (CEF datalist bug) — vlastný suggest dropdown s mousedown potvrdením, šípkami/Enter/Escape a diakriticky necitlivým filtrom; aj inline editor výrobcu — PR #109
 - **D-68** formát platne pre dopísané hrúbky (zástena 9,2 už nie je slepá ulička) — pruh „Formát výnimiek" per hrúbka; nová gramatika: čiarka bez medzery = desatinná (9,2 = 9,2 mm; koniec tichého rozpadu 9,20 → 9+20), položky oddeľuje čiarka s medzerou/bodkočiarka; inline `20/4100x600` ostáva — PR #109
 - **D-59** rodina informatívne označuje „už v katalógu“ podľa kódu (sivý riadok, checkbox aktívny — kolízia kódov nesmie zamykať; auto-návrh pásky ich preskakuje) — PR #108
