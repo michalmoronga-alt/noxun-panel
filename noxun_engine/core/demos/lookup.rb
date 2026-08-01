@@ -144,6 +144,11 @@ module Noxun
         end
         deliver(ctx, 'type' => 'sitemap', 'state' => 'refreshing')
         reset_watchdog(ctx)
+        # V0.6 M-A (audit F6): prvy refresh (index + N child sitemap s 3 s
+        # throttle) bezne trva dlhsie nez WATCHDOG_S — kazdy stiahnuty krok
+        # rearmuje watchdog TOHTO kontextu (watcher per cakatel: druhe okno
+        # pripojene k bezacemu refreshu si rearmuje SVOJ watchdog samo).
+        add_refresh_watcher { reset_watchdog(ctx) }
         start_refresh do |ok, err|
           reset_watchdog(ctx)
           if ok
@@ -162,10 +167,11 @@ module Noxun
         @refresh_waiters << done
         return true if @refreshing
         @refreshing = true
-        DemosSitemapCache.refresh! do |res|
+        DemosSitemapCache.refresh!(progress: proc { notify_refresh_watchers }) do |res|
           @refreshing = false
           waiters = @refresh_waiters || []
           @refresh_waiters = []
+          @refresh_watchers = []
           waiters.each do |w|
             begin
               w.call(res['ok'] == true, res['error'])
@@ -177,11 +183,28 @@ module Noxun
         true
       end
 
+      # F6: progress listeneri bezaceho refreshu (rearm watchdogov cakatelov).
+      # Mrtvy kontext je no-op (reset_watchdog na completed ctx nic nespravi).
+      def add_refresh_watcher(&watcher)
+        (@refresh_watchers ||= []) << watcher
+      end
+
+      def notify_refresh_watchers
+        Array(@refresh_watchers).each do |w|
+          begin
+            w.call
+          rescue StandardError => e
+            Engine.log_error(e, 'DemosLookup.refresh watcher') if defined?(Engine)
+          end
+        end
+      end
+
       # Test-only reset zdielaneho refresh stavu (module premenne preziju
       # medzi testami — bez resetu by druhy test cakal na neexistujuci beh).
       def refresh_state_reset!
         @refreshing = false
         @refresh_waiters = []
+        @refresh_watchers = []
       end
 
       # --- fetch retaz ---------------------------------------------------------

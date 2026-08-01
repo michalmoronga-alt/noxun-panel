@@ -46,8 +46,20 @@ module Noxun
         out['params'] = parse_params(html)
         # GH #96 P2: znacka je vnorena (<span itemprop="brand">Egger</span>).
         out['brand'] = capture(html, /itemprop="brand"[^>]*>\s*([^<]+?)\s*</m)
+        # V0.6 M-A: obrazok dekoru = <img itemprop="image" src=...> (og:image je
+        # genericke logo webu). RAW hodnota — sanitize robi zapisova cesta
+        # (Demos.sanitize_image_url v create flow), parser len navrhuje.
+        out['image_url'] = parse_image(html)
         out['related'] = parse_related(html, out['warnings'])
         out
+      end
+
+      # Prvy <img> s itemprop="image" -> src (poradie atributov lubovolne).
+      def parse_image(html)
+        tag = capture(html, /(<img[^>]*\bitemprop="image"[^>]*>)/m)
+        return nil unless tag
+        m = tag.match(/\bsrc\s*=\s*"([^"]+)"/m)
+        m ? m[1].strip : nil
       end
 
       # "Zakladna cena za ks" blok: prva suma = bez DPH, druha (pri "s DPH") = s DPH.
