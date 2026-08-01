@@ -20,15 +20,13 @@ module Noxun
 
       module_function
 
-      # Typ tag zo slug prefixu: sheet typy z DemosSlugMatcher::TYPE_PREFIXES,
-      # ABS pasky maju prefix absb. Neznamy prefix = nil (URL sa nehlada —
-      # prislusenstvo/listy/vzorky nie su materialove polozky).
+      # Typ tag zo slug prefixu — D-65: jedna autorita (DemosSlugMatcher,
+      # prefix plati len s pomlckou; koniec volneho start_with, ktore sa
+      # spravalo inak nez family klasifikacia). Neznamy prefix = nil (URL sa
+      # nehlada — prislusenstvo/listy/vzorky nie su materialove polozky).
       def type_of(slug)
-        return 'ABS' if slug.start_with?('absb')
-        DemosSlugMatcher::TYPE_PREFIXES.each do |type, prefixes|
-          return type if prefixes.any? { |p| slug.start_with?(p) }
-        end
-        nil
+        return 'ABS' if DemosSlugMatcher.edge_slug?(slug)
+        DemosSlugMatcher.sheet_type_of(slug)
       end
 
       # Dotaz -> slug tokeny (diakritika/case cez Materials.slug — jedina
@@ -38,11 +36,14 @@ module Noxun
       end
 
       # Predpocitany index: [[slug, type, url], ...] len pre zname typy.
+      # D-65/D-55: produktove slugy VZDY nesu rozmery — slug bez cislice je
+      # clanok/kategoria (pracovna-doska-v-hlbokom-mate) a do navrhov nepatri
+      # (klik na ne konci "stranka nema cislo dekoru").
       def build_index(urls)
         out = []
         Array(urls).each do |url|
           slug = DemosSlugMatcher.slug_of(url)
-          next if slug.empty?
+          next if slug.empty? || !slug.match?(/\d/)
           type = type_of(slug)
           next unless type
           out << [slug, type, url]
@@ -109,11 +110,12 @@ module Noxun
 
       # Citatelny label do naseptavaca: slug bez typoveho prefixu, pomlcky
       # ako medzery (dtdl-h1193-st12-dub-halifax-2800-2070-18 ->
-      # "h1193 st12 dub halifax 2800 2070 18").
+      # "h1193 st12 dub halifax 2800 2070 18"). D-65: odstrihava sa NAJDLHSI
+      # matchujuci prefix (dtd-laminovana pred dtdl by inak ostal polovicny).
       def label_of(slug, type)
-        prefixes = type == 'ABS' ? ['absb'] : Array(DemosSlugMatcher::TYPE_PREFIXES[type])
+        prefixes = type == 'ABS' ? DemosSlugMatcher::EDGE_PREFIXES : Array(DemosSlugMatcher::TYPE_PREFIXES[type])
         body = slug
-        prefixes.each do |p|
+        prefixes.sort_by { |p| -p.length }.each do |p|
           next unless body.start_with?("#{p}-")
           body = body[(p.length + 1)..]
           break

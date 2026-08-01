@@ -6,25 +6,24 @@
 
 ## Blokery (bránia dokončeniu zákazky)
 
-*(momentálne žiadne — D-45 vyriešené PR #83)*
+- **D-67 · Výber typu materiálu zo zoznamu nereaguje** (Michal 1.8. neskoro večer, smoke F8100/zástena) — vo formulári variantu sa pri písaní typu ukáže ponuka (DTDL, MDF…), ale klik na položku hodnotu nevyplní; typ treba dopísať ručne. Príčina: natívny HTML `datalist` v CEF okne (rovnaký mechanizmus má aj pole Výrobca). *Fix (audit 1.8.): vlastný klikateľný zoznam návrhov (vzor hľadania v „Pridať z Demosu") s potvrdením na mousedown (blur pasca), Enter/Escape/šípkami a diakriticky necitlivým filtrom; konvertovať aj `md_man_input` v detaile skupiny — jediný ďalší datalist.* → dávka M-A3c
+- **D-68 · Formát platne sa pri dopísaných hrúbkach nedá zadať — zástena sa nedá vytvoriť** (Michal 1.8. neskoro večer, BLOKER) — pole formátu majú len prednastavené čipy hrúbok; „Ďalšie hrúbky" (9,2 pre zástenu) formát nemajú, ale server ho pri type s formátom v identite (PD, zástena) povinne vyžaduje → validačná chyba bez cesty von. *Fix (audit 1.8.): formátový pruh per dopísanú hrúbku (vzor čipov, vlastný menný priestor kľúčov, dedup 9,2=9,20); prefill formátu pre PD/zástenu ostáva prázdny (nevymýšľať identitu); zjednotiť gramatiku desatinnej čiarky („9,2" = 9,2 mm — dnes sa rozpadne na 9 a 2!) + testy; zachovať inline zápis `20/4100x600`.* → dávka M-A3c
 
 ## Spomaľovače (vysoká priorita)
 
 - **D-59 · Rodina neoznačuje „už v katalógu“** (Michal 1.8. večer, smoke M-A) — pri doplnení variantu do existujúcej skupiny ponúka rodina aj položky, ktoré už v katalógu sú (PD 920 pri pridávaní PD 650); zápis duplicitu preskočí, ale ponuka mätie. *Fix: server pri family evente označí položky podľa KÓDU (unikátny) — „už pridané“ zamknuté/sivé.* → dávka M-A3
 - **D-60 · URL väzba nie je v UI viditeľná** (Michal 1.8. večer) — demos_url/price_checked_at sa ukladajú, ale detail variantu ich nezobrazuje; nedá sa overiť prepojenie. *Fix: v detaile ikona väzby + dátum overenia + „Otvoriť u dodávateľa“; spolu s D-56 badge na dlaždici.* → M-A3
-- **D-64 · ABS pásky Kronospan dekorov sa nezakladajú** (Michal 1.8. večer, BUG) — verify pri create vyžaduje zhodu výrobcu stránky s rodinou; pásky k Kronospan dekorom vyrába iný výrobca pások („79098 ohne…“) → „výrobca stránky nesedí“ a položka padá. Egger si pásky robí sám, preto Halifaxy prešli. *Fix: pásky overovať dekorom+rozmermi (výrobca sa pri ABS ani neukladá — štandard 7.5); brand check len dosky.* → M-A3
-- **D-65 · Demos slug prefixy nepokryté** (Michal 1.8. večer, BUG) — `dtd-laminovana-…` (Kronospan DTDL) a `mdfl` nepoznáme → doska „mimo systému“ s mätúcim dôvodom „príslušenstvo“; rovnaké URL ignoruje aj hľadanie. *Fix: analýza všetkých prefixov zo sitemap cache (48k) → doplniť aliasy do TYPE_PREFIXES + lepší text dôvodu.* → M-A3
 
 ## UX drobnosti (nízka priorita)
 
-- **D-58 · ABS z Demosu bez štruktúry** (Michal 1.8.) — stránky pások štruktúru neuvádzajú → banner + ručné „univerzálna“ pri každom importe. *Fix: pri zakladaní dediť štruktúru z hlavičky rodiny.*
 - **D-61 · Ceny za KUS/tabuľu, nie €/m²** (Michal 1.8.) — plošné materiály sa kupujú po celých tabuliach (1,2 platne = kupujem 2); €/m² len interná jednotka. *UI: cena za tabuľu primárne (m²×formát), m² sekundárne; ABS €/bm OK. VÄZBA NA DÁVKU E: sumár musí rátať celé kusy.*
 - **D-62 · Textúra len na dlaždici skupiny** (Michal 1.8.) — detail skupiny/variantu ukazuje len farbu. *Fix: fotka aj v hlavičke detailu.*
 - **D-63 · Odrezané názvy dlaždíc** (Michal 1.8.) — „H1181 Dub Halifax…“ bez rozlišujúcej časti (tabakový/prírodný). *Fix: dvojriadkový názov/podnázov + tooltip.*
-- **D-55 · „+ z Demosu“ na skupine — dotiahnutie** (Michal 1.8.) — flow UŽ funguje (identitu nesie stránka položky); zostáva: stránka BEZ identity (PD) v kontexte otvorenej skupiny neblokovať + modrý pás „pridávam do existujúcej“ výraznejšie.
+- **D-55 · „+ z Demosu“ na skupine — dotiahnutie** (Michal 1.8.) — flow UŽ funguje (identitu nesie stránka položky); zostáva: modrý pás „pridávam do existujúcej“ výraznejšie (→ M-A3b). *Zúžené po audite 1.8.: pôvodný nápad doplniť chýbajúcu identitu stránky z otvorenej skupiny Codex zamietol (adresa nedokazuje výrobcu — kontaminácia skupiny); „stránky bez identity“ boli reálne články/kategórie zo sitemap — tie od PR #106 z návrhov vypadli (produktové adresy vždy nesú rozmery).*
 
 ## Nápady na zváženie (nerozhodnuté)
 
+- **D-66 · Zástena priamo z Demosu** (Michal 1.8. neskoro večer, smoke F8100) — „Pridať z Demosu“ zástenu nájde, ale označí „mimo systému — založ ručne“ (vedomé z M-A1: rub je len v adrese a čítanie identity z adresy bolo zakázané). Michal: do budúcna importovať priamo. *Návrh: samostatná mini dávka po M-A3 — D-64 už kontrolovane otvoril výnimku „identita z adresy“ pre pásky; pre zástenu treba rub (líce PRED rubom v slugu, vzor score) + formát + audit.* 
 - **D-48 · Zdieľaná knižnica pre 2 PC (Michal + Lucia)** (Michal 31.7. večer) — obe pracoviská majú zobrazovať ROVNAKÉ šablóny aj materiály (spolupráca, posúvanie projektov). Jednotný zdroj = **firemný Google Disk** (sú tam všetky firemné veci). Dotýka sa: katalóg materiálov, šablóny korpusov, pravidlá kovania (dnes všetko v lokálnom %APPDATA%). *Stav: na návrhovú dávku — sync/zdieľanie cez G-Disk priečinok.*
 - **D-49 · Duplák = samozrejmosť, nie variant** (Michal 31.7. večer — revízia D-43 modelu) — ak existuje 18 mm doska, **automaticky sa dá zduplovať** (36 = 2×18): NErobiť 36-ku ako osobitný katalógový variant, má **rovnaký kód ako 18-ka**, dostupná automaticky pri každej 18-ke (napr. v selecte hrúbky/materiálu rovno ponuka „36 (duplák)"). *Stav: prebrať — mení create flow z 2B-1 (tlačidlo → automatika); dátový model (source väzba v snapshote) zostáva platný.*
 - **D-50 · OCL inšpirácia UI/UX** (Michal 31.7. večer) — pár detailov z OCL flow prevziať; najprv slovné prebratie (sedenie), potom zapracovanie. *Stav: čaká na sedenie.*
@@ -39,6 +38,7 @@
 
 ## Návrhy väčších celkov (na rozpracovanie)
 
+- **D-69 · Jednotný editor materiálov** (Michal 1.8. neskoro večer, smoke F8100/zástena) — editor variantov nie je prispôsobený novému systému: niektoré údaje server vyžaduje, ale používateľ ich nemá kde zadať/skontrolovať (formát, URL, dodávateľ, kód, stav väzby). Odporúčanie: JEDNO spoločné modálne okno pre pridanie z Demosu / ručné pridanie / editáciu / dopĺňanie / opravy — rovnaké polia bez ohľadu na vstupný bod. *Zaradenie: UI 2.0 dávka (OCL smer, D-50) — spája sa s D-15 („pridávačky ako modal“) a D-51 (štandard okien); akútne diery kryjú D-67/D-68 (M-A3c) a D-60/D-62 (M-A3b).*
 - **D-20 · Quick actions — bezpečný move plugin** (Michal 19.7., „pre budúceho Michala a Fable, keď bude základ top 😉") — zlúčiť funkčné pluginy noxun_mower + Snaper do jedného toolbar pluginu (rýchly pohyb, kopírovanie, rotácie, prisunutie na doraz). **Známy poznatok:** mower „rýchla kópia skrinky vedľa" vytvorí kópiu LEN ako geometriu — bez NOXUN identity kabinetu (kópia mimo observer/dedup flow). Pri stavbe quick actions kopírovanie prerobiť tak, aby kópia prešla štandardným dedup tickom (plná identita + config). *Stav: budúcnosť (po V1 / pri zostavách).*
 - **D-09 · Snap body pri presúvaní priečok** (1/4, 1/2, 3/4…) v zónovom náhľade. *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
 - **D-10 · Presúvanie/úprava čiel priamo v náhľade** (ako drag priečok). *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
@@ -103,6 +103,9 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ## Vyriešené — index (plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md))
 
+- **D-64** ABS pásky tretích strán (Rehau…) padali na kontrole výrobcu — pásky sa overujú dekorom v adrese (mimo koncových rozmerov) + rozmermi; brand check len dosky — PR #106
+- **D-65** slug prefixy zo sitemap analýzy 48k: dtd-laminovana→DTDL, mdfl/mdfs→MDF, kd-in/kd-ex→KOMPAKT, pracovni-deska→PD, absl/abs-→ABS; jedna autorita klasifikácie + filter článkov bez číslic; mdfd (dyhovaná) vedome mimo — PR #106
+- **D-58** ABS z Demosu dedí štruktúru povrchu z rodiny (stránky pások ju neuvádzajú; „Štruktúra hrán“ výrobcu pásky sa vedome nečíta) — PR #106
 - **D-57** upratanie knižnice materiálov (1.8. večer: katalóg 27/23→13/12 — UNI sada pod fallback ID, staré textové skupiny zmazané, pravidlo „len UNI + Demos-kompatibilné“; šablóny všetky dedia; záloha materials.pred-upratanim-20260801) — jednorazová akcia, bez PR
 - **D-43** duplák 36 = 2×18 (väzba na zdroj + násobič, všetko ostatné derivované; väzba vo výrobnom snapshote; odhad platní prelieva plochu do zdroja; katalóg SCHEMA 3 lazy; batch čip vedome odložený) — PR #94
 - **D-47** hlavička panela — tlačidlo Materiály vedľa Výroby (rovnako široké), 3 taby rovnako široké s ikonami, pod 400 px akcie icon-only — PR 2A-4b (TBD)

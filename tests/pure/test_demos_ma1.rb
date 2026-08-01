@@ -118,6 +118,26 @@ NxTest.test('ma1 name search: neznamy prefix sa nehlada, absb je ABS, label bez 
   NxTest.assert(hits[0]['label'].start_with?('h3303'), hits[0]['label'])
 end
 
+NxTest.test('ma1 name search D-65: alias prefixy najditelne, clanky bez cislic von, label bez aliasu') do
+  urls = ['https://www.demos-trade.sk/dtd-laminovana-k003-pw-gold-craft-oak-2800-2070-25/',
+          'https://www.demos-trade.sk/mdfl-101-sm-front-white-2800-2070-8/',
+          'https://www.demos-trade.sk/kd-in-w980-st7-platinovo-biela-cj-cgs-2790-2060-12/',
+          'https://www.demos-trade.sk/absl-76955-14-mamba-green-7190-bs-22-0-4/',
+          'https://www.demos-trade.sk/pracovna-doska-v-hlbokom-mate/',
+          'https://www.demos-trade.sk/kompaktne-dosky-prehlad-skladovej-kolekcie/']
+  dtd = DNS_MA.search(urls, 'gold craft')
+  NxTest.assert_equal(1, dtd.length, dtd.inspect)
+  NxTest.assert_equal('DTDL', dtd[0]['type'])
+  NxTest.assert(dtd[0]['label'].start_with?('k003'), "alias prefix odstrihnuty: #{dtd[0]['label']}")
+  NxTest.assert_equal('MDF', DNS_MA.search(urls, 'front white')[0]['type'])
+  NxTest.assert_equal('KOMPAKT', DNS_MA.search(urls, 'platinovo')[0]['type'])
+  NxTest.assert_equal('ABS', DNS_MA.search(urls, 'mamba')[0]['type'])
+  NxTest.assert_equal([], DNS_MA.search(urls, 'hlbokom mate'),
+                      'clanok bez cislic sa neindexuje (digit guard)')
+  NxTest.assert_equal([], DNS_MA.search(urls, 'prehlad skladovej'),
+                      'kategoria sa neindexuje')
+end
+
 NxTest.test('ma1 name search: cache index sa memoizuje podla fetched_at') do
   DNS_MA.index_reset!
   Noxun::Engine::JsonFileStore.write(Noxun::Engine::DemosSitemapCache.path,
@@ -196,9 +216,26 @@ NxTest.test('ma1 family: klasifikacia slugov — sheet typy, ABS rozmery, vzorka
   NxTest.assert(vz['reason'].include?('vzorka'), vz['reason'])
   li = DFA.classify_item('x', '6', 'https://www.demos-trade.sk/lista-prechodova-h3303/', 'ks', 1.0)
   NxTest.assert_equal('other', li['kind'])
+  NxTest.assert_equal('mimo podporovaných typov materiálu', li['reason'], 'D-65: uz nie "(prislusenstvo)"')
   za = DFA.classify_item('x', '7', 'https://www.demos-trade.sk/zastena-h3303-st10-f620-4100-640-9-2/', 'ks', 1.0)
   NxTest.assert_equal('other', za['kind'])
   NxTest.assert(za['reason'].include?('zástena'), za['reason'])
+end
+
+NxTest.test('ma1 family: klasifikacia D-65 — alias prefixy dtd-laminovana/mdfl/kd-in/absl') do
+  dtd = DFA.classify_item('x', '1', 'https://www.demos-trade.sk/dtd-laminovana-k003-pw-gold-craft-oak-2800-2070-25/', 'ks', 10.0)
+  NxTest.assert_equal(%w[sheet DTDL], [dtd['kind'], dtd['type']], dtd.inspect)
+  NxTest.assert_close(25.0, dtd['thickness_hint'], 0.01)
+  ml = DFA.classify_item('x', '2', 'https://www.demos-trade.sk/mdfl-101-sm-front-white-2800-2070-8/', 'ks', 10.0)
+  NxTest.assert_equal(%w[sheet MDF], [ml['kind'], ml['type']])
+  kd = DFA.classify_item('x', '3', 'https://www.demos-trade.sk/kd-in-w980-st7-platinovo-biela-cj-cgs-2790-2060-12/', 'ks', 10.0)
+  NxTest.assert_equal(%w[sheet KOMPAKT], [kd['kind'], kd['type']])
+  al = DFA.classify_item('x', '4', 'https://www.demos-trade.sk/absl-76955-14-mamba-green-7190-bs-22-0-4/', 'm', 1.0)
+  NxTest.assert_equal('edge', al['kind'])
+  NxTest.assert_close(22.0, al['width_hint'], 0.01)
+  NxTest.assert_close(0.4, al['thickness_hint'], 0.01)
+  md = DFA.classify_item('x', '5', 'https://www.demos-trade.sk/mdfd-dub-comfort-a-b-2520-1810-19/', 'ks', 10.0)
+  NxTest.assert_equal('other', md['kind'], 'dyhovana MDF vedome mimo')
 end
 
 NxTest.test('ma1 family: load_family — hlavicka + polozky z PD fixture, complete raz') do
@@ -284,20 +321,80 @@ ensure
   NxTest.install_fresh_seed_catalog!
 end
 
-NxTest.test('ma1 create: iny vyrobca polozky = fail CELEJ davky, katalog nezmeneny') do
+NxTest.test('ma1 create: iny vyrobca DOSKY = fail CELEJ davky, katalog nezmeneny (D-64: len dosky)') do
   NxTest.install_fresh_seed_catalog!
   before = File.read(MAT_MA.path)
   map = {
     MA1_DTDL18_URL => [200, {}, ma1_fixture('h3303_dtdl18_product.html')],
-    MA1_ABS_URL => [200, {}, ma1_abs_html(brand: 'Kronospan')]
+    MA1_ABS_URL => [200, {}, ma1_abs_html]
   }
-  events, = ma1_run_create(ma1_header, [ma1_sheet_item, ma1_edge_item], %w[i0 i1], map)
+  header = ma1_header.merge('manufacturer' => 'Kronospan')
+  events, = ma1_run_create(header, [ma1_sheet_item, ma1_edge_item], %w[i0 i1], map)
   done = ma1_complete(events)
   NxTest.assert_equal(false, done['ok'])
-  NxTest.assert_equal(1, done['failed'].length, 'vinnik menovany')
-  NxTest.assert_equal('i1', done['failed'][0]['iid'])
+  NxTest.assert_equal(1, done['failed'].length, 'vinnik menovany (paska cez slug dekoru presla)')
+  NxTest.assert_equal('i0', done['failed'][0]['iid'])
   NxTest.assert(done['failed'][0]['reason'].include?('výrobca'), done['failed'][0]['reason'])
   NxTest.assert_equal(before, File.read(MAT_MA.path), 'all-or-nothing: ziadny zapis')
+end
+
+NxTest.test('ma1 create D-64+D-58: paska tretej strany (cudzi brand aj params-decor) prejde slugom, dedi strukturu rodiny') do
+  NxTest.install_fresh_seed_catalog!
+  # Realny vzor Rehau: brand=Rehau, "Cislo dekoru"=79098/LPE05 (vlastne cislo
+  # vyrobcu pasky), struktura POVRCHU na stranke nie je — dekor rodiny nesie
+  # len slug URL. Tabulkove rozmery zamerne ziadne (realne stranky pasok maju
+  # ine nazvy poli — parser ich necita).
+  rehau = <<~HTML
+    <html><body>
+    <h1>ABSB 79098/OHNE/LPE05 Dub Hamilton 23/1</h1>
+    <span>Kód sortimentu</span> <strong>356427</strong>
+    <span itemprop="brand">Rehau</span>
+    <dl><dt>Základná cena za m</dt><dd>0,43 EUR<br>0,52 EUR s DPH</dd></dl>
+    <table>
+      <tr><td>Číslo dekoru</td><td>79098/LPE05</td></tr>
+    </table>
+    </body></html>
+  HTML
+  map = { MA1_DTDL18_URL => [200, {}, ma1_fixture('h3303_dtdl18_product.html')],
+          MA1_ABS_URL => [200, {}, rehau] }
+  events, = ma1_run_create(ma1_header, [ma1_sheet_item, ma1_edge_item], %w[i0 i1], map)
+  done = ma1_complete(events)
+  NxTest.assert_equal(true, done['ok'], events.inspect)
+  e = MAT_MA.edge(done['result']['edges'][0])
+  NxTest.assert_close(23.0, e['width'], 0.01, 'sirka zo slugu (autorita)')
+  NxTest.assert_close(1.0, e['thickness'], 0.01)
+  NxTest.assert_equal('ST10', e['structure'], 'D-58: struktura zdedena z hlavicky rodiny')
+  NxTest.assert_equal('356427', e['code'])
+ensure
+  NxTest.install_fresh_seed_catalog!
+end
+
+NxTest.test('ma1 create D-64: paska bez dekoru rodiny v adrese aj parametroch = fail; dekor sa nehlada v rozmeroch') do
+  NxTest.install_fresh_seed_catalog!
+  before = File.read(MAT_MA.path)
+  cudzia = 'https://www.demos-trade.sk/absb-79098-ohne-lpe05-iny-vzor-23-1/'
+  map = { cudzia => [200, {}, ma1_abs_html(decor: '79098/LPE05')] }
+  events, = ma1_run_create(ma1_header, [ma1_edge_item('url' => cudzia)], %w[i1], map)
+  done = ma1_complete(events)
+  NxTest.assert_equal(false, done['ok'])
+  NxTest.assert(done['failed'][0]['reason'].include?('nenesie číslo dekoru'), done['failed'][0]['reason'])
+  NxTest.assert_equal(before, File.read(MAT_MA.path))
+  # kolizia dekoru s rozmermi: dekor rodiny '23' NESMIE matchnut sirku 23 v konci slugu
+  NxTest.refute(DFA.edge_slug_decor?('absb-79098-ohne-iny-vzor-23-1', '23'),
+                'koncove rozmery sa do dokazu dekoru neratatju')
+  NxTest.assert(DFA.edge_slug_decor?('absb-23-nieco-42-2', '23'), 'dekor v tele slugu plati')
+  NxTest.assert(DFA.edge_slug_decor?('absb-79098-ohne-lpe05-cashmere-5981-bs-5981-pd-23-0-8', '5981'),
+                'realny Rehau slug s dekorom 5981 v tele')
+  # GH #106 P2: ciselny dekor TESNE pred rozmermi — odsekavaju sa LEN tokeny
+  # realne parsovane ako sirka×hrubka (2 cele / 3 desatinna), nie vsetky cisla.
+  NxTest.assert(DFA.edge_slug_decor?('absb-5981-23-1', '5981'),
+                'dekor hned pred sirka-hrubka prezije (cele)')
+  NxTest.assert(DFA.edge_slug_decor?('absb-5981-23-0-8', '5981'),
+                'dekor hned pred sirka-desatinna-hrubka prezije')
+  NxTest.refute(DFA.edge_slug_decor?('absb-5981-23-1', '23'),
+                'sirka sa ani tak nestane dekorom')
+ensure
+  NxTest.install_fresh_seed_catalog!
 end
 
 NxTest.test('ma1 create: fetch chyba polozky = ziadny zapis; cancel medzi fetchmi = ticho bez zapisu') do
