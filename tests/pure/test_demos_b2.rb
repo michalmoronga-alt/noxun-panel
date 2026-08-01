@@ -189,6 +189,85 @@ ensure
   Noxun::Engine::Demos.transport = nil
 end
 
+NxTest.test('demos b2: lookup D-70 — zviazany zaznam ide PRIAMO z demos_url, bez sitemap') do
+  db2_clear_sitemap!
+  DL2.refresh_state_reset!
+  # Ziadna sitemap cache — zviazana skupina sa MUSI aktualizovat aj tak.
+  rec = db2_dtdl_rec('demos_url' => DB2_DTDL18_URL)
+  events, fake = db2_run([rec], DB2_DTDL18_URL => [200, {}, db2_fixture('h3303_dtdl18_product.html')])
+  p = db2_proposals(events).first
+  NxTest.assert_equal('match', p['status'], p.inspect)
+  NxTest.assert_equal('175718', p['code']['new'])
+  NxTest.assert_equal([DB2_DTDL18_URL], fake.calls, 'presne 1 fetch = ulozena vazba, ziadny sitemap')
+  NxTest.assert(db2_complete(events).first['ok'])
+ensure
+  DL2.refresh_state_reset!
+end
+
+NxTest.test('demos b2: lookup D-70 — zmiesana davka: vazba priamo, nezviazany cez sitemap match') do
+  db2_sitemap!([DB2_DTDL18_URL])
+  bound_url = 'https://www.demos-trade.sk/dtdl-h3303-st10-dub-hamilton-prirodny-2800-2070-8/'
+  recs = [db2_dtdl_rec('material_id' => 'B2_BOUND', 'thickness' => 8.0,
+                       'sheet_size' => nil, 'demos_url' => bound_url),
+          db2_dtdl_rec]
+  # Fixture obsahom sedi na DTDL 18 — bound zaznam (hrubka 8) dostane
+  # identity_fail so SPECIFICKOU hlaskou o vazbe; nezviazany prejde matchom.
+  events, fake = db2_run(recs, bound_url => [200, {}, db2_fixture('h3303_dtdl18_product.html')],
+                               DB2_DTDL18_URL => [200, {}, db2_fixture('h3303_dtdl18_product.html')])
+  by_id = db2_proposals(events).map { |p| [p['record_id'], p] }.to_h
+  NxTest.assert_equal('match', by_id['B2_DTDL_18']['status'])
+  NxTest.assert_equal('identity_fail', by_id['B2_BOUND']['status'])
+  NxTest.assert(by_id['B2_BOUND']['warnings'].any? { |w| w.include?('väzba') },
+                "zastarana vazba ma vlastnu hlasku: #{by_id['B2_BOUND']['warnings'].inspect}")
+  NxTest.assert_equal(2, fake.calls.length, 'oba fetche, ziadne navyse')
+ensure
+  db2_clear_sitemap!
+end
+
+NxTest.test('demos b2: lookup D-70 (audit BLOCKER) — zmiesana davka BEZ cache: vazba sa fetchne, sitemap fail nezahodi vysledok') do
+  db2_clear_sitemap!
+  DL2.refresh_state_reset!
+  recs = [db2_dtdl_rec('demos_url' => DB2_DTDL18_URL),
+          db2_dtdl_rec('material_id' => 'B2_NOVY', 'decor' => 'U9999')]
+  # Ziadna cache + refresh zlyha (index :err) — zviazany zaznam MUSI dobehnut
+  # PRED sitemap fazou a jeho vysledok prezit; nezviazany konci miss s dovodom;
+  # complete presne RAZ a USPESNE (Apply v modali ostava mozny).
+  events, fake = db2_run(recs, DB2_DTDL18_URL => [200, {}, db2_fixture('h3303_dtdl18_product.html')],
+                               Noxun::Engine::DemosSitemapCache::INDEX_URL => :err)
+  by_id = db2_proposals(events).map { |p| [p['record_id'], p] }.to_h
+  NxTest.assert_equal('match', by_id['B2_DTDL_18']['status'], by_id.inspect)
+  NxTest.assert_equal('175718', by_id['B2_DTDL_18']['code']['new'])
+  NxTest.assert_equal('miss', by_id['B2_NOVY']['status'])
+  NxTest.assert(by_id['B2_NOVY']['warnings'].any? { |w| w.include?('sitemap') || w.include?('zoznam') },
+                by_id['B2_NOVY'].inspect)
+  NxTest.assert_equal(DB2_DTDL18_URL, fake.calls.first, 'vazba sa fetchla PRED sitemap pokusom')
+  dones = db2_complete(events)
+  NxTest.assert_equal(1, dones.length, 'complete presne raz')
+  NxTest.assert_equal(true, dones.first['ok'], 'sitemap fail nezhodi davku so zviazanymi vysledkami')
+  # cisto NEZVIAZANA davka drzi povodne spravanie: complete false
+  DL2.refresh_state_reset!
+  events2, = db2_run([db2_dtdl_rec], Noxun::Engine::DemosSitemapCache::INDEX_URL => :err)
+  NxTest.assert_equal(false, db2_complete(events2).first['ok'], 'bez bound vysledkov = povodny fail')
+ensure
+  DL2.refresh_state_reset!
+end
+
+NxTest.test('demos b2: lookup D-70 — nevalidna ulozena URL = fallback na match; skip guardy maju prednost') do
+  db2_sitemap!([DB2_DTDL18_URL])
+  # cudzi host neprejde sanitize -> zaznam ide klasickou match cestou
+  rec = db2_dtdl_rec('demos_url' => 'https://evil.example.com/x')
+  events, fake = db2_run([rec], DB2_DTDL18_URL => [200, {}, db2_fixture('h3303_dtdl18_product.html')])
+  NxTest.assert_equal('match', db2_proposals(events).first['status'], 'fallback match funguje')
+  NxTest.assert_equal([DB2_DTDL18_URL], fake.calls)
+  # duplak s vazbou sa NEfetchuje (skip pred vazbou)
+  events2, fake2 = db2_run([db2_dtdl_rec('material_id' => 'B2_DUP', 'source_material_id' => 'X',
+                                         'source_multiplier' => 2, 'demos_url' => DB2_DTDL18_URL)], {})
+  NxTest.assert_equal('skipped_duplak', db2_proposals(events2).first['status'])
+  NxTest.assert_equal(0, fake2.calls.length)
+ensure
+  db2_clear_sitemap!
+end
+
 NxTest.test('demos b2: lookup — completed retaz uz NEfetchuje (watchdog guard, GH #97 P2)') do
   ctx = DL2.new_ctx(-> { true }, ->(_e) {})
   ctx['completed'] = true

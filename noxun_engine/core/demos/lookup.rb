@@ -49,26 +49,75 @@ module Noxun
                                             .find { |m| !m.empty? }
         pre = []
         work = []
+        bound = []
         Array(records).each do |rec|
           kind = rec['abs_id'].to_s.empty? ? 'sheet' : 'edge'
           if (skip = skip_reason(rec, kind))
             pre << base_proposal(rec, kind).merge('status' => skip[0], 'warnings' => [skip[1]])
+            next
+          end
+          # D-70: zaznam s ULOZENOU vazbou sa fetchuje priamo z nej — ziadny
+          # sitemap match (ziadne "viac kandidatov" pri celnych hranach, ziadna
+          # zavislost na cache). Cerstvy sanitize ako pri open_demos_url (D-60):
+          # genericke save cesty demos_url nevaliduju; nevalidna vazba = zaznam
+          # ide klasickou match cestou, nie hard fail. Plne verify bezi aj tak —
+          # zastarana vazba skonci identity_fail s manual-URL fallbackom.
+          clean = nil
+          unless rec['demos_url'].to_s.strip.empty?
+            clean, = Demos.sanitize_url(rec['demos_url'])
+          end
+          if clean
+            bound << [rec, kind, clean, true]
           else
             work << [rec, kind]
           end
         end
-        # GH #97 P2: vsetko preskocene = ziadna URL netreba — complete HNED,
-        # bez sitemap (fresh install by zbytocne stahoval 9,5 MB a pripadny
-        # nesuvisiaci fail refreshu by zhodil ok=false).
+        pre.each { |p| deliver_proposal(ctx, p) }
+        # GH #97 P2: ked ziadny zaznam nepotrebuje sitemap match, complete/fetch
+        # ide HNED bez sitemap (fresh install by zbytocne stahoval 9,5 MB a
+        # nesuvisiaci fail refreshu by zhodil ok=false). D-70: plne zviazana
+        # skupina sa aktualizuje aj uplne BEZ sitemap cache.
         if work.empty?
-          pre.each { |p| deliver_proposal(ctx, p) }
-          return complete(ctx, true, nil)
+          return complete(ctx, true, nil) if bound.empty?
+          ctx['total'] = bound.length
+          fetch_chain(ctx, bound)
+          return true
         end
+        if bound.empty?
+          match_phase(ctx, work, false)
+          return true
+        end
+        # D-70 (audit BLOCKER): zviazane zaznamy sa fetchuju PRED sitemap
+        # castou — zlyhanie refreshu (jeden novy/nezviazany zaznam v skupine)
+        # NESMIE zahodit ich vysledky (complete ok=false by vypol Apply).
+        # fetch_chain po dobehnuti bound fronty NEvola complete, ale pokracuje
+        # sitemap fazou (on_empty continuation — complete pride presne raz).
+        ctx['total'] = bound.length
+        fetch_chain(ctx, bound, on_empty: proc { match_phase(ctx, work, true) })
+        true
+      end
+
+      # D-70: sitemap cast lookupu (nezviazane zaznamy). had_bound = v davke uz
+      # boli dorucene vysledky zviazanych — sitemap fail ich nesmie zahodit:
+      # nezviazane skoncia ako miss s dovodom a complete je USPESNY (Apply
+      # ostava mozny). Cisto nezviazana davka drzi povodne spravanie
+      # (complete false — nie je co zapisat).
+      def match_phase(ctx, work, had_bound)
+        return if ctx['completed']
+        return unless ctx['alive'].call
         ensure_urls(ctx) do |urls, stale_warning, err|
+          next if ctx['completed']
           next unless ctx['alive'].call
           ctx['warnings'] << stale_warning if stale_warning
-          pre.each { |p| deliver_proposal(ctx, p) }
-          next complete(ctx, false, err || 'zoznam produktov Demosu nie je k dispozícii') unless urls
+          unless urls
+            why = err || 'zoznam produktov Demosu nie je k dispozícii'
+            next complete(ctx, false, why) unless had_bound
+            ctx['warnings'] << why
+            work.each do |rec, kind|
+              deliver_proposal(ctx, base_proposal(rec, kind).merge('status' => 'miss', 'warnings' => [why]))
+            end
+            next complete(ctx, true, nil)
+          end
           queue = []
           work.each do |rec, kind|
             m = DemosSlugMatcher.match(rec, urls)
@@ -82,10 +131,9 @@ module Noxun
               deliver_proposal(ctx, base_proposal(rec, kind).merge('status' => 'miss'))
             end
           end
-          ctx['total'] = queue.length
+          ctx['total'] += queue.length
           fetch_chain(ctx, queue)
         end
-        true
       end
 
       # Manualna URL pre JEDEN zaznam (fallback pri miss/ambiguous). Ziadna
@@ -214,24 +262,29 @@ module Noxun
       # GH #97 P2: 'completed' (watchdog timeout uz ohlasil koniec) zastavuje
       # retaz ROVNAKO ako mrtvy alive — neskoro dosla odpoved visiaceho
       # requestu nesmie potichu rozbehnut zvysne fetche popri novom pokuse.
-      def fetch_chain(ctx, queue)
+      # on_empty: D-70 continuation — po dobehnuti fronty NEvola complete, ale
+      # pokracovanie (sitemap faza zmiesanej davky); complete pride presne raz.
+      def fetch_chain(ctx, queue, on_empty: nil)
         return if ctx['completed']
-        return complete(ctx, true, nil) if queue.empty?
+        if queue.empty?
+          return on_empty.call if on_empty
+          return complete(ctx, true, nil)
+        end
         return unless ctx['alive'].call
-        rec, kind, url = queue.shift
+        rec, kind, url, bound = queue.shift
         reset_watchdog(ctx)
         Demos.fetch(url) do |res|
           next if ctx['completed']
           next unless ctx['alive'].call
           reset_watchdog(ctx)
-          deliver_proposal(ctx, proposal_from_fetch(ctx, rec, kind, res))
+          deliver_proposal(ctx, proposal_from_fetch(ctx, rec, kind, res, bound))
           ctx['done'] += 1
           deliver(ctx, 'type' => 'progress', 'done' => ctx['done'], 'total' => ctx['total'])
-          fetch_chain(ctx, queue)
+          fetch_chain(ctx, queue, on_empty: on_empty)
         end
       end
 
-      def proposal_from_fetch(ctx, rec, kind, res)
+      def proposal_from_fetch(ctx, rec, kind, res, bound = false)
         p = base_proposal(rec, kind)
         unless res['ok']
           return p.merge('status' => 'fetch_error', 'warnings' => [res['error'].to_s])
@@ -239,9 +292,12 @@ module Noxun
         parsed = DemosProductParser.parse(res['body'])
         final_url = res['url'].to_s
         unless parsed['ok'] && verified?(ctx, rec, kind, parsed, final_url)
+          # D-70: zviazany zaznam s nesediacou strankou = zastarana VAZBA
+          # (produkt sa zmenil/presunul) — hlaska naviguje na novu adresu.
+          fail_text = bound ? 'uložená väzba už nesedí so záznamom (produkt sa zmenil?) — vlož novú adresu' :
+                              'stránka nesedí s identitou záznamu — kód a cena sa nepreberajú'
           return p.merge('status' => 'identity_fail', 'url' => final_url,
-                         'warnings' => Array(parsed['warnings']) +
-                                       ['stránka nesedí s identitou záznamu — kód a cena sa nepreberajú'])
+                         'warnings' => Array(parsed['warnings']) + [fail_text])
         end
         collect_accessories(ctx, parsed)
         build_proposal(ctx, p, rec, kind, parsed, final_url)

@@ -6,7 +6,7 @@
 const assert = require('node:assert');
 const path = require('node:path');
 const { mddNewModel, mddApplyEvent, mddOffers, mddBuildView, mddRowRevOf,
-        mddAccepts, mddStatusLabel, mddFmtPrice } =
+        mddAccepts, mddStatusLabel, mddFmtPrice, mddAttentionText } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'demos_diff.js'));
 
 let n = 0;
@@ -132,5 +132,19 @@ eq(mddStatusLabel('nieco-nove'), 'nieco-nove', 'neznamy stav sa ukaze doslovne')
 eq(mddFmtPrice(18.994), '18.99 €', 'cena na 2 desatiny');
 eq(mddFmtPrice(null), '—', 'nil cena = pomlcka');
 ok(mddNewModel(7).session === 7 && mddNewModel(7).order.length === 0, 'cisty model');
+
+// D-70 (GH #111 P2): specificky serverov dovod (posledny warning) sa ukaze
+// namiesto genericheho labelu — inak by hlaska o zastaranej vazbe nezila.
+eq(mddAttentionText({ status: 'identity_fail',
+                      warnings: ['parser x', 'uložená väzba už nesedí so záznamom (produkt sa zmenil?) — vlož novú adresu'] }),
+   'uložená väzba už nesedí so záznamom (produkt sa zmenil?) — vlož novú adresu',
+   'bound identity_fail nesie hlasku o vazbe');
+eq(mddAttentionText({ status: 'identity_fail', warnings: [] }),
+   'stránka nesedí s identitou záznamu', 'bez warnings = genericky label');
+eq(mddAttentionText({ status: 'miss', warnings: ['zoznam produktov Demosu nie je k dispozícii'] }),
+   'zoznam produktov Demosu nie je k dispozícii', 'miss s dovodom (sitemap fail)');
+eq(mddAttentionText({ status: 'ambiguous', warnings: ['x'] }),
+   'viac kandidátov — vlož presnú adresu produktu', 'ambiguous drzi svoj label');
+eq(mddAttentionText(null), '', 'null bezpecne');
 
 console.log(JSON.stringify({ passed: n, failed: 0 }));
