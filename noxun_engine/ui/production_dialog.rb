@@ -466,7 +466,12 @@ module Noxun
             gen: @generation,
             model_title: (model.title.to_s.empty? ? 'Bez názvu' : model.title.to_s),
             rows: bom[:rows], sheets: bom[:sheets], edging: bom[:edging],
-            hardware: bom[:hardware], summary: bom[:summary],
+            # V0.6 C-2 (audit F11): slovensky label kovania TRANZIENTNE —
+            # autorita HardwareRules.label_for; do BOM/snapshotu sa neuklada.
+            hardware: (bom[:hardware] || []).map { |g|
+              g.is_a?(Hash) ? g.merge('label' => HardwareRules.label_for(g['generic_type'] || g[:generic_type])) : g
+            },
+            summary: bom[:summary],
             # V0.5 D: KONTROLA nahradza povodny warnings tab (nalez 9) — build warnings
             # su v control.items ako kategoria "stavba". counts zo servera (nalez 11) —
             # JS ich NIKDY neprepocitava (header badge, status aj LOG rovnake cisla).

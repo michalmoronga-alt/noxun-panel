@@ -4,9 +4,9 @@
 
 ## Kde sme (1.8.2026)
 
-- Plugin **v0.5.15** — v rámci V0.6 hotové: **2A (SCHEMA 2 skupiny + cutover, PR #89–#93)**, **2B (duplák #94 / zástena #95 — SCHEMA 3/4 lazy)** a **dávka B Demos lookup KOMPLET**: **B-1 core** (#96 — klient s allowlist/robots/throttle 3 s, sitemap cache 48k URL, slug matcher s plnou identitou, parser produktovej stránky), **B-2a server** (#97 — orchestrátor lookupu s fetch-om každého variantu a overením slug+parametre+výrobca, atomický `apply_demos_batch`, **SCHEMA 5** = pohyblivá cenová cache `demos_url`+`price_checked_at`), **B-2b UI** (okno Materiály: tlačidlo „Aktualizovať z Demosu" v detaile dekoru, diff modal s checkboxami — predvolene ON len prázdne polia, ručná URL pre nenájdené, XSS-safe DOM render, ruby session token).
-- Testy: **672 headless + 449 JS v 13 sadách (CI na každý push) + ~140 in-SketchUp scenárov**.
-- Práve beží: **V0.6 dávka C — kovanie katalóg** (prevzatie CatalogStore/SearchEngine vzorov z KOVANIE; ceny S DPH), potom D (flag→ZOZNAM kódov setov) a E (ceny v sumári + „Prepočítať ceny").
+- Plugin **v0.5.17** — v rámci V0.6 hotové: **2A (SCHEMA 2 skupiny + cutover, PR #89–#93)**, **2B (duplák #94 / zástena #95 — SCHEMA 3/4 lazy)**, **dávka B Demos lookup KOMPLET** (#96 core · #97 B-2a server s overením slug+parametre+výrobca a atomickým `apply_demos_batch`, **SCHEMA 5** = pohyblivá cenová cache · #98 B-2b UI „Aktualizovať z Demosu" v detaile dekoru) a **dávka C katalóg kovania KOMPLET**: **C-1 server** (#99 — `HardwareCatalog`: identita `item_code` CI-unique, kategórie/MJ enum, create/patch split s whitelistom, serverový price-proposal flow s pid + base_row_rev, search s diakritikou a use_count tie-breakom, read-only matica, **seed 58 položiek z reálnych sond** — ceny S DPH z DEMOS CSV; krytky Sensys chýbajú = diera pred D), **C-2 UI** (#100 — okno „Katalóg kovania": serverový search s debounce, inline bunky s row_rev, detail s kategóriou/MJ/aktivitou, overenie ceny per položka, delete s confirmom; slovenské labely kovania tranzientne v paneli aj Výrobe).
+- Testy: **684 headless + 473 JS v 14 sadách (CI na každý push — od 1.8. opäť živé) + ~140 in-SketchUp scenárov**.
+- Práve beží: **V0.6 dávka D — mapovanie flagov kovania → zoznamy kódov setov** (⚠ vstupná podmienka: kód krytiek Sensys od Michala; use_count kontrakt sa vyjasní tu; `variant_id == item_code` zmraziť), potom E (ceny v sumári + „Prepočítať ceny").
 - Ďalej: **V0.6 KOVANIE fáza 2** · V0.4.8 otvorená/neplánovaná · V1.0 zostavy.
 
 ## Hotové etapy (kompakt)

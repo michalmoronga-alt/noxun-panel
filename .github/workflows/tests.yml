@@ -39,3 +39,5 @@ jobs:
         run: node tests/js/test_md_schema2.js
       - name: JS testy — Demos diff modal (V0.6 B-2b)
         run: node tests/js/test_demos_diff.js
+      - name: JS testy — okno Katalog kovania (V0.6 C-2)
+        run: node tests/js/test_hw_catalog.js

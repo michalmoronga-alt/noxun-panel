@@ -4,6 +4,8 @@
   // ju posiela set_hardware_override do Ruby. Bez oznacenej skrinky len hint
   // (kovanie sa pocita na realnej skrinke, nie z hodnot panela).
 
+  // V0.6 C-2 (audit F11): autorita labelov je SERVER (HardwareRules.label_for,
+  // payload nesie it.label) — tato mapa je uz LEN fallback pre stary payload.
   function hwLabel(t){
     return { leg:'Nohy', hinge:'Závesy', slide:'Výsuv', handle:'Úchytky',
              shelf_pin:'Podperky', connector:'Spojky' }[t] || t;
@@ -51,7 +53,7 @@
     var present = {};
     items.forEach(function(it){
       present[hwKey(it.owner_part_key, it.generic_type, it.rule_id)] = true;
-      var name = hwLabel(it.generic_type);
+      var name = it.label || hwLabel(it.generic_type);
       var owner = hwOwnerDesc(it.owner_part_key);
       var extra = hwParamsDesc(it);
       var manual = it.source === 'manual';
