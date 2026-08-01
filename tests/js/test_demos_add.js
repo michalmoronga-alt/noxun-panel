@@ -42,6 +42,12 @@ eq(add.nxdaAutoEdgeSuggest(ITEMS, { i2: true }, 'i1'), null,
    'uz zaskrtnuta paska sa nenavrhuje (nie je undefined)');
 eq(add.nxdaAutoEdgeSuggest(ITEMS, {}, 'i5'), null, 'non-sheet nevracia navrh');
 eq(add.nxdaAutoEdgeSuggest([{ iid: 's', kind: 'sheet' }], {}, 's'), null, 'bez thickness_hint ziadny navrh');
+// D-66: zastena sa neolepuje — ziadna auto-paska ANI pri platnom thickness_hint
+// (test kryje aj nahodnu zavislost od chybajuceho hintu).
+eq(add.nxdaAutoEdgeSuggest(
+  ITEMS.concat([{ iid: 'iz', kind: 'sheet', type: 'ZASTENA', name: 'Zastena 9,2', thickness_hint: 9.2 }]),
+  {}, 'iz'
+), null, 'ZASTENA nikdy nedostane auto-navrh pasky');
 
 // M-A3b (D-59): paska "uz v katalogu" sa nenavrhuje automaticky (informativny
 // flag zo servera; vedomy rucny vyber ostava mozny — checkbox nie je zamknuty).

@@ -18,7 +18,6 @@
 
 ## Nápady na zváženie (nerozhodnuté)
 
-- **D-66 · Zástena priamo z Demosu** (Michal 1.8. neskoro večer, smoke F8100) — „Pridať z Demosu“ zástenu nájde, ale označí „mimo systému — založ ručne“ (vedomé z M-A1: rub je len v adrese a čítanie identity z adresy bolo zakázané). Michal: do budúcna importovať priamo. *Návrh: samostatná mini dávka po M-A3 — D-64 už kontrolovane otvoril výnimku „identita z adresy“ pre pásky; pre zástenu treba rub (líce PRED rubom v slugu, vzor score) + formát + audit.* 
 - **D-48 · Zdieľaná knižnica pre 2 PC (Michal + Lucia)** (Michal 31.7. večer) — obe pracoviská majú zobrazovať ROVNAKÉ šablóny aj materiály (spolupráca, posúvanie projektov). Jednotný zdroj = **firemný Google Disk** (sú tam všetky firemné veci). Dotýka sa: katalóg materiálov, šablóny korpusov, pravidlá kovania (dnes všetko v lokálnom %APPDATA%). *Stav: na návrhovú dávku — sync/zdieľanie cez G-Disk priečinok.*
 - **D-49 · Duplák = samozrejmosť, nie variant** (Michal 31.7. večer — revízia D-43 modelu; **POTVRDENÉ Michalom 1.8. v noci pri smoke Krono**: „duplák by sa mal vytvárať automaticky, nie ako možnosť") — ak existuje 18 mm doska, **automaticky sa dá zduplovať** (36 = 2×18): NErobiť 36-ku ako osobitný katalógový variant, má **rovnaký kód ako 18-ka**, dostupná automaticky pri každej 18-ke (napr. v selecte hrúbky/materiálu rovno ponuka „36 (duplák)"). *Stav: prebrať — mení create flow z 2B-1 (tlačidlo → automatika); dátový model (source väzba v snapshote) zostáva platný. Kandidát: návrhová dávka pred/pri M-B2.*
 - **D-50 · OCL inšpirácia UI/UX** (Michal 31.7. večer) — pár detailov z OCL flow prevziať; najprv slovné prebratie (sedenie), potom zapracovanie. *Stav: čaká na sedenie.*
@@ -98,6 +97,7 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ## Vyriešené — index (plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md))
 
+- **D-66** zástena priamo z Demosu — rub sa číta z PARAMETROV stránky (živé overenie vyvrátilo „rub je len v adrese"); rodina ju ponúka ako dosku, založí sa s rubom (identita, ID s R-tokenom, dedup), „Aktualizovať z Demosu" na zástene funguje; bez auto-návrhu pásky — PR #115
 - **D-53** UNI dotiahnuté: sekcia „Pracovné (UNI)" + badge; „Nahradiť UNI…" — hromadná zámena UNI za reálny dekor s rozpisom dopadu pred potvrdením (skrinky/dosky/predvoľby/hrúbky/ABS), odtlačok plánu proti súbežným zmenám, 1 undo — PR #114
 - **D-71** URL väzba sa dá ručne pridať/upraviť/zmazať v edit formulári variantu (ceruzka; server sanitize — len demos-trade.sk; zmena/zmazanie ruší dátum overenia ceny; UNI pole nemá; zlá adresa nezatvára formulár). Vedomé zúženie: batch „ručne…" URL pole nemá — väzba sa dopĺňa editom po vytvorení — PR #112
 - **D-70** „Aktualizovať z Demosu“ číta uloženú väzbu — variant s demos_url sa fetchuje priamo (žiadne „viac kandidátov“ pri čelných hranách, funguje aj bez sitemap cache); hľadanie len pre nezviazané; zastaraná väzba = jasná hláška; základ „Prepočítať ceny“ dávky E — PR #111

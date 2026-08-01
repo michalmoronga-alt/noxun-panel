@@ -79,10 +79,26 @@ module Noxun
         if decor.empty? || brand.empty?
           return [nil, nil, 'stránka nemá číslo dekoru alebo výrobcu — pre založenie skupiny vlož stránku dosky/pásky dekoru']
         end
+        decor_name = params['decor_name'].to_s.strip
+        structure = params['structure'].to_s.strip
+        # D-66 (audit F3): zastena ako VSTUPNA stranka rodiny — parametre nesu
+        # lice/rub v jednom poli; identita RODINY je LICE (rub patri variantu,
+        # cita ho verify_sheet). Bez splitu by skupina vznikla ako "F094/H1145".
+        if DemosSlugMatcher.sheet_type_of(DemosSlugMatcher.slug_of(final_url)) == 'ZASTENA'
+          dp = DemosProductParser.split_pair(decor)
+          unless dp
+            return [nil, nil, 'zástena neuvádza oba dekory (líce/rub) — stránka má nečakaný tvar, založ ručne']
+          end
+          decor = dp[0]
+          sp = DemosProductParser.split_pair(structure, require_both: false)
+          structure = sp[0] if sp
+          dn = DemosProductParser.split_pair(decor_name, require_both: false)
+          decor_name = dn[0] if dn
+        end
         header = {
           'manufacturer' => brand, 'decor' => decor,
-          'decor_name' => params['decor_name'].to_s.strip,
-          'structure' => params['structure'].to_s.strip,
+          'decor_name' => decor_name,
+          'structure' => structure,
           'title' => parsed['title'].to_s, 'url' => final_url,
           'image_url' => parsed['image_url'].to_s
         }
@@ -136,9 +152,13 @@ module Noxun
           # len listy/kovanie/vzorky, text ostava neutralny.
           item['reason'] = 'mimo podporovaných typov materiálu'
         elsif type == 'ZASTENA'
-          # Zastena nesie obojstranny dekor (rub) — zakladanie z Demosu ju
-          # zatial nepodporuje (rub by sa musel citat zo slugu, FIX 7 zakazuje).
-          item['reason'] = 'zástena (obojstranný dekor) — založ ručne'
+          # D-66: rub aj lice zasteny su v PARAMETROCH produktovej stranky
+          # (overene zivou strankou — "Cislo dekoru: F094/H1145") — zastena sa
+          # zaklada ako doska; rub cita verify_sheet z parametrov pri fetchi
+          # variantu. Slug ostava len kandidat/hint (FIX 7 nedotknuty).
+          item['kind'] = 'sheet'
+          item['type'] = type
+          item['thickness_hint'] = sheet_thickness_from_slug(slug)
         else
           item['kind'] = 'sheet'
           item['type'] = type
@@ -253,8 +273,17 @@ module Noxun
                Materials.identity_norm(brand) == Materials.identity_norm(header['manufacturer'])
           return { 'reason' => 'výrobca stránky nesedí s rodinou — položka sa nezakladá' }
         end
-        unless params['decor'] &&
-               Materials.identity_norm(params['decor']) == Materials.identity_norm(header['decor'])
+        # D-66: dekorova brana pre zastenu porovnava LICE (cast pred lomkou);
+        # stranka bez paru = necakany tvar (audit F4 — prisny split, ziadne
+        # tiche zahodenie casti identity).
+        page_decor = params['decor']
+        if sheet_type_of(slug) == 'ZASTENA'
+          dp = DemosProductParser.split_pair(page_decor)
+          return { 'reason' => 'zástena neuvádza oba dekory (líce/rub)' } unless dp
+          page_decor = dp[0]
+        end
+        unless page_decor &&
+               Materials.identity_norm(page_decor) == Materials.identity_norm(header['decor'])
           return { 'reason' => 'číslo dekoru stránky nesedí s rodinou' }
         end
         verify_sheet(parsed, params, slug, code, final_url, it)
@@ -262,7 +291,7 @@ module Noxun
 
       def verify_sheet(parsed, params, slug, code, final_url, it)
         type = sheet_type_of(slug)
-        return { 'reason' => 'finálna adresa nie je podporovaný typ dosky' } if type.nil? || type == 'ZASTENA'
+        return { 'reason' => 'finálna adresa nie je podporovaný typ dosky' } if type.nil?
         if it['type'] && type != it['type']
           return { 'reason' => "typ sa po presmerovaní zmenil (#{it['type']} → #{type})" }
         end
@@ -272,14 +301,35 @@ module Noxun
         if Materials.format_in_identity?(type) && fmt.nil?
           return { 'reason' => 'stránka neuvádza formát (pri tomto type je súčasťou identity)' }
         end
-        {
+        structure = params['structure'].to_s.strip
+        back_decor = nil
+        back_structure = nil
+        if type == 'ZASTENA'
+          # D-66: rub z PARAMETROV stranky (nie zo slugu — FIX 7 nedotknuty);
+          # dekor bez paru uz zachytila dekorova brana, tu je split povinny
+          # znova (verify_sheet je volatelny aj samostatne v testoch).
+          dp = DemosProductParser.split_pair(params['decor'])
+          return { 'reason' => 'zástena neuvádza oba dekory (líce/rub)' } unless dp
+          back_decor = dp[1]
+          sp = DemosProductParser.split_pair(structure, require_both: false)
+          if sp
+            structure = sp[0]
+            back_structure = sp[1].empty? ? nil : sp[1]
+          end
+        end
+        out = {
           'kind' => 'sheet', 'type' => type, 'thickness' => th,
-          'structure' => params['structure'].to_s.strip,
+          'structure' => structure,
           'sheet_size' => fmt, 'code' => code,
           'price' => DemosProductParser.price_for_catalog(parsed['price_vat'], parsed['unit'], 'sheet', fmt),
           'demos_url' => final_url, 'image_url' => parsed['image_url'].to_s,
           'reason' => nil
         }
+        if back_decor
+          out['back_decor'] = back_decor
+          out['back_structure'] = back_structure.to_s
+        end
+        out
       end
 
       # D-64: dekor rodiny dokazuje bud parameter stranky (Kronospan si pasky
