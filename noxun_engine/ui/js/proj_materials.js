@@ -20,7 +20,8 @@
   // doplnenia UNI sady nesmie zamknut cele okno); katalog s novsim markerom by
   // staremu oknu zapis odmietol (nove polia by ticho zahodilo). Pri katalogu,
   // ktory je este SCHEMA 1 (nerozhodnutelna migracia), server batch 3 odmietne.
-  var MD_CLIENT_SCHEMA = 7;
+  // V0.6 M-C hranova uprava PD (pd_edge_subtype — schema 8) => konstanta je 8.
+  var MD_CLIENT_SCHEMA = 8;
   // 2B-2 (F10 zrkadlo registra): typy s formatom v identite — batch/formular
   // format VYZADUJU. Server je autorita (format_in_identity?), toto je UX.
   var MD_FORMAT_TYPES = ['PD', 'ZASTENA'];
@@ -704,14 +705,23 @@
     var backFilled = !!(s && s.back_decor);
     el('ms_back_decor').readOnly = backFilled;
     el('ms_back_structure').readOnly = !!(s && s.back_structure);
+    // M-C: hranova uprava PD (postforming/abs; prazdne = neurcena — standardne
+    // ABS defaulty). Editovatelna vlastnost, nie identita.
+    if (el('ms_pd_edge')) el('ms_pd_edge').value = s ? (s.pd_edge_subtype || '') : '';
     mdSheetTypeChanged();
     el('mdSheetForm').style.display = '';
+  }
+  // M-C: PD rozpoznanie pre formular (zrkadlo registra; server je autorita).
+  function mdPdType(type){
+    return String(type == null ? '' : type).trim().toUpperCase() === 'PD';
   }
   // 2B-2: viditelnost rub polí podla typu vo formulari (create aj edit).
   function mdSheetTypeChanged(){
     var show = mdZastena(el('ms_type').value);
     el('ms_back_row').style.display = show ? '' : 'none';
     el('ms_back_hint').style.display = show ? '' : 'none';
+    // M-C: riadok hranovej upravy LEN pre typ PD.
+    if (el('ms_pd_row')) el('ms_pd_row').style.display = mdPdType(el('ms_type').value) ? '' : 'none';
   }
   // D-42: prazdny string ak cena nie je zadana (nil/undefined), inak hodnota
   // (aj 0 = zadana nula). Rozlisuje "nezadana" od "0".
@@ -1489,6 +1499,11 @@
       payload.back_decor = el('ms_back_decor').value;
       payload.back_structure = el('ms_back_structure').value;
     }
+    // M-C: hranova uprava LEN pri type PD (vzor rub polia — skryte pole nesmie
+    // letiet na server); prazdna hodnota = vedome "neurcena" (vymaze pole).
+    if (mdPdType(payload.type) && el('ms_pd_edge')){
+      payload.pd_edge_subtype = el('ms_pd_edge').value;
+    }
     // D-19: format platne sa posiela LEN ako kompletny platny par; polovicny
     // alebo neplatny vstup zastavi ulozenie (ziadne tiche 0/reset — Codex F4).
     // M-A3e (audit FIX 4): zla adresa NEZATVARA formular — server ju sice
@@ -1554,6 +1569,7 @@
       el('ms_sheet_l').value = p.sheet_size ? p.sheet_size[0] : '';
       el('ms_sheet_w').value = p.sheet_size ? p.sheet_size[1] : '';
       el('ms_demos_url').value = p.demos_url || ''; // M-A3e (audit FIX 2)
+      if (el('ms_pd_edge')) el('ms_pd_edge').value = p.pd_edge_subtype || ''; // M-C
     } else {
       mdOpenEdgeForm(p.abs_id || null);
       el('me_decor').value = p.decor || ''; el('me_price').value = p.price_per_bm || '';

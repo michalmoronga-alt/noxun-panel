@@ -230,6 +230,14 @@ module Noxun
       # Vrati VZDY kompletnu mapu {L1,L2,W1,W2} kde hodnota = abs_id alebo nil.
       # Ak pravidlo ziada hrubku, pre ktoru dekor nema pouzitelny variant -> nil + info log (standard 7.5).
       def resolve_edges(role, decor, part_thickness = nil, sheet: nil, collector: nil)
+        # M-C: typova pravda materialu prebija rolove defaulty — KOMPAKT ma
+        # monoliticku hranu a postforming hrany PD su hotove z vyroby (konce
+        # PD lepi HPDB paska mimo ABS katalogu). Potlacaju sa LEN automaticke
+        # defaulty; rucne overridy hran ostavaju mozne (autorita v Materials.
+        # abs_default_suppression — semafor cita tu istu).
+        if defined?(Materials) && Materials.abs_default_suppression(sheet) == :all
+          return empty_edges
+        end
         th = thicknesses_for(role)
         out = { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil }
         schema2 = sheet.is_a?(Hash) && defined?(Materials) &&

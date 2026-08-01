@@ -89,11 +89,14 @@ module Noxun
         # V0.6 M-B1 (audit F4): dielce na UNI materiali — ich ABS build
         # warnings sa potlacaju (jedna jasna sprava "material neurceny"
         # namiesto trojiteho hluku o chybajucich paskach).
+        # M-C (GH #118 P2): to iste pre NELEPITELNE materialy (kompakt /
+        # PD postforming) — ulozene abs_* warnings zo starsich buildov by po
+        # upgrade/zmene podtypu strasili, hoci olep neexistuje.
         uni_parts = {}
         Array(collected[:records]).each do |r|
           next unless r.is_a?(Hash)
           s = smap[r['material_id'].to_s]
-          uni_parts["#{r['owner_id']}|#{r['part_key']}"] = true if uni_sheet?(s)
+          uni_parts["#{r['owner_id']}|#{r['part_key']}"] = true if uni_sheet?(s) || abs_impossible?(s)
         end
         Array(collected[:records]).each { |r| check_record(r, smap, emap, items) }
         Array(collected[:hardware_overrides]).each { |ov| check_hardware(ov, items) }
@@ -137,7 +140,7 @@ module Noxun
         end
 
         check_abs_catalog(r, edges_catalog, items) if edges_catalog
-        check_abs(r, role, items)
+        check_abs(r, role, items, sheet)
       end
 
       # RED (2A-2, F6): hrana referencuje abs_id, ktore v aktualnom katalogu nie
@@ -212,9 +215,22 @@ module Noxun
         a <= sl + DIM_TOL && b <= sw + DIM_TOL
       end
 
+      # M-C: typy, ktore sa ABS-om NELEPIA — kompakt (monoliticka hrana) a PD
+      # s postformingom (hrany hotove z vyroby; konce lepi HPDB mimo ABS).
+      # ORANGE "bez ABS" pri nich neSTRASI — nie je co skontrolovat. Chybajuci
+      # sheet (material mimo katalogu) sa NEpotlaca (audit F6). Headless
+      # dvojnik Materials.abs_default_suppression (vzor uni_sheet?).
+      def abs_impossible?(sheet)
+        return false unless sheet.is_a?(Hash)
+        type = sheet['type'].to_s.strip.upcase
+        return true if type == 'KOMPAKT'
+        type == 'PD' && sheet['pd_edge_subtype'].to_s == 'postforming'
+      end
+
       # ORANGE: celo bez ABS / volna doska bez ABS. Jedna polozka na dielec (part_key),
       # NIE per hrana (nalez 11).
-      def check_abs(r, role, items)
+      def check_abs(r, role, items, sheet = nil)
+        return if abs_impossible?(sheet)
         return unless no_abs?(r)
         if FRONT_ROLES.include?(role)
           items << record_item(ORANGE, CAT_FRONT_ABS, r,

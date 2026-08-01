@@ -366,6 +366,10 @@ module Noxun
         # server stopka (JS modal je len UX; "Vytvorit a pokracovat" nesmie
         # zalozit globalnu pasku pracovneho materialu).
         return [:uni_material, nil] if uni?(s)
+        # M-C (GH #118 P2): nelepitelny material (kompakt / PD postforming) —
+        # paska sa NEdotvara; "Vytvorit a pokracovat" nesmie zalozit globalny
+        # zaznam pre material, ktory olep zo zasady nema.
+        return [:abs_suppressed, nil] if abs_default_suppression(s) == :all
         th = s['thickness'].to_f
         part_th = th.positive? ? th : nil
         # Sheet-aware cesta LEN pre migrovany zaznam (nesie group_id). Zaznam

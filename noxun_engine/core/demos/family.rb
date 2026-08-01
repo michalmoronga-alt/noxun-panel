@@ -329,6 +329,14 @@ module Noxun
           out['back_decor'] = back_decor
           out['back_structure'] = back_structure.to_s
         end
+        if type == 'PD'
+          # M-C (audit F3): hranova uprava PD z parametra stranky "Typ
+          # pracovnej dosky" — "Postforming" -> postforming, ina NEPRAZDNA
+          # hodnota (DTL, ABS...) -> abs, chybajuci parameter = bez pola
+          # (nezname sa NEdomysla — standardne ABS defaulty ostanu).
+          pt = params['pd_type'].to_s.strip
+          out['pd_edge_subtype'] = (pt.casecmp('postforming').zero? ? 'postforming' : 'abs') unless pt.empty?
+        end
         out
       end
 
