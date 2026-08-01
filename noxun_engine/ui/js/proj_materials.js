@@ -118,11 +118,14 @@
       // V0.6 M-A2: obrazok skupiny = prvy sheet s LOKALNYM suborom (image_file
       // stavia server z DemosImageCache — remote URL do CEF nikdy nejde).
       if (!g.image && s.image_file) g.image = s.image_file;
+      // M-A3b (D-56): pocet variantov s ulozenou vazbou na Demos (badge dlazdice).
+      if (s.demos_url) g.demos_n = (g.demos_n || 0) + 1;
     });
     (catalog.edges || []).forEach(function(a){
       var g = grp(a);
       g.edges.push(a);
       if (!g.color && a.color) g.color = a.color;
+      if (a.demos_url) g.demos_n = (g.demos_n || 0) + 1;
     });
     order.sort(function(x, y){
       var a = map[x], b = map[y];
@@ -330,13 +333,41 @@
     var sw = '<i class="mdsw" style="background:' + esc(rgbToHex(g.color)) + '">' +
       (g.image ? '<img class="mdsw-photo" src="' + esc(mdImageSrc(g.image)) + '" alt="" onerror="this.style.display=\'none\'">' : '') +
       '</i>';
-    return '<div class="mdtile" onclick="mdOpenDetail(' + esc(JSON.stringify(g.key)) + ')">' +
+    // M-A3b: D-63 plny nazov v tooltipe (dvojriadkovy clamp ho moze orezat);
+    // D-56 badge vazby na Demos (aspon 1 variant s ulozenou URL).
+    var full = name + ' · ' + (g.manufacturer || 'vlastný');
+    return '<div class="mdtile" title="' + esc(full) + '" onclick="mdOpenDetail(' + esc(JSON.stringify(g.key)) + ')">' +
       '<div class="mdtile-head">' +
       sw +
       '<span class="mdtile-name"><b>' + esc(name) + '</b>' +
       '<span class="mans">' + esc(sub) + '</span></span>' +
+      (g.demos_n ? '<span class="mddemos" title="Prepojené s Demosom (' + g.demos_n + ' var.)"><svg class="ic" aria-hidden="true"><use href="#i-cloud-download"/></svg></span>' : '') +
       (usedCount ? '<span class="mdused">' + usedCount + '×</span>' : '') +
       '</div><div class="mdtile-chips">' + (chips || '<span class="muted">bez variantov</span>') + '</div></div>';
+  }
+
+  // M-A3b (D-60): "cena overená" datum z ISO price_checked_at -> DD.MM.RRRR
+  // (cista funkcia, Node test; nevalidny vstup = prazdny string).
+  function mdDateLabel(iso){
+    var m = String(iso == null ? '' : iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return '';
+    return parseInt(m[3], 10) + '.' + parseInt(m[2], 10) + '.' + m[1];
+  }
+
+  // M-A3b (D-60): ikona vazby na Demos v riadku variantu — klik otvori stranku
+  // u dodavatela (URL drzi VYHRADNE server: klient posiela len kind+id, audit
+  // BLOCKER 2). Bez ulozenej vazby ziadne tlacidlo (ziadny mrtvy priestor).
+  function mdDemosBtn(kind, id, rec){
+    if (!rec || !rec.demos_url) return '';
+    var when = mdDateLabel(rec.price_checked_at);
+    var title = 'Prepojené s Demosom' + (when ? ' · cena overená ' + when : '') + ' — otvoriť u dodávateľa';
+    return '<button class="mduni mddm" title="' + esc(title) + '" aria-label="Otvoriť u dodávateľa"' +
+      ' onclick="mdDemosOpen(\'' + kind + '\', \'' + esc(id) + '\')">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-external-link"/></svg></button>';
+  }
+  function mdDemosOpen(kind, id){
+    if (window.sketchup && sketchup.open_demos_url)
+      sketchup.open_demos_url(JSON.stringify({ kind: kind, id: id }));
   }
 
   // 2A-4b: sekcie detailu per STRUKTURA povrchu (cista funkcia, Node test).
@@ -367,7 +398,11 @@
     var h = '<div class="mdcard mdet">';
     h += '<div class="tplrow mdhead">' +
       '<button class="ghostbtn tplbtn" onclick="mdCloseDetail()" title="Späť na katalóg" aria-label="Späť na katalóg"><svg class="ic" aria-hidden="true"><use href="#i-arrow-left"/></svg></button>' +
-      '<i class="mdsw mdsw-lg" style="background:' + esc(rgbToHex(g.color)) + '"></i>' +
+      // M-A3b (D-62): fotka dekoru aj v hlavicke detailu (vzor dlazdice —
+      // onerror schova <img>, fallback farba swatchu ostava pod nou).
+      '<i class="mdsw mdsw-lg" style="background:' + esc(rgbToHex(g.color)) + '">' +
+      (g.image ? '<img class="mdsw-photo" src="' + esc(mdImageSrc(g.image)) + '" alt="" onerror="this.style.display=\'none\'">' : '') +
+      '</i>' +
       '<span class="tpln"><b>' + esc(name) + '</b>' + (g.manufacturer ? ' <span class="tplt">' + esc(g.manufacturer) + '</span>' : '') + '</span>' +
       (g.decor === '' ? '' :
         '<button class="ghostbtn tplbtn"' + dis + ' onclick="mdOpenDecorForm(' + esc(JSON.stringify(g.key)) + ')">+ variant</button>' +
@@ -427,7 +462,8 @@
           h += mdVariantRow('sheet', s.material_id, s.row_rev, dim,
             s.code, s.price_per_m2, s.supplier, s.label,
             'mdOpenSheetForm(\'' + esc(s.material_id) + '\')',
-            prot ? null : 'mdDeleteSheet(\'' + esc(s.material_id) + '\')', prot, mdDuplakBtn(s));
+            prot ? null : 'mdDeleteSheet(\'' + esc(s.material_id) + '\')', prot,
+            mdDuplakBtn(s) + mdDemosBtn('sheet', s.material_id, s));
         }
       });
     }
@@ -438,7 +474,8 @@
         h += mdVariantRow('edge', a.abs_id, a.row_rev, esc(edgeChipLabel(a)),
           a.code, a.price_per_bm, a.supplier, a.label,
           'mdOpenEdgeForm(\'' + esc(a.abs_id) + '\')',
-          'mdDeleteEdge(\'' + esc(a.abs_id) + '\')', false, mdUniBtn(a));
+          'mdDeleteEdge(\'' + esc(a.abs_id) + '\')', false,
+          mdUniBtn(a) + mdDemosBtn('edge', a.abs_id, a));
       });
     }
     return h;
@@ -1477,6 +1514,9 @@
       // 2B-2 — zastena (format-required helper, ciste funkcie)
       mdFormatRequired: mdFormatRequired, mdZastena: mdZastena,
       // V0.6 M-A2 — dlazdice s obrazkom + delete preflight (ciste funkcie)
-      mdImageSrc: mdImageSrc, mdDeleteSummary: mdDeleteSummary };
+      mdImageSrc: mdImageSrc, mdDeleteSummary: mdDeleteSummary,
+      // M-A3b — vazby na Demos v UI (D-56/D-60/D-62/D-63)
+      mdTileHtml: mdTileHtml, mdDateLabel: mdDateLabel, mdDemosBtn: mdDemosBtn,
+      mdDetailHtml: mdDetailHtml };
   }
   if (typeof window !== 'undefined' && window.sketchup && sketchup.ready) sketchup.ready('');

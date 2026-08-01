@@ -11,15 +11,11 @@
 
 ## Spomaľovače (vysoká priorita)
 
-- **D-59 · Rodina neoznačuje „už v katalógu“** (Michal 1.8. večer, smoke M-A) — pri doplnení variantu do existujúcej skupiny ponúka rodina aj položky, ktoré už v katalógu sú (PD 920 pri pridávaní PD 650); zápis duplicitu preskočí, ale ponuka mätie. *Fix: server pri family evente označí položky podľa KÓDU (unikátny) — „už pridané“ zamknuté/sivé.* → dávka M-A3
-- **D-60 · URL väzba nie je v UI viditeľná** (Michal 1.8. večer) — demos_url/price_checked_at sa ukladajú, ale detail variantu ich nezobrazuje; nedá sa overiť prepojenie. *Fix: v detaile ikona väzby + dátum overenia + „Otvoriť u dodávateľa“; spolu s D-56 badge na dlaždici.* → M-A3
+*(momentálne žiadne — D-59/D-60 vyriešené PR #107)*
 
 ## UX drobnosti (nízka priorita)
 
 - **D-61 · Ceny za KUS/tabuľu, nie €/m²** (Michal 1.8.) — plošné materiály sa kupujú po celých tabuliach (1,2 platne = kupujem 2); €/m² len interná jednotka. *UI: cena za tabuľu primárne (m²×formát), m² sekundárne; ABS €/bm OK. VÄZBA NA DÁVKU E: sumár musí rátať celé kusy.*
-- **D-62 · Textúra len na dlaždici skupiny** (Michal 1.8.) — detail skupiny/variantu ukazuje len farbu. *Fix: fotka aj v hlavičke detailu.*
-- **D-63 · Odrezané názvy dlaždíc** (Michal 1.8.) — „H1181 Dub Halifax…“ bez rozlišujúcej časti (tabakový/prírodný). *Fix: dvojriadkový názov/podnázov + tooltip.*
-- **D-55 · „+ z Demosu“ na skupine — dotiahnutie** (Michal 1.8.) — flow UŽ funguje (identitu nesie stránka položky); zostáva: modrý pás „pridávam do existujúcej“ výraznejšie (→ M-A3b). *Zúžené po audite 1.8.: pôvodný nápad doplniť chýbajúcu identitu stránky z otvorenej skupiny Codex zamietol (adresa nedokazuje výrobcu — kontaminácia skupiny); „stránky bez identity“ boli reálne články/kategórie zo sitemap — tie od PR #106 z návrhov vypadli (produktové adresy vždy nesú rozmery).*
 
 ## Nápady na zváženie (nerozhodnuté)
 
@@ -103,6 +99,11 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ## Vyriešené — index (plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md))
 
+- **D-59** rodina informatívne označuje „už v katalógu“ podľa kódu (sivý riadok, checkbox aktívny — kolízia kódov nesmie zamykať; auto-návrh pásky ich preskakuje) — PR #107
+- **D-60 + D-56** URL väzba viditeľná: ikona v riadku variantu s dátumom overenia ceny + „Otvoriť u dodávateľa“ (URL výhradne zo servera, čerstvý sanitize — audit) + badge na dlaždici skupiny — PR #107
+- **D-62** fotka dekoru aj v hlavičke detailu skupiny — PR #107
+- **D-63** názvy dlaždíc dvojriadkovo (clamp) + plný názov v tooltipe — PR #107
+- **D-55** pás „pridávam do existujúcej skupiny“ výrazný (plný akcent); zvyšok zúžený po audite (filter článkov = PR #106) — PR #107
 - **D-64** ABS pásky tretích strán (Rehau…) padali na kontrole výrobcu — pásky sa overujú dekorom v adrese (mimo koncových rozmerov) + rozmermi; brand check len dosky — PR #106
 - **D-65** slug prefixy zo sitemap analýzy 48k: dtd-laminovana→DTDL, mdfl/mdfs→MDF, kd-in/kd-ex→KOMPAKT, pracovni-deska→PD, absl/abs-→ABS; jedna autorita klasifikácie + filter článkov bez číslic; mdfd (dyhovaná) vedome mimo — PR #106
 - **D-58** ABS z Demosu dedí štruktúru povrchu z rodiny (stránky pások ju neuvádzajú; „Štruktúra hrán“ výrobcu pásky sa vedome nečíta) — PR #106

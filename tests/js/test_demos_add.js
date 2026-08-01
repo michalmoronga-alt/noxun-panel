@@ -43,6 +43,16 @@ eq(add.nxdaAutoEdgeSuggest(ITEMS, { i2: true }, 'i1'), null,
 eq(add.nxdaAutoEdgeSuggest(ITEMS, {}, 'i5'), null, 'non-sheet nevracia navrh');
 eq(add.nxdaAutoEdgeSuggest([{ iid: 's', kind: 'sheet' }], {}, 's'), null, 'bez thickness_hint ziadny navrh');
 
+// M-A3b (D-59): paska "uz v katalogu" sa nenavrhuje automaticky (informativny
+// flag zo servera; vedomy rucny vyber ostava mozny — checkbox nie je zamknuty).
+const IN_CAT = [
+  { iid: 'i1', kind: 'sheet', thickness_hint: 18 },
+  { iid: 'i2', kind: 'edge', width_hint: 23, thickness_hint: 1, in_catalog: true },
+  { iid: 'i3', kind: 'edge', width_hint: 43, thickness_hint: 1 }
+];
+eq(add.nxdaAutoEdgeSuggest(IN_CAT, {}, 'i1'), 'i3', 'paska uz v katalogu sa preskoci — navrh dalsej');
+eq(add.nxdaAutoEdgeSuggest(IN_CAT.slice(0, 2), {}, 'i1'), null, 'jedina vyhovujuca je v katalogu = ziadny navrh');
+
 // --- vyber ----------------------------------------------------------------------
 
 eq(add.nxdaSelectedIids({ i1: true, i2: false, i3: true }), ['i1', 'i3'], 'selected = len true, sorted');

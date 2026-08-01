@@ -207,6 +207,33 @@ module Noxun
         clean
       end
 
+      # M-A3b D-59: kod polozky rodiny uz v katalogu je? INFORMATIVNY UX flag
+      # (riadok sa oznaci, checkbox ostava aktivny — rozhodnutie Michal 1.8.
+      # po audite: zamknutie by pri kolizii kodov blokovalo legitimnu polozku).
+      # Autoritou dedupu ostava variantova identita pri zapise (skipped).
+      # Match: rovnaky druh + kod (ci) + dodavatel Demos alebo prazdny.
+      def demos_code_known?(kind, code)
+        c = code.to_s.strip.downcase
+        return false if c.empty?
+        list = kind == 'edge' ? edges : sheets
+        list.any? do |r|
+          r['code'].to_s.strip.downcase == c &&
+            ['', 'demos'].include?(r['supplier'].to_s.strip.downcase)
+        end
+      end
+
+      # M-A3b D-60 (audit BLOCKER 2): cielova URL "Otvorit u dodavatela" —
+      # VYHRADNE zo zaznamu katalogu a VZDY cez cerstvy sanitize (genericke
+      # save cesty demos_url nevaliduju — poskodeny/cudzi zaznam sa neotvori).
+      def demos_open_target(kind, id)
+        rec = kind == 'edge' ? edge(id) : sheet(id)
+        return nil unless rec
+        raw = rec['demos_url'].to_s
+        return nil if raw.empty?
+        clean, = Demos.sanitize_url(raw)
+        clean
+      end
+
       # Pary kod+dodavatel po zapise davky; konflikt = par s 2+ zaznamami,
       # z ktorych aspon jeden je NOVY. Vrati zoznam id vinnikov alebo nil.
       def demos_create_code_conflict(data, new_ids)
