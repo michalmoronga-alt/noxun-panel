@@ -52,6 +52,9 @@ const IN_CAT = [
 ];
 eq(add.nxdaAutoEdgeSuggest(IN_CAT, {}, 'i1'), 'i3', 'paska uz v katalogu sa preskoci — navrh dalsej');
 eq(add.nxdaAutoEdgeSuggest(IN_CAT.slice(0, 2), {}, 'i1'), null, 'jedina vyhovujuca je v katalogu = ziadny navrh');
+// GH #107 P2: rucne ZASKRTNUTA in_catalog paska KRYJE dekor — druha sa nenavrhuje.
+eq(add.nxdaAutoEdgeSuggest(IN_CAT, { i2: true }, 'i1'), null,
+   'vedome vybrata in_catalog paska = covered, ziadny dalsi navrh');
 
 // --- vyber ----------------------------------------------------------------------
 

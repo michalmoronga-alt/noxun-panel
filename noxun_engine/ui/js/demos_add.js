@@ -43,9 +43,6 @@ function nxdaAutoEdgeSuggest(items, checks, sheetIid){
   var th = parseFloat(sheet.thickness_hint);
   if (isNaN(th) || th <= 0) return null;
   function fits(it){
-    // M-A3b (D-59): paska, ktora uz v katalogu je, sa nenavrhuje (riadok je
-    // oznaceny informativne; vedomy vyber ostava mozny).
-    if (it.in_catalog === true) return false;
     var et = parseFloat(it.thickness_hint);
     var ew = parseFloat(it.width_hint);
     return !isNaN(et) && Math.abs(et - 1.0) <= 0.01 && !isNaN(ew) && ew >= th + 2;
@@ -54,10 +51,14 @@ function nxdaAutoEdgeSuggest(items, checks, sheetIid){
   var best = null;
   (items || []).forEach(function(it){
     if (!it || it.kind !== 'edge' || !fits(it)) return;
-    // Vyhovujuca paska UZ zaskrtnuta (napr. navrh k predoslej doske) —
-    // dalsia sirsia sa nepridava, jedna 1 mm paska na dekor staci.
+    // Vyhovujuca paska UZ zaskrtnuta (napr. navrh k predoslej doske alebo
+    // vedome vybrata "uz v katalogu") — dalsia sirsia sa nepridava, jedna
+    // 1 mm paska na dekor staci (GH #107 P2: in_catalog SMIE nastavit covered).
     if (checks && checks[it.iid] === true){ covered = true; return; }
     if (checks && Object.prototype.hasOwnProperty.call(checks, it.iid)) return;
+    // M-A3b (D-59): paska, ktora uz v katalogu je, sa NENAVRHUJE automaticky
+    // (riadok je oznaceny informativne; vedomy rucny vyber ostava mozny).
+    if (it.in_catalog === true) return;
     if (!best || parseFloat(it.width_hint) < parseFloat(best.width_hint) ||
         (parseFloat(it.width_hint) === parseFloat(best.width_hint) && String(it.iid) < String(best.iid))) best = it;
   });
