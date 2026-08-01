@@ -104,6 +104,17 @@ module Noxun
           seed!
           return @state
         end
+        # GH #99 P1: poskodeny PRIMAR s platnou .bak = READ-ONLY, nie ticha
+        # zaloha — mutacia nad fallbackom by prepisala primar STARSIM obsahom
+        # a znicila by opravitelne zmeny od poslednej zalohy. Citanie dalej
+        # bezi z .bak (JsonFileStore recovery), zapisy stoja.
+        if File.exist?(path)
+          begin
+            JSON.parse(File.binread(path))
+          rescue StandardError
+            return set_read_only('katalóg kovania je poškodený — číta sa záloha, zápisy sú vypnuté (oprav/zmaž súbor)')
+          end
+        end
         data = begin
           JsonFileStore.read(path)
         rescue StandardError
@@ -119,8 +130,22 @@ module Noxun
           set_read_only('katalóg kovania je v novšej verzii — aktualizuj plugin')
         elsif data['items'].any? { |i| !valid_stored_item?(i) }
           set_read_only('katalóg kovania obsahuje nečitateľné položky')
+        elsif duplicate_codes?(data['items'])
+          # GH #99 P2: dva kody lisiace sa len velkostou/medzerami = nejednoznacna
+          # identita (find/patch/delete by operovali len s jednym riadkom).
+          set_read_only('katalóg kovania má duplicitné kódy — oprav súbor')
         end
         @state
+      end
+
+      def duplicate_codes?(items)
+        seen = {}
+        items.each do |i|
+          key = i['item_code'].to_s.strip.downcase
+          return true if seen[key]
+          seen[key] = true
+        end
+        false
       end
 
       def set_read_only(reason)
@@ -207,6 +232,12 @@ module Noxun
         out = { 'item_code' => code, 'name_sk' => name,
                 'category' => category, 'unit' => unit }
         price = Materials.normalize_price(a['price_eur_vat'] || a[:price_eur_vat])
+        # GH #99 P2: zaporna cena by presla do cenotvorby, nekonecno (1e999)
+        # by zhodilo JSON serializaciu — cena musi byt konecna a nezaporna
+        # (0 je legalna; nil = nezadana, kluc chyba).
+        if !price.nil? && (!price.finite? || price.negative?)
+          return [nil, 'cena musí byť nezáporné číslo']
+        end
         out['price_eur_vat'] = price unless price.nil?
         put_opt(out, 'supplier', a['supplier'] || a[:supplier])
         put_opt(out, 'notes', a['notes'] || a[:notes])
@@ -320,8 +351,30 @@ module Noxun
           Engine.log("kovanie katalog: zapis odmietnuty — #{state_reason}") if defined?(Engine)
           return false
         end
+        # GH #99 P1: cached :ok NIE JE dokaz aktualneho stavu — iny proces /
+        # novsi plugin mohol subor medzitym nahradit novsou schemou a tento
+        # zapis by ju ticho zhodil na 1 (zahodil by novsie polia). Marker sa
+        # cita CERSTVO z disku pod zamkom pred KAZDYM zapisom.
+        if File.exist?(path)
+          fresh = begin
+            JSON.parse(File.binread(path))
+          rescue StandardError
+            nil
+          end
+          if fresh.is_a?(Hash) &&
+             (fresh['std'].to_s != STD || fresh['schema'].to_i > SCHEMA_CURRENT)
+            set_read_only(fresh['std'].to_s != STD ? 'katalóg kovania patrí inému systému (std)' : 'katalóg kovania je v novšej verzii — aktualizuj plugin')
+            return false
+          end
+        end
         payload = { 'std' => STD, 'schema' => SCHEMA_CURRENT, 'items' => data['items'] }
         JsonFileStore.write(path, payload)
+      rescue StandardError => e
+        # GH #99 P2: plny disk / nezapisovatelny priecinok / zlyhany rename
+        # RAISNE z JsonFileStore — volajuci ma dostat :write_failed, nie
+        # vynimku bez normalnej odpovede.
+        Engine.log_error(e, 'HardwareCatalog.write') if defined?(Engine)
+        false
       end
 
       # --- vyhladavanie (JEDINA autorita — UI len renderuje, F12) -------------
@@ -432,25 +485,40 @@ module Noxun
         end
         old = rec['price_eur_vat']
         unchanged = !old.nil? && (price.to_f - old.to_f).abs < PRICE_TOLERANCE
+        # GH #99 P2: pid = identita KONKRETNEHO navrhu — dva prekryvajuce sa
+        # checky tej istej polozky by inak zdielali slot a apply by mohol
+        # zapisat neskorsi navrh, ktory pouzivatel nevidel.
+        pid = next_proposal_id
         price_proposals[code] = {
-          'price_vat' => price.to_f.round(4), 'final_url' => res['url'].to_s,
+          'pid' => pid, 'price_vat' => price.to_f.round(4),
+          'final_url' => res['url'].to_s,
           'base_row_rev' => record_rev(rec), 'unchanged' => unchanged
         }
         finish_check_ctx(ctx, 'ok' => true,
                               'status' => unchanged ? 'unchanged' : 'proposal',
                               'old' => old, 'new' => price.to_f.round(4),
-                              'url' => res['url'].to_s)
+                              'url' => res['url'].to_s, 'pid' => pid)
+      end
+
+      def next_proposal_id
+        @proposal_seq = @proposal_seq.to_i + 1
+        "p#{@proposal_seq}"
       end
 
       # Zapis navrhu — VYHRADNE zo serveroveho proposalu (accept flag, ziadna
-      # hodnota z klienta). Baseline = row_rev z CASU checku; zaznam zmeneny
-      # medzitym = :conflict a proposal sa zahodi (treba novy check).
+      # hodnota z klienta). pid viaze zapis na navrh, ktory pouzivatel VIDEL
+      # (GH #99 P2 — prekryvajuce sa checky); baseline = row_rev z CASU checku,
+      # zaznam zmeneny medzitym = :conflict a proposal sa zahodi (novy check).
+      # GH #99 P2: 'unchanged' navrh ZACHOVA ulozenu cenu (4.18 vs 4.184 na
+      # stranke je "nezmenene" — katalogova hodnota sa nesmie posunut) a
+      # obnovi len vazbu URL + datum overenia.
       # -> [:ok, rec] | [:no_proposal|:not_found|:conflict|:read_only|:write_failed, info]
-      def apply_price_proposal!(code)
+      def apply_price_proposal!(code, pid: nil)
         return [:read_only, state_reason] if read_only?
         key = code.to_s.strip
         proposal = price_proposals[key]
         return [:no_proposal, nil] unless proposal
+        return [:no_proposal, nil] if pid.to_s != proposal['pid'].to_s
         with_lock do
           JsonFileStore.invalidate(path)
           data = load
@@ -463,11 +531,12 @@ module Noxun
             price_proposals.delete(key)
             return [:conflict, nil]
           end
-          merged = existing.merge(
-            'price_eur_vat' => proposal['price_vat'],
+          patch = {
             'demos_url' => proposal['final_url'],
             'price_checked_at' => Time.now.utc.iso8601 # server stamp (F5/FIX 10 vzor B)
-          )
+          }
+          patch['price_eur_vat'] = proposal['price_vat'] unless proposal['unchanged']
+          merged = existing.merge(patch)
           rec, err = normalize_item(merged)
           return [:invalid, err] if rec.nil?
           data['items'] = data['items'].map { |i| i.equal?(existing) ? rec : i }

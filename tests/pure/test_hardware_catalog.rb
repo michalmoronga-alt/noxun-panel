@@ -48,6 +48,12 @@ NxTest.test('hw katalog: normalize — povinne polia, enum kategorie a MJ, alias
   NxTest.refute(bez.key?('price_eur_vat'), 'prazdna cena = kluc chyba (nil != 0)')
   off = HWC.normalize_item(hwc_item('active' => false))[0]
   NxTest.assert_equal(false, off['active'], 'active false sa uklada')
+  # GH #99 P2: zaporna / nekonecna cena sa odmietne (0 je legalna)
+  NxTest.assert_equal(nil, HWC.normalize_item(hwc_item('price_eur_vat' => -5))[0], 'zaporna nie')
+  NxTest.assert_equal(nil, HWC.normalize_item(hwc_item('price_eur_vat' => '1e999'))[0],
+                      'nekonecno by zhodilo JSON zapis')
+  NxTest.assert_close(0.0, HWC.normalize_item(hwc_item('price_eur_vat' => 0))[0]['price_eur_vat'],
+                      0.0001, 'nula je legalna cena')
 end
 
 # --- create / patch / delete -------------------------------------------------
@@ -176,6 +182,42 @@ NxTest.test('hw katalog: assess — poskodeny/novsi/zly tvar = READ-ONLY, mutaci
   NxTest.assert_equal(:read_only, HWC.assess!, 'items nie Array = read-only')
 end
 
+NxTest.test('hw katalog: poskodeny PRIMAR s platnou zalohou = read-only (GH #99 P1), dup kody = read-only') do
+  # platny katalog -> vznikne .bak -> primar sa poskodi -> citanie bezi z .bak,
+  # ale zapis STOJI (mutacia by prepisala primar starsim obsahom zalohy)
+  hwc_empty!
+  HWC.create_item(hwc_item)
+  HWC.create_item(hwc_item('item_code' => 'X2')) # 2. zapis -> .bak drzi 1-polozkovy stav
+  File.write(HWC.path, '{zlomeny')
+  Noxun::Engine::JsonFileStore.invalidate(HWC.path)
+  HWC.reset_state!
+  NxTest.assert_equal(:read_only, HWC.assess!, 'fallback na .bak NIE JE :ok')
+  NxTest.assert(HWC.items.length >= 1, 'citanie z .bak dalej funguje')
+  NxTest.assert_equal(:read_only, HWC.create_item(hwc_item('item_code' => 'X3'))[0])
+  # duplicitne kody (case-insensitive) v subore = nejednoznacna identita
+  hwc_wipe!
+  Noxun::Engine::JsonFileStore.write(HWC.path, 'std' => HWC::STD, 'schema' => 1, 'items' => [
+    HWC.normalize_item(hwc_item)[0],
+    HWC.normalize_item(hwc_item('item_code' => ' 104717 ', 'name_sk' => 'Duplikat'))[0]
+  ])
+  Noxun::Engine::JsonFileStore.invalidate(HWC.path)
+  HWC.reset_state!
+  NxTest.assert_equal(:read_only, HWC.assess!, 'CI duplicitne kody = read-only (GH #99 P2)')
+end
+
+NxTest.test('hw katalog: write_unlocked cita CERSTVY marker — cudzi novsi subor sa neprepise (GH #99 P1)') do
+  hwc_empty!
+  HWC.create_item(hwc_item)
+  rec = HWC.find('104717')
+  # iny proces medzitym nahradi subor NOVSOU schemou (cached @state je :ok)
+  File.write(HWC.path, JSON.generate('std' => HWC::STD, 'schema' => 99, 'items' => []))
+  Noxun::Engine::JsonFileStore.invalidate(HWC.path)
+  st, = HWC.patch_item('104717', { 'notes' => 'x' }, row_rev: HWC.record_rev(rec))
+  NxTest.refute(st == :ok, 'zapis nad novsou schemou sa odmietne')
+  raw = JSON.parse(File.binread(HWC.path))
+  NxTest.assert_equal(99, raw['schema'], 'novsi subor ostal nedotknuty')
+end
+
 # --- price proposal flow (BLOCKER 1) -----------------------------------------
 
 def hwc_product_html(code, price_vat, unit = 'ks')
@@ -216,15 +258,19 @@ ensure
   Noxun::Engine::Demos.transport = nil
 end
 
-NxTest.test('hw katalog: apply_price_proposal! — zapis len z proposalu, base_row_rev conflict, stamp') do
+NxTest.test('hw katalog: apply_price_proposal! — zapis len z proposalu, pid vazba, base_row_rev conflict') do
   hwc_empty!
   HWC.create_item(hwc_item)
   url = 'https://www.demos-trade.sk/zaves-sensys/'
   Noxun::Engine::Demos.transport = Db1Transport.new(url => [200, {}, hwc_product_html('104717', 4.30)])
-  HWC.check_price!('104717', url: url) { |_r| }
+  got = nil
+  HWC.check_price!('104717', url: url) { |r| got = r }
   Noxun::Engine::Demos.transport = nil
-  NxTest.assert_equal(:no_proposal, HWC.apply_price_proposal!('999')[0], 'bez proposalu nic')
-  st, rec = HWC.apply_price_proposal!('104717')
+  NxTest.assert(got['pid'].to_s.length.positive?, 'vysledok nesie pid navrhu')
+  NxTest.assert_equal(:no_proposal, HWC.apply_price_proposal!('999', pid: got['pid'])[0], 'cudzi kod nic')
+  NxTest.assert_equal(:no_proposal, HWC.apply_price_proposal!('104717', pid: 'iny')[0],
+                      'pid mismatch = zapis odmietnuty (GH #99 P2 — prekryvajuce sa checky)')
+  st, rec = HWC.apply_price_proposal!('104717', pid: got['pid'])
   NxTest.assert_equal(:ok, st)
   NxTest.assert_close(4.30, rec['price_eur_vat'], 0.001)
   NxTest.assert_equal(url, rec['demos_url'], 'finalna URL sa ulozi ako vazba')
@@ -232,11 +278,12 @@ NxTest.test('hw katalog: apply_price_proposal! — zapis len z proposalu, base_r
   NxTest.assert_equal(nil, HWC.price_proposals['104717'], 'proposal skonzumovany')
   # conflict: proposal nad starym zaznamom
   Noxun::Engine::Demos.transport = Db1Transport.new(url => [200, {}, hwc_product_html('104717', 4.55)])
-  HWC.check_price!('104717') { |_r| } # pouzije ulozenu demos_url
+  got2 = nil
+  HWC.check_price!('104717') { |r| got2 = r } # pouzije ulozenu demos_url
   Noxun::Engine::Demos.transport = nil
   fresh = HWC.find('104717')
   HWC.patch_item('104717', { 'notes' => 'medzitym' }, row_rev: HWC.record_rev(fresh))
-  NxTest.assert_equal(:conflict, HWC.apply_price_proposal!('104717')[0],
+  NxTest.assert_equal(:conflict, HWC.apply_price_proposal!('104717', pid: got2['pid'])[0],
                       'zaznam zmeneny od checku = conflict (base_row_rev)')
   NxTest.assert_equal(nil, HWC.price_proposals['104717'], 'konfliktny proposal zahodeny')
 ensure
@@ -271,17 +318,20 @@ NxTest.test('hw katalog: seed — deterministicky manifest, unikatne kody, enum,
   NxTest.assert_equal('moje', HWC.find('104717')['notes'], 'druhy boot seed NEPREPISE data')
 end
 
-NxTest.test('hw katalog: check_price! unchanged — potvrdenie obnovi len datum') do
+NxTest.test('hw katalog: check_price! unchanged — ZACHOVA ulozenu cenu, obnovi len URL+datum (GH #99 P2)') do
   hwc_empty!
   HWC.create_item(hwc_item) # cena 4.18
   url = 'https://www.demos-trade.sk/zaves-sensys/'
-  Noxun::Engine::Demos.transport = Db1Transport.new(url => [200, {}, hwc_product_html('104717', 4.18)])
+  # stranka ma 4.1840 — v tolerancii 0.005 = "nezmenene"; katalogova hodnota
+  # sa NESMIE posunut na fetchnute 4.184 (sucty by sa hybali bez dovodu)
+  Noxun::Engine::Demos.transport = Db1Transport.new(url => [200, {}, hwc_product_html('104717', 4.184)])
   got = nil
   HWC.check_price!('104717', url: url) { |r| got = r }
   Noxun::Engine::Demos.transport = nil
   NxTest.assert_equal('unchanged', got['status'])
-  st, rec = HWC.apply_price_proposal!('104717')
+  st, rec = HWC.apply_price_proposal!('104717', pid: got['pid'])
   NxTest.assert_equal(:ok, st)
-  NxTest.assert_close(4.18, rec['price_eur_vat'], 0.001, 'hodnota nezmenena')
+  NxTest.assert_close(4.18, rec['price_eur_vat'], 0.0001, 'ulozena cena OSTALA presne 4.18')
+  NxTest.assert_equal(url, rec['demos_url'])
   NxTest.assert(rec['price_checked_at'].to_s.length.positive?, 'datum overenia obnoveny')
 end
