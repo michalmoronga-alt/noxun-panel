@@ -227,7 +227,10 @@ module Noxun
 
         def handle_apply_price(payload)
           data = JSON.parse(payload.to_s)
-          status, rec = HardwareCatalog.apply_price_proposal!(data['code'].to_s)
+          # GH #99 P2: pid viaze zapis na navrh, ktory pouzivatel VIDEL —
+          # prekryvajuce sa checky nemozu potajme zapisat inu cenu.
+          status, rec = HardwareCatalog.apply_price_proposal!(data['code'].to_s,
+                                                             pid: data['pid'].to_s)
           case status
           when :ok
             push_items

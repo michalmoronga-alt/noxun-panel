@@ -373,7 +373,10 @@
         mdhRender();
         mdhSend('hw_check_price', { code: code, url: urlInp ? urlInp.value.trim() : '' });
       } else if (action === 'hw-apply'){
-        mdhSend('hw_apply_price', { code: code });
+        // GH #99 P2: pid navrhu, ktory je prave ZOBRAZENY — server odmietne
+        // zapis, ak medzitym dobehol iny check (prekryvajuce sa overenia).
+        var shown = MDH_PRICE[code] || {};
+        mdhSend('hw_apply_price', { code: code, pid: shown.pid || '' });
       }
     });
     document.addEventListener('focusout', function(ev){
