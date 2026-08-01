@@ -128,6 +128,18 @@
              skipped_duplak: 'duplák — kupuje sa zdrojová doska' }[status] || status;
   }
 
+  // D-70 (GH #111 P2): server dava k identity_fail/miss SPECIFICKEJSI dovod
+  // do warnings (napr. "ulozena vazba uz nesedi — vloz novu adresu") — riadok
+  // ho musi ukazat namiesto genericheho labelu, inak slub hlasky neplati.
+  // Cista funkcia (Node test): posledny warning je serverov zaverecny dovod.
+  function mddAttentionText(p){
+    if (p && (p.status === 'identity_fail' || p.status === 'miss') &&
+        p.warnings && p.warnings.length){
+      return p.warnings[p.warnings.length - 1];
+    }
+    return mddStatusLabel(p ? p.status : '');
+  }
+
   function mddFmtPrice(v){
     return v == null ? '—' : (Math.round(Number(v) * 100) / 100).toFixed(2) + ' €';
   }
@@ -196,7 +208,7 @@
     row.setAttribute('data-mdd-key', a.key);
     row.appendChild(mddEl('span', 'mddlbl', mddVariantLabel(a.p)));
     var body = mddEl('span', 'mddoffers');
-    body.appendChild(mddEl('span', 'mddwarn', mddStatusLabel(a.p.status)));
+    body.appendChild(mddEl('span', 'mddwarn', mddAttentionText(a.p)));
     (a.p.candidates || []).slice(0, 3).forEach(function(c){
       body.appendChild(mddEl('div', 'mddcand', c));
     });
@@ -365,5 +377,6 @@
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { mddNewModel: mddNewModel, mddApplyEvent: mddApplyEvent,
       mddOffers: mddOffers, mddBuildView: mddBuildView, mddRowRevOf: mddRowRevOf,
-      mddAccepts: mddAccepts, mddStatusLabel: mddStatusLabel, mddFmtPrice: mddFmtPrice };
+      mddAccepts: mddAccepts, mddStatusLabel: mddStatusLabel, mddFmtPrice: mddFmtPrice,
+      mddAttentionText: mddAttentionText };
   }
