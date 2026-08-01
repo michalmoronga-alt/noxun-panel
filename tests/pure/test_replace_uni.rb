@@ -205,6 +205,36 @@ NxTest.test('mb2: blokujuci dielec (vlastny material inej hrubky) = blocked :par
   end
 end
 
+NxTest.test('mb2: override-only UNI (Dekor2 vzor) + cielova hrubka nesedi dielcu = blocked (GH #114 P1)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  res = ru_seed_target
+  begin
+    t186 = ru_sheet_of(res, 18.6)
+    t18 = ru_sheet_of(res, 18.0)
+    base = ru_params
+    side = ru_side_key(base)
+    # telo NIE JE UNI (realny 18) — UNI sedi LEN v override dielca; telo sa
+    # nemeni, adopt_thickness sa nespusti, gate musi chytit 18,6 na 18 dielci
+    params = ru_params('material_id' => t18['material_id'],
+                       'part_overrides' => { side => { 'material_id' => RU_UNI_BODY } })
+    scan = ru_scan(cabs: [['CAB-010', params, ru_eff(body: t18['material_id']), 'raw10', :r10]])
+    out = RUMAT.replace_uni_classify(scan, RUMAT.sheet(RU_UNI_BODY), t186)
+    NxTest.assert_equal(1, out['blocked'].size, 'override-only prepis s inou hrubkou musi blokovat')
+    NxTest.assert_equal(:parts, out['blocked'][0][1])
+    NxTest.assert_equal([], out['jobs_cab'])
+
+    # rovnaka hrubka ciela (18) prejde bez blokacie
+    params2 = ru_params('material_id' => t18['material_id'],
+                        'part_overrides' => { side => { 'material_id' => RU_UNI_BODY } })
+    scan2 = ru_scan(cabs: [['CAB-011', params2, ru_eff(body: t18['material_id']), 'raw11', :r11]])
+    out2 = RUMAT.replace_uni_classify(scan2, RUMAT.sheet(RU_UNI_BODY), t18)
+    NxTest.assert_equal([], out2['blocked'])
+    NxTest.assert_equal(1, out2['jobs_cab'].size)
+  ensure
+    ru_cleanup(res)
+  end
+end
+
 NxTest.test('mb2: doska na UNI — prepis ID, zrusena duplak vazba, hrubka podla ciela v summary') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   res = ru_seed_target

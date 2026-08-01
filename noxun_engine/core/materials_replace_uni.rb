@@ -160,6 +160,17 @@ module Noxun
               blocked_reason = :range
             end
           end
+          if blocked_reason.nil?
+            # GH #114 P1: finálny hrúbkový gate NAD VŠETKÝMI mutáciami — aj
+            # override-only prípad (Dekor2 UNI na dielci) musí prejsť kontrolou
+            # dielcov s vlastným materiálom; adopt_thickness ju volá len pri
+            # zmene hrúbky TELA, prepis overridu by inak prešiel bez kontroly.
+            names = CabinetBuilder.parts_blocking_thickness(params)
+            unless names.empty?
+              blocked_reason = :parts
+              blocked_names = names
+            end
+          end
           if blocked_reason
             out['blocked'] << [cid, blocked_reason, blocked_names]
             next
