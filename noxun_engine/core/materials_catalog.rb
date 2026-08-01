@@ -809,7 +809,8 @@ module Noxun
         # GH #103 P2: formular posiela nakupne kluce VZDY (aj prazdne) —
         # zasah je len NEPRAZDNA hodnota; nil patch = konzervativne odmietnut.
         if patch.is_a?(Hash)
-          touched = %w[code supplier price_per_m2 price_per_bm].any? do |k|
+          # M-A3e D-71: demos_url je nakupne pole — UNI vazbu na dodavatela nema.
+          touched = %w[code supplier price_per_m2 price_per_bm demos_url].any? do |k|
             patch.key?(k) && !patch[k].to_s.strip.empty?
           end
           return nil unless touched

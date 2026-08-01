@@ -234,6 +234,36 @@ module Noxun
         clean
       end
 
+      # M-A3e D-71: rucne zadana vazba z formulara variantu (ceruzka).
+      # Vrati [:ok, clean|nil, invalidate] | [:invalid, msg].
+      #   prazdny vstup  -> [:ok, nil, true ak vazba existovala]  (vedome zmazanie)
+      #   zly host/tvar  -> [:invalid, ...]                        (save sa ODMIETNE)
+      #   platna adresa  -> [:ok, clean, true ak je to INY produkt nez doteraz]
+      # invalidate = price_checked_at prestava platit (cena nie je overena voci
+      # novej/ziadnej adrese — vzor HW katalogu). Audit FIX 3: porovnava sa
+      # KANONICKY produkt (host+cesta bez query/fragmentu a koncovej lomky) —
+      # dopisane ?utm ci lomka nie su zmena vazby a datum overenia preziju;
+      # ULOZI sa vzdy sanitize vystup tak, ako ho pouzivatel dal.
+      def manual_demos_url(raw, existing_url)
+        s = raw.to_s.strip
+        if s.empty?
+          return [:ok, nil, !existing_url.to_s.strip.empty?]
+        end
+        clean, err = Demos.sanitize_url(s)
+        return [:invalid, "adresa nie je produktová stránka demos-trade.sk (#{err})"] unless clean
+        prev, = Demos.sanitize_url(existing_url.to_s)
+        [:ok, clean, canonical_demos_product(clean) != canonical_demos_product(prev)]
+      end
+
+      # Kanonicka identita produktu za URL — LEN na porovnanie (nie na zapis).
+      def canonical_demos_product(url)
+        return nil if url.to_s.empty?
+        uri = URI.parse(url)
+        "#{uri.host.to_s.downcase}#{uri.path.to_s.chomp('/')}"
+      rescue StandardError
+        url
+      end
+
       # Pary kod+dodavatel po zapise davky; konflikt = par s 2+ zaznamami,
       # z ktorych aspon jeden je NOVY. Vrati zoznam id vinnikov alebo nil.
       def demos_create_code_conflict(data, new_ids)

@@ -670,6 +670,8 @@
     el('ms_price').value = mdPriceVal(s && s.price_per_m2);
     el('ms_code').value = s ? (s.code || '') : '';
     el('ms_supplier').value = s ? (s.supplier || '') : '';
+    // M-A3e (D-71): rucna vazba na Demos — prefill + hint s datumom overenia.
+    mdDemosField('ms', s);
     el('ms_color').value = rgbToHex(s ? s.color : null);
     el('ms_family').value = s ? (s.family || '') : '';
     el('ms_manufacturer').value = s ? (s.manufacturer || '') : '';
@@ -700,6 +702,38 @@
   // D-42: prazdny string ak cena nie je zadana (nil/undefined), inak hodnota
   // (aj 0 = zadana nula). Rozlisuje "nezadana" od "0".
   function mdPriceVal(v){ return (v === null || v === undefined || v === '') ? '' : String(v); }
+  // M-A3e (D-71): pole rucnej vazby vo formulari (prefix 'ms'/'me') — prefill
+  // z existujuceho zaznamu + hint s datumom overenia ceny (mdDateLabel).
+  // Prazdne pole pri ulozeni = vedome zmazanie vazby (server kontrakt).
+  // Audit FIX 5: UNI je bez nakupnych poli — riadok sa pri UNI zazname SKRYJE
+  // (server by neprazdnu URL aj tak odmietol, ale pole by bola slepa ulicka).
+  function mdDemosField(prefix, rec){
+    var inp = el(prefix + '_demos_url');
+    if (!inp) return;
+    inp.value = rec ? (rec.demos_url || '') : '';
+    var row = inp.closest ? inp.closest('.row') : null;
+    if (row) row.style.display = (rec && rec.uni === true) ? 'none' : '';
+    var hint = el(prefix + '_demos_hint');
+    if (!hint) return;
+    var when = (rec && !rec.uni) ? mdDateLabel(rec.price_checked_at) : '';
+    if (when){
+      hint.textContent = 'Cena overená ' + when + ' — zmena alebo zmazanie adresy dátum zruší.';
+      hint.style.display = '';
+    } else {
+      hint.textContent = '';
+      hint.style.display = 'none';
+    }
+  }
+  // Audit FIX 4: hruba klientska kontrola PRED odoslanim — formular ostava
+  // otvoreny s hlaskou (server po odoslani formular zatvara a jeho odmietnutie
+  // by stalo cely prepis). Server ostava autorita (jemnosti /vyhledavani atd.).
+  function mdDemosUrlLocalError(v){
+    var s = String(v == null ? '' : v).trim();
+    if (!s) return null;
+    if (!/^https:\/\//i.test(s)) return 'Adresa u dodávateľa musí začínať https:// (alebo pole nechaj prázdne).';
+    if (!/^https:\/\/(www\.)?demos-trade\.sk\//i.test(s)) return 'Adresa musí byť produktová stránka demos-trade.sk.';
+    return null;
+  }
   function mdOpenEdgeForm(id){
     if (MD_RO){ MD.setStatus('Katalóg je len na čítanie — úpravy sú vypnuté.', true); return; }
     mdCloseForms();
@@ -716,6 +750,8 @@
     el('me_price').value = mdPriceVal(a && a.price_per_bm);
     el('me_code').value = a ? (a.code || '') : '';
     el('me_supplier').value = a ? (a.supplier || '') : '';
+    // M-A3e (D-71): rucna vazba na Demos — prefill + hint s datumom overenia.
+    mdDemosField('me', a);
     el('me_color').value = rgbToHex(a ? a.color : null);
     el('mdEdgeForm').style.display = '';
   }
@@ -1421,6 +1457,7 @@
       price_per_m2: el('ms_price').value,   // D-42: prazdne = nezadana (nie 0)
       code: el('ms_code').value,             // D-42 dodavatelsky kod
       supplier: el('ms_supplier').value,     // D-42 preferovany dodavatel
+      demos_url: el('ms_demos_url').value,   // M-A3e (D-71): prazdne = zmazat vazbu
       color: hexToRgb(el('ms_color').value),
       family: el('ms_family').value,
       manufacturer: el('ms_manufacturer').value,
@@ -1435,6 +1472,10 @@
     }
     // D-19: format platne sa posiela LEN ako kompletny platny par; polovicny
     // alebo neplatny vstup zastavi ulozenie (ziadne tiche 0/reset — Codex F4).
+    // M-A3e (audit FIX 4): zla adresa NEZATVARA formular — server ju sice
+    // odmietne tiez, ale az po zavreti a prepis by prepadol.
+    var due = mdDemosUrlLocalError(payload.demos_url);
+    if (due){ MD.setStatus(due, true); return; }
     var sl = mdSheetDim(el('ms_sheet_l').value);
     var sw = mdSheetDim(el('ms_sheet_w').value);
     if ((sl === null) !== (sw === null) || (sl !== null && (isNaN(sl) || isNaN(sw)))){
@@ -1460,9 +1501,13 @@
       price_per_bm: el('me_price').value,  // D-42: prazdne = nezadana (nie 0)
       code: el('me_code').value,
       supplier: el('me_supplier').value,
+      demos_url: el('me_demos_url').value,   // M-A3e (D-71): prazdne = zmazat vazbu
       color: hexToRgb(el('me_color').value),
       allow_duplicate_code: mdDupAllow === 'edge'
     };
+    // M-A3e (audit FIX 4): zla adresa nezatvara formular (vzor mdSaveSheet).
+    var due = mdDemosUrlLocalError(payload.demos_url);
+    if (due){ MD.setStatus(due, true); return; }
     mdLastAttempt = { kind: 'edge', payload: payload };
     var fn = mdEditing && mdEditing.id ? 'update_edge' : 'add_edge';
     if (window.sketchup && sketchup[fn]) sketchup[fn](JSON.stringify(payload));
@@ -1489,6 +1534,7 @@
       if (p.color) el('ms_color').value = rgbToHex(p.color);
       el('ms_sheet_l').value = p.sheet_size ? p.sheet_size[0] : '';
       el('ms_sheet_w').value = p.sheet_size ? p.sheet_size[1] : '';
+      el('ms_demos_url').value = p.demos_url || ''; // M-A3e (audit FIX 2)
     } else {
       mdOpenEdgeForm(p.abs_id || null);
       el('me_decor').value = p.decor || ''; el('me_price').value = p.price_per_bm || '';
@@ -1496,6 +1542,7 @@
       el('me_width').value = (p.width === null || p.width === undefined) ? '' : p.width;
       el('me_thickness').value = p.thickness || '1.0';
       if (p.color) el('me_color').value = rgbToHex(p.color);
+      el('me_demos_url').value = p.demos_url || ''; // M-A3e (audit FIX 2)
     }
   }
   // V0.6 M-A2 (Halifax lekcia / audit F9): mazanie ide VZDY cez serverovy

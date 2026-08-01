@@ -493,6 +493,41 @@ ensure
   NxTest.install_fresh_seed_catalog!
 end
 
+# --- M-A3e (D-71): rucna vazba z formulara --------------------------------------
+
+NxTest.test('ma3e: manual_demos_url — sanitize, vedome zmazanie, invalidacia datumu') do
+  ok_url = 'https://www.demos-trade.sk/dtdl-h9999-st9-x-2800-2070-18/'
+  # platna adresa na cisty zaznam: ziadna invalidacia netreba? — nova vazba
+  # znamena, ze stary datum (ak bol) uz neplati; bez existujucej = invalidate
+  # true je neskodne (kluc neexistuje).
+  st, val, inv = MAT_MA.manual_demos_url(ok_url, nil)
+  NxTest.assert_equal([:ok, ok_url, true], [st, val, inv])
+  # ta ista adresa znova = ZIADNA zmena vazby (datum overenia prezije)
+  st2, val2, inv2 = MAT_MA.manual_demos_url("  #{ok_url}  ", ok_url)
+  NxTest.assert_equal([:ok, ok_url, false], [st2, val2, inv2], 'trim + porovnanie po sanitize')
+  # ina adresa = invalidacia
+  iny = 'https://www.demos-trade.sk/dtdl-h9999-st9-x-2800-2070-25/'
+  NxTest.assert_equal(true, MAT_MA.manual_demos_url(iny, ok_url)[2])
+  # prazdne pole = vedome zmazanie; invalidacia len ak vazba existovala
+  NxTest.assert_equal([:ok, nil, true], MAT_MA.manual_demos_url('   ', ok_url)[0..2])
+  NxTest.assert_equal([:ok, nil, false], MAT_MA.manual_demos_url('', nil)[0..2])
+  # zly host / nezmysel = invalid (save sa odmietne)
+  NxTest.assert_equal(:invalid, MAT_MA.manual_demos_url('https://evil.example.com/x', nil)[0])
+  NxTest.assert_equal(:invalid, MAT_MA.manual_demos_url('nie je url', nil)[0])
+end
+
+NxTest.test('ma3e: uni_edit_error — demos_url je nakupne pole (UNI ho odmietne)') do
+  NxTest.install_fresh_seed_catalog!
+  uni = MAT_MA.sheets.find { |s| MAT_MA.uni?(s) }
+  NxTest.assert(uni, 'seed ma UNI zaznam')
+  err = MAT_MA.uni_edit_error(uni, { 'demos_url' => 'https://www.demos-trade.sk/x-18/' })
+  NxTest.assert(err.to_s.include?('UNI'), err.inspect)
+  NxTest.assert_equal(nil, MAT_MA.uni_edit_error(uni, { 'demos_url' => '' }),
+                      'prazdne pole formulara UNI needituje')
+ensure
+  NxTest.install_fresh_seed_catalog!
+end
+
 # --- Materials.create_group_from_demos (mutator) -------------------------------
 
 NxTest.test('ma1 mutator: legacy katalog odmietnuty; znackova skupina bez dosky odmietnuta') do
