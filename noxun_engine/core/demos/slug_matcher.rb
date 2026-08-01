@@ -17,17 +17,45 @@ module Noxun
     module DemosSlugMatcher
       # Prefix slugu podla kanonickeho typu zaznamu (registry typov) — zuzuje
       # kandidatov a chrani pred zamenou DTDL vs PD vs zastena toho isteho
-      # dekoru. ABS pasky maju vlastny prefix absb.
+      # dekoru. D-65 (analyza sitemap 48k, 1.8.): jeden typ ma na Demose viac
+      # slug tvarov — dtd-laminovana (Kronospan DTDL), mdfl/mdfs (lakovana/
+      # surova MDF — mdfd dyhovana VEDOME mimo, Michal 1.8.), kd-in/kd-ex
+      # (realne kompakty; stary "kompakt" prefix kryl len 2 produkty),
+      # pracovni-deska (CZ mutacia). Prefix plati LEN s pomlckou za nim
+      # (prefix_match?) — vsetky tri konzumenty (family, name_search, score)
+      # klasifikuju CEZ TENTO modul, ziadne volne start_with.
       TYPE_PREFIXES = {
-        'DTDL' => ['dtdl'],
-        'MDF' => ['mdf'],
+        'DTDL' => ['dtdl', 'dtd-laminovana'],
+        'MDF' => ['mdf', 'mdfl', 'mdfs'],
         'HDF' => ['hdf'],
-        'PD' => ['pracovna-doska'],
+        'PD' => ['pracovna-doska', 'pracovni-deska'],
         'ZASTENA' => ['zastena'],
-        'KOMPAKT' => ['kompaktna-doska', 'kompakt']
+        'KOMPAKT' => ['kompaktna-doska', 'kompakt', 'kd-in', 'kd-ex']
       }.freeze
 
+      # ABS pasky: rad absb + kratke rady absl/abs- (bezsvove hotair/laser).
+      EDGE_PREFIXES = %w[absb absl abs].freeze
+
       module_function
+
+      # Prefix plati len ako CELY prvy usek slugu (mdf-... ano, mdfl-... nie
+      # pre prefix 'mdf') — jedina prefixova semantika celeho modulu.
+      def prefix_match?(slug, prefix)
+        slug == prefix || slug.start_with?("#{prefix}-")
+      end
+
+      # Kanonicky sheet typ zo slugu (nil = nie je znamy doskovy typ).
+      def sheet_type_of(slug)
+        TYPE_PREFIXES.each do |type, prefixes|
+          return type if prefixes.any? { |p| prefix_match?(slug, p) }
+        end
+        nil
+      end
+
+      # Slug je ABS paska?
+      def edge_slug?(slug)
+        EDGE_PREFIXES.any? { |p| prefix_match?(slug, p) }
+      end
 
       # rec: katalogovy zaznam (sheet alebo edge — edge s 'abs_id').
       # urls: pole produktovych URL zo sitemap cache.
@@ -65,7 +93,7 @@ module Noxun
           'back_decor' => norm_token(rec['back_decor']),
           'back_structure' => norm_token(rec['back_structure']),
           'edge' => edge,
-          'prefixes' => (edge ? ['absb'] : TYPE_PREFIXES[Materials.identity_norm(type)])
+          'prefixes' => (edge ? EDGE_PREFIXES : TYPE_PREFIXES[Materials.identity_norm(type)])
         }
       end
 
@@ -77,10 +105,12 @@ module Noxun
       def score(slug, toks)
         parts = slug.split('-')
         return nil unless contains_seq?(parts, toks['decor'])
+        # D-65: prefix filter cez prefix_match? (cely prvy usek) — DTDL zaznam
+        # tak matchne aj dtd-laminovana URL, a 'mdf' uz nechyta 'mdfl-…' omylom.
         if toks['prefixes']
-          return nil unless toks['prefixes'].any? { |p| slug.start_with?(p) }
+          return nil unless toks['prefixes'].any? { |p| prefix_match?(slug, p) }
         elsif toks['edge']
-          return nil unless slug.start_with?('absb')
+          return nil unless edge_slug?(slug)
         end
         return nil if toks['structure'] && !contains_seq?(parts, toks['structure'])
         if toks['edge']

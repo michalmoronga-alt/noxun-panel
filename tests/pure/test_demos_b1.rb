@@ -267,6 +267,31 @@ NxTest.test('demos b1: matcher — ABS sirka/hrubka, zastena s rubom (aj -2 dedu
                       'iny rub diskvalifikuje (B4)')
 end
 
+NxTest.test('demos b1: matcher D-65 — alias prefixy (dtd-laminovana, absl) a pomlckova semantika') do
+  urls = db1_urls
+  dtd = { 'material_id' => 'X', 'decor' => 'K003', 'structure' => 'PW', 'type' => 'DTDL',
+          'thickness' => 25.0, 'sheet_size' => [2800.0, 2070.0] }
+  r = DSM.match(dtd, urls)
+  NxTest.assert_equal('match', r['status'], "DTDL zaznam matchne dtd-laminovana URL: #{r.inspect}")
+  NxTest.assert(r['url'].include?('dtd-laminovana-k003'), r.inspect)
+  ab = { 'abs_id' => 'A', 'decor' => '76955', 'width' => 22.0, 'thickness' => 0.4 }
+  NxTest.assert_equal('match', DSM.match(ab, urls)['status'], 'absl- paska je edge kandidat')
+  # prefix plati LEN ako cely prvy usek slugu
+  NxTest.refute(DSM.prefix_match?('mdfl-101-x', 'mdf'), 'mdf nechyta mdfl-')
+  NxTest.assert(DSM.prefix_match?('mdf-pet-101-x', 'mdf'))
+  NxTest.assert_equal('MDF', DSM.sheet_type_of('mdfl-101-sm-front-white-2800-2070-8'))
+  NxTest.assert_equal('MDF', DSM.sheet_type_of('mdfs-sonae-arauco-2800-2070-18'))
+  NxTest.assert_equal(nil, DSM.sheet_type_of('mdfd-dub-comfort-2520-1810-19'),
+                      'dyhovana MDF vedome mimo (Michal 1.8.)')
+  NxTest.assert_equal('KOMPAKT', DSM.sheet_type_of('kd-in-w980-st7-platinovo-biela-cj-cgs-2790-2060-12'))
+  NxTest.assert_equal(nil, DSM.sheet_type_of('kompaktne-dosky-prehlad-skladovej-kolekcie'),
+                      'clanok nezacina kompakt-')
+  NxTest.assert_equal('PD', DSM.sheet_type_of('pracovni-deska-perfectsense-u999-pm-cierna-abs-4100-1200-38'))
+  NxTest.assert(DSM.edge_slug?('absl-76955-14-mamba-green-7190-bs-22-0-4'))
+  NxTest.assert(DSM.edge_slug?('abs-sl-seamless-w1100-pg-hotair-laser-23-1'))
+  NxTest.refute(DSM.edge_slug?('absolut-nieco-23-1'), 'abs prefix len ako cely usek')
+end
+
 # --- parser (audit B3/F8/F10) ------------------------------------------------
 
 NxTest.test('demos b1: parser PD fixture — kod, ceny s/bez DPH, parametre, 21 related bez warningov') do

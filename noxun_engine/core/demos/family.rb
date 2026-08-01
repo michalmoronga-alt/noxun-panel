@@ -118,7 +118,7 @@ module Noxun
           item['reason'] = 'vzorka — nie je materiál'
           return item
         end
-        if slug.start_with?('absb')
+        if DemosSlugMatcher.edge_slug?(slug)
           w, th = edge_dims_from_slug(slug)
           item['width_hint'] = w
           item['thickness_hint'] = th
@@ -131,7 +131,10 @@ module Noxun
         end
         type = sheet_type_of(slug)
         if type.nil?
-          item['reason'] = 'mimo podporovaných typov (príslušenstvo)'
+          # D-65: povodne "(prislusenstvo)" klamalo pri doskach s nepokrytym
+          # prefixom (dtd-laminovana…) — po rozsireni prefixov su tu uz naozaj
+          # len listy/kovanie/vzorky, text ostava neutralny.
+          item['reason'] = 'mimo podporovaných typov materiálu'
         elsif type == 'ZASTENA'
           # Zastena nesie obojstranny dekor (rub) — zakladanie z Demosu ju
           # zatial nepodporuje (rub by sa musel citat zo slugu, FIX 7 zakazuje).
@@ -144,11 +147,10 @@ module Noxun
         item
       end
 
+      # D-65: klasifikacia slugu ma JEDNU autoritu (DemosSlugMatcher) — family,
+      # name_search aj score pouzivaju tie iste prefixy s tou istou semantikou.
       def sheet_type_of(slug)
-        DemosSlugMatcher::TYPE_PREFIXES.each do |type, prefixes|
-          return type if prefixes.any? { |p| slug.start_with?("#{p}-") || slug == p }
-        end
-        nil
+        DemosSlugMatcher.sheet_type_of(slug)
       end
 
       # ABS slug konci sirka-hrubka (absb-...-23-1, ...-43-2) alebo pri
@@ -247,15 +249,20 @@ module Noxun
       # Fetch vysledok polozky -> overene polia na zapis | {'reason'=>...}.
       # FIX 7: typ zo slugu FINALNEJ URL, parametre z PARSOVANEJ stranky;
       # chybajuci/nesediaci parameter = fail polozky (nie tichy odhad).
+      # D-64: brand + params-decor dokaz identity plati LEN pre dosky (GH #97
+      # P1 — Egger vs Kronospan zdielaju cisla dekorov). Pasky vyrabaju tretie
+      # strany (Rehau…): ich stranka nesie VLASTNU znacku aj VLASTNE "Cislo
+      # dekoru" (79098/LPE05), dekor dosky je len v slugu — overuje verify_edge.
       def verify_item(header, it, res)
         return { 'reason' => "sieť: #{res['error']}" } unless res['ok']
         parsed = DemosProductParser.parse(res['body'])
         return { 'reason' => 'stránka nie je produktový detail' } unless parsed['ok']
         final_url = res['url'].to_s
         params = parsed['params'] || {}
+        code = parsed['code'].to_s
+        slug = DemosSlugMatcher.slug_of(final_url)
+        return verify_edge(header, parsed, params, slug, code, final_url) if it['kind'] == 'edge'
         brand = parsed['brand'].to_s
-        # Identita skupiny: brand + cislo dekoru stranky polozky MUSIA sediet
-        # s hlavickou (Egger vs Kronospan zdielaju cisla dekorov — GH #97 P1).
         unless !brand.strip.empty? &&
                Materials.identity_norm(brand) == Materials.identity_norm(header['manufacturer'])
           return { 'reason' => 'výrobca stránky nesedí s rodinou — položka sa nezakladá' }
@@ -264,13 +271,7 @@ module Noxun
                Materials.identity_norm(params['decor']) == Materials.identity_norm(header['decor'])
           return { 'reason' => 'číslo dekoru stránky nesedí s rodinou' }
         end
-        code = parsed['code'].to_s
-        slug = DemosSlugMatcher.slug_of(final_url)
-        if it['kind'] == 'edge'
-          verify_edge(parsed, params, slug, code, final_url)
-        else
-          verify_sheet(parsed, params, slug, code, final_url, it)
-        end
+        verify_sheet(parsed, params, slug, code, final_url, it)
       end
 
       def verify_sheet(parsed, params, slug, code, final_url, it)
@@ -295,8 +296,17 @@ module Noxun
         }
       end
 
-      def verify_edge(parsed, params, slug, code, final_url)
-        return { 'reason' => 'finálna adresa nie je ABS páska' } unless slug.start_with?('absb')
+      # D-64: dekor rodiny dokazuje bud parameter stranky (Kronospan si pasky
+      # znaci spravne), alebo slug finalnej URL v useku PRED koncovymi rozmermi
+      # (dekor '23' nesmie matchnut sirku 23). Brand sa pri paske neoveruje —
+      # ABS zaznam vyrobcu ani nenesie (standard 7.5).
+      def verify_edge(header, parsed, params, slug, code, final_url)
+        return { 'reason' => 'finálna adresa nie je ABS páska' } unless DemosSlugMatcher.edge_slug?(slug)
+        page_decor_ok = params['decor'] &&
+                        Materials.identity_norm(params['decor']) == Materials.identity_norm(header['decor'])
+        unless page_decor_ok || edge_slug_decor?(slug, header['decor'])
+          return { 'reason' => 'adresa pásky nenesie číslo dekoru rodiny — položka sa nezakladá' }
+        end
         w, th = edge_dims_from_slug(slug)
         unless w && w.positive? && th && th.positive?
           return { 'reason' => 'z adresy pásky sa nedá určiť šírka×hrúbka' }
@@ -310,12 +320,30 @@ module Noxun
         if pt.is_a?(Numeric) && (pt.to_f - th).abs > 0.011
           return { 'reason' => 'hrúbka pásky na stránke nesedí s adresou' }
         end
+        # D-58: stranky pasok strukturu POVRCHU neuvadzaju (maju len "Struktura
+        # hran" vyrobcu pasky — vedome sa NECITA, bola by zla autorita); prazdna
+        # struktura dedi strukturu rodiny, aby picker (skupina + presna
+        # struktura) pasku nachadzal a banner "bez struktury" nestrasil.
+        structure = params['structure'].to_s.strip
+        structure = header['structure'].to_s.strip if structure.empty?
         {
           'kind' => 'edge', 'width' => w, 'thickness' => th,
-          'structure' => params['structure'].to_s.strip, 'code' => code,
+          'structure' => structure, 'code' => code,
           'price' => DemosProductParser.price_for_catalog(parsed['price_vat'], parsed['unit'], 'edge', nil),
           'demos_url' => final_url, 'reason' => nil
         }
+      end
+
+      # Dekor rodiny ako suvisla sekvencia tokenov slugu PRED koncovymi
+      # rozmermi (absb-79098-ohne-lpe05-cashmere-5981-bs-5981-pd-23-0-8 ma
+      # dekor 5981 v tele; koncove 23-0-8 su sirka×hrubka a do dokazu nepatria).
+      def edge_slug_decor?(slug, decor)
+        seq = DemosSlugMatcher.norm_token(decor)
+        return false if seq.nil? || seq.empty?
+        parts = slug.split('-')
+        tail = trailing_numbers(slug).length
+        body = tail.positive? ? parts[0...-tail] : parts
+        DemosSlugMatcher.contains_seq?(body, seq)
       end
 
       # Po dobehnuti vsetkych fetchov: all-or-nothing zapis + obrazok.
