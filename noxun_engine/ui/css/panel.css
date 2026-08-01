@@ -527,6 +527,13 @@
   .mduni .ic { width: 14px; height: 14px; }
   /* M-A3b (D-60): vazba na Demos v riadku variantu — akcent, klik otvara stranku */
   .mddm { color: var(--nx-select-accent); }
+  /* M-A3c (D-67): vlastny suggest dropdown (CEF datalist klik bug) — jeden
+     zdielany overlay, position:fixed nad formularmi (ziadne clipovanie). */
+  #mdSgBox { position: fixed; z-index: 80; background: var(--nx-surface);
+             border: 1px solid var(--nx-border-strong); border-radius: 6px;
+             box-shadow: 0 4px 14px var(--nx-modal-shadow); max-height: 200px; overflow-y: auto; }
+  .mdsg-row { padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--nx-ink); }
+  .mdsg-row:hover, .mdsg-row.on { background: var(--nx-select-bg-hover); }
   /* V0.4.5 D3: vypis upozorneni + badge kovania pri celach */
   /* D-29 A1: warnlist ukotveny hned pod sticky hlavickou (toggle robi scroll-to-top,
      aby bol viditelny aj po odscrollovani). */

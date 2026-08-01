@@ -423,7 +423,7 @@
     if (mdManufacturing === g.key){
       // D-44: naseptavac (datalist mdManList) + VLASTNE tlacidlo na vymazanie —
       // prazdny input uz vyrobcu nezmaze (server odmietne bez flagu, audit F9).
-      h += '<div class="tplrow"><input id="md_man_input" type="text" list="mdManList" value="' + esc(g.manufacturer || '') + '" placeholder="Výrobca (napr. Egger)" style="flex:1">' +
+      h += '<div class="tplrow"><input id="md_man_input" type="text" value="' + esc(g.manufacturer || '') + '" placeholder="Výrobca (napr. Egger)" style="flex:1">' +
         '<button class="primary tplbtn" onclick="mdManufacturerSave(' + esc(JSON.stringify(g.key)) + ')">Uložiť</button>' +
         (g.manufacturer ? '<button class="ghostbtn tpldel" title="Zmazať výrobcu" aria-label="Zmazať výrobcu" onclick="mdManufacturerClear(' + esc(JSON.stringify(g.key)) + ')"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>' : '') +
         '<button class="ghostbtn tplbtn" onclick="mdManufacturerOpen(null)">Zrušiť</button></div>';
@@ -592,7 +592,9 @@
     var gi = el('md_gname_input');
     if (gi){ gi.focus(); gi.select(); return; }
     var mi = el('md_man_input');
-    if (mi){ mi.focus(); mi.select(); }
+    // M-A3c (D-67, audit FIX 6): inline editor vyrobcu bol jediny dalsi
+    // spotrebitel datalistu — dostava ten isty suggest komponent.
+    if (mi){ mdSgBind('md_man_input', function(){ return MD_SUGGEST.manufacturers; }, null); mi.focus(); mi.select(); }
   }
   function mdRenameOpen(key){
     mdRenaming = key; mdManufacturing = null; mdNaming = null;
@@ -850,9 +852,18 @@
   }
   // Zmena spolocneho typu prepocita NAVRHY (PD navrh nema, takze DTDL -> PD
   // pole vyprazdni — inak by odoslal 2800x2070 pre pracovnu dosku).
+  // M-A3c: + auto pruhy vynimiek (rucne hodnoty auto=false ostavaju).
   function mdTypeChanged(){
     mdActiveSheetChips().forEach(function(c){ if (!c.type) mdFmtPrefill(c.key, c.hintType); });
+    var t = ((el('nd_type') && el('nd_type').value) || '').trim();
+    Object.keys(mdFmtX).forEach(function(k){
+      if (!mdFmtX[k].auto) return;
+      var hint = mdFormatRequired(t) ? null : mdFormatHint(t, MD_FORMAT_HINTS);
+      mdFmtX[k].l = hint ? mdFmtStr(hint[0]) : '';
+      mdFmtX[k].w = hint ? mdFmtStr(hint[1]) : '';
+    });
     mdRenderFmtRow();
+    mdRenderExtraFmtRow();
   }
   // Kompaktny pruh: 1 riadok, LEN prave aktivne cipy (viac cipov = mini-polia
   // vedla seba so skratkou typu). Ziadny aktivny cip = riadok je skryty.
@@ -881,6 +892,50 @@
     box.innerHTML = html;
     row.style.display = '';
   }
+  // M-A3c (D-68): formatovy pruh pre DOPISANE hrubky ("Dalsie hrubky") —
+  // zastena 9,2 uz nie je slepa ulicka: server format v identite vyzaduje a
+  // pole na jeho zadanie tu KONECNE existuje. Pruh sa ukaze len pre vynimky
+  // bez inline formatu; prefill z hintov LEN pri type bez formatu v identite
+  // (audit BLOCKER 1: PD/zastena NIKDY — formaty sa liseia, identita sa nesmie
+  // vymysliet). Klucom je kanonicka hrubka (9,2 = 9.2 = 09.2 — jeden pruh).
+  var mdFmtX = {}; // {'x:9.2': {l, w, auto}}
+  function mdFmtXState(key, type){
+    if (!mdFmtX[key]){
+      mdFmtX[key] = { l: '', w: '', auto: true };
+      if (!mdFormatRequired(type)){
+        var hint = mdFormatHint(type, MD_FORMAT_HINTS);
+        if (hint){ mdFmtX[key].l = mdFmtStr(hint[0]); mdFmtX[key].w = mdFmtStr(hint[1]); }
+      }
+    }
+    return mdFmtX[key];
+  }
+  function mdFmtXInput(inp){
+    var f = mdFmtXState(inp.getAttribute('data-key'), (el('nd_type') && el('nd_type').value) || '');
+    f[inp.getAttribute('data-dim')] = inp.value;
+    f.auto = false;
+  }
+  function mdRenderExtraFmtRow(){
+    var row = el('nd_xfmt_row'), box = el('nd_xfmt_fields');
+    if (!row || !box) return;
+    var type = ((el('nd_type') && el('nd_type').value) || '').trim();
+    var chips = mdExtraFmtChips((el('nd_ths') && el('nd_ths').value) || '').filter(function(c){ return !c.inline; });
+    if (!chips.length){ box.innerHTML = ''; row.style.display = 'none'; return; }
+    var html = '';
+    chips.forEach(function(c){
+      var f = mdFmtXState(c.key, type);
+      html += '<span class="mdfmt">' +
+        '<i>' + esc(c.th) + '</i>' +
+        '<input type="text" class="fmtdim" data-key="' + esc(c.key) + '" data-dim="l" value="' + esc(f.l) + '"' +
+        ' placeholder="dĺžka" title="Formát platne výnimky — dĺžka (mm)" oninput="mdFmtXInput(this)">' +
+        '<span class="sheetx">×</span>' +
+        '<input type="text" class="fmtdim" data-key="' + esc(c.key) + '" data-dim="w" value="' + esc(f.w) + '"' +
+        ' placeholder="šírka" title="Formát platne výnimky — šírka (mm)" oninput="mdFmtXInput(this)">' +
+        '</span>';
+    });
+    box.innerHTML = html;
+    row.style.display = '';
+  }
+
   // 2A-4b: pruh detailu ABS cipov — struktura + vedomy priznak "univerzalna".
   function mdRenderAbsRow(){
     var row = el('nd_abs_row'), box = el('nd_abs_fields');
@@ -942,27 +997,51 @@
                universal: !!(uni && uni[c.key]) };
     });
   }
-  // 2A-4b (ciste funkcie, Node test): batch 3 NEPRIJIMA surove textove polia
-  // (server ich odmieta — struktura by sa ticho stratila), preto "Dalsie
-  // hrubky/ABS" parsuje KLIENT do strukturovanych variantov so SPOLOCNOU
-  // strukturou. Zrkadli serverove pravidla (desatinna ciarka, sirka/hrubka
-  // tvar) v miere potrebnej na prevod — server vsetko validuje znova.
-  // GH #93 P2 (5. kolo): PD typ vyzaduje format v identite — vlastna hrubka
-  // (mimo preset cipov) ho zapise INLINE: "20/4100x600". Pri zdielanom type PD
-  // je format povinny (server by variant bez formatu odmietol a dialog nema
-  // inu create cestu); pri inych typoch je "/DxS" volitelny.
-  function mdParseExtraThs(text, commonSt, sharedType){
+  // M-A3c (D-68, audit BLOCKER 3): JEDNA gramatika "Dalsich hrubok/ABS" —
+  // polozky oddeluje bodkociarka alebo ciarka S MEDZEROU; ciarka BEZ medzery
+  // medzi cislicami je DESATINNA (9,2 = 9.2 — slovenska klavesnica; povodne
+  // sa "9,20" TICHO rozpadlo na hrubky 9 a 20). Kompaktny zoznam bez medzier
+  // ("18,36") tym prestava byt zoznam — hint aj placeholder to hovoria a novy
+  // formatovy pruh kazdu parsovanu hrubku VIDITELNE ukaze. Viac ciarok
+  // v tokene = jasna chyba, ziadny tichy vyklad.
+  function mdSplitExtraTokens(text){
     var s = String(text == null ? '' : text).trim();
-    if (!s) return { variants: [], error: null };
-    var amb = s.match(/\d+,\d(?![\d.])/);
-    if (amb) return { variants: [], error: 'Nejednoznačný zápis „' + amb[0] + '“ — desatiny píš bodkou (18.5), položky oddeľuj čiarkou.' };
-    // 2B-2 (F10): povinnost formatu cez helper (PD + ZASTENA).
-    var needFmt = mdFormatRequired(sharedType);
+    if (!s) return { tokens: [], error: null };
+    var toks = s.split(/;|,\s+/);
     var out = [];
-    var toks = s.split(',');
     for (var i = 0; i < toks.length; i++){
       var t = toks[i].trim();
       if (!t) continue;
+      var commas = (t.match(/,/g) || []).length;
+      if (commas > 1){
+        return { tokens: [], error: 'Nejednoznačný zápis „' + t + '“ — položky oddeľuj medzerou za čiarkou (18.5, 9,2).' };
+      }
+      if (commas === 1){
+        var fixed = t.replace(/(\d),(\d)/, '$1.$2');
+        if (fixed.indexOf(',') >= 0){
+          return { tokens: [], error: 'Nejednoznačný zápis „' + t + '“ — desatiny píš 9,2 alebo 9.2, položky oddeľuj medzerou za čiarkou.' };
+        }
+        t = fixed;
+      }
+      out.push(t);
+    }
+    return { tokens: out, error: null };
+  }
+  // 2A-4b (ciste funkcie, Node test): batch 3 NEPRIJIMA surove textove polia
+  // (server ich odmieta — struktura by sa ticho stratila), preto "Dalsie
+  // hrubky/ABS" parsuje KLIENT do strukturovanych variantov so SPOLOCNOU
+  // strukturou. Server vsetko validuje znova.
+  // GH #93 P2 (5. kolo): PD typ vyzaduje format v identite — vlastna hrubka
+  // ho zapise INLINE ("20/4100x600") ALEBO cez formatovy pruh vynimiek
+  // (M-A3c D-68: fmtx mapa 'x:<hrubka>' => {l, w}); inline ma prednost.
+  // Pri type s formatom v identite je format povinny; inde volitelny.
+  function mdParseExtraThs(text, commonSt, sharedType, fmtx){
+    var sp = mdSplitExtraTokens(text);
+    if (sp.error) return { variants: [], error: sp.error };
+    var needFmt = mdFormatRequired(sharedType);
+    var out = [];
+    for (var i = 0; i < sp.tokens.length; i++){
+      var t = sp.tokens[i];
       var parts = t.split('/');
       var f = Number(parts[0]);
       if (!isFinite(f) || f <= 0) return { variants: [], error: 'Hrúbka „' + t + '“ nie je kladné číslo.' };
@@ -974,23 +1053,57 @@
           return { variants: [], error: 'Formát pri hrúbke „' + t + '“ zapíš ako DĺžkaxŠírka (napr. 20/4100x600).' };
         }
         v.sheet_size = [d, w];
-      } else if (needFmt){
-        return { variants: [], error: 'Hrúbka „' + t + '“ pri tomto type potrebuje formát platne — zapíš 20/4100x600.' };
+      } else {
+        var fx = fmtx ? fmtx[mdExtraKey(parts[0])] : null;
+        var l2 = fx ? mdSheetDim(fx.l) : null;
+        var w2 = fx ? mdSheetDim(fx.w) : null;
+        if (l2 !== null || w2 !== null){
+          if (l2 === null || w2 === null || isNaN(l2) || isNaN(w2)){
+            return { variants: [], error: 'Formát výnimky ' + parts[0] + ': vyplň obe čísla (mm), alebo nechaj obe prázdne.' };
+          }
+          v.sheet_size = [l2, w2];
+        } else if (needFmt){
+          return { variants: [], error: 'Hrúbka „' + t + '“ pri tomto type potrebuje formát platne — vyplň ho v riadku Formát výnimiek (alebo zapíš 20/4100x600).' };
+        }
       }
       out.push(v);
     }
     return { variants: out, error: null };
   }
-  function mdParseExtraAbs(text, commonSt){
-    var s = String(text == null ? '' : text).trim();
-    if (!s) return { variants: [], error: null };
+  // M-A3c (D-68): kanonicky kluc vynimkovej hrubky — 9.2, 9.20 aj 09.2 su TEN
+  // ISTY variant (jeden pruh, jedna serverova identita).
+  function mdExtraKey(th){
+    var f = parseFloat(th);
+    return 'x:' + (isFinite(f) ? String(f) : String(th).trim());
+  }
+  // Parsovane vynimky -> podklad pruhov: [{key, th, inline}] (dedup podla
+  // kanonickeho kluca; inline = format uz zapisany v tokene, pruh netreba).
+  function mdExtraFmtChips(text){
+    var sp = mdSplitExtraTokens(text);
+    if (sp.error) return [];
+    var seen = {};
     var out = [];
-    var toks = s.split(',');
-    for (var i = 0; i < toks.length; i++){
-      var t = toks[i].trim();
-      if (!t) continue;
+    sp.tokens.forEach(function(t){
+      var parts = t.split('/');
+      var f = Number(parts[0]);
+      if (!isFinite(f) || f <= 0) return;
+      var key = mdExtraKey(parts[0]);
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push({ key: key, th: String(parseFloat(parts[0])), inline: parts.length > 1 });
+    });
+    return out;
+  }
+  // M-A3c (D-68): rovnaka gramatika ako hrubky — "22/0,8" je legalny zapis
+  // desatinnej hrubky pasky.
+  function mdParseExtraAbs(text, commonSt){
+    var sp = mdSplitExtraTokens(text);
+    if (sp.error) return { variants: [], error: sp.error };
+    var out = [];
+    for (var i = 0; i < sp.tokens.length; i++){
+      var t = sp.tokens[i];
       var m = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/.exec(t);
-      if (!m) return { variants: [], error: 'ABS „' + t + '“ zapíš ako šírka/hrúbka (napr. 23/1, desatiny bodkou).' };
+      if (!m) return { variants: [], error: 'ABS „' + t + '“ zapíš ako šírka/hrúbka (napr. 23/1 alebo 23/0,8).' };
       out.push({ width: m[1], thickness: m[2], structure: commonSt || '', universal: false });
     }
     return { variants: out, error: null };
@@ -1041,6 +1154,113 @@
     var keys = Object.keys(seen);
     return keys.length === 1 ? seen[keys[0]] : '';
   }
+  // --- M-A3c (D-67): vlastny suggest dropdown --------------------------------
+  // Nativny <datalist> v CEF okne NEZAPISUJE kliknutu polozku (smoke F8100 —
+  // klik na typ „Zástena" nespravil nic). Nahrada: jeden zdielany overlay
+  // (#mdSgBox, position:fixed — audit FIX 7: ziadne clipovanie formularom),
+  // vyber MOUSEDOWN-om (audit FIX 4: blur by dropdown zavrel skor, nez klik
+  // dopadne), klavesnica sipky/Enter/Escape (FIX 5 — datalist ju daval
+  // zadarmo), diakriticky necitlivy filter (FIX 5). Vyber ide cez onPick
+  // COMMIT cestu pola (audit BLOCKER 2 — nd_type musi prepocitat formaty).
+  function mdNormText(s){
+    // \u0300-\u036f = combining diakritika po NFD rozklade (explicitne escapy,
+    // ziadne neviditelne znaky v kode).
+    return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+  // Cista funkcia (Node test): prefix zhody pred substring, poradie zoznamu
+  // stabilne (server ho dodava dedupnute a zoradene), prazdny dotaz = vsetko.
+  function mdSuggestFilter(list, query, limit){
+    var q = mdNormText(String(query == null ? '' : query).trim());
+    var pref = [], sub = [];
+    (list || []).forEach(function(v){
+      var n = mdNormText(v);
+      if (!q || n.indexOf(q) === 0) pref.push(v);
+      else if (n.indexOf(q) > 0) sub.push(v);
+    });
+    return pref.concat(sub).slice(0, limit || 8);
+  }
+  var mdSg = { input: null, getList: null, onPick: null, items: [], active: -1 };
+  function mdSgBox(){
+    var b = el('mdSgBox');
+    if (!b){
+      b = document.createElement('div');
+      b.id = 'mdSgBox';
+      b.style.display = 'none';
+      document.body.appendChild(b);
+      // FIX 4: mousedown vyhrava nad blur; click uz len pre istotu.
+      b.addEventListener('mousedown', function(ev){
+        var r = ev.target && ev.target.closest ? ev.target.closest('.mdsg-row') : null;
+        if (!r) return;
+        ev.preventDefault();
+        mdSgPick(parseInt(r.getAttribute('data-i'), 10) || 0);
+      });
+      // fixed pozicia sa pri scrolle rozide s inputom — radsej zavriet.
+      window.addEventListener('scroll', mdSgClose, true);
+    }
+    return b;
+  }
+  function mdSgClose(){
+    mdSg.input = null;
+    mdSg.items = [];
+    mdSg.active = -1;
+    var b = el('mdSgBox');
+    if (b) b.style.display = 'none';
+  }
+  function mdSgPick(i){
+    var inp = mdSg.input, v = mdSg.items[i], cb = mdSg.onPick;
+    mdSgClose();
+    if (!inp || v == null) return;
+    inp.value = v;
+    if (cb) cb(); // commit cesta pola (nd_type -> mdTypeChanged)
+    inp.focus();
+  }
+  function mdSgRender(){
+    var b = mdSgBox(), inp = mdSg.input;
+    if (!inp || !mdSg.items.length){ b.style.display = 'none'; return; }
+    b.textContent = '';
+    mdSg.items.forEach(function(v, i){
+      var r = document.createElement('div');
+      r.className = 'mdsg-row' + (i === mdSg.active ? ' on' : '');
+      r.setAttribute('data-i', String(i));
+      r.textContent = v; // XSS kontrakt: textContent, ziadny innerHTML
+      b.appendChild(r);
+    });
+    var rect = inp.getBoundingClientRect();
+    b.style.left = Math.round(rect.left) + 'px';
+    b.style.top = Math.round(rect.bottom + 2) + 'px';
+    b.style.minWidth = Math.round(rect.width) + 'px';
+    b.style.display = '';
+  }
+  function mdSgUpdate(){
+    if (!mdSg.input) return;
+    mdSg.items = mdSuggestFilter(mdSg.getList ? mdSg.getList() : [], mdSg.input.value);
+    mdSg.active = -1;
+    mdSgRender();
+  }
+  // Bind na input (idempotentne — data-sg marker; konfiguracia _sgList/_sgPick
+  // sa obnovi pri kazdom volani). getList sa cita az PRI otvoreni dropdownu
+  // (katalogove echo medzitym MD_SUGGEST vymeni — ziadne stale data).
+  function mdSgBind(id, getList, onPick){
+    var inp = el(id);
+    if (!inp) return;
+    if (!inp.getAttribute('data-sg')){
+      inp.setAttribute('data-sg', '1');
+      inp.setAttribute('autocomplete', 'off');
+      inp.addEventListener('focus', function(){ mdSg.input = inp; mdSg.getList = inp._sgList; mdSg.onPick = inp._sgPick; mdSgUpdate(); });
+      inp.addEventListener('input', function(){ if (mdSg.input === inp) mdSgUpdate(); });
+      inp.addEventListener('blur', function(){ setTimeout(function(){ if (mdSg.input === inp) mdSgClose(); }, 120); });
+      inp.addEventListener('keydown', function(ev){
+        if (mdSg.input !== inp || !mdSg.items.length) return;
+        if (ev.key === 'ArrowDown'){ ev.preventDefault(); mdSg.active = (mdSg.active + 1) % mdSg.items.length; mdSgRender(); }
+        else if (ev.key === 'ArrowUp'){ ev.preventDefault(); mdSg.active = (mdSg.active - 1 + mdSg.items.length) % mdSg.items.length; mdSgRender(); }
+        else if (ev.key === 'Enter'){ ev.preventDefault(); mdSgPick(mdSg.active >= 0 ? mdSg.active : 0); }
+        else if (ev.key === 'Escape'){ mdSgClose(); }
+      });
+    }
+    inp._sgList = getList;
+    inp._sgPick = onPick;
+  }
+
   function mdOpenDecorForm(key){
     if (MD_RO){ MD.setStatus('Katalóg je len na čítanie — úpravy sú vypnuté.', true); return; }
     mdCloseForms();
@@ -1068,6 +1288,9 @@
     // NOVY dekor = predvyplnit poslednou sadou; "+ variant" zacina prazdny
     // (doplna sa konkretna vec do existujucej skupiny).
     mdFmt = {};
+    mdFmtX = {}; // M-A3c: pruhy vynimiek zacinaju cisto (audit NOTE 9: obnoveny
+                 // ths ich vyrenderuje s hintom podla typu — formaty vynimiek
+                 // sa do zapamatanej sady neukladaju)
     mdStS = {};
     mdStE = {};
     mdUni = {};
@@ -1090,6 +1313,9 @@
     mdActiveSheetChips().forEach(function(c){ mdFmtPrefill(c.key, c.hintType); });
     mdRenderFmtRow();
     mdRenderAbsRow();
+    mdRenderExtraFmtRow(); // M-A3c (D-68): pruhy pre obnovene "Dalsie hrubky"
+    mdSgBind('nd_type', function(){ return MD_SUGGEST.types; }, mdTypeChanged);
+    mdSgBind('nd_manufacturer', function(){ return MD_SUGGEST.manufacturers; }, null);
     el('mdDecorForm').style.display = '';
   }
   // 2A-4b: pri SCHEMA 2 katalogu davka batch_schema 3 (skupiny/struktura/
@@ -1104,7 +1330,9 @@
     // Polovicny format = formular OSTAVA otvoreny (hodnoty sa nestratia).
     if (built.error){ MD.setStatus(built.error, true); return; }
     var commonSt = mdCommonSt();
-    var extraS = mdParseExtraThs(el('nd_ths').value, commonSt, el('nd_type').value);
+    // M-A3c (D-68): pruhy vynimiek (mdFmtX) doplnaju format hrubkam bez
+    // inline zapisu — inline "20/4100x600" ma prednost.
+    var extraS = mdParseExtraThs(el('nd_ths').value, commonSt, el('nd_type').value, mdFmtX);
     if (extraS.error){ MD.setStatus(extraS.error, true); return; }
     var extraE = mdParseExtraAbs(el('nd_abs').value, commonSt);
     if (extraE.error){ MD.setStatus(extraE.error, true); return; }
@@ -1156,6 +1384,7 @@
   function mdCloseForms(){
     mdEditing = null;
     mdDupAllow = null; // nove otvorenie formulara rusi potvrdenie duplicity
+    mdSgClose(); // M-A3c: otvoreny suggest nesmie prezit zatvorenie formulara
     if (el('mdSheetForm')) el('mdSheetForm').style.display = 'none';
     if (el('mdEdgeForm')) el('mdEdgeForm').style.display = 'none';
     if (el('mdDecorForm')) el('mdDecorForm').style.display = 'none';
@@ -1321,14 +1550,6 @@
   // renderom sa zachyti fokus + ROZPISANA (dirty) hodnota a po renderi obnovi.
   // Cista bunka (value == orig) dostane cerstvu hodnotu z payloadu, dirty drzi
   // pouzivatelov text; server aj tak strazi row_rev.
-  // D-44: naplni <datalist> navrhmi zo servera (poradie aj dedup su serverove).
-  function mdFillDatalist(id, items){
-    var dl = el(id);
-    if (!dl) return;
-    var html = '';
-    (items || []).forEach(function(v){ html += '<option value="' + esc(v) + '"></option>'; });
-    dl.innerHTML = html;
-  }
 
   // --- D-46: potvrdzovacia lista projektovej predvolby KORPUSU ------------
   // Projektove selecty nemaju Ulozit (onchange = zapis), takze suhlas so zmenou
@@ -1388,10 +1609,11 @@
     // MD_CLIENT_SCHEMA konstantu (echo servera by falosne "povysilo" stare
     // okno bez novych poli); MD_SCHEMA2 je len ZOBRAZOVACI rezim.
     // D-44: naseptavace + navrhy formatu — jedna autorita (server), JS renderuje.
+    // M-A3c (D-67): <datalist> nahradil vlastny suggest (CEF klik bug) —
+    // dropdown cita MD_SUGGEST zivo pri otvoreni; otvoreny sa pri echu zavrie.
     MD_SUGGEST = data.suggest || { manufacturers: [], types: [] };
     MD_FORMAT_HINTS = data.format_hints || {};
-    mdFillDatalist('mdManList', MD_SUGGEST.manufacturers);
-    mdFillDatalist('mdTypeList', MD_SUGGEST.types);
+    mdSgClose();
     mdPatchDup = null; // uspesny zapis/refresh rusi pending potvrdenie duplicity
     var keep = null;
     var ae = document.activeElement;
@@ -1517,6 +1739,10 @@
       mdImageSrc: mdImageSrc, mdDeleteSummary: mdDeleteSummary,
       // M-A3b — vazby na Demos v UI (D-56/D-60/D-62/D-63)
       mdTileHtml: mdTileHtml, mdDateLabel: mdDateLabel, mdDemosBtn: mdDemosBtn,
-      mdDetailHtml: mdDetailHtml };
+      mdDetailHtml: mdDetailHtml,
+      // M-A3c — editor variantov (D-67 suggest, D-68 gramatika + pruhy vynimiek)
+      mdNormText: mdNormText, mdSuggestFilter: mdSuggestFilter,
+      mdSplitExtraTokens: mdSplitExtraTokens, mdExtraKey: mdExtraKey,
+      mdExtraFmtChips: mdExtraFmtChips };
   }
   if (typeof window !== 'undefined' && window.sketchup && sketchup.ready) sketchup.ready('');
