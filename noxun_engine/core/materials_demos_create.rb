@@ -62,6 +62,16 @@ module Noxun
           gid = group['group_id']
           gname = group['decor_name']
           data = load
+          # GH #101 P2: nazov je vlastnost SKUPINY — ak existujuci clen skupiny
+          # nazov nema (napr. skupina zalozena bez neho) a davka ho nesie,
+          # doplni sa VSETKYM clenom v TEJ ISTEJ transakcii; skupina nikdy
+          # neskonci s nekonzistentnym decor_name naprieč zaznamami.
+          if !group['new'] && !gname.empty?
+            (data['sheets'] + data['edges']).each do |r|
+              next unless r['group_id'].to_s == gid
+              r['decor_name'] = gname if r['decor_name'].to_s.strip.empty?
+            end
+          end
           stamp = Time.now.utc.iso8601
           taken = (data['sheets'].map { |s| s['material_id'].to_s.upcase } +
                    data['edges'].map { |e| e['abs_id'].to_s.upcase })
@@ -69,6 +79,12 @@ module Noxun
           created_edges = []
           new_ids = {}
           skipped = []
+          # GH #101 P1: dedup aj PROTI DAVKE SAMEJ — find_*_variant vidi len
+          # katalog z disku, nie zaznamy prave pridavane do data. Dve polozky
+          # vyberu s rovnakou identitou (dve Demos URL toho isteho variantu)
+          # su chyba davky (vzor v3: ziadny tichy prvy-vyhrava).
+          batch_sheet_keys = []
+          batch_edge_keys = []
 
           sheet_items.each do |it|
             item = it.is_a?(Hash) ? it : {}
@@ -85,6 +101,14 @@ module Noxun
             code = item['code'].to_s.strip
             return [:invalid, { 'detail' => 'doska bez kódu sortimentu' }] if code.empty?
             structure = item['structure'].to_s.strip
+            want = sheet_identity_key({ 'decor' => decor, 'type' => vt, 'thickness' => th,
+                                        'structure' => structure, 'sheet_size' => size,
+                                        'group_id' => gid, 'manufacturer' => manufacturer },
+                                      SCHEMA_GROUPS)
+            if batch_sheet_keys.any? { |k| identity_keys_tolerant?(k, want) }
+              return [:invalid, { 'detail' => "dve vybrané položky sú ten istý variant (#{v3_sheet_label('type' => vt, 'structure' => structure, 'thickness' => th)}) — odškrtni jednu" }]
+            end
+            batch_sheet_keys << want
             if find_sheet_variant(decor, vt, th, structure, size,
                                   group_id: gid, manufacturer: manufacturer)
               skipped << v3_sheet_label('type' => vt, 'structure' => structure, 'thickness' => th)
@@ -127,6 +151,13 @@ module Noxun
             code = item['code'].to_s.strip
             return [:invalid, { 'detail' => 'ABS páska bez kódu sortimentu' }] if code.empty?
             structure = item['structure'].to_s.strip
+            want = edge_identity_key({ 'decor' => decor, 'width' => w, 'thickness' => th,
+                                       'structure' => structure, 'group_id' => gid },
+                                     SCHEMA_GROUPS)
+            if batch_edge_keys.any? { |k| identity_keys_tolerant?(k, want) }
+              return [:invalid, { 'detail' => "dve vybrané pásky sú ten istý variant (ABS #{v3_edge_label('width' => w, 'thickness' => th, 'structure' => structure)}) — odškrtni jednu" }]
+            end
+            batch_edge_keys << want
             if find_edge_variant(decor, w, th, structure, group_id: gid)
               skipped << "ABS #{v3_edge_label('width' => w, 'thickness' => th, 'structure' => structure)}"
               next

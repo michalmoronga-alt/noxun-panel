@@ -202,7 +202,9 @@ module Noxun
         ctx = new_ctx(alive, emit)
         by_iid = {}
         Array(items).each { |it| by_iid[it['iid'].to_s] = it }
-        chosen = Array(iids).map { |x| by_iid[x.to_s] }.compact
+        # GH #101 P1: opakovany iid vo vybere = jedna polozka (duplicitny
+        # fetch aj zapis by inak siel dvakrat).
+        chosen = Array(iids).map(&:to_s).uniq.map { |x| by_iid[x] }.compact
         return complete_create_fail(ctx, 'nie je vybraná žiadna položka', []) if chosen.empty?
         if (bad = chosen.find { |it| !%w[sheet edge].include?(it['kind'].to_s) })
           reason = bad['reason'].to_s.empty? ? 'mimo systému' : bad['reason']
@@ -328,28 +330,35 @@ module Noxun
         # posledneho fetchu nesmie skoncit zapisom).
         return unless ctx['alive'].call
         header = ctx['header'] || {}
+        sheet_results = ctx['results'].select { |r| r['kind'] == 'sheet' }
+        # GH #101 P2: obrazok skupiny = JEDNA URL — ta ista sa zapisuje na
+        # vsetky dosky AJ stahuje do cache (path_for hashuje presnu URL;
+        # header vs per-variant URL by dali cache miss). Header ma prednost,
+        # fallback je prvy variant s obrazkom.
+        group_img = header['image_url'].to_s
+        group_img = sheet_results.map { |r| r['image_url'].to_s }.find { |u| !u.empty? }.to_s if group_img.empty?
+        sheet_results.each { |r| r['image_url'] = group_img }
         status, info = Materials.create_group_from_demos(
           'manufacturer' => header['manufacturer'], 'decor' => header['decor'],
           'decor_name' => header['decor_name'],
-          'sheet_items' => ctx['results'].select { |r| r['kind'] == 'sheet' },
+          'sheet_items' => sheet_results,
           'edge_items' => ctx['results'].select { |r| r['kind'] == 'edge' }
         )
         unless status == :ok
           detail = info.is_a?(Hash) ? info['detail'] : nil
           return complete_create_fail(ctx, create_error_text(status, detail), [])
         end
-        fetch_group_image(ctx, header, info)
+        fetch_group_image(ctx, group_img, info)
       end
 
       # BLOCKER 1: obrazok az PO zapise, cez klienta (throttle) do lokalnej
       # cache — best effort (false = dlazdica ma fallback farbu).
-      def fetch_group_image(ctx, header, result)
-        url = header['image_url'].to_s
+      def fetch_group_image(ctx, url, result)
         finish = proc do |local|
           complete_create_ok(ctx, result.merge('image' => !local.nil?))
         end
-        return finish.call(nil) if url.empty? || result['sheets'].empty?
-        reset_watchdog(ctx)
+        return finish.call(nil) if url.to_s.empty? || result['sheets'].empty?
+        arm_image_watchdog(ctx, result)
         DemosImageCache.ensure(url) do |local|
           next if ctx['completed']
           finish.call(local)
@@ -357,6 +366,17 @@ module Noxun
       rescue StandardError => e
         Engine.log_error(e, 'DemosFamily.fetch_group_image') if defined?(Engine)
         complete_create_ok(ctx, result.merge('image' => false))
+      end
+
+      # GH #101 P2: katalog je v tejto chvili UZ zapisany — visiaci/pomaly
+      # obrazok NESMIE ohlasit fail (UI by klamalo, ze zalozenie zlyhalo, a
+      # zvadzalo na retry). Timeout obrazka = uspech s image=false.
+      def arm_image_watchdog(ctx, result)
+        stop_watchdog(ctx)
+        return if ctx['completed'] || !Demos.timers_available?
+        ctx['watchdog'] = UI.start_timer(WATCHDOG_S, false) do
+          complete_create_ok(ctx, result.merge('image' => false))
+        end
       end
 
       def create_error_text(status, detail)

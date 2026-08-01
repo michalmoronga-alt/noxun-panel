@@ -39,9 +39,20 @@ module Noxun
 
       # Lokalny subor pre URL, ak uz je stiahnuty (rychla cesta pre payloady
       # okna — ziadna siet). Nil = nie je v cache.
+      # GH #101 P2: velkost suboru NIE JE dokaz platnosti — preruseny zapis
+      # by nechal neprazdny fragment a kazdy dalsi ensure by ho vecne
+      # preskakoval. Overuju sa magic bytes; nevalidny subor = nil (refetch).
       def local_for(url)
         p = path_for(url)
-        p && File.exist?(p) && File.size(p).positive? ? p : nil
+        p && valid_image_file?(p) ? p : nil
+      end
+
+      def valid_image_file?(path)
+        return false unless File.exist?(path) && File.size(path) >= 4
+        head = File.open(path, 'rb') { |f| f.read(4) }
+        head.to_s.start_with?(JPEG_MAGIC) || head.to_s.start_with?(PNG_MAGIC)
+      rescue StandardError
+        false
       end
 
       # ensure(url) { |local_path_or_nil| } — existujuci subor vrati HNED bez
@@ -61,16 +72,25 @@ module Noxun
 
       # Binarny zapis s validaciou obsahu (JPEG/PNG magic — HTML chybova
       # stranka s 200 sa nesmie ulozit ako "obrazok").
+      # GH #101 P2: zapis cez temp + presun (preruseny binwrite priamo do
+      # ciela by nechal fragment, ktory vyzera ako subor).
       def store(local, body)
         return nil unless local
         b = body.to_s.dup.force_encoding(Encoding::BINARY)
         return nil if b.empty? || b.bytesize > MAX_IMAGE_BYTES
         return nil unless b.start_with?(JPEG_MAGIC) || b.start_with?(PNG_MAGIC)
         FileUtils.mkdir_p(File.dirname(local))
-        File.binwrite(local, b)
+        tmp = "#{local}.tmp#{Process.pid}"
+        File.binwrite(tmp, b)
+        FileUtils.mv(tmp, local, force: true)
         local
       rescue StandardError => e
         Engine.log_error(e, 'DemosImageCache.store') if defined?(Engine)
+        begin
+          FileUtils.rm_f(tmp) if tmp
+        rescue StandardError
+          nil
+        end
         nil
       end
     end

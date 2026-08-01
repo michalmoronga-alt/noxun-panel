@@ -435,6 +435,118 @@ ensure
   NxTest.install_fresh_seed_catalog!
 end
 
+# --- GH #101 review fixy ---------------------------------------------------------
+
+NxTest.test('ma1 p1: dve polozky davky s rovnakou identitou variantu = invalid, nic sa nezapise') do
+  NxTest.install_fresh_seed_catalog!
+  before = File.read(MAT_MA.path)
+  item = { 'type' => 'DTDL', 'thickness' => 18.0, 'structure' => 'ST10',
+           'code' => '111', 'demos_url' => MA1_DTDL18_URL }
+  st, info = MAT_MA.create_group_from_demos(
+    'manufacturer' => 'Egger', 'decor' => 'H3303', 'decor_name' => '',
+    'sheet_items' => [item, item.merge('code' => '222')], 'edge_items' => [])
+  NxTest.assert_equal(:invalid, st)
+  NxTest.assert(info['detail'].include?('ten istý variant'), info.inspect)
+  NxTest.assert_equal(before, File.read(MAT_MA.path))
+  eitem = { 'width' => 23.0, 'thickness' => 1.0, 'structure' => 'ST10',
+            'code' => '333', 'demos_url' => MA1_ABS_URL }
+  st2, info2 = MAT_MA.create_group_from_demos(
+    'manufacturer' => 'Egger', 'decor' => 'H3303', 'decor_name' => '',
+    'sheet_items' => [item],
+    'edge_items' => [eitem, eitem.merge('code' => '444')])
+  NxTest.assert_equal(:invalid, st2)
+  NxTest.assert(info2['detail'].include?('pásky'), info2.inspect)
+ensure
+  NxTest.install_fresh_seed_catalog!
+end
+
+NxTest.test('ma1 p1: opakovany iid vo vybere = jedna polozka (jeden fetch)') do
+  NxTest.install_fresh_seed_catalog!
+  map = { MA1_DTDL18_URL => [200, {}, ma1_fixture('h3303_dtdl18_product.html')] }
+  header = ma1_header.merge('image_url' => '')
+  events, fake = ma1_run_create(header, [ma1_sheet_item], %w[i0 i0 i0], map)
+  done = ma1_complete(events)
+  NxTest.assert_equal(true, done['ok'], events.inspect)
+  NxTest.assert_equal(1, done['result']['sheets'].length)
+  NxTest.assert_equal(1, fake.calls.count { |u| u == MA1_DTDL18_URL },
+                      'duplicitny iid nefetchuje polozku druhykrat')
+ensure
+  NxTest.install_fresh_seed_catalog!
+end
+
+NxTest.test('ma1 p2: skupina bez mena dostane meno pri doplneni variantu — VSETKY zaznamy') do
+  NxTest.install_fresh_seed_catalog!
+  st, info = MAT_MA.create_group_from_demos(
+    'manufacturer' => 'Egger', 'decor' => 'H3303', 'decor_name' => '',
+    'sheet_items' => [{ 'type' => 'DTDL', 'thickness' => 18.0, 'structure' => 'ST10',
+                        'code' => '111', 'demos_url' => MA1_DTDL18_URL }],
+    'edge_items' => [])
+  NxTest.assert_equal(:ok, st)
+  first_id = info['sheets'][0]
+  NxTest.assert_equal(nil, MAT_MA.sheet(first_id)['decor_name'], 'skupina zatial bez mena')
+  st2, = MAT_MA.create_group_from_demos(
+    'manufacturer' => 'Egger', 'decor' => 'H3303', 'decor_name' => 'Dub Hamilton',
+    'sheet_items' => [{ 'type' => 'DTDL', 'thickness' => 36.0, 'structure' => 'ST10',
+                        'code' => '222', 'demos_url' => MA1_DTDL18_URL }],
+    'edge_items' => [])
+  NxTest.assert_equal(:ok, st2)
+  NxTest.assert_equal('Dub Hamilton', MAT_MA.sheet(first_id)['decor_name'],
+                      'PRVY zaznam skupiny dostal meno v tej istej transakcii')
+ensure
+  NxTest.install_fresh_seed_catalog!
+end
+
+NxTest.test('ma1 p2: na dosky sa zapisuje TA ISTA obrazkova URL, ktora sa stahuje (header)') do
+  NxTest.install_fresh_seed_catalog!
+  header_img = 'https://www.demos-trade.sk/content/images/product/default/231680.jpg'
+  FileUtils.rm_f(DIC.path_for(header_img).to_s)
+  map = {
+    MA1_DTDL18_URL => [200, {}, ma1_fixture('h3303_dtdl18_product.html')], # stranka nesie 244894
+    header_img => [200, {}, ma1_jpeg_body]
+  }
+  events, fake = ma1_run_create(ma1_header.merge('image_url' => header_img),
+                                [ma1_sheet_item], %w[i0], map)
+  done = ma1_complete(events)
+  NxTest.assert_equal(true, done['ok'], events.inspect)
+  NxTest.assert_equal(true, done['result']['image'])
+  s = MAT_MA.sheet(done['result']['sheets'][0])
+  NxTest.assert_equal(header_img, s['image_url'], 'zapisana URL = stahovana URL (cache hit)')
+  NxTest.assert(fake.calls.include?(header_img))
+  NxTest.assert(File.exist?(DIC.path_for(header_img)))
+ensure
+  FileUtils.rm_f(DIC.path_for('https://www.demos-trade.sk/content/images/product/default/231680.jpg').to_s)
+  NxTest.install_fresh_seed_catalog!
+end
+
+NxTest.test('ma1 p2: chyba stahovania obrazka NEZHADZUJE uspesne zalozenie (image=false)') do
+  NxTest.install_fresh_seed_catalog!
+  map = { MA1_DTDL18_URL => [200, {}, ma1_fixture('h3303_dtdl18_product.html')],
+          MA1_IMG_URL => :err }
+  events, = ma1_run_create(ma1_header, [ma1_sheet_item], %w[i0], map)
+  done = ma1_complete(events)
+  NxTest.assert_equal(true, done['ok'], 'katalog je zapisany — obrazok je best effort')
+  NxTest.assert_equal(false, done['result']['image'])
+  NxTest.assert_equal(1, done['result']['sheets'].length)
+ensure
+  NxTest.install_fresh_seed_catalog!
+end
+
+NxTest.test('ma1 p2: poskodeny subor v image cache sa neuzna a refetch ho opravi') do
+  path = DIC.path_for(MA1_IMG_URL)
+  FileUtils.mkdir_p(File.dirname(path))
+  File.binwrite(path, '<html>fragment po prerusenom zapise</html>')
+  NxTest.assert_equal(nil, DIC.local_for(MA1_IMG_URL), 'fragment bez magic bytes nie je platny obrazok')
+  got = nil
+  ma1_with_transport(MA1_IMG_URL => [200, {}, ma1_jpeg_body]) do |fake|
+    DIC.ensure(MA1_IMG_URL) { |local| got = local }
+    NxTest.assert_equal(1, fake.calls.length, 'nevalidny subor = refetch')
+  end
+  NxTest.assert_equal(path, got)
+  NxTest.assert_equal(path, DIC.local_for(MA1_IMG_URL), 'po refetchi je cache platna')
+ensure
+  FileUtils.rm_f(DIC.path_for(MA1_IMG_URL).to_s)
+end
+
 # --- SCHEMA 6 ------------------------------------------------------------------
 
 NxTest.test('ma1 schema 6: required_schema_for + normalize prepusta len cistu image_url') do
