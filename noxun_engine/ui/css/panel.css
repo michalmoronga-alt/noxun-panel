@@ -286,6 +286,13 @@
                   border-radius: 4px; padding: 6px 8px; font-size: 12px; margin: 8px 0; }
   /* ===== V0.6 B-2b: Demos diff modal (okno Materialy) ===== */
   .nxmodal-wide { width: min(94%, 560px); max-height: 86vh; display: flex; flex-direction: column; }
+  /* ===== V0.6 M-B2: „Nahradit UNI…" (audit F6: telo skroluje, akcie fixne) ===== */
+  .nxmodal-scroll { width: min(94%, 420px); max-height: 86vh; display: flex; flex-direction: column; }
+  .nxmodal-scroll .nxmodal-body { overflow-y: auto; flex: 1; min-height: 40px; margin: 6px 0; }
+  .mdunil { flex: 0 0 52px; font-size: 12px; color: var(--nx-ink-soft); }
+  .mdunib { flex: 0 0 auto; font-size: 10px; font-weight: 700; letter-spacing: 0.4px;
+            color: var(--nx-select); border: 1px solid var(--nx-select); border-radius: 3px;
+            padding: 0 4px; line-height: 14px; }
   .mddbody { overflow-y: auto; flex: 1; min-height: 60px; margin: 6px 0; }
   .mddrow { display: flex; gap: 8px; align-items: flex-start; padding: 5px 6px;
             border-bottom: 1px solid var(--nx-border); font-size: 12px; }

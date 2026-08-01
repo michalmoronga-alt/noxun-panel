@@ -108,6 +108,9 @@ module Noxun
           cb(dlg, 'delete_preflight') { |p| handle_delete_preflight(p) }
           # M-A3b D-60: "Otvorit u dodavatela" z riadku variantu.
           cb(dlg, 'open_demos_url') { |p| handle_open_demos_url(p) }
+          # V0.6 M-B2: „Nahradit UNI…" — rozpis dopadu + potvrdenie odtlackom.
+          cb(dlg, 'replace_uni_preview') { |p| handle_replace_uni_preview(p) }
+          cb(dlg, 'replace_uni_apply')   { |p| handle_replace_uni_apply(p) }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(materials): #{msg}")
@@ -653,6 +656,114 @@ module Noxun
             'duplak_deps' => (kind == 'sheet' ? Materials.duplak_dependents(id).first(3) : [])
           }
           js("MD.confirmDelete(#{info.to_json})")
+        end
+
+        # --- V0.6 M-B2: „Nahradit UNI…" --------------------------------------
+        # Preview aj apply stavaju plan TOU ISTOU dvojicou scan+classify
+        # (materials_replace_uni.rb) — ponuka nemoze slubit nic ine, nez apply
+        # spravi. Potvrdenie sa viaze kanonickym ODTLACKOM planu (audit B1):
+        # zmena configov, katalogu ci modelu medzi ponukou a potvrdenim = stale.
+        def handle_replace_uni_preview(payload)
+          data = JSON.parse(payload.to_s)
+          model = Sketchup.active_model
+          return push_state if ru_stale_model?(data, model)
+          plan, err = replace_uni_plan(model, data['uni_id'], data['target_id'])
+          return set_status(err, true) if err
+          if Materials.replace_uni_empty?(plan)
+            uni = Materials.sheet(data['uni_id'].to_s)
+            label = uni ? uni['decor'].to_s : 'UNI'
+            return js("MD.replaceUniOffer(#{{ 'empty' => "#{label} sa v projekte nepoužíva — niet čo nahradiť." }.to_json})")
+          end
+          unless plan['blocked'].empty?
+            return js("MD.replaceUniOffer(#{{ 'blocked' => plan['summary']['blocked'] }.to_json})")
+          end
+          js("MD.replaceUniOffer(#{{ 'summary' => plan['summary'],
+                                     'pending' => ru_pending(model, data, plan) }.to_json})")
+        end
+
+        def handle_replace_uni_apply(payload)
+          data = JSON.parse(payload.to_s)
+          model = Sketchup.active_model
+          return push_state if ru_stale_model?(data, model)
+          confirm = data['confirm']
+          return set_status('Potvrdenie nahradenia je neúplné — otvor rozpis znova.', true) unless confirm.is_a?(Hash)
+          plan, err = replace_uni_plan(model, confirm['uni_id'], confirm['target_id'])
+          return set_status(err, true) if err
+          return set_status('UNI sa v projekte už nepoužíva — niet čo nahradiť.', true) if Materials.replace_uni_empty?(plan)
+          unless plan['blocked'].empty?
+            set_status('Stav sa medzitým zmenil — nahradenie je teraz blokované.', true)
+            return js("MD.replaceUniOffer(#{{ 'blocked' => plan['summary']['blocked'] }.to_json})")
+          end
+          fresh = ru_pending(model, confirm, plan)
+          unless Materials.replace_uni_pending_ok?(confirm, fresh)
+            set_status('Stav sa medzitým zmenil — skontroluj rozpis znova a potvrď nanovo.')
+            return js("MD.replaceUniOffer(#{{ 'summary' => plan['summary'], 'pending' => fresh,
+                                              'stale' => true }.to_json})")
+          end
+          # Board joby KOMPLET pripravene PRED operaciou (audit F4): overena
+          # identita, normalizovany config, validacia — pad az po start_operation
+          # by nechal rozrobenu davku.
+          board_jobs = plan['jobs_board'].map do |inst, merged|
+            cfg = BoardBuilder.normalize(merged)
+            BoardBuilder.validate_config!(cfg)
+            [inst, BoardBuilder.board_id!(inst), cfg]
+          end
+          selected = Panel.find_cabinet(model)
+          Panel.suspend_selection_sync do
+            # Zapisy predvolieb + dosky VNUTRI jedinej operacie rebuildov —
+            # 1 undo vrati geometriu, dosky aj modelove defaulty naraz.
+            CabinetBuilder.rebuild_many(model, plan['jobs_cab'], op_name: 'NOXUN: Nahradiť UNI') do
+              plan['project_writes'].each do |k, v|
+                raise 'Projektovú predvoľbu sa nepodarilo uložiť.' unless Materials.set_project_default(model, k, v)
+              end
+              board_jobs.each { |inst, bid, cfg| BoardBuilder.rebuild_in_operation(model, inst, bid, cfg) }
+            end
+            Panel.reselect(model, selected) if selected && selected.valid?
+          end
+          set_status(ru_done_msg(plan['summary']))
+          push_state
+          Panel.push_selected(model) # refresh Inspectora (selecty, karta dielca/dosky)
+        end
+
+        # Spolocna stavba planu: guardy katalogu/zaznamov -> scan -> klasifikacia.
+        # Vrati [plan, nil] alebo [nil, chybova hlaska].
+        def replace_uni_plan(model, uni_id, target_id)
+          if Materials.catalog_state == :read_only
+            return [nil, 'Katalóg je v núdzovom režime len na čítanie — nahradenie počká, kým sa katalóg neobnoví.']
+          end
+          uni = Materials.sheet(uni_id.to_s)
+          return [nil, 'UNI materiál sa nenašiel v katalógu.'] unless uni && Materials.uni?(uni)
+          target = Materials.sheet(target_id.to_s)
+          return [nil, 'Cieľový materiál sa nenašiel v katalógu — obnov okno.'] unless target
+          return [nil, 'Cieľom nahradenia nemôže byť ďalší UNI materiál.'] if Materials.uni?(target)
+          scan = Materials.replace_uni_scan(model, uni['material_id'])
+          [Materials.replace_uni_classify(scan, uni, target), nil]
+        end
+
+        def ru_stale_model?(data, model)
+          data.key?('model_guid') && !data['model_guid'].to_s.empty? &&
+            data['model_guid'].to_s != model_guid(model)
+        end
+
+        def ru_pending(model, data, plan)
+          { 'model_guid' => model_guid(model), 'uni_id' => data['uni_id'].to_s,
+            'target_id' => data['target_id'].to_s,
+            'catalog_rev' => Materials.catalog_revision, 'digest' => plan['digest'] }
+        end
+
+        def ru_done_msg(s)
+          cabs_n = s['adopting_n'].to_i + s['recompute_n'].to_i
+          msg = +"UNI nahradené za #{s['target_label']}"
+          parts = []
+          parts << "#{cabs_n} skriniek (#{s['adopting_n']} prevzalo hrúbku #{Panel.fmt_mm(s['target_th'])} mm)" if cabs_n.positive?
+          parts << "#{s['boards'].size} dosiek" unless s['boards'].empty?
+          parts << "predvoľby: #{s['project'].join(', ')}" unless s['project'].empty?
+          msg << ' — ' << parts.join(', ') unless parts.empty?
+          msg << '.'
+          abs = s['abs'] || {}
+          msg << " ABS hrany prevedené (#{abs['changed']}×)." if abs['changed'].to_i.positive?
+          msg << " Bez náhrady: #{Array(abs['lost']).join(', ')}." if abs['lost_n'].to_i.positive?
+          msg
         end
 
         # --- akcia ----------------------------------------------------------
