@@ -23,6 +23,13 @@
     if (text != null) n.textContent = text;
     return n;
   }
+  // GH #100 P2: kody su volny text — do CSS selektora VZDY cez escape
+  // (spatne lomitko/uvodzovka by selektor rozbila alebo zmenila).
+  function mdhCssEscape(s){
+    var v = String(s == null ? '' : s);
+    if (typeof CSS !== 'undefined' && CSS.escape) return CSS.escape(v);
+    return v.replace(/[^a-zA-Z0-9_-]/g, function(c){ return "\\" + c; });
+  }
 
   // --- ciste funkcie (Node testy) -----------------------------------------
 
@@ -110,10 +117,14 @@
     var row = mdhMk('div', 'mdvrow hwrow' + (item.active === false ? ' hwoff' : ''));
     row.setAttribute('data-hw-row', item.item_code);
     var head = mdhMk('span', 'mdvdim');
-    var toggle = mdhMk('button', 'ghostbtn tplbtn', MDH_OPEN === item.item_code ? '▾' : '▸');
+    // GH #100 P1: sprite ikona namiesto Unicode glyfu (UI_DIZAJN — ziadne
+    // glyfy v ovladacich prvkoch); otvoreny stav rotuje chevron CSS triedou.
+    var toggle = mdhMk('button', 'ghostbtn tplbtn hwtoggle' + (MDH_OPEN === item.item_code ? ' hwopen' : ''));
+    toggle.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-chevron-right"/></svg>';
     toggle.setAttribute('data-action', 'hw-toggle');
     toggle.setAttribute('data-hw-code', item.item_code);
     toggle.setAttribute('aria-label', 'Detail položky');
+    toggle.setAttribute('aria-expanded', MDH_OPEN === item.item_code ? 'true' : 'false');
     head.appendChild(toggle);
     head.appendChild(mdhMk('b', null, item.item_code));
     row.appendChild(head);
@@ -166,6 +177,15 @@
     check.setAttribute('data-hw-code', item.item_code);
     if (MDH_RO) check.disabled = true;
     line3.appendChild(check);
+    if (item.demos_url){
+      // GH #100 P2: ulozena vazba sa da VYMAZAT (zla URL by inak ostala navzdy
+      // — prazdny input server chape ako "pouzi ulozenu").
+      var clr = mdhMk('button', 'ghostbtn tpldel', 'Zrušiť väzbu');
+      clr.setAttribute('data-action', 'hw-url-clear');
+      clr.setAttribute('data-hw-code', item.item_code);
+      if (MDH_RO) clr.disabled = true;
+      line3.appendChild(clr);
+    }
     box.appendChild(line3);
     var checked = mdhCheckedLabel(item.price_checked_at);
     if (checked) box.appendChild(mdhMk('div', 'mans', 'cena ' + checked));
@@ -217,8 +237,8 @@
       if (MDH_OPEN === item.item_code) list.appendChild(mdhDetail(item));
     });
     if (keepFocus){
-      var sel = '.mdcell[data-hw-code="' + keepFocus.code.replace(/"/g, '\\"') +
-        '"][data-hw-field="' + keepFocus.field + '"]';
+      var sel = '.mdcell[data-hw-code="' + mdhCssEscape(keepFocus.code) +
+        '"][data-hw-field="' + mdhCssEscape(keepFocus.field) + '"]';
       var inp = list.querySelector(sel);
       if (inp){
         if (keepFocus.value !== keepFocus.orig){
@@ -242,12 +262,12 @@
     if (banner) banner.style.display = MDH_RO ? '' : 'none';
     var txt = hwEl('hwRoText');
     if (txt) txt.textContent = data.state_reason || 'Katalóg je len na čítanie.';
-    // poradie: zachovaj posledny search vysledok; nove/neexistujuce kody
-    // dopln na koniec (cerstvo pridana polozka musi byt hned viditelna)
-    var known = {};
-    MDH_ORDER = MDH_ORDER.filter(function(c){ if (!MDH_ITEMS[c] || known[c]) return false; known[c] = true; return true; });
-    Object.keys(MDH_ITEMS).forEach(function(c){ if (!known[c]){ MDH_ORDER.push(c); known[c] = true; } });
+    // GH #100 P2: poradie NIKDY nedoplna JS — zachovaju sa len kody
+    // z posledneho SERVEROVEHO vysledku (zmiznute von) a hned sa vyziada
+    // cerstvy search (mutacia mohla zmenit zhodu s filtrom/limitom).
+    MDH_ORDER = MDH_ORDER.filter(function(c){ return !!MDH_ITEMS[c]; });
     mdhRender();
+    mdhSearchNow();
   }
 
   // --- flush buniek / selectov / checkboxov -------------------------------
@@ -315,7 +335,12 @@
       MDH_PRICE[r.code] = r.ok ? r : { status: 'error', error: r.error };
       mdhRender();
     },
-    priceApplied: function(r){ delete MDH_PRICE[r.code]; },
+    // GH #100 P2: po zapise sa navrh zmaze A prekresli — stale tlacidlo
+    // "Zapisat cenu" nesmie ostat viditelne (push_items bezal skor).
+    priceApplied: function(r){
+      delete MDH_PRICE[r.code];
+      mdhRender();
+    },
     created: function(){
       var f = hwEl('hwNewForm');
       if (f) f.style.display = 'none';
@@ -323,6 +348,13 @@
         var i = hwEl(id);
         if (i) i.value = '';
       });
+      // GH #100 P2: nova polozka musi byt hned viditelna — filter sa vycisti
+      // a poradie pride zo servera (ziadne lokalne doplnanie).
+      var q = hwEl('hwSearch');
+      if (q) q.value = '';
+      var c = hwEl('hwCategory');
+      if (c) c.value = '';
+      mdhSearchNow();
     }
   };
 
@@ -368,10 +400,15 @@
         var m3 = hwEl('hwDelModal');
         if (m3) m3.style.display = 'none';
       } else if (action === 'hw-check'){
-        var urlInp = document.querySelector('input[data-hw-url="' + code.replace(/"/g, '\\"') + '"]');
+        var urlInp = document.querySelector('input[data-hw-url="' + mdhCssEscape(code) + '"]');
         MDH_PRICE[code] = { status: 'pending' };
         mdhRender();
         mdhSend('hw_check_price', { code: code, url: urlInp ? urlInp.value.trim() : '' });
+      } else if (action === 'hw-url-clear'){
+        // GH #100 P2: vymazanie ulozene vazby — prazdny demos_url patch je
+        // jedina legalna cesta (server: neprazdnu URL patch odmieta).
+        var it = MDH_ITEMS[code];
+        if (it) mdhSend('hw_patch', mdhPatchPayload(code, it.row_rev, 'demos_url', ''));
       } else if (action === 'hw-apply'){
         // GH #99 P2: pid navrhu, ktory je prave ZOBRAZENY — server odmietne
         // zapis, ak medzitym dobehol iny check (prekryvajuce sa overenia).
@@ -384,6 +421,14 @@
       if (t && t.classList && t.classList.contains('mdcell') && t.getAttribute('data-hw-field')){
         mdhFlushCell(t);
       }
+    });
+    // GH #100 P2: Enter ulozi (blur -> focusout flush), Escape vrati povodnu
+    // hodnotu bez ulozenia (vzor mdCellKey okna Materialy).
+    document.addEventListener('keydown', function(ev){
+      var t = ev.target;
+      if (!t || !t.classList || !t.classList.contains('mdcell') || !t.getAttribute('data-hw-field')) return;
+      if (ev.key === 'Enter'){ ev.preventDefault(); t.blur(); }
+      else if (ev.key === 'Escape'){ t.value = t.getAttribute('data-orig') || ''; t.blur(); }
     });
     document.addEventListener('change', function(ev){
       var t = ev.target;
@@ -403,6 +448,6 @@
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { mdhFmtPrice: mdhFmtPrice, mdhCheckedLabel: mdhCheckedLabel,
       mdhPatchPayload: mdhPatchPayload, mdhOrderItems: mdhOrderItems,
-      mdhCreatePayload: mdhCreatePayload };
+      mdhCreatePayload: mdhCreatePayload, mdhCssEscape: mdhCssEscape };
   }
   if (typeof window !== 'undefined' && window.sketchup && sketchup.ready) sketchup.ready('');

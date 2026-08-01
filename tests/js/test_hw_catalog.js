@@ -6,7 +6,7 @@
 const assert = require('node:assert');
 const path = require('node:path');
 const { mdhFmtPrice, mdhCheckedLabel, mdhPatchPayload, mdhOrderItems,
-        mdhCreatePayload } =
+        mdhCreatePayload, mdhCssEscape } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'hw_catalog.js'));
 
 let n = 0;
@@ -58,5 +58,13 @@ eq(mdhOrderItems(MAP, ['B', 'ZMIZLA', 'C']).map(i => i.item_code), ['B', 'C'],
    'neznamy kod sa vynecha (polozka medzitym zmazana)');
 eq(mdhOrderItems(MAP, []), [], 'prazdny vysledok = prazdno (JS nedoplna vlastne poradie)');
 eq(mdhOrderItems({}, ['A']), [], 'prazdna mapa');
+
+// --- mdhCssEscape (GH #100 P2 — kod v CSS selektore) -------------------------
+eq(mdhCssEscape('104717'), '104717', 'bezny kod bez zmeny');
+ok(mdhCssEscape('a"b').indexOf('"') === -1 || mdhCssEscape('a"b').indexOf('\\"') >= 0,
+   'uvodzovka sa escapne');
+ok(mdhCssEscape('x\\').endsWith('\\\\') || mdhCssEscape('x\\').indexOf('\\\\') >= 0,
+   'koncove spatne lomitko sa escapne (nerozbije selektor)');
+eq(mdhCssEscape(null), '', 'null = prazdny string');
 
 console.log(JSON.stringify({ passed: n, failed: 0 }));

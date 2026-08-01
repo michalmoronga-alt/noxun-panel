@@ -48,7 +48,8 @@
     <div class="hint" id="hwDelText">…</div>
     <div class="nxmodal-warn">Zmazanie neruší históriu zákaziek — tie držia vlastné snapshoty. Mapovania dávky D budú mať vlastný guard.</div>
     <div class="btnrow">
-      <button class="primary" data-action="hw-del-confirm">Zmazať</button>
+      <!-- GH #100 P1: destruktivna akcia = .danger (UI_DIZAJN), nie primary -->
+      <button class="danger" data-action="hw-del-confirm">Zmazať</button>
       <button class="ghostbtn" data-action="hw-del-close">Zrušiť</button>
     </div>
   </div>
