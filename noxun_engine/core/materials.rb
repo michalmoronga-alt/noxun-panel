@@ -55,9 +55,15 @@ module Noxun
       # starsi klient polia normalize whitelistom zahodil, ale STALE cenu
       # ponechal — cena bez vazby a datumu overenia je horsia nez read-only.
       SCHEMA_DEMOS = 5
+      # V0.6 M-A: obrazok dekoru (image_url na sheet zazname — lokalnu kopiu
+      # drzi DemosImageCache, katalog nesie zdrojovu URL vazbu). Marker 6 LAZY
+      # prvym zapisom zaznamu s image_url — rovnaka filozofia ako duplak/demos:
+      # starsi klient by pole normalize whitelistom ticho zahodil, preto ho
+      # marker posiela do read-only.
+      SCHEMA_IMAGE = 6
       # Najnovsia schema, ktorej tvar tato verzia pluginu POZNA (write guard +
       # assess). Bump VYHRADNE spolu s kodom, ktory nove polia nesie.
-      SCHEMA_CURRENT = SCHEMA_DEMOS
+      SCHEMA_CURRENT = SCHEMA_IMAGE
       # Povoleny nasobic duplaku (2 = bezny pripad "36 z 2x18"; 3 = rezerva).
       DUPLAK_MULTIPLIERS = [2, 3].freeze
       # Nemenna PREDMIGRACNA zaloha (standard 7.1) — mimo bezneho .bak, ktory sa
@@ -310,6 +316,9 @@ module Noxun
                (!r['demos_url'].to_s.empty? || !r['price_checked_at'].to_s.empty?)
               need = SCHEMA_DEMOS
             end
+            # V0.6 M-A: obrazok dekoru = marker 6 (kontrola oboch zoznamov —
+            # keby pole niekedy nieslo aj ABS, bump nesmie chybat).
+            need = SCHEMA_IMAGE if need < SCHEMA_IMAGE && !r['image_url'].to_s.empty?
           end
         end
         need
@@ -532,6 +541,19 @@ module Noxun
         put_duplak_fields(out, a)
         put_zastena_fields(out, a)
         put_demos_fields(out, a)
+        put_image_fields(out, a)
+        out
+      end
+
+      # V0.6 M-A (SCHEMA 6, audit F8): obrazok dekoru sa NESIE merge-safe, ale
+      # normalizacia prepusti VYHRADNE URL cez sanitize_image_url (https +
+      # allowlist + cesta produktoveho obrazka) — nevalidna hodnota sa zahodi,
+      # nikdy sa neprenasa surova. Guard defined? kryje load poradie modulov.
+      def put_image_fields(out, a)
+        raw = (a['image_url'] || a[:image_url]).to_s.strip
+        return out if raw.empty?
+        clean = defined?(Demos) ? Demos.sanitize_image_url(raw) : nil
+        out['image_url'] = clean if clean
         out
       end
 

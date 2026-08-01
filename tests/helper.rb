@@ -134,6 +134,10 @@ unless NxTest::IN_SKETCHUP
     core/demos/slug_matcher
     core/demos/product_parser
     core/demos/lookup
+    core/demos/name_search
+    core/demos/image_cache
+    core/demos/family
+    core/materials_demos_create
     core/abs_rules
     core/hardware_rules
     core/hardware_catalog

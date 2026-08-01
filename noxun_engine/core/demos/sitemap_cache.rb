@@ -55,7 +55,11 @@ module Noxun
       # ASYNC refresh: index -> vsetky child sitemapy -> atomicky publish.
       # done.call('ok' => true, 'count' => n) | ('ok' => false, 'error' => ...)
       # Audit F11: zlyhanie KTOREHOKOLVEK kroku = stary cache ostava.
-      def refresh!(now: Time.now.to_f, &done)
+      # V0.6 M-A (audit F6): progress sa vola po KAZDOM stiahnutom kroku
+      # (index aj child) — cely refresh s throttle 3 s/child vie trvat dlhsie
+      # nez watchdog lookupu (falosne "Demos neodpoveda" zo zive ho testu 1.8.);
+      # volajuci si nim rearmuje watchdog kazdeho cakajuceho kontextu.
+      def refresh!(now: Time.now.to_f, progress: nil, &done)
         Demos.fetch(INDEX_URL, limit: :sitemap) do |res|
           unless res['ok']
             next done.call('ok' => false, 'error' => "sitemap index: #{res['error']}")
@@ -65,13 +69,20 @@ module Noxun
           if children.empty? && direct.empty?
             next done.call('ok' => false, 'error' => 'sitemap index je prázdny — cache ostáva pôvodná')
           end
-          collect_children(children, direct, now, done)
+          safe_progress(progress, 0, children.length)
+          collect_children(children, direct, now, done, progress, children.length)
         end
+      end
+
+      def safe_progress(progress, done_n, total)
+        progress&.call('done' => done_n, 'total' => total)
+      rescue StandardError => e
+        Engine.log_error(e, 'DemosSitemapCache.progress') if defined?(Engine)
       end
 
       # Postupne (throttle poradi klient) stiahne child sitemapy; az ked su
       # VSETKY ok, publish. Rekurzia cez async callbacky — ziadne cakanie.
-      def collect_children(remaining, urls_acc, now, done)
+      def collect_children(remaining, urls_acc, now, done, progress = nil, total = nil)
         if remaining.empty?
           products = urls_acc.uniq
           if products.empty?
@@ -95,7 +106,10 @@ module Noxun
           unless res['ok']
             next done.call('ok' => false, 'error' => "sitemap #{current}: #{res['error']} — cache ostáva pôvodná")
           end
-          collect_children(rest, urls_acc + locs(res['body']), now, done)
+          if total
+            safe_progress(progress, total - rest.length, total)
+          end
+          collect_children(rest, urls_acc + locs(res['body']), now, done, progress, total)
         end
       end
     end

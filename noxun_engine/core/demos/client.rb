@@ -55,6 +55,33 @@ module Noxun
         [uri.to_s, nil]
       end
 
+      # V0.6 M-A (audit F8): guard URL obrazka dekoru — VYHRADNE https,
+      # allowlist host, ocakavana cesta produktoveho obrazka a pripona;
+      # query/fragment sa zahadzuju (staticky subor). Vrati cistu URL alebo
+      # nil — obrazok je best-effort, ziadne dovody sa nehlasia (fallback
+      # farba dlazdice). "Host je povoleny" samo o sebe NESTACI: pole sa
+      # perzistuje v katalogu a cita ho HtmlDialog cez lokalnu cache.
+      IMAGE_PATH_PREFIX = '/content/images/product/'
+      IMAGE_EXTENSIONS = %w[.jpg .jpeg .png].freeze
+
+      def sanitize_image_url(raw)
+        s = raw.to_s.strip
+        return nil if s.empty?
+        begin
+          uri = URI.parse(s)
+        rescue StandardError
+          return nil
+        end
+        return nil unless uri.is_a?(URI::HTTPS)
+        return nil unless ALLOWED_HOSTS.include?(uri.host.to_s.downcase)
+        path = decoded_path(uri)
+        return nil unless path.start_with?(IMAGE_PATH_PREFIX)
+        return nil unless IMAGE_EXTENSIONS.any? { |e| path.end_with?(e) }
+        uri.query = nil
+        uri.fragment = nil
+        uri.to_s
+      end
+
       # Percent-decode + kolaps lomiek + ROZLISENIE dot segmentov (GH #96 P2:
       # /a/../vyhledavani by po normalizacii na origine skoncil na zakazanom
       # endpointe) — guard nesmie obist %2F/%76/%2e zapisy ani "..".

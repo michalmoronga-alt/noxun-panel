@@ -689,15 +689,22 @@ module Noxun
       # autorita ako migracia 2A-2) s koliznou kontrolou proti obsadenym gid.
       # decor_name je vlastnost skupiny: existujucej sa davkou NEMENI (iny
       # neprazdny nazov = chyba, prazdny = zdedi sa). Vrati [true, hash]/[false, chyba].
-      def resolve_batch_group(manufacturer, decor, decor_name)
+      # V0.6 M-A: prefer_existing_name: true (Demos create) — nazov zo stranky
+      # je len NAVRH: existujuca skupina si drzi svoj nazov bez chyby (Demos
+      # texty sa casom menia a nesmu blokovat pridanie variantu do skupiny).
+      def resolve_batch_group(manufacturer, decor, decor_name, prefer_existing_name: false)
         reg = v3_groups_registry
         exact = reg.values.find { |g| g['manufacturer'] == manufacturer && g['decor'] == decor }
         if exact
-          if !decor_name.empty? && decor_name != exact['decor_name']
+          if !prefer_existing_name && !decor_name.empty? && decor_name != exact['decor_name']
             return [false, "Skupina #{decor} už má názov „#{exact['decor_name']}“ — názov sa mení v katalógu, nie dávkou."] unless exact['decor_name'].empty?
             return [false, "Skupina #{decor} zatiaľ nemá názov — názov sa dopĺňa v katalógu, nie dávkou."]
           end
-          return [true, { 'group_id' => exact['group_id'], 'decor_name' => exact['decor_name'] }]
+          # prefer_existing_name: neprazdny existujuci nazov vyhrava; prazdny
+          # sa doplni navrhom zo stranky (jedina cesta, ako ho dávka smie dat).
+          name = exact['decor_name']
+          name = decor_name if prefer_existing_name && name.empty?
+          return [true, { 'group_id' => exact['group_id'], 'decor_name' => name }]
         end
         near = reg.values.find do |g|
           decor_norm_key(g['manufacturer']) == decor_norm_key(manufacturer) &&
