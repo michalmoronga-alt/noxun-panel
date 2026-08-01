@@ -924,6 +924,11 @@ module Noxun
             id = data['material_id'].to_s
             existing = Materials.sheet(id)
             return set_status('Materiál sa nenašiel — obnov okno.', true) unless existing
+            # GH #103 P2: UNI formularovy edit nesmie obist inline patch guard —
+            # nakupne polia (kod/dodavatel/cena) sa pri UNI odmietaju aj tu.
+            if (uni_err = Materials.uni_edit_error(existing, data))
+              return set_status(uni_err, true)
+            end
             # 2B-1: duplak nema editovatelne polia — vsetko derivuje zo zdroja.
             if (dup_err = Materials.duplak_edit_error(existing))
               return set_status(dup_err, true)
@@ -1060,6 +1065,10 @@ module Noxun
           return set_status(err, true) unless ok
           th = data['thickness'].to_s.tr(',', '.').to_f
           if create
+            # GH #103 P2: ABS do UNI skupiny sa netvori ani formularom.
+            if Materials.uni_group?(data['group_id'], data['decor'])
+              return set_status('UNI je pracovný materiál bez ABS pások — pásky dostane až reálny dekor.', true)
+            end
             # D-41: near-match dekor + dup variant (dekor+sirka+hrubka) guardy.
             if (near = Materials.decor_conflict(data['decor']))
               return set_status("Dekor sa líši od existujúceho „#{near}“ len zápisom — použi presný tvar.", true)

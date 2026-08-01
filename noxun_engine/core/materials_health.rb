@@ -470,6 +470,14 @@ module Noxun
           deploy_bytes(bak, bytes)
           deploy_bytes(path, bytes)
           JsonFileStore.invalidate(path)
+          # GH #103 P2: vedomy rollback vracia PRED-UNI katalog — marker
+          # jednorazoveho doplnenia sa maze, aby boot po (re)migracii UNI sadu
+          # doplnil znova (inak by sa uz nikdy nevratila).
+          begin
+            FileUtils.rm_f(uni_marker_path) if respond_to?(:uni_marker_path)
+          rescue StandardError
+            nil
+          end
           assess_catalog! # reentrantny zamok; obnoveny legacy katalog = :ok
           if defined?(Engine)
             Engine.log("materialy: katalog obnoveny z predmigracnej zalohy (odlozeny: #{rolled || 'nic'})")

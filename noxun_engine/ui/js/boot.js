@@ -13,6 +13,8 @@
      'fr_gap','fr_gap_top','fr_gap_bottom','fr_gap_sides'] // D-07 medzery/presahy cel
       .forEach(function(id){ attachExprField(el(id), { flushFn: flushCabinetEditsNow }); });
     ['ib_length','ib_width'].forEach(function(id){ attachExprField(el(id)); });
-    ['bc_length','bc_width'].forEach(function(id){ attachExprField(el(id), { flushFn: flushBoardEditsNow }); });
+    // GH #103 P2: bc_thickness je pri UNI editovatelne dim pole — vyrazy
+    // (18-6) potrebuju rovnaky expr handler ako dlzka/sirka.
+    ['bc_length','bc_width','bc_thickness'].forEach(function(id){ attachExprField(el(id), { flushFn: flushBoardEditsNow }); });
   }
   window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupFieldEditorDelegation(); document.body.setAttribute('data-insert-kind', getInsertKind()); setCabTab('korpus'); /* D-08 Codex F2: atribut+preview+tlacidla jednym volanim */ if (window.sketchup && sketchup.ready) sketchup.ready(); };

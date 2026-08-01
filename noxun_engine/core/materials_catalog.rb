@@ -806,11 +806,27 @@ module Noxun
       # patch/edit kodu, dodavatela ci ceny sa odmieta na SERVERI.
       def uni_edit_error(rec, patch = nil)
         return nil unless uni?(rec)
-        if patch.is_a?(Hash) &&
-           (patch.keys & %w[code supplier price_per_m2 price_per_bm]).empty?
-          return nil
+        # GH #103 P2: formular posiela nakupne kluce VZDY (aj prazdne) —
+        # zasah je len NEPRAZDNA hodnota; nil patch = konzervativne odmietnut.
+        if patch.is_a?(Hash)
+          touched = %w[code supplier price_per_m2 price_per_bm].any? do |k|
+            patch.key?(k) && !patch[k].to_s.strip.empty?
+          end
+          return nil unless touched
         end
         'UNI je pracovný materiál bez nákupných polí — kód/cenu dostane až reálny materiál.'
+      end
+
+      # GH #103 P2: patri skupina UNI zaznamu? ABS pasky sa v UNI skupine
+      # nesmu tvorit ZIADNOU cestou (batch, formular) — server autorita.
+      def uni_group?(group_id, decor = nil)
+        gid = group_id.to_s.strip
+        dec = decor.to_s.strip
+        sheets.any? do |s|
+          next false unless uni?(s)
+          (!gid.empty? && s['group_id'].to_s == gid) ||
+            (gid.empty? && !dec.empty? && s['decor'].to_s.strip == dec)
+        end
       end
     end
   end

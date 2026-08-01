@@ -41,6 +41,36 @@ NxTest.test('mb1 patch: UNI zaznam odmieta nakupne polia, nenakupne prejdu') do
   NxTest.assert(err && err.include?('UNI'), err.inspect)
   NxTest.assert(MB1.uni_edit_error(mb1_uni_sheet, { 'price_per_m2' => 5 }))
   NxTest.assert_equal(nil, MB1.uni_edit_error(mb1_uni_sheet, {}), 'bez nakupnych poli OK')
+  # GH #103 P2: formularovy edit posiela kluce VZDY — prazdne hodnoty nie su zasah
+  NxTest.assert_equal(nil, MB1.uni_edit_error(mb1_uni_sheet, { 'code' => '', 'supplier' => ' ', 'price_per_m2' => '' }),
+                      'prazdne nakupne kluce z formu prejdu')
+end
+
+NxTest.test('mb1 #103: ensure_edge guard porovnava so SCHEMA_GROUPS, nie markerom (panel client 2)') do
+  NxTest.install_fresh_seed_catalog! # marker 7 (UNI seed)
+  data = MB1.load
+  data['sheets'] << MB1.normalize_sheet('material_id' => 'REAL_ST', 'decor' => 'R1',
+                                        'structure' => 'ST9', 'type' => 'DTDL', 'thickness' => 18.0,
+                                        'group_id' => MB1.group_id_for('', 'R1'))
+  NxTest.assert(MB1.write(data))
+  status, abs_id = MB1.ensure_edge_for_sheet('REAL_ST', client_schema: 2)
+  NxTest.assert_equal(:created, status, "panel (client 2) nesmie dostat :schema_read_only pri markeri 7 (#{status})")
+  NxTest.assert(abs_id)
+ensure
+  NxTest.install_fresh_seed_catalog!
+end
+
+NxTest.test('mb1 #103: ABS do UNI skupiny sa nezalozi ani davkou (+ variant)') do
+  NxTest.install_fresh_seed_catalog!
+  ok, err = MB1.add_decor_batch('batch_schema' => 3, 'decor' => 'Korpus UNI',
+                                'manufacturer' => '', 'sheet_variants' => [],
+                                'edge_variants' => [{ 'width' => 23, 'thickness' => 1.0 }])
+  NxTest.assert_equal(false, ok)
+  NxTest.assert(err.include?('UNI'), err.inspect)
+  NxTest.assert_equal(true, MB1.uni_group?(nil, 'Korpus UNI'))
+  NxTest.assert_equal(false, MB1.uni_group?(nil, 'Realny dekor'))
+ensure
+  NxTest.install_fresh_seed_catalog!
 end
 
 # --- seedy ----------------------------------------------------------------------
