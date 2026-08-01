@@ -724,14 +724,19 @@
       hint.style.display = 'none';
     }
   }
-  // Audit FIX 4: hruba klientska kontrola PRED odoslanim — formular ostava
-  // otvoreny s hlaskou (server po odoslani formular zatvara a jeho odmietnutie
-  // by stalo cely prepis). Server ostava autorita (jemnosti /vyhledavani atd.).
+  // Audit FIX 4: klientska kontrola PRED odoslanim — formular ostava otvoreny
+  // s hlaskou (server po odoslani formular zatvara a jeho odmietnutie by
+  // stalo cely prepis). GH #112 P2: zrkadli CELU serverovu validaciu vratane
+  // zakazanej cesty /vyhledavani (same-host URL by inak presla guardom,
+  // server ju odmietol a rozpisane edity by prepadli). Server ostava autorita.
   function mdDemosUrlLocalError(v){
     var s = String(v == null ? '' : v).trim();
     if (!s) return null;
     if (!/^https:\/\//i.test(s)) return 'Adresa u dodávateľa musí začínať https:// (alebo pole nechaj prázdne).';
     if (!/^https:\/\/(www\.)?demos-trade\.sk\//i.test(s)) return 'Adresa musí byť produktová stránka demos-trade.sk.';
+    if (/^https:\/\/(www\.)?demos-trade\.sk\/vyhledavani([\/?]|$)/i.test(s)){
+      return 'Vyhľadávanie Demosu sa nesmie volať (robots.txt) — vlož adresu produktu.';
+    }
     return null;
   }
   function mdOpenEdgeForm(id){
@@ -1790,6 +1795,8 @@
       // M-A3c — editor variantov (D-67 suggest, D-68 gramatika + pruhy vynimiek)
       mdNormText: mdNormText, mdSuggestFilter: mdSuggestFilter,
       mdSplitExtraTokens: mdSplitExtraTokens, mdExtraKey: mdExtraKey,
-      mdExtraFmtChips: mdExtraFmtChips };
+      mdExtraFmtChips: mdExtraFmtChips,
+      // M-A3e — rucna vazba (D-71): klientske zrkadlo serverovej validacie
+      mdDemosUrlLocalError: mdDemosUrlLocalError };
   }
   if (typeof window !== 'undefined' && window.sketchup && sketchup.ready) sketchup.ready('');

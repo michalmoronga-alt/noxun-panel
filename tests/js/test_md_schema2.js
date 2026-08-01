@@ -252,6 +252,17 @@ eq(M.mdSuggestFilter(['Kronospan', 'Kastamonu', 'Falco Krono'], 'kro'), ['Kronos
 eq(M.mdSuggestFilter(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'], '', 4).length, 4, 'limit');
 eq(M.mdSuggestFilter(null, 'x'), [], 'null zoznam = prazdno');
 
+// --- M-A3e (D-71): klientske zrkadlo validacie Demos URL ---------------------
+eq(M.mdDemosUrlLocalError(''), null, 'prazdne pole = OK (zmazanie vazby)');
+eq(M.mdDemosUrlLocalError('https://www.demos-trade.sk/dtdl-x-18/'), null, 'produktova adresa OK');
+ok(M.mdDemosUrlLocalError('http://www.demos-trade.sk/x/') !== null, 'http (bez s) = chyba');
+ok(M.mdDemosUrlLocalError('https://evil.example.com/x') !== null, 'cudzi host = chyba');
+ok(M.mdDemosUrlLocalError('https://www.demos-trade.sk/vyhledavani?q=halifax') !== null,
+   'GH #112 P2: /vyhledavani = chyba UZ NA KLIENTOVI (formular ostava otvoreny)');
+ok(M.mdDemosUrlLocalError('https://www.demos-trade.sk/vyhledavani/') !== null, '/vyhledavani/ = chyba');
+eq(M.mdDemosUrlLocalError('https://www.demos-trade.sk/vyhledavani-nieco-18/'), null,
+   'slug ZACINAJUCI na vyhledavani- je legalny produkt (hranica cesty)');
+
 // --- M-A3b (D-60): datum overenia ceny DD.M.RRRR -----------------------------
 eq(M.mdDateLabel('2026-08-01T18:00:00Z'), '1.8.2026', 'ISO -> DD.M.RRRR bez nul');
 eq(M.mdDateLabel('2026-12-24'), '24.12.2026', 'datum bez casu');
