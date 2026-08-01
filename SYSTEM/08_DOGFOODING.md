@@ -6,8 +6,7 @@
 
 ## Blokery (bránia dokončeniu zákazky)
 
-- **D-67 · Výber typu materiálu zo zoznamu nereaguje** (Michal 1.8. neskoro večer, smoke F8100/zástena) — vo formulári variantu sa pri písaní typu ukáže ponuka (DTDL, MDF…), ale klik na položku hodnotu nevyplní; typ treba dopísať ručne. Príčina: natívny HTML `datalist` v CEF okne (rovnaký mechanizmus má aj pole Výrobca). *Fix (audit 1.8.): vlastný klikateľný zoznam návrhov (vzor hľadania v „Pridať z Demosu") s potvrdením na mousedown (blur pasca), Enter/Escape/šípkami a diakriticky necitlivým filtrom; konvertovať aj `md_man_input` v detaile skupiny — jediný ďalší datalist.* → dávka M-A3c
-- **D-68 · Formát platne sa pri dopísaných hrúbkach nedá zadať — zástena sa nedá vytvoriť** (Michal 1.8. neskoro večer, BLOKER) — pole formátu majú len prednastavené čipy hrúbok; „Ďalšie hrúbky" (9,2 pre zástenu) formát nemajú, ale server ho pri type s formátom v identite (PD, zástena) povinne vyžaduje → validačná chyba bez cesty von. *Fix (audit 1.8.): formátový pruh per dopísanú hrúbku (vzor čipov, vlastný menný priestor kľúčov, dedup 9,2=9,20); prefill formátu pre PD/zástenu ostáva prázdny (nevymýšľať identitu); zjednotiť gramatiku desatinnej čiarky („9,2" = 9,2 mm — dnes sa rozpadne na 9 a 2!) + testy; zachovať inline zápis `20/4100x600`.* → dávka M-A3c
+*(momentálne žiadne — D-67/D-68 vyriešené PR #109)*
 
 ## Spomaľovače (vysoká priorita)
 
@@ -99,6 +98,8 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ## Vyriešené — index (plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md))
 
+- **D-67** výber typu/výrobcu z ponuky nereagoval (CEF datalist bug) — vlastný suggest dropdown s mousedown potvrdením, šípkami/Enter/Escape a diakriticky necitlivým filtrom; aj inline editor výrobcu — PR #109
+- **D-68** formát platne pre dopísané hrúbky (zástena 9,2 už nie je slepá ulička) — pruh „Formát výnimiek" per hrúbka; nová gramatika: čiarka bez medzery = desatinná (9,2 = 9,2 mm; koniec tichého rozpadu 9,20 → 9+20), položky oddeľuje čiarka s medzerou/bodkočiarka; inline `20/4100x600` ostáva — PR #109
 - **D-59** rodina informatívne označuje „už v katalógu“ podľa kódu (sivý riadok, checkbox aktívny — kolízia kódov nesmie zamykať; auto-návrh pásky ich preskakuje) — PR #108
 - **D-60 + D-56** URL väzba viditeľná: ikona v riadku variantu s dátumom overenia ceny + „Otvoriť u dodávateľa“ (URL výhradne zo servera, čerstvý sanitize — audit) + badge na dlaždici skupiny — PR #108
 - **D-62** fotka dekoru aj v hlavičke detailu skupiny — PR #108

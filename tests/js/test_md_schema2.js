@@ -109,15 +109,24 @@ eq(M.mdParseExtraThs('', 'PW'), { variants: [], error: null }, 'prazdny text = n
 eq(M.mdParseExtraThs('18.5, 25', 'PW'),
   { variants: [{ type: '', thickness: '18.5', structure: 'PW' }, { type: '', thickness: '25', structure: 'PW' }], error: null },
   'hrubky preberu SPOLOCNU strukturu');
-ok(M.mdParseExtraThs('18,5', 'PW').error !== null, 'desatinna ciarka = jasna chyba (zrkadlo servera)');
+// M-A3c (D-68, audit BLOCKER 3): NOVA gramatika — ciarka bez medzery medzi
+// cislicami je DESATINNA (9,2 = 9.2; povodne sa 9,20 TICHO rozpadlo na 9 a 20).
+// Kompaktny zoznam bez medzier ("18,36") tym VEDOME prestava byt zoznam —
+// polozky oddeluje ciarka s medzerou alebo bodkociarka.
+eq(M.mdParseExtraThs('18,5', 'PW'),
+  { variants: [{ type: '', thickness: '18.5', structure: 'PW' }], error: null },
+  'desatinna ciarka bez medzery = desatiny (slovenska klavesnica)');
 ok(M.mdParseExtraThs('abc', '').error !== null, 'necislo = chyba');
 ok(M.mdParseExtraThs('-3', '').error !== null, 'zaporna hrubka = chyba');
-eq(M.mdParseExtraThs('18,36', 'ST9').variants.length, 2, 'kompaktny zoznam bez medzier je legalny');
+eq(M.mdParseExtraThs('18,36', 'ST9').variants.length, 1, 'bez medzery uz NIE JE zoznam — jedna hrubka 18.36');
 eq(M.mdParseExtraAbs('28/2', 'ST9'),
   { variants: [{ width: '28', thickness: '2', structure: 'ST9', universal: false }], error: null },
   'ABS token sirka/hrubka so spolocnou strukturou, universal false');
 ok(M.mdParseExtraAbs('28', '').error !== null, 'token bez lomky = chyba');
-ok(M.mdParseExtraAbs('22,5/1', '').error !== null, 'desatinna ciarka v tokene = chyba');
+eq(M.mdParseExtraAbs('22,5/1', ''),
+  { variants: [{ width: '22.5', thickness: '1', structure: '', universal: false }], error: null },
+  'M-A3c: desatinna ciarka v sirke je legalna');
+eq(M.mdParseExtraAbs('23/0,8', 'MG').variants[0].thickness, '0.8', 'desatinna ciarka v hrubke pasky');
 
 // --- mdEdgeBannerText: sklonovanie ------------------------------------------
 ok(M.mdEdgeBannerText(1).indexOf('1 páska nemá') === 0, 'jednotne cislo');
@@ -202,6 +211,46 @@ const ZG = { decor: 'K551', decor_name: '', manufacturer: 'Kronospan',
 ok(M.mdMatchGroup(ZG, 'k552'), 'hladanie podla rubu najde skupinu');
 ok(M.mdMatchGroup(ZG, 'rt') || M.mdMatchGroup(ZG, 'RT'.toLowerCase()), 'hladanie podla struktury rubu');
 ok(!M.mdMatchGroup(ZG, 'k999'), 'nezname cislo nematchne');
+
+// --- M-A3c (D-68): gramatika tokenov + pruhy vynimiek ------------------------
+eq(M.mdSplitExtraTokens('18.5, 9,2').tokens, ['18.5', '9.2'], 'zoznam s medzerou + desatinna ciarka');
+eq(M.mdSplitExtraTokens('9,20').tokens, ['9.20'], '9,20 je JEDNA hrubka 9.2 (nie 9 a 20 — povodny bug)');
+eq(M.mdSplitExtraTokens('18.5; 9.2').tokens, ['18.5', '9.2'], 'bodkociarka oddeluje');
+ok(M.mdSplitExtraTokens('18,5,9,2').error !== null, 'viac ciarok bez medzier = jasna chyba');
+eq(M.mdSplitExtraTokens('9,2/4100x640').tokens, ['9.2/4100x640'], 'desatinna ciarka pred inline formatom');
+eq(M.mdSplitExtraTokens('').tokens, [], 'prazdny vstup');
+eq(M.mdExtraKey('9.2'), 'x:9.2', 'kanonicky kluc');
+eq(M.mdExtraKey('9,2'.replace(',', '.')), M.mdExtraKey('9.20'), '9.2 = 9.20 = jeden variant');
+eq(M.mdExtraKey('09.2'), 'x:9.2', 'vodiaca nula nerobi novy kluc');
+eq(M.mdExtraFmtChips('18.5, 9,2'), [{ key: 'x:18.5', th: '18.5', inline: false }, { key: 'x:9.2', th: '9.2', inline: false }],
+  'pruhy pre vynimky bez inline formatu');
+eq(M.mdExtraFmtChips('9.2/4100x640')[0].inline, true, 'inline format = pruh netreba');
+eq(M.mdExtraFmtChips('9.2, 9,20').length, 1, 'dedup 9.2 = 9,20 — jeden pruh');
+eq(M.mdExtraFmtChips('zle'), [], 'nevalidny vstup = ziadne pruhy (chybu da az save)');
+// pruh doplna sheet_size; inline ma prednost; required bez formatu = chyba s navodom
+eq(M.mdParseExtraThs('9,2', 'RT', 'ZASTENA', { 'x:9.2': { l: '4100', w: '640' } }),
+  { variants: [{ type: '', thickness: '9.2', structure: 'RT', sheet_size: [4100, 640] }], error: null },
+  'zastena 9,2 s formatom z pruhu — koniec slepej ulicky (D-68)');
+eq(M.mdParseExtraThs('9.2/4100x640', 'RT', 'ZASTENA', { 'x:9.2': { l: '1', w: '1' } }).variants[0].sheet_size,
+  [4100, 640], 'inline format ma prednost pred pruhom');
+ok(M.mdParseExtraThs('9,2', 'RT', 'ZASTENA', {}).error.indexOf('Formát výnimiek') >= 0 ||
+   M.mdParseExtraThs('9,2', 'RT', 'ZASTENA', {}).error.indexOf('formát platne') >= 0,
+   'required typ bez formatu = chyba s navodom kde ho vyplnit');
+ok(M.mdParseExtraThs('19', 'ST9', 'DTDL', { 'x:19': { l: '2800', w: '' } }).error !== null,
+   'polovicny format pruhu = chyba (nie tichy no-op)');
+eq(M.mdParseExtraThs('19', 'ST9', 'DTDL', {}).variants[0].sheet_size, undefined,
+   'ne-required typ bez pruhu = variant bez formatu (ako doteraz)');
+
+// --- M-A3c (D-67): suggest filter (diakritika, prefix pred substring) --------
+eq(M.mdNormText('Zástena'), 'zastena', 'diakritika von, lowercase');
+eq(M.mdNormText('ŠTRUKTÚRA'), 'struktura', 'velke pismena s diakritikou');
+eq(M.mdSuggestFilter(['DTDL', 'MDF', 'HDF', 'PD', 'Zástena', 'kompakt'], 'zas'), ['Zástena'],
+  'dotaz bez diakritiky najde polozku s diakritikou');
+eq(M.mdSuggestFilter(['DTDL', 'MDF', 'HDF'], ''), ['DTDL', 'MDF', 'HDF'], 'prazdny dotaz = vsetko (poradie servera)');
+eq(M.mdSuggestFilter(['Kronospan', 'Kastamonu', 'Falco Krono'], 'kro'), ['Kronospan', 'Falco Krono'],
+  'prefix zhoda pred substring zhodou');
+eq(M.mdSuggestFilter(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'], '', 4).length, 4, 'limit');
+eq(M.mdSuggestFilter(null, 'x'), [], 'null zoznam = prazdno');
 
 // --- M-A3b (D-60): datum overenia ceny DD.M.RRRR -----------------------------
 eq(M.mdDateLabel('2026-08-01T18:00:00Z'), '1.8.2026', 'ISO -> DD.M.RRRR bez nul');

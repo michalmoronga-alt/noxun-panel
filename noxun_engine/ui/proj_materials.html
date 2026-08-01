@@ -3,7 +3,7 @@
      (%APPDATA%). -->
 <!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.5.22">
+<link rel="stylesheet" href="css/panel.css?v=0.5.23">
 
 <h1>Materiály projektu</h1>
 <p class="sub" id="mdline">…</p>
@@ -91,11 +91,13 @@
          variant sa da prepisat v pruhu pri cipe). -->
     <div class="row"><label>Číslo dekoru *</label><input id="nd_decor" type="text" placeholder="napr. K009 (alebo vlastný názov)"><span class="unit"></span></div>
     <div class="row"><label>Názov</label><input id="nd_decor_name" type="text" placeholder="napr. Dub Halifax prírodný — voliteľné"><span class="unit"></span></div>
-    <!-- D-44 (audit F10): našepkávače výrobcu a typu = datalist na EXISTUJÚCOM
-         poli (žiadny nový riadok ani čipy); návrhy stavia server (payload suggest). -->
-    <div class="row"><label>Výrobca</label><input id="nd_manufacturer" type="text" list="mdManList" placeholder="napr. Egger"><span class="unit"></span></div>
+    <!-- D-44 (audit F10): našepkávače výrobcu a typu na EXISTUJÚCOM poli
+         (žiadny nový riadok ani čipy); návrhy stavia server (payload suggest).
+         M-A3c (D-67): natívny datalist nahradil vlastný suggest (mdSgBind) —
+         klik na položku datalistu v CEF hodnotu nezapisoval. -->
+    <div class="row"><label>Výrobca</label><input id="nd_manufacturer" type="text" placeholder="napr. Egger"><span class="unit"></span></div>
     <div class="row"><label>Štruktúra</label><input id="nd_structure" type="text" placeholder="napr. PW / ST9 — voliteľné" oninput="mdCommonStructureChanged()"><span class="unit"></span></div>
-    <div class="row"><label>Typ dosiek</label><input id="nd_type" type="text" list="mdTypeList" value="DTDL" onchange="mdTypeChanged()"><span class="unit"></span></div>
+    <div class="row"><label>Typ dosiek</label><input id="nd_type" type="text" value="DTDL" onchange="mdTypeChanged()"><span class="unit"></span></div>
     <div class="row"><label>Smer dekoru</label>
       <select id="nd_grain">
         <option value="length">Po dĺžke</option>
@@ -137,9 +139,15 @@
     <div class="row" id="nd_abs_row" style="display:none"><label>Detail ABS</label>
       <div class="mdfmtrow" id="nd_abs_fields"></div><span class="unit"></span>
     </div>
-    <div class="row"><label>Ďalšie hrúbky</label><input id="nd_ths" type="text" placeholder="voliteľné, napr. 18.5"><span class="unit">mm</span></div>
-    <div class="row"><label>Ďalšie ABS</label><input id="nd_abs" type="text" placeholder="voliteľné, napr. 28/2"><span class="unit">š/hr</span></div>
-    <div class="hint">Klikaj čipy, výnimky dopíš (čiarkami, desatiny bodkou). Štruktúru a formát uprav pri čipe (PD formát zadaj — je súčasť identity). Dopísané výnimky preberú spoločnú štruktúru. Ceny a kódy doplníš v detaile dekoru.</div>
+    <div class="row"><label>Ďalšie hrúbky</label><input id="nd_ths" type="text" placeholder="voliteľné, napr. 18.5, 9,2" oninput="mdRenderExtraFmtRow()"><span class="unit">mm</span></div>
+    <!-- M-A3c (D-68): formát platne DOPÍSANÝCH hrúbok — zástena 9,2 už nie je
+         slepá ulička (server formát v identite vyžaduje, pole naň existuje).
+         Pruh sa ukáže len pri výnimkách bez inline zápisu 20/4100x600. -->
+    <div class="row" id="nd_xfmt_row" style="display:none"><label>Formát výnimiek</label>
+      <div class="mdfmtrow" id="nd_xfmt_fields"></div><span class="unit">mm</span>
+    </div>
+    <div class="row"><label>Ďalšie ABS</label><input id="nd_abs" type="text" placeholder="voliteľné, napr. 28/2, 23/0,8"><span class="unit">š/hr</span></div>
+    <div class="hint">Klikaj čipy, výnimky dopíš — oddeľuj medzerou za čiarkou, desatiny 9,2 aj 9.2. Štruktúru a formát uprav pri čipe (PD/zástena formát zadaj — je súčasť identity). Dopísané výnimky preberú spoločnú štruktúru. Ceny a kódy doplníš v detaile dekoru.</div>
     <div class="btnrow">
       <button class="primary" onclick="mdSaveDecorBatch()">Vytvoriť</button>
       <button class="ghostbtn" onclick="mdCloseForms()">Zrušiť</button>
@@ -260,16 +268,14 @@
 
 <!-- D-44: zoznamy návrhov pre našepkávače (výrobca, typ dosky). Nerenderujú sa —
      napĺňa ich JS z payloadu servera; používa ich batch aj inline editor výrobcu. -->
-<datalist id="mdManList"></datalist>
-<datalist id="mdTypeList"></datalist>
 
 <div id="status">Pripravené.</div>
 
 <!-- icons.js prvy (sprite musi existovat pred prvym renderom mdRenderLists);
      demos_diff.js pred proj_materials.js (mddLookup pouzivaju onclick handlery
      detailu; ready() bezi az na konci proj_materials.js). -->
-<script src="js/errors.js?v=0.5.22"></script>
-<script src="js/icons.js?v=0.5.22"></script>
-<script src="js/demos_diff.js?v=0.5.22"></script>
-<script src="js/demos_add.js?v=0.5.22"></script>
-<script src="js/proj_materials.js?v=0.5.22"></script>
+<script src="js/errors.js?v=0.5.23"></script>
+<script src="js/icons.js?v=0.5.23"></script>
+<script src="js/demos_diff.js?v=0.5.23"></script>
+<script src="js/demos_add.js?v=0.5.23"></script>
+<script src="js/proj_materials.js?v=0.5.23"></script>
