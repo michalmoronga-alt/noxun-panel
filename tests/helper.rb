@@ -136,6 +136,7 @@ unless NxTest::IN_SKETCHUP
     core/demos/lookup
     core/abs_rules
     core/hardware_rules
+    core/hardware_catalog
     modules/shelves
     modules/fronts
     core/zone_tree
