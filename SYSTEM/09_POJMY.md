@@ -30,6 +30,10 @@
 - **Reálny sortiment (prieskum 29.7., plné dáta: [zdroje/DEMOS_PD_prieskum_2026-07.md](zdroje/DEMOS_PD_prieskum_2026-07.md)):** šírky 600/635/650/900/920/1200 (+ zásteny 640), hrúbka 38 dominuje + **nové línie 20 mm (ABS rovná hrana, Egger 7/2026) a kompakt 12 mm** — šírka a hrúbka sú atribúty variantu, nie typy. **Podtypy hranovej úpravy PD: postforming / ABS rovná hrana (páska 1,5)** — riadi ABS logiku prednej hrany. (Kompaktné dosky 12 mm s monolitickou hranou = samostatný kanonický TYP `Kompakt`, nie PD podtyp — rozhodnuté pri 2A-0.) **PD existuje len pre „veľké" dekory** (drevo/kameň/betón) — uni a lesklé MG dekory PD spravidla nemajú.
 - Pri spotrebičoch pod PD (umývačka, rúra) treba spodok prelepiť hliníkovou páskou (ochrana proti pare) — poznámka z Demos popisu.
 
+### Hustota a hmotnosť materiálu
+
+- **Hustota je vlastnosť TYPU, nie záznamu (Michal 2.8.):** DTDL má v ~90 % prípadov rovnakú hustotu/hmotnosť; podstatný rozdiel je **MDF vs DTDL** — hmotnosť ČELA rozhoduje pri výpočte **výklopov** (sila piestov, hlavný dôvod) a **závesov**. Inde sa hmotnostná logika nepotrebuje. Realizácia: register kanonických typov nesie default hustotu (kg/m³) — dávka M-C; spotrebuje ju kovanie (dávka D, hmotnostné tabuľky). Per-záznam override až keď ho prax vypýta.
+
 ### Dosky (DTDL)
 
 - **DTDL 36 = 2× zlepená doska 18** (výrobný postup — napr. pre hrubé korpusové/pohľadové prvky). Demos predáva aj hotovú DTDL 38 (a rad hrúbok 8–38).

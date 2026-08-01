@@ -19,7 +19,6 @@
 ## Nápady na zváženie (nerozhodnuté)
 
 - **D-48 · Zdieľaná knižnica pre 2 PC (Michal + Lucia)** (Michal 31.7. večer) — obe pracoviská majú zobrazovať ROVNAKÉ šablóny aj materiály (spolupráca, posúvanie projektov). Jednotný zdroj = **firemný Google Disk** (sú tam všetky firemné veci). Dotýka sa: katalóg materiálov, šablóny korpusov, pravidlá kovania (dnes všetko v lokálnom %APPDATA%). *Stav: na návrhovú dávku — sync/zdieľanie cez G-Disk priečinok.*
-- **D-49b · Hrúbková auto-cesta dupláku** (odčlenené z D-49, 2.8.) — „napíš hrúbku 36 pri dekore s 18-kou → duplák sa doberie sám" (dnes to selectová ponuka rieši vedomým výberom). Vyžaduje potvrdzovaciu lištu v PANELI (katalógový zápis mimo undo musí byť vedomý — Codex audit F6) — panel takú infra nemá. *Stav: kandidát po Michalovom teste D-49; ak selectová ponuka stačí, zavrieť.*
 - **D-50 · OCL inšpirácia UI/UX** (Michal 31.7. večer) — pár detailov z OCL flow prevziať; najprv slovné prebratie (sedenie), potom zapracovanie. *Stav: čaká na sedenie.*
 - **D-51 · Štandard veľkostí okien a tlačidiel** (Michal 31.7. večer) — zjednotiť šírky, rozmery a rozmiestnenie naprieč oknami (panel, Materiály, Výroba, Pravidlá, Šablóny) — dohodnúť konkrétne hodnoty do UI_DIZAJN.md **pred prvým testovaním Lucie („skúška ohňom")**. *Stav: na UI dávku pred nasadením u Lucie.*
 - **D-52 · Tlačidlo „Aktualizovať" (auto-update pluginu)** (Michal 31.7. večer) — jednoklikový update na najnovšiu verziu, distribučný kanál možno G-Disk; hlavne pre Luciu (nech Michal nemusí posielať súbory). *Stav: na návrhovú dávku (spolu s D-48 kanálom).*
@@ -28,7 +27,7 @@
 - **D-15 · UX vzor: „pridávačky" ako modal** (Michal 19.7.) — všetky akcie „pridať niečo" (šablóna, materiál, …) zjednotiť na modal s formulárom. Napĺňa sa postupne (prvý bol D-14; materiál formulár sa prerobí neskôr).
 - **D-26 · Režim Jednoduchý/Rozšírený** (Michal 19.7. večer, debata) — prepínač v UI: jednoduchý = najčastejšie polia, rozšírený = všetko (tvorba šablón, špeciálne zostavy). Rozhodnuté MIESTO samostatného okna Nastavenia (nastavenie ostáva pri svojom poli). *Stav: čaká na dáta z merača D-25 (čo reálne skrývať) — pár týždňov zberu.*
 - **D-27 · Rýchle zobraziť/skryť tagy z panela** (Michal 19.7. večer) — mini prepínače priamo v paneli (Čelá 👁 · Chrbát 👁 …) v logike Ghost checkboxu, nech sa nepreklikáva do SketchUp Tags. *Stav: zápis bokom, kandidát na budúcu UX dávku.*
-- **D-28 · Textúry materiálov (render)** (Michal 19.7. večer) — katalóg rozšíriť o textúru (obrázok dekoru) + mierku rapportu; builder ich aplikuje pri rebuilde → model pripravený na render (Lucia). Fáza 2: orientácia textúry podľa smeru dekoru dielca. Michal má kompletnú knižnicu textúr; injecting dát príde v dávkach po V1. *Stav: zaradené po V0.6.*
+- **D-28 · Textúry materiálov (render)** (Michal 19.7. večer) — *Stav: **ZLÚČENÉ do dávky M-R** (roadmapa „Materiály — dokončenie", 2.8.): texture_path + render vlastnosti + „Uložiť vzhľad do knižnice" + mierka rapportu; fáza 2 orientácia podľa smeru dekoru. Zaradenie: po dávke D, pred UI 2.0 (Luciina priorita).*
 
 ## Návrhy väčších celkov (na rozpracovanie)
 
@@ -46,24 +45,9 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 - **Hardening zoznam:** manuálne overiť redo (Ctrl+Y) po zlúčených transparentných operáciách (pozorovanie zo 17.7.).
 - **Priebeh testovania seedu (27.7.):** beží — nové D-43 (duplák), D-44 (výber výrobcu/typu), D-45 (bloker 18,6). Funguje: zmena formátu platne podľa postupu (MG Cashmere → 2800×2050 ✓).
 
-### Seed katalógu — podklad na ručné vloženie (zoznam Michal 25.7., jednorazová sekcia)
+### Seed katalógu — PREKONANÉ, kanonický podklad je [zdroje/SEED_KATALOG_2026-07.md](zdroje/SEED_KATALOG_2026-07.md)
 
-**Odporúčaný postup:** vkladať RUČNE cez batch „Nový dekor" (preset-čipy) — zároveň otestuje D-42 UI na reálnych dátach (18,6 mm; PD 38). Demos import (V0.6) potom záznamy len obohatí — DK kódy už budú sedieť. Ku každému dekoru vlož aspoň ABS 22/1,0 (nech funguje picker a olep); ABS kódy doplníme po vyriešení mapovania (09_POJMY otázka 2). **Formát platne (od D-44, PR #84):** zadávaš ho rovno v dávke — pod čipmi dosiek je pruh `dĺžka × šírka` pre zapnuté čipy (DTDL/MDF/HDF predvyplnené 2800×2070, PD prázdne zámerne). Prepíš tam: obe MG dekory → **2800×2050**, PD 38 → **4100×600**. Ak formát nevyplníš, záznam ostane bez neho a odhad platní to viditeľne označí ako núdzový (semafor „nezmestí sa" mlčí) — dodatočne sa dopĺňa ceruzkou pri variante.
-
-| Výrobca | Dekor (kľúč) | Názov | Doskové varianty | DK kód (code; supplier = Demos) | Poznámka |
-|---|---|---|---|---|---|
-| Egger | U750 ST9 | Taupe šedá | DTDL 18 | 175726 | |
-| Egger | H3303 ST10 | Dub Hamilton prírodný | DTDL 18 | 175718 | |
-| Egger | F800 ST9 | Mramor krištáľový | DTDL 18 + PD 38 | DTDL 514269 · PD 514485 | PD 920 (514486) čaká na otázku 3; overené na webe — skupina má aj 8 ABS pások |
-| Egger | H1180 ST37 | Dub Halifax prírodný | DTDL **18,6** | 275848 | test guardu hrúbky |
-| Kronospan | K097 SU BU | Dusk Blue | DTDL 18 | 353854 | |
-| Kronospan | 164 PE BU | Antracit | DTDL 18 | 142438 | |
-| Kronospan | 5981 MG | Cashmere | DTDL 18 | 473933 | formát **2800×2050** |
-| Kronospan | 191 MG | Cool grey | DTDL 18 | 457973 | formát **2800×2050** |
-| Kronospan | K350 RT BU | Flow betónový | DTDL 18 | 402872 | |
-| Kronospan | K2738 PW BU | Torro Cremona Oak | DTDL 18 | 532848 | PD 38 „FP" (532772) — otázka 1 (kľúč skupiny) |
-| Falco | Y121 FS01 | Biela hladká | DTDL 18 | — (bez DK) | dodávateľ? |
-| Kastamonu | A860 PS29 | Dub Korona | DTDL 18 | — (bez DK) | formát overiť |
+Pôvodná tabuľka z 25.7. (12 dekorov na ručný batch) je zlúčená a rozšírená v konsolidovanom SEED_KATALOG dokumente (§1.1 jadro s Disk frekvenciami + §1.2 druhá vlna z reálnych zákaziek). Vkladať sa bude cez **„Pridať z Demosu"** (M-A — rodina s kódmi/cenami/fotkou z 1 URL), nie ručným batchom; Falco/Kastamonu (bez DK, cez VEPO) ručne. **Zaradenie: posledný materiálový krok pred dávkou D** (rozhodnuté 2.8., roadmapa „Materiály — dokončenie").
 
 ## 2A migračná mapa — ✅ SCHVÁLENÁ, kanonický podklad pre 2A-2 (Michal 30.7.: „mapa OK — Pracovná doska zmaž, Halifax zlúč")
 
@@ -97,7 +81,8 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ## Vyriešené — index (plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md))
 
-- **D-49** duplák automaticky — selecty tela/dielca/dosky ponúkajú „×2 → 36 (duplák)" pri každej reálnej DTDL/MDF doske; výber duplák dovytvorí (idempotentne, guardy UNI/kupovaná 36-ka/reťazenie; duplák už nededí demos väzbu ani uni flag); vklad dosky a projektové predvoľby virtuály nevidia; hrúbková auto-cesta odčlenená ako D-49b — PR #116
+- **D-49b** create-time/hrúbková automatika dupláku — ZAVRETÉ bez implementácie (Michal 2.8.: pôvodný zámer bol „pri vkladaní 18-ky do katalógu sa 36-ka vytvorí sama"; selectová ponuka z D-49 vyhodnotená ako lepšia — „funguje ešte lepšie")
+- **D-49** duplák automaticky — selecty tela/dielca/dosky ponúkajú „×2 → 36 (duplák)" pri každej reálnej DTDL/MDF doske; výber duplák dovytvorí (idempotentne, guardy UNI/kupovaná 36-ka/reťazenie; duplák už nededí demos väzbu ani uni flag); vklad dosky a projektové predvoľby virtuály nevidia; Michal potvrdil 2.8. „funguje bez výhrad" — PR #116
 - **D-66** zástena priamo z Demosu — rub sa číta z PARAMETROV stránky (živé overenie vyvrátilo „rub je len v adrese"); rodina ju ponúka ako dosku, založí sa s rubom (identita, ID s R-tokenom, dedup), „Aktualizovať z Demosu" na zástene funguje; bez auto-návrhu pásky — PR #115
 - **D-53** UNI dotiahnuté: sekcia „Pracovné (UNI)" + badge; „Nahradiť UNI…" — hromadná zámena UNI za reálny dekor s rozpisom dopadu pred potvrdením (skrinky/dosky/predvoľby/hrúbky/ABS), odtlačok plánu proti súbežným zmenám, 1 undo — PR #114
 - **D-71** URL väzba sa dá ručne pridať/upraviť/zmazať v edit formulári variantu (ceruzka; server sanitize — len demos-trade.sk; zmena/zmazanie ruší dátum overenia ceny; UNI pole nemá; zlá adresa nezatvára formulár). Vedomé zúženie: batch „ručne…" URL pole nemá — väzba sa dopĺňa editom po vytvorení — PR #112
