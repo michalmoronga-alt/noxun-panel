@@ -106,6 +106,8 @@ module Noxun
           # V0.6 M-A2 (audit F9 / Halifax lekcia): potvrdenie mazania s
           # variantovo presnym rozpisom zo SERVERA (nie plain confirm).
           cb(dlg, 'delete_preflight') { |p| handle_delete_preflight(p) }
+          # M-A3b D-60: "Otvorit u dodavatela" z riadku variantu.
+          cb(dlg, 'open_demos_url') { |p| handle_open_demos_url(p) }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(materials): #{msg}")
@@ -556,7 +558,17 @@ module Noxun
             if event['type'] == 'family' && @demos_session.to_i == session
               @demos_family = { 'session' => session,
                                 'header' => event['header'], 'items' => event['items'] }
-              event = event.merge('existing' => demos_family_existing?(event['header']))
+              # M-A3b D-59: informativne oznacenie poloziek, ktorych kod uz
+              # v katalogu je (rovnaky druh + dodavatel Demos/prazdny) — LEN
+              # zobrazenie, do family STORE ide povodny zoznam (autorita
+              # dedupu je variantova identita pri zapise).
+              flagged = Array(event['items']).map do |it|
+                kind = it['kind'].to_s
+                next it unless %w[sheet edge].include?(kind)
+                Materials.demos_code_known?(kind, it['code']) ? it.merge('in_catalog' => true) : it
+              end
+              event = event.merge('items' => flagged,
+                                  'existing' => demos_family_existing?(event['header']))
             end
             if event['type'] == 'complete' && event['ok'] && event['result'].is_a?(Hash)
               @demos_family = nil
@@ -600,6 +612,17 @@ module Noxun
         def handle_demos_family_cancel
           demos_bump_session
           @demos_family = nil
+        end
+
+        # M-A3b D-60 (audit BLOCKER 2): URL sa NIKDY neberie z klienta — klient
+        # posiela len kind+id, zaznam sa cita z katalogu a URL prechadza
+        # cerstvym sanitize tesne pred otvorenim (poskodeny zaznam sa neotvori).
+        def handle_open_demos_url(payload)
+          data = JSON.parse(payload.to_s)
+          kind = data['kind'].to_s == 'edge' ? 'edge' : 'sheet'
+          url = Materials.demos_open_target(kind, data['id'].to_s)
+          return set_status('Záznam nemá platnú väzbu na Demos.', true) unless url
+          UI.openURL(url)
         end
 
         # --- V0.6 M-A2 (audit F9): preflight mazania variantu ------------------

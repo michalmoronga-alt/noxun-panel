@@ -203,4 +203,54 @@ ok(M.mdMatchGroup(ZG, 'k552'), 'hladanie podla rubu najde skupinu');
 ok(M.mdMatchGroup(ZG, 'rt') || M.mdMatchGroup(ZG, 'RT'.toLowerCase()), 'hladanie podla struktury rubu');
 ok(!M.mdMatchGroup(ZG, 'k999'), 'nezname cislo nematchne');
 
+// --- M-A3b (D-60): datum overenia ceny DD.M.RRRR -----------------------------
+eq(M.mdDateLabel('2026-08-01T18:00:00Z'), '1.8.2026', 'ISO -> DD.M.RRRR bez nul');
+eq(M.mdDateLabel('2026-12-24'), '24.12.2026', 'datum bez casu');
+eq(M.mdDateLabel(''), '', 'prazdny vstup = prazdny label');
+eq(M.mdDateLabel('nezmysel'), '', 'nevalidny vstup = prazdny label');
+eq(M.mdDateLabel(null), '', 'null = prazdny label');
+
+// --- M-A3b (D-60): tlacidlo vazby na Demos v riadku variantu -----------------
+const DBTN = M.mdDemosBtn('sheet', 'EG_U750_18',
+  { demos_url: 'https://www.demos-trade.sk/dtdl-u750-st9-x-2800-2070-18/', price_checked_at: '2026-08-01T10:00:00Z' });
+ok(DBTN.indexOf('external-link') >= 0, 'demos tlacidlo nesie external-link ikonu');
+ok(DBTN.indexOf('cena overená 1.8.2026') >= 0, 'title nesie datum overenia');
+ok(DBTN.indexOf("mdDemosOpen('sheet', 'EG_U750_18')") >= 0, 'klik posiela LEN kind+id (URL drzi server)');
+ok(DBTN.indexOf('demos-trade.sk') < 0, 'URL sa do DOM nedava (server autorita)');
+eq(M.mdDemosBtn('sheet', 'X', { price_checked_at: '2026-08-01' }), '', 'bez demos_url ziadne tlacidlo');
+eq(M.mdDemosBtn('sheet', 'X', null), '', 'bez zaznamu ziadne tlacidlo');
+const DBTN2 = M.mdDemosBtn('edge', 'ABS_X', { demos_url: 'https://www.demos-trade.sk/absb-x-23-1/' });
+ok(DBTN2.indexOf('cena overená') < 0, 'bez datumu title bez casti o overeni');
+
+// --- M-A3b (D-56/D-63): dlazdica — badge vazby + title tooltip ---------------
+const TG = { key: 'g:GRP-EG', decor: 'H1181', decor_name: 'Dub Halifax tabakový',
+  manufacturer: 'Egger', count: 2, demos_n: 2, color: [200, 180, 150],
+  sheets: [{ type: 'DTDL', thickness: 18 }], edges: [{ thickness: 1, width: 23 }] };
+const TILE = M.mdTileHtml(TG, 0);
+ok(TILE.indexOf('mddemos') >= 0 && TILE.indexOf('cloud-download') >= 0, 'badge vazby na Demos (D-56)');
+ok(TILE.indexOf('(2 var.)') >= 0, 'badge title nesie pocet prepojenych variantov');
+ok(TILE.indexOf('title="H1181 Dub Halifax tabakový · Egger"') >= 0, 'plny nazov v tooltipe (D-63)');
+const TILE0 = M.mdTileHtml({ key: 'd:X', decor: 'X', decor_name: '', manufacturer: '',
+  count: 0, color: null, sheets: [], edges: [] }, 0);
+ok(TILE0.indexOf('mddemos') < 0, 'bez vazby ziadny badge');
+ok(TILE0.indexOf('vlastný') >= 0, 'fallback vyrobcu v tooltipe aj podriadku');
+
+// --- M-A3b (D-62): fotka v hlavicke detailu ----------------------------------
+const DG = { key: 'g:GRP-EG', decor: 'H1181', decor_name: 'Dub Halifax tabakový',
+  manufacturer: 'Egger', count: 1, color: [200, 180, 150], image: 'C:\\cache\\img.jpg',
+  sheets: [{ material_id: 'S1', type: 'DTDL', thickness: 18, structure: 'ST37', row_rev: 'r1' }],
+  edges: [] };
+const DET = M.mdDetailHtml(DG);
+ok(DET.indexOf('mdsw-photo') >= 0 && DET.indexOf('mdsw-lg') >= 0, 'detail ma fotku v swatchi (D-62)');
+const DET0 = M.mdDetailHtml(Object.assign({}, DG, { image: null }));
+ok(DET0.indexOf('mdsw-photo') < 0, 'bez fotky len farba (fallback)');
+
+// --- M-A3b (D-60): demos tlacidlo v riadkoch sekcie --------------------------
+const SECD = M.mdSectionRows({ key: 'ST37', title: 'ST37',
+  sheets: [{ material_id: 'S1', type: 'DTDL', thickness: 18, row_rev: 'r1', code: '111',
+             demos_url: 'https://www.demos-trade.sk/x-18/', price_checked_at: '2026-08-01' }],
+  edges: [{ abs_id: 'A1', thickness: 1, width: 23, row_rev: 'r2' }] });
+ok(SECD.indexOf("mdDemosOpen('sheet', 'S1')") >= 0, 'doska s vazbou ma demos tlacidlo');
+ok(SECD.indexOf("mdDemosOpen('edge'") < 0, 'paska bez vazby tlacidlo nema');
+
 console.log(JSON.stringify({ passed: n, failed: 0 }));
