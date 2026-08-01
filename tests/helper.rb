@@ -138,6 +138,7 @@ unless NxTest::IN_SKETCHUP
     core/demos/image_cache
     core/demos/family
     core/materials_demos_create
+    core/materials_replace_uni
     core/abs_rules
     core/hardware_rules
     core/hardware_catalog

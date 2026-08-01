@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.5.25' unless defined?(VERSION)
+    VERSION = '0.5.26' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -52,6 +52,7 @@ Sketchup.require 'noxun_engine/core/demos/name_search'   # V0.6 M-A: offline naz
 Sketchup.require 'noxun_engine/core/demos/image_cache'   # V0.6 M-A: lokalna cache obrazkov dekorov (BLOCKER 1 — ziadne remote img v CEF)
 Sketchup.require 'noxun_engine/core/demos/family'        # V0.6 M-A: rodina dekoru zo stranky + orchestrator zalozenia
 Sketchup.require 'noxun_engine/core/materials_demos_create' # V0.6 M-A: atomicke zalozenie skupiny z Demosu (1 lock, 1 zapis)
+Sketchup.require 'noxun_engine/core/materials_replace_uni'  # V0.6 M-B2: „Nahradit UNI…" (scan+klasifikacia+odtlacok planu)
 Sketchup.require 'noxun_engine/core/abs_rules'   # V0.3 ABS pravidla (pouziva Materials)
 Sketchup.require 'noxun_engine/core/hardware_rules' # V0.4 pravidla kovania (pred construction)
 Sketchup.require 'noxun_engine/core/hardware_catalog' # V0.6 C-1: katalog kovania (po materials/demos — pouziva slug, normalize_price, Demos.fetch)

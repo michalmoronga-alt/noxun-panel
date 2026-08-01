@@ -3,7 +3,7 @@
      (%APPDATA%). -->
 <!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.5.25">
+<link rel="stylesheet" href="css/panel.css?v=0.5.26">
 
 <h1>Materiály projektu</h1>
 <p class="sub" id="mdline">…</p>
@@ -274,6 +274,26 @@
   </div>
 </div>
 
+<!-- V0.6 M-B2: „Nahradiť UNI…" — krok 1 výber cieľa, krok 2 rozpis dopadu zo
+     SERVERA (scan+klasifikácia+odtlačok plánu); telo skroluje, akcie sú fixné
+     (audit F6 — rozpis desiatok skriniek sa musí zmestiť do 560 px okna). -->
+<div id="mdUniModal" class="nxmodal" style="display:none">
+  <div class="nxmodal-card nxmodal-scroll">
+    <div class="nxmodal-title"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg> <span id="mdUniName">Nahradiť UNI</span></div>
+    <div id="mdUniStep1">
+      <div class="hint">Vyber reálny dekor, ktorý nahradí UNI v celom projekte.</div>
+      <div class="tplrow"><label class="mdunil">Dekor</label><select id="mdUniGroup" onchange="mdUniGroupChange()" style="flex:1"></select></div>
+      <div class="tplrow"><label class="mdunil">Variant</label><select id="mdUniVariant" style="flex:1"></select></div>
+    </div>
+    <div id="mdUniStep2" class="nxmodal-body" style="display:none"><div id="mdUniBody"></div></div>
+    <div class="btnrow">
+      <button class="primary" id="mdUniNextBtn" onclick="mdUniPreview()">Ukázať dopad</button>
+      <button class="primary" id="mdUniConfirmBtn" style="display:none" onclick="mdUniConfirm()">Nahradiť</button>
+      <button class="ghostbtn" onclick="mdUniClose()">Zrušiť</button>
+    </div>
+  </div>
+</div>
+
 <!-- D-44: zoznamy návrhov pre našepkávače (výrobca, typ dosky). Nerenderujú sa —
      napĺňa ich JS z payloadu servera; používa ich batch aj inline editor výrobcu. -->
 
@@ -282,8 +302,8 @@
 <!-- icons.js prvy (sprite musi existovat pred prvym renderom mdRenderLists);
      demos_diff.js pred proj_materials.js (mddLookup pouzivaju onclick handlery
      detailu; ready() bezi az na konci proj_materials.js). -->
-<script src="js/errors.js?v=0.5.25"></script>
-<script src="js/icons.js?v=0.5.25"></script>
-<script src="js/demos_diff.js?v=0.5.25"></script>
-<script src="js/demos_add.js?v=0.5.25"></script>
-<script src="js/proj_materials.js?v=0.5.25"></script>
+<script src="js/errors.js?v=0.5.26"></script>
+<script src="js/icons.js?v=0.5.26"></script>
+<script src="js/demos_diff.js?v=0.5.26"></script>
+<script src="js/demos_add.js?v=0.5.26"></script>
+<script src="js/proj_materials.js?v=0.5.26"></script>

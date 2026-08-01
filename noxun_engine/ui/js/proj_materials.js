@@ -120,6 +120,8 @@
       if (!g.image && s.image_file) g.image = s.image_file;
       // M-A3b (D-56): pocet variantov s ulozenou vazbou na Demos (badge dlazdice).
       if (s.demos_url) g.demos_n = (g.demos_n || 0) + 1;
+      // V0.6 M-B2: UNI skupina (badge + vlastna sekcia + tlacidlo Nahradit).
+      if (s.uni === true){ g.uni = true; if (!g.uni_role && s.uni_role) g.uni_role = s.uni_role; }
     });
     (catalog.edges || []).forEach(function(a){
       var g = grp(a);
@@ -207,8 +209,14 @@
   function mdUsageKey(g){ return g.usage_key === undefined ? g.decor : g.usage_key; }
   function mdBuildSections(groups, used, mode, query){
     if (query) return [{ title: 'Výsledky', kind: 'flat', groups: groups }];
-    if (mode !== 'man') return [{ title: '', kind: 'flat', groups: groups }];
-    var out = [];
+    // V0.6 M-B2 (audit N8): UNI pracovne materialy = vlastna sekcia NAVRCHU
+    // v OBOCH rezimoch (vyrobca aj A–Z); pri hladani filtruju normalne.
+    var uniGroups = groups.filter(function(g){ return g.uni === true; });
+    var rest = groups.filter(function(g){ return g.uni !== true; });
+    var uniSec = uniGroups.length ? [{ title: 'Pracovné (UNI)', kind: 'uni', groups: uniGroups }] : [];
+    if (mode !== 'man') return uniSec.concat([{ title: '', kind: 'flat', groups: rest }]);
+    groups = rest;
+    var out = uniSec;
     used = used || {};
     var usedGroups = groups.filter(function(g){ return (used[mdUsageKey(g)] || 0) > 0; })
       .slice().sort(function(a, b){
@@ -301,7 +309,8 @@
       if (sec.title){
         html += '<div class="mdsechead">' +
           (sec.kind === 'used' ? '<svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>'
-                               : '<svg class="ic" aria-hidden="true"><use href="#i-factory"/></svg>') +
+            : sec.kind === 'uni' ? '<svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg>'
+                                 : '<svg class="ic" aria-hidden="true"><use href="#i-factory"/></svg>') +
           ' ' + esc(sec.title) + '</div>';
       }
       html += '<div class="mdgrid">';
@@ -341,6 +350,7 @@
       sw +
       '<span class="mdtile-name"><b>' + esc(name) + '</b>' +
       '<span class="mans">' + esc(sub) + '</span></span>' +
+      (g.uni ? '<span class="mdunib" title="Pracovný UNI materiál — pred výrobou nahraď reálnym dekorom">UNI</span>' : '') +
       (g.demos_n ? '<span class="mddemos" title="Prepojené s Demosom (' + g.demos_n + ' var.)"><svg class="ic" aria-hidden="true"><use href="#i-cloud-download"/></svg></span>' : '') +
       (usedCount ? '<span class="mdused">' + usedCount + '×</span>' : '') +
       '</div><div class="mdtile-chips">' + (chips || '<span class="muted">bez variantov</span>') + '</div></div>';
@@ -403,7 +413,11 @@
       '<i class="mdsw mdsw-lg" style="background:' + esc(rgbToHex(g.color)) + '">' +
       (g.image ? '<img class="mdsw-photo" src="' + esc(mdImageSrc(g.image)) + '" alt="" onerror="this.style.display=\'none\'">' : '') +
       '</i>' +
-      '<span class="tpln"><b>' + esc(name) + '</b>' + (g.manufacturer ? ' <span class="tplt">' + esc(g.manufacturer) + '</span>' : '') + '</span>' +
+      '<span class="tpln"><b>' + esc(name) + '</b>' + (g.manufacturer ? ' <span class="tplt">' + esc(g.manufacturer) + '</span>' : '') +
+      (g.uni ? ' <span class="mdunib">UNI</span>' : '') + '</span>' +
+      // V0.6 M-B2: hromadna zamena UNI za realny dekor (nazov drzat presne —
+      // semafor ORANGE „material neurceny" nan odkazuje textom).
+      (g.uni ? '<button class="primary tplbtn"' + dis + ' onclick="mdUniOpen(' + esc(JSON.stringify(g.key)) + ')">Nahradiť UNI…</button>' : '') +
       (g.decor === '' ? '' :
         '<button class="ghostbtn tplbtn"' + dis + ' onclick="mdOpenDecorForm(' + esc(JSON.stringify(g.key)) + ')">+ variant</button>' +
         '<button class="ghostbtn tplbtn"' + dis + ' onclick="mdManufacturerOpen(' + esc(JSON.stringify(g.key)) + ')">Výrobca</button>' +
@@ -1592,6 +1606,108 @@
     if (m) m.style.display = 'none';
   }
 
+  // --- V0.6 M-B2: „Nahradiť UNI…" — modal s výberom cieľa a rozpisom -------
+  // Autorita je server (scan+klasifikácia+odtlačok plánu); JS len zbiera výber
+  // a renderuje rozpis. Katalógové echo/init modal aj ponuku RUŠÍ (audit F6).
+  var MD_UNI = null;          // { uni_id, key } otvoreného modalu
+  var MD_UNI_PENDING = null;  // pending odtlačok aktuálnej ponuky zo servera
+
+  // Čistá funkcia (Node test): kandidáti cieľa = non-UNI skupiny s doskami.
+  function mdUniTargets(catalog, schema2){
+    return groupCatalogByDecor(catalog || { sheets: [], edges: [] }, schema2)
+      .filter(function(g){ return g.uni !== true && g.sheets.length; });
+  }
+  // Čistá funkcia (Node test): riadky rozpisu dopadu zo summary payloadu.
+  function mdUniSummaryLines(s){
+    var lines = [];
+    var cabsN = (s.adopting_n || 0) + (s.recompute_n || 0);
+    if (s.project && s.project.length) lines.push('Predvoľby projektu: ' + s.project.join(', ') + ' → ' + s.target_label);
+    if (cabsN){
+      var t = 'Skrinky: ' + cabsN + ' sa prepočíta';
+      if (s.adopting_n) t += ', ' + s.adopting_n + ' prevezme hrúbku ' + fmtNum(s.target_th) + ' mm';
+      lines.push(t);
+    }
+    (s.th_changes || []).forEach(function(t){ lines.push('Zmena hrúbky ' + t.change + ' mm: ' + t.n + '×'); });
+    if (s.overrides_n) lines.push('Dielce s vlastným UNI materiálom: ' + s.overrides_n + '×');
+    if (s.boards && s.boards.length){
+      lines.push('Dosky: ' + s.boards.map(function(b){
+        return b.bid + (b.from !== b.to ? ' (' + fmtNum(b.from) + '→' + fmtNum(b.to) + ' mm)' : '');
+      }).join(', '));
+    }
+    var abs = s.abs || {};
+    if (abs.changed) lines.push('ABS hrany sa prevedú na nový dekor (' + abs.changed + '×)');
+    if (abs.lost_n){
+      lines.push('ABS bez náhrady: ' + (abs.lost || []).join(', ') +
+        (abs.lost_n > (abs.lost || []).length ? '…' : ''));
+    }
+    lines.push('Šablóny sa nemenia — sú globálna knižnica, nie projekt.');
+    return lines;
+  }
+
+  function mdUniOpen(key){
+    var g = mdGroupByKey(key);
+    var us = g && g.sheets.filter(function(s){ return s.uni === true; })[0];
+    if (!us) return;
+    MD_UNI = { uni_id: us.material_id, key: key };
+    MD_UNI_PENDING = null;
+    var name = el('mdUniName');
+    if (name) name.textContent = 'Nahradiť ' + (g.decor || 'UNI') + ' reálnym dekorom';
+    var gsel = el('mdUniGroup');
+    if (gsel){
+      gsel.innerHTML = '';
+      mdUniTargets(MD_CATALOG, MD_SCHEMA2).forEach(function(t){
+        var o = document.createElement('option');
+        o.value = t.key;
+        o.textContent = (t.decor + ' ' + (t.decor_name || '')).trim() + (t.manufacturer ? ' · ' + t.manufacturer : '');
+        gsel.appendChild(o);
+      });
+    }
+    mdUniGroupChange();
+    mdUniStep(1);
+    var m = el('mdUniModal');
+    if (m) m.style.display = '';
+  }
+  function mdUniGroupChange(){
+    var gsel = el('mdUniGroup'), vsel = el('mdUniVariant');
+    if (!gsel || !vsel) return;
+    vsel.innerHTML = '';
+    var g = mdGroupByKey(gsel.value);
+    ((g && g.sheets) || []).filter(function(s){ return s.uni !== true; }).forEach(function(s){
+      var o = document.createElement('option');
+      o.value = s.material_id;
+      var dim = sheetDimLabel(s);
+      o.textContent = dim.dim + ' mm' + (dim.sub ? ' · ' + dim.sub : '');
+      vsel.appendChild(o);
+    });
+  }
+  function mdUniStep(n){
+    var s1 = el('mdUniStep1'), s2 = el('mdUniStep2'), ok = el('mdUniConfirmBtn'), nx = el('mdUniNextBtn');
+    if (s1) s1.style.display = n === 1 ? '' : 'none';
+    if (s2) s2.style.display = n === 2 ? '' : 'none';
+    if (ok) ok.style.display = n === 2 ? '' : 'none';
+    if (nx) nx.style.display = n === 1 ? '' : 'none';
+  }
+  function mdUniPreview(){
+    var vsel = el('mdUniVariant');
+    if (!MD_UNI || !vsel || !vsel.value) return;
+    if (window.sketchup && sketchup.replace_uni_preview){
+      sketchup.replace_uni_preview(JSON.stringify({
+        uni_id: MD_UNI.uni_id, target_id: vsel.value, model_guid: MD_MODEL_GUID }));
+    }
+  }
+  function mdUniConfirm(){
+    var pending = MD_UNI_PENDING;
+    mdUniClose();
+    if (pending && window.sketchup && sketchup.replace_uni_apply)
+      sketchup.replace_uni_apply(JSON.stringify({ confirm: pending, model_guid: MD_MODEL_GUID }));
+  }
+  function mdUniClose(){
+    MD_UNI = null;
+    MD_UNI_PENDING = null;
+    var m = el('mdUniModal');
+    if (m) m.style.display = 'none';
+  }
+
   // Top-level var v script tagu = window.MD v CEF; v Node require nepada na window.
   var MD_MODEL_GUID = ''; // D-42: identita modelu pre projektove predvolby (blocker 4)
   var MD_USED = {};       // D-42 PR B: {dekor => pocet dielcov v aktivnom modeli}
@@ -1644,6 +1760,7 @@
 
   function mdApplyCatalog(data){
     mdClearPending(); // refresh (init aj katalogove echo) rusi nepotvrdenu ponuku
+    mdUniClose();     // M-B2 (audit F6): aj UNI modal s pending odtlackom
     MD_SHEETS = (data.materials && data.materials.sheets) ? data.materials.sheets : [];
     MD_CATALOG = data.catalog || { sheets: [], edges: [] };
     MD_PROTECTED = data.protected_ids || [];
@@ -1754,6 +1871,39 @@
       if (btn) btn.disabled = !!(p.protected || (p.duplak_deps && p.duplak_deps.length));
       var m = el('mdDeleteModal');
       if (m) m.style.display = '';
+    },
+    // V0.6 M-B2: odpoveď servera na „Nahradiť UNI…" — rozpis dopadu / blokácia
+    // / nič na nahradenie. Render VÝHRADNE cez DOM API (textContent); autorita
+    // potvrdenia je server (pending odtlačok plánu ide celý späť).
+    replaceUniOffer: function(p){
+      if (p.empty){
+        mdUniClose();
+        MD.setStatus(p.empty, false);
+        return;
+      }
+      var body = el('mdUniBody');
+      if (!body) return;
+      body.textContent = '';
+      function div(cls, text){
+        var d = document.createElement('div');
+        if (cls) d.className = cls;
+        d.textContent = text;
+        body.appendChild(d);
+      }
+      if (p.blocked){
+        MD_UNI_PENDING = null;
+        div('mddel-warn', 'Nahradenie je blokované — najprv vyrieš:');
+        (p.blocked || []).forEach(function(t){ div('mddel-line', t); });
+      } else {
+        MD_UNI_PENDING = p.pending || null;
+        if (p.stale) div('mddel-warn', 'Stav sa medzitým zmenil — toto je čerstvý rozpis, potvrď nanovo.');
+        mdUniSummaryLines(p.summary || {}).forEach(function(t){ div('mddel-line', t); });
+      }
+      mdUniStep(2);
+      var ok = el('mdUniConfirmBtn');
+      if (ok) ok.style.display = MD_UNI_PENDING ? '' : 'none';
+      var m = el('mdUniModal');
+      if (m) m.style.display = '';
     }
   };
 
@@ -1797,6 +1947,8 @@
       mdSplitExtraTokens: mdSplitExtraTokens, mdExtraKey: mdExtraKey,
       mdExtraFmtChips: mdExtraFmtChips,
       // M-A3e — rucna vazba (D-71): klientske zrkadlo serverovej validacie
-      mdDemosUrlLocalError: mdDemosUrlLocalError };
+      mdDemosUrlLocalError: mdDemosUrlLocalError,
+      // M-B2 — „Nahradit UNI…" (ciste funkcie bez DOM)
+      mdUniTargets: mdUniTargets, mdUniSummaryLines: mdUniSummaryLines };
   }
   if (typeof window !== 'undefined' && window.sketchup && sketchup.ready) sketchup.ready('');
