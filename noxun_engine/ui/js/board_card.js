@@ -165,19 +165,27 @@
     if (el('bc_grain') && document.activeElement !== el('bc_grain')) el('bc_grain').value = bc.grain_direction || 'none';
     if (el('bc_diag')) el('bc_diag').textContent = 'Výrobná trieda: sheet · ide do výroby';
     var ms = el('bc_material');
-    if (ms){ fillBoardMaterialSelect(ms, bc.material_id || ''); }
+    if (ms){ fillBoardMaterialSelect(ms, bc.material_id || '', true); }
     renderBoardEdgeRows(bc);
     renderBoardSvg(bc);
   }
 
   // Material select dosky: VSETKY doskove materialy bez hrubkoveho filtra a bez
   // "dedit" volby — doska ma vzdy konkretny katalogovy material (snapshot).
-  function fillBoardMaterialSelect(sel, keepValue){
+  // D-49 (audit B3): withOffers pridava virtualne duplaky — dostava ich LEN
+  // karta OZNACENEJ dosky (set_board_material ma resolver); VKLADACI select
+  // ich nesmie mat (add_board by poslal duplak2:* rovno do BoardBuilder).
+  function fillBoardMaterialSelect(sel, keepValue, withOffers){
     var cur = (keepValue !== undefined && keepValue !== null) ? keepValue : sel.value;
     var html = '';
     MATERIALS.sheets.forEach(function(s){
       html += '<option value="' + esc(s.id) + '">' + esc(s.label) + '</option>';
     });
+    if (withOffers){
+      (MATERIALS.duplak_offers || []).forEach(function(s){
+        html += '<option value="' + esc(s.id) + '">' + esc(s.label) + '</option>';
+      });
+    }
     sel.innerHTML = html;
     sel.value = cur;
   }

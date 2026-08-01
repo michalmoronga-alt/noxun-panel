@@ -23,6 +23,17 @@ module Noxun
           key = { 'body' => 'material_id', 'front' => 'front_material_id', 'back' => 'back_material_id' }[data['which'].to_s]
           return set_status('Neznamy material korpusu.', true) unless key
           value = present_str(data['value'])
+          # D-49 (audit F4): virtualna polozka selectu sa rozriesi HNED — pred
+          # efektivnymi materialmi aj hrubkovou adopciou.
+          duplak_note = ''
+          if value
+            value, dnote = resolve_virtual_material(value)
+            unless value
+              set_status(dnote, true)
+              return push_selected(model) # select spat na ulozeny material
+            end
+            duplak_note = dnote.to_s
+          end
           params = existing_params(cab)
           old_eff = effective_materials(model, params)
           params[key] = value
@@ -45,7 +56,7 @@ module Noxun
             CabinetBuilder.rebuild(model, cab, params, op_name: 'NOXUN: material korpusu')
             reselect(model, cab)
           end
-          set_status("Materiál korpusu #{value ? 'nastavený' : 'dedí z projektu'}.#{th_note}#{remap_note(remap)}")
+          set_status("Materiál korpusu #{value ? 'nastavený' : 'dedí z projektu'}.#{th_note}#{remap_note(remap)}#{duplak_note}")
           push_selected(model)
         end
 

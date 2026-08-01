@@ -113,6 +113,40 @@ module Noxun
           %w[true 1 yes].include?(val.to_s.downcase)
         end
 
+        # --- D-49: duplak automaticky — virtualna hodnota selectu -------------
+        # "duplak2:<source_id>" (resp. duplak3:) -> realne material_id. Bezi na
+        # ZACIATKU handlerov (audit F4) — PRED ABS kontrolami, hrubkovymi guardmi
+        # aj efektivnymi materialmi; poskodena/zastarana hodnota = ciste
+        # odmietnutie (volajuci spravi UI resync), ziadny ciastocny zapis.
+        # Katalogovy zapis bezi MIMO modeloveho undo (vedomy kontrakt ensure_*
+        # ciest — Spat vrati model, globalna polozka ostava; hlaska to hovori).
+        # Vrati [real_id | povodna hodnota, note | nil] alebo [nil, chyba].
+        def resolve_virtual_material(value)
+          m = value.to_s.match(/\Aduplak([23]):(.+)\z/)
+          return [value, nil] unless m
+          status, rec = Materials.ensure_duplak_for(m[2], m[1].to_i)
+          case status
+          when :ok
+            # F5: novy zaznam musi byt v selectoch SKOR, nez sa posle payload
+            # objektu — inak sa select po rebuilde zobrazi prazdny.
+            push_materials
+            [rec['material_id'],
+             " Duplák #{fmt_mm(rec['thickness'])} mm pripravený v katalógu (globálna položka — krok Späť ju neodstráni)."]
+          when :exists_regular
+            # B2: identitu drzi KUPOVANA doska — pouzije sa ona, nie duplak.
+            push_materials
+            if rec
+              [rec['material_id'], " Hrúbku #{fmt_mm(rec['thickness'])} mm už drží kupovaná doska — použila sa tá."]
+            else
+              [nil, 'Duplák sa nedá pripraviť — obnov okno.']
+            end
+          when :catalog_read_only
+            [nil, 'Katalóg je len na čítanie — duplák sa teraz nedá vytvoriť.']
+          else
+            [nil, rec.is_a?(String) ? rec : 'Duplák sa nedá pripraviť — obnov okno.']
+          end
+        end
+
       end
     end
   end

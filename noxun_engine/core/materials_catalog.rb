@@ -96,6 +96,11 @@ module Noxun
           if duplak?(source)
             return [:invalid, 'Zdroj je sám duplák — reťazenie duplákov nie je povolené.']
           end
+          # D-49 (audit B1): UNI nie je vyrobny material — "UNI duplak" by nakazil
+          # cely system (semafor, Nahradit UNI, supisy). Guard POD zamkom.
+          if uni?(source)
+            return [:invalid, 'Duplák sa robí z reálnych dosiek — UNI materiál nemá duplák.']
+          end
           # 2B-2 (GH #95 P2): duplak je korpusovy koncept (lepene DTDL/MDF) —
           # typy s formatom v identite (PD, zastena) sa nelepia; duplak by
           # navyse nezvladol first-fill rubu zdroja (immutable kopie by sa
@@ -121,12 +126,65 @@ module Noxun
 
       # Derivovany zaznam duplaku zo zdroja (bez ID — to prideluje volajuci
       # pod zamkom). Kopiruje sa vsetko zdielane; nakupne polia sa vynechaju.
+      # D-49 (audit B1): ani UNI flagy, ani Demos vazba — duplak sa nekupuje,
+      # "Aktualizovat z Demosu" by inak fetchoval zdrojovu 18-ku na duplak a
+      # zdedene uni:true by z duplaku spravilo pracovny material.
       def duplak_record_from(source, mult)
-        rec = source.reject { |k, _| %w[material_id code supplier price_per_m2].include?(k) }
+        rec = source.reject do |k, _|
+          %w[material_id code supplier price_per_m2
+             uni uni_role demos_url price_checked_at].include?(k)
+        end
         rec['thickness'] = (source['thickness'].to_f * mult).round(2)
         rec['source_material_id'] = source['material_id'].to_s
         rec['source_multiplier'] = mult
         rec
+      end
+
+      # --- D-49: duplak automaticky ----------------------------------------
+      # JEDINA vstupna brana automatiky (select "36 (duplak)" aj buduce cesty).
+      # Idempotentne: existujuci duplak (zdroj, nasobic) sa vrati bez zapisu.
+      # Kolizia identity s KUPOVANOU doskou (bezna 36-ka toho isteho dekoru) =
+      # :exists_regular — kupovana doska sa NIKDY nevydava za duplak (audit B2);
+      # volajuci ju smie pouzit ako obycajny material, ale bez source vazby.
+      # Vrati [:ok, rec] | [:exists_regular, rec] | [:invalid, msg] |
+      #        [:write_failed, nil] | [:catalog_read_only, nil].
+      def ensure_duplak_for(source_id, multiplier)
+        existing = duplak_dependents(source_id)
+                   .find { |s| s['source_multiplier'].to_i == multiplier.to_i }
+        return [:ok, existing] if existing
+        status, res = create_duplak_sheet(source_id, multiplier)
+        case status
+        when :ok then [:ok, res]
+        when :duplicate
+          rec = sheet(res)
+          if rec && duplak?(rec) && rec['source_material_id'].to_s == source_id.to_s
+            [:ok, rec] # sub-tolerancna kolizia identity ineho duplaku toho isteho zdroja
+          else
+            [:exists_regular, rec]
+          end
+        else
+          [status, res]
+        end
+      end
+
+      # D-49: zdroje, ktorym sa v selectoch ponuka VIRTUALNA polozka
+      # "(duplak x2)". Cita katalog; ponuka sa len ked:
+      #   - zdroj je realna korpusova doska (non-UNI, non-duplak, nie PD/zastena),
+      #   - duplak (zdroj, 2) este neexistuje,
+      #   - identitu zdvojenej hrubky NEDRZI kupovana doska (audit B2 — ta ma
+      #     prednost a virtualna ponuka by ju obisla).
+      # Vrati pole zdrojovych zaznamov (poradie katalogu).
+      def duplak_offer_sources(multiplier = 2)
+        sheets.select do |s|
+          next false if uni?(s) || duplak?(s)
+          next false if format_in_identity?(s['type']) || double_sided_type?(s['type'])
+          next false if duplak_dependents(s['material_id'])
+                        .any? { |d| d['source_multiplier'].to_i == multiplier }
+          probe = duplak_record_from(s, multiplier)
+          key = sheet_identity_key(probe)
+          next false if sheets.any? { |o| identity_keys_tolerant?(sheet_identity_key(o), key) }
+          true
+        end
       end
 
       # Duplaky ukazujuce na dany zdroj (delete guard + UI vypis). Cita katalog.

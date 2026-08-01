@@ -19,6 +19,17 @@ module Noxun
           rk = data['role_key'].to_s
           return set_status('Chyba identifikacie dielca.', true) if rk.empty?
           mat = present_str(data['material_id'])
+          # D-49 (audit F4): virtualny duplak rozries PRED hrubkovym guardom aj
+          # ABS tvorbou — dalsie kroky pracuju s realnym zaznamom.
+          duplak_note = ''
+          if mat
+            mat, dnote = resolve_virtual_material(mat)
+            unless mat
+              set_status(dnote, true)
+              return push_selected(model)
+            end
+            duplak_note = dnote.to_s
+          end
           params = existing_params(cab)
           old_overrides = JsonFileStore.deep_copy(params['part_overrides'] || {})
           rk = canonical_part_key(params, rk)
@@ -42,7 +53,7 @@ module Noxun
           eff = effective_materials(model, params) # base sa nemeni — rozdiel robi override
           remap = CabinetBuilder.remap_part_edge_overrides!(params, eff, eff, old_overrides: old_overrides)
           rebuild_focus_part(model, cab, rk, params,
-                             "Materiál dielca #{mat ? 'nastavený' : 'zdedený'}.#{remap_note(remap)}#{abs_note}")
+                             "Materiál dielca #{mat ? 'nastavený' : 'zdedený'}.#{remap_note(remap)}#{abs_note}#{duplak_note}")
         end
 
         # D-45: nekompatibilna hrubka per-dielec materialu — vrati hlasku alebo nil.
