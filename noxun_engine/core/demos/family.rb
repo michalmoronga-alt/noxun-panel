@@ -348,6 +348,10 @@ module Noxun
           detail = info.is_a?(Hash) ? info['detail'] : nil
           return complete_create_fail(ctx, create_error_text(status, detail), [])
         end
+        # GH #102 P1: katalog je ZAPISANY — od tejto chvile sa complete doruci
+        # VZDY (aj ked cancel/zatvorenie medzitym zhodilo alive): mutacia sa
+        # nesmie zatajit, volajuci musi spravit katalogovy refresh.
+        ctx['committed'] = true
         fetch_group_image(ctx, group_img, info)
       end
 
@@ -414,7 +418,10 @@ module Noxun
         return if ctx['completed']
         ctx['completed'] = true
         stop_watchdog(ctx)
-        return unless ctx['alive'].call
+        # GH #102 P1: po commite katalogu sa uspesny complete doruci aj mrtvej
+        # session — neskory cancel nesmie zatajit realne zalozenu skupinu
+        # (emit lambda dialogu si okno/refresh guarduje sama).
+        return unless ctx['committed'] || ctx['alive'].call
         ctx['emit'].call('type' => 'complete', 'ok' => true, 'result' => result)
         nil
       end

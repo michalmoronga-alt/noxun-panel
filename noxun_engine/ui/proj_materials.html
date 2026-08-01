@@ -3,7 +3,7 @@
      (%APPDATA%). -->
 <!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.5.18">
+<link rel="stylesheet" href="css/panel.css?v=0.5.19">
 
 <h1>Materiály projektu</h1>
 <p class="sub" id="mdline">…</p>
@@ -70,7 +70,10 @@
       <option value="man">Podľa výrobcu</option>
       <option value="az">A–Z</option>
     </select>
-    <button class="ghostbtn" id="mdNewDecorBtn" onclick="mdOpenDecorForm(null)"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nový dekor</button>
+    <!-- V0.6 M-A2: primarna cesta zakladania = Demos (mockup s0); rucny batch
+         formular ostava ako zalozna cesta "rucne…". -->
+    <button class="primary" id="mdDemosAddBtn" onclick="nxdaOpen()"><svg class="ic" aria-hidden="true"><use href="#i-cloud-download"/></svg> Pridať z Demosu</button>
+    <button class="ghostbtn" id="mdNewDecorBtn" title="Pridať materiál ručne (bez Demosu)" onclick="mdOpenDecorForm(null)"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> ručne…</button>
     <!-- GH #93 P2 (10. kolo): rollback dostupny aj pri ZDRAVOM katalogu (nie
          len z nudzoveho banneru) — ukazuje sa len so SCHEMA 2 + existujucou
          predmigracnou zalohou; potvrdenie robi ten isty modal. -->
@@ -230,6 +233,31 @@
   </div>
 </div>
 
+<!-- V0.6 M-A2: modal "Pridať z Demosu" (mockup s1–s4). Obsah stavia demos_add.js
+     VÝHRADNE cez DOM API (textContent — XSS kontrakt); ovládanie data-action
+     delegáciou. Server drží family store — JS posiela len iid vybraných. -->
+<div id="nxdaModal" class="nxmodal" style="display:none">
+  <div class="nxmodal-card nxmodal-wide">
+    <div class="nxmodal-title"><svg class="ic" aria-hidden="true"><use href="#i-cloud-download"/></svg> Pridať z Demosu</div>
+    <div class="hint" id="nxdaStatus">Vlož adresu produktu alebo hľadaj názvom.</div>
+    <div id="nxdaBody" class="nxdabody"></div>
+  </div>
+</div>
+
+<!-- V0.6 M-A2 (Halifax lekcia / audit F9): potvrdenie mazania variantu s
+     rozpisom zo SERVERA (delete_preflight) — kód, cena, použitie v modeli.
+     Finálny delete ide existujúcimi callbackmi (guardy sa vyhodnotia znova). -->
+<div id="mdDeleteModal" class="nxmodal" style="display:none">
+  <div class="nxmodal-card">
+    <div class="nxmodal-title">Zmazať z katalógu?</div>
+    <div id="mdDelBody"></div>
+    <div class="btnrow">
+      <button class="danger" id="mdDelConfirmBtn" onclick="mdDeleteConfirm()">Zmazať</button>
+      <button class="ghostbtn" onclick="mdDeleteClose()">Zrušiť</button>
+    </div>
+  </div>
+</div>
+
 <!-- D-44: zoznamy návrhov pre našepkávače (výrobca, typ dosky). Nerenderujú sa —
      napĺňa ich JS z payloadu servera; používa ich batch aj inline editor výrobcu. -->
 <datalist id="mdManList"></datalist>
@@ -240,7 +268,8 @@
 <!-- icons.js prvy (sprite musi existovat pred prvym renderom mdRenderLists);
      demos_diff.js pred proj_materials.js (mddLookup pouzivaju onclick handlery
      detailu; ready() bezi az na konci proj_materials.js). -->
-<script src="js/errors.js?v=0.5.18"></script>
-<script src="js/icons.js?v=0.5.18"></script>
-<script src="js/demos_diff.js?v=0.5.18"></script>
-<script src="js/proj_materials.js?v=0.5.18"></script>
+<script src="js/errors.js?v=0.5.19"></script>
+<script src="js/icons.js?v=0.5.19"></script>
+<script src="js/demos_diff.js?v=0.5.19"></script>
+<script src="js/demos_add.js?v=0.5.19"></script>
+<script src="js/proj_materials.js?v=0.5.19"></script>

@@ -547,6 +547,72 @@ ensure
   FileUtils.rm_f(DIC.path_for(MA1_IMG_URL).to_s)
 end
 
+# Transport, ktory vybrane URL ODLOZI (callback az flush!) — simulacia cancelu
+# POCAS stahovania obrazka, ked katalog uz je zapisany (GH #102 P1).
+class Ma1DeferTransport
+  attr_reader :calls
+
+  def initialize(map, defer_url)
+    @map = map
+    @defer_url = defer_url
+    @deferred = []
+    @calls = []
+  end
+
+  def start(url, _limit, &blk)
+    @calls << url
+    if url == @defer_url
+      @deferred << blk
+      return true
+    end
+    entry = @map[url]
+    if entry.nil?
+      blk.call(404, {}, '', nil)
+    elsif entry == :err
+      blk.call(nil, {}, nil, 'spojenie zlyhalo')
+    else
+      blk.call(entry[0], entry[1], entry[2], nil)
+    end
+    true
+  end
+
+  def flush!(status, headers, body, err)
+    pending = @deferred
+    @deferred = []
+    pending.each { |blk| blk.call(status, headers, body, err) }
+  end
+end
+
+NxTest.test('ma1 p1 #102: cancel POCAS obrazkovej fazy (po zapise) nezataji zalozenie') do
+  NxTest.install_fresh_seed_catalog!
+  FileUtils.rm_f(DIC.path_for(MA1_IMG_URL).to_s)
+  fake = Ma1DeferTransport.new(
+    { MA1_DTDL18_URL => [200, {}, ma1_fixture('h3303_dtdl18_product.html')] }, MA1_IMG_URL
+  )
+  box = { 'alive' => true }
+  events = []
+  begin
+    DMA.transport = fake
+    DFA.create(ma1_header, [ma1_sheet_item], %w[i0],
+               alive: -> { box['alive'] },
+               emit: ->(e) { events << e })
+    # polozky overene, katalog ZAPISANY, obrazok visi v odlozenom fetchi
+    NxTest.assert_equal(nil, ma1_complete(events), 'complete este necakame')
+    NxTest.assert_equal(1, MAT_MA.load['sheets'].count { |s| s['code'] == '175718' }, 'zapis prebehol')
+    box['alive'] = false # cancel/zatvorenie okna az TERAZ (image faza)
+    fake.flush!(nil, {}, nil, 'spojenie zlyhalo')
+  ensure
+    DMA.transport = nil
+  end
+  done = ma1_complete(events)
+  NxTest.assert(done, 'committed complete doruceny aj mrtvej session (events: ' + events.map { |e| e['type'] }.inspect + ')')
+  NxTest.assert_equal(true, done['ok'])
+  NxTest.assert_equal(1, done['result']['sheets'].length, 'skupina JE zalozena')
+  NxTest.assert_equal(false, done['result']['image'], 'obrazok zlyhal — best effort')
+ensure
+  NxTest.install_fresh_seed_catalog!
+end
+
 # --- SCHEMA 6 ------------------------------------------------------------------
 
 NxTest.test('ma1 schema 6: required_schema_for + normalize prepusta len cistu image_url') do

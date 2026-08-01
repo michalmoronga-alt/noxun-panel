@@ -14,11 +14,12 @@
   // 2A-1 (GH P1): klient hlasi SVOJU podporovanu schemu katalogu — KONSTANTU
   // tejto verzie kodu, NIE echo servera. 2B-2: toto okno pozna duplak polia
   // (schema 3) AJ rub zasteny (back_decor/back_structure — schema 4);
-  // V0.6 B-2b navyse demos polia (demos_url/price_checked_at — schema 5) =>
-  // konstanta je 5; katalog s novsim markerom by staremu oknu zapis odmietol
-  // (nove polia by ticho zahodilo). Pri katalogu, ktory je este SCHEMA 1
-  // (nerozhodnutelna migracia), server batch 3 odmietne — ine mutacie prejdu.
-  var MD_CLIENT_SCHEMA = 5;
+  // V0.6 B-2b demos polia (demos_url/price_checked_at — schema 5);
+  // V0.6 M-A2 obrazok dekoru (image_url — schema 6) => konstanta je 6;
+  // katalog s novsim markerom by staremu oknu zapis odmietol (nove polia by
+  // ticho zahodilo). Pri katalogu, ktory je este SCHEMA 1 (nerozhodnutelna
+  // migracia), server batch 3 odmietne — ine mutacie prejdu.
+  var MD_CLIENT_SCHEMA = 6;
   // 2B-2 (F10 zrkadlo registra): typy s formatom v identite — batch/formular
   // format VYZADUJU. Server je autorita (format_in_identity?), toto je UX.
   var MD_FORMAT_TYPES = ['PD', 'ZASTENA'];
@@ -113,6 +114,9 @@
       g.sheets.push(s);
       if (!g.manufacturer && s.manufacturer) g.manufacturer = s.manufacturer;
       if (!g.color && s.color) g.color = s.color;
+      // V0.6 M-A2: obrazok skupiny = prvy sheet s LOKALNYM suborom (image_file
+      // stavia server z DemosImageCache — remote URL do CEF nikdy nejde).
+      if (!g.image && s.image_file) g.image = s.image_file;
     });
     (catalog.edges || []).forEach(function(a){
       var g = grp(a);
@@ -257,6 +261,11 @@
     }
     var nb = el('mdNewDecorBtn');
     if (nb) nb.disabled = MD_RO;
+    // GH #102 P2: aj primarna Demos cesta je katalogova mutacia — v read-only
+    // rezime sa vypina rovnako ako rucny batch (server by create odmietol az
+    // po celom fetchovani rodiny).
+    var db = el('mdDemosAddBtn');
+    if (db) db.disabled = MD_RO;
     // GH #93 P2 (10. kolo): rollback aj pri zdravej SCHEMA 2 (zaloha existuje);
     // v read-only stave ho nesie nudzovy banner, tu by bol duplicitny.
     var rb = el('mdRestoreBtn');
@@ -301,15 +310,28 @@
   // Dlazdica skupiny: swatch + hlavicka (cislo + nazov; vyrobca · pocet
   // variantov) + suhrn variantov (chips su len prehlad — sprava variantov zije
   // v detaile po rozkliku, audit BLOCKER 6).
+  // V0.6 M-A2: lokalna cesta obrazka -> file:/// URL pre CEF (backslash na
+  // slash + encodeURI kvoli medzeram v ceste). Cista funkcia (Node test).
+  function mdImageSrc(path){
+    var p = String(path == null ? '' : path).trim();
+    if (!p) return '';
+    return 'file:///' + encodeURI(p.replace(/\\/g, '/').replace(/^\/+/, ''));
+  }
+
   function mdTileHtml(g, usedCount){
     var name = g.decor === '' ? '(bez dekoru)' : g.decor + (g.decor_name ? ' ' + g.decor_name : '');
     var sub = (g.manufacturer || 'vlastný') + ' · ' + g.count + ' var.';
     var chips = '';
     g.sheets.forEach(function(s){ chips += '<span class="vchip">' + esc(sheetChipLabel(s)) + '</span>'; });
     g.edges.forEach(function(a){ chips += '<span class="vchip vchip-abs">' + esc(edgeChipLabel(a)) + '</span>'; });
+    // V0.6 M-A2: realna fotka dekoru zo stiahnutej cache; pri chybe suboru
+    // inline onerror (bez dat) schova <img> a ostane fallback farba swatchu.
+    var sw = '<i class="mdsw" style="background:' + esc(rgbToHex(g.color)) + '">' +
+      (g.image ? '<img class="mdsw-photo" src="' + esc(mdImageSrc(g.image)) + '" alt="" onerror="this.style.display=\'none\'">' : '') +
+      '</i>';
     return '<div class="mdtile" onclick="mdOpenDetail(' + esc(JSON.stringify(g.key)) + ')">' +
       '<div class="mdtile-head">' +
-      '<i class="mdsw" style="background:' + esc(rgbToHex(g.color)) + '"></i>' +
+      sw +
       '<span class="mdtile-name"><b>' + esc(name) + '</b>' +
       '<span class="mans">' + esc(sub) + '</span></span>' +
       (usedCount ? '<span class="mdused">' + usedCount + '×</span>' : '') +
@@ -1209,11 +1231,46 @@
       if (p.color) el('me_color').value = rgbToHex(p.color);
     }
   }
+  // V0.6 M-A2 (Halifax lekcia / audit F9): mazanie ide VZDY cez serverovy
+  // preflight — modal ukaze presne CO sa maze (kod, cena, pouzitie v modeli)
+  // a az potvrdenie posle skutocny delete. Guardy vyhodnoti server ZNOVA.
+  var MD_DEL = null; // {kind, id} cakajuce potvrdenie
   function mdDeleteSheet(id){
-    if (window.sketchup && sketchup.delete_sheet) sketchup.delete_sheet(JSON.stringify({ material_id: id, catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA }));
+    if (window.sketchup && sketchup.delete_preflight) sketchup.delete_preflight(JSON.stringify({ kind: 'sheet', id: id }));
   }
   function mdDeleteEdge(id){
-    if (window.sketchup && sketchup.delete_edge) sketchup.delete_edge(JSON.stringify({ abs_id: id, catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA }));
+    if (window.sketchup && sketchup.delete_preflight) sketchup.delete_preflight(JSON.stringify({ kind: 'edge', id: id }));
+  }
+  // Cista funkcia (Node test): riadky rozpisu modalu z preflight payloadu.
+  // -> {lines: [text...], warn: text|null, block: text|null}
+  function mdDeleteSummary(p){
+    var lines = [];
+    if (p.code) lines.push('Kód: ' + p.code + (p.supplier ? ' (' + p.supplier + ')' : ''));
+    if (p.price != null && p.price !== '') lines.push('Cena: ' + p.price + (p.kind === 'edge' ? ' €/bm' : ' €/m²'));
+    if (p.demos_url) lines.push('Má uloženú väzbu na Demos — po zmazaní sa stratí.');
+    var warn = null, block = null;
+    if (p.used_count > 0){
+      warn = 'Používa sa v modeli (' + p.used_count + '×: ' + (p.used || []).join(', ') +
+        (p.used_count > (p.used || []).length ? '…' : '') + ') — server mazanie odmietne.';
+    }
+    if (p.protected) block = 'Systémová predvoľba nových projektov — nedá sa zmazať.';
+    else if (p.duplak_deps && p.duplak_deps.length) block = 'Na dosku sa odkazuje duplák ' + p.duplak_deps.join(', ') + ' — najprv zmaž duplák.';
+    return { lines: lines, warn: warn, block: block };
+  }
+  function mdDeleteConfirm(){
+    var d = MD_DEL;
+    mdDeleteClose();
+    if (!d || !window.sketchup) return;
+    if (d.kind === 'edge'){
+      if (sketchup.delete_edge) sketchup.delete_edge(JSON.stringify({ abs_id: d.id, catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA }));
+    } else if (sketchup.delete_sheet){
+      sketchup.delete_sheet(JSON.stringify({ material_id: d.id, catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA }));
+    }
+  }
+  function mdDeleteClose(){
+    MD_DEL = null;
+    var m = el('mdDeleteModal');
+    if (m) m.style.display = 'none';
   }
 
   // Top-level var v script tagu = window.MD v CEF; v Node require nepada na window.
@@ -1359,7 +1416,33 @@
       MD.setStatus(p.message || '', false);
     },
     // D-46: odmietnutie (blokujuce dielce) — select spat na default, ziadna ponuka.
-    resetProject: function(p){ mdClearPending(); mdSetProjectSelect(p.key, p.current); }
+    resetProject: function(p){ mdClearPending(); mdSetProjectSelect(p.key, p.current); },
+    // V0.6 M-A2 (audit F9): serverovy preflight mazania — modal s rozpisom.
+    // Render VYHRADNE cez DOM API (textContent); potvrdenie posle skutocny
+    // delete, guardy vyhodnoti server znova (preflight nie je autorita).
+    confirmDelete: function(p){
+      MD_DEL = { kind: p.kind, id: p.id };
+      var body = el('mdDelBody');
+      if (body){
+        body.textContent = '';
+        function div(cls, text){
+          var d = document.createElement('div');
+          if (cls) d.className = cls;
+          d.textContent = text;
+          body.appendChild(d);
+        }
+        div('mddel-name', p.label || p.id);
+        var s = mdDeleteSummary(p);
+        s.lines.forEach(function(t){ div('mddel-line', t); });
+        if (s.warn) div('mddel-warn', s.warn);
+        if (s.block) div('mddel-warn', s.block);
+        if (!s.lines.length && !s.warn && !s.block) div('mddel-line', 'Bez kódu a ceny — nič sa nestratí.');
+      }
+      var btn = el('mdDelConfirmBtn');
+      if (btn) btn.disabled = !!(p.protected || (p.duplak_deps && p.duplak_deps.length));
+      var m = el('mdDeleteModal');
+      if (m) m.style.display = '';
+    }
   };
 
   function onProjMaterial(key, value){
@@ -1391,6 +1474,8 @@
       // 2B-1 (tests/js/test_md_schema2.js) — duplak render bez DOM
       mdDuplakRow: mdDuplakRow, mdDuplakBtn: mdDuplakBtn, mdSectionRows: mdSectionRows,
       // 2B-2 — zastena (format-required helper, ciste funkcie)
-      mdFormatRequired: mdFormatRequired, mdZastena: mdZastena };
+      mdFormatRequired: mdFormatRequired, mdZastena: mdZastena,
+      // V0.6 M-A2 — dlazdice s obrazkom + delete preflight (ciste funkcie)
+      mdImageSrc: mdImageSrc, mdDeleteSummary: mdDeleteSummary };
   }
   if (typeof window !== 'undefined' && window.sketchup && sketchup.ready) sketchup.ready('');
