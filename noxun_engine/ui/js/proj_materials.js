@@ -15,11 +15,12 @@
   // tejto verzie kodu, NIE echo servera. 2B-2: toto okno pozna duplak polia
   // (schema 3) AJ rub zasteny (back_decor/back_structure — schema 4);
   // V0.6 B-2b demos polia (demos_url/price_checked_at — schema 5);
-  // V0.6 M-A2 obrazok dekoru (image_url — schema 6) => konstanta je 6;
-  // katalog s novsim markerom by staremu oknu zapis odmietol (nove polia by
-  // ticho zahodilo). Pri katalogu, ktory je este SCHEMA 1 (nerozhodnutelna
-  // migracia), server batch 3 odmietne — ine mutacie prejdu.
-  var MD_CLIENT_SCHEMA = 6;
+  // V0.6 M-A2 obrazok dekoru (image_url — schema 6); V0.6 M-B1 UNI polia
+  // (uni/uni_role — schema 7) => konstanta je 7 (audit M-B B2: marker 7 z boot
+  // doplnenia UNI sady nesmie zamknut cele okno); katalog s novsim markerom by
+  // staremu oknu zapis odmietol (nove polia by ticho zahodilo). Pri katalogu,
+  // ktory je este SCHEMA 1 (nerozhodnutelna migracia), server batch 3 odmietne.
+  var MD_CLIENT_SCHEMA = 7;
   // 2B-2 (F10 zrkadlo registra): typy s formatom v identite — batch/formular
   // format VYZADUJU. Server je autorita (format_in_identity?), toto je UX.
   var MD_FORMAT_TYPES = ['PD', 'ZASTENA'];

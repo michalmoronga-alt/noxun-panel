@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.5.19' unless defined?(VERSION)
+    VERSION = '0.5.20' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -90,6 +90,15 @@ module Noxun
         Materials.boot_cutover!
       rescue StandardError => e
         log_error(e, 'boot_cutover')
+      end
+
+      # V0.6 M-B1: jednorazove doplnenie UNI sady do existujuceho katalogu
+      # (fresh install ju ma v seede). Vlastny chraneny blok — zlyhanie nesmie
+      # zhodit boot; marker subor drzi jednorazovost.
+      begin
+        Materials.ensure_uni_records!
+      rescue StandardError => e
+        log_error(e, 'ensure_uni_records')
       end
 
       begin

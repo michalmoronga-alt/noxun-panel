@@ -487,6 +487,11 @@ module Noxun
           if kind == 'sheet' && (dup_err = duplak_edit_error(existing))
             return [:invalid, dup_err]
           end
+          # V0.6 M-B1: UNI nema nakupne polia (universal toggle na ABS sa
+          # UNI netyka — uni je len sheet pole).
+          if kind == 'sheet' && (uni_err = uni_edit_error(existing, patch))
+            return [:invalid, uni_err]
+          end
           clean = patch.is_a?(Hash) ? patch.select { |k, _| PATCHABLE.fetch(kind, []).include?(k) } : {}
           return [:invalid, 'Žiadne editovateľné pole.'] if clean.empty?
           merged = existing.merge(clean)
@@ -701,75 +706,111 @@ module Noxun
         [patch, nil]
       end
 
-      # --- seed (predvolene zaznamy; 2A-4b = nativne SCHEMA 2, audit F9) -------
-      # ID ostavaju PRESNE povodne (opaque, navzdy nemenne — PROJECT_FALLBACK aj
-      # existujuce modely sa viazu na ne). Skupinove polia podla standardu 7.1:
-      # decor = cislo, structure z nazvu (K009 -> PW, W1000 -> ST9, HDF biela
-      # bez struktury), decor_name kde dava zmysel, manufacturer na doskach,
-      # group_id deterministicky cez group_id_for (ta ista autorita ako
-      # migracia 2A-2 — cerstvy seed a zmigrovany katalog daju rovnake skupiny).
+      # --- seed (V0.6 M-B1 = nativne UNI sada; predtym 2A-4b SCHEMA 2) ---------
+      # Fresh install zacina s 5 UNI pracovnymi materialmi (mockup s0): tvorba
+      # oslobodena od materialov, realne dekory pridu z Demosu (M-A).
+      # ID prvych troch su PRESNE povodne seed ID (opaque, navzdy nemenne —
+      # PROJECT_FALLBACK aj stare modely sa viazu na ne; fallback tak na fresh
+      # instalacii ukazuje priamo na UNI bez zmeny konstant). Seed ABS pasky
+      # ZANIKLI (audit M-B: UNI pasky nema — olep sa riesi az s realnym dekorom).
+      #
+      # UNI zaznam NIKDY nenesie nakupne polia (code/supplier/cena/demos_url/
+      # image_url) — je to pracovny material bez zavazku; strazi to aj
+      # duplak_edit_error vzor v patchi (uni_edit_error).
 
-      def seed_group_kronospan_k009
-        group_id_for('Kronospan', 'K009')
+      # Definicia UNI sady na JEDNOM mieste: [id, decor(=nazov), rola, hrubka,
+      # farba]. Pouziva ju fresh seed AJ jednorazove doplnenie do existujucich
+      # katalogov (ensure_uni_records!) — obe cesty daju identicke zaznamy.
+      UNI_SEED = [
+        ['K009_PW_DTDL_18', 'Korpus UNI', 'body',   18.0, [169, 169, 178]],
+        ['W1000_DTDL_18',   'Čelo UNI',   'front',  18.0, [125, 167, 217]],
+        ['UNI_DEKOR2_18',   'Dekor2 UNI', 'decor2', 18.0, [143, 191, 159]],
+        ['HDF_WHITE_3',     'HDF UNI',    'hdf',     3.0, [217, 201, 154]],
+        ['UNI_DOSKA_18',    'Doska UNI',  'board',  18.0, [201, 167, 217]]
+      ].freeze
+
+      def uni_seed_record(id, decor, role, thickness, color)
+        {
+          'material_id' => id, 'family' => decor, 'manufacturer' => '',
+          'decor' => decor, 'group_id' => group_id_for('', decor),
+          'type' => 'DTDL', 'thickness' => thickness, 'grain' => 'none',
+          'sheet_size' => [2800.0, 2070.0], 'color' => color,
+          'production_class' => 'sheet', 'uni' => true, 'uni_role' => role
+        }
       end
 
-      def seed_group_egger_w1000
-        group_id_for('Egger', 'W1000')
-      end
-
-      # Doskove materialy: K009 PW dub 18/16, HDF biela 3, W1000 biela celova 18.
       def seed_sheets
-        [
-          {
-            'material_id' => 'K009_PW_DTDL_18', 'family' => 'Kronospan K009 PW',
-            'manufacturer' => 'Kronospan', 'decor' => 'K009', 'structure' => 'PW',
-            'group_id' => seed_group_kronospan_k009, 'type' => 'DTDL',
-            'thickness' => 18.0, 'grain' => 'length', 'price_per_m2' => 12.5,
-            'sheet_size' => [2800.0, 2070.0], 'color' => [198, 168, 122], 'production_class' => 'sheet'
-          },
-          {
-            'material_id' => 'K009_PW_DTDL_16', 'family' => 'Kronospan K009 PW',
-            'manufacturer' => 'Kronospan', 'decor' => 'K009', 'structure' => 'PW',
-            'group_id' => seed_group_kronospan_k009, 'type' => 'DTDL',
-            'thickness' => 16.0, 'grain' => 'length', 'price_per_m2' => 11.8,
-            'sheet_size' => [2800.0, 2070.0], 'color' => [198, 168, 122], 'production_class' => 'sheet'
-          },
-          {
-            'material_id' => 'HDF_WHITE_3', 'family' => 'HDF biela',
-            'manufacturer' => 'Kronospan', 'decor' => 'Biela HDF',
-            'group_id' => group_id_for('Kronospan', 'Biela HDF'), 'type' => 'HDF',
-            'thickness' => 3.0, 'grain' => 'none', 'price_per_m2' => 3.2,
-            'sheet_size' => [2800.0, 2070.0], 'color' => [238, 236, 230], 'production_class' => 'sheet'
-          },
-          {
-            'material_id' => 'W1000_DTDL_18', 'family' => 'Egger W1000 ST9',
-            'manufacturer' => 'Egger', 'decor' => 'W1000', 'decor_name' => 'Biela',
-            'structure' => 'ST9', 'group_id' => seed_group_egger_w1000, 'type' => 'DTDL',
-            'thickness' => 18.0, 'grain' => 'none', 'price_per_m2' => 13.9,
-            'sheet_size' => [2800.0, 2070.0], 'color' => [246, 246, 244], 'production_class' => 'sheet'
-          }
-        ]
+        UNI_SEED.map { |args| uni_seed_record(*args) }
       end
 
-      # ABS pasky nesu PRESNU strukturu svojej dosky (PW/ST9) — picker
-      # abs_for_sheet ich najde hned po fresh installe (vetva A). Priznak
-      # universal seedy NENESU (audit O3): universal je VEDOMY priznak pre
-      # jednofarebne pasky bez struktury (Biela korpus, UNI — v Michalovom
-      # zivom katalogu, NIE v seedoch) a oznacuje sa v katalogu togglom;
-      # strukturna paska ho nikdy nepotrebuje. Seed set ziadnu bezstrukturnu
-      # pasku nema, takze fresh install nema co oznacovat (0 v banneri).
       def seed_edges
-        [
-          { 'abs_id' => 'ABS_K009_10', 'decor' => 'K009', 'structure' => 'PW',
-            'group_id' => seed_group_kronospan_k009, 'thickness' => 1.0,
-            'price_per_bm' => 0.55, 'color' => [198, 168, 122] },
-          { 'abs_id' => 'ABS_K009_20', 'decor' => 'K009', 'structure' => 'PW',
-            'group_id' => seed_group_kronospan_k009, 'thickness' => 2.0,
-            'price_per_bm' => 0.85, 'color' => [198, 168, 122] },
-          { 'abs_id' => 'ABS_W1000_10', 'decor' => 'W1000', 'decor_name' => 'Biela',
-            'structure' => 'ST9', 'group_id' => seed_group_egger_w1000, 'thickness' => 1.0,
-            'price_per_bm' => 0.60, 'color' => [246, 246, 244] }
-        ]
+        []
+      end
+
+      # V0.6 M-B1: jednorazove DOPLNENIE UNI sady do EXISTUJUCEHO katalogu.
+      # Audit M-B BLOCKER 1: zivy katalog sa NIKDY neprepisuje in-place (K009/
+      # W1000/HDF mohli byt pouzivatelom pretavene na realne materialy) — UNI
+      # zaznamy sa APPENDUJU s vlastnymi UNI_* ID; kolizia ID/dekoru = polozka
+      # sa preskoci (nikdy neprepise). Marker subor drzi jednorazovost (aj ked
+      # pouzivatel UNI zaznamy vedome zmaze, nevratia sa).
+      # Volane z main.rb bootu (vlastny chraneny blok, vzor boot_cutover!).
+      UNI_APPEND_IDS = {
+        'body' => 'UNI_KORPUS_18', 'front' => 'UNI_CELO_18',
+        'decor2' => 'UNI_DEKOR2_18', 'hdf' => 'UNI_HDF_3', 'board' => 'UNI_DOSKA_18'
+      }.freeze
+
+      def uni_marker_path
+        File.join(dir, 'uni_seed.done')
+      end
+
+      def ensure_uni_records!
+        return :done if File.exist?(uni_marker_path)
+        return :skip if catalog_read_only?
+        # Legacy (pred-cutover) katalog nema skupinovu identitu — pocka na
+        # migraciu (marker sa nezapise, skusi sa dalsi start).
+        return :skip if catalog_schema < SCHEMA_GROUPS
+        added = []
+        with_catalog_lock do
+          JsonFileStore.invalidate(path)
+          data = load
+          return :skip if catalog_schema_on_disk < SCHEMA_GROUPS
+          taken_ids = data['sheets'].map { |s| s['material_id'].to_s.upcase }
+          taken_decors = data['sheets'].map { |s| decor_norm_key(s['decor']) } +
+                         data['edges'].map { |e| decor_norm_key(e['decor']) }
+          UNI_SEED.each do |(_seed_id, decor, role, thickness, color)|
+            id = UNI_APPEND_IDS[role]
+            next if taken_ids.include?(id.to_s.upcase)
+            next if taken_decors.include?(decor_norm_key(decor))
+            data['sheets'] << normalize_sheet(uni_seed_record(id, decor, role, thickness, color))
+            added << id
+          end
+          if added.empty? || write_unlocked(data)
+            write_uni_marker
+            added.empty? ? :noop : :added
+          else
+            :write_failed
+          end
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'Materials.ensure_uni_records!') if defined?(Engine)
+        :error
+      end
+
+      def write_uni_marker
+        JsonFileStore.write(uni_marker_path, 'done_at' => Time.now.utc.iso8601)
+      rescue StandardError
+        nil
+      end
+
+      # V0.6 M-B1 (vzor duplak_edit_error): UNI zaznam nema nakupne polia —
+      # patch/edit kodu, dodavatela ci ceny sa odmieta na SERVERI.
+      def uni_edit_error(rec, patch = nil)
+        return nil unless uni?(rec)
+        if patch.is_a?(Hash) &&
+           (patch.keys & %w[code supplier price_per_m2 price_per_bm]).empty?
+          return nil
+        end
+        'UNI je pracovný materiál bez nákupných polí — kód/cenu dostane až reálny materiál.'
       end
     end
   end

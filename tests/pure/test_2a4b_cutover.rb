@@ -94,8 +94,8 @@ NxTest.test('2a4b boot: fresh stav = :not_found, NIC sa nezapisuje (seed flow be
     NxTest.assert_equal(:not_found, B4MAT.boot_cutover!)
     NxTest.refute(File.exist?(B4MAT.path), 'boot NIKDY neseeduje')
     NxTest.assert_equal(:ok, B4MAT.catalog_state)
-    B4MAT.catalog # seed flow (bod 6): prvy pristup seedne NATIVNE SCHEMA 2
-    NxTest.assert_equal(2, JSON.parse(File.binread(B4MAT.path))['schema'].to_i)
+    B4MAT.catalog # seed flow (bod 6): prvy pristup seedne (M-B1: UNI sada = marker 7)
+    NxTest.assert_equal(7, JSON.parse(File.binread(B4MAT.path))['schema'].to_i)
   end
 end
 
@@ -188,42 +188,31 @@ end
 # Seedy nativne SCHEMA 2 (audit F9 + O3)
 # ---------------------------------------------------------------------------
 
-NxTest.test('2a4b seeds: marker 2, deterministicke group_id, struktury z nazvov, decor_name') do
+NxTest.test('2a4b seeds (M-B1): UNI sada — marker 7, group_id, fallback id recyklovane') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   NxTest.assert(NxTest.install_fresh_seed_catalog!)
   parsed = b4_disk
-  NxTest.assert_equal(2, parsed['schema'].to_i, 'panensky seed nesie marker 2')
+  NxTest.assert_equal(7, parsed['schema'].to_i, 'panensky seed nesie marker 7 (uni polia)')
   NxTest.assert(B4MAT.schema2_complete?(parsed['sheets'], parsed['edges']), 'kazdy zaznam ma group_id')
-  k18 = B4MAT.sheet('K009_PW_DTDL_18')
-  k16 = B4MAT.sheet('K009_PW_DTDL_16')
-  ke10 = B4MAT.edge('ABS_K009_10')
-  NxTest.assert_equal('K009', k18['decor'])
-  NxTest.assert_equal('PW', k18['structure'])
-  NxTest.assert_equal(B4MAT.group_id_for('Kronospan', 'K009'), k18['group_id'],
+  k = B4MAT.sheet('K009_PW_DTDL_18')
+  NxTest.assert_equal(['Korpus UNI', 'body', true], [k['decor'], k['uni_role'], k['uni']])
+  NxTest.assert_equal(B4MAT.group_id_for('', 'Korpus UNI'), k['group_id'],
                       'group_id z rovnakej autority ako migracia (group_id_for)')
-  NxTest.assert_equal(k18['group_id'], k16['group_id'])
-  NxTest.assert_equal(k18['group_id'], ke10['group_id'], 'doska a paska zdielaju skupinu')
   w = B4MAT.sheet('W1000_DTDL_18')
-  NxTest.assert_equal(%w[W1000 ST9 Biela], [w['decor'], w['structure'], w['decor_name']])
+  NxTest.assert_equal(['Čelo UNI', 'front'], [w['decor'], w['uni_role']])
   hdf = B4MAT.sheet('HDF_WHITE_3')
-  NxTest.assert_equal('Biela HDF', hdf['decor'])
-  NxTest.assert_equal(nil, hdf['structure'], 'HDF biela je vedome bez struktury')
+  NxTest.assert_equal(['HDF UNI', 'hdf'], [hdf['decor'], hdf['uni_role']])
+  NxTest.assert_equal(nil, hdf['structure'], 'UNI je vedome bez struktury')
+  NxTest.refute(k.key?('code') || k.key?('price_per_m2'), 'UNI bez nakupnych poli')
 end
 
-NxTest.test('2a4b seeds: pasky nesu strukturu dosky, universal NIE (O3) — picker funguje HNED') do
+NxTest.test('2a4b seeds (M-B1): ziadne seed pasky; UNI picker vracia uni reason') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   NxTest.assert(NxTest.install_fresh_seed_catalog!)
-  B4MAT.edges.each do |a|
-    NxTest.refute(a['universal'] == true, "seed paska #{a['abs_id']} nesmie byt universal (O3)")
-    NxTest.refute(a['structure'].to_s.strip.empty?, "seed paska #{a['abs_id']} nesie strukturu")
-  end
+  NxTest.assert_equal(0, B4MAT.edges.length, 'seed ABS pasky zanikli (UNI ich nema)')
   NxTest.assert_equal(0, B4MAT.unusable_edges_count, 'fresh install nema nepouzitelne pasky (banner 0)')
-  # K009 picker (abs_for_sheet, vetva A — presna struktura) hned po instalacii:
   k = B4MAT.sheet('K009_PW_DTDL_18')
-  NxTest.assert_equal(['ABS_K009_10', nil], B4MAT.abs_for_sheet(k, :jednotka, 18.0))
-  NxTest.assert_equal(['ABS_K009_20', nil], B4MAT.abs_for_sheet(k, :dvojka, 18.0))
-  w = B4MAT.sheet('W1000_DTDL_18')
-  NxTest.assert_equal(['ABS_W1000_10', nil], B4MAT.abs_for_sheet(w, :jednotka, 18.0))
+  NxTest.assert_equal([nil, 'abs_uni_material'], B4MAT.abs_for_sheet(k, :jednotka, 18.0))
 end
 
 # ---------------------------------------------------------------------------

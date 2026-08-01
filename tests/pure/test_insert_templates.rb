@@ -54,6 +54,17 @@ module NxTest
   end
 
   test('kopia B3: config_to_params nesie materialy, overridy, cela, zony aj nazov') do
+    # M-B1: seed uz pasku ABS_K009_10 nema — roundtrip normalizuje edges cez
+    # katalog, preto si ju test dopise (id je od UNI seedu volne).
+    if NxTest.headless?
+      m = Noxun::Engine::Materials
+      NxTest.install_fresh_seed_catalog!
+      data = m.load
+      data['edges'] << m.normalize_edge('abs_id' => 'ABS_K009_10', 'decor' => 'K009',
+                                        'structure' => 'PW', 'thickness' => 1.0,
+                                        'group_id' => m.group_id_for('Kronospan', 'K009'))
+      raise 'fixture write failed' unless m.write(data)
+    end
     stored = {
       'type' => 'lower', 'width' => 640.0, 'height' => 720.0, 'depth' => 510.0,
       'thickness' => 18.0, 'floor_height' => 100.0,

@@ -63,7 +63,9 @@ module Noxun
             width:  clampf(fetchf(p, :width,  DEFAULTS[:width]),  *LIMITS[:width]),
             # Hrubka sa riadi katalogovym materialom; bez materialu (docasny stav
             # pred doplnenim defaultu builderom) plati clampnuty vstup.
-            thickness: sheet ? sheet['thickness'].to_f : clampf(fetchf(p, :thickness, DEFAULTS[:thickness]), *LIMITS[:thickness]),
+            # V0.6 M-B1: UNI doska ma hrubku z CONFIGU (default roly je len
+            # startovacia hodnota) — "12 mm doska" sa da konecne vymodelovat.
+            thickness: (sheet && !Materials.uni?(sheet)) ? sheet['thickness'].to_f : clampf(fetchf(p, :thickness, DEFAULTS[:thickness]), *LIMITS[:thickness]),
             material_id: mat,
             grain_direction: norm_grain(p, sheet),
             edges: norm_edges(p, sheet, picker_issues),
@@ -452,15 +454,25 @@ module Noxun
         # spravanie ako korpusove part_overrides). Vzdy vracia CERSTVU kompletnu mapu.
         # collector (2A-3, audit B2/F6): zber neuspechov pickera pri SCHEMA 2
         # defaulte (resolve_edges dostava sheet — sheet-aware cesta dosky).
+        # V0.6 M-B1 (audit F6): hrubka pre sirkovy picker ABS — realny material
+        # = katalogova hrubka (positive guard, 0.0 je v Ruby truthy), UNI alebo
+        # doska bez materialu = clampnuty config vstup.
+        def board_part_thickness(p, sheet)
+          th = sheet && sheet['thickness'].to_f
+          return th if th && th.positive? && !(defined?(Materials) && Materials.uni?(sheet))
+          clampf(fetchf(p, :thickness, DEFAULTS[:thickness]), *LIMITS[:thickness])
+        end
+
         def norm_edges(p, sheet, collector = nil)
           input = raw(p, :edges)
           unless input.is_a?(Hash)
             decor = sheet && sheet['decor']
-            # D-41: hrubka dosky je VZDY z materialu — picker sirky dostava tu istu.
+            # D-41: hrubka dosky je z materialu; V0.6 M-B1: UNI doska pickeru
+            # sirky podava CONFIG hrubku (+ positive guard — 0.0 je truthy).
             unless defined?(AbsRules)
               return empty_edges
             end
-            return AbsRules.resolve_edges(ROLE, decor, sheet && sheet['thickness'],
+            return AbsRules.resolve_edges(ROLE, decor, board_part_thickness(p, sheet),
                                           sheet: sheet, collector: collector)
           end
           out = {}
@@ -526,7 +538,10 @@ module Noxun
           end
           return [{}, []] if failed.empty? || new_sheet.nil? || !defined?(AbsRules)
           collector = []
-          fresh = AbsRules.resolve_edges(cfg['role'], new_sheet['decor'], new_sheet['thickness'],
+          # V0.6 M-B1: pri UNI cieli riadi sirku pasky hrubka DOSKY z configu.
+          remap_th = Materials.uni?(new_sheet) ? cfg['thickness'].to_f : new_sheet['thickness'].to_f
+          remap_th = nil unless remap_th.positive?
+          fresh = AbsRules.resolve_edges(cfg['role'], new_sheet['decor'], remap_th,
                                          sheet: new_sheet, collector: collector)
           refill = {}
           failed.each { |c| refill[c] = fresh.is_a?(Hash) ? fresh[c] : nil }

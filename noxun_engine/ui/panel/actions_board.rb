@@ -12,7 +12,10 @@ module Noxun
     module Panel
       # Whitelist poli editovatelnych cez set_board_fields (material ma vlastny
       # callback; edges vlastny s read-modify-write).
-      BOARD_FIELD_KEYS = %w[name length width quantity grain_direction].freeze
+      # V0.6 M-B1 (audit F5): thickness je editovatelna VYHRADNE pri UNI
+      # materiali (server guard v handle_set_board_fields) — pri realnom
+      # materiali hrubku dalej urcuje katalog (D-45).
+      BOARD_FIELD_KEYS = %w[name length width quantity grain_direction thickness].freeze
 
       class << self
         # Vlozenie novej dosky z vkladacej karty. Material doplni BoardBuilder
@@ -41,6 +44,14 @@ module Noxun
           params = {}
           BOARD_FIELD_KEYS.each do |k|
             params[k] = fields[k] if fields.key?(k)
+          end
+          # V0.6 M-B1 (audit F5): hrubku smie menit LEN doska na UNI materiali
+          # — pri realnom ju urcuje katalog (normalize by ju aj tak prepisal,
+          # ale payload sa zahadzuje uz tu, nech UI neklame "ulozene").
+          if params.key?('thickness')
+            cfg = Store.config(board)
+            sheet = defined?(Materials) ? Materials.sheet(cfg.is_a?(Hash) ? cfg['material_id'] : nil) : nil
+            params.delete('thickness') unless sheet && Materials.uni?(sheet)
           end
           return if params.empty?
           apply_board(model, board, params, 'Doska upravená.')

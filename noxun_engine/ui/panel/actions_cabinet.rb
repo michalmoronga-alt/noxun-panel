@@ -70,6 +70,8 @@ module Noxun
           eff = CabinetBuilder.effective_materials(model, params)
           sheet = Materials.sheet(eff['back'])
           return nil if sheet.nil? # legacy material mimo katalogu — stary rezim
+          # V0.6 M-B1: UNI chrbat prijme lubovolnu hrubku — ziadna vymena.
+          return nil if Materials.uni?(sheet)
           return nil if (sheet['thickness'].to_f - want).abs <= 0.01
 
           body_sheet = Materials.sheet(eff['body'])
@@ -162,6 +164,11 @@ module Noxun
           blocked = CabinetBuilder.parts_blocking_thickness(params) # audit F8
           return { error: blocked_parts_msg(want, blocked) } unless blocked.empty?
 
+          # V0.6 M-B1: UNI telo prijme lubovolnu hrubku (6-50) — material sa
+          # NEvymiena, hrubku drzi config (real dielce s override strazi
+          # blocked check vyssie).
+          return nil if Materials.uni?(sheet)
+
           # 2A-3 (audit F10): schema ako parameter — pri SCHEMA 2 kandidat drzi
           # skupinu + strukturu; prazdna struktura = ziadny auto vyber.
           res = CabinetBuilder.pick_body_sheet(want, sheet, Materials.sheets,
@@ -235,6 +242,8 @@ module Noxun
           explicit = str_or_nil(params['material_id'])
           sheet = Materials.sheet(CabinetBuilder.effective_materials(model, params)['body'])
           return nil if sheet.nil? # legacy material mimo katalogu — stary rezim
+          # V0.6 M-B1: UNI telo — hrubka vkladu/sablony plati bez adopcie.
+          return nil if Materials.uni?(sheet)
           have = sheet['thickness'].to_f
           return nil if CabinetBuilder.thickness_eq?(params['thickness'], have)
 

@@ -358,6 +358,10 @@ module Noxun
         JsonFileStore.invalidate(path)
         s = sheet(material_id)
         return [:no_sheet, nil] unless s
+        # V0.6 M-B1 (audit M-B BLOCKER 3): pre UNI sa paska NIKDY nedotvara —
+        # server stopka (JS modal je len UX; "Vytvorit a pokracovat" nesmie
+        # zalozit globalnu pasku pracovneho materialu).
+        return [:uni_material, nil] if uni?(s)
         th = s['thickness'].to_f
         part_th = th.positive? ? th : nil
         # Sheet-aware cesta LEN pre migrovany zaznam (nesie group_id). Zaznam

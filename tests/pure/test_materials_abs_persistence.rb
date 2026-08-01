@@ -133,28 +133,67 @@ end
 
 # ============================ Materials ========================================
 
-NxTest.test('materials: prvy pristup seedne katalog v APPDATA sandboxe') do
+# V0.6 M-B1: seed je UNI sada — testy klasickej mechaniky lookup/filter/picker
+# si instaluju EXPLICITNY stary SCHEMA 2 katalog (presne byvale seed zaznamy).
+def mabs_classic!
+  mat = Noxun::Engine::Materials
+  nx_reset_catalog_file(mat.path)
+  gid_k = mat.group_id_for('Kronospan', 'K009')
+  gid_w = mat.group_id_for('Egger', 'W1000')
+  data = {
+    'sheets' => [
+      mat.normalize_sheet('material_id' => 'K009_PW_DTDL_18', 'manufacturer' => 'Kronospan',
+                          'decor' => 'K009', 'structure' => 'PW', 'group_id' => gid_k,
+                          'type' => 'DTDL', 'thickness' => 18.0, 'grain' => 'length',
+                          'price_per_m2' => 12.5, 'sheet_size' => [2800.0, 2070.0],
+                          'color' => [198, 168, 122]),
+      mat.normalize_sheet('material_id' => 'K009_PW_DTDL_16', 'manufacturer' => 'Kronospan',
+                          'decor' => 'K009', 'structure' => 'PW', 'group_id' => gid_k,
+                          'type' => 'DTDL', 'thickness' => 16.0, 'sheet_size' => [2800.0, 2070.0]),
+      mat.normalize_sheet('material_id' => 'HDF_WHITE_3', 'manufacturer' => 'Kronospan',
+                          'decor' => 'Biela HDF', 'group_id' => mat.group_id_for('Kronospan', 'Biela HDF'),
+                          'type' => 'HDF', 'thickness' => 3.0, 'grain' => 'none',
+                          'color' => [238, 236, 230]),
+      mat.normalize_sheet('material_id' => 'W1000_DTDL_18', 'manufacturer' => 'Egger',
+                          'decor' => 'W1000', 'decor_name' => 'Biela', 'structure' => 'ST9',
+                          'group_id' => gid_w, 'type' => 'DTDL', 'thickness' => 18.0,
+                          'color' => [246, 246, 244])
+    ],
+    'edges' => [
+      mat.normalize_edge('abs_id' => 'ABS_K009_10', 'decor' => 'K009', 'structure' => 'PW',
+                         'group_id' => gid_k, 'thickness' => 1.0, 'price_per_bm' => 0.55),
+      mat.normalize_edge('abs_id' => 'ABS_K009_20', 'decor' => 'K009', 'structure' => 'PW',
+                         'group_id' => gid_k, 'thickness' => 2.0, 'price_per_bm' => 0.85),
+      mat.normalize_edge('abs_id' => 'ABS_W1000_10', 'decor' => 'W1000', 'structure' => 'ST9',
+                         'group_id' => gid_w, 'thickness' => 1.0, 'price_per_bm' => 0.6)
+    ]
+  }
+  # Explicitny marker 2 — write bez neho by na cistom subore zapisal 1 a
+  # vznikol by hybrid (group_id data pod legacy markerom).
+  raise 'mabs classic write failed' unless mat.write(data.merge('schema' => 2))
+  mat
+end
+
+NxTest.test('materials: prvy pristup seedne katalog v APPDATA sandboxe (M-B1: UNI sada)') do
   NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
   mat = Noxun::Engine::Materials
   nx_reset_catalog_file(mat.path)
   NxTest.refute(File.exist?(mat.path), 'reset mal zmazat materials.json')
   sheets = mat.sheets # prvy pristup -> ensure_seeded
   NxTest.assert(File.exist?(mat.path), 'prvy pristup mal vytvorit materials.json')
-  NxTest.assert_equal(4, sheets.size)
-  NxTest.assert_equal(3, mat.edges.size)
-  # Obsah suboru kontrolujeme AZ PO prvom citani (write-on-read normalizacia).
+  NxTest.assert_equal(5, sheets.size)
+  NxTest.assert_equal(0, mat.edges.size, 'UNI sada je bez pasok')
   parsed = JSON.parse(File.binread(mat.path))
   NxTest.assert_equal(1, parsed['std'])
-  NxTest.assert_equal(%w[HDF_WHITE_3 K009_PW_DTDL_16 K009_PW_DTDL_18 W1000_DTDL_18],
+  NxTest.assert_equal(%w[HDF_WHITE_3 K009_PW_DTDL_18 UNI_DEKOR2_18 UNI_DOSKA_18 W1000_DTDL_18],
                       parsed['sheets'].map { |s| s['material_id'] }.sort)
-  NxTest.assert_equal(%w[ABS_K009_10 ABS_K009_20 ABS_W1000_10],
-                      parsed['edges'].map { |a| a['abs_id'] }.sort)
+  NxTest.assert(parsed['sheets'].all? { |s| s['uni'] == true })
 end
 
 NxTest.test('materials: sheet/edge lookup, decor_of a color_of') do
   NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
   mat = Noxun::Engine::Materials
-  nx_reset_catalog_file(mat.path)
+  mabs_classic!
   s = mat.sheet('K009_PW_DTDL_18')
   NxTest.assert(s, 'seed sheet K009_PW_DTDL_18 sa nenasiel')
   NxTest.assert_close(18.0, s['thickness'])
@@ -192,7 +231,7 @@ NxTest.test('materials: supported_edge_thickness? — SCHEMA 1 presne {1;2}, SCH
   NxTest.refute(mat.supported_edge_thickness?(0.999, legacy), 'v0.3.3 BEZ tolerancie — presna zhoda')
   NxTest.refute(mat.supported_edge_thickness?(nil, legacy), 'nil.to_f = 0.0 -> nepodporovana')
   # SCHEMA 2 (default seedovaneho katalogu): obchodne hodnoty (2A-3), 3.0 nie.
-  nx_reset_catalog_file(mat.path)
+  mabs_classic!
   mat.catalog
   NxTest.assert_equal(2, mat.catalog_schema, 'cerstvy seed je SCHEMA 2')
   NxTest.assert(mat.supported_edge_thickness?(0.8), 'SCHEMA 2 pusti 0.8')
@@ -203,7 +242,7 @@ end
 NxTest.test('materials: normalized_abs_id pusti len id existujuce v katalogu') do
   NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
   mat = Noxun::Engine::Materials
-  nx_reset_catalog_file(mat.path)
+  mabs_classic!
   NxTest.assert_equal('ABS_K009_10', mat.normalized_abs_id('ABS_K009_10'))
   NxTest.assert_equal('ABS_W1000_10', mat.normalized_abs_id('  ABS_W1000_10  '), 'id sa ma strip-nut')
   # v0.3.3 (PR #12): ZIADNA migracia legacy id podla dekoru — nezname/legacy -> nil.
@@ -218,7 +257,7 @@ end
 NxTest.test('materials: abs_for_decor toleruje hrubku len do 0.01 mm') do
   NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
   mat = Noxun::Engine::Materials
-  nx_reset_catalog_file(mat.path)
+  mabs_classic!
   # 2A-4b: seed dekory su cisla (K009/W1000) — abs_for_decor je textovy legacy
   # picker, semantika tolerancie sa nemeni.
   NxTest.assert_equal('ABS_K009_10', mat.abs_for_decor('K009', 1.0))
@@ -236,11 +275,15 @@ NxTest.test('materials: catalog pri citani odfiltruje nepodporovane ABS a prepis
   NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
   mat = Noxun::Engine::Materials
   store = Noxun::Engine::JsonFileStore
-  nx_reset_catalog_file(mat.path)
+  # M-B1: seed_sheets/seed_edges su uz UNI sada — SCHEMA 1 filter test pouziva
+  # explicitne legacy zaznamy z helpera (4 dosky + 3 pasky, marker 1).
+  base = JSON.parse(JSON.generate(NxTest::LEGACY_SEED_CATALOG))
   legacy = { 'abs_id' => 'ABS_K009_08', 'decor' => 'K009 PW', 'thickness' => 0.8,
              'price_per_bm' => 0.4, 'color' => [198, 168, 122] }
-  store.write(mat.path, { 'std' => 1, 'sheets' => mat.seed_sheets,
-                          'edges' => mat.seed_edges + [legacy] })
+  nx_reset_catalog_file(mat.path)
+  store.write(mat.path, { 'std' => 1, 'sheets' => base['sheets'],
+                          'edges' => base['edges'] + [legacy] })
+  mat.reset_catalog_state!
   cat = mat.catalog # write-on-read: legacy edge sa odfiltruje a subor sa prepise
   NxTest.assert_equal(3, cat['edges'].size)
   NxTest.refute(cat['edges'].any? { |a| a['abs_id'] == 'ABS_K009_08' })
@@ -384,7 +427,7 @@ NxTest.test('abs_rules: resolve_edges spoji pravidla s ABS katalogom podla dekor
   rules = Noxun::Engine::AbsRules
   mat = Noxun::Engine::Materials
   nx_reset_catalog_file(rules.path)
-  nx_reset_catalog_file(mat.path)
+  mabs_classic!
   # Polica: pravidlo len L1 (predna) -> ABS dekoru K009 hrubky 1.0.
   # (2A-4b: seed dekory su cisla — textova legacy cesta resolve_edges bez
   # sheet zaznamu bezi dalej, len s novym textom dekoru.)

@@ -38,9 +38,12 @@
   }
   function onBoardField(key, value){
     if (!boardCard) return;
-    var isDim = (key === 'length' || key === 'width');
+    // M-B1: thickness sa edituje LEN pri UNI (readOnly pole inak input neda,
+    // ale guard drzi aj proti programovym zmenam; server je autorita).
+    if (key === 'thickness' && boardCard.uni !== true) return;
+    var isDim = (key === 'length' || key === 'width' || key === 'thickness');
     if (isDim){
-      var elm = el(key === 'length' ? 'bc_length' : 'bc_width');
+      var elm = el(key === 'length' ? 'bc_length' : (key === 'width' ? 'bc_width' : 'bc_thickness'));
       if (isExprStr(value)){ withdrawPending(key); return; } // zivy nahlad; commit az Enter/blur
       var v = String(value).trim() === '' ? NaN : evalDim(value);
       if (isNaN(v)){
@@ -151,7 +154,14 @@
     bset('bc_width', fmtdim(bc.width));
     bset('bc_quantity', bc.quantity || 1);
     if (el('bc_role')) el('bc_role').value = bc.role_label || bc.role || '';
-    if (el('bc_thickness')) el('bc_thickness').value = fmtmm(bc.thickness);
+    // V0.6 M-B1: hrubku UNI dosky urcuje dielec — pole sa odomyka (server
+    // guard: pri realnom materiali sa thickness payload zahadzuje).
+    var bcth = el('bc_thickness');
+    if (bcth){
+      bcth.value = fmtmm(bc.thickness);
+      bcth.readOnly = bc.uni !== true;
+      bcth.title = bc.uni === true ? 'UNI: hrúbku určuje doska (6–60 mm)' : 'Hrúbku určuje materiál';
+    }
     if (el('bc_grain') && document.activeElement !== el('bc_grain')) el('bc_grain').value = bc.grain_direction || 'none';
     if (el('bc_diag')) el('bc_diag').textContent = 'Výrobná trieda: sheet · ide do výroby';
     var ms = el('bc_material');

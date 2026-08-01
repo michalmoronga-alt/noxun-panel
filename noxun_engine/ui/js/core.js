@@ -85,12 +85,17 @@
   function thMatch(target){
     var t = parseFloat(target);
     if (isNaN(t)) return function(){ return true; };
-    return function(s){ return Math.abs(parseFloat(s.thickness) - t) < 0.05; };
+    // V0.6 M-B1: UNI prejde kazdym hrubkovym filtrom (hrubku urcuje dielec).
+    return function(s){ return s.uni === true || Math.abs(parseFloat(s.thickness) - t) < 0.05; };
   }
   // D-45: doska je pouzitelna ako korpus/celo, ked je jej hrubka v rozsahu dosky —
   // konkretnu hrubku prevezme dielec z materialu (server), nie naopak.
   function rangeMatch(){
-    return function(s){ var t = parseFloat(s.thickness); return !isNaN(t) && t >= TH_RANGE[0]-0.001 && t <= TH_RANGE[1]+0.001; };
+    return function(s){
+      if (s.uni === true) return true; // M-B1: UNI bez hrubkoveho zavazku
+      var t = parseFloat(s.thickness);
+      return !isNaN(t) && t >= TH_RANGE[0]-0.001 && t <= TH_RANGE[1]+0.001;
+    };
   }
   // D-45: cela uz NIE su natvrdo 18/19 — beru katalogovu hrubku sveho materialu
   // (geometriu prisposobi server, materialized_part). Filter drzi len rozsah dosky.
@@ -295,6 +300,9 @@
   // 2A-3b: dispatcher zrkadla modalu — schema VYHRADNE z payloadu (F11);
   // hybrid bez group_id = legacy dekor logika (zrkadlo servera).
   function absUsableForSheet(edges, sheetRec, catalogSchema, partTh){
+    // V0.6 M-B1: UNI pasky nema ZO ZASADY — modal "Vytvorit pasku" sa nikdy
+    // neotvara (server ma tvrdu stopku, toto je UX zrkadlo).
+    if (sheetRec && sheetRec.uni === true) return true;
     if (catalogSchema >= 2 && groupIdOf(sheetRec) !== '')
       return absUsableExistsV2(edges, sheetRec, partTh);
     return absUsableExists(edges, sheetRec ? sheetRec.decor : '', 1.0, partTh);
@@ -335,7 +343,7 @@
     // to, co server odmietne — hrubka mimo rozsahu dosky); hrubku korpusu po
     // vybere prevezme materiál a label to hovori dopredu.
     fillSheetSelectFiltered(el('cab_body'), true, rangeMatch(), undefined, undefined,
-      function(s){ return bodyThicknessNote(s.thickness, bodyTh); });
+      function(s){ return s.uni === true ? '' : bodyThicknessNote(s.thickness, bodyTh); });
     fillSheetSelectFiltered(el('cab_front'), true, frontMatch());
     fillSheetSelectFiltered(el('cab_back'), true, thMatch(backTh));
   }

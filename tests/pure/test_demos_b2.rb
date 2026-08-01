@@ -33,6 +33,32 @@ def db2_clear_sitemap!
   Noxun::Engine::JsonFileStore.invalidate(p)
 end
 
+# V0.6 M-B1: seed je uz UNI sada — apply testy potrebuju klasicke K009
+# zaznamy (dosky 18/16 + jednotkova paska). Fixtures sa upsertnu nad fresh
+# seedom pod VLASTNYMI id (sufix X — seed id K009_PW_DTDL_18 je teraz UNI
+# Korpus a nesmie sa v apply testoch pouzivat).
+def db2_apply_fixtures!
+  NxTest.install_fresh_seed_catalog!
+  m = Noxun::Engine::Materials
+  gid = m.group_id_for('Kronospan', 'K009')
+  data = m.load
+  data['sheets'] += [
+    m.normalize_sheet('material_id' => 'K009_PW_DTDL_18X', 'manufacturer' => 'Kronospan',
+                      'decor' => 'K009', 'structure' => 'PW', 'type' => 'DTDL',
+                      'thickness' => 18.0, 'group_id' => gid, 'price_per_m2' => 15.0,
+                      'sheet_size' => [2800.0, 2070.0]),
+    m.normalize_sheet('material_id' => 'K009_PW_DTDL_16X', 'manufacturer' => 'Kronospan',
+                      'decor' => 'K009', 'structure' => 'PW', 'type' => 'DTDL',
+                      'thickness' => 16.0, 'group_id' => gid,
+                      'sheet_size' => [2800.0, 2070.0])
+  ]
+  data['edges'] += [
+    m.normalize_edge('abs_id' => 'ABS_K009_10', 'decor' => 'K009', 'structure' => 'PW',
+                     'group_id' => gid, 'thickness' => 1.0, 'price_per_bm' => 0.55)
+  ]
+  raise 'db2 fixtures write failed' unless m.write(data)
+end
+
 def db2_dtdl_rec(over = {})
   { 'material_id' => 'B2_DTDL_18', 'decor' => 'H3303', 'structure' => 'ST10', 'type' => 'DTDL',
     'thickness' => 18.0, 'sheet_size' => [2800.0, 2070.0], 'price_per_m2' => 15.0,
@@ -328,7 +354,7 @@ end
 # --- apply_demos_batch (audit B6/FIX 10/11/12/14) ----------------------------
 
 def db2_seed!
-  NxTest.install_fresh_seed_catalog!
+  db2_apply_fixtures!
 end
 
 def db2_sheet_item(id, fields)
@@ -343,15 +369,18 @@ end
 
 NxTest.test('demos b2: apply — kod+cena+URL na doske, price_confirmed na paske; SCHEMA 5, stamp servera') do
   db2_seed!
-  NxTest.assert(MAT2.catalog_schema < MAT2::SCHEMA_DEMOS, 'pred applyom marker pod 5')
-  items = [db2_sheet_item('K009_PW_DTDL_18',
+  # M-B1: seed je UNI sada = marker 7 od zaciatku — povodny dokaz lazy bumpu
+  # (marker pod 5 pred applyom) uz nema zmysel; drzi ho required_schema_for
+  # unit test. Tu staci, ze apply demos poli marker nikdy NEZNIZI.
+  before_schema = MAT2.catalog_schema
+  items = [db2_sheet_item('K009_PW_DTDL_18X',
                           'code' => '175718', 'price' => 18.9924,
                           'demos_url' => DB2_DTDL18_URL),
            db2_edge_item('ABS_K009_10', 'price_confirmed' => true, 'demos_url' => DB2_DTDL18_URL)]
   status, report = MAT2.apply_demos_batch(items, catalog_rev: MAT2.catalog_revision)
   NxTest.assert_equal(:ok, status, report.inspect)
   NxTest.assert_equal(2, report['applied'].length)
-  sheet = MAT2.sheet('K009_PW_DTDL_18')
+  sheet = MAT2.sheet('K009_PW_DTDL_18X')
   NxTest.assert_equal('175718', sheet['code'])
   NxTest.assert_equal('Demos', sheet['supplier'], 'dodavatel ide SPOLU s kodom (FIX 11)')
   NxTest.assert_close(18.9924, sheet['price_per_m2'], 0.001)
@@ -361,33 +390,33 @@ NxTest.test('demos b2: apply — kod+cena+URL na doske, price_confirmed na paske
   NxTest.assert_close(0.55, edge['price_per_bm'], 0.001, 'price_confirmed hodnotu NEMENI')
   NxTest.assert(edge['price_checked_at'].to_s.length > 0, 'datum overenia sa obnovil (FIX 10)')
   NxTest.assert_equal(nil, edge['supplier'], 'bez prijateho kodu sa dodavatel neprepisuje')
-  NxTest.assert_equal(MAT2::SCHEMA_DEMOS, MAT2.catalog_schema, 'lazy bump na 5')
+  NxTest.assert(MAT2.catalog_schema >= before_schema && MAT2.catalog_schema >= MAT2::SCHEMA_DEMOS, 'marker sa applyom neznizil a pokryva demos polia')
 end
 
 NxTest.test('demos b2: apply — kod-only NEobnovi datum overenia ceny (FIX 10)') do
   db2_seed!
-  status, = MAT2.apply_demos_batch([db2_sheet_item('K009_PW_DTDL_18', 'code' => '175718')],
+  status, = MAT2.apply_demos_batch([db2_sheet_item('K009_PW_DTDL_18X', 'code' => '175718')],
                                    catalog_rev: MAT2.catalog_revision)
   NxTest.assert_equal(:ok, status)
-  sheet = MAT2.sheet('K009_PW_DTDL_18')
+  sheet = MAT2.sheet('K009_PW_DTDL_18X')
   NxTest.assert_equal(nil, sheet['price_checked_at'], 'cena nebola potvrdena')
   NxTest.assert_equal('Demos', sheet['supplier'])
 end
 
 NxTest.test('demos b2: apply atomicita — zly row_rev druhej polozky NEzapise ani prvu') do
   db2_seed!
-  before = MAT2.sheet('K009_PW_DTDL_18')
-  items = [db2_sheet_item('K009_PW_DTDL_18', 'code' => '175718'),
-           db2_sheet_item('K009_PW_DTDL_16', 'code' => '999999').merge('row_rev' => 'deadbeef0000')]
+  before = MAT2.sheet('K009_PW_DTDL_18X')
+  items = [db2_sheet_item('K009_PW_DTDL_18X', 'code' => '175718'),
+           db2_sheet_item('K009_PW_DTDL_16X', 'code' => '999999').merge('row_rev' => 'deadbeef0000')]
   status, report = MAT2.apply_demos_batch(items, catalog_rev: MAT2.catalog_revision)
   NxTest.assert_equal(:conflict, status)
-  NxTest.assert_equal('K009_PW_DTDL_16', report['id'], 'report menuje vinnika')
-  NxTest.assert_equal(before, MAT2.sheet('K009_PW_DTDL_18'), 'all-or-nothing: prva polozka nezapisana')
+  NxTest.assert_equal('K009_PW_DTDL_16X', report['id'], 'report menuje vinnika')
+  NxTest.assert_equal(before, MAT2.sheet('K009_PW_DTDL_18X'), 'all-or-nothing: prva polozka nezapisana')
 end
 
 NxTest.test('demos b2: apply — stale catalog_rev, not_found, duplak, zle payloady') do
   db2_seed!
-  ok_item = db2_sheet_item('K009_PW_DTDL_18', 'code' => 'X')
+  ok_item = db2_sheet_item('K009_PW_DTDL_18X', 'code' => 'X')
   NxTest.assert_equal(:stale_catalog, MAT2.apply_demos_batch([ok_item], catalog_rev: 'stary')[0])
   NxTest.assert_equal(:not_found, MAT2.apply_demos_batch(
     [{ 'kind' => 'sheet', 'id' => 'NEEXISTUJE', 'row_rev' => 'x', 'fields' => { 'code' => 'A' } }],
@@ -398,13 +427,13 @@ NxTest.test('demos b2: apply — stale catalog_rev, not_found, duplak, zle paylo
     [ok_item.merge('kind' => 'foo')], catalog_rev: MAT2.catalog_revision
   )[0], 'neznamy kind sa neinterpretuje ako sheet (FIX 12)')
   NxTest.assert_equal(:invalid, MAT2.apply_demos_batch(
-    [ok_item, db2_sheet_item('K009_PW_DTDL_18', 'code' => 'Y')],
+    [ok_item, db2_sheet_item('K009_PW_DTDL_18X', 'code' => 'Y')],
     catalog_rev: MAT2.catalog_revision
   )[0], 'duplicitna (kind,id) polozka')
   # duplak v katalogu -> apply na neho zomrie
-  NxTest.assert(MAT2.upsert_sheet(MAT2.sheet('K009_PW_DTDL_18')
+  NxTest.assert(MAT2.upsert_sheet(MAT2.sheet('K009_PW_DTDL_18X')
     .merge('material_id' => 'B2_DUP_36', 'thickness' => 36.0,
-           'source_material_id' => 'K009_PW_DTDL_18', 'source_multiplier' => 2)), 'duplak seed')
+           'source_material_id' => 'K009_PW_DTDL_18X', 'source_multiplier' => 2)), 'duplak seed')
   dup_rec = MAT2.sheet('B2_DUP_36')
   NxTest.assert_equal(:duplak, MAT2.apply_demos_batch(
     [{ 'kind' => 'sheet', 'id' => 'B2_DUP_36', 'row_rev' => MAT2.record_rev(dup_rec),
@@ -417,35 +446,35 @@ NxTest.test('demos b2: apply — validacia poli: cena, URL, prazdny kod') do
   db2_seed!
   rev = MAT2.catalog_revision
   NxTest.assert_equal(:invalid, MAT2.apply_demos_batch(
-    [db2_sheet_item('K009_PW_DTDL_18', 'price' => 'abc')], catalog_rev: rev
+    [db2_sheet_item('K009_PW_DTDL_18X', 'price' => 'abc')], catalog_rev: rev
   )[0], 'necislo nie je cena')
   NxTest.assert_equal(:invalid, MAT2.apply_demos_batch(
-    [db2_sheet_item('K009_PW_DTDL_18', 'price' => -5)], catalog_rev: rev
+    [db2_sheet_item('K009_PW_DTDL_18X', 'price' => -5)], catalog_rev: rev
   )[0], 'zaporna cena nie')
   NxTest.assert_equal(:invalid, MAT2.apply_demos_batch(
-    [db2_sheet_item('K009_PW_DTDL_18', 'code' => 'X', 'demos_url' => 'https://evil.sk/x')],
+    [db2_sheet_item('K009_PW_DTDL_18X', 'code' => 'X', 'demos_url' => 'https://evil.sk/x')],
     catalog_rev: rev
   )[0], 'cudzia URL neprejde sanitize')
   NxTest.assert_equal(:invalid, MAT2.apply_demos_batch(
-    [db2_sheet_item('K009_PW_DTDL_18', 'code' => '   ')], catalog_rev: rev
+    [db2_sheet_item('K009_PW_DTDL_18X', 'code' => '   ')], catalog_rev: rev
   )[0], 'prazdny kod')
   NxTest.assert_equal(:invalid, MAT2.apply_demos_batch(
-    [db2_sheet_item('K009_PW_DTDL_18', {})], catalog_rev: rev
+    [db2_sheet_item('K009_PW_DTDL_18X', {})], catalog_rev: rev
   )[0], 'polozka nic nemeni')
 end
 
 NxTest.test('demos b2: apply — duplicitny kod v SIMULOVANOM stave (dve polozky davky aj proti katalogu)') do
   db2_seed!
-  items = [db2_sheet_item('K009_PW_DTDL_18', 'code' => 'DUPKOD'),
-           db2_sheet_item('K009_PW_DTDL_16', 'code' => 'DUPKOD')]
+  items = [db2_sheet_item('K009_PW_DTDL_18X', 'code' => 'DUPKOD'),
+           db2_sheet_item('K009_PW_DTDL_16X', 'code' => 'DUPKOD')]
   status, report = MAT2.apply_demos_batch(items, catalog_rev: MAT2.catalog_revision)
   NxTest.assert_equal(:code_conflict, status, 'polozky davky sa VIDIA navzajom (FIX 12)')
   NxTest.assert(report['detail'].is_a?(Array) && !report['detail'].empty?)
   # proti existujucemu zaznamu: najprv zapis kod na 18-ku, potom davka na 16-ku s tym istym
-  st, = MAT2.apply_demos_batch([db2_sheet_item('K009_PW_DTDL_18', 'code' => 'OBSADENY')],
+  st, = MAT2.apply_demos_batch([db2_sheet_item('K009_PW_DTDL_18X', 'code' => 'OBSADENY')],
                                catalog_rev: MAT2.catalog_revision)
   NxTest.assert_equal(:ok, st)
-  st2, = MAT2.apply_demos_batch([db2_sheet_item('K009_PW_DTDL_16', 'code' => 'OBSADENY')],
+  st2, = MAT2.apply_demos_batch([db2_sheet_item('K009_PW_DTDL_16X', 'code' => 'OBSADENY')],
                                 catalog_rev: MAT2.catalog_revision)
   NxTest.assert_equal(:code_conflict, st2, 'kolizia s nedotknutym zaznamom (supplier Demos na oboch)')
 end
@@ -453,11 +482,11 @@ end
 NxTest.test('demos b2: apply — price-only na zazname s VEDOME povolenou duplicitou prejde (GH #97 P2)') do
   db2_seed!
   # vedome povoleny duplicitny par (vzor allow_duplicate_code) — upsert guard nema
-  s18 = MAT2.sheet('K009_PW_DTDL_18').merge('code' => 'SPOLOCNY', 'supplier' => 'Demos')
-  s16 = MAT2.sheet('K009_PW_DTDL_16').merge('code' => 'SPOLOCNY', 'supplier' => 'Demos')
+  s18 = MAT2.sheet('K009_PW_DTDL_18X').merge('code' => 'SPOLOCNY', 'supplier' => 'Demos')
+  s16 = MAT2.sheet('K009_PW_DTDL_16X').merge('code' => 'SPOLOCNY', 'supplier' => 'Demos')
   NxTest.assert(MAT2.upsert_sheet(s18) && MAT2.upsert_sheet(s16))
   status, = MAT2.apply_demos_batch(
-    [db2_sheet_item('K009_PW_DTDL_18', 'price' => 19.5)],
+    [db2_sheet_item('K009_PW_DTDL_18X', 'price' => 19.5)],
     catalog_rev: MAT2.catalog_revision
   )
   NxTest.assert_equal(:ok, status, 'nedotknuty par sa nevycita')
@@ -515,16 +544,16 @@ end
 NxTest.test('demos b2: demos polia preziju cudzi patch (merge-safe normalize) a nesu SCHEMA 5') do
   db2_seed!
   st, = MAT2.apply_demos_batch(
-    [db2_sheet_item('K009_PW_DTDL_18', 'code' => '175718', 'price' => 18.99,
+    [db2_sheet_item('K009_PW_DTDL_18X', 'code' => '175718', 'price' => 18.99,
                     'demos_url' => DB2_DTDL18_URL)],
     catalog_rev: MAT2.catalog_revision
   )
   NxTest.assert_equal(:ok, st)
-  fresh = MAT2.sheet('K009_PW_DTDL_18')
-  st2, = MAT2.patch_record('sheet', 'K009_PW_DTDL_18', { 'price_per_m2' => '21.5' },
+  fresh = MAT2.sheet('K009_PW_DTDL_18X')
+  st2, = MAT2.patch_record('sheet', 'K009_PW_DTDL_18X', { 'price_per_m2' => '21.5' },
                            row_rev: MAT2.record_rev(fresh))
   NxTest.assert_equal(:ok, st2)
-  after = MAT2.sheet('K009_PW_DTDL_18')
+  after = MAT2.sheet('K009_PW_DTDL_18X')
   NxTest.assert_equal(DB2_DTDL18_URL, after['demos_url'], 'patch inej bunky vazbu nezhodil')
   NxTest.assert(after['price_checked_at'].to_s.length > 0)
   # required_schema_for pozna demos polia na doskach AJ paskach
