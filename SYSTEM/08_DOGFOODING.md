@@ -10,11 +10,18 @@
 
 ## Spomaľovače (vysoká priorita)
 
-*(momentálne žiadne)*
+- **D-59 · Rodina neoznačuje „už v katalógu“** (Michal 1.8. večer, smoke M-A) — pri doplnení variantu do existujúcej skupiny ponúka rodina aj položky, ktoré už v katalógu sú (PD 920 pri pridávaní PD 650); zápis duplicitu preskočí, ale ponuka mätie. *Fix: server pri family evente označí položky podľa KÓDU (unikátny) — „už pridané“ zamknuté/sivé.* → dávka M-A3
+- **D-60 · URL väzba nie je v UI viditeľná** (Michal 1.8. večer) — demos_url/price_checked_at sa ukladajú, ale detail variantu ich nezobrazuje; nedá sa overiť prepojenie. *Fix: v detaile ikona väzby + dátum overenia + „Otvoriť u dodávateľa“; spolu s D-56 badge na dlaždici.* → M-A3
+- **D-64 · ABS pásky Kronospan dekorov sa nezakladajú** (Michal 1.8. večer, BUG) — verify pri create vyžaduje zhodu výrobcu stránky s rodinou; pásky k Kronospan dekorom vyrába iný výrobca pások („79098 ohne…“) → „výrobca stránky nesedí“ a položka padá. Egger si pásky robí sám, preto Halifaxy prešli. *Fix: pásky overovať dekorom+rozmermi (výrobca sa pri ABS ani neukladá — štandard 7.5); brand check len dosky.* → M-A3
+- **D-65 · Demos slug prefixy nepokryté** (Michal 1.8. večer, BUG) — `dtd-laminovana-…` (Kronospan DTDL) a `mdfl` nepoznáme → doska „mimo systému“ s mätúcim dôvodom „príslušenstvo“; rovnaké URL ignoruje aj hľadanie. *Fix: analýza všetkých prefixov zo sitemap cache (48k) → doplniť aliasy do TYPE_PREFIXES + lepší text dôvodu.* → M-A3
 
 ## UX drobnosti (nízka priorita)
 
-*(momentálne žiadne — D-47 vyriešené v 2A-4b)*
+- **D-58 · ABS z Demosu bez štruktúry** (Michal 1.8.) — stránky pások štruktúru neuvádzajú → banner + ručné „univerzálna“ pri každom importe. *Fix: pri zakladaní dediť štruktúru z hlavičky rodiny.*
+- **D-61 · Ceny za KUS/tabuľu, nie €/m²** (Michal 1.8.) — plošné materiály sa kupujú po celých tabuliach (1,2 platne = kupujem 2); €/m² len interná jednotka. *UI: cena za tabuľu primárne (m²×formát), m² sekundárne; ABS €/bm OK. VÄZBA NA DÁVKU E: sumár musí rátať celé kusy.*
+- **D-62 · Textúra len na dlaždici skupiny** (Michal 1.8.) — detail skupiny/variantu ukazuje len farbu. *Fix: fotka aj v hlavičke detailu.*
+- **D-63 · Odrezané názvy dlaždíc** (Michal 1.8.) — „H1181 Dub Halifax…“ bez rozlišujúcej časti (tabakový/prírodný). *Fix: dvojriadkový názov/podnázov + tooltip.*
+- **D-55 · „+ z Demosu“ na skupine — dotiahnutie** (Michal 1.8.) — flow UŽ funguje (identitu nesie stránka položky); zostáva: stránka BEZ identity (PD) v kontexte otvorenej skupiny neblokovať + modrý pás „pridávam do existujúcej“ výraznejšie.
 
 ## Nápady na zváženie (nerozhodnuté)
 
@@ -96,6 +103,7 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ## Vyriešené — index (plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md))
 
+- **D-57** upratanie knižnice materiálov (1.8. večer: katalóg 27/23→13/12 — UNI sada pod fallback ID, staré textové skupiny zmazané, pravidlo „len UNI + Demos-kompatibilné“; šablóny všetky dedia; záloha materials.pred-upratanim-20260801) — jednorazová akcia, bez PR
 - **D-43** duplák 36 = 2×18 (väzba na zdroj + násobič, všetko ostatné derivované; väzba vo výrobnom snapshote; odhad platní prelieva plochu do zdroja; katalóg SCHEMA 3 lazy; batch čip vedome odložený) — PR #94
 - **D-47** hlavička panela — tlačidlo Materiály vedľa Výroby (rovnako široké), 3 taby rovnako široké s ikonami, pod 400 px akcie icon-only — PR 2A-4b (TBD)
 - **D-46** projektová predvoľba korpusu s inou hrúbkou (potvrdzovacia lišta namiesto tvrdého stopu — dediace skrinky prevezmú hrúbku v 1 kroku Späť) — PR #86
