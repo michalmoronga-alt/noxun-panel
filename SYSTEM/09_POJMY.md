@@ -25,10 +25,14 @@
 ### Pracovné dosky (PD)
 
 - **Postforming** = laminát plynulo prechádza z plochy cez zaoblenú hranu pod dosku (uzavreté UV lakom); skladba: laminát 0,6 + nosič DTD + protiťahový papier.
-- **PD šírky 600: postforming LEN z prednej pozdĺžnej hrany. Šírky 900/920/1100: postforming na OBOCH pozdĺžnych hranách** (Michal 25.7.). Dôsledok pre ABS logiku: postforming hrany sa NEolepujú.
+- **PD úzke šírky (600, 635, 650): postforming LEN z prednej pozdĺžnej hrany. Široké šírky 900/920/1100: postforming na OBOCH pozdĺžnych hranách** (Michal 25.7.; 635/650 doplnené 2.8. — reálne formáty zo seed podkladu patria k úzkym). Dôsledok pre ABS logiku: postforming hrany sa NEolepujú.
 - **Rezané konce PD** sa lepia hranou š.45 (Demos „HPDB š.45" — laminátová hrana; pribalená len k objednávke CELEJ dosky).
 - **Reálny sortiment (prieskum 29.7., plné dáta: [zdroje/DEMOS_PD_prieskum_2026-07.md](zdroje/DEMOS_PD_prieskum_2026-07.md)):** šírky 600/635/650/900/920/1200 (+ zásteny 640), hrúbka 38 dominuje + **nové línie 20 mm (ABS rovná hrana, Egger 7/2026) a kompakt 12 mm** — šírka a hrúbka sú atribúty variantu, nie typy. **Podtypy hranovej úpravy PD: postforming / ABS rovná hrana (páska 1,5)** — riadi ABS logiku prednej hrany. (Kompaktné dosky 12 mm s monolitickou hranou = samostatný kanonický TYP `Kompakt`, nie PD podtyp — rozhodnuté pri 2A-0.) **PD existuje len pre „veľké" dekory** (drevo/kameň/betón) — uni a lesklé MG dekory PD spravidla nemajú.
 - Pri spotrebičoch pod PD (umývačka, rúra) treba spodok prelepiť hliníkovou páskou (ochrana proti pare) — poznámka z Demos popisu.
+
+### Hustota a hmotnosť materiálu
+
+- **Hustota je vlastnosť TYPU, nie záznamu (Michal 2.8.):** DTDL má v ~90 % prípadov rovnakú hustotu/hmotnosť; podstatný rozdiel je **MDF vs DTDL** — hmotnosť ČELA rozhoduje pri výpočte **výklopov** (sila piestov, hlavný dôvod) a **závesov**. Inde sa hmotnostná logika nepotrebuje. Realizácia: register kanonických typov nesie default hustotu (kg/m³) — dávka M-C; spotrebuje ju kovanie (dávka D, hmotnostné tabuľky). Per-záznam override až keď ho prax vypýta.
 
 ### Dosky (DTDL)
 
