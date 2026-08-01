@@ -120,6 +120,18 @@ module Noxun
         # odmietnutie (volajuci spravi UI resync), ziadny ciastocny zapis.
         # Katalogovy zapis bezi MIMO modeloveho undo (vedomy kontrakt ensure_*
         # ciest — Spat vrati model, globalna polozka ostava; hlaska to hovori).
+        # GH #116 P2: PROBE virtualnej hodnoty BEZ katalogoveho zapisu — volajuci
+        # ňou overi hrubkove guardy PRED resolve_virtual_material (odmietnuta
+        # zmena nesmie nechat v katalogu nepouzity globalny zaznam).
+        # Vrati nil (nie virtual) | { 'thickness' => cielova } | { 'error' => msg }.
+        def virtual_duplak_probe(value)
+          m = value.to_s.match(/\Aduplak([23]):(.+)\z/)
+          return nil unless m
+          src = Materials.sheet(m[2])
+          return { 'error' => 'Zdroj dupláku sa nenašiel v katalógu — obnov okno.' } unless src
+          { 'thickness' => (src['thickness'].to_f * m[1].to_i).round(2) }
+        end
+
         # Vrati [real_id | povodna hodnota, note | nil] alebo [nil, chyba].
         def resolve_virtual_material(value)
           m = value.to_s.match(/\Aduplak([23]):(.+)\z/)

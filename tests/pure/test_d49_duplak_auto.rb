@@ -119,3 +119,24 @@ NxTest.test('d49: duplak_offer_sources — UNI/duplak/PD/pokryte zdroje vypadnu'
     d49_cleanup(plain, covered, bought)
   end
 end
+
+NxTest.test('d49: HDF/KOMPAKT nie su duplak zdroje — ponuka aj create ich odmietnu (GH #116 P2)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  ok, res = D49M.add_decor_batch(
+    'batch_schema' => 3, 'decor' => 'H300', 'manufacturer' => 'Kronospan',
+    'decor_name' => 'Biela HDF test', 'type' => 'HDF', 'grain' => 'none',
+    'color' => [240, 240, 240],
+    'sheet_variants' => [{ 'thickness' => 3.0, 'structure' => 'SM' }], 'edge_variants' => []
+  )
+  raise "seed HDF zlyhal: #{res.inspect}" unless ok
+  begin
+    hdf_id = res['sheets'][0]
+    NxTest.refute(D49M.duplak_offer_sources(2).map { |s| s['material_id'] }.include?(hdf_id),
+                  'HDF sa v ponuke neobjavi (3 mm x2 nie je korpusova doska)')
+    status, msg = D49M.ensure_duplak_for(hdf_id, 2)
+    NxTest.assert_equal(:invalid, status, 'server backstop plati aj pre priamu hodnotu')
+    NxTest.assert(msg.to_s.include?('DTDL/MDF'), msg.inspect)
+  ensure
+    d49_cleanup(res)
+  end
+end

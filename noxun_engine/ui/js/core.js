@@ -156,8 +156,25 @@
   // katalog. Zdvihnut az ked panel novsi format REALNE podporuje.
   var PANEL_CLIENT_SCHEMA = 2;
   // 2A-3b: cely zaznam dosky z katalogu (group_id/structure pre zrkadlo). null = neznamy.
+  // D-49 (GH #116 P2): virtualna hodnota "duplak2:<id>" — zrkadla (ABS
+  // pouzitelnost, hrubkove poznamky) hodnotia ZDROJOVY zaznam s cielovou
+  // hrubkou x nasobic; bez toho by modal hlasil prazdny dekor "bez pasky".
   function sheetRecOf(materialId){
     if (!materialId) return null;
+    var vm = String(materialId).match(/^duplak([23]):(.+)$/);
+    if (vm){
+      for (var j=0;j<MATERIALS.sheets.length;j++){
+        if (MATERIALS.sheets[j].id===vm[2]){
+          var src = MATERIALS.sheets[j];
+          var out = {};
+          for (var k in src){ if (Object.prototype.hasOwnProperty.call(src,k)) out[k]=src[k]; }
+          out.id = materialId;
+          out.thickness = Math.round(parseFloat(src.thickness)*parseInt(vm[1],10)*100)/100;
+          return out;
+        }
+      }
+      return null;
+    }
     for (var i=0;i<MATERIALS.sheets.length;i++){
       if (MATERIALS.sheets[i].id===materialId) return MATERIALS.sheets[i];
     }

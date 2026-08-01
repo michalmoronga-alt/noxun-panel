@@ -19,9 +19,21 @@ module Noxun
           rk = data['role_key'].to_s
           return set_status('Chyba identifikacie dielca.', true) if rk.empty?
           mat = present_str(data['material_id'])
-          # D-49 (audit F4): virtualny duplak rozries PRED hrubkovym guardom aj
-          # ABS tvorbou — dalsie kroky pracuju s realnym zaznamom.
+          params = existing_params(cab)
+          old_overrides = JsonFileStore.deep_copy(params['part_overrides'] || {})
+          rk = canonical_part_key(params, rk)
+          # D-49 (audit F4 + GH #116 P2): virtualny duplak — hrubkovy guard
+          # najprv PROBE hodnotou BEZ zapisu (odmietnuty dielec nesmie nechat
+          # nepouzity globalny zaznam), resolver az po guarde; dalsie kroky
+          # (konflikt, ABS tvorba) pracuju s realnym zaznamom.
           duplak_note = ''
+          if mat && (probe = virtual_duplak_probe(mat))
+            return set_status(probe['error'], true) if probe['error']
+            pd = CabinetBuilder.plan_parts_by_key(params)[rk]
+            if pd && !CabinetBuilder.thickness_ok_for?(pd[:role], pd[:prod][:thickness].to_f, probe['thickness'])
+              return set_status("Duplák #{fmt_mm(probe['thickness'])} mm nesedí dielcu #{pd[:name] || rk} (#{fmt_mm(pd[:prod][:thickness])} mm) — dielec hrúbku dedí po korpuse. Katalóg sa nezmenil.", true)
+            end
+          end
           if mat
             mat, dnote = resolve_virtual_material(mat)
             unless mat
@@ -30,9 +42,6 @@ module Noxun
             end
             duplak_note = dnote.to_s
           end
-          params = existing_params(cab)
-          old_overrides = JsonFileStore.deep_copy(params['part_overrides'] || {})
-          rk = canonical_part_key(params, rk)
           # D-45: hrubkovy guard PRED akymkolvek zapisom (aj pred pripadnou tvorbou
           # ABS — audit FIX 8 kontrakt ostava). Predtym padol az rebuild surovou
           # hlaskou; teraz hlaska NAVIGUJE, kde sa hrubka realne meni.
