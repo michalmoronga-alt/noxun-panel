@@ -47,7 +47,12 @@ module Noxun
           # V0.4 kovanie: vypocitane polozky (vystup planu) + rucne zasahy (identita
           # owner+type+rule_id). hardware_overrides su aj v params (config_to_params),
           # tu explicitne — UI paruje disabled zaznamy na vypnute kategorie.
-          params['hardware'] = cfg['hardware'].is_a?(Array) ? cfg['hardware'] : []
+          # V0.6 C-2 (audit F11): slovensky label TRANZIENTNE v payloade —
+          # jedina autorita HardwareRules.label_for (JS mapy su len fallback);
+          # do configu/snapshotu sa label NIKDY neuklada.
+          params['hardware'] = (cfg['hardware'].is_a?(Array) ? cfg['hardware'] : []).map do |h|
+            h.is_a?(Hash) ? h.merge('label' => HardwareRules.label_for(h['generic_type'])) : h
+          end
           params
         end
 

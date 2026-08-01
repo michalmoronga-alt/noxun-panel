@@ -382,8 +382,9 @@ module Noxun
       # Tokenizovane skore s diakritickou normalizaciou (autorita Materials.slug).
       # KAZDY token dotazu musi matchnut; skore aditivne, use_count LEN
       # tie-break (vedome nie skore), potom item_code. Neaktivne polozky sa
-      # vracaju IBA na presnu zhodu kodu.
-      def search(list, query, category: nil, top: 20)
+      # vracaju IBA na presnu zhodu kodu — alebo s include_inactive (C-2
+      # filter "zobrazit neaktivne", audit F10: inak sa nedaju najst a ozivit).
+      def search(list, query, category: nil, top: 20, include_inactive: false)
         q = norm_text(query)
         cat = category.to_s.strip.upcase
         pool = list.select { |i| cat.empty? || i['category'].to_s == cat }
@@ -391,7 +392,7 @@ module Noxun
         scored = []
         pool.each do |i|
           active = i['active'] != false
-          next unless active || i.equal?(exact_code)
+          next unless active || include_inactive || i.equal?(exact_code)
           s = score_item(i, q)
           scored << [s, -i['use_count'].to_i, i['item_code'].to_s, i] if s
         end

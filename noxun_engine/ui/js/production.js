@@ -200,7 +200,8 @@
     list.forEach(function(g, i){
       var params = Object.keys(g.params || {}).map(function(k){ return esc(k) + ' ' + esc(g.params[k]); }).join(', ') || '—';
       var kde = (g.breakdown || []).map(function(b){ return esc(b.owner_id) + '×' + b.quantity + (b.source === 'manual' ? ' (ručne)' : ''); }).join(', ');
-      h += '<tr class="hwrow" data-i="' + i + '"><td>' + esc(g.generic_type) + '</td><td>' + params + '</td>' +
+      // V0.6 C-2 (audit F11): slovensky label zo SERVERA (fallback surovy typ)
+      h += '<tr class="hwrow" data-i="' + i + '"><td>' + esc(g.label || g.generic_type) + '</td><td>' + params + '</td>' +
            '<td><b>' + num(g.quantity) + '</b></td><td>' + kde + '</td></tr>';
     });
     box.innerHTML = h + '</tbody></table>';
