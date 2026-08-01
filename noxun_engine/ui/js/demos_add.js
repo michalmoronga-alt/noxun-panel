@@ -43,6 +43,9 @@ function nxdaAutoEdgeSuggest(items, checks, sheetIid){
   var th = parseFloat(sheet.thickness_hint);
   if (isNaN(th) || th <= 0) return null;
   function fits(it){
+    // M-A3b (D-59): paska, ktora uz v katalogu je, sa nenavrhuje (riadok je
+    // oznaceny informativne; vedomy vyber ostava mozny).
+    if (it.in_catalog === true) return false;
     var et = parseFloat(it.thickness_hint);
     var ew = parseFloat(it.width_hint);
     return !isNaN(et) && Math.abs(et - 1.0) <= 0.01 && !isNaN(ew) && ew >= th + 2;
@@ -288,7 +291,11 @@ function nxdaRenderSearch(body){
 }
 
 function nxdaFamilyRow(it){
-  var row = nxdaEl('div', 'nxda-row' + (it.kind === 'other' ? ' nxda-dis' : ''));
+  // M-A3b (D-59): "uz v katalogu" (podla kodu) = sivy INFORMATIVNY riadok —
+  // checkbox ostava aktivny (rozhodnutie Michal 1.8.: zamknutie by pri kolizii
+  // kodov blokovalo legitimnu polozku; server dedup pri zapise aj tak drzi).
+  var inCat = it.in_catalog === true && it.kind !== 'other';
+  var row = nxdaEl('div', 'nxda-row' + (it.kind === 'other' ? ' nxda-dis' : '') + (inCat ? ' nxda-in' : ''));
   var cb = document.createElement('input');
   cb.type = 'checkbox';
   cb.setAttribute('data-iid', it.iid);
@@ -301,6 +308,8 @@ function nxdaFamilyRow(it){
     nm.appendChild(nxdaEl('small', 'nxda-why', NXDA_STATE.failed[it.iid]));
   } else if (it.kind === 'other' && it.reason){
     nm.appendChild(nxdaEl('small', 'nxda-why', it.reason));
+  } else if (inCat){
+    nm.appendChild(nxdaEl('small', 'nxda-auto', 'už v katalógu'));
   } else if (it.iid === NXDA_STATE.autoIid && NXDA_STATE.checks[it.iid] === true){
     nm.appendChild(nxdaEl('small', 'nxda-auto', 'návrh k doske — dá sa odškrtnúť'));
   }
@@ -320,7 +329,9 @@ function nxdaRenderFamily(body){
   crumb.appendChild(back);
   var title = [h.manufacturer, h.decor, h.structure, h.decor_name].filter(Boolean).join(' ');
   crumb.appendChild(nxdaEl('b', null, title));
-  crumb.appendChild(nxdaEl('span', 'nxda-badge',
+  // M-A3b (D-55): "pridavam do existujucej" vyrazne (plny akcent) — pri
+  // dopĺňaní skupiny je to klucova informacia, povodna pilulka zanikala.
+  crumb.appendChild(nxdaEl('span', 'nxda-badge' + (NXDA_STATE.existing ? ' nxda-badge-strong' : ''),
     NXDA_STATE.existing ? 'pridávam do existujúcej skupiny' : 'identita zo stránky'));
   body.appendChild(crumb);
 

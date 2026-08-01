@@ -438,10 +438,16 @@
   .mdsw { flex: 0 0 26px; width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--nx-border-strong); }
   .mdsw-lg { flex: 0 0 34px; width: 34px; height: 34px; border-radius: 7px; }
   .mdtile-name { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
-  .mdtile-name b { font-size: 12.5px; color: var(--nx-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* M-A3b (D-63): nazov na 2 riadky (clamp) — "tabakovy/prirodny" sa uz
+     neodreze; plny text nesie title dlazdice. CEF = Chromium, -webkit OK. */
+  .mdtile-name b { font-size: 12.5px; color: var(--nx-ink); display: -webkit-box; -webkit-line-clamp: 2;
+                   -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
   .mdtile-name .mans { font-size: 10px; }
   .mans { color: var(--nx-ink-faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
   .mdused { flex: 0 0 auto; font-size: 10.5px; color: var(--nx-select); background: var(--nx-select-bg); border-radius: 8px; padding: 1px 7px; }
+  /* M-A3b (D-56): mini badge vazby na Demos na dlazdici */
+  .mddemos { flex: 0 0 auto; display: inline-flex; align-items: center; color: var(--nx-select-accent); }
+  .mddemos .ic { width: 13px; height: 13px; }
   .mdtile-chips { display: flex; flex-wrap: wrap; gap: 3px; min-height: 18px; }
   .vchip { display: inline-block; padding: 1px 7px; border-radius: 5px; font-size: 11px; background: var(--nx-surface-sunken);
            color: var(--nx-ink-label); border: 1px solid var(--nx-border-soft); }
@@ -519,6 +525,8 @@
            border: 1px solid var(--nx-border); border-radius: 5px; cursor: pointer; }
   .mduni.on { background: var(--nx-select-bg); color: var(--nx-select-strong); border-color: var(--nx-select-accent); }
   .mduni .ic { width: 14px; height: 14px; }
+  /* M-A3b (D-60): vazba na Demos v riadku variantu — akcent, klik otvara stranku */
+  .mddm { color: var(--nx-select-accent); }
   /* V0.4.5 D3: vypis upozorneni + badge kovania pri celach */
   /* D-29 A1: warnlist ukotveny hned pod sticky hlavickou (toggle robi scroll-to-top,
      aby bol viditelny aj po odscrollovani). */
@@ -578,6 +586,14 @@
   .nxda-crumb { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 6px; flex-wrap: wrap; }
   .nxda-badge { font-size: 10px; font-weight: 700; letter-spacing: .3px; padding: 1px 7px;
                 border-radius: 9px; background: var(--nx-select-bg); color: var(--nx-select-accent); }
+  /* M-A3b (D-55): doplnanie EXISTUJUCEJ skupiny musi bit do oci — plny akcent */
+  .nxda-badge-strong { background: var(--nx-select-accent); color: var(--nx-on-accent); }
+  /* M-A3b (D-59): polozka s kodom uz v katalogu — informativne stlmenie,
+     checkbox ostava aktivny (nie je to zamok) */
+  .nxda-in { opacity: .62; }
+  /* M-A3b: nadpisy sekcii Dosky/ABS/Mimo systemu v modali (mimo .mdet scope) */
+  .nxdabody .mdsec { margin: 10px 2px 4px; font-size: 11px; font-weight: 600;
+                     text-transform: uppercase; letter-spacing: .05em; color: var(--nx-ink-muted); }
   .nxda-row { display: flex; align-items: center; gap: 8px; padding: 6px 6px;
               border-bottom: 1px solid var(--nx-border-soft); font-size: 12px; }
   .nxda-row input[type="checkbox"] { flex: 0 0 auto; }

@@ -151,7 +151,9 @@ Aktuálny set: `maximize` (fit), `alert`, `lock` / `lock-open`, `eye` / `eye-off
 `check`, `chevron-right` (disclosure), `link`, `search`, `arrow-left`, `trash`,
 `pencil`, `box` (tab Korpus), `layout-grid` (tab Zóny), `columns-2` (tab Čelá),
 `layers` (Materiály), `globe` (universal ABS), `info` (banner),
-`refresh-cw` (Aktualizovať z Demosu — detail dekoru), `logo`.
+`refresh-cw` (Aktualizovať z Demosu — detail dekoru),
+`cloud-download` (Pridať z Demosu; aj badge väzby na dlaždici — D-56),
+`external-link` (Otvoriť u dodávateľa — riadok variantu, D-60), `logo`.
 
 ### D-47: hlavička panela (rad 2)
 Tri režimové taby (Korpus·Zóny·Čelá) sú **rovnako široké** (`flex: 1 1 0`)

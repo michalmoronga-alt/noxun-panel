@@ -450,6 +450,49 @@ ensure
   NxTest.install_fresh_seed_catalog!
 end
 
+# --- M-A3b: demos_code_known? (D-59) + demos_open_target (D-60) ----------------
+
+NxTest.test('ma3b: demos_code_known? — kind+kod+dodavatel; demos_open_target — sanitize pred otvorenim') do
+  NxTest.install_fresh_seed_catalog!
+  st, info = MAT_MA.create_group_from_demos(
+    'manufacturer' => 'Egger', 'decor' => 'H9999', 'decor_name' => 'Testovací',
+    'sheet_items' => [{ 'type' => 'DTDL', 'thickness' => 18.0, 'structure' => 'ST9',
+                        'sheet_size' => [2800.0, 2070.0], 'code' => '111222', 'price' => 10.0,
+                        'demos_url' => 'https://www.demos-trade.sk/dtdl-h9999-st9-x-2800-2070-18/',
+                        'image_url' => nil }],
+    'edge_items' => [{ 'width' => 23.0, 'thickness' => 1.0, 'structure' => 'ST9',
+                       'code' => '333444', 'price' => 0.5, 'demos_url' => nil }]
+  )
+  NxTest.assert_equal(:ok, st, info.inspect)
+  sid = info['sheets'][0]
+  # D-59: match je kind+kod (ci, trim) + dodavatel Demos/prazdny
+  NxTest.assert_equal(true, MAT_MA.demos_code_known?('sheet', '111222'))
+  NxTest.assert_equal(true, MAT_MA.demos_code_known?('sheet', '  111222  '), 'trim')
+  NxTest.assert_equal(false, MAT_MA.demos_code_known?('edge', '111222'), 'kod dosky nematchuje pasky')
+  NxTest.assert_equal(true, MAT_MA.demos_code_known?('edge', '333444'))
+  NxTest.assert_equal(false, MAT_MA.demos_code_known?('sheet', ''), 'prazdny kod nikdy')
+  NxTest.assert_equal(false, MAT_MA.demos_code_known?('sheet', '999999'), 'neznamy kod')
+  # iny dodavatel toho isteho kodu nematchuje (kolizia kodov nezamyka polozku)
+  rec = MAT_MA.sheet(sid)
+  st2, = MAT_MA.patch_record('sheet', sid, { 'supplier' => 'InyVelkoobchod' },
+                             row_rev: MAT_MA.record_rev(rec), allow_duplicate_code: true)
+  NxTest.assert_equal(:ok, st2)
+  NxTest.assert_equal(false, MAT_MA.demos_code_known?('sheet', '111222'), 'cudzi dodavatel sa nerata')
+  # D-60: URL vyhradne zo zaznamu + cerstvy sanitize (audit BLOCKER 2)
+  NxTest.assert_equal('https://www.demos-trade.sk/dtdl-h9999-st9-x-2800-2070-18/',
+                      MAT_MA.demos_open_target('sheet', sid))
+  NxTest.assert_equal(nil, MAT_MA.demos_open_target('edge', info['edges'][0]), 'zaznam bez vazby = nil')
+  NxTest.assert_equal(nil, MAT_MA.demos_open_target('sheet', 'NEEXISTUJE'), 'nezname id = nil')
+  # poskodeny zaznam (cudzi host vpisany priamo do JSON) sa NIKDY neotvori
+  raw = JSON.parse(File.read(MAT_MA.path))
+  raw['sheets'].find { |s| s['material_id'] == sid }['demos_url'] = 'https://evil.example.com/x'
+  File.write(MAT_MA.path, JSON.pretty_generate(raw))
+  Noxun::Engine::JsonFileStore.invalidate(MAT_MA.path)
+  NxTest.assert_equal(nil, MAT_MA.demos_open_target('sheet', sid), 'cudzi host neprejde sanitize')
+ensure
+  NxTest.install_fresh_seed_catalog!
+end
+
 # --- Materials.create_group_from_demos (mutator) -------------------------------
 
 NxTest.test('ma1 mutator: legacy katalog odmietnuty; znackova skupina bez dosky odmietnuta') do
