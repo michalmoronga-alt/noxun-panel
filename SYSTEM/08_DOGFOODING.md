@@ -11,7 +11,7 @@
 
 ## Spomaľovače (vysoká priorita)
 
-*(momentálne žiadne — D-59/D-60 vyriešené PR #107)*
+*(momentálne žiadne — D-59/D-60 vyriešené PR #108)*
 
 ## UX drobnosti (nízka priorita)
 
@@ -99,11 +99,11 @@ Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jas
 
 ## Vyriešené — index (plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md))
 
-- **D-59** rodina informatívne označuje „už v katalógu“ podľa kódu (sivý riadok, checkbox aktívny — kolízia kódov nesmie zamykať; auto-návrh pásky ich preskakuje) — PR #107
-- **D-60 + D-56** URL väzba viditeľná: ikona v riadku variantu s dátumom overenia ceny + „Otvoriť u dodávateľa“ (URL výhradne zo servera, čerstvý sanitize — audit) + badge na dlaždici skupiny — PR #107
-- **D-62** fotka dekoru aj v hlavičke detailu skupiny — PR #107
-- **D-63** názvy dlaždíc dvojriadkovo (clamp) + plný názov v tooltipe — PR #107
-- **D-55** pás „pridávam do existujúcej skupiny“ výrazný (plný akcent); zvyšok zúžený po audite (filter článkov = PR #106) — PR #107
+- **D-59** rodina informatívne označuje „už v katalógu“ podľa kódu (sivý riadok, checkbox aktívny — kolízia kódov nesmie zamykať; auto-návrh pásky ich preskakuje) — PR #108
+- **D-60 + D-56** URL väzba viditeľná: ikona v riadku variantu s dátumom overenia ceny + „Otvoriť u dodávateľa“ (URL výhradne zo servera, čerstvý sanitize — audit) + badge na dlaždici skupiny — PR #108
+- **D-62** fotka dekoru aj v hlavičke detailu skupiny — PR #108
+- **D-63** názvy dlaždíc dvojriadkovo (clamp) + plný názov v tooltipe — PR #108
+- **D-55** pás „pridávam do existujúcej skupiny“ výrazný (plný akcent); zvyšok zúžený po audite (filter článkov = PR #106) — PR #108
 - **D-64** ABS pásky tretích strán (Rehau…) padali na kontrole výrobcu — pásky sa overujú dekorom v adrese (mimo koncových rozmerov) + rozmermi; brand check len dosky — PR #106
 - **D-65** slug prefixy zo sitemap analýzy 48k: dtd-laminovana→DTDL, mdfl/mdfs→MDF, kd-in/kd-ex→KOMPAKT, pracovni-deska→PD, absl/abs-→ABS; jedna autorita klasifikácie + filter článkov bez číslic; mdfd (dyhovaná) vedome mimo — PR #106
 - **D-58** ABS z Demosu dedí štruktúru povrchu z rodiny (stránky pások ju neuvádzajú; „Štruktúra hrán“ výrobcu pásky sa vedome nečíta) — PR #106
