@@ -327,10 +327,20 @@
   }
   // 2A-3b: dispatcher zrkadla modalu — schema VYHRADNE z payloadu (F11);
   // hybrid bez group_id = legacy dekor logika (zrkadlo servera).
+  // M-C (GH #118 P2): typy, ktore sa NELEPIA (kompakt monolit / PD postforming)
+  // — zrkadlo Materials.abs_default_suppression (server ma tvrdu stopku).
+  function absSuppressedSheet(rec){
+    if (!rec) return false;
+    var t = String(rec.type || '').trim().toUpperCase();
+    if (t === 'KOMPAKT') return true;
+    return t === 'PD' && rec.pd_edge_subtype === 'postforming';
+  }
   function absUsableForSheet(edges, sheetRec, catalogSchema, partTh){
     // V0.6 M-B1: UNI pasky nema ZO ZASADY — modal "Vytvorit pasku" sa nikdy
     // neotvara (server ma tvrdu stopku, toto je UX zrkadlo).
     if (sheetRec && sheetRec.uni === true) return true;
+    // M-C: nelepitelne typy modal tiez nikdy neotvaraju.
+    if (absSuppressedSheet(sheetRec)) return true;
     if (catalogSchema >= 2 && groupIdOf(sheetRec) !== '')
       return absUsableExistsV2(edges, sheetRec, partTh);
     return absUsableExists(edges, sheetRec ? sheetRec.decor : '', 1.0, partTh);

@@ -162,3 +162,37 @@ NxTest.test('mc: semafor — "bez ABS" mlci pri kompakt/PD-postforming, NEmlci p
                 'bezna doska sa kontroluje')
   NxTest.assert(run.call(nil).include?('material'), 'chybajuci material = RED (potlacenie sa NEuplatni)')
 end
+
+NxTest.test('mc: semafor — ULOZENE abs_* build warnings mlcia pri nelepitelnom materiali (GH #118 P2)') do
+  rec = { 'name' => 'Doska', 'part_key' => 'board/x', 'owner_id' => 'BRD-1', 'pid' => 1,
+          'role' => 'free_panel', 'length' => 600.0, 'width' => 400.0, 'thickness' => 12.0,
+          'quantity' => 1, 'material_id' => 'M1',
+          'edges' => { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil } }
+  warn = { 'code' => 'abs_no_structure', 'message' => 'Dielec bez pasky',
+           'part_key' => 'board/x', 'owner_id' => 'BRD-1' }
+  out = MCV.run({ records: [rec], hardware_overrides: [], warnings: [warn] },
+                sheets: { 'M1' => { 'material_id' => 'M1', 'type' => 'KOMPAKT', 'thickness' => 12.0 } })
+  NxTest.refute(out['items'].any? { |i| i['category'] == 'build' },
+                'stary abs_ build warning na kompakte sa nezobrazuje')
+  out2 = MCV.run({ records: [rec], hardware_overrides: [], warnings: [warn] },
+                 sheets: { 'M1' => { 'material_id' => 'M1', 'type' => 'DTDL', 'thickness' => 12.0 } })
+  NxTest.assert(out2['items'].any? { |i| i['category'] == 'build' },
+                'na beznej doske warning ostava')
+end
+
+NxTest.test('mc: ensure_edge_for_sheet — nelepitelny material pasku NEdotvara (GH #118 P2)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  NxTest.assert(NxTest.install_fresh_seed_catalog!)
+  ok, res = MCM.add_decor_batch(
+    'batch_schema' => 3, 'decor' => 'K900', 'manufacturer' => 'Egger',
+    'decor_name' => 'MC kompakt', 'type' => 'KOMPAKT', 'grain' => 'none', 'color' => [5, 5, 5],
+    'sheet_variants' => [{ 'thickness' => 12.0, 'structure' => 'SM' }], 'edge_variants' => []
+  )
+  raise res.inspect unless ok
+  begin
+    status, = MCM.ensure_edge_for_sheet(res['sheets'][0], client_schema: MCM::SCHEMA_CURRENT)
+    NxTest.assert_equal(:abs_suppressed, status, 'kompakt = ziadna auto-paska')
+  ensure
+    (res['sheets'] || []).each { |id| MCM.delete_sheet(id) }
+  end
+end

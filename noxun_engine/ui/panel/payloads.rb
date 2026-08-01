@@ -120,7 +120,12 @@ module Noxun
               # dekoru z katalogu — bez grain by formular posielal nespravny default.
               # V0.6 M-B1: 'uni' => true LEN pri UNI (JS filtre/badge/board karta).
               base = { 'id' => s['material_id'], 'label' => sheet_label(s, ctx), 'decor' => s['decor'],
-                       'thickness' => s['thickness'], 'color' => s['color'], 'grain' => s['grain'] }
+                       'thickness' => s['thickness'], 'color' => s['color'], 'grain' => s['grain'],
+                       # M-C (GH #118 P2): typ + hranova uprava PD — JS zrkadlo
+                       # potlacenia ABS (absUsableForSheet) ich potrebuje, inak
+                       # by kompakt/postforming otvaral modal "Vytvorit pasku".
+                       'type' => s['type'] }
+              base['pd_edge_subtype'] = s['pd_edge_subtype'] unless s['pd_edge_subtype'].to_s.empty?
               base['uni'] = true if Materials.uni?(s)
               base.merge(schema2_mirror_fields(s))
             },

@@ -103,6 +103,16 @@ module Noxun
           msg = 'Materiál dosky nastavený.'
           msg += ' ABS hrany prevedené na nový dekor.' if remap
           msg += " Hrany #{lost.join(', ')} bez ABS (nový dekor nemá variant hrúbky)." unless lost.empty?
+          # M-C (GH #118 P1): material, ktory sa NELEPI (kompakt / PD s
+          # postformingom) — stare hrany by prezili remap (same-decor = no-op)
+          # a snapshot by niesol ABS na materiali bez olepu. Hrany sa vycistia
+          # CELE (vratane rucnych — hlaska to hovori; rucne sa daju vratit).
+          if defined?(Materials) && Materials.abs_default_suppression(new_sheet) == :all
+            params['edges'] = { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil }
+            pruned = BoardBuilder.prune_edge_warnings(cfg['warnings'], %w[L1 L2 W1 W2], cfg['name'])
+            params['warnings'] = pruned unless pruned.nil?
+            msg = 'Materiál dosky nastavený. Hrany zrušené — tento materiál sa neolepuje (kompakt/postforming).'
+          end
           apply_board(model, board, params, "#{msg}#{abs_note}#{duplak_note}")
         end
 

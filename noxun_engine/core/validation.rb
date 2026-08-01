@@ -89,11 +89,14 @@ module Noxun
         # V0.6 M-B1 (audit F4): dielce na UNI materiali — ich ABS build
         # warnings sa potlacaju (jedna jasna sprava "material neurceny"
         # namiesto trojiteho hluku o chybajucich paskach).
+        # M-C (GH #118 P2): to iste pre NELEPITELNE materialy (kompakt /
+        # PD postforming) — ulozene abs_* warnings zo starsich buildov by po
+        # upgrade/zmene podtypu strasili, hoci olep neexistuje.
         uni_parts = {}
         Array(collected[:records]).each do |r|
           next unless r.is_a?(Hash)
           s = smap[r['material_id'].to_s]
-          uni_parts["#{r['owner_id']}|#{r['part_key']}"] = true if uni_sheet?(s)
+          uni_parts["#{r['owner_id']}|#{r['part_key']}"] = true if uni_sheet?(s) || abs_impossible?(s)
         end
         Array(collected[:records]).each { |r| check_record(r, smap, emap, items) }
         Array(collected[:hardware_overrides]).each { |ov| check_hardware(ov, items) }

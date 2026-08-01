@@ -120,6 +120,9 @@ module Noxun
           when :uni_material
             # V0.6 M-B1 (audit B3): UNI pasky nema — tvorba je zablokovana.
             [false, 'UNI je pracovný materiál bez ABS pások — olep sa rieši až s reálnym dekorom.']
+          when :abs_suppressed
+            # M-C (GH #118 P2): kompakt/PD-postforming sa nelepia.
+            [false, 'Tento materiál sa neolepuje (kompakt / postforming) — páska sa nevytvára.']
           else
             [false, 'Vytvorenie ABS pásky zlyhalo.']
           end
