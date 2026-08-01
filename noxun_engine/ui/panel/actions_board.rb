@@ -69,6 +69,15 @@ module Noxun
           return unless board
           mat = data['material_id'].to_s.strip
           return set_status('Doska potrebuje konkrétny materiál.', true) if mat.empty?
+          # D-49 (audit F4): virtualny duplak rozries PRED ABS kontrolou aj
+          # remapom — BoardBuilder dostane vyhradne realny katalogovy zaznam.
+          duplak_note = ''
+          mat, dnote = resolve_virtual_material(mat)
+          unless mat
+            set_status(dnote, true)
+            return push_selected(model)
+          end
+          duplak_note = dnote.to_s
           # D-41 C2: modal "Vytvorit a pokracovat" — dovytvorenie pasky pred
           # remapom (hrubka dosky nasleduje novy sheet, kompat kontrola netreba).
           abs_note = ''
@@ -94,7 +103,7 @@ module Noxun
           msg = 'Materiál dosky nastavený.'
           msg += ' ABS hrany prevedené na nový dekor.' if remap
           msg += " Hrany #{lost.join(', ')} bez ABS (nový dekor nemá variant hrúbky)." unless lost.empty?
-          apply_board(model, board, params, "#{msg}#{abs_note}")
+          apply_board(model, board, params, "#{msg}#{abs_note}#{duplak_note}")
         end
 
         # Prevod ABS hran stareho dekoru na novy (drzi nominalnu triedu). Vrati

@@ -22,6 +22,26 @@ module Noxun
           params = existing_params(cab)
           old_overrides = JsonFileStore.deep_copy(params['part_overrides'] || {})
           rk = canonical_part_key(params, rk)
+          # D-49 (audit F4 + GH #116 P2): virtualny duplak — hrubkovy guard
+          # najprv PROBE hodnotou BEZ zapisu (odmietnuty dielec nesmie nechat
+          # nepouzity globalny zaznam), resolver az po guarde; dalsie kroky
+          # (konflikt, ABS tvorba) pracuju s realnym zaznamom.
+          duplak_note = ''
+          if mat && (probe = virtual_duplak_probe(mat))
+            return set_status(probe['error'], true) if probe['error']
+            pd = CabinetBuilder.plan_parts_by_key(params)[rk]
+            if pd && !CabinetBuilder.thickness_ok_for?(pd[:role], pd[:prod][:thickness].to_f, probe['thickness'])
+              return set_status("Duplák #{fmt_mm(probe['thickness'])} mm nesedí dielcu #{pd[:name] || rk} (#{fmt_mm(pd[:prod][:thickness])} mm) — dielec hrúbku dedí po korpuse. Katalóg sa nezmenil.", true)
+            end
+          end
+          if mat
+            mat, dnote = resolve_virtual_material(mat)
+            unless mat
+              set_status(dnote, true)
+              return push_selected(model)
+            end
+            duplak_note = dnote.to_s
+          end
           # D-45: hrubkovy guard PRED akymkolvek zapisom (aj pred pripadnou tvorbou
           # ABS — audit FIX 8 kontrakt ostava). Predtym padol az rebuild surovou
           # hlaskou; teraz hlaska NAVIGUJE, kde sa hrubka realne meni.
@@ -42,7 +62,7 @@ module Noxun
           eff = effective_materials(model, params) # base sa nemeni — rozdiel robi override
           remap = CabinetBuilder.remap_part_edge_overrides!(params, eff, eff, old_overrides: old_overrides)
           rebuild_focus_part(model, cab, rk, params,
-                             "Materiál dielca #{mat ? 'nastavený' : 'zdedený'}.#{remap_note(remap)}#{abs_note}")
+                             "Materiál dielca #{mat ? 'nastavený' : 'zdedený'}.#{remap_note(remap)}#{abs_note}#{duplak_note}")
         end
 
         # D-45: nekompatibilna hrubka per-dielec materialu — vrati hlasku alebo nil.

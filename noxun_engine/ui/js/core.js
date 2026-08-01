@@ -115,7 +115,7 @@
   // D-45: matchFn rozhoduje o DISABLED (co server odmietne), noteFn o texte pripony
   // pri KAZDEJ volbe (napr. „prevezme hrúbku 18,6" — legitimna volba, ktora len
   // zmeni hrubku). Bez noteFn ostava povodne spravanie „(nekompatibilné)".
-  function fillSheetSelectFiltered(sel, includeInherit, matchFn, keepValue, inheritLabel, noteFn){
+  function fillSheetSelectFiltered(sel, includeInherit, matchFn, keepValue, inheritLabel, noteFn, withDuplakOffers){
     if (!sel) return;
     var cur = (keepValue !== undefined && keepValue !== null) ? keepValue : sel.value;
     var html = includeInherit ? '<option value="">'+esc(inheritLabel || '(dediť z projektu)')+'</option>' : '';
@@ -125,6 +125,17 @@
       var note = noteFn ? noteFn(s) : (ok ? '' : ' · (nekompatibilné)');
       html += '<option value="'+esc(s.id)+'"'+(keep?'':' disabled')+'>'+esc(s.label)+esc(note)+'</option>';
     });
+    // D-49 (audit B3): virtualne duplaky "(duplak x2)" LEN na vyziadanie
+    // volajuceho — telo korpusu, dielec, karta dosky. Vklad dosky, cela,
+    // chrbat ani projektove selecty ich nikdy nedostanu. Vyber posle
+    // "duplak2:<id>", realne ID rozriesi server (ensure_duplak_for).
+    if (withDuplakOffers){
+      (MATERIALS.duplak_offers || []).forEach(function(s){
+        var ok = matchFn ? matchFn(s) : true;
+        var note = noteFn ? noteFn(s) : (ok ? '' : ' · (nekompatibilné)');
+        html += '<option value="'+esc(s.id)+'"'+(ok?'':' disabled')+'>'+esc(s.label)+esc(note)+'</option>';
+      });
+    }
     sel.innerHTML = html;
     sel.value = cur;
   }
@@ -145,8 +156,25 @@
   // katalog. Zdvihnut az ked panel novsi format REALNE podporuje.
   var PANEL_CLIENT_SCHEMA = 2;
   // 2A-3b: cely zaznam dosky z katalogu (group_id/structure pre zrkadlo). null = neznamy.
+  // D-49 (GH #116 P2): virtualna hodnota "duplak2:<id>" — zrkadla (ABS
+  // pouzitelnost, hrubkove poznamky) hodnotia ZDROJOVY zaznam s cielovou
+  // hrubkou x nasobic; bez toho by modal hlasil prazdny dekor "bez pasky".
   function sheetRecOf(materialId){
     if (!materialId) return null;
+    var vm = String(materialId).match(/^duplak([23]):(.+)$/);
+    if (vm){
+      for (var j=0;j<MATERIALS.sheets.length;j++){
+        if (MATERIALS.sheets[j].id===vm[2]){
+          var src = MATERIALS.sheets[j];
+          var out = {};
+          for (var k in src){ if (Object.prototype.hasOwnProperty.call(src,k)) out[k]=src[k]; }
+          out.id = materialId;
+          out.thickness = Math.round(parseFloat(src.thickness)*parseInt(vm[1],10)*100)/100;
+          return out;
+        }
+      }
+      return null;
+    }
     for (var i=0;i<MATERIALS.sheets.length;i++){
       if (MATERIALS.sheets[i].id===materialId) return MATERIALS.sheets[i];
     }
@@ -343,7 +371,7 @@
     // to, co server odmietne — hrubka mimo rozsahu dosky); hrubku korpusu po
     // vybere prevezme materiál a label to hovori dopredu.
     fillSheetSelectFiltered(el('cab_body'), true, rangeMatch(), undefined, undefined,
-      function(s){ return s.uni === true ? '' : bodyThicknessNote(s.thickness, bodyTh); });
+      function(s){ return s.uni === true ? '' : bodyThicknessNote(s.thickness, bodyTh); }, true);
     fillSheetSelectFiltered(el('cab_front'), true, frontMatch());
     fillSheetSelectFiltered(el('cab_back'), true, thMatch(backTh));
   }

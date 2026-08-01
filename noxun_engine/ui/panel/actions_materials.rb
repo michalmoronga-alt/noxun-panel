@@ -24,6 +24,32 @@ module Noxun
           return set_status('Neznamy material korpusu.', true) unless key
           value = present_str(data['value'])
           params = existing_params(cab)
+          # D-49 (audit F4 + GH #116 P2): virtualna polozka — najprv PROBE
+          # hrubkovych guardov BEZ zapisu (blokovana zmena nesmie nechat
+          # nepouzity globalny duplak v katalogu), az potom ensure+rozriesenie.
+          duplak_note = ''
+          if value && (probe = virtual_duplak_probe(value))
+            return set_status(probe['error'], true) if probe['error']
+            if key == 'material_id'
+              test = JsonFileStore.deep_copy(params)
+              state, names = CabinetBuilder.adopt_thickness(test, probe)
+              if state == :blocked
+                set_status("Duplák #{fmt_mm(probe['thickness'])} mm sa nedá použiť — dielce s vlastným materiálom inej hrúbky: #{Array(names).join(', ')}. Katalóg sa nezmenil.", true)
+                return push_selected(model)
+              elsif state == :range
+                set_status("Hrúbka dupláku #{fmt_mm(probe['thickness'])} mm je mimo rozsahu korpusu. Katalóg sa nezmenil.", true)
+                return push_selected(model)
+              end
+            end
+          end
+          if value
+            value, dnote = resolve_virtual_material(value)
+            unless value
+              set_status(dnote, true)
+              return push_selected(model) # select spat na ulozeny material
+            end
+            duplak_note = dnote.to_s
+          end
           old_eff = effective_materials(model, params)
           params[key] = value
           new_eff = effective_materials(model, params)
@@ -45,7 +71,7 @@ module Noxun
             CabinetBuilder.rebuild(model, cab, params, op_name: 'NOXUN: material korpusu')
             reselect(model, cab)
           end
-          set_status("Materiál korpusu #{value ? 'nastavený' : 'dedí z projektu'}.#{th_note}#{remap_note(remap)}")
+          set_status("Materiál korpusu #{value ? 'nastavený' : 'dedí z projektu'}.#{th_note}#{remap_note(remap)}#{duplak_note}")
           push_selected(model)
         end
 

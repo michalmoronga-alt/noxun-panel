@@ -128,11 +128,30 @@ module Noxun
               { 'id' => a['abs_id'], 'label' => abs_label(a, ctx), 'decor' => a['decor'],
                 'thickness' => a['thickness'], 'width' => a['width'], 'color' => a['color'] }
                 .merge(schema2_mirror_fields(a, universal: true))
-            }
+            },
+            # D-49 (audit B3): virtualne polozky "(duplak x2)" — SAMOSTATNE pole
+            # (NIE sheets: vkladanie dosky a projektove selecty ich nesmu vidiet).
+            # Konzumuju ich VYHRADNE selecty tela korpusu, dielca a karty dosky;
+            # vyber posle "duplak2:<id>" a server ho rozriesi ensure_duplak_for.
+            'duplak_offers' => duplak_offers(ctx)
           }
         rescue StandardError => e
           Engine.log_error(e, 'materials_payload')
           { 'sheets' => [], 'edges' => [] }
+        end
+
+        # D-49: ponuka virtualnych duplakov (zdroje bez existujuceho duplaku a
+        # bez kupovanej dosky tej istej identity — autorita Materials).
+        def duplak_offers(ctx = label_ctx)
+          Materials.duplak_offer_sources(2).map do |s|
+            th2 = (s['thickness'].to_f * 2).round(2)
+            { 'id' => "duplak2:#{s['material_id']}",
+              'label' => "#{sheet_label(s, ctx)} ×2 → #{fmt_mm(th2)} (duplák)",
+              'thickness' => th2 }
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'duplak_offers')
+          []
         end
 
         # 2A-3b (F11): SCHEMA 2 polia zaznamu do payloadu — bez prazdnych klucov.

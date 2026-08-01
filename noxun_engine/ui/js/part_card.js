@@ -29,7 +29,9 @@
     var selectedMaterial = pc.has_material_override ? (pc.material_id || '') : '';
     var inheritLabel = '(dedí: '+sheetLabelOf(pc.material_id)+')';
     var ms = el('pcMaterial');
-    fillSheetSelectFiltered(ms, true, matFn, selectedMaterial, inheritLabel);
+    // D-49: virtualne duplaky aj tu — thMatch ich pri nesediacej hrubke dielca
+    // necha disabled (zrkadlo serveroveho D-45 guardu), pri 36 mm dielci su volne.
+    fillSheetSelectFiltered(ms, true, matFn, selectedMaterial, inheritLabel, undefined, true);
     ms.value = selectedMaterial;
     ms.className = pc.has_material_override ? 'ovr' : '';
     renderEdgeRows(pc);
