@@ -97,6 +97,15 @@ module Noxun
           cb(dlg, 'demos_manual_url') { |p| handle_demos_manual(p) }
           cb(dlg, 'demos_apply')      { |p| handle_demos_apply(p) }
           cb(dlg, 'demos_cancel')     { |_p| handle_demos_cancel }
+          # V0.6 M-A2: modal "Pridat z Demosu" — nazvove hladanie, rodina
+          # dekoru zo stranky, atomicke zalozenie skupiny (family store TU).
+          cb(dlg, 'demos_name_search')   { |p| handle_demos_name_search(p) }
+          cb(dlg, 'demos_family')        { |p| handle_demos_family(p) }
+          cb(dlg, 'demos_family_create') { |p| handle_demos_family_create(p) }
+          cb(dlg, 'demos_family_cancel') { |_p| handle_demos_family_cancel }
+          # V0.6 M-A2 (audit F9 / Halifax lekcia): potvrdenie mazania s
+          # variantovo presnym rozpisom zo SERVERA (nie plain confirm).
+          cb(dlg, 'delete_preflight') { |p| handle_delete_preflight(p) }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(materials): #{msg}")
@@ -224,7 +233,14 @@ module Noxun
           ctx = Panel.label_ctx # 2A-4b: kolizie cisla dekoru raz pre cely payload
           {
             'sheets' => cat['sheets'].map { |s|
-              s.merge('label' => Panel.sheet_label(s, ctx), 'row_rev' => Materials.record_rev(s))
+              extra = { 'label' => Panel.sheet_label(s, ctx), 'row_rev' => Materials.record_rev(s) }
+              # V0.6 M-A2 (audit BLOCKER 1): dlazdica dostava VYHRADNE lokalny
+              # subor z DemosImageCache — remote URL do CEF nikdy nejde (throttle
+              # /allowlist by obisiel). Bez suboru = fallback farba.
+              if !s['image_url'].to_s.empty? && (local = DemosImageCache.local_for(s['image_url']))
+                extra['image_file'] = local
+              end
+              s.merge(extra)
             },
             'edges' => cat['edges'].map { |a|
               a.merge('label' => Panel.abs_label(a, ctx), 'row_rev' => Materials.record_rev(a))
@@ -484,6 +500,136 @@ module Noxun
         def handle_demos_cancel
           demos_bump_session
           set_status('Aktualizácia z Demosu zrušená.')
+        end
+
+        # --- V0.6 M-A2: modal "Pridat z Demosu" -------------------------------
+        # Family store zije TU (audit BLOCKER 2): server drzi hlavicku + polozky
+        # z load_family; JS posiela LEN iid vybranych poloziek. Store je viazany
+        # na session (bump pri cancel/close/model switch/novom lookupe ho
+        # zneplatni) — create so starou rodinou sa odmietne.
+
+        # Zive navrhy nazvoveho hladania. Ziadny session bump (pisanie nesmie
+        # rusit nic bezace); gen echo strazi poradie vysledkov v JS (F10).
+        # Chybajuca sitemap cache -> jednorazovy zdielany refresh (single-flight
+        # DemosLookup.start_refresh) + stavova hlaska; po dobehnuti JS zopakuje
+        # aktualny dotaz (refresh_done).
+        def handle_demos_name_search(payload)
+          data = JSON.parse(payload.to_s)
+          gen = data['gen'].to_i
+          if DemosSitemapCache.load.nil?
+            dlg = @dialog
+            js("NXDA.suggest(#{{ 'gen' => gen, 'refreshing' => true }.to_json})")
+            DemosLookup.start_refresh do |ok, err|
+              next unless @dialog && @dialog.equal?(dlg) && @dialog.visible?
+              if ok
+                js("NXDA.suggest(#{{ 'refresh_done' => true }.to_json})")
+              else
+                js("NXDA.fail(#{{ 'msg' => "Zoznam produktov sa nepodarilo stiahnuť: #{err}" }.to_json})")
+              end
+            end
+            return
+          end
+          hits = DemosNameSearch.search_cached(data['query'].to_s)
+          js("NXDA.suggest(#{{ 'gen' => gen, 'hits' => hits }.to_json})")
+        end
+
+        # Nacitanie rodiny dekoru zo stranky. Novy beh = nova session (stary
+        # lookup/create umiera); family store sa plni AZ z family eventu a LEN
+        # ak session stale plati (oneskoreny event stareho behu store neprepise).
+        def handle_demos_family(payload)
+          data = JSON.parse(payload.to_s)
+          demos_bump_session
+          @demos_family = nil
+          session = @demos_session
+          emit = demos_family_emit(session)
+          DemosFamily.load_family(data['url'].to_s,
+                                  alive: demos_alive_proc(session, @dialog),
+                                  emit: emit)
+        end
+
+        # Emit wrapper family/create eventov: family event odklada rodinu do
+        # store (server autorita), complete uspesneho create robi katalogove
+        # echo PRED forwardom (JS complete skace na detail — potrebuje cerstvy
+        # katalog v okne).
+        def demos_family_emit(session)
+          lambda do |event|
+            if event['type'] == 'family' && @demos_session.to_i == session
+              @demos_family = { 'session' => session,
+                                'header' => event['header'], 'items' => event['items'] }
+              event = event.merge('existing' => demos_family_existing?(event['header']))
+            end
+            if event['type'] == 'complete' && event['ok'] && event['result'].is_a?(Hash)
+              @demos_family = nil
+              after_catalog_change
+              set_status("Skupina založená z Demosu (#{Array(event['result']['sheets']).length + Array(event['result']['edges']).length} položiek).")
+            end
+            js("NXDA.event(#{event.merge('session' => session).to_json})")
+          end
+        end
+
+        # Skupina s identitou hlavicky (vyrobca + cislo dekoru) uz v katalogu
+        # existuje? UI hint "pridavam do existujucej skupiny" (server aj tak
+        # resolvuje pri zapise — toto je len zobrazenie).
+        def demos_family_existing?(header)
+          return false unless header.is_a?(Hash)
+          want = Materials.group_identity_key(header['manufacturer'], header['decor'])
+          Materials.sheets.any? { |s| Materials.group_identity_key(s['manufacturer'], s['decor']) == want } ||
+            false
+        rescue StandardError
+          false
+        end
+
+        # Zalozenie: server berie polozky VYHRADNE z family store (iid vyber),
+        # session sa NEbumpuje (create bezi v aktualnej); po :ok complete emit
+        # wrapper bumpne tym, ze store zmaze a katalog echo posle.
+        def handle_demos_family_create(payload)
+          data = JSON.parse(payload.to_s)
+          unless catalog_write_ok?(data)
+            return js("NXDA.fail(#{{ 'msg' => 'Katalóg sa medzitým zmenil — zavri okno Pridať z Demosu a skús znova.' }.to_json})")
+          end
+          family = @demos_family
+          unless family.is_a?(Hash) && family['session'].to_i == @demos_session.to_i
+            return js("NXDA.fail(#{{ 'msg' => 'Rodina už nie je načítaná (okno/model sa medzitým zmenili) — začni odznova.' }.to_json})")
+          end
+          session = @demos_session
+          DemosFamily.create(family['header'], family['items'], Array(data['iids']),
+                             alive: demos_alive_proc(session, @dialog),
+                             emit: demos_family_emit(session))
+        end
+
+        def handle_demos_family_cancel
+          demos_bump_session
+          @demos_family = nil
+        end
+
+        # --- V0.6 M-A2 (audit F9): preflight mazania variantu ------------------
+        # Server zostavi variantovo PRESNY rozpis (label, kod, cena, pouzitie
+        # v aktivnom modeli, ochrany) — modal ho ukaze pred potvrdenim. Finalny
+        # delete ide existujucimi callbackmi, ktore VSETKY guardy vyhodnotia
+        # znova (preflight je informacia, nie autorita).
+        def handle_delete_preflight(payload)
+          data = JSON.parse(payload.to_s)
+          kind = data['kind'].to_s == 'edge' ? 'edge' : 'sheet'
+          id = data['id'].to_s
+          rec = demos_find_record(kind, id)
+          return set_status('Záznam sa nenašiel — katalóg sa obnovil.', true) unless rec
+          model = Sketchup.active_model
+          used = if kind == 'edge'
+                   Materials.used_abs_ids(model)[id] || []
+                 else
+                   Materials.used_material_ids(model)[id] || []
+                 end
+          info = {
+            'kind' => kind, 'id' => id,
+            'label' => (kind == 'edge' ? Panel.abs_label(rec, Panel.label_ctx) : Panel.sheet_label(rec, Panel.label_ctx)),
+            'code' => rec['code'].to_s, 'supplier' => rec['supplier'].to_s,
+            'price' => (kind == 'edge' ? rec['price_per_bm'] : rec['price_per_m2']),
+            'demos_url' => rec['demos_url'].to_s,
+            'used' => used.uniq.first(6), 'used_count' => used.size,
+            'protected' => (kind == 'sheet' && Materials::PROTECTED_SHEET_IDS.include?(id)),
+            'duplak_deps' => (kind == 'sheet' ? Materials.duplak_dependents(id).first(3) : [])
+          }
+          js("MD.confirmDelete(#{info.to_json})")
         end
 
         # --- akcia ----------------------------------------------------------

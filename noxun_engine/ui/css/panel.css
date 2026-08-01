@@ -560,3 +560,49 @@
      nahlad, nie tab. Za tabovymi pravidlami = vyhrava pri rovnakej specificite. */
   body.mode-part .pvhint .ph-zones { display: inline; }
   body.mode-part .pvhint .ph-fronts { display: none; }
+  /* ===== V0.6 M-A2: modal "Pridat z Demosu" (nxda*) + dlazdice s fotkou +
+     potvrdenie mazania. Farby VYHRADNE cez tokeny --nx-* (UI_DIZAJN). */
+  .nxdabody { overflow-y: auto; flex: 1; min-height: 120px; max-height: 62vh; margin: 6px 0; }
+  .nxda-search { display: flex; align-items: center; gap: 6px; border: 1px solid var(--nx-border);
+                 border-radius: 6px; padding: 6px 9px; background: var(--nx-surface); }
+  .nxda-search input { border: 0; outline: 0; flex: 1; font: inherit; background: transparent; color: var(--nx-ink); }
+  .nxda-sugg { border: 1px solid var(--nx-border); border-radius: 6px; margin-top: 6px; overflow: hidden; }
+  .nxda-sugg-row { display: flex; align-items: center; gap: 7px; padding: 6px 8px; cursor: pointer;
+                   border-bottom: 1px solid var(--nx-border-soft); }
+  .nxda-sugg-row:last-child { border-bottom: 0; }
+  .nxda-sugg-row:hover { background: var(--nx-select-bg-hover); }
+  .nxda-tag { flex: 0 0 auto; font-size: 10px; font-weight: 700; color: var(--nx-ink-muted);
+              border: 1px solid var(--nx-border); border-radius: 4px; padding: 0 5px; }
+  .nxda-sugg-label { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nxda-note { color: var(--nx-ink-muted); font-size: 11.5px; padding: 6px 2px; }
+  .nxda-crumb { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+  .nxda-badge { font-size: 10px; font-weight: 700; letter-spacing: .3px; padding: 1px 7px;
+                border-radius: 9px; background: var(--nx-select-bg); color: var(--nx-select-accent); }
+  .nxda-row { display: flex; align-items: center; gap: 8px; padding: 6px 6px;
+              border-bottom: 1px solid var(--nx-border-soft); font-size: 12px; }
+  .nxda-row input[type="checkbox"] { flex: 0 0 auto; }
+  .nxda-nm { flex: 1; min-width: 0; }
+  .nxda-nm small { display: block; }
+  .nxda-why { color: var(--nx-warn-fg); font-size: 11px; }
+  .nxda-auto { color: var(--nx-ink-muted); font-size: 11px; }
+  .nxda-cd { flex: 0 0 62px; color: var(--nx-ink-muted); font-size: 11.5px; }
+  .nxda-pr { flex: 0 0 96px; text-align: right; font-variant-numeric: tabular-nums; }
+  .nxda-dis { opacity: .55; }
+  .nxda-fail { background: var(--nx-err-bg); border-radius: 5px; }
+  .nxda-fail .nxda-why { color: var(--nx-err-fg); }
+  .nxda-foot { display: flex; align-items: center; gap: 8px; justify-content: flex-end;
+               border-top: 1px solid var(--nx-border-soft); margin-top: 8px; padding-top: 8px; }
+  .nxda-count { margin-right: auto; color: var(--nx-ink-muted); font-size: 12px; }
+  .nxda-progress { height: 8px; background: var(--nx-surface-sunken); border-radius: 5px; overflow: hidden; margin: 8px 0; }
+  .nxda-progress i { display: block; height: 100%; width: 0%; background: var(--nx-select-accent); transition: width .4s; }
+  .nxda-log { font-size: 12px; color: var(--nx-ink-muted); max-height: 40vh; overflow-y: auto; }
+  .nxda-err { color: var(--nx-err-fg); }
+  /* dlazdica: fotka dekoru prekryva farebny swatch (fallback = farba pod nou) */
+  .mdsw { overflow: hidden; position: relative; }
+  .mdsw-photo { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 5px; }
+  /* potvrdenie mazania (Halifax lekcia) */
+  #mdDelBody { font-size: 12px; margin: 4px 0 8px; }
+  .mddel-name { font-weight: 600; margin-bottom: 4px; }
+  .mddel-line { color: var(--nx-ink-muted); padding: 1px 0; }
+  .mddel-warn { background: var(--nx-warn-bg); border: 1px solid var(--nx-warnchip-border);
+                color: var(--nx-warn-fg); border-radius: 5px; padding: 5px 8px; margin-top: 6px; }
