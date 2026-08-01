@@ -261,6 +261,11 @@
     }
     var nb = el('mdNewDecorBtn');
     if (nb) nb.disabled = MD_RO;
+    // GH #102 P2: aj primarna Demos cesta je katalogova mutacia — v read-only
+    // rezime sa vypina rovnako ako rucny batch (server by create odmietol az
+    // po celom fetchovani rodiny).
+    var db = el('mdDemosAddBtn');
+    if (db) db.disabled = MD_RO;
     // GH #93 P2 (10. kolo): rollback aj pri zdravej SCHEMA 2 (zaloha existuje);
     // v read-only stave ho nesie nudzovy banner, tu by bol duplicitny.
     var rb = el('mdRestoreBtn');

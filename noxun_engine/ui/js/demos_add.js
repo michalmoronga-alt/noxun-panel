@@ -151,8 +151,12 @@ function nxdaInputChanged(){
   var inp = document.getElementById('nxdaInput');
   if (!inp) return;
   var v = inp.value.trim();
+  // GH #102 P2: URL sa NEnačítava na každý úder klávesu (postupné písanie
+  // https://… by strieľalo request za requestom do throttle radu) — URL
+  // potvrdzuje Enter alebo paste (nxdaMaybeUrl), tu sa len utíši našepkávač.
   if (/^https?:\/\//i.test(v)){
-    nxdaLoadFamily(v);
+    if (nxdaDebounce) clearTimeout(nxdaDebounce);
+    nxdaSuggestRender([], 'Adresa produktu — potvrď klávesom Enter.');
     return;
   }
   if (nxdaDebounce) clearTimeout(nxdaDebounce);
@@ -162,6 +166,13 @@ function nxdaInputChanged(){
     if (window.sketchup && sketchup.demos_name_search)
       sketchup.demos_name_search(JSON.stringify({ query: v, gen: NXDA_STATE.gen }));
   }, 150);
+}
+
+// Vložená URL (paste) sa načíta hneď — písaná až Enterom.
+function nxdaMaybeUrl(value){
+  var v = String(value == null ? '' : value).trim();
+  if (/^https?:\/\//i.test(v)){ nxdaLoadFamily(v); return true; }
+  return false;
 }
 
 function nxdaSuggestRender(hits, note){
@@ -250,8 +261,12 @@ function nxdaRenderSearch(body){
   inp.placeholder = 'Vlož URL produktu alebo píš názov… (napr. dub halifax)';
   inp.autocomplete = 'off';
   inp.addEventListener('input', nxdaInputChanged);
+  inp.addEventListener('paste', function(){
+    setTimeout(function(){ nxdaMaybeUrl(inp.value); }, 0); // hodnota až po paste
+  });
   inp.addEventListener('keydown', function(ev){
     if (ev.key === 'Enter'){
+      if (nxdaMaybeUrl(inp.value)) return;
       var first = document.querySelector('#nxdaSugg .nxda-sugg-row');
       if (first) nxdaLoadFamily(first.getAttribute('data-url'));
     } else if (ev.key === 'Escape'){ nxdaClose(); }
@@ -263,7 +278,13 @@ function nxdaRenderSearch(body){
   sugg.style.display = 'none';
   body.appendChild(sugg);
   body.appendChild(nxdaEl('div', 'nxda-note',
-    'Zhody sa hľadajú okamžite v stiahnutom zozname produktov Demosu — bez čakania na web. Enter potvrdí prvú zhodu.'));
+    'Zhody sa hľadajú okamžite v stiahnutom zozname produktov Demosu — bez čakania na web. Enter potvrdí prvú zhodu aj vpísanú URL.'));
+  // GH #102 P2: viditeľná cesta von aj pre myš (Escape nie je jediná).
+  var foot = nxdaEl('div', 'nxda-foot');
+  var close = nxdaEl('button', 'ghostbtn', 'Zavrieť');
+  close.setAttribute('data-action', 'nxda-close');
+  foot.appendChild(close);
+  body.appendChild(foot);
 }
 
 function nxdaFamilyRow(it){
@@ -330,6 +351,12 @@ function nxdaRenderFamily(body){
   body.appendChild(foot);
 }
 
+// GH #102 P1: fáza po overení všetkých položiek = zápis + obrázok — katalóg
+// môže byť už zapísaný, Zrušiť tam nemá čo robiť. Čistá funkcia (Node test).
+function nxdaImagePhase(logLen, total){
+  return total > 0 && logLen >= total;
+}
+
 function nxdaRenderProgress(body){
   var h = NXDA_STATE.header || {};
   body.appendChild(nxdaEl('div', 'nxda-crumb',
@@ -345,9 +372,13 @@ function nxdaRenderProgress(body){
   NXDA_STATE.log.forEach(function(line){ log.appendChild(nxdaEl('div', null, line)); });
   body.appendChild(log);
   var foot = nxdaEl('div', 'nxda-foot');
-  var cancel = nxdaEl('button', 'ghostbtn', 'Zrušiť (nič sa nezapíše)');
-  cancel.setAttribute('data-action', 'nxda-cancel-create');
-  foot.appendChild(cancel);
+  if (nxdaImagePhase(NXDA_STATE.log.length, total)){
+    foot.appendChild(nxdaEl('span', 'nxda-count', 'Zapisujem a sťahujem obrázok dekoru…'));
+  } else {
+    var cancel = nxdaEl('button', 'ghostbtn', 'Zrušiť (nič sa nezapíše)');
+    cancel.setAttribute('data-action', 'nxda-cancel-create');
+    foot.appendChild(cancel);
+  }
   body.appendChild(foot);
 }
 
@@ -395,18 +426,21 @@ var NXDA = {
 };
 
 function nxdaComplete(e){
+  // GH #102 P1: úspešné založenie sa prizná VŽDY — aj keď medzitým prišlo
+  // Zrušiť/iný stav (katalóg je reálne zapísaný, server complete po commite
+  // doručí vždy). Hláška „zrušené" sa nesmie ponechať nad založenou skupinou.
+  if (e.ok && e.result){
+    var r = e.result;
+    var n = (r.sheets || []).length + (r.edges || []).length;
+    var skipped = (r.skipped || []).length;
+    nxdaClose();
+    MD.setStatus('Skupina založená z Demosu: ' + n + ' položiek' +
+      (skipped ? ' (' + skipped + ' už v katalógu bolo)' : '') +
+      (r.image === false ? ' — obrázok sa nepodarilo stiahnuť' : '') + '.', false);
+    if (r.group_id && typeof mdOpenDetail === 'function') mdOpenDetail('g:' + r.group_id);
+    return;
+  }
   if (NXDA_STATE.mode === 'progress'){
-    if (e.ok && e.result){
-      var r = e.result;
-      var n = (r.sheets || []).length + (r.edges || []).length;
-      var skipped = (r.skipped || []).length;
-      nxdaClose();
-      MD.setStatus('Skupina založená z Demosu: ' + n + ' položiek' +
-        (skipped ? ' (' + skipped + ' už v katalógu bolo)' : '') +
-        (r.image === false ? ' — obrázok sa nepodarilo stiahnuť' : '') + '.', false);
-      if (r.group_id && typeof mdOpenDetail === 'function') mdOpenDetail('g:' + r.group_id);
-      return;
-    }
     // all-or-nothing fail: návrat na výber s vyznačenými vinníkmi
     NXDA_STATE.mode = 'family';
     NXDA_STATE.failed = {};
@@ -428,6 +462,12 @@ function nxdaComplete(e){
 
 if (typeof document !== 'undefined'){
   document.addEventListener('click', function(ev){
+    // GH #102 P2: klik na scrim (mimo karty) zatvára — myš nesmie ostať
+    // uväznená; počas progresu sa scrim ignoruje (zatvára Zrušiť/committed).
+    if (ev.target && ev.target.id === 'nxdaModal' && NXDA_STATE.mode !== 'progress'){
+      nxdaClose();
+      return;
+    }
     var sugg = ev.target && ev.target.closest ? ev.target.closest('.nxda-sugg-row') : null;
     if (sugg){ nxdaLoadFamily(sugg.getAttribute('data-url')); return; }
     var act = ev.target && ev.target.closest ? ev.target.closest('[data-action]') : null;
@@ -453,6 +493,7 @@ if (typeof module !== 'undefined' && module.exports){
     nxdaSelectedIids: nxdaSelectedIids,
     nxdaEdgeOnly: nxdaEdgeOnly,
     nxdaPriceLabel: nxdaPriceLabel,
-    nxdaSessionCheck: nxdaSessionCheck
+    nxdaSessionCheck: nxdaSessionCheck,
+    nxdaImagePhase: nxdaImagePhase
   };
 }

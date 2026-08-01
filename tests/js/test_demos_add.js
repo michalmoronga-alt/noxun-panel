@@ -61,6 +61,13 @@ eq(add.nxdaSessionCheck(5, 5), 'ok', 'rovnaka session');
 eq(add.nxdaSessionCheck(5, 6), 'new', 'novsia preberie');
 eq(add.nxdaSessionCheck(5, 4), 'stale', 'starsia sa zahodi');
 
+// --- GH #102 P1: faza zapis+obrazok (Zrusit sa skryva) ------------------------
+
+eq(add.nxdaImagePhase(0, 2), false, 'fetch beží — Zrušiť viditeľné');
+eq(add.nxdaImagePhase(1, 2), false, 'este chyba polozka');
+eq(add.nxdaImagePhase(2, 2), true, 'vsetky overene = zapis/obrazok faza');
+eq(add.nxdaImagePhase(0, 0), false, 'prazdny total nikdy nie je image faza');
+
 // --- proj_materials: mdImageSrc ---------------------------------------------------
 
 eq(md.mdImageSrc('C:\\Users\\PC\\AppData\\Roaming\\NOXUN\\Engine\\textures\\ab_1.jpg'),
