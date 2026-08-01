@@ -1015,6 +1015,16 @@ module Noxun
           # "bez overeneho formatu" by sa pri existujucom zazname nedal dosiahnut.
           rec.delete('sheet_size') if !create && data['clear_sheet_size']
           rec.delete('clear_sheet_size')
+          # M-A3e D-71: rucna vazba na dodavatela — cerstvy sanitize (zly host/
+          # tvar = save ODMIETNUTY), prazdne pole = vedome zmazanie vazby; zmena
+          # alebo zmazanie rusi price_checked_at (cena uz nie je overena).
+          if data.key?('demos_url')
+            st, val, invalidate = Materials.manual_demos_url(data['demos_url'],
+                                                             create ? nil : existing['demos_url'])
+            return set_status(val, true) if st == :invalid
+            val ? rec['demos_url'] = val : rec.delete('demos_url')
+            rec.delete('price_checked_at') if invalidate
+          end
           # 2B-1: edit zdroja drzi zdielane polia duplakov v synchre (format/
           # grain/farba) v JEDNOM atomickom zapise; create nema co synchrovat.
           saved = create ? Materials.upsert_sheet(rec) : Materials.upsert_sheet_with_duplak_sync(rec)
@@ -1136,6 +1146,14 @@ module Noxun
           # D-42 (audit FIX 8): duplicitny kod ABS (rovnaky dodavatel) -> potvrdenie.
           conflict = maybe_code_conflict(data, 'edge', create ? nil : id)
           return conflict if conflict
+          # M-A3e D-71: rucna vazba pasky — rovnaky kontrakt ako doska.
+          if data.key?('demos_url')
+            st, val, invalidate = Materials.manual_demos_url(data['demos_url'],
+                                                             create ? nil : existing['demos_url'])
+            return set_status(val, true) if st == :invalid
+            val ? rec['demos_url'] = val : rec.delete('demos_url')
+            rec.delete('price_checked_at') if invalidate
+          end
           return set_status('Uloženie katalógu zlyhalo.', true) unless Materials.upsert_edge(rec)
           after_catalog_change
           set_status(create ? "ABS páska pridaná (#{id})." : "ABS #{id} upravená.")

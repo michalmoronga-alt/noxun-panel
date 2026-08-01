@@ -3,7 +3,7 @@
      (%APPDATA%). -->
 <!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.5.24">
+<link rel="stylesheet" href="css/panel.css?v=0.5.25">
 
 <h1>Materiály projektu</h1>
 <p class="sub" id="mdline">…</p>
@@ -172,6 +172,11 @@
     <!-- D-42: kod (dodavatelsky/katalogovy) + preferovany dodavatel — volitelne -->
     <div class="row"><label>Kód</label><input id="ms_code" type="text" placeholder="dodávateľský kód"><span class="unit"></span></div>
     <div class="row"><label>Dodávateľ</label><input id="ms_supplier" type="text" placeholder="napr. Demos"><span class="unit"></span></div>
+    <!-- M-A3e (D-71): rucna vazba na produktovu stranku — server ju validuje
+         (len demos-trade.sk); prazdne pole = vedome zmazanie vazby; zmena rusi
+         datum overenia ceny. -->
+    <div class="row"><label>Demos URL</label><input id="ms_demos_url" type="text" placeholder="https://www.demos-trade.sk/…"><span class="unit"></span></div>
+    <div class="hint" id="ms_demos_hint" style="display:none"></div>
     <div class="row"><label>Farba</label><input id="ms_color" type="color" value="#d8c4a0"><span class="unit"></span></div>
     <div class="row"><label>Rodina</label><input id="ms_family" type="text" placeholder="voliteľné"><span class="unit"></span></div>
     <div class="row"><label>Výrobca</label><input id="ms_manufacturer" type="text" placeholder="voliteľné" disabled><span class="unit"></span></div>
@@ -202,6 +207,9 @@
     <div class="row"><label>Cena</label><input id="me_price" type="text" placeholder="nezadaná"><span class="unit">€/bm</span></div>
     <div class="row"><label>Kód</label><input id="me_code" type="text" placeholder="dodávateľský kód"><span class="unit"></span></div>
     <div class="row"><label>Dodávateľ</label><input id="me_supplier" type="text" placeholder="napr. Demos"><span class="unit"></span></div>
+    <!-- M-A3e (D-71): rucna vazba pasky — rovnaky kontrakt ako doska. -->
+    <div class="row"><label>Demos URL</label><input id="me_demos_url" type="text" placeholder="https://www.demos-trade.sk/…"><span class="unit"></span></div>
+    <div class="hint" id="me_demos_hint" style="display:none"></div>
     <div class="row"><label>Farba</label><input id="me_color" type="color" value="#d8c4a0"><span class="unit"></span></div>
     <div class="btnrow">
       <button class="primary" onclick="mdSaveEdge()">Uložiť</button>
@@ -274,8 +282,8 @@
 <!-- icons.js prvy (sprite musi existovat pred prvym renderom mdRenderLists);
      demos_diff.js pred proj_materials.js (mddLookup pouzivaju onclick handlery
      detailu; ready() bezi az na konci proj_materials.js). -->
-<script src="js/errors.js?v=0.5.24"></script>
-<script src="js/icons.js?v=0.5.24"></script>
-<script src="js/demos_diff.js?v=0.5.24"></script>
-<script src="js/demos_add.js?v=0.5.24"></script>
-<script src="js/proj_materials.js?v=0.5.24"></script>
+<script src="js/errors.js?v=0.5.25"></script>
+<script src="js/icons.js?v=0.5.25"></script>
+<script src="js/demos_diff.js?v=0.5.25"></script>
+<script src="js/demos_add.js?v=0.5.25"></script>
+<script src="js/proj_materials.js?v=0.5.25"></script>
