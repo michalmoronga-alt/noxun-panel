@@ -10,7 +10,7 @@
 
 ## Spomaľovače (vysoká priorita)
 
-*(momentálne žiadne — D-59/D-60 vyriešené PR #108)*
+- **D-70 · Aktualizácia cien má ísť cez uloženú väzbu** (Michal 1.8. neskoro večer, smoke aktualizácie H3176) — „Aktualizovať z Demosu“ hľadá adresu KAŽDÉHO variantu nanovo v sitemap podľa identity a uloženú `demos_url` väzbu vôbec nečíta → pri páskach „viac kandidátov“ (čelná hrana Q3176 RO zdieľa dekor aj rozmery s bežnou páskou) a zbytočné fetche. Súvisiaci nález: 4/7 pások padlo na „stránka nesedí s identitou“ — bug identity checku pások (stránky pások majú iné názvy parametrov), **opravený v PR #106** (v0.5.20 ho ešte mala). *Návrh (mini dávka M-A3d — čaká na Michalovo finálne slovo z debaty 1.8.): variant s väzbou sa fetchuje PRIAMO z demos_url (plné verify beží aj tak), sitemap match len pre nezviazané varianty; mechanika = základ „Prepočítať ceny“ dávky E.*
 
 ## UX drobnosti (nízka priorita)
 
