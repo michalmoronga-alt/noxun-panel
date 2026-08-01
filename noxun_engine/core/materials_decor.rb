@@ -347,8 +347,12 @@ module Noxun
       # (:catalog_read_only = nudzovy rezim 2A-4a, audit B4).
       def ensure_edge_for_sheet(material_id, client_schema: SCHEMA_LEGACY)
         return [:catalog_read_only, nil] if catalog_read_only?
+        # GH #103 P1: klient musi rozumiet SKUPINAM (schema 2 tvar pasky) —
+        # NIE aktualnemu markeru. Marker rastie aditivnymi poliami (3..7) a
+        # ensure ich netvori; porovnanie s markerom by panel (client 2)
+        # zamklo hned prvym duplak/demos/uni zaznamom v katalogu.
         server = catalog_schema
-        if server >= SCHEMA_GROUPS && client_schema.to_i < server
+        if server >= SCHEMA_GROUPS && client_schema.to_i < SCHEMA_GROUPS
           return [:schema_read_only, nil]
         end
         # GH #91 P1 (2. kolo): CELE read-modify-write pod zamkom s cerstvym
@@ -358,6 +362,10 @@ module Noxun
         JsonFileStore.invalidate(path)
         s = sheet(material_id)
         return [:no_sheet, nil] unless s
+        # V0.6 M-B1 (audit M-B BLOCKER 3): pre UNI sa paska NIKDY nedotvara —
+        # server stopka (JS modal je len UX; "Vytvorit a pokracovat" nesmie
+        # zalozit globalnu pasku pracovneho materialu).
+        return [:uni_material, nil] if uni?(s)
         th = s['thickness'].to_f
         part_th = th.positive? ? th : nil
         # Sheet-aware cesta LEN pre migrovany zaznam (nesie group_id). Zaznam
@@ -592,6 +600,11 @@ module Noxun
         return [false, edge_items] unless ok_de
         if sheet_items.empty? && edge_items.empty?
           return [false, 'Zadaj aspoň jeden variant dosky alebo ABS pásku.']
+        end
+        # GH #103 P2: UNI skupina nesmie dostat ABS pasky ani cez davku
+        # (+ variant na UNI dlazdici) — rovnaka zasada ako ensure stopka.
+        if !edge_items.empty? && uni_group?(nil, decor)
+          return [false, 'UNI je pracovný materiál bez ABS pások — pásky dostane až reálny dekor.']
         end
 
         # GH #91 P1: CELE read-modify-write pod JEDNYM medziprocesovym zamkom

@@ -61,9 +61,16 @@ module Noxun
       # starsi klient by pole normalize whitelistom ticho zahodil, preto ho
       # marker posiela do read-only.
       SCHEMA_IMAGE = 6
+      # V0.6 M-B1: UNI pracovne materialy (uni + uni_role na doske) — hrubku
+      # dielca urcuje dielec, katalogova hrubka je len DEFAULT roly. Marker 7
+      # LAZY prvym zapisom zaznamu s uni polom (vzor duplak/demos/image).
+      SCHEMA_UNI = 7
       # Najnovsia schema, ktorej tvar tato verzia pluginu POZNA (write guard +
       # assess). Bump VYHRADNE spolu s kodom, ktory nove polia nesie.
-      SCHEMA_CURRENT = SCHEMA_IMAGE
+      SCHEMA_CURRENT = SCHEMA_UNI
+      # Roly UNI sady (M-B): body=Korpus, front=Celo, decor2=Dekor2, hdf=HDF,
+      # board=Doska. PD zamerne BEZ UNI. Enum strazi put_uni_fields.
+      UNI_ROLES = %w[body front decor2 hdf board].freeze
       # Povoleny nasobic duplaku (2 = bezny pripad "36 z 2x18"; 3 = rezerva).
       DUPLAK_MULTIPLIERS = [2, 3].freeze
       # Nemenna PREDMIGRACNA zaloha (standard 7.1) — mimo bezneho .bak, ktory sa
@@ -319,6 +326,8 @@ module Noxun
             # V0.6 M-A: obrazok dekoru = marker 6 (kontrola oboch zoznamov —
             # keby pole niekedy nieslo aj ABS, bump nesmie chybat).
             need = SCHEMA_IMAGE if need < SCHEMA_IMAGE && !r['image_url'].to_s.empty?
+            # V0.6 M-B1: UNI pracovny material = marker 7.
+            need = SCHEMA_UNI if need < SCHEMA_UNI && r['uni'] == true
           end
         end
         need
@@ -542,7 +551,26 @@ module Noxun
         put_zastena_fields(out, a)
         put_demos_fields(out, a)
         put_image_fields(out, a)
+        put_uni_fields(out, a)
         out
+      end
+
+      # V0.6 M-B1 (SCHEMA 7): UNI priznak + rola sa NESU merge-safe. uni sa
+      # uklada LEN ako true (vzor universal na ABS); uni_role VYHRADNE z enumu
+      # UNI_ROLES a LEN spolu s uni (rola bez priznaku je nezmysel).
+      def put_uni_fields(out, a)
+        if flag_true?(a['uni'] || a[:uni])
+          out['uni'] = true
+          role = (a['uni_role'] || a[:uni_role]).to_s.strip
+          out['uni_role'] = role if UNI_ROLES.include?(role)
+        end
+        out
+      end
+
+      # JEDINA autorita rozpoznania UNI zaznamu (vzor duplak?) — buildery,
+      # preflighty, validacia aj payloady sa pytaju tu.
+      def uni?(rec)
+        rec.is_a?(Hash) && rec['uni'] == true
       end
 
       # V0.6 M-A (SCHEMA 6, audit F8): obrazok dekoru sa NESIE merge-safe, ale

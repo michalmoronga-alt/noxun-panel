@@ -275,7 +275,9 @@ NxTest.test('ma1 create: happy path — skupina s kodmi, cenami, URL, obrazkom, 
   NxTest.assert_close(0.52, e['price_per_bm'], 0.001, 'cena s DPH za meter')
   NxTest.assert_equal(s['group_id'], e['group_id'], 'paska v tej istej skupine')
   raw = JSON.parse(File.read(MAT_MA.path))
-  NxTest.assert_equal(6, raw['schema'], 'image_url dviha marker na 6 (lazy)')
+  # M-B1: seed je UNI (marker 7 od zaciatku) — image_url by sam dvihol na 6,
+  # marker drzi vyssiu zo schem (downgrade zakazany).
+  NxTest.assert(raw['schema'] >= 6, "image_url vyzaduje aspon 6, marker je #{raw['schema']}")
   NxTest.assert(File.exist?(DIC.path_for(img)), 'obrazok v textures cache')
 ensure
   FileUtils.rm_f(DIC.path_for('https://www.demos-trade.sk/content/images/product/default/244894.jpeg').to_s)

@@ -33,7 +33,10 @@ module Noxun
       #   doubled_m2       = cast m2 pridana duplakmi (uz po x mult)
       #   doubled_quantity = pocet kusov duplak dielcov (informativny)
       # count_min/max sa pocitaju z celkoveho m2 (nakup zdrojovych platni).
-      def estimate(rows, sheet_sizes: {}, k_min: K_MIN, k_max: K_MAX)
+      # V0.6 M-B1 (audit F7): uni_ids = mapa material_id => true pre UNI
+      # zaznamy — ich pocet platni je len ORIENTACNY (format je pracovny
+      # default) a vystup to nesie ('uni' => true), UI ho tak aj oznaci.
+      def estimate(rows, sheet_sizes: {}, k_min: K_MIN, k_max: K_MAX, uni_ids: {})
         kmin, kmax = valid_coeffs(k_min, k_max)
         per = {}
         Array(rows).each do |r|
@@ -69,6 +72,7 @@ module Noxun
             out['doubled_m2'] = g['doubled_m2'].round(3)
             out['doubled_quantity'] = g['doubled_quantity'].to_i
           end
+          out['uni'] = true if uni_ids.is_a?(Hash) && uni_ids[mid]
           out
         end.sort_by { |g| g['material_id'] }
       end

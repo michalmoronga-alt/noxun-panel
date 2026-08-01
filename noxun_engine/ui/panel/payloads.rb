@@ -23,6 +23,8 @@ module Noxun
             'role_label' => BOARD_ROLE_LABELS[role] || role,
             'length' => cfg['length'], 'width' => cfg['width'], 'thickness' => cfg['thickness'],
             'material_id' => cfg['material_id'],
+            # V0.6 M-B1: UNI doska ma hrubku editovatelnu v karte (JS odomkne pole).
+            'uni' => (defined?(Materials) && Materials.uni?(Materials.sheet(cfg['material_id'])) ? true : false),
             'grain_direction' => cfg['grain_direction'] || 'none',
             'edges' => cfg['edges'].is_a?(Hash) ? cfg['edges'] : {},
             'edge_labels' => AbsRules.edge_labels(role),
@@ -116,9 +118,11 @@ module Noxun
             'sheets' => Materials.sheets.map { |s|
               # grain (V0.4.7c, Codex GH #33): vkladacia karta dosky predvyplna smer
               # dekoru z katalogu — bez grain by formular posielal nespravny default.
-              { 'id' => s['material_id'], 'label' => sheet_label(s, ctx), 'decor' => s['decor'],
-                'thickness' => s['thickness'], 'color' => s['color'], 'grain' => s['grain'] }
-                .merge(schema2_mirror_fields(s))
+              # V0.6 M-B1: 'uni' => true LEN pri UNI (JS filtre/badge/board karta).
+              base = { 'id' => s['material_id'], 'label' => sheet_label(s, ctx), 'decor' => s['decor'],
+                       'thickness' => s['thickness'], 'color' => s['color'], 'grain' => s['grain'] }
+              base['uni'] = true if Materials.uni?(s)
+              base.merge(schema2_mirror_fields(s))
             },
             'edges' => Materials.edges.map { |a|
               { 'id' => a['abs_id'], 'label' => abs_label(a, ctx), 'decor' => a['decor'],
@@ -207,6 +211,9 @@ module Noxun
         end
 
         def sheet_label(s, ctx = label_ctx)
+          # V0.6 M-B1: UNI label BEZ typu a hrubky ("Korpus UNI · UNI") —
+          # katalogova hrubka je len pracovny default, v selecte by klamala.
+          return "#{label_base(s, s['manufacturer'], ctx)} · UNI" if Materials.uni?(s)
           th = s['thickness'].to_f
           thl = (th == th.round ? th.round : th)
           # 2B-2 (GH #95 P1): varianty s formatom v identite (PD/zastena) sa mozu

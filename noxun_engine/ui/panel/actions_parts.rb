@@ -53,6 +53,8 @@ module Noxun
           return nil unless mat && defined?(Materials)
           sheet = Materials.sheet(mat)
           return nil unless sheet # legacy material mimo katalogu — stary rezim
+          # V0.6 M-B1: UNI dielec — hrubku dedi po korpuse, ziadny konflikt.
+          return nil if Materials.uni?(sheet)
           pd = CabinetBuilder.plan_parts_by_key(params)[rk]
           return nil unless pd
           want = pd[:prod][:thickness].to_f
@@ -95,6 +97,9 @@ module Noxun
           when :no_standard_width
             widths = Materials::AUTO_WIDTHS.map { |w| fmt_mm(w) }.join('/')
             [false, "Hrúbka je mimo štandardných šírok pások (#{widths} mm) — pridaj pásku ručne v Materiáloch projektu."]
+          when :uni_material
+            # V0.6 M-B1 (audit B3): UNI pasky nema — tvorba je zablokovana.
+            [false, 'UNI je pracovný materiál bez ABS pások — olep sa rieši až s reálnym dekorom.']
           else
             [false, 'Vytvorenie ABS pásky zlyhalo.']
           end

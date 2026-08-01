@@ -21,6 +21,8 @@ module Noxun
       # Remap kontrakt 0,4 (rozhodnute 30.7.): stara 0,4 sa NIKDY automaticky
       # nenahradza — hrana ide do lost s tymto reasonom, pouzivatel vybera vedome.
       REASON_ABS_04_MANUAL = 'abs_04_manual'
+      # V0.6 M-B1: UNI pracovny material — pasky nema a nikdy sa netvoria.
+      REASON_UNI = 'abs_uni_material'
 
       # Nominalne triedy (standard 7.5): pravidla roli ziadaju TRIEDU, resolver
       # ju preklada na dostupne pasky skupiny v tomto poradi preferencie.
@@ -79,6 +81,9 @@ module Noxun
       # Vrati [abs_id|nil, reason|nil] — reason aj pri uspechu (abs_15_fallback).
       def abs_for_sheet(sheet_rec, nominal, part_thickness = nil)
         return [nil, REASON_ABS_STRUCTURE] unless sheet_rec.is_a?(Hash)
+        # V0.6 M-B1: UNI nema pasky ZO ZASADY — picker vracia vlastny dovod
+        # (validacia ho pre UNI dielce potlaca, hlasi sa len "material neurceny").
+        return [nil, REASON_UNI] if uni?(sheet_rec)
         cands = edges_of_group(sheet_rec)
         st = identity_norm(sheet_rec['structure'])
         exact = st.empty? ? [] : cands.select { |a| identity_norm(a['structure']) == st }

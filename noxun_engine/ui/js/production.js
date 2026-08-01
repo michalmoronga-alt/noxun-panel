@@ -152,6 +152,9 @@
       var fb = e && e.fallback;
       var fmt = e ? (num(e.sheet_size[0]) + '×' + num(e.sheet_size[1])) : '—';
       var pl = e ? (num(e.count_min, 1) + ' – ' + num(e.count_max, 1)) : '—';
+      // V0.6 M-B1 (audit F7): UNI = material neurceny, pocet platni je len
+      // orientacny (format je pracovny default) — NIE nakupne cislo.
+      if (e && e.uni === true){ pl += ' <span class="muted">(orientačne — UNI)</span>'; }
       var ds = dupSrc[s.material_id];
       if (!e && ds){
         fmt = '—';

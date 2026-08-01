@@ -478,7 +478,11 @@ module Noxun
             control: control['items'], counts: control['counts'],
             # D-19: odhad platni per material (rozsah 10-25 %; JS paruje mapou
             # podla material_id — nie indexom, Codex F7)
-            sheet_estimate: SheetEstimate.estimate(bom[:rows], sheet_sizes: sheet_sizes),
+            sheet_estimate: SheetEstimate.estimate(
+              bom[:rows], sheet_sizes: sheet_sizes,
+              # M-B1 (F7): UNI pocty platni su len orientacne — flag pre UI.
+              uni_ids: smap.each_with_object({}) { |(id, s), out| out[id] = true if Materials.uni?(s) }
+            ),
             # V0.5 C: default projektu + zapamatany merge (JS input lifecycle F10);
             # model_key = epocha prepnuti + cesta (GH P2: rovnake tituly nestacia)
             vepo: { default_project: default_project_name(model),

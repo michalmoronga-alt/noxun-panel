@@ -322,7 +322,13 @@ module Noxun
           # D-41 (audit FIX 10): picker sirky pasky dostava CIELOVU hrubku dielca —
           # katalogova hrubka sheetu ma prednost (cela 18/19 sa geometricky prisposobia
           # sheetu az v materialized_part, resolve_edges bezi skor).
-          part_th = (sheet && sheet['thickness']) || pd[:prod][:thickness]
+          # V0.6 M-B1: pri UNI hrubku urcuje DIELEC (katalogova je len default
+          # roly) + hardening M-B F6: 0.0 je truthy — nekladna katalogova
+          # hrubka nesmie pickeru podhodit need=2 mm.
+          sheet_th = sheet && sheet['thickness'].to_f
+          sheet_th = nil unless sheet_th && sheet_th.positive?
+          uni_sheet = defined?(Materials) && Materials.uni?(sheet)
+          part_th = (uni_sheet ? nil : sheet_th) || pd[:prod][:thickness]
           picker_issues = abs_issues.nil? ? nil : []
           base_edges = if defined?(AbsRules)
                          AbsRules.resolve_edges(pd[:role], decor, part_th,
@@ -359,8 +365,10 @@ module Noxun
           edges = base_edges.merge(known_edges(ov_edges))
           grain = sheet && sheet['grain'].to_s
           grain = 'none' unless %w[length width none].include?(grain)
+          # V0.6 M-B1: UNI sheet_thickness sa NEexportuje (nil) — materialized_part
+          # cela nepretvaruje na katalogovy default a vyrobny udaj drzi config.
           { part_key: part_key, role_key: part_key, material_id: mat_id, edges: edges,
-            grain_direction: grain, sheet_thickness: (sheet && sheet['thickness']),
+            grain_direction: grain, sheet_thickness: (uni_sheet ? nil : (sheet && sheet['thickness'])),
             material_source: mat_source }
         end
 
@@ -405,6 +413,9 @@ module Noxun
         # Cela su specialny pripad: povolene varianty 18/19 mm upravia aj geometriu.
         def validate_material_thickness!(mat_id, sheet, pd)
           return unless mat_id && sheet
+          # V0.6 M-B1: UNI je pracovny material — hrubku urcuje dielec, ziadny
+          # drift sa nevynucuje (semafor hlasi ORANGE "material neurceny").
+          return if defined?(Materials) && Materials.uni?(sheet)
           want = pd[:prod][:thickness].to_f
           have = sheet['thickness'].to_f
           return if thickness_ok_for?(pd[:role], want, have)
@@ -480,10 +491,20 @@ module Noxun
         # bez zhody sa zmena odmietne (ziadny tichy skok na cudzi material).
         def pick_body_sheet(want, current, pool, schema: 1)
           w = want.to_f
+          # V0.6 M-B1: skrinka NA UNI ostava na UNI pri kazdej hrubke — auto-pick
+          # sa nespusta (UNI prijme lubovolnu hrubku; prepnut ju na realny
+          # material smie len vedomy vyber, nie zmena hrubky).
+          if defined?(Materials) && Materials.uni?(current)
+            return { pick: current, candidates: [current] }
+          end
           # GH P2: v tolerancii 0,05 moze byt viac roznych hrubok (18,56 vs 18,60) —
           # prve kriterium je NAJMENSI rozdiel od want, material_id je az tie-break.
-          cands = Array(pool).select { |s| s.is_a?(Hash) && thickness_eq?(s['thickness'], w) }
-                             .sort_by { |s| [(s['thickness'].to_f - w).abs, s['material_id'].to_s] }
+          # V0.6 M-B1: UNI zaznamy NIE SU kandidati auto-picku (zmena hrubky
+          # nesmie realny material ticho vymenit za pracovny).
+          cands = Array(pool).select do |s|
+            s.is_a?(Hash) && thickness_eq?(s['thickness'], w) &&
+              !(defined?(Materials) && Materials.uni?(s))
+          end.sort_by { |s| [(s['thickness'].to_f - w).abs, s['material_id'].to_s] }
           return { pick: nil, candidates: cands } if cands.empty?
           if defined?(Materials) && schema.to_i >= Materials::SCHEMA_GROUPS
             return { pick: pick_body_sheet_v2(cands, current), candidates: cands }
@@ -521,6 +542,9 @@ module Noxun
         # Vrati [:same, nil] (netreba nic) / [:adopted, nil] /
         #       [:range, nil] (hrubka mimo 6–50) / [:blocked, [nazvy dielcov]].
         def adopt_thickness(params, sheet)
+          # V0.6 M-B1: UNI material hrubku NIKDY nevnucuje — dielec/korpus si
+          # drzi svoju (adopcia je no-op, D-46 ponuka sa nezobrazi).
+          return [:same, nil] if defined?(Materials) && Materials.uni?(sheet)
           have = sheet.is_a?(Hash) ? sheet['thickness'].to_f : 0.0
           return [:same, nil] unless have.positive?
           old = params['thickness']
@@ -591,6 +615,7 @@ module Noxun
             next unless pd
             sheet = Materials.sheet(mid)
             next unless sheet # legacy material mimo katalogu sa nekontroluje
+            next if Materials.uni?(sheet) # M-B1 F6: UNI override hrubku neblokuje
             next if thickness_ok_for?(pd[:role], pd[:prod][:thickness].to_f, sheet['thickness'].to_f)
             out << (pd[:name] || rk).to_s
           end
@@ -643,7 +668,13 @@ module Noxun
             new_sheet = Materials.sheet(new_mat)
             # Cielova hrubka: katalogova hrubka noveho sheetu (cela 18/19 sa jej
             # prisposobia — FIX 10), fallback konstrukcna hrubka dielca.
-            target = new_sheet ? new_sheet['thickness'].to_f : pd[:prod][:thickness].to_f
+            # V0.6 M-B1: UNI cielova hrubka = hrubka DIELCA (katalogova je len
+            # default roly, sirka pasky sa vybera podla realneho dielca).
+            target = if new_sheet && !(defined?(Materials) && Materials.uni?(new_sheet))
+                       new_sheet['thickness'].to_f
+                     else
+                       pd[:prod][:thickness].to_f
+                     end
             target = target.positive? ? target : nil
             if schema2
               remapped, issues = Materials.remap_edges_v2(rec['edges'], Materials.sheet(old_mat),

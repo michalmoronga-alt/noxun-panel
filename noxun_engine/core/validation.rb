@@ -54,6 +54,7 @@ module Noxun
       CAT_PANEL_ABS = 'panel_abs'  # ORANGE
       CAT_HARDWARE  = 'hardware'   # ORANGE
       CAT_BUILD     = 'build'      # ORANGE — build warnings stavby (nalez 9: JEDINY kanon)
+      CAT_UNI       = 'uni_material' # ORANGE — V0.6 M-B1: dielec na UNI (material neurceny)
 
       SEVERITY_RANK = { RED => 0, ORANGE => 1 }.freeze
 
@@ -85,11 +86,26 @@ module Noxun
         smap = sheets.is_a?(Hash) ? sheets : {}
         emap = edges.is_a?(Hash) ? edges : nil
         items = []
+        # V0.6 M-B1 (audit F4): dielce na UNI materiali — ich ABS build
+        # warnings sa potlacaju (jedna jasna sprava "material neurceny"
+        # namiesto trojiteho hluku o chybajucich paskach).
+        uni_parts = {}
+        Array(collected[:records]).each do |r|
+          next unless r.is_a?(Hash)
+          s = smap[r['material_id'].to_s]
+          uni_parts["#{r['owner_id']}|#{r['part_key']}"] = true if uni_sheet?(s)
+        end
         Array(collected[:records]).each { |r| check_record(r, smap, emap, items) }
         Array(collected[:hardware_overrides]).each { |ov| check_hardware(ov, items) }
-        Array(collected[:warnings]).each { |w| check_build(w, items) }
+        Array(collected[:warnings]).each { |w| check_build(w, items, uni_parts) }
         items = sort_items(dedup(items))
         { 'items' => items, 'counts' => counts(items) }
+      end
+
+      # UNI rozpoznanie bez zavislosti na Materials (headless mapy) — zhodne
+      # s Materials.uni? (rec['uni'] == true).
+      def uni_sheet?(sheet)
+        sheet.is_a?(Hash) && sheet['uni'] == true
       end
 
       # --- kontroly dielca ---------------------------------------------------
@@ -107,6 +123,14 @@ module Noxun
           items << record_item(RED, CAT_MATERIAL, r,
                                "Dielec „#{disp_name(r)}“ (#{disp_owner(r)}) — materiál #{mat} " \
                                'nie je v aktuálnom katalógu.')
+        elsif uni_sheet?(sheet)
+          # V0.6 M-B1: UNI = material neurceny. JEDNA jasna ORANGE polozka;
+          # drift/oversize/ABS kontroly sa NEHLASIA (katalogova hrubka aj
+          # format su len pracovne defaulty, pasky UNI zo zasady nema).
+          items << record_item(ORANGE, CAT_UNI, r,
+                               "Dielec „#{disp_name(r)}“ (#{disp_owner(r)}) — materiál UNI " \
+                               '(neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).')
+          return
         elsif sheet
           check_thickness(r, role, sheet, items)
           check_oversize(r, sheet, items)
@@ -233,11 +257,14 @@ module Noxun
       # ORANGE: build warning stavby (kategoria "stavba"). KONTROLA je JEDINY
       # kanonicky zoznam (nalez 9) — povodna sekcia "Upozornenia stavby" zmizla.
       # Build warnings maju owner_id a PRIPADNE part_key (owner_pid neexistuje).
-      def check_build(w, items)
+      def check_build(w, items, uni_parts = {})
         return unless w.is_a?(Hash)
         oid  = w['owner_id'].to_s
         pkey = w['part_key'].to_s
         code = w['code'].to_s
+        # V0.6 M-B1 (audit F4): ulozene ABS warnings dielca, ktory je AKTUALNE
+        # na UNI, sa potlacaju — hlasi sa len CAT_UNI (jedna sprava, nie tri).
+        return if code.start_with?('abs_') && uni_parts["#{oid}|#{pkey}"]
         msg  = (w['message'] || w['code']).to_s
         text = msg.empty? ? 'Upozornenie stavby.' : msg
         text = "#{oid}: #{text}" unless oid.empty?
