@@ -283,6 +283,17 @@ module Noxun
         return [false, 'Štruktúra rubu vyžaduje číslo rubového dekoru.'] if bd.empty? && !bs.empty?
         return [false, "Rubový dekor je príliš dlhý (max #{CODE_MAX})."] if bd.length > CODE_MAX
         return [false, "Štruktúra rubu je príliš dlhá (max #{CODE_MAX})."] if bs.length > CODE_MAX
+        # M-C (audit F5): hranova uprava patri VYHRADNE typu PD a len z enumu;
+        # chybajuca hodnota je platne "nezname" (server, nie UI).
+        pe = (a['pd_edge_subtype'] || a[:pd_edge_subtype]).to_s.strip
+        unless pe.empty?
+          unless identity_norm(type) == 'PD'
+            return [false, 'Hranová úprava (postforming/ABS) patrí len pracovnej doske.']
+          end
+          unless PD_EDGE_SUBTYPES.include?(pe)
+            return [false, 'Hranová úprava musí byť postforming alebo abs.']
+          end
+        end
         [true, nil]
       end
 

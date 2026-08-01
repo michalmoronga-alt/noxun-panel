@@ -65,9 +65,17 @@ module Noxun
       # dielca urcuje dielec, katalogova hrubka je len DEFAULT roly. Marker 7
       # LAZY prvym zapisom zaznamu s uni polom (vzor duplak/demos/image).
       SCHEMA_UNI = 7
+      # V0.6 M-C: hranova uprava PD (pd_edge_subtype postforming|abs) — riadi
+      # ABS defaulty a semafor. Marker 8 LAZY prvym zapisom zaznamu s polom
+      # (vzor duplak/zastena/demos/image/uni — starsi klient by pole normalize
+      # whitelistom ticho zahodil, preto ho marker posiela do read-only).
+      SCHEMA_PD_EDGE = 8
       # Najnovsia schema, ktorej tvar tato verzia pluginu POZNA (write guard +
       # assess). Bump VYHRADNE spolu s kodom, ktory nove polia nesie.
-      SCHEMA_CURRENT = SCHEMA_UNI
+      SCHEMA_CURRENT = SCHEMA_PD_EDGE
+      # M-C: povolene hodnoty hranovej upravy PD (registrovy zoznam
+      # pd_edge_subtypes je zdroj; konstanta = rychly enum guard pri zapise).
+      PD_EDGE_SUBTYPES = %w[postforming abs].freeze
       # Roly UNI sady (M-B): body=Korpus, front=Celo, decor2=Dekor2, hdf=HDF,
       # board=Doska. PD zamerne BEZ UNI. Enum strazi put_uni_fields.
       UNI_ROLES = %w[body front decor2 hdf board].freeze
@@ -110,22 +118,31 @@ module Noxun
       #   thickness_suggestions — bezne hrubky do naseptavaca (NIE enum)
       #   pd_edge_subtypes      — len PD: hranova uprava (postforming | ABS rovna hrana)
       #   body_candidate        — typ, z ktoreho sa realne stava telo korpusu
+      # M-C: 'density' (kg/m3) = default hustota TYPU (rozhodnutie Michal 2.8.:
+      # hustota je vlastnost TYPU, nie zaznamu — DTDL ma ~90 % rovnaku; rozdiel
+      # MDF vs DTDL rozhoduje pri hmotnosti CELA pre vyklopy/zavesy v davke D).
+      # Hodnoty su inzinierske defaulty (DTD ~680, MDF ~750, HDF ~870, kompakt
+      # HPL ~1350); per-zaznam override az ked ho prax vypyta.
       TYPE_REGISTRY = {
         'DTDL' => { 'label' => 'DTD laminovaná', 'format_hint' => [2800.0, 2070.0].freeze,
-                    'thickness_suggestions' => [18.0, 19.0, 36.0].freeze, 'body_candidate' => true },
+                    'thickness_suggestions' => [18.0, 19.0, 36.0].freeze, 'body_candidate' => true,
+                    'density' => 680.0 },
         'MDF' => { 'label' => 'MDF', 'format_hint' => [2800.0, 2070.0].freeze,
-                   'thickness_suggestions' => [18.0, 19.0].freeze, 'body_candidate' => true },
+                   'thickness_suggestions' => [18.0, 19.0].freeze, 'body_candidate' => true,
+                   'density' => 750.0 },
         'HDF' => { 'label' => 'HDF', 'format_hint' => [2800.0, 2070.0].freeze,
-                   'thickness_suggestions' => [3.0].freeze, 'body_candidate' => false },
+                   'thickness_suggestions' => [3.0].freeze, 'body_candidate' => false,
+                   'density' => 870.0 },
         'PD' => { 'label' => 'Pracovná doska', 'format_hint' => nil,
                   'thickness_suggestions' => [38.0, 20.0].freeze,
                   'pd_edge_subtypes' => %w[postforming abs].freeze, 'body_candidate' => false,
-                  'format_in_identity' => true },
+                  'format_in_identity' => true, 'density' => 680.0 },
         'ZASTENA' => { 'label' => 'Zástena', 'format_hint' => [4100.0, 640.0].freeze,
                        'thickness_suggestions' => [9.2, 10.0].freeze, 'body_candidate' => false,
-                       'format_in_identity' => true, 'double_sided' => true },
+                       'format_in_identity' => true, 'double_sided' => true, 'density' => 680.0 },
         'KOMPAKT' => { 'label' => 'Kompaktná doska', 'format_hint' => nil,
-                       'thickness_suggestions' => [12.0].freeze, 'body_candidate' => false }
+                       'thickness_suggestions' => [12.0].freeze, 'body_candidate' => false,
+                       'density' => 1350.0 }
       }.freeze
 
       # D-44 (audit B2): NAVRH formatu platne podla typu dosky pre nove varianty
@@ -328,6 +345,8 @@ module Noxun
             need = SCHEMA_IMAGE if need < SCHEMA_IMAGE && !r['image_url'].to_s.empty?
             # V0.6 M-B1: UNI pracovny material = marker 7.
             need = SCHEMA_UNI if need < SCHEMA_UNI && r['uni'] == true
+            # V0.6 M-C: hranova uprava PD = marker 8.
+            need = SCHEMA_PD_EDGE if need < SCHEMA_PD_EDGE && !r['pd_edge_subtype'].to_s.empty?
           end
         end
         need
@@ -552,7 +571,46 @@ module Noxun
         put_demos_fields(out, a)
         put_image_fields(out, a)
         put_uni_fields(out, a)
+        put_pd_edge_fields(out, a)
         out
+      end
+
+      # V0.6 M-C (SCHEMA 8): hranova uprava PD sa NESIE merge-safe — LEN enum
+      # hodnota a LEN pri kanonickom type PD (typovy guard drzi aj normalize,
+      # nie iba validacia — pole na inom type je nezmysel a nesmie prezit ani
+      # okruznou cestou). Chybajuca hodnota = "nezname" (kluc sa neuklada).
+      def put_pd_edge_fields(out, a)
+        v = (a['pd_edge_subtype'] || a[:pd_edge_subtype]).to_s.strip
+        return out if v.empty?
+        out['pd_edge_subtype'] = v if PD_EDGE_SUBTYPES.include?(v) &&
+                                      identity_norm(out['type']) == 'PD'
+        out
+      end
+
+      # M-C: default hustota materialu (kg/m3) z registra TYPOV. Neznamy/"iny"
+      # typ aj UNI = nil (ziadna vymyslena vaha) — spotrebuje davka D (kovanie:
+      # hmotnost cela rozhoduje o vyklopoch/zavesoch).
+      def density_for(rec)
+        return nil unless rec.is_a?(Hash)
+        return nil if uni?(rec)
+        entry = type_registry_entry(rec['type'])
+        entry && entry['density'] ? entry['density'].to_f : nil
+      end
+
+      # M-C: ktore ABS defaulty typ materialu POTLACA (autorita pre
+      # AbsRules.resolve_edges aj semafor). :all = ziadne automaticke ABS:
+      #   KOMPAKT — monoliticka hrana, nelepi sa nikdy;
+      #   PD s podtypom postforming — pozdlzne hrany su hotove z vyroby a
+      #   rezane konce sa lepia HPDB paskou s. 45 (nakupna polozka mimo ABS
+      #   katalogu — vystupy HPDB riesi davka E, vedome mimo M-C).
+      # nil = standardne rolove defaulty (aj PD bez podtypu — nezname data sa
+      # ticho nepotlacaju, audit B2). Rucne overridy hran ostavaju MOZNE vzdy.
+      def abs_default_suppression(rec)
+        return nil unless rec.is_a?(Hash)
+        key = identity_norm(rec['type'])
+        return :all if key == 'KOMPAKT'
+        return :all if key == 'PD' && rec['pd_edge_subtype'].to_s == 'postforming'
+        nil
       end
 
       # V0.6 M-B1 (SCHEMA 7): UNI priznak + rola sa NESU merge-safe. uni sa

@@ -131,6 +131,9 @@ module Noxun
               'group_id' => gid, 'decor_name' => gname, 'structure' => structure,
               'back_decor' => (back_decor.empty? ? nil : back_decor),
               'back_structure' => (back_structure.empty? ? nil : back_structure),
+              # M-C: hranova uprava PD z verify_sheet (audit F3); prazdne = kluc
+              # sa neulozi (put_pd_edge_fields + typovy guard validacie).
+              'pd_edge_subtype' => (item['pd_edge_subtype'].to_s.strip.empty? ? nil : item['pd_edge_subtype'].to_s.strip),
               'code' => code, 'supplier' => 'Demos',
               'price_per_m2' => normalize_price(item['price']),
               'demos_url' => sanitized_demos_url(item['demos_url']),
