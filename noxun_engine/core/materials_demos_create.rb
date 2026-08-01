@@ -101,27 +101,36 @@ module Noxun
             code = item['code'].to_s.strip
             return [:invalid, { 'detail' => 'doska bez kódu sortimentu' }] if code.empty?
             structure = item['structure'].to_s.strip
+            # D-66 (audit B1): rub zasteny je SUCAST variant identity (2B-2) —
+            # bez neho by sa existujuca zastena (batch v3 / predosly import)
+            # porovnala s rubom nil a vznikol by duplicitny variant.
+            back_decor = item['back_decor'].to_s.strip
+            back_structure = item['back_structure'].to_s.strip
             want = sheet_identity_key({ 'decor' => decor, 'type' => vt, 'thickness' => th,
                                         'structure' => structure, 'sheet_size' => size,
-                                        'group_id' => gid, 'manufacturer' => manufacturer },
+                                        'group_id' => gid, 'manufacturer' => manufacturer,
+                                        'back_decor' => back_decor, 'back_structure' => back_structure },
                                       SCHEMA_GROUPS)
             if batch_sheet_keys.any? { |k| identity_keys_tolerant?(k, want) }
               return [:invalid, { 'detail' => "dve vybrané položky sú ten istý variant (#{v3_sheet_label('type' => vt, 'structure' => structure, 'thickness' => th)}) — odškrtni jednu" }]
             end
             batch_sheet_keys << want
             if find_sheet_variant(decor, vt, th, structure, size,
-                                  group_id: gid, manufacturer: manufacturer)
+                                  group_id: gid, manufacturer: manufacturer,
+                                  back_decor: back_decor, back_structure: back_structure)
               skipped << v3_sheet_label('type' => vt, 'structure' => structure, 'thickness' => th)
               next
             end
             src = {
               'material_id' => generate_sheet_id(decor, vt, th, structure: structure,
-                                                 sheet_size: size, taken: taken,
-                                                 schema: SCHEMA_GROUPS),
+                                                 sheet_size: size, back_decor: back_decor,
+                                                 taken: taken, schema: SCHEMA_GROUPS),
               'family' => "#{manufacturer} #{decor}".strip,
               'manufacturer' => manufacturer, 'decor' => decor, 'type' => vt,
               'thickness' => th, 'grain' => 'length', 'sheet_size' => size,
               'group_id' => gid, 'decor_name' => gname, 'structure' => structure,
+              'back_decor' => (back_decor.empty? ? nil : back_decor),
+              'back_structure' => (back_structure.empty? ? nil : back_structure),
               'code' => code, 'supplier' => 'Demos',
               'price_per_m2' => normalize_price(item['price']),
               'demos_url' => sanitized_demos_url(item['demos_url']),

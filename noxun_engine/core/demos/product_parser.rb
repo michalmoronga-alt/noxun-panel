@@ -187,22 +187,57 @@ module Noxun
         rows.values
       end
 
+      # D-66: zastena nesie oba dekory v JEDNOM parametri stranky
+      # ("F094/H1145", "ST15/ST10", "Nazov lica / Nazov rubu"). Prisny split
+      # (audit F4, jediny helper pre hlavicku, verify aj lookup): presne DVE
+      # casti po trime — split('/', -1), aby koncova lomka ("F094/H1145/")
+      # nepresla ako dvojica; tri a viac casti = nil (ziadne tiche zahodenie).
+      # require_both: dekor vyzaduje obe casti neprazdne; struktura/nazov smie
+      # mat rub prazdny (vrati sa '').
+      def split_pair(value, require_both: true)
+        parts = value.to_s.split('/', -1).map(&:strip)
+        return nil unless parts.length == 2
+        return nil if parts[0].empty?
+        return nil if require_both && parts[1].empty?
+        parts
+      end
+
       # --- identity verify (audit B5): parsovana stranka vs katalogovy zaznam --
       # PLNA identita: cislo dekoru (povinne), struktura, hrubka, format (pri
       # typoch s formatom v identite) — cez kanonicke normalizacie Materials.
-      # Zastena rub a ABS strukturu nad RELATED polozkami riesi B-2 apply; TU
-      # sa overuje HLAVNY produkt stranky proti cielovemu zaznamu.
+      # ABS strukturu nad RELATED polozkami riesi B-2 apply; TU sa overuje
+      # HLAVNY produkt stranky proti cielovemu zaznamu.
       # GH #96 P1: kazdy identity komponent, ktory ma CIELOVY zaznam, musi byt
       # na stranke PRITOMNY a ZHODNY — chybajuci parameter (Demos zmeni markup)
       # NIE JE zhoda, inak by stacil spravny dekor a kod/cena ineho variantu by
       # presli guardom.
+      # D-66 (audit B2): zastena zaznam sa porovnava LICOM — stranka bez paru
+      # v dekore nie je zhoda; rub sa overuje proti back_* zaznamu (ak ich
+      # zaznam ma — GH #96 P1 pravidlo plati aj tu).
       def identity_match?(parsed, sheet_record)
         p = parsed['params'] || {}
-        return false unless p['decor'] &&
-                            Materials.identity_norm(p['decor']) == Materials.identity_norm(sheet_record['decor'])
+        page_decor = p['decor']
+        page_structure = p['structure']
+        if Materials.identity_norm(sheet_record['type']) == 'ZASTENA'
+          dp = split_pair(page_decor)
+          return false unless dp
+          page_decor = dp[0]
+          sp = split_pair(page_structure, require_both: false)
+          page_structure = sp[0] if sp
+          unless sheet_record['back_decor'].to_s.strip.empty?
+            return false unless Materials.identity_norm(dp[1]) ==
+                                Materials.identity_norm(sheet_record['back_decor'])
+          end
+          unless sheet_record['back_structure'].to_s.strip.empty?
+            return false unless sp && Materials.identity_norm(sp[1]) ==
+                                      Materials.identity_norm(sheet_record['back_structure'])
+          end
+        end
+        return false unless page_decor &&
+                            Materials.identity_norm(page_decor) == Materials.identity_norm(sheet_record['decor'])
         unless sheet_record['structure'].to_s.strip.empty?
-          return false unless p['structure'] &&
-                              Materials.identity_norm(p['structure']) == Materials.identity_norm(sheet_record['structure'])
+          return false unless page_structure &&
+                              Materials.identity_norm(page_structure) == Materials.identity_norm(sheet_record['structure'])
         end
         if sheet_record['thickness']
           return false unless p['thickness'] &&

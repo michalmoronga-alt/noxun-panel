@@ -40,6 +40,9 @@ function nxdaAutoEdgeSuggest(items, checks, sheetIid){
   var sheet = null;
   (items || []).forEach(function(it){ if (it && it.iid === sheetIid) sheet = it; });
   if (!sheet || sheet.kind !== 'sheet') return null;
+  // D-66: zastena sa neolepuje — paska sa k nej nikdy nenavrhuje automaticky
+  // (rucny vyber ostava mozny).
+  if (sheet.type === 'ZASTENA') return null;
   var th = parseFloat(sheet.thickness_hint);
   if (isNaN(th) || th <= 0) return null;
   function fits(it){

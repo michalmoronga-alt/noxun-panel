@@ -217,9 +217,12 @@ NxTest.test('ma1 family: klasifikacia slugov — sheet typy, ABS rozmery, vzorka
   li = DFA.classify_item('x', '6', 'https://www.demos-trade.sk/lista-prechodova-h3303/', 'ks', 1.0)
   NxTest.assert_equal('other', li['kind'])
   NxTest.assert_equal('mimo podporovaných typov materiálu', li['reason'], 'D-65: uz nie "(prislusenstvo)"')
+  # D-66: zastena uz NIE JE "zaloz rucne" — je doskovy kandidat (rub cita
+  # verify_sheet z parametrov stranky pri fetchi variantu).
   za = DFA.classify_item('x', '7', 'https://www.demos-trade.sk/zastena-h3303-st10-f620-4100-640-9-2/', 'ks', 1.0)
-  NxTest.assert_equal('other', za['kind'])
-  NxTest.assert(za['reason'].include?('zástena'), za['reason'])
+  NxTest.assert_equal(%w[sheet ZASTENA], [za['kind'], za['type']], za.inspect)
+  NxTest.assert_equal(nil, za['reason'])
+  NxTest.assert_close(9.2, za['thickness_hint'], 0.01)
 end
 
 NxTest.test('ma1 family: klasifikacia D-65 — alias prefixy dtd-laminovana/mdfl/kd-in/absl') do
