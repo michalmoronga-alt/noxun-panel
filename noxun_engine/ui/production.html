@@ -2,7 +2,7 @@
      Vanilla JS, ziadne CDN, slovensky. READ-ONLY nad modelom — klik iba vybera.
      Data: NX.setBom push z production_dialog.rb. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.5.35">
+<link rel="stylesheet" href="css/panel.css?v=0.5.36">
 <!-- V0.5 D: styly semaforu ZAMERNE inline v production.html (NIE v zdielanom
      panel.css — paralelna davka D-29 ho meni; ziadny cache-bust konflikt). -->
 <style>
@@ -18,6 +18,16 @@
   .bomtab td.ctrlicon { text-align: center; width: 20px; }
   .bomtab tr.ctrl-red td:first-child { box-shadow: inset 3px 0 0 #c62828; }
   .bomtab tr.ctrl-orange td:first-child { box-shadow: inset 3px 0 0 #ffb74d; }
+  /* V0.6 D1b: tab Kovanie — nakupny zoznam zo setov (styly ZAMERNE inline). */
+  .hwsec { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px;
+           font-weight: 700; font-size: 12.5px; color: #37474f; }
+  .hwsec-warn span { color: #e65100; }
+  .hwbanner { background: #fff3e0; border: 1px solid #ffb74d; border-radius: 6px;
+              padding: 6px 10px; margin: 4px 0; font-size: 12px; color: #7a3c00; }
+  .bomtab tr.hwcat td { background: #eceff1; font-weight: 700; font-size: 11.5px;
+                        color: #546e7a; padding: 2px 6px; }
+  .bomtab tr.hwmiss td { color: #b45309; }
+  .bomtab tr.hwsum td { font-weight: 600; border-top: 2px solid #cfd8dc; }
 </style>
 
 <div class="prodhead">
@@ -50,5 +60,5 @@
 <div id="prodBody" class="prodbody"><div class="muted">Načítavam…</div></div>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.5.35"></script>
-<script src="js/production.js?v=0.5.35"></script>
+<script src="js/errors.js?v=0.5.36"></script>
+<script src="js/production.js?v=0.5.36"></script>

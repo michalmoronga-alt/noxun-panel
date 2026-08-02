@@ -482,6 +482,81 @@ NxTest.test('hw katalog F8: pouzivatelom upraveny/previazany riadok 93240 sa NEp
   NxTest.assert(HWCAT.find('105408'), 'backfill krytiek bezi nezavisle')
 end
 
+# --- D1b: nakupny CSV + CRUD kniznice setov + projektovy merge pravidiel ------
+
+NxTest.test('hw sety D1b: purchase_csv — SK ciarka, nezadana cena prazdna (nie 0), nemapovana sekcia') do
+  exp = HWS.expand([NxSets.hinge_item, NxSets.slide_item(450.0)], NxSets.state,
+                   catalog: NxSets.catalog)
+  csv = HWS.purchase_csv(exp, project: 'Test kuchyňa', generated_at: '2026-08-02 20:00')
+  NxTest.assert(csv.include?('"104717"'), 'kod v CSV')
+  NxTest.assert(csv.include?('"4,18"'), 'cena s DPH so SK ciarkou')
+  NxTest.assert(csv.include?('"8,36"'), 'medzisucet 2 x 4,18')
+  NxTest.assert(csv.include?('NEMAPOVANÉ'), 'sekcia nemapovanych (NL 450 bez kodu)')
+  NxTest.assert(csv.include?('"SPOLU'), 'suctovy riadok')
+  line = csv.lines.find { |l| l.include?('"105408"') }
+  NxTest.assert(!line.nil? && line.include?(';"";""'), 'nezadana cena = prazdne bunky, NIKDY 0')
+end
+
+NxTest.test('hw sety D1b: save_set!/delete_set! — revision guard, typ nemenny, mapping sa cisti') do
+  [HWS.path, "#{HWS.path}.bak"].each { |f| File.delete(f) if File.exist?(f) }
+  Noxun::Engine::JsonFileStore.invalidate(HWS.path)
+  rev = HWS.revision
+  status, rec = HWS.save_set!({ 'set_id' => 'moj-set', 'name' => 'Môj set',
+                                'generic_type' => 'hinge',
+                                'members' => [{ 'code' => '111', 'qty' => 1 }] }, revision: rev)
+  NxTest.assert_equal(:ok, status)
+  NxTest.assert_equal('moj-set', rec['set_id'])
+  status, = HWS.save_set!({ 'set_id' => 'x', 'name' => 'X', 'generic_type' => 'hinge',
+                            'members' => [{ 'code' => '1', 'qty' => 1 }] }, revision: rev)
+  NxTest.assert_equal(:conflict, status, 'stara revizia kniznice = conflict')
+  status, info = HWS.save_set!({ 'set_id' => 'moj-set', 'name' => 'Iný typ',
+                                 'generic_type' => 'slide',
+                                 'members' => [{ 'code' => '1', 'qty' => 1 }] },
+                               revision: HWS.revision)
+  NxTest.assert_equal(:invalid, status, 'generic_type existujuceho setu sa NEMENI')
+  NxTest.assert(info.to_s.include?('typ'), 'zrozumitelny dovod')
+  NxTest.assert_equal(true, HWS.set_global_mapping!('hinge', 'moj-set'))
+  NxTest.assert_equal('moj-set', HWS.load['mapping']['hinge'])
+  NxTest.assert_equal(false, HWS.set_global_mapping!('hinge', 'set-co-nie-je'),
+                      'mapovanie len na existujuci set spravneho typu')
+  status, = HWS.delete_set!('moj-set', revision: HWS.revision)
+  NxTest.assert_equal(:ok, status)
+  NxTest.assert_equal(nil, HWS.load['mapping']['hinge'],
+                      'mapovanie na zmazany set sa vycisti (ORANGE to ukaze)')
+  status, = HWS.delete_set!('moj-set', revision: HWS.revision)
+  NxTest.assert_equal(:not_found, status)
+ensure
+  # uprac: cisty seed pre nasledne testy (kniznica je globalny sandbox subor)
+  [HWS.path, "#{HWS.path}.bak"].each { |f| File.delete(f) if File.exist?(f) }
+  Noxun::Engine::JsonFileStore.invalidate(HWS.path)
+end
+
+NxTest.test('hw pravidla D1b: merge_project_seed! doplni nove + obnovi nezmenene, potom :none') do
+  hr = Noxun::Engine::HardwareRules
+  m = NxFakeModel.new
+  NxTest.assert_equal([:none, [], []], hr.merge_project_seed!(m),
+                      'bez snapshotu sa nic nerobi (projekt berie global sam)')
+  legacy = hr::LEGACY_SEED_SHAPES['vysuvy-nl-podla-hlbky'][0]
+  hr.set_project_rules(m, hr.normalize_rules([hr::SEED_RULES[0], legacy]))
+  status, added, refreshed = hr.merge_project_seed!(m)
+  NxTest.assert_equal(:updated, status)
+  NxTest.assert_equal(%w[podperky-policove zavesenie-hornej-skrinky zavesy-podla-vysky],
+                      added.sort, 'chybajuce seed pravidla doplnene')
+  NxTest.assert_equal(['vysuvy-nl-podla-hlbky'], refreshed, 'nezmeneny v1 seed obnoveny')
+  rules = hr.project_rules(m)
+  NxTest.assert_equal(5, rules.length)
+  vys = rules.find { |r| r['rule_id'] == 'vysuvy-nl-podla-hlbky' }
+  NxTest.assert(vys['series'].include?(420.0), 'seria po obnove = Atira rad')
+  status2, = hr.merge_project_seed!(m)
+  NxTest.assert_equal(:none, status2, 'druhy beh nic nemeni (idempotentne)')
+  custom = hr.normalize_rules([legacy.merge('series' => [111.0])])
+  hr.set_project_rules(m, custom)
+  _, _, refreshed3 = hr.merge_project_seed!(m)
+  NxTest.assert_equal([], refreshed3, 'pouzivatelska seria sa NIKDY neobnovuje')
+  vys3 = hr.project_rules(m).find { |r| r['rule_id'] == 'vysuvy-nl-podla-hlbky' }
+  NxTest.assert_equal([111.0], vys3['series'], 'uprava prezila merge')
+end
+
 NxTest.test('hw katalog F8: bezna mutacia zachovava seed_version (write round-trip)') do
   hws_catalog_wipe!
   HWCAT.assess!

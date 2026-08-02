@@ -277,6 +277,10 @@ module Noxun
           # Prvy build ho zapise z globalnej kniznice; sme VNUTRI operacie volajuceho,
           # takze undo vrati model aj snapshot naraz.
           rules = defined?(HardwareRules) ? HardwareRules.ensure_project_rules!(model) : nil
+          # D1b: rovnaka mechanika pre SETY kovania — prva stavba zmrazi
+          # mapping + definicie z globalu (audit B2/F9; :invalid sa NEOPRAVUJE
+          # ticho — ensure vtedy vrati nil a nic nezapise).
+          HardwareSets.ensure_project_state!(model) if defined?(HardwareSets)
           plan = Construction.build_plan(cfg, cid, hardware_rules: rules) # validuje interne
           ents = cdef.entities
           tid = template_id_for(cfg[:type])

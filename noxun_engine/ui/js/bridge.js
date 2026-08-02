@@ -153,7 +153,7 @@
       if (c.available_depth!=null) setVal('av_depth', Math.round(c.available_depth));
       if (c.available_height!=null) setVal('av_height', Math.round(c.available_height));
       renderPartCard(c.part_card || null); // V0.3 karta dielca (ak je vybraty dielec)
-      renderHardware(c.hardware || [], c.hardware_overrides || []); // V0.4 kovanie
+      renderHardware(c.hardware || [], c.hardware_overrides || [], c.hardware_set_options || []); // V0.4 kovanie + D1b sety
       renderPreview();
       refreshZoneUI();
     },

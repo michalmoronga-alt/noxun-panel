@@ -158,4 +158,9 @@
     if (window.sketchup && sketchup.load_global) sketchup.load_global('');
   }
 
+  // V0.6 D1b (audit F4): vedome doplnenie novych seed pravidiel do projektu.
+  function mergeSeed(){
+    if (window.sketchup && sketchup.merge_seed) sketchup.merge_seed('');
+  }
+
   if (window.sketchup && sketchup.ready) sketchup.ready('');

@@ -55,6 +55,7 @@ module Noxun
           cb(dlg, 'ready')       { |_p| push_state }
           cb(dlg, 'save_rules')  { |p| handle_save(p) }
           cb(dlg, 'load_global') { |_p| push_global }
+          cb(dlg, 'merge_seed')  { |_p| handle_merge_seed } # V0.6 D1b (audit F4)
           # Diagnostika JS chyb (vzor panel.rb): priamo, NIE cez cb — chyba v logovani
           # nesmie spustit set_status a slucku.
           dlg.add_action_callback('js_error') do |_ctx, msg|
@@ -111,6 +112,32 @@ module Noxun
           return false if (model ? model.path.to_s : '') != @baseline_path.to_s
           current = HardwareRules.project_rules(model) || HardwareRules.load
           current == @baseline_rules
+        end
+
+        # V0.6 D1b (audit F4): vedome doplnenie novych default pravidiel do
+        # PROJEKTOVEHO snapshotu (nikdy sa nemerguje sam). 1 undo krok;
+        # formular sa nacita nanovo (baseline sa obnovi).
+        def handle_merge_seed
+          model = Sketchup.active_model
+          return set_status('Žiadny aktívny model.', true) if model.nil?
+          if HardwareRules.project_rules(model).nil?
+            return set_status('Projekt ešte nemá vlastné pravidlá — preberá globálne (nie je čo dopĺňať).')
+          end
+          model.start_operation('NOXUN: Doplnenie predvolených pravidiel', true)
+          status, added, refreshed = HardwareRules.merge_project_seed!(model)
+          model.commit_operation
+          push_state
+          if status == :none
+            set_status('Projekt už má všetky predvolené pravidlá v aktuálnom tvare.')
+          else
+            parts = []
+            parts << "doplnené: #{added.join(', ')}" unless added.empty?
+            parts << "obnovené: #{refreshed.join(', ')}" unless refreshed.empty?
+            set_status("Predvolené pravidlá — #{parts.join(' · ')}. Skrinky sa prepočítajú pri najbližšej zmene.")
+          end
+        rescue StandardError => e
+          model.abort_operation if model
+          raise e
         end
 
         # Volane z EngineAppObserver pri File > New/Open/Activate: otvoreny formular

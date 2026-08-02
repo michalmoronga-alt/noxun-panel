@@ -55,7 +55,55 @@ module Noxun
           params['hardware'] = (cfg['hardware'].is_a?(Array) ? cfg['hardware'] : []).map do |h|
             h.is_a?(Hash) ? h.merge('label' => HardwareRules.label_for(h['generic_type'])) : h
           end
+          # V0.6 D1b: vyber setu per typ NA SKRINKE (override projektovej
+          # predvolby) — ponuka + efektivny stav; server je autorita.
+          params['hardware_set_options'] = hardware_set_options(cfg, params['hardware'])
           params
+        end
+
+        # Ponuka setov pre typy kovania, ktore skrinka realne ma: projektove
+        # mapovanie (snapshot; missing = global default NA CITANIE — zmrazi ho
+        # az stavba/zmena), sety z GLOBALU + aktualne mapovany/overridnuty zo
+        # SNAPSHOTU (v globale uz nemusi byt). invalid = prazdna ponuka + flag.
+        def hardware_set_options(cfg, hardware)
+          model = Sketchup.active_model
+          status, state = HardwareSets.project_state_status(model)
+          if status == :missing
+            lib = HardwareSets.load
+            snap_sets = {}
+            lib['sets'].each { |s| snap_sets[s['set_id']] = s }
+            proj_map = lib['mapping']
+          elsif state
+            snap_sets = state['sets']
+            proj_map = state['mapping']
+          else
+            snap_sets = {}
+            proj_map = {}
+          end
+          globals = HardwareSets.load['sets']
+          overrides = cfg['hardware_sets'].is_a?(Hash) ? cfg['hardware_sets'] : {}
+          types = Array(hardware).filter_map { |h| h.is_a?(Hash) ? h['generic_type'].to_s : nil }
+                                 .reject(&:empty?).uniq
+          types |= overrides.keys
+          types.map do |gt|
+            opts = globals.select { |s| s['generic_type'] == gt }
+            [proj_map[gt], overrides[gt]].compact.each do |sid|
+              next if opts.any? { |s| s['set_id'] == sid }
+              snap = snap_sets[sid]
+              opts += [snap] if snap && snap['generic_type'] == gt
+            end
+            proj_sid = proj_map[gt]
+            proj_name = proj_sid && (opts.find { |s| s['set_id'] == proj_sid } || {})['name']
+            {
+              'generic_type' => gt,
+              'label' => HardwareRules.label_for(gt),
+              'project_set_id' => proj_sid,
+              'project_set_name' => proj_name,
+              'override_set_id' => overrides[gt],
+              'status' => status.to_s,
+              'options' => opts.map { |s| { 'set_id' => s['set_id'], 'name' => s['name'] } }
+            }
+          end
         end
 
         # existujuce params korpusu (na zachovanie casti pri ciastocnej zmene)

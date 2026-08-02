@@ -42,8 +42,9 @@
   }
   function hwKey(owner, type, rule){ return (owner||'') + '||' + type + '||' + rule; }
 
-  // items: config.hardware (pole) alebo null (nic neoznacene); overrides: hardware_overrides.
-  function renderHardware(items, overrides){
+  // items: config.hardware (pole) alebo null (nic neoznacene); overrides: hardware_overrides;
+  // setOptions (D1b): ponuka setu per typ (server payloads.hardware_set_options).
+  function renderHardware(items, overrides, setOptions){
     var box = el('hwRows'); if (!box) return;
     if (items === null){
       box.innerHTML = '<div class="muted">Označ skrinku v modeli — kovanie sa počíta na vloženej skrinke.</div>';
@@ -80,7 +81,26 @@
         + '</div>';
     });
     if (!html) html = '<div class="muted">Skrinka nemá žiadne kovanie (bez čiel, bez podstavca).</div>';
+    // V0.6 D1b: vyber setu per typ — override projektovej predvolby na TEJTO
+    // skrinke. Kompaktne (vertikalny priestor): 1 riadok na pritomny typ.
+    (setOptions || []).forEach(function(o){
+      if (!o || !(o.options || []).length && !o.override_set_id) return;
+      var projLabel = 'projekt: ' + (o.project_set_name || (o.project_set_id || 'bez setu'));
+      var sel = '<select class="hwsetsel" data-gt="'+esc(o.generic_type)+'" onchange="onHwSet(this)">'
+              + '<option value=""'+(o.override_set_id ? '' : ' selected')+'>'+esc(projLabel)+'</option>';
+      (o.options || []).forEach(function(s){
+        sel += '<option value="'+esc(s.set_id)+'"'+(o.override_set_id === s.set_id ? ' selected' : '')+'>'
+             + esc(s.name) + '</option>';
+      });
+      sel += '</select>';
+      html += '<div class="hwrow hwsetrow"><span class="hwname">'+esc(o.label)
+            + ' <span class="hwown">set</span></span>' + sel + '</div>';
+    });
     box.innerHTML = html;
+  }
+  function onHwSet(sel){
+    if (window.sketchup && sketchup.set_hardware_set)
+      sketchup.set_hardware_set(JSON.stringify({ generic_type: sel.dataset.gt, set_id: sel.value }));
   }
 
   function hwPayload(node, extra){

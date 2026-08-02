@@ -45,6 +45,8 @@
 # vstup = raw hardware z Bom.collect (s owner_id), NIE agregovany BOM
 # (audit F6 — per-owner clen potrebuje vlastnika).
 require 'json'
+require 'csv'
+require 'digest'
 
 module Noxun
   module Engine
@@ -166,6 +168,115 @@ module Noxun
       def reload!
         JsonFileStore.reload!(path)
         load
+      end
+
+      # Baseline guard okna (vzor catalog_revision): odtlacok suboru kniznice.
+      def revision
+        ensure_seeded
+        raw = begin
+          File.binread(path)
+        rescue StandardError
+          ''
+        end
+        Digest::SHA1.hexdigest(raw)[0, 12]
+      end
+
+      # Ulozi/nahradi JEDEN set v globalnej kniznici (D1b editor). Identita =
+      # set_id; revision = baseline z casu nacitania okna (cudzia zmena
+      # medzitym = :conflict, okno sa obnovi). generic_type existujuceho setu
+      # sa NEMENI (mapovania by ticho zmenili vyznam).
+      def save_set!(set_def, revision: nil)
+        norm = normalize_sets([set_def]).first
+        return [:invalid, 'set sa nedá uložiť — skontroluj kódy a členov'] if norm.nil?
+        return [:conflict, nil] if revision && revision != self.revision
+        lib = load
+        sets = lib['sets']
+        idx = sets.index { |s| s['set_id'] == norm['set_id'] }
+        if idx
+          if sets[idx]['generic_type'] != norm['generic_type']
+            return [:invalid, 'typ kovania existujúceho setu sa nemení — vytvor nový set']
+          end
+          sets[idx] = norm
+        else
+          sets << norm
+        end
+        return [:write_failed, nil] unless write(sets, lib['mapping'])
+        [:ok, norm]
+      end
+
+      # Zmaze set z globalnej kniznice; mapovanie globalu sa ocisti (write ho
+      # filtruje cez ids). Projektove snapshoty drzia vlastne kopie — historia
+      # zakaziek sa mazanim kniznice NEMENI (rovnaka filozofia ako katalog).
+      def delete_set!(set_id, revision: nil)
+        sid = set_id.to_s.strip
+        return [:not_found, nil] if sid.empty?
+        return [:conflict, nil] if revision && revision != self.revision
+        lib = load
+        sets = lib['sets'].reject { |s| s['set_id'] == sid }
+        return [:not_found, nil] if sets.length == lib['sets'].length
+        return [:write_failed, nil] unless write(sets, lib['mapping'])
+        [:ok, sid]
+      end
+
+      # Nastavi mapovanie GLOBALNEJ kniznice (default novych projektov).
+      def set_global_mapping!(generic_type, set_id)
+        gt = generic_type.to_s.strip
+        return false unless BuildPlan::GENERIC_TYPES.include?(gt)
+        lib = load
+        mapping = lib['mapping']
+        if set_id.nil? || set_id.to_s.strip.empty?
+          mapping.delete(gt)
+        else
+          sid = set_id.to_s.strip
+          return false unless lib['sets'].any? { |s| s['set_id'] == sid && s['generic_type'] == gt }
+          mapping[gt] = sid
+        end
+        write(lib['sets'], mapping)
+      end
+
+      # --- nakupny CSV (D1b, audit N11) ----------------------------------------
+
+      CSV_CRLF = "\r\n"
+
+      # CSV nakupneho zoznamu z expand vysledku — CISTA funkcia (testy).
+      # Format ako VEPO (';' + force_quotes + CRLF, UTF-8); cena nil =
+      # "nezadana" (prazdna bunka, NIKDY 0). Nemapovane polozky = vlastna
+      # sekcia na konci (viditelnost — zoznam NIE JE kompletny).
+      def purchase_csv(exp, project: '', generated_at: '')
+        rows = exp.is_a?(Hash) ? Array(exp['rows']) : []
+        unmapped = exp.is_a?(Hash) ? Array(exp['unmapped']) : []
+        summary = exp.is_a?(Hash) && exp['summary'].is_a?(Hash) ? exp['summary'] : {}
+        CSV.generate(col_sep: ';', force_quotes: true, row_sep: CSV_CRLF) do |out|
+          out << ['NOXUN kovanie — nákupný zoznam', project.to_s, generated_at.to_s]
+          out << ['kategória', 'kód', 'názov', 'počet', 'MJ', 'cena € s DPH', 'medzisúčet € s DPH']
+          rows.each do |r|
+            out << [
+              r['missing'] ? 'MIMO KATALÓGU' : r['category'].to_s,
+              r['code'].to_s,
+              r['name_sk'].to_s,
+              r['quantity'].to_i,
+              r['unit'].to_s,
+              price_cell(r['price_eur_vat']),
+              price_cell(r['subtotal_eur_vat'])
+            ]
+          end
+          out << ['SPOLU (len známe ceny)', '', '', summary['quantity'].to_i, '',
+                  '', price_cell(summary['total_eur_vat'])]
+          unless unmapped.empty?
+            out << []
+            out << ['NEMAPOVANÉ (bez kódov — nenacenené)', '', '', '', '', '', '']
+            unmapped.each do |u|
+              out << [u['generic_type'].to_s, '', "#{u['cabinet_id']} #{u['owner_part_key']}".strip,
+                      u['quantity'].to_i, '', '', '']
+            end
+          end
+        end
+      end
+
+      # SK desatinna ciarka (Excel); nil = prazdna bunka (nezadana != 0).
+      def price_cell(v)
+        return '' unless v.is_a?(Numeric)
+        format('%.2f', v.to_f).tr('.', ',')
       end
 
       # --- projektovy snapshot (NOXUN dict na modeli) --------------------------

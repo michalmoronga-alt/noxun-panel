@@ -196,18 +196,81 @@
     box.innerHTML = h + '</tbody></table>';
   }
 
+  // V0.6 D1b: cena — nil/undefined = „nezadaná" (—), NIKDY 0 (audit N11).
+  function price(v){ return (v == null || isNaN(v)) ? '—' : num(v, 2) + ' €'; }
+
+  function hwCsvExport(){
+    if (!BOM || !window.sketchup || !sketchup.hw_csv_export) return;
+    NX.setStatus('Exportujem nákupný zoznam…', false);
+    sketchup.hw_csv_export(JSON.stringify({
+      gen: BOM.gen,
+      project: (el('vepoProject') ? el('vepoProject').value : '').trim()
+    }));
+  }
+
+  // V0.6 D1b: tab Kovanie = NÁKUPNÝ ZOZNAM zo setov (hore) + generika podľa
+  // pravidiel (dole, klik-select cez .hwrow ostáva). Dáta VÝHRADNE zo servera
+  // (BOM.hardware_sets = HardwareSets.expand) — JS len renderuje.
   function renderHardware(box){
+    var hs = BOM.hardware_sets || null;
     var list = BOM.hardware || [];
-    if (!list.length){ box.innerHTML = '<div class="muted">Žiadne kovanie (kovanie sa počíta z pravidiel korpusov).</div>'; return; }
-    var h = '<table class="bomtab"><thead><tr><th>Typ</th><th>Parametre</th><th>ks</th><th>Kde</th></tr></thead><tbody>';
-    list.forEach(function(g, i){
-      var params = Object.keys(g.params || {}).map(function(k){ return esc(k) + ' ' + esc(g.params[k]); }).join(', ') || '—';
-      var kde = (g.breakdown || []).map(function(b){ return esc(b.owner_id) + '×' + b.quantity + (b.source === 'manual' ? ' (ručne)' : ''); }).join(', ');
-      // V0.6 C-2 (audit F11): slovensky label zo SERVERA (fallback surovy typ)
-      h += '<tr class="hwrow" data-i="' + i + '"><td>' + esc(g.label || g.generic_type) + '</td><td>' + params + '</td>' +
-           '<td><b>' + num(g.quantity) + '</b></td><td>' + kde + '</td></tr>';
-    });
-    box.innerHTML = h + '</tbody></table>';
+    var h = '<div class="hwsec"><span>Nákupný zoznam (sety)</span>'
+          + '<button class="ghostbtn" onclick="hwCsvExport()" title="CSV nákupného zoznamu — počíta sa z čerstvého modelu">⇩ CSV kovania</button></div>';
+    if (!hs){
+      h += '<div class="muted">Nákupný zoznam sa nepodarilo zostaviť (pozri Ruby konzolu).</div>';
+    } else {
+      if (hs.state_status === 'invalid'){
+        h += '<div class="hwbanner">Sety projektu sú poškodené — nič sa nemapuje. Otvor Katalóg kovania → Predvoľby projektu a vyber sety nanovo.</div>';
+      }
+      var rows = hs.rows || [];
+      if (!rows.length){
+        h += '<div class="muted">Žiadne namapované kovanie' + ((hs.unmapped || []).length ? '' : ' (model nemá kovanie)') + '.</div>';
+      } else {
+        h += '<table class="bomtab"><thead><tr><th>Kód</th><th>Názov</th><th>ks</th><th>MJ</th><th>€ s DPH</th><th>Spolu</th></tr></thead><tbody>';
+        var cat = null;
+        rows.forEach(function(r){
+          var c = r.missing ? 'MIMO KATALÓGU' : (r.category || '—');
+          if (c !== cat){ cat = c; h += '<tr class="hwcat"><td colspan="6">' + esc(c) + '</td></tr>'; }
+          h += '<tr' + (r.missing ? ' class="hwmiss"' : '') + '><td>' + esc(r.code) + '</td>'
+             + '<td>' + esc(r.missing ? 'nie je v katalógu kovania' : (r.name_sk || '')) + '</td>'
+             + '<td><b>' + num(r.quantity) + '</b></td><td>' + esc(r.unit || '—') + '</td>'
+             + '<td>' + price(r.price_eur_vat) + '</td><td>' + price(r.subtotal_eur_vat) + '</td></tr>';
+        });
+        var sum = hs.summary || {};
+        h += '<tr class="hwsum"><td colspan="5">SPOLU — len známe ceny'
+           + (sum.unknown_prices ? ' (' + sum.unknown_prices + '× cena nezadaná)' : '')
+           + '</td><td><b>' + price(sum.total_eur_vat) + '</b></td></tr></tbody></table>';
+      }
+      var un = hs.unmapped || [];
+      if (un.length){
+        h += '<div class="hwsec hwsec-warn"><span>Bez kódov (' + un.length + ') — nenacenené, detail v tabe Kontrola</span></div>'
+           + '<table class="bomtab"><tbody>';
+        un.forEach(function(u){
+          var reason = u.reason === 'nl_missing'
+            ? ('set nemá kód pre dĺžku' + (u.nominal_length != null ? ' NL ' + Math.round(u.nominal_length) : ''))
+            : (u.reason === 'set_missing' ? ('set „' + u.set_id + '“ v projekte chýba') : 'typ nemá priradený set');
+          h += '<tr class="hwmiss"><td>' + esc(u.generic_type) + '</td>'
+             + '<td>' + esc(u.cabinet_id + (u.owner_part_key ? ' · ' + u.owner_part_key : '')) + '</td>'
+             + '<td>' + num(u.quantity) + '</td><td>' + esc(reason) + '</td></tr>';
+        });
+        h += '</tbody></table>';
+      }
+    }
+    h += '<div class="hwsec"><span>Podľa pravidiel (generika)</span></div>';
+    if (!list.length){
+      h += '<div class="muted">Žiadne kovanie (kovanie sa počíta z pravidiel korpusov).</div>';
+    } else {
+      h += '<table class="bomtab"><thead><tr><th>Typ</th><th>Parametre</th><th>ks</th><th>Kde</th></tr></thead><tbody>';
+      list.forEach(function(g, i){
+        var params = Object.keys(g.params || {}).map(function(k){ return esc(k) + ' ' + esc(g.params[k]); }).join(', ') || '—';
+        var kde = (g.breakdown || []).map(function(b){ return esc(b.owner_id) + '×' + b.quantity + (b.source === 'manual' ? ' (ručne)' : ''); }).join(', ');
+        // V0.6 C-2 (audit F11): slovensky label zo SERVERA (fallback surovy typ)
+        h += '<tr class="hwrow" data-i="' + i + '"><td>' + esc(g.label || g.generic_type) + '</td><td>' + params + '</td>' +
+             '<td><b>' + num(g.quantity) + '</b></td><td>' + kde + '</td></tr>';
+      });
+      h += '</tbody></table>';
+    }
+    box.innerHTML = h;
   }
 
   // V0.5 D: KONTROLA — deterministicky zoznam problemov (RED/ORANGE). Klik na
