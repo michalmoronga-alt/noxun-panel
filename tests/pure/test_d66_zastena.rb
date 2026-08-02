@@ -77,10 +77,17 @@ NxTest.test('d66: verify_sheet — rub z parametrov do zapisu; bez paru = fail')
   NxTest.assert_equal('ST10', out['back_structure'])
   NxTest.assert_equal([4100.0, 640.0], out['sheet_size'])
 
+  # D-72: jednostranny dekor uz NIE JE chyba (protitahova zastena) — variant
+  # vznika bez back poli; neplatny tvar (3 casti) failuje dalej.
   single = JSON.parse(JSON.generate(parsed))
   single['params']['decor'] = 'F094'
-  bad = D66F.verify_sheet(single, single['params'], slug, 'X', D66_URL, { 'kind' => 'sheet' })
-  NxTest.assert(bad['reason'].to_s.include?('líce/rub'), "jednostranny dekor musi failnut: #{bad.inspect}")
+  ok1 = D66F.verify_sheet(single, single['params'], slug, 'X', D66_URL, { 'kind' => 'sheet' })
+  NxTest.assert_equal(nil, ok1['reason'], ok1.inspect)
+  NxTest.refute(ok1.key?('back_decor'), 'single = bez back poli')
+  bad = JSON.parse(JSON.generate(parsed))
+  bad['params']['decor'] = 'F094/H1145/X'
+  b = D66F.verify_sheet(bad, bad['params'], slug, 'X', D66_URL, { 'kind' => 'sheet' })
+  NxTest.assert(b['reason'].to_s.include?('nečakaný tvar'), "3 casti musia failnut: #{b.inspect}")
 end
 
 NxTest.test('d66: identity_match? — zastena lookup cez lice+rub (audit B2)') do
@@ -99,6 +106,54 @@ NxTest.test('d66: identity_match? — zastena lookup cez lice+rub (audit B2)') d
   plain['params']['decor'] = 'F094'
   NxTest.refute(D66P.identity_match?(plain, rec),
                 'zaznam zasteny vs stranka bez paru = necakany tvar, nie zhoda')
+end
+
+# ---------------------------------------------------------------------------
+# D-72: PROTITAHOVA (jednostranna) zastena — realny produkt (399198, fixture)
+# ---------------------------------------------------------------------------
+
+def d72_parsed
+  @d72_parsed ||= D66P.parse(
+    File.read(File.join(NxTest::ROOT, 'tests', 'fixtures', 'demos', 'zastena_f206_protitah_product.html'),
+              encoding: 'UTF-8')
+  )
+end
+
+D72_URL = 'https://www.demos-trade.sk/zastena-f206-pm-protitah-sm-4100-640-9-2/'
+
+NxTest.test('d72: zastena_decor_parts — single legalny, par prisny, odpad odmietnuty') do
+  NxTest.assert_equal(['F206', nil], D66P.zastena_decor_parts('F206'))
+  NxTest.assert_equal(%w[F094 H1145], D66P.zastena_decor_parts('F094/H1145'))
+  NxTest.assert_equal(nil, D66P.zastena_decor_parts('F094/'), 'par s prazdnym rubom nie')
+  NxTest.assert_equal(nil, D66P.zastena_decor_parts('a/b/c'), '3 casti nie')
+  NxTest.assert_equal(nil, D66P.zastena_decor_parts('  '))
+end
+
+NxTest.test('d72: protitahova zastena — parser/rodina/verify bez rubu (zivy fixture 399198)') do
+  p = d72_parsed
+  NxTest.assert(p['ok'])
+  NxTest.assert_equal('F206', p['params']['decor'], 'stranka nesie JEDEN dekor')
+  header, items, err = D66F.family_from(p, D72_URL)
+  NxTest.assert(header, "rodina vznikla: #{err.inspect}")
+  NxTest.assert_equal('F206', header['decor'])
+  NxTest.assert_equal('PM', header['structure'])
+  main = items.find { |it| it['url'] == D72_URL }
+  NxTest.assert_equal(%w[sheet ZASTENA], [main['kind'], main['type']], main.inspect)
+
+  slug = Noxun::Engine::DemosSlugMatcher.slug_of(D72_URL)
+  out = D66F.verify_sheet(p, p['params'], slug, '399198', D72_URL, { 'kind' => 'sheet', 'type' => 'ZASTENA' })
+  NxTest.assert_equal(nil, out['reason'], out.inspect)
+  NxTest.refute(out.key?('back_decor'), 'jednostranna zastena bez back poli')
+  NxTest.assert_equal('PM', out['structure'])
+end
+
+NxTest.test('d72: identity_match? — jednostranny zaznam vs protitahova stranka ANO; zaznam s rubom NIE') do
+  single = { 'type' => 'ZASTENA', 'decor' => 'F206', 'structure' => 'PM',
+             'thickness' => 9.2, 'sheet_size' => [4100.0, 640.0] }
+  NxTest.assert(D66P.identity_match?(d72_parsed, single), 'protitahovy zaznam matchne svoju stranku')
+  double = single.merge('back_decor' => 'H1145', 'back_structure' => 'ST10')
+  NxTest.refute(D66P.identity_match?(d72_parsed, double),
+                'zaznam S rubom sa s jednostrannou strankou nezhodne (iny produkt)')
 end
 
 NxTest.test('d66: create — zastena sa zalozi s rubom, ID nesie R token, dedup funguje (audit B1)') do
