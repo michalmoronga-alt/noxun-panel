@@ -180,13 +180,59 @@ NxTest.test('mc: semafor — ULOZENE abs_* build warnings mlcia pri nelepitelnom
                 'na beznej doske warning ostava')
 end
 
+NxTest.test('d73: kompakt — format platne je identita variantu (920 a 650 su DVE dosky)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  NxTest.assert(NxTest.install_fresh_seed_catalog!)
+  NxTest.assert(MCM.format_in_identity?('KOMPAKT'), 'register flag')
+  NxTest.assert(MCM.format_in_identity?('kompakt'), 'case-insensitive')
+  item = { 'kind' => 'sheet', 'type' => 'KOMPAKT', 'thickness' => 12.0, 'structure' => 'ST9',
+           'sheet_size' => [4100.0, 920.0], 'code' => '472102', 'price' => 785.59,
+           'demos_url' => 'https://www.demos-trade.sk/kd-in-f206-st9-pietra-grigia-cierna-cj-cgs-4100-920-12/',
+           'image_url' => '' }
+  narrow = item.merge('sheet_size' => [4100.0, 650.0], 'code' => '472100',
+                      'demos_url' => 'https://www.demos-trade.sk/kd-in-f206-st9-pietra-grigia-cierna-cj-cgs-4100-650-12/')
+  created = []
+  begin
+    status, info = MCM.create_group_from_demos(
+      'manufacturer' => 'Egger', 'decor' => 'F206', 'decor_name' => 'Pietra Grigia',
+      'sheet_items' => [item, narrow], 'edge_items' => []
+    )
+    NxTest.assert_equal(:ok, status, info.inspect)
+    created.concat(info['sheets'])
+    NxTest.assert_equal(2, info['sheets'].size, 'dva formaty = dva varianty (Michalov smoke F206)')
+    ids = info['sheets']
+    NxTest.assert(ids.any? { |id| id.include?('4100X920') } && ids.any? { |id| id.include?('4100X650') },
+                  "ID nesu format token: #{ids.inspect}")
+    # rovnaky format druhykrat = skip (identita s formatom dedupuje spravne)
+    status2, info2 = MCM.create_group_from_demos(
+      'manufacturer' => 'Egger', 'decor' => 'F206', 'decor_name' => '',
+      'sheet_items' => [item], 'edge_items' => []
+    )
+    NxTest.assert_equal(:ok, status2, info2.inspect)
+    created.concat(info2['sheets'])
+    NxTest.assert_equal(0, info2['sheets'].size)
+    NxTest.assert_equal(1, Array(info2['skipped']).size)
+    # kompakt bez formatu sa uz nezaklada (format = identita)
+    status3, info3 = MCM.create_group_from_demos(
+      'manufacturer' => 'Egger', 'decor' => 'F206', 'decor_name' => '',
+      'sheet_items' => [item.merge('sheet_size' => nil, 'code' => '999999')], 'edge_items' => []
+    )
+    NxTest.assert_equal(:invalid, status3, info3.inspect)
+    NxTest.assert(info3['detail'].to_s.include?('formát'), info3.inspect)
+  ensure
+    created.each { |id| MCM.delete_sheet(id) }
+  end
+end
+
 NxTest.test('mc: ensure_edge_for_sheet — nelepitelny material pasku NEdotvara (GH #118 P2)') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   NxTest.assert(NxTest.install_fresh_seed_catalog!)
+  # D-73: kompakt ma format v identite — batch variant ho nesie (sheet_size).
   ok, res = MCM.add_decor_batch(
     'batch_schema' => 3, 'decor' => 'K900', 'manufacturer' => 'Egger',
     'decor_name' => 'MC kompakt', 'type' => 'KOMPAKT', 'grain' => 'none', 'color' => [5, 5, 5],
-    'sheet_variants' => [{ 'thickness' => 12.0, 'structure' => 'SM' }], 'edge_variants' => []
+    'sheet_variants' => [{ 'thickness' => 12.0, 'structure' => 'SM', 'sheet_size' => [4100.0, 650.0] }],
+    'edge_variants' => []
   )
   raise res.inspect unless ok
   begin

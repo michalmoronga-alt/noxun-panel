@@ -24,7 +24,8 @@
   var MD_CLIENT_SCHEMA = 8;
   // 2B-2 (F10 zrkadlo registra): typy s formatom v identite — batch/formular
   // format VYZADUJU. Server je autorita (format_in_identity?), toto je UX.
-  var MD_FORMAT_TYPES = ['PD', 'ZASTENA'];
+  // D-73: + KOMPAKT (sirok vela ako PD — format je identita variantu).
+  var MD_FORMAT_TYPES = ['PD', 'ZASTENA', 'KOMPAKT'];
   function mdFormatRequired(type){
     return MD_FORMAT_TYPES.indexOf(String(type || '').trim().toUpperCase()) >= 0;
   }
