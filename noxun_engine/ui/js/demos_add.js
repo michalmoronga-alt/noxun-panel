@@ -319,6 +319,11 @@ function nxdaFamilyRow(it){
   if (it.kind === 'other') cb.disabled = true;
   else cb.checked = NXDA_STATE.checks[it.iid] === true;
   row.appendChild(cb);
+  // D-74b (GH #123 P2): label_of odstrihava typovy prefix — v spolocnej sekcii
+  // "Dosky" by DTDL/PD/KOMPAKT/ZASTENA splynuli. Typovy stitok (vzor kroku 1)
+  // drzi rozlisenie; pri other/legacy bez typu sa nevklada.
+  var tag = it.kind === 'edge' ? 'ABS' : (it.type || '');
+  if (tag && it.label) row.appendChild(nxdaEl('span', 'nxda-tag', tag));
   // D-74b: formatovany label zo servera (jednotny s naseptavacom); fallback
   // povodny name (other/legacy payload).
   var nm = nxdaEl('span', 'nxda-nm', it.label || it.name || '');
