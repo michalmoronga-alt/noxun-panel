@@ -29,6 +29,13 @@ module Noxun
     module HardwareCatalog
       STD = 'noxun-hardware-catalog'
       SCHEMA_CURRENT = 1
+      # Verzia SEED sady (nezavisla od SCHEMA — tvar zaznamov sa nemeni).
+      # Upgrade existujuceho katalogu robi apply_seed_patches! (audit D1 F8):
+      # merge-safe backfill novych kodov + oprava LEN preukazatelne
+      # nezmenenych povodnych seed riadkov; pouzivatelske upravy sa NIKDY
+      # neprepisuju. v2 (D1): +105408/105425 (krytky Sensys, debata 2.8.),
+      # 93240 NOHY -> SPOJOVACI_MATERIAL (Bystrica nie je noha).
+      SEED_SET_VERSION = 2
       FILE = 'hardware_catalog.json'
 
       CATEGORIES = %w[ZAVESY VYSUVY VYKLOPY NOHY UCHYTKY SPOJOVACI_MATERIAL
@@ -134,6 +141,15 @@ module Noxun
           # GH #99 P2: dva kody lisiace sa len velkostou/medzerami = nejednoznacna
           # identita (find/patch/delete by operovali len s jednym riadkom).
           set_read_only('katalóg kovania má duplicitné kódy — oprav súbor')
+        end
+        # D1 F8: upgrade seed sady bezi az nad ZDRAVYM katalogom (:ok) —
+        # read-only stavy sa nikdy nemutuju. Zlyhanie patchu nezhadzuje boot.
+        if @state == :ok && data.is_a?(Hash) && data['seed_version'].to_i < SEED_SET_VERSION
+          begin
+            apply_seed_patches!
+          rescue StandardError => e
+            Engine.log_error(e, 'HardwareCatalog.apply_seed_patches!') if defined?(Engine)
+          end
         end
         @state
       end
@@ -367,7 +383,13 @@ module Noxun
             return false
           end
         end
-        payload = { 'std' => STD, 'schema' => SCHEMA_CURRENT, 'items' => data['items'] }
+        # seed_version cestuje s dokumentom (F8): explicitna hodnota z patch
+        # cesty > cerstva hodnota z disku > 1 (legacy subor pred D1). Bezne
+        # mutacie (create/patch/delete) ju tak zachovaju bez vlastnej rezie.
+        stored_sv = fresh.is_a?(Hash) ? fresh['seed_version'].to_i : 0
+        sv = (data['seed_version'] || (stored_sv.positive? ? stored_sv : 1)).to_i
+        payload = { 'std' => STD, 'schema' => SCHEMA_CURRENT,
+                    'seed_version' => sv, 'items' => data['items'] }
         JsonFileStore.write(path, payload)
       rescue StandardError => e
         # GH #99 P2: plny disk / nezapisovatelny priecinok / zlyhany rename
@@ -551,9 +573,10 @@ module Noxun
       # Deterministicky manifest (audit BLOCKER 2) — 1 riadok = 1 item_code,
       # presny nazov/kategoria/MJ/cena S DPH z DEMOS CSV (autorita nazvov a
       # cien) + Gmail/Disk sond (SYSTEM/zdroje/SEED_KATALOG_2026-07.md).
-      # nil cena = nezadana (sondy maju len ceny zostav). Krytky Sensys VEDOME
-      # chybaju (kod neexistuje v ziadnom zdroji — doplni sa pred davkou D).
-      # Sety NIE SU polozky — mapovanie flag->zoznam kodov robi davka D.
+      # nil cena = nezadana (sondy maju len ceny zostav). Krytky Sensys
+      # 105408/105425 doplnil Michal pri debate 2.8. (predtym kod chybal vo
+      # vsetkych zdrojoch); nazvy su opisne — spresni ich Demos vazba (D2).
+      # Sety NIE SU polozky — mapovanie flag->zoznam kodov robi HardwareSets (D1).
       # Zmrazene rozhodnutia manifestu (1.8.2026): TipOn = 250831/250834
       # (CSV riadok 25031 je preklep — Gmail 2x nezavisle plny kod); LED
       # profily = 'ks' s poznamkou "4 m profil" (ziadne prepocty na meter);
@@ -567,6 +590,8 @@ module Noxun
         ['421309', 'HETTICH 9073673 Sensys 8675 vložený 110° P2O', 'ZAVESY', 'ks', 4.41, 'vložený P2O k tip-onu'],
         ['264246', 'HETTICH 9099540 Sensys 8657i TH52 165°, naložený, SiSy', 'ZAVESY', 'ks', nil, nil],
         ['106412', 'HETTICH 9071656 podložka 8099 s excentrom D=1,5', 'ZAVESY', 'ks', 0.97, '1:1 ku každému závesu'],
+        ['105408', 'HETTICH krytka misky Sensys', 'ZAVESY', 'ks', nil, '1:1 ku každému závesu (SET ZÁVES — debata 2.8.)'],
+        ['105425', 'HETTICH krytka ramienka Sensys', 'ZAVESY', 'ks', nil, '1:1 ku každému závesu (SET ZÁVES — debata 2.8.)'],
         ['104454', 'Záves chladničkový HETTICH + platničky (komplet)', 'ZAVESY', 'ks', 10.12, nil],
         ['104802', 'HETTICH 9088021 Sensys uhlový W90 TH52', 'ZAVESY', 'ks', nil, 'rohové skrinky'],
         ['250831', 'BLUM 956A1004 TipOn pre záves 76 mm s magnetom, biely', 'ZAVESY', 'ks', nil, 'kód overiť (CSV šablóna má preklep 25031)'],
@@ -602,7 +627,7 @@ module Noxun
         ['282474', 'IF K12 244 plynokvapalinová vzpera 120 N automatická', 'VYKLOPY', 'ks', nil, 'lacná alternatíva výklopu'],
         ['82744', 'STRONG klzák s rektifikáciou, výška 17 mm, čierny', 'NOHY', 'ks', 0.48, 'najpoužívanejšia „noha"'],
         ['367823', 'Häfele 637.76.355 noha AXILO v. 150 mm + podložka', 'NOHY', 'ks', 1.38, '4 ks na spodnú skrinku'],
-        ['93240', 'Závesné kovanie Bystrica (rektifikát hornej skrinky)', 'NOHY', 'ks', nil, '2 ks na hornú skrinku'],
+        ['93240', 'Rektifikačný uholník „Bystrica" (zavesenie skrinky na stenu)', 'SPOJOVACI_MATERIAL', 'ks', nil, '2 ks na hornú skrinku; NIE noha (debata 2.8.)'],
         ['146993', 'Strong Big rektifikačná noha 100 mm', 'NOHY', 'ks', nil, nil],
         ['360281', 'Skrutka SPAX 3,5×16 záp. hl. (bal 1000 ks)', 'SPOJOVACI_MATERIAL', 'ks', nil, 'predaj v bal 1000'],
         ['228922', 'Skrutka PZ ZH 3,5×30 biely Zn (bal 1000)', 'SPOJOVACI_MATERIAL', 'ks', nil, 'predaj v bal 1000'],
@@ -631,7 +656,73 @@ module Noxun
       def seed!
         with_lock do
           recs = SEED_ITEMS.map { |a| normalize_item(a)[0] }.compact
-          write_unlocked('items' => recs)
+          # Cerstvy seed je natívne v aktualnej sade — patch sa ho uz nedotkne.
+          write_unlocked('items' => recs, 'seed_version' => SEED_SET_VERSION)
+        end
+      end
+
+      # --- seed patch existujuceho katalogu (audit D1 F8) ----------------------
+      # Bezi z assess! LEN pri stave :ok. Merge-safe: nove kody sa doplnia iba
+      # ak item_code neexistuje; oprava povodneho riadku iba ak je bajtovo
+      # zhodny s v1 seedom v identitnych poliach a nema Demos vazbu (inak sa
+      # nechava + info log). Bump seed_version sa zapise aj bez zmien poloziek
+      # (patch sa nabuduce uz neskusa).
+      SEED_PATCH_V2_ADD = %w[105408 105425].freeze
+      LEGACY_SEED_93240 = { 'item_code' => '93240',
+                            'name_sk' => 'Závesné kovanie Bystrica (rektifikát hornej skrinky)',
+                            'category' => 'NOHY', 'unit' => 'ks',
+                            'supplier' => 'Demos',
+                            'notes' => '2 ks na hornú skrinku' }.freeze
+      SEED_MATCH_FIELDS = %w[name_sk category unit price_eur_vat notes supplier].freeze
+
+      def apply_seed_patches!
+        with_lock do
+          JsonFileStore.invalidate(path)
+          doc = begin
+            JsonFileStore.read(path)
+          rescue StandardError
+            nil
+          end
+          return false unless doc.is_a?(Hash) && doc['items'].is_a?(Array)
+          from = doc['seed_version'].to_i
+          from = 1 if from < 1
+          return false if from >= SEED_SET_VERSION
+          items = doc['items'].dup
+          changed = []
+          if from < 2
+            seed_by_code = {}
+            SEED_ITEMS.each { |s| seed_by_code[s['item_code']] = s }
+            SEED_PATCH_V2_ADD.each do |code|
+              next if items.any? { |i| i['item_code'].to_s.strip.downcase == code.downcase }
+              rec, = normalize_item(seed_by_code[code])
+              next unless rec
+              items << rec
+              changed << "+#{code}"
+            end
+            idx = items.index { |i| i['item_code'].to_s.strip == '93240' }
+            if idx
+              legacy, = normalize_item(LEGACY_SEED_93240)
+              cur = items[idx]
+              untouched = legacy &&
+                          SEED_MATCH_FIELDS.all? { |k| cur[k] == legacy[k] } &&
+                          cur['demos_url'].to_s.empty?
+              if untouched
+                fixed, = normalize_item(seed_by_code['93240'])
+                if fixed
+                  # use_count/active preziju — patch meni len seed polia.
+                  items[idx] = cur.merge(fixed)
+                  changed << '93240->SPOJOVACI_MATERIAL'
+                end
+              else
+                Engine.log('kovanie katalog: 93240 je upravene pouzivatelom — kategoriu nechavam (patri do SPOJOVACI_MATERIAL)') if defined?(Engine)
+              end
+            end
+          end
+          ok = write_unlocked('items' => items, 'seed_version' => SEED_SET_VERSION)
+          if ok && defined?(Engine)
+            Engine.log("kovanie katalog: seed patch v#{from} -> v#{SEED_SET_VERSION}#{changed.any? ? " (#{changed.join(', ')})" : ''}")
+          end
+          ok
         end
       end
 

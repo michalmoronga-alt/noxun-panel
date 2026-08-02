@@ -295,7 +295,7 @@ NxTest.test('hw katalog: seed — deterministicky manifest, unikatne kody, enum,
   NxTest.assert_equal(:ok, HWC.assess!, 'chybajuci subor -> seed -> ok')
   list = HWC.items
   NxTest.assert_equal(HWC::SEED_ROWS.length, list.length, 'kazdy riadok manifestu sa seedol')
-  NxTest.assert_equal(58, list.length, 'zmrazeny rozsah manifestu (57 + bonus 421309)')
+  NxTest.assert_equal(60, list.length, 'zmrazeny rozsah manifestu (58 + krytky 105408/105425 — D1)')
   codes = list.map { |i| i['item_code'].downcase }
   NxTest.assert_equal(codes.uniq.length, codes.length, 'unikatne kody')
   list.each do |i|
