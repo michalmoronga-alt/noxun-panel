@@ -140,9 +140,12 @@ module Noxun
         'ZASTENA' => { 'label' => 'Zástena', 'format_hint' => [4100.0, 640.0].freeze,
                        'thickness_suggestions' => [9.2, 10.0].freeze, 'body_candidate' => false,
                        'format_in_identity' => true, 'double_sided' => true, 'density' => 680.0 },
+        # D-73: kompakt ma sirok vela (650/920/1300...) presne ako PD — format
+        # platne je SUCAST identity variantu (F206 kompakt 4100x920 a 4100x650
+        # su dve rozne dosky, nie duplicita). format_hint nil = vedome zadanie.
         'KOMPAKT' => { 'label' => 'Kompaktná doska', 'format_hint' => nil,
                        'thickness_suggestions' => [12.0].freeze, 'body_candidate' => false,
-                       'density' => 1350.0 }
+                       'format_in_identity' => true, 'density' => 1350.0 }
       }.freeze
 
       # D-44 (audit B2): NAVRH formatu platne podla typu dosky pre nove varianty
