@@ -256,6 +256,13 @@ NxTest.test('ma1 family: klasifikacia slugov — sheet typy, ABS rozmery, vzorka
   NxTest.assert_equal(%w[sheet ZASTENA], [za['kind'], za['type']], za.inspect)
   NxTest.assert_equal(nil, za['reason'])
   NxTest.assert_close(9.2, za['thickness_hint'], 0.01)
+  # D-74b: rodina nesie formatovany label (jednotna autorita name_search).
+  NxTest.assert_equal('H3303 ST10 F620 · 4100×640 · 9,2 mm', za['label'], za.inspect)
+  kd = DFA.classify_item('x', '8', 'https://www.demos-trade.sk/kd-in-f206-st9-pietra-grigia-cierna-cj-cgs-4100-650-12/', 'ks', 1.0)
+  NxTest.assert_equal('F206 ST9 Pietra Grigia Cierna CJ Cgs · 4100×650 · 12 mm', kd['label'], kd.inspect)
+  ab = DFA.classify_item('x', '9', 'https://www.demos-trade.sk/absb-f206-st9-pietra-grigia-cierna-23-0-8-2/', 'm', 1.0)
+  NxTest.assert_equal('edge', ab['kind'])
+  NxTest.assert_equal('F206 ST9 Pietra Grigia Cierna · 23/0,8', ab['label'], ab.inspect)
 end
 
 NxTest.test('ma1 family: klasifikacia D-65 — alias prefixy dtd-laminovana/mdfl/kd-in/absl') do
