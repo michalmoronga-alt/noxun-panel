@@ -97,6 +97,23 @@
       p.flush_blocked = blocked;
       if (window.sketchup && sketchup.production_do_export) sketchup.production_do_export(JSON.stringify(p));
     },
+    // V0.6 D1b (GH #127 P1): CSV kovania — rovnaky flush handshake ako VEPO
+    // (neplatne pole = export stoji; inak flush editov PRED zberom modelu).
+    productionRelayHwCsv: function(p){
+      var blocked = false;
+      try {
+        if (typeof validateFields === 'function' && typeof selectedCabId !== 'undefined' &&
+            selectedCabId && !validateFields()) blocked = true;
+        var badBoard = document.querySelector('#boardCard input.bad, #boardCard .bad');
+        if (badBoard) blocked = true;
+      } catch (e) { blocked = false; }
+      if (!blocked){
+        if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+        if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
+      }
+      p.flush_blocked = blocked;
+      if (window.sketchup && sketchup.production_do_hw_csv) sketchup.production_do_hw_csv(JSON.stringify(p));
+    },
     // D-05: zivy katalog materialov po CRUD v okne Materialy projektu. Obnovi
     // vsetky selecty s materialmi BEZ resetu formulara; zachovava vybrane hodnoty.
     setMaterials: function(data){
@@ -153,7 +170,7 @@
       if (c.available_depth!=null) setVal('av_depth', Math.round(c.available_depth));
       if (c.available_height!=null) setVal('av_height', Math.round(c.available_height));
       renderPartCard(c.part_card || null); // V0.3 karta dielca (ak je vybraty dielec)
-      renderHardware(c.hardware || [], c.hardware_overrides || [], c.hardware_set_options || []); // V0.4 kovanie + D1b sety
+      renderHardware(c.hardware || [], c.hardware_overrides || [], c.hardware_set_options || [], c.cabinet_id || ''); // V0.4 kovanie + D1b sety
       renderPreview();
       refreshZoneUI();
     },

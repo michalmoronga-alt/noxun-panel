@@ -128,7 +128,11 @@ module Noxun
           # flushi editov PREPOCITA NANOVO a entity sa dohladaju podla identity
           # (owner_id + part_key), nie podla PID (rebuild ho meni).
           if data['problem_key']
-            item = Validation.run(collected, sheets: sheets_map, edges: edges_map)['items']
+            # GH #127 P2: klik-resolve MUSI ratat s rovnakym vstupom ako
+            # push_state — bez hardware_expansion by sa stable kluce novych
+            # ORANGE (hardware_unmapped/hardware_code) nikdy nenasli.
+            item = Validation.run(collected, sheets: sheets_map, edges: edges_map,
+                                  hardware_expansion: hardware_expansion(model, collected))['items']
                              .find { |it| it['stable_key'] == data['problem_key'] }
             if item.nil?
               push_state
@@ -392,9 +396,21 @@ module Noxun
           nil
         end
 
+        # CSV kovania: vstup z okna — rovnaky flush handshake ako VEPO export
+        # (GH #127 P1: rozpisany edit panela by inak exportoval stare pocty).
+        def handle_hw_csv(payload)
+          data = JSON.parse(payload.to_s)
+          if Panel.dialog_alive?
+            Panel.js("NX.productionRelayHwCsv(#{data.to_json})")
+          else
+            do_hw_csv(payload)
+          end
+        end
+
         # CSV nakupneho zoznamu — server-side z CERSTVEHO modelu (audit N11;
         # flush/generation vzor VEPO: data z DOM su po editoch zastarale).
-        def handle_hw_csv(payload)
+        # Vstup po relay z panela (edity flushnute) alebo priamo bez panela.
+        def do_hw_csv(payload)
           data = JSON.parse(payload.to_s)
           if data['flush_blocked']
             return set_status('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)

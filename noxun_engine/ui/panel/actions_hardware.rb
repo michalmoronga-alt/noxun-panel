@@ -65,6 +65,14 @@ module Noxun
           gt = data['generic_type'].to_s
           return set_status('Neznámy typ kovania.', true) unless BuildPlan::GENERIC_TYPES.include?(gt)
 
+          # GH #127 P2: payload nesie identitu RENDROVANEJ skrinky — zmena
+          # vyberu pred obsluhou callbacku nesmie prepisat inu skrinku.
+          rendered = data['cabinet_id'].to_s
+          if !rendered.empty? && rendered != Store.get(cab, 'cabinet_id').to_s
+            push_selected(model)
+            return set_status('Výber sa medzitým zmenil — panel sa obnovil, skús znova.', true)
+          end
+
           status, = HardwareSets.project_state_status(model)
           if status == :invalid
             return set_status('Sety projektu sú poškodené — obnov ich v Katalógu kovania (Predvoľby projektu).', true)

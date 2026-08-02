@@ -84,6 +84,8 @@ module Noxun
           cb(dlg, 'production_do_select')   { |p| ProductionDialog.do_select(p) }
           # V0.5 C relay: export VEPO az PO flushi editov panela (stale data = zla objednavka)
           cb(dlg, 'production_do_export')   { |p| ProductionDialog.do_export(p) }
+          # V0.6 D1b relay (GH #127 P1): CSV kovania — rovnaky flush handshake
+          cb(dlg, 'production_do_hw_csv')   { |p| ProductionDialog.do_hw_csv(p) }
           # V0.4.7c: samostatna doska — vlozenie + karta (fields/material/ABS hrana)
           cb(dlg, 'insert_board')       { |p| handle_insert_board(p) }
           cb(dlg, 'set_board_fields')   { |p| handle_set_board_fields(p) }

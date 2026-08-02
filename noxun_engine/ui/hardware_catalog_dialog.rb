@@ -143,7 +143,11 @@ module Noxun
             'global_mapping' => lib['mapping'],
             'revision' => HardwareSets.revision,
             'project' => { 'status' => status.to_s,
-                           'mapping' => (state ? state['mapping'] : {}) },
+                           'mapping' => (state ? state['mapping'] : {}),
+                           # GH #127 P2: zmrazene KOPIE projektu — mapovany set
+                           # mohol byt v globale zmeneny/zmazany; predvolby
+                           # musia ukazat pravdu projektu, nie globalu.
+                           'sets' => (state ? state['sets'].values : []) },
             # handle/connector v ponuke NEskryvame — pravidla ich sice
             # negeneruju (uchytky mimo D — Michal 2.8.), ale set sa da
             # pripravit dopredu; expanzia bez poloziek aj tak nic nespravi.
@@ -158,11 +162,17 @@ module Noxun
         def handle_set_save(payload)
           data = JSON.parse(payload.to_s)
           status, info = HardwareSets.save_set!(data['set'].is_a?(Hash) ? data['set'] : {},
-                                                revision: data['revision'].to_s)
+                                                revision: data['revision'].to_s,
+                                                create: data['create'] == true)
           case status
           when :ok
             push_sets
+            js('HWSETS.saved()') # GH #127 P2: editor sa zavrie az pri USPECHU
             set_status("Set „#{info['name']}“ uložený.")
+          when :exists
+            # GH #127 P2: slug z nazvu trafil existujucu identitu — novy set
+            # nesmie ticho prepisat globalnu definiciu.
+            set_status("Set s identitou „#{info}“ už existuje — zmeň názov (alebo uprav existujúci set).", true)
           when :conflict
             push_sets
             set_status('Knižnica setov sa medzitým zmenila — obnovené, uprav znova.', true)

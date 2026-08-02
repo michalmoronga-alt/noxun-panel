@@ -184,14 +184,17 @@ module Noxun
       # Ulozi/nahradi JEDEN set v globalnej kniznici (D1b editor). Identita =
       # set_id; revision = baseline z casu nacitania okna (cudzia zmena
       # medzitym = :conflict, okno sa obnovi). generic_type existujuceho setu
-      # sa NEMENI (mapovania by ticho zmenili vyznam).
-      def save_set!(set_def, revision: nil)
+      # sa NEMENI (mapovania by ticho zmenili vyznam). create: true = NOVY set
+      # nesmie trafit existujucu identitu (GH #127 P2 — slug z nazvu moze
+      # kolidovat a "Novy set" by ticho prepisal globalnu definiciu).
+      def save_set!(set_def, revision: nil, create: false)
         norm = normalize_sets([set_def]).first
         return [:invalid, 'set sa nedá uložiť — skontroluj kódy a členov'] if norm.nil?
         return [:conflict, nil] if revision && revision != self.revision
         lib = load
         sets = lib['sets']
         idx = sets.index { |s| s['set_id'] == norm['set_id'] }
+        return [:exists, norm['set_id']] if create && idx
         if idx
           if sets[idx]['generic_type'] != norm['generic_type']
             return [:invalid, 'typ kovania existujúceho setu sa nemení — vytvor nový set']
@@ -317,13 +320,9 @@ module Noxun
         status == :ok ? state : nil
       end
 
-      # Vrati snapshot; ak chyba, zapise global default (mapping + namapovane
-      # sety). VOLAT LEN vnutri otvorenej operacie (vzor ensure_project_rules!).
-      # :invalid sa NEOPRAVUJE ticho — vrati nil, UI ponukne vedomu obnovu.
-      def ensure_project_state!(model)
-        status, state = project_state_status(model)
-        return state if status == :ok
-        return nil if status == :invalid
+      # Globalne predvolby ako projektovy stav (mapping + kopie namapovanych
+      # setov) — default noveho snapshotu (ensure, prva zmena, vedoma obnova).
+      def global_default_state
         lib = load
         by_id = {}
         lib['sets'].each { |s| by_id[s['set_id']] = s }
@@ -334,7 +333,17 @@ module Noxun
           mapping[gt] = sid
           sets[sid] = by_id[sid]
         end
-        state = { 'mapping' => mapping, 'sets' => sets }
+        { 'mapping' => mapping, 'sets' => sets }
+      end
+
+      # Vrati snapshot; ak chyba, zapise global default (mapping + namapovane
+      # sety). VOLAT LEN vnutri otvorenej operacie (vzor ensure_project_rules!).
+      # :invalid sa NEOPRAVUJE ticho — vrati nil, UI ponukne vedomu obnovu.
+      def ensure_project_state!(model)
+        status, state = project_state_status(model)
+        return state if status == :ok
+        return nil if status == :invalid
+        state = global_default_state
         write_project_state(model, state) if model
         state
       end
@@ -361,7 +370,10 @@ module Noxun
       def set_project_mapping!(model, generic_type, set_id, set_def = nil)
         status, state = project_state_status(model)
         return false unless status == :ok || status == :missing
-        state ||= { 'mapping' => {}, 'sets' => {} }
+        # GH #127 P1: prva zmena v projekte BEZ snapshotu najprv zmrazi VSETKY
+        # globalne predvolby (UI ich prave ukazovalo ako platne) a az nad nimi
+        # meni jeden typ — start z prazdna by ostatne typy ticho odmapoval.
+        state ||= global_default_state
         gt = generic_type.to_s
         return false if gt.empty?
         if set_id.nil? || set_id.to_s.strip.empty?
@@ -381,7 +393,7 @@ module Noxun
       def add_project_set!(model, set_def)
         status, state = project_state_status(model)
         return false unless status == :ok || status == :missing
-        state ||= { 'mapping' => {}, 'sets' => {} }
+        state ||= global_default_state # GH #127 P1 — prvy zapis mrazi vsetko
         norm = normalize_sets([set_def]).first
         return false if norm.nil?
         state['sets'][norm['set_id']] = norm

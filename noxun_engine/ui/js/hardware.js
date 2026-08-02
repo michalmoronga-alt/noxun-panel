@@ -43,8 +43,9 @@
   function hwKey(owner, type, rule){ return (owner||'') + '||' + type + '||' + rule; }
 
   // items: config.hardware (pole) alebo null (nic neoznacene); overrides: hardware_overrides;
-  // setOptions (D1b): ponuka setu per typ (server payloads.hardware_set_options).
-  function renderHardware(items, overrides, setOptions){
+  // setOptions (D1b): ponuka setu per typ (server payloads.hardware_set_options);
+  // cabId (GH #127 P2): identita RENDROVANEJ skrinky — cestuje s payloadom.
+  function renderHardware(items, overrides, setOptions, cabId){
     var box = el('hwRows'); if (!box) return;
     if (items === null){
       box.innerHTML = '<div class="muted">Označ skrinku v modeli — kovanie sa počíta na vloženej skrinke.</div>';
@@ -86,7 +87,7 @@
     (setOptions || []).forEach(function(o){
       if (!o || !(o.options || []).length && !o.override_set_id) return;
       var projLabel = 'projekt: ' + (o.project_set_name || (o.project_set_id || 'bez setu'));
-      var sel = '<select class="hwsetsel" data-gt="'+esc(o.generic_type)+'" onchange="onHwSet(this)">'
+      var sel = '<select class="hwsetsel" data-gt="'+esc(o.generic_type)+'" data-cab="'+esc(cabId||'')+'" onchange="onHwSet(this)">'
               + '<option value=""'+(o.override_set_id ? '' : ' selected')+'>'+esc(projLabel)+'</option>';
       (o.options || []).forEach(function(s){
         sel += '<option value="'+esc(s.set_id)+'"'+(o.override_set_id === s.set_id ? ' selected' : '')+'>'
@@ -100,7 +101,8 @@
   }
   function onHwSet(sel){
     if (window.sketchup && sketchup.set_hardware_set)
-      sketchup.set_hardware_set(JSON.stringify({ generic_type: sel.dataset.gt, set_id: sel.value }));
+      sketchup.set_hardware_set(JSON.stringify({ generic_type: sel.dataset.gt, set_id: sel.value,
+                                                 cabinet_id: sel.dataset.cab || '' })); // GH #127 P2
   }
 
   function hwPayload(node, extra){

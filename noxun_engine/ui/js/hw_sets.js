@@ -95,6 +95,12 @@
       // Rozpracovany editor NEZAHADZUJEME pri echu (vzor dirty buniek okna
       // Materialy) — render ho necha tak; zoznam a predvolby sa obnovia.
       hwsRenderAll();
+    },
+    // GH #127 P2: editor sa zatvara az pri USPESNOM ulozeni (server volanie)
+    // — invalid/conflict necha rozpisany navrh na doopravenie.
+    saved: function(){
+      HWS_EDIT = null;
+      hwsRenderSets();
     }
   };
 
@@ -295,19 +301,29 @@
         'Projekt zatiaľ preberá globálne predvoľby — zmrazia sa doň pri prvej stavbe skrinky alebo prvej zmene tu.'));
     }
     var mapping = proj.status === 'ok' ? (proj.mapping || {}) : (HWS_DATA.global_mapping || {});
-    box.appendChild(hwsMappingTable(mapping, 'hws-map-proj'));
+    // GH #127 P2: projektove selecty vidia aj ZMRAZENE kopie projektu —
+    // mapovany set mohol byt v globale premenovany/zmazany a predvolba musi
+    // ukazovat pravdu projektu (kniznica ho uz ponukat nemusi).
+    box.appendChild(hwsMappingTable(mapping, 'hws-map-proj', proj.sets || []));
 
     // Globalne defaulty novych projektov — zbalene (vertikalny priestor).
     var det = document.createElement('details');
     det.appendChild(hwsMk('summary', null, 'Predvoľby nových projektov (globálne)'));
-    det.appendChild(hwsMappingTable(HWS_DATA.global_mapping || {}, 'hws-map-global'));
+    det.appendChild(hwsMappingTable(HWS_DATA.global_mapping || {}, 'hws-map-global', []));
     box.appendChild(det);
   }
 
-  function hwsMappingTable(mapping, action){
+  function hwsMappingTable(mapping, action, extraSets){
     var t = hwsMk('div', 'hwsmap');
     ((HWS_DATA && HWS_DATA.generic_types) || []).forEach(function(gt){
       var opts = hwsSetsForType(HWS_DATA.sets, gt.key);
+      // zmrazene projektove kopie, ktore kniznica (uz) nema — do ponuky
+      hwsSetsForType(extraSets || [], gt.key).forEach(function(ps){
+        if (!opts.some(function(s){ return s.set_id === ps.set_id; })){
+          opts = opts.concat([{ set_id: ps.set_id, name: ps.name + ' (kópia projektu)',
+                                generic_type: ps.generic_type }]);
+        }
+      });
       if (!opts.length && !mapping[gt.key]) return; // typ bez setov nezobrazuj
       var row = hwsMk('div', 'hwsmap-row');
       row.appendChild(hwsMk('label', null, gt.label));
@@ -365,9 +381,11 @@
         if (a === 'hws-save'){
           if (HWS_EDIT){
             if (!HWS_EDIT.existing) HWS_EDIT.set_id = hwsSlug(HWS_EDIT.name);
+            // GH #127 P2: create flag (server odmietne koliziu slugu) +
+            // editor sa NEzatvara tu — az HWSETS.saved() pri uspechu.
             hwsSend('hws_save_set', { set: hwsBuildSetPayload(HWS_EDIT),
-                                      revision: HWS_DATA.revision || '' });
-            HWS_EDIT = null;
+                                      revision: HWS_DATA.revision || '',
+                                      create: !HWS_EDIT.existing });
           }
           return;
         }

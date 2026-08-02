@@ -305,6 +305,24 @@ NxTest.test('hw sety: set_project_mapping! vklada definiciu do snapshotu (B2)') 
                       'invalid snapshot sa TICHO neprepisuje (F9)')
 end
 
+NxTest.test('hw sety GH#127 P1: prva zmena v projekte BEZ snapshotu zmrazi VSETKY globalne predvolby') do
+  [HWS.path, "#{HWS.path}.bak"].each { |f| File.delete(f) if File.exist?(f) }
+  Noxun::Engine::JsonFileStore.invalidate(HWS.path)
+  m = NxFakeModel.new # ziadny snapshot (missing)
+  p2o = HWS.normalize_sets(HWS::SEED_SETS).find { |s| s['set_id'] == 'zaves-p2o' }
+  NxTest.assert_equal(true, HWS.set_project_mapping!(m, 'hinge', 'zaves-p2o', p2o))
+  _, st = HWS.project_state_status(m)
+  NxTest.assert_equal('zaves-p2o', st['mapping']['hinge'], 'zmeneny typ plati')
+  NxTest.assert_equal('nohy-klzak-17', st['mapping']['leg'],
+                      'OSTATNE typy ostali zmrazene z globalu (nie odmapovane)')
+  NxTest.assert_equal(HWS::SEED_MAPPING.length, st['mapping'].length, 'cely default zmrazeny')
+  NxTest.assert(st['sets'].key?('nohy-klzak-17') && st['sets'].key?('zaves-p2o'),
+                'definicie zmrazene tiez (B2)')
+ensure
+  [HWS.path, "#{HWS.path}.bak"].each { |f| File.delete(f) if File.exist?(f) }
+  Noxun::Engine::JsonFileStore.invalidate(HWS.path)
+end
+
 # --- validation napojenie (F7) --------------------------------------------------
 
 NxTest.test('semafor: hardware_expansion — unmapped a chybajuci kod = ORANGE s plnou identitou') do
@@ -515,6 +533,11 @@ NxTest.test('hw sety D1b: save_set!/delete_set! — revision guard, typ nemenny,
                                revision: HWS.revision)
   NxTest.assert_equal(:invalid, status, 'generic_type existujuceho setu sa NEMENI')
   NxTest.assert(info.to_s.include?('typ'), 'zrozumitelny dovod')
+  status, info = HWS.save_set!({ 'set_id' => 'moj-set', 'name' => 'Kolízia', 'generic_type' => 'hinge',
+                                 'members' => [{ 'code' => '9', 'qty' => 1 }] },
+                               revision: HWS.revision, create: true)
+  NxTest.assert_equal(:exists, status, 'create NIKDY neprepise existujucu identitu (GH#127 P2)')
+  NxTest.assert_equal('moj-set', info)
   NxTest.assert_equal(true, HWS.set_global_mapping!('hinge', 'moj-set'))
   NxTest.assert_equal('moj-set', HWS.load['mapping']['hinge'])
   NxTest.assert_equal(false, HWS.set_global_mapping!('hinge', 'set-co-nie-je'),
