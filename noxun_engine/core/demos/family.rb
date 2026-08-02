@@ -149,6 +149,9 @@ module Noxun
             item['reason'] = "ABS hrúbka #{Materials.fmt_mm(th)} mm je mimo podporovaných"
           else
             item['kind'] = 'edge'
+            # D-74b: citatelny label aj v RODINE (vzor naseptavaca) — related
+            # nazvy byvaju slugove; formatovanie robi jedna autorita.
+            item['label'] = DemosNameSearch.label_of(slug, 'ABS')
           end
           return item
         end
@@ -166,10 +169,13 @@ module Noxun
           item['kind'] = 'sheet'
           item['type'] = type
           item['thickness_hint'] = sheet_thickness_from_slug(slug)
+          item['label'] = DemosNameSearch.label_of(slug, type) # D-74b
         else
           item['kind'] = 'sheet'
           item['type'] = type
           item['thickness_hint'] = sheet_thickness_from_slug(slug)
+          # D-74b: citatelny label aj v RODINE (jednotny s naseptavacom).
+          item['label'] = DemosNameSearch.label_of(slug, type)
         end
         item
       end

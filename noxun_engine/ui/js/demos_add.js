@@ -319,7 +319,9 @@ function nxdaFamilyRow(it){
   if (it.kind === 'other') cb.disabled = true;
   else cb.checked = NXDA_STATE.checks[it.iid] === true;
   row.appendChild(cb);
-  var nm = nxdaEl('span', 'nxda-nm', it.name || '');
+  // D-74b: formatovany label zo servera (jednotny s naseptavacom); fallback
+  // povodny name (other/legacy payload).
+  var nm = nxdaEl('span', 'nxda-nm', it.label || it.name || '');
   if (NXDA_STATE.failed[it.iid]){
     row.className += ' nxda-fail';
     nm.appendChild(nxdaEl('small', 'nxda-why', NXDA_STATE.failed[it.iid]));
@@ -333,6 +335,20 @@ function nxdaFamilyRow(it){
   row.appendChild(nm);
   row.appendChild(nxdaEl('span', 'nxda-cd', it.code || ''));
   row.appendChild(nxdaEl('span', 'nxda-pr', nxdaPriceLabel(it.price_vat, it.unit)));
+  // D-74b: kontrola na Demose aj v rodine (vzor kroku 1) — klik NESMIE
+  // prepnut checkbox (stopPropagation); URL pred otvorenim sanitizuje server.
+  if (it.url){
+    var open = nxdaEl('button', 'nxda-sugg-open');
+    open.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-external-link"/></svg>';
+    open.title = 'Otvoriť na Demose (kontrola pred vložením)';
+    open.setAttribute('aria-label', 'Otvoriť na Demose');
+    open.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      if (window.sketchup && sketchup.open_search_url)
+        sketchup.open_search_url(JSON.stringify({ url: it.url }));
+    });
+    row.appendChild(open);
+  }
   return row;
 }
 
