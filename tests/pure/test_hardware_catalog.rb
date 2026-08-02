@@ -381,3 +381,27 @@ NxTest.test('d2 katalog: create_from_demos! — zapis z proposalu so server vazb
   NxTest.refute(rec.key?('price_checked_at'), 'bez ceny ziadny datum overenia')
   NxTest.assert_equal('https://www.demos-trade.sk/zaves-x-999001/', rec['demos_url'], 'vazba aj bez ceny')
 end
+
+NxTest.test('d2 katalog GH#128: materialova stranka sa do kovania NEDOSTANE') do
+  body = File.read(File.join(__dir__, '..', 'fixtures', 'demos', 'h3303_dtdl18_product.html'),
+                   mode: 'rb:UTF-8')
+  url = 'https://www.demos-trade.sk/dtd-laminovana-h3303-st10-dub-hamilton-2800-2070-18/'
+  out = HWC.build_create_proposal(url, 'ok' => true, 'body' => body)
+  NxTest.assert_equal(false, out['ok'], 'DTDL doska sa neda zalozit ako kovanie')
+  NxTest.assert(out['error'].to_s.include?('materiál'), "zrozumitelny dovod: #{out['error']}")
+end
+
+NxTest.test('d2 katalog GH#128: redirect URL a cas fetchu putuju do zaznamu') do
+  hwc_wipe!
+  HWC.assess!
+  final = 'https://www.demos-trade.sk/zaves-novy-999003/'
+  prop = { 'pid' => 'p-redir', 'url' => final, 'code' => '999003',
+           'name_sk' => 'Záves po presmerovaní', 'unit' => 'ks', 'price_vat' => 2.0,
+           'fetched_at' => '2026-07-30T08:00:00Z', 'category_guess' => 'ZAVESY' }
+  HWC.create_proposals['p-redir'] = prop
+  status, rec = HWC.create_from_demos!('p-redir')
+  NxTest.assert_equal(:ok, status)
+  NxTest.assert_equal(final, rec['demos_url'], 'ulozena je KONECNA adresa')
+  NxTest.assert_equal('2026-07-30T08:00:00Z', rec['price_checked_at'],
+                      'datum overenia = cas FETCHU, nie kliku na Vytvorit')
+end

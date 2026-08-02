@@ -352,6 +352,12 @@
     if (!d) return;
     if (d.status === 'pending'){
       box.appendChild(mdhMk('div', 'muted', 'Načítavam stránku…'));
+      // GH #128 P2: zrusit sa da aj POCAS fetchu (server bumpne generaciu)
+      var pb = mdhMk('div', 'btnrow');
+      var pc = mdhMk('button', 'ghostbtn', 'Zrušiť náhľad');
+      pc.setAttribute('data-action', 'hw-demos-cancel');
+      pb.appendChild(pc);
+      box.appendChild(pb);
       return;
     }
     if (!d.ok){
@@ -460,7 +466,21 @@
       var inp = hwEl('hn_demos');
       // neaktualne vysledky (pouzivatel medzitym pise dalej) sa zahadzuju
       if (!inp || inp.value.trim() !== (d.query || '')) return;
+      if (d.refreshing){
+        var box = hwEl('hwDemosHits');
+        if (box){
+          box.textContent = '';
+          box.appendChild(mdhMk('div', 'muted', 'Sťahujem zoznam produktov Demosu (prvé použitie, chvíľu to trvá)…'));
+        }
+        return;
+      }
       mdhRenderDemosHits(d.results || []);
+    },
+    // GH #128 P2: sitemap cache dobehla — zopakuj AKTUALNY dotaz
+    demosRefreshDone: function(){
+      var inp = hwEl('hn_demos');
+      var q = inp ? inp.value.trim() : '';
+      if (q.length >= 3 && !mdhDemosIsUrl(q)) mdhSend('hw_demos_search', { query: q });
     },
     demosPreview: function(res){
       MDH_DEMOS = res || { ok: false, error: 'prázdna odpoveď' };
@@ -560,6 +580,9 @@
         mdhSend('hw_demos_create', mdhDemosCreatePayload(MDH_DEMOS,
           catSel ? catSel.value : '', notesInp ? notesInp.value.trim() : ''));
       } else if (action === 'hw-demos-cancel'){
+        // GH #128 P2: server bumpne generaciu — dobiehajuci fetch uz zruseny
+        // nahlad znovu neotvori.
+        mdhSend('hw_demos_cancel', {});
         MDH_DEMOS = null;
         mdhRenderDemosPreview();
       }

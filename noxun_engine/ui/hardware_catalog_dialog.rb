@@ -46,7 +46,8 @@ module Noxun
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'hardware_catalog.html'))
           register_callbacks(@dialog) # pred show!
           @dialog.set_on_closed do
-            bump_gen # F9: zavrete okno zneplatni bezace cenove overenia
+            bump_gen       # F9: zavrete okno zneplatni bezace cenove overenia
+            bump_demos_gen # GH #128 P2: aj bezaci nahlad z Demosu
             @dialog = nil
           end
           @dialog
@@ -63,6 +64,7 @@ module Noxun
           # V0.6 D2: "Pridat z Demosu" — zhody zo sitemap, nahlad, zapis
           cb(dlg, 'hw_demos_search')  { |p| handle_demos_search(p) }
           cb(dlg, 'hw_demos_preview') { |p| handle_demos_preview(p) }
+          cb(dlg, 'hw_demos_cancel')  { |p| handle_demos_cancel(p) }
           cb(dlg, 'hw_demos_create')  { |p| handle_demos_create(p) }
           # V0.6 D1b: sety kovania (tab Sety + Predvolby projektu)
           cb(dlg, 'hws_save_set')      { |p| handle_set_save(p) }
@@ -128,24 +130,54 @@ module Noxun
         # --- V0.6 D2: Pridat z Demosu ------------------------------------------
 
         # Zive zhody kovania zo sitemap cache (offline; server = autorita
-        # poradia, JS len renderuje — vzor F12).
+        # poradia, JS len renderuje — vzor F12). GH #128 P2: na cerstvej
+        # instalacii cache este nie je — spustime zdielany jednorazovy refresh
+        # (single-flight DemosLookup.start_refresh, vzor MaterialsDialog) a po
+        # dobehnuti si JS dotaz zopakuje.
         def handle_demos_search(payload)
           data = JSON.parse(payload.to_s)
-          results = DemosNameSearch.search_hardware_cached(data['query'].to_s, top: 10)
-          js("MDH.demosResults(#{{ 'query' => data['query'].to_s,
-                                   'results' => results }.to_json})")
+          query = data['query'].to_s
+          if DemosSitemapCache.load.nil?
+            dlg = @dialog
+            js("MDH.demosResults(#{{ 'query' => query, 'results' => [],
+                                     'refreshing' => true }.to_json})")
+            DemosLookup.start_refresh do |ok, err|
+              next unless @dialog && @dialog.equal?(dlg) && @dialog.visible?
+              if ok
+                js("MDH.demosRefreshDone()")
+              else
+                set_status("Zoznam produktov sa nepodarilo stiahnuť: #{err}", true)
+              end
+            end
+            return
+          end
+          results = DemosNameSearch.search_hardware_cached(query, top: 10)
+          js("MDH.demosResults(#{{ 'query' => query, 'results' => results }.to_json})")
         end
 
-        # Async nahlad produktu — gen guard ako check_price (stary vysledok
-        # nesmie prepisat novsi nahlad ani zavrete okno).
+        # GH #128 P2: nahlad ma VLASTNY generation counter — spolocny @gen s
+        # cenovym overenim by si dva subezne behy navzajom zabijali (formular
+        # novej polozky moze byt otvoreny popri rozbalenej polozke katalogu).
+        def bump_demos_gen
+          @demos_gen = @demos_gen.to_i + 1
+        end
+
+        # Async nahlad produktu — gen guard (stary vysledok nesmie prepisat
+        # novsi nahlad, zrusenie pouzivatelom ani zavrete okno).
         def handle_demos_preview(payload)
           data = JSON.parse(payload.to_s)
-          gen = bump_gen
+          gen = bump_demos_gen
           dlg = @dialog
           HardwareCatalog.demos_preview!(data['url'].to_s) do |res|
-            next unless @gen.to_i == gen && @dialog && @dialog.equal?(dlg) && @dialog.visible?
+            next unless @demos_gen.to_i == gen && @dialog && @dialog.equal?(dlg) && @dialog.visible?
             js("MDH.demosPreview(#{res.merge('gen' => gen).to_json})")
           end
+        end
+
+        # GH #128 P2: „Zrušiť náhľad" pri bežiacom fetchi — bump generacie
+        # zahodi dobiehajúci vysledok (inak by sa zruseny nahlad znovu otvoril).
+        def handle_demos_cancel(_payload)
+          bump_demos_gen
         end
 
         def handle_demos_create(payload)

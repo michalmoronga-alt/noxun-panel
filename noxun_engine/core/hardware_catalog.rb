@@ -621,6 +621,18 @@ module Noxun
       # Cista stavba proposalu z parsovanej stranky (testovatelne bez siete).
       def build_create_proposal(url, res)
         return { 'ok' => false, 'error' => res['error'].to_s } unless res['ok']
+        # GH #128 P2: po presmerovani je autoritou KONECNA adresa (vzor
+        # check_price!) — stara/presunuta URL by sa ulozila ako mrtva vazba
+        # a buduce obnovenie ceny by na nej padlo.
+        final_url = res['url'].to_s.strip.empty? ? url : res['url'].to_s
+        # GH #128 P2: vlozena MATERIALOVA adresa sa do katalogu kovania
+        # nedostane (parsuje sa rovnako dobre — kod, MJ ks, cena) — inak by
+        # doska skoncila ako kovanie 'OSTATNE' a dala sa vybrat do setu.
+        mat_type = DemosNameSearch.type_of(DemosSlugMatcher.slug_of(final_url))
+        if mat_type
+          return { 'ok' => false,
+                   'error' => "toto je materiál (#{mat_type}), nie kovanie — zakladá sa v okne Materiály" }
+        end
         parsed = DemosProductParser.parse(res['body'])
         return { 'ok' => false, 'error' => 'stránka nie je produktový detail' } unless parsed['ok']
         code = parsed['code'].to_s.strip
@@ -632,9 +644,12 @@ module Noxun
         price = parsed['price_vat']
         price = nil unless price.is_a?(Numeric) && price.positive? && price.to_f.finite?
         pid = next_proposal_id
-        prop = { 'pid' => pid, 'url' => url, 'code' => code, 'name_sk' => name,
+        # GH #128 P2: datum overenia patri CASU FETCHU, nie kliku na Vytvorit —
+        # nahlad otvoreny cez noc by inak staru cenu oznacil za overenu dnes.
+        prop = { 'pid' => pid, 'url' => final_url, 'code' => code, 'name_sk' => name,
                  'unit' => unit, 'price_vat' => price,
-                 'category_guess' => category_guess("#{url} #{name}") }
+                 'fetched_at' => Time.now.utc.iso8601,
+                 'category_guess' => category_guess("#{final_url} #{name}") }
         create_proposals.clear if create_proposals.length > 8 # bounded pamat
         create_proposals[pid] = prop
         related = Array(parsed['related']).first(10).map do |r|
@@ -657,10 +672,13 @@ module Noxun
         attrs['notes'] = n unless n.empty?
         rec, err = normalize_item(attrs)
         return [:invalid, err] if rec.nil?
-        # Server-stamped vazba: URL aj cena pochadzaju z fetchu TERAZ — datum
-        # overenia patri cene (bez ceny sa neuklada; "Overit" ho doplni).
+        # Server-stamped vazba: URL aj cena pochadzaju z FETCHU (nie z kliku) —
+        # datum overenia patri cene (bez ceny sa neuklada; "Overit" ho doplni).
         rec['demos_url'] = prop['url']
-        rec['price_checked_at'] = Time.now.utc.iso8601 if rec.key?('price_eur_vat')
+        if rec.key?('price_eur_vat')
+          rec['price_checked_at'] = prop['fetched_at'].to_s.empty? ? Time.now.utc.iso8601
+                                                                  : prop['fetched_at']
+        end
         with_lock do
           JsonFileStore.invalidate(path)
           data = load
