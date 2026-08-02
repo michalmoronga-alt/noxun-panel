@@ -32,6 +32,7 @@ module Noxun
         records = []
         hardware = []
         hardware_overrides = []
+        cabinet_sets = {}
         warnings = []
         cabinets = 0
         boards = 0
@@ -49,6 +50,12 @@ module Noxun
             Array(ccfg['hardware_overrides']).each do |ov|
               next unless ov.is_a?(Hash)
               hardware_overrides << ov.merge('owner_id' => cid, 'owner_pid' => inst.persistent_id)
+            end
+            # V0.6 D1: cabinet override setov kovania (mapa generic_type=>set_id)
+            # — expanzia setov ju berie per korpus (audit B1/F6). Aditivne pole,
+            # compute() ho ignoruje.
+            if ccfg['hardware_sets'].is_a?(Hash) && !ccfg['hardware_sets'].empty?
+              cabinet_sets[cid] = ccfg['hardware_sets']
             end
             Array(ccfg['warnings']).each { |w| warnings << (w.is_a?(Hash) ? w.merge('owner_id' => cid) : { 'message' => w.to_s, 'owner_id' => cid }) }
             inst.definition.entities.grep(Sketchup::ComponentInstance).each do |pi|
@@ -92,6 +99,7 @@ module Noxun
           end
         end
         { records: records, hardware: hardware, hardware_overrides: hardware_overrides,
+          cabinet_sets: cabinet_sets,
           warnings: warnings, cabinets: cabinets, boards: boards }
       end
 

@@ -88,7 +88,20 @@ module Noxun
 
       # Slovnik generickych typov kovania (faza 1 pouziva leg/hinge/slide; zvysok
       # rezervovany standardom 2.4). Neznamy typ = chyba kontraktu, nie nova kategoria.
-      GENERIC_TYPES = %w[leg hinge slide handle shelf_pin connector].freeze
+      # wall_hanger = zavesenie skrinky na stenu (rektifikacny uholnik "Bystrica",
+      # debata 2.8.2026). Rozsirenie je aditivne; starsi plugin config s nim
+      # NEvaliduje — forward-compat guard resi CabinetBuilder (audit D1 B5).
+      GENERIC_TYPES = %w[leg hinge slide handle shelf_pin connector wall_hanger].freeze
+
+      # D1 (audit B5): genericke typy z configu, ktore TATO verzia nepozna
+      # (model z novsej verzie pluginu). Cista funkcia — builder na nej stavia
+      # forward-compat guard prestavby, testy ju volaju priamo.
+      def self.unknown_generic_types(hardware)
+        Array(hardware).filter_map do |h|
+          gt = h.is_a?(Hash) ? h['generic_type'].to_s : ''
+          gt unless gt.empty? || GENERIC_TYPES.include?(gt)
+        end.uniq
+      end
 
       # Horna hranica poctu jednej polozky — poistka proti poskodenym pravidlam/override
       # (quantity priamo riadi pocet kreslenych noh; 100000 valcov nesmie byt mozne).

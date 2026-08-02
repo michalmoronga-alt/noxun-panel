@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.5.34' unless defined?(VERSION)
+    VERSION = '0.5.35' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -56,6 +56,7 @@ Sketchup.require 'noxun_engine/core/materials_replace_uni'  # V0.6 M-B2: „Nahr
 Sketchup.require 'noxun_engine/core/abs_rules'   # V0.3 ABS pravidla (pouziva Materials)
 Sketchup.require 'noxun_engine/core/hardware_rules' # V0.4 pravidla kovania (pred construction)
 Sketchup.require 'noxun_engine/core/hardware_catalog' # V0.6 C-1: katalog kovania (po materials/demos — pouziva slug, normalize_price, Demos.fetch)
+Sketchup.require 'noxun_engine/core/hardware_sets' # V0.6 D1: sety kovania (po build_plan/hardware_catalog — GENERIC_TYPES, CATEGORIES; pred validation/ui)
 Sketchup.require 'noxun_engine/modules/shelves'
 Sketchup.require 'noxun_engine/modules/fronts'
 Sketchup.require 'noxun_engine/core/zone_tree'

@@ -55,7 +55,8 @@ module Noxun
   module Engine
     module HardwareRules
       STD          = 1 # verzia formatu suboru pravidiel (doc: std/seed_version/rules)
-      SEED_VERSION = 1 # verzia seed sady — buduce doplnanie novych default pravidiel (PR C)
+      SEED_VERSION = 2 # v2 (D1): +zavesenie hornej skrinky, +podperky policove,
+                       # seria vysuvov zladena s realnym radom Atira (GH #125 P2)
       FILE         = 'hardware_rules.json'
       MODEL_KEY    = 'hardware_rules' # kluc snapshotu v NOXUN dict na modeli
 
@@ -79,13 +80,40 @@ module Noxun
             { 'max' => 1900.0, 'quantity' => 4 },
             { 'max' => nil,    'quantity' => 5 }
           ] },
+        # Seria v2 = realny rad Hettich InnoTech Atira (GH #125 P2 — povodna
+        # genericka seria mala 400/450 a NL 420 nikdy nevznikla, takze kluc
+        # mapy setu bol nedosiahnutelny). NL mimo mapy setu = ORANGE (D1).
         { 'rule_id' => 'vysuvy-nl-podla-hlbky', 'enabled' => true,
           'applies_to' => { 'role' => 'drawer_front' },
           'output' => 'slide', 'kind' => 'fit_series', 'input' => 'available_depth',
-          'series' => [270.0, 300.0, 350.0, 400.0, 450.0, 470.0, 500.0,
-                       520.0, 550.0, 580.0, 620.0, 650.0],
-          'clearance' => 10.0, 'quantity' => 1 }
+          'series' => [260.0, 300.0, 350.0, 420.0, 470.0, 520.0, 560.0, 620.0],
+          'clearance' => 10.0, 'quantity' => 1 },
+        # D1 (debata 2.8.): "Bystrica" = rektifikacny uholnik na zavesenie
+        # skrinky na stenu — 2 ks na HORNU skrinku. Filter cabinet_type, NIE
+        # support (GH #125 P2: support 'none' ma aj spodna skrinka bez noh).
+        { 'rule_id' => 'zavesenie-hornej-skrinky', 'enabled' => true,
+          'applies_to' => { 'role' => 'cabinet', 'cabinet_type' => %w[upper] },
+          'output' => 'wall_hanger', 'kind' => 'fixed', 'quantity' => 2 },
+        # D1 (debata 2.8.): 4 podperky na kazdu policu.
+        { 'rule_id' => 'podperky-policove', 'enabled' => true,
+          'applies_to' => { 'role' => 'shelf' },
+          'output' => 'shelf_pin', 'kind' => 'fixed', 'quantity' => 4 }
       ].freeze
+
+      # Povodne v1 tvary seed pravidiel, ktore v2 MENI (nie len doplna).
+      # merge_seed pravidlo bajtovo zhodne s v1 tvarom NAHRADI novym seedom
+      # (vzor F8 katalogu: aktualizuje sa LEN preukazatelne nezmeneny riadok;
+      # pouzivatelska uprava sa NIKDY neprepisuje). Porovnanie po normalize.
+      LEGACY_SEED_SHAPES = {
+        'vysuvy-nl-podla-hlbky' => [
+          { 'rule_id' => 'vysuvy-nl-podla-hlbky', 'enabled' => true,
+            'applies_to' => { 'role' => 'drawer_front' },
+            'output' => 'slide', 'kind' => 'fit_series', 'input' => 'available_depth',
+            'series' => [270.0, 300.0, 350.0, 400.0, 450.0, 470.0, 500.0,
+                         520.0, 550.0, 580.0, 620.0, 650.0],
+            'clearance' => 10.0, 'quantity' => 1 }
+        ]
+      }.freeze
 
       module_function
 
@@ -120,14 +148,32 @@ module Noxun
         deep_copy(SEED_RULES)
       end
 
-      # Doplni seed pravidla, ktore v kniznici chybaju (podla rule_id). Vrati
-      # [rules, changed] — changed aj pri samotnom bumpe seed_version (write ulozi novu).
+      # Doplni seed pravidla, ktore v kniznici chybaju (podla rule_id), a
+      # OBNOVI pravidla bajtovo zhodne s niektorym STARSIM seed tvarom
+      # (LEGACY_SEED_SHAPES — vzor F8: aktualizuje sa len preukazatelne
+      # nezmenene pravidlo, pouzivatelska uprava sa nikdy neprepisuje). Vrati
+      # [rules, changed] — changed aj pri samotnom bumpe seed_version.
       def merge_seed(rules, from_version)
         return [rules, false] if from_version >= SEED_VERSION
+        seed_by_id = {}
+        SEED_RULES.each { |r| seed_by_id[r['rule_id']] = r }
+        refreshed = rules.map do |r|
+          rid = r['rule_id']
+          next r unless seed_by_id[rid] && legacy_seed_shape?(r)
+          normalize_rules([seed_by_id[rid]]).first
+        end
         have = {}
-        rules.each { |r| have[r['rule_id']] = true }
+        refreshed.each { |r| have[r['rule_id']] = true }
         missing = SEED_RULES.reject { |r| have[r['rule_id']] }
-        [rules + normalize_rules(missing), true]
+        [refreshed + normalize_rules(missing), true]
+      end
+
+      # Pravidlo je nezmeneny STARY seed? (porovnanie normalizovanych tvarov)
+      def legacy_seed_shape?(rule)
+        shapes = LEGACY_SEED_SHAPES[rule['rule_id']]
+        return false unless shapes
+        norm = normalize_rules([rule]).first
+        shapes.any? { |s| normalize_rules([s]).first == norm }
       end
 
       def ensure_seeded
@@ -230,6 +276,10 @@ module Noxun
         if role == 'cabinet'
           supports = Array((rule['applies_to'] || {})['support']).map(&:to_s)
           return if supports.any? && !supports.include?(ctx['support'].to_s)
+          # D1 (GH #125 P2): predikat typu korpusu — support 'none' nerozlisuje
+          # hornu skrinku od spodnej bez noh (Bystrica ide LEN na horne).
+          kinds = Array((rule['applies_to'] || {})['cabinet_type']).map(&:to_s)
+          return if kinds.any? && !kinds.include?(ctx['cabinet_type'].to_s)
           emit(rule, nil, ctx, nil, items, warnings)
         else
           parts.each do |pd|
@@ -389,7 +439,8 @@ module Noxun
 
       def label_for(generic_type)
         { 'leg' => 'Nohy', 'hinge' => 'Závesy', 'slide' => 'Výsuv',
-          'handle' => 'Úchytky', 'shelf_pin' => 'Podperky', 'connector' => 'Spojky' }[generic_type.to_s] || generic_type.to_s
+          'handle' => 'Úchytky', 'shelf_pin' => 'Podperky', 'connector' => 'Spojky',
+          'wall_hanger' => 'Zavesenie na stenu' }[generic_type.to_s] || generic_type.to_s
       end
 
       def stringify(h)

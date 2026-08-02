@@ -44,7 +44,7 @@ end
 
 NxTest.test('hardware_rules: seed sa normalizuje (bands zoradene, series bez nekladnych)') do
   r = NxHW.rules
-  NxTest.assert_equal(3, r.length, 'seed ma 3 pravidla')
+  NxTest.assert_equal(5, r.length, 'seed ma 5 pravidiel (D1: +zavesenie hornej, +podperky)')
   bands = r.find { |x| x['rule_id'] == 'zavesy-podla-vysky' }['bands']
   NxTest.assert_equal([900.0, 1400.0, 1900.0, nil], bands.map { |b| b['max'] }, 'bands sort, null posledne')
   messy = Noxun::Engine::HardwareRules.normalize_rules([
@@ -99,7 +99,10 @@ NxTest.test('hardware_rules: kazde kridlo ma vlastne zavesy (owner = part_key kr
 end
 
 NxTest.test('hardware_rules: fit_series vyberie najvacsiu NL <= svetla hlbka - 10') do
-  { 510.0 => 500.0, 509.99 => 470.0, 660.0 => 650.0, 280.0 => 270.0 }.each do |avail, want|
+  # Seria v2 = realny rad Atira (260..620); hlbka 430 od D1 dava NL 420 —
+  # presne pripad z GH #125 P2 (stara seria 400/450 tam davala 400).
+  { 510.0 => 470.0, 509.99 => 470.0, 660.0 => 620.0, 280.0 => 260.0,
+    430.0 => 420.0 }.each do |avail, want|
     slides = NxHW.items_of(NxHW.evaluate([NxHW.drawer], 'available_depth' => avail), 'slide')
     NxTest.assert_equal(1, slides.length, "hlbka #{avail}: 1 polozka")
     NxTest.assert_close(want, slides.first['params']['nominal_length'], 0.01,
@@ -326,12 +329,12 @@ NxTest.test('hardware_rules: seed-merge doplni nove default pravidla len do glob
   jfs.write(hr.path, { 'std' => 1, 'seed_version' => 0, 'rules' => custom })
   jfs.reload!(hr.path)
   merged = hr.load
-  NxTest.assert_equal(3, merged.length, 'chybajuce seed pravidla sa doplnia')
+  NxTest.assert_equal(5, merged.length, 'chybajuce seed pravidla sa doplnia')
   NxTest.assert_equal(7, merged.find { |r| r['rule_id'] == 'nohy-zakladne' }['quantity'],
                       'pouzivatelska uprava sa pri merge NEprepise')
   doc = jfs.read(hr.path)
   NxTest.assert_equal(hr::SEED_VERSION, doc['seed_version'], 'subor sa po merge ulozi s novou verziou')
-  NxTest.assert_equal(3, hr.load.length, 'druhy load uz nic nemerguje (stabilny stav)')
+  NxTest.assert_equal(5, hr.load.length, 'druhy load uz nic nemerguje (stabilny stav)')
   # uprac: vrat cisty seed (nasledne testy citaju globalnu kniznicu)
   hr.write(hr.normalize_rules(hr::SEED_RULES))
   jfs.reload!(hr.path)

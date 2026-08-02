@@ -55,12 +55,15 @@ module Noxun
       CAT_HARDWARE  = 'hardware'   # ORANGE
       CAT_BUILD     = 'build'      # ORANGE — build warnings stavby (nalez 9: JEDINY kanon)
       CAT_UNI       = 'uni_material' # ORANGE — V0.6 M-B1: dielec na UNI (material neurceny)
+      CAT_HW_UNMAPPED = 'hardware_unmapped' # ORANGE — V0.6 D1: genericky typ bez setu / NL mimo radu
+      CAT_HW_CODE     = 'hardware_code'     # ORANGE — V0.6 D1: kod clena setu mimo katalogu
 
       SEVERITY_RANK = { RED => 0, ORANGE => 1 }.freeze
 
       HW_LABELS = {
         'leg' => 'Nohy', 'hinge' => 'Závesy', 'slide' => 'Výsuv',
-        'handle' => 'Úchytky', 'shelf_pin' => 'Podperky', 'connector' => 'Spojky'
+        'handle' => 'Úchytky', 'shelf_pin' => 'Podperky', 'connector' => 'Spojky',
+        'wall_hanger' => 'Zavesenie na stenu'
       }.freeze
 
       module_function
@@ -79,9 +82,14 @@ module Noxun
       #   volania a existujuce testy bez zmeny spravania); prazdna mapa = kazde
       #   pouzite abs_id je mimo katalogu.
       #
+      # hardware_expansion: vystup HardwareSets.expand (D1) — nil = kontrola
+      #   setov sa cela preskoci (legacy volania bez zmeny spravania; vzor
+      #   edges:). Z 'unmapped' vznika CAT_HW_UNMAPPED, z rows.missing
+      #   CAT_HW_CODE — oba ORANGE, NIKDY neblokuju export.
+      #
       # Vrati: { 'items' => [...deterministicky zoradene, deduplikovane...],
       #          'counts' => { 'red' => N, 'orange' => M, 'total' => N+M } }
-      def run(collected, sheets: {}, edges: nil)
+      def run(collected, sheets: {}, edges: nil, hardware_expansion: nil)
         collected = {} unless collected.is_a?(Hash)
         smap = sheets.is_a?(Hash) ? sheets : {}
         emap = edges.is_a?(Hash) ? edges : nil
@@ -100,6 +108,7 @@ module Noxun
         end
         Array(collected[:records]).each { |r| check_record(r, smap, emap, items) }
         Array(collected[:hardware_overrides]).each { |ov| check_hardware(ov, items) }
+        check_hardware_expansion(hardware_expansion, items)
         Array(collected[:warnings]).each { |w| check_build(w, items, uni_parts) }
         items = sort_items(dedup(items))
         { 'items' => items, 'counts' => counts(items) }
@@ -268,6 +277,58 @@ module Noxun
           'message_sk' => "Kovanie „#{label}“ (#{where}) je vypnuté — skontroluj, či zámerne.",
           'stable_key' => "#{CAT_HARDWARE}|#{oid}|#{opk}|#{gt}|#{rid}"
         }
+      end
+
+      # ORANGE (D1): sety kovania. Stable key nesie plnu identitu zdroja
+      # (audit F7 — kategoria|korpus|vlastnik|generic|rule|set|kod): jedna
+      # chybajuca polozka na 3 skrinkach = 3 klik-selectovatelne riadky.
+      def check_hardware_expansion(exp, items)
+        return unless exp.is_a?(Hash)
+        Array(exp['unmapped']).each do |u|
+          next unless u.is_a?(Hash)
+          oid = u['cabinet_id'].to_s
+          gt  = u['generic_type'].to_s
+          opk = u['owner_part_key'].to_s
+          sid = u['set_id'].to_s
+          label = HW_LABELS[gt] || (gt.empty? ? 'kovanie' : gt)
+          where = oid.empty? ? '—' : oid
+          where += " · #{opk}" unless opk.empty?
+          msg =
+            case u['reason'].to_s
+            when 'nl_missing'
+              nl = u['nominal_length']
+              nl_txt = nl.is_a?(Numeric) ? " NL #{nl.round}" : ''
+              "#{label} (#{where}): set „#{sid}“ nemá kód pre dĺžku#{nl_txt} — doplň rad setu."
+            when 'set_missing'
+              "#{label} (#{where}): projekt odkazuje na set „#{sid}“, ktorý v projekte nie je — vyber set nanovo."
+            else
+              "#{label} (#{where}) nemá priradený set — kovanie je bez kódov (nenacenené)."
+            end
+          items << {
+            'severity' => ORANGE, 'category' => CAT_HW_UNMAPPED,
+            'owner_id' => oid, 'part_key' => (opk.empty? ? nil : opk), 'hw_key' => nil,
+            'message_sk' => msg,
+            'stable_key' => [CAT_HW_UNMAPPED, oid, opk, gt, u['rule_id'].to_s, sid,
+                             u['reason'].to_s].join('|')
+          }
+        end
+        Array(exp['rows']).each do |row|
+          next unless row.is_a?(Hash) && row['missing'] == true
+          code = row['code'].to_s
+          Array(row['sources']).each do |src|
+            next unless src.is_a?(Hash)
+            oid = src['cabinet_id'].to_s
+            opk = src['owner_part_key'].to_s
+            gt  = src['generic_type'].to_s
+            items << {
+              'severity' => ORANGE, 'category' => CAT_HW_CODE,
+              'owner_id' => oid, 'part_key' => (opk.empty? ? nil : opk), 'hw_key' => nil,
+              'message_sk' => "Kód #{code} zo setu „#{src['set_id']}“ nie je v katalógu kovania — bez názvu a ceny.",
+              'stable_key' => [CAT_HW_CODE, oid, opk, gt, src['rule_id'].to_s,
+                               src['set_id'].to_s, code].join('|')
+            }
+          end
+        end
       end
 
       # ORANGE: build warning stavby (kategoria "stavba"). KONTROLA je JEDINY

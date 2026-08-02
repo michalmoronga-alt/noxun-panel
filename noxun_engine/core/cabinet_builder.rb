@@ -167,6 +167,13 @@ module Noxun
           cid = Store.get(inst, 'cabinet_id')
           raise 'Vybrana instancia nie je NOXUN korpus.' if cid.nil?
 
+          # D1 (audit B5, forward-compat): config z NOVSEJ verzie pluginu moze
+          # niest genericky typ kovania, ktory tato verzia nepozna — plan
+          # vznika nanovo, takze rebuild by polozky TICHO stratil (objednavka
+          # by prisla o kovanie). Radsej jasne odmietnut; model sa da dalej
+          # citat aj exportovat, len prestavba caka na aktualizaciu pluginu.
+          guard_unknown_hardware!(inst)
+
           inst.make_unique if inst.definition.instances.size > 1
           cdef = inst.definition
           # 2B-1 (audit F8): duplak vazby zo SUCASNYCH snapshotov dielcov — na
@@ -179,6 +186,17 @@ module Noxun
           apply_scale_lock(inst)
           Zones.sync_ghost(model, inst) if defined?(Zones)
           inst
+        end
+
+        # D1 (audit B5): neznamy generic_type v ulozenom config.hardware[] =
+        # model z novsej verzie pluginu; prestavba sa odmieta (cista kontrola
+        # zije v BuildPlan.unknown_generic_types).
+        def guard_unknown_hardware!(inst)
+          cfg = Store.config(inst)
+          return unless cfg.is_a?(Hash)
+          unknown = BuildPlan.unknown_generic_types(cfg['hardware'])
+          return if unknown.empty?
+          raise "Korpus nesie kovanie z novšej verzie Noxun (#{unknown.join(', ')}) — projekt vyžaduje novší plugin, prestavba by kovanie stratila."
         end
 
         # V0.2c fix #6: detekuje kopie korpusu (viac instancii so zdielanym cabinet_id) a kazdej
@@ -1006,6 +1024,7 @@ module Noxun
             back_material_id: cfg[:back_material_id],
             part_overrides: cfg[:part_overrides].is_a?(Hash) ? cfg[:part_overrides] : {},
             hardware_overrides: cfg[:hardware_overrides].is_a?(Array) ? cfg[:hardware_overrides] : [],
+            hardware_sets: cfg[:hardware_sets].is_a?(Hash) ? cfg[:hardware_sets] : {},
             available_width: cfg[:available_width],
             available_height: cfg[:available_height],
             available_depth: cfg[:available_depth],
@@ -1093,6 +1112,9 @@ module Noxun
             # V0.4 kovanie: rucne zasahy do poctov (pravidlo = default, override vitazi)
             hardware_overrides: prune_none_front_overrides(
               norm_hardware_overrides(raw(p, :hardware_overrides)), fronts_cfg),
+            # V0.6 D1 (audit B1): cabinet override setov kovania — mapa
+            # {generic_type => set_id}; bez round-tripu by ju rebuild zmazal.
+            hardware_sets: norm_hardware_sets(raw(p, :hardware_sets)),
             part_key_schema: raw(p, :part_key_schema).to_i,
             name: (p['name'] || p[:name])
           }
@@ -1146,6 +1168,22 @@ module Noxun
         # rule_id, quantity(1..MAX)? | disabled(true)? }. Identita = (owner, type, rule_id);
         # duplicitny zaznam -> POSLEDNY vyhrava (deduplikovane uz tu, config je cisty).
         # Zaznam bez quantity aj bez disabled je bezobsazny -> zahodi sa.
+        # D1 (audit B1): mapa {generic_type => set_id} — cabinet override setov
+        # kovania. Neznamy typ / prazdny set_id von; ze snapshot definiciu setu
+        # NESIE, gardi zapisova cesta HardwareSets (audit B2), nie builder.
+        def norm_hardware_sets(raw_map)
+          return {} unless raw_map.is_a?(Hash)
+          out = {}
+          raw_map.each do |k, v|
+            gt = k.to_s.strip
+            sid = v.to_s.strip
+            next unless BuildPlan::GENERIC_TYPES.include?(gt)
+            next if sid.empty?
+            out[gt] = sid
+          end
+          out
+        end
+
         def norm_hardware_overrides(raw_ov)
           return [] unless raw_ov.is_a?(Array)
           out = {}

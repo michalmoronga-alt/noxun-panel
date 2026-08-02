@@ -142,6 +142,7 @@ unless NxTest::IN_SKETCHUP
     core/abs_rules
     core/hardware_rules
     core/hardware_catalog
+    core/hardware_sets
     modules/shelves
     modules/fronts
     core/zone_tree

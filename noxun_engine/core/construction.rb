@@ -73,7 +73,10 @@ module Noxun
           'available_width' => (w - 2 * t),
           'available_height' => interior[:avail_h],
           'available_depth' => interior[:back_front_y],
-          'support' => support_type(cfg)
+          'support' => support_type(cfg),
+          # D1: predikat pravidiel podla typu korpusu (upper/lower) — support
+          # 'none' nerozlisuje hornu od spodnej bez noh (GH #125 P2).
+          'cabinet_type' => cfg[:type].to_s
         }
         hw = HardwareRules.evaluate(cfg, parts, hw_ctx, rules: hardware_rules || HardwareRules.load)
         warnings.concat(hw[:warnings])
