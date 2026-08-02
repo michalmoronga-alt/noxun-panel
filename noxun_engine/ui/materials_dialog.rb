@@ -108,6 +108,8 @@ module Noxun
           cb(dlg, 'delete_preflight') { |p| handle_delete_preflight(p) }
           # M-A3b D-60: "Otvorit u dodavatela" z riadku variantu.
           cb(dlg, 'open_demos_url') { |p| handle_open_demos_url(p) }
+          # D-74: kontrola zhody naseptavaca priamo na Demose (sanitize server).
+          cb(dlg, 'open_search_url') { |p| handle_open_search_url(p) }
           # V0.6 M-B2: „Nahradit UNI…" — rozpis dopadu + potvrdenie odtlackom.
           cb(dlg, 'replace_uni_preview') { |p| handle_replace_uni_preview(p) }
           cb(dlg, 'replace_uni_apply')   { |p| handle_replace_uni_apply(p) }
@@ -626,6 +628,16 @@ module Noxun
           url = Materials.demos_open_target(kind, data['id'].to_s)
           return set_status('Záznam nemá platnú väzbu na Demos.', true) unless url
           UI.openURL(url)
+        end
+
+        # D-74: otvorenie ZHODY naseptavaca — URL pochadza zo serverovej sitemap
+        # cache, ale otvara sa VZDY cez cerstvy sanitize (allowlist demos-trade;
+        # klientske echo nie je autorita — vzor D-60).
+        def handle_open_search_url(payload)
+          data = JSON.parse(payload.to_s)
+          clean, err = Demos.sanitize_url(data['url'].to_s)
+          return set_status("Adresa sa nedá otvoriť#{err ? ": #{err}" : ''}.", true) unless clean
+          UI.openURL(clean)
         end
 
         # --- V0.6 M-A2 (audit F9): preflight mazania variantu ------------------
