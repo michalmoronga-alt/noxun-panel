@@ -46,7 +46,8 @@
 
 - **Zástena** = doska medzi PD a hornými skrinkami; **hrúbka 9,2–12 mm** (9,2 = dominantný Egger štandard — 63 položiek; 10 = Kronospan; do 12 podľa Michala), dĺžky ako pracovné dosky (4100).
 - **Obojstranné dekory:** zástena máva občas KAŽDÚ stranu úplne iný dekor (šetrenie výroby — na stenu sa lepí nepohľadovou stranou, pohľadová ostáva von). Dátový dôsledok: variant môže niesť dva dekory (líce/rub) — doriešiť pri PD/zástena modeli vo V0.6.
-- **Potvrdené prieskumom (29.7., 102 položiek):** konzistentný vzor 4100×640, hrúbka **9,2 (Egger) / 10 (Kronospan)**, dva dekory VŽDY v názve — obojstranný dekor je štandard sortimentu, nie výnimka. Demos príklad: „Zástena K551/K552 4100/640/10".
+- **Potvrdené prieskumom (29.7., 102 položiek):** konzistentný vzor 4100×640, hrúbka **9,2 (Egger) / 10 (Kronospan)**, dva dekory v názve — obojstranný dekor je štandard sortimentu. Demos príklad: „Zástena K551/K552 4100/640/10".
+- **Existuje aj PROTIŤAHOVÁ (jednostranná) zástena (D-72, live overenie 2.8.):** dekor len na pohľadovej strane, rub = protiťahový papier — „Číslo dekoru" na stránke nesie JEDNU hodnotu (napr. „F206", title „Zástena F206 PM/ protiťah SM"). „Dva dekory VŽDY" teda neplatí — dátovo je to zástena variant BEZ back polí.
 
 ### ABS hrany
 

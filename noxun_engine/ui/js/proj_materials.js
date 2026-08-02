@@ -702,9 +702,13 @@
     // existujucej zastene = first-fill (dovoleny, s dup kontrolou servera).
     el('ms_back_decor').value = s ? (s.back_decor || '') : '';
     el('ms_back_structure').value = s ? (s.back_structure || '') : '';
+    // D-72: protitahova zastena rub NIKDY nedostane (server guard; tu UX) —
+    // first-fill by ju premenil na iny produkt.
+    var singleSided = !!(s && s.single_sided === true);
+    if (singleSided && !el('ms_back_decor').value) el('ms_back_decor').placeholder = '(protiťah — bez rubu)';
     var backFilled = !!(s && s.back_decor);
-    el('ms_back_decor').readOnly = backFilled;
-    el('ms_back_structure').readOnly = !!(s && s.back_structure);
+    el('ms_back_decor').readOnly = backFilled || singleSided;
+    el('ms_back_structure').readOnly = !!(s && s.back_structure) || singleSided;
     // M-C: hranova uprava PD (postforming/abs; prazdne = neurcena — standardne
     // ABS defaulty). Editovatelna vlastnost, nie identita.
     if (el('ms_pd_edge')) el('ms_pd_edge').value = s ? (s.pd_edge_subtype || '') : '';

@@ -202,6 +202,29 @@ module Noxun
         parts
       end
 
+      # D-72: zastena je OBOJSTRANNA ("F094/H1145") ALEBO PROTITAHOVA
+      # (jednostranna — parameter nesie len "F206"; rub je protitahovy papier
+      # a stranka ho ako dekor neuvadza — overene zivou strankou 399198).
+      # Vrati [lice, rub|nil]; nil = neplatny tvar (prazdne lice, 3+ casti,
+      # par s prazdnym rubom) — prisnost F4 plati, len single uz nie je chyba.
+      def zastena_decor_parts(value)
+        v = value.to_s.strip
+        return nil if v.empty?
+        return [v, nil] unless v.include?('/')
+        pair = split_pair(v)
+        pair ? [pair[0], pair[1]] : nil
+      end
+
+      # D-72 (GH #119 P2): JEDNU hodnotu dekoru prijimame LEN pri produkte,
+      # ktory sa sam oznacuje ako protitahovy (slug alebo nazov) — obojstranna
+      # stranka s docasne rozbitym parametrom sa nesmie ticho importnut ako
+      # jednostranny variant. Transliteracia cez Materials.slug (protiťah ->
+      # PROTITAH) drzi porovnanie bez diakritiky.
+      def zastena_counterbalance?(slug, title)
+        return true if slug.to_s.split('-').include?('protitah')
+        Materials.slug(title.to_s).to_s.downcase.include?('protitah')
+      end
+
       # --- identity verify (audit B5): parsovana stranka vs katalogovy zaznam --
       # PLNA identita: cislo dekoru (povinne), struktura, hrubka, format (pri
       # typoch s formatom v identite) — cez kanonicke normalizacie Materials.
@@ -219,18 +242,31 @@ module Noxun
         page_decor = p['decor']
         page_structure = p['structure']
         if Materials.identity_norm(sheet_record['type']) == 'ZASTENA'
-          dp = split_pair(page_decor)
+          # D-72 (GH #119 P1/P2) pravidla stran:
+          #   stranka SINGLE: len skutocny protitah produkt (marker v title —
+          #     slug tu nie je); zaznam S rubom sa nezhoduje (iny produkt);
+          #     single_sided aj legacy-bez-rubu prechadzaju licom.
+          #   stranka PAR: single_sided zaznam sa NIKDY nezhoduje (obojstranna
+          #     stranka by mu podvrhla kod/cenu ineho produktu); zaznam s rubom
+          #     musi rub trafit; legacy bez rubu = lice-only (GH #96 pravidlo).
+          dp = zastena_decor_parts(page_decor)
           return false unless dp
           page_decor = dp[0]
           sp = split_pair(page_structure, require_both: false)
           page_structure = sp[0] if sp
-          unless sheet_record['back_decor'].to_s.strip.empty?
-            return false unless Materials.identity_norm(dp[1]) ==
-                                Materials.identity_norm(sheet_record['back_decor'])
-          end
-          unless sheet_record['back_structure'].to_s.strip.empty?
-            return false unless sp && Materials.identity_norm(sp[1]) ==
-                                      Materials.identity_norm(sheet_record['back_structure'])
+          if dp[1].nil?
+            return false unless zastena_counterbalance?(nil, parsed['title'])
+            return false unless sheet_record['back_decor'].to_s.strip.empty?
+          else
+            return false if sheet_record['single_sided'] == true
+            unless sheet_record['back_decor'].to_s.strip.empty?
+              return false unless Materials.identity_norm(dp[1]) ==
+                                  Materials.identity_norm(sheet_record['back_decor'])
+            end
+            unless sheet_record['back_structure'].to_s.strip.empty?
+              return false unless sp && Materials.identity_norm(sp[1]) ==
+                                        Materials.identity_norm(sheet_record['back_structure'])
+            end
           end
         end
         return false unless page_decor &&

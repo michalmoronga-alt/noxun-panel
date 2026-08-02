@@ -283,6 +283,15 @@ module Noxun
         return [false, 'Štruktúra rubu vyžaduje číslo rubového dekoru.'] if bd.empty? && !bs.empty?
         return [false, "Rubový dekor je príliš dlhý (max #{CODE_MAX})."] if bd.length > CODE_MAX
         return [false, "Štruktúra rubu je príliš dlhá (max #{CODE_MAX})."] if bs.length > CODE_MAX
+        # D-72 (GH #119 P1): protitahovy priznak — len zastena a NIKDY s rubom.
+        if flag_true?(a['single_sided'] || a[:single_sided])
+          unless double_sided_type?(type)
+            return [false, 'Protiťahová (jednostranná) je len zástena.']
+          end
+          unless bd.empty? && bs.empty?
+            return [false, 'Protiťahová zástena nemôže mať rubový dekor.']
+          end
+        end
         # M-C (audit F5): hranova uprava patri VYHRADNE typu PD a len z enumu;
         # chybajuca hodnota je platne "nezname" (server, nie UI).
         pe = (a['pd_edge_subtype'] || a[:pd_edge_subtype]).to_s.strip
@@ -351,6 +360,14 @@ module Noxun
         # Dup kontrolu first-fillu robi volajuci (handle_save_sheet) — tu sa
         # posudzuje len nemennost.
         if double_sided_type?(existing['type'])
+          # D-72 (GH #119 P1): protitahovy zaznam rub NIKDY nedostane —
+          # first-fill by ho premenil na INY (obojstranny) produkt so
+          # zachovanym kodom/cenou/URL jednostranneho.
+          if existing['single_sided'] == true &&
+             ((attrs.key?('back_decor') && !identity_norm(attrs['back_decor']).empty?) ||
+              (attrs.key?('back_structure') && !identity_norm(attrs['back_structure']).empty?))
+            return 'Protiťahová zástena rub nemá — obojstranná je iný produkt, pridaj nový variant.'
+          end
           old_bd = identity_norm(existing['back_decor'])
           if attrs.key?('back_decor') && !old_bd.empty? &&
              identity_norm(attrs['back_decor']) != old_bd
