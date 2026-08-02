@@ -4,7 +4,7 @@
      DOM API (textContent — XSS vzor demos_diff.js), ovladanie data-action
      delegaciou; inline handlery LEN bez dat. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.5.36">
+<link rel="stylesheet" href="css/panel.css?v=0.5.37">
 
 <h1>Katalóg kovania</h1>
 <p class="sub" id="hwline">…</p>
@@ -40,6 +40,12 @@
 
 <!-- Formular novej polozky — enum selecty plni JS zo state payloadu. -->
 <div id="hwNewForm" style="display:none">
+  <!-- V0.6 D2: Pridat z Demosu — jedno pole URL/nazov (vzor M-A), zhody zo
+       sitemap cache, nahlad zo stranky (server proposal), zapis s vazbou. -->
+  <div class="row"><label>Z Demosu</label><input id="hn_demos" type="text" placeholder="URL produktu alebo hľadaj názvom (3+ znaky)"><span class="unit"><button class="ghostbtn" data-action="hw-demos-load" title="Načíta produktovú stránku a predvyplní položku">Načítať</button></span></div>
+  <div id="hwDemosHits"></div>
+  <div id="hwDemosPreview" style="display:none"></div>
+  <div class="hint" id="hwManualHint">…alebo vyplň ručne:</div>
   <div class="row"><label>Kód *</label><input id="hn_code" type="text" placeholder="Demos kód alebo vlastný"><span class="unit"></span></div>
   <div class="row"><label>Názov *</label><input id="hn_name" type="text"><span class="unit"></span></div>
   <div class="row"><label>Kategória</label><select id="hn_category"></select><span class="unit"></span></div>
@@ -70,7 +76,7 @@
 
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.5.36"></script>
-<script src="js/icons.js?v=0.5.36"></script>
-<script src="js/hw_sets.js?v=0.5.36"></script>
-<script src="js/hw_catalog.js?v=0.5.36"></script>
+<script src="js/errors.js?v=0.5.37"></script>
+<script src="js/icons.js?v=0.5.37"></script>
+<script src="js/hw_sets.js?v=0.5.37"></script>
+<script src="js/hw_catalog.js?v=0.5.37"></script>

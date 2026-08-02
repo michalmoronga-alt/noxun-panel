@@ -60,6 +60,10 @@ module Noxun
           cb(dlg, 'hw_delete')      { |p| handle_delete(p) }
           cb(dlg, 'hw_check_price') { |p| handle_check_price(p) }
           cb(dlg, 'hw_apply_price') { |p| handle_apply_price(p) }
+          # V0.6 D2: "Pridat z Demosu" — zhody zo sitemap, nahlad, zapis
+          cb(dlg, 'hw_demos_search')  { |p| handle_demos_search(p) }
+          cb(dlg, 'hw_demos_preview') { |p| handle_demos_preview(p) }
+          cb(dlg, 'hw_demos_create')  { |p| handle_demos_create(p) }
           # V0.6 D1b: sety kovania (tab Sety + Predvolby projektu)
           cb(dlg, 'hws_save_set')      { |p| handle_set_save(p) }
           cb(dlg, 'hws_delete_set')    { |p| handle_set_delete(p) }
@@ -119,6 +123,52 @@ module Noxun
 
         def set_status(msg, error = false)
           js("MDH.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})")
+        end
+
+        # --- V0.6 D2: Pridat z Demosu ------------------------------------------
+
+        # Zive zhody kovania zo sitemap cache (offline; server = autorita
+        # poradia, JS len renderuje — vzor F12).
+        def handle_demos_search(payload)
+          data = JSON.parse(payload.to_s)
+          results = DemosNameSearch.search_hardware_cached(data['query'].to_s, top: 10)
+          js("MDH.demosResults(#{{ 'query' => data['query'].to_s,
+                                   'results' => results }.to_json})")
+        end
+
+        # Async nahlad produktu — gen guard ako check_price (stary vysledok
+        # nesmie prepisat novsi nahlad ani zavrete okno).
+        def handle_demos_preview(payload)
+          data = JSON.parse(payload.to_s)
+          gen = bump_gen
+          dlg = @dialog
+          HardwareCatalog.demos_preview!(data['url'].to_s) do |res|
+            next unless @gen.to_i == gen && @dialog && @dialog.equal?(dlg) && @dialog.visible?
+            js("MDH.demosPreview(#{res.merge('gen' => gen).to_json})")
+          end
+        end
+
+        def handle_demos_create(payload)
+          data = JSON.parse(payload.to_s)
+          status, info = HardwareCatalog.create_from_demos!(
+            data['pid'].to_s, category: data['category'].to_s, notes: data['notes'].to_s
+          )
+          case status
+          when :ok
+            push_items
+            js('MDH.demosCreated()')
+            set_status("Položka #{info['item_code']} pridaná z Demosu#{info['price_eur_vat'] ? ' (cena s DPH overená dnes)' : ''}.")
+          when :exists
+            set_status("Kód #{info} už v katalógu je — cenu obnovíš cez Overiť na existujúcej položke.", true)
+          when :no_proposal
+            set_status('Náhľad už nie je platný — načítaj stránku znova.', true)
+          when :invalid
+            set_status("Nedá sa uložiť — #{info}.", true)
+          when :read_only
+            set_status("Katalóg je len na čítanie: #{HardwareCatalog.state_reason}", true)
+          else
+            set_status('Uloženie zlyhalo.', true)
+          end
         end
 
         # --- V0.6 D1b: sety kovania -------------------------------------------

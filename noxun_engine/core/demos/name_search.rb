@@ -86,11 +86,72 @@ module Noxun
         search_index(@index, query, top: top)
       end
 
+      # --- kovanie (V0.6 D2) --------------------------------------------------
+      # Rovnaka mechanika nad OPACNYM vyberom sitemapy: slugy s cislicou, ktore
+      # NIE SU materialove (type_of nil = kovanie/prislusenstvo/doplnky).
+      # Vysledok je LEN navrh na klik — identitu overi fetch stranky (kod
+      # sortimentu), nic sa zo slugu nezapisuje.
+
+      def build_hardware_index(urls)
+        out = []
+        Array(urls).each do |url|
+          slug = DemosSlugMatcher.slug_of(url)
+          next if slug.empty? || !slug.match?(/\d/) # clanky/kategorie von (D-65)
+          next if type_of(slug) # materialove polozky maju vlastne hladanie
+          out << [slug, url]
+        end
+        out
+      end
+
+      def search_hardware_index(index, query, top: TOP_DEFAULT)
+        return [] if query.to_s.strip.length < MIN_QUERY_CHARS
+        toks = query_tokens(query)
+        return [] if toks.empty?
+        scored = []
+        index.each do |(slug, url)|
+          pos = match_positions(slug, toks)
+          scored << [pos, slug.length, slug, url] if pos
+        end
+        scored.sort.first(top.to_i.positive? ? top.to_i : TOP_DEFAULT)
+              .map { |(_, _, slug, url)| hardware_entry(url, slug) }
+      end
+
+      # Pure vstup pre testy a male zoznamy.
+      def search_hardware(urls, query, top: TOP_DEFAULT)
+        search_hardware_index(build_hardware_index(urls), query, top: top)
+      end
+
+      # Produkcna cesta s memoizaciou podla fetched_at (vzor search_cached).
+      def search_hardware_cached(query, top: TOP_DEFAULT)
+        data = DemosSitemapCache.load
+        return [] unless data
+        key = data['fetched_at'].to_f
+        if @hw_index_key != key
+          @hw_index = build_hardware_index(data['urls'])
+          @hw_index_key = key
+        end
+        search_hardware_index(@hw_index, query, top: top)
+      end
+
+      # Label kovania: slova s velkym zaciatkom, tokeny s cislicou VELKYM
+      # (sensys -> Sensys, 8645i -> 8645I nie — kody nechavame ako su, len
+      # pismenkove slova kapitalizujeme; slug nenesie diakritiku).
+      def hardware_label_of(slug)
+        slug.split('-').map { |t| t.match?(/\d/) ? t : t.capitalize }.join(' ')
+      end
+
+      def hardware_entry(url, slug)
+        { 'url' => url, 'slug' => slug, 'type' => 'KOVANIE',
+          'label' => hardware_label_of(slug) }
+      end
+
       # Test-only: zahodenie memoizovaneho indexu (module premenne preziju
       # medzi testami s roznym test_dir_override).
       def index_reset!
         @index = nil
         @index_key = nil
+        @hw_index = nil
+        @hw_index_key = nil
       end
 
       # Sucet pozicii prvych vyskytov tokenov, nil = aspon jeden token chyba.

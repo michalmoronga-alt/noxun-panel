@@ -68,3 +68,20 @@ ok(mdhCssEscape('x\\').endsWith('\\\\') || mdhCssEscape('x\\').indexOf('\\\\') >
 eq(mdhCssEscape(null), '', 'null = prazdny string');
 
 console.log(JSON.stringify({ passed: n, failed: 0 }));
+
+// --- V0.6 D2: Pridat z Demosu (ciste funkcie) --------------------------------
+const { mdhDemosIsUrl, mdhDemosCreatePayload, mdhRelatedLine } =
+  require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'hw_catalog.js'));
+
+eq(mdhDemosIsUrl('https://www.demos-trade.sk/zaves-x/'), true, 'URL sa pozna');
+eq(mdhDemosIsUrl('zaves sensys'), false, 'text nie je URL');
+eq(mdhDemosIsUrl('  HTTP://x  '), true, 'case/trim tolerantne');
+
+eq(mdhDemosCreatePayload({ pid: 'p1' }, 'ZAVESY', 'pozn'),
+   { pid: 'p1', category: 'ZAVESY', notes: 'pozn' }, 'payload nesie len pid+kategoriu+notes');
+eq(mdhDemosCreatePayload(null, '', ''), { pid: '', category: '', notes: '' },
+   'bez proposalu bezpecne prazdne');
+
+eq(mdhRelatedLine([{ code: '106412', name: 'podložka' }, { code: '105408', name: '' }]),
+   'Súvisiaci sortiment: 106412 (podložka), 105408', 'related summary');
+eq(mdhRelatedLine([]), null, 'bez related nic');
