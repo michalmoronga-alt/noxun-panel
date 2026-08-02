@@ -154,6 +154,23 @@ NxTest.test('ma1/D-74: citatelne labely — dekor VELKYM, nazov s velkym zaciatk
   NxTest.assert(labels.include?('F206 ST9 Pietra Grigia Cierna Stara · 23/2'), labels.inspect)
 end
 
+NxTest.test('ma1/D-74 (GH #121 P2): dedup sufixy a ciselne dekory v labeloch') do
+  urls = ['https://www.demos-trade.sk/zastena-h1180-st37-w908-st37-4100-640-9-2-2/',
+          'https://www.demos-trade.sk/absb-h1180-st37-dub-halifax-23-1-2/',
+          'https://www.demos-trade.sk/absb-5981-mg-cashmere-23-1/',
+          'https://www.demos-trade.sk/dtdl-5981-mg-cashmere-2800-2050-18/']
+  labels = DNS_MA.search(urls, 'h1180') + DNS_MA.search(urls, '5981')
+  labels = labels.map { |h| h['label'] }
+  NxTest.assert(labels.include?('H1180 ST37 W908 ST37 · 4100×640 · 9,2 mm'),
+                "doskovy dedup sufix (9-2-2) nesmie dat 640×9 · 2,2: #{labels.inspect}")
+  NxTest.assert(labels.include?('H1180 ST37 Dub Halifax · 23/1'),
+                "ABS -23-1-2 = 23/1 s dup sufixom, nie 23/1,2: #{labels.inspect}")
+  NxTest.assert(labels.include?('5981 MG Cashmere · 23/1'),
+                "ciselny dekor pasky musi v labeli ostat: #{labels.inspect}")
+  NxTest.assert(labels.include?('5981 MG Cashmere · 2800×2050 · 18 mm'),
+                "ciselny dekor dosky musi v labeli ostat: #{labels.inspect}")
+end
+
 NxTest.test('ma1 name search: cache index sa memoizuje podla fetched_at') do
   DNS_MA.index_reset!
   Noxun::Engine::JsonFileStore.write(Noxun::Engine::DemosSitemapCache.path,

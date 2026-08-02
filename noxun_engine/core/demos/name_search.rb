@@ -129,29 +129,21 @@ module Noxun
       # (desatinnu hrubku 9-2 sklada ta ista heuristika ako family hint).
       def label_of(slug, type)
         toks = strip_prefix(slug, type).split('-')
+        nums = trailing_numbers_of(toks)
         dims = ''
+        consumed = 0
         if type == 'ABS'
-          w, th = abs_dims_hint(trailing_numbers_of(toks))
-          if w && th
-            dims = " · #{fmt_num(w)}/#{fmt_num(th)}"
-            toks = drop_trailing_numbers(toks)
-          end
+          w, th, consumed = abs_dims_hint(nums)
+          dims = " · #{fmt_num(w)}/#{fmt_num(th)}" if w && th
         else
-          th = defined?(DemosFamily) ? DemosFamily.sheet_thickness_from_slug(slug) : nil
-          toks = drop_trailing_numbers(toks) if th
-          nums = trailing_numbers_of(strip_prefix(slug, type).split('-'))
-          if th && nums.length >= 2
-            # koncove cisla = [... dlzka, sirka, hrubka(1-2 tokeny)] — format
-            # su DVE cisla pred hrubkovymi tokenmi.
-            th_tok = th == th.round ? 1 : 2
-            fmt_toks = nums[0...-th_tok]
-            if fmt_toks.length >= 2
-              dims = " · #{fmt_num(fmt_toks[-2].to_f)}×#{fmt_num(fmt_toks[-1].to_f)} · #{fmt_num(th)} mm"
-            else
-              dims = " · #{fmt_num(th)} mm"
-            end
+          l, sw, th, consumed = sheet_dims_hint(nums)
+          if th
+            dims = l ? " · #{fmt_num(l)}×#{fmt_num(sw)} · #{fmt_num(th)} mm" : " · #{fmt_num(th)} mm"
           end
         end
+        # GH #121 P2: dropuju sa LEN tokeny SPOTREBOVANE rozmermi — ciselny
+        # dekor pred nimi (absb-5981-23-1, dtdl-1234-...) musi v labeli ostat.
+        toks = toks[0...-consumed] if consumed.positive?
         # Dekorove kody (s cislicou) a kratke strukturne kody (pm/sm/cj...)
         # VELKYM; ostatne slova s velkym zaciatkom (diakritiku slug nema).
         words = toks.map { |t| t.match?(/\d/) || t.length <= 2 ? t.upcase : t.capitalize }
@@ -161,24 +153,60 @@ module Noxun
       # D-74: LABEL hint rozmerov ABS z koncovych cisel slugu. Realne slugy
       # mavaju dedup sufix (…-23-0-8-2 = sirka 23, hrubka 0,8, sufix 2) —
       # desatinna dvojica sa uznava LEN ked da zmyselnu obchodnu hrubku
-      # (0,4/0,8/1/1,2/1,5/2), inak sa skusi variant bez sufixu. Ciste na
-      # zobrazenie (verify pouziva match proti katalogu, nie extrakciu).
+      # (0,4/0,8/1/1,2/1,5/2). GH #121 P2: NAJBEZNEJSI sufix „-2" sa skusa
+      # ODSTRANIT PRED plnym vykladom (…-23-1-2 = 23/1 dup, nie 23/1,2);
+      # zriedkave sufixy 3–9 az PO plnom (…-43-1-5 je realna 43/1,5). Ciste
+      # na zobrazenie (verify pouziva match proti katalogu, nie extrakciu).
+      # Vrati [sirka, hrubka, POCET SPOTREBOVANYCH tokenov] alebo [nil,nil,0].
       ABS_LABEL_THS = [0.4, 0.8, 1.0, 1.2, 1.5, 2.0].freeze
       def abs_dims_hint(nums)
-        cands = [nums]
-        cands << nums[0...-1] if nums.length >= 3 && nums.last.to_i.between?(2, 9)
-        cands.each do |c|
+        cands = []
+        cands << [nums[0...-1], 1] if nums.length >= 3 && nums.last == '2'
+        cands << [nums, 0]
+        cands << [nums[0...-1], 1] if nums.length >= 3 && nums.last.to_i.between?(3, 9)
+        cands.each do |c, suffix|
           next if c.length < 2
           if c.length >= 3
             dec = "#{c[-2]}.#{c[-1]}".to_f
             w = c[-3].to_f
-            return [w, dec] if ABS_LABEL_THS.include?(dec) && w.between?(10, 200)
+            return [w, dec, 3 + suffix] if ABS_LABEL_THS.include?(dec) && w.between?(10, 200)
           end
           th = c[-1].to_f
           w = c[-2].to_f
-          return [w, th] if [1.0, 2.0].include?(th) && w.between?(10, 200)
+          return [w, th, 2 + suffix] if [1.0, 2.0].include?(th) && w.between?(10, 200)
         end
-        [nil, nil]
+        [nil, nil, 0]
+      end
+
+      # D-74 (GH #121 P2): LABEL hint dosky — [dlzka, sirka, hrubka, consumed].
+      # Koncove cisla = [.. dekor?, DLZKA, SIRKA, hrubka(1-2 tokeny), sufix?]:
+      # format su PRESNE DVE velke hodnoty (>=300 — SHEET_SIZE_RANGE zacina na
+      # 500, hrubky koncia pod 100), za nimi male hrubkove tokeny. Dedup sufix
+      # za desatinou (…-9-2-2) sa rozpozna, ciselny dekor PRED formatom sa
+      # nespotrebuje (dtdl-1234-2800-2070-18).
+      def sheet_dims_hint(nums)
+        small = []
+        small.unshift(nums.pop) while nums.any? && nums.last.to_f < 300
+        return [nil, nil, nil, 0] if small.empty? || small.length > 3
+        l = sw = nil
+        big_used = 0
+        if nums.length >= 2
+          l = nums[-2].to_f
+          sw = nums[-1].to_f
+          big_used = 2
+        end
+        th, th_used =
+          case small.length
+          when 1 then [small[0].to_f, 1]
+          when 2
+            dec = "#{small[0]}.#{small[1]}".to_f
+            small[1].length == 1 && small[0].length <= 2 && dec < 100 ? [dec, 2] : [small[0].to_f, 2]
+          else # 3: desatinna + dedup sufix (9-2-2)
+            dec = "#{small[0]}.#{small[1]}".to_f
+            small[1].length == 1 && dec < 100 && small[2].to_i.between?(2, 9) ? [dec, 3] : [nil, 0]
+          end
+        return [nil, nil, nil, 0] unless th && th.positive? && th < 100
+        [l, sw, th, th_used + big_used]
       end
 
       # Neprerusene ciselne tokeny z konca pola (kopia family vzoru — tu nad
