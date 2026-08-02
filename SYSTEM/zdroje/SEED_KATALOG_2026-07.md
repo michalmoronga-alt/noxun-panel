@@ -61,12 +61,12 @@ Kódy = Demos „Kód sortimentu" (objednávané cez VEPO). **SET** = položky, 
 
 | # | Položka | Kód | Frekvencia | SET |
 |---|---|---|---|---|
-| 1 | HETTICH Sensys 8645i 110° TH52, naložený, SiSy — **„KLASIK"** | **104717** | Gmail 3× · Disk 7/9, ~212 ks | **SET ZÁVES = záves 1 : podložka 1 : krytky 1** (Disk potvrdzuje 1:1:1 v každej zákazke; na 1 dvierka 2 sety) |
+| 1 | HETTICH Sensys 8645i 110° TH52, naložený, SiSy — **„KLASIK"** | **104717** | Gmail 3× · Disk 7/9, ~212 ks | **SET ZÁVES 1:1:1:1 = 104717 + 106412 + 105408 + 105425** (záves + platnička + krytka misky + krytka ramienka — potvrdil Michal, debata 2.8.; Disk potvrdzuje pomer v každej zákazke; na 1 dvierka 2 sety) |
 | 2 | HETTICH Sensys 8645i 110° vložený, SiSy | 104719 | Gmail 1× (50 ks) | do setu namiesto naloženého |
 | 3 | HETTICH Sensys 8675 110° **P2O** (k tip-onu, bez tlmenia) | **245723** | Gmail 3× · Disk 6/9, ~66 ks | **SET P2O** = 2× záves + 2× podložka + 2× krytky + **1× TipOn** na dvierka |
 | 4 | HETTICH Sensys 8657i 165°, naložený, SiSy | 264246 | Gmail 2× · Disk 1× | set ako KLASIK |
 | 5 | **podložka 8099 s excentrom D=1,5** | **106412** | Gmail 4× · Disk 8/9, ~254 ks | 1 : 1 ku KAŽDÉMU závesu (automaticky) |
-| 6 | **krytky (miska + ramienko), set** | — **kód CHÝBA** | Disk 8/9, ~213 ks | 1 : 1 ku každému závesu (automaticky) |
+| 6 | **krytky: miska + ramienko** | **105408** (miska) + **105425** (ramienko) — doplnil Michal, debata 2.8. | Disk 8/9, ~213 ks | 1 : 1 ku každému závesu (automaticky) |
 | 7 | BLUM 956A1004 TipOn 76 mm s magnetom | 250831 biely · 250834 čierny | Gmail 3× · Disk 5/9 | 1 na dvierka s P2O; lacná alt.: Strong tip-on 35000 |
 | 8 | Záves chladničkový HETTICH + platničky | 104454 | Gmail 1× · Disk 3/9 (15 ks) | komplet s platničkou |
 | 9 | Sensys uhlový W90 TH52 (9088021) | 104802 | Disk 1× (2) | rohové skrinky |
@@ -101,7 +101,7 @@ Kódy = Demos „Kód sortimentu" (objednávané cez VEPO). **SET** = položky, 
 |---|---|---|---|---|
 | 24 | **STRONG klzák s rektifikáciou 17 mm** („nohy 17 mm") | **82744** (variant 272212) | Disk **8/9, ~166 ks** · Gmail 1× | najpoužívanejšia „noha" — sokel na klzákoch |
 | 25 | **Noha AXILO 150 mm + podložka** (Häfele 637.76.355) | **367823** (+ 60 mm variant, platničky) | Disk 6/9, ~124 ks · Gmail 2× (naskladnenie 100 ks) | 4 ks na spodnú skrinku |
-| 26 | Závesné kovanie „Bystrica" (rektifikát hornej skrinky) | 93240 | Gmail 3× (50–100 ks) | 2 ks na hornú skrinku + krytka |
+| 26 | „Bystrica" — **rektifikačný uholník na uchytenie skrinky do steny** (NIE noha — oprava Michal, debata 2.8.) | 93240 | Gmail 3× (50–100 ks) | 2 ks na hornú skrinku; krytka zatiaľ mimo setu |
 | 27 | Strong Big rektifikačná noha 100 mm | 146993 | Gmail 1× (40) | |
 | 28 | Skrutka SPAX 3,5×16 (bal 1000) | 360281 | Gmail **6×** — najčastejšia položka | montáž kovania |
 | 29 | PZ 3,5×30 / 3,5×35 · konfirmát 5/50 · podperka policová 7/5 | 228922 / 228924 · 11090 · 306125 | Gmail 4×/3×/2×/3× | korpusová montáž; podperky 4/policu |
@@ -119,8 +119,8 @@ Kódy = Demos „Kód sortimentu" (objednávané cez VEPO). **SET** = položky, 
 
 ### 2.6 Pomery pre automatiku (overené v oboch sondách)
 
-- **Dvierka klasik:** 2× (záves 104717 + podložka 106412 + krytky) — SET 1:1:1.
-- **Dvierka P2O:** 2× (245723 + podložka + krytky) + 1× TipOn.
+- **Dvierka klasik:** 2× (záves 104717 + platnička 106412 + krytky 105408 + 105425) — SET 1:1:1:1.
+- **Dvierka P2O:** 2× (245723 + platnička + krytky) + 1× TipOn 250831 na dvierka.
 - **Zásuvka:** 1× K-sada (Atira/StrongMax/StrongBox/Legrabox) — vnútorná +čelo/príchyty; drevený šuflík: pár Quadro V6 + spojky (alebo K-set).
 - **Výklop:** 1× set Aventos + krytky zvlášť.
 - **Spodná skrinka:** 4× klzák 17 mm ALEBO 4× AXILO; **horná skrinka:** 2× Bystrica; police: 4 podperky/policu.
@@ -130,7 +130,7 @@ Kódy = Demos „Kód sortimentu" (objednávané cez VEPO). **SET** = položky, 
 
 ## 3. OTVORENÉ DIERY (doplniť priebežne)
 
-1. **Kód krytiek Sensys** (miska + ramienko) — vo VŠETKÝCH zdrojoch bez kódu („set"); doplniť presné Demos kódy.
+1. ~~Kód krytiek Sensys~~ — **VYRIEŠENÉ (debata 2.8.):** miska **105408** + ramienko **105425** (doplnil Michal; súčasť SET ZÁVES 1:1:1:1).
 2. **Skladové zásoby (Michal)** — naskladnené položky (AXILO 100 ks, podložky, SPAX…) skresľujú frekvencie objednávok; Michal dodá stavy → upravia sa pomery kovania.
 3. **Falco a Kastamonu** — zdroj/kódy (Y121, A860; „FAL 500 SM 16" cez VEPO) — nejasný dodávateľ a či majú DK kódy.
 4. **ABS mapovanie dekor↔kód** (09_POJMY ot. 2) — z Disku už máme reálne kódy: 515069 (skupinová biela), 356427 (Cashmere BS/PD), 398905, 514401/514404, 392486, 510705, 495215; doplniť pri Demos importe (V0.6 „zadaj kód").

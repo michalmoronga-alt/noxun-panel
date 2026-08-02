@@ -18,6 +18,7 @@
 | **BuildPlan** | záväzný kontrakt plánu stavby (SCHEMA 2) — geometria, kusovník aj VEPO čítajú TEN ISTÝ plán |
 | **Semafor** | kontrolný zoznam RED/ORANGE v okne Výroba (RED nikdy neblokuje export) |
 | **Proxy kovania** | vizuál (nohy) v modeli; NIE je zdroj pravdy — súpis číta VÝHRADNE `config.hardware[]` |
+| **Set kovania** | mapovacie pravidlo: generický typ z pravidiel (záves, noha, výsuv…) → zoznam Demos kódov s pomermi (per jednotka / per vlastník / rad podľa NL); **NIE je položka katalógu**; definície globálne + snapshot v modeli (dávka D) |
 | **Šablóna vs TYP vs parameter** | tri úrovne konfigurácie — hranica definovaná v [04_ROADMAP.md](04_ROADMAP.md) |
 
 ## Stolárske poznatky (doména)
@@ -66,10 +67,27 @@
 - **EN DANIELI** (Lipt. Mikuláš, od 04/2026) = alternatívny porez/olep/kovanie; POZOR: ceny uvádza s DPH (VEPO bez DPH).
 - ~~Kanonický daňový základ cien bez DPH~~ — **ZMENENÉ (Michal 31.7. večer): ceny sa evidujú a počítajú S DPH, presne ako ich zobrazuje Demos.** Vo výslednom výpočte (sumár/ponuka) je jednoduchý **prepínač „s DPH / bez DPH"** (÷1,23 na zobrazenie). Zdroj bez DPH (historický VEPO cenník) sa pri vstupe prepočíta ×1,23. Dôvod: 90 % cien ide z Demosu s DPH — dvojitý prevod bol šum.
 - **Ceny sú POHYBLIVÉ — nefixujú sa do katalógu (Michal 31.7. večer):** katalóg drží **väzbu na produkt** (DK kód + URL) a len „poslednú známu cenu + dátum overenia" (cache). Autorita ceny pre ponuku = tlačidlo **„Prepočítať ceny"** v zákazke: prejde všetky použité materiály/ABS/kovanie, natiahne čerstvé ceny z produktových stránok (1 stránka = celá dekorová skupina; Crawl-delay 3 s) a ukáže zmeny pred zápisom. Mechanika fetchu = dávka B; tlačidlo v zákazkovom sumári = dávka E.
-- **Kovanie sa objednáva v SETOCH (Michal 31.7. večer — vstup pre dávku D):** závesy = **Hettich** (nie Blum), ~90 % **naložené 110° s tlmením + podložka 1,5 mm + krytky** — jeden funkčný záves = SADA kódov. Mapovanie flag→kód (dávka D) preto mapuje generický flag na **zoznam položiek s počtami** (záves ×1, podložka ×1, krytky ×1), nie na 1 kód. Základné sety šuflíkov zmapuje Gmail sonda (1–2 sety od hlavných kovaní vložiť na testy).
+- **Kovanie sa objednáva v SETOCH (Michal 31.7. večer — vstup pre dávku D):** závesy = **Hettich** (nie Blum), ~90 % **naložené 110° s tlmením + podložka 1,5 mm + krytky** — jeden funkčný záves = SADA kódov. Mapovanie flag→kód (dávka D) preto mapuje generický flag na **zoznam položiek s počtami** (záves ×1, podložka ×1, krytky ×1), nie na 1 kód. Základné sety šuflíkov zmapuje Gmail sonda (1–2 sety od hlavných kovaní vložiť na testy). **Finálna anatómia setov = sekcia „Kovanie — sety" nižšie (debata 2.8.).**
 - **Falco a Kastamonu dosky sa kupujú cez VEPO** (nie Demos) — rieši otvorený bod seedu; `supplier` pole per variant.
 - **AREDO** (od 05/2026) = lakované dvierka, má konfigurátor + SketchUp knižnice — kandidát na integráciu čiel po V1.
 - Vizuálna knižnica dekorov (JPG per výrobca) žije na Disku v `NOXUN PROJEKTY/METERIÁLY` — pripravený zdroj pre D-28 textúry/render.
+
+### Kovanie — sety (debata s Michalom 2.8.2026 — závery pre dávku D)
+
+- **Set = mapovacie pravidlo, NIE položka katalógu:** generický typ z pravidiel kovania → zoznam Demos kódov s pomermi. Katalóg kovania drží len reálne objednávateľné položky (1 kód = 1 položka); set sa na ne odkazuje kódmi.
+- **SET ZÁVES „KLASIK"** (Sensys 8645i 110° naložený): záves **104717** + platnička **106412** (podložka 8099 s excentrom) + krytka misky **105408** + krytka ramienka **105425** — pomer **1:1:1:1 na 1 ZÁVES**; počet závesov na dvierka určuje PRAVIDLO (bands podľa výšky: 2/3/4/5 — dva sú typický prípad z Disk sondy, NIE kontrakt), expanzia setu násobí členov množstvom z pravidla (GH #125 P2). Kódy krytiek doplnil Michal pri debate (dovtedy „otvorená diera č. 1" seed podkladu).
+- **SET P2O** (Sensys 8675 k tip-onu, bez tlmenia): záves **245723** + platnička + krytky (1:1:1:1) + **1× TipOn 250831 na DVIERKA** — člen setu viazaný na VLASTNÍKA (čelo), nie na jednotku závesu. Strong tip-on 35000 = samostatný lacnejší set.
+- **Výsuvy: dĺžku vyberá SYSTÉM automaticky** (Michal 2.8.) — pravidlo `fit_series` už dnes počíta `nominal_length` zo svetlej hĺbky; set výsuvu je preto **RAD**: mapa NL → kód (Atira biela H70: 420 → 357695, 470 → 357696…), nie jeden pevný kód. **Séria seed pravidla sa v D1 zladí s reálnym produktovým radom Atira** (napr. 420/470/520/620 — dnešná generická séria hodnotu 420 nikdy nevyprodukuje, kľúč mapy by bol nedosiahnuteľný; GH #125 P2); NL bez kľúča v mape = ORANGE nemapované, susedný kód sa NIKDY neberie — staré projekty so starou sériou diery UVIDIA (aktualizácia pravidla = vedomá akcia).
+- **Zásuvka = 1× K-sada** (jeden kód = kompletný set bočníc + výsuvu); vnútorná zásuvka navyše čelo profilu + príchyty; drevený šuflík = pár Quadro V6 + spojky.
+- **Výklop = 1× set Aventos + krytky VŽDY zvlášť** (samostatný kód ako člen setu). **Realizácia ODLOŽENÁ za D1** (GH #125 P2): pravidlá dnes výklopy negenerujú (žiadny lift generic_type, čelá flap bez pravidla) — set by nemal čo mapovať; anatómia je zaznamenaná pre budúci výklopový model (tam sa napojí aj density/hmotnostný kontrakt).
+- **Nohy: 4× klzák 17 mm (82744) ALEBO 4× AXILO (367823)** na spodnú skrinku — dva alternatívne sety, vyberá predvoľba.
+- **„Bystrica" NIE je noha — je to rektifikačný uholník na uchytenie skrinky do steny** (Michal 2.8., oprava klasifikácie zo sond): 2 ks na hornú skrinku; krytka sa do setu zatiaľ nedáva. Vyžaduje nový generický typ zavesenia na stenu + pravidlo 2×/horná skrinka.
+- **Police: 4× podperka (306125) na policu** — pravidlo + set pribudnú v D.
+- **Úchytky sa zatiaľ neriešia** (Michal 2.8.) — pravidlo handle sa v D nezavádza; rozteč/vŕtanie je téma na neskôr.
+- **Spojovací materiál (SPAX, konfirmáty) mimo automatiky** — kupuje sa po baleniach na sklad; keď prax vypýta, doplní sa JSON pravidlom bez zmeny kódu.
+- **Balenia a zaokrúhľovanie:** D počíta čisté kusy; zaokrúhlenie nahor na balenia rieši E pri cenách (veľkosť balenia = vlastnosť položky katalógu).
+- **Nemapovaný typ = ORANGE** „kovanie bez kódov" v semafore + v súpise viditeľné ako nenacenené; **nikdy neblokuje** (rovnaká filozofia ako materiály).
+- **Reprodukovateľnosť zákazky:** definície setov žijú globálne (%APPDATA%), ale model nesie **snapshot** mapovania aj použitých setov (vzor hardware_rules) — zmena globálnych setov nesmie ticho zmeniť starú zákazku. Rovnaký kontrakt platí pre budúce hmotnostné tabuľky: **density vstupy sa pri použití zmrazia do modelu** (živý register typov je len default).
 
 ### Demos (hlavný dodávateľ ~90 % materiálu)
 
