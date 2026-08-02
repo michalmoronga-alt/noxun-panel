@@ -77,13 +77,13 @@ NxTest.test('d66: verify_sheet — rub z parametrov do zapisu; bez paru = fail')
   NxTest.assert_equal('ST10', out['back_structure'])
   NxTest.assert_equal([4100.0, 640.0], out['sheet_size'])
 
-  # D-72: jednostranny dekor uz NIE JE chyba (protitahova zastena) — variant
-  # vznika bez back poli; neplatny tvar (3 casti) failuje dalej.
+  # D-72 + GH #119 P2: jeden dekor je legalny LEN pri skutocnom protitah
+  # produkte — obojstranna stranka s rozbitym parametrom sa neimportuje ticho.
   single = JSON.parse(JSON.generate(parsed))
   single['params']['decor'] = 'F094'
-  ok1 = D66F.verify_sheet(single, single['params'], slug, 'X', D66_URL, { 'kind' => 'sheet' })
-  NxTest.assert_equal(nil, ok1['reason'], ok1.inspect)
-  NxTest.refute(ok1.key?('back_decor'), 'single = bez back poli')
+  bad1 = D66F.verify_sheet(single, single['params'], slug, 'X', D66_URL, { 'kind' => 'sheet' })
+  NxTest.assert(bad1['reason'].to_s.include?('nečakaný tvar'),
+                "single BEZ protitah markera musi failnut: #{bad1.inspect}")
   bad = JSON.parse(JSON.generate(parsed))
   bad['params']['decor'] = 'F094/H1145/X'
   b = D66F.verify_sheet(bad, bad['params'], slug, 'X', D66_URL, { 'kind' => 'sheet' })
@@ -144,16 +144,57 @@ NxTest.test('d72: protitahova zastena — parser/rodina/verify bez rubu (zivy fi
   out = D66F.verify_sheet(p, p['params'], slug, '399198', D72_URL, { 'kind' => 'sheet', 'type' => 'ZASTENA' })
   NxTest.assert_equal(nil, out['reason'], out.inspect)
   NxTest.refute(out.key?('back_decor'), 'jednostranna zastena bez back poli')
+  NxTest.assert_equal(true, out['single_sided'], 'explicitny protitahovy priznak (GH #119 P1)')
   NxTest.assert_equal('PM', out['structure'])
 end
 
-NxTest.test('d72: identity_match? — jednostranny zaznam vs protitahova stranka ANO; zaznam s rubom NIE') do
-  single = { 'type' => 'ZASTENA', 'decor' => 'F206', 'structure' => 'PM',
+NxTest.test('d72: identity_match? — pravidla stran (single/par stranka vs single_sided/legacy/rub zaznam)') do
+  legacy = { 'type' => 'ZASTENA', 'decor' => 'F206', 'structure' => 'PM',
              'thickness' => 9.2, 'sheet_size' => [4100.0, 640.0] }
-  NxTest.assert(D66P.identity_match?(d72_parsed, single), 'protitahovy zaznam matchne svoju stranku')
-  double = single.merge('back_decor' => 'H1145', 'back_structure' => 'ST10')
-  NxTest.refute(D66P.identity_match?(d72_parsed, double),
-                'zaznam S rubom sa s jednostrannou strankou nezhodne (iny produkt)')
+  flagged = legacy.merge('single_sided' => true)
+  double = legacy.merge('back_decor' => 'H1145', 'back_structure' => 'ST10')
+  # protitahova (single) stranka:
+  NxTest.assert(D66P.identity_match?(d72_parsed, flagged), 'single_sided zaznam matchne svoju stranku')
+  NxTest.assert(D66P.identity_match?(d72_parsed, legacy), 'legacy bez rubu prechadza licom (GH #96)')
+  NxTest.refute(D66P.identity_match?(d72_parsed, double), 'zaznam S rubom vs single stranka = iny produkt')
+  # obojstranna (par) stranka F094/H1145 — GH #119 P1: single_sided zaznam sa NIKDY nezhodne
+  pair = JSON.parse(JSON.generate(d66_parsed))
+  f094_single = { 'type' => 'ZASTENA', 'decor' => 'F094', 'structure' => 'ST15',
+                  'thickness' => 9.2, 'sheet_size' => [4100.0, 640.0], 'single_sided' => true }
+  NxTest.refute(D66P.identity_match?(pair, f094_single),
+                'parova stranka nesmie podvrhnut kod/cenu jednostrannemu zaznamu')
+  # single stranka BEZ protitah markera (F094 parsed s orezanym dekorom) = nezhoda
+  fake = JSON.parse(JSON.generate(d66_parsed))
+  fake['params']['decor'] = 'F094'
+  NxTest.refute(D66P.identity_match?(fake, f094_single.merge('decor' => 'F094')),
+                'malformovana stranka bez protitah markera nie je dokaz (GH #119 P2)')
+end
+
+NxTest.test('d72: create + first-fill — single_sided sa ulozi a rub sa nan uz NIKDY nedoplni (GH #119 P1)') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  item = { 'kind' => 'sheet', 'type' => 'ZASTENA', 'thickness' => 9.2,
+           'structure' => 'PM', 'single_sided' => true,
+           'sheet_size' => [4100.0, 640.0], 'code' => '399198',
+           'price' => 36.7, 'demos_url' => D72_URL, 'image_url' => '' }
+  created = []
+  begin
+    status, info = D66M.create_group_from_demos(
+      'manufacturer' => 'Egger', 'decor' => 'F206', 'decor_name' => 'Pietra Grigia',
+      'sheet_items' => [item], 'edge_items' => []
+    )
+    NxTest.assert_equal(:ok, status, info.inspect)
+    created.concat(info['sheets'])
+    rec = D66M.sheet(info['sheets'][0])
+    NxTest.assert_equal(true, rec['single_sided'], 'priznak prezil create+normalize')
+    NxTest.refute(rec.key?('back_decor'))
+    err = D66M.identity_edit_error({ 'back_decor' => 'H1145' }, rec)
+    NxTest.assert(err.to_s.include?('Protiťahová'), "first-fill rubu musi byt odmietnuty: #{err.inspect}")
+    ok_v, msg_v = D66M.validate_sheet_attrs(rec.merge('back_decor' => 'H1145'))
+    NxTest.refute(ok_v, 'validacia odmieta single_sided + rub sucasne')
+    NxTest.assert(msg_v.to_s.include?('rubový'), msg_v.inspect)
+  ensure
+    created.each { |id| D66M.delete_sheet(id) }
+  end
 end
 
 NxTest.test('d66: create — zastena sa zalozi s rubom, ID nesie R token, dedup funguje (audit B1)') do

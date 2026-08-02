@@ -84,9 +84,15 @@ module Noxun
         # D-66 (audit F3): zastena ako VSTUPNA stranka rodiny — parametre nesu
         # lice/rub v jednom poli; identita RODINY je LICE (rub patri variantu,
         # cita ho verify_sheet). Bez splitu by skupina vznikla ako "F094/H1145".
-        # D-72: protitahova zastena je jednostranna (decor bez lomky) — legalna.
-        if DemosSlugMatcher.sheet_type_of(DemosSlugMatcher.slug_of(final_url)) == 'ZASTENA'
+        # D-72: protitahova zastena je jednostranna (decor bez lomky) — legalna,
+        # ale LEN pri produkte so skutocnym protitah markerom (GH #119 P2).
+        entry_slug = DemosSlugMatcher.slug_of(final_url)
+        if DemosSlugMatcher.sheet_type_of(entry_slug) == 'ZASTENA'
           dp = DemosProductParser.zastena_decor_parts(decor)
+          if dp && dp[1].nil? &&
+             !DemosProductParser.zastena_counterbalance?(entry_slug, parsed['title'])
+            dp = nil
+          end
           unless dp
             return [nil, nil, 'zástena má nečakaný tvar čísla dekoru — založ ručne']
           end
@@ -275,11 +281,14 @@ module Noxun
           return { 'reason' => 'výrobca stránky nesedí s rodinou — položka sa nezakladá' }
         end
         # D-66: dekorova brana pre zastenu porovnava LICE (cast pred lomkou).
-        # D-72: jednostranna (protitahova) zastena je legalna — lice je cely
-        # parameter; prisnost F4 plati na 3+ casti / prazdne lice.
+        # D-72: jednostranna (protitahova) zastena je legalna LEN so skutocnym
+        # protitah markerom (GH #119 P2); prisnost F4 na 3+ casti/prazdne lice.
         page_decor = params['decor']
         if sheet_type_of(slug) == 'ZASTENA'
           dp = DemosProductParser.zastena_decor_parts(page_decor)
+          if dp && dp[1].nil? && !DemosProductParser.zastena_counterbalance?(slug, parsed['title'])
+            dp = nil
+          end
           return { 'reason' => 'zástena má nečakaný tvar čísla dekoru' } unless dp
           page_decor = dp[0]
         end
@@ -305,13 +314,20 @@ module Noxun
         structure = params['structure'].to_s.strip
         back_decor = nil
         back_structure = nil
+        single_sided = false
         if type == 'ZASTENA'
           # D-66: rub z PARAMETROV stranky (nie zo slugu — FIX 7 nedotknuty).
-          # D-72: protitahova zastena rub NEMA (decor bez lomky) — zaklada sa
-          # ako jednostranny variant bez back poli (2B-2 ich ma volitelne).
+          # D-72: protitahova zastena rub NEMA — zaklada sa ako jednostranny
+          # variant s EXPLICITNYM priznakom single_sided (GH #119 P1: first-fill
+          # rubu je na nom zakazany); single LEN s protitah markerom (P2).
           dp = DemosProductParser.zastena_decor_parts(params['decor'])
+          if dp && dp[1].nil? &&
+             !DemosProductParser.zastena_counterbalance?(slug, parsed['title'])
+            dp = nil
+          end
           return { 'reason' => 'zástena má nečakaný tvar čísla dekoru' } unless dp
           back_decor = dp[1]
+          single_sided = dp[1].nil?
           sp = DemosProductParser.split_pair(structure, require_both: false)
           if sp
             structure = sp[0]
@@ -330,6 +346,7 @@ module Noxun
           out['back_decor'] = back_decor
           out['back_structure'] = back_structure.to_s
         end
+        out['single_sided'] = true if single_sided
         if type == 'PD'
           # M-C (audit F3): hranova uprava PD z parametra stranky "Typ
           # pracovnej dosky" — "Postforming" -> postforming, ina NEPRAZDNA

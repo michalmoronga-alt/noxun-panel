@@ -134,6 +134,8 @@ module Noxun
               # M-C: hranova uprava PD z verify_sheet (audit F3); prazdne = kluc
               # sa neulozi (put_pd_edge_fields + typovy guard validacie).
               'pd_edge_subtype' => (item['pd_edge_subtype'].to_s.strip.empty? ? nil : item['pd_edge_subtype'].to_s.strip),
+              # D-72: protitahovy priznak z verify_sheet (GH #119 P1).
+              'single_sided' => (item['single_sided'] == true ? true : nil),
               'code' => code, 'supplier' => 'Demos',
               'price_per_m2' => normalize_price(item['price']),
               'demos_url' => sanitized_demos_url(item['demos_url']),

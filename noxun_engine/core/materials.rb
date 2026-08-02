@@ -345,8 +345,10 @@ module Noxun
             need = SCHEMA_IMAGE if need < SCHEMA_IMAGE && !r['image_url'].to_s.empty?
             # V0.6 M-B1: UNI pracovny material = marker 7.
             need = SCHEMA_UNI if need < SCHEMA_UNI && r['uni'] == true
-            # V0.6 M-C: hranova uprava PD = marker 8.
-            need = SCHEMA_PD_EDGE if need < SCHEMA_PD_EDGE && !r['pd_edge_subtype'].to_s.empty?
+            # V0.6 M-C: hranova uprava PD = marker 8; D-72: protitahovy priznak
+            # zasteny patri k tomu istemu markeru (rovnaka generacia poli).
+            need = SCHEMA_PD_EDGE if need < SCHEMA_PD_EDGE &&
+                                     (!r['pd_edge_subtype'].to_s.empty? || r['single_sided'] == true)
           end
         end
         need
@@ -662,6 +664,13 @@ module Noxun
         put_opt(out, 'back_decor', a['back_decor'] || a[:back_decor])
         put_opt(out, 'back_structure', a['back_structure'] || a[:back_structure])
         out.delete('back_structure') unless out.key?('back_decor')
+        # D-72 (GH #119 P1): protitahova zastena nesie EXPLICITNY priznak —
+        # bez neho by bol zaznam nerozlisitelny od legacy neuplneho a
+        # first-fill rubu by ho premenil na INY produkt so zachovanym kodom.
+        # NIKDY spolu s rubom (konflikt strazi aj validacia).
+        if flag_true?(a['single_sided'] || a[:single_sided]) && !out.key?('back_decor')
+          out['single_sided'] = true
+        end
         out
       end
 
