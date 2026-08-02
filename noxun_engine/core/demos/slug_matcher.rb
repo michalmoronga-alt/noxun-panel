@@ -78,32 +78,40 @@ module Noxun
       # D-74c (Michalov smoke F206): JEDNA autorita rozmerov ABS zo slugu —
       # Demos dedup sufix (…-43-2-2 = 43/2 duplikat; …-23-0-8-2 = 23/0,8)
       # posuval sirku na hrubku a zakladanie padalo na guarde sirky.
-      # Kandidati (vzor D-74 label hintov): bez najbeznejsieho sufixu „-2"
-      # PRED plnym vykladom (…-23-1-2 = 23/1 dup, nie 23/1,2), zriedkave
-      # sufixy 3–9 az PO plnom (…-43-1-5 je realna 43/1,5). Platny vyklad =
-      # obchodna hrubka (desatinna z SUPPORTED_V2 / cela 1 alebo 2) + sirka
-      # 10–200 (rovnaky rozsah ako zapisovy guard). Ked nic nesedi, plati
-      # POVODNY fallback (exoticke slugy sa spravaju ako pred D-74c).
+      # Zbieraju sa VSETKY platne interpretacie (obchodna hrubka: desatinna
+      # z SUPPORTED_V2 / cela 1 alebo 2; sirka 10–200 ako zapisovy guard):
+      # DESATINNY vyklad ma prednost (GH #124 P1: …-23-1-2 je realna 23/1,2 —
+      # 1,2 je podporovana a v sortimente; dedup „-2" na celej 1-ke rozhodne
+      # prefer_thickness), potom vyklady so zahodenym sufixom, nakoniec cele.
+      # prefer_thickness (hrubka zo STRANKY pri zakladani / zo ZAZNAMU pri
+      # lookupe) vyhra nad poradim — ambiguity riesia data, nie heuristika.
+      # Ked nic nesedi, plati POVODNY fallback (exoticke slugy bez zmeny).
       # Vrati [sirka, hrubka, pocet spotrebovanych tokenov].
       EDGE_INT_THS = [1.0, 2.0].freeze
-      def edge_dims_scan(slug)
+      def edge_dims_scan(slug, prefer_thickness: nil)
         nums = trailing_numbers(slug)
         return [nil, nil, 0] if nums.length < 2
-        cands = []
-        cands << [nums[0...-1], 1] if nums.length >= 3 && nums.last == '2'
-        cands << [nums, 0]
-        cands << [nums[0...-1], 1] if nums.length >= 3 && nums.last.to_i.between?(3, 9)
+        cands = [[nums, 0]]
+        cands << [nums[0...-1], 1] if nums.length >= 3 && nums.last.to_i.between?(2, 9)
+        opts = []
+        # 1. kolo: desatinne vyklady (plny pred sufixovym), 2. kolo: cele.
+        cands.each do |c, suf|
+          next if c.length < 3
+          dec = "#{c[-2]}.#{c[-1]}".to_f
+          w = c[-3].to_f
+          opts << [w, dec, 3 + suf] if decimal_edge_thickness?(dec) && w.between?(10.0, 200.0)
+        end
         cands.each do |c, suf|
           next if c.length < 2
-          if c.length >= 3
-            dec = "#{c[-2]}.#{c[-1]}".to_f
-            w = c[-3].to_f
-            return [w, dec, 3 + suf] if decimal_edge_thickness?(dec) && w.between?(10.0, 200.0)
-          end
           th = c[-1].to_f
           w = c[-2].to_f
-          return [w, th, 2 + suf] if EDGE_INT_THS.include?(th) && w.between?(10.0, 200.0)
+          opts << [w, th, 2 + suf] if EDGE_INT_THS.include?(th) && w.between?(10.0, 200.0)
         end
+        if prefer_thickness.is_a?(Numeric)
+          hit = opts.find { |_w, th, _c| (th - prefer_thickness.to_f).abs <= 0.011 }
+          return hit if hit
+        end
+        return opts.first if opts.first
         if nums.length >= 3
           dec = "#{nums[-2]}.#{nums[-1]}".to_f
           return [nums[-3].to_f, dec, 3] if decimal_edge_thickness?(dec)

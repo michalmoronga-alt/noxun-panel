@@ -348,7 +348,9 @@ module Noxun
         page_decor_ok = params['decor'] &&
                         Materials.identity_norm(params['decor']) == Materials.identity_norm(rec['decor'])
         return false unless page_decor_ok || DemosSlugMatcher.edge_slug_decor?(slug, rec['decor'])
-        w, th = DemosSlugMatcher.edge_dims_from_slug(slug)
+        # GH #124 P1: hrubka ZAZNAMU rozhoduje ambivalentne slugy (1,2 vs 1+dup).
+        w, th, = DemosSlugMatcher.edge_dims_scan(slug,
+                                                 prefer_thickness: rec['thickness'].to_f)
         return false unless w && th && rec['width'] && rec['thickness']
         return false if (w - rec['width'].to_f).abs > 0.011
         return false if (th - rec['thickness'].to_f).abs > 0.011

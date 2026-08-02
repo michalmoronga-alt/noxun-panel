@@ -165,7 +165,13 @@ NxTest.test('d74c: edge_dims_from_slug — dedup sufixy (Michalov smoke F206: si
   # bez sufixu presne ako doteraz
   NxTest.assert_equal([23.0, 1.0], sm.edge_dims_from_slug('absb-5981-23-1'))
   NxTest.assert_equal([43.0, 1.5], sm.edge_dims_from_slug('absb-h1180-43-1-5'))
-  NxTest.assert_equal([23.0, 1.0], sm.edge_dims_from_slug('absb-h1180-23-1-2'), 'sufix -2 pri celej 1 = 23/1 dup')
+  # GH #124 P1: …-23-1-2 je AMBIVALENTNE (realna 1,2 vs 23/1 dedup) — bez
+  # prefer vyhrava DESATINNY vyklad (1,2 je podporovana a v sortimente);
+  # prefer (hrubka zo stranky/zaznamu) rozhodne s istotou oboma smermi.
+  NxTest.assert_equal([23.0, 1.2], sm.edge_dims_from_slug('absb-h1180-23-1-2'))
+  NxTest.assert_equal([23.0, 1.0], sm.edge_dims_scan('absb-h1180-23-1-2', prefer_thickness: 1.0)[0, 2])
+  NxTest.assert_equal([23.0, 1.2], sm.edge_dims_scan('absb-h1180-23-1-2', prefer_thickness: 1.2)[0, 2])
+  NxTest.assert_equal([43.0, 2.0], sm.edge_dims_scan('absb-x-43-2-2', prefer_thickness: 2.0)[0, 2])
   # token_count zrkadlo — dekor tesne pred sufixovymi rozmermi prezije
   NxTest.assert_equal(4, sm.edge_dims_token_count('absb-x-23-0-8-2'))
   NxTest.assert(DFA.edge_slug_decor?('absb-5981-23-0-8-2', '5981'),
@@ -181,8 +187,10 @@ NxTest.test('ma1/D-74 (GH #121 P2): dedup sufixy a ciselne dekory v labeloch') d
   labels = labels.map { |h| h['label'] }
   NxTest.assert(labels.include?('H1180 ST37 W908 ST37 · 4100×640 · 9,2 mm'),
                 "doskovy dedup sufix (9-2-2) nesmie dat 640×9 · 2,2: #{labels.inspect}")
-  NxTest.assert(labels.include?('H1180 ST37 Dub Halifax · 23/1'),
-                "ABS -23-1-2 = 23/1 s dup sufixom, nie 23/1,2: #{labels.inspect}")
+  # GH #124 P1 (revizia #121 P2): bez prefer vyhrava desatinny vyklad —
+  # 1,2 je realna podporovana paska; label nasleduje zapisovu autoritu.
+  NxTest.assert(labels.include?('H1180 ST37 Dub Halifax · 23/1,2'),
+                "ABS -23-1-2 bez prefer = 23/1,2 (dec priorita): #{labels.inspect}")
   NxTest.assert(labels.include?('5981 MG Cashmere · 23/1'),
                 "ciselny dekor pasky musi v labeli ostat: #{labels.inspect}")
   NxTest.assert(labels.include?('5981 MG Cashmere · 2800×2050 · 18 mm'),
