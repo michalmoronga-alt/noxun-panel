@@ -375,7 +375,11 @@ module Noxun
         unless page_decor_ok || edge_slug_decor?(slug, header['decor'])
           return { 'reason' => 'adresa pásky nenesie číslo dekoru rodiny — položka sa nezakladá' }
         end
-        w, th = edge_dims_from_slug(slug)
+        # GH #124 P1: hrubka zo STRANKY rozhoduje ambivalentne slugy
+        # (…-23-1-2 = 1,2 paska ALEBO 23/1 dedup) — prefer ju vyberie.
+        pt = params['thickness']
+        w, th, = DemosSlugMatcher.edge_dims_scan(slug,
+                                                 prefer_thickness: (pt if pt.is_a?(Numeric)))
         unless w && w.positive? && th && th.positive?
           return { 'reason' => 'z adresy pásky sa nedá určiť šírka×hrúbka' }
         end
@@ -384,7 +388,6 @@ module Noxun
         if pw.is_a?(Numeric) && (pw.to_f - w).abs > 0.011
           return { 'reason' => 'šírka pásky na stránke nesedí s adresou' }
         end
-        pt = params['thickness']
         if pt.is_a?(Numeric) && (pt.to_f - th).abs > 0.011
           return { 'reason' => 'hrúbka pásky na stránke nesedí s adresou' }
         end

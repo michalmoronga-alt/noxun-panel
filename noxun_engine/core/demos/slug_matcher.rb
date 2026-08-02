@@ -62,30 +62,61 @@ module Noxun
       # desatinnej hrubke sirka-cele-desatina (...-23-0-8 = 23x0,8;
       # ...-43-1-5 = 43x1,5). Vrati [width, thickness] alebo [nil, nil].
       def edge_dims_from_slug(slug)
-        nums = trailing_numbers(slug)
-        return [nil, nil] if nums.length < 2
-        # Kandidat 1: posledne DVA tokeny ako desatinna hrubka (X-Y = X.Y) —
-        # plati len pre realne obchodne desatinne hrubky (0,4/0,8/1,2/1,5).
-        if nums.length >= 3
-          dec = "#{nums[-2]}.#{nums[-1]}".to_f
-          if decimal_edge_thickness?(dec)
-            return [nums[-3].to_f, dec]
-          end
-        end
-        [nums[-2].to_f, nums[-1].to_f]
+        w, th, = edge_dims_scan(slug)
+        [w, th]
       end
 
-      # Kolko koncovych tokenov slugu tvori sirka×hrubka (2 cele / 3 desatinna)
-      # — presne zrkadlo edge_dims_from_slug. GH #106 P2: ciselny dekor tesne
-      # pred rozmermi (absb-5981-23-1) NESMIE byt odseknuty s nimi.
+      # Kolko koncovych tokenov slugu tvori sirka×hrubka (vratane pripadneho
+      # dedup sufixu) — presne zrkadlo edge_dims_from_slug. GH #106 P2: ciselny
+      # dekor tesne pred rozmermi (absb-5981-23-1) NESMIE byt odseknuty s nimi.
       def edge_dims_token_count(slug)
         nums = trailing_numbers(slug)
         return nums.length if nums.length < 2
+        edge_dims_scan(slug)[2]
+      end
+
+      # D-74c (Michalov smoke F206): JEDNA autorita rozmerov ABS zo slugu —
+      # Demos dedup sufix (…-43-2-2 = 43/2 duplikat; …-23-0-8-2 = 23/0,8)
+      # posuval sirku na hrubku a zakladanie padalo na guarde sirky.
+      # Zbieraju sa VSETKY platne interpretacie (obchodna hrubka: desatinna
+      # z SUPPORTED_V2 / cela 1 alebo 2; sirka 10–200 ako zapisovy guard):
+      # DESATINNY vyklad ma prednost (GH #124 P1: …-23-1-2 je realna 23/1,2 —
+      # 1,2 je podporovana a v sortimente; dedup „-2" na celej 1-ke rozhodne
+      # prefer_thickness), potom vyklady so zahodenym sufixom, nakoniec cele.
+      # prefer_thickness (hrubka zo STRANKY pri zakladani / zo ZAZNAMU pri
+      # lookupe) vyhra nad poradim — ambiguity riesia data, nie heuristika.
+      # Ked nic nesedi, plati POVODNY fallback (exoticke slugy bez zmeny).
+      # Vrati [sirka, hrubka, pocet spotrebovanych tokenov].
+      EDGE_INT_THS = [1.0, 2.0].freeze
+      def edge_dims_scan(slug, prefer_thickness: nil)
+        nums = trailing_numbers(slug)
+        return [nil, nil, 0] if nums.length < 2
+        cands = [[nums, 0]]
+        cands << [nums[0...-1], 1] if nums.length >= 3 && nums.last.to_i.between?(2, 9)
+        opts = []
+        # 1. kolo: desatinne vyklady (plny pred sufixovym), 2. kolo: cele.
+        cands.each do |c, suf|
+          next if c.length < 3
+          dec = "#{c[-2]}.#{c[-1]}".to_f
+          w = c[-3].to_f
+          opts << [w, dec, 3 + suf] if decimal_edge_thickness?(dec) && w.between?(10.0, 200.0)
+        end
+        cands.each do |c, suf|
+          next if c.length < 2
+          th = c[-1].to_f
+          w = c[-2].to_f
+          opts << [w, th, 2 + suf] if EDGE_INT_THS.include?(th) && w.between?(10.0, 200.0)
+        end
+        if prefer_thickness.is_a?(Numeric)
+          hit = opts.find { |_w, th, _c| (th - prefer_thickness.to_f).abs <= 0.011 }
+          return hit if hit
+        end
+        return opts.first if opts.first
         if nums.length >= 3
           dec = "#{nums[-2]}.#{nums[-1]}".to_f
-          return 3 if decimal_edge_thickness?(dec)
+          return [nums[-3].to_f, dec, 3] if decimal_edge_thickness?(dec)
         end
-        2
+        [nums[-2].to_f, nums[-1].to_f, 2]
       end
 
       # D-64: dekor rodiny ako suvisla sekvencia tokenov slugu PRED koncovymi
