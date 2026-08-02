@@ -81,6 +81,7 @@ Pôvodná tabuľka z 25.7. (12 dekorov na ručný batch) je zlúčená a rozší
 
 ## Vyriešené — index (plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md))
 
+- **D-74** zhody našeptávača ťažko čitateľné (bez diakritiky/formátovania) + chýbala kontrola linku (Michal 2.8.) — labely formátované (VEĽKÉ kódy, kapitalizácia, rozmery „23/0,8" / „2800×2070 · 8 mm"; diakritika technicky nejde — slug ju nemá, plné názvy dá až fetch rodiny), tlačidlo „Otvoriť na Demose" pri každej zhode so server sanitize — PR #121
 - **D-73** dve kompakty rôznych šírok hlásili „ten istý variant" (Michal 2.8., smoke F206 — 4100×920 vs 4100×650) — kompakt má šírok veľa ako PD; formát platne pridaný do identity variantu cez registrový flag (dedup, ID token, povinnosť pri zakladaní, nemennosť pri edite automaticky) — PR #120
 - **D-72** protiťahová (jednostranná) zástena sa nedala založiť z Demosu (Michal 2.8., smoke F206 — „zástena neuvádza oba dekory") — parameter nesie len líce, rub je protiťah; single je po novom legálny na hlavičke rodiny, verify aj lookupe, variant vzniká bez back polí; prísnosť na 3+ časti/prázdne líce ostáva — PR #119
 - **D-49b** create-time/hrúbková automatika dupláku — ZAVRETÉ bez implementácie (Michal 2.8.: pôvodný zámer bol „pri vkladaní 18-ky do katalógu sa 36-ka vytvorí sama"; selectová ponuka z D-49 vyhodnotená ako lepšia — „funguje ešte lepšie")

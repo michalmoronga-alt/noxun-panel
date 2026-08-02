@@ -115,7 +115,9 @@ NxTest.test('ma1 name search: neznamy prefix sa nehlada, absb je ABS, label bez 
   hits = DNS_MA.search(urls, 'h3303')
   NxTest.assert_equal(1, hits.length, 'lista (neznamy prefix) sa nehlada')
   NxTest.assert_equal('ABS', hits[0]['type'])
-  NxTest.assert(hits[0]['label'].start_with?('h3303'), hits[0]['label'])
+  # D-74: label je citatelny — dekor VELKYM, rozmery ABS "23/1".
+  NxTest.assert(hits[0]['label'].start_with?('H3303'), hits[0]['label'])
+  NxTest.assert(hits[0]['label'].include?('23/1'), "ABS rozmery formatovane: #{hits[0]['label']}")
 end
 
 NxTest.test('ma1 name search D-65: alias prefixy najditelne, clanky bez cislic von, label bez aliasu') do
@@ -128,7 +130,7 @@ NxTest.test('ma1 name search D-65: alias prefixy najditelne, clanky bez cislic v
   dtd = DNS_MA.search(urls, 'gold craft')
   NxTest.assert_equal(1, dtd.length, dtd.inspect)
   NxTest.assert_equal('DTDL', dtd[0]['type'])
-  NxTest.assert(dtd[0]['label'].start_with?('k003'), "alias prefix odstrihnuty: #{dtd[0]['label']}")
+  NxTest.assert(dtd[0]['label'].start_with?('K003'), "alias prefix odstrihnuty: #{dtd[0]['label']}")
   NxTest.assert_equal('MDF', DNS_MA.search(urls, 'front white')[0]['type'])
   NxTest.assert_equal('KOMPAKT', DNS_MA.search(urls, 'platinovo')[0]['type'])
   NxTest.assert_equal('ABS', DNS_MA.search(urls, 'mamba')[0]['type'])
@@ -136,6 +138,20 @@ NxTest.test('ma1 name search D-65: alias prefixy najditelne, clanky bez cislic v
                       'clanok bez cislic sa neindexuje (digit guard)')
   NxTest.assert_equal([], DNS_MA.search(urls, 'prehlad skladovej'),
                       'kategoria sa neindexuje')
+end
+
+NxTest.test('ma1/D-74: citatelne labely — dekor VELKYM, nazov s velkym zaciatkom, rozmery per typ') do
+  urls = ['https://www.demos-trade.sk/dtdl-f206-st9-pietra-grigia-cierna-2800-2070-8/',
+          'https://www.demos-trade.sk/zastena-f206-pm-protitah-sm-4100-640-9-2/',
+          'https://www.demos-trade.sk/kd-in-f206-st9-pietra-grigia-cierna-cj-cgs-4100-650-12/',
+          'https://www.demos-trade.sk/absb-f206-st9-pietra-grigia-cierna-23-0-8-2/',
+          'https://www.demos-trade.sk/absb-f206-st9-pietra-grigia-cierna-stara-23-2/']
+  labels = DNS_MA.search(urls, 'f206').map { |h| h['label'] }
+  NxTest.assert(labels.include?('F206 ST9 Pietra Grigia Cierna · 2800×2070 · 8 mm'), labels.inspect)
+  NxTest.assert(labels.include?('F206 PM Protitah SM · 4100×640 · 9,2 mm'), labels.inspect)
+  NxTest.assert(labels.include?('F206 ST9 Pietra Grigia Cierna CJ Cgs · 4100×650 · 12 mm'), labels.inspect)
+  NxTest.assert(labels.include?('F206 ST9 Pietra Grigia Cierna · 23/0,8'), labels.inspect)
+  NxTest.assert(labels.include?('F206 ST9 Pietra Grigia Cierna Stara · 23/2'), labels.inspect)
 end
 
 NxTest.test('ma1 name search: cache index sa memoizuje podla fetched_at') do

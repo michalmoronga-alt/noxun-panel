@@ -197,6 +197,19 @@ function nxdaSuggestRender(hits, note){
     row.setAttribute('data-url', h.url || '');
     row.appendChild(nxdaEl('span', 'nxda-tag', h.type || ''));
     row.appendChild(nxdaEl('span', 'nxda-sugg-label', h.label || h.slug || ''));
+    // D-74: kontrola zhody priamo na Demose — klik NESMIE vybrat riadok
+    // (stopPropagation); URL pochadza zo servera (sitemap cache) a server ju
+    // pred otvorenim ZNOVU sanitizuje (vzor D-60 — klient nie je autorita).
+    var open = nxdaEl('button', 'nxda-sugg-open');
+    open.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-external-link"/></svg>';
+    open.title = 'Otvoriť na Demose (kontrola pred vložením)';
+    open.setAttribute('aria-label', 'Otvoriť na Demose');
+    open.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      if (window.sketchup && sketchup.open_search_url)
+        sketchup.open_search_url(JSON.stringify({ url: h.url || '' }));
+    });
+    row.appendChild(open);
     box.appendChild(row);
   });
   box.style.display = '';

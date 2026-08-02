@@ -108,11 +108,9 @@ module Noxun
         { 'url' => url, 'slug' => slug, 'type' => type, 'label' => label_of(slug, type) }
       end
 
-      # Citatelny label do naseptavaca: slug bez typoveho prefixu, pomlcky
-      # ako medzery (dtdl-h1193-st12-dub-halifax-2800-2070-18 ->
-      # "h1193 st12 dub halifax 2800 2070 18"). D-65: odstrihava sa NAJDLHSI
-      # matchujuci prefix (dtd-laminovana pred dtdl by inak ostal polovicny).
-      def label_of(slug, type)
+      # Slug bez typoveho prefixu. D-65: odstrihava sa NAJDLHSI matchujuci
+      # prefix (dtd-laminovana pred dtdl by inak ostal polovicny).
+      def strip_prefix(slug, type)
         prefixes = type == 'ABS' ? DemosSlugMatcher::EDGE_PREFIXES : Array(DemosSlugMatcher::TYPE_PREFIXES[type])
         body = slug
         prefixes.sort_by { |p| -p.length }.each do |p|
@@ -120,7 +118,93 @@ module Noxun
           body = body[(p.length + 1)..]
           break
         end
-        body.tr('-', ' ')
+        body
+      end
+
+      # D-74: CITATELNY label naseptavaca. Slug nenesie diakritiku (offline
+      # zoznam adries — plne nazvy pridu az s fetchom rodiny), ale citatelnost
+      # sa da zdvihnut: dekorove tokeny (s cislicou) VELKYM (f206 -> F206,
+      # st9 -> ST9), nazvove slova s velkym zaciatkom, koncove rozmery
+      # formatovane per typ — ABS "43/0,8", doska "2800×2070 · 8 mm"
+      # (desatinnu hrubku 9-2 sklada ta ista heuristika ako family hint).
+      def label_of(slug, type)
+        toks = strip_prefix(slug, type).split('-')
+        dims = ''
+        if type == 'ABS'
+          w, th = abs_dims_hint(trailing_numbers_of(toks))
+          if w && th
+            dims = " · #{fmt_num(w)}/#{fmt_num(th)}"
+            toks = drop_trailing_numbers(toks)
+          end
+        else
+          th = defined?(DemosFamily) ? DemosFamily.sheet_thickness_from_slug(slug) : nil
+          toks = drop_trailing_numbers(toks) if th
+          nums = trailing_numbers_of(strip_prefix(slug, type).split('-'))
+          if th && nums.length >= 2
+            # koncove cisla = [... dlzka, sirka, hrubka(1-2 tokeny)] — format
+            # su DVE cisla pred hrubkovymi tokenmi.
+            th_tok = th == th.round ? 1 : 2
+            fmt_toks = nums[0...-th_tok]
+            if fmt_toks.length >= 2
+              dims = " · #{fmt_num(fmt_toks[-2].to_f)}×#{fmt_num(fmt_toks[-1].to_f)} · #{fmt_num(th)} mm"
+            else
+              dims = " · #{fmt_num(th)} mm"
+            end
+          end
+        end
+        # Dekorove kody (s cislicou) a kratke strukturne kody (pm/sm/cj...)
+        # VELKYM; ostatne slova s velkym zaciatkom (diakritiku slug nema).
+        words = toks.map { |t| t.match?(/\d/) || t.length <= 2 ? t.upcase : t.capitalize }
+        "#{words.join(' ')}#{dims}"
+      end
+
+      # D-74: LABEL hint rozmerov ABS z koncovych cisel slugu. Realne slugy
+      # mavaju dedup sufix (…-23-0-8-2 = sirka 23, hrubka 0,8, sufix 2) —
+      # desatinna dvojica sa uznava LEN ked da zmyselnu obchodnu hrubku
+      # (0,4/0,8/1/1,2/1,5/2), inak sa skusi variant bez sufixu. Ciste na
+      # zobrazenie (verify pouziva match proti katalogu, nie extrakciu).
+      ABS_LABEL_THS = [0.4, 0.8, 1.0, 1.2, 1.5, 2.0].freeze
+      def abs_dims_hint(nums)
+        cands = [nums]
+        cands << nums[0...-1] if nums.length >= 3 && nums.last.to_i.between?(2, 9)
+        cands.each do |c|
+          next if c.length < 2
+          if c.length >= 3
+            dec = "#{c[-2]}.#{c[-1]}".to_f
+            w = c[-3].to_f
+            return [w, dec] if ABS_LABEL_THS.include?(dec) && w.between?(10, 200)
+          end
+          th = c[-1].to_f
+          w = c[-2].to_f
+          return [w, th] if [1.0, 2.0].include?(th) && w.between?(10, 200)
+        end
+        [nil, nil]
+      end
+
+      # Neprerusene ciselne tokeny z konca pola (kopia family vzoru — tu nad
+      # uz odprefixovanym telom slugu).
+      def trailing_numbers_of(toks)
+        out = []
+        toks.reverse_each do |t|
+          break unless t.match?(/\A\d+\z/)
+          out.unshift(t)
+        end
+        out
+      end
+
+      def drop_trailing_numbers(toks)
+        n = trailing_numbers_of(toks).length
+        n.zero? ? toks : toks[0...-n]
+      end
+
+      def numeric?(t)
+        t.to_s.match?(/\A\d+\z/)
+      end
+
+      # 0.8 -> "0,8"; 43.0 -> "43" (slovenska desatinna ciarka).
+      def fmt_num(v)
+        f = v.to_f
+        (f == f.round ? f.round.to_s : format('%g', f)).tr('.', ',')
       end
     end
   end

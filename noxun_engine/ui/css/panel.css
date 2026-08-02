@@ -596,6 +596,11 @@
   .nxda-tag { flex: 0 0 auto; font-size: 10px; font-weight: 700; color: var(--nx-ink-muted);
               border: 1px solid var(--nx-border); border-radius: 4px; padding: 0 5px; }
   .nxda-sugg-label { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* D-74: kontrola zhody na Demose — ghost ikonka vpravo, klik nevybera riadok */
+  .nxda-sugg-open { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+                    width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px;
+                    background: transparent; color: var(--nx-ink-muted); cursor: pointer; }
+  .nxda-sugg-open:hover { background: var(--nx-select-bg-hover); color: var(--nx-select); }
   .nxda-note { color: var(--nx-ink-muted); font-size: 11.5px; padding: 6px 2px; }
   .nxda-crumb { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 6px; flex-wrap: wrap; }
   .nxda-badge { font-size: 10px; font-weight: 700; letter-spacing: .3px; padding: 1px 7px;
