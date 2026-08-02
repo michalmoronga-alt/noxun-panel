@@ -95,12 +95,19 @@ module Noxun
 
       # D1 (audit B5): genericke typy z configu, ktore TATO verzia nepozna
       # (model z novsej verzie pluginu). Cista funkcia — builder na nej stavia
-      # forward-compat guard prestavby, testy ju volaju priamo.
-      def self.unknown_generic_types(hardware)
-        Array(hardware).filter_map do |h|
+      # forward-compat guard prestavby, testy ju volaju priamo. set_keys =
+      # kluce config.hardware_sets (GH #126 P2 — override novsieho typu by
+      # normalize ticho zahodil aj ked polozka kovania prave neexistuje).
+      def self.unknown_generic_types(hardware, set_keys = nil)
+        out = Array(hardware).filter_map do |h|
           gt = h.is_a?(Hash) ? h['generic_type'].to_s : ''
           gt unless gt.empty? || GENERIC_TYPES.include?(gt)
-        end.uniq
+        end
+        Array(set_keys).each do |k|
+          gt = k.to_s
+          out << gt unless gt.empty? || GENERIC_TYPES.include?(gt)
+        end
+        out.uniq
       end
 
       # Horna hranica poctu jednej polozky — poistka proti poskodenym pravidlam/override

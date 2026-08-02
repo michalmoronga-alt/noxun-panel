@@ -10,13 +10,24 @@
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function rlLabel(t){
     return { leg:'Nohy', hinge:'Závesy', slide:'Výsuvy', handle:'Úchytky',
-             shelf_pin:'Podperky', connector:'Spojky' }[t] || t;
+             shelf_pin:'Podperky', connector:'Spojky',
+             wall_hanger:'Zavesenie na stenu' }[t] || t;
   }
   function roleDesc(r){
+    // GH #126 P2: popis podla SKUTOCNYCH filtrov pravidla — cabinet pravidlo
+    // moze cielit podla podopretia (nohy) ALEBO typu korpusu (Bystrica).
     var ap = (r.applies_to || {}); var role = ap.role || '';
-    if (role === 'cabinet') return 'na skrinku s podstavcom';
+    if (role === 'cabinet'){
+      var kinds = ap.cabinet_type || [];
+      var hasU = kinds.indexOf('upper') >= 0, hasL = kinds.indexOf('lower') >= 0;
+      if (hasU && !hasL) return 'na hornú skrinku';
+      if (hasL && !hasU) return 'na spodnú skrinku';
+      if ((ap.support || []).length) return 'na skrinku s podstavcom';
+      return 'na každú skrinku';
+    }
     if (role === 'front_door') return 'na každé krídlo dvierok';
     if (role === 'drawer_front') return 'na každé zásuvkové čelo';
+    if (role === 'shelf') return 'na každú policu';
     return role;
   }
 

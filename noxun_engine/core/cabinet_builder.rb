@@ -188,13 +188,14 @@ module Noxun
           inst
         end
 
-        # D1 (audit B5): neznamy generic_type v ulozenom config.hardware[] =
-        # model z novsej verzie pluginu; prestavba sa odmieta (cista kontrola
-        # zije v BuildPlan.unknown_generic_types).
+        # D1 (audit B5): neznamy generic_type v ulozenom config.hardware[]
+        # ALEBO v klucoch hardware_sets (GH #126 P2) = model z novsej verzie
+        # pluginu; prestavba sa odmieta (cista kontrola v BuildPlan).
         def guard_unknown_hardware!(inst)
           cfg = Store.config(inst)
           return unless cfg.is_a?(Hash)
-          unknown = BuildPlan.unknown_generic_types(cfg['hardware'])
+          set_keys = cfg['hardware_sets'].is_a?(Hash) ? cfg['hardware_sets'].keys : nil
+          unknown = BuildPlan.unknown_generic_types(cfg['hardware'], set_keys)
           return if unknown.empty?
           raise "Korpus nesie kovanie z novšej verzie Noxun (#{unknown.join(', ')}) — projekt vyžaduje novší plugin, prestavba by kovanie stratila."
         end
@@ -1270,6 +1271,10 @@ module Noxun
             # POZN. buduci part_key schema bump: owner_part_key tychto zaznamov musi
             # prejst TOU ISTOU legacy->current mapou ako part_overrides (audit D5).
             'hardware_overrides' => cfg['hardware_overrides'].is_a?(Array) ? cfg['hardware_overrides'] : [],
+            # V0.6 D1 (GH #126 P1): bez kopie by KAZDY rebuild zo stored configu
+            # (scale absorpcia, ulozenie pravidiel, Nahradit UNI, panel akcie)
+            # zahodil cabinet override setov kovania.
+            'hardware_sets' => cfg['hardware_sets'].is_a?(Hash) ? cfg['hardware_sets'] : {},
             'name' => cfg['name']
           }
           migrate_legacy_part_keys(params, cfg)

@@ -159,6 +159,25 @@ NxTest.test('hw sety: expand — rad podla NL, presny kluc, sused NIKDY (F10)') 
   NxTest.assert_equal(450.0, miss['unmapped'][0]['nominal_length'])
   bez = HWS.expand([NxSets.slide_item(nil)], NxSets.state, catalog: NxSets.catalog)
   NxTest.assert_equal('nl_missing', bez['unmapped'][0]['reason'], 'chybajuce params.nominal_length')
+  frak = HWS.expand([NxSets.slide_item(419.6)], NxSets.state, catalog: NxSets.catalog)
+  NxTest.assert_equal([], frak['rows'], 'frakcna NL 419,6 sa NEzaokruhli na 420 (GH #126 P2)')
+  NxTest.assert_equal('nl_missing', frak['unmapped'][0]['reason'])
+  celo = HWS.expand([NxSets.slide_item(420.0)], NxSets.state, catalog: NxSets.catalog)
+  NxTest.assert_equal(1, NxSets.row(celo, '357695')['quantity'], 'presna 420.0 mapuje')
+end
+
+NxTest.test('hw sety: expand — agregacia kodov je case-insensitive (GH #126 P2)') do
+  sets = HWS.normalize_sets([
+    { 'set_id' => 'case-test', 'generic_type' => 'hinge',
+      'members' => [{ 'code' => 'ABC9', 'per' => 'unit', 'qty' => 1 },
+                    { 'code' => 'abc9', 'per' => 'unit', 'qty' => 1 }] }
+  ])
+  st = { 'mapping' => { 'hinge' => 'case-test' }, 'sets' => { 'case-test' => sets[0] } }
+  cat = [{ 'item_code' => 'ABC9', 'name_sk' => 'Case položka', 'category' => 'ZAVESY', 'unit' => 'ks' }]
+  res = HWS.expand([NxSets.hinge_item], st, catalog: cat)
+  NxTest.assert_equal(1, res['rows'].length, 'ABC9 + abc9 = JEDEN nakupny riadok')
+  NxTest.assert_equal(4, res['rows'][0]['quantity'], '2 clenovia x qty 2 z pravidla')
+  NxTest.assert_equal(false, res['rows'][0]['missing'], 'katalogovy join case-insensitive')
 end
 
 NxTest.test('hw sety: expand — nemapovany typ a mrtvy odkaz na set (F9 vetva)') do
@@ -237,6 +256,23 @@ NxTest.test('hw sety: snapshot — missing != invalid (F9), zapis+citanie round-
   NxTest.assert_equal(:invalid, status, 'poskodeny JSON = invalid, NIE fallback na global')
   status, = HWS.project_state_status(NxFakeModel.new('{"mapping": {}}'))
   NxTest.assert_equal(:invalid, status, 'chyba sets = invalid')
+  # GH #126 P2: normalizacia musi byt BEZSTRATOVA, inak :invalid — zapis by
+  # zahodene data zvecnil.
+  lossy_set = { 'std' => 1, 'mapping' => {},
+                'sets' => { 'zly' => { 'set_id' => 'zly', 'generic_type' => 'hinge', 'members' => [] } } }
+  status, = HWS.project_state_status(NxFakeModel.new(lossy_set.to_json))
+  NxTest.assert_equal(:invalid, status, 'poskodeny set (bez clenov) = invalid, nie ticha strata')
+  lossy_map = { 'std' => 1, 'mapping' => { 'hinge' => 'neexistuje' }, 'sets' => {} }
+  status, = HWS.project_state_status(NxFakeModel.new(lossy_map.to_json))
+  NxTest.assert_equal(:invalid, status, 'mapping na chybajuci set = invalid')
+  future_map = { 'std' => 1, 'mapping' => { 'magnet_push' => 'x' },
+                 'sets' => { 'x' => { 'set_id' => 'x', 'generic_type' => 'hinge',
+                                      'members' => [{ 'code' => 'a', 'qty' => 1 }] } } }
+  status, = HWS.project_state_status(NxFakeModel.new(future_map.to_json))
+  NxTest.assert_equal(:invalid, status, 'mapping neznameho (novsieho) typu = invalid')
+  cudzi = { 'std' => 99, 'mapping' => {}, 'sets' => {} }
+  status, = HWS.project_state_status(NxFakeModel.new(cudzi.to_json))
+  NxTest.assert_equal(:invalid, status, 'cudzi std = invalid')
   m = NxFakeModel.new
   ok = HWS.write_project_state(m, NxSets.state)
   NxTest.assert_equal(true, ok)
@@ -365,6 +401,26 @@ NxTest.test('build_plan: unknown_generic_types — wall_hanger je znamy, buduci 
                                                 { 'generic_type' => 'magnet_push' },
                                                 'nie hash', nil]),
                       'neznamy typ raz, ne-hash polozky sa ignoruju')
+  # GH #126 P2: neznamy typ v klucoch hardware_sets chyta guard aj bez polozky
+  NxTest.assert_equal(['magnet_push'],
+                      bp.unknown_generic_types([], %w[hinge magnet_push]),
+                      'kluce override mapy sa kontroluju tiez')
+end
+
+NxTest.test('builder round-trip: hardware_sets prezije config_to_params aj normalize (GH #126 P1)') do
+  cb = Noxun::Engine::CabinetBuilder
+  stored = { 'type' => 'lower', 'part_overrides' => {},
+             'hardware_sets' => { 'hinge' => 'zaves-p2o' } }
+  params = cb.send(:config_to_params, stored)
+  NxTest.assert_equal({ 'hinge' => 'zaves-p2o' }, params['hardware_sets'],
+                      'config_to_params kopiruje override setov')
+  cfg = cb.normalize(params)
+  NxTest.assert_equal({ 'hinge' => 'zaves-p2o' }, cfg[:hardware_sets],
+                      'normalize ho zachova')
+  messy = cb.normalize('hardware_sets' => { 'hinge' => ' zaves-p2o ', 'vymysleny' => 'x',
+                                            'slide' => '', 'leg' => nil })
+  NxTest.assert_equal({ 'hinge' => 'zaves-p2o' }, messy[:hardware_sets],
+                      'neznamy typ / prazdne set_id von, trim')
 end
 
 # --- katalog: seed patch F8 ------------------------------------------------------

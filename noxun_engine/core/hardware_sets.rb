@@ -179,13 +179,21 @@ module Noxun
         return [:missing, nil] if raw.nil? || raw.to_s.strip.empty?
         doc = JSON.parse(raw.to_s)
         return [:invalid, nil] unless doc.is_a?(Hash)
+        # GH #126 P2: snapshot sa cita BEZSTRATOVO alebo vobec. Normalizacia,
+        # ktora by nieco zahodila (cudzi std, poskodeny set, mapping na
+        # chybajuci set ci neznamy generic_type novsej verzie), NESMIE vratit
+        # :ok — nasledny zapis (set_project_mapping!) by stratu zvecnil.
+        return [:invalid, nil] if doc.key?('std') && doc['std'].to_i != STD
         sets_map = doc['sets'].is_a?(Hash) ? doc['sets'] : nil
         mapping  = doc['mapping'].is_a?(Hash) ? doc['mapping'] : nil
         return [:invalid, nil] if sets_map.nil? || mapping.nil?
         sets = normalize_sets(sets_map.values)
+        return [:invalid, nil] if sets.length != sets_map.length
         by_id = {}
         sets.each { |s| by_id[s['set_id']] = s }
-        [:ok, { 'mapping' => normalize_mapping(mapping, sets), 'sets' => by_id }]
+        norm_map = normalize_mapping(mapping, sets)
+        return [:invalid, nil] if norm_map.length != mapping.length
+        [:ok, { 'mapping' => norm_map, 'sets' => by_id }]
       rescue StandardError => e
         Engine.log_error(e, 'HardwareSets.project_state_status') if defined?(Engine)
         [:invalid, nil]
@@ -348,7 +356,11 @@ module Noxun
           params = it['params'].is_a?(Hash) ? it['params'] : {}
           nl = params['nominal_length']
           return :nl_missing unless nl.is_a?(Numeric) && nl.to_f.finite?
-          code = member['code_by_nl'][Integer(nl.round).to_s]
+          # GH #126 P2: frakcna NL z vlastnej serie (419,6) sa NEZAOKRUHLUJE
+          # na susedny kluc — presna celociselna zhoda alebo nic (F10).
+          i = nl.round
+          return :nl_missing unless (nl.to_f - i).abs < 1e-9
+          code = member['code_by_nl'][i.to_s]
           return :nl_missing if code.nil? || code.to_s.strip.empty?
           code.to_s.strip
         else
@@ -358,7 +370,9 @@ module Noxun
       end
 
       def add_row(rows, code, quantity, it, sid, lookup)
-        row = rows[code] ||= { 'code' => code, 'quantity' => 0, 'sources' => [] }
+        # GH #126 P2: identita kodu je case-insensitive (kontrakt katalogu) —
+        # agregacny kluc kanonicky, zobrazuje sa prvy videny zapis.
+        row = rows[code.downcase] ||= { 'code' => code, 'quantity' => 0, 'sources' => [] }
         row['quantity'] += quantity
         row['sources'] << {
           'cabinet_id' => it['owner_id'].to_s,
