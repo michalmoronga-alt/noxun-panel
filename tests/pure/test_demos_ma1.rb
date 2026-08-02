@@ -154,6 +154,24 @@ NxTest.test('ma1/D-74: citatelne labely — dekor VELKYM, nazov s velkym zaciatk
   NxTest.assert(labels.include?('F206 ST9 Pietra Grigia Cierna Stara · 23/2'), labels.inspect)
 end
 
+NxTest.test('d74c: edge_dims_from_slug — dedup sufixy (Michalov smoke F206: sirka uz nie je 2.0/8.0)') do
+  sm = Noxun::Engine::DemosSlugMatcher
+  # F206 realne slugy so sufixom -2 (516784/516785/516786...)
+  NxTest.assert_equal([43.0, 2.0], sm.edge_dims_from_slug('absb-f206-st9-pietra-grigia-cierna-43-2-2'))
+  NxTest.assert_equal([23.0, 0.8], sm.edge_dims_from_slug('absb-f206-st9-pietra-grigia-cierna-23-0-8-2'))
+  NxTest.assert_equal([23.0, 2.0], sm.edge_dims_from_slug('absb-f206-st9-pietra-grigia-cierna-23-2-2'))
+  NxTest.assert_equal([100.0, 0.8], sm.edge_dims_from_slug('absb-jumbo-f206-st9-pietra-grigia-cierna-100-0-8'))
+  NxTest.assert_equal([43.0, 1.5], sm.edge_dims_from_slug('absb-f206-st9-pietra-grigia-cierna-43-1-5-2'))
+  # bez sufixu presne ako doteraz
+  NxTest.assert_equal([23.0, 1.0], sm.edge_dims_from_slug('absb-5981-23-1'))
+  NxTest.assert_equal([43.0, 1.5], sm.edge_dims_from_slug('absb-h1180-43-1-5'))
+  NxTest.assert_equal([23.0, 1.0], sm.edge_dims_from_slug('absb-h1180-23-1-2'), 'sufix -2 pri celej 1 = 23/1 dup')
+  # token_count zrkadlo — dekor tesne pred sufixovymi rozmermi prezije
+  NxTest.assert_equal(4, sm.edge_dims_token_count('absb-x-23-0-8-2'))
+  NxTest.assert(DFA.edge_slug_decor?('absb-5981-23-0-8-2', '5981'),
+                'ciselny dekor pred sufixovymi rozmerami sa neodsekne')
+end
+
 NxTest.test('ma1/D-74 (GH #121 P2): dedup sufixy a ciselne dekory v labeloch') do
   urls = ['https://www.demos-trade.sk/zastena-h1180-st37-w908-st37-4100-640-9-2-2/',
           'https://www.demos-trade.sk/absb-h1180-st37-dub-halifax-23-1-2/',

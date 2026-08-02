@@ -133,7 +133,7 @@ module Noxun
         dims = ''
         consumed = 0
         if type == 'ABS'
-          w, th, consumed = abs_dims_hint(nums)
+          w, th, consumed = abs_dims_hint(slug)
           dims = " · #{fmt_num(w)}/#{fmt_num(th)}" if w && th
         else
           l, sw, th, consumed = sheet_dims_hint(nums)
@@ -150,32 +150,17 @@ module Noxun
         "#{words.join(' ')}#{dims}"
       end
 
-      # D-74: LABEL hint rozmerov ABS z koncovych cisel slugu. Realne slugy
-      # mavaju dedup sufix (…-23-0-8-2 = sirka 23, hrubka 0,8, sufix 2) —
-      # desatinna dvojica sa uznava LEN ked da zmyselnu obchodnu hrubku
-      # (0,4/0,8/1/1,2/1,5/2). GH #121 P2: NAJBEZNEJSI sufix „-2" sa skusa
-      # ODSTRANIT PRED plnym vykladom (…-23-1-2 = 23/1 dup, nie 23/1,2);
-      # zriedkave sufixy 3–9 az PO plnom (…-43-1-5 je realna 43/1,5). Ciste
-      # na zobrazenie (verify pouziva match proti katalogu, nie extrakciu).
-      # Vrati [sirka, hrubka, POCET SPOTREBOVANYCH tokenov] alebo [nil,nil,0].
-      ABS_LABEL_THS = [0.4, 0.8, 1.0, 1.2, 1.5, 2.0].freeze
-      def abs_dims_hint(nums)
-        cands = []
-        cands << [nums[0...-1], 1] if nums.length >= 3 && nums.last == '2'
-        cands << [nums, 0]
-        cands << [nums[0...-1], 1] if nums.length >= 3 && nums.last.to_i.between?(3, 9)
-        cands.each do |c, suffix|
-          next if c.length < 2
-          if c.length >= 3
-            dec = "#{c[-2]}.#{c[-1]}".to_f
-            w = c[-3].to_f
-            return [w, dec, 3 + suffix] if ABS_LABEL_THS.include?(dec) && w.between?(10, 200)
-          end
-          th = c[-1].to_f
-          w = c[-2].to_f
-          return [w, th, 2 + suffix] if [1.0, 2.0].include?(th) && w.between?(10, 200)
-        end
-        [nil, nil, 0]
+      # D-74/D-74c: rozmery ABS pre label — DELEGUJE na jedinu autoritu
+      # DemosSlugMatcher.edge_dims_scan (dedup sufixy, enum hrubok, consumed).
+      # Fallback vetva autority (exoticky slug) sa v LABELI nezobrazuje —
+      # radsej bez rozmerov nez zavadzajuce cislo (zapisove cesty maju guardy).
+      def abs_dims_hint(slug)
+        w, th, consumed = DemosSlugMatcher.edge_dims_scan(slug)
+        return [nil, nil, 0] unless w && th &&
+                                    w.between?(10.0, 200.0) &&
+                                    (DemosSlugMatcher::EDGE_INT_THS.include?(th) ||
+                                     DemosSlugMatcher.decimal_edge_thickness?(th))
+        [w, th, consumed]
       end
 
       # D-74 (GH #121 P2): LABEL hint dosky — [dlzka, sirka, hrubka, consumed].
