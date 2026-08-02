@@ -908,3 +908,23 @@ NxTest.test('ma1 watchdog: refresh watcheri lookupu sa notifikuju a po dokonceni
   Noxun::Engine::DemosLookup.notify_refresh_watchers
   NxTest.assert_equal(1, hits, 'reset watcherov cisti zoznam')
 end
+
+# --- V0.6 D2: hladanie KOVANIA (opacny vyber sitemapy) ------------------------
+
+NxTest.test('d2 hw search: kovanie slugy sa najdu, materialy a clanky NIE') do
+  urls = [
+    'https://www.demos-trade.sk/zaves-sensys-8645i-110-th52-nalozeny-sisy-104717/',
+    'https://www.demos-trade.sk/dtd-laminovana-h3303-st10-dub-hamilton-2800-2070-18/',
+    'https://www.demos-trade.sk/ako-vybrat-zaves/', # clanok bez cislice
+    'https://www.demos-trade.sk/podlozka-8099-s-excentrom-d-1-5-106412/'
+  ]
+  idx = DNS_MA.build_hardware_index(urls)
+  NxTest.assert_equal(2, idx.length, 'len kovanie s cislicou (material a clanok von)')
+  hits = DNS_MA.search_hardware(urls, 'zaves sensys')
+  NxTest.assert_equal(1, hits.length)
+  NxTest.assert_equal('KOVANIE', hits[0]['type'])
+  NxTest.assert(hits[0]['label'].include?('Sensys'), 'label kapitalizuje slova')
+  NxTest.assert_equal([], DNS_MA.search_hardware(urls, 'dub hamilton'),
+                      'materialove slugy do kovania nepatria')
+  NxTest.assert_equal([], DNS_MA.search_hardware(urls, 'za'), 'min 3 znaky')
+end

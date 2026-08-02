@@ -335,3 +335,73 @@ NxTest.test('hw katalog: check_price! unchanged — ZACHOVA ulozenu cenu, obnovi
   NxTest.assert_equal(url, rec['demos_url'])
   NxTest.assert(rec['price_checked_at'].to_s.length.positive?, 'datum overenia obnoveny')
 end
+
+# --- V0.6 D2: Pridat z Demosu (proposal -> zapis s vazbou) --------------------
+
+NxTest.test('d2 katalog: category_guess — heuristika slug/nazov, fallback OSTATNE') do
+  NxTest.assert_equal('ZAVESY', HWC.category_guess('zaves-sensys-8645i Sensys 110'))
+  NxTest.assert_equal('VYSUVY', HWC.category_guess('k-innotech-atira-celny-biely-420-70'))
+  NxTest.assert_equal('SPOJOVACI_MATERIAL', HWC.category_guess('podperka-policova-7-5'))
+  NxTest.assert_equal('SPOJOVACI_MATERIAL', HWC.category_guess('zavesne-kovanie-bystrica'))
+  NxTest.assert_equal('VYKLOPY', HWC.category_guess('blum aventos hl'))
+  NxTest.assert_equal('OSTATNE', HWC.category_guess('nieco-uplne-ine-123'))
+end
+
+NxTest.test('d2 katalog: build_create_proposal — kod/nazov/MJ povinne, cena volitelna, related') do
+  html_err = HWC.build_create_proposal('https://x/', 'ok' => false, 'error' => 'timeout')
+  NxTest.assert_equal(false, html_err['ok'])
+  bad = HWC.build_create_proposal('https://x/', 'ok' => true, 'body' => '<html><body>nic</body></html>')
+  NxTest.assert_equal(false, bad['ok'], 'neproduktova stranka = chyba')
+end
+
+NxTest.test('d2 katalog: create_from_demos! — zapis z proposalu so server vazbou; exists/no_proposal') do
+  hwc_wipe!
+  HWC.assess!
+  prop = { 'pid' => 'test-pid-1', 'url' => 'https://www.demos-trade.sk/zaves-x-999001/',
+           'code' => '999001', 'name_sk' => 'Testovací záves', 'unit' => 'ks',
+           'price_vat' => 3.5, 'category_guess' => 'ZAVESY' }
+  HWC.create_proposals['test-pid-1'] = prop
+  status, rec = HWC.create_from_demos!('test-pid-1', category: '', notes: 'z testu')
+  NxTest.assert_equal(:ok, status)
+  NxTest.assert_equal('ZAVESY', rec['category'], 'prazdna kategoria = guess')
+  NxTest.assert_close(3.5, rec['price_eur_vat'], 0.001)
+  NxTest.assert_equal('https://www.demos-trade.sk/zaves-x-999001/', rec['demos_url'], 'vazba zo servera')
+  NxTest.assert(rec['price_checked_at'].to_s.length.positive?, 'cena overena = datum')
+  NxTest.assert_equal('z testu', rec['notes'])
+  NxTest.assert_equal(:no_proposal, HWC.create_from_demos!('test-pid-1')[0],
+                      'proposal je jednorazovy (zmizol po zapise)')
+  HWC.create_proposals['test-pid-2'] = prop.merge('pid' => 'test-pid-2')
+  NxTest.assert_equal(:exists, HWC.create_from_demos!('test-pid-2')[0], 'duplicitny kod = exists')
+  HWC.create_proposals['test-pid-3'] = prop.merge('pid' => 'test-pid-3', 'code' => '999002',
+                                                  'price_vat' => nil)
+  status, rec = HWC.create_from_demos!('test-pid-3', category: 'NOHY')
+  NxTest.assert_equal(:ok, status)
+  NxTest.assert_equal('NOHY', rec['category'], 'kategoriu smie klient zmenit (enum guard)')
+  NxTest.refute(rec.key?('price_eur_vat'), 'bez ceny = kluc chyba (nil != 0)')
+  NxTest.refute(rec.key?('price_checked_at'), 'bez ceny ziadny datum overenia')
+  NxTest.assert_equal('https://www.demos-trade.sk/zaves-x-999001/', rec['demos_url'], 'vazba aj bez ceny')
+end
+
+NxTest.test('d2 katalog GH#128: materialova stranka sa do kovania NEDOSTANE') do
+  body = File.read(File.join(__dir__, '..', 'fixtures', 'demos', 'h3303_dtdl18_product.html'),
+                   mode: 'rb:UTF-8')
+  url = 'https://www.demos-trade.sk/dtd-laminovana-h3303-st10-dub-hamilton-2800-2070-18/'
+  out = HWC.build_create_proposal(url, 'ok' => true, 'body' => body)
+  NxTest.assert_equal(false, out['ok'], 'DTDL doska sa neda zalozit ako kovanie')
+  NxTest.assert(out['error'].to_s.include?('materiál'), "zrozumitelny dovod: #{out['error']}")
+end
+
+NxTest.test('d2 katalog GH#128: redirect URL a cas fetchu putuju do zaznamu') do
+  hwc_wipe!
+  HWC.assess!
+  final = 'https://www.demos-trade.sk/zaves-novy-999003/'
+  prop = { 'pid' => 'p-redir', 'url' => final, 'code' => '999003',
+           'name_sk' => 'Záves po presmerovaní', 'unit' => 'ks', 'price_vat' => 2.0,
+           'fetched_at' => '2026-07-30T08:00:00Z', 'category_guess' => 'ZAVESY' }
+  HWC.create_proposals['p-redir'] = prop
+  status, rec = HWC.create_from_demos!('p-redir')
+  NxTest.assert_equal(:ok, status)
+  NxTest.assert_equal(final, rec['demos_url'], 'ulozena je KONECNA adresa')
+  NxTest.assert_equal('2026-07-30T08:00:00Z', rec['price_checked_at'],
+                      'datum overenia = cas FETCHU, nie kliku na Vytvorit')
+end

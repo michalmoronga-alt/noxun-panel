@@ -569,6 +569,129 @@ module Noxun
         end
       end
 
+      # --- V0.6 D2: "Pridat z Demosu" (novy zaznam z produktovej stranky) -----
+      # Vzor M-A + check_price!: fetch/parse VYHRADNE server, klient posiela
+      # len URL a potvrdenie; hodnoty (kod/nazov/cena/MJ) sa z klienta NIKDY
+      # neprijimaju — zapisuje sa serverovy proposal (pid). Kategoria je len
+      # NAVRH (heuristika zo slugu/nazvu) — pouzivatel ju moze zmenit; notes
+      # volitelne. Vazba demos_url + price_checked_at = server stamp.
+
+      # Navrh kategorie z URL slugu + nazvu (diakritika von cez Materials.slug).
+      # Poradie zalezi: specifickejsie vzory skor (podperka je SPOJOVACI, nie
+      # NOHY; uholnik "Bystrica" = SPOJOVACI_MATERIAL — debata 2.8.).
+      CATEGORY_GUESS = [
+        ['SPOJOVACI_MATERIAL', /skrutk|konfirmat|podperk|kolik|vrut|spojk|excentr|uholnik|zavesne-kovanie|rektifik/],
+        ['ZAVESY',   /zaves|sensys|intermat|klip-top|clip-top|tipon|tip-on|podlozk/],
+        ['VYSUVY',   /vysuv|zasuvk|atira|strongmax|strongbox|legrabox|quadro|innotech|reling|celovysuv/],
+        ['VYKLOPY',  /vyklop|aventos|vzper/],
+        ['NOHY',     /noha|nozk|klzak|sokl|axilo|podnoz/],
+        ['UCHYTKY',  /uchytk|knopk|madlo/],
+        ['VESIAKY',  /vesiak|hacik/],
+        ['OSVETLENIE', /led-|led$|-led|svietidl|trafo|napajac|profil/]
+      ].freeze
+
+      def category_guess(text)
+        t = Materials.slug(text.to_s).downcase.tr('_', '-')
+        CATEGORY_GUESS.each { |(cat, re)| return cat if t.match?(re) }
+        'OSTATNE'
+      end
+
+      def create_proposals
+        @create_proposals ||= {}
+      end
+
+      # Async preview: URL -> fetch -> parse -> proposal (server pamat, pid).
+      # result: {'ok'=>bool, 'error'=>.., pid/code/name_sk/unit/price_vat/
+      #          category_guess/url/exists/related[]}
+      def demos_preview!(url, &callback)
+        clean, err = Demos.sanitize_url(url.to_s)
+        unless clean
+          return finish_check(callback, 'ok' => false,
+                                        'error' => err || 'vlož adresu produktu z demos-trade.sk')
+        end
+        ctx = { 'done' => false, 'callback' => callback }
+        start_check_watchdog(ctx)
+        Demos.fetch(clean) do |res|
+          next if ctx['done']
+          finish_check_ctx(ctx, build_create_proposal(clean, res))
+        end
+        true
+      end
+
+      # Cista stavba proposalu z parsovanej stranky (testovatelne bez siete).
+      def build_create_proposal(url, res)
+        return { 'ok' => false, 'error' => res['error'].to_s } unless res['ok']
+        # GH #128 P2: po presmerovani je autoritou KONECNA adresa (vzor
+        # check_price!) — stara/presunuta URL by sa ulozila ako mrtva vazba
+        # a buduce obnovenie ceny by na nej padlo.
+        final_url = res['url'].to_s.strip.empty? ? url : res['url'].to_s
+        # GH #128 P2: vlozena MATERIALOVA adresa sa do katalogu kovania
+        # nedostane (parsuje sa rovnako dobre — kod, MJ ks, cena) — inak by
+        # doska skoncila ako kovanie 'OSTATNE' a dala sa vybrat do setu.
+        mat_type = DemosNameSearch.type_of(DemosSlugMatcher.slug_of(final_url))
+        if mat_type
+          return { 'ok' => false,
+                   'error' => "toto je materiál (#{mat_type}), nie kovanie — zakladá sa v okne Materiály" }
+        end
+        parsed = DemosProductParser.parse(res['body'])
+        return { 'ok' => false, 'error' => 'stránka nie je produktový detail' } unless parsed['ok']
+        code = parsed['code'].to_s.strip
+        return { 'ok' => false, 'error' => 'stránka nemá kód sortimentu' } if code.empty?
+        name = parsed['title'].to_s.strip
+        return { 'ok' => false, 'error' => 'stránka nemá názov produktu' } if name.empty?
+        unit = canonical_unit(parsed['unit'])
+        return { 'ok' => false, 'error' => "neznáma merná jednotka „#{parsed['unit']}“" } unless unit
+        price = parsed['price_vat']
+        price = nil unless price.is_a?(Numeric) && price.positive? && price.to_f.finite?
+        pid = next_proposal_id
+        # GH #128 P2: datum overenia patri CASU FETCHU, nie kliku na Vytvorit —
+        # nahlad otvoreny cez noc by inak staru cenu oznacil za overenu dnes.
+        prop = { 'pid' => pid, 'url' => final_url, 'code' => code, 'name_sk' => name,
+                 'unit' => unit, 'price_vat' => price,
+                 'fetched_at' => Time.now.utc.iso8601,
+                 'category_guess' => category_guess("#{final_url} #{name}") }
+        create_proposals.clear if create_proposals.length > 8 # bounded pamat
+        create_proposals[pid] = prop
+        related = Array(parsed['related']).first(10).map do |r|
+          { 'code' => r['code'].to_s, 'name' => r['name'].to_s }
+        end
+        prop.merge('ok' => true, 'exists' => !find(code).nil?, 'related' => related)
+      end
+
+      # Zapis z proposalu (pid = navrh, ktory pouzivatel VIDEL). Kategoriu
+      # smie klient zmenit (enum gardi normalize_item), notes volitelne.
+      # -> [:ok, rec] | [:no_proposal|:exists|:invalid|:read_only|:write_failed, info]
+      def create_from_demos!(pid, category: nil, notes: nil)
+        prop = create_proposals[pid.to_s]
+        return [:no_proposal, nil] unless prop
+        attrs = { 'item_code' => prop['code'], 'name_sk' => prop['name_sk'],
+                  'category' => (category.to_s.strip.empty? ? prop['category_guess'] : category),
+                  'unit' => prop['unit'], 'supplier' => 'Demos' }
+        attrs['price_eur_vat'] = prop['price_vat'] unless prop['price_vat'].nil?
+        n = notes.to_s.strip
+        attrs['notes'] = n unless n.empty?
+        rec, err = normalize_item(attrs)
+        return [:invalid, err] if rec.nil?
+        # Server-stamped vazba: URL aj cena pochadzaju z FETCHU (nie z kliku) —
+        # datum overenia patri cene (bez ceny sa neuklada; "Overit" ho doplni).
+        rec['demos_url'] = prop['url']
+        if rec.key?('price_eur_vat')
+          rec['price_checked_at'] = prop['fetched_at'].to_s.empty? ? Time.now.utc.iso8601
+                                                                  : prop['fetched_at']
+        end
+        with_lock do
+          JsonFileStore.invalidate(path)
+          data = load
+          if data['items'].any? { |i| i['item_code'].to_s.strip.downcase == rec['item_code'].downcase }
+            return [:exists, rec['item_code']]
+          end
+          data['items'] = data['items'] + [rec]
+          return [:write_failed, nil] unless write_unlocked(data)
+          create_proposals.delete(pid.to_s)
+          [:ok, rec]
+        end
+      end
+
       # --- seed ---------------------------------------------------------------
       # Deterministicky manifest (audit BLOCKER 2) — 1 riadok = 1 item_code,
       # presny nazov/kategoria/MJ/cena S DPH z DEMOS CSV (autorita nazvov a

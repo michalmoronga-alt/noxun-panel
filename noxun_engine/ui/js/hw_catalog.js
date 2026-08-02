@@ -290,6 +290,126 @@
     ));
   }
 
+  // --- V0.6 D2: Pridat z Demosu ---------------------------------------------
+  // Jedno pole URL/nazov (vzor M-A): text -> zive zhody zo sitemap (server),
+  // URL/klik na zhodu -> nahlad zo stranky (server proposal, pid) -> zapis.
+  // Hodnoty polozky NIKDY necestuju z klienta — len pid + kategoria + notes.
+
+  var MDH_DEMOS = null;      // posledny preview proposal (res zo servera)
+  var mdhDemosTimer = null;
+
+  function mdhDemosIsUrl(text){
+    return /^https?:\/\//i.test(String(text == null ? '' : text).trim());
+  }
+  function mdhDemosCreatePayload(prop, category, notes){
+    return { pid: (prop && prop.pid) || '', category: category || '', notes: notes || '' };
+  }
+  // "Suvisiaci sortiment: 106412 (podlozka), 105408 (krytka)…" — urychlovac
+  // skladania setov (kody na rovnakej stranke ako zaves).
+  function mdhRelatedLine(related){
+    var rs = (related || []).filter(function(r){ return r && r.code; });
+    if (!rs.length) return null;
+    return 'Súvisiaci sortiment: ' + rs.map(function(r){
+      return r.code + (r.name ? ' (' + r.name + ')' : '');
+    }).join(', ');
+  }
+
+  function mdhDemosInput(){
+    var inp = hwEl('hn_demos');
+    var q = inp ? inp.value.trim() : '';
+    if (mdhDemosIsUrl(q)){ mdhRenderDemosHits([]); return; }
+    if (q.length < 3){ mdhRenderDemosHits([]); return; }
+    if (mdhDemosTimer) clearTimeout(mdhDemosTimer);
+    mdhDemosTimer = setTimeout(function(){ mdhSend('hw_demos_search', { query: q }); }, 200);
+  }
+
+  function mdhDemosLoad(url){
+    MDH_DEMOS = { status: 'pending' };
+    mdhRenderDemosPreview();
+    mdhSend('hw_demos_preview', { url: url });
+  }
+
+  function mdhRenderDemosHits(results){
+    var box = hwEl('hwDemosHits');
+    if (!box) return;
+    box.textContent = '';
+    (results || []).forEach(function(r){
+      var row = mdhMk('div', 'hwdemos-hit', r.label || r.slug);
+      row.setAttribute('data-action', 'hw-demos-hit');
+      row.setAttribute('data-url', r.url);
+      box.appendChild(row);
+    });
+  }
+
+  function mdhRenderDemosPreview(){
+    var box = hwEl('hwDemosPreview');
+    if (!box) return;
+    var d = MDH_DEMOS;
+    box.textContent = '';
+    box.style.display = d ? '' : 'none';
+    var manual = hwEl('hwManualHint');
+    if (manual) manual.style.display = (d && d.ok) ? 'none' : '';
+    if (!d) return;
+    if (d.status === 'pending'){
+      box.appendChild(mdhMk('div', 'muted', 'Načítavam stránku…'));
+      // GH #128 P2: zrusit sa da aj POCAS fetchu (server bumpne generaciu)
+      var pb = mdhMk('div', 'btnrow');
+      var pc = mdhMk('button', 'ghostbtn', 'Zrušiť náhľad');
+      pc.setAttribute('data-action', 'hw-demos-cancel');
+      pb.appendChild(pc);
+      box.appendChild(pb);
+      return;
+    }
+    if (!d.ok){
+      box.appendChild(mdhMk('div', 'err', 'Nedá sa načítať: ' + (d.error || 'neznáma chyba')));
+      return;
+    }
+    var head = mdhMk('div', 'hwdemos-head');
+    head.appendChild(mdhMk('b', null, d.code));
+    head.appendChild(mdhMk('span', null, d.name_sk));
+    box.appendChild(head);
+    var meta = mdhMk('div', 'hwdemos-meta',
+      (d.price_vat != null ? mdhFmtPrice(d.price_vat) + ' s DPH · ' : 'cena na stránke nie je · ') + d.unit);
+    box.appendChild(meta);
+    if (d.exists){
+      box.appendChild(mdhMk('div', 'hwdemos-warn',
+        'Tento kód už v katalógu je — cenu obnovíš cez „Overiť" na existujúcej položke.'));
+    }
+    var rel = mdhRelatedLine(d.related);
+    if (rel) box.appendChild(mdhMk('div', 'hwdemos-rel', rel));
+    var row = mdhMk('div', 'row');
+    row.appendChild(mdhMk('label', null, 'Kategória'));
+    var sel = mdhMk('select');
+    sel.id = 'hn_demos_category';
+    MDH_CATS.forEach(function(c){
+      var op = mdhMk('option', null, c);
+      op.value = c;
+      if (c === d.category_guess) op.selected = true;
+      sel.appendChild(op);
+    });
+    row.appendChild(sel);
+    row.appendChild(mdhMk('span', 'unit', 'návrh'));
+    box.appendChild(row);
+    var row2 = mdhMk('div', 'row');
+    row2.appendChild(mdhMk('label', null, 'Poznámka'));
+    var notes = mdhMk('input');
+    notes.type = 'text';
+    notes.id = 'hn_demos_notes';
+    row2.appendChild(notes);
+    row2.appendChild(mdhMk('span', 'unit', ''));
+    box.appendChild(row2);
+    var btns = mdhMk('div', 'btnrow');
+    if (!d.exists){
+      var create = mdhMk('button', 'primary', 'Vytvoriť z Demosu');
+      create.setAttribute('data-action', 'hw-demos-create');
+      btns.appendChild(create);
+    }
+    var cancel = mdhMk('button', 'ghostbtn', 'Zrušiť náhľad');
+    cancel.setAttribute('data-action', 'hw-demos-cancel');
+    btns.appendChild(cancel);
+    box.appendChild(btns);
+  }
+
   // --- verejne API pre Ruby ------------------------------------------------
 
   var MDH = {
@@ -340,6 +460,39 @@
     priceApplied: function(r){
       delete MDH_PRICE[r.code];
       mdhRender();
+    },
+    // V0.6 D2: zive zhody + nahlad + zapis z Demosu
+    demosResults: function(d){
+      var inp = hwEl('hn_demos');
+      // neaktualne vysledky (pouzivatel medzitym pise dalej) sa zahadzuju
+      if (!inp || inp.value.trim() !== (d.query || '')) return;
+      if (d.refreshing){
+        var box = hwEl('hwDemosHits');
+        if (box){
+          box.textContent = '';
+          box.appendChild(mdhMk('div', 'muted', 'Sťahujem zoznam produktov Demosu (prvé použitie, chvíľu to trvá)…'));
+        }
+        return;
+      }
+      mdhRenderDemosHits(d.results || []);
+    },
+    // GH #128 P2: sitemap cache dobehla — zopakuj AKTUALNY dotaz
+    demosRefreshDone: function(){
+      var inp = hwEl('hn_demos');
+      var q = inp ? inp.value.trim() : '';
+      if (q.length >= 3 && !mdhDemosIsUrl(q)) mdhSend('hw_demos_search', { query: q });
+    },
+    demosPreview: function(res){
+      MDH_DEMOS = res || { ok: false, error: 'prázdna odpoveď' };
+      mdhRenderDemosHits([]);
+      mdhRenderDemosPreview();
+    },
+    demosCreated: function(){
+      MDH_DEMOS = null;
+      var i = hwEl('hn_demos');
+      if (i) i.value = '';
+      mdhRenderDemosPreview();
+      MDH.created();
     },
     created: function(){
       var f = hwEl('hwNewForm');
@@ -414,6 +567,24 @@
         // zapis, ak medzitym dobehol iny check (prekryvajuce sa overenia).
         var shown = MDH_PRICE[code] || {};
         mdhSend('hw_apply_price', { code: code, pid: shown.pid || '' });
+      } else if (action === 'hw-demos-load'){
+        var di = hwEl('hn_demos');
+        var val = di ? di.value.trim() : '';
+        if (mdhDemosIsUrl(val)) mdhDemosLoad(val);
+        else MDH.setStatus('Vlož URL produktu z demos-trade.sk, alebo klikni na zhodu z hľadania.', true);
+      } else if (action === 'hw-demos-hit'){
+        mdhDemosLoad(t.getAttribute('data-url') || '');
+      } else if (action === 'hw-demos-create'){
+        var catSel = hwEl('hn_demos_category');
+        var notesInp = hwEl('hn_demos_notes');
+        mdhSend('hw_demos_create', mdhDemosCreatePayload(MDH_DEMOS,
+          catSel ? catSel.value : '', notesInp ? notesInp.value.trim() : ''));
+      } else if (action === 'hw-demos-cancel'){
+        // GH #128 P2: server bumpne generaciu — dobiehajuci fetch uz zruseny
+        // nahlad znovu neotvori.
+        mdhSend('hw_demos_cancel', {});
+        MDH_DEMOS = null;
+        mdhRenderDemosPreview();
       }
     });
     document.addEventListener('focusout', function(ev){
@@ -438,6 +609,8 @@
     });
     var si = hwEl('hwSearch');
     if (si) si.addEventListener('input', mdhSearchDebounced);
+    var dii = hwEl('hn_demos');
+    if (dii) dii.addEventListener('input', mdhDemosInput);
     var ci = hwEl('hwCategory');
     if (ci) ci.addEventListener('change', mdhSearchNow);
     var ii = hwEl('hwInactive');
@@ -448,6 +621,8 @@
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { mdhFmtPrice: mdhFmtPrice, mdhCheckedLabel: mdhCheckedLabel,
       mdhPatchPayload: mdhPatchPayload, mdhOrderItems: mdhOrderItems,
-      mdhCreatePayload: mdhCreatePayload, mdhCssEscape: mdhCssEscape };
+      mdhCreatePayload: mdhCreatePayload, mdhCssEscape: mdhCssEscape,
+      mdhDemosIsUrl: mdhDemosIsUrl, mdhDemosCreatePayload: mdhDemosCreatePayload,
+      mdhRelatedLine: mdhRelatedLine };
   }
   if (typeof window !== 'undefined' && window.sketchup && sketchup.ready) sketchup.ready('');

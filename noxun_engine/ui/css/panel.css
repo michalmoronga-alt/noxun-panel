@@ -668,3 +668,15 @@
 .hwbanner { background: var(--nx-warn-bg); border: 1px solid var(--nx-warnchip-border);
             color: var(--nx-warn-fg); border-radius: 6px; padding: 6px 10px; margin: 6px 0; font-size: 12px; }
 .hwsetrow .hwsetsel { flex: 1 1 auto; min-width: 120px; font-size: 11.5px; }
+
+/* ===== V0.6 D2: Pridat z Demosu (katalog kovania) ===== */
+.hwdemos-hit { padding: 3px 8px; border: 1px solid var(--nx-border); border-radius: 5px;
+               margin: 2px 0; cursor: pointer; font-size: 12px; }
+.hwdemos-hit:hover { background: var(--nx-ghost-hover); }
+#hwDemosPreview { border: 1px solid var(--nx-border-strong); border-radius: 8px;
+                  padding: 7px 10px; margin: 6px 0; }
+.hwdemos-head { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; }
+.hwdemos-meta { color: var(--nx-ink-muted); font-size: 12px; margin: 2px 0; }
+.hwdemos-warn { background: var(--nx-warn-bg); border: 1px solid var(--nx-warnchip-border);
+                color: var(--nx-warn-fg); border-radius: 5px; padding: 4px 8px; margin: 4px 0; font-size: 12px; }
+.hwdemos-rel { color: var(--nx-ink-muted); font-size: 11.5px; margin: 3px 0; }
