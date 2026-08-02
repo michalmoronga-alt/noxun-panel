@@ -4,7 +4,7 @@
      DOM API (textContent — XSS vzor demos_diff.js), ovladanie data-action
      delegaciou; inline handlery LEN bez dat. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.5.35">
+<link rel="stylesheet" href="css/panel.css?v=0.5.36">
 
 <h1>Katalóg kovania</h1>
 <p class="sub" id="hwline">…</p>
@@ -14,6 +14,18 @@
   <span id="hwRoText">…</span>
 </div>
 
+<!-- V0.6 D1b: taby — Polozky (C-2) | Sety | Predvolby projektu. Sety su
+     mapovacie pravidla (NIE polozky katalogu); obsah stavia hw_sets.js. -->
+<div class="pvtabs" id="hwTabs">
+  <button id="hwt_items" class="on" data-action="hws-tab" data-tab="items">Položky</button>
+  <button id="hwt_sets" data-action="hws-tab" data-tab="sets">Sety</button>
+  <button id="hwt_proj" data-action="hws-tab" data-tab="proj">Predvoľby projektu</button>
+</div>
+
+<div id="hwTabSets" style="display:none"></div>
+<div id="hwTabProj" style="display:none"></div>
+
+<div id="hwTabItems">
 <div class="mdbar">
   <div class="mdsearch">
     <svg class="ic mdsearch-ic" aria-hidden="true"><use href="#i-search"/></svg>
@@ -40,6 +52,7 @@
     <button class="ghostbtn" data-action="hw-new-close">Zrušiť</button>
   </div>
 </div>
+</div><!-- /hwTabItems -->
 
 <!-- Potvrdenie zmazania — in-window modal (NIE UI.messagebox). -->
 <div id="hwDelModal" class="nxmodal" style="display:none">
@@ -57,6 +70,7 @@
 
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.5.35"></script>
-<script src="js/icons.js?v=0.5.35"></script>
-<script src="js/hw_catalog.js?v=0.5.35"></script>
+<script src="js/errors.js?v=0.5.36"></script>
+<script src="js/icons.js?v=0.5.36"></script>
+<script src="js/hw_sets.js?v=0.5.36"></script>
+<script src="js/hw_catalog.js?v=0.5.36"></script>

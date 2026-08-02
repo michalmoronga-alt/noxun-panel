@@ -71,6 +71,7 @@ module Noxun
           cb(dlg, 'set_part_edges_all')   { |p| handle_set_part_edges_all(p) }   # D-35 olep vsetky 4 hrany (1 undo)
           # V0.4 kovanie: rucny pocet / vypnutie / reset polozky + editor pravidiel
           cb(dlg, 'set_hardware_override') { |p| handle_set_hardware_override(p) }
+          cb(dlg, 'set_hardware_set')      { |p| handle_set_hardware_set(p) } # V0.6 D1b: set na skrinke
           cb(dlg, 'open_rules')            { |_p| RulesDialog.show }
           # V0.4.5 D1: omrvinka karty dielca — spat na korpus (oznaci ho v modeli)
           cb(dlg, 'select_cabinet')        { |p| handle_select_cabinet(p) }
@@ -83,6 +84,8 @@ module Noxun
           cb(dlg, 'production_do_select')   { |p| ProductionDialog.do_select(p) }
           # V0.5 C relay: export VEPO az PO flushi editov panela (stale data = zla objednavka)
           cb(dlg, 'production_do_export')   { |p| ProductionDialog.do_export(p) }
+          # V0.6 D1b relay (GH #127 P1): CSV kovania — rovnaky flush handshake
+          cb(dlg, 'production_do_hw_csv')   { |p| ProductionDialog.do_hw_csv(p) }
           # V0.4.7c: samostatna doska — vlozenie + karta (fields/material/ABS hrana)
           cb(dlg, 'insert_board')       { |p| handle_insert_board(p) }
           cb(dlg, 'set_board_fields')   { |p| handle_set_board_fields(p) }

@@ -51,6 +51,59 @@ module Noxun
           ov_owner = present_str(ov['owner_part_key'])
           ov_owner == owner && ov['generic_type'].to_s == gt && ov['rule_id'].to_s == rid
         end
+
+        # V0.6 D1b: vyber setu kovania NA SKRINKE (override projektovej
+        # predvolby). set_id prazdne = spat na predvolbu projektu. Zapis
+        # overridu + definicia setu do snapshotu (audit B2) + rebuild =
+        # JEDNA operacia (rebuild_many yield).
+        def handle_set_hardware_set(payload)
+          model = Sketchup.active_model
+          cab = find_cabinet(model)
+          return set_status('Najprv označ NOXUN korpus.', true) if cab.nil?
+
+          data = parse(payload)
+          gt = data['generic_type'].to_s
+          return set_status('Neznámy typ kovania.', true) unless BuildPlan::GENERIC_TYPES.include?(gt)
+
+          # GH #127 P2: payload nesie identitu RENDROVANEJ skrinky — zmena
+          # vyberu pred obsluhou callbacku nesmie prepisat inu skrinku.
+          rendered = data['cabinet_id'].to_s
+          if !rendered.empty? && rendered != Store.get(cab, 'cabinet_id').to_s
+            push_selected(model)
+            return set_status('Výber sa medzitým zmenil — panel sa obnovil, skús znova.', true)
+          end
+
+          status, = HardwareSets.project_state_status(model)
+          if status == :invalid
+            return set_status('Sety projektu sú poškodené — obnov ich v Katalógu kovania (Predvoľby projektu).', true)
+          end
+
+          sid = present_str(data['set_id'])
+          set_def = nil
+          if sid
+            set_def = HardwareSets.load['sets'].find { |s| s['set_id'] == sid && s['generic_type'] == gt }
+            if set_def.nil?
+              state = HardwareSets.project_state(model)
+              cand = state && state['sets'][sid]
+              set_def = cand if cand && cand['generic_type'] == gt
+            end
+            return set_status('Set sa nenašiel — otvor Katalóg kovania a skús znova.', true) if set_def.nil?
+          end
+
+          params = existing_params(cab)
+          map = params['hardware_sets'].is_a?(Hash) ? params['hardware_sets'] : {}
+          sid ? map[gt] = sid : map.delete(gt)
+          params['hardware_sets'] = map
+          suspend_selection_sync do
+            CabinetBuilder.rebuild_many(model, [[cab, params]], op_name: 'NOXUN: set kovania') do
+              HardwareSets.add_project_set!(model, set_def) if set_def
+            end
+            reselect(model, cab)
+          end
+          label = HardwareRules.label_for(gt)
+          status_with_warnings(cab, sid ? "#{label}: set „#{set_def['name']}“ pre túto skrinku." : "#{label}: platí predvoľba projektu.")
+          push_selected(model)
+        end
       end
     end
   end

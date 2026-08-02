@@ -1,7 +1,7 @@
 <!-- Noxun Engine — dialog Pravidla kovania (V0.4). Vanilla JS, ziadne CDN, slovensky. -->
 <!-- Otvara sa z menu Extensions > Noxun Engine > Pravidla kovania alebo z panela (sekcia Kovanie). -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.5.35">
+<link rel="stylesheet" href="css/panel.css?v=0.5.36">
 
 <h1>Pravidlá kovania</h1>
 <p class="sub" id="srcline">…</p>
@@ -15,10 +15,13 @@
   <div class="btnrow">
     <button class="primary" onclick="saveRules()">Uložiť a prestavať skrinky</button>
     <button class="ghostbtn" onclick="loadGlobal()">Načítať globálne predvoľby</button>
+    <!-- V0.6 D1b (audit F4): nove seed pravidla sa do projektu dostanu LEN
+         touto vedomou akciou (snapshot sa nikdy nemerguje sam). -->
+    <button class="ghostbtn" onclick="mergeSeed()" title="Doplní do projektu nové predvolené pravidlá (napr. zavesenie hornej skrinky, podperky) a obnoví nezmenené na aktuálny tvar — tvoje úpravy nechá.">Doplniť nové predvolené</button>
   </div>
 </div>
 
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.5.35"></script>
-<script src="js/rules.js?v=0.5.35"></script>
+<script src="js/errors.js?v=0.5.36"></script>
+<script src="js/rules.js?v=0.5.36"></script>

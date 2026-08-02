@@ -220,6 +220,33 @@ module Noxun
         rules
       end
 
+      # D1b (audit F4): VEDOMA akcia "Doplnit nove predvolene pravidla" —
+      # jedina cesta, ktorou sa novy seed dostane do EXISTUJUCEHO projektu
+      # (snapshot sa NIKDY nemerguje sam). Doplni chybajuce rule_id + obnovi
+      # pravidla bajtovo zhodne so starym seed tvarom (LEGACY_SEED_SHAPES —
+      # napr. seria vysuvov v1 -> Atira rad); pouzivatelske upravy nedotknute.
+      # Volat VNUTRI operacie. -> [:none|:updated, added_ids, refreshed_ids]
+      def merge_project_seed!(model)
+        existing = project_rules(model)
+        return [:none, [], []] if existing.nil? # bez snapshotu berie projekt globál sám
+        seed_by_id = {}
+        SEED_RULES.each { |r| seed_by_id[r['rule_id']] = r }
+        refreshed_ids = []
+        refreshed = existing.map do |r|
+          rid = r['rule_id']
+          next r unless seed_by_id[rid] && legacy_seed_shape?(r)
+          refreshed_ids << rid
+          normalize_rules([seed_by_id[rid]]).first
+        end
+        have = {}
+        refreshed.each { |r| have[r['rule_id']] = true }
+        missing = SEED_RULES.reject { |r| have[r['rule_id']] }
+        added_ids = missing.map { |r| r['rule_id'] }
+        return [:none, [], []] if added_ids.empty? && refreshed_ids.empty?
+        set_project_rules(model, refreshed + normalize_rules(missing))
+        [:updated, added_ids, refreshed_ids]
+      end
+
       # Zapise projektovy snapshot (editor pravidiel / ensure). Volajuci drzi operaciu.
       def set_project_rules(model, rules)
         return false unless model

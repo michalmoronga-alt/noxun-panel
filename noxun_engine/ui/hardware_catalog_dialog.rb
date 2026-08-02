@@ -53,13 +53,19 @@ module Noxun
         end
 
         def register_callbacks(dlg)
-          cb(dlg, 'ready')          { |_p| push_state }
+          cb(dlg, 'ready')          { |_p| push_state; push_sets }
           cb(dlg, 'hw_search')      { |p| handle_search(p) }
           cb(dlg, 'hw_create')      { |p| handle_create(p) }
           cb(dlg, 'hw_patch')       { |p| handle_patch(p) }
           cb(dlg, 'hw_delete')      { |p| handle_delete(p) }
           cb(dlg, 'hw_check_price') { |p| handle_check_price(p) }
           cb(dlg, 'hw_apply_price') { |p| handle_apply_price(p) }
+          # V0.6 D1b: sety kovania (tab Sety + Predvolby projektu)
+          cb(dlg, 'hws_save_set')      { |p| handle_set_save(p) }
+          cb(dlg, 'hws_delete_set')    { |p| handle_set_delete(p) }
+          cb(dlg, 'hws_map_project')   { |p| handle_map_project(p) }
+          cb(dlg, 'hws_map_global')    { |p| handle_map_global(p) }
+          cb(dlg, 'hws_reset_project') { |p| handle_reset_project(p) }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(hw_catalog): #{msg}")
@@ -113,6 +119,156 @@ module Noxun
 
         def set_status(msg, error = false)
           js("MDH.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})")
+        end
+
+        # --- V0.6 D1b: sety kovania -------------------------------------------
+
+        # Prepnutie modelu (EngineAppObserver) — tab Predvolby projektu cita
+        # NOVY aktivny model; polozky katalogu su globalne (netreba refresh).
+        def on_model_changed(_model)
+          return unless @dialog && @dialog.visible?
+          push_sets
+        end
+
+        def push_sets
+          js("HWSETS.init(#{sets_payload.to_json})")
+        end
+
+        def sets_payload
+          lib = HardwareSets.load
+          model = Sketchup.active_model
+          status, state = HardwareSets.project_state_status(model)
+          {
+            'sets' => lib['sets'],
+            'global_mapping' => lib['mapping'],
+            'revision' => HardwareSets.revision,
+            'project' => { 'status' => status.to_s,
+                           'mapping' => (state ? state['mapping'] : {}),
+                           # GH #127 P2: zmrazene KOPIE projektu — mapovany set
+                           # mohol byt v globale zmeneny/zmazany; predvolby
+                           # musia ukazat pravdu projektu, nie globalu.
+                           'sets' => (state ? state['sets'].values : []) },
+            # handle/connector v ponuke NEskryvame — pravidla ich sice
+            # negeneruju (uchytky mimo D — Michal 2.8.), ale set sa da
+            # pripravit dopredu; expanzia bez poloziek aj tak nic nespravi.
+            'generic_types' => BuildPlan::GENERIC_TYPES.map { |gt|
+              { 'key' => gt, 'label' => HardwareRules.label_for(gt) }
+            },
+            'model_guid' => model ? model.guid.to_s : '',
+            'model_title' => model && !model.title.to_s.empty? ? model.title.to_s : 'Bez názvu'
+          }
+        end
+
+        def handle_set_save(payload)
+          data = JSON.parse(payload.to_s)
+          status, info = HardwareSets.save_set!(data['set'].is_a?(Hash) ? data['set'] : {},
+                                                revision: data['revision'].to_s,
+                                                create: data['create'] == true)
+          case status
+          when :ok
+            push_sets
+            js('HWSETS.saved()') # GH #127 P2: editor sa zavrie az pri USPECHU
+            set_status("Set „#{info['name']}“ uložený.")
+          when :exists
+            # GH #127 P2: slug z nazvu trafil existujucu identitu — novy set
+            # nesmie ticho prepisat globalnu definiciu.
+            set_status("Set s identitou „#{info}“ už existuje — zmeň názov (alebo uprav existujúci set).", true)
+          when :conflict
+            push_sets
+            set_status('Knižnica setov sa medzitým zmenila — obnovené, uprav znova.', true)
+          when :invalid
+            set_status(info.to_s.empty? ? 'Set sa nedá uložiť.' : info.to_s, true)
+          else
+            push_sets
+            set_status('Uloženie setu zlyhalo.', true)
+          end
+        end
+
+        def handle_set_delete(payload)
+          data = JSON.parse(payload.to_s)
+          status, = HardwareSets.delete_set!(data['set_id'].to_s, revision: data['revision'].to_s)
+          case status
+          when :ok
+            push_sets
+            set_status("Set zmazaný. Projekty, ktoré ho používajú, držia vlastnú kópiu — ich súpisy sa nemenia.")
+          when :conflict
+            push_sets
+            set_status('Knižnica setov sa medzitým zmenila — obnovené, skús znova.', true)
+          when :not_found
+            push_sets
+          else
+            set_status('Zmazanie setu zlyhalo.', true)
+          end
+        end
+
+        def handle_map_project(payload)
+          data = JSON.parse(payload.to_s)
+          model = Sketchup.active_model
+          return set_status('Žiadny aktívny model.', true) if model.nil?
+          if data['model_guid'].to_s != model.guid.to_s
+            push_sets
+            return set_status('Model sa medzitým prepol — predvoľby sa obnovili, vyber znova.', true)
+          end
+          gt = data['generic_type'].to_s
+          sid = data['set_id'].to_s.strip
+          sid = nil if sid.empty?
+          set_def = nil
+          if sid
+            lib = HardwareSets.load
+            set_def = lib['sets'].find { |s| s['set_id'] == sid }
+            if set_def.nil?
+              push_sets
+              return set_status('Set sa v knižnici nenašiel — obnovené.', true)
+            end
+          end
+          # Zapis = 1 undo krok; snapshot dostane mapping AJ definiciu (B2).
+          model.start_operation('NOXUN: Predvoľba setu kovania', true)
+          ok = HardwareSets.set_project_mapping!(model, gt, sid, set_def)
+          if ok
+            model.commit_operation
+            push_sets
+            ProductionDialog.on_model_changed(model) if defined?(ProductionDialog)
+            set_status(sid ? "#{HardwareRules.label_for(gt)} → #{set_def['name']}." : "#{HardwareRules.label_for(gt)} — bez setu.")
+          else
+            model.abort_operation
+            push_sets
+            set_status('Predvoľba sa nedá uložiť — sety projektu sú poškodené (tlačidlo Obnoviť).', true)
+          end
+        end
+
+        def handle_map_global(payload)
+          data = JSON.parse(payload.to_s)
+          ok = HardwareSets.set_global_mapping!(data['generic_type'].to_s, data['set_id'])
+          push_sets
+          set_status(ok ? 'Globálna predvoľba uložená (platí pre nové projekty).' : 'Globálna predvoľba sa nedá uložiť.', !ok)
+        end
+
+        # F9: VEDOMA obnova poskodenych/chybajucich predvolieb projektu z
+        # globalnych — jedina cesta, ktora invalid snapshot prepise.
+        def handle_reset_project(payload)
+          data = JSON.parse(payload.to_s)
+          model = Sketchup.active_model
+          return set_status('Žiadny aktívny model.', true) if model.nil?
+          if data['model_guid'].to_s != model.guid.to_s
+            push_sets
+            return set_status('Model sa medzitým prepol — obnovené.', true)
+          end
+          lib = HardwareSets.load
+          by_id = {}
+          lib['sets'].each { |s| by_id[s['set_id']] = s }
+          mapping = {}
+          sets = {}
+          lib['mapping'].each do |gt, sid|
+            next unless by_id[sid]
+            mapping[gt] = sid
+            sets[sid] = by_id[sid]
+          end
+          model.start_operation('NOXUN: Obnova predvolieb setov', true)
+          ok = HardwareSets.write_project_state(model, 'mapping' => mapping, 'sets' => sets)
+          ok ? model.commit_operation : model.abort_operation
+          push_sets
+          ProductionDialog.on_model_changed(model) if defined?(ProductionDialog) && ok
+          set_status(ok ? 'Predvoľby projektu obnovené z globálnych.' : 'Obnova zlyhala.', !ok)
         end
 
         def js(script)

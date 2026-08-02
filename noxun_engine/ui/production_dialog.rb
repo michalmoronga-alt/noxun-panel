@@ -78,7 +78,8 @@ module Noxun
           # v LOGu z TOHO ISTEHO vysledku). Vysledok z DOM je po flushi zastaraly.
           collected = fresh_collect(model)
           bom = Bom.compute(collected)
-          control = Validation.run(collected, sheets: sheets_map, edges: edges_map)
+          control = Validation.run(collected, sheets: sheets_map, edges: edges_map,
+                                   hardware_expansion: hardware_expansion(model, collected))
           merge = data['merge'] != false
           result = VepoExport.build(
             bom[:rows],
@@ -127,7 +128,11 @@ module Noxun
           # flushi editov PREPOCITA NANOVO a entity sa dohladaju podla identity
           # (owner_id + part_key), nie podla PID (rebuild ho meni).
           if data['problem_key']
-            item = Validation.run(collected, sheets: sheets_map, edges: edges_map)['items']
+            # GH #127 P2: klik-resolve MUSI ratat s rovnakym vstupom ako
+            # push_state — bez hardware_expansion by sa stable kluce novych
+            # ORANGE (hardware_unmapped/hardware_code) nikdy nenasli.
+            item = Validation.run(collected, sheets: sheets_map, edges: edges_map,
+                                  hardware_expansion: hardware_expansion(model, collected))['items']
                              .find { |it| it['stable_key'] == data['problem_key'] }
             if item.nil?
               push_state
@@ -187,6 +192,7 @@ module Noxun
           cb(dlg, 'refresh_bom') { |_p| push_state }
           cb(dlg, 'select_row')  { |p| handle_select(p) }
           cb(dlg, 'vepo_export') { |p| handle_export(p) } # V0.5 C
+          cb(dlg, 'hw_csv_export') { |p| handle_hw_csv(p) } # V0.6 D1b
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(production): #{msg}")
@@ -366,6 +372,72 @@ module Noxun
           Bom.collect(model)
         end
 
+        # V0.6 D1b: nakupny zoznam kovania. Stav snapshotu setov (audit F9):
+        # :ok = snapshot projektu · :missing = projekt este sety nezmrazil ->
+        # global default LEN NA CITANIE (okno Vyroba je read-only; zmrazi ho az
+        # prva stavba/zmena predvolby) · :invalid = NIC sa nemapuje (vsetko
+        # unmapped ORANGE) + banner, NIKDY tichy fallback na dnesny global.
+        def hardware_expansion(model, collected)
+          status, state = HardwareSets.project_state_status(model)
+          if status == :missing
+            lib = HardwareSets.load
+            by_id = {}
+            lib['sets'].each { |s| by_id[s['set_id']] = s }
+            state = { 'mapping' => lib['mapping'], 'sets' => by_id }
+          end
+          exp = HardwareSets.expand(
+            Array(collected[:hardware]), state,
+            cabinet_overrides: collected[:cabinet_sets].is_a?(Hash) ? collected[:cabinet_sets] : {},
+            catalog: HardwareCatalog.items
+          )
+          exp.merge('state_status' => status.to_s)
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.hardware_expansion')
+          nil
+        end
+
+        # CSV kovania: vstup z okna — rovnaky flush handshake ako VEPO export
+        # (GH #127 P1: rozpisany edit panela by inak exportoval stare pocty).
+        def handle_hw_csv(payload)
+          data = JSON.parse(payload.to_s)
+          if Panel.dialog_alive?
+            Panel.js("NX.productionRelayHwCsv(#{data.to_json})")
+          else
+            do_hw_csv(payload)
+          end
+        end
+
+        # CSV nakupneho zoznamu — server-side z CERSTVEHO modelu (audit N11;
+        # flush/generation vzor VEPO: data z DOM su po editoch zastarale).
+        # Vstup po relay z panela (edity flushnute) alebo priamo bez panela.
+        def do_hw_csv(payload)
+          data = JSON.parse(payload.to_s)
+          if data['flush_blocked']
+            return set_status('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
+          end
+          model = Sketchup.active_model
+          exp = hardware_expansion(model, fresh_collect(model))
+          return set_status('Nákupný zoznam sa nedá zostaviť (pozri Ruby konzolu).', true) if exp.nil?
+          if Array(exp['rows']).empty? && Array(exp['unmapped']).empty?
+            return set_status('Model nemá žiadne kovanie — niet čo exportovať.', true)
+          end
+          project = data['project'].to_s.strip
+          project = default_project_name(model) if project.empty?
+          fname = "kovanie_#{VepoExport.project_slug(project)}.csv"
+          target = UI.savepanel('Uložiť nákupný zoznam kovania', vepo_settings['last_dir'], fname)
+          return set_status('Export zrušený.') if target.nil? || target.to_s.empty?
+          csv = HardwareSets.purchase_csv(exp, project: project,
+                                          generated_at: Time.now.strftime('%Y-%m-%d %H:%M'))
+          File.open(target, 'wb') { |f| f.write("\xEF\xBB\xBF" + csv) } # BOM pre Excel
+          save_vepo_settings('last_dir' => File.dirname(target))
+          n = Array(exp['rows']).length
+          un = Array(exp['unmapped']).length
+          set_status("Nákupný zoznam: #{n} položiek#{un.positive? ? " + #{un} nemapovaných (v CSV aj KONTROLE)" : ''} → #{target}", un.positive?)
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.handle_hw_csv')
+          set_status("Export zlyhal: #{e.message}", true)
+        end
+
         # Katalog dosiek ako mapa pre Validation.run ({ material_id => sheet }).
         def sheets_map
           return {} unless defined?(Materials)
@@ -459,8 +531,12 @@ module Noxun
           # sluzi semaforu (formaty + hrubky), sheet_sizes odhadu platni.
           smap = sheets_map
           sheet_sizes = smap.each_with_object({}) { |(id, s), out| out[id] = s['sheet_size'] }
+          # V0.6 D1b: nakupny zoznam kovania z TOHO ISTEHO zberu (audit F6) +
+          # jeho ORANGE do KONTROLY (hardware_unmapped / hardware_code).
+          hw_exp = hardware_expansion(model, collected)
           # V0.5 D: KONTROLA z TOHO ISTEHO cerstveho zberu (nalez 5).
-          control = Validation.run(collected, sheets: smap, edges: edges_map)
+          control = Validation.run(collected, sheets: smap, edges: edges_map,
+                                   hardware_expansion: hw_exp)
           data = {
             version: Engine::VERSION,
             gen: @generation,
@@ -471,6 +547,9 @@ module Noxun
             hardware: (bom[:hardware] || []).map { |g|
               g.is_a?(Hash) ? g.merge('label' => HardwareRules.label_for(g['generic_type'] || g[:generic_type])) : g
             },
+            # V0.6 D1b: nakupny zoznam setov (rows/unmapped/summary + stav
+            # snapshotu setov projektu — invalid = banner, missing = global default).
+            hardware_sets: hw_exp,
             summary: bom[:summary],
             # V0.5 D: KONTROLA nahradza povodny warnings tab (nalez 9) — build warnings
             # su v control.items ako kategoria "stavba". counts zo servera (nalez 11) —
