@@ -1173,20 +1173,16 @@ module Noxun
         # rule_id, quantity(1..MAX)? | disabled(true)? }. Identita = (owner, type, rule_id);
         # duplicitny zaznam -> POSLEDNY vyhrava (deduplikovane uz tu, config je cisty).
         # Zaznam bez quantity aj bez disabled je bezobsazny -> zahodi sa.
-        # D1 (audit B1): mapa {generic_type => set_id} — cabinet override setov
-        # kovania. Neznamy typ / prazdny set_id von; ze snapshot definiciu setu
-        # NESIE, gardi zapisova cesta HardwareSets (audit B2), nie builder.
+        # D1 (audit B1): cabinet override setov kovania. Kluc = 'generic_type'
+        # alebo 'generic_type@owner_part_key' (H1a — vyber na urovni dielca),
+        # hodnota = set_id alebo selector podla parametra. JEDINY parser tvaru
+        # je HardwareSets.parse_mapping (audit BLOCKER 2); tu je CITACIA cesta,
+        # takze neplatna polozka vypadne s logom (rebuild nikdy nespadne na
+        # cudzom/legacy configu). Ze snapshot definiciu setu NESIE, gardi
+        # zapisova cesta HardwareSets (audit B2), nie builder.
         def norm_hardware_sets(raw_map)
           return {} unless raw_map.is_a?(Hash)
-          out = {}
-          raw_map.each do |k, v|
-            gt = k.to_s.strip
-            sid = v.to_s.strip
-            next unless BuildPlan::GENERIC_TYPES.include?(gt)
-            next if sid.empty?
-            out[gt] = sid
-          end
-          out
+          HardwareSets.normalize_mapping(raw_map, nil, allow_owner: true)
         end
 
         def norm_hardware_overrides(raw_ov)
@@ -1277,8 +1273,9 @@ module Noxun
             'hardware_overrides' => cfg['hardware_overrides'].is_a?(Array) ? cfg['hardware_overrides'] : [],
             # V0.6 D1 (GH #126 P1): bez kopie by KAZDY rebuild zo stored configu
             # (scale absorpcia, ulozenie pravidiel, Nahradit UNI, panel akcie)
-            # zahodil cabinet override setov kovania.
-            'hardware_sets' => cfg['hardware_sets'].is_a?(Hash) ? cfg['hardware_sets'] : {},
+            # zahodil cabinet override setov kovania. H1a: ten isty parser ako
+            # normalize — params uz opustaju config v platnom tvare.
+            'hardware_sets' => norm_hardware_sets(cfg['hardware_sets']),
             'name' => cfg['name']
           }
           migrate_legacy_part_keys(params, cfg)

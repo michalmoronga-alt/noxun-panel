@@ -93,19 +93,57 @@ module Noxun
       # NEvaliduje — forward-compat guard resi CabinetBuilder (audit D1 B5).
       GENERIC_TYPES = %w[leg hinge slide handle shelf_pin connector wall_hanger].freeze
 
+      # H1a (audit BLOCKER 2): JEDINY parser kluca mapovania setov kovania.
+      # Tvar kluca: "generic_type" ALEBO "generic_type@owner_part_key"
+      # (composite = override na UROVNI VLASTNIKA; zatial ho tvori len 'slide'
+      # — bocnice per celo — ale parser je genericky).
+      #
+      # ROZHODNUTIE (audit FIX 7): identita overridu je DVOJICA
+      # (owner_part_key, generic_type) — override prebija VSETKY polozky daneho
+      # generickeho typu na tom vlastnikovi BEZ ohladu na rule_id. Dve pravidla,
+      # ktore na jedno celo posielaju vysuv, su z pohladu nakupu jeden vyber.
+      #
+      # Zije v BuildPlan, lebo tu zije slovnik GENERIC_TYPES a parser potrebuju
+      # AJ vrstvy nacitane pred HardwareSets (guard prestavby v CabinetBuilder).
+      # Vrati [generic_type, owner_part_key|nil] alebo nil (neplatny tvar).
+      def self.parse_hardware_set_key(key)
+        raw = key.to_s.strip
+        return nil if raw.empty?
+        gt, owner = raw.split('@', 2) # generic_type nikdy neobsahuje '@'
+        gt = gt.to_s.strip
+        return nil unless GENERIC_TYPES.include?(gt)
+        return [gt, nil] if owner.nil?
+        o = owner.to_s.strip
+        return nil if o.empty? || !PartKeys.valid?(o)
+        [gt, o]
+      end
+
+      # Genericky typ z kluca mapovania aj ked kluc TATO verzia nepozna
+      # (forward-compat guard nizsie potrebuje odlisit neznamy TYP od
+      # neplatneho ownera). Vrati String (moze byt neznamy typ) alebo nil.
+      def self.hardware_set_key_type(key)
+        raw = key.to_s.strip
+        return nil if raw.empty?
+        gt = raw.split('@', 2).first.to_s.strip
+        gt.empty? ? nil : gt
+      end
+
       # D1 (audit B5): genericke typy z configu, ktore TATO verzia nepozna
       # (model z novsej verzie pluginu). Cista funkcia — builder na nej stavia
       # forward-compat guard prestavby, testy ju volaju priamo. set_keys =
       # kluce config.hardware_sets (GH #126 P2 — override novsieho typu by
       # normalize ticho zahodil aj ked polozka kovania prave neexistuje).
+      # H1a: kluc moze byt composite ("slide@front:F1/panel") — porovnava sa
+      # LEN typova cast; neplatny owner rebuild neblokuje (zahodi ho citacia
+      # normalizacia s logom), blokuje VYHRADNE neznamy skutocny generic_type.
       def self.unknown_generic_types(hardware, set_keys = nil)
         out = Array(hardware).filter_map do |h|
           gt = h.is_a?(Hash) ? h['generic_type'].to_s : ''
           gt unless gt.empty? || GENERIC_TYPES.include?(gt)
         end
         Array(set_keys).each do |k|
-          gt = k.to_s
-          out << gt unless gt.empty? || GENERIC_TYPES.include?(gt)
+          gt = hardware_set_key_type(k)
+          out << gt unless gt.nil? || GENERIC_TYPES.include?(gt)
         end
         out.uniq
       end

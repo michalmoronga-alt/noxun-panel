@@ -23,9 +23,41 @@
 #                   na dvierka aj pri 2-5 zavesoch); dedup (cabinet, owner,
 #                   set, code) — dve pravidla na jednom vlastnikovi nesmu
 #                   zdvojit clena (audit B3)
-#   code XOR code_by_nl — rad podla params['nominal_length'] (vysuvy; fit_series
-#   NL uz pocita). Kluc mapy = cele mm ako string ("420"); NL mimo mapy =
-#   nemapovane (ORANGE), NIKDY sa neberie susedny kod (audit F10).
+#   code XOR code_by_nl XOR param_bands — PRAVE JEDEN z trojice.
+#   code_by_nl = rad podla params['nominal_length'] (vysuvy; fit_series NL uz
+#   pocita). Kluc mapy = cele mm ako string ("420"); NL mimo mapy = nemapovane
+#   (ORANGE), NIKDY sa neberie susedny kod (audit F10).
+#   param_bands (H1a, audit FIX 8) = kod podla ciselneho parametra polozky:
+#     { "param": "height",
+#       "bands": [ { "min": 17.0, "max": 21.0, "code": "82744" }, ... ] }
+#   Priklad: „Nohy podla vysky sokla" — klzak 17-21 mm, AXILO pri 140-160 mm.
+#
+# ======================= PASMA (jedna konvencia) ======================
+# Pasma param_bands aj selector bands (nizsie) maju TU ISTU semantiku:
+#   * min/max su konecne Floaty, min <= max
+#   * hranice su UZAVRETE:  min <= v <= max
+#   * preto DOTYK dvoch pasiem (predchadzajuci max == nasledujuci min) je
+#     PREKRYV = chyba zapisu; medzery su legalne
+#   * hodnota mimo vsetkych pasiem = NEMAPOVANE (ORANGE), NIKDY najblizsie
+#     pasmo (rovnaka filozofia ako "presny NL kluc, nikdy sused")
+#
+# ================== MAPOVANIE: JEDEN PARSER FORIEM ====================
+# (H1a, audit BLOCKER 2) Kluc mapovania:
+#   "generic_type"                     — bezny vyber setu
+#   "generic_type@owner_part_key"      — override na UROVNI VLASTNIKA;
+#     povoleny LEN v cabinet override mape (config['hardware_sets']).
+#     Projektovy/globalny mapping composite kluce NEMA — owner_part_key nie je
+#     jednoznacny naprieg skrinkami (front:F1/panel existuje v kazdej).
+# Hodnota mapovania:
+#   "set_id"  (String)                 — pevny set
+#   selector  (Hash)                   — set podla ciselneho parametra polozky:
+#     { "param": "front_height",
+#       "bands": [ { "min": 0.0, "max": 120.0, "set_id": "atira-h70" }, ... ] }
+# Parser (parse_mapping / parse_mapping_value) je JEDINA autorita tvaru a
+# pouzivaju ho vsetky cesty: globalny zapis, snapshot, cabinet override
+# (CabinetBuilder.norm_hardware_sets), expanzia aj forward-compat guard.
+# ZAPISOVA cesta neplatny tvar ODMIETNE (chyba); CITACIA (legacy/cudzi config)
+# nevalidnu polozku preskoci s logom — citanie nesmie zhodit prestavbu.
 #
 # ====================== ZDROJE A REPRODUKOVATELNOST ===================
 # 1) GLOBALNA kniznica %APPDATA%\NOXUN\Engine\hardware_sets.json (+.bak, seed) =
@@ -52,11 +84,21 @@ module Noxun
   module Engine
     module HardwareSets
       STD          = 1
-      SEED_VERSION = 1
+      # v2 (H1a): +set „Nohy podla vysky sokla" (param_bands) a migracia
+      # globalneho defaultu leg z 'nohy-klzak-17' na neho. STD sa NEBUMPA —
+      # tvar suboru/snapshotu ostava rovnaky, pribudli len nove tvary clena a
+      # hodnoty mapovania (starsi plugin ich precita ako :invalid = ORANGE,
+      # NIKDY ticho nemapuje inak).
+      SEED_VERSION = 2
       FILE         = 'hardware_sets.json'
       MODEL_KEY    = 'hardware_sets' # kluc snapshotu v NOXUN dict na modeli
 
       PER_KINDS = %w[unit owner].freeze
+
+      # Dovody nemapovanej polozky (ORANGE) — jediny kanonicky zoznam; texty
+      # semaforu mapuje Validation.check_hardware_expansion.
+      UNMAPPED_REASONS = %w[no_set set_missing nl_missing
+                            param_band_missing selector_unresolved].freeze
 
       # Seed sety = zavery debaty 2.8.2026 (09_POJMY "Kovanie — sety");
       # kody = SYSTEM/zdroje/SEED_KATALOG_2026-07.md §2. Atira rad nesie LEN
@@ -79,6 +121,22 @@ module Noxun
             { 'code' => '105425', 'per' => 'unit', 'qty' => 1, 'label' => 'krytka ramienka' },
             { 'code' => '250831', 'per' => 'owner', 'qty' => 1, 'label' => 'TipOn na dvierka' }
           ] },
+        # H1a (smoke test D-79): noha sa vybera podla VYSKY SOKLA — polozka
+        # 'leg' nesie params['height'] = floor_height (pravidlo nohy-zakladne).
+        # Skrinka so soklom 150 uz nedostane klzak 17. Vyska mimo pasiem =
+        # ORANGE „doplnit pasmo", NIKDY najblizsie pasmo.
+        { 'set_id' => 'nohy-podla-sokla', 'name' => 'Nohy podľa výšky sokla',
+          'generic_type' => 'leg',
+          'members' => [
+            { 'per' => 'unit', 'qty' => 1, 'label' => 'noha',
+              'param_bands' => { 'param' => 'height',
+                                 'bands' => [
+                                   { 'min' => 17.0, 'max' => 21.0, 'code' => '82744' },
+                                   { 'min' => 140.0, 'max' => 160.0, 'code' => '367823' }
+                                 ] } }
+          ] },
+        # Jednokodove sety nôh OSTAVAJU — pouzivatelia ich mozu mat namapovane
+        # (a migracia defaultu nizsie ich vedome respektuje).
         { 'set_id' => 'nohy-klzak-17', 'name' => 'Klzák s rektifikáciou 17 mm',
           'generic_type' => 'leg',
           'members' => [{ 'code' => '82744', 'per' => 'unit', 'qty' => 1 }] },
@@ -103,10 +161,32 @@ module Noxun
       # (uchytky sa v D neriesia — Michal 2.8.; connector pravidlo neexistuje).
       SEED_MAPPING = {
         'hinge'       => 'zaves-klasik',
-        'leg'         => 'nohy-klzak-17',
+        'leg'         => 'nohy-podla-sokla', # H1a: default riadi vyska sokla
         'slide'       => 'vysuv-atira-biela-h70',
         'wall_hanger' => 'zavesenie-bystrica',
         'shelf_pin'   => 'podperky-police'
+      }.freeze
+
+      # --- migracia globalneho defaultu nôh (H1a, audit BLOCKER 3) ------------
+      # Povodne (v1) seed tvary setov, ktorych migracia sa TYKA. Vzor
+      # HardwareRules::LEGACY_SEED_SHAPES: dotkne sa LEN preukazatelne
+      # NEZMENENEHO seed riadku; akykolvek pouzivatelsky zasah = ruky prec.
+      LEGACY_SEED_SHAPES = {
+        'nohy-klzak-17' => [
+          { 'set_id' => 'nohy-klzak-17', 'name' => 'Klzák s rektifikáciou 17 mm',
+            'generic_type' => 'leg',
+            'members' => [{ 'code' => '82744', 'per' => 'unit', 'qty' => 1 }] }
+        ]
+      }.freeze
+
+      # Migracie mapovania GLOBALNEJ kniznice: { generic_type => [from_set_id,
+      # to_set_id] }. Prepis nastane LEN ked (a) mapovanie je dnes presne
+      # from_set_id A (b) set from_set_id je v kniznici nezmeneny seed tvar.
+      # Jednorazovost strazi seed_version (merge_seed bezi len pri starsom
+      # subore) — ked si user leg neskor prehodi spat, uz sa nic neprepise.
+      # PROJEKTOVE SNAPSHOTY sa NEMENIA NIKDY samy.
+      MAPPING_MIGRATIONS = {
+        'leg' => %w[nohy-klzak-17 nohy-podla-sokla]
       }.freeze
 
       module_function
@@ -132,22 +212,54 @@ module Noxun
         sets = doc.is_a?(Hash) ? normalize_sets(doc['sets']) : []
         mapping = doc.is_a?(Hash) ? normalize_mapping(doc['mapping'], sets) : {}
         return { 'sets' => deep_copy(SEED_SETS), 'mapping' => SEED_MAPPING.dup } if sets.empty?
-        merged, changed = merge_seed(sets, doc['seed_version'].to_i)
-        if changed && write(merged, mapping)
+        merged, merged_map, changed = merge_seed(sets, mapping, doc['seed_version'].to_i)
+        if changed && write(merged, merged_map)
           Engine.log('hardware sets: globalna kniznica doplnena o nove default sety') if defined?(Engine)
         end
-        { 'sets' => merged, 'mapping' => mapping }
+        { 'sets' => merged, 'mapping' => merged_map }
       rescue StandardError => e
         Engine.log_error(e, 'HardwareSets.load') if defined?(Engine)
         { 'sets' => deep_copy(SEED_SETS), 'mapping' => SEED_MAPPING.dup }
       end
 
-      def merge_seed(sets, from_version)
-        return [sets, false] if from_version >= SEED_VERSION
+      # Seed-merge globalnej kniznice: doplni CHYBAJUCE seed sety (podla
+      # set_id, bez prepisu pouzivatelskych uprav) a spusti MAPPING_MIGRATIONS
+      # (H1a BLOCKER 3). Vrati [sets, mapping, changed].
+      def merge_seed(sets, mapping, from_version)
+        map = mapping.is_a?(Hash) ? mapping.dup : {}
+        return [sets, map, false] if from_version >= SEED_VERSION
         have = {}
         sets.each { |s| have[s['set_id']] = true }
         missing = SEED_SETS.reject { |s| have[s['set_id']] }
-        [sets + normalize_sets(missing), true]
+        merged = sets + normalize_sets(missing)
+        [merged, migrate_mapping(merged, map), true]
+      end
+
+      # Prepis defaultu LEN pri nedotknutom seed stave (vzor F8/LEGACY_SEED_SHAPES):
+      # mapovanie musi byt presne stara hodnota A stary set musi byt v kniznici
+      # v nezmenenom seed tvare. Cielovy set musi po merge existovat.
+      def migrate_mapping(sets, mapping)
+        by_id = {}
+        sets.each { |s| by_id[s['set_id']] = s }
+        out = mapping.dup
+        MAPPING_MIGRATIONS.each do |gt, (from_id, to_id)|
+          next unless out[gt] == from_id
+          next unless by_id[to_id]
+          old = by_id[from_id]
+          next unless old && legacy_seed_shape?(old)
+          out[gt] = to_id
+          Engine.log("hardware sets: default '#{gt}' migrovany #{from_id} -> #{to_id}") if defined?(Engine)
+        end
+        out
+      end
+
+      # Set je NEZMENENY stary seed tvar? (porovnanie normalizovanych tvarov)
+      def legacy_seed_shape?(set)
+        shapes = LEGACY_SEED_SHAPES[set.is_a?(Hash) ? set['set_id'].to_s : '']
+        return false unless shapes
+        norm = normalize_sets([set]).first
+        return false if norm.nil?
+        shapes.any? { |s| normalize_sets([s]).first == norm }
       end
 
       def ensure_seeded
@@ -155,11 +267,24 @@ module Noxun
         write(deep_copy(SEED_SETS), SEED_MAPPING.dup)
       end
 
+      # ZAPISOVA cesta (H1a): tvar setov aj mapovania sa validuje PRISNE —
+      # chybny clen/forma = odmietnutie CELEHO zapisu (all-or-nothing), nikdy
+      # tichy drop. Referencna cistota ostava tolerantna: mapovanie na set,
+      # ktory v kniznici uz nie je (delete_set!), sa vyhodi ticho — typ zostane
+      # nemapovany a ORANGE to ukaze.
       def write(sets, mapping)
-        norm = normalize_sets(sets)
+        norm, set_errors = validate_sets(sets)
+        unless set_errors.empty?
+          Engine.log("hardware sets: zapis kniznice odmietnuty — #{set_errors.first}") if defined?(Engine)
+          return false
+        end
+        map, map_errors = parse_mapping(mapping, set_ids: norm.map { |s| s['set_id'] })
+        unless map_errors.empty?
+          Engine.log("hardware sets: zapis mapovania odmietnuty — #{map_errors.first}") if defined?(Engine)
+          return false
+        end
         JsonFileStore.write(path, { 'std' => STD, 'seed_version' => SEED_VERSION,
-                                    'sets' => norm,
-                                    'mapping' => normalize_mapping(mapping, norm) })
+                                    'sets' => norm, 'mapping' => map })
       rescue StandardError => e
         Engine.log_error(e, 'HardwareSets.write') if defined?(Engine)
         false
@@ -188,8 +313,10 @@ module Noxun
       # nesmie trafit existujucu identitu (GH #127 P2 — slug z nazvu moze
       # kolidovat a "Novy set" by ticho prepisal globalnu definiciu).
       def save_set!(set_def, revision: nil, create: false)
-        norm = normalize_sets([set_def]).first
-        return [:invalid, 'set sa nedá uložiť — skontroluj kódy a členov'] if norm.nil?
+        norm, errors = validate_set(set_def)
+        if norm.nil?
+          return [:invalid, errors.first || 'set sa nedá uložiť — skontroluj kódy a členov']
+        end
         return [:conflict, nil] if revision && revision != self.revision
         lib = load
         sets = lib['sets']
@@ -222,17 +349,21 @@ module Noxun
       end
 
       # Nastavi mapovanie GLOBALNEJ kniznice (default novych projektov).
-      def set_global_mapping!(generic_type, set_id)
+      # value = set_id String | selector Hash | nil/'' (odmapovanie).
+      def set_global_mapping!(generic_type, value)
         gt = generic_type.to_s.strip
         return false unless BuildPlan::GENERIC_TYPES.include?(gt)
         lib = load
         mapping = lib['mapping']
-        if set_id.nil? || set_id.to_s.strip.empty?
+        if value.nil? || (value.is_a?(String) && value.strip.empty?)
           mapping.delete(gt)
         else
-          sid = set_id.to_s.strip
-          return false unless lib['sets'].any? { |s| s['set_id'] == sid && s['generic_type'] == gt }
-          mapping[gt] = sid
+          status, norm, refs = parse_mapping_value(value)
+          return false unless status == :ok
+          return false unless refs.all? do |sid|
+            lib['sets'].any? { |s| s['set_id'] == sid && s['generic_type'] == gt }
+          end
+          mapping[gt] = norm
         end
         write(lib['sets'], mapping)
       end
@@ -328,10 +459,14 @@ module Noxun
         lib['sets'].each { |s| by_id[s['set_id']] = s }
         mapping = {}
         sets = {}
-        lib['mapping'].each do |gt, sid|
-          next unless by_id[sid]
-          mapping[gt] = sid
-          sets[sid] = by_id[sid]
+        lib['mapping'].each do |gt, value|
+          # H1a: hodnota moze byt selector — zmrazit treba VSETKY sety, na
+          # ktore ukazuje (audit BLOCKER 1); ak niektory chyba, typ sa
+          # nezmrazi vobec (ciastocny selector by mlcky menil vyber).
+          refs = value_set_ids(value)
+          next if refs.empty? || refs.any? { |sid| by_id[sid].nil? }
+          mapping[gt] = deep_copy(value)
+          refs.each { |sid| sets[sid] = by_id[sid] }
         end
         { 'mapping' => mapping, 'sets' => sets }
       end
@@ -349,12 +484,30 @@ module Noxun
       end
 
       # Zapise snapshot (volajuci drzi operaciu — undo vrati model aj sety).
+      # H1a: ZAPISOVA cesta — tvar setov aj mapovania sa validuje prisne a
+      # kazdy referencovany set MUSI byt v snapshote (audit BLOCKER 1). Bez
+      # toho by sa zapisal stav, ktory sa vzapati precita ako :invalid.
       def write_project_state(model, state)
         return false unless model
-        sets = state['sets'].is_a?(Hash) ? state['sets'] : {}
-        doc = { 'std' => STD,
-                'mapping' => state['mapping'].is_a?(Hash) ? state['mapping'] : {},
-                'sets' => sets }
+        raw_sets = state.is_a?(Hash) && state['sets'].is_a?(Hash) ? state['sets'] : {}
+        norm_sets, set_errors = validate_sets(raw_sets.values)
+        unless set_errors.empty?
+          Engine.log("hardware sets: snapshot odmietnuty — #{set_errors.first}") if defined?(Engine)
+          return false
+        end
+        by_id = {}
+        norm_sets.each { |s| by_id[s['set_id']] = s }
+        mapping, map_errors = parse_mapping(state.is_a?(Hash) ? state['mapping'] : nil)
+        unless map_errors.empty?
+          Engine.log("hardware sets: snapshot odmietnuty — #{map_errors.first}") if defined?(Engine)
+          return false
+        end
+        missing = referenced_set_ids(mapping).reject { |sid| by_id.key?(sid) }
+        unless missing.empty?
+          Engine.log("hardware sets: snapshot odmietnuty — chyba definicia setu #{missing.first}") if defined?(Engine)
+          return false
+        end
+        doc = { 'std' => STD, 'mapping' => mapping, 'sets' => by_id }
         model.set_attribute(Store::DICT, MODEL_KEY, doc.to_json)
         true
       rescue StandardError => e
@@ -367,7 +520,12 @@ module Noxun
       # zapise (audit B2: snapshot drzi kazdy referencovany set). set_id nil =
       # typ sa odmapuje (definicia v snapshote ostava pre historiu overridov).
       # Volajuci drzi operaciu.
-      def set_project_mapping!(model, generic_type, set_id, set_def = nil)
+      # value = set_id String | selector Hash | nil (odmapovanie).
+      # set_defs = definicie VSETKYCH setov, na ktore hodnota ukazuje (jedna
+      # definicia, pole alebo mapa set_id=>definicia). H1a BLOCKER 1: zapis
+      # mapovania a zmrazenie definicii je JEDEN zapis v JEDNEJ operacii —
+      # inak by projekt ukazoval na set, ktory v .skp nie je.
+      def set_project_mapping!(model, generic_type, value, set_defs = nil)
         status, state = project_state_status(model)
         return false unless status == :ok || status == :missing
         # GH #127 P1: prva zmena v projekte BEZ snapshotu najprv zmrazi VSETKY
@@ -375,29 +533,175 @@ module Noxun
         # meni jeden typ — start z prazdna by ostatne typy ticho odmapoval.
         state ||= global_default_state
         gt = generic_type.to_s
-        return false if gt.empty?
-        if set_id.nil? || set_id.to_s.strip.empty?
+        return false unless BuildPlan::GENERIC_TYPES.include?(gt)
+        if value.nil? || (value.is_a?(String) && value.strip.empty?)
           state['mapping'].delete(gt)
-        else
-          sid = set_id.to_s.strip
-          norm = normalize_sets([set_def]).first
-          return false if norm.nil? || norm['set_id'] != sid || norm['generic_type'] != gt
-          state['mapping'][gt] = sid
-          state['sets'][sid] = norm
+          return write_project_state(model, state)
         end
+        vstatus, norm_value, refs = parse_mapping_value(value)
+        return false unless vstatus == :ok
+        defs = collect_set_defs(set_defs)
+        return false unless refs.all? do |sid|
+          d = defs[sid]
+          d && d['generic_type'] == gt
+        end
+        state['mapping'][gt] = norm_value
+        refs.each { |sid| state['sets'][sid] = defs[sid] }
         write_project_state(model, state)
       end
 
-      # Vlozi/aktualizuje definiciu setu v snapshote BEZ zmeny mapovania
+      # Vlozi/aktualizuje definicie setov v snapshote BEZ zmeny mapovania
       # (cabinet override na nenamapovany set — audit B2). Volajuci drzi operaciu.
-      def add_project_set!(model, set_def)
+      def add_project_sets!(model, set_defs)
         status, state = project_state_status(model)
         return false unless status == :ok || status == :missing
         state ||= global_default_state # GH #127 P1 — prvy zapis mrazi vsetko
-        norm = normalize_sets([set_def]).first
-        return false if norm.nil?
-        state['sets'][norm['set_id']] = norm
+        defs = collect_set_defs(set_defs)
+        return false if defs.empty?
+        defs.each { |sid, d| state['sets'][sid] = d }
         write_project_state(model, state)
+      end
+
+      def add_project_set!(model, set_def)
+        add_project_sets!(model, set_def)
+      end
+
+      # Definicie setov -> mapa set_id => normalizovana definicia. Prijme jednu
+      # definiciu, pole aj mapu; nevalidna definicia sa vyhodi (volajuci potom
+      # neprejde referencnou kontrolou vyssie).
+      def collect_set_defs(set_defs)
+        list =
+          case set_defs
+          when nil then []
+          when Array then set_defs
+          when Hash then set_defs.key?('members') || set_defs.key?(:members) ? [set_defs] : set_defs.values
+          else [set_defs]
+          end
+        out = {}
+        normalize_sets(list).each { |d| out[d['set_id']] = d }
+        out
+      end
+
+      # --- precedencia definicii (H1a, audit BLOCKER 4) ------------------------
+
+      # Definicia setu pre zobrazenie/zapis. Pre set_id, ktore je AKTUALNE
+      # namapovane alebo overridnute, vyhrava definicia zo SNAPSHOTU projektu
+      # (to je to, podla coho sa zakazka naozaj nakupuje); global je len
+      # fallback pre sety, na ktore projekt neukazuje. cabinet_overrides =
+      # { cabinet_id => override mapa } (Bom.collect); bez nich sa referencie
+      # rataju len z projektoveho mapovania.
+      def resolve_set_def(model, set_id, cabinet_overrides: {})
+        sid = set_id.to_s.strip
+        return nil if sid.empty?
+        state = project_state(model)
+        if state
+          refs = referenced_set_ids(state['mapping'], cabinet_overrides)
+          snap = state['sets'][sid]
+          return snap if snap && refs.include?(sid)
+        end
+        global = load['sets'].find { |s| s['set_id'] == sid }
+        return global if global
+        state ? state['sets'][sid] : nil
+      end
+
+      # Ponuka setov jedneho generickeho typu pre UI select. Rovnaka
+      # precedencia ako resolve_set_def: referencovane set_id sa beru zo
+      # snapshotu, zvysok z globalu. Poradie deterministicke (nazov, set_id).
+      def set_options(generic_type, globals, snapshot_sets, referenced_ids)
+        gt = generic_type.to_s
+        refs = Array(referenced_ids).map(&:to_s)
+        snap = snapshot_sets.is_a?(Hash) ? snapshot_sets : {}
+        by_id = {}
+        Array(globals).each do |s|
+          next unless s.is_a?(Hash) && s['generic_type'] == gt
+          by_id[s['set_id']] = s
+        end
+        snap.each do |sid, s|
+          next unless s.is_a?(Hash) && s['generic_type'] == gt
+          by_id[sid] = s if refs.include?(sid.to_s) || !by_id.key?(sid)
+        end
+        by_id.values.sort_by { |s| [s['name'].to_s, s['set_id'].to_s] }
+      end
+
+      # --- cabinet override (H1a, audit FIX 7) --------------------------------
+
+      # Zapisova cesta overridu setu NA SKRINKE (aj na urovni vlastnika).
+      # cfg = ULOZENY config korpusu (string kluce; potrebuje 'hardware' a
+      # 'hardware_sets'). owner_part_key nil = override celej skrinky.
+      # value = set_id String | selector Hash | nil (zrusenie).
+      # Identita = (owner_part_key, generic_type) — override prebija VSETKY
+      # polozky daneho typu na vlastnikovi bez ohladu na rule_id.
+      # known_sets = definicie, proti ktorym sa overi, ze VSETKY referencovane
+      # sety existuju a su spravneho typu (volajuci ich vytiahne cez
+      # resolve_set_def — snapshot pred globalom). Bez nich sa kontroluje LEN
+      # tvar; volajuci potom typ musi overit sam.
+      # -> [:ok, new_map, referenced_set_ids] | [:invalid, message, nil]
+      def apply_cabinet_override(cfg, generic_type, owner_part_key, value, known_sets: nil)
+        gt = generic_type.to_s.strip
+        unless BuildPlan::GENERIC_TYPES.include?(gt)
+          return [:invalid, 'neznámy typ kovania', nil]
+        end
+        hardware = cfg.is_a?(Hash) ? Array(cfg['hardware']) : []
+        owner = owner_part_key.nil? ? nil : owner_part_key.to_s.strip
+        owner = nil if owner == ''
+        if owner
+          return [:invalid, 'neplatný dielec', nil] unless PartKeys.valid?(owner)
+          match = hardware.any? do |h|
+            h.is_a?(Hash) && h['generic_type'].to_s == gt &&
+              h['owner_part_key'].to_s == owner
+          end
+          unless match
+            return [:invalid, 'tento dielec nemá v skrinke také kovanie', nil]
+          end
+        end
+        base = cfg.is_a?(Hash) && cfg['hardware_sets'].is_a?(Hash) ? cfg['hardware_sets'] : {}
+        map = normalize_mapping(base, nil, allow_owner: true)
+        key = owner ? "#{gt}@#{owner}" : gt
+        if value.nil? || (value.is_a?(String) && value.strip.empty?)
+          map.delete(key)
+          return [:ok, map, []]
+        end
+        status, norm, refs = parse_mapping_value(value)
+        return [:invalid, norm, nil] unless status == :ok
+        unless known_sets.nil?
+          defs = collect_set_defs(known_sets)
+          bad = refs.find { |sid| defs[sid].nil? || defs[sid]['generic_type'] != gt }
+          return [:invalid, "set „#{bad}“ sa nenašiel alebo je iného typu", nil] if bad
+        end
+        map[key] = norm
+        [:ok, map, refs]
+      end
+
+      # --- vedomy merge globalnych predvolieb do projektu (H1a, audit FIX 10) --
+
+      # Vzor HardwareRules.merge_project_seed!: doplni do snapshotu CHYBAJUCE
+      # globalne mapovania (+ definicie setov, na ktore ukazuju). EXISTUJUCE
+      # mapovania sa NEPREPISUJU a ziadna snapshot definicia sa NEODSTRANUJE
+      # (mohol by na nu ukazovat cabinet override). Volat VNUTRI operacie.
+      # -> [:none|:updated, added_set_ids, added_mapping_keys]
+      def merge_project_sets_seed!(model)
+        status, state = project_state_status(model)
+        return [:none, [], []] unless status == :ok # bez snapshotu berie projekt global sam
+        lib = load
+        by_id = {}
+        lib['sets'].each { |s| by_id[s['set_id']] = s }
+        added_sets = []
+        added_map = []
+        lib['mapping'].each do |gt, value|
+          next if state['mapping'].key?(gt)
+          refs = value_set_ids(value)
+          next if refs.empty? || refs.any? { |sid| by_id[sid].nil? }
+          state['mapping'][gt] = deep_copy(value)
+          added_map << gt
+          refs.each do |sid|
+            next if state['sets'].key?(sid)
+            state['sets'][sid] = by_id[sid]
+            added_sets << sid
+          end
+        end
+        return [:none, [], []] if added_map.empty?
+        return [:none, [], []] unless write_project_state(model, state)
+        [:updated, added_sets.uniq, added_map]
       end
 
       # --- expanzia (cista funkcia, audit F6) ----------------------------------
@@ -405,7 +709,9 @@ module Noxun
       # hardware_items: RAW polozky z Bom.collect — string kluce + 'owner_id'
       #   (cabinet id); owner_part_key/generic_type/quantity/rule_id/params.
       # state: projektovy snapshot {'mapping','sets'} alebo nil (= nic nemapuje).
-      # cabinet_overrides: { cabinet_id => { generic_type => set_id } } z configov.
+      # cabinet_overrides: { cabinet_id => override mapa } z configov korpusov —
+      #   kluc 'generic_type' alebo 'generic_type@owner_part_key', hodnota
+      #   set_id alebo selector (H1a).
       # catalog: pole poloziek HardwareCatalog.items alebo mapa code=>item.
       # Vrati { 'rows' => [...], 'unmapped' => [...], 'summary' => {...} } —
       # deterministicke poradie (kategoria podla HardwareCatalog::CATEGORIES,
@@ -413,6 +719,9 @@ module Noxun
       def expand(hardware_items, state, cabinet_overrides: {}, catalog: nil)
         mapping = state.is_a?(Hash) && state['mapping'].is_a?(Hash) ? state['mapping'] : {}
         sets    = state.is_a?(Hash) && state['sets'].is_a?(Hash) ? state['sets'] : {}
+        # Cabinet override mapy prechadzaju TYM ISTYM parserom (citacia cesta —
+        # neplatna polozka vypadne s logom, expanzia nikdy nespadne).
+        overrides = normalize_cabinet_overrides(cabinet_overrides)
         lookup  = catalog_lookup(catalog)
         rows = {}
         unmapped = []
@@ -420,12 +729,11 @@ module Noxun
         Array(hardware_items).each do |it|
           next unless it.is_a?(Hash)
           gt  = it['generic_type'].to_s
-          cid = it['owner_id'].to_s
           qty = it['quantity'].to_i
           next if gt.empty? || qty < 1
-          sid = resolve_set_id(gt, cid, cabinet_overrides, mapping)
+          sid, reason, info = resolve_set_id(gt, it, overrides, mapping)
           if sid.nil?
-            unmapped << unmapped_entry(it, nil, 'no_set')
+            unmapped << unmapped_entry(it, nil, reason, info)
             next
           end
           set = sets[sid]
@@ -438,21 +746,69 @@ module Noxun
         finalize(rows, unmapped)
       end
 
-      # Poradie: cabinet override -> projektove mapovanie -> nil.
-      def resolve_set_id(generic_type, cabinet_id, cabinet_overrides, mapping)
-        ov = cabinet_overrides.is_a?(Hash) ? cabinet_overrides[cabinet_id] : nil
-        sid = ov.is_a?(Hash) ? ov[generic_type] : nil
-        sid = mapping[generic_type] if sid.nil? || sid.to_s.strip.empty?
-        sid = sid.to_s.strip
-        sid.empty? ? nil : sid
+      def normalize_cabinet_overrides(cabinet_overrides)
+        return {} unless cabinet_overrides.is_a?(Hash)
+        out = {}
+        cabinet_overrides.each do |cid, map|
+          next unless map.is_a?(Hash)
+          out[cid.to_s] = normalize_mapping(map, nil, allow_owner: true)
+        end
+        out
+      end
+
+      # Set pre polozku. Poradie (H1a D-81): override na urovni VLASTNIKA
+      # ("slide@front:F1/panel") -> cabinet override ("slide") -> projektove
+      # mapovanie. Ked je vyhrana hodnota selector, set urci pasmo parametra;
+      # chybajuca hodnota / mimo pasiem = ORANGE, NIKDY hadanie.
+      # -> [set_id|nil, reason|nil, info Hash]
+      def resolve_set_id(generic_type, it, cabinet_overrides, mapping)
+        value = resolve_mapping_value(generic_type, it, cabinet_overrides, mapping)
+        return [nil, 'no_set', {}] if value.nil?
+        return [value, nil, {}] if value.is_a?(String)
+        param = value['param'].to_s
+        v = numeric_param(it, param)
+        info = { 'param' => param, 'value' => v }
+        return [nil, 'selector_unresolved', info] if v.nil?
+        band = Array(value['bands']).find { |b| v >= b['min'].to_f && v <= b['max'].to_f }
+        return [nil, 'selector_unresolved', info] if band.nil?
+        [band['set_id'].to_s, nil, {}]
+      end
+
+      def resolve_mapping_value(generic_type, it, cabinet_overrides, mapping)
+        ov = cabinet_overrides[it['owner_id'].to_s]
+        if ov.is_a?(Hash)
+          opk = it['owner_part_key'].to_s
+          unless opk.empty?
+            v = ov["#{generic_type}@#{opk}"]
+            return v if present_mapping_value?(v)
+          end
+          v = ov[generic_type]
+          return v if present_mapping_value?(v)
+        end
+        v = mapping[generic_type]
+        present_mapping_value?(v) ? v : nil
+      end
+
+      def present_mapping_value?(v)
+        (v.is_a?(String) && !v.strip.empty?) || (v.is_a?(Hash) && v['bands'].is_a?(Array))
+      end
+
+      def numeric_param(it, param)
+        params = it['params'].is_a?(Hash) ? it['params'] : {}
+        v = params[param]
+        return nil unless v.is_a?(Numeric) && v.to_f.finite?
+        v.to_f
       end
 
       def expand_members(it, set, qty, rows, unmapped, owner_seen, lookup)
         sid = set['set_id']
-        Array(set['members']).each do |m|
-          code = member_code(m, it)
-          if code == :nl_missing
-            unmapped << unmapped_entry(it, sid, 'nl_missing')
+        Array(set['members']).each_with_index do |m, idx|
+          code, miss = member_code(m, it)
+          if miss
+            unmapped << unmapped_entry(it, sid, miss['reason'], miss.merge(
+                                                                  'member_index' => idx,
+                                                                  'member_label' => m['label']
+                                                                ))
             next
           end
           next if code.nil?
@@ -472,23 +828,34 @@ module Noxun
         end
       end
 
-      # Kod clena: pevny 'code' alebo rad 'code_by_nl' podla params.nominal_length.
-      # Vrati String | nil (clen sa preskoci — nevalidny) | :nl_missing (ORANGE).
+      # Kod clena: pevny 'code', rad 'code_by_nl' podla params.nominal_length
+      # alebo 'param_bands' podla lubovolneho ciselneho parametra.
+      # -> [code|nil, nil] (nil code = clen sa preskoci) | [nil, miss Hash]
       def member_code(member, it)
         if member['code_by_nl'].is_a?(Hash)
-          params = it['params'].is_a?(Hash) ? it['params'] : {}
-          nl = params['nominal_length']
-          return :nl_missing unless nl.is_a?(Numeric) && nl.to_f.finite?
+          nl = numeric_param(it, 'nominal_length')
+          miss = { 'reason' => 'nl_missing', 'param' => 'nominal_length', 'value' => nl }
+          return [nil, miss] if nl.nil?
           # GH #126 P2: frakcna NL z vlastnej serie (419,6) sa NEZAOKRUHLUJE
           # na susedny kluc — presna celociselna zhoda alebo nic (F10).
           i = nl.round
-          return :nl_missing unless (nl.to_f - i).abs < 1e-9
+          return [nil, miss] unless (nl - i).abs < 1e-9
           code = member['code_by_nl'][i.to_s]
-          return :nl_missing if code.nil? || code.to_s.strip.empty?
-          code.to_s.strip
+          return [nil, miss] if code.nil? || code.to_s.strip.empty?
+          [code.to_s.strip, nil]
+        elsif member['param_bands'].is_a?(Hash)
+          param = member['param_bands']['param'].to_s
+          v = numeric_param(it, param)
+          miss = { 'reason' => 'param_band_missing', 'param' => param, 'value' => v }
+          return [nil, miss] if v.nil?
+          band = Array(member['param_bands']['bands']).find do |b|
+            v >= b['min'].to_f && v <= b['max'].to_f
+          end
+          return [nil, miss] if band.nil? || band['code'].to_s.strip.empty?
+          [band['code'].to_s.strip, nil]
         else
           c = member['code'].to_s.strip
-          c.empty? ? nil : c
+          [c.empty? ? nil : c, nil]
         end
       end
 
@@ -526,9 +893,13 @@ module Noxun
         row
       end
 
-      def unmapped_entry(it, sid, reason)
+      # H1a (audit FIX 9): dovod nesie AJ parameter, jeho hodnotu a — pri
+      # pasmach clena — identifikaciu CLENA (index + label). Bez toho by dva
+      # chybajuce pasma v jednom sete splynuli do jedneho ORANGE riadku a
+      # klik-select by neukazal, ktory clen doplnit.
+      def unmapped_entry(it, sid, reason, extra = {})
         params = it['params'].is_a?(Hash) ? it['params'] : {}
-        {
+        out = {
           'cabinet_id' => it['owner_id'].to_s,
           'owner_part_key' => (it['owner_part_key'].nil? ? nil : it['owner_part_key'].to_s),
           'generic_type' => it['generic_type'].to_s,
@@ -538,6 +909,11 @@ module Noxun
           'reason' => reason,
           'nominal_length' => (params['nominal_length'].is_a?(Numeric) ? params['nominal_length'].to_f : nil)
         }
+        ex = extra.is_a?(Hash) ? extra : {}
+        %w[param value member_index member_label].each do |k|
+          out[k] = ex[k] if ex.key?(k)
+        end
+        out
       end
 
       # Zoradenie + medzisucty. Cena nil = "nezadana" (subtotal nil, nikdy 0 —
@@ -587,11 +963,182 @@ module Noxun
         out
       end
 
-      # --- normalizacia a validacia (audit F10) --------------------------------
+      # --- normalizacia a validacia (audit F10 + H1a) --------------------------
 
-      # Ocisti pole setov; nevalidny set/clen sa ZAHADZUJE (log), nie polovicato
-      # opravuje. Kody VZDY String (JSON cisla by znicili uvodne nuly), qty
-      # kladny Integer, per enum, code XOR code_by_nl, owner bez NL mapy.
+      # PRISNA validacia JEDNEHO setu (zapisova cesta). ALL-OR-NOTHING:
+      # jediny chybny clen zhodi cely set — ziadny tichy drop clenov.
+      # -> [norm|nil, errors]
+      def validate_set(set)
+        return [nil, ['set musí byť objekt']] unless set.is_a?(Hash)
+        s = deep_copy(stringify(set))
+        sid = s['set_id'].to_s.strip
+        return [nil, ['set nemá set_id']] if sid.empty?
+        gt = s['generic_type'].to_s.strip
+        unless BuildPlan::GENERIC_TYPES.include?(gt)
+          return [nil, ["set „#{sid}“ má neznámy typ kovania „#{gt}“"]]
+        end
+        raw_members = s['members']
+        unless raw_members.is_a?(Array) && !raw_members.empty?
+          return [nil, ["set „#{sid}“ nemá členov"]]
+        end
+        errors = []
+        members = raw_members.each_with_index.map do |m, i|
+          norm, errs = validate_member(m, i, strict: true)
+          errors.concat(errs.map { |e| "set „#{sid}“: #{e}" })
+          norm
+        end
+        return [nil, errors] unless errors.empty?
+        [{ 'set_id' => sid,
+           'name' => (s['name'].to_s.strip.empty? ? sid : s['name'].to_s.strip),
+           'generic_type' => gt,
+           'members' => members }, []]
+      end
+
+      # PRISNA validacia pola setov. Duplicitne set_id = chyba (v citacej ceste
+      # sa druhy ticho zahodi, v zapisovej je to nejednoznacnost). -> [norm, errors]
+      def validate_sets(sets)
+        return [[], ['sety musia byť pole']] unless sets.is_a?(Array)
+        errors = []
+        seen = {}
+        out = sets.map do |set|
+          norm, errs = validate_set(set)
+          errors.concat(errs)
+          next nil if norm.nil?
+          if seen[norm['set_id']]
+            errors << "set „#{norm['set_id']}“ je v knižnici viackrát"
+            next nil
+          end
+          seen[norm['set_id']] = true
+          norm
+        end
+        errors.empty? ? [out, []] : [[], errors]
+      end
+
+      # Clen setu: per enum, qty kladny Integer, PRAVE JEDEN z
+      # code / code_by_nl / param_bands. -> [norm|nil, errors]
+      # strict: true = zapisova cesta (chybny kluc radu = chyba). false =
+      # citacia cesta legacy suborov, kde sa nepouzitelny kluc radu ticho
+      # zahodi (historicke spravanie; pasma tuto tolerancia NEMAJU — pokazene
+      # pasmo by ticho menilo, ktory kod sa vyberie).
+      def validate_member(member, index = 0, strict: false)
+        pos = "člen #{index + 1}"
+        return [nil, ["#{pos} musí byť objekt"]] unless member.is_a?(Hash)
+        mm = stringify(member)
+        per = mm['per'].to_s.strip
+        per = 'unit' if per.empty?
+        return [nil, ["#{pos} má neznáme „per“ (#{per})"]] unless PER_KINDS.include?(per)
+        qty = mm['qty'].nil? ? 1 : mm['qty'].to_i
+        return [nil, ["#{pos} má neplatný počet"]] if qty < 1
+        qty = [qty, BuildPlan::MAX_HW_QUANTITY].min
+
+        has_code  = !mm['code'].to_s.strip.empty?
+        has_nl    = mm['code_by_nl'].is_a?(Hash) && !mm['code_by_nl'].empty?
+        has_bands = mm['param_bands'].is_a?(Hash)
+        kinds = [has_code, has_nl, has_bands].count(true)
+        if kinds != 1
+          return [nil, ["#{pos} musí mať práve jedno z: kód, rad podľa dĺžky, pásma parametra"]]
+        end
+        if per == 'owner' && (has_nl || has_bands)
+          return [nil, ["#{pos}: rad/pásma sú per jednotka, nie per vlastníka"]]
+        end
+
+        out = { 'per' => per, 'qty' => qty }
+        label = mm['label'].to_s.strip
+        out['label'] = label unless label.empty?
+        if has_code
+          out['code'] = mm['code'].to_s.strip
+        elsif has_nl
+          map, errs = validate_code_by_nl(mm['code_by_nl'], pos, strict: strict)
+          return [nil, errs] unless errs.empty?
+          out['code_by_nl'] = map
+        else
+          bands, errs = validate_param_bands(mm['param_bands'], 'code', pos)
+          return [nil, errs] unless errs.empty?
+          out['param_bands'] = bands
+        end
+        [out, []]
+      end
+
+      def validate_code_by_nl(raw, pos, strict: false)
+        map = {}
+        errors = []
+        raw.each do |k, v|
+          nl = begin
+            Integer(k.to_s.strip, 10)
+          rescue ArgumentError, TypeError
+            nil
+          end
+          code = v.to_s.strip
+          if nl.nil? || nl < 1
+            errors << "#{pos}: „#{k}“ nie je platná dĺžka radu" if strict
+          elsif code.empty?
+            errors << "#{pos}: dĺžka #{nl} nemá kód" if strict
+          else
+            map[nl.to_s] = code
+          end
+        end
+        errors << "#{pos}: rad je prázdny" if map.empty? && errors.empty?
+        [map, errors]
+      end
+
+      # Pasma (H1a FIX 8) — value_key 'code' (clen setu) alebo 'set_id'
+      # (selector mapovania). Konvencia hranic a prekryvov je v hlavicke suboru.
+      # -> [norm|nil, errors]; norm = { 'param' => .., 'bands' => [...] } zoradene.
+      def validate_param_bands(raw, value_key, pos)
+        return [nil, ["#{pos}: pásma musia byť objekt"]] unless raw.is_a?(Hash)
+        h = stringify(raw)
+        param = h['param'].to_s.strip
+        return [nil, ["#{pos}: pásma nemajú názov parametra"]] if param.empty?
+        list = h['bands']
+        return [nil, ["#{pos}: pásma sú prázdne"]] unless list.is_a?(Array) && !list.empty?
+        errors = []
+        bands = list.each_with_index.map do |b, i|
+          unless b.is_a?(Hash)
+            errors << "#{pos}: pásmo #{i + 1} musí byť objekt"
+            next nil
+          end
+          bb = stringify(b)
+          min = num(bb['min'])
+          max = num(bb['max'])
+          val = bb[value_key].to_s.strip
+          if min.nil? || max.nil?
+            errors << "#{pos}: pásmo #{i + 1} nemá konečné min/max"
+            next nil
+          end
+          if min > max
+            errors << "#{pos}: pásmo #{i + 1} má min väčšie ako max"
+            next nil
+          end
+          if val.empty?
+            errors << "#{pos}: pásmo #{i + 1} (#{min.round(1)}–#{max.round(1)}) nemá hodnotu"
+            next nil
+          end
+          { 'min' => min, 'max' => max, value_key => val }
+        end
+        return [nil, errors] unless errors.empty?
+        bands = bands.sort_by { |b| [b['min'], b['max']] }
+        bands.each_cons(2) do |a, b|
+          # UZAVRETE hranice -> dotyk (a.max == b.min) je uz prekryv
+          next if a['max'] < b['min']
+          errors << "#{pos}: pásma #{a['min'].round(1)}–#{a['max'].round(1)} a " \
+                    "#{b['min'].round(1)}–#{b['max'].round(1)} sa prekrývajú"
+        end
+        return [nil, errors] unless errors.empty?
+        [{ 'param' => param, 'bands' => bands }, []]
+      end
+
+      def num(v)
+        return nil unless v.is_a?(Numeric) || (v.is_a?(String) && !v.strip.empty?)
+        f = Float(v)
+        f.finite? ? f : nil
+      rescue ArgumentError, TypeError
+        nil
+      end
+
+      # CITACIA cesta (legacy/cudzi subor): TOLERANTNA — nevalidny clen vypadne,
+      # set bez pouzitelnych clenov vypadne cely; obe s logom. Citanie nesmie
+      # zhodit prestavbu ANI zahodit cely set kvoli jednemu starsiemu clenu.
+      # Zapisova cesta ide cez validate_sets (prisne, all-or-nothing).
       def normalize_sets(sets)
         seen = {}
         Array(sets).filter_map do |set|
@@ -602,7 +1149,10 @@ module Noxun
           gt = s['generic_type'].to_s.strip
           next nil unless BuildPlan::GENERIC_TYPES.include?(gt)
           members = normalize_members(s['members'])
-          next nil if members.empty?
+          if members.empty?
+            log_skip("set „#{sid}“ preskoceny — ziadny pouzitelny clen")
+            next nil
+          end
           seen[sid] = true
           { 'set_id' => sid,
             'name' => (s['name'].to_s.strip.empty? ? sid : s['name'].to_s.strip),
@@ -612,59 +1162,92 @@ module Noxun
       end
 
       def normalize_members(members)
-        Array(members).filter_map do |m|
-          next nil unless m.is_a?(Hash)
-          mm = stringify(m)
-          per = mm['per'].to_s.strip
-          per = 'unit' if per.empty?
-          next nil unless PER_KINDS.include?(per)
-          qty = mm['qty'].nil? ? 1 : mm['qty'].to_i
-          next nil if qty < 1
-          qty = [qty, BuildPlan::MAX_HW_QUANTITY].min
-          has_code = !mm['code'].to_s.strip.empty?
-          has_map  = mm['code_by_nl'].is_a?(Hash) && !mm['code_by_nl'].empty?
-          next nil if has_code == has_map # XOR: prave jedno z dvojice
-          next nil if has_map && per == 'owner' # rad je per jednotka (vysuvy)
-          out = { 'per' => per, 'qty' => qty }
-          label = mm['label'].to_s.strip
-          out['label'] = label unless label.empty?
-          if has_code
-            out['code'] = mm['code'].to_s.strip
-          else
-            map = {}
-            mm['code_by_nl'].each do |k, v|
-              nl = begin
-                Integer(k.to_s.strip, 10)
-              rescue ArgumentError, TypeError
-                nil
-              end
-              code = v.to_s.strip
-              next if nl.nil? || nl < 1 || code.empty?
-              map[nl.to_s] = code
-            end
-            next nil if map.empty?
-            out['code_by_nl'] = map
-          end
-          out
+        Array(members).each_with_index.filter_map do |m, i|
+          norm, errors = validate_member(m, i)
+          log_skip(errors.first) if norm.nil? && !errors.empty?
+          norm
         end
       end
 
-      # Mapovanie: len zname genericke typy; set_id neprazdny String. Vazbu na
-      # existujuci set kontroluje volajuci (global write prijme mapovanie len
-      # na sety kniznice; snapshot si konzistenciu drzi cez set_project_mapping!).
-      def normalize_mapping(mapping, sets = nil)
-        return {} unless mapping.is_a?(Hash)
-        ids = sets.nil? ? nil : sets.map { |s| s['set_id'] }
+      # JEDINY parser mapovania (audit BLOCKER 2). Vrati [norm, errors]:
+      #   errors — chyby TVARU (zapisova cesta ich odmieta, citacia loguje)
+      #   set_ids — ak su dane, polozka ukazujuca na NEEXISTUJUCI set sa vyhodi
+      #             TICHO (delete_set! ocisti mapovanie; typ ostane nemapovany)
+      #   allow_owner — composite kluce "gt@owner_part_key"; true LEN pre
+      #             cabinet override mapu (config['hardware_sets'])
+      def parse_mapping(mapping, set_ids: nil, allow_owner: false)
+        return [{}, []] if mapping.nil? # chybajuce mapovanie = legitimne prazdne
+        return [{}, ['mapovanie musí byť objekt']] unless mapping.is_a?(Hash)
+        ids = set_ids.nil? ? nil : Array(set_ids).map(&:to_s)
         out = {}
-        mapping.each do |gt, sid|
-          g = gt.to_s.strip
-          s = sid.to_s.strip
-          next unless BuildPlan::GENERIC_TYPES.include?(g)
-          next if s.empty?
-          next if ids && !ids.include?(s)
-          out[g] = s
+        errors = []
+        mapping.each do |key, value|
+          parsed = BuildPlan.parse_hardware_set_key(key)
+          if parsed.nil?
+            errors << "mapovanie „#{key}“ má neplatný kľúč"
+            next
+          end
+          gt, owner = parsed
+          if owner && !allow_owner
+            errors << "mapovanie „#{key}“: výber na úrovni dielca je len na skrinke"
+            next
+          end
+          status, norm, refs = parse_mapping_value(value)
+          if status != :ok
+            errors << "mapovanie „#{key}“: #{norm}"
+            next
+          end
+          next if ids && refs.any? { |sid| !ids.include?(sid) }
+          out[owner ? "#{gt}@#{owner}" : gt] = norm
         end
+        [out, errors]
+      end
+
+      # Hodnota mapovania: set_id String ALEBO selector Hash.
+      # -> [:ok, norm, referenced_set_ids] | [:invalid, message, nil]
+      def parse_mapping_value(value)
+        if value.is_a?(String) || value.is_a?(Symbol)
+          sid = value.to_s.strip
+          return [:invalid, 'prázdne set_id', nil] if sid.empty?
+          return [:ok, sid, [sid]]
+        end
+        unless value.is_a?(Hash)
+          return [:invalid, 'hodnota musí byť set_id alebo výber podľa parametra', nil]
+        end
+        norm, errors = validate_param_bands(value, 'set_id', 'výber')
+        return [:invalid, errors.first, nil] if norm.nil?
+        [:ok, norm, norm['bands'].map { |b| b['set_id'] }.uniq]
+      end
+
+      # Vsetky set_id, na ktore hodnota mapovania ukazuje (priamo alebo cez
+      # pasma selectora) — pouziva ich zmrazovanie snapshotu (audit BLOCKER 1).
+      def value_set_ids(value)
+        status, _norm, refs = parse_mapping_value(value)
+        status == :ok ? refs : []
+      end
+
+      # Mnozina set_id referencovanych mapovanim projektu + cabinet overridmi.
+      def referenced_set_ids(mapping, cabinet_overrides = {})
+        out = []
+        (mapping.is_a?(Hash) ? mapping : {}).each_value { |v| out.concat(value_set_ids(v)) }
+        (cabinet_overrides.is_a?(Hash) ? cabinet_overrides : {}).each_value do |map|
+          next unless map.is_a?(Hash)
+          map.each_value { |v| out.concat(value_set_ids(v)) }
+        end
+        out.uniq
+      end
+
+      # CITACIA normalizacia mapovania (spatna kompatibilita signatury:
+      # sets = pole definicii setov). Chyby tvaru sa loguju a polozka vypadne.
+      def normalize_mapping(mapping, sets = nil, allow_owner: false)
+        ids = sets.nil? ? nil : sets.map { |s| s['set_id'] }
+        out, errors = parse_mapping(mapping, set_ids: ids, allow_owner: allow_owner)
+        errors.each { |e| log_skip(e) }
         out
+      end
+
+      def log_skip(msg)
+        Engine.log("hardware sets: #{msg}") if defined?(Engine) && Engine.respond_to?(:log)
       end
 
       def stringify(h)

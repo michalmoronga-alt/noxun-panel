@@ -321,7 +321,10 @@ module Noxun
       def emit(rule, owner, ctx, pd, items, warnings)
         qty, params = compute(rule, ctx, pd, owner, warnings)
         return if qty.nil?
-        params = params.merge(context_params(rule, ctx))
+        # Poradie merge: kontextove params (deklarativne z pravidla) a AZ POTOM
+        # odvodene params dielca — tie su autoritativne (front_height je vyska
+        # KONKRETNEHO cela, ziadna korpusova hodnota ju nesmie prebit).
+        params = params.merge(context_params(rule, ctx)).merge(part_params(rule, pd))
         items << {
           'owner_part_key'   => owner,
           'generic_type'     => rule['output'].to_s,
@@ -387,6 +390,22 @@ module Noxun
                                       part_key: owner, severity: 'info',
                                       data: { 'rule_id' => rule['rule_id'].to_s, 'input' => input })
         nil
+      end
+
+      # H1a (audit FIX 5): params odvodene z DIELCA-vlastnika. Zatial jedine
+      # 'front_height' pre vysuvy — vyska konkretneho cela v okamihu evaluacie.
+      # Set potom vie vybrat bocnicu per celo (D-81); params_from_context by to
+      # neuniesol, ten cita LEN korpusovy kontext (jedna hodnota na skrinku).
+      # Ked vyska nie je k dispozicii, kluc NEVZNIKNE — selector potom korektne
+      # spadne do ORANGE namiesto hadania pasma.
+      FRONT_ROLES = %w[front_door drawer_front flap cover_panel false_front].freeze
+
+      def part_params(rule, pd)
+        return {} unless rule['output'].to_s == 'slide'
+        return {} unless pd.is_a?(Hash) && FRONT_ROLES.include?(pd[:role].to_s)
+        v = pd[:prod].is_a?(Hash) ? pd[:prod][:length] : nil
+        return {} unless v.is_a?(Numeric) && v.to_f.finite? && v.to_f.positive?
+        { 'front_height' => v.to_f.round(2) }
       end
 
       # Deklarativne params z kontextu: {"height": "floor_height"} -> params['height']=ctx['floor_height'].

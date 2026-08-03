@@ -335,18 +335,11 @@ module Noxun
             push_sets
             return set_status('Model sa medzitým prepol — obnovené.', true)
           end
-          lib = HardwareSets.load
-          by_id = {}
-          lib['sets'].each { |s| by_id[s['set_id']] = s }
-          mapping = {}
-          sets = {}
-          lib['mapping'].each do |gt, sid|
-            next unless by_id[sid]
-            mapping[gt] = sid
-            sets[sid] = by_id[sid]
-          end
+          # H1a: skladanie globalneho defaultu je JEDNA autorita v core
+          # (global_default_state) — zvlada aj vyber setu podla parametra.
+          state = HardwareSets.global_default_state
           model.start_operation('NOXUN: Obnova predvolieb setov', true)
-          ok = HardwareSets.write_project_state(model, 'mapping' => mapping, 'sets' => sets)
+          ok = HardwareSets.write_project_state(model, state)
           ok ? model.commit_operation : model.abort_operation
           push_sets
           ProductionDialog.on_model_changed(model) if defined?(ProductionDialog) && ok

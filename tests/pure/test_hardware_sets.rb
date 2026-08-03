@@ -313,10 +313,10 @@ NxTest.test('hw sety GH#127 P1: prva zmena v projekte BEZ snapshotu zmrazi VSETK
   NxTest.assert_equal(true, HWS.set_project_mapping!(m, 'hinge', 'zaves-p2o', p2o))
   _, st = HWS.project_state_status(m)
   NxTest.assert_equal('zaves-p2o', st['mapping']['hinge'], 'zmeneny typ plati')
-  NxTest.assert_equal('nohy-klzak-17', st['mapping']['leg'],
+  NxTest.assert_equal('nohy-podla-sokla', st['mapping']['leg'],
                       'OSTATNE typy ostali zmrazene z globalu (nie odmapovane)')
   NxTest.assert_equal(HWS::SEED_MAPPING.length, st['mapping'].length, 'cely default zmrazeny')
-  NxTest.assert(st['sets'].key?('nohy-klzak-17') && st['sets'].key?('zaves-p2o'),
+  NxTest.assert(st['sets'].key?('nohy-podla-sokla') && st['sets'].key?('zaves-p2o'),
                 'definicie zmrazene tiez (B2)')
 ensure
   [HWS.path, "#{HWS.path}.bak"].each { |f| File.delete(f) if File.exist?(f) }

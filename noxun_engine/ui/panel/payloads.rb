@@ -81,25 +81,35 @@ module Noxun
             proj_map = {}
           end
           globals = HardwareSets.load['sets']
-          overrides = cfg['hardware_sets'].is_a?(Hash) ? cfg['hardware_sets'] : {}
+          # H1a: override mapa moze mat composite kluce (gt@owner) a hodnota
+          # moze byt selector — parser je jedina autorita tvaru; ponuku setov
+          # sklada HardwareSets.set_options (definicia zo SNAPSHOTU vyhrava nad
+          # globalom pre referencovane set_id — audit BLOCKER 4).
+          overrides = HardwareSets.normalize_mapping(
+            cfg['hardware_sets'].is_a?(Hash) ? cfg['hardware_sets'] : {}, nil, allow_owner: true
+          )
+          refs = HardwareSets.referenced_set_ids(proj_map, 'cab' => overrides)
           types = Array(hardware).filter_map { |h| h.is_a?(Hash) ? h['generic_type'].to_s : nil }
                                  .reject(&:empty?).uniq
-          types |= overrides.keys
+          overrides.each_key do |k|
+            parsed = BuildPlan.parse_hardware_set_key(k)
+            types |= [parsed[0]] if parsed
+          end
           types.map do |gt|
-            opts = globals.select { |s| s['generic_type'] == gt }
-            [proj_map[gt], overrides[gt]].compact.each do |sid|
-              next if opts.any? { |s| s['set_id'] == sid }
-              snap = snap_sets[sid]
-              opts += [snap] if snap && snap['generic_type'] == gt
-            end
-            proj_sid = proj_map[gt]
+            opts = HardwareSets.set_options(gt, globals, snap_sets, refs)
+            proj_val = proj_map[gt]
+            ov_val = overrides[gt]
+            proj_sid = proj_val.is_a?(String) ? proj_val : nil
             proj_name = proj_sid && (opts.find { |s| s['set_id'] == proj_sid } || {})['name']
             {
               'generic_type' => gt,
               'label' => HardwareRules.label_for(gt),
               'project_set_id' => proj_sid,
               'project_set_name' => proj_name,
-              'override_set_id' => overrides[gt],
+              # H1b vykresli vyber podla parametra; H1a ho len verne prenasa.
+              'project_selector' => (proj_val.is_a?(Hash) ? proj_val : nil),
+              'override_set_id' => (ov_val.is_a?(String) ? ov_val : nil),
+              'override_selector' => (ov_val.is_a?(Hash) ? ov_val : nil),
               'status' => status.to_s,
               'options' => opts.map { |s| { 'set_id' => s['set_id'], 'name' => s['name'] } }
             }
