@@ -72,6 +72,7 @@ module Noxun
           cb(dlg, 'hws_map_project')   { |p| handle_map_project(p) }
           cb(dlg, 'hws_map_global')    { |p| handle_map_global(p) }
           cb(dlg, 'hws_reset_project') { |p| handle_reset_project(p) }
+          cb(dlg, 'hws_merge_seed')    { |p| handle_merge_seed(p) } # H1b (FIX 10)
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(hw_catalog): #{msg}")
@@ -224,6 +225,13 @@ module Noxun
             'sets' => lib['sets'],
             'global_mapping' => lib['mapping'],
             'revision' => HardwareSets.revision,
+            # H1b (audit BLOCKER 1): ponuku per typ sklada SERVER cez
+            # HardwareSets.set_options — pre set_id, ktore projekt uz pouziva,
+            # vyhrava definicia zo SNAPSHOTU (podla nej sa nakupuje), takze
+            # select ukazuje nazov PROJEKTU, nie neskor premenovany global.
+            'type_options' => project_type_options(lib, state),
+            # Parametre pasiem/selectora — jediny slovnik je v core.
+            'params' => HardwareSets::PARAM_OPTIONS,
             'project' => { 'status' => status.to_s,
                            'mapping' => (state ? state['mapping'] : {}),
                            # GH #127 P2: zmrazene KOPIE projektu — mapovany set
@@ -241,6 +249,44 @@ module Noxun
           }
         end
 
+        # { generic_type => [{set_id, name, project_copy}] } — poradie a vyber
+        # definicie robi server (snapshot > global). project_copy = set, ktory
+        # v kniznici uz NIE JE (projekt drzi vlastnu kopiu).
+        def project_type_options(lib, state)
+          snap_sets = state ? state['sets'] : {}
+          refs = HardwareSets.referenced_set_ids(state ? state['mapping'] : {})
+          out = {}
+          BuildPlan::GENERIC_TYPES.each do |gt|
+            out[gt] = HardwareSets.set_options(gt, lib['sets'], snap_sets, refs).map do |s|
+              { 'set_id' => s['set_id'], 'name' => s['name'],
+                'project_copy' => lib['sets'].none? { |g| g['set_id'] == s['set_id'] } }
+            end
+          end
+          out
+        end
+
+        # D-75: po KAZDEJ uspesnej zmene setov/predvolieb — obnova okna +
+        # ZIVY push ponuky do panela (NX.setHardwareSets). NIKDY push_selected:
+        # ten resetuje rozpracovany formular panela a dedup-uje kopie
+        # (= zmena v satelitnom okne by siahla na model).
+        def after_sets_change(model = nil)
+          push_sets
+          Panel.push_hardware_sets if defined?(Panel) && Panel.dialog_alive?
+          ProductionDialog.on_model_changed(model) if model && defined?(ProductionDialog)
+        end
+
+        # Hodnota mapovania z okna: 'value' = set_id String ALEBO selector Hash
+        # (H1b vyber podla parametra); stary kluc 'set_id' ostava kompatibilny.
+        # Prazdne = odmapovanie (nil). Tvar validuje VYHRADNE core parser.
+        def mapping_value(data)
+          raw = data.key?('value') ? data['value'] : data['set_id']
+          return nil if raw.nil?
+          return raw if raw.is_a?(Hash)
+
+          s = raw.to_s.strip
+          s.empty? ? nil : s
+        end
+
         def handle_set_save(payload)
           data = JSON.parse(payload.to_s)
           status, info = HardwareSets.save_set!(data['set'].is_a?(Hash) ? data['set'] : {},
@@ -248,7 +294,7 @@ module Noxun
                                                 create: data['create'] == true)
           case status
           when :ok
-            push_sets
+            after_sets_change # D-75: nový/upravený set je HNEĎ aj v selectoch panela
             js('HWSETS.saved()') # GH #127 P2: editor sa zavrie az pri USPECHU
             set_status("Set „#{info['name']}“ uložený.")
           when :exists
@@ -271,7 +317,7 @@ module Noxun
           status, = HardwareSets.delete_set!(data['set_id'].to_s, revision: data['revision'].to_s)
           case status
           when :ok
-            push_sets
+            after_sets_change
             set_status("Set zmazaný. Projekty, ktoré ho používajú, držia vlastnú kópiu — ich súpisy sa nemenia.")
           when :conflict
             push_sets
@@ -292,25 +338,34 @@ module Noxun
             return set_status('Model sa medzitým prepol — predvoľby sa obnovili, vyber znova.', true)
           end
           gt = data['generic_type'].to_s
-          sid = data['set_id'].to_s.strip
-          sid = nil if sid.empty?
-          set_def = nil
-          if sid
-            lib = HardwareSets.load
-            set_def = lib['sets'].find { |s| s['set_id'] == sid }
-            if set_def.nil?
+          value = mapping_value(data)
+          set_defs = nil
+          if value
+            # H1b: hodnota moze byt selector — tvar overi PARSER (jedina
+            # autorita) a do snapshotu sa musia zmrazit VSETKY sety, na ktore
+            # ukazuje (audit BLOCKER 1). Definicie berie resolver: pre set_id,
+            # ktore projekt uz pouziva, vyhrava snapshot (BLOCKER 4).
+            vstatus, norm, refs = HardwareSets.parse_mapping_value(value)
+            return set_status("Výber sa nedá uložiť — #{norm}.", true) unless vstatus == :ok
+
+            set_defs = refs.map { |sid| HardwareSets.resolve_set_def(model, sid) }
+            if set_defs.any?(&:nil?)
               push_sets
               return set_status('Set sa v knižnici nenašiel — obnovené.', true)
             end
+            bad = set_defs.find { |d| d['generic_type'] != gt }
+            return set_status("Set „#{bad['name']}“ je iného typu kovania.", true) if bad
           end
-          # Zapis = 1 undo krok; snapshot dostane mapping AJ definiciu (B2).
+          # Zapis = 1 undo krok; snapshot dostane mapping AJ definicie (B2).
           model.start_operation('NOXUN: Predvoľba setu kovania', true)
-          ok = HardwareSets.set_project_mapping!(model, gt, sid, set_def)
+          ok = HardwareSets.set_project_mapping!(model, gt, value, set_defs)
           if ok
             model.commit_operation
-            push_sets
-            ProductionDialog.on_model_changed(model) if defined?(ProductionDialog)
-            set_status(sid ? "#{HardwareRules.label_for(gt)} → #{set_def['name']}." : "#{HardwareRules.label_for(gt)} — bez setu.")
+            after_sets_change(model)
+            # Editor pasiem sa zatvara AZ po uspesnom zapise (echo kluca) —
+            # pri chybe ostane rozpisany na doopravenie (vzor HWSETS.saved).
+            js("HWSETS.mapSaved(#{data['ui_key'].to_s.to_json})")
+            set_status(mapping_status_txt(gt, value, set_defs))
           else
             model.abort_operation
             push_sets
@@ -318,11 +373,59 @@ module Noxun
           end
         end
 
+        # „Výsuv → Atira biela H70." / „Výsuv → podľa výšky čela (2 pásma)."
+        def mapping_status_txt(gt, value, set_defs)
+          label = HardwareRules.label_for(gt)
+          return "#{label} — bez setu." if value.nil?
+          if value.is_a?(Hash)
+            n = Array(value['bands']).length
+            return "#{label} → #{HardwareSets.param_by(value['param'])} (#{n} #{n == 1 ? 'pásmo' : 'pásma'})."
+          end
+          "#{label} → #{(set_defs || []).first&.fetch('name', value) || value}."
+        end
+
         def handle_map_global(payload)
           data = JSON.parse(payload.to_s)
-          ok = HardwareSets.set_global_mapping!(data['generic_type'].to_s, data['set_id'])
-          push_sets
-          set_status(ok ? 'Globálna predvoľba uložená (platí pre nové projekty).' : 'Globálna predvoľba sa nedá uložiť.', !ok)
+          ok = HardwareSets.set_global_mapping!(data['generic_type'].to_s, mapping_value(data))
+          after_sets_change
+          js("HWSETS.mapSaved(#{data['ui_key'].to_s.to_json})") if ok
+          set_status(ok ? 'Globálna predvoľba uložená (platí pre nové projekty).' : 'Globálna predvoľba sa nedá uložiť — skontroluj pásma a sety.', !ok)
+        end
+
+        # H1b (audit FIX 10): vedome DOPLNENIE chybajucich globalnych predvolieb
+        # do projektu — vzor „Doplniť nové predvolené" v okne Pravidlá.
+        # Existujuce mapovania sa NEPREPISUJU (to robi len Obnoviť) a ziadna
+        # definicia zo snapshotu sa neodstranuje. 1 undo krok.
+        def handle_merge_seed(payload)
+          data = JSON.parse(payload.to_s)
+          model = Sketchup.active_model
+          return set_status('Žiadny aktívny model.', true) if model.nil?
+          if data['model_guid'].to_s != model.guid.to_s
+            push_sets
+            return set_status('Model sa medzitým prepol — obnovené.', true)
+          end
+          status, = HardwareSets.project_state_status(model)
+          if status == :missing
+            return set_status('Projekt zatiaľ preberá globálne predvoľby celé — nie je čo dopĺňať.')
+          end
+          if status == :invalid
+            return set_status('Predvoľby projektu sú poškodené — použi „Obnoviť z globálnych predvolieb".', true)
+          end
+
+          model.start_operation('NOXUN: Doplnenie predvolieb setov', true)
+          res, added_sets, added_map = HardwareSets.merge_project_sets_seed!(model)
+          res == :updated ? model.commit_operation : model.abort_operation
+          after_sets_change(model)
+          if res == :updated
+            labels = added_map.map { |gt| HardwareRules.label_for(gt) }
+            set_status("Doplnené predvoľby: #{labels.join(', ')} (#{added_sets.length} " \
+                       "#{added_sets.length == 1 ? 'nový set' : 'nových setov'}). Existujúce zostali.")
+          else
+            set_status('Projekt už má všetky globálne predvoľby — nič sa nedopĺňalo.')
+          end
+        rescue StandardError => e
+          model.abort_operation if model
+          raise e
         end
 
         # F9: VEDOMA obnova poskodenych/chybajucich predvolieb projektu z
@@ -341,8 +444,7 @@ module Noxun
           model.start_operation('NOXUN: Obnova predvolieb setov', true)
           ok = HardwareSets.write_project_state(model, state)
           ok ? model.commit_operation : model.abort_operation
-          push_sets
-          ProductionDialog.on_model_changed(model) if defined?(ProductionDialog) && ok
+          after_sets_change(ok ? model : nil) # D-75: aj panel dostane novú ponuku
           set_status(ok ? 'Predvoľby projektu obnovené z globálnych.' : 'Obnova zlyhala.', !ok)
         end
 

@@ -246,21 +246,10 @@
         h += '<div class="hwsec hwsec-warn"><span>Bez kódov (' + un.length + ') — nenacenené, detail v tabe Kontrola</span></div>'
            + '<table class="bomtab"><tbody>';
         un.forEach(function(u){
-          // H1a: dovody su serverovy enum (HardwareSets::UNMAPPED_REASONS);
-          // plne texty su v KONTROLE, tu je len kratky suhrn.
-          var val = (u.value != null ? ' ' + Math.round(u.value * 10) / 10 + ' mm' : '');
-          var reason;
-          if (u.reason === 'nl_missing'){
-            reason = 'set nemá kód pre dĺžku' + (u.nominal_length != null ? ' NL ' + Math.round(u.nominal_length) : '');
-          } else if (u.reason === 'param_band_missing'){
-            reason = 'set nemá pásmo pre ' + (u.param || 'parameter') + val;
-          } else if (u.reason === 'selector_unresolved'){
-            reason = 'výber setu nemá pásmo pre ' + (u.param || 'parameter') + val;
-          } else if (u.reason === 'set_missing'){
-            reason = 'set „' + u.set_id + '“ v projekte chýba';
-          } else {
-            reason = 'typ nemá priradený set';
-          }
+          // H1b: krátky SK text dôvodu skladá SERVER (HardwareSets.unmapped_reason_sk
+          // → payload 'reason_sk') — ten istý text ide aj do CSV. JS už žiadny
+          // vlastný preklad enumu nemá; fallback je len pre starý payload.
+          var reason = u.reason_sk || ('bez kódov (' + (u.reason || '?') + ')');
           h += '<tr class="hwmiss"><td>' + esc(u.generic_type) + '</td>'
              + '<td>' + esc(u.cabinet_id + (u.owner_part_key ? ' · ' + u.owner_part_key : '')) + '</td>'
              + '<td>' + num(u.quantity) + '</td><td>' + esc(reason) + '</td></tr>';

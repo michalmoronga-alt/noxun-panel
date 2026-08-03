@@ -192,6 +192,11 @@
   .hwrow .hwsrc { flex: 0 0 auto; width: 20px; }
   .hwrow.hwoff .hwname { color: var(--nx-ink-faint); }
   .hwrow .hwqty.manual, .hwrow.manual .hwqty { border-color: var(--nx-warn); background: var(--nx-warn-bg); }
+  /* D-81: vyber setu PRIAMO v riadku kovania dielca — kompaktne, aby riadok
+     ostal jeden (vertikalny priestor). Vlastny vyber (nie dedeny) = jantar. */
+  .hwrow .hwsetsel { flex: 0 1 104px; min-width: 60px; max-width: 150px; padding: 2px 4px;
+                     border: 1px solid var(--nx-border-strong); border-radius: 4px;
+                     font-size: 11px; color: var(--nx-ink-muted); }
   /* PRAVIDLA KOVANIA (dialog) */
   .rrule { border: 1px solid var(--nx-border); border-radius: 6px; padding: 8px 10px; margin: 8px 0; background: var(--nx-surface); }
   .rrule .rhead { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
@@ -233,6 +238,9 @@
   @media (max-width: 400px) {
     .prodbtn span { display: none; }
     .prodbtn { padding: 5px 7px; }
+    /* D-81: na uzkom paneli ustupi doplnkovy popis parametra (NL 500 / 150 mm)
+       — je aj v tooltipe riadku; vyber setu a pocet musia ostat citatelne. */
+    .hwrow .hwext { display: none; }
   }
   /* identita oznaceneho (A6: bez vlastneho margin-bottom — hlavicka ho riesi; A7: cname ellipsis) */
   .idbar { display: flex; align-items: baseline; gap: 8px; margin: 0; min-width: 0; flex: 1 1 auto; }
@@ -661,6 +669,19 @@
 .hwsed-srow { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
 .hwsed-srow input { width: 90px; }
 .hwsproj-title { font-weight: 700; font-size: 12.5px; margin: 6px 0; }
+/* H1b: hlavicka tabu Predvolby — model + „Doplniť nové predvoľby" v JEDNOM rade */
+.hwsproj-head { display: flex; align-items: center; gap: 8px; }
+.hwsproj-head .hwsproj-title { flex: 1 1 auto; min-width: 0; }
+/* H1b: editor vyberu setu podla parametra (selector mapovania) + jeho suhrn.
+   Odsadenie = sirka labelu riadku mapovania, aby pasma sedeli pod selectom. */
+.hwssel { border: 1px solid var(--nx-border); border-left: 3px solid var(--nx-warn);
+          border-radius: 6px; padding: 6px 8px; margin: 2px 0 8px 158px;
+          background: var(--nx-surface); }
+.hwssel-sum { display: flex; align-items: center; gap: 8px; margin: 0 0 8px 158px;
+              font-size: 11.5px; color: var(--nx-ink-muted); }
+/* pásma: úzke od/do + široká hodnota (kód alebo select setu) */
+.hwsed-srow input.hwsed-band { width: 62px; flex: 0 0 auto; }
+.hwsed-srow select { flex: 1 1 auto; min-width: 90px; }
 .hwsmap { margin: 6px 0 10px; }
 .hwsmap-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
 .hwsmap-row label { flex: 0 0 150px; font-size: 12px; }

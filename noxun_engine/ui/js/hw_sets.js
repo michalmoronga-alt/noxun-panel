@@ -10,6 +10,14 @@
   var HWS_TAB = 'items'; // items | sets | proj
   var HWS_EDIT = null;   // rozpracovany editor setu (null = zavrety)
   var HWS_DEL_ARM = '';  // set_id cakajuci na druhy klik "Naozaj zmazat?"
+  // H1b: rozpracovane editory VYBERU SETU PODLA PARAMETRA (selector mapovania).
+  // Kluc = "<action>|<generic_type>" (projektova a globalna tabulka su oddelene);
+  // hodnota = { param, rows: [{min, max, set_id}] } alebo null = editor zavrety.
+  var HWS_SEL = {};
+  var HWS_GLOBAL_OPEN = false; // <details> globálnych predvolieb prežije prerender
+  // Hodnota volby „nastaviť podľa parametra…" v selecte mapovania — NIKDY sa
+  // neposiela na server, len otvara editor pasiem.
+  var HWS_PARAM_OPT = '__param__';
 
   function hwsEl(id){ return document.getElementById(id); }
   function hwsMk(tag, cls, text){
@@ -36,18 +44,67 @@
   function hwsSetsForType(sets, gt){
     return (sets || []).filter(function(s){ return s.generic_type === gt; });
   }
-  // Citatelny suhrn clena: "104717 ×1", "TipOn ×1 na dvierka", "rad NL: 420→357695, 470→357696".
-  function hwsMemberSummary(m){
+  function hwsTrim(v){ return String(v == null ? '' : v).trim(); }
+  function hwsBlank(v){ return hwsTrim(v) === ''; }
+  // Cislo pre ZOBRAZENIE: 17 -> "17", 17.5 -> "17,5" (zrkadlo Ruby fmt_mm).
+  function hwsNum(v){
+    var s = hwsTrim(v);
+    if (s === '') return ''; // prázdne pole ostáva prázdne (Number('') je 0!)
+    var n = Number(s.replace(',', '.'));
+    if (!isFinite(n)) return s;
+    return (Math.abs(n - Math.round(n)) < 1e-9)
+      ? String(Math.round(n))
+      : String(Math.round(n * 10) / 10).replace('.', ',');
+  }
+  // Cislo pre SERVER: SK ciarka -> bodka (Ruby Float("17,5") by spadlo).
+  function hwsNumIn(v){ return hwsTrim(v).replace(',', '.'); }
+  // Nazov parametra zo servera (payload params = HardwareSets::PARAM_OPTIONS).
+  // form 'by' = "podľa výšky sokla", 'label' = "výška sokla".
+  function hwsParamLabel(key, params, form){
+    var list = params || [];
+    for (var i = 0; i < list.length; i++){
+      if (list[i] && list[i].key === key) return list[i][form || 'by'] || list[i].label;
+    }
+    return key ? ('podľa: ' + key) : 'podľa parametra';
+  }
+  // Citatelny suhrn clena: "104717 ×1", "TipOn ×1 na dvierka",
+  // "rad NL: 420→357695, 470→357696", "podľa výšky sokla: 17–21 → 82744 · …".
+  function hwsMemberSummary(m, params){
     if (!m) return '';
     if (m.code_by_nl){
       var pairs = Object.keys(m.code_by_nl).sort(function(a, b){ return Number(a) - Number(b); })
         .map(function(nl){ return nl + '→' + m.code_by_nl[nl]; });
       return 'rad NL: ' + (pairs.join(', ') || '—');
     }
+    if (m.param_bands){
+      return hwsParamLabel(m.param_bands.param, params) + ': ' + hwsBandsSummary(m.param_bands.bands, 'code');
+    }
     var label = m.label ? m.label + ' ' : '';
     return label + m.code + ' ×' + (m.qty || 1) + (m.per === 'owner' ? ' na vlastníka (dvierka)' : '');
   }
-  // Editor stav -> set payload pre server (rad: riadky {nl, code} -> mapa).
+  // „17–21 → 82744 · 140–160 → 367823"; names = mapa hodnota->citatelny nazov
+  // (pri selectore su hodnoty set_id, pri clene setu kody).
+  function hwsBandsSummary(bands, key, names){
+    var list = (bands || []).map(function(b){
+      var v = b[key];
+      return hwsNum(b.min) + '–' + hwsNum(b.max) + ' → ' + ((names && names[v]) || v);
+    });
+    return list.join(' · ') || '—';
+  }
+  // Riadky editora -> pasma pre server. ZAHODI sa len uplne prazdny riadok
+  // (nic vyplnene — vzor radu NL); ciastocne vyplneny ide na server, aby
+  // pouzivatel dostal konkretnu chybu (validacia je all-or-nothing na SERVERI).
+  function hwsBuildBands(rows, key){
+    return (rows || []).filter(function(r){
+      return !(hwsBlank(r.min) && hwsBlank(r.max) && hwsBlank(r[key]));
+    }).map(function(r){
+      var out = { min: hwsNumIn(r.min), max: hwsNumIn(r.max) };
+      out[key] = hwsTrim(r[key]);
+      return out;
+    });
+  }
+  // Editor stav -> set payload pre server (rad: riadky {nl, code} -> mapa;
+  // pasma: riadky {min, max, code} -> { param, bands }).
   function hwsBuildSetPayload(edit){
     var members = (edit.members || []).map(function(m){
       var out = { per: m.per === 'owner' ? 'owner' : 'unit', qty: parseInt(m.qty, 10) || 1 };
@@ -55,17 +112,19 @@
       if (m.is_series){
         var map = {};
         (m.series || []).forEach(function(row){
-          var nl = String(row.nl == null ? '' : row.nl).trim();
-          var code = String(row.code == null ? '' : row.code).trim();
+          var nl = hwsTrim(row.nl);
+          var code = hwsTrim(row.code);
           if (nl && code) map[nl] = code;
         });
         out.code_by_nl = map;
+      } else if (m.is_bands){
+        out.param_bands = { param: hwsTrim(m.param), bands: hwsBuildBands(m.bands, 'code') };
       } else {
-        out.code = String(m.code == null ? '' : m.code).trim();
+        out.code = hwsTrim(m.code);
       }
       return out;
     });
-    return { set_id: edit.set_id, name: String(edit.name == null ? '' : edit.name).trim(),
+    return { set_id: edit.set_id, name: hwsTrim(edit.name),
              generic_type: edit.generic_type, members: members };
   }
   // Set z kniznice -> editor stav (kopia; rad -> riadky zoradene podla NL).
@@ -79,10 +138,29 @@
                    series: Object.keys(m.code_by_nl).sort(function(a, b){ return Number(a) - Number(b); })
                      .map(function(nl){ return { nl: nl, code: m.code_by_nl[nl] }; }) };
         }
+        if (m.param_bands){
+          return { is_bands: true, per: 'unit', qty: m.qty || 1, label: m.label || '',
+                   param: m.param_bands.param || '',
+                   bands: (m.param_bands.bands || []).map(function(b){
+                     return { min: hwsNum(b.min), max: hwsNum(b.max), code: b.code || '' };
+                   }) };
+        }
         return { is_series: false, per: m.per || 'unit', qty: m.qty || 1,
                  label: m.label || '', code: m.code || '' };
       })
     };
+  }
+  // Selector mapovania (server tvar) -> stav editora pasiem; nie-selector = null.
+  function hwsSelectorFrom(value){
+    if (!value || typeof value !== 'object' || !value.bands) return null;
+    return { param: value.param || '',
+             rows: (value.bands || []).map(function(b){
+               return { min: hwsNum(b.min), max: hwsNum(b.max), set_id: b.set_id || '' };
+             }) };
+  }
+  // Stav editora -> hodnota mapovania pre server (tvar overi core parser).
+  function hwsBuildSelector(state){
+    return { param: hwsTrim(state && state.param), bands: hwsBuildBands(state && state.rows, 'set_id') };
   }
 
   // --- vstup zo servera ------------------------------------------------------
@@ -101,6 +179,12 @@
     saved: function(){
       HWS_EDIT = null;
       hwsRenderSets();
+    },
+    // H1b: to iste pre editor pásiem výberu setu — server ho zavrie AŽ po
+    // úspešnom zápise (echo kľúča editora); pri chybe ostane rozpísaný.
+    mapSaved: function(key){
+      if (key) delete HWS_SEL[key];
+      hwsRenderProj();
     }
   };
 
@@ -162,7 +246,7 @@
       card.appendChild(head);
       var ul = hwsMk('div', 'hwsset-members');
       (s.members || []).forEach(function(m){
-        ul.appendChild(hwsMk('div', 'hwsset-m', hwsMemberSummary(m)));
+        ul.appendChild(hwsMk('div', 'hwsset-m', hwsMemberSummary(m, HWS_DATA.params)));
       });
       card.appendChild(ul);
       box.appendChild(card);
@@ -210,6 +294,11 @@
     var adds = hwsMk('button', 'ghostbtn', '+ rad podľa NL (výsuvy)');
     adds.setAttribute('data-action', 'hws-m-add-series');
     wrap.appendChild(adds);
+    // H1b: tretí druh člena — kód podľa PÁSMA parametra (nohy podľa výšky sokla).
+    var addp = hwsMk('button', 'ghostbtn', '+ pásma podľa parametra');
+    addp.setAttribute('data-action', 'hws-m-add-bands');
+    addp.title = 'Kód sa vyberie podľa rozmeru položky (napr. noha podľa výšky sokla).';
+    wrap.appendChild(addp);
 
     var btns = hwsMk('div', 'btnrow');
     var save = hwsMk('button', 'primary', 'Uložiť set');
@@ -249,6 +338,23 @@
       add.setAttribute('data-hws-m', i);
       sbox.appendChild(add);
       row.appendChild(sbox);
+    } else if (m.is_bands){
+      // H1b: kód podľa pásma parametra. Hranice sú UZAVRETÉ (min ≤ v ≤ max),
+      // dotyk dvoch pásiem = prekryv → server zápis odmietne (all-or-nothing).
+      row.appendChild(hwsMk('span', 'hwsed-mlbl', 'Pásma'));
+      var bbox = hwsMk('div', 'hwsed-series');
+      bbox.appendChild(hwsParamSelect(m.param, i, null));
+      (m.bands || []).forEach(function(brow, j){
+        bbox.appendChild(hwsBandRow(brow, { m: i, b: j, valueField: 'code',
+                                            placeholder: 'kód', delAction: 'hws-b-del' }));
+      });
+      var addb2 = hwsMk('button', 'ghostbtn hwsbtn', '+ pásmo');
+      addb2.setAttribute('data-action', 'hws-b-add');
+      addb2.setAttribute('data-hws-m', i);
+      bbox.appendChild(addb2);
+      var hintb = hwsMk('div', 'hint', 'Hodnota mimo pásiem = ORANGE „doplň pásmo" — nikdy sa neberie najbližšie pásmo.');
+      bbox.appendChild(hintb);
+      row.appendChild(bbox);
     } else {
       var code2 = hwsMk('input'); code2.type = 'text'; code2.value = m.code || '';
       code2.placeholder = 'Demos kód'; code2.setAttribute('data-hws-m', i);
@@ -279,6 +385,82 @@
     return row;
   }
 
+  // --- zdielane prvky pásiem (člen setu aj výber setu) ------------------------
+
+  // Select parametra pásiem. mi = index člena (editor setu) ALEBO selKey =
+  // kľúč rozpracovaného výberu setu (mapovanie) — vždy práve jedno z nich.
+  function hwsParamSelect(param, mi, selKey){
+    var wrap = hwsMk('div', 'hwsed-srow');
+    wrap.appendChild(hwsMk('span', 'hwsed-mlbl', 'Podľa'));
+    var sel = hwsMk('select');
+    if (selKey != null) sel.setAttribute('data-hws-sel', selKey);
+    if (mi != null) sel.setAttribute('data-hws-m', mi);
+    sel.setAttribute('data-hws-field', 'param');
+    ((HWS_DATA && HWS_DATA.params) || []).forEach(function(p){
+      var o = hwsMk('option', null, p.label);
+      o.value = p.key;
+      if (p.key === param) o.selected = true;
+      sel.appendChild(o);
+    });
+    wrap.appendChild(sel);
+    return wrap;
+  }
+
+  function hwsBandAttrs(node, o, field){
+    if (o.sel != null) node.setAttribute('data-hws-sel', o.sel);
+    if (o.m != null) node.setAttribute('data-hws-m', o.m);
+    node.setAttribute('data-hws-b', o.b);
+    if (field) node.setAttribute('data-hws-field', field);
+  }
+
+  // Riadok pásma „[od] – [do] → [hodnota] ×". Hodnota = kód (člen setu) alebo
+  // select zo setov daného typu (výber setu podľa parametra).
+  function hwsBandRow(brow, o){
+    var r = hwsMk('div', 'hwsed-srow');
+    var mn = hwsMk('input');
+    mn.type = 'text'; mn.value = brow.min == null ? '' : brow.min;
+    mn.placeholder = 'od'; mn.className = 'hwsed-band';
+    hwsBandAttrs(mn, o, 'min');
+    r.appendChild(mn);
+    r.appendChild(hwsMk('span', null, '–'));
+    var mx = hwsMk('input');
+    mx.type = 'text'; mx.value = brow.max == null ? '' : brow.max;
+    mx.placeholder = 'do'; mx.className = 'hwsed-band';
+    hwsBandAttrs(mx, o, 'max');
+    r.appendChild(mx);
+    r.appendChild(hwsMk('span', null, '→'));
+    var cur = brow[o.valueField] || '';
+    var val;
+    if (o.setOptions){
+      val = hwsMk('select');
+      var none = hwsMk('option', null, '— vyber set —');
+      none.value = '';
+      val.appendChild(none);
+      var found = false;
+      o.setOptions.forEach(function(s){
+        var op = hwsMk('option', null, s.name);
+        op.value = s.set_id;
+        if (s.set_id === cur){ op.selected = true; found = true; }
+        val.appendChild(op);
+      });
+      if (cur && !found){ // set zmizol z knižnice — riadok nesmie klamať
+        var miss = hwsMk('option', null, cur + ' (chýba)');
+        miss.value = cur; miss.selected = true;
+        val.appendChild(miss);
+      }
+    } else {
+      val = hwsMk('input');
+      val.type = 'text'; val.value = cur; val.placeholder = o.placeholder || '';
+    }
+    hwsBandAttrs(val, o, o.valueField);
+    r.appendChild(val);
+    var del = hwsMk('button', 'ghostbtn hwsbtn', '×');
+    del.setAttribute('data-action', o.delAction);
+    hwsBandAttrs(del, o, null);
+    r.appendChild(del);
+    return r;
+  }
+
   // --- tab PREDVOLBY PROJEKTU ---------------------------------------------------
 
   function hwsRenderProj(){
@@ -286,7 +468,14 @@
     if (!box || !HWS_DATA) return;
     box.textContent = '';
     var proj = HWS_DATA.project || {};
-    box.appendChild(hwsMk('div', 'hwsproj-title', 'Model: ' + (HWS_DATA.model_title || '—')));
+    // Hlavička tabu: model + doplnenie nových predvolieb v JEDNOM rade.
+    var head = hwsMk('div', 'hwsproj-head');
+    head.appendChild(hwsMk('div', 'hwsproj-title', 'Model: ' + (HWS_DATA.model_title || '—')));
+    var mb = hwsMk('button', 'ghostbtn', 'Doplniť nové predvoľby');
+    mb.setAttribute('data-action', 'hws-merge-seed');
+    mb.title = 'Doplní do projektu globálne predvoľby, ktoré tu ešte nie sú (napr. nový typ kovania). Existujúce výbery nechá tak.';
+    head.appendChild(mb);
+    box.appendChild(head);
     if (proj.status === 'invalid'){
       var ban = hwsMk('div', 'hwbanner',
         'Predvoľby setov v tomto projekte sú poškodené — súpis kovania sa nemapuje. ');
@@ -301,48 +490,128 @@
         'Projekt zatiaľ preberá globálne predvoľby — zmrazia sa doň pri prvej stavbe skrinky alebo prvej zmene tu.'));
     }
     var mapping = proj.status === 'ok' ? (proj.mapping || {}) : (HWS_DATA.global_mapping || {});
-    // GH #127 P2: projektove selecty vidia aj ZMRAZENE kopie projektu —
-    // mapovany set mohol byt v globale premenovany/zmazany a predvolba musi
-    // ukazovat pravdu projektu (kniznica ho uz ponukat nemusi).
-    box.appendChild(hwsMappingTable(mapping, 'hws-map-proj', proj.sets || []));
+    // GH #127 P2 + H1b (audit BLOCKER 1): ponuku per typ sklada SERVER
+    // (type_options) — pre set, ktory projekt uz pouziva, ukazuje nazov zo
+    // SNAPSHOTU (podla neho sa nakupuje), nie neskor premenovany global.
+    box.appendChild(hwsMappingTable(mapping, 'hws-map-proj', hwsProjOptions));
 
     // Globalne defaulty novych projektov — zbalene (vertikalny priestor).
     var det = document.createElement('details');
+    det.open = HWS_GLOBAL_OPEN; // prerender (napr. + pásmo) nesmie zavrieť sekciu
+    det.setAttribute('data-hws-det', 'global');
     det.appendChild(hwsMk('summary', null, 'Predvoľby nových projektov (globálne)'));
-    det.appendChild(hwsMappingTable(HWS_DATA.global_mapping || {}, 'hws-map-global', []));
+    det.appendChild(hwsMappingTable(HWS_DATA.global_mapping || {}, 'hws-map-global', hwsGlobalOptions));
     box.appendChild(det);
   }
 
-  function hwsMappingTable(mapping, action, extraSets){
+  // Ponuka setov typu: projekt = server (snapshot > global, „(kópia projektu)"
+  // pri sete, ktorý knižnica už nemá), globálne predvoľby = knižnica.
+  function hwsProjOptions(gt){
+    var list = ((HWS_DATA && HWS_DATA.type_options) || {})[gt] || [];
+    return list.map(function(s){
+      return { set_id: s.set_id, name: s.name + (s.project_copy ? ' (kópia projektu)' : '') };
+    });
+  }
+  function hwsGlobalOptions(gt){
+    return hwsSetsForType(HWS_DATA && HWS_DATA.sets, gt).map(function(s){
+      return { set_id: s.set_id, name: s.name };
+    });
+  }
+  function hwsSelKey(action, gt){ return action + '|' + gt; }
+  function hwsDefaultParam(gt){
+    if (gt === 'slide') return 'front_height'; // bočnice sa vyberajú podľa výšky čela
+    var list = (HWS_DATA && HWS_DATA.params) || [];
+    return list.length ? list[0].key : 'height';
+  }
+
+  function hwsMappingTable(mapping, action, optionsFor){
     var t = hwsMk('div', 'hwsmap');
     ((HWS_DATA && HWS_DATA.generic_types) || []).forEach(function(gt){
-      var opts = hwsSetsForType(HWS_DATA.sets, gt.key);
-      // zmrazene projektove kopie, ktore kniznica (uz) nema — do ponuky
-      hwsSetsForType(extraSets || [], gt.key).forEach(function(ps){
-        if (!opts.some(function(s){ return s.set_id === ps.set_id; })){
-          opts = opts.concat([{ set_id: ps.set_id, name: ps.name + ' (kópia projektu)',
-                                generic_type: ps.generic_type }]);
-        }
-      });
-      if (!opts.length && !mapping[gt.key]) return; // typ bez setov nezobrazuj
+      var opts = optionsFor(gt.key);
+      var value = mapping[gt.key];
+      var key = hwsSelKey(action, gt.key);
+      var edit = HWS_SEL[key] || null;
+      if (!opts.length && !value) return; // typ bez setov nezobrazuj
       var row = hwsMk('div', 'hwsmap-row');
       row.appendChild(hwsMk('label', null, gt.label));
-      var sel = hwsMk('select');
-      sel.setAttribute('data-action-change', action);
-      sel.setAttribute('data-hws-gt', gt.key);
-      var none = hwsMk('option', null, '— bez setu (ORANGE)');
-      none.value = '';
-      sel.appendChild(none);
-      opts.forEach(function(s){
-        var o = hwsMk('option', null, s.name);
-        o.value = s.set_id;
-        if (mapping[gt.key] === s.set_id) o.selected = true;
-        sel.appendChild(o);
-      });
-      row.appendChild(sel);
+      row.appendChild(hwsMapSelect(gt.key, action, key, value, opts, edit));
       t.appendChild(row);
+      if (edit){
+        t.appendChild(hwsSelectorEditor(key, gt.key, action, opts, edit));
+      } else if (hwsIsSelector(value)){
+        t.appendChild(hwsSelectorSummaryRow(key, value, opts));
+      }
     });
     return t;
+  }
+
+  function hwsIsSelector(v){ return !!(v && typeof v === 'object' && v.bands); }
+
+  // Select mapovania: „bez setu" + sety typu + POSLEDNÁ voľba „podľa
+  // parametra…" (otvorí editor pásiem; na server sa nikdy neposiela).
+  function hwsMapSelect(gt, action, key, value, opts, edit){
+    var sel = hwsMk('select');
+    sel.setAttribute('data-action-change', action);
+    sel.setAttribute('data-hws-gt', gt);
+    sel.setAttribute('data-hws-key', key);
+    var byParam = !!edit || hwsIsSelector(value);
+    var none = hwsMk('option', null, '— bez setu (ORANGE)');
+    none.value = '';
+    none.selected = !byParam && !value;
+    sel.appendChild(none);
+    opts.forEach(function(s){
+      var o = hwsMk('option', null, s.name);
+      o.value = s.set_id;
+      if (!byParam && value === s.set_id) o.selected = true;
+      sel.appendChild(o);
+    });
+    var po = hwsMk('option', null, byParam
+      ? hwsParamLabel(edit ? edit.param : value.param, HWS_DATA && HWS_DATA.params)
+      : 'nastaviť podľa parametra…');
+    po.value = HWS_PARAM_OPT;
+    po.selected = byParam;
+    sel.appendChild(po);
+    return sel;
+  }
+
+  // Zavretý výber podľa parametra — čitateľný prehľad pásiem + „Upraviť".
+  function hwsSelectorSummaryRow(key, value, opts){
+    var names = {};
+    (opts || []).forEach(function(s){ names[s.set_id] = s.name; });
+    var box = hwsMk('div', 'hwssel-sum');
+    box.appendChild(hwsMk('span', null, hwsBandsSummary(value.bands, 'set_id', names)));
+    var eb = hwsMk('button', 'ghostbtn hwsbtn', 'Upraviť pásma');
+    eb.setAttribute('data-action', 'hws-sel-edit');
+    eb.setAttribute('data-hws-key', key);
+    box.appendChild(eb);
+    return box;
+  }
+
+  // Editor výberu setu podľa parametra (automatika bočníc podľa výšky čela).
+  function hwsSelectorEditor(key, gt, action, opts, state){
+    var box = hwsMk('div', 'hwssel');
+    box.appendChild(hwsParamSelect(state.param, null, key));
+    (state.rows || []).forEach(function(r, j){
+      box.appendChild(hwsBandRow(r, { sel: key, b: j, valueField: 'set_id',
+                                      setOptions: opts, delAction: 'hws-sb-del' }));
+    });
+    var add = hwsMk('button', 'ghostbtn hwsbtn', '+ pásmo');
+    add.setAttribute('data-action', 'hws-sb-add');
+    add.setAttribute('data-hws-key', key);
+    box.appendChild(add);
+    var save = hwsMk('button', 'primary', 'Uložiť výber');
+    save.setAttribute('data-action', 'hws-sel-save');
+    save.setAttribute('data-hws-key', key);
+    save.setAttribute('data-hws-gt', gt);
+    save.setAttribute('data-hws-act', action);
+    box.appendChild(save);
+    var cancel = hwsMk('button', 'ghostbtn', 'Zrušiť');
+    cancel.setAttribute('data-action', 'hws-sel-cancel');
+    cancel.setAttribute('data-hws-key', key);
+    box.appendChild(cancel);
+    box.appendChild(hwsMk('div', 'hint',
+      'Hodnota mimo pásiem = ORANGE „doplň pásmo" — nikdy sa neberie najbližšie pásmo. Pásma sa nesmú prekrývať (aj dotyk je prekryv).'));
+    return box;
   }
 
   // --- delegacia ------------------------------------------------------------------
@@ -389,13 +658,31 @@
           }
           return;
         }
-        if (a === 'hws-m-add' || a === 'hws-m-add-series'){
+        if (a === 'hws-m-add' || a === 'hws-m-add-series' || a === 'hws-m-add-bands'){
           if (HWS_EDIT){
-            HWS_EDIT.members.push(a === 'hws-m-add'
-              ? { is_series: false, per: 'unit', qty: 1, code: '', label: '' }
-              : { is_series: true, per: 'unit', qty: 1, label: '', series: [{ nl: '', code: '' }] });
+            if (a === 'hws-m-add'){
+              HWS_EDIT.members.push({ is_series: false, per: 'unit', qty: 1, code: '', label: '' });
+            } else if (a === 'hws-m-add-series'){
+              HWS_EDIT.members.push({ is_series: true, per: 'unit', qty: 1, label: '',
+                                      series: [{ nl: '', code: '' }] });
+            } else {
+              HWS_EDIT.members.push({ is_bands: true, per: 'unit', qty: 1, label: '',
+                                      param: hwsDefaultParam(HWS_EDIT.generic_type),
+                                      bands: [{ min: '', max: '', code: '' }] });
+            }
             hwsRenderSets();
           }
+          return;
+        }
+        // pásma člena setu
+        if (a === 'hws-b-add'){
+          var mb = hwsMember(parseInt(t.getAttribute('data-hws-m'), 10));
+          if (mb){ (mb.bands = mb.bands || []).push({ min: '', max: '', code: '' }); hwsRenderSets(); }
+          return;
+        }
+        if (a === 'hws-b-del'){
+          var mb2 = hwsMember(parseInt(t.getAttribute('data-hws-m'), 10));
+          if (mb2 && mb2.bands){ mb2.bands.splice(parseInt(t.getAttribute('data-hws-b'), 10), 1); hwsRenderSets(); }
           return;
         }
         if (a === 'hws-m-del'){
@@ -417,6 +704,48 @@
           hwsSend('hws_reset_project', { model_guid: (HWS_DATA && HWS_DATA.model_guid) || '' });
           return;
         }
+        // H1b (FIX 10): doplnenie chýbajúcich globálnych predvolieb do projektu
+        if (a === 'hws-merge-seed'){
+          hwsSend('hws_merge_seed', { model_guid: (HWS_DATA && HWS_DATA.model_guid) || '' });
+          return;
+        }
+        // --- výber setu podľa parametra (selector mapovania) ---
+        if (a === 'hws-sel-edit'){
+          var ekey = t.getAttribute('data-hws-key');
+          HWS_SEL[ekey] = hwsSelectorFrom(hwsMappingValue(ekey)) ||
+                          { param: hwsDefaultParam(hwsGtOfKey(ekey)), rows: [{ min: '', max: '', set_id: '' }] };
+          hwsRenderProj();
+          return;
+        }
+        if (a === 'hws-sel-cancel'){
+          delete HWS_SEL[t.getAttribute('data-hws-key')];
+          hwsRenderProj();
+          return;
+        }
+        if (a === 'hws-sb-add'){
+          var sk = t.getAttribute('data-hws-key');
+          if (HWS_SEL[sk]){ (HWS_SEL[sk].rows = HWS_SEL[sk].rows || []).push({ min: '', max: '', set_id: '' }); hwsRenderProj(); }
+          return;
+        }
+        if (a === 'hws-sb-del'){
+          var sk2 = t.getAttribute('data-hws-sel');
+          if (HWS_SEL[sk2] && HWS_SEL[sk2].rows){
+            HWS_SEL[sk2].rows.splice(parseInt(t.getAttribute('data-hws-b'), 10), 1);
+            hwsRenderProj();
+          }
+          return;
+        }
+        if (a === 'hws-sel-save'){
+          var savKey = t.getAttribute('data-hws-key');
+          var st = HWS_SEL[savKey];
+          if (st){
+            // Editor sa NEZATVÁRA tu — až po úspešnom zápise (HWSETS.init).
+            // Tvar aj prekryvy pásiem posudzuje VÝHRADNE server.
+            hwsSendMap(t.getAttribute('data-hws-act'), t.getAttribute('data-hws-gt'),
+                       hwsBuildSelector(st));
+          }
+          return;
+        }
       }
       // klik mimo "Naozaj zmazat?" odzbroji potvrdenie
       if (HWS_DEL_ARM && !(t && t.getAttribute('data-action') === 'hws-del')){
@@ -424,49 +753,107 @@
         if (HWS_TAB === 'sets') hwsRenderSets();
       }
     });
-    // Editor setu: inputs pisu do HWS_EDIT (input event — bez prerenderu);
-    // selecty mapovania posielaju zmenu hned (change).
-    document.addEventListener('input', function(ev){
-      var t = ev.target;
-      if (!t || !t.getAttribute || !HWS_EDIT) return;
-      var field = t.getAttribute('data-hws-field');
-      if (!field) return;
-      var mi = t.getAttribute('data-hws-m');
-      if (mi == null){
-        if (field === 'name') HWS_EDIT.name = t.value;
-        if (field === 'generic_type') HWS_EDIT.generic_type = t.value;
-        return;
-      }
-      var m = hwsMember(parseInt(mi, 10));
-      if (!m) return;
-      var si = t.getAttribute('data-hws-s');
-      if (si != null && m.series){
-        var srow = m.series[parseInt(si, 10)];
-        if (srow) srow[field] = t.value;
-        return;
-      }
-      m[field] = (field === 'qty') ? t.value : t.value;
-    });
+    // Editor setu aj editor pásiem: inputs píšu do stavu (input event — bez
+    // prerenderu); selecty menia hodnotu až na change, preto ten istý zápis
+    // beží v oboch listeneroch (JEDNA cesta = hwsWriteField).
+    document.addEventListener('input', function(ev){ hwsWriteField(ev.target); });
     document.addEventListener('change', function(ev){
       var t = ev.target;
       if (!t || !t.getAttribute) return;
       var act = t.getAttribute('data-action-change');
-      if (act === 'hws-map-proj'){
-        hwsSend('hws_map_project', { generic_type: t.getAttribute('data-hws-gt'),
-                                     set_id: t.value,
-                                     model_guid: (HWS_DATA && HWS_DATA.model_guid) || '' });
-      } else if (act === 'hws-map-global'){
-        hwsSend('hws_map_global', { generic_type: t.getAttribute('data-hws-gt'),
-                                    set_id: t.value });
-      } else if (HWS_EDIT && t.getAttribute('data-hws-field') === 'generic_type' && t.tagName === 'SELECT'){
-        HWS_EDIT.generic_type = t.value;
+      if (act === 'hws-map-proj' || act === 'hws-map-global'){
+        var gt = t.getAttribute('data-hws-gt');
+        var key = t.getAttribute('data-hws-key') || hwsSelKey(act, gt);
+        if (t.value === HWS_PARAM_OPT){
+          // „podľa parametra…" NIE JE hodnota — otvorí editor pásiem;
+          // na server ide až Uložiť výber.
+          HWS_SEL[key] = HWS_SEL[key] || hwsSelectorFrom(hwsMappingValue(key)) ||
+                         { param: hwsDefaultParam(gt), rows: [{ min: '', max: '', set_id: '' }] };
+          hwsRenderProj();
+          return;
+        }
+        delete HWS_SEL[key]; // pevný set / bez setu = editor pásiem zavretý
+        hwsSendMap(act, gt, t.value, key);
+        return;
       }
+      hwsWriteField(t);
     });
+    // Zbalená sekcia globálnych predvolieb si pamätá stav — prerender pri
+    // úprave pásiem ju inak zakaždým zavrie.
+    document.addEventListener('toggle', function(ev){
+      var t = ev.target;
+      if (t && t.getAttribute && t.getAttribute('data-hws-det') === 'global') HWS_GLOBAL_OPEN = !!t.open;
+    }, true);
+  }
+
+  // Zápis hodnoty poľa do rozpracovaného stavu (editor setu / editor pásiem).
+  function hwsWriteField(t){
+    if (!t || !t.getAttribute) return false;
+    var field = t.getAttribute('data-hws-field');
+    if (!field) return false;
+    var selKey = t.getAttribute('data-hws-sel');
+    if (selKey != null){
+      var st = HWS_SEL[selKey];
+      if (!st) return false;
+      var sbi = t.getAttribute('data-hws-b');
+      if (sbi == null){ st[field] = t.value; return true; } // param výberu
+      var srow2 = (st.rows || [])[parseInt(sbi, 10)];
+      if (srow2) srow2[field] = t.value;
+      return true;
+    }
+    if (!HWS_EDIT) return false;
+    var mi = t.getAttribute('data-hws-m');
+    if (mi == null){
+      if (field === 'name') HWS_EDIT.name = t.value;
+      if (field === 'generic_type') HWS_EDIT.generic_type = t.value;
+      return true;
+    }
+    var m = hwsMember(parseInt(mi, 10));
+    if (!m) return false;
+    var si = t.getAttribute('data-hws-s');
+    if (si != null && m.series){
+      var srow = m.series[parseInt(si, 10)];
+      if (srow) srow[field] = t.value;
+      return true;
+    }
+    var bi = t.getAttribute('data-hws-b');
+    if (bi != null && m.bands){
+      var brow = m.bands[parseInt(bi, 10)];
+      if (brow) brow[field] = t.value;
+      return true;
+    }
+    m[field] = t.value;
+    return true;
+  }
+
+  // Odoslanie mapovania. value = set_id String ('' = bez setu) alebo selector
+  // Hash; ui_key je len echo pre zatvorenie editora po ÚSPECHU.
+  function hwsSendMap(action, gt, value, key){
+    if (action === 'hws-map-global'){
+      hwsSend('hws_map_global', { generic_type: gt, value: value, ui_key: key || '' });
+    } else {
+      hwsSend('hws_map_project', { generic_type: gt, value: value, ui_key: key || '',
+                                   model_guid: (HWS_DATA && HWS_DATA.model_guid) || '' });
+    }
+  }
+  function hwsGtOfKey(key){ return String(key || '').split('|')[1] || ''; }
+  // Aktuálna hodnota mapovania pre kľúč editora ("<action>|<generic_type>").
+  function hwsMappingValue(key){
+    var parts = String(key || '').split('|');
+    var proj = (HWS_DATA && HWS_DATA.project) || {};
+    var global = (HWS_DATA && HWS_DATA.global_mapping) || {};
+    var mapping = (parts[0] === 'hws-map-global') ? global
+                : (proj.status === 'ok' ? (proj.mapping || {}) : global);
+    return mapping[parts[1]];
   }
 
   // Node testy — len ciste funkcie bez DOM.
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { hwsSlug: hwsSlug, hwsSetsForType: hwsSetsForType,
       hwsMemberSummary: hwsMemberSummary, hwsBuildSetPayload: hwsBuildSetPayload,
-      hwsEditStateFrom: hwsEditStateFrom };
+      hwsEditStateFrom: hwsEditStateFrom,
+      // H1b: pásma člena setu + výber setu podľa parametra
+      hwsNum: hwsNum, hwsParamLabel: hwsParamLabel, hwsBandsSummary: hwsBandsSummary,
+      hwsBuildBands: hwsBuildBands, hwsSelectorFrom: hwsSelectorFrom,
+      hwsBuildSelector: hwsBuildSelector };
   }

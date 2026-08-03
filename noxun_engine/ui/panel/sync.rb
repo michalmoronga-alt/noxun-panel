@@ -76,6 +76,29 @@ module Noxun
           js("NX.setMaterials(#{materials_payload.to_json})")
         end
 
+        # D-75 (H1b): zivy refresh PONUKY setov kovania po zmene v okne Katalog
+        # kovania. Obnovi LEN moznosti selectov (NX.setHardwareSets) — ziadny
+        # push_selected: ten resetuje rozpracovany formular a navyse dedup-uje
+        # kopie, cize by zmena v satelitnom okne siahla na MODEL.
+        # Cita sa iba (find_cabinet + config) — bez operacie, bez zapisu.
+        def push_hardware_sets
+          return unless dialog_alive?
+
+          model = Sketchup.active_model
+          cab = model ? find_cabinet(model) : nil
+          data =
+            if cab.nil?
+              { 'cabinet_id' => nil, 'options' => [] }
+            else
+              cfg = Store.config(cab) || {}
+              { 'cabinet_id' => Store.get(cab, 'cabinet_id'),
+                'options' => hardware_set_options(cfg, cfg['hardware']) }
+            end
+          js("NX.setHardwareSets(#{data.to_json})")
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.push_hardware_sets')
+        end
+
         def set_status(msg, error = false)
           js("NX.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})")
         end

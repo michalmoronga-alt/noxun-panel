@@ -109,6 +109,17 @@ module Noxun
       UNMAPPED_REASONS = %w[no_set set_missing nl_missing
                             param_band_missing selector_unresolved].freeze
 
+      # H1b: parametre, podla ktorych sa daju stavat pasma clena (param_bands)
+      # a selector mapovania. JEDINA autorita ponuky pre UI — okno Katalog
+      # kovania ich dostane v payloade, JS ziadny vlastny zoznam nema.
+      #   label = 1. pad (popisok selectu), by = „podla ..." (2. pad).
+      # (Validation::HW_PARAM_LABELS drzi 4. pad pre vety semafora — iny pad,
+      # ina vrstva; sem patri to, co vidi pouzivatel v EDITORE.)
+      PARAM_OPTIONS = [
+        { 'key' => 'height',       'label' => 'výška sokla', 'by' => 'podľa výšky sokla' },
+        { 'key' => 'front_height', 'label' => 'výška čela',  'by' => 'podľa výšky čela' }
+      ].freeze
+
       # Seed sety = zavery debaty 2.8.2026 (09_POJMY "Kovanie — sety");
       # kody = SYSTEM/zdroje/SEED_KATALOG_2026-07.md §2. Atira rad nesie LEN
       # dolozene kody (420/470) — ostatne NL = ORANGE, kody doplni Michal/D2.
@@ -199,6 +210,18 @@ module Noxun
       }.freeze
 
       module_function
+
+      # --- slovnik parametrov (H1b) --------------------------------------------
+
+      def param_label(key)
+        opt = PARAM_OPTIONS.find { |o| o['key'] == key.to_s }
+        opt ? opt['label'] : (key.to_s.empty? ? 'parameter' : "parameter „#{key}“")
+      end
+
+      def param_by(key)
+        opt = PARAM_OPTIONS.find { |o| o['key'] == key.to_s }
+        opt ? opt['by'] : "podľa: #{param_label(key)}"
+      end
 
       # --- globalna kniznica (%APPDATA%) --------------------------------------
 
@@ -414,13 +437,62 @@ module Noxun
                   '', price_cell(summary['total_eur_vat'])]
           unless unmapped.empty?
             out << []
-            out << ['NEMAPOVANÉ (bez kódov — nenacenené)', '', '', '', '', '', '']
+            # H1b: sekcia nesie AJ dovod (stlpec „kód" je tu popis problemu —
+            # hlavicka sekcie ho pomenuva). Bez neho sa z CSV nedalo zistit,
+            # ktore pasmo/rad chyba a co doplnit.
+            out << ['NEMAPOVANÉ (bez kódov — nenacenené)', 'dôvod', 'kde', 'počet', '', '', '']
             unmapped.each do |u|
-              out << [u['generic_type'].to_s, '', "#{u['cabinet_id']} #{u['owner_part_key']}".strip,
+              out << [u['generic_type'].to_s, unmapped_reason_sk(u),
+                      "#{u['cabinet_id']} #{u['owner_part_key']}".strip,
                       u['quantity'].to_i, '', '', '']
             end
           end
         end
+      end
+
+      # H1b (audit FIX 9 UI): KRATKY slovensky dovod nemapovanej polozky —
+      # jedna autorita pre CSV aj pre tab Kovanie (payload nesie 'reason_sk',
+      # JS uz ziadny vlastny preklad nema). Dlhsie vety s navodom „co doplnit"
+      # ostavaju vrstvou semafora (Validation.check_hardware_expansion).
+      def unmapped_reason_sk(u)
+        return '' unless u.is_a?(Hash)
+        sid = u['set_id'].to_s
+        case u['reason'].to_s
+        when 'nl_missing'
+          nl = u['nominal_length']
+          nl.is_a?(Numeric) ? "set „#{sid}“ nemá kód pre dĺžku NL #{nl.round}" \
+                            : "dĺžka výsuvu nie je známa — set „#{sid}“ nemá čo vybrať"
+        when 'param_band_missing'
+          name = param_label(u['param'])
+          v = u['value']
+          who = member_txt(u)
+          v.is_a?(Numeric) ? "#{name} #{fmt_mm(v)} mm je mimo pásiem setu „#{sid}“#{who}" \
+                           : "#{name} nie je známa — set „#{sid}“ nemá čo vybrať#{who}"
+        when 'selector_unresolved'
+          name = param_label(u['param'])
+          v = u['value']
+          v.is_a?(Numeric) ? "#{name} #{fmt_mm(v)} mm nespadá do žiadneho pásma predvoľby" \
+                           : "#{name} nie je známa — predvoľba ju potrebuje"
+        when 'set_missing'
+          "set „#{sid}“ v projekte chýba"
+        else
+          'typ nemá priradený set'
+        end
+      end
+
+      # „ (člen 2)" / „ (noha)" — identita clena setu (H1a nesie index aj label).
+      def member_txt(u)
+        label = u['member_label'].to_s.strip
+        return " (#{label})" unless label.empty?
+        return '' unless u.key?('member_index')
+        " (člen #{u['member_index'].to_i + 1})"
+      end
+
+      # 150.0 -> „150", 17.5 -> „17,5" (SK desatinna ciarka).
+      def fmt_mm(v)
+        f = v.to_f
+        return format('%d', f.round) if (f - f.round).abs < 1e-9
+        format('%.1f', f).tr('.', ',')
       end
 
       # SK desatinna ciarka (Excel); nil = prazdna bunka (nezadana != 0).

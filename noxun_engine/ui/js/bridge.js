@@ -123,6 +123,16 @@
       if (typeof partCard !== 'undefined' && partCard) renderPartCard(partCard);
       if (typeof boardCard !== 'undefined' && boardCard) renderBoardCard(boardCard);
     },
+    // D-75 (H1b): živý zoznam setov kovania po zmene v okne Katalóg kovania.
+    // Obnoví LEN možnosti selectov setu (skrinka aj dielce) — riadky, rozpísané
+    // počty ani výber sa nedotknú (vzor setMaterials, NIE push_selected).
+    setHardwareSets: function(data){
+      var d = data || {};
+      // Identity guard: kým bežal callback, mohol sa zmeniť výber — vtedy panel
+      // dostane vlastný loadSelected a tento (starý) payload sa zahodí.
+      if ((d.cabinet_id || '') !== (selectedCabId || '')) return;
+      if (typeof refreshHardwareSets === 'function') refreshHardwareSets(d.options || []);
+    },
     loadSelected: function(c){
       // V0.4.7c: odchod z kontextu dosky — zrus cakajuce board edity + kartu
       cancelBoardEdits();
