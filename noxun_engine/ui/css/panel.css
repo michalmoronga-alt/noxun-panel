@@ -193,10 +193,11 @@
   .hwrow.hwoff .hwname { color: var(--nx-ink-faint); }
   .hwrow .hwqty.manual, .hwrow.manual .hwqty { border-color: var(--nx-warn); background: var(--nx-warn-bg); }
   /* D-81: vyber setu PRIAMO v riadku kovania dielca — kompaktne, aby riadok
-     ostal jeden (vertikalny priestor). Vlastny vyber (nie dedeny) = jantar. */
-  .hwrow .hwsetsel { flex: 0 1 104px; min-width: 60px; max-width: 150px; padding: 2px 4px;
-                     border: 1px solid var(--nx-border-strong); border-radius: 4px;
-                     font-size: 11px; color: var(--nx-ink-muted); }
+     ostal jeden (vertikalny priestor). Riadok setu CELEJ skrinky (.hwsetrow)
+     ma vlastne pravidlo nizsie a tento kompakt sa ho NEDOTYKA. */
+  .hwrow:not(.hwsetrow) .hwsetsel { flex: 0 1 104px; min-width: 60px; max-width: 150px;
+                     padding: 2px 4px; border: 1px solid var(--nx-border-strong);
+                     border-radius: 4px; font-size: 11px; color: var(--nx-ink-muted); }
   /* PRAVIDLA KOVANIA (dialog) */
   .rrule { border: 1px solid var(--nx-border); border-radius: 6px; padding: 8px 10px; margin: 8px 0; background: var(--nx-surface); }
   .rrule .rhead { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
