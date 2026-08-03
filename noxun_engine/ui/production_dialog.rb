@@ -165,6 +165,37 @@ module Noxun
           set_status("Chyba výberu: #{e.message}", true)
         end
 
+        # CSV nakupneho zoznamu — server-side z CERSTVEHO modelu (audit N11;
+        # flush/generation vzor VEPO: data z DOM su po editoch zastarale).
+        # Vstup po relay z panela (edity flushnute) alebo priamo bez panela.
+        def do_hw_csv(payload)
+          data = JSON.parse(payload.to_s)
+          if data['flush_blocked']
+            return set_status('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
+          end
+          model = Sketchup.active_model
+          exp = hardware_expansion(model, fresh_collect(model))
+          return set_status('Nákupný zoznam sa nedá zostaviť (pozri Ruby konzolu).', true) if exp.nil?
+          if Array(exp['rows']).empty? && Array(exp['unmapped']).empty?
+            return set_status('Model nemá žiadne kovanie — niet čo exportovať.', true)
+          end
+          project = data['project'].to_s.strip
+          project = default_project_name(model) if project.empty?
+          fname = "kovanie_#{VepoExport.project_slug(project)}.csv"
+          target = UI.savepanel('Uložiť nákupný zoznam kovania', vepo_settings['last_dir'], fname)
+          return set_status('Export zrušený.') if target.nil? || target.to_s.empty?
+          csv = HardwareSets.purchase_csv(exp, project: project,
+                                          generated_at: Time.now.strftime('%Y-%m-%d %H:%M'))
+          File.open(target, 'wb') { |f| f.write("\xEF\xBB\xBF" + csv) } # BOM pre Excel
+          save_vepo_settings('last_dir' => File.dirname(target))
+          n = Array(exp['rows']).length
+          un = Array(exp['unmapped']).length
+          set_status("Nákupný zoznam: #{n} položiek#{un.positive? ? " + #{un} nemapovaných (v CSV aj KONTROLE)" : ''} → #{target}", un.positive?)
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.handle_hw_csv')
+          set_status("Export zlyhal: #{e.message}", true)
+        end
+
         private
 
         def ensure_dialog
@@ -405,37 +436,6 @@ module Noxun
           else
             do_hw_csv(payload)
           end
-        end
-
-        # CSV nakupneho zoznamu — server-side z CERSTVEHO modelu (audit N11;
-        # flush/generation vzor VEPO: data z DOM su po editoch zastarale).
-        # Vstup po relay z panela (edity flushnute) alebo priamo bez panela.
-        def do_hw_csv(payload)
-          data = JSON.parse(payload.to_s)
-          if data['flush_blocked']
-            return set_status('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
-          end
-          model = Sketchup.active_model
-          exp = hardware_expansion(model, fresh_collect(model))
-          return set_status('Nákupný zoznam sa nedá zostaviť (pozri Ruby konzolu).', true) if exp.nil?
-          if Array(exp['rows']).empty? && Array(exp['unmapped']).empty?
-            return set_status('Model nemá žiadne kovanie — niet čo exportovať.', true)
-          end
-          project = data['project'].to_s.strip
-          project = default_project_name(model) if project.empty?
-          fname = "kovanie_#{VepoExport.project_slug(project)}.csv"
-          target = UI.savepanel('Uložiť nákupný zoznam kovania', vepo_settings['last_dir'], fname)
-          return set_status('Export zrušený.') if target.nil? || target.to_s.empty?
-          csv = HardwareSets.purchase_csv(exp, project: project,
-                                          generated_at: Time.now.strftime('%Y-%m-%d %H:%M'))
-          File.open(target, 'wb') { |f| f.write("\xEF\xBB\xBF" + csv) } # BOM pre Excel
-          save_vepo_settings('last_dir' => File.dirname(target))
-          n = Array(exp['rows']).length
-          un = Array(exp['unmapped']).length
-          set_status("Nákupný zoznam: #{n} položiek#{un.positive? ? " + #{un} nemapovaných (v CSV aj KONTROLE)" : ''} → #{target}", un.positive?)
-        rescue StandardError => e
-          Engine.log_error(e, 'ProductionDialog.handle_hw_csv')
-          set_status("Export zlyhal: #{e.message}", true)
         end
 
         # Katalog dosiek ako mapa pre Validation.run ({ material_id => sheet }).
