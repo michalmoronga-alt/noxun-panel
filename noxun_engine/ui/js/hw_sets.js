@@ -739,10 +739,10 @@
           var savKey = t.getAttribute('data-hws-key');
           var st = HWS_SEL[savKey];
           if (st){
-            // Editor sa NEZATVÁRA tu — až po úspešnom zápise (HWSETS.init).
-            // Tvar aj prekryvy pásiem posudzuje VÝHRADNE server.
+            // Editor sa NEZATVÁRA tu — až echom HWSETS.mapSaved po ÚSPEŠNOM
+            // zápise. Tvar aj prekryvy pásiem posudzuje VÝHRADNE server.
             hwsSendMap(t.getAttribute('data-hws-act'), t.getAttribute('data-hws-gt'),
-                       hwsBuildSelector(st));
+                       hwsBuildSelector(st), savKey);
           }
           return;
         }
