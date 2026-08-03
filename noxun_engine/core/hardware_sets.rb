@@ -83,12 +83,21 @@ require 'digest'
 module Noxun
   module Engine
     module HardwareSets
-      STD          = 1
+      STD = 1 # baseline: len legacy tvary (code / code_by_nl, mapovanie = set_id)
+
+      # GH #131 P2: marker novych tvarov, LAZY podla OBSAHU (vzor materials
+      # SCHEMA_CURRENT). Starsi plugin (0.5.39) by zo setu s param_bands ticho
+      # zahodil LEN ten clen a set by nechal — jeho project_state_status
+      # porovnava iba POCET setov, takze by vratil :ok a nakupil NEUPLNY set.
+      # Snapshot, ktory nesie pasma clena alebo selector v mapovani, preto
+      # dostane std 2 — starsia verzia ho odmietne ako :invalid (ORANGE,
+      # NIKDY ticho iny nakup). Snapshoty bez novych tvarov ostavaju std 1,
+      # takze starsie verzie ich citaju dalej bez zmeny.
+      STD_PARAM_FORMS = 2
+      STD_SUPPORTED   = [STD, STD_PARAM_FORMS].freeze
+
       # v2 (H1a): +set „Nohy podla vysky sokla" (param_bands) a migracia
-      # globalneho defaultu leg z 'nohy-klzak-17' na neho. STD sa NEBUMPA —
-      # tvar suboru/snapshotu ostava rovnaky, pribudli len nove tvary clena a
-      # hodnoty mapovania (starsi plugin ich precita ako :invalid = ORANGE,
-      # NIKDY ticho nemapuje inak).
+      # globalneho defaultu leg z 'nohy-klzak-17' na neho.
       SEED_VERSION = 2
       FILE         = 'hardware_sets.json'
       MODEL_KEY    = 'hardware_sets' # kluc snapshotu v NOXUN dict na modeli
@@ -236,15 +245,22 @@ module Noxun
       end
 
       # Prepis defaultu LEN pri nedotknutom seed stave (vzor F8/LEGACY_SEED_SHAPES):
-      # mapovanie musi byt presne stara hodnota A stary set musi byt v kniznici
-      # v nezmenenom seed tvare. Cielovy set musi po merge existovat.
+      #   1) mapovanie je presne stara hodnota,
+      #   2) STARY set je v kniznici v nezmenenom seed tvare,
+      #   3) CIELOVY set je presne nas seed (GH #131 P2 — ked si ID medzitym
+      #      obsadil vlastny set pouzivatela, migracia sa NEVYKONA; inak by sa
+      #      nohy premapovali na cudziu, hoci aj inotypovu definiciu).
       def migrate_mapping(sets, mapping)
         by_id = {}
         sets.each { |s| by_id[s['set_id']] = s }
+        seed_by_id = {}
+        normalize_sets(SEED_SETS).each { |s| seed_by_id[s['set_id']] = s }
         out = mapping.dup
         MAPPING_MIGRATIONS.each do |gt, (from_id, to_id)|
           next unless out[gt] == from_id
-          next unless by_id[to_id]
+          target = by_id[to_id]
+          seed = seed_by_id[to_id]
+          next unless target && seed && target == seed && target['generic_type'] == gt
           old = by_id[from_id]
           next unless old && legacy_seed_shape?(old)
           out[gt] = to_id
@@ -428,7 +444,10 @@ module Noxun
         # ktora by nieco zahodila (cudzi std, poskodeny set, mapping na
         # chybajuci set ci neznamy generic_type novsej verzie), NESMIE vratit
         # :ok — nasledny zapis (set_project_mapping!) by stratu zvecnil.
-        return [:invalid, nil] if doc.key?('std') && doc['std'].to_i != STD
+        # GH #131 P2: std je LAZY marker tvarov — 1 = len legacy, 2 = snapshot
+        # nesie pasma/selector. Neznamy (novsi) std = :invalid, NIKDY ciastocne
+        # citanie.
+        return [:invalid, nil] if doc.key?('std') && !STD_SUPPORTED.include?(doc['std'].to_i)
         sets_map = doc['sets'].is_a?(Hash) ? doc['sets'] : nil
         mapping  = doc['mapping'].is_a?(Hash) ? doc['mapping'] : nil
         return [:invalid, nil] if sets_map.nil? || mapping.nil?
@@ -507,12 +526,24 @@ module Noxun
           Engine.log("hardware sets: snapshot odmietnuty — chyba definicia setu #{missing.first}") if defined?(Engine)
           return false
         end
-        doc = { 'std' => STD, 'mapping' => mapping, 'sets' => by_id }
+        doc = { 'std' => snapshot_std(mapping, norm_sets), 'mapping' => mapping, 'sets' => by_id }
         model.set_attribute(Store::DICT, MODEL_KEY, doc.to_json)
         true
       rescue StandardError => e
         Engine.log_error(e, 'HardwareSets.write_project_state') if defined?(Engine)
         false
+      end
+
+      # GH #131 P2: marker tvarov podla OBSAHU snapshotu. std 2 dostane len
+      # snapshot, ktory bez novych tvarov necita spravne — ostatne ostavaju
+      # std 1 (spatna citatelnost starsimi verziami sa zbytocne neblokuje).
+      def snapshot_std(mapping, sets)
+        new_forms =
+          Array(sets).any? do |s|
+            Array(s['members']).any? { |m| m.is_a?(Hash) && m['param_bands'].is_a?(Hash) }
+          end ||
+          (mapping.is_a?(Hash) && mapping.each_value.any? { |v| v.is_a?(Hash) })
+        new_forms ? STD_PARAM_FORMS : STD
       end
 
       # Zmeni projektove mapovanie JEDNEHO generickeho typu. set_def = plna

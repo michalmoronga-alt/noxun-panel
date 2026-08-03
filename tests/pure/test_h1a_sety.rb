@@ -38,6 +38,11 @@ module NxH1a
       'members' => [{ 'code' => code, 'per' => 'unit', 'qty' => 1 }] }
   end
 
+  # PRESNA seed definicia (migracia cielovy set porovnava bajt na bajt).
+  def seed_set(sid)
+    HWS.normalize_sets(HWS::SEED_SETS).find { |s| s['set_id'] == sid }
+  end
+
   # Stav so setmi 'a'/'b' (slide) a seed nohami.
   def state(mapping = {})
     sets = HWS.normalize_sets(HWS::SEED_SETS +
@@ -392,6 +397,53 @@ ensure
   NxH1a.wipe_library!
 end
 
+NxTest.test('H1a snapshot GH#131 P2: std marker podla OBSAHU — nove tvary starsia verzia odmietne') do
+  hws = NxH1a::HWS
+  dict = Noxun::Engine::Store::DICT
+  std_of = lambda do |model|
+    JSON.parse(model.get_attribute(dict, hws::MODEL_KEY).to_s)['std']
+  end
+  seed = hws.normalize_sets(hws::SEED_SETS)
+  klzak = seed.find { |s| s['set_id'] == 'nohy-klzak-17' }
+  nohy = seed.find { |s| s['set_id'] == 'nohy-podla-sokla' }
+  # legacy obsah -> std 1 (starsie verzie ho citaju dalej bez zmeny)
+  m1 = NxH1a::Model.new
+  hws.write_project_state(m1, 'mapping' => { 'leg' => 'nohy-klzak-17' },
+                              'sets' => { 'nohy-klzak-17' => klzak })
+  NxTest.assert_equal(hws::STD, std_of.call(m1), 'len legacy tvary = std 1')
+  # clen s pasmami -> std 2
+  m2 = NxH1a::Model.new
+  hws.write_project_state(m2, 'mapping' => { 'leg' => 'nohy-podla-sokla' },
+                              'sets' => { 'nohy-podla-sokla' => nohy })
+  NxTest.assert_equal(hws::STD_PARAM_FORMS, std_of.call(m2), 'param_bands = std 2')
+  # MIESANY set (legacy clen + pasma) — presne pripad z GH #131 P2
+  miesany = hws.normalize_sets([
+    { 'set_id' => 'miesany', 'name' => 'Miešaný', 'generic_type' => 'leg',
+      'members' => [{ 'code' => 'A', 'per' => 'unit', 'qty' => 1 },
+                    { 'per' => 'unit', 'qty' => 1,
+                      'param_bands' => { 'param' => 'height',
+                                         'bands' => [{ 'min' => 1.0, 'max' => 2.0, 'code' => 'B' }] } }] }
+  ]).first
+  m3 = NxH1a::Model.new
+  hws.write_project_state(m3, 'mapping' => { 'leg' => 'miesany' }, 'sets' => { 'miesany' => miesany })
+  NxTest.assert_equal(hws::STD_PARAM_FORMS, std_of.call(m3),
+                      'miesany set MUSI byt std 2 — starsia verzia by ticho nakupila neuplny set')
+  # selector v mapovani -> std 2 aj bez pasiem v sete
+  a = hws.normalize_sets([NxH1a.set_def('bocnica-h70', 'slide', 'S70')]).first
+  m4 = NxH1a::Model.new
+  hws.write_project_state(m4,
+                          'mapping' => { 'slide' => NxH1a.selector('front_height',
+                                                                   [{ 'min' => 0.0, 'max' => 120.0,
+                                                                      'set_id' => 'bocnica-h70' }]) },
+                          'sets' => { 'bocnica-h70' => a })
+  NxTest.assert_equal(hws::STD_PARAM_FORMS, std_of.call(m4), 'selector = std 2')
+  # citanie: oba markery su platne, novsi nie
+  [m1, m2, m3, m4].each { |m| NxTest.assert_equal(:ok, hws.project_state_status(m)[0]) }
+  cudzi = { 'std' => 99, 'mapping' => {}, 'sets' => {} }
+  NxTest.assert_equal(:invalid, hws.project_state_status(NxH1a::Model.new(cudzi.to_json))[0],
+                      'novsi std = :invalid (ORANGE), NIKDY ciastocne citanie')
+end
+
 NxTest.test('H1a snapshot: referenced_set_ids berie priame aj selector referencie') do
   hws = NxH1a::HWS
   sel = NxH1a.selector('front_height',
@@ -464,8 +516,8 @@ end
 
 NxTest.test('H1a migracia: cisty seed v1 prepne leg na nohy-podla-sokla') do
   hws = NxH1a::HWS
-  sets = hws.normalize_sets([hws::LEGACY_SEED_SHAPES['nohy-klzak-17'][0],
-                             NxH1a.set_def('nohy-podla-sokla', 'leg', 'X')])
+  sets = hws.normalize_sets([hws::LEGACY_SEED_SHAPES['nohy-klzak-17'][0]]) +
+         [NxH1a.seed_set('nohy-podla-sokla')]
   _, map, changed = hws.merge_seed(sets, { 'leg' => 'nohy-klzak-17' }, 1)
   NxTest.assert_equal(true, changed)
   NxTest.assert_equal('nohy-podla-sokla', map['leg'], 'default sa migroval')
@@ -474,23 +526,48 @@ end
 NxTest.test('H1a migracia: uzivatelska volba (ine mapovanie / upraveny set) sa NEDOTKNE') do
   hws = NxH1a::HWS
   sets = hws.normalize_sets([hws::LEGACY_SEED_SHAPES['nohy-klzak-17'][0],
-                             NxH1a.set_def('nohy-podla-sokla', 'leg', 'X'),
-                             NxH1a.set_def('nohy-axilo-150', 'leg', '367823')])
+                             NxH1a.set_def('nohy-axilo-150', 'leg', '367823')]) +
+         [NxH1a.seed_set('nohy-podla-sokla')]
   _, map, = hws.merge_seed(sets, { 'leg' => 'nohy-axilo-150' }, 1)
   NxTest.assert_equal('nohy-axilo-150', map['leg'], 'ine mapovanie = ruky prec')
   upraveny = hws.normalize_sets([{ 'set_id' => 'nohy-klzak-17', 'name' => 'Klzák s rektifikáciou 17 mm',
                                    'generic_type' => 'leg',
-                                   'members' => [{ 'code' => 'MOJ-KOD', 'per' => 'unit', 'qty' => 1 }] },
-                                 NxH1a.set_def('nohy-podla-sokla', 'leg', 'X')])
+                                   'members' => [{ 'code' => 'MOJ-KOD', 'per' => 'unit', 'qty' => 1 }] }]) +
+             [NxH1a.seed_set('nohy-podla-sokla')]
   _, map2, = hws.merge_seed(upraveny, { 'leg' => 'nohy-klzak-17' }, 1)
   NxTest.assert_equal('nohy-klzak-17', map2['leg'],
                       'upraveny set = mapovanie sa neprepisuje (vzor F8)')
 end
 
+NxTest.test('H1a migracia GH#131 P2: obsadene ID cieloveho setu migraciu ZASTAVI') do
+  hws = NxH1a::HWS
+  legacy = hws::LEGACY_SEED_SHAPES['nohy-klzak-17'][0]
+  # (a) ID si obsadil vlastny set INEHO typu — nohy by expandovali na zavesy
+  kolizia = hws.normalize_sets([legacy,
+                                { 'set_id' => 'nohy-podla-sokla', 'name' => 'Môj záves',
+                                  'generic_type' => 'hinge',
+                                  'members' => [{ 'code' => 'ZAVES', 'qty' => 1 }] }])
+  _, map, = hws.merge_seed(kolizia, { 'leg' => 'nohy-klzak-17' }, 1)
+  NxTest.assert_equal('nohy-klzak-17', map['leg'], 'kolizia ID ineho typu = ziadna migracia')
+  # (b) ID je spravneho typu, ale definiciu si pouzivatel upravil
+  upraveny_ciel = hws.normalize_sets(
+    [legacy,
+     { 'set_id' => 'nohy-podla-sokla', 'name' => 'Nohy podľa výšky sokla',
+       'generic_type' => 'leg',
+       'members' => [{ 'per' => 'unit', 'qty' => 1,
+                       'param_bands' => { 'param' => 'height',
+                                          'bands' => [{ 'min' => 1.0, 'max' => 2.0,
+                                                        'code' => 'MOJ' }] } }] }]
+  )
+  _, map2, = hws.merge_seed(upraveny_ciel, { 'leg' => 'nohy-klzak-17' }, 1)
+  NxTest.assert_equal('nohy-klzak-17', map2['leg'],
+                      'upraveny cielovy set = migracia sa nevykona (nie je to nas seed)')
+end
+
 NxTest.test('H1a migracia: idempotencia — aktualna seed_version uz nic nemeni') do
   hws = NxH1a::HWS
-  sets = hws.normalize_sets([hws::LEGACY_SEED_SHAPES['nohy-klzak-17'][0],
-                             NxH1a.set_def('nohy-podla-sokla', 'leg', 'X')])
+  sets = hws.normalize_sets([hws::LEGACY_SEED_SHAPES['nohy-klzak-17'][0]]) +
+         [NxH1a.seed_set('nohy-podla-sokla')]
   merged, map, changed = hws.merge_seed(sets, { 'leg' => 'nohy-klzak-17' }, hws::SEED_VERSION)
   NxTest.assert_equal(false, changed)
   NxTest.assert_equal('nohy-klzak-17', map['leg'],
