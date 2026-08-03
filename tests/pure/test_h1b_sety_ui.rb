@@ -39,6 +39,10 @@ NxTest.test('H1b formát čísla: 150 / 17,5 — rovnaký v semafore, CSV aj v U
   NxTest.assert_equal('150', hws.fmt_mm(150.0))
   NxTest.assert_equal('17,5', hws.fmt_mm(17.5))
   NxTest.assert_equal('0', hws.fmt_mm(0))
+  # GH #132 P2: text NIKDY nezaokruhluje — 419,6 nie je 420 a 120,25 nie je
+  # 120,3 (inak hlaska posiela doplnit pasmo/kod, ktory uz existuje).
+  NxTest.assert_equal('419,6', hws.fmt_mm(419.6))
+  NxTest.assert_equal('120,25', hws.fmt_mm(120.25))
   # Validation pouziva TU ISTU funkciu (jeden tvar cisla vsade)
   u = NxH1b.unmapped('param_band_missing', 'param' => 'height', 'value' => 17.5,
                      'member_index' => 0)
@@ -75,6 +79,15 @@ NxTest.test('H1b dôvody: každý reason má krátky SK text s parametrom aj čl
 
   nl = hws.unmapped_reason_sk(NxH1b.unmapped('nl_missing', 'nominal_length' => 450.0))
   NxTest.assert(nl.include?('NL 450'))
+  # GH #132 P2: frakcna NL je VEDOME nemapovana (rad ma presne celociselne
+  # kluce) — text ju nesmie zaokruhlit na existujuci kluc radu.
+  frak = hws.unmapped_reason_sk(NxH1b.unmapped('nl_missing', 'nominal_length' => 419.6))
+  NxTest.assert(frak.include?('NL 419,6'), 'frakcna NL sa nezaokruhli na 420')
+  items = []
+  Noxun::Engine::Validation.check_hardware_expansion(
+    { 'unmapped' => [NxH1b.unmapped('nl_missing', 'nominal_length' => 419.6)] }, items
+  )
+  NxTest.assert(items[0]['message_sk'].include?('NL 419,6'), 'semafor rovnako')
   NxTest.assert(hws.unmapped_reason_sk(NxH1b.unmapped('set_missing')).include?('moj-set'))
   NxTest.assert(hws.unmapped_reason_sk(NxH1b.unmapped('no_set')).include?('nemá priradený set'))
   # neznamy (novsi) dovod nesmie skoncit prazdnym textom

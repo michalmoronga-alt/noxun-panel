@@ -459,8 +459,11 @@ module Noxun
         sid = u['set_id'].to_s
         case u['reason'].to_s
         when 'nl_missing'
+          # GH #132 P2: NL sa NEZAOKRUHLUJE — frakcna dlzka (419,6) je vedome
+          # NEMAPOVANA (rad ma presne celociselne kluce); „NL 420" by poslalo
+          # doplnit kod, ktory uz existuje, a skryla by sa skutocna pricina.
           nl = u['nominal_length']
-          nl.is_a?(Numeric) ? "set „#{sid}“ nemá kód pre dĺžku NL #{nl.round}" \
+          nl.is_a?(Numeric) ? "set „#{sid}“ nemá kód pre dĺžku NL #{fmt_mm(nl)}" \
                             : "dĺžka výsuvu nie je známa — set „#{sid}“ nemá čo vybrať"
         when 'param_band_missing'
           name = param_label(u['param'])
@@ -489,10 +492,13 @@ module Noxun
       end
 
       # 150.0 -> „150", 17.5 -> „17,5" (SK desatinna ciarka).
+      # GH #132 P2: hodnota sa NEZAOKRUHLUJE — text ma ukazat presne to, co
+      # polozka nesie (419,6 nie je 420; 120,25 nie je 120,3), inak by hlaska
+      # posielala doplnit pasmo/kod, ktory uz existuje.
       def fmt_mm(v)
         f = v.to_f
         return format('%d', f.round) if (f - f.round).abs < 1e-9
-        format('%.1f', f).tr('.', ',')
+        f.to_s.tr('.', ',')
       end
 
       # SK desatinna ciarka (Excel); nil = prazdna bunka (nezadana != 0).

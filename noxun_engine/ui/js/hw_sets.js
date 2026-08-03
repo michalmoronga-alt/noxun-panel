@@ -47,6 +47,9 @@
   function hwsTrim(v){ return String(v == null ? '' : v).trim(); }
   function hwsBlank(v){ return hwsTrim(v) === ''; }
   // Cislo pre ZOBRAZENIE: 17 -> "17", 17.5 -> "17,5" (zrkadlo Ruby fmt_mm).
+  // GH #132 P2: hodnota sa NEZAOKRUHLUJE — cez tuto funkciu ide aj hranica
+  // pasma do EDITORA, takze zo 120,25 by sa otvorenim a ulozenim editora
+  // ticho stalo 120,3 (a hranica by vyberala iny set/kod).
   function hwsNum(v){
     var s = hwsTrim(v);
     if (s === '') return ''; // prázdne pole ostáva prázdne (Number('') je 0!)
@@ -54,7 +57,7 @@
     if (!isFinite(n)) return s;
     return (Math.abs(n - Math.round(n)) < 1e-9)
       ? String(Math.round(n))
-      : String(Math.round(n * 10) / 10).replace('.', ',');
+      : String(n).replace('.', ',');
   }
   // Cislo pre SERVER: SK ciarka -> bodka (Ruby Float("17,5") by spadlo).
   function hwsNumIn(v){ return hwsTrim(v).replace(',', '.'); }
@@ -150,6 +153,14 @@
       })
     };
   }
+  // Kluce rozpracovanych PROJEKTOVYCH pasiem (kluc = "<action>|<generic_type>").
+  // Globalne drafty su viazane na kniznicu, nie na model — tie sa nezahadzuju.
+  function hwsProjDraftKeys(keys){
+    return (keys || []).filter(function(k){ return String(k).indexOf('hws-map-proj|') === 0; });
+  }
+  function hwsDropProjDrafts(){
+    hwsProjDraftKeys(Object.keys(HWS_SEL)).forEach(function(k){ delete HWS_SEL[k]; });
+  }
   // Selector mapovania (server tvar) -> stav editora pasiem; nie-selector = null.
   function hwsSelectorFrom(value){
     if (!value || typeof value !== 'object' || !value.bands) return null;
@@ -169,9 +180,15 @@
   // (Node testy subor require-uju bez DOM).
   var HWSETS = {
     init: function(data){
+      var prev = HWS_DATA;
       HWS_DATA = data || null;
-      // Rozpracovany editor NEZAHADZUJEME pri echu (vzor dirty buniek okna
-      // Materialy) — render ho necha tak; zoznam a predvolby sa obnovia.
+      // GH #132 P1: PREPNUTIE MODELU zahodi rozpracovane PROJEKTOVE pasma —
+      // patrili inej zakazke a Ulozit by ich zapisalo do noveho projektu
+      // (model_guid guard by presiel, GUID sa berie z CERSTVEHO payloadu).
+      // Globalne (kniznicne) drafty na modeli nezavisia — tie ostavaju.
+      if (prev && HWS_DATA && prev.model_guid !== HWS_DATA.model_guid) hwsDropProjDrafts();
+      // Rozpracovany editor SETU NEZAHADZUJEME pri echu (vzor dirty buniek
+      // okna Materialy) — render ho necha tak; zoznam a predvolby sa obnovia.
       hwsRenderAll();
     },
     // GH #127 P2: editor sa zatvara az pri USPESNOM ulozeni (server volanie)
@@ -855,5 +872,5 @@
       // H1b: pásma člena setu + výber setu podľa parametra
       hwsNum: hwsNum, hwsParamLabel: hwsParamLabel, hwsBandsSummary: hwsBandsSummary,
       hwsBuildBands: hwsBuildBands, hwsSelectorFrom: hwsSelectorFrom,
-      hwsBuildSelector: hwsBuildSelector };
+      hwsBuildSelector: hwsBuildSelector, hwsProjDraftKeys: hwsProjDraftKeys };
   }

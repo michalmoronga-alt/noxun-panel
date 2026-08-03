@@ -7,7 +7,7 @@ const assert = require('node:assert');
 const path = require('node:path');
 const { hwsSlug, hwsSetsForType, hwsMemberSummary, hwsBuildSetPayload,
         hwsEditStateFrom, hwsNum, hwsParamLabel, hwsBandsSummary, hwsBuildBands,
-        hwsSelectorFrom, hwsBuildSelector } =
+        hwsSelectorFrom, hwsBuildSelector, hwsProjDraftKeys } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'hw_sets.js'));
 
 // Slovnik parametrov posiela server (HardwareSets::PARAM_OPTIONS).
@@ -92,6 +92,10 @@ eq(hwsNum(17), '17', 'cele cislo bez desatin');
 eq(hwsNum(17.0), '17', 'Float bez zvysku = cele');
 eq(hwsNum(17.5), '17,5', 'SK desatinna ciarka pre zobrazenie');
 eq(hwsNum(''), '', 'prazdna hodnota ostava prazdna');
+// GH #132 P2: hranica pasma ide cez tuto funkciu DO EDITORA — zaokruhlenie by
+// otvorenim a ulozenim ticho posunulo hranicu (120,25 -> 120,3).
+eq(hwsNum(120.25), '120,25', 'presnost sa NEstraca');
+eq(hwsNum('0,5'), '0,5', 'vstup s ciarkou sa neznormalizuje na 0');
 
 // --- hwsParamLabel ------------------------------------------------------------
 eq(hwsParamLabel('height', PARAMS), 'podľa výšky sokla', '2. pad zo servera');
@@ -155,5 +159,16 @@ eq(hwsBandsSummary([{ min: 0, max: 120, set_id: 'a' }], 'set_id', { a: 'Atira H7
    '0–120 → Atira H70', 'suhrn vyberu pouzije NAZOV setu');
 eq(hwsBandsSummary([{ min: 0, max: 120, set_id: 'zmazany' }], 'set_id', {}),
    '0–120 → zmazany', 'set mimo ponuky sa ukaze aspon identitou');
+// hranica s dvoma desatinami prezije round-trip editorom bez posunu
+const presne = hwsSelectorFrom({ param: 'front_height',
+                                 bands: [{ min: 120.25, max: 400.0, set_id: 'a' }] });
+eq(presne.rows[0].min, '120,25', 'hranica v editore drzi presnost');
+eq(hwsBuildSelector(presne).bands[0].min, '120.25', 'a vracia sa serveru nezmenena');
+
+// --- GH #132 P1: rozpracovane PROJEKTOVE pasma su viazane na model ----------
+eq(hwsProjDraftKeys(['hws-map-proj|slide', 'hws-map-global|leg', 'hws-map-proj|leg']),
+   ['hws-map-proj|slide', 'hws-map-proj|leg'],
+   'prepnutie modelu zahodi len projektove drafty, globalne (kniznicne) ostanu');
+eq(hwsProjDraftKeys([]), [], 'ziadne drafty');
 
 console.log(`OK — test_hw_sets.js: ${n} testov preslo`);

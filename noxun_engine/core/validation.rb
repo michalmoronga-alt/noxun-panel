@@ -308,8 +308,10 @@ module Noxun
           msg =
             case u['reason'].to_s
             when 'nl_missing'
+              # GH #132 P2: bez zaokruhlenia — frakcna NL (419,6) je vedome
+              # nemapovana; „NL 420" by ukazovalo na kod, ktory uz existuje.
               nl = u['nominal_length']
-              nl_txt = nl.is_a?(Numeric) ? " NL #{nl.round}" : ''
+              nl_txt = nl.is_a?(Numeric) ? " NL #{HardwareSets.fmt_mm(nl)}" : ''
               "#{label} (#{where}): set „#{sid}“ nemá kód pre dĺžku#{nl_txt} — doplň rad setu."
             when 'param_band_missing'
               "#{label} (#{where}): set „#{sid}“ nemá pásmo pre #{param_txt(u)}" \
