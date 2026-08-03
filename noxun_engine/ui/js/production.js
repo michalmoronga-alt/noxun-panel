@@ -246,9 +246,21 @@
         h += '<div class="hwsec hwsec-warn"><span>Bez kódov (' + un.length + ') — nenacenené, detail v tabe Kontrola</span></div>'
            + '<table class="bomtab"><tbody>';
         un.forEach(function(u){
-          var reason = u.reason === 'nl_missing'
-            ? ('set nemá kód pre dĺžku' + (u.nominal_length != null ? ' NL ' + Math.round(u.nominal_length) : ''))
-            : (u.reason === 'set_missing' ? ('set „' + u.set_id + '“ v projekte chýba') : 'typ nemá priradený set');
+          // H1a: dovody su serverovy enum (HardwareSets::UNMAPPED_REASONS);
+          // plne texty su v KONTROLE, tu je len kratky suhrn.
+          var val = (u.value != null ? ' ' + Math.round(u.value * 10) / 10 + ' mm' : '');
+          var reason;
+          if (u.reason === 'nl_missing'){
+            reason = 'set nemá kód pre dĺžku' + (u.nominal_length != null ? ' NL ' + Math.round(u.nominal_length) : '');
+          } else if (u.reason === 'param_band_missing'){
+            reason = 'set nemá pásmo pre ' + (u.param || 'parameter') + val;
+          } else if (u.reason === 'selector_unresolved'){
+            reason = 'výber setu nemá pásmo pre ' + (u.param || 'parameter') + val;
+          } else if (u.reason === 'set_missing'){
+            reason = 'set „' + u.set_id + '“ v projekte chýba';
+          } else {
+            reason = 'typ nemá priradený set';
+          }
           h += '<tr class="hwmiss"><td>' + esc(u.generic_type) + '</td>'
              + '<td>' + esc(u.cabinet_id + (u.owner_part_key ? ' · ' + u.owner_part_key : '')) + '</td>'
              + '<td>' + num(u.quantity) + '</td><td>' + esc(reason) + '</td></tr>';

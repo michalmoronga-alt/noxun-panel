@@ -66,6 +66,12 @@ module Noxun
         'wall_hanger' => 'Zavesenie na stenu'
       }.freeze
 
+      # H1a: slovenske nazvy parametrov pasiem (presne texty doladi H1b).
+      HW_PARAM_LABELS = {
+        'height' => 'výšku sokla', 'front_height' => 'výšku čela',
+        'nominal_length' => 'dĺžku', 'width' => 'šírku', 'depth' => 'hĺbku'
+      }.freeze
+
       module_function
 
       # collected: vystup Bom.collect —
@@ -293,12 +299,21 @@ module Noxun
           label = HW_LABELS[gt] || (gt.empty? ? 'kovanie' : gt)
           where = oid.empty? ? '—' : oid
           where += " · #{opk}" unless opk.empty?
+          # H1a (audit FIX 9): pri pasmach nesie riadok AJ clena setu — dva
+          # chybajuce pasma v jednom sete su DVA problemy (a dva klik-selecty).
+          member = u['member_label'].to_s
+          member = "člen #{u['member_index'].to_i + 1}" if member.empty? && u.key?('member_index')
           msg =
             case u['reason'].to_s
             when 'nl_missing'
               nl = u['nominal_length']
               nl_txt = nl.is_a?(Numeric) ? " NL #{nl.round}" : ''
               "#{label} (#{where}): set „#{sid}“ nemá kód pre dĺžku#{nl_txt} — doplň rad setu."
+            when 'param_band_missing'
+              "#{label} (#{where}): set „#{sid}“ nemá pásmo pre #{param_txt(u)}" \
+                "#{member.empty? ? '' : " (#{member})"} — doplň pásmo setu."
+            when 'selector_unresolved'
+              "#{label} (#{where}): výber setu podľa #{param_txt(u)} nemá pásmo — doplň pásmo predvoľby."
             when 'set_missing'
               "#{label} (#{where}): projekt odkazuje na set „#{sid}“, ktorý v projekte nie je — vyber set nanovo."
             else
@@ -309,7 +324,7 @@ module Noxun
             'owner_id' => oid, 'part_key' => (opk.empty? ? nil : opk), 'hw_key' => nil,
             'message_sk' => msg,
             'stable_key' => [CAT_HW_UNMAPPED, oid, opk, gt, u['rule_id'].to_s, sid,
-                             u['reason'].to_s].join('|')
+                             u['reason'].to_s, u['member_index'].to_s].join('|')
           }
         end
         Array(exp['rows']).each do |row|
@@ -329,6 +344,15 @@ module Noxun
             }
           end
         end
+      end
+
+      # „výšku sokla 150 mm" / „výšku čela (nezadaná)" — parameter + hodnota
+      # v jednom citatelnom kuse (H1a FIX 9).
+      def param_txt(u)
+        param = u['param'].to_s
+        name = HW_PARAM_LABELS[param] || (param.empty? ? 'parameter' : "parameter „#{param}“")
+        v = u['value']
+        v.is_a?(Numeric) ? "#{name} #{v.round(1)} mm" : "#{name} (nezadaná)"
       end
 
       # ORANGE: build warning stavby (kategoria "stavba"). KONTROLA je JEDINY

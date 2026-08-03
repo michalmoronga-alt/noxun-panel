@@ -81,12 +81,11 @@ module Noxun
           sid = present_str(data['set_id'])
           set_def = nil
           if sid
-            set_def = HardwareSets.load['sets'].find { |s| s['set_id'] == sid && s['generic_type'] == gt }
-            if set_def.nil?
-              state = HardwareSets.project_state(model)
-              cand = state && state['sets'][sid]
-              set_def = cand if cand && cand['generic_type'] == gt
-            end
+            # H1a (audit BLOCKER 4): definiciu vybera resolver — pre set_id,
+            # ktore projekt uz pouziva, vyhrava SNAPSHOT (podla neho sa
+            # nakupuje), global je len fallback pre nereferencovane.
+            cand = HardwareSets.resolve_set_def(model, sid)
+            set_def = cand if cand && cand['generic_type'] == gt
             return set_status('Set sa nenašiel — otvor Katalóg kovania a skús znova.', true) if set_def.nil?
           end
 
