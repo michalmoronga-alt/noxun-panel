@@ -120,7 +120,9 @@ module Noxun
           return set_status('Najprv označ NOXUN korpus — šablóna sa ukladá z neho.', true) if cab.nil?
 
           # H2 (D-76): model = zdroj ZMRAZENYCH definicii setov kovania.
-          config = Panel.template_config_from(Store.config(cab) || {}, model: model)
+          cab_cfg = Store.config(cab) || {}
+          config = Panel.template_config_from(cab_cfg, model: model)
+          hw_note = Panel.template_save_hardware_note(cab_cfg, config, model) # GH #133 P2
           res = UI.inputbox(['Nazov sablony:'], [Panel.suggest_template_name(cab, {})], 'Ulozit sablonu')
           return if res == false # zrusene
 
@@ -132,7 +134,7 @@ module Noxun
             return set_status('Zrušené — šablóna nezmenená.')
           end
           TemplateStore.upsert(name, config)
-          after_change("Šablóna \"#{name}\" uložená.")
+          after_change("Šablóna \"#{name}\" uložená.#{hw_note}")
         end
 
         def handle_delete(payload)
@@ -163,6 +165,15 @@ module Noxun
           if tpl_type != cab_type
             push_state # obnov disabled stav podla aktualneho vyberu
             return set_status("Šablóna je pre iný typ (#{tpl_type == 'upper' ? 'horná' : 'dolná'}) než označená skrinka — nepoužitá.", true)
+          end
+
+          # GH #133 P2: kovanie sablony sa cita BEZSTRATOVO alebo vobec. Sablona
+          # z novsej verzie (neznamy typ kovania) ci rucne upravena by ocesanou
+          # mapou ticho ZMAZALA platny vyber setov cielovej skrinky.
+          hw_status, hw_lost = HardwareSets.read_template_mapping((tpl['config'] || {})['hardware_sets'])
+          if hw_status == :lossy
+            return set_status("Šablóna nesie kovanie, ktoré sa nedá prečítať (#{Array(hw_lost).join(', ')}) — " \
+                              'je z novšej verzie Noxun alebo ručne upravená. Nepoužitá, nič sa nezmenilo.', true)
           end
 
           target = Panel.existing_params(cab)

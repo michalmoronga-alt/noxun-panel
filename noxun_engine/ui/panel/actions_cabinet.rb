@@ -266,23 +266,31 @@ module Noxun
         # definicie. JS je len prenasac (autorita je server): mapovanie sa TU
         # normalizuje s allow_owner: false — composite kluce „typ@dielec" patria
         # ku konkretnym dielcom zdrojovej skrinky a do noveho korpusu nepatria.
-        # Vrati { 'mapping', 'defs' } alebo nil (vklad bez kovania).
+        # GH #133 P2: kovanie sablony sa cita BEZSTRATOVO alebo vobec — sablona
+        # z novsej verzie (neznamy typ kovania) ci rucne upravena sa NEVKLADA
+        # ocesana, vklad sa odmietne.
+        # -> [:ok, { 'mapping', 'defs' } | nil] | [:lossy, [zahodene kluce]]
         def take_insert_hardware!(params)
           defs = params.delete('hardware_set_defs')
-          raw = params['hardware_sets']
-          map = HardwareSets.normalize_mapping(raw.is_a?(Hash) ? raw : {}, nil, allow_owner: false)
-          if map.empty?
+          status, res = HardwareSets.read_template_mapping(params['hardware_sets'])
+          return [:lossy, res] unless status == :ok
+
+          if res.empty?
             params.delete('hardware_sets')
-            return nil
+            return [:ok, nil]
           end
-          params['hardware_sets'] = map
-          { 'mapping' => map, 'defs' => defs }
+          params['hardware_sets'] = res
+          [:ok, { 'mapping' => res, 'defs' => defs }]
         end
 
         def handle_insert(payload)
           model = Sketchup.active_model
           params = parse(payload)
-          hw = take_insert_hardware!(params) # H2 (D-76)
+          hw_status, hw = take_insert_hardware!(params) # H2 (D-76)
+          if hw_status == :lossy
+            return set_status("Šablóna nesie kovanie, ktoré sa nedá prečítať (#{Array(hw).join(', ')}) — " \
+                              'je z novšej verzie Noxun alebo ručne upravená. Nič sa nevložilo.', true)
+          end
           tf = insert_thickness_preflight(params, model) # D-45
           return set_status("#{tf[:error]}#{insert_locks_hint}", true) if tf && tf[:error]
           pf = material_preflight(params, model)

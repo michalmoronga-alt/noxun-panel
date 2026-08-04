@@ -210,6 +210,7 @@ NxTest.test('H2 merge: sablona s kovanim je autorita generickych klucov, composi
                       'vyber na konkretnom dielci ciela sablona nikdy nemaze')
 end
 
+# (GH #133 P2: takuto sablonu odmietne uz handle_apply — merge je druha obrana.)
 NxTest.test('H2 merge: composite kluc v sablone (rucne upraveny JSON) sa do skrinky NEDOSTANE') do
   tpl = { 'hardware_sets' => { 'slide@front:F1/panel' => 'bocnica-h144',
                                'hinge' => 'zaves-klasik', 'vymysleny' => 'x' } }
@@ -413,16 +414,14 @@ end
 
 # --- 4) vklad zo sablony: sanitizacia payloadu (audit F3) --------------------
 
-NxTest.test('H2 vklad: mapovanie z JS sa normalizuje, composite kluce a definicie do configu nejdu') do
-  m = NxH2::Model.new
+NxTest.test('H2 vklad: mapovanie z JS sa normalizuje, definicie do configu skrinky nejdu') do
   defs = { 'zaves-klasik' => NxH2.set_def('zaves-klasik', 'hinge', '104717') }
   params = { 'type' => 'lower', 'width' => 600.0,
-             'hardware_sets' => { 'hinge' => ' zaves-klasik ', 'slide@front:F1/panel' => 'x',
-                                  'vymysleny' => 'y' },
+             'hardware_sets' => { 'hinge' => ' zaves-klasik ' },
              'hardware_set_defs' => defs }
-  hw = NxH2::PANEL.take_insert_hardware!(params)
-  NxTest.assert_equal({ 'hinge' => 'zaves-klasik' }, hw['mapping'],
-                      'composite kluc cudzej skrinky ani neznamy typ do noveho korpusu nepatria')
+  status, hw = NxH2::PANEL.take_insert_hardware!(params)
+  NxTest.assert_equal(:ok, status)
+  NxTest.assert_equal({ 'hinge' => 'zaves-klasik' }, hw['mapping'], 'hodnota otrimovana')
   NxTest.assert_equal(defs, hw['defs'], 'definicie idu na zmrazenie, nie do configu')
   NxTest.assert_equal({ 'hinge' => 'zaves-klasik' }, params['hardware_sets'],
                       'params nesu uz OCISTENE mapovanie')
@@ -432,18 +431,68 @@ NxTest.test('H2 vklad: mapovanie z JS sa normalizuje, composite kluce a definici
   NxTest.assert_equal({ 'hinge' => 'zaves-klasik' }, cfg[:hardware_sets], 'mapovanie doputuje do configu')
 end
 
+NxTest.test('H2 vklad GH#133 P2: neprecitatelne kovanie sablony vklad ODMIETNE (ziadna ocesana mapa)') do
+  status, lost = NxH2::PANEL.take_insert_hardware!(
+    'hardware_sets' => { 'hinge' => 'zaves-klasik', 'slide@front:F1/panel' => 'x' }
+  )
+  NxTest.assert_equal(:lossy, status, 'composite kluc = rucne upravena sablona')
+  NxTest.assert_equal(['slide@front:F1/panel'], lost, 'hlaska vymenuje, co sa necita')
+  NxTest.assert_equal(:lossy, NxH2::PANEL.take_insert_hardware!('hardware_sets' => { 'magnet_push' => 'x' })[0],
+                      'typ kovania z NOVSEJ verzie pluginu')
+  NxTest.assert_equal(:ok, NxH2::PANEL.take_insert_hardware!('hardware_sets' => { 'hinge' => 'zaves-klasik' })[0],
+                      'cista mapa prejde')
+end
+
 NxTest.test('H2 vklad: bez kovania sa kluce z params ODSTRANIA (ziadne prazdne mapovanie)') do
-  m = NxH2::Model.new
   params = { 'type' => 'lower', 'hardware_sets' => {}, 'hardware_set_defs' => {} }
-  NxTest.assert_equal(nil, NxH2::PANEL.take_insert_hardware!(params), 'nic na zmrazenie')
+  NxTest.assert_equal([:ok, nil], NxH2::PANEL.take_insert_hardware!(params), 'nic na zmrazenie')
   NxTest.assert_equal(false, params.key?('hardware_sets'))
   NxTest.assert_equal(false, params.key?('hardware_set_defs'))
   # payload uplne bez klucov (bezny vklad) nespadne
   plain = { 'type' => 'lower' }
-  NxTest.assert_equal(nil, NxH2::PANEL.take_insert_hardware!(plain))
+  NxTest.assert_equal([:ok, nil], NxH2::PANEL.take_insert_hardware!(plain))
   NxTest.assert_equal({ 'type' => 'lower' }, plain, 'bezny vklad sa nemeni')
   # samotne definicie bez mapovania nemaju co zmrazit
   only_defs = { 'hardware_set_defs' => { 'x' => NxH2.set_def('x', 'slide', 'S') } }
-  NxTest.assert_equal(nil, NxH2::PANEL.take_insert_hardware!(only_defs))
+  NxTest.assert_equal([:ok, nil], NxH2::PANEL.take_insert_hardware!(only_defs))
   NxTest.assert_equal(false, only_defs.key?('hardware_set_defs'))
+end
+
+# --- 5) GH #133 P2: bezstratove citanie sablony + poskodene sety projektu -----
+
+NxTest.test('H2 GH#133 P2: mapovanie sablony sa cita BEZSTRATOVO alebo vobec') do
+  hws = NxH2::HWS
+  NxTest.assert_equal([:ok, {}], hws.read_template_mapping(nil), 'legacy sablona bez kluca')
+  NxTest.assert_equal(:ok, hws.read_template_mapping('hinge' => 'zaves-klasik')[0])
+  NxTest.assert_equal([:ok, { 'leg' => 'nohy-podla-sokla' }],
+                      hws.read_template_mapping(' leg ' => ' nohy-podla-sokla '),
+                      'trim nie je strata')
+  NxTest.assert_equal(:lossy, hws.read_template_mapping('magnet_push' => 'x')[0],
+                      'typ kovania z novsej verzie pluginu')
+  NxTest.assert_equal(:lossy, hws.read_template_mapping('hinge' => 42)[0], 'neplatna hodnota')
+  NxTest.assert_equal(:lossy, hws.read_template_mapping('nezmysel')[0], 'cudzi tvar')
+  NxTest.assert_equal(:lossy, hws.read_template_mapping('slide@front:F1/panel' => 'x')[0],
+                      'composite kluc — rucne upravena sablona')
+end
+
+NxTest.test('H2 GH#133 P2: poskodene sety projektu = sablona sa ulozi BEZ kovania a hlasi to') do
+  NxH2.wipe_library!
+  m = NxH2::Model.new('{ nezmysel') # snapshot :invalid
+  cfg = { 'type' => 'lower', 'hardware_sets' => { 'hinge' => 'zaves-klasik' } }
+  tc = NxH2::PANEL.template_config_from(cfg, model: m)
+  NxTest.assert_equal(false, tc.key?('hardware_sets'),
+                      'NIKDY kody z globalu, ktore zdrojovy model nepouziva')
+  NxTest.assert_equal(false, tc.key?('hardware_set_defs'))
+  NxTest.assert(NxH2::PANEL.template_save_hardware_note(cfg, tc, m).include?('poškodené'),
+                'pouzivatel sa dozvie, ze sablona kovanie nenesie')
+  # zdravy projekt: kovanie sa ulozi a hlaska nie je
+  zdravy = NxH2.project_with({ 'zaves-klasik' => NxH2.norm('zaves-klasik', 'hinge', 'SNAP') })
+  ok_tc = NxH2::PANEL.template_config_from(cfg, model: zdravy)
+  NxTest.assert_equal('SNAP', ok_tc['hardware_set_defs']['zaves-klasik']['members'][0]['code'])
+  NxTest.assert_equal('', NxH2::PANEL.template_save_hardware_note(cfg, ok_tc, zdravy))
+  # skrinka bez kovania ziadnu hlasku nedostane
+  NxTest.assert_equal('', NxH2::PANEL.template_save_hardware_note({ 'type' => 'lower' },
+                                                                  { 'type' => 'lower' }, zdravy))
+ensure
+  NxH2.wipe_library!
 end

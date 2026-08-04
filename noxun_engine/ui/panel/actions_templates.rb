@@ -35,14 +35,16 @@ module Noxun
           return set_status('Prázdny názov — šablóna neuložená.', true) if name.empty?
 
           # H2 (D-76): model = zdroj ZMRAZENYCH definicii setov kovania.
-          config = template_config_from(Store.config(cab) || {}, model: model)
+          cab_cfg = Store.config(cab) || {}
+          config = template_config_from(cab_cfg, model: model)
+          hw_note = template_save_hardware_note(cab_cfg, config, model) # GH #133 P2
           unless TemplateStore.upsert(name, config)
             return set_status('Šablónu sa nepodarilo zapísať (disk/práva) — skús znova.', true)
           end
 
           push_templates                       # quick-pick v paneli
           TemplatesDialog.refresh_if_open      # Codex F3: zivy sync satelitu
-          set_status("Šablóna \"#{name}\" uložená do knižnice.")
+          set_status("Šablóna \"#{name}\" uložená do knižnice.#{hw_note}")
         end
 
       end

@@ -205,13 +205,33 @@ module Noxun
           map = HardwareSets.normalize_mapping(cfg['hardware_sets'], nil, allow_owner: false)
           return tc if map.empty?
 
-          tc['hardware_sets'] = map
+          # GH #133 P2: poskodeny snapshot projektu (:invalid) = definicie by sa
+          # dobrali z GLOBALU a sablona by niesla kody, ktore zdrojovy model
+          # nepouziva. Radsej sablona BEZ kovania (a hlaska pouzivatelovi).
           defs = HardwareSets.template_set_defs(model, map)
+          return tc if defs.nil?
+
+          tc['hardware_sets'] = map
           tc['hardware_set_defs'] = defs unless defs.empty?
           tc
         rescue StandardError => e
           Engine.log_error(e, 'Panel.add_template_hardware')
           tc
+        end
+
+        # GH #133 P2: hlaska, ked skrinka kovanie MA, ale do sablony sa neulozilo
+        # (poskodene sety projektu). Ticho by pouzivatel dostal „prazdnu" sablonu.
+        def template_save_hardware_note(cfg, tc, model)
+          return '' unless model && defined?(HardwareSets)
+          return '' if tc.is_a?(Hash) && tc.key?('hardware_sets')
+          return '' if HardwareSets.normalize_mapping(cfg['hardware_sets'], nil,
+                                                      allow_owner: false).empty?
+
+          ' Kovanie sa do šablóny NEULOŽILO — sety projektu sú poškodené ' \
+            '(obnov ich v Katalógu kovania, Predvoľby projektu).'
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.template_save_hardware_note')
+          ''
         end
 
         # H2 (D-76): SPOLOCNA zapisova cesta setov zo sablony — aplikacia

@@ -825,10 +825,15 @@ module Noxun
       # skrinka realne nakupuje (aj ked projekt ma namapovane iny set).
       # Set, ktory sa nedá rozlozit, sablona nenesie — pri aplikacii skonci
       # ORANGE (set_missing), NIKDY tichy iny hardver.
+      # GH #133 P2: pri POSKODENOM snapshote (:invalid) vrati nil — resolver by
+      # spadol na globalnu kniznicu a sablona by niesla kody, ktore zdrojovy
+      # model NEPOUZIVA (expanzia pri :invalid vedome nemapuje nic). Volajuci
+      # vtedy ulozi sablonu BEZ kovania a nahlasi to.
       def template_set_defs(model, mapping)
         map = mapping.is_a?(Hash) ? mapping : {}
         refs = referenced_set_ids(map)
         return {} if refs.empty?
+        return nil if project_state_status(model)[0] == :invalid
         as_override = { 'template' => map }
         out = {}
         refs.each do |sid|
@@ -836,6 +841,23 @@ module Noxun
           out[sid] = deep_copy(d) if d
         end
         out
+      end
+
+      # CITANIE mapovania zo SABLONY (GH #133 P2). Sablona je datovy subor MIMO
+      # modelu — moze byt rucne upravena alebo z novsej verzie pluginu. Ked
+      # normalizacia cokolvek ZAHODI (neznamy generic_type novsej verzie,
+      # composite kluc, neplatna hodnota), zvysok NESMIE platit za „vedomy vyber
+      # pouzivatela": ocesana (aj prazdna) mapa by pri aplikacii ticho ZMAZALA
+      # platny vyber setov cieloveho korpusu. Vzor guard_unknown_hardware!:
+      # radsej jasne odmietnut nez ticho stratit kovanie.
+      # -> [:ok, mapa] | [:lossy, [zahodene kluce]]
+      def read_template_mapping(raw)
+        return [:ok, {}] if raw.nil?
+        return [:lossy, ['hardware_sets']] unless raw.is_a?(Hash)
+
+        map = normalize_mapping(raw, nil, allow_owner: false)
+        lost = raw.keys.map(&:to_s).reject { |k| map.key?(k.strip) }
+        lost.empty? ? [:ok, map] : [:lossy, lost]
       end
 
       # set_id => generic_type podla KLUCA mapovania (composite kluc nesie typ
