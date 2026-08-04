@@ -153,7 +153,11 @@ Aktuálny set: `maximize` (fit), `alert`, `lock` / `lock-open`, `eye` / `eye-off
 `layers` (Materiály), `globe` (universal ABS), `info` (banner),
 `refresh-cw` (Aktualizovať z Demosu — detail dekoru),
 `cloud-download` (Pridať z Demosu; aj badge väzby na dlaždici — D-56),
-`external-link` (Otvoriť u dodávateľa — riadok variantu, D-60), `logo`.
+`external-link` (Otvoriť u dodávateľa — riadok variantu, D-60),
+`arrow-left-right` (Nahradiť UNI… — riadok KONTROLY v okne Výroba, D-83), `logo`.
+
+> Okno **Výroba** načítava `icons.js` od v0.5.44 (predtým sprite nemalo) — nové
+> ovládacie prvky v ňom používajú sprite, nie glyfy.
 
 ### D-47: hlavička panela (rad 2)
 Tri režimové taby (Korpus·Zóny·Čelá) sú **rovnako široké** (`flex: 1 1 0`)
