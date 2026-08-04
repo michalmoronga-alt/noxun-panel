@@ -43,3 +43,9 @@ jobs:
         run: node tests/js/test_demos_add.js
       - name: JS testy — okno Katalog kovania (V0.6 C-2)
         run: node tests/js/test_hw_catalog.js
+      - name: JS testy — nahradenie UNI materialov (M-B2)
+        run: node tests/js/test_replace_uni.js
+      - name: JS testy — sety kovania v okne Katalog (D1b + H1b pasma/vyber)
+        run: node tests/js/test_hw_sets.js
+      - name: JS testy — ponuka setov v paneli (H1b, D-81)
+        run: node tests/js/test_hw_panel_sets.js

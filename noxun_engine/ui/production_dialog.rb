@@ -421,6 +421,12 @@ module Noxun
             cabinet_overrides: collected[:cabinet_sets].is_a?(Hash) ? collected[:cabinet_sets] : {},
             catalog: HardwareCatalog.items
           )
+          # H1b (audit FIX 9 UI): dovod dostane SK text uz na SERVERI — tab
+          # Kovanie aj CSV citaju to iste 'reason_sk' (JS ziadny vlastny
+          # preklad enumu nema).
+          exp['unmapped'] = Array(exp['unmapped']).map do |u|
+            u.is_a?(Hash) ? u.merge('reason_sk' => HardwareSets.unmapped_reason_sk(u)) : u
+          end
           exp.merge('state_status' => status.to_s)
         rescue StandardError => e
           Engine.log_error(e, 'ProductionDialog.hardware_expansion')

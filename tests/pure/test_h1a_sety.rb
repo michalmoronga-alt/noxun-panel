@@ -672,11 +672,13 @@ NxTest.test('H1a semafor: nove dovody maju SK text, parameter aj identitu clena'
   NxTest.assert_equal(2, items.length)
   band = items.find { |i| i['stable_key'].include?('param_band_missing') }
   NxTest.assert(!band.nil?, 'pasmo clena setu ma vlastny dovod')
-  NxTest.assert(band['message_sk'].include?('výšku sokla 100.0 mm'), 'sprava nesie parameter aj hodnotu')
+  # H1b: cisla su vsade v tom istom tvare (150 / 17,5) — fmt_mm.
+  NxTest.assert(band['message_sk'].include?('výšku sokla 100 mm'), 'sprava nesie parameter aj hodnotu')
   NxTest.assert(band['stable_key'].end_with?('|0'), 'stable_key nesie index clena (F7)')
   selr = items.find { |i| i['stable_key'].include?('selector_unresolved') }
   NxTest.assert(!selr.nil?)
-  NxTest.assert(selr['message_sk'].include?('výšku čela 500.0 mm'))
+  # H1b: parameter je PODMET vety (1. pad) — „podľa + 4. pad" bola chyba
+  NxTest.assert(selr['message_sk'].include?('výška čela 500 mm nespadá'), 'selector: 1. pad')
   NxTest.assert_equal(res['counts']['orange'], res['items'].length, 'vsetko ORANGE, RED nic')
 end
 

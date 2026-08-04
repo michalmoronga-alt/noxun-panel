@@ -56,6 +56,11 @@ module Noxun
         # predvolby). set_id prazdne = spat na predvolbu projektu. Zapis
         # overridu + definicia setu do snapshotu (audit B2) + rebuild =
         # JEDNA operacia (rebuild_many yield).
+        # H1b (D-81): payload moze niest owner_part_key — potom je override LEN
+        # na tom dielci (kluc "generic_type@owner_part_key"). Tvar kluca aj
+        # kontrolu, ci dielec take kovanie vobec ma, robi VYHRADNE server
+        # (HardwareSets.apply_cabinet_override) — jedna zapisova cesta pre oba
+        # pripady, ziadne skladanie klucov v paneli.
         def handle_set_hardware_set(payload)
           model = Sketchup.active_model
           cab = find_cabinet(model)
@@ -79,6 +84,7 @@ module Noxun
           end
 
           sid = present_str(data['set_id'])
+          owner = present_str(data['owner_part_key'])
           set_def = nil
           if sid
             # H1a (audit BLOCKER 4): definiciu vybera resolver — pre set_id,
@@ -89,9 +95,12 @@ module Noxun
             return set_status('Set sa nenašiel — otvor Katalóg kovania a skús znova.', true) if set_def.nil?
           end
 
+          cfg = Store.config(cab) || {}
+          st, map, = HardwareSets.apply_cabinet_override(cfg, gt, owner, sid,
+                                                         known_sets: (set_def ? [set_def] : nil))
+          return set_status("Výber setu sa nedá uložiť — #{map}.", true) unless st == :ok
+
           params = existing_params(cab)
-          map = params['hardware_sets'].is_a?(Hash) ? params['hardware_sets'] : {}
-          sid ? map[gt] = sid : map.delete(gt)
           params['hardware_sets'] = map
           suspend_selection_sync do
             CabinetBuilder.rebuild_many(model, [[cab, params]], op_name: 'NOXUN: set kovania') do
@@ -99,9 +108,16 @@ module Noxun
             end
             reselect(model, cab)
           end
-          label = HardwareRules.label_for(gt)
-          status_with_warnings(cab, sid ? "#{label}: set „#{set_def['name']}“ pre túto skrinku." : "#{label}: platí predvoľba projektu.")
+          status_with_warnings(cab, hw_set_status_msg(gt, owner, sid, set_def))
           push_selected(model)
+        end
+
+        # Hlaska po zmene setu — rozlisi skrinku a konkretny dielec (D-81).
+        def hw_set_status_msg(gt, owner, sid, set_def)
+          who = "#{HardwareRules.label_for(gt)}#{owner ? " pre dielec #{owner}" : ''}"
+          return "#{who}: set „#{set_def['name']}“." if sid
+
+          owner ? "#{who}: platí výber skrinky/projektu." : "#{who}: platí predvoľba projektu."
         end
       end
     end

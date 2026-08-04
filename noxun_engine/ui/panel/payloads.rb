@@ -108,12 +108,58 @@ module Noxun
               'project_set_name' => proj_name,
               # H1b vykresli vyber podla parametra; H1a ho len verne prenasa.
               'project_selector' => (proj_val.is_a?(Hash) ? proj_val : nil),
+              # H1b: hotovy text prvej volby selectu — SERVER je autorita
+              # (JS ziadny vlastny preklad selectora nema).
+              'project_label' => project_set_label(proj_val, proj_name),
               'override_set_id' => (ov_val.is_a?(String) ? ov_val : nil),
               'override_selector' => (ov_val.is_a?(Hash) ? ov_val : nil),
+              'override_label' => (ov_val.is_a?(Hash) ? HardwareSets.param_by(ov_val['param']) : nil),
+              # H1b (D-81): vybery na urovni VLASTNIKA (kluc "gt@owner_part_key")
+              # — panel ich vykresli priamo v riadku kovania toho dielca.
+              'owner_overrides' => owner_set_overrides(overrides, gt),
+              'owner_default_label' => owner_default_label(ov_val, proj_val, opts, proj_name),
               'status' => status.to_s,
               'options' => opts.map { |s| { 'set_id' => s['set_id'], 'name' => s['name'] } }
             }
           end
+        end
+
+        # Prva volba selectu setu na SKRINKE = co plati z projektu.
+        def project_set_label(proj_val, proj_name)
+          return "podľa projektu — #{HardwareSets.param_by(proj_val['param'])}" if proj_val.is_a?(Hash)
+          return "podľa projektu — #{proj_name || proj_val}" if proj_val.is_a?(String)
+
+          'podľa projektu — bez setu'
+        end
+
+        # Co plati na dielci, ked na nom vlastny vyber NIE JE (tooltip riadku):
+        # vyber skrinky prebija projekt (poradie ako v HardwareSets.resolve_set_id).
+        def owner_default_label(ov_val, proj_val, opts, proj_name)
+          if ov_val.is_a?(Hash)
+            "podľa skrinky — #{HardwareSets.param_by(ov_val['param'])}"
+          elsif ov_val.is_a?(String)
+            name = (opts.find { |s| s['set_id'] == ov_val } || {})['name'] || ov_val
+            "podľa skrinky — #{name}"
+          else
+            project_set_label(proj_val, proj_name)
+          end
+        end
+
+        # { owner_part_key => { 'set_id' | 'selector' } } pre jeden typ kovania.
+        def owner_set_overrides(overrides, gt)
+          out = {}
+          overrides.each do |key, val|
+            parsed = BuildPlan.parse_hardware_set_key(key)
+            next unless parsed && parsed[0] == gt && parsed[1]
+
+            out[parsed[1]] =
+              if val.is_a?(Hash)
+                { 'selector' => true, 'label' => HardwareSets.param_by(val['param']) }
+              else
+                { 'set_id' => val.to_s }
+              end
+          end
+          out
         end
 
         # existujuce params korpusu (na zachovanie casti pri ciastocnej zmene)

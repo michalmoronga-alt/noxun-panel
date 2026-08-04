@@ -66,7 +66,9 @@ module Noxun
         'wall_hanger' => 'Zavesenie na stenu'
       }.freeze
 
-      # H1a: slovenske nazvy parametrov pasiem (presne texty doladi H1b).
+      # H1a: slovenske nazvy parametrov pasiem — 4. PAD pre vety typu „nemá
+      # pásmo pre výšku sokla". 1. pad (podmet vety, popisky editora) a tvar
+      # „podľa …" drzi HardwareSets::PARAM_OPTIONS — jeden slovnik, dva pady.
       HW_PARAM_LABELS = {
         'height' => 'výšku sokla', 'front_height' => 'výšku čela',
         'nominal_length' => 'dĺžku', 'width' => 'šírku', 'depth' => 'hĺbku'
@@ -306,14 +308,19 @@ module Noxun
           msg =
             case u['reason'].to_s
             when 'nl_missing'
+              # GH #132 P2: bez zaokruhlenia — frakcna NL (419,6) je vedome
+              # nemapovana; „NL 420" by ukazovalo na kod, ktory uz existuje.
               nl = u['nominal_length']
-              nl_txt = nl.is_a?(Numeric) ? " NL #{nl.round}" : ''
+              nl_txt = nl.is_a?(Numeric) ? " NL #{HardwareSets.fmt_mm(nl)}" : ''
               "#{label} (#{where}): set „#{sid}“ nemá kód pre dĺžku#{nl_txt} — doplň rad setu."
             when 'param_band_missing'
               "#{label} (#{where}): set „#{sid}“ nemá pásmo pre #{param_txt(u)}" \
                 "#{member.empty? ? '' : " (#{member})"} — doplň pásmo setu."
             when 'selector_unresolved'
-              "#{label} (#{where}): výber setu podľa #{param_txt(u)} nemá pásmo — doplň pásmo predvoľby."
+              # H1b: parameter je tu PODMET vety — 1. pad („výška čela 300 mm
+              # nespadá…"); „podľa + 4. pad" bola gramaticka chyba.
+              "#{label} (#{where}): #{param_txt_nom(u)} nespadá do žiadneho pásma " \
+                'predvoľby — doplň pásmo výberu setu.'
             when 'set_missing'
               "#{label} (#{where}): projekt odkazuje na set „#{sid}“, ktorý v projekte nie je — vyber set nanovo."
             else
@@ -347,12 +354,23 @@ module Noxun
       end
 
       # „výšku sokla 150 mm" / „výšku čela (nezadaná)" — parameter + hodnota
-      # v jednom citatelnom kuse (H1a FIX 9).
+      # v jednom citatelnom kuse (H1a FIX 9). 4. pad (predmet vety).
       def param_txt(u)
         param = u['param'].to_s
         name = HW_PARAM_LABELS[param] || (param.empty? ? 'parameter' : "parameter „#{param}“")
-        v = u['value']
-        v.is_a?(Numeric) ? "#{name} #{v.round(1)} mm" : "#{name} (nezadaná)"
+        param_value_txt(name, u['value'])
+      end
+
+      # 1. pad — parameter ako PODMET vety („výška čela 300 mm nespadá…").
+      # Nazov berie zo slovnika HardwareSets (jedina autorita parametrov pasiem).
+      def param_txt_nom(u)
+        param_value_txt(HardwareSets.param_label(u['param']), u['value'])
+      end
+
+      # Cislo formatuje HardwareSets.fmt_mm — TEN ISTY tvar ako v CSV a v tabe
+      # Kovanie (150 / 17,5), aby ta ista hodnota nikde nevyzerala inak.
+      def param_value_txt(name, v)
+        v.is_a?(Numeric) ? "#{name} #{HardwareSets.fmt_mm(v)} mm" : "#{name} (nezadaná)"
       end
 
       # ORANGE: build warning stavby (kategoria "stavba"). KONTROLA je JEDINY
