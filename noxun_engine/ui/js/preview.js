@@ -90,7 +90,16 @@
     S.push('<rect x="'+rx(0)+'" y="'+ry(H)+'" width="'+t+'" height="'+H+'" fill="'+partFill+'" stroke="'+partStroke+'"/>');       // bok L
     S.push('<rect x="'+rx(W-t)+'" y="'+ry(H)+'" width="'+t+'" height="'+H+'" fill="'+partFill+'" stroke="'+partStroke+'"/>');     // bok R
     S.push('<rect x="'+rx(0)+'" y="'+ry(fh+t)+'" width="'+W+'" height="'+t+'" fill="'+partFill+'" stroke="'+partStroke+'"/>');    // dno
-    if (!topNone) S.push('<rect x="'+rx(t)+'" y="'+ry(H)+'" width="'+(W-2*t)+'" height="'+t+'" fill="'+partFill+'" stroke="'+partStroke+'"/>'); // vrch
+    // D-80: vrch podla rezimu. Plny vrch = doska tesne pod hornou hranou;
+    // two_rails = pas vystuh na SKUTOCNOM mieste (odsadenie od vrchu + orientacia:
+    // flat je hruby t, upright az po celej vyske vystuhy); none = nic.
+    // Geometriu dava zdielana core.js funkcia — nahlad nesmie mat vlastny vzorec.
+    if (val('top_mode') === 'two_rails'){
+      var rg = nxRailGeom(currentCarcass({ height: H, thickness: t }));
+      S.push('<rect x="'+rx(t)+'" y="'+ry(rg.zTop)+'" width="'+(W-2*t)+'" height="'+(rg.zTop-rg.zBottom)+'" fill="'+partFill+'" stroke="'+partStroke+'"/>'); // vystuhy
+    } else if (!topNone){
+      S.push('<rect x="'+rx(t)+'" y="'+ry(H)+'" width="'+(W-2*t)+'" height="'+t+'" fill="'+partFill+'" stroke="'+partStroke+'"/>'); // vrch
+    }
     if (fh>0) S.push('<rect x="'+rx(0)+'" y="'+ry(fh)+'" width="'+W+'" height="'+fh+'" fill="#f4f5f7" stroke="#cfd8dc" stroke-dasharray="4 3"/>'); // podstavec
 
     if (previewMode==='zones'){

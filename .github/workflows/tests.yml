@@ -49,3 +49,5 @@ jobs:
         run: node tests/js/test_hw_sets.js
       - name: JS testy — ponuka setov v paneli (H1b, D-81)
         run: node tests/js/test_hw_panel_sets.js
+      - name: JS testy — svetla vyska a vystuhy (H3, D-80)
+        run: node tests/js/test_interior_height.js

@@ -394,6 +394,67 @@
   function getType(){ var r = document.querySelector('input[name=ctype]:checked'); return r ? r.value : 'lower'; }
   function setType(t){ var r = document.querySelector('input[name=ctype][value="' + t + '"]'); if (r) r.checked = true; }
 
+  // ===== D-80: VNUTRO A HORNE VYSTUHY (zrkadlo Ruby Construction) ==============
+  // JEDINA JS autorita svetlej vysky. Pouzivaju ju VSETCI traja: zone_tree.js
+  // (box zon), form.js ("Svetla vyska") aj preview.js (kreslenie vrchu) — ziadna
+  // dalsia kopia vzorca sa uz nesmie rozist s Ruby.
+  var NX_MIN_INTERIOR_H = 20.0; // Construction::MIN_INTERIOR_H (rezerva vnutra pod vystuhami)
+  var NX_RAIL_MIN       = 20.0; // najmensia hlbka (flat) / vyska (upright) vystuhy
+  var NX_BACK_TH_DFLT   = 3.0;  // Construction::BACK_THICKNESS_DEFAULT
+
+  function nxNum(v, dflt){ var x = parseFloat(v); return isNaN(x) ? (dflt || 0) : x; }
+
+  // Konstrukcna hlbka tela (D-37): overlay chrbat zabera zadnych bt z celkovej hlbky.
+  function nxCarcassDepth(c){
+    var bt = nxNum(c.back_thickness, NX_BACK_TH_DFLT);
+    if (!(bt > 0)) bt = NX_BACK_TH_DFLT;
+    var d = nxNum(c.depth);
+    return (c.back_mode === 'overlay') ? (d - bt) : d;
+  }
+
+  // Geometria vystuh: odsadenie od vrchu + kolko zaberu na vysku. Clampy su
+  // zhodne s Ruby Construction.rail_geometry (vratane rezervy MIN_INTERIOR_H).
+  function nxRailGeom(c){
+    var h = nxNum(c.height), t = nxNum(c.thickness), s = nxNum(c.floor_height);
+    var head = Math.max(h - (s + t) - NX_MIN_INTERIOR_H, 0);
+    var wantDepth = nxNum(c.rail_depth), wantOff = nxNum(c.rails_top_offset);
+    var upright = (c.rails_orientation === 'upright');
+    var limit = upright ? head : (nxCarcassDepth(c) / 2 - 10);
+    var dep = Math.min(wantDepth, limit);
+    if (dep < NX_RAIL_MIN) dep = NX_RAIL_MIN;
+    var occupy = upright ? dep : t;
+    var maxOff = Math.max(head - occupy, 0);
+    var off = Math.min(Math.max(wantOff, 0), maxOff);
+    return { offset:off, wantedOffset:wantOff, depth:dep, wantedDepth:wantDepth,
+             occupy:occupy, upright:upright, zTop:(h - off), zBottom:(h - off - occupy) };
+  }
+
+  // Svetle vnutro korpusu: { zLo, zHi, availH }. two_rails konci na SPODNEJ hrane
+  // vystuh (nie na h - t) — inak by zony/police siahali do priestoru varnej dosky.
+  function nxInteriorZ(c){
+    var h = nxNum(c.height), t = nxNum(c.thickness), s = nxNum(c.floor_height);
+    var zLo = s + t, zHi;
+    if (c.top_mode === 'none') zHi = h;
+    else if (c.top_mode === 'two_rails') zHi = nxRailGeom(c).zBottom;
+    else zHi = h - t;
+    return { zLo:zLo, zHi:zHi, availH:(zHi - zLo) };
+  }
+
+  // DOM most: precita konstrukcne polia formulara (s rovnakymi fallbackmi ako
+  // nahlad). `over` = bodove prepisanie hodnot volajucim (napr. uz precitana vyska).
+  function currentCarcass(over){
+    var c = {
+      height: numv('height') || 720, thickness: numv('thickness') || 18,
+      floor_height: (getType() === 'upper') ? 0 : (numv('floor_height') || 0),
+      depth: numv('depth') || 0,
+      back_mode: val('back_mode'), back_thickness: numv('back_thickness') || NX_BACK_TH_DFLT,
+      top_mode: val('top_mode'), rails_orientation: val('rails_orientation'),
+      rails_top_offset: numv('rails_top_offset') || 0, rail_depth: numv('rail_depth') || 100
+    };
+    if (over){ for (var k in over){ if (Object.prototype.hasOwnProperty.call(over, k)) c[k] = over[k]; } }
+    return c;
+  }
+
   // JEDINY zoznam konstrukcnych poli panela (predtym duplikovany na 6 miestach:
   // collectConstruction, setDefaults, onTemplateChange, NX.loadSelected + 2x Ruby whitelist).
   // Nove pole (napr. kovanie) = pridat TU + <input>/<select> v HTML + kluc v Ruby PARAM_KEYS.
@@ -434,6 +495,10 @@
       absMissingLabel: absMissingLabel, absUnitClass: absUnitClass,
       // D-45 (tests/js/test_thickness_labels.js) — ciste funkcie hrubkovych filtrov/labelov
       mmLabel: mmLabel, bodyThicknessNote: bodyThicknessNote, frontMatch: frontMatch,
-      rangeMatch: rangeMatch, thMatch: thMatch, TH_RANGE: TH_RANGE };
+      rangeMatch: rangeMatch, thMatch: thMatch, TH_RANGE: TH_RANGE,
+      // D-80 (tests/js/test_interior_height.js) — zrkadlo Construction: svetla
+      // vyska a geometria vystuh. currentCarcass sa NEexportuje (cita DOM).
+      nxInteriorZ: nxInteriorZ, nxRailGeom: nxRailGeom, nxCarcassDepth: nxCarcassDepth,
+      NX_MIN_INTERIOR_H: NX_MIN_INTERIOR_H };
   }
 

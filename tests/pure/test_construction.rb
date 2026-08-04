@@ -331,10 +331,12 @@ NxTest.test('construction: rail_parts upright geometria a clamp na vysku') do
   h.assert_vec([18.0, 489.0, 620.0], rb[:origin], 'RAIL-B upright origin (y = carcass d - t, D-37)')
   h.assert_prod(564.0, 100.0, 18.0, rf[:prod], 'RAIL-F upright')
 
-  # Clamp hlbky na vysku: h=200, s=100 -> rdp = min(100, 200-100-18-10=72) = 72.
+  # Clamp hlbky na vysku: h=200, s=100 -> rdp = min(100, 200-100-18-20=62) = 62.
+  # D-80: rezerva vnutra je MIN_INTERIOR_H (20), nie povodnych 10 — pri 10 by
+  # extremna vystuha nechala avail_h = 10 a validate! by rebuild TVRDO odmietol.
   low = h.cn.rail_parts(h.raw_cfg(rails_orientation: 'upright', height: 200.0))
-  h.assert_vec([564.0, 18.0, 72.0], low[0][:box], 'RAIL-F upright clamp box')
-  h.assert_vec([18.0, 0.0, 128.0], low[0][:origin], 'RAIL-F upright clamp origin')
+  h.assert_vec([564.0, 18.0, 62.0], low[0][:box], 'RAIL-F upright clamp box')
+  h.assert_vec([18.0, 0.0, 138.0], low[0][:origin], 'RAIL-F upright clamp origin')
 
   # Clamp minima: rail_depth 5 -> 20.
   tiny = h.cn.rail_parts(h.raw_cfg(rails_orientation: 'upright', rail_depth: 5.0))
@@ -452,4 +454,151 @@ NxTest.test('construction: D-31 round-trip — none prezije JSON config -> param
   NxTest.assert_equal('none', cfg2[:back_mode], 'none prezil round-trip')
   NxTest.assert_close(18.0, cfg2[:back_thickness], 0.01,
                       'hrubka sa pri none ZACHOVAVA (navrat rezimu ju obnovi)')
+end
+
+# --- D-80: vnutorny priestor respektuje horne vystuhy ---------------------------
+
+NxTest.test('construction: D-80 interior_dims matica vrch x orientacia x odsadenie') do
+  h = NxConsHelp
+  # [top_mode, orientacia, ziadane odsadenie, ocakavane z_hi, ocakavane avail_h, popis]
+  # Zaklad: 600x720x510, sokel 100, t 18 -> z_lo = 118, rail_depth 100.
+  [
+    ['full',      'flat',    0.0,   702.0, 584.0, 'plny vrch ignoruje parametre vystuh'],
+    ['full',      'upright', 500.0, 702.0, 584.0, 'plny vrch: aj extremne odsadenie je bez ucinku'],
+    ['none',      'flat',    30.0,  720.0, 602.0, 'bez vrchu: vnutro az po vrch korpusu'],
+    ['two_rails', 'flat',    0.0,   702.0, 584.0, 'flat bez odsadenia = povodne h - t (ziadna regresia)'],
+    ['two_rails', 'flat',    30.0,  672.0, 554.0, 'flat s odsadenim 30: vnutro konci 30 nizsie'],
+    ['two_rails', 'flat',    500.0, 202.0,  84.0, 'flat extrem: odsadenie sa este zmesti (bez orezu)'],
+    ['two_rails', 'upright', 0.0,   620.0, 502.0, 'upright: vnutro konci pod CELOU vystuhou (h - 100)'],
+    ['two_rails', 'upright', 30.0,  590.0, 472.0, 'upright + odsadenie 30'],
+    ['two_rails', 'upright', 500.0, 138.0,  20.0, 'upright extrem: odsadenie orezane, vnutro drzi 20 mm']
+  ].each do |tm, ori, off, z_hi, avail, label|
+    i = h.cn.interior_dims(h.raw_cfg(top_mode: tm, rails_orientation: ori, rails_top_offset: off))
+    NxTest.assert_close(z_hi, i[:z_hi], 0.01, "#{tm}/#{ori}/off #{off}: z_hi — #{label}")
+    NxTest.assert_close(avail, i[:avail_h], 0.01, "#{tm}/#{ori}/off #{off}: avail_h — #{label}")
+    NxTest.assert_close(118.0, i[:z_lo], 0.01, "#{tm}/#{ori}/off #{off}: z_lo sa nemeni")
+  end
+end
+
+NxTest.test('construction: D-80 realny pripad 860 / sokel 150 / flat / odsadenie 30') do
+  h = NxConsHelp
+  cfg = h.cb.normalize('height' => 860.0, 'floor_height' => 150.0, 'top_mode' => 'two_rails',
+                       'rails_orientation' => 'flat', 'rails_top_offset' => 30.0)
+  plan = h.cn.build_plan(cfg, 'CAB-D80A')
+  # Pred opravou hlasil engine 674 (h - sokel - 2t, vystuhy ignoroval) — spravne je 644.
+  NxTest.assert_close(644.0, plan[:available][:height], 0.01, 'svetla vyska pod vystuhami')
+  NxTest.assert_close(644.0, plan[:zones].first[:height], 0.01, 'korenova zona sa konci pod vystuhami')
+  rf = h.part(plan, 'cabinet/rail:front')
+  NxTest.assert_close(812.0, rf[:origin][2], 0.01, 'spodna hrana vystuhy = strop vnutra')
+  NxTest.assert_close(812.0, plan[:interior][:z_hi], 0.01, 'z_hi planu sedi s vystuhou')
+end
+
+NxTest.test('construction: D-80 orezanie odsadenia hlasi warning a NEodmietne rebuild') do
+  h = NxConsHelp
+  # 720/100/18, upright rail_depth 400, odsadenie 500: hlava = 720-118-20 = 582,
+  # vystuha 400 -> max odsadenie 182. Vnutro ostane presne MIN_INTERIOR_H (20).
+  cfg = h.cb.normalize('top_mode' => 'two_rails', 'rails_orientation' => 'upright',
+                       'rail_depth' => 400.0, 'rails_top_offset' => 500.0)
+  plan = h.cn.build_plan(cfg, 'CAB-D80B') # nesmie hodit vynimku (BLOCKER 1)
+  NxTest.assert_close(20.0, plan[:available][:height], 0.01, 'vnutro drzi rezervu 20 mm')
+  w = plan[:warnings].find { |x| x['code'] == 'rail_offset_clamped' }
+  NxTest.assert(!w.nil?, "cakal som rail_offset_clamped, warnings: #{plan[:warnings].inspect}")
+  NxTest.assert_close(500.0, w['data']['wanted'], 0.01, 'warning nesie ziadanu hodnotu')
+  NxTest.assert_close(182.0, w['data']['used'], 0.01, 'warning nesie pouzitu hodnotu')
+  rf = h.part(plan, 'cabinet/rail:front')
+  NxTest.assert_close(138.0, rf[:origin][2], 0.01, 'vystuha sedi na orezanom odsadeni')
+  # Ziadny dielec sa neprepadol pod prah degenerovanosti (MIN_DIM).
+  plan[:parts].each do |pd|
+    pd[:box].each_with_index do |v, i|
+      NxTest.assert(v.to_f > Noxun::Engine::BuildPlan::MIN_DIM,
+                    "#{pd[:part_key]}: box[#{i}] = #{v.inspect} pod MIN_DIM")
+    end
+  end
+  # Bez orezania sa warning NEhlasi (rovnaky vzor ako rail_depth_clamped).
+  ok = h.cn.build_plan(h.cb.normalize('top_mode' => 'two_rails', 'rails_top_offset' => 30.0), 'CAB-D80C')
+  NxTest.refute(ok[:warnings].any? { |x| x['code'] == 'rail_offset_clamped' },
+                'odsadenie v limite sa nesmie hlasit ako orezane')
+end
+
+NxTest.test('construction: D-80 chrbat — inset/groove sa skratia LEN o odsadenie, overlay nie') do
+  h = NxConsHelp
+  # [back_mode, orientacia, odsadenie, ocakavana vyska chrbta, popis]
+  [
+    ['inset',   'flat',    0.0,  584.0, 'inset bez odsadenia = povodna vyska (h - t - z_lo)'],
+    ['inset',   'flat',    30.0, 554.0, 'inset s odsadenim 30: presne o 30 kratsi'],
+    ['inset',   'upright', 0.0,  584.0, 'upright bez odsadenia nemeni chrbat'],
+    ['inset',   'upright', 30.0, 554.0, 'upright: skratenie LEN o odsadenie, NIE o vysku vystuhy'],
+    ['groove',  'flat',    0.0,  584.0, 'groove bez odsadenia = povodna vyska'],
+    ['groove',  'flat',    30.0, 554.0, 'groove s odsadenim 30'],
+    ['overlay', 'flat',    30.0, 620.0, 'overlay je nalozeny zozadu — odsadenie ho NEMENI (h - sokel)'],
+    ['overlay', 'upright', 30.0, 620.0, 'overlay pri upright rovnako nezmeneny']
+  ].each do |bkm, ori, off, bh, label|
+    cfg = h.cb.normalize('back_mode' => bkm, 'top_mode' => 'two_rails',
+                         'rails_orientation' => ori, 'rails_top_offset' => off)
+    bk = h.part(h.cn.build_plan(cfg, 'CAB-D80D'), 'cabinet/back')
+    NxTest.assert_close(bh, bk[:prod][:width], 0.01, "#{bkm}/#{ori}/off #{off}: #{label}")
+    NxTest.assert_close(bh, bk[:box][2], 0.01, "#{bkm}/#{ori}/off #{off}: box chrbta")
+  end
+
+  # Rezimy bez vystuh ostavaju na povodnych hodnotach (full/none).
+  [['full', 584.0], ['none', 602.0]].each do |tm, bh|
+    cfg = h.cb.normalize('back_mode' => 'inset', 'top_mode' => tm, 'rails_top_offset' => 30.0)
+    bk = h.part(h.cn.build_plan(cfg, 'CAB-D80E'), 'cabinet/back')
+    NxTest.assert_close(bh, bk[:prod][:width], 0.01, "top #{tm}: vyska chrbta bez zmeny")
+  end
+  NxTest.refute(h.keys(h.cn.build_plan(h.cb.normalize('back_mode' => 'none', 'top_mode' => 'two_rails',
+                                                      'rails_top_offset' => 30.0), 'CAB-D80F'))
+                  .include?('cabinet/back'), 'D-31: bez chrbta neexistuje dielec ani pri vystuhach')
+end
+
+NxTest.test('construction: D-80 mensie vnutro odmietne rebuild so zrozumitelnou hlaskou') do
+  h = NxConsHelp
+  params = { 'top_mode' => 'two_rails', 'rails_orientation' => 'flat',
+             'rails_top_offset' => 500.0, 'zone_tree' => { 'shelves' => 4 } }
+  # 4 police potrebuju 172 mm svetla; po odsadeni 500 ostane 84 mm -> odmietnutie.
+  e = NxTest.assert_raise('Vnútorná výška sa znížila') do
+    h.cn.build_plan(h.cb.normalize(params), 'CAB-D80G')
+  end
+  NxTest.assert(e.message.include?('odsadenie výstuh'), "hlaska musi poradit riesenie: #{e.message}")
+  NxTest.assert(e.message.include?('polic'), "hlaska si nesie povodny dovod zo ZoneTree: #{e.message}")
+
+  # Ten isty strom s plnym vrchom prejde — vinnikom je naozaj zuzene vnutro.
+  plan = h.cn.build_plan(h.cb.normalize(params.merge('top_mode' => 'full')), 'CAB-D80H')
+  NxTest.assert_equal(4, plan[:parts].count { |p| p[:role] == 'shelf' }, 'plny vrch: 4 police stoja')
+
+  # Chyba zony BEZ vystuh si drzi povodnu hlasku (prefix sa nelepi vsade).
+  e2 = NxTest.assert_raise('prilis nizka') do
+    h.cn.build_plan(h.cb.normalize('type' => 'upper', 'height' => 200.0,
+                                   'zone_tree' => { 'shelves' => 4 }), 'CAB-D80I')
+  end
+  NxTest.refute(e2.message.include?('výstuhy'), "bez vystuh sa D-80 prefix nesmie objavit: #{e2.message}")
+end
+
+NxTest.test('construction: D-80 part_key mnozina nezavisi od odsadenia vystuh') do
+  h = NxConsHelp
+  base = h.identity_params.merge('top_mode' => 'two_rails', 'rails_orientation' => 'upright')
+  k0 = h.keys(h.cn.build_plan(h.cb.normalize(base), 'CAB-D80J')).sort
+  k30 = h.keys(h.cn.build_plan(h.cb.normalize(base.merge('rails_top_offset' => 30.0)), 'CAB-D80J')).sort
+  NxTest.assert_equal(k0, k30, 'odsadenie vystuh nesmie zmenit identitu dielcov')
+  NxTest.assert(k0.include?('cabinet/rail:front') && k0.include?('cabinet/rail:back'), 'vystuhy su v plane')
+end
+
+NxTest.test('construction: D-80 available_height ako vstup pravidla kovania') do
+  h = NxConsHelp
+  # Vlastne pravidlo zavisle od svetlej vysky (pasmo do 650 = 2 ks, nad = 4 ks).
+  rule = { 'rule_id' => 'test-podla-vnutra', 'enabled' => true,
+           'applies_to' => { 'role' => 'cabinet' },
+           'output' => 'connector', 'kind' => 'bands', 'input' => 'available_height',
+           'bands' => [{ 'max' => 650.0, 'quantity' => 2 }, { 'max' => nil, 'quantity' => 4 }] }
+  dims = { 'height' => 860.0, 'floor_height' => 150.0 }
+  rails = h.cb.normalize(dims.merge('top_mode' => 'two_rails', 'rails_orientation' => 'flat',
+                                    'rails_top_offset' => 30.0))
+  full  = h.cb.normalize(dims.merge('top_mode' => 'full'))
+
+  hw_rails = h.cn.build_plan(rails, 'CAB-D80K', hardware_rules: [rule])[:hardware]
+  hw_full  = h.cn.build_plan(full, 'CAB-D80L', hardware_rules: [rule])[:hardware]
+  NxTest.assert_equal(2, hw_rails.first['quantity'],
+                      'svetla vyska 644 spada do pasma do 650 (pred opravou to bolo 674 -> 4 ks)')
+  NxTest.assert_equal(4, hw_full.first['quantity'], 'plny vrch: 674 mm -> vyssie pasmo')
+  NxTest.assert_equal('test-podla-vnutra', hw_rails.first['rule_id'])
 end
