@@ -11,6 +11,9 @@
 # INFO ostava len pre redo pozorovania (Ruby API nema spolahlive redo na Windows).
 #
 # Struktura:
+#   SYNC-VYSTUHY (H3/D-80) — vnutro konci pod hornymi vystuhami: odsadenie flat,
+#     orientacia upright, vyska chrbta inset, odmietnutie rebuildu pri zmensenom
+#     vnutre + warning o orezanom odsadeni.
 #   SYNC cast — geometria proti BuildPlan kontraktu (plan vs. model 1:1), NOXUN data
 #     dielcov, ghost zony, rebuild identita + prezitie part_overrides, dedup kopie
 #     (priame volanie), undo rebuildu = presne 1 krok; D-45 sekcia (hrubka <->
@@ -778,6 +781,19 @@ module NoxunSuRunner
     mm(pi.bounds.max.y) - mm(pi.bounds.min.y)
   end
 
+  # H3/D-80: zvisle rozmery dielca v ramci definicie korpusu (Z = vyska).
+  def part_z0(pi)
+    mm(pi.bounds.min.z)
+  end
+
+  def part_z1(pi)
+    mm(pi.bounds.max.z)
+  end
+
+  def part_height(pi)
+    part_z1(pi) - part_z0(pi)
+  end
+
   def carcass_max_y(inst)
     parts = inst.definition.entities.grep(Sketchup::ComponentInstance)
                 .select { |i| e::Store.kind(i) == 'part' }
@@ -853,6 +869,79 @@ module NoxunSuRunner
     ok('back: cleanup (0 korpusov)', cabinets(model).empty?)
   rescue StandardError => ex
     log_line("FAIL: sync-back vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
+  # --- SYNC-VYSTUHY: H3/D-80 vnutro konci pod hornymi vystuhami (davka Geometria).
+  # Realny pripad z hlasenia: varna skrinka 860 / sokel 150 / vystuhy naplocho
+  # znizene o 30 mm pod varnu dosku. Overuje sa MODEL, nie len plan.
+  def run_sync_rails(model)
+    base = { 'type' => 'lower', 'width' => 600.0, 'height' => 860.0, 'depth' => 510.0,
+             'floor_height' => 150.0, 'back_mode' => 'inset',
+             'top_mode' => 'two_rails', 'rails_orientation' => 'flat',
+             'rail_depth' => 100.0, 'rails_top_offset' => 30.0,
+             'zone_tree' => { 'id' => 'Z1', 'shelves' => 2, 'children' => [] } }
+    inst = e::CabinetBuilder.build(model, base)
+    return ok('rails: vlozenie korpusu', false) unless inst
+
+    # 1) flat + odsadenie 30: spodna hrana vystuh (812) = strop vnutra; svetla
+    #    vyska 644 (pred opravou hlasil engine 674 a police liezli do vystuh).
+    rf = find_part(inst, 'cabinet/rail:front')
+    ok('rails D-80: flat vystuha stoji na 812 (860 - 30 - 18)',
+       rf && (part_z0(rf) - 812.0).abs < TOL)
+    ok('rails D-80: svetla vyska v configu = 644 (pred opravou 674)',
+       ((e::Store.config(inst) || {})['available_height'].to_f - 644.0).abs < 0.01)
+    top_shelf = find_part(inst, 'zone:Z1/shelf:2')
+    ok('rails D-80: horna polica ostala POD vystuhami',
+       top_shelf && part_z1(top_shelf) <= 812.0 + TOL)
+    bk = find_part(inst, 'cabinet/back')
+    ok('rails D-80: inset chrbat skrateny presne o odsadenie (644)',
+       bk && (part_height(bk) - 644.0).abs < TOL)
+
+    # 2) upright bez odsadenia: vnutro konci pod CELOU vystuhou (760), chrbat sa
+    #    o jej vysku NEskracuje — bezi za vystuhami (674).
+    up = e::CabinetBuilder.config_to_params(e::Store.config(inst))
+                          .merge('rails_orientation' => 'upright', 'rails_top_offset' => 0.0)
+    e::CabinetBuilder.rebuild(model, inst, up)
+    rfu = find_part(inst, 'cabinet/rail:front')
+    ok('rails D-80: upright vystuha vysoka 100 stoji na 760',
+       rfu && (part_z0(rfu) - 760.0).abs < TOL && (part_height(rfu) - 100.0).abs < TOL)
+    ok('rails D-80: upright svetla vyska = 592 (860 - 100 - 168)',
+       ((e::Store.config(inst) || {})['available_height'].to_f - 592.0).abs < 0.01)
+    ok('rails D-80: chrbat pri upright NIE JE skrateny o vysku vystuhy (674)',
+       (part_height(find_part(inst, 'cabinet/back')) - 674.0).abs < TOL)
+
+    # 3) extremne odsadenie + 4 police: odsadenie sa OREZE (warning) a clenenie sa
+    #    do zmenseneho vnutra nezmesti -> rebuild sa odmietne zrozumitelnou hlaskou
+    #    a model ostane presne taky, aky bol (abort_safely).
+    bad = e::CabinetBuilder.config_to_params(e::Store.config(inst))
+                           .merge('rails_orientation' => 'upright', 'rail_depth' => 400.0,
+                                  'rails_top_offset' => 500.0,
+                                  'zone_tree' => { 'id' => 'Z1', 'shelves' => 4, 'children' => [] })
+    msg = nil
+    begin
+      e::CabinetBuilder.rebuild(model, inst, bad)
+    rescue StandardError => ex
+      msg = ex.message
+    end
+    ok('rails D-80: prilis male vnutro odmietne rebuild zrozumitelnou hlaskou',
+       msg.to_s.include?('Vnútorná výška sa znížila'))
+    ok('rails D-80: odmietnuty rebuild nechal korpus nedotknuty (upright vystuha na 760)',
+       inst.valid? && (part_z0(find_part(inst, 'cabinet/rail:front')) - 760.0).abs < TOL)
+
+    # 4) to iste odsadenie BEZ policia prejde — orezanie sa hlasi warningom.
+    okp = bad.merge('zone_tree' => { 'id' => 'Z1', 'shelves' => 0, 'children' => [] })
+    e::CabinetBuilder.rebuild(model, inst, okp)
+    warns = ((e::Store.config(inst) || {})['warnings'] || [])
+    ok('rails D-80: orezanie odsadenia sa hlasi warningom rail_offset_clamped',
+       warns.any? { |x| x.is_a?(Hash) && x['code'] == 'rail_offset_clamped' })
+    ok('rails D-80: po oreze drzi vnutro rezervu 20 mm',
+       ((e::Store.config(inst) || {})['available_height'].to_f - 20.0).abs < 0.01)
+
+    cleanup(model)
+    ok('rails: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: sync-rails vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
     cleanup(model)
   end
 
@@ -2203,6 +2292,7 @@ module NoxunSuRunner
     e::ProductionDialog.instance_variable_set(:@generation, 0) if defined?(e::ProductionDialog)
     run_sync(model)
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
+    run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_d45(model)           # D-45: hrubka <-> material tela (18,6 mm deadlock)
     run_d46(model)           # D-46: projektova predvolba korpusu s inou hrubkou (potvrdenie)

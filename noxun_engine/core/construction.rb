@@ -111,7 +111,7 @@ module Noxun
 
       # D-80 (F3): ked vystuhy znizia strop vnutra, stare clenenie (police, delenia,
       # zamknute vysky) sa uz nemusi zmestit. ZoneTree v takom pripade RAISNE —
-      # rebuild sa odmietne (ziadne tiche mazanie policia zamkov), ale pouzivatel
+      # rebuild sa odmietne (ziadne tiche mazanie polic a zamkov), ale pouzivatel
       # musi vidiet PRECO. Panel hlasku ukaze cez set_status.
       def compute_zone_tree!(cfg, interior, zbox, t, cabinet_id)
         ZoneTree.compute(cfg[:zone_tree], zbox, t, cabinet_id)
