@@ -51,5 +51,5 @@ jobs:
         run: node tests/js/test_hw_panel_sets.js
       - name: JS testy — svetla vyska a vystuhy (H3, D-80)
         run: node tests/js/test_interior_height.js
-      - name: JS testy — UI drobnosti (H4: farba dekoru D-82, skratka UNI D-83)
+      - name: JS testy — UI drobnosti H4 (farba dekoru D-82, skratka UNI D-83)
         run: node tests/js/test_h4_ui.js
