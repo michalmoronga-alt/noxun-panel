@@ -113,9 +113,12 @@ module Noxun
       # zamknute vysky) sa uz nemusi zmestit. ZoneTree v takom pripade RAISNE —
       # rebuild sa odmietne (ziadne tiche mazanie polic a zamkov), ale pouzivatel
       # musi vidiet PRECO. Panel hlasku ukaze cez set_status.
+      # ZAMERNE len RuntimeError: ZoneTree validacie hlasia `raise "text"`. Chyba
+      # kodu (NoMethodError a spol.) sa NESMIE prezliect za pouzivatelsku hlasku —
+      # bublina ide von nedotknuta. Povodny dovod zo ZoneTree ostava v texte.
       def compute_zone_tree!(cfg, interior, zbox, t, cabinet_id)
         ZoneTree.compute(cfg[:zone_tree], zbox, t, cabinet_id)
-      rescue StandardError => e
+      rescue RuntimeError => e
         raise e unless rails_lower_interior?(cfg, interior)
         raise "Vnútorná výška sa znížila (výstuhy) — uprav zóny alebo odsadenie výstuh. #{e.message}"
       end
@@ -155,6 +158,10 @@ module Noxun
       # Clampy (obidva hlasene warningom, nikdy tiche):
       #   depth  — flat: hlbka <= d/2 - 10; upright: vyska <= dostupne miesto; min 20
       #   offset — 0 .. (dostupne miesto - occupy), aby vnutro drzalo MIN_INTERIOR_H
+      # Hranicny pripad: ak je `head` mensi nez minimalna vystuha (20 mm), vyhrava
+      # minimum a vnutro klesne pod rezervu — taky korpus (napr. 200 mm vysoky so
+      # soklom 153) je nezmyselny uz sam o sebe a validate! ho odmietne vlastnou
+      # hlaskou o vyske/podstavci. Zamerne sa tu nerobi vystuha tenka ako 5 mm.
       def rail_geometry(cfg)
         h = cfg[:height].to_f; t = cfg[:thickness].to_f; s = cfg[:floor_height].to_f
         d = carcass_depth(cfg)
