@@ -108,4 +108,17 @@ close(flatOff.zBottom, 672, 'flat + odsadenie: spodna hrana vystuhy');
 close(nxRailGeom(cab({ top_mode:'two_rails', rails_top_offset:-50 })).offset, 0,
       'zaporne odsadenie -> 0');
 
+// --- prilis nizky korpus (Codex P2 na PR #134) ----------------------------------
+// 200 / sokel 150 / t 18: na vystuhu (min 20) + rezervu (20) niet miesta.
+// JS je CISTY kalkulator — vrati skutocnu (mensiu) hodnotu; odmietnutie takej
+// kombinacie je serverovy invariant (Construction.validate!), nie praca nahladu.
+const tiny = cab({ height:200, floor_height:150, top_mode:'two_rails' });
+close(nxRailGeom(Object.assign({}, tiny, { rails_orientation:'upright' })).depth, 20,
+      'upright: minimum vystuhy 20 prebije limit 12');
+close(nxInteriorZ(Object.assign({}, tiny, { rails_orientation:'upright' })).availH, 12,
+      'upright v nizkom korpuse: vnutro 12 mm (server to odmietne)');
+close(nxInteriorZ(tiny).availH, 14, 'flat v nizkom korpuse: vnutro 14 mm');
+close(nxInteriorZ(cab({ height:206, floor_height:150, top_mode:'two_rails' })).availH, 20,
+      'hranica: vnutro presne 20 mm');
+
 console.log(`OK — test_interior_height.js: ${n} testov preslo`);

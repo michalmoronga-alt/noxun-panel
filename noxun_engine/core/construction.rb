@@ -158,10 +158,12 @@ module Noxun
       # Clampy (obidva hlasene warningom, nikdy tiche):
       #   depth  — flat: hlbka <= d/2 - 10; upright: vyska <= dostupne miesto; min 20
       #   offset — 0 .. (dostupne miesto - occupy), aby vnutro drzalo MIN_INTERIOR_H
-      # Hranicny pripad: ak je `head` mensi nez minimalna vystuha (20 mm), vyhrava
-      # minimum a vnutro klesne pod rezervu — taky korpus (napr. 200 mm vysoky so
-      # soklom 153) je nezmyselny uz sam o sebe a validate! ho odmietne vlastnou
-      # hlaskou o vyske/podstavci. Zamerne sa tu nerobi vystuha tenka ako 5 mm.
+      # Hranicny pripad (Codex P2 na PR #134): ak je `head` mensi nez minimalna
+      # vystuha (20 mm), vyhrava minimum vystuhy a vnutro by kleslo pod rezervu
+      # (napr. 200/sokel 150/t 18 upright -> vnutro 12 mm). Vystuha tenka ako 12 mm
+      # je nezmysel, preto sa TU nic neohyba — invariant "two_rails => vnutro aspon
+      # MIN_INTERIOR_H" strazi validate! vlastnou zrozumitelnou hlaskou.
+      # rail_geometry ostava CISTY kalkulator (ziadna vynimka) — presne to zrkadli JS.
       def rail_geometry(cfg)
         h = cfg[:height].to_f; t = cfg[:thickness].to_f; s = cfg[:floor_height].to_f
         d = carcass_depth(cfg)
@@ -361,6 +363,15 @@ module Noxun
         raise 'Hlbka je prilis mala.' if interior[:back_front_y] <= 10
         raise 'Podstavec/sokel nesmie byt vyssi nez korpus.' if s >= h
         raise 'Vnutorna vyska je nulova alebo zaporna (skontroluj vysku, podstavec a hrubky).' if interior[:avail_h] <= 10
+        # D-80 (Codex P2 na PR #134): pri vrchu "dve vystuhy" musi pod nimi ostat
+        # aspon MIN_INTERIOR_H svetla — inak vznikne zona mensia nez ZoneTree::MIN_FIELD
+        # (a pri upright dokonca vystuha tenka pod svoje vlastne minimum). Kombinacia
+        # je fyzicky nemozna, nie orezatelna — hlasi sa zrozumitelne, nie ticho.
+        return unless cfg[:top_mode] == 'two_rails'
+        return if interior[:avail_h] >= MIN_INTERIOR_H - 0.01
+        raise 'Vnútro je príliš nízke na výstuhy (ostáva ' \
+              "#{interior[:avail_h].to_f.round(1)} mm) — zväčši výšku korpusu, zmenši podstavec " \
+              'alebo prepni vrch na plný.'
       end
     end
   end

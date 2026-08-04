@@ -602,3 +602,29 @@ NxTest.test('construction: D-80 available_height ako vstup pravidla kovania') do
   NxTest.assert_equal(4, hw_full.first['quantity'], 'plny vrch: 674 mm -> vyssie pasmo')
   NxTest.assert_equal('test-podla-vnutra', hw_rails.first['rule_id'])
 end
+
+NxTest.test('construction: D-80 vystuhy do prilis nizkeho korpusu sa ODMIETNU (Codex P2 na PR #134)') do
+  h = NxConsHelp
+  # 200 / sokel 150 / t 18 je cez normalize PLATNE zadanie, ale nad dnom ostava
+  # len 32 mm — na vystuhu (min 20) + rezervu vnutra (20) to nestaci. Upright by
+  # vyrobil 20 mm vystuhu a vnutro 12 mm (mensie nez ZoneTree::MIN_FIELD).
+  low = { 'height' => 200.0, 'floor_height' => 150.0 }
+  up = h.cb.normalize(low.merge('top_mode' => 'two_rails', 'rails_orientation' => 'upright'))
+  NxTest.assert_close(12.0, h.cn.interior_dims(up)[:avail_h], 0.01, 'kalkulator vrati 12 mm')
+  NxTest.assert_raise('príliš nízke na výstuhy') { h.cn.build_plan(up, 'CAB-D80M') }
+
+  # flat na tom istom tele ma vnutro 14 mm — rovnaky invariant, rovnaka hlaska.
+  flat = h.cb.normalize(low.merge('top_mode' => 'two_rails'))
+  NxTest.assert_close(14.0, h.cn.interior_dims(flat)[:avail_h], 0.01)
+  NxTest.assert_raise('príliš nízke na výstuhy') { h.cn.build_plan(flat, 'CAB-D80N') }
+
+  # Invariant sa NEROZSIRUJE na rezimy bez vystuh — plny vrch s 14 mm vnutra
+  # stavia dalej presne ako doteraz (oprava nesmie zhodit existujuce modely).
+  full = h.cn.build_plan(h.cb.normalize(low.merge('top_mode' => 'full')), 'CAB-D80O')
+  NxTest.assert_close(14.0, full[:available][:height], 0.01, 'plny vrch ostava povoleny')
+
+  # Hranica: presne MIN_INTERIOR_H (20 mm) este prejde.
+  edge = h.cb.normalize('height' => 206.0, 'floor_height' => 150.0, 'top_mode' => 'two_rails')
+  NxTest.assert_close(20.0, h.cn.build_plan(edge, 'CAB-D80P')[:available][:height], 0.01,
+                      'vnutro presne 20 mm je este platne')
+end
