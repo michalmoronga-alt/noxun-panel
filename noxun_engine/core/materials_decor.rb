@@ -313,6 +313,116 @@ module Noxun
         [true, changed]
       end
 
+      # --- D-82: farba dekorovej skupiny --------------------------------------
+      # Farba je vlastnost DEKORU (skupiny), nie variantu — presne ako vyrobca
+      # (D-42 FIX 7). Doteraz ju niesol kazdy zaznam zvlast, menila sa len vo
+      # variantovych formularoch a kazda cesta vzniku (batch, Demos, duplak) ju
+      # stavala inak; vysledok bolo "hnede more" na katalogovej mriezke.
+      # Teraz: JEDNA zmena prefarbi cely dekor — dosky AJ pasky — v JEDNOM
+      # atomickom zapise (vzor set_decor_manufacturer 1:1, rovnaka kriticka
+      # sekcia). Vrati [true, pocet zaznamov] alebo [false, hlaska].
+      def set_decor_color(decor, color, group_id: nil)
+        return [false, catalog_read_only_message] if catalog_read_only?
+        rgb = parse_rgb(color)
+        return [false, 'Neplatná farba — očakávam #RRGGBB alebo [r,g,b] 0–255.'] unless rgb
+        # GH #92 P1: rovnaka kriticka sekcia ako rename/manufacturer.
+        with_catalog_lock do
+          JsonFileStore.invalidate(path)
+          if catalog_schema >= SCHEMA_GROUPS
+            ok, entry = resolve_group_target(decor, group_id)
+            return [false, entry] unless ok
+            gid = entry['group_id']
+            # UNI su CHRANENE: ich farby su pracovne rozlisovacie znaky roli
+            # (Korpus/Celo/Dekor2/HDF/Doska). Prefarbenie na realny dekor by
+            # opticky schovalo semafor ORANGE „materiál neurčený".
+            return [false, uni_color_locked_message] if uni_group?(gid, entry['decor'])
+            data = load
+            changed = paint_records(data, rgb) { |r| identity_norm(r['group_id']) == identity_norm(gid) }
+          else
+            d = decor.to_s.strip
+            return [false, 'Dekor je povinný.'] if d.empty?
+            return [false, uni_color_locked_message] if uni_group?(nil, d)
+            data = load
+            changed = paint_records(data, rgb) { |r| r['decor'].to_s == d }
+          end
+          return [false, 'Dekorová skupina sa nenašla.'] if changed.zero?
+          return [false, 'Zápis katalógu zlyhal.'] unless write_unlocked(data)
+          [true, changed]
+        end
+      end
+
+      def uni_color_locked_message
+        'UNI je pracovný materiál — jeho farba rozlišuje rolu a nemení sa.'
+      end
+
+      # Prefarbi vsetky zaznamy (dosky aj pasky), ktore vyhovuju bloku.
+      # Kazdy zaznam dostane VLASTNU kopiu pola (zdielana instancia by sa pri
+      # neskorsom zapise do jedneho zaznamu prejavila na celej skupine).
+      def paint_records(data, rgb, &match)
+        n = 0
+        %w[sheets edges].each do |k|
+          data[k].each do |r|
+            next unless match.call(r)
+            r['color'] = rgb.dup
+            n += 1
+          end
+        end
+        n
+      end
+
+      # Farba ako [r,g,b] 0-255 z '#RRGGBB' AJ z pola (JS posiela pole, rucne
+      # volanie a testy hex) — cokolvek ine je nil (volajuci odmietne zapis).
+      def parse_rgb(value)
+        if value.is_a?(Array) && value.size == 3 &&
+           value.all? { |v| v.is_a?(Numeric) || v.to_s.strip.match?(/\A\d+\z/) }
+          rgb = value.map { |v| v.to_i }
+          return rgb if rgb.all? { |v| (0..255).cover?(v) }
+          return nil
+        end
+        m = value.to_s.strip.match(/\A#?([0-9a-fA-F]{6})\z/)
+        return nil unless m
+        [m[1][0, 2], m[1][2, 2], m[1][4, 2]].map { |h| h.to_i(16) }
+      end
+
+      # ULOZENA farba skupiny z dat V RUKE (pod zamkom) — JEDINA autorita pri
+      # vzniku noveho variantu. group_id ma prednost (SCHEMA 2), text dekoru je
+      # legacy fallback. Prazdna skupina = nil (volajuci pouzije DEFAULT_DECOR_RGB).
+      def group_color_in(data, group_id, decor)
+        gid = group_id.to_s.strip
+        dec = decor.to_s.strip
+        rows = (data['sheets'] || []) + (data['edges'] || [])
+        hit = rows.find do |r|
+          next false unless r['color'].is_a?(Array) && r['color'].size == 3
+          if !gid.empty?
+            identity_norm(r['group_id']) == identity_norm(gid)
+          else
+            !dec.empty? && r['decor'].to_s.strip == dec
+          end
+        end
+        hit ? hit['color'].map(&:to_i) : nil
+      end
+
+      # D-82 (audit B2): farbu zapisovaneho zaznamu urcuje SKUPINA, nie payload.
+      # Odstraneny input vo formulari NIE JE ochrana (stary klient z CEF cache,
+      # podvrhnuty payload) — TOTO je serverova autorita a bezi POD ZAMKOM nad
+      # datami v ruke, tesne pred zapisom:
+      #   existujuci zaznam  -> farba OSTAVA (edit variantu ju NIKDY nemeni),
+      #   novy do skupiny    -> ulozena farba skupiny (payload nerozhoduje),
+      #   novy do NOVEJ skupiny -> hodnota zo zaznamu (prva farba skupiny;
+      #     normalize uz doplnil DEFAULT_DECOR_RGB, ked ju volajuci neuviedol).
+      def enforce_group_color!(rec, data, kind)
+        idk = kind == :edge ? 'abs_id' : 'material_id'
+        listk = kind == :edge ? 'edges' : 'sheets'
+        old = (data[listk] || []).find { |r| r[idk] == rec[idk] }
+        forced = if old && old['color'].is_a?(Array) && old['color'].size == 3
+                   old['color'].map(&:to_i)
+                 else
+                   group_color_in(data, rec['group_id'], rec['decor'])
+                 end
+        rec['color'] = forced if forced
+        rec
+      end
+
       # --- D-41 PR C2: dovytvorenie chybajucej pasky (modal "Vytvorit a pokracovat") --
 
       # Standardna sirka pasky pre hrubku dielca: najmensia z AUTO_WIDTHS s presahom
@@ -487,7 +597,7 @@ module Noxun
         type = 'DTDL' if type.empty?
         grain = (attrs['grain'] || attrs[:grain] || 'length').to_s
         return [false, 'Smer dekoru musí byť length/width/none.'] unless GRAINS.include?(grain)
-        color = normalize_rgb(attrs['color'] || attrs[:color], [216, 196, 160])
+        color = normalize_rgb(attrs['color'] || attrs[:color], DEFAULT_DECOR_RGB)
 
         ok_th, ths = parse_number_list(attrs['thicknesses'] || attrs[:thicknesses])
         return [false, ths] unless ok_th
@@ -513,6 +623,9 @@ module Noxun
         return [false, 'Zadaj aspoň jednu hrúbku dosky alebo ABS pásku.'] if sheet_pairs.empty? && abs_list.empty?
 
         data = load
+        # D-82: v legacy katalogu je skupina text dekoru — existujuca skupina
+        # svoju ulozenu farbu vnucuje, nova si drzi farbu z formulara.
+        color = group_color_in(data, nil, decor) || color
         taken = (data['sheets'].map { |s| s['material_id'].to_s.upcase } +
                  data['edges'].map { |a| a['abs_id'].to_s.upcase })
         created_sheets = []
@@ -592,7 +705,7 @@ module Noxun
         type = 'DTDL' if type.empty?
         grain = (attrs['grain'] || attrs[:grain] || 'length').to_s
         return [false, 'Smer dekoru musí byť length/width/none.'] unless GRAINS.include?(grain)
-        color = normalize_rgb(attrs['color'] || attrs[:color], [216, 196, 160])
+        color = normalize_rgb(attrs['color'] || attrs[:color], DEFAULT_DECOR_RGB)
 
         ok_s, sheet_entries = parse_sheet_entries_v3(attrs, type)
         return [false, sheet_entries] unless ok_s
@@ -638,6 +751,11 @@ module Noxun
         gid = group['group_id']
         gname = group['decor_name']
         data = load
+        # D-82: farba je vlastnost SKUPINY. „+ variant" do EXISTUJUCEJ skupiny
+        # farbu z formulara IGNORUJE (payload nerozhoduje — davka nesmie skupinu
+        # rozdvojit na dve farby); NOVA skupina si ju urci RAZ tu a dostane ju
+        # kazdy zaznam davky (dosky aj pasky).
+        color = group_color_in(data, gid, decor) || color
         taken = (data['sheets'].map { |s| s['material_id'].to_s.upcase } +
                  data['edges'].map { |a| a['abs_id'].to_s.upcase })
         created_sheets = []

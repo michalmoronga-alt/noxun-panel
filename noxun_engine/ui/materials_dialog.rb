@@ -56,19 +56,25 @@ module Noxun
             style: UI::HtmlDialog::STYLE_DIALOG
           )
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'proj_materials.html'))
+          @ready = false # D-83: HTML este nebezi — execute_script by sa stratil
           register_callbacks(@dialog) # pred show!
           # B-2b (audit BLOCKER 5): zatvorenie okna zneplatni bezaci Demos
           # lookup (session bump) — nova instancia okna nesmie dostat eventy
           # starej (ABA: visible? by po reopene patrilo NOVEMU oknu).
           @dialog.set_on_closed do
             demos_bump_session
+            @ready = false
+            @pending_replace_uni = nil # D-83: zatvorene okno poziadavku zahadzuje
             @dialog = nil
           end
           @dialog
         end
 
         def register_callbacks(dlg)
-          cb(dlg, 'ready')                { |_p| push_state }
+          # D-83: pending poziadavka („Nahradiť UNI…" z okna Výroba) sa spusta AZ
+          # tu — po push_state, ked JS uz ma katalog. Volanie pred nacitanim HTML
+          # by CEF zahodil.
+          cb(dlg, 'ready') { |_p| @ready = true; push_state; flush_pending_replace_uni }
           cb(dlg, 'set_project_material') { |p| handle_set_project_material(p) }
           # Davka 2 (D-05): sprava katalogu — create/edit ODDELENE (edit nikdy
           # nemeni ID a negeneruje ho; create ID generuje server, JS mu never).
@@ -86,6 +92,9 @@ module Noxun
           cb(dlg, 'set_decor_name')  { |p| handle_set_decor_name(p) }
           # D-42: vyrobca je vlastnost dekoru — zmena atomicky pre celu skupinu.
           cb(dlg, 'set_decor_manufacturer') { |p| handle_set_decor_manufacturer(p) }
+          # D-82: farba je rovnako vlastnost dekoru — jedna zmena prefarbi
+          # dosky AJ pasky celej skupiny (koniec "hnedeho mora").
+          cb(dlg, 'set_decor_color') { |p| handle_set_decor_color(p) }
           # D-42 PR C (audit BLOCKER 1): inline bunky detailu — patch protokol
           # (whitelist poli, merge s cerstvym zaznamom, baseline per RIADOK).
           cb(dlg, 'patch_sheet') { |p| handle_patch(p, 'sheet') }
@@ -327,6 +336,7 @@ module Noxun
         # sa pri File > New/Open/Activate naplni z prave aktivneho modelu.
         def on_model_changed(_model)
           demos_bump_session # B-2b: prepnuty model rusi bezaci Demos lookup
+          @pending_replace_uni = nil # D-83: poziadavka patrila PREDOSLEMU modelu
           return unless @dialog && @dialog.visible?
           push_state
           set_status('Aktívny model sa zmenil — predvoľby načítané z tohto modelu.')
@@ -668,6 +678,44 @@ module Noxun
             'duplak_deps' => (kind == 'sheet' ? Materials.duplak_dependents(id).first(3) : [])
           }
           js("MD.confirmDelete(#{info.to_json})")
+        end
+
+        # --- D-83: „Nahradiť UNI…" spustene z okna Výroba --------------------
+        # Vstup z ProductionDialog (ten uz overil gen, model a ze uni_id JE UNI).
+        # Ak okno bezi a JS je pripraveny, modal sa otvori hned; inak sa
+        # poziadavka ODLOZI a spusti ju `ready` callback po push_state — CEF
+        # zahodi execute_script poslany pred nacitanim HTML, takze slepy skript
+        # hned po `show` by sa stratil. Poziadavka je JEDNORAZOVA a zomiera pri
+        # zatvoreni okna aj pri prepnuti modelu.
+        # Vrati true, ak sa okno podarilo otvorit/aktivovat.
+        def request_replace_uni(uni_id, model)
+          @pending_replace_uni = { 'uni_id' => uni_id.to_s, 'model_guid' => model_guid(model) }
+          live = @dialog && @dialog.visible? && @ready
+          return false unless show
+          flush_pending_replace_uni if live
+          true
+        rescue StandardError => e
+          Engine.log_error(e, 'MaterialsDialog.request_replace_uni')
+          false
+        end
+
+        # Spusti odlozenu poziadavku — s CERSTVYM overenim (audit F5): medzi
+        # klikom vo Výrobe a nacitanim okna sa mohol prepnut model alebo zmenit
+        # katalog. Neplatna poziadavka konci stavovou hlaskou, modal sa neotvori.
+        def flush_pending_replace_uni
+          req = @pending_replace_uni
+          return unless req
+
+          @pending_replace_uni = nil # jednorazova aj vo vetve odmietnutia
+          model = Sketchup.active_model
+          if req['model_guid'].to_s != model_guid(model)
+            return set_status('Model sa medzitým prepol — „Nahradiť UNI…“ sa nespustilo.', true)
+          end
+          uni = Materials.sheet(req['uni_id'].to_s)
+          unless uni && Materials.uni?(uni)
+            return set_status('Materiál sa medzitým zmenil — „Nahradiť UNI…“ sa nespustilo.', true)
+          end
+          js("MD.openReplaceUni(#{req['uni_id'].to_s.to_json})")
         end
 
         # --- V0.6 M-B2: „Nahradit UNI…" --------------------------------------
@@ -1016,6 +1064,20 @@ module Noxun
           decor = data['decor'].to_s.strip
           set_status(clear ? "Výrobca dekoru #{decor} zmazaný (#{result} dosiek)."
                            : "Výrobca dekoru #{decor} nastavený (#{result} dosiek).")
+        end
+
+        # D-82: farba CELEJ dekorovej skupiny (dosky aj pasky) — vzor
+        # handle_set_decor_manufacturer. Variantove formulare farbu uz nemaju;
+        # jedina cesta zmeny je tento skupinovy control v hlavicke detailu.
+        def handle_set_decor_color(payload)
+          data = JSON.parse(payload.to_s)
+          return unless catalog_write_ok?(data)
+          ok, result = Materials.set_decor_color(data['decor'], data['color'],
+                                                 group_id: data['group_id'])
+          return set_status(result, true) unless ok
+          after_catalog_change
+          decor = data['decor'].to_s.strip
+          set_status("Farba dekoru #{decor} zmenená (#{result} záznamov).")
         end
 
         # --- D-05: sprava katalogu (Codex audit davky 2 zapracovany) ----------
