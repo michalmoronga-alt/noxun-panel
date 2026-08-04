@@ -147,9 +147,14 @@ module Noxun
           # V0.6 M-B1: UNI = material neurceny. JEDNA jasna ORANGE polozka;
           # drift/oversize/ABS kontroly sa NEHLASIA (katalogova hrubka aj
           # format su len pracovne defaulty, pasky UNI zo zasady nema).
+          # D-83: riadok nesie aj ID UNI materialu, aby sa dalo „Nahradiť UNI…"
+          # spustit priamo z KONTROLY. Hodnota ide zo SERVERA z CERSTVEHO
+          # katalogoveho zaznamu (nie z klienta ani z part snapshotu) — okno
+          # Materialy ju pred otvorenim modalu aj tak overuje znova.
           items << record_item(ORANGE, CAT_UNI, r,
                                "Dielec „#{disp_name(r)}“ (#{disp_owner(r)}) — materiál UNI " \
-                               '(neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).')
+                               '(neurčený) — pred výrobou vyber reálny dekor (Nahradiť UNI…).',
+                               extra: { 'uni_id' => sheet['material_id'].to_s })
           return
         elsif sheet
           check_thickness(r, role, sheet, items)
@@ -405,15 +410,19 @@ module Noxun
 
       # --- pomocne -----------------------------------------------------------
 
-      def record_item(severity, category, r, message)
+      # extra = volitelne DOPLNKOVE polia riadku (D-83 'uni_id'). Do stable_key
+      # NEvstupuju — kluc je identita problemu a nesmie sa hnut, inak by sa
+      # rozbil klik-select aj dedup.
+      def record_item(severity, category, r, message, extra: nil)
         oid  = r['owner_id'].to_s
         pkey = r['part_key'].to_s
-        {
+        item = {
           'severity' => severity, 'category' => category,
           'owner_id' => oid, 'part_key' => (pkey.empty? ? nil : pkey), 'hw_key' => nil,
           'message_sk' => message,
           'stable_key' => "#{category}|#{oid}|#{pkey}"
         }
+        extra.is_a?(Hash) ? item.merge(extra) : item
       end
 
       # Dedup podla stable_key — jeden problem (kategoria + vlastnik + kluc) = jeden

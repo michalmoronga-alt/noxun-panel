@@ -224,6 +224,8 @@ module Noxun
           cb(dlg, 'select_row')  { |p| handle_select(p) }
           cb(dlg, 'vepo_export') { |p| handle_export(p) } # V0.5 C
           cb(dlg, 'hw_csv_export') { |p| handle_hw_csv(p) } # V0.6 D1b
+          # D-83: skratka z riadku KONTROLY do „Nahradiť UNI…" (okno Materiály).
+          cb(dlg, 'replace_uni') { |p| handle_replace_uni(p) }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(production): #{msg}")
@@ -444,6 +446,46 @@ module Noxun
           end
         end
 
+        # D-83: „Nahradiť UNI…" z riadku KONTROLY. Model sa TU nemeni — len sa
+        # otvara okno Materiály s predvyplnenym modalom; samotnu zamenu robi
+        # MaterialsDialog s vlastnymi guardmi (scan, odtlacok planu, 1 undo),
+        # preto tu netreba flush handshake ako pri selecte/exporte.
+        # Vsetky tri guardy bezia na SERVERI (klientovi sa neveri):
+        #   gen        — riadok zo stareho DOM (medzitym prepocitany kusovnik),
+        #   model_guid — medzitym prepnuty dokument,
+        #   uni_id     — material medzitym zmazany/nahradeny/uz nie je UNI.
+        def handle_replace_uni(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          model = Sketchup.active_model
+          unless data['gen'].to_i == @generation.to_i
+            push_state if @dialog && @dialog.visible?
+            return set_status('Kontrola sa medzitým zmenila — obnovené, klikni znova.', true)
+          end
+          guid = data['model_guid'].to_s
+          if !guid.empty? && guid != model_guid(model)
+            push_state
+            return set_status('Model sa medzitým prepol — obnovené, klikni znova.', true)
+          end
+          uni_id = data['uni_id'].to_s
+          sheet = defined?(Materials) ? Materials.sheet(uni_id) : nil
+          unless sheet && Materials.uni?(sheet)
+            push_state
+            return set_status('Materiál už nie je UNI (medzitým sa zmenil) — kontrola obnovená.', true)
+          end
+          unless defined?(MaterialsDialog) && MaterialsDialog.request_replace_uni(uni_id, model)
+            return set_status('Okno Materiály sa nepodarilo otvoriť.', true)
+          end
+          set_status("Otváram „Nahradiť UNI…“ pre #{uni_id}.")
+        end
+
+        # Stabilna identita modelu — zrkadlo MaterialsDialog.model_guid (oneskoreny
+        # klik po prepnuti dokumentu nesmie otvorit modal nad inym projektom).
+        def model_guid(model)
+          model && model.respond_to?(:guid) ? model.guid.to_s : ''
+        rescue StandardError
+          ''
+        end
+
         # Katalog dosiek ako mapa pre Validation.run ({ material_id => sheet }).
         def sheets_map
           return {} unless defined?(Materials)
@@ -547,6 +589,9 @@ module Noxun
             version: Engine::VERSION,
             gen: @generation,
             model_title: (model.title.to_s.empty? ? 'Bez názvu' : model.title.to_s),
+            # D-83: identita modelu pre skratku „Nahradiť UNI…" — klik zo
+            # stareho okna po prepnuti dokumentu sa na serveri odmietne.
+            model_guid: model_guid(model),
             rows: bom[:rows], sheets: bom[:sheets], edging: bom[:edging],
             # V0.6 C-2 (audit F11): slovensky label kovania TRANZIENTNE —
             # autorita HardwareRules.label_for; do BOM/snapshotu sa neuklada.

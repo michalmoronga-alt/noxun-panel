@@ -285,15 +285,43 @@
       var red = it.severity === 'red';
       h += '<tr class="ctrlrow ' + (red ? 'ctrl-red' : 'ctrl-orange') + '" data-i="' + i + '">' +
            '<td class="ctrlicon">' + (red ? '🔴' : '🟠') + '</td>' +
-           '<td>' + esc(it.message_sk) + '</td>' +
+           '<td>' + esc(it.message_sk) + ctrlActionHtml(it) + '</td>' +
            '<td>' + esc(it.owner_id || '—') + '</td></tr>';
     });
     box.innerHTML = h + '</tbody></table>';
   }
 
+  // D-83: pri riadku „materiál neurčený" (UNI) ponukne skratku rovno do
+  // „Nahradiť UNI…" v okne Materiály — inak pouzivatel musel otvorit katalog,
+  // najst spravnu UNI dlazdicu a modal spustit rucne. Ikona sedi v EXISTUJUCOM
+  // riadku (vertikalny priestor); uni_id nesie SERVER, klient si ho nevymysla.
+  function ctrlActionHtml(it){
+    if (!it || it.category !== 'uni_material' || !it.uni_id) return '';
+    return ' <button type="button" class="ctrlact" data-uni="' + esc(it.uni_id) + '"' +
+      ' title="Nahradiť UNI…" aria-label="Nahradiť UNI reálnym dekorom">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-arrow-left-right"/></svg></button>';
+  }
+  // Relay do Ruby — gen aj model_guid overuje SERVER (stary DOM / prepnuty
+  // dokument sa odmietne a nic sa neotvori).
+  function requestReplaceUni(uniId){
+    if (!uniId || !BOM || !window.sketchup || !sketchup.replace_uni) return;
+    sketchup.replace_uni(JSON.stringify({ uni_id: uniId, gen: BOM.gen,
+                                          model_guid: BOM.model_guid || '' }));
+  }
+
   // Delegovany klik: posiela KLUC riadku (nie pids) — Ruby si po flushi editov
   // najde cerstve refs (Codex GH #48 P2: rebuild po flushi meni persistent id).
   document.addEventListener('click', function(ev){
+    // D-83: ikona akcie v riadku KONTROLY ma VLASTNY klik — nesmie zaroven
+    // oznacit dielec v modeli. Vetvenie je TU (a nie v druhom listeneri):
+    // stopPropagation medzi dvoma listenermi na TOM ISTOM uzle nefunguje.
+    var act = ev.target && ev.target.closest ? ev.target.closest('button.ctrlact') : null;
+    if (act){
+      ev.preventDefault();
+      ev.stopPropagation();
+      requestReplaceUni(act.getAttribute('data-uni'));
+      return;
+    }
     var tr = ev.target && ev.target.closest ? ev.target.closest('tr.bomrow, tr.hwrow, tr.ctrlrow') : null;
     if (!tr || !BOM || !window.sketchup || !sketchup.select_row) return;
     var i = parseInt(tr.getAttribute('data-i'), 10);
