@@ -9,6 +9,12 @@
 # Sablony su GLOBALNE (%APPDATA%, TemplateStore) — nie su viazane na model,
 # preto dialog nepotrebuje refresh pri prepnuti dokumentu; "oznaceny korpus"
 # sa hlada cerstvo pri kazdej akcii.
+#
+# H2 (D-76): sablona nesie AJ kovanie — mapovanie setov + ZMRAZENE definicie
+# (ulozenie: Panel.template_config_from s modelom; aplikacia: merge_hardware_sets
+# + zmrazenie do projektoveho snapshotu v operacii prestavby). Sablona je datovy
+# subor MIMO modelu, preto sa jej kovanie cita BEZSTRATOVO alebo vobec
+# (HardwareSets.read_template_mapping — GH #133 P2).
 require 'json'
 
 module Noxun
@@ -147,8 +153,10 @@ module Noxun
         end
 
         # Pouzije sablonu na oznaceny korpus. MERGE, nie nahradenie: konstrukcne
-        # kluce zo sablony; materialy + part_overrides + hardware_overrides CIELA
-        # zostavaju (sablona ich nenesie — viazane na konkretne dielce zdroja).
+        # kluce zo sablony; part_overrides + hardware_overrides CIELA zostavaju
+        # (sablona ich nenesie — viazane na konkretne dielce zdroja).
+        # H2 (D-76): SETY KOVANIA sablona nesie (mapovanie + zmrazene definicie) —
+        # merge_hardware_sets, zmrazenie v operacii prestavby.
         def handle_apply(payload)
           name = JSON.parse(payload.to_s)['template'].to_s
           tpl = TemplateStore.find(name)
