@@ -9,6 +9,12 @@
 # Sablony su GLOBALNE (%APPDATA%, TemplateStore) — nie su viazane na model,
 # preto dialog nepotrebuje refresh pri prepnuti dokumentu; "oznaceny korpus"
 # sa hlada cerstvo pri kazdej akcii.
+#
+# H2 (D-76): sablona nesie AJ kovanie — mapovanie setov + ZMRAZENE definicie
+# (ulozenie: Panel.template_config_from s modelom; aplikacia: merge_hardware_sets
+# + zmrazenie do projektoveho snapshotu v operacii prestavby). Sablona je datovy
+# subor MIMO modelu, preto sa jej kovanie cita BEZSTRATOVO alebo vobec
+# (HardwareSets.read_template_mapping — GH #133 P2).
 require 'json'
 
 module Noxun
@@ -119,7 +125,10 @@ module Noxun
           cab = Panel.find_cabinet(model)
           return set_status('Najprv označ NOXUN korpus — šablóna sa ukladá z neho.', true) if cab.nil?
 
-          config = Panel.template_config_from(Store.config(cab) || {})
+          # H2 (D-76): model = zdroj ZMRAZENYCH definicii setov kovania.
+          cab_cfg = Store.config(cab) || {}
+          config = Panel.template_config_from(cab_cfg, model: model)
+          hw_note = Panel.template_save_hardware_note(cab_cfg, config, model) # GH #133 P2
           res = UI.inputbox(['Nazov sablony:'], [Panel.suggest_template_name(cab, {})], 'Ulozit sablonu')
           return if res == false # zrusene
 
@@ -131,7 +140,7 @@ module Noxun
             return set_status('Zrušené — šablóna nezmenená.')
           end
           TemplateStore.upsert(name, config)
-          after_change("Šablóna \"#{name}\" uložená.")
+          after_change("Šablóna \"#{name}\" uložená.#{hw_note}")
         end
 
         def handle_delete(payload)
@@ -144,8 +153,10 @@ module Noxun
         end
 
         # Pouzije sablonu na oznaceny korpus. MERGE, nie nahradenie: konstrukcne
-        # kluce zo sablony; materialy + part_overrides + hardware_overrides CIELA
-        # zostavaju (sablona ich nenesie — viazane na konkretne dielce zdroja).
+        # kluce zo sablony; part_overrides + hardware_overrides CIELA zostavaju
+        # (sablona ich nenesie — viazane na konkretne dielce zdroja).
+        # H2 (D-76): SETY KOVANIA sablona nesie (mapovanie + zmrazene definicie) —
+        # merge_hardware_sets, zmrazenie v operacii prestavby.
         def handle_apply(payload)
           name = JSON.parse(payload.to_s)['template'].to_s
           tpl = TemplateStore.find(name)
@@ -164,6 +175,15 @@ module Noxun
             return set_status("Šablóna je pre iný typ (#{tpl_type == 'upper' ? 'horná' : 'dolná'}) než označená skrinka — nepoužitá.", true)
           end
 
+          # GH #133 P2: kovanie sablony sa cita BEZSTRATOVO alebo vobec. Sablona
+          # z novsej verzie (neznamy typ kovania) ci rucne upravena by ocesanou
+          # mapou ticho ZMAZALA platny vyber setov cielovej skrinky.
+          hw_status, hw_lost = HardwareSets.read_template_mapping((tpl['config'] || {})['hardware_sets'])
+          if hw_status == :lossy
+            return set_status("Šablóna nesie kovanie, ktoré sa nedá prečítať (#{Array(hw_lost).join(', ')}) — " \
+                              'je z novšej verzie Noxun alebo ručne upravená. Nepoužitá, nič sa nezmenilo.', true)
+          end
+
           target = Panel.existing_params(cab)
           merged = merge_template(target, tpl['config'])
           # D-45 (audit B4): sablona nesie hrubku aj (nepovinne) material — dvojica
@@ -172,12 +192,30 @@ module Noxun
           # inak material dobera body_preflight; nejednoznacnost = odmietnutie.
           pf = template_material_preflight(merged, tpl['config'], target, model)
           return set_status(pf[:error], true) if pf && pf[:error]
+          # H2 (D-76): definicie setov zo sablony sa zmrazia do projektoveho
+          # snapshotu v TEJ ISTEJ operacii ako prestavba (rebuild_many blok) —
+          # jedno undo a ziadna skrinka s nezmrazenym setom (zlyhanie zmrazenia
+          # vyhodi vynimku a operacia sa cela zrusi).
+          hw_note = ''
           Panel.suspend_selection_sync do
-            CabinetBuilder.rebuild(model, cab, merged)
+            CabinetBuilder.rebuild_many(model, [[cab, merged]], op_name: 'NOXUN: Aplikuj sablonu') do
+              hw_note = freeze_sets_from_template!(model, merged, tpl['config'])
+            end
             Panel.reselect(model, cab)
           end
-          set_status("Šablóna \"#{name}\" použitá na #{Store.get(cab, 'cabinet_id')}.#{pf ? pf[:note] : ''}")
+          set_status("Šablóna \"#{name}\" použitá na #{Store.get(cab, 'cabinet_id')}." \
+                     "#{pf ? pf[:note] : ''}#{hw_note}")
           Panel.push_selected(model)
+        end
+
+        # H2 (D-76): zmrazenie definicii setov zo sablony do projektu. Legacy
+        # sablona (bez kluca 'hardware_sets') nema co mrazit — mapovanie ciela
+        # ostava tak, ako ho projekt uz ma zmrazene.
+        def freeze_sets_from_template!(model, merged, tpl_config)
+          return '' unless tpl_config.is_a?(Hash) && tpl_config.key?('hardware_sets')
+
+          Panel.freeze_template_hardware!(model, merged['hardware_sets'],
+                                          tpl_config['hardware_set_defs'])
         end
 
         # D-45: zladenie hrubka<->material pre MERGED params sablony.
@@ -208,6 +246,7 @@ module Noxun
           merged = tpl_config.dup
           merged['part_overrides'] = target_params['part_overrides'] || {}
           merged['hardware_overrides'] = target_params['hardware_overrides'] || []
+          merged['hardware_sets'] = merge_hardware_sets(target_params, tpl_config)
           # D-13 (Codex F3): legacy sablona BEZ plinth_recess nesmie cielovy korpus
           # ticho stiahnut na novy default — chybajuci kluc = zachovaj hodnotu ciela.
           merged['plinth_recess'] = target_params['plinth_recess'] unless tpl_config.key?('plinth_recess')
@@ -216,6 +255,28 @@ module Noxun
             merged[k] = tv || target_params[k]
           end
           merged
+        end
+
+        # H2 (D-76): sety kovania pri aplikacii sablony.
+        #   sablona kluc NEMA (legacy/seed)  -> zachova sa CELE mapovanie CIELA
+        #     (vzor plinth_recess D-13; do H2 sa override setov ticho ZMAZAL)
+        #   sablona kluc MA                  -> genericke kluce zo SABLONY;
+        #     composite kluce „typ@owner_part_key" CIELA sa pridaju spat —
+        #     su viazane na konkretne dielce ciela, sablona o nich nic nevie
+        #     a nikdy ich nemaze ani neprepisuje.
+        # Mapa zo sablony sa VZDY normalizuje s allow_owner: false — rucne
+        # upraveny JSON s composite klucom sa cez sablonu do skrinky nedostane.
+        def merge_hardware_sets(target_params, tpl_config)
+          target = target_params['hardware_sets'].is_a?(Hash) ? target_params['hardware_sets'] : {}
+          target = HardwareSets.normalize_mapping(target, nil, allow_owner: true)
+          return target unless tpl_config.is_a?(Hash) && tpl_config.key?('hardware_sets')
+
+          out = HardwareSets.normalize_mapping(tpl_config['hardware_sets'], nil, allow_owner: false)
+          target.each do |key, value|
+            parsed = BuildPlan.parse_hardware_set_key(key)
+            out[key] = value if parsed && parsed[1] # composite = override na dielci
+          end
+          out
         end
 
         # Po zmene kniznice: refresh dialogu + quick-pick selectu v paneli.

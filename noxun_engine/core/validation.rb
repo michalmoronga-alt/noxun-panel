@@ -323,6 +323,10 @@ module Noxun
                 'predvoľby — doplň pásmo výberu setu.'
             when 'set_missing'
               "#{label} (#{where}): projekt odkazuje na set „#{sid}“, ktorý v projekte nie je — vyber set nanovo."
+            when 'set_type_mismatch'
+              # H2 (D-76): set zo sablony vs. vlastna definicia projektu — radsej
+              # NIC ako tichy zly hardver (kody ineho typu kovania).
+              "#{label} (#{where}): set „#{sid}“ je v projekte iného typu kovania — vyber set nanovo."
             else
               "#{label} (#{where}) nemá priradený set — kovanie je bez kódov (nenacenené)."
             end

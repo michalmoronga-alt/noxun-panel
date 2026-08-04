@@ -262,16 +262,48 @@ module Noxun
                    "#{mat_name(sheet)} (#{fmt_mm(have)} mm) — odomkni hrúbku alebo zmeň materiál. Nič sa neupravilo." }
         end
 
+        # H2 (D-76): vklad zo sablony nesie KOVANIE — mapovanie setov + zmrazene
+        # definicie. JS je len prenasac (autorita je server): mapovanie sa TU
+        # normalizuje s allow_owner: false — composite kluce „typ@dielec" patria
+        # ku konkretnym dielcom zdrojovej skrinky a do noveho korpusu nepatria.
+        # GH #133 P2: kovanie sablony sa cita BEZSTRATOVO alebo vobec — sablona
+        # z novsej verzie (neznamy typ kovania) ci rucne upravena sa NEVKLADA
+        # ocesana, vklad sa odmietne.
+        # -> [:ok, { 'mapping', 'defs' } | nil] | [:lossy, [zahodene kluce]]
+        def take_insert_hardware!(params)
+          defs = params.delete('hardware_set_defs')
+          status, res = HardwareSets.read_template_mapping(params['hardware_sets'])
+          return [:lossy, res] unless status == :ok
+
+          if res.empty?
+            params.delete('hardware_sets')
+            return [:ok, nil]
+          end
+          params['hardware_sets'] = res
+          [:ok, { 'mapping' => res, 'defs' => defs }]
+        end
+
         def handle_insert(payload)
           model = Sketchup.active_model
           params = parse(payload)
+          hw_status, hw = take_insert_hardware!(params) # H2 (D-76)
+          if hw_status == :lossy
+            return set_status("Šablóna nesie kovanie, ktoré sa nedá prečítať (#{Array(hw).join(', ')}) — " \
+                              'je z novšej verzie Noxun alebo ručne upravená. Nič sa nevložilo.', true)
+          end
           tf = insert_thickness_preflight(params, model) # D-45
           return set_status("#{tf[:error]}#{insert_locks_hint}", true) if tf && tf[:error]
           pf = material_preflight(params, model)
           return set_status("#{pf[:error]}#{insert_locks_hint}", true) if pf && pf[:error]
           pf = { note: "#{tf ? tf[:note] : ''}#{pf ? pf[:note] : ''}" }
+          hw_note = ''
           begin
-            inst = CabinetBuilder.build(model, params)
+            # Zmrazenie setov zo sablony je SUCAST operacie vlozenia (1 undo);
+            # jeho zlyhanie zrusi celu operaciu — ziadna skrinka s nezmrazenym
+            # setom (rovnaky kontrakt ako pri aplikacii sablony).
+            inst = CabinetBuilder.build(model, params) do
+              hw_note = freeze_template_hardware!(model, hw['mapping'], hw['defs']) if hw
+            end
           rescue StandardError => e
             # F8: konflikt sablona x zamok NIC ticho neupravuje — vklad odmietnu
             # existujuce guardy stavby (Fronts.validate_layout!, hrubkova kontrola
@@ -281,7 +313,8 @@ module Noxun
           end
           select_only(model, inst)
           cid = Store.get(inst, 'cabinet_id')
-          status_with_warnings(inst, "Vlozeny #{cid} — #{part_count(inst)} dielcov.#{pf ? pf[:note] : ''}")
+          status_with_warnings(inst, "Vlozeny #{cid} — #{part_count(inst)} dielcov." \
+                                     "#{pf ? pf[:note] : ''}#{hw_note}")
           push_selected(model)
         end
 

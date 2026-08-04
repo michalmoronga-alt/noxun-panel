@@ -72,6 +72,10 @@ module Noxun
         # Vlozi novy korpus. Dolna na Z=0 vedla existujucich; horna na Z=UPPER_HANG_Z. Vrati instanciu.
         # Korpus je VZDY top-level (model.entities) — nikdy do aktivneho edit kontextu (inak
         # by sa korpus vlozil do cudzieho komponentu). Preto najprv zavrieme edit kontext.
+        # H2 (D-76): volitelny blok bezi v TEJ ISTEJ operacii PRED stavbou (vzor
+        # rebuild_many) — zapis dat, ktore k novej skrinke patria (zmrazenie setov
+        # kovania zo sablony). Vynimka v bloku zrusi CELU operaciu: ziadna skrinka,
+        # ziadny zapis.
         def build(model, params)
           ensure_root_context(model)
           cfg = normalize(params)
@@ -84,6 +88,7 @@ module Noxun
           guarded do
             model.start_operation('NOXUN: Vloz korpus', true)
             begin
+              yield if block_given? # H2: sprievodny zapis v tej istej operacii
               cdef = model.definitions.add("NOXUN Korpus #{cid}")
               cdef.entities.clear!
               final = build_into(model, cdef, cfg, cid)

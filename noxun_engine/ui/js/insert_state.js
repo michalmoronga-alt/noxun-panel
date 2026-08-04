@@ -10,11 +10,14 @@
     'use strict';
     var LOCK_FIELDS = ['width', 'height', 'depth', 'thickness', 'floor_height'];
     var MATERIAL_KEYS = ['material_id', 'front_material_id', 'back_material_id'];
+    // H2 (D-76): kovanie zo sablony — mapovanie setov + zmrazene definicie.
+    var HARDWARE_KEYS = ['hardware_sets', 'hardware_set_defs'];
     var state = {
       type: 'lower',
       template: '',   // nazov zvolenej sablony ('' = defaulty typu)
       locks: {},      // { width: { locked:true, value:950 }, ... } — chybajuci kluc = odomknute
       materials: { material_id: null, front_material_id: null, back_material_id: null },
+      hardware: { hardware_sets: null, hardware_set_defs: null }, // H2 (D-76)
       lastMode: null  // posledny UI rezim (insert|cab|part|board); null = pred prvym initom
     };
 
@@ -107,10 +110,42 @@
     }
     function setMaterials(map){ state.materials = materialsOf(map || {}); }
 
+    // --- H2 (D-76): kovanie zo sablony --------------------------------------
+    // Stav je LEN prenasac do insert payloadu — autorita je server (normalizuje
+    // mapovanie s allow_owner:false a zmrazi definicie v operacii vlozenia).
+    // Sablona sa NIKDY nemutuje (N11): mapa sa kopiruje, hodnoty sa len citaju.
+    // Chybajuci/prazdny kluc = null, takze zrusenie vyberu sablony stav VYCISTI;
+    // definicie bez mapovania nemaju co zmrazit -> tiez null.
+    function plainMap(v){
+      if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+      var out = {}, any = false, k;
+      for (k in v){
+        if (!Object.prototype.hasOwnProperty.call(v, k)) continue;
+        out[k] = v[k];
+        any = true;
+      }
+      return any ? out : null;
+    }
+    function hardwareOf(src){
+      var out = { hardware_sets: null, hardware_set_defs: null };
+      HARDWARE_KEYS.forEach(function(k){ out[k] = plainMap(src ? src[k] : null); });
+      if (!out.hardware_sets) out.hardware_set_defs = null;
+      return out;
+    }
+    function setHardware(src){ state.hardware = hardwareOf(src || {}); }
+    // Kluce do insert payloadu — prazdne kluce sa NEposielaju.
+    function hardwarePayload(){
+      var hw = state.hardware || {};
+      var out = {};
+      HARDWARE_KEYS.forEach(function(k){ if (hw[k]) out[k] = hw[k]; });
+      return out;
+    }
+
     return {
       state: state,
       LOCK_FIELDS: LOCK_FIELDS,
       MATERIAL_KEYS: MATERIAL_KEYS,
+      HARDWARE_KEYS: HARDWARE_KEYS,
       needsReset: needsReset,
       trackMode: trackMode,
       lockableField: lockableField,
@@ -124,7 +159,10 @@
       composeSource: composeSource,
       applyLocks: applyLocks,
       materialsOf: materialsOf,
-      setMaterials: setMaterials
+      setMaterials: setMaterials,
+      hardwareOf: hardwareOf,
+      setHardware: setHardware,
+      hardwarePayload: hardwarePayload
     };
   })();
 

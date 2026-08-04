@@ -267,6 +267,7 @@
     currentZoneTree = src.zone_tree ? sanitizeTree(src.zone_tree) : defaultTree();
     activeZoneId = null;
     NXInsert.setMaterials(src);              //         materialy zo sablony (F6)
+    NXInsert.setHardware(src);               //         sety kovania zo sablony (H2/D-76)
     applyInsertLockValues();                 // krok 2: zamky prebiju zdroj
     renderInsertLocks();
     applyVisibility(st.type);                // krok 3: viditelnost + validacia + nahlad
