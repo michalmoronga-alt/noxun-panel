@@ -284,9 +284,6 @@ module Noxun
         end
       end
 
-      # Chrbat — overlay / inset / groove / none (D-31: none = ziadny dielec).
-      # D-37: VSETKY rezimy koncia najneskor na celkovej hlbke d — overlay chrbat
-      # lezi v pasme [d-bt, d] ZA skratenym korpusom (uz nie za celkovou hlbkou).
       # D-80 (F5): horna hrana chrbta v rezimoch inset/groove. KONZERVATIVNE —
       # chrbat bezi ZA vystuhami, preto sa skracuje LEN o odsadenie vystuh
       # (rails_top_offset), NIE o vysku upright vystuhy. Pri offsete 0 vrati presne
@@ -298,6 +295,9 @@ module Noxun
         cfg[:height].to_f - rail_geometry(cfg)[:offset] - cfg[:thickness].to_f
       end
 
+      # Chrbat — overlay / inset / groove / none (D-31: none = ziadny dielec).
+      # D-37: VSETKY rezimy koncia najneskor na celkovej hlbke d — overlay chrbat
+      # lezi v pasme [d-bt, d] ZA skratenym korpusom (uz nie za celkovou hlbkou).
       def back_part(cfg, interior)
         return nil if cfg[:back_mode] == 'none' # D-31: explicitne (else vetva by vyrobila overlay!)
         w = cfg[:width]; d = cfg[:depth]; h = cfg[:height]; t = cfg[:thickness]; s = cfg[:floor_height]
