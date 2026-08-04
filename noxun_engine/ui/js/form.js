@@ -167,8 +167,6 @@
   function updateAvailable(){
     // pri oznacenom pouzijeme presne z backendu; inak lokalny odhad
     var t = numv('thickness') || 18, w = numv('width') || 0, h = numv('height') || 0, d = numv('depth') || 0;
-    var fh = numv('floor_height') || 0;
-    var topNone = val('top_mode') === 'none';
     setVal('av_width', Math.max(0, Math.round(w - 2*t)));
     // D-37: svetla hlbka zrkadli interior_dims — hlbka je CELKOVA vratane chrbta:
     // overlay/inset: d - bt; groove: d - 10 - bt; none: d (audit FIX 5 — bez tohto
@@ -178,7 +176,11 @@
     if (bm === 'overlay' || bm === 'inset') ad = d - bt;
     else if (bm === 'groove') ad = d - 10 - bt;
     setVal('av_depth', Math.max(0, Math.round(ad)));
-    setVal('av_height', Math.max(0, Math.round(h - fh - t - (topNone ? 0 : t))));
+    // D-80: svetla vyska cez JEDINU zdielanu funkciu (core.js nxInteriorZ) —
+    // pri two_rails ju urcuje spodna hrana vystuh (odsadenie + orientacia).
+    // Vyska/hrubka sa posielaju z uz precitanych poli (prazdne pole = 0 ako predtym).
+    var iv = nxInteriorZ(currentCarcass({ height: h, thickness: t }));
+    setVal('av_height', Math.max(0, Math.round(iv.availH)));
   }
 
   // --- defaulty / viditelnost ---

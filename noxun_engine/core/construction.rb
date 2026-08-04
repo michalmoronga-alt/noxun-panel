@@ -18,6 +18,15 @@ module Noxun
       BACK_THICKNESS_DEFAULT = 3.0    # default hrubka chrbta (HDF), ak cfg neuvedie
       GROOVE_OFFSET          = 10.0   # odsadenie chrbta v drazke od zadnej hrany
 
+      # D-80: rezerva svetleho vnutra POD vystuhami (mm). JEDEN zdroj pravdy pre
+      # clamp vysky upright vystuhy AJ pre clamp odsadenia (rails_top_offset):
+      # spodna hrana vystuh nikdy neklesne pod z_lo + tuto rezervu.
+      # Preco 20 a nie 10 (povodny limit vysky upright vystuhy): validate! odmieta
+      # avail_h <= 10, takze pri rezerve 10 by extremne zadanie skoncilo TVRDYM
+      # odmietnutim rebuildu. S 20 sa extrem OREZE a nahlasi warningom (a 20 mm je
+      # zaroven ZoneTree::MIN_FIELD — najmensie zmysluplne svetle pole).
+      MIN_INTERIOR_H = 20.0
+
       module_function
 
       # Hlavny vstup: cfg (symbolove kluce, mm Float) + cabinet_id (pre ID zon) -> plan.
@@ -43,7 +52,7 @@ module Noxun
         # Vnutro = strom zon nad vnutornym boxom (3D). Priecky + police su dielce korpusu.
         zbox = { x0: t, x1: w - t, y0: 0.0, y1: interior[:back_front_y],
                  z0: interior[:z_lo], z1: interior[:z_hi] }
-        zres = ZoneTree.compute(cfg[:zone_tree], zbox, t, cabinet_id)
+        zres = compute_zone_tree!(cfg, interior, zbox, t, cabinet_id)
         parts.concat(zres[:dividers])
         parts.concat(zres[:shelves])
         warnings.concat(zres[:warnings] || [])
@@ -100,6 +109,26 @@ module Noxun
         BuildPlan.validate!(plan)
       end
 
+      # D-80 (F3): ked vystuhy znizia strop vnutra, stare clenenie (police, delenia,
+      # zamknute vysky) sa uz nemusi zmestit. ZoneTree v takom pripade RAISNE —
+      # rebuild sa odmietne (ziadne tiche mazanie polic a zamkov), ale pouzivatel
+      # musi vidiet PRECO. Panel hlasku ukaze cez set_status.
+      # ZAMERNE len RuntimeError: ZoneTree validacie hlasia `raise "text"`. Chyba
+      # kodu (NoMethodError a spol.) sa NESMIE prezliect za pouzivatelsku hlasku —
+      # bublina ide von nedotknuta. Povodny dovod zo ZoneTree ostava v texte.
+      def compute_zone_tree!(cfg, interior, zbox, t, cabinet_id)
+        ZoneTree.compute(cfg[:zone_tree], zbox, t, cabinet_id)
+      rescue RuntimeError => e
+        raise e unless rails_lower_interior?(cfg, interior)
+        raise "Vnútorná výška sa znížila (výstuhy) — uprav zóny alebo odsadenie výstuh. #{e.message}"
+      end
+
+      # true = strop vnutra urcuju vystuhy a lezi NIZSIE, nez by lezal plny vrch.
+      def rails_lower_interior?(cfg, interior)
+        return false unless cfg[:top_mode] == 'two_rails'
+        interior[:z_hi].to_f < (cfg[:height].to_f - cfg[:thickness].to_f - 0.01)
+      end
+
       # Typ podopretia korpusu (JEDEN zdroj pravdy — builder support_descriptor aj
       # pravidla kovania citaju tuto funkciu): horna/na zemi = none, predny sokel =
       # plinth (nohy pod nim aj tak su — pravidlo noh berie legs AJ plinth), inak legs.
@@ -118,13 +147,57 @@ module Noxun
         cfg[:back_mode] == 'overlay' ? cfg[:depth] - back_thickness(cfg) : cfg[:depth]
       end
 
+      # D-80: geometria hornych vystuh na JEDNOM mieste. rail_parts (dielce),
+      # interior_dims (strop vnutra) aj back_z_hi (vyska chrbta) citaju TENTO
+      # vysledok — ziadna druha kopia vzorca, ktora by sa mohla rozist.
+      #
+      # Vystuhy zaberaju od vrchu smerom dole: `offset` (rails_top_offset, napr.
+      # znizenie pod varnu dosku) + `occupy` (flat = hrubka dosky; upright = vyska
+      # vystuhy na hranu, az ~rail_depth). Spodna hrana `z_bottom` = strop vnutra.
+      #
+      # Clampy (obidva hlasene warningom, nikdy tiche):
+      #   depth  — flat: hlbka <= d/2 - 10; upright: vyska <= dostupne miesto; min 20
+      #   offset — 0 .. (dostupne miesto - occupy), aby vnutro drzalo MIN_INTERIOR_H
+      # Hranicny pripad (Codex P2 na PR #134): ak je `head` mensi nez minimalna
+      # vystuha (20 mm), vyhrava minimum vystuhy a vnutro by kleslo pod rezervu
+      # (napr. 200/sokel 150/t 18 upright -> vnutro 12 mm). Vystuha tenka ako 12 mm
+      # je nezmysel, preto sa TU nic neohyba — invariant "two_rails => vnutro aspon
+      # MIN_INTERIOR_H" strazi validate! vlastnou zrozumitelnou hlaskou.
+      # rail_geometry ostava CISTY kalkulator (ziadna vynimka) — presne to zrkadli JS.
+      def rail_geometry(cfg)
+        h = cfg[:height].to_f; t = cfg[:thickness].to_f; s = cfg[:floor_height].to_f
+        d = carcass_depth(cfg)
+        # kolko smie odsadenie + vystuha spolu zabrat z vysky korpusu
+        head = [h - (s + t) - MIN_INTERIOR_H, 0.0].max
+        want_depth = cfg[:rail_depth].to_f
+        want_off   = cfg[:rails_top_offset].to_f
+        upright = cfg[:rails_orientation] == 'upright'
+        limit = upright ? head : (d / 2.0 - 10.0)
+        dep = [want_depth, limit].min
+        dep = 20.0 if dep < 20.0
+        occupy = upright ? dep : t
+        max_off = [head - occupy, 0.0].max
+        off = [[want_off, 0.0].max, max_off].min
+        { offset: off, wanted_offset: want_off, depth: dep, wanted_depth: want_depth,
+          occupy: occupy, upright: upright, clamp_label: (upright ? 'vyska' : 'hlbka'),
+          z_top: h - off, z_bottom: h - off - occupy }
+      end
+
       # Vnutorne rozmery (svetle) + poloha celnej hrany chrbta. Hrubka chrbta z configu.
       def interior_dims(cfg)
         h = cfg[:height]; d = cfg[:depth]
         t = cfg[:thickness]; s = cfg[:floor_height]
         bt = back_thickness(cfg)
         z_lo = s + t
-        z_hi = cfg[:top_mode] == 'none' ? h : h - t
+        # D-80: pri two_rails konci vnutro na SPODNEJ hrane vystuh (nie na h - t) —
+        # inak by sa zony/police/priecky ratali do priestoru varnej dosky a pri
+        # vystuhach 'upright' aj do celej vysky vystuhy.
+        z_hi =
+          case cfg[:top_mode]
+          when 'none'      then h
+          when 'two_rails' then rail_geometry(cfg)[:z_bottom]
+          else                  h - t
+          end
         back_front_y =
           case cfg[:back_mode]
           when 'none'   then d # D-31: ziadny chrbat — vnutro az po zadnu rovinu
@@ -185,29 +258,23 @@ module Noxun
       # Orezanie hlbky/vysky vystuhy uz nie je tiche — hlasi sa do warnings (ak je kolektor).
       # D-37: zadna vystuha sedi na KONSTRUKCNEJ hlbke (pri overlay pred chrbtom).
       def rail_parts(cfg, warnings = nil)
-        w = cfg[:width]; d = carcass_depth(cfg); t = cfg[:thickness]; h = cfg[:height]; s = cfg[:floor_height]
-        off = cfg[:rails_top_offset].to_f
-        z_top = h - off
-        if cfg[:rails_orientation] == 'upright'
-          rdp = [cfg[:rail_depth], (h - s - t - 10.0)].min
-          rdp = 20.0 if rdp < 20.0
-          rail_clamp_warning(warnings, cfg[:rail_depth], rdp, 'vyska')
-          z0 = z_top - rdp
-          prod = { length: w - 2 * t, width: rdp, thickness: t }
+        w = cfg[:width]; d = carcass_depth(cfg); t = cfg[:thickness]
+        g = rail_geometry(cfg) # D-80: JEDINY zdroj clampov (zdielany s interior_dims)
+        rail_clamp_warning(warnings, g[:wanted_depth], g[:depth], g[:clamp_label])
+        rail_offset_warning(warnings, g[:wanted_offset], g[:offset])
+        z0 = g[:z_bottom]
+        rd = g[:depth]
+        prod = { length: w - 2 * t, width: rd, thickness: t }
+        if g[:upright]
           [
             { suffix: 'TOP-RAIL-F', part_key: PartKeys.cabinet('rail', 'front'),
               role: 'rail_front', name: 'Vystuha predna', material: :korpus,
-              box: [w - 2 * t, t, rdp], origin: [t, 0, z0], prod: prod },
+              box: [w - 2 * t, t, rd], origin: [t, 0, z0], prod: prod },
             { suffix: 'TOP-RAIL-B', part_key: PartKeys.cabinet('rail', 'back'),
               role: 'rail_back', name: 'Vystuha zadna', material: :korpus,
-              box: [w - 2 * t, t, rdp], origin: [t, d - t, z0], prod: prod }
+              box: [w - 2 * t, t, rd], origin: [t, d - t, z0], prod: prod }
           ]
         else # flat
-          rd = [cfg[:rail_depth], (d / 2.0 - 10.0)].min
-          rd = 20.0 if rd < 20.0
-          rail_clamp_warning(warnings, cfg[:rail_depth], rd, 'hlbka')
-          z0 = z_top - t
-          prod = { length: w - 2 * t, width: rd, thickness: t }
           [
             { suffix: 'TOP-RAIL-F', part_key: PartKeys.cabinet('rail', 'front'),
               role: 'rail_front', name: 'Vystuha predna', material: :korpus,
@@ -219,6 +286,17 @@ module Noxun
         end
       end
 
+      # D-80 (F5): horna hrana chrbta v rezimoch inset/groove. KONZERVATIVNE —
+      # chrbat bezi ZA vystuhami, preto sa skracuje LEN o odsadenie vystuh
+      # (rails_top_offset), NIE o vysku upright vystuhy. Pri offsete 0 vrati presne
+      # povodne h - t => bez odsadenia sa vyroba chrbta NEMENI.
+      # POZN: finalny konstrukcny detail (napr. ci ma chrbat pri upright vystuhe
+      # koncit este nizsie) potvrdi Michal pri teste — je to zmena na 1 riadku.
+      def back_z_hi(cfg, interior)
+        return interior[:z_hi] unless cfg[:top_mode] == 'two_rails'
+        cfg[:height].to_f - rail_geometry(cfg)[:offset] - cfg[:thickness].to_f
+      end
+
       # Chrbat — overlay / inset / groove / none (D-31: none = ziadny dielec).
       # D-37: VSETKY rezimy koncia najneskor na celkovej hlbke d — overlay chrbat
       # lezi v pasme [d-bt, d] ZA skratenym korpusom (uz nie za celkovou hlbkou).
@@ -226,13 +304,14 @@ module Noxun
         return nil if cfg[:back_mode] == 'none' # D-31: explicitne (else vetva by vyrobila overlay!)
         w = cfg[:width]; d = cfg[:depth]; h = cfg[:height]; t = cfg[:thickness]; s = cfg[:floor_height]
         bt = interior[:back_thickness]
+        z_hi = back_z_hi(cfg, interior)
         case cfg[:back_mode]
         when 'inset'
-          z0 = interior[:z_lo]; bh = interior[:z_hi] - z0
+          z0 = interior[:z_lo]; bh = z_hi - z0
           { suffix: 'BACK', part_key: PartKeys.cabinet('back'), role: 'back', name: 'Chrbat', material: :korpus,
             box: [w - 2 * t, bt, bh], origin: [t, d - bt, z0], prod: { length: w - 2 * t, width: bh, thickness: bt } }
         when 'groove'
-          z0 = interior[:z_lo]; bh = interior[:z_hi] - z0
+          z0 = interior[:z_lo]; bh = z_hi - z0
           y0 = d - GROOVE_OFFSET - bt
           { suffix: 'BACK', part_key: PartKeys.cabinet('back'), role: 'back', name: 'Chrbat', material: :korpus,
             box: [w - 2 * t, bt, bh], origin: [t, y0, z0], prod: { length: w - 2 * t, width: bh, thickness: bt } }
@@ -267,12 +346,32 @@ module Noxun
                                       data: { 'wanted' => wanted.to_f, 'used' => used.to_f })
       end
 
+      # D-80: to iste pre ODSADENIE vystuh od vrchu (rovnaky vzor — nikdy tiche
+      # orezanie). Extremne odsadenie sa oreze tak, aby vnutro drzalo
+      # MIN_INTERIOR_H; rebuild sa NEodmietne.
+      def rail_offset_warning(warnings, wanted, used)
+        return if warnings.nil? || (wanted.to_f - used.to_f).abs < 0.01
+        warnings << BuildPlan.warning('rail_offset_clamped',
+                                      "Vystuha: odsadenie od vrchu orezane z #{wanted.to_f.round(1)} na " \
+                                      "#{used.to_f.round(1)} mm (vnutro korpusu).",
+                                      data: { 'wanted' => wanted.to_f, 'used' => used.to_f })
+      end
+
       def validate!(cfg, interior)
         w = cfg[:width]; h = cfg[:height]; t = cfg[:thickness]; s = cfg[:floor_height]
         raise 'Sirka je prilis mala vzhladom na hrubku materialu.' if w <= 2 * t + 10
         raise 'Hlbka je prilis mala.' if interior[:back_front_y] <= 10
         raise 'Podstavec/sokel nesmie byt vyssi nez korpus.' if s >= h
         raise 'Vnutorna vyska je nulova alebo zaporna (skontroluj vysku, podstavec a hrubky).' if interior[:avail_h] <= 10
+        # D-80 (Codex P2 na PR #134): pri vrchu "dve vystuhy" musi pod nimi ostat
+        # aspon MIN_INTERIOR_H svetla — inak vznikne zona mensia nez ZoneTree::MIN_FIELD
+        # (a pri upright dokonca vystuha tenka pod svoje vlastne minimum). Kombinacia
+        # je fyzicky nemozna, nie orezatelna — hlasi sa zrozumitelne, nie ticho.
+        return unless cfg[:top_mode] == 'two_rails'
+        return if interior[:avail_h] >= MIN_INTERIOR_H - 0.01
+        raise 'Vnútro je príliš nízke na výstuhy (ostáva ' \
+              "#{interior[:avail_h].to_f.round(1)} mm) — zväčši výšku korpusu, zmenši podstavec " \
+              'alebo prepni vrch na plný.'
       end
     end
   end

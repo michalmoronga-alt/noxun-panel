@@ -64,10 +64,11 @@
   // Vypocet zon (2D: x,z) z currentZoneTree + rozmerov korpusu. Vrati pole {id,path,x,z,w,h,leaf,shelves,split,label}.
   function computeZones(){
     var t = numv('thickness')||18, W = numv('width')||600, H = numv('height')||720;
-    var fh = (getType()==='upper') ? 0 : (numv('floor_height')||0);
-    var topNone = val('top_mode')==='none';
     var x0 = t, x1 = W - t;
-    var z0 = fh + t, z1 = topNone ? H : H - t;
+    // D-80: strop vnutra pocita JEDINA zdielana funkcia (core.js nxInteriorZ) —
+    // pri two_rails konci zonovy box pod vystuhami, nie na H - t.
+    var iv = nxInteriorZ(currentCarcass({ height: H, thickness: t }));
+    var z0 = iv.zLo, z1 = iv.zHi;
     var out = [];
     walkZones(sanitizeTree(currentZoneTree||defaultTree()), [1], x0, x1, z0, z1, t, 'Celé vnútro', out);
     return out;
