@@ -902,6 +902,9 @@ module Noxun
             res['kept'] << sid
           end
         end
+        # Ked nie je co pridat, snapshot sa TU nezapisuje — projekt bez snapshotu
+        # ho dostane pri stavbe (CabinetBuilder.build_into -> ensure_project_state!,
+        # tá istá operácia), takze zmrazenie ostava jednym zapisom.
         return res if to_add.empty?
         return res.merge('status' => :failed) unless add_project_sets!(model, to_add.values)
         res['added'] = to_add.keys

@@ -278,6 +278,22 @@ ensure
   NxH2.wipe_library!
 end
 
+NxTest.test('H2 zmrazenie: kolizia s GLOBALNOU predvolbou — sablonova verzia sa NEZAPISE') do
+  hws = NxH2::HWS
+  NxH2.wipe_library! # global = seed (zaves-klasik, kod 104717)
+  m = NxH2::Model.new # projekt este NEMA snapshot
+  iny = NxH2.norm('zaves-klasik', 'hinge', 'INY')
+  res = hws.freeze_template_sets!(m, { 'hinge' => 'zaves-klasik' }, { 'zaves-klasik' => iny })
+  NxTest.assert_equal(['zaves-klasik'], res['kept'],
+                      'prvy zapis mrazi globalne predvolby — tie su uz "verzia projektu"')
+  NxTest.assert_equal(0, m.writes, 'nic sa nezapisuje')
+  NxTest.assert_equal('104717',
+                      hws.global_default_state['sets']['zaves-klasik']['members'][0]['code'],
+                      'pri stavbe (ensure_project_state!) sa zmrazi GLOBALNA definicia')
+ensure
+  NxH2.wipe_library!
+end
+
 NxTest.test('H2 zmrazenie: nekompatibilny typ setu sa NEZMRAZI (mapovanie ostava, ORANGE)') do
   hws = NxH2::HWS
   NxH2.wipe_library!
