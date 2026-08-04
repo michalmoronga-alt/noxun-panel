@@ -167,7 +167,11 @@ module Noxun
           CabinetBuilder.config_to_params(Store.config(cab) || {})
         end
 
-        def template_config_from(cfg)
+        # H2 (D-76): sablona nesie AJ kovanie — mapovanie setov + ZMRAZENE
+        # definicie, aby sa dala pouzit v inom projekte aj na inom PC.
+        # model = zdroj definicii (snapshot projektu pred globalnou kniznicou);
+        # bez modelu (legacy volanie) sa kovanie do sablony neuklada.
+        def template_config_from(cfg, model: nil)
           tc = {
             'type' => cfg['type'], 'width' => cfg['width'], 'height' => cfg['height'], 'depth' => cfg['depth'],
             'thickness' => cfg['thickness'], 'floor_height' => cfg['floor_height'],
@@ -186,7 +190,58 @@ module Noxun
             v = present_str(cfg[k])
             tc[k] = v if v
           end
+          add_template_hardware(tc, cfg, model)
+        end
+
+        # H2 (D-76): kovanie do sablony. Composite kluce „typ@owner_part_key" sa
+        # NEUKLADAJU (audit BLOCKER 1) — owner_part_key su per-skrinka generovane
+        # ID (front:F1/panel je v kazdej skrinke INY dielec), takze prenosne nie
+        # su; normalizacia s allow_owner: false ich zahodi. Sablona bez kovania
+        # nedostane ziadny kluc — merge pri aplikacii tak rozozna, ze mapovanie
+        # ciela sa ma zachovat (legacy/seed sablony).
+        def add_template_hardware(tc, cfg, model)
+          return tc unless model && defined?(HardwareSets)
+
+          map = HardwareSets.normalize_mapping(cfg['hardware_sets'], nil, allow_owner: false)
+          return tc if map.empty?
+
+          tc['hardware_sets'] = map
+          defs = HardwareSets.template_set_defs(model, map)
+          tc['hardware_set_defs'] = defs unless defs.empty?
           tc
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.add_template_hardware')
+          tc
+        end
+
+        # H2 (D-76): SPOLOCNA zapisova cesta setov zo sablony — aplikacia
+        # sablony (okno Sablony) aj vklad zo sablony (quick-pick v paneli).
+        # VOLAT LEN vnutri operacie stavby (rebuild_many / build blok): zlyhanie
+        # vyhodi vynimku a cela operacia sa zrusi — ziadna skrinka s
+        # nezmrazenym setom. Vrati poznamku do statusu (SK, moze byt prazdna).
+        def freeze_template_hardware!(model, mapping, defs)
+          res = HardwareSets.freeze_template_sets!(model, mapping, defs)
+          case res['status']
+          when :invalid
+            raise 'Sety kovania projektu sú poškodené — obnov ich v Katalógu kovania ' \
+                  '(Predvoľby projektu), potom šablónu použi znova.'
+          when :failed
+            raise 'Sety kovania zo šablóny sa nepodarilo zapísať do projektu — nič sa nezmenilo.'
+          end
+          template_hardware_note(res)
+        end
+
+        # Hlaska o setoch zo sablony. Kolizie sa NIKDY nezamlcia: projekt si drzi
+        # vlastnu verziu setu a pouzivatel to musi vediet.
+        def template_hardware_note(res)
+          return '' unless res.is_a?(Hash)
+
+          out = ''
+          out += " · sety kovania zo šablóny doplnené (#{res['added'].join(', ')})" unless res['added'].empty?
+          res['kept'].each { |sid| out += " · set „#{sid}“: projekt používa vlastnú verziu" }
+          res['type_mismatch'].each { |sid| out += " · set „#{sid}“ je iného typu kovania — nepoužil sa" }
+          res['missing'].each { |sid| out += " · set „#{sid}“ v projekte chýba — kovanie ostáva nepriradené" }
+          out
         end
 
         def template_config_from_fields(data)

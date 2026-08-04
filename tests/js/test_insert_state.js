@@ -107,4 +107,38 @@ ins.setMaterials(full);
 eq(JSON.stringify(TPL), tplJson, 'sablona po celom insert toku byte-nezmenena');
 eq(full.width, 950, 'zamok v plnom toku aplikovany');
 
+// --- H2 (D-76): kovanie zo sablony vo vkladacej karte ---
+const TPL_HW = deepFreeze({
+  type: 'lower', width: 600,
+  hardware_sets: { hinge: 'zaves-klasik', slide: { param: 'front_height', bands: [] } },
+  hardware_set_defs: { 'zaves-klasik': { set_id: 'zaves-klasik', generic_type: 'hinge' } }
+});
+eq(ins.hardwareOf({}), { hardware_sets: null, hardware_set_defs: null },
+  'sablona bez kovania = ziadne kluce');
+eq(ins.hardwareOf({ hardware_sets: {}, hardware_set_defs: {} }),
+  { hardware_sets: null, hardware_set_defs: null },
+  'prazdne mapy = null (do payloadu sa neposielaju)');
+eq(ins.hardwareOf({ hardware_set_defs: { x: {} } }),
+  { hardware_sets: null, hardware_set_defs: null },
+  'definicie BEZ mapovania nemaju co zmrazit');
+eq(ins.hardwareOf({ hardware_sets: 'nezmysel' }), { hardware_sets: null, hardware_set_defs: null },
+  'necakany tvar sa zahodi (server je aj tak autorita)');
+const hw = ins.hardwareOf(TPL_HW);
+eq(hw.hardware_sets, TPL_HW.hardware_sets, 'mapovanie sablony sa nesie');
+eq(Object.keys(hw.hardware_set_defs), ['zaves-klasik'], 'definicie sa nesu');
+hw.hardware_sets.hinge = 'zmena'; // mutacia vysledku...
+eq(TPL_HW.hardware_sets.hinge, 'zaves-klasik', '...sa NEDOTKNE sablony (kopia mapy, N11)');
+
+ins.setHardware(TPL_HW);
+eq(ins.hardwarePayload().hardware_sets.hinge, 'zaves-klasik', 'payload nesie mapovanie');
+eq(Object.keys(ins.hardwarePayload()).sort(), ['hardware_set_defs', 'hardware_sets'],
+  'payload nesie oba kluce');
+ins.setHardware(ins.composeSource(DEFAULTS, null)); // zrusenie vyberu sablony
+eq(ins.hardwarePayload(), {}, 'zrusenie sablony stav VYCISTI (bezny vklad nenesie kovanie)');
+ins.setHardware(ins.composeSource(DEFAULTS, TPL_HW));
+eq(ins.hardwarePayload().hardware_sets.hinge, 'zaves-klasik',
+  'vyber sablony cez composeSource stav naplni');
+ins.setHardware(ins.composeSource(DEFAULTS, TPL)); // ina sablona BEZ kovania
+eq(ins.hardwarePayload(), {}, 'prepnutie na sablonu bez kovania stav vycisti');
+
 console.log(JSON.stringify({ passed: n, failed: 0 }));

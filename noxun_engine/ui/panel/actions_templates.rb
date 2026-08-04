@@ -34,7 +34,8 @@ module Noxun
           name = data['name'].to_s.strip
           return set_status('Prázdny názov — šablóna neuložená.', true) if name.empty?
 
-          config = template_config_from(Store.config(cab) || {})
+          # H2 (D-76): model = zdroj ZMRAZENYCH definicii setov kovania.
+          config = template_config_from(Store.config(cab) || {}, model: model)
           unless TemplateStore.upsert(name, config)
             return set_status('Šablónu sa nepodarilo zapísať (disk/práva) — skús znova.', true)
           end

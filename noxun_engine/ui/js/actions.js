@@ -188,6 +188,11 @@
     // zapise do configu (normalize materialy pozna od V0.3).
     var mats = NXInsert.state.materials || {};
     NXInsert.MATERIAL_KEYS.forEach(function(k){ if (mats[k]) p[k] = mats[k]; });
+    // H2 (D-76): sety kovania zo sablony (mapovanie + zmrazene definicie) idu
+    // do payloadu rovnako ako materialy — server ich normalizuje a zmrazi do
+    // projektu v operacii vlozenia. Bez sablony su kluce prazdne = neposlu sa.
+    var hw = NXInsert.hardwarePayload();
+    NXInsert.HARDWARE_KEYS.forEach(function(k){ if (hw[k]) p[k] = hw[k]; });
     if (window.sketchup && sketchup.insert_cabinet) sketchup.insert_cabinet(JSON.stringify(p));
   }
   // B3 „Vlozit kopiu": PRESNA SERVEROVA kopia oznacenej skrinky — config sa cita

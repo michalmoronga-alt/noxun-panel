@@ -106,7 +106,7 @@ module Noxun
 
       # Dovody nemapovanej polozky (ORANGE) — jediny kanonicky zoznam; texty
       # semaforu mapuje Validation.check_hardware_expansion.
-      UNMAPPED_REASONS = %w[no_set set_missing nl_missing
+      UNMAPPED_REASONS = %w[no_set set_missing set_type_mismatch nl_missing
                             param_band_missing selector_unresolved].freeze
 
       # H1b: parametre, podla ktorych sa daju stavat pasma clena (param_bands)
@@ -478,6 +478,8 @@ module Noxun
                            : "#{name} nie je známa — predvoľba ju potrebuje"
         when 'set_missing'
           "set „#{sid}“ v projekte chýba"
+        when 'set_type_mismatch'
+          "set „#{sid}“ v projekte je iného typu kovania"
         else
           'typ nemá priradený set'
         end
@@ -813,6 +815,99 @@ module Noxun
         [:updated, added_sets.uniq, added_map]
       end
 
+      # --- sety v SABLONE korpusu (H2, D-76) -----------------------------------
+
+      # Definicie setov na ULOZENIE do sablony: pre kazde set_id, na ktore
+      # mapovanie sablony ukazuje (priamo AJ cez pasma selectora), vyberie
+      # definiciu TOU ISTOU precedenciou, akou ju pouziva skrinka — projektovy
+      # snapshot pred globalnou kniznicou (H1a BLOCKER 4). Mapovanie skrinky sa
+      # resolveru odovzda ako cabinet override, takze sa zmrazi presne to, co
+      # skrinka realne nakupuje (aj ked projekt ma namapovane iny set).
+      # Set, ktory sa nedá rozlozit, sablona nenesie — pri aplikacii skonci
+      # ORANGE (set_missing), NIKDY tichy iny hardver.
+      def template_set_defs(model, mapping)
+        map = mapping.is_a?(Hash) ? mapping : {}
+        refs = referenced_set_ids(map)
+        return {} if refs.empty?
+        as_override = { 'template' => map }
+        out = {}
+        refs.each do |sid|
+          d = resolve_set_def(model, sid, cabinet_overrides: as_override)
+          out[sid] = deep_copy(d) if d
+        end
+        out
+      end
+
+      # set_id => generic_type podla KLUCA mapovania (composite kluc nesie typ
+      # rovnako). Ten isty set pod dvoma roznymi typmi = konflikt -> nil
+      # (definicia sa nezmrazi, mapovanie skonci ORANGE).
+      def mapping_types_by_set(mapping)
+        out = {}
+        (mapping.is_a?(Hash) ? mapping : {}).each do |key, value|
+          parsed = BuildPlan.parse_hardware_set_key(key)
+          next if parsed.nil?
+          gt = parsed[0]
+          value_set_ids(value).each do |sid|
+            out[sid] = out.key?(sid) && out[sid] != gt ? nil : gt
+          end
+        end
+        out
+      end
+
+      # Kanonicke porovnanie definicii setu (obe strany prejdu normalizaciou —
+      # rozdiel v poradi klucov ci v legacy tvare NIE JE rozdiel v obsahu).
+      def same_set_def?(a, b)
+        na = normalize_sets([a]).first
+        nb = normalize_sets([b]).first
+        return false if na.nil? || nb.nil?
+        na == nb
+      end
+
+      # Zmrazi definicie setov zo SABLONY do projektoveho snapshotu. VOLAT LEN
+      # vnutri otvorenej operacie (rebuild_many blok / build blok) — zapis
+      # definicii a stavba skrinky su JEDNO undo (audit BLOCKER 2).
+      #   mapping = mapovanie, ktore skrinka nakoniec dostane
+      #   defs    = { set_id => definicia } zo sablony (hardware_set_defs)
+      # Kolizie (audit BLOCKER 1 + FIX 5):
+      #   set v projekte NIE JE         -> zapise sa definicia zo sablony
+      #   je s ROVNAKOU definiciou      -> nic
+      #   je s INOU definiciou          -> PROJEKT VYHRAVA (prepis by zmenil uz
+      #                                    postavene skrinky zakazky), volajuci
+      #                                    to ohlasi v statuse
+      #   generic_type nesedi s klucom  -> definicia sa NEZMRAZI; mapovanie sa
+      #                                    aplikuje a expanzia skonci ORANGE
+      # -> { 'status' => :ok | :invalid | :failed, 'added' => [], 'kept' => [],
+      #      'type_mismatch' => [], 'missing' => [] }
+      def freeze_template_sets!(model, mapping, defs)
+        res = { 'status' => :ok, 'added' => [], 'kept' => [], 'type_mismatch' => [], 'missing' => [] }
+        wanted = mapping_types_by_set(mapping)
+        return res if wanted.empty?
+        status, state = project_state_status(model)
+        return res.merge('status' => :invalid) if status == :invalid
+        # Bez snapshotu zmrazi prvy zapis najprv globalne predvolby (GH #127 P1)
+        # — porovnavame teda proti TOMU, co v projekte naozaj vznikne.
+        state ||= global_default_state
+        have = state['sets'].is_a?(Hash) ? state['sets'] : {}
+        pool = collect_set_defs(defs)
+        to_add = {}
+        wanted.each do |sid, gt|
+          d = pool[sid]
+          if d.nil?
+            res['missing'] << sid unless have.key?(sid)
+          elsif gt.nil? || d['generic_type'] != gt
+            res['type_mismatch'] << sid
+          elsif have[sid].nil?
+            to_add[sid] = d
+          elsif !same_set_def?(have[sid], d)
+            res['kept'] << sid
+          end
+        end
+        return res if to_add.empty?
+        return res.merge('status' => :failed) unless add_project_sets!(model, to_add.values)
+        res['added'] = to_add.keys
+        res
+      end
+
       # --- expanzia (cista funkcia, audit F6) ----------------------------------
 
       # hardware_items: RAW polozky z Bom.collect — string kluce + 'owner_id'
@@ -848,6 +943,14 @@ module Noxun
           set = sets[sid]
           if set.nil?
             unmapped << unmapped_entry(it, sid, 'set_missing')
+            next
+          end
+          # H2 (audit FIX 5): set INEHO typu = ORANGE, NIKDY tichy zly hardver.
+          # Zapisove cesty typ strazia, ale mapovanie zo sablony moze ukazat na
+          # set_id, ktoreho definiciu si projekt drzi vlastnu (a ta moze byt
+          # ineho typu) — expanzia je posledna poistka.
+          if set['generic_type'].to_s != gt
+            unmapped << unmapped_entry(it, sid, 'set_type_mismatch')
             next
           end
           expand_members(it, set, qty, rows, unmapped, owner_seen, lookup)
