@@ -410,10 +410,18 @@
   body[data-cab-tab="korpus"] .zoneline, body[data-cab-tab="cela"] .zoneline { display: none; }
   body[data-cab-tab="korpus"] details[data-key="fronts"], body[data-cab-tab="zony"] details[data-key="fronts"] { display: none; }
   /* D-29 A3: po presune tabov do hlavicky — .cabtab skryte v rezimoch bez korpusoveho
-     nahladu (dielec, doska, vkladanie dosky); tlacidlo Vyroba (.prodbtn) ostava viditelne. */
+     nahladu (dielec, doska); tlacidlo Vyroba (.prodbtn) ostava viditelne. */
   body.mode-part .cabtab,
-  body.mode-board .cabtab,
-  body[data-insert-kind="board"].mode-insert .cabtab { display: none; }
+  body.mode-board .cabtab { display: none; }
+  /* D-78: v rezime VKLADANIA taby uz NEMIZNU — zapamatany data-insert-kind="board"
+     ich doteraz schoval a po navrate ku Korpusu sa hlavicka javila rozbita. Ostavaju
+     viditelne (kotva rozlozenia hlavicky), ale su NEAKTIVNE: prepinanie ma zmysel az
+     nad oznacenym korpusom. Vizualny stav je CSS podla rezimu; skutocnu ochranu drzi
+     guard v setCabTab (klik AJ klavesnica) + aria-disabled — HTML `disabled` sa
+     zamerne nepouziva, aby tlacidla ostali fokusovatelne a niesli title. */
+  body.mode-insert .cabtab { opacity: .45; cursor: default; }
+  body.mode-insert .cabtab:hover { background: var(--nx-surface-sunken); }
+  body.mode-insert .cabtab.on:hover { background: var(--nx-select); }
   /* ===== V0.4.7e: zivy nahlad vyrazu "= 614" (expr.js injektuje span za input) =====
      Pevna rezerva + nowrap, aby hint neposuval .unit a nelamal .row/.frow/.fldrow. */
   .exprhint { flex: 0 0 auto; min-width: 44px; font-size: 10.5px; color: var(--nx-ink-faint);
@@ -644,6 +652,13 @@
   /* dlazdica: fotka dekoru prekryva farebny swatch (fallback = farba pod nou) */
   .mdsw { overflow: hidden; position: relative; }
   .mdsw-photo { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 5px; }
+  /* D-82: swatch v HLAVICKE detailu je zaroven vyber farby CELEHO dekoru
+     (skupinovy — jedna zmena prefarbi dosky aj pasky). Native <input type=color>
+     lezi cez swatch neviditelne, takze hlavicka nerastie ani o pixel
+     (vertikalny priestor) a klik na farbu otvori paletu. */
+  .mdswpick { cursor: pointer; }
+  .mdswpick input[type="color"] { position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                                  opacity: 0; margin: 0; padding: 0; border: 0; cursor: pointer; }
   /* potvrdenie mazania (Halifax lekcia) */
   #mdDelBody { font-size: 12px; margin: 4px 0 8px; }
   .mddel-name { font-weight: 600; margin-bottom: 4px; }
