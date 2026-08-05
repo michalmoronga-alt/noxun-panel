@@ -196,7 +196,174 @@ module Noxun
           set_status("Export zlyhal: #{e.message}", true)
         end
 
+        # V0.6 E-b: XLSX rozpocet v "Luciinom formate". Rovnaky flush/generation
+        # handshake ako VEPO — cisla harku musia sediet s modelom PO flushi
+        # rozpisaneho editu panela, nie s tym, co drzi DOM okna.
+        def do_budget_xlsx(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          unless data['gen'].to_i == @generation.to_i
+            push_state if @dialog && @dialog.visible?
+            return set_status('Dáta okna sa medzitým zmenili — skús export znova.', true)
+          end
+          if data['flush_blocked']
+            return set_status('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
+          end
+
+          model = Sketchup.active_model
+          collected = fresh_collect(model)
+          bom = Bom.compute(collected)
+          budget = budget_payload(model, bom, collected)
+          return set_status('Rozpočet sa nepodarilo zostaviť (pozri Ruby konzolu).', true) if budget.nil?
+
+          project = data['project'].to_s.strip
+          project = default_project_name(model) if project.empty?
+          now = Time.now
+          fname = BudgetXlsx.file_name(project, now)
+          target = UI.savepanel('Uložiť rozpočet (XLSX)', vepo_settings['last_dir'], fname)
+          return set_status('Export zrušený.') if target.nil? || target.to_s.empty?
+
+          # Bez pripony by Excel subor neotvoril dvojklikom — savepanel ju
+          # nedoplna, ked ju pouzivatel v nazve prepise.
+          target = "#{target}.xlsx" unless File.extname(target.to_s).downcase == '.xlsx'
+          XlsxWriter.write(target, BudgetXlsx.sheet(budget, project: project, now: now), now: now)
+          save_vepo_settings('last_dir' => File.dirname(target))
+          totals = budget['totals'] || {}
+          miss = totals['unknown_count_in_total'].to_i
+          set_status("Rozpočet uložený: #{fmt_eur(totals['total'])} → #{target}" \
+                     "#{miss.positive? ? " · #{miss} riadkov bez ceny sa nezapočítalo" : ''}", miss.positive?)
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.do_budget_xlsx')
+          set_status("Export rozpočtu zlyhal: #{e.message}", true)
+        end
+
+        # V0.6 E-b: mutacie rozpoctu (rezim, prepis sumy, nasobok, m2, spotrebice
+        # v sucte, vlastne polozky). Guardy bezia na SERVERI — HTML disabled ani
+        # klientske echo nie su ochrana:
+        #   gen        — zapis zo stareho DOM (medzitym prepocitane okno),
+        #   model_guid — medzitym prepnuty dokument (zapis by sadol do cudzej zakazky).
+        # Po KAZDOM zapise ide cerstvy payload (push_state) — klient si sumy
+        # NIKDY neprepocitava.
+        def do_budget(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          model = Sketchup.active_model
+          unless data['gen'].to_i == @generation.to_i
+            push_state if @dialog && @dialog.visible?
+            return set_status('Rozpočet sa medzitým prepočítal — obnovené, skús znova.', true)
+          end
+          guid = data['model_guid'].to_s
+          if !guid.empty? && guid != model_guid(model)
+            push_state
+            return set_status('Model sa medzitým prepol — obnovené, skús znova.', true)
+          end
+          ok, errors = apply_budget_op(model, data)
+          # GH #138 P2: vysledok ide do okna PRED cerstvym payloadom — rozpisany
+          # novy riadok sa smie zavriet LEN pri uspechu (inak by pouzivatel po
+          # odmietnutom zapise prisiel o vsetky vyplnene hodnoty).
+          js("if (window.NX && NX.budgetResult) NX.budgetResult(#{data['op'].to_s.to_json}, #{ok ? 'true' : 'false'});")
+          push_state
+          return set_status("Nezapísané: #{Array(errors).join(' · ')}", true) unless ok
+          set_status(budget_op_status(data))
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.do_budget')
+          # Aj po vynimke musi prist payload — inak by okno ostalo v stave
+          # „cakam na odpoved" a fronta zapisov by sa neuvolnila.
+          push_state
+          set_status("Chyba rozpočtu: #{e.message}", true)
+        end
+
         private
+
+        # Jedna mutacia = jedna metoda BudgetStore = jeden undo krok. Validacia
+        # aj rozsahy su v BudgetStore (server), tu sa len smeruje.
+        # -> [ok, errors]
+        def apply_budget_op(model, data)
+          attrs = data['attrs'].is_a?(Hash) ? data['attrs'] : {}
+          id = data['id'].to_s
+          case data['op'].to_s
+          when 'mode'            then BudgetStore.set_mode!(model, data['mode'])
+          when 'override'        then BudgetStore.set_override!(model, data['row_key'], data['amount'])
+          when 'multiplier'      then BudgetStore.set_std_multiplier!(model, data['row_key'], data['multiplier'])
+          when 'viz_m2'          then BudgetStore.set_viz_m2!(model, data['value'])
+          when 'appl_included'   then BudgetStore.set_appliances_included!(model, data['included'])
+          when 'custom_add'      then ok_pair(BudgetStore.add_custom_item!(model, attrs))
+          when 'custom_update'   then ok_pair(BudgetStore.update_custom_item!(model, id, attrs))
+          when 'custom_remove'   then BudgetStore.remove_custom_item!(model, id)
+          when 'appliance_add'   then ok_pair(BudgetStore.add_appliance!(model, attrs))
+          when 'appliance_update' then ok_pair(BudgetStore.update_appliance!(model, id, attrs))
+          when 'appliance_remove' then BudgetStore.remove_appliance!(model, id)
+          else [false, ['neznáma operácia rozpočtu']]
+          end
+        end
+
+        # add_/update_ vracaju [polozka|nil, chyby] — zjednotenie na [ok, chyby].
+        def ok_pair(result)
+          item, errors = result
+          [!item.nil? && Array(errors).empty?, errors]
+        end
+
+        BUDGET_OP_STATUS = {
+          'mode' => 'Cenový režim zmenený.', 'override' => 'Suma riadku prepísaná.',
+          'multiplier' => 'Násobok riadku uložený.', 'viz_m2' => 'm² vizualizácie uložené.',
+          'appl_included' => 'Spotrebiče v súčte — prepnuté.',
+          'custom_add' => 'Položka pridaná.', 'custom_update' => 'Položka upravená.',
+          'custom_remove' => 'Položka zmazaná.', 'appliance_add' => 'Spotrebič pridaný.',
+          'appliance_update' => 'Spotrebič upravený.', 'appliance_remove' => 'Spotrebič zmazaný.'
+        }.freeze
+
+        def budget_op_status(data)
+          BUDGET_OP_STATUS[data['op'].to_s] || 'Rozpočet uložený.'
+        end
+
+        # ↗ v riadku: URL sa NEBERIE z klienta — dohladava sa v modeli podla ID
+        # polozky a este raz sanitizuje (BudgetStore.sanitize_url povoluje LEN
+        # http/https). Klient tak nema ako podstrcit javascript:/file: adresu.
+        def handle_budget_url(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          model = Sketchup.active_model
+          id = data['id'].to_s
+          list = data['kind'].to_s == 'appliance' ? BudgetStore.appliances(model) : BudgetStore.custom_items(model)
+          item = list.find { |it| it['id'] == id }
+          return set_status('Položka sa nenašla — obnov okno.', true) if item.nil?
+          url = BudgetStore.sanitize_url(item['url'])
+          return set_status('Položka nemá platnú adresu (http:// alebo https://).', true) if url.nil?
+          UI.openURL(url)
+          set_status("Otváram #{url}")
+        end
+
+        def fmt_eur(value)
+          f = value.to_f
+          format('%.2f €', f).tr('.', ',')
+        end
+
+        # V0.6 E-b: payload rozpoctu z TYCH ISTYCH dat ako kusovnik/semafor
+        # (jedna autorita cisel). Zlyhanie NIKDY nezhodi okno — tab Rozpocet
+        # ukaze hlasku, zvysok okna zije dalej.
+        def budget_payload(model, bom, collected, estimate = nil, hw_exp = nil, smap = nil)
+          smap ||= sheets_map
+          est = estimate || SheetEstimate.estimate(
+            bom[:rows],
+            sheet_sizes: smap.each_with_object({}) { |(id, s), out| out[id] = s['sheet_size'] },
+            uni_ids: smap.each_with_object({}) { |(id, s), out| out[id] = true if Materials.uni?(s) }
+          )
+          exp = hw_exp || hardware_expansion(model, collected)
+          Budget.payload_for(model, bom, sheets: smap, edges: (edges_map || {}),
+                             hardware_expansion: exp, hardware_catalog: hardware_catalog_items,
+                             sheet_estimate: est)
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.budget_payload')
+          nil
+        end
+
+        # Katalog kovania pre scan veku cien; chyba katalogu = scan sa preskoci
+        # (vzor edges_map), rozpocet sa nezhodi.
+        def hardware_catalog_items
+          return nil unless defined?(HardwareCatalog)
+
+          HardwareCatalog.items
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.hardware_catalog_items')
+          nil
+        end
 
         def ensure_dialog
           return @dialog if @dialog
@@ -226,6 +393,11 @@ module Noxun
           cb(dlg, 'hw_csv_export') { |p| handle_hw_csv(p) } # V0.6 D1b
           # D-83: skratka z riadku KONTROLY do „Nahradiť UNI…" (okno Materiály).
           cb(dlg, 'replace_uni') { |p| handle_replace_uni(p) }
+          # V0.6 E-b: tab Rozpočet — mutácie, XLSX export, ⚙ Nastavenia, ↗ URL.
+          cb(dlg, 'budget_mutate')   { |p| do_budget(p) }
+          cb(dlg, 'budget_xlsx')     { |p| handle_budget_xlsx(p) }
+          cb(dlg, 'budget_open_url') { |p| handle_budget_url(p) }
+          cb(dlg, 'budget_settings') { |_p| open_budget_settings }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(production): #{msg}")
@@ -266,6 +438,24 @@ module Noxun
           else
             do_export(data)
           end
+        end
+
+        # V0.6 E-b: XLSX rozpočtu — rovnaký flush handshake ako VEPO/CSV.
+        def handle_budget_xlsx(payload)
+          data = JSON.parse(payload.to_s)
+          if Panel.dialog_alive?
+            Panel.js("NX.productionRelayBudget(#{data.to_json})")
+          else
+            do_budget_xlsx(data)
+          end
+        end
+
+        # ⚙ z tabu Rozpočet — satelit Nastavenia (sadzby sú GLOBÁLNE, nie per model).
+        def open_budget_settings
+          return set_status('Okno Nastavenia nie je k dispozícii.', true) unless defined?(SupplierSettingsDialog)
+
+          SupplierSettingsDialog.show
+          set_status('Otváram Nastavenia rozpočtu.')
         end
 
         # --- VEPO pomocnici (V0.5 C) ---------------------------------------
@@ -582,9 +772,21 @@ module Noxun
           # V0.6 D1b: nakupny zoznam kovania z TOHO ISTEHO zberu (audit F6) +
           # jeho ORANGE do KONTROLY (hardware_unmapped / hardware_code).
           hw_exp = hardware_expansion(model, collected)
+          # D-19: odhad platni per material — JEDEN vypocet pre tab Materiály AJ
+          # rozpočet (dve cesty by dali dve rôzne čísla platní).
+          # M-B1 (F7): UNI počty platní sú len orientačné — flag pre UI.
+          estimate = SheetEstimate.estimate(
+            bom[:rows], sheet_sizes: sheet_sizes,
+            uni_ids: smap.each_with_object({}) { |(id, s), out| out[id] = true if Materials.uni?(s) }
+          )
+          # V0.6 E-b: rozpočet z TÝCH ISTÝCH dát (BOM + odhad + katalógy + stav zákazky).
+          budget = budget_payload(model, bom, collected, estimate, hw_exp, smap)
           # V0.5 D: KONTROLA z TOHO ISTEHO cerstveho zberu (nalez 5).
           control = Validation.run(collected, sheets: smap, edges: edges_map,
                                    hardware_expansion: hw_exp)
+          # E-b: upozornenia rozpočtu sú kategória „budget" v TOM ISTOM zozname —
+          # counts (badge, tab, status) tak ostávajú jedno číslo zo servera.
+          control = Validation.with_budget(control, budget['budget_check']) if budget
           data = {
             version: Engine::VERSION,
             gen: @generation,
@@ -608,11 +810,10 @@ module Noxun
             control: control['items'], counts: control['counts'],
             # D-19: odhad platni per material (rozsah 10-25 %; JS paruje mapou
             # podla material_id — nie indexom, Codex F7)
-            sheet_estimate: SheetEstimate.estimate(
-              bom[:rows], sheet_sizes: sheet_sizes,
-              # M-B1 (F7): UNI pocty platni su len orientacne — flag pre UI.
-              uni_ids: smap.each_with_object({}) { |(id, s), out| out[id] = true if Materials.uni?(s) }
-            ),
+            sheet_estimate: estimate,
+            # V0.6 E-b: celý rozpočet zákazky (sekcie, sumy, vek cien, kontrola).
+            # JS z neho LEN číta — žiadne sumy sa v prehliadači nepočítajú.
+            budget: budget,
             # V0.5 C: default projektu + zapamatany merge (JS input lifecycle F10);
             # model_key = epocha prepnuti + cesta (GH P2: rovnake tituly nestacia)
             vepo: { default_project: default_project_name(model),

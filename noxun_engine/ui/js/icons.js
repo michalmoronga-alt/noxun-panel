@@ -96,7 +96,11 @@
     // V0.6 M-A2 (okno Materialy): primarne tlacidlo "Pridat z Demosu"
     'cloud-download': '<path d="M12 13v8l-4-4"/><path d="m12 21 4-4"/><path d="M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284"/>',
     // M-A3b (D-60): vazba na Demos v riadku variantu — "Otvorit u dodavatela"
-    'external-link': '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>'
+    'external-link': '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+    // V0.6 E-b (tab Rozpocet): "⋯" dalsie udaje riadku (kod/URL/poznamka)
+    // a "⬇" export suboru — nahradzaju glyfy z mocku (ziadne emoji v UI chrome).
+    'more-horizontal': '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+    'download': '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>'
   };
 
   // Firemne logo — prstenec + krizove ramena. Renderuje sa FILL-om (.nx-logo),

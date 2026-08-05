@@ -117,6 +117,23 @@
       p.flush_blocked = blocked;
       if (window.sketchup && sketchup.production_do_hw_csv) sketchup.production_do_hw_csv(JSON.stringify(p));
     },
+    // V0.6 E-b: XLSX rozpoctu — rovnaky flush handshake (rozpisany edit korpusu
+    // meni kusovnik, teda aj platne, olep a montaz v rozpocte).
+    productionRelayBudget: function(p){
+      var blocked = false;
+      try {
+        if (typeof validateFields === 'function' && typeof selectedCabId !== 'undefined' &&
+            selectedCabId && !validateFields()) blocked = true;
+        var badBoard = document.querySelector('#boardCard input.bad, #boardCard .bad');
+        if (badBoard) blocked = true;
+      } catch (e) { blocked = false; }
+      if (!blocked){
+        if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+        if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
+      }
+      p.flush_blocked = blocked;
+      if (window.sketchup && sketchup.production_do_budget) sketchup.production_do_budget(JSON.stringify(p));
+    },
     // D-05: zivy katalog materialov po CRUD v okne Materialy projektu. Obnovi
     // vsetky selecty s materialmi BEZ resetu formulara; zachovava vybrane hodnoty.
     setMaterials: function(data){

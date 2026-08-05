@@ -154,10 +154,28 @@ Aktuálny set: `maximize` (fit), `alert`, `lock` / `lock-open`, `eye` / `eye-off
 `refresh-cw` (Aktualizovať z Demosu — detail dekoru),
 `cloud-download` (Pridať z Demosu; aj badge väzby na dlaždici — D-56),
 `external-link` (Otvoriť u dodávateľa — riadok variantu, D-60),
-`arrow-left-right` (Nahradiť UNI… — riadok KONTROLY v okne Výroba, D-83), `logo`.
+`arrow-left-right` (Nahradiť UNI… — riadok KONTROLY v okne Výroba, D-83),
+`more-horizontal` (⋯ ďalšie údaje riadku rozpočtu — kód/adresa/poznámka, E-b),
+`download` (⬇ export súboru — XLSX rozpočet, E-b), `logo`.
 
 > Okno **Výroba** načítava `icons.js` od v0.5.44 (predtým sprite nemalo) — nové
 > ovládacie prvky v ňom používajú sprite, nie glyfy.
+
+### E-b: tab Rozpočet (okno Výroba)
+Jediný tab okna Výroba, ktorý model **mení** (dáta rozpočtu v `NOXUN` dict na
+modeli). Vzory:
+- **Sekcie = `<details>`** s medzisúčtom v hlavičke; stav rozbalenia prežije
+  prekreslenie (payload chodí po každom zápise).
+- **Inline edit** (Lucia §11): číselné polia sa zapisujú až na `change`
+  (blur/Enter), nie pri každom stlačení klávesy; fokus aj rozpísaná hodnota sa
+  cez prekreslenie obnovia.
+- **Nulové riadky ostávajú viditeľné** (rozpočet je zároveň kontrolný zoznam);
+  chýbajúca cena je jantárový riadok so štítkom, NIKDY nula.
+- **Veľké tlačidlo plnej šírky** (`.baddbig`) na pridanie ručného riadku —
+  jediné miesto, kde sa vedome porušuje šetrenie vertikálnym priestorom
+  (sekcia inak nemá viditeľný vstupný bod).
+- **Prepínače** (`.bseg`): s DPH / bez DPH je len zobrazenie (localStorage),
+  režim €/€€/€€€ je zápis do zákazky; tooltipy nesú názvy režimov.
 
 ### D-47: hlavička panela (rad 2)
 Tri režimové taby (Korpus·Zóny·Čelá) sú **rovnako široké** (`flex: 1 1 0`)
