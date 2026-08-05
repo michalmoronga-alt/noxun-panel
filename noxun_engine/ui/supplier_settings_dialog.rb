@@ -131,10 +131,10 @@ module Noxun
           end
           patch = data['patch'].is_a?(Hash) ? data['patch'] : {}
           ok, errors = SupplierSettings.patch_active!(patch)
-          unless ok
-            push_state
-            return set_status("Neuložené: #{Array(errors).join(' · ')}", true)
-          end
+          # Pri chybe sa formular ZAMERNE NEnacitava nanovo — pouzivatel by
+          # prisiel o vsetky rozpisane hodnoty a videl by len hlasku. Nic sa
+          # nezapisalo (patch je all-or-nothing), takze staci chybu ukazat.
+          return set_status("Neuložené: #{Array(errors).join(' · ')}", true) unless ok
           push_state
           # Sadzby su vstup rozpoctu — otvorene okno Vyroba musi ukazat nove cisla.
           ProductionDialog.refresh_if_open if defined?(ProductionDialog)
