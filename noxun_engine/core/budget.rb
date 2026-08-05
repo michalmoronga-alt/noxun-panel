@@ -296,7 +296,8 @@ module Noxun
       end
 
       # Pracovna doska v zakazke = aspon jeden POUZITY material kanonickeho
-      # typu PD (porovnanie bez diakritiky/velkosti pismen, vzor identity_norm).
+      # typu PD ('PD' je kluc TYPE_REGISTRY; porovnanie je case-insensitive,
+      # aby "pd" z rucne upraveneho katalogu neuniklo).
       def pd_present?(estimate, sheets)
         Array(estimate).any? do |g|
           next false unless g.is_a?(Hash)
@@ -322,7 +323,7 @@ module Noxun
             m2 = state['viz_m2']
             if m2.nil?
               # Bez m2 z meracky sa suma NEDA vypocitat — ale len ked sa riadok
-              # vobec ucuje (nasobok > 0). Pri nasobku 0 je to cisty nulovy
+              # vobec uctuje (nasobok > 0). Pri nasobku 0 je to cisty nulovy
               # riadok (ostava viditelny ako kontrola).
               missing_m2 = mult.positive?
               qty = missing_m2 ? nil : 0.0
