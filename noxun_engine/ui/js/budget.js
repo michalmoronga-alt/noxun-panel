@@ -229,8 +229,8 @@
     if (!items.length) return '';
     var h = '<div class="blist">';
     items.forEach(function(w){
-      h += '<div class="bwrow" data-bud="goto" data-section="' + bEsc(w.section) + '">' +
-           '<span>' + bEsc(w.message) + '</span></div>';
+      h += '<div class="bwrow" data-bud="goto" data-section="' + bEsc(w.section) + '"' +
+           ' title="Prejsť na sekciu rozpočtu"><span>' + bEsc(w.message) + '</span></div>';
     });
     return h + '</div>';
   }
@@ -298,7 +298,7 @@
         rows.forEach(function(r){ body += budMaterialRow(r, b, d); });
         break;
       case 'abs':
-        head = ['Páska', 'Dĺžka s rezervou', 'MJ', '€ / bm', '', 'Medzisúčet'];
+        head = ['Páska', 'Dĺžka s rezervou', 'MJ', '€ / bm', 'Overená', 'Medzisúčet'];
         rows.forEach(function(r){ body += budSimpleRow(r, b, d); });
         break;
       case 'hardware':
