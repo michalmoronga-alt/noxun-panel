@@ -256,11 +256,18 @@ module Noxun
             return set_status('Model sa medzitým prepol — obnovené, skús znova.', true)
           end
           ok, errors = apply_budget_op(model, data)
+          # GH #138 P2: vysledok ide do okna PRED cerstvym payloadom — rozpisany
+          # novy riadok sa smie zavriet LEN pri uspechu (inak by pouzivatel po
+          # odmietnutom zapise prisiel o vsetky vyplnene hodnoty).
+          js("if (window.NX && NX.budgetResult) NX.budgetResult(#{data['op'].to_s.to_json}, #{ok ? 'true' : 'false'});")
           push_state
           return set_status("Nezapísané: #{Array(errors).join(' · ')}", true) unless ok
           set_status(budget_op_status(data))
         rescue StandardError => e
           Engine.log_error(e, 'ProductionDialog.do_budget')
+          # Aj po vynimke musi prist payload — inak by okno ostalo v stave
+          # „cakam na odpoved" a fronta zapisov by sa neuvolnila.
+          push_state
           set_status("Chyba rozpočtu: #{e.message}", true)
         end
 

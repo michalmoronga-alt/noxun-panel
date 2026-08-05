@@ -121,6 +121,27 @@ function payload(over){
   eq(B.budSectionCount({ key: 'appliances', rows: [] }, {}), 'manuálne · katalóg príde v S1', 'spotrebice');
 })();
 
+// --- GH #138 P2: rozpisany novy riadok prezije odmietnuty zapis ---------------
+(function(){
+  eq(B.budDraftAttrs('custom', { popis: 'Doprava', cena: '42,5' }),
+     { popis: 'Doprava', pocet: '1', cena: '42,5' }, 'chybajuci pocet ma default 1');
+  eq(B.budDraftAttrs('custom', { popis: 'X', pocet: '3', cena: '' }),
+     { popis: 'X', pocet: '3', cena: '' }, 'prazdna cena ostava prazdna (nie 0)');
+  eq(B.budDraftAttrs('appliance', { nazov: 'Bosch', cena: '649' }),
+     { typ: 'ine', nazov: 'Bosch', dodavatel: '', cena: '649' }, 'chybajuci typ padne na „iné"');
+  eq(B.budDraftAttrs('custom', null), { popis: '', pocet: '1', cena: '' }, 'prazdny formular nezhodi render');
+})();
+
+(function(){
+  eq(B.budDraftMissing('custom', { popis: '  ' }), 'Popis položky je povinný.', 'popis je povinny');
+  eq(B.budDraftMissing('custom', { popis: 'X' }), null, 'so popisom mozeme odoslat');
+  eq(B.budDraftMissing('appliance', { nazov: '' }), 'Názov spotrebiča je povinný.', 'nazov je povinny');
+  eq(B.budDraftMissing('appliance', { nazov: 'Bosch' }), null, 'so nazvom mozeme odoslat');
+  // Rozsahy a typy strazi SERVER — klient necislo NEblokuje, len ho posle
+  // a pri odmietnutí ostanú hodnoty v drafte.
+  eq(B.budDraftMissing('custom', { popis: 'X', cena: 'abc' }), null, 'cenu validuje server, nie klient');
+})();
+
 // --- XSS: data do innerHTML idu VZDY escapovane -------------------------------
 (function(){
   eq(B.budEsc('<img src=x onerror=alert(1)>'),

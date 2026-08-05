@@ -14,8 +14,19 @@
   var BUD_STALE_OPEN = false;
   var BUD_WARN_OPEN = false;
   var BUD_DRAFT = null;        // rozpisany novy riadok: 'custom' | 'appliance'
+  var BUD_DRAFT_VALUES = null; // GH #138 P2: hodnoty draftu prezijú odmietnutý zápis
   var BUD_MODAL = null;        // { kind, id } — otvoreny ⋯ modal
   var BUD_FOCUS = null;        // obnova fokusu/hodnoty cez re-render
+
+  // GH #138 P2: zapisy sa SERIALIZUJU. `sketchup.*` je asynchronne — pri
+  // rychlom slede (blur poľa + hneď klik na režim) by sa druhy zapis poslal
+  // este so STAROU `gen` a server by ho odmietol ako zastaraly, hoci je
+  // uplne v poriadku. Kym nedorazi cerstvy payload, dalsie mutacie cakaju
+  // vo fronte a odosielaju sa AZ s novou generaciou.
+  var BUD_BUSY = false;
+  var BUD_QUEUE = [];
+  var budBusyTimer = null;
+  var BUD_BUSY_MS = 6000; // poistka, keby Ruby callback spadol pred push_state
 
   var BUD_VAT_KEY = 'nx_budget_vat';
 
@@ -504,14 +515,17 @@
   // (prazdna polozka by inak hned vyrobila upozornenie „bez popisu").
   function budDraftHtml(kind){
     if (BUD_DRAFT !== kind) return '';
+    var v = BUD_DRAFT_VALUES || {};
     var h = '<div class="bdraft">';
     if (kind === 'custom'){
-      h += budTypeless('Popis položky…', 'dpopis', 'bwide') +
-           budTypeless('1', 'dpocet', 'bshort') + budTypeless('0,00', 'dcena', 'bshort');
+      h += budTypeless('Popis položky…', 'dpopis', 'bwide', v.popis) +
+           budTypeless('1', 'dpocet', 'bshort', v.pocet) +
+           budTypeless('0,00', 'dcena', 'bshort', v.cena);
     } else {
-      h += budTypeSelect('id="bud_dtyp"', 'chladnicka') +
-           budTypeless('Názov / model…', 'dnazov', 'bwide') +
-           budTypeless('Dodávateľ', 'ddod', '') + budTypeless('0,00', 'dcena', 'bshort');
+      h += budTypeSelect('id="bud_dtyp"', v.typ || 'chladnicka') +
+           budTypeless('Názov / model…', 'dnazov', 'bwide', v.nazov) +
+           budTypeless('Dodávateľ', 'ddod', '', v.dodavatel) +
+           budTypeless('0,00', 'dcena', 'bshort', v.cena);
     }
     h += '<button type="button" class="primary bdraftok" data-bud="draft_ok" data-kind="' + kind + '">' +
          '<svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Pridať</button>' +
@@ -519,9 +533,9 @@
     return h;
   }
 
-  function budTypeless(ph, id, cls){
+  function budTypeless(ph, id, cls, value){
     return '<input class="bedit ' + cls + '" type="text" id="bud_' + id + '" placeholder="' + bEsc(ph) + '"' +
-           ' aria-label="' + bEsc(ph) + '">';
+           ' value="' + bEsc(value == null ? '' : value) + '" aria-label="' + bEsc(ph) + '">';
   }
 
   function budRoundingHtml(sec, b, d){
@@ -624,9 +638,25 @@
 
   // --- akcie ---------------------------------------------------------------
 
+  // GH #138 P2: kym bezi predchadzajuci zapis, dalsi ide DO FRONTY (nie do
+  // koša) — odosle sa hned po prichode cerstveho payloadu, uz s novou `gen`.
   function budSend(op, extra){
     if (!BOM || !window.sketchup || !sketchup.budget_mutate) return;
+    if (BUD_BUSY){ BUD_QUEUE.push([op, extra]); return; }
+    BUD_BUSY = true;
+    if (budBusyTimer) clearTimeout(budBusyTimer);
+    budBusyTimer = setTimeout(budAfterPush, BUD_BUSY_MS);
     sketchup.budget_mutate(JSON.stringify(budMutation(BOM, op, extra)));
+  }
+
+  // Vola sa po KAZDOM prichode payloadu (aj po odmietnutom zapise — server
+  // vzdy re-pushne) a z poistneho timera.
+  function budAfterPush(){
+    if (budBusyTimer){ clearTimeout(budBusyTimer); budBusyTimer = null; }
+    BUD_BUSY = false;
+    if (!BUD_QUEUE.length) return;
+    var next = BUD_QUEUE.shift();
+    budSend(next[0], next[1]);
   }
 
   function budNumericSend(input, op, extra){
@@ -659,24 +689,39 @@
     }));
   }
 
+  // GH #138 P2: draft sa NEZAHADZUJE pri odoslani. Server moze zapis odmietnut
+  // (necislo, cena mimo rozsahu, pridlhy text) — vtedy musi pouzivatel najst
+  // svoje hodnoty na mieste, nie prazdny formular. Zavrie ho az POTVRDENIE
+  // zo servera (NX.budgetResult).
   function budDraftCommit(kind){
-    var attrs;
+    var attrs = budDraftAttrs(kind, {
+      popis: (budEl('bud_dpopis') || {}).value, pocet: (budEl('bud_dpocet') || {}).value,
+      nazov: (budEl('bud_dnazov') || {}).value, typ: (budEl('bud_dtyp') || {}).value,
+      dodavatel: (budEl('bud_ddod') || {}).value, cena: (budEl('bud_dcena') || {}).value
+    });
+    BUD_DRAFT_VALUES = attrs; // hodnoty su zapamatane PRED odoslanim
+    var missing = budDraftMissing(kind, attrs);
+    if (missing){ NX.setStatus(missing, true); return; }
+    budSend(kind === 'custom' ? 'custom_add' : 'appliance_add', { attrs: attrs });
+  }
+
+  // Ciste: polia formulara -> atributy pre server (default pocet 1, typ „iné").
+  function budDraftAttrs(kind, f){
+    var g = f || {};
     if (kind === 'custom'){
-      var popis = (budEl('bud_dpopis') || {}).value || '';
-      if (!popis.trim()){ NX.setStatus('Popis položky je povinný.', true); return; }
-      attrs = { popis: popis, pocet: (budEl('bud_dpocet') || {}).value || '1',
-                cena: (budEl('bud_dcena') || {}).value || '' };
-      BUD_DRAFT = null;
-      budSend('custom_add', { attrs: attrs });
-    } else {
-      var nazov = (budEl('bud_dnazov') || {}).value || '';
-      if (!nazov.trim()){ NX.setStatus('Názov spotrebiča je povinný.', true); return; }
-      attrs = { typ: (budEl('bud_dtyp') || {}).value || 'ine', nazov: nazov,
-                dodavatel: (budEl('bud_ddod') || {}).value || '',
-                cena: (budEl('bud_dcena') || {}).value || '' };
-      BUD_DRAFT = null;
-      budSend('appliance_add', { attrs: attrs });
+      return { popis: g.popis || '', pocet: (g.pocet == null || g.pocet === '') ? '1' : g.pocet,
+               cena: g.cena || '' };
     }
+    return { typ: g.typ || 'ine', nazov: g.nazov || '',
+             dodavatel: g.dodavatel || '', cena: g.cena || '' };
+  }
+
+  // Ciste: co este chyba, aby sa dalo odoslat (null = mozeme). Rozsahy a typy
+  // stráži SERVER — tu je len povinne pole, aby sa zbytocne nechodilo do Ruby.
+  function budDraftMissing(kind, attrs){
+    var a = attrs || {};
+    if (kind === 'custom') return String(a.popis || '').trim() ? null : 'Popis položky je povinný.';
+    return String(a.nazov || '').trim() ? null : 'Názov spotrebiča je povinný.';
   }
 
   function budModalSave(){
@@ -691,6 +736,25 @@
     BUD_MODAL = null;
     budRenderModal();
     budSend(op, { id: id, attrs: attrs });
+  }
+
+  // GH #138 P2: napojenie na zivotny cyklus payloadu. budget.js sa nacitava AZ
+  // ZA production.js, takze NX uz existuje — obalime setBom (uvolnenie fronty
+  // po prichode novej generacie) a doplnime budgetResult (vysledok zapisu).
+  if (typeof window !== 'undefined' && window.NX && typeof NX.setBom === 'function'){
+    var budPrevSetBom = NX.setBom;
+    NX.setBom = function(data){
+      budPrevSetBom(data);
+      budAfterPush(); // fronta sa odosiela AZ s cerstvou gen z tohto payloadu
+    };
+    // Server hlasi vysledok mutacie PRED push_state — draft sa zavrie LEN pri
+    // uspechu, inak ostane aj s rozpisanymi hodnotami.
+    NX.budgetResult = function(op, ok){
+      if (ok && (op === 'custom_add' || op === 'appliance_add')){
+        BUD_DRAFT = null;
+        BUD_DRAFT_VALUES = null;
+      }
+    };
   }
 
   if (typeof document !== 'undefined'){
@@ -711,9 +775,9 @@
       } else if (a === 'goto'){
         budGoto(b.getAttribute('data-section'));
       } else if (a === 'draft'){
-        BUD_DRAFT = b.getAttribute('data-kind'); renderBody();
+        BUD_DRAFT = b.getAttribute('data-kind'); BUD_DRAFT_VALUES = null; renderBody();
       } else if (a === 'draft_cancel'){
-        BUD_DRAFT = null; renderBody();
+        BUD_DRAFT = null; BUD_DRAFT_VALUES = null; renderBody();
       } else if (a === 'draft_ok'){
         budDraftCommit(b.getAttribute('data-kind'));
       } else if (a === 'remove'){
@@ -795,5 +859,6 @@
     module.exports = { budFmtEur: budFmtEur, budFmtNum: budFmtNum, budDisplay: budDisplay,
       budPluralSk: budPluralSk, budStaleLabel: budStaleLabel, budWarnChips: budWarnChips,
       budMutation: budMutation, budParse: budParse, budNumText: budNumText,
-      budSectionCount: budSectionCount, budEsc: bEsc };
+      budSectionCount: budSectionCount, budEsc: bEsc,
+      budDraftAttrs: budDraftAttrs, budDraftMissing: budDraftMissing };
   }
