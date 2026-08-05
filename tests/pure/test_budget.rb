@@ -322,6 +322,42 @@ NxTest.test('budget: zaokruhlenie BRUTTO sumy nahor (1 € default aj krok 10 �
   NxTest.assert_close(t['raw_total'], t10['raw_total'], 0.01, 'zaokruhlenie nemeni podklad')
 end
 
+NxTest.test('budget: cena za platnu z NEZAOKRUHLENYCH rozmerov (GH #137 P2)') do
+  # 4100 x 635 = 2,6035 m2; odhad platni zaokruhluje sheet_m2 na 3 desatiny
+  # (2,604) — cena sa musi ratat z rozmerov, inak ujde na KAZDEJ platni.
+  NxTest.assert_close(260.35, NxBudget.bd.price_per_plate(100.0, 2.604, [4100.0, 635.0]), 0.001)
+  NxTest.assert_close(260.40, NxBudget.bd.price_per_plate(100.0, 2.604, nil), 0.001,
+                      'bez rozmerov ostava fallback na hodnotu z odhadu')
+  NxTest.assert(NxBudget.bd.price_per_plate(nil, 2.604, [4100.0, 635.0]).nil?, 'bez ceny = nil')
+  NxTest.assert(NxBudget.bd.price_per_plate(10.0, nil, ['x', 0]).nil?, 'poskodene rozmery = nil')
+
+  sh = NxBudget.sheets
+  sh['PD38'] = sh['PD38'].merge('sheet_size' => [4100.0, 635.0], 'price_per_m2' => 100.0)
+  p = NxBudget.bd.compute(NxBudget.bom, NxBudget.state, NxBudget.settings, sheets: sh, edges: NxBudget.edges)
+  r = p['sections'].find { |s| s['key'] == 'materials' }['rows'].find { |x| x['key'] == 'material:PD38' }
+  NxTest.assert_close(260.35, r['cena_mj'], 0.001)
+end
+
+NxTest.test('budget: MJ kovania — balenie a bezny meter neprepadnu na KS (GH #137 P2)') do
+  NxTest.assert_equal('BAL', NxBudget.bd.unit_label('bal'))
+  NxTest.assert_equal('BM', NxBudget.bd.unit_label('m'))
+  NxTest.assert_equal('SET', NxBudget.bd.unit_label('set'))
+  NxTest.assert_equal('PÁR', NxBudget.bd.unit_label('par'))
+  NxTest.assert_equal('KS', NxBudget.bd.unit_label('ks'))
+  NxTest.assert_equal('KS', NxBudget.bd.unit_label(nil), 'neznama jednotka = kusy')
+  # kanonicke jednotky katalogu kovania musia byt VSETKY namapovane
+  if defined?(Noxun::Engine::HardwareCatalog)
+    Noxun::Engine::HardwareCatalog::UNITS.each do |u|
+      NxTest.assert(NxBudget.bd::HW_UNIT_LABELS.key?(u), "jednotka #{u} nema MJ rozpoctu")
+    end
+  end
+  exp = { 'rows' => [{ 'code' => 'B1', 'quantity' => 2, 'name_sk' => 'Kolíky', 'unit' => 'bal',
+                       'price_eur_vat' => 4.0, 'missing' => false }] }
+  p = NxBudget.bd.compute(NxBudget.bom, NxBudget.state, NxBudget.settings,
+                          sheets: NxBudget.sheets, edges: NxBudget.edges, hardware_expansion: exp)
+  NxTest.assert_equal('BAL', p['sections'].find { |s| s['key'] == 'hardware' }['rows'].first['mj'])
+end
+
 NxTest.test('budget: pocet platni — float drift nenakupi platnu navyse') do
   NxTest.assert_equal(5, NxBudget.bd.plates_of('count_max' => 5.0))
   NxTest.assert_equal(5, NxBudget.bd.plates_of('count_max' => 5.000000000000001))

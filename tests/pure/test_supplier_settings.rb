@@ -182,3 +182,21 @@ NxTest.test('supplier_settings: patch rezimovych hodnot — null hodnotu ZMAZE')
   sup2 = NxSS.supplier(NxSS.ss.reload!)
   NxTest.assert_close(0.90, NxSS.ss.rate(sup2, 'olep', 'vysoky'), 0.001, 'po zmazani padne na zakladnu sadzbu')
 end
+
+NxTest.test('supplier_settings: zmazanie SEEDOVANEJ rezimovej hodnoty PREZIJE dalsie nacitanie (GH #137 P2)') do
+  NxTest.skip!('zapisuje do APPDATA') unless NxTest.headless?
+  NxSS.reset!
+  NxSS.ss.load
+  NxTest.assert_close(50.0, NxSS.ss.rate(NxSS.supplier, 'pd_opracovanie', 'nizky'), 0.001, 'seed hodnota')
+  ok, = NxSS.ss.patch_active!('mode_values' => { 'pd_opracovanie' => { 'nizky' => nil } })
+  NxTest.assert(ok)
+  2.times do
+    sup = NxSS.supplier(NxSS.ss.reload!)
+    NxTest.refute(sup['mode_values'].fetch('pd_opracovanie', {}).key?('nizky'),
+                  'merge nesmie vratit vedome zmazanu rezimovu hodnotu')
+    NxTest.assert_close(100.0, NxSS.ss.rate(sup, 'pd_opracovanie', 'nizky'), 0.001,
+                        'po zmazani plati zakladna sadzba aj v rezime nizky')
+  end
+  # ostatne seed hodnoty ostavaju nedotknute
+  NxTest.assert_close(80.0, NxSS.ss.rate(NxSS.supplier, 'doprava_zakaznik', 'vysoky'), 0.001)
+end

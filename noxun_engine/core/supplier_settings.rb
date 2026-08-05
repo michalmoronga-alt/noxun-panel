@@ -195,6 +195,7 @@ module Noxun
       # -> [doc, changed]
       def merge_seed(doc)
         changed = false
+        from_version = doc['seed_version'].to_i
         doc['suppliers'] = [seed_supplier] if Array(doc['suppliers']).empty?
         doc['suppliers'].each do |sup|
           sup['rates'] = {} unless sup['rates'].is_a?(Hash)
@@ -225,17 +226,24 @@ module Noxun
             sup['standard_rows'] = reordered
             changed = true
           end
-          SEED_MODE_VALUES.each do |key, modes|
-            cur = sup['mode_values'][key]
-            unless cur.is_a?(Hash)
-              sup['mode_values'][key] = deep_copy(modes)
-              changed = true
-              next
-            end
-            modes.each do |mode, value|
-              next if cur.key?(mode)
-              cur[mode] = value
-              changed = true
+          # GH #137 P2: rezimove hodnoty sa seeduju LEN RAZ per SEED_VERSION.
+          # Su to JEDINE polia, ktore smie pouzivatel VEDOME zmazat (patch
+          # null = "pouzi zakladnu sadzbu") — unconditional merge by mu ich
+          # pri najblizsom nacitani ticho vratil. Nove rezimove hodnoty
+          # buduceho seedu pridu s bumpom SEED_VERSION.
+          if from_version < SEED_VERSION
+            SEED_MODE_VALUES.each do |key, modes|
+              cur = sup['mode_values'][key]
+              unless cur.is_a?(Hash)
+                sup['mode_values'][key] = deep_copy(modes)
+                changed = true
+                next
+              end
+              modes.each do |mode, value|
+                next if cur.key?(mode)
+                cur[mode] = value
+                changed = true
+              end
             end
           end
         end

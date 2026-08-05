@@ -40,6 +40,17 @@ module Noxun
       MJ_PLATA = 'PLATŇA'
       MJ_M2    = 'M2'
       MJ_FIX   = 'FIX'
+      MJ_SET   = 'SET'
+      MJ_PAR   = 'PÁR'
+      MJ_BAL   = 'BAL' # balenie — kovanie sa casto predava po baleniach
+
+      # Kanonicke jednotky katalogu kovania (HardwareCatalog::UNITS) -> MJ
+      # rozpoctu; aliasy su tu len ako poistka pre starsie/rucne zapisy.
+      HW_UNIT_LABELS = {
+        'ks' => MJ_KS, 'set' => MJ_SET, 'sada' => MJ_SET, 'par' => MJ_PAR,
+        'pár' => MJ_PAR, 'bal' => MJ_BAL, 'balenie' => MJ_BAL,
+        'm' => MJ_BM, 'bm' => MJ_BM
+      }.freeze
 
       SRC_AUTO     = 'auto'
       SRC_MANUAL   = 'manual'
@@ -149,7 +160,7 @@ module Noxun
           plates = plates_of(g)
           sheet_m2 = num(g['sheet_m2'])
           price_m2 = num(rec['price_per_m2'])
-          per_plate = price_per_plate(price_m2, sheet_m2)
+          per_plate = price_per_plate(price_m2, sheet_m2, g['sheet_size'])
           notes = []
           size = g['sheet_size']
           notes << "#{fmt(g['m2'])} m²"
@@ -177,9 +188,22 @@ module Noxun
       end
 
       # JEDINA konverzia EUR/m2 -> EUR/platna v celom rozpocte.
-      def price_per_plate(price_m2, sheet_m2)
-        return nil if price_m2.nil? || sheet_m2.nil? || sheet_m2 <= 0
-        (price_m2 * sheet_m2).round(2)
+      # GH #137 P2: plocha sa pocita z NEZAOKRUHLENYCH rozmerov platne —
+      # `sheet_m2` z odhadu je zaokruhleny na 3 desatinne miesta (prezentacna
+      # hodnota) a pri formatoch ako 4100x635 (2,6035 m2) by cena za platnu
+      # ušla o niekolko centov na KAZDEJ platni.
+      def price_per_plate(price_m2, sheet_m2, sheet_size = nil)
+        area = exact_sheet_m2(sheet_size) || sheet_m2
+        return nil if price_m2.nil? || area.nil? || area <= 0
+        (price_m2 * area).round(2)
+      end
+
+      def exact_sheet_m2(size)
+        return nil unless size.is_a?(Array) && size.length == 2
+        l = num(size[0])
+        w = num(size[1])
+        return nil if l.nil? || w.nil? || l <= 0 || w <= 0
+        l * w / 1_000_000.0
       end
 
       # Cele platne sa NAKUPUJU — pesimisticky odhad (count_max) nahor.
@@ -244,15 +268,11 @@ module Noxun
         section('hardware', rows)
       end
 
+      # GH #137 P2: MJ kovania musi prezit 1:1 do exportu — katalog povoluje
+      # aj `bal` (balenie) a `m` (bezny meter). Tichy fallback na KS by
+      # tvrdil kusy tam, kde je cena za balenie/meter.
       def unit_label(unit)
-        u = unit.to_s.strip.downcase
-        case u
-        when 'set' then 'SET'
-        when 'par', 'pár' then 'PÁR'
-        when 'bm' then MJ_BM
-        when 'm2' then MJ_M2
-        else MJ_KS
-        end
+        HW_UNIT_LABELS[unit.to_s.strip.downcase] || MJ_KS
       end
 
       # --- sekcia SLUZBY (AUTO) ------------------------------------------------
