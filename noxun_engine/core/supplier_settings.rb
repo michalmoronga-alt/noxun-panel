@@ -188,6 +188,8 @@ module Noxun
 
       # Doplni LEN to, co chyba (kluce sadzieb, skalare, standardne riadky,
       # rezimove hodnoty) — pouzivatelska hodnota sa nikdy neprepise.
+      # 8 standardnych riadkov je FIXNA mnozina: zmazany riadok merge vrati
+      # (riadok sa "vypina" nasobkom 0, ktory ostava viditelny v rozpocte).
       # Ocakava NORMALIZOVANY dokument (load ho tak vola); guardy nizsie kryju
       # aj priame volanie nad surovym tvarom.
       # -> [doc, changed]
@@ -252,6 +254,9 @@ module Noxun
 
       # Defenzivna normalizacia CELEHO dokumentu (rucne upraveny JSON, starsi
       # zapis, poskodene typy). Nikdy nevyhodi vynimku, nikdy nevrati nil.
+      # Tvar je WHITELIST — cokolvek mimo znamych poli sa zahodi (subor su
+      # nastavenia, nie pouzivatelske data; verziu formatu nesie `std` a
+      # buducu migraciu urobi kod, ktory nove pole zavedie).
       def normalize(raw)
         doc = raw.is_a?(Hash) ? deep_copy(stringify(raw)) : {}
         suppliers = Array(doc['suppliers']).map { |s| normalize_supplier(s) }.compact
