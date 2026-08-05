@@ -322,6 +322,13 @@ NxTest.test('budget: zaokruhlenie BRUTTO sumy nahor (1 € default aj krok 10 �
   NxTest.assert_close(t['raw_total'], t10['raw_total'], 0.01, 'zaokruhlenie nemeni podklad')
 end
 
+NxTest.test('budget: pocet platni — float drift nenakupi platnu navyse') do
+  NxTest.assert_equal(5, NxBudget.bd.plates_of('count_max' => 5.0))
+  NxTest.assert_equal(5, NxBudget.bd.plates_of('count_max' => 5.000000000000001))
+  NxTest.assert_equal(5, NxBudget.bd.plates_of('count_max' => 4.4), 'neuplna platna sa nakupuje cela')
+  NxTest.assert_equal(0, NxBudget.bd.plates_of('count_max' => 0.0))
+end
+
 NxTest.test('budget: ceil_to — presna hranica sa nezdvihne, tesne nad ide hore') do
   NxTest.assert_close(1235.0, NxBudget.bd.ceil_to(1234.56, 1.0), 0.001)
   NxTest.assert_close(1234.0, NxBudget.bd.ceil_to(1234.0, 1.0), 0.001, 'presna suma sa nezaokruhli hore')

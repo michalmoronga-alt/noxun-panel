@@ -183,9 +183,11 @@ module Noxun
       end
 
       # Cele platne sa NAKUPUJU — pesimisticky odhad (count_max) nahor.
+      # round(6) PRED ceil (vzor SheetEstimate.ceil_tenth): 5.000000000000001 by
+      # inak nakupil o platnu viac.
       def plates_of(group)
         v = num(group['count_max']) || 0.0
-        v <= 0 ? 0 : v.ceil
+        v <= 0 ? 0 : v.round(6).ceil
       end
 
       # --- sekcia ABS ----------------------------------------------------------
@@ -561,7 +563,7 @@ module Noxun
           end
           next unless sec['unknown_count'].to_i.positive?
           out << warn_item("budget|section:#{sec['key']}|incomplete", sec['key'], nil,
-                           "#{sec['name']}: #{sec['unknown_count']} riadkov bez ceny — medzisúčet je neúplný.")
+                           "#{sec['name']}: #{rows_sk(sec['unknown_count'])} bez ceny — medzisúčet je neúplný.")
         end
         dedup(out)
       end
@@ -586,6 +588,14 @@ module Noxun
       def row_title(row)
         t = row['nazov'].to_s.strip
         t.empty? ? '(bez názvu)' : t
+      end
+
+      # Slovenske sklonovanie v hlaskach KONTROLY (1 riadok / 2 riadky / 5 riadkov).
+      def rows_sk(count)
+        n = count.to_i
+        return "#{n} riadok" if n == 1
+        return "#{n} riadky" if n >= 2 && n <= 4
+        "#{n} riadkov"
       end
 
       # --- spolocne stavebne kamene -------------------------------------------
