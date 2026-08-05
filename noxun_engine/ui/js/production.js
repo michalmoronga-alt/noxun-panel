@@ -58,7 +58,7 @@
 
   function setProdTab(t){
     prodTab = t;
-    ['rows','sheets','edging','hardware','control'].forEach(function(k){
+    ['rows','sheets','edging','hardware','budget','control'].forEach(function(k){
       el('pt_' + k).classList.toggle('on', k === t);
     });
     // klik na riadok vybera v modeli v kusovniku, kovani AJ kontrole
@@ -109,7 +109,37 @@
     if (prodTab === 'sheets') return renderSheets(box);
     if (prodTab === 'edging') return renderEdging(box);
     if (prodTab === 'hardware') return renderHardware(box);
+    if (prodTab === 'budget') return renderBudget(box); // V0.6 E-b (js/budget.js)
     renderControl(box);
+  }
+
+  // V0.6 E-b: cenove bunky tabov Materialy/ABS citaju TEN ISTY payload rozpoctu
+  // (BOM.budget) — okno nikde nema druhy vypocet ceny. Mapa podla identity
+  // zaznamu (material_id / abs_id), nie podla indexu.
+  function budgetRowMap(sectionKey, idField){
+    var out = {};
+    var b = BOM && BOM.budget;
+    if (!b) return out;
+    (b.sections || []).forEach(function(s){
+      if (s.key !== sectionKey) return;
+      (s.rows || []).forEach(function(r){ if (r[idField]) out[r[idField]] = r; });
+    });
+    return out;
+  }
+
+  function budgetSubtotal(sectionKey){
+    var b = BOM && BOM.budget;
+    if (!b || !b.totals || !b.totals.subtotals) return null;
+    var v = b.totals.subtotals[sectionKey];
+    return (v === undefined) ? null : v;
+  }
+
+  // Suma sekcie pod tabulkou — hodnota zo servera, JS ju NEskladá.
+  function budgetSumRow(sectionKey, cols, label){
+    var v = budgetSubtotal(sectionKey);
+    if (v === null) return '';
+    return '<tr class="hwsum"><td colspan="' + (cols - 1) + '">' + label + '</td>' +
+           '<td><b>' + price(v) + '</b></td></tr>';
   }
 
   function renderRows(box){
@@ -144,8 +174,10 @@
       var list = dupSrc[r.material_id] = dupSrc[r.material_id] || [];
       if (list.indexOf(lbl) < 0) list.push(lbl);
     });
+    // D-61 (E-b): pri doske je primárna cena za TABUĽU, €/m² sekundárne.
+    var bmat = budgetRowMap('materials', 'material_id');
     var seen = {};
-    var h = '<table class="bomtab"><thead><tr><th>Materiál</th><th>m²</th><th>dielcov</th><th>Formát</th><th>Platne (odhad)</th></tr></thead><tbody>';
+    var h = '<table class="bomtab"><thead><tr><th>Materiál</th><th>m²</th><th>dielcov</th><th>Formát</th><th>Platne (odhad)</th><th>Cena</th></tr></thead><tbody>';
     list.forEach(function(s){
       seen[s.material_id] = true;
       var e = est[s.material_id];
@@ -168,7 +200,8 @@
       var cls = 'estcell' + (fb ? ' estfb' : '');
       var tt = fb ? ' title="Materiál nemá formát v katalógu — použitý 2800×2070"' : '';
       h += '<tr><td>' + esc(s.material_id) + '</td><td>' + m2cell + '</td><td>' + num(s.quantity) + '</td>' +
-           '<td class="' + cls + '"' + tt + '>' + fmt + '</td><td class="' + cls + '"' + tt + '><b>' + pl + '</b></td></tr>';
+           '<td class="' + cls + '"' + tt + '>' + fmt + '</td><td class="' + cls + '"' + tt + '><b>' + pl + '</b></td>' +
+           '<td class="estcell">' + plateCell(bmat[s.material_id]) + '</td></tr>';
     });
     // 2B-1: nakupny riadok zdroja, ktory NEMA vlastne dielce (odhad ho pozna,
     // vyrobny zoznam nie) — bez neho by nakup zdrojovych platni z tabulky zmizol.
@@ -180,20 +213,41 @@
       h += '<tr><td>' + esc(e.material_id) + ' <span class="muted">(nákup pre dupláky)</span></td>' +
            '<td><b>' + num(e.m2, 2) + '</b></td><td>—</td>' +
            '<td class="' + cls + '"' + tt + '>' + num(e.sheet_size[0]) + '×' + num(e.sheet_size[1]) + '</td>' +
-           '<td class="' + cls + '"' + tt + '><b>' + num(e.count_min, 1) + ' – ' + num(e.count_max, 1) + '</b></td></tr>';
+           '<td class="' + cls + '"' + tt + '><b>' + num(e.count_min, 1) + ' – ' + num(e.count_max, 1) + '</b></td>' +
+           '<td class="estcell">' + plateCell(bmat[e.material_id]) + '</td></tr>';
     });
+    h += budgetSumRow('materials', 6, 'Odhad ceny — celé tabule (ceny s DPH)');
     box.innerHTML = h + '</tbody></table>' +
-      '<div class="hint">Odhad = plocha × prerez 10–25 % ÷ platňa. Orientačný rozsah, NIE nárezový plán. Duplák sa lepí zo zdrojových platní — jeho plocha sa počíta do nákupu zdroja. Formát platne sa nastavuje v katalógu materiálov (okno Materiály projektu).</div>';
+      '<div class="hint">Odhad = plocha × prerez 10–25 % ÷ platňa. Orientačný rozsah, NIE nárezový plán. Duplák sa lepí zo zdrojových platní — jeho plocha sa počíta do nákupu zdroja. Formát platne sa nastavuje v katalógu materiálov (okno Materiály projektu). Cena = celé tabule × cena za tabuľu; rozpis v tabe Rozpočet.</div>';
+  }
+
+  // D-61: „€ / tabuľa" primárne, €/m² v zátvorke. Obe čísla nesie payload
+  // rozpočtu (Budget.price_per_plate je JEDINÁ konverzia €/m² → €/tabuľa).
+  function plateCell(row){
+    if (!row) return '<span class="muted">—</span>';
+    if (row.price_missing) return '<span class="muted" title="Materiál nemá cenu v katalógu">chýba cena</span>';
+    var m2 = (row.price_per_m2 == null) ? '' :
+      ' <span class="muted">(' + num(row.price_per_m2, 2) + ' €/m²)</span>';
+    return '<b>' + price(row.cena_mj) + '</b>/tab.' + m2;
   }
 
   function renderEdging(box){
     var list = BOM.edging || [];
     if (!list.length){ box.innerHTML = '<div class="muted">Žiadne ABS hrany.</div>'; return; }
-    var h = '<table class="bomtab"><thead><tr><th>ABS páska</th><th>bm</th><th>hrán</th></tr></thead><tbody>';
+    // E-b: nákupné bm (vrátane rezervy) aj cena idú z payloadu rozpočtu.
+    var babs = budgetRowMap('abs', 'abs_id');
+    var h = '<table class="bomtab"><thead><tr><th>ABS páska</th><th>bm</th><th>hrán</th><th>bm s rezervou</th><th>€ / bm</th></tr></thead><tbody>';
     list.forEach(function(e){
-      h += '<tr><td>' + esc(e.abs_id) + '</td><td><b>' + num(e.bm, 1) + '</b></td><td>' + num(e.edges) + '</td></tr>';
+      var br = babs[e.abs_id];
+      var res = br ? ('<b>' + num(br.mnozstvo, 1) + '</b>') : '<span class="muted">—</span>';
+      var pb = br ? (br.price_missing ? '<span class="muted">chýba cena</span>' : price(br.cena_mj))
+                  : '<span class="muted">—</span>';
+      h += '<tr><td>' + esc(e.abs_id) + '</td><td><b>' + num(e.bm, 1) + '</b></td><td>' + num(e.edges) + '</td>' +
+           '<td>' + res + '</td><td>' + pb + '</td></tr>';
     });
-    box.innerHTML = h + '</tbody></table>';
+    h += budgetSumRow('abs', 5, 'Odhad ceny — s rezervou (ceny s DPH)');
+    box.innerHTML = h + '</tbody></table>' +
+      '<div class="hint">Rezerva na olep sa nastavuje v ⚙ Nastaveniach rozpočtu; rozpis v tabe Rozpočet.</div>';
   }
 
   // V0.6 D1b: cena — nil/undefined = „nezadaná" (—), NIKDY 0 (audit N11).
@@ -283,10 +337,13 @@
     var h = '<table class="bomtab ctrltab"><thead><tr><th>!</th><th>Problém</th><th>Kde</th></tr></thead><tbody>';
     list.forEach(function(it, i){
       var red = it.severity === 'red';
+      // V0.6 E-b: rozpočtové upozornenie nemá entitu v modeli — „Kde" ukazuje
+      // cieľ v Rozpočte a klik prepne tab (nič sa v modeli neoznačuje).
+      var bud = it.category === 'budget';
       h += '<tr class="ctrlrow ' + (red ? 'ctrl-red' : 'ctrl-orange') + '" data-i="' + i + '">' +
            '<td class="ctrlicon">' + (red ? '🔴' : '🟠') + '</td>' +
            '<td>' + esc(it.message_sk) + ctrlActionHtml(it) + '</td>' +
-           '<td>' + esc(it.owner_id || '—') + '</td></tr>';
+           '<td>' + (bud ? 'Rozpočet' : esc(it.owner_id || '—')) + '</td></tr>';
     });
     box.innerHTML = h + '</tbody></table>';
   }
@@ -335,6 +392,13 @@
       // flushi editov prepocita validaciu a najde entity podla identity (nalez 4).
       var it = (BOM.control || [])[i];
       if (!it || !it.stable_key) return;
+      // V0.6 E-b: rozpoctove upozornenie NEMA entitu — klik prepne na tab
+      // Rozpocet a odscroluje na sekciu (server sa vobec nevola).
+      if (it.category === 'budget'){
+        setProdTab('budget');
+        if (typeof budGoto === 'function' && it.budget_section) budGoto(it.budget_section);
+        return;
+      }
       payload.problem_key = it.stable_key;
     } else {
       var g = (BOM.hardware || [])[i];
