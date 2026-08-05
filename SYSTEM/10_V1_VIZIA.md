@@ -47,11 +47,11 @@
 
 - **Vkladanie na klik** (V1-04 fáza 1, SKORO — malá dávka): skrinka visí na kurzore, klik umiestni. Snap/pripájanie k susedom = V1 zostavy (roadmapa).
 - **Vizuálny materiálový workflow:** farba per DEKOR (C-06/D-82, skupinová operácia) → Demos fotka ako textúra SU materiálu (M-R quick-win) → **nástroj „pixla"** (V1-06): ikonka na dlaždici materiálu → klik prefarbuje dielce (cez part_override cestu, 1 klik = 1 undo). Koniec „hnedého mora".
-- **UI 2.0 — štúdio** (D-50 + celý E blok zápisu): satelity (Materiály·Kovanie·Výroba·Pravidlá·Šablóny) → JEDNO okno s bočnou navigáciou (OCL vzor, GPL kód nie); header panela = prístup ku všetkému (UX-02); karta Zóna so smerovými ikonami (UX-06); štandard veľkostí okien/tlačidiel (D-51) PRED Luciiným nasadením; select „(podľa projektu)" vs explicitná voľba viditeľne (zámok predvoľby); polia šírkou podľa obsahu (UX-03); „Nahradiť UNI" dostupné z KONTROLY (UX-07/D-83). **Mockup pred implementáciou** (vzor Materiály 2.0 — schválený klikateľný HTML).
+- **UI 2.0 — štúdio** (D-50 + celý E blok zápisu): satelity (Materiály·Kovanie·Výroba·Pravidlá·Šablóny) → JEDNO okno s bočnou navigáciou (OCL vzor, GPL kód nie); header panela = prístup ku všetkému (UX-02); karta Zóna so smerovými ikonami (UX-06); štandard veľkostí okien/tlačidiel (D-51) PRED Luciiným nasadením — vrátane okien, ktoré sa otvárajú odseknuté (D-77); select „(podľa projektu)" vs explicitná voľba viditeľne (zámok predvoľby); polia šírkou podľa obsahu (UX-03); „Nahradiť UNI" dostupné z KONTROLY (UX-07/D-83). **Mockup pred implementáciou** (vzor Materiály 2.0 — schválený klikateľný HTML).
 
 ## 7 · Navrhované poradie po smoke teste
 
-1. **H-dávky (opravy+malé, pred E):** H1 kovanie (D-75 live push setov · D-79 nohy default+rad · D-81 bočnice+owner override) → H2 šablóny s kovaním (D-76) → H3 geometria interiéru (D-80, SU testy) → H4 UI drobnosti (D-77 · D-78 · D-82 · D-83).
+1. **H-dávky (opravy+malé, pred E) — HOTOVÉ 4.8. (PR #131–#135, v0.5.44):** H1 kovanie (D-75 live push setov · D-79 nohy default+rad · D-81 bočnice+owner override) → H2 šablóny s kovaním (D-76) → H3 geometria interiéru (D-80, SU testy) → H4 UI drobnosti (D-78 · D-82 · D-83). **D-77** (odseknuté okno detailu) z H4 VYPADOL — Michal 4.8.: „vyriešime plošným reworkom, týchto chýb v oknách je viac" → rieši ho bod 6 (UI 2.0, spolu s D-50/D-51). H-dávky teda E neblokujú.
 2. **Dávka E** — rozpočet/ceny (+ cenová čerstvosť V1-03 základ: manuálne overenie + vek).
 3. **Seed katalógu** (odložený po E — plán platí).
 4. **Spotrebiče S1** (katalóg+model+kontrola+rozpočet sekcia).
