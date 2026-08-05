@@ -26,6 +26,7 @@ module Noxun
         with_catalog_lock do
           JsonFileStore.invalidate(path)
           data = load
+          enforce_group_color!(rec, data, :sheet) # D-82: farbu drzi skupina, nie payload
           data['sheets'] = data['sheets'].reject { |m| m['material_id'] == rec['material_id'] } + [rec]
           write_unlocked(data)
         end
@@ -38,6 +39,7 @@ module Noxun
         with_catalog_lock do
           JsonFileStore.invalidate(path)
           data = load
+          enforce_group_color!(rec, data, :edge) # D-82: farbu drzi skupina, nie payload
           data['edges'] = data['edges'].reject { |a| a['abs_id'] == rec['abs_id'] } + [rec]
           write_unlocked(data)
         end
@@ -118,7 +120,10 @@ module Noxun
           rec['material_id'] = generate_sheet_id(rec['decor'], rec['type'], rec['thickness'],
                                                  structure: rec['structure'], sheet_size: rec['sheet_size'],
                                                  taken: data['sheets'].map { |s| s['material_id'].to_s.upcase })
-          data['sheets'] += [normalize_sheet(rec)]
+          # D-82: duplak je novy variant TEJ ISTEJ skupiny — farbu dedi po nej
+          # (duplak_record_from ju kopiruje zo zdroja, toto je poistka aj pre
+          # zdroj s chybajucou/poskodenou farbou).
+          data['sheets'] += [enforce_group_color!(normalize_sheet(rec), data, :sheet)]
           # Prvy duplak LAZY zdvihne marker na 3 — starsie verzie pluginu by
           # source_* polia pri zapise zahodili (write_unlocked ich odmietne).
           data['schema'] = SCHEMA_DUPLAK
@@ -215,6 +220,7 @@ module Noxun
         with_catalog_lock do
           JsonFileStore.invalidate(path)
           data = load
+          enforce_group_color!(rec, data, :sheet) # D-82: farbu drzi skupina, nie payload
           data['sheets'] = data['sheets'].reject { |m| m['material_id'] == rec['material_id'] } + [rec]
           data['sheets'] = data['sheets'].map do |s|
             next s unless s['source_material_id'].to_s == rec['material_id']

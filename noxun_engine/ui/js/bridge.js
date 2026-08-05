@@ -12,6 +12,9 @@
     // rozpisane upravy v karte preziju. Jedine miesto zmeny rezimu = jedine
     // miesto resetu — plati pre kazdu buducu cestu do mode-insert.
     if (NXInsert.trackMode(mode)) materializeInsertCard();
+    // D-78: rezimove taby su v mode-insert neaktivne — aria stav drzime pri KAZDEJ
+    // zmene rezimu (className vyssie zmazal aj pripadne stare priznaky).
+    if (typeof syncCabTabsLocked === 'function') syncCabTabsLocked();
   }
   // D3: klik na ⚠ chip rozbali/zbali zoznam upozorneni stavby pod identitou.
   function setIdbar(c){
@@ -213,7 +216,9 @@
       buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
       setIdbar(null);
       setUiMode('insert');
-      previewMode = cabTabPreview(currentCabTab); // D-08: taby funguju aj na navrhu (draft)
+      // D-78: vo vkladani su taby neaktivne a zobrazuje sa Korpus (effectiveCabTab);
+      // zapamatany pracovny tab prezije a obnovi sa pri oznaceni korpusu.
+      previewMode = cabTabPreview(effectiveCabTab());
       invalidateFrontPlaceholders(); // D-23: navrhovy rezim nema resolved vysky
       if (lastCabForFit !== null){ lastCabForFit = null; fitPreview(); }
       renderPartCard(null);      // schovaj kartu dielca

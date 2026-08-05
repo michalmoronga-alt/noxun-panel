@@ -172,6 +172,12 @@ module Noxun
       PROTECTED_SHEET_IDS = PROJECT_FALLBACK.values.freeze
       GRAINS = %w[length width none].freeze
 
+      # D-82: farba je vlastnost DEKOROVEJ SKUPINY, nie variantu. Doteraz ju
+      # niesol kazdy zaznam zvlast a kazda cesta vzniku (formular, batch, Demos)
+      # ju stavala inak — vysledkom bolo "hnede more" (vsetko na tomto defaulte).
+      # JEDNA hodnota tu = jediny zdroj pravdy pre vsetky vytvaracie cesty.
+      DEFAULT_DECOR_RGB = [216, 196, 160].freeze
+
       module_function
 
       # --- cesty / perzistencia ------------------------------------------------
@@ -557,7 +563,7 @@ module Noxun
           'grain'       => (a['grain'] || a[:grain] || 'none').to_s,
           'price_per_m2' => normalize_price(a['price_per_m2'] || a[:price_per_m2]),
           'sheet_size'  => normalize_pair(a['sheet_size'] || a[:sheet_size]),
-          'color'       => normalize_rgb(a['color'] || a[:color], [216, 196, 160]),
+          'color'       => normalize_rgb(a['color'] || a[:color], DEFAULT_DECOR_RGB),
           'production_class' => 'sheet'
         }
         # D-42: cena ako nil-alebo-Float — kluc sa uklada LEN ked je cena ZADANA
@@ -720,7 +726,7 @@ module Noxun
           'decor'        => (a['decor'] || a[:decor]).to_s.strip,
           'thickness'    => thickness,
           'price_per_bm' => normalize_price(a['price_per_bm'] || a[:price_per_bm]),
-          'color'        => normalize_rgb(a['color'] || a[:color], [216, 196, 160])
+          'color'        => normalize_rgb(a['color'] || a[:color], DEFAULT_DECOR_RGB)
         }
         out.delete('price_per_bm') if out['price_per_bm'].nil?
         # D-41: 'width' kluc sa uklada LEN ked ma hodnotu — legacy zaznam bez

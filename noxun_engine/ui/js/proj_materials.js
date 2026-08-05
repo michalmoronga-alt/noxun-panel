@@ -382,6 +382,41 @@
       sketchup.open_demos_url(JSON.stringify({ kind: kind, id: id }));
   }
 
+  // --- D-82: farba dekoru = vlastnost SKUPINY -----------------------------
+  // Doteraz ju niesol KAZDY variant zvlast (vlastne pole vo formulari dosky aj
+  // pasky) — nikto ju neprepisoval po jednom, takze katalog ostal "hnede more".
+  // Teraz sa meni RAZ pre cely dekor a nove varianty (aj z Demosu) ju dedia.
+  // Ovladac je priamo SWATCH v hlavicke detailu: native paleta lezi cez neho
+  // neviditelne, takze hlavicka nerastie do vysky (vertikalny priestor).
+  // Cista funkcia (Node test): true = farba sa v tejto skupine da menit.
+  function mdColorEditable(g, ro){
+    return !!g && !ro && g.uni !== true && g.decor !== '';
+  }
+  function mdGroupSwatch(g){
+    var photo = g.image
+      ? '<img class="mdsw-photo" src="' + esc(mdImageSrc(g.image)) + '" alt="" onerror="this.style.display=\'none\'">'
+      : '';
+    var bg = ' style="background:' + esc(rgbToHex(g.color)) + '"';
+    if (!mdColorEditable(g, MD_RO)){
+      // UNI (farba rozlisuje rolu — server ju chrani) a read-only rezim:
+      // swatch ostava len ukazkou, ziadna paleta.
+      var t = g.uni === true ? ' title="UNI má farbu podľa role — nemení sa"' : '';
+      return '<i class="mdsw mdsw-lg"' + bg + t + '>' + photo + '</i>';
+    }
+    return '<label class="mdsw mdsw-lg mdswpick"' + bg +
+      ' title="Farba dekoru — platí pre celú skupinu (dosky aj ABS)">' + photo +
+      '<input type="color" id="md_group_color" value="' + esc(rgbToHex(g.color)) + '"' +
+      ' aria-label="Farba dekoru — platí pre celú skupinu"' +
+      ' onchange="mdColorSave(' + esc(JSON.stringify(g.key)) + ', this.value)"></label>';
+  }
+  function mdColorSave(key, hex){
+    var g = mdGroupByKey(key);
+    if (!g) return;
+    if (window.sketchup && sketchup.set_decor_color)
+      sketchup.set_decor_color(JSON.stringify({ decor: g.decor, color: hex,
+        group_id: g.gid || '', catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA }));
+  }
+
   // 2A-4b: sekcie detailu per STRUKTURA povrchu (cista funkcia, Node test).
   // Kluc = normalizovana struktura (trim+kolaps medzier+upper), title = prvy
   // videny tvar; sekcia bez struktury posledna (patria sem aj universal pasky).
@@ -412,9 +447,8 @@
       '<button class="ghostbtn tplbtn" onclick="mdCloseDetail()" title="Späť na katalóg" aria-label="Späť na katalóg"><svg class="ic" aria-hidden="true"><use href="#i-arrow-left"/></svg></button>' +
       // M-A3b (D-62): fotka dekoru aj v hlavicke detailu (vzor dlazdice —
       // onerror schova <img>, fallback farba swatchu ostava pod nou).
-      '<i class="mdsw mdsw-lg" style="background:' + esc(rgbToHex(g.color)) + '">' +
-      (g.image ? '<img class="mdsw-photo" src="' + esc(mdImageSrc(g.image)) + '" alt="" onerror="this.style.display=\'none\'">' : '') +
-      '</i>' +
+      // D-82: swatch je zaroven SKUPINOVY vyber farby (bez noveho riadku).
+      mdGroupSwatch(g) +
       '<span class="tpln"><b>' + esc(name) + '</b>' + (g.manufacturer ? ' <span class="tplt">' + esc(g.manufacturer) + '</span>' : '') +
       (g.uni ? ' <span class="mdunib">UNI</span>' : '') + '</span>' +
       // V0.6 M-B2: hromadna zamena UNI za realny dekor (nazov drzat presne —
@@ -688,7 +722,6 @@
     el('ms_supplier').value = s ? (s.supplier || '') : '';
     // M-A3e (D-71): rucna vazba na Demos — prefill + hint s datumom overenia.
     mdDemosField('ms', s);
-    el('ms_color').value = rgbToHex(s ? s.color : null);
     el('ms_family').value = s ? (s.family || '') : '';
     el('ms_manufacturer').value = s ? (s.manufacturer || '') : '';
     // D-42: vyrobca je group-level — pri edite disabled + hint (mrekt cez kartu).
@@ -786,7 +819,6 @@
     el('me_supplier').value = a ? (a.supplier || '') : '';
     // M-A3e (D-71): rucna vazba na Demos — prefill + hint s datumom overenia.
     mdDemosField('me', a);
-    el('me_color').value = rgbToHex(a ? a.color : null);
     el('mdEdgeForm').style.display = '';
   }
   // D-41: batch "Novy dekor" / "+ variant" (decor predvyplneny a zamknuty —
@@ -1352,7 +1384,11 @@
     var firstSheet = g && g.sheets.length ? g.sheets[0] : null;
     el('nd_type').value = firstSheet ? (firstSheet.type || 'DTDL') : 'DTDL';
     el('nd_grain').value = firstSheet ? (firstSheet.grain || 'length') : 'length';
+    // D-82: farba sa zadava LEN pri ZAKLADANI dekoru — „+ variant" do
+    // existujucej skupiny ju dedi (server ju vnuti bez ohladu na payload),
+    // preto riadok zmizne a nikoho neplete.
     el('nd_color').value = rgbToHex(g ? g.color : null);
+    if (el('nd_color_row')) el('nd_color_row').style.display = g ? 'none' : '';
     el('nd_ths').value = '';
     el('nd_abs').value = '';
     // NOVY dekor = predvyplnit poslednou sadou; "+ variant" zacina prazdny
@@ -1492,7 +1528,6 @@
       code: el('ms_code').value,             // D-42 dodavatelsky kod
       supplier: el('ms_supplier').value,     // D-42 preferovany dodavatel
       demos_url: el('ms_demos_url').value,   // M-A3e (D-71): prazdne = zmazat vazbu
-      color: hexToRgb(el('ms_color').value),
       family: el('ms_family').value,
       manufacturer: el('ms_manufacturer').value,
       allow_duplicate_code: mdDupAllow === 'sheet' // potvrdenie duplicitneho kodu (2. ulozenie)
@@ -1541,7 +1576,6 @@
       code: el('me_code').value,
       supplier: el('me_supplier').value,
       demos_url: el('me_demos_url').value,   // M-A3e (D-71): prazdne = zmazat vazbu
-      color: hexToRgb(el('me_color').value),
       allow_duplicate_code: mdDupAllow === 'edge'
     };
     // M-A3e (audit FIX 4): zla adresa nezatvara formular (vzor mdSaveSheet).
@@ -1570,7 +1604,6 @@
       el('ms_code').value = p.code || ''; el('ms_supplier').value = p.supplier || '';
       el('ms_grain').value = p.grain || 'none'; el('ms_family').value = p.family || '';
       el('ms_manufacturer').value = p.manufacturer || '';
-      if (p.color) el('ms_color').value = rgbToHex(p.color);
       el('ms_sheet_l').value = p.sheet_size ? p.sheet_size[0] : '';
       el('ms_sheet_w').value = p.sheet_size ? p.sheet_size[1] : '';
       el('ms_demos_url').value = p.demos_url || ''; // M-A3e (audit FIX 2)
@@ -1581,7 +1614,6 @@
       el('me_code').value = p.code || ''; el('me_supplier').value = p.supplier || '';
       el('me_width').value = (p.width === null || p.width === undefined) ? '' : p.width;
       el('me_thickness').value = p.thickness || '1.0';
-      if (p.color) el('me_color').value = rgbToHex(p.color);
       el('me_demos_url').value = p.demos_url || ''; // M-A3e (audit FIX 2)
     }
   }
@@ -1665,10 +1697,29 @@
     return lines;
   }
 
-  function mdUniOpen(key){
+  // Čistá funkcia (Node test): kľúč skupiny, ktorá nesie daný UNI materiál.
+  // D-83: skratka z okna Výroba pozná len uni_id — dlaždicu k nemu hľadá TU.
+  function mdGroupKeyForUni(catalog, schema2, uniId){
+    var id = String(uniId == null ? '' : uniId);
+    if (!id) return null;
+    var hit = null;
+    groupCatalogByDecor(catalog || { sheets: [], edges: [] }, schema2).forEach(function(g){
+      if (hit) return;
+      var m = g.sheets.filter(function(s){ return s.uni === true && s.material_id === id; })[0];
+      if (m) hit = g.key;
+    });
+    return hit;
+  }
+
+  // uniId (voliteľné, D-83) = KONKRÉTNY UNI materiál, ktorý sa má nahradiť;
+  // bez neho sa berie prvý UNI variant skupiny (pôvodné správanie tlačidla).
+  // Vráti true, keď sa modal otvoril.
+  function mdUniOpen(key, uniId){
     var g = mdGroupByKey(key);
-    var us = g && g.sheets.filter(function(s){ return s.uni === true; })[0];
-    if (!us) return;
+    var us = g && g.sheets.filter(function(s){
+      return s.uni === true && (!uniId || s.material_id === uniId);
+    })[0];
+    if (!us) return false;
     MD_UNI = { uni_id: us.material_id, key: key };
     MD_UNI_PENDING = null;
     var name = el('mdUniName');
@@ -1687,6 +1738,7 @@
     mdUniStep(1);
     var m = el('mdUniModal');
     if (m) m.style.display = '';
+    return true;
   }
   function mdUniGroupChange(){
     var gsel = el('mdUniGroup'), vsel = el('mdUniVariant');
@@ -1893,6 +1945,21 @@
       var m = el('mdDeleteModal');
       if (m) m.style.display = '';
     },
+    // D-83: skratka z okna Výroba — otvor detail dekoru a rovno modal
+    // „Nahradiť UNI…" s TÝM materiálom, na ktorý používateľ klikol v KONTROLE.
+    // Server pred týmto volaním overil model aj to, že materiál je stále UNI;
+    // tu ostáva už len zhoda s katalógom, ktorý má okno naozaj načítaný.
+    openReplaceUni: function(uniId){
+      var key = mdGroupKeyForUni(MD_CATALOG, MD_SCHEMA2, uniId);
+      if (!key){
+        MD.setStatus('UNI materiál sa v katalógu nenašiel — obnov okno Materiály.', true);
+        return;
+      }
+      mdCloseForms();
+      mdView = key;      // detail skupiny ostane pod modalom (kontext)
+      mdRenderLists();
+      if (!mdUniOpen(key, uniId)) MD.setStatus('UNI materiál sa medzitým zmenil.', true);
+    },
     // V0.6 M-B2: odpoveď servera na „Nahradiť UNI…" — rozpis dopadu / blokácia
     // / nič na nahradenie. Render VÝHRADNE cez DOM API (textContent); autorita
     // potvrdenia je server (pending odtlačok plánu ide celý späť).
@@ -1960,6 +2027,10 @@
       mdFormatRequired: mdFormatRequired, mdZastena: mdZastena,
       // V0.6 M-A2 — dlazdice s obrazkom + delete preflight (ciste funkcie)
       mdImageSrc: mdImageSrc, mdDeleteSummary: mdDeleteSummary,
+      // D-82 — skupinova farba dekoru (swatch v hlavicke detailu)
+      mdColorEditable: mdColorEditable, mdGroupSwatch: mdGroupSwatch,
+      // D-83 — skratka z KONTROLY: dlazdica k danemu UNI materialu
+      mdGroupKeyForUni: mdGroupKeyForUni,
       // M-A3b — vazby na Demos v UI (D-56/D-60/D-62/D-63)
       mdTileHtml: mdTileHtml, mdDateLabel: mdDateLabel, mdDemosBtn: mdDemosBtn,
       mdDetailHtml: mdDetailHtml,

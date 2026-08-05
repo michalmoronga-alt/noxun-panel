@@ -73,6 +73,12 @@ module Noxun
             end
           end
           stamp = Time.now.utc.iso8601
+          # D-82 (audit B3): farba je vlastnost SKUPINY a Demos ju zo stranky
+          # nedostava. Pridavanie do EXISTUJUCEJ skupiny prevezme jej ulozenu
+          # farbu POD ZAMKOM; nova skupina si default urci RAZ tu a dostane ho
+          # KAZDY zaznam davky (dosky aj pasky) — inak by uz pri zalozeni
+          # vznikla skupina namiesana z dvoch farieb.
+          color = group_color_in(data, gid, decor) || DEFAULT_DECOR_RGB
           taken = (data['sheets'].map { |s| s['material_id'].to_s.upcase } +
                    data['edges'].map { |e| e['abs_id'].to_s.upcase })
           created_sheets = []
@@ -139,7 +145,8 @@ module Noxun
               'code' => code, 'supplier' => 'Demos',
               'price_per_m2' => normalize_price(item['price']),
               'demos_url' => sanitized_demos_url(item['demos_url']),
-              'image_url' => item['image_url']
+              'image_url' => item['image_url'],
+              'color' => color # D-82: jedna farba pre CELU zakladanu skupinu
             }
             src['price_checked_at'] = stamp if src['price_per_m2']
             ok_v, verr = validate_sheet_attrs(src)
@@ -182,7 +189,8 @@ module Noxun
               'group_id' => gid, 'decor_name' => gname, 'structure' => structure,
               'code' => code, 'supplier' => 'Demos',
               'price_per_bm' => normalize_price(item['price']),
-              'demos_url' => sanitized_demos_url(item['demos_url'])
+              'demos_url' => sanitized_demos_url(item['demos_url']),
+              'color' => color # D-82: paska dedi farbu skupiny (vzor dosky)
             }
             src['price_checked_at'] = stamp if src['price_per_bm']
             ok_v, verr = validate_edge_attrs(src)

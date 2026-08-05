@@ -112,7 +112,7 @@ NxTest.test('2b1: patch_record na duplak = :invalid (nakupne polia patria zdroju
   end
 end
 
-NxTest.test('2b1: upsert_sheet_with_duplak_sync — format/grain/farba sa propaguju na duplak') do
+NxTest.test('2b1: upsert_sheet_with_duplak_sync — format/grain sa propaguju na duplak') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   dp_with_catalog([dp_sheet]) do
     _, rec = DPMAT.create_duplak_sheet('TK_PW_DTDL_18', 2)
@@ -122,7 +122,10 @@ NxTest.test('2b1: upsert_sheet_with_duplak_sync — format/grain/farba sa propag
     dup = DPMAT.sheet(rec['material_id'])
     NxTest.assert_equal([2800.0, 2050.0], dup['sheet_size'], 'format nasleduje zdroj')
     NxTest.assert_equal('none', dup['grain'], 'grain nasleduje zdroj')
-    NxTest.assert_equal([1, 2, 3], dup['color'], 'farba nasleduje zdroj')
+    # D-82: farba UZ NIE JE variantova — edit zdroja ju nemeni ani jemu, ani
+    # duplaku. Skupinova zmena (set_decor_color) nizsie zasiahne oboch naraz.
+    NxTest.assert_equal(src['color'], DPMAT.sheet('TK_PW_DTDL_18')['color'], 'edit variantu farbu NEMENI')
+    NxTest.assert_equal(src['color'], dup['color'], 'duplak drzi farbu skupiny')
     NxTest.assert_close(36.0, dup['thickness'], 0.001, 'hrubka duplaku sa NEmeni')
     # clear formatu zdroja zmaze format aj duplaku (odhad prejde na fallback)
     cleared = DPMAT.sheet('TK_PW_DTDL_18').reject { |k, _| k == 'sheet_size' }
