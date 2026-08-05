@@ -222,6 +222,9 @@ module Noxun
           target = UI.savepanel('Uložiť rozpočet (XLSX)', vepo_settings['last_dir'], fname)
           return set_status('Export zrušený.') if target.nil? || target.to_s.empty?
 
+          # Bez pripony by Excel subor neotvoril dvojklikom — savepanel ju
+          # nedoplna, ked ju pouzivatel v nazve prepise.
+          target = "#{target}.xlsx" unless File.extname(target.to_s).downcase == '.xlsx'
           XlsxWriter.write(target, BudgetXlsx.sheet(budget, project: project, now: now), now: now)
           save_vepo_settings('last_dir' => File.dirname(target))
           totals = budget['totals'] || {}
