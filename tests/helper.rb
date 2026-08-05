@@ -160,6 +160,7 @@ unless NxTest::IN_SKETCHUP
     core/supplier_settings
     core/budget_store
     core/budget
+    core/xlsx_writer
   ].each { |rel| require File.join(NxTest::ROOT, 'noxun_engine', rel) }
 end
 
