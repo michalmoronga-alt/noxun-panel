@@ -35,6 +35,7 @@
 require 'json'
 require 'fileutils'
 require 'tmpdir'
+require 'digest'
 
 module Noxun
   module Engine
@@ -360,6 +361,17 @@ module Noxun
         vals = supplier['mode_values'][key.to_s]
         return nil unless vals.is_a?(Hash)
         num(vals[m])
+      end
+
+      # V0.6 E-b: odtlacok stavu AKTIVNEHO dodavatela — baseline guard okna
+      # Nastavenia (vzor `catalog_revision` v Materials). Okno si revziu zapamata
+      # pri otvoreni a posle ju spat pri ulozeni; ak sa medzitym zmenila (iny
+      # dialog, rucna uprava suboru, seed-merge), zapis sa ODMIETNE a formular
+      # sa nacita nanovo — inak by tichy prepis zahodil cudziu zmenu.
+      def revision(supplier)
+        Digest::SHA1.hexdigest(JSON.generate(normalize_supplier(supplier) || {}))[0, 12]
+      rescue StandardError
+        ''
       end
 
       def standard_rows(supplier)

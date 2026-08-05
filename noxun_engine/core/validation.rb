@@ -57,6 +57,10 @@ module Noxun
       CAT_UNI       = 'uni_material' # ORANGE — V0.6 M-B1: dielec na UNI (material neurceny)
       CAT_HW_UNMAPPED = 'hardware_unmapped' # ORANGE — V0.6 D1: genericky typ bez setu / NL mimo radu
       CAT_HW_CODE     = 'hardware_code'     # ORANGE — V0.6 D1: kod clena setu mimo katalogu
+      # ORANGE — V0.6 E-b: upozornenia ROZPOCTU (riadok bez ceny/popisu, chybajuce
+      # m2, nezapocitane spotrebice). Zrkadli Budget::CAT_BUDGET; vlastna
+      # konstanta preto, ze validation.rb sa nacitava PRED budget.rb.
+      CAT_BUDGET      = 'budget'
 
       SEVERITY_RANK = { RED => 0, ORANGE => 1 }.freeze
 
@@ -120,6 +124,36 @@ module Noxun
         Array(collected[:warnings]).each { |w| check_build(w, items, uni_parts) }
         items = sort_items(dedup(items))
         { 'items' => items, 'counts' => counts(items) }
+      end
+
+      # V0.6 E-b: KONTROLA + upozornenia ROZPOCTU v JEDNOM zozname.
+      # Budget.check nezije v Validation.run zamerne (rozpocet nie je vyrobne
+      # data a bezi nad HOTOVYM payloadom) — spajaju sa az tu, na urovni okna,
+      # aby counts aj poradie mali NADALEJ jednu autoritu (nalez 11: JS si nic
+      # neprepocitava). Rozpoctove polozky su VZDY ORANGE a NIKDY neblokuju
+      # export; klik na ne neoznacuje entitu (owner_id je prazdny) — okno ich
+      # smeruje do tabu Rozpocet.
+      # control: vystup run(); budget_check: vystup Budget.check(payload)
+      # -> { 'items' => [...], 'counts' => {...} } (novy hash, vstupy nedotknute)
+      def with_budget(control, budget_check)
+        base = control.is_a?(Hash) ? control : {}
+        items = Array(base['items']).dup
+        Array(budget_check).each do |b|
+          next unless b.is_a?(Hash)
+          items << budget_item(b)
+        end
+        merged = sort_items(dedup(items))
+        { 'items' => merged, 'counts' => counts(merged) }
+      end
+
+      # Tvar riadku KONTROLY z rozpoctoveho upozornenia (E-a nesie 'message' a
+      # 'stable_key'; okno cita 'message_sk' a 'category' ako vsade inde).
+      def budget_item(warn)
+        { 'severity' => ORANGE, 'category' => CAT_BUDGET,
+          'owner_id' => nil, 'part_key' => nil, 'hw_key' => nil,
+          'message_sk' => warn['message'].to_s,
+          'stable_key' => warn['stable_key'].to_s,
+          'budget_section' => warn['section'], 'budget_row_key' => warn['row_key'] }
       end
 
       # UNI rozpoznanie bez zavislosti na Materials (headless mapy) — zhodne

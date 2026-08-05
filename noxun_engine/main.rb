@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.5.45' unless defined?(VERSION)
+    VERSION = '0.5.46' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -76,11 +76,13 @@ Sketchup.require 'noxun_engine/core/validation'    # V0.5 D kontrolny semafor vy
 Sketchup.require 'noxun_engine/core/supplier_settings' # V0.6 E-a: sadzby/rezimy/standardne riadky rozpoctu (globál)
 Sketchup.require 'noxun_engine/core/budget_store'  # V0.6 E-a: data rozpoctu v zakazke (po store + supplier_settings)
 Sketchup.require 'noxun_engine/core/budget'        # V0.6 E-a: vypocet rozpoctu (po bom/sheet_estimate/budget_store)
+Sketchup.require 'noxun_engine/core/xlsx_writer'   # V0.6 E-b: pravy .xlsx bez gemov + Luciin harok rozpoctu
 Sketchup.require 'noxun_engine/ui/production_dialog' # V0.5 B okno Vyroba
 Sketchup.require 'noxun_engine/ui/panel'
 Sketchup.require 'noxun_engine/ui/rules_dialog'     # V0.4 editor pravidiel kovania
 Sketchup.require 'noxun_engine/ui/materials_dialog' # V0.4.5 D2 projektove predvolby materialov
 Sketchup.require 'noxun_engine/ui/hardware_catalog_dialog' # V0.6 C-2: okno Katalog kovania
+Sketchup.require 'noxun_engine/ui/supplier_settings_dialog' # V0.6 E-b: okno Nastavenia rozpoctu
 Sketchup.require 'noxun_engine/ui/templates_dialog' # V0.4.5 D2 sprava sablon
 
 module Noxun
@@ -125,6 +127,7 @@ module Noxun
         menu.add_item('Pravidlá kovania') { RulesDialog.show }
         menu.add_item('Materiály projektu') { MaterialsDialog.show }
         menu.add_item('Katalóg kovania') { HardwareCatalogDialog.show } # V0.6 C-2
+        menu.add_item('Nastavenia rozpočtu') { SupplierSettingsDialog.show } # V0.6 E-b
         menu.add_item('Šablóny') { TemplatesDialog.show }
 
         # Scale observer — attach na existujuce korpusy + AppObserver pre buduce modely.
