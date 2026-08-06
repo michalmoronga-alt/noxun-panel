@@ -139,6 +139,10 @@
       }
     });
     elm.addEventListener('keydown', function(ev){
+      // E-03: pole moze byt zamknute za behu (ib_thickness/bc_thickness pri
+      // realnom materiali) — sipky ani Enter zamknutu hodnotu NIKDY nemenia,
+      // inak by UI ukazovalo hrubku, ktoru server odmietne ulozit.
+      if (elm.readOnly) return;
       if (ev.key === 'Enter'){
         ev.preventDefault();
         if (commitExprEl(elm)){

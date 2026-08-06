@@ -174,6 +174,39 @@ ensure
   NxTest.install_fresh_seed_catalog!
 end
 
+NxTest.test('e03 vklad: hrubku z formulara prijme LEN UNI material (server guard)') do
+  NxTest.install_fresh_seed_catalog!
+  data = MB1.load
+  data['sheets'] << MB1.normalize_sheet('material_id' => 'REAL_19', 'decor' => 'R',
+                                        'type' => 'DTDL', 'thickness' => 19.0,
+                                        'group_id' => MB1.group_id_for('', 'R'))
+  NxTest.assert(MB1.write(data))
+  # UNI: hodnota z vkladacieho formulara prejde (Number aj string, aj s ciarkou)
+  NxTest.assert_close(12.0, BBU.insert_thickness_for('UNI_DOSKA_18', 12.0), 0.01)
+  NxTest.assert_close(12.0, BBU.insert_thickness_for('UNI_DOSKA_18', '12'), 0.01)
+  NxTest.assert_close(12.5, BBU.insert_thickness_for('UNI_DOSKA_18', '12,5'), 0.01, 'desatinna ciarka')
+  # UNI bez hodnoty / so smetim = default roly zo zaznamu, NIKDY chyba
+  NxTest.assert_close(18.0, BBU.insert_thickness_for('UNI_DOSKA_18', nil), 0.01)
+  NxTest.assert_close(18.0, BBU.insert_thickness_for('UNI_DOSKA_18', '   '), 0.01)
+  NxTest.assert_close(18.0, BBU.insert_thickness_for('UNI_DOSKA_18', '650-36'), 0.01,
+                      'surovy vyraz sa NESMIE dostat na to_f (bolo by 650)')
+  # clamp na LIMITS dosky
+  NxTest.assert_close(60.0, BBU.insert_thickness_for('UNI_DOSKA_18', 999), 0.01)
+  NxTest.assert_close(1.0, BBU.insert_thickness_for('UNI_DOSKA_18', 0.2), 0.01)
+  # realny material: payload sa IGNORUJE (HTML readonly nie je ochrana, D-45)
+  NxTest.assert_equal(nil, BBU.insert_thickness_for('REAL_19', 12.0), 'realny material hrubku diktuje')
+  NxTest.assert_equal(nil, BBU.insert_thickness_for('', 12.0), 'bez materialu')
+  NxTest.assert_equal(nil, BBU.insert_thickness_for('NEZNAMY_ID', 12.0), 'neznamy zaznam')
+  # round-trip presne ako build: helper -> normalize
+  cfg = BBU.normalize('material_id' => 'UNI_DOSKA_18', 'length' => 800, 'width' => 300,
+                      'thickness' => BBU.insert_thickness_for('UNI_DOSKA_18', '12'))
+  NxTest.assert_close(12.0, cfg[:thickness], 0.01, 'UNI doska sa vlozi ako 12 mm')
+  cfg2 = BBU.normalize('material_id' => 'REAL_19', 'length' => 800, 'width' => 300)
+  NxTest.assert_close(19.0, cfg2[:thickness], 0.01, 'realna doska drzi katalogovu hrubku')
+ensure
+  NxTest.install_fresh_seed_catalog!
+end
+
 NxTest.test('mb1 abs: UNI nema pasky — picker reason + serverova stopka dotvarania') do
   NxTest.install_fresh_seed_catalog!
   abs_id, reason = MB1.abs_for_sheet(mb1_uni_sheet, :jednotka, 18.0)
