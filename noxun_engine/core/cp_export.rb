@@ -84,7 +84,10 @@ module Noxun
       }.freeze
 
       # Role dielcov, ktore zakaznik vidi ako "dvierka a viditeľné časti".
-      FRONT_ROLES = %w[front_door drawer_front flap cover_panel false_front gola_profile].freeze
+      # GH #139 P2: `plinth` sem PATRI — Construction.plinth_parts ho vyrobi LEN
+      # pri `plinth_mode == 'front'`, teda je to VIDITELNY predny sokel, nie
+      # vnutorna cast korpusu (nohy su kovanie a maju vlastnu kategoriu).
+      FRONT_ROLES = %w[front_door drawer_front flap cover_panel false_front gola_profile plinth].freeze
 
       # Kategoria katalogu kovania -> kategoria specifikacie.
       HW_CATEGORY_MAP = {
@@ -108,7 +111,12 @@ module Noxun
       BLOCKED_PATTERNS = [
         /\b\d{6,}\b/,                                        # nakupne kody (6+ cislic)
         /[A-Za-z0-9]{2,}_[A-Za-z0-9]{2,}_[A-Za-z0-9]+/,      # material_id / abs_id token
-        /_(?:DTDL|MDF|HDF|PD|KOMPAKT|ZASTENA|ABS)_/i
+        /_(?:DTDL|MDF|HDF|PD|KOMPAKT|ZASTENA|ABS)_/i,
+        # GH #139 P2: bunka, ktora je UZ LEN cislo/kod (napr. "93240" po
+        # odstraneni slova "Kód"). Kratsie kody nez 6 cislic sa v beznom texte
+        # NEhladaju (falosne poplachy na rozmeroch), ale CELA bunka zlozena len
+        # z cislic a oddelovacov nie je nazov polozky — je to kod.
+        /\A[\d\s.,:;\/_-]{4,}\z/
       ].freeze
 
       module_function
@@ -142,6 +150,10 @@ module Noxun
 
         cp_total = rows.sum { |r| r['cena'].to_f }.round(2)
         diff = (cp_total - budget_total).round(2)
+        # GH #139 P1: riadok rozpoctu bez ceny do `total` nevstupuje — suma
+        # ponuky je vtedy PODHODNOTENA, hoci polozka v specifikacii ostava.
+        # Nahlad aj export to musia povedat nahlas.
+        unknown = totals['unknown_count_in_total'].to_i
         { 'rows' => rows,
           'total' => cp_total,
           'total_label' => TOTAL_NAME,
@@ -150,6 +162,8 @@ module Noxun
           'consistent' => diff.abs < 0.005,
           'assembly' => assembly,
           'assembly_negative' => assembly < -0.005,
+          'unknown_count' => unknown,
+          'complete' => unknown.zero?,
           'threshold' => thr,
           'candidates' => cands,
           'separate_count' => separate.length,
@@ -262,7 +276,7 @@ module Noxun
         raw = row['cp_nazov'].to_s.strip
         raw = row['nazov'].to_s.strip if raw.empty?
         label = clean_label(raw)
-        return label unless label.empty? || id_like?(label)
+        return label unless unusable_label?(label)
 
         GENERIC_LABELS[section_key] || 'Položka'
       end
@@ -304,7 +318,7 @@ module Noxun
           next if r['missing'] == true # bez katalogoveho nazvu ostava len kod — do CP NIKDY
 
           label = clean_label(r['name_sk'])
-          next if label.empty? || id_like?(label)
+          next if unusable_label?(label) # bez pouzitelneho nazvu radsej nic nez kod
 
           buckets[HW_CATEGORY_MAP[r['category'].to_s] || 'ostatne'] << label
         end
@@ -353,7 +367,7 @@ module Noxun
         parts << "#{fmt(th)} mm" if th && th.positive?
         parts << fmt_size(rec['sheet_size']) if format_in_identity?(rec['type']) && rec['sheet_size'].is_a?(Array)
         label = clean_label(parts.join(' · '))
-        label.empty? || id_like?(label) ? GENERIC_LABELS['materials'] : label
+        unusable_label?(label) ? GENERIC_LABELS['materials'] : label
       end
 
       # Ludsky nazov typu z registra materialov (DTDL -> "DTD laminovaná").
@@ -383,6 +397,7 @@ module Noxun
           next nil unless r.is_a?(Hash)
 
           name = clean_label(r['nazov'])
+          name = '' if unusable_label?(name) # kod/ID nie je nazov spotrebica
           typ = r['typ_label'].to_s.strip
           label = if name.empty?
                     typ
@@ -403,12 +418,19 @@ module Noxun
       # `id_like?` chyta len cely token, toto chyta aj vnorene ID.
       ID_TOKEN_RE = /(?<![A-Za-z0-9_])[A-Za-z0-9]{2,}_[A-Za-z0-9]{2,}(?:_[A-Za-z0-9]+)+(?![A-Za-z0-9_])/.freeze
 
+      # GH #139 P2: marker "Kód" nesie SVOJU HODNOTU — samotne slovo odstranit
+      # nestaci, "Kód 93240" by nechalo zakaznikovi holy kod (5-ciferne kody su
+      # v seede kovania bezne a pravidlo na 6+ cislic ich nechyti).
+      KOD_VALUE_RE  = %r{\bk[oó]d\b\s*[:.]?\s*[A-Za-z0-9][A-Za-z0-9._/-]*}i.freeze
+      KOD_MARKER_RE = /\bk[oó]d\b\s*[:.]?\s*/i.freeze
+
       # Ocisti text pre zakaznika: nakupne kody (6+ cislic), ID zaznamov a
-      # "Kód …" prefixy prec, biele znaky zjednotene, osamotene oddelovace orezane.
+      # "Kód …" VRATANE hodnoty prec, biele znaky zjednotene, osamotene
+      # oddelovace orezane.
       def clean_label(text)
         s = text.to_s.gsub(ID_TOKEN_RE, ' ')
         s = s.gsub(/\b\d{6,}\b/, ' ')
-        s = s.gsub(/\bk[oó]d\b\s*:?\s*/i, ' ')
+        s = s.gsub(KOD_VALUE_RE, ' ').gsub(KOD_MARKER_RE, ' ')
         s = s.gsub(/\s+/, ' ').strip
         s.sub(/\A[·\-–—,;:]+\s*/, '').sub(/\s*[·\-–—,;:]+\z/, '').strip
       end
@@ -417,6 +439,20 @@ module Noxun
       def id_like?(text)
         s = text.to_s.strip
         !s.empty? && !(s =~ /\A[A-Za-z0-9]+(?:_[A-Za-z0-9]+)+\z/).nil?
+      end
+
+      # GH #139 P2: to, co po ocisteni ostalo, uz nie je NAZOV ale KOD —
+      # cely text je len cislo a oddelovace ("93240", "105 408"). Taky riadok
+      # dostane nahradny nazov sekcie namiesto kodu.
+      def code_like?(text)
+        s = text.to_s.strip
+        !s.empty? && !(s =~ %r{\A[\d\s.,:;/_-]+\z}).nil?
+      end
+
+      # Jediny test „tento text sa zakaznikovi ukazat NEDA".
+      def unusable_label?(text)
+        s = text.to_s.strip
+        s.empty? || id_like?(s) || code_like?(s)
       end
 
       # Kontrola HOTOVEHO exportu. -> [{ 'text' =>, 'term' => }]

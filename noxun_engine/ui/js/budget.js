@@ -565,6 +565,14 @@
     if (c.assembly_negative){
       return { ok: false, text: 'Samostatné riadky prevyšujú rozpočet — zostava je záporná' };
     }
+    // GH #139 P1: riadok bez ceny do súčtu nevstupuje — ponuka by bola
+    // podhodnotená, hoci položka v špecifikácii ostáva. Počet ráta server.
+    if (c.complete === false){
+      return { ok: false, text: 'Suma ponuky je podhodnotená — ' + (c.unknown_count || 0) + ' ' +
+                                budPluralSk(c.unknown_count || 0,
+                                  ['riadok rozpočtu nemá cenu', 'riadky rozpočtu nemajú cenu',
+                                   'riadkov rozpočtu nemá cenu']) };
+    }
     return { ok: true, text: 'CP = Rozpočet' };
   }
 

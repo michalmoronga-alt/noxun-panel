@@ -152,6 +152,13 @@ function payload(over){
      { ok: false, text: 'CP nesedí s rozpočtom o −675,60 €' }, 'nesulad sa musi ukazat s rozdielom');
   eq(B.budCpBand({ consistent: true, assembly_negative: true }).ok, false,
      'zaporna zostava je tiez chyba, aj ked suma sedi');
+  // GH #139 P1: riadok bez ceny do suctu nevstupuje — ponuka by bola podhodnotena.
+  eq(B.budCpBand({ consistent: true, complete: false, unknown_count: 2 }),
+     { ok: false, text: 'Suma ponuky je podhodnotená — 2 riadky rozpočtu nemajú cenu' },
+     'neuplna suma sa musi ukazat');
+  eq(B.budCpBand({ consistent: true, complete: false, unknown_count: 1 }).text,
+     'Suma ponuky je podhodnotená — 1 riadok rozpočtu nemá cenu', 'sklonovanie 1 riadok');
+  eq(B.budCpBand({ consistent: true, complete: true }).ok, true, 'uplna suma = zeleny pas');
   eq(B.budCpBand({}), { ok: true, text: 'CP = Rozpočet' }, 'chybajuce polia nezhodia render');
   eq(B.budCpBand(null).ok, true, 'null payload nezhodi render');
 })();

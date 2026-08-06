@@ -244,6 +244,11 @@ module Noxun
         # (CpExport.firewall_hits). Nalez export NEBLOKUJE (rovnaky kontrakt ako
         # KONTROLA pri VEPO), ale ide do statusu aj do logu — Michal musi
         # vediet, ze do zakaznickeho dokumentu presiel interny pojem.
+        #
+        # GH #139 P1/P2: status hlasi AJ neuplnost cisel — riadok bez ceny
+        # (suma ponuky je podhodnotena, hoci polozka v specifikacii je) a
+        # zapornu "Nábytkovú zostavu". Zakaznicky dokument sa nesmie tvarit
+        # ako v poriadku, ked cislo v nom nie je cele.
         def do_cp_xlsx(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           unless data['gen'].to_i == @generation.to_i
@@ -279,7 +284,8 @@ module Noxun
           hits = CpExport.firewall_hits(CpXlsx.text_cells(sheets))
           XlsxWriter.write_book(target, sheets, now: now)
           save_vepo_settings('last_dir' => File.dirname(target))
-          set_status(cp_status(cp, spec, target, hits), !hits.empty? || cp['consistent'] == false)
+          warnings = cp_warnings(cp, budget, hits)
+          set_status(cp_status(cp, spec, target, warnings), !warnings.empty?)
         rescue StandardError => e
           Engine.log_error(e, 'ProductionDialog.do_cp_xlsx')
           set_status("Export cenovej ponuky zlyhal: #{e.message}", true)
@@ -345,19 +351,38 @@ module Noxun
           end
         end
 
-        # Status exportu CP. Nesuhlas sumy by nemal nastat (zostava je
-        # automaticky zvysok) — keby nastal, MUSI byt vidiet.
-        def cp_status(cp, spec, target, hits)
+        # GH #139 P1/P2: JEDEN zoznam dovodov, preco zakaznicky dokument NIE JE
+        # v poriadku — rozhoduje aj o farbe statusu, aby sa zelene "uložené"
+        # nikdy neobjavilo nad podhodnotenou alebo zápornou sumou.
+        def cp_warnings(cp, budget, hits)
+          c = cp.is_a?(Hash) ? cp : {}
+          totals = budget.is_a?(Hash) && budget['totals'].is_a?(Hash) ? budget['totals'] : {}
+          out = []
+          miss = totals['unknown_count_in_total'].to_i
+          if miss.positive?
+            out << "#{miss} riadkov rozpočtu nemá cenu — suma ponuky je PODHODNOTENÁ " \
+                   '(položky v špecifikácii sú, v cene nie)'
+          end
+          if c['assembly_negative']
+            out << "„Nábytková zostava“ vyšla záporná (#{fmt_eur(c['assembly'])}) — " \
+                   'samostatné riadky prevyšujú rozpočet'
+          end
+          out << "CP nesedí s rozpočtom o #{fmt_eur(c['diff'])}" if c['consistent'] == false
+          unless Array(hits).empty?
+            terms = hits.map { |h| h['term'] }.uniq.first(5).join(', ')
+            out << "v dokumente ostali interné pojmy (#{terms}) — oprav názvy a exportuj znova"
+          end
+          out
+        end
+
+        def cp_status(cp, spec, target, warnings)
           c = cp.is_a?(Hash) ? cp : {}
           items = spec.is_a?(Hash) ? spec['item_count'].to_i : 0
           msg = "Cenová ponuka uložená: #{fmt_eur(c['total'])} · #{c['rows'].to_a.length} riadkov · " \
                 "špecifikácia #{items} položiek → #{target}"
-          msg += " · POZOR: CP nesedí s rozpočtom o #{fmt_eur(c['diff'])}" if c['consistent'] == false
-          unless Array(hits).empty?
-            terms = hits.map { |h| h['term'] }.uniq.first(5).join(', ')
-            msg += " · POZOR: v dokumente ostali interné pojmy (#{terms}) — oprav názvy a exportuj znova"
-          end
-          msg
+          return msg if Array(warnings).empty?
+
+          "#{msg} · POZOR: #{warnings.join(' · ')}"
         end
 
         # add_/update_ vracaju [polozka|nil, chyby] — zjednotenie na [ok, chyby].

@@ -449,6 +449,43 @@ NxTest.test('firewall: export prezije aj rozpocet plny internych nazvov') do
   NxTest.refute(NxCp.rows_of(c).any? { |l| l.include?('317642') }, 'kod sa z nazvu odstrani')
 end
 
+NxTest.test('GH #139 P2: "Kód <hodnota>" sa odstrani AJ s hodnotou (5-ciferne kody)') do
+  cp = NxCp.cp
+  NxTest.assert_equal('', cp.clean_label('Kód 93240'), '5-ciferny kod nesmie ostat po slove Kód')
+  NxTest.assert_equal('', cp.clean_label('kód: AB-12/3'))
+  NxTest.assert_equal('Úchytka VARADERO 320mm', cp.clean_label('Úchytka VARADERO 320mm Kód 494760'))
+  NxTest.assert(cp.code_like?('93240'), 'holy kod nie je nazov')
+  NxTest.assert(cp.code_like?('105 408'))
+  NxTest.refute(cp.code_like?('Sensys 8675'), 'nazov s pismenami nie je kod')
+  NxTest.assert(cp.unusable_label?(''), 'prazdny label sa neda ukazat')
+end
+
+NxTest.test('GH #139 P2: z riadku, ktory je uz len kod, sa stane nahradny nazov') do
+  p = NxCp.payload
+  p['sections'].find { |s| s['key'] == 'hardware' }['rows'][0]['nazov'] = 'Kód 93240'
+  c = NxCp.cp.cp_rows(p)
+  NxTest.assert(NxCp.rows_of(c).include?('Kovanie'), "kod ostal v ponuke: #{NxCp.rows_of(c).inspect}")
+  NxTest.refute(NxCp.rows_of(c).join(' ').include?('93240'))
+  # a keby predsa nejaka bunka ostala holym kodom, firewall to musi chytit
+  NxTest.refute(NxCp.cp.firewall_hits(['93240']).empty?, 'bunka zlozena len z cislic = nalez')
+  NxTest.assert(NxCp.cp.firewall_hits(['Sokel 100 mm']).empty?, 'bezny nazov nesmie byt falosny poplach')
+end
+
+NxTest.test('GH #139 P2: viditeľný sokel patrí medzi DVIERKA A VIDITEĽNÉ ČASTI') do
+  s = NxCp.cp.specification([{ 'material_id' => 'W1000', 'role' => 'plinth' }], sheets: NxCp.sheets)
+  NxTest.assert_equal('dvierka', s['categories'].first['key'],
+                      'sokel z plinth_mode=front je viditeľná časť, nie vnútorný korpus')
+end
+
+NxTest.test('GH #139 P1: nahlad CP hlasi neuplnu sumu (riadok bez ceny)') do
+  p = NxCp.payload
+  p['totals']['unknown_count_in_total'] = 2
+  c = NxCp.cp.cp_rows(p)
+  NxTest.assert_equal(2, c['unknown_count'])
+  NxTest.refute(c['complete'], 'suma s riadkom bez ceny nie je uplna')
+  NxTest.assert(NxCp.cp.cp_rows(NxCp.payload)['complete'], 'uplny rozpocet = uplna ponuka')
+end
+
 NxTest.test('firewall: clean_label odstrani kody, id_like? spozna material_id') do
   NxTest.assert_equal('HETTICH Sensys 8675 110°', NxCp.cp.clean_label('HETTICH 9071313 Sensys 8675 110°'))
   NxTest.assert_equal('', NxCp.cp.clean_label('Kód 494760'))
@@ -547,13 +584,19 @@ NxTest.test('cp_overrides: zapisuju sa LEN zname kluce a zname zaradenia') do
   NxTest.assert(ok, 'platny zapis musi prejst')
   NxTest.assert_equal({ 'material:DTDL18' => 'samostatne' }, bs.cp_overrides(model))
 
+  # GH #139 P2: kod kovania smie obsahovat MEDZERU (katalog vyzaduje len
+  # neprazdny trim) — prepinac na takej polozke sa nesmie odmietat.
+  ok2, = bs.set_cp_group!(model, 'hw:ab 123/x', 'zostava')
+  NxTest.assert(ok2, 'kluc s medzerou v kode musi prejst')
+  NxTest.assert_equal('zostava', bs.cp_overrides(model)['hw:ab 123/x'])
+
   bad, errs = bs.set_cp_group!(model, 'std:balne', 'samostatne')
   NxTest.refute(bad, 'kluc standardneho riadku nie je polozka cenovej ponuky')
   NxTest.refute(errs.empty?)
   bad2, = bs.set_cp_group!(model, 'material:DTDL18', 'niekde_inde')
   NxTest.refute(bad2, 'nezname zaradenie sa odmietne')
-  NxTest.assert_equal({ 'material:DTDL18' => 'samostatne' }, bs.cp_overrides(model),
-                      'odmietnuty zapis nesmie nic zmenit')
+  NxTest.assert_equal({ 'material:DTDL18' => 'samostatne', 'hw:ab 123/x' => 'zostava' },
+                      bs.cp_overrides(model), 'odmietnuty zapis nesmie nic zmenit')
 end
 
 NxTest.test('cp_overrides: prazdna hodnota vrati polozku na serverovy navrh') do

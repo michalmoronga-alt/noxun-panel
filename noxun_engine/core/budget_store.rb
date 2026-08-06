@@ -63,7 +63,13 @@ module Noxun
       # ("material:<id>", "hw:<kod>", "custom:<uuid>", "appliance:<uuid>").
       # Nazvy sa ako kluc NIKDY nepouzivaju — kluc riadku je stabilny naprieč
       # prepocitmi a nesie uz aj material_id / kod / uuid.
-      CP_KEY_RE = /\A(material|hw|custom|appliance):\S{1,80}\z/.freeze
+      #
+      # GH #139 P2: za dvojbodkou sa NEOBMEDZUJE znakova sada. Katalog kovania
+      # vyzaduje od kodu LEN neprazdny trim (HardwareCatalog.normalize_item),
+      # takze kod smie obsahovat MEDZERU — prisnejsi vzor (\S) by prepinac
+      # cenovej ponuky na takej polozke natrvalo odmietal. Strazi sa prefix,
+      # dlzka a zakaz riadiacich znakov; identitu kluca definuje Budget.
+      CP_KEY_RE = /\A(material|hw|custom|appliance):[^[:cntrl:]]{1,120}\z/.freeze
       CP_GROUPS = %w[samostatne zostava].freeze
 
       MAX_CUSTOM_ITEMS = 200
