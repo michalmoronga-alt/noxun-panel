@@ -260,6 +260,10 @@
   }
 
   // ===================== VKLADACIA CAST (prepinac Korpus/Doska) =====================
+  // Codex #142 P2: material, pre ktory je v poli Hrubka dosadena katalogova
+  // hodnota — rozlisi ZMENU VYBERU od obycajneho refreshu katalogu (draft UNI
+  // hrubky refresh neprezije, ked sa porovnava len fokus).
+  var insertMatLast = null;
   function getInsertKind(){
     var r = document.querySelector('input[name=ikind]:checked');
     return r ? r.value : 'cabinet';
@@ -295,6 +299,20 @@
       if (sheets[i] && sheets[i].id === id) return sheets[i];
     }
     return null;
+  }
+  // Codex #142 P2: ma sa hrubka vo vkladacej karte PREPISAT z katalogu?
+  // Rozpisany UNI draft ("12") nesmie zmiznut pri zivom sync katalogu
+  // (NX.setMaterials po CRUD v okne Materialy vola refreshInsertBoardMaterials).
+  // Fokus je slaby signal — pouzivatel klika v DRUHOM okne, tu ho nema nikto.
+  // Preto rozhoduje ZMENA VYBERU materialu:
+  //   iny material (aj UNI<->realny, aj zmizol z katalogu) -> prepis (novy default),
+  //   ten isty UNI material -> NEPREPISUJ (drz draft pouzivatela),
+  //   ten isty realny material -> prepis (pole je zamknute, ziadny draft neexistuje),
+  //   pole ma prave fokus -> nikdy neprepisuj (pisanie v TOMTO okne).
+  function insertThicknessShouldWrite(prevMaterialId, materialId, sheet, focused){
+    if (focused) return false;
+    if (materialId !== prevMaterialId) return true;
+    return !sheetIsUni(sheet);
   }
   // Poskladaj payload vkladanej dosky z HODNOT formulara (ziadny DOM, ziadne globaly).
   // vals: surove stringy {name,length,width,material_id,grain_direction,thickness}
@@ -337,9 +355,7 @@
       var uni = sheetIsUni(sheet);
       th.readOnly = !uni; // UNI = odomknute (readonly styling riesi CSS)
       th.title = uni ? 'UNI: hrúbku určuje doska' : 'Hrúbku určuje materiál';
-      // Hodnotu neprepisuj, ked pole prave edituje pouzivatel (zivy sync
-      // katalogu NX.setMaterials -> refreshInsertBoardMaterials).
-      if (document.activeElement !== th){
+      if (insertThicknessShouldWrite(insertMatLast, ms.value, sheet, document.activeElement === th)){
         th.value = sheet ? fmtmm(sheet.thickness) : '';
         // Zivy nahlad vyrazu ("= 12") visi na input evente — po programovom
         // prepise ho zosynchronizuj, inak po zmene materialu ostane stary.
@@ -347,6 +363,7 @@
         th.dispatchEvent(new Event('input'));
       }
     }
+    insertMatLast = ms.value;
     if (el('ib_grain') && sheet && sheet.grain) el('ib_grain').value = sheet.grain;
   }
   function insertBoard(){
@@ -367,5 +384,6 @@
   // vetva sa preskoci. Exportuju sa LEN ciste funkcie (bez DOM/MATERIALS).
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { buildInsertBoardPayload: buildInsertBoardPayload,
-                       sheetIsUni: sheetIsUni, findSheetIn: findSheetIn };
+                       sheetIsUni: sheetIsUni, findSheetIn: findSheetIn,
+                       insertThicknessShouldWrite: insertThicknessShouldWrite };
   }

@@ -8,7 +8,7 @@
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
-const { buildInsertBoardPayload, sheetIsUni, findSheetIn } =
+const { buildInsertBoardPayload, sheetIsUni, findSheetIn, insertThicknessShouldWrite } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'board_card.js'));
 const { evalDim } = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'expr.js'));
 
@@ -35,6 +35,30 @@ eq(sheetIsUni({ uni: 'true' }), false, 'string nie je priznak (zrkadlo Materials
 eq(findSheetIn(SHEETS, 'REAL_19'), REAL, 'najde podla id');
 eq(findSheetIn(SHEETS, 'NIC'), null, 'nezname id = null');
 eq(findSheetIn(null, 'REAL_19'), null, 'prazdny katalog neprepadne');
+
+// --- Codex #142 P2: rozpisany UNI draft prezije refresh katalogu --------------
+// Scenar: v paneli je UNI doska, pouzivatel prepise hrubku na 12 a NEODOSLE ju.
+// Medzitym v okne Materialy urobi CRUD -> NX.setMaterials -> refreshInsertBoard-
+// Materials() -> onInsertBoardMaterial(). Fokus je v DRUHOM okne, takze focus
+// guard nepomoze — rozhodnut musi ZMENA VYBERU materialu.
+(function(){
+  eq(insertThicknessShouldWrite('UNI_DOSKA_18', 'UNI_DOSKA_18', UNI, false), false,
+     'refresh katalogu pri NEZMENENOM UNI materiali draft NEPREPISE');
+  eq(insertThicknessShouldWrite('UNI_DOSKA_18', 'UNI_DOSKA_18', UNI, true), false,
+     'pole s fokusom sa neprepisuje uz vobec');
+  eq(insertThicknessShouldWrite(null, 'UNI_DOSKA_18', UNI, false), true,
+     'prve naplnenie karty dosadi default roly');
+  eq(insertThicknessShouldWrite('REAL_19', 'UNI_DOSKA_18', UNI, false), true,
+     'prepnutie realny -> UNI dosadi default roly');
+  eq(insertThicknessShouldWrite('UNI_DOSKA_18', 'REAL_19', REAL, false), true,
+     'prepnutie UNI -> realny vrati katalogovu hodnotu');
+  eq(insertThicknessShouldWrite('UNI_DOSKA_18', 'UNI_INY', { id: 'UNI_INY', thickness: 38, uni: true }, false), true,
+     'iny UNI zaznam = realna zmena vyberu, dosad jeho default');
+  eq(insertThicknessShouldWrite('REAL_19', 'REAL_19', REAL, false), true,
+     'realny material draft nema — hodnota vzdy z katalogu');
+  eq(insertThicknessShouldWrite('UNI_DOSKA_18', 'UNI_DOSKA_18', null, false), true,
+     'material medzitym zmizol z katalogu -> pole sa vycisti');
+})();
 
 const FORM = { name: 'Polica', length: '800', width: '300',
                material_id: 'UNI_DOSKA_18', grain_direction: 'none', thickness: '12' };
