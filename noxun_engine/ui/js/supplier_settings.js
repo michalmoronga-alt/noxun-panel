@@ -104,7 +104,10 @@
     ['abs_reserve_pct', 'ABS rezerva', '%'],
     ['montaz_m2_per_plate', 'm² na jednu platňu (montáž)', 'm²'],
     ['rounding_step', 'Zaokrúhlenie ponuky nahor na', '€'],
-    ['stale_days', 'Upozorniť na cenu staršiu ako', 'dní']
+    ['stale_days', 'Upozorniť na cenu staršiu ako', 'dní'],
+    // E-b2: od akej sumy navrhne cenová ponuka SAMOSTATNÝ riadok (rozhodnutie
+    // per položka ostáva v zákazke — toto je len návrh).
+    ['cp_highlight_threshold', 'Samostatný riadok v cenovej ponuke od', '€']
   ];
 
   function ssRenderScalars(){

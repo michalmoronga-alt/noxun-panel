@@ -402,11 +402,17 @@ module Noxun
       end
 
       # D-42: kod a dodavatel su volitelne kratke texty (limit proti zneuzitiu).
+      CP_NAZOV_MAX = 200
+
       def validate_text_fields(a)
         %w[code supplier].each do |k|
           v = (a[k] || a[k.to_sym]).to_s
           return [false, "Pole #{k == 'code' ? 'Kód' : 'Dodávateľ'} je príliš dlhé (max #{CODE_MAX})."] if v.length > CODE_MAX
         end
+        # E-b2: obchodny nazov je dlhsi (celu vetu pise Michal), ale nie neobmedzeny.
+        cp = (a['cp_nazov'] || a[:cp_nazov]).to_s
+        return [false, "Obchodný názov je príliš dlhý (max #{CP_NAZOV_MAX})."] if cp.length > CP_NAZOV_MAX
+
         [true, nil]
       end
 
@@ -545,8 +551,10 @@ module Noxun
       # 2A-4b: 'universal' na ABS je VLASTNOST VYBERU, nie identita (standard
       # 7.5) — toggle v karte skupiny ho meni patchom; false hodnotu
       # normalize_edge kluc odstrani (merge-safe).
+      # E-b2: `cp_nazov` je OBCHODNY nazov pre cenovu ponuku — nie identita,
+      # nie nakupny udaj; patchom sa da kedykolvek prepisat aj vymazat.
       PATCHABLE = {
-        'sheet' => %w[code supplier price_per_m2],
+        'sheet' => %w[code supplier price_per_m2 cp_nazov],
         'edge'  => %w[code supplier price_per_bm universal]
       }.freeze
 

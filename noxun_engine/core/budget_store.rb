@@ -8,6 +8,8 @@
 #   budget_custom_items[]      — vlastne polozky (doprava, subdodavky, LED...)
 #   budget_appliances[]        — spotrebice (manualne, S1 z nich urobi katalog)
 #   budget_appliances_included — sceituju sa spotrebice do SPOLU? (default NIE)
+#   budget_cp_overrides        — { zdrojovy_kluc => "samostatne"|"zostava" }
+#                                zaradenie polozky v CENOVEJ PONUKE (E-b2)
 #
 # ========================== ZAVAZNE PRAVIDLA ===========================
 # 1) MALE MUTACNE METODY — kazda zmena ma vlastnu metodu a vlastnu
@@ -35,6 +37,7 @@ module Noxun
       KEY_CUSTOM      = 'budget_custom_items'
       KEY_APPLIANCES  = 'budget_appliances'
       KEY_APPL_INCL   = 'budget_appliances_included'
+      KEY_CP_OVERRIDES = 'budget_cp_overrides'
 
       # Typy spotrebicov (S1 z enumu spravi vazbu na katalog — ID struktura
       # ostava kompatibilna dopredu).
@@ -52,6 +55,13 @@ module Noxun
       # automaticke sluzby, "std:<riadok>" pre standardne riadky. Nazvy sa
       # NIKDY nepouzivaju ako kluc (audit 6).
       ROW_KEY_RE = /\A(service|std):[a-z0-9_]{1,40}\z/.freeze
+
+      # E-b2: zdrojovy kluc zaradenia v cenovej ponuke = KLUC RIADKU ROZPOCTU
+      # ("material:<id>", "hw:<kod>", "custom:<uuid>", "appliance:<uuid>").
+      # Nazvy sa ako kluc NIKDY nepouzivaju — kluc riadku je stabilny naprieč
+      # prepocitmi a nesie uz aj material_id / kod / uuid.
+      CP_KEY_RE = /\A(material|hw|custom|appliance):\S{1,80}\z/.freeze
+      CP_GROUPS = %w[samostatne zostava].freeze
 
       MAX_CUSTOM_ITEMS = 200
       MAX_APPLIANCES   = 100
@@ -81,7 +91,8 @@ module Noxun
           'viz_m2' => viz_m2(model),
           'custom_items' => custom_items(model),
           'appliances' => appliances(model),
-          'appliances_included' => appliances_included?(model)
+          'appliances_included' => appliances_included?(model),
+          'cp_overrides' => cp_overrides(model)
         }
       end
 
@@ -113,6 +124,21 @@ module Noxun
 
       def appliances_included?(model)
         read_attr(model, KEY_APPL_INCL) == true
+      end
+
+      # E-b2: zaradenie polozky v cenovej ponuke. Chybajuci zaznam = "necham
+      # rozhodnut server" (navrh podla prahu) — preto sa NIKDY nedopĺňa default.
+      def cp_overrides(model)
+        out = {}
+        raw = read_json(model, KEY_CP_OVERRIDES)
+        return out unless raw.is_a?(Hash)
+
+        raw.each do |k, v|
+          key = k.to_s
+          val = v.to_s
+          out[key] = val if CP_KEY_RE.match?(key) && CP_GROUPS.include?(val)
+        end
+        out
       end
 
       # --- mutacie (kazda = 1 undo krok) --------------------------------------
@@ -186,6 +212,29 @@ module Noxun
       def set_appliances_included!(model, included)
         flag = included == true || included.to_s == 'true'
         write!(model, 'Rozpočet — spotrebiče v súčte') { write_attr(model, KEY_APPL_INCL, flag) }
+      end
+
+      # E-b2: „samostatne v CP" / „v zostave" per polozka. Prazdna hodnota =
+      # ZRUSENIE rozhodnutia (polozka sa vrati na serverovy navrh podla prahu).
+      def set_cp_group!(model, source_key, group)
+        key = source_key.to_s.strip
+        return [false, ['neplatný kľúč položky']] unless CP_KEY_RE.match?(key)
+
+        value = group.to_s.strip
+        if value.empty?
+          return write!(model, 'Cenová ponuka — návrat na návrh') do
+            map = cp_overrides(model)
+            map.delete(key)
+            write_json(model, KEY_CP_OVERRIDES, map)
+          end
+        end
+        return [false, ['neznáme zaradenie v cenovej ponuke']] unless CP_GROUPS.include?(value)
+
+        write!(model, 'Cenová ponuka — zaradenie položky') do
+          map = cp_overrides(model)
+          map[key] = value
+          write_json(model, KEY_CP_OVERRIDES, map)
+        end
       end
 
       # --- vlastne polozky -----------------------------------------------------
