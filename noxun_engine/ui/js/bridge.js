@@ -134,6 +134,24 @@
       p.flush_blocked = blocked;
       if (window.sketchup && sketchup.production_do_budget) sketchup.production_do_budget(JSON.stringify(p));
     },
+    // V0.6 E-b2: cenova ponuka pre zakaznika — CP je VIEW nad rozpoctom, takze
+    // potrebuje presne ten isty flush handshake (inak by zakaznik dostal sumu
+    // zo stareho modelu).
+    productionRelayCp: function(p){
+      var blocked = false;
+      try {
+        if (typeof validateFields === 'function' && typeof selectedCabId !== 'undefined' &&
+            selectedCabId && !validateFields()) blocked = true;
+        var badCp = document.querySelector('#boardCard input.bad, #boardCard .bad');
+        if (badCp) blocked = true;
+      } catch (e) { blocked = false; }
+      if (!blocked){
+        if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+        if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
+      }
+      p.flush_blocked = blocked;
+      if (window.sketchup && sketchup.production_do_cp) sketchup.production_do_cp(JSON.stringify(p));
+    },
     // D-05: zivy katalog materialov po CRUD v okne Materialy projektu. Obnovi
     // vsetky selecty s materialmi BEZ resetu formulara; zachovava vybrane hodnoty.
     setMaterials: function(data){

@@ -49,22 +49,35 @@ module Noxun
       # cell:  { 'v' => hodnota, 's' => stylovy index, 'n' => true pre cislo }
       # -> retazec BAJTOV (BINARY) hotoveho .xlsx
       def build(sheet, now: nil)
-        s = sheet.is_a?(Hash) ? sheet : {}
+        build_book([sheet.is_a?(Hash) ? sheet : {}], now: now)
+      end
+
+      # V0.6 E-b2: zosit s VIAC harkami (cenova ponuka + specifikacia). Poradie
+      # casti v archive ostava rovnake ako pri jednom harku (styles PRED
+      # worksheetmi) — harky sa len pridavaju na koniec ako sheetN.xml.
+      def build_book(sheets, now: nil)
+        list = Array(sheets).select { |s| s.is_a?(Hash) }
+        list = [{}] if list.empty?
+        names = unique_names(list)
         parts = {
-          '[Content_Types].xml'        => content_types_xml,
+          '[Content_Types].xml'        => content_types_xml(list.length),
           '_rels/.rels'                => root_rels_xml,
-          'xl/workbook.xml'            => workbook_xml(s['name']),
-          'xl/_rels/workbook.xml.rels' => workbook_rels_xml,
-          'xl/styles.xml'              => styles_xml,
-          'xl/worksheets/sheet1.xml'   => sheet_xml(s)
+          'xl/workbook.xml'            => workbook_xml(names),
+          'xl/_rels/workbook.xml.rels' => workbook_rels_xml(list.length),
+          'xl/styles.xml'              => styles_xml
         }
+        list.each_with_index { |s, i| parts["xl/worksheets/sheet#{i + 1}.xml"] = sheet_xml(s) }
         zip(parts, now: now)
       end
 
       # Zapis na disk — VZDY binarne ('wb'), inak by Windows prepisal LF na CRLF
       # a rozbil CRC/offsety v ZIPe.
       def write(path, sheet, now: nil)
-        data = build(sheet, now: now)
+        write_book(path, [sheet], now: now)
+      end
+
+      def write_book(path, sheets, now: nil)
+        data = build_book(sheets, now: now)
         File.open(path, 'wb') { |f| f.write(data) }
         path
       end
@@ -135,13 +148,19 @@ module Noxun
 
       # --- XML casti -----------------------------------------------------------
 
-      def content_types_xml
+      def content_types_xml(sheet_count = 1)
+        n = sheet_count.to_i
+        n = 1 if n < 1
+        overrides = (1..n).map do |i|
+          "<Override PartName=\"/xl/worksheets/sheet#{i}.xml\" " \
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        end.join
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' \
           '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' \
           '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' \
           '<Default Extension="xml" ContentType="application/xml"/>' \
-          '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' \
-          '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' \
+          '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+          overrides +
           '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' \
           '</Types>'
       end
@@ -153,19 +172,34 @@ module Noxun
           '</Relationships>'
       end
 
-      def workbook_rels_xml
+      def workbook_rels_xml(sheet_count = 1)
+        n = sheet_count.to_i
+        n = 1 if n < 1
+        rels = (1..n).map do |i|
+          "<Relationship Id=\"rId#{i}\" " \
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" ' \
+            "Target=\"worksheets/sheet#{i}.xml\"/>"
+        end.join
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' \
-          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' \
-          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' \
-          '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' \
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          rels +
+          "<Relationship Id=\"rId#{n + 1}\" " \
+          'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" ' \
+          'Target="styles.xml"/>' \
           '</Relationships>'
       end
 
+      # name: String (jeden harok) alebo pole UZ UNIKATNYCH nazvov.
       def workbook_xml(name)
+        names = name.is_a?(Array) ? name : [sheet_name(name)]
+        names = [sheet_name(nil)] if names.empty?
+        tags = names.each_with_index.map do |n, i|
+          "<sheet name=\"#{esc(n)}\" sheetId=\"#{i + 1}\" r:id=\"rId#{i + 1}\"/>"
+        end.join
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' \
           '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' \
           'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' \
-          "<sheets><sheet name=\"#{esc(sheet_name(name))}\" sheetId=\"1\" r:id=\"rId1\"/></sheets>" \
+          "<sheets>#{tags}</sheets>" \
           '</workbook>'
       end
 
@@ -174,6 +208,24 @@ module Noxun
         v = name.to_s.gsub(%r{[:\\/?*\[\]]}, ' ').strip
         v = 'Rozpočet' if v.empty?
         v[0, 31]
+      end
+
+      # Dva harky s rovnakym nazvom = Excel subor neotvori. Duplicita dostane
+      # ciselny sufix a stale sa zmesti do 31 znakov.
+      def unique_names(sheets)
+        seen = {}
+        Array(sheets).map do |s|
+          base = sheet_name(s.is_a?(Hash) ? s['name'] : s)
+          name = base
+          i = 1
+          while seen[name.downcase]
+            i += 1
+            suffix = " (#{i})"
+            name = base[0, 31 - suffix.length] + suffix
+          end
+          seen[name.downcase] = true
+          name
+        end
       end
 
       def styles_xml

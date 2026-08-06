@@ -576,6 +576,10 @@ module Noxun
         out.delete('sheet_size') if out['sheet_size'].nil?
         put_opt(out, 'code', a['code'] || a[:code])
         put_opt(out, 'supplier', a['supplier'] || a[:supplier])
+        # V0.6 E-b2: OBCHODNY nazov pre cenovu ponuku (dlhy predajny text, ktory
+        # zakaznik cita namiesto zlozeneho dekor·typ·hrubka). Volitelne, merge-safe
+        # — prazdna hodnota kluc odstrani; do vypoctov ani exportov VEPO nevstupuje.
+        put_opt(out, 'cp_nazov', a['cp_nazov'] || a[:cp_nazov])
         put_schema2_fields(out, a)
         put_duplak_fields(out, a)
         put_zastena_fields(out, a)

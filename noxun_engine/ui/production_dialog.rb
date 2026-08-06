@@ -236,6 +236,61 @@ module Noxun
           set_status("Export rozpočtu zlyhal: #{e.message}", true)
         end
 
+        # V0.6 E-b2: ZAKAZNICKA CENOVA PONUKA (XLSX, 2 harky). Rovnaky
+        # flush/generation handshake ako rozpocet — CP je VIEW nad TYM ISTYM
+        # payloadom, takze cisla musia sediet s modelom PO flushi editov panela.
+        #
+        # FIREWALL: pred zapisom sa cely vysledny harok prejde blocklistom
+        # (CpExport.firewall_hits). Nalez export NEBLOKUJE (rovnaky kontrakt ako
+        # KONTROLA pri VEPO), ale ide do statusu aj do logu — Michal musi
+        # vediet, ze do zakaznickeho dokumentu presiel interny pojem.
+        #
+        # GH #139 P1/P2: status hlasi AJ neuplnost cisel — riadok bez ceny
+        # (suma ponuky je podhodnotena, hoci polozka v specifikacii je) a
+        # zapornu "Nábytkovú zostavu". Zakaznicky dokument sa nesmie tvarit
+        # ako v poriadku, ked cislo v nom nie je cele.
+        def do_cp_xlsx(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          unless data['gen'].to_i == @generation.to_i
+            push_state if @dialog && @dialog.visible?
+            return set_status('Dáta okna sa medzitým zmenili — skús export znova.', true)
+          end
+          if data['flush_blocked']
+            return set_status('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
+          end
+
+          model = Sketchup.active_model
+          collected = fresh_collect(model)
+          bom = Bom.compute(collected)
+          smap = sheets_map
+          hw_exp = hardware_expansion(model, collected)
+          budget = budget_payload(model, bom, collected, nil, hw_exp, smap)
+          return set_status('Rozpočet sa nepodarilo zostaviť (pozri Ruby konzolu).', true) if budget.nil?
+
+          cp = budget['cp_preview']
+          cp ||= CpExport.preview(budget, BudgetStore.cp_overrides(model), SupplierSettings.active)
+          spec = CpExport.specification(collected[:records], sheets: smap,
+                                                             hardware_expansion: hw_exp, budget: budget)
+
+          project = data['project'].to_s.strip
+          project = default_project_name(model) if project.empty?
+          now = Time.now
+          target = UI.savepanel('Uložiť cenovú ponuku (XLSX)', vepo_settings['last_dir'],
+                                CpXlsx.file_name(project, now))
+          return set_status('Export zrušený.') if target.nil? || target.to_s.empty?
+
+          target = "#{target}.xlsx" unless File.extname(target.to_s).downcase == '.xlsx'
+          sheets = CpXlsx.sheets(cp, spec, project: project, now: now)
+          hits = CpExport.firewall_hits(CpXlsx.text_cells(sheets))
+          XlsxWriter.write_book(target, sheets, now: now)
+          save_vepo_settings('last_dir' => File.dirname(target))
+          warnings = cp_warnings(cp, budget, hits)
+          set_status(cp_status(cp, spec, target, warnings), !warnings.empty?)
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.do_cp_xlsx')
+          set_status("Export cenovej ponuky zlyhal: #{e.message}", true)
+        end
+
         # V0.6 E-b: mutacie rozpoctu (rezim, prepis sumy, nasobok, m2, spotrebice
         # v sucte, vlastne polozky). Guardy bezia na SERVERI — HTML disabled ani
         # klientske echo nie su ochrana:
@@ -291,8 +346,43 @@ module Noxun
           when 'appliance_add'   then ok_pair(BudgetStore.add_appliance!(model, attrs))
           when 'appliance_update' then ok_pair(BudgetStore.update_appliance!(model, id, attrs))
           when 'appliance_remove' then BudgetStore.remove_appliance!(model, id)
+          when 'cp_group'        then BudgetStore.set_cp_group!(model, data['source_key'], data['group'])
           else [false, ['neznáma operácia rozpočtu']]
           end
+        end
+
+        # GH #139 P1/P2: JEDEN zoznam dovodov, preco zakaznicky dokument NIE JE
+        # v poriadku — rozhoduje aj o farbe statusu, aby sa zelene "uložené"
+        # nikdy neobjavilo nad podhodnotenou alebo zápornou sumou.
+        def cp_warnings(cp, budget, hits)
+          c = cp.is_a?(Hash) ? cp : {}
+          totals = budget.is_a?(Hash) && budget['totals'].is_a?(Hash) ? budget['totals'] : {}
+          out = []
+          miss = totals['unknown_count_in_total'].to_i
+          if miss.positive?
+            out << "#{miss} riadkov rozpočtu nemá cenu — suma ponuky je PODHODNOTENÁ " \
+                   '(položky v špecifikácii sú, v cene nie)'
+          end
+          if c['assembly_negative']
+            out << "„Nábytková zostava“ vyšla záporná (#{fmt_eur(c['assembly'])}) — " \
+                   'samostatné riadky prevyšujú rozpočet'
+          end
+          out << "CP nesedí s rozpočtom o #{fmt_eur(c['diff'])}" if c['consistent'] == false
+          unless Array(hits).empty?
+            terms = hits.map { |h| h['term'] }.uniq.first(5).join(', ')
+            out << "v dokumente ostali interné pojmy (#{terms}) — oprav názvy a exportuj znova"
+          end
+          out
+        end
+
+        def cp_status(cp, spec, target, warnings)
+          c = cp.is_a?(Hash) ? cp : {}
+          items = spec.is_a?(Hash) ? spec['item_count'].to_i : 0
+          msg = "Cenová ponuka uložená: #{fmt_eur(c['total'])} · #{c['rows'].to_a.length} riadkov · " \
+                "špecifikácia #{items} položiek → #{target}"
+          return msg if Array(warnings).empty?
+
+          "#{msg} · POZOR: #{warnings.join(' · ')}"
         end
 
         # add_/update_ vracaju [polozka|nil, chyby] — zjednotenie na [ok, chyby].
@@ -307,7 +397,8 @@ module Noxun
           'appl_included' => 'Spotrebiče v súčte — prepnuté.',
           'custom_add' => 'Položka pridaná.', 'custom_update' => 'Položka upravená.',
           'custom_remove' => 'Položka zmazaná.', 'appliance_add' => 'Spotrebič pridaný.',
-          'appliance_update' => 'Spotrebič upravený.', 'appliance_remove' => 'Spotrebič zmazaný.'
+          'appliance_update' => 'Spotrebič upravený.', 'appliance_remove' => 'Spotrebič zmazaný.',
+          'cp_group' => 'Zaradenie v cenovej ponuke zmenené.'
         }.freeze
 
         def budget_op_status(data)
@@ -396,6 +487,8 @@ module Noxun
           # V0.6 E-b: tab Rozpočet — mutácie, XLSX export, ⚙ Nastavenia, ↗ URL.
           cb(dlg, 'budget_mutate')   { |p| do_budget(p) }
           cb(dlg, 'budget_xlsx')     { |p| handle_budget_xlsx(p) }
+          # V0.6 E-b2: zákaznícka cenová ponuka (XLSX — cenová tabuľka + špecifikácia)
+          cb(dlg, 'cp_xlsx')         { |p| handle_cp_xlsx(p) }
           cb(dlg, 'budget_open_url') { |p| handle_budget_url(p) }
           cb(dlg, 'budget_settings') { |_p| open_budget_settings }
           dlg.add_action_callback('js_error') do |_ctx, msg|
@@ -447,6 +540,16 @@ module Noxun
             Panel.js("NX.productionRelayBudget(#{data.to_json})")
           else
             do_budget_xlsx(data)
+          end
+        end
+
+        # V0.6 E-b2: cenová ponuka — rovnaký flush handshake ako XLSX rozpočtu.
+        def handle_cp_xlsx(payload)
+          data = JSON.parse(payload.to_s)
+          if Panel.dialog_alive?
+            Panel.js("NX.productionRelayCp(#{data.to_json})")
+          else
+            do_cp_xlsx(data)
           end
         end
 

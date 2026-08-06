@@ -129,13 +129,25 @@ module Noxun
             'rounding_step' => SupplierSettings.scalar(sup, 'rounding_step'),
             'abs_reserve_pct' => SupplierSettings.scalar(sup, 'abs_reserve_pct'),
             'stale_days' => SupplierSettings.scalar(sup, 'stale_days'),
-            'montaz_m2_per_plate' => SupplierSettings.scalar(sup, 'montaz_m2_per_plate')
+            'montaz_m2_per_plate' => SupplierSettings.scalar(sup, 'montaz_m2_per_plate'),
+            'cp_highlight_threshold' => SupplierSettings.scalar(sup, 'cp_highlight_threshold')
           },
           'viz_m2' => st['viz_m2'],
           'appliances_included' => st['appliances_included']
         }
         payload['budget_check'] = check(payload)
+        # E-b2: CENOVA PONUKA je VIEW nad TYMTO payloadom — nahlad v UI aj export
+        # citaju TEN ISTY vysledok (jedna autorita cisel). Zlyhanie CP nikdy
+        # nezhodi rozpocet: tab Rozpocet zije dalej, len bez nahladu.
+        payload['cp_preview'] = cp_preview(payload, st, sup)
         payload
+      end
+
+      def cp_preview(payload, state, settings)
+        CpExport.preview(payload, state['cp_overrides'], settings)
+      rescue StandardError => e
+        Engine.log_error(e, 'Budget.cp_preview') if defined?(Engine)
+        nil
       end
 
       # Tenka nadstavba pre SketchUp cestu (E-b): stav zo zakazky + globalne
@@ -181,6 +193,10 @@ module Noxun
           row['m2'] = num(g['m2'])
           row['price_per_m2'] = price_m2
           row['estimated'] = (g['fallback'] == true)
+          # E-b2: obchodny nazov pre CENOVU PONUKU (volitelne pole katalogu).
+          # V rozpocte sa NEZOBRAZUJE — cestuje len ako podklad pre CP.
+          cp = rec['cp_nazov'].to_s.strip
+          row['cp_nazov'] = cp unless cp.empty?
           row['uni'] = true if g['uni'] == true
           row
         end.compact
@@ -679,7 +695,8 @@ module Noxun
           'viz_m2' => num(s['viz_m2']),
           'custom_items' => Array(s['custom_items']).select { |i| i.is_a?(Hash) },
           'appliances' => Array(s['appliances']).select { |i| i.is_a?(Hash) },
-          'appliances_included' => (s['appliances_included'] == true) }
+          'appliances_included' => (s['appliances_included'] == true),
+          'cp_overrides' => (s['cp_overrides'].is_a?(Hash) ? s['cp_overrides'] : {}) }
       end
 
       def estimate_for(bom, sheets)

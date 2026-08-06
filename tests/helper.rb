@@ -161,6 +161,7 @@ unless NxTest::IN_SKETCHUP
     core/budget_store
     core/budget
     core/xlsx_writer
+    core/cp_export
   ].each { |rel| require File.join(NxTest::ROOT, 'noxun_engine', rel) }
 end
 

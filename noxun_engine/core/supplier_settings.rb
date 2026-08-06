@@ -68,11 +68,16 @@ module Noxun
       #   rounding_step       — krok zaokruhlenia KONECNEJ sumy (Michal: na cele EUR)
       #   abs_reserve_pct     — rezerva na olep/ABS v % (Michal: 10 %)
       #   montaz_m2_per_plate — m2 na 1 platnu vo vzorci montaze (10/10 rozpoctov 5,8)
+      #   cp_highlight_threshold — E-b2: od akej sumy NAVRHNE cenova ponuka
+      #     samostatny riadok (prieskum 22 CP: najlacnejsia samostatne uvedena
+      #     polozka 27 €, najdrahsia zlucena ~700 € -> navrh 150 €). Je to LEN
+      #     navrh — rozhodnutie per polozka zije v zakazke (cp_overrides).
       SCALAR_DEFAULTS = {
         'stale_days'          => 30,
         'rounding_step'       => 1.0,
         'abs_reserve_pct'     => 10.0,
-        'montaz_m2_per_plate' => 5.8
+        'montaz_m2_per_plate' => 5.8,
+        'cp_highlight_threshold' => 150.0
       }.freeze
 
       ROW_KINDS = %w[fixed per_m2].freeze
@@ -118,6 +123,14 @@ module Noxun
       ROUNDING_RANGE   = (0.01..1_000.0)
       RESERVE_RANGE    = (0.0..100.0)
       M2_PER_PLATE_RANGE = (0.1..100.0)
+      CP_THRESHOLD_RANGE = (0.0..1_000_000.0)
+
+      # Skalare editovatelne patchom z okna Nastavenia + ich rozsahy (jedna
+      # autorita pre validaciu aj chybovu hlasku).
+      SCALAR_RANGES = {
+        'rounding_step' => ROUNDING_RANGE, 'abs_reserve_pct' => RESERVE_RANGE,
+        'montaz_m2_per_plate' => M2_PER_PLATE_RANGE, 'cp_highlight_threshold' => CP_THRESHOLD_RANGE
+      }.freeze
 
       module_function
 
@@ -298,6 +311,8 @@ module Noxun
         out['abs_reserve_pct'] = num_in(raw['abs_reserve_pct'], RESERVE_RANGE, SCALAR_DEFAULTS['abs_reserve_pct'])
         out['montaz_m2_per_plate'] = num_in(raw['montaz_m2_per_plate'], M2_PER_PLATE_RANGE,
                                             SCALAR_DEFAULTS['montaz_m2_per_plate'])
+        out['cp_highlight_threshold'] = num_in(raw['cp_highlight_threshold'], CP_THRESHOLD_RANGE,
+                                               SCALAR_DEFAULTS['cp_highlight_threshold'])
         out
       end
 
@@ -409,11 +424,9 @@ module Noxun
           errors << 'názov dodávateľa nesmie byť prázdny' if v.empty?
         end
 
-        %w[rounding_step abs_reserve_pct montaz_m2_per_plate].each do |key|
+        SCALAR_RANGES.each do |key, range|
           next unless p.key?(key)
           f = num(p[key])
-          range = { 'rounding_step' => ROUNDING_RANGE, 'abs_reserve_pct' => RESERVE_RANGE,
-                    'montaz_m2_per_plate' => M2_PER_PLATE_RANGE }[key]
           errors << "#{key}: hodnota mimo rozsahu #{range.first}–#{range.last}" if f.nil? || !range.cover?(f)
         end
         if p.key?('stale_days')
@@ -487,7 +500,7 @@ module Noxun
         return [false, errors.uniq] unless errors.empty?
 
         sup['name'] = p['name'].to_s.strip unless p['name'].nil?
-        %w[rounding_step abs_reserve_pct montaz_m2_per_plate].each do |key|
+        SCALAR_RANGES.each_key do |key|
           sup[key] = num(p[key]) if p.key?(key)
         end
         sup['stale_days'] = int_or_nil(p['stale_days']) if p.key?('stale_days')

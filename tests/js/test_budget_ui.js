@@ -142,6 +142,57 @@ function payload(over){
   eq(B.budDraftMissing('custom', { popis: 'X', cena: 'abc' }), null, 'cenu validuje server, nie klient');
 })();
 
+// --- E-b2: kontrolny pas cenovej ponuky ---------------------------------------
+// `consistent` pocita SERVER (zostava je automaticky zvysok) — JS z neho len
+// sklada text. Ziadna aritmetika nad sumami.
+(function(){
+  eq(B.budCpBand({ consistent: true, diff: 0, total: 18800 }),
+     { ok: true, text: 'CP = Rozpočet' }, 'zhoda = zeleny pas');
+  eq(B.budCpBand({ consistent: false, diff: -675.6 }),
+     { ok: false, text: 'CP nesedí s rozpočtom o −675,60 €' }, 'nesulad sa musi ukazat s rozdielom');
+  eq(B.budCpBand({ consistent: true, assembly_negative: true }).ok, false,
+     'zaporna zostava je tiez chyba, aj ked suma sedi');
+  // GH #139 P1: riadok bez ceny do suctu nevstupuje — ponuka by bola podhodnotena.
+  eq(B.budCpBand({ consistent: true, complete: false, unknown_count: 2 }),
+     { ok: false, text: 'Suma ponuky je podhodnotená — 2 riadky rozpočtu nemajú cenu' },
+     'neuplna suma sa musi ukazat');
+  eq(B.budCpBand({ consistent: true, complete: false, unknown_count: 1 }).text,
+     'Suma ponuky je podhodnotená — 1 riadok rozpočtu nemá cenu', 'sklonovanie 1 riadok');
+  eq(B.budCpBand({ consistent: true, complete: true }).ok, true, 'uplna suma = zeleny pas');
+  eq(B.budCpBand({}), { ok: true, text: 'CP = Rozpočet' }, 'chybajuce polia nezhodia render');
+  eq(B.budCpBand(null).ok, true, 'null payload nezhodi render');
+})();
+
+// --- E-b2: render nahladu CP (data VYHRADNE z payloadu, ziadny vypocet) -------
+(function(){
+  const cp = {
+    total: 18800, budget_total: 18800, diff: 0, consistent: true, threshold: 150,
+    total_label: 'SPOLU',
+    rows: [
+      { key: 'cp:assembly', polozka: 'Nábytková zostava', cena: 7778, mnozstvo: 1, mj: 'set', kind: 'assembly' },
+      { key: 'cp:item:hw:317642', polozka: 'VÝSUVY Quadro', cena: 1157, mnozstvo: 30, mj: 'set',
+        kind: 'item', source_key: 'hw:317642' },
+      { key: 'cp:zameranie', polozka: 'Zameranie', cena: 0, mnozstvo: 1, mj: 'set', kind: 'fixed' }
+    ],
+    candidates: [
+      { source_key: 'hw:317642', label: 'VÝSUVY Quadro', amount: 1157, state: 'samostatne' },
+      { source_key: 'custom:U1', label: 'LED <b>pás</b>', amount: 85, state: 'zostava', overridden: true }
+    ]
+  };
+  const h = B.budCpHtml({ cp_preview: cp, vat_divisor: 1.23 }, 1.23);
+  ok(h.indexOf('Cenová ponuka — náhľad') > -1, 'sekcia ma nadpis');
+  ok(h.indexOf('CP = Rozpočet') > -1, 'kontrolny pas');
+  ok(h.indexOf('Nábytková zostava') > -1 && h.indexOf('VÝSUVY Quadro') > -1, 'riadky CP');
+  ok(h.indexOf('data-bud="cp_group" data-source="hw:317642" data-group="zostava"') > -1,
+     'samostatny riadok ponuka zlucenie do zostavy');
+  ok(h.indexOf('data-group="samostatne"') > -1, 'zlucena polozka sa da vytiahnut');
+  ok(h.indexOf('Zlúčené v zostave (1)') > -1, 'zoznam zlucenych je zbaleny a spocitany');
+  ok(h.indexOf('LED &lt;b&gt;pás&lt;/b&gt;') > -1, 'nazvy polozek su escapovane');
+  ok(h.indexOf('<b>pás</b>') === -1, 'ziadne surove HTML z dat');
+  eq(B.budCpHtml({}, 1.23), '', 'bez cp_preview sa sekcia nevykresli');
+  eq(B.budCpHtml(null, 1.23), '', 'null payload nezhodi render');
+})();
+
 // --- XSS: data do innerHTML idu VZDY escapovane -------------------------------
 (function(){
   eq(B.budEsc('<img src=x onerror=alert(1)>'),

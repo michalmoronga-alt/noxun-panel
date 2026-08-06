@@ -143,7 +143,7 @@
       // Predvolene otvorene sekcie = mock v4 (materiál, služby, štandardné
       // riadky, vlastné položky, spotrebiče); ABS a kovanie sú zbalené.
       BUD_OPEN = { materials: true, abs: false, hardware: false, services: true,
-                   standard_rows: true, custom: true, appliances: true };
+                   standard_rows: true, custom: true, appliances: true, cp: true };
     }
     return BUD_OPEN[key] !== false;
   }
@@ -165,6 +165,7 @@
       if (sec.key === 'rounding') h += budRoundingHtml(sec, b, d);
       else h += budSectionHtml(sec, b, d);
     });
+    h += budCpHtml(b, d);
     h += budFootHtml();
     box.innerHTML = h;
     budRestoreFocus();
@@ -548,6 +549,105 @@
       bEsc(budSub(t.rounding, d)) + ' → ' + bEsc(total) + '</span></div>';
   }
 
+  // ================= CENOVA PONUKA — NAHLAD (E-b2) =========================
+  // CP je VIEW nad rozpoctom: vsetky riadky, sumy aj navrhy pocita SERVER
+  // (payload.cp_preview). JS ich LEN zobrazuje a posiela prepnutie zaradenia.
+  // Riadok „Nábytková zostava" je automaticky zvysok — dorovnanie nikdy nerobi
+  // pouzivatel a nikdy sa nezabudne.
+
+  // Ciste: kontrolny pas CP vs rozpocet. `consistent` pocita server; keby sa
+  // niekedy rozisli, pas to povie nahlas namiesto ticheho rozdielu.
+  function budCpBand(cp){
+    var c = cp || {};
+    if (c.consistent === false){
+      return { ok: false, text: 'CP nesedí s rozpočtom o ' + budFmtEur(c.diff) };
+    }
+    if (c.assembly_negative){
+      return { ok: false, text: 'Samostatné riadky prevyšujú rozpočet — zostava je záporná' };
+    }
+    // GH #139 P1: riadok bez ceny do súčtu nevstupuje — ponuka by bola
+    // podhodnotená, hoci položka v špecifikácii ostáva. Počet ráta server.
+    if (c.complete === false){
+      return { ok: false, text: 'Suma ponuky je podhodnotená — ' + (c.unknown_count || 0) + ' ' +
+                                budPluralSk(c.unknown_count || 0,
+                                  ['riadok rozpočtu nemá cenu', 'riadky rozpočtu nemajú cenu',
+                                   'riadkov rozpočtu nemá cenu']) };
+    }
+    return { ok: true, text: 'CP = Rozpočet' };
+  }
+
+  function budCpHtml(b, d){
+    var cp = b ? b.cp_preview : null;
+    if (!cp) return '';
+    var open = budSectionOpen('cp');
+    var band = budCpBand(cp);
+    var h = '<details class="bsec" data-section="cp"' + (open ? ' open' : '') + '>' +
+      '<summary><h3>Cenová ponuka — náhľad</h3>' +
+      '<span class="bcnt">' + bEsc((cp.rows || []).length + ' ' +
+        budPluralSk((cp.rows || []).length, ['riadok', 'riadky', 'riadkov']) +
+        ' · samostatne od ' + budFmtEur(cp.threshold)) + '</span>' +
+      '<span class="bsubt">' + bEsc(budSub(cp.total, d)) + '</span></summary>';
+    h += '<div class="bcpband' + (band.ok ? ' ok' : '') + '">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-' + (band.ok ? 'check' : 'alert') + '"/></svg> ' +
+      bEsc(band.text) + '</div>';
+    h += budCpTableHtml(cp, d);
+    h += budCpMergedHtml(cp, d);
+    h += '<div class="bnote">Zákaznícky pohľad na ten istý rozpočet — suma sa nikdy nelíši. ' +
+      'Zameranie a Vizualizácie sú v ponuke vždy 0 € (náklad je rozpustený v zostave). ' +
+      'Významné položky vieš dať samostatne, ostatné sa zlúčia do nábytkovej zostavy. ' +
+      'Export je vždy s DPH (ceny sú konečné).</div>';
+    return h + '</details>';
+  }
+
+  function budCpTableHtml(cp, d){
+    var rows = cp.rows || [];
+    if (!rows.length) return '<div class="muted" style="padding:6px 12px">Zatiaľ prázdne.</div>';
+    var h = '<table class="btab"><thead><tr><th>Položka</th><th class="bnum">Cena</th>' +
+      '<th class="bnum">Množstvo</th><th class="bnum">MJ</th><th class="bnum"></th></tr></thead><tbody>';
+    rows.forEach(function(r){
+      var act = '';
+      if (r.source_key){
+        act = '<button type="button" class="bact" data-bud="cp_group" data-source="' + bEsc(r.source_key) + '"' +
+          ' data-group="zostava" title="Zlúčiť do nábytkovej zostavy" aria-label="Zlúčiť do zostavy">' +
+          '<svg class="ic" aria-hidden="true"><use href="#i-arrow-left-right"/></svg></button>';
+      }
+      h += '<tr class="' + (r.kind === 'assembly' ? 'bcpasm' : '') + '"><td>' + bEsc(r.polozka) + '</td>' +
+        '<td class="bnum">' + bEsc(budSub(r.cena, d)) + '</td>' +
+        '<td class="bnum">' + bEsc(budFmtNum(r.mnozstvo, 0)) + '</td>' +
+        '<td class="bnum">' + bEsc(r.mj) + '</td>' +
+        '<td class="bnum bacts">' + act + '</td></tr>';
+    });
+    h += '<tr class="bcptotal"><td>' + bEsc(cp.total_label || 'SPOLU') + '</td>' +
+      '<td class="bnum">' + bEsc(budSub(cp.total, d)) + '</td><td></td><td></td><td></td></tr>';
+    return h + '</tbody></table>';
+  }
+
+  // Zbalene (vertikalny priestor!) — otvara sa len ked chce Michal nieco
+  // vytiahnut zo zostavy. Zoznam pocita a zoradi server.
+  function budCpMergedHtml(cp, d){
+    var merged = (cp.candidates || []).filter(function(c){ return c.state !== 'samostatne'; });
+    if (!merged.length) return '';
+    var h = '<details class="bcpmerged"><summary>Zlúčené v zostave (' + merged.length + ')</summary>';
+    merged.forEach(function(c){
+      h += '<div class="bcpmrow"><span>' + bEsc(c.label) +
+        (c.overridden ? ' <span class="bfnt">· ručne v zostave</span>' : '') + '</span>' +
+        '<span class="bnum">' + bEsc(budSub(c.amount, d)) + '</span>' +
+        '<button type="button" class="bact" data-bud="cp_group" data-source="' + bEsc(c.source_key) + '"' +
+        ' data-group="samostatne" title="Ukázať v cenovej ponuke samostatne" aria-label="Samostatne v ponuke">' +
+        '<svg class="ic" aria-hidden="true"><use href="#i-arrow-left-right"/></svg></button></div>';
+    });
+    return h + '</details>';
+  }
+
+  function budCpExport(){
+    if (!BOM || !window.sketchup || !sketchup.cp_xlsx) return;
+    NX.setStatus('Pripravujem cenovú ponuku…', false);
+    sketchup.cp_xlsx(JSON.stringify({
+      gen: BOM.gen,
+      project: (budEl('vepoProject') ? budEl('vepoProject').value : '').trim()
+    }));
+  }
+
   // Disabled tlacidlo nedostava mouse eventy, takze `title` na nom tooltip
   // NEUKAZE — obal ho nesie namiesto neho (pouzivatel musi vidiet PRECO je sive).
   function budSoonBtn(icon, label, why){
@@ -560,7 +660,9 @@
       budSoonBtn('refresh-cw', 'Prepočítať ceny', 'Príde v ďalšej časti dávky E (E-c) — overenie cien u dodávateľa.') +
       '<button type="button" class="primary" data-bud="xlsx" title="Interný rozpočet v presnom formáte tvojich hárkov">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> XLSX rozpočet</button>' +
-      budSoonBtn('download', 'Cenová ponuka', 'Cenová ponuka pre zákazníka — príde v ďalšej časti dávky E.') +
+      '<button type="button" class="primary" data-bud="cp"' +
+      ' title="Zákaznícky dokument: cenová tabuľka + špecifikácia (bez interných pojmov a kódov)">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Cenová ponuka (zákazník)</button>' +
       '<button type="button" class="ghostbtn bgear" data-bud="settings" title="Sadzby, režimy a prahy — globálne">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Nastavenia</button></div>';
   }
@@ -796,6 +898,10 @@
         budModalSave();
       } else if (a === 'xlsx'){
         budXlsx();
+      } else if (a === 'cp'){
+        budCpExport();
+      } else if (a === 'cp_group'){
+        budSend('cp_group', { source_key: b.getAttribute('data-source'), group: b.getAttribute('data-group') });
       } else if (a === 'settings'){
         if (window.sketchup && sketchup.budget_settings) sketchup.budget_settings('');
       }
@@ -860,5 +966,6 @@
       budPluralSk: budPluralSk, budStaleLabel: budStaleLabel, budWarnChips: budWarnChips,
       budMutation: budMutation, budParse: budParse, budNumText: budNumText,
       budSectionCount: budSectionCount, budEsc: bEsc,
-      budDraftAttrs: budDraftAttrs, budDraftMissing: budDraftMissing };
+      budDraftAttrs: budDraftAttrs, budDraftMissing: budDraftMissing,
+      budCpBand: budCpBand, budCpHtml: budCpHtml };
   }
