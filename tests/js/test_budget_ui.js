@@ -286,6 +286,20 @@ function payload(over){
   eq(late.report.changed, 1, 'oneskoreny complete stareho behu report neprepise');
 })();
 
+// GH #140 P2: odmietnuty START musi okno ODOMKNUT — klient prepne modal do
+// „bezi" hned po kliku, takze bez terminalneho eventu by ostal zamknuty.
+(function(){
+  const pending = { phase: 'run', pid: null, total: 3, done: 0, label: '', report: null,
+                    single: null, cancelling: false };
+  eq(B.budPrEvent(pending, { type: 'rejected', error: 'Model sa medzitým prepol' }), null,
+     'odmietnuty start zavrie modal a odomkne tlacidlo');
+  eq(B.budPrEvent(null, { type: 'rejected', error: 'x' }), null, 'bez stavu sa nic nerozbije');
+  const running = { phase: 'run', pid: 7, total: 3, done: 1, label: 'X', report: null,
+                    single: null, cancelling: false };
+  eq(B.budPrEvent(running, { type: 'rejected', error: 'x' }), running,
+     'BEZIACI prepocet (uz ma pid) sa odmietnutim iného startu NEDA zabit');
+})();
+
 (function(){
   const report = { total: 4, done: 4, skipped: 0, cancelled: false, changed: 2, unchanged: 1, errors: 1,
     items: [

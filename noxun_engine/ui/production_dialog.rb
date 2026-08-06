@@ -568,24 +568,37 @@ module Noxun
           model = Sketchup.active_model
           unless data['gen'].to_i == @generation.to_i
             push_state if @dialog && @dialog.visible?
-            return set_status('Rozpočet sa medzitým prepočítal — obnovené, skús znova.', true)
+            return price_refresh_reject('Rozpočet sa medzitým prepočítal — obnovené, skús znova.')
           end
           guid = data['model_guid'].to_s
           if !guid.empty? && guid != model_guid(model)
             push_state
-            return set_status('Model sa medzitým prepol — obnovené, skús znova.', true)
+            return price_refresh_reject('Model sa medzitým prepol — obnovené, skús znova.')
           end
-          return set_status('Prepočet cien už beží.', true) if PriceRefresh.running?
+          return price_refresh_reject('Prepočet cien už beží.') if PriceRefresh.running?
 
           targets = price_refresh_targets(model, data)
           if targets.empty?
             push_state
-            return set_status('Nie je čo obnoviť — položka už nie je v rozpočte alebo nemá väzbu na Demos.', true)
+            return price_refresh_reject('Nie je čo obnoviť — položka už nie je v rozpočte alebo nemá väzbu na Demos.')
           end
-          pid = PriceRefresh.run(targets, alive: price_refresh_alive, emit: price_refresh_emit)
-          return set_status('Prepočet cien sa nepodarilo spustiť.', true) if pid.nil?
+          pid = PriceRefresh.run(targets, alive: price_refresh_alive(@dialog), emit: price_refresh_emit)
+          return price_refresh_reject('Prepočet cien sa nepodarilo spustiť.') if pid.nil?
+          # GH #140 P2: beh mohol dobehnúť UŽ TERAZ (synchrónne — napr. bez
+          # sieťového transportu alebo samé chybné väzby). Vtedy status už nesie
+          # VÝSLEDOK a „Sťahujem…" by ho prepísalo klamlivým priebehom.
+          return if PriceRefresh.running_pid != pid
 
           set_status("Sťahujem ceny z Demosu (#{targets.length}) — medzi položkami je 3 s pauza (pravidlo Demosu).")
+        end
+
+        # GH #140 P2: okno prepne modal do „beží" HNEĎ po kliku (odpoveď servera
+        # je asynchrónna). Každé odmietnutie štartu preto musí poslať TERMINÁLNY
+        # event — inak by progres aj tlačidlo ostali zamknuté a Zrušiť by nemalo
+        # čo zrušiť (žiadny beh na serveri neexistuje).
+        def price_refresh_reject(msg)
+          js("if (window.NX && NX.priceRefresh) NX.priceRefresh(#{{ 'type' => 'rejected', 'error' => msg }.to_json});")
+          set_status(msg, true)
         end
 
         # Zrušenie: ďalšie položky sa už nestiahnu, rozbehnutá dobehne a zapíše
@@ -615,11 +628,14 @@ module Noxun
           all.select { |t| t['kind'] == kind && t['id'] == id }
         end
 
-        # Životnosť behu = otvorené okno Výroba. Prepnutie modelu beh NEZASTAVÍ:
-        # ceny sa zapisujú do KATALÓGU (globálny, na zákazke nezávislý) a po
-        # dobehnutí sa aj tak pushne čerstvý rozpočet práve aktívneho modelu.
-        def price_refresh_alive
-          -> { !@dialog.nil? && @dialog.visible? }
+        # Životnosť behu = TÁ ISTÁ inštancia okna Výroba, z ktorej sa spustil
+        # (vzor MaterialsDialog.demos_alive_proc). GH #140 P2: samotné `@dialog`
+        # nestačí — zavretie okna počas fetchu a jeho znovuotvorenie by opustený
+        # beh „oživilo" (dofetchoval by zvyšok fronty a posielal eventy do NOVÉHO
+        # okna). Prepnutie MODELU beh nezastaví: ceny idú do katalógu, ktorý je
+        # globálny a na zákazke nezávislý.
+        def price_refresh_alive(dlg)
+          -> { !dlg.nil? && !@dialog.nil? && @dialog.equal?(dlg) && dlg.visible? }
         end
 
         def price_refresh_emit
@@ -638,6 +654,10 @@ module Noxun
           begin
             MaterialsDialog.push_catalog if defined?(MaterialsDialog)
             Panel.push_materials if defined?(Panel)
+            # GH #140 P2: prepočet mení AJ ceny kovania — otvorené okno Katalóg
+            # kovania by inak držalo starú cenu a starý row_rev (jeho ďalšia
+            # úprava by skončila ako konflikt).
+            HardwareCatalogDialog.push_items if defined?(HardwareCatalogDialog)
           rescue StandardError => e
             Engine.log_error(e, 'ProductionDialog.after_price_refresh refresh')
           end

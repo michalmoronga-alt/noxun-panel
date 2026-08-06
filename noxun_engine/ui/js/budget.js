@@ -755,6 +755,12 @@
       return { phase: 'run', pid: e.pid, total: Number(e.total || 0), done: 0, label: '',
                report: null, single: (s && s.single) || null, cancelling: false };
     }
+    if (e.type === 'rejected'){
+      // Server beh VÔBEC NEZAČAL (staré okno, iný model, už beží, nie je čo
+      // obnoviť) — modal sa zavrie a tlačidlo sa odomkne. Ruší sa LEN čakajúci
+      // štart: bežiaci prepočet (ten už má pid) sa tým nesmie dať zabiť.
+      return (s && s.pid) ? s : null;
+    }
     if (s && s.pid && e.pid !== s.pid) return s; // event CUDZIEHO (staršieho) behu
     if (e.type === 'complete'){
       // Report sa ukáže aj vtedy, keď okno stav medzitým stratilo — je to
@@ -1121,9 +1127,13 @@
     // príde zo servera aj čerstvý payload — re-render odblokuje footer a
     // ukáže nové ceny AJ obnovený pás cenovej čerstvosti za modalom.
     NX.priceRefresh = function(ev){
+      var wasRunning = !!(BUD_PR && BUD_PR.phase === 'run');
       BUD_PR = budPrEvent(BUD_PR, ev);
       budPrRenderModal();
-      if (ev && ev.type === 'complete') renderBody();
+      // Telo tabu sa prekresľuje LEN pri prechode z behu (dobehnutie AJ
+      // odmietnutý štart) — footer tlačidlo sa musí odomknúť. Počas behu sa
+      // prekresľuje iba modal (progres by inak trhal celý tab).
+      if (wasRunning && !(BUD_PR && BUD_PR.phase === 'run')) renderBody();
     };
   }
 

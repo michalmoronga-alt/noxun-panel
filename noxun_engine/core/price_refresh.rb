@@ -181,8 +181,17 @@ module Noxun
         deliver(ctx, 'type' => 'progress', 'done' => ctx['done'], 'total' => ctx['total'],
                      'label' => target['label'].to_s, 'kind' => target['kind'].to_s)
         refresh_one(ctx, target) do |result|
-          record(ctx, result)
-          step(ctx)
+          # Pokracovanie retaze bezi v ASYNC callbacku (HTTP odpoved) — mimo
+          # ramca step/refresh_one. Vynimka odtialto by skoncila v sieti a beh
+          # by ostal bez terminalneho eventu (zamknuty progres + drziaci lock);
+          # preto sa kazda chyba retaze prelozi na KONIEC behu s reportom.
+          begin
+            record(ctx, result)
+            step(ctx)
+          rescue StandardError => e
+            Engine.log_error(e, 'PriceRefresh.step chain') if defined?(Engine)
+            complete(ctx)
+          end
         end
       end
 
@@ -244,7 +253,12 @@ module Noxun
           when 'complete'
             next if fired
             fired = true
-            done.call(apply_material(target, kind, base_rev, proposal, event))
+            # GH #140 P2: tento callback bezi AZ po navrate refresh_one — jeho
+            # rescue uz nechyta. Zlyhanie zapisu (zamok katalogu, IO) musi
+            # skoncit ako CHYBA POLOZKY, nie ako beh bez terminalneho eventu.
+            done.call(safe_result(target, 'PriceRefresh.apply_material') do
+              apply_material(target, kind, base_rev, proposal, event)
+            end)
           end
         end
         # alive vnutorneho lookupu NIE JE zivotnost okna: rozbehnuta polozka
@@ -327,7 +341,9 @@ module Noxun
         HardwareCatalog.check_price!(code) do |res|
           next if fired
           fired = true
-          done.call(apply_hardware(target, code, res))
+          done.call(safe_result(target, 'PriceRefresh.apply_hardware') do
+            apply_hardware(target, code, res)
+          end)
         end
         nil
       end
@@ -354,6 +370,15 @@ module Noxun
       end
 
       # --- report + eventy -----------------------------------------------------
+
+      # Vyhodnotenie vysledku polozky, ktore NESMIE vyhodit vynimku von: volaju
+      # ho ASYNC callbacky (sietova odpoved), kde uz ziadny rescue retaze nie je.
+      def safe_result(target, context)
+        yield
+      rescue StandardError => e
+        Engine.log_error(e, context) if defined?(Engine)
+        result_for(target, 'error', 'error' => "zápis zlyhal: #{e.message}")
+      end
 
       def result_for(target, status, extra = {})
         out = { 'kind' => target['kind'].to_s, 'id' => target['id'].to_s,

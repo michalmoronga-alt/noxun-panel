@@ -70,6 +70,24 @@ def ec_report(events)
   ev && ev['report']
 end
 
+# Docasne nahradi zapisovu metodu vybuchujucou. POZOR: module_function metody
+# ziju NA SINGLETON TRIEDE modulu — define_singleton_method by originál
+# PREPÍSAL a remove_method by ho zmazal nadobro (dalsie testy by padali).
+# Preto alias tam a spat.
+def ec_with_failing_write(on_call)
+  sc = PR_EC.singleton_class
+  sc.send(:alias_method, :ec_orig_write_material, :write_material)
+  sc.send(:define_method, :write_material) do |*_args|
+    on_call.call
+    raise 'simulovane zlyhanie zapisu'
+  end
+  yield
+ensure
+  sc.send(:remove_method, :write_material)
+  sc.send(:alias_method, :write_material, :ec_orig_write_material)
+  sc.send(:remove_method, :ec_orig_write_material)
+end
+
 # Polozka kovania so ZVIAZANOU adresou. create_item vazbu z klienta NIKDY
 # nepreberie (F7) — vznika vyhradne proposal flowom, takze ju tu zalozime
 # presne tak, ako to robi tlacidlo „Over cenu" (rovnaka cena = unchanged).
@@ -242,6 +260,36 @@ NxTest.test('ec ceny: zastarany row_rev = conflict (cudzia zmena sa NEPREPISE)')
   NxTest.assert_equal('error', out['status'])
   NxTest.assert(out['error'].include?('medzitým'), out.inspect)
   NxTest.assert_close(15.0, MAT_EC.sheet('EC_DTDL_18')['price_per_m2'], 0.001, 'cena netknuta')
+end
+
+NxTest.test('ec ceny GH#140: vynimka pri zapise = chyba polozky, beh dobehne a lock sa uvolni') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  ec_install_catalog!(second_url: EC_DTDL18_URL)
+  # Zapis vybuchne (zamok katalogu / IO) — dochadza to v ASYNC callbacku, kde
+  # uz rescue retaze nie je. Beh NESMIE ostat bez terminalneho eventu.
+  boom = [0]
+  events = nil
+  ec_with_failing_write(-> { boom[0] += 1 }) do
+    # 2. zaznam mieri na 18 mm stranku (verify ho odmietne) — dokaz, ze retaz
+    # islas DALEJ aj po vynimke pri prvej polozke.
+    events, = ec_run([ec_target('sheet', 'EC_DTDL_18', 'H3303 18'),
+                      ec_target('sheet', 'EC_DTDL_16', 'H3303 16')], ec_page_map)
+  end
+  NxTest.assert_equal(1, boom[0], 'zapis sa pokusil (a vybuchol)')
+  report = ec_report(events)
+  NxTest.assert(report, 'complete MUSI prist aj po vynimke v async callbacku')
+  NxTest.assert_equal(2, report['errors'], report.inspect)
+  NxTest.assert_equal(2, report['done'], 'retaz pokracovala dalsou polozkou')
+  NxTest.assert(report['items'].first['error'].include?('zápis zlyhal'), report['items'].first.inspect)
+  NxTest.assert_equal(false, PR_EC.running?, 'lock sa uvolnil (beh nezostal visiet)')
+  NxTest.assert_close(15.0, MAT_EC.sheet('EC_DTDL_18')['price_per_m2'], 0.001, 'cena netknuta')
+end
+
+NxTest.test('ec ceny GH#140: safe_result prelozi vynimku na chybu polozky') do
+  out = PR_EC.safe_result(ec_target('sheet', 'X', 'Doska'), 'test') { raise 'bum' }
+  NxTest.assert_equal('error', out['status'])
+  NxTest.assert(out['error'].include?('zápis zlyhal'), out.inspect)
+  NxTest.assert_equal('X', out['id'], 'identita polozky ostava v reporte')
 end
 
 # --- Zrusit -------------------------------------------------------------------
