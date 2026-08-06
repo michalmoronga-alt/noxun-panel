@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.5.47' unless defined?(VERSION)
+    VERSION = '0.5.48' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -78,6 +78,7 @@ Sketchup.require 'noxun_engine/core/budget_store'  # V0.6 E-a: data rozpoctu v z
 Sketchup.require 'noxun_engine/core/budget'        # V0.6 E-a: vypocet rozpoctu (po bom/sheet_estimate/budget_store)
 Sketchup.require 'noxun_engine/core/xlsx_writer'   # V0.6 E-b: pravy .xlsx bez gemov + Luciin harok rozpoctu
 Sketchup.require 'noxun_engine/core/cp_export'     # V0.6 E-b2: cenova ponuka (view nad rozpoctom) + zakaznicky xlsx
+Sketchup.require 'noxun_engine/core/price_refresh' # V0.6 E-c: hromadne obnovenie cien z Demosu (po demos/lookup + hardware_catalog)
 Sketchup.require 'noxun_engine/ui/production_dialog' # V0.5 B okno Vyroba
 Sketchup.require 'noxun_engine/ui/panel'
 Sketchup.require 'noxun_engine/ui/rules_dialog'     # V0.4 editor pravidiel kovania

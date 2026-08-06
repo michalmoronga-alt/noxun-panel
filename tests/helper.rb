@@ -162,6 +162,7 @@ unless NxTest::IN_SKETCHUP
     core/budget
     core/xlsx_writer
     core/cp_export
+    core/price_refresh
   ].each { |rel| require File.join(NxTest::ROOT, 'noxun_engine', rel) }
 end
 

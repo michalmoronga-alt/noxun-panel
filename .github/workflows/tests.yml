@@ -53,3 +53,5 @@ jobs:
         run: node tests/js/test_interior_height.js
       - name: JS testy — UI drobnosti H4 (farba dekoru D-82, skratka UNI D-83)
         run: node tests/js/test_h4_ui.js
+      - name: JS testy — tab Rozpocet a Nastavenia (E-b) + Prepocitat ceny (E-c)
+        run: node tests/js/test_budget_ui.js
