@@ -399,10 +399,15 @@ module Noxun
       # FIREWALL
       # =====================================================================
 
-      # Ocisti text pre zakaznika: nakupne kody (6+ cislic) a "Kód …" prefixy
-      # prec, biele znaky zjednotene, osamotene oddelovace orezane.
+      # ID materialu/pasky VNUTRI textu ("Doska K009_PW_DTDL_18 hrúbka 18") —
+      # `id_like?` chyta len cely token, toto chyta aj vnorene ID.
+      ID_TOKEN_RE = /(?<![A-Za-z0-9_])[A-Za-z0-9]{2,}_[A-Za-z0-9]{2,}(?:_[A-Za-z0-9]+)+(?![A-Za-z0-9_])/.freeze
+
+      # Ocisti text pre zakaznika: nakupne kody (6+ cislic), ID zaznamov a
+      # "Kód …" prefixy prec, biele znaky zjednotene, osamotene oddelovace orezane.
       def clean_label(text)
-        s = text.to_s.gsub(/\b\d{6,}\b/, ' ')
+        s = text.to_s.gsub(ID_TOKEN_RE, ' ')
+        s = s.gsub(/\b\d{6,}\b/, ' ')
         s = s.gsub(/\bk[oó]d\b\s*:?\s*/i, ' ')
         s = s.gsub(/\s+/, ' ').strip
         s.sub(/\A[·\-–—,;:]+\s*/, '').sub(/\s*[·\-–—,;:]+\z/, '').strip
