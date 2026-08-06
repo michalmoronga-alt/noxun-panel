@@ -21,8 +21,11 @@
 #    — NIKDY sa nenahradi nulou (audit 5/9).
 # 4) ID polozky je serverom generovane UUID (audit 9/13) — klient ho pri
 #    zakladani nedodava; update/delete adresuju polozku VYHRADNE cez UUID.
-# 5) cp_skupina (default "zostava") nesie kazda rucna polozka — cenova ponuka
-#    (mimo E) z nej stavia skupiny; v rozpocte je to len prenasane pole.
+# 5) cp_skupina (default "zostava") nesie kazda rucna polozka — je to VOLNY
+#    nazov skupiny z E-a, ktory sa len prenasa (rozpocet ho nepouziva).
+#    POZOR: AUTORITA zaradenia polozky v CENOVEJ PONUKE je `budget_cp_overrides`
+#    nizsie (E-b2) — riesi VSETKY riadky rozpoctu jednotne cez kluc riadku,
+#    nielen rucne polozky. cp_skupina ostava kvoli spatnej kompatibilite dat.
 require 'json'
 require 'securerandom'
 require 'uri'
