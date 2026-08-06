@@ -193,15 +193,25 @@ module Noxun
                      'done' => ctx['done'], 'total' => ctx['total'])
       end
 
+      # `done` sa smie ozvat PRESNE RAZ. Headless (a chybove skratky) bezia
+      # synchronne — zvysok retaze teda dobehne VNUTRI tohto ramca a vynimka
+      # spod neho by cez rescue posunula druhy vysledok tej istej polozky
+      # (rozbity pocet done/total). Guard je tu, nie v jednotlivych vetvach.
       def refresh_one(ctx, target, &done)
+        fired = false
+        once = lambda do |result|
+          next if fired
+          fired = true
+          done.call(result)
+        end
         if target['kind'].to_s == 'hardware'
-          refresh_hardware(ctx, target, &done)
+          refresh_hardware(ctx, target, &once)
         else
-          refresh_material(ctx, target, &done)
+          refresh_material(ctx, target, &once)
         end
       rescue StandardError => e
         Engine.log_error(e, 'PriceRefresh.refresh_one') if defined?(Engine)
-        done.call(result_for(target, 'error', 'error' => "chyba: #{e.message}"))
+        once.call(result_for(target, 'error', 'error' => "chyba: #{e.message}"))
       end
 
       # --- materialy (dosky + ABS) ---------------------------------------------
