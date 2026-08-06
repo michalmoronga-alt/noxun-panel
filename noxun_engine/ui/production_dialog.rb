@@ -491,6 +491,9 @@ module Noxun
           cb(dlg, 'cp_xlsx')         { |p| handle_cp_xlsx(p) }
           cb(dlg, 'budget_open_url') { |p| handle_budget_url(p) }
           cb(dlg, 'budget_settings') { |_p| open_budget_settings }
+          # V0.6 E-c: „Prepočítať ceny" — hromadné obnovenie cien z Demosu.
+          cb(dlg, 'price_refresh')        { |p| handle_price_refresh(p) }
+          cb(dlg, 'price_refresh_cancel') { |_p| handle_price_refresh_cancel }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(production): #{msg}")
@@ -551,6 +554,108 @@ module Noxun
           else
             do_cp_xlsx(data)
           end
+        end
+
+        # --- V0.6 E-c: Prepočítať ceny --------------------------------------
+        # Jedno tlačidlo obnoví ceny VŠETKÝCH položiek zákazky, ktoré majú väzbu
+        # na Demos (dosky, ABS, kovanie). Guardy ako pri každej inej akcii tabu
+        # (gen + model_guid — klik zo starého DOM sa odmietne). Zoznam cieľov
+        # skladá SERVER z čerstvého rozpočtu: klient posiela len „spusti"
+        # (prípadne kind+id JEDNÉHO riadku zo zoznamu starých cien), nikdy nie
+        # adresu ani cenu.
+        def handle_price_refresh(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          model = Sketchup.active_model
+          unless data['gen'].to_i == @generation.to_i
+            push_state if @dialog && @dialog.visible?
+            return set_status('Rozpočet sa medzitým prepočítal — obnovené, skús znova.', true)
+          end
+          guid = data['model_guid'].to_s
+          if !guid.empty? && guid != model_guid(model)
+            push_state
+            return set_status('Model sa medzitým prepol — obnovené, skús znova.', true)
+          end
+          return set_status('Prepočet cien už beží.', true) if PriceRefresh.running?
+
+          targets = price_refresh_targets(model, data)
+          if targets.empty?
+            push_state
+            return set_status('Nie je čo obnoviť — položka už nie je v rozpočte alebo nemá väzbu na Demos.', true)
+          end
+          pid = PriceRefresh.run(targets, alive: price_refresh_alive, emit: price_refresh_emit)
+          return set_status('Prepočet cien sa nepodarilo spustiť.', true) if pid.nil?
+
+          set_status("Sťahujem ceny z Demosu (#{targets.length}) — medzi položkami je 3 s pauza (pravidlo Demosu).")
+        end
+
+        # Zrušenie: ďalšie položky sa už nestiahnu, rozbehnutá dobehne a zapíše
+        # sa (jej cena je reálne overená — zahodiť ju by bolo horšie).
+        def handle_price_refresh_cancel
+          if PriceRefresh.cancel!
+            set_status('Prepočet cien sa ukončí po dobehnutí prebiehajúcej položky.')
+          else
+            set_status('Žiadny prepočet cien nebeží.')
+          end
+        end
+
+        # Ciele = viazané položky POUŽITÉ v ČERSTVOM rozpočte. kind+id (jeden
+        # riadok zo zoznamu starých cien) sa použije len ako FILTER nad týmto
+        # serverovým zoznamom — položka mimo rozpočtu sa nefetchuje.
+        def price_refresh_targets(model, data)
+          collected = fresh_collect(model)
+          bom = Bom.compute(collected)
+          budget = budget_payload(model, bom, collected)
+          return [] unless budget
+
+          all = PriceRefresh.targets_from_budget(budget)
+          kind = data['kind'].to_s
+          id = data['id'].to_s
+          return all if kind.empty? || id.empty?
+
+          all.select { |t| t['kind'] == kind && t['id'] == id }
+        end
+
+        # Životnosť behu = otvorené okno Výroba. Prepnutie modelu beh NEZASTAVÍ:
+        # ceny sa zapisujú do KATALÓGU (globálny, na zákazke nezávislý) a po
+        # dobehnutí sa aj tak pushne čerstvý rozpočet práve aktívneho modelu.
+        def price_refresh_alive
+          -> { !@dialog.nil? && @dialog.visible? }
+        end
+
+        def price_refresh_emit
+          lambda do |event|
+            js("if (window.NX && NX.priceRefresh) NX.priceRefresh(#{event.to_json});")
+            next unless event['type'] == 'complete'
+
+            after_price_refresh(event['report'])
+          end
+        end
+
+        # Po dobehnutí: čerstvý rozpočet (sumy AJ pás cenovej čerstvosti) + refresh
+        # ostatných okien nad katalógom — ceny sa práve zmenili globálne.
+        def after_price_refresh(report)
+          push_state
+          begin
+            MaterialsDialog.push_catalog if defined?(MaterialsDialog)
+            Panel.push_materials if defined?(Panel)
+          rescue StandardError => e
+            Engine.log_error(e, 'ProductionDialog.after_price_refresh refresh')
+          end
+          set_status(price_refresh_status(report), price_refresh_report_error?(report))
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.after_price_refresh')
+        end
+
+        def price_refresh_report_error?(report)
+          report.is_a?(Hash) && report['errors'].to_i.positive?
+        end
+
+        def price_refresh_status(report)
+          r = report.is_a?(Hash) ? report : {}
+          parts = ["#{r['changed'].to_i} cien zmenených", "#{r['unchanged'].to_i} bez zmeny"]
+          parts << "#{r['errors'].to_i} chýb" if r['errors'].to_i.positive?
+          parts << "zrušené (#{r['skipped'].to_i} preskočených)" if r['cancelled']
+          "Prepočet cien hotový: #{parts.join(' · ')}."
         end
 
         # ⚙ z tabu Rozpočet — satelit Nastavenia (sadzby sú GLOBÁLNE, nie per model).

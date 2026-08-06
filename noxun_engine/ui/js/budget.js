@@ -17,6 +17,9 @@
   var BUD_DRAFT_VALUES = null; // GH #138 P2: hodnoty draftu prezijú odmietnutý zápis
   var BUD_MODAL = null;        // { kind, id } — otvoreny ⋯ modal
   var BUD_FOCUS = null;        // obnova fokusu/hodnoty cez re-render
+  // E-c „Prepočítať ceny": { phase:'confirm'|'run'|'report', pid, total, done,
+  // label, report, single, cancelling }. Beh riadi SERVER — toto je len okno.
+  var BUD_PR = null;
 
   // GH #138 P2: zapisy sa SERIALIZUJU. `sketchup.*` je asynchronne — pri
   // rychlom slede (blur poľa + hneď klik na režim) by sa druhy zapis poslal
@@ -228,9 +231,25 @@
     items.forEach(function(it){
       var age = it.state === 'stale' ? ('overené pred ' + it.age_days + ' dňami')
               : (it.state === 'unverified' ? 'cena nikdy neoverená' : 'ručná položka');
-      h += '<div><span>' + bEsc(it.label) + '</span><span class="bage">' + bEsc(age) + '</span></div>';
+      // Akcia/poznámka je SÚRODENEC veku, nie jeho súčasť — .bage je nowrap
+      // (dátum sa nesmie zalomiť), dôvod „bez väzby" sa zalomiť SMIE.
+      h += '<div><span>' + bEsc(it.label) + '</span><span class="bage">' + bEsc(age) + '</span>' +
+           budStaleActionHtml(it) + '</div>';
     });
     return h + '</div>';
+  }
+
+  // E-c: VIAZANÝ riadok (má demos_url) dostane mini akciu „obnoviť túto" —
+  // ide TOU ISTOU cestou ako hromadný prepočet, len s jednou položkou.
+  // Riadok BEZ väzby sa nefetchuje NIKDY (server ho ani nedostane) — len
+  // povie, čo s ním: over cenu v katalógu ručne.
+  function budStaleActionHtml(it){
+    var i = it || {};
+    if (!i.demos_url) return ' <span class="bprwhy">· bez Demos väzby — over v katalógu ručne</span>';
+    return ' <button type="button" class="bact" data-bud="refresh_one" data-kind="' + bEsc(i.kind) +
+      '" data-id="' + bEsc(i.id) + '" data-label="' + bEsc(i.label) +
+      '" title="Obnoviť cenu tejto položky z Demosu" aria-label="Obnoviť túto cenu">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg></button>';
   }
 
   function budWarnListHtml(b){
@@ -648,16 +667,13 @@
     }));
   }
 
-  // Disabled tlacidlo nedostava mouse eventy, takze `title` na nom tooltip
-  // NEUKAZE — obal ho nesie namiesto neho (pouzivatel musi vidiet PRECO je sive).
-  function budSoonBtn(icon, label, why){
-    return '<span title="' + bEsc(why) + '"><button type="button" class="ghostbtn" disabled>' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-' + icon + '"/></svg> ' + bEsc(label) + '</button></span>';
-  }
-
   function budFootHtml(){
+    var running = !!(BUD_PR && BUD_PR.phase === 'run');
     return '<div class="bfoot">' +
-      budSoonBtn('refresh-cw', 'Prepočítať ceny', 'Príde v ďalšej časti dávky E (E-c) — overenie cien u dodávateľa.') +
+      '<button type="button" class="ghostbtn" data-bud="refresh"' + (running ? ' disabled' : '') +
+      ' title="Stiahne aktuálne ceny všetkých položiek zákazky viazaných na Demos' +
+      ' (medzi položkami je 3 s pauza — pravidlo Demosu)">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Prepočítať ceny</button>' +
       '<button type="button" class="primary" data-bud="xlsx" title="Interný rozpočet v presnom formáte tvojich hárkov">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> XLSX rozpočet</button>' +
       '<button type="button" class="primary" data-bud="cp"' +
@@ -665,6 +681,250 @@
       '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Cenová ponuka (zákazník)</button>' +
       '<button type="button" class="ghostbtn bgear" data-bud="settings" title="Sadzby, režimy a prahy — globálne">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Nastavenia</button></div>';
+  }
+
+  // --- E-c: PREPOČÍTAŤ CENY ------------------------------------------------
+  // Beh riadi SERVER (core/price_refresh.rb): sekvenčný fetch s 3 s pauzou a
+  // zápis po JEDNEJ položke (čiastočný úspech je normálny výsledok). Tu žije
+  // len stav okna — potvrdenie, progres so Zrušiť a report. Klient NEPOSIELA
+  // ani adresy, ani ceny: len „spusti" (prípadne kind+id jedného riadku).
+
+  function budPrCopy(state, over){
+    var out = {};
+    var s = state || {};
+    var k;
+    for (k in s){ if (Object.prototype.hasOwnProperty.call(s, k)) out[k] = s[k]; }
+    for (k in (over || {})){ if (Object.prototype.hasOwnProperty.call(over, k)) out[k] = over[k]; }
+    return out;
+  }
+
+  // Zrkadlo serverového výberu (PriceRefresh.targets_from_budget) — slúži LEN
+  // na počet a potvrdenie. Autorita zoznamu je server: klik posiela „spusti",
+  // ciele si skladá z čerstvého rozpočtu sám.
+  function budPrTargets(budget){
+    var items = (budget && budget.stale && budget.stale.items) || [];
+    var kinds = { sheet: 1, edge: 1, hardware: 1 };
+    var seen = {};
+    var out = [];
+    items.forEach(function(it){
+      if (!it || !it.demos_url) return;                 // ručná položka = nikdy fetch
+      var id = String(it.id == null ? '' : it.id);
+      if (!kinds[it.kind] || !id) return;
+      var key = it.kind + '|' + id;
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push(it);
+    });
+    return out;
+  }
+
+  // Odhad času: 3 s crawl-delay + ~1 s fetch na položku (rovnaká konštanta ako
+  // PriceRefresh::SECONDS_PER_ITEM — je to len text pre používateľa).
+  function budPrEta(n){
+    var s = Math.max(0, Number(n) || 0) * 4;
+    if (s < 60) return 'približne ' + s + ' s';
+    var m = Math.round(s / 60);
+    return 'približne ' + m + ' ' + budPluralSk(m, ['minútu', 'minúty', 'minút']);
+  }
+
+  function budPrConfirmText(st){
+    var s = st || {};
+    var n = Number(s.total || 0);
+    if (s.single){
+      return 'Stiahnem aktuálnu cenu položky „' + (s.single.label || '') + '“ z Demosu — ' +
+             budPrEta(1) + '.';
+    }
+    return 'Obnoviť ' + n + ' ' + budPluralSk(n, ['cenu', 'ceny', 'cien']) + ' z Demosu? Potrvá to ' +
+           budPrEta(n) + ' — medzi položkami je povinná 3 s pauza. Priebeh sa dá kedykoľvek zrušiť.';
+  }
+
+  function budPrTitle(st){
+    var s = st || {};
+    if (s.phase === 'report') return 'Prepočet cien — výsledok';
+    if (s.phase === 'run') return 'Sťahujem ceny z Demosu';
+    return 'Prepočítať ceny';
+  }
+
+  // Event zo servera -> nový stav. „Pending pid guard": kým nepríde `start`,
+  // stav pid nemá a eventy sa neaplikujú; po ňom sa berú LEN eventy TOHO behu
+  // (oneskorená odpoveď starého behu nesmie prepísať nový).
+  function budPrEvent(state, ev){
+    var e = ev || {};
+    var s = state;
+    if (e.type === 'start'){
+      return { phase: 'run', pid: e.pid, total: Number(e.total || 0), done: 0, label: '',
+               report: null, single: (s && s.single) || null, cancelling: false };
+    }
+    if (s && s.pid && e.pid !== s.pid) return s; // event CUDZIEHO (staršieho) behu
+    if (e.type === 'complete'){
+      // Report sa ukáže aj vtedy, keď okno stav medzitým stratilo — je to
+      // jediný terminálny stav a používateľ musí vidieť, čo sa zapísalo.
+      var base = s || { phase: 'run', pid: e.pid, total: 0, done: 0, label: '', single: null };
+      return budPrCopy(base, { phase: 'report', pid: e.pid, report: e.report || null,
+                               label: '', cancelling: false });
+    }
+    if (!s || !s.pid) return s; // pending: kým nepríde `start`, pid nepoznám
+    if (e.type === 'progress'){
+      return budPrCopy(s, { done: Number(e.done || 0), total: Number(e.total || s.total),
+                            label: String(e.label || '') });
+    }
+    if (e.type === 'item'){
+      return budPrCopy(s, { done: Number(e.done || s.done), total: Number(e.total || s.total) });
+    }
+    return s;
+  }
+
+  // Report -> podklad pre zobrazenie. Počty NEPREPOČÍTAVAM — čísla nesie server;
+  // tu sa riadky len triedia do troch skupín.
+  function budPrSummary(report){
+    var r = report || {};
+    var changed = [];
+    var errors = [];
+    (r.items || []).forEach(function(i){
+      if (i.status === 'changed') changed.push(i);
+      else if (i.status === 'error') errors.push(i);
+    });
+    return { changed: changed, errors: errors,
+             unchanged: Number(r.unchanged || 0), skipped: Number(r.skipped || 0),
+             cancelled: r.cancelled === true, total: Number(r.total || 0),
+             text: budPrSummaryText(r) };
+  }
+
+  function budPrSummaryText(report){
+    var r = report || {};
+    var ch = Number(r.changed || 0);
+    var un = Number(r.unchanged || 0);
+    var er = Number(r.errors || 0);
+    var out = [ch + ' ' + budPluralSk(ch, ['cena zmenená', 'ceny zmenené', 'cien zmenených'])];
+    if (un) out.push(un + ' bez zmeny');
+    if (er) out.push(er + ' ' + budPluralSk(er, ['chyba', 'chyby', 'chýb']));
+    if (r.cancelled) out.push('zrušené — ' + Number(r.skipped || 0) + ' preskočených');
+    return out.join(' · ');
+  }
+
+  function budPrDiffText(item){
+    var i = item || {};
+    if (i.diff === null || i.diff === undefined || isNaN(i.diff)) return '';
+    var v = Number(i.diff);
+    var sign = v > 0 ? '+' : (v < 0 ? '−' : '');
+    return sign + budFmtEur(Math.abs(v));
+  }
+
+  function budPrProgressText(st){
+    var s = st || {};
+    var total = Number(s.total || 0);
+    var done = Number(s.done || 0);
+    if (s.cancelling) return 'Ukončujem — dobehne ešte rozbehnutá položka…';
+    var at = done + 1 > total ? total : done + 1;
+    return 'Sťahujem ' + at + ' z ' + total + (s.label ? ' · ' + s.label : '');
+  }
+
+  function budPrProgressHtml(st){
+    var total = Number(st.total || 0);
+    var done = Number(st.done || 0);
+    var pct = total ? Math.round((done / total) * 100) : 0;
+    return '<div class="bprog"><i style="width:' + pct + '%"></i></div>' +
+           '<div class="hint">' + bEsc(budPrProgressText(st)) + '</div>';
+  }
+
+  function budPrReportHtml(report){
+    var s = budPrSummary(report);
+    var h = '<div class="hint">' + bEsc(s.text) + '</div><div class="nxmodal-body">';
+    if (s.changed.length){
+      h += '<table class="btab"><tbody>';
+      s.changed.forEach(function(i){
+        h += '<tr><td>' + bEsc(i.label) + '</td><td class="bnum">' +
+          bEsc(budFmtEur(i.old_price)) + ' → ' + bEsc(budFmtEur(i.new_price)) +
+          '</td><td class="bnum">' + bEsc(budPrDiffText(i)) + '</td></tr>';
+      });
+      h += '</tbody></table>';
+    }
+    if (s.errors.length){
+      h += '<div class="blist">';
+      s.errors.forEach(function(i){
+        h += '<div><span>' + bEsc(i.label) + '</span>' +
+             '<span class="bprwhy">' + bEsc(i.error || 'nepodarilo sa overiť') + '</span></div>';
+      });
+      h += '</div>';
+    }
+    if (!s.changed.length && !s.errors.length){
+      h += '<div class="bnote">Ceny sedia s Demosom — v katalógu sa obnovil len dátum overenia.</div>';
+    }
+    return h + '</div>';
+  }
+
+  function budPrModalHtml(){
+    var st = BUD_PR;
+    if (!st) return '';
+    var body;
+    var foot;
+    if (st.phase === 'confirm'){
+      body = '<div class="hint">' + bEsc(budPrConfirmText(st)) + '</div>';
+      foot = '<button class="primary" data-bud="pr_go">Prepočítať</button>' +
+             '<button class="ghostbtn" data-bud="pr_close">Zrušiť</button>';
+    } else if (st.phase === 'run'){
+      body = budPrProgressHtml(st);
+      foot = '<button class="ghostbtn" data-bud="pr_cancel"' + (st.cancelling ? ' disabled' : '') +
+             '>Zrušiť</button>';
+    } else {
+      body = budPrReportHtml(st.report);
+      foot = '<button class="primary" data-bud="pr_close">Zavrieť</button>';
+    }
+    return '<div class="nxmodal" id="budPrModal"><div class="nxmodal-card nxmodal-scroll">' +
+      '<div class="nxmodal-title">' + bEsc(budPrTitle(st)) + '</div>' + body +
+      '<div class="btnrow">' + foot + '</div></div></div>';
+  }
+
+  // Modal žije MIMO tela tabu (document.body) — prežije prekreslenie rozpočtu,
+  // ktoré príde hneď po dobehnutí prepočtu (čerstvé ceny za modalom).
+  function budPrRenderModal(){
+    var old = budEl('budPrModal');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    if (!BUD_PR) return;
+    var box = document.createElement('div');
+    box.innerHTML = budPrModalHtml();
+    var node = box.firstChild;
+    if (node) document.body.appendChild(node);
+  }
+
+  function budPrStart(single){
+    if (BUD_PR && BUD_PR.phase === 'run') return;
+    var targets = budPrTargets((BOM && BOM.budget) ? BOM.budget : null);
+    if (single){
+      targets = targets.filter(function(t){
+        return t.kind === single.kind && String(t.id) === String(single.id);
+      });
+      if (!targets.length){
+        NX.setStatus('Položka už nie je v zozname starých cien — obnov okno.', true);
+        return;
+      }
+    }
+    if (!targets.length){
+      NX.setStatus('Všetky ceny viazané na Demos sú čerstvé — netreba nič sťahovať.', false);
+      return;
+    }
+    BUD_PR = { phase: 'confirm', pid: null, total: targets.length, done: 0, label: '',
+               report: null, single: single || null, cancelling: false };
+    budPrRenderModal();
+  }
+
+  function budPrSend(){
+    if (!BUD_PR || BUD_PR.phase !== 'confirm') return;
+    if (!BOM || !window.sketchup || !sketchup.price_refresh) return;
+    var single = BUD_PR.single;
+    var extra = single ? { kind: single.kind, id: single.id } : {};
+    BUD_PR = { phase: 'run', pid: null, total: BUD_PR.total, done: 0, label: '',
+               report: null, single: single, cancelling: false };
+    budPrRenderModal();
+    renderBody(); // footer tlačidlo počas behu zošedne
+    sketchup.price_refresh(JSON.stringify(budMutation(BOM, 'price_refresh', extra)));
+  }
+
+  function budPrCancel(){
+    if (!BUD_PR || BUD_PR.phase !== 'run' || BUD_PR.cancelling) return;
+    BUD_PR = budPrCopy(BUD_PR, { cancelling: true });
+    budPrRenderModal();
+    if (window.sketchup && sketchup.price_refresh_cancel) sketchup.price_refresh_cancel('');
   }
 
   // --- ⋯ modal (kód / adresa / poznámka) -----------------------------------
@@ -857,6 +1117,14 @@
         BUD_DRAFT_VALUES = null;
       }
     };
+    // E-c: eventy prepočtu cien (start/progress/item/complete). Po `complete`
+    // príde zo servera aj čerstvý payload — re-render odblokuje footer a
+    // ukáže nové ceny AJ obnovený pás cenovej čerstvosti za modalom.
+    NX.priceRefresh = function(ev){
+      BUD_PR = budPrEvent(BUD_PR, ev);
+      budPrRenderModal();
+      if (ev && ev.type === 'complete') renderBody();
+    };
   }
 
   if (typeof document !== 'undefined'){
@@ -904,6 +1172,19 @@
         budSend('cp_group', { source_key: b.getAttribute('data-source'), group: b.getAttribute('data-group') });
       } else if (a === 'settings'){
         if (window.sketchup && sketchup.budget_settings) sketchup.budget_settings('');
+      } else if (a === 'refresh'){
+        budPrStart(null);
+      } else if (a === 'refresh_one'){
+        budPrStart({ kind: b.getAttribute('data-kind'), id: b.getAttribute('data-id'),
+                     label: b.getAttribute('data-label') });
+      } else if (a === 'pr_go'){
+        budPrSend();
+      } else if (a === 'pr_cancel'){
+        budPrCancel();
+      } else if (a === 'pr_close'){
+        BUD_PR = null;
+        budPrRenderModal();
+        renderBody();
       }
     });
 
@@ -967,5 +1248,11 @@
       budMutation: budMutation, budParse: budParse, budNumText: budNumText,
       budSectionCount: budSectionCount, budEsc: bEsc,
       budDraftAttrs: budDraftAttrs, budDraftMissing: budDraftMissing,
-      budCpBand: budCpBand, budCpHtml: budCpHtml };
+      budCpBand: budCpBand, budCpHtml: budCpHtml,
+      // E-c „Prepočítať ceny"
+      budPrTargets: budPrTargets, budPrEta: budPrEta, budPrConfirmText: budPrConfirmText,
+      budPrEvent: budPrEvent, budPrSummary: budPrSummary, budPrSummaryText: budPrSummaryText,
+      budPrDiffText: budPrDiffText, budPrProgressText: budPrProgressText,
+      budPrProgressHtml: budPrProgressHtml, budPrReportHtml: budPrReportHtml,
+      budPrTitle: budPrTitle, budStaleActionHtml: budStaleActionHtml };
   }

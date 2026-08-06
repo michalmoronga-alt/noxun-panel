@@ -230,4 +230,111 @@ function payload(over){
   eq(S.ssParse('17,00'), 17, 'ciarka aj desatinne nuly');
 })();
 
+// --- E-c: PREPOCITAT CENY (vyber cielov, progres, report) ---------------------
+// JS NEROZHODUJE, co sa stiahne — server si ciele sklada z cerstveho rozpoctu
+// sam; tieto funkcie su ZRKADLO pre potvrdenie a zobrazenie.
+(function(){
+  const b = { stale: { items: [
+    { kind: 'sheet', id: 'S1', label: 'H3303 DTDL 18', state: 'stale', age_days: 44,
+      demos_url: 'https://www.demos-trade.sk/a/' },
+    { kind: 'sheet', id: 'S1', label: 'H3303 DTDL 18', state: 'stale', age_days: 44,
+      demos_url: 'https://www.demos-trade.sk/a/' },
+    { kind: 'edge', id: 'A1', label: 'ABS H3303 22×1', state: 'unverified',
+      demos_url: 'https://www.demos-trade.sk/b/' },
+    { kind: 'hardware', id: '104717', label: 'Záves Sensys', state: 'stale', age_days: 60,
+      demos_url: 'https://www.demos-trade.sk/c/' },
+    { kind: 'sheet', id: 'S9', label: 'Ručná doska', state: 'manual' }
+  ] } };
+  const t = B.budPrTargets(b);
+  eq(t.map(function(x){ return x.id; }), ['S1', 'A1', '104717'],
+     'len viazane polozky, dedup podla (kind,id)');
+  eq(B.budPrTargets({ stale: { items: [] } }), [], 'prazdny scan = nic na obnovu');
+  eq(B.budPrTargets(null), [], 'chybajuci payload nezhodi render');
+})();
+
+(function(){
+  eq(B.budPrEta(0), 'približne 0 s', 'nulovy odhad');
+  eq(B.budPrEta(5), 'približne 20 s', '4 s na polozku (3 s pauza + fetch)');
+  eq(B.budPrEta(30), 'približne 2 minúty', 'nad 90 s sa prepocita na minuty');
+  eq(B.budPrEta(15), 'približne 1 minútu', 'sklonovanie 1');
+  ok(B.budPrConfirmText({ total: 5 }).indexOf('Obnoviť 5 cien') > -1, 'potvrdenie nesie pocet');
+  ok(B.budPrConfirmText({ total: 5 }).indexOf('3 s pauza') > -1, 'potvrdenie priznava crawl-delay');
+  ok(B.budPrConfirmText({ total: 1, single: { label: 'ABS H3303' } }).indexOf('ABS H3303') > -1,
+     'jedna polozka sa pyta menom');
+  eq(B.budPrTitle({ phase: 'run' }), 'Sťahujem ceny z Demosu', 'titulok podla fazy');
+  eq(B.budPrTitle({ phase: 'report' }), 'Prepočet cien — výsledok', 'titulok reportu');
+})();
+
+// Pending pid guard: kym nepride `start`, stav pid nema; potom sa beru LEN
+// eventy TOHO behu (oneskoreny event stareho behu nesmie prepisat novy).
+(function(){
+  let s = { phase: 'run', pid: null, total: 3, done: 0, label: '', report: null,
+            single: null, cancelling: false };
+  s = B.budPrEvent(s, { type: 'progress', pid: 7, done: 1, total: 3, label: 'X' });
+  eq(s.done, 0, 'event pred `start` sa ignoruje (pid este nepoznam)');
+  s = B.budPrEvent(s, { type: 'start', pid: 7, total: 3 });
+  eq([s.phase, s.pid, s.total], ['run', 7, 3], '`start` je autorita pid aj poctu');
+  s = B.budPrEvent(s, { type: 'progress', pid: 7, done: 1, total: 3, label: 'H3303' });
+  eq([s.done, s.label], [1, 'H3303'], 'progres nesie prave stahovanu polozku');
+  s = B.budPrEvent(s, { type: 'progress', pid: 99, done: 3, total: 3, label: 'cudzie' });
+  eq([s.done, s.label], [1, 'H3303'], 'event CUDZIEHO behu sa zahodi');
+  s = B.budPrEvent(s, { type: 'item', pid: 7, done: 2, total: 3 });
+  eq(s.done, 2, 'item posuva pocitadlo');
+  s = B.budPrEvent(s, { type: 'complete', pid: 7, report: { changed: 1 } });
+  eq([s.phase, s.report.changed], ['report', 1], 'complete prepne na report');
+  const late = B.budPrEvent(s, { type: 'complete', pid: 4, report: { changed: 9 } });
+  eq(late.report.changed, 1, 'oneskoreny complete stareho behu report neprepise');
+})();
+
+(function(){
+  const report = { total: 4, done: 4, skipped: 0, cancelled: false, changed: 2, unchanged: 1, errors: 1,
+    items: [
+      { kind: 'sheet', id: 'S1', label: 'H3303 DTDL 18', status: 'changed',
+        old_price: 15, new_price: 18.99, diff: 3.99 },
+      { kind: 'edge', id: 'A1', label: 'ABS H3303', status: 'changed',
+        old_price: 0.9, new_price: 0.8, diff: -0.1 },
+      { kind: 'sheet', id: 'S2', label: 'W1000', status: 'unchanged', old_price: 13, new_price: 13 },
+      { kind: 'hardware', id: '104717', label: 'Záves <b>Sensys</b>', status: 'error',
+        error: 'stránka patrí kódu 999999' }
+    ] };
+  const s = B.budPrSummary(report);
+  eq([s.changed.length, s.errors.length, s.unchanged], [2, 1, 1], 'riadky sa len triedia');
+  eq(s.text, '2 ceny zmenené · 1 bez zmeny · 1 chyba', 'zhrnutie zo serverovych poctov');
+  eq(B.budPrSummaryText({ changed: 0, unchanged: 0, errors: 0 }), '0 cien zmenených',
+     'nic sa nezmenilo = cisty text');
+  eq(B.budPrSummaryText({ changed: 1, unchanged: 2, errors: 0, cancelled: true, skipped: 5 }),
+     '1 cena zmenená · 2 bez zmeny · zrušené — 5 preskočených', 'zrusenie sa priznava');
+  eq(B.budPrDiffText({ diff: 3.99 }), '+3,99 €', 'zdrazenie s plusom');
+  eq(B.budPrDiffText({ diff: -0.1 }), '−0,10 €', 'zlacnenie s minusom (typograficky)');
+  eq(B.budPrDiffText({}), '', 'bez rozdielu ziadny text');
+  const h = B.budPrReportHtml(report);
+  ok(h.indexOf('15,00 € → 18,99 €') > -1, 'stara -> nova cena');
+  ok(h.indexOf('stránka patrí kódu 999999') > -1, 'dovod chyby je v reporte');
+  ok(h.indexOf('Záves &lt;b&gt;Sensys&lt;/b&gt;') > -1, 'nazvy su escapovane');
+  ok(h.indexOf('<b>Sensys</b>') === -1, 'ziadne surove HTML z dat');
+})();
+
+(function(){
+  eq(B.budPrProgressText({ total: 12, done: 3, label: 'ABS H3303' }), 'Sťahujem 4 z 12 · ABS H3303',
+     'progres hovori, co sa prave stahuje');
+  eq(B.budPrProgressText({ total: 3, done: 3, label: '' }), 'Sťahujem 3 z 3',
+     'posledna polozka nepretecie nad total');
+  eq(B.budPrProgressText({ total: 5, done: 2, cancelling: true }),
+     'Ukončujem — dobehne ešte rozbehnutá položka…', 'Zrusit nezahadzuje rozbehnutu polozku');
+  ok(B.budPrProgressHtml({ total: 4, done: 1 }).indexOf('width:25%') > -1, 'pas ukazuje podiel');
+})();
+
+// Zoznam starych cien: viazany riadok ma mini akciu, nevaizany len odporucanie.
+(function(){
+  const bound = B.budStaleActionHtml({ kind: 'sheet', id: 'S1', label: 'H3303',
+                                       demos_url: 'https://www.demos-trade.sk/a/' });
+  ok(bound.indexOf('data-bud="refresh_one"') > -1, 'viazany riadok ma akciu „obnoviť túto"');
+  ok(bound.indexOf('data-kind="sheet"') > -1 && bound.indexOf('data-id="S1"') > -1,
+     'akcia nesie identitu polozky');
+  ok(bound.indexOf('#i-refresh-cw') > -1, 'sprite ikona (ziadne emoji)');
+  const manual = B.budStaleActionHtml({ kind: 'sheet', id: 'S9', label: 'Ručná', state: 'manual' });
+  eq(manual.indexOf('data-bud'), -1, 'polozka bez vazby sa NEDA stiahnut');
+  ok(manual.indexOf('over v katalógu ručne') > -1, 'namiesto akcie odporucanie');
+})();
+
 console.log('test_budget_ui.js: ' + passed + ' OK');
