@@ -4,6 +4,8 @@
 >
 > Začaté 19.7.2026 — prvé veľké testovanie po sérii V0.4.7 (samostatná doska + výrazové polia). Stav k 24.7.: zápisník ČISTÝ — žiadne otvorené blokery ani spomaľovače.
 >
+> **Stav k 6.8.:** **dávka E KOMPLET** (PR #137–#140, v0.5.45 → **v0.5.48**) — zákazka má peňažnú vrstvu: **rozpočet** (sadzby zo syntézy reálnych rozpočtov, cenové režimy, upozornenia a overridy, XLSX v Luciinom formáte), **cenová ponuka** (zákaznícky pohľad, „Nábytková zostava" ako automatický zvyšok, firewall na interné pojmy) a **„Prepočítať ceny"** (hromadné obnovenie cien viazaných na Demos). Zo zápisníka sa vyriešil **D-61** (ceny za celé tabule) → archív. Vedome odložené kúsky sú nižšie v „Nápady na zváženie". Otvorený ostáva jediný nález smoke testu V1 — **D-77**.
+>
 > **Stav k 4.8.:** **dávka H KOMPLET** (PR #131–#135, v0.5.44) — všetkých osem riešiteľných nálezov smoke testu V1 z 3.8. (fiktívna zákazka, 12 skriniek + 4 dosky — kovanie checklist **6/6** vrátane „Z Demosu" a CSV exportu, semafor ČISTÝ po nahradení UNI reálnymi dekormi) je vyriešených a v archíve: D-75, D-76, D-78, D-79, D-80, D-81, D-82, D-83. Otvorený ostáva jediný nález testu — **D-77** (preradený do plošného UI reworku). Zápisník je opäť **bez otvorených blokerov aj spomaľovačov**; väčšie celky drží vízia uzatvorenia V1: [10_V1_VIZIA.md](10_V1_VIZIA.md).
 
 ## Blokery (bránia dokončeniu zákazky)
@@ -17,10 +19,10 @@
 ## UX drobnosti (nízka priorita)
 
 - **D-77 · Okno detailu dielca je po otvorení odseknuté** (Michal 3.8.) — pravá spodná časť nastavení dielca nie je vidieť, kým sa okno ručne nezväčší. *Stav: rieši plošný UI rework (UI 2.0, D-50/D-51) — Michal 4.8.: „vyriešime plošným reworkom, týchto chýb v oknách je viac"; screenshot netreba.*
-- **D-61 · Ceny za KUS/tabuľu, nie €/m²** (Michal 1.8.) — plošné materiály sa kupujú po celých tabuliach (1,2 platne = kupujem 2); €/m² len interná jednotka. *UI: cena za tabuľu primárne (m²×formát), m² sekundárne; ABS €/bm OK. VÄZBA NA DÁVKU E: sumár musí rátať celé kusy.*
 
 ## Nápady na zváženie (nerozhodnuté)
 
+- **Vedome odložené z dávky E** (6.8., nič z toho neblokuje prácu so zákazkou) — **manuálne 1-klik overenie ceny** pre položky BEZ väzby na Demos (zvyšok V1-03; dnes ich „Prepočítať ceny" preskočí) · **plný generátor cenovej ponuky do DOCX/PDF** so šablónou a vizualizáciami (dnes je výstup XLSX) · prepínač **„na faktúru"** (×1,2 — vzor ADAMČÍK), kandidát na štvrtý cenový režim · **EN DANIELI textový export** výrobného zadania (Michal: „po E") · **rodina dokumentov** okolo ponuky (ponuka 3D vizualizácií, preberací protokol). *Stav: čaká na prax — vytiahne sa, keď si to reálna zákazka vypýta.*
 - **D-48 · Zdieľaná knižnica pre 2 PC (Michal + Lucia)** (Michal 31.7. večer) — obe pracoviská majú zobrazovať ROVNAKÉ šablóny aj materiály (spolupráca, posúvanie projektov). Jednotný zdroj = **firemný Google Disk** (sú tam všetky firemné veci). Dotýka sa: katalóg materiálov, šablóny korpusov, pravidlá kovania (dnes všetko v lokálnom %APPDATA%). *Stav: na návrhovú dávku — sync/zdieľanie cez G-Disk priečinok.*
 - **D-50 · OCL inšpirácia UI/UX** (Michal 31.7. večer) — pár detailov z OCL flow prevziať; najprv slovné prebratie (sedenie), potom zapracovanie. *Stav: čaká na sedenie.*
 - **D-51 · Štandard veľkostí okien a tlačidiel** (Michal 31.7. večer) — zjednotiť šírky, rozmery a rozmiestnenie naprieč oknami (panel, Materiály, Výroba, Pravidlá, Šablóny) — dohodnúť konkrétne hodnoty do UI_DIZAJN.md **pred prvým testovaním Lucie („skúška ohňom")**. *Stav: na UI dávku pred nasadením u Lucie.*
@@ -82,6 +84,7 @@ Pôvodná tabuľka z 25.7. (12 dekorov na ručný batch) je zlúčená a rozší
 
 ## Vyriešené — index (plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md))
 
+- **D-61** ceny za KUS/tabuľu, nie €/m² — rozpočet ráta plošný materiál po CELÝCH tabuliach s cenou za tabuľu (ABS ostáva v bm + 10 % rezerva), taby Materiály/ABS ukazujú cenu za tabuľu primárne; duplák sa platí ako lepenie zdrojovej platne, chýbajúci formát = priznaný odhad, neznáma cena nikdy nula — PR #137 + #138
 - **D-83** „Nahradiť UNI…" priamo z KONTROLY — ikona v ORANGE riadku otvorí modal s predvyplneným materiálom (pending flow cez ready callback okna Materiály, guardy na prepnutý model/prepočítanú kontrolu; ikona nevyberá dielec) — PR #135
 - **D-82** farba je vlastnosť DEKORU, nie variantu — skupinová `set_decor_color` (dosky aj pásky naraz z hlavičky detailu) + `enforce_group_color!` na všetkých cestách vzniku (variant, batch, duplák, dotvorená páska, Demos); UNI chránené, farba preč z variantných formulárov, bez bumpu schémy — PR #135
 - **D-78** taby hlavičky už nemiznú po prepnutí vkladania na „Doska" — v mode-insert sú vždy viditeľné, ale neaktívne; bez výberu panel ukáže obsah tabu Korpus a pracovný tab si pamätá — PR #135

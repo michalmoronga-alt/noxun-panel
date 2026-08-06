@@ -10,6 +10,12 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
+### Dávka E — rozpočet a cenová ponuka (5.–6.8.2026, PR #137–#140, v0.5.45–v0.5.48)
+
+*Dávka E dala zákazke peňažnú vrstvu: rozpočet (interný), cenovú ponuku (zákaznícka) a tlačidlo „Prepočítať ceny". Sadzby a kostra dokumentov stoja na syntéze 10 reálnych rozpočtov a prieskume 22 dvojíc cenová ponuka ↔ rozpočet (pracovné podklady sú lokálne, do repa sa neprenášajú). Zápisníkový nález, ktorý dávka uzavrela, je jeden — D-61.*
+
+- **D-61 · Ceny za KUS/tabuľu, nie €/m²** (Michal 1.8., pri prezeraní materiálového sumáru; vyriešené PR #137 + #138, v0.5.45/0.5.46) — plošný materiál sa **kupuje po celých tabuliach**: keď zákazka spotrebuje 1,2 platne, nakupujú sa 2 a zaplatia sa 2. Sumár pritom pracoval s €/m², čo je len interná počítacia jednotka — z takého čísla sa nedá objednávať ani ponúkať. **Fix:** rozpočet ráta plošný materiál **po celých tabuliach s cenou za tabuľu** (množstvo = odhad platní zaokrúhlený NAHOR, jednotka `PLATŇA`), taby **Materiály a ABS** v okne Výroba ukazujú **cenu za tabuľu primárne** a m² už len ako doplnkový údaj; ABS ostáva v **bm** (tak sa kupuje) plus rezerva 10 % na olep. Sprievodné kontrakty výpočtu: **duplák** sa v odhade platní prelieva do ZDROJOVÉHO materiálu a cena sa viaže na nákupný `material_id`, nikdy na duplákový (za duplák sa platí lepenie, nie druhá platňa) · **chýbajúci formát platne** = odhad beží na fallbacku 2800×2070 a riadok to prizná príznakom „odhad" — číslo sa nikdy netvári isto · **neznáma cena sa NIKDY nenahradí nulou** (riadok nesie „cena nezadaná", sekcia počíta neúplné položky a celkový súčet sa nahlas označí za neúplný). Tým sa uzavrela aj väzba zapísaná pri hlásení: „VÄZBA NA DÁVKU E: sumár musí rátať celé kusy".
+
 ### Dávka H — nálezy smoke testu V1 (3.–4.8.2026, PR #131–#135, v0.5.40–v0.5.44)
 
 *Smoke test V1 z 3.8. (fiktívna zákazka: 12 skriniek + 4 dosky, kovanie checklist 6/6, semafor ČISTÝ) dal osem nálezov, ktoré sa riešili v štyroch malých dávkach H1–H4. Vízia a poradie ďalších dávok: [../10_V1_VIZIA.md](../10_V1_VIZIA.md). Deviaty nález D-77 (odseknuté okno detailu) ostáva otvorený — Michal ho 4.8. preradil do plošného UI reworku.*
