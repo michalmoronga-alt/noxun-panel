@@ -41,7 +41,7 @@
 
 - **Spotrebiče** (V1-02): katalóg (6 typov + neskôr príslušenstvo; niche rozmery; viac URL; cena s DPH) → **položky PROJEKTU s voliteľnou väzbou na skrinku**; kontrola niche semaforom; sekcia v rozpočte. Šablóna nesie očakávaný typ („spotrebič nevybraný" ORANGE).
 - **Dávka E — rozpočet** (UX-08 potvrdené zadanie): Materiály tab = súčet po CELÝCH TABULIACH (D-61) s cenami; ABS tab = bm × cena; Kovanie už má; **okno Rozpočet = všetko spolu** + sadzby služieb („Nastavenia dodávateľa") + montáž (count_max × 5,8 × sadzba) + spotrebiče. Luciin nástroj — dizajnovať pre ňu.
-- **Cenová čerstvosť** (V1-03, globálne): price_checked_at všade; overenie AUTO (Demos fetch) alebo MANUÁL (klik URL → 1-klik „cena sedí/zmeniť" — klik sám NEzapisuje); vek ceny viditeľný kontextovo pri POUŽITÍ (rozpočet: „N cien starších ako 30 dní"); viac URL na položke, cena vždy JEDNA.
+- **Cenová čerstvosť** (V1-03, globálne): price_checked_at všade; overenie AUTO (Demos fetch) alebo MANUÁL (klik URL → 1-klik „cena sedí/zmeniť" — klik sám NEzapisuje); vek ceny viditeľný kontextovo pri POUŽITÍ (rozpočet: „N cien starších ako 30 dní"); viac URL na položke, cena vždy JEDNA. *Stav po dávke E (6.8.): hotová je **AUTO vetva** („Prepočítať ceny" nad položkami s väzbou na Demos, server-stamped dátum overenia) a **vek ceny** v rozpočte; **zvyšok V1-03 ostáva otvorený** — manuálne 1-klik overenie pre položky BEZ väzby a viac URL na položke (vedomý odklad, zoznam v [08_DOGFOODING.md](08_DOGFOODING.md)).*
 
 ## 6 · Workflow a UI 2.0
 
@@ -52,7 +52,7 @@
 ## 7 · Navrhované poradie po smoke teste
 
 1. **H-dávky (opravy+malé, pred E) — HOTOVÉ 4.8. (PR #131–#135, v0.5.44):** H1 kovanie (D-75 live push setov · D-79 nohy default+rad · D-81 bočnice+owner override) → H2 šablóny s kovaním (D-76) → H3 geometria interiéru (D-80, SU testy) → H4 UI drobnosti (D-78 · D-82 · D-83). **D-77** (odseknuté okno detailu) z H4 VYPADOL — Michal 4.8.: „vyriešime plošným reworkom, týchto chýb v oknách je viac" → rieši ho bod 6 (UI 2.0, spolu s D-50/D-51). H-dávky teda E neblokujú.
-2. **Dávka E** — rozpočet/ceny (+ cenová čerstvosť V1-03 základ: manuálne overenie + vek).
+2. **Dávka E — HOTOVÉ 6.8. (PR #137–#140, v0.5.48):** rozpočet + zákaznícka cenová ponuka + „Prepočítať ceny". **Zmena rozsahu oproti pôvodnému zadaniu:** z cenovej čerstvosti (V1-03) dávka dodala **AUTO overenie a vek ceny**, ale **manuálne 1-klik overenie pre položky bez väzby na Demos sa vedome ODLOŽILO** (nie je to prehliadnutie — zoznam odkladov dávky E je v [08_DOGFOODING.md](08_DOGFOODING.md), sekcia „Nápady na zváženie").
 3. **Seed katalógu** (odložený po E — plán platí).
 4. **Spotrebiče S1** (katalóg+model+kontrola+rozpočet sekcia).
 5. **M-R render** (textúry — Lucia) + pixla nástroj (V1-06).
