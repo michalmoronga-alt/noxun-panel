@@ -113,6 +113,36 @@ module Noxun
           cfg
         end
 
+        # --- vkladanie: hrubka podla materialu (E-03) ------------------------
+        # JEDINA autorita hrubky pri VKLADANI dosky (vola ju build). Panel posiela
+        # surovy vstup z formulara — HTML readonly nie je ochrana, rozhoduje sa tu:
+        #   realny katalogovy material -> nil = "thickness sa IGNORUJE" (hrubku
+        #     dosadi normalize z katalogu; invariant D-45 "hrubku urcuje material"),
+        #   UNI material (M-B1: hrubku urcuje DIELEC) -> clampnuta hodnota z
+        #     formulara; prazdna alebo necislena = default roly zo zaznamu
+        #     (presne to, co vkladacia karta ukazuje) — NIKDY chyba,
+        #   bez materialu / neznamy zaznam -> nil (chybu riesi validate_config!).
+        # Vracia Float alebo nil (nil = kluc thickness sa do normalize neposiela).
+        def insert_thickness_for(material_id, raw_value)
+          sheet = catalog_sheet(material_id)
+          return nil unless sheet && defined?(Materials) && Materials.uni?(sheet)
+          v = numeric_mm(raw_value)
+          return clampf(v, *LIMITS[:thickness]) if v
+          role_default = sheet['thickness'].to_f
+          role_default.positive? ? clampf(role_default, *LIMITS[:thickness]) : DEFAULTS[:thickness]
+        end
+
+        # Prisne cislo v mm. Payload z panela je Number, ale callback prijme
+        # cokolvek — surovy vyraz ('650-36') ani smeti sa NESMU dostat na to_f
+        # (to_f by z nich urobilo 650.0 / 0.0); nezname vstupy vratia nil = default.
+        def numeric_mm(v)
+          return nil if v.nil?
+          return v.to_f if v.is_a?(Numeric)
+          s = v.to_s.strip.tr(',', '.')
+          return nil unless s =~ /\A[+-]?\d+(\.\d+)?\z/
+          s.to_f
+        end
+
         # --- vyrobny deskriptor ---------------------------------------------
         # cfg -> deskriptor dielca v TVARE BuildPlan kontraktu, zvalidovany TYM ISTYM
         # validatorom ako dielce korpusu. seen mapa je IZOLOVANA per doska — part_key
@@ -200,6 +230,14 @@ module Noxun
           p = stringify(params)
           if present(p['material_id']).nil? && defined?(Materials)
             p['material_id'] = Materials.project_defaults(model)['default_material_id']
+          end
+          # E-03: hrubka VKLADANEJ dosky — guard az TU, ked je material znamy
+          # (aj po doplneni projektoveho defaultu). HTML readonly nie je ochrana.
+          th = insert_thickness_for(p['material_id'], p['thickness'])
+          if th.nil?
+            p.delete('thickness')
+          else
+            p['thickness'] = th
           end
           cfg = normalize(p)
           validate_config!(cfg)

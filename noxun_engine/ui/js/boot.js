@@ -12,7 +12,9 @@
     ['width','height','depth','thickness','floor_height','plinth_recess','rails_top_offset','rail_depth',
      'fr_gap','fr_gap_top','fr_gap_bottom','fr_gap_sides'] // D-07 medzery/presahy cel
       .forEach(function(id){ attachExprField(el(id), { flushFn: flushCabinetEditsNow }); });
-    ['ib_length','ib_width'].forEach(function(id){ attachExprField(el(id)); });
+    // E-03: ib_thickness je pri UNI materiali editovatelne dim pole (pri realnom
+    // je readOnly — expr handler sam zamknute pole nikdy nemeni).
+    ['ib_length','ib_width','ib_thickness'].forEach(function(id){ attachExprField(el(id)); });
     // GH #103 P2: bc_thickness je pri UNI editovatelne dim pole — vyrazy
     // (18-6) potrebuju rovnaky expr handler ako dlzka/sirka.
     ['bc_length','bc_width','bc_thickness'].forEach(function(id){ attachExprField(el(id), { flushFn: flushBoardEditsNow }); });

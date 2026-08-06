@@ -20,11 +20,14 @@ module Noxun
       class << self
         # Vlozenie novej dosky z vkladacej karty. Material doplni BoardBuilder
         # z projektoveho defaultu, ak vo formulari chyba.
+        # E-03: thickness sa LEN prepusti — o tom, ci sa pouzije, rozhoduje
+        # BoardBuilder.insert_thickness_for (material je znamy az po doplneni
+        # projektoveho defaultu, preto guard sedi v builderi, nie tu).
         def handle_insert_board(payload)
           model = Sketchup.active_model
           data = parse(payload)
           params = {}
-          %w[name length width material_id grain_direction].each do |k|
+          %w[name length width material_id grain_direction thickness].each do |k|
             v = data[k]
             params[k] = v unless v.nil? || v.to_s.strip.empty?
           end

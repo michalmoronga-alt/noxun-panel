@@ -55,3 +55,5 @@ jobs:
         run: node tests/js/test_h4_ui.js
       - name: JS testy — tab Rozpocet a Nastavenia (E-b) + Prepocitat ceny (E-c)
         run: node tests/js/test_budget_ui.js
+      - name: JS testy — vkladanie dosky s UNI materialom (E-03)
+        run: node tests/js/test_e03_board_insert.js

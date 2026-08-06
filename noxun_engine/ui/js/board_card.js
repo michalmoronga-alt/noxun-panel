@@ -284,33 +284,88 @@
     if (ms.value !== keep || !ms.value){ ms.selectedIndex = ms.selectedIndex < 0 ? 0 : ms.selectedIndex; }
     onInsertBoardMaterial();
   }
+  // --- E-03: hrubka vo vkladacej karte (ciste funkcie, testuje test_e03_board_insert.js) ---
+  // UNI material nema hrubkovu identitu — hrubku urcuje DIELEC (M-B1), takze
+  // vkladacie pole sa pri nom odomyka. Pri realnom materiali hrubku diktuje
+  // katalog: pole ostava zamknute A payload ju ani nenesie. Autorita je server
+  // (BoardBuilder.insert_thickness_for) — toto je len UX zrkadlo.
+  function sheetIsUni(sheet){ return !!(sheet && sheet.uni === true); }
+  function findSheetIn(sheets, id){
+    for (var i = 0; i < (sheets || []).length; i++){
+      if (sheets[i] && sheets[i].id === id) return sheets[i];
+    }
+    return null;
+  }
+  // Poskladaj payload vkladanej dosky z HODNOT formulara (ziadny DOM, ziadne globaly).
+  // vals: surove stringy {name,length,width,material_id,grain_direction,thickness}
+  // sheet: katalogovy zaznam vybraneho materialu (alebo null)
+  // -> { ok:true, payload:{...} } | { ok:false, error:'hlaska pre status' }
+  function buildInsertBoardPayload(vals, sheet, evalFn){
+    vals = vals || {};
+    var ev = evalFn || (typeof evalDim === 'function' ? evalDim : null);
+    // V0.4.7e: rozmery cez evalDim — vyraz sa vyhodnoti, nezmysel sa odmietne
+    // (surovy '650-36' by Ruby to_f orezalo na 650)
+    function dim(rawv){
+      var s = String(rawv === null || rawv === undefined ? '' : rawv).trim();
+      if (s === '') return '';
+      return ev ? ev(s) : parseFloat(s);
+    }
+    var l = dim(vals.length), w = dim(vals.width);
+    if ((l !== '' && isNaN(l)) || (w !== '' && isNaN(w))){
+      return { ok: false, error: 'Skontroluj rozmery dosky (neplatný výraz).' };
+    }
+    var payload = {
+      name: String(vals.name === null || vals.name === undefined ? '' : vals.name),
+      length: l,
+      width: w,
+      material_id: String(vals.material_id === null || vals.material_id === undefined ? '' : vals.material_id),
+      grain_direction: String(vals.grain_direction === null || vals.grain_direction === undefined ? '' : vals.grain_direction)
+    };
+    if (sheetIsUni(sheet)){
+      var t = dim(vals.thickness);
+      if (t !== '' && isNaN(t)) return { ok: false, error: 'Skontroluj hrúbku dosky (neplatný výraz).' };
+      if (t !== '') payload.thickness = t; // prazdna = server dosadi default roly
+    }
+    return { ok: true, payload: payload };
+  }
   // Zmena materialu vo vkladacej karte: dosad hrubku + default smer dekoru z katalogu.
   function onInsertBoardMaterial(){
     var ms = el('ib_material'); if (!ms) return;
-    var sheet = null;
-    for (var i = 0; i < MATERIALS.sheets.length; i++){
-      if (MATERIALS.sheets[i].id === ms.value){ sheet = MATERIALS.sheets[i]; break; }
+    var sheet = findSheetIn(MATERIALS.sheets, ms.value);
+    var th = el('ib_thickness');
+    if (th){
+      var uni = sheetIsUni(sheet);
+      th.readOnly = !uni; // UNI = odomknute (readonly styling riesi CSS)
+      th.title = uni ? 'UNI: hrúbku určuje doska' : 'Hrúbku určuje materiál';
+      // Hodnotu neprepisuj, ked pole prave edituje pouzivatel (zivy sync
+      // katalogu NX.setMaterials -> refreshInsertBoardMaterials).
+      if (document.activeElement !== th){
+        th.value = sheet ? fmtmm(sheet.thickness) : '';
+        // Zivy nahlad vyrazu ("= 12") visi na input evente — po programovom
+        // prepise ho zosynchronizuj, inak po zmene materialu ostane stary.
+        // Nebubla: jediny poslucac je expr handler pripojeny na tomto poli.
+        th.dispatchEvent(new Event('input'));
+      }
     }
-    if (el('ib_thickness')) el('ib_thickness').value = sheet ? fmtmm(sheet.thickness) : '';
     if (el('ib_grain') && sheet && sheet.grain) el('ib_grain').value = sheet.grain;
   }
   function insertBoard(){
-    // V0.4.7e: rozmery cez evalDim — vyraz sa vyhodnoti, nezmysel sa odmietne
-    // (surovy '650-36' by Ruby to_f orezalo na 650)
-    var lRaw = el('ib_length') ? el('ib_length').value : '';
-    var wRaw = el('ib_width') ? el('ib_width').value : '';
-    var l = String(lRaw).trim() === '' ? '' : evalDim(lRaw);
-    var w = String(wRaw).trim() === '' ? '' : evalDim(wRaw);
-    if ((l !== '' && isNaN(l)) || (w !== '' && isNaN(w))){
-      NX.setStatus('Skontroluj rozmery dosky (neplatný výraz).', true);
-      return;
-    }
-    var payload = {
-      name: (el('ib_name') ? el('ib_name').value : ''),
-      length: l,
-      width: w,
-      material_id: (el('ib_material') ? el('ib_material').value : ''),
-      grain_direction: (el('ib_grain') ? el('ib_grain').value : '')
-    };
-    if (window.sketchup && sketchup.insert_board) sketchup.insert_board(JSON.stringify(payload));
+    var ms = el('ib_material');
+    var res = buildInsertBoardPayload({
+      name: el('ib_name') ? el('ib_name').value : '',
+      length: el('ib_length') ? el('ib_length').value : '',
+      width: el('ib_width') ? el('ib_width').value : '',
+      material_id: ms ? ms.value : '',
+      grain_direction: el('ib_grain') ? el('ib_grain').value : '',
+      thickness: el('ib_thickness') ? el('ib_thickness').value : ''
+    }, findSheetIn(MATERIALS.sheets, ms ? ms.value : ''));
+    if (!res.ok){ NX.setStatus(res.error, true); return; }
+    if (window.sketchup && sketchup.insert_board) sketchup.insert_board(JSON.stringify(res.payload));
+  }
+
+  // Node testy (tests/js/test_e03_board_insert.js) — v CEF je module undefined,
+  // vetva sa preskoci. Exportuju sa LEN ciste funkcie (bez DOM/MATERIALS).
+  if (typeof module !== 'undefined' && module.exports){
+    module.exports = { buildInsertBoardPayload: buildInsertBoardPayload,
+                       sheetIsUni: sheetIsUni, findSheetIn: findSheetIn };
   }
