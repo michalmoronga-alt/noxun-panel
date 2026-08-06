@@ -213,6 +213,24 @@ NxTest.test('ec ceny: zaznam mimo katalogu / bez vazby = chyba bez fetchu') do
   NxTest.assert(item['error'].include?('nenašiel'), item.inspect)
 end
 
+NxTest.test('ec ceny: neplatna ulozena vazba = chyba riadku, NIKDY sitemap cesta') do
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  ec_install_catalog!
+  # Neplatnu vazbu vlozime PRIAMO do suboru (save cesty ju sanitizuju) —
+  # presne stav, ktory vie vzniknut starsim zapisom alebo rucnou opravou.
+  data = MAT_EC.load
+  data['sheets'] = data['sheets'].map do |s|
+    s['material_id'] == 'EC_DTDL_18' ? s.merge('demos_url' => 'https://evil.example.com/x/') : s
+  end
+  raise 'ec bad url write failed' unless MAT_EC.write(data)
+  events, fake = ec_run([ec_target('sheet', 'EC_DTDL_18', 'H3303')], ec_page_map)
+  NxTest.assert_equal(0, fake.calls.length,
+                      'ziadny fetch — sitemap fallback (9,5 MB) sa NESMIE spustit')
+  item = ec_report(events)['items'].first
+  NxTest.assert_equal('error', item['status'])
+  NxTest.assert(item['error'].include?('neplatná'), item.inspect)
+end
+
 NxTest.test('ec ceny: zastarany row_rev = conflict (cudzia zmena sa NEPREPISE)') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   ec_install_catalog!

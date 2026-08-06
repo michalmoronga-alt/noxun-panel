@@ -217,6 +217,14 @@ module Noxun
         if rec['demos_url'].to_s.strip.empty?
           return done.call(result_for(target, 'error', 'error' => 'záznam nemá uloženú adresu produktu'))
         end
+        # POVINNÝ guard: DemosLookup pri NEPLATNEJ väzbe spadne na sitemap cestu
+        # (match podľa slugu) — a tá vie stiahnuť 9,5 MB zoznam produktov.
+        # Prepočet cien ide VÝHRADNE po uloženej väzbe; neplatná = chyba riadku.
+        clean, err = Demos.sanitize_url(rec['demos_url'])
+        unless clean
+          return done.call(result_for(target, 'error',
+                                      'error' => "uložená adresa produktu je neplatná (#{err}) — over väzbu v katalógu"))
+        end
         base_rev = Materials.record_rev(rec)
         proposal = nil
         fired = false

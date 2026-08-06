@@ -651,11 +651,13 @@ module Noxun
         end
 
         def price_refresh_status(report)
+          # Vetné tvary bez skloňovania počtu (status je jednoriadkový; plné
+          # sklonované zhrnutie ukazuje report v okne).
           r = report.is_a?(Hash) ? report : {}
-          parts = ["#{r['changed'].to_i} cien zmenených", "#{r['unchanged'].to_i} bez zmeny"]
-          parts << "#{r['errors'].to_i} chýb" if r['errors'].to_i.positive?
-          parts << "zrušené (#{r['skipped'].to_i} preskočených)" if r['cancelled']
-          "Prepočet cien hotový: #{parts.join(' · ')}."
+          parts = ["zmenené #{r['changed'].to_i}", "bez zmeny #{r['unchanged'].to_i}"]
+          parts << "chyby #{r['errors'].to_i}" if r['errors'].to_i.positive?
+          parts << "zrušené (preskočené #{r['skipped'].to_i})" if r['cancelled']
+          "Prepočet cien hotový — #{parts.join(' · ')}."
         end
 
         # ⚙ z tabu Rozpočet — satelit Nastavenia (sadzby sú GLOBÁLNE, nie per model).
