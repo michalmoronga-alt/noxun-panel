@@ -12,6 +12,10 @@
 #   bands      — pasma podla 1 vstupu, max je VRATANE (vyska cela <= 900 -> 2 panty)
 #   fit_series — najvacsia hodnota radu <= (vstup - clearance); vysledok ide do
 #                params['nominal_length'] (vysuv NL podla svetlej hlbky)
+#   part_flag_length (D-90) — polozka vznikne LEN pre dielec s PRIZNAKOM
+#                (uchytkovy profil na cele); dlzka rezu ide do
+#                params['cut_length_mm'] (= sirka dielca), typ profilu do
+#                params['profile']. Dielec bez profilu polozku nedostane.
 # Nova kategoria kovania = spravidla len novy JSON zaznam; novy kind az pri novej logike.
 # VEDOME OBMEDZENIE fazy 1: vystup je vzdy production_class 'counted' (pocitane kusy).
 # Dlzkove kovanie (gola profily = 'linear' s vyrobnou dlzkou) a polozky viazane na
@@ -55,12 +59,13 @@ module Noxun
   module Engine
     module HardwareRules
       STD          = 1 # verzia formatu suboru pravidiel (doc: std/seed_version/rules)
-      SEED_VERSION = 2 # v2 (D1): +zavesenie hornej skrinky, +podperky policove,
+      SEED_VERSION = 3 # v2 (D1): +zavesenie hornej skrinky, +podperky policove,
                        # seria vysuvov zladena s realnym radom Atira (GH #125 P2)
+                       # v3 (D-90): +uchytkovy profil na dvierkach a zasuvkovych celach
       FILE         = 'hardware_rules.json'
       MODEL_KEY    = 'hardware_rules' # kluc snapshotu v NOXUN dict na modeli
 
-      KINDS = %w[fixed bands fit_series].freeze
+      KINDS = %w[fixed bands fit_series part_flag_length].freeze
 
       # Kontextove kluce povolene ako input/params_from_context (dokumentacia tvaru ctx).
       CONTEXT_KEYS = %w[width height depth floor_height available_depth
@@ -97,8 +102,21 @@ module Noxun
         # D1 (debata 2.8.): 4 podperky na kazdu policu.
         { 'rule_id' => 'podperky-policove', 'enabled' => true,
           'applies_to' => { 'role' => 'shelf' },
-          'output' => 'shelf_pin', 'kind' => 'fixed', 'quantity' => 4 }
+          'output' => 'shelf_pin', 'kind' => 'fixed', 'quantity' => 4 },
+        # D-90: uchytkovy profil (UKW-7). Polozka vznikne LEN na cele, ktore ma
+        # profil zapnuty (deskriptor nesie :profile) — applies_to je 1 rola ako
+        # u ostatnych pravidiel, preto DVE pravidla: dvierka a zasuvkove cela.
+        { 'rule_id' => 'uchytkovy-profil', 'enabled' => true,
+          'applies_to' => { 'role' => 'front_door' },
+          'output' => 'handle', 'kind' => 'part_flag_length', 'quantity' => 1 },
+        { 'rule_id' => 'uchytkovy-profil-zasuvky', 'enabled' => true,
+          'applies_to' => { 'role' => 'drawer_front' },
+          'output' => 'handle', 'kind' => 'part_flag_length', 'quantity' => 1 }
       ].freeze
+
+      # D-90: kind pravidla, ktore reaguje na PRIZNAK PROFILU dielca. Zdielaju ho
+      # emisia polozky aj kontrola profile_rule_missing (jeden nazov, jedno miesto).
+      KIND_PROFILE = 'part_flag_length'
 
       # Povodne v1 tvary seed pravidiel, ktore v2 MENI (nie len doplna).
       # merge_seed pravidlo bajtovo zhodne s v1 tvarom NAHRADI novym seedom
@@ -294,7 +312,40 @@ module Noxun
           end
           apply_rule(rule, cfg, parts, ctx, items, warnings)
         end
+        warnings.concat(profile_rule_warnings(parts, rules))
         { items: apply_overrides(items, cfg[:hardware_overrides]), warnings: warnings }
+      end
+
+      # D-90 ORANGE `profile_rule_missing`: dielec MA uchytkovy profil, ale
+      # PROJEKTOVY snapshot pravidiel pre jeho rolu ziadne pravidlo typu
+      # part_flag_length nepozna — profil by ticho vypadol zo supisu aj z nakupu.
+      # Snapshot sa nikdy nemerguje sam (reprodukovatelnost stavby z .skp),
+      # naprava je vedoma akcia „Doplniť nové predvolené" v Pravidlach kovania.
+      #
+      # VEDOME: pravidlo, ktore v snapshote JE, ale je VYPNUTE (enabled false)
+      # alebo vyradene overridom, warning NESPUSTA — vypnute kovanie kryje
+      # vlastny existujuci ORANGE (semafor, kategoria hardware).
+      def profile_rule_warnings(parts, rules)
+        roles = {}
+        Array(rules).each do |r|
+          next unless r.is_a?(Hash) && r['kind'].to_s == KIND_PROFILE
+          role = (r['applies_to'] || {})['role'].to_s
+          roles[role] = true unless role.empty?
+        end
+        Array(parts).filter_map do |pd|
+          next nil unless pd.is_a?(Hash)
+          prof = FrontProfiles.of(pd)
+          next nil if prof.nil?
+          next nil if roles[pd[:role].to_s]
+          name = pd[:name].to_s.strip
+          who = name.empty? ? 'Dielec' : "Dielec „#{name}“"
+          BuildPlan.warning('profile_rule_missing',
+                            "#{who} má úchytkový profil (#{FrontProfiles.name(prof)}), ale projekt " \
+                            'nemá pravidlo kovania pre profil — profil sa nedostane do súpisu ani ' \
+                            'do nákupu. Otvor Pravidlá kovania a klikni „Doplniť nové predvolené".',
+                            part_key: PartKeys.for_descriptor(pd),
+                            data: { 'profile' => prof, 'role' => pd[:role].to_s })
+        end
       end
 
       # Aplikuje jedno pravidlo: korpusova uroven (owner nil) alebo per dielec roly.
@@ -370,6 +421,12 @@ module Noxun
             return [nil, {}]
           end
           [clamp_qty(rule.fetch('quantity', 1)), { 'nominal_length' => nl }]
+        when KIND_PROFILE
+          # D-90: bez priznaku profilu polozka NEVZNIKNE (ziadny warning — je to
+          # bezny stav, cela bez profilu su vacsina).
+          p = flag_length_params(pd)
+          return [nil, {}] if p.empty?
+          [clamp_qty(rule.fetch('quantity', 1)), p]
         end
       end
 
@@ -401,11 +458,43 @@ module Noxun
       FRONT_ROLES = %w[front_door drawer_front flap cover_panel false_front].freeze
 
       def part_params(rule, pd)
+        # D-90: params dlzkoveho priznaku su odvodene z DIELCA — musia byt
+        # autoritativne (params_from_context ich nikdy neprebije), preto sa
+        # re-asertuju TU, v poslednom merge kroku. Jeden vypocet (flag_length_params).
+        return flag_length_params(pd) if rule['kind'].to_s == KIND_PROFILE
         return {} unless rule['output'].to_s == 'slide'
         return {} unless pd.is_a?(Hash) && FRONT_ROLES.include?(pd[:role].to_s)
         v = pd[:prod].is_a?(Hash) ? pd[:prod][:length] : nil
         return {} unless v.is_a?(Numeric) && v.to_f.finite? && v.to_f.positive?
         { 'front_height' => v.to_f.round(2) }
+      end
+
+      # D-90: params polozky dlzkoveho priznaku (uchytkovy profil).
+      # cut_length_mm = SIRKA dielca (prod width) — rez profilu je sirka kridla/cela.
+      # Prazdny hash = dielec priznak nema (alebo nema pouzitelnu sirku) -> polozka nevznikne.
+      def flag_length_params(pd)
+        return {} unless pd.is_a?(Hash)
+        prof = FrontProfiles.of(pd)
+        return {} if prof.nil?
+        v = pd[:prod].is_a?(Hash) ? pd[:prod][:width] : nil
+        return {} unless v.is_a?(Numeric) && v.to_f.finite? && v.to_f.positive?
+        { 'cut_length_mm' => v.to_f.round(2), 'profile' => prof }
+      end
+
+      # D-90 (audit F5): SERVEROVY format params pre zobrazenie — „rez 597 mm".
+      # JEDINA autorita textu (tab Vyroba aj CSV kovania ho len vypisu; JS si nic
+      # neformatuje). nil = polozka nema co zobrazit navyse.
+      def params_label(params)
+        return nil unless params.is_a?(Hash)
+        v = params['cut_length_mm'] || params[:cut_length_mm]
+        return nil unless v.is_a?(Numeric) && v.to_f.finite? && v.to_f.positive?
+        "rez #{fmt_mm(v)} mm"
+      end
+
+      # Cele mm bez desatin, inak 1 desatinne miesto (slovenska ciarka).
+      def fmt_mm(v)
+        f = v.to_f
+        (f - f.round).abs < 0.05 ? f.round.to_s : format('%.1f', f).tr('.', ',')
       end
 
       # Deklarativne params z kontextu: {"height": "floor_height"} -> params['height']=ctx['floor_height'].
