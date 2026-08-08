@@ -58,13 +58,6 @@ module Noxun
         id = normalize(raw)
         id == NONE ? nil : id
       end
-
-      # Zoznam pre UI (PR 2): [{ 'id', 'name', 'reduction' }] + neutralna volba.
-      def options
-        REGISTRY.map do |id, spec|
-          { 'id' => id, 'name' => spec[:name].to_s, 'reduction' => spec[:reduction].to_f }
-        end
-      end
     end
   end
 end
