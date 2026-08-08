@@ -563,11 +563,13 @@ NxTest.test('hw pravidla D1b: merge_project_seed! doplni nove + obnovi nezmenene
   hr.set_project_rules(m, hr.normalize_rules([hr::SEED_RULES[0], legacy]))
   status, added, refreshed = hr.merge_project_seed!(m)
   NxTest.assert_equal(:updated, status)
-  NxTest.assert_equal(%w[podperky-policove zavesenie-hornej-skrinky zavesy-podla-vysky],
+  # D-90: seed v3 doplna aj obe pravidla uchytkoveho profilu
+  NxTest.assert_equal(%w[podperky-policove uchytkovy-profil uchytkovy-profil-zasuvky
+                         zavesenie-hornej-skrinky zavesy-podla-vysky],
                       added.sort, 'chybajuce seed pravidla doplnene')
   NxTest.assert_equal(['vysuvy-nl-podla-hlbky'], refreshed, 'nezmeneny v1 seed obnoveny')
   rules = hr.project_rules(m)
-  NxTest.assert_equal(5, rules.length)
+  NxTest.assert_equal(hr::SEED_RULES.length, rules.length)
   vys = rules.find { |r| r['rule_id'] == 'vysuvy-nl-podla-hlbky' }
   NxTest.assert(vys['series'].include?(420.0), 'seria po obnove = Atira rad')
   status2, = hr.merge_project_seed!(m)

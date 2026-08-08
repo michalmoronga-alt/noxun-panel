@@ -1120,8 +1120,11 @@ module Noxun
             back_material_id: present(raw(p, :back_material_id)),
             part_overrides: norm_overrides(raw(p, :part_overrides)),
             # V0.4 kovanie: rucne zasahy do poctov (pravidlo = default, override vitazi)
-            hardware_overrides: prune_none_front_overrides(
-              norm_hardware_overrides(raw(p, :hardware_overrides)), fronts_cfg),
+            hardware_overrides: prune_profile_overrides(
+              prune_none_front_overrides(
+                norm_hardware_overrides(raw(p, :hardware_overrides)), fronts_cfg
+              ), fronts_cfg
+            ),
             # V0.6 D1 (audit B1): cabinet override setov kovania — mapa
             # {generic_type => set_id}; bez round-tripu by ju rebuild zmazal.
             hardware_sets: norm_hardware_sets(raw(p, :hardware_sets)),
@@ -1229,6 +1232,26 @@ module Noxun
           overrides.reject do |ov|
             m = ov['owner_part_key'].to_s.match(%r{\Afront:([^/]+)/})
             m && none_ids.include?(m[1])
+          end
+        end
+
+        # D-90 (Codex #144 P2): rucny zasah do kovania PROFILU zije len dovtedy,
+        # kym celo profil MA. Po vypnuti profilu by zaznam ostal mrtvy — semafor
+        # by hlasil ORANGE „Úchytky vypnuté" pre profil, ktory uz neexistuje, a
+        # pri opatovnom zapnuti by necakane ozil (vzor prune_none_front_overrides).
+        # Cielime VYHRADNE na rule_id profilovych SEED pravidiel — vlastne
+        # premenovane pravidlo si pouzivatel spravuje sam.
+        def prune_profile_overrides(overrides, fronts_cfg)
+          ids = defined?(HardwareRules) ? HardwareRules.profile_rule_ids : []
+          return overrides if ids.empty?
+          no_profile = (fronts_cfg['items'] || [])
+                       .reject { |it| FrontProfiles.of(it) }
+                       .map { |it| it['id'].to_s }
+          return overrides if no_profile.empty?
+          overrides.reject do |ov|
+            next false unless ids.include?(ov['rule_id'].to_s)
+            m = ov['owner_part_key'].to_s.match(%r{\Afront:([^/]+)/})
+            m && no_profile.include?(m[1])
           end
         end
 

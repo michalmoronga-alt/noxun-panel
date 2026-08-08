@@ -140,6 +140,7 @@ unless NxTest::IN_SKETCHUP
     core/materials_demos_create
     core/materials_replace_uni
     core/abs_rules
+    core/front_profiles
     core/hardware_rules
     core/hardware_catalog
     core/hardware_sets

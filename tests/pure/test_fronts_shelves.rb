@@ -169,8 +169,10 @@ end
 NxTest.test('fronts: layout bez items vrati prazdny vysledok') do
   f = Noxun::Engine::Fronts
   out = f.layout(nil, 600.0, 720.0, 100.0, 18.0)
-  NxTest.assert_equal({ parts: [], items: [], wings: 0 }, out)
-  NxTest.assert_equal({ parts: [], items: [], wings: 0 }, f.layout('none', 600.0, 720.0, 100.0, 18.0))
+  # D-90: layout nesie aj kanal warnings (BuildPlan.warning) — bez ciel prazdny.
+  NxTest.assert_equal({ parts: [], items: [], wings: 0, warnings: [] }, out)
+  NxTest.assert_equal({ parts: [], items: [], wings: 0, warnings: [] },
+                      f.layout('none', 600.0, 720.0, 100.0, 18.0))
 end
 
 NxTest.test('fronts: layout 2 auto dvierka — auto_h, z postupnost, origin, box, prod') do
@@ -202,7 +204,8 @@ NxTest.test('fronts: layout 2 auto dvierka — auto_h, z postupnost, origin, box
   NxTest.assert_close(411.5, p2[:origin][2], 0.01, 'z2 = 102 + 306.5 + gap 3')
 
   i1 = out[:items][0]
-  NxTest.assert_equal(%w[id type mode height locked wings wings_n z], i1.keys)
+  # D-90: resolved item nesie aj 'profile' (nahlad/UI ho potrebuje)
+  NxTest.assert_equal(%w[id type mode height locked wings wings_n profile z], i1.keys)
   NxTest.assert_equal('F1', i1['id'])
   NxTest.assert_equal('door', i1['type'])
   NxTest.assert_equal('auto', i1['mode'])

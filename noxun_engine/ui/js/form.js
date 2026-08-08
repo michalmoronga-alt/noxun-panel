@@ -28,8 +28,13 @@
       var wings = r.querySelector('.fw').value;
       var hasH = hv !== '';
       var hNum = hasH ? evalDim(hv) : NaN; // vyraz vo vyske cela -> cislo (NaN blokuje apply cez validateFields)
+      // D-90 (Codex #144 P1): 'profile' este NEMA ovladac (pride v PR 2), ale
+      // MUSI prezit round-trip — inak by kazda zmena ineho pola poslala riadok
+      // bez profilu a server by ho znormalizoval na 'none' (celo by sa ticho
+      // vratilo na plnu vysku a profil by vypadol z kovania).
       items.push({ id: r.dataset.frontId || newStableId('F'), type: type, mode: hasH ? 'fixed' : 'auto',
-        height: hasH ? (isNaN(hNum) ? null : hNum) : null, locked: hasH ? locked : false, wings: (type === 'door') ? wings : '1' });
+        height: hasH ? (isNaN(hNum) ? null : hNum) : null, locked: hasH ? locked : false, wings: (type === 'door') ? wings : '1',
+        profile: r.dataset.frontProfile || 'none' });
     }
     return { split_axis: 'height', gap: frontGapVal('fr_gap', 3.0), gap_top: frontGapVal('fr_gap_top', 2.0),
              gap_bottom: frontGapVal('fr_gap_bottom', 2.0), gap_sides: frontGapVal('fr_gap_sides', 2.0),
@@ -432,6 +437,9 @@
     var row = document.createElement('div');
     row.className = 'frow';
     row.dataset.frontId = item.id || newStableId('F');
+    // D-90: profil riadku zije v datasete (ovladac pride v PR 2) — collectFronts
+    // ho posiela spat, takze editacia inych poli profil nezhodi.
+    row.dataset.frontProfile = item.profile || 'none';
     var badge = frontHwBadge(row.dataset.frontId); // D3: kovanie cela (zavesy/vysuv) z planu
     row.innerHTML =
       '<span class="fnum">F' + idx + '</span>' +

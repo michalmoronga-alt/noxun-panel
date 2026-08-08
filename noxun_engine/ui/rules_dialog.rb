@@ -115,29 +115,36 @@ module Noxun
         end
 
         # V0.6 D1b (audit F4): vedome doplnenie novych default pravidiel do
-        # PROJEKTOVEHO snapshotu (nikdy sa nemerguje sam). 1 undo krok;
-        # formular sa nacita nanovo (baseline sa obnovi).
+        # PROJEKTOVEHO snapshotu (nikdy sa nemerguje sam).
+        # D-90 (Codex #144 P1): snapshot sa zapisuje V TEJ ISTEJ operacii ako
+        # PRESTAVBA vsetkych skriniek — presne ako handle_save. Bez prestavby by
+        # nove pravidlo sice bolo v snapshote, ale ulozene config.hardware[]
+        # skriniek by ho nepoznali: kusovnik ani nakupny zoznam citaju SNAPSHOT
+        # NA ENTITE, takze profil by do objednavky nikdy nedosiel (a warning
+        # profile_rule_missing by z KONTROLY zmizol skor, nez sa problem vyriesil).
         def handle_merge_seed
           model = Sketchup.active_model
           return set_status('Žiadny aktívny model.', true) if model.nil?
-          if HardwareRules.project_rules(model).nil?
+          existing = HardwareRules.project_rules(model)
+          if existing.nil?
             return set_status('Projekt ešte nemá vlastné pravidlá — preberá globálne (nie je čo dopĺňať).')
           end
-          model.start_operation('NOXUN: Doplnenie predvolených pravidiel', true)
-          status, added, refreshed = HardwareRules.merge_project_seed!(model)
-          model.commit_operation
-          push_state
-          if status == :none
-            set_status('Projekt už má všetky predvolené pravidlá v aktuálnom tvare.')
-          else
-            parts = []
-            parts << "doplnené: #{added.join(', ')}" unless added.empty?
-            parts << "obnovené: #{refreshed.join(', ')}" unless refreshed.empty?
-            set_status("Predvolené pravidlá — #{parts.join(' · ')}. Skrinky sa prepočítajú pri najbližšej zmene.")
+          rules, added, refreshed = HardwareRules.project_seed_plan(existing)
+          if added.empty? && refreshed.empty?
+            return set_status('Projekt už má všetky predvolené pravidlá v aktuálnom tvare.')
           end
-        rescue StandardError => e
-          model.abort_operation if model
-          raise e
+
+          jobs = cabinets(model).map { |c| [c, CabinetBuilder.config_to_params(Store.config(c) || {})] }
+          CabinetBuilder.rebuild_many(model, jobs, op_name: 'NOXUN: doplnenie predvolenych pravidiel') do
+            raise 'Predvolené pravidlá sa nepodarilo uložiť do projektu.' unless
+              HardwareRules.set_project_rules(model, rules)
+          end
+          push_state
+          parts = []
+          parts << "doplnené: #{added.join(', ')}" unless added.empty?
+          parts << "obnovené: #{refreshed.join(', ')}" unless refreshed.empty?
+          set_status("Predvolené pravidlá — #{parts.join(' · ')} · prestavaných #{jobs.size} skriniek.")
+          Panel.push_selected(model) if defined?(Panel) # refresh sekcie Kovanie v paneli
         end
 
         # Volane z EngineAppObserver pri File > New/Open/Activate: otvoreny formular

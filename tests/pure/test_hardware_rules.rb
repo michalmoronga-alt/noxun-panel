@@ -44,7 +44,8 @@ end
 
 NxTest.test('hardware_rules: seed sa normalizuje (bands zoradene, series bez nekladnych)') do
   r = NxHW.rules
-  NxTest.assert_equal(5, r.length, 'seed ma 5 pravidiel (D1: +zavesenie hornej, +podperky)')
+  # D-90: seed v3 pridal 2 pravidla uchytkoveho profilu (dvierka + zasuvkove cela)
+  NxTest.assert_equal(7, r.length, 'seed ma 7 pravidiel (D1: +zavesenie hornej, +podperky; D-90: +2x profil)')
   bands = r.find { |x| x['rule_id'] == 'zavesy-podla-vysky' }['bands']
   NxTest.assert_equal([900.0, 1400.0, 1900.0, nil], bands.map { |b| b['max'] }, 'bands sort, null posledne')
   messy = Noxun::Engine::HardwareRules.normalize_rules([
@@ -329,12 +330,12 @@ NxTest.test('hardware_rules: seed-merge doplni nove default pravidla len do glob
   jfs.write(hr.path, { 'std' => 1, 'seed_version' => 0, 'rules' => custom })
   jfs.reload!(hr.path)
   merged = hr.load
-  NxTest.assert_equal(5, merged.length, 'chybajuce seed pravidla sa doplnia')
+  NxTest.assert_equal(hr::SEED_RULES.length, merged.length, 'chybajuce seed pravidla sa doplnia')
   NxTest.assert_equal(7, merged.find { |r| r['rule_id'] == 'nohy-zakladne' }['quantity'],
                       'pouzivatelska uprava sa pri merge NEprepise')
   doc = jfs.read(hr.path)
   NxTest.assert_equal(hr::SEED_VERSION, doc['seed_version'], 'subor sa po merge ulozi s novou verziou')
-  NxTest.assert_equal(5, hr.load.length, 'druhy load uz nic nemerguje (stabilny stav)')
+  NxTest.assert_equal(hr::SEED_RULES.length, hr.load.length, 'druhy load uz nic nemerguje (stabilny stav)')
   # uprac: vrat cisty seed (nasledne testy citaju globalnu kniznicu)
   hr.write(hr.normalize_rules(hr::SEED_RULES))
   jfs.reload!(hr.path)

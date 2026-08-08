@@ -22,19 +22,28 @@ module Noxun
       EDGE_LIMIT_UNLOCKED = 2000.0
       AUTO_TWO_ABOVE  = 600.0 # nad touto sirkou celneho otvoru auto dvierka = 2 kridla
       MIN_AUTO        = 10.0  # ochrana: auto celo nikdy < 10 mm
+      # D-90: najmensi ROZUMNY panel pod uchytkovym profilom (mm). Pod nim sa
+      # hlasi warning (existujuci kanal warnings planu) — dvierka 100 mm vysoke
+      # so 36 mm profilom su takmer iste omyl, ale NIE su nemozne (zaklopka).
+      # Pod BuildPlan::MIN_DIM uz panel neexistuje -> tvrdy raise (profil bez
+      # panelu nesmie ticho prejst ako dnesne degeneraty).
+      MIN_PROFILE_PANEL = 70.0
 
       module_function
 
       # fronts_cfg: canonical hash (viz normalize_config) alebo legacy string ('none'/'1'/'2'/'auto') alebo nil.
       # width/height/floor_height/thickness = rozmery korpusu (mm).
-      # Vrati: { parts:[deskriptory], items:[resolved s reÁlnymi vyskami], wings:Integer }.
+      # Vrati: { parts:[deskriptory], items:[resolved s reÁlnymi vyskami],
+      #          wings:Integer, warnings:[BuildPlan.warning] }.
+      # D-90: warnings su kanonicky kanal planu (Construction ich pripoji do
+      # plan[:warnings]) — nefatalne upozornenia matematiky ciel.
       def layout(fronts_cfg, width, height, floor_height, _thickness)
         cfg = normalize_config(fronts_cfg)
         # D-07: rozsahy medzier platia VZDY (aj bez ciel) — neplatne hodnoty sa
         # nesmu ulozit cez externy callback a vybuchnut az po pridani cela.
         validate_gap_ranges!(cfg)
         items = cfg['items']
-        return { parts: [], items: [], wings: 0 } if items.nil? || items.empty?
+        return { parts: [], items: [], wings: 0, warnings: [] } if items.nil? || items.empty?
 
         gap = cfg['gap']; gt = cfg['gap_top']; gb = cfg['gap_bottom']; gs = cfg['gap_sides']
         n = items.size
@@ -50,11 +59,13 @@ module Noxun
 
         parts = []
         resolved = []
+        warnings = []
         total_wings = 0
         z = floor_height + gb
         items.each_with_index do |it, i|
           idx = i + 1
           h = it['mode'] == 'fixed' ? it['height'].to_f : auto_h
+          validate_profile!(it, idx, h, warnings)
           panels = panels_for(it, idx, gs, opening_w, z, h, gap)
           total_wings += panels.size if it['type'] == 'door'
           parts.concat(panels)
@@ -62,11 +73,42 @@ module Noxun
             'id' => it['id'] || "F#{idx}", 'type' => it['type'], 'mode' => it['mode'],
             'height' => h.round(2), 'locked' => !!it['locked'], 'wings' => it['wings'],
             'wings_n' => (it['type'] == 'door' ? panels.size : 1), # D-07: efektivny pocet kridiel pre nahlad
+            # D-90: profil riadku ide aj do resolved itemu (nahlad/UI v PR 2).
+            'profile' => it['profile'] || FrontProfiles::NONE,
             'z' => z.round(2)
           }
           z += h + gap
         end
-        { parts: parts, items: resolved, wings: total_wings }
+        { parts: parts, items: resolved, wings: total_wings, warnings: warnings }
+      end
+
+      # D-90: kontrola vysky panelu POD profilom (po vypocte realnej vysky riadku).
+      # Riadkova matematika sa nemeni — profil zabera hornych `reduction` mm riadku.
+      #   panel <= BuildPlan::MIN_DIM  -> raise (panel by neexistoval)
+      #   panel <  MIN_PROFILE_PANEL   -> warning (postavi sa, ale skoro iste omyl)
+      def validate_profile!(item, idx, h, warnings)
+        red = FrontProfiles.reduction(item['profile'])
+        return if red <= 0.0 || item['type'] == 'none'
+        panel_h = h.to_f - red
+        pname = FrontProfiles.name(item['profile']) || 'Profil'
+        if panel_h <= BuildPlan::MIN_DIM
+          raise "Čelo #{idx} s profilom je príliš nízke: #{pname} zaberá #{fmt_mm(red)} mm " \
+                "z výšky #{fmt_mm(h)} mm a na panel nezostane nič. Zväčši výšku čela alebo vypni profil."
+        end
+        return if panel_h >= MIN_PROFILE_PANEL
+        warnings << BuildPlan.warning(
+          'profile_panel_low',
+          "Čelo #{idx}: po odčítaní profilu (#{pname}, #{fmt_mm(red)} mm) zostáva panel " \
+          "#{fmt_mm(panel_h)} mm — skontroluj, či je to zámer.",
+          data: { 'front_id' => (item['id'] || "F#{idx}").to_s, 'panel_height' => panel_h.round(2),
+                  'profile' => item['profile'].to_s }
+        )
+      end
+
+      # Cele mm bez desatin, inak 1 desatinne miesto (slovenska ciarka) — hlasky.
+      def fmt_mm(v)
+        f = v.to_f
+        (f - f.round).abs < 0.05 ? f.round.to_s : format('%.1f', f).tr('.', ',')
       end
 
       # Panely jedneho cela. drawer_front = 1 panel; door = 1..4 kridla podla wings (D-24).
@@ -82,13 +124,23 @@ module Noxun
       # voci susedom ostavaju ako pri cele (ziadna specialna vetva), takze realny
       # otvor je opticky vacsi o susedne skary. Bez dielcov nevznikne ani kovanie
       # (HardwareRules iteruje dielce planu podla roly) ani polozky kusovnika/VEPO.
+      #
+      # D-90 PROFIL: riadkova matematika sa NEMENI (vyska riadku h, pozicia z,
+      # medzery) — skracuje sa PANEL: panel_h = h - reduction, panel ostava na z
+      # (cela sa kladu odspodu, hornych `reduction` mm riadku zaberie profil).
+      # Kazde kridlo ma vlastny profil dlzky = sirka kridla.
       def panels_for(item, idx, gs, opening_w, z, h, gap = GAP_DEFAULT)
         return [] if item['type'] == 'none'
         front_id = item['id'].to_s
         front_id = "F#{idx}" if front_id.empty?
+        prof = FrontProfiles.normalize(item['profile'])
+        red = FrontProfiles.reduction(prof)
+        ph = h - red # vyska PANELU (bez pasma profilu)
+        band = red.positive? ? { z: (z + ph).round(2), h: red } : nil
         if item['type'] == 'drawer_front'
           [box_desc("DRW-#{idx}", PartKeys.front(front_id, 'panel'),
-                    'drawer_front', "Zasuvkove celo #{idx}", gs, opening_w, z, h)]
+                    'drawer_front', "Zasuvkove celo #{idx}", gs, opening_w, z, ph,
+                    profile: prof, profile_band: band)]
         else
           wings = resolve_wings(item['wings'], opening_w)
           case wings
@@ -96,9 +148,11 @@ module Noxun
             dw = (opening_w - gap) / 2.0
             [
               box_desc("DOOR-#{idx}-L", PartKeys.front(front_id, 'wing', 'left'),
-                       'front_door', "Dvierka #{idx} lave", gs, dw, z, h),
+                       'front_door', "Dvierka #{idx} lave", gs, dw, z, ph,
+                       profile: prof, profile_band: band),
               box_desc("DOOR-#{idx}-R", PartKeys.front(front_id, 'wing', 'right'),
-                       'front_door', "Dvierka #{idx} prave", gs + dw + gap, dw, z, h)
+                       'front_door', "Dvierka #{idx} prave", gs + dw + gap, dw, z, ph,
+                       profile: prof, profile_band: band)
             ]
           when 3, 4
             # sirka kridla = (otvor - medzery medzi kridlami) / n; x postupuje o (dw + gap)
@@ -106,23 +160,33 @@ module Noxun
             (1..wings).map do |i|
               box_desc("DOOR-#{idx}-P#{i}", PartKeys.front(front_id, 'wing', "p#{i}"),
                        'front_door', "Dvierka #{idx} kridlo #{i}/#{wings}",
-                       gs + (i - 1) * (dw + gap), dw, z, h)
+                       gs + (i - 1) * (dw + gap), dw, z, ph,
+                       profile: prof, profile_band: band)
             end
           else
             [box_desc("DOOR-#{idx}", PartKeys.front(front_id, 'wing', 'single'),
-                      'front_door', "Dvierka #{idx}", gs, opening_w, z, h)]
+                      'front_door', "Dvierka #{idx}", gs, opening_w, z, ph,
+                      profile: prof, profile_band: band)]
           end
         end
       end
 
       # Deskriptor dielca cela — box [sirka, hrubka, vyska], origin pred korpusom (Y = -hrubka).
-      def box_desc(suffix, part_key, role, name, x, wdt, z, h)
+      # h = vyska PANELU (uz po odcitani profilu). D-90 metadata:
+      #   :profile       — id profilu ('none' = bez profilu)
+      #   :profile_band  — { z:, h: } pasmo profilu nad panelom (vizual, PR 2)
+      # ABS sa profilom NEMENI (Michal 9.8.): hrana pod profilom sa v praxi
+      # olepuje normalne — profil sa nasuva na hotovu olepenu hranu.
+      def box_desc(suffix, part_key, role, name, x, wdt, z, h, profile: FrontProfiles::NONE, profile_band: nil)
         ft = FRONT_THICKNESS
-        {
+        desc = {
           suffix: suffix, part_key: part_key, role: role, name: name, material: :front,
           box: [wdt, ft, h], origin: [x, -ft, z],
-          prod: { length: h.round(2), width: wdt.round(2), thickness: ft }
+          prod: { length: h.round(2), width: wdt.round(2), thickness: ft },
+          profile: profile
         }
+        desc[:profile_band] = profile_band if profile_band
+        desc
       end
 
       # D-24: '3'/'4' su vyhradne RUCNA volba — auto ostava 1/2 podla AUTO_TWO_ABOVE
@@ -251,13 +315,19 @@ module Noxun
           mode = 'auto' if mode == 'fixed' && !has_h # fixed bez vysky nema zmysel -> auto
           wings = (it['wings'] || it[:wings] || 'auto').to_s
           wings = 'auto' unless %w[1 2 3 4 auto].include?(wings) # D-24: + 3/4 (rucna volba)
+          # D-90: uchytkovy profil. Kluc smie chybat (starsi config = 'none',
+          # ziadna migracia); neznamu hodnotu (aj z novsej verzie) normalize
+          # sklopi na 'none'. Riadok "Bez cela" profil nema — nie je na com.
+          profile = FrontProfiles.normalize(it['profile'] || it[:profile])
+          profile = FrontProfiles::NONE if type == 'none'
           {
             'id' => front_id,
             'type' => type,
             'mode' => mode,
             'height' => has_h ? hraw.to_f : nil,
             'locked' => truthy(it['locked'] || it[:locked]) && mode == 'fixed',
-            'wings' => (type == 'door' ? wings : 1)
+            'wings' => (type == 'door' ? wings : 1),
+            'profile' => profile
           }
         end
       end
@@ -268,7 +338,8 @@ module Noxun
         return empty_config if v.strip.empty? || %w[none 0].include?(v)
         wings = %w[1 2].include?(v) ? v : 'auto'
         empty_config.merge('items' => [
-          { 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'height' => nil, 'locked' => false, 'wings' => wings }
+          { 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'height' => nil, 'locked' => false,
+            'wings' => wings, 'profile' => FrontProfiles::NONE }
         ])
       end
 

@@ -60,6 +60,8 @@ module Noxun
         # Cela pred korpusom (fixed + auto s lockmi).
         fr = Fronts.layout(cfg[:fronts], w, h, cfg[:floor_height], t)
         parts.concat(fr[:parts])
+        # D-90: nefatalne upozornenia matematiky ciel (nizky panel pod profilom).
+        warnings.concat(fr[:warnings] || [])
 
         # Kontrakt: parts = realne postavitelne dielce. Degenerovane (rozmer <= MIN_DIM)
         # sa vyradia UZ TU s warningom — kusovnik/VEPO nikdy neuvidia dielec,

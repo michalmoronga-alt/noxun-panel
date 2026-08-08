@@ -440,11 +440,13 @@ module Noxun
             # H1b: sekcia nesie AJ dovod (stlpec „kód" je tu popis problemu —
             # hlavicka sekcie ho pomenuva). Bez neho sa z CSV nedalo zistit,
             # ktore pasmo/rad chyba a co doplnit.
-            out << ['NEMAPOVANÉ (bez kódov — nenacenené)', 'dôvod', 'kde', 'počet', '', '', '']
+            # D-90: stlpec „MJ" nesie v tejto sekcii ROZMER polozky (rez profilu) —
+            # bez neho by sa z CSV nedala objednat dlzka tyce.
+            out << ['NEMAPOVANÉ (bez kódov — nenacenené)', 'dôvod', 'kde', 'počet', 'rozmer', '', '']
             unmapped.each do |u|
               out << [u['generic_type'].to_s, unmapped_reason_sk(u),
                       "#{u['cabinet_id']} #{u['owner_part_key']}".strip,
-                      u['quantity'].to_i, '', '', '']
+                      u['quantity'].to_i, u['params_label'].to_s, '', '']
             end
           end
         end
@@ -1144,7 +1146,10 @@ module Noxun
           'quantity' => it['quantity'].to_i,
           'set_id' => sid,
           'reason' => reason,
-          'nominal_length' => (params['nominal_length'].is_a?(Numeric) ? params['nominal_length'].to_f : nil)
+          'nominal_length' => (params['nominal_length'].is_a?(Numeric) ? params['nominal_length'].to_f : nil),
+          # D-90: serverovy popis dlzkovych params („rez 597 mm") — CSV aj tab
+          # Kovanie ho len vypisu. nil pri polozkach bez dlzkoveho priznaku.
+          'params_label' => HardwareRules.params_label(params)
         }
         ex = extra.is_a?(Hash) ? extra : {}
         %w[param value member_index member_label].each do |k|
