@@ -14,6 +14,13 @@
 # PR 1 (engine) drzi len `reduction` + `name`. Geometricky obrys (outline,
 # depth, height) pribudne v PR 2 (vizual) — engine ho nepotrebuje.
 #
+# ROZSIRITELNOST (Michal 9.8.): neskor pribudnu dalsie profily a VOLBA HRANY
+# osadenia (dolna hrana sa pouziva casto, existuju aj bocne). Tvar configu to
+# uz unesie — riadok cela drzi JEDEN string kluc 'profile' a vsetko ostatne
+# (skratenie, nazov, buduca hrana) zije TU v registry. Dnesna implementacia
+# rata s hornou hranou, ale je to vlastnost KODU fronts, nie ulozenych dat:
+# pridanie hrany nebude vyzadovat migraciu configov ani sablon.
+#
 # Hodnota 'none' NIE JE v registry: je to explicitna neutralna volba
 # ("bez profilu") a plati ako default vsade, kde config kluc chyba
 # (starsi korpus bez kluca 'profile' = ziadna migracia).

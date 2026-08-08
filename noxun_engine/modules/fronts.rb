@@ -28,10 +28,6 @@ module Noxun
       # Pod BuildPlan::MIN_DIM uz panel neexistuje -> tvrdy raise (profil bez
       # panelu nesmie ticho prejst ako dnesne degeneraty).
       MIN_PROFILE_PANEL = 70.0
-      # D-90: hrana cela, ktoru profil ZAKRYVA. Konvencia AbsRules pre rolu
-      # front_door/drawer_front: W2 = Horna (prod length = vyska, W hrany lezia
-      # na width). Profil sedi na hornej hrane -> ABS default sa na nu neaplikuje.
-      PROFILE_EDGE = 'W2'
 
       module_function
 
@@ -179,8 +175,8 @@ module Noxun
       # h = vyska PANELU (uz po odcitani profilu). D-90 metadata:
       #   :profile       — id profilu ('none' = bez profilu)
       #   :profile_band  — { z:, h: } pasmo profilu nad panelom (vizual, PR 2)
-      #   :suppress_edges— hrany, na ktore sa NEAPLIKUJE automaticke ABS
-      #                    (horna hrana je schovana v profile; rucny override ostava mozny)
+      # ABS sa profilom NEMENI (Michal 9.8.): hrana pod profilom sa v praxi
+      # olepuje normalne — profil sa nasuva na hotovu olepenu hranu.
       def box_desc(suffix, part_key, role, name, x, wdt, z, h, profile: FrontProfiles::NONE, profile_band: nil)
         ft = FRONT_THICKNESS
         desc = {
@@ -189,10 +185,7 @@ module Noxun
           prod: { length: h.round(2), width: wdt.round(2), thickness: ft },
           profile: profile
         }
-        if profile_band
-          desc[:profile_band] = profile_band
-          desc[:suppress_edges] = [PROFILE_EDGE]
-        end
+        desc[:profile_band] = profile_band if profile_band
         desc
       end
 

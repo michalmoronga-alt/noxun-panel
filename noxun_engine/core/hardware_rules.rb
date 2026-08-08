@@ -247,6 +247,20 @@ module Noxun
       def merge_project_seed!(model)
         existing = project_rules(model)
         return [:none, [], []] if existing.nil? # bez snapshotu berie projekt globál sám
+        rules, added_ids, refreshed_ids = project_seed_plan(existing)
+        return [:none, [], []] if added_ids.empty? && refreshed_ids.empty?
+        set_project_rules(model, rules)
+        [:updated, added_ids, refreshed_ids]
+      end
+
+      # CISTA funkcia (ziadny zapis): co by seed-merge urobil so snapshotom.
+      # -> [vysledne pravidla, added_ids, refreshed_ids].
+      # D-90 (Codex #144 P1): volajuci (RulesDialog) potrebuje vediet DOPREDU,
+      # ci sa nieco zmeni — zapis snapshotu totiz musi prebehnut V TEJ ISTEJ
+      # operacii ako PRESTAVBA skriniek (inak by nove pravidlo nedostalo
+      # ulozene config.hardware[] a nakup by o nom nevedel).
+      def project_seed_plan(existing)
+        return [[], [], []] unless existing.is_a?(Array)
         seed_by_id = {}
         SEED_RULES.each { |r| seed_by_id[r['rule_id']] = r }
         refreshed_ids = []
@@ -259,10 +273,15 @@ module Noxun
         have = {}
         refreshed.each { |r| have[r['rule_id']] = true }
         missing = SEED_RULES.reject { |r| have[r['rule_id']] }
-        added_ids = missing.map { |r| r['rule_id'] }
-        return [:none, [], []] if added_ids.empty? && refreshed_ids.empty?
-        set_project_rules(model, refreshed + normalize_rules(missing))
-        [:updated, added_ids, refreshed_ids]
+        [refreshed + normalize_rules(missing), missing.map { |r| r['rule_id'] }, refreshed_ids]
+      end
+
+      # D-90: rule_id pravidiel, ktore reaguju na priznak profilu (SEED sada).
+      # Pouziva ich CabinetBuilder na upratanie mrtvych overridov po vypnuti
+      # profilu; vlastne (premenovane) pravidlo si pouzivatel spravuje sam —
+      # mazat cudzie zaznamy by bolo horsie nez ich nechat.
+      def profile_rule_ids
+        SEED_RULES.select { |r| r['kind'] == KIND_PROFILE }.map { |r| r['rule_id'] }
       end
 
       # Zapise projektovy snapshot (editor pravidiel / ensure). Volajuci drzi operaciu.

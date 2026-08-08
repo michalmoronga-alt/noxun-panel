@@ -7,10 +7,11 @@
 #      zasuvkove celo; guard 70 mm (warning) a MIN_DIM (raise); stary config = 'none'
 #   3) HardwareRules kind part_flag_length — emisia, identita, override/disable,
 #      seed v3, warning profile_rule_missing
-#   4) ABS — horna hrana (W2) pod profilom sa NEOLEPUJE a NEHLASI sa; rucny
-#      override ostava mozny; semafor nehlasi „celo bez ABS"
-#   5) params_label („rez 597 mm") — serverovy format pre tab Vyroba aj CSV
-#   6) sablona — config s profilom prezije JSON round-trip
+#   4) params_label („rez 597 mm") — serverovy format pre tab Vyroba aj CSV
+#   5) sablona — config s profilom prezije JSON round-trip
+#
+# ABS sa profilom NEMENI (Michal 9.8., foto realnej montaze): hrana pod
+# profilom sa olepuje normalne — profil sa nasuva na hotovu olepenu hranu.
 require_relative '../helper' unless defined?(NxTest)
 
 module NxD90
@@ -109,10 +110,10 @@ NxTest.test('D-90 fronts: profil skrati PANEL o 36 mm, riadok aj z ostavaju') do
   # pasmo profilu nad panelom (vizual PR 2)
   NxTest.assert_close(102.0 + 464.0, p[:profile_band][:z], 0.01, 'pasmo zacina na vrchu panelu')
   NxTest.assert_close(36.0, p[:profile_band][:h], 0.01)
-  NxTest.assert_equal(['W2'], p[:suppress_edges], 'horna hrana cela (W2) je pod profilom')
   NxTest.assert_equal('none', base[:items][0]['profile'])
-  NxTest.assert_equal(nil, base[:parts][0][:profile_band], 'bez profilu ziadne pasmo ani potlacenie')
-  NxTest.assert_equal(nil, base[:parts][0][:suppress_edges])
+  NxTest.assert_equal(nil, base[:parts][0][:profile_band], 'bez profilu ziadne pasmo')
+  # ABS sa profilom NEMENI — deskriptor ziadne hrany nepotlaca
+  NxTest.assert_equal(nil, p[:suppress_edges], 'ziadne potlacenie hran (hrana sa olepuje aj pod profilom)')
 end
 
 NxTest.test('D-90 fronts: profil na 2/3/4 kridlach — kazde kridlo skratene, sirky nedotknute') do
@@ -124,7 +125,6 @@ NxTest.test('D-90 fronts: profil na 2/3/4 kridlach — kazde kridlo skratene, si
       NxTest.assert_close(464.0, p[:box][2], 0.01, "kridlo #{i + 1}: panel skrateny")
       NxTest.assert_close(base[:parts][i][:box][0], p[:box][0], 0.01, "kridlo #{i + 1}: sirka nedotknuta")
       NxTest.assert_equal(base[:parts][i][:origin], p[:origin], "kridlo #{i + 1}: poloha nedotknuta")
-      NxTest.assert_equal(['W2'], p[:suppress_edges])
     end
   end
 end
@@ -135,7 +135,6 @@ NxTest.test('D-90 fronts: profil na zasuvkovom cele') do
   p = out[:parts][0]
   NxTest.assert_equal('drawer_front', p[:role])
   NxTest.assert_close(164.0, p[:box][2], 0.01, 'zasuvkove celo 200 - 36')
-  NxTest.assert_equal(['W2'], p[:suppress_edges])
 end
 
 NxTest.test('D-90 fronts: guard — panel pod 70 mm hlasi warning, bez panelu raise') do
@@ -302,8 +301,50 @@ NxTest.test('D-90 pravidla: build_plan koncoveho korpusu — profil, rez a hrany
   NxTest.assert_equal('ukw7', plan[:front_items][0]['profile'])
 end
 
+NxTest.test('D-90 pravidla: project_seed_plan je CISTA (nic nezapise) a vie, co pribudne') do
+  hr = NxD90.hr
+  m = NxTest::FakeEntity.new
+  old = NxD90.rules.reject { |r| r['kind'] == 'part_flag_length' }
+  hr.set_project_rules(m, old)
+  rules, added, refreshed = hr.project_seed_plan(hr.project_rules(m))
+  NxTest.assert_equal(%w[uchytkovy-profil uchytkovy-profil-zasuvky], added.sort,
+                      'plan vie DOPREDU, ktore pravidla pribudnu')
+  NxTest.assert_equal([], refreshed)
+  NxTest.assert_equal(hr::SEED_RULES.length, rules.length)
+  NxTest.assert_equal(old, hr.project_rules(m), 'plan je cisty — snapshot ostal nedotknuty')
+  # idempotencia: nad uz doplnenym snapshotom nic nepribudne
+  hr.set_project_rules(m, rules)
+  _, added2, refreshed2 = hr.project_seed_plan(hr.project_rules(m))
+  NxTest.assert_equal([[], []], [added2, refreshed2])
+end
+
+NxTest.test('D-90 pravidla: vypnutie profilu upratalo mrtvy override (Codex #144 P2)') do
+  cb = Noxun::Engine::CabinetBuilder
+  ov = [{ 'owner_part_key' => 'front:F1/wing:single', 'generic_type' => 'handle',
+          'rule_id' => 'uchytkovy-profil', 'disabled' => true },
+        { 'owner_part_key' => 'front:F1/wing:single', 'generic_type' => 'hinge',
+          'rule_id' => 'zavesy-podla-vysky', 'quantity' => 3 }]
+  door = { 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed', 'height' => 500.0, 'wings' => '1' }
+  with_profile = cb.normalize('hardware_overrides' => ov,
+                              'fronts' => { 'items' => [door.merge('profile' => 'ukw7')] })
+  NxTest.assert_equal(2, with_profile[:hardware_overrides].length,
+                      'kym profil zije, zasah zije s nim')
+  without = cb.normalize('hardware_overrides' => ov, 'fronts' => { 'items' => [door] })
+  rules_left = without[:hardware_overrides].map { |o| o['rule_id'] }
+  NxTest.assert_equal(['zavesy-podla-vysky'], rules_left,
+                      'po vypnuti profilu ostal len zaves — mrtvy zaznam profilu je prec')
+end
+
+NxTest.test('D-90 guard: panel posiela profil spat (form.js round-trip pred PR 2)') do
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'form.js'), encoding: 'UTF-8')
+  NxTest.assert(src.include?('row.dataset.frontProfile = item.profile'),
+                'addFrontRow musi ulozit profil riadku do datasetu')
+  NxTest.assert(src.include?("profile: r.dataset.frontProfile || 'none'"),
+                'collectFronts musi profil posielat spat — inak by ho kazdy edit zhodil')
+end
+
 # ---------------------------------------------------------------------------
-# 4) ABS — horna hrana pod profilom
+# 4) ABS — profil ju NEMENI (Michal 9.8.: hrana sa olepuje aj pod profilom)
 # ---------------------------------------------------------------------------
 
 # Docasny katalog (vzor test_2a3_picker) — bajt-presna obnova povodneho stavu.
@@ -333,62 +374,25 @@ def d90_edge(id = 'E10')
     'group_id' => 'GRP-G1', 'structure' => 'ST9', 'width' => 23.0 }
 end
 
-NxTest.test('D-90 ABS: potlacena hrana nedostane default a NEZBIERA warning (audit F4)') do
-  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
-  abs = Noxun::Engine::AbsRules
-  d90_with_catalog([d90_sheet], [d90_edge], schema: 2) do
-    sheet = Noxun::Engine::Materials.sheet('S18')
-    plain = abs.resolve_edges('front_door', 'G1', 18.0, sheet: sheet)
-    NxTest.assert_equal(%w[E10 E10 E10 E10], %w[L1 L2 W1 W2].map { |c| plain[c] },
-                        'celo sa bezne olepuje dookola')
-    hidden = abs.resolve_edges('front_door', 'G1', 18.0, sheet: sheet, suppress: ['W2'])
-    NxTest.assert_equal(nil, hidden['W2'], 'horna hrana pod profilom sa NEOLEPUJE')
-    NxTest.assert_equal(%w[E10 E10 E10], %w[L1 L2 W1].map { |c| hidden[c] },
-                        'ostatne hrany sa nemenia')
-  end
-  # katalog BEZ pasky: bezne by picker zapisal reason pre kazdu hranu; W2 nikdy
-  d90_with_catalog([d90_sheet], [], schema: 2) do
-    sheet = Noxun::Engine::Materials.sheet('S18')
-    all = []
-    abs.resolve_edges('front_door', 'G1', 18.0, sheet: sheet, collector: all)
-    NxTest.assert_equal(%w[L1 L2 W1 W2], all.map { |i| i[:code] }, 'bez potlacenia sa hlasia vsetky 4')
-    some = []
-    abs.resolve_edges('front_door', 'G1', 18.0, sheet: sheet, collector: some, suppress: ['W2'])
-    NxTest.assert_equal(%w[L1 L2 W1], some.map { |i| i[:code] },
-                        'hrana pod profilom NIKDY nezapise abs_* warning — nie je co skontrolovat')
-  end
-end
-
-NxTest.test('D-90 ABS: resolve_part potlaci W2 z deskriptora, rucny override ostava mozny') do
+NxTest.test('D-90 ABS: celo s profilom sa olepuje DOOKOLA presne ako bez profilu') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   cb = Noxun::Engine::CabinetBuilder
   d90_with_catalog([d90_sheet], [d90_edge], schema: 2) do
-    pd = { role: 'front_door', part_key: 'front:F1/wing:single', suffix: 'DOOR-1',
-           name: 'Dvierka 1', material: :front, profile: 'ukw7',
-           profile_band: { z: 566.0, h: 36.0 }, suppress_edges: ['W2'],
-           box: [596.0, 18.0, 464.0], origin: [2.0, -18.0, 102.0],
-           prod: { length: 464.0, width: 596.0, thickness: 18.0 } }
-    issues = []
-    r = cb.resolve_part(pd, 'S18', 'S18', 'S18', {}, abs_issues: issues)
-    NxTest.assert_equal(nil, r[:edges]['W2'], 'automaticky default hornej hrany je potlaceny')
-    NxTest.assert_equal('E10', r[:edges]['L1'], 'ostatne hrany olepene ako vzdy')
-    NxTest.assert_equal([], issues, 'ziadny falosny abs_* warning')
-    # rucny override tej istej hrany (profil UKW-11 a spol.) ostava mozny
-    ov = { 'front:F1/wing:single' => { 'edges' => { 'W2' => 'E10' } } }
-    r2 = cb.resolve_part(pd, 'S18', 'S18', 'S18', ov, abs_issues: [])
-    NxTest.assert_equal('E10', r2[:edges]['W2'], 'rucny override sa merguje AZ PO potlaceni')
+    base = { role: 'front_door', part_key: 'front:F1/wing:single', suffix: 'DOOR-1',
+             name: 'Dvierka 1', material: :front,
+             box: [596.0, 18.0, 464.0], origin: [2.0, -18.0, 102.0],
+             prod: { length: 464.0, width: 596.0, thickness: 18.0 } }
+    plain_issues = []
+    plain = cb.resolve_part(base.merge(profile: 'none'), 'S18', 'S18', 'S18', {},
+                            abs_issues: plain_issues)
+    prof_issues = []
+    prof = cb.resolve_part(base.merge(profile: 'ukw7', profile_band: { z: 566.0, h: 36.0 }),
+                           'S18', 'S18', 'S18', {}, abs_issues: prof_issues)
+    NxTest.assert_equal(%w[E10 E10 E10 E10], %w[L1 L2 W1 W2].map { |c| prof[:edges][c] },
+                        'profil ABS NEMENI — profil sa nasuva na hotovu olepenu hranu')
+    NxTest.assert_equal(plain[:edges], prof[:edges], 'hrany su zhodne s celom bez profilu')
+    NxTest.assert_equal([[], []], [plain_issues, prof_issues])
   end
-end
-
-NxTest.test('D-90 ABS: semafor nehlasi „celo bez ABS" kvoli potlacenej hrane') do
-  val = Noxun::Engine::Validation
-  rec = { 'name' => 'Dvierka 1', 'part_key' => 'front:F1/wing:single', 'owner_id' => 'CAB-001',
-          'role' => 'front_door', 'length' => 464.0, 'width' => 596.0, 'thickness' => 18.0,
-          'quantity' => 1, 'material_id' => 'S18', 'grain_direction' => 'length',
-          'edges' => { 'L1' => 'E10', 'L2' => 'E10', 'W1' => 'E10', 'W2' => nil } }
-  out = val.run({ records: [rec] })
-  NxTest.assert_equal([], out['items'].select { |i| i['category'] == 'front_abs' },
-                      'celo s 3 hranami je v poriadku (ORANGE je az pri ZIADNEJ hrane)')
 end
 
 # ---------------------------------------------------------------------------
