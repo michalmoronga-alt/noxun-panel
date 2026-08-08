@@ -424,9 +424,9 @@ module Noxun
         when KIND_PROFILE
           # D-90: bez priznaku profilu polozka NEVZNIKNE (ziadny warning — je to
           # bezny stav, cela bez profilu su vacsina).
-          p = flag_length_params(pd)
-          return [nil, {}] if p.empty?
-          [clamp_qty(rule.fetch('quantity', 1)), p]
+          flag_params = flag_length_params(pd)
+          return [nil, {}] if flag_params.empty?
+          [clamp_qty(rule.fetch('quantity', 1)), flag_params]
         end
       end
 
