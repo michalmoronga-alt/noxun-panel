@@ -7,8 +7,9 @@
 #      zasuvkove celo; guard 70 mm (warning) a MIN_DIM (raise); stary config = 'none'
 #   3) HardwareRules kind part_flag_length — emisia, identita, override/disable,
 #      seed v3, warning profile_rule_missing
-#   4) params_label („rez 597 mm") — serverovy format pre tab Vyroba aj CSV
-#   5) sablona — config s profilom prezije JSON round-trip
+#   4) ABS — profilom sa NEMENI (celo je olepene dookola ako vzdy)
+#   5) params_label („rez 597 mm") — serverovy format pre tab Vyroba aj CSV
+#   6) sablona — config s profilom prezije JSON round-trip
 #
 # ABS sa profilom NEMENI (Michal 9.8., foto realnej montaze): hrana pod
 # profilom sa olepuje normalne — profil sa nasuva na hotovu olepenu hranu.
@@ -280,7 +281,7 @@ NxTest.test('D-90 pravidla: profile_rule_missing sa nespusti pri vyradenom OVERR
   NxTest.assert_equal([], res[:warnings].select { |w| w['code'] == 'profile_rule_missing' })
 end
 
-NxTest.test('D-90 pravidla: build_plan koncoveho korpusu — profil, rez a hrany naraz') do
+NxTest.test('D-90 pravidla: build_plan koncoveho korpusu — skratene cela + rez per kridlo') do
   NxTest.skip!('build_plan default cita globalnu kniznicu — headless only') unless NxTest.headless?
   cb = Noxun::Engine::CabinetBuilder
   cn = Noxun::Engine::Construction
