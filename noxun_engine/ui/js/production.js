@@ -304,6 +304,9 @@
           // → payload 'reason_sk') — ten istý text ide aj do CSV. JS už žiadny
           // vlastný preklad enumu nemá; fallback je len pre starý payload.
           var reason = u.reason_sk || ('bez kódov (' + (u.reason || '?') + ')');
+          // D-90: 'params_label' („rez 597 mm") zo servera — bez neho by pri
+          // dĺžkovom kovaní nebolo v zozname vidieť, aký rozmer objednať.
+          if (u.params_label) reason += ' · ' + u.params_label;
           h += '<tr class="hwmiss"><td>' + esc(u.generic_type) + '</td>'
              + '<td>' + esc(u.cabinet_id + (u.owner_part_key ? ' · ' + u.owner_part_key : '')) + '</td>'
              + '<td>' + num(u.quantity) + '</td><td>' + esc(reason) + '</td></tr>';
@@ -317,7 +320,11 @@
     } else {
       h += '<table class="bomtab"><thead><tr><th>Typ</th><th>Parametre</th><th>ks</th><th>Kde</th></tr></thead><tbody>';
       list.forEach(function(g, i){
-        var params = Object.keys(g.params || {}).map(function(k){ return esc(k) + ' ' + esc(g.params[k]); }).join(', ') || '—';
+        // D-90: 'params_label' je SERVEROVY text („rez 597 mm") — ked ho polozka
+        // ma, zobrazi sa NAMIESTO surovych key/value (JS nic neformatuje).
+        var params = g.params_label
+          ? esc(g.params_label)
+          : (Object.keys(g.params || {}).map(function(k){ return esc(k) + ' ' + esc(g.params[k]); }).join(', ') || '—');
         var kde = (g.breakdown || []).map(function(b){ return esc(b.owner_id) + '×' + b.quantity + (b.source === 'manual' ? ' (ručne)' : ''); }).join(', ');
         // V0.6 C-2 (audit F11): slovensky label zo SERVERA (fallback surovy typ)
         h += '<tr class="hwrow" data-i="' + i + '"><td>' + esc(g.label || g.generic_type) + '</td><td>' + params + '</td>' +

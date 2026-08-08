@@ -69,6 +69,9 @@
         html += '<div class="rrow"><label>Rezerva</label><input class="rclr rnum" type="number" min="0" step="1" value="'+esc(r.clearance!=null?r.clearance:10)+'"><span class="unit">mm</span></div>';
         html += '<div class="rrow"><label>Počet</label><input class="rqty rnum" type="number" min="1" max="999" step="1" value="'+esc(r.quantity!=null?r.quantity:1)+'"><span class="unit">sád</span></div>';
         html += '<div class="hint">Vyberie sa najväčšia dĺžka z radu, ktorá sa zmestí do svetlej hĺbky mínus rezerva.</div>';
+      } else if (r.kind === 'part_flag_length'){
+        // D-90: pravidlo bez nastavení — reaguje na príznak profilu na čele.
+        html += '<div class="hint">Platí len pre čelá so zapnutým úchytkovým profilom — 1 kus na čelo, dĺžka rezu = šírka krídla. Vypnutím vyššie sa profil prestane počítať.</div>';
       } else {
         html += '<div class="hint">Pravidlo novšej verzie („'+esc(r.kind)+'“) — tu sa needituje, zostáva zachované.</div>';
       }

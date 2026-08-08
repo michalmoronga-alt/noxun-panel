@@ -1027,8 +1027,12 @@ module Noxun
             rows: bom[:rows], sheets: bom[:sheets], edging: bom[:edging],
             # V0.6 C-2 (audit F11): slovensky label kovania TRANZIENTNE —
             # autorita HardwareRules.label_for; do BOM/snapshotu sa neuklada.
+            # D-90: to iste pre 'params_label' („rez 597 mm") — format je
+            # SERVEROVY (JS ho len vypise), aby tab Výroba a CSV hovorili rovnako.
             hardware: (bom[:hardware] || []).map { |g|
-              g.is_a?(Hash) ? g.merge('label' => HardwareRules.label_for(g['generic_type'] || g[:generic_type])) : g
+              next g unless g.is_a?(Hash)
+              g.merge('label' => HardwareRules.label_for(g['generic_type'] || g[:generic_type]),
+                      'params_label' => HardwareRules.params_label(g['params'] || g[:params]))
             },
             # V0.6 D1b: nakupny zoznam setov (rows/unmapped/summary + stav
             # snapshotu setov projektu — invalid = banner, missing = global default).
