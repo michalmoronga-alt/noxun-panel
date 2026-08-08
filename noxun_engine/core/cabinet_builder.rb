@@ -358,9 +358,14 @@ module Noxun
           uni_sheet = defined?(Materials) && Materials.uni?(sheet)
           part_th = (uni_sheet ? nil : sheet_th) || pd[:prod][:thickness]
           picker_issues = abs_issues.nil? ? nil : []
+          # D-90 (audit F4): hrany zakryte uchytkovym profilom idu do resolve —
+          # default sa na ne neaplikuje a collector pre ne nezapise abs_* warning.
+          # Rucne overridy hran sa merguju az nizsie (ostavaju plne mozne).
+          suppressed = Array(pd[:suppress_edges]).map(&:to_s)
           base_edges = if defined?(AbsRules)
                          AbsRules.resolve_edges(pd[:role], decor, part_th,
-                                                sheet: sheet, collector: picker_issues)
+                                                sheet: sheet, collector: picker_issues,
+                                                suppress: suppressed)
                        else
                          empty_edges
                        end

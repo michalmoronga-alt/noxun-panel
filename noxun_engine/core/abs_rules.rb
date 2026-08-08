@@ -227,9 +227,14 @@ module Noxun
       #   collector — pole pre zber neuspechov/falibackov pickera (2A-3, audit
       #     B2): kazdy strojovy reason sa prida ako {code:, reason:, want:};
       #     caller doplna part_key/nazov a agreguje cez pick_warnings.
+      #   suppress — D-90 (audit F4): hrany, ktore su FYZICKY ZAKRYTE (uchytkovy
+      #     profil na hornej hrane cela). Potlacenie je sucastou RESOLVE, nie
+      #     nasledny uklid: pravidlovy default sa na hranu neaplikuje A collector
+      #     pre nu NIKDY nezapise abs_* warning (nie je co skontrolovat).
+      #     Rucny override hrany ostava mozny — merguje ho volajuci AZ POTOM.
       # Vrati VZDY kompletnu mapu {L1,L2,W1,W2} kde hodnota = abs_id alebo nil.
       # Ak pravidlo ziada hrubku, pre ktoru dekor nema pouzitelny variant -> nil + info log (standard 7.5).
-      def resolve_edges(role, decor, part_thickness = nil, sheet: nil, collector: nil)
+      def resolve_edges(role, decor, part_thickness = nil, sheet: nil, collector: nil, suppress: nil)
         # M-C: typova pravda materialu prebija rolove defaulty — KOMPAKT ma
         # monoliticku hranu a postforming hrany PD su hotove z vyroby (konce
         # PD lepi HPDB paska mimo ABS katalogu). Potlacaju sa LEN automaticke
@@ -240,11 +245,13 @@ module Noxun
         end
         th = thicknesses_for(role)
         out = { 'L1' => nil, 'L2' => nil, 'W1' => nil, 'W2' => nil }
+        hidden = Array(suppress).map(&:to_s)
         schema2 = sheet.is_a?(Hash) && defined?(Materials) &&
                   Materials.catalog_schema >= Materials::SCHEMA_GROUPS
         EDGE_ORDER.each do |code|
           want = th[code]
           next if want.nil?
+          next if hidden.include?(code) # D-90: hrana pod profilom — ziadny default, ziadny warning
           if schema2
             abs_id, reason = Materials.abs_for_sheet(sheet, Materials.edge_thickness_class(want),
                                                      part_thickness)
