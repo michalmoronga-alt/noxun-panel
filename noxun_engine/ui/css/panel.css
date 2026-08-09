@@ -207,6 +207,17 @@
   .hwrow:not(.hwsetrow) .hwsetsel { flex: 0 1 104px; min-width: 60px; max-width: 150px;
                      padding: 2px 4px; border: 1px solid var(--nx-border-strong);
                      border-radius: 4px; font-size: 11px; color: var(--nx-ink-muted); }
+  /* D-92 „co sa realne kupi": JEDEN sekundarny riadok pod polozkou (set -> kody).
+     Obal .hwitem preberá vertikalny odstup, aby dvojica riadkov nezaberala viac
+     miesta nez doteraz jeden (pravidlo vertikalneho priestoru). Riadok je
+     jednoriadkovy s ellipsis — plny text nesie title. */
+  .hwitem { margin: 4px 0; }
+  .hwitem .hwrow { margin: 0; }
+  .hwbuy { font-size: 11px; color: var(--nx-ink-muted); margin: 1px 0 0 2px;
+           overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* nekompletny nakup (chyba set/kod/pasmo) = jantarove UPOZORNENIE;
+     semaforove --nx-state-* su rezervovane a nesmu sa sem miesat */
+  .hwbuy.hwbuy-warn { color: var(--nx-warnchip-fg); }
   /* PRAVIDLA KOVANIA (dialog) */
   .rrule { border: 1px solid var(--nx-border); border-radius: 6px; padding: 8px 10px; margin: 8px 0; background: var(--nx-surface); }
   .rrule .rhead { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
@@ -229,8 +240,9 @@
   .nxhdr-id { display: flex; align-items: center; gap: 8px; min-height: 20px; }
   .nx-logo { flex: 0 0 auto; width: 16px; height: 16px; color: var(--nx-logo); } /* FILL vynimka — NEdedi .ic stroke */
   /* rad 2 (D-47): rezimove taby vlavo (3x ROVNAKO siroke, s ikonami) +
-     satelitne akcie Materialy·Vyroba vpravo (2x rovnako siroke — inline-grid
-     1fr 1fr vyrovna obe na sirku sirsej). */
+     satelitne akcie Materialy·Vyroba·Kovanie vpravo (rovnako siroke — inline-grid
+     s rovnakymi stlpcami vyrovna vsetky na sirku najsirsej).
+     D-91: pribudla tretia akcia (Kovanie) — stale JEDEN rad, ziadny rast do vysky. */
   .nxhdr-modes { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
   .cabtabs { display: flex; gap: 6px; flex: 1 1 auto; min-width: 0; }
   .cabtab { flex: 1 1 0; min-width: 0; padding: 5px 3px; font-size: 11px; background: var(--nx-surface-sunken);
@@ -238,16 +250,20 @@
             display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
   .cabtab.on { background: var(--nx-select); color: var(--nx-on-accent); border-color: var(--nx-select); }
   .cabtab .ic { width: 13px; height: 13px; }
-  .satbtns { flex: 0 0 auto; display: inline-grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .satbtns { flex: 0 0 auto; display: inline-grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .prodbtn { padding: 5px 8px; font-size: 11px; background: var(--nx-surface-sunken);
              color: var(--nx-ink-strong); border: 1px solid var(--nx-border);
              display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
   .prodbtn:hover { background: var(--nx-ghost-hover); }
   /* D-47: uzky panel — satelitne akcie icon-only (ZIADNY treti riadok);
-     title/aria-label ostavaju, takze vyznam nesie tooltip + citacka. */
-  @media (max-width: 400px) {
+     title/aria-label ostavaju, takze vyznam nesie tooltip + citacka.
+     D-91: s tretou akciou (Kovanie) sa texty musia stratit SKOR, inak by
+     rezimove taby ostali bez miesta — vlastny (sirsi) breakpoint. */
+  @media (max-width: 480px) {
     .prodbtn span { display: none; }
     .prodbtn { padding: 5px 7px; }
+  }
+  @media (max-width: 400px) {
     /* D-81: na uzkom paneli ustupi doplnkovy popis parametra (NL 500 / 150 mm)
        — je aj v tooltipe riadku; vyber setu a pocet musia ostat citatelne. */
     .hwrow .hwext { display: none; }

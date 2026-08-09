@@ -157,7 +157,8 @@ Aktuálny set: `maximize` (fit), `alert`, `lock` / `lock-open`, `eye` / `eye-off
 `arrow-left-right` (Nahradiť UNI… — riadok KONTROLY v okne Výroba, D-83),
 `more-horizontal` (⋯ ďalšie údaje riadku rozpočtu — kód/adresa/poznámka, E-b),
 `download` (⬇ export súboru — XLSX rozpočet, E-b),
-`profile` (vlastný symbol — úchytkový profil v riadku čela, D-90), `logo`.
+`profile` (vlastný symbol — úchytkový profil v riadku čela, D-90),
+`wrench` (Kovanie — satelitná akcia v hlavičke panela, D-91), `logo`.
 
 > Okno **Výroba** načítava `icons.js` od v0.5.44 (predtým sprite nemalo) — nové
 > ovládacie prvky v ňom používajú sprite, nie glyfy.
@@ -178,12 +179,28 @@ modeli). Vzory:
 - **Prepínače** (`.bseg`): s DPH / bez DPH je len zobrazenie (localStorage),
   režim €/€€/€€€ je zápis do zákazky; tooltipy nesú názvy režimov.
 
-### D-47: hlavička panela (rad 2)
+### D-47 / D-91: hlavička panela (rad 2)
 Tri režimové taby (Korpus·Zóny·Čelá) sú **rovnako široké** (`flex: 1 1 0`)
-s ikonou + textom; satelitné akcie **Materiály · Výroba** sú rovnako široké
-(inline-grid `1fr 1fr`) a pri šírke panela pod ~400 px sa prepnú na
-**icon-only** (media query skryje `.prodbtn span`; `title`/`aria-label`
+s ikonou + textom; satelitné akcie **Materiály · Výroba · Kovanie** sú rovnako
+široké (inline-grid `repeat(3, 1fr)`) a pri šírke panela pod ~480 px sa prepnú
+na **icon-only** (media query skryje `.prodbtn span`; `title`/`aria-label`
 ostávajú) — žiadny tretí riadok, vertikálny priestor panela sa nemení.
+Breakpoint je **vlastný** (nie spoločný s 400 px pravidlom pre `.hwext`):
+s treťou akciou musia texty ustúpiť skôr, inak by taby ostali bez miesta.
+
+> **D-91 (Michal 9.8.):** umiestnenie „za Výrobou" je **dočasné** — finálny
+> domov satelitných okien (toolbar: hlavná · materiály · výroba · kovanie)
+> rozhodne debata UI 2.0.
+
+### D-92: nákup pod položkou kovania (`.hwitem` / `.hwbuy`)
+Položka sekcie Kovanie je **obal `.hwitem`** = pôvodný `.hwrow` (počet, výber
+setu, akcie) + **jeden** sekundárny riadok `.hwbuy` drobným písmom:
+`Atira biela H176 → 357783 · K-Atira zásuvka 620/50kg`. Riadok je jednoriadkový
+s ellipsis, plný text nesie `title`. Nekompletný nákup (chýba set, kód alebo
+pásmo) dostane `.hwbuy-warn` = **jantárové upozornenie** (`--nx-warnchip-fg`);
+semaforové `--nx-state-*` sa sem **nemiešajú**. Obsah riadku skladá výhradne
+server (`HardwareSets.explain` + `PartKeys.human_label`) — JS nerozhoduje, čo
+sa kupuje, ani neprekladá dôvody.
 
 ### Pravidlo: žiadne emoji v UI chrome
 Emoji/unicode glyfy (🔒 ✕ ↺ ⚙ 📋 ★ ⧉ ⛶ ⚠ 🔗 …) sa v ovládacích prvkoch panela

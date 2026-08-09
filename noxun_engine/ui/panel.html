@@ -5,7 +5,7 @@
      sablon ziju v satelitnych oknach (proj_materials.html, templates.html) — panel ma len
      quick-pick sablony a materialy oznacenej skrinky. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.5.52">
+<link rel="stylesheet" href="css/panel.css?v=0.5.53">
 
 <!-- D-29: STICKY dvojradova hlavicka Inspectora. Rad 1 = firemne logo + identita
      objektu (bridge.js setIdbar) + warn chip. Rad 2 = rezimove taby (setCabTab,
@@ -16,9 +16,9 @@
     <svg class="nx-logo" viewBox="0 0 100 100" aria-hidden="true"><use href="#i-logo"/></svg>
     <div id="idbar" class="idbar"><span class="free">Nič nie je označené — návrh nového objektu</span></div>
   </div>
-  <!-- D-47: 3 taby rovnako siroke s ikonami + 2 satelitne akcie rovnako siroke
-       (Materialy vedla Vyroby). Pod ~400 px su akcie icon-only (CSS media query
-       .prodbtn span — ziadny treti riadok, vertikalny priestor). -->
+  <!-- D-47: 3 taby rovnako siroke s ikonami + satelitne akcie rovnako siroke
+       (Materialy · Vyroba · D-91 Kovanie). Pod ~480 px su akcie icon-only (CSS
+       media query .prodbtn span — ziadny treti riadok, vertikalny priestor). -->
   <div class="nxhdr-modes">
     <div class="cabtabs">
       <button id="tabCab" class="cabtab on" onclick="setCabTab('korpus')" aria-pressed="true"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg><span>Korpus</span></button>
@@ -28,6 +28,10 @@
     <div class="satbtns">
       <button class="prodbtn" onclick="openProjectMaterialsDialog()" title="Materiály — katalóg a predvoľby projektu" aria-label="Materiály — katalóg a predvoľby projektu"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg><span>Materiály</span></button>
       <button class="prodbtn" onclick="openProductionDialog()" title="Výroba — kusovník a súpisy" aria-label="Výroba — kusovník a súpisy"><svg class="ic" aria-hidden="true"><use href="#i-factory"/></svg><span>Výroba</span></button>
+      <!-- D-91: Katalóg kovania z hlavičky (dočasné miesto „za Výrobou" —
+           finálny domov rozhodne UI 2.0). Rovnaký mechanizmus ako ostatné
+           satelity: callback otvorí HardwareCatalogDialog. -->
+      <button class="prodbtn" onclick="openHardwareCatalogDialog()" title="Kovanie — katalóg položiek a sety" aria-label="Kovanie — katalóg položiek a sety"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg><span>Kovanie</span></button>
     </div>
   </div>
 </header>
@@ -369,19 +373,19 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.5.52"></script>
-<script src="js/icons.js?v=0.5.52"></script>
-<script src="js/core.js?v=0.5.52"></script>
-<script src="js/expr.js?v=0.5.52"></script>
-<script src="js/insert_state.js?v=0.5.52"></script>
-<script src="js/form.js?v=0.5.52"></script>
-<script src="js/zone_tree.js?v=0.5.52"></script>
-<script src="js/preview.js?v=0.5.52"></script>
-<script src="js/actions.js?v=0.5.52"></script>
-<script src="js/bridge.js?v=0.5.52"></script>
-<script src="js/materials.js?v=0.5.52"></script>
-<script src="js/part_card.js?v=0.5.52"></script>
-<script src="js/board_card.js?v=0.5.52"></script>
-<script src="js/hardware.js?v=0.5.52"></script>
-<script src="js/usage.js?v=0.5.52"></script>
-<script src="js/boot.js?v=0.5.52"></script>
+<script src="js/errors.js?v=0.5.53"></script>
+<script src="js/icons.js?v=0.5.53"></script>
+<script src="js/core.js?v=0.5.53"></script>
+<script src="js/expr.js?v=0.5.53"></script>
+<script src="js/insert_state.js?v=0.5.53"></script>
+<script src="js/form.js?v=0.5.53"></script>
+<script src="js/zone_tree.js?v=0.5.53"></script>
+<script src="js/preview.js?v=0.5.53"></script>
+<script src="js/actions.js?v=0.5.53"></script>
+<script src="js/bridge.js?v=0.5.53"></script>
+<script src="js/materials.js?v=0.5.53"></script>
+<script src="js/part_card.js?v=0.5.53"></script>
+<script src="js/board_card.js?v=0.5.53"></script>
+<script src="js/hardware.js?v=0.5.53"></script>
+<script src="js/usage.js?v=0.5.53"></script>
+<script src="js/boot.js?v=0.5.53"></script>

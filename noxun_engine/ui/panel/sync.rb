@@ -84,6 +84,13 @@ module Noxun
         # push_selected: ten resetuje rozpracovany formular a navyse dedup-uje
         # kopie, cize by zmena v satelitnom okne siahla na MODEL.
         # Cita sa iba (find_cabinet + config) — bez operacie, bez zapisu.
+        #
+        # D-92 (audit BLOCKER 2): payload nesie AJ nakupny rozpis poloziek
+        # (set -> kody -> nazvy). Bez neho by sekcia Kovanie po zmene setu,
+        # kodu ci nazvu polozky ukazovala stary nakup az do prekliku vyberu.
+        # Riadky sa NEPREKRESLUJU — JS meni len sekundarne riadky (rozpisany
+        # pocet aj vyber setu ostavaju). 'items' nesie identitu polozky
+        # (owner_part_key + generic_type + rule_id), aby ich JS spároval.
         def push_hardware_sets
           return unless dialog_alive?
 
@@ -91,15 +98,27 @@ module Noxun
           cab = model ? find_cabinet(model) : nil
           data =
             if cab.nil?
-              { 'cabinet_id' => nil, 'options' => [] }
+              { 'cabinet_id' => nil, 'options' => [], 'items' => [] }
             else
               cfg = Store.config(cab) || {}
+              items = hardware_items_payload(cfg)
               { 'cabinet_id' => Store.get(cab, 'cabinet_id'),
-                'options' => hardware_set_options(cfg, cfg['hardware']) }
+                'options' => hardware_set_options(cfg, items),
+                'items' => items.map { |h| hardware_purchase_row(h) }.compact }
             end
           js("NX.setHardwareSets(#{data.to_json})")
         rescue StandardError => e
           Engine.log_error(e, 'Panel.push_hardware_sets')
+        end
+
+        # D-92: minimalny tvar pre zivy refresh — identita riadku + to, co sa
+        # v nom meni. Nic viac (payload chodi po kazdej zmene katalogu).
+        def hardware_purchase_row(item)
+          return nil unless item.is_a?(Hash)
+
+          { 'owner_part_key' => item['owner_part_key'], 'generic_type' => item['generic_type'],
+            'rule_id' => item['rule_id'], 'owner_label' => item['owner_label'],
+            'purchase' => item['purchase'] }
         end
 
         def set_status(msg, error = false)

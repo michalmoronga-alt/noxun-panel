@@ -52,13 +52,113 @@ module Noxun
           # V0.6 C-2 (audit F11): slovensky label TRANZIENTNE v payloade —
           # jedina autorita HardwareRules.label_for (JS mapy su len fallback);
           # do configu/snapshotu sa label NIKDY neuklada.
-          params['hardware'] = (cfg['hardware'].is_a?(Array) ? cfg['hardware'] : []).map do |h|
-            h.is_a?(Hash) ? h.merge('label' => HardwareRules.label_for(h['generic_type'])) : h
-          end
+          params['hardware'] = hardware_items_payload(cfg)
+          # D-92: aj VYPNUTE kategorie (disabled overridy) pomenuva server —
+          # inak by jedine ony ostali v sekcii Kovanie so surovym part_key.
+          params['hardware_overrides'] = hardware_overrides_payload(cfg, params['hardware_overrides'])
           # V0.6 D1b: vyber setu per typ NA SKRINKE (override projektovej
           # predvolby) — ponuka + efektivny stav; server je autorita.
           params['hardware_set_options'] = hardware_set_options(cfg, params['hardware'])
           params
+        end
+
+        # V0.6 D-92: polozky kovania pre panel. Aditivne k ulozenemu configu:
+        #   label       — slovensky nazov typu (jedina autorita HardwareRules)
+        #   owner_label — LUDSKY nazov vlastnika namiesto suroveho part_key
+        #                 (D-92; JS uz nic neskladá)
+        #   purchase    — co sa realne kupi (set -> kody -> nazvy z katalogu)
+        # Vsetko TRANZIENTNE — do configu/snapshotu sa NIKDY nic z toho neuklada.
+        # Cesta je CITACIA: ziadna operacia, ziadny zapis do modelu.
+        def hardware_items_payload(cfg)
+          items = (cfg['hardware'].is_a?(Array) ? cfg['hardware'] : []).map do |h|
+            h.is_a?(Hash) ? h.merge('label' => HardwareRules.label_for(h['generic_type'])) : h
+          end
+          decorate_hardware_purchase(cfg, items)
+        end
+
+        # D-92: ludsky nazov vlastnika aj pri vypnutych kategoriach.
+        def hardware_overrides_payload(cfg, overrides)
+          fronts = payload_fronts(cfg)
+          Array(overrides).map do |ov|
+            next ov unless ov.is_a?(Hash)
+
+            ov.merge('owner_label' => PartKeys.human_label(ov['owner_part_key'], fronts: fronts))
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.hardware_overrides_payload')
+          overrides
+        end
+
+        # Resolved cela poslednej stavby — zdroj cisla „F2" (D-92).
+        def payload_fronts(cfg)
+          cfg['front_items'].is_a?(Array) ? cfg['front_items'] : []
+        end
+
+        # D-92: doplni owner_label + purchase. Zlyhanie TU nesmie zhodit cely
+        # payload skrinky (panel by ostal prazdny) — vrati sa aspon holy zoznam.
+        def decorate_hardware_purchase(cfg, items)
+          return items if items.empty?
+
+          fronts = payload_fronts(cfg)
+          status, state = hardware_read_state
+          overrides = cabinet_set_overrides(cfg)
+          # Katalog sa cita LEN ked skrinka nejake kovanie ma (guard vyssie) a
+          # mapa kod=>polozka sa stavia RAZ pre cely payload (audit D-92 FIX 3).
+          # HardwareCatalog.items pritom moze pri PRVOM citani v sedeni zaseedovat
+          # globalnu kniznicu — je to VEDOMY kontrakt (rovnako ako HardwareSets.load
+          # v tom istom payloade): bez seedu by panel pri cerstvej instalacii
+          # tvrdil „mimo katalógu" pri kazdom kode, co je horsie nez zapis do
+          # %APPDATA%. Model sa NIKDY nedotkne.
+          lookup = HardwareSets.catalog_lookup(HardwareCatalog.items)
+          items.map do |h|
+            next h unless h.is_a?(Hash)
+
+            h.merge('owner_label' => PartKeys.human_label(h['owner_part_key'], fronts: fronts),
+                    'purchase' => item_purchase(h, status, state, overrides, lookup))
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.decorate_hardware_purchase')
+          items
+        end
+
+        # Poskodeny snapshot setov (:invalid) sa NIKDY nedopocitava z globalu —
+        # expanzia pri nom vedome nemapuje nic, takze aj panel musi povedat
+        # pravdu a poslat pouzivatela tam, kde sa to da opravit.
+        INVALID_SETS_SK = 'sety projektu sú poškodené — obnov ich v Katalógu kovania (Predvoľby projektu)'
+
+        def item_purchase(item, status, state, overrides, lookup)
+          if status == :invalid
+            return { 'set_id' => nil, 'set_name' => nil, 'members' => [],
+                     'problems' => [INVALID_SETS_SK] }
+          end
+          HardwareSets.explain(item, state, overrides: overrides, lookup: lookup)
+        end
+
+        # Override mapa setov TEJTO skrinky (moze mat composite kluce gt@owner
+        # a selector hodnoty — parser je jedina autorita tvaru).
+        def cabinet_set_overrides(cfg)
+          HardwareSets.normalize_mapping(
+            cfg['hardware_sets'].is_a?(Hash) ? cfg['hardware_sets'] : {}, nil, allow_owner: true
+          )
+        end
+
+        # Projektovy stav setov NA CITANIE (ziadny zapis do modelu):
+        #   :ok      — snapshot projektu
+        #   :missing — projekt snapshot este nema, plati globalna kniznica
+        #              (zmrazi ju az stavba/zmena — citanie model nemeni)
+        #   :invalid — poskodeny snapshot: ziadne mapovanie, ziadny fallback
+        # -> [status, { 'mapping' =>, 'sets' => }]
+        def hardware_read_state
+          model = Sketchup.active_model
+          status, state = HardwareSets.project_state_status(model)
+          return [status, state] if status == :ok && state
+          if status == :missing
+            lib = HardwareSets.load
+            sets = {}
+            lib['sets'].each { |s| sets[s['set_id']] = s }
+            return [status, { 'mapping' => lib['mapping'], 'sets' => sets }]
+          end
+          [status, { 'mapping' => {}, 'sets' => {} }]
         end
 
         # Ponuka setov pre typy kovania, ktore skrinka realne ma: projektove
@@ -66,28 +166,15 @@ module Noxun
         # az stavba/zmena), sety z GLOBALU + aktualne mapovany/overridnuty zo
         # SNAPSHOTU (v globale uz nemusi byt). invalid = prazdna ponuka + flag.
         def hardware_set_options(cfg, hardware)
-          model = Sketchup.active_model
-          status, state = HardwareSets.project_state_status(model)
-          if status == :missing
-            lib = HardwareSets.load
-            snap_sets = {}
-            lib['sets'].each { |s| snap_sets[s['set_id']] = s }
-            proj_map = lib['mapping']
-          elsif state
-            snap_sets = state['sets']
-            proj_map = state['mapping']
-          else
-            snap_sets = {}
-            proj_map = {}
-          end
+          status, state = hardware_read_state
+          snap_sets = state['sets']
+          proj_map = state['mapping']
           globals = HardwareSets.load['sets']
           # H1a: override mapa moze mat composite kluce (gt@owner) a hodnota
           # moze byt selector — parser je jedina autorita tvaru; ponuku setov
           # sklada HardwareSets.set_options (definicia zo SNAPSHOTU vyhrava nad
           # globalom pre referencovane set_id — audit BLOCKER 4).
-          overrides = HardwareSets.normalize_mapping(
-            cfg['hardware_sets'].is_a?(Hash) ? cfg['hardware_sets'] : {}, nil, allow_owner: true
-          )
+          overrides = cabinet_set_overrides(cfg)
           refs = HardwareSets.referenced_set_ids(proj_map, 'cab' => overrides)
           types = Array(hardware).filter_map { |h| h.is_a?(Hash) ? h['generic_type'].to_s : nil }
                                  .reject(&:empty?).uniq

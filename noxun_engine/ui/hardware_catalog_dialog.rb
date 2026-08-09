@@ -103,6 +103,13 @@ module Noxun
 
         def push_items
           js("MDH.setItems(#{items_payload.to_json})")
+          # D-92 (audit BLOCKER 2): sekcia Kovanie v paneli ukazuje KODY a NAZVY
+          # kupovanych poloziek — po kazdej zmene katalogu ich treba obnovit,
+          # inak by drzala stary nazov (alebo „mimo katalógu") az do prekliku
+          # vyberu. ZIVY push (NIKDY push_selected — ten siaha na model).
+          Panel.push_hardware_sets if defined?(Panel) && Panel.dialog_alive?
+        rescue StandardError => e
+          Engine.log_error(e, 'HardwareCatalogDialog.push_items')
         end
 
         def state_payload
