@@ -2412,6 +2412,28 @@ module NoxunSuRunner
       ok('D-104: opatovne zapnutie v tom istom modeli funguje (nova instancia overlayu)',
          st['active'] == true && d104_overlay_present?(model) && st['count'].to_i == 1)
 
+      # 9b) Codex #152 P2: zmena KATALOGU nie je modelova transakcia — invalidate!
+      #     musi stacit na cerstvy pocet uz pri najblizsom stave pre okno.
+      e::EdgeCheck.invalidate!
+      dirty_before = e::EdgeCheck.instance_variable_get(:@dirty)
+      st = d104_state(model)
+      ok('D-104: invalidate! (zmena katalogu) sa prepocita bez modelovej transakcie',
+         dirty_before == true && e::EdgeCheck.instance_variable_get(:@dirty) == false &&
+         st['count'].to_i == 1)
+
+      # 9c) Codex #152 P2: nativne vypnutie v paneli Overlays sa musi hlasit ako VYPNUTE
+      ov = e::EdgeCheck.instance_variable_get(:@overlay)
+      if ov.respond_to?(:enabled=)
+        ov.enabled = false
+        ok('D-104: nativne vypnuty overlay sa NEhlasi ako zapnuty',
+           d104_state(model)['active'] == false)
+        ov.enabled = true
+        ok('D-104: po nativnom zapnuti sa hlasi zase zapnuty (a pocet sedi)',
+           d104_state(model)['active'] == true && d104_state(model)['count'].to_i == 1)
+      else
+        info('D-104: Sketchup::Overlay#enabled= nie je k dispozicii — nativny toggle netestovany')
+      end
+
       # 10) kreslenie nespadne a obal kresby nie je prazdny
       begin
         e::EdgeCheck.draw(model.active_view)

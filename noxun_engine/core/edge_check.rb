@@ -178,9 +178,31 @@ module Noxun
         false
       end
 
+      # ZAPNUTE = mame overlay, patri TOMUTO modelu, je v nom zaregistrovany a
+      # nie je NATIVNE vypnuty. Codex GH #152 P2: overlay sa da vypnut aj v
+      # SketchUp paneli Overlays (Utilities) — vtedy ostane zaregistrovany, ale
+      # prestane kreslit; okno by inak tvrdilo „zapnute" nad prazdnym modelom
+      # a pocet by zamrzol (bez `draw` sa cache neprepocita).
       def active?(model = nil)
         m = model || active_model
-        !@overlay.nil? && same_model?(@model, m)
+        return false if @overlay.nil?
+        return false unless same_model?(@model, m)
+        overlay_live?(m)
+      end
+
+      def overlay_live?(model)
+        return false if @overlay.nil?
+        return false unless registered?(model)
+        !@overlay.respond_to?(:enabled?) || @overlay.enabled? == true
+      rescue StandardError
+        false
+      end
+
+      def registered?(model)
+        return true unless model.respond_to?(:overlays)
+        model.overlays.to_a.include?(@overlay)
+      rescue StandardError
+        true
       end
 
       # Identita dokumentu: SketchUp vracia zvycajne ten isty objekt, ale po
@@ -282,6 +304,18 @@ module Noxun
         @cache = scan(m)
         @dirty = false
         @cache
+      end
+
+      # Oznaci cache za starú BEZ modelovej transakcie (Codex GH #152 P2):
+      # zmena KATALOGU (typ dosky, PD podtyp, pasky) meni, ktore hrany su
+      # lepitelne, ale ziadny ModelObserver o nej nevie. Prepocet bezi lazy —
+      # v najblizsom `ui_state` (push_state okna) alebo pri prekresleni.
+      def invalidate!
+        return unless @overlay
+        @dirty = true
+        request_redraw(@model)
+      rescue StandardError => e
+        Engine.log_error(e, 'EdgeCheck.invalidate!')
       end
 
       # Volane z ModelObservera (commit/undo/redo/abort). V observeri sa NIC
@@ -388,6 +422,10 @@ module Noxun
       def ui_state(model = nil)
         m = model || active_model
         on = active?(m)
+        # Cislo v okne nesmie byt stare: ked je cache oznacena za starú (modelova
+        # transakcia alebo zmena katalogu), prepocita sa TU — inak by okno cakalo
+        # na najblizsie prekreslenie pohladu.
+        refresh!(m) if on && (@cache.nil? || @dirty)
         c = on && @cache ? @cache : nil
         { 'available' => available?(m), 'active' => on,
           'count' => c ? c['count'] : nil, 'drawn' => c ? c['drawn'] : nil,

@@ -1422,6 +1422,12 @@ module Noxun
           # ready/on_model_changed/projektove predvolby.
           push_catalog
           Panel.push_materials if defined?(Panel)
+          # D-104 (Codex GH #152 P2): katalogovy zapis NIE JE modelova transakcia,
+          # takze ModelObserver zvyraznenia hran o nom nevie — a pritom prave
+          # zmena typu/podtypu dosky (napr. PD abs <-> postforming) meni, ktore
+          # hrany su lepitelne. Cache sa preto oznaci za starú TU; prepocet bezi
+          # lazy (push_state nizsie / najblizsie prekreslenie).
+          EdgeCheck.invalidate! if defined?(EdgeCheck)
           # D-19 (Codex F3): otvorene okno Vyroba by inak drzalo stary odhad
           # platni (format sa prave mohol zmenit)
           ProductionDialog.refresh_if_open if defined?(ProductionDialog)
