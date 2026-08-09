@@ -443,8 +443,15 @@ NxTest.test('D-90 obrys: prierez UKW-7 je kompletny a v deklarovanom obalovom kv
   NxTest.assert_equal([], bad, 'kazdy bod je dvojica konecnych Float [hlbka, vyska]')
   ds = o.map(&:first)
   vs = o.map(&:last)
-  NxTest.assert_close(0.0, ds.min, 0.0001, 'hlbka 0 = ZADNA rovina profilu (= zadna rovina cela)')
-  NxTest.assert_close(19.181, ds.max, 0.0001, 'hlbka prierezu')
+  NxTest.assert_close(0.0, ds.min, 0.0001, 'hlbka 0 = PREDNA strana profilu (nos) — konvencia GH #146')
+  NxTest.assert_close(19.181, ds.max, 0.0001, 'hlbka prierezu (max = CHRBAT na zadnej rovine cela)')
+  # ORIENTACIA OBRYSU (GH #146 P2): nos = najnizsie body MUSIA byt pri d=0
+  # (vpredu). Keby niekto vlozil novy profil s opacnou orientaciou, spadne
+  # uz headless — nie az vizualne v modeli.
+  z_floor = vs.min
+  nose_ds = o.select { |d, v| (v - z_floor).abs <= 0.01 }.map(&:first)
+  NxTest.assert(!nose_ds.empty? && nose_ds.max < 2.0,
+                "nos obrysu lezi vpredu pri d=0 (najnizsie body: d #{nose_ds.map { |d| d.round(2) }})")
   NxTest.assert_close(0.0, vs.min, 0.0001)
   NxTest.assert_close(37.419, vs.max, 0.0001, 'vyska prierezu')
   geo = fp.geometry('ukw7')

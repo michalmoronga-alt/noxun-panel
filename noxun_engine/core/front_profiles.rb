@@ -30,9 +30,15 @@ module Noxun
       # D-90 PR 2 — PRIEREZ UKW-7 (83 bodov, mm) presne z Michalovho modelu
       # (extrakcia 9.8.2026, `_dev/UKW7_prierez.json`; `_dev` je gitignore, preto
       # je obrys zakodovany TU ako jediny zdroj pravdy tvaru).
-      # Suradnica bodu = [hlbka, vyska]:
-      #   hlbka  0 .. 19,181 — 0 je ZADNA rovina profilu (= zadna rovina cela),
-      #                        rastie DOPREDU (v modeli sa mapuje na -Y)
+      # Suradnica bodu = [hlbka, vyska] — ZAVAZNA KONVENCIA pre VSETKY profily
+      # registry (GH #146 P2 — renderer aj registry MUSIA citat hlbku rovnako):
+      #   hlbka  0 .. depth — 0 je PREDNA strana profilu (nos/uchyt), depth je
+      #                       CHRBAT (= zadna rovina cela). Renderer mapuje
+      #                       [d, v] -> Y = d - depth, cize chrbat lici so
+      #                       zadnou rovinou cela a nos konci na Y = -depth.
+      #                       (Povodny text tu tvrdil opak a kreslenie podla
+      #                       neho vykreslilo UKW-7 zrkadlovo — nalez Michala
+      #                       na realnej zakazke 9.8.2026.)
       #   vyska  0 .. 37,419 — 37,419 je VRCH profilu (= horna hrana POVODNEHO
       #                        cela pred skratenim o 36 mm)
       # Body sa NEZAOKRUHLUJU ani neredukuju — tvar „nosa" nad licom cela vznikne
