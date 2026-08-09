@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.5.57' unless defined?(VERSION)
+    VERSION = '0.5.58' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -75,6 +75,8 @@ Sketchup.require 'noxun_engine/core/vepo_export'   # V0.5 C VEPO CSV export (pri
 Sketchup.require 'noxun_engine/core/sheet_estimate' # D-19 orientacny odhad platni
 Sketchup.require 'noxun_engine/core/debug'         # read-only diagnostika stavu (bugcatch cez MCP)
 Sketchup.require 'noxun_engine/core/validation'    # V0.5 D kontrolny semafor vyroby (RED/ORANGE)
+Sketchup.require 'noxun_engine/core/edge_check'     # D-104 kontrola hran (po validation — zdiela jeho definicie UNI/nelepitelnych)
+Sketchup.require 'noxun_engine/core/edge_overlay'   # D-104 Sketchup::Overlay + ModelObserver (SU 2023+, guardovane)
 Sketchup.require 'noxun_engine/core/supplier_settings' # V0.6 E-a: sadzby/rezimy/standardne riadky rozpoctu (globál)
 Sketchup.require 'noxun_engine/core/budget_store'  # V0.6 E-a: data rozpoctu v zakazke (po store + supplier_settings)
 Sketchup.require 'noxun_engine/core/budget'        # V0.6 E-a: vypocet rozpoctu (po bom/sheet_estimate/budget_store)

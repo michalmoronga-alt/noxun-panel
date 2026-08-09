@@ -293,6 +293,56 @@ module Noxun
           set_status("Export cenovej ponuky zlyhal: #{e.message}", true)
         end
 
+        # D-104: prepinac zvyraznenia hran bez olepu (tab KONTROLA). Model sa
+        # NEMENI — overlay kresli NAD nim (ziadna operacia, ziadny undo krok).
+        # Guardy bezia na SERVERI (HTML disabled nie je ochrana):
+        #   gen        — klik zo stareho DOM (medzitym prepocitane okno),
+        #   model_guid — medzitym prepnuty dokument (zaplo by sa v cudzej zakazke),
+        #   available  — SketchUp bez Overlay API (SU 2022 a starsi).
+        def do_edge_check(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          model = Sketchup.active_model
+          unless defined?(EdgeCheck) && EdgeCheck.available?(model)
+            push_edge_check
+            return set_status('Zvýraznenie hrán vyžaduje SketchUp 2023 alebo novší.', true)
+          end
+          unless data['gen'].to_i == @generation.to_i
+            push_state if @dialog && @dialog.visible?
+            return set_status('Okno sa medzitým prepočítalo — obnovené, klikni znova.', true)
+          end
+          guid = data['model_guid'].to_s
+          if !guid.empty? && guid != model_guid(model)
+            push_state
+            return set_status('Model sa medzitým prepol — obnovené, klikni znova.', true)
+          end
+          state = EdgeCheck.toggle(model)
+          push_edge_check(state)
+          set_status(edge_check_status(state))
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.do_edge_check')
+          set_status("Chyba zvýraznenia hrán: #{e.message}", true)
+        end
+
+        # Maly echo push (bez prepoctu celeho okna) — vola ho aj EdgeCheck po
+        # prepocte cache (rebuild pri zapnutom zvyrazneni).
+        def push_edge_check(state = nil)
+          return unless defined?(EdgeCheck)
+          st = state || EdgeCheck.ui_state(Sketchup.active_model)
+          js("if (window.NX && NX.setEdgeCheck) NX.setEdgeCheck(#{st.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.push_edge_check')
+        end
+
+        def edge_check_status(state)
+          st = state.is_a?(Hash) ? state : {}
+          return 'Zvýraznenie hrán vypnuté — v modeli nič neostalo.' unless st['active']
+          n = st['count'].to_i
+          return 'Zvýraznenie zapnuté — všetky hrany podľa pravidla sú olepené.' if n.zero?
+
+          extra = st['unresolved'].to_i.positive? ? " (#{st['unresolved'].to_i} sa nedá zvýrazniť)" : ''
+          "Zvýraznenie zapnuté — #{n} hrán bez olepu#{extra}."
+        end
+
         # V0.6 E-b: mutacie rozpoctu (rezim, prepis sumy, nasobok, m2, spotrebice
         # v sucte, vlastne polozky). Guardy bezia na SERVERI — HTML disabled ani
         # klientske echo nie su ochrana:
@@ -474,7 +524,17 @@ module Noxun
           )
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'production.html'))
           register_callbacks(@dialog) # pred show!
-          @dialog.set_on_closed { @dialog = nil }
+          # D-104: zvyraznenie hran je nastroj TOHTO okna — zatvorenie ho vypne,
+          # aby v modeli neostalo nic, co sa neda vypnut (kontrakt „vypneš a nič
+          # v modeli neostane").
+          @dialog.set_on_closed do
+            @dialog = nil
+            begin
+              EdgeCheck.disable! if defined?(EdgeCheck)
+            rescue StandardError => e
+              Engine.log_error(e, 'ProductionDialog.on_closed edge_check')
+            end
+          end
           @dialog
         end
 
@@ -486,6 +546,9 @@ module Noxun
           cb(dlg, 'hw_csv_export') { |p| handle_hw_csv(p) } # V0.6 D1b
           # D-83: skratka z riadku KONTROLY do „Nahradiť UNI…" (okno Materiály).
           cb(dlg, 'replace_uni') { |p| handle_replace_uni(p) }
+          # D-104: prepínač zvýraznenia hrán bez olepu (tab KONTROLA). Žiadny
+          # flush handshake — model sa nemení, len sa nad ním kreslí.
+          cb(dlg, 'edge_check_toggle') { |p| do_edge_check(p) }
           # V0.6 E-b: tab Rozpočet — mutácie, XLSX export, ⚙ Nastavenia, ↗ URL.
           cb(dlg, 'budget_mutate')   { |p| do_budget(p) }
           cb(dlg, 'budget_xlsx')     { |p| handle_budget_xlsx(p) }
@@ -1074,6 +1137,9 @@ module Noxun
             # V0.6 E-b: celý rozpočet zákazky (sekcie, sumy, vek cien, kontrola).
             # JS z neho LEN číta — žiadne sumy sa v prehliadači nepočítajú.
             budget: budget,
+            # D-104: stav zvyraznenia hran bez olepu (tab KONTROLA). Ked je
+            # vypnute, NIC sa neskenuje — okno platí nulu navyše.
+            edge_check: (defined?(EdgeCheck) ? EdgeCheck.ui_state(model) : nil),
             # V0.5 C: default projektu + zapamatany merge (JS input lifecycle F10);
             # model_key = epocha prepnuti + cesta (GH P2: rovnake tituly nestacia)
             vepo: { default_project: default_project_name(model),
