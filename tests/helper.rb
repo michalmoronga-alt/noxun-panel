@@ -121,6 +121,7 @@ unless NxTest::IN_SKETCHUP
   %w[
     core/part_keys
     core/build_plan
+    core/part_faces
     core/json_file_store
     core/materials
     core/materials_catalog

@@ -387,13 +387,30 @@
   // (Odporucane k dekoru / Ostatne). 2A-3b: parameter je ID materialu dielca
   // (skupinu urcuje cely zaznam dosky — group_id/structure podla schemy),
   // currentValue = aktualna ABS hodnota tejto hrany (zachova sa aj mimo katalogu — F5).
-  function edgeOptionsHtml(materialId, currentValue){
-    var prefix = '<option value="__inherit__">(podľa pravidla)</option><option value="">Bez ABS</option>';
+  // D-102: inheritLabel = HOTOVY text zo servera „(podľa pravidla — 500 SM Biela 23/1 mm)".
+  // Skladá ho VYHRADNE Ruby (payloads.edge_rule_options) — JS ho len ESCAPUJE a vlozi.
+  // Bez textu (napr. po lokalnej zmene materialu, kym nedojde serverovy payload)
+  // sa pouzije neutralne „(podľa pravidla)" — radsej ziadny udaj nez STARY udaj.
+  function edgeOptionsHtml(materialId, currentValue, inheritLabel){
+    var txt = (inheritLabel === null || inheritLabel === undefined || inheritLabel === '')
+      ? '(podľa pravidla)' : inheritLabel;
+    var prefix = '<option value="__inherit__">'+esc(txt)+'</option><option value="">Bez ABS</option>';
     return absOptionsHtml(prefix, groupAbsForSheet(MATERIALS.edges, sheetRecOf(materialId), catalogSchemaNow(), currentValue));
   }
   // Volby ABS pre dropdown hrany DOSKY: doska nema override vrstvu (fixne len Bez ABS).
-  function boardEdgeOptionsHtml(materialId, currentValue){
-    return absOptionsHtml('<option value="">Bez ABS</option>', groupAbsForSheet(MATERIALS.edges, sheetRecOf(materialId), catalogSchemaNow(), currentValue));
+  // D-102: noneLabel nesie serverovy text „Bez ABS (nelepí sa)" pri nelepitelnom materiali.
+  function boardEdgeOptionsHtml(materialId, currentValue, noneLabel){
+    var txt = (noneLabel === null || noneLabel === undefined || noneLabel === '') ? 'Bez ABS' : noneLabel;
+    return absOptionsHtml('<option value="">'+esc(txt)+'</option>', groupAbsForSheet(MATERIALS.edges, sheetRecOf(materialId), catalogSchemaNow(), currentValue));
+  }
+  // D-102: popisok strany v 2D nahlade = nazov hrany + SKRATKA vyriesenej pasky
+  // („Predná · 23/1"). Skratku sklada server (payloads.abs_short_text) — JS ju
+  // len pripaja, aby nahlad nepotreboval novy riadok (vertikalny priestor).
+  // Zdielaju ho karta dielca aj karta dosky (jeden zdroj, jedno spravanie).
+  function edgeSideText(baseLabel, shortText){
+    var b = (baseLabel === null || baseLabel === undefined) ? '' : String(baseLabel);
+    var s = (shortText === null || shortText === undefined) ? '' : String(shortText);
+    return s === '' ? b : (b === '' ? s : b + ' · ' + s);
   }
   // FIX 2: naplni/obnovi vsetky projektove + korpusove material selecty podla hrubky KONTEXTU
   // (korpus = pole 'thickness', chrbat = 'back_thickness', cela = rozsah dosky). Nekompatibilne
@@ -528,6 +545,9 @@
       groupAbsEdgesV2: groupAbsEdgesV2, groupAbsForSheet: groupAbsForSheet,
       absUsableExistsV2: absUsableExistsV2, absUsableForSheet: absUsableForSheet,
       absMissingLabel: absMissingLabel, absUnitClass: absUnitClass,
+      // D-102 (tests/js/test_d102_pravidlo.js) — serverove texty volieb a popiskov
+      edgeOptionsHtml: edgeOptionsHtml, boardEdgeOptionsHtml: boardEdgeOptionsHtml,
+      edgeSideText: edgeSideText,
       // D-45 (tests/js/test_thickness_labels.js) — ciste funkcie hrubkovych filtrov/labelov
       mmLabel: mmLabel, bodyThicknessNote: bodyThicknessNote, frontMatch: frontMatch,
       rangeMatch: rangeMatch, thMatch: thMatch, TH_RANGE: TH_RANGE,

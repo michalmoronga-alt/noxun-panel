@@ -30,7 +30,7 @@ module Noxun
             'edge_labels' => AbsRules.edge_labels(role),
             'edge_sides' => AbsRules.edge_sides(role),
             'quantity' => cfg['quantity'] || 1
-          }
+          }.merge(board_edge_texts(role, cfg))
         end
 
         def cabinet_payload(cab)
@@ -532,6 +532,72 @@ module Noxun
           "#{base} #{fmt_num(w)}/#{fmt_num(a['thickness'])} mm#{uni}"
         end
 
+        # --- D-102: „podľa pravidla" musi povedat, CO pravidlo vybralo ----------
+        #
+        # Karta dielca aj karta dosky dostavaju HOTOVE TEXTY zo servera — JS z nich
+        # nic neskladá ani neprekladá (vzor D-92 riadku nakupu). Zdroj vysledku je
+        # TA ISTA cesta ako v builderi: katalogovy zaznam dosky -> hrubka pre picker
+        # (CabinetBuilder.abs_pick_thickness) -> AbsRules.resolve_edges. Preto sa
+        # panel nemoze rozist s tym, co postavi rebuild.
+
+        # Vysledok PRAVIDLA (bez overridov) ako text per hrana:
+        #   paska  -> jej label ("500 SM Biela 23/1 mm")
+        #   nic    -> "bez ABS"
+        #   KOMPAKT / PD-postforming -> "nelepí sa" (M-C: ABS defaulty su potlacene)
+        def edge_rule_results(role, material_id, thickness)
+          sheet = Materials.sheet(material_id)
+          th = CabinetBuilder.abs_pick_thickness(sheet, thickness)
+          base = AbsRules.resolve_edges(role.to_s, sheet && sheet['decor'], th, sheet: sheet)
+          suppressed = Materials.abs_default_suppression(sheet) == :all
+          ctx = label_ctx
+          AbsRules::EDGE_ORDER.each_with_object({}) do |code, out|
+            out[code] = abs_result_text(base[code], suppressed, ctx)
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'edge_rule_results')
+          {}
+        end
+
+        # Text jednej vyriesenej hodnoty ABS (nil = bez pasky / potlacene).
+        def abs_result_text(abs_id, suppressed, ctx = nil)
+          return suppressed ? 'nelepí sa' : 'bez ABS' if abs_id.nil? || abs_id.to_s.strip.empty?
+          rec = Materials.edge(abs_id)
+          rec ? abs_label(rec, ctx) : abs_id.to_s
+        end
+
+        # Kratka skratka pasky do 2D nahladu ("23/1" resp. "1") — Michalov zapis
+        # sirka/hrubka. Bez pasky prazdny retazec (pas ostava len farebny).
+        def abs_short_text(abs_id)
+          rec = abs_id ? Materials.edge(abs_id) : nil
+          return '' unless rec
+          w = rec['width']
+          w.nil? ? fmt_num(rec['thickness']) : "#{fmt_num(w)}/#{fmt_num(rec['thickness'])}"
+        rescue StandardError
+          ''
+        end
+
+        # Popisky pasov 2D nahladu: title (plny text) + short (skratka do popisku).
+        # `edges` = SKUTOCNE hrany dielca/dosky (vysledok po overidoch).
+        def edge_view_hints(edges, labels, suppressed)
+          ctx = label_ctx
+          AbsRules::EDGE_ORDER.each_with_object({}) do |code, out|
+            aid = edges.is_a?(Hash) ? edges[code] : nil
+            name = (labels.is_a?(Hash) ? labels[code] : nil) || code
+            out[code] = { 'title' => "#{name} — #{abs_result_text(aid, suppressed, ctx)}",
+                          'short' => abs_short_text(aid) }
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'edge_view_hints')
+          {}
+        end
+
+        # Je material NELEPITELNY (KOMPAKT / PD postforming)? Autorita = Materials.
+        def abs_suppressed_material?(material_id)
+          Materials.abs_default_suppression(Materials.sheet(material_id)) == :all
+        rescue StandardError
+          false
+        end
+
         # Cele cislo bez desatin (22.0 -> "22"), inak s nimi (22.5 -> "22.5").
         def fmt_num(v)
           f = v.to_f
@@ -565,10 +631,40 @@ module Noxun
             'edge_overrides' => (ov['edges'] || {}), # ktore hrany maju rucny override (UI odlisi "dedi")
             'has_material_override' => !ov['material_id'].nil?,
             'cabinet_id' => Store.get(cab, 'cabinet_id')
-          }
+          }.merge(part_edge_texts(role, cfg))
         rescue StandardError => e
           Engine.log_error(e, 'part_card_payload')
           nil
+        end
+
+        # D-102: serverove texty hran karty DIELCA — volba „(podľa pravidla — …)"
+        # a popisky pasov nahladu. Cely text sklada server (JS len vklada).
+        def part_edge_texts(role, cfg)
+          labels = AbsRules.edge_labels(role)
+          edges = cfg['edges'].is_a?(Hash) ? cfg['edges'] : {}
+          suppressed = abs_suppressed_material?(cfg['material_id'])
+          rule = edge_rule_results(role, cfg['material_id'], cfg['thickness'])
+          {
+            'edge_rule_options' => rule.each_with_object({}) { |(c, txt), o| o[c] = "(podľa pravidla — #{txt})" },
+            'edge_hints' => edge_view_hints(edges, labels, suppressed)
+          }
+        rescue StandardError => e
+          Engine.log_error(e, 'part_edge_texts')
+          {}
+        end
+
+        # D-102: to iste pre kartu DOSKY. Doska nema override vrstvu (ziadne
+        # „podľa pravidla"), ale nelepitelny material to musi POVEDAT — inak
+        # „Bez ABS" vyzera ako vedome rozhodnutie pouzivatela.
+        def board_edge_texts(role, cfg)
+          labels = AbsRules.edge_labels(role)
+          edges = cfg['edges'].is_a?(Hash) ? cfg['edges'] : {}
+          suppressed = abs_suppressed_material?(cfg['material_id'])
+          { 'edge_none_option' => suppressed ? 'Bez ABS (nelepí sa)' : 'Bez ABS',
+            'edge_hints' => edge_view_hints(edges, labels, suppressed) }
+        rescue StandardError => e
+          Engine.log_error(e, 'board_edge_texts')
+          {}
         end
 
         # part_key z plocheho atributu; fallback cez legacy role_key a nakoniec part_id.

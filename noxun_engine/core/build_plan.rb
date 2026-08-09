@@ -205,11 +205,32 @@ module Noxun
           raise "BuildPlan: dielec #{key} ma neplatny prod #{f} (#{v.inspect})." unless v.is_a?(Numeric) && v.positive?
         end
 
+        validate_axes!(key, pd[:axes])
+
         pc = pd.fetch(:production_class, 'sheet').to_s
         raise "BuildPlan: dielec #{key} ma neznamu production_class '#{pc}'." unless PRODUCTION_CLASSES.include?(pc)
         qty = pd.fetch(:quantity, 1)
         raise "BuildPlan: dielec #{key} ma neplatnu quantity (#{qty.inspect})." unless qty.is_a?(Integer) && qty.positive?
         pd
+      end
+
+      # D-88: osi deskriptora (mapovanie hrana -> plocha kvadra, core/part_faces.rb).
+      # Kluc je VOLITELNY (deskriptor bez neho sa len nezafarbi — geometria ani
+      # vyrobne data od neho nezavisia), ale ked je pritomny, musi byt UPLNY a
+      # musi to byt PERMUTACIA osi 0/1/2 — polovicna alebo kolizna mapa by
+      # farbila hrany na zlych plochach, co je horsie nez ziadna farba.
+      def validate_axes!(key, ax)
+        return nil if ax.nil?
+        raise "BuildPlan: dielec #{key} ma neplatne axes (#{ax.inspect})." unless ax.is_a?(Hash)
+        vals = %i[length width thickness].map do |k|
+          v = ax[k].nil? ? ax[k.to_s] : ax[k]
+          unless v.is_a?(Integer) && v >= 0 && v <= 2
+            raise "BuildPlan: dielec #{key} ma neplatnu os axes[#{k}] (#{v.inspect})."
+          end
+          v
+        end
+        raise "BuildPlan: dielec #{key} ma kolizne axes (#{ax.inspect})." unless vals.uniq.length == 3
+        ax
       end
 
       # 2B-1 (D-43): kontrakt duplak vazby vo VYROBNOM SNAPSHOTE dielca/dosky

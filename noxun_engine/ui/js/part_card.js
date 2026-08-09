@@ -50,7 +50,9 @@
       // schema 2 grupuje group_id+strukturou); curVal drzi hodnotu tejto
       // hrany (aj legacy mimo katalogu — F5) a NEsmie ju prebit prva odporucana paska.
       var curVal = isOvr ? (absId==null?'':absId) : '__inherit__';
-      sel.innerHTML = edgeOptionsHtml(pc.material_id, curVal);
+      // D-102: text „(podľa pravidla — …)" zo servera (pc.edge_rule_options).
+      sel.innerHTML = edgeOptionsHtml(pc.material_id, curVal,
+        pc.edge_rule_options ? pc.edge_rule_options[code] : null);
       sel.value = curVal;
       if (isOvr) sel.className='ovr';
       sel.setAttribute('data-edge', code);
@@ -73,14 +75,21 @@
     var pad=28, availW=300-2*pad, availH=200-2*pad;
     var sc = Math.min(availW/horiz, availH/vert); if(!isFinite(sc)||sc<=0) sc=1;
     var rw=horiz*sc, rh=vert*sc, ox=(300-rw)/2, oy=(200-rh)/2, ew=7;
-    var edges = pc.edges||{}, lab = pc.edge_labels||{};
+    var edges = pc.edges||{}, lab = pc.edge_labels||{}, hints = pc.edge_hints||{};
     function ecol(code){ return absColorOf(edges[code]); }
+    // D-102: plny text pasky ako tooltip pasu + skratka do EXISTUJUCEHO popisku
+    // strany (ziadny novy riadok — vertikalny priestor panela je vzacny).
+    function tip(code){ return (hints[code] && hints[code].title) ? hints[code].title : ''; }
+    function sideText(code){
+      return edgeSideText(lab[code], hints[code] ? hints[code].short : '');
+    }
     // Farebny bar (klik-target) danej strany obdlznika.
     function bar(side, code, fill){
-      if (side==='top')    return '<rect class="ehit" data-edge="'+code+'" x="'+ox+'" y="'+(oy-ew/2)+'" width="'+rw+'" height="'+ew+'" fill="'+fill+'" style="cursor:pointer"/>';
-      if (side==='bottom') return '<rect class="ehit" data-edge="'+code+'" x="'+ox+'" y="'+(oy+rh-ew/2)+'" width="'+rw+'" height="'+ew+'" fill="'+fill+'" style="cursor:pointer"/>';
-      if (side==='left')   return '<rect class="ehit" data-edge="'+code+'" x="'+(ox-ew/2)+'" y="'+oy+'" width="'+ew+'" height="'+rh+'" fill="'+fill+'" style="cursor:pointer"/>';
-      return '<rect class="ehit" data-edge="'+code+'" x="'+(ox+rw-ew/2)+'" y="'+oy+'" width="'+ew+'" height="'+rh+'" fill="'+fill+'" style="cursor:pointer"/>'; // right
+      var t = tip(code) ? '<title>'+esc(tip(code))+'</title>' : '';
+      if (side==='top')    return '<rect class="ehit" data-edge="'+code+'" x="'+ox+'" y="'+(oy-ew/2)+'" width="'+rw+'" height="'+ew+'" fill="'+fill+'" style="cursor:pointer">'+t+'</rect>';
+      if (side==='bottom') return '<rect class="ehit" data-edge="'+code+'" x="'+ox+'" y="'+(oy+rh-ew/2)+'" width="'+rw+'" height="'+ew+'" fill="'+fill+'" style="cursor:pointer">'+t+'</rect>';
+      if (side==='left')   return '<rect class="ehit" data-edge="'+code+'" x="'+(ox-ew/2)+'" y="'+oy+'" width="'+ew+'" height="'+rh+'" fill="'+fill+'" style="cursor:pointer">'+t+'</rect>';
+      return '<rect class="ehit" data-edge="'+code+'" x="'+(ox+rw-ew/2)+'" y="'+oy+'" width="'+ew+'" height="'+rh+'" fill="'+fill+'" style="cursor:pointer">'+t+'</rect>'; // right
     }
     // Popis (label) strany — vodorovne hore/dole, zvisle vlavo/vpravo (rotovane).
     function label(side, txt){
@@ -95,7 +104,7 @@
     ['L1','L2','W1','W2'].forEach(function(code){
       var side = sides[code]; if(!side) return;
       S.push(bar(side, code, ecol(code)));
-      S.push(label(side, lab[code]));
+      S.push(label(side, sideText(code)));
     });
     S.push('<text x="150" y="100" font-size="12" fill="#b0bec5" text-anchor="middle" dominant-baseline="middle" pointer-events="none">'+Math.round(L)+'×'+Math.round(Wd)+'</text>');
     svg.innerHTML = S.join('');
@@ -130,6 +139,9 @@
   // F3/N7: prekresli options KAZDEHO ABS selectu dielca podla materialu (2A-3b:
   // parameter je material_id), zachova hodnotu (aj mimo katalogu — F5).
   // Programove nastavenie value NEstriela change event.
+  // D-102 (audit F4): pri LOKALNOM pregrupovani po zmene materialu sa serverovy
+  // text „podľa pravidla" VEDOME nepouzije — patri Este STAREMU materialu.
+  // Ostane neutralne „(podľa pravidla)", spravnu hodnotu doplni Ruby echo.
   function regroupPartEdges(materialId){
     var box = el('edgeRows'); if (!box) return;
     var sels = box.querySelectorAll('select[data-edge]');

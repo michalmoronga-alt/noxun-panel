@@ -160,6 +160,8 @@ module Noxun
             name: cfg[:name].to_s, material: :concrete,
             box: [l, w, t], origin: [0.0, 0.0, 0.0],
             prod: { length: l, width: w, thickness: t },
+            # D-88: doska lezi — dlzka X, sirka Y, hrubka Z (kontrakt core/part_faces.rb).
+            axes: PartFaces::AXES_LYING,
             production_class: 'sheet', manufactured: true,
             quantity: cfg[:quantity].to_i
           }
@@ -397,8 +399,24 @@ module Noxun
           })
           inst.name = "Doska #{bid}"
           inst.material = Materials.ensure_su_material(model, cfg[:material_id], FALLBACK_RGB) if defined?(Materials)
+          # D-88: bocne plosky s ABS paskou dostanu farbu pasky — TA ISTA cesta
+          # ako dielce korpusu (CabinetBuilder.paint_edge_faces je zdielany).
+          paint_edges(model, inst, cfg) if defined?(CabinetBuilder)
           inst.layer = board_tag(model)
           inst
+        end
+
+        # D-88: farba ABS na bocnych plochach dosky. Deskriptor osi je TEN ISTY,
+        # ktory ide do planu (AXES_LYING — dlzka X, sirka Y, hrubka Z), aby sa
+        # mapovanie hran nemohlo rozist s vyrobnym zaznamom.
+        def paint_edges(model, inst, cfg)
+          pd = { suffix: 'BOARD', box: [cfg[:length].to_f, cfg[:width].to_f, cfg[:thickness].to_f],
+                 prod: { length: cfg[:length].to_f, width: cfg[:width].to_f, thickness: cfg[:thickness].to_f },
+                 axes: PartFaces::AXES_LYING }
+          CabinetBuilder.paint_edge_faces(model, inst.definition.entities, pd, cfg[:edges], cfg[:material_id])
+        rescue StandardError => e
+          Engine.log_error(e, 'BoardBuilder.paint_edges') if defined?(Engine)
+          nil
         end
 
         def board_tag(model)

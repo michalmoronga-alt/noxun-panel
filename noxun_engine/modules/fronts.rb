@@ -183,6 +183,9 @@ module Noxun
           suffix: suffix, part_key: part_key, role: role, name: name, material: :front,
           box: [wdt, ft, h], origin: [x, -ft, z],
           prod: { length: h.round(2), width: wdt.round(2), thickness: ft },
+          # D-88: celo ma dlzku ZVISLE (Z), sirku v X a hrubku v Y — viz kontrakt
+          # v core/part_faces.rb (mapovanie hrana -> plocha kvadra).
+          axes: PartFaces::AXES_FRONT,
           profile: profile
         }
         desc[:profile_band] = profile_band if profile_band
