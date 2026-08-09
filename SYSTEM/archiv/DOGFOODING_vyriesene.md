@@ -10,7 +10,7 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
-### D-103 — násobenie kópií (`*4`) vyrobilo dosku dvakrát (10.8.2026, PR, v0.5.57)
+### D-103 — násobenie kópií (`*4`) vyrobilo dosku dvakrát (10.8.2026, PR #151, v0.5.57)
 
 - **D-103 · Kópia dosky vznikla DVAKRÁT na tom istom mieste** (Michal 9.8., reálna zákazka, so screenshotmi) — postup: označiť NOXUN dosku → **Move + Ctrl** → posun 200 mm → potvrdiť → dopísať **`*4`** (násobenie poľa kópií). Očakávaných 5 kusov (originál + 4), v modeli ich bolo **6** — prvá kópia stála na svojom mieste **dvakrát** (pri výbere bolo vidieť dvojitý obrys). Zradné je, že sa to nijako neohlási: dvojitá doska ticho prejde do **kusovníka, VEPO aj rozpočtu**, takže zákazka sa naceňuje aj reže s dielcom navyše.
 
