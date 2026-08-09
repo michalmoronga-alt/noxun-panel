@@ -250,6 +250,11 @@ module Noxun
           # D-13 (Codex F3): legacy sablona BEZ plinth_recess nesmie cielovy korpus
           # ticho stiahnut na novy default — chybajuci kluc = zachovaj hodnotu ciela.
           merged['plinth_recess'] = target_params['plinth_recess'] unless tpl_config.key?('plinth_recess')
+          # D-100 (GH #149 P2): sablona nazov skrinky NENESIE (template_config_from
+          # ho neuklada) — bez tohto by merge zacal od sablony a rucny nazov ciela
+          # („Chladnickova") by po pouziti sablony ticho zmizol. Rovnaky vzor ako
+          # plinth_recess: chybajuci kluc = zachovaj hodnotu CIELA.
+          merged['name'] = target_params['name'] unless tpl_config.key?('name')
           %w[material_id front_material_id back_material_id].each do |k|
             tv = Panel.present_str(tpl_config[k])
             merged[k] = tv || target_params[k]

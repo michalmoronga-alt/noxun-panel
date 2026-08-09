@@ -78,6 +78,8 @@ module Noxun
           cb(dlg, 'open_hardware_catalog') { |_p| HardwareCatalogDialog.show }
           # V0.4.5 D1: omrvinka karty dielca — spat na korpus (oznaci ho v modeli)
           cb(dlg, 'select_cabinet')        { |p| handle_select_cabinet(p) }
+          # D-100: premenovanie skrinky (inline edit nazvu v hlavicke panela)
+          cb(dlg, 'rename_cabinet')        { |p| handle_rename_cabinet(p) }
           # V0.4.5 D2: satelitne okna (projektove predvolby a sprava sablon mimo panela)
           cb(dlg, 'open_project_materials') { |_p| MaterialsDialog.show }
           cb(dlg, 'open_templates')         { |_p| TemplatesDialog.show }

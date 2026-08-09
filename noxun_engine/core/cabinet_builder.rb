@@ -28,6 +28,13 @@ module Noxun
         rail_depth: 100.0, rails_orientation: 'flat', rails_top_offset: 0.0
       }.freeze
 
+      # D-100: nazov skrinky. Zhoda s tymto vzorom = nazov POVAZUJEME za
+      # nenastaveny (automaticky sa dopocitava zo sucasnych parametrov) — tak
+      # ozivnu aj skrinky, ktore maju dnesny default zapeceny v configu, vratane
+      # stareho bezdiakritickeho tvaru. Ruby /i pokryva aj velke Á.
+      AUTO_NAME_RE = /\A(?:horn(?:a|á)|spodn(?:a|á))\s+skrinka\s+\d+\z/i
+      NAME_MAX_LEN = 80 # JS zrkadlo: CAB_NAME_MAX v ui/js/core.js
+
       GAP_BETWEEN_CABS = 50.0    # medzera medzi korpusmi pri vkladani vedla seba
       UPPER_HANG_Z     = 1400.0  # vyska zavesenia hornej skrinky (Z pri vlozeni)
 
@@ -1151,7 +1158,9 @@ module Noxun
             warnings: cfg[:warnings].is_a?(Array) ? cfg[:warnings] : [],
             hardware: cfg[:hardware].is_a?(Array) ? cfg[:hardware] : [],
             type: cfg[:type],
-            name: cfg[:name] || default_name(cfg),
+            # D-100: uklada sa LEN rucny nazov (nil = zivy default z display_name).
+            # Zapecenim defaultu by nazov prestal sledovat sirku/typ skrinky.
+            name: manual_name(cfg),
             construction_preset: cfg[:type] == 'upper' ? 'noxun-upper-18' : 'noxun-lower-18',
             mode: 'parametric',
             width: cfg[:width], height: cfg[:height], depth: cfg[:depth],
@@ -1201,8 +1210,48 @@ module Noxun
           end
         end
 
+        # --- D-100: nazov skrinky -------------------------------------------
+        # Automaticky nazov sa NEUKLADA — dopocitava sa zo SUCASNYCH parametrov,
+        # takze zmena sirky ho opravi sama ("Spodna skrinka 700" pri sirke 900
+        # bola trvala lez). Ulozeny je len RUCNY nazov (display_name ho vzdy
+        # uprednostni). Vsetky metody citaju cfg s lubovolnym typom kluca —
+        # volaju sa aj nad Store.config (stringy) aj nad normalize (symboly).
+
+        def display_name(cfg)
+          manual_name(cfg) || default_name(cfg)
+        end
+
+        # Ocisteny RUCNY nazov z configu, alebo nil (prazdny / automaticky vzor).
+        def manual_name(cfg)
+          sanitize_name(cfg.is_a?(Hash) ? raw(cfg, :name) : nil)
+        end
+
+        # JEDINA autorita ocistenia nazvu (callback panela ju vola pred zapisom).
+        # nil = "bez rucneho nazvu" (= vrat sa na zivy default).
+        def sanitize_name(value)
+          s = value.to_s.gsub(/\s+/, ' ').strip
+          s = nfc(s)
+          s = s[0, NAME_MAX_LEN].to_s.strip
+          return nil if s.empty? || auto_name?(s)
+
+          s
+        end
+
+        def auto_name?(value)
+          !(AUTO_NAME_RE =~ nfc(value.to_s.gsub(/\s+/, ' ').strip)).nil?
+        end
+
+        # Rozlozena diakritika (macOS/kopirovanie z webu) by vzor minula.
+        def nfc(str)
+          str.unicode_normalize(:nfc)
+        rescue StandardError
+          str
+        end
+
         def default_name(cfg)
-          cfg[:type] == 'upper' ? "Horna skrinka #{cfg[:width].round}" : "Spodna skrinka #{cfg[:width].round}"
+          w = (cfg.is_a?(Hash) ? raw(cfg, :width) : nil).to_f.round
+          type = (cfg.is_a?(Hash) ? raw(cfg, :type) : nil).to_s
+          type == 'upper' ? "Horná skrinka #{w}" : "Spodná skrinka #{w}"
         end
 
         def template_id_for(type)
@@ -1272,7 +1321,10 @@ module Noxun
             # {generic_type => set_id}; bez round-tripu by ju rebuild zmazal.
             hardware_sets: norm_hardware_sets(raw(p, :hardware_sets)),
             part_key_schema: raw(p, :part_key_schema).to_i,
-            name: (p['name'] || p[:name])
+            # D-100: nazov prechadza cez JEDINU ocistovaciu cestu — stary
+            # zapeceny default (aj bez diakritiky) sa tu zmeni na nil a skrinka
+            # sa pri najblizsej prestavbe vrati na zivy nazov.
+            name: sanitize_name(raw(p, :name))
           }
         end
 

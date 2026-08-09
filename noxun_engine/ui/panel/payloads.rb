@@ -36,6 +36,11 @@ module Noxun
         def cabinet_payload(cab)
           cfg = Store.config(cab) || {}
           params = CabinetBuilder.config_to_params(cfg)
+          # D-100: zobrazovany nazov = JEDINY server-side helper (rucny nazov,
+          # inak zivy default zo SUCASNYCH parametrov). config_to_params vedome
+          # nesie SUROVY ulozeny nazov — je to vstup prestavby, nie popisok;
+          # dopocitany default sa nikdy nesmie vratit do configu.
+          params['name'] = CabinetBuilder.display_name(cfg)
           params['cabinet_id'] = Store.get(cab, 'cabinet_id')
           params['fronts'] = Fronts.normalize_config(cfg['fronts']) # kanonicke pre riadky cela
           params['zones'] = cfg['zones'] || []                      # ploche zony pre strom + nahlad

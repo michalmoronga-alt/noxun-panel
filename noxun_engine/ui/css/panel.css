@@ -271,7 +271,18 @@
   /* identita oznaceneho (A6: bez vlastneho margin-bottom — hlavicka ho riesi; A7: cname ellipsis) */
   .idbar { display: flex; align-items: baseline; gap: 8px; margin: 0; min-width: 0; flex: 1 1 auto; }
   .idbar .cid { flex: 0 0 auto; font-weight: 700; font-size: 14px; color: var(--nx-select); }
-  .idbar .cname { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--nx-ink-strong); font-size: 12px; }
+  /* D-100: nazov skrinky je ovladac (premenovanie inline, ziadny novy riadok).
+     Vyzera ako text — bez ramika a pozadia; ceruzka je tlmena a zvyrazni sa
+     pri hoveri/fokuse. Fokus musi ostat viditelny (klavesnica, Codex NOTE 7). */
+  .idbar .cname { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; color: var(--nx-ink-strong); font-size: 12px;
+                  display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none;
+                  cursor: pointer; text-align: left; }
+  .idbar .cname .cnametext { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .idbar .cname .ic { flex: 0 0 auto; width: 12px; height: 12px; color: var(--nx-ink-faint); }
+  .idbar .cname:hover { color: var(--nx-select); }
+  .idbar .cname:hover .ic, .idbar .cname:focus .ic { color: var(--nx-select); }
+  .idbar .cnameinput { flex: 1 1 auto; min-width: 0; font-size: 12px; padding: 1px 4px;
+                       border: 1px solid var(--nx-border-strong); background: var(--nx-surface); color: var(--nx-ink); }
   .idbar .free { color: var(--nx-ink-soft); font-size: 12px; }
   /* warn chip = skutocne <button> (A10): fokusovatelne, klavesova aktivacia */
   .idbar .warnchip { margin-left: auto; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px;

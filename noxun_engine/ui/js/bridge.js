@@ -16,23 +16,112 @@
     // zmene rezimu (className vyssie zmazal aj pripadne stare priznaky).
     if (typeof syncCabTabsLocked === 'function') syncCabTabsLocked();
   }
+  // D-100: inline premenovanie skrinky. Editor zije v hlavicke (ziadny novy
+  // riadok) a jeho stav je viazany na cabinet_id — Codex audit FIX 4: debounced
+  // auto-apply posle echo, ktore prekresli idbar, a rozpisany nazov by bez tohto
+  // guardu ticho zmizol. Rovnake ID = editor sa NEPREPISE; ine ID = zrusi sa.
+  var renameFor = null;      // cabinet_id s otvorenym editorom (null = zavrety)
+  var renameSending = false; // Escape/odoslanie uz zavrelo editor — blur nesmie strielat druhykrat
+  var lastCabName = '';      // posledny nazov z Ruby (fallback pri zruseni editora)
+
+  // Zrusi rozpisany editor BEZ odoslania (zmena vyberu, doska, prazdny vyber).
+  function dropCabRename(){
+    if (!renameFor) return;
+    renameFor = null;
+    renameSending = true;
+  }
+
+  function cabNameCellHtml(c){
+    var nm = c.name || '';
+    // A10 vzor: ovladac je skutocne <button> (fokusovatelne, Enter/Space) — nie
+    // klikatelny span. Ceruzka je zo spritu, ziadne emoji (UI_DIZAJN).
+    return '<button type="button" id="cnameBtn" class="cname" onclick="startCabRename()"' +
+      ' title="Premenovať skrinku" aria-label="Premenovať skrinku — ' + esc(nm) + '">' +
+      '<span class="cnametext">' + esc(nm) + '</span>' + NXIcons.svg('pencil') + '</button>';
+  }
+
+  function startCabRename(){
+    var btn = el('cnameBtn'); if (!btn || !selectedCabId) return;
+    var cur = btn.querySelector('.cnametext');
+    var txt = cur ? cur.textContent : '';
+    renameFor = selectedCabId;
+    renameSending = false;
+    var inp = document.createElement('input');
+    inp.type = 'text'; inp.id = 'cnameInput'; inp.className = 'cnameinput';
+    inp.value = txt; inp.maxLength = CAB_NAME_MAX;
+    inp.title = 'Enter uloží, Escape zruší, prázdne pole vráti automatický názov';
+    inp.setAttribute('aria-label', 'Názov skrinky');
+    inp.onkeydown = function(ev){
+      if (ev.key === 'Enter'){ ev.preventDefault(); commitCabRename(); }
+      else if (ev.key === 'Escape'){ ev.preventDefault(); cancelCabRename(); }
+    };
+    inp.onblur = function(){ commitCabRename(); };
+    btn.parentNode.replaceChild(inp, btn);
+    inp.focus(); inp.select();
+  }
+
+  function commitCabRename(){
+    var inp = el('cnameInput');
+    if (!inp || renameSending) return;
+    renameSending = true; // blur po Enter/odstraneni prvku nesmie poslat druhy callback
+    var cid = renameFor;
+    renameFor = null;
+    var name = cabNameValue(inp.value);
+    // Editor sa zatvara HNED (ziadny stuck input, ked server zapis zahodi);
+    // spravny nazov dokresli push_selected — autorita je vzdy server.
+    closeCabRenameEditor();
+    // Identity guard aj na klientovi (server ma svoj vlastny, prisnejsi):
+    // ak sa vyber medzitym presunul, zapis sa neposiela vobec.
+    if (cid && cid === selectedCabId && window.sketchup && sketchup.rename_cabinet){
+      sketchup.rename_cabinet(JSON.stringify({ cabinet_id: cid, name: name }));
+    }
+  }
+
+  function cancelCabRename(){
+    if (!el('cnameInput')) return;
+    dropCabRename(); // NOTE 7: Escape uz cez nasledny blur NIC neodosle
+    closeCabRenameEditor();
+  }
+
+  // Vrati bunku nazvu do textovej podoby BEZ zasahu do modelu (Escape, zmena vyberu).
+  function closeCabRenameEditor(){
+    var inp = el('cnameInput'); if (!inp) return;
+    var span = document.createElement('span');
+    span.innerHTML = cabNameCellHtml({ name: lastCabName });
+    inp.parentNode.replaceChild(span.firstChild, inp);
+  }
+
   // D3: klik na ⚠ chip rozbali/zbali zoznam upozorneni stavby pod identitou.
   function setIdbar(c){
     var bar = el('idbar'), list = el('warnList');
     if (!bar) return;
     if (!c){
+      dropCabRename(); // vyber zmizol — rozpisany nazov konci bez zapisu
       bar.innerHTML = '<span class="free">Nič nie je označené — návrh nového objektu</span>';
       if (list){ list.style.display = 'none'; list.innerHTML = ''; }
       return;
     }
+    lastCabName = c.name || '';
     var warns = c.warnings || [];
     // A10: warn chip = skutocne <button> (fokusovatelne, klavesova aktivacia).
     // Ikona zo spritu (staticky markup); pocet je cislo — bezpecne (B9).
     var wHtml = warns.length
       ? ' <button type="button" class="warnchip" onclick="toggleWarnList()" title="Zobraziť upozornenia stavby" aria-label="Zobraziť upozornenia stavby">' + NXIcons.svg('alert') + ' ' + warns.length + '</button>'
       : '';
-    bar.innerHTML = '<span class="cid">' + esc(c.cabinet_id || '?') + '</span>' +
-      '<span class="cname">' + esc(c.name || '') + '</span>' + wHtml;
+    // FIX 4: echo TEJ ISTEJ skrinky nesmie zhltnut rozpisany nazov — prekresli
+    // sa vsetko okrem bunky nazvu, ktora ostane v editacnom rezime.
+    var keepEditor = renameFor && renameFor === (c.cabinet_id || '') && el('cnameInput');
+    if (keepEditor){
+      var idEl = bar.querySelector('.cid');
+      if (idEl) idEl.textContent = c.cabinet_id || '?';
+      var oldChip = bar.querySelector('.warnchip');
+      if (oldChip) oldChip.parentNode.removeChild(oldChip);
+      if (wHtml) bar.insertAdjacentHTML('beforeend', wHtml);
+    } else {
+      dropCabRename(); // ina skrinka = editor konci bez zapisu
+      bar.innerHTML = '<span class="cid">' + esc(c.cabinet_id || '?') + '</span>' +
+        cabNameCellHtml(c) + wHtml;
+    }
     if (list){
       if (warns.length){
         var html = '';
@@ -272,6 +361,7 @@
   function setBoardIdbar(b){
     var bar = el('idbar'), list = el('warnList');
     if (!bar) return;
+    dropCabRename(); // D-100: prechod na dosku ukoncuje rozpisany nazov skrinky bez zapisu
     if (list){ list.style.display = 'none'; list.innerHTML = ''; }
     if (!b){ setIdbar(null); return; }
     bar.innerHTML = '<span class="cid">' + esc(b.board_id || '?') + '</span>' +
