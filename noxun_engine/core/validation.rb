@@ -61,6 +61,17 @@ module Noxun
       # m2, nezapocitane spotrebice). Zrkadli Budget::CAT_BUDGET; vlastna
       # konstanta preto, ze validation.rb sa nacitava PRED budget.rb.
       CAT_BUDGET      = 'budget'
+      # ORANGE — D-103: dva top-level kusy (skrinky/dosky) na IDENTICKOM mieste.
+      # Typicky pozostatok po `*N` nasobeni kopii; nikdy sa nic nemaze automaticky
+      # (paste-in-place je legitimny krok pouzivatela) — len sa ukaze a da vybrat.
+      CAT_DUPLICATE   = 'duplicate_position'
+
+      # Tolerancie zhody umiestnenia. Artefakt nasobenia lezi PRESNE na tom istom
+      # mieste (rovnaka transformacia), preto su prahy tesne — cielom je NULA
+      # falosnych poplachov, nie odhalenie „skoro rovnakych" polôh.
+      POS_TOL  = 0.001   # mm
+      AXIS_TOL = 1.0e-6  # normalizovane osi (bezrozmerne)
+      SIZE_TOL = 0.01    # mm — vonkajsie rozmery definicie
 
       SEVERITY_RANK = { RED => 0, ORANGE => 1 }.freeze
 
@@ -101,7 +112,10 @@ module Noxun
       #
       # Vrati: { 'items' => [...deterministicky zoradene, deduplikovane...],
       #          'counts' => { 'red' => N, 'orange' => M, 'total' => N+M } }
-      def run(collected, sheets: {}, edges: nil, hardware_expansion: nil)
+      # placements (D-103): [{kind, owner_id, origin[3] mm, axes[9] normalizovane,
+      #   size[3] mm}] z Bom.collect. nil = kontrola sa cela preskoci (legacy
+      #   volania a existujuce testy bez zmeny spravania; vzor edges:).
+      def run(collected, sheets: {}, edges: nil, hardware_expansion: nil, placements: nil)
         collected = {} unless collected.is_a?(Hash)
         smap = sheets.is_a?(Hash) ? sheets : {}
         emap = edges.is_a?(Hash) ? edges : nil
@@ -121,6 +135,7 @@ module Noxun
         Array(collected[:records]).each { |r| check_record(r, smap, emap, items) }
         Array(collected[:hardware_overrides]).each { |ov| check_hardware(ov, items) }
         check_hardware_expansion(hardware_expansion, items)
+        check_placements(placements, items)
         Array(collected[:warnings]).each { |w| check_build(w, items, uni_parts) }
         items = sort_items(dedup(items))
         { 'items' => items, 'counts' => counts(items) }
@@ -300,6 +315,86 @@ module Noxun
       def no_abs?(r)
         edges = r['edges'].is_a?(Hash) ? r['edges'] : {}
         EDGE_CODES.none? { |c| present?(edges[c]) }
+      end
+
+      # --- D-103: dva kusy na jednom mieste ---------------------------------
+
+      # ORANGE: viac top-level NOXUN objektov ROVNAKEHO druhu s identickou
+      # transformaciou aj vonkajsimi rozmermi. Vznika po `*N` nasobeni kopii
+      # (pozri D-103) a je to TICHA chyba — kusovnik, VEPO aj rozpocet by
+      # zdvojeny kus zapocitali bez jedineho varovania.
+      # NIC sa nemaze automaticky: paste-in-place pred presunom je legitimny
+      # postup, takze rozhodnutie ostava na cloveku (klik oznaci CELU skupinu).
+      def check_placements(placements, items)
+        return unless placements.is_a?(Array)
+        coincident_groups(placements).each { |g| items << duplicate_item(g) }
+      end
+
+      # Deterministicke skupiny zhodne umiestnenych objektov. Vstup sa najprv
+      # zoradi (kind, owner_id), takze poradie vystupu nezavisi od poradia entit
+      # v modeli; porovnava sa kazdy kandidat proti PRVEMU clenovi skupiny.
+      def coincident_groups(placements)
+        list = placements.select { |p| usable_placement?(p) }
+                         .sort_by { |p| [p['kind'].to_s, p['owner_id'].to_s] }
+        taken = {}
+        groups = []
+        list.each_with_index do |a, i|
+          next if taken[i]
+          taken[i] = true
+          grp = [a]
+          list.each_with_index do |b, j|
+            next if j <= i || taken[j]
+            next unless same_placement?(a, b)
+            taken[j] = true
+            grp << b
+          end
+          groups << grp if grp.length > 1
+        end
+        groups
+      end
+
+      # Codex audit FIX 5: zaznam bez uplnych, konecnych a kladnych hodnot sa
+      # NEPOROVNAVA — degenerovany/poskodeny objekt nesmie vyrobit falosny nalez.
+      def usable_placement?(p)
+        return false unless p.is_a?(Hash)
+        return false if p['owner_id'].to_s.strip.empty?
+        return false if p['kind'].to_s.strip.empty?
+        return false unless num_vec?(p['origin'], 3) && num_vec?(p['axes'], 9) && num_vec?(p['size'], 3)
+        Array(p['size']).all? { |v| v.to_f > 0.0 }
+      end
+
+      def num_vec?(v, len)
+        a = v
+        return false unless a.is_a?(Array) && a.length == len
+        a.all? { |x| x.is_a?(Numeric) && x.to_f.finite? }
+      end
+
+      def same_placement?(a, b)
+        return false unless a['kind'].to_s == b['kind'].to_s
+        near_vec?(a['origin'], b['origin'], POS_TOL) &&
+          near_vec?(a['axes'], b['axes'], AXIS_TOL) &&
+          near_vec?(a['size'], b['size'], SIZE_TOL)
+      end
+
+      def near_vec?(x, y, tol)
+        x.each_with_index.all? { |v, i| (v.to_f - y[i].to_f).abs <= tol }
+      end
+
+      # Jedna polozka na skupinu. Codex audit FIX 3: stable_key nesie DRUH aj
+      # VSETKY zoradene ID — dve nezavisle kolizie sa nesmu zliat cez dedup.
+      # FIX 4: 'dup_kind' + 'dup_owner_ids' su adresa klik-selectu (presne tie
+      # top-level objekty, nikdy odpojene dielce so zhodnym vlastnikom).
+      def duplicate_item(group)
+        kind = group.first['kind'].to_s
+        ids = group.map { |p| p['owner_id'].to_s }.sort
+        noun = kind == 'cabinet' ? 'Skrinky' : 'Dosky'
+        items_txt = ids.length == 2 ? ids.join(' a ') : "#{ids[0..-2].join(', ')} a #{ids[-1]}"
+        { 'severity' => ORANGE, 'category' => CAT_DUPLICATE,
+          'owner_id' => ids.first, 'part_key' => nil, 'hw_key' => nil,
+          'dup_kind' => kind, 'dup_owner_ids' => ids,
+          'message_sk' => "#{noun} #{items_txt} stoja na rovnakom mieste — pravdepodobne " \
+                          'duplikát z kopírovania; skontroluj a prebytočnú zmaž.',
+          'stable_key' => "#{CAT_DUPLICATE}|#{kind}|#{ids.join(',')}" }
       end
 
       # --- kontroly kovania a stavby ----------------------------------------

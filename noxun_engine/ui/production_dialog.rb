@@ -79,7 +79,8 @@ module Noxun
           collected = fresh_collect(model)
           bom = Bom.compute(collected)
           control = Validation.run(collected, sheets: sheets_map, edges: edges_map,
-                                   hardware_expansion: hardware_expansion(model, collected))
+                                   hardware_expansion: hardware_expansion(model, collected),
+                                   placements: collected[:placements])
           merge = data['merge'] != false
           result = VepoExport.build(
             bom[:rows],
@@ -132,7 +133,8 @@ module Noxun
             # push_state — bez hardware_expansion by sa stable kluce novych
             # ORANGE (hardware_unmapped/hardware_code) nikdy nenasli.
             item = Validation.run(collected, sheets: sheets_map, edges: edges_map,
-                                  hardware_expansion: hardware_expansion(model, collected))['items']
+                                  hardware_expansion: hardware_expansion(model, collected),
+                                  placements: collected[:placements])['items']
                              .find { |it| it['stable_key'] == data['problem_key'] }
             if item.nil?
               push_state
@@ -942,6 +944,11 @@ module Noxun
         # celok (vypnute kovanie, korpusove build warning). Vnorene dielce sa vyberaju
         # cez persistent_id (rovnaka cesta ako refs_for).
         def pids_for_problem(model, item)
+          # D-103 (Codex audit FIX 4): nalez „dva kusy na jednom mieste" ma VLASTNU
+          # adresu — presne tie top-level objekty daneho druhu. Vseobecna vetva nizsie
+          # by pri korpuse pribalila aj odpojene dielce s tym istym cabinet_id.
+          return pids_for_duplicate(model, item) if item['category'].to_s == Validation::CAT_DUPLICATE
+
           oid = item['owner_id'].to_s
           pkey = item['part_key'].to_s
           out = []
@@ -973,6 +980,24 @@ module Noxun
                 out << inst.persistent_id
               end
             end
+          end
+          out.compact.uniq
+        end
+
+        # D-103: klik na nalez o zhodnom umiestneni oznaci CELU skupinu (obe/vsetky
+        # zhodne umiestnene skrinky ci dosky), aby pouzivatel videl, co presne mazat.
+        # Identita je (dup_kind + dup_owner_ids) — zbierana zo SERVERA, klient ju
+        # neposiela; hlada sa VYHRADNE medzi top-level objektmi daneho druhu.
+        def pids_for_duplicate(model, item)
+          kind = item['dup_kind'].to_s
+          ids = Array(item['dup_owner_ids']).map(&:to_s).reject(&:empty?)
+          return [] if kind.empty? || ids.empty?
+
+          id_key = kind == 'cabinet' ? 'cabinet_id' : 'id'
+          out = []
+          model.entities.grep(Sketchup::ComponentInstance).each do |inst|
+            next unless Store.kind(inst).to_s == kind
+            out << inst.persistent_id if ids.include?(Store.get(inst, id_key).to_s)
           end
           out.compact.uniq
         end
@@ -1013,7 +1038,8 @@ module Noxun
           budget = budget_payload(model, bom, collected, estimate, hw_exp, smap)
           # V0.5 D: KONTROLA z TOHO ISTEHO cerstveho zberu (nalez 5).
           control = Validation.run(collected, sheets: smap, edges: edges_map,
-                                   hardware_expansion: hw_exp)
+                                   hardware_expansion: hw_exp,
+                                   placements: collected[:placements])
           # E-b: upozornenia rozpočtu sú kategória „budget" v TOM ISTOM zozname —
           # counts (badge, tab, status) tak ostávajú jedno číslo zo servera.
           control = Validation.with_budget(control, budget['budget_check']) if budget
