@@ -416,7 +416,10 @@ NxTest.test('2A-1: PATCHABLE — identita nikdy cez inline patch (universal = vl
   NxTest.refute(A1MAT::PATCHABLE['sheet'].include?('universal'), 'sheet universal nema')
   # E-b2: 'cp_nazov' je OBCHODNY nazov pre cenovu ponuku — nie identita a nie
   # nakupny udaj, preto patchovatelny (a kedykolvek zmazatelny prazdnou hodnotou).
-  NxTest.assert_equal(%w[code supplier price_per_m2 cp_nazov], A1MAT::PATCHABLE['sheet'])
+  # D-98: 'supplier_decor' (dekor u dodavatela) je obchodny udaj triedy kodu —
+  # identitu variantu nemeni, preto patchovatelny (zmena vsak rusi overenie ceny).
+  NxTest.assert_equal(%w[code supplier price_per_m2 cp_nazov supplier_decor],
+                      A1MAT::PATCHABLE['sheet'])
   NxTest.assert_equal(%w[code supplier price_per_bm universal], A1MAT::PATCHABLE['edge'])
 end
 

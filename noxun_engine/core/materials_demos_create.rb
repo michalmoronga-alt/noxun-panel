@@ -18,6 +18,10 @@
 #   - duplicity kod+dodavatel sa kontroluju v SIMULOVANOM finalnom stave
 #     (vzor apply_demos_batch preflight 2) — vycitaju sa LEN novym zaznamom.
 #   - nova znackova skupina bez dosky = chyba (vyrobcu nesie doska, 7.5).
+#   - D-98 VEDOME MIMO ROZSAHU: „dekor u dodavatela" (supplier_decor) tato cesta
+#     nezaklada ani nehada — zalozenie z Demosu ide cez slug rodiny dekoru, kym
+#     alias sa objavi az na variante s cudzim cislom (Egger kompakt F8001 pre
+#     dekor F800). Doplna sa editom variantu; automatika je samostatna tema.
 
 module Noxun
   module Engine

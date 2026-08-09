@@ -3,7 +3,7 @@
      (%APPDATA%). -->
 <!-- Otvara sa z panela (sekcia Materialy) alebo z menu Extensions > Noxun Engine. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.5.53">
+<link rel="stylesheet" href="css/panel.css?v=0.5.54">
 
 <h1>Materiály projektu</h1>
 <p class="sub" id="mdline">…</p>
@@ -162,6 +162,9 @@
     <div class="row"><label>Dekor</label><input id="ms_decor" type="text" placeholder="napr. Dub Halifax prírodný"><span class="unit"></span></div>
     <div class="hint" id="ms_decor_hint" style="display:none">Dekor je identita skupiny — premení sa tlačidlom Premenovať na karte dekoru.</div>
     <div class="row"><label>Typ *</label><input id="ms_type" type="text" placeholder="DTDL / MDF / HDF / kompakt" oninput="mdSheetTypeChanged()"><span class="unit"></span></div>
+    <!-- D-97: nenasilne upozornenie na neznamy typ (typ ostava volny string —
+         server nic neblokuje; zoznam znamych typov posiela server v known_types) -->
+    <div class="hint" id="ms_type_warn" style="display:none"></div>
     <div class="row"><label>Hrúbka *</label><input id="ms_thickness" type="text"><span class="unit">mm</span></div>
     <div class="hint" id="ms_thick_hint" style="display:none">Hrúbka definuje variant — pre inú hrúbku pridaj nový materiál.</div>
     <div class="row"><label>Smer dekoru</label>
@@ -176,6 +179,11 @@
     <!-- D-42: kod (dodavatelsky/katalogovy) + preferovany dodavatel — volitelne -->
     <div class="row"><label>Kód</label><input id="ms_code" type="text" placeholder="dodávateľský kód"><span class="unit"></span></div>
     <div class="row"><label>Dodávateľ</label><input id="ms_supplier" type="text" placeholder="napr. Demos"><span class="unit"></span></div>
+    <!-- D-98: alias cisla dekoru u dodavatela (Egger kompakt F8001 pre dekor
+         F800) — nie je identita variantu, ale rozhoduje o dokaze pri stahovani
+         ceny; zmena/vymazanie rusi datum overenia ceny (server). -->
+    <div class="row" id="ms_sd_row"><label>Dekor u dodávateľa</label><input id="ms_supplier_decor" type="text" placeholder="napr. F8001"><span class="unit"></span></div>
+    <div class="hint" id="ms_sd_hint">Len ak dodávateľ používa iné číslo dekoru — napr. Egger kompakt F8001 pre dekor F800.</div>
     <!-- M-A3e (D-71): rucna vazba na produktovu stranku — server ju validuje
          (len demos-trade.sk); prazdne pole = vedome zmazanie vazby; zmena rusi
          datum overenia ceny. -->
@@ -306,8 +314,8 @@
 <!-- icons.js prvy (sprite musi existovat pred prvym renderom mdRenderLists);
      demos_diff.js pred proj_materials.js (mddLookup pouzivaju onclick handlery
      detailu; ready() bezi az na konci proj_materials.js). -->
-<script src="js/errors.js?v=0.5.53"></script>
-<script src="js/icons.js?v=0.5.53"></script>
-<script src="js/demos_diff.js?v=0.5.53"></script>
-<script src="js/demos_add.js?v=0.5.53"></script>
-<script src="js/proj_materials.js?v=0.5.53"></script>
+<script src="js/errors.js?v=0.5.54"></script>
+<script src="js/icons.js?v=0.5.54"></script>
+<script src="js/demos_diff.js?v=0.5.54"></script>
+<script src="js/demos_add.js?v=0.5.54"></script>
+<script src="js/proj_materials.js?v=0.5.54"></script>

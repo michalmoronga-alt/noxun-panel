@@ -20,8 +20,9 @@
   // doplnenia UNI sady nesmie zamknut cele okno); katalog s novsim markerom by
   // staremu oknu zapis odmietol (nove polia by ticho zahodilo). Pri katalogu,
   // ktory je este SCHEMA 1 (nerozhodnutelna migracia), server batch 3 odmietne.
-  // V0.6 M-C hranova uprava PD (pd_edge_subtype — schema 8) => konstanta je 8.
-  var MD_CLIENT_SCHEMA = 8;
+  // V0.6 M-C hranova uprava PD (pd_edge_subtype — schema 8); D-98 dekor u
+  // dodavatela (supplier_decor — schema 9) => konstanta je 9.
+  var MD_CLIENT_SCHEMA = 9;
   // 2B-2 (F10 zrkadlo registra): typy s formatom v identite — batch/formular
   // format VYZADUJU. Server je autorita (format_in_identity?), toto je UX.
   // D-73: + KOMPAKT (sirok vela ako PD — format je identita variantu).
@@ -45,6 +46,10 @@
   // D-44: navrhy naseptavacov a navrhy formatu platne — obe STAVIA SERVER
   // (payload suggest/format_hints), JS ich len renderuje.
   var MD_SUGGEST = { manufacturers: [], types: [] };
+  // D-97 (audit F4): KANONICKE typy z registra — SAMOSTATNE serverove pole,
+  // NIE suggest.types (tie miesaju aj volne typy z katalogu, takze raz ulozeny
+  // preklep „KD" by prestal byt „neznamy" a upozornenie by uz nikdy neprislo).
+  var MD_KNOWN_TYPES = [];
   var MD_FORMAT_HINTS = {};
   var mdEditing = null;    // null | {kind:'sheet'|'edge', id:null|'...'}
 
@@ -177,6 +182,10 @@
       var back = 'rub ' + [s.back_decor, s.back_structure || ''].filter(Boolean).join(' ');
       fmt = fmt ? fmt + ' · ' + back : back;
     }
+    // D-98: dekor u dodavatela do toho isteho sub riadku ("4100×650 · dod. F8001")
+    // — obchodne dolezity udaj, ale nesmie zabrat vlastny stlpec ani riadok.
+    var sd = String(s.supplier_decor == null ? '' : s.supplier_decor).trim();
+    if (sd) fmt = fmt ? fmt + ' · dod. ' + sd : 'dod. ' + sd;
     return { dim: sheetChipLabel(s), sub: fmt };
   }
 
@@ -193,6 +202,9 @@
     for (var i = 0; i < vs.length; i++){
       if (String(vs[i].code || '').toLowerCase().indexOf(q) >= 0) return true;
       if (String(vs[i].supplier || '').toLowerCase().indexOf(q) >= 0) return true;
+      // D-98: dekor u dodavatela je objednavkove cislo — hladanie „F8001" musi
+      // najst skupinu F800 (inak je alias v katalogu neviditelny).
+      if (String(vs[i].supplier_decor || '').toLowerCase().indexOf(q) >= 0) return true;
       // 2B-2 (GH #95 P2): rub zasteny je objednavkova identita — "K552" musi
       // najst skupinu K551/K552 (aj struktura rubu).
       if (String(vs[i].back_decor || '').toLowerCase().indexOf(q) >= 0) return true;
@@ -720,6 +732,8 @@
     el('ms_price').value = mdPriceVal(s && s.price_per_m2);
     el('ms_code').value = s ? (s.code || '') : '';
     el('ms_supplier').value = s ? (s.supplier || '') : '';
+    // D-98: alias cisla dekoru u dodavatela (nie identita — editovatelny vzdy).
+    if (el('ms_supplier_decor')) el('ms_supplier_decor').value = s ? (s.supplier_decor || '') : '';
     // M-A3e (D-71): rucna vazba na Demos — prefill + hint s datumom overenia.
     mdDemosField('ms', s);
     el('ms_family').value = s ? (s.family || '') : '';
@@ -755,11 +769,38 @@
   }
   // 2B-2: viditelnost rub polí podla typu vo formulari (create aj edit).
   function mdSheetTypeChanged(){
-    var show = mdZastena(el('ms_type').value);
+    var type = el('ms_type').value;
+    var show = mdZastena(type);
     el('ms_back_row').style.display = show ? '' : 'none';
     el('ms_back_hint').style.display = show ? '' : 'none';
     // M-C: riadok hranovej upravy LEN pre typ PD.
-    if (el('ms_pd_row')) el('ms_pd_row').style.display = mdPdType(el('ms_type').value) ? '' : 'none';
+    if (el('ms_pd_row')) el('ms_pd_row').style.display = mdPdType(type) ? '' : 'none';
+    // D-98 (audit F3): zastena alias dekoru nema — riadok sa skryje a hodnota
+    // sa na server neposiela (server ju aj tak odmietne).
+    if (el('ms_sd_row')) el('ms_sd_row').style.display = show ? 'none' : '';
+    if (el('ms_sd_hint')) el('ms_sd_hint').style.display = show ? 'none' : '';
+    // D-97: nenasilne upozornenie na neznamy typ (nikdy neblokuje ulozenie).
+    var warn = el('ms_type_warn');
+    if (warn){
+      var txt = mdUnknownTypeWarning(type, MD_KNOWN_TYPES);
+      warn.textContent = txt || '';
+      warn.style.display = txt ? '' : 'none';
+    }
+  }
+  // D-97 (cista funkcia, Node test): text upozornenia pre neznamy typ dosky,
+  // alebo null. Porovnanie je case-insensitive a s trimom (zapis „dtdl" je ten
+  // isty typ); prazdne pole nikdy nevarujeme (povinnost riesi validacia).
+  // Typ ZOSTAVA volny string — toto je informacia, nie zakaz (D-67/D-68).
+  function mdUnknownTypeWarning(type, known){
+    var t = String(type == null ? '' : type).trim();
+    if (!t) return null;
+    var list = known || [];
+    for (var i = 0; i < list.length; i++){
+      if (String(list[i]).trim().toUpperCase() === t.toUpperCase()) return null;
+    }
+    if (!list.length) return null; // bez serverovho zoznamu sa nehada
+    return 'Neznámy typ — skontroluj (známe: ' + list.slice(0, 3).join(', ') +
+      (list.length > 3 ? '…' : '') + ').';
   }
   // D-42: prazdny string ak cena nie je zadana (nil/undefined), inak hodnota
   // (aj 0 = zadana nula). Rozlisuje "nezadana" od "0".
@@ -1544,6 +1585,11 @@
     if (mdPdType(payload.type) && el('ms_pd_edge')){
       payload.pd_edge_subtype = el('ms_pd_edge').value;
     }
+    // D-98: alias dekoru u dodavatela — vsade OKREM zasteny (skryte pole nesmie
+    // letiet na server, vzor rub/hranova uprava). Prazdna hodnota = vymazanie.
+    if (!mdZastena(payload.type) && el('ms_supplier_decor')){
+      payload.supplier_decor = el('ms_supplier_decor').value;
+    }
     // D-19: format platne sa posiela LEN ako kompletny platny par; polovicny
     // alebo neplatny vstup zastavi ulozenie (ziadne tiche 0/reset — Codex F4).
     // M-A3e (audit FIX 4): zla adresa NEZATVARA formular — server ju sice
@@ -1608,6 +1654,8 @@
       el('ms_sheet_w').value = p.sheet_size ? p.sheet_size[1] : '';
       el('ms_demos_url').value = p.demos_url || ''; // M-A3e (audit FIX 2)
       if (el('ms_pd_edge')) el('ms_pd_edge').value = p.pd_edge_subtype || ''; // M-C
+      if (el('ms_supplier_decor')) el('ms_supplier_decor').value = p.supplier_decor || ''; // D-98
+      mdSheetTypeChanged(); // typ z payloadu prekreslil polia — obnov viditelnost/varovanie
     } else {
       mdOpenEdgeForm(p.abs_id || null);
       el('me_decor').value = p.decor || ''; el('me_price').value = p.price_per_bm || '';
@@ -1854,6 +1902,7 @@
     // M-A3c (D-67): <datalist> nahradil vlastny suggest (CEF klik bug) —
     // dropdown cita MD_SUGGEST zivo pri otvoreni; otvoreny sa pri echu zavrie.
     MD_SUGGEST = data.suggest || { manufacturers: [], types: [] };
+    MD_KNOWN_TYPES = data.known_types || []; // D-97: kanonicke typy (registry)
     MD_FORMAT_HINTS = data.format_hints || {};
     mdSgClose();
     mdPatchDup = null; // uspesny zapis/refresh rusi pending potvrdenie duplicity
@@ -2040,6 +2089,8 @@
       mdExtraFmtChips: mdExtraFmtChips,
       // M-A3e — rucna vazba (D-71): klientske zrkadlo serverovej validacie
       mdDemosUrlLocalError: mdDemosUrlLocalError,
+      // D-97 — upozornenie na neznamy typ dosky (ciste, bez DOM)
+      mdUnknownTypeWarning: mdUnknownTypeWarning,
       // M-B2 — „Nahradit UNI…" (ciste funkcie bez DOM)
       mdUniTargets: mdUniTargets, mdUniSummaryLines: mdUniSummaryLines };
   }

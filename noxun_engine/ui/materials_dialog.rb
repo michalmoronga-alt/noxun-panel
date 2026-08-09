@@ -196,6 +196,11 @@ module Noxun
             # takze novy vyrobca/typ je v navrhoch hned po zapise.
             suggest: { manufacturers: Materials.manufacturer_suggestions,
                        types: Materials.type_suggestions },
+            # D-97 (audit F4): KANONICKE typy z registra ako SAMOSTATNE pole.
+            # `suggest.types` mieša aj volne typy z katalogu — po ulozeni
+            # preklepu „KD" by uz nikdy nebol „neznamy" a upozornenie by zmizlo.
+            # Typ ostava volny string (D-67/D-68); toto je LEN podklad hlasky.
+            known_types: Materials::SEED_TYPES,
             format_hints: Materials::TYPE_FORMAT_HINTS
           }
         end
@@ -1209,6 +1214,13 @@ module Noxun
             return set_status(val, true) if st == :invalid
             val ? rec['demos_url'] = val : rec.delete('demos_url')
             rec.delete('price_checked_at') if invalidate
+          end
+          # D-98 (audit B2): zmena ALEBO vymazanie dekoru u dodavatela rusi datum
+          # overenia ceny rovnako ako zmena adresy — cena, kod aj URL ostavaju,
+          # ale uz nie su overene voci tomu, co dodavatel vedie pod novym cislom.
+          if !create && data.key?('supplier_decor') &&
+             data['supplier_decor'].to_s.strip != existing['supplier_decor'].to_s.strip
+            rec.delete('price_checked_at')
           end
           # 2B-1: edit zdroja drzi zdielane polia duplakov v synchre (format/
           # grain/farba) v JEDNOM atomickom zapise; create nema co synchrovat.

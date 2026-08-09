@@ -112,7 +112,8 @@ NxTest.test('mc: normalize_sheet — pole prezije LEN pri PD; required_schema_fo
   NxTest.refute(rec4.key?('pd_edge_subtype'), 'chybajuce = bez kluca')
   NxTest.assert_equal(MCM::SCHEMA_PD_EDGE, MCM.required_schema_for([rec]), 'obsah pola = marker 8')
   NxTest.assert_equal(0, MCM.required_schema_for([rec4]), 'bez pola marker nestupa')
-  NxTest.assert_equal(8, MCM::SCHEMA_CURRENT, 'SCHEMA_CURRENT bumpnuta s kodom')
+  # D-98 posunula SCHEMA_CURRENT na 9 (supplier_decor); marker PD ostava 8.
+  NxTest.assert_equal(9, MCM::SCHEMA_CURRENT, 'SCHEMA_CURRENT bumpnuta s kodom')
 end
 
 # ---------------------------------------------------------------------------
