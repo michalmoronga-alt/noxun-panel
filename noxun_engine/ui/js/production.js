@@ -345,9 +345,6 @@
     box.innerHTML = h;
   }
 
-  // V0.5 D: KONTROLA — deterministicky zoznam problemov (RED/ORANGE). Klik na
-  // riadok oznaci problemovy dielec/korpus v modeli (relay cez stabilny kluc).
-  // Poradie a dedup robi server; JS len renderuje.
   // D-104: prepinac zvyraznenia hran bez olepu — CISTA funkcia (node test).
   // Pocet aj dostupnost prichadzaju zo servera; JS ich len vypise.
   function edgeCheckBarHtml(st){
@@ -392,6 +389,9 @@
     sketchup.edge_check_toggle(JSON.stringify(edgeCheckPayload(BOM)));
   }
 
+  // V0.5 D: KONTROLA — deterministicky zoznam problemov (RED/ORANGE). Klik na
+  // riadok oznaci problemovy dielec/korpus v modeli (relay cez stabilny kluc).
+  // Poradie a dedup robi server; JS len renderuje.
   function renderControl(box){
     var list = (BOM && BOM.control) ? BOM.control : [];
     // D-104: prepinac je nad zoznamom VZDY — hrany bez olepu nie su polozkou
