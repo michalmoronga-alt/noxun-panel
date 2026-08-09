@@ -26,6 +26,10 @@
 #     2A-2 sekcia (migracia katalogu na SCHEMA 2 nad IZOLOVANYM katalogom cez
 #     Materials.test_dir_override — dry_run/ostry beh, rebuild, BOM, semafor
 #     abs_missing, remap; realny %APPDATA% katalog sa necita ani nezapisuje).
+#   D-90 sekcia — vizual uchytkoveho profilu UKW-7: kotva proxy (vrch riadku,
+#     zadna rovina cela, dlzka = sirka kridla, prekryv „nosa" 1,419 mm), proxy
+#     kontrakt, zdielana definicia per (profil, dlzka), reprodukovatelny rebuild,
+#     vypnutie profilu a undo.
 #   ASYNC cast — retaz UI.start_timer krokov (observer debounce = 0.2 s):
 #     S1 scale -> absorpcia -> Ctrl+Z (audit riziko: re-absorpcia po undo)
 #     S2 kopia -> observer dedup -> Ctrl+Z (audit riziko: zapis ID mimo operacie)
@@ -1966,6 +1970,124 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- D-90: vizual uchytkoveho profilu UKW-7 na cele ------------------------
+  # Overuje sa PROXY geometria proti kotve z navrhu (potvrdena fotkou montaze):
+  #   vrch profilu = vrch POVODNEHO cela (z riadku + vyska riadku)
+  #   zadna rovina = zadna rovina cela (Y = 0), profil ide dopredu do -19,181
+  #   dlzka = sirka kridla; kazde kridlo ma vlastny kus
+  # + vypnutie profilu (proxy zmizne, celo naspat plnou vyskou), undo a
+  # reprodukovatelnost rebuildu.
+  def d90_profiles(inst)
+    inst.definition.entities.grep(Sketchup::ComponentInstance).select do |i|
+      e::Store.kind(i) == 'hardware' && (e::Store.config(i) || {})['profile']
+    end
+  end
+
+  def d90_fronts(inst)
+    inst.definition.entities.grep(Sketchup::ComponentInstance).select do |i|
+      e::Store.kind(i) == 'part' && e::Store.get(i, 'role') == 'front_door'
+    end
+  end
+
+  # Obalovy kvader instancie v suradniciach KORPUSU (mm) = posun instancie +
+  # obalovy kvader definicie (transformacia je ciste posunutie, ako pri dielcoch).
+  def d90_box(i)
+    o = i.transformation.origin
+    b = i.definition.bounds
+    { x0: mm(o.x) + mm(b.min.x), x1: mm(o.x) + mm(b.max.x),
+      y0: mm(o.y) + mm(b.min.y), y1: mm(o.y) + mm(b.max.y),
+      z0: mm(o.z) + mm(b.min.z), z1: mm(o.z) + mm(b.max.z) }
+  end
+
+  def d90_params(profile)
+    { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0,
+      'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed',
+                                  'height' => 500.0, 'wings' => '2',
+                                  'profile' => profile }] } }
+  end
+
+  def run_d90(model)
+    inst = e::CabinetBuilder.build(model, d90_params('ukw7'))
+    return ok('D90: vlozenie korpusu s profilom', false) unless inst
+
+    profs = d90_profiles(inst)
+    fronts = d90_fronts(inst)
+    ok("D90: 2 kridla = 2 kusy profilu (najdenych #{profs.length})", profs.length == 2)
+    ok("D90: cela su skratene o 36 mm (#{fronts.map { |f| mm(f.definition.bounds.depth).round(1) }})",
+       fronts.length == 2 && fronts.all? { |f| (mm(f.definition.bounds.depth) - 464.0).abs <= TOL })
+
+    # kotva: vrch riadku = 102 (podlaha 100 + okraj 2) + 500 = 602
+    z_top = 602.0
+    bad = []
+    profs.each do |p|
+      b = d90_box(p)
+      bad << "vrch #{b[:z1].round(2)} != #{z_top}" if (b[:z1] - z_top).abs > TOL
+      bad << "vyska #{(b[:z1] - b[:z0]).round(2)} != 37,419" if ((b[:z1] - b[:z0]) - 37.419).abs > TOL
+      bad << "zadna rovina #{b[:y1].round(2)} != 0" if b[:y1].abs > TOL
+      bad << "hlbka #{(b[:y1] - b[:y0]).round(2)} != 19,181" if ((b[:y1] - b[:y0]) - 19.181).abs > TOL
+    end
+    ok("D90: profil sedi v pasme nad celom (#{bad.length} nezhod)#{bad.empty? ? '' : ' — ' + bad.first(3).join('; ')}",
+       bad.empty?)
+
+    # dlzka rezu = sirka kridla; kazdy profil lezi presne nad „svojim" kridlom
+    pairs = profs.map do |p|
+      pb = d90_box(p)
+      f = fronts.find { |fr| (mm(fr.transformation.origin.x) - pb[:x0]).abs <= TOL }
+      [pb, f]
+    end
+    ok('D90: kazdy profil ma svoje kridlo a dlzku = sirka kridla',
+       pairs.all? { |pb, f| f && ((pb[:x1] - pb[:x0]) - mm(f.definition.bounds.width)).abs <= TOL })
+
+    # spodok profilu prekryva vrch skrateneho panelu o 1,419 mm (zamerne)
+    over = pairs.map do |pb, f|
+      f ? (mm(f.transformation.origin.z) + mm(f.definition.bounds.depth)) - pb[:z0] : nil
+    end
+    ok("D90: spodny nos profilu prekryva lico cela o 1,419 mm (#{over.map { |v| v && v.round(3) }})",
+       over.all? { |v| v && (v - 1.419).abs <= TOL })
+
+    # PROXY kontrakt (supis geometriu nikdy necita)
+    p0 = profs.first
+    pcfg = e::Store.config(p0) || {}
+    ok('D90: proxy = kind hardware, production_class none, manufactured false',
+       e::Store.kind(p0) == 'hardware' && e::Store.get(p0, 'production_class') == 'none' &&
+       e::Store.get(p0, 'manufactured') == false)
+    ok("D90: proxy nesie generic_type handle + profil + rez (#{pcfg['generic_type']}, #{pcfg['profile']})",
+       pcfg['generic_type'] == 'handle' && pcfg['profile'] == 'ukw7' && pcfg['proxy'] == true)
+    ok('D90: definicia je per (profil, dlzka) — obe kridla ju zdielaju',
+       profs.map { |p| p.definition.name }.uniq.length == 1 &&
+       profs.first.definition.name.start_with?('NOXUN_PROFILE_UKW7_L'))
+    # supis kovania ostava datovy — 2 polozky z config.hardware[], nie z geometrie
+    hw = (e::Store.config(inst) || {})['hardware'] || []
+    ok("D90: config.hardware nesie 2 polozky profilu (#{hw.count { |h| (h['params'] || {})['profile'] == 'ukw7' }})",
+       hw.count { |h| (h['params'] || {})['profile'] == 'ukw7' } == 2)
+
+    # reprodukovatelnost: rovnaky rebuild = rovnaky pocet aj kotva
+    before = profs.map { |p| d90_box(p) }.sort_by { |b| b[:x0] }
+    e::CabinetBuilder.rebuild(model, inst, d90_params('ukw7'))
+    after = d90_profiles(inst).map { |p| d90_box(p) }.sort_by { |b| b[:x0] }
+    ok('D90: rebuild je reprodukovatelny (rovnake proxy na rovnakom mieste)',
+       after.length == before.length &&
+       before.zip(after).all? { |a, b| a.keys.all? { |k| (a[k] - b[k]).abs <= TOL } })
+
+    # vypnutie profilu: proxy zmizne a celo je opat plnou vyskou riadku
+    e::CabinetBuilder.rebuild(model, inst, d90_params('none'))
+    ok('D90: vypnutie profilu odstrani proxy', d90_profiles(inst).empty?)
+    ok('D90: celo je po vypnuti opat 500 mm',
+       d90_fronts(inst).all? { |f| (mm(f.definition.bounds.depth) - 500.0).abs <= TOL })
+
+    # undo posledneho rebuildu = 1 krok spat (profil aj skratene celo su naspat)
+    Sketchup.undo
+    ok("D90: 1x undo vratil profil (#{d90_profiles(inst).length} ks) aj skratene celo",
+       d90_profiles(inst).length == 2 &&
+       d90_fronts(inst).all? { |f| (mm(f.definition.bounds.depth) - 464.0).abs <= TOL })
+
+    cleanup(model)
+    ok('D90: cleanup (0 korpusov)', cabinets(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: D90 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
   # --- ASYNC: undo/redo scenare (retaz timerov, observer debounce 0.2 s) -----
 
   def run_async(model, done)
@@ -2300,6 +2422,7 @@ module NoxunSuRunner
     run_2a3(model)           # 2A-3: vyberove cesty ABS so strukturou (SCHEMA 2 sandbox katalog)
     run_2a4(model)           # 2A-4b: OSTRY cutover — boot_cutover!, picker, universal, rollback+hold
     run_d40(model)           # D-40: selection eventy po builde (DC observer pasca)
+    run_d90(model)           # D-90: vizual uchytkoveho profilu UKW-7 (kotva, undo, rebuild)
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
