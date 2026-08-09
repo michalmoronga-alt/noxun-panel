@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.5.55' unless defined?(VERSION)
+    VERSION = '0.5.56' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -35,6 +35,7 @@ Sketchup.require 'noxun_engine/core/ids'
 Sketchup.require 'noxun_engine/core/store'
 Sketchup.require 'noxun_engine/core/part_keys' # stabilna identita dielcov pre override a buduce vystupy
 Sketchup.require 'noxun_engine/core/build_plan' # zavazny kontrakt planu (validator, warnings, hardware)
+Sketchup.require 'noxun_engine/core/part_faces' # D-88: kontrakt hrana -> plocha kvadra (pred vsetkymi tvorcami deskriptorov)
 Sketchup.require 'noxun_engine/core/json_file_store' # cache + bezpecny atomicky zapis JSON katalogov
 Sketchup.require 'noxun_engine/core/materials'   # V0.3 materialovy katalog (pred abs_rules)
 Sketchup.require 'noxun_engine/core/materials_catalog' # V0.5.1 split: CRUD/validacia/scan/patch/seed

@@ -223,10 +223,12 @@ module Noxun
         [
           { suffix: 'SIDE-L', part_key: PartKeys.cabinet('side', 'left'),
             role: 'side_left', name: 'Bok lavy', material: :korpus,
-            box: [t, d, sh], origin: [0, 0, z0], prod: { length: sh, width: d, thickness: t } },
+            box: [t, d, sh], origin: [0, 0, z0], prod: { length: sh, width: d, thickness: t },
+            axes: PartFaces::AXES_UPRIGHT },
           { suffix: 'SIDE-R', part_key: PartKeys.cabinet('side', 'right'),
             role: 'side_right', name: 'Bok pravy', material: :korpus,
-            box: [t, d, sh], origin: [w - t, 0, z0], prod: { length: sh, width: d, thickness: t } }
+            box: [t, d, sh], origin: [w - t, 0, z0], prod: { length: sh, width: d, thickness: t },
+            axes: PartFaces::AXES_UPRIGHT }
         ]
       end
 
@@ -235,10 +237,12 @@ module Noxun
         w = cfg[:width]; d = carcass_depth(cfg); t = cfg[:thickness]; s = cfg[:floor_height]
         if cfg[:bottom_mode] == 'under_sides'
           { suffix: 'BOTTOM', part_key: PartKeys.cabinet('bottom'), role: 'bottom', name: 'Dno', material: :korpus,
-            box: [w, d, t], origin: [0, 0, s], prod: { length: w, width: d, thickness: t } }
+            box: [w, d, t], origin: [0, 0, s], prod: { length: w, width: d, thickness: t },
+            axes: PartFaces::AXES_LYING }
         else
           { suffix: 'BOTTOM', part_key: PartKeys.cabinet('bottom'), role: 'bottom', name: 'Dno', material: :korpus,
-            box: [w - 2 * t, d, t], origin: [t, 0, s], prod: { length: w - 2 * t, width: d, thickness: t } }
+            box: [w - 2 * t, d, t], origin: [t, 0, s], prod: { length: w - 2 * t, width: d, thickness: t },
+            axes: PartFaces::AXES_LYING }
         end
       end
 
@@ -252,7 +256,8 @@ module Noxun
           rail_parts(cfg, warnings)
         else # full
           [{ suffix: 'TOP', part_key: PartKeys.cabinet('top'), role: 'top', name: 'Vrch', material: :korpus,
-             box: [w - 2 * t, d, t], origin: [t, 0, h - t], prod: { length: w - 2 * t, width: d, thickness: t } }]
+             box: [w - 2 * t, d, t], origin: [t, 0, h - t], prod: { length: w - 2 * t, width: d, thickness: t },
+             axes: PartFaces::AXES_LYING }]
         end
       end
 
@@ -271,19 +276,19 @@ module Noxun
           [
             { suffix: 'TOP-RAIL-F', part_key: PartKeys.cabinet('rail', 'front'),
               role: 'rail_front', name: 'Vystuha predna', material: :korpus,
-              box: [w - 2 * t, t, rd], origin: [t, 0, z0], prod: prod },
+              box: [w - 2 * t, t, rd], origin: [t, 0, z0], prod: prod, axes: PartFaces::AXES_WALL },
             { suffix: 'TOP-RAIL-B', part_key: PartKeys.cabinet('rail', 'back'),
               role: 'rail_back', name: 'Vystuha zadna', material: :korpus,
-              box: [w - 2 * t, t, rd], origin: [t, d - t, z0], prod: prod }
+              box: [w - 2 * t, t, rd], origin: [t, d - t, z0], prod: prod, axes: PartFaces::AXES_WALL }
           ]
         else # flat
           [
             { suffix: 'TOP-RAIL-F', part_key: PartKeys.cabinet('rail', 'front'),
               role: 'rail_front', name: 'Vystuha predna', material: :korpus,
-              box: [w - 2 * t, rd, t], origin: [t, 0, z0], prod: prod },
+              box: [w - 2 * t, rd, t], origin: [t, 0, z0], prod: prod, axes: PartFaces::AXES_LYING },
             { suffix: 'TOP-RAIL-B', part_key: PartKeys.cabinet('rail', 'back'),
               role: 'rail_back', name: 'Vystuha zadna', material: :korpus,
-              box: [w - 2 * t, rd, t], origin: [t, d - rd, z0], prod: prod }
+              box: [w - 2 * t, rd, t], origin: [t, d - rd, z0], prod: prod, axes: PartFaces::AXES_LYING }
           ]
         end
       end
@@ -311,15 +316,18 @@ module Noxun
         when 'inset'
           z0 = interior[:z_lo]; bh = z_hi - z0
           { suffix: 'BACK', part_key: PartKeys.cabinet('back'), role: 'back', name: 'Chrbat', material: :korpus,
-            box: [w - 2 * t, bt, bh], origin: [t, d - bt, z0], prod: { length: w - 2 * t, width: bh, thickness: bt } }
+            box: [w - 2 * t, bt, bh], origin: [t, d - bt, z0], prod: { length: w - 2 * t, width: bh, thickness: bt },
+            axes: PartFaces::AXES_WALL }
         when 'groove'
           z0 = interior[:z_lo]; bh = z_hi - z0
           y0 = d - GROOVE_OFFSET - bt
           { suffix: 'BACK', part_key: PartKeys.cabinet('back'), role: 'back', name: 'Chrbat', material: :korpus,
-            box: [w - 2 * t, bt, bh], origin: [t, y0, z0], prod: { length: w - 2 * t, width: bh, thickness: bt } }
+            box: [w - 2 * t, bt, bh], origin: [t, y0, z0], prod: { length: w - 2 * t, width: bh, thickness: bt },
+            axes: PartFaces::AXES_WALL }
         else # overlay
           { suffix: 'BACK', part_key: PartKeys.cabinet('back'), role: 'back', name: 'Chrbat', material: :korpus,
-            box: [w, bt, h - s], origin: [0, d - bt, s], prod: { length: w, width: h - s, thickness: bt } }
+            box: [w, bt, h - s], origin: [0, d - bt, s], prod: { length: w, width: h - s, thickness: bt },
+            axes: PartFaces::AXES_WALL }
         end
       end
 
@@ -337,7 +345,8 @@ module Noxun
         pw = between ? (w - 2 * t) : w
         [{ suffix: 'PLINTH', part_key: PartKeys.cabinet('plinth', 'front'),
            role: 'plinth', name: 'Sokel predny', material: :korpus,
-           box: [pw, t, s], origin: [px, recess, 0], prod: { length: pw, width: s, thickness: t } }]
+           box: [pw, t, s], origin: [px, recess, 0], prod: { length: pw, width: s, thickness: t },
+           axes: PartFaces::AXES_WALL }]
       end
 
       # Prida warning o orezani rozmeru vystuhy (ziadany != pouzity).

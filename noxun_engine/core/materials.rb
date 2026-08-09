@@ -551,6 +551,46 @@ module Noxun
         model.materials[material_id.to_s] || model.materials.add('NOXUN_material')
       end
 
+      # --- D-88: vizualny material ABS PASKY -----------------------------------
+      #
+      # Nazov SketchUp materialu pasky ma VLASTNY namespace `NOXUN_ABS_<abs_id>`.
+      # Doskove materialy sa volaju holym material_id — keby sa paska volala holym
+      # abs_id, zhodne ID v oboch katalogoch by prefarbilo dosku farbou pasky
+      # (audit D-88, nalez 6). Prefix je zaroven znacka pre upratanie modelu
+      # (Purge unused v SketchUpe technicke pasky odstrani).
+      SU_EDGE_PREFIX = 'NOXUN_ABS_'
+      # Paska mimo katalogu (legacy abs_id) — neutralna seda, aby hrana bola
+      # ODLISENA od dosky a bolo vidiet, ze o nej katalog nic nevie.
+      # Zhodne s UI tokenom --nx-abs-none (#b0bec5).
+      FALLBACK_EDGE_RGB = [176, 190, 197].freeze
+
+      def su_edge_material_name(abs_id)
+        "#{SU_EDGE_PREFIX}#{abs_id}"
+      end
+
+      # Farba ABS pasky ([r,g,b]) z katalogu (D-82: farba je vlastnostou dekorovej
+      # skupiny), alebo nil pri paske mimo katalogu.
+      def edge_color_of(abs_id)
+        a = edge(abs_id)
+        return nil unless a && a['color'].is_a?(Array) && a['color'].size == 3
+        a['color'].map(&:to_i)
+      end
+
+      # SketchUp material pasky (vytvori/najde). Farba sa prepisuje LEN pri
+      # skutocnej zmene — rebuild inak zbytocne spina model.
+      def ensure_su_edge_material(model, abs_id, fallback_rgb = FALLBACK_EDGE_RGB)
+        return nil if abs_id.nil? || abs_id.to_s.strip.empty?
+        name = su_edge_material_name(abs_id)
+        rgb = edge_color_of(abs_id) || fallback_rgb
+        mt = model.materials[name] || model.materials.add(name)
+        c = mt.color
+        mt.color = Sketchup::Color.new(*rgb) unless c && c.red == rgb[0] && c.green == rgb[1] && c.blue == rgb[2]
+        mt
+      rescue StandardError => e
+        Engine.log_error(e, 'Materials.ensure_su_edge_material') if defined?(Engine)
+        nil
+      end
+
       # Farba doskoveho materialu ([r,g,b]) z katalogu, alebo nil (potom fallback).
       def color_of(material_id)
         s = sheet(material_id)

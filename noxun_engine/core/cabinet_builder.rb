@@ -377,10 +377,8 @@ module Noxun
           # V0.6 M-B1: pri UNI hrubku urcuje DIELEC (katalogova je len default
           # roly) + hardening M-B F6: 0.0 je truthy — nekladna katalogova
           # hrubka nesmie pickeru podhodit need=2 mm.
-          sheet_th = sheet && sheet['thickness'].to_f
-          sheet_th = nil unless sheet_th && sheet_th.positive?
           uni_sheet = defined?(Materials) && Materials.uni?(sheet)
-          part_th = (uni_sheet ? nil : sheet_th) || pd[:prod][:thickness]
+          part_th = abs_pick_thickness(sheet, pd[:prod][:thickness])
           picker_issues = abs_issues.nil? ? nil : []
           base_edges = if defined?(AbsRules)
                          AbsRules.resolve_edges(pd[:role], decor, part_th,
@@ -422,6 +420,19 @@ module Noxun
           { part_key: part_key, role_key: part_key, material_id: mat_id, edges: edges,
             grain_direction: grain, sheet_thickness: (uni_sheet ? nil : (sheet && sheet['thickness'])),
             material_source: mat_source }
+        end
+
+        # D-41 (audit FIX 10) + D-102: JEDINA autorita hrubky, s ktorou sa pyta ABS
+        # picker. Katalogova hrubka sheetu ma prednost pred hrubkou dielca (cela
+        # 18/19 sa geometricky prisposobia sheetu az v materialized_part), UNI
+        # material hrubku neurcuje (M-B1) a nekladna katalogova hrubka sa ignoruje
+        # (M-B F6: 0.0 je truthy). Zdiela ju resolve_part aj karta dielca v paneli
+        # — inak by panel ukazoval iny vysledok pravidla, nez postavi builder.
+        def abs_pick_thickness(sheet, fallback_th)
+          sheet_th = sheet && sheet['thickness'].to_f
+          sheet_th = nil unless sheet_th && sheet_th.positive?
+          uni = defined?(Materials) && Materials.uni?(sheet)
+          (uni ? nil : sheet_th) || fallback_th
         end
 
         # 2B-1 (D-43): duplak vazba do snapshotu dielca. Ked katalog material
@@ -840,6 +851,9 @@ module Noxun
           # SketchUp material z katalogu (nazov = material_id, farba z color) — vizual, nie vyrobna pravda.
           fallback = pd[:material] == :front ? FALLBACK_RGB_FRONT : FALLBACK_RGB_KORPUS
           inst.material = su_material(model, resolved[:material_id], fallback)
+          # D-88: bocne plosky s vyriesenou ABS paskou dostanu farbu PASKY (velke
+          # dekorove plochy ostavaju bez materialu = dedia material instancie).
+          paint_edge_faces(model, pdef.entities, pd, resolved[:edges], resolved[:material_id])
           inst.layer = part_tag(model, pd[:role]) # tag dielca (Korpus/Chrbát/Čelá/Vnútro)
           pid = Ids.part_id(cid, pd[:suffix])
           # BuildPlan kontrakt: vyrobne zaradenie riadi DESKRIPTOR (default sheet/true/1) —
@@ -1123,6 +1137,50 @@ module Noxun
         def part_tag(model, role)
           name = PART_TAGS[role.to_s] || PART_TAG_DEFAULT
           model.layers[name] || model.layers.add(name)
+        end
+
+        # --- D-88: farba ABS pasky na bocnych plochach dielca ------------------
+        #
+        # Kontrakt mapovania hrana -> plocha je v core/part_faces.rb (osi nesie
+        # deskriptor). Tu sa uz len VYSLEDOK resolve (resolved[:edges]) premieta
+        # na plochy: hrana s paskou dostane material farby pasky, hrana bez pasky
+        # (vedome nil, potlacene KOMPAKT/PD, ziadne pravidlo) ostava BEZ materialu
+        # a dedi farbu dosky z instancie — presne ako doteraz.
+        # Bezi VNUTRI existujuceho rebuildu (ziadna vlastna operacia, 1 undo) a
+        # nikdy nezhodi stavbu: chyba sa zaloguje a dielec ostane jednofarebny.
+        # Zdielane s BoardBuilder (doska ide tou istou cestou).
+        def paint_edge_faces(model, ents, pd, edges, material_id)
+          return unless edges.is_a?(Hash) && edges.any? { |_k, v| !v.nil? && !v.to_s.strip.empty? }
+          return unless defined?(Materials)
+          ax = PartFaces.verified_axes(pd)
+          if ax.nil?
+            Engine.log("D-88: dielec #{pd[:suffix]} nema overitelne osi — hrany sa nefarbia") if defined?(Engine)
+            return
+          end
+          box = pd[:box]
+          sheet_rgb = Materials.color_of(material_id)
+          ents.grep(Sketchup::Face).each do |f|
+            code = PartFaces.edge_code_for_center(face_center_mm(f), box, ax)
+            next if code.nil?
+            abs_id = edges[code]
+            next if abs_id.nil? || abs_id.to_s.strip.empty?
+            # Paska rovnakeho dekoru ako doska = ziadny vizualny rozdiel; material
+            # sa vtedy vobec nevytvara (kniznica materialov modelu sa nezanasa).
+            next if sheet_rgb && Materials.edge_color_of(abs_id) == sheet_rgb
+            mat = Materials.ensure_su_edge_material(model, abs_id)
+            next unless mat
+            f.material = mat
+            f.back_material = mat
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'paint_edge_faces') if defined?(Engine)
+          nil
+        end
+
+        # Stred plochy v mm lokalnych osiach definicie (geometria je v palcoch).
+        def face_center_mm(face)
+          c = face.bounds.center
+          [Units.to_mm(c.x), Units.to_mm(c.y), Units.to_mm(c.z)]
         end
 
         # Box od (0,0,0) rozmerov sx,sy,sz (mm). Kontrola normaly pred pushpull.

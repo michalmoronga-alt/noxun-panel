@@ -354,7 +354,8 @@ module Noxun
             suffix: "DIVV-#{suffix_path}-#{idx}", part_key: PartKeys.zone(node_id, 'divider_v', idx),
             role: 'divider_v', name: 'Priecka zvisla',
             material: :korpus, box: [t, depth, height], origin: [pos, box[:y0], box[:z0]],
-            prod: { length: r2(height), width: r2(depth), thickness: r2(t) }
+            prod: { length: r2(height), width: r2(depth), thickness: r2(t) },
+            axes: PartFaces::AXES_UPRIGHT
           }
         else
           width = box[:x1] - box[:x0]
@@ -363,7 +364,8 @@ module Noxun
             suffix: "DIVH-#{suffix_path}-#{idx}", part_key: PartKeys.zone(node_id, 'divider_h', idx),
             role: 'divider_h', name: 'Priecka vodorovna',
             material: :korpus, box: [width, depth, t], origin: [box[:x0], box[:y0], pos],
-            prod: { length: r2(width), width: r2(depth), thickness: r2(t) }
+            prod: { length: r2(width), width: r2(depth), thickness: r2(t) },
+            axes: PartFaces::AXES_LYING
           }
         end
       end
@@ -386,7 +388,8 @@ module Noxun
             suffix: "SHELF-#{suffix_path}-#{i + 1}", part_key: PartKeys.zone(node_id, 'shelf', i + 1),
             role: 'shelf', name: "Polica #{i + 1}",
             material: :korpus, box: [w, sd, t], origin: [box[:x0], box[:y0] + SHELF_FRONT_INSET, sh[:z]],
-            prod: { length: r2(w), width: r2(sd), thickness: r2(t) }
+            prod: { length: r2(w), width: r2(sd), thickness: r2(t) },
+            axes: PartFaces::AXES_LYING
           }
         end
       end

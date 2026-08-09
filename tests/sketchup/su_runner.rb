@@ -2097,6 +2097,193 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- D-88: farba ABS pasky na bocnych plochach dielcov ---------------------
+  #
+  # Overuje sa to, co Michal vidi v modeli: hnedá páska na bielej doske = HNEDÁ
+  # bočná plôška, veľké plochy ostávajú vo farbe dosky. Kontroluje sa POLOHOU
+  # plochy (nie cez PartFaces, aby test nebol tautologiou): plocha na minime osi
+  # sirky = L1, na maxime = L2, na minime osi dlzky = W1 atd. — viď kontrakt
+  # v core/part_faces.rb.
+  # Bezi nad IZOLOVANYM katalogom (Materials.test_dir_override, vzor 2A-3).
+  def d88_catalog_json
+    sheet = lambda do |id, gid, decor, color, extra|
+      { 'material_id' => id, 'manufacturer' => 'Egger', 'decor' => decor,
+        'type' => 'DTDL', 'thickness' => 18.0, 'grain' => 'none',
+        'sheet_size' => [2800.0, 2070.0], 'color' => color,
+        'production_class' => 'sheet', 'group_id' => gid, 'structure' => 'SM' }.merge(extra)
+    end
+    edge = lambda do |id, gid, decor, color|
+      { 'abs_id' => id, 'decor' => decor, 'thickness' => 1.0, 'width' => 23.0,
+        'color' => color, 'group_id' => gid, 'structure' => 'SM' }
+    end
+    {
+      'std' => 1, 'schema' => 2,
+      'sheets' => [
+        sheet.call('D88BIELA18', 'GRP-D88BIELA', 'BIELA', [246, 246, 244], {}),
+        sheet.call('D88ZHODA18', 'GRP-D88ZHODA', 'ZHODA', [200, 190, 170], {}),
+        sheet.call('D88NOABS18', 'GRP-D88NOABS', 'NOABS', [180, 180, 180], {})
+      ],
+      'edges' => [
+        # kontrastna paska (hneda na bielej doske) — TOTO je D-88
+        edge.call('D88E_HNEDA_23X10', 'GRP-D88BIELA', 'BIELA', [120, 80, 40]),
+        # paska ROVNAKEJ farby ako doska — material sa vtedy vobec nevytvara
+        edge.call('D88E_ZHODA_23X10', 'GRP-D88ZHODA', 'ZHODA', [200, 190, 170])
+      ]
+    }
+  end
+
+  def d88_part(inst, role)
+    inst.definition.entities.grep(Sketchup::ComponentInstance)
+        .find { |i| e::Store.kind(i) == 'part' && e::Store.get(i, 'role').to_s == role }
+  end
+
+  # Plocha na danej stene obalu definicie: axis 0=X 1=Y 2=Z, side :min/:max.
+  def d88_face_on(pi, axis, side)
+    b = pi.definition.bounds
+    lo = [mm(b.min.x), mm(b.min.y), mm(b.min.z)]
+    hi = [mm(b.max.x), mm(b.max.y), mm(b.max.z)]
+    want = side == :min ? lo[axis] : hi[axis]
+    pi.definition.entities.grep(Sketchup::Face).find do |f|
+      c = f.bounds.center
+      ([mm(c.x), mm(c.y), mm(c.z)][axis] - want).abs <= TOL
+    end
+  end
+
+  def d88_face_mat(pi, axis, side)
+    f = d88_face_on(pi, axis, side)
+    m = f && f.material
+    m ? m.name.to_s : nil
+  end
+
+  def d88_abs_name(abs_id)
+    e::Materials.su_edge_material_name(abs_id)
+  end
+
+  def d88_params(extra = {})
+    { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0,
+      'thickness' => 18.0, 'material_id' => 'D88BIELA18', 'front_material_id' => 'D88BIELA18',
+      'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => '1' }] },
+      'zone_tree' => { 'id' => 'Z1', 'shelves' => 1, 'children' => [] } }.merge(extra)
+  end
+
+  def run_d88(model)
+    tmp = File.join(Dir.tmpdir, "noxun_d88_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(d88_catalog_json))
+    e::Materials.test_dir_override = tmp
+    e::Materials.reload!
+    hneda = d88_abs_name('D88E_HNEDA_23X10')
+    begin
+      ok('D-88: override katalogu aktivny (kontrastna paska v katalogu)',
+         !e::Materials.edge('D88E_HNEDA_23X10').nil? &&
+         e::Materials.edge_color_of('D88E_HNEDA_23X10') == [120, 80, 40])
+
+      inst = e::CabinetBuilder.build(model, d88_params)
+      return ok('D-88: vlozenie korpusu', false) unless inst
+
+      # BOK: osi UPRIGHT (dlzka Z, sirka Y, hrubka X) -> L1 = plocha na Y minime.
+      side = d88_part(inst, 'side_left')
+      scfg = e::Store.config(side) || {}
+      ok("D-88: bok ma pravidlovu pasku na L1 (#{(scfg['edges'] || {})['L1']})",
+         (scfg['edges'] || {})['L1'] == 'D88E_HNEDA_23X10')
+      ok('D-88: bok — predna ploska (Y min) nesie material PASKY',
+         d88_face_mat(side, 1, :min) == hneda)
+      ok('D-88: bok — zadna ploska (Y max) bez pasky ostava bez materialu',
+         d88_face_mat(side, 1, :max).nil?)
+      ok('D-88: bok — velke dekorove plochy (X min/max) ostavaju bez materialu (dedia dosku)',
+         d88_face_mat(side, 0, :min).nil? && d88_face_mat(side, 0, :max).nil?)
+      ok('D-88: bok — dolna/horna ploska (Z) bez pravidla ostava bez materialu',
+         d88_face_mat(side, 2, :min).nil? && d88_face_mat(side, 2, :max).nil?)
+
+      # CELO: osi FRONT (dlzka Z, sirka X, hrubka Y) -> vsetky 4 bocne plosky.
+      front = d88_part(inst, 'front_door')
+      ok('D-88: celo ma pasku na vsetkych 4 bocnych ploskach',
+         [[0, :min], [0, :max], [2, :min], [2, :max]].all? { |a, s| d88_face_mat(front, a, s) == hneda })
+      ok('D-88: celo — velke plochy (Y min/max) ostavaju bez materialu',
+         d88_face_mat(front, 1, :min).nil? && d88_face_mat(front, 1, :max).nil?)
+
+      # POLICA: osi LYING (dlzka X, sirka Y) -> L1 = Y minimum (predna hrana).
+      shelf = d88_part(inst, 'shelf')
+      ok('D-88: polica — predna ploska (Y min) nesie pasku, ostatne nie',
+         d88_face_mat(shelf, 1, :min) == hneda && d88_face_mat(shelf, 1, :max).nil? &&
+         d88_face_mat(shelf, 0, :min).nil? && d88_face_mat(shelf, 2, :min).nil?)
+
+      # CHRBAT: pravidlo prazdne -> ziadna farebna ploska.
+      back = d88_part(inst, 'back')
+      ok('D-88: chrbat (pravidlo bez ABS) nema ziadnu zafarbenu plosku',
+         back.nil? || back.definition.entities.grep(Sketchup::Face).none? { |f| f.material })
+
+      # OVERRIDE: rucne olepenie zadnej hrany police -> po rebuilde je zafarbena.
+      params = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+      pkey = e::Store.get(shelf, 'part_key').to_s
+      params['part_overrides'] = { pkey => { 'edges' => { 'L2' => 'D88E_HNEDA_23X10' } } }
+      e::CabinetBuilder.rebuild(model, inst, params)
+      shelf2 = d88_part(inst, 'shelf')
+      ok('D-88: rucny override L2 sa po rebuilde prejavi na zadnej plosky police',
+         d88_face_mat(shelf2, 1, :max) == hneda)
+      Sketchup.undo
+      shelf3 = d88_part(inst, 'shelf')
+      ok('D-88: 1x undo vrati zafarbenie do povodneho stavu (zadna ploska cista)',
+         d88_face_mat(shelf3, 1, :max).nil? && d88_face_mat(shelf3, 1, :min) == hneda)
+
+      # VEDOME „bez ABS" na prednej hrane -> ploska sa vrati na farbu dosky.
+      params2 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+      params2['part_overrides'] = { pkey => { 'edges' => { 'L1' => nil } } }
+      e::CabinetBuilder.rebuild(model, inst, params2)
+      shelf4 = d88_part(inst, 'shelf')
+      ok('D-88: vedome „bez ABS" necha plosku vo farbe dosky (bez materialu)',
+         d88_face_mat(shelf4, 1, :min).nil?)
+
+      # PASKA ROVNAKEJ FARBY ako doska: ziadny material sa netvori (cista kniznica).
+      inst2 = e::CabinetBuilder.build(model, d88_params('width' => 500.0,
+                                                        'material_id' => 'D88ZHODA18',
+                                                        'front_material_id' => 'D88ZHODA18'))
+      side2 = d88_part(inst2, 'side_left')
+      ok('D-88: paska rovnakej farby ako doska plosku nefarbi (ziadny zbytocny material)',
+         d88_face_mat(side2, 1, :min).nil? &&
+         model.materials[d88_abs_name('D88E_ZHODA_23X10')].nil?)
+
+      # SAMOSTATNA DOSKA: osi LYING; pravidlo free_panel = L1 (pozdlzna).
+      board = e::BoardBuilder.build(model, { 'material_id' => 'D88BIELA18',
+                                             'length' => 800.0, 'width' => 400.0 })
+      bcfg = e::Store.config(board) || {}
+      ok("D-88: doska ma pravidlovu pasku na L1 (#{(bcfg['edges'] || {})['L1']})",
+         (bcfg['edges'] || {})['L1'] == 'D88E_HNEDA_23X10')
+      ok('D-88: doska — ploska na Y minime nesie pasku, velke plochy (Z) nie',
+         d88_face_mat(board, 1, :min) == hneda &&
+         d88_face_mat(board, 2, :min).nil? && d88_face_mat(board, 2, :max).nil?)
+      # rebuild dosky (zmena rozmeru) zafarbenie ZACHOVA a scale zamok drzi
+      e::BoardBuilder.rebuild(model, board, { 'length' => 900.0 })
+      ok('D-88: po rebuilde dosky ostava ploska zafarbena a rozmer sedi',
+         d88_face_mat(board, 1, :min) == hneda &&
+         (mm(board.definition.bounds.width) - 900.0).abs <= TOL)
+      ok('D-88: doska ma po rebuilde stale scale masku (absorpcia nedotknuta)',
+         board.definition.get_attribute('dynamic_attributes', 'scaletool').to_s == '120')
+
+      # doska bez pouzitelnej pasky -> ziadna zafarbena ploska
+      board2 = e::BoardBuilder.build(model, { 'material_id' => 'D88NOABS18',
+                                              'length' => 300.0, 'width' => 200.0 })
+      ok('D-88: doska bez pasky v skupine nema ziadnu zafarbenu plosku',
+         board2.definition.entities.grep(Sketchup::Face).none? { |f| f.material })
+    ensure
+      e::Materials.test_dir_override = nil
+      e::Materials.reload!
+      cleanup(model)
+      begin
+        FileUtils.rm_rf(tmp)
+      rescue StandardError
+        nil
+      end
+    end
+    ok('D-88: cleanup (override prec, model prazdny)',
+       e::Materials.test_dir_override.nil? && cabinets(model).empty? && boards(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: D-88 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    e::Materials.test_dir_override = nil
+    e::Materials.reload!
+    cleanup(model)
+  end
+
   # --- ASYNC: undo/redo scenare (retaz timerov, observer debounce 0.2 s) -----
 
   def run_async(model, done)
@@ -2432,6 +2619,7 @@ module NoxunSuRunner
     run_2a4(model)           # 2A-4b: OSTRY cutover — boot_cutover!, picker, universal, rollback+hold
     run_d40(model)           # D-40: selection eventy po builde (DC observer pasca)
     run_d90(model)           # D-90: vizual uchytkoveho profilu UKW-7 (kotva, undo, rebuild)
+    run_d88(model)           # D-88: farba ABS na bocnych plochach dielcov a dosky
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

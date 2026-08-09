@@ -203,7 +203,9 @@
       // bez inherit — doska nema override vrstvu). curVal drzi hodnotu hrany
       // aj legacy mimo katalogu (F5).
       var curVal = absId == null ? '' : absId;
-      sel.innerHTML = boardEdgeOptionsHtml(bc.material_id, curVal);
+      // D-102: pri nelepitelnom materiali (KOMPAKT / PD postforming) volba povie
+      // „Bez ABS (nelepí sa)" — text sklada server (bc.edge_none_option).
+      sel.innerHTML = boardEdgeOptionsHtml(bc.material_id, curVal, bc.edge_none_option);
       sel.value = curVal;
       sel.setAttribute('data-edge', code);
       sel.onchange = (function(cc, ss){ return function(){ onBoardEdgeChange(cc, ss.value); }; })(code, sel);
@@ -223,13 +225,20 @@
     var pad = 28, availW = 300 - 2 * pad, availH = 200 - 2 * pad;
     var sc = Math.min(availW / horiz, availH / vert); if (!isFinite(sc) || sc <= 0) sc = 1;
     var rw = horiz * sc, rh = vert * sc, ox = (300 - rw) / 2, oy = (200 - rh) / 2, ew = 7;
-    var edges = bc.edges || {}, lab = bc.edge_labels || {};
+    var edges = bc.edges || {}, lab = bc.edge_labels || {}, hints = bc.edge_hints || {};
     function ecol(code){ return absColorOf(edges[code]); }
+    // D-102: tooltip s plnym textom pasky + skratka do EXISTUJUCEHO popisku strany
+    // (ziadny novy riadok — pravidlo vertikalneho priestoru).
+    function tip(code){ return (hints[code] && hints[code].title) ? hints[code].title : ''; }
+    function sideText(code){
+      return edgeSideText(lab[code], hints[code] ? hints[code].short : '');
+    }
     function bar(side, code, fill){
-      if (side === 'top')    return '<rect class="behit" data-edge="' + code + '" x="' + ox + '" y="' + (oy - ew / 2) + '" width="' + rw + '" height="' + ew + '" fill="' + fill + '" style="cursor:pointer"/>';
-      if (side === 'bottom') return '<rect class="behit" data-edge="' + code + '" x="' + ox + '" y="' + (oy + rh - ew / 2) + '" width="' + rw + '" height="' + ew + '" fill="' + fill + '" style="cursor:pointer"/>';
-      if (side === 'left')   return '<rect class="behit" data-edge="' + code + '" x="' + (ox - ew / 2) + '" y="' + oy + '" width="' + ew + '" height="' + rh + '" fill="' + fill + '" style="cursor:pointer"/>';
-      return '<rect class="behit" data-edge="' + code + '" x="' + (ox + rw - ew / 2) + '" y="' + oy + '" width="' + ew + '" height="' + rh + '" fill="' + fill + '" style="cursor:pointer"/>';
+      var t = tip(code) ? '<title>' + esc(tip(code)) + '</title>' : '';
+      if (side === 'top')    return '<rect class="behit" data-edge="' + code + '" x="' + ox + '" y="' + (oy - ew / 2) + '" width="' + rw + '" height="' + ew + '" fill="' + fill + '" style="cursor:pointer">' + t + '</rect>';
+      if (side === 'bottom') return '<rect class="behit" data-edge="' + code + '" x="' + ox + '" y="' + (oy + rh - ew / 2) + '" width="' + rw + '" height="' + ew + '" fill="' + fill + '" style="cursor:pointer">' + t + '</rect>';
+      if (side === 'left')   return '<rect class="behit" data-edge="' + code + '" x="' + (ox - ew / 2) + '" y="' + oy + '" width="' + ew + '" height="' + rh + '" fill="' + fill + '" style="cursor:pointer">' + t + '</rect>';
+      return '<rect class="behit" data-edge="' + code + '" x="' + (ox + rw - ew / 2) + '" y="' + oy + '" width="' + ew + '" height="' + rh + '" fill="' + fill + '" style="cursor:pointer">' + t + '</rect>';
     }
     function label(side, txt){
       txt = esc(txt || '');
@@ -243,7 +252,7 @@
     ['L1', 'L2', 'W1', 'W2'].forEach(function(code){
       var side = sides[code]; if (!side) return;
       S.push(bar(side, code, ecol(code)));
-      S.push(label(side, lab[code]));
+      S.push(label(side, sideText(code)));
     });
     S.push('<text x="150" y="100" font-size="12" fill="#b0bec5" text-anchor="middle" dominant-baseline="middle" pointer-events="none">' + Math.round(L) + '×' + Math.round(Wd) + '</text>');
     svg.innerHTML = S.join('');

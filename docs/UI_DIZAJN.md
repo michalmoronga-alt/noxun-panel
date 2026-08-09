@@ -202,6 +202,19 @@ semaforové `--nx-state-*` sa sem **nemiešajú**. Obsah riadku skladá výhradn
 server (`HardwareSets.explain` + `PartKeys.human_label`) — JS nerozhoduje, čo
 sa kupuje, ani neprekladá dôvody.
 
+### D-102: vyriešená ABS páska v karte dielca a dosky
+Rozbaľovačka hrany nesmie skončiť pri „(podľa pravidla)" — voľba nesie **výsledok**
+(`(podľa pravidla — 500 SM Biela 23/1 mm)`, `(podľa pravidla — bez ABS)`,
+`(podľa pravidla — nelepí sa)`). Karta Dosky nemá vrstvu overridov, preto sa u nej
+mení voľba „Bez ABS" na **„Bez ABS (nelepí sa)"** pri nelepiteľnom materiáli.
+V 2D náhľade dostal každý farebný pás **`<title>` tooltip** s plným textom a do
+**existujúceho** popisku strany pribudla skratka (`Predná · 23/1`) — **žiadny nový
+riadok**. Text skladá **výhradne server** (`Panel.edge_rule_results` /
+`edge_view_hints`), JS ho len escapuje a vkladá; pri lokálnom prekreslení po zmene
+materiálu sa serverový text vedome NEPOUŽIJE (patrí starému materiálu) a ukáže sa
+neutrálne „(podľa pravidla)". Farby pásov ostávajú na ABS tokenoch `--nx-abs-*`
+(semaforové `--nx-state-*` sa sem nemiešajú).
+
 ### Pravidlo: žiadne emoji v UI chrome
 Emoji/unicode glyfy (🔒 ✕ ↺ ⚙ 📋 ★ ⧉ ⛶ ⚠ 🔗 …) sa v ovládacích prvkoch panela
 nepoužívajú — nahrádza ich ikona zo spritu. Kde SVG nejde (napr. `<option>`,
