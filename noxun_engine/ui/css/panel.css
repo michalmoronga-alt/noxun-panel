@@ -102,13 +102,15 @@
   /* Cela riadky */
   .frow { display: flex; gap: 5px; align-items: center; margin: 4px 0; }
   .frow .fnum { flex: 0 0 24px; color: var(--nx-ink-faint); font-size: 11px; text-align: center; } /* D-23: "F1" namiesto "1" */
-  .frow select.ftype { flex: 1 1 auto; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 4px; }
+  /* min-width: 0 — bez neho select nepusti pod sirku najdlhsej polozky a rad by
+     sa pri uzkom paneli zalomil (D-90: v rade pribudla volba profilu). */
+  .frow select.ftype { flex: 1 1 auto; min-width: 0; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 4px; }
   .frow input.fh { flex: 0 0 58px; padding: 3px 4px; border: 1px solid var(--nx-border-strong); border-radius: 4px; }
   .frow select.fw { flex: 0 0 56px; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 4px; }
   .frow .flock { flex: 0 0 20px; text-align: center; }
   /* D-90: volba uchytkoveho profilu — ikonove tlacidlo v rade riadku cela
      (bez popisku, stav nesie ramik + aria-pressed; zapnuty = akcent vyberu). */
-  .frow .fprof { flex: 0 0 24px; padding: 2px 0; background: var(--nx-surface-sunken);
+  .frow .fprof { flex: 0 0 22px; padding: 2px 0; background: var(--nx-surface-sunken);
                  color: var(--nx-ink-muted); border: 1px solid var(--nx-border-strong);
                  border-radius: 4px; line-height: 0; }
   .frow .fprof.on { background: var(--nx-select-bg); color: var(--nx-select);
