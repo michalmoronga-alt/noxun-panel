@@ -137,9 +137,12 @@ module Noxun
       # D-49 (audit B1): ani UNI flagy, ani Demos vazba — duplak sa nekupuje,
       # "Aktualizovat z Demosu" by inak fetchoval zdrojovu 18-ku na duplak a
       # zdedene uni:true by z duplaku spravilo pracovny material.
+      # D-98 (audit F5): ani `supplier_decor` — duplak sa NEKUPUJE, takze
+      # dodavatelov alias dekoru nema komu sluzit; zdedeny by navyse tvrdil,
+      # ze duplak ma vlastnu produktovu stranku u dodavatela.
       def duplak_record_from(source, mult)
         rec = source.reject do |k, _|
-          %w[material_id code supplier price_per_m2
+          %w[material_id code supplier price_per_m2 supplier_decor
              uni uni_role demos_url price_checked_at].include?(k)
         end
         rec['thickness'] = (source['thickness'].to_f * mult).round(2)
@@ -308,6 +311,15 @@ module Noxun
           unless PD_EDGE_SUBTYPES.include?(pe)
             return [false, 'Hranová úprava musí byť postforming alebo abs.']
           end
+        end
+        # D-98 (audit F3): alias dekoru u dodavatela — volitelny kratky text,
+        # NIKDY na zastene (obojstranny dekor ma vlastnu semantiku lica/rubu).
+        sd = (a['supplier_decor'] || a[:supplier_decor]).to_s.strip
+        unless sd.empty?
+          if double_sided_type?(type)
+            return [false, 'Zástena dekor u dodávateľa nemá — strany určuje líce a rub.']
+          end
+          return [false, "Dekor u dodávateľa je príliš dlhý (max #{CODE_MAX})."] if sd.length > CODE_MAX
         end
         [true, nil]
       end
@@ -553,8 +565,12 @@ module Noxun
       # normalize_edge kluc odstrani (merge-safe).
       # E-b2: `cp_nazov` je OBCHODNY nazov pre cenovu ponuku — nie identita,
       # nie nakupny udaj; patchom sa da kedykolvek prepisat aj vymazat.
+      # D-98: `supplier_decor` (dekor u dodavatela) je rovnaka trieda ako kod —
+      # obchodny udaj, nie identita; patchom sa da prepisat aj vymazat. Zmena
+      # vsak MENI dokaz identity voci stranke dodavatela, preto s nou padne
+      # price_checked_at (audit B2 — nizsie v patch_record).
       PATCHABLE = {
-        'sheet' => %w[code supplier price_per_m2 cp_nazov],
+        'sheet' => %w[code supplier price_per_m2 cp_nazov supplier_decor],
         'edge'  => %w[code supplier price_per_bm universal]
       }.freeze
 
@@ -599,6 +615,14 @@ module Noxun
           clean = patch.is_a?(Hash) ? patch.select { |k, _| PATCHABLE.fetch(kind, []).include?(k) } : {}
           return [:invalid, 'Žiadne editovateľné pole.'] if clean.empty?
           merged = existing.merge(clean)
+          # D-98 (audit B2): zmena ALEBO vymazanie aliasu dekoru u dodavatela
+          # rusi datum overenia ceny — cena/kod/URL ostavaju, ale ako NEOVERENE
+          # (rovnaky kontrakt ako zmena demos_url vo formulari). Autorita je
+          # server: klient datum nikdy neposiela.
+          if clean.key?('supplier_decor') &&
+             clean['supplier_decor'].to_s.strip != existing['supplier_decor'].to_s.strip
+            merged.delete('price_checked_at')
+          end
           ok, err = kind == 'edge' ? validate_edge_attrs(merged) : validate_sheet_attrs(merged)
           return [:invalid, err] unless ok
           # Codex GH #76: dup kontrola bezi pri zmene kodu AJ dodavatela — patch
@@ -914,7 +938,8 @@ module Noxun
         # zasah je len NEPRAZDNA hodnota; nil patch = konzervativne odmietnut.
         if patch.is_a?(Hash)
           # M-A3e D-71: demos_url je nakupne pole — UNI vazbu na dodavatela nema.
-          touched = %w[code supplier price_per_m2 price_per_bm demos_url].any? do |k|
+          # D-98: alias dekoru u dodavatela patri do tej istej triedy.
+          touched = %w[code supplier price_per_m2 price_per_bm demos_url supplier_decor].any? do |k|
             patch.key?(k) && !patch[k].to_s.strip.empty?
           end
           return nil unless touched

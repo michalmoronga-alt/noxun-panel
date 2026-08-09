@@ -70,9 +70,16 @@ module Noxun
       # (vzor duplak/zastena/demos/image/uni — starsi klient by pole normalize
       # whitelistom ticho zahodil, preto ho marker posiela do read-only).
       SCHEMA_PD_EDGE = 8
+      # D-98: dekor u dodavatela (supplier_decor na DOSKE) — alias cisla dekoru,
+      # pod ktorym ten isty dekor vedie dodavatel (Egger kompakt F8001 = kompaktna
+      # verzia dekoru F800). NIE JE identita variantu, ale JE dokaz identity pri
+      # Demos overeni. Marker 9 LAZY prvym zapisom zaznamu s polom (vzor duplak/
+      # demos/uni/pd_edge): starsi klient by alias normalize whitelistom ticho
+      # zahodil a jeho zapis by vazbu na dodavatelovu stranku rozbil.
+      SCHEMA_SUPPLIER_DECOR = 9
       # Najnovsia schema, ktorej tvar tato verzia pluginu POZNA (write guard +
       # assess). Bump VYHRADNE spolu s kodom, ktory nove polia nesie.
-      SCHEMA_CURRENT = SCHEMA_PD_EDGE
+      SCHEMA_CURRENT = SCHEMA_SUPPLIER_DECOR
       # M-C: povolene hodnoty hranovej upravy PD (registrovy zoznam
       # pd_edge_subtypes je zdroj; konstanta = rychly enum guard pri zapise).
       PD_EDGE_SUBTYPES = %w[postforming abs].freeze
@@ -339,6 +346,11 @@ module Noxun
             next unless s.is_a?(Hash)
             need = SCHEMA_DUPLAK if need < SCHEMA_DUPLAK && !s['source_material_id'].to_s.empty?
             need = SCHEMA_ZASTENA if need < SCHEMA_ZASTENA && !s['back_decor'].to_s.empty?
+            # D-98: alias dekoru u dodavatela = marker 9 (LEN doska — na ABS
+            # paske pole neexistuje, preto sa kontroluje v sheet vetve).
+            if need < SCHEMA_SUPPLIER_DECOR && !s['supplier_decor'].to_s.empty?
+              need = SCHEMA_SUPPLIER_DECOR
+            end
           end
         end
         [sheets_raw, edges_raw].each do |list|
@@ -587,6 +599,21 @@ module Noxun
         put_image_fields(out, a)
         put_uni_fields(out, a)
         put_pd_edge_fields(out, a)
+        put_supplier_decor_fields(out, a)
+        out
+      end
+
+      # D-98 (SCHEMA 9): "dekor u dodavatela" = alias cisla dekoru, pod ktorym
+      # dodavatel vedie TEN ISTY dekor (Egger kompaktna doska ma vlastne cislo
+      # F8001 pre dekor F800 — stranka Demosu ho uvadza v parametroch a dokaz
+      # identity by inak padol navzdy). Merge-safe ako code/supplier (trim,
+      # prazdna hodnota kluc odstrani). NIE JE sucastou identity variantu.
+      # Audit F3: typ ZASTENA pole NEDOSTANE — obojstranny dekor ma vlastnu
+      # semantiku lica/rubu a alias by mohol obist model stran (identity_match?
+      # zastenovu vetvu nedotyka). Typovy guard drzi normalize aj validacia.
+      def put_supplier_decor_fields(out, a)
+        return out if identity_norm(out['type']) == 'ZASTENA'
+        put_opt(out, 'supplier_decor', a['supplier_decor'] || a[:supplier_decor])
         out
       end
 

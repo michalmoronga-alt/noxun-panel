@@ -42,15 +42,19 @@ NxTest.test('d49: ensure_duplak_for — vytvori, ocisti zdedene polia, druhy raz
   begin
     src_id = res['sheets'][0]
     # zdroju pridame Demos vazbu, nech ocista ma co chytat (audit B1)
-    st_p, = D49M.patch_record('sheet', src_id, { 'code' => '111222', 'supplier' => 'Demos' })
+    # D-98 (audit F5): + alias dekoru u dodavatela — duplak sa nekupuje, takze
+    # ani jeho dodavatelovo cislo dekoru dedit nesmie.
+    st_p, = D49M.patch_record('sheet', src_id, { 'code' => '111222', 'supplier' => 'Demos',
+                                                 'supplier_decor' => 'F8001' })
     NxTest.assert_equal(:ok, st_p, 'patch zdroja presiel')
+    NxTest.assert_equal('F8001', D49M.sheet(src_id)['supplier_decor'], 'sanity: zdroj alias ma')
     status, rec = D49M.ensure_duplak_for(src_id, 2)
     NxTest.assert_equal(:ok, status, rec.inspect)
     res['duplaks'] << rec['material_id']
     NxTest.assert_close(36.0, rec['thickness'])
     NxTest.assert_equal(src_id, rec['source_material_id'])
     NxTest.assert_equal(2, rec['source_multiplier'])
-    %w[code supplier price_per_m2 uni uni_role demos_url price_checked_at].each do |k|
+    %w[code supplier price_per_m2 supplier_decor uni uni_role demos_url price_checked_at].each do |k|
       NxTest.refute(rec.key?(k), "duplak nesmie zdedit #{k}")
     end
     status2, rec2 = D49M.ensure_duplak_for(src_id, 2)

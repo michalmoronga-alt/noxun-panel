@@ -237,11 +237,23 @@ module Noxun
       # D-66 (audit B2): zastena zaznam sa porovnava LICOM — stranka bez paru
       # v dekore nie je zhoda; rub sa overuje proti back_* zaznamu (ak ich
       # zaznam ma — GH #96 P1 pravidlo plati aj tu).
+      # D-98: dodavatel smie viest TEN ISTY dekor pod vlastnym cislom (Egger
+      # kompaktna doska F8001 = kompaktna verzia dekoru F800; zaznam zije v
+      # skupine F800 a stranka v parametroch pise "F8001 ST9"). Ked ma zaznam
+      # vyplneny alias `supplier_decor`, dekor STRANKY sa porovnava s NIM —
+      # inak by sa cena kompaktu nedala stiahnut nikdy. Alias NIE JE identita
+      # variantu; dokaz identity nezoslabne, lebo slug musi obsahovat OBA
+      # tokeny (DemosSlugMatcher.score, audit B1).
       def identity_match?(parsed, sheet_record)
         p = parsed['params'] || {}
         page_decor = p['decor']
         page_structure = p['structure']
-        if Materials.identity_norm(sheet_record['type']) == 'ZASTENA'
+        zastena = Materials.identity_norm(sheet_record['type']) == 'ZASTENA'
+        # Audit F3: zastena alias NEMA (normalize aj validacia ho odmietaju) —
+        # jej vetva stran ostava nedotknuta aj keby ho legacy zaznam niesol.
+        want_decor = zastena ? '' : sheet_record['supplier_decor'].to_s.strip
+        want_decor = sheet_record['decor'] if want_decor.empty?
+        if zastena
           # D-72 (GH #119 P1/P2) pravidla stran:
           #   stranka SINGLE: len skutocny protitah produkt (marker v title —
           #     slug tu nie je); zaznam S rubom sa nezhoduje (iny produkt);
@@ -270,7 +282,7 @@ module Noxun
           end
         end
         return false unless page_decor &&
-                            Materials.identity_norm(page_decor) == Materials.identity_norm(sheet_record['decor'])
+                            Materials.identity_norm(page_decor) == Materials.identity_norm(want_decor)
         unless sheet_record['structure'].to_s.strip.empty?
           return false unless page_structure &&
                               Materials.identity_norm(page_structure) == Materials.identity_norm(sheet_record['structure'])

@@ -175,6 +175,10 @@ module Noxun
         type = edge ? nil : rec['type'].to_s
         {
           'decor' => norm_token(rec['decor']),
+          # D-98: alias dekoru u dodavatela (len doska) — v slugu MUSI byt
+          # spolu s cislom skupiny (score nizsie), inak by alias dokaz identity
+          # oslaboval namiesto toho, aby ho spresnil.
+          'supplier_decor' => (norm_token(rec['supplier_decor']) unless edge),
           'structure' => norm_token(rec['structure']),
           'thickness' => num_seq(rec['thickness']),
           'width' => (num_seq(rec['width']) if edge),
@@ -194,6 +198,13 @@ module Noxun
       def score(slug, toks)
         parts = slug.split('-')
         return nil unless contains_seq?(parts, toks['decor'])
+        # D-98 (audit B1): zaznam s aliasom vyzaduje v slugu OBA tokeny — cislo
+        # skupiny AJ dodavatelov alias (kd-in-f8001-st9-f800-... ma f800 aj
+        # f8001 -> prejde; cudzi produkt F900 bez f800 -> neprejde). ZIADNE
+        # "alebo": OR by z aliasu spravil zadne dvierka do inej skupiny.
+        if toks['supplier_decor'] && !contains_seq?(parts, toks['supplier_decor'])
+          return nil
+        end
         # D-65: prefix filter cez prefix_match? (cely prvy usek) — DTDL zaznam
         # tak matchne aj dtd-laminovana URL, a 'mdf' uz nechyta 'mdfl-…' omylom.
         if toks['prefixes']
