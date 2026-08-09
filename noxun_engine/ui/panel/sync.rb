@@ -27,7 +27,10 @@ module Noxun
             selected_kind: cab ? 'cabinet' : (board ? 'board' : 'none'),
             # D-39 (audit B5): zamky vkladacej karty z Ruby pamate — preziju
             # zatvorenie panela; JS ich obnovi pri kazdom otvoreni (push_init).
-            insert_locks: insert_locks
+            insert_locks: insert_locks,
+            # D-90: ponuka uchytkovych profilov (id/nazov/skratenie) — JEDINY
+            # zdroj je registry FrontProfiles, JS si ziadny zoznam nedrzi.
+            front_profiles: FrontProfiles.options
           }
           js("NX.init(#{data.to_json})")
         end

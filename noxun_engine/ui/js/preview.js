@@ -205,16 +205,30 @@
         var wex = parseInt(it.wings, 10);
         wn = (wex >= 1 && wex <= 4) ? wex : (ow > 600 ? 2 : 1);
       }
+      // Stlpce = kridla (D-24: 2/3/4 s medzerou gap medzi nimi), 1 kridlo = cely otvor.
+      var cols = [];
       if (it.type === 'door' && wn > 1){
-        // viackridlove dvierka (D-24: 2/3/4) = wn panelov s medzerou gap medzi kridlami
         var dw = (ow - (wn - 1) * gap) / wn;
-        for (var w = 0; w < wn; w++){
-          S.push('<rect x="'+rx(gs + w*(dw+gap))+'" y="'+ry(z+h)+'" width="'+dw+'" height="'+h+'" fill="'+col+'" stroke="#4fc3f7" stroke-width="1.5"/>');
-        }
+        for (var w = 0; w < wn; w++) cols.push({ x: gs + w*(dw+gap), w: dw });
       } else {
-        S.push('<rect x="'+rx(gs)+'" y="'+ry(z+h)+'" width="'+ow+'" height="'+h+'" fill="'+col+'" stroke="#4fc3f7" stroke-width="1.5"/>');
+        cols.push({ x: gs, w: ow });
       }
-      S.push('<text x="'+rx(W/2)+'" y="'+ry(z+h/2)+'" font-size="18" fill="#0277bd" text-anchor="middle" dominant-baseline="middle">'+fnum+' · '+(it.type==='drawer_front'?'zásuvka':'dvierka')+' '+Math.round(h)+'</text>');
+      // D-90: uchytkovy profil zaberá hornych `red` mm RIADKU — panel je o tolko
+      // nizsi a nad nim sa kresli plny pruh profilu (kazde kridlo ma vlastny kus).
+      // Skratenie ide z Ruby registry (FRONT_PROFILES), nie z konstanty v JS.
+      var red = Math.min(frontProfileReduction(it.profile), h);
+      var ph = h - red;
+      cols.forEach(function(c){
+        if (ph > 0){
+          S.push('<rect x="'+rx(c.x)+'" y="'+ry(z+ph)+'" width="'+c.w+'" height="'+ph+'" fill="'+col+'" stroke="#4fc3f7" stroke-width="1.5"/>');
+        }
+        if (red > 0){
+          S.push('<rect class="fprofband" x="'+rx(c.x)+'" y="'+ry(z+h)+'" width="'+c.w+'" height="'+red+'"/>');
+        }
+      });
+      // popis do stredu PANELU (pri profile nesmie skoncit v jeho pruhu);
+      // cislo ostava vyskou RIADKU — presne to, co je v zozname ciel.
+      S.push('<text x="'+rx(W/2)+'" y="'+ry(z+(ph > 0 ? ph : h)/2)+'" font-size="18" fill="#0277bd" text-anchor="middle" dominant-baseline="middle">'+fnum+' · '+(it.type==='drawer_front'?'zásuvka':'dvierka')+' '+Math.round(h)+'</text>');
       S.push('</g>');
     });
   }

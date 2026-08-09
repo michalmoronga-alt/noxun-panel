@@ -437,8 +437,8 @@
     var row = document.createElement('div');
     row.className = 'frow';
     row.dataset.frontId = item.id || newStableId('F');
-    // D-90: profil riadku zije v datasete (ovladac pride v PR 2) — collectFronts
-    // ho posiela spat, takze editacia inych poli profil nezhodi.
+    // D-90: profil riadku zije v datasete (ovladac = tlacidlo .fprof nizsie) —
+    // collectFronts ho posiela spat, takze editacia inych poli profil nezhodi.
     row.dataset.frontProfile = item.profile || 'none';
     var badge = frontHwBadge(row.dataset.frontId); // D3: kovanie cela (zavesy/vysuv) z planu
     row.innerHTML =
@@ -448,6 +448,14 @@
         '<option value="none">Bez čela</option></select>' +
       '<input class="fh" type="text" placeholder="auto" oninput="onField()">' +
       '<select class="fw" onchange="onField()"><option value="auto">auto</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>' +
+      // D-90: volba uchytkoveho profilu — IKONOVE tlacidlo v EXISTUJUCOM rade
+      // (pravidlo vertikalneho priestoru; ziadny novy riadok ani popisok).
+      // Klik cykli „bez profilu -> profily z registry", stav drzi dataset +
+      // aria-pressed; ked Ruby ziadny profil nepozna, tlacidlo sa nevykresli.
+      (FRONT_PROFILES.length
+        ? '<button class="fprof" type="button" aria-pressed="false" onclick="toggleFrontProfile(this); onField()">' +
+          NXIcons.svg('profile') + '</button>'
+        : '') +
       '<input class="flock" type="checkbox" title="Zamknúť pevnú výšku" onchange="onField()">' +
       '<button class="fdel" title="Odstrániť" aria-label="Odstrániť čelo" onclick="delFrontRow(this); onField()">' + NXIcons.svg('x') + '</button>' +
       (badge ? '<span class="fhw" title="Kovanie tohto čela (sekcia Kovanie)">' + NXIcons.svg('link') + esc(badge) + '</span>' : '');
@@ -457,6 +465,7 @@
     if (item.wings) row.querySelector('.fw').value = item.wings;
     if (item.locked) row.querySelector('.flock').checked = true;
     attachExprField(row.querySelector('.fh'), { flushFn: flushCabinetEditsNow }); // V0.4.7e vyrazy vo vyske cela
+    syncFrontProfileBtn(row); // D-90: stav tlacidla profilu z datasetu
     onFrontTypeChange(row.querySelector('.ftype'));
     if (userAdd){
       // D-23: novy riadok vznika NAVRCHU zoznamu — dotiahni ho do pohladu a fokusni vysku
@@ -472,6 +481,41 @@
     row.querySelector('.fw').style.visibility = (sel.value === 'door') ? 'visible' : 'hidden';
     var hw = row.querySelector('.fhw');
     if (hw) hw.style.display = (sel.value === 'none') ? 'none' : '';
+    // D-90: „Bez čela" nemá na čom profil držať — voľba zmizne a stav sa zhodí
+    // na 'none' (rovnako to robí Ruby normalize; UI sa mu nesmie rozísť).
+    var pb = row.querySelector('.fprof');
+    if (pb){
+      var off = (sel.value === 'none');
+      pb.style.visibility = off ? 'hidden' : 'visible';
+      if (off && row.dataset.frontProfile !== 'none'){
+        row.dataset.frontProfile = 'none';
+        syncFrontProfileBtn(row);
+      }
+    }
+  }
+  // D-90: klik cykli profil riadku (bez profilu -> UKW-7 -> …). Autorita je
+  // server (Fronts.normalize_config neznámu hodnotu zhodí na 'none'); tu ide
+  // len o pohodlie a čitateľný stav.
+  function toggleFrontProfile(btn){
+    var row = btn.closest('.frow'); if (!row) return;
+    row.dataset.frontProfile = frontProfileNext(row.dataset.frontProfile || 'none');
+    syncFrontProfileBtn(row);
+  }
+  function syncFrontProfileBtn(row){
+    var btn = row.querySelector('.fprof'); if (!btn) return;
+    var id = row.dataset.frontProfile || 'none';
+    var rec = frontProfileRec(id);
+    var nxt = frontProfileNext(id);
+    var nxtRec = frontProfileRec(nxt);
+    var nxtTxt = nxtRec ? nxtRec.name : 'bez profilu';
+    var txt = rec
+      ? ('Úchytkový profil: ' + rec.name + ' — čelo sa skráti o ' + Math.round(rec.reduction) +
+         ' mm (klik = ' + nxtTxt + ')')
+      : ('Úchytkový profil: bez profilu (klik = ' + nxtTxt + ')');
+    btn.classList.toggle('on', !!rec);
+    btn.setAttribute('aria-pressed', rec ? 'true' : 'false');
+    btn.title = txt;
+    btn.setAttribute('aria-label', txt);
   }
   function delFrontRow(btn){ btn.closest('.frow').remove(); renumberFronts(); }
   // D-23: datovo posledne celo = HORNY riadok DOM (zoznam je obrateny); po

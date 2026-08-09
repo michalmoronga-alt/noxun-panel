@@ -59,6 +59,7 @@
       DEFAULTS = data.defaults || { lower: {}, upper: {} };
       TEMPLATES = data.templates || [];
       MATERIALS = data.materials || { sheets: [], edges: [] };
+      FRONT_PROFILES = data.front_profiles || []; // D-90: registry profilov z Ruby
       // D-39 (audit B5): zamky z Ruby pamate Panel modulu — PRED vetvami nizsie,
       // aby ich prvy reset karty (clearSelected -> materializeInsertCard) aplikoval.
       NXInsert.setLocksFlat(data.insert_locks);

@@ -100,7 +100,10 @@
     // V0.6 E-b (tab Rozpocet): "⋯" dalsie udaje riadku (kod/URL/poznamka)
     // a "⬇" export suboru — nahradzaju glyfy z mocku (ziadne emoji v UI chrome).
     'more-horizontal': '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
-    'download': '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>'
+    'download': '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>',
+    // V0.6 D-90: uchytkovy profil na hornej hrane cela (vlastny symbol) —
+    // lista profilu cez celu sirku + celo pod nou.
+    'profile': '<rect x="2" y="3" width="20" height="5" rx="1.5"/><path d="M6 8v13h12V8"/>'
   };
 
   // Firemne logo — prstenec + krizove ramena. Renderuje sa FILL-om (.nx-logo),

@@ -106,6 +106,13 @@
   .frow input.fh { flex: 0 0 58px; padding: 3px 4px; border: 1px solid var(--nx-border-strong); border-radius: 4px; }
   .frow select.fw { flex: 0 0 56px; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 4px; }
   .frow .flock { flex: 0 0 20px; text-align: center; }
+  /* D-90: volba uchytkoveho profilu — ikonove tlacidlo v rade riadku cela
+     (bez popisku, stav nesie ramik + aria-pressed; zapnuty = akcent vyberu). */
+  .frow .fprof { flex: 0 0 24px; padding: 2px 0; background: var(--nx-surface-sunken);
+                 color: var(--nx-ink-muted); border: 1px solid var(--nx-border-strong);
+                 border-radius: 4px; line-height: 0; }
+  .frow .fprof.on { background: var(--nx-select-bg); color: var(--nx-select);
+                    border-color: var(--nx-select); }
   .frow .fdel { flex: 0 0 22px; background: var(--nx-danger-bg); color: var(--nx-danger); border: 1px solid var(--nx-danger-border); border-radius: 4px; padding: 2px 0; }
   /* D-22: zamok limitu presahov (v riadku medzier sekcie Cela) — ikona + text v rade */
   .row .lockbtn { flex: 1; text-align: left; padding: 4px 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
@@ -584,6 +591,11 @@
      Zvyraznenie bezi CISTO cez CSS — ziadny renderPreview pocas hoveru. CSS
      pravidla prebiju prezentacne ATRIBUTY rectov/textov (stroke/fill). */
   #preview g.fgrp { cursor: pointer; }
+  /* D-90: pasmo uchytkoveho profilu nad celom — plny neutralny (hlinikovy) pruh
+     odliseny od panelu; farby VYHRADNE cez tokeny (nahlad ich inak pise
+     prezentacnymi atributmi, tu je to CSS trieda). */
+  #preview rect.fprofband { fill: var(--nx-border-strong); stroke: var(--nx-ink-faint);
+                            stroke-width: 1.5; }
   #preview g.fgrp.hov rect { stroke: var(--nx-select-strong); stroke-width: 3.5; }
   #preview g.fgrp.hov text { fill: var(--nx-select-strong); }
   .frow.hov { background: var(--nx-select-bg-hover); border-radius: 4px; }
