@@ -66,6 +66,16 @@ module Noxun
       # je proxy a nesmie polozit SketchUp pri poskodenom/extremnom pocte (audit D7).
       LEG_RENDER_MAX = 16
 
+      # D-90 vizual uchytkoveho profilu (proxy): neutralny hlinikovy odtien +
+      # odtlacok geometrie na definicii. PROFILE_GEOM_REV sa BUMPNE pri kazdej
+      # zmene obrysu v FrontProfiles — stare definicie v ulozenych modeloch sa
+      # tak pri najblizsom rebuilde prekreslia (recyklacia podla mena inak
+      # zastaralu geometriu nikdy nezbadá).
+      PROFILE_MATERIAL = 'NOXUN_PROFIL_HLINIK'
+      PROFILE_RGB      = [176, 180, 184].freeze
+      PROFILE_DICT     = 'NOXUN_PROFILE'
+      PROFILE_GEOM_REV = 1
+
       class << self
         # --- verejne API ----------------------------------------------------
 
@@ -309,6 +319,9 @@ module Noxun
             resolved = resolve_part(pd, eff_body, eff_front, eff_back, overrides,
                                     abs_issues: abs_issues, legacy_sources: legacy_sources)
             add_part(model, ents, pd, resolved, cid, tid)
+            # D-90: uchytkovy profil na hornej hrane cela — PROXY vizual v pasme
+            # nad skratenym panelom (rovnaky kontrakt ako nohy, viz nizsie).
+            render_front_profile(model, ents, pd, cid)
           end
           attach_abs_warnings!(plan, abs_issues)
 
@@ -925,6 +938,108 @@ module Noxun
 
         def hardware_tag(model)
           model.layers[HARDWARE_TAG] || model.layers.add(HARDWARE_TAG)
+        end
+
+        # --- D-90: vizual uchytkoveho profilu na cele -----------------------
+        #
+        # PROXY kontrakt je ZHODNY s nohami (standard 6.3): kind 'hardware',
+        # production_class 'none', manufactured false — zdroj pravdy supisu je
+        # VYHRADNE config.hardware[] korpusu (pravidlo part_flag_length z PR 1),
+        # geometria sa na cisla NIKDY nepyta.
+        #
+        # KOTVA (potvrdena Michalom 9.8. fotkou montaze):
+        #   Y: zadna rovina profilu = zadna rovina cela (Y = 0), profil ide
+        #      DOPREDU do Y = -depth; lico 18 mm cela tak presahuje o ~1,2 mm.
+        #   Z: VRCH profilu = vrch POVODNEHO cela (vrch pasma = z + vyska riadku),
+        #      profil siaha `height` nadol a spodnym „nosom" prekryva vrch
+        #      skrateneho panelu o (height - reduction) = 1,419 mm — zamerne.
+        #   X: dlzka rezu = sirka kridla (box[0]), zaciatok na origin[0].
+        def render_front_profile(model, parent_ents, pd, cid)
+          pl = profile_placement(pd)
+          return nil unless pl
+
+          pdef = profile_definition(model, pl)
+          return nil unless pdef
+
+          inst = parent_ents.add_instance(
+            pdef, Geom::Transformation.translation(Units.point(pl[:x], 0.0, pl[:z_base]))
+          )
+          inst.material = ensure_material(model, PROFILE_MATERIAL, PROFILE_RGB)
+          inst.layer = hardware_tag(model)
+          hw_id = "#{cid}-HW-PROFILE-#{pd[:suffix]}"
+          Store.write(inst, {
+                        std: Store::STD, kind: 'hardware', id: hw_id, part_id: hw_id,
+                        cabinet_id: cid, role: 'handle',
+                        manufactured: false, production_class: 'none',
+                        config: { generic_type: 'handle', proxy: true, quantity: 1,
+                                  profile: pl[:profile], owner_part_key: pd[:part_key].to_s,
+                                  params: { 'cut_length_mm' => pl[:length].round(2),
+                                            'profile' => pl[:profile] } }
+                      })
+          inst
+        rescue StandardError => e
+          # Vizual NIKDY nezhodi rebuild — dielec aj data kovania uz stoja.
+          Engine.log_error(e, 'render_front_profile') if defined?(Engine)
+          nil
+        end
+
+        # Umiestnenie proxy z deskriptora dielca — CISTY vypocet bez SketchUp API
+        # (kotva sa tak da overit headless). nil = dielec profil nema alebo je
+        # zdegenerovany. z_base = spodok obrysu, z_top = vrch POVODNEHO cela.
+        def profile_placement(pd)
+          pid = FrontProfiles.of(pd)
+          return nil unless pid
+          band = pd[:profile_band]
+          geo = FrontProfiles.geometry(pid)
+          return nil unless band.is_a?(Hash) && geo
+
+          length = pd[:box][0].to_f
+          return nil unless length > BuildPlan::MIN_DIM
+
+          z_top = band[:z].to_f + band[:h].to_f
+          { profile: pid, geometry: geo, length: length, x: pd[:origin][0].to_f,
+            z_top: z_top, z_base: z_top - geo[:height], depth: geo[:depth],
+            def_name: profile_def_name(pid, length) }
+        end
+
+        # Meno definicie = (profil, dlzka na 1 desatinu). Dlzka je sucastou mena,
+        # takze rovnako siroke kridla zdielaju jednu definiciu.
+        def profile_def_name(pid, length)
+          format('NOXUN_PROFILE_%s_L%.1f', pid.to_s.upcase, length.to_f)
+        end
+
+        # Definicia per (profil, dlzka) s recyklaciou podla mena — vzor dielcov.
+        # Mena su GLOBALNE (nie per korpus): rovnako siroke kridla v celej zakazke
+        # zdielaju jednu definiciu. Preto sa hotova definicia NEPREKRESLUJE nasilu;
+        # prekresli sa len ked chyba, je prazdna alebo nesedi odtlacok geometrie
+        # (zmena obrysu v novej verzii pluginu = PROFILE_GEOM_REV bump).
+        def profile_definition(model, pl)
+          dname = pl[:def_name]
+          stamp = "#{pl[:profile]}|#{PROFILE_GEOM_REV}|#{format('%.3f', pl[:length])}"
+          pdef = model.definitions[dname]
+          if pdef && pdef.entities.length.positive? &&
+             pdef.get_attribute(PROFILE_DICT, 'geom').to_s == stamp
+            return pdef
+          end
+
+          pdef ||= model.definitions.add(dname)
+          pdef.entities.clear!
+          face = draw_profile_section(pdef.entities, pl[:geometry], pl[:length])
+          return nil unless face
+          pdef.set_attribute(PROFILE_DICT, 'geom', stamp)
+          pdef
+        end
+
+        # Prierez v rovine X=0 (bod [hlbka, vyska] -> [0, -hlbka, vyska])
+        # + pushpull po DLZKE do +X. Normala sa kontroluje pred vytlacenim
+        # (rovnaky vzor ako draw_box/draw_leg_cylinder).
+        def draw_profile_section(ents, geo, length)
+          pts = geo[:outline].map { |d, v| Units.point(0.0, -d.to_f, v.to_f) }
+          face = ents.add_face(pts)
+          return nil unless face
+          face.reverse! if face.normal.x < 0
+          face.pushpull(Units.mm(length))
+          face
         end
 
         # Cela maju hrubku v osi Y. Ak katalog hovori 18/19 mm, upravime box,
