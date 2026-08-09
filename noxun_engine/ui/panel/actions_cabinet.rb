@@ -337,6 +337,58 @@ module Noxun
           push_selected(model)
         end
 
+        # D-100: premenovanie skrinky z hlavicky panela (inline edit v idbare).
+        # Nazov nema ziadny geometricky dosah, takze sa zapisuje PRIAMO do configu
+        # (ziadna prestavba) — ale vzdy vo vlastnej operacii = 1 undo krok.
+        #
+        # Codex audit BLOCKER 1: `Store.write_config` meni atribut instancie a
+        # CabinetEntityObserver by z toho spravil "zmenu korpusu" (po debounce
+        # presun ghost zon vo VLASTNEJ transparentnej operacii) — zapis preto
+        # bezi pod ScaleWatch guardom (CabinetBuilder.guarded).
+        # BLOCKER 2: refresh panela s `dedup: false` — predvoleny push_selected
+        # spusta dedup_copies, ktory by pri premenovani mohol prestavat CUDZIU
+        # duplicitnu skrinku (geometria a undo mimo vybraneho objektu).
+        # FIX 6: prazdne alebo nezhodne cabinet_id = ziadny zapis (prisnejsie ako
+        # auto-apply — premenovanie je vedomy akt nad KONKRETNOU skrinkou).
+        def handle_rename_cabinet(payload)
+          model = Sketchup.active_model
+          data = parse(payload)
+          echo = data['cabinet_id'].to_s
+          cab = find_cabinet(model)
+          return set_status('Najprv označ NOXUN korpus.', true) if cab.nil?
+
+          cid = Store.get(cab, 'cabinet_id').to_s
+          if echo.empty? || echo != cid
+            Engine.log("rename_cabinet zahodeny — echo #{echo.empty? ? '(prazdne)' : echo} nesedi s vyberom #{cid}")
+            return
+          end
+
+          cfg = Store.config(cab) || {}
+          name = CabinetBuilder.sanitize_name(data['name'])
+          if name == CabinetBuilder.manual_name(cfg)
+            push_selected(model, dedup: false) # UI resync (input -> text), model netreba menit
+            return
+          end
+
+          begin
+            CabinetBuilder.guarded do
+              model.start_operation('NOXUN: Premenovanie skrinky', true)
+              cfg['name'] = name
+              Store.write_config(cab, cfg)
+              model.commit_operation
+            end
+          rescue StandardError => e
+            CabinetBuilder.abort_safely(model)
+            Engine.log_error(e, 'Panel.handle_rename_cabinet')
+            push_selected(model, dedup: false)
+            return set_status('Názov sa nepodarilo uložiť — skús znova.', true)
+          end
+
+          set_status(name ? "#{cid} premenovaná na „#{name}“." \
+                          : "#{cid} — vlastný názov zrušený, platí #{CabinetBuilder.display_name(cfg)}.")
+          push_selected(model, dedup: false)
+        end
+
         # Konstrukcne/rozmerove zmeny na oznaceny korpus. Zachova strom zon + cela.
         def handle_apply(payload)
           model = Sketchup.active_model

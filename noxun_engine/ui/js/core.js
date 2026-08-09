@@ -504,6 +504,15 @@
     });
   }
 
+  // D-100: ocistenie nazvu skrinky PRED odoslanim (zrkadlo Ruby
+  // CabinetBuilder.sanitize_name — trim, jedna medzera, dlzka NAME_MAX_LEN).
+  // JS je len UX zrkadlo: co je "automaticky nazov" a co sa naozaj ulozi
+  // rozhoduje VYHRADNE server (rovnaky kontrakt ako absUsableExists).
+  var CAB_NAME_MAX = 80;
+  function cabNameValue(raw){
+    return String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim().slice(0, CAB_NAME_MAX).trim();
+  }
+
   // D-36 Node testy (tests/js/test_abs_groups.js) — v CEF je module undefined, vetva
   // sa preskoci. Exportuju sa len CISTE grouping funkcie (bez DOM/MATERIALS zavislosti).
   if (typeof module !== 'undefined' && module.exports){
@@ -529,6 +538,8 @@
       // D-90 (tests/js/test_d90_profil_ui.js) — ciste funkcie volby profilu;
       // register sa testom odovzdava parametrom (global plni az NX.init z Ruby).
       frontProfileRec: frontProfileRec, frontProfileReduction: frontProfileReduction,
-      frontProfileNext: frontProfileNext };
+      frontProfileNext: frontProfileNext,
+      // D-100 (tests/js/test_d100_nazvy.js) — zrkadlo ocistenia nazvu skrinky
+      cabNameValue: cabNameValue, CAB_NAME_MAX: CAB_NAME_MAX };
   }
 

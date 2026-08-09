@@ -594,7 +594,10 @@ NxTest.test('builder: cabinet_config nesie verziu, schemu a je JSON-ovatelny') d
   NxTest.assert_equal(Noxun::Engine::PartKeys::SCHEMA, c[:part_key_schema])
   NxTest.assert_equal('lower', c[:type])
   NxTest.assert_equal('noxun-lower-18', c[:construction_preset])
-  NxTest.assert_equal('Spodna skrinka 600', c[:name])
+  # D-100: automaticky nazov sa uz do configu NEUKLADA (dopocitava sa zivo
+  # z aktualnych parametrov cez CabinetBuilder.display_name).
+  NxTest.assert_equal(nil, c[:name])
+  NxTest.assert_equal('Spodná skrinka 600', Noxun::Engine::CabinetBuilder.display_name(c))
   NxTest.assert_equal('legs', c[:support][:type]) # lower + floor_height bez sokloveho panela
   NxTest.assert_close(100.0, c[:support][:height])
   NxTest.assert_equal({}, c[:part_overrides])
@@ -618,7 +621,8 @@ NxTest.test('builder: cabinet_config upper - preset, meno a support none') do
   cb = Noxun::Engine::CabinetBuilder
   c = cb.cabinet_config(cb.normalize('type' => 'upper'))
   NxTest.assert_equal('noxun-upper-18', c[:construction_preset])
-  NxTest.assert_equal('Horna skrinka 600', c[:name])
+  NxTest.assert_equal(nil, c[:name]) # D-100: zivy default, nie zapeceny nazov
+  NxTest.assert_equal('Horná skrinka 600', Noxun::Engine::CabinetBuilder.display_name(c))
   NxTest.assert_equal('none', c[:support][:type])
   NxTest.assert_close(0.0, c[:support][:height])
   # lower s plinth_mode front -> soklovy panel s odsadenim
