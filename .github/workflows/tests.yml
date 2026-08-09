@@ -63,3 +63,5 @@ jobs:
         run: node tests/js/test_d92_hw_nakup.js
       - name: JS testy — neznamy typ dosky (D-97) + dekor u dodavatela (D-98)
         run: node tests/js/test_d97_98_ui.js
+      - name: JS testy — prepinac zvyraznenia hran bez olepu (D-104)
+        run: node tests/js/test_d104_kontrola_hran.js
