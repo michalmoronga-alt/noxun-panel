@@ -13,6 +13,32 @@
   var PALETTE = ['#46beff','#6eff96','#ffaf50','#dc78ff','#ffeb5a'];
   // V0.3 materialy + ABS
   var MATERIALS = { sheets: [], edges: [] }; // katalog z backendu
+  // D-90: uchytkove profily z Ruby registry (FrontProfiles.options) — poradie
+  // volby v riadku cela AJ zdroj skratenia pre 2D nahlad. JS si ZIADNY vlastny
+  // zoznam profilov nedrzi; prazdne pole = volba sa vobec nezobrazi.
+  // (volitelny parameter `list` pouzivaju LEN Node testy — v paneli sa vzdy
+  //  cita zivy register z Ruby)
+  var FRONT_PROFILES = [];
+  function frontProfileRec(id, list){
+    if (!id || id === 'none') return null;
+    var arr = list || FRONT_PROFILES;
+    for (var i = 0; i < arr.length; i++){
+      if (arr[i].id === id) return arr[i];
+    }
+    return null; // profil z novsej verzie = neutral (rovnako ako Ruby normalize)
+  }
+  // Skratenie cela (mm) pre nahlad — neznamy profil neskracuje nic.
+  function frontProfileReduction(id, list){
+    var r = frontProfileRec(id, list);
+    return (r && r.reduction > 0) ? r.reduction : 0;
+  }
+  // Dalsia hodnota v cykle „bez profilu -> profily z registry -> bez profilu".
+  function frontProfileNext(id, list){
+    var ids = ['none'];
+    (list || FRONT_PROFILES).forEach(function(p){ ids.push(p.id); });
+    var i = ids.indexOf(id || 'none');
+    return ids[(i < 0 ? 0 : i + 1) % ids.length];
+  }
   var partCard = null;                        // aktualna karta dielca (null = ziadny dielec)
   // D3: mapa front_id -> texty kovania ("4× záves", "NL 500") pre badge v riadkoch ciel.
   var HW_FRONT_BADGES = {};
@@ -499,6 +525,10 @@
       // D-80 (tests/js/test_interior_height.js) — zrkadlo Construction: svetla
       // vyska a geometria vystuh. currentCarcass sa NEexportuje (cita DOM).
       nxInteriorZ: nxInteriorZ, nxRailGeom: nxRailGeom, nxCarcassDepth: nxCarcassDepth,
-      NX_MIN_INTERIOR_H: NX_MIN_INTERIOR_H };
+      NX_MIN_INTERIOR_H: NX_MIN_INTERIOR_H,
+      // D-90 (tests/js/test_d90_profil_ui.js) — ciste funkcie volby profilu;
+      // register sa testom odovzdava parametrom (global plni az NX.init z Ruby).
+      frontProfileRec: frontProfileRec, frontProfileReduction: frontProfileReduction,
+      frontProfileNext: frontProfileNext };
   }
 

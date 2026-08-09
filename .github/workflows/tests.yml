@@ -57,3 +57,5 @@ jobs:
         run: node tests/js/test_budget_ui.js
       - name: JS testy — vkladanie dosky s UNI materialom (E-03)
         run: node tests/js/test_e03_board_insert.js
+      - name: JS testy — volba uchytkoveho profilu v paneli (D-90)
+        run: node tests/js/test_d90_profil_ui.js

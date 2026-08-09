@@ -156,7 +156,8 @@ Aktuálny set: `maximize` (fit), `alert`, `lock` / `lock-open`, `eye` / `eye-off
 `external-link` (Otvoriť u dodávateľa — riadok variantu, D-60),
 `arrow-left-right` (Nahradiť UNI… — riadok KONTROLY v okne Výroba, D-83),
 `more-horizontal` (⋯ ďalšie údaje riadku rozpočtu — kód/adresa/poznámka, E-b),
-`download` (⬇ export súboru — XLSX rozpočet, E-b), `logo`.
+`download` (⬇ export súboru — XLSX rozpočet, E-b),
+`profile` (vlastný symbol — úchytkový profil v riadku čela, D-90), `logo`.
 
 > Okno **Výroba** načítava `icons.js` od v0.5.44 (predtým sprite nemalo) — nové
 > ovládacie prvky v ňom používajú sprite, nie glyfy.

@@ -10,6 +10,8 @@
 #   4) ABS — profilom sa NEMENI (celo je olepene dookola ako vzdy)
 #   5) params_label („rez 597 mm") — serverovy format pre tab Vyroba aj CSV
 #   6) sablona — config s profilom prezije JSON round-trip
+#   7) PR 2: obrys prierezu (integrita registry), kotva proxy vizualu, ponuka
+#      pre UI a zrkadla v paneli (volba profilu, pasmo v nahlade, guard ciel)
 #
 # ABS sa profilom NEMENI (Michal 9.8., foto realnej montaze): hrana pod
 # profilom sa olepuje normalne — profil sa nasuva na hotovu olepenu hranu.
@@ -427,6 +429,167 @@ end
 # ---------------------------------------------------------------------------
 # 6) Sablony — round-trip configu s profilom
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# 7) PR 2 — obrys prierezu, kotva vizualu, UI zrkadla
+# ---------------------------------------------------------------------------
+
+NxTest.test('D-90 obrys: prierez UKW-7 je kompletny a v deklarovanom obalovom kvadri') do
+  fp = NxD90.fp
+  o = fp::UKW7_OUTLINE
+  NxTest.assert_equal(83, o.length, 'presne 83 bodov z Michalovho modelu (nekratime)')
+  NxTest.assert(o.frozen?, 'obrys je konstanta — nikto ho nesmie prepisat za behu')
+  bad = o.reject { |p| p.is_a?(Array) && p.length == 2 && p.all? { |v| v.is_a?(Float) && v.finite? } }
+  NxTest.assert_equal([], bad, 'kazdy bod je dvojica konecnych Float [hlbka, vyska]')
+  ds = o.map(&:first)
+  vs = o.map(&:last)
+  NxTest.assert_close(0.0, ds.min, 0.0001, 'hlbka 0 = ZADNA rovina profilu (= zadna rovina cela)')
+  NxTest.assert_close(19.181, ds.max, 0.0001, 'hlbka prierezu')
+  NxTest.assert_close(0.0, vs.min, 0.0001)
+  NxTest.assert_close(37.419, vs.max, 0.0001, 'vyska prierezu')
+  geo = fp.geometry('ukw7')
+  NxTest.assert_close(ds.max, geo[:depth], 0.0001, 'deklarovana hlbka == obalovy kvader obrysu')
+  NxTest.assert_close(vs.max, geo[:height], 0.0001, 'deklarovana vyska == obalovy kvader obrysu')
+  NxTest.assert_equal(o, geo[:outline])
+  # Presah „nosa" cez lico skrateneho cela — zamerny (montaz nasunutim).
+  NxTest.assert_close(1.419, geo[:height] - fp.reduction('ukw7'), 0.0001,
+                      'profil prekryva vrch panelu o 1,419 mm')
+end
+
+NxTest.test('D-90 obrys: ziadne duplicitne susedne body (uzavretost aj cez posledny->prvy)') do
+  o = NxD90.fp::UKW7_OUTLINE
+  # SketchUp zluci body blizsie ako 0,001" (= 0,0254 mm) — duplicita by rozbila
+  # face. Kontrolujeme aj spojnicu posledny->prvy (obrys sa uzatvara implicitne).
+  min_seg = nil
+  worst = nil
+  o.each_with_index do |p, i|
+    q = o[(i + 1) % o.length]
+    d = Math.sqrt((p[0] - q[0])**2 + (p[1] - q[1])**2)
+    if min_seg.nil? || d < min_seg
+      min_seg = d
+      worst = [i, p, q]
+    end
+  end
+  NxTest.assert(min_seg > 0.0254,
+                "najkratsia hrana #{min_seg.round(4)} mm musi prezit toleranciu SketchUpu (#{worst.inspect})")
+  NxTest.assert_equal(o.length, o.map { |p| [p[0].round(4), p[1].round(4)] }.uniq.length,
+                      'ziadny bod sa v obryse neopakuje')
+  NxTest.refute(o.first == o.last, 'obrys sa NEuzatvara duplicitnym bodom (add_face si ho uzavrie sam)')
+end
+
+NxTest.test('D-90 registry: geometry/options — jediny zdroj pre vizual aj UI') do
+  fp = NxD90.fp
+  NxTest.assert_equal(nil, fp.geometry('none'), "'none' geometriu nema")
+  NxTest.assert_equal(nil, fp.geometry('ukw11'))
+  NxTest.assert_equal(nil, fp.geometry(nil))
+  NxTest.assert_equal([{ 'id' => 'ukw7', 'name' => 'Profil UKW-7', 'short' => 'UKW-7',
+                         'reduction' => 36.0 }], fp.options,
+                      'ponuka pre panel ide zo servera (JS si zoznam profilov nedrzi)')
+end
+
+NxTest.test('D-90 vizual: kotva proxy — vrch riadku, zadna rovina, dlzka = sirka kridla') do
+  cb = Noxun::Engine::CabinetBuilder
+  out = NxD90.layout(NxD90.door('wings' => '2', 'profile' => 'ukw7'))
+  parts = out[:parts]
+  NxTest.assert_equal(2, parts.length)
+  parts.each do |pd|
+    pl = cb.profile_placement(pd)
+    NxTest.refute(pl.nil?, 'kridlo s profilom ma umiestnenie proxy')
+    NxTest.assert_equal('ukw7', pl[:profile])
+    NxTest.assert_close(pd[:box][0], pl[:length], 0.01, 'dlzka rezu = sirka kridla')
+    NxTest.assert_close(pd[:origin][0], pl[:x], 0.01, 'proxy zacina na lavej hrane kridla')
+    # vrch profilu = vrch POVODNEHO cela = z riadku + vyska riadku (102 + 500)
+    NxTest.assert_close(602.0, pl[:z_top], 0.01)
+    NxTest.assert_close(602.0 - 37.419, pl[:z_base], 0.001, 'obrys visi 37,419 mm nadol')
+    # spodok profilu je 1,419 mm POD vrchom skrateneho panelu (prekryv „nosa")
+    panel_top = pd[:origin][2] + pd[:box][2]
+    NxTest.assert_close(panel_top - 1.419, pl[:z_base], 0.001)
+    NxTest.assert_close(19.181, pl[:depth], 0.001, 'profil ide dopredu z roviny Y=0')
+  end
+  # 2 kridla = 2 proxy s rovnakou dlzkou -> jedna zdielana definicia
+  NxTest.assert_equal(1, parts.map { |pd| cb.profile_placement(pd)[:def_name] }.uniq.length)
+end
+
+NxTest.test('D-90 vizual: bez profilu ziadne proxy; meno definicie nesie profil a dlzku') do
+  cb = Noxun::Engine::CabinetBuilder
+  plain = NxD90.layout(NxD90.door)[:parts][0]
+  NxTest.assert_equal(nil, cb.profile_placement(plain), 'celo bez profilu proxy nedostane')
+  NxTest.assert_equal(nil, cb.profile_placement({}), 'cudzi/prazdny deskriptor neprejde')
+  # degenerovana sirka (pod BuildPlan::MIN_DIM) sa nekresli
+  degen = { profile: 'ukw7', profile_band: { z: 100.0, h: 36.0 }, box: [0.0, 18.0, 464.0],
+            origin: [0.0, -18.0, 100.0], suffix: 'DOOR-1', part_key: 'front:F1/wing:single' }
+  NxTest.assert_equal(nil, cb.profile_placement(degen))
+  NxTest.assert_equal('NOXUN_PROFILE_UKW7_L596.00', cb.profile_def_name('ukw7', 596.0))
+  NxTest.assert_equal('NOXUN_PROFILE_UKW7_L296.54', cb.profile_def_name('ukw7', 296.54),
+                      'dlzka je sucastou mena — rovnake kridla zdielaju definiciu')
+end
+
+NxTest.test('D-90 vizual (GH #145 P2): zhodne meno definicie = zhodna kreslena dlzka') do
+  cb = Noxun::Engine::CabinetBuilder
+  # Meno definicie MUSI mat rovnaku presnost ako kreslena dlzka. Inak by dve
+  # dlzky so zhodnym menom niesli rozny obsah a druha stavba by prekreslila
+  # zdielanu definiciu spatne aj instanciam prveho korpusu.
+  def_of = lambda do |w|
+    pd = { profile: 'ukw7', profile_band: { z: 566.0, h: 36.0 }, box: [w, 18.0, 464.0],
+           origin: [2.0, -18.0, 102.0], suffix: 'DOOR-1', part_key: 'front:F1/wing:single' }
+    cb.profile_placement(pd)
+  end
+  a = def_of.call(296.500)
+  b = def_of.call(296.504) # Codex priklad: pod krokom kvantovania
+  NxTest.assert_equal(a[:def_name], b[:def_name], 'rozdiel pod 0,01 mm = ta ista definicia')
+  NxTest.assert_close(a[:length], b[:length], 0.0000001,
+                      'a preto aj PRESNE ta ista kreslena dlzka (ziadne spatne prekreslenie)')
+  c = def_of.call(296.51)
+  NxTest.refute(a[:def_name] == c[:def_name], 'rozdiel nad krokom = vlastna definicia')
+  NxTest.assert_close(296.5, a[:length], 0.0001, 'kvantovanie je na 0,01 mm — pod toleranciou SketchUpu')
+  NxTest.assert_close(296.54, def_of.call(296.5351)[:length], 0.0001, 'zaokruhlenie, nie orezanie')
+end
+
+NxTest.test('D-90 UI: panel posiela register profilov a riadok cela ma volbu') do
+  root = NxTest::ROOT
+  sync = File.read(File.join(root, 'noxun_engine', 'ui', 'panel', 'sync.rb'), encoding: 'UTF-8')
+  NxTest.assert(sync.include?('front_profiles: FrontProfiles.options'),
+                'push_init nesie ponuku profilov (JS si ju nevymysla)')
+  bridge = File.read(File.join(root, 'noxun_engine', 'ui', 'js', 'bridge.js'), encoding: 'UTF-8')
+  NxTest.assert(bridge.include?('FRONT_PROFILES = data.front_profiles'),
+                'NX.init register ulozi')
+  form = File.read(File.join(root, 'noxun_engine', 'ui', 'js', 'form.js'), encoding: 'UTF-8')
+  NxTest.assert(form.include?('class="fprof"'), 'riadok cela ma tlacidlo profilu')
+  NxTest.assert(form.include?("NXIcons.svg('profile')"), 'ikona zo spritu — ziadne emoji')
+  NxTest.assert(form.include?('frontProfileNext(row.dataset.frontProfile'),
+                'klik cykli hodnoty z registry')
+  NxTest.assert(form.include?("row.dataset.frontProfile = 'none'"),
+                "prepnutie na „Bez cela\" zhodi profil (zrkadlo Ruby normalize)")
+  icons = File.read(File.join(root, 'noxun_engine', 'ui', 'js', 'icons.js'), encoding: 'UTF-8')
+  NxTest.assert(icons.include?("'profile':"), 'sprite ma symbol profilu')
+end
+
+NxTest.test('D-90 UI: nahlad kresli pasmo profilu z registry a farby berie z tokenov') do
+  root = NxTest::ROOT
+  pv = File.read(File.join(root, 'noxun_engine', 'ui', 'js', 'preview.js'), encoding: 'UTF-8')
+  NxTest.assert(pv.include?('frontProfileReduction(it.profile)'),
+                'skratenie v nahlade ide z registry, nie z konstanty v JS')
+  NxTest.assert(pv.include?('class="fprofband"'), 'pasmo profilu je vlastny pruh')
+  css = File.read(File.join(root, 'noxun_engine', 'ui', 'css', 'panel.css'), encoding: 'UTF-8')
+  band = css[/#preview rect\.fprofband \{([^}]*)\}/m, 1].to_s
+  NxTest.refute(band.empty?, 'pruh profilu ma styl v panel.css')
+  NxTest.refute(band.include?('#'), "farby VYHRADNE cez --nx-* tokeny: #{band}")
+  NxTest.assert(band.include?('var(--nx-'), 'pruh pouziva tokeny')
+  prof = css.scan(/\.frow \.fprof[^{]*\{([^}]*)\}/m).flatten.join(' ')
+  NxTest.refute(prof.empty?, 'tlacidlo profilu ma styl v panel.css')
+  NxTest.refute(prof.include?('#'), "tlacidlo profilu bez natvrdo pisanych farieb: #{prof}")
+end
+
+NxTest.test('D-90 (audit F6): handle_apply_fronts ma identity guard ako auto-apply') do
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_cabinet.rb'),
+                  encoding: 'UTF-8')
+  body = src[/def handle_apply_fronts.*?\n        end/m].to_s
+  NxTest.refute(body.empty?, 'handler existuje')
+  NxTest.assert(body.include?("data['cabinet_id']"), 'payload nesie snapshot identity')
+  NxTest.assert(body.include?("Store.get(cab, 'cabinet_id')"), 'porovnava sa s AKTUALNYM vyberom')
+  NxTest.assert(body.include?('return') && body.include?('zahodeny'),
+                'nesuhlas = tichy discard (ziadny zapis do ineho korpusu)')
+end
 
 NxTest.test('D-90 sablony: config s profilom prezije ulozenie aj nacitanie sablony') do
   NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
