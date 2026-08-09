@@ -5,6 +5,16 @@
 # automaticky (aj stary bezdiakriticky tvar), sa povazuje za NEnastaveny.
 require_relative '../helper' unless defined?(NxTest)
 
+# Headless: ui vrstva nie je v require zozname helpera. templates_dialog.rb aj
+# panel/payloads.rb su parse-safe (SketchUp API zije vyhradne VNUTRI metod);
+# potrebujeme z nich `merge_template` a `Panel.present_str`. V SketchUpe su uz
+# nacitane pluginom — nenacitavame druhykrat.
+# (panel.rb sa NEnacitava — na konci ma `Sketchup.require`, teda headless nezije.)
+if NxTest.headless?
+  require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'payloads')
+  require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog')
+end
+
 CB100 = Noxun::Engine::CabinetBuilder
 
 # ---------------------------------------------------------------------------
@@ -141,11 +151,21 @@ NxTest.test('D-100: sablona nenesie nazov skrinky (round-trip)') do
                   "sablona „#{t['name']}“ nesmie niest nazov skrinky")
   end
 
+  # GH #149 P2: testovat treba SKUTOCNU cestu aplikacie sablony
+  # (TemplatesDialog.merge_template zacina od configu SABLONY), nie
+  # target.merge(template) — ten by stratu nazvu nikdy neodhalil.
   stored = JSON.parse(JSON.generate(CB100.cabinet_config(CB100.normalize('name' => 'Chladničková'))))
   target = CB100.config_to_params(stored)
-  merged = target.merge(Noxun::Engine::TemplateStore.build_predefined.first['config'])
-  NxTest.assert_equal('Chladničková', CB100.normalize(merged)[:name],
-                      'pouzitie sablony nesmie zmazat rucny nazov skrinky')
+  Noxun::Engine::TemplateStore.build_predefined.each do |t|
+    merged = Noxun::Engine::TemplatesDialog.merge_template(target, t['config'])
+    NxTest.assert_equal('Chladničková', CB100.normalize(merged)[:name],
+                        "sablona „#{t['name']}“ nesmie zmazat rucny nazov skrinky")
+  end
+
+  # skrinka bez rucneho nazvu ostava na zivom defaulte aj po sablone
+  plain = CB100.config_to_params(JSON.parse(JSON.generate(CB100.cabinet_config(CB100.normalize({})))))
+  m2 = Noxun::Engine::TemplatesDialog.merge_template(plain, Noxun::Engine::TemplateStore.build_predefined.first['config'])
+  NxTest.assert_equal(nil, CB100.normalize(m2)[:name])
 end
 
 # ---------------------------------------------------------------------------
