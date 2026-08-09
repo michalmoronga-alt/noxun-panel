@@ -519,9 +519,30 @@ NxTest.test('D-90 vizual: bez profilu ziadne proxy; meno definicie nesie profil 
   degen = { profile: 'ukw7', profile_band: { z: 100.0, h: 36.0 }, box: [0.0, 18.0, 464.0],
             origin: [0.0, -18.0, 100.0], suffix: 'DOOR-1', part_key: 'front:F1/wing:single' }
   NxTest.assert_equal(nil, cb.profile_placement(degen))
-  NxTest.assert_equal('NOXUN_PROFILE_UKW7_L596.0', cb.profile_def_name('ukw7', 596.0))
-  NxTest.assert_equal('NOXUN_PROFILE_UKW7_L296.5', cb.profile_def_name('ukw7', 296.54),
-                      'dlzka v mene na 1 desatinu — rovnake kridla zdielaju definiciu')
+  NxTest.assert_equal('NOXUN_PROFILE_UKW7_L596.00', cb.profile_def_name('ukw7', 596.0))
+  NxTest.assert_equal('NOXUN_PROFILE_UKW7_L296.54', cb.profile_def_name('ukw7', 296.54),
+                      'dlzka je sucastou mena — rovnake kridla zdielaju definiciu')
+end
+
+NxTest.test('D-90 vizual (GH #145 P2): zhodne meno definicie = zhodna kreslena dlzka') do
+  cb = Noxun::Engine::CabinetBuilder
+  # Meno definicie MUSI mat rovnaku presnost ako kreslena dlzka. Inak by dve
+  # dlzky so zhodnym menom niesli rozny obsah a druha stavba by prekreslila
+  # zdielanu definiciu spatne aj instanciam prveho korpusu.
+  def_of = lambda do |w|
+    pd = { profile: 'ukw7', profile_band: { z: 566.0, h: 36.0 }, box: [w, 18.0, 464.0],
+           origin: [2.0, -18.0, 102.0], suffix: 'DOOR-1', part_key: 'front:F1/wing:single' }
+    cb.profile_placement(pd)
+  end
+  a = def_of.call(296.500)
+  b = def_of.call(296.504) # Codex priklad: pod krokom kvantovania
+  NxTest.assert_equal(a[:def_name], b[:def_name], 'rozdiel pod 0,01 mm = ta ista definicia')
+  NxTest.assert_close(a[:length], b[:length], 0.0000001,
+                      'a preto aj PRESNE ta ista kreslena dlzka (ziadne spatne prekreslenie)')
+  c = def_of.call(296.51)
+  NxTest.refute(a[:def_name] == c[:def_name], 'rozdiel nad krokom = vlastna definicia')
+  NxTest.assert_close(296.5, a[:length], 0.0001, 'kvantovanie je na 0,01 mm — pod toleranciou SketchUpu')
+  NxTest.assert_close(296.54, def_of.call(296.5351)[:length], 0.0001, 'zaokruhlenie, nie orezanie')
 end
 
 NxTest.test('D-90 UI: panel posiela register profilov a riadok cela ma volbu') do

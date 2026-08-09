@@ -75,6 +75,10 @@ module Noxun
       PROFILE_RGB      = [176, 180, 184].freeze
       PROFILE_DICT     = 'NOXUN_PROFILE'
       PROFILE_GEOM_REV = 1
+      # Krok kvantovania dlzky proxy (mm) — meno definicie, odtlacok aj kreslena
+      # geometria pouzivaju ROVNAKU zaokruhlenu hodnotu (GH #145 P2). 0,01 mm je
+      # pod toleranciou SketchUpu (0,0254 mm).
+      PROFILE_LENGTH_STEP = 0.01
 
       class << self
         # --- verejne API ----------------------------------------------------
@@ -993,7 +997,7 @@ module Noxun
           geo = FrontProfiles.geometry(pid)
           return nil unless band.is_a?(Hash) && geo
 
-          length = pd[:box][0].to_f
+          length = quantize_profile_length(pd[:box][0])
           return nil unless length > BuildPlan::MIN_DIM
 
           z_top = band[:z].to_f + band[:h].to_f
@@ -1002,10 +1006,21 @@ module Noxun
             def_name: profile_def_name(pid, length) }
         end
 
-        # Meno definicie = (profil, dlzka na 1 desatinu). Dlzka je sucastou mena,
-        # takze rovnako siroke kridla zdielaju jednu definiciu.
+        # Meno definicie = (profil, dlzka). Dlzka je sucastou mena, takze rovnako
+        # siroke kridla zdielaju jednu definiciu.
+        # GH #145 P2: presnost MENA musi sedet s presnostou KRESLENEJ dlzky —
+        # inak by dve dlzky, ktore sa zaokruhlia rovnako (296,500 a 296,504),
+        # dostali to iste meno, ale rozny obsah, a druha stavba by prekreslila
+        # zdielanu definiciu spatne aj vsetkym existujucim instanciam. Preto sa
+        # dlzka KVANTUJE na PROFILE_LENGTH_STEP uz v profile_placement a meno,
+        # odtlacok aj geometria pouzivaju TU ISTU hodnotu. Krok 0,01 mm je pod
+        # toleranciou SketchUpu (0,0254 mm) — vizualne nerozoznatelny.
         def profile_def_name(pid, length)
-          format('NOXUN_PROFILE_%s_L%.1f', pid.to_s.upcase, length.to_f)
+          format('NOXUN_PROFILE_%s_L%.2f', pid.to_s.upcase, quantize_profile_length(length))
+        end
+
+        def quantize_profile_length(v)
+          (v.to_f / PROFILE_LENGTH_STEP).round * PROFILE_LENGTH_STEP
         end
 
         # Definicia per (profil, dlzka) s recyklaciou podla mena — vzor dielcov.
@@ -1015,7 +1030,10 @@ module Noxun
         # (zmena obrysu v novej verzii pluginu = PROFILE_GEOM_REV bump).
         def profile_definition(model, pl)
           dname = pl[:def_name]
-          stamp = "#{pl[:profile]}|#{PROFILE_GEOM_REV}|#{format('%.3f', pl[:length])}"
+          # Odtlacok drzi TU ISTU presnost ako meno (GH #145 P2) — zhodne meno
+          # teda znamena zhodnu geometriu a definicia sa nikdy neprekresli „pod
+          # rukami" instanciam ineho korpusu.
+          stamp = "#{pl[:profile]}|#{PROFILE_GEOM_REV}|#{format('%.2f', pl[:length])}"
           pdef = model.definitions[dname]
           if pdef && pdef.entities.length.positive? &&
              pdef.get_attribute(PROFILE_DICT, 'geom').to_s == stamp
@@ -1025,7 +1043,12 @@ module Noxun
           pdef ||= model.definitions.add(dname)
           pdef.entities.clear!
           face = draw_profile_section(pdef.entities, pl[:geometry], pl[:length])
-          return nil unless face
+          if face.nil?
+            # Prierez sa nedal postavit (SketchUp odmietol face) — vizual odpada,
+            # ale NIKDY ticho: dielec aj kovanie stoja, chyba patri do logu.
+            Engine.log("profil #{pl[:profile]}: prierez sa nepodarilo postavit (#{dname})") if defined?(Engine)
+            return nil
+          end
           pdef.set_attribute(PROFILE_DICT, 'geom', stamp)
           pdef
         end
