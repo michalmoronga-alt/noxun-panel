@@ -74,7 +74,7 @@ module Noxun
       PROFILE_MATERIAL = 'NOXUN_PROFIL_HLINIK'
       PROFILE_RGB      = [176, 180, 184].freeze
       PROFILE_DICT     = 'NOXUN_PROFILE'
-      PROFILE_GEOM_REV = 1
+      PROFILE_GEOM_REV = 2
       # Krok kvantovania dlzky proxy (mm) — meno definicie, odtlacok aj kreslena
       # geometria pouzivaju ROVNAKU zaokruhlenu hodnotu (GH #145 P2). 0,01 mm je
       # pod toleranciou SketchUpu (0,0254 mm).
@@ -1053,11 +1053,16 @@ module Noxun
           pdef
         end
 
-        # Prierez v rovine X=0 (bod [hlbka, vyska] -> [0, -hlbka, vyska])
-        # + pushpull po DLZKE do +X. Normala sa kontroluje pred vytlacenim
-        # (rovnaky vzor ako draw_box/draw_leg_cylinder).
+        # Prierez v rovine X=0 + pushpull po DLZKE do +X. Normala sa kontroluje
+        # pred vytlacenim (rovnaky vzor ako draw_box/draw_leg_cylinder).
+        # ORIENTACIA (D-90 fix, Michal 9.8.): v obryse je d=0 PREDNA strana
+        # (nos), d=depth chrbat profilu — bod [d, v] -> [0, d - depth, v],
+        # takze chrbat lici so zadnou rovinou cela (Y=0) a nos konci vpredu
+        # na Y = -depth. Povodne mapovanie -d kreslilo profil zrkadlovo
+        # (nos dozadu, ukazka realneho osadenia = foto v PR).
         def draw_profile_section(ents, geo, length)
-          pts = geo[:outline].map { |d, v| Units.point(0.0, -d.to_f, v.to_f) }
+          depth = geo[:depth].to_f
+          pts = geo[:outline].map { |d, v| Units.point(0.0, d.to_f - depth, v.to_f) }
           face = ents.add_face(pts)
           return nil unless face
           face.reverse! if face.normal.x < 0

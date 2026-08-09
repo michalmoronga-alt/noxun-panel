@@ -2056,6 +2056,15 @@ module NoxunSuRunner
     ok('D90: definicia je per (profil, dlzka) — obe kridla ju zdielaju',
        profs.map { |p| p.definition.name }.uniq.length == 1 &&
        profs.first.definition.name.start_with?('NOXUN_PROFILE_UKW7_L'))
+    # ORIENTACIA (Michalov nalez 9.8. — profil bol zrkadlovo): nos = najnizsie
+    # body obrysu MUSIA lezat vpredu (y ~ -depth), chrbat na zadnej rovine.
+    # Bbox je na zrkadlenie slepy, kontroluju sa skutocne vrcholy definicie.
+    dverts = p0.definition.entities.grep(Sketchup::Edge).flat_map(&:vertices).uniq
+                .map { |v| [mm(v.position.y), mm(v.position.z)] }
+    dz0 = dverts.map(&:last).min
+    nose_y = dverts.select { |_y, z| (z - dz0).abs <= 0.01 }.map(&:first)
+    ok("D90: nos profilu je VPREDU (y spodnych bodov #{nose_y.map { |y| y.round(1) }.uniq.sort})",
+       !nose_y.empty? && nose_y.all? { |y| y < -17.0 })
     # supis kovania ostava datovy — 2 polozky z config.hardware[], nie z geometrie
     hw = (e::Store.config(inst) || {})['hardware'] || []
     ok("D90: config.hardware nesie 2 polozky profilu (#{hw.count { |h| (h['params'] || {})['profile'] == 'ukw7' }})",
