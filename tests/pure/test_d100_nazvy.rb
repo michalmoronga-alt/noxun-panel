@@ -147,3 +147,28 @@ NxTest.test('D-100: sablona nenesie nazov skrinky (round-trip)') do
   NxTest.assert_equal('Chladničková', CB100.normalize(merged)[:name],
                       'pouzitie sablony nesmie zmazat rucny nazov skrinky')
 end
+
+# ---------------------------------------------------------------------------
+# guard nad zdrojakom callbacku (zavery Codex auditu nesmu ticho vypadnut)
+# ---------------------------------------------------------------------------
+
+NxTest.test('D-100 guard: callback premenovania je registrovany a drzi zavery auditu') do
+  panel = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.rb'), encoding: 'UTF-8')
+  NxTest.assert(panel.include?("cb(dlg, 'rename_cabinet')"),
+                'callback rename_cabinet musi byt registrovany v panel.rb')
+
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_cabinet.rb'),
+                  encoding: 'UTF-8')
+  body = src[/def handle_rename_cabinet.*?\n        end\n/m].to_s
+  NxTest.refute(body.empty?, 'handle_rename_cabinet sa nenasiel')
+  NxTest.assert(body.include?('CabinetBuilder.guarded'),
+                'BLOCKER 1: zapis nazvu musi bezat pod ScaleWatch guardom (inak observer presunie ghost zony ' \
+                'vo vlastnej operacii a premenovanie prestane byt 1 undo krok)')
+  NxTest.assert(body.include?('start_operation'), 'zapis musi byt vlastna undo operacia')
+  NxTest.refute(body.include?('push_selected(model)'),
+                'BLOCKER 2: refresh po premenovani musi ist s dedup: false (inak moze prestavat cudziu duplicitnu skrinku)')
+  NxTest.assert(body.scan('push_selected(model, dedup: false)').size >= 2,
+                'BLOCKER 2: vsetky refreshe v premenovani su bez dedupu')
+  NxTest.assert(body.include?('echo.empty? || echo != cid'),
+                'FIX 6: prazdne ANI nezhodne cabinet_id nesmie nic zapisat')
+end
