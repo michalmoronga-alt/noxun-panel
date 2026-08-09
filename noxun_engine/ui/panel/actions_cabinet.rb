@@ -359,12 +359,21 @@ module Noxun
         end
 
         # Cela na oznaceny korpus. Zachova konstrukciu + strom zon.
+        # D-90 (audit F6): payload nesie snapshot cabinet_id z casu odoslania —
+        # ak sa medzitym vyber presunul na INY korpus, zapis sa TICHO zahodi
+        # (rovnaky guard ako handle_apply_all nizsie). HTML disabled nie je
+        # ochrana; volajuci moze byt akykolvek (callback je verejny kanal).
         def handle_apply_fronts(payload)
           model = Sketchup.active_model
           cab = find_cabinet(model)
           return set_status('Najprv oznac NOXUN korpus v modeli.', true) if cab.nil?
 
           data = parse(payload)
+          echo = data['cabinet_id'].to_s
+          if !echo.empty? && echo != Store.get(cab, 'cabinet_id').to_s
+            Engine.log("apply_fronts zahodeny — echo #{echo} nesedi s vyberom #{Store.get(cab, 'cabinet_id')}")
+            return
+          end
           params = existing_params(cab)
           params['fronts'] = data['fronts'] || Fronts.empty_config
           CabinetBuilder.rebuild(model, cab, params)
