@@ -37,13 +37,19 @@ module Noxun
 
         # dedup: false = refresh po programovom selecte z okna Vyroba (V0.5 B,
         # Codex B2) — vyber NESMIE mutovat model (dedup meni ID a stavia).
+        #
+        # D-103 (9.8.2026, ziva reprodukcia): sync vyberu uz dedup NEVYKONAVA, len si
+        # ho VYZIADA u observera. Doteraz tu bezala vlastna netransparentna operacia
+        # PRIAMO v selection evente — teda hned po pouzivatelovej kopirovacej operacii
+        # (Move+Ctrl s otvorenym Inspectorom). Stala sa vrcholom undo stacku a ked
+        # pouzivatel dopisal `*4`, Move nastroj svoju operaciu PREPISAL (interne undo
+        # + nove kopie) — undo vsak trafilo NASU operaciu, povodna kopia prezila a
+        # nasobenie polozilo dalsiu na to iste miesto: dve dosky na jednom mieste =
+        # dva dielce v kusovniku, VEPO aj rozpocte. Observer to spravi o 0,2 s neskor
+        # TRANSPARENTNE (splynie s krokom pouzivatela), co je overene bezpecne.
+        # Kartu s novym ID doplni observer sam (refresh_panel po dedupe).
         def push_selected(model, dedup: true)
-          # fix #6: "sync tick" resolvera — ak vznikla kopia korpusu/dosky (zdielane id),
-          # pridelí sa jej nove ID (+ korpusu vlastne ghosty) este pred nacitanim vyberu.
-          if dedup
-            CabinetBuilder.dedup_copies(model) if defined?(CabinetBuilder)
-            BoardBuilder.dedup_copies(model) if defined?(BoardBuilder)
-          end
+          ScaleWatch.request_dedup(model) if dedup && defined?(ScaleWatch)
           # V0.4.5 D2: dialog Sablony sleduje vyber (disabled stav "Pouzit na oznaceny")
           TemplatesDialog.on_selection_changed if defined?(TemplatesDialog)
           zone = find_selected_zone(model)

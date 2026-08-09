@@ -37,6 +37,10 @@
 #     S4 miesana davka stale+fresh duplicit -> fresh v paste ticku, stale follow-up
 #     S5 scale DOSKY (V0.4.7d): X absorpcia+undo, vertikalna doska (global Z =
 #        lokalna sirka), X+Z kombinacia (hrubka drzi material), reject bez materialu
+#     S6 nasobenie kopii `*N` (D-103): kopia s OTVORENYM Inspectorom (Panel.push_selected)
+#        -> interne undo nastroja MUSI odstranit kopiu (ziadna zombie) -> pole 4 kopii
+#        = presne 5 dosiek s 5 ID na 5 roznych miestach; S6b = zachytna siet v KONTROLE
+#        (Bom.collect placements -> Validation duplicate_position -> klik oznaci obe)
 #
 # Cistenie: kazdy scenar maze svoje korpusy v ScaleWatch.guard (inak by debounce
 # timer po skonceni testu vykonal dedup/prune nekontrolovane) + purge_unused.
@@ -2560,6 +2564,102 @@ module NoxunSuRunner
          (cfg['length'].to_f - 500.0).abs < 0.01 && clean && b.valid?)
       # obnov PRESNY povodny zaznam (nie seed — respektuje pouzivatelske upravy)
       e::Materials.upsert_sheet(state[:s5_saved_sheet]) if state[:s5_saved_sheet]
+      cleanup(model)
+    end]
+
+    # S6 (D-103, Codex audit FIX 7): NASOBENIE KOPII `*N`. Realna chyba:
+    # Move+Ctrl kopia s OTVORENYM Inspectorom -> selection callback spustil
+    # netransparentny dedup -> ten sa stal vrcholom undo stacku -> ked pouzivatel
+    # dopisal `*4`, Move nastroj svoju operaciu PREPISAL (interne undo + nove
+    # kopie) a undo trafilo NASU operaciu: kopia prezila a nasobenie polozilo
+    # dalsiu na to iste miesto (6 dosiek namiesto 5, dva dielce vo vystupoch).
+    # Scenar ide presne touto cestou vratane Panel.push_selected.
+    steps << [0.8, lambda do
+      b = e::BoardBuilder.build(model, { 'material_id' => 'K009_PW_DTDL_18',
+                                         'length' => 400.0, 'width' => 300.0 })
+      state[:s6] = b
+      state[:s6_bid] = e::Store.get(b, 'id')
+      attrs = %w[std kind id part_id part_key part_key_schema role name manufactured production_class config]
+      model.start_operation('SU-TEST user move+ctrl copy', true)
+      cp = model.entities.add_instance(b.definition,
+                                       b.transformation * Geom::Transformation.translation(e::Units.vector(200, 0, 0)))
+      attrs.each { |k| v = e::Store.get(b, k); cp.set_attribute('NOXUN', k, v) unless v.nil? }
+      model.commit_operation
+      state[:s6_copy] = cp
+      # PRESNA cesta otvoreneho Inspectora: SelObserver -> Panel.push_selected.
+      # Po D-103 uz NESMIE vykonat vlastnu (netransparentnu) operaciu.
+      e::Panel.select_only(model, cp)
+      e::Panel.push_selected(model)
+    end]
+    steps << [SETTLE, lambda do
+      cp = state[:s6_copy]
+      new_id = cp && cp.valid? ? e::Store.get(cp, 'id') : nil
+      ok("async S6: kopia dostala nove ID aj bez dedupu vo vybere (#{state[:s6_bid]} -> #{new_id})",
+         !new_id.nil? && new_id != state[:s6_bid])
+      # `*4` nasobenie: SketchUp najprv ODUNDUJE svoju kopirovaciu operaciu
+      Sketchup.undo
+    end]
+    steps << [SETTLE, lambda do
+      cp = state[:s6_copy]
+      gone = cp.nil? || !cp.valid?
+      bids = boards(model).map { |i| e::Store.get(i, 'id') }
+      # JADRO OPRAVY: interne undo nastroja musi trafit KOPIU, nie nasu operaciu.
+      ok("async S6: interne undo nasobenia odstranilo kopiu CELU — ziadna zombie (kopia prec=#{gone}, dosky: #{bids.sort.join(', ')})",
+         gone && bids == [state[:s6_bid]])
+      # ...a teraz nastroj polozi pole 4 kopii v JEDNEJ operacii
+      b = state[:s6]
+      attrs = %w[std kind id part_id part_key part_key_schema role name manufactured production_class config]
+      model.start_operation('SU-TEST user copy array *4', true)
+      [200.0, 400.0, 600.0, 800.0].each do |dx|
+        c = model.entities.add_instance(b.definition,
+                                        b.transformation * Geom::Transformation.translation(e::Units.vector(dx, 0, 0)))
+        attrs.each { |k| v = e::Store.get(b, k); c.set_attribute('NOXUN', k, v) unless v.nil? }
+      end
+      model.commit_operation
+      e::Panel.push_selected(model) # selection sync po nasobeni
+    end]
+    steps << [SETTLE, lambda do
+      bs = boards(model)
+      ids = bs.map { |i| e::Store.get(i, 'id') }
+      origins = bs.map { |i| o = i.transformation.origin; [mm(o.x).round(3), mm(o.y).round(3), mm(o.z).round(3)] }
+      ok("async S6: po `*4` je presne 5 dosiek s 5 unikatnymi ID (#{ids.sort.join(', ')})",
+         bs.length == 5 && ids.compact.uniq.length == 5)
+      ok("async S6: ziadne dve dosky nestoja na tom istom mieste (#{origins.map { |o| o[0] }.sort.join(', ')})",
+         origins.uniq.length == origins.length)
+      state[:s6_dump] = origins
+      cleanup(model)
+    end]
+
+    # S6b: zachytna siet v KONTROLE — ked uz dva kusy na jednom mieste vzniknu
+    # (starsi projekt, paste-in-place), semafor ich MUSI ukazat. Overuje CELU
+    # retaz Bom.collect -> Validation.run(placements:), nielen cistu funkciu.
+    steps << [0.5, lambda do
+      b1 = e::BoardBuilder.build(model, { 'material_id' => 'K009_PW_DTDL_18',
+                                          'length' => 400.0, 'width' => 300.0 })
+      b2 = e::BoardBuilder.build(model, { 'material_id' => 'K009_PW_DTDL_18',
+                                          'length' => 400.0, 'width' => 300.0 })
+      state[:s6b] = [b1, b2]
+      # polož druhu PRESNE na prvu (guard: nejde o kopiu, ID su rozne)
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST paste-in-place', true)
+        b2.transformation = b1.transformation
+        model.commit_operation
+      end
+    end]
+    steps << [SETTLE, lambda do
+      collected = e::Bom.collect(model)
+      pl = Array(collected[:placements])
+      out = e::Validation.run(collected, sheets: {}, placements: pl)
+      dups = out['items'].select { |i| i['category'] == e::Validation::CAT_DUPLICATE }
+      ids = state[:s6b].map { |i| e::Store.get(i, 'id') }.sort
+      ok("async S6b: Bom.collect zbiera umiestnenia (#{pl.length} zaznamov, druhy: #{pl.map { |p| p['kind'] }.uniq.join(',')})",
+         pl.length >= 2 && pl.all? { |p| p['origin'].is_a?(Array) && p['axes'].length == 9 })
+      ok("async S6b: KONTROLA hlasi dve dosky na jednom mieste ako ORANGE (#{dups.map { |d| d['message_sk'] }.join(' | ')})",
+         dups.length == 1 && dups.first['severity'] == 'orange' &&
+         dups.first['dup_owner_ids'] == ids && dups.first['dup_kind'] == 'board')
+      pids = e::ProductionDialog.send(:pids_for_problem, model, dups.first) unless dups.empty?
+      ok("async S6b: klik na nalez oznaci OBE dosky (#{Array(pids).length} entit)",
+         Array(pids).length == 2)
       cleanup(model)
       log_line('=== KONIEC SUBORU ===')
       done.call if done

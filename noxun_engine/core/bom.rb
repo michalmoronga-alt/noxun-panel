@@ -34,6 +34,7 @@ module Noxun
         hardware_overrides = []
         cabinet_sets = {}
         warnings = []
+        placements = [] # D-103: umiestnenie top-level skriniek/dosiek (zachytna siet duplicit)
         cabinets = 0
         boards = 0
         model.entities.grep(Sketchup::ComponentInstance).each do |inst|
@@ -41,6 +42,7 @@ module Noxun
           when 'cabinet'
             cabinets += 1
             cid = Store.get(inst, 'cabinet_id').to_s
+            add_placement(placements, inst, 'cabinet', cid)
             ccfg = Store.config(inst) || {}
             Array(ccfg['hardware']).each { |h| hardware << h.merge('owner_id' => cid, 'owner_pid' => inst.persistent_id) }
             # V0.5 D (nalez 2): RAW hardware_overrides — disabled:true polozka je
@@ -70,6 +72,9 @@ module Noxun
             end
           when 'board'
             boards += 1
+            # D-103: umiestnenie sa zbiera PRED filtrom manufactured — duplicitna
+            # doska je duplicitna aj ked sa (docasne) nevyraba.
+            add_placement(placements, inst, 'board', Store.get(inst, 'id').to_s)
             next unless Store.get(inst, 'manufactured') == true
             bcfg = Store.config(inst) || {}
             bid = Store.get(inst, 'id').to_s
@@ -99,8 +104,36 @@ module Noxun
           end
         end
         { records: records, hardware: hardware, hardware_overrides: hardware_overrides,
-          cabinet_sets: cabinet_sets,
+          cabinet_sets: cabinet_sets, placements: placements,
           warnings: warnings, cabinets: cabinets, boards: boards }
+      end
+
+      # D-103: umiestnenie top-level NOXUN objektu pre kontrolu „dva kusy na
+      # jednom mieste" (zachytna siet po `*N` nasobeni kopii). Zbiera sa VYHRADNE
+      # to, co sa da porovnavat: pozicia v mm (Units — jedina autorita prevodu),
+      # NORMALIZOVANE osi (orientacia bez scale) a vonkajsie rozmery definicie.
+      # Codex audit FIX 5: nepouzitelny zaznam sa radsej NEZBIERA (chybajuce ID,
+      # nekonecne/NaN cisla, degenerovana definicia) — falosny ORANGE by bol
+      # horsi nez ziadny; zhoda musi byt preukazatelna, nie odhadnuta.
+      def add_placement(out, inst, kind, owner_id)
+        return if owner_id.to_s.strip.empty?
+        tr = inst.transformation
+        o = tr.origin
+        b = inst.definition.bounds
+        origin = [Units.to_mm(o.x), Units.to_mm(o.y), Units.to_mm(o.z)].map(&:to_f)
+        size = [Units.to_mm(b.width), Units.to_mm(b.height), Units.to_mm(b.depth)].map(&:to_f)
+        axes = [tr.xaxis, tr.yaxis, tr.zaxis].map do |v|
+          n = v.length.to_f
+          return if n <= 0.0 || !n.finite?
+          [v.x / n, v.y / n, v.z / n].map(&:to_f)
+        end.flatten
+        return unless (origin + size + axes).all? { |v| v.is_a?(Float) && v.finite? }
+        return if size.any? { |v| v <= 0.0 }
+        out << { 'kind' => kind.to_s, 'owner_id' => owner_id.to_s,
+                 'origin' => origin, 'axes' => axes, 'size' => size }
+      rescue StandardError => e
+        Engine.log_error(e, 'Bom.add_placement') if defined?(Engine)
+        nil
       end
 
       # Normalizovany zaznam zo snapshot configu (mm Float; edges mapa L1..W2 -> abs_id|nil).

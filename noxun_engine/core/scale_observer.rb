@@ -138,6 +138,27 @@ module Noxun
           Engine.log_error(e, 'ScaleWatch.notify_added')
         end
 
+        # D-103: NEMUTUJUCA ziadost o opravu identity (kopie so zdielanym ID).
+        # Volajuci (sync vyberu v paneli) NESMIE spustit vlastnu operaciu — tá by
+        # sa stala VRCHOLOM undo stacku a nasledne `*N` nasobenie SketchUpu (Move
+        # nastroj svoju operaciu PREPISUJE: interne undo + nove kopie) by odundovalo
+        # JU namiesto kopie. Kopia by prezila, nasobenie by k nej pridalo dalsiu na
+        # to iste miesto = dva dielce v kusovniku/VEPO/rozpocte (ziva reprodukcia
+        # 9.8.2026). Oprava preto vzdy patri debouncovanemu tiku observera, ktory
+        # ju vykona TRANSPARENTNE (= splynie s pouzivatelovym krokom).
+        # Multi-model (Codex audit BLOCKER 1): ziadosti sa drzia ako MNOZINA modelov
+        # — dva dokumenty v jednom debounce okne (macOS) sa nesmu prepisat.
+        def request_dedup(model)
+          return if @rebuilding
+          return unless model
+          @requested ||= {}
+          @requested[model.object_id] = model
+          @last_model = model
+          schedule
+        rescue StandardError => e
+          Engine.log_error(e, 'ScaleWatch.request_dedup')
+        end
+
         # Debounce + generation counter: kazda zmena posunie generaciu a restartuje timer;
         # spusti sa iba posledny naplanovany tick.
         def schedule
@@ -165,6 +186,8 @@ module Noxun
           @need_prune = false
           erase_model = @erase_model
           @erase_model = nil
+          requested = (@requested || {}).values # D-103: modely s ziadostou o opravu identity
+          @requested = {}
 
           # fix #6 + kopie: kopia korpusu (zdielane cabinet_id) -> nove ID + vlastne ghosty, este
           # pred spracovanim dirty. Spusti sa aj z onElementAdded (kopia Ctrl+C/V), nielen z move
@@ -172,6 +195,9 @@ module Noxun
           # z viacerych dokumentov (macOS) — dedup/attach bezi pre KAZDY dotknuty model zvlast.
           touched_models = (dirty.values + added.values)
                            .select { |i| i && i.valid? }.map(&:model).compact.uniq
+          # D-103 (Codex audit BLOCKER 1): ziadosti z ineho dokumentu sa NESMU
+          # stratit — pridavaju sa k dotknutym modelom, nie ako fallback jedneho.
+          touched_models = (touched_models + requested.compact).uniq
           touched_models = [erase_model || @last_model].compact if touched_models.empty?
           added_models = added.values.select { |i| i && i.valid? }.map(&:model).compact.uniq
 
@@ -185,12 +211,23 @@ module Noxun
             fresh_copy = added_models.include?(mdl)
             fresh_ids = added.values.select { |i| i && i.valid? && (i.model rescue nil) == mdl }
                              .map(&:entityID)
+            changed = []
             if fresh_ids.empty?
-              CabinetBuilder.dedup_copies(mdl) if defined?(CabinetBuilder)
-              BoardBuilder.dedup_copies(mdl) if defined?(BoardBuilder)
+              # D-103 INVARIANT: observer NIKDY nekomituje NETRANSPARENTNU operaciu.
+              # Kazda jeho reakcia sa lepi na pouzivatelov krok (rovnako ako absorpcia
+              # scale a presun ghostov) — inak by ostala ako samostatny VRCHOL undo
+              # stacku a nastroj, ktory svoju operaciu este prepisuje (`*N` nasobenie
+              # kopii, zmena VCB), by odundoval JU namiesto svojej. Vysledkom bola
+              # prezivsia „zombie" kopia a dvojity dielec vo vystupoch.
+              # Cena (vedome, vzor absorpcie na riadku ~320): ak sa oprava STAREJ
+              # duplicity prilepi na nesuvisiaci krok, undo toho kroku ju vrati spat —
+              # system sa zbiehá sam (dalsi tik ju opravi znova). Radsej rozbita
+              # skupina undo krokov nez ticho zdvojeny dielec v cenovej ponuke.
+              changed.concat(Array(CabinetBuilder.dedup_copies(mdl, transparent: true))) if defined?(CabinetBuilder)
+              changed.concat(Array(BoardBuilder.dedup_copies(mdl, transparent: true))) if defined?(BoardBuilder)
             else
-              CabinetBuilder.dedup_copies(mdl, fresh_ids: fresh_ids) if defined?(CabinetBuilder)
-              BoardBuilder.dedup_copies(mdl, fresh_ids: fresh_ids) if defined?(BoardBuilder)
+              changed.concat(Array(CabinetBuilder.dedup_copies(mdl, fresh_ids: fresh_ids))) if defined?(CabinetBuilder)
+              changed.concat(Array(BoardBuilder.dedup_copies(mdl, fresh_ids: fresh_ids))) if defined?(BoardBuilder)
               stale = defined?(Ids) &&
                       (Ids.duplicate_cabinets(mdl) + Ids.duplicate_boards(mdl))
                       .any? { |i| i && i.valid? }
@@ -199,6 +236,10 @@ module Noxun
               # sa uz nevola.
               schedule if stale
             end
+            # D-103: po skutocnej zmene identity obnov Inspector — sync vyberu uz
+            # dedup nespusta, takze bez tohto by karta drzala zdielane (povodne) ID
+            # az do dalsieho kliknutia. Citanie, ziadny zasah do modelu.
+            refresh_panel(mdl) unless changed.empty?
             # Kopie zachytene cez onElementAdded nemaju vlastny per-instancny EntityObserver
             # (kopia ho nededi). Po dedupe (novy cabinet_id + ghosty cez rebuild->sync_ghost)
             # im observer pripojime, aby ich buduci move/scale spustil ghost sync.
@@ -338,9 +379,11 @@ module Noxun
         # od V0.4.5) — obnovi sa standardnym sync tickom; bez otvoreneho panela no-op.
         # Multi-model guard (Codex GH #36): debounced absorpcia na POZADOVOM modeli
         # (macOS viac dokumentov) nesmie prepisat Inspector aktivneho dokumentu.
+        # D-103 (Codex audit NOTE 8): VZDY `dedup: false` — refresh z observera je
+        # cisté citanie a nesmie spustit dalsi zasah do modelu (ani nekonecny tik).
         def refresh_panel(model)
           return unless model == Sketchup.active_model
-          Panel.push_selected(model) if defined?(Panel)
+          Panel.push_selected(model, dedup: false) if defined?(Panel)
         rescue StandardError => e
           Engine.log_error(e, 'ScaleWatch.refresh_panel')
         end
