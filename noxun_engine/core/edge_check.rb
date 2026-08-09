@@ -213,6 +213,14 @@ module Noxun
         end
         @overlay = ov
         @model = model
+        # Overlay si stav „zapnuty" pamata SketchUp (panel Overlays v Utilities).
+        # Ked ho pouzivatel niekedy vypol, nasa registracia by sama nekreslila —
+        # preto ho zapneme, ak to API dovoli (starsie verzie setter nemaju).
+        begin
+          ov.enabled = true if ov.respond_to?(:enabled=)
+        rescue StandardError => e
+          Engine.log_error(e, 'EdgeCheck.enable! overlay.enabled=')
+        end
         attach_observer(model)
         refresh!(model)
         ui_state(model)
