@@ -165,12 +165,15 @@
     // D-75 (H1b): živý zoznam setov kovania po zmene v okne Katalóg kovania.
     // Obnoví LEN možnosti selectov setu (skrinka aj dielce) — riadky, rozpísané
     // počty ani výber sa nedotknú (vzor setMaterials, NIE push_selected).
+    // D-92: tým istým kanálom chodí aj nákupný rozpis (set → kódy → názvy),
+    // inak by po zmene setu/kódu/názvu ostal v paneli starý nákup.
     setHardwareSets: function(data){
       var d = data || {};
       // Identity guard: kým bežal callback, mohol sa zmeniť výber — vtedy panel
       // dostane vlastný loadSelected a tento (starý) payload sa zahodí.
       if ((d.cabinet_id || '') !== (selectedCabId || '')) return;
       if (typeof refreshHardwareSets === 'function') refreshHardwareSets(d.options || []);
+      if (typeof refreshHardwarePurchase === 'function') refreshHardwarePurchase(d.items || []);
     },
     loadSelected: function(c){
       // V0.4.7c: odchod z kontextu dosky — zrus cakajuce board edity + kartu

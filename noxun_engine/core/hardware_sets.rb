@@ -1205,6 +1205,101 @@ module Noxun
         out
       end
 
+      # --- rozpis nakupu JEDNEJ polozky (D-92, cista funkcia) ------------------
+
+      # Synteticky vlastnik pre resolver: expand berie cabinet overridy podla
+      # it['owner_id'], explain dostava override mapu UZ konkretnej skrinky.
+      EXPLAIN_OWNER = '__explain__'
+
+      # „Co sa realne kupi" pre JEDNU polozku config.hardware[] — podklad sekcie
+      # Kovanie v karte skrinky (D-92). Doteraz sa v paneli nedalo zistit, ktory
+      # set a ktore KODY z polozky vzniknu; supis to ukazal az v okne Vyroba.
+      #
+      # Vsetky rozhodnutia robia TIE ISTE autority ako expand (jeden vyklad
+      # nakupu — panel a supis sa nesmu rozist): resolve_set_id (override
+      # vlastnika -> override skrinky -> mapovanie projektu, selector podla
+      # parametra), member_code (code / code_by_nl / param_bands),
+      # unmapped_entry + unmapped_reason_sk (slovenske dovody), catalog_lookup.
+      # Rozdiel je LEN v tvare vystupu: expand agreguje kody cez cely projekt,
+      # explain rozpisuje jednu polozku.
+      #
+      # state = projektovy snapshot {'mapping','sets'} alebo nil (nic nemapuje).
+      # overrides = override mapa TEJ skrinky (config['hardware_sets']).
+      # catalog = HardwareCatalog.items (nazvy kodov) alebo nil.
+      # lookup  = UZ postavena mapa kod=>polozka (audit FIX D-92): volajuci,
+      #   ktory explain vola v cykle cez vsetky polozky skrinky, si ju postavi
+      #   RAZ — inak by sa katalog premapoval pri kazdej polozke.
+      #
+      # POZOR na per 'owner': expand deduplikuje clena na (korpus, vlastnik,
+      # set, kod) cez VSETKY polozky, explain vidi len jednu — pri dvoch
+      # pravidlach na tom istom vlastnikovi ho preto ukaze pri oboch, hoci sa
+      # kupi raz. Je to POHLAD NA POLOZKU, nie nakupny zoznam (ten je vo Vyrobe).
+      #
+      # Cista funkcia: ziadne IO, ziadny SketchUp, vstup sa NEMENI.
+      # -> { 'set_id', 'set_name', 'members' => [...], 'problems' => [SK texty] }
+      def explain(item, state, overrides: {}, catalog: nil, lookup: nil)
+        out = { 'set_id' => nil, 'set_name' => nil, 'members' => [], 'problems' => [] }
+        return out unless item.is_a?(Hash)
+        gt = item['generic_type'].to_s
+        return out if gt.empty?
+
+        mapping = state.is_a?(Hash) && state['mapping'].is_a?(Hash) ? state['mapping'] : {}
+        sets    = state.is_a?(Hash) && state['sets'].is_a?(Hash) ? state['sets'] : {}
+        it = item.merge('owner_id' => EXPLAIN_OWNER)
+        ovr = { EXPLAIN_OWNER => normalize_mapping(overrides.is_a?(Hash) ? overrides : {},
+                                                   nil, allow_owner: true) }
+
+        sid, reason, info = resolve_set_id(gt, it, ovr, mapping)
+        if sid.nil?
+          out['problems'] << unmapped_reason_sk(unmapped_entry(it, nil, reason, info))
+          return out
+        end
+        out['set_id'] = sid
+        set = sets[sid]
+        if set.nil?
+          out['problems'] << unmapped_reason_sk(unmapped_entry(it, sid, 'set_missing'))
+          return out
+        end
+        out['set_name'] = set['name']
+        if set['generic_type'].to_s != gt
+          out['problems'] << unmapped_reason_sk(unmapped_entry(it, sid, 'set_type_mismatch'))
+          return out
+        end
+        explain_members(it, set, sid, (lookup || catalog_lookup(catalog)), out)
+        out
+      end
+
+      def explain_members(it, set, sid, lookup, out)
+        # Pocet polozky je v configu vzdy >= 1; obrana pre poskodeny zaznam.
+        qty = [it['quantity'].to_i, 1].max
+        Array(set['members']).each_with_index do |m, idx|
+          code, miss = member_code(m, it)
+          if miss
+            out['problems'] << unmapped_reason_sk(
+              unmapped_entry(it, sid, miss['reason'],
+                             miss.merge('member_index' => idx, 'member_label' => m['label']))
+            )
+            next
+          end
+          next if code.nil? # clen bez kodu (legacy tvar) sa preskoci ako v expand
+          item = lookup[code.downcase]
+          per = m['per'].to_s
+          out['members'] << {
+            'code' => code,
+            # nil nazov = kod NIE JE v katalogu kovania (UI to pomenuje);
+            # nikdy sa nedosadzuje nahradny text uz na serveri.
+            'name' => (item ? item['name_sk'] : nil),
+            'missing' => item.nil?,
+            'qty' => (per == 'owner' ? m['qty'].to_i : qty * m['qty'].to_i),
+            'per' => per,
+            'label' => m['label'],
+            # Rad podla dlzky: hodnota, ktora kod vybrala (tooltip vo Vyrobe aj
+            # v paneli) — pri pevnom kode nil.
+            'nominal_length' => (m['code_by_nl'].is_a?(Hash) ? numeric_param(it, 'nominal_length') : nil)
+          }
+        end
+      end
+
       # --- normalizacia a validacia (audit F10 + H1a) --------------------------
 
       # PRISNA validacia JEDNEHO setu (zapisova cesta). ALL-OR-NOTHING:

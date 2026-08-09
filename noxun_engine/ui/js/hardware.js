@@ -42,6 +42,44 @@
   }
   function hwKey(owner, type, rule){ return (owner||'') + '||' + type + '||' + rule; }
 
+  // ---- D-92: „co sa realne kupi" (sekundarny riadok polozky) ----------------
+  // Server (HardwareSets.explain) posle rozpis: nazov setu + clenovia s kodmi,
+  // nazvami z katalogu a poctami, plus slovenske problemy (nemapovane).
+  // TU sa uz len sklada text — ziadne rozhodovanie o nakupe (autorita je server).
+  // Ciste funkcie (Node testy: tests/js/test_d92_hw_nakup.js).
+  var HW_NO_CATALOG = 'mimo katalógu'; // kod, ktory v katalogu kovania nie je
+
+  function hwMemberText(m){
+    if (!m) return '';
+    var q = (m.qty && m.qty > 1) ? (m.qty + '× ') : '';
+    return q + (m.code || '') + ' · ' + (m.name || HW_NO_CATALOG);
+  }
+  // -> null (nic na zobrazenie) | { text, warn }
+  // warn = true, ked nakup NIE JE kompletny (chyba set/kod/pasmo) — riadok
+  // dostane jantarovu farbu upozornenia (NIE semaforove --nx-state-*).
+  function hwBuyLine(p){
+    if (!p) return null;
+    var parts = (p.members || []).map(hwMemberText).filter(function(t){ return t !== ''; });
+    var problems = (p.problems || []).filter(function(t){ return !!t; });
+    var text = '';
+    if (parts.length){
+      text = (p.set_name ? p.set_name + ' → ' : '') + parts.join(' + ');
+      if (problems.length) text += ' · ' + problems.join(' · ');
+    } else if (problems.length){
+      text = problems.join(' · ');
+    } else {
+      return null;
+    }
+    return { text: text, warn: problems.length > 0 };
+  }
+  function hwBuyHtml(p){
+    var line = hwBuyLine(p);
+    if (!line) return '';
+    // title = plny text (riadok je jednoriadkovy s ellipsis — vertikalny priestor)
+    return '<div class="hwbuy' + (line.warn ? ' hwbuy-warn' : '') + '" title="' + esc(line.text) + '">'
+         + esc(line.text) + '</div>';
+  }
+
   // ---- V0.6 H1b: vyber setu (skrinka + D-81 per dielec) --------------------
   // Posledna ponuka zo servera (payload hardware_set_options). Zivy push
   // NX.setHardwareSets ju vymeni a prekresli LEN <select>y — riadky, rozpisane
@@ -127,6 +165,31 @@
       sel.title = owner ? hwOwnerTitle(entry) : hwCabTitle(entry);
     }
   }
+  // D-92: zivy refresh SEKUNDARNYCH riadkov (nakup) bez prekreslenia poloziek —
+  // rozpisany pocet, fokus aj vyber setu ostavaju. Parovanie cez identitu
+  // riadku (owner_part_key + generic_type + rule_id), presne tak, ako ju
+  // posiela server; polozka, ktora sa uz nezhoduje, sa ticho preskoci
+  // (nasledujuci push_selected riadky aj tak prestavia).
+  function refreshHardwarePurchase(items){
+    var box = el('hwRows'); if (!box) return;
+    (items || []).forEach(function(it){
+      if (!it) return;
+      var sel = '.hwrow[data-owner="' + cssEsc(it.owner_part_key || '') + '"]'
+              + '[data-type="' + cssEsc(it.generic_type || '') + '"]'
+              + '[data-rule="' + cssEsc(it.rule_id || '') + '"]';
+      var row = box.querySelector(sel);
+      var item = row ? row.parentNode : null;
+      if (!item || !item.classList || !item.classList.contains('hwitem')) return;
+      var old = item.querySelector('.hwbuy');
+      if (old) old.parentNode.removeChild(old);
+      var html = hwBuyHtml(it.purchase);
+      if (html) item.insertAdjacentHTML('beforeend', html);
+    });
+  }
+  // Hodnoty v atributovom selektore su datove (part_key, rule_id) — uvodzovky
+  // a spatne lomitka treba escapovat, inak by selektor spadol.
+  function cssEsc(v){ return String(v).replace(/(["\\])/g, '\\$1'); }
+
   function hwOwnerTitle(entry){
     return 'Set kovania pre tento dielec · bez vlastného výberu platí: '
          + ((entry && entry.owner_default_label) || 'predvoľba projektu');
@@ -151,7 +214,9 @@
     items.forEach(function(it){
       present[hwKey(it.owner_part_key, it.generic_type, it.rule_id)] = true;
       var name = it.label || hwLabel(it.generic_type);
-      var owner = hwOwnerDesc(it.owner_part_key);
+      // D-92: vlastnika pomenuva SERVER (owner_label — „F2 · zásuvkové čelo").
+      // hwOwnerDesc ostava LEN ako fallback pre stary payload.
+      var owner = it.owner_label || hwOwnerDesc(it.owner_part_key);
       var extra = hwParamsDesc(it);
       var manual = it.source === 'manual';
       // D-81: kovanie viazane na DIELEC (čelo/zásuvka) má vlastný výber setu
@@ -163,7 +228,11 @@
         ? hwSetSelectHtml(hwOwnerOptionList(entry, it.owner_part_key), it.generic_type,
                           it.owner_part_key, cabId, hwOwnerTitle(entry))
         : '';
-      html += '<div class="hwrow" data-owner="'+esc(it.owner_part_key||'')+'" data-type="'+esc(it.generic_type)+'" data-rule="'+esc(it.rule_id)+'">'
+      // D-92: polozka = hlavny riadok + JEDEN sekundarny riadok s nakupom
+      // (obal .hwitem drzi obe casti pokope; .hwrow ostava nedotknuty, takze
+      // hwPayload/closest('.hwrow') aj refreshHardwareSets funguju dalej).
+      html += '<div class="hwitem">'
+        + '<div class="hwrow" data-owner="'+esc(it.owner_part_key||'')+'" data-type="'+esc(it.generic_type)+'" data-rule="'+esc(it.rule_id)+'">'
         // title = celý popis riadku — na úzkom paneli (<400 px) sa .hwext skrýva
         + '<span class="hwname" title="'+esc(name+(owner?' · '+owner:'')+(extra?' · '+extra:''))+'">'
         + esc(name)+(owner?' <span class="hwown">'+esc(owner)+'</span>':'')
@@ -175,13 +244,15 @@
             ? '<button class="ghostbtn hwbtn" title="Vrátiť na pravidlo ('+esc(it.rule_quantity)+')" aria-label="Vrátiť na pravidlo" onclick="onHwReset(this)">'+NXIcons.svg('rotate-ccw')+'</button>'
             : '<span class="hwsrc" title="Počet z pravidla"></span>')
         + '<button class="ghostbtn hwbtn" title="Vypnúť položku" aria-label="Vypnúť položku" onclick="onHwDisable(this)">'+NXIcons.svg('x')+'</button>'
+        + '</div>'
+        + hwBuyHtml(it.purchase)
         + '</div>';
     });
     // Vypnute kategorie: disabled override bez zodpovedajucej polozky (evaluate ju vyradil).
     (overrides || []).forEach(function(ov){
       if (!ov || ov.disabled !== true) return;
       if (present[hwKey(ov.owner_part_key, ov.generic_type, ov.rule_id)]) return;
-      var owner = hwOwnerDesc(ov.owner_part_key);
+      var owner = ov.owner_label || hwOwnerDesc(ov.owner_part_key); // D-92
       html += '<div class="hwrow hwoff" data-owner="'+esc(ov.owner_part_key||'')+'" data-type="'+esc(ov.generic_type)+'" data-rule="'+esc(ov.rule_id)+'">'
         + '<span class="hwname">'+esc(hwLabel(ov.generic_type))+(owner?' <span class="hwown">'+esc(owner)+'</span>':'')
         + ' <span class="hwext">vypnuté</span></span>'
@@ -235,11 +306,18 @@
   function openRulesDialog(){
     if (window.sketchup && sketchup.open_rules) sketchup.open_rules('');
   }
+  // D-91: Katalog kovania z hlavicky panela — rovnaky mechanizmus ako
+  // "Pravidla kovania..." (satelitne okno, ziadny zasah do modelu).
+  function openHardwareCatalogDialog(){
+    if (window.sketchup && sketchup.open_hardware_catalog) sketchup.open_hardware_catalog('');
+  }
 
   // Node testy (tests/js/test_hw_panel_sets.js) — LEN ciste funkcie ponuky
   // setov (bez DOM). V CEF je module undefined a vetva sa preskoci.
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { hwSetOptionList: hwSetOptionList, hwOwnerOptionList: hwOwnerOptionList,
       hwCabOptionList: hwCabOptionList, hwFindEntry: hwFindEntry, hwOwnerDesc: hwOwnerDesc,
-      HW_SET_PARAM: HW_SET_PARAM };
+      HW_SET_PARAM: HW_SET_PARAM,
+      // D-92 rozpis nakupu (tests/js/test_d92_hw_nakup.js)
+      hwMemberText: hwMemberText, hwBuyLine: hwBuyLine, HW_NO_CATALOG: HW_NO_CATALOG };
   }

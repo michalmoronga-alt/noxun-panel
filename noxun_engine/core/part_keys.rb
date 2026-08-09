@@ -71,6 +71,62 @@ module Noxun
         out
       end
 
+      # --- D-92: ludska podoba identity (LEN zobrazenie) ----------------------
+      # Panel doteraz ukazoval v sekcii Kovanie SUROVY part_key
+      # ("front:Fmsi0wnix-1-3a3kxe/panel") — id cela je generovany retazec,
+      # takze sa z neho neda precitat, o ktore celo ide. Tato funkcia z neho
+      # sklada slovensky popis; SERVER je jedina autorita textu (JS uz nic
+      # neskladá).
+      #
+      # fronts = resolved cela (cfg['front_items'], F1 = SPODNE) — cislo „F2"
+      # je PORADIE v tomto zozname, presne to, co pouzivatel vidi v karte Cela.
+      # Ked sa id v zozname nenajde (stary config, cudzi kluc), pouzije sa
+      # surove id — NIKDY sa nehada.
+      #
+      # CISTA funkcia (ziadne IO/SketchUp) — headless testovatelna. Neznamy
+      # tvar kluca sa vracia NEZMENENY: radsej surovy kluc nez vymysleny nazov.
+      # nil/prazdny kluc = nil (kovanie na urovni skrinky vlastnika nema).
+      def human_label(key, fronts: [])
+        k = key.to_s.strip
+        return nil if k.empty?
+
+        if (m = k.match(%r{\Afront:([^/]+)/panel\z}))
+          return "#{front_no(m[1], fronts)} · zásuvkové čelo"
+        end
+        if (m = k.match(%r{\Afront:([^/]+)/wing:(left|right|single|p[1-4])\z}))
+          return "#{front_no(m[1], fronts)} · #{wing_label(m[2], m[1], fronts)}"
+        end
+        if (m = k.match(%r{\Azone:[^/]+/(shelf|divider_v|divider_h):(\d+)\z}))
+          return "#{ZONE_PART_LABELS[m[1]]} #{m[2]}"
+        end
+
+        k
+      end
+
+      ZONE_PART_LABELS = { 'shelf' => 'Polica', 'divider_v' => 'Zvislá priečka',
+                           'divider_h' => 'Vodorovná priečka' }.freeze
+
+      # „F2" podla poradia v resolved celach; bez zhody surove id.
+      def front_no(front_id, fronts)
+        idx = Array(fronts).index { |f| f.is_a?(Hash) && f['id'].to_s == front_id.to_s }
+        idx ? "F#{idx + 1}" : front_id.to_s
+      end
+
+      # Kridlo dvierok. p1..p4 nesie aj celkovy pocet kridiel („krídlo 2/3"),
+      # ked ho resolved celo pozna (wings_n) — inak len poradie.
+      def wing_label(wing, front_id, fronts)
+        case wing
+        when 'left'  then 'dvierka ľavé'
+        when 'right' then 'dvierka pravé'
+        when 'single' then 'dvierka'
+        else
+          i = wing[1..-1].to_i
+          f = Array(fronts).find { |x| x.is_a?(Hash) && x['id'].to_s == front_id.to_s }
+          n = f ? f['wings_n'].to_i : 0
+          n >= i ? "dvierka, krídlo #{i}/#{n}" : "dvierka, krídlo #{i}"
+        end
+      end
+
       def segment(value)
         cleaned = value.to_s.strip.gsub(/[^A-Za-z0-9_.-]+/, '_')
         cleaned.empty? ? 'unknown' : cleaned

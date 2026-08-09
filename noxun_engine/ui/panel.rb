@@ -73,6 +73,9 @@ module Noxun
           cb(dlg, 'set_hardware_override') { |p| handle_set_hardware_override(p) }
           cb(dlg, 'set_hardware_set')      { |p| handle_set_hardware_set(p) } # V0.6 D1b: set na skrinke
           cb(dlg, 'open_rules')            { |_p| RulesDialog.show }
+          # D-91: Katalog kovania priamo z hlavicky panela (docasne miesto "za
+          # Vyrobou" — finalny domov rozhodne UI 2.0). Len otvorenie satelitu.
+          cb(dlg, 'open_hardware_catalog') { |_p| HardwareCatalogDialog.show }
           # V0.4.5 D1: omrvinka karty dielca — spat na korpus (oznaci ho v modeli)
           cb(dlg, 'select_cabinet')        { |p| handle_select_cabinet(p) }
           # V0.4.5 D2: satelitne okna (projektove predvolby a sprava sablon mimo panela)
