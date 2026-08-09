@@ -207,7 +207,9 @@ module Noxun
             # vrati kopiu celu. V0.4.7b (Codex audit + GH review P2): pri cerstvych
             # entitach sa v tomto ticku spracuju VYHRADNE ony (transparent drzi priamo
             # na paste operacii); pripadne STARE duplicity v tom istom okne sa odlozia
-            # na follow-up tick (schedule) a spracuju sa ako samostatne undo kroky.
+            # na follow-up tick (schedule). D-103: aj ten uz bezi TRANSPARENTNE —
+            # samostatny undo krok tesne po kopirovani bol prave ta pasca, ktora
+            # rozbijala `*N` nasobenie (viz komentar v nasledujucej vetve).
             fresh_copy = added_models.include?(mdl)
             fresh_ids = added.values.select { |i| i && i.valid? && (i.model rescue nil) == mdl }
                              .map(&:entityID)
