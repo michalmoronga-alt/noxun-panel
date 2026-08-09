@@ -10,7 +10,7 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
-### D-104 — kontrola hrán „light": zvýrazni v modeli hrany bez olepu (10.8.2026, PR #TBD, v0.5.58)
+### D-104 — kontrola hrán „light": zvýrazni v modeli hrany bez olepu (10.8.2026, PR #152, v0.5.58)
 
 **Odkiaľ prišlo:** zákazka KLINIKA je hotová (254 dielcov) a pred odoslaním do výroby prichádza **záverečná kontrola olepov**. Doteraz sa dala robiť len preklikávaním dielec po dielci v paneli — pri 254 dielcoch to je nekontrolovateľné. D-88 (farba pásky v modeli) ukázala, že olep sa dá vidieť priamo v 3D; D-104 tú istú cestu otáča: namiesto „čo je olepené" ukáže **čo olepené NIE JE, hoci má byť**.
 
