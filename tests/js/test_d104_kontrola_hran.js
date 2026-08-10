@@ -26,40 +26,44 @@ eq(P.edgePluralSk(5), 'hrán', '5 = hran');
 eq(P.edgePluralSk(21), 'hrán', '21 = hran (bez vynimiek)');
 
 // --- text stavu ---------------------------------------------------------------
+// D-105: stav uz nesie 'options' + 'counts' (pocty per stav). Skalarny 'count'
+// ostava v payloade kvoli kompatibilite, ale text sa sklada z 'counts'.
+const RED_ONLY = { show_missing: true, show_extra: false, show_taped: false, taped_selected_only: true };
+function red(n, extra){
+  return Object.assign({ available: true, active: true, options: RED_ONLY,
+                         counts: { missing: n, extra: 0, taped: 0 } }, extra || {});
+}
+
 eq(P.edgeCheckText(null), 'Vypnuté — v modeli nie je nič nakreslené.', 'bez stavu = vypnute');
 eq(P.edgeCheckText({ available: true, active: false }),
    'Vypnuté — v modeli nie je nič nakreslené.', 'vypnute povie, ze v modeli nic nie je');
-eq(P.edgeCheckText({ available: true, active: true, count: 0 }),
+eq(P.edgeCheckText(red(0)),
    'Všetky hrany podľa pravidla sú olepené.', 'nula = ciste (Michalov cielovy stav)');
-eq(P.edgeCheckText({ available: true, active: true, count: 1 }),
-   '1 hrana bez olepu', 'jedna hrana');
-eq(P.edgeCheckText({ available: true, active: true, count: 7 }),
-   '7 hrán bez olepu', 'sedem hran');
-ok(P.edgeCheckText({ available: true, active: true, count: 7, unresolved: 2 })
-    .indexOf('2 sa nedá zvýrazniť') >= 0,
+eq(P.edgeCheckText(red(1)), '1 hrana bez olepu', 'jedna hrana');
+eq(P.edgeCheckText(red(7)), '7 hrán bez olepu', 'sedem hran');
+ok(P.edgeCheckText(red(7, { unresolved: 2 })).indexOf('2 sa nedá zvýrazniť') >= 0,
    'nezvyraznitelne hrany sa PRIZNAJU (nie tiche mlcanie)');
-ok(P.edgeCheckText({ available: true, active: true, count: 3, multi: 1 })
-    .indexOf('nakreslený raz') >= 0,
+ok(P.edgeCheckText(red(3, { multi: 1 })).indexOf('nakreslený raz') >= 0,
    'dielec s viac kusmi je v modeli nakresleny raz — text to povie');
 
 // --- lista prepinaca ----------------------------------------------------------
 (function(){
-  const off = P.edgeCheckBarHtml({ available: true, active: false });
-  ok(off.indexOf('Zvýrazniť hrany bez olepu') >= 0, 'vypnute tlacidlo pozyva zapnut');
+  const off = P.edgeCheckBarHtml({ available: true, active: false, options: RED_ONLY }, false);
+  ok(off.indexOf('Zvýrazniť hrany') >= 0, 'tlacidlo nesie nazov akcie');
   ok(off.indexOf('#i-eye') >= 0, 'ikona zo spritu (ziadne emoji)');
   ok(off.indexOf('aria-pressed="false"') >= 0, 'vypnuty stav je aj pre citacku');
-  ok(off.indexOf('class="ghostbtn ecbtn"') >= 0, 'vypnute tlacidlo nema triedu on');
+  ok(off.indexOf('class="ecbtn ecmain"') >= 0, 'vypnute tlacidlo nema triedu on');
 
-  const on = P.edgeCheckBarHtml({ available: true, active: true, count: 2 });
-  ok(on.indexOf('ecbtn on') >= 0, 'zapnuty stav je ZJAVNY (trieda on)');
+  const on = P.edgeCheckBarHtml(red(2), false);
+  ok(on.indexOf('ecmain on') >= 0, 'zapnuty stav je ZJAVNY (trieda on)');
   ok(on.indexOf('#i-eye-off') >= 0, 'zapnute tlacidlo ponuka vypnutie');
   ok(on.indexOf('aria-pressed="true"') >= 0, 'zapnuty stav je aj pre citacku');
   ok(on.indexOf('2 hrany bez olepu') >= 0, 'pocet zo servera je v liste');
 
-  const na = P.edgeCheckBarHtml({ available: false });
+  const na = P.edgeCheckBarHtml({ available: false }, false);
   ok(na.indexOf('SketchUp 2023') >= 0, 'stary SketchUp dostane vetu, nie mrtve tlacidlo');
   ok(na.indexOf('<button') < 0, 'bez Overlay API sa tlacidlo vobec nezobrazi');
-  ok(P.edgeCheckBarHtml(null).indexOf('SketchUp 2023') >= 0, 'chybajuci stav = nedostupne');
+  ok(P.edgeCheckBarHtml(null, false).indexOf('SketchUp 2023') >= 0, 'chybajuci stav = nedostupne');
 })();
 
 // --- payload do Ruby ----------------------------------------------------------

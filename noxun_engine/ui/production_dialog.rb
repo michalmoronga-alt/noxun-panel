@@ -293,8 +293,8 @@ module Noxun
           set_status("Export cenovej ponuky zlyhal: #{e.message}", true)
         end
 
-        # D-104: prepinac zvyraznenia hran bez olepu (tab KONTROLA). Model sa
-        # NEMENI — overlay kresli NAD nim (ziadna operacia, ziadny undo krok).
+        # D-104/D-105: prepinac zvyraznenia hran (tab KONTROLA). Model sa NEMENI
+        # — overlay kresli NAD nim (ziadna operacia, ziadny undo krok).
         # Guardy bezia na SERVERI (HTML disabled nie je ochrana):
         #   gen        — klik zo stareho DOM (medzitym prepocitane okno),
         #   model_guid — medzitym prepnuty dokument (zaplo by sa v cudzej zakazke),
@@ -302,25 +302,61 @@ module Noxun
         def do_edge_check(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           model = Sketchup.active_model
-          unless defined?(EdgeCheck) && EdgeCheck.available?(model)
-            push_edge_check
-            return set_status('Zvýraznenie hrán vyžaduje SketchUp 2023 alebo novší.', true)
-          end
-          unless data['gen'].to_i == @generation.to_i
-            push_state if @dialog && @dialog.visible?
-            return set_status('Okno sa medzitým prepočítalo — obnovené, klikni znova.', true)
-          end
-          guid = data['model_guid'].to_s
-          if !guid.empty? && guid != model_guid(model)
-            push_state
-            return set_status('Model sa medzitým prepol — obnovené, klikni znova.', true)
-          end
+          return unless edge_check_guard(data, model)
+
           state = EdgeCheck.toggle(model)
           push_edge_check(state)
           set_status(edge_check_status(state))
         rescue StandardError => e
           Engine.log_error(e, 'ProductionDialog.do_edge_check')
           set_status("Chyba zvýraznenia hrán: #{e.message}", true)
+        end
+
+        # D-105: prepinace stavov (chyba / mimo pravidla / olepene + „len vybrané").
+        # Zapisuju sa do %APPDATA% (nastavenie pocitaca), NIKDY do modelu — preto
+        # ziadny flush handshake ani undo krok. Codex audit FIX 4: kluc musi byt
+        # z whitelistu a hodnota VYSLOVNE true/false (retazec "false" je v Ruby
+        # pravdivy) — inak sa NEZAPISE nic.
+        def do_edge_check_option(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          model = Sketchup.active_model
+          return unless edge_check_guard(data, model)
+
+          key = data['key'].to_s
+          value = data['value']
+          unless EdgeCheck::OPTION_KEYS.include?(key) && (value == true || value == false)
+            push_edge_check
+            return set_status('Neznáme nastavenie zvýraznenia — nič sa nezmenilo.', true)
+          end
+          EdgeCheck.set_option(key, value)
+          push_edge_check
+          set_status(edge_check_option_status(key, value))
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.do_edge_check_option')
+          set_status("Chyba nastavenia zvýraznenia: #{e.message}", true)
+        end
+
+        # Spolocne serverove guardy oboch akcii zvyraznenia. false = akcia sa
+        # NEVYKONA (volajuci uz poslal status aj cerstvy payload).
+        # Codex audit FIX 4: guid sa porovnava STRIKTNE — prazdny udaj z klienta
+        # uz guard NEOBIDE (obe strany citaju to iste `model_guid`).
+        def edge_check_guard(data, model)
+          unless defined?(EdgeCheck) && EdgeCheck.available?(model)
+            push_edge_check
+            set_status('Zvýraznenie hrán vyžaduje SketchUp 2023 alebo novší.', true)
+            return false
+          end
+          unless data['gen'].to_i == @generation.to_i
+            push_state if @dialog && @dialog.visible?
+            set_status('Okno sa medzitým prepočítalo — obnovené, klikni znova.', true)
+            return false
+          end
+          unless data['model_guid'].to_s == model_guid(model)
+            push_state
+            set_status('Model sa medzitým prepol — obnovené, klikni znova.', true)
+            return false
+          end
+          true
         end
 
         # Maly echo push (bez prepoctu celeho okna) — vola ho aj EdgeCheck po
@@ -336,11 +372,28 @@ module Noxun
         def edge_check_status(state)
           st = state.is_a?(Hash) ? state : {}
           return 'Zvýraznenie hrán vypnuté — v modeli nič neostalo.' unless st['active']
-          n = st['count'].to_i
-          return 'Zvýraznenie zapnuté — všetky hrany podľa pravidla sú olepené.' if n.zero?
 
-          extra = st['unresolved'].to_i.positive? ? " (#{st['unresolved'].to_i} sa nedá zvýrazniť)" : ''
-          "Zvýraznenie zapnuté — #{n} hrán bez olepu#{extra}."
+          opts = st['options'].is_a?(Hash) ? st['options'] : {}
+          counts = st['counts'].is_a?(Hash) ? st['counts'] : {}
+          parts = []
+          parts << "#{counts['missing'].to_i} chýba podľa pravidla" if opts['show_missing']
+          parts << "#{counts['extra'].to_i} neolepených mimo pravidla" if opts['show_extra']
+          parts << "#{counts['taped'].to_i} olepených" if opts['show_taped']
+          return 'Zvýraznenie zapnuté — žiadny stav nie je zapnutý (otvor nastavenie ▾).' if parts.empty?
+
+          extra = st['unresolved'].to_i.positive? ? " · #{st['unresolved'].to_i} sa nedá zvýrazniť" : ''
+          "Zvýraznenie zapnuté — #{parts.join(' · ')}#{extra}."
+        end
+
+        # D-105: kratke potvrdenie prepnutia (nazvy su TIE ISTE ako v rozbalovacom
+        # okne — server je jediny zdroj textov).
+        EDGE_OPTION_LABELS = {
+          'show_missing' => 'Chýba podľa pravidla', 'show_extra' => 'Neolepené mimo pravidla',
+          'show_taped' => 'Olepené', 'taped_selected_only' => 'Olepené — len vybrané'
+        }.freeze
+
+        def edge_check_option_status(key, value)
+          "#{EDGE_OPTION_LABELS[key] || key}: #{value ? 'zapnuté' : 'vypnuté'}."
         end
 
         # V0.6 E-b: mutacie rozpoctu (rezim, prepis sumy, nasobok, m2, spotrebice
@@ -546,9 +599,11 @@ module Noxun
           cb(dlg, 'hw_csv_export') { |p| handle_hw_csv(p) } # V0.6 D1b
           # D-83: skratka z riadku KONTROLY do „Nahradiť UNI…" (okno Materiály).
           cb(dlg, 'replace_uni') { |p| handle_replace_uni(p) }
-          # D-104: prepínač zvýraznenia hrán bez olepu (tab KONTROLA). Žiadny
-          # flush handshake — model sa nemení, len sa nad ním kreslí.
+          # D-104: prepínač zvýraznenia hrán (tab KONTROLA). Žiadny flush
+          # handshake — model sa nemení, len sa nad ním kreslí.
           cb(dlg, 'edge_check_toggle') { |p| do_edge_check(p) }
+          # D-105: prepínače stavov v rozbaľovacom okne (zapisujú sa do %APPDATA%).
+          cb(dlg, 'edge_check_option') { |p| do_edge_check_option(p) }
           # V0.6 E-b: tab Rozpočet — mutácie, XLSX export, ⚙ Nastavenia, ↗ URL.
           cb(dlg, 'budget_mutate')   { |p| do_budget(p) }
           cb(dlg, 'budget_xlsx')     { |p| handle_budget_xlsx(p) }

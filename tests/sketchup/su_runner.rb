@@ -2476,6 +2476,207 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- D-105: prepinace kontroly hran (tri stavy + filter podla vyberu) ------
+  # Headless sada overuje CISTE rozhodnutie (klasifikacia, filter, prepinace).
+  # TU sa dokazuje to, co sa inak dokazat neda: ze prepnutie prepinaca ani zmena
+  # VYBERU nespusti novy sken, ze zmena vyberu NEMENI MODEL a nerobi undo krok
+  # (lekcia D-103), ze KOMPAKT nesvieti fialovo a ze obal kresby drzi vsetky tri
+  # stavy aj ked su vypnute (Codex audit FIX 6).
+
+  def d105_counts(model)
+    (e::EdgeCheck.ui_state(model)['counts'] || {})
+  end
+
+  def d105_cache_id
+    c = e::EdgeCheck.instance_variable_get(:@cache)
+    c.nil? ? nil : c.object_id
+  end
+
+  def d105_extents_key(model)
+    bb = e::EdgeCheck.extents(model)
+    [bb.min.to_a.map { |v| v.round(6) }, bb.max.to_a.map { |v| v.round(6) }]
+  end
+
+  # Odtlacok MODELU (nie vyberu): kolko entit, ake objekty a s akymi datami.
+  # Zmena vyberu ho NESMIE pohnut ani o bit.
+  def d105_fingerprint(model)
+    rows = model.entities.grep(Sketchup::ComponentInstance).map do |i|
+      [e::Store.kind(i).to_s, i.persistent_id,
+       (e::Store.get(i, 'cabinet_id') || e::Store.get(i, 'id')).to_s,
+       i.definition.entities.length, (e::Store.config(i) || {}).to_json]
+    end
+    [model.entities.length, model.definitions.length, rows.sort_by(&:to_s)].to_json
+  end
+
+  def d105_reset_options
+    e::EdgeCheck::DEFAULT_OPTIONS.each { |k, v| e::EdgeCheck.set_option(k, v) }
+  end
+
+  def run_d105(model)
+    unless e::EdgeCheck.available?(model)
+      info('D-105: SketchUp bez Overlay API (SU 2022 a starsi) — sekcia preskocena')
+      return
+    end
+    tmp = File.join(Dir.tmpdir, "noxun_d105_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(d104_catalog_json))
+    e::Materials.test_dir_override = tmp
+    e::Materials.reload!
+    begin
+      cleanup(model)
+      d105_reset_options
+      inst = e::CabinetBuilder.build(model, d88_params)
+      return ok('D-105: vlozenie korpusu', false) unless inst
+
+      e::EdgeCheck.enable!(model)
+      # Baza sa meria BEZ filtra vyberu — „len vybrane" ma vlastnu sekciu nizsie
+      # (s filtrom a prazdnym vyberom je zelena spravne 0 a nedalo by sa nic porovnat).
+      e::EdgeCheck.set_option('taped_selected_only', false)
+      base = d105_counts(model)
+      ok("D-105: cista skrinka — 0 cervenych, ale fialove aj zelene hrany existuju (#{base.inspect})",
+         base['missing'].to_i.zero? && base['extra'].to_i.positive? && base['taped'].to_i.positive?)
+
+      # 1) POCTY nezavisia od prepinacov zobrazenia (cislo vedla prepinaca musi
+      #    byt pravdive este predtym, nez ho pouzivatel zapne)
+      cache_before = d105_cache_id
+      e::EdgeCheck.set_option('show_extra', true)
+      e::EdgeCheck.set_option('show_taped', true)
+      all_on = d105_counts(model)
+      ok("D-105: pocty su rovnake pri zapnutych aj vypnutych stavoch (#{all_on.inspect})",
+         all_on == base)
+      ok('D-105: prepnutie prepinaca NESPUSTA novy sken (ta ista cache)',
+         !cache_before.nil? && d105_cache_id == cache_before)
+      st = e::EdgeCheck.ui_state(model)
+      ok("D-105: tri stavy naraz sa aj kreslia (drawn #{st['drawn']})",
+         st['drawn'].to_i >= base.values.map(&:to_i).sum - st['unresolved'].to_i)
+
+      # 2) obal kresby drzi VSETKY tri stavy aj ked su vypnute (Codex FIX 6)
+      ext_all = d105_extents_key(model)
+      e::EdgeCheck.set_option('show_extra', false)
+      e::EdgeCheck.set_option('show_taped', false)
+      ok('D-105: obal kresby (getExtents) sa vypnutim stavov NEZMENSI',
+         d105_extents_key(model) == ext_all)
+      e::EdgeCheck.set_option('show_extra', true)
+      e::EdgeCheck.set_option('show_taped', true)
+
+      # 3) KOMPAKT (nelepitelny) nesmie svietit ANI FIALOVO
+      kompakt = e::BoardBuilder.build(model, { 'material_id' => 'D104KOMPAKT12',
+                                               'length' => 600.0, 'width' => 300.0 })
+      e::EdgeCheck.refresh!(model)
+      ok('D-105: KOMPAKT doska nepridala ziadnu hranu do ziadneho stavu (ani fialovu)',
+         kompakt && d105_counts(model) == base)
+      kompakt.erase! if kompakt && kompakt.valid?
+      e::EdgeCheck.refresh!(model)
+
+      # 4) „len vybrane" patri VYHRADNE zelenej
+      board = e::BoardBuilder.build(model, { 'material_id' => 'D88BIELA18',
+                                             'length' => 800.0, 'width' => 400.0 })
+      e::EdgeCheck.refresh!(model)
+      with_board = d105_counts(model)
+      e::EdgeCheck.set_option('taped_selected_only', true)
+      model.selection.clear
+      empty = e::EdgeCheck.ui_state(model)
+      ok("D-105: prazdny vyber — zelena je 0, cervena a fialova ostavaju (#{empty['counts'].inspect})",
+         empty['counts']['taped'].to_i.zero? && empty['selection_empty'] == true &&
+         empty['counts']['extra'] == with_board['extra'] &&
+         empty['counts']['missing'] == with_board['missing'])
+
+      cache_sel = d105_cache_id
+      model.selection.add(inst)
+      only_cab = d105_counts(model)
+      ok("D-105: oznaceny korpus rozsvieti zelenu len na nom (#{only_cab['taped']} z #{with_board['taped']})",
+         only_cab['taped'].to_i.positive? && only_cab['taped'].to_i < with_board['taped'].to_i)
+      ok('D-105: zmena vyberu NESPUSTA novy sken (prepocita sa len filter)',
+         d105_cache_id == cache_sel)
+
+      model.selection.add(board)
+      ok('D-105: VIAC oznacenych objektov naraz (korpus + doska) = zelena na oboch',
+         d105_counts(model)['taped'].to_i == with_board['taped'].to_i)
+      e::EdgeCheck.set_option('taped_selected_only', false) # spat na porovnatelnu bazu
+
+      # 5) DOKAZ: zmena vyberu nemeni model a nie je undo krok
+      fp = d105_fingerprint(model)
+      3.times do
+        model.selection.clear
+        model.selection.add(inst)
+        model.selection.add(board)
+      end
+      model.selection.clear
+      ok('D-105: seria zmien vyberu NEZMENILA model (odtlacok sedi)',
+         d105_fingerprint(model) == fp)
+      Sketchup.undo
+      ok('D-105: 1x undo vratil VLOZENIE DOSKY — zmeny vyberu nevyrobili undo krok',
+         boards(model).empty?)
+      e::EdgeCheck.refresh!(model)
+      ok('D-105: po undo sedia pocty zase so stavom pred doskou', d105_counts(model) == base)
+
+      # 6) prestavba pri zapnutom zvyrazneni — cerstve pocty bez zasahu pouzivatela
+      shelf = d88_part(inst, 'shelf')
+      pkey = e::Store.get(shelf, 'part_key').to_s
+      params = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+      params['part_overrides'] = { pkey => { 'edges' => { 'L1' => nil } } }
+      e::CabinetBuilder.rebuild(model, inst, params)
+      e::EdgeCheck.refresh!(model)
+      after = d105_counts(model)
+      ok("D-105: po prestavbe je 1 cervena navyse a 1 zelena menej (#{after.inspect})",
+         after['missing'].to_i == base['missing'].to_i + 1 &&
+         after['taped'].to_i == base['taped'].to_i - 1 &&
+         after['extra'].to_i == base['extra'].to_i)
+      Sketchup.undo
+
+      # 7) nastavenie prezije vypnutie/zapnutie (zije v %APPDATA%, nie v modeli)
+      e::EdgeCheck.set_option('show_extra', true)
+      e::EdgeCheck.disable!
+      st = e::EdgeCheck.ui_state(model)
+      ok('D-105: po vypnuti su prepinace v stave, kde ostali (a bez poctov)',
+         st['active'] == false && st['counts'].nil? && st['options']['show_extra'] == true)
+      e::EdgeCheck.enable!(model)
+      ok('D-105: po opatovnom zapnuti sedia prepinace aj pocty',
+         e::EdgeCheck.ui_state(model)['options']['show_extra'] == true)
+      ok('D-105: nastavenie zije v %APPDATA%, NIC z neho nejde do modelu',
+         File.exist?(e::EdgeCheck.settings_path) &&
+         (e::Store.config(inst) || {}).to_json.index('show_extra').nil?)
+
+      # 8) prepnutie dokumentu = zvyraznenie zhasne (vratane odpojenia observerov)
+      e::EdgeCheck.on_model_changed(Object.new)
+      ok('D-105: prepnutie okna vypne zvyraznenie a odregistruje overlay',
+         e::EdgeCheck.active?(model) == false && !d104_overlay_present?(model))
+      model.selection.clear
+      ok('D-105: po vypnuti uz zmena vyberu nic nerobi (stav ostava cisty)',
+         e::EdgeCheck.ui_state(model)['counts'].nil?)
+
+      cleanup(model)
+      ok('D-105: cleanup — model prazdny, overlay odregistrovany',
+         cabinets(model).empty? && boards(model).empty? && !d104_overlay_present?(model))
+    ensure
+      begin
+        e::EdgeCheck.disable!
+        d105_reset_options
+        e::EdgeCheck.instance_variable_set(:@options, nil)
+      rescue StandardError
+        nil
+      end
+      e::Materials.test_dir_override = nil
+      e::Materials.reload!
+      begin
+        FileUtils.rm_rf(tmp)
+      rescue StandardError
+        nil
+      end
+    end
+  rescue StandardError => ex
+    log_line("FAIL: D-105 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    begin
+      e::EdgeCheck.disable!
+      e::EdgeCheck.instance_variable_set(:@options, nil)
+    rescue StandardError
+      nil
+    end
+    e::Materials.test_dir_override = nil
+    e::Materials.reload!
+    cleanup(model)
+  end
+
   # --- ASYNC: undo/redo scenare (retaz timerov, observer debounce 0.2 s) -----
 
   def run_async(model, done)
@@ -2909,6 +3110,7 @@ module NoxunSuRunner
     run_d90(model)           # D-90: vizual uchytkoveho profilu UKW-7 (kotva, undo, rebuild)
     run_d88(model)           # D-88: farba ABS na bocnych plochach dielcov a dosky
     run_d104(model)          # D-104: overlay „hrany bez olepu" (lifecycle, pocty, ziadny undo krok)
+    run_d105(model)          # D-105: tri stavy + filter podla vyberu (vyber NEMENI model)
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

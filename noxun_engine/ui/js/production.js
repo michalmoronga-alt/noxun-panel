@@ -6,9 +6,12 @@
 
   var BOM = null;          // posledny push z Ruby
   var prodTab = 'rows';
-  // D-104: stav zvyraznenia hran bez olepu. SERVER je autorita (aj pocet) — JS
-  // si nic neprepocitava a stav si NEPAMATA sam (kazdy push ho prepise).
+  // D-104: stav zvyraznenia hran. SERVER je autorita (pocty, zapnutost aj stav
+  // prepinacov) — JS si nic neprepocitava a stav si NEPAMATA sam (kazdy push ho
+  // prepise). D-105: jedina vec, ktoru si drzi klient, je ci je rozbalovacie
+  // okno prepinacov otvorene (cisto zobrazovacia vec, nikam sa neuklada).
   var EDGE = null;
+  var ecMenuOpen = false;
 
   function el(id){ return document.getElementById(id); }
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -19,13 +22,14 @@
       BOM = data || null;
       EDGE = (BOM && BOM.edge_check) ? BOM.edge_check : null;
       el('prodModel').textContent = BOM ? ('model: ' + BOM.model_title + ' · v' + BOM.version) : '…';
-      vepoSync(); renderSummary(); renderBadge(); renderBody();
+      vepoSync(); renderSummary(); renderBadge(); renderEdgeBar(); renderBody();
     },
-    // D-104: maly echo push (prepnutie / prepocet po prestavbe) — prekresli sa
-    // LEN tab Kontrola, zvysok okna sa nedotkne.
+    // D-104: maly echo push (prepnutie / prepocet po prestavbe / zmena vyberu)
+    // — prekresli sa LEN lista zvyraznenia, zoznam kontroly sa nedotkne
+    // (pri zmene vyberu chodi casto a tabulka moze mat stovky riadkov).
     setEdgeCheck: function(state){
       EDGE = state || null;
-      if (prodTab === 'control') renderBody();
+      renderEdgeBar();
     },
     setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; }
   };
@@ -73,7 +77,24 @@
     });
     // klik na riadok vybera v modeli v kusovniku, kovani AJ kontrole
     el('prodHint').style.display = (t === 'rows' || t === 'hardware' || t === 'control') ? '' : 'none';
+    if (t !== 'control') ecMenuOpen = false; // odchod z tabu okno zavrie
+    renderEdgeBar();
     renderBody();
+  }
+
+  // D-105: lista zvyraznenia hran zije MIMO scrollovacieho #prodBody (jeho
+  // overflow by orezal rozbalovacie okno). Mimo tabu Kontrola je prazdna a
+  // skryta — vertikalny priestor okna sa nemeni.
+  function renderEdgeBar(){
+    var box = el('ecBar');
+    if (!box) return;
+    if (prodTab !== 'control'){
+      box.style.display = 'none';
+      box.innerHTML = '';
+      return;
+    }
+    box.style.display = '';
+    box.innerHTML = edgeCheckBarHtml(EDGE, ecMenuOpen);
   }
 
   function renderSummary(){
@@ -345,26 +366,86 @@
     box.innerHTML = h;
   }
 
-  // D-104: prepinac zvyraznenia hran bez olepu — CISTA funkcia (node test).
-  // Pocet aj dostupnost prichadzaju zo servera; JS ich len vypise.
-  function edgeCheckBarHtml(st){
+  // D-104/D-105: prepinac zvyraznenia hran — CISTE funkcie (node testy).
+  // Pocty, zapnutost aj STAV PREPINACOV prichadzaju zo servera; JS ich len
+  // vypise a nikdy si ich neprepocitava ani nepamata.
+  //
+  // D-105 tvar: split tlacidlo (lava polovica = zap/vyp, prava = rozbalovacie
+  // okno s tromi stavmi). Okno je OVERLAY pod tlacidlom — ziadny novy riadok
+  // v layoute (vertikalny priestor je vzacny).
+  var EC_ROWS = [
+    { key: 'show_missing', state: 'missing', label: 'Chýba podľa pravidla' },
+    { key: 'show_extra',   state: 'extra',   label: 'Neolepené mimo pravidla' },
+    { key: 'show_taped',   state: 'taped',   label: 'Olepené' }
+  ];
+
+  function ecNum(v){ return (v == null || isNaN(v)) ? 0 : Number(v); }
+
+  function edgeCheckBarHtml(st, menuOpen){
     if (!st || !st.available){
-      return '<div class="ecbar ecoff">Zvýraznenie hrán bez olepu vyžaduje SketchUp 2023 alebo novší.</div>';
+      return '<div class="ecbar ecoff">Zvýraznenie hrán vyžaduje SketchUp 2023 alebo novší.</div>';
     }
     var on = st.active === true;
-    return '<div class="ecbar"><button type="button" id="ecBtn" class="ghostbtn ecbtn' + (on ? ' on' : '') + '"' +
+    return '<div class="ecbar"><div class="ecsplit">' +
+      '<button type="button" id="ecBtn" class="ecbtn ecmain' + (on ? ' on' : '') + '"' +
       ' onclick="edgeCheckToggle()" aria-pressed="' + (on ? 'true' : 'false') + '"' +
-      ' title="Červené plôšky na hranách, ktoré podľa pravidla ABS majú byť olepené a nie sú. Model sa nemení.">' +
+      ' title="Farebné zvýraznenie stavu olepu priamo v modeli. Model sa nemení — kreslí sa nad ním.">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-' + (on ? 'eye-off' : 'eye') + '"/></svg>' +
-      (on ? 'Zvýraznenie zapnuté — vypnúť' : 'Zvýrazniť hrany bez olepu') + '</button>' +
-      '<span class="ecinfo">' + edgeCheckText(st) + '</span></div>';
+      'Zvýrazniť hrany</button>' +
+      '<button type="button" id="ecMore" class="ecbtn ecmore' + (on ? ' on' : '') + '"' +
+      ' onclick="edgeCheckMenuToggle()" aria-expanded="' + (menuOpen ? 'true' : 'false') + '"' +
+      ' aria-label="Nastavenie zvýraznenia hrán" title="Nastavenie — ktoré stavy hrán sa zvýraznia">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>' +
+      edgeCheckMenuHtml(st, menuOpen) +
+      '</div><span class="ecinfo">' + edgeCheckText(st) + '</span></div>';
+  }
+
+  // Rozbalovacie okno: tri stavy (checkbox + farebny stvorcek + nazov + ZIVY
+  // POCET) a pod zelenou odsadeny podriadeny prepinac „len vybrané".
+  function edgeCheckMenuHtml(st, menuOpen){
+    var o = (st && st.options) || {};
+    var c = (st && st.counts) || null;
+    var h = '<div class="ecmenu' + (menuOpen ? ' open' : '') + '" id="ecMenu">';
+    EC_ROWS.forEach(function(r){
+      h += '<label class="ecopt"><input type="checkbox"' + (o[r.key] ? ' checked' : '') +
+           ' onchange="edgeCheckOption(\'' + r.key + '\', this.checked)">' +
+           '<i class="ecsw ecsw-' + r.state + '" aria-hidden="true"></i>' +
+           '<span>' + r.label + '</span>' +
+           '<b class="eccnt">' + (c ? ecNum(c[r.state]) : '—') + '</b></label>';
+      if (r.key !== 'show_taped') return;
+      h += '<label class="ecopt ecsub"><input type="checkbox"' +
+           (o.taped_selected_only ? ' checked' : '') +
+           ' onchange="edgeCheckOption(\'taped_selected_only\', this.checked)">' +
+           '<span>len vybrané</span>' +
+           (edgeCheckSelectionHint(st) ? '<b class="ecnote">označ skrinky v modeli</b>' : '') +
+           '</label>';
+    });
+    return h + '</div>';
+  }
+
+  // Prazdny vyber pri zapnutom „len vybrané" = zelená sa nekreslí. Povedz to
+  // nahlas (tiché zobrazenie všetkého by klamalo).
+  function edgeCheckSelectionHint(st){
+    if (!st || !st.active) return false;
+    var o = st.options || {};
+    return o.show_taped === true && o.taped_selected_only === true && st.selection_empty === true;
   }
 
   function edgeCheckText(st){
     if (!st || !st.active) return 'Vypnuté — v modeli nie je nič nakreslené.';
-    var n = st.count || 0;
-    if (!n) return 'Všetky hrany podľa pravidla sú olepené.';
-    var t = n + ' ' + edgePluralSk(n) + ' bez olepu';
+    var o = st.options || {};
+    var c = st.counts || {};
+    var miss = ecNum(c.missing);
+    var parts = [];
+    if (o.show_missing) parts.push(miss + ' ' + edgePluralSk(miss) + ' bez olepu');
+    if (o.show_extra) parts.push(ecNum(c.extra) + ' mimo pravidla');
+    if (o.show_taped) parts.push(ecNum(c.taped) + ' olepených');
+    if (!parts.length) return 'Žiadny stav nie je zapnutý — otvor nastavenie (▾).';
+    if (o.show_missing && !o.show_extra && !o.show_taped && miss === 0){
+      return 'Všetky hrany podľa pravidla sú olepené.';
+    }
+    var t = parts.join(' · ');
+    if (edgeCheckSelectionHint(st)) t += ' · označ skrinky v modeli';
     if (st.unresolved) t += ' · ' + st.unresolved + ' sa nedá zvýrazniť (neznáma orientácia dielca)';
     if (st.multi) t += ' · dielec s viac kusmi je v modeli nakreslený raz';
     return t;
@@ -384,9 +465,36 @@
     return { gen: (bom && bom.gen) || 0, model_guid: (bom && bom.model_guid) || '' };
   }
 
+  // D-105: klient posiela LEN kluc a boolean — o platnosti kluca aj o zapise
+  // rozhoduje server (whitelist + striktny boolean).
+  function edgeCheckOptionPayload(bom, key, value){
+    var p = edgeCheckPayload(bom);
+    p.key = String(key == null ? '' : key);
+    p.value = value === true;
+    return p;
+  }
+
   function edgeCheckToggle(){
     if (!BOM || !window.sketchup || !sketchup.edge_check_toggle) return;
     sketchup.edge_check_toggle(JSON.stringify(edgeCheckPayload(BOM)));
+  }
+
+  function edgeCheckOption(key, value){
+    if (!BOM || !window.sketchup || !sketchup.edge_check_option) return;
+    sketchup.edge_check_option(JSON.stringify(edgeCheckOptionPayload(BOM, key, value)));
+  }
+
+  // Otvorenie/zatvorenie rozbalovacieho okna je CISTO klientska vec (nikam sa
+  // neuklada) — server ho neriesi; ecMenuOpen zije hore pri EDGE.
+  function edgeCheckMenuToggle(){
+    ecMenuOpen = !ecMenuOpen;
+    renderEdgeBar();
+  }
+
+  function edgeCheckMenuClose(){
+    if (!ecMenuOpen) return;
+    ecMenuOpen = false;
+    renderEdgeBar();
   }
 
   // V0.5 D: KONTROLA — deterministicky zoznam problemov (RED/ORANGE). Klik na
@@ -394,11 +502,11 @@
   // Poradie a dedup robi server; JS len renderuje.
   function renderControl(box){
     var list = (BOM && BOM.control) ? BOM.control : [];
-    // D-104: prepinac je nad zoznamom VZDY — hrany bez olepu nie su polozkou
-    // semaforu, takze „kontrola bez nálezov" ich este nevylucuje.
-    var bar = edgeCheckBarHtml(EDGE);
-    if (!list.length){ box.innerHTML = bar + '<div class="muted">Kontrola bez nálezov — dáta výroby čisté.</div>'; return; }
-    var h = bar + '<table class="bomtab ctrltab"><thead><tr><th>!</th><th>Problém</th><th>Kde</th></tr></thead><tbody>';
+    // D-104/D-105: lista zvyraznenia je nad zoznamom VZDY (renderEdgeBar, mimo
+    // tohto scrollovacieho boxu) — hrany bez olepu nie su polozkou semaforu,
+    // takze „kontrola bez nálezov" ich este nevylucuje.
+    if (!list.length){ box.innerHTML = '<div class="muted">Kontrola bez nálezov — dáta výroby čisté.</div>'; return; }
+    var h = '<table class="bomtab ctrltab"><thead><tr><th>!</th><th>Problém</th><th>Kde</th></tr></thead><tbody>';
     list.forEach(function(it, i){
       var red = it.severity === 'red';
       // V0.6 E-b: rozpočtové upozornenie nemá entitu v modeli — „Kde" ukazuje
@@ -433,6 +541,12 @@
   // Delegovany klik: posiela KLUC riadku (nie pids) — Ruby si po flushi editov
   // najde cerstve refs (Codex GH #48 P2: rebuild po flushi meni persistent id).
   document.addEventListener('click', function(ev){
+    // D-105: klik MIMO split tlacidla zavrie rozbalovacie okno prepinacov.
+    // Riesi sa TU (a nie druhym listenerom): stopPropagation medzi dvoma
+    // listenermi na TOM ISTOM uzle nefunguje (lekcia D-83 nizsie).
+    if (ecMenuOpen && !(ev.target && ev.target.closest && ev.target.closest('.ecsplit'))){
+      edgeCheckMenuClose();
+    }
     // D-83: ikona akcie v riadku KONTROLY ma VLASTNY klik — nesmie zaroven
     // oznacit dielec v modeli. Vetvenie je TU (a nie v druhom listeneri):
     // stopPropagation medzi dvoma listenermi na TOM ISTOM uzle nefunguje.
@@ -474,8 +588,11 @@
 
   window.onload = function(){ if (window.sketchup && sketchup.ready) sketchup.ready(''); };
 
-  // Node testy (tests/js/test_d104_kontrola_hran.js) — LEN ciste funkcie bez DOM.
+  // Node testy (tests/js/test_d104_kontrola_hran.js, test_d105_prepinace_hran.js)
+  // — LEN ciste funkcie bez DOM.
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { edgeCheckBarHtml: edgeCheckBarHtml, edgeCheckText: edgeCheckText,
-      edgePluralSk: edgePluralSk, edgeCheckPayload: edgeCheckPayload };
+      edgePluralSk: edgePluralSk, edgeCheckPayload: edgeCheckPayload,
+      edgeCheckMenuHtml: edgeCheckMenuHtml, edgeCheckOptionPayload: edgeCheckOptionPayload,
+      edgeCheckSelectionHint: edgeCheckSelectionHint };
   }
