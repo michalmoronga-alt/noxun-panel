@@ -64,7 +64,10 @@ module Noxun
       OUT_MM = 0.5
       # Farby su zrkadlom tokenov --nx-edge-* v ui/css/panel.css (svorka v okne
       # Vyroba musi mat PRESNE farbu plosky v modeli).
-      COLORS = { MISSING => [226, 75, 74], EXTRA => [127, 119, 221],
+      # EXTRA bola povodne fialova — v modeli splyvala s modrym zvyraznenim
+      # vyberu aj s osami (Michal 11.8.); jasna oranzova je v drevodekorovom
+      # modeli nepravdepodobna, takze je jednoznacna.
+      COLORS = { MISSING => [226, 75, 74], EXTRA => [255, 140, 0],
                  TAPED => [29, 158, 117] }.freeze
       # Michalov test na hotovej zakazke (11.8.2026) VYVRATIL povodny predpoklad,
       # ze 400+ zelenych plosok bude mazanica: pri dieloch vedla seba je tenka

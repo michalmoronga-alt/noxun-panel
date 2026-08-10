@@ -57,19 +57,19 @@ function state(options, counts, extra){
     ok(h.indexOf('ecsw ecsw-' + s) >= 0, 'stav ' + s + ' ma farebny stvorcek');
   });
   ok(h.indexOf('<b class="eccnt">3</b>') >= 0, 'zivy pocet cervenej zo servera');
-  ok(h.indexOf('<b class="eccnt">9</b>') >= 0, 'zivy pocet fialovej zo servera');
+  ok(h.indexOf('<b class="eccnt">9</b>') >= 0, 'zivy pocet oranzovej zo servera');
   ok(h.indexOf('<b class="eccnt">40</b>') >= 0, 'zivy pocet zelenej zo servera');
   ok(h.indexOf('ecopt ecsub') >= 0, '„len vybrané" je ODSADENY podriadeny prepinac');
   ok(h.indexOf('<span>len vybrané</span>') >= 0, 'podriadeny prepinac ma svoj nazov');
   // poradie: podriadeny prepinac patri VYHRADNE zelenej -> hned za nou
   ok(h.indexOf('ecsw-taped') < h.indexOf('ecsub'), '„len vybrané" nasleduje az za zelenou');
-  ok(h.indexOf('ecsub') > h.indexOf('ecsw-extra'), '„len vybrané" nepatri fialovej');
+  ok(h.indexOf('ecsub') > h.indexOf('ecsw-extra'), '„len vybrané" nepatri oranzovej');
 })();
 
 // --- stav prepinacov je zo SERVERA -------------------------------------------
 (function(){
   const def = P.edgeCheckMenuHtml(state(DEFAULTS, { missing: 0, extra: 0, taped: 0 }), true);
-  // default: zaskrtnuta je cervena a „len vybrané"; fialova a zelena nie
+  // default: zaskrtnuta je cervena a „len vybrané"; oranzova a zelena nie
   eq((def.match(/ checked onchange/g) || []).length, 2, 'default ma zaskrtnute presne dva prepinace');
   ok(def.indexOf("edgeCheckOption('show_missing', this.checked)") >= 0, 'kluc prepinaca je v handleri');
 

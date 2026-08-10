@@ -55,7 +55,7 @@
        hrubky (--nx-abs-*), ani stavovy semafor (--nx-state-*). Hodnoty su
        ZAVAZNE zrkadlo EdgeCheck::COLORS (core/edge_check.rb) — svorka v okne
        musi mat presne farbu plosky v modeli. */
-    --nx-edge-missing:#e24b4a; --nx-edge-extra:#7f77dd; --nx-edge-taped:#1d9e75;
+    --nx-edge-missing:#e24b4a; --nx-edge-extra:#ff8c00; --nx-edge-taped:#1d9e75;
     /* prekrytia */
     --nx-scrim:rgba(38,50,56,0.45); --nx-modal-shadow:rgba(0,0,0,0.25);
     /* ===== SEMAFOR — REZERVOVANE (B6). NIKDE sa nepouzivaju; vyhradene pre stavovy
