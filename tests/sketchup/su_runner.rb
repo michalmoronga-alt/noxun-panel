@@ -2480,7 +2480,7 @@ module NoxunSuRunner
   # Headless sada overuje CISTE rozhodnutie (klasifikacia, filter, prepinace).
   # TU sa dokazuje to, co sa inak dokazat neda: ze prepnutie prepinaca ani zmena
   # VYBERU nespusti novy sken, ze zmena vyberu NEMENI MODEL a nerobi undo krok
-  # (lekcia D-103), ze KOMPAKT nesvieti fialovo a ze obal kresby drzi vsetky tri
+  # (lekcia D-103), ze KOMPAKT nesvieti oranzovo a ze obal kresby drzi vsetky tri
   # stavy aj ked su vypnute (Codex audit FIX 6).
 
   def d105_counts(model)
@@ -2533,7 +2533,7 @@ module NoxunSuRunner
       # (s filtrom a prazdnym vyberom je zelena spravne 0 a nedalo by sa nic porovnat).
       e::EdgeCheck.set_option('taped_selected_only', false)
       base = d105_counts(model)
-      ok("D-105: cista skrinka — 0 cervenych, ale fialove aj zelene hrany existuju (#{base.inspect})",
+      ok("D-105: cista skrinka — 0 cervenych, ale oranzove aj zelene hrany existuju (#{base.inspect})",
          base['missing'].to_i.zero? && base['extra'].to_i.positive? && base['taped'].to_i.positive?)
 
       # 1) POCTY nezavisia od prepinacov zobrazenia (cislo vedla prepinaca musi
@@ -2559,11 +2559,11 @@ module NoxunSuRunner
       e::EdgeCheck.set_option('show_extra', true)
       e::EdgeCheck.set_option('show_taped', true)
 
-      # 3) KOMPAKT (nelepitelny) nesmie svietit ANI FIALOVO
+      # 3) KOMPAKT (nelepitelny) nesmie svietit ANI oranzovo
       kompakt = e::BoardBuilder.build(model, { 'material_id' => 'D104KOMPAKT12',
                                                'length' => 600.0, 'width' => 300.0 })
       e::EdgeCheck.refresh!(model)
-      ok('D-105: KOMPAKT doska nepridala ziadnu hranu do ziadneho stavu (ani fialovu)',
+      ok('D-105: KOMPAKT doska nepridala ziadnu hranu do ziadneho stavu (ani oranzovu)',
          kompakt && d105_counts(model) == base)
       kompakt.erase! if kompakt && kompakt.valid?
       e::EdgeCheck.refresh!(model)
@@ -2576,7 +2576,7 @@ module NoxunSuRunner
       e::EdgeCheck.set_option('taped_selected_only', true)
       model.selection.clear
       empty = e::EdgeCheck.ui_state(model)
-      ok("D-105: prazdny vyber — zelena je 0, cervena a fialova ostavaju (#{empty['counts'].inspect})",
+      ok("D-105: prazdny vyber — zelena je 0, cervena a oranzova ostavaju (#{empty['counts'].inspect})",
          empty['counts']['taped'].to_i.zero? && empty['selection_empty'] == true &&
          empty['counts']['extra'] == with_board['extra'] &&
          empty['counts']['missing'] == with_board['missing'])

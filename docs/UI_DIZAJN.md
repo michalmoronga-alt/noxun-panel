@@ -110,7 +110,7 @@ natvrdo hex. Nedefinovaný token = zahodená vlastnosť (skontroluj preklepy).
 | Token | Hex | Použitie |
 |---|---|---|
 | `--nx-edge-missing` | `#e24b4a` | chýba podľa pravidla (červená) |
-| `--nx-edge-extra` | `#7f77dd` | neolepené mimo pravidla (fialová) |
+| `--nx-edge-extra` | `#ff8c00` | neolepené mimo pravidla (oranžová — fialová splývala s modrým výberom SketchUpu) |
 | `--nx-edge-taped` | `#1d9e75` | olepené (zelená) |
 
 > Vlastná rodina — **nie** sú to ABS hrúbky (`--nx-abs-*`) ani stavový semafor
