@@ -55,7 +55,7 @@ module Noxun
       EXTRA   = 'extra'
       TAPED   = 'taped'
       STATES  = [MISSING, EXTRA, TAPED].freeze
-      # Zelena sa kresli PRVA (tenka linka), cervena posledna — pri ostrom uhle
+      # Zelena sa kresli PRVA, cervena posledna — pri ostrom uhle
       # pohladu tak kriticky stav nikdy neprekryje informativny.
       DRAW_ORDER = [TAPED, EXTRA, MISSING].freeze
 
@@ -66,10 +66,13 @@ module Noxun
       # Vyroba musi mat PRESNE farbu plosky v modeli).
       COLORS = { MISSING => [226, 75, 74], EXTRA => [127, 119, 221],
                  TAPED => [29, 158, 117] }.freeze
-      # Zelenych hran je na hotovej zakazke 400+ — plna ploska by bola necitatelna
-      # mazanica, preto sa kresli LEN tenky obrys.
-      OUTLINE_ONLY = [TAPED].freeze
-      LINE_WIDTH = { MISSING => 2, EXTRA => 2, TAPED => 1 }.freeze
+      # Michalov test na hotovej zakazke (11.8.2026) VYVRATIL povodny predpoklad,
+      # ze 400+ zelenych plosok bude mazanica: pri dieloch vedla seba je tenka
+      # linka takmer necitatelna a modre zvyraznenie vybraneho korpusu ju navyse
+      # prekryva. Kontroluje sa po sektoroch (+ filter „len vybrane"), takze plna
+      # ploska je citatelnejsia. VSETKY tri stavy sa preto kreslia rovnako.
+      OUTLINE_ONLY = [].freeze
+      LINE_WIDTH = { MISSING => 2, EXTRA => 2, TAPED => 2 }.freeze
 
       OVERLAY_ID = 'noxun.engine.edge_check'
       OVERLAY_NAME = 'Noxun — kontrola hrán'

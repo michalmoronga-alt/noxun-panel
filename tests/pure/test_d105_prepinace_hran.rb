@@ -205,8 +205,9 @@ NxTest.test('D-105: farby stavov su tri RÔZNE a kryju sa s tokenmi --nx-edge-*'
   end
 end
 
-NxTest.test('D-105: zelena sa kresli LEN obrysom (plna ploska by bola mazanica)') do
-  NxTest.assert_equal(['taped'], D105::OUTLINE_ONLY)
+NxTest.test('D-105: vsetky tri stavy sa kreslia plnou ploskou (Michalov test 11.8.)') do
+  NxTest.assert_equal([], D105::OUTLINE_ONLY,
+                      'linka namiesto plosky je necitatelna pri dieloch vedla seba')
   NxTest.assert(D105::DRAW_ORDER.first == 'taped' && D105::DRAW_ORDER.last == 'missing',
                 'cervena sa kresli posledna — nikdy ju neprekryje informativny stav')
 end
