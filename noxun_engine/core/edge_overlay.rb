@@ -1,5 +1,6 @@
 # frozen_string_literal: true
-# Noxun Engine — D-104: SketchUp objekty kontroly hran (Overlay + ModelObserver).
+# Noxun Engine — D-104/D-105: SketchUp objekty kontroly hran (Overlay +
+# ModelObserver + SelectionObserver).
 # Logika a stav ziju v core/edge_check.rb; tu su LEN tenke SketchUp obaly.
 #
 # Cely subor je pod guardom `defined?(Sketchup::Overlay)` — Overlay API prislo v
@@ -14,7 +15,8 @@ module Noxun
       class EdgeOverlay < Sketchup::Overlay
         def initialize
           super(EdgeCheck::OVERLAY_ID, EdgeCheck::OVERLAY_NAME,
-                description: 'Cervene plosky na hranach, ktore maju byt olepene a nie su (D-104).')
+                description: 'Farebne zvyraznenie stavu olepu hran: cervena chyba podla ' \
+                             'pravidla, fialova neolepene mimo pravidla, zelena olepene (D-105).')
         end
 
         def draw(view)
@@ -31,6 +33,39 @@ module Noxun
         rescue StandardError => e
           Engine.log_error(e, 'EdgeOverlay#getExtents')
           Geom::BoundingBox.new
+        end
+      end
+
+      # D-105: zmena VYBERU meni, co sa kresli pri „len vybrané" (zelena) —
+      # NIE to, co je v modeli. KRITICKE (lekcia D-103, PR #151): z tejto cesty
+      # sa NESMIE spustit ziadna operacia, dedup ani zapis — inak by sa stala
+      # vrcholom undo stacku hned po pouzivatelovom kroku. EdgeCheck tu iba
+      # zahodi filter, poziada o cerstve cisla a prekresli pohlad.
+      class EdgeSelectionWatch < Sketchup::SelectionObserver
+        def onSelectionBulkChange(selection) # rubocop:disable Naming/MethodName — SketchUp API
+          EdgeCheck.on_selection_changed(model_of(selection))
+        end
+
+        def onSelectionCleared(selection) # rubocop:disable Naming/MethodName — SketchUp API
+          EdgeCheck.on_selection_changed(model_of(selection))
+        end
+
+        # Jedna pridana/odobrata entita fire-uje VLASTNY callback (nie bulk) —
+        # bez nich by sa Ctrl+klik po jednom neprejavil (vzor Panel::SelObserver).
+        def onSelectionAdded(selection, _element) # rubocop:disable Naming/MethodName — SketchUp API
+          EdgeCheck.on_selection_changed(model_of(selection))
+        end
+
+        def onSelectionRemoved(selection, _element) # rubocop:disable Naming/MethodName — SketchUp API
+          EdgeCheck.on_selection_changed(model_of(selection))
+        end
+
+        # Model z kolekcie vyberu; pri chybe nil = EdgeCheck si vezme svoj vlastny
+        # (a stale overi, ze ide o TEN ISTY dokument).
+        def model_of(selection)
+          selection.respond_to?(:model) ? selection.model : nil
+        rescue StandardError
+          nil
         end
       end
 
