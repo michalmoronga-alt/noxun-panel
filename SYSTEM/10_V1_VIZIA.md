@@ -53,10 +53,10 @@
 
 1. **H-dávky (opravy+malé, pred E) — HOTOVÉ 4.8. (PR #131–#135, v0.5.44):** H1 kovanie (D-75 live push setov · D-79 nohy default+rad · D-81 bočnice+owner override) → H2 šablóny s kovaním (D-76) → H3 geometria interiéru (D-80, SU testy) → H4 UI drobnosti (D-78 · D-82 · D-83). **D-77** (odseknuté okno detailu) z H4 VYPADOL — Michal 4.8.: „vyriešime plošným reworkom, týchto chýb v oknách je viac" → rieši ho bod 6 (UI 2.0, spolu s D-50/D-51). H-dávky teda E neblokujú.
 2. **Dávka E — HOTOVÉ 6.8. (PR #137–#140, v0.5.48):** rozpočet + zákaznícka cenová ponuka + „Prepočítať ceny". **Zmena rozsahu oproti pôvodnému zadaniu:** z cenovej čerstvosti (V1-03) dávka dodala **AUTO overenie a vek ceny**, ale **manuálne 1-klik overenie pre položky bez väzby na Demos sa vedome ODLOŽILO** (nie je to prehliadnutie — zoznam odkladov dávky E je v [08_DOGFOODING.md](08_DOGFOODING.md), sekcia „Nápady na zváženie").
-3. **Seed katalógu** (odložený po E — plán platí).
+3. ~~**Seed katalógu** (odložený po E — plán platí).~~ — **ZRUŠENÉ (Michal 10.8.):** katalóg si narastie sám prácou na zákazkách; skutočný problém je **nájsť materiál aj v malom zozname** = UX výberov (D-85), teda súčasť UI 2.0.
 4. **Spotrebiče S1** (katalóg+model+kontrola+rozpočet sekcia).
-5. **M-R render** (textúry — Lucia) + pixla nástroj (V1-06).
-6. **UI 2.0** (mockup → dávky; vrátane V1-01 karta dielca Konštrukcia — alebo V1-01 skôr, rozhodne prax).
+5. **M-R render** (textúry — Lucia) + pixla nástroj (V1-06). — **posunuté ZA UI 2.0** (Michal 10.8.).
+6. **UI 2.0** (mockup → dávky; vrátane V1-01 karta dielca Konštrukcia — alebo V1-01 skôr, rozhodne prax). — **PREDRADENÉ pred M-R (Michal 10.8.):** po dokončení zákazky KLINIKA nasleduje kontrola + testy + posledné úpravy, potom UI 2.0 (najprv debata, potom klikateľný mockup vzorom Materiály 2.0). Podklad: merač používania D-25 (materiály/ABS 400+ použití, taby 287×, satelitné okná 234× — [08_DOGFOODING.md](08_DOGFOODING.md)). **Žiadne quick-win náplasti pred reworkom.**
 7. **V1.0 zostavy** (roadmapa: sokel/PD/obklady/snap) + vkladanie fáza 1 SKÔR (malá, zaradiť medzi H-dávky?).
 8. **V1-05 výplne + C-05 výklopy** = kovanie fáza 3 (po E, vzorce od Michala).
 
