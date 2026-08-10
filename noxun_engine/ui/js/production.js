@@ -77,6 +77,7 @@
     });
     // klik na riadok vybera v modeli v kusovniku, kovani AJ kontrole
     el('prodHint').style.display = (t === 'rows' || t === 'hardware' || t === 'control') ? '' : 'none';
+    if (t !== 'control') ecMenuOpen = false; // odchod z tabu okno zavrie
     renderEdgeBar();
     renderBody();
   }
