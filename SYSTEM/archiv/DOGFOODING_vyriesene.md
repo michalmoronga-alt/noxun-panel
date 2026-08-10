@@ -10,6 +10,43 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
+### D-105 — prepínače kontroly hrán: tri stavy olepu a filter podľa výberu (10.8.2026, PR #153, v0.5.59)
+
+**Odkiaľ prišlo:** D-104 ukázala len jednu vec — „chýba podľa pravidla". Pri záverečnej kontrole KLINIKY (254 dielcov) ale treba vidieť aj to, čo pravidlo nežiada a olepené nie je (rozhodne človek), a naopak overiť, čo olepené **je**. Michal odsúhlasil mockup 10.8.
+
+**Čo pribudlo (z pohľadu používateľa):** tlačidlo sa volá **„Zvýrazniť hrany"** a je rozdelené na dve polovice (jeden vizuálny celok). **Ľavá** zapína a vypína zvýraznenie (zapnutý stav je zjavný — modré pozadie a ikona „oko prečiarknuté"). **Pravá** (užšia, so šípkou nadol) otvorí malé okno priamo pod tlačidlom, kde sú **tri riadky** s checkboxom, farebným štvorčekom, názvom a **živým počtom**:
+
+| Stav | Farba | Default | Znamená |
+|---|---|---|---|
+| Chýba podľa pravidla | červená | **zapnuté** | pravidlo hranu žiada a páska nie je (aj vedome zrušený olep) |
+| Neolepené mimo pravidla | fialová | vypnuté | pravidlo hranu nežiada a páska nie je (chrbát, zadné hrany políc…) |
+| Olepené | zelená | vypnuté | páska tam je (bez ohľadu na pravidlo) |
+
+Pod zelenou je odsadený podriadený prepínač **„len vybrané"** (default zapnutý), ktorý patrí **výhradne** zelenej: označíš v modeli skrinky — pokojne **celý sektor naraz** — a zelená sa ukáže len na nich. Podporuje korpus (→ všetky jeho dielce), samostatnú dosku aj jeden dielec vnútri skrinky. Keď nie je označené nič, okno to **povie** („označ skrinky v modeli") namiesto toho, aby ticho ukázalo všetko. Zelená sa navyše kreslí **len tenkou obrysovou linkou** — pri 400+ olepených hranách by plná plôška bola nečitateľná mazanica; červená a fialová ostávajú plné plôšky.
+
+Nastavenie prepínačov si plugin **pamätá medzi otvoreniami** — žije v počítači (`%APPDATA%\NOXUN\Engine\edge_check.json`), **nikdy v zákazke**: kontrola je spôsob práce, nie vlastnosť projektu. Zatvorenie okna Výroba zvýraznenie naďalej vypína.
+
+**Čo sa NEZMENILO:** červená má presne význam z D-104 (vrátane vedome zrušeného olepu) a **preskočené dielce ostávajú preskočené vo všetkých troch stavoch** — materiál mimo katalógu, **UNI** a **nelepiteľné** (KOMPAKT, PD s postformingom). KOMPAKT teda nikdy nesvieti fialovo ako „neolepený": on sa lepiť nedá. Autoritou je stále tá istá sada ABS pravidiel a tie isté zdieľané definície zo semaforu (`Validation.abs_impossible?` / `uni_sheet?`) — žiadny paralelný zoznam.
+
+**Ako je to spravené:** sken modelu (ktorý stav má ktorá hrana + plôšky všetkých troch stavov) beží **len** pri zapnutí, po zmene modelu a po zmene katalógu. Prepnutie prepínača ani **zmena výberu sken nespúšťa** — prepočíta sa iba lacný filter a hotové GL polia, ktoré `draw` už len pošle. Počty sú **zo servera** a počítajú sa aj pre vypnutý stav (číslo pri prepínači musí byť pravdivé skôr, než ho zapneš); zelený počet rešpektuje „len vybrané".
+
+**Kritické (lekcia D-103):** reakcia na zmenu výberu **nesmie meniť model**. Nový `SelectionObserver` kontroly hrán preto nespúšťa žiadnu operáciu, nežiada dedup a nič nezapisuje — len zahodí filter, pošle oknu čerstvé počty a prekreslí pohľad. (Vlastný dedup panela pri synchronizácii výberu je nedotknutá, D-103 overená cesta observera.)
+
+**Codex audit pred implementáciou** našiel 3 blokery a 4 nálezy, všetky zapracované:
+1. **BLOCKER — „žiadna cesta z výberu nemení model" neplatí plošne** (panel si pri sync-u výberu žiada dedup). Kontrakt sa **zúžil a napísal presne**: nemení model *reakcia kontroly hrán*; panelová cesta ostáva D-103 stav. Dôkaz je in-SketchUp test (séria zmien výberu → odtlačok modelu nezmenený, 1× undo vráti poslednú reálnu operáciu).
+2. **BLOCKER — dielec vybraný vnútri skopírovanej skrinky.** Kópie zdieľajú definíciu, takže vnorený dielec má v oboch rovnaké `entityID` a zelená by sa rozsvietila vo všetkých kópiách. Rieši **`model.active_path`** — o tom, ktorý výskyt je otvorený, rozhoduje kontext editácie.
+3. **BLOCKER — počty by zamrzli**, keby sa pohľad náhodou neprekreslil. Po zmene výberu sa teraz **vždy** (cez zlučujúci timer, mimo callbacku) pošle čerstvý stav a až potom sa invaliduje pohľad.
+4. **FIX — guardy:** `model_guid` sa porovnáva **striktne** (prázdny údaj z klienta už guard neobíde), kľúč prepínača je whitelist a hodnota musí byť **výslovne** `true`/`false` (reťazec `"false"` je v Ruby pravdivý).
+5. **FIX — rozsah:** sken vidí top-level skrinky a dosky presne ako kusovník (`Bom.collect`); skrinka vložená do groupy nie je ani v kusovníku — vlastnosť celého produktu, teraz výslovne zapísaná.
+6. **FIX — obal kresby** (`getExtents`) berie všetky tri stavy z celej cache, nie len práve viditeľné — zapnutie ďalšieho stavu tak nikdy neskončí orezanou kresbou.
+7. **NOTE — výkon:** body sa predpočítavajú pri zmene cache/filtra, `draw` už nič neskladá.
+
+**Nájdené pri vizuálnej kontrole (mimo auditu):** rozbaľovacie okno by orezal scrollovací `#prodBody` (`overflow: auto`) — a najhoršie práve v cieľovom stave „kontrola bez nálezov", kde je box nízky. Lišta sa preto presunula **mimo** scrollovacej oblasti; mimo tabu Kontrola je prázdna a skrytá, takže vertikálny priestor okna sa nezmenil. Ako bonus sa pri častých pushoch (zmena výberu) prekresľuje **len lišta**, nie tabuľka s nálezmi.
+
+**Testy:** **1163 headless** (+21 nových: tri stavy vrátane „každá hrana práve v jednom", preskočené dielce vo všetkých stavoch, filter podľa výberu vrátane kópií a prázdneho výberu, whitelist/boolean/poškodený súbor, zhoda farieb s tokenmi), **29 JS sád / 966 kontrol** (nová `test_d105_prepinace_hran.js`, 44 kontrol) a **in-SketchUp runner 302 PASS / 0 FAIL** — nová sekcia `run_d105`: tri stavy naraz, počty nezávislé od prepínačov, dôkaz že prepínač ani výber **nespúšťajú sken**, zelená len na označenom (aj viacnásobný výber), prázdny výber, KOMPAKT nesvieti fialovo, **séria zmien výberu nezmenila model ani neurobila undo krok**, prestavba pri zapnutom, prepnutie dokumentu a perzistencia nastavenia.
+
+**Čo ostáva otvorené:** **D-95** (plný režim krížovej kontroly „diel po diele") — D-104 aj D-105 sú jeho **základ**, nie náhrada; ostávajú **odškrtávanie so stavom v zákazke**, prechod dielec po dielci, rozšírenie na rozmery a kovanie, **šípky smeru dekoru** a **X-ray cez telesá**.
+
 ### D-104 — kontrola hrán „light": zvýrazni v modeli hrany bez olepu (10.8.2026, PR #152, v0.5.58)
 
 **Odkiaľ prišlo:** zákazka KLINIKA je hotová (254 dielcov) a pred odoslaním do výroby prichádza **záverečná kontrola olepov**. Doteraz sa dala robiť len preklikávaním dielec po dielci v paneli — pri 254 dielcoch to je nekontrolovateľné. D-88 (farba pásky v modeli) ukázala, že olep sa dá vidieť priamo v 3D; D-104 tú istú cestu otáča: namiesto „čo je olepené" ukáže **čo olepené NIE JE, hoci má byť**.

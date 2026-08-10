@@ -106,6 +106,18 @@ natvrdo hex. Nedefinovaný token = zahodená vlastnosť (skontroluj preklepy).
 | `--nx-abs-none` | `#b0bec5` | bez ABS |
 | `--nx-abs-tape-bg` | `#faf6ee` | béžová výplň ikony „olep 4 hrany" |
 
+### Kontrola hrán — tri stavy olepu (D-105, vlastné tokeny)
+| Token | Hex | Použitie |
+|---|---|---|
+| `--nx-edge-missing` | `#e24b4a` | chýba podľa pravidla (červená) |
+| `--nx-edge-extra` | `#7f77dd` | neolepené mimo pravidla (fialová) |
+| `--nx-edge-taped` | `#1d9e75` | olepené (zelená) |
+
+> Vlastná rodina — **nie** sú to ABS hrúbky (`--nx-abs-*`) ani stavový semafor
+> (`--nx-state-*`). Hodnoty sú **záväzným zrkadlom** `EdgeCheck::COLORS`
+> (`core/edge_check.rb`): štvorček v okne musí mať presne farbu plôšky v modeli.
+> Zhodu stráži test (`tests/pure/test_d105_prepinace_hran.rb`).
+
 ### Prekrytia
 | Token | Hex | Použitie |
 |---|---|---|
@@ -148,7 +160,8 @@ natvrdo hex. Nedefinovaný token = zahodená vlastnosť (skontroluj preklepy).
 
 Aktuálny set: `maximize` (fit), `alert`, `lock` / `lock-open`, `eye` / `eye-off`,
 `copy`, `factory` (Výroba), `settings`, `star`, `rotate-ccw` (reset), `x`, `plus`,
-`check`, `chevron-right` (disclosure), `link`, `search`, `arrow-left`, `trash`,
+`check`, `chevron-right` (disclosure), `chevron-down` (pravá polovica split
+tlačidla — D-105), `link`, `search`, `arrow-left`, `trash`,
 `pencil`, `box` (tab Korpus), `layout-grid` (tab Zóny), `columns-2` (tab Čelá),
 `layers` (Materiály), `globe` (universal ABS), `info` (banner),
 `refresh-cw` (Aktualizovať z Demosu — detail dekoru),
@@ -214,6 +227,26 @@ riadok**. Text skladá **výhradne server** (`Panel.edge_rule_results` /
 materiálu sa serverový text vedome NEPOUŽIJE (patrí starému materiálu) a ukáže sa
 neutrálne „(podľa pravidla)". Farby pásov ostávajú na ABS tokenoch `--nx-abs-*`
 (semaforové `--nx-state-*` sa sem nemiešajú).
+
+### D-105: split tlačidlo „Zvýrazniť hrany" (okno Výroba → KONTROLA)
+Jeden vizuálny celok, dve polovice: **ľavá** = zapnúť/vypnúť (zapnutý stav je
+zjavný — modré pozadie `--nx-select` + ikona `eye-off`), **pravá** (užšia,
+`chevron-down`) = rozbaľovacie okno s nastavením. Vzory:
+- **Okno je overlay** (`position: absolute` pod tlačidlom), **nie nový riadok**
+  layoutu — vertikálny priestor sa nemení ani keď je otvorené.
+- **Lišta žije MIMO scrollovacieho `#prodBody`** (`overflow: auto` by overlay
+  orezal — pri „kontrola bez nálezov" je box nízky a z okna by ostal prúžok).
+  Mimo tabu Kontrola je jej `div` prázdny a skrytý, takže nič nezaberá.
+- Riadok stavu = checkbox + **farebný štvorček** (`--nx-edge-*`, presne farba
+  plôšky v modeli) + názov + **živý počet zo servera**. Počet je pravdivý aj pre
+  vypnutý stav — inak by sa používateľ nemal podľa čoho rozhodnúť.
+- **Podriadený prepínač** (`.ecsub`, odsadený) patrí výhradne jednému nadradenému
+  riadku; jeho väzbu hovorí odsadenie, nie text.
+- Klient si drží **len** to, či je okno otvorené. Stav prepínačov, počty aj
+  zapnutosť sú zo servera; klik posiela iba `kľúč + boolean` (whitelist a striktný
+  boolean rozhoduje Ruby — HTML `disabled` nie je ochrana).
+- Prázdny výber pri zapnutom „len vybrané" sa **povie nahlas** („označ skrinky
+  v modeli"), nikdy sa ticho nezobrazí všetko.
 
 ### Pravidlo: žiadne emoji v UI chrome
 Emoji/unicode glyfy (🔒 ✕ ↺ ⚙ 📋 ★ ⧉ ⛶ ⚠ 🔗 …) sa v ovládacích prvkoch panela
