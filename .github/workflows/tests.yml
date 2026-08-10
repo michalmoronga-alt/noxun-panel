@@ -65,3 +65,11 @@ jobs:
         run: node tests/js/test_d97_98_ui.js
       - name: JS testy — prepinac zvyraznenia hran bez olepu (D-104)
         run: node tests/js/test_d104_kontrola_hran.js
+      - name: JS testy — prepinace kontroly hran, tri stavy (D-105)
+        run: node tests/js/test_d105_prepinace_hran.js
+      # Doplnene v D-105: sady D-100/D-102 sa do CI omylom nikdy nedostali,
+      # hoci lokalne aj v dokumentacii figuruju medzi „vsetkymi JS sadami".
+      - name: JS testy — inline premenovanie skrinky (D-100)
+        run: node tests/js/test_d100_nazvy.js
+      - name: JS testy — vyriesena ABS paska v rozbalovacke hrany (D-102)
+        run: node tests/js/test_d102_pravidlo.js
