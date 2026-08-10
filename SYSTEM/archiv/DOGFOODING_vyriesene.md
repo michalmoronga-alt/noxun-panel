@@ -10,7 +10,7 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
-### D-105 — prepínače kontroly hrán: tri stavy olepu a filter podľa výberu (10.8.2026, PR #153, v0.5.59)
+### D-105 — prepínače kontroly hrán: tri stavy olepu a filter podľa výberu (10.–11.8.2026, PR #153 + #154, v0.5.59–v0.5.60)
 
 **Odkiaľ prišlo:** D-104 ukázala len jednu vec — „chýba podľa pravidla". Pri záverečnej kontrole KLINIKY (254 dielcov) ale treba vidieť aj to, čo pravidlo nežiada a olepené nie je (rozhodne človek), a naopak overiť, čo olepené **je**. Michal odsúhlasil mockup 10.8.
 
