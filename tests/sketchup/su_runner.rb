@@ -2288,6 +2288,194 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- D-104: kontrola hran (overlay „zvyrazni hrany bez olepu") -------------
+  # Overlay lifecycle sa headless overit NEDA — tato sekcia dokazuje presne to,
+  # co je na nom rizikove: zapnutie/vypnutie/znovuzapnutie, pravdivy pocet,
+  # invalidacia po prestavbe, ziadny undo krok a ziadna stopa v modeli.
+
+  # Katalog D-88 + KOMPAKT doska (nelepitelny typ) — D-88 sadu nechavame nedotknutu.
+  def d104_catalog_json
+    cat = d88_catalog_json
+    cat['sheets'] = cat['sheets'] + [
+      { 'material_id' => 'D104KOMPAKT12', 'manufacturer' => 'Egger', 'decor' => 'KOMPAKT',
+        'type' => 'KOMPAKT', 'thickness' => 12.0, 'grain' => 'none',
+        'sheet_size' => [4100.0, 1300.0], 'color' => [90, 90, 90],
+        'production_class' => 'sheet', 'group_id' => 'GRP-D104KOMPAKT', 'structure' => 'SM' }
+    ]
+    cat
+  end
+
+  def d104_overlay_present?(model)
+    return false unless model.respond_to?(:overlays)
+    model.overlays.to_a.any? { |o| o.respond_to?(:overlay_id) && o.overlay_id.to_s == e::EdgeCheck::OVERLAY_ID }
+  end
+
+  def d104_state(model)
+    e::EdgeCheck.ui_state(model)
+  end
+
+  def run_d104(model)
+    unless e::EdgeCheck.available?(model)
+      info('D-104: SketchUp bez Overlay API (SU 2022 a starsi) — sekcia preskocena')
+      return
+    end
+    tmp = File.join(Dir.tmpdir, "noxun_d104_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(d104_catalog_json))
+    e::Materials.test_dir_override = tmp
+    e::Materials.reload!
+    begin
+      # 1) prazdny model = nula, nic zapnute
+      cleanup(model)
+      st = d104_state(model)
+      ok('D-104: pred zapnutim je zvyraznenie vypnute a bez poctu',
+         st['available'] == true && st['active'] == false && st['count'].nil?)
+
+      inst = e::CabinetBuilder.build(model, d88_params)
+      return ok('D-104: vlozenie korpusu', false) unless inst
+
+      # 2) zapnutie nad ciston skrinkou — vsetko olepene podla pravidla
+      st = e::EdgeCheck.toggle(model)
+      ok('D-104: po zapnuti je overlay zaregistrovany v modeli',
+         st['active'] == true && d104_overlay_present?(model))
+      ok("D-104: cista skrinka nema hrany bez olepu (count #{st['count']}, unresolved #{st['unresolved']})",
+         st['count'].to_i.zero? && st['unresolved'].to_i.zero?)
+
+      # 3) vedome zrusena paska na prednej hrane police -> presne 1 hrana
+      shelf = d88_part(inst, 'shelf')
+      pkey = e::Store.get(shelf, 'part_key').to_s
+      params = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+      params['part_overrides'] = { pkey => { 'edges' => { 'L1' => nil } } }
+      e::CabinetBuilder.rebuild(model, inst, params)
+      e::EdgeCheck.refresh!(model)
+      st = d104_state(model)
+      ok("D-104: po prestavbe (polica bez pasky) hlasi 1 hranu bez olepu (#{st['count']}, kreslene #{st['drawn']})",
+         st['count'].to_i == 1 && st['drawn'].to_i == 1)
+
+      # 4) ziadny undo krok: posledna transakcia je PRESTAVBA, nie zapnutie
+      Sketchup.undo
+      shelf_back = d88_part(inst, 'shelf')
+      back_cfg = shelf_back ? (e::Store.config(shelf_back) || {}) : {}
+      ok('D-104: 1x undo vrati prestavbu (zvyraznenie nie je undo krok)',
+         (back_cfg['edges'] || {})['L1'].to_s == 'D88E_HNEDA_23X10')
+      e::EdgeCheck.refresh!(model)
+      ok('D-104: po undo je pocet zase nulovy', d104_state(model)['count'].to_i.zero?)
+
+      # 5) doska s viac kusmi: 1 ploska, ale pocet hovori o KUSOCH
+      board = e::BoardBuilder.build(model, { 'material_id' => 'D88NOABS18', 'length' => 800.0,
+                                             'width' => 400.0, 'quantity' => 3 })
+      e::EdgeCheck.refresh!(model)
+      st = d104_state(model)
+      ok("D-104: doska 3 ks bez pouzitelnej pasky = 3 hrany, 1 ploska, priznak multi (#{st.inspect})",
+         board && st['count'].to_i == 3 && st['drawn'].to_i == 1 && st['multi'].to_i == 1)
+
+      # 6) nelepitelny material sa nezvyrazni ani ked pravidlo pasku ziada
+      board.erase! if board && board.valid?
+      kompakt = e::BoardBuilder.build(model, { 'material_id' => 'D104KOMPAKT12', 'length' => 600.0,
+                                               'width' => 300.0 })
+      e::EdgeCheck.refresh!(model)
+      ok('D-104: KOMPAKT doska nema ziadnu zvyraznenu hranu',
+         kompakt && d104_state(model)['count'].to_i.zero?)
+      kompakt.erase! if kompakt && kompakt.valid?
+
+      # 7) kopia skrinky PRED dedup tickom: obe kopie sa kreslia (identita vyskytu,
+      #    nie persistent_id vnoreneho dielca)
+      params2 = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+      params2['part_overrides'] = { pkey => { 'edges' => { 'L1' => nil } } }
+      e::CabinetBuilder.rebuild(model, inst, params2)
+      copy = nil
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST kopia', true)
+        tr = inst.transformation * Geom::Transformation.translation(e::Units.vector(1000, 0, 0))
+        copy = model.entities.add_instance(inst.definition, tr)
+        # Ctrl+C/V nesie atributy INSTANCIE — bez nich by kopia nebola NOXUN korpus.
+        %w[std kind id cabinet_id template_id role part_key_schema manufactured
+           production_class config].each do |k|
+          v = e::Store.get(inst, k)
+          copy.set_attribute('NOXUN', k, v) unless v.nil?
+        end
+        model.commit_operation
+      end
+      e::EdgeCheck.refresh!(model)
+      st = d104_state(model)
+      ok("D-104: kopia skrinky pred dedup tickom sa zvyrazni tiez (#{st['drawn']} plosky)",
+         copy && st['drawn'].to_i == 2 && st['count'].to_i == 2)
+      copy.erase! if copy && copy.valid?
+
+      # 8) vypnutie: overlay prec, ziadne cisla
+      st = e::EdgeCheck.toggle(model)
+      ok('D-104: po vypnuti nie je overlay v modeli a stav je cisty',
+         st['active'] == false && st['count'].nil? && !d104_overlay_present?(model))
+
+      # 9) ON -> OFF -> ON v tom istom modeli (odstraneny Overlay je navzdy neplatny)
+      st = e::EdgeCheck.toggle(model)
+      ok('D-104: opatovne zapnutie v tom istom modeli funguje (nova instancia overlayu)',
+         st['active'] == true && d104_overlay_present?(model) && st['count'].to_i == 1)
+
+      # 9b) Codex #152 P2: zmena KATALOGU nie je modelova transakcia — invalidate!
+      #     musi stacit na cerstvy pocet uz pri najblizsom stave pre okno.
+      e::EdgeCheck.invalidate!
+      dirty_before = e::EdgeCheck.instance_variable_get(:@dirty)
+      st = d104_state(model)
+      ok('D-104: invalidate! (zmena katalogu) sa prepocita bez modelovej transakcie',
+         dirty_before == true && e::EdgeCheck.instance_variable_get(:@dirty) == false &&
+         st['count'].to_i == 1)
+
+      # 9c) Codex #152 P2: nativne vypnutie v paneli Overlays sa musi hlasit ako VYPNUTE
+      ov = e::EdgeCheck.instance_variable_get(:@overlay)
+      if ov.respond_to?(:enabled=)
+        ov.enabled = false
+        ok('D-104: nativne vypnuty overlay sa NEhlasi ako zapnuty',
+           d104_state(model)['active'] == false)
+        ov.enabled = true
+        ok('D-104: po nativnom zapnuti sa hlasi zase zapnuty (a pocet sedi)',
+           d104_state(model)['active'] == true && d104_state(model)['count'].to_i == 1)
+      else
+        info('D-104: Sketchup::Overlay#enabled= nie je k dispozicii — nativny toggle netestovany')
+      end
+
+      # 10) kreslenie nespadne a obal kresby nie je prazdny
+      begin
+        e::EdgeCheck.draw(model.active_view)
+        drawn_ok = true
+      rescue StandardError => ex
+        drawn_ok = false
+        log_line("INFO: D-104 draw vynimka: #{ex.class}: #{ex.message}")
+      end
+      bb = e::EdgeCheck.extents(model)
+      ok('D-104: kreslenie prebehne a obal kresby (getExtents) je platny',
+         drawn_ok && bb.is_a?(Geom::BoundingBox) && bb.valid?)
+
+      e::EdgeCheck.disable!
+      cleanup(model)
+      ok('D-104: cleanup — model prazdny, overlay odregistrovany',
+         cabinets(model).empty? && boards(model).empty? && !d104_overlay_present?(model))
+    ensure
+      begin
+        e::EdgeCheck.disable!
+      rescue StandardError
+        nil
+      end
+      e::Materials.test_dir_override = nil
+      e::Materials.reload!
+      begin
+        FileUtils.rm_rf(tmp)
+      rescue StandardError
+        nil
+      end
+    end
+  rescue StandardError => ex
+    log_line("FAIL: D-104 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    begin
+      e::EdgeCheck.disable!
+    rescue StandardError
+      nil
+    end
+    e::Materials.test_dir_override = nil
+    e::Materials.reload!
+    cleanup(model)
+  end
+
   # --- ASYNC: undo/redo scenare (retaz timerov, observer debounce 0.2 s) -----
 
   def run_async(model, done)
@@ -2720,6 +2908,7 @@ module NoxunSuRunner
     run_d40(model)           # D-40: selection eventy po builde (DC observer pasca)
     run_d90(model)           # D-90: vizual uchytkoveho profilu UKW-7 (kotva, undo, rebuild)
     run_d88(model)           # D-88: farba ABS na bocnych plochach dielcov a dosky
+    run_d104(model)          # D-104: overlay „hrany bez olepu" (lifecycle, pocty, ziadny undo krok)
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

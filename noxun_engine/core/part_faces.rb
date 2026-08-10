@@ -89,6 +89,79 @@ module Noxun
         nil
       end
 
+      # ================= D-104: OSI ZO SNAPSHOTU (vedoma legacy vynimka) =============
+      # Kontrola olepov (D-104) bezi nad UZ POSTAVENOU zakazkou. Deskriptor s `axes:`
+      # zije LEN v plane — na entite dielca ulozeny NIE JE (standard 8.3 sneha vyrobne
+      # udaje, nie geometricke osi) a prestavat 254 dielcov len kvoli doplneniu osi je
+      # neprijatelne. Preto sa osi pri CITANI odvodia z ROLY a OVERIA proti skutocnemu
+      # kvadru.
+      #
+      # NIE JE to hadanie z rozmerov zakazane v hlavicke tohto suboru:
+      #   1) kandidati su obmedzeni ROLOU (stvorcove celo ma jedineho kandidata),
+      #   2) akceptuje sa VYHRADNE jednoznacna zhoda — nula alebo dve zhody vratia nil
+      #      a dielec sa jednoducho nezvyrazni (rovnaka zasada „radsej ziadna farba").
+      # Jediny realny dvojkandidat su vystuhy (flat = lezaci panel, upright = stena);
+      # rozlisi ich kvader, a ked ma vystuha hlbku ROVNU hrubke, zhody su dve -> nil.
+      ROLE_AXES = {
+        'side_left' => [AXES_UPRIGHT], 'side_right' => [AXES_UPRIGHT], 'divider_v' => [AXES_UPRIGHT],
+        'bottom' => [AXES_LYING], 'top' => [AXES_LYING], 'shelf' => [AXES_LYING],
+        'divider_h' => [AXES_LYING], 'free_panel' => [AXES_LYING],
+        'front_door' => [AXES_FRONT], 'drawer_front' => [AXES_FRONT],
+        'back' => [AXES_WALL], 'plinth' => [AXES_WALL],
+        'rail_front' => [AXES_LYING, AXES_WALL], 'rail_back' => [AXES_LYING, AXES_WALL]
+      }.freeze
+
+      # Osi dielca z jeho ROLY + rozmerov kvadra (mm) a vyrobnych udajov snapshotu.
+      # box = [sx, sy, sz]; prod = {length:, width:, thickness:} (aj string kluce).
+      def axes_for_snapshot(role, box, prod)
+        cands = ROLE_AXES[role.to_s]
+        return nil unless cands.is_a?(Array) && !cands.empty?
+        return nil unless box.is_a?(Array) && box.length == 3 && prod.is_a?(Hash)
+        hits = cands.select { |ax| axes_match?(ax, box, prod) }
+        hits.length == 1 ? hits.first : nil
+      end
+
+      # Sedia osi s kvadrom? (rovnaka tolerancia ako verified_axes)
+      def axes_match?(ax, box, prod)
+        AXIS_KEYS.all? do |k|
+          want = prod[k].nil? ? prod[k.to_s] : prod[k]
+          next false unless want.is_a?(Numeric)
+          (box[ax[k]].to_f - want.to_f).abs <= TOL
+        end
+      end
+
+      # 4 rohy PLOSKY hrany v lokalnych mm (po obvode). lo/hi = protilahle rohy
+      # kvadra dielca (obal definicie), `out` = posun VON z telesa proti
+      # z-fightingu. Posuva sa v LOKALNYCH osiach — zrkadlena ci otocena
+      # instancia si smer „von" zachova aj po transformacii (winding quadu sa na
+      # to pouzit NEDA).
+      def face_rect_mm(code, lo, hi, ax, out = 0.0)
+        axis, side = rect_axis_side(code, ax)
+        return nil if axis.nil?
+        return nil unless lo.is_a?(Array) && hi.is_a?(Array) && lo.length == 3 && hi.length == 3
+        a, b = [0, 1, 2] - [axis]
+        v = side == :min ? lo[axis].to_f - out : hi[axis].to_f + out
+        [[lo[a], lo[b]], [hi[a], lo[b]], [hi[a], hi[b]], [lo[a], hi[b]]].map do |ca, cb|
+          p = [0.0, 0.0, 0.0]
+          p[axis] = v
+          p[a] = ca.to_f
+          p[b] = cb.to_f
+          p
+        end
+      end
+
+      # Kod hrany -> [index osi, :min|:max]. Zrkadlo edge_code_for_center (opacny smer).
+      def rect_axis_side(code, ax)
+        return [nil, nil] unless ax.is_a?(Hash)
+        case code.to_s
+        when 'L1' then [ax[:width], :min]
+        when 'L2' then [ax[:width], :max]
+        when 'W1' then [ax[:length], :min]
+        when 'W2' then [ax[:length], :max]
+        else [nil, nil]
+        end
+      end
+
       # Na ktorej stene kvadra plocha lezi: [index osi, :min | :max] alebo nil.
       # Rozhoduje POLOHA stredu plochy, nie normala — plocha smie byt otocena.
       def axis_side(center_mm, box)

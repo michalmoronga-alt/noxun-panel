@@ -6,6 +6,9 @@
 
   var BOM = null;          // posledny push z Ruby
   var prodTab = 'rows';
+  // D-104: stav zvyraznenia hran bez olepu. SERVER je autorita (aj pocet) — JS
+  // si nic neprepocitava a stav si NEPAMATA sam (kazdy push ho prepise).
+  var EDGE = null;
 
   function el(id){ return document.getElementById(id); }
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -14,8 +17,15 @@
   window.NX = {
     setBom: function(data){
       BOM = data || null;
+      EDGE = (BOM && BOM.edge_check) ? BOM.edge_check : null;
       el('prodModel').textContent = BOM ? ('model: ' + BOM.model_title + ' · v' + BOM.version) : '…';
       vepoSync(); renderSummary(); renderBadge(); renderBody();
+    },
+    // D-104: maly echo push (prepnutie / prepocet po prestavbe) — prekresli sa
+    // LEN tab Kontrola, zvysok okna sa nedotkne.
+    setEdgeCheck: function(state){
+      EDGE = state || null;
+      if (prodTab === 'control') renderBody();
     },
     setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; }
   };
@@ -335,13 +345,60 @@
     box.innerHTML = h;
   }
 
+  // D-104: prepinac zvyraznenia hran bez olepu — CISTA funkcia (node test).
+  // Pocet aj dostupnost prichadzaju zo servera; JS ich len vypise.
+  function edgeCheckBarHtml(st){
+    if (!st || !st.available){
+      return '<div class="ecbar ecoff">Zvýraznenie hrán bez olepu vyžaduje SketchUp 2023 alebo novší.</div>';
+    }
+    var on = st.active === true;
+    return '<div class="ecbar"><button type="button" id="ecBtn" class="ghostbtn ecbtn' + (on ? ' on' : '') + '"' +
+      ' onclick="edgeCheckToggle()" aria-pressed="' + (on ? 'true' : 'false') + '"' +
+      ' title="Červené plôšky na hranách, ktoré podľa pravidla ABS majú byť olepené a nie sú. Model sa nemení.">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-' + (on ? 'eye-off' : 'eye') + '"/></svg>' +
+      (on ? 'Zvýraznenie zapnuté — vypnúť' : 'Zvýrazniť hrany bez olepu') + '</button>' +
+      '<span class="ecinfo">' + edgeCheckText(st) + '</span></div>';
+  }
+
+  function edgeCheckText(st){
+    if (!st || !st.active) return 'Vypnuté — v modeli nie je nič nakreslené.';
+    var n = st.count || 0;
+    if (!n) return 'Všetky hrany podľa pravidla sú olepené.';
+    var t = n + ' ' + edgePluralSk(n) + ' bez olepu';
+    if (st.unresolved) t += ' · ' + st.unresolved + ' sa nedá zvýrazniť (neznáma orientácia dielca)';
+    if (st.multi) t += ' · dielec s viac kusmi je v modeli nakreslený raz';
+    return t;
+  }
+
+  // 1 hrana / 2–4 hrany / 5+ hrán (slovenske sklonovanie poctu)
+  function edgePluralSk(n){
+    var v = Math.abs(n);
+    if (v === 1) return 'hrana';
+    if (v >= 2 && v <= 4) return 'hrany';
+    return 'hrán';
+  }
+
+  // Relay do Ruby — gen aj model_guid overuje SERVER (stary DOM / prepnuty
+  // dokument sa odmietne a v modeli sa nic nezapne).
+  function edgeCheckPayload(bom){
+    return { gen: (bom && bom.gen) || 0, model_guid: (bom && bom.model_guid) || '' };
+  }
+
+  function edgeCheckToggle(){
+    if (!BOM || !window.sketchup || !sketchup.edge_check_toggle) return;
+    sketchup.edge_check_toggle(JSON.stringify(edgeCheckPayload(BOM)));
+  }
+
   // V0.5 D: KONTROLA — deterministicky zoznam problemov (RED/ORANGE). Klik na
   // riadok oznaci problemovy dielec/korpus v modeli (relay cez stabilny kluc).
   // Poradie a dedup robi server; JS len renderuje.
   function renderControl(box){
     var list = (BOM && BOM.control) ? BOM.control : [];
-    if (!list.length){ box.innerHTML = '<div class="muted">Kontrola bez nálezov — dáta výroby čisté.</div>'; return; }
-    var h = '<table class="bomtab ctrltab"><thead><tr><th>!</th><th>Problém</th><th>Kde</th></tr></thead><tbody>';
+    // D-104: prepinac je nad zoznamom VZDY — hrany bez olepu nie su polozkou
+    // semaforu, takze „kontrola bez nálezov" ich este nevylucuje.
+    var bar = edgeCheckBarHtml(EDGE);
+    if (!list.length){ box.innerHTML = bar + '<div class="muted">Kontrola bez nálezov — dáta výroby čisté.</div>'; return; }
+    var h = bar + '<table class="bomtab ctrltab"><thead><tr><th>!</th><th>Problém</th><th>Kde</th></tr></thead><tbody>';
     list.forEach(function(it, i){
       var red = it.severity === 'red';
       // V0.6 E-b: rozpočtové upozornenie nemá entitu v modeli — „Kde" ukazuje
@@ -416,3 +473,9 @@
   });
 
   window.onload = function(){ if (window.sketchup && sketchup.ready) sketchup.ready(''); };
+
+  // Node testy (tests/js/test_d104_kontrola_hran.js) — LEN ciste funkcie bez DOM.
+  if (typeof module !== 'undefined' && module.exports){
+    module.exports = { edgeCheckBarHtml: edgeCheckBarHtml, edgeCheckText: edgeCheckText,
+      edgePluralSk: edgePluralSk, edgeCheckPayload: edgeCheckPayload };
+  }

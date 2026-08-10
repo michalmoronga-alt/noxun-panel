@@ -576,6 +576,9 @@ module Noxun
         def model_switched(model)
           ScaleWatch.attach_all(model)
           ScaleWatch.attach_entities(model)
+          # D-104: zvyraznenie hran patri modelu, v ktorom sa zaplo — pri prepnuti
+          # dokumentu sa vypne PRED notifikaciou okien (aby uz hlasili cerstvy stav).
+          EdgeCheck.on_model_changed(model) if defined?(EdgeCheck)
           RulesDialog.on_model_changed(model) if defined?(RulesDialog)
           MaterialsDialog.on_model_changed(model) if defined?(MaterialsDialog)
           ProductionDialog.on_model_changed(model) if defined?(ProductionDialog) # V0.5 B (nova generacia dat)
