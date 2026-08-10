@@ -102,13 +102,13 @@ Pôvodná tabuľka z 25.7. (12 dekorov na ručný batch) je zlúčená a rozší
 
 ## Merač používania (D-25) — čo hovoria dáta za tri týždne (odčítané 11.8.)
 
-Merač beží od **20.7.** (PR #50) a zbiera výhradne **ktorý prvok bol použitý a koľkokrát** — žiadne hodnoty, žiadny obsah zákazky (`%APPDATA%\NOXUN\Engine\usage_stats.json`). Prvé odčítanie po troch týždňoch reálnej práce:
+Merač beží od **20.7.** (PR #50) a zbiera výhradne **ktorý prvok bol použitý a koľkokrát** — žiadne hodnoty, žiadny obsah zákazky (`%APPDATA%\NOXUN\Engine\usage_stats.json`). **Meria FREKVENCIU interakcií, NIE čas** (nie sú tam trvania ani hranice úloh) — rovnaký počet môže znamenať rýchle cielené použitie aj dlhé hľadanie. Prvé odčítanie po troch týždňoch reálnej práce:
 
-- **Najväčšia záťaž sú materiály a ABS — spolu vyše 400 použití:** otvorenie okna Materiály **115×**, výber materiálu pri vkladaní dosky **112×**, ABS selecty dielcov a dosiek **117×**, materiál dosky **32×**, materiály korpusu **34×**.
+- **Najviac interakcií pripadá na materiály a ABS — spolu vyše 400:** otvorenie okna Materiály **115×**, výber materiálu pri vkladaní dosky **112×**, ABS selecty dielcov a dosiek **117×**, materiál dosky **32×**, materiály korpusu **34×**.
 - **Preklikávanie tabov 287×** a **otváranie satelitných okien 234×** (materiály 115 · výroba 96 · kovanie 17 · pravidlá 6) — teda samotné *hľadanie miesta, kde sa vec nastavuje*, je jedna z najčastejších činností.
 - **Takmer nepoužité prvky (1–2× za tri týždne):** orientácia a odsadenie výstuh, počet vodorovných delení, režim sokla, fit náhľadu, reset kovania.
 
-**Záver:** dáta potvrdzujú Michalovu sťažnosť na UI z prvej ruky — nie je to dojem, ale meranie. Sú zároveň hotovým podkladom pre **UI 2.0** (čo musí byť na jeden klik: materiály, ABS, prepínanie kontextu) aj pre starú otázku **D-26** „jednoduchý vs. rozšírený režim" (zoznam kandidátov na skrytie je vyššie). **Merač sa cez rework nevypína** — po ňom sa to isté odčíta znova a bude vidieť, či sa práca reálne skrátila.
+**Záver:** dáta ukazujú, KDE sa práca sústreďuje — materiály, ABS a prepínanie kontextu — a tým dávajú Michalovej sťažnosti na UI merateľné ťažisko (samotný pocit „trápim sa" merač dokázať nevie, na to by musel merať čas a hranice úloh). Sú hotovým podkladom pre **UI 2.0** (čo musí byť na jeden klik) aj pre starú otázku **D-26** „jednoduchý vs. rozšírený režim" (kandidáti na skrytie sú vyššie). **Merač sa cez rework nevypína** — po ňom sa to isté odčíta znova; porovnanie ukáže posun vo FREKVENCII (napr. menej otvorení okien na tú istú prácu), nie ušetrené minúty. Ak by sme chceli tvrdiť úsporu času, merač by musel dostať trvania a hranice úloh — samostatné rozhodnutie, dnes ho nemá.
 
 ## Trvalé UI/UX pravidlo (Michal 20.7. — platí pre všetku ďalšiu prácu na paneli)
 
