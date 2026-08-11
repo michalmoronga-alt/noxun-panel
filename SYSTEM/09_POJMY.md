@@ -20,7 +20,7 @@
 | **Proxy kovania** | vizuál (nohy, úchytkový profil) v modeli; NIE je zdroj pravdy — súpis číta VÝHRADNE `config.hardware[]` |
 | **Úchytkový profil (UKW)** | hliníkový profil nasunutý na hranu čela namiesto úchytky (UKW-7 = 19,181 × 37,419 mm, tyče 3000/3500 mm, 7 farieb). Čelo sa kvôli nemu **skracuje o 36 mm**, riadok čiel si výšku drží — profil je jeho súčasť. Rez = šírka krídla, každé krídlo má vlastný kus. Dnes vždy **horná** hrana; dolná (častá v praxi) a bočné sú v backlogu. Hrana sa **olepuje normálne** — profil sa nasúva na hotový olep. **Osadenie:** zadná rovina profilu je zarovno so zadnou rovinou čela, hrúbka profilu teda **presahuje dopredu**, a spodný „nos" prekrýva líce čela o ~1,4 mm (nie je to symetrická lišta — orientácia dopredu/dozadu je zameniteľná a raz sa už zamenila, D-90/PR #146) |
 | **Set kovania** | mapovacie pravidlo: generický typ z pravidiel (záves, noha, výsuv…) → zoznam Demos kódov s pomermi (per jednotka / per vlastník / rad podľa NL); **NIE je položka katalógu**; definície globálne + snapshot v modeli (dávka D) |
-| **Šablóna vs TYP vs parameter** | tri úrovne konfigurácie — hranica definovaná v [04_ROADMAP.md](04_ROADMAP.md) |
+| **Šablóna vs TYP vs parameter** | tri úrovne konfigurácie — hranica definovaná v [PLAN.md](PLAN.md) (sekcia „Hranica: TYP vs. ŠABLÓNA vs. PARAMETER") |
 
 ## Stolárske poznatky (doména)
 

@@ -1,6 +1,6 @@
 # Roadmapa — archív hotových etáp (plné texty)
 
-> **ARCHÍV (založené 24.7.2026 pri uzávere V0.5).** Živá roadmapa [../04_ROADMAP.md](../04_ROADMAP.md) drží hotové etapy len ako kompaktný riadok — tu sú plné pôvodné texty (história rozhodnutí, rozsahov a PR). Otvorené záväzky z týchto textov sú vytiahnuté do sekcie „Prenesené záväzky" živej roadmapy — tento súbor je čisto referenčný.
+> **ARCHÍV (založené 24.7.2026 pri uzávere V0.5).** Kompaktné riadky hotových etáp drží [KRONIKA.md](KRONIKA.md) (časová os) — tu sú plné pôvodné texty (história rozhodnutí, rozsahov a PR). Otvorené záväzky z týchto textov sú od 11.8.2026 zaradené do blokov [../PLAN.md](../PLAN.md) — tento súbor je čisto referenčný.
 
 ## Etapy
 
