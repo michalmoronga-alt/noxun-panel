@@ -11,10 +11,9 @@ Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolova
 
 ## Robí sa
 
-**Upratovacia etapa U1–U4** — dokumentácia a hygiena repa pred veľkými etapami. Rozsah a poradie: [PLAN.md](PLAN.md), blok UPRATANIE. U1 (navigácia docs) aj U2 (čistka zápisníka) sú uzavreté — **aktuálna dávka = U3**.
+**Upratovacia etapa U1–U4** — dokumentácia a hygiena repa pred veľkými etapami. Rozsah a poradie: [PLAN.md](PLAN.md), blok UPRATANIE. U1 (navigácia docs), U2 (čistka zápisníka) aj U3 (diéta CLAUDE.md) sú uzavreté — **aktuálna dávka = U4, posledná v etape**.
 
-- **U3 (nasleduje)** — diéta [../CLAUDE.md](../CLAUDE.md) + nová `docs/ARCHITEKTURA.md` + tabuľka povinného čítania.
-- **U4** — presuny do archívu, premenovanie súborov na mená bez čísel, README, checkpoint verzie.
+- **U4** — `00_VIZIA` a `06_PANEL_NASTAVENIA_navrh` do archívu, [../docs/ARCHIWOOD_INSPIRACIA.md](../docs/ARCHIWOOD_INSPIRACIA.md) do [zdroje/](zdroje/), premenovanie súborov na mená bez čísel, README, checkpoint verzie; lokálne (bez PR) zmazanie starých worktrees a zmergovaných vetiev.
 
 Dávky sa NEstackujú — každá štartuje z čerstvého `main` až po mergi predchodcu.
 
@@ -24,6 +23,7 @@ Po upratovaní: **workflow retrospektíva** (samostatná session — pravidlá M
 
 ## Posledné uzávery
 
+- **U3 diéta CLAUDE.md** (architektúra do vlastnej referencie [../docs/ARCHITEKTURA.md](../docs/ARCHITEKTURA.md), tabuľka povinného čítania podľa typu zásahu) — PR **#159** (11.8.)
 - **U2 čistka dogfooding zápisníka** (otvorené postrehy v skupinách podľa blokov, história do archívu, merač do zdrojov) — PR **#158** (11.8.)
 - **U1 navigácia docs (STAV · PLAN · KRONIKA)** — PR **#157** (11.8.)
 - **D-93 ručný zámok dĺžky výsuvu** — PR **#156**, v0.5.61 (11.8.)
@@ -42,8 +42,8 @@ Plné texty všetkých uzáverov a starších etáp: [archiv/KRONIKA.md](archiv/
 | „prečo je X takto?" — história dávok, etáp a rozhodnutí | [archiv/KRONIKA.md](archiv/KRONIKA.md) · [archiv/](archiv/) |
 | pojmy, stolárska doména, fakty o materiáloch a kovaní | [09_POJMY.md](09_POJMY.md) |
 | pravidlá písania kódu — SketchUp / DC / UI dizajn | [../docs/SKETCHUP_PRAVIDLA.md](../docs/SKETCHUP_PRAVIDLA.md) · [../docs/DC_PRAVIDLA.md](../docs/DC_PRAVIDLA.md) · [../docs/UI_DIZAJN.md](../docs/UI_DIZAJN.md) |
-| architektúra modulov (core / modules / ui) | [../CLAUDE.md](../CLAUDE.md) — sekcia „Architektúra" |
-| workflow, verzie, uzáver dávky, testovanie | [../CLAUDE.md](../CLAUDE.md) |
+| architektúra modulov (core / modules / ui) + invarianty | [../docs/ARCHITEKTURA.md](../docs/ARCHITEKTURA.md) |
+| workflow, verzie, uzáver dávky, testovanie, čo si pred zásahom prečítať | [../CLAUDE.md](../CLAUDE.md) |
 | cieľ — čo znamená „V1 hotové" a nemenné princípy | [10_V1_VIZIA.md](10_V1_VIZIA.md) |
 | smer UI | [07_UI_VIZIA.md](07_UI_VIZIA.md) |
 | kontrakt výstupu do VEPO | [03_VYSTUP_vepo_kontrakt.md](03_VYSTUP_vepo_kontrakt.md) |

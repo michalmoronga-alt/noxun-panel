@@ -9,7 +9,6 @@
 
 **Cieľ:** dokumentácia a repo tak, aby agent na štarte sedenia do dvoch minút vedel, kde projekt je, čo sa robí a kam sa pozrieť pri probléme.
 
-- **U3 — diéta CLAUDE.md**: sekcia Architektúra → nová `docs/ARCHITEKTURA.md` (referencia čítaná pri práci na kóde) + tabuľka povinného čítania podľa typu zásahu; mapa v STAV.md sa prepne na ARCHITEKTURU.
 - **U4 — presuny a uzáver**: `00_VIZIA` a `06_PANEL_NASTAVENIA_navrh` do archívu (otvorené body sú už zaradené nižšie), `docs/ARCHIWOOD_INSPIRACIA.md` do [zdroje/](zdroje/), premenovanie súborov na mená bez čísel, README, checkpoint verzie; lokálne (bez PR) zmazanie starých worktrees a zmergovaných vetiev.
 
 **Pravidlo dávok:** U1–U4 sa NEstackujú — každá štartuje z čerstvého `main` až PO mergi predchodcu.
