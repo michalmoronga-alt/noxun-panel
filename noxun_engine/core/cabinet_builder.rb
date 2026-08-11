@@ -1446,6 +1446,10 @@ module Noxun
           HardwareSets.normalize_mapping(raw_map, nil, allow_owner: true)
         end
 
+        # D-93 (audit B2): polia zaznamu su NEZAVISLE — 'disabled' uz NESMIE
+        # zahodit quantity ani nominal_length (zmena jedneho pola by inak ticho
+        # zmazala ostatne rucne zasahy tej istej identity). Zaznam bez jedineho
+        # obsahoveho pola je bezobsazny -> zahodi sa.
         def norm_hardware_overrides(raw_ov)
           return [] unless raw_ov.is_a?(Array)
           out = {}
@@ -1459,14 +1463,14 @@ module Noxun
             next if rid.empty?
 
             rec = { 'owner_part_key' => owner, 'generic_type' => gt, 'rule_id' => rid }
-            if truthy_flag(ov['disabled'] || ov[:disabled])
-              rec['disabled'] = true
-            else
-              q = (ov['quantity'] || ov[:quantity])
-              qi = q.to_s.strip.empty? ? nil : q.to_i
-              next if qi.nil? || qi < 1
-              rec['quantity'] = [qi, BuildPlan::MAX_HW_QUANTITY].min
-            end
+            rec['disabled'] = true if truthy_flag(ov['disabled'] || ov[:disabled])
+            q = (ov['quantity'] || ov[:quantity])
+            qi = q.to_s.strip.empty? ? nil : q.to_i
+            rec['quantity'] = [qi, BuildPlan::MAX_HW_QUANTITY].min if qi && qi >= 1
+            # NL: JEDINA autorita tvaru je HardwareRules.override_nl (strict Float).
+            nl = HardwareRules.override_nl(ov['nominal_length'] || ov[:nominal_length])
+            rec['nominal_length'] = nl if nl
+            next unless rec.key?('disabled') || rec.key?('quantity') || rec.key?('nominal_length')
             out[[owner, gt, rid]] = rec
           end
           out.values

@@ -57,7 +57,9 @@ module Noxun
           # V0.6 C-2 (audit F11): slovensky label TRANZIENTNE v payloade —
           # jedina autorita HardwareRules.label_for (JS mapy su len fallback);
           # do configu/snapshotu sa label NIKDY neuklada.
-          params['hardware'] = hardware_items_payload(cfg)
+          # D-93: k polozkam pribuda stav rucnych zasahov po POLIACH (rucny
+          # pocet vs. zamok dlzky) + rad NL pre vysuvy.
+          params['hardware'] = hardware_override_payload(hardware_items_payload(cfg), cfg, cab)
           # D-92: aj VYPNUTE kategorie (disabled overridy) pomenuva server —
           # inak by jedine ony ostali v sekcii Kovanie so surovym part_key.
           params['hardware_overrides'] = hardware_overrides_payload(cfg, params['hardware_overrides'])
@@ -79,6 +81,59 @@ module Noxun
             h.is_a?(Hash) ? h.merge('label' => HardwareRules.label_for(h['generic_type'])) : h
           end
           decorate_hardware_purchase(cfg, items)
+        end
+
+        # D-93: stav rucnych zasahov po POLIACH + rad nominalnych dlzok pre
+        # polozky pravidla kind 'fit_series' (dnes vysuvy). VSETKO TRANZIENTNE
+        # (do configu sa neuklada nic) a CITACIE — pravidla sa citaju rovnakou
+        # cestou ako pri zapise overridu (panel_hardware_rules), takze ponuka
+        # selectu a serverova validacia SET nemozu ukazovat iny rad.
+        #   quantity_manual — pocet je rucny (source 'manual' uz nestaci: manual
+        #                     je polozka aj pri samotnom zamku dlzky)
+        #   nl.series  — rad z pravidla (Float mm)
+        #   nl.value   — co plati teraz (params['nominal_length'])
+        #   nl.locked  — zamok = existencia platneho pola v override zazname
+        #   nl.auto    — co by dal automat (auto_known false = nevie)
+        def hardware_override_payload(items, cfg, cab)
+          rules = panel_hardware_rules(cab.respond_to?(:model) ? cab.model : nil)
+          by_id = {}
+          # Duplicitny rule_id: evaluator berie PRVE pravidlo (a varuje) — payload
+          # musi zrkadlit tu istu volbu, inak select ukaze rad z pravidla, ktore
+          # polozku nevytvorilo (Codex GH #156 P2).
+          Array(rules).each { |r| by_id[r['rule_id'].to_s] ||= r if r.is_a?(Hash) }
+          list = cfg['hardware_overrides'].is_a?(Array) ? cfg['hardware_overrides'] : []
+          Array(items).map do |h|
+            next h unless h.is_a?(Hash)
+            ov = Array(list).select { |o| o.is_a?(Hash) && HardwareRules.override_match?(o, h) }.last
+            out = h.merge('quantity_manual' => (ov.is_a?(Hash) && !ov['quantity'].nil?))
+            rule = by_id[h['rule_id'].to_s]
+            next out unless rule.is_a?(Hash) && rule['kind'].to_s == 'fit_series'
+            series = Array(rule['series']).map(&:to_f).select(&:positive?)
+            next out if series.empty?
+            params = h['params'].is_a?(Hash) ? h['params'] : {}
+            value = params['nominal_length'].is_a?(Numeric) ? params['nominal_length'].to_f : nil
+            locked = !HardwareRules.override_nl(ov.is_a?(Hash) ? ov['nominal_length'] : nil).nil?
+            auto = if locked
+                     h['rule_nominal_length'].is_a?(Numeric) ? h['rule_nominal_length'].to_f : nil
+                   else
+                     value
+                   end
+            out.merge('nl' => { 'series' => series, 'value' => value, 'locked' => locked,
+                                'auto' => auto, 'auto_known' => !auto.nil? })
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.hardware_override_payload')
+          items
+        end
+
+        # JEDINA citacia cesta k pravidlam kovania pre panel (payload aj zapis
+        # overridu): projektovy snapshot, a kym ho projekt nema, globalna
+        # kniznica (rovnaka, aku do snapshotu zapise najblizsia stavba).
+        def panel_hardware_rules(model)
+          HardwareRules.project_rules(model) || HardwareRules.load
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.panel_hardware_rules')
+          []
         end
 
         # D-92: ludsky nazov vlastnika aj pri vypnutych kategoriach.

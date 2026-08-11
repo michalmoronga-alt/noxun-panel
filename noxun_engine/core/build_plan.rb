@@ -58,8 +58,13 @@
 #   manufactured     true
 #   params           Hash (String kluce -> String/Numeric skalary), napr. height nohy,
 #                    nominal_length vysuvu
-#   source           'rule' | 'manual' (manual = quantity z hardware_overrides)
+#   source           'rule' | 'manual' (manual = quantity/nominal_length z hardware_overrides)
 #   rule_quantity    Integer — povodny pocet z pravidla (UI: "rucne (pravidlo: 4)")
+# VOLITELNE:
+#   rule_nominal_length  Float > 0 | nil — D-93: hodnota, ktoru by dal AUTOMAT,
+#                    ked je params['nominal_length'] rucne prepisana (zamok).
+#                    Kluc EXISTUJE len pri rucnej NL; nil = automat nevie
+#                    (do svetlej hlbky sa nezmestila ziadna dlzka radu).
 # Identita polozky = trojica (owner_part_key, generic_type, rule_id).
 #
 # WARNING polozka: { 'code', 'severity' ('warn'|'info'), 'message' (slovensky),
@@ -286,6 +291,16 @@ module Noxun
         rq = hw['rule_quantity']
         unless rq.is_a?(Integer) && rq >= 1 && rq <= MAX_HW_QUANTITY
           raise "BuildPlan: hardware #{gt} ma neplatnu rule_quantity (#{rq.inspect})."
+        end
+        # D-93: kluc existuje LEN pri rucnej NL; nil = automat nevedel vybrat.
+        if hw.key?('rule_nominal_length')
+          rnl = hw['rule_nominal_length']
+          unless rnl.nil? || (rnl.is_a?(Numeric) && rnl.to_f.finite? && rnl.to_f.positive?)
+            raise "BuildPlan: hardware #{gt} ma neplatnu rule_nominal_length (#{rnl.inspect})."
+          end
+          unless hw['source'].to_s == 'manual'
+            raise "BuildPlan: hardware #{gt} nesie rule_nominal_length bez source 'manual'."
+          end
         end
         hw
       end

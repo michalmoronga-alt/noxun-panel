@@ -284,6 +284,15 @@
   // V0.6 D1b: cena — nil/undefined = „nezadaná" (—), NIKDY 0 (audit N11).
   function price(v){ return (v == null || isNaN(v)) ? '—' : num(v, 2) + ' €'; }
 
+  // D-93: drobné znamienko „ručne prepísané" pri počte. Text skladá VÝHRADNE
+  // server (HardwareSets.manual_note / Bom.manual_note) — JS ho len vypíše;
+  // žiadne emoji, sprite ikona (ceruzka = ručný zásah).
+  function hwManualMark(note){
+    if (!note) return '';
+    return ' <span class="hwmanual" title="' + esc(note) + '">'
+         + '<svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></span>';
+  }
+
   function hwCsvExport(){
     if (!BOM || !window.sketchup || !sketchup.hw_csv_export) return;
     NX.setStatus('Exportujem nákupný zoznam…', false);
@@ -318,7 +327,8 @@
           if (c !== cat){ cat = c; h += '<tr class="hwcat"><td colspan="6">' + esc(c) + '</td></tr>'; }
           h += '<tr' + (r.missing ? ' class="hwmiss"' : '') + '><td>' + esc(r.code) + '</td>'
              + '<td>' + esc(r.missing ? 'nie je v katalógu kovania' : (r.name_sk || '')) + '</td>'
-             + '<td><b>' + num(r.quantity) + '</b></td><td>' + esc(r.unit || '—') + '</td>'
+             + '<td><b>' + num(r.quantity) + '</b>' + hwManualMark(r.manual_note) + '</td>'
+             + '<td>' + esc(r.unit || '—') + '</td>'
              + '<td>' + price(r.price_eur_vat) + '</td><td>' + price(r.subtotal_eur_vat) + '</td></tr>';
         });
         var sum = hs.summary || {};
@@ -356,7 +366,12 @@
         var params = g.params_label
           ? esc(g.params_label)
           : (Object.keys(g.params || {}).map(function(k){ return esc(k) + ' ' + esc(g.params[k]); }).join(', ') || '—');
-        var kde = (g.breakdown || []).map(function(b){ return esc(b.owner_id) + '×' + b.quantity + (b.source === 'manual' ? ' (ručne)' : ''); }).join(', ');
+        // D-93: pri ručne zamknutej dĺžke nesie riadok serverový popis
+        // („ručne prepísaná dĺžka (automat: 470 mm)") ako tooltip.
+        var kde = (g.breakdown || []).map(function(b){
+          var t = esc(b.owner_id) + '×' + b.quantity + (b.source === 'manual' ? ' (ručne)' : '');
+          return b.manual_note ? '<span title="' + esc(b.manual_note) + '">' + t + '</span>' : t;
+        }).join(', ');
         // V0.6 C-2 (audit F11): slovensky label zo SERVERA (fallback surovy typ)
         h += '<tr class="hwrow" data-i="' + i + '"><td>' + esc(g.label || g.generic_type) + '</td><td>' + params + '</td>' +
              '<td><b>' + num(g.quantity) + '</b></td><td>' + kde + '</td></tr>';
@@ -594,5 +609,7 @@
     module.exports = { edgeCheckBarHtml: edgeCheckBarHtml, edgeCheckText: edgeCheckText,
       edgePluralSk: edgePluralSk, edgeCheckPayload: edgeCheckPayload,
       edgeCheckMenuHtml: edgeCheckMenuHtml, edgeCheckOptionPayload: edgeCheckOptionPayload,
-      edgeCheckSelectionHint: edgeCheckSelectionHint };
+      edgeCheckSelectionHint: edgeCheckSelectionHint,
+      // D-93 znamienko rucneho zasahu (tests/js/test_d93_nl_override.js)
+      hwManualMark: hwManualMark };
   }
