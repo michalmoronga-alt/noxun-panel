@@ -18,5 +18,5 @@ Parametrický nábytkársky systém pre SketchUp (Ruby plugin). Korpusy generuje
 ## Inštalácia a vývoj
 
 - **Inštalácia (dev):** `INSTALL_noxun_engine.ps1` → SketchUp 2026 → Extensions → Noxun Engine → Panel
-- **Testy:** `ruby tests/run_all.rb` (headless) · `node tests/js/test_*.js` · `scripts\run_su_tests.ps1` (in-SketchUp)
+- **Testy:** `ruby tests/run_all.rb` (headless) · JS sady po jednej — bash: `for f in tests/js/test_*.js; do node "$f" || exit 1; done` (glob priamo za `node` spustí len prvý súbor) · `scripts\run_su_tests.ps1` (in-SketchUp)
 - **Workflow:** vetva → PR → Codex review → merge (podrobne v [CLAUDE.md](CLAUDE.md))
