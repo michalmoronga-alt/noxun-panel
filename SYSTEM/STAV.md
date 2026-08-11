@@ -42,8 +42,8 @@ Plné texty všetkých uzáverov a starších etáp: [archiv/KRONIKA.md](archiv/
 | „prečo je X takto?" — história dávok, etáp a rozhodnutí | [archiv/KRONIKA.md](archiv/KRONIKA.md) · [archiv/](archiv/) |
 | pojmy, stolárska doména, fakty o materiáloch a kovaní | [09_POJMY.md](09_POJMY.md) |
 | pravidlá písania kódu — SketchUp / DC / UI dizajn | [../docs/SKETCHUP_PRAVIDLA.md](../docs/SKETCHUP_PRAVIDLA.md) · [../docs/DC_PRAVIDLA.md](../docs/DC_PRAVIDLA.md) · [../docs/UI_DIZAJN.md](../docs/UI_DIZAJN.md) |
-| architektúra modulov (core / modules / ui) | [../CLAUDE.md](../CLAUDE.md) — sekcia „Architektúra" |
-| workflow, verzie, uzáver dávky, testovanie | [../CLAUDE.md](../CLAUDE.md) |
+| architektúra modulov (core / modules / ui) + invarianty | [../docs/ARCHITEKTURA.md](../docs/ARCHITEKTURA.md) |
+| workflow, verzie, uzáver dávky, testovanie, čo si pred zásahom prečítať | [../CLAUDE.md](../CLAUDE.md) |
 | cieľ — čo znamená „V1 hotové" a nemenné princípy | [10_V1_VIZIA.md](10_V1_VIZIA.md) |
 | smer UI | [07_UI_VIZIA.md](07_UI_VIZIA.md) |
 | kontrakt výstupu do VEPO | [03_VYSTUP_vepo_kontrakt.md](03_VYSTUP_vepo_kontrakt.md) |
