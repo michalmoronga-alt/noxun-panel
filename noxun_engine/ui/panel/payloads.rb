@@ -97,7 +97,10 @@ module Noxun
         def hardware_override_payload(items, cfg, cab)
           rules = panel_hardware_rules(cab.respond_to?(:model) ? cab.model : nil)
           by_id = {}
-          Array(rules).each { |r| by_id[r['rule_id'].to_s] = r if r.is_a?(Hash) }
+          # Duplicitny rule_id: evaluator berie PRVE pravidlo (a varuje) — payload
+          # musi zrkadlit tu istu volbu, inak select ukaze rad z pravidla, ktore
+          # polozku nevytvorilo (Codex GH #156 P2).
+          Array(rules).each { |r| by_id[r['rule_id'].to_s] ||= r if r.is_a?(Hash) }
           list = cfg['hardware_overrides'].is_a?(Array) ? cfg['hardware_overrides'] : []
           Array(items).map do |h|
             next h unless h.is_a?(Hash)
