@@ -9,7 +9,7 @@
 
 ## 1. MATERIÁLY — zlúčený zoznam (ručný seed 25. 7. + Disk frekvencie)
 
-Frekvencia „Disk n/9" = počet zákaziek zo sondy Disku (9 rozpočtov 2024–2026), v ktorých sa dekor vyskytol. „Seed" = Michalov ručný zoznam z 08_DOGFOODING (§Seed katalógu). Formáty platní: štandard 2800×2070; MG dekory 2800×2050; PD podľa záznamu.
+Frekvencia „Disk n/9" = počet zákaziek zo sondy Disku (9 rozpočtov 2024–2026), v ktorých sa dekor vyskytol. „Seed" = Michalov ručný zoznam z archívu zápisníka (`archiv/DOGFOODING_historia.md`, §Seed katalógu). Formáty platní: štandard 2800×2070; MG dekory 2800×2050; PD podľa záznamu.
 
 ### 1.1 Jadro (zaradiť určite)
 
@@ -148,4 +148,4 @@ Kódy = Demos „Kód sortimentu" (objednávané cez VEPO). **SET** = položky, 
 
 - [GMAIL_KOVANIE_sonda_2026-07.md](GMAIL_KOVANIE_sonda_2026-07.md) — objednávky kovania z firemného Gmailu (2023–2026), sety, dodávatelia (VEPO/Demos), naskladňovací zoznam 12/2024.
 - [DISK_ZAKAZKY_sonda_2026-07.md](DISK_ZAKAZKY_sonda_2026-07.md) — 9 zákazkových rozpočtov + CP + firemná šablóna rozpočtu z Google Disku (2024–2026), frekvencie materiálov aj kovania, ceny, VEPO služby.
-- [../08_DOGFOODING.md](../08_DOGFOODING.md) — sekcia „Seed katalógu" (ručný zoznam Michal 25. 7.) + 2A migračná mapa existujúceho katalógu.
+- [../archiv/DOGFOODING_historia.md](../archiv/DOGFOODING_historia.md) — sekcia „Seed katalógu" (ručný zoznam Michal 25. 7.) + 2A migračná mapa existujúceho katalógu. *(Obe sekcie boli do 11.8.2026 v živom zápisníku 08_DOGFOODING.md.)*

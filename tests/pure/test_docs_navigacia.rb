@@ -27,9 +27,9 @@ NxTest.test('docs: STAV.md ma vsetkych 5 povinnych sekcii') do
                 "STAV.md nema povinne sekcie: #{missing.join(' · ')} (najdene: #{headings.join(' · ')})")
 end
 
-NxTest.test('docs: relativne odkazy v STAV.md a PLAN.md ukazuju na existujuce subory') do
+NxTest.test('docs: relativne odkazy v STAV.md, PLAN.md a 08_DOGFOODING.md ukazuju na existujuce subory') do
   broken = []
-  %w[STAV.md PLAN.md].each do |name|
+  %w[STAV.md PLAN.md 08_DOGFOODING.md].each do |name|
     path = File.join(NxTest::ROOT, 'SYSTEM', name)
     NxTest.assert(File.exist?(path), "SYSTEM/#{name} chyba")
     dir = File.dirname(path)
