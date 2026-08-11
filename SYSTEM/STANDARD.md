@@ -1,6 +1,6 @@
 # Noxun Component Standard v1.0 (15.7.2026, potvrdený praxou — premenovaný z draftu 24.7.2026)
 
-> Záväzný kontrakt dátového modelu a princípov nového SketchUp plugin systému pre nábytkárstvo na mieru (korpusy, čelá, kovanie, ABS, výstupy). Nadväzuje na `00_VIZIA.md`, uzamknuté rozhodnutia z `archiv/01_STANDARD_osnova.md`, analýzu `archiv/02_ANALYZA_korpus_dc_vs_ruby.md`, VEPO kontrakt `03_VYSTUP_vepo_kontrakt.md` a technické pasce v `docs/DC_PRAVIDLA.md`. Štandard bol overený implementáciou V0.1–V0.5 (vrátane krížovej validácie VEPO výstupov s OCL flow 20.7.2026) a z „draftu" sa stal potvrdeným kontraktom.
+> Záväzný kontrakt dátového modelu a princípov nového SketchUp plugin systému pre nábytkárstvo na mieru (korpusy, čelá, kovanie, ABS, výstupy). Nadväzuje na `archiv/00_VIZIA_povodna.md`, uzamknuté rozhodnutia z `archiv/01_STANDARD_osnova.md`, analýzu `archiv/02_ANALYZA_korpus_dc_vs_ruby.md`, VEPO kontrakt `VEPO_KONTRAKT.md` a technické pasce v `docs/DC_PRAVIDLA.md`. Štandard bol overený implementáciou V0.1–V0.5 (vrátane krížovej validácie VEPO výstupov s OCL flow 20.7.2026) a z „draftu" sa stal potvrdeným kontraktom.
 
 ---
 
@@ -780,7 +780,7 @@ Možnosti:
 - **Súpis ABS** — podľa ABS variantu, dĺžka v **bm**.
 - **Súpis kovania** — podľa katalógového kódu, počet **ks** (z flagov → mapovanie fáza 2).
 - **Celkový sumár** — kusovník + m² + bm + ks + súčet cien materiálu/ABS/kovania.
-- **VEPO CSV** — presne podľa `03_VYSTUP_vepo_kontrakt.md` (stĺpce `nazov;dlzka;hrana_pozdlz;sirka;hrana_naprieč;hrubka;pocet_ks;material`, oddeľovač `;`, úvodzovky, `—`/`=` kódy hrán dopočítané z L1/L2/W1/W2, normalizácia hrúbok 18/36, slug názvy súborov `<projekt>_<material>_<hrubka>.csv`). Priamo z dielcov, **bez OCL medzikroku**.
+- **VEPO CSV** — presne podľa `VEPO_KONTRAKT.md` (stĺpce `nazov;dlzka;hrana_pozdlz;sirka;hrana_naprieč;hrubka;pocet_ks;material`, oddeľovač `;`, úvodzovky, `—`/`=` kódy hrán dopočítané z L1/L2/W1/W2, normalizácia hrúbok 18/36, slug názvy súborov `<projekt>_<material>_<hrubka>.csv`). Priamo z dielcov, **bez OCL medzikroku**.
 
 **Žiadne marže, žiadne DPH, žiadna cena práce** — možno neskôr. Cenotvorba je len súčet materiálu/ABS/kovania.
 

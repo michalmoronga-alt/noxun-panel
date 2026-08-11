@@ -43,7 +43,7 @@
 | 16.7. | Zložka pluginu — konsolidovať súbory pod jednu strechu | ✅ PR #4 (SYSTEM + docs + zdroje v repe) |
 | 16.7. | Vyhradený testovací projekt ENGINEtests.skp | ✅ zavedené (`_dev\`, gitignore, pravidlo v CLAUDE.md) |
 | 16.7. | BUG: drag priečky funguje len raz | ✅ PR #2 + #3 (suspend_selection_sync) |
-| 16.7. | UI mockup „NOXUN Furniture Engine" | ✅ rozpísané v [../07_UI_VIZIA.md](../07_UI_VIZIA.md) (živý dokument so stavmi) |
+| 16.7. | UI mockup „NOXUN Furniture Engine" | ✅ rozpísané v [../UI_VIZIA.md](../UI_VIZIA.md) (živý dokument so stavmi) |
 | 16.7. | Materiály: povolené hrúbky na rodine; dielec mimo povolených → „!" v kusovníku | ✅ vyriešené INAK — dekorové skupiny D-41 (hrúbka = vlastnosť variantu materiálu) + hrúbkový drift ako RED v semafore V0.5-D |
 | 16.7. | ABS UX v2: hrúbky 1/2 mm; odvodené od materiálu; predvolená ABS pre skrinku + výnimky | ✅ V0.3.3 (hrúbky) + dedenie + D-36 (odporúčané k dekoru) + D-41 (dekorové skupiny) |
 | 17.7. | Undo/redo riziká (audit kódu) | ✅ undo opravené 17.7. (transparentné operácie, S1/S2 asserty); redo pozorovanie presunuté do živého backlogu |

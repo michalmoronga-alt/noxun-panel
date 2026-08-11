@@ -1,5 +1,8 @@
 # Noxun System — vízia (v0.1, 15.7.2026)
 
+> ⚠️ **ARCHÍV — archivované 11.8.2026 (dávka U4).** Pôvodná vízia z 15.7. je prekonaná praxou (Hybrid DC + Ruby, poradie vrstiev, meradlá) a ako plán sa už nečíta.
+> **Živé jadro prevzal [../V1_VIZIA.md](../V1_VIZIA.md)** (čo znamená „V1 hotové") — tento text ostáva ako záznam východiskového zámeru.
+
 > Plánovací dokument nového komplexného systému. Toto je živý dokument — dopĺňa sa pri každom plánovacom sedení.
 >
 > **Stav k 24.7.2026 (v0.5.0):** vrstvy 1–3 a 5 stavebného poradia STOJA (štandard → referenčný korpus → zóny/čelá/childy → výstupy s VEPO validáciou a semaforom); vrstva 4 (kovania engine) má hotovú fázu 1 (pravidlá/flagy), katalóg a ceny = V0.6. Princíp „Hybrid DC + Ruby" bol prekonaný praxou — korpusy aj childy generuje čistý Ruby (regenerate pattern), DC most ostáva len pre budúce čierne skrinky (Atira). Meradlo úspechu (manželka dostane výstupy bez SketchUpu) čaká na cenovú vrstvu V0.6.

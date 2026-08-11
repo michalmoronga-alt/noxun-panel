@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # Noxun Engine — V0.5 C: VEPO CSV export PRIAMO z BOM riadkov (bez OCL medzikroku).
-# Zdroj pravdy formatu: SYSTEM/03_VYSTUP_vepo_kontrakt.md (reverz funkcneho vepo_exporter).
+# Zdroj pravdy formatu: SYSTEM/VEPO_KONTRAKT.md (reverz funkcneho vepo_exporter).
 #
 # SEMANTIKA ROZMEROV (oprava 20.7. po smoke teste — Michal, vlastnik VEPO flow):
 # CSV nesie HOTOVE rozmery dielca (presne ako BOM). VEPO system si odpocet

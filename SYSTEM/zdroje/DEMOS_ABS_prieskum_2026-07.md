@@ -1,6 +1,6 @@
 # Demos ABS prieskum per dekor (29.7.2026, demos-trade.sk bez loginu)
 
-> Dátový podklad pre seed katalógu a dizajn dávky 2A (ABS obchodné hodnoty). Zisťované subagentom cez verejné vyhľadávanie (`ABSB <dekor>`); ceny = „Základná cena za MJ" bez DPH/s DPH za meter, dostupnosť = centrálny sklad. Dopredaj/výpredaj šarže vynechané. K rozhodnutiam viď [../09_POJMY.md](../09_POJMY.md).
+> Dátový podklad pre seed katalógu a dizajn dávky 2A (ABS obchodné hodnoty). Zisťované subagentom cez verejné vyhľadávanie (`ABSB <dekor>`); ceny = „Základná cena za MJ" bez DPH/s DPH za meter, dostupnosť = centrálny sklad. Dopredaj/výpredaj šarže vynechané. K rozhodnutiam viď [../POJMY.md](../POJMY.md).
 
 ## 1. Egger U750 ST9 · Taupe šedá
 

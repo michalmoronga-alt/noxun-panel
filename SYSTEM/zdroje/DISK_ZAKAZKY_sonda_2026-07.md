@@ -69,7 +69,7 @@
 
 **Poznatky k materiálom:**
 - **Hrúbky v praxi:** 18 (dominantná), 16 (korpus ekonomy/Falco), 2,5 (HDF), 38 (PD), 12 (kompakt KD-IN), 9,2 (zástena), 18,6 a 22,6 (Egger „hrubšie" dekory — potvrdzuje D-45 guard hrúbok), 18,7 (MDF AL06).
-- **ABS s DK kódmi z rozpočtov:** biela skupinová páska **515069** „Biela hladká W960/W980/101/110/500/8100/8685 SM 23/0,8" — jedna páska oficiálne pokrýva celú skupinu bielych dekorov (podklad k otázke mapovania ABS, 09_POJMY ot. 2). Ďalej 356427 (Cashmere BS/PD), 398905, 514401/514404, 392486, 510705, 495215.
+- **ABS s DK kódmi z rozpočtov:** biela skupinová páska **515069** „Biela hladká W960/W980/101/110/500/8100/8685 SM 23/0,8" — jedna páska oficiálne pokrýva celú skupinu bielych dekorov (podklad k otázke mapovania ABS, POJMY ot. 2). Ďalej 356427 (Cashmere BS/PD), 398905, 514401/514404, 392486, 510705, 495215.
 - **Externé dvierka** (nie z DTDL): Trachea (Z4, Z9 — sety 130–230 €), Svet dvierok „TVAR" supermat (Z2, 741 €), SALU šatníkové/hliníkové rámy (Z2 614 €, Z7 222 €). Do katalógu raz ako nákupná položka-set.
 - **Flexipanely.sk** (obkladové panely/lamely: Marble Calacatta, Wave Gold, HARD Rock White, LAMELY Classic White) — 4 zákazky; kupujú sa na ks + doprava.
 

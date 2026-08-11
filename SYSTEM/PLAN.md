@@ -1,28 +1,20 @@
 # PLAN — čo sa ide robiť (bloky prác)
 
 > Roadmapa **bez histórie**: bloky v poradí, každý s cieľom a zaradenými položkami. Blok NEMÁ číslo verzie vopred — **dostane ho pri štarte** (uzáver etapy = minor bump).
-> **Údržba:** pri uzávere dávky sa jej riadok z bloku odstráni, odsek o nej ide do [archiv/KRONIKA.md](archiv/KRONIKA.md) a prepíše sa [STAV.md](STAV.md). Plné znenie otvorených postrehov žije v [08_DOGFOODING.md](08_DOGFOODING.md) **v skupinách podľa týchto blokov** — tu je len číslo, názov a jedna veta.
+> **Údržba:** pri uzávere dávky sa jej riadok z bloku odstráni, odsek o nej ide do [archiv/KRONIKA.md](archiv/KRONIKA.md) a prepíše sa [STAV.md](STAV.md). Plné znenie otvorených postrehov žije v [DOGFOODING.md](DOGFOODING.md) **v skupinách podľa týchto blokov** — tu je len číslo, názov a jedna veta.
 
 ## Bloky
 
-### 1 · UPRATANIE — beží
-
-**Cieľ:** dokumentácia a repo tak, aby agent na štarte sedenia do dvoch minút vedel, kde projekt je, čo sa robí a kam sa pozrieť pri probléme.
-
-- **U4 — presuny a uzáver**: `00_VIZIA` a `06_PANEL_NASTAVENIA_navrh` do archívu (otvorené body sú už zaradené nižšie), `docs/ARCHIWOOD_INSPIRACIA.md` do [zdroje/](zdroje/), premenovanie súborov na mená bez čísel, README, checkpoint verzie; lokálne (bez PR) zmazanie starých worktrees a zmergovaných vetiev.
-
-**Pravidlo dávok:** U1–U4 sa NEstackujú — každá štartuje z čerstvého `main` až PO mergi predchodcu.
-
-### 2 · RETRO — workflow retrospektíva (samostatná session)
+### 1 · RETRO — workflow retrospektíva (samostatná session)
 
 **Cieľ:** prejsť spôsob práce Michal ↔ Claude ↔ Codex a doladiť pravidlá, ktoré sa usadili praxou (nie kód).
 
 - Vstup: skúsenosti zo série KLINIKA — čo brzdilo (opakované vysvetľovanie kontextu, veľkosť PR, poradie auditov), čo fungovalo (codex-audit pred implementáciou, PR popis zrozumiteľný z mobilu).
 - Výstup: úprava [../CLAUDE.md](../CLAUDE.md), skillov `codex-audit` / `codex-po-pr`, pravidiel PR popisov a testovacej slučky.
 
-### 3 · UI 2.0 — štúdio okno a výbery
+### 2 · UI 2.0 — štúdio okno a výbery
 
-**Cieľ:** satelitné okná → jedno štúdio okno s toolbarom a bočnou navigáciou; výber materiálu/ABS na jeden klik namiesto scrollovania. **Mockup PRED implementáciou** (vzor Materiály 2.0 — schválený klikateľný HTML). Podklad: merač používania D-25 (materiály/ABS vyše 400 interakcií, taby 287×, satelitné okná 234×) a [07_UI_VIZIA.md](07_UI_VIZIA.md); cieľový obraz v [10_V1_VIZIA.md](10_V1_VIZIA.md) §6.
+**Cieľ:** satelitné okná → jedno štúdio okno s toolbarom a bočnou navigáciou; výber materiálu/ABS na jeden klik namiesto scrollovania. **Mockup PRED implementáciou** (vzor Materiály 2.0 — schválený klikateľný HTML). Podklad: merač používania D-25 (materiály/ABS vyše 400 interakcií, taby 287×, satelitné okná 234×) a [UI_VIZIA.md](UI_VIZIA.md); cieľový obraz v [V1_VIZIA.md](V1_VIZIA.md) §6.
 
 - **D-50 · OCL inšpirácia UI/UX** — prebrať detaily z OCL flow (najprv slovné sedenie, potom zapracovanie); vzory áno, GPL kód nie.
 - **D-51 · Štandard veľkostí okien a tlačidiel** — zjednotiť šírky a rozmiestnenie naprieč oknami, konkrétne hodnoty do [../docs/UI_DIZAJN.md](../docs/UI_DIZAJN.md) pred Luciiným nasadením.
@@ -42,7 +34,7 @@
 
 *(Seed katalógu ako krok je ZRUŠENÝ (Michal 10.8.) — katalóg rastie sám prácou na zákazkách; skutočný problém „nájsť materiál aj v malom zozname" rieši D-85. Podklad kódov a cien ostáva v [zdroje/SEED_KATALOG_2026-07.md](zdroje/SEED_KATALOG_2026-07.md).)*
 
-### 4 · KONTROLA + VÝROBA
+### 3 · KONTROLA + VÝROBA
 
 **Cieľ:** dotiahnuť krížovú kontrolu zákazky pred odoslaním do výroby a výrobné výstupy.
 
@@ -52,7 +44,7 @@
 - **Nárezový plán fáza 2** — guillotine, kerf, orezky, orientácia dekoru; vlastná heuristika v čistom Ruby (OpenCutList je GPL — algoritmus áno, kód nie), kontrakt D-19 pripravený.
 - **Stráž kolízií** — upozorniť, keď sa dielce prekrývajú alebo vyskočia mimo box (bbox check do validačnej vrstvy semaforu).
 
-### 5 · STABILITA
+### 4 · STABILITA
 
 **Cieľ:** synchronizácia panela s modelom a okrajové situácie observerov.
 
@@ -61,20 +53,20 @@
 - **Redo po zlúčených transparentných operáciách** — manuálne overiť Ctrl+Y (Ruby API nemá na Windows spoľahlivú redo akciu); otvorené od 17.7.
 - **Prepínanie typu HORNÁ/DOLNÁ na označenom korpuse občas zlyhá** — odložené, rieši sa s knižnicou/editorom typov.
 
-### 6 · V1 DOTIAHNUTIE
+### 5 · V1 DOTIAHNUTIE
 
-**Cieľ:** kompletná reálna zákazka od návrhu po objednávky bez opustenia pluginu a bez ručného dopočítavania — definícia a princípy v [10_V1_VIZIA.md](10_V1_VIZIA.md).
+**Cieľ:** kompletná reálna zákazka od návrhu po objednávky bez opustenia pluginu a bez ručného dopočítavania — definícia a princípy v [V1_VIZIA.md](V1_VIZIA.md).
 
 - **Kovanie fáza 3:** výklopy podľa hmotnosti čela (C-05 — generic_type lift + AVENTOS tabuľky, hustoty z M-C ako SNAPSHOT do modelu) · výplne šuflíkov ako vyrábané dielce (V1-05 — Atira dno+chrbát, Quadro/Tandem) · smer otvárania a typ závesu · hmotnostné Blum tabuľky · automatika počtu nôh podľa šírky · „Použiť na podobné".
 - **Spotrebiče S1** (V1-02) — katalóg, položky projektu s väzbou na skrinku, kontrola niche semaforom, sekcia v rozpočte.
 - **Ceny a dokumenty ponuky** (vedome odložené z dávky E): manuálne 1-klik overenie ceny pre položky BEZ väzby na Demos a viac URL na položke (zvyšok V1-03) · plný generátor cenovej ponuky do DOCX/PDF so šablónou a vizualizáciami · prepínač „na faktúru" (×1,2, kandidát na štvrtý cenový režim) · rodina dokumentov okolo ponuky (ponuka vizualizácií, preberací protokol).
-- **Konštrukcia:** per-dielec odsadenia vpredu/vzadu pre strop/dno/boky (V1-01, chladničkový komín) · typy čiel lakované / frézované / sklo-Al rám (V1-07) · balík V0.4.8 z `06_PANEL_NASTAVENIA_navrh` — rohové spoje dna a stropu per strana, chrbát s poldrážkou, „bez dielca" varianty s validáciou, per-dielec hrúbky a odsadenia.
+- **Konštrukcia:** per-dielec odsadenia vpredu/vzadu pre strop/dno/boky (V1-01, chladničkový komín) · typy čiel lakované / frézované / sklo-Al rám (V1-07) · balík V0.4.8 z [archiv/06_PANEL_NASTAVENIA_navrh.md](archiv/06_PANEL_NASTAVENIA_navrh.md) — rohové spoje dna a stropu per strana, chrbát s poldrážkou, „bez dielca" varianty s validáciou, per-dielec hrúbky a odsadenia.
 - **Vkladanie na klik** (V1-04 fáza 1) — skrinka visí na kurzore, klik umiestni.
 - **D-09 · Snap body pri presúvaní priečok** — 1/4, 1/2, 3/4 v zónovom náhľade.
 - **D-10 · Presúvanie a úprava čiel priamo v náhľade** — ako drag priečok.
 - **V1.0 zostavy:** spájanie a zarovnávanie korpusov (čelné/zadné hrany, pripájacie body, snaper logika) · soklová lišta v celku pre segment · obklady a krycie prvky segmentu vrátane pilastra (priznaný vs. skrytý) · pracovné a horné krycie dosky na označený segment · migrácia a oprava starých modelov · test na kompletnej reálnej zákazke. *(Sem patrí aj to, čo V0.4.7 vedome neobsahovalo: attachment/segmenty, automatické krycie dosky, PD cez segment.)*
 
-### 7 · RENDER M-R
+### 6 · RENDER M-R
 
 **Cieľ:** materiál vyzerá v modeli ako v skutočnosti — Luciin nástroj na vizualizácie.
 
@@ -82,7 +74,7 @@
 - **D-87 · Vizuálne zobrazenie SMERU štruktúry v modeli** — overlay čiar v smere dekoru na dielcoch (vzor ghost zón) ako rýchla kontrola orientácie celej zákazky; logicky sa rieši s textúrami a nárezovým plánom.
 - **Nástroj „pixla"** (V1-06) — ikonka na dlaždici materiálu, klik prefarbuje dielce cez `part_override` cestu (1 klik = 1 undo).
 
-### 8 · INFRA (priebežne, podľa potreby)
+### 7 · INFRA (priebežne, podľa potreby)
 
 **Cieľ:** aby plugin a knižnice fungovali na dvoch pracoviskách (Michal + Lucia).
 
@@ -105,7 +97,7 @@
 
 **Píš postrehy HNEĎ, keď ich vidíš — hocikedy, hociktorú tému.** Nemusíš strážiť, čo je kedy v pláne — ja každý postreh zaradím: buď do bežiacej etapy (ak sa týka), alebo do backlogu nižšie s označením etapy. Nič sa nestratí. Krátka veta stačí („boky majú stáť na dne, nohy pod tým") — doplňujúce otázky si vyžiadam sám.
 
-**Triedenie hlásení (dohoda 25.7.):** bežiaca etapa · priebežné dopĺňanie · celková vízia · **odklad do V1** — kým sa k V1 dostaneme, zbierame dáta, a z odložených tém sa potom poskladajú ďalšie bloky V1–V2. Trvalé fakty domény (stolárske poznatky, pojmy) idú do [09_POJMY.md](09_POJMY.md).
+**Triedenie hlásení (dohoda 25.7.):** bežiaca etapa · priebežné dopĺňanie · celková vízia · **odklad do V1** — kým sa k V1 dostaneme, zbierame dáta, a z odložených tém sa potom poskladajú ďalšie bloky V1–V2. Trvalé fakty domény (stolárske poznatky, pojmy) idú do [POJMY.md](POJMY.md).
 
 ## Trvalé UI/UX pravidlo (Michal 20.7. — platí pre všetku ďalšiu prácu na paneli)
 
