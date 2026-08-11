@@ -11,10 +11,9 @@ Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolova
 
 ## Robí sa
 
-**Upratovacia etapa U1–U4** — dokumentácia a hygiena repa pred veľkými etapami. Rozsah a poradie: [PLAN.md](PLAN.md), blok UPRATANIE. U1 (navigácia docs) aj U2 (čistka zápisníka) sú uzavreté — **aktuálna dávka = U3**.
+**Upratovacia etapa U1–U4** — dokumentácia a hygiena repa pred veľkými etapami. Rozsah a poradie: [PLAN.md](PLAN.md), blok UPRATANIE. U1 (navigácia docs), U2 (čistka zápisníka) aj U3 (diéta CLAUDE.md) sú uzavreté — **aktuálna dávka = U4, posledná v etape**.
 
-- **U3 (nasleduje)** — diéta [../CLAUDE.md](../CLAUDE.md) + nová `docs/ARCHITEKTURA.md` + tabuľka povinného čítania.
-- **U4** — presuny do archívu, premenovanie súborov na mená bez čísel, README, checkpoint verzie.
+- **U4** — `00_VIZIA` a `06_PANEL_NASTAVENIA_navrh` do archívu, [../docs/ARCHIWOOD_INSPIRACIA.md](../docs/ARCHIWOOD_INSPIRACIA.md) do [zdroje/](zdroje/), premenovanie súborov na mená bez čísel, README, checkpoint verzie; lokálne (bez PR) zmazanie starých worktrees a zmergovaných vetiev.
 
 Dávky sa NEstackujú — každá štartuje z čerstvého `main` až po mergi predchodcu.
 
@@ -24,6 +23,7 @@ Po upratovaní: **workflow retrospektíva** (samostatná session — pravidlá M
 
 ## Posledné uzávery
 
+- **U3 diéta CLAUDE.md** (architektúra do vlastnej referencie [../docs/ARCHITEKTURA.md](../docs/ARCHITEKTURA.md), tabuľka povinného čítania podľa typu zásahu) — PR **#159** (11.8.)
 - **U2 čistka dogfooding zápisníka** (otvorené postrehy v skupinách podľa blokov, história do archívu, merač do zdrojov) — PR **#158** (11.8.)
 - **U1 navigácia docs (STAV · PLAN · KRONIKA)** — PR **#157** (11.8.)
 - **D-93 ručný zámok dĺžky výsuvu** — PR **#156**, v0.5.61 (11.8.)
