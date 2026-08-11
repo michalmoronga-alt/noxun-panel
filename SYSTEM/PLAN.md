@@ -1,7 +1,7 @@
 # PLAN — čo sa ide robiť (bloky prác)
 
 > Roadmapa **bez histórie**: bloky v poradí, každý s cieľom a zaradenými položkami. Blok NEMÁ číslo verzie vopred — **dostane ho pri štarte** (uzáver etapy = minor bump).
-> **Údržba:** pri uzávere dávky sa jej riadok z bloku odstráni, odsek o nej ide do [archiv/KRONIKA.md](archiv/KRONIKA.md) a prepíše sa [STAV.md](STAV.md). Plné znenie otvorených D-čísel žije v [08_DOGFOODING.md](08_DOGFOODING.md) — tu je len číslo, názov a jedna veta.
+> **Údržba:** pri uzávere dávky sa jej riadok z bloku odstráni, odsek o nej ide do [archiv/KRONIKA.md](archiv/KRONIKA.md) a prepíše sa [STAV.md](STAV.md). Plné znenie otvorených postrehov žije v [08_DOGFOODING.md](08_DOGFOODING.md) **v skupinách podľa týchto blokov** — tu je len číslo, názov a jedna veta.
 
 ## Bloky
 
@@ -9,7 +9,6 @@
 
 **Cieľ:** dokumentácia a repo tak, aby agent na štarte sedenia do dvoch minút vedel, kde projekt je, čo sa robí a kam sa pozrieť pri probléme.
 
-- **U2 — čistka zápisníka**: v [08_DOGFOODING.md](08_DOGFOODING.md) ostanú LEN otvorené D-čísla zoskupené podľa blokov tohto plánu; história (2A migračná mapa, hardening zoznamy, priebeh seedu) do archívu; dáta merača D-25 do [zdroje/](zdroje/) ako podklad UI 2.0.
 - **U3 — diéta CLAUDE.md**: sekcia Architektúra → nová `docs/ARCHITEKTURA.md` (referencia čítaná pri práci na kóde) + tabuľka povinného čítania podľa typu zásahu; mapa v STAV.md sa prepne na ARCHITEKTURU.
 - **U4 — presuny a uzáver**: `00_VIZIA` a `06_PANEL_NASTAVENIA_navrh` do archívu (otvorené body sú už zaradené nižšie), `docs/ARCHIWOOD_INSPIRACIA.md` do [zdroje/](zdroje/), premenovanie súborov na mená bez čísel, README, checkpoint verzie; lokálne (bez PR) zmazanie starých worktrees a zmergovaných vetiev.
 
@@ -108,6 +107,10 @@
 **Píš postrehy HNEĎ, keď ich vidíš — hocikedy, hociktorú tému.** Nemusíš strážiť, čo je kedy v pláne — ja každý postreh zaradím: buď do bežiacej etapy (ak sa týka), alebo do backlogu nižšie s označením etapy. Nič sa nestratí. Krátka veta stačí („boky majú stáť na dne, nohy pod tým") — doplňujúce otázky si vyžiadam sám.
 
 **Triedenie hlásení (dohoda 25.7.):** bežiaca etapa · priebežné dopĺňanie · celková vízia · **odklad do V1** — kým sa k V1 dostaneme, zbierame dáta, a z odložených tém sa potom poskladajú ďalšie bloky V1–V2. Trvalé fakty domény (stolárske poznatky, pojmy) idú do [09_POJMY.md](09_POJMY.md).
+
+## Trvalé UI/UX pravidlo (Michal 20.7. — platí pre všetku ďalšiu prácu na paneli)
+
+**VERTIKÁLNY priestor panela je vzácny.** Pred umiestnením každého nového tlačidla/poľa/funkcie sa POVINNE zamyslieť, či sa nedá umiestniť inak a rozumnejšie (do existujúceho radu, do rohu náhľadu, ako ikona, kontextovo) — rast do výšky len v krajných prípadoch. Inak panel skončí ako scrollovanie cez 20 tlačidiel a 30 sekcií.
 
 ## Hranica: TYP vs. ŠABLÓNA vs. PARAMETER (rozhodnuté 15.7.2026)
 

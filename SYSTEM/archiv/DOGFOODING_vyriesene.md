@@ -1,6 +1,6 @@
 # Dogfooding — archív vyriešených postrehov (plné texty)
 
-> **ARCHÍV (založené 24.7.2026 pri uzávere V0.5).** Živý zápisník [../08_DOGFOODING.md](../08_DOGFOODING.md) drží len otvorené body a jednoriadkový index — tu sú plné texty vyriešených D-čísel (rozhodnutia, príčiny, PR) a záznam smoke testu s VEPO validáciou. Číslovanie D-xx je trvalé, nerecykluje sa.
+> **ARCHÍV (založené 24.7.2026 pri uzávere V0.5).** Živý zápisník [../08_DOGFOODING.md](../08_DOGFOODING.md) drží len otvorené body a jednoriadkový index — tu sú plné texty vyriešených D-čísel (rozhodnutia, príčiny, PR) a záznam smoke testu s VEPO validáciou. Číslovanie D-xx je trvalé, nerecykluje sa. Uzavreté a historické SEKCIE zápisníka (priebežné stavy, 2A migračná mapa, hardening V0.5, seed, zodpovedané otázky) sú vedľa v [DOGFOODING_historia.md](DOGFOODING_historia.md).
 
 ## Smoke test 20.7. — výsledok (testy 1–11) + VEPO validácia
 
