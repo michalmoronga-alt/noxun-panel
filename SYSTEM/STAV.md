@@ -11,10 +11,9 @@ Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolova
 
 ## Robí sa
 
-**Upratovacia etapa U1–U4** — dokumentácia a hygiena repa pred veľkými etapami. Rozsah a poradie: [PLAN.md](PLAN.md), blok UPRATANIE.
+**Upratovacia etapa U1–U4** — dokumentácia a hygiena repa pred veľkými etapami. Rozsah a poradie: [PLAN.md](PLAN.md), blok UPRATANIE. U1 (navigácia docs) je uzavretá — **aktuálna dávka = U2**.
 
-- **U1 = tento PR** — nová navigácia docs: STAV.md + [PLAN.md](PLAN.md) + [archiv/KRONIKA.md](archiv/KRONIKA.md), zrušená roadmapa, guard test.
-- **U2** — čistka zápisníka [08_DOGFOODING.md](08_DOGFOODING.md) (otvorené D-čísla podľa blokov, história do archívu, merač do zdrojov).
+- **U2 (nasleduje)** — čistka zápisníka [08_DOGFOODING.md](08_DOGFOODING.md) (otvorené D-čísla podľa blokov, história do archívu, merač do zdrojov).
 - **U3** — diéta [../CLAUDE.md](../CLAUDE.md) + nová `docs/ARCHITEKTURA.md` + tabuľka povinného čítania.
 - **U4** — presuny do archívu, premenovanie súborov na mená bez čísel, README, checkpoint verzie.
 
@@ -26,6 +25,7 @@ Po upratovaní: **workflow retrospektíva** (samostatná session — pravidlá M
 
 ## Posledné uzávery
 
+- **U1 navigácia docs (STAV · PLAN · KRONIKA)** — PR **#157** (11.8.)
 - **D-93 ručný zámok dĺžky výsuvu** — PR **#156**, v0.5.61 (11.8.)
 - **Séria okolo zákazky KLINIKA** (D-90…D-105: úchytkový profil UKW-7, kovanie v paneli, živé názvy, farba ABS na hranách, kontrola hrán v modeli) — PR **#144–#155**, v0.5.49 → v0.5.60 (9.–11.8.)
 - **Materiály 2.0 KOMPLET + dávky D a E** (identita dekorov, Demos konektor, sety kovania, rozpočet a cenová ponuka) — PR **#89–#140**, do v0.5.48 (30.7.–6.8.)

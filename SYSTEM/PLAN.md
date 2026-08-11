@@ -9,7 +9,6 @@
 
 **Cieľ:** dokumentácia a repo tak, aby agent na štarte sedenia do dvoch minút vedel, kde projekt je, čo sa robí a kam sa pozrieť pri probléme.
 
-- **U1 — kronika + STAV + PLAN** *(beží)*: vyrezanie histórie do [archiv/KRONIKA.md](archiv/KRONIKA.md), nový [STAV.md](STAV.md) a tento súbor, zrušená stará roadmapa, prelinkovanie celého repa, guard test štruktúry.
 - **U2 — čistka zápisníka**: v [08_DOGFOODING.md](08_DOGFOODING.md) ostanú LEN otvorené D-čísla zoskupené podľa blokov tohto plánu; história (2A migračná mapa, hardening zoznamy, priebeh seedu) do archívu; dáta merača D-25 do [zdroje/](zdroje/) ako podklad UI 2.0.
 - **U3 — diéta CLAUDE.md**: sekcia Architektúra → nová `docs/ARCHITEKTURA.md` (referencia čítaná pri práci na kóde) + tabuľka povinného čítania podľa typu zásahu; mapa v STAV.md sa prepne na ARCHITEKTURU.
 - **U4 — presuny a uzáver**: `00_VIZIA` a `06_PANEL_NASTAVENIA_navrh` do archívu (otvorené body sú už zaradené nižšie), `docs/ARCHIWOOD_INSPIRACIA.md` do [zdroje/](zdroje/), premenovanie súborov na mená bez čísel, README, checkpoint verzie; lokálne (bez PR) zmazanie starých worktrees a zmergovaných vetiev.
