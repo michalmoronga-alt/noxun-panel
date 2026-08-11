@@ -22,7 +22,10 @@ GitHub Codex review beží automaticky na každý PR. **Nálezy sú v REVIEW THR
    gh api repos/michalmoronga-alt/noxun-panel/pulls/<N>/comments/<databaseId>/replies -f body="Opravené v <hash> — <krátko čo a ako>."
    ```
    Ak nález vedome neopravuješ, odpovedz prečo.
-5. **Merge robí Claude (od RETRO 12.8.):** keď sú OBE brány splnené — **CI zelené** (`gh pr checks <N>`) + **všetky nálezy vyriešené** (opravené s reply, alebo zdôvodnené prečo nie) — zmerguj: `gh pr merge <N> --merge` (vetvu maže repo automaticky). Potom over `git fetch` + `git log origin/main --oneline -3`, že merge commit v maine naozaj je.
+5. **Merge robí Claude (od RETRO 12.8.)** — až keď AKTUÁLNA hlava vetvy prešla oboma bránami:
+   - **Review kolo uzavreté pre aktuálny head:** po KAŽDOM fix pushi sa vráť na krok 1 (nový budík ~10 min + kontrola threadov) — nové kolo môže nájsť ďalšie nálezy a CI býva hotové skôr než Codex, takže „CI zelené po pushi opráv" NIKDY nestačí na merge. Kolo je uzavreté, keď head dostal 👍, alebo po budíku nepribudli žiadne nové thready a všetky existujúce majú reply (oprava s hashom / zdôvodnenie).
+   - **CI zelené** na aktuálnom head commite (`gh pr checks <N>`).
+   Merge s pripnutou odrevidovanou hlavou (ochrana pred pretekom s cudzím pushom): `sha=$(git rev-parse HEAD)` → `gh pr merge <N> --merge --match-head-commit "$sha"` (vetvu na GitHube maže repo automaticky). Potom **návrat na čerstvý main**: `git checkout main && git pull && git branch -d <vetva>` — ďalšia dávka štartuje výhradne odtiaľto. Over `git log origin/main --oneline -3`, že merge commit v maine naozaj je.
 6. **Záznam do denného reportu** (nahrádza niekdajšie hlásenie „môžeš mergovať"): čo PR mení z pohľadu používateľa · stav testov · výsledok Codex review (počet nálezov + ako vyriešené). Report sa Michalovi posiela súhrnne na konci bloku, zrozumiteľný z mobilu bez čítania diffu.
 
 **Pravidlo 3 kôl:** ak review ide do 3. kola opráv, PR bol zle narezaný — zavri ho a rozdeľ na menšie celky, neiteruj (lekcia PR #93 s 10 kolami).
