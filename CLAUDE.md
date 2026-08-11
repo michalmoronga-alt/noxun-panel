@@ -15,14 +15,14 @@ GitHub: https://github.com/michalmoronga-alt/noxun-panel
 ## Verzia a uzáver dávky (od v0.5.0)
 
 - `VERSION` žije na 2 miestach: `noxun_engine.rb` (autorita) + `noxun_engine/main.rb` (fallback) — synchro stráži guard test.
-- **Každý PR meniaci kód pluginu = bump patch** (0.5.0 → 0.5.1); **uzáver etapy roadmapy = bump minor** (0.5.x → 0.6.0).
+- **Každý PR meniaci kód pluginu = bump patch** (0.5.0 → 0.5.1); **uzáver etapy (bloku v `SYSTEM/PLAN.md`) = bump minor** (0.5.x → 0.6.0).
 - **Cache-bust:** každý `?v=` v `ui/*.html` = presne VERSION (stráži guard test; CEF cachuje css/js). Zmena css/js ⇒ bump verzie ⇒ prepísať všetky `?v=`.
-- **Checklist uzáveru dávky:** bump VERSION (2×) + `?v=` → testy zelené → zápisník `SYSTEM/08_DOGFOODING.md` (vyriešené D-čísla do archívu, index s PR) → roadmapa („Kde sme" + kompaktný riadok) → README pri uzávere etapy.
+- **Checklist uzáveru dávky:** bump VERSION (2×) + `?v=` → testy zelené → vyriešené D-čísla do `SYSTEM/archiv/DOGFOODING_vyriesene.md` (plný text + PR) → zápisník `SYSTEM/08_DOGFOODING.md` (jednoriadkový index) → **prepíš `SYSTEM/STAV.md` + APPEND odsek navrch „Záznamy dávok" v `SYSTEM/archiv/KRONIKA.md` + aktualizuj blok v `SYSTEM/PLAN.md`** → README pri uzávere etapy.
 
 ## Špecifikácia a kontext (všetko v tomto repe)
 
 - **Záväzný štandard dát:** [SYSTEM/01_STANDARD.md](SYSTEM/01_STANDARD.md) (dictionary NOXUN, mm Float, roly, regenerate pattern)
-- **Roadmapa a backlog postrehov:** [SYSTEM/04_ROADMAP.md](SYSTEM/04_ROADMAP.md) · dogfooding zápisník: [SYSTEM/08_DOGFOODING.md](SYSTEM/08_DOGFOODING.md) · UI vízia: [SYSTEM/07_UI_VIZIA.md](SYSTEM/07_UI_VIZIA.md)
+- **Kde projekt je (čítaj ako prvé):** [SYSTEM/STAV.md](SYSTEM/STAV.md) · plán a bloky prác: [SYSTEM/PLAN.md](SYSTEM/PLAN.md) · história dávok: [SYSTEM/archiv/KRONIKA.md](SYSTEM/archiv/KRONIKA.md) · dogfooding zápisník: [SYSTEM/08_DOGFOODING.md](SYSTEM/08_DOGFOODING.md) · UI vízia: [SYSTEM/07_UI_VIZIA.md](SYSTEM/07_UI_VIZIA.md)
 - **Glosár pojmov + stolárske poznatky:** [SYSTEM/09_POJMY.md](SYSTEM/09_POJMY.md) — jednotný jazyk sedení a fakty domény (postforming, formáty, hrúbky, ABS obchodné hodnoty); trvalé poznatky z hlásení zapisovať SEM
 - **Historické dokumenty (uzavreté rozhodnutia, plné texty hotových etáp a vyriešených postrehov):** [SYSTEM/archiv/](SYSTEM/archiv/)
 - **Pravidlá SketchUp kódu:** [docs/SKETCHUP_PRAVIDLA.md](docs/SKETCHUP_PRAVIDLA.md) · DC pasce: [docs/DC_PRAVIDLA.md](docs/DC_PRAVIDLA.md) · UI dizajn: [docs/UI_DIZAJN.md](docs/UI_DIZAJN.md) — kompletné a samostatné v tomto repe. (Nadradený `..\CLAUDE.md` existuje len v Michalovom lokálnom workspace `C:\APP DEV\RUBY` — mapa ostatných pluginov; pre prácu v tomto repe nie je potrebný.)

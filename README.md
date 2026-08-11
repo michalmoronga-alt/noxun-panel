@@ -2,7 +2,7 @@
 
 Parametrický nábytkársky systém pre SketchUp (Ruby plugin). Korpusy generované kódom z konfigurácie — žiadne Dynamic Components: zóny s priečkami, čelá s lockmi (fixed/auto), šablóny, scale→automatická prestavba na mm, 2D náhľad v paneli, materiály s dekorovými skupinami a výrobné výstupy.
 
-- **Špecifikácia:** [Noxun Component Standard](SYSTEM/01_STANDARD.md) · [Roadmapa](SYSTEM/04_ROADMAP.md) · [docs](docs/) — všetko v tomto repe
+- **Špecifikácia:** [Noxun Component Standard](SYSTEM/01_STANDARD.md) · [Stav](SYSTEM/STAV.md) · [Plán](SYSTEM/PLAN.md) · [docs](docs/) — všetko v tomto repe
 - **Inštalácia (dev):** `INSTALL_noxun_engine.ps1` → SketchUp 2026 → Extensions → Noxun Engine → Panel
 - **Workflow:** vetva → PR → Codex review → merge (viď `CLAUDE.md`)
 
@@ -14,4 +14,4 @@ Materiály sú od 2.8.2026 KOMPLET: „Nahradiť UNI…" (hromadná zámena s ro
 
 Od 2.8.2026 ďalej pribudlo: **sety kovania** (generický typ → zoznam objednávateľných kódov, nákupný zoznam s cenami a CSV), **rozpočet a zákaznícka cenová ponuka** vrátane XLSX exportov a tlačidla „Prepočítať ceny", **úchytkový profil UKW-7** na hrane čela, **farba ABS pásky priamo na hranách v modeli** a **kontrola olepov v troch stavoch** so zvýraznením v modeli (bez zásahu do súboru).
 
-Kontrakty: BuildPlan (geometria, kusovník aj VEPO čítajú ten istý plán) + výrobný snapshot na entite (štandard 8.2/8.3). Testy: **1163 headless + 29 JS sád / 966 kontrol (CI na každý push) + 302 in-SketchUp scenárov**. Ďalej: dokončiť prvú reálnu zákazku vyrobenú čisto z pluginu → kontrola a testy → **UI 2.0** (mockup pred implementáciou), potom M-R render — viď roadmapa.
+Kontrakty: BuildPlan (geometria, kusovník aj VEPO čítajú ten istý plán) + výrobný snapshot na entite (štandard 8.2/8.3). Testy: **1163 headless + 29 JS sád / 966 kontrol (CI na každý push) + 302 in-SketchUp scenárov**. Ďalej: dokončiť prvú reálnu zákazku vyrobenú čisto z pluginu → kontrola a testy → **UI 2.0** (mockup pred implementáciou), potom M-R render — viď [plán](SYSTEM/PLAN.md).
