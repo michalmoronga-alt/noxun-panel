@@ -5,12 +5,13 @@
 
 ## Bloky
 
-### 1 · RETRO — workflow retrospektíva (samostatná session)
+### 1 · ŠTART AUTONÓMIE — stabilita a drobné fixy
 
-**Cieľ:** prejsť spôsob práce Michal ↔ Claude ↔ Codex a doladiť pravidlá, ktoré sa usadili praxou (nie kód).
+**Cieľ:** rozbehnúť autonómny režim dávok ([../CLAUDE.md](../CLAUDE.md), sekcia Git workflow — rozhodnutia RETRO 12.8.) na dávkach s jasným zadaním a merateľným výsledkom; zároveň zmiznú tri známe chyby. *(Vedomá výnimka z pravidla „žiadne náplasti pred reworkom" z 10.8. — sú to chyby, nie UX vylepšenia.)*
 
-- Vstup: skúsenosti zo série KLINIKA — čo brzdilo (opakované vysvetľovanie kontextu, veľkosť PR, poradie auditov), čo fungovalo (codex-audit pred implementáciou, PR popis zrozumiteľný z mobilu).
-- Výstup: úprava [../CLAUDE.md](../CLAUDE.md), skillov `codex-audit` / `codex-po-pr`, pravidiel PR popisov a testovacej slučky.
+- **D-101 · Panel sa po Späť/Znova neobnoví** — `ModelObserver` s `onTransactionUndo`/`onTransactionRedo` v existujúcom lifecycle panela; observer/undo lifecycle ⇒ codex-audit povinný + in-SketchUp beh. *(presunuté zo STABILITY)*
+- **D-86 · Smer dekoru vo vkladacej karte sa ticho vráti na predvoľbu** — vlastný guard: prepíš pole len pri skutočnej zmene materiálu. *(presunuté z UI 2.0)*
+- **D-77 · Okno detailu dielca je po otvorení odseknuté** — spodná časť nastavení nie je vidieť, kým sa okno ručne nezväčší. *(presunuté z UI 2.0)*
 
 ### 2 · UI 2.0 — štúdio okno a výbery
 
@@ -24,9 +25,7 @@
 - **D-15 · „Pridávačky" ako modal** — všetky akcie „pridať niečo" (šablóna, materiál, položka) na jeden UX vzor.
 - **D-26 · Režim Jednoduchý/Rozšírený** — rozhodnúť spolu s reworkom; kandidáti na skrytie z merača sú známi (orientácia a odsadenie výstuh, vodorovné delenia, režim sokla, reset kovania).
 - **D-27 · Rýchle zobraziť/skryť tagy z panela** — mini prepínače (Čelá, Chrbát) v logike Ghost checkboxu.
-- **D-77 · Okno detailu dielca je po otvorení odseknuté** — spodná časť nastavení nie je vidieť, kým sa okno ručne nezväčší.
 - **D-84 · Čelá: tlačidlá rečou stolára** — „+ pridaj čelo" / „+ pridaj dvere", „− riadok" odpadá (mazanie krížikom pri riadku).
-- **D-86 · Smer dekoru vo vkladacej karte sa ticho vráti na predvoľbu** — vlastný guard: prepíš pole len pri skutočnej zmene materiálu.
 - **D-89 (otvorená časť) · Orientácia hrán v UI** — hover hrany v karte dielca / ABS editore zvýrazní zodpovedajúcu hranu priamo v MODELI, prípadne slovné označenie strany. *(Časť „podľa pravidla povie výsledok" je hotová ako D-102.)*
 - **D-96 · Úchytkový profil do vlastnej sekcie „Úchytky"** — výber profilu, hrany osadenia a rozsahu na jednom mieste; ikona v riadku čela ostane len indikátor.
 - **Nové: klik na materiál/ABS → zvýraznenie miest použitia v projekte** — z katalógu vidieť, kde presne dekor v zákazke je.
@@ -46,9 +45,8 @@
 
 ### 4 · STABILITA
 
-**Cieľ:** synchronizácia panela s modelom a okrajové situácie observerov.
+**Cieľ:** synchronizácia panela s modelom a okrajové situácie observerov. *(D-101 je predsunutá do bloku 1 · ŠTART AUTONÓMIE.)*
 
-- **D-101 · Panel sa po Späť/Znova neobnoví** — `ModelObserver` s `onTransactionUndo`/`onTransactionRedo` v existujúcom lifecycle panela; vlastná malá dávka s auditom a in-SketchUp behom.
 - **D-99 · Glitch názvov kópií pri premenovaní dielca** — nereprodukované pozorovanie, dáta boli správne; sleduje sa.
 - **Redo po zlúčených transparentných operáciách** — manuálne overiť Ctrl+Y (Ruby API nemá na Windows spoľahlivú redo akciu); otvorené od 17.7.
 - **Prepínanie typu HORNÁ/DOLNÁ na označenom korpuse občas zlyhá** — odložené, rieši sa s knižnicou/editorom typov.

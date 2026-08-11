@@ -1,11 +1,11 @@
 ---
 name: codex-audit
-description: Nezávislý Codex audit návrhu PRED implementáciou (devil's advocate). Povinný pred každou dávkou/iteráciou, ak je Codex CLI dostupný. Odošle návrh do lokálneho Codex CLI, počká na dobehnutie a vráti číslované nálezy BLOCKER/FIX/NOTE.
+description: Nezávislý Codex audit návrhu PRED implementáciou (devil's advocate). Risk-based od 12.8.2026 — povinný LEN pre dávky meniace dátový kontrakt, schému, migráciu, observer/undo lifecycle alebo pridávajúce nový modul (ak je Codex CLI dostupný). Odošle návrh do lokálneho Codex CLI, počká na dobehnutie a vráti číslované nálezy BLOCKER/FIX/NOTE.
 ---
 
 # Codex audit návrhu (devil's advocate)
 
-Povinný krok pred implementáciou každej dávky/iterácie (pravidlo z 18.7.2026). Beží cez Michalov lokálny Codex CLI (ChatGPT účet — nemíňa Claude limity); model `gpt-5.6-sol`, effort `high` sú nastavené v `~/.codex/config.toml` — **netreba nič flagovať**. Proces sa osvedčil: pred+po Codex chytil dokopy 5+ blockerov a 5 reálnych bugov.
+**Risk-based pravidlo (RETRO 12.8.2026 — nahrádza „povinný vždy" z 18.7.):** audit je povinný **LEN** pre dávky meniace **dátový kontrakt, schému, migráciu, observer/undo lifecycle** alebo pridávajúce **nový modul**. Fix dávky, docs a UI úpravy idú rovno do implementácie — poistkou ostáva `codex-po-pr`, ktorý je povinný pre každý PR (dáta z histórie: ~23 % PR malo reálny nález). Beží cez Michalov lokálny Codex CLI (ChatGPT účet — nemíňa Claude limity); model `gpt-5.6-sol`, effort `high` sú nastavené v `~/.codex/config.toml` — **netreba nič flagovať**. Proces sa osvedčil: pred+po Codex chytil dokopy 5+ blockerov a 5 reálnych bugov.
 
 **Dostupnosť:** skill vyžaduje nainštalovaný Codex plugin (companion runtime). Ak runtime v kroku 1 nenájdeš (iný checkout/prostredie než Michalovo lokálne PC, napr. cloud sandbox), krok NEblokuje — výslovne ohlás, že adversarial audit treba spustiť na Michalovom lokálnom prostredí, a pokračuj s o to prísnejšou vlastnou kontrolou návrhu.
 

@@ -11,14 +11,15 @@ Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolova
 
 ## Robí sa
 
-**Nič nebeží — ďalší blok podľa [PLAN.md](PLAN.md).** Upratovacia etapa je uzavretá: navigácia stojí na trojici STAV · PLAN · [archiv/KRONIKA.md](archiv/KRONIKA.md), zápisník drží len otvorené postrehy v skupinách podľa blokov, architektúra žije v [../docs/ARCHITEKTURA.md](../docs/ARCHITEKTURA.md) a súbory v `SYSTEM/` majú mená bez čísel.
+**Blok 1 · ŠTART AUTONÓMIE** ([PLAN.md](PLAN.md)) — prvé dávky v **autonómnom režime** (pravidlá z retrospektívy RETRO, PR #161: risk-based codex-audit, merge robí Claude po bránach CI + review, denný report na konci bloku — plné znenie [../CLAUDE.md](../CLAUDE.md), sekcia Git workflow). Poradie dávok: **D-101** (panel po Späť/Znova) → **D-86** (guard smeru dekoru) → **D-77** (odseknuté okno detailu).
 
 ## Ďalší krok
 
-**RETRO** — workflow retrospektíva (samostatná session: pravidlá Michal ↔ Claude ↔ Codex, skilly, PR rytmus) → potom **UI 2.0** (debata → klikateľné wireframes/mockup vzorom Materiály 2.0 → až potom implementačné dávky).
+**UI 2.0** — najprv podklady pripraví agent autonómne (analýza OCL k D-50, súhrn merača D-25, klikateľný HTML mockup vzorom Materiály 2.0) → večerná debata s Michalom → až potom implementačné dávky.
 
 ## Posledné uzávery
 
+- **RETRO — workflow retrospektíva** (risk-based codex-audit, pravidlo 3 kôl, autonómne bloky s merge po bránach, denný report; blok ŠTART AUTONÓMIE predsunutý) — PR **#161** (12.8.)
 - **ETAPA UPRATANIE UZAVRETÁ** (U1–U4, PR **#157–#160**) — checkpoint **v0.6.0** (11.8.)
 - **U4 presuny a checkpoint** (premenovanie súborov na mená bez čísel, pôvodná vízia a návrh panela do archívu, ARCHIWOOD do zdrojov, README, bump v0.6.0) — PR **#160** (11.8.)
 - **U3 diéta CLAUDE.md** (architektúra do vlastnej referencie [../docs/ARCHITEKTURA.md](../docs/ARCHITEKTURA.md), tabuľka povinného čítania podľa typu zásahu) — PR **#159** (11.8.)
