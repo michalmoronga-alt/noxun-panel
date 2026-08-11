@@ -23,14 +23,16 @@ GitHub: https://github.com/michalmoronga-alt/noxun-panel
 
 Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Architektúra sa udržiava priebežne:** dávka, ktorá mení modul, prepíše JEHO odsek v [docs/ARCHITEKTURA.md](docs/ARCHITEKTURA.md) — nikdy nepridáva text na koniec súboru.
 
-## Git workflow (záväzné od 16.7.2026)
+## Git workflow (záväzné od 16.7.2026, revízia RETRO 12.8.2026)
 
-- **Žiadne priame commity do `main`.** Každá zmena: **vetva → commity → PR → Codex auto-review → merge robí Michal** po kontrole.
+- **Žiadne priame commity do `main`.** Každá zmena: **vetva → commity → PR → Codex review → merge po splnení brán** (nižšie).
+- **Merge robí Claude** (`gh pr merge <N> --merge --match-head-commit <SHA>` — pripnutá presne tá hlava, ktorá prešla bránami) po splnení OBOCH brán **pre aktuálnu hlavu vetvy**: **CI zelené** + **review kolo uzavreté**. Po KAŽDOM fix pushi beží nové review kolo — nikdy nemergovať hneď po pushi opráv len preto, že CI zbehlo skôr než Codex. Po mergi **návrat na čerstvý `main`** (`git checkout main && git pull`) — ďalšia dávka štartuje odtiaľ. Michalov merge klik odpadá (rozhodnutie RETRO 12.8.); vetvy na GitHube maže repo automaticky. Detailný postup: skill `codex-po-pr`.
 - Vetvy pomenúvať `feat/<krátky-popis>`, `fix/<popis>`, `docs/<popis>` (napr. `feat/v03-materialy`).
 - PR popis po slovensky: čo sa mení z pohľadu používateľa + ako testované (SkAgent/MCP výsledky). Malé PR > obrie PR — deliť po celkoch.
 - Commit messages: vecné, slovensky/anglicky konzistentne s históriou, trailer `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`.
 - Paralelné úlohy: každá vo vlastnej vetve (agenti: worktree izolácia), konflikty rieši integrácia pred PR.
-- **Codex kontrolné body:** PRED implementáciou dávky = skill `codex-audit` (adversarial audit návrhu cez Codex CLI — povinný na Michalovom lokálnom prostredí; v prostredí bez Codex CLI/companion runtime krok NEblokuje — ohlás, že audit treba spustiť lokálne, a pokračuj); PO odoslaní PR = skill `codex-po-pr` (budík ~10 min → review thready → oprava → reply s hashom → „môžeš mergovať"). Oba v `.claude/skills/`.
+- **Codex kontrolné body (risk-based od 12.8.):** skill `codex-audit` PRED implementáciou je povinný **LEN** pre dávky meniace **dátový kontrakt, schému, migráciu, observer/undo lifecycle** alebo pridávajúce **nový modul** — rozhoduje OBSAH zásahu, nie žáner dávky (aj „fix" observera je audit-povinný). Fix, docs a UI dávky, ktoré sa žiadnej z vymenovaných oblastí nedotýkajú, idú rovno do implementácie (v prostredí bez Codex CLI krok neblokuje — ohlás a pokračuj). Skill `codex-po-pr` PO odoslaní PR je povinný **bez výnimky**. **Pravidlo 3 kôl:** ak review ide do 3. kola opráv, PR bol zle narezaný — zavrieť a rozdeliť, nie iterovať (lekcia PR #93). Oba skilly v `.claude/skills/`.
+- **Autonómne bloky (od 12.8.):** Michal ráno odsúhlasí blok dávok; tie sa spracúvajú **sekvenčne bez čakania na pokyn medzi dávkami** — každá štartuje z čerstvého `main` po mergi predchodcu (nestackovať). Na konci bloku **denný report** (zrozumiteľný z mobilu, bez čítania diffu): čo je v maine · čo čaká a prečo · čo zlyhalo · čo večer otestovať. Výber a poradie práce určuje Michal (PLAN.md) — agent si sám dávky nevyberá.
 
 ## Verzia a uzáver dávky (od v0.5.0)
 

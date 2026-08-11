@@ -1,6 +1,6 @@
 ---
 name: codex-po-pr
-description: Po odoslaní PR — budík ~10 min, kontrola Codex GH review (nálezy sú v review threadoch, nie komentoch), oprava nálezov, reply s commit hashom, hlásenie Michalovi „môžeš mergovať".
+description: Po odoslaní PR — budík ~10 min, kontrola Codex GH review (nálezy sú v review threadoch, nie komentoch), oprava nálezov, reply s commit hashom; po splnení brán (CI zelené + review vybavené) merge robí Claude a výsledok ide do denného reportu.
 ---
 
 # Codex review po PR
@@ -22,10 +22,16 @@ GitHub Codex review beží automaticky na každý PR. **Nálezy sú v REVIEW THR
    gh api repos/michalmoronga-alt/noxun-panel/pulls/<N>/comments/<databaseId>/replies -f body="Opravené v <hash> — <krátko čo a ako>."
    ```
    Ak nález vedome neopravuješ, odpovedz prečo.
-5. **Hlásenie Michalovi** (po slovensky, zrozumiteľné z mobilu BEZ čítania diffu): čo PR mení z pohľadu používateľa · stav testov · výsledok Codex review (počet nálezov + ako vyriešené) · explicitne „**môžeš mergovať**" + pripomienka **„Delete branch"** pri mergi (prevencia stacked pasce — nezmazaná vetva po mergi base PR nechá ďalšie PR v reťazi mimo main).
+5. **Merge robí Claude (od RETRO 12.8.)** — až keď AKTUÁLNA hlava vetvy prešla oboma bránami:
+   - **Review kolo uzavreté pre aktuálny head:** po KAŽDOM fix pushi sa vráť na krok 1 (nový budík ~10 min + kontrola threadov) — nové kolo môže nájsť ďalšie nálezy a CI býva hotové skôr než Codex, takže „CI zelené po pushi opráv" NIKDY nestačí na merge. Kolo je uzavreté, keď head dostal 👍, alebo po budíku nepribudli žiadne nové thready a všetky existujúce majú reply (oprava s hashom / zdôvodnenie).
+   - **CI zelené** na aktuálnom head commite (`gh pr checks <N>`).
+   Merge s pripnutou odrevidovanou hlavou (ochrana pred pretekom s cudzím pushom): `sha=$(git rev-parse HEAD)` → `gh pr merge <N> --merge --match-head-commit "$sha"` (vetvu na GitHube maže repo automaticky). Potom **návrat na čerstvý main**: `git checkout main && git pull && git branch -d <vetva>` — ďalšia dávka štartuje výhradne odtiaľto. Over `git log origin/main --oneline -3`, že merge commit v maine naozaj je.
+6. **Záznam do denného reportu** (nahrádza niekdajšie hlásenie „môžeš mergovať"): čo PR mení z pohľadu používateľa · stav testov · výsledok Codex review (počet nálezov + ako vyriešené). Report sa Michalovi posiela súhrnne na konci bloku, zrozumiteľný z mobilu bez čítania diffu.
+
+**Pravidlo 3 kôl:** ak review ide do 3. kola opráv, PR bol zle narezaný — zavri ho a rozdeľ na menšie celky, neiteruj (lekcia PR #93 s 10 kolami).
 
 ## Pasce
 
-- MERGED v `gh pr list` ≠ obsah v maine — po Michalovom „zmergované" vždy `git fetch` + `git log origin/main`.
-- Stacked PR: ak base vetva nebola zmazaná, over `gh pr view <N> --json baseRefName` a prípadne `gh pr edit <N> --base main`.
+- MERGED v `gh pr list` ≠ obsah v maine — po mergi vždy `git fetch` + `git log origin/main`.
+- Stacked PR: ak base vetva nebola zmazaná, over `gh pr view <N> --json baseRefName` a prípadne `gh pr edit <N> --base main`. (Repo má „Delete branch on merge" zapnuté, takže pasca hrozí len pri ručne vytvorených reťaziach.)
 - Slovenský text do PR/replies vždy cez `--body-file` alebo `-f body=` (nie here-string v PowerShelli).
