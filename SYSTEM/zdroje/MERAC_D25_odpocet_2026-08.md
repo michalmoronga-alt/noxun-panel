@@ -1,6 +1,6 @@
 # Merač používania (D-25) — odpočet za tri týždne (11.8.2026)
 
-> **Podklad pre UI 2.0** — dáta, o ktoré sa opiera rozhodnutie, čo musí byť na jeden klik (a stará otázka D-26 „jednoduchý vs. rozšírený režim"). Presunuté zo živého zápisníka [../08_DOGFOODING.md](../08_DOGFOODING.md) pri dávke U2; text je pôvodný.
+> **Podklad pre UI 2.0** — dáta, o ktoré sa opiera rozhodnutie, čo musí byť na jeden klik (a stará otázka D-26 „jednoduchý vs. rozšírený režim"). Presunuté zo živého zápisníka [../DOGFOODING.md](../DOGFOODING.md) pri dávke U2; text je pôvodný.
 > **Merač beží ďalej aj počas reworku** — po ňom sa to isté odčíta znova a porovnanie ukáže posun vo frekvencii.
 
 Merač beží od **20.7.** (PR #50) a zbiera výhradne **ktorý prvok bol použitý a koľkokrát** — žiadne hodnoty, žiadny obsah zákazky (`%APPDATA%\NOXUN\Engine\usage_stats.json`). **Meria FREKVENCIU interakcií, NIE čas** (nie sú tam trvania ani hranice úloh) — rovnaký počet môže znamenať rýchle cielené použitie aj dlhé hľadanie. Prvé odčítanie po troch týždňoch reálnej práce:

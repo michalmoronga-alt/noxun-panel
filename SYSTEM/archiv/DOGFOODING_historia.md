@@ -1,6 +1,6 @@
 # Dogfooding — archív histórie zápisníka
 
-> **ARCHÍV (založený 11.8.2026, dávka U2).** Uzavreté a historické sekcie presunuté zo živého zápisníka [../08_DOGFOODING.md](../08_DOGFOODING.md): priebežné stavy zápisníka, schválená 2A migračná mapa, hardening a slovné sedenia V0.5, priebeh testovania seedu a zodpovedané otázky pre Michala. Texty sú pôvodné, upravené sú výhradne relatívne cesty odkazov.
+> **ARCHÍV (založený 11.8.2026, dávka U2).** Uzavreté a historické sekcie presunuté zo živého zápisníka [../DOGFOODING.md](../DOGFOODING.md): priebežné stavy zápisníka, schválená 2A migračná mapa, hardening a slovné sedenia V0.5, priebeh testovania seedu a zodpovedané otázky pre Michala. Texty sú pôvodné, upravené sú výhradne relatívne cesty odkazov.
 > Plné texty vyriešených D-čísel sú vedľa v [DOGFOODING_vyriesene.md](DOGFOODING_vyriesene.md), história dávok a etáp v [KRONIKA.md](KRONIKA.md); živý zápisník drží už len otvorené postrehy.
 
 ## Priebežné stavy zápisníka (19.7. – 11.8.2026)
@@ -25,14 +25,14 @@
 >
 > **Test dávky E na reálnej zákazke beží** (Michal 6.8.) — jediná chyba testu, **E-03** (doska s UNI materiálom sa nedala vložiť s vlastnou hrúbkou), je opravená hotfixom **PR #142, v0.5.49** (plný text v archíve, D-číslo nedostala). Zvyšok postrehov z testu je zapísaný nižšie ako **D-84 až D-89**: dve UX drobnosti (D-84, D-86), dva spomaľovače (D-85 vyhľadávanie v selectoch materiálov, D-89 orientácia hrán pri olepení) a dva nápady na zváženie (D-87 smer štruktúry v modeli, D-88 farba hrany podľa ABS). **D-88 je od 9.8. vyriešená** (PR #150) — spolu s ňou aj časť (b) postrehu D-89 ako **D-102**.
 >
-> **Stav k 4.8.:** **dávka H KOMPLET** (PR #131–#135, v0.5.44) — všetkých osem riešiteľných nálezov smoke testu V1 z 3.8. (fiktívna zákazka, 12 skriniek + 4 dosky — kovanie checklist **6/6** vrátane „Z Demosu" a CSV exportu, semafor ČISTÝ po nahradení UNI reálnymi dekormi) je vyriešených a v archíve: D-75, D-76, D-78, D-79, D-80, D-81, D-82, D-83. Otvorený ostáva jediný nález testu — **D-77** (preradený do plošného UI reworku). Zápisník je opäť **bez otvorených blokerov aj spomaľovačov**; väčšie celky drží vízia uzatvorenia V1: [../10_V1_VIZIA.md](../10_V1_VIZIA.md).
+> **Stav k 4.8.:** **dávka H KOMPLET** (PR #131–#135, v0.5.44) — všetkých osem riešiteľných nálezov smoke testu V1 z 3.8. (fiktívna zákazka, 12 skriniek + 4 dosky — kovanie checklist **6/6** vrátane „Z Demosu" a CSV exportu, semafor ČISTÝ po nahradení UNI reálnymi dekormi) je vyriešených a v archíve: D-75, D-76, D-78, D-79, D-80, D-81, D-82, D-83. Otvorený ostáva jediný nález testu — **D-77** (preradený do plošného UI reworku). Zápisník je opäť **bez otvorených blokerov aj spomaľovačov**; väčšie celky drží vízia uzatvorenia V1: [../V1_VIZIA.md](../V1_VIZIA.md).
 
 ## Uzáver V0.5 — hardening a slovné sedenia (od 24.7.)
 
-Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jasných krokoch**: ujasnenie pojmov a špecifických funkcií naprieč sedeniami, podstatné veci sa dopĺňajú do dokumentácie (glosár + poznatky: [../09_POJMY.md](../09_POJMY.md)). Plán sedení: ① vkladanie+korpus · ② zóny+čelá · ③ materiály+ABS+dekory (aj otvorené otázky z 09_POJMY) · ④ kovanie · ⑤ Výroba+VEPO+semafor. K tomu:
+Stabilizácia pred V0.6 = **spoločné prechádzky funkčnosťou v krátkych jasných krokoch**: ujasnenie pojmov a špecifických funkcií naprieč sedeniami, podstatné veci sa dopĺňajú do dokumentácie (glosár + poznatky: [../POJMY.md](../POJMY.md)). Plán sedení: ① vkladanie+korpus · ② zóny+čelá · ③ materiály+ABS+dekory (aj otvorené otázky z 09_POJMY) · ④ kovanie · ⑤ Výroba+VEPO+semafor. K tomu:
 
 - **Katalóg materiálov (Demos):** Michalov zoznam (25.7.) spracovaný do seed podkladu nižšie; 90 % materiálu/kovania/ABS ide z demos-trade.sk. Otvorená debata V0.6: „zadaj kód → plugin načíta dáta" (verejné vyhľadávanie kód→položka aj dekor→celá skupina s cenami; Konfigurátor cenníkov za loginom) + **pracovné dosky v dekorovej skupine** (otázky 1–3 v 09_POJMY).
-- **Hardening zoznam:** jediný otvorený bod tohto zoznamu (manuálne overenie redo Ctrl+Y po zlúčených transparentných operáciách) žije ďalej v zápisníku [../08_DOGFOODING.md](../08_DOGFOODING.md), skupina STABILITA.
+- **Hardening zoznam:** jediný otvorený bod tohto zoznamu (manuálne overenie redo Ctrl+Y po zlúčených transparentných operáciách) žije ďalej v zápisníku [../DOGFOODING.md](../DOGFOODING.md), skupina STABILITA.
 - **Priebeh testovania seedu (27.7.):** beží — nové D-43 (duplák), D-44 (výber výrobcu/typu), D-45 (bloker 18,6). Funguje: zmena formátu platne podľa postupu (MG Cashmere → 2800×2050 ✓).
 
 ### Seed katalógu — ZRUŠENÝ ako krok (Michal 10.8.); podklad ostáva v [../zdroje/SEED_KATALOG_2026-07.md](../zdroje/SEED_KATALOG_2026-07.md)

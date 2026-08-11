@@ -6,7 +6,7 @@
 # (hinge x6 s ownerom, slide s params.nominal_length...), set ju prelozi na
 # KODY katalogu (hardware_catalog) s pomermi. Set NIE JE polozka katalogu —
 # je to mapovacie pravidlo (zamknute rozhodnutie, debata 2.8.2026,
-# SYSTEM/09_POJMY.md "Kovanie — sety").
+# SYSTEM/POJMY.md "Kovanie — sety").
 #
 # TVAR SETU:
 #   { "set_id": "zaves-klasik",            # slug identita, NEMENNA
@@ -120,7 +120,7 @@ module Noxun
         { 'key' => 'front_height', 'label' => 'výška čela',  'by' => 'podľa výšky čela' }
       ].freeze
 
-      # Seed sety = zavery debaty 2.8.2026 (09_POJMY "Kovanie — sety");
+      # Seed sety = zavery debaty 2.8.2026 (POJMY "Kovanie — sety");
       # kody = SYSTEM/zdroje/SEED_KATALOG_2026-07.md §2. Atira rad nesie LEN
       # dolozene kody (420/470) — ostatne NL = ORANGE, kody doplni Michal/D2.
       SEED_SETS = [

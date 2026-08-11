@@ -9,16 +9,16 @@ GitHub: https://github.com/michalmoronga-alt/noxun-panel
 
 | Ideš robiť… | Pred prácou POVINNE prečítaj |
 |---|---|
-| **novú dávku · plánovanie · zadanie** | [SYSTEM/STAV.md](SYSTEM/STAV.md) (kde projekt je) → [SYSTEM/PLAN.md](SYSTEM/PLAN.md) (blok, do ktorého dávka patrí) → skupinu toho bloku v [SYSTEM/08_DOGFOODING.md](SYSTEM/08_DOGFOODING.md) (plné znenia D-čísel) |
-| **zmenu Ruby kódu — core / modules** | [docs/ARCHITEKTURA.md](docs/ARCHITEKTURA.md) — odseky **dotknutých modulov** (nájdeš ich Grepom podľa mena súboru) + dotknuté § [SYSTEM/01_STANDARD.md](SYSTEM/01_STANDARD.md) |
-| **buildery · observery · undo · geometriu** | ARCHITEKTURA (`construction`, `cabinet_builder`, `board_builder`, `zone_tree`, `scale_observer`) + [docs/SKETCHUP_PRAVIDLA.md](docs/SKETCHUP_PRAVIDLA.md) + 01_STANDARD §3, §4, §9. **In-SketchUp testy sú tu POVINNÉ** (`scripts\run_su_tests.ps1`) — headless sada geometriu ani undo neoverí |
+| **novú dávku · plánovanie · zadanie** | [SYSTEM/STAV.md](SYSTEM/STAV.md) (kde projekt je) → [SYSTEM/PLAN.md](SYSTEM/PLAN.md) (blok, do ktorého dávka patrí) → skupinu toho bloku v [SYSTEM/DOGFOODING.md](SYSTEM/DOGFOODING.md) (plné znenia D-čísel) |
+| **zmenu Ruby kódu — core / modules** | [docs/ARCHITEKTURA.md](docs/ARCHITEKTURA.md) — odseky **dotknutých modulov** (nájdeš ich Grepom podľa mena súboru) + dotknuté § [SYSTEM/STANDARD.md](SYSTEM/STANDARD.md) |
+| **buildery · observery · undo · geometriu** | ARCHITEKTURA (`construction`, `cabinet_builder`, `board_builder`, `zone_tree`, `scale_observer`) + [docs/SKETCHUP_PRAVIDLA.md](docs/SKETCHUP_PRAVIDLA.md) + STANDARD §3, §4, §9. **In-SketchUp testy sú tu POVINNÉ** (`scripts\run_su_tests.ps1`) — headless sada geometriu ani undo neoverí |
 | **UI — panel, HTML, JS, CSS, satelitné okná** | [docs/UI_DIZAJN.md](docs/UI_DIZAJN.md) (pri KAŽDEJ UI práci) + ARCHITEKTURA sekcia „UI — Inspector + satelity" + **cache-bust pravidlo** nižšie (`?v=` = presne VERSION) + trvalé pravidlo **„vertikálny priestor panela je vzácny"** ([SYSTEM/PLAN.md](SYSTEM/PLAN.md), sekcia Trvalé UI/UX pravidlo) |
-| **materiály · ABS · katalóg · Demos** | ARCHITEKTURA — `materials`, `materials_*` split, `materials_migration`, `materials_health`, `abs_rules`, `demos/` + [SYSTEM/01_STANDARD.md](SYSTEM/01_STANDARD.md) **§7 Materiály a ABS** |
-| **kovanie — pravidlá, sety, katalóg** | ARCHITEKTURA — `hardware_rules`, `hardware_catalog` + [SYSTEM/01_STANDARD.md](SYSTEM/01_STANDARD.md) **§6 Kovanie** |
-| **výstupy — VEPO, kusovník, nákup, CSV/XLSX** | [SYSTEM/03_VYSTUP_vepo_kontrakt.md](SYSTEM/03_VYSTUP_vepo_kontrakt.md) + ARCHITEKTURA (`build_plan`, `part_keys`, `validation`) + 01_STANDARD §8 a §11 |
+| **materiály · ABS · katalóg · Demos** | ARCHITEKTURA — `materials`, `materials_*` split, `materials_migration`, `materials_health`, `abs_rules`, `demos/` + [SYSTEM/STANDARD.md](SYSTEM/STANDARD.md) **§7 Materiály a ABS** |
+| **kovanie — pravidlá, sety, katalóg** | ARCHITEKTURA — `hardware_rules`, `hardware_catalog` + [SYSTEM/STANDARD.md](SYSTEM/STANDARD.md) **§6 Kovanie** |
+| **výstupy — VEPO, kusovník, nákup, CSV/XLSX** | [SYSTEM/VEPO_KONTRAKT.md](SYSTEM/VEPO_KONTRAKT.md) + ARCHITEKTURA (`build_plan`, `part_keys`, `validation`) + STANDARD §8 a §11 |
 | **bugfix · diagnostiku · „prečo to padá"** | mapa „Kam sa pozrieť" v [SYSTEM/STAV.md](SYSTEM/STAV.md) → odsek dotknutého modulu v ARCHITEKTURE → pri otázke **„prečo je to takto?"** [SYSTEM/archiv/KRONIKA.md](SYSTEM/archiv/KRONIKA.md) a [SYSTEM/archiv/DOGFOODING_vyriesene.md](SYSTEM/archiv/DOGFOODING_vyriesene.md) |
 | **testy — novú sadu alebo úpravu** | sekcia **Testovanie** nižšie + vzory v `tests/pure/`, `tests/js/`, `tests/sketchup/` (nová sada = štruktúra najbližšej existujúcej, nie vlastný formát) |
-| **code review · audit návrhu** | [SYSTEM/01_STANDARD.md](SYSTEM/01_STANDARD.md) (kontrakt, proti ktorému sa posudzuje) + ARCHITEKTURA odseky dotknutých modulov + skill `codex-audit` |
+| **code review · audit návrhu** | [SYSTEM/STANDARD.md](SYSTEM/STANDARD.md) (kontrakt, proti ktorému sa posudzuje) + ARCHITEKTURA odseky dotknutých modulov + skill `codex-audit` |
 | **dynamické komponenty (DC)** | [docs/DC_PRAVIDLA.md](docs/DC_PRAVIDLA.md) — vždy a bez výnimky (draho zaplatené pasce) |
 
 Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Architektúra sa udržiava priebežne:** dávka, ktorá mení modul, prepíše JEHO odsek v [docs/ARCHITEKTURA.md](docs/ARCHITEKTURA.md) — nikdy nepridáva text na koniec súboru.
@@ -37,14 +37,14 @@ Keď zásah spadá do viacerých riadkov, platia VŠETKY. **Architektúra sa udr
 - `VERSION` žije na 2 miestach: `noxun_engine.rb` (autorita) + `noxun_engine/main.rb` (fallback) — synchro stráži guard test.
 - **Každý PR meniaci kód pluginu = bump patch** (0.5.0 → 0.5.1); **uzáver etapy (bloku v `SYSTEM/PLAN.md`) = bump minor** (0.5.x → 0.6.0).
 - **Cache-bust:** každý `?v=` v `ui/*.html` = presne VERSION (stráži guard test; CEF cachuje css/js). Zmena css/js ⇒ bump verzie ⇒ prepísať všetky `?v=`.
-- **Checklist uzáveru dávky:** bump VERSION (2×) + `?v=` → testy zelené → **odsek dotknutého modulu v `docs/ARCHITEKTURA.md` aktualizovaný na mieste** → vyriešené D-čísla do `SYSTEM/archiv/DOGFOODING_vyriesene.md` (plný text + PR) → zápisník `SYSTEM/08_DOGFOODING.md` (jednoriadkový index) → **prepíš `SYSTEM/STAV.md` + APPEND odsek navrch „Záznamy dávok" v `SYSTEM/archiv/KRONIKA.md` + aktualizuj blok v `SYSTEM/PLAN.md`** → README pri uzávere etapy.
+- **Checklist uzáveru dávky:** bump VERSION (2×) + `?v=` → testy zelené → **odsek dotknutého modulu v `docs/ARCHITEKTURA.md` aktualizovaný na mieste** → vyriešené D-čísla do `SYSTEM/archiv/DOGFOODING_vyriesene.md` (plný text + PR) → zápisník `SYSTEM/DOGFOODING.md` (jednoriadkový index) → **prepíš `SYSTEM/STAV.md` + APPEND odsek navrch „Záznamy dávok" v `SYSTEM/archiv/KRONIKA.md` + aktualizuj blok v `SYSTEM/PLAN.md`** → README pri uzávere etapy.
 
 ## Špecifikácia a kontext (všetko v tomto repe)
 
-- **Záväzný štandard dát:** [SYSTEM/01_STANDARD.md](SYSTEM/01_STANDARD.md) (dictionary NOXUN, mm Float, roly, regenerate pattern)
+- **Záväzný štandard dát:** [SYSTEM/STANDARD.md](SYSTEM/STANDARD.md) (dictionary NOXUN, mm Float, roly, regenerate pattern)
 - **Architektúra modulov (core / modules / ui) + kľúčové invarianty:** [docs/ARCHITEKTURA.md](docs/ARCHITEKTURA.md) — JEDINÉ miesto, kde architektúra žije; číta sa pri práci na kóde podľa tabuľky vyššie
-- **Kde projekt je (čítaj ako prvé):** [SYSTEM/STAV.md](SYSTEM/STAV.md) · plán a bloky prác: [SYSTEM/PLAN.md](SYSTEM/PLAN.md) · história dávok: [SYSTEM/archiv/KRONIKA.md](SYSTEM/archiv/KRONIKA.md) · dogfooding zápisník: [SYSTEM/08_DOGFOODING.md](SYSTEM/08_DOGFOODING.md) · UI vízia: [SYSTEM/07_UI_VIZIA.md](SYSTEM/07_UI_VIZIA.md)
-- **Glosár pojmov + stolárske poznatky:** [SYSTEM/09_POJMY.md](SYSTEM/09_POJMY.md) — jednotný jazyk sedení a fakty domény (postforming, formáty, hrúbky, ABS obchodné hodnoty); trvalé poznatky z hlásení zapisovať SEM
+- **Kde projekt je (čítaj ako prvé):** [SYSTEM/STAV.md](SYSTEM/STAV.md) · plán a bloky prác: [SYSTEM/PLAN.md](SYSTEM/PLAN.md) · história dávok: [SYSTEM/archiv/KRONIKA.md](SYSTEM/archiv/KRONIKA.md) · dogfooding zápisník: [SYSTEM/DOGFOODING.md](SYSTEM/DOGFOODING.md) · UI vízia: [SYSTEM/UI_VIZIA.md](SYSTEM/UI_VIZIA.md)
+- **Glosár pojmov + stolárske poznatky:** [SYSTEM/POJMY.md](SYSTEM/POJMY.md) — jednotný jazyk sedení a fakty domény (postforming, formáty, hrúbky, ABS obchodné hodnoty); trvalé poznatky z hlásení zapisovať SEM
 - **Historické dokumenty (uzavreté rozhodnutia, plné texty hotových etáp a vyriešených postrehov):** [SYSTEM/archiv/](SYSTEM/archiv/)
 - **Pravidlá SketchUp kódu:** [docs/SKETCHUP_PRAVIDLA.md](docs/SKETCHUP_PRAVIDLA.md) · DC pasce: [docs/DC_PRAVIDLA.md](docs/DC_PRAVIDLA.md) · UI dizajn: [docs/UI_DIZAJN.md](docs/UI_DIZAJN.md) — kompletné a samostatné v tomto repe. (Nadradený `..\CLAUDE.md` existuje len v Michalovom lokálnom workspace `C:\APP DEV\RUBY` — mapa ostatných pluginov; pre prácu v tomto repe nie je potrebný.)
 

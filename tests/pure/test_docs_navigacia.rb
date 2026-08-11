@@ -57,7 +57,7 @@ end
 
 NxTest.test('docs: relativne odkazy v navigacnych suboroch ukazuju na existujuce subory') do
   broken = []
-  %w[CLAUDE.md docs/ARCHITEKTURA.md SYSTEM/STAV.md SYSTEM/PLAN.md SYSTEM/08_DOGFOODING.md].each do |name|
+  %w[CLAUDE.md docs/ARCHITEKTURA.md SYSTEM/STAV.md SYSTEM/PLAN.md SYSTEM/DOGFOODING.md].each do |name|
     path = File.join(NxTest::ROOT, name)
     NxTest.assert(File.exist?(path), "#{name} chyba")
     dir = File.dirname(path)

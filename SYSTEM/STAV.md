@@ -5,24 +5,22 @@
 
 ## Stav
 
-**v0.5.61 · 11.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku.
+**v0.6.0 · 11.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku. Na to nadviazala a práve sa uzavrela **upratovacia etapa U1–U4** (dokumentácia a hygiena repa); verzia **v0.6.0** je jej checkpoint — bez zmeny logiky.
 
 Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **D-93** — ručný zámok nominálnej dĺžky výsuvu, PR **#156**. Testy: **1176 headless · 30 JS sád · 312 in-SketchUp scenárov**.
 
 ## Robí sa
 
-**Upratovacia etapa U1–U4** — dokumentácia a hygiena repa pred veľkými etapami. Rozsah a poradie: [PLAN.md](PLAN.md), blok UPRATANIE. U1 (navigácia docs), U2 (čistka zápisníka) aj U3 (diéta CLAUDE.md) sú uzavreté — **aktuálna dávka = U4, posledná v etape**.
-
-- **U4** — `00_VIZIA` a `06_PANEL_NASTAVENIA_navrh` do archívu, [../docs/ARCHIWOOD_INSPIRACIA.md](../docs/ARCHIWOOD_INSPIRACIA.md) do [zdroje/](zdroje/), premenovanie súborov na mená bez čísel, README, checkpoint verzie; lokálne (bez PR) zmazanie starých worktrees a zmergovaných vetiev.
-
-Dávky sa NEstackujú — každá štartuje z čerstvého `main` až po mergi predchodcu.
+**Nič nebeží — ďalší blok podľa [PLAN.md](PLAN.md).** Upratovacia etapa je uzavretá: navigácia stojí na trojici STAV · PLAN · [archiv/KRONIKA.md](archiv/KRONIKA.md), zápisník drží len otvorené postrehy v skupinách podľa blokov, architektúra žije v [../docs/ARCHITEKTURA.md](../docs/ARCHITEKTURA.md) a súbory v `SYSTEM/` majú mená bez čísel.
 
 ## Ďalší krok
 
-Po upratovaní: **workflow retrospektíva** (samostatná session — pravidlá Michal ↔ Claude ↔ Codex, skilly, PR rytmus) → **UI 2.0** (debata → klikateľné wireframes/mockup vzorom Materiály 2.0 → až potom implementačné dávky).
+**RETRO** — workflow retrospektíva (samostatná session: pravidlá Michal ↔ Claude ↔ Codex, skilly, PR rytmus) → potom **UI 2.0** (debata → klikateľné wireframes/mockup vzorom Materiály 2.0 → až potom implementačné dávky).
 
 ## Posledné uzávery
 
+- **ETAPA UPRATANIE UZAVRETÁ** (U1–U4, PR **#157–#160**) — checkpoint **v0.6.0** (11.8.)
+- **U4 presuny a checkpoint** (premenovanie súborov na mená bez čísel, pôvodná vízia a návrh panela do archívu, ARCHIWOOD do zdrojov, README, bump v0.6.0) — PR **#160** (11.8.)
 - **U3 diéta CLAUDE.md** (architektúra do vlastnej referencie [../docs/ARCHITEKTURA.md](../docs/ARCHITEKTURA.md), tabuľka povinného čítania podľa typu zásahu) — PR **#159** (11.8.)
 - **U2 čistka dogfooding zápisníka** (otvorené postrehy v skupinách podľa blokov, história do archívu, merač do zdrojov) — PR **#158** (11.8.)
 - **U1 navigácia docs (STAV · PLAN · KRONIKA)** — PR **#157** (11.8.)
@@ -36,15 +34,15 @@ Plné texty všetkých uzáverov a starších etáp: [archiv/KRONIKA.md](archiv/
 
 | Keď riešiš… | Dokument |
 |---|---|
-| dátový kontrakt — dictionary, roly, identita, plán, mm Float | [01_STANDARD.md](01_STANDARD.md) |
+| dátový kontrakt — dictionary, roly, identita, plán, mm Float | [STANDARD.md](STANDARD.md) |
 | čo sa ide robiť, bloky prác, zaradenie D-čísel | [PLAN.md](PLAN.md) |
-| otvorené postrehy z praxe (plné znenie D-čísel) | [08_DOGFOODING.md](08_DOGFOODING.md) |
+| otvorené postrehy z praxe (plné znenie D-čísel) | [DOGFOODING.md](DOGFOODING.md) |
 | „prečo je X takto?" — história dávok, etáp a rozhodnutí | [archiv/KRONIKA.md](archiv/KRONIKA.md) · [archiv/](archiv/) |
-| pojmy, stolárska doména, fakty o materiáloch a kovaní | [09_POJMY.md](09_POJMY.md) |
+| pojmy, stolárska doména, fakty o materiáloch a kovaní | [POJMY.md](POJMY.md) |
 | pravidlá písania kódu — SketchUp / DC / UI dizajn | [../docs/SKETCHUP_PRAVIDLA.md](../docs/SKETCHUP_PRAVIDLA.md) · [../docs/DC_PRAVIDLA.md](../docs/DC_PRAVIDLA.md) · [../docs/UI_DIZAJN.md](../docs/UI_DIZAJN.md) |
 | architektúra modulov (core / modules / ui) + invarianty | [../docs/ARCHITEKTURA.md](../docs/ARCHITEKTURA.md) |
 | workflow, verzie, uzáver dávky, testovanie, čo si pred zásahom prečítať | [../CLAUDE.md](../CLAUDE.md) |
-| cieľ — čo znamená „V1 hotové" a nemenné princípy | [10_V1_VIZIA.md](10_V1_VIZIA.md) |
-| smer UI | [07_UI_VIZIA.md](07_UI_VIZIA.md) |
-| kontrakt výstupu do VEPO | [03_VYSTUP_vepo_kontrakt.md](03_VYSTUP_vepo_kontrakt.md) |
+| cieľ — čo znamená „V1 hotové" a nemenné princípy | [V1_VIZIA.md](V1_VIZIA.md) |
+| smer UI | [UI_VIZIA.md](UI_VIZIA.md) |
+| kontrakt výstupu do VEPO | [VEPO_KONTRAKT.md](VEPO_KONTRAKT.md) |
 | rešerše, prieskumy dodávateľov, seed podklady | [zdroje/](zdroje/) |

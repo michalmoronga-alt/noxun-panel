@@ -133,8 +133,8 @@ Kódy = Demos „Kód sortimentu" (objednávané cez VEPO). **SET** = položky, 
 1. ~~Kód krytiek Sensys~~ — **VYRIEŠENÉ (debata 2.8.):** miska **105408** + ramienko **105425** (doplnil Michal; súčasť SET ZÁVES 1:1:1:1).
 2. **Skladové zásoby (Michal)** — naskladnené položky (AXILO 100 ks, podložky, SPAX…) skresľujú frekvencie objednávok; Michal dodá stavy → upravia sa pomery kovania.
 3. **Falco a Kastamonu** — zdroj/kódy (Y121, A860; „FAL 500 SM 16" cez VEPO) — nejasný dodávateľ a či majú DK kódy.
-4. **ABS mapovanie dekor↔kód** (09_POJMY ot. 2) — z Disku už máme reálne kódy: 515069 (skupinová biela), 356427 (Cashmere BS/PD), 398905, 514401/514404, 392486, 510705, 495215; doplniť pri Demos importe (V0.6 „zadaj kód").
-5. **Pracovné dosky v dekorovej skupine** (09_POJMY ot. 1/3) — testovacie rodiny z praxe: F206 (DTDL+PD+kompakt+zástena), K2738 (DTDL+PD FP), K551 (kompakt+PD), F800 (DTDL+PD 600/920).
+4. **ABS mapovanie dekor↔kód** (POJMY ot. 2) — z Disku už máme reálne kódy: 515069 (skupinová biela), 356427 (Cashmere BS/PD), 398905, 514401/514404, 392486, 510705, 495215; doplniť pri Demos importe (V0.6 „zadaj kód").
+5. **Pracovné dosky v dekorovej skupine** (POJMY ot. 1/3) — testovacie rodiny z praxe: F206 (DTDL+PD+kompakt+zástena), K2738 (DTDL+PD FP), K551 (kompakt+PD), F800 (DTDL+PD 600/920).
 6. **StrongMax 16/18** — nastupujúci systém (3 zákazky 2025–2026, v Gmail objednávkach chýba) — potvrdiť zaradenie do V0.6 katalógu popri Atire.
 7. **AvanTech YOU** — nikde sa nevyskytol; V0.6 stavať na InnoTech Atira (+ StrongMax), nie AvanTech.
 8. **Neprečítané zdroje:** 2 ODT rozpočty 2025 (kuchyňa; chodba+kúpeľňa+schody), prílohy VEPO v mailoch (PDF faktúry/CP), stránka 2+ vyhľadávania Disku (2023–2024).
@@ -148,4 +148,4 @@ Kódy = Demos „Kód sortimentu" (objednávané cez VEPO). **SET** = položky, 
 
 - [GMAIL_KOVANIE_sonda_2026-07.md](GMAIL_KOVANIE_sonda_2026-07.md) — objednávky kovania z firemného Gmailu (2023–2026), sety, dodávatelia (VEPO/Demos), naskladňovací zoznam 12/2024.
 - [DISK_ZAKAZKY_sonda_2026-07.md](DISK_ZAKAZKY_sonda_2026-07.md) — 9 zákazkových rozpočtov + CP + firemná šablóna rozpočtu z Google Disku (2024–2026), frekvencie materiálov aj kovania, ceny, VEPO služby.
-- [../archiv/DOGFOODING_historia.md](../archiv/DOGFOODING_historia.md) — sekcia „Seed katalógu" (ručný zoznam Michal 25. 7.) + 2A migračná mapa existujúceho katalógu. *(Obe sekcie boli do 11.8.2026 v živom zápisníku 08_DOGFOODING.md.)*
+- [../archiv/DOGFOODING_historia.md](../archiv/DOGFOODING_historia.md) — sekcia „Seed katalógu" (ručný zoznam Michal 25. 7.) + 2A migračná mapa existujúceho katalógu. *(Obe sekcie boli do 11.8.2026 v živom zápisníku DOGFOODING.md.)*
