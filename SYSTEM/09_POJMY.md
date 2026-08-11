@@ -18,7 +18,7 @@
 | **BuildPlan** | záväzný kontrakt plánu stavby (SCHEMA 2) — geometria, kusovník aj VEPO čítajú TEN ISTÝ plán |
 | **Semafor** | kontrolný zoznam RED/ORANGE v okne Výroba (RED nikdy neblokuje export) |
 | **Proxy kovania** | vizuál (nohy, úchytkový profil) v modeli; NIE je zdroj pravdy — súpis číta VÝHRADNE `config.hardware[]` |
-| **Úchytkový profil (UKW)** | hliníkový profil nasunutý na hranu čela namiesto úchytky (UKW-7 = 19,181 × 37,419 mm, tyče 3000/3500 mm, 7 farieb). Čelo sa kvôli nemu **skracuje o 36 mm**, riadok čiel si výšku drží — profil je jeho súčasť. Rez = šírka krídla, každé krídlo má vlastný kus. Dnes vždy **horná** hrana; dolná (častá v praxi) a bočné sú v backlogu. Hrana sa **olepuje normálne** — profil sa nasúva na hotový olep |
+| **Úchytkový profil (UKW)** | hliníkový profil nasunutý na hranu čela namiesto úchytky (UKW-7 = 19,181 × 37,419 mm, tyče 3000/3500 mm, 7 farieb). Čelo sa kvôli nemu **skracuje o 36 mm**, riadok čiel si výšku drží — profil je jeho súčasť. Rez = šírka krídla, každé krídlo má vlastný kus. Dnes vždy **horná** hrana; dolná (častá v praxi) a bočné sú v backlogu. Hrana sa **olepuje normálne** — profil sa nasúva na hotový olep. **Osadenie:** zadná rovina profilu je zarovno so zadnou rovinou čela, hrúbka profilu teda **presahuje dopredu**, a spodný „nos" prekrýva líce čela o ~1,4 mm (nie je to symetrická lišta — orientácia dopredu/dozadu je zameniteľná a raz sa už zamenila, D-90/PR #146) |
 | **Set kovania** | mapovacie pravidlo: generický typ z pravidiel (záves, noha, výsuv…) → zoznam Demos kódov s pomermi (per jednotka / per vlastník / rad podľa NL); **NIE je položka katalógu**; definície globálne + snapshot v modeli (dávka D) |
 | **Šablóna vs TYP vs parameter** | tri úrovne konfigurácie — hranica definovaná v [04_ROADMAP.md](04_ROADMAP.md) |
 
@@ -42,6 +42,7 @@
 - **Dekorové číslovanie AJ štruktúry povrchu sú PER VÝROBCA:** Egger (U750 ST9, H3303 ST10, F800 ST9, H1180 ST37), Kronospan (K097 SU BU, 164 PE BU, 5981 MG, K350 RT BU, K2738 PW BU), Falco (Y121 FS01), Kastamonu (A860 PS29). „ST9" a pod. = kód štruktúry (embosovania) povrchu.
 - **Formáty platní sa líšia aj v rámci výrobcu:** Egger 2800×2070; Kronospan 2800×2070 aj **2800×2050** (napr. MG dekory). Formát je vlastnosť materiálu (pole z D-19) — vplýva na odhad platní a semafor „nezmestí sa".
 - **Hrúbka nie je vždy 18,0:** Egger H1180 Dub Halifax = **18,6 mm** (hlboká synchrónna štruktúra). Guardy hrúbok a semafor s tým musia rátať. **Prax (Michal 30.7.):** ~95 % korpusov je 18 mm; občas 19 mm; 18,6 je rarita (Halifax prakticky jediný) — výnimka, ktorá stolárom komplikuje život → preto obojsmerné previazanie hrúbka↔materiál (D-45/D-46).
+- **Dodávateľ môže viesť ten istý dekor pod INÝM číslom (D-98, 9.8.):** Egger má pre **kompaktné** dosky vlastné číslo dekoru — kompakt dekoru **F800** sa u dodávateľa volá **F8001**. Nie je to iný dekor (vzor je ten istý), je to obchodné číslo produktovej rady. Dôsledok pre dáta: číslo dekoru v našej skupine ostáva **F800** a dodávateľské číslo je samostatné voliteľné pole **„Dekor u dodávateľa"** na variante — inak sa cena a kód kompaktu nedajú stiahnuť nikdy. Pri objednávaní a hľadaní treba počítať s oboma číslami.
 - **Rovnaký dekor existuje ako DTDL aj PD s INOU štruktúrou povrchu:** Kronospan K2738 Torro Cremona Oak = DTDL „PW BU" (DK 532848) + PD „FP" (DK 532772). → otvorená otázka kľúča skupiny (nižšie).
 
 ### Zásteny
@@ -59,6 +60,12 @@
 - **Hĺbka odfrezovania sa u nás NErieši** — to spracúva VEPO; na našej strane ide len o výber hrúbky pásky a priradenie kódu.
 - ABS sa objednáva na metre (bal. 25/75 m).
 - **Prieskum Demos per dekor (29.7., plné tabuľky s kódmi: [zdroje/DEMOS_ABS_prieskum_2026-07.md](zdroje/DEMOS_ABS_prieskum_2026-07.md)):** bežné dekory majú 23+43 v 0,8 aj 2,0 takmer vždy skladom (default model „jednotka+dvojka" platí) — ALE **lesklé MG dekory majú JEDINÚ hrúbku 1 mm** (0,8 ani 2 neexistujú → pravidlá potrebujú fallback „najbližšia hrúbka, ktorú dekor má"), **Halifax má dvojku len ako 22/2** (nie 23), existuje aj mikro-hrana 22/0,4 a Raukantex 1,2. Guard hrúbok ABS → povoliť {0,4 · 0,8 · 1,0 · 1,2 · 1,5 · 2,0} — **potvrdené (Michal 29.7.):** mikro-hrana 0,4 sa takmer nepoužíva, ale zaradí sa rovno („nech máme pokryté spektrum") — šum vo výbere vyrieši inteligentné UI/UX zobrazovanie (odporúčané hore, exotika zbalená). Dvojka je ~1,4–1,8× drahšia než 0,8. **Falco a Kastamonu:** iní dodávatelia, zatiaľ sa neriešia — pár dekorov a cien sa vyplní ručne (mimo Demos flow).
+
+### Kontrola olepov (poznatok z KLINIKY, 10.–11.8. — D-104/D-105)
+
+- **Kontrola olepu má TRI stavy, nie dva:** hrana, ktorú **pravidlo žiada a páska na nej nie je** (chyba, ktorú treba opraviť) · hrana **mimo pravidla a neolepená** (legálny stav — ale iba človek vie, či je to naozaj v poriadku) · hrana **olepená** (potvrdenie, že práca je hotová). Dvojstavové zobrazenie „chýba / nechýba" nestačí, lebo tretina reálnych rozhodnutí je práve v prostrednej kategórii.
+- **Pohľadovosť hrany systém NEVIE a hádať ju nemá.** Či je hrana v hotovej kuchyni vidieť, závisí od toho, kde skrinka stojí — nie od jej roly: **bočné hrany dna sú v rade skriniek skryté** (nelepia sa), ale **v koncovej skrinke sú pohľadové** (lepia sa). Preto kontrola stavy iba **ukazuje** — nikdy sama nič nedopĺňa ani neruší, rozhodnutie ostáva na človeku. Rovnaký dôvod má aj pravidlo „vedome zrušený olep sa v kontrole ZOBRAZÍ": zmyslom záverečnej kontroly je ukázať všetko, čo pravidlo žiada a v modeli to nie je.
+- **Materiál, ktorý sa lepiť nedá, sa do kontroly nepletie vôbec** (KOMPAKT s monolitickou hranou, PD s postformingom, neurčený UNI a materiál mimo katalógu) — inak by najhlučnejšie svietili práve dielce, na ktorých sa nedá nič spraviť.
 
 ### Dodávatelia a zdroje cien (29.7. — mail research + Disk prieskum)
 
