@@ -260,12 +260,33 @@ module Noxun
                              'params' => params, 'quantity' => 0, 'breakdown' => [] }
           q = h['quantity'].to_i
           g['quantity'] += q
-          g['breakdown'] << { 'owner_id' => h['owner_id'].to_s, 'owner_pid' => h['owner_pid'],
-                              'rule_id' => h['rule_id'].to_s,
-                              'source' => h['source'].to_s, 'quantity' => q,
-                              'owner_part_key' => h['owner_part_key'] }
+          row = { 'owner_id' => h['owner_id'].to_s, 'owner_pid' => h['owner_pid'],
+                  'rule_id' => h['rule_id'].to_s,
+                  'source' => h['source'].to_s, 'quantity' => q,
+                  'owner_part_key' => h['owner_part_key'] }
+          # D-93: pri rucne zamknutej NL nesie riadok AJ hodnotu automatu
+          # (nil = automat nevedel) + hotovy slovensky popis pre tooltip.
+          if h.key?('rule_nominal_length')
+            rnl = h['rule_nominal_length']
+            row['rule_nominal_length'] = rnl.is_a?(Numeric) ? rnl.to_f : nil
+            row['manual_note'] = manual_note(row['rule_nominal_length'])
+          end
+          g['breakdown'] << row
         end
         out.values.sort_by { |g| [g['generic_type'], params_signature(g['params'])] }
+      end
+
+      # D-93: JEDINA autorita textu znamienka „ručne prepísané" (JS ho len vypise).
+      def manual_note(rule_nl)
+        auto = rule_nl.is_a?(Numeric) ? "#{fmt_mm(rule_nl)} mm" : 'nezmestí sa'
+        "ručne prepísaná dĺžka (automat: #{auto})"
+      end
+
+      # Cele mm bez desatin, inak 1 desatinne miesto (slovenska ciarka) —
+      # ten isty tvar ako HardwareRules.fmt_mm (Bom je cisty, bez zavislosti).
+      def fmt_mm(v)
+        f = v.to_f
+        (f - f.round).abs < 0.05 ? f.round.to_s : format('%.1f', f).tr('.', ',')
       end
 
       def params_signature(params)

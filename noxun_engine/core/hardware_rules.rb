@@ -48,10 +48,22 @@
 # cfg[:hardware_overrides] (pole v configu korpusu, prezije rebuild ako part_overrides):
 #   { "owner_part_key": null|"front:F1/wing:left", "generic_type": "hinge",
 #     "rule_id": "zavesy-podla-vysky", "quantity": 6 }   alebo   "disabled": true
+#   alebo (D-93)   "nominal_length": 420.0
 # Identita override = TROJICA (owner_part_key, generic_type, rule_id) — dve pravidla
 # s rovnakym outputom na tom istom ownerovi su adresovatelne samostatne (audit K1).
 # disabled vitazi nad quantity; posledny duplicitny match vyhrava (normalize deduplikuje).
 # Polozka po override nesie source='manual' + rule_quantity (povodny pocet z pravidla).
+#
+# D-93 RUCNY NL VYSUVU (audit B1/B2):
+#   Polia zaznamu su NEZAVISLE — jeden zaznam moze niest quantity aj nominal_length
+#   (a disabled). Zapisove cesty pracuju PO POLIACH: zmena NL nikdy nezmaze rucny
+#   pocet a naopak; zaznam zanikne az ked je prazdny.
+#   ZAMOK = existencia platneho pola 'nominal_length' (ziadny extra priznak).
+#   Polozka po NL override nesie params['nominal_length'] = rucna hodnota,
+#   source='manual' a 'rule_nominal_length' = hodnota, ktoru by dal automat
+#   (nil = automat nevie — do svetlej hlbky sa nezmesti ziadna dlzka radu).
+#   fit_series emituje polozku AJ ked automat nevyberie nic, pokial ma dielec
+#   platny NL override (inak by zamok pri zmensenej hlbke ticho zmizol).
 require 'json'
 require 'fileutils'
 
@@ -329,7 +341,7 @@ module Noxun
                                                   'output' => rule['output'].to_s })
             next
           end
-          apply_rule(rule, cfg, parts, ctx, items, warnings)
+          apply_rule(rule, cfg || {}, parts, ctx, items, warnings)
         end
         warnings.concat(profile_rule_warnings(parts, rules))
         { items: apply_overrides(items, cfg[:hardware_overrides]), warnings: warnings }
@@ -368,7 +380,8 @@ module Noxun
       end
 
       # Aplikuje jedno pravidlo: korpusova uroven (owner nil) alebo per dielec roly.
-      def apply_rule(rule, _cfg, parts, ctx, items, warnings)
+      # cfg putuje az do compute — fit_series musi vediet o rucnom NL zamku (D-93).
+      def apply_rule(rule, cfg, parts, ctx, items, warnings)
         role = (rule['applies_to'] || {})['role'].to_s
         if role == 'cabinet'
           supports = Array((rule['applies_to'] || {})['support']).map(&:to_s)
@@ -377,19 +390,19 @@ module Noxun
           # hornu skrinku od spodnej bez noh (Bystrica ide LEN na horne).
           kinds = Array((rule['applies_to'] || {})['cabinet_type']).map(&:to_s)
           return if kinds.any? && !kinds.include?(ctx['cabinet_type'].to_s)
-          emit(rule, nil, ctx, nil, items, warnings)
+          emit(rule, nil, ctx, nil, items, warnings, cfg)
         else
           parts.each do |pd|
             next unless pd[:role].to_s == role
-            emit(rule, PartKeys.for_descriptor(pd), ctx, pd, items, warnings)
+            emit(rule, PartKeys.for_descriptor(pd), ctx, pd, items, warnings, cfg)
           end
         end
       end
 
       # Vypocita pocet + params a prida polozku (string kluce — JSON round-trip
       # cez config korpusu bez konverzii, ako warnings).
-      def emit(rule, owner, ctx, pd, items, warnings)
-        qty, params = compute(rule, ctx, pd, owner, warnings)
+      def emit(rule, owner, ctx, pd, items, warnings, cfg = {})
+        qty, params = compute(rule, ctx, pd, owner, warnings, cfg)
         return if qty.nil?
         # Poradie merge: kontextove params (deklarativne z pravidla) a AZ POTOM
         # odvodene params dielca — tie su autoritativne (front_height je vyska
@@ -410,7 +423,7 @@ module Noxun
       end
 
       # Vzory vypoctu. Vrati [quantity, params] alebo [nil, _] = polozka nevznikne.
-      def compute(rule, ctx, pd, owner, warnings)
+      def compute(rule, ctx, pd, owner, warnings, cfg = {})
         case rule['kind'].to_s
         when 'fixed'
           [clamp_qty(rule['quantity']), {}]
@@ -431,7 +444,22 @@ module Noxun
           return [nil, {}] if v.nil?
           budget = v - rule['clearance'].to_f
           nl = Array(rule['series']).map(&:to_f).select { |s| s <= budget }.max
+          # D-93: rucny zamok NL (existencia platneho pola v override zazname).
+          manual = override_nominal_length(cfg, owner, rule)
+          if manual && manual > budget
+            # ORANGE „skontroluj" — NEBLOKUJE (Michal moze vedome, napr. ina montaz).
+            warnings << BuildPlan.warning('hardware_manual_no_fit',
+                                          "#{label_for(rule['output'])}: ručne zamknutá dĺžka #{fmt_mm(manual)} mm sa do svetlej hĺbky #{fmt_mm(v)} mm nezmestí (rezerva #{fmt_mm(rule['clearance'].to_f)} mm) — skontroluj.",
+                                          part_key: owner,
+                                          data: { 'rule_id' => rule['rule_id'].to_s, 'available' => v,
+                                                  'clearance' => rule['clearance'].to_f,
+                                                  'nominal_length' => manual })
+          end
           if nl.nil?
+            # B1: so zamkom polozka VZNIKNE aj tak — NL doplni apply_overrides,
+            # rule_nominal_length ostane nil („automat nevie"). Bez zamku plati
+            # povodne spravanie (polozka nevznikne + hardware_no_fit).
+            return [clamp_qty(rule.fetch('quantity', 1)), {}] if manual
             warnings << BuildPlan.warning('hardware_no_fit',
                                           "#{label_for(rule['output'])}: do svetlej hĺbky #{v.round(1)} mm sa nezmestí žiadna dĺžka z radu (rezerva #{rule['clearance'].to_f.round(1)} mm).",
                                           part_key: owner,
@@ -527,7 +555,8 @@ module Noxun
       end
 
       # Rucne zasahy z configu korpusu. Match = (owner, generic_type, rule_id);
-      # disabled -> polozka von; quantity -> prepis + source 'manual' (rule_quantity ostava).
+      # disabled -> polozka von; quantity -> prepis poctu; nominal_length (D-93) ->
+      # prepis params. Polia su NEZAVISLE, jeden zaznam ich moze niest viac.
       def apply_overrides(items, overrides)
         list = Array(overrides).select { |ov| ov.is_a?(Hash) }
         return items if list.empty?
@@ -535,14 +564,47 @@ module Noxun
           ov = list.select { |o| override_match?(o, it) }.last
           next it unless ov
           next nil if ov['disabled'] == true
+          out = it
+          # D-93: rucna NL. rule_nominal_length = hodnota automatu (nil = automat
+          # nevie; polozka vznikla LEN vdaka zamku — B1).
+          nl = override_nl(ov['nominal_length'].nil? ? ov[:nominal_length] : ov['nominal_length'])
+          if nl
+            params = (out['params'].is_a?(Hash) ? out['params'] : {})
+            rule_nl = params['nominal_length']
+            out = out.merge('params' => params.merge('nominal_length' => nl),
+                            'source' => 'manual',
+                            'rule_nominal_length' => (rule_nl.is_a?(Numeric) ? rule_nl.to_f : nil))
+          end
           q = clamp_qty(ov['quantity'])
-          next it if q.nil?
           # ZAMERNE aj pri q == rule_quantity: kym zaznam existuje v configu, polozka
           # MUSI byt oznacena source 'manual' (UI ukaze reset). Inak by override splynul
           # s pravidlom, reset by zmizol a stale zaznam by necakane ozil pri buducej
           # zmene pravidla ci rozmerov (Codex review PR #24).
-          it.merge('quantity' => q, 'source' => 'manual')
+          out = out.merge('quantity' => q, 'source' => 'manual') if q
+          out
         end
+      end
+
+      # D-93: JEDINA autorita hodnoty NL overridu (strict). Konecny kladny Float,
+      # zaokruhleny na 2 desatinne miesta (mm Float, standard §2); cokolvek ine
+      # (String, nil, nula, NaN) = nie je override. Citaciu aj zapisovu cestu
+      # (builder normalize, evaluacia, panel callback) obsluhuje TATO funkcia.
+      def override_nl(v)
+        return nil unless v.is_a?(Numeric)
+        f = v.to_f
+        return nil unless f.finite? && f.positive?
+        f.round(2)
+      end
+
+      # Platny NL override pre (owner, output, rule_id) z configu korpusu.
+      # disabled zaznam zamok nenesie (polozka aj tak nevznikne).
+      def override_nominal_length(cfg, owner, rule)
+        list = cfg.is_a?(Hash) ? (cfg[:hardware_overrides] || cfg['hardware_overrides']) : nil
+        probe = { 'owner_part_key' => owner, 'generic_type' => rule['output'].to_s,
+                  'rule_id' => rule['rule_id'].to_s }
+        ov = Array(list).select { |o| o.is_a?(Hash) && override_match?(o, probe) }.last
+        return nil if ov.nil? || ov['disabled'] == true
+        override_nl(ov.key?('nominal_length') ? ov['nominal_length'] : ov[:nominal_length])
       end
 
       def override_match?(ov, item)

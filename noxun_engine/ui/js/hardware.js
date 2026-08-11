@@ -40,6 +40,49 @@
     if (ps.height != null) return Math.round(ps.height) + ' mm';
     return '';
   }
+
+  // ---- D-93: rucny override nominalnej dlzky vysuvu (zamok) ----------------
+  // Server posiela pri polozkach pravidla 'fit_series' blok `nl`
+  // { series, value, locked, auto, auto_known }. Zamok = existencia rucnej
+  // hodnoty na serveri — JS si stav NIKDY nepamata ani neodvodzuje.
+  // Ciste funkcie (Node testy: tests/js/test_d93_nl_override.js).
+  function hwNlFmt(v){
+    var f = Number(v);
+    if (!isFinite(f)) return '';
+    return (Math.abs(f - Math.round(f)) < 0.05) ? String(Math.round(f))
+                                                : f.toFixed(1).replace('.', ',');
+  }
+  // Ponuka selectu NL: hodnoty radu z pravidla; ULOZENA hodnota mimo radu
+  // (rad sa medzitým upravil) sa NEMAZE — pridá sa ako doplnená voľba, inak by
+  // select klamal (F5). -> [{ value, text, selected }]
+  function hwNlOptionList(nl){
+    var out = [];
+    var series = (nl && nl.series) || [];
+    var value = (nl && nl.value != null) ? Number(nl.value) : null;
+    var found = false;
+    series.forEach(function(s){
+      var sel = value != null && Math.abs(Number(s) - value) < 0.001;
+      if (sel) found = true;
+      out.push({ value: String(s), text: hwNlFmt(s), selected: sel });
+    });
+    if (value != null && !found){
+      out.push({ value: String(value), text: hwNlFmt(value) + ' (mimo radu)', selected: true });
+    }
+    return out;
+  }
+  function hwNlAutoText(nl){
+    return (nl && nl.auto_known) ? (hwNlFmt(nl.auto) + ' mm') : 'nezmestí sa';
+  }
+  function hwNlSelectTitle(nl){
+    return (nl && nl.locked)
+      ? ('Dĺžka výsuvu je ručne zamknutá (automat: ' + hwNlAutoText(nl) + ')')
+      : 'Dĺžku výsuvu určuje automat podľa svetlej hĺbky — výberom hodnoty ju zamkneš';
+  }
+  function hwNlLockTitle(nl){
+    return (nl && nl.locked)
+      ? ('Odomknúť — vráti sa automat (' + hwNlAutoText(nl) + ')')
+      : 'Zamknúť túto dĺžku (zmena hĺbky skrinky ju už nezmení)';
+  }
   function hwKey(owner, type, rule){ return (owner||'') + '||' + type + '||' + rule; }
 
   // ---- D-92: „co sa realne kupi" (sekundarny riadok polozky) ----------------
@@ -217,8 +260,14 @@
       // D-92: vlastnika pomenuva SERVER (owner_label — „F2 · zásuvkové čelo").
       // hwOwnerDesc ostava LEN ako fallback pre stary payload.
       var owner = it.owner_label || hwOwnerDesc(it.owner_part_key);
-      var extra = hwParamsDesc(it);
-      var manual = it.source === 'manual';
+      // D-93: pri výsuvoch nahradí popis „NL 470" priamo ovládateľný select —
+      // žiadny nový riadok, len iný obsah toho istého miesta.
+      var extra = it.nl ? '' : hwParamsDesc(it);
+      // D-93: „ručne" pri POČTE je vlastné pole overridu (samotný zámok dĺžky
+      // už tiež robí položku manual, ale počet pravidla nemení).
+      var manual = (it.quantity_manual != null) ? (it.quantity_manual === true)
+                                                : (it.source === 'manual');
+      var nlHtml = it.nl ? hwNlHtml(it.nl) : '';
       // D-81: kovanie viazane na DIELEC (čelo/zásuvka) má vlastný výber setu
       // PRIAMO v riadku — žiadny nový riadok (vertikálny priestor). Platí pre
       // každý typ s vlastníkom (výsuv per zásuvka, závesy per krídlo) — server
@@ -232,11 +281,12 @@
       // (obal .hwitem drzi obe casti pokope; .hwrow ostava nedotknuty, takze
       // hwPayload/closest('.hwrow') aj refreshHardwareSets funguju dalej).
       html += '<div class="hwitem">'
-        + '<div class="hwrow" data-owner="'+esc(it.owner_part_key||'')+'" data-type="'+esc(it.generic_type)+'" data-rule="'+esc(it.rule_id)+'">'
+        + '<div class="hwrow" data-owner="'+esc(it.owner_part_key||'')+'" data-type="'+esc(it.generic_type)+'" data-rule="'+esc(it.rule_id)+'" data-cab="'+esc(cabId||'')+'">'
         // title = celý popis riadku — na úzkom paneli (<400 px) sa .hwext skrýva
         + '<span class="hwname" title="'+esc(name+(owner?' · '+owner:'')+(extra?' · '+extra:''))+'">'
         + esc(name)+(owner?' <span class="hwown">'+esc(owner)+'</span>':'')
         + (extra?' <span class="hwext">'+esc(extra)+'</span>':'')+'</span>'
+        + nlHtml
         + setSel
         + '<input class="hwqty'+(manual?' manual':'')+'" type="number" min="1" max="999" step="1" value="'+esc(it.quantity)+'" onchange="onHwQty(this)">'
         + '<span class="unit">'+hwUnit(it.generic_type)+'</span>'
@@ -253,10 +303,10 @@
       if (!ov || ov.disabled !== true) return;
       if (present[hwKey(ov.owner_part_key, ov.generic_type, ov.rule_id)]) return;
       var owner = ov.owner_label || hwOwnerDesc(ov.owner_part_key); // D-92
-      html += '<div class="hwrow hwoff" data-owner="'+esc(ov.owner_part_key||'')+'" data-type="'+esc(ov.generic_type)+'" data-rule="'+esc(ov.rule_id)+'">'
+      html += '<div class="hwrow hwoff" data-owner="'+esc(ov.owner_part_key||'')+'" data-type="'+esc(ov.generic_type)+'" data-rule="'+esc(ov.rule_id)+'" data-cab="'+esc(cabId||'')+'">'
         + '<span class="hwname">'+esc(hwLabel(ov.generic_type))+(owner?' <span class="hwown">'+esc(owner)+'</span>':'')
         + ' <span class="hwext">vypnuté</span></span>'
-        + '<button class="ghostbtn hwbtn" title="Obnoviť (platí pravidlo)" onclick="onHwReset(this)">'+NXIcons.svg('rotate-ccw')+' obnoviť</button>'
+        + '<button class="ghostbtn hwbtn" title="Obnoviť (platí pravidlo)" onclick="onHwEnable(this)">'+NXIcons.svg('rotate-ccw')+' obnoviť</button>'
         + '</div>';
     });
     if (!html) html = '<div class="muted">Skrinka nemá žiadne kovanie (bez čiel, bez podstavca).</div>';
@@ -285,10 +335,26 @@
                                                  cabinet_id: sel.getAttribute('data-cab') || '' })); // GH #127 P2
   }
 
+  // D-93: select dlzky + zamok v TOM ISTOM riadku (vertikalny priestor).
+  function hwNlHtml(nl){
+    var opts = '';
+    hwNlOptionList(nl).forEach(function(o){
+      opts += '<option value="'+esc(o.value)+'"'+(o.selected?' selected':'')+'>'+esc(o.text)+'</option>';
+    });
+    var locked = nl.locked === true;
+    return '<select class="hwnlsel'+(locked?' manual':'')+'" title="'+esc(hwNlSelectTitle(nl))+'"'
+         + ' aria-label="Nominálna dĺžka výsuvu" onchange="onHwNl(this)">'+opts+'</select>'
+         + '<button class="ghostbtn hwbtn hwlock'+(locked?' on':'')+'" aria-pressed="'+(locked?'true':'false')+'"'
+         + ' aria-label="'+(locked?'Odomknúť dĺžku výsuvu':'Zamknúť dĺžku výsuvu')+'"'
+         + ' title="'+esc(hwNlLockTitle(nl))+'" onclick="onHwLock(this)">'
+         + NXIcons.svg(locked ? 'lock' : 'lock-open')+'</button>';
+  }
+
   function hwPayload(node, extra){
     var row = node.closest('.hwrow');
     var out = { owner_part_key: row.dataset.owner || null,
-                generic_type: row.dataset.type, rule_id: row.dataset.rule };
+                generic_type: row.dataset.type, rule_id: row.dataset.rule,
+                cabinet_id: row.dataset.cab || '' }; // D-93 F6: identity guard
     for (var k in extra) out[k] = extra[k];
     return out;
   }
@@ -296,13 +362,33 @@
     if (window.sketchup && sketchup.set_hardware_override)
       sketchup.set_hardware_override(JSON.stringify(payload));
   }
+  // Zapis ide PO POLIACH (field + value; value null = zrus len toto pole) —
+  // zmena dlzky nesmie zmazat rucny pocet a naopak.
   function onHwQty(inp){
     var q = parseInt(inp.value, 10);
     if (isNaN(q) || q < 1){ NX.setStatus('Počet musí byť aspoň 1 (alebo položku vypni).', true); return; }
-    hwSend(hwPayload(inp, { quantity: q }));
+    hwSend(hwPayload(inp, { field: 'quantity', value: q }));
   }
-  function onHwDisable(btn){ hwSend(hwPayload(btn, { disabled: true })); }
-  function onHwReset(btn){ hwSend(hwPayload(btn, { reset: true })); }
+  function onHwDisable(btn){ hwSend(hwPayload(btn, { field: 'disabled', value: true })); }
+  function onHwReset(btn){ hwSend(hwPayload(btn, { field: 'quantity', value: null })); }
+  function onHwEnable(btn){ hwSend(hwPayload(btn, { field: 'disabled', value: null })); }
+  function onHwNl(sel){
+    var v = parseFloat(sel.value);
+    if (isNaN(v)){ NX.setStatus('Neplatná dĺžka výsuvu.', true); return; }
+    hwSend(hwPayload(sel, { field: 'nominal_length', value: v }));
+  }
+  // Zamknutý zámok odomyká; odomknutý zamkne PRÁVE ZOBRAZENÚ hodnotu.
+  function onHwLock(btn){
+    if (btn.getAttribute('aria-pressed') === 'true'){
+      hwSend(hwPayload(btn, { field: 'nominal_length', value: null }));
+      return;
+    }
+    var row = btn.closest('.hwrow');
+    var sel = row ? row.querySelector('select.hwnlsel') : null;
+    var v = sel ? parseFloat(sel.value) : NaN;
+    if (isNaN(v)){ NX.setStatus('Vyber dĺžku výsuvu.', true); return; }
+    hwSend(hwPayload(btn, { field: 'nominal_length', value: v }));
+  }
   function openRulesDialog(){
     if (window.sketchup && sketchup.open_rules) sketchup.open_rules('');
   }
@@ -319,5 +405,10 @@
       hwCabOptionList: hwCabOptionList, hwFindEntry: hwFindEntry, hwOwnerDesc: hwOwnerDesc,
       HW_SET_PARAM: HW_SET_PARAM,
       // D-92 rozpis nakupu (tests/js/test_d92_hw_nakup.js)
-      hwMemberText: hwMemberText, hwBuyLine: hwBuyLine, HW_NO_CATALOG: HW_NO_CATALOG };
+      hwMemberText: hwMemberText, hwBuyLine: hwBuyLine, HW_NO_CATALOG: HW_NO_CATALOG,
+      // D-93 rucny NL vysuvu (tests/js/test_d93_nl_override.js) — hwNlHtml a
+      // hwPayload potrebuju globalne esc/NXIcons, test si ich podstrci.
+      hwNlFmt: hwNlFmt, hwNlOptionList: hwNlOptionList, hwNlAutoText: hwNlAutoText,
+      hwNlSelectTitle: hwNlSelectTitle, hwNlLockTitle: hwNlLockTitle,
+      hwNlHtml: hwNlHtml, hwPayload: hwPayload };
   }

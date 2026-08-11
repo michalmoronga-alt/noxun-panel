@@ -212,6 +212,17 @@
   .hwrow:not(.hwsetrow) .hwsetsel { flex: 0 1 104px; min-width: 60px; max-width: 150px;
                      padding: 2px 4px; border: 1px solid var(--nx-border-strong);
                      border-radius: 4px; font-size: 11px; color: var(--nx-ink-muted); }
+  /* D-93: rucny NL vysuvu — select dlzky + zamok v TOM ISTOM riadku (namiesto
+     popisu „NL 470", ziadny novy riadok). Zamknuty stav = jantarovy override
+     (rovnaka rec ako .hwqty.manual); semaforove --nx-state-* sa sem nemiesaju. */
+  .hwrow .hwnlsel { flex: 0 1 78px; min-width: 56px; padding: 2px 4px;
+                    border: 1px solid var(--nx-border-strong); border-radius: 4px;
+                    font-size: 11px; color: var(--nx-ink-muted); }
+  .hwrow .hwnlsel.manual { border-color: var(--nx-warn); background: var(--nx-warn-bg);
+                           color: var(--nx-ink-strong); }
+  .hwrow .hwlock { color: var(--nx-ink-faint); padding: 2px 5px; }
+  .hwrow .hwlock.on { color: var(--nx-warn-fg); background: var(--nx-warn-bg-soft);
+                      border-color: var(--nx-warn); }
   /* D-92 „co sa realne kupi": JEDEN sekundarny riadok pod polozkou (set -> kody).
      Obal .hwitem preberá vertikalny odstup, aby dvojica riadkov nezaberala viac
      miesta nez doteraz jeden (pravidlo vertikalneho priestoru). Riadok je
@@ -751,6 +762,10 @@
 .hwbanner { background: var(--nx-warn-bg); border: 1px solid var(--nx-warnchip-border);
             color: var(--nx-warn-fg); border-radius: 6px; padding: 6px 10px; margin: 6px 0; font-size: 12px; }
 .hwsetrow .hwsetsel { flex: 1 1 auto; min-width: 120px; font-size: 11.5px; }
+/* D-93: znamienko rucneho zasahu pri pocte (okno Vyroba) — drobna ikona
+   s tooltipom zo servera, jantarova ako ostatne override znaky. */
+.hwmanual { color: var(--nx-warnchip-fg); display: inline-flex; vertical-align: -2px; }
+.hwmanual .ic { width: 13px; height: 13px; }
 
 /* ===== V0.6 D2: Pridat z Demosu (katalog kovania) ===== */
 .hwdemos-hit { padding: 3px 8px; border: 1px solid var(--nx-border); border-radius: 5px;

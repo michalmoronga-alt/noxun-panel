@@ -2101,6 +2101,101 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- D-93: rucny zamok nominalnej dlzky vysuvu ------------------------------
+  #
+  # Overuje sa to, co Michal robi rukou: zamkne dlzku vysuvu na 420, potom meni
+  # HLBKU skrinky — zamok musi drzat (aj ked automat by dal ine cislo, aj ked sa
+  # do svetlej hlbky uz nezmesti ziadna dlzka radu), a po odomknuti sa musi
+  # vratit automat. Vsetko cez REALNU prestavbu korpusu (config je autorita).
+  def d93_params(depth)
+    { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => depth,
+      'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'drawer_front',
+                                  'mode' => 'fixed', 'height' => 200.0 }] } }
+  end
+
+  def d93_slide(inst)
+    ((e::Store.config(inst) || {})['hardware'] || []).find { |h| h['generic_type'] == 'slide' }
+  end
+
+  def d93_warn?(inst, code)
+    Array((e::Store.config(inst) || {})['warnings']).any? { |w| w.is_a?(Hash) && w['code'] == code }
+  end
+
+  def d93_rebuild(model, inst, depth, overrides)
+    p = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
+    p['depth'] = depth
+    p['hardware_overrides'] = overrides
+    e::CabinetBuilder.rebuild(model, inst, p)
+  end
+
+  def run_d93(model)
+    inst = e::CabinetBuilder.build(model, d93_params(510.0))
+    return ok('D93: vlozenie korpusu so zasuvkovym celom', false) unless inst
+
+    auto = d93_slide(inst)
+    ok("D93: automat vybral NL z hlbky (#{auto && auto['params'] && auto['params']['nominal_length']})",
+       !auto.nil? && auto['source'] == 'rule' && auto['params']['nominal_length'].to_f > 0)
+    owner = auto && auto['owner_part_key']
+    lock = [{ 'owner_part_key' => owner, 'generic_type' => 'slide',
+              'rule_id' => 'vysuvy-nl-podla-hlbky', 'nominal_length' => 420.0 }]
+
+    # 1) zamok pri povodnej hlbke
+    d93_rebuild(model, inst, 510.0, lock)
+    s1 = d93_slide(inst)
+    ok('D93: zamknuta NL 420 (source manual, automat ostal v rule_nominal_length)',
+       !s1.nil? && (s1['params']['nominal_length'].to_f - 420.0).abs < 0.01 &&
+       s1['source'] == 'manual' && s1['rule_nominal_length'].to_f > 420.0)
+
+    # 2) zmena hlbky skrinky — zamok DRZI (automat by dal ine cislo)
+    d93_rebuild(model, inst, 660.0, lock)
+    s2 = d93_slide(inst)
+    ok("D93: po zmene hlbky 510->660 NL drzi na 420 (automat #{s2 && s2['rule_nominal_length']})",
+       !s2.nil? && (s2['params']['nominal_length'].to_f - 420.0).abs < 0.01 &&
+       s2['rule_nominal_length'].to_f > 420.0)
+    ok('D93: override prezil prestavbu v configu korpusu',
+       Array((e::Store.config(inst) || {})['hardware_overrides'])
+         .any? { |o| (o['nominal_length'].to_f - 420.0).abs < 0.01 })
+
+    # 3) hlbka POD minimom radu — polozka existuje LEN vdaka zamku (audit B1)
+    d93_rebuild(model, inst, 240.0, lock)
+    s3 = d93_slide(inst)
+    ok('D93: pod minimom radu polozka VZNIKNE so zamkom (automat nevie = nil)',
+       !s3.nil? && (s3['params']['nominal_length'].to_f - 420.0).abs < 0.01 &&
+       s3.key?('rule_nominal_length') && s3['rule_nominal_length'].nil?)
+    ok('D93: pod minimom radu ORANGE hardware_manual_no_fit (nie hardware_no_fit)',
+       d93_warn?(inst, 'hardware_manual_no_fit') && !d93_warn?(inst, 'hardware_no_fit'))
+
+    # 4) odomknutie = automat (a pri malej hlbke povodne spravanie bez polozky)
+    d93_rebuild(model, inst, 240.0, [])
+    ok('D93: odomknutie pri malej hlbke — polozka zmizne, plati hardware_no_fit',
+       d93_slide(inst).nil? && d93_warn?(inst, 'hardware_no_fit'))
+    d93_rebuild(model, inst, 510.0, [])
+    s4 = d93_slide(inst)
+    ok("D93: odomknute pri hlbke 510 = automat (#{s4 && s4['params'] && s4['params']['nominal_length']})",
+       !s4.nil? && s4['source'] == 'rule' && !s4.key?('rule_nominal_length') &&
+       s4['params']['nominal_length'].to_f > 420.0)
+
+    # 5) nezavislost poli (audit B2): rucny pocet + zamok naraz, zrusenie NL
+    #    nesmie zmazat pocet.
+    both = [{ 'owner_part_key' => owner, 'generic_type' => 'slide',
+              'rule_id' => 'vysuvy-nl-podla-hlbky', 'nominal_length' => 420.0, 'quantity' => 3 }]
+    d93_rebuild(model, inst, 510.0, both)
+    s5 = d93_slide(inst)
+    ok('D93: jeden zaznam nesie NL aj rucny pocet',
+       !s5.nil? && s5['quantity'] == 3 && (s5['params']['nominal_length'].to_f - 420.0).abs < 0.01)
+    only_qty = [{ 'owner_part_key' => owner, 'generic_type' => 'slide',
+                  'rule_id' => 'vysuvy-nl-podla-hlbky', 'quantity' => 3 }]
+    d93_rebuild(model, inst, 510.0, only_qty)
+    s6 = d93_slide(inst)
+    ok('D93: odomknutie NL nechalo rucny pocet na mieste',
+       !s6.nil? && s6['quantity'] == 3 && s6['params']['nominal_length'].to_f > 420.0)
+
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: D93 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
   # --- D-88: farba ABS pasky na bocnych plochach dielcov ---------------------
   #
   # Overuje sa to, co Michal vidi v modeli: hnedá páska na bielej doske = HNEDÁ
@@ -3108,6 +3203,7 @@ module NoxunSuRunner
     run_2a4(model)           # 2A-4b: OSTRY cutover — boot_cutover!, picker, universal, rollback+hold
     run_d40(model)           # D-40: selection eventy po builde (DC observer pasca)
     run_d90(model)           # D-90: vizual uchytkoveho profilu UKW-7 (kotva, undo, rebuild)
+    run_d93(model)           # D-93: rucny zamok NL vysuvu (drzi cez zmenu hlbky, odomknutie)
     run_d88(model)           # D-88: farba ABS na bocnych plochach dielcov a dosky
     run_d104(model)          # D-104: overlay „hrany bez olepu" (lifecycle, pocty, ziadny undo krok)
     run_d105(model)          # D-105: tri stavy + filter podla vyberu (vyber NEMENI model)

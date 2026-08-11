@@ -10,6 +10,30 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
+### D-93 — ručný zámok nominálnej dĺžky výsuvu (11.8.2026, PR #156, v0.5.61)
+
+**Odkiaľ prišlo:** test kovania na reálnej zákazke (Michal 9.8.). Pravidlo `vysuvy-nl-podla-hlbky` vyberá dĺžku výsuvu automaticky zo svetlej hĺbky korpusu (najdlhší rad, ktorý sa zmestí, mínus rezerva), lenže v praxi sa bežne kupuje **kratší výsuv** (cena, dostupnosť, prekážka v skrinke, zjednotenie objednávky) — na KLINIKE 30× Atira 420/70 pri hĺbke na 470. Prepnúť sa dal celý set alebo ručný POČET, nie samotná dĺžka — a dĺžka ide priamo do výberu kódu (`code_by_nl`), takže sa objednala nesprávna položka.
+
+**Čo pribudlo (z pohľadu používateľa):** v sekcii Kovanie má riadok výsuvu namiesto popisu „NL 470" priamo **rozbaľovačku s dĺžkami z radu** a vedľa nej **zámok**. Vyberieš hodnotu → dĺžka je **zamknutá** (rozbaľovačka zjantárovie ako ručne prepísaný počet) a **drží aj pri zmene hĺbky skrinky**. Klik na zámok ju odomkne — vráti sa automat. Tooltipy vždy povedia, čo by dal automat („automat: 470 mm", pri nezmestiteľnej hĺbke „nezmestí sa"). Nastavuje sa **per čelo** (každá zásuvka zvlášť), presne ako výber setu. Žiadny nový riadok v paneli — select a zámok sedia v tom istom rade.
+
+Ak sa ručná dĺžka do svetlej hĺbky nezmestí, KONTROLA to povie **oranžovým upozornením** („ručne zamknutá dĺžka 620 mm sa do svetlej hĺbky 470 mm nezmestí — skontroluj"), ale **nič neblokuje** — ide o vedomé rozhodnutie (iná montáž). V okne Výroba je pri ručne ovplyvnenom nákupnom riadku **drobná ceruzka** s tooltipom „ručne prepísané: X ks (automat: 470 mm)"; **CSV nákupu sa nemení**.
+
+**Rozhodnutia kontraktu:** zámok = **existencia poľa `nominal_length`** v zázname ručných zásahov (žiadny nový príznak). Polia záznamu (`quantity`, `disabled`, `nominal_length`) sú **nezávislé** — zápis ide po poliach, takže zmena dĺžky nikdy nezmaže ručný počet a naopak; „vypnuté" už ostatné polia nezahadzuje. Uložiť sa dá **len hodnota z aktuálneho radu** pravidla; ak sa rad neskôr upraví, uložená hodnota sa **nikdy nemaže** — ukáže sa ako „(mimo radu)" a odomknúť sa dá vždy.
+
+**Codex audit návrhu** našiel 4 blokery, 3 nálezy a 1 poznámku — všetky zapracované:
+1. **BLOCKER — zámok musí prežiť hĺbku pod minimom radu.** Keby sa skrinka zúžila natoľko, že automat nevyberie nič, položka by zmizla aj so zámkom. Teraz **vznikne aj tak** (dĺžku dodá zámok, „automat nevie" sa zapíše ako prázdna hodnota) a namiesto „nezmestí sa žiadna dĺžka" sa hlási ručné upozornenie.
+2. **BLOCKER — zámok je pole, nie záznam** (viď kontrakt vyššie) + oprava normalizácie, kde „vypnuté" zahadzovalo ostatné polia.
+3. **BLOCKER — upozornenie je build warning** (rovnaká cesta ako existujúce „nezmestí sa"), nie samostatná kategória semaforu.
+4. **BLOCKER — nákupné CSV bez zmeny kontraktu**; znamienko ručného zásahu žije v okne Výroba.
+5. **FIX — hodnota mimo radu** sa nemaže a odomknutie funguje vždy.
+6. **FIX — identity guard** (`cabinet_id` v payloade) pre **všetky** override callbacky, nielen nový.
+7. **FIX — kontrakt** dopísaný do štandardu (§6.2) vrátane validácie plánu.
+8. **NOTE** — odomknutý zámok používa sprite `lock-open` (`i-unlock` neexistuje) a cache-bust prepísaný vo všetkých `ui/*.html`.
+
+**Testy:** 1176 headless (13 nových — zámok, kombinácie polí, strict tvar hodnoty, hĺbka pod minimom radu, kontrakt plánu, nákupné znamienko), 30 JS sád (nová sada: ponuka selectu, hodnota mimo radu, render zámku, payload s `cabinet_id`), in-SketchUp scenár „zamkni 420 → meň hĺbku → drží → odomkni → automat" nad testovacím modelom.
+
+**Vedome mimo rozsah:** hromadný override na celú skrinku/projekt (per čelo stačí), upratovanie zásahov na zmazaných čelách (existujúce správanie), výklopy/AVENTOS, vnútorné zásuvky za dverami.
+
 ### D-105 — prepínače kontroly hrán: tri stavy olepu a filter podľa výberu (10.–11.8.2026, PR #153 + #154, v0.5.59–v0.5.60)
 
 **Odkiaľ prišlo:** D-104 ukázala len jednu vec — „chýba podľa pravidla". Pri záverečnej kontrole KLINIKY (254 dielcov) ale treba vidieť aj to, čo pravidlo nežiada a olepené nie je (rozhodne človek), a naopak overiť, čo olepené **je**. Michal odsúhlasil mockup 10.8.

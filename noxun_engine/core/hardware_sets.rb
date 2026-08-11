@@ -1101,8 +1101,10 @@ module Noxun
       def add_row(rows, code, quantity, it, sid, lookup)
         # GH #126 P2: identita kodu je case-insensitive (kontrakt katalogu) —
         # agregacny kluc kanonicky, zobrazuje sa prvy videny zapis.
-        row = rows[code.downcase] ||= { 'code' => code, 'quantity' => 0, 'sources' => [] }
+        row = rows[code.downcase] ||= { 'code' => code, 'quantity' => 0, 'sources' => [],
+                                        'manual_quantity' => 0 }
         row['quantity'] += quantity
+        note_manual(row, it, quantity)
         row['sources'] << {
           'cabinet_id' => it['owner_id'].to_s,
           'owner_part_key' => (it['owner_part_key'].nil? ? nil : it['owner_part_key'].to_s),
@@ -1112,6 +1114,29 @@ module Noxun
           'quantity' => quantity
         }
         row_join(row, lookup)
+      end
+
+      # D-93 (audit B4): nakupny riadok nesie ZNAMIENKO rucneho zasahu — pocet
+      # kusov z poloziek so source 'manual' + hodnoty, ktore by dal automat.
+      # Nakupny CSV kontrakt sa TYM NEMENI (znamienko zije v okne Vyroba).
+      def note_manual(row, it, quantity)
+        return unless it.is_a?(Hash) && it['source'].to_s == 'manual'
+        row['manual_quantity'] = row['manual_quantity'].to_i + quantity
+        return unless it.key?('rule_nominal_length')
+        rnl = it['rule_nominal_length']
+        label = rnl.is_a?(Numeric) ? "#{fmt_mm(rnl)} mm" : 'nezmestí sa'
+        list = (row['manual_auto'] ||= [])
+        list << label unless list.include?(label)
+      end
+
+      # Hotovy slovensky text znamienka (tooltip v okne Vyroba). Text sklada
+      # VYHRADNE server — JS ho len vypise vedla ikony.
+      def manual_note(row)
+        q = row['manual_quantity'].to_i
+        return nil if q < 1
+        auto = Array(row['manual_auto'])
+        base = "ručne prepísané: #{q} ks"
+        auto.empty? ? base : "#{base} (automat: #{auto.join(' / ')})"
       end
 
       def row_join(row, lookup)
@@ -1171,6 +1196,9 @@ module Noxun
         total = 0.0
         unknown = 0
         list.each do |r|
+          # D-93: znamienko rucneho zasahu — hotovy text (nil = ziadny zasah).
+          r['manual_note'] = manual_note(r)
+          r.delete('manual_auto') # pomocna zbierka, do payloadu nepatri
           price = r['price_eur_vat']
           if price.is_a?(Numeric) && r['missing'] == false
             r['subtotal_eur_vat'] = (price.to_f * r['quantity']).round(2)

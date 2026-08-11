@@ -7,43 +7,128 @@ module Noxun
     module Panel
       class << self
         # Jeden zasah do kovania oznacenej skrinky. Identita = (owner_part_key,
-        # generic_type, rule_id); akcia podla payloadu:
-        #   quantity N  -> rucny pocet (pravidlo ostava ako default v rule_quantity)
-        #   disabled    -> kategoria sa vypne (polozka zmizne z planu aj supisu)
-        #   reset       -> zasah sa odstrani, plati zas pravidlo
+        # generic_type, rule_id).
+        #
+        # D-93 (audit B2): zapis ide PO POLIACH — payload nesie 'field'
+        # ('quantity' | 'disabled' | 'nominal_length') a 'value' (null = zrus
+        # LEN toto pole). Zaznam identity sa MERGUJE (zmena NL nikdy nezmaze
+        # rucny pocet a naopak) a zanikne az vtedy, ked ostane prazdny.
+        # Stary tvar payloadu ostava funkcny: quantity N / disabled true /
+        # reset true (= zahodi CELY zaznam).
         # Zapis + rebuild v jednej operacii (override zije v configu korpusu).
+        OVERRIDE_FIELDS = %w[quantity disabled nominal_length].freeze
+
         def handle_set_hardware_override(payload)
           model = Sketchup.active_model
           cab = find_cabinet(model)
-          return set_status('Najprv oznac NOXUN korpus.', true) if cab.nil?
+          return set_status('Najprv označ NOXUN korpus.', true) if cab.nil?
 
           data = parse(payload)
           gt = data['generic_type'].to_s
           rid = data['rule_id'].to_s
-          return set_status('Neznama polozka kovania.', true) if gt.empty? || rid.empty?
+          return set_status('Neznáma položka kovania.', true) if gt.empty? || rid.empty?
+
+          # F6: payload nesie identitu RENDROVANEJ skrinky — zmena vyberu pred
+          # obsluhou callbacku nesmie prepisat inu skrinku (vzor callbacku setov).
+          rendered = data['cabinet_id'].to_s
+          if !rendered.empty? && rendered != Store.get(cab, 'cabinet_id').to_s
+            push_selected(model)
+            return set_status('Výber sa medzitým zmenil — panel sa obnovil, skús znova.', true)
+          end
 
           owner = present_str(data['owner_part_key'])
+          field, value, err = override_change(data, model, owner, gt, rid)
+          return set_status(err, true) if err
+
           params = existing_params(cab)
-          list = (params['hardware_overrides'].is_a?(Array) ? params['hardware_overrides'] : [])
-                 .reject { |ov| ov_match?(ov, owner, gt, rid) }
-          if truthy?(data['disabled'])
-            list << { 'owner_part_key' => owner, 'generic_type' => gt, 'rule_id' => rid,
-                      'disabled' => true }
-          elsif data['quantity']
-            q = data['quantity'].to_i
-            return set_status('Pocet musi byt aspon 1 (alebo polozku vypni).', true) if q < 1
-            list << { 'owner_part_key' => owner, 'generic_type' => gt, 'rule_id' => rid,
-                      'quantity' => [q, BuildPlan::MAX_HW_QUANTITY].min }
-          end
-          # reset = len odstranenie zaznamu (list uz je bez neho)
+          all = params['hardware_overrides'].is_a?(Array) ? params['hardware_overrides'] : []
+          list = merge_override(all, owner, gt, rid, field, value)
 
           params['hardware_overrides'] = list
           suspend_selection_sync do
-            CabinetBuilder.rebuild(model, cab, params, op_name: 'NOXUN: kovanie rucne')
+            CabinetBuilder.rebuild(model, cab, params, op_name: 'NOXUN: kovanie ručne')
             reselect(model, cab)
           end
-          status_with_warnings(cab, "Kovanie upravene — #{Store.get(cab, 'cabinet_id')}.")
+          status_with_warnings(cab, override_status_msg(cab, field, value))
           push_selected(model)
+        end
+
+        # Zisti, ktore POLE sa meni a na aku hodnotu. -> [field, value, error]
+        #   field == :all  -> zahodit cely zaznam (stare 'reset')
+        #   value == nil   -> zrusit len dane pole
+        def override_change(data, model, owner, gt, rid)
+          if data.key?('field')
+            f = data['field'].to_s
+            return [nil, nil, 'Neznáme pole ručného zásahu.'] unless OVERRIDE_FIELDS.include?(f)
+            return [f, nil, nil] if data['value'].nil?
+            return override_value(f, data['value'], model, owner, gt, rid)
+          end
+          return [:all, nil, nil] if truthy?(data['reset'])
+          return ['disabled', true, nil] if truthy?(data['disabled'])
+          return override_value('quantity', data['quantity'], model, owner, gt, rid) if data['quantity']
+
+          [:all, nil, nil]
+        end
+
+        # Serverova validacia hodnoty pola (HTML disabled nie je ochrana).
+        def override_value(field, raw, model, owner, gt, rid)
+          case field
+          when 'disabled'
+            [field, true, nil]
+          when 'quantity'
+            q = raw.to_i
+            return [nil, nil, 'Počet musí byť aspoň 1 (alebo položku vypni).'] if q < 1
+            [field, [q, BuildPlan::MAX_HW_QUANTITY].min, nil]
+          when 'nominal_length'
+            nl = HardwareRules.override_nl(raw.is_a?(String) ? Float(raw, exception: false) : raw)
+            return [nil, nil, 'Neplatná dĺžka výsuvu.'] if nl.nil?
+            return [nil, nil, 'Táto dĺžka nie je v rade pravidla — otvor Pravidlá kovania.'] \
+              unless series_value?(model, rid, gt, nl)
+            [field, nl, nil]
+          else
+            [nil, nil, 'Neznáme pole ručného zásahu.']
+          end
+        end
+
+        # F5/F7: SET smie ulozit LEN hodnotu z aktualneho radu pravidla (presna
+        # zhoda). Uz ULOZENA hodnota mimo radu sa nikdy nemaze — len sa zobrazi
+        # a da sa odomknut (to je cesta 'value' => nil, ktora sem nechodi).
+        def series_value?(model, rid, gt, nl)
+          rule = Array(panel_hardware_rules(model)).find do |r|
+            r.is_a?(Hash) && r['rule_id'].to_s == rid && r['output'].to_s == gt
+          end
+          return false unless rule && rule['kind'].to_s == 'fit_series'
+          Array(rule['series']).any? { |s| (s.to_f - nl).abs < 0.001 }
+        end
+
+        # Merge do zaznamu identity: prazdny zaznam zanikne, ostatne polia ostanu.
+        def merge_override(all, owner, gt, rid, field, value)
+          rec = Array(all).select { |ov| ov_match?(ov, owner, gt, rid) }.last
+          rest = Array(all).reject { |ov| ov_match?(ov, owner, gt, rid) }
+          return rest if field == :all
+
+          out = { 'owner_part_key' => owner, 'generic_type' => gt, 'rule_id' => rid }
+          if rec.is_a?(Hash)
+            OVERRIDE_FIELDS.each { |k| out[k] = rec[k] if rec.key?(k) && !rec[k].nil? }
+          end
+          if value.nil?
+            out.delete(field)
+          else
+            out[field] = value
+          end
+          return rest unless OVERRIDE_FIELDS.any? { |k| out.key?(k) }
+
+          rest + [out]
+        end
+
+        def override_status_msg(cab, field, value)
+          cid = Store.get(cab, 'cabinet_id')
+          if field == 'nominal_length'
+            return "Dĺžka výsuvu odomknutá (platí automat) — #{cid}." if value.nil?
+
+            return "Dĺžka výsuvu zamknutá na #{HardwareRules.fmt_mm(value)} mm — #{cid}."
+          end
+          "Kovanie upravené — #{cid}."
         end
 
         def ov_match?(ov, owner, gt, rid)
