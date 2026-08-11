@@ -24,7 +24,7 @@ Po upratovaní: **workflow retrospektíva** (samostatná session — pravidlá M
 
 ## Posledné uzávery
 
-- **U2 čistka dogfooding zápisníka** (otvorené postrehy v skupinách podľa blokov, história do archívu, merač do zdrojov) — PR **#TBD** (11.8.)
+- **U2 čistka dogfooding zápisníka** (otvorené postrehy v skupinách podľa blokov, história do archívu, merač do zdrojov) — PR **#158** (11.8.)
 - **U1 navigácia docs (STAV · PLAN · KRONIKA)** — PR **#157** (11.8.)
 - **D-93 ručný zámok dĺžky výsuvu** — PR **#156**, v0.5.61 (11.8.)
 - **Séria okolo zákazky KLINIKA** (D-90…D-105: úchytkový profil UKW-7, kovanie v paneli, živé názvy, farba ABS na hranách, kontrola hrán v modeli) — PR **#144–#155**, v0.5.49 → v0.5.60 (9.–11.8.)
