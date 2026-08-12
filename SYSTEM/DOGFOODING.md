@@ -5,10 +5,6 @@
 > **Postrehy Michala sa píšu HNEĎ**, hocikedy a na hociktorú tému — zaradenie robí agent (plné pravidlo: [PLAN.md](PLAN.md), sekcia „Pravidlo pre postrehy").
 > **Kde je zvyšok:** história zápisníka (priebežné stavy, 2A migračná mapa, hardening a sedenia V0.5, priebeh seedu, zodpovedané otázky) → [archiv/DOGFOODING_historia.md](archiv/DOGFOODING_historia.md) · odpočet merača D-25 → [zdroje/MERAC_D25_odpocet_2026-08.md](zdroje/MERAC_D25_odpocet_2026-08.md) · história dávok → [archiv/KRONIKA.md](archiv/KRONIKA.md).
 
-## ŠTART AUTONÓMIE — stabilita a drobné fixy
-
-- **D-77 · Okno detailu dielca je po otvorení odseknuté** (Michal 3.8.) — pravá spodná časť nastavení dielca nie je vidieť, kým sa okno ručne nezväčší. *Stav: predsunuté z UI 2.0 (RETRO 12.8.) — chyba veľkosti okna sa opraví hneď; členenie obsahu okna ostáva na plošný rework (D-50/D-51).*
-
 ## UI 2.0 — štúdio okno a výbery
 
 - **D-50 · OCL inšpirácia UI/UX** (Michal 31.7. večer) — pár detailov z OCL flow prevziať; najprv slovné prebratie (sedenie), potom zapracovanie. *Stav: čaká na sedenie.*
@@ -53,6 +49,7 @@
 
 ## Vyriešené — index (plné texty v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md))
 
+- **D-77** okná sa už **neotvárajú odseknuté** — okno detailu dielca aj satelity (Materiály, Výroba, Katalóg kovania, Pravidlá, Šablóny, Nastavenia rozpočtu) majú pri otvorení aspoň takú veľkosť, aby bol obsah vidieť bez ručného ťahania za roh. Príčina bola v zapamätanej veľkosti okna (rozmer z kódu platí len pri prvom otvorení, minimum bránilo iba ručnému zmenšovaniu): okná dostali väčší východzí rozmer aj vyššie minimum a zapamätaná malá veľkosť sa pri otvorení dorovná — **len smerom nahor, len po minimum a nikdy nad plochu obrazovky**, takže väčšie okno používateľa ostáva. Členenie obsahu okien sa nemenilo (patrí do D-50/D-51) — PR #164
 - **D-86** vedome zvolený **smer dekoru** vo vkladacej karte dosky už neutečie — práca v okne Materiály (živý refresh katalógu) ho neprepíše späť na predvoľbu; pole sa mení len pri skutočnej zmene materiálu, a kým naň používateľ nesiahol, predvoľba sa dopĺňa ako doteraz. Čistá JS zmena v paneli, žiadny Ruby kontrakt — PR #163
 - **D-101** panel sa po **Späť/Znova** obnoví sám — Ctrl+Z a Ctrl+Y už Inspector neostávajú „o krok pozadu": názov skrinky aj polia rozmerov ukážu skutočný stav modelu bez prekliknutia výberu. Refresh je čisté čítanie (**žiadny nový krok Späť**, žiadny zásah do modelu z observera), viac rýchlych vrátení za sebou sa zlúči do jedného obnovenia a udalosť z iného dokumentu Inspector aktívneho neprepíše — PR #162
 - **D-93** ručný zámok nominálnej dĺžky výsuvu — riadok výsuvu v sekcii Kovanie má rozbaľovačku dĺžok radu a **zámok**: vybraná dĺžka drží aj pri zmene hĺbky skrinky (Michalov prípad — 30× Atira 420/70 pri hĺbke na 470), zámok ju odomkne späť na automat. Nastavuje sa **per čelo**, žiadny nový riadok v paneli. Nezmestiteľná ručná dĺžka je oranžové upozornenie, ktoré **nič neblokuje**; v okne Výroba má ovplyvnený nákupný riadok drobnú ceruzku „ručne prepísané: X ks (automat: 470 mm)" a **CSV nákupu ostáva bez zmeny kontraktu** — PR #156

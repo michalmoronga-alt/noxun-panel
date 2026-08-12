@@ -5,20 +5,22 @@
 
 ## Stav
 
-**v0.6.2 · 12.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0).
+**v0.7.0 · 12.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0). **Blok ŠTART AUTONÓMIE je uzavretý** (D-101 · D-86 · D-77, PR #162–#164) — prvý blok spracovaný v autonómnom režime podľa retrospektívy RETRO.
 
-Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **D-86** — vedome zvolený smer dekoru vo vkladacej karte dosky prežije živý refresh katalógu, PR **#163** (v0.6.2). Testy: **1187 headless · 30 JS sád · in-SketchUp 334 PASS / 0 FAIL** (posledný beh pri D-101; D-86 je čistá JS zmena bez buildera/observera, in-SU beh nebol potrebný — programové redo na Windows neexistuje, reálne Ctrl+Y sa overuje ručne).
+Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **D-77** — okná sa už neotvárajú odseknuté (väčšie východzie rozmery + dorovnanie zapamätanej malej veľkosti pri otvorení), PR **#164** (v0.7.0). Testy: **1187 headless · 31 JS sád · in-SketchUp 334 PASS / 0 FAIL** (posledný beh pri D-101; D-86 aj D-77 sú UI zmeny bez buildera/observera, in-SU beh nebol potrebný — programové redo na Windows neexistuje, reálne Ctrl+Y sa overuje ručne).
 
 ## Robí sa
 
-**Blok 1 · ŠTART AUTONÓMIE** ([PLAN.md](PLAN.md)) — prvé dávky v **autonómnom režime** (pravidlá z retrospektívy RETRO, PR #161: risk-based codex-audit, merge robí Claude po bránach CI + review, denný report na konci bloku — plné znenie [../CLAUDE.md](../CLAUDE.md), sekcia Git workflow). **D-101 hotová (PR #162)**, **D-86 hotová (PR #163)**; ostáva: **D-77** (odseknuté okno detailu dielca).
+**Nič** — blok je uzavretý, čaká sa na Michalov výber ďalšieho bloku ([PLAN.md](PLAN.md)).
 
 ## Ďalší krok
 
-**UI 2.0** — najprv podklady pripraví agent autonómne (analýza OCL k D-50, súhrn merača D-25, klikateľný HTML mockup vzorom Materiály 2.0) → večerná debata s Michalom → až potom implementačné dávky.
+**UI 2.0** — najprv podklady pripraví agent autonómne (analýza OCL k D-50, súhrn merača D-25, klikateľný HTML mockup vzorom Materiály 2.0) → večerná debata s Michalom → až potom implementačné dávky. *(Pri štandarde rozmerov okien D-51 nadviazať na D-77: mechanika „okno sa pri otvorení dorovná na svoje minimum" už existuje, chýbajú len jednotné hodnoty.)*
 
 ## Posledné uzávery
 
+- **BLOK ŠTART AUTONÓMIE UZAVRETÝ** (D-101 #162 · D-86 #163 · D-77 #164) — checkpoint **v0.7.0** (12.8.)
+- **D-77 okná sa neotvárajú odseknuté** (väčšie východzie rozmery a minimá všetkých okien + dorovnanie zapamätanej malej veľkosti pri otvorení — len nahor, len po minimum, nikdy nad obrazovku) — PR **#164**, v0.7.0 (12.8.)
 - **D-86 guard smeru dekoru vo vkladacej karte** (vedomá voľba prežije živý refresh katalógu z okna Materiály; pole sa mení len pri skutočnej zmene materiálu) — PR **#163**, v0.6.2 (12.8.)
 - **D-101 panel po Späť/Znova** (Ctrl+Z aj Ctrl+Y obnovia Inspector sám — čisté čítanie bez nového kroku Späť, zlúčenie rýchlych vrátení) — PR **#162**, v0.6.1 (12.8.)
 - **RETRO — workflow retrospektíva** (risk-based codex-audit, pravidlo 3 kôl, autonómne bloky s merge po bránach, denný report; blok ŠTART AUTONÓMIE predsunutý) — PR **#161** (12.8.)
