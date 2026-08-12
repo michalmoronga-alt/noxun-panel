@@ -273,6 +273,11 @@
   // hodnota — rozlisi ZMENU VYBERU od obycajneho refreshu katalogu (draft UNI
   // hrubky refresh neprezije, ked sa porovnava len fokus).
   var insertMatLast = null;
+  // Codex #163 P2: marker je VLASTNY pre kazde pole — guardy sa potlacaju NEZAVISLE
+  // (fokus je v jednom z poli), spolocny marker by rozhodnutie jedneho pola miesal
+  // do druheho (drzanie kvoli fokusu v smere by pri UNI zmazalo draft hrubky).
+  var insertGrainMatLast = null;
+  var insertGrainTouched = false; // D-86: siahol pouzivatel na smer dekoru pri tomto materiali?
   function getInsertKind(){
     var r = document.querySelector('input[name=ikind]:checked');
     return r ? r.value : 'cabinet';
@@ -323,6 +328,49 @@
     if (materialId !== prevMaterialId) return true;
     return !sheetIsUni(sheet);
   }
+  // D-86: ma sa SMER DEKORU vo vkladacej karte prepisat katalogovou predvolbou?
+  // Rovnaka trieda chyby ako E-03 draft hrubky, ale insertThicknessShouldWrite sa
+  // pouzit NEDA: ten pri rovnakom REALNOM materiali vracia true (pole je vtedy
+  // zamknute, ziadny draft neexistuje) — smer dekoru sa vsak da menit pri KAZDOM
+  // materiali, takze by zivy refresh katalogu (NX.setMaterials -> refreshInsert-
+  // BoardMaterials) vedomu volbu ("Bez smeru") ticho vratil na predvolbu.
+  // Rozhoduje preto dvojica ZMENA MATERIALU + siahol nan pouzivatel:
+  //   iny material            -> prepis (predvolba noveho materialu),
+  //   ten isty + touched      -> NEPREPISUJ (drz vedomu volbu pouzivatela),
+  //   ten isty + netknuty     -> prepis sa smie (v poli je aj tak predvolba),
+  //   katalog nema predvolbu  -> nic (select ma pevne moznosti, necisti sa),
+  //   select ma prave fokus   -> nikdy (rozkliknuty dropdown v TOMTO okne).
+  function insertGrainShouldWrite(prevMaterialId, materialId, sheet, touched, focused){
+    if (!sheet || !sheet.grain) return false;
+    if (focused) return false;
+    if (materialId !== prevMaterialId) return true;
+    return !touched;
+  }
+  // Codex #163 P2: ma sa material zapamatat ako ten, s ktorym je pole ZOSYNCHRONIZOVANE?
+  // NIE, ked zapis potlacil VYHRADNE fokus a material sa pritom naozaj zmenil (refresh
+  // katalogu vymenil vyber, napr. po zmazani materialu, kym pouzivatel v poli stal).
+  // Marker sa vtedy drzi na starom ID, takze zmena ostane "viditelna" a najblizsi beh
+  // (blur pola alebo dalsi refresh) predvolbu dokona — inak by dalsie refreshe tvarili
+  // stav ako "bez zmeny" a do vlozenej dosky by isla zatuchnuta hodnota zmazaneho
+  // materialu. Kym sa material nezmenil, drzanie je aj tak bez ucinku (marker == ID).
+  function insertMatMarkAdvances(prevMaterialId, materialId, focused){
+    return !(focused && materialId !== prevMaterialId);
+  }
+  // Jeden krok synchronizacie SMERU DEKORU s katalogom — cisty automat bez DOM
+  // (produkcna cesta aj testy pouzivaju TENTO kod, nie svoju kopiu pravidiel).
+  // state: { mark, touched, value } -> novy state + priznak wrote.
+  function insertGrainSync(state, materialId, sheet, focused){
+    var st = state || {};
+    var write = insertGrainShouldWrite(st.mark === undefined ? null : st.mark,
+                                       materialId, sheet, !!st.touched, !!focused);
+    return {
+      mark: insertMatMarkAdvances(st.mark === undefined ? null : st.mark, materialId, focused)
+              ? materialId : st.mark,
+      touched: write ? false : !!st.touched,
+      value: write ? sheet.grain : st.value,
+      wrote: write
+    };
+  }
   // Poskladaj payload vkladanej dosky z HODNOT formulara (ziadny DOM, ziadne globaly).
   // vals: surove stringy {name,length,width,material_id,grain_direction,thickness}
   // sheet: katalogovy zaznam vybraneho materialu (alebo null)
@@ -355,16 +403,21 @@
     }
     return { ok: true, payload: payload };
   }
+  // D-86: pouzivatel prave vedome zmenil smer dekoru — od tejto chvile ho zivy
+  // refresh katalogu (pri NEZMENENOM materiali) nesmie prepisat.
+  function onInsertGrainChange(){ insertGrainTouched = true; }
   // Zmena materialu vo vkladacej karte: dosad hrubku + default smer dekoru z katalogu.
   function onInsertBoardMaterial(){
     var ms = el('ib_material'); if (!ms) return;
     var sheet = findSheetIn(MATERIALS.sheets, ms.value);
     var th = el('ib_thickness');
+    var thFocused = false;
     if (th){
       var uni = sheetIsUni(sheet);
       th.readOnly = !uni; // UNI = odomknute (readonly styling riesi CSS)
       th.title = uni ? 'UNI: hrúbku určuje doska' : 'Hrúbku určuje materiál';
-      if (insertThicknessShouldWrite(insertMatLast, ms.value, sheet, document.activeElement === th)){
+      thFocused = document.activeElement === th;
+      if (insertThicknessShouldWrite(insertMatLast, ms.value, sheet, thFocused)){
         th.value = sheet ? fmtmm(sheet.thickness) : '';
         // Zivy nahlad vyrazu ("= 12") visi na input evente — po programovom
         // prepise ho zosynchronizuj, inak po zmene materialu ostane stary.
@@ -372,8 +425,22 @@
         th.dispatchEvent(new Event('input'));
       }
     }
-    insertMatLast = ms.value;
-    if (el('ib_grain') && sheet && sheet.grain) el('ib_grain').value = sheet.grain;
+    // Codex #163 P2: marker sa posunie, LEN ked zapis nepotlacil samotny fokus
+    // (inak by sa zmena materialu stratila — plati pre hrubku aj pre smer).
+    if (insertMatMarkAdvances(insertMatLast, ms.value, thFocused)) insertMatLast = ms.value;
+    // D-86: predvolba smeru sa dosadi len ked na to ma pravo (viz insertGrainSync).
+    // Po dosadeni je v poli katalogova hodnota, nie volba pouzivatela — priznak padne.
+    var gs = el('ib_grain');
+    if (gs){
+      var st = insertGrainSync({ mark: insertGrainMatLast, touched: insertGrainTouched,
+                                 value: gs.value },
+                               ms.value, sheet, document.activeElement === gs);
+      if (st.wrote) gs.value = st.value;
+      insertGrainMatLast = st.mark;
+      insertGrainTouched = st.touched;
+    } else {
+      insertGrainMatLast = ms.value;
+    }
   }
   function insertBoard(){
     var ms = el('ib_material');
@@ -394,5 +461,8 @@
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { buildInsertBoardPayload: buildInsertBoardPayload,
                        sheetIsUni: sheetIsUni, findSheetIn: findSheetIn,
-                       insertThicknessShouldWrite: insertThicknessShouldWrite };
+                       insertThicknessShouldWrite: insertThicknessShouldWrite,
+                       insertGrainShouldWrite: insertGrainShouldWrite,
+                       insertMatMarkAdvances: insertMatMarkAdvances,
+                       insertGrainSync: insertGrainSync };
   }
