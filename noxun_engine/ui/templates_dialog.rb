@@ -52,10 +52,12 @@ module Noxun
             preferences_key: DLG_KEY,
             scrollable: true,
             resizable: true,
-            width: 420,
-            height: 460,
-            min_width: 360,
-            min_height: 320,
+            # D-77: riadok sablony nesie nazov + akcie vpravo.
+            # Rozmery platia LEN pri prvom otvoreni — zapamatane male okno dorovna nx_fit.
+            width: 460,
+            height: 540,
+            min_width: 380,
+            min_height: 360,
             style: UI::HtmlDialog::STYLE_DIALOG
           )
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'templates.html'))
@@ -65,6 +67,7 @@ module Noxun
         end
 
         def register_callbacks(dlg)
+          Engine.register_dialog_fit(dlg, 'templates') # D-77: zapamatane male okno sa dorovna
           cb(dlg, 'ready')      { |_p| push_state }
           cb(dlg, 'tpl_apply')  { |p| handle_apply(p) }
           cb(dlg, 'tpl_delete') { |p| handle_delete(p) }

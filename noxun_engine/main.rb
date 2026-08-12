@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.6.2' unless defined?(VERSION)
+    VERSION = '0.7.0' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -24,6 +24,36 @@ module Noxun
       bt = e.respond_to?(:backtrace) ? e.backtrace : nil
       bt.first(4).each { |line| puts "  #{line}" } if bt
       nil
+    end
+
+    # --- D-77: okno sa nesmie otvorit odseknute -------------------------------
+    # HtmlDialog si pamata poslednu velkost per `preferences_key`; `width`/
+    # `height` v konstruktore plati LEN pri prvom otvoreni a `min_width`/
+    # `min_height` chrania iba rucne zmensovanie. Ked teda okno raz ostalo male
+    # (starsia verzia pluginu, omylom stiahnuty roh), otvara sa odseknute donekonecna.
+    # Preto kazde okno po nacitani HTML ohlasi svoj viewport (ui/js/win_fit.js) a
+    # tento callback ho cez `set_size` dorovna. JS je len merac — rozhodnutie
+    # „rozumny rozmer" ostava tu: hodnoty mimo rozsahu sa zahodia.
+    DIALOG_FIT_MIN_PX = 240   # mensie okno nema zmysel (a nie je to nas obsah)
+    DIALOG_FIT_MAX_PX = 2600  # strop proti nezmyslu z JS (4K plocha + rezerva)
+
+    # Registruje callback `nx_fit` na dialogu. Volat v register_callbacks —
+    # teda PRED show (kontrakt HtmlDialog, docs/SKETCHUP_PRAVIDLA.md).
+    def self.register_dialog_fit(dlg, tag)
+      dlg.add_action_callback('nx_fit') do |_ctx, w, h|
+        begin
+          tw = w.to_i
+          th = h.to_i
+          if tw.between?(DIALOG_FIT_MIN_PX, DIALOG_FIT_MAX_PX) &&
+             th.between?(DIALOG_FIT_MIN_PX, DIALOG_FIT_MAX_PX)
+            dlg.set_size(tw, th)
+            log("#{tag}: okno dorovnane na #{tw}x#{th} px (D-77)")
+          end
+        rescue StandardError => e
+          log_error(e, "#{tag} nx_fit")
+        end
+        next
+      end
     end
   end
 end

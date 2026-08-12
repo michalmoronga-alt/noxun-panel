@@ -569,10 +569,13 @@ module Noxun
             preferences_key: DLG_KEY,
             scrollable: true,
             resizable: true,
-            width: 560,
-            height: 520,
-            min_width: 420,
-            min_height: 340,
+            # D-77: kusovnik aj rozpocet su tabulky s editovatelnymi bunkami a
+            # stlpcom akcii vpravo — v 560 px okne konci prava cast riadku mimo.
+            # Rozmery platia LEN pri prvom otvoreni; zapamatane male okno dorovna nx_fit.
+            width: 760,
+            height: 640,
+            min_width: 560,
+            min_height: 440,
             style: UI::HtmlDialog::STYLE_DIALOG
           )
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'production.html'))
@@ -592,6 +595,7 @@ module Noxun
         end
 
         def register_callbacks(dlg)
+          Engine.register_dialog_fit(dlg, 'production') # D-77: zapamatane male okno sa dorovna
           cb(dlg, 'ready')       { |_p| push_state }
           cb(dlg, 'refresh_bom') { |_p| push_state }
           cb(dlg, 'select_row')  { |p| handle_select(p) }

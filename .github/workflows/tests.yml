@@ -73,3 +73,5 @@ jobs:
         run: node tests/js/test_d100_nazvy.js
       - name: JS testy — vyriesena ABS paska v rozbalovacke hrany (D-102)
         run: node tests/js/test_d102_pravidlo.js
+      - name: JS testy — velkost okna pri otvoreni (D-77)
+        run: node tests/js/test_d77_okno_fit.js

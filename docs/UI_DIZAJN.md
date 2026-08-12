@@ -272,6 +272,14 @@ alebo status v `textContent` ceste do Ruby), použije sa **čistý text**, nie g
 - **Karty:** `fieldset`/`details` na bielom povrchu, rámik `--nx-border`.
 - **Warn chip / warnlist:** klik na chip ukotvený zoznam upozornení hore (pri
   rozbalení návrat na začiatok, aby bol viditeľný aj po odscrollovaní).
+- **Veľkosť okna pri otvorení (D-77):** žiadne okno sa nesmie otvoriť odseknuté.
+  `width`/`height` v `HtmlDialog.new` platia len pri PRVOM otvorení (potom
+  rozhoduje veľkosť zapamätaná pod `preferences_key`), preto každé okno deklaruje
+  v HTML svoje **obsahové minimum** `window.NX_FIT_MIN = { w, h }` a načíta
+  `js/win_fit.js` — to okno pri otvorení dorovná. Dorovnáva sa **len nahor**, len
+  po deklarované minimum a nikdy nad plochu obrazovky; väčšie okno používateľa
+  ostáva. Nové okno = nové `NX_FIT_MIN` (bez neho fit nebeží).
+  *Jednotný štandard šírok a rozmerov okien je úloha D-51 (UI 2.0).*
 
 ---
 

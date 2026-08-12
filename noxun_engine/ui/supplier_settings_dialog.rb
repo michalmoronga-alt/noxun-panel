@@ -58,10 +58,12 @@ module Noxun
             preferences_key: DLG_KEY,
             scrollable: true,
             resizable: true,
-            width: 620,
-            height: 620,
-            min_width: 460,
-            min_height: 360,
+            # D-77: tabulky sadzieb maju stlpce € / €€ / €€€ + jednotku.
+            # Rozmery platia LEN pri prvom otvoreni — zapamatane male okno dorovna nx_fit.
+            width: 680,
+            height: 660,
+            min_width: 520,
+            min_height: 420,
             style: UI::HtmlDialog::STYLE_DIALOG
           )
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'supplier_settings.html'))
@@ -71,6 +73,7 @@ module Noxun
         end
 
         def register_callbacks(dlg)
+          Engine.register_dialog_fit(dlg, 'supplier_settings') # D-77: zapamatane male okno sa dorovna
           cb(dlg, 'ready')    { |_p| push_state }
           cb(dlg, 'save')     { |p| handle_save(p) }
           cb(dlg, 'reload')   { |_p| handle_reload }

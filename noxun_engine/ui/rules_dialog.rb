@@ -39,10 +39,12 @@ module Noxun
             preferences_key: DLG_KEY,
             scrollable: true,
             resizable: true,
-            width: 460,
-            height: 560,
-            min_width: 380,
-            min_height: 420,
+            # D-77: formular pravidiel + tri tlacidla akcii pod nim.
+            # Rozmery platia LEN pri prvom otvoreni — zapamatane male okno dorovna nx_fit.
+            width: 480,
+            height: 620,
+            min_width: 400,
+            min_height: 440,
             style: UI::HtmlDialog::STYLE_DIALOG
           )
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'rules.html'))
@@ -52,6 +54,7 @@ module Noxun
         end
 
         def register_callbacks(dlg)
+          Engine.register_dialog_fit(dlg, 'rules') # D-77: zapamatane male okno sa dorovna
           cb(dlg, 'ready')       { |_p| push_state }
           cb(dlg, 'save_rules')  { |p| handle_save(p) }
           cb(dlg, 'load_global') { |_p| push_global }

@@ -33,10 +33,13 @@ module Noxun
             preferences_key: DLG_KEY,
             scrollable: true,
             resizable: true,
+            # D-77: rezim dielca (nahlad + karta dielca s riadkami hran) potrebuje
+            # vysku — pri 640 px konci spodok karty pod okrajom okna. Rozmery tu
+            # platia LEN pri prvom otvoreni; zapamatane male okno dorovna nx_fit.
             width: 400,
-            height: 640,
+            height: 720,
             min_width: 360,
-            min_height: 480,
+            min_height: 560,
             style: UI::HtmlDialog::STYLE_DIALOG
           )
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'panel.html'))
@@ -51,6 +54,7 @@ module Noxun
 
         # --- callbacky (JS -> Ruby) -----------------------------------------
         def register_callbacks(dlg)
+          Engine.register_dialog_fit(dlg, 'panel') # D-77: zapamatane male okno sa dorovna
           cb(dlg, 'ready')          { |_p| push_init }
           cb(dlg, 'insert_cabinet') { |p| handle_insert(p) }
           cb(dlg, 'insert_copy')    { |p| handle_insert_copy(p) } # B3: presna serverova kopia oznacenej skrinky
