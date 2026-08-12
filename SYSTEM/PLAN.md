@@ -9,7 +9,6 @@
 
 **Cieľ:** rozbehnúť autonómny režim dávok ([../CLAUDE.md](../CLAUDE.md), sekcia Git workflow — rozhodnutia RETRO 12.8.) na dávkach s jasným zadaním a merateľným výsledkom; zároveň zmiznú tri známe chyby. *(Vedomá výnimka z pravidla „žiadne náplasti pred reworkom" z 10.8. — sú to chyby, nie UX vylepšenia.)*
 
-- **D-86 · Smer dekoru vo vkladacej karte sa ticho vráti na predvoľbu** — vlastný guard: prepíš pole len pri skutočnej zmene materiálu. *(presunuté z UI 2.0)*
 - **D-77 · Okno detailu dielca je po otvorení odseknuté** — spodná časť nastavení nie je vidieť, kým sa okno ručne nezväčší. *(presunuté z UI 2.0)*
 
 ### 2 · UI 2.0 — štúdio okno a výbery

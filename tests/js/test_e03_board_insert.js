@@ -8,7 +8,8 @@
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
-const { buildInsertBoardPayload, sheetIsUni, findSheetIn, insertThicknessShouldWrite } =
+const { buildInsertBoardPayload, sheetIsUni, findSheetIn, insertThicknessShouldWrite,
+        insertGrainShouldWrite } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'board_card.js'));
 const { evalDim } = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'expr.js'));
 
@@ -58,6 +59,36 @@ eq(findSheetIn(null, 'REAL_19'), null, 'prazdny katalog neprepadne');
      'realny material draft nema — hodnota vzdy z katalogu');
   eq(insertThicknessShouldWrite('UNI_DOSKA_18', 'UNI_DOSKA_18', null, false), true,
      'material medzitym zmizol z katalogu -> pole sa vycisti');
+})();
+
+// --- D-86: vedome zvoleny SMER DEKORU prezije refresh katalogu -----------------
+// Scenar: vo vkladacej karte je materiál so smerom "po dĺžke", používateľ vedome
+// prepne na "Bez smeru" a dosku ešte NEVLOŽÍ. Medzitým v okne Materiály urobí CRUD
+// -> NX.setMaterials -> refreshInsertBoardMaterials() -> onInsertBoardMaterial().
+// Hotový insertThicknessShouldWrite sa použiť NEDÁ: pri rovnakom REÁLNOM materiáli
+// vracia true (hrúbka je vtedy zamknutá), kým smer sa dá meniť pri každom materiáli.
+// Rozhoduje preto zmena materiálu + príznak "siahol naň používateľ".
+(function(){
+  eq(insertGrainShouldWrite('REAL_19', 'REAL_19', REAL, true, false), false,
+     'refresh katalogu pri NEZMENENOM materiali drzi volbu pouzivatela');
+  eq(insertGrainShouldWrite('UNI_DOSKA_18', 'UNI_DOSKA_18', UNI, true, false), false,
+     'to iste plati aj pri UNI materiali (na type materialu nezalezi)');
+  eq(insertGrainShouldWrite('REAL_19', 'REAL_19', REAL, false, false), true,
+     'nezmeneny material, pouzivatel na smer NESIAHOL -> predvolba sa smie doplnit');
+  eq(insertGrainShouldWrite(null, 'REAL_19', REAL, false, false), true,
+     'prve naplnenie karty dosadi predvolbu materialu');
+  eq(insertGrainShouldWrite('UNI_DOSKA_18', 'REAL_19', REAL, true, false), true,
+     'skutocna zmena materialu prepise aj vedomu volbu (novy material = nova predvolba)');
+  eq(insertGrainShouldWrite('REAL_19', 'REAL_19', REAL, true, true), false,
+     'rozkliknuty select v TOMTO okne sa neprepisuje uz vobec');
+  eq(insertGrainShouldWrite('REAL_19', 'REAL_19', REAL, false, true), false,
+     'fokus prebije aj netknuty stav');
+  eq(insertGrainShouldWrite('UNI_DOSKA_18', 'REAL_19', null, false, false), false,
+     'material zmizol z katalogu -> select sa NEcisti (ma pevne moznosti)');
+  eq(insertGrainShouldWrite('UNI_DOSKA_18', 'BEZ_SMERU', { id: 'BEZ_SMERU', thickness: 18 }, false, false), false,
+     'zaznam bez kluca grain nema co dosadit');
+  eq(insertGrainShouldWrite('UNI_DOSKA_18', 'BEZ_SMERU', { id: 'BEZ_SMERU', grain: '' }, false, false), false,
+     'prazdna predvolba nie je predvolba');
 })();
 
 const FORM = { name: 'Polica', length: '800', width: '300',

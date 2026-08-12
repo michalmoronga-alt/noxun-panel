@@ -10,6 +10,18 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
+### D-86 — smer dekoru vo vkladacej karte sa pri refreshi katalógu ticho vrátil na predvoľbu (12.8.2026, PR #163, v0.6.2)
+
+**Odkiaľ prišlo:** nález subagenta pri dávke E-03 (6.8.); chyba existovala od V0.4.7c, teda odkedy vkladacia karta dosky existuje. Vo vkladacej karte („Nový objekt → Doska") si používateľ vedome prepol **Smer dekoru** na „Bez smeru", dosku ešte nevložil a medzitým čokoľvek urobil v okne Materiály. Živý push katalógu (`NX.setMaterials` → `refreshInsertBoardMaterials` → `onInsertBoardMaterial`) prepísal pole späť na **katalógovú predvoľbu materiálu** — bez akéhokoľvek náznaku. Vložená doska tak dostala iný smer dekoru, než si používateľ nastavil, a zistilo sa to až na hotovom dielci.
+
+**Prečo sa nedal použiť hotový guard z E-03:** ide o **rovnakú triedu chyby** ako rozpísaný draft hrúbky (Codex #142 P2), ale `insertThicknessShouldWrite` sa použiť **nedá**: pri rovnakom REÁLNOM materiáli vracia `true` — a smie, lebo pole hrúbky je vtedy zamknuté a žiadny draft v ňom neexistuje. Smer dekoru sa však dá meniť pri **každom** materiáli, takže by ten istý guard voľbu naďalej prepisoval. D-86 preto dostala **vlastný guard**.
+
+**Čo sa zmenilo (z pohľadu používateľa):** vedome zvolený smer dekoru vo vkladacej karte **prežije** akúkoľvek prácu v okne Materiály — pole sa prepíše len vtedy, keď sa reálne zmení materiál (vtedy je predvoľba nového materiálu správna odpoveď). Kým používateľ na smer nesiahol, predvoľba sa dopĺňa ako doteraz, takže bežný tok („vyber materiál → vlož") je nezmenený.
+
+**Ako je to spravené (kontrakt):** čistá JS zmena v paneli, **žiadny Ruby kontrakt sa nedotkol**. Nová čistá funkcia `insertGrainShouldWrite(prevMaterialId, materialId, sheet, touched, focused)` v `ui/js/board_card.js` (vzor `insertThicknessShouldWrite`): katalóg bez predvoľby (`sheet` chýba alebo nemá `grain`) → **nepíš nič** (select má pevné možnosti, nemá sa čím vyčistiť) · rozkliknutý select s fokusom → nikdy · iný materiál → píš · ten istý materiál → píš **len ak používateľ na pole nesiahol**. Príznak „siahol" nesie `insertGrainTouched`, ktorý zapína `onchange` selectu (`onInsertGrainChange`) a ktorý po dosadení predvoľby **padá späť** (v poli je vtedy katalógová hodnota, nie voľba používateľa). `onInsertBoardMaterial` si predošlý materiál drží v lokálnej premennej, takže hrúbkový aj smerový guard vidia **ten istý** predošlý stav.
+
+**Testy:** 10 nových kontrol v `tests/js/test_e03_board_insert.js` (sada vkladacej karty dosky — guard býva vedľa svojho súrodenca z E-03): refresh bez zmeny materiálu drží voľbu · zmena materiálu píše predvoľbu · netknuté pole sa smie doplniť · fokus prebije všetko · zmiznutý materiál a záznam bez `grain` nič nezapíšu. **1187 headless · 30 JS sád zelených.** In-SketchUp beh nebol potrebný — dávka sa nedotkla buildera, observera ani geometrie.
+
 ### D-101 — panel sa po Späť/Znova neobnoví (12.8.2026, PR #162, v0.6.1)
 
 **Odkiaľ prišlo:** nález Codex review PR #149 (9.8.). Po **Ctrl+Z** ostal Inspector visieť na predošlom stave, kým sa neprekliklo na výber: model bol správny, panel zaostával. Nebola to novinka — v pluginu **neexistovala žiadna synchronizácia na Späť/Znova** (rovnako zostali stáť polia rozmerov po vrátení zmeny šírky), len pri premenovaní skrinky to bolo najviditeľnejšie, lebo jediný viditeľný účinok akcie je práve popisok v paneli. Dáta sa nekazili a stav sa sám opravil pri najbližšom kliknutí. Vedome NIE v PR #149: observer sa nedá overiť headless a in-SketchUp beh by počas práce na zákazke prepísal živý plugin — preto vlastná dávka s codex-auditom (observer/undo lifecycle) a in-SU behom (trieda chýb ako D-40 „panel visel po vložení").

@@ -273,6 +273,7 @@
   // hodnota — rozlisi ZMENU VYBERU od obycajneho refreshu katalogu (draft UNI
   // hrubky refresh neprezije, ked sa porovnava len fokus).
   var insertMatLast = null;
+  var insertGrainTouched = false; // D-86: siahol pouzivatel na smer dekoru pri tomto materiali?
   function getInsertKind(){
     var r = document.querySelector('input[name=ikind]:checked');
     return r ? r.value : 'cabinet';
@@ -323,6 +324,24 @@
     if (materialId !== prevMaterialId) return true;
     return !sheetIsUni(sheet);
   }
+  // D-86: ma sa SMER DEKORU vo vkladacej karte prepisat katalogovou predvolbou?
+  // Rovnaka trieda chyby ako E-03 draft hrubky, ale insertThicknessShouldWrite sa
+  // pouzit NEDA: ten pri rovnakom REALNOM materiali vracia true (pole je vtedy
+  // zamknute, ziadny draft neexistuje) — smer dekoru sa vsak da menit pri KAZDOM
+  // materiali, takze by zivy refresh katalogu (NX.setMaterials -> refreshInsert-
+  // BoardMaterials) vedomu volbu ("Bez smeru") ticho vratil na predvolbu.
+  // Rozhoduje preto dvojica ZMENA MATERIALU + siahol nan pouzivatel:
+  //   iny material            -> prepis (predvolba noveho materialu),
+  //   ten isty + touched      -> NEPREPISUJ (drz vedomu volbu pouzivatela),
+  //   ten isty + netknuty     -> prepis sa smie (v poli je aj tak predvolba),
+  //   katalog nema predvolbu  -> nic (select ma pevne moznosti, necisti sa),
+  //   select ma prave fokus   -> nikdy (rozkliknuty dropdown v TOMTO okne).
+  function insertGrainShouldWrite(prevMaterialId, materialId, sheet, touched, focused){
+    if (!sheet || !sheet.grain) return false;
+    if (focused) return false;
+    if (materialId !== prevMaterialId) return true;
+    return !touched;
+  }
   // Poskladaj payload vkladanej dosky z HODNOT formulara (ziadny DOM, ziadne globaly).
   // vals: surove stringy {name,length,width,material_id,grain_direction,thickness}
   // sheet: katalogovy zaznam vybraneho materialu (alebo null)
@@ -355,16 +374,20 @@
     }
     return { ok: true, payload: payload };
   }
+  // D-86: pouzivatel prave vedome zmenil smer dekoru — od tejto chvile ho zivy
+  // refresh katalogu (pri NEZMENENOM materiali) nesmie prepisat.
+  function onInsertGrainChange(){ insertGrainTouched = true; }
   // Zmena materialu vo vkladacej karte: dosad hrubku + default smer dekoru z katalogu.
   function onInsertBoardMaterial(){
     var ms = el('ib_material'); if (!ms) return;
+    var prevMat = insertMatLast;
     var sheet = findSheetIn(MATERIALS.sheets, ms.value);
     var th = el('ib_thickness');
     if (th){
       var uni = sheetIsUni(sheet);
       th.readOnly = !uni; // UNI = odomknute (readonly styling riesi CSS)
       th.title = uni ? 'UNI: hrúbku určuje doska' : 'Hrúbku určuje materiál';
-      if (insertThicknessShouldWrite(insertMatLast, ms.value, sheet, document.activeElement === th)){
+      if (insertThicknessShouldWrite(prevMat, ms.value, sheet, document.activeElement === th)){
         th.value = sheet ? fmtmm(sheet.thickness) : '';
         // Zivy nahlad vyrazu ("= 12") visi na input evente — po programovom
         // prepise ho zosynchronizuj, inak po zmene materialu ostane stary.
@@ -373,7 +396,14 @@
       }
     }
     insertMatLast = ms.value;
-    if (el('ib_grain') && sheet && sheet.grain) el('ib_grain').value = sheet.grain;
+    // D-86: predvolba smeru sa dosadi len ked na to ma pravo (viz guard vyssie).
+    // Po dosadeni je v poli katalogova hodnota, nie volba pouzivatela — priznak padne.
+    var gs = el('ib_grain');
+    if (gs && insertGrainShouldWrite(prevMat, ms.value, sheet, insertGrainTouched,
+                                     document.activeElement === gs)){
+      gs.value = sheet.grain;
+      insertGrainTouched = false;
+    }
   }
   function insertBoard(){
     var ms = el('ib_material');
@@ -394,5 +424,6 @@
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { buildInsertBoardPayload: buildInsertBoardPayload,
                        sheetIsUni: sheetIsUni, findSheetIn: findSheetIn,
-                       insertThicknessShouldWrite: insertThicknessShouldWrite };
+                       insertThicknessShouldWrite: insertThicknessShouldWrite,
+                       insertGrainShouldWrite: insertGrainShouldWrite };
   }
