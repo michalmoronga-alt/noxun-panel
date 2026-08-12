@@ -129,8 +129,10 @@
     <!-- E-03: pri UNI materiali sa pole odomyka (readOnly riadi board_card.js) -->
     <div class="row"><label>Hrúbka</label><input id="ib_thickness" type="text" readonly><span class="unit">mm</span></div>
     <div class="row"><label>Smer dekoru</label>
-      <!-- D-86: onchange oznaci volbu za vedomu — refresh katalogu ju uz neprepise -->
-      <select id="ib_grain" onchange="onInsertGrainChange()">
+      <!-- D-86: onchange oznaci volbu za vedomu — refresh katalogu ju uz neprepise.
+           onblur (Codex #163 P2) dokona odlozeny zapis, ak katalog vymenil material,
+           kym pouzivatel v selecte stal — nemusi sa cakat na dalsi refresh. -->
+      <select id="ib_grain" onchange="onInsertGrainChange()" onblur="onInsertBoardMaterial()">
         <option value="length">Po dĺžke</option>
         <option value="width">Po šírke</option>
         <option value="none">Bez smeru</option>

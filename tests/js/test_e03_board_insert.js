@@ -9,7 +9,7 @@
 const assert = require('node:assert');
 const path = require('node:path');
 const { buildInsertBoardPayload, sheetIsUni, findSheetIn, insertThicknessShouldWrite,
-        insertGrainShouldWrite } =
+        insertGrainShouldWrite, insertMatMarkAdvances, insertGrainSync } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'board_card.js'));
 const { evalDim } = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'expr.js'));
 
@@ -89,6 +89,61 @@ eq(findSheetIn(null, 'REAL_19'), null, 'prazdny katalog neprepadne');
      'zaznam bez kluca grain nema co dosadit');
   eq(insertGrainShouldWrite('UNI_DOSKA_18', 'BEZ_SMERU', { id: 'BEZ_SMERU', grain: '' }, false, false), false,
      'prazdna predvolba nie je predvolba');
+})();
+
+// --- Codex #163 P2: fokus nesmie zmenu materialu ZAHODIT ----------------------
+// Diera povodneho fixu (a rovnako aj hrubkoveho guardu z E-03): ked refresh katalogu
+// vymenil vybrany material (napr. ho niekto zmazal), kym pouzivatel stal v poli,
+// fokusovy guard zapis potlacil — ale marker "pre ktory material je pole zosynchro-
+// nizovane" sa aj tak posunul. Dalsie refreshe uz videli "bez zmeny" a do vlozenej
+// dosky isla zatuchnuta hodnota. Marker sa preto pri fokusom potlacenom zapise DRZI.
+(function(){
+  eq(insertMatMarkAdvances('REAL_19', 'UNI_DOSKA_18', true), false,
+     'fokus + ZMENENY material -> marker sa drzi (zapis sa dokona neskor)');
+  eq(insertMatMarkAdvances('REAL_19', 'UNI_DOSKA_18', false), true,
+     'bez fokusu sa marker posuva vzdy');
+  eq(insertMatMarkAdvances('REAL_19', 'REAL_19', true), true,
+     'fokus pri NEZMENENOM materiali marker nedrzi (bolo by to bez ucinku)');
+  eq(insertMatMarkAdvances(null, 'REAL_19', true), false,
+     'prve naplnenie s fokusom sa tiez odklada, nie zahadzuje');
+})();
+
+// Tu istu dieru mal aj hrubkovy guard z E-03 (uzsiu — prejavila by sa pri UNI
+// materiali, kde je draft chraneny) a opravuje ju ten isty mechanizmus: zapis sa
+// potlaci, ale marker sa drzi, takze po odchode fokusu default noveho materialu dobehne.
+(function(){
+  eq(insertThicknessShouldWrite('REAL_19', 'UNI_DOSKA_18', UNI, true), false,
+     'hrubka: fokus zapis potlacil');
+  eq(insertMatMarkAdvances('REAL_19', 'UNI_DOSKA_18', true), false,
+     'hrubka: marker sa drzi na starom materiali (ten isty mechanizmus ako smer)');
+  eq(insertThicknessShouldWrite('REAL_19', 'UNI_DOSKA_18', UNI, false), true,
+     'hrubka: po odchode fokusu sa default noveho materialu dosadi');
+})();
+
+// Scenar cez CISTY automat insertGrainSync (produkcia aj test pouzivaju ten isty kod).
+(function(){
+  // 1) prve naplnenie karty: predvolba materialu sa dosadi ('none' z UNI zaznamu)
+  var st = insertGrainSync({ mark: null, touched: false, value: '' }, 'UNI_DOSKA_18', UNI, false);
+  eq([st.value, st.wrote, st.mark], ['none', true, 'UNI_DOSKA_18'],
+     'prve naplnenie dosadi predvolbu materialu');
+  // 2) pouzivatel vedome prepne smer na "po sirke"
+  st = { mark: st.mark, touched: true, value: 'width' };
+  // 3) refresh katalogu bez zmeny materialu (aj opakovany) volbu DRZI
+  st = insertGrainSync(st, 'UNI_DOSKA_18', UNI, false);
+  eq([st.value, st.wrote], ['width', false], 'refresh bez zmeny materialu drzi volbu');
+  st = insertGrainSync(st, 'UNI_DOSKA_18', UNI, false);
+  eq([st.value, st.touched], ['width', true], 'ani opakovany refresh na tom nic nemeni');
+  // 4) refresh VYMENI material, kym pouzivatel stoji v selecte -> zapis sa odlozi
+  st = insertGrainSync(st, 'REAL_19', REAL, true);
+  eq([st.value, st.wrote, st.mark], ['width', false, 'UNI_DOSKA_18'],
+     'fokus zapis potlacil — marker ostal na starom materiali (zmena sa NEZAHODILA)');
+  // 5) ...a NAKONIEC sa dosadi (blur selectu alebo dalsi refresh)
+  st = insertGrainSync(st, 'REAL_19', REAL, false);
+  eq([st.value, st.wrote, st.mark, st.touched], ['length', true, 'REAL_19', false],
+     'odlozena predvolba noveho materialu sa dokona a priznak "siahol" padne');
+  // 6) netknute pole uz patri katalogu — dalsi refresh zapise tu istu hodnotu (bez ucinku)
+  var after = insertGrainSync(st, 'REAL_19', REAL, false);
+  eq([after.value, after.mark], ['length', 'REAL_19'], 'zosynchronizovany stav je stabilny');
 })();
 
 const FORM = { name: 'Polica', length: '800', width: '300',
