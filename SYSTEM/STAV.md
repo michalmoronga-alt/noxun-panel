@@ -5,13 +5,13 @@
 
 ## Stav
 
-**v0.6.0 · 11.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku. Na to nadviazala a práve sa uzavrela **upratovacia etapa U1–U4** (dokumentácia a hygiena repa); verzia **v0.6.0** je jej checkpoint — bez zmeny logiky.
+**v0.6.1 · 12.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0).
 
-Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **D-93** — ručný zámok nominálnej dĺžky výsuvu, PR **#156**. Testy: **1176 headless · 30 JS sád · 312 in-SketchUp scenárov**.
+Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **D-101** — panel sa po **Späť/Znova** obnoví sám, PR **#162** (v0.6.1). Testy: **1187 headless · 30 JS sád**; in-SketchUp sada má nové scenáre D-101, ale **beh čaká na voľnú SketchUp session** (12.8. v noci ju držala otvorená živá zákazka — druhá inštancia uviazne na okne Welcome).
 
 ## Robí sa
 
-**Blok 1 · ŠTART AUTONÓMIE** ([PLAN.md](PLAN.md)) — prvé dávky v **autonómnom režime** (pravidlá z retrospektívy RETRO, PR #161: risk-based codex-audit, merge robí Claude po bránach CI + review, denný report na konci bloku — plné znenie [../CLAUDE.md](../CLAUDE.md), sekcia Git workflow). Poradie dávok: **D-101** (panel po Späť/Znova) → **D-86** (guard smeru dekoru) → **D-77** (odseknuté okno detailu).
+**Blok 1 · ŠTART AUTONÓMIE** ([PLAN.md](PLAN.md)) — prvé dávky v **autonómnom režime** (pravidlá z retrospektívy RETRO, PR #161: risk-based codex-audit, merge robí Claude po bránach CI + review, denný report na konci bloku — plné znenie [../CLAUDE.md](../CLAUDE.md), sekcia Git workflow). **D-101 hotová (PR #162)**; ďalej: **D-86** (guard smeru dekoru) → **D-77** (odseknuté okno detailu).
 
 ## Ďalší krok
 
@@ -19,6 +19,7 @@ Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolova
 
 ## Posledné uzávery
 
+- **D-101 panel po Späť/Znova** (Ctrl+Z aj Ctrl+Y obnovia Inspector sám — čisté čítanie bez nového kroku Späť, zlúčenie rýchlych vrátení) — PR **#162**, v0.6.1 (12.8.)
 - **RETRO — workflow retrospektíva** (risk-based codex-audit, pravidlo 3 kôl, autonómne bloky s merge po bránach, denný report; blok ŠTART AUTONÓMIE predsunutý) — PR **#161** (12.8.)
 - **ETAPA UPRATANIE UZAVRETÁ** (U1–U4, PR **#157–#160**) — checkpoint **v0.6.0** (11.8.)
 - **U4 presuny a checkpoint** (premenovanie súborov na mená bez čísel, pôvodná vízia a návrh panela do archívu, ARCHIWOOD do zdrojov, README, bump v0.6.0) — PR **#160** (11.8.)
