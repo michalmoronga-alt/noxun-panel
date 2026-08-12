@@ -10,6 +10,22 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
+### D-101 — panel sa po Späť/Znova neobnoví (12.8.2026, PR #162, v0.6.1)
+
+**Odkiaľ prišlo:** nález Codex review PR #149 (9.8.). Po **Ctrl+Z** ostal Inspector visieť na predošlom stave, kým sa neprekliklo na výber: model bol správny, panel zaostával. Nebola to novinka — v pluginu **neexistovala žiadna synchronizácia na Späť/Znova** (rovnako zostali stáť polia rozmerov po vrátení zmeny šírky), len pri premenovaní skrinky to bolo najviditeľnejšie, lebo jediný viditeľný účinok akcie je práve popisok v paneli. Dáta sa nekazili a stav sa sám opravil pri najbližšom kliknutí. Vedome NIE v PR #149: observer sa nedá overiť headless a in-SketchUp beh by počas práce na zákazke prepísal živý plugin — preto vlastná dávka s codex-auditom (observer/undo lifecycle) a in-SU behom (trieda chýb ako D-40 „panel visel po vložení").
+
+**Čo sa zmenilo (z pohľadu používateľa):** **Ctrl+Z aj Ctrl+Y obnovia panel samy.** Vrátiš premenovanie — v hlavičke je hneď starý názov; vrátiš zmenu šírky — polia ukazujú pôvodný rozmer; vrátiš vloženie skrinky — panel sa prepne do režimu vkladania. Nič sa nedá „stratiť" a nič netreba preklikávať. Podržané Ctrl+Z (viac krokov rýchlo za sebou) panel neblikne desaťkrát — obnoví sa **raz, na najnovší stav**.
+
+**Ako je to spravené (kontrakt):** panel počúva okrem výberu aj transakcie modelu — nový `PanelModelObserver` (`onTransactionUndo` / `onTransactionRedo` / `onTransactionAbort`) v **existujúcom** lifecycle panela (attach pri otvorení dialógu, detach pri zatvorení, prepnutie pri zmene dokumentu — vzor `SelObserver`, žiadne nové call sites). Kritické zásady, ktoré vyplynuli z Codex auditu návrhu (1 blocker + 4 nálezy + 2 poznámky, všetky zapracované PRED implementáciou):
+
+- **Refresh je čisté čítanie** — `push_selected(model, dedup: false)`. Dedup by cez `ScaleWatch.request_dedup` siahol na model a stal by sa vrcholom undo stacku (lekcia D-103). Refresh preto **nepridáva žiadny krok Späť**.
+- **Tenký callback + odložený zlúčený refresh** — v observer kontexte sa nič nečíta ani nemení, len sa označí pending a naplánuje `UI.start_timer(0)` (vzor `EdgeCheck.request_redraw`); viac udalostí počas pendingu = **jeden** push najnovšieho stavu.
+- **Atomický lifecycle** — anti-double remove→add pri attachi s rollbackom už pripojenej polovice; pri detachi má **každý observer vlastný chránený krok**, takže zlyhanie jedného remove neposkočí druhý ani predčasne nevynuluje `@observer_model` (žiadny visiaci observer po zatvorení a znovuotvorení panela).
+- **Multi-model guard dvakrát** — v callbacku aj tesne pred pushom: oneskorená udalosť zo starého dokumentu nesmie prepísať Inspector aktívneho.
+- **Suspend guard neZAHADZUJE** — pri našom vlastnom reselecte sa refresh len odloží, udalosť sa nestratí.
+
+**Testy:** headless sada má statické guardy na kontrakt (pokrytie undo/redo/abort, `dedup: false`, tenký callback, dvojitý guard, chránený detach). In-SketchUp scenáre idú **cez skutočný observer** (`Sketchup.undo`/`redo`), nie cez priame volanie handlera, a dokazujú sa **počítadlom vstupov** do handlera — „neprišiel push" totiž detach nedokazuje (handler by aj tak skončil na guarde). Overujú: refresh po undo prebehne presne raz a s `dedup: false`; ďalší Ctrl+Z odstráni celé vloženie (dôkaz, že refresh nepridal undo krok); dve rýchle undo = 2 udalosti a 1 push; po detachi **ani jeden** vstup; dvojitý attach = presne jeden vstup; udalosť z iného dokumentu sa zastaví na guarde aj vtedy, keď sa dokument prepne až medzi udalosťou a timerom; a pri simulovanom zlyhaní prvého remove sa druhý observer aj tak odvesí. *(Beh in-SketchUp sady 12.8. v noci neprešiel — druhá inštancia SketchUpu uviazne na okne Welcome, kým je otvorená živá zákazka; sada sa musí spustiť vo voľnej session.)*
+
 ### D-93 — ručný zámok nominálnej dĺžky výsuvu (11.8.2026, PR #156, v0.5.61)
 
 **Odkiaľ prišlo:** test kovania na reálnej zákazke (Michal 9.8.). Pravidlo `vysuvy-nl-podla-hlbky` vyberá dĺžku výsuvu automaticky zo svetlej hĺbky korpusu (najdlhší rad, ktorý sa zmestí, mínus rezerva), lenže v praxi sa bežne kupuje **kratší výsuv** (cena, dostupnosť, prekážka v skrinke, zjednotenie objednávky) — na KLINIKE 30× Atira 420/70 pri hĺbke na 470. Prepnúť sa dal celý set alebo ručný POČET, nie samotná dĺžka — a dĺžka ide priamo do výberu kódu (`code_by_nl`), takže sa objednala nesprávna položka.

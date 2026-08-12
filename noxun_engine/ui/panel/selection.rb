@@ -1,16 +1,36 @@
 # frozen_string_literal: true
-# Noxun Engine - Panel: SelectionObserver lifecycle + suspend guard + reselect + SelObserver trieda.
+# Noxun Engine - Panel: observer lifecycle (vyber + transakcie) + suspend guard
+# + reselect + triedy SelObserver / PanelModelObserver.
 # Cast modulu Panel (reopen) - zdiela ivary (dialog, active_zone_id, suspend guard)
 # cez class << self. Nacitava panel.rb; ziadna logika mimo modulu.
 module Noxun
   module Engine
     module Panel
       class << self
-        # --- SelectionObserver ----------------------------------------------
+        # --- observery vyberu a transakcii ----------------------------------
+        # Panel pocuva DVE veci naraz:
+        #   SelObserver        — zmena vyberu (klik pouzivatela)
+        #   PanelModelObserver — undo/redo/abort transakcie (D-101)
+        # ATOMICKY lifecycle (Codex audit D-101, BLOCKER): kazdy observer ma
+        # vlastny chraneny remove; ked attach druheho zlyhá, prvy sa vrati spat
+        # (rollback) — nikdy nesmie ostat „polovicny" stav, kde panel pocuva
+        # vyber, ale nie transakcie (alebo naopak).
         def attach_observer
           model = Sketchup.active_model
           @observer ||= SelObserver.new
-          model.selection.add_observer(@observer)
+          @model_observer ||= PanelModelObserver.new
+          sel_attached = false
+          begin
+            observer_quiet { model.selection.remove_observer(@observer) } # anti-double
+            model.selection.add_observer(@observer)
+            sel_attached = true
+            observer_quiet { model.remove_observer(@model_observer) } # anti-double
+            model.add_observer(@model_observer)
+          rescue StandardError
+            # rollback uz pripojenej polovice — polovicny attach je horsi nez ziadny
+            observer_quiet { model.selection.remove_observer(@observer) } if sel_attached
+            raise
+          end
           @observer_model = model
           ensure_app_observer
         rescue StandardError => e
@@ -37,14 +57,33 @@ module Noxun
           Engine.log_error(e, 'Panel.on_model_switched')
         end
 
+        # KAZDY observer ma VLASTNY chraneny detach (Codex audit D-101, BLOCKER):
+        # zlyhanie prveho remove nesmie preskocit druhy ani predcasne vynulovat
+        # @observer_model — inak by na modeli ostal visiaci observer.
         def detach_observer
-          return unless @observer && @observer_model
+          model = @observer_model
+          return unless model
 
-          @observer_model.selection.remove_observer(@observer)
-        rescue StandardError => e
-          Engine.log_error(e, 'Panel.detach_observer')
+          detach_one('vyber') { model.selection.remove_observer(@observer) if @observer }
+          detach_one('transakcie') { model.remove_observer(@model_observer) if @model_observer }
         ensure
           @observer_model = nil
+        end
+
+        def detach_one(label)
+          yield
+        rescue StandardError => e
+          Engine.log_error(e, "Panel.detach_observer (#{label})")
+          nil
+        end
+
+        # Anti-double remove pred add (vzor edge_check.rb / scale_observer.rb):
+        # pri nepripojenom observeri SketchUp nic nespravi, pripadna vynimka je
+        # bezvyznamova — preto sa NEloguje (nie je to chyba, je to poistka).
+        def observer_quiet
+          yield
+        rescue StandardError
+          nil
         end
 
         def on_selection_changed
@@ -53,6 +92,59 @@ module Noxun
           push_selected(Sketchup.active_model)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.on_selection_changed')
+        end
+
+        # --- D-101: Spat / Znova (Ctrl+Z, Ctrl+Y) ---------------------------
+        # Undo/redo meni model, ale ziadny selection event nepride — Inspector
+        # visel na predoslom stave az do prekliku vyberu (premenovanie skrinky,
+        # vratene rozmery). Callback je TENKY: v observer kontexte sa NIC necita
+        # ani nemeni, len sa oznaci pending a naplanuje refresh na timer
+        # (vzor EdgeCheck.request_redraw / EdgeModelWatch).
+        # Multi-model guard (Codex audit FIX B): udalost z ineho dokumentu nesmie
+        # prepisat Inspector aktivneho — a overuje sa ZNOVA v timeri.
+        def on_model_txn(model)
+          return unless @dialog
+          return unless txn_model_ok?(model)
+
+          request_txn_refresh(model)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.on_model_txn')
+        end
+
+        # Coalescing (Codex audit FIX C): viac rychlych undo/redo za sebou =
+        # JEDEN push najnovsieho stavu — dalsia udalost pocas pending uz dalsi
+        # timer nepridava.
+        def request_txn_refresh(model, delay = 0)
+          return if @txn_refresh_pending
+
+          @txn_refresh_pending = true
+          UI.start_timer(delay, false) do
+            begin
+              @txn_refresh_pending = false
+              flush_txn_refresh(model)
+            rescue StandardError => e
+              Engine.log_error(e, 'Panel.request_txn_refresh')
+            end
+          end
+        end
+
+        # Re-check TESNE pred pushom (vzor ScaleWatch.refresh_panel): oneskoreny
+        # callback zo stareho dokumentu ani po zatvoreni panela nesmie nic prepisat.
+        # KRITICKE `dedup: false` — dedup pyta ScaleWatch.request_dedup (zasah do
+        # modelu) a z observer cesty je zakazany (lekcia D-103).
+        def flush_txn_refresh(model)
+          return unless @dialog
+          return unless txn_model_ok?(model)
+
+          # Suspend guard sa testuje AZ TU a udalost sa NEZAHADZUJE (Codex audit
+          # NOTE F): pocas naseho vlastneho reselectu sa refresh len odlozi.
+          return request_txn_refresh(model, 0.1) if @suspend_selection_sync
+
+          push_selected(model, dedup: false)
+        end
+
+        def txn_model_ok?(model)
+          !model.nil? && model == @observer_model && model == Sketchup.active_model
         end
 
         # Programmaticka reselect (nas clear+add po rebuilde) NESMIE rozhodit panel.
@@ -124,6 +216,23 @@ module Noxun
 
         def onSelectionRemoved(_selection, _element)
           Panel.on_selection_changed
+        end
+      end
+
+      # D-101: undo/redo/abort transakcie — drzany v @model_observer.
+      # Vsetky tri cesty koncia v TOM ISTOM odlozenom refreshi (abort je zadarmo
+      # — vzor EdgeModelWatch): v callbacku sa NIC neceka, necita ani nemeni.
+      class PanelModelObserver < Sketchup::ModelObserver
+        def onTransactionUndo(model)
+          Panel.on_model_txn(model)
+        end
+
+        def onTransactionRedo(model)
+          Panel.on_model_txn(model)
+        end
+
+        def onTransactionAbort(model)
+          Panel.on_model_txn(model)
         end
       end
 
