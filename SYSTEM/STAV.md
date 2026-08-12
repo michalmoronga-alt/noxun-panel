@@ -7,7 +7,7 @@
 
 **v0.6.1 · 12.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0).
 
-Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **D-101** — panel sa po **Späť/Znova** obnoví sám, PR **#162** (v0.6.1). Testy: **1187 headless · 30 JS sád**; in-SketchUp sada má nové scenáre D-101, ale **beh čaká na voľnú SketchUp session** (12.8. v noci ju držala otvorená živá zákazka — druhá inštancia uviazne na okne Welcome).
+Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **D-101** — panel sa po **Späť/Znova** obnoví sám, PR **#162** (v0.6.1). Testy: **1187 headless · 30 JS sád · in-SketchUp 334 PASS / 0 FAIL** (vrátane novej sekcie D-101; programové redo na Windows neexistuje — vetva je pokrytá priamou invokáciou handlera, reálne Ctrl+Y sa overuje ručne).
 
 ## Robí sa
 
