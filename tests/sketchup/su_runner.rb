@@ -42,8 +42,9 @@
 #        rychlych undo; detach/anti-double/multi-model/zlyhany remove sa dokazuju
 #        POCITADLOM vstupov do handlera (nie „neprisiel push"). Redo vetva je
 #        VRSTVENA (Ruby API nema na Windows spolahlivu redo akciu): editRedo ->
-#        legacy numericke ID -> priama invokacia onTransactionRedo; pouzita cesta
-#        sa vzdy prizna v INFO riadku.
+#        legacy numericke ID -> priama invokacia onTransactionRedo. Cesta sa
+#        kvalifikuje UCINKOM, nie navratovou hodnotou (numericke ID vracia na
+#        Windows true a nespravi nic); pouzita cesta sa vzdy prizna v INFO riadku.
 #     S6 nasobenie kopii `*N` (D-103): kopia s OTVORENYM Inspectorom (Panel.push_selected)
 #        -> interne undo nastroja MUSI odstranit kopiu (ziadna zombie) -> pole 4 kopii
 #        = presne 5 dosiek s 5 ID na 5 roznych miestach; S6b = zachytna siet v KONTROLE
@@ -3193,14 +3194,18 @@ module NoxunSuRunner
       # VRSTVENY pristup (Ruby API nema na Windows spolahlivu redo akciu — vid
       # PLAN, blok STABILITA; `Sketchup.redo` v API vobec nie je): skusi sa
       # 1) send_action('editRedo') — funguje na macOS, 2) legacy numericke ID
-      # Windows prikazu Redo, 3) priama invokacia callbacku observera. Prva
-      # uspesna cesta vyhrava a scenar sa v logu prizna, ktora to bola.
+      # Windows prikazu Redo, 3) priama invokacia callbacku observera.
+      # KVALIFIKACIA CESTY JE PODLA UCINKU, NIE PODLA NAVRATOVEJ HODNOTY:
+      # send_action(21836) na tomto builde vrati true a NESPRAVI NIC (falosny
+      # pozitiv, beh c. 4) — preto sa v dalsom kroku ceka na skutocny ucinok
+      # (sirka spat na 850 + prirastok vstupov do handlera) a bez neho sa
+      # prepadne na cestu 3. Pouzita cesta sa vzdy prizna v logu.
       inst = state[:d101_cab]
       d101_rebuild(model, inst, 850.0)
       d101_reset(st)
       state[:d101_js].clear
       Sketchup.undo # 850 -> 600
-      state[:d101_redo_route] =
+      state[:d101_redo_sent] =
         if d101_send_action('editRedo') then :action_name
         elsif d101_send_action(21836) then :action_id
         end
@@ -3208,19 +3213,32 @@ module NoxunSuRunner
     steps << [SETTLE, lambda do
       st = state[:d101]
       w = d101_width(state[:d101_cab])
-      route = state[:d101_redo_route]
-      if route
-        info("D101 REDO: pouzita cesta #{route == :action_name ? "send_action('editRedo')" : 'send_action(21836) — legacy Windows ID prikazu Redo'}")
+      sent = state[:d101_redo_sent]
+      # UCINOK = model sa naozaj vratil do 850 A handler dostal dalsi vstup
+      # (undo + redo). Samotne „akcia bola prijata" nestaci.
+      effect = w && (w - 850.0).abs < 0.01 && st[:txn] >= 2
+      if sent && effect
+        info("D101 REDO: pouzita cesta #{sent == :action_name ? "send_action('editRedo')" : 'send_action(21836) — legacy Windows ID prikazu Redo'}")
         ok("D101: redo vratilo zmenu SPAT a panel sa obnovil tou istou cestou (sirka #{w}, txn #{st[:txn]}, refreshov #{st[:flush]}, dedup #{st[:flush_dedups].inspect})",
-           w && (w - 850.0).abs < 0.01 && st[:txn] >= 2 && st[:flush] >= 1 &&
-           !st[:flush_dedups].empty? && st[:flush_dedups].all? { |d| d == false })
+           st[:flush] >= 1 && !st[:flush_dedups].empty? && st[:flush_dedups].all? { |d| d == false })
       else
-        # Windows: ziadna redo akcia Ruby API nezabrala. Model teda redo nespravi,
-        # ale ZAPOJENIE onTransactionRedo -> pending -> timer -> push_selected
-        # sa da overit tvrdo — invokaciou callbacku na SKUTOCNOM observer objekte,
-        # ktory drzi Panel. Skutocne Ctrl+Y z klavesnice overuje Michal rucne
-        # (otvoreny bod „redo po zlucenych transparentnych operaciach" v PLAN).
-        info('D101 REDO: ani editRedo, ani legacy ID neprijaty (Windows) — handler sa overuje priamou invokaciou onTransactionRedo.')
+        # Windows: ziadna redo akcia Ruby API realne nezabrala. Model teda redo
+        # nespravi, ale ZAPOJENIE onTransactionRedo -> pending -> timer ->
+        # push_selected sa da overit tvrdo — invokaciou callbacku na SKUTOCNOM
+        # observer objekte, ktory drzi Panel. Skutocne Ctrl+Y z klavesnice
+        # overuje Michal rucne (otvoreny bod „redo po zlucenych transparentnych
+        # operaciach" v PLAN, blok STABILITA).
+        if sent
+          info("D101 REDO: #{sent == :action_name ? "send_action('editRedo')" : 'send_action(21836)'} vratilo true, ale BEZ UCINKU " \
+               "(sirka #{w}, vstupov do handlera #{st[:txn]}) — prepadam na priamu invokaciu.")
+        else
+          info('D101 REDO: ani editRedo, ani legacy ID neboli prijate — prepadam na priamu invokaciu.')
+        end
+        # Cesta 2 mohla stav rozbehnut (ciastocny/oneskoreny ucinok) — pred
+        # cestou 3 obnovime vychodisko scenara, nech jej asserty meraju cisto:
+        # sirka 600 po undo a vynulovane pocitadla.
+        inst = state[:d101_cab]
+        d101_rebuild(model, inst, 600.0) if inst && inst.valid? && w && (w - 600.0).abs >= 0.01
         obs = e::Panel.instance_variable_get(:@model_observer)
         state[:d101_direct] = true
         ok('D101: observer transakcii je drzany v Paneli (bez neho by redo cestu nebolo na com overit)', !obs.nil?)
@@ -3232,10 +3250,13 @@ module NoxunSuRunner
     steps << [SETTLE, lambda do
       st = state[:d101]
       if state[:d101_direct]
+        w = d101_width(state[:d101_cab])
         ok("D101: redo handler cez priamu invokaciu (Windows bez redo akcie) — pending -> timer -> jeden push s dedup:false (txn #{st[:txn]}, refreshov #{st[:flush]}, pushov #{st[:flush_pushes]}, dedup #{st[:flush_dedups].inspect})",
            st[:txn] == 1 && st[:flush] == 1 && st[:flush_pushes] == 1 && st[:flush_dedups] == [false])
         ok("D101: priama invokacia doniesla Inspectoru cerstvy stav (#{state[:d101_js].length} js volani)",
            state[:d101_js].any? { |s| s.include?('NX.loadSelected') || s.include?('NX.clearSelected') })
+        ok("D101: priama invokacia NEsiahla na model — vychodisko scenara drzi (sirka #{w})",
+           w && (w - 600.0).abs < 0.01)
       end
       # ZIADNY NOVY UNDO KROK: po refreshi musi dalsi Ctrl+Z odstranit CELE vlozenie.
       cleanup(model)
