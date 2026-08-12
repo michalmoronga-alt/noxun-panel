@@ -2812,7 +2812,7 @@ module NoxunSuRunner
   end
 
   def d101_state
-    { txn: 0, flush: 0, push: 0, in_flush: false, flush_pushes: 0, flush_dedups: [] }
+    { txn: 0, sel: 0, flush: 0, push: 0, in_flush: false, flush_pushes: 0, flush_dedups: [] }
   end
 
   # `flush_dedups` je najtvrdsi dokaz kontraktu: zbiera hodnotu `dedup` VYHRADNE
@@ -2821,11 +2821,18 @@ module NoxunSuRunner
   def d101_install_probe(st)
     e::Panel.singleton_class.class_eval do
       alias_method :nx_d101_txn, :on_model_txn
+      alias_method :nx_d101_sel, :on_selection_changed
       alias_method :nx_d101_flush, :flush_txn_refresh
       alias_method :nx_d101_push, :push_selected
       define_method(:on_model_txn) do |model|
         st[:txn] += 1
         nx_d101_txn(model)
+      end
+      # Vstupy do sync vyberu — dokazuju, ze na modeli NEVISI observer vyberu
+      # (rata sa PRED suspend guardom, takze ziadny guard vysledok neskresli).
+      define_method(:on_selection_changed) do
+        st[:sel] += 1
+        nx_d101_sel
       end
       define_method(:flush_txn_refresh) do |model|
         st[:flush] += 1
@@ -2855,9 +2862,11 @@ module NoxunSuRunner
 
     sc.class_eval do
       alias_method :on_model_txn, :nx_d101_txn
+      alias_method :on_selection_changed, :nx_d101_sel
       alias_method :flush_txn_refresh, :nx_d101_flush
       alias_method :push_selected, :nx_d101_push
       remove_method :nx_d101_txn
+      remove_method :nx_d101_sel
       remove_method :nx_d101_flush
       remove_method :nx_d101_push
     end
@@ -2865,6 +2874,7 @@ module NoxunSuRunner
 
   def d101_reset(st)
     st[:txn] = 0
+    st[:sel] = 0
     st[:flush] = 0
     st[:push] = 0
     st[:flush_pushes] = 0
@@ -2892,7 +2902,13 @@ module NoxunSuRunner
     return unless state && state[:d101_active]
 
     state[:d101_active] = false
+    # VZDY vynutit cisty detach nad REALNYM modelom — nezavisle od toho, ci bol
+    # panel otvoreny. Failure-probe (simulovane zlyhanie prveho remove) necha
+    # observer VYBERU visiet na modeli a @observer_model vynulovany; bez tohto
+    # by dalsie sekcie bezali s kontaminovanym observerom (kazda zmena vyberu
+    # by pytala dedup a menila model).
     begin
+      e::Panel.instance_variable_set(:@observer_model, state[:d101_model] || Sketchup.active_model)
       e::Panel.detach_observer
     rescue StandardError
       nil
@@ -3115,6 +3131,7 @@ module NoxunSuRunner
       st = d101_state
       state[:d101] = st
       state[:d101_prev_dialog] = e::Panel.instance_variable_get(:@dialog)
+      state[:d101_model] = model
       state[:d101_active] = true
       e::Panel.instance_variable_set(:@dialog, D101FakeDialog.new)
       d101_install_probe(st)
@@ -3157,23 +3174,26 @@ module NoxunSuRunner
       w = d101_width(state[:d101_cab])
       ok("D101: dve rychle undo = 2 udalosti, ale JEDEN push najnovsieho stavu (txn #{st[:txn]}, flush #{st[:flush]}, pushov #{st[:flush_pushes]}, sirka #{w})",
          st[:txn] == 2 && st[:flush] == 1 && st[:flush_pushes] == 1 && w && (w - 600.0).abs < 0.01)
-      # REDO — rovnaka cesta (onTransactionRedo -> ten isty odlozeny refresh).
-      state[:d101_redo] = Sketchup.respond_to?(:redo)
+      # REDO — `onTransactionRedo` musi ist tou istou cestou. Undo aj redo bezia
+      # v JEDNOM kroku: medzi ne sa tak NEZMESTI debounce tick ScaleWatchu, ktory
+      # by transparentnou operaciou vymazal redo stack. `send_action('editRedo')`
+      # je jediny spolahlivy sposob na Windows (Sketchup.redo v API nie je) —
+      # vykona sa asynchronne, vysledok sa overuje v dalsom kroku.
+      inst = state[:d101_cab]
+      d101_rebuild(model, inst, 850.0)
       d101_reset(st)
       state[:d101_js].clear
-      Sketchup.redo if state[:d101_redo]
+      Sketchup.undo # 850 -> 600
+      state[:d101_redo_sent] = Sketchup.send_action('editRedo') # 600 -> 850
     end]
     steps << [SETTLE, lambda do
       st = state[:d101]
       w = d101_width(state[:d101_cab])
-      if !state[:d101_redo]
-        info('D101 REDO: Sketchup.redo nie je dostupne — vetva netestovana (kod je zhodny s undo).')
-      elsif w && (w - 800.0).abs < 0.01
-        ok("D101: redo obnovil panel rovnakou cestou (sirka #{w}, txn #{st[:txn]}, dedup #{st[:flush_dedups].inspect})",
-           st[:txn] >= 1 && st[:flush_dedups] == [false])
-      else
-        info("D101 REDO: redo stack bol prazdny (transparentne operacie observera po undo) — sirka ostala #{w}; vetva netestovana.")
-      end
+      ok('D101: akcia editRedo je na tejto platforme dostupna (bez nej sa redo vetva neda overit)',
+         state[:d101_redo_sent] != false)
+      ok("D101: redo vratilo zmenu SPAT a panel sa obnovil tou istou cestou (sirka #{w}, txn #{st[:txn]}, refreshov #{st[:flush]}, dedup #{st[:flush_dedups].inspect})",
+         w && (w - 850.0).abs < 0.01 && st[:txn] >= 2 && st[:flush] >= 1 &&
+         !st[:flush_dedups].empty? && st[:flush_dedups].all? { |d| d == false })
       # ZIADNY NOVY UNDO KROK: po refreshi musi dalsi Ctrl+Z odstranit CELE vlozenie.
       cleanup(model)
       inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
@@ -3259,6 +3279,19 @@ module NoxunSuRunner
       st = state[:d101]
       ok("D101: zlyhanie remove observera vyberu NEPRESKOCILO odvesenie ModelObservera (vstupov #{st[:txn]})",
          st[:txn].zero?)
+      # Po failure-probe VISI realny observer VYBERU na modeli (jeho remove
+      # simulovane zlyhal) a @observer_model je vynulovany. Odvesit ho treba
+      # VZDY — aj ked panel nebol otvoreny; inak by S5/S6 bezali s kontaminovanym
+      # observerom (kazda zmena vyberu = ziadost o dedup = zasah do modelu).
+      e::Panel.instance_variable_set(:@observer_model, model)
+      e::Panel.detach_observer
+      probe = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
+                                               'height' => 720.0, 'depth' => 510.0 })
+      d101_reset(st)
+      e::Panel.select_only(model, probe) # zmena vyberu: klik + zrusenie
+      model.selection.clear
+      ok("D101: po failure-probe uz na modeli NEVISI observer vyberu (vstupov do sync vyberu: #{st[:sel]})",
+         st[:sel].zero?)
       d101_teardown(state) # vrati Panel do povodneho stavu (dialog + observery)
       cleanup(model)
       ok('D101: cleanup (0 korpusov, sonda odstranena)',
