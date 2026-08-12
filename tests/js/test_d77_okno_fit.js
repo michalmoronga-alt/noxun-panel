@@ -1,9 +1,11 @@
 // Testy D-77: okno sa nesmie otvorit odseknute — ciste jadro win_fit.js
 // (nxFitTarget / nxFitChrome). Dependency-free Node:
 //   node tests/js/test_d77_okno_fit.js
-// Kontrakt: dorovnava sa LEN smerom nahor, LEN po deklarovane minimum okna a
-// NIKDY nad dostupnu plochu obrazovky. Autorita „rozumneho rozmeru" je server
-// (Engine.register_dialog_fit zahodi hodnoty mimo 240..2600 px) — toto je merac.
+// Kontrakt: dorovnava sa OBOMA smermi — nahor po deklarovane minimum okna,
+// nadol po dostupnu plochu obrazovky (plocha ma prednost pred minimom); medzi
+// tymito hranicami sa velkosti okna nikto nedotkne. Autorita „rozumneho rozmeru"
+// je server (Engine.register_dialog_fit zahodi hodnoty mimo 240..2600 px) —
+// toto je merac.
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
@@ -50,6 +52,47 @@ eq(nxFitTarget({ w: 900, h: 300 }, MIN, BIG, CHROME), { w: 916, h: 580 },
   const t2 = nxFitTarget({ w: 300, h: 240 }, MIN, tiny, CHROME);
   eq(t2, { w: 600, h: 460 }, 'na malej ploche je stropom plocha, nie minimum okna');
 })();
+
+// --- Codex #164 P2: okno VACSIE nez plocha sa musi zmensit -------------------
+// Zapamatane okno z vacsieho monitora (alebo po znizeni rozlisenia / pripojeni
+// cez remote desktop) trca mimo obrazovky — to je presne choroba D-77, len z
+// druhej strany. Skorsia verzia riesila iba „viewport >= ciel" a takto velke
+// okno nechala orezane.
+(function(){
+  eq(nxFitTarget({ w: 2000, h: 1200 }, MIN, BIG, CHROME), { w: 1920, h: 1040 },
+     'okno vacsie nez plocha sa zmensi presne na plochu');
+  eq(nxFitTarget({ w: 2000, h: 600 }, MIN, BIG, CHROME), { w: 1920, h: 640 },
+     'preteka len sirka — vyska (nad minimom) ostava');
+  eq(nxFitTarget({ w: 700, h: 1200 }, MIN, BIG, CHROME), { w: 716, h: 1040 },
+     'preteka len vyska — sirka ostava');
+  eq(nxFitTarget({ w: 1904, h: 1000 }, MIN, BIG, CHROME), null,
+     'okno presne na plochu sa uz nedorovnava (ziadny zbytocny set_size)');
+  eq(nxFitTarget({ w: 1905, h: 1001 }, MIN, BIG, CHROME), null,
+     'presah v ramci tolerancie sa neriesi (ziadne skakanie okna)');
+
+  // Plocha mensia nez minimum okna: minimum sa NEvynuti — plocha vyhrava.
+  const tiny = { w: 500, h: 400 };
+  eq(nxFitTarget({ w: 600, h: 500 }, MIN, tiny, CHROME), { w: 500, h: 400 },
+     'okno vacsie nez plocha a mensie nez minimum: plocha ma prednost');
+  eq(nxFitTarget({ w: 200, h: 150 }, MIN, tiny, CHROME), { w: 500, h: 400 },
+     'male okno na malej ploche rastie len po plochu, nie po minimum');
+
+  // Kombinacia: sirka pod minimom, vyska nad plochou — opravia sa OBE.
+  eq(nxFitTarget({ w: 300, h: 1500 }, MIN, BIG, CHROME), { w: 656, h: 1040 },
+     'sirka sa zvacsi po minimum a vyska zmensi po plochu naraz');
+
+  // Bez znamej plochy sa okno NIKDY nezmensuje (nehadame velkost obrazovky).
+  eq(nxFitTarget({ w: 2000, h: 1200 }, MIN, null, CHROME), null,
+     'neznama plocha: velke okno sa nechava tak');
+  eq(nxFitTarget({ w: 2000, h: 1200 }, MIN, { w: 0, h: 0 }, CHROME), null,
+     'plocha 0 sa neberie ako maly monitor');
+})();
+
+// --- bezny pripad ostava nezmeneny -------------------------------------------
+eq(nxFitTarget({ w: 700, h: 600 }, MIN, BIG, CHROME), null,
+   'okno medzi minimom a plochou sa nedotyka nikto');
+eq(nxFitTarget({ w: 1200, h: 900 }, MIN, BIG, CHROME), null,
+   'vedome zvacsene okno pod plochou ostava');
 
 // --- degenerovane vstupy: radsej nerobit nic ---------------------------------
 eq(nxFitTarget(null, MIN, BIG, CHROME), null, 'bez merania sa nic nemeni');

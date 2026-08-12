@@ -276,9 +276,11 @@ alebo status v `textContent` ceste do Ruby), použije sa **čistý text**, nie g
   `width`/`height` v `HtmlDialog.new` platia len pri PRVOM otvorení (potom
   rozhoduje veľkosť zapamätaná pod `preferences_key`), preto každé okno deklaruje
   v HTML svoje **obsahové minimum** `window.NX_FIT_MIN = { w, h }` a načíta
-  `js/win_fit.js` — to okno pri otvorení dorovná. Dorovnáva sa **len nahor**, len
-  po deklarované minimum a nikdy nad plochu obrazovky; väčšie okno používateľa
-  ostáva. Nové okno = nové `NX_FIT_MIN` (bez neho fit nebeží).
+  `js/win_fit.js` — to okno pri otvorení dorovná. Dorovnáva sa **oboma smermi**:
+  nahor po deklarované minimum, nadol po dostupnú plochu obrazovky (okno
+  zapamätané z väčšieho monitora je inak orezané rovnako). **Plocha má prednosť
+  pred minimom**; medzi minimom a plochou sa veľkosti okna nikto nedotkne, takže
+  vedome zväčšené okno ostáva. Nové okno = nové `NX_FIT_MIN` (bez neho fit nebeží).
   *Jednotný štandard šírok a rozmerov okien je úloha D-51 (UI 2.0).*
 
 ---

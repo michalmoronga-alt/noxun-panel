@@ -9,10 +9,14 @@
 //
 // RIESENIE: kazde okno po nacitani HTML ohlasi svoj VIEWPORT a Ruby ho cez
 // `set_size` dorovna. Pravidla su zamerne konzervativne:
-//   - LEN smerom NAHOR (okno sa nikdy samo nezmensi — vacsie okno je vedoma
-//     volba pouzivatela a musi prezit),
-//   - LEN po deklarovane minimum okna (`window.NX_FIT_MIN`, obsahove px),
-//   - NIKDY nad dostupnu plochu obrazovky (maly monitor rozhoduje),
+//   - NAHOR po deklarovane minimum okna (`window.NX_FIT_MIN`, obsahove px),
+//   - NADOL po dostupnu plochu obrazovky — okno zapamatane z VACSIEHO monitora
+//     (alebo po znizeni rozlisenia ci pripojeni cez remote desktop) je inak
+//     orezane obrazovkou, co je presne ta ista choroba D-77,
+//   - plocha ma PREDNOST pred minimom (nikdy nad nu; na malej ploche je
+//     stropom plocha, aj ked je mensia nez deklarovane minimum),
+//   - v pasme medzi minimom a plochou sa NESIAHA na nic — velkost okna medzi
+//     tymito hranicami je vedoma volba pouzivatela a musi prezit,
 //   - LEN RAZ pri nacitani (nie pri zmene obsahu — okno by pod rukami skakalo).
 // Ramik a titulok okna sa dopocitaju z rozdielu outer/inner, aby `set_size`
 // (vonkajsi rozmer) skutocne dal ziadany obsahovy priestor — inak by sa fit
@@ -27,8 +31,9 @@ var NX_FIT_TOL = 2;
 var NX_FIT_CHROME_FALLBACK = { w: 16, h: 40 };
 
 // Ciste jadro (testovane v tests/js/test_d77_okno_fit.js).
-// cur/min/avail/chrome = { w, h }; vracia VONKAJSI rozmer okna alebo null,
-// ked netreba nic robit.
+// cur = obsahovy viewport, min = deklarovane obsahove minimum okna,
+// avail = dostupna plocha obrazovky, chrome = ramik+titulok okna ({ w, h }).
+// Vracia VONKAJSI rozmer okna alebo null, ked netreba nic robit.
 function nxFitTarget(cur, min, avail, chrome){
   if (!cur || !min) return null;
   var cw = Number(cur.w), ch = Number(cur.h);
@@ -42,16 +47,22 @@ function nxFitTarget(cur, min, avail, chrome){
   var aw = avail && Number(avail.w) > 0 ? Number(avail.w) : 0;
   var ah = avail && Number(avail.h) > 0 ? Number(avail.h) : 0;
 
-  // Ciel = minimum, ale nikdy viac, nez sa zmesti na obrazovku.
-  var wantW = aw > 0 ? Math.min(mw, Math.max(1, aw - kw)) : mw;
-  var wantH = ah > 0 ? Math.min(mh, Math.max(1, ah - kh)) : mh;
+  // Strop = dostupna plocha bez ramika okna. Ked plochu nepozname, ziadny strop
+  // (nehadame — okno sa vtedy smie len zvacsit).
+  var capW = aw > 0 ? Math.max(1, aw - kw) : Infinity;
+  var capH = ah > 0 ? Math.max(1, ah - kh) : Infinity;
+  // Ciel = minimum, ale nikdy nad strop: PLOCHA MA PREDNOST pred minimom.
+  var wantW = Math.min(mw, capW);
+  var wantH = Math.min(mh, capH);
+  // Dorovnanie ide OBOMA smermi — nahor po minimum, nadol po plochu. Okno
+  // zapamatane z vacsieho monitora inak trca mimo obrazovky a je orezane
+  // presne tak, ako to hlasi D-77. Medzi minimom a plochou sa nesiaha na nic.
+  var tw = Math.min(Math.max(cw, wantW), capW);
+  var th = Math.min(Math.max(ch, wantH), capH);
 
-  if (cw + NX_FIT_TOL >= wantW && ch + NX_FIT_TOL >= wantH) return null;
+  if (Math.abs(tw - cw) <= NX_FIT_TOL && Math.abs(th - ch) <= NX_FIT_TOL) return null;
 
-  return {
-    w: Math.round(Math.max(cw, wantW) + kw),
-    h: Math.round(Math.max(ch, wantH) + kh)
-  };
+  return { w: Math.round(tw + kw), h: Math.round(th + kh) };
 }
 
 // Ramik okna z rozdielu outer/inner; ked hodnoty nedavaju zmysel, zaloha.
