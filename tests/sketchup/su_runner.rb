@@ -40,7 +40,10 @@
 #     D-101 panel po Spat/Znova: Ctrl+Z/Ctrl+Y obnovi Inspector sam — refresh
 #        bezi PRESNE raz, s dedup:false a BEZ noveho undo kroku; coalescing dvoch
 #        rychlych undo; detach/anti-double/multi-model/zlyhany remove sa dokazuju
-#        POCITADLOM vstupov do handlera (nie „neprisiel push")
+#        POCITADLOM vstupov do handlera (nie „neprisiel push"). Redo vetva je
+#        VRSTVENA (Ruby API nema na Windows spolahlivu redo akciu): editRedo ->
+#        legacy numericke ID -> priama invokacia onTransactionRedo; pouzita cesta
+#        sa vzdy prizna v INFO riadku.
 #     S6 nasobenie kopii `*N` (D-103): kopia s OTVORENYM Inspectorom (Panel.push_selected)
 #        -> interne undo nastroja MUSI odstranit kopiu (ziadna zombie) -> pole 4 kopii
 #        = presne 5 dosiek s 5 ID na 5 roznych miestach; S6b = zachytna siet v KONTROLE
@@ -2887,6 +2890,16 @@ module NoxunSuRunner
     (e::Store.config(inst) || {})['width'].to_f
   end
 
+  # send_action defenzivne: neznamy nazov akcie aj numericke ID mozu na danom
+  # builde vratit false ALEBO hodit vynimku — vrstveny redo fallback nesmie
+  # kvoli tomu zhodit cely scenar.
+  def d101_send_action(action)
+    Sketchup.send_action(action) ? true : false
+  rescue StandardError => ex
+    info("D101 REDO: send_action(#{action.inspect}) odmietnute (#{ex.class})")
+    false
+  end
+
   def d101_rebuild(model, inst, width)
     params = e::CabinetBuilder.config_to_params(e::Store.config(inst) || {})
     params['width'] = width
@@ -3176,24 +3189,54 @@ module NoxunSuRunner
          st[:txn] == 2 && st[:flush] == 1 && st[:flush_pushes] == 1 && w && (w - 600.0).abs < 0.01)
       # REDO — `onTransactionRedo` musi ist tou istou cestou. Undo aj redo bezia
       # v JEDNOM kroku: medzi ne sa tak NEZMESTI debounce tick ScaleWatchu, ktory
-      # by transparentnou operaciou vymazal redo stack. `send_action('editRedo')`
-      # je jediny spolahlivy sposob na Windows (Sketchup.redo v API nie je) —
-      # vykona sa asynchronne, vysledok sa overuje v dalsom kroku.
+      # by transparentnou operaciou vymazal redo stack.
+      # VRSTVENY pristup (Ruby API nema na Windows spolahlivu redo akciu — vid
+      # PLAN, blok STABILITA; `Sketchup.redo` v API vobec nie je): skusi sa
+      # 1) send_action('editRedo') — funguje na macOS, 2) legacy numericke ID
+      # Windows prikazu Redo, 3) priama invokacia callbacku observera. Prva
+      # uspesna cesta vyhrava a scenar sa v logu prizna, ktora to bola.
       inst = state[:d101_cab]
       d101_rebuild(model, inst, 850.0)
       d101_reset(st)
       state[:d101_js].clear
       Sketchup.undo # 850 -> 600
-      state[:d101_redo_sent] = Sketchup.send_action('editRedo') # 600 -> 850
+      state[:d101_redo_route] =
+        if d101_send_action('editRedo') then :action_name
+        elsif d101_send_action(21836) then :action_id
+        end
     end]
     steps << [SETTLE, lambda do
       st = state[:d101]
       w = d101_width(state[:d101_cab])
-      ok('D101: akcia editRedo je na tejto platforme dostupna (bez nej sa redo vetva neda overit)',
-         state[:d101_redo_sent] != false)
-      ok("D101: redo vratilo zmenu SPAT a panel sa obnovil tou istou cestou (sirka #{w}, txn #{st[:txn]}, refreshov #{st[:flush]}, dedup #{st[:flush_dedups].inspect})",
-         w && (w - 850.0).abs < 0.01 && st[:txn] >= 2 && st[:flush] >= 1 &&
-         !st[:flush_dedups].empty? && st[:flush_dedups].all? { |d| d == false })
+      route = state[:d101_redo_route]
+      if route
+        info("D101 REDO: pouzita cesta #{route == :action_name ? "send_action('editRedo')" : 'send_action(21836) — legacy Windows ID prikazu Redo'}")
+        ok("D101: redo vratilo zmenu SPAT a panel sa obnovil tou istou cestou (sirka #{w}, txn #{st[:txn]}, refreshov #{st[:flush]}, dedup #{st[:flush_dedups].inspect})",
+           w && (w - 850.0).abs < 0.01 && st[:txn] >= 2 && st[:flush] >= 1 &&
+           !st[:flush_dedups].empty? && st[:flush_dedups].all? { |d| d == false })
+      else
+        # Windows: ziadna redo akcia Ruby API nezabrala. Model teda redo nespravi,
+        # ale ZAPOJENIE onTransactionRedo -> pending -> timer -> push_selected
+        # sa da overit tvrdo — invokaciou callbacku na SKUTOCNOM observer objekte,
+        # ktory drzi Panel. Skutocne Ctrl+Y z klavesnice overuje Michal rucne
+        # (otvoreny bod „redo po zlucenych transparentnych operaciach" v PLAN).
+        info('D101 REDO: ani editRedo, ani legacy ID neprijaty (Windows) — handler sa overuje priamou invokaciou onTransactionRedo.')
+        obs = e::Panel.instance_variable_get(:@model_observer)
+        state[:d101_direct] = true
+        ok('D101: observer transakcii je drzany v Paneli (bez neho by redo cestu nebolo na com overit)', !obs.nil?)
+        d101_reset(st)
+        state[:d101_js].clear
+        obs.onTransactionRedo(model) if obs
+      end
+    end]
+    steps << [SETTLE, lambda do
+      st = state[:d101]
+      if state[:d101_direct]
+        ok("D101: redo handler cez priamu invokaciu (Windows bez redo akcie) — pending -> timer -> jeden push s dedup:false (txn #{st[:txn]}, refreshov #{st[:flush]}, pushov #{st[:flush_pushes]}, dedup #{st[:flush_dedups].inspect})",
+           st[:txn] == 1 && st[:flush] == 1 && st[:flush_pushes] == 1 && st[:flush_dedups] == [false])
+        ok("D101: priama invokacia doniesla Inspectoru cerstvy stav (#{state[:d101_js].length} js volani)",
+           state[:d101_js].any? { |s| s.include?('NX.loadSelected') || s.include?('NX.clearSelected') })
+      end
       # ZIADNY NOVY UNDO KROK: po refreshi musi dalsi Ctrl+Z odstranit CELE vlozenie.
       cleanup(model)
       inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
