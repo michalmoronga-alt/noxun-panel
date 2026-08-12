@@ -5,13 +5,7 @@
 
 ## Bloky
 
-### 1 · ŠTART AUTONÓMIE — stabilita a drobné fixy
-
-**Cieľ:** rozbehnúť autonómny režim dávok ([../CLAUDE.md](../CLAUDE.md), sekcia Git workflow — rozhodnutia RETRO 12.8.) na dávkach s jasným zadaním a merateľným výsledkom; zároveň zmiznú tri známe chyby. *(Vedomá výnimka z pravidla „žiadne náplasti pred reworkom" z 10.8. — sú to chyby, nie UX vylepšenia.)*
-
-- **D-77 · Okno detailu dielca je po otvorení odseknuté** — spodná časť nastavení nie je vidieť, kým sa okno ručne nezväčší. *(presunuté z UI 2.0)*
-
-### 2 · UI 2.0 — štúdio okno a výbery
+### 1 · UI 2.0 — štúdio okno a výbery
 
 **Cieľ:** satelitné okná → jedno štúdio okno s toolbarom a bočnou navigáciou; výber materiálu/ABS na jeden klik namiesto scrollovania. **Mockup PRED implementáciou** (vzor Materiály 2.0 — schválený klikateľný HTML). Podklad: merač používania D-25 (materiály/ABS vyše 400 interakcií, taby 287×, satelitné okná 234×) a [UI_VIZIA.md](UI_VIZIA.md); cieľový obraz v [V1_VIZIA.md](V1_VIZIA.md) §6.
 
@@ -31,7 +25,7 @@
 
 *(Seed katalógu ako krok je ZRUŠENÝ (Michal 10.8.) — katalóg rastie sám prácou na zákazkách; skutočný problém „nájsť materiál aj v malom zozname" rieši D-85. Podklad kódov a cien ostáva v [zdroje/SEED_KATALOG_2026-07.md](zdroje/SEED_KATALOG_2026-07.md).)*
 
-### 3 · KONTROLA + VÝROBA
+### 2 · KONTROLA + VÝROBA
 
 **Cieľ:** dotiahnuť krížovú kontrolu zákazky pred odoslaním do výroby a výrobné výstupy.
 
@@ -41,15 +35,15 @@
 - **Nárezový plán fáza 2** — guillotine, kerf, orezky, orientácia dekoru; vlastná heuristika v čistom Ruby (OpenCutList je GPL — algoritmus áno, kód nie), kontrakt D-19 pripravený.
 - **Stráž kolízií** — upozorniť, keď sa dielce prekrývajú alebo vyskočia mimo box (bbox check do validačnej vrstvy semaforu).
 
-### 4 · STABILITA
+### 3 · STABILITA
 
-**Cieľ:** synchronizácia panela s modelom a okrajové situácie observerov. *(D-101 je predsunutá do bloku 1 · ŠTART AUTONÓMIE.)*
+**Cieľ:** synchronizácia panela s modelom a okrajové situácie observerov. *(D-101 — panel po Späť/Znova — je vyriešená, PR #162.)*
 
 - **D-99 · Glitch názvov kópií pri premenovaní dielca** — nereprodukované pozorovanie, dáta boli správne; sleduje sa.
 - **Redo po zlúčených transparentných operáciách** — manuálne overiť Ctrl+Y (Ruby API nemá na Windows spoľahlivú redo akciu); otvorené od 17.7.
 - **Prepínanie typu HORNÁ/DOLNÁ na označenom korpuse občas zlyhá** — odložené, rieši sa s knižnicou/editorom typov.
 
-### 5 · V1 DOTIAHNUTIE
+### 4 · V1 DOTIAHNUTIE
 
 **Cieľ:** kompletná reálna zákazka od návrhu po objednávky bez opustenia pluginu a bez ručného dopočítavania — definícia a princípy v [V1_VIZIA.md](V1_VIZIA.md).
 
@@ -62,7 +56,7 @@
 - **D-10 · Presúvanie a úprava čiel priamo v náhľade** — ako drag priečok.
 - **V1.0 zostavy:** spájanie a zarovnávanie korpusov (čelné/zadné hrany, pripájacie body, snaper logika) · soklová lišta v celku pre segment · obklady a krycie prvky segmentu vrátane pilastra (priznaný vs. skrytý) · pracovné a horné krycie dosky na označený segment · migrácia a oprava starých modelov · test na kompletnej reálnej zákazke. *(Sem patrí aj to, čo V0.4.7 vedome neobsahovalo: attachment/segmenty, automatické krycie dosky, PD cez segment.)*
 
-### 6 · RENDER M-R
+### 5 · RENDER M-R
 
 **Cieľ:** materiál vyzerá v modeli ako v skutočnosti — Luciin nástroj na vizualizácie.
 
@@ -70,7 +64,7 @@
 - **D-87 · Vizuálne zobrazenie SMERU štruktúry v modeli** — overlay čiar v smere dekoru na dielcoch (vzor ghost zón) ako rýchla kontrola orientácie celej zákazky; logicky sa rieši s textúrami a nárezovým plánom.
 - **Nástroj „pixla"** (V1-06) — ikonka na dlaždici materiálu, klik prefarbuje dielce cez `part_override` cestu (1 klik = 1 undo).
 
-### 7 · INFRA (priebežne, podľa potreby)
+### 6 · INFRA (priebežne, podľa potreby)
 
 **Cieľ:** aby plugin a knižnice fungovali na dvoch pracoviskách (Michal + Lucia).
 

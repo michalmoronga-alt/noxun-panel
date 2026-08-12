@@ -37,10 +37,13 @@ module Noxun
             preferences_key: DLG_KEY,
             scrollable: true,
             resizable: true,
-            width: 680,
-            height: 560,
-            min_width: 520,
-            min_height: 400,
+            # D-77: zoznam poloziek a editor setov maju siroke riadky s akciami
+            # vpravo. Rozmery platia LEN pri prvom otvoreni — zapamatane male okno
+            # dorovna nx_fit.
+            width: 760,
+            height: 620,
+            min_width: 560,
+            min_height: 420,
             style: UI::HtmlDialog::STYLE_DIALOG
           )
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'hardware_catalog.html'))
@@ -54,6 +57,7 @@ module Noxun
         end
 
         def register_callbacks(dlg)
+          Engine.register_dialog_fit(dlg, 'hw_catalog') # D-77: zapamatane male okno sa dorovna
           cb(dlg, 'ready')          { |_p| push_state; push_sets }
           cb(dlg, 'hw_search')      { |p| handle_search(p) }
           cb(dlg, 'hw_create')      { |p| handle_create(p) }

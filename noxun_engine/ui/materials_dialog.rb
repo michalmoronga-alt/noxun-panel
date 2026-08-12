@@ -49,10 +49,13 @@ module Noxun
             preferences_key: DLG_KEY,
             scrollable: true,
             resizable: true,
-            width: 640,
-            height: 560,
-            min_width: 500,
-            min_height: 400,
+            # D-77: detail dekoru (riadky variantov min-width 430 px + editovatelne
+            # bunky) a modaly sirky 560 px sa musia zmestit bez rucneho zvacsovania.
+            # Rozmery platia LEN pri prvom otvoreni — zapamatane male okno dorovna nx_fit.
+            width: 720,
+            height: 640,
+            min_width: 560,
+            min_height: 460,
             style: UI::HtmlDialog::STYLE_DIALOG
           )
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'proj_materials.html'))
@@ -71,6 +74,7 @@ module Noxun
         end
 
         def register_callbacks(dlg)
+          Engine.register_dialog_fit(dlg, 'materials') # D-77: zapamatane male okno sa dorovna
           # D-83: pending poziadavka („Nahradiť UNI…" z okna Výroba) sa spusta AZ
           # tu — po push_state, ked JS uz ma katalog. Volanie pred nacitanim HTML
           # by CEF zahodil.

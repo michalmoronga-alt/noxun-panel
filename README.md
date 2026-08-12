@@ -2,7 +2,7 @@
 
 Parametrický nábytkársky systém pre SketchUp (Ruby plugin). Korpusy generuje kód z konfigurácie — žiadne Dynamic Components: zóny s priečkami, čelá s lockmi (fixed/auto), šablóny, scale → automatická prestavba na mm, 2D náhľad v paneli, materiály s dekorovými skupinami, kovanie so setmi a výrobné aj obchodné výstupy (kusovník, VEPO CSV, nákupné zoznamy, rozpočet, cenová ponuka).
 
-**Stav: v0.6.0** — etapa V0.6 (katalógy a ceny) je obsahovo splnená a prvá reálna zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a porovnaná s ručným rozpočtom. Ďalej: workflow retrospektíva → **UI 2.0**.
+**Stav: v0.7.0** — etapa V0.6 (katalógy a ceny) je obsahovo splnená a prvá reálna zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a porovnaná s ručným rozpočtom; po nej workflow retrospektíva a blok ŠTART AUTONÓMIE (tri opravy v autonómnom režime). Ďalej: **UI 2.0**.
 
 ## Kam sa pozrieť
 
