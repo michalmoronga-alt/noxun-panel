@@ -1,5 +1,15 @@
   // ===================== 2D NAHLAD (SVG) =====================
   var PV_PAD = 14; // padding viewBoxu nahladu (mm) — zdielaju ho renderPreview aj prevod px->mm v dragu
+  // UI-01: kreslenie do SVG nevie citat CSS premenne cez var() v atributoch,
+  // preto su farby vyberovej rodiny ZRKADLOM tokenov --nx-* z panel.css
+  // (rovnaky vzor ako EdgeCheck::COLORS). Zmena tokenu = zmena aj tu.
+  // POZN: nahlad zamerne NEREAGUJE na temu (UI-01 O4) — tema prepina LEN CSS
+  // tokeny panela; kreslene farby ostavaju firemne teal.
+  var PV_SELECT = '#107787';        // --nx-select (aktivna zona)
+  var PV_SELECT_ACCENT = '#0e6b7a'; // --nx-select-accent (popis cela)
+  var PV_FRONT_DOOR = '#e0f2f4';    // --nx-select-bg (vypln dvierok)
+  var PV_FRONT_DRAWER = '#bfe3e8';  // tmavsi odtien rodiny (vypln zasuvky)
+  var PV_FRONT_STROKE = '#7fc4cf';  // --nx-part-border (obrys cela)
   var dragState = null;
   // ===== D-08: rezimove taby — tab prepina nahlad AJ viditelne sekcie (CSS cez
   // data-cab-tab na <body>). refreshZoneUI ma mode guard (D-03 Codex F2 — karta
@@ -137,7 +147,7 @@
         if (z.leaf){
           var col = PALETTE[leafIdx % PALETTE.length]; leafIdx++;
           var active = (fullZoneId(z.id) === activeZoneId);
-          S.push('<rect class="zrect" data-zid="'+z.id+'" x="'+rx(z.x)+'" y="'+ry(z.z+z.h)+'" width="'+z.w+'" height="'+z.h+'" fill="'+col+'" fill-opacity="'+(active?0.55:0.32)+'" stroke="'+(active?'#1565c0':col)+'" stroke-width="'+(active?4:1.5)+'" style="cursor:pointer"/>');
+          S.push('<rect class="zrect" data-zid="'+z.id+'" x="'+rx(z.x)+'" y="'+ry(z.z+z.h)+'" width="'+z.w+'" height="'+z.h+'" fill="'+col+'" fill-opacity="'+(active?0.55:0.32)+'" stroke="'+(active?PV_SELECT:col)+'" stroke-width="'+(active?4:1.5)+'" style="cursor:pointer"/>');
           // police (tenke ciary)
           if (z.shelves>0){ for (var s=1;s<=z.shelves;s++){ var zs = z.z + z.h*s/(z.shelves+1); S.push('<line x1="'+rx(z.x)+'" y1="'+ry(zs)+'" x2="'+rx(z.x+z.w)+'" y2="'+ry(zs)+'" stroke="#8d6e63" stroke-width="2"/>'); } }
           // rozmer text
@@ -187,7 +197,7 @@
     var gap = 3; var gv = numv('fr_gap'); if (!isNaN(gv)) gap = gv;
     var ow = W - 2*gs;
     items.forEach(function(it, i){
-      var z = it.z, h = it.height, col = (it.type==='drawer_front')?'#b3e5fc':'#e1f5fe';
+      var z = it.z, h = it.height, col = (it.type==='drawer_front')?PV_FRONT_DRAWER:PV_FRONT_DOOR;
       var fnum = 'F' + (i + 1);
       S.push('<g class="fgrp" data-front-id="'+esc(it.id || '')+'">');
       if (it.type === 'none'){
@@ -220,7 +230,7 @@
       var ph = h - red;
       cols.forEach(function(c){
         if (ph > 0){
-          S.push('<rect x="'+rx(c.x)+'" y="'+ry(z+ph)+'" width="'+c.w+'" height="'+ph+'" fill="'+col+'" stroke="#4fc3f7" stroke-width="1.5"/>');
+          S.push('<rect x="'+rx(c.x)+'" y="'+ry(z+ph)+'" width="'+c.w+'" height="'+ph+'" fill="'+col+'" stroke="'+PV_FRONT_STROKE+'" stroke-width="1.5"/>');
         }
         if (red > 0){
           S.push('<rect class="fprofband" x="'+rx(c.x)+'" y="'+ry(z+h)+'" width="'+c.w+'" height="'+red+'"/>');
@@ -228,7 +238,7 @@
       });
       // popis do stredu PANELU (pri profile nesmie skoncit v jeho pruhu);
       // cislo ostava vyskou RIADKU — presne to, co je v zozname ciel.
-      S.push('<text x="'+rx(W/2)+'" y="'+ry(z+(ph > 0 ? ph : h)/2)+'" font-size="18" fill="#0277bd" text-anchor="middle" dominant-baseline="middle">'+fnum+' · '+(it.type==='drawer_front'?'zásuvka':'dvierka')+' '+Math.round(h)+'</text>');
+      S.push('<text x="'+rx(W/2)+'" y="'+ry(z+(ph > 0 ? ph : h)/2)+'" font-size="18" fill="'+PV_SELECT_ACCENT+'" text-anchor="middle" dominant-baseline="middle">'+fnum+' · '+(it.type==='drawer_front'?'zásuvka':'dvierka')+' '+Math.round(h)+'</text>');
       S.push('</g>');
     });
   }

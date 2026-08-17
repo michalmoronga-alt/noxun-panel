@@ -4,7 +4,7 @@
      V0.6 E-b: pribudol tab ROZPOCET (js/budget.js) — jediny tab, ktory model
      MENI (data rozpoctu v NOXUN dict na modeli, kazda zmena = 1 undo krok). -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.7.0">
+<link rel="stylesheet" href="css/panel.css?v=0.7.1">
 <!-- V0.5 D: styly semaforu ZAMERNE inline v production.html (NIE v zdielanom
      panel.css — paralelna davka D-29 ho meni; ziadny cache-bust konflikt). -->
 <style>
@@ -16,7 +16,7 @@
   .ctrlbadge .cb-orange { color: #e65100; }
   .wbadge.wbadge-red { background: #ef9a9a; color: #7f1d1d; }
   .bomtab tr.ctrlrow { cursor: pointer; }
-  .bomtab tr.ctrlrow:hover { background: #e3f2fd; }
+  .bomtab tr.ctrlrow:hover { background: var(--nx-select-bg); }
   .bomtab td.ctrlicon { text-align: center; width: 20px; }
   .bomtab tr.ctrl-red td:first-child { box-shadow: inset 3px 0 0 #c62828; }
   .bomtab tr.ctrl-orange td:first-child { box-shadow: inset 3px 0 0 #ffb74d; }
@@ -96,7 +96,7 @@
   .bwarns { margin-left: auto; display: flex; flex-direction: column; gap: 5px; align-items: flex-end; }
   .bchip { display: inline-flex; align-items: center; gap: 6px; background: var(--nx-warn-bg);
            border: 1px solid var(--nx-warnchip-border); color: var(--nx-warn-fg);
-           border-radius: 7px; padding: 5px 10px; font-size: 11.5px; cursor: pointer;
+           border-radius: 6px; padding: 5px 10px; font-size: 11.5px; cursor: pointer;
            font: inherit; text-align: left; }
   .bchip .ic { width: 12px; height: 12px; transition: transform .12s; }
   .bchip.open .ic { transform: rotate(90deg); }
@@ -136,7 +136,7 @@
   .btab tr.bzero td { color: var(--nx-ink-faint); }
   .btab tr.bmiss td { background: var(--nx-warn-bg); }
   .bmisslbl { color: var(--nx-warn-fg); font-size: 11px; }
-  .bold-price { color: var(--nx-warn-fg); background: var(--nx-warn-bg); border-radius: 4px; padding: 0 5px; }
+  .bold-price { color: var(--nx-warn-fg); background: var(--nx-warn-bg); border-radius: 6px; padding: 0 5px; }
 
   .bedit { font: inherit; font-size: 12px; border: 1px solid var(--nx-border-strong);
            border-radius: 5px; padding: 2px 5px; background: var(--nx-surface); color: var(--nx-ink);
@@ -237,17 +237,17 @@
 <div id="prodBody" class="prodbody"><div class="muted">Načítavam…</div></div>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.7.0"></script>
+<script src="js/errors.js?v=0.7.1"></script>
 <!-- D-77: minimalna OBSAHOVA velkost okna pri otvoreni (js/win_fit.js). Tabulky
      kusovnika a rozpoctu maju editovatelne bunky a stlpec akcii vpravo — v uzkom
      okne konci prava cast riadku mimo. -->
 <script>window.NX_FIT_MIN = { w: 640, h: 540 };</script>
-<script src="js/win_fit.js?v=0.7.0"></script>
+<script src="js/win_fit.js?v=0.7.1"></script>
 <!-- D-83: sprite ikon (ziadne emoji v ovladacich prvkoch) — akcia „Nahradiť UNI…"
      v riadku KONTROLY. Musi byt PRED production.js (renderControl pouziva <use>). -->
-<script src="js/icons.js?v=0.7.0"></script>
-<script src="js/production.js?v=0.7.0"></script>
+<script src="js/icons.js?v=0.7.1"></script>
+<script src="js/production.js?v=0.7.1"></script>
 <!-- V0.6 E-b: tab Rozpocet. Az ZA production.js — cita jeho globalny BOM a
      vola renderBody()/NX.setStatus(); production.js volá renderBudget() az pri
      prepnuti tabu, takze poradie definicii sedi. -->
-<script src="js/budget.js?v=0.7.0"></script>
+<script src="js/budget.js?v=0.7.1"></script>

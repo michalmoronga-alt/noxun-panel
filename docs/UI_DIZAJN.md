@@ -14,10 +14,16 @@ dokument opisuje **prečo** a **ako** — tabuľka tokenov nižšie je zrkadlom 
   riadkom/poľom zváž umiestnenie do existujúceho radu, rohu náhľadu alebo ikony.
 - **Žiadne emoji v UI chrome.** Ovládacie prvky (tlačidlá, zámky, akcie) používajú
   ikony zo spritu `icons.js`. Emoji/unicode glyfy sa v ovládaní nepoužívajú.
-- **Farba nesie význam.** Zelená = primárna akcia, modrá = výber/aktívny stav,
-  červená = chyba/mazanie, jantár = upozornenie/override. Významy sa nemiešajú.
-- **Žiadna vizuálna zmena bez zámeru.** Tokeny sú 1:1 mapované na doterajšie hex —
-  refaktor na premenné nemení vzhľad.
+- **Farba nesie význam.** Zelená = primárna akcia, **teal (firemná NOXUN) = výber/
+  aktívny stav**, červená = chyba/mazanie, jantár = upozornenie/override. Významy
+  sa nemiešajú.
+- **Značka je len vo výberovej rodine.** Firemnú farbu nesie výber/aktívny stav —
+  primárna akcia zostáva zelená (O2) a významové farby sa značkou neriadia.
+- **Rádius 6 px** na všetkých komponentoch (input, select, tlačidlo, chip, karta,
+  dlaždica). Výnimky sú len nekomponentové: farebné štvorčeky (2–3 px), pill/99 px,
+  50 % kruhy a väčšie plochy modalov/kariet (8 px).
+- **Žiadna vizuálna zmena bez zámeru.** Nová farba sa nepridáva ako hex do súboru —
+  pridáva sa token, alebo sa použije existujúci.
 
 ---
 
@@ -35,7 +41,7 @@ natvrdo hex. Nedefinovaný token = zahodená vlastnosť (skontroluj preklepy).
 | `--nx-surface-readonly` | `#f4f6f8` | readonly input |
 | `--nx-surface-preview` | `#fafcff` | pozadie 2D náhľadu |
 | `--nx-surface-th` | `#f5f7f8` | hlavička tabuľky (okno Výroba) |
-| `--nx-part-bg` | `#f5fbff` | karta dielca (bledomodrá) |
+| `--nx-part-bg` | `#f2fafb` | karta dielca (bledý teal — patrí do výberovej rodiny) |
 
 ### Text / ink
 | Token | Hex | Použitie |
@@ -55,19 +61,25 @@ natvrdo hex. Nedefinovaný token = zahodená vlastnosť (skontroluj preklepy).
 | `--nx-border-strong` | `#b0bec5` | rámik inputov |
 | `--nx-border-soft` | `#eceff1` | jemný rozdeľovník |
 
-### Akcia (zelená) vs výber (modrá) — významovo rôzne
+### Akcia (zelená) vs výber (NOXUN teal) — významovo rôzne
 | Token | Hex | Použitie |
 |---|---|---|
 | `--nx-action` | `#2e7d32` | pozadie primárneho tlačidla |
 | `--nx-action-hover` | `#1b5e20` | hover primárneho tlačidla |
 | `--nx-on-accent` | `#ffffff` | text na akcii/výbere |
-| `--nx-select` | `#1565c0` | aktívny tab, ID, výber |
-| `--nx-select-strong` | `#01579b` | zvýraznenie čela (hover) |
-| `--nx-select-accent` | `#0277bd` | akcent riadku čela |
-| `--nx-select-bg` | `#e3f2fd` | pozadie výberu (zóna, riadok) |
-| `--nx-select-bg-soft` | `#f1f8ff` | hover zóny |
-| `--nx-select-bg-hover` | `#e1f5fe` | hover riadku čela |
-| `--nx-part-border` | `#90caf9` | rámik karty dielca |
+| `--nx-select` | `#107787` | aktívny tab, ID, výber |
+| `--nx-select-strong` | `#0B5661` | zvýraznenie čela (hover) |
+| `--nx-select-accent` | `#0e6b7a` | akcent riadku čela |
+| `--nx-select-bg` | `#e0f2f4` | pozadie výberu (zóna, riadok) |
+| `--nx-select-bg-soft` | `#f0f9fa` | hover zóny |
+| `--nx-select-bg-hover` | `#d6eef1` | hover riadku čela |
+| `--nx-part-border` | `#7fc4cf` | rámik karty dielca |
+
+> **Osem tokenov vyššie + `--nx-part-bg` = „výberová rodina"** (od UI-01, rozhodnutie
+> O1 z 15.8.2026 — firemný teal loga a webu; predošlá modrá skončila). Je to jediná
+> rodina, ktorú smie prepnúť **téma** (sekcia 2.1). Primárna akcia zostáva zelená (O2).
+> Kreslené farby 2D náhľadu (`ui/js/preview.js`) sú **zrkadlom** týchto tokenov — SVG
+> atribúty nevedia čítať `var()`, takže zmena tokenu znamená zmenu aj tam.
 
 ### Stavy (vlastné tokeny — NIE action)
 | Token | Hex | Použitie |
@@ -134,6 +146,35 @@ natvrdo hex. Nedefinovaný token = zahodená vlastnosť (skontroluj preklepy).
 > Semaforové tokeny sú **len zadefinované**. Nikde sa nepoužívajú — sú rezervou pre
 > stavový semafor (paralelná dávka). Ich významy sa **nesmú miešať** s ABS farbami
 > ani so stavmi OK/chyba, ktoré majú vlastné tokeny.
+
+---
+
+## 2.1 Témy (UI-01, rozhodnutie O4)
+
+Plugin má dve témy: **NOXUN** (firemná teal, základ) a **Lucia** (ružový akcent pre
+druhý počítač). Pravidlá sú úzke zámerne:
+
+- **Téma prepína VÝHRADNE výberovú rodinu** (8 tokenov + `--nx-part-bg`). Významové
+  farby — danger, warn, ok/chyba, ABS `--nx-abs-*`, hrany `--nx-edge-*`, semafor
+  `--nx-state-*` aj zelená akcia — sa témou **nikdy** nemenia. Červená musí zostať
+  červenou na oboch počítačoch.
+- **Téma je vec POČÍTAČA, nie zákazky** — žije v `%APPDATA%\NOXUN\Engine\ui_theme.json`
+  (`{"std":1,"theme":"noxun"|"lucia"}`, zápis atomicky + `.bak` cez `JsonFileStore`),
+  **nikdy** v `.skp`: Michal a Lucia otvárajú tie isté zákazky.
+- **Tolerantné čítanie:** chýbajúci alebo poškodený súbor aj neznáma hodnota = `noxun`.
+  Whitelist je **na strane Ruby** (`Engine.normalize_ui_theme`), rovnaký fallback má
+  aj JS (`nxThemeName`) — obe strany musia povedať to isté.
+- **Cesta do okna:** okno si tému vypýta po načítaní HTML (`sketchup.nx_theme()` v
+  `ui/js/win_fit.js` — jediný skript, ktorý načítavajú všetky okná), Ruby odpovie
+  volaním `nxThemeApply(<meno>)`. Registruje sa v spoločnom boot hooku
+  `Engine.register_dialog_fit` (main.rb), takže nové okno tému dostane automaticky —
+  stačí, že načíta `win_fit.js`.
+- **Aplikácia:** `nxThemeApply` najprv zhodí všetky témové prepisy (návrat na `:root`)
+  a až potom nasadí svoje — prepnutie späť na NOXUN nesmie nechať ružové zvyšky.
+  Koreň dokumentu nesie `data-nx-theme`.
+- **UI prepínač témy príde v dávke UI-B3** (koliesko → Nastavenia Inspectora). Do
+  vtedy sa téma mení z Ruby: `Engine.set_ui_theme('lucia')`.
+- Kreslené farby náhľadu (`preview.js`) tému **zámerne nesledujú** — sú firemné teal.
 
 ---
 

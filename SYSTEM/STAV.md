@@ -5,20 +5,23 @@
 
 ## Stav
 
-**v0.7.0 · 12.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0). **Blok ŠTART AUTONÓMIE je uzavretý** (D-101 · D-86 · D-77, PR #162–#164) — prvý blok spracovaný v autonómnom režime podľa retrospektívy RETRO.
+**v0.7.1 · 18.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
 
-Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **D-77** — okná sa už neotvárajú odseknuté (väčšie východzie rozmery + dorovnanie zapamätanej malej veľkosti pri otvorení), PR **#164** (v0.7.0). Testy: **1187 headless · 31 JS sád · in-SketchUp 334 PASS / 0 FAIL** (posledný beh pri D-101; D-86 aj D-77 sú UI zmeny bez buildera/observera, in-SU beh nebol potrebný — programové redo na Windows neexistuje, reálne Ctrl+Y sa overuje ručne).
+**Beží blok UI 2.0.** Koncept Inspectora je uzavretý (Michal 18.8.) — záväzná referencia je mockup `_dev/mockup_inspector_c.html` a slovný kontrakt v `_dev/UI20_PODKLAD.md`; práca je narezaná do dávok UI-A → UI-B → UI-C → UI-D a fázy ŠTÚDIO ([PLAN.md](PLAN.md)).
+
+Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-01** — plugin je v firemnej NOXUN teal farbe s jednotným rádiusom 6 px a pripravenou témou „Lucia". Testy: **1195 headless · 32 JS sád · in-SketchUp 334 PASS / 0 FAIL** (posledný beh pri D-101; UI dávky bez buildera/observera in-SU beh nepotrebujú — vizuál overuje Michal).
 
 ## Robí sa
 
-**Nič** — blok je uzavretý, čaká sa na Michalov výber ďalšieho bloku ([PLAN.md](PLAN.md)).
+**BLOK UI-A · základ značky.** Hotová **UI-01** (paleta + téma), ďalej **UI-02** (logo a SketchUp toolbar), potom **UI-03** (zdieľaný combobox materiálov a ABS, D-85).
 
 ## Ďalší krok
 
-**UI 2.0** — najprv podklady pripraví agent autonómne (analýza OCL k D-50, súhrn merača D-25, klikateľný HTML mockup vzorom Materiály 2.0) → večerná debata s Michalom → až potom implementačné dávky. *(Pri štandarde rozmerov okien D-51 nadviazať na D-77: mechanika „okno sa pri otvorení dorovná na svoje minimum" už existuje, chýbajú len jednotné hodnoty.)*
+Po UI-A nasleduje **UI-B** (kostra Inspectora: rail + 4 sektory, náhľad, obsah Korpusu a koliesko s prepínačom témy). *(Štandard rozmerov okien D-51 sa rieši v UI-B1 a nadväzuje na D-77 — mechanika „okno sa pri otvorení dorovná na svoje minimum" už existuje, chýbajú len jednotné hodnoty.)*
 
 ## Posledné uzávery
 
+- **UI-01 paleta NOXUN teal + rádius 6 + mechanizmus témy Lucia** (prvá dávka bloku UI-A) — PR **#165**, v0.7.1 (18.8.)
 - **BLOK ŠTART AUTONÓMIE UZAVRETÝ** (D-101 #162 · D-86 #163 · D-77 #164) — checkpoint **v0.7.0** (12.8.)
 - **D-77 okná sa neotvárajú odseknuté** (väčšie východzie rozmery a minimá všetkých okien + dorovnanie zapamätanej veľkosti pri otvorení oboma smermi — nahor po minimum, nadol po plochu obrazovky) — PR **#164**, v0.7.0 (12.8.)
 - **D-86 guard smeru dekoru vo vkladacej karte** (vedomá voľba prežije živý refresh katalógu z okna Materiály; pole sa mení len pri skutočnej zmene materiálu) — PR **#163**, v0.6.2 (12.8.)
