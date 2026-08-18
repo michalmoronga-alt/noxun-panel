@@ -422,8 +422,18 @@ module Noxun
           tc
         end
 
-        def template_list
-          TemplateStore.load
+        # UI-C1a: zoznam nesie IDENTITU sablony (`kind` + `name`) a poradove
+        # cislo posledneho pouzitia (`used_seq`, nil = nikdy nepouzita) — z neho
+        # sklada vkladacia karta poradie „Naposledy pouzite". Cislo zije v inom
+        # subore (TemplateUsage), takze subor sablon sa vlozenim NEMENI (N11).
+        # kind: filter pouziva okno Sablony — spravuje VYHRADNE korpusove.
+        def template_list(kind: nil)
+          seq = TemplateUsage.map
+          TemplateStore.load.each_with_object([]) do |t, out|
+            next if kind && t['kind'] != kind
+
+            out << t.merge('used_seq' => seq["#{t['kind']}:#{t['name']}"])
+          end
         rescue StandardError => e
           Engine.log_error(e, 'template_list')
           []

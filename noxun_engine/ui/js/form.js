@@ -219,6 +219,9 @@
     var sel = el('template'); var cur = sel.value;
     sel.innerHTML = '<option value="">— vyber —</option>';
     TEMPLATES.forEach(function(tp){
+      // UI-C1a: kniznica nesie aj DOSKOVE sablony — do korpusoveho selectu
+      // nepatria (identita sablony je dvojica kind+name).
+      if (NXInsert.templateKind(tp) !== 'cabinet') return;
       var tt = (tp.config && tp.config.type) ? tp.config.type : 'lower';
       if (tt !== t) return;
       var o = document.createElement('option'); o.value = tp.name; o.textContent = tp.name; sel.appendChild(o);
@@ -249,6 +252,8 @@
     for (var i = 0; i < TEMPLATES.length; i++){
       var tp = TEMPLATES[i];
       if (tp.name !== name) continue;
+      if (NXInsert.templateKind(tp) !== 'cabinet') continue; // UI-C1a: rovnomenna doskova sablona nie je tato
+
       var tt = (tp.config && tp.config.type) ? tp.config.type : 'lower';
       return tt === type ? tp : null;
     }
@@ -398,13 +403,17 @@
     var m = el('tplModal'); if (m) m.style.display = 'none';
   }
   function tplModalOpen(){ var m = el('tplModal'); return !!(m && m.style.display !== 'none'); }
-  // Kolizia nazvu: CELE pole TEMPLATES (nie typovy filter selectu), trim,
+  // Kolizia nazvu: VSETKY KORPUSOVE sablony (nie typovy filter selectu), trim,
   // case-sensitive presne ako Ruby store (Codex N8). Vola sa aj z NX.setTemplates,
   // aby varovanie zilo pri zmene kniznice pocas otvoreneho modalu (Codex F3).
+  // UI-C1a: doskova sablona rovnakeho mena kolizia NIE JE — identita v sklade
+  // je dvojica (kind, name) a modal uklada vzdy korpusovu.
   function refreshTplModalWarn(){
     if (!tplModalOpen()) return;
     var name = el('tplSaveName').value.trim();
-    var exists = TEMPLATES.some(function(t){ return t.name === name; });
+    var exists = TEMPLATES.some(function(t){
+      return NXInsert.templateKind(t) === 'cabinet' && t.name === name;
+    });
     el('tplSaveWarn').style.display = exists ? '' : 'none';
   }
   function saveTemplateAs(){

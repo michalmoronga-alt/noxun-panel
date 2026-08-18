@@ -1004,14 +1004,21 @@ module NoxunSuRunner
     # GH P2: NIKDY nesiahat na pouzivatelske sablony — exoticky nazov, ktory
     # pouzivatel nema; ak by predsa existoval, scenar sa preskoci (nic nemazeme).
     tpl_name = '__SU_TEST_VKLAD__'
-    if e::TemplateStore.find(tpl_name)
+    if e::TemplateStore.find('cabinet', tpl_name)
       info("vklad: sablona #{tpl_name} uz existuje — sablonovy scenar preskoceny (chranime pouzivatelske data)")
       tpl_snapshot = nil
     else
-      e::TemplateStore.upsert(tpl_name, tpl_cfg)
-      tpl_snapshot = File.binread(e::TemplateStore.path) # snapshot AZ PO seede (N11)
+      e::TemplateStore.upsert('cabinet', tpl_name, tpl_cfg)
+      tpl_snapshot = File.binread(e::TemplateStore.path) # snapshot AZ PO migracii+seede (N11)
     end
-    payload = tpl_snapshot ? (e::TemplateStore.find(tpl_name) || {})['config'].merge('height' => 950.0) : nil
+    # UI-C1a: payload nesie IDENTITU sablony (kind + nazov) — server ju po vklade
+    # opeciatkuje do template_usage.json, ale subor SABLON musi ostat byte-
+    # nezmeneny (N11 nizsie kontroluje presne to).
+    payload = if tpl_snapshot
+                (e::TemplateStore.find('cabinet', tpl_name) || {})['config']
+                  .merge('height' => 950.0,
+                         'template_kind' => 'cabinet', 'template_name' => tpl_name)
+              end
     if payload
       e::Panel.handle_insert(payload.to_json)
       inst = model.selection.to_a.find { |i| e::Store.kind(i) == 'cabinet' }
@@ -1028,9 +1035,13 @@ module NoxunSuRunner
       # modify korpusu po vklade — sablona sa NIKDY nemeni (N11)
       e::CabinetBuilder.rebuild(model, inst,
                                 e::CabinetBuilder.config_to_params(cfg).merge('width' => 650.0)) if inst
+      # UI-C1a: peciatka pouzitia ide do INEHO suboru (template_usage.json),
+      # takze byte-identita suboru sablon plati aj po vklade ZO SABLONY.
       ok('vklad N11: subor sablon byte-nezmeneny po inserte + edite korpusu',
          File.binread(e::TemplateStore.path) == tpl_snapshot)
-      e::TemplateStore.delete(tpl_name) # cleanup VLASTNEJ testovacej sablony
+      ok('vklad UI-C1a: pouzitie sablony opeciatkovane vo vlastnom subore',
+         !e::TemplateUsage.seq_for('cabinet', tpl_name).nil?)
+      e::TemplateStore.delete('cabinet', tpl_name) # cleanup VLASTNEJ testovacej sablony
     end
 
     # 2) F8 konflikt A: zamknuta vyska + vysoke pevne cela -> vklad ODMIETNUTY
@@ -1258,12 +1269,13 @@ module NoxunSuRunner
       # (e) SABLONA na EXISTUJUCU skrinku (audit B4): sablona s materialom 18,6
       #     zladi hrubku ciela; typovy guard aj merge ostavaju nedotknute.
       tpl_name = '__SU_TEST_D45__'
-      if e::TemplateStore.find(tpl_name)
+      if e::TemplateStore.find('cabinet', tpl_name)
         info("D-45 (e): sablona #{tpl_name} uz existuje — scenar preskoceny")
       else
-        e::TemplateStore.upsert(tpl_name, { 'type' => 'lower', 'width' => 500.0, 'height' => 720.0,
-                                            'depth' => 510.0, 'thickness' => 18.6, 'material_id' => id186,
-                                            'back_thickness' => 3.0 })
+        e::TemplateStore.upsert('cabinet', tpl_name,
+                                { 'type' => 'lower', 'width' => 500.0, 'height' => 720.0,
+                                  'depth' => 510.0, 'thickness' => 18.6, 'material_id' => id186,
+                                  'back_thickness' => 3.0 })
         target = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0,
                                                   'depth' => 510.0, 'thickness' => 18.0, 'material_id' => id18 })
         model.selection.clear
@@ -1273,7 +1285,7 @@ module NoxunSuRunner
         ok('D-45 (e): sablona s materialom 18,6 prestavala skrinku na 18,6',
            (cfg_t['thickness'].to_f - 18.6).abs < 0.01 && cfg_t['material_id'] == id186 &&
            (part_width_x(find_part(target, 'cabinet/side:left')) - 18.6).abs < TOL)
-        e::TemplateStore.delete(tpl_name)
+        e::TemplateStore.delete('cabinet', tpl_name)
       end
     ensure
       # poradie: model spat na povodnu predvolbu, potom katalog (mazanie dosky

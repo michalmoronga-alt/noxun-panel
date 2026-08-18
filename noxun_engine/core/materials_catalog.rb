@@ -501,7 +501,10 @@ module Noxun
 
       def collect_template_usage(used)
         return unless defined?(TemplateStore)
-        TemplateStore.load.each do |t|
+
+        # UI-C1a: `migrate: false` = CISTE CITANIE. Scan bezi v horucej ceste
+        # payloadu materialov a nesmie spustit lazy migraciu suboru sablon.
+        TemplateStore.load(migrate: false).each do |t|
           cfg = t['config'] || {}
           %w[material_id front_material_id back_material_id].each do |k|
             v = cfg[k]

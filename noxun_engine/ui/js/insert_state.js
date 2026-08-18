@@ -133,6 +133,20 @@
       return out;
     }
     function setHardware(src){ state.hardware = hardwareOf(src || {}); }
+
+    // --- UI-C1a: druh sablony (identita je dvojica kind+name) ----------------
+    // Zaznam zo servera nesie `kind` ('cabinet' | 'board'). Zaznam BEZ neho je
+    // legacy korpusova sablona; 'board' sa da odvodit este z redundantneho
+    // `config.type` (to isté poistne pole, ktore chrani starsieho klienta).
+    function templateKind(tp){
+      var k = tp && tp.kind;
+      if (k === 'board' || k === 'cabinet') return k;
+      return (tp && tp.config && tp.config.type === 'board') ? 'board' : 'cabinet';
+    }
+    function templatesOfKind(list, kind){
+      var want = (kind === 'board') ? 'board' : 'cabinet';
+      return (list || []).filter(function(tp){ return templateKind(tp) === want; });
+    }
     // Kluce do insert payloadu — prazdne kluce sa NEposielaju.
     function hardwarePayload(){
       var hw = state.hardware || {};
@@ -162,7 +176,9 @@
       setMaterials: setMaterials,
       hardwareOf: hardwareOf,
       setHardware: setHardware,
-      hardwarePayload: hardwarePayload
+      hardwarePayload: hardwarePayload,
+      templateKind: templateKind,
+      templatesOfKind: templatesOfKind
     };
   })();
 

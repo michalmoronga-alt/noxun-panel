@@ -141,4 +141,28 @@ eq(ins.hardwarePayload().hardware_sets.hinge, 'zaves-klasik',
 ins.setHardware(ins.composeSource(DEFAULTS, TPL)); // ina sablona BEZ kovania
 eq(ins.hardwarePayload(), {}, 'prepnutie na sablonu bez kovania stav vycisti');
 
+// --- UI-C1a: druh sablony (identita = kind + name) ---
+eq(ins.templateKind({ name: 'A', kind: 'cabinet' }), 'cabinet', 'explicitny kind cabinet');
+eq(ins.templateKind({ name: 'A', kind: 'board' }), 'board', 'explicitny kind board');
+eq(ins.templateKind({ name: 'A', config: { type: 'lower' } }), 'cabinet',
+  'legacy zaznam bez kind je korpusovy');
+eq(ins.templateKind({ name: 'A', config: { type: 'board' } }), 'board',
+  'bez kind sa druh odvodi z redundantneho config.type');
+eq(ins.templateKind({ name: 'A', kind: 'nezmysel', config: { type: 'lower' } }), 'cabinet',
+  'neznamy kind = korpusova sablona');
+eq(ins.templateKind(null), 'cabinet', 'prazdny vstup nespadne');
+
+const LIB = [
+  { name: 'Dolna klasik', kind: 'cabinet', config: { type: 'lower' } },
+  { name: 'Zástena', kind: 'board', config: { type: 'board' } },
+  { name: 'Zástena', kind: 'cabinet', config: { type: 'upper' } },
+  { name: 'Legacy', config: { type: 'lower' } }
+];
+eq(ins.templatesOfKind(LIB, 'cabinet').map(function(t){ return t.config.type; }),
+  ['lower', 'upper', 'lower'], 'filter kind: korpusove (vratane legacy bez kind)');
+eq(ins.templatesOfKind(LIB, 'board').length, 1, 'filter kind: doskove');
+eq(ins.templatesOfKind(LIB, 'board')[0].name, 'Zástena',
+  'rovnake meno v inom druhu je INA sablona');
+eq(ins.templatesOfKind(null, 'cabinet'), [], 'prazdna kniznica nespadne');
+
 console.log(JSON.stringify({ passed: n, failed: 0 }));

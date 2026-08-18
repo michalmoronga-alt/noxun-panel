@@ -102,7 +102,10 @@ module Noxun
           cab_type = cab ? ((Store.config(cab) || {})['type'] || 'lower') : nil
           data = {
             version: Engine::VERSION,
-            templates: Panel.template_list,
+            # UI-C1a: okno spravuje VYHRADNE korpusove sablony — doskove sa v nom
+            # ani neukazu (payload je filtrovany a serverove akcie maju vlastny
+            # guard na kind, HTML nie je ochrana).
+            templates: Panel.template_list(kind: 'cabinet'),
             selected_cab: cab ? Store.get(cab, 'cabinet_id') : nil,
             selected_type: cab_type # guard: apply len na rovnaky typ (dolna/horna)
           }
@@ -138,11 +141,11 @@ module Noxun
           name = res[0].to_s.strip
           return set_status('Prázdny názov — zrušené.', true) if name.empty?
 
-          if TemplateStore.find(name) &&
+          if TemplateStore.find('cabinet', name) &&
              UI.messagebox("Sablona \"#{name}\" existuje. Prepisat?", MB_YESNO) != IDYES
             return set_status('Zrušené — šablóna nezmenená.')
           end
-          TemplateStore.upsert(name, config)
+          TemplateStore.upsert('cabinet', name, config)
           after_change("Šablóna \"#{name}\" uložená.#{hw_note}")
         end
 
@@ -151,7 +154,9 @@ module Noxun
           return set_status('Vyber šablónu na vymazanie.', true) if name.empty?
           return unless UI.messagebox("Vymazat sablonu \"#{name}\"?", MB_YESNO) == IDYES
 
-          TemplateStore.delete(name)
+          # Guard kind: okno vidi len korpusove, takze aj mazat smie len tie —
+          # rovnomenna doskova sablona sa odtialto nikdy nezmaze.
+          TemplateStore.delete('cabinet', name)
           after_change("Šablóna \"#{name}\" vymazaná.")
         end
 
@@ -162,7 +167,9 @@ module Noxun
         # merge_hardware_sets, zmrazenie v operacii prestavby.
         def handle_apply(payload)
           name = JSON.parse(payload.to_s)['template'].to_s
-          tpl = TemplateStore.find(name)
+          # Guard kind (UI-C1a): doskovu sablonu na korpus aplikovat nemozno —
+          # hladame VYHRADNE medzi korpusovymi.
+          tpl = TemplateStore.find('cabinet', name)
           return set_status('Šablóna sa nenašla.', true) if tpl.nil?
           model = Sketchup.active_model
           cab = Panel.find_cabinet(model)

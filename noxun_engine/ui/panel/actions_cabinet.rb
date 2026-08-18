@@ -286,6 +286,9 @@ module Noxun
         def handle_insert(payload)
           model = Sketchup.active_model
           params = parse(payload)
+          # UI-C1a: metadata sablony sa z payloadu vyberu HNED — do buildera
+          # sa nikdy nedostanu; peciatka pouzitia ide az po uspesnom vlozeni.
+          tpl_ref = take_template_ref!(params, 'cabinet')
           hw_status, hw = take_insert_hardware!(params) # H2 (D-76)
           if hw_status == :lossy
             return set_status("Šablóna nesie kovanie, ktoré sa nedá prečítať (#{Array(hw).join(', ')}) — " \
@@ -316,6 +319,7 @@ module Noxun
           status_with_warnings(inst, "Vlozeny #{cid} — #{part_count(inst)} dielcov." \
                                      "#{pf ? pf[:note] : ''}#{hw_note}")
           push_selected(model)
+          stamp_template_used(tpl_ref) # UI-C1a: az PO vlozeni, mimo operacie
         end
 
         # B3 „Vlozit kopiu": PRESNA serverova kopia — config sa cita z MODELU
