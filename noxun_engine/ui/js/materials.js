@@ -10,10 +10,14 @@
     setVal('cab_back', c.back_material_id || '');
     el('cabMatHint').textContent = on ? 'Materiály tejto skrinky — prázdne = dediť z projektu.'
                                       : 'Označ skrinku pre nastavenie jej materiálov.';
+    // D-85: zmena `value`/`disabled` nevystreli ziadnu udalost — trigger comboboxu
+    // treba obnovit vyslovne (inak by ukazoval material predoslej skrinky).
+    nxComboSync();
   }
   function clearCabinetMaterials(){
     ['cab_body','cab_front','cab_back'].forEach(function(id){ var e=el(id); if(e){ e.value=''; e.disabled=true; } });
     el('cabMatHint').textContent = 'Označ skrinku pre nastavenie jej materiálov.';
+    nxComboSync();
   }
   // D-45 (audit F9): payload nesie cabinet_id z casu kliku — server ho overi proti
   // aktualnemu vyberu (preklik medzi klikom a callbackom nesmie zasiahnut iny

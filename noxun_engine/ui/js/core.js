@@ -94,6 +94,53 @@
   }
   function absColorOf(absId){ return absId ? absColorByThickness(absThicknessOf(absId)) : '#b0bec5'; }
 
+  // ===== D-85 (UI-03): napojenie zdielaneho comboboxu na katalog ================
+  // nx_combo.js sam ZIADNY katalog nepozna — vsetky data mu podava panel dvoma
+  // hookmi. Vdaka tomu je komponent prenositelny do dalsich okien bez toho, aby
+  // si nosil kopiu MATERIALS.
+  //   * farba stvorceka: dekor berie farbu z katalogu, ABS paska z HRUBKY
+  //     (rovnaka legenda ako riadky hran a .absleg — standard 7.6),
+  //   * "Pouzite v projekte": ciste odvodeny zoznam id zo serveroveho payloadu
+  //     (materials.used_ids) — panel nic nedopocitava a nic si nepamata.
+  // Farba dekoru je v katalogu POLE [r,g,b] (tak ju drzi Materials aj payload),
+  // nie CSS retazec — do style atributu sa musi previest. Zrkadlo rgbToHex
+  // z okna Materialy, ale BEZ nahradnej farby: neznamy vstup = ziadny stvorcek
+  // (radsej nic nez vymyslena farba).
+  function nxRgbHex(rgb){
+    if (!rgb || rgb.length !== 3) return '';
+    var out = '#';
+    for (var i = 0; i < 3; i++){
+      var c = parseInt(rgb[i], 10);
+      if (isNaN(c)) return '';
+      c = Math.max(0, Math.min(255, c));
+      out += ('0' + c.toString(16)).slice(-2);
+    }
+    return out;
+  }
+  function nxComboColorOf(kind, value){
+    if (!value) return '';
+    if (kind === 'abs') return absColorOf(value);
+    var rec = sheetRecOf(value);
+    return rec ? nxRgbHex(rec.color) : '';
+  }
+  function nxComboUsedOf(kind){
+    var u = MATERIALS.used_ids || {};
+    return (kind === 'abs' ? u.edges : u.sheets) || [];
+  }
+  // Codex #167 P2: zoznam pouzitych sa meni pri KAZDOM zapise materialu (vratane
+  // Spat/Znova a vkladania), ale CITA sa len pri otvoreni ponuky. Preto si ho
+  // combobox pri otvoreni VYPYTA — server tak nemusi robit plny scan modelu pri
+  // kazdom kliku vo vybere (push_selected je horuca cesta). Odpoved chodi cez
+  // NX.setUsedIds a prekresli uz otvoreny zoznam.
+  function nxComboRequestUsed(){
+    if (window.sketchup && sketchup.nx_used_ids) sketchup.nx_used_ids('');
+  }
+  if (typeof NXCombo !== 'undefined' && NXCombo){
+    NXCombo.setColorResolver(nxComboColorOf);
+    NXCombo.setUsedResolver(nxComboUsedOf);
+    NXCombo.setUsedRefresher(nxComboRequestUsed);
+  }
+
   // D-45: rozsah hrubky korpusu/cela — zrkadlo Ruby CabinetBuilder::THICKNESS_RANGE.
   var TH_RANGE = [6, 50];
   // D-45 (audit F10): mm s desatinnou CIARKOU pre UI texty — cele cisla bez
@@ -427,6 +474,22 @@
       function(s){ return s.uni === true ? '' : bodyThicknessNote(s.thickness, bodyTh); }, true);
     fillSheetSelectFiltered(el('cab_front'), true, frontMatch());
     fillSheetSelectFiltered(el('cab_back'), true, thMatch(backTh));
+    nxComboSync(); // D-85: prekreslene <option>y -> obnov popisky comboboxov
+  }
+  // D-85: jeden vstupny bod pre "pripoj combobox na nove selecty + obnov existujuce".
+  // Vola sa po KAZDOM renderi, ktory siaha na material/ABS selecty. Bez neho by
+  // trigger ukazoval starý popis (zmena `value` ziadnu udalost nevystreli).
+  function nxComboSync(root){
+    if (typeof NXCombo !== 'undefined' && NXCombo) NXCombo.scan(root);
+  }
+  // D-85: "je pole prave obsluhovane pouzivatelom?" — fokus v nativnom poli ALEBO
+  // otvoreny combobox nad nim. Guardy, ktore doteraz pozerali len na
+  // document.activeElement, musia vidiet aj otvoreny popup (inak by zivy refresh
+  // katalogu prestaval rozkliknuty vyber respektovat).
+  function nxFieldBusy(node){
+    if (!node) return false;
+    if (document.activeElement === node) return true;
+    return !!(typeof NXCombo !== 'undefined' && NXCombo && NXCombo.isOpen(node));
   }
   function val(id){ var e = el(id); return e ? e.value : null; }
   // V0.4.7e: numv cita cez evalDim — nahlad/svetle rozmery/filtre vidia hodnotu
@@ -560,6 +623,9 @@
       frontProfileRec: frontProfileRec, frontProfileReduction: frontProfileReduction,
       frontProfileNext: frontProfileNext,
       // D-100 (tests/js/test_d100_nazvy.js) — zrkadlo ocistenia nazvu skrinky
-      cabNameValue: cabNameValue, CAB_NAME_MAX: CAB_NAME_MAX };
+      cabNameValue: cabNameValue, CAB_NAME_MAX: CAB_NAME_MAX,
+      // D-85 (tests/js/test_ui03_combobox.js) — prevod katalogovej farby [r,g,b]
+      // na hex pre stvorcek comboboxu (nxComboColorOf uz cita globalny MATERIALS)
+      nxRgbHex: nxRgbHex };
   }
 

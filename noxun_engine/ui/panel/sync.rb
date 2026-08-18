@@ -85,6 +85,21 @@ module Noxun
           js("NX.setMaterials(#{materials_payload.to_json})")
         end
 
+        # D-85 (Codex #167 P2): SAMOTNY odvodeny zoznam „Použité v projekte" pre
+        # otvoreny combobox — bez katalogu, bez prekreslenia karty (rozpisany
+        # formular sa nesmie dotknut, vzor push_materials/setHardwareSets).
+        # Vola sa na VYZIADANIE z panela (callback nx_used_ids pri otvoreni
+        # ponuky), nie z push_selected: scan modelu je prilis draha vec na to,
+        # aby bezala pri kazdom kliku vo vybere. Cita sa iba (Materials.used_*)
+        # — ziadna operacia, ziadny zapis, ziadny undo krok (lekcia D-103).
+        def push_used_ids
+          return unless dialog_alive?
+
+          js("NX.setUsedIds(#{used_ids_payload.to_json})")
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.push_used_ids')
+        end
+
         # D-75 (H1b): zivy refresh PONUKY setov kovania po zmene v okne Katalog
         # kovania. Obnovi LEN moznosti selectov (NX.setHardwareSets) — ziadny
         # push_selected: ten resetuje rozpracovany formular a navyse dedup-uje

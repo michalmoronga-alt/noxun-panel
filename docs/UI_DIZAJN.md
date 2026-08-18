@@ -132,6 +132,15 @@ natvrdo hex. Nedefinovaný token = zahodená vlastnosť (skontroluj preklepy).
 > (`core/edge_check.rb`): štvorček v okne musí mať presne farbu plôšky v modeli.
 > Zhodu stráži test (`tests/pure/test_d105_prepinace_hran.rb`).
 
+### Hľadanie (D-85 combobox)
+| Token | Hex | Použitie |
+|---|---|---|
+| `--nx-mark-bg` | `#fff3b0` | `<mark>` zvýraznenie zhody vo výsledkoch hľadania |
+
+> Vlastný token zámerne — **nie je to stav, výber ani upozornenie**, je to
+> „toto si napísal". Preto sa nemieša s `--nx-warn*` ani s výberovou rodinou
+> a **téma ho nemení** (žltá musí ostať žltou na oboch počítačoch).
+
 ### Prekrytia
 | Token | Hex | Použitie |
 |---|---|---|
@@ -291,6 +300,67 @@ akcia, preto výberová a nie zelená), **pravá** (užšia,
   boolean rozhoduje Ruby — HTML `disabled` nie je ochrana).
 - Prázdny výber pri zapnutom „len vybrané" sa **povie nahlas** („označ skrinky
   v modeli"), nikdy sa ticho nezobrazí všetko.
+
+### D-85 / UI-03: zdieľaný combobox materiálov a ABS (`.nxcombo`)
+
+Každý výber materiálu alebo ABS pásky v paneli je **jeden a ten istý komponent**
+(`ui/js/nx_combo.js`) — nie päť kópií. Vzhľad je prevzatý 1:1 z mockupu
+`SYSTEM/zdroje/ui20/mockup_inspector_c.html`.
+
+**Anatómia:** `.nxcombo` (obal) → `.cbtrigger` (tlačidlo so **štvorčekom farby**,
+popisom a `chevron-down`) → `.cbpop` (popup: `.cbsearch` s ikonou `search` a
+inputom · `.cblist` so `.cbsec` hlavičkami a `.cbopt` riadkami · `.cbfoot`
+s `.kbd` nápovedou). Zvýraznenie zhody je `<mark>` s vlastným tokenom
+`--nx-mark-bg` (nie je to stav ani výber — je to „toto si napísal").
+
+**Záväzné pravidlá komponentu:**
+
+- **Natívny `<select>` sa NENAHRÁDZA, len obaľuje.** Ostáva v DOM (skrytý,
+  `tabindex="-1"`) a je naďalej **jediným zdrojom pravdy**: možnosti sa čítajú
+  z jeho `<option>`/`<optgroup>`, výber zapíše `value` a vystrelí `change`.
+  Vďaka tomu platí všetka existujúca logika bez duplikátu (hrúbkové filtre D-45,
+  ABS skupiny D-36, texty „(podľa pravidla — …)" D-102, dupláky D-49, `disabled`
+  „(nekompatibilné)") a **prežívajú všetky guardy** na `change` ceste
+  (E-03 hrúbka, D-86 smer dekoru, D-41 modal chýbajúcej pásky, identity guardy).
+  Nový výber materiálu = pridať `data-nx-combo="decor"|"abs"` na `<select>`,
+  nič viac.
+- **Skrýva ATRIBÚT, nie trieda** (`.nxcombo > select[data-nx-combo]`): panel
+  selectom prepisuje `className` (`ovr`), trieda by zmizla. Override `ovr` sa
+  z selectu **zrkadlí** na trigger.
+- **Popup je `position: fixed` nad `body`** — žiadny predok s `overflow: auto`
+  ho neoreže (poučenie D-67 FIX 7 a D-105). Otvára sa **doľava** (pravá hrana
+  lícuje s triggerom), šírka `max(trigger, 270 px)`, pri málo mieste dole sa
+  preklopí nahor. Scroll **mimo** popupu ho zavrie, scroll v zozname nie.
+- **Výber `mousedown`-om** (D-67 FIX 4 — `blur` by popup zavrel skôr, než klik
+  dopadne); `<datalist>` v CEF nefunguje vôbec.
+- **Poradie sekcií je kontrakt:** fixné voľby (dediť / podľa pravidla / Bez ABS,
+  bez hlavičky) → **Použité v projekte** → **Naposledy použité** → zvyšok
+  katalógu členený podľa `<optgroup>`. Položka sa objaví **práve raz**; aby sa
+  členenie D-36 nestratilo, nesie riadok meno svojej skupiny ako podtitul.
+- **Dáta si komponent nedrží.** „Použité v projekte" je odvodený zoznam ID zo
+  servera; keďže sa mení pri každom zápise materiálu, ale **číta sa len pri
+  otvorení ponuky**, combobox si ho pri otvorení **vypýta** (`nx_used_ids` →
+  `NX.setUsedIds` → prekreslenie otvoreného zoznamu). Farbu štvorčeka dáva panel
+  resolverom (`nxComboColorOf` v `core.js`: dekor z katalógu — pozor, katalógová
+  farba je pole `[r,g,b]`, nie CSS reťazec; ABS **podľa hrúbky** — rovnaká
+  legenda ako `.absleg`); do `style` prejde len hex. „Naposledy použité" je
+  `localStorage` **tohto počítača** (`nx_recent_decor` / `nx_recent_abs`, max 5,
+  len ID) — nikdy nie model ani `%APPDATA%`; fixné voľby sa nepamätajú.
+- **Sync zvonka popup ZAVRIE.** Serverový push (iná skrinka, nový katalóg),
+  prestavba `<option>`ov aj odchod z okna zatvárajú otvorenú ponuku — drží
+  položky z času otvorenia, takže by klik potvrdil voľbu starého kontextu do
+  nového. Natívna rozbaľovačka sa pri prestavbe správa rovnako.
+- **Klávesnica:** ↑↓ (preskakujú `disabled`), Enter potvrdí, Esc zavrie a vráti
+  fokus na trigger, Tab zavrie. Pri otvorení stojí kurzor na **aktuálnej hodnote**
+  (Enter nič nezmení omylom), pri písaní skočí na prvú zhodu.
+- Filter je **necitlivý na diakritiku** oboma smermi (`modra` nájde „modrá“,
+  `modrá` tiež) a hľadá aj v ID (nesie kód dekoru).
+- Vedomá výnimka z rádiusu 6: `.sw` štvorčeky a `.kbd` klávesy majú **3 px**
+  (nie sú to komponentové rámy — rovnaká trieda ako farebné štvorčeky legiend).
+
+> Okno **Materiály** má vlastný suggest (D-67) nad textovými poľami a komponent
+> zámerne **nepreberá** — sú to rôzne veci (voľný text vs. výber z katalógu).
+> Projektové predvoľby žijú tiež tam, nie v paneli.
 
 ### 4.1 SketchUp toolbar (UI-02)
 

@@ -9,9 +9,6 @@
 
 **Cieľ:** satelitné okná → jedno štúdio okno s toolbarom a bočnou navigáciou; výber materiálu/ABS na jeden klik namiesto scrollovania. **Koncept Inspectora je uzavretý** (Michal, 18.8.2026) — záväzný slovný kontrakt je [zdroje/ui20/UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) (sekcie „SCHVÁLENÉ ROZHODNUTIA" a „FINÁLNY KONCEPT INSPECTOR C") a vizuálna referencia mockupy vedľa neho: [Inspector C v16](zdroje/ui20/mockup_inspector_c.html) · [štúdio okno](zdroje/ui20/mockup_ui20.html) · [dizajnový lístok](zdroje/ui20/dizajnovy_listok.html); implementácia ide po dávkach nižšie. Podklad: merač používania D-25 (materiály/ABS vyše 400 interakcií, taby 287×, satelitné okná 234×) a [UI_VIZIA.md](UI_VIZIA.md); cieľový obraz v [V1_VIZIA.md](V1_VIZIA.md) §6.
 
-**UI-A · Základ značky** *(nízke riziko, okamžite viditeľné)*
-- **UI-03 · Zdieľaný combobox materiálov a ABS (D-85, aj D-16)** — jeden komponent pre VŠETKY selecty materiálov a ABS: písanie s filtrom bez diakritiky, sekcia „Použité v projekte", naposledy použité. Najväčší úžitok z merača.
-
 **UI-B · Inspector kostra**
 - **UI-B1 · Kostra panela (aj D-51)** — rail + 4 sektory (Náhľad · Základné · Materiály · Nastavenia) s exkluzivitou skupín, presun existujúcich kariet, šírka 470 px, kontextové riadky. Štandard šírok okien a tlačidiel (D-51) sa dopisuje sem a do [../docs/UI_DIZAJN.md](../docs/UI_DIZAJN.md).
 - **UI-B2 · Náhľad (aj D-27)** — kontextové projekcie s kótami + spodný pás: vrstvové chipy Zóny·Čelá·Kovanie·Olep (rýchle zobraziť/skryť — D-27), kamera, fit.
@@ -37,7 +34,7 @@
 
 *(Z vízie V1 sú v koncepte zapracované: header ako prístup ku všetkému UX-02 → UI-B1 · karta Zóna so smerovými ikonami UX-06 → UI-C2 · polia šírkou podľa obsahu UX-03 → UI-B1/UI-C.)*
 
-*(Seed katalógu ako krok je ZRUŠENÝ (Michal 10.8.) — katalóg rastie sám prácou na zákazkách; skutočný problém „nájsť materiál aj v malom zozname" rieši D-85. Podklad kódov a cien ostáva v [zdroje/SEED_KATALOG_2026-07.md](zdroje/SEED_KATALOG_2026-07.md).)*
+*(Seed katalógu ako krok je ZRUŠENÝ (Michal 10.8.) — katalóg rastie sám prácou na zákazkách; skutočný problém „nájsť materiál aj v malom zozname" rieši D-85 — **hotová 18.8. (PR #167)**. Podklad kódov a cien ostáva v [zdroje/SEED_KATALOG_2026-07.md](zdroje/SEED_KATALOG_2026-07.md).)*
 
 ### 2 · KONTROLA + VÝROBA
 

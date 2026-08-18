@@ -5,7 +5,7 @@
      sablon ziju v satelitnych oknach (proj_materials.html, templates.html) — panel ma len
      quick-pick sablony a materialy oznacenej skrinky. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.7.2">
+<link rel="stylesheet" href="css/panel.css?v=0.7.3">
 
 <!-- D-29: STICKY dvojradova hlavicka Inspectora. Rad 1 = firemne logo + identita
      objektu (bridge.js setIdbar) + warn chip. Rad 2 = rezimove taby (setCabTab,
@@ -83,8 +83,11 @@
   <div class="crumb"><span class="backlink" onclick="backToCabinet()" title="Späť na skrinku">‹ <span id="pcCab">—</span></span> › <b id="pcName2"></b></div>
   <div class="pchead" id="pcName"></div>
   <div class="pcdim" id="pcDim"></div>
+  <!-- D-85: data-nx-combo = tento select obsluhuje zdielany combobox (nx_combo.js).
+       Select ostava zdrojom pravdy — combobox mu len zapise hodnotu a vystreli
+       change, takze onPartMaterial (aj modal chybajucej pasky D-41) beziat ako doteraz. -->
   <div class="pcmat"><label>Materiál</label>
-    <select id="pcMaterial" onchange="onPartMaterial()"></select>
+    <select id="pcMaterial" data-nx-combo="decor" onchange="onPartMaterial()"></select>
   </div>
   <svg id="partSvg" viewBox="0 0 300 200" preserveAspectRatio="xMidYMid meet"></svg>
   <!-- D-35: kompaktna ikona v EXISTUJUCOM riadku legendy (ziadny novy riadok — pravidlo
@@ -125,7 +128,9 @@
     <div class="row"><label>Názov</label><input id="ib_name" type="text" placeholder="Doska"><span class="unit"></span></div>
     <div class="row"><label>Dĺžka</label><input id="ib_length" type="text" value="800"><span class="unit">mm</span></div>
     <div class="row"><label>Šírka</label><input id="ib_width" type="text" value="600"><span class="unit">mm</span></div>
-    <div class="row"><label>Materiál</label><select id="ib_material" onchange="onInsertBoardMaterial()"></select><span class="unit"></span></div>
+    <!-- D-85 combobox; E-03/D-86 guardy visia na onInsertBoardMaterial a combobox
+         ich necha bezat po TEJ ISTEJ ceste (zapis value + change). -->
+    <div class="row"><label>Materiál</label><select id="ib_material" data-nx-combo="decor" onchange="onInsertBoardMaterial()"></select><span class="unit"></span></div>
     <!-- E-03: pri UNI materiali sa pole odomyka (readOnly riadi board_card.js) -->
     <div class="row"><label>Hrúbka</label><input id="ib_thickness" type="text" readonly><span class="unit">mm</span></div>
     <div class="row"><label>Smer dekoru</label>
@@ -148,7 +153,7 @@
   <div class="row"><label>Názov</label><input id="bc_name" type="text" oninput="onBoardField('name', this.value)"><span class="unit"></span></div>
   <div class="row"><label>Dĺžka</label><input id="bc_length" type="text" oninput="onBoardField('length', this.value)"><span class="unit">mm</span></div>
   <div class="row"><label>Šírka</label><input id="bc_width" type="text" oninput="onBoardField('width', this.value)"><span class="unit">mm</span></div>
-  <div class="row"><label>Materiál</label><select id="bc_material" onchange="onBoardMaterial(this.value)"></select><span class="unit"></span></div>
+  <div class="row"><label>Materiál</label><select id="bc_material" data-nx-combo="decor" onchange="onBoardMaterial(this.value)"></select><span class="unit"></span></div>
   <!-- V0.6 M-B1: pri UNI materiali sa pole odomyka (readOnly riadi board_card.js) -->
   <div class="row"><label>Hrúbka</label><input id="bc_thickness" type="text" readonly oninput="onBoardField('thickness', this.value)"><span class="unit">mm</span></div>
   <div class="row"><label>Smer dekoru</label>
@@ -311,9 +316,9 @@
   <summary>Materiály</summary>
   <div class="body">
     <div class="hint" id="cabMatHint">Materiály tejto skrinky — prázdne = dediť z projektu. Označ skrinku pre nastavenie.</div>
-    <div class="matrow"><label>Korpus</label><select id="cab_body" onchange="onCabinetMaterial('body', this.value)"></select></div>
-    <div class="matrow"><label>Čelá</label><select id="cab_front" onchange="onCabinetMaterial('front', this.value)"></select></div>
-    <div class="matrow"><label>Chrbát</label><select id="cab_back" onchange="onCabinetMaterial('back', this.value)"></select></div>
+    <div class="matrow"><label>Korpus</label><select id="cab_body" data-nx-combo="decor" onchange="onCabinetMaterial('body', this.value)"></select></div>
+    <div class="matrow"><label>Čelá</label><select id="cab_front" data-nx-combo="decor" onchange="onCabinetMaterial('front', this.value)"></select></div>
+    <div class="matrow"><label>Chrbát</label><select id="cab_back" data-nx-combo="decor" onchange="onCabinetMaterial('back', this.value)"></select></div>
     <div class="btnrow">
       <button class="ghostbtn" onclick="openProjectMaterialsDialog()"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Materiály projektu…</button>
     </div>
@@ -376,25 +381,29 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.7.2"></script>
+<script src="js/errors.js?v=0.7.3"></script>
 <!-- D-77: minimalna OBSAHOVA velkost okna pri otvoreni. Panel v rezime dielca
      (nahlad + karta dielca s hranami) potrebuje vysku — inak konci prava spodna
      cast nastavenia hran pod okrajom. Dorovnava sa len smerom nahor, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 380, h: 640 };</script>
-<script src="js/win_fit.js?v=0.7.2"></script>
-<script src="js/icons.js?v=0.7.2"></script>
-<script src="js/core.js?v=0.7.2"></script>
-<script src="js/expr.js?v=0.7.2"></script>
-<script src="js/insert_state.js?v=0.7.2"></script>
-<script src="js/form.js?v=0.7.2"></script>
-<script src="js/zone_tree.js?v=0.7.2"></script>
-<script src="js/preview.js?v=0.7.2"></script>
-<script src="js/actions.js?v=0.7.2"></script>
-<script src="js/bridge.js?v=0.7.2"></script>
-<script src="js/materials.js?v=0.7.2"></script>
-<script src="js/part_card.js?v=0.7.2"></script>
-<script src="js/board_card.js?v=0.7.2"></script>
-<script src="js/hardware.js?v=0.7.2"></script>
-<script src="js/usage.js?v=0.7.2"></script>
-<script src="js/boot.js?v=0.7.2"></script>
+<script src="js/win_fit.js?v=0.7.3"></script>
+<script src="js/icons.js?v=0.7.3"></script>
+<!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
+     renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
+     defenzivne cez NXIcons, ak sprite existuje). -->
+<script src="js/nx_combo.js?v=0.7.3"></script>
+<script src="js/core.js?v=0.7.3"></script>
+<script src="js/expr.js?v=0.7.3"></script>
+<script src="js/insert_state.js?v=0.7.3"></script>
+<script src="js/form.js?v=0.7.3"></script>
+<script src="js/zone_tree.js?v=0.7.3"></script>
+<script src="js/preview.js?v=0.7.3"></script>
+<script src="js/actions.js?v=0.7.3"></script>
+<script src="js/bridge.js?v=0.7.3"></script>
+<script src="js/materials.js?v=0.7.3"></script>
+<script src="js/part_card.js?v=0.7.3"></script>
+<script src="js/board_card.js?v=0.7.3"></script>
+<script src="js/hardware.js?v=0.7.3"></script>
+<script src="js/usage.js?v=0.7.3"></script>
+<script src="js/boot.js?v=0.7.3"></script>

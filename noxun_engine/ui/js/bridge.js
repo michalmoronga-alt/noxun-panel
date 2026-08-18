@@ -244,6 +244,13 @@
     },
     // D-05: zivy katalog materialov po CRUD v okne Materialy projektu. Obnovi
     // vsetky selecty s materialmi BEZ resetu formulara; zachovava vybrane hodnoty.
+    // D-85 (Codex #167 P2): CERSTVE „Použité v projekte" pre otvoreny combobox.
+    // Odpoved na nx_used_ids — meni LEN odvodeny zoznam id, ziadny render karty
+    // (rozpisany formular sa nesmie dotknut). Otvoreny zoznam sa prekresli.
+    setUsedIds: function(data){
+      MATERIALS.used_ids = data || { sheets: [], edges: [] };
+      if (typeof NXCombo !== 'undefined' && NXCombo) NXCombo.rerender();
+    },
     setMaterials: function(data){
       MATERIALS = data || { sheets: [], edges: [] };
       refreshMaterialFilters();
