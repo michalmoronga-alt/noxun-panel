@@ -124,6 +124,21 @@ NxTest.test('UI-02: ABS tlacidlo len prepina existujuce EdgeCheck API (D-104/D-1
                 'EdgeCheck sa pouziva len ked je nacitany (starsi SketchUp nema Overlay)')
 end
 
+NxTest.test('UI-02: prepnutie ABS z toolbaru obnovi ovladanie v okne Vyroba (D-105)') do
+  # Okno Vyroba ma vlastne split tlacidlo hran so stavmi a poctami. Bez pushu
+  # noveho stavu by po prepnuti z toolbaru ukazovalo stary — presne to robi aj
+  # existujuca cesta ProductionDialog#do_edge_check.
+  body = ui02_install_toolbar
+  NxTest.assert(body.include?('ProductionDialog.push_edge_check(state)'),
+                'toolbar musi poslat novy stav oknu Vyroba (inak ostane split tlacidlo na starom)')
+  NxTest.assert(body.include?('defined?(ProductionDialog)'),
+                'push je defenzivny — pri zavretom/nenacitanom okne sa ticho zahodi')
+  prod = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_dialog.rb'), encoding: 'UTF-8')
+  verejne = prod[/\A.*?\n\s*private\b/m].to_s # cast triedy PRED `private` (lekcia A-05)
+  NxTest.assert(verejne.include?('def push_edge_check'),
+                'push_edge_check musi ostat verejne — vola ho aj EdgeCheck a toolbar')
+end
+
 # --- 5) ziadny zapis do modelu z toolbaru -------------------------------------
 
 NxTest.test('UI-02: z toolbaru sa do modelu NEZAPISUJE (lekcia D-103/D-105)') do

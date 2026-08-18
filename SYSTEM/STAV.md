@@ -9,7 +9,7 @@
 
 **Beží blok UI 2.0.** Koncept Inspectora je uzavretý (Michal 18.8.) — záväzný kontrakt a mockupy sú v repe: [zdroje/ui20/](zdroje/ui20/) ([UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) + mockupy Inspector C, štúdio, dizajnový lístok); práca je narezaná do dávok UI-A → UI-B → UI-C → UI-D a fázy ŠTÚDIO ([PLAN.md](PLAN.md)).
 
-Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-02** — plugin má vlastný SketchUp toolbar so 4 tlačidlami (logo · Štúdio · ABS kontrola · Vložiť) a firemná značka je prvýkrát vidieť priamo v SketchUpe. Testy: **1205 headless · 32 JS sád · in-SketchUp 334 PASS / 0 FAIL** (posledný beh pri D-101; UI dávky bez buildera/observera in-SU beh nepotrebujú — vizuál overuje Michal).
+Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-02** — plugin má vlastný SketchUp toolbar so 4 tlačidlami (logo · Štúdio · ABS kontrola · Vložiť) a firemná značka je prvýkrát vidieť priamo v SketchUpe. Testy: **1206 headless · 32 JS sád · in-SketchUp 334 PASS / 0 FAIL** (posledný beh pri D-101; UI dávky bez buildera/observera in-SU beh nepotrebujú — vizuál overuje Michal).
 
 ## Robí sa
 

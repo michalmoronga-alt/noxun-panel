@@ -178,7 +178,15 @@ module Noxun
       tb.add_item(cmd_studio)
 
       cmd_abs = UI::Command.new('ABS kontrola hrán') do
-        EdgeCheck.toggle(Sketchup.active_model) if defined?(EdgeCheck)
+        next unless defined?(EdgeCheck)
+
+        state = EdgeCheck.toggle(Sketchup.active_model)
+        # D-105: okno Vyroba ma vlastne ovladanie hran (split tlacidlo so stavmi
+        # a poctami). Prepnutie z toolbaru mu preto musi poslat NOVY stav —
+        # inak by okno ostalo na starom (cesta ProductionDialog#do_edge_check
+        # posiela push_edge_check rovnako). Defenzivne: pri zavretom okne sa
+        # push ticho zahodi (`js` ma vlastny guard aj rescue).
+        ProductionDialog.push_edge_check(state) if defined?(ProductionDialog)
       end
       cmd_abs.tooltip = 'ABS kontrola hrán — zvýrazní olep v modeli (prepínač)'
       cmd_abs.status_bar_text = 'Zapne/vypne farebné zvýraznenie olepu hrán. Nastavenie je v okne Výroba → Kontrola.'
