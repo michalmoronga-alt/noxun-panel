@@ -186,13 +186,83 @@ module Noxun
 
         # V0.4.5 D1: omrvinka karty dielca ("‹ CAB-003") — oznaci korpus v modeli
         # (vyjde z editu komponentu) a panel sa prepne na kontext skrinky.
+        # IDENTITY GUARD (Codex #168 P2, 4. kolo): callback HtmlDialogu je
+        # asynchronny. ID skriniek sa naprie dokumentmi OPAKUJU, takze oneskoreny
+        # klik z dokumentu A by inak oznacil rovnomennu skrinku v dokumente B —
+        # a aj v jednom dokumente by prepisal novsi vyber. Preto sa reselect
+        # vykona LEN vtedy, ked je stale oznaceny TEN ISTY dielec, z ktoreho
+        # sa odchadza. Chybajuce udaje (starsi klient) = spravanie ako doteraz.
         def handle_select_cabinet(payload)
           model = Sketchup.active_model
-          cid = parse(payload)['cabinet_id'].to_s
+          data = parse(payload)
+          cid = data['cabinet_id'].to_s
+          return refresh_after_stale(model) unless select_cabinet_fresh?(model, data)
+
           cab = find_cabinet_by_id(model, cid)
           return set_status('Skrinka sa nenasla.', true) if cab.nil?
           reselect(model, cab)
           push_selected(model)
+        end
+
+        # Je klik stale platny? Dokument sa nesmel prepnut a vo vybere musi byt
+        # TEN ISTY dielec (podla kanonickeho role_key), z ktoreho sa odchadza.
+        def select_cabinet_fresh?(model, data)
+          guid = data['model_guid'].to_s
+          return false if !guid.empty? && guid != model_guid(model)
+
+          want = data['role_key'].to_s
+          return true if want.empty? # starsi klient identitu dielca neposielal
+
+          part = find_selected_part(model)
+          cab = find_cabinet(model)
+          return false if part.nil? || cab.nil?
+          return false if Store.get(cab, 'cabinet_id').to_s != data['cabinet_id'].to_s
+
+          params = CabinetBuilder.config_to_params(Store.config(cab) || {})
+          canonical_part_key(params, part_identity(cab, part)).to_s == want
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.select_cabinet_fresh?')
+          false
+        end
+
+        # Vyber sa medzitym zmenil — nic sa nepresuva, panel sa len zosuladi.
+        def refresh_after_stale(model)
+          push_selected(model, dedup: false)
+        end
+
+        # UI-B1: krizik docasnej polozky raily pri oznacenej DOSKE — doska nema
+        # rodica, na ktoreho by sa dalo vratit, takze sa vyber jednoducho zhodi
+        # a panel sa prepne do vkladacieho rezimu. Presne vzor Panel.show_insert
+        # (toolbar „Vložiť"): vycistenie pod SUSPEND guardom (inak by observer
+        # spustil vlastny druhy refresh) a refresh `dedup: false` — dedup MENI
+        # model a z UI akcie sa do modelu nikdy nezapisuje (lekcia D-103).
+        #
+        # IDENTITY GUARD (Codex #168 P2): callback z HtmlDialogu je asynchronny —
+        # kym dobehne, mohol pouzivatel oznacit nieco ine alebo prepnut dokument.
+        # Cisti sa preto LEN vtedy, ked je stale vybrata TA ISTA doska, ktoru
+        # panel zobrazoval; inak sa vyber nedotkne a panel sa len obnovi.
+        # Prazdny/chybajuci board_id = stary klient -> spravanie ako doteraz.
+        def handle_clear_selection(payload = nil)
+          model = Sketchup.active_model
+          return if model.nil?
+
+          data = payload ? parse(payload) : {}
+          # Codex #168 P2 (2. kolo): ID dosky je jedinecne LEN v ramci modelu
+          # (Ids.next_board_id pocita v kazdom dokumente od zaciatku), takze dva
+          # otvorene dokumenty bezne obsahuju BRD-001 — bez guidu by oneskoreny
+          # callback zhodil vyber v CUDZOM dokumente.
+          # PRISNE porovnanie (Codex #168 P2, 5. kolo): `clear_selection` je tiez
+          # novy callback — prazdny guid nie je starsi klient, ale okno bez
+          # dobehnuteho NX.init, a to nesmie cistit vyber v cudzom dokumente.
+          return push_selected(model, dedup: false) if data['model_guid'].to_s != model_guid(model)
+
+          want = data['board_id'].to_s
+          board = find_board(model)
+          have = board ? Store.get(board, 'id').to_s : ''
+          return push_selected(model, dedup: false) if !want.empty? && want != have
+
+          suspend_selection_sync { model.selection.clear }
+          push_selected(model, dedup: false)
         end
 
       end

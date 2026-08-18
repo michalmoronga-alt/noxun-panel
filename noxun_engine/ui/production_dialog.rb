@@ -304,8 +304,10 @@ module Noxun
           model = Sketchup.active_model
           return unless edge_check_guard(data, model)
 
-          state = EdgeCheck.toggle(model)
-          push_edge_check(state)
+          # UI-B1 (audit A2): prepnutie ide cez ZDIELANU Engine.toggle_edge_check —
+          # tá zavola EdgeCheck.toggle a novy stav rozposle VSETKYM oknam (aj
+          # railu Inspectora). Vlastny push tu uz netreba, status je lokalny.
+          state = Engine.toggle_edge_check(model)
           set_status(edge_check_status(state))
         rescue StandardError => e
           Engine.log_error(e, 'ProductionDialog.do_edge_check')
@@ -586,7 +588,13 @@ module Noxun
           @dialog.set_on_closed do
             @dialog = nil
             begin
-              EdgeCheck.disable! if defined?(EdgeCheck)
+              # Codex #168 P2 (2. kolo): vypnutie musi dostat aj rail Inspectora —
+              # inak by po zatvoreni okna Vyroba dalej ukazoval zapnute
+              # zvyraznenie a dalsi klik by ho zapol namiesto vypnutia.
+              if defined?(EdgeCheck)
+                EdgeCheck.disable!
+                EdgeCheck.notify_state_changed
+              end
             rescue StandardError => e
               Engine.log_error(e, 'ProductionDialog.on_closed edge_check')
             end

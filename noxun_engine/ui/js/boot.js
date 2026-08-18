@@ -1,9 +1,55 @@
-  // Pamatanie rozbalenia sekcii (localStorage).
+  // ===== Pamatanie rozbalenia sekcii (localStorage) ==========================
+  // UI-B1 (audit A5): kluc skupiny v sektore S4 je KVALIFIKOVANY KONTEXTOM
+  // (`nxsec_s4.korpus.top`), aby sa stavy skupin rôznych kontextov nemiesali,
+  // keby v buducnosti pribudla rovnomenna skupina v inom kontexte. Sektory
+  // (S1–S4) su NEZAVISLE a perzistentne — ich zbalenia preziju echo push aj
+  // zatvorenie panela, lebo ziju v localStorage a kostra sa nikdy neprekresluje.
+  // Rozhodovacia logika (kluce + exkluzivita) zije v NXShell (js/shell.js), aby
+  // sa dala testovat v Node bez DOM — tu ostava uz len praca s prvkami.
+  function nxSecNodes(){
+    return Array.prototype.slice.call(document.querySelectorAll('details[data-key]'));
+  }
+  function nxSecItem(d){
+    return { key: d.dataset.key, s4: d.getAttribute('data-s4') || null,
+             solo: d.hasAttribute('data-s4-solo'), open: !!d.open, node: d };
+  }
+  function nxSecWrite(d){
+    try { localStorage.setItem(NXShell.secKey(d.dataset.key, d.getAttribute('data-s4')), d.open ? '1' : '0'); } catch(e){}
+  }
+  // A5: skupiny v ramci JEDNEHO kontextu S4 su EXKLUZIVNE — otvorenie zavrie
+  // surodencov a ich zatvorenie sa aj ULOZI (inak by sa pri navrate otvorili
+  // vsetky naraz). Sektory S1–S4 su nezavisle, `data-s4-solo` (strom zon) je
+  // z exkluzivity vynaty.
+  function nxSecExclusive(d){
+    if (!d.open) return;
+    var items = nxSecNodes().map(nxSecItem);
+    var close = NXShell.exclusiveClose(items, d.dataset.key);
+    if (!close.length) return;
+    items.forEach(function(it){
+      if (close.indexOf(it.key) < 0) return;
+      it.node.open = false;
+      nxSecWrite(it.node);
+    });
+  }
   function bindDetails(){
-    document.querySelectorAll('details[data-key]').forEach(function(d){
-      var k = 'nxsec_' + d.dataset.key;
-      try { var v = localStorage.getItem(k); if (v !== null) d.open = (v === '1'); } catch(e){}
-      d.addEventListener('toggle', function(){ try { localStorage.setItem(k, d.open ? '1' : '0'); } catch(e){} });
+    nxSecNodes().forEach(function(d){
+      try {
+        var v = localStorage.getItem(NXShell.secKey(d.dataset.key, d.getAttribute('data-s4')));
+        if (v !== null) d.open = (v === '1');
+      } catch(e){}
+      d.addEventListener('toggle', function(){ nxSecExclusive(d); nxSecWrite(d); });
+    });
+    // Po obnove z localStorage moze byt otvorenych viac surodencov naraz
+    // (starsi stav, rucny zasah) — exkluzivitu presadime hned pri starte:
+    // v kazdom kontexte ostane otvorena PRVA skupina, ostatne sa zavru.
+    NXShell.CONTEXTS.forEach(function(ctx){
+      var first = null;
+      nxSecNodes().forEach(function(d){
+        if (d.getAttribute('data-s4') !== ctx || d.hasAttribute('data-s4-solo') || !d.open) return;
+        if (!first){ first = d; return; }
+        d.open = false;
+        nxSecWrite(d);
+      });
     });
   }
   // V0.4.7e: staticke rozmerove polia s vyrazovou podporou (dynamicke — cela .fh
@@ -22,4 +68,6 @@
   // D-85 (UI-03): prve pripojenie zdielaneho comboboxu na STATICKE selecty panela
   // (korpus/celá/chrbát, materiál dielca, materiál dosky, vkladaci materiál).
   // Dynamicke (hrany dielca a dosky) si ho beru vlastnym nxComboSync pri renderi.
-  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupFieldEditorDelegation(); nxComboSync(); document.body.setAttribute('data-insert-kind', getInsertKind()); setCabTab('korpus'); /* D-08 Codex F2: atribut+preview+tlacidla jednym volanim */ if (window.sketchup && sketchup.ready) sketchup.ready(); };
+  // UI-B1: nxShellApply nahradilo setCabTab('korpus') — nasadi data-view-ctx,
+  // stav raily aj nazov sektora S4 este pred prvym setUiMode.
+  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupFieldEditorDelegation(); nxComboSync(); document.body.setAttribute('data-insert-kind', getInsertKind()); nxShellApply(); if (window.sketchup && sketchup.ready) sketchup.ready(); };

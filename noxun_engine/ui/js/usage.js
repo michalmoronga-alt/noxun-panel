@@ -19,6 +19,13 @@
   // hit plochy — fgrp je celo v nahlade, D-23 klik-sync na riadok zoznamu).
   // Prazdna plocha SVG (pan/zoom) sa NEpocita — nie je to pouzitie prvku.
   var HIT_CLASSES = ['zrect', 'divh', 'ehit', 'behit', 'lockbtn', 'znode', 'fgrp'];
+  // UI-B1 (audit A9): prvok smie vyhlasit VLASTNY kluc atributom `data-nx-usage`
+  // — ale LEN hodnotu z tohto allowlistu. Je to zamer: rail Inspectora ma
+  // staticke ID, no citatelny kluc („rail:zony") povie z odpoctu viac nez ID
+  // tlacidla. Allowlist drzi invariant D-25 — kluc NIKDY nesmie prist z dat.
+  // (docasna polozka raily je len UKAZOVATEL — klikatelny je jej krizik.)
+  var USAGE_KEYS = ['rail:korpus', 'rail:zony', 'rail:cela', 'rail:kovanie',
+                    'rail:zrusit', 'rail:abs', 'rail:nastavenia', 'rail:studio'];
 
   // --- klasifikacia (cista logika, testovatelna v Node cez module.exports) ---
 
@@ -77,14 +84,19 @@
     var fn = fnName(attrOf(el, 'onclick') || attrOf(el, 'onchange') || attrOf(el, 'oninput'));
     return fn ? base + ':' + fn : base;
   }
-  // Kluc kliknutia (null = nepocitat). bodyTab = aktualny data-cab-tab na <body>
-  // (delegovany listener bezi az PO inline handleri, atribut je uz prepnuty).
-  function clickKey(target, bodyTab){
+  // Vyhlaseny kluc prvku (A9) — LEN z allowlistu, inak sa ignoruje.
+  function declaredKey(el){
+    var v = attrOf(el, 'data-nx-usage');
+    return (v && USAGE_KEYS.indexOf(v) >= 0) ? v : null;
+  }
+  // Kluc kliknutia (null = nepocitat).
+  function clickKey(target){
     var c = clickTargetOf(target);
     if (!c) return null;
     var tag = tagOf(c);
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return null; // tika 'change'
-    if (hasClass(c, 'cabtab')) return 'tab:' + (bodyTab || '?'); // rezimove taby
+    var dk = declaredKey(c);
+    if (dk) return dk; // UI-B1: rail Inspectora (staticky allowlist)
     if (tag === 'SUMMARY'){
       var dk = attrOf(c.parentNode, 'data-key');
       if (dk) return 'sec:' + dk; // akordeony sekcii
@@ -103,7 +115,8 @@
   // Node testy (tests/js/test_usage.js) — v CEF je module undefined, vetva spi.
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { fnName: fnName, keyFor: keyFor, clickKey: clickKey,
-                       changeKey: changeKey, clickTargetOf: clickTargetOf };
+                       changeKey: changeKey, clickTargetOf: clickTargetOf,
+                       declaredKey: declaredKey, USAGE_KEYS: USAGE_KEYS };
     return;
   }
 
@@ -122,7 +135,7 @@
   function onClick(e){
     try {
       if (!e || e.isTrusted === false) return;
-      tick(clickKey(e.target, document.body.getAttribute('data-cab-tab')));
+      tick(clickKey(e.target));
     } catch(err){}
   }
   function onChange(e){

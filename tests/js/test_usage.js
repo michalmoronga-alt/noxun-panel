@@ -53,23 +53,34 @@ eq(usage.keyFor(elm('BUTTON', { attrs: { onclick: 'openRulesDialog()' } })),
 // --- clickKey: klikatelne prvky ---
 const body = elm('BODY');
 const btn = elm('BUTTON', { parent: body, attrs: { onclick: 'openProductionDialog()' } });
-eq(usage.clickKey(btn, 'korpus'), '?/button:openProductionDialog', 'klik na button');
+eq(usage.clickKey(btn), '?/button:openProductionDialog', 'klik na button');
 // klik na vnoreny span v buttone sa pripise buttonu
 const span = elm('SPAN', { parent: btn });
-eq(usage.clickKey(span, 'korpus'), '?/button:openProductionDialog', 'klik cez vnoreny span');
+eq(usage.clickKey(span), '?/button:openProductionDialog', 'klik cez vnoreny span');
 // input/select sa na klik NEpocita (tika cez change — ziadne dvojite pocitanie)
 eq(usage.clickKey(elm('INPUT', { type: 'radio', parent: body, attrs: { onchange: 'onTypeChange()' } }), 'korpus'),
   null, 'radio klik nepocita');
 // neklikatelny div bez vsetkeho = null
 eq(usage.clickKey(elm('DIV', { parent: body }), 'korpus'), null, 'plain div nepocita');
 
-// --- tab: a sec: kluce ---
-const tabBtn = elm('BUTTON', { id: 'tabZones', attrs: { class: 'cabtab', onclick: "setCabTab('zony')" } });
-eq(usage.clickKey(tabBtn, 'zony'), 'tab:zony', 'tab kluc z data-cab-tab');
-eq(usage.clickKey(tabBtn, null), 'tab:?', 'tab fallback bez atributu');
+// --- UI-B1: rail Inspectora — vyhlaseny kluc z ALLOWLISTU (data-nx-usage) ---
+const railBtn = elm('BUTTON', { id: 'railZony', attrs: { class: 'railbtn', 'data-nx-usage': 'rail:zony', onclick: "setViewContext('zony')" } });
+eq(usage.clickKey(railBtn), 'rail:zony', 'rail kontext ma citatelny kluc');
+// klik cez vnorenu ikonu sa pripise tlacidlu raily
+eq(usage.clickKey(elm('svg', { parent: railBtn })), 'rail:zony', 'klik cez ikonu raily');
+// hodnota MIMO allowlistu sa ignoruje (invariant D-25: kluc nikdy z dat)
+const fakeBtn = elm('BUTTON', { id: 'railFake', attrs: { 'data-nx-usage': 'CAB-005 · Dolná drezová', onclick: 'x()' } });
+eq(usage.clickKey(fakeBtn), 'railFake', 'kluc mimo allowlistu NESMIE prejst — plati id prvku');
+eq(usage.declaredKey(fakeBtn), null, 'declaredKey odmieta hodnotu mimo allowlistu');
+eq(usage.declaredKey(railBtn), 'rail:zony', 'declaredKey pusti len allowlist');
+eq(usage.USAGE_KEYS.indexOf('rail:abs') >= 0, true, 'ABS kontrola ma vlastny kluc');
+
+// --- sec: kluce (sektory S1–S4 aj skupiny) ---
 const details = elm('DETAILS', { attrs: { 'data-key': 'fronts' } });
-eq(usage.clickKey(elm('SUMMARY', { parent: details }), 'korpus'), 'sec:fronts', 'akordeon sekcie');
-eq(usage.clickKey(elm('SUMMARY', { parent: elm('DETAILS') }), 'korpus'), '?/summary', 'summary bez data-key');
+eq(usage.clickKey(elm('SUMMARY', { parent: details })), 'sec:fronts', 'akordeon sekcie');
+const sect = elm('DETAILS', { id: 'secSet', attrs: { 'data-key': 's4' } });
+eq(usage.clickKey(elm('SUMMARY', { parent: sect })), 'sec:s4', 'sektor S4');
+eq(usage.clickKey(elm('SUMMARY', { parent: elm('DETAILS') })), '?/summary', 'summary bez data-key');
 
 // --- allowlist tried: delegovane prvky (SVG hit plochy, lockbtn, znode) ---
 const preview = elm('svg', { id: 'preview' });

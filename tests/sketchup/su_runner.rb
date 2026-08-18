@@ -2934,6 +2934,227 @@ module NoxunSuRunner
     nil
   end
 
+  # --- UI-B1: kostra Inspectora (rail + sektory) — SERVEROVA cast smoke testu --
+  # Co sa da overit z Ruby: kontrakt payloadov, ktore rail a sektory riadia
+  # (rezim vyberu + identita + stav ABS kontroly) a obe cesty krizika docasnej
+  # polozky. Prepinanie kontextov je ciste JS a stravi ho sada
+  # tests/js/test_uib1_kostra.js — TU sa strazi to, co JS nemoze: ze zmena
+  # vyberu z panela NEMENI model a NEROBI undo krok.
+  def run_uib1(model)
+    cleanup(model)
+
+    # 1) push_init nesie stav ABS kontroly pre ikonu v raile (pull pri otvoreni)
+    rec = []
+    install_js_recorder(rec)
+    begin
+      e::Panel.push_init
+    ensure
+      remove_js_recorder
+    end
+    init = rec.find { |s| s.include?('NX.init(') }
+    ok('UI-B1: push_init nesie stav ABS kontroly pre rail (edge_check)',
+       !init.nil? && init.include?('"edge_check"'))
+    ok('UI-B1: push_init nesie identitu dokumentu (model_guid)',
+       !init.nil? && init.include?('"model_guid"'))
+
+    # 2) oznaceny KORPUS -> rezim cab (rail ma aktivne kontexty)
+    # Vlastne parametre (ziadny testovaci katalog — materialy dedia z projektu).
+    uib1 = { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0,
+             'thickness' => 18.0,
+             'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => '1' }] },
+             'zone_tree' => { 'id' => 'Z1', 'shelves' => 1, 'children' => [] } }
+    inst = e::CabinetBuilder.build(model, uib1)
+    return ok('UI-B1: vlozenie korpusu', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id').to_s
+    model.selection.clear
+    model.selection.add(inst)
+    rec = []
+    install_js_recorder(rec)
+    begin
+      e::Panel.push_selected(model, dedup: false)
+    ensure
+      remove_js_recorder
+    end
+    cab_push = rec.find { |s| s.include?('NX.loadSelected(') }
+    ok('UI-B1: oznaceny korpus posiela loadSelected s identitou skrinky',
+       !cab_push.nil? && cab_push.include?("\"cabinet_id\":\"#{cid}\"") &&
+         cab_push.include?('"part_card":null'))
+
+    # 3) oznaceny DIELEC -> rezim part (rail ukaze docasnu polozku, kontexty sivnu)
+    shelf = d88_part(inst, 'shelf')
+    if shelf
+      begin
+        model.active_path = [inst]
+      rescue StandardError
+        nil
+      end
+      model.selection.clear
+      model.selection.add(shelf)
+      rec = []
+      install_js_recorder(rec)
+      begin
+        e::Panel.push_selected(model, dedup: false)
+      ensure
+        remove_js_recorder
+      end
+      part_push = rec.find { |s| s.include?('NX.loadSelected(') }
+      ok('UI-B1: oznaceny dielec posiela part_card (identita docasnej polozky raily)',
+         !part_push.nil? && part_push.include?('"part_card":{') && part_push.include?('"role_key"'))
+
+      # Codex #168 P2 (3. kolo): panel OTVORENY nad uz oznacenym dielcom musi
+      # dostat rovnaky obraz ako pri beznom pushi — inak by sa otvoril v rezime
+      # skrinky (bez docasnej polozky raily a bez karty dielca).
+      rec = []
+      install_js_recorder(rec)
+      begin
+        e::Panel.push_init
+      ensure
+        remove_js_recorder
+      end
+      init2 = rec.find { |s| s.include?('NX.init(') }
+      ok('UI-B1: push_init nad oznacenym dielcom nesie part_card aj model_guid',
+         !init2.nil? && init2.include?('"part_card":{') && init2.include?('"model_guid"'))
+
+      # 4) krizik pri DIELCI = existujuca cesta „spat na skrinku"
+      before = model.entities.length
+      # Codex #168 P2 (4. kolo): oneskoreny klik z INEHO dokumentu nesmie
+      # prehodit vyber tu (ID skriniek sa naprie dokumentmi opakuju).
+      rec = []
+      install_js_recorder(rec)
+      begin
+        e::Panel.handle_select_cabinet({ 'cabinet_id' => cid, 'model_guid' => 'CUDZI-GUID' }.to_json)
+      ensure
+        remove_js_recorder
+      end
+      ok('UI-B1: navrat na skrinku z INEHO dokumentu sa NEVYKONA (guard dokumentu)',
+         model.selection.to_a.include?(shelf))
+
+      rec = []
+      install_js_recorder(rec)
+      begin
+        e::Panel.handle_select_cabinet({ 'cabinet_id' => cid,
+                                         'model_guid' => e::Panel.model_guid(model) }.to_json)
+      ensure
+        remove_js_recorder
+      end
+      back = rec.find { |s| s.include?('NX.loadSelected(') }
+      ok('UI-B1: krizik pri dielci vrati vyber na skrinku (bez karty dielca)',
+         !back.nil? && back.include?('"part_card":null') &&
+           model.selection.to_a.include?(inst))
+      ok('UI-B1: navrat na skrinku NEMENI model (ziadna nova entita)',
+         model.entities.length == before)
+    else
+      info('UI-B1: v skrinke nie je polica — cast s dielcom preskocena')
+    end
+
+    # 5) krizik pri DOSKE = vycistenie vyberu (bez zapisu do modelu, bez undo kroku)
+    board = e::BoardBuilder.build(model, { 'length' => 800.0, 'width' => 600.0 })
+    if board
+      model.selection.clear
+      model.selection.add(board)
+      before = model.entities.length
+      bid = e::Store.get(board, 'id').to_s
+      # Codex #168 P2: identity guard — callback zo STAREJ dosky (medzitym sa
+      # vyber zmenil) NESMIE zhodit novy vyber. Panel sa len obnovi.
+      rec = []
+      install_js_recorder(rec)
+      begin
+        e::Panel.handle_clear_selection({ 'board_id' => 'BRD-NEEXISTUJE',
+                                          'model_guid' => e::Panel.model_guid(model) }.to_json)
+      ensure
+        remove_js_recorder
+      end
+      ok('UI-B1: krizik STAREJ dosky vyber NEZHODI (identity guard)',
+         model.selection.to_a.include?(board) &&
+           rec.none? { |s| s.include?('NX.clearSelected(') })
+
+      # Codex #168 P2 (2. kolo): ID dosky je jedinecne LEN v ramci modelu —
+      # callback z INEHO dokumentu nesmie zhodit vyber tu, aj keby ID sedelo.
+      rec = []
+      install_js_recorder(rec)
+      begin
+        e::Panel.handle_clear_selection({ 'board_id' => bid, 'model_guid' => 'CUDZI-GUID' }.to_json)
+      ensure
+        remove_js_recorder
+      end
+      ok('UI-B1: krizik z INEHO dokumentu vyber NEZHODI (guard dokumentu)',
+         model.selection.to_a.include?(board) &&
+           rec.none? { |s| s.include?('NX.clearSelected(') })
+
+      # Codex #168 P2 (5. kolo): guard je PRISNY — aj CHYBAJUCA identita sa
+      # odmieta (okno, ktoremu este nedosiel NX.init, nesmie cistit vyber).
+      rec = []
+      install_js_recorder(rec)
+      begin
+        e::Panel.handle_clear_selection({ 'board_id' => bid }.to_json)
+      ensure
+        remove_js_recorder
+      end
+      ok('UI-B1: krizik BEZ identity dokumentu vyber NEZHODI (prisny guard)',
+         model.selection.to_a.include?(board) &&
+           rec.none? { |s| s.include?('NX.clearSelected(') })
+
+      rec = []
+      install_js_recorder(rec)
+      begin
+        e::Panel.handle_clear_selection({ 'board_id' => bid,
+                                          'model_guid' => e::Panel.model_guid(model) }.to_json)
+      ensure
+        remove_js_recorder
+      end
+      ok('UI-B1: krizik pri doske posiela clearSelected (vkladaci rezim)',
+         rec.any? { |s| s.include?('NX.clearSelected(') })
+      # Codex #168 P2 (3. kolo): aj prazdny vyber nesie identitu dokumentu —
+      # bez nej by panel po prepnuti do dokumentu BEZ vyberu drzal stary guid
+      # a ABS prepinac by kazdy klik odmietal ako nezhodu modelu.
+      ok('UI-B1: clearSelected nesie identitu dokumentu',
+         rec.any? { |s| s.include?("NX.clearSelected(\"") })
+      ok('UI-B1: vycistenie vyberu NEMENI model (ziadna entita naviac ani menej)',
+         model.entities.length == before && model.selection.empty?)
+      # Jeden krok Spat musi zmazat DOSKU — keby vycistenie vyberu bolo vlastnou
+      # operaciou, undo by najprv vratilo ju a doska by ostala v modeli.
+      Sketchup.undo
+      ok('UI-B1: 1x Spat zmaze dosku (vycistenie vyberu NIE JE undo krok)',
+         boards(model).none? { |b| b.valid? && b == board })
+    else
+      info('UI-B1: dosku sa nepodarilo vlozit — cast s doskou preskocena')
+    end
+
+    # 6) ABS kontrola z raily: prepne EdgeCheck a NEVYTVORI undo krok
+    if e::EdgeCheck.available?(model)
+      was = e::EdgeCheck.active?(model)
+      e::EdgeCheck.disable! if was
+      marker = e::CabinetBuilder.build(model, uib1)
+      # Guard dokumentu: klik z INEHO dokumentu nesmie zapnut overlay tu.
+      e::Panel.handle_edge_toggle({ 'model_guid' => 'CUDZI-GUID' }.to_json)
+      ok('UI-B1: ABS toggle z INEHO dokumentu zvyraznenie NEZAPNE (guard dokumentu)',
+         e::EdgeCheck.active?(model) == false)
+      # Codex #168 P2 (5. kolo): guard je PRISNY — chybajuca identita sa tiez odmieta
+      # (okno, ktoremu este nedosiel NX.init, nesmie prepnut prave aktivny model).
+      e::Panel.handle_edge_toggle(nil)
+      ok('UI-B1: ABS toggle BEZ identity dokumentu sa odmietne (prisny guard)',
+         e::EdgeCheck.active?(model) == false)
+
+      e::Panel.handle_edge_toggle({ 'model_guid' => e::Panel.model_guid(model) }.to_json)
+      ok('UI-B1: ABS toggle z panela ZAPOL zvyraznenie (rovnaka cesta ako toolbar)',
+         e::EdgeCheck.active?(model) == true)
+      # Undo musi vratit POSLEDNU MODELOVU operaciu (vlozenie markera), nie toggle.
+      Sketchup.undo
+      ok('UI-B1: 1x Spat po ABS toggle vrati vlozenie skrinky (toggle nie je undo krok)',
+         marker.nil? || !marker.valid?)
+      e::Panel.handle_edge_toggle({ 'model_guid' => e::Panel.model_guid(model) }.to_json)
+      ok('UI-B1: opakovany klik zvyraznenie VYPOL', e::EdgeCheck.active?(model) == false)
+    else
+      info('UI-B1: SketchUp bez Overlay API — ABS cast preskocena')
+    end
+
+    cleanup(model)
+  rescue StandardError => ex
+    remove_js_recorder
+    log_line("FAIL: UI-B1 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   # --- ASYNC: undo/redo scenare (retaz timerov, observer debounce 0.2 s) -----
 
   def run_async(model, done)
@@ -3595,6 +3816,7 @@ module NoxunSuRunner
     run_d88(model)           # D-88: farba ABS na bocnych plochach dielcov a dosky
     run_d104(model)          # D-104: overlay „hrany bez olepu" (lifecycle, pocty, ziadny undo krok)
     run_d105(model)          # D-105: tri stavy + filter podla vyberu (vyber NEMENI model)
+    run_uib1(model)          # UI-B1: kostra Inspectora — payloady raily, krizik dielca/dosky, ABS toggle bez undo kroku
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

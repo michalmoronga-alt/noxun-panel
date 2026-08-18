@@ -90,6 +90,48 @@ module Noxun
           note
         end
 
+        # UI-B1 (audit A2): ABS kontrola hran z raily Inspectora. Prepnutie robi
+        # ZDIELANA Engine.toggle_edge_check — presne tá istá cesta ako toolbar
+        # (UI-02) aj okno Vyroba (D-105), takze sa spravanie nemoze rozist a
+        # novy stav dostanu vsetky otvorene okna naraz.
+        # ZIADNY zapis do modelu, ziadna operacia, ziadny undo krok — EdgeCheck
+        # je overlay NAD modelom (lekcia D-103).
+        # IDENTITY GUARD DOKUMENTU (Codex #168 P2, 2. kolo): callback HtmlDialogu
+        # je asynchronny — ak pouzivatel medzitym prepol dokument, prepinac by
+        # zapol overlay v CUDZOM modeli. Rovnaky guard ma D-105 v okne Vyroba.
+        def handle_edge_toggle(payload = nil)
+          model = Sketchup.active_model
+          unless defined?(EdgeCheck) && EdgeCheck.available?(model)
+            push_edge_check
+            return set_status('Zvýraznenie hrán vyžaduje SketchUp 2023 alebo novší.', true)
+          end
+
+          # PRISNE porovnanie (Codex #168 P2, 5. kolo) — zhoda, nie „prazdne
+          # preskoc". `nx_edge_toggle` je NOVY callback bez starsich klientov,
+          # takze prazdna hodnota nie je spatna kompatibilita, ale diera: klik
+          # z okna, ktoremu este nedosiel NX.init, by prepol PRAVE AKTIVNY model.
+          # Rovnaky tvar guardu ma ProductionDialog#edge_check_guard.
+          unless (payload ? parse(payload)['model_guid'].to_s : '') == model_guid(model)
+            push_edge_check
+            return set_status('Model sa medzitým prepol — stav obnovený, klikni znova.', true)
+          end
+
+          state = Engine.toggle_edge_check(model)
+          set_status(edge_toggle_status(state))
+        end
+
+        # Kratke potvrdenie do statusu panela. Podrobne nastavenie stavov
+        # (chyba / mimo pravidla / olepene) zostava v okne Vyroba — rail je len
+        # prepinac (3-stavove nastavenie pride neskor).
+        def edge_toggle_status(state)
+          st = state.is_a?(Hash) ? state : {}
+          return 'Zvýraznenie hrán vypnuté — v modeli nič neostalo.' unless st['active']
+
+          counts = st['counts'].is_a?(Hash) ? st['counts'] : {}
+          "Zvýraznenie hrán zapnuté — #{counts['missing'].to_i} chýba podľa pravidla " \
+            "(nastavenie stavov je v okne Výroba → Kontrola)."
+        end
+
       end
     end
   end

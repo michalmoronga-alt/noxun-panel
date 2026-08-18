@@ -69,7 +69,9 @@
     --nx-state-red:#d32f2f; --nx-state-orange:#f9a825; --nx-state-green:#388e3c;
     /* ===== D-29 sticky hlavicka + ikony ===== */
     --nx-logo:#78909c;             /* firemne logo — tlmene */
-    --nx-header-h:80px;            /* orientacna vyska sticky hlavicky (scroll-padding-top) */
+    /* UI-B1: hlavicka Inspectora je JEDNORADOVA (rezimove taby nahradil rail) */
+    --nx-header-h:42px;            /* orientacna vyska sticky hlavicky (scroll-padding-top) */
+    --nx-rail-w:44px;              /* UI-B1: sirka lavej listy kontextov Inspectora */
   }
   * { box-sizing: border-box; }
   html { scroll-padding-top: var(--nx-header-h); } /* D-29 A11: fokus nesmie skoncit pod sticky hlavickou */
@@ -307,30 +309,9 @@
   /* rad 1: logo + identita + warn chip */
   .nxhdr-id { display: flex; align-items: center; gap: 8px; min-height: 20px; }
   .nx-logo { flex: 0 0 auto; width: 16px; height: 16px; color: var(--nx-logo); } /* FILL vynimka — NEdedi .ic stroke */
-  /* rad 2 (D-47): rezimove taby vlavo (3x ROVNAKO siroke, s ikonami) +
-     satelitne akcie Materialy·Vyroba·Kovanie vpravo (rovnako siroke — inline-grid
-     s rovnakymi stlpcami vyrovna vsetky na sirku najsirsej).
-     D-91: pribudla tretia akcia (Kovanie) — stale JEDEN rad, ziadny rast do vysky. */
-  .nxhdr-modes { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-  .cabtabs { display: flex; gap: 6px; flex: 1 1 auto; min-width: 0; }
-  .cabtab { flex: 1 1 0; min-width: 0; padding: 5px 3px; font-size: 11px; background: var(--nx-surface-sunken);
-            color: var(--nx-ink-strong); border: 1px solid var(--nx-border);
-            display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
-  .cabtab.on { background: var(--nx-select); color: var(--nx-on-accent); border-color: var(--nx-select); }
-  .cabtab .ic { width: 13px; height: 13px; }
-  .satbtns { flex: 0 0 auto; display: inline-grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-  .prodbtn { padding: 5px 8px; font-size: 11px; background: var(--nx-surface-sunken);
-             color: var(--nx-ink-strong); border: 1px solid var(--nx-border);
-             display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
-  .prodbtn:hover { background: var(--nx-ghost-hover); }
-  /* D-47: uzky panel — satelitne akcie icon-only (ZIADNY treti riadok);
-     title/aria-label ostavaju, takze vyznam nesie tooltip + citacka.
-     D-91: s tretou akciou (Kovanie) sa texty musia stratit SKOR, inak by
-     rezimove taby ostali bez miesta — vlastny (sirsi) breakpoint. */
-  @media (max-width: 480px) {
-    .prodbtn span { display: none; }
-    .prodbtn { padding: 5px 7px; }
-  }
+  /* (D-47/D-91 rad 2 — rezimove taby a satelitne akcie — zanikol v UI-B1:
+     kontexty prevzal RAIL vlavo, Studio je v raile, Materialy projektu su
+     v sektore Materialy a Katalog kovania v skupine Kovanie.) */
   @media (max-width: 400px) {
     /* D-81: na uzkom paneli ustupi doplnkovy popis parametra (NL 500 / 150 mm)
        — je aj v tooltipe riadku; vyber setu a pocet musia ostat citatelne. */
@@ -457,75 +438,143 @@
   .bomtab tr.bomrow:hover, .bomtab tr.hwrow:hover { background: var(--nx-select-bg); }
   .wbadge { background: var(--nx-warn); color: var(--nx-wbadge-fg); border-radius: 9px; padding: 0 6px;
             font-size: 11px; font-weight: 600; }
-  body.mode-cab #insertCard { display: none; }
-  body.mode-part #insertCard, body.mode-part #basicCard,
-  body.mode-part details[data-key="top"], body.mode-part details[data-key="bottom"],
-  body.mode-part details[data-key="sides"], body.mode-part details[data-key="back"],
-  body.mode-part details[data-key="fronts"], body.mode-part details[data-key="hardware"],
-  body.mode-part details[data-key="materials"], body.mode-part details[data-key="templates"],
-  body.mode-part #zoneCard, body.mode-part details[data-key="zones"],
-  body.mode-part .insertmore { display: none; }
-  /* Codex PR #27: karta dielca sa sustredi LEN na dielec — karta zony aj strom zon
-     su v mode-part skryte (CSS vitazi aj nad inline style.display='' z refreshZoneUI);
-     klik na zonu v nahlade ostava moznym VEDOMYM odchodom z dielca (oznaci zonu v modeli). */
-  /* ===== V0.4.7c: rezim DOSKA (mode-board) + vkladaci prepinac Korpus/Doska ===== */
-  /* mode-board: LEN identita + karta dosky (ako mode-part, navyse bez nahladu —
-     preview kresli zony/cela korpusu, pre dosku je irelevantny). */
-  body.mode-board #insertCard, body.mode-board #basicCard, body.mode-board .pvbox,
-  body.mode-board details[data-key="top"], body.mode-board details[data-key="bottom"],
-  body.mode-board details[data-key="sides"], body.mode-board details[data-key="back"],
-  body.mode-board details[data-key="fronts"], body.mode-board details[data-key="hardware"],
-  body.mode-board details[data-key="materials"], body.mode-board details[data-key="zones"],
-  body.mode-board #zoneCard, body.mode-board #partCard,
-  body.mode-board .insertmore { display: none; }
-  /* kartu dosky riadi renderBoardCard (inline display) — mimo mode-board ju CSS drzi skrytu */
-  body.mode-insert #boardCard, body.mode-cab #boardCard, body.mode-part #boardCard { display: none; }
-  /* Vkladaci prepinac: data-insert-kind atribut na <body> (PREZIJE setUiMode className
-     prepis — Codex audit c, blocker G). Rezim Doska skryje korpusovy vkladaci formular
-     AJ vsetky korpusove sekcie pod kartou (basicCard, nahlad, akordeony). */
-  body:not([data-insert-kind="board"]) #insertBoardForm { display: none; }
-  body[data-insert-kind="board"].mode-insert #insertCabForm { display: none; }
-  body[data-insert-kind="board"].mode-insert #basicCard,
-  body[data-insert-kind="board"].mode-insert .pvbox,
-  body[data-insert-kind="board"].mode-insert #zoneCard,
-  body[data-insert-kind="board"].mode-insert details[data-key="top"],
-  body[data-insert-kind="board"].mode-insert details[data-key="bottom"],
-  body[data-insert-kind="board"].mode-insert details[data-key="sides"],
-  body[data-insert-kind="board"].mode-insert details[data-key="back"],
-  body[data-insert-kind="board"].mode-insert details[data-key="fronts"],
-  body[data-insert-kind="board"].mode-insert details[data-key="hardware"],
-  body[data-insert-kind="board"].mode-insert details[data-key="materials"],
-  body[data-insert-kind="board"].mode-insert details[data-key="zones"] { display: none; }
+  /* ===================================================================
+     UI-B1 — KOSTRA INSPECTORA: rail (kontexty) + 4 sektory.
+     VSETKY pravidla kostry su pod korenovou triedou `.nx-inspector`
+     (audit A8) — panel.css zdielaju satelitne okna a tie o raile ani
+     sektoroch nesmu vediet. Stare pravidla rezimovych tabov (body class
+     mode-* + atribut aktivneho tabu)
+     su NAHRADENE, nie prekryte dalsou vrstvou.
+     =================================================================== */
+  /* --- rozlozenie: rail je FIXNY lavy stlpec, scroll ostava dokumentovy (A6) */
+  .nx-inspector body { padding-left: calc(10px + var(--nx-rail-w)); }
+  .nx-inspector .crail { position: fixed; top: 0; left: 0; bottom: 0; width: var(--nx-rail-w);
+            z-index: 55; background: var(--nx-bg); border-right: 1px solid var(--nx-border);
+            padding: 6px 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .nx-inspector .railgap { flex: 1 1 auto; }
+  .nx-inspector .raildiv { flex: 0 0 auto; width: 24px; height: 1px; background: var(--nx-border); margin: 4px 0; }
+  .nx-inspector .railbtn { position: relative; flex: 0 0 auto; width: 34px; height: 32px; padding: 0;
+            border: 1px solid transparent; border-radius: 6px; background: none;
+            color: var(--nx-ink-muted); cursor: pointer;
+            display: inline-flex; align-items: center; justify-content: center; }
+  .nx-inspector .railbtn:hover { background: var(--nx-select-bg-soft); color: var(--nx-select); }
+  .nx-inspector .railbtn.on { background: var(--nx-select-bg); color: var(--nx-select);
+            border-color: var(--nx-select); box-shadow: inset 2px 0 0 var(--nx-select); }
+  .nx-inspector .railbtn .ic { width: 17px; height: 17px; }
+  /* Neaktivny kontext (vzor D-78): aria-disabled, NIE HTML `disabled` — tlacidlo
+     ostava fokusovatelne a nesie vysvetlenie v bubline. Skutocna ochrana je
+     guard v setViewContext, nie CSS. */
+  .nx-inspector .railbtn[aria-disabled="true"] { opacity: .4; cursor: default; }
+  .nx-inspector .railbtn[aria-disabled="true"]:hover { background: none; color: var(--nx-ink-muted); }
+  /* Funkcna sekcia raily (ABS kontrola) — tlmena, kym nie je zapnuta. */
+  .nx-inspector .railbtn.fn .ic { color: var(--nx-ink-faint); }
+  .nx-inspector .railbtn.fn.on .ic { color: var(--nx-select); }
+  /* Docasna polozka (dielec/doska) — prerusovany ramik = "je tu len docasne". */
+  .nx-inspector .railbtn.ctxi { border: 1px dashed var(--nx-part-border);
+            background: var(--nx-part-bg); color: var(--nx-select); }
+  /* Krizik je SAMOSTATNE tlacidlo vedla ukazovatela (nie v nom) — vnorene
+     tlacidlo je neplatne HTML a span s role="button" nejde aktivovat
+     klavesnicou (Codex #168 P2). Obal drzi ich vzajomnu poziciu. */
+  .nx-inspector .railtempbox { position: relative; flex: 0 0 auto; display: inline-flex; }
+  .nx-inspector .railtempbox .rx { position: absolute; top: -3px; right: -3px; width: 15px; height: 15px;
+            padding: 0; border-radius: 50%; background: var(--nx-surface); border: 1px solid var(--nx-border);
+            color: var(--nx-ink-muted); cursor: pointer; z-index: 1;
+            display: inline-flex; align-items: center; justify-content: center; }
+  .nx-inspector .railtempbox .rx .ic { width: 9px; height: 9px; stroke-width: 3; }
+  .nx-inspector .railtempbox .rx:hover { border-color: var(--nx-danger); color: var(--nx-danger); }
+  /* Bublina s popisom — rail je uzky, nazov kontextu sa don nezmesti. */
+  .nx-inspector .railtip { position: absolute; left: 40px; top: 50%; transform: translateY(-50%);
+            background: var(--nx-ink); color: var(--nx-on-accent); font-size: 11px; font-weight: 400;
+            padding: 2px 8px; border-radius: 6px; white-space: nowrap; opacity: 0;
+            pointer-events: none; transition: opacity .1s; z-index: 60; }
+  .nx-inspector .railbtn:hover .railtip, .nx-inspector .railbtn:focus .railtip { opacity: 1; }
+  /* Docasna polozka sa ukazuje LEN pri oznacenom dielci/doske. */
+  .nx-inspector #railTempBox, .nx-inspector #railTempDiv { display: none; }
+  .nx-inspector body.mode-part #railTempBox, .nx-inspector body.mode-board #railTempBox { display: inline-flex; }
+  .nx-inspector body.mode-part #railTempDiv, .nx-inspector body.mode-board #railTempDiv { display: block; }
+  /* Hlavicka je jednoradova — logo o nieco vacsie (koncept UI 2.0). */
+  .nx-inspector .nxhdr .nx-logo { width: 20px; height: 20px; }
+
+  /* --- SEKTORY (S1-S4) ---------------------------------------------------
+     Sektor je <details data-key="s..."> — zbalenie si pamata bindDetails
+     (localStorage), takze prezije echo push aj zatvorenie panela. */
+  .nx-inspector .sect { border: 1px solid var(--nx-border); border-radius: 6px;
+            background: var(--nx-surface); margin: 0 0 8px; }
+  .nx-inspector .sect > .secthead { display: flex; align-items: center; gap: 7px;
+            padding: 6px 9px; background: var(--nx-surface-sunken); border-radius: 6px;
+            cursor: pointer; list-style: none; user-select: none; }
+  .nx-inspector .sect > .secthead::-webkit-details-marker { display: none; }
+  .nx-inspector .sect > .secthead::before { margin-right: 0; }
+  .nx-inspector .sect[open] > .secthead { border-bottom: 1px solid var(--nx-border-soft);
+            border-radius: 6px 6px 0 0; }
+  .nx-inspector .sect > .secthead:hover { background: var(--nx-select-bg-soft); }
+  .nx-inspector .sect > .secthead .sn { font-weight: 600; font-size: 11px; letter-spacing: .05em;
+            text-transform: uppercase; color: var(--nx-ink-muted); }
+  /* Meta suhrn v liste sektora (obsah doplna UI-B3) — nikdy nelame riadok. */
+  .nx-inspector .sect > .secthead .meta { margin-left: auto; min-width: 0; padding-left: 8px;
+            font-size: 11px; color: var(--nx-ink-soft); overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap; }
+  .nx-inspector .sect > .sectbody { padding: 7px 9px 9px; }
+  /* Karty vnutri sektora uz vlastny ramik nepotrebuju — sektor JE ramik.
+     Vynimka: karta zony/dielca/dosky ostava samostatnou kartou (vlastna farba). */
+  .nx-inspector .sectbody > fieldset:not(#zoneCard):not(#partCard):not(#boardCard) {
+            border: 0; padding: 0; margin: 0 0 8px; background: none; }
+  .nx-inspector .sectbody > fieldset:last-child { margin-bottom: 0; }
+  .nx-inspector .sectbody > fieldset > legend { padding: 0 0 2px; }
+  /* A13: .cbpop je position:fixed — sektory NEpotrebuju overflow:visible,
+     ostava im ciste orezanie a zaoblenie. */
+
+  /* --- VIDITELNOST SEKTOROV PODLA REZIMU VYBERU (A3) --------------------- */
+  /* Dielec a doska: len nahlad (S1) + karta v S4; S2/S3 sa nezobrazuju. */
+  .nx-inspector body.mode-part #secBasic, .nx-inspector body.mode-part #secMat,
+  .nx-inspector body.mode-board #secBasic, .nx-inspector body.mode-board #secMat,
+  .nx-inspector body.mode-insert #secSet { display: none; }
+  /* Vkladanie: materialy SKRINKY sa nastavuju az nad oznacenym korpusom (cab_*
+     selecty su bez vyberu disabled), ale sektor sa NESKRYVA — ostava v nom
+     „Materiály projektu…", jediny vstup do katalogu z panela (Codex #168 P2). */
+  /* Vkladanie DOSKY: korpusovy nahlad je bezpredmetny (ako doteraz). */
+  .nx-inspector body[data-insert-kind="board"].mode-insert #secPreview { display: none; }
+
+  /* --- S1: ktory nahlad sa kresli --------------------------------------- */
+  .nx-inspector #partSvg, .nx-inspector #boardSvg { display: none; }
+  .nx-inspector body.mode-part #partSvg { display: block; }
+  .nx-inspector body.mode-board #boardSvg { display: block; }
+  .nx-inspector body.mode-board .pvbox { display: none; }
+  .nx-inspector body[data-insert-kind="board"].mode-insert .pvbox { display: none; }
+  #boardSvg { width: 100%; max-height: 200px; border: 1px solid var(--nx-border); border-radius: 6px;
+              background: var(--nx-surface); margin: 4px 0 6px; }
+  /* Zaskrtnutie "zony ghost" patri ku kontextu Zony. */
+  .nx-inspector body:not([data-view-ctx="zony"]) .zoneline { display: none; }
+
+  /* --- S2: vkladacia karta vs. rozmery ----------------------------------- */
+  .nx-inspector body.mode-cab #insertCard { display: none; }
+  /* Vkladaci prepinac: data-insert-kind atribut na <body> (PREZIJE setUiMode
+     className prepis — Codex audit c, blocker G). */
+  .nx-inspector body:not([data-insert-kind="board"]) #insertBoardForm { display: none; }
+  .nx-inspector body[data-insert-kind="board"].mode-insert #insertCabForm { display: none; }
+  .nx-inspector body[data-insert-kind="board"].mode-insert #basicCard { display: none; }
   #insertKindRow { border-bottom: 1px dashed var(--nx-border); padding-bottom: 6px; margin-bottom: 8px; }
-  /* ===== D-08: rezimove taby Korpus/Zony/Cela — data-cab-tab atribut na <body>
-     (vzor data-insert-kind, PREZIJE setUiMode className prepis). Pravidla su BEZ
-     mode prefixu: part/board rezimy skryvaju svoje sekcie vlastnymi pravidlami
-     (nadmnozina), takze atribut realne riadi len mode-cab a mode-insert (korpus).
-     BEZ atributu (pred boot initom) ostava vsetko viditelne — ziadny flash. */
-  body[data-cab-tab="zony"] #basicCard, body[data-cab-tab="cela"] #basicCard,
-  body[data-cab-tab="zony"] details[data-key="top"], body[data-cab-tab="cela"] details[data-key="top"],
-  body[data-cab-tab="zony"] details[data-key="bottom"], body[data-cab-tab="cela"] details[data-key="bottom"],
-  body[data-cab-tab="zony"] details[data-key="sides"], body[data-cab-tab="cela"] details[data-key="sides"],
-  body[data-cab-tab="zony"] details[data-key="back"], body[data-cab-tab="cela"] details[data-key="back"],
-  body[data-cab-tab="zony"] details[data-key="hardware"], body[data-cab-tab="cela"] details[data-key="hardware"],
-  body[data-cab-tab="zony"] details[data-key="materials"], body[data-cab-tab="cela"] details[data-key="materials"] { display: none; }
-  body[data-cab-tab="korpus"] #zoneCard, body[data-cab-tab="cela"] #zoneCard,
-  body[data-cab-tab="korpus"] details[data-key="zones"], body[data-cab-tab="cela"] details[data-key="zones"],
-  body[data-cab-tab="korpus"] .zoneline, body[data-cab-tab="cela"] .zoneline { display: none; }
-  body[data-cab-tab="korpus"] details[data-key="fronts"], body[data-cab-tab="zony"] details[data-key="fronts"] { display: none; }
-  /* D-29 A3: po presune tabov do hlavicky — .cabtab skryte v rezimoch bez korpusoveho
-     nahladu (dielec, doska); tlacidlo Vyroba (.prodbtn) ostava viditelne. */
-  body.mode-part .cabtab,
-  body.mode-board .cabtab { display: none; }
-  /* D-78: v rezime VKLADANIA taby uz NEMIZNU — zapamatany data-insert-kind="board"
-     ich doteraz schoval a po navrate ku Korpusu sa hlavicka javila rozbita. Ostavaju
-     viditelne (kotva rozlozenia hlavicky), ale su NEAKTIVNE: prepinanie ma zmysel az
-     nad oznacenym korpusom. Vizualny stav je CSS podla rezimu; skutocnu ochranu drzi
-     guard v setCabTab (klik AJ klavesnica) + aria-disabled — HTML `disabled` sa
-     zamerne nepouziva, aby tlacidla ostali fokusovatelne a niesli title. */
-  body.mode-insert .cabtab { opacity: .45; cursor: default; }
-  body.mode-insert .cabtab:hover { background: var(--nx-surface-sunken); }
-  body.mode-insert .cabtab.on:hover { background: var(--nx-select); }
+
+  /* --- S3: materialy skrinky vs. materialy vkladanej dosky --------------- */
+  .nx-inspector #insertBoardMatForm { display: none; }
+  .nx-inspector body[data-insert-kind="board"].mode-insert #insertBoardMatForm { display: block; }
+  .nx-inspector body.mode-insert #cabMatBlock { display: none; }
+
+  /* --- S4: skupiny podla KONTEXTU (data-view-ctx na <body>) --------------
+     Skupina nesie `data-s4="<kontext>"`. Zakladne pravidlo vsetky skryje,
+     kontextove ich vrati — takze rezimy part/board/insert nepotrebuju
+     vlastny zoznam (S4 v nich ukazuje len kartu dielca/dosky). */
+  .nx-inspector [data-s4] { display: none; }
+  .nx-inspector body.mode-cab[data-view-ctx="korpus"] [data-s4="korpus"],
+  .nx-inspector body.mode-cab[data-view-ctx="zony"] [data-s4="zony"],
+  .nx-inspector body.mode-cab[data-view-ctx="cela"] [data-s4="cela"],
+  .nx-inspector body.mode-cab[data-view-ctx="kovanie"] [data-s4="kovanie"] { display: block; }
+  /* Karty dielca/dosky riadi ich renderer (inline display) — mimo svojho
+     rezimu ich CSS drzi skryte (poistka, nie jediny mechanizmus). */
+  .nx-inspector body.mode-insert #boardCard, .nx-inspector body.mode-cab #boardCard,
+  .nx-inspector body.mode-part #boardCard { display: none; }
+  .nx-inspector body.mode-insert #partCard, .nx-inspector body.mode-cab #partCard,
+  .nx-inspector body.mode-board #partCard { display: none; }
   /* ===== V0.4.7e: zivy nahlad vyrazu "= 614" (expr.js injektuje span za input) =====
      Pevna rezerva + nowrap, aby hint neposuval .unit a nelamal .row/.frow/.fldrow. */
   .exprhint { flex: 0 0 auto; min-width: 44px; font-size: 10.5px; color: var(--nx-ink-faint);
@@ -697,15 +746,16 @@
   #preview g.fgrp.hov text { fill: var(--nx-select-strong); }
   .frow.hov { background: var(--nx-select-bg-hover); border-radius: 6px; }
   .frow.hov .fnum { color: var(--nx-select-accent); font-weight: 600; }
-  /* D-23: hint pod nahladom podla aktivneho tabu (data-cab-tab z D-08) —
-     klik na celo sa ukazuje LEN v tabe Cela; zonovy hint LEN v tabe Zony. */
+  /* D-23: hint pod nahladom podla aktivneho kontextu (data-view-ctx, UI-B1) —
+     klik na celo sa ukazuje LEN v kontexte Cela; zonovy hint LEN v Zonach. */
   .pvhint .ph-fronts { display: none; }
-  body[data-cab-tab="cela"] .pvhint .ph-fronts { display: inline; }
-  body[data-cab-tab="cela"] .pvhint .ph-zones,
-  body[data-cab-tab="korpus"] .pvhint .ph-zones { display: none; }
+  body[data-view-ctx="cela"] .pvhint .ph-fronts { display: inline; }
+  body[data-view-ctx="cela"] .pvhint .ph-zones,
+  body[data-view-ctx="kovanie"] .pvhint .ph-zones,
+  body[data-view-ctx="korpus"] .pvhint .ph-zones { display: none; }
   /* GH P3: oznaceny DIELEC ma nahlad NUTENE zonovy (bridge previewMode='zones',
-     data-cab-tab sa vedome NEMENI kvoli navratu) — hint musi nasledovat realny
-     nahlad, nie tab. Za tabovymi pravidlami = vyhrava pri rovnakej specificite. */
+     data-view-ctx sa vedome NEMENI) — hint musi nasledovat realny
+     nahlad, nie kontext. Za kontextovymi pravidlami = vyhrava pri rovnakej specificite. */
   body.mode-part .pvhint .ph-zones { display: inline; }
   body.mode-part .pvhint .ph-fronts { display: none; }
   /* ===== V0.6 M-A2: modal "Pridat z Demosu" (nxda*) + dlazdice s fotkou +

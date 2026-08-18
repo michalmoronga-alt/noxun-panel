@@ -622,8 +622,9 @@
       if (rows[i].dataset.frontId === fid){ row = rows[i]; break; }
     }
     if (!row) return;
-    var det = document.querySelector('details[data-key="fronts"]');
-    if (det) det.open = true; // zbalena sekcia by fokus/scroll zhltla
+    // UI-B1 (Codex #168 P2): rozbal CELU cestu k riadku — od sektora Nastavenia
+    // po skupinu Cela. Zbalený predok by fokus aj scroll zhltol.
+    if (typeof nxRevealTarget === 'function') nxRevealTarget(row);
     row.scrollIntoView({ block: 'nearest' });
     var fh = row.querySelector('.fh');
     if (fh) fh.focus();

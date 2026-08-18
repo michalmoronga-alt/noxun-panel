@@ -13,6 +13,24 @@ module Noxun
           # V0.4.7c: aj uz oznacena DOSKA pri otvoreni panela (Codex audit c, blocker B) —
           # priorita korpus -> doska -> nic, rovnaka ako push_selected.
           board = cab.nil? ? find_board(model) : nil
+          # Codex #168 P2 (3. kolo): pociatocny payload musi byt ZRKADLOM
+          # push_selected — inak sa panel pri otvoreni sprava inak nez pri
+          # kazdom dalsom pushi:
+          #   * bez model_guid by mala prva identita prazdny dokument a PRVE
+          #     bezne echo by vyzeralo ako novy vyber (kontext by skocil na Korpus),
+          #   * bez part_card by panel nad uz oznacenym DIELCOM otvoril rezim
+          #     skrinky — bez docasnej polozky raily a bez karty dielca.
+          initial = if cab
+                      p = cabinet_payload(cab)
+                      p['model_guid'] = model_guid(model)
+                      part = find_selected_part(model)
+                      p['part_card'] = part ? part_card_payload(model, cab, part) : nil
+                      p
+                    elsif board
+                      p = board_payload(board)
+                      p['model_guid'] = model_guid(model)
+                      p
+                    end
           data = {
             version: Engine::VERSION, # UI zobrazuje verziu odtialto — ziadny hardcode v HTML
             defaults: {
@@ -23,16 +41,46 @@ module Noxun
             templates: template_list,
             materials: materials_payload, # V0.3 katalog (dosky + ABS) pre selecty
             # (projektove predvolby zobrazuje okno MaterialsDialog — D2)
-            selected: cab ? cabinet_payload(cab) : (board ? board_payload(board) : nil),
+            selected: initial,
             selected_kind: cab ? 'cabinet' : (board ? 'board' : 'none'),
             # D-39 (audit B5): zamky vkladacej karty z Ruby pamate — preziju
             # zatvorenie panela; JS ich obnovi pri kazdom otvoreni (push_init).
             insert_locks: insert_locks,
             # D-90: ponuka uchytkovych profilov (id/nazov/skratenie) — JEDINY
             # zdroj je registry FrontProfiles, JS si ziadny zoznam nedrzi.
-            front_profiles: FrontProfiles.options
+            front_profiles: FrontProfiles.options,
+            # UI-B1 (audit A2): stav ABS kontroly hran pre ikonu v raile. PULL
+            # pri otvoreni panela; dalsie zmeny chodia pushom (push_edge_check)
+            # z panela, z toolbaru aj z okna Vyroba. CISTE CITANIE.
+            edge_check: edge_check_state,
+            # Identita dokumentu pre stavovy stroj panela aj pre identity guardy
+            # asynchronnych callbackov (Codex #168 P2).
+            model_guid: model_guid(model)
           }
           js("NX.init(#{data.to_json})")
+        end
+
+        # UI-B1: stav zvyraznenia olepu pre rail. Nedostupny/nenacitany EdgeCheck
+        # (SketchUp bez Overlay API) = ikona zosedne, panel sa tym nezhodi.
+        def edge_check_state
+          return { 'available' => false, 'active' => false } unless defined?(EdgeCheck)
+
+          EdgeCheck.ui_state(Sketchup.active_model)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.edge_check_state')
+          { 'available' => false, 'active' => false }
+        end
+
+        # Maly echo push stavu hran (bez prepoctu panela) — vzor
+        # ProductionDialog#push_edge_check. Vola ho Engine.broadcast_edge_check
+        # (klik z panela, z toolbaru aj z okna Vyroba) a EdgeCheck po prepocte.
+        def push_edge_check(state = nil)
+          return unless dialog_alive?
+
+          st = state || edge_check_state
+          js("if (window.NX && NX.setEdgeCheck) NX.setEdgeCheck(#{st.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.push_edge_check')
         end
 
         # dedup: false = refresh po programovom selecte z okna Vyroba (V0.5 B,
@@ -58,8 +106,15 @@ module Noxun
             @active_zone_id = nil
             # V0.4.7c: doska ma vlastnu kartu; korpus ma v Inspectore prednost.
             board = find_board(model)
-            return js("NX.loadBoard(#{board_payload(board).to_json})") if board
-            return js('NX.clearSelected()')
+            if board
+              bp = board_payload(board)
+              bp['model_guid'] = model_guid(model)
+              return js("NX.loadBoard(#{bp.to_json})")
+            end
+            # Codex #168 P2 (3. kolo): AJ prazdny vyber nesie identitu dokumentu.
+            # Prepnutie do dokumentu bez vyberu inak nechalo panel na guide
+            # STAREHO modelu a ABS prepinac by kazdy klik odmietal ako nezhodu.
+            return js("NX.clearSelected(#{model_guid(model).to_json})")
           end
           az = if zone && zone['cabinet_id'] == Store.get(cab, 'cabinet_id')
                  zone['zone_id']
@@ -69,10 +124,26 @@ module Noxun
           @active_zone_id = az
           payload = cabinet_payload(cab)
           payload['active_zone'] = az
+          payload['model_guid'] = model_guid(model)
           # V0.3: ak je vo vybere DIELEC (kind=part), priloz kartu dielca (ABS/materialovy editor).
           part = find_selected_part(model)
           payload['part_card'] = part ? part_card_payload(model, cab, part) : nil
           js("NX.loadSelected(#{payload.to_json})")
+        end
+
+        # UI-B1 (Codex #168 P2, 2. kolo): IDENTITA DOKUMENTU. ID objektov su
+        # jedinecne LEN v ramci modelu (Ids.next_board_id pocita od zaciatku
+        # v kazdom dokumente), takze dva otvorene dokumenty bezne obsahuju
+        # BRD-001 aj CAB-001. Bez guidu by:
+        #   * prepnutie dokumentu vyzeralo pre panel ako ECHO push tej istej
+        #     identity (kontext by ostal na starom mieste namiesto resetu),
+        #   * oneskoreny callback (krizik dosky, ABS prepinac) trafil CUDZI
+        #     dokument. Zrkadlo ProductionDialog#model_guid.
+        def model_guid(model = nil)
+          m = model || Sketchup.active_model
+          m && m.respond_to?(:guid) ? m.guid.to_s : ''
+        rescue StandardError
+          ''
         end
 
         def push_templates

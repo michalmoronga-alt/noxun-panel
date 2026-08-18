@@ -108,7 +108,16 @@
     'download': '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>',
     // V0.6 D-90: uchytkovy profil na hornej hrane cela (vlastny symbol) —
     // lista profilu cez celu sirku + celo pod nou.
-    'profile': '<rect x="2" y="3" width="20" height="5" rx="1.5"/><path d="M6 8v13h12V8"/>'
+    'profile': '<rect x="2" y="3" width="20" height="5" rx="1.5"/><path d="M6 8v13h12V8"/>',
+    // ===== UI-B1: rail Inspectora (kontexty + funkcie) =========================
+    // Prevzate 1:1 z mockupu SYSTEM/zdroje/ui20/mockup_inspector_c.html — rovnaky
+    // Lucide styl (24x24, stroke-2). 'cabinet'/'front'/'slab' su vlastne symboly
+    // (Lucide nema nabytkarske tvary), 'hammer' a 'shell' su Lucide originaly.
+    'cabinet': '<rect x="4" y="3" width="16" height="15" rx="1"/><path d="M12 3v15"/><path d="M6 21v-3"/><path d="M18 21v-3"/><path d="M9.5 10h.01"/><path d="M14.5 10h.01"/>',
+    'front': '<rect x="4" y="3" width="16" height="18" rx="1"/><rect x="8" y="7" width="8" height="2" rx="1"/>',
+    'hammer': '<path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/>',
+    'shell': '<path d="M14 11a2 2 0 1 1-4 0 4 4 0 0 1 8 0 6 6 0 0 1-12 0 8 8 0 0 1 16 0 10 10 0 1 1-20 0 11.93 11.93 0 0 1 2.42-7.22 2 2 0 1 1 3.16 2.44"/>',
+    'slab': '<rect x="2" y="6" width="20" height="12" rx="1.5"/><path d="M2 10h20"/>'
   };
 
   // Firemne logo — prstenec + krizove ramena. Renderuje sa FILL-om (.nx-logo),
