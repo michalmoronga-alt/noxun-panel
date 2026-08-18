@@ -297,6 +297,10 @@
       var ms = el('ib_material');
       if (ms && !ms.options.length){ fillBoardMaterialSelect(ms, ''); nxComboSync(); onInsertBoardMaterial(); }
     }
+    // Codex #173 P2: prepnutie Korpus/Doska meni, KTORE polia sektory ukazuju
+    // (rozmery korpusu vs. dlzka/sirka dosky, material dosky) — meta v listach
+    // musi ist s nimi. Atribut sa meni programovo, ziadna udalost sa nevystreli.
+    if (typeof nxSectorMetaApply === 'function') nxSectorMetaApply();
   }
   // D-05: po zmene katalogu (NX.setMaterials) sa vkladaci select NEplni "iba raz" —
   // force refill so zachovanim platneho vyberu + prepocet hrubky/grainu. Fokusovany

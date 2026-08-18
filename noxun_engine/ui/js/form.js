@@ -284,6 +284,10 @@
     updateAvailable();
     renderPreview();
     refreshZoneUI();
+    // Codex #173 P2: karta sa prave PROGRAMOVO prepisala (rozmery zo sablony,
+    // viditelnost sokla podla typu) — ziadne `input`/`change` sa nevystreli,
+    // takze meta listy sektorov treba obnovit vyslovne.
+    if (typeof nxSectorMetaApply === 'function') nxSectorMetaApply();
   }
 
   // --- D-39: zamky poli vkladacej karty (sirka/vyska/hlbka/hrubka/sokel) ---

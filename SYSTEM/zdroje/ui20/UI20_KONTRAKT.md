@@ -86,6 +86,9 @@ vnútro:
 - **D-85 combobox** vo VŠETKÝCH výberoch materiálu/ABS: písanie s filtrom bez diakritiky,
   sekcia „Použité v projekte" navrchu, naposledy použité; jeden komponent, päť miest
   (telo/dielec/doska/čelá/chrbát + ABS hrany + projektové predvoľby). ŽIVÝ v mockupe.
+  **Vedomá odchýlka implementácie (UI-03):** projektové predvoľby a satelitné okná
+  combobox **nemajú** — majú vlastný suggest nad voľným textom (D-67); dôvod je
+  zapísaný v [docs/UI_DIZAJN.md](../../../docs/UI_DIZAJN.md) (sekcia D-85 / UI-03).
 - **D-84 čelá rečou stolára:** „+ pridaj čelo" / „+ pridaj dvere"; „− riadok" zaniká
   (krížik pri riadku).
 - **UX-06 karta Zóna:** smerové ikony delenia (zvislé/vodorovné) namiesto textových selectov.

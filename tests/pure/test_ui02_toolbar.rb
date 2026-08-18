@@ -67,6 +67,45 @@ NxTest.test('UI-02: ikony toolbaru maju PEVNU farbu (ziadny currentColor)') do
   end
 end
 
+# --- 1b) logo: sprite panela a ikona toolbaru kreslia TU ISTU znacku ----------
+
+# Zrolovana znacka z originalnych kriviek webu ma DVE podoby: samostatny SVG
+# subor pre SketchUp toolbar a symbol #i-logo v HTML sprite (hlavicka panela +
+# koliesko „O plugine"). Krivky musia byt zhodne — inak by plugin nosil dve
+# rozne znacky. Lisit sa smie LEN viewBox (toolbar ma ~12 % vnutorny okraj).
+UI02_SPRITE = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'icons.js'), encoding: 'UTF-8')
+UI02_PANEL_CSS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'css', 'panel.css'), encoding: 'UTF-8')
+
+# Kresba = vsetky `d="…"` a `points="…"` v poradi, v akom su v zdroji.
+def ui02_curves(src)
+  src.scan(/(?:\bd|\bpoints)="([^"]+)"/).flatten.map { |s| s.gsub(/\s+/, ' ').strip }
+end
+
+def ui02_logo_symbol
+  UI02_SPRITE[/var LOGO = (.*?);\n/m].to_s
+end
+
+NxTest.test('UI-02: logo v sprite kresli TIE ISTE krivky ako ikona toolbaru') do
+  symbol = ui02_logo_symbol
+  NxTest.refute(symbol.empty?, 'icons.js musi mat symbol #i-logo (LOGO)')
+  file = File.read(File.join(UI02_ICON_DIR, 'noxun_logo.svg'), encoding: 'UTF-8')
+  NxTest.assert_equal(ui02_curves(file), ui02_curves(symbol),
+                      'sprite a toolbar musia kreslit rovnaku zrolovanu znacku')
+  NxTest.assert(symbol.include?('fill="currentColor"'),
+                'logo je FILL vynimka — bez currentColor by v paneli ostalo cierne')
+  vb = symbol[/viewBox="([^"]+)"/, 1].to_s
+  NxTest.refute(vb.empty?, 'symbol #i-logo musi mat vlastny viewBox')
+  NxTest.refute(vb == '0 0 100 100',
+                'viewBox 0 0 100 100 = stary zjednoduseny prstenec, nie originalne krivky')
+end
+
+NxTest.test('UI-02: logo v hlavicke panela ma 24 px (kontrakt UI 2.0)') do
+  rule = UI02_PANEL_CSS[/\.nxhdr \.nx-logo \{([^}]*)\}/, 1].to_s
+  NxTest.refute(rule.empty?, 'panel.css musi urcovat velkost loga v hlavicke')
+  NxTest.assert(rule.include?('width: 24px') && rule.include?('height: 24px'),
+                "hlavicka nesie znacku 24 px (kontrakt UI 2.0), je: #{rule.strip}")
+end
+
 # --- 2) registracia toolbaru --------------------------------------------------
 
 NxTest.test('UI-02: toolbar sa registruje s guardom proti dvojitej registracii') do

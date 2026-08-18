@@ -120,6 +120,38 @@ NxTest.test('UI-B1: kazdy kontext ma v S4 aspon jednu skupinu (data-s4)') do
   end
 end
 
+NxTest.test('UI-B: lista kazdeho sektora ma ZIVY meta suhrn') do
+  # Miesto v kostre existuje od UI-B1; obsah do neho pise shell.js. Prazdny
+  # element bez plnica = lista, ktora sluby o suhrne nedodrzi.
+  %w[s1Meta s2Meta s3Meta s4Meta].each do |id|
+    NxTest.assert(UIB1_HTML.include?("id=\"#{id}\""), "liste sektora chyba miesto na meta (#{id})")
+    NxTest.assert(UIB1_SHELL_CODE.include?("'#{id}'"), "meta #{id} nikto neplni (shell.js)")
+  end
+  NxTest.assert(UIB1_SHELL_CODE.include?('sectorMeta'),
+                'texty meta sklada CISTA funkcia NXShell.sectorMeta (testovana v Node)')
+  # Meta je len ZOBRAZENIE — obnova visi na udalostiach, nie na zapisovej ceste.
+  NxTest.assert(UIB1_SHELL_CODE.include?('nxSectorMetaApply()'),
+                'meta sa musi obnovovat (nxSectorMetaApply)')
+  # Codex #173 P2: `data-s4-solo` je vynate z EXKLUZIVITY, NIE zo zberu udajov.
+  # Kontext Zony ma jedine dieta S4 a je to prave solo strom — jeho preskocenie
+  # znamena trvalo prazdnu listu sektora.
+  zber = UIB1_SHELL_CODE[/function nxMetaGroups\(\).*?\n  \}/m].to_s
+  NxTest.refute(zber.empty?, 'shell.js musi mat zber skupin pre meta (nxMetaGroups)')
+  NxTest.refute(zber.include?('data-s4-solo'),
+                'meta nesmie solo skupinu preskocit — vynimka patri len exkluzivite')
+end
+
+NxTest.test('UI-B: PROGRAMOVE zmeny karty obnovia meta (Codex #173 P2)') do
+  # Delegovany input/change listener zachyti len RUCNE zmeny. Cesty, ktore
+  # prepisu polia alebo popisy zvnutra kodu, musia meta obnovit vyslovne.
+  { 'js/form.js' => 'materializeInsertCard (sablona a typ prepisu rozmery)',
+    'js/board_card.js' => 'onInsertKindChange (Korpus/Doska meni ukazane polia)',
+    'js/bridge.js' => 'NX.setMaterials (premenovanie dekoru meni popis)' }.each do |file, why|
+    src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', file), encoding: 'UTF-8')
+    NxTest.assert(src.include?('nxSectorMetaApply()'), "#{file}: #{why} — meta ostane stara")
+  end
+end
+
 NxTest.test('UI-B1: strom zon je z exkluzivity vynaty (data-s4-solo)') do
   zones = UIB1_HTML[/<details data-key="zones"[^>]*>/].to_s
   NxTest.assert(zones.include?('data-s4-solo'),
