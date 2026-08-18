@@ -268,7 +268,7 @@
       drawZonesBase(S, rx, ry, g);
     } else if (previewMode === 'fronts'){
       // cela pohlad + koty vysok a medzier
-      renderFrontsPreview(S, rx, ry, W, H, g.fh, g.t);
+      renderFrontsPreview(S, rx, ry, g);
       drawFrontDims(S, rx, ry, g);
     } else if (previewMode === 'hw'){
       // UI-B2: kontext Kovanie ma vlastnu projekciu — pozicie kovania
@@ -339,8 +339,10 @@
   // none ciarkovany pas AJ text su jeden interakcny ciel (klik/hover na hocaku
   // cast = ten isty item; pri viacerych kridlach sa zvyraznuju vsetky naraz).
   // F-cislo (kanonicka pozicia v datach, F1 dole) sa kresli raz per item.
-  function renderFrontsPreview(S, rx, ry, W, H, fh, t){
-    var items = frontItems;
+  // UI-B2: geometriu berie z pvGeom (jeden zdroj pre vsetky vrstvy) — okraje
+  // a medzera sa uz necitaju z formulara druhykrat.
+  function renderFrontsPreview(S, rx, ry, g){
+    var W = g.W, H = g.H, items = g.fronts;
     if (!items || !items.length){
       // odhad z formulara (bez presnych vysok) — len info
       S.push('<text x="'+rx(W/2)+'" y="'+ry(H/2)+'" font-size="20" fill="#90a4ae" text-anchor="middle">Čelá: nastav v sekcii Čelá</text>');
@@ -348,8 +350,7 @@
     }
     // D-07: okraje/medzera z poli (0 je platna hodnota — NIE || default);
     // zaporny bocny okraj = cela sirsie nez korpus (presah).
-    var gs = 2; var gsv = numv('fr_gap_sides'); if (!isNaN(gsv)) gs = gsv;
-    var gap = 3; var gv = numv('fr_gap'); if (!isNaN(gv)) gap = gv;
+    var gs = g.gapSides, gap = g.gap;
     var ow = W - 2*gs;
     items.forEach(function(it, i){
       var z = it.z, h = it.height, col = (it.type==='drawer_front')?PV_FRONT_DRAWER:PV_FRONT_DOOR;
@@ -632,9 +633,17 @@
   // ===================== UI-B2: SPODNY PAS NAHLADU ===========================
   // Chipy vrstiev vlavo, nastroje vpravo (kamera N7 + fit). Pas je STATICKA
   // kostra v panel.html — tu sa meni len obsah #pvChips a stav tlacidiel.
+  // Podpis stavu pasu — renderPreview bezi aj pri KAZDOM kroku tahu priecky,
+  // takze pas sa prestavuje LEN vtedy, ked sa naozaj zmenil (inak by sa 4
+  // tlacidla prekreslovali 60x za sekundu a hover/fokus by blikal).
+  var pvBarSig = null;
   function renderPvBar(){
     var box = el('pvChips');
     var mode = pvChipMode(), avail = pvAvail();
+    var sig = mode + '|' + NXLayers.chips(mode, avail).map(function(c){ return c.key + ':' + c.state; }).join(',') +
+              '|' + (selectedCabId ? '1' : '0');
+    if (sig === pvBarSig) return;
+    pvBarSig = sig;
     if (box){
       var h = '';
       NXLayers.chips(mode, avail).forEach(function(c){
