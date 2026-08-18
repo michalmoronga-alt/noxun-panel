@@ -115,7 +115,8 @@
         <div class="row"><label>Názov</label><input id="ib_name" type="text" placeholder="Doska"><span class="unit"></span></div>
         <div class="row"><label>Dĺžka</label><input id="ib_length" type="text" value="800"><span class="unit">mm</span></div>
         <div class="row"><label>Šírka</label><input id="ib_width" type="text" value="600"><span class="unit">mm</span></div>
-        <button class="primary wide" onclick="insertBoard()">Vložiť dosku</button>
+        <!-- (zelené „Vložiť dosku" je AŽ ZA materiálom — v sektore Materiály;
+             primárna akcia musí byť posledná, nie pred voľbou materiálu.) -->
       </div>
     </fieldset>
 
@@ -174,6 +175,7 @@
           <option value="none">Bez smeru</option>
         </select><span class="unit"></span>
       </div>
+      <button class="primary wide" onclick="insertBoard()">Vložiť dosku</button>
     </div>
   </div>
 </details>
