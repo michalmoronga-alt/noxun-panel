@@ -18,6 +18,7 @@ UIB1_RB   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.rb'),
 UIB1_USAGE = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'usage.js'), encoding: 'UTF-8')
 UIB1_SHELL = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'shell.js'), encoding: 'UTF-8')
 UIB1_ICONS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'icons.js'), encoding: 'UTF-8')
+UIB1_BRIDGE = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'bridge.js'), encoding: 'UTF-8')
 
 UIB1_RAIL_IDS = %w[railKorpus railZony railCela railKovanie railTemp railAbs railCfg railStudio].freeze
 UIB1_CTX = %w[korpus zony cela kovanie].freeze
@@ -198,6 +199,20 @@ NxTest.test('UI-B1: S2/S3 patria kontextu Korpus, inde je kontextovy riadok') do
                 'shell.js musi mat viditelnost sektorov ako cistu funkciu')
   NxTest.assert(UIB1_SHELL_CODE.include?('sectorVis: sectorVis'),
                 'sectorVis sa exportuje (inak ju Node matica neotestuje)')
+end
+
+NxTest.test('UI-B1: kontextovy riadok drzi DATA, nie hotovy text (zivy katalog)') do
+  # Codex #171 P2: premenovanie dekoru v okne Materialy chodi cez NX.setMaterials
+  # (bez loadSelected). Keby si riadok cachoval hotovy popis, ukazoval by stary
+  # nazov az do dalsieho vyberu — preto drzi material_id a preklada az pri
+  # kresleni, a setMaterials ho musi prekreslit.
+  bridge = uib1_no_comments(UIB1_BRIDGE, :js)
+  NxTest.assert(bridge.include?('material_id: p.material_id'),
+                'setCtxNote musi ulozit ID materialu, nie prelozeny popis')
+  set_mat = bridge[/setMaterials: function\(data\)\{?.*?\n    \},/m].to_s
+  NxTest.refute(set_mat.empty?, 'setMaterials sa nenasiel — guard by tichol')
+  NxTest.assert(set_mat.include?('renderCtxNote()'),
+                'zivy refresh katalogu musi prekreslit aj kontextovy riadok')
 end
 
 NxTest.test('UI-B1: sektor S4 prepina skupiny cez data-view-ctx (nie cez re-render)') do

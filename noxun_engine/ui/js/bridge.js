@@ -295,6 +295,9 @@
       if (typeof refreshInsertBoardMaterials === 'function') refreshInsertBoardMaterials();
       if (typeof partCard !== 'undefined' && partCard) renderPartCard(partCard);
       if (typeof boardCard !== 'undefined' && boardCard) renderBoardCard(boardCard);
+      // Codex #171 P2: premenovanie dekoru v okne Materialy chodi TOUTO cestou
+      // (bez loadSelected) — kontextovy riadok si preto popis prelozi znova.
+      renderCtxNote();
     },
     // D-75 (H1b): živý zoznam setov kovania po zmene v okne Katalóg kovania.
     // Obnoví LEN možnosti selectov setu (skrinka aj dielce) — riadky, rozpísané
@@ -431,18 +434,31 @@
   // (core.js) z payloadu skrinky; bez oznacenej skrinky su pomlcky a klikatelne
   // riadky su neaktivne — `aria-disabled`, NIE HTML `disabled` (vzor D-78:
   // tlacidlo ostava fokusovatelne a nesie vysvetlenie).
-  // Suhrn skrinky do kontextoveho riadku: rozmery z payloadu + popis dekoru
-  // tela z katalogu (`sheetLabelOf`). Prazdny material_id znamena „dedi
-  // z projektu" — povedz to nahlas, nepis meno cudzieho dekoru. Text sklada
-  // cista funkcia NXShell.ctxNoteText, tu sa len vyberaju vstupy.
+  // Suhrn skrinky do kontextoveho riadku. Vstupy si drzime ako DATA (rozmery
+  // + ID materialu), NIE ako hotovy text: popis dekoru sa da premenovat v okne
+  // Materialy a ten push (`NX.setMaterials`) kartu skrinky neposiela — cachovany
+  // retazec by ukazoval stary nazov az do dalsieho vyberu (Codex #171 P2).
+  var ctxNoteSrc = null;
+
   function setCtxNote(c){
-    if (typeof nxSetCtxNote !== 'function') return;
     var p = c || {};
-    if (!p.cabinet_id){ nxSetCtxNote(null, ''); return; }
-    var mat = p.material_id
-      ? (typeof sheetLabelOf === 'function' ? sheetLabelOf(p.material_id) : '')
+    ctxNoteSrc = p.cabinet_id
+      ? { w: p.width, h: p.height, d: p.depth, material_id: p.material_id || '' }
+      : null;
+    renderCtxNote();
+  }
+
+  // Preklad ID -> popis dekoru sa robi AZ TU, z aktualneho katalogu. Prazdny
+  // material_id znamena „dedi z projektu" — povedz to nahlas, nepis meno
+  // cudzieho dekoru. Text sklada cista funkcia NXShell.ctxNoteText.
+  function renderCtxNote(){
+    if (typeof nxSetCtxNote !== 'function') return;
+    if (!ctxNoteSrc){ nxSetCtxNote(null, ''); return; }
+    var s = ctxNoteSrc;
+    var mat = s.material_id
+      ? (typeof sheetLabelOf === 'function' ? sheetLabelOf(s.material_id) : '')
       : 'dekor dedí z projektu';
-    nxSetCtxNote({ w: p.width, h: p.height, d: p.depth }, mat);
+    nxSetCtxNote({ w: s.w, h: s.h, d: s.d }, mat);
   }
 
   function setCabInfo(c){
