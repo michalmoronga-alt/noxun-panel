@@ -33,7 +33,8 @@
                     'pv:kamera', 'pv:fit',
                     'pv:vrstva:zony', 'pv:vrstva:cela', 'pv:vrstva:kovanie', 'pv:vrstva:olep',
                     'rad:sirka', 'rad:vyska', 'rad:hlbka', 'rad:sokel',
-                    'info:dielce', 'info:material'];
+                    'info:dielce', 'info:material',
+                    'ctx:korpus'];
 
   // --- klasifikacia (cista logika, testovatelna v Node cez module.exports) ---
 

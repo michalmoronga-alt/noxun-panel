@@ -430,6 +430,18 @@ sektoroch**. Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html
   `<details>` — zbalenie si pamätá `localStorage`, takže **prežije prekreslenie
   aj zatvorenie panela**. Lišta sektora je tmavšia než telo a má miesto na
   **meta súhrn** vpravo (dopĺňa ho UI-B3).
+- **S2 a S3 patria kontextu Korpus** (+ Materiály pri vkladaní). V kontextoch
+  **Zóny · Čelá · Kovanie** sa skrývajú a namiesto nich stojí **tenký kontextový
+  riadok** `#ctxNote` so súhrnom skrinky a preklikom späť („Skrinka 900 × 720 ×
+  560 · K2738 MO — rozmery a materiály **upravíš v Korpuse**"). Dôvod je
+  vertikálny priestor: inak by každý kontext začínal tromi cudzími sektormi a
+  jeho vlastný obsah by ležal pod zlomom. **Jediná autorita pravidla je čistá
+  funkcia `NXShell.sectorVis(mode, ctx)`** — CSS pravidlá nad `#secBasic` /
+  `#secMat` sú jej **zrkadlom** (zhodu stráži `tests/pure/test_uib1_kostra.rb`,
+  maticu `tests/js/test_uib1_kostra.js`). Riadok si viditeľnosť nesie inline
+  (vzor `renderPartCard`), text do neho píše `bridge.js` z payloadu skrinky —
+  **žiadne nové dáta a žiadny `innerHTML`** (kostra je statická, A4). Pri
+  **dielci a doske** sa S2/S3 aj riadok skrývajú (majú vlastnú kartu v S4).
 - **Skupiny v S4 sú EXKLUZÍVNE** v rámci jedného kontextu: otvorenie jednej
   zavrie ostatné (aj ich zatvorenie sa uloží). Sektory samotné sú **nezávislé**.
   Výnimka `data-s4-solo` (Štruktúra zón) do exkluzivity nepatrí.

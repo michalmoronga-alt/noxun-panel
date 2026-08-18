@@ -549,6 +549,30 @@
   /* Vkladanie DOSKY: korpusovy nahlad je bezpredmetny (ako doteraz). */
   .nx-inspector body[data-insert-kind="board"].mode-insert #secPreview { display: none; }
 
+  /* --- VIDITELNOST S2/S3 PODLA KONTEXTU RAILY (kontrakt UI 2.0, Kostra) ---
+     Zakladne a Materialy su vlastnosti SKRINKY a patria kontextu KORPUS
+     (+ Materialy pri vkladani). V Zonach/Celach/Kovani by tri cudzie sektory
+     odtlacili vlastny obsah kontextu pod zlom — namiesto nich stoji tenky
+     #ctxNote s preklikom spat na Korpus. UI-B1 tuto cast mapy [A3] nedotiahla
+     (riesila len rezim vyberu), preto pribuda az teraz; strazi to guard test
+     tests/pure/test_uib1_kostra.rb + JS matica tests/js/test_uib1_kostra.js. */
+  .nx-inspector body.mode-cab:not([data-view-ctx="korpus"]) #secBasic,
+  .nx-inspector body.mode-cab:not([data-view-ctx="korpus"]) #secMat { display: none; }
+
+  /* Kontextovy riadok. Viditelnost riadi JS (NXShell.sectorVis -> inline
+     display, vzor partCard/boardCard); CSS je POISTKA pre rezimy, v ktorych
+     riadok nesmie byt nikdy — dielec a doska maju vlastnu kartu, vkladanie
+     nema o com informovat. */
+  .nx-inspector .ctxnote { background: var(--nx-part-bg); border: 1px solid var(--nx-part-border);
+            border-radius: 6px; padding: 6px 8px; font-size: 11px; color: var(--nx-ink-muted);
+            margin: 0 0 8px; }
+  .nx-inspector .ctxnote b { color: var(--nx-ink-strong); font-weight: 600; }
+  .nx-inspector .ctxlink { padding: 0; border: 0; background: none; font: inherit; cursor: pointer;
+            color: var(--nx-select); text-decoration: underline; }
+  .nx-inspector .ctxlink:hover { color: var(--nx-select-strong); }
+  .nx-inspector body.mode-insert #ctxNote, .nx-inspector body.mode-part #ctxNote,
+  .nx-inspector body.mode-board #ctxNote { display: none; }
+
   /* --- S1: ktory nahlad sa kresli --------------------------------------- */
   .nx-inspector #partSvg, .nx-inspector #boardSvg { display: none; }
   .nx-inspector body.mode-part #partSvg { display: block; }
