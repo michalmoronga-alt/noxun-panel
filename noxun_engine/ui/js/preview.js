@@ -753,8 +753,14 @@
     var S = [];
     function rx(x){ return x; }
     function ry(y){ return Wd - y; } // model (x,y) -> svg (flip Y): dlzka vodorovne
-    S.push('<rect x="0" y="0" width="' + L + '" height="' + Wd + '" fill="' + PV_FRONT_DOOR +
-           '" fill-opacity=".55" stroke="' + PV_FRONT_STROKE + '" stroke-width="2"/>');
+    // Vypln = farba zvoleneho DEKORU z katalogu (vzor mockupu); ked ju katalog
+    // nema, ostava neutralna vyberova. Hrubka ciary sa skaluje so scenou —
+    // pevne 2 mm su na 2600 mm doske neviditelne.
+    var mc = (typeof nxComboColorOf === 'function') ? nxComboColorOf('decor', val('ib_material')) : '';
+    var sw = Math.max(2, Math.round(Math.max(L, Wd) / 300));
+    S.push('<rect x="0" y="0" width="' + L + '" height="' + Wd + '" fill="' + (mc || PV_FRONT_DOOR) +
+           '" fill-opacity="' + (mc ? '.8' : '.55') + '" stroke="' + PV_FRONT_STROKE +
+           '" stroke-width="' + sw + '"/>');
     var arrows = nxGrainArrows(L, Wd, grain);
     if (arrows.length){
       var d = arrows.map(function(a){
