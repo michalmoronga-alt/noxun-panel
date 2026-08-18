@@ -26,6 +26,10 @@ module Noxun
         def handle_insert_board(payload)
           model = Sketchup.active_model
           data = parse(payload)
+          # UI-C1a: metadata sablony (`template_kind`/`template_name`) su MIMO
+          # whitelistu poli, takze sa do buildera nedostanu tak ci tak — vyberu
+          # sa vsak vyslovne, aby bolo jasne, ze ide o identitu na peciatku.
+          tpl_ref = take_template_ref!(data, 'board')
           params = {}
           %w[name length width material_id grain_direction thickness].each do |k|
             v = data[k]
@@ -35,6 +39,7 @@ module Noxun
           select_only(model, inst)
           set_status("Doska #{Store.get(inst, 'id')} vložená.")
           push_selected(model)
+          stamp_template_used(tpl_ref) # UI-C1a: az PO vlozeni, mimo operacie
         end
 
         # Hromadny zapis obycajnych poli karty (name/length/width/quantity/grain).

@@ -453,14 +453,16 @@ end
 
 # ============================ TemplateStore ====================================
 
-NxTest.test('templates: prvy load seedne 4 predvolene sablony') do
+NxTest.test('templates: prvy load seedne 4 korpusove + 3 doskove sablony') do
   NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
   tpl = Noxun::Engine::TemplateStore
   nx_reset_catalog_file(tpl.path)
   list = tpl.load
-  NxTest.assert_equal(4, list.size)
+  NxTest.assert_equal(7, list.size)
   NxTest.assert_equal(['Dolna klasik', 'Drezova', 'Varna doska', 'Horna klasik'],
-                      list.map { |t| t['name'] })
+                      list.select { |t| t['kind'] == 'cabinet' }.map { |t| t['name'] })
+  NxTest.assert_equal(['Diel', 'Pracovná doska', 'Zástena'],
+                      list.select { |t| t['kind'] == 'board' }.map { |t| t['name'] })
   dolna = list[0]['config']
   NxTest.assert_equal('lower', dolna['type'])
   NxTest.assert_equal('two_rails', dolna['top_mode'])
@@ -474,32 +476,33 @@ NxTest.test('templates: prvy load seedne 4 predvolene sablony') do
   NxTest.assert_equal('groove', horna['back_mode'])
   NxTest.assert_close(320.0, horna['depth'])
   parsed = JSON.parse(File.binread(tpl.path))
-  NxTest.assert_equal(1, parsed['std'])
-  NxTest.assert_equal(4, parsed['templates'].size)
+  NxTest.assert_equal(2, parsed['std'], 'cerstva instalacia je rovno na marker 2')
+  NxTest.assert_equal(7, parsed['templates'].size)
 end
 
 NxTest.test('templates: find/upsert/delete round-trip') do
   NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
   tpl = Noxun::Engine::TemplateStore
   nx_reset_catalog_file(tpl.path)
-  NxTest.assert_equal(true, tpl.upsert('Testovacia', { 'type' => 'lower', 'width' => 450.0 }))
-  found = tpl.find('Testovacia')
+  NxTest.assert_equal(true, tpl.upsert('cabinet', 'Testovacia', { 'type' => 'lower', 'width' => 450.0 }))
+  found = tpl.find('cabinet', 'Testovacia')
   NxTest.assert(found, 'upsertnuta sablona sa nenasla')
   NxTest.assert_equal('Testovacia', found['name'])
+  NxTest.assert_equal('cabinet', found['kind'])
   NxTest.assert_equal('lower', found['config']['type'])
   NxTest.assert_close(450.0, found['config']['width'])
-  NxTest.assert_equal(5, tpl.load.size, '4 seed + 1 nova')
-  NxTest.assert_equal(true, tpl.delete('Testovacia'))
-  NxTest.assert_equal(nil, tpl.find('Testovacia'))
-  NxTest.assert_equal(4, tpl.load.size)
+  NxTest.assert_equal(8, tpl.load.size, '7 seed + 1 nova')
+  NxTest.assert_equal(true, tpl.delete('cabinet', 'Testovacia'))
+  NxTest.assert_equal(nil, tpl.find('cabinet', 'Testovacia'))
+  NxTest.assert_equal(7, tpl.load.size)
 end
 
-NxTest.test('templates: upsert prepise existujucu sablonu podla mena') do
+NxTest.test('templates: upsert prepise existujucu sablonu podla dvojice (kind, meno)') do
   NxTest.skip! 'katalogove testy bezia len headless (APPDATA sandbox)' unless NxTest.headless?
   tpl = Noxun::Engine::TemplateStore
   nx_reset_catalog_file(tpl.path)
-  tpl.upsert('Duplikat', { 'width' => 400.0 })
-  tpl.upsert('Duplikat', { 'width' => 500.0 })
+  tpl.upsert('cabinet', 'Duplikat', { 'width' => 400.0 })
+  tpl.upsert('cabinet', 'Duplikat', { 'width' => 500.0 })
   matching = tpl.load.select { |t| t['name'] == 'Duplikat' }
   NxTest.assert_equal(1, matching.size, 'upsert nesmie duplikovat meno')
   NxTest.assert_close(500.0, matching[0]['config']['width'])
@@ -514,9 +517,12 @@ NxTest.test('templates: reload! nacita subor po rucnom zapise mimo store') do
                             { 'std' => 1,
                               'templates' => [{ 'name' => 'Rucna', 'config' => { 'type' => 'upper' } }] }
                           ))
+  # Rucny zapis vratil marker na 1 -> dalsi load spusti migraciu (kind + seed
+  # dosiek). Rucna sablona ostava a dostane kind 'cabinet'.
   list = tpl.reload!
-  NxTest.assert_equal(1, list.size)
+  NxTest.assert_equal(4, list.size, '1 rucna + 3 doskove zo seedu migracie')
   NxTest.assert_equal('Rucna', list[0]['name'])
+  NxTest.assert_equal('cabinet', list[0]['kind'])
   NxTest.assert_equal('upper', list[0]['config']['type'])
-  NxTest.assert_equal(1, tpl.load.size, 'aj dalsi load ma vidiet rucny zapis')
+  NxTest.assert_equal(4, tpl.load.size, 'aj dalsi load ma vidiet rucny zapis')
 end

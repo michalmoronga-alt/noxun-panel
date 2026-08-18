@@ -609,10 +609,10 @@ NxTest.test('D-90 sablony: config s profilom prezije ulozenie aj nacitanie sablo
     'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'fixed', 'height' => 500.0,
                   'wings' => '1', 'profile' => 'ukw7' }]
   )
-  config = ts.find('Dolna klasik')['config'].merge('fronts' => fronts)
-  NxTest.assert(ts.upsert('D90 profil test', config))
+  config = ts.find('cabinet', 'Dolna klasik')['config'].merge('fronts' => fronts)
+  NxTest.assert(ts.upsert('cabinet', 'D90 profil test', config))
   ts.reload!
-  back = ts.find('D90 profil test')
+  back = ts.find('cabinet', 'D90 profil test')
   NxTest.assert_equal('ukw7', back['config']['fronts']['items'][0]['profile'],
                       'profil prezil JSON round-trip sablony')
   plan = cn.build_plan(cb.normalize(back['config']), 'CAB-001')
@@ -620,7 +620,7 @@ NxTest.test('D-90 sablony: config s profilom prezije ulozenie aj nacitanie sablo
   NxTest.assert_close(464.0, door[:prod][:length], 0.01, 'sablona postavi skratene celo')
 ensure
   if NxTest.headless?
-    Noxun::Engine::TemplateStore.delete('D90 profil test')
+    Noxun::Engine::TemplateStore.delete('cabinet', 'D90 profil test')
     Noxun::Engine::TemplateStore.reload!
     NxTest.assert_equal(before, Noxun::Engine::TemplateStore.load.length) if before
   end

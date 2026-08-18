@@ -16,11 +16,11 @@ module NxTest
     skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
 
     E::TemplateStore.reload!            # cisty cache nad testovacim APPDATA
-    list = E::TemplateStore.load        # seed sa dokonci TU (ensure_seeded)
+    list = E::TemplateStore.load        # seed + migracia sa dokoncia TU (ensure_current)
     assert(list.length >= 4, 'seed predvolenych sablon')
     snapshot = File.binread(E::TemplateStore.path) # snapshot AZ PO seede (N11)
 
-    tpl = E::TemplateStore.find('Dolna klasik')
+    tpl = E::TemplateStore.find('cabinet', 'Dolna klasik')
     assert(!tpl.nil?, 'sablona Dolna klasik existuje')
 
     # "Insert zo sablony": payload vznika z config sablony; pouzivatel/normalize
@@ -33,7 +33,7 @@ module NxTest
     assert_close(999.0, cfg[:width], 0.01, 'normalize vidi mutovane params')
 
     # Store aj disk ostavaju netknute: load vracia deep copy, insert NIC nezapisuje.
-    fresh = E::TemplateStore.find('Dolna klasik')
+    fresh = E::TemplateStore.find('cabinet', 'Dolna klasik')
     assert_close(600.0, fresh['config']['width'], 0.01, 'store drzi povodnu sirku 600')
     assert_equal(0, fresh['config']['zone_tree']['shelves'].to_i, 'store drzi povodne zony')
     assert_equal([], fresh['config']['fronts']['items'] || [], 'store drzi povodne cela')
@@ -45,12 +45,12 @@ module NxTest
     skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
 
     E::TemplateStore.reload!
-    before = E::TemplateStore.find('Horna klasik')
-    E::TemplateStore.upsert('N11 docasna', { 'type' => 'lower', 'width' => 450.0 })
-    after = E::TemplateStore.find('Horna klasik')
+    before = E::TemplateStore.find('cabinet', 'Horna klasik')
+    E::TemplateStore.upsert('cabinet', 'N11 docasna', { 'type' => 'lower', 'width' => 450.0 })
+    after = E::TemplateStore.find('cabinet', 'Horna klasik')
     assert_equal(before, after, 'cudzi upsert nezmenil existujucu sablonu')
-    E::TemplateStore.delete('N11 docasna')
-    assert(E::TemplateStore.find('N11 docasna').nil?, 'docasna sablona uprataná')
+    E::TemplateStore.delete('cabinet', 'N11 docasna')
+    assert(E::TemplateStore.find('cabinet', 'N11 docasna').nil?, 'docasna sablona uprataná')
   end
 
   test('kopia B3: config_to_params nesie materialy, overridy, cela, zony aj nazov') do

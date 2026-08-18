@@ -291,14 +291,14 @@ NxTest.test('mat-fields: model_decor_usage cita part/board snapshoty, BEZ sablon
     st.write(cab, { kind: 'cabinet', cabinet_id: 'CAB-001', config: { 'material_id' => 'MDU_18' } })
     model = NxTest::FakeModel.new([NxTest::FakeDefinition.new([p1, p2, board, cudzi, cab])])
     # sablona s tym istym materialom NESMIE zvysit pocet (nie je "pouzitie v projekte")
-    Noxun::Engine::TemplateStore.upsert('mdu-test-tpl', 'material_id' => 'MDU_18')
+    Noxun::Engine::TemplateStore.upsert('cabinet', 'mdu-test-tpl', 'material_id' => 'MDU_18')
     usage = FMAT.model_decor_usage(model)
     NxTest.assert_equal(5, usage['MDU Dekor'], '2 dielce + doska s quantity 3 (korpus/cudzi material sa neratahju)')
     NxTest.assert_equal(0, usage['MIMO_KATALOGU'], 'material mimo katalogu nema dekor (default 0)')
     NxTest.refute(usage.keys.include?('MIMO_KATALOGU'), 'a nevytvara kluc v mape')
     NxTest.assert_equal({}, FMAT.model_decor_usage(nil), 'bez modelu prazdna mapa')
   ensure
-    Noxun::Engine::TemplateStore.delete('mdu-test-tpl')
+    Noxun::Engine::TemplateStore.delete('cabinet', 'mdu-test-tpl')
     FMAT.delete_sheet('MDU_18')
   end
 end

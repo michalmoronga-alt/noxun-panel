@@ -108,7 +108,7 @@ NxTest.test('mat-crud: used_material_ids vidi defaulty, korpusy, overrides, diel
   st.write(board, { kind: 'board', id: 'BRD-001', config: { 'material_id' => 'MAT_BOARD', 'edges' => { 'W1' => 'ABS_Y_20' } } })
   model = MatCrudFakeModel.new([NxTest::FakeDefinition.new([cab, part, board])],
                                'default_material_id' => 'MAT_DEFAULT')
-  Noxun::Engine::TemplateStore.upsert('mat-crud-test-tpl', 'material_id' => 'MAT_TPL')
+  Noxun::Engine::TemplateStore.upsert('cabinet', 'mat-crud-test-tpl', 'material_id' => 'MAT_TPL')
 
   used = MAT.used_material_ids(model)
   NxTest.assert(used['MAT_A'].any? { |w| w == 'CAB-001' }, 'korpusovy material')
@@ -124,7 +124,7 @@ NxTest.test('mat-crud: used_material_ids vidi defaulty, korpusy, overrides, diel
   NxTest.assert(abs['ABS_Y_20'].any? { |w| w == 'BRD-001' }, 'ABS na doske')
   NxTest.assert_equal([], abs['ABS_VOLNA'])
 
-  Noxun::Engine::TemplateStore.delete('mat-crud-test-tpl')
+  Noxun::Engine::TemplateStore.delete('cabinet', 'mat-crud-test-tpl')
 end
 
 NxTest.test('mat-crud: upsert_sheet round-trip vsetkych poli + cache refresh') do

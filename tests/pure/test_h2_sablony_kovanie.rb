@@ -165,15 +165,15 @@ NxTest.test('H2 sablona: kovanie prezije ulozenie a nacitanie z kniznice sablon'
                                         model: m)
   store = Noxun::Engine::TemplateStore
   store.reload!
-  store.upsert('H2 docasna', tc)
+  store.upsert('cabinet', 'H2 docasna', tc)
   store.reload!
-  back = store.find('H2 docasna')['config']
+  back = store.find('cabinet', 'H2 docasna')['config']
   NxTest.assert_equal({ 'hinge' => 'zaves-klasik' }, back['hardware_sets'], 'mapovanie prezilo JSON')
   NxTest.assert_equal('SNAP', back['hardware_set_defs']['zaves-klasik']['members'][0]['code'],
                       'zmrazena definicia prezila JSON (sablona funguje aj na inom PC)')
 ensure
   begin
-    Noxun::Engine::TemplateStore.delete('H2 docasna')
+    Noxun::Engine::TemplateStore.delete('cabinet', 'H2 docasna')
   rescue StandardError
     nil
   end

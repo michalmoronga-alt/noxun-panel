@@ -48,7 +48,9 @@ module Noxun
           config = template_config_from(cab_cfg, model: model)
           hw_note = template_save_hardware_note(cab_cfg, config, model) # GH #133 P2
           type_note = apply_template_type!(config, data['type'])        # UI-B3 modal: Nazov + Typ
-          unless TemplateStore.upsert(name, config)
+          # UI-C1a: z panela sa uklada VZDY korpusova sablona (doskove vznikaju
+          # inou cestou) — identita v sklade je dvojica (kind, name).
+          unless TemplateStore.upsert('cabinet', name, config)
             return set_status('Šablónu sa nepodarilo zapísať (disk/práva) — skús znova.', true)
           end
 
@@ -73,6 +75,39 @@ module Noxun
           return '' if want == have
 
           " Uložená ako #{want == 'upper' ? 'HORNÁ' : 'DOLNÁ'} (rozmery a konštrukcia ostali z tejto skrinky)."
+        end
+
+        # --- UI-C1a: identita pouzitej sablony vo vkladacom payloade ---------
+
+        # Vyberie z payloadu metadata sablony (`template_kind` + `template_name`)
+        # a ODSTRANI ich — builder o nich nesmie vediet (do configu korpusu ani
+        # dosky nepatria). Vrati [kind, name] na opeciatkovanie, alebo nil, ked
+        # payload sablonu nenesie ci nesedi druh (doskova sablona vo vklade
+        # korpusu = ziadna peciatka, vklad bezi normalne).
+        def take_template_ref!(params, expected_kind)
+          kind = params.delete('template_kind').to_s
+          name = params.delete('template_name').to_s
+          return nil if name.empty? || kind != expected_kind
+
+          [kind, name]
+        end
+
+        # Peciatka „naposledy pouzite" — SAMOSTATNA operacia PO uspesnom
+        # vlozeni a MIMO model.start_operation. Zaznam sa najprv znovu najde
+        # (medzitym ho mohol niekto vymazat alebo prepisat inym druhom) —
+        # zmiznuta sablona = vklad je hotovy a peciatka sa ticho vynecha.
+        # Zlyhanie zapisu NIKDY nemeni vysledok vkladania: len log, ziadna
+        # chybova hlaska pouzivatelovi.
+        def stamp_template_used(ref)
+          return if ref.nil?
+
+          kind, name = ref
+          return if TemplateStore.find(kind, name).nil?
+          return unless TemplateStore.touch_used(kind, name)
+
+          push_templates # poradie „Naposledy pouzite" v paneli je hned cerstve
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.stamp_template_used')
         end
 
       end

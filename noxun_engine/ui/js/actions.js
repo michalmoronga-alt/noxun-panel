@@ -193,6 +193,13 @@
     // projektu v operacii vlozenia. Bez sablony su kluce prazdne = neposlu sa.
     var hw = NXInsert.hardwarePayload();
     NXInsert.HARDWARE_KEYS.forEach(function(k){ if (hw[k]) p[k] = hw[k]; });
+    // UI-C1a: identita pouzitej sablony (kind + nazov) — server si zaznam znovu
+    // najde, metadata odstrani PRED builderom a az po uspesnom vlozeni z nich
+    // spravi peciatku „naposledy pouzite". Do configu skrinky sa nedostanu.
+    if (NXInsert.state.template){
+      p.template_kind = 'cabinet';
+      p.template_name = NXInsert.state.template;
+    }
     if (window.sketchup && sketchup.insert_cabinet) sketchup.insert_cabinet(JSON.stringify(p));
   }
   // B3 „Vlozit kopiu": PRESNA SERVEROVA kopia oznacenej skrinky — config sa cita

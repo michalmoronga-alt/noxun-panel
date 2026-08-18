@@ -628,7 +628,9 @@ module Noxun
         # existujuceho suboru sablon nie je co prehladavat.
         return [] unless File.exist?(TemplateStore.path)
         hits = []
-        TemplateStore.load.each do |t|
+        # UI-C1a: `migrate: false` — dry_run nesmie zapisat NIC ani nepriamo
+        # (lazy migracia sablon std 1->2 by inak z tohto scanu vystrelila).
+        TemplateStore.load(migrate: false).each do |t|
           ov = (t['config'] || {})['part_overrides']
           next unless ov.is_a?(Hash)
           used = ov.each_value.any? do |rec|
