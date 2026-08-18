@@ -12,7 +12,7 @@
      Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
      bezpecne zdielatelny so satelitnymi oknami. -->
 <script>document.documentElement.className = 'nx-inspector';</script>
-<link rel="stylesheet" href="css/panel.css?v=0.7.7">
+<link rel="stylesheet" href="css/panel.css?v=0.7.8">
 
 <!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
      Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
@@ -222,6 +222,16 @@
     </div>
   </div>
 </details>
+
+<!-- ===== KONTEXTOVY RIADOK (kontrakt UI 2.0, sekcia Kostra) ================
+     S2 Zakladne a S3 Materialy su vlastnosti SKRINKY a patria kontextu KORPUS
+     (+ Materialy pri vkladani). V kontextoch Zony/Cela/Kovanie sa skryvaju a
+     namiesto nich stoji TENKY riadok so suhrnom a preklikom spat na Korpus —
+     inak by kazdy kontext zacinal tromi cudzimi sektormi a vlastny obsah by
+     bol az pod nimi (vertikalny priestor panela je vzacny).
+     Kostra je STATICKA (A4): JS pise LEN text suhrnu a display (vzor
+     partCard/boardCard), NIKDY innerHTML. -->
+<div class="ctxnote" id="ctxNote" style="display:none">Skrinka <b id="ctxNoteSum">—</b> — rozmery a materiály <button type="button" class="ctxlink" id="ctxNoteLink" data-nx-usage="ctx:korpus" onclick="setViewContext('korpus')">upravíš v Korpuse</button></div>
 
 <!-- ===== S4 · NASTAVENIA ===================================================
      Obsah sektora urcuje KONTEXT raily (data-view-ctx na <body>): skupiny su
@@ -551,34 +561,34 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.7.7"></script>
+<script src="js/errors.js?v=0.7.8"></script>
 <!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
      jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
      pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
-<script src="js/win_fit.js?v=0.7.7"></script>
-<script src="js/icons.js?v=0.7.7"></script>
+<script src="js/win_fit.js?v=0.7.8"></script>
+<script src="js/icons.js?v=0.7.8"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.7.7"></script>
-<script src="js/core.js?v=0.7.7"></script>
-<script src="js/expr.js?v=0.7.7"></script>
-<script src="js/insert_state.js?v=0.7.7"></script>
-<script src="js/form.js?v=0.7.7"></script>
-<script src="js/zone_tree.js?v=0.7.7"></script>
-<script src="js/preview.js?v=0.7.7"></script>
+<script src="js/nx_combo.js?v=0.7.8"></script>
+<script src="js/core.js?v=0.7.8"></script>
+<script src="js/expr.js?v=0.7.8"></script>
+<script src="js/insert_state.js?v=0.7.8"></script>
+<script src="js/form.js?v=0.7.8"></script>
+<script src="js/zone_tree.js?v=0.7.8"></script>
+<script src="js/preview.js?v=0.7.8"></script>
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
-<script src="js/shell.js?v=0.7.7"></script>
-<script src="js/actions.js?v=0.7.7"></script>
+<script src="js/shell.js?v=0.7.8"></script>
+<script src="js/actions.js?v=0.7.8"></script>
 <!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
      bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
-<script src="js/settings.js?v=0.7.7"></script>
-<script src="js/bridge.js?v=0.7.7"></script>
-<script src="js/materials.js?v=0.7.7"></script>
-<script src="js/part_card.js?v=0.7.7"></script>
-<script src="js/board_card.js?v=0.7.7"></script>
-<script src="js/hardware.js?v=0.7.7"></script>
-<script src="js/usage.js?v=0.7.7"></script>
-<script src="js/boot.js?v=0.7.7"></script>
+<script src="js/settings.js?v=0.7.8"></script>
+<script src="js/bridge.js?v=0.7.8"></script>
+<script src="js/materials.js?v=0.7.8"></script>
+<script src="js/part_card.js?v=0.7.8"></script>
+<script src="js/board_card.js?v=0.7.8"></script>
+<script src="js/hardware.js?v=0.7.8"></script>
+<script src="js/usage.js?v=0.7.8"></script>
+<script src="js/boot.js?v=0.7.8"></script>

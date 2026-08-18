@@ -174,6 +174,32 @@ NxTest.test('UI-B1: pravidla kostry visia pod korenovou triedou .nx-inspector') 
   end
 end
 
+NxTest.test('UI-B1: S2/S3 patria kontextu Korpus, inde je kontextovy riadok') do
+  # Kontrakt UI 2.0 (sekcia Kostra): Zakladne a Materialy su vlastnosti SKRINKY
+  # a ziju v kontexte Korpus (+ Materialy pri vkladani); Zony/Cela/Kovanie
+  # dostanu namiesto nich tenky riadok s preklikom. UI-B1 dala do CSS mapu len
+  # pre REZIM VYBERU a tuto cast ticho vynechala — guard to uz nedovoli.
+  NxTest.assert(UIB1_CSS.include?('body.mode-cab:not([data-view-ctx="korpus"]) #secBasic'),
+                'CSS musi mimo Korpusu skryvat sektor Zakladne')
+  NxTest.assert(UIB1_CSS.include?('body.mode-cab:not([data-view-ctx="korpus"]) #secMat'),
+                'CSS musi mimo Korpusu skryvat sektor Materialy')
+  # Rezimove skryvanie (dielec/doska maju vlastnu kartu) ostava v platnosti.
+  NxTest.assert(UIB1_CSS.include?('body.mode-part #secBasic'), 'dielec: S2 sa stale skryva')
+  NxTest.assert(UIB1_CSS.include?('body.mode-board #secMat'), 'doska: S3 sa stale skryva')
+  # Riadok je STATICKY prvok kostry s preklikom cez rovnaky guard ako rail.
+  NxTest.assert(UIB1_HTML.include?('id="ctxNote"'), 'kontextovy riadok chyba v kostre')
+  NxTest.assert(UIB1_HTML.include?('id="ctxNoteSum"'), 'riadok musi mat miesto na suhrn skrinky')
+  link = UIB1_HTML_CODE[/<[a-z]+ [^>]*id="ctxNoteLink"[^>]*>/].to_s
+  NxTest.assert(link.start_with?('<button'), 'preklik na Korpus musi byt <button> (klavesnica)')
+  NxTest.assert(link.include?("setViewContext('korpus')"),
+                'preklik ide cez guard setViewContext, nie priamou zmenou DOM')
+  # Pravidlo zije v JS ako CISTA funkcia — CSS je jej zrkadlo, nie druhy zdroj.
+  NxTest.assert(UIB1_SHELL_CODE.include?('function sectorVis('),
+                'shell.js musi mat viditelnost sektorov ako cistu funkciu')
+  NxTest.assert(UIB1_SHELL_CODE.include?('sectorVis: sectorVis'),
+                'sectorVis sa exportuje (inak ju Node matica neotestuje)')
+end
+
 NxTest.test('UI-B1: sektor S4 prepina skupiny cez data-view-ctx (nie cez re-render)') do
   NxTest.assert(UIB1_CSS.include?('body.mode-cab[data-view-ctx="korpus"] [data-s4="korpus"]'),
                 'CSS musi kontextom vraciat skupiny S4')

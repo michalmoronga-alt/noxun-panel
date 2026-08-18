@@ -5,15 +5,15 @@
 
 ## Stav
 
-**v0.7.7 · 18.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
+**v0.7.8 · 18.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
 
 **Beží blok UI 2.0.** Koncept Inspectora je uzavretý (Michal 18.8.) — záväzný kontrakt a mockupy sú v repe: [zdroje/ui20/](zdroje/ui20/) ([UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) + mockupy Inspector C, štúdio, dizajnový lístok); práca je narezaná do dávok UI-A → UI-B → UI-C → UI-D a fázy ŠTÚDIO ([PLAN.md](PLAN.md)).
 
-Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-B3** — sektor Základné má vľavo rozmery s ikonami a rozmerovými radmi, vpravo informačný stĺpec (vnútorné rozmery, počet dielcov, m² materiálu — klikateľné), skupiny Nastavení dostali ikony, šablóna sa ukladá cez mini-modal s Názvom a Typom a **koliesko v raile ožilo** (téma NOXUN/Lucia · editor radov · O plugine). Testy: **1259 headless · 36 JS sád**; in-SketchUp sada má sekciu `run_uib2` (kamera) a **nový scenár výberu dielcov (UI-B3)**, ktoré **ešte nebežali** — posledný plný beh je z UI-B1 (345 PASS / 0 FAIL).
+Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-B3** — sektor Základné má vľavo rozmery s ikonami a rozmerovými radmi, vpravo informačný stĺpec (vnútorné rozmery, počet dielcov, m² materiálu — klikateľné), skupiny Nastavení dostali ikony, šablóna sa ukladá cez mini-modal s Názvom a Typom a **koliesko v raile ožilo** (téma NOXUN/Lucia · editor radov · O plugine). Testy: **1260 headless · 36 JS sád**; in-SketchUp sada má sekciu `run_uib2` (kamera) a **nový scenár výberu dielcov (UI-B3)**, ktoré **ešte nebežali** — posledný plný beh je z UI-B1 (345 PASS / 0 FAIL).
 
 ## Robí sa
 
-**BLOK UI-A JE KOMPLET** (UI-01 paleta a téma · UI-02 logo a toolbar · UI-03 combobox) a **BLOK UI-B JE KOMPLET** (UI-B1 kostra · UI-B2 náhľad · UI-B3 obsah Korpusu + koliesko). Inspector má odteraz celú kostru, kontextové projekcie aj hotový kontext Korpus.
+**BLOK UI-A JE KOMPLET** (UI-01 paleta a téma · UI-02 logo a toolbar · UI-03 combobox) a **BLOK UI-B JE KOMPLET** (UI-B1 kostra · UI-B2 náhľad · UI-B3 obsah Korpusu + koliesko). Inspector má odteraz celú kostru, kontextové projekcie aj hotový kontext Korpus. **Bugfix z Michalovho testu (v0.7.8):** Základné a Materiály sa ukazovali vo všetkých kontextoch — patria Korpusu, ostatné kontexty majú namiesto nich tenký riadok s preklikom (nedotiahnutá mapa viditeľnosti z UI-B1).
 
 ## Ďalší krok
 

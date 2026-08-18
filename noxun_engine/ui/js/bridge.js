@@ -347,6 +347,10 @@
       setCabinetMaterials(c); // V0.3 korpusove material selecty (prazdne = dedi)
       renderFilteredTemplates();
       setIdbar(c);
+      // Kontextovy riadok (nahrada S2/S3 v Zonach/Celach/Kovani) — PRED
+      // setUiMode, aby nxShellApply uz pisal cerstvy suhrn. Ziadne nove data:
+      // rozmery su z payloadu, popis materialu z katalogu, ktory panel uz ma.
+      setCtxNote(c);
       // part_card je vnoreny payload — identitu dokumentu nesie obalka.
       if (c.part_card) c.part_card.model_guid = c.model_guid;
       setUiMode(c.part_card ? 'part' : 'cab', c.part_card ? c.part_card : c);
@@ -378,6 +382,7 @@
       invalidateFrontPlaceholders(); // D-23: bez resolved dat ziadne ≈ odhady
       buildFrontHwBadges([]);
       setCabInfo(null); // UI-B3: kontext dosky — korpusove dopocty neplatia
+      setCtxNote(null); // ani suhrn skrinky (doska ma vlastnu kartu)
       renderPartCard(null);
       renderHardware(null, []);
       clearCabinetMaterials();
@@ -398,6 +403,7 @@
       activeZoneId = null; frontItems = null; hwItems = null;
       buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
       setCabInfo(null);       // UI-B3: bez skrinky niet dielcov ani plochy
+      setCtxNote(null);       // ani suhrn skrinky do kontextoveho riadku
       setIdbar(null);
       setUiMode('insert', null);
       // D-78 / UI-B1: vo vkladani su kontexty neaktivne a platí Korpus
@@ -425,6 +431,20 @@
   // (core.js) z payloadu skrinky; bez oznacenej skrinky su pomlcky a klikatelne
   // riadky su neaktivne — `aria-disabled`, NIE HTML `disabled` (vzor D-78:
   // tlacidlo ostava fokusovatelne a nesie vysvetlenie).
+  // Suhrn skrinky do kontextoveho riadku: rozmery z payloadu + popis dekoru
+  // tela z katalogu (`sheetLabelOf`). Prazdny material_id znamena „dedi
+  // z projektu" — povedz to nahlas, nepis meno cudzieho dekoru. Text sklada
+  // cista funkcia NXShell.ctxNoteText, tu sa len vyberaju vstupy.
+  function setCtxNote(c){
+    if (typeof nxSetCtxNote !== 'function') return;
+    var p = c || {};
+    if (!p.cabinet_id){ nxSetCtxNote(null, ''); return; }
+    var mat = p.material_id
+      ? (typeof sheetLabelOf === 'function' ? sheetLabelOf(p.material_id) : '')
+      : 'dekor dedí z projektu';
+    nxSetCtxNote({ w: p.width, h: p.height, d: p.depth }, mat);
+  }
+
   function setCabInfo(c){
     var info = nxCabInfo(c);
     setOut('inf_parts', info.parts);

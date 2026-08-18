@@ -86,6 +86,40 @@
 
     function setLabel(t){ state.label = String(t == null ? '' : t); }
 
+    // --- viditelnost sektorov S2/S3 + kontextovy riadok (kontrakt UI 2.0) -----
+    // JEDINA autorita pravidla. Zakladne a Materialy su vlastnosti SKRINKY:
+    //   * dielec / doska  — nezobrazuju sa vobec (maju vlastnu kartu v S4),
+    //   * vkladanie       — zobrazuju sa (vkladacia karta + material dosky),
+    //   * oznaceny korpus — LEN v kontexte Korpus; v Zonach/Celach/Kovani ich
+    //     nahradi tenky kontextovy riadok s preklikom spat na Korpus.
+    // CSS (pravidla nad #secBasic/#secMat) je ZRKADLOM tejto funkcie — zhodu
+    // strazi tests/pure/test_uib1_kostra.rb, maticu tests/js/test_uib1_kostra.js.
+    function sectorVis(mode, ctx){
+      var m = (mode === undefined ? state.mode : mode);
+      if (m === 'part' || m === 'board') return { basic: false, mat: false, note: false };
+      var cab = (m === 'cab');
+      // Mimo oznaceneho korpusu je zobrazeny kontext vzdy Korpus (effectiveCtx).
+      var korpus = !cab || normCtx(ctx === undefined ? state.ctx : ctx) === 'korpus';
+      return { basic: korpus, mat: korpus, note: cab && !korpus };
+    }
+
+    // Suhrn skrinky do kontextoveho riadku: „900 × 720 × 560 · K2738 MO".
+    // Cista funkcia — cisla aj popis materialu prichadzaju z payloadu, panel
+    // nic nedopocitava. Chybajuci udaj sa VYNECHA (radsej kratsi riadok nez
+    // vymyslene cislo); ked nie je nic, ostane pomlcka (vzor nxCabInfo).
+    function ctxNoteText(dims, material){
+      var d = dims || {};
+      var out = [];
+      var mm = ['w', 'h', 'd'].map(function(k){
+        var n = parseFloat(d[k]);
+        return (isNaN(n) || n <= 0) ? null : String(Math.round(n));
+      });
+      if (mm[0] && mm[1] && mm[2]) out.push(mm.join(' × '));
+      var m = String(material == null ? '' : material).trim();
+      if (m) out.push(m);
+      return out.length ? out.join(' · ') : '—';
+    }
+
     // --- zbalenia sektorov a skupin (audit A5) -------------------------------
     // Kluc pamate: sektory (S1–S4) su NEZAVISLE (`nxsec_s1`), skupiny sektora S4
     // su KVALIFIKOVANE KONTEXTOM (`nxsec_s4.korpus.top`) — dva kontexty tak
@@ -126,6 +160,8 @@
       identityId: identityId,
       identityGuid: identityGuid,
       setLabel: setLabel,
+      sectorVis: sectorVis,
+      ctxNoteText: ctxNoteText,
       mode: function(){ return state.mode; },
       label: function(){ return state.label; }
     };
@@ -205,6 +241,29 @@
     }
     var s4 = el('s4Name');
     if (s4) s4.textContent = nxS4Title(mode, ctx);
+    nxCtxNoteApply();
+  }
+
+  // ===== DOM: kontextovy riadok (nahrada S2/S3 mimo Korpusu) =================
+  // Suhrn skrinky si panel drzi TU — kontext sa prepina bez serveroveho pushu,
+  // takze text musi prezit prepnutie. Plni ho bridge pri kazdom pushi skrinky
+  // (nxSetCtxNote), viditelnost rozhoduje NXShell.sectorVis.
+  var nxCtxNoteSum = '—';
+
+  function nxSetCtxNote(dims, material){
+    nxCtxNoteSum = NXShell.ctxNoteText(dims, material);
+    nxCtxNoteApply();
+  }
+
+  // Viditelnost riadku riadi JS (inline display — vzor renderPartCard /
+  // renderBoardCard); CSS je len poistka pre rezimy, kde riadok nesmie byt.
+  function nxCtxNoteApply(){
+    var n = el('ctxNote');
+    if (!n) return;
+    var vis = NXShell.sectorVis();
+    var sum = el('ctxNoteSum');
+    if (sum) sum.textContent = nxCtxNoteSum;
+    n.style.display = vis.note ? '' : 'none';
   }
 
   // Klik na kontext v raile (inline onclick). Prepnutie meni nahlad aj
