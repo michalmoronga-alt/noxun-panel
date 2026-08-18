@@ -701,14 +701,16 @@ Samostatný výrobný dielec **bez korpusu** (krycia doska, blenda, výplň, aty
     "thickness": 18.0,
     "material_id": "K009_PW_DTDL_18",
     "grain_direction": "length",
-    "edges": { "L1": "ABS_K009_10", "L2": null, "W1": null, "W2": null }
+    "edges": { "L1": "ABS_K009_10", "L2": null, "W1": null, "W2": null },
+    "orientation": "leziaca"
   }
 }
 ```
 
 Záväzné princípy dosky:
 
-- **Config dosky = superset configu dielca korpusu** — rovnaké výrobné polia (`quantity`/`length`/`width`/`thickness`/`material_id`/`grain_direction`/`edges`), navyše `engine_version`/`name`/`role` pre round-trip editácie. Výstupy čítajú názov a rolu z **plochých** kľúčov (2.1), nie z configu.
+- **Config dosky = superset configu dielca korpusu** — rovnaké výrobné polia (`quantity`/`length`/`width`/`thickness`/`material_id`/`grain_direction`/`edges`), navyše `engine_version`/`name`/`role` pre round-trip editácie a `orientation` pre umiestnenie (nižšie). Výstupy čítajú názov a rolu z **plochých** kľúčov (2.1), nie z configu.
+- **`orientation` je údaj UMIESTNENIA, nie výrobný údaj** (V0.7, UI-C1c). Enum: `"leziaca"` (default) · `"stojaca"` · `"na_stenu"`. **Chýbajúci alebo prázdny kľúč = `"leziaca"`** (dosky vložené pred V0.7 sú platné a nemenia sa); **explicitná neznáma hodnota je CHYBA** — builder ju odmietne rovnako ako neznámu rolu, žiadna tichá preklasifikácia (config z novšej verzie nesmie stratiť význam v staršom plugine). Realizuje sa **výhradne transformáciou inštancie** — geometria v definícii ostáva ležiaca (dĺžka X, šírka Y, hrúbka Z), takže **výrobné rozmery, `edges`, `grain_direction`, osi deskriptora ani agregácia kusovníka a VEPO sa orientáciou NEMENIA** (je to ten istý invariant ako 3.3 „rotácia nemení výrobné dáta"); do agregačného kľúča kusovníka pole **nepatrí**. Zmena orientácie je **delta** nad súčasnou transformáciou (`T × O_old⁻¹ × O_new`), takže ručné otočenie používateľa prežije a pole eviduje **len pluginom aplikovanú** orientáciu. `"na_stenu"` má dnes zhodnú maticu ako `"stojaca"` — je to údaj umiestnenia so sémantikou (zadná plocha pri stene; budúce prisatie/elevácia), rozlišuje sa **poľom, nikdy bounding boxom**.
 - **Autoritatívny výrobný záznam pre výstupy (V0.5) je snapshot na entite** — pri dielcoch korpusu ho builder zapisuje z plánu po `resolve_part` (finálny materiál/ABS), pri doskách ho zapisuje `BoardBuilder` priamo. `BuildPlan` je **plán stavby korpusu** (medzikrok) — dosky v ňom nie sú; per-dielec kontrakt (`BuildPlan.validate_part!`) je však spoločný validátor oboch.
 - **Kusovník V0.5 zbiera entity `manufactured: true` jednotne** (`kind: part` aj `kind: board`) a agreguje **výhradne podľa výrobných polí** (`material_id` + rozmery + `edges` + `grain_direction`); `quantity` sa sčítava. `id`, `part_key`, `name` ani `engine_version` do agregačného kľúča nepatria.
 - **Materiál dosky je snapshot** — vždy konkrétny **katalógový** záznam (predvyplnený z projektového defaultu pri vložení, žiadne živé dedenie) a **hrúbka sa riadi materiálom** (nie je voľný rozmer). Legacy výnimka „neznámy materiál smie prejsť" platí len pre staré korpusy, na dosky sa neprenáša.

@@ -5,21 +5,23 @@
 
 ## Stav
 
-**v0.7.9 · 18.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
+**v0.7.12 · 18.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
 
 **Beží blok UI 2.0.** Koncept Inspectora je uzavretý (Michal 18.8.) — záväzný kontrakt a mockupy sú v repe: [zdroje/ui20/](zdroje/ui20/) ([UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) + mockupy Inspector C, štúdio, dizajnový lístok); práca je narezaná do dávok UI-A → UI-B → UI-C → UI-D a fázy ŠTÚDIO ([PLAN.md](PLAN.md)).
 
-Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-B dotiahnutie po audite** — panel prešiel kontrolou proti kontraktu UI 2.0 a dorovnal tri veci, ktoré sa počas bloku UI-B stratili: **logo je konečne naša značka** (zrolovaná z originálnych kriviek, tá istá kresba ako ikona toolbaru; v hlavičke 24 px, aj v koliesku „O plugine"), **lišty sektorov nesú meta súhrny** (projekcia · rozmery so soklom · materiály · otvorená skupina — naživo pri písaní) a **kanál témy je jediný** (mŕtve `ui_theme` z pushu nastavení je preč). Testy: **1265 headless · 37 JS sád**; in-SketchUp sada má sekciu `run_uib2` (kamera) a **nový scenár výberu dielcov (UI-B3)**, ktoré **ešte nebežali** — posledný plný beh je z UI-B1 (345 PASS / 0 FAIL).
+Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-C1 · Vkladanie je KOMPLET** — vkladacia karta má typové tlačidlá (Dolná · Horná · Doska), dlaždice šablón s „naposledy použitými" a dvojklikom, doskové šablóny a **umiestnenie dosky** (naležato · nastojato · na stenu) pri vkladaní aj na karte už vloženej dosky. Testy: **1327 headless · 39 JS sád**; posledný **plný in-SketchUp beh 409 PASS / 0 FAIL** — po prvý raz v ňom bežali aj sekcie `run_uib2` (kamera) a `run_uib3` (výber dielcov) a nová sekcia `run_uic1c` (orientácia dosky).
 
 ## Robí sa
 
-**BLOK UI-A JE KOMPLET** (UI-01 paleta a téma · UI-02 logo a toolbar · UI-03 combobox) a **BLOK UI-B JE KOMPLET** (UI-B1 kostra · UI-B2 náhľad · UI-B3 obsah Korpusu + koliesko) **vrátane dvoch dotiahnutí po teste a audite** (v0.7.8 · v0.7.9). Inspector má odteraz celú kostru, kontextové projekcie, hotový kontext Korpus, správnu značku a hovoriace lišty sektorov.
+**BLOK UI-A JE KOMPLET** (UI-01 paleta a téma · UI-02 logo a toolbar · UI-03 combobox), **BLOK UI-B JE KOMPLET** (UI-B1 kostra · UI-B2 náhľad · UI-B3 obsah Korpusu + koliesko, vrátane dvoch dotiahnutí po teste a audite) a **UI-C1 · Vkladanie JE KOMPLET** v troch PR: **C1a dátová vrstva šablón** (#174) · **C1b vkladacia karta** (#175) · **C1c orientácia dosky** (tento PR). Inspector má celú kostru, kontextové projekcie, hotový kontext Korpus a hotové vkladanie.
 
 ## Ďalší krok
 
-**UI-C1 · Vkladanie** — typové tlačidlá (Dolná/Horná/Doska), šablóny (nedávne prvé N16, dvojklik vloží N17, reálne náhľady), zámky D-39 a doskové šablóny. **codex-audit je HOTOVÝ** a dávka je podľa neho **narezaná na tri menšie: C1a · C1b · C1c** — jedna obria dávka meniaca dátový útvar šablón dosiek by porušila pravidlo malých PR.
+**UI-C2 · Zóny** — obsah kontextu Zóny (strom, delenie, police). ⚠ **codex-audit je pred implementáciou povinný** (dávka siaha na dátový útvar zón) a **in-SketchUp testy sú povinné** (mení sa geometria a undo).
 
 ## Posledné uzávery
+
+- **BLOK UI-C1 UZAVRETÝ — Vkladanie** (**C1a** šablóna má druh `cabinet`/`board`, identita je dvojica druh+názov, seed troch doskových šablón, poradie „naposledy použité" vo vlastnom súbore · **C1b** typové tlačidlá, dlaždice šablón s náhľadmi a dvojklikom, doskové zámky, náhľad vkladania · **C1c** umiestnenie dosky naležato/nastojato/na stenu ako otočenie vloženej dosky, výrobné dáta sa ním nemenia) — PR **#174 · #175 · tento**, v0.7.10 → **v0.7.12** (18.8.)
 
 - **UI-B dotiahnutie po audite** (logo = zrolovaná značka z originálnych kriviek v hlavičke aj v „O plugine", 24 px; meta súhrny v lištách všetkých štyroch sektorov — naživo; mŕtve `ui_theme` z pushu nastavení preč, téma má jediný kanál) — PR **#173**, v0.7.9 (18.8.)
 - **FIX Základné a Materiály patria Korpusu** (v ostatných kontextoch ich nahradí tenký riadok s preklikom — nedotiahnutá mapa viditeľnosti z UI-B1) — PR **#171**, v0.7.8 (18.8.)

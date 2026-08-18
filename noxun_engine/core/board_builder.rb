@@ -16,6 +16,15 @@
 # jednotne (kind part aj board) a agreguje VYHRADNE podla vyrobnych poli
 # (material_id + rozmery + edges + grain), quantity scituje.
 #
+# ORIENTACIA DOSKY (UI-C1c) — `config['orientation']`:
+#   'leziaca' (default) · 'stojaca' · 'na_stenu'
+# Je to VYHRADNE TRANSFORMACIA INSTANCIE. Vnutro definicie ostava LEZIACE
+# (dlzka X, sirka Y, hrubka Z — viz draw_board), takze osi deskriptora
+# (PartFaces::AXES_LYING), mapa hran D-88, ABS farbenie, kusovnik aj VEPO su
+# ORIENTACIOU NEDOTKNUTE. Orientacia NIKDY nesmie vstupit do descriptor.prod,
+# descriptor.axes, agregacneho kluca kusovnika ani AbsRules.edge_sides —
+# je to udaj UMIESTNENIA v modeli, nie vyrobny udaj (standard 3.3).
+#
 # Materialova politika dosky (Michal 18.7.2026): material je SNAPSHOT — vzdy
 # konkretny katalogovy zaznam (predvyplna sa z projektoveho defaultu pri vlozeni,
 # ziadne zive dedenie) a hrubka dosky sa RIADI materialom (nie je volny rozmer).
@@ -39,6 +48,15 @@ module Noxun
       MAX_QUANTITY = 999
       GRAINS = %w[length width none].freeze
       EDGE_KEYS = %w[L1 L2 W1 W2].freeze
+
+      # UI-C1c: umiestnenie dosky v modeli. Chybajuca/prazdna hodnota = 'leziaca'
+      # (spatna kompatibilita vsetkych dosiek vlozenych pred UI-C1c); EXPLICITNA
+      # NEZNAMA hodnota je CHYBA (fail-fast, rovnaky kontrakt ako ROLES) — config
+      # z novsej verzie pluginu sa nesmie ticho preklasifikovat na leziacu.
+      ORIENTATIONS = %w[leziaca stojaca na_stenu].freeze
+      DEFAULT_ORIENTATION = 'leziaca'
+      ORIENTATION_LABELS = { 'leziaca' => 'Naležato', 'stojaca' => 'Nastojato',
+                             'na_stenu' => 'Na stenu' }.freeze
 
       class << self
         # --- normalizacia ---------------------------------------------------
@@ -69,7 +87,9 @@ module Noxun
             material_id: mat,
             grain_direction: norm_grain(p, sheet),
             edges: norm_edges(p, sheet, picker_issues),
-            quantity: norm_quantity(p)
+            quantity: norm_quantity(p),
+            # UI-C1c: umiestnenie, nie vyrobny udaj — do deskriptora NEJDE.
+            orientation: norm_orientation(p)
           }
           # 2B-1 (GH #94 P2): duplak vazba zo SNAPSHOTU sa nesie cez normalize —
           # board_config ju pouzije ako carry-over, ked katalog vazbu pre tento
@@ -181,7 +201,10 @@ module Noxun
             thickness: cfg[:thickness].to_f.round(2),
             material_id: cfg[:material_id],
             grain_direction: cfg[:grain_direction],
-            edges: cfg[:edges]
+            edges: cfg[:edges],
+            # UI-C1c: umiestnenie dosky. Je v CONFIGU (nie na plochom NOXUN kluci),
+            # lebo ho drzi round-trip editacie karty; vystupy ho ignoruju.
+            orientation: cfg[:orientation].to_s
           }
           # 2B-1 (D-43): duplak vazba do vyrobneho snapshotu dosky. Ked katalog
           # material POZNA ako duplak, je autoritou (aktualne hodnoty vazby);
@@ -225,6 +248,60 @@ module Noxun
         # ostavaju ciste osi X/Y/Z. Rovnaka hodnota ako CabinetBuilder.
         SCALE_TOOL_MASK = 120
 
+        # === UI-C1c: ORIENTACIA = TRANSFORMACIA INSTANCIE ====================
+        # Geometria v definicii ostava LEZIACA (draw_board: dlzka X, sirka Y,
+        # hrubka Z) — otaca sa INSTANCIA. Presne matice (Codex audit C1c B1):
+        #
+        #   leziaca  = IDENTITA (dnesny stav pred UI-C1c).
+        #   stojaca  = R_x(+90°) a potom posun o `thickness` po +Y. Telo lezi v
+        #              X = 0..dlzka, Y = 0..hrubka, Z = 0..sirka; DEKOROVA plocha
+        #              (povodne horna, lokalne Z=th) ma normalu -Y = mieri DOPREDU
+        #              k pozorovatelovi a lezi v rovine Y=0; spodna dlha hrana
+        #              sadne na Z=0 (doska stoji na podlahe).
+        #   na_stenu = ZAMERNE TA ISTA matica ako stojaca. Enum je udaj
+        #              UMIESTNENIA so semantikou (zadna plocha je pri stene v +Y;
+        #              buduce prisatie na stenu / elevacia), geometricky sa DNES
+        #              nelisi — testy tieto dva stavy rozlisuju POLOM v configu,
+        #              NIKDY bboxom.
+        #
+        # `thickness_mm` je hrubka z CONFIGU. Vedoma odchylka: ked sa hrubka zmeni
+        # (iny material), transformacia sa NEPREPOCITAVA (rebuild transformaciu
+        # nemeni) — pri neskorsom prepnuti orientacie ostane v Y rozdiel starej a
+        # novej hrubky. Je to posun radovo v mm a poloha je vec umiestnenia, nie
+        # vyroby; alternativa (prepocet transformacie pri kazdom rebuilde) by
+        # dosku pod rukami posuvala.
+        def orientation_matrix(orientation, thickness_mm)
+          o = orientation.to_s
+          o = DEFAULT_ORIENTATION if o.strip.empty?
+          raise "Neznáma orientácia dosky '#{o}'." unless ORIENTATIONS.include?(o)
+          return Geom::Transformation.new if o == DEFAULT_ORIENTATION
+
+          rot = Geom::Transformation.rotation(Geom::Point3d.new(0, 0, 0),
+                                              Geom::Vector3d.new(1, 0, 0), Math::PI / 2.0)
+          Geom::Transformation.translation(Units.vector(0, thickness_mm.to_f, 0)) * rot
+        end
+
+        # DELTA, nie absolutna matica (Codex audit C1c B3): orientacia sa sklada
+        # NA existujucu transformaciu, takze rucne otocenie/posun pouzivatela
+        # prezije a opakovane prepnutie NEKUMULUJE. Pole `orientation` eviduje LEN
+        # to, co aplikoval plugin — rucne rotacie sa s nou skladaju.
+        #   T_new = T_current × inverse(O_old) × O_new
+        # Obe matice sa pocitaju z ROVNAKEJ hrubky, takze sa cast O_old presne
+        # vykrati (viz vedoma odchylka pri zmene hrubky vyssie).
+        def orientation_delta(current, old_orientation, new_orientation, thickness_mm)
+          o_old = orientation_matrix(old_orientation, thickness_mm)
+          o_new = orientation_matrix(new_orientation, thickness_mm)
+          current * o_old.inverse * o_new
+        end
+
+        # Ulozena orientacia dosky (config) — chybajuca = leziaca. NEZNAMU
+        # NEPREKLASIFIKUJE: vrati ju tak, ako je, a volajuci ju odmietne.
+        def stored_orientation(cfg)
+          v = cfg.is_a?(Hash) ? (cfg['orientation'] || cfg[:orientation]) : nil
+          s = v.to_s.strip
+          s.empty? ? DEFAULT_ORIENTATION : s
+        end
+
         # Vlozi novu dosku nalezato na Z=0 vedla najpravejsieho NOXUN objektu.
         # Bez material_id v params sa doplni projektovy default (snapshot!).
         # Vrati instanciu.
@@ -253,7 +330,10 @@ module Noxun
               bdef = model.definitions.add(definition_name(bid))
               bdef.entities.clear!
               draw_board(bdef.entities, cfg)
-              inst = model.entities.add_instance(bdef, Geom::Transformation.translation(Units.point(x, 0, 0)))
+              # UI-C1c: umiestnenie vedla poslednej entity a NAD nim orientacia
+              # (rotacia okolo lokalneho pociatku — poradie X-posunu nemeni).
+              place = Geom::Transformation.translation(Units.point(x, 0, 0))
+              inst = model.entities.add_instance(bdef, place * orientation_matrix(cfg[:orientation], cfg[:thickness]))
               write_board_attrs(model, inst, bid, cfg)
               model.commit_operation
             rescue StandardError => e
@@ -306,6 +386,10 @@ module Noxun
           bdef.name = definition_name(bid) unless bdef.name == definition_name(bid)
           bdef.entities.clear!
           draw_board(bdef.entities, cfg)
+          # UI-C1c: orientacia sa tu NEAPLIKUJE. Geometria definicie je vzdy
+          # leziaca a transformaciu drzi instancia — rebuild by ju druhym
+          # nasobenim skumulovala. `transform:` (scale absorpcia, orientacna
+          # delta) je uz FINALNA transformacia od volajuceho.
           inst.transformation = transform if transform
           write_board_attrs(model, inst, bid, cfg)
           apply_scale_lock(inst)
@@ -483,6 +567,16 @@ module Noxun
           role = v.to_s
           raise "Neznáma rola dosky '#{role}'." unless ROLES.include?(role)
           role
+        end
+
+        # JEDINA autorita orientacie (insert aj edit cesta idu cez nu — normalize).
+        # Chyba/prazdna => 'leziaca'; EXPLICITNA neznama => vynimka.
+        def norm_orientation(p)
+          v = raw(p, :orientation)
+          return DEFAULT_ORIENTATION if v.nil? || v.to_s.strip.empty?
+          o = v.to_s
+          raise "Neznáma orientácia dosky '#{o}'." unless ORIENTATIONS.include?(o)
+          o
         end
 
         def norm_name(p)

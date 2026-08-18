@@ -23,11 +23,16 @@
     // tlacidiel (Dolna · Horna · Doska). Nahradila dvojicu radiov kind+ctype;
     // stav je tu, nie v DOM (kostra panela sa neprekresluje).
     var INSERT_TYPES = ['lower', 'upper', 'board'];
+    // UI-C1c: umiestnenie vkladanej dosky (zrkadlo Ruby BoardBuilder::ORIENTATIONS).
+    // Je to stav vkladania, NIE vyrobny udaj — do zamkov ani do materialov nepatri.
+    var BOARD_ORIENTATIONS = ['leziaca', 'stojaca', 'na_stenu'];
+    var DEFAULT_ORIENTATION = 'leziaca';
     var state = {
       type: 'lower',  // typ KORPUSU (lower|upper) — drzi sa aj kym je zvolena Doska
       kind: 'cabinet',// co sa vklada: 'cabinet' | 'board'
       template: '',   // nazov zvolenej KORPUSOVEJ sablony ('' = defaulty typu)
       boardTemplate: '', // nazov zvolenej DOSKOVEJ sablony ('' = predvolene rozmery karty)
+      boardOrientation: DEFAULT_ORIENTATION, // UI-C1c: umiestnenie vkladanej dosky
       locks: {},      // { width: { locked:true, value:950 }, ... } — chybajuci kluc = odomknute
       boardLocks: {}, // to iste pre dosku (kluce length/width) — NIKDY do Ruby
       materials: { material_id: null, front_material_id: null, back_material_id: null },
@@ -73,6 +78,24 @@
       if (typeChanged) state.template = '';
       return true;
     }
+    // --- UI-C1c: orientacia vkladanej dosky ----------------------------------
+    // Kontrakt (Codex audit C1c FIX 8): orientacia sa nastavuje EXPLICITNE pri
+    // KAZDEJ materializacii karty — aj pri „Bez šablóny" a pri sablone, ktora
+    // pole nema. Bez toho by novy vklad zdedil orientaciu predosleho draftu.
+    // `orientationOf` je preto POVINNY vstup materializacie, nie „ak je".
+    function orientationOf(cfg){
+      var o = cfg ? cfg.orientation : null;
+      return (BOARD_ORIENTATIONS.indexOf(o) >= 0) ? o : DEFAULT_ORIENTATION;
+    }
+    function boardOrientation(){ return state.boardOrientation; }
+    // Vracia true = stav sa naozaj zmenil (volajuci prekresli segmenty).
+    function setBoardOrientation(o){
+      var next = (BOARD_ORIENTATIONS.indexOf(o) >= 0) ? o : DEFAULT_ORIENTATION;
+      if (next === state.boardOrientation) return false;
+      state.boardOrientation = next;
+      return true;
+    }
+
     // Nazov sablony podla druhu — jedno miesto, aby sa dva sklady nemiesali.
     function templateName(kind){ return kind === 'board' ? state.boardTemplate : state.template; }
     function setTemplateName(kind, name){
@@ -271,6 +294,11 @@
       LOCK_FIELDS: LOCK_FIELDS,
       BOARD_LOCK_FIELDS: BOARD_LOCK_FIELDS,
       INSERT_TYPES: INSERT_TYPES,
+      BOARD_ORIENTATIONS: BOARD_ORIENTATIONS,
+      DEFAULT_ORIENTATION: DEFAULT_ORIENTATION,
+      orientationOf: orientationOf,
+      boardOrientation: boardOrientation,
+      setBoardOrientation: setBoardOrientation,
       MATERIAL_KEYS: MATERIAL_KEYS,
       HARDWARE_KEYS: HARDWARE_KEYS,
       insertType: insertType,

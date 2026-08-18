@@ -156,6 +156,7 @@ module Noxun
           cb(dlg, 'insert_board')       { |p| handle_insert_board(p) }
           cb(dlg, 'set_board_fields')   { |p| handle_set_board_fields(p) }
           cb(dlg, 'set_board_material') { |p| handle_set_board_material(p) }
+          cb(dlg, 'set_board_orientation') { |p| handle_set_board_orientation(p) } # UI-C1c orientacia dosky
           cb(dlg, 'set_board_edge')     { |p| handle_set_board_edge(p) }
           cb(dlg, 'set_board_edges_all') { |p| handle_set_board_edges_all(p) } # D-35 olep vsetky 4 hrany (1 undo)
           # D-25: merac pouzivania panela — lokalne pocitadla interakcii (len

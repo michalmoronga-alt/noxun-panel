@@ -13,11 +13,15 @@
 # Marker suboru `std`:
 #   1 = pred UI-C1a (len korpusove sablony, bez `kind`)
 #   2 = `kind` na zazname + seed 3 doskovych sablon
-# Migracia je LAZY (pri prvom `load`): zaznam bez `kind` dostane 'cabinet'
-# a prechod std<2 -> 2 doseje doskove sablony — VSETKO JEDNYM atomickym
-# zapisom. Seed je MARKEROVY, nie obsahovy: viaze sa na prechod markera, nie
-# na pritomnost zaznamov, takze sa uz nikdy neopakuje (zmazanu doskovu
-# sablonu plugin nevrati).
+#   3 = UI-C1c: doskove sablony nesu `config['orientation']`
+# Migracia je LAZY (pri prvom `load`) a STUPNOVANA (Codex audit C1c B2):
+# `migrate!` si precita STARY marker PRED zapisom a podla neho spusti
+#   old_std < 2 -> doseje doskove sablony (uz s orientaciou),
+#   old_std < 3 -> doplni orientaciu existujucim doskovym sablonam,
+# VSETKO JEDNYM atomickym zapisom pod JEDNYM zamkom (ziadny medzistav na disku).
+# Seed je MARKEROVY, nie obsahovy: viaze sa na prechod markera, nie na
+# pritomnost zaznamov, takze sa uz nikdy neopakuje (zmazanu doskovu sablonu
+# plugin nevrati).
 #
 # FORWARD GUARD (vzor usage_stats.rb): subor s `std` VYSSIM nez STD pochadza
 # z novsej verzie pluginu -> store prejde do REZIMU LEN NA CITANIE
@@ -34,7 +38,7 @@ require 'tmpdir'
 module Noxun
   module Engine
     module TemplateStore
-      STD  = 2
+      STD  = 3
       FILE = 'templates.json'
       KINDS = %w[cabinet board].freeze
       DEFAULT_KIND = 'cabinet'
@@ -162,20 +166,73 @@ module Noxun
 
       # Bezi VYHRADNE pod zamkom (with_lock invaliduje cache, takze citame
       # cerstvo z disku). Chybajuci subor = cerstva instalacia (korpusovy aj
-      # doskovy seed naraz); std < STD = doplnenie `kind` + doseje doskovych
-      # sablon JEDNYM atomickym zapisom (ziadny medzistav na disku).
+      # doskovy seed naraz, uz s orientaciou).
+      #
+      # UI-C1c (Codex audit B2): migracia je STUPNOVANA podla STAREHO markera,
+      # nie podla obsahu — kroky sa skladaju a zapisu sa RAZ:
+      #   old_std < 2 -> doseje chybajuce doskove sablony,
+      #   old_std < 3 -> doplni orientaciu doskovym sablonam (fill_orientations).
+      # Subor uz na std 3 sem nedojde (current? ho zastavi vyssie).
       def migrate!
         return true if current? # medzitym to stihla ina instancia
 
         return write_list(build_predefined + build_predefined_boards) unless JsonFileStore.available?(path)
 
         data = JsonFileStore.read(path, copy: false)
+        old_std = data.is_a?(Hash) && data['std'].is_a?(Integer) ? data['std'] : 1
         raw = data.is_a?(Hash) ? data['templates'] : nil
         list = normalize_list(raw.is_a?(Array) ? raw : build_predefined)
-        write_list(list + missing_board_seed(list))
+        list += missing_board_seed(list) if old_std < 2
+        list = fill_orientations(list) if old_std < 3
+        write_list(list)
       rescue StandardError => e
         Engine.log_error(e, 'TemplateStore.migrate!')
         false
+      end
+
+      # UI-C1c (Codex audit FIX 5): doplnenie `config['orientation']` doskovym
+      # sablonam pri prechode std 2 -> 3. Kontraktovu orientaciu dostane LEN
+      # zaznam, ktory je PREUKAZATELNE nedotknuty seed std 2 — teda sedi MENO
+      # aj ODTLACOK (rozmery, hrubka, material_id nil, grain 'length' a ziadna
+      # orientacia). Vsetko ostatne bez pola dostane 'leziaca':
+      #   * premenovany seed = leziaca (meno je jediny kluc, ktory mame —
+      #     vedome obmedzenie, radsej rovna doska nez zle otocena),
+      #   * upraveny rovnomenny zaznam = leziaca (pouzivatel si ho prestaval,
+      #     nemozeme mu podsunut orientaciu seedu),
+      #   * EXPLICITNA orientacia (aj neznama) ostava NEDOTKNUTA — zaznam z
+      #     novsej verzie sa neprepisuje (rovnaka zasada ako pri `kind`).
+      # Korpusovych sablon sa netyka vobec.
+      def fill_orientations(list)
+        prints = seed_prints
+        list.map do |rec|
+          next rec unless rec['kind'] == 'board'
+
+          cfg = rec['config'].is_a?(Hash) ? rec['config'] : {}
+          next rec if cfg.key?('orientation')
+
+          want = prints[rec['name']]
+          rec = JsonFileStore.deep_copy(rec)
+          fallback = BoardBuilder::DEFAULT_ORIENTATION # jedina autorita slovnika orientacii
+          rec['config'] = cfg.merge('orientation' => (want && seed_print?(cfg, want) ? want['orientation'] : fallback))
+          rec
+        end
+      end
+
+      # Odtlacok seedov std 2 podla mena (rozmery + kontraktova orientacia C1c).
+      def seed_prints
+        build_predefined_boards.each_with_object({}) do |seed, out|
+          cfg = seed['config']
+          out[seed['name']] = { 'length' => cfg['length'], 'width' => cfg['width'],
+                                'thickness' => cfg['thickness'], 'orientation' => cfg['orientation'] }
+        end
+      end
+
+      # Sedi config s odtlackom seedu std 2? (material_id EXPLICITNE nil, smer
+      # dekoru 'length' — presne to, co seed std 2 zapisal.)
+      def seed_print?(cfg, want)
+        %w[length width thickness].all? { |k| (cfg[k].to_f - want[k].to_f).abs < 0.01 } &&
+          cfg.key?('material_id') && cfg['material_id'].nil? &&
+          cfg['grain_direction'].to_s == 'length'
       end
 
       # Exkluzivny zamok na SIDECAR subore (drzany handle by na Windows
@@ -298,13 +355,15 @@ module Noxun
       end
 
       # Doskovy seed (UI-C1a). Rozmery su KANONICKE polia dosky podla
-      # SYSTEM/STANDARD.md 8.3 — `length`/`width`/`thickness`/`grain_direction`;
-      # ZIADNA orientacia (umiestnenie dosky riesi az UI-C1c).
+      # SYSTEM/STANDARD.md 8.3 — `length`/`width`/`thickness`/`grain_direction`.
+      # UI-C1c: kazdy seed nesie aj ORIENTACIU (umiestnenie v modeli) — presne
+      # tak, ako sa dany diel v kuchyni realne pouziva: Diel stoji (bok/priecka),
+      # Pracovna doska lezi, Zastena ide na stenu. Slovnik je BoardBuilder.
       def build_predefined_boards
         [
-          board_tpl('Diel', 18.0, 800.0, 600.0),
-          board_tpl('Pracovná doska', 38.0, 2600.0, 600.0),
-          board_tpl('Zástena', 10.0, 2600.0, 580.0)
+          board_tpl('Diel', 18.0, 800.0, 600.0, 'stojaca'),
+          board_tpl('Pracovná doska', 38.0, 2600.0, 600.0, 'leziaca'),
+          board_tpl('Zástena', 10.0, 2600.0, 580.0, 'na_stenu')
         ]
       end
 
@@ -320,9 +379,10 @@ module Noxun
       # bez tohto zapisaneho kontraktu by builder dosadil projektovy default
       # a `insert_thickness_for` (autorita realneho materialu) by hrubku
       # sablony zahodil — Pracovna doska aj Zastena by sa vlozili na 18 mm.
-      def board_tpl(name, thickness, length, width)
+      def board_tpl(name, thickness, length, width, orientation)
         record('board', name, 'material_id' => nil, 'length' => length, 'width' => width,
-                              'thickness' => thickness, 'grain_direction' => 'length')
+                              'thickness' => thickness, 'grain_direction' => 'length',
+                              'orientation' => orientation)
       end
 
       def lower_base(overrides = {})

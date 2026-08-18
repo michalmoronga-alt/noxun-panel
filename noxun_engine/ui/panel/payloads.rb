@@ -26,6 +26,12 @@ module Noxun
             # V0.6 M-B1: UNI doska ma hrubku editovatelnu v karte (JS odomkne pole).
             'uni' => (defined?(Materials) && Materials.uni?(Materials.sheet(cfg['material_id'])) ? true : false),
             'grain_direction' => cfg['grain_direction'] || 'none',
+            # UI-C1c: umiestnenie dosky pre trojsegment karty. Chybajuce =
+            # 'leziaca' (dosky vlozene pred UI-C1c); NEZNAMU hodnotu payload
+            # NEPREKLASIFIKUJE — karta ziadny segment nerozsvieti a zapis
+            # odmietne serverovy guard (handle_set_board_orientation).
+            'orientation' => BoardBuilder.stored_orientation(cfg),
+            'orientation_label' => BoardBuilder::ORIENTATION_LABELS[BoardBuilder.stored_orientation(cfg)].to_s,
             'edges' => cfg['edges'].is_a?(Hash) ? cfg['edges'] : {},
             'edge_labels' => AbsRules.edge_labels(role),
             'edge_sides' => AbsRules.edge_sides(role),

@@ -26,6 +26,13 @@
 #     2A-2 sekcia (migracia katalogu na SCHEMA 2 nad IZOLOVANYM katalogom cez
 #     Materials.test_dir_override — dry_run/ostry beh, rebuild, BOM, semafor
 #     abs_missing, remap; realny %APPDATA% katalog sa necita ani nezapisuje).
+#   UI-C1c sekcia — ORIENTACIA DOSKY (leziaca/stojaca/na_stenu): svetove osi,
+#     normala dekorovej plochy a kotviace roviny pre kazdu hodnotu, zhodnost
+#     matic stojaca/na_stenu (lisi sa POLE, nie bbox), zmena orientacie ako
+#     DELTA (rucne otocenie prezije, opakovanie nekumuluje), 1 undo krok,
+#     rebuild transformaciu nemeni, cache scale observera ide s otocenim
+#     (odmietnuty scale vracia do OTOCENEJ polohy), dedup kopie, guard neznamej
+#     hodnoty a NEDOTKNUTY vyrobny obraz (kusovnik = vstup VEPO).
 #   D-90 sekcia — vizual uchytkoveho profilu UKW-7: kotva proxy (vrch riadku,
 #     zadna rovina cela, dlzka = sirka kridla, prekryv „nosa" 1,419 mm), proxy
 #     kontrakt, zdielana definicia per (profil, dlzka), reprodukovatelny rebuild,
@@ -3303,6 +3310,242 @@ module NoxunSuRunner
     log_line("FAIL: UI-B3 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
 
+  # === UI-C1c: ORIENTACIA DOSKY ==============================================
+  # Overuje presne to, co headless sada NEVIE: realne matice, SVETOVE osi,
+  # normalu dekorovej plochy, kotviace roviny, spravanie transformacie pri
+  # rebuilde/scale/dedupe a pocet undo krokov.
+  #
+  # KONTRAKT (Codex audit C1c): orientacia je TRANSFORMACIA INSTANCIE —
+  # geometria v definicii ostava LEZIACA a vyrobne data (deskriptor, kusovnik,
+  # VEPO) sa NEMENIA. Zmena orientacie je DELTA (T × O_old⁻¹ × O_new), takze
+  # rucne otocenie pouzivatela prezije a opakovane prepnutie nekumuluje.
+
+  # Zloženie transformacie ako porovnatelne pole (mm-presnost staci).
+  def tr_key(tr)
+    tr.to_a.map { |v| v.round(6) }
+  end
+
+  def vec_near?(vec, x, y, z, tol = 0.001)
+    v = vec.normalize
+    (v.x - x).abs < tol && (v.y - y).abs < tol && (v.z - z).abs < tol
+  end
+
+  # VYROBNY OBRAZ modelu (vstup kusovnika a odtial VEPO) BEZ adresnych udajov:
+  # `refs`/`kde`/`names`/`key` su navigacia v UI (pid, vlastnik, nazvy), nie
+  # vyroba — porovnavaju sa rozmery, material, hrany, smer dekoru a mnozstvo.
+  def bom_rows(model)
+    e::Bom.compute(e::Bom.collect(model))[:rows].map do |r|
+      r.reject { |k, _| %w[refs kde names key].include?(k) }
+    end
+  end
+
+  def run_uic1c(model)
+    cleanup(model)
+    mat = 'K009_PW_DTDL_18'
+    th = 18.0
+    len = 700.0
+    wid = 500.0
+
+    # --- 1) VLOZENIE v kazdej orientacii: svetove osi + normala dekoru + roviny
+    insts = {}
+    %w[leziaca stojaca na_stenu].each do |o|
+      insts[o] = e::BoardBuilder.build(model, { 'material_id' => mat, 'length' => len,
+                                                'width' => wid, 'orientation' => o,
+                                                'name' => "UI-C1c #{o}" })
+    end
+    return ok('UI-C1c: vlozenie dosiek vo vsetkych troch orientaciach', false) if insts.values.any?(&:nil?)
+
+    insts.each do |o, inst|
+      cfg = e::Store.config(inst) || {}
+      ok("UI-C1c: config nesie orientaciu '#{o}'", cfg['orientation'] == o)
+      # Geometria DEFINICIE je pri kazdej orientacii ROVNAKA (lezaca).
+      db = inst.definition.bounds
+      ok("UI-C1c (#{o}): geometria definicie ostala LEZIACA (#{len}x#{wid}x#{th})",
+         (mm(db.width) - len).abs <= TOL && (mm(db.height) - wid).abs <= TOL &&
+         (mm(db.depth) - th).abs <= TOL)
+    end
+
+    lez = insts['leziaca']
+    ok('UI-C1c (leziaca): svetove osi = identita (X dlzka, Y sirka, Z hrubka)',
+       vec_near?(lez.transformation.xaxis, 1, 0, 0) &&
+       vec_near?(lez.transformation.yaxis, 0, 1, 0) &&
+       vec_near?(lez.transformation.zaxis, 0, 0, 1))
+    lb = lez.bounds
+    ok('UI-C1c (leziaca): dekorova plocha mieri HORE (+Z) a doska lezi na Z=0',
+       vec_near?(lez.transformation.zaxis, 0, 0, 1) && mm(lb.min.z).abs <= TOL &&
+       (mm(lb.max.z) - th).abs <= TOL)
+
+    %w[stojaca na_stenu].each do |o|
+      inst = insts[o]
+      tr = inst.transformation
+      ok("UI-C1c (#{o}): svetove osi — dlzka X, hrubka do +Y, vyska do +Z",
+         vec_near?(tr.xaxis, 1, 0, 0) && vec_near?(tr.yaxis, 0, 0, 1) && vec_near?(tr.zaxis, 0, -1, 0))
+      ok("UI-C1c (#{o}): normala DEKOROVEJ plochy mieri DOPREDU (-Y)",
+         vec_near?(tr.zaxis, 0, -1, 0))
+      b = inst.bounds
+      ok("UI-C1c (#{o}): kotviace roviny — dekor na Y=0, chrbat na Y=hrubka",
+         mm(b.min.y).abs <= TOL && (mm(b.max.y) - th).abs <= TOL)
+      ok("UI-C1c (#{o}): spodna dlha hrana sadla na Z=0, vyska = sirka dosky",
+         mm(b.min.z).abs <= TOL && (mm(b.max.z) - wid).abs <= TOL)
+      ok("UI-C1c (#{o}): dlzka ostala v X (#{len} mm)",
+         (mm(b.max.x) - mm(b.min.x) - len).abs <= TOL)
+    end
+
+    # ZAMERNE zhodne matice — enum je udaj UMIESTNENIA so semantikou, nie tvar.
+    ok('UI-C1c: „na_stenu" ma ZAMERNE tu istu maticu ako „stojaca" (lisi sa POLE, nie bbox)',
+       tr_key(e::BoardBuilder.orientation_matrix('stojaca', th)) ==
+       tr_key(e::BoardBuilder.orientation_matrix('na_stenu', th)) &&
+       (e::Store.config(insts['stojaca']) || {})['orientation'] !=
+       (e::Store.config(insts['na_stenu']) || {})['orientation'])
+
+    # --- 2) VYROBNE DATA sa orientaciou NEMENIA (kusovnik = vstup VEPO) -------
+    rows_before = bom_rows(model)
+    ok('UI-C1c: tri rovnake dosky v troch orientaciach = JEDEN riadok kusovnika',
+       rows_before.size == 1 && rows_before.first['quantity'].to_i == 3)
+
+    # --- 3) ZMENA ORIENTACIE cez panel: delta, 1 undo krok, cache observera ---
+    b = lez
+    bid = e::Store.get(b, 'id').to_s
+    e::Panel.select_only(model, b)
+    e::Panel.handle_set_board_orientation({ 'board_id' => bid, 'orientation' => 'stojaca' }.to_json)
+    cfg_after = e::Store.config(b) || {}
+    ok('UI-C1c edit: config prevzal novu orientaciu', cfg_after['orientation'] == 'stojaca')
+    ok('UI-C1c edit: instancia sa naozaj otocila (dekor mieri do -Y)',
+       vec_near?(b.transformation.zaxis, 0, -1, 0))
+    db2 = b.definition.bounds
+    ok('UI-C1c edit: geometria definicie ostala LEZIACA (otocila sa INSTANCIA)',
+       (mm(db2.width) - len).abs <= TOL && (mm(db2.height) - wid).abs <= TOL &&
+       (mm(db2.depth) - th).abs <= TOL)
+    ok('UI-C1c edit: kusovnik sa NEZMENIL (orientacia nie je vyrobny udaj)',
+       bom_rows(model) == rows_before)
+    # FIX 4: stabilna transformacia observera musi ist s otocenim, inak by
+    # najblizsi ODMIETNUTY scale dosku vratil do starej polohy.
+    ok('UI-C1c edit: scale observer si zapamatal NOVU stabilnu transformaciu',
+       e::ScaleWatch.stable_transform(b) &&
+       tr_key(e::ScaleWatch.stable_transform(b)) == tr_key(b.transformation))
+
+    tr_standing = tr_key(b.transformation)
+    Sketchup.undo
+    ok('UI-C1c edit: 1x Spat vratil orientaciu AJ transformaciu (jeden krok)',
+       (e::Store.config(b) || {})['orientation'] == 'leziaca' &&
+       vec_near?(b.transformation.zaxis, 0, 0, 1))
+    e::Panel.handle_set_board_orientation({ 'board_id' => bid, 'orientation' => 'stojaca' }.to_json)
+    ok('UI-C1c edit: opakovane prepnutie dava TU ISTU transformaciu (ziadna kumulacia)',
+       tr_key(b.transformation) == tr_standing)
+
+    # --- 4) DELTA: rucne otocenie pouzivatela PREZIJE zmenu orientacie -------
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST rucna rotacia dosky', true)
+      b.transformation = Geom::Transformation.rotation(ORIGIN, Z_AXIS, 90.degrees) * b.transformation
+      model.commit_operation
+    end
+    e::ScaleWatch.remember_transform(b)
+    e::Panel.handle_set_board_orientation({ 'board_id' => bid, 'orientation' => 'leziaca' }.to_json)
+    ok('UI-C1c delta: rucne otocenie o 90° prezilo prepnutie orientacie',
+       vec_near?(b.transformation.xaxis, 0, 1, 0) && vec_near?(b.transformation.zaxis, 0, 0, 1) &&
+       (e::Store.config(b) || {})['orientation'] == 'leziaca')
+    # Rucnu rotaciu vratime spat — dalsie scenare (scale, dedup) porovnavaju
+    # SVETOVE osi proti kontraktovym hodnotam, nie proti pouzivatelovmu natoceniu.
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST navrat z rucnej rotacie', true)
+      b.transformation = Geom::Transformation.rotation(ORIGIN, Z_AXIS, -90.degrees) * b.transformation
+      model.commit_operation
+    end
+    e::ScaleWatch.remember_transform(b)
+    e::Panel.handle_set_board_orientation({ 'board_id' => bid, 'orientation' => 'stojaca' }.to_json)
+    ok('UI-C1c delta: po navrate rucnej rotacie doska zas stoji v kontraktovej polohe',
+       vec_near?(b.transformation.zaxis, 0, -1, 0) && vec_near?(b.transformation.xaxis, 1, 0, 0))
+
+    # --- 5) REBUILD transformaciu NEMENI + je idempotentny -------------------
+    tr_keep = tr_key(b.transformation)
+    e::BoardBuilder.rebuild(model, b, { 'width' => 520.0 })
+    ok('UI-C1c rebuild: zmena rozmeru transformaciu NEMENI (orientacia sa neaplikuje 2x)',
+       tr_key(b.transformation) == tr_keep &&
+       ((e::Store.config(b) || {})['width'].to_f - 520.0).abs < 0.01 &&
+       (e::Store.config(b) || {})['orientation'] == 'stojaca')
+    e::BoardBuilder.rebuild(model, b, { 'width' => 520.0 })
+    ok('UI-C1c rebuild: opakovany rebuild je idempotentny',
+       tr_key(b.transformation) == tr_keep)
+
+    # --- 6) SCALE: absorpcia aj ODMIETNUTIE nad OTOCENOU doskou --------------
+    # Scale v LOKALNEJ osi Y (= svetove Z stojacej dosky) musi skoncit v sirke.
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST scale otocenej dosky', true)
+      b.transformation = b.transformation * Geom::Transformation.scaling(ORIGIN, 1.0, 1.2, 1.0)
+      model.commit_operation
+    end
+    e::ScaleWatch.absorb_board(b)
+    ok('UI-C1c scale: absorpcia otocenej dosky isla do SIRKY (520 -> 624)',
+       ((e::Store.config(b) || {})['width'].to_f - 624.0).abs < 1.0)
+    ok('UI-C1c scale: po absorpcii je transformacia bez scale a doska stale stoji',
+       !e::ScaleWatch.scaled?(b.transformation) && vec_near?(b.transformation.zaxis, 0, -1, 0))
+
+    stable_now = tr_key(b.transformation)
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST neplatny scale dosky', true)
+      b.transformation = b.transformation * Geom::Transformation.scaling(ORIGIN, 3.0, 1.0, 1.0)
+      model.commit_operation
+    end
+    e::ScaleWatch.reject_scale(b, RuntimeError.new('SU-TEST odmietnutie'))
+    ok('UI-C1c scale: ODMIETNUTY scale vratil dosku do OTOCENEJ polohy (nie do lezacej)',
+       tr_key(b.transformation) == stable_now && vec_near?(b.transformation.zaxis, 0, -1, 0))
+
+    # --- 7) KOPIA: dedup drzi orientaciu aj polohu ---------------------------
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST kopia otocenej dosky', true)
+      trc = b.transformation * Geom::Transformation.translation(e::Units.vector(900, 0, 0))
+      bcopy = model.entities.add_instance(b.definition, trc)
+      %w[std kind id part_id part_key part_key_schema role name manufactured production_class config].each do |k|
+        v = e::Store.get(b, k)
+        bcopy.set_attribute('NOXUN', k, v) unless v.nil?
+      end
+      model.commit_operation
+    end
+    copies = e::BoardBuilder.dedup_copies(model)
+    cp = copies.first
+    ok('UI-C1c kopia: dedup dal nove ID a kopia si drzi orientaciu aj natocenie',
+       copies.length == 1 && cp && (e::Store.config(cp) || {})['orientation'] == 'stojaca' &&
+       vec_near?(cp.transformation.zaxis, 0, -1, 0) &&
+       e::Store.get(cp, 'id').to_s != bid)
+
+    # --- 8) GUARD neznamej hodnoty (insert aj edit) --------------------------
+    before_boards = boards(model).length
+    raised = false
+    begin
+      e::BoardBuilder.build(model, { 'material_id' => mat, 'orientation' => 'zavesena' })
+    rescue StandardError
+      raised = true
+    end
+    ok('UI-C1c guard: neznama orientacia pri VKLADANI padne a doska nevznikne',
+       raised && boards(model).length == before_boards)
+
+    e::Panel.select_only(model, b)
+    cfg_keep = (e::Store.config(b) || {})['orientation']
+    tr_before_bad = tr_key(b.transformation)
+    e::Panel.handle_set_board_orientation({ 'board_id' => bid, 'orientation' => 'zavesena' }.to_json)
+    ok('UI-C1c guard: neznama orientacia pri EDITE nic nezmeni (config ani poloha)',
+       (e::Store.config(b) || {})['orientation'] == cfg_keep &&
+       tr_key(b.transformation) == tr_before_bad)
+
+    # Ulozena NEZNAMA orientacia (config z novsej verzie) = odmietnutie, nie
+    # ticha oprava — delta by z nej spravila nezmysel.
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST config z novsej verzie', true)
+      bad = (e::Store.config(b) || {}).merge('orientation' => 'zavesena')
+      e::Store.write(b, { config: bad })
+      model.commit_operation
+    end
+    e::Panel.handle_set_board_orientation({ 'board_id' => bid, 'orientation' => 'leziaca' }.to_json)
+    ok('UI-C1c guard: NEZNAMA ULOZENA orientacia sa odmietne (poloha ostala)',
+       (e::Store.config(b) || {})['orientation'] == 'zavesena' &&
+       tr_key(b.transformation) == tr_before_bad)
+
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: UI-C1c sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
   # --- ASYNC: undo/redo scenare (retaz timerov, observer debounce 0.2 s) -----
 
   def run_async(model, done)
@@ -3967,6 +4210,7 @@ module NoxunSuRunner
     run_uib1(model)          # UI-B1: kostra Inspectora — payloady raily, krizik dielca/dosky, ABS toggle bez undo kroku
     run_uib2(model)          # UI-B2: kamera nahladu — celny pohlad, guardy identity, ziadny zapis ani undo krok
     run_uib3(model)          # UI-B3: vyber dielcov z informacneho stlpca — ciste citanie, ziadny undo krok
+    run_uic1c(model)         # UI-C1c: orientacia dosky — matice, delta, scale/dedup, vyrobne data nedotknute
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

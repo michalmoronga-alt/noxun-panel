@@ -31,7 +31,11 @@ module Noxun
           # sa vsak vyslovne, aby bolo jasne, ze ide o identitu na peciatku.
           tpl_ref = take_template_ref!(data, 'board')
           params = {}
-          %w[name length width material_id grain_direction thickness].each do |k|
+          # UI-C1c: `orientation` je vo whiteliste vkladania — karta ju posiela
+          # pri KAZDEJ materializacii explicitne (default 'leziaca'), takze
+          # „Bez šablóny" nikdy nezdedi starý draft. Neznamu hodnotu odmietne
+          # BoardBuilder.norm_orientation vynimkou (cb ju ukaze v statuse).
+          %w[name length width material_id grain_direction thickness orientation].each do |k|
             v = data[k]
             params[k] = v unless v.nil? || v.to_s.strip.empty?
           end
@@ -63,6 +67,43 @@ module Noxun
           end
           return if params.empty?
           apply_board(model, board, params, 'Doska upravená.')
+        end
+
+        # UI-C1c: prepnutie ORIENTACIE uz vlozenej dosky. Orientacia NIE JE
+        # bezne pole karty (BOARD_FIELD_KEYS) — meni TRANSFORMACIU INSTANCIE,
+        # takze ma vlastnu cestu s vlastnym guardom:
+        #   * neznama POZADOVANA hodnota  -> odmietnutie (ziadna tichá zmena),
+        #   * neznama ULOZENA hodnota     -> odmietnutie (config z novsej verzie
+        #     pluginu — delta by z neho spravila nezmysel),
+        #   * rovnaka hodnota             -> no-op (ziadny prazdny undo krok).
+        # Zmena je DELTA (BoardBuilder.orientation_delta) nad SUCASNOU
+        # transformaciou, takze rucne otocenie/posun pouzivatela prezije;
+        # rebuild + zapis transformacie su JEDNA operacia = JEDEN krok Spat.
+        def handle_set_board_orientation(payload)
+          data = parse(payload)
+          model, board = guarded_board(data)
+          return unless board
+          want = data['orientation'].to_s
+          return set_status('Neznáma orientácia dosky.', true) unless BoardBuilder::ORIENTATIONS.include?(want)
+
+          cfg = Store.config(board) || {}
+          old = BoardBuilder.stored_orientation(cfg)
+          unless BoardBuilder::ORIENTATIONS.include?(old)
+            return set_status("Doska má neznámu uloženú orientáciu „#{old}“ — pochádza z novšej verzie pluginu.", true)
+          end
+          return set_status("Doska je už #{BoardBuilder::ORIENTATION_LABELS[want].to_s.downcase}.") if old == want
+
+          tr = BoardBuilder.orientation_delta(board.transformation, old, want, cfg['thickness'].to_f)
+          suspend_selection_sync do
+            BoardBuilder.rebuild(model, board, { 'orientation' => want },
+                                 transform: tr, op_name: 'NOXUN: Otoč dosku')
+          end
+          # Codex audit C1c FIX 4: stabilna transformacia v scale observeri musi
+          # ist s otocenim. Bez tohto by najblizsi ODMIETNUTY scale vratil dosku
+          # do STAREJ polohy, kym config uz nesie novu orientaciu.
+          ScaleWatch.remember_transform(board) if defined?(ScaleWatch)
+          set_status("Doska — #{BoardBuilder::ORIENTATION_LABELS[want].to_s.downcase}.")
+          push_selected(model)
         end
 
         # Zmena materialu — hrubka nasleduje katalog (BoardBuilder.normalize).

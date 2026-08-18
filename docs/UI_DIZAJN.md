@@ -244,7 +244,9 @@ Korpus · Čelá · Kovanie · ABS kontrola · dočasný dielec/doska),
 Nastavení; `brace` čaká na skupinu Výstuhy z bloku UI-C),
 `palette` (UI-B3 — sekcia Vzhľad v koliesku),
 `cab-low` / `cab-high` (UI-C1b — typ vkladaného objektu: skrinka na sokli vs.
-zavesená; tretí typ „Doska" používa existujúci `slab`).
+zavesená; tretí typ „Doska" používa existujúci `slab`),
+`ori-lying` / `ori-stand` / `ori-wall` (UI-C1c — umiestnenie dosky; v každej je
+**podlaha** ako vodorovná čiara, v `ori-wall` navyše zvislá čiara steny).
 
 > Okno **Výroba** načítava `icons.js` od v0.5.44 (predtým sprite nemalo) — nové
 > ovládacie prvky v ňom používajú sprite, nie glyfy.
@@ -568,7 +570,7 @@ sekcie podľa kontraktu: **Vzhľad** (téma) · **Rozmerové rady** (editor — 
 oddelené čiarkou, čistenie a poradie robí server) · **O plugine** (logo +
 verzia z Ruby).
 
-### 5.4 Vkladacia karta — typ, dlaždice šablón (UI-C1b)
+### 5.4 Vkladacia karta — typ, dlaždice šablón (UI-C1b), umiestnenie dosky (UI-C1c)
 
 Vkladanie je **jediné miesto, kde sa objekt vytvára**, preto má vlastný vzor.
 Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html`
@@ -595,6 +597,15 @@ Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html`
 - **Odhad namiesto ticha:** dopočítané údaje, ktoré pre nevložený návrh nemá kto
   spočítať presne, sa ukazujú so značkou **≈** a s vysvetlením v tooltipe —
   nikdy nie pomlčka a nikdy nie číslo, ktoré sa tvári ako presné.
+- **Umiestnenie dosky = ďalší `.segrow`** (Naležato · Nastojato · Na stenu) —
+  rovnaký vzor ako typ objektu, **nie select**: sú to tri rovnocenné stavy a
+  ikona povie viac než slovo. Stojí **dvakrát**: v karte vkladania a na karte
+  označenej dosky, s rovnakými popiskami. Každý segment nesie `aria-label`
+  (celá veta) aj `title`; stav je `aria-pressed` + trieda `.on`. Je to **údaj
+  umiestnenia, nie výrobný** — kusovník, hrany ani dekor sa ním nemenia, a UI to
+  hovorí nahlas (tooltipy aj hint karty). Klik na už zvolenú hodnotu je **no-op**
+  (žiadny prázdny krok Späť); na karte vloženej dosky sa pred odoslaním flushne
+  čakajúci debounce ostatných polí.
 
 ### 5.5 Ostatné vzory
 

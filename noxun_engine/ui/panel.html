@@ -12,7 +12,7 @@
      Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
      bezpecne zdielatelny so satelitnymi oknami. -->
 <script>document.documentElement.className = 'nx-inspector';</script>
-<link rel="stylesheet" href="css/panel.css?v=0.7.11">
+<link rel="stylesheet" href="css/panel.css?v=0.7.12">
 
 <!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
      Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
@@ -137,6 +137,14 @@
            polia. Zelene „Vložiť" stoji AZ NA KONCI sektora Materiály. -->
       <div id="insertBoardForm">
         <div class="hint">Samostatný výrobný dielec — krycia doska, blenda, výplň… Hrúbku určuje materiál (pri UNI a doskovej šablóne ju zadáš sám); ABS nastavíš po vložení na karte dosky.</div>
+        <!-- UI-C1c: UMIESTNENIE dosky v modeli (nie výrobný údaj — kusovník,
+             hrany ani dekor sa ním nemenia). Stav drží NXInsert, DOM je zrkadlo;
+             šablóna ho dosadí pri každej materializácii (default naležato). -->
+        <div class="segrow" id="insBoardOriRow" role="group" aria-label="Umiestnenie vkladanej dosky">
+          <button type="button" data-ins-ori="leziaca" onclick="onInsertOrientation('leziaca')" aria-pressed="true" aria-label="Naležato — doska leží vodorovne" title="Naležato — doska leží vodorovne (krycia alebo pracovná doska)"><svg class="ic" aria-hidden="true"><use href="#i-ori-lying"/></svg><span>Naležato</span></button>
+          <button type="button" data-ins-ori="stojaca" onclick="onInsertOrientation('stojaca')" aria-pressed="false" aria-label="Nastojato — doska stojí na dlhej hrane" title="Nastojato — doska stojí na dlhej hrane (bok, priečka, deliaci diel)"><svg class="ic" aria-hidden="true"><use href="#i-ori-stand"/></svg><span>Nastojato</span></button>
+          <button type="button" data-ins-ori="na_stenu" onclick="onInsertOrientation('na_stenu')" aria-pressed="false" aria-label="Na stenu — zvislá doska pri stene" title="Na stenu — zvislá doska pri stene (zástena za pracovnou doskou)"><svg class="ic" aria-hidden="true"><use href="#i-ori-wall"/></svg><span>Na stenu</span></button>
+        </div>
         <div class="row"><label>Názov</label><input id="ib_name" type="text" placeholder="Doska"><span class="unit"></span></div>
         <!-- 2 stlpce ako UI-B3: vlavo VSTUPY (s D-39 zamkami dosky — vlastne
              kluce length/width), vpravo DOPOCITANE udaje ako TEXT. -->
@@ -469,6 +477,13 @@
           <option value="none">Bez smeru</option>
         </select><span class="unit"></span>
       </div>
+      <!-- UI-C1c: UMIESTNENIE už vloženej dosky. Klik = 1 prestavba = 1 krok
+           Späť (server počíta deltu transformácie, ručné otočenie prežije). -->
+      <div class="segrow" id="boardOriRow" role="group" aria-label="Umiestnenie dosky">
+        <button type="button" data-bc-ori="leziaca" onclick="onBoardOrientation('leziaca')" aria-pressed="false" aria-label="Naležato — doska leží vodorovne" title="Naležato — doska leží vodorovne (krycia alebo pracovná doska)"><svg class="ic" aria-hidden="true"><use href="#i-ori-lying"/></svg><span>Naležato</span></button>
+        <button type="button" data-bc-ori="stojaca" onclick="onBoardOrientation('stojaca')" aria-pressed="false" aria-label="Nastojato — doska stojí na dlhej hrane" title="Nastojato — doska stojí na dlhej hrane (bok, priečka, deliaci diel)"><svg class="ic" aria-hidden="true"><use href="#i-ori-stand"/></svg><span>Nastojato</span></button>
+        <button type="button" data-bc-ori="na_stenu" onclick="onBoardOrientation('na_stenu')" aria-pressed="false" aria-label="Na stenu — zvislá doska pri stene" title="Na stenu — zvislá doska pri stene (zástena za pracovnou doskou)"><svg class="ic" aria-hidden="true"><use href="#i-ori-wall"/></svg><span>Na stenu</span></button>
+      </div>
       <div class="absleg">
         <span><i style="background:var(--nx-abs-1mm)"></i>1,0 mm</span>
         <span><i style="background:var(--nx-abs-2mm)"></i>2,0 mm</span>
@@ -599,34 +614,34 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.7.11"></script>
+<script src="js/errors.js?v=0.7.12"></script>
 <!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
      jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
      pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
-<script src="js/win_fit.js?v=0.7.11"></script>
-<script src="js/icons.js?v=0.7.11"></script>
+<script src="js/win_fit.js?v=0.7.12"></script>
+<script src="js/icons.js?v=0.7.12"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.7.11"></script>
-<script src="js/core.js?v=0.7.11"></script>
-<script src="js/expr.js?v=0.7.11"></script>
-<script src="js/insert_state.js?v=0.7.11"></script>
-<script src="js/form.js?v=0.7.11"></script>
-<script src="js/zone_tree.js?v=0.7.11"></script>
-<script src="js/preview.js?v=0.7.11"></script>
+<script src="js/nx_combo.js?v=0.7.12"></script>
+<script src="js/core.js?v=0.7.12"></script>
+<script src="js/expr.js?v=0.7.12"></script>
+<script src="js/insert_state.js?v=0.7.12"></script>
+<script src="js/form.js?v=0.7.12"></script>
+<script src="js/zone_tree.js?v=0.7.12"></script>
+<script src="js/preview.js?v=0.7.12"></script>
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
-<script src="js/shell.js?v=0.7.11"></script>
-<script src="js/actions.js?v=0.7.11"></script>
+<script src="js/shell.js?v=0.7.12"></script>
+<script src="js/actions.js?v=0.7.12"></script>
 <!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
      bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
-<script src="js/settings.js?v=0.7.11"></script>
-<script src="js/bridge.js?v=0.7.11"></script>
-<script src="js/materials.js?v=0.7.11"></script>
-<script src="js/part_card.js?v=0.7.11"></script>
-<script src="js/board_card.js?v=0.7.11"></script>
-<script src="js/hardware.js?v=0.7.11"></script>
-<script src="js/usage.js?v=0.7.11"></script>
-<script src="js/boot.js?v=0.7.11"></script>
+<script src="js/settings.js?v=0.7.12"></script>
+<script src="js/bridge.js?v=0.7.12"></script>
+<script src="js/materials.js?v=0.7.12"></script>
+<script src="js/part_card.js?v=0.7.12"></script>
+<script src="js/board_card.js?v=0.7.12"></script>
+<script src="js/hardware.js?v=0.7.12"></script>
+<script src="js/usage.js?v=0.7.12"></script>
+<script src="js/boot.js?v=0.7.12"></script>
