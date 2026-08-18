@@ -1,10 +1,15 @@
 # frozen_string_literal: true
-# Noxun Engine — modul police. Rovnomerne rozlozenie 0-4 polic + vypocet zon.
+# Noxun Engine — modul police. Rovnomerne rozlozenie 0-6 polic + vypocet zon.
 # Cisto vypoctovy modul (mm Float), ziadna geometria — tu kresli builder/zones.
 module Noxun
   module Engine
     module Shelves
-      MAX = 4
+      # UI-C2 (kontrakt UI 2.0, sekcia Zony): pills 0–6. Strop je 6, NIE numericky
+      # fallback — kto chce viac polic, deli zonu. Zrkadlo v `ui/js/zone_tree.js`
+      # (sanitizeTree clamp) a v pilulkach `ui/js/actions.js`; zhodu strazi test.
+      # Geometriu vysokych poctov chrani `ZoneTree.validate_shelves!` (zona musi
+      # mat na n polic aspon n*t + (n+1)*MIN_FIELD svetlej vysky).
+      MAX = 6
 
       # Rozlozi 'count' polic rovnomerne v svetlom priestore [clear_z0, clear_z1].
       # n polic => n+1 zon; gap = (svetla_vyska - n*hrubka) / (n+1).

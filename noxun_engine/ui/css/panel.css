@@ -139,19 +139,52 @@
   /* Nahlad (fit ⛶ presunuty do overlaya nahladu — D-29; rezimove taby su v sticky hlavicke) */
   #preview { width: 100%; border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface-preview); display: block; touch-action: none; }
   .pvhint { font-size: 10px; color: var(--nx-ink-faint); text-align: center; margin: 3px 0 4px; }
-  /* Zony strom */
-  #zoneTree { border: 1px solid var(--nx-border-soft); border-radius: 6px; margin: 6px 0; max-height: 140px; overflow: auto; }
-  .znode { padding: 4px 6px; cursor: pointer; border-bottom: 1px solid var(--nx-bg); font-size: 12px; }
+  /* ===== Zony (UI-C2) =====================================================
+     Strom so STROMOVYMI SPOJNICAMI: vnorenie kresli vlastny kontajner `.zkids`
+     s lavou linkou a vodorovnym „zubom" pri kazdom uzle. Odsadenie paddingom
+     (do 0.7.12) ziadnu spojnicu nakreslit nevedelo. Prazdny `.zkids` (listova
+     zona) sa nezobrazuje vobec. */
+  #zoneTree { border: 1px solid var(--nx-border-soft); border-radius: 6px; margin: 2px 0 6px;
+              padding: 3px 4px; max-height: 168px; overflow: auto; }
+  .znode { position: relative; padding: 4px 6px; cursor: pointer; border-radius: 6px; font-size: 12px; }
   .znode:hover { background: var(--nx-select-bg-soft); }
   .znode.active { background: var(--nx-select-bg); box-shadow: inset 3px 0 0 var(--nx-select); }
   .znode .dim { color: var(--nx-ink-faint); font-size: 10.5px; }
   .znode .zs { color: var(--nx-ink-muted); font-size: 10.5px; }
-  #zoneActive { font-size: 11px; color: var(--nx-ink-strong); margin: 4px 0 6px; }
-  #zoneActive b { color: var(--nx-select); }
-  .zact { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
-  .zact label { flex: 0 0 118px; color: var(--nx-ink-label); }
-  .zact select { flex: 0 0 52px; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 6px; }
-  .zact button { flex: 1; }
+  .zkids { margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--nx-border); }
+  .zkids:empty { display: none; }
+  .zkids > .znode::before { content: ''; position: absolute; left: -10px; top: 50%;
+              width: 8px; border-top: 1px solid var(--nx-border); }
+  /* Uroven nad 3 (legacy strom/sablona z inej verzie): NEklikatelny varovny
+     riadok. Strom sa NIKDY neoreze — orezanie by zmazalo dielce zakazky. */
+  .znode.deep { cursor: default; color: var(--nx-ink-muted); }
+  .znode.deep:hover { background: none; }
+  .znode .zwarn { color: var(--nx-warn-fg); font-size: 10.5px; white-space: nowrap; }
+  .znode .zwarn .ic-inline { color: var(--nx-warn); }
+  /* Hlavicka vybranej zony nad dlazdicami delenia. */
+  #zoneActive { font-size: 11.5px; font-weight: 600; color: var(--nx-select); margin: 2px 0 6px; }
+  /* Dlazdice delenia — 4 v rade (2/3 stlpce, 2/3 riadky). Ikona JE odpoved. */
+  .ztiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 2px 0 8px; }
+  .ztile { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px;
+           border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface);
+           color: var(--nx-ink); font: inherit; font-size: 10.5px; cursor: pointer; }
+  .ztile .ic { width: 20px; height: 20px; color: var(--nx-ink-muted); }
+  .ztile:hover { border-color: var(--nx-select); }
+  .ztile:hover .ic { color: var(--nx-select); }
+  /* NEAKTIVNY stav je `.off` + aria-disabled (vzor D-78) — HTML `disabled` by
+     zhltol hover aj tooltip a pouzivatel by sa dovod nedozvedel. */
+  .ztile.off, .npills button.off { opacity: .45; cursor: not-allowed; }
+  .ztile.off:hover { border-color: var(--nx-border); }
+  .ztile.off:hover .ic { color: var(--nx-ink-muted); }
+  /* Pilulky poctu polic 0–6 (Shelves::MAX). */
+  .npills { display: flex; gap: 4px; flex: 1; }
+  .npills button { flex: 1; padding: 4px 0; border: 1px solid var(--nx-border); border-radius: 6px;
+           background: var(--nx-surface); color: var(--nx-ink); font: inherit; font-size: 12px; cursor: pointer; }
+  .npills button:hover { border-color: var(--nx-select); }
+  .npills button.on { border-color: var(--nx-select); background: var(--nx-select-bg); color: var(--nx-select); font-weight: 600; }
+  .npills button.on.off { background: var(--nx-surface); }
+  /* „Prva zona" je textovy popisok — 62 px stlpca rozmerov naň nestaci. */
+  #zoneFirstRow label { flex: 0 0 78px; }
   .fldrow { display: flex; gap: 5px; align-items: center; margin: 3px 0; font-size: 12px; }
   .fldrow .fldn { flex: 0 0 66px; color: var(--nx-ink-label); }
   .fldrow input { flex: 1; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 6px; min-width: 0; }
@@ -531,7 +564,7 @@
   .nx-inspector .sect > .sectbody { padding: 7px 9px 9px; }
   /* Karty vnutri sektora uz vlastny ramik nepotrebuju — sektor JE ramik.
      Vynimka: karta zony/dielca/dosky ostava samostatnou kartou (vlastna farba). */
-  .nx-inspector .sectbody > fieldset:not(#zoneCard):not(#partCard):not(#boardCard) {
+  .nx-inspector .sectbody > fieldset:not(#partCard):not(#boardCard) {
             border: 0; padding: 0; margin: 0 0 8px; background: none; }
   .nx-inspector .sectbody > fieldset:last-child { margin-bottom: 0; }
   .nx-inspector .sectbody > fieldset > legend { padding: 0 0 2px; }

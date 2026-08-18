@@ -25,6 +25,23 @@ module Noxun
       SHELF_FRONT_INSET = 20.0 # police odsadene od cela (mm)
       MIN_FIELD         = 20.0 # najmensia svetla sirka/vyska pola (mm)
 
+      # UI-C2 (N22): strom ma NAJVIAC 3 urovne — Z1 · Z1.x · Z1.x.y. Guard je
+      # v `set_split!` (server), zrkadlo v `ui/js/actions.js` (draft aj online).
+      # DOLEZITE: `sanitize` hlbku NEOREZAVA — legacy strom alebo sablona z inej
+      # verzie sa musi dat otvorit aj precitat (orezanie by ticho zmazalo dielce
+      # zakazky). Strom sa len uz nedelí a panel hlbsie urovne oznaci varovanim.
+      MAX_LEVELS = 3
+
+      # Zlomkove presety pola „Prva zona" (viditelne v paneli) a magnetove body
+      # tahania priecky (N20/N21). Parser prijme aj dalsie zlomky — toto su
+      # ponuky, nie whitelist.
+      FIELD_FRACTIONS = [Rational(1, 4), Rational(1, 3), Rational(1, 2)].freeze
+      SNAP_FRACTIONS  = [Rational(1, 4), Rational(1, 2), Rational(3, 4)].freeze
+
+      # Presnost rozmerov poli (mm). STANDARD zna mm Float — zaokruhlovanie na
+      # cele mm by pri delení na 3 polia „zjedlo" az 2 mm z korpusu.
+      FIELD_EPS = 0.01
+
       module_function
 
       # --- konstrukcia / uprava stromu (string-keyed) -------------------------
@@ -105,11 +122,32 @@ module Noxun
         node
       end
 
-      # Rozdel uzol na 'count' casti pozdlz osi. Prepise pripadny existujuci podstrom.
+      # Je uzol LIST (bez delenia)? UI-C2: delit a davat police smie VYHRADNE list;
+      # delena zona sa najprv vycisti („Vycistit zonu" je jedina destruktivna cesta).
+      def leaf?(node)
+        node.is_a?(Hash) && !(node['split'] || node[:split]).is_a?(Hash)
+      end
+
+      # Kolko UROVNI ma strom (koren = 1). Cita sa zo SUROVEHO stromu — pouziva sa
+      # na varovanie pri legacy sablone (B4), preto nesmie nic orezavat.
+      def depth(node, level = 1)
+        node = {} unless node.is_a?(Hash)
+        kids = node['children'] || node[:children]
+        split = node['split'] || node[:split]
+        return level unless split.is_a?(Hash) && kids.is_a?(Array) && !kids.empty?
+
+        kids.map { |k| depth(k, level + 1) }.max || level
+      end
+
+      # Rozdel uzol na 'count' casti pozdlz osi. Zaklada NOVY podstrom, preto smie
+      # bezat LEN na liste a LEN do MAX_LEVELS urovni (UI-C2 guardy — server, nie
+      # len HTML `disabled`: callback HtmlDialogu vie prist aj zo zastaraneho panela).
       # cuts sa zalozia ako auto (rovnomerne) — konkretne rozmery/zamky nastavi set_field!.
       def set_split!(tree, path, axis, count)
         node = navigate(tree, path)
         return false unless node
+        return false unless leaf?(node)               # delena zona: najprv Vycistit zonu
+        return false if Array(path).length >= MAX_LEVELS # N22: max 3 urovne
         count = 2 if count < 2
         count = 4 if count > 4
         axis = 'h' if axis.to_s == 'h'
@@ -148,9 +186,12 @@ module Noxun
         true
       end
 
+      # Police patria LISTOVEJ zone (UI-C2). Na delenej by tichy zapis zmazal cely
+      # podstrom aj s dielcami — to smie iba `clear_zone!`.
       def set_shelves!(tree, path, n)
         node = navigate(tree, path)
         return false unless node
+        return false unless leaf?(node)
         node['split'] = nil
         node['children'] = []
         node['shelves'] = Shelves.clamp(n.to_i)
@@ -298,6 +339,120 @@ module Noxun
           sizes[i] = free * (w / weight_sum)
         end
         sizes
+      end
+
+      # --- UI-C2: JEDNA geometria pre zlomky aj magnet tahania -----------------
+      #
+      # Zona ma rozpatie `span`, `count` poli a (count-1) priecok hrubky `t`.
+      # SVETLY priestor (co ostane poliam) je `span - (count-1)*t`.
+      #
+      # Zlomok (1/2 zony) aj magnet tahania hovoria o TOM ISTOM: kde ma sediet
+      # STRED priecky. Preto je to JEDNA funkcia — pole „Prva zona" ju vola pre
+      # priecku 0, drag pre priecku `i`:
+      #
+      #   stred priecky i  =  frac * span
+      #   svetly sucet poli 0..i  =  frac * span - i*t - t/2
+      #
+      # Pri count=2 a frac=1/2 z toho vyjde presne polovica SVETLEHO priestoru
+      # (nie polovica rozpatia) — to je ten rozdiel, ktory mockup pocital nahrubo
+      # (864/2 = 432 namiesto (864-18)/2 = 423) a stolarovi by ho vyrobil bok
+      # posunuty o 9 mm.
+      def clear_space(span, count, t)
+        c = span.to_f - ([count.to_i, 1].max - 1) * t.to_f
+        c.negative? ? 0.0 : c
+      end
+
+      # Svetly sucet poli 0..index pri zlomku `frac` (Rational alebo Float).
+      def cum_for_fraction(span, count, t, index, frac)
+        (frac.to_f * span.to_f) - index.to_i * t.to_f - t.to_f / 2.0
+      end
+
+      # Ktore zlomky su pre priecku `index` vobec dosiahnutelne (ostatne polia
+      # musia dostat aspon MIN_FIELD). Vrati [{ frac:, cum:, size_hint: }].
+      def fraction_options(span, count, t, index, fracs = FIELD_FRACTIONS)
+        clear = clear_space(span, count, t)
+        lo = (index.to_i + 1) * MIN_FIELD
+        hi = clear - (count.to_i - index.to_i - 1) * MIN_FIELD
+        fracs.map { |f| [f, cum_for_fraction(span, count, t, index, f)] }
+             .select { |(_f, cum)| cum >= lo - FIELD_EPS && cum <= hi + FIELD_EPS }
+             .map { |(f, cum)| { 'label' => "#{f.numerator}/#{f.denominator}",
+                                 'frac' => f.to_f, 'cum' => r2(cum) } }
+      end
+
+      # Magnet: prilep svetly sucet `cum` na najblizsi zlomok, ak je bliz nez
+      # `tol_mm`. `tol_mm <= 0` (Alt) = magnet vypnuty — vrati vstup nedotknuty.
+      def snap_cum(span, count, t, index, cum, tol_mm, fracs = SNAP_FRACTIONS)
+        return cum.to_f if tol_mm.to_f <= 0
+
+        best = nil
+        fracs.each do |f|
+          target = cum_for_fraction(span, count, t, index, f)
+          d = (target - cum.to_f).abs
+          best = [d, target] if d <= tol_mm.to_f && (best.nil? || d < best[0])
+        end
+        best ? best[1] : cum.to_f
+      end
+
+      # --- UI-C2: PRISNA validacia poli prichadzajucich z panela ---------------
+      #
+      # `sanitize_cuts` je OPRAVNA vrstva (legacy strom sa musi dat precitat), a
+      # preto je zamerne tolerantna — `'abc'.to_f` je 0.0. Vstup z panela vsak
+      # tolerantny byt NESMIE: „650-36" by sa ticho stalo 650 a stolar by vyrobil
+      # iny nabytok, nez pouzivatel zadal. Preto ma zapisova cesta vlastnu,
+      # PRISNU kontrolu — a odmietnutie je cele (ziadny ciastocny zapis).
+      #
+      # Vrati nil (OK) alebo hlasku pre pouzivatela.
+      #   clear: svetly priestor zony, ak ho volajuci pozna (sucet sa kontroluje
+      #          s toleranciou FIELD_EPS); nil = kontrola suctu sa preskoci.
+      def validate_cuts(cuts, count, clear: nil)
+        count = count.to_i
+        return 'Rozdelenie zóny je poškodené — obnov panel.' unless cuts.is_a?(Array) && cuts.length == count
+
+        sizes = []
+        cuts.each_with_index do |c, i|
+          return 'Rozmery polí sú poškodené — obnov panel.' unless c.is_a?(Hash)
+
+          sz = strict_mm(c['size'].nil? ? c[:size] : c['size'])
+          return "Pole #{i + 1}: rozmer nie je platné číslo." if sz == :invalid
+          next if sz.nil? # auto pole je platne — dopocita ho resolve_fields
+
+          return "Pole #{i + 1}: #{fmt(sz)} mm je menej než najmenšie pole (#{fmt(MIN_FIELD)} mm)." if
+            sz < MIN_FIELD - FIELD_EPS
+
+          sizes << sz
+        end
+        return nil if clear.nil? || sizes.length != count
+
+        total = sizes.reduce(0.0, :+)
+        return nil if (total - clear.to_f).abs <= FIELD_EPS
+
+        if total > clear.to_f
+          "Polia sa do zóny nezmestia: #{fmt(total)} mm proti #{fmt(clear.to_f)} mm svetlého priestoru."
+        else
+          "Polia nevyplnia celú zónu: #{fmt(total)} mm proti #{fmt(clear.to_f)} mm svetlého priestoru."
+        end
+      end
+
+      # Prisny prevod na mm: nil/prazdne = nil (auto), cislo = Float,
+      # cokolvek ine (text, NaN, Infinity) = :invalid. ZIADNY `to_f` fallback.
+      def strict_mm(raw)
+        return nil if raw.nil?
+        return nil if raw.is_a?(String) && raw.strip.empty?
+
+        v = if raw.is_a?(Numeric)
+              raw.to_f
+            elsif raw.is_a?(String)
+              Float(raw.strip.tr(',', '.')) rescue nil
+            end
+        return :invalid if v.nil?
+        return :invalid unless v.finite?
+
+        v
+      end
+
+      def fmt(v)
+        r = v.to_f.round(2)
+        (r - r.round).abs < 0.001 ? r.round.to_s : r.to_s.tr('.', ',')
       end
 
       # Rozdelenie nesmie vytvorit nulove ani zaporne polia. Zamknute rozmery

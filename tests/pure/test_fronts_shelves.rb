@@ -602,16 +602,17 @@ NxTest.test('shelves: 2 police -> 3 zony, gap = (clear - n*t)/(n+1), pozicie z')
   NxTest.assert_close(216.0, z2[:height])
 end
 
-NxTest.test('shelves: clamp 0..4 — zaporne na 0, nad MAX na 4') do
+# UI-C2: strop je od v0.7.13 SEST (pills 0–6 v kontrakte UI 2.0), nie styri.
+NxTest.test('shelves: clamp 0..6 — zaporne na 0, nad MAX na 6') do
   sh = Noxun::Engine::Shelves
   NxTest.assert_equal(0, sh.clamp(-3))
-  NxTest.assert_equal(4, sh.clamp(9))
+  NxTest.assert_equal(6, sh.clamp(9))
   NxTest.assert_equal(3, sh.clamp('3'))
-  NxTest.assert_equal(4, sh.clamp(4))
+  NxTest.assert_equal(6, sh.clamp(6))
 
   out_hi = sh.layout(0.0, 700.0, 18.0, 9)
-  NxTest.assert_equal(4, out_hi[:shelves].size)
-  NxTest.assert_equal(5, out_hi[:zones].size)
+  NxTest.assert_equal(6, out_hi[:shelves].size)
+  NxTest.assert_equal(7, out_hi[:zones].size)
 
   out_lo = sh.layout(0.0, 700.0, 18.0, -5)
   NxTest.assert_equal([], out_lo[:shelves])

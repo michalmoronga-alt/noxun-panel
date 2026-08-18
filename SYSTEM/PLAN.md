@@ -15,7 +15,8 @@
 
 **~~UI-C1 · Vkladanie~~ — DÁVKA KOMPLET** (C1a #174 · C1b #175 · C1c tento PR, **v0.7.12**): typové tlačidlá (Dolná · Horná · Doska), dlaždice šablón s „naposledy použitými" a dvojklikom (N16/N17), zámky D-39 pre dosku, doskové šablóny a **orientácia dosky** (naležato · nastojato · na stenu) pri vkladaní aj na karte vloženej dosky. Reálne PNG náhľady dlaždíc ostávajú vedome v **UI-D2** (dnes schematická kresba). Plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 
-- **UI-C2 · Zóny** — strom so spojnicami, dlaždice delenia, presné delenie v mm, snap 1/4·1/2·3/4 (D-09), police ako pills, slot „Vnútro".
+**~~UI-C2 · Zóny~~ — DÁVKA HOTOVÁ** (tento PR, **v0.7.13**): štruktúra navrchu so stromovými spojnicami a najviac 3 úrovňami (N22), delenie na štyri dlaždice, presné delenie prvej zóny v mm aj zlomkom (N21), magnet 1/4·1/2·3/4 pri ťahaní priečky s vypnutím cez Alt (N20, **D-09 tým uzavreté**), police ako pilulky 0–6, rezervovaný slot „Vnútro". Vedomé odchýlky od mockupu (dlaždice a pilulky len na nerozdelenej zóne, pravidlo zámku poľa „Prvá zóna", strop políc) sú zapísané v [zdroje/ui20/UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md); plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).
+
 - **UI-C3 · Čelá (D-84, D-89a, D-96)** — riadky s ikonou typu, AUTO chip, rady výšok, naviazané kovanie pod riadkom, **reč stolára „+ pridaj čelo / + pridaj dvere" (D-84)**, **sekcia Úchytky (D-96)**, **hover hrany zvýrazní hranu v MODELI (D-89 otvorená časť)**.
 - **UI-C4 · Kovanie** — položky v boxoch podľa vlastníka (skrinka / každé čelo) + značky v náhľade.
 
@@ -62,7 +63,6 @@
 - **Ceny a dokumenty ponuky** (vedome odložené z dávky E): manuálne 1-klik overenie ceny pre položky BEZ väzby na Demos a viac URL na položke (zvyšok V1-03) · plný generátor cenovej ponuky do DOCX/PDF so šablónou a vizualizáciami · prepínač „na faktúru" (×1,2, kandidát na štvrtý cenový režim) · rodina dokumentov okolo ponuky (ponuka vizualizácií, preberací protokol).
 - **Konštrukcia:** per-dielec odsadenia vpredu/vzadu pre strop/dno/boky (V1-01, chladničkový komín) · typy čiel lakované / frézované / sklo-Al rám (V1-07) · balík V0.4.8 z [archiv/06_PANEL_NASTAVENIA_navrh.md](archiv/06_PANEL_NASTAVENIA_navrh.md) — rohové spoje dna a stropu per strana, chrbát s poldrážkou, „bez dielca" varianty s validáciou, per-dielec hrúbky a odsadenia.
 - **Vkladanie na klik** (V1-04 fáza 1) — skrinka visí na kurzore, klik umiestni.
-- **D-09 · Snap body pri presúvaní priečok** — 1/4, 1/2, 3/4 v zónovom náhľade.
 - **D-10 · Presúvanie a úprava čiel priamo v náhľade** — ako drag priečok.
 - **V1.0 zostavy:** spájanie a zarovnávanie korpusov (čelné/zadné hrany, pripájacie body, snaper logika) · soklová lišta v celku pre segment · obklady a krycie prvky segmentu vrátane pilastra (priznaný vs. skrytý) · pracovné a horné krycie dosky na označený segment · migrácia a oprava starých modelov · test na kompletnej reálnej zákazke. *(Sem patrí aj to, čo V0.4.7 vedome neobsahovalo: attachment/segmenty, automatické krycie dosky, PD cez segment.)*
 

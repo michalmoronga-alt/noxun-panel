@@ -3310,6 +3310,163 @@ module NoxunSuRunner
     log_line("FAIL: UI-B3 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
 
+  # === UI-C2: ZONY ===========================================================
+  # Overuje presne to, co headless sada NEVIE: ci sa zmena stromu naozaj
+  # PRESTAVA v modeli (priecky, police), ci je to JEDEN krok Spat, ci vyber po
+  # operacii ostava na skrinke a — hlavne — ci ODMIETNUTA zmena model NEDOTKNE.
+  #
+  # Najdrahsia pasca tejto davky: poskodene `zone_id` doteraz padlo na KOREN
+  # (`zone_path` vracala [1]), takze „Vycistit zonu" vedelo zmazat cele vnutro
+  # skrinky. Tu sa to overuje na zivom modeli.
+
+  # Kolko dielcov s danou rolou ma skrinka (priecky, police).
+  def zone_role_count(cab, role)
+    return 0 unless cab && cab.valid?
+
+    # `role` je TOP-LEVEL atribut dielca (Store.write), nie polozka configu.
+    cab.definition.entities.grep(Sketchup::ComponentInstance).count do |x|
+      e::Store.get(x, 'role').to_s == role
+    end
+  end
+
+  def zone_tree_of(cab)
+    (e::Store.config(cab) || {})['zone_tree'] || {}
+  end
+
+  def run_uic2(model)
+    cleanup(model)
+
+    cfg = { 'type' => 'lower', 'width' => 900.0, 'height' => 720.0, 'depth' => 560.0,
+            'thickness' => 18.0, 'floor_height' => 100.0 }
+    cab = e::CabinetBuilder.build(model, cfg)
+    return ok('UI-C2: vlozenie skrinky pre zonove testy', false) unless cab
+
+    cid = e::Store.get(cab, 'cabinet_id').to_s
+    guid = e::Panel.model_guid(model)
+    root = "#{cid}-Z1"
+    e::Panel.select_only(model, cab)
+
+    # --- 1) GUARD DOKUMENTU: cudzi guid nesmie prestavat NIC ------------------
+    before = zone_role_count(cab, 'divider_v')
+    e::Panel.handle_split_zone({ 'zone_id' => root, 'axis' => 'v', 'count' => 2,
+                                 'model_guid' => 'CUDZI-GUID', 'cabinet_id' => cid }.to_json)
+    ok('UI-C2: delenie z INEHO dokumentu sa NEVYKONA (guard identity)',
+       zone_role_count(cab, 'divider_v') == before && zone_tree_of(cab)['split'].nil?)
+
+    # --- 2) POSKODENE zone_id: ziadny fallback na koren ----------------------
+    e::Panel.handle_split_zone({ 'zone_id' => "#{cid}-ZXY", 'axis' => 'v', 'count' => 2,
+                                 'model_guid' => guid, 'cabinet_id' => cid }.to_json)
+    ok('UI-C2: poskodene zone_id sa ODMIETNE (nepadne na koren)',
+       zone_tree_of(cab)['split'].nil?)
+
+    # --- 3) DELENIE: prestavba, jeden undo krok, vyber ostava ----------------
+    # Ghost zon zije PRIAMO v `model.entities` (zones.rb), takze holy pocet entit
+    # sa delenim legitimne meni — invariantom je pocet NOXUN objektov.
+    cabs_before = cabinets(model).length
+    e::Panel.handle_split_zone({ 'zone_id' => root, 'axis' => 'v', 'count' => 2,
+                                 'model_guid' => guid, 'cabinet_id' => cid }.to_json)
+    cab = e::Panel.find_cabinet_by_id(model, cid)
+    ok('UI-C2: delenie na 2 stlpce postavilo ZVISLU priecku',
+       zone_role_count(cab, 'divider_v') == 1)
+    ok('UI-C2: strom skrinky nesie delenie (v ×2)',
+       zone_tree_of(cab)['split'].is_a?(Hash) &&
+       zone_tree_of(cab)['split']['axis'] == 'v' && zone_tree_of(cab)['split']['count'].to_i == 2)
+    ok('UI-C2: po deleni ostava oznacena SKRINKA (nie zmazany ghost)',
+       model.selection.to_a == [cab])
+    ok('UI-C2: delenie nevyrobilo ziadny novy NOXUN objekt na najvyssej urovni',
+       cabinets(model).length == cabs_before && boards(model).empty?)
+
+    # --- 4) DRUHE delenie tej istej zony sa ODMIETNE (jedina cesta = Vycistit)
+    e::Panel.handle_split_zone({ 'zone_id' => root, 'axis' => 'h', 'count' => 3,
+                                 'model_guid' => guid, 'cabinet_id' => cid }.to_json)
+    cab = e::Panel.find_cabinet_by_id(model, cid)
+    ok('UI-C2: opakovane delenie uz delenej zony sa ODMIETNE (podstrom prezije)',
+       zone_tree_of(cab)['split']['axis'] == 'v' && zone_role_count(cab, 'divider_h').zero?)
+
+    # --- 5) POLICE 0–6 na LISTOVEJ zone, odmietnutie na delenej --------------
+    e::Panel.handle_set_zone_shelves({ 'zone_id' => root, 'count' => 3,
+                                       'model_guid' => guid, 'cabinet_id' => cid }.to_json)
+    cab = e::Panel.find_cabinet_by_id(model, cid)
+    ok('UI-C2: police na DELENEJ zone sa odmietnu (podstrom sa nezmaze)',
+       zone_tree_of(cab)['split'].is_a?(Hash) && zone_role_count(cab, 'shelf').zero?)
+
+    e::Panel.handle_set_zone_shelves({ 'zone_id' => "#{cid}-Z1.1", 'count' => 6,
+                                       'model_guid' => guid, 'cabinet_id' => cid }.to_json)
+    cab = e::Panel.find_cabinet_by_id(model, cid)
+    ok('UI-C2: 6 polic (novy strop) sa naozaj postavilo v stlpci Z1.1',
+       zone_role_count(cab, 'shelf') == 6)
+
+    # --- 6) PRESNA CESTA: rozmer pola cislom --------------------------------
+    plan_zone = lambda do
+      cfg2 = e::CabinetBuilder.normalize(e::Panel.existing_params(cab))
+      Array(e::Construction.build_plan(cfg2, cid)[:zones]).find { |z| z[:id].to_s == root }
+    end
+    z = plan_zone.call
+    clear = Array(z[:split][:fields]).reduce(0.0) { |s, f| s + f[:size].to_f }
+    good = [{ 'size' => 500.0, 'locked' => true }, { 'size' => (clear - 500.0).round(2), 'locked' => false }]
+    e::Panel.handle_set_zone_field({ 'zone_id' => root, 'index' => 0, 'cuts' => good,
+                                     'model_guid' => guid, 'cabinet_id' => cid }.to_json)
+    cab = e::Panel.find_cabinet_by_id(model, cid)
+    cuts = zone_tree_of(cab)['split']['cuts']
+    ok('UI-C2: presny rozmer pola 1 sa ulozil aj so zamkom',
+       (cuts[0]['size'].to_f - 500.0).abs < 0.01 && cuts[0]['locked'] == true)
+    z2 = plan_zone.call
+    ok('UI-C2: geometria plan<->strom sedi (prve pole ma 500 mm)',
+       (z2[:split][:fields][0][:size].to_f - 500.0).abs < 0.01)
+
+    # Nezmestitelna hodnota sa ODMIETNE — nikdy sa ticho nezmensi.
+    bad = [{ 'size' => clear + 200.0, 'locked' => true }, { 'size' => 100.0, 'locked' => false }]
+    e::Panel.handle_set_zone_field({ 'zone_id' => root, 'index' => 0, 'cuts' => bad,
+                                     'model_guid' => guid, 'cabinet_id' => cid }.to_json)
+    cab = e::Panel.find_cabinet_by_id(model, cid)
+    ok('UI-C2: nezmestitelny rozmer sa ODMIETNE a strom ostane povodny',
+       (zone_tree_of(cab)['split']['cuts'][0]['size'].to_f - 500.0).abs < 0.01)
+    # Text namiesto cisla tiez (`'650-36'.to_f` by ticho vratilo 650).
+    txt = [{ 'size' => '650-36', 'locked' => true }, { 'size' => 100.0, 'locked' => false }]
+    e::Panel.handle_set_zone_field({ 'zone_id' => root, 'index' => 0, 'cuts' => txt,
+                                     'model_guid' => guid, 'cabinet_id' => cid }.to_json)
+    cab = e::Panel.find_cabinet_by_id(model, cid)
+    ok('UI-C2: textovy „rozmer" sa ODMIETNE (ziadny tichy prevod na cislo)',
+       (zone_tree_of(cab)['split']['cuts'][0]['size'].to_f - 500.0).abs < 0.01)
+
+    # --- 7) UNDO: posledna zmena je PRESNE JEDEN krok Spat -------------------
+    shelves_before = zone_role_count(cab, 'shelf')
+    e::Panel.handle_set_zone_shelves({ 'zone_id' => "#{cid}-Z1.2", 'count' => 2,
+                                       'model_guid' => guid, 'cabinet_id' => cid }.to_json)
+    cab = e::Panel.find_cabinet_by_id(model, cid)
+    ok('UI-C2: police v druhom stlpci pribudli',
+       zone_role_count(cab, 'shelf') == shelves_before + 2)
+    Sketchup.undo
+    cab = e::Panel.find_cabinet_by_id(model, cid)
+    ok('UI-C2: 1x Spat vratil presne poslednu zonovu zmenu (jedna operacia)',
+       cab && cab.valid? && zone_role_count(cab, 'shelf') == shelves_before &&
+       zone_role_count(cab, 'divider_v') == 1)
+
+    # --- 8) VYCISTIT ZONU je jedina destruktivna cesta -----------------------
+    e::Panel.handle_clean_zone({ 'zone_id' => root, 'model_guid' => guid,
+                                 'cabinet_id' => cid }.to_json)
+    cab = e::Panel.find_cabinet_by_id(model, cid)
+    ok('UI-C2: „Vycistit zonu" zrusilo delenie aj police',
+       zone_tree_of(cab)['split'].nil? && zone_role_count(cab, 'divider_v').zero? &&
+       zone_role_count(cab, 'shelf').zero?)
+    ok('UI-C2: po vycisteni ostava oznacena skrinka', model.selection.to_a == [cab])
+
+    # --- 9) HLBKA: 4. uroven sa neda vytvorit -------------------------------
+    e::Panel.handle_split_zone({ 'zone_id' => root, 'axis' => 'v', 'count' => 2,
+                                 'model_guid' => guid, 'cabinet_id' => cid }.to_json)
+    e::Panel.handle_split_zone({ 'zone_id' => "#{cid}-Z1.1", 'axis' => 'h', 'count' => 2,
+                                 'model_guid' => guid, 'cabinet_id' => cid }.to_json)
+    e::Panel.handle_split_zone({ 'zone_id' => "#{cid}-Z1.1.1", 'axis' => 'v', 'count' => 2,
+                                 'model_guid' => guid, 'cabinet_id' => cid }.to_json)
+    cab = e::Panel.find_cabinet_by_id(model, cid)
+    ok('UI-C2 (N22): 4. uroven sa neda vytvorit (strom ostal na 3)',
+       e::ZoneTree.depth(zone_tree_of(cab)) == 3)
+
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: UI-C2 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   # === UI-C1c: ORIENTACIA DOSKY ==============================================
   # Overuje presne to, co headless sada NEVIE: realne matice, SVETOVE osi,
   # normalu dekorovej plochy, kotviace roviny, spravanie transformacie pri
@@ -4211,6 +4368,7 @@ module NoxunSuRunner
     run_uib2(model)          # UI-B2: kamera nahladu — celny pohlad, guardy identity, ziadny zapis ani undo krok
     run_uib3(model)          # UI-B3: vyber dielcov z informacneho stlpca — ciste citanie, ziadny undo krok
     run_uic1c(model)         # UI-C1c: orientacia dosky — matice, delta, scale/dedup, vyrobne data nedotknute
+    run_uic2(model)          # UI-C2: zony — delenie/police/presna cesta na zivej skrinke, guardy, undo, vyber
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

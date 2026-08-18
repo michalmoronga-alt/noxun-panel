@@ -185,6 +185,27 @@ plné odôvodnenia v [../../archiv/KRONIKA.md](../../archiv/KRONIKA.md) a [../..
 Delenie = 4 dlaždice + pole „Prvá zóna" mm so zlomkami (N21) + drag so snap 1/4·1/2·3/4 (N20) ·
 Police = pills 0–6 · Vnútro = rezervovaný slot (po V1).
 
+**Zóny — vedomé odchýlky od mockupu (implementácia UI-C2, 19.8.2026):**
+- **Dlaždice delenia a pilulky políc sú aktívne LEN na LISTOVEJ zóne.** Mockup ich kreslí
+  aktívne aj nad delenou Z1.2; v skutočnosti by opakované delenie ticho zmazalo celý podstrom
+  aj s materiálmi a ABS jeho dielcov. Na delenej zóne sú preto viditeľné, ale neaktívne
+  s vysvetlením (`aria-disabled`, vzor D-78) a **jedinou deštruktívnou cestou ostáva
+  „Vyčistiť zónu"**. Vynucuje to SERVER, nie len HTML. *Mockup sa dorovná pri 1:1 kole.*
+- **Pole „Prvá zóna" je naopak aktívne LEN na DELENEJ zóne** — edituje jej pole 1. Na liste
+  ešte žiadne polia neexistujú, takže by nemalo čo meniť.
+- **Zámok = vypísaná hodnota** (rovnaké pravidlo ako výšky čiel): vyplnená „Prvá zóna" pole 1
+  zamkne, prázdna odomkne. Per-pole zámky v úplnom zozname polí ostávajú — nové pole je
+  **skratka**, nie náhrada.
+- **Zlomky sa počítajú zo SVETLÉHO priestoru** (rozpätie − priečky) tak, aby **stred priečky**
+  sadol na zlomok. Mockupových „432 (1/2)" pri 864 mm a hrúbke 18 je v skutočnosti **423** —
+  mockup rátal nahrubo a bok by vyšiel posunutý o 9 mm. Je to tá istá funkcia, akou počíta
+  magnet ťahania, takže sa číslo v poli a poloha priečky nemôžu rozísť.
+- **Presné delenie nezmestiteľnú hodnotu ODMIETNE** (nikdy ticho nezmenší), presnosť **0,01 mm**.
+- **Strop políc 6 je strop, nie fallback** — kto chce viac priehradiek, zónu rozdelí.
+- **Legacy strom hlbší než 3 úrovne sa NEOREZÁVA:** vloženie aj šablóna prejdú s ORANGE
+  varovaním, hlbšie úrovne sú v strome neklikateľný varovný riadok. Orezanie by zmazalo
+  dielce živej zákazky.
+
 **Čelá:** riadky s ikonou typu (N27) · úzke pole 46 px, „mm" pri hodnote, AUTO chip na návrat
 (zámok pri výške ZRUŠENÝ — zamknuté ⇔ vypísané) · rady výšok N25 · naviazané kovanie pod riadkom
 (klik → Kovanie) · výklop v ponuke s upozornením „AVENTOS ručne, automatika fáza 3" · D-84 reč

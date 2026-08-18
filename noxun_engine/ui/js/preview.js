@@ -949,7 +949,10 @@
   function setupPreviewDelegation(){
     if (previewBound) return;
     var svg = el('preview'); if (!svg) return;
-    svg.addEventListener('mousedown', function(ev){
+    // UI-C2: `pointerdown` (nie `mousedown`) — bez neho nie je `pointerId`, a bez
+    // neho sa neda nastavit pointer capture. Kompatibilne `mousedown` sa uz
+    // nekona (startDivDrag robi preventDefault), pan si listenery viaze sam.
+    svg.addEventListener('pointerdown', function(ev){
       var t = closestClass(ev.target, 'divh');
       if (t){ startDivDrag(ev, t, svg); return; }
       startPan(ev); // pan pohladu (aj nad zonou — kratky tah bez pohybu ostava klikom)
@@ -1101,21 +1104,27 @@
   function pickZone(localId){
     activeZoneId = fullZoneId(localId);
     refreshZoneUI();
-    // UI-B1 (Codex #168 P2): karta Zona zije v sektore Nastavenia — klik na zonu
-    // v nahlade ju musi aj UKAZAT (zbaleny sektor by ju schoval). Rozbaluje sa
+    // UI-B1 (Codex #168 P2): skupiny zon ziju v sektore Nastavenia — klik na zonu
+    // v nahlade ich musi aj UKAZAT (zbaleny sektor by ich schoval). Rozbaluje sa
     // LEN na tejto pouzivatelskej ceste, nie pri kazdom serverovom refreshi.
-    if (typeof nxRevealTarget === 'function') nxRevealTarget(el('zoneCard'));
+    // UI-C2: cielom je hlavicka vybranej zony v skupine Delenie zony.
+    if (typeof nxRevealTarget === 'function') nxRevealTarget(el('zoneActive'));
     renderPreview();
-    if (selectedCabId && window.sketchup && sketchup.select_zone) sketchup.select_zone(JSON.stringify({ zone_id: activeZoneId }));
+    if (selectedCabId && window.sketchup && sketchup.select_zone)
+      sketchup.select_zone(nxZonePayload({ zone_id: activeZoneId }));
   }
 
-  // --- drag priecky ---
+  // --- drag priecky (UI-C2: magnet N20 + pointer capture) --------------------
+  // MAGNET: priecka sa prilepi na 1/4 · 1/2 · 3/4 zony. Pocita to TA ISTA
+  // zdielana funkcia (`nxZoneSnapCum`), aku pouzivaju zlomky pola „Prva zona",
+  // takze cislo v poli a poloha priecky sa nikdy nerozidu. Prah je v PIXELOCH
+  // prepocitany aktualnym zoomom — pri priblizenom pohlade musi ist doladit na
+  // desatiny milimetra, inak by magnet presnu pracu znemoznil.
+  // ALT drzany pocas tahania magnet VYPINA (rozhoduje sa PRED aplikaciou).
+  var DIV_SNAP_PX = 8;
   function startDivDrag(ev, d, svg){
     ev.preventDefault();
-    // Obrana: ak by z predchadzajuceho dragu ostali visiet listenery (napr. mouseup mimo okna),
-    // vycisti ich a zahod stary stav — inak by sa drag "zasekol" a dalsi neodstartoval cisto.
-    document.removeEventListener('mousemove', onDivDrag);
-    document.removeEventListener('mouseup', endDivDrag);
+    endDivListeners();
     dragState = null;
     var zid = d.getAttribute('data-zid'), idx = parseInt(d.getAttribute('data-idx'),10), axis = d.getAttribute('data-axis');
     // najdi rodicovsku zonu v computeZones pre span
@@ -1127,9 +1136,36 @@
     var t = numv('thickness')||18;
     var span = (axis==='v') ? parent.w : parent.h;
     dragState = { zid: zid, idx: idx, axis: axis, parent: parent, span: span, t: t,
-                  sizes: parent.split.sizes.slice(), startX: ev.clientX, startY: ev.clientY, svg: svg };
-    document.addEventListener('mousemove', onDivDrag);
-    document.addEventListener('mouseup', endDivDrag);
+                  count: parent.split.count,
+                  sizes: parent.split.sizes.slice(), startX: ev.clientX, startY: ev.clientY,
+                  svg: svg, node: d, pid: (ev.pointerId != null ? ev.pointerId : null) };
+    // POINTER CAPTURE: `mouseup` mimo okna panela (CEF, pretiahnutie cez okraj)
+    // sa do dokumentu uz nedostane — drag potom ostal visiet a neulozeny stav
+    // sa stratil. Capture drzi udalosti na uzle priecky az do pointerup/cancel.
+    if (d.setPointerCapture && dragState.pid != null){
+      try { d.setPointerCapture(dragState.pid); } catch (e) { /* starsi CEF — ostava fallback nizsie */ }
+      d.addEventListener('pointermove', onDivDrag);
+      d.addEventListener('pointerup', endDivDrag);
+      d.addEventListener('pointercancel', endDivDrag);
+      dragState.captured = true;
+    } else {
+      document.addEventListener('mousemove', onDivDrag);
+      document.addEventListener('mouseup', endDivDrag);
+      window.addEventListener('blur', endDivDrag); // strata fokusu = koniec tahania
+    }
+  }
+  function endDivListeners(){
+    document.removeEventListener('mousemove', onDivDrag);
+    document.removeEventListener('mouseup', endDivDrag);
+    window.removeEventListener('blur', endDivDrag);
+    if (dragState && dragState.captured && dragState.node){
+      dragState.node.removeEventListener('pointermove', onDivDrag);
+      dragState.node.removeEventListener('pointerup', endDivDrag);
+      dragState.node.removeEventListener('pointercancel', endDivDrag);
+      if (dragState.node.releasePointerCapture && dragState.pid != null){
+        try { dragState.node.releasePointerCapture(dragState.pid); } catch (e) { /* uz uvolnene */ }
+      }
+    }
   }
   function onDivDrag(ev){
     if (!dragState) return;
@@ -1142,28 +1178,38 @@
     var i = dragState.idx;
     // presun hranice medzi polom i a i+1: zvacsi i, zmensi i+1
     var newI = sizes[i] + d_mm, newN = sizes[i+1] - d_mm;
+
+    // MAGNET nad SVETLYM suctom poli 0..i (to je presne to, co zdielana
+    // geometria pozna). Alt ho vypina — rozhodne sa PRED aplikaciou.
+    var before = 0; for (var k = 0; k < i; k++) before += sizes[k];
+    var tolMm = (ev.altKey || !(scale > 0)) ? 0 : (DIV_SNAP_PX / scale);
+    var snapped = nxZoneSnapCum(dragState.span, dragState.count, dragState.t, i, before + newI, tolMm);
+    var magnet = Math.abs((before + newI) - snapped) > 1e-9;
+    if (magnet){ var shift = snapped - (before + newI); newI += shift; newN -= shift; }
+
     if (newI < MINF){ newN -= (MINF-newI); newI = MINF; }
     if (newN < MINF){ newI -= (MINF-newN); newN = MINF; }
     sizes[i] = newI; sizes[i+1] = newN;
-    // uloz do currentZoneTree (docasne, ako size hodnoty)
+    // uloz do currentZoneTree (docasne, ako size hodnoty; mm Float 0,01)
     var tree = sanitizeTree(currentZoneTree);
     var node = navTree(tree, pathOf(dragState.zid));
-    if (node && node.split){ node.split.cuts[i] = { size: Math.round(newI), locked: node.split.cuts[i].locked };
-                             node.split.cuts[i+1] = { size: Math.round(newN), locked: node.split.cuts[i+1].locked }; }
+    if (node && node.split){ node.split.cuts[i] = { size: nxRound2(newI), locked: node.split.cuts[i].locked };
+                             node.split.cuts[i+1] = { size: nxRound2(newN), locked: node.split.cuts[i+1].locked }; }
     currentZoneTree = tree;
     renderPreview();
-    NX.setStatus('Pole '+(i+1)+': '+Math.round(newI)+' mm · pole '+(i+2)+': '+Math.round(newN)+' mm', false);
+    NX.setStatus('Pole '+(i+1)+': '+mmLabel(nxRound2(newI))+' mm · pole '+(i+2)+': '+mmLabel(nxRound2(newN)) +
+                 ' mm' + (magnet ? ' · magnet' : ''), false);
   }
   function endDivDrag(ev){
-    document.removeEventListener('mousemove', onDivDrag);
-    document.removeEventListener('mouseup', endDivDrag);
-    if (!dragState) return;
+    if (!dragState){ endDivListeners(); return; }
     var i = dragState.idx, zid = dragState.zid;
+    endDivListeners();
     // fix #5: posli kompletny layout (vsetky polia uz maju explicitne sizes zo freeze + dragu)
     if (selectedCabId) pushFieldCuts(zid, i);
     // Codex #175 P2: v navrhu tah priecky meni plochy polic — odhad musi ist s nimi.
     else if (typeof nxDraftChanged === 'function') nxDraftChanged();
     dragState = null;
+    if (typeof refreshZoneUI === 'function') refreshZoneUI(); // polia a „Prva zona" nesu novy rozmer
   }
 
   // Node testy (tests/js/test_uib2_nahlad.js) — LEN ciste jadro projekcii
