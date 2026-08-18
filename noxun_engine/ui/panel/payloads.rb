@@ -464,11 +464,41 @@ module Noxun
             # (NIE sheets: vkladanie dosky a projektove selecty ich nesmu vidiet).
             # Konzumuju ich VYHRADNE selecty tela korpusu, dielca a karty dosky;
             # vyber posle "duplak2:<id>" a server ho rozriesi ensure_duplak_for.
-            'duplak_offers' => duplak_offers(ctx)
+            'duplak_offers' => duplak_offers(ctx),
+            # D-85 (UI-03): id POUZITE V TEJTO ZAKAZKE — zdroj sekcie „Použité
+            # v projekte" v comboboxe. ODVODENY udaj (ziadna nova schema, ziadny
+            # zapis do modelu), cisty read-only scan configov.
+            'used_ids' => used_ids_payload
           }
         rescue StandardError => e
           Engine.log_error(e, 'materials_payload')
           { 'sheets' => [], 'edges' => [] }
+        end
+
+        # D-85: „Použité v projekte" = tato ZAKAZKA, nie globalna kniznica —
+        # zdroje typu „šablóna X" sa preto vyhadzuju (sablony su spolocna kniznica
+        # oboch pocitacov, nie obsah otvoreneho modelu). Projektove predvolby
+        # zakazkou SU, takze ostavaju. Cita sa vyhradne (Materials.used_*_ids
+        # su read-only scany) — payload nesie len ID, nic ine.
+        def used_ids_payload
+          model = Sketchup.active_model
+          { 'sheets' => used_model_ids(Materials.used_material_ids(model)),
+            'edges' => used_model_ids(Materials.used_abs_ids(model)) }
+        rescue StandardError => e
+          Engine.log_error(e, 'used_ids_payload')
+          { 'sheets' => [], 'edges' => [] }
+        end
+
+        TEMPLATE_SOURCE_PREFIX = 'šablóna '
+
+        # Z mapy {id => [zdroje]} nechaj id, ktore ma ASPON JEDEN zdroj mimo sablon.
+        def used_model_ids(map)
+          (map || {}).each_with_object([]) do |(id, sources), out|
+            next if id.to_s.empty?
+            next unless Array(sources).any? { |s| !s.to_s.start_with?(TEMPLATE_SOURCE_PREFIX) }
+
+            out << id.to_s
+          end
         end
 
         # D-49: ponuka virtualnych duplakov (zdroje bez existujuceho duplaku a

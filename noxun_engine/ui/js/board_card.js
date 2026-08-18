@@ -96,6 +96,7 @@
       sels[i].innerHTML = boardEdgeOptionsHtml(materialId, cur);
       sels[i].value = cur;
     }
+    nxComboSync(box); // D-85: pregrupovane volby -> obnov popisky triggerov
   }
   // ABS hrana: okamzity zapis JEDNEJ hrany; kompletnu mapu sklada Ruby (read-modify-write).
   function onBoardEdgeChange(code, value){
@@ -168,6 +169,7 @@
     if (ms){ fillBoardMaterialSelect(ms, bc.material_id || '', true); }
     renderBoardEdgeRows(bc);
     renderBoardSvg(bc);
+    nxComboSync(box); // D-85: materialovy combobox + 4 comboboxy hran dosky
   }
 
   // Material select dosky: VSETKY doskove materialy bez hrubkoveho filtra a bez
@@ -208,6 +210,8 @@
       sel.innerHTML = boardEdgeOptionsHtml(bc.material_id, curVal, bc.edge_none_option);
       sel.value = curVal;
       sel.setAttribute('data-edge', code);
+      sel.setAttribute('data-nx-combo', 'abs'); // D-85: hrany su ABS combobox
+
       sel.onchange = (function(cc, ss){ return function(){ onBoardEdgeChange(cc, ss.value); }; })(code, sel);
       row.appendChild(sel);
       box.appendChild(row);
@@ -264,7 +268,11 @@
       var t = closestClass(ev.target, 'behit'); if (!t) return;
       var code = t.getAttribute('data-edge');
       var sel = el('boardEdgeRows').querySelector('select[data-edge="' + code + '"]');
-      if (sel){ sel.focus(); NX.setStatus('Hrana ' + code + ' — vyber ABS v zozname.', false); }
+      // D-85: nativny select je skryty — klik na hranu rovno otvori combobox.
+      if (sel){
+        if (!(typeof NXCombo !== 'undefined' && NXCombo && NXCombo.open(sel))) sel.focus();
+        NX.setStatus('Hrana ' + code + ' — vyber ABS v zozname.', false);
+      }
     });
   }
 
@@ -287,19 +295,23 @@
     document.body.setAttribute('data-insert-kind', kind); // atribut PREZIJE setUiMode className prepis
     if (kind === 'board'){
       var ms = el('ib_material');
-      if (ms && !ms.options.length){ fillBoardMaterialSelect(ms, ''); onInsertBoardMaterial(); }
+      if (ms && !ms.options.length){ fillBoardMaterialSelect(ms, ''); nxComboSync(); onInsertBoardMaterial(); }
     }
   }
   // D-05: po zmene katalogu (NX.setMaterials) sa vkladaci select NEplni "iba raz" —
   // force refill so zachovanim platneho vyberu + prepocet hrubky/grainu. Fokusovany
   // select sa nechava tak (nerozbit rozkliknuty dropdown).
+  // D-85: "rozkliknuty" uz neznamena len fokus nativneho selectu — od UI-03 je nad
+  // nim combobox, takze sa pyta nxFieldBusy (fokus ALEBO otvoreny popup). Bez toho
+  // by zivy refresh katalogu prekreslil ponuku pod rukami pisuceho pouzivatela.
   function refreshInsertBoardMaterials(){
     var ms = el('ib_material');
     if (!ms || !ms.options.length) return; // este nenaplneny — naplni onInsertKindChange
-    if (document.activeElement === ms) return;
+    if (nxFieldBusy(ms)) return;
     var keep = ms.value;
     fillBoardMaterialSelect(ms, keep);
     if (ms.value !== keep || !ms.value){ ms.selectedIndex = ms.selectedIndex < 0 ? 0 : ms.selectedIndex; }
+    nxComboSync();
     onInsertBoardMaterial();
   }
   // --- E-03: hrubka vo vkladacej karte (ciste funkcie, testuje test_e03_board_insert.js) ---

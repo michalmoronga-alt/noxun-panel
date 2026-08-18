@@ -36,6 +36,7 @@
     ms.className = pc.has_material_override ? 'ovr' : '';
     renderEdgeRows(pc);
     renderPartSvg(pc);
+    nxComboSync(box); // D-85: materialovy combobox + 4 comboboxy hran
   }
   function renderEdgeRows(pc){
     var box = el('edgeRows'); box.innerHTML='';
@@ -56,6 +57,8 @@
       sel.value = curVal;
       if (isOvr) sel.className='ovr';
       sel.setAttribute('data-edge', code);
+      sel.setAttribute('data-nx-combo', 'abs'); // D-85: hrany su ABS combobox
+
       sel.onchange = (function(cc){ return function(){ onEdgeChange(cc, sel.value); }; })(code);
       row.appendChild(sel);
       box.appendChild(row);
@@ -150,6 +153,7 @@
       sels[i].innerHTML = edgeOptionsHtml(materialId, cur);
       sels[i].value = cur;
     }
+    nxComboSync(box); // D-85: pregrupovane volby -> obnov popisky triggerov
   }
   // Spat z karty dielca na skrinku (omrvinka) — Ruby oznaci korpus a poslе novy stav.
   function backToCabinet(){
@@ -192,7 +196,12 @@
       var code = t.getAttribute('data-edge');
       var sel = el('edgeRows').querySelector('select[data-edge="'+code+'"]');
       // len fokus + status; class 'ovr' (vizual override) patri az realnemu overridu z onEdgeChange
-      if (sel){ sel.focus(); NX.setStatus('Hrana '+code+' — vyber ABS v zozname.', false); }
+      // D-85: nativny select je skryty — klik na hranu preto rovno OTVORI combobox
+      // (fokus zostava fallbackom, keby komponent nebezal).
+      if (sel){
+        if (!(typeof NXCombo !== 'undefined' && NXCombo && NXCombo.open(sel))) sel.focus();
+        NX.setStatus('Hrana '+code+' — vyber ABS v zozname.', false);
+      }
     });
   }
 

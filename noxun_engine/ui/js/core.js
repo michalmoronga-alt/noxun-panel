@@ -94,6 +94,29 @@
   }
   function absColorOf(absId){ return absId ? absColorByThickness(absThicknessOf(absId)) : '#b0bec5'; }
 
+  // ===== D-85 (UI-03): napojenie zdielaneho comboboxu na katalog ================
+  // nx_combo.js sam ZIADNY katalog nepozna — vsetky data mu podava panel dvoma
+  // hookmi. Vdaka tomu je komponent prenositelny do dalsich okien bez toho, aby
+  // si nosil kopiu MATERIALS.
+  //   * farba stvorceka: dekor berie farbu z katalogu, ABS paska z HRUBKY
+  //     (rovnaka legenda ako riadky hran a .absleg — standard 7.6),
+  //   * "Pouzite v projekte": ciste odvodeny zoznam id zo serveroveho payloadu
+  //     (materials.used_ids) — panel nic nedopocitava a nic si nepamata.
+  function nxComboColorOf(kind, value){
+    if (!value) return '';
+    if (kind === 'abs') return absColorOf(value);
+    var rec = sheetRecOf(value);
+    return (rec && rec.color) ? rec.color : '';
+  }
+  function nxComboUsedOf(kind){
+    var u = MATERIALS.used_ids || {};
+    return (kind === 'abs' ? u.edges : u.sheets) || [];
+  }
+  if (typeof NXCombo !== 'undefined' && NXCombo){
+    NXCombo.setColorResolver(nxComboColorOf);
+    NXCombo.setUsedResolver(nxComboUsedOf);
+  }
+
   // D-45: rozsah hrubky korpusu/cela — zrkadlo Ruby CabinetBuilder::THICKNESS_RANGE.
   var TH_RANGE = [6, 50];
   // D-45 (audit F10): mm s desatinnou CIARKOU pre UI texty — cele cisla bez
@@ -427,6 +450,22 @@
       function(s){ return s.uni === true ? '' : bodyThicknessNote(s.thickness, bodyTh); }, true);
     fillSheetSelectFiltered(el('cab_front'), true, frontMatch());
     fillSheetSelectFiltered(el('cab_back'), true, thMatch(backTh));
+    nxComboSync(); // D-85: prekreslene <option>y -> obnov popisky comboboxov
+  }
+  // D-85: jeden vstupny bod pre "pripoj combobox na nove selecty + obnov existujuce".
+  // Vola sa po KAZDOM renderi, ktory siaha na material/ABS selecty. Bez neho by
+  // trigger ukazoval starý popis (zmena `value` ziadnu udalost nevystreli).
+  function nxComboSync(root){
+    if (typeof NXCombo !== 'undefined' && NXCombo) NXCombo.scan(root);
+  }
+  // D-85: "je pole prave obsluhovane pouzivatelom?" — fokus v nativnom poli ALEBO
+  // otvoreny combobox nad nim. Guardy, ktore doteraz pozerali len na
+  // document.activeElement, musia vidiet aj otvoreny popup (inak by zivy refresh
+  // katalogu prestaval rozkliknuty vyber respektovat).
+  function nxFieldBusy(node){
+    if (!node) return false;
+    if (document.activeElement === node) return true;
+    return !!(typeof NXCombo !== 'undefined' && NXCombo && NXCombo.isOpen(node));
   }
   function val(id){ var e = el(id); return e ? e.value : null; }
   // V0.4.7e: numv cita cez evalDim — nahlad/svetle rozmery/filtre vidia hodnotu

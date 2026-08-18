@@ -59,6 +59,9 @@
        ZAVAZNE zrkadlo EdgeCheck::COLORS (core/edge_check.rb) — svorka v okne
        musi mat presne farbu plosky v modeli. */
     --nx-edge-missing:#e24b4a; --nx-edge-extra:#ff8c00; --nx-edge-taped:#1d9e75;
+    /* D-85 combobox — zvyraznenie zhody pri hladani (vlastny token: nie je to
+       ani stav, ani vyber, ani upozornenie — je to "toto si napisal") */
+    --nx-mark-bg:#fff3b0;
     /* prekrytia */
     --nx-scrim:rgba(38,50,56,0.45); --nx-modal-shadow:rgba(0,0,0,0.25);
     /* ===== SEMAFOR — REZERVOVANE (B6). NIKDE sa nepouzivaju; vyhradene pre stavovy
@@ -199,6 +202,52 @@
   .pcmat label { flex: 0 0 78px; font-size: 12px; color: var(--nx-ink-label); }
   .pcmat select { flex: 1; padding: 4px 6px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 12px; min-width: 0; }
   .pcmat select.ovr { border-color: var(--nx-warn); background: var(--nx-warn-bg); }
+  /* ===== D-85 / UI-03 ZDIELANY COMBOBOX (js/nx_combo.js) =====================
+     Nativny <select> ostava v DOM ako zdroj pravdy — len sa neukazuje. Skryva ho
+     ATRIBUT (nie trieda): panel selectom prepisuje className ('ovr'), takze
+     trieda by zmizla. `display:none` je zamer — pole nesmie chytat mysku ani tab.
+     Vzhlad prevzaty 1:1 z mockupu SYSTEM/zdroje/ui20/mockup_inspector_c.html. */
+  .nxcombo { position: relative; min-width: 0; }
+  .nxcombo > select[data-nx-combo] { display: none; }
+  /* Combobox preberá miesto povodneho <select>u v svojom riadku. */
+  .row .nxcombo, .matrow .nxcombo, .pcmat .nxcombo, .edgerow .nxcombo { flex: 1; }
+  .cbtrigger { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 6px;
+               font: inherit; font-size: 12px; background: var(--nx-surface);
+               border: 1px solid var(--nx-border-strong); border-radius: 6px;
+               cursor: pointer; color: var(--nx-ink); text-align: left; min-height: 27px; }
+  .cbtrigger:hover:not(:disabled) { border-color: var(--nx-select); }
+  .cbtrigger:disabled { background: var(--nx-surface-sunken); color: var(--nx-ink-faint); cursor: default; }
+  .cbtrigger.ovr { border-color: var(--nx-warn); background: var(--nx-warn-bg); }
+  .cbtrigger .sw { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--nx-border); flex: 0 0 14px; }
+  .cbtrigger .lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cbtrigger .ic { width: 13px; height: 13px; color: var(--nx-ink-faint); flex: 0 0 13px; }
+  /* Popup je position:fixed NAD body — ziadny overflow:auto predok ho neoreze
+     (poucenie D-67 FIX 7 a D-105). Poziciu pocita JS. */
+  .cbpop { position: fixed; z-index: 120; background: var(--nx-surface);
+           border: 1px solid var(--nx-border); border-radius: 6px;
+           box-shadow: 0 8px 22px var(--nx-modal-shadow); overflow: hidden; }
+  .cbsearch { display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+              border-bottom: 1px solid var(--nx-border-soft); }
+  .cbsearch .ic { width: 14px; height: 14px; color: var(--nx-ink-faint); flex: 0 0 14px; }
+  .cbsearch input { flex: 1; border: 0; outline: 0; font: inherit; font-size: 12.5px;
+                    background: transparent; min-width: 0; color: var(--nx-ink); }
+  .cblist { max-height: 230px; overflow: auto; }
+  .cbsec { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+           color: var(--nx-ink-faint); padding: 6px 9px 2px; }
+  .cbopt { display: flex; align-items: center; gap: 8px; padding: 5px 9px; cursor: pointer; font-size: 12.5px; }
+  .cbopt .sw { width: 18px; height: 18px; border-radius: 3px; border: 1px solid var(--nx-border); flex: 0 0 18px; }
+  .cbopt .sw.nosw { border-style: dashed; background: var(--nx-surface-sunken); }
+  .cbopt .t { flex: 1; min-width: 0; overflow: hidden; }
+  .cbopt .t b { font-weight: 600; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cbopt .t i { font-style: normal; color: var(--nx-ink-faint); font-size: 10.5px; display: block; }
+  .cbopt.act { background: var(--nx-select-bg); }
+  .cbopt.off { color: var(--nx-ink-faint); cursor: default; }
+  .cbopt mark { background: var(--nx-mark-bg); color: inherit; padding: 0; }
+  .cbempty { padding: 10px 9px; font-size: 12px; color: var(--nx-ink-faint); }
+  .cbfoot { padding: 5px 9px; border-top: 1px solid var(--nx-border-soft); font-size: 10.5px;
+            color: var(--nx-ink-faint); display: flex; gap: 6px; align-items: center; }
+  .kbd { border: 1px solid var(--nx-border); border-bottom-width: 2px; border-radius: 3px;
+         padding: 0 4px; font-size: 10px; background: var(--nx-surface-sunken); color: var(--nx-ink-muted); }
   /* KOVANIE (V0.4) */
   .hwrow { display: flex; align-items: center; gap: 5px; margin: 4px 0; }
   .hwrow .hwname { flex: 1; font-size: 12px; color: var(--nx-ink-strong); min-width: 0; }

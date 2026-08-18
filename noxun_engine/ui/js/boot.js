@@ -19,4 +19,7 @@
     // (18-6) potrebuju rovnaky expr handler ako dlzka/sirka.
     ['bc_length','bc_width','bc_thickness'].forEach(function(id){ attachExprField(el(id), { flushFn: flushBoardEditsNow }); });
   }
-  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupFieldEditorDelegation(); document.body.setAttribute('data-insert-kind', getInsertKind()); setCabTab('korpus'); /* D-08 Codex F2: atribut+preview+tlacidla jednym volanim */ if (window.sketchup && sketchup.ready) sketchup.ready(); };
+  // D-85 (UI-03): prve pripojenie zdielaneho comboboxu na STATICKE selecty panela
+  // (korpus/celá/chrbát, materiál dielca, materiál dosky, vkladaci materiál).
+  // Dynamicke (hrany dielca a dosky) si ho beru vlastnym nxComboSync pri renderi.
+  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupFieldEditorDelegation(); nxComboSync(); document.body.setAttribute('data-insert-kind', getInsertKind()); setCabTab('korpus'); /* D-08 Codex F2: atribut+preview+tlacidla jednym volanim */ if (window.sketchup && sketchup.ready) sketchup.ready(); };
