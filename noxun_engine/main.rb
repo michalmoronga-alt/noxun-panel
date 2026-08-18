@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.7.1' unless defined?(VERSION)
+    VERSION = '0.7.2' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -126,6 +126,89 @@ module Noxun
         next
       end
     end
+
+    # --- UI-02: SketchUp toolbar ---------------------------------------------
+    # Styri tlacidla podla kontraktu UI 2.0 (N4): logo (Inspector) · Studio ·
+    # ABS kontrola hran (prepinac) · Vlozit skrinku. Toolbar NIE je novy modul —
+    # zije v main.rb ako menu, s ktorym zdiela kazdy `UI::Command`.
+    #
+    # Zelezne pravidlo (lekcia D-103/D-105): z toolbaru sa do MODELU NEZAPISUJE.
+    # Tlacidla len otvaraju okna a prepinaju zobrazenie — ziadny
+    # `start_operation`, ziadny dedup, ziadna geometria.
+    TOOLBAR_NAME = 'Noxun Engine'
+    TOOLBAR_ICON_DIR = File.join(PLUGIN_DIR, 'ui', 'icons')
+
+    # Ikona toolbaru: jedno SVG na oba rozmery (SketchUp na Windows si SVG
+    # prepocita sam). Chybajuci subor tlacidlo nezhodi — ostane bez ikony.
+    def self.toolbar_icon(cmd, file)
+      path = File.join(TOOLBAR_ICON_DIR, file)
+      return unless File.exist?(path)
+
+      cmd.small_icon = path
+      cmd.large_icon = path
+    end
+
+    # Validation proc bezi pri KAZDOM prekresleni UI — musi byt lacny a nesmie
+    # nikdy vyhodit vynimku (zlyhanie by SketchUp opakoval donekonecna).
+    def self.toolbar_state(&block)
+      block.call ? MF_CHECKED : MF_UNCHECKED
+    rescue StandardError
+      MF_UNCHECKED
+    end
+
+    # Guard proti dvojitej registracii: pri reloade pluginu (`load main.rb`)
+    # by inak pribudol dalsi rad rovnakych tlacidiel. Referenciu drzime aj
+    # kvoli GC (rovnaky dovod ako pri HtmlDialogu).
+    def self.install_toolbar
+      return @toolbar if @toolbar
+
+      tb = UI::Toolbar.new(TOOLBAR_NAME)
+
+      cmd_panel = UI::Command.new('Inspector') { Panel.dialog_alive? ? Panel.hide : Panel.show }
+      cmd_panel.tooltip = 'Inspector — panel Noxun Engine (znova zavrie)'
+      cmd_panel.status_bar_text = 'Otvori alebo zavrie panel na vkladanie a upravu korpusov.'
+      cmd_panel.set_validation_proc { toolbar_state { Panel.dialog_alive? } }
+      toolbar_icon(cmd_panel, 'noxun_logo.svg')
+      tb.add_item(cmd_panel)
+
+      cmd_studio = UI::Command.new('Štúdio') { ProductionDialog.show }
+      cmd_studio.tooltip = 'Štúdio — zatiaľ otvára okno Výroba (plné Štúdio príde v ďalšej fáze)'
+      cmd_studio.status_bar_text = 'Kusovník, kontrola, rozpočet a výstupy zákazky.'
+      toolbar_icon(cmd_studio, 'noxun_studio.svg')
+      tb.add_item(cmd_studio)
+
+      cmd_abs = UI::Command.new('ABS kontrola hrán') do
+        next unless defined?(EdgeCheck)
+
+        state = EdgeCheck.toggle(Sketchup.active_model)
+        # D-105: okno Vyroba ma vlastne ovladanie hran (split tlacidlo so stavmi
+        # a poctami). Prepnutie z toolbaru mu preto musi poslat NOVY stav —
+        # inak by okno ostalo na starom (cesta ProductionDialog#do_edge_check
+        # posiela push_edge_check rovnako). Defenzivne: pri zavretom okne sa
+        # push ticho zahodi (`js` ma vlastny guard aj rescue).
+        ProductionDialog.push_edge_check(state) if defined?(ProductionDialog)
+      end
+      cmd_abs.tooltip = 'ABS kontrola hrán — zvýrazní olep v modeli (prepínač)'
+      cmd_abs.status_bar_text = 'Zapne/vypne farebné zvýraznenie olepu hrán. Nastavenie je v okne Výroba → Kontrola.'
+      cmd_abs.set_validation_proc do
+        if !defined?(EdgeCheck) || !EdgeCheck.available?
+          MF_GRAYED
+        else
+          toolbar_state { EdgeCheck.active? }
+        end
+      end
+      toolbar_icon(cmd_abs, 'noxun_abs.svg')
+      tb.add_item(cmd_abs)
+
+      cmd_insert = UI::Command.new('Vložiť skrinku') { Panel.show_insert }
+      cmd_insert.tooltip = 'Vložiť skrinku — otvorí panel vo vkladacom režime'
+      cmd_insert.status_bar_text = 'Otvori panel s vkladacou kartou (vyber v modeli sa zrusi).'
+      toolbar_icon(cmd_insert, 'noxun_insert.svg')
+      tb.add_item(cmd_insert)
+
+      tb.restore
+      @toolbar = tb
+    end
   end
 end
 
@@ -216,18 +299,7 @@ module Noxun
       end
 
       begin
-        cmd = UI::Command.new('Noxun Engine — Panel') { Panel.show }
-        cmd.tooltip = 'Noxun Engine — Panel'
-        cmd.status_bar_text = 'Otvori panel na vkladanie a upravu parametrickych korpusov.'
-        icon = File.join(PLUGIN_DIR, 'icons', 'panel.svg')
-        if File.exist?(icon)
-          cmd.small_icon = icon
-          cmd.large_icon = icon
-        end
-
-        toolbar = UI::Toolbar.new('Noxun Engine')
-        toolbar.add_item(cmd)
-        toolbar.restore
+        install_toolbar # UI-02: logo · Studio · ABS kontrola · Vlozit
 
         menu = UI.menu('Extensions').add_submenu('Noxun Engine')
         menu.add_item('Panel') { Panel.show }

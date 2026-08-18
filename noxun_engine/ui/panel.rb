@@ -25,6 +25,34 @@ module Noxun
           Engine.log_error(e, 'Panel.show')
         end
 
+        # UI-02: toolbar tlacidlo loga je PREPINAC — druhy klik panel zavrie.
+        # Zatvorenie ide cez `set_on_closed` (detach observera + @dialog = nil),
+        # takze stav panela ostava konzistentny s beznym zavretim krizikom.
+        def hide
+          return false unless @dialog
+
+          @dialog.close
+          true
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.hide')
+          false
+        end
+
+        # UI-02: toolbar tlacidlo „Vlozit" — panel BEZ vyberu ukazuje vkladaciu
+        # kartu, takze staci otvorit panel a zhodit vyber. Ziadna operacia a
+        # ziadny zapis do modelu (lekcia D-103: prazdny vyber sa vycisti pod
+        # suspend guardom, aby observer nespustil vlastny refresh, a refresh
+        # panela ide s `dedup: false` — dedup MENI model).
+        def show_insert
+          model = Sketchup.active_model
+          suspend_selection_sync { model.selection.clear } if model
+          dlg = show
+          push_selected(model, dedup: false) if model && dialog_alive?
+          dlg
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.show_insert')
+        end
+
         def ensure_dialog
           return @dialog if @dialog
 

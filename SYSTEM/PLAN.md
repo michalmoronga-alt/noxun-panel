@@ -10,7 +10,6 @@
 **Cieľ:** satelitné okná → jedno štúdio okno s toolbarom a bočnou navigáciou; výber materiálu/ABS na jeden klik namiesto scrollovania. **Koncept Inspectora je uzavretý** (Michal, 18.8.2026) — záväzný slovný kontrakt je [zdroje/ui20/UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) (sekcie „SCHVÁLENÉ ROZHODNUTIA" a „FINÁLNY KONCEPT INSPECTOR C") a vizuálna referencia mockupy vedľa neho: [Inspector C v16](zdroje/ui20/mockup_inspector_c.html) · [štúdio okno](zdroje/ui20/mockup_ui20.html) · [dizajnový lístok](zdroje/ui20/dizajnovy_listok.html); implementácia ide po dávkach nižšie. Podklad: merač používania D-25 (materiály/ABS vyše 400 interakcií, taby 287×, satelitné okná 234×) a [UI_VIZIA.md](UI_VIZIA.md); cieľový obraz v [V1_VIZIA.md](V1_VIZIA.md) §6.
 
 **UI-A · Základ značky** *(nízke riziko, okamžite viditeľné)*
-- **UI-02 · Logo + SketchUp toolbar** — zrolovaná firemná značka ako ikony + `UI::Toolbar` so 4 tlačidlami (panel · Štúdio → dočasne okno Výroba · ABS toggle na EdgeCheck · vkladací režim).
 - **UI-03 · Zdieľaný combobox materiálov a ABS (D-85, aj D-16)** — jeden komponent pre VŠETKY selecty materiálov a ABS: písanie s filtrom bez diakritiky, sekcia „Použité v projekte", naposledy použité. Najväčší úžitok z merača.
 
 **UI-B · Inspector kostra**
