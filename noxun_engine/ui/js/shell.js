@@ -120,6 +120,84 @@
       return out.length ? out.join(' · ') : '—';
     }
 
+    // --- meta suhrny v listach sektorov (kontrakt UI 2.0) --------------------
+    // Lista kazdeho sektora nesie vpravo jednoriadkovy SUHRN toho, co je vnutri
+    // (mockup `sect(key, name, meta, …)`). Vidno ho ROVNAKO zbaleny aj rozbaleny
+    // — zbaleny sektor tak povie, co skryva, a rozbaleny drzi ten isty udaj na
+    // ocnom mieste. Skladanie je CISTA funkcia (testovana v Node): DOM cita az
+    // obal `nxSectorMetaApply` nizsie.
+    var PV_TITLE = { korpus: 'Čelný rez + kóty', zony: 'Zóny', cela: 'Čelá',
+                     kovanie: 'Kovanie — pozície' };
+
+    // mm do suhrnu: cele cislo (rozmer je cislo, nie veta). Neplatna alebo
+    // nulova hodnota = null — radsej kratsi text nez vymyslene cislo.
+    function metaMm(v){
+      var n = parseFloat(v);
+      return (isNaN(n) || n <= 0) ? null : String(Math.round(n));
+    }
+
+    // S1 — nazov PROJEKCIE, ktora sa prave kresli (nahlad je kontextovy, UI-B2).
+    function metaTitle(mode, ctx, insertKind){
+      if (mode === 'part')  return 'Dielec — hrany';
+      if (mode === 'board') return 'Doska — hrany';
+      if (mode === 'insert') return insertKind === 'board' ? 'Doska — smer dekoru' : 'Náhľad šablóny';
+      return PV_TITLE[normCtx(ctx)];
+    }
+
+    // S2 — „900 × 720 × 560 · sokel 100". Trojica rozmerov je nedelitelna
+    // (dva z troch by klamali); sokel sa pripaja len tam, kde vobec je
+    // (horna skrinka ani doska ho nemaju).
+    function metaDims(dims){
+      var d = dims || {};
+      var mm = [metaMm(d.w), metaMm(d.h), metaMm(d.d)];
+      if (!(mm[0] && mm[1] && mm[2])) return '';
+      var out = [mm.join(' × ')];
+      var p = metaMm(d.plinth);
+      if (p && d.plinth_visible !== false) out.push('sokel ' + p);
+      return out.join(' · ');
+    }
+
+    // S3 — popisy materialov oddelene bodkou. Prazdny slot = dedenie, preto sa
+    // vynecha; ked su prazdne VSETKY ponuknute sloty, povie sa to nahlas
+    // (prazdna lista by vyzerala ako nedorobok). Ziadny slot (dielec, doska,
+    // vkladanie korpusu) = ziadne meta.
+    function metaMaterials(list){
+      var src = list || [], out = [], i, s;
+      for (i = 0; i < src.length; i++){
+        s = String(src[i] == null ? '' : src[i]).trim();
+        if (s) out.push(s);
+      }
+      if (out.length) return out.join(' · ');
+      return src.length ? 'dedí z projektu' : '';
+    }
+
+    // S4 — otvorena skupina menom, inak pocet zbalenych. Slovenska mnozina:
+    // 1 skupina · 2–4 skupiny · 5+ skupín. Meta NIKDY neopakuje nazov sektora
+    // (kontext Cela ma jedinu skupinu „Čelá" — „ČELÁ Čelá" je sum, nie udaj).
+    function metaGroups(groups, sectorName){
+      var g = groups || {};
+      var open = String(g.open == null ? '' : g.open).trim();
+      if (open) return (open === String(sectorName == null ? '' : sectorName).trim()) ? '' : open;
+      var n = parseInt(g.count, 10);
+      if (isNaN(n) || n <= 0) return '';
+      var w = (n === 1) ? 'skupina' : (n < 5 ? 'skupiny' : 'skupín');
+      return n + ' ' + w + ' · všetko zbalené';
+    }
+
+    // Vstup je STAV, nie hotove texty — volajuci posiela cisla a ID prelozene
+    // na popisy AZ v okamihu kreslenia (lekcia Codex #171 P2: cachovany retazec
+    // by po premenovani dekoru ukazoval stary nazov).
+    function sectorMeta(s){
+      var x = s || {};
+      var mode = (x.mode === undefined) ? state.mode : x.mode;
+      return {
+        s1: metaTitle(mode, x.ctx, x.insert_kind),
+        s2: metaDims(x.dims),
+        s3: metaMaterials(x.materials),
+        s4: metaGroups(x.groups, x.s4_name)
+      };
+    }
+
     // --- zbalenia sektorov a skupin (audit A5) -------------------------------
     // Kluc pamate: sektory (S1–S4) su NEZAVISLE (`nxsec_s1`), skupiny sektora S4
     // su KVALIFIKOVANE KONTEXTOM (`nxsec_s4.korpus.top`) — dva kontexty tak
@@ -162,6 +240,7 @@
       setLabel: setLabel,
       sectorVis: sectorVis,
       ctxNoteText: ctxNoteText,
+      sectorMeta: sectorMeta,
       mode: function(){ return state.mode; },
       label: function(){ return state.label; }
     };
@@ -242,6 +321,7 @@
     var s4 = el('s4Name');
     if (s4) s4.textContent = nxS4Title(mode, ctx);
     nxCtxNoteApply();
+    nxSectorMetaApply(); // meta suhrny listy sektorov (rezim aj kontext ich menia)
   }
 
   // ===== DOM: kontextovy riadok (nahrada S2/S3 mimo Korpusu) =================
@@ -264,6 +344,90 @@
     var sum = el('ctxNoteSum');
     if (sum) sum.textContent = nxCtxNoteSum;
     n.style.display = vis.note ? '' : 'none';
+  }
+
+  // ===== DOM: meta suhrny v listach sektorov =================================
+  // Cita ZIVY stav panela (polia S2, materialove selecty S3, otvorenu skupinu
+  // S4) a prelozi ho cistou funkciou NXShell.sectorMeta. Ziadna vlastna kopia
+  // dat — text sa sklada az v okamihu kreslenia, takze nikdy nezostarne.
+  function nxMetaInsertKind(){
+    var b = document.body;
+    return (b && b.getAttribute('data-insert-kind')) || 'cabinet';
+  }
+  // Rozmery berie meta z TYCH ISTYCH poli, ktore sektor ukazuje — vratane
+  // rozpisanej hodnoty (vyrazy prelozi numv rovnako ako zapisova cesta).
+  function nxMetaDims(){
+    if (NXShell.mode() === 'insert' && nxMetaInsertKind() === 'board')
+      return { w: numv('ib_length'), h: numv('ib_width'), d: numv('ib_thickness') };
+    var fh = el('fhRow');
+    return { w: numv('width'), h: numv('height'), d: numv('depth'),
+             plinth: numv('floor_height'),
+             plinth_visible: !(fh && fh.style.display === 'none') };
+  }
+  // ID materialu -> popis z AKTUALNEHO katalogu (sheetLabelOf). Dielec a doska
+  // maju vlastnu kartu v S4, vkladanie korpusu material v paneli nevolí (ten
+  // urcuje sablona a projekt) — tam ziadne sloty neposielame.
+  function nxMetaMaterials(){
+    var mode = NXShell.mode();
+    if (mode === 'part' || mode === 'board') return [];
+    var lbl = function(id){
+      var n = el(id), v = n ? n.value : '';
+      if (!v) return '';
+      return (typeof sheetLabelOf === 'function') ? sheetLabelOf(v) : v;
+    };
+    if (mode === 'insert'){
+      if (nxMetaInsertKind() !== 'board') return [];
+      var m = lbl('ib_material');
+      return m ? [m] : [];
+    }
+    return [lbl('cab_body'), lbl('cab_front'), lbl('cab_back')];
+  }
+  // Skupiny S4 patria KONTEXTU (data-s4). Nazov otvorenej skupiny sa cita z jej
+  // <summary> — slovenske nazvy tak ziju len v HTML (ikona je SVG, textContent
+  // ju neberie). `data-s4-solo` (strom zon) do poctu nepatri, rovnako ako je
+  // vynaty z exkluzivity.
+  function nxMetaGroups(){
+    var mode = NXShell.mode();
+    if (mode === 'part' || mode === 'board') return { open: '', count: 0 };
+    var nodes = document.querySelectorAll('#secSet details[data-s4="' + NXShell.effectiveCtx() + '"]');
+    var count = 0, open = '', i, s;
+    for (i = 0; i < nodes.length; i++){
+      if (nodes[i].hasAttribute('data-s4-solo')) continue;
+      count++;
+      if (nodes[i].open && !open){
+        s = nodes[i].querySelector('summary');
+        open = s ? (s.textContent || '').trim() : '';
+      }
+    }
+    return { open: open, count: count };
+  }
+  function nxSectorMetaApply(){
+    if (!document.body) return;
+    var mode = NXShell.mode(), ctx = NXShell.effectiveCtx();
+    var m = NXShell.sectorMeta({
+      mode: mode, ctx: ctx, insert_kind: nxMetaInsertKind(),
+      dims: nxMetaDims(), materials: nxMetaMaterials(),
+      groups: nxMetaGroups(), s4_name: nxS4Title(mode, ctx)
+    });
+    [['s1Meta', m.s1], ['s2Meta', m.s2], ['s3Meta', m.s3], ['s4Meta', m.s4]].forEach(function(o){
+      var n = el(o[0]);
+      if (n) n.textContent = o[1];
+    });
+  }
+  // ZIVA obnova pri praci pouzivatela: pisanie do rozmerov a zmena materialu.
+  // JEDEN delegovany listener namiesto zasahov do form.js/materials.js — meta je
+  // len ZOBRAZENIE, nesmie sa votierat do zapisovych ciest. Zmenu kontextu,
+  // rezimu aj serverovy push pokryva nxShellApply, otvorenie skupiny boot.js.
+  var NX_META_FIELDS = ['width', 'height', 'depth', 'floor_height',
+                        'ib_length', 'ib_width', 'ib_thickness',
+                        'cab_body', 'cab_front', 'cab_back', 'ib_material'];
+  if (typeof document !== 'undefined'){
+    var nxMetaWatch = function(ev){
+      var t = ev.target;
+      if (t && t.id && NX_META_FIELDS.indexOf(t.id) >= 0) nxSectorMetaApply();
+    };
+    document.addEventListener('input', nxMetaWatch, true);
+    document.addEventListener('change', nxMetaWatch, true);
   }
 
   // Klik na kontext v raile (inline onclick). Prepnutie meni nahlad aj

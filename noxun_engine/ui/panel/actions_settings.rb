@@ -56,13 +56,16 @@ module Noxun
           Engine.log_error(e, 'Panel.push_ui_settings')
         end
 
+        # TEMA V TOMTO PAYLOADE NIE JE — a nesmie pribudnut. Farby nasadzuje
+        # VYHRADNE `nxThemeApply` cez kanal `win_fit.js` (jediny skript, ktory
+        # nacitavaju vsetky okna), panel si temu nedrzi a JS len cita
+        # `data-nx-theme` z korena, aby vedel, ktore tlacidlo je aktivne. Druhy
+        # kanal temy by znamenal dva zdroje pravdy o farbe okna.
         def ui_settings_payload(refill_editor: false)
-          { 'dim_series' => DimSeries.get, 'ui_theme' => Engine.get_ui_theme,
-            'refill_editor' => refill_editor }
+          { 'dim_series' => DimSeries.get, 'refill_editor' => refill_editor }
         rescue StandardError => e
           Engine.log_error(e, 'Panel.ui_settings_payload')
-          { 'dim_series' => DimSeries::DEFAULTS, 'ui_theme' => Engine::UI_THEME_DEFAULT,
-            'refill_editor' => false }
+          { 'dim_series' => DimSeries::DEFAULTS, 'refill_editor' => false }
         end
       end
     end

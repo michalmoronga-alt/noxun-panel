@@ -168,12 +168,10 @@
   }
 
   // ===== DOM: modal Nastavenia Inspectora ===================================
-  // Farebne vzorky prepinaca temy. Su to LITERALY zamerne: vzorka musi ukazat
-  // farbu temy, ktoru PONUKA — cez var(--nx-select) by obe vzorky ukazovali
-  // prave nasadenu temu. Zrkadlo :root (panel.css) a NX_THEME_TOKENS
-  // (win_fit.js) — rovnaky vzor ako kreslene farby nahladu.
-  var NX_THEME_SWATCH = { noxun: '#107787', lucia: '#c2185b' };
-
+  // Farebne vzorky prepinaca temy su LITERALY v panel.css (`.thsw[data-sw=…]`)
+  // zamerne: vzorka musi ukazat farbu temy, ktoru PONUKA — cez var(--nx-select)
+  // by obe ukazovali prave nasadenu temu. JS o nich nevie nic (farbi ich CSS),
+  // drzi len to, ktore tlacidlo je aktivne.
   function nxThemeNow(){
     var root = document.documentElement;
     var v = root ? root.getAttribute('data-nx-theme') : null;

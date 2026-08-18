@@ -120,6 +120,20 @@ NxTest.test('UI-B1: kazdy kontext ma v S4 aspon jednu skupinu (data-s4)') do
   end
 end
 
+NxTest.test('UI-B: lista kazdeho sektora ma ZIVY meta suhrn') do
+  # Miesto v kostre existuje od UI-B1; obsah do neho pise shell.js. Prazdny
+  # element bez plnica = lista, ktora sluby o suhrne nedodrzi.
+  %w[s1Meta s2Meta s3Meta s4Meta].each do |id|
+    NxTest.assert(UIB1_HTML.include?("id=\"#{id}\""), "liste sektora chyba miesto na meta (#{id})")
+    NxTest.assert(UIB1_SHELL_CODE.include?("'#{id}'"), "meta #{id} nikto neplni (shell.js)")
+  end
+  NxTest.assert(UIB1_SHELL_CODE.include?('sectorMeta'),
+                'texty meta sklada CISTA funkcia NXShell.sectorMeta (testovana v Node)')
+  # Meta je len ZOBRAZENIE — obnova visi na udalostiach, nie na zapisovej ceste.
+  NxTest.assert(UIB1_SHELL_CODE.include?('nxSectorMetaApply()'),
+                'meta sa musi obnovovat (nxSectorMetaApply)')
+end
+
 NxTest.test('UI-B1: strom zon je z exkluzivity vynaty (data-s4-solo)') do
   zones = UIB1_HTML[/<details data-key="zones"[^>]*>/].to_s
   NxTest.assert(zones.include?('data-s4-solo'),

@@ -506,8 +506,9 @@
   .nx-inspector #railTempBox, .nx-inspector #railTempDiv { display: none; }
   .nx-inspector body.mode-part #railTempBox, .nx-inspector body.mode-board #railTempBox { display: inline-flex; }
   .nx-inspector body.mode-part #railTempDiv, .nx-inspector body.mode-board #railTempDiv { display: block; }
-  /* Hlavicka je jednoradova — logo o nieco vacsie (koncept UI 2.0). */
-  .nx-inspector .nxhdr .nx-logo { width: 20px; height: 20px; }
+  /* Hlavicka je jednoradova — logo 24 px podla kontraktu UI 2.0 (header 24,
+     toolbar 19). Sprite je zrolovana ZNACKA z originalnych kriviek (icons.js). */
+  .nx-inspector .nxhdr .nx-logo { width: 24px; height: 24px; }
 
   /* --- SEKTORY (S1-S4) ---------------------------------------------------
      Sektor je <details data-key="s..."> — zbalenie si pamata bindDetails
@@ -524,7 +525,9 @@
   .nx-inspector .sect > .secthead:hover { background: var(--nx-select-bg-soft); }
   .nx-inspector .sect > .secthead .sn { font-weight: 600; font-size: 11px; letter-spacing: .05em;
             text-transform: uppercase; color: var(--nx-ink-muted); }
-  /* Meta suhrn v liste sektora (obsah doplna UI-B3) — nikdy nelame riadok. */
+  /* Meta suhrn v liste sektora — jednoriadkovy popis toho, co je vnutri
+     (projekcia · rozmery · materialy · otvorena skupina). Text plni shell.js
+     (nxSectorMetaApply), tu ostava len to, ze NIKDY nelame riadok. */
   .nx-inspector .sect > .secthead .meta { margin-left: auto; min-width: 0; padding-left: 8px;
             font-size: 11px; color: var(--nx-ink-soft); overflow: hidden;
             text-overflow: ellipsis; white-space: nowrap; }

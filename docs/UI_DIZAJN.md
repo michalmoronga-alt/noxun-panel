@@ -216,6 +216,11 @@ druhý počítač). Pravidlá sú úzke zámerne:
 - Zmena stavu ikony (napr. zámok): meň `href` v `<use>` cez `NXIcons.set(btn, 'lock-open')`,
   **nie** prepisom `textContent` celého tlačidla.
 - **Logo je výnimka** — renderuje sa `fill`-om cez triedu `.nx-logo` (nie stroke).
+  Symbol `#i-logo` nesie **zrolovanú značku z originálnych kriviek** webu, teda
+  presne tú istú kresbu ako ikona toolbaru `noxun_logo.svg` (líši sa len viewBox
+  — toolbar má navyše ~12 % vnútorný okraj). Veľkosti podľa kontraktu UI 2.0:
+  **hlavička 24 px**, toolbar 19 px, „O plugine" 28 px. Zhodu kriviek aj veľkosť
+  v hlavičke stráži guard test `tests/pure/test_ui02_toolbar.rb`.
 
 Aktuálny set: `maximize` (fit), `alert`, `lock` / `lock-open`, `eye` / `eye-off`,
 `copy`, `factory` (Výroba), `settings`, `star`, `rotate-ccw` (reset), `x`, `plus`,
@@ -428,8 +433,15 @@ sektoroch**. Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html
   aby tlačidlá ostali fokusovateľné (vzor D-78).
 - **Sektory:** `S1 Náhľad · S2 Základné · S3 Materiály · S4 Nastavenia`. Sú to
   `<details>` — zbalenie si pamätá `localStorage`, takže **prežije prekreslenie
-  aj zatvorenie panela**. Lišta sektora je tmavšia než telo a má miesto na
-  **meta súhrn** vpravo (dopĺňa ho UI-B3).
+  aj zatvorenie panela**. Lišta sektora je tmavšia než telo a nesie vpravo
+  **meta súhrn** toho, čo je vnútri: S1 názov kreslenej projekcie · S2
+  `900 × 720 × 560 · sokel 100` · S3 popisy materiálov (prázdny slot = dedenie
+  sa vynechá, všetko dedené povie „dedí z projektu") · S4 otvorená skupina
+  menom, inak `4 skupiny · všetko zbalené`. Súhrn je vidno **rovnako zbalený aj
+  rozbalený** — zbalený sektor povie, čo skrýva, rozbalený drží ten istý údaj na
+  očnom mieste. Text sa skladá **až pri kreslení** zo živého stavu panela
+  (`NXShell.sectorMeta`); nikdy sa necachuje ako hotový reťazec a nikdy nelomí
+  riadok (ellipsis).
 - **S2 a S3 patria kontextu Korpus** (+ Materiály pri vkladaní). V kontextoch
   **Zóny · Čelá · Kovanie** sa skrývajú a namiesto nich stojí **tenký kontextový
   riadok** `#ctxNote` so súhrnom skrinky a preklikom späť („Skrinka 900 × 720 ×

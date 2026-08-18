@@ -143,17 +143,19 @@
     'brace': '<rect x="4" y="5" width="16" height="3"/><rect x="4" y="11" width="16" height="3"/><path d="M4 20h16"/>'
   };
 
-  // Firemne logo — prstenec + krizove ramena. Renderuje sa FILL-om (.nx-logo),
-  // NEdedi stroke-only pravidla .ic ikon.
-  var LOGO = '<symbol id="i-logo" viewBox="0 0 100 100">' +
+  // Firemne logo — ZROLOVANA ZNACKA z ORIGINALNYCH kriviek webu (pismena
+  // posunute do spolocneho stredu, X rotovane o 45°). Krivky su TIE ISTE ako
+  // v ui/icons/noxun_logo.svg (toolbar) — zhodu strazi test_ui02_toolbar.rb;
+  // lisi sa LEN viewBox: toolbarova ikona ma navyse ~12 % vnutorny okraj, aby
+  // v tlacidle nelicovala s jeho hranou, sprite v HTML ho nepotrebuje.
+  // Renderuje sa FILL-om (.nx-logo), NEdedi stroke-only pravidla .ic ikon.
+  var LOGO = '<symbol id="i-logo" viewBox="7071.5 11779.5 6054 6054">' +
     '<g fill="currentColor">' +
-    '<rect x="46.5" y="10" width="7" height="80"/>' +
-    '<polygon points="50,0 58,9 50,18 42,9"/>' +
-    '<polygon points="50,82 58,91 50,100 42,91"/>' +
-    '<rect x="10" y="46.5" width="80" height="7"/>' +
-    '<polygon points="0,50 14,41 14,59"/>' +
-    '<polygon points="100,50 86,41 86,59"/>' +
-    '<path d="M50 31a19 19 0 1 0 0 38a19 19 0 1 0 0-38Zm0 9a10 10 0 1 1 0 20a10 10 0 1 1 0-20Z" fill-rule="evenodd"/>' +
+    '<g transform="translate(6842.5 56)"><path d="M4814 14749c0,521 0,1041 0,1561 -145,0 -291,0 -436,0 0,-517 0,-1035 0,-1552l436 -9zm0 3c-12,-788 -622,-1561 -1566,-1556 -944,6 -1549,792 -1550,1556l0 100 0 1458 433 0 0 -1474 0 -84c21,-630 497,-1124 1124,-1136 577,-12 1127,493 1123,1146l436 -10z"/></g>' +
+    '<g transform="translate(3466.5 59.5)"><path d="M8203 14742c0,-9 0,-7 -1,-16 -25,-784 -637,-1547 -1578,-1542 -951,6 -1562,787 -1563,1558l437 -1c21,-635 501,-1121 1133,-1134 569,-11 1113,476 1132,1114 0,14 0,5 0,19l440 2zm-3142 -1c12,794 627,1574 1579,1569 951,-5 1562,-798 1563,-1568l-437 0c-21,634 -501,1132 -1133,1145 -568,12 -1112,-473 -1134,-1107 0,-16 -2,-23 -2,-39l-436 0z"/></g>' +
+    '<g transform="rotate(45 10098.5 14806.5) translate(222 0)"><polygon points="7673,12911 8290,12911 9876,14498 11463,12911 12080,12911 10185,14806 12080,16702 11464,16702 9876,15114 8289,16702 7673,16702 9568,14806"/></g>' +
+    '<g transform="translate(-3489.5 -25)"><path d="M12030 14746c0,-520 0,-868 0,-1388 145,0 290,0 436,0 0,517 0,863 0,1380l-436 8zm0 -2c12,787 622,1561 1565,1555 944,-5 1550,-791 1551,-1555l0 -100 0 -1286 -433 0 0 1302 0 84c-21,630 -497,1123 -1124,1136 -577,12 -1128,-493 -1123,-1146l-436 10z"/></g>' +
+    '<g transform="translate(-6842.5 61)"><path d="M18499 14744c0,520 0,1040 0,1561 -145,0 -291,0 -436,0 0,-518 0,-1035 0,-1553l436 -8zm0 2c-12,-787 -622,-1560 -1566,-1555 -943,5 -1549,791 -1550,1555l0 100 0 1459 433 0 0 -1475 0 -84c21,-629 497,-1123 1124,-1136 577,-12 1127,494 1123,1146l436 -10z"/></g>' +
     '</g></symbol>';
 
   function buildSprite() {
