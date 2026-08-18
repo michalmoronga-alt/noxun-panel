@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.7.0' unless defined?(VERSION)
+    VERSION = '0.7.1' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -37,9 +37,12 @@ module Noxun
     DIALOG_FIT_MIN_PX = 240   # mensie okno nema zmysel (a nie je to nas obsah)
     DIALOG_FIT_MAX_PX = 2600  # strop proti nezmyslu z JS (4K plocha + rezerva)
 
-    # Registruje callback `nx_fit` na dialogu. Volat v register_callbacks —
-    # teda PRED show (kontrakt HtmlDialog, docs/SKETCHUP_PRAVIDLA.md).
+    # Registruje SPOLOCNE boot callbacky okna (`nx_fit` + UI-01 `nx_theme`).
+    # Volat v register_callbacks — teda PRED show (kontrakt HtmlDialog,
+    # docs/SKETCHUP_PRAVIDLA.md). Meno ostava historicke (D-77), aby sa
+    # nemenilo 7 volani ani odkazy v dokumentacii.
     def self.register_dialog_fit(dlg, tag)
+      register_dialog_theme(dlg, tag)
       dlg.add_action_callback('nx_fit') do |_ctx, w, h|
         begin
           tw = w.to_i
@@ -51,6 +54,74 @@ module Noxun
           end
         rescue StandardError => e
           log_error(e, "#{tag} nx_fit")
+        end
+        next
+      end
+    end
+
+    # --- UI-01: tema panela (NOXUN / Lucia) ----------------------------------
+    # Tema je vec POCITACA, nie zakazky — zije v %APPDATA%\NOXUN\Engine\
+    # ui_theme.json (vzor prepinacov EdgeCheck), NIKDY v .skp: Michal a Lucia
+    # otvaraju tie iste zakazky a farba panela nesmie cestovat s modelom.
+    # Tema prepina VYHRADNE vyberovu rodinu tokenov (--nx-select*, --nx-part-*);
+    # vyznamove farby (danger/warn/ok/ABS/edge/semafor) sa nou NIKDY nemenia
+    # (rozhodnutie O4, 15.8.2026 — docs/UI_DIZAJN.md sekcia Temy).
+    # Konkretne hodnoty tokenov drzi JS (ui/js/win_fit.js) — Ruby posiela LEN
+    # meno temy, aby paleta zila na jednom mieste s CSS.
+    UI_THEMES = %w[noxun lucia].freeze
+    UI_THEME_DEFAULT = 'noxun'
+    UI_THEME_FILE = 'ui_theme.json'
+    UI_THEME_STD = 1 # verzia formatu suboru (buduce migracie)
+
+    def self.ui_theme_dir
+      return Materials.dir if defined?(Materials) && Materials.respond_to?(:dir)
+
+      File.join(ENV['APPDATA'].to_s, 'NOXUN', 'Engine')
+    end
+
+    def self.ui_theme_path
+      File.join(ui_theme_dir, UI_THEME_FILE)
+    end
+
+    # Neznama/prazdna hodnota = zakladna tema. Autorita whitelistu je TU
+    # (nie v HTML) — presne ako pri EdgeCheck.set_option.
+    def self.normalize_ui_theme(value)
+      v = value.to_s.strip.downcase
+      UI_THEMES.include?(v) ? v : UI_THEME_DEFAULT
+    end
+
+    # Ulozena tema. Chybajuci ani poskodeny subor NIKDY nezhodi otvaranie okna
+    # — vrati sa zakladna tema.
+    def self.get_ui_theme
+      raw = JsonFileStore.available?(ui_theme_path) ? JsonFileStore.read(ui_theme_path) : nil
+      normalize_ui_theme(raw.is_a?(Hash) ? raw['theme'] : nil)
+    rescue StandardError => e
+      log_error(e, 'Engine.get_ui_theme')
+      UI_THEME_DEFAULT
+    end
+
+    # Zapis temy (UI prepinac pride v davke UI-B3; zatial len Ruby strana).
+    # Neznama hodnota sa NEZAPISE — ulozi sa normalizovana. Zapisuje
+    # JsonFileStore (atomicky + .bak).
+    def self.set_ui_theme(value)
+      theme = normalize_ui_theme(value)
+      JsonFileStore.write(ui_theme_path, 'std' => UI_THEME_STD, 'theme' => theme)
+      theme
+    rescue StandardError => e
+      log_error(e, 'Engine.set_ui_theme')
+      UI_THEME_DEFAULT
+    end
+
+    # Registruje callback `nx_theme`: okno si po nacitani HTML vypyta temu
+    # (ui/js/win_fit.js) a Ruby ju posle spat do JS. Rovnaky smer ako nx_fit —
+    # `execute_script` pred `show` nefunguje, preto si okno pyta samo.
+    def self.register_dialog_theme(dlg, tag)
+      dlg.add_action_callback('nx_theme') do |_ctx, _payload|
+        begin
+          theme = get_ui_theme
+          dlg.execute_script("if (window.nxThemeApply) nxThemeApply(#{theme.to_json});")
+        rescue StandardError => e
+          log_error(e, "#{tag} nx_theme")
         end
         next
       end

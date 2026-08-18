@@ -7,21 +7,36 @@
 
 ### 1 · UI 2.0 — štúdio okno a výbery
 
-**Cieľ:** satelitné okná → jedno štúdio okno s toolbarom a bočnou navigáciou; výber materiálu/ABS na jeden klik namiesto scrollovania. **Mockup PRED implementáciou** (vzor Materiály 2.0 — schválený klikateľný HTML). Podklad: merač používania D-25 (materiály/ABS vyše 400 interakcií, taby 287×, satelitné okná 234×) a [UI_VIZIA.md](UI_VIZIA.md); cieľový obraz v [V1_VIZIA.md](V1_VIZIA.md) §6.
+**Cieľ:** satelitné okná → jedno štúdio okno s toolbarom a bočnou navigáciou; výber materiálu/ABS na jeden klik namiesto scrollovania. **Koncept Inspectora je uzavretý** (Michal, 18.8.2026) — záväzný slovný kontrakt je [zdroje/ui20/UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) (sekcie „SCHVÁLENÉ ROZHODNUTIA" a „FINÁLNY KONCEPT INSPECTOR C") a vizuálna referencia mockupy vedľa neho: [Inspector C v16](zdroje/ui20/mockup_inspector_c.html) · [štúdio okno](zdroje/ui20/mockup_ui20.html) · [dizajnový lístok](zdroje/ui20/dizajnovy_listok.html); implementácia ide po dávkach nižšie. Podklad: merač používania D-25 (materiály/ABS vyše 400 interakcií, taby 287×, satelitné okná 234×) a [UI_VIZIA.md](UI_VIZIA.md); cieľový obraz v [V1_VIZIA.md](V1_VIZIA.md) §6.
 
-- **D-50 · OCL inšpirácia UI/UX** — prebrať detaily z OCL flow (najprv slovné sedenie, potom zapracovanie); vzory áno, GPL kód nie.
-- **D-51 · Štandard veľkostí okien a tlačidiel** — zjednotiť šírky a rozmiestnenie naprieč oknami, konkrétne hodnoty do [../docs/UI_DIZAJN.md](../docs/UI_DIZAJN.md) pred Luciiným nasadením.
+**UI-A · Základ značky** *(nízke riziko, okamžite viditeľné)*
+- **UI-02 · Logo + SketchUp toolbar** — zrolovaná firemná značka ako ikony + `UI::Toolbar` so 4 tlačidlami (panel · Štúdio → dočasne okno Výroba · ABS toggle na EdgeCheck · vkladací režim).
+- **UI-03 · Zdieľaný combobox materiálov a ABS (D-85, aj D-16)** — jeden komponent pre VŠETKY selecty materiálov a ABS: písanie s filtrom bez diakritiky, sekcia „Použité v projekte", naposledy použité. Najväčší úžitok z merača.
+
+**UI-B · Inspector kostra**
+- **UI-B1 · Kostra panela (aj D-51)** — rail + 4 sektory (Náhľad · Základné · Materiály · Nastavenia) s exkluzivitou skupín, presun existujúcich kariet, šírka 470 px, kontextové riadky. Štandard šírok okien a tlačidiel (D-51) sa dopisuje sem a do [../docs/UI_DIZAJN.md](../docs/UI_DIZAJN.md).
+- **UI-B2 · Náhľad (aj D-27)** — kontextové projekcie s kótami + spodný pás: vrstvové chipy Zóny·Čelá·Kovanie·Olep (rýchle zobraziť/skryť — D-27), kamera, fit.
+- **UI-B3 · Obsah Korpusu + koliesko** — Základné v 2 stĺpcoch + informačný stĺpec, rozmerové rady, ikony skupín, modal „Uložiť ako šablónu", typ badge a kontext kolieska (**UI prepínač témy NOXUN/Lucia** · editor radov · O plugine).
+
+**UI-C · Kontexty**
+- **UI-C1 · Vkladanie** — typové tlačidlá, šablóny (nedávne prvé, dvojklik vloží, reálne náhľady), zámky D-39, doskové šablóny.
+- **UI-C2 · Zóny** — strom so spojnicami, dlaždice delenia, presné delenie v mm, snap 1/4·1/2·3/4 (D-09), police ako pills, slot „Vnútro".
+- **UI-C3 · Čelá (D-84, D-89a, D-96)** — riadky s ikonou typu, AUTO chip, rady výšok, naviazané kovanie pod riadkom, **reč stolára „+ pridaj čelo / + pridaj dvere" (D-84)**, **sekcia Úchytky (D-96)**, **hover hrany zvýrazní hranu v MODELI (D-89 otvorená časť)**.
+- **UI-C4 · Kovanie** — položky v boxoch podľa vlastníka (skrinka / každé čelo) + značky v náhľade.
+
+**UI-D · Dotiahnutie**
+- **UI-D1 · Dielec** — Základné hore, hranové ikony, „Označiť v modeli", „Použiť na podobné".
+- **UI-D2 · Náhľady šablón** — PNG pri uložení + schéma ako fallback.
+- **UI-D3 · Klikateľnosť a uzávery (aj D-26)** — warnpanel deep-linky, klikateľné informačné údaje, **rozhodnutie D-26 Jednoduchý/Rozšírený** (v koncepte „Menej časté" neexistuje — potvrdí sa nad hotovým panelom) + doťaženie `UI_DIZAJN.md`.
+
+**Fáza ŠTÚDIO** *(záver bloku — vlastné dávky po sektorovej debate nad [mockupom štúdia](zdroje/ui20/mockup_ui20.html))*
+- **D-50 · OCL inšpirácia UI/UX** — prebrať detaily z OCL flow (vzory áno, GPL kód nie); ťažisko je práve v štúdio okne (kusovník, kontrola, nákup, rozpočet).
 - **D-69 · Jednotný editor materiálov** — jedno modálne okno pre pridanie z Demosu / ručné pridanie / editáciu, rovnaké polia bez ohľadu na vstupný bod.
-- **D-85 · Hľadanie vo VŠETKÝCH selectoch materiálov a ABS** — jeden zdieľaný combobox s písaním a filtrom bez diakritiky + sekcia „Použité v projekte" + naposledy použité; platí aj pre selecty ABS pások.
-- **D-16 · Autocomplete dekoru** — obsahovo splynulo s D-85; samostatne sa už nerieši, ale ABS časť nesmie z rozsahu D-85 vypadnúť.
 - **D-15 · „Pridávačky" ako modal** — všetky akcie „pridať niečo" (šablóna, materiál, položka) na jeden UX vzor.
-- **D-26 · Režim Jednoduchý/Rozšírený** — rozhodnúť spolu s reworkom; kandidáti na skrytie z merača sú známi (orientácia a odsadenie výstuh, vodorovné delenia, režim sokla, reset kovania).
-- **D-27 · Rýchle zobraziť/skryť tagy z panela** — mini prepínače (Čelá, Chrbát) v logike Ghost checkboxu.
-- **D-84 · Čelá: tlačidlá rečou stolára** — „+ pridaj čelo" / „+ pridaj dvere", „− riadok" odpadá (mazanie krížikom pri riadku).
-- **D-89 (otvorená časť) · Orientácia hrán v UI** — hover hrany v karte dielca / ABS editore zvýrazní zodpovedajúcu hranu priamo v MODELI, prípadne slovné označenie strany. *(Časť „podľa pravidla povie výsledok" je hotová ako D-102.)*
-- **D-96 · Úchytkový profil do vlastnej sekcie „Úchytky"** — výber profilu, hrany osadenia a rozsahu na jednom mieste; ikona v riadku čela ostane len indikátor.
-- **Nové: klik na materiál/ABS → zvýraznenie miest použitia v projekte** — z katalógu vidieť, kde presne dekor v zákazke je.
-- **Z vízie V1:** header panela ako prístup ku všetkému (UX-02) · karta Zóna so smerovými ikonami (UX-06) · polia šírkou podľa obsahu (UX-03) · viditeľný rozdiel „(podľa projektu)" vs. explicitná voľba.
+- **Klik na materiál/ABS → zvýraznenie miest použitia v projekte** — z katalógu vidieť, kde presne dekor v zákazke je.
+- Presun satelitných okien do štúdia po jednom (Materiály · Výroba · Kovanie · Pravidlá · Šablóny · Nastavenia) — satelity zanikajú postupne, plugin je použiteľný po každej dávke.
+
+*(Z vízie V1 sú v koncepte zapracované: header ako prístup ku všetkému UX-02 → UI-B1 · karta Zóna so smerovými ikonami UX-06 → UI-C2 · polia šírkou podľa obsahu UX-03 → UI-B1/UI-C.)*
 
 *(Seed katalógu ako krok je ZRUŠENÝ (Michal 10.8.) — katalóg rastie sám prácou na zákazkách; skutočný problém „nájsť materiál aj v malom zozname" rieši D-85. Podklad kódov a cien ostáva v [zdroje/SEED_KATALOG_2026-07.md](zdroje/SEED_KATALOG_2026-07.md).)*
 

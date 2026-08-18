@@ -9,7 +9,7 @@
     --nx-surface-readonly:#f4f6f8; /* readonly input */
     --nx-surface-preview:#fafcff;  /* pozadie 2D nahladu */
     --nx-surface-th:#f5f7f8;       /* hlavicka tabulky (okno Vyroba) */
-    --nx-part-bg:#f5fbff;          /* karta dielca (bledomodra) */
+    --nx-part-bg:#f2fafb;          /* karta dielca (bledy teal) */
     /* text / ink */
     --nx-ink:#263238;              /* zakladny text */
     --nx-ink-title:#1b3a4b;        /* h1 (okno Vyroba) */
@@ -26,14 +26,17 @@
     --nx-action:#2e7d32;
     --nx-action-hover:#1b5e20;
     --nx-on-accent:#fff;
-    /* vyber / aktivny (modra) — taby, oznacenie */
-    --nx-select:#1565c0;
-    --nx-select-strong:#01579b;
-    --nx-select-accent:#0277bd;
-    --nx-select-bg:#e3f2fd;
-    --nx-select-bg-soft:#f1f8ff;
-    --nx-select-bg-hover:#e1f5fe;
-    --nx-part-border:#90caf9;
+    /* vyber / aktivny — NOXUN TEAL (UI-01, rozhodnutie O1 z 15.8.2026: firemna
+       farba loga a webu; predosla modra rodina skoncila). TOTO je jedina rodina,
+       ktoru smie prepnut tema (--nx-part-bg vyssie patri do nej) — vyznamove
+       farby (danger/warn/ok/ABS/edge/semafor) sa temou NIKDY nemenia. */
+    --nx-select:#107787;
+    --nx-select-strong:#0B5661;
+    --nx-select-accent:#0e6b7a;
+    --nx-select-bg:#e0f2f4;
+    --nx-select-bg-soft:#f0f9fa;
+    --nx-select-bg-hover:#d6eef1;
+    --nx-part-border:#7fc4cf;
     /* stav OK (zelena rodina — vlastne tokeny, NIE action) */
     --nx-ok-bg:#e8f5e9; --nx-ok-fg:#1b5e20; --nx-ok-border:#c8e6c9;
     /* stav CHYBA (cervena rodina) */
@@ -84,14 +87,14 @@
   .body { padding: 0 10px 10px; }
   .row { display: flex; align-items: center; margin: 5px 0; }
   .row label { flex: 0 0 128px; color: var(--nx-ink-label); }
-  .row input, .row select { flex: 1; padding: 4px 6px; border: 1px solid var(--nx-border-strong); border-radius: 4px; font-size: 13px; min-width: 0; }
+  .row input, .row select { flex: 1; padding: 4px 6px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 13px; min-width: 0; }
   .row input.bad { border-color: var(--nx-danger-line); background: var(--nx-danger-bg-soft); }
   .row .unit { flex: 0 0 26px; text-align: right; color: var(--nx-ink-faint); font-size: 11px; padding-left: 4px; }
   .row input[readonly] { background: var(--nx-surface-readonly); color: var(--nx-ink-soft); border-style: dashed; }
   .typerow { display: flex; gap: 16px; padding: 2px 2px 6px; }
   .typerow label { display: flex; align-items: center; color: var(--nx-ink-strong); font-weight: 600; cursor: pointer; }
   .typerow input { margin-right: 6px; }
-  button { padding: 7px 8px; border: 0; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 600; }
+  button { padding: 7px 8px; border: 0; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
   .wide { width: 100%; margin-top: 4px; padding: 8px; font-size: 13px; }
   .primary { background: var(--nx-action); color: var(--nx-on-accent); } .primary:hover { background: var(--nx-action-hover); }
   .ghostbtn { background: var(--nx-surface-sunken); color: var(--nx-ink-strong); border: 1px solid var(--nx-border); }
@@ -109,18 +112,18 @@
   .frow .fnum { flex: 0 0 24px; color: var(--nx-ink-faint); font-size: 11px; text-align: center; } /* D-23: "F1" namiesto "1" */
   /* min-width: 0 — bez neho select nepusti pod sirku najdlhsej polozky a rad by
      sa pri uzkom paneli zalomil (D-90: v rade pribudla volba profilu). */
-  .frow select.ftype { flex: 1 1 auto; min-width: 0; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 4px; }
-  .frow input.fh { flex: 0 0 58px; padding: 3px 4px; border: 1px solid var(--nx-border-strong); border-radius: 4px; }
-  .frow select.fw { flex: 0 0 56px; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 4px; }
+  .frow select.ftype { flex: 1 1 auto; min-width: 0; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 6px; }
+  .frow input.fh { flex: 0 0 58px; padding: 3px 4px; border: 1px solid var(--nx-border-strong); border-radius: 6px; }
+  .frow select.fw { flex: 0 0 56px; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 6px; }
   .frow .flock { flex: 0 0 20px; text-align: center; }
   /* D-90: volba uchytkoveho profilu — ikonove tlacidlo v rade riadku cela
      (bez popisku, stav nesie ramik + aria-pressed; zapnuty = akcent vyberu). */
   .frow .fprof { flex: 0 0 22px; padding: 2px 0; background: var(--nx-surface-sunken);
                  color: var(--nx-ink-muted); border: 1px solid var(--nx-border-strong);
-                 border-radius: 4px; line-height: 0; }
+                 border-radius: 6px; line-height: 0; }
   .frow .fprof.on { background: var(--nx-select-bg); color: var(--nx-select);
                     border-color: var(--nx-select); }
-  .frow .fdel { flex: 0 0 22px; background: var(--nx-danger-bg); color: var(--nx-danger); border: 1px solid var(--nx-danger-border); border-radius: 4px; padding: 2px 0; }
+  .frow .fdel { flex: 0 0 22px; background: var(--nx-danger-bg); color: var(--nx-danger); border: 1px solid var(--nx-danger-border); border-radius: 6px; padding: 2px 0; }
   /* D-22: zamok limitu presahov (v riadku medzier sekcie Cela) — ikona + text v rade */
   .row .lockbtn { flex: 1; text-align: left; padding: 4px 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
   .row .lockbtn.unlocked { background: var(--nx-warn-bg); border-color: var(--nx-warn); color: var(--nx-warn-fg); }
@@ -128,14 +131,14 @@
      (audit F10: vlastna trieda, NIE .row .lockbtn — ta je flex cez celu sirku;
      ziadny novy riadok — pravidlo vertikalneho priestoru). Mimo mode-insert skryte. */
   .inslock { display: none; flex: 0 0 26px; margin-left: 4px; padding: 3px 0; text-align: center;
-             border: 1px solid var(--nx-border); border-radius: 4px; background: var(--nx-surface-sunken); cursor: pointer; font-size: 12px; }
+             border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface-sunken); cursor: pointer; font-size: 12px; }
   body.mode-insert .inslock { display: inline-flex; align-items: center; justify-content: center; }
   .inslock.on { background: var(--nx-warn-bg-soft); border-color: var(--nx-warn); }
   /* Nahlad (fit ⛶ presunuty do overlaya nahladu — D-29; rezimove taby su v sticky hlavicke) */
-  #preview { width: 100%; border: 1px solid var(--nx-border); border-radius: 5px; background: var(--nx-surface-preview); display: block; touch-action: none; }
+  #preview { width: 100%; border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface-preview); display: block; touch-action: none; }
   .pvhint { font-size: 10px; color: var(--nx-ink-faint); text-align: center; margin: 3px 0 4px; }
   /* Zony strom */
-  #zoneTree { border: 1px solid var(--nx-border-soft); border-radius: 5px; margin: 6px 0; max-height: 140px; overflow: auto; }
+  #zoneTree { border: 1px solid var(--nx-border-soft); border-radius: 6px; margin: 6px 0; max-height: 140px; overflow: auto; }
   .znode { padding: 4px 6px; cursor: pointer; border-bottom: 1px solid var(--nx-bg); font-size: 12px; }
   .znode:hover { background: var(--nx-select-bg-soft); }
   .znode.active { background: var(--nx-select-bg); box-shadow: inset 3px 0 0 var(--nx-select); }
@@ -145,29 +148,29 @@
   #zoneActive b { color: var(--nx-select); }
   .zact { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
   .zact label { flex: 0 0 118px; color: var(--nx-ink-label); }
-  .zact select { flex: 0 0 52px; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 4px; }
+  .zact select { flex: 0 0 52px; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 6px; }
   .zact button { flex: 1; }
   .fldrow { display: flex; gap: 5px; align-items: center; margin: 3px 0; font-size: 12px; }
   .fldrow .fldn { flex: 0 0 66px; color: var(--nx-ink-label); }
-  .fldrow input { flex: 1; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 4px; min-width: 0; }
-  .fldrow .lockbtn { flex: 0 0 30px; cursor: pointer; text-align: center; border: 1px solid var(--nx-border); border-radius: 4px; background: var(--nx-surface-sunken); padding: 3px 0; display: inline-flex; align-items: center; justify-content: center; }
+  .fldrow input { flex: 1; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 6px; min-width: 0; }
+  .fldrow .lockbtn { flex: 0 0 30px; cursor: pointer; text-align: center; border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface-sunken); padding: 3px 0; display: inline-flex; align-items: center; justify-content: center; }
   .fldrow .lockbtn.on { background: var(--nx-warn-bg-soft); border-color: var(--nx-warn); }
   .zoneline { display: flex; align-items: center; margin: 8px 0 2px; }
   .zoneline input { margin-right: 7px; width: 15px; height: 15px; }
   .zoneline label { color: var(--nx-ink-label); }
-  #status { font-size: 11px; padding: 7px 9px; border-radius: 5px; background: var(--nx-surface-sunken); color: var(--nx-ink-label); border: 1px solid var(--nx-border); min-height: 16px; line-height: 1.35; margin-top: 8px; }
+  #status { font-size: 11px; padding: 7px 9px; border-radius: 6px; background: var(--nx-surface-sunken); color: var(--nx-ink-label); border: 1px solid var(--nx-border); min-height: 16px; line-height: 1.35; margin-top: 8px; }
   #status.err { background: var(--nx-err-bg); color: var(--nx-err-fg); border-color: var(--nx-err-border); }
   #status.ok  { background: var(--nx-ok-bg); color: var(--nx-ok-fg); border-color: var(--nx-ok-border); }
   /* V0.3 Materialy */
   .matrow { display: flex; align-items: center; margin: 5px 0; }
   .matrow label { flex: 0 0 118px; color: var(--nx-ink-label); font-size: 12px; }
-  .matrow select { flex: 1; padding: 4px 6px; border: 1px solid var(--nx-border-strong); border-radius: 4px; font-size: 12px; min-width: 0; }
+  .matrow select { flex: 1; padding: 4px 6px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 12px; min-width: 0; }
   /* D-46: potvrdzovacia lista projektovej predvolby — JEDEN riadok pod selectom
      (vertikalny priestor). Jantar = rozhodnutie/upozornenie, nie chyba. */
   .mdconfirm { display: flex; align-items: center; gap: 6px; margin: 2px 0 5px;
                padding: 4px 6px; font-size: 11px; line-height: 1.3;
                background: var(--nx-warn-bg); color: var(--nx-warnrow-fg);
-               border: 1px solid var(--nx-warnchip-border); border-radius: 4px; }
+               border: 1px solid var(--nx-warnchip-border); border-radius: 6px; }
   .mdconfirm span { flex: 1; min-width: 0; }
   .mdconfirm button { flex: 0 0 auto; padding: 3px 8px; font-size: 11px; }
   .subhead { font-size: 11px; font-weight: 600; color: var(--nx-ink-muted); margin: 8px 0 3px; text-transform: uppercase; letter-spacing: .03em; }
@@ -177,7 +180,7 @@
   .pchead { font-size: 12px; color: var(--nx-ink-strong); margin: 0 0 2px; }
   .pchead b { color: var(--nx-select); }
   .pcdim { font-size: 11px; color: var(--nx-ink-soft); margin: 0 0 8px; }
-  #partSvg { width: 100%; max-height: 200px; border: 1px solid var(--nx-border); border-radius: 5px; background: var(--nx-surface); display: block; margin: 4px 0 6px; }
+  #partSvg { width: 100%; max-height: 200px; border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface); display: block; margin: 4px 0 6px; }
   .absleg { display: flex; flex-wrap: wrap; gap: 8px; font-size: 10px; color: var(--nx-ink-muted); margin: 2px 0 8px; align-items: center; }
   .absleg span { display: inline-flex; align-items: center; gap: 3px; }
   .absleg i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
@@ -190,18 +193,18 @@
   .edgerow { display: flex; gap: 5px; align-items: center; margin: 3px 0; }
   .edgerow .en { flex: 0 0 78px; font-size: 12px; color: var(--nx-ink-label); display: flex; align-items: center; gap: 5px; }
   .edgerow .en i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; flex: 0 0 11px; }
-  .edgerow select { flex: 1; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 4px; font-size: 12px; min-width: 0; }
+  .edgerow select { flex: 1; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 12px; min-width: 0; }
   .edgerow select.ovr { border-color: var(--nx-warn); background: var(--nx-warn-bg); }
   .pcmat { display: flex; align-items: center; gap: 5px; margin: 2px 0 6px; }
   .pcmat label { flex: 0 0 78px; font-size: 12px; color: var(--nx-ink-label); }
-  .pcmat select { flex: 1; padding: 4px 6px; border: 1px solid var(--nx-border-strong); border-radius: 4px; font-size: 12px; min-width: 0; }
+  .pcmat select { flex: 1; padding: 4px 6px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 12px; min-width: 0; }
   .pcmat select.ovr { border-color: var(--nx-warn); background: var(--nx-warn-bg); }
   /* KOVANIE (V0.4) */
   .hwrow { display: flex; align-items: center; gap: 5px; margin: 4px 0; }
   .hwrow .hwname { flex: 1; font-size: 12px; color: var(--nx-ink-strong); min-width: 0; }
   .hwrow .hwown { color: var(--nx-ink-muted); font-size: 11px; }
   .hwrow .hwext { color: var(--nx-ink-faint); font-size: 11px; }
-  .hwrow .hwqty { flex: 0 0 52px; width: 52px; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 4px; font-size: 12px; text-align: right; }
+  .hwrow .hwqty { flex: 0 0 52px; width: 52px; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 12px; text-align: right; }
   .hwrow .hwbtn { flex: 0 0 auto; padding: 2px 7px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
   .hwrow .hwsrc { flex: 0 0 auto; width: 20px; }
   .hwrow.hwoff .hwname { color: var(--nx-ink-faint); }
@@ -211,12 +214,12 @@
      ma vlastne pravidlo nizsie a tento kompakt sa ho NEDOTYKA. */
   .hwrow:not(.hwsetrow) .hwsetsel { flex: 0 1 104px; min-width: 60px; max-width: 150px;
                      padding: 2px 4px; border: 1px solid var(--nx-border-strong);
-                     border-radius: 4px; font-size: 11px; color: var(--nx-ink-muted); }
+                     border-radius: 6px; font-size: 11px; color: var(--nx-ink-muted); }
   /* D-93: rucny NL vysuvu — select dlzky + zamok v TOM ISTOM riadku (namiesto
      popisu „NL 470", ziadny novy riadok). Zamknuty stav = jantarovy override
      (rovnaka rec ako .hwqty.manual); semaforove --nx-state-* sa sem nemiesaju. */
   .hwrow .hwnlsel { flex: 0 1 78px; min-width: 56px; padding: 2px 4px;
-                    border: 1px solid var(--nx-border-strong); border-radius: 4px;
+                    border: 1px solid var(--nx-border-strong); border-radius: 6px;
                     font-size: 11px; color: var(--nx-ink-muted); }
   .hwrow .hwnlsel.manual { border-color: var(--nx-warn); background: var(--nx-warn-bg);
                            color: var(--nx-ink-strong); }
@@ -240,8 +243,8 @@
   .rrule .rhead .rid { color: var(--nx-ink-faint); font-size: 11px; }
   .rrow { display: flex; align-items: center; gap: 5px; margin: 4px 0; }
   .rrow label { flex: 0 0 auto; min-width: 64px; color: var(--nx-ink-label); font-size: 12px; }
-  .rrow .rnum { width: 64px; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 4px; font-size: 12px; text-align: right; }
-  .rrow .rseries { flex: 1; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 4px; font-size: 12px; min-width: 0; }
+  .rrow .rnum { width: 64px; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 12px; text-align: right; }
+  .rrow .rseries { flex: 1; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 12px; min-width: 0; }
   .rband .arrow { color: var(--nx-ink-faint); }
   .rband .bmaxfill { width: 64px; display: inline-block; }
   .rband .bdel { flex: 0 0 auto; width: 26px; padding: 2px 0; }
@@ -315,7 +318,7 @@
   #preview { height: clamp(210px, 38vh, 640px); }
   .pvfitwrap { position: absolute; top: 6px; right: 6px; pointer-events: none; }
   .pvfit { pointer-events: auto; width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
-           background: var(--nx-surface); color: var(--nx-ink-strong); border: 1px solid var(--nx-border); border-radius: 5px;
+           background: var(--nx-surface); color: var(--nx-ink-strong); border: 1px solid var(--nx-border); border-radius: 6px;
            box-shadow: 0 1px 2px var(--nx-modal-shadow); opacity: .9; }
   .pvfit:hover { opacity: 1; background: var(--nx-surface-sunken); }
   .pvfit .ic { width: 16px; height: 16px; }
@@ -344,7 +347,7 @@
                   box-shadow: 0 8px 28px var(--nx-modal-shadow); padding: 14px; width: min(92%, 340px); }
   .nxmodal-title { font-weight: 600; font-size: 14px; margin-bottom: 10px; color: var(--nx-ink); }
   .nxmodal-warn { background: var(--nx-warn-bg); border: 1px solid var(--nx-warn); color: var(--nx-modalwarn-fg);
-                  border-radius: 4px; padding: 6px 8px; font-size: 12px; margin: 8px 0; }
+                  border-radius: 6px; padding: 6px 8px; font-size: 12px; margin: 8px 0; }
   /* ===== V0.6 B-2b: Demos diff modal (okno Materialy) ===== */
   .nxmodal-wide { width: min(94%, 560px); max-height: 86vh; display: flex; flex-direction: column; }
   /* ===== V0.6 M-B2: „Nahradit UNI…" (audit F6: telo skroluje, akcie fixne) ===== */
@@ -488,20 +491,20 @@
   .tplrow .tpldel { flex: 0 0 28px; padding: 3px 0; color: var(--nx-danger); }
   /* D-42: hladacie pole katalogu (okno Materialy) — input s ikonou lupy */
   .mdsearch { position: relative; margin: 2px 0 8px; }
-  .mdsearch input { width: 100%; padding: 5px 8px 5px 30px; border: 1px solid var(--nx-border-strong); border-radius: 5px; font-size: 13px; }
+  .mdsearch input { width: 100%; padding: 5px 8px 5px 30px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 13px; }
   .mdsearch .mdsearch-ic { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--nx-ink-faint); pointer-events: none; }
   /* D-41 PR B: dekorove karty katalogu (okno Materialy) — kompaktne, chips wrapuju */
   .mdcard { border: 1px solid var(--nx-border-soft); border-radius: 6px; padding: 4px 8px; margin: 6px 0; background: var(--nx-surface); }
   .mdcard .mdhead { margin: 2px 0; }
   .mdcard .mdline { flex-wrap: wrap; row-gap: 4px; margin: 2px 0 4px; }
   .mdcard .mdline > .tplt { flex: 0 0 42px; }
-  .mdchip { display: inline-flex; align-items: center; border: 1px solid var(--nx-border); border-radius: 4px; overflow: hidden; }
+  .mdchip { display: inline-flex; align-items: center; border: 1px solid var(--nx-border); border-radius: 6px; overflow: hidden; }
   .mdchip .ghostbtn { border: 0; border-radius: 0; padding: 2px 8px; font-size: 11.5px; }
   .mdchip .tpldel { flex: 0 0 22px; border-left: 1px solid var(--nx-border-soft); }
   /* D-42 PR B: top bar + mriezka dlazdic + detail dekoru (okno Materialy 640px) */
   .mdbar { display: flex; gap: 6px; align-items: center; margin: 2px 0 8px; }
   .mdbar .mdsearch { flex: 1; margin: 0; }
-  .mdbar select { flex: 0 0 auto; padding: 5px 6px; border: 1px solid var(--nx-border-strong); border-radius: 5px; font-size: 12px; }
+  .mdbar select { flex: 0 0 auto; padding: 5px 6px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 12px; }
   .mdbar .ghostbtn { flex: 0 0 auto; white-space: nowrap; padding: 5px 10px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
   .mdsechead { display: flex; align-items: center; gap: 6px; margin: 10px 2px 5px; font-size: 11px; font-weight: 600;
                text-transform: uppercase; letter-spacing: .05em; color: var(--nx-ink-muted); }
@@ -512,7 +515,7 @@
   .mdtile:hover { border-color: var(--nx-border-strong); background: var(--nx-select-bg-soft); }
   .mdtile-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; min-width: 0; }
   .mdsw { flex: 0 0 26px; width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--nx-border-strong); }
-  .mdsw-lg { flex: 0 0 34px; width: 34px; height: 34px; border-radius: 7px; }
+  .mdsw-lg { flex: 0 0 34px; width: 34px; height: 34px; border-radius: 6px; }
   .mdtile-name { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
   /* M-A3b (D-63): nazov na 2 riadky (clamp) — "tabakovy/prirodny" sa uz
      neodreze; plny text nesie title dlazdice. CEF = Chromium, -webkit OK. */
@@ -525,7 +528,7 @@
   .mddemos { flex: 0 0 auto; display: inline-flex; align-items: center; color: var(--nx-select-accent); }
   .mddemos .ic { width: 13px; height: 13px; }
   .mdtile-chips { display: flex; flex-wrap: wrap; gap: 3px; min-height: 18px; }
-  .vchip { display: inline-block; padding: 1px 7px; border-radius: 5px; font-size: 11px; background: var(--nx-surface-sunken);
+  .vchip { display: inline-block; padding: 1px 7px; border-radius: 6px; font-size: 11px; background: var(--nx-surface-sunken);
            color: var(--nx-ink-label); border: 1px solid var(--nx-border-soft); }
   .vchip-abs { background: var(--nx-abs-tape-bg); }
   /* Detail dekoru: riadky variantov rozmer · kod · cena · dodavatel + akcie.
@@ -548,7 +551,7 @@
   .mdvp { flex: 0 0 84px; text-align: right; color: var(--nx-ink); }
   /* Editovatelne bunky (kod/cena/dodavatel) — nenapadne inputy, ramik az na fokus */
   .mdvrow .mdcell { flex: 1 1 0; min-width: 0; padding: 3px 5px; font-size: 12px; border: 1px solid transparent;
-                    border-radius: 4px; background: transparent; color: var(--nx-ink); }
+                    border-radius: 6px; background: transparent; color: var(--nx-ink); }
   .mdvrow .mdcell:hover { border-color: var(--nx-border-soft); background: var(--nx-surface); }
   .mdvrow .mdcell:focus { border-color: var(--nx-border-strong); background: var(--nx-surface); outline: none; }
   .mdvrow .mdcell.mdvp { flex: 0 0 84px; text-align: right; }
@@ -569,12 +572,12 @@
   .mdfmt i { font-style: normal; font-size: 10px; letter-spacing: .04em; text-transform: uppercase;
              color: var(--nx-ink-faint); white-space: nowrap; }
   .mdfmt input.fmtdim { width: 54px; padding: 2px 4px; font-size: 11.5px; text-align: right;
-                        border: 1px solid var(--nx-border); border-radius: 4px; background: var(--nx-surface); color: var(--nx-ink); }
+                        border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface); color: var(--nx-ink); }
   .mdfmt input.fmtdim::placeholder { color: var(--nx-ink-faint); }
   /* 2A-4b: struktura povrchu per aktivny cip (doska aj ABS) + universal checkbox
      na ABS cipe — rovnaky kompaktny pruh ako format (ziadny novy riadok per cip) */
   .mdfmt input.fmtst { width: 46px; padding: 2px 4px; font-size: 11.5px; text-transform: uppercase;
-                       border: 1px solid var(--nx-border); border-radius: 4px; background: var(--nx-surface); color: var(--nx-ink); }
+                       border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface); color: var(--nx-ink); }
   .mdfmt input.fmtst::placeholder { color: var(--nx-ink-faint); text-transform: none; }
   .mdfmt label.fmtuni { display: inline-flex; align-items: center; gap: 3px; font-size: 10px;
                         color: var(--nx-ink-muted); cursor: pointer; white-space: nowrap; }
@@ -598,7 +601,7 @@
      vyberu, meni sa patchom; pocas zapisu disabled */
   .mduni { flex: 0 0 26px; width: 26px; padding: 3px 0; display: inline-flex; align-items: center;
            justify-content: center; background: var(--nx-surface-sunken); color: var(--nx-ink-faint);
-           border: 1px solid var(--nx-border); border-radius: 5px; cursor: pointer; }
+           border: 1px solid var(--nx-border); border-radius: 6px; cursor: pointer; }
   .mduni.on { background: var(--nx-select-bg); color: var(--nx-select-strong); border-color: var(--nx-select-accent); }
   .mduni .ic { width: 14px; height: 14px; }
   /* M-A3b (D-60): vazba na Demos v riadku variantu — akcent, klik otvara stranku */
@@ -628,7 +631,7 @@
   /* V0.5 C: VEPO export lista v okne Vyroba */
   .vepobar { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; }
   .vepobar #vepoProject { flex: 1; min-width: 0; padding: 4px 8px; font-size: 12px;
-                          border: 1px solid var(--nx-border); border-radius: 5px; }
+                          border: 1px solid var(--nx-border); border-radius: 6px; }
   .vepobar .vepomerge { flex: 0 0 auto; display: flex; align-items: center; gap: 4px;
                         font-size: 11.5px; color: var(--nx-ink-label); white-space: nowrap; }
   .vepobar .vepobtn { flex: 0 0 auto; padding: 4px 12px; font-size: 12px; font-weight: 600; }
@@ -643,7 +646,7 @@
                             stroke-width: 1.5; }
   #preview g.fgrp.hov rect { stroke: var(--nx-select-strong); stroke-width: 3.5; }
   #preview g.fgrp.hov text { fill: var(--nx-select-strong); }
-  .frow.hov { background: var(--nx-select-bg-hover); border-radius: 4px; }
+  .frow.hov { background: var(--nx-select-bg-hover); border-radius: 6px; }
   .frow.hov .fnum { color: var(--nx-select-accent); font-weight: 600; }
   /* D-23: hint pod nahladom podla aktivneho tabu (data-cab-tab z D-08) —
      klik na celo sa ukazuje LEN v tabe Cela; zonovy hint LEN v tabe Zony. */
@@ -668,11 +671,11 @@
   .nxda-sugg-row:last-child { border-bottom: 0; }
   .nxda-sugg-row:hover { background: var(--nx-select-bg-hover); }
   .nxda-tag { flex: 0 0 auto; font-size: 10px; font-weight: 700; color: var(--nx-ink-muted);
-              border: 1px solid var(--nx-border); border-radius: 4px; padding: 0 5px; }
+              border: 1px solid var(--nx-border); border-radius: 6px; padding: 0 5px; }
   .nxda-sugg-label { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* D-74: kontrola zhody na Demose — ghost ikonka vpravo, klik nevybera riadok */
   .nxda-sugg-open { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
-                    width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px;
+                    width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px;
                     background: transparent; color: var(--nx-ink-muted); cursor: pointer; }
   .nxda-sugg-open:hover { background: var(--nx-select-bg-hover); color: var(--nx-select); }
   .nxda-note { color: var(--nx-ink-muted); font-size: 11.5px; padding: 6px 2px; }
@@ -697,18 +700,18 @@
   .nxda-cd { flex: 0 0 62px; color: var(--nx-ink-muted); font-size: 11.5px; }
   .nxda-pr { flex: 0 0 96px; text-align: right; font-variant-numeric: tabular-nums; }
   .nxda-dis { opacity: .55; }
-  .nxda-fail { background: var(--nx-err-bg); border-radius: 5px; }
+  .nxda-fail { background: var(--nx-err-bg); border-radius: 6px; }
   .nxda-fail .nxda-why { color: var(--nx-err-fg); }
   .nxda-foot { display: flex; align-items: center; gap: 8px; justify-content: flex-end;
                border-top: 1px solid var(--nx-border-soft); margin-top: 8px; padding-top: 8px; }
   .nxda-count { margin-right: auto; color: var(--nx-ink-muted); font-size: 12px; }
-  .nxda-progress { height: 8px; background: var(--nx-surface-sunken); border-radius: 5px; overflow: hidden; margin: 8px 0; }
+  .nxda-progress { height: 8px; background: var(--nx-surface-sunken); border-radius: 6px; overflow: hidden; margin: 8px 0; }
   .nxda-progress i { display: block; height: 100%; width: 0%; background: var(--nx-select-accent); transition: width .4s; }
   .nxda-log { font-size: 12px; color: var(--nx-ink-muted); max-height: 40vh; overflow-y: auto; }
   .nxda-err { color: var(--nx-err-fg); }
   /* dlazdica: fotka dekoru prekryva farebny swatch (fallback = farba pod nou) */
   .mdsw { overflow: hidden; position: relative; }
-  .mdsw-photo { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 5px; }
+  .mdsw-photo { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 6px; }
   /* D-82: swatch v HLAVICKE detailu je zaroven vyber farby CELEHO dekoru
      (skupinovy — jedna zmena prefarbi dosky aj pasky). Native <input type=color>
      lezi cez swatch neviditelne, takze hlavicka nerastie ani o pixel
@@ -721,7 +724,7 @@
   .mddel-name { font-weight: 600; margin-bottom: 4px; }
   .mddel-line { color: var(--nx-ink-muted); padding: 1px 0; }
   .mddel-warn { background: var(--nx-warn-bg); border: 1px solid var(--nx-warnchip-border);
-                color: var(--nx-warn-fg); border-radius: 5px; padding: 5px 8px; margin-top: 6px; }
+                color: var(--nx-warn-fg); border-radius: 6px; padding: 5px 8px; margin-top: 6px; }
 
 /* ===== V0.6 D1b: Katalog kovania — taby Sety + Predvolby projektu ===== */
 #hwTabs { margin: 6px 0 8px; }
@@ -768,7 +771,7 @@
 .hwmanual .ic { width: 13px; height: 13px; }
 
 /* ===== V0.6 D2: Pridat z Demosu (katalog kovania) ===== */
-.hwdemos-hit { padding: 3px 8px; border: 1px solid var(--nx-border); border-radius: 5px;
+.hwdemos-hit { padding: 3px 8px; border: 1px solid var(--nx-border); border-radius: 6px;
                margin: 2px 0; cursor: pointer; font-size: 12px; }
 .hwdemos-hit:hover { background: var(--nx-ghost-hover); }
 #hwDemosPreview { border: 1px solid var(--nx-border-strong); border-radius: 8px;
@@ -776,5 +779,5 @@
 .hwdemos-head { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; }
 .hwdemos-meta { color: var(--nx-ink-muted); font-size: 12px; margin: 2px 0; }
 .hwdemos-warn { background: var(--nx-warn-bg); border: 1px solid var(--nx-warnchip-border);
-                color: var(--nx-warn-fg); border-radius: 5px; padding: 4px 8px; margin: 4px 0; font-size: 12px; }
+                color: var(--nx-warn-fg); border-radius: 6px; padding: 4px 8px; margin: 4px 0; font-size: 12px; }
 .hwdemos-rel { color: var(--nx-ink-muted); font-size: 11.5px; margin: 3px 0; }

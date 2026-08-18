@@ -93,15 +93,87 @@ function nxFitRun(){
   }
 }
 
+// ===================== UI-01: TEMA OKNA (NOXUN / Lucia) =====================
+//
+// Tema je nastavenie POCITACA (%APPDATA%\NOXUN\Engine\ui_theme.json), nie
+// zakazky — Ruby ju cita a posiela sem meno temy. Prepina sa VYHRADNE vyberova
+// rodina tokenov; vyznamove farby (danger/warn/ok/ABS/edge/semafor) tema NIKDY
+// nemeni (rozhodnutie O4, docs/UI_DIZAJN.md sekcia „Temy").
+//
+// Preco tu: win_fit.js je JEDINY skript, ktory nacitavaju VSETKY okna (panel aj
+// satelity) — tema tak plati vsade bez noveho suboru v kazdom HTML.
+// UI prepinac temy pride v davke UI-B3; zatial sa hodnota meni z Ruby
+// (Engine.set_ui_theme).
+var NX_THEME_DEFAULT = 'noxun';
+// Zakladna tema NEMA prepisy — jej hodnoty su priamo v :root (panel.css).
+// Lucia = ruzovy akcent (manzelkin pocitac), rovnakych 8 tokenov.
+var NX_THEME_TOKENS = {
+  noxun: {},
+  lucia: {
+    '--nx-select': '#c2185b',
+    '--nx-select-strong': '#880e4f',
+    '--nx-select-accent': '#ad1457',
+    '--nx-select-bg': '#fce4ec',
+    '--nx-select-bg-soft': '#fdf1f5',
+    '--nx-select-bg-hover': '#fce4ec',
+    '--nx-part-border': '#f48fb1',
+    '--nx-part-bg': '#fff5f9'
+  }
+};
+
+// Tolerantne citanie mena: prazdna, cudzia ci nesprava hodnota = zakladna tema
+// (rovnaky fallback ako v Ruby — obe strany musia povedat to iste).
+function nxThemeName(raw){
+  var v = (raw === null || raw === undefined) ? '' : String(raw);
+  v = v.replace(/^\s+|\s+$/g, '').toLowerCase();
+  return Object.prototype.hasOwnProperty.call(NX_THEME_TOKENS, v) ? v : NX_THEME_DEFAULT;
+}
+
+// Nasadi temu na koren dokumentu. Najprv ZHODI vsetky temove prepisy (navrat na
+// hodnoty z :root), az potom nasadi tie svoje — inak by prepnutie spat na NOXUN
+// nechalo ruzove zvysky. Vracia meno skutocne pouzitej temy.
+function nxThemeApply(raw, rootEl){
+  var name = nxThemeName(raw);
+  var root = rootEl || ((typeof document !== 'undefined') ? document.documentElement : null);
+  if (!root || !root.style) return name;
+  var overrides = NX_THEME_TOKENS.lucia; // jediny zdroj zoznamu temovych tokenov
+  var key;
+  for (key in overrides){
+    if (Object.prototype.hasOwnProperty.call(overrides, key)) root.style.removeProperty(key);
+  }
+  var tokens = NX_THEME_TOKENS[name] || {};
+  for (key in tokens){
+    if (Object.prototype.hasOwnProperty.call(tokens, key)) root.style.setProperty(key, tokens[key]);
+  }
+  if (root.setAttribute) root.setAttribute('data-nx-theme', name);
+  return name;
+}
+
+// Okno si temu VYPYTA (rovnaky smer ako nx_fit — `execute_script` pred `show`
+// nefunguje). Odpoved pride ako volanie nxThemeApply z Ruby.
+function nxThemeRun(){
+  try {
+    if (typeof sketchup === 'undefined' || !sketchup.nx_theme) return;
+    sketchup.nx_theme('');
+  } catch (e) {
+    if (typeof console !== 'undefined' && console.log) console.log('nx_theme: ' + e);
+  }
+}
+
 if (typeof document !== 'undefined'){
   if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', nxFitRun);
+    document.addEventListener('DOMContentLoaded', function(){ nxFitRun(); nxThemeRun(); });
   } else {
     nxFitRun();
+    nxThemeRun();
   }
 }
 
 // Node testy — v CEF je module undefined, vetva sa preskoci.
 if (typeof module !== 'undefined' && module.exports){
-  module.exports = { nxFitTarget: nxFitTarget, nxFitChrome: nxFitChrome };
+  module.exports = {
+    nxFitTarget: nxFitTarget, nxFitChrome: nxFitChrome,
+    nxThemeName: nxThemeName, nxThemeApply: nxThemeApply,
+    NX_THEME_TOKENS: NX_THEME_TOKENS, NX_THEME_DEFAULT: NX_THEME_DEFAULT
+  };
 }
