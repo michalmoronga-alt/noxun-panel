@@ -243,11 +243,13 @@
     }
   }
 
-  // Koliesko — Nastavenia Inspectora (tema, rozmerove rady, o plugine) pridu
-  // v davke UI-B3. Do vtedy tlacidlo poctivo povie, ze este nic nerobi.
+  // Koliesko — Nastavenia Inspectora (tema, rozmerove rady, o plugine, UI-B3).
+  // Otvara MODAL, nie novy kontext raily: su to nastavenia POCITACA a musia byt
+  // dostupne aj vtedy, ked nie je oznacene nic (kontexty su platne len nad
+  // korpusom). Stavovy stroj NXShell sa tym nedotkne.
   function onInspectorSettings(){
-    if (window.NX && NX.setStatus)
-      NX.setStatus('Nastavenia Inspectora (téma, rozmerové rady, o plugine) pribudnú v ďalšej dávke.', false);
+    if (typeof openInspectorSettings === 'function'){ openInspectorSettings(); return; }
+    if (window.NX && NX.setStatus) NX.setStatus('Nastavenia Inspectora sa nepodarilo otvoriť.', true);
   }
 
   // Codex #168 P2 (2. kolo): akcie z NAHLADU (klik na celo, klik na hranu

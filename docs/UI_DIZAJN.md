@@ -183,8 +183,15 @@ druhý počítač). Pravidlá sú úzke zámerne:
 - **Aplikácia:** `nxThemeApply` najprv zhodí všetky témové prepisy (návrat na `:root`)
   a až potom nasadí svoje — prepnutie späť na NOXUN nesmie nechať ružové zvyšky.
   Koreň dokumentu nesie `data-nx-theme`.
-- **UI prepínač témy príde v dávke UI-B3** (koliesko → Nastavenia Inspectora). Do
-  vtedy sa téma mení z Ruby: `Engine.set_ui_theme('lucia')`.
+- **UI prepínač témy (UI-B3)** je v koliesku raily → sekcia **Vzhľad**: dve
+  tlačidlá so **vzorkami farieb** (NOXUN teal / Lucia ružová). Klik volá Ruby
+  (`Engine.apply_ui_theme`), ktoré tému uloží a **rozpošle ju VŠETKÝM otvoreným
+  oknám** — prepnutie je vidieť hneď a bez reštartu. Panel si tému **nedrží ani
+  nenasadzuje**: farby nasadzuje výhradne `nxThemeApply`, JS len číta
+  `data-nx-theme` z koreňa, aby vedel, ktoré tlačidlo je aktívne. **Vzorky sú
+  literály** (nie `var(--nx-select)`) — musia ukázať farbu, ktorú *ponúkajú*,
+  nie tú, ktorá je práve nasadená; sú preto zrkadlom `:root` a `NX_THEME_TOKENS`
+  (stráži test).
 - Kreslené farby náhľadu (`preview.js`) tému **zámerne nesledujú** — sú firemné teal.
 
 ---
@@ -225,7 +232,12 @@ tlačidla — D-105), `link`, `search`, `arrow-left`, `trash`,
 `profile` (vlastný symbol — úchytkový profil v riadku čela, D-90),
 `wrench` (Kovanie — katalóg kovania), `logo`,
 `cabinet` / `front` / `hammer` / `shell` / `slab` (UI-B1 — rail Inspectora:
-Korpus · Čelá · Kovanie · ABS kontrola · dočasný dielec/doska).
+Korpus · Čelá · Kovanie · ABS kontrola · dočasný dielec/doska),
+`camera` (UI-B2 — kamera v spodnom páse náhľadu),
+`arr-h` / `arr-v` / `arr-d` / `plinth` (UI-B3 — rozmery v sektore Základné),
+`p-top` / `p-bottom` / `p-side` / `p-back` / `brace` (UI-B3 — ikony skupín
+Nastavení; `brace` čaká na skupinu Výstuhy z bloku UI-C),
+`palette` (UI-B3 — sekcia Vzhľad v koliesku).
 
 > Okno **Výroba** načítava `icons.js` od v0.5.44 (predtým sprite nemalo) — nové
 > ovládacie prvky v ňom používajú sprite, nie glyfy.
@@ -483,7 +495,54 @@ Zásady kreslenia:
 > **náhľadu**, nie tagy modelu. Modelové tagy Čelá/Chrbát ostávajú na neskôr
 > (vzor je checkbox „Zobraziť zóny (ghost) v modeli").
 
-### 5.3 Ostatné vzory
+### 5.3 Základné — dva stĺpce, rozmerové rady a koliesko (UI-B3)
+
+Sektor **Základné** je rozdelený na **vstupy vľavo a dopočítané údaje vpravo**
+(`.basicgrid`). Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html`
+(`basicgrid` / `rowc` / `dwrap` / `miniopts` / `infocol`).
+
+- **Vľavo kompaktné rozmery** (`.rowc`): Šírka · Výška · Hĺbka · Sokel · Hrúbka,
+  každý s ikonou zo spritu. Pole je úzke a hodnota zarovnaná doprava —
+  rozmer je číslo, nie veta (UX-03).
+- **Vpravo informačný stĺpec** (`.infocol`) — **výstupy nikdy nevyzerajú ako
+  vstupy** (trvalá zásada z kôl 15.8.). Dopočítaný údaj je **text**, nie
+  readonly pole: Vnút. šírka · Vnút. hĺbka · Úložná výška · Dielcov · Materiál
+  m² · Hmotnosť („—" s vysvetlením, že príde s kovaním fáza 3).
+- **Klikateľné je len to, čo niekam vedie (N13)** — „Dielcov" označí výrobné
+  dielce skrinky v modeli, „Materiál" povie, kam údaj patrí (Štúdio → Kusovník).
+  Bez označenej skrinky sú riadky `aria-disabled` s vysvetlením (vzor D-78),
+  nikdy ticho mŕtve.
+- **Rozmerový rad (N6)** je **ponuka, nie ďalšie pole**: šípka pri poli otvorí
+  `.miniopts` s bežnými hodnotami a položkou „Upraviť rad…". Voľba **len dosadí
+  hodnotu do poľa** a ohlási ju rovnakou udalosťou ako písanie rukou — všetky
+  guardy (výrazy, validácia, debounce apply, zámky D-39) bežia nezmenene.
+  Otvorená je vždy najviac **jedna** ponuka a klik mimo nej ju zavrie (rovnaké
+  správanie ako natívna rozbaľovačka). Hrúbka rad zámerne nemá — určuje ju
+  materiál (D-45).
+- **Hodnoty radov sú nastavenie POČÍTAČA** (`%APPDATA%\NOXUN\Engine\dim_series.json`),
+  nie zákazky — rovnaký dôvod ako pri téme: Michal a Lucia otvárajú tie isté
+  zákazky, ale majú vlastné zvyklosti. V editore **čiarka oddeľuje hodnoty**
+  (hodnoty sú celé mm), nezmysel a čísla mimo 10–3000 mm sa **zahodia** — rad
+  smie obsahovať len to, čo doň používateľ naozaj napísal.
+- **Klik na informačný údaj, ktorý mení výber, má flush handshake:** rozpísaná
+  úprava sa najprv odošle a **červené pole akciu zastaví** — inak by ju
+  serverový push prepísal a úprava by ticho zmizla (rovnako ako „Vložiť kópiu"
+  a exporty okna Výroba).
+- **Skupiny v Nastaveniach majú ikony** (N3b) — ikona ukazuje **dielec, o ktorom
+  skupina hovorí** (Strop · Dno · Boky · Chrbát) a rozsvieti sa s otvorenou
+  skupinou. Ostatné kontexty ikony dostanú s blokom UI-C.
+- **Typ korpusu je badge v hlavičke** (readonly): typ sa nastavuje **výhradne
+  šablónou alebo vkladaním**, preto mini-modal „Uložiť ako šablónu" nesie
+  **Názov + Typ** — je to jediné miesto, kde sa typ šablóny volí.
+
+**Koliesko = Nastavenia Inspectora** otvára **modal** (nie ďalší kontext railu):
+sú to nastavenia počítača, musia byť dostupné aj vtedy, keď nie je označené nič,
+a stavový stroj kontextov (platných len nad korpusom) sa ich nesmie týkať. Tri
+sekcie podľa kontraktu: **Vzhľad** (téma) · **Rozmerové rady** (editor — hodnoty
+oddelené čiarkou, čistenie a poradie robí server) · **O plugine** (logo +
+verzia z Ruby).
+
+### 5.4 Ostatné vzory
 
 - **Sticky hlavička (Inspector):** jednoradová, zostáva pri scrollovaní
   (`position: sticky`, `z-index` pod modalom 60): logo + ID + názov s ceruzkou
@@ -496,7 +555,7 @@ Zásady kreslenia:
 - **Tlačidlá:** `.primary` (akcia, zelená), `.ghostbtn` (neutrál), `.danger`
   (mazanie, červená). Ikonové akcie sú kompaktné, s `aria-label`.
 - **Náhľad:** fixné okno so zoom/pan; ovládanie (kamera + fit) žije v **spodnom
-  páse** — viď 5.3.
+  páse** — viď 5.2.
 - **Karty:** `fieldset`/`details` na bielom povrchu, rámik `--nx-border`.
 - **Warn chip / warnlist:** klik na chip ukotvený zoznam upozornení hore (pri
   rozbalení návrat na začiatok, aby bol viditeľný aj po odscrollovaní).

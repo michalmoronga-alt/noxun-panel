@@ -589,6 +589,85 @@
   .nx-inspector body.mode-part #boardCard { display: none; }
   .nx-inspector body.mode-insert #partCard, .nx-inspector body.mode-cab #partCard,
   .nx-inspector body.mode-board #partCard { display: none; }
+  /* ===================================================================
+     UI-B3 — OBSAH KORPUSU: Zakladne v DVOCH stlpcoch (vlavo vstupy s
+     rozmerovymi radmi, vpravo dopocitane info) + koliesko (Nastavenia
+     Inspectora). Vzhlad je 1:1 mockup SYSTEM/zdroje/ui20/mockup_inspector_c.html
+     (basicgrid / rowc / dwrap / miniopts / infocol).
+     =================================================================== */
+  .nx-inspector .basicgrid { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; align-items: start; }
+  /* Kompaktny rozmerovy riadok — uzsi nez .row, aby sa vedla neho zmestil
+     informacny stlpec (obsah panela ma 470 px, viac uz nebude). */
+  .nx-inspector .rowc { display: flex; align-items: center; gap: 5px; margin: 4px 0; }
+  .nx-inspector .rowc label { flex: 0 0 62px; display: flex; align-items: center; gap: 5px;
+                color: var(--nx-ink-label); font-size: 12.5px; }
+  .nx-inspector .rowc label .ic { width: 14px; height: 14px; color: var(--nx-ink-faint); flex: 0 0 14px; }
+  .nx-inspector .rowc input { width: 56px; padding: 4px 6px; text-align: right; font: inherit; font-size: 13px;
+                font-weight: 600; color: var(--nx-ink); border: 1px solid var(--nx-border-strong);
+                border-radius: 6px; }
+  .nx-inspector .rowc input.bad { border-color: var(--nx-danger-line); background: var(--nx-danger-bg-soft); }
+  .nx-inspector .rowc .unit { color: var(--nx-ink-faint); font-size: 10.5px; }
+  /* Obal pola + sipky radu; ponuka visi pod nim (position: absolute). */
+  .nx-inspector .dwrap { position: relative; display: inline-flex; align-items: center; gap: 2px; }
+  .nx-inspector .dwrap .exprhint { min-width: 0; padding-left: 2px; } /* v kompaktnom riadku nesmie rozhodit sirku */
+  .nx-inspector .pbtn { width: 17px; height: 26px; padding: 0; border: 1px solid var(--nx-border); border-radius: 6px;
+          background: var(--nx-surface-sunken); color: var(--nx-ink-muted); cursor: pointer;
+          display: inline-flex; align-items: center; justify-content: center; }
+  .nx-inspector .pbtn:hover { border-color: var(--nx-select); color: var(--nx-select); }
+  .nx-inspector .pbtn .ic { width: 11px; height: 11px; }
+  /* Rozmerovy rad (N6): mini-ponuka beznych hodnot. Otvorena je vzdy najviac
+     jedna (trieda `on`) — klik mimo nej ju zavrie (settings.js). */
+  .nx-inspector .miniopts { display: none; position: absolute; top: calc(100% + 2px); left: 0; z-index: 120;
+              background: var(--nx-surface); border: 1px solid var(--nx-border); border-radius: 6px;
+              box-shadow: 0 6px 16px var(--nx-modal-shadow); min-width: 74px; }
+  .nx-inspector .miniopts.on { display: block; }
+  .nx-inspector .miniopts button { display: block; width: 100%; padding: 4px 14px; border: 0; background: none;
+                     cursor: pointer; font: inherit; font-size: 12px; text-align: left; color: var(--nx-ink); }
+  .nx-inspector .miniopts button:hover { background: var(--nx-select-bg); }
+  .nx-inspector .miniopts .miniedit { border-top: 1px solid var(--nx-border-soft); color: var(--nx-ink-faint);
+                        display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .nx-inspector .miniopts .miniedit .ic { width: 11px; height: 11px; }
+  /* INFORMACNY STLPEC — dopocitane udaje. Su to VYSTUPY: text, nie polia. */
+  .nx-inspector .infocol { padding: 2px 0 0 12px; border-left: 1px solid var(--nx-border-soft); align-self: stretch; }
+  .nx-inspector .inforow { display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+             width: 100%; padding: 2px 0; font-size: 10.8px; color: var(--nx-ink-soft);
+             background: none; border: 0; font-family: inherit; text-align: left; }
+  .nx-inspector .inforow b { color: var(--nx-ink-strong); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 11.2px; }
+  .nx-inspector .inforow.click { cursor: pointer; }
+  .nx-inspector .inforow.click:hover span,
+  .nx-inspector .inforow.click:hover b { color: var(--nx-select); }
+  /* Neaktivny riadok drzi `aria-disabled` (vzor D-78) — ostava fokusovatelny
+     a nesie vysvetlenie; HTML `disabled` sa nepouziva. */
+  .nx-inspector .inforow[aria-disabled="true"] { cursor: default; opacity: .7; }
+  .nx-inspector .inforow[aria-disabled="true"]:hover span,
+  .nx-inspector .inforow[aria-disabled="true"]:hover b { color: inherit; }
+  /* Typ korpusu v hlavicke — READONLY badge (typ urcuje sablona/vkladanie). */
+  .nx-inspector .idbar .typbadge { flex: 0 0 auto; font-size: 10px; font-weight: 700; letter-spacing: .04em;
+            text-transform: uppercase; padding: 1px 7px; border-radius: 9px;
+            background: var(--nx-surface-sunken); color: var(--nx-ink-muted);
+            border: 1px solid var(--nx-border-soft); }
+  /* Ikona skupiny v sektore Nastavenia (N3b) — rozsvieti sa s otvorenou skupinou. */
+  .nx-inspector details > summary .gic { width: 13px; height: 13px; color: var(--nx-ink-faint);
+            margin-right: 6px; vertical-align: -2px; }
+  .nx-inspector details[open] > summary .gic { color: var(--nx-select); }
+  /* --- koliesko: Nastavenia Inspectora (modal) --------------------------- */
+  .nx-inspector .themerow { display: flex; gap: 6px; margin: 2px 0 4px; }
+  .nx-inspector .thbtn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+           padding: 7px 4px; border: 1px solid var(--nx-border); border-radius: 6px;
+           background: var(--nx-surface); cursor: pointer; font: inherit; font-size: 12px;
+           color: var(--nx-ink-strong); }
+  .nx-inspector .thbtn:hover { border-color: var(--nx-select); }
+  .nx-inspector .thbtn.on { background: var(--nx-select-bg); border-color: var(--nx-select);
+              color: var(--nx-select-strong); font-weight: 600; }
+  /* Vzorky su LITERALY: musia ukazat farbu temy, ktoru PONUKAJU — cez
+     var(--nx-select) by obe ukazovali prave nasadenu temu. Zrkadlo :root
+     a NX_THEME_TOKENS (rovnaky vzor ako kreslene farby nahladu). */
+  .nx-inspector .thsw { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--nx-border); flex: 0 0 14px; }
+  .nx-inspector .thsw[data-sw="noxun"] { background: #107787; }
+  .nx-inspector .thsw[data-sw="lucia"] { background: #c2185b; }
+  .nx-inspector .aboutrow { display: flex; align-items: flex-start; gap: 10px; margin: 2px 0; }
+  .nx-inspector .aboutlogo { width: 28px; height: 28px; flex: 0 0 28px; }
+  .nx-inspector .aboutname { font-size: 12.5px; font-weight: 600; color: var(--nx-ink-strong); margin-bottom: 2px; }
   /* ===== V0.4.7e: zivy nahlad vyrazu "= 614" (expr.js injektuje span za input) =====
      Pevna rezerva + nowrap, aby hint neposuval .unit a nelamal .row/.frow/.fldrow. */
   .exprhint { flex: 0 0 auto; min-width: 44px; font-size: 10.5px; color: var(--nx-ink-faint);

@@ -158,6 +158,22 @@
     if (Math.abs(r - Math.round(r)) < 0.001) return String(Math.round(r));
     return String(r).replace('.', ',');
   }
+  // UI-B3: texty informacneho stlpca Zakladnych z payloadu skrinky. CISTA
+  // funkcia (testovana v Node) — panel nic nedopocitava, cisla posiela server
+  // (parts_count / parts_area_m2 v cabinet_payload). Chybajuci udaj = '—'
+  // (radsej pomlcka nez vymyslene cislo); typ badge je tiez odtialto, aby sa
+  // slovenske nazvy typov nepisali na dvoch miestach.
+  var NX_TYPE_LABEL = { lower: 'Dolná', upper: 'Horná' };
+  function nxCabInfo(c){
+    var p = c || {};
+    var n = parseInt(p.parts_count, 10);
+    var a = parseFloat(p.parts_area_m2);
+    return {
+      parts: (isNaN(n) || n <= 0) ? '—' : String(n),
+      area: (isNaN(a) || a <= 0) ? '—' : (mmLabel(a) + ' m²'),
+      type: NX_TYPE_LABEL[p.type] || NX_TYPE_LABEL.lower
+    };
+  }
   // FIX 2: hrubkove predikaty pre filter doskovych materialov (tolerancia 0,05 mm).
   // Prazdny/neplatny cielovy rozmer -> nefiltruj (radsej vsetko nez nic).
   function thMatch(target){
@@ -501,6 +517,13 @@
   // vyrazu, nie parseFloat orezanie ('650-36' NIE JE 650).
   function numv(id){ var e = el(id); return e ? evalDim(e.value) : NaN; }
   function setVal(id, v){ var e = el(id); if (e && v !== null && v !== undefined) e.value = v; }
+  // UI-B3: zapis DOPOCITANEHO udaja do informacneho stlpca. Vystupy su TEXT,
+  // nie polia (zasada „výstupy nikdy nevyzerajú ako vstupy") — preto textContent
+  // a nie .value. Prazdna hodnota = pomlcka, nikdy prazdne miesto.
+  function setOut(id, v){
+    var e = el(id); if (!e) return;
+    e.textContent = (v === null || v === undefined || v === '') ? '—' : String(v);
+  }
   function setNum(id, v){ var e = el(id); if (e && v !== null && v !== undefined) e.value = String(parseFloat(v)); }
   function getType(){ var r = document.querySelector('input[name=ctype]:checked'); return r ? r.value : 'lower'; }
   function setType(t){ var r = document.querySelector('input[name=ctype][value="' + t + '"]'); if (r) r.checked = true; }
@@ -629,6 +652,8 @@
       frontProfileNext: frontProfileNext,
       // D-100 (tests/js/test_d100_nazvy.js) — zrkadlo ocistenia nazvu skrinky
       cabNameValue: cabNameValue, CAB_NAME_MAX: CAB_NAME_MAX,
+      // UI-B3 (tests/js/test_uib3_korpus.js) — texty informacneho stlpca a typ badge
+      nxCabInfo: nxCabInfo, NX_TYPE_LABEL: NX_TYPE_LABEL,
       // D-85 (tests/js/test_ui03_combobox.js) — prevod katalogovej farby [r,g,b]
       // na hex pre stvorcek comboboxu (nxComboColorOf uz cita globalny MATERIALS)
       nxRgbHex: nxRgbHex };

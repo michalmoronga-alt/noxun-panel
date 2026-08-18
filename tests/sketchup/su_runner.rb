@@ -3238,6 +3238,59 @@ module NoxunSuRunner
     log_line("FAIL: UI-B2 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
 
+  # UI-B3: klik na „Dielcov" v informacnom stlpci Zakladnych. Overuje presne to,
+  # co sa da overit LEN v SketchUpe: ze oznacenie dielcov je CISTE CITANIE +
+  # zmena vyberu — teda ziadna nova entita, ziadny novy krok Spat a spravny
+  # pocet oznacenych dielcov. Guardy identity sa testuju rovnako ako pri kamere.
+  def run_uib3(model)
+    cleanup(model)
+
+    cfg = { 'type' => 'lower', 'width' => 900.0, 'height' => 720.0, 'depth' => 560.0,
+            'thickness' => 18.0, 'floor_height' => 100.0 }
+    inst = e::CabinetBuilder.build(model, cfg)
+    return ok('UI-B3: vlozenie skrinky pre vyber dielcov', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id').to_s
+    model.selection.clear
+    model.selection.add(inst)
+    before_ents = model.entities.length
+    guid = e::Panel.model_guid(model)
+
+    # Odvodene udaje informacneho stlpca — ciste citanie snapshotov.
+    stats = e::Panel.cabinet_stats(inst)
+    parts = e::Panel.manufactured_parts(inst)
+    ok('UI-B3: informacny stlpec pozna pocet dielcov (rovnaky filter ako kusovnik)',
+       stats['parts_count'].to_i.positive? && stats['parts_count'].to_i >= parts.size)
+    ok('UI-B3: informacny stlpec pozna plochu materialu (m2 > 0)',
+       stats['parts_area_m2'].to_f > 0.0)
+
+    # Guard dokumentu aj cerstvosti vyberu — klik z ineho dokumentu / na inu
+    # skrinku vyber NEMENI (asynchronny callback HtmlDialogu).
+    e::Panel.handle_select_parts({ 'cabinet_id' => cid, 'model_guid' => 'CUDZI-GUID' }.to_json)
+    ok('UI-B3: vyber dielcov z INEHO dokumentu sa NEVYKONA (guard dokumentu)',
+       model.selection.to_a == [inst])
+    e::Panel.handle_select_parts({ 'cabinet_id' => 'CAB-NEEXISTUJE', 'model_guid' => guid }.to_json)
+    ok('UI-B3: vyber dielcov pre INU nez oznacenu skrinku sa NEVYKONA',
+       model.selection.to_a == [inst])
+
+    e::Panel.handle_select_parts({ 'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+    sel = model.selection.to_a
+    ok('UI-B3: oznacili sa VYROBNE dielce skrinky (a nie skrinka sama)',
+       !sel.empty? && sel.size == parts.size && sel.none? { |x| x == inst })
+    ok('UI-B3: oznacenie dielcov NEMENI model (ziadna entita naviac ani menej)',
+       model.entities.length == before_ents)
+
+    # Keby oznacenie bolo vlastnou operaciou, 1x Spat by vratilo JU a skrinka by
+    # v modeli ostala. Poslednou modelovou operaciou je zatial vlozenie skrinky.
+    Sketchup.undo
+    ok('UI-B3: 1x Spat zmaze skrinku (oznacenie dielcov NIE JE undo krok)',
+       inst.nil? || !inst.valid?)
+
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: UI-B3 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   # --- ASYNC: undo/redo scenare (retaz timerov, observer debounce 0.2 s) -----
 
   def run_async(model, done)
@@ -3901,6 +3954,7 @@ module NoxunSuRunner
     run_d105(model)          # D-105: tri stavy + filter podla vyberu (vyber NEMENI model)
     run_uib1(model)          # UI-B1: kostra Inspectora — payloady raily, krizik dielca/dosky, ABS toggle bez undo kroku
     run_uib2(model)          # UI-B2: kamera nahladu — celny pohlad, guardy identity, ziadny zapis ani undo krok
+    run_uib3(model)          # UI-B3: vyber dielcov z informacneho stlpca — ciste citanie, ziadny undo krok
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

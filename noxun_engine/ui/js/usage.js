@@ -26,10 +26,14 @@
   // (docasna polozka raily je len UKAZOVATEL — klikatelny je jej krizik.)
   // UI-B2: spodny pas nahladu — chipy vrstiev sa kreslia z JS, preto maju
   // vlastne kluce (ID by boli generovane); zoznam ostava STATICKY.
+  // UI-B3: rozmerove rady (sipka pri poli) a klikatelny informacny stlpec —
+  // merac tak povie, ci sa rady naozaj pouzivaju a ktore udaje lakaju na klik.
   var USAGE_KEYS = ['rail:korpus', 'rail:zony', 'rail:cela', 'rail:kovanie',
                     'rail:zrusit', 'rail:abs', 'rail:nastavenia', 'rail:studio',
                     'pv:kamera', 'pv:fit',
-                    'pv:vrstva:zony', 'pv:vrstva:cela', 'pv:vrstva:kovanie', 'pv:vrstva:olep'];
+                    'pv:vrstva:zony', 'pv:vrstva:cela', 'pv:vrstva:kovanie', 'pv:vrstva:olep',
+                    'rad:sirka', 'rad:vyska', 'rad:hlbka', 'rad:sokel',
+                    'info:dielce', 'info:material'];
 
   // --- klasifikacia (cista logika, testovatelna v Node cez module.exports) ---
 

@@ -12,7 +12,7 @@
      Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
      bezpecne zdielatelny so satelitnymi oknami. -->
 <script>document.documentElement.className = 'nx-inspector';</script>
-<link rel="stylesheet" href="css/panel.css?v=0.7.5">
+<link rel="stylesheet" href="css/panel.css?v=0.7.7">
 
 <!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
      Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
@@ -41,7 +41,7 @@
   <button type="button" id="railAbs" data-nx-usage="rail:abs" class="railbtn fn" onclick="onEdgeCheckToggle()" aria-pressed="false" aria-label="ABS kontrola hrán"><svg class="ic" aria-hidden="true"><use href="#i-shell"/></svg><span class="railtip" id="railAbsTip">ABS kontrola hrán — zvýrazní olep v modeli</span></button>
   <span class="railgap"></span>
   <div class="raildiv"></div>
-  <button type="button" id="railCfg" data-nx-usage="rail:nastavenia" class="railbtn" onclick="onInspectorSettings()" aria-label="Nastavenia Inspectora"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg><span class="railtip">Nastavenia Inspectora — pripravujú sa</span></button>
+  <button type="button" id="railCfg" data-nx-usage="rail:nastavenia" class="railbtn" onclick="onInspectorSettings()" aria-label="Nastavenia Inspectora"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg><span class="railtip">Nastavenia Inspectora — téma, rozmerové rady, o plugine</span></button>
   <button type="button" id="railStudio" data-nx-usage="rail:studio" class="railbtn" onclick="openProductionDialog()" aria-label="Štúdio"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg><span class="railtip">Štúdio — kusovník, kontrola, výstupy</span></button>
 </nav>
 
@@ -130,20 +130,49 @@
       </div>
     </fieldset>
 
-    <!-- ZAKLADNE: rozmery + svetle (spolocne pre navrh aj oznaceny korpus).
+    <!-- ZAKLADNE (UI-B3): DVA STLPCE — vlavo rozmery (VSTUPY), vpravo dopocitane
+         udaje (TEXT, nie polia: vystup sa nesmie tvarit ako vstup).
+         Polia si drzia SVOJE ID aj zapisovu cestu (oninput="onField()") —
+         rozmerovy rad (sipka -> .miniopts) do nich len DOSADI hodnotu a ohlasi
+         ju povodnou udalostou, takze vyrazy, validacia, debounce apply aj zamky
+         beziat nezmenene.
          D-39: .inslock v EXISTUJUCICH riadkoch (ziadny novy riadok — pravidlo
          vertikalneho priestoru); CSS ich zobrazuje LEN v mode-insert. -->
     <fieldset id="basicCard">
       <legend>Rozmery</legend>
-      <div class="row"><label>Šírka</label><input id="width" type="text" oninput="onField()"><button class="inslock" data-lock="width" onclick="toggleInsertLock('width')" aria-label="Zamknúť šírku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
-      <div class="row"><label>Výška</label><input id="height" type="text" oninput="onField()"><button class="inslock" data-lock="height" onclick="toggleInsertLock('height')" aria-label="Zamknúť výšku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
-      <div class="row"><label>Hĺbka</label><input id="depth" type="text" oninput="onField()"><button class="inslock" data-lock="depth" onclick="toggleInsertLock('depth')" aria-label="Zamknúť hĺbku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
-      <div class="row"><label>Hrúbka materiálu</label><input id="thickness" type="text" oninput="onField()"><button class="inslock" data-lock="thickness" onclick="toggleInsertLock('thickness')" aria-label="Zamknúť hrúbku materiálu" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
-      <!-- D-11: vyska sokla patri k zakladnym rozmerom (pre hornu skrinku sa skryva — applyVisibility) -->
-      <div class="row" id="fhRow"><label>Výška sokla</label><input id="floor_height" type="text" oninput="onField()"><button class="inslock" data-lock="floor_height" onclick="toggleInsertLock('floor_height')" aria-label="Zamknúť výšku sokla" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
-      <div class="row"><label>Svetlá šírka</label><input id="av_width" type="text" readonly><span class="unit">mm</span></div>
-      <div class="row"><label>Svetlá hĺbka</label><input id="av_depth" type="text" readonly><span class="unit">mm</span></div>
-      <div class="row"><label>Úložná výška</label><input id="av_height" type="text" readonly><span class="unit">mm</span></div>
+      <div class="basicgrid">
+        <div class="dimcol">
+          <div class="rowc"><label for="width"><svg class="ic" aria-hidden="true"><use href="#i-arr-h"/></svg>Šírka</label>
+            <span class="dwrap"><input id="width" type="text" oninput="onField()"><button type="button" class="pbtn" data-nx-usage="rad:sirka" onclick="nxDimToggle(this, event)" title="Rozmerový rad — bežné šírky" aria-label="Rozmerový rad šírky"><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><span class="miniopts" id="dimser_width"></span></span>
+            <button class="inslock" data-lock="width" onclick="toggleInsertLock('width')" aria-label="Zamknúť šírku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
+          <div class="rowc"><label for="height"><svg class="ic" aria-hidden="true"><use href="#i-arr-v"/></svg>Výška</label>
+            <span class="dwrap"><input id="height" type="text" oninput="onField()"><button type="button" class="pbtn" data-nx-usage="rad:vyska" onclick="nxDimToggle(this, event)" title="Rozmerový rad — bežné výšky" aria-label="Rozmerový rad výšky"><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><span class="miniopts" id="dimser_height"></span></span>
+            <button class="inslock" data-lock="height" onclick="toggleInsertLock('height')" aria-label="Zamknúť výšku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
+          <div class="rowc"><label for="depth"><svg class="ic" aria-hidden="true"><use href="#i-arr-d"/></svg>Hĺbka</label>
+            <span class="dwrap"><input id="depth" type="text" oninput="onField()"><button type="button" class="pbtn" data-nx-usage="rad:hlbka" onclick="nxDimToggle(this, event)" title="Rozmerový rad — bežné hĺbky" aria-label="Rozmerový rad hĺbky"><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><span class="miniopts" id="dimser_depth"></span></span>
+            <button class="inslock" data-lock="depth" onclick="toggleInsertLock('depth')" aria-label="Zamknúť hĺbku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
+          <!-- D-11: vyska sokla patri k zakladnym rozmerom (pre hornu skrinku sa skryva — applyVisibility) -->
+          <div class="rowc" id="fhRow"><label for="floor_height"><svg class="ic" aria-hidden="true"><use href="#i-plinth"/></svg>Sokel</label>
+            <span class="dwrap"><input id="floor_height" type="text" oninput="onField()"><button type="button" class="pbtn" data-nx-usage="rad:sokel" onclick="nxDimToggle(this, event)" title="Rozmerový rad — bežné výšky sokla" aria-label="Rozmerový rad výšky sokla"><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><span class="miniopts" id="dimser_floor_height"></span></span>
+            <button class="inslock" data-lock="floor_height" onclick="toggleInsertLock('floor_height')" aria-label="Zamknúť výšku sokla" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
+          <!-- Hrubka rad NEMA — urcuje ju material dosky (D-45). -->
+          <div class="rowc"><label for="thickness"><svg class="ic" aria-hidden="true"><use href="#i-slab"/></svg>Hrúbka</label>
+            <span class="dwrap"><input id="thickness" type="text" oninput="onField()"></span>
+            <button class="inslock" data-lock="thickness" onclick="toggleInsertLock('thickness')" aria-label="Zamknúť hrúbku materiálu" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
+        </div>
+        <!-- INFORMACNY STLPEC: dopocitane udaje. Svetle rozmery posiela backend
+             (available_*), pocet dielcov a plochu tiez (parts_count/parts_area_m2
+             — ciste citanie snapshotov). Klikatelne su LEN tie, ktore niekam
+             vedu (N13): Dielcov = oznaci ich v modeli. -->
+        <div class="infocol">
+          <div class="inforow" title="Svetlá šírka vnútra (mm)"><span>Vnút. šírka</span><b id="av_width">—</b></div>
+          <div class="inforow" title="Svetlá hĺbka vnútra (mm)"><span>Vnút. hĺbka</span><b id="av_depth">—</b></div>
+          <div class="inforow" title="Úložná výška vnútra (mm)"><span>Úložná výška</span><b id="av_height">—</b></div>
+          <button type="button" class="inforow click" id="infParts" onclick="onInfoParts()" data-nx-usage="info:dielce" title="Klik = označí výrobné dielce tejto skrinky v modeli"><span>Dielcov</span><b id="inf_parts">—</b></button>
+          <button type="button" class="inforow click" id="infArea" onclick="onInfoArea()" data-nx-usage="info:material" title="Plocha dosky tejto skrinky — kusovník s filtrom príde v Štúdiu"><span>Materiál</span><b id="inf_area">—</b></button>
+          <div class="inforow" title="Hmotnosť príde s kovaním (fáza 3) — podklad pre výklopy"><span>Hmotnosť</span><b>—</b></div>
+        </div>
+      </div>
     </fieldset>
   </div>
 </details>
@@ -204,8 +233,10 @@
   <div class="sectbody">
 
     <!-- --- kontext KORPUS: konstrukcia per dielec (akordeony podla SYSTEM/06) --- -->
+    <!-- N3b: skupiny Nastaveni nesu ikonu dielca, o ktorom hovoria (mapa GRPICON
+         z mockupu). Ostatne kontexty (Zony/Cela/Kovanie) ikony dostanu v UI-C. -->
     <details data-key="top" data-s4="korpus">
-      <summary>Strop</summary>
+      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-p-top"/></svg>Strop</summary>
       <div class="body">
         <div class="row"><label>Konštrukcia</label>
           <select id="top_mode" onchange="toggleTwoRails(); onField()">
@@ -228,7 +259,7 @@
     </details>
 
     <details data-key="bottom" data-s4="korpus">
-      <summary>Dno &amp; podstavec</summary>
+      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-p-bottom"/></svg>Dno &amp; podstavec</summary>
       <div class="body">
         <div class="row"><label>Dno</label>
           <select id="bottom_mode" onchange="onField()">
@@ -249,14 +280,14 @@
     </details>
 
     <details data-key="sides" data-s4="korpus">
-      <summary>Boky</summary>
+      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-p-side"/></svg>Boky</summary>
       <div class="body">
         <div class="hint">Boky obaľujú korpus (hrúbka podľa Základné). Per-bok nastavenia (rohové spoje, odsadenia) pribudnú v ďalšej verzii.</div>
       </div>
     </details>
 
     <details data-key="back" data-s4="korpus">
-      <summary>Chrbát</summary>
+      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-p-back"/></svg>Chrbát</summary>
       <div class="body">
         <div class="row"><label>Konštrukcia</label>
           <select id="back_mode" onchange="toggleBackTh(); onField()">
@@ -420,6 +451,15 @@
   <div class="nxmodal-card">
     <div class="nxmodal-title">Uložiť ako šablónu</div>
     <div class="row"><label>Názov</label><input id="tplSaveName" type="text"><span class="unit"></span></div>
+    <!-- UI-B3: TYP je jediny udaj, ktory sa v modale nastavuje nad ramec nazvu —
+         urcuje, pod ktorym typom sa sablona ponuka pri vkladani (zoznam je
+         typovo filtrovany). Predvypln sa z typu oznacenej skrinky; whitelist
+         a hlaska o rozdiele su na strane Ruby. -->
+    <div class="row"><label>Typ</label>
+      <select id="tplSaveType">
+        <option value="lower">Dolná</option>
+        <option value="upper">Horná</option>
+      </select><span class="unit"></span></div>
     <div class="hint">Uloží sa konštrukcia, zóny, čelá s medzerami a nastavené materiály skrinky. Úpravy jednotlivých dielcov (materiál/ABS) a kovanie sa neukladajú — viažu sa na konkrétnu skrinku.</div>
     <div class="nxmodal-warn" id="tplSaveWarn" style="display:none">Šablóna s týmto názvom už existuje — Uložiť ju prepíše.</div>
     <div class="btnrow">
@@ -446,6 +486,60 @@
   </div>
 </div>
 
+<!-- ===== UI-B3: NASTAVENIA INSPECTORA (koliesko v raile) ====================
+     Tri sekcie z kontraktu UI 2.0: Vzhľad (téma) · Rozmerové rady · O plugine.
+     Je to MODAL, nie dalsi kontext raily — nastavenia POCITACA nepatria do
+     stavoveho stroja „co je oznacene x co chce pouzivatel vidiet" (NXShell)
+     a musia byt dostupne aj bez oznaceneho objektu. -->
+<div id="cfgModal" class="nxmodal" style="display:none">
+  <div class="nxmodal-card nxmodal-scroll">
+    <div class="nxmodal-title">Nastavenia Inspectora</div>
+    <div class="nxmodal-body">
+      <details id="cfg_theme" data-key="cfg_theme" open>
+        <summary><svg class="ic gic" aria-hidden="true"><use href="#i-palette"/></svg>Vzhľad</summary>
+        <div class="body">
+          <div class="themerow">
+            <button type="button" class="thbtn" data-theme="noxun" aria-pressed="false" onclick="onSetUiTheme('noxun')"><i class="thsw" data-sw="noxun"></i>NOXUN teal</button>
+            <button type="button" class="thbtn" data-theme="lucia" aria-pressed="false" onclick="onSetUiTheme('lucia')"><i class="thsw" data-sw="lucia"></i>Lucia ružová</button>
+          </div>
+          <div class="hint">Téma mení len farbu výberu a aktívnych prvkov — chyby, upozornenia, ABS a kontrola hrán ostávajú rovnaké. Ukladá sa pre TENTO počítač (nie do zákazky) a nasadí sa hneď vo všetkých otvorených oknách.</div>
+        </div>
+      </details>
+      <details id="cfg_series" data-key="cfg_series">
+        <summary><svg class="ic gic" aria-hidden="true"><use href="#i-arr-h"/></svg>Rozmerové rady</summary>
+        <div class="body">
+          <div class="hint">Hodnoty, ktoré ponúka šípka pri rozmerovom poli. Oddeľ ich čiarkou; poradie, duplicity a nezmysly upraví uloženie.</div>
+          <div class="row"><label>Šírky</label><input id="ser_sirka" type="text"><span class="unit">mm</span></div>
+          <div class="row"><label>Výšky</label><input id="ser_vyska" type="text"><span class="unit">mm</span></div>
+          <div class="row"><label>Hĺbky</label><input id="ser_hlbka" type="text"><span class="unit">mm</span></div>
+          <div class="row"><label>Sokle</label><input id="ser_sokel" type="text"><span class="unit">mm</span></div>
+          <div class="row"><label>Výšky čiel</label><input id="ser_vyska_cela" type="text"><span class="unit">mm</span></div>
+          <div class="hint">Výšky čiel použije zoznam čiel (pribudne s dávkou UI-C3).</div>
+          <div class="btnrow">
+            <button class="primary" onclick="saveDimSeries()">Uložiť rady</button>
+            <button class="ghostbtn" onclick="resetDimSeriesFields()"><svg class="ic" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> Predvolené</button>
+          </div>
+        </div>
+      </details>
+      <details id="cfg_about" data-key="cfg_about">
+        <summary><svg class="ic gic" aria-hidden="true"><use href="#i-info"/></svg>O plugine</summary>
+        <div class="body">
+          <div class="aboutrow">
+            <svg class="nx-logo aboutlogo" viewBox="0 0 100 100" aria-hidden="true"><use href="#i-logo"/></svg>
+            <div>
+              <div class="aboutname">Noxun Engine <span id="cfgVersion">…</span></div>
+              <div class="hint">Parametrický nábytkársky systém pre SketchUp. Nastavenia tohto počítača žijú v <b>%APPDATA%\NOXUN\Engine</b>.</div>
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
+    <div class="btnrow">
+      <button class="ghostbtn" onclick="closeInspectorSettings()">Zavrieť</button>
+    </div>
+  </div>
+</div>
+
 <div id="status">Pripravené.</div>
 
 <!-- D-29 A12/A2: paticka v normalnom toku (NIE fixed). #verline je PRESUNUTY sem
@@ -457,31 +551,34 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.7.5"></script>
+<script src="js/errors.js?v=0.7.7"></script>
 <!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
      jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
      pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
-<script src="js/win_fit.js?v=0.7.5"></script>
-<script src="js/icons.js?v=0.7.5"></script>
+<script src="js/win_fit.js?v=0.7.7"></script>
+<script src="js/icons.js?v=0.7.7"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.7.5"></script>
-<script src="js/core.js?v=0.7.5"></script>
-<script src="js/expr.js?v=0.7.5"></script>
-<script src="js/insert_state.js?v=0.7.5"></script>
-<script src="js/form.js?v=0.7.5"></script>
-<script src="js/zone_tree.js?v=0.7.5"></script>
-<script src="js/preview.js?v=0.7.5"></script>
+<script src="js/nx_combo.js?v=0.7.7"></script>
+<script src="js/core.js?v=0.7.7"></script>
+<script src="js/expr.js?v=0.7.7"></script>
+<script src="js/insert_state.js?v=0.7.7"></script>
+<script src="js/form.js?v=0.7.7"></script>
+<script src="js/zone_tree.js?v=0.7.7"></script>
+<script src="js/preview.js?v=0.7.7"></script>
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
-<script src="js/shell.js?v=0.7.5"></script>
-<script src="js/actions.js?v=0.7.5"></script>
-<script src="js/bridge.js?v=0.7.5"></script>
-<script src="js/materials.js?v=0.7.5"></script>
-<script src="js/part_card.js?v=0.7.5"></script>
-<script src="js/board_card.js?v=0.7.5"></script>
-<script src="js/hardware.js?v=0.7.5"></script>
-<script src="js/usage.js?v=0.7.5"></script>
-<script src="js/boot.js?v=0.7.5"></script>
+<script src="js/shell.js?v=0.7.7"></script>
+<script src="js/actions.js?v=0.7.7"></script>
+<!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
+     bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
+<script src="js/settings.js?v=0.7.7"></script>
+<script src="js/bridge.js?v=0.7.7"></script>
+<script src="js/materials.js?v=0.7.7"></script>
+<script src="js/part_card.js?v=0.7.7"></script>
+<script src="js/board_card.js?v=0.7.7"></script>
+<script src="js/hardware.js?v=0.7.7"></script>
+<script src="js/usage.js?v=0.7.7"></script>
+<script src="js/boot.js?v=0.7.7"></script>

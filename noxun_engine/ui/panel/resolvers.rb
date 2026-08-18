@@ -109,6 +109,64 @@ module Noxun
           end
         end
 
+        # UI-B3: VYROBNE dielce korpusu — presne ten isty filter, aky ma
+        # `Bom.collect` (kusovnik, VEPO). Proxy kovania (nohy, profily) sa
+        # tak do poctu ani do plochy nikdy nedostanu.
+        #
+        # Codex #170 P2: patria sem AJ odpojene (vytiahnute) dielce na najvyssej
+        # urovni modelu — standard 01 ich necha citatelne pre BOM a `Bom.collect`
+        # ich zbiera (bom.rb, vetva `when 'part'`). Bez nich by informacny stlpec
+        # Inspectora hlasil iny pocet a inu plochu nez kusovnik TEJ ISTEJ skrinky.
+        def manufactured_parts(cab)
+          return [] unless cab && cab.valid? && cab.respond_to?(:definition)
+
+          out = cab.definition.entities.grep(Sketchup::ComponentInstance)
+                   .select { |e| manufactured_sheet_part?(e) }
+          cid = Store.get(cab, 'cabinet_id').to_s
+          model = cab.respond_to?(:model) ? cab.model : nil
+          if model && !cid.empty?
+            model.entities.grep(Sketchup::ComponentInstance).each do |e|
+              next unless manufactured_sheet_part?(e)
+              next unless Store.get(e, 'cabinet_id').to_s == cid
+
+              out << e
+            end
+          end
+          out
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.manufactured_parts')
+          []
+        end
+
+        # Jeden filter pre obe miesta (vnorene aj odpojene dielce) — zrkadlo
+        # podmienok v `Bom.collect`.
+        def manufactured_sheet_part?(ent)
+          ent.valid? && Store.kind(ent) == 'part' &&
+            Store.get(ent, 'manufactured') == true &&
+            Store.get(ent, 'production_class').to_s == 'sheet'
+        rescue StandardError
+          false
+        end
+
+        # UI-B3 informacny stlpec: kolko dielcov a kolko m2 dosky skrinka drzi.
+        # CISTE CITANIE snapshotov na dielcoch (autorita vyrobneho zaznamu,
+        # standard 8.3) — ziadny prepocet planu a ziadny zapis. Hodnoty su
+        # TRANZIENTNE: do configu ani snapshotu sa NIKDY neukladaju.
+        def cabinet_stats(cab)
+          count = 0
+          area = 0.0
+          manufactured_parts(cab).each do |part|
+            cfg = Store.config(part) || {}
+            qty = [cfg['quantity'].to_i, 1].max
+            count += qty
+            area += cfg['length'].to_f * cfg['width'].to_f * qty
+          end
+          { 'parts_count' => count, 'parts_area_m2' => (area / 1_000_000.0).round(3) }
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.cabinet_stats')
+          { 'parts_count' => 0, 'parts_area_m2' => 0.0 }
+        end
+
         def truthy?(val)
           %w[true 1 yes].include?(val.to_s.downcase)
         end

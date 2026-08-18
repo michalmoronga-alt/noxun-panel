@@ -119,7 +119,28 @@
     'shell': '<path d="M14 11a2 2 0 1 1-4 0 4 4 0 0 1 8 0 6 6 0 0 1-12 0 8 8 0 0 1 16 0 10 10 0 1 1-20 0 11.93 11.93 0 0 1 2.42-7.22 2 2 0 1 1 3.16 2.44"/>',
     'slab': '<rect x="2" y="6" width="20" height="12" rx="1.5"/><path d="M2 10h20"/>',
     // UI-B2: kamera N7 v spodnom pase nahladu — zarovna pohlad SketchUpu na skrinku
-    'camera': '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>'
+    'camera': '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+    // ===== UI-B3: rozmery Zakladnych + ikony skupin Korpusu ====================
+    // Prevzate 1:1 z mockupu SYSTEM/zdroje/ui20/mockup_inspector_c.html. Sipky
+    // su smerove (sirka/vyska/hlbka), 'plinth' a 'p-*' su VLASTNE nabytkarske
+    // symboly (Lucide ich nema) — panel dielca vo svojej polohe.
+    'arr-h': '<path d="M8 8 4 12l4 4"/><path d="m16 8 4 4-4 4"/><path d="M4 12h16"/>',
+    'arr-v': '<path d="m8 8 4-4 4 4"/><path d="m8 16 4 4 4-4"/><path d="M12 4v16"/>',
+    'arr-d': '<path d="M18 6 6 18"/><path d="M6 11v7h7"/><path d="M18 13V6h-7"/>',
+    // Sokel: korpus so soklovym pasom dole (pas je PLNY — je to jediny prvok,
+    // ktory ikona meria).
+    'plinth': '<rect x="4" y="3" width="16" height="13" rx="2"/><rect x="6" y="19" width="12" height="3" rx="1" fill="currentColor" stroke="none"/>',
+    // Skupiny Nastaveni (N3b): zvyrazneny je dielec, o ktorom skupina hovori.
+    'p-top': '<rect x="3" y="4" width="18" height="4"/><path d="M5 8v12"/><path d="M19 8v12"/>',
+    'p-bottom': '<rect x="3" y="16" width="18" height="4"/><path d="M5 4v12"/><path d="M19 4v12"/>',
+    'p-side': '<rect x="3" y="4" width="4" height="16"/><rect x="17" y="4" width="4" height="16"/><path d="M7 6h10"/><path d="M7 18h10"/>',
+    'p-back': '<rect x="4" y="4" width="16" height="16"/><path d="m4 20 16-16"/>',
+    // Koliesko -> sekcia Vzhlad (prepinac temy NOXUN / Lucia).
+    'palette': '<path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/>',
+    // 'brace' (vystuhy) patri skupine, ktora vznikne az pri rozdeleni Korpusu
+    // v bloku UI-C — symbol je tu, aby sa mapa GRPICON z mockupu nemusela
+    // dopisovat po castiach.
+    'brace': '<rect x="4" y="5" width="16" height="3"/><rect x="4" y="11" width="16" height="3"/><path d="M4 20h16"/>'
   };
 
   // Firemne logo — prstenec + krizove ramena. Renderuje sa FILL-om (.nx-logo),

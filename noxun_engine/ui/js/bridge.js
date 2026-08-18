@@ -130,16 +130,22 @@
     // FIX 4: echo TEJ ISTEJ skrinky nesmie zhltnut rozpisany nazov — prekresli
     // sa vsetko okrem bunky nazvu, ktora ostane v editacnom rezime.
     var keepEditor = renameFor && renameFor === (c.cabinet_id || '') && el('cnameInput');
+    // UI-B3: typ skrinky ako READONLY badge (Dolná/Horná). Typ sa nastavuje
+    // VYHRADNE šablónou/vkladaním — badge ho len ukazuje a title to hovorí.
+    var tHtml = ' <span class="typbadge" title="Typ korpusu — určuje ho šablóna pri vložení">' +
+      esc(nxCabInfo(c).type) + '</span>';
     if (keepEditor){
       var idEl = bar.querySelector('.cid');
       if (idEl) idEl.textContent = c.cabinet_id || '?';
       var oldChip = bar.querySelector('.warnchip');
       if (oldChip) oldChip.parentNode.removeChild(oldChip);
-      if (wHtml) bar.insertAdjacentHTML('beforeend', wHtml);
+      var oldBadge = bar.querySelector('.typbadge');
+      if (oldBadge) oldBadge.parentNode.removeChild(oldBadge);
+      bar.insertAdjacentHTML('beforeend', tHtml + wHtml);
     } else {
       dropCabRename(); // ina skrinka = editor konci bez zapisu
       bar.innerHTML = '<span class="cid">' + esc(c.cabinet_id || '?') + '</span>' +
-        cabNameCellHtml(c) + wHtml;
+        cabNameCellHtml(c) + tHtml + wHtml;
     }
     if (list){
       if (warns.length){
@@ -171,7 +177,14 @@
       // D-39 (audit B5): zamky z Ruby pamate Panel modulu — PRED vetvami nizsie,
       // aby ich prvy reset karty (clearSelected -> materializeInsertCard) aplikoval.
       NXInsert.setLocksFlat(data.insert_locks);
-      if (data.version) el('verline').textContent = 'V' + data.version; // verzia z Ruby (jediny zdroj)
+      if (data.version){
+        el('verline').textContent = 'V' + data.version; // verzia z Ruby (jediny zdroj)
+        // UI-B3: tá istá verzia v koliesku (sekcia O plugine) — ziadny hardcode.
+        var cv = el('cfgVersion'); if (cv) cv.textContent = 'V' + data.version;
+      }
+      // UI-B3: nastavenia POCITACA (rozmerove rady + tema) — nie su to data
+      // zakazky; menia LEN ponuky pri rozmeroch a stav prepinaca v koliesku.
+      if (typeof nxApplyUiSettings === 'function') nxApplyUiSettings(data.ui_settings);
       // UI-B1 (audit A2): stav ABS kontroly hran pri OTVORENI panela (pull).
       // Dalsie zmeny chodia pushom — z panela, z toolbaru aj z okna Vyroba.
       if (typeof nxApplyEdgeCheck === 'function') nxApplyEdgeCheck(data.edge_check);
@@ -320,9 +333,11 @@
       currentZoneTree = c.zone_tree ? sanitizeTree(c.zone_tree) : defaultTree();
       tplNameSuggestion = c.template_name_suggestion || ''; // D-14 modal prefill
       // Codex GH #46 P2: preklik na INY korpus pri otvorenom modale = zavriet
-      // (mode ostava cab, setUiMode guard nezabera; identitu navyse strazi server)
+      // (mode ostava cab, setUiMode guard nezabera; identitu navyse strazi server).
+      // UI-B3 (Codex audit BLOCKER 2): „iny" znamena aj INY DOKUMENT — ID skriniek
+      // sa naprie dokumentmi opakuju, takze samotne cabinet_id nestaci.
       if (typeof tplModalOpen === 'function' && tplModalOpen() &&
-          tplModalCabId && c.cabinet_id !== tplModalCabId) closeSaveTemplateModal();
+          typeof tplModalStale === 'function' && tplModalStale(c)) closeSaveTemplateModal();
       // D-41 C2: novy vyber pocas otvoreneho ABS modalu = tiche zatvorenie bez
       // akcie (rozhodnutie by zasiahlo inu kartu; identitu navyse strazi server).
       if (typeof absModalCloseSilent === 'function') absModalCloseSilent();
@@ -341,10 +356,13 @@
       previewMode = c.part_card ? 'zones' : cabTabPreview(NXShell.effectiveCtx());
       // pohlad: ina skrinka -> fit; ta ista (auto-apply rebuild) -> pohlad DRZI
       if (c.cabinet_id !== lastCabForFit){ lastCabForFit = c.cabinet_id; fitPreview(); }
-      // svetle rozmery presne z backendu ak su
-      if (c.available_width!=null) setVal('av_width', Math.round(c.available_width));
-      if (c.available_depth!=null) setVal('av_depth', Math.round(c.available_depth));
-      if (c.available_height!=null) setVal('av_height', Math.round(c.available_height));
+      // svetle rozmery presne z backendu ak su (UI-B3: TEXT v informacnom stlpci)
+      if (c.available_width!=null) setOut('av_width', Math.round(c.available_width));
+      if (c.available_depth!=null) setOut('av_depth', Math.round(c.available_depth));
+      if (c.available_height!=null) setOut('av_height', Math.round(c.available_height));
+      // UI-B3: dopocitane udaje stlpca — pocet dielcov a plocha dosky. Cisla
+      // pocita server (ciste citanie snapshotov), JS ich len formatuje.
+      setCabInfo(c);
       renderPartCard(c.part_card || null); // V0.3 karta dielca (ak je vybraty dielec)
       renderHardware(c.hardware || [], c.hardware_overrides || [], c.hardware_set_options || [], c.cabinet_id || ''); // V0.4 kovanie + D1b sety
       renderPreview();
@@ -359,6 +377,7 @@
       activeZoneId = null; frontItems = null; hwItems = null;
       invalidateFrontPlaceholders(); // D-23: bez resolved dat ziadne ≈ odhady
       buildFrontHwBadges([]);
+      setCabInfo(null); // UI-B3: kontext dosky — korpusove dopocty neplatia
       renderPartCard(null);
       renderHardware(null, []);
       clearCabinetMaterials();
@@ -378,6 +397,7 @@
       setSelected(null);
       activeZoneId = null; frontItems = null; hwItems = null;
       buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
+      setCabInfo(null);       // UI-B3: bez skrinky niet dielcov ani plochy
       setIdbar(null);
       setUiMode('insert', null);
       // D-78 / UI-B1: vo vkladani su kontexty neaktivne a platí Korpus
@@ -391,11 +411,32 @@
       refreshZoneUI(); renderPreview();
     },
     setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; },
+    // UI-B3: maly push nastaveni pocitaca po zmene v koliesku (rady/tema).
+    // Meni LEN ponuky a stav prepinaca — ZIADNY render karty, rozpisany
+    // formular sa nesmie dotknut (vzor NX.setUsedIds).
+    setUiSettings: function(data){ if (typeof nxApplyUiSettings === 'function') nxApplyUiSettings(data); },
     // UI-B1 (audit A2): stav ABS kontroly hran do raily. Rovnaky kanal ako ma
     // okno Vyroba (D-105) — panel si ZIADNY vlastny stav nedrzi, len zobrazuje
     // to, co posle server (klik z panela, z toolbaru aj z okna Vyroba).
     setEdgeCheck: function(state){ if (typeof nxApplyEdgeCheck === 'function') nxApplyEdgeCheck(state); }
   };
+
+  // UI-B3: informacny stlpec Zakladnych. Texty sklada cista funkcia nxCabInfo
+  // (core.js) z payloadu skrinky; bez oznacenej skrinky su pomlcky a klikatelne
+  // riadky su neaktivne — `aria-disabled`, NIE HTML `disabled` (vzor D-78:
+  // tlacidlo ostava fokusovatelne a nesie vysvetlenie).
+  function setCabInfo(c){
+    var info = nxCabInfo(c);
+    setOut('inf_parts', info.parts);
+    setOut('inf_area', info.area);
+    var live = !!(c && c.cabinet_id);
+    [['infParts', 'Klik = označí výrobné dielce tejto skrinky v modeli'],
+     ['infArea', 'Plocha dosky tejto skrinky — kusovník s filtrom príde v Štúdiu']].forEach(function(o){
+      var n = el(o[0]); if (!n) return;
+      n.setAttribute('aria-disabled', live ? 'false' : 'true');
+      n.title = live ? o[1] : 'Označ skrinku v modeli';
+    });
+  }
 
   // Identita dosky v idbar (BRD-xxx + nazov; bez warnchipu — dosky warnings zatial nemaju).
   function setBoardIdbar(b){

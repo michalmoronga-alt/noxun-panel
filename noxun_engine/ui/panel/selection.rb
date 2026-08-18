@@ -89,6 +89,9 @@ module Noxun
         def on_selection_changed
           return if @suspend_selection_sync # nase vlastne reselecty resyncnu panel explicitne
 
+          # Codex #170 P1: pouzivatel klikol v modeli = nova situacia; priznak
+          # odmietnuteho apply uz nepatri k tomu, co robi teraz.
+          @last_apply_error = nil
           push_selected(Sketchup.active_model)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.on_selection_changed')
@@ -263,6 +266,56 @@ module Noxun
 
           suspend_selection_sync { model.selection.clear }
           push_selected(model, dedup: false)
+        end
+
+        # UI-B3 (N13): klik na „Dielcov" v informacnom stlpci Zakladnych —
+        # oznaci VYROBNE dielce tejto skrinky v modeli.
+        #
+        # CISTE CITANIE MODELU + zmena VYBERU: ziadny `start_operation`, ziadny
+        # zapis do dictionary, ziadny krok Spat (lekcia D-103). Vyber sa meni
+        # pod `suspend_selection_sync` a panel sa obnovi PRESNE raz — je to ta
+        # ista cesta, akou uz oznacuje dielce okno Vyroba
+        # (ProductionDialog.do_select), takze sa spravanie nemoze rozist:
+        # panel po nej ukaze kartu prveho oznaceneho dielca (rail dostane
+        # docasnu polozku) a status povie, kolko ich je oznacenych.
+        #
+        # IDENTITY GUARD (vzor handle_camera_focus): callback HtmlDialogu je
+        # asynchronny — overuje sa DOKUMENT (prisne, ID skriniek sa naprie
+        # dokumentmi opakuju) aj to, ze ide stale o TU ISTU skrinku.
+        def handle_select_parts(payload = nil)
+          model = Sketchup.active_model
+          return if model.nil?
+
+          data = payload ? parse(payload) : {}
+          return set_status('Dielce sa neoznačili — panel patrí inému dokumentu.', true) if
+            data['model_guid'].to_s != model_guid(model)
+
+          # Codex #170 P1: klient pred touto akciou flushol rozpisany edit, ALE
+          # server ho mohol odmietnut (material_preflight). Vtedy uz bezal UI
+          # resync s POVODNYMI hodnotami — a keby sme teraz oznacili dielce a
+          # ohlasili uspech, prekryli by sme jedinu spravu, ktora hovori PRAVDU
+          # o tom, preco sa uprava neulozila. Odmietnutie sa preto zopakuje a
+          # priznak sa spotrebuje (dalsi klik uz prejde).
+          if @last_apply_error
+            msg = @last_apply_error
+            @last_apply_error = nil
+            return set_status("Dielce sa neoznačili — najprv oprav úpravu: #{msg}", true)
+          end
+
+          cab = find_cabinet(model)
+          return refresh_after_stale(model) if cab.nil? ||
+                                               Store.get(cab, 'cabinet_id').to_s != data['cabinet_id'].to_s
+
+          parts = manufactured_parts(cab)
+          return set_status('Skrinka nemá výrobné dielce — nie je čo označiť.', true) if parts.empty?
+
+          suspend_selection_sync do
+            sel = model.selection
+            sel.clear
+            parts.each { |p| sel.add(p) }
+          end
+          push_selected(model, dedup: false)
+          set_status("Označených #{parts.size} dielcov skrinky #{Store.get(cab, 'cabinet_id')} v modeli.")
         end
 
         # UI-B2 (N7): „Pohlad na skrinku" zo spodneho pasu nahladu. Zarovna

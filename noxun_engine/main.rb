@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.7.5' unless defined?(VERSION)
+    VERSION = '0.7.7' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -100,24 +100,87 @@ module Noxun
       UI_THEME_DEFAULT
     end
 
-    # Zapis temy (UI prepinac pride v davke UI-B3; zatial len Ruby strana).
-    # Neznama hodnota sa NEZAPISE — ulozi sa normalizovana. Zapisuje
-    # JsonFileStore (atomicky + .bak).
+    # Zapis temy. Neznama hodnota sa NEZAPISE — ulozi sa normalizovana.
+    # Zapisuje JsonFileStore (atomicky + .bak).
+    # Codex audit FIX 6: zlyhanie zapisu vracia NIL — volajuci to musi povedat
+    # nahlas (tichy fallback by ohlasil uspech, ktory sa nestal).
     def self.set_ui_theme(value)
       theme = normalize_ui_theme(value)
       JsonFileStore.write(ui_theme_path, 'std' => UI_THEME_STD, 'theme' => theme)
       theme
     rescue StandardError => e
       log_error(e, 'Engine.set_ui_theme')
-      UI_THEME_DEFAULT
+      nil
+    end
+
+    # UI-B3: prepnutie temy Z UI (koliesko Inspectora). Ulozi hodnotu a HNED ju
+    # nasadi VSETKYM otvorenym oknam — inak by panel zmenil farbu a satelity
+    # ostali na starej az do svojho dalsieho otvorenia.
+    # Vracia ulozenu temu, alebo NIL ked sa zapis nepodaril; rozposiela sa vzdy
+    # to, co NAOZAJ plati (pri zlyhani teda povodna tema — okna nikdy neukazuju
+    # farbu, ktora nie je zapisana).
+    def self.apply_ui_theme(value)
+      theme = set_ui_theme(value)
+      broadcast_ui_theme(theme || get_ui_theme)
+      theme
+    end
+
+    # Zoznam ZIVYCH okien, ktore vedia temu nasadit. Plni ho
+    # `register_dialog_theme` (teda kazde okno cez `register_dialog_fit`).
+    def self.theme_dialogs
+      @theme_dialogs ||= []
+    end
+
+    # Codex audit FIX 7: zavrete okno sa zo zoznamu VYHODI — referencia na mrtvy
+    # dialog (aj s jeho callback closure) sa nesmie drzat. Cisti sa pri KAZDEJ
+    # registracii aj pri kazdom rozoslani, takze opakovane otvaranie a zatvaranie
+    # okien zoznam nenafukuje.
+    def self.prune_theme_dialogs
+      theme_dialogs.select! do |dlg|
+        begin
+          dlg.visible?
+        rescue StandardError
+          false
+        end
+      end
+      theme_dialogs
+    end
+
+    def self.broadcast_ui_theme(theme)
+      script = "if (window.nxThemeApply) nxThemeApply(#{theme.to_json});"
+      prune_theme_dialogs.each do |dlg|
+        begin
+          dlg.execute_script(script)
+        rescue StandardError
+          nil # okno prave zaniklo — vypadne pri najblizsom cisteni
+        end
+      end
+      theme
+    rescue StandardError => e
+      log_error(e, 'Engine.broadcast_ui_theme')
+      theme
+    end
+
+    # Prihlasi okno na ZIVE prepnutie temy. Volaju to DVE miesta: registracia
+    # callbackov (pred `show`) a samotny `nx_theme` po nacitani HTML — druhe
+    # miesto je zamerne: medzi registraciou a zobrazenim okno este `visible?`
+    # nie je, takze by ho cistenie mohlo vyhodit.
+    def self.track_theme_dialog(dlg)
+      theme_dialogs << dlg unless theme_dialogs.include?(dlg)
+      dlg
     end
 
     # Registruje callback `nx_theme`: okno si po nacitani HTML vypyta temu
     # (ui/js/win_fit.js) a Ruby ju posle spat do JS. Rovnaky smer ako nx_fit —
     # `execute_script` pred `show` nefunguje, preto si okno pyta samo.
+    # Okno sa zaroven zaradi medzi prijemcov ZIVEHO prepnutia temy (UI-B3).
     def self.register_dialog_theme(dlg, tag)
+      prune_theme_dialogs # najprv von so zavretymi, az POTOM pridaj nove okno
+      theme_dialogs.delete(dlg) # anti-double pri opatovnej registracii toho isteho okna
+      track_theme_dialog(dlg)
       dlg.add_action_callback('nx_theme') do |_ctx, _payload|
         begin
+          track_theme_dialog(dlg) # okno je nacitane a zive — nech dostane aj buduce prepnutia
           theme = get_ui_theme
           dlg.execute_script("if (window.nxThemeApply) nxThemeApply(#{theme.to_json});")
         rescue StandardError => e
@@ -241,6 +304,7 @@ Sketchup.require 'noxun_engine/core/part_keys' # stabilna identita dielcov pre o
 Sketchup.require 'noxun_engine/core/build_plan' # zavazny kontrakt planu (validator, warnings, hardware)
 Sketchup.require 'noxun_engine/core/part_faces' # D-88: kontrakt hrana -> plocha kvadra (pred vsetkymi tvorcami deskriptorov)
 Sketchup.require 'noxun_engine/core/json_file_store' # cache + bezpecny atomicky zapis JSON katalogov
+Sketchup.require 'noxun_engine/core/dim_series'  # UI-B3 (N6): rozmerove rady panela (%APPDATA%, nastavenie pocitaca)
 Sketchup.require 'noxun_engine/core/materials'   # V0.3 materialovy katalog (pred abs_rules)
 Sketchup.require 'noxun_engine/core/materials_catalog' # V0.5.1 split: CRUD/validacia/scan/patch/seed
 Sketchup.require 'noxun_engine/core/materials_decor'    # V0.5.1 split: D-41 dekor = kluc skupiny + batch

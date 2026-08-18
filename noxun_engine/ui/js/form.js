@@ -172,7 +172,8 @@
   function updateAvailable(){
     // pri oznacenom pouzijeme presne z backendu; inak lokalny odhad
     var t = numv('thickness') || 18, w = numv('width') || 0, h = numv('height') || 0, d = numv('depth') || 0;
-    setVal('av_width', Math.max(0, Math.round(w - 2*t)));
+    // UI-B3: svetle rozmery su TEXT v informacnom stlpci (setOut), nie readonly polia.
+    setOut('av_width', Math.max(0, Math.round(w - 2*t)));
     // D-37: svetla hlbka zrkadli interior_dims — hlbka je CELKOVA vratane chrbta:
     // overlay/inset: d - bt; groove: d - 10 - bt; none: d (audit FIX 5 — bez tohto
     // by navrh noveho korpusu ukazoval zlu hodnotu az do prveho rebuildu).
@@ -180,12 +181,12 @@
     var ad = d;
     if (bm === 'overlay' || bm === 'inset') ad = d - bt;
     else if (bm === 'groove') ad = d - 10 - bt;
-    setVal('av_depth', Math.max(0, Math.round(ad)));
+    setOut('av_depth', Math.max(0, Math.round(ad)));
     // D-80: svetla vyska cez JEDINU zdielanu funkciu (core.js nxInteriorZ) —
     // pri two_rails ju urcuje spodna hrana vystuh (odsadenie + orientacia).
     // Vyska/hrubka sa posielaju z uz precitanych poli (prazdne pole = 0 ako predtym).
     var iv = nxInteriorZ(currentCarcass({ height: h, thickness: t }));
-    setVal('av_height', Math.max(0, Math.round(iv.availH)));
+    setOut('av_height', Math.max(0, Math.round(iv.availH)));
   }
 
   // --- defaulty / viditelnost ---
@@ -364,11 +365,26 @@
   // Enter uklada, Esc zatvara, Tab ostava v modale (focus trap).
   var tplModalBound = false;
   var tplModalCabId = null; // Codex GH #46 P2: identita ZACHYTENA pri otvoreni modalu
+  // Codex audit BLOCKER 2 (UI-B3): identita skrinky NESTACI — ID sa naprie
+  // dokumentmi opakuju (CAB-001 je v kazdom modeli), takze modal otvoreny nad
+  // jednym dokumentom by po prepnuti ulozil skrinku z ineho. Zachytava sa aj
+  // DOKUMENT a server ho striktne overuje (vzor clear_selection / kamera).
+  var tplModalGuid = null;
+  // Je otvoreny modal uz „o inej skrinke"? (zmena ID ALEBO dokumentu)
+  function tplModalStale(c){
+    if (!tplModalCabId) return false;
+    var p = c || {};
+    return (p.cabinet_id !== tplModalCabId) || (String(p.model_guid || '') !== String(tplModalGuid || ''));
+  }
   function openSaveTemplateModal(){
     if (!selectedCabId){ NX.setStatus('Najprv označ korpus.', true); return; }
     var m = el('tplModal'); if (!m) return;
     tplModalCabId = selectedCabId;
+    tplModalGuid = (typeof nxModelGuid === 'string') ? nxModelGuid : '';
     el('tplSaveName').value = (typeof tplNameSuggestion === 'string' && tplNameSuggestion) ? tplNameSuggestion : '';
+    // UI-B3: typ sa predvyplni z TYPU OZNACENEJ SKRINKY (radio vo vkladacej
+    // karte je pri oznacenom korpuse zrkadlom jeho typu — setType v loadSelected).
+    setVal('tplSaveType', getType());
     m.style.display = 'flex';
     refreshTplModalWarn();
     bindTplModal();
@@ -392,12 +408,24 @@
     var name = inp.value.trim();
     if (!name){ inp.classList.add('bad'); inp.focus(); return; }
     inp.classList.remove('bad');
+    // Codex audit FIX 3 (UI-B3): flush pri NEPLATNYCH poliach edity ticho
+    // NEaplikuje — sablona by sa ulozila zo starych hodnot a este by ohlasila
+    // uspech. Ukladanie preto stoji, kym cervene pole neopravis (modal ostava
+    // otvoreny; vzor „Vložiť kópiu").
+    if (typeof validateFields === 'function' && !validateFields()){
+      NX.setStatus('Skontroluj červené polia — šablóna by sa uložila zo starých hodnôt.', true);
+      return;
+    }
     // Codex GH #46 P2: rozpisane edity (400 ms debounce) najprv flushnut — callbacky
     // sa spracuju v poradi, takze apply_all prebehne PRED save a config je cerstvy.
     if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
     if (window.sketchup && sketchup.save_template_as){
-      // identita z casu OTVORENIA modalu — preklik na inu skrinku server odmietne
-      sketchup.save_template_as(JSON.stringify({ name: name, cabinet_id: tplModalCabId || selectedCabId }));
+      // identita z casu OTVORENIA modalu — preklik na inu skrinku ANI iny
+      // dokument server neprepusti; UI-B3: typ urcuje, pod ktorym typom sa
+      // sablona ponuka (whitelist v Ruby)
+      sketchup.save_template_as(JSON.stringify({ name: name, cabinet_id: tplModalCabId || selectedCabId,
+                                                 model_guid: tplModalGuid || '',
+                                                 type: val('tplSaveType') || getType() }));
     }
     closeSaveTemplateModal();
   }
