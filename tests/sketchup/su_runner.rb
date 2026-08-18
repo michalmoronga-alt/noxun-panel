@@ -3018,10 +3018,23 @@ module NoxunSuRunner
 
       # 4) krizik pri DIELCI = existujuca cesta „spat na skrinku"
       before = model.entities.length
+      # Codex #168 P2 (4. kolo): oneskoreny klik z INEHO dokumentu nesmie
+      # prehodit vyber tu (ID skriniek sa naprie dokumentmi opakuju).
       rec = []
       install_js_recorder(rec)
       begin
-        e::Panel.handle_select_cabinet({ 'cabinet_id' => cid }.to_json)
+        e::Panel.handle_select_cabinet({ 'cabinet_id' => cid, 'model_guid' => 'CUDZI-GUID' }.to_json)
+      ensure
+        remove_js_recorder
+      end
+      ok('UI-B1: navrat na skrinku z INEHO dokumentu sa NEVYKONA (guard dokumentu)',
+         model.selection.to_a.include?(shelf))
+
+      rec = []
+      install_js_recorder(rec)
+      begin
+        e::Panel.handle_select_cabinet({ 'cabinet_id' => cid,
+                                         'model_guid' => e::Panel.model_guid(model) }.to_json)
       ensure
         remove_js_recorder
       end

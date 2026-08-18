@@ -155,10 +155,17 @@
     nxComboSync(box); // D-85: pregrupovane volby -> obnov popisky triggerov
   }
   // Spat z karty dielca na skrinku (omrvinka) — Ruby oznaci korpus a poslе novy stav.
+  // Codex #168 P2 (4. kolo): callback je asynchronny, takze nesie IDENTITU toho,
+  // z coho sa odchadza — dokument aj dielec. Bez toho by oneskoreny klik oznacil
+  // rovnomennu skrinku v CUDZOM dokumente (ID sa naprie dokumentmi opakuju),
+  // pripadne prepisal novsi vyber v tom istom.
   function backToCabinet(){
     if (!partCard) return;
     if (window.sketchup && sketchup.select_cabinet)
-      sketchup.select_cabinet(JSON.stringify({ cabinet_id: partCard.cabinet_id }));
+      sketchup.select_cabinet(JSON.stringify({ cabinet_id: partCard.cabinet_id,
+                                               role_key: partCard.role_key,
+                                               model_guid: (typeof NXShell !== 'undefined' && NXShell)
+                                                 ? NXShell.identityGuid() : '' }));
   }
   function onEdgeChange(code, value){
     if (!partCard) return;

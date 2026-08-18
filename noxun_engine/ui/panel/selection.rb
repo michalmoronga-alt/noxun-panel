@@ -186,13 +186,48 @@ module Noxun
 
         # V0.4.5 D1: omrvinka karty dielca ("‹ CAB-003") — oznaci korpus v modeli
         # (vyjde z editu komponentu) a panel sa prepne na kontext skrinky.
+        # IDENTITY GUARD (Codex #168 P2, 4. kolo): callback HtmlDialogu je
+        # asynchronny. ID skriniek sa naprie dokumentmi OPAKUJU, takze oneskoreny
+        # klik z dokumentu A by inak oznacil rovnomennu skrinku v dokumente B —
+        # a aj v jednom dokumente by prepisal novsi vyber. Preto sa reselect
+        # vykona LEN vtedy, ked je stale oznaceny TEN ISTY dielec, z ktoreho
+        # sa odchadza. Chybajuce udaje (starsi klient) = spravanie ako doteraz.
         def handle_select_cabinet(payload)
           model = Sketchup.active_model
-          cid = parse(payload)['cabinet_id'].to_s
+          data = parse(payload)
+          cid = data['cabinet_id'].to_s
+          return refresh_after_stale(model) unless select_cabinet_fresh?(model, data)
+
           cab = find_cabinet_by_id(model, cid)
           return set_status('Skrinka sa nenasla.', true) if cab.nil?
           reselect(model, cab)
           push_selected(model)
+        end
+
+        # Je klik stale platny? Dokument sa nesmel prepnut a vo vybere musi byt
+        # TEN ISTY dielec (podla kanonickeho role_key), z ktoreho sa odchadza.
+        def select_cabinet_fresh?(model, data)
+          guid = data['model_guid'].to_s
+          return false if !guid.empty? && guid != model_guid(model)
+
+          want = data['role_key'].to_s
+          return true if want.empty? # starsi klient identitu dielca neposielal
+
+          part = find_selected_part(model)
+          cab = find_cabinet(model)
+          return false if part.nil? || cab.nil?
+          return false if Store.get(cab, 'cabinet_id').to_s != data['cabinet_id'].to_s
+
+          params = CabinetBuilder.config_to_params(Store.config(cab) || {})
+          canonical_part_key(params, part_identity(cab, part)).to_s == want
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.select_cabinet_fresh?')
+          false
+        end
+
+        # Vyber sa medzitym zmenil — nic sa nepresuva, panel sa len zosuladi.
+        def refresh_after_stale(model)
+          push_selected(model, dedup: false)
         end
 
         # UI-B1: krizik docasnej polozky raily pri oznacenej DOSKE — doska nema
