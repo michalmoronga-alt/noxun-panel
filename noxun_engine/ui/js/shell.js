@@ -140,7 +140,9 @@
     function metaTitle(mode, ctx, insertKind){
       if (mode === 'part')  return 'Dielec — hrany';
       if (mode === 'board') return 'Doska — hrany';
-      if (mode === 'insert') return insertKind === 'board' ? 'Doska — smer dekoru' : 'Náhľad šablóny';
+      // UI-C1b: vkladanie kresli sablonu TAK, AKO BUDE VLOZENA (N9) — nazov
+      // projekcie je zrkadlom mockupu.
+      if (mode === 'insert') return insertKind === 'board' ? 'Doska — smer dekoru' : 'Šablóna — ako bude vložená';
       return PV_TITLE[normCtx(ctx)];
     }
 

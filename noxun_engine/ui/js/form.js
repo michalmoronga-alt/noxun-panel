@@ -187,6 +187,28 @@
     // Vyska/hrubka sa posielaju z uz precitanych poli (prazdne pole = 0 ako predtym).
     var iv = nxInteriorZ(currentCarcass({ height: h, thickness: t }));
     setOut('av_height', Math.max(0, Math.round(iv.availH)));
+    // UI-C1b: vo VKLADANI KORPUSU nesu „Dielcov" a „Materiál" ODHAD zo sablony —
+    // server dopocet (Panel.cabinet_stats) cita snapshoty uz vlozenej skrinky
+    // a builder sa kvoli informacnemu riadku nespusta.
+    if (!selectedCabId && NXInsert.state.kind !== 'board') setInsertCabInfo();
+  }
+  // Codex #175 P2: zmena STROMU ZON v navrhu (delenie, police, vycistenie,
+  // rozmery poli) mala vlastnu cestu — renderPreview + refreshZoneUI — takze
+  // odhad „≈ Dielcov / ≈ Materiál" ostaval zatuchnuty az do editu ineho pola.
+  // Toto je jeho jediny obnovovaci bod mimo updateAvailable.
+  function nxDraftChanged(){
+    if (selectedCabId || NXInsert.state.kind === 'board') return;
+    setInsertCabInfo();
+  }
+  // Odhad je ZNACENY (≈) a riadky ostavaju neklikatelne (nie je co oznacit v
+  // modeli) — vzor D-78: aria-disabled + vysvetlenie, nikdy ticho mrtve.
+  function setInsertCabInfo(){
+    var st = nxDraftStats(pvGeom(), computeZones(), pvInsertFronts());
+    setOut('inf_parts', st.count > 0 ? ('≈ ' + st.count) : '—');
+    setOut('inf_area', st.area > 0 ? ('≈ ' + mmLabel(st.area) + ' m²') : '—');
+    var pn = el('infParts'), an = el('infArea');
+    if (pn) pn.title = 'Odhad počtu výrobných dielcov zo šablóny — presné číslo dá skrinka po vložení';
+    if (an) an.title = 'Odhad plochy dosky zo šablóny — presné číslo dá skrinka po vložení';
   }
 
   // --- defaulty / viditelnost ---
@@ -205,36 +227,179 @@
   // rezimu ju obnovi; sablony a config ju drzia dalej).
   function toggleBackTh(){ var r = el('backThRow'); if (r) r.style.display = (val('back_mode') === 'none') ? 'none' : ''; }
 
-  function onTypeChange(){
-    // D-32: typ patri do insert STAVU; zmena typu zahadzuje sablonu (zoznam je
-    // typovo filtrovany) a karta sa materializuje nanovo — zamky preziju (D-39).
-    NXInsert.state.type = getType();
-    NXInsert.state.template = '';
+  // ===== UI-C1b: TYP VKLADANEHO OBJEKTU (tri segmentove tlacidla) ===========
+  // Nahradilo dvojicu radiov (kind Korpus/Doska + ctype Dolna/Horna). Autorita
+  // je NXInsert (cisty stav), DOM je len jeho zrkadlo — kostra sa neprekresluje.
+  function onInsertType(t){
+    if (!NXInsert.setInsertType(t)) return; // klik na uz zvoleny typ nic nerobi
+    onInsertKindChange();                   // body atribut + material dosky (board_card.js)
+    // Novy vyjav = cisty fit (rovnaka zasada ako pri prepnuti kontextu raily):
+    // zoom na 600 mm skrinke by na 2600 mm doske mieril mimo.
+    pvUserView = false; pvView = null;
     materializeInsertCard();
+  }
+  function syncInsertTypeButtons(){
+    var cur = NXInsert.insertType();
+    var btns = document.querySelectorAll('#insertTypeRow button[data-ins-type]');
+    for (var i = 0; i < btns.length; i++){
+      var on = btns[i].getAttribute('data-ins-type') === cur;
+      btns[i].classList.toggle('on', on);
+      btns[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
   }
 
-  // --- sablony (filter podla typu) ---
-  function renderFilteredTemplates(){
-    var t = getType();
-    var sel = el('template'); var cur = sel.value;
-    sel.innerHTML = '<option value="">— vyber —</option>';
-    TEMPLATES.forEach(function(tp){
-      // UI-C1a: kniznica nesie aj DOSKOVE sablony — do korpusoveho selectu
-      // nepatria (identita sablony je dvojica kind+name).
-      if (NXInsert.templateKind(tp) !== 'cabinet') return;
-      var tt = (tp.config && tp.config.type) ? tp.config.type : 'lower';
-      if (tt !== t) return;
-      var o = document.createElement('option'); o.value = tp.name; o.textContent = tp.name; sel.appendChild(o);
-    });
-    sel.value = cur;
+  // ===== UI-C1b: DLAZDICE SABLON (N16 nedavne prve, N17 dvojklik vlozi) =====
+  // Mriezka sa PRESTAVUJE len vtedy, ked sa zmenil typ vkladania alebo prisla
+  // nova kniznica (push_templates). Vyber sablony mriezku NEPRESTAVUJE — meni
+  // sa iba trieda `.on` (Codex FIX 14 + pasca CEF: klik, ktory zahodi uzol,
+  // by druhy klik dvojkliku uz nemal na com dokoncit).
+  var TPL_RECENT_MAX = 3;
+  // Schematicky nahlad sablony — JEDNODUCHA kresba z configu (REALNE PNG nahlady
+  // su az UI-D2). Ciste (Node testy): vracia INNER markup SVG bez jedinej farby
+  // — obrys aj vypln davaju CSS tokeny (`.tpltile svg` v panel.css), rovnaka
+  // zasada ako inde: ziadny hex mimo palety.
+  function nxTplGlyph(tp){
+    var cfg = (tp && tp.config) || {};
+    var box = '<rect x="2" y="2" width="56" height="36"/>';
+    if (NXInsert.templateKind(tp) === 'board'){
+      // doska: obdlznik s uhlopriecnym naznakom plochy
+      return box + '<path d="M8 30 52 10"/>';
+    }
+    var g = '';
+    var items = (cfg.fronts && cfg.fronts.items) ? cfg.fronts.items : [];
+    var n = items.length;
+    if (n > 1){
+      // vodorovne delenie radov ciel (max 4 ciary, nech dlazdica ostane citatelna)
+      var lines = Math.min(n - 1, 4);
+      for (var i = 1; i <= lines; i++){
+        var y = 2 + 36 * i / (lines + 1);
+        g += '<path d="M2 ' + y.toFixed(1) + 'h56"/>';
+      }
+    }
+    if (n === 1 && String(items[0] && items[0].wings) === '2'){
+      g += '<path d="M30 2v36"/>';
+    }
+    if (!g){
+      // bez ciel: naznac police zo stromu zon (prazdny korpus ostane prazdny)
+      var sh = (cfg.zone_tree && parseInt(cfg.zone_tree.shelves, 10)) || 0;
+      var s = Math.min(sh, 4);
+      for (var k = 1; k <= s; k++){
+        var zy = 2 + 36 * k / (s + 1);
+        g += '<path d="M6 ' + zy.toFixed(1) + 'h48" stroke-dasharray="3 3"/>';
+      }
+    }
+    return box + g;
   }
-  function onTemplateChange(){
-    // D-33: vyber sablony = zapis do insert STAVU + plna materializacia karty
-    // (konstrukcia + cela + medzery + zamok presahov + zony + MATERIALY — audit F6).
-    // Prazdna volba "— vyber —" vrati defaulty typu. Zamky prebiju sablonu (D-39).
-    // fix #2 plati dalej: ziadny apply_all — sablona meni len navrh karty.
-    NXInsert.state.template = val('template') || '';
+  // Popisok pod kresbou: nazov + (pri doske) badge hrubky.
+  // Ciste (Node testy) — vracia TEXT, escapuje az volajuci.
+  function nxTplBadge(tp){
+    if (NXInsert.templateKind(tp) !== 'board') return '';
+    var th = tp && tp.config ? parseFloat(tp.config.thickness) : NaN;
+    return (isNaN(th) || th <= 0) ? '' : (mmLabel(th) + ' mm');
+  }
+  function tplTileHtml(tp, sel){
+    var badge = nxTplBadge(tp);
+    return '<button type="button" class="tpltile' + (tp.name === sel ? ' on' : '') + '"' +
+      ' data-tpl-name="' + esc(tp.name) + '" title="' + esc(tp.name) + ' — klik = vybrať · dvojklik = vlož hneď">' +
+      '<svg viewBox="0 0 60 40" aria-hidden="true">' + nxTplGlyph(tp) + '</svg>' +
+      '<span>' + esc(tp.name) + (badge ? ' <i>· ' + esc(badge) + '</i>' : '') + '</span></button>';
+  }
+  // Codex #175 P2: CESTA SPAT NA PREDVOLBY. Klik na uz vybranu dlazdicu je no-op
+  // (dvojklik posiela dva kliky za sebou), takze bez tejto dlazdice by sa vyber
+  // sablony nedal zrusit — najma pri doske, ktora si ho drzi aj cez prepnutie
+  // typu. Je to nahrada za zaniknutu volbu „— vyber —" v selecte.
+  function tplClearTileHtml(sel){
+    return '<button type="button" class="tpltile tplclear' + (sel ? '' : ' on') + '"' +
+      ' data-tpl-clear="1" title="Bez šablóny — vráti predvolené hodnoty tohto typu">' +
+      '<svg viewBox="0 0 60 40" aria-hidden="true">' +
+      '<rect x="2" y="2" width="56" height="36" stroke-dasharray="4 3"/></svg>' +
+      '<span>Bez šablóny</span></button>';
+  }
+  function renderTemplateTiles(force){
+    var box = el('tplTiles'); if (!box) return;
+    var type = NXInsert.insertType();
+    var kind = (type === 'board') ? 'board' : 'cabinet';
+    var sel = NXInsert.templateName(kind);
+    // Prestavba LEN pri zmene typu / novej kniznici; inak staci prepnut triedy.
+    if (!force && box.dataset.forType === type){ syncTemplateTiles(); return; }
+    var groups = NXInsert.templateGroups(TEMPLATES, type, TPL_RECENT_MAX);
+    var h = '';
+    if (groups.recent.length){
+      h += '<div class="tplsec">Naposledy použité</div><div class="tpltiles">';
+      groups.recent.forEach(function(tp){ h += tplTileHtml(tp, sel); });
+      h += '</div><div class="tplsec">Všetky šablóny</div>';
+    }
+    // „Bez šablóny" stoji ako PRVA dlazdica skupiny „Všetky šablóny" — je to
+    // rovnocenna volba (predvolby typu), nie skryta akcia.
+    h += '<div class="tpltiles">' + tplClearTileHtml(sel);
+    groups.all.forEach(function(tp){ h += tplTileHtml(tp, sel); });
+    h += '</div>';
+    if (!groups.all.length){
+      h += '<div class="tplempty">Zatiaľ žiadna šablóna tohto typu — ulož si ju z hotovej skrinky.</div>';
+    }
+    box.dataset.forType = type;
+    box.innerHTML = h;
+    setTplMeta();
+  }
+  // Prepnutie vybranej dlazdice BEZ prestavby mriezky (ten isty nazov moze byt
+  // v oboch skupinach — „naposledy použité" aj „všetky", preto sa prechadzaju
+  // VSETKY dlazdice).
+  function syncTemplateTiles(){
+    var box = el('tplTiles'); if (!box) return;
+    var kind = (NXInsert.insertType() === 'board') ? 'board' : 'cabinet';
+    var sel = NXInsert.templateName(kind);
+    var tiles = box.querySelectorAll('.tpltile');
+    for (var i = 0; i < tiles.length; i++){
+      var on = tiles[i].hasAttribute('data-tpl-clear')
+        ? !sel                                                   // „Bez šablóny"
+        : (tiles[i].getAttribute('data-tpl-name') === sel);
+      tiles[i].classList.toggle('on', on);
+    }
+    setTplMeta();
+  }
+  function setTplMeta(){
+    var m = el('insTplMeta'); if (!m) return;
+    var kind = (NXInsert.insertType() === 'board') ? 'board' : 'cabinet';
+    m.textContent = NXInsert.templateName(kind) || 'bez šablóny';
+  }
+  // Vyber sablony = zapis do insert STAVU + plna materializacia karty (D-33:
+  // konstrukcia + cela + medzery + zamok presahov + zony + MATERIALY — audit F6).
+  // Klik na UZ vybranu dlazdicu je NO-OP (nie odznacenie): dvojklik posiela dva
+  // kliky za sebou a odznacenie by medzi nimi kartu vratilo na defaulty typu.
+  // fix #2 plati dalej: ziadny apply_all, sablona meni len navrh karty.
+  // `name` = '' (dlazdica „Bez šablóny") vracia kartu na PREDVOLBY typu.
+  function pickTemplateTile(name){
+    var kind = (NXInsert.insertType() === 'board') ? 'board' : 'cabinet';
+    var next = (name === undefined || name === null) ? '' : String(name);
+    if (NXInsert.templateName(kind) === next) return;
+    NXInsert.setTemplateName(kind, next);
     materializeInsertCard();
+  }
+  // JEDNA delegacia na kontajneri (Codex FIX 14): dlazdice sa prekresluju, ale
+  // listener zije na statickom #tplTiles. Dvojklik vklada TOU ISTOU validovanou
+  // cestou ako zelene tlacidlo (ziadne priame volanie bridgu odtialto — N17).
+  // Meno sablony z dlazdice; dlazdica „Bez šablóny" vracia prazdny retazec.
+  function tplTileName(node){
+    return node.hasAttribute('data-tpl-clear') ? '' : (node.getAttribute('data-tpl-name') || '');
+  }
+  var tplTilesBound = false;
+  function setupTemplateTiles(){
+    if (tplTilesBound) return;
+    var box = el('tplTiles'); if (!box) return;
+    box.addEventListener('click', function(ev){
+      var t = closestClass(ev.target, 'tpltile'); if (!t) return;
+      pickTemplateTile(tplTileName(t));
+    });
+    box.addEventListener('dblclick', function(ev){
+      var t = closestClass(ev.target, 'tpltile'); if (!t) return;
+      // N17: klik uz sablonu vybral a karta sa z nej materializovala — dvojklik
+      // len spusti TO ISTE vlozenie ako zelene tlacidlo (validacia, zamky aj
+      // peciatka pouzitia ostavaju v jednej ceste). Na dlazdici „Bez šablóny"
+      // vlozi predvolby typu — tiez tou istou cestou.
+      pickTemplateTile(tplTileName(t));
+      if (NXInsert.insertType() === 'board') insertBoard(); else insertCabinet();
+    });
+    tplTilesBound = true;
   }
   // (saveTemplate/deleteTemplate/applyTemplateToSelected sa V0.4.5 D2 presunuli
   //  do okna Sablony — js/templates_dialog.js; panel drzi len quick-pick vyber.)
@@ -248,16 +413,9 @@
   //   2) zamknute hodnoty prebiju zdroj (D-39),
   //   3) viditelnost + validacia + nahlad.
   function findTemplateFor(name, type){
-    if (!name) return null;
-    for (var i = 0; i < TEMPLATES.length; i++){
-      var tp = TEMPLATES[i];
-      if (tp.name !== name) continue;
-      if (NXInsert.templateKind(tp) !== 'cabinet') continue; // UI-C1a: rovnomenna doskova sablona nie je tato
-
-      var tt = (tp.config && tp.config.type) ? tp.config.type : 'lower';
-      return tt === type ? tp : null;
-    }
-    return null;
+    // UI-C1a: rovnomenna doskova sablona NIE JE tato (identita je kind+name).
+    var tp = NXInsert.findTemplate(TEMPLATES, 'cabinet', name);
+    return (tp && NXInsert.templateType(tp) === type) ? tp : null;
   }
   // Cela zdroja: objekt s items = sablonove cela; inak null (defaulty maju
   // legacy string 'none' -> prazdny zoznam + predvolene medzery 3/2/2/2).
@@ -267,11 +425,35 @@
   }
   function materializeInsertCard(){
     var st = NXInsert.state;
+    syncInsertTypeButtons();
+    renderTemplateTiles();  // prestavba len pri zmene typu; inak sa prepnu triedy
+    if (st.kind === 'board'){
+      materializeInsertBoardCard();
+      renderInsertLocks();
+      if (typeof nxSectorMetaApply === 'function') nxSectorMetaApply();
+      return;
+    }
+    materializeInsertCabCard();
+  }
+  // UI-C1b: doskova vetva vkladacej karty (rozmery + material + hrubka + smer).
+  // Detail (kontrakt hrubky, UNI material, zamky) zije v board_card.js — tu je
+  // len poradie krokov, aby bola cesta rovnaka ako pri korpuse.
+  function materializeInsertBoardCard(){
+    var name = NXInsert.templateName('board');
+    var tp = NXInsert.findTemplate(TEMPLATES, 'board', name);
+    if (!tp && name) NXInsert.setTemplateName('board', ''); // zmazana sablona -> defaulty karty
+    if (tp) applyBoardTemplate(tp.config || {});
+    applyInsertLockValues('board');       // krok 2: zamky prebiju sablonu (D-39)
+    refreshInsertBoardInfo();
+    syncTemplateTiles();
+    renderPreview();
+  }
+  function materializeInsertCabCard(){
+    var st = NXInsert.state;
     var tp = findTemplateFor(st.template, st.type);
     if (!tp && st.template) st.template = ''; // zmazana/inotypova sablona -> defaulty
     setType(st.type);
-    renderFilteredTemplates();
-    setVal('template', st.template);
+    syncTemplateTiles();
     var src = NXInsert.composeSource(DEFAULTS[st.type] || {}, tp ? tp.config : null);
     writeConstruction(src);                  // krok 1: konstrukcia (plny obraz)
     buildFrontHwBadges([]);                  // navrh nema kovanie (Codex PR #30)
@@ -299,15 +481,21 @@
   // Ikony 🔒 ziju v EXISTUJUCICH riadkoch poli (.inslock, CSS ich mimo
   // mode-insert skryva); stav drzi NXInsert a zrkadli sa do Ruby pamate
   // Panel modulu (audit B5 — prezije zatvorenie panela, zomrie s restartom SU).
-  function applyInsertLockValues(){
-    var flat = NXInsert.locksFlat();
-    for (var f in flat){ if (Object.prototype.hasOwnProperty.call(flat, f)) setNum(f, flat[f]); }
+  // UI-C1b: pole zamku -> ID inputu. Korpusove kluce SU ID poli; doskove maju
+  // prefix `ib_` (vkladacia doska) — mapovanie zije LEN tu.
+  function insertLockElId(field, scope){ return (scope === 'board') ? ('ib_' + field) : field; }
+  function applyInsertLockValues(scope){
+    var flat = NXInsert.locksFlat(scope);
+    for (var f in flat){
+      if (Object.prototype.hasOwnProperty.call(flat, f)) setNum(insertLockElId(f, scope), flat[f]);
+    }
   }
   function renderInsertLocks(){
     var btns = document.querySelectorAll('.inslock');
     for (var i = 0; i < btns.length; i++){
       var f = btns[i].getAttribute('data-lock');
-      var on = NXInsert.isLocked(f);
+      var scope = btns[i].getAttribute('data-lock-scope') || 'cabinet';
+      var on = NXInsert.isLocked(f, scope);
       // B3: meni sa len symbol v <use>, nie textContent celeho tlacidla (zmazal by SVG).
       if (window.NXIcons) NXIcons.set(btns[i], on ? 'lock' : 'lock-open');
       btns[i].classList.toggle('on', on);
@@ -317,17 +505,30 @@
         : 'Zamknúť hodnotu pre ďalšie vklady (prežije výber šablóny aj reset karty).';
     }
   }
-  function toggleInsertLock(field){
-    if (NXInsert.isLocked(field)){
-      NXInsert.clearLock(field);
+  function toggleInsertLock(field, scope){
+    if (NXInsert.isLocked(field, scope)){
+      NXInsert.clearLock(field, scope);
     } else {
-      var v = evalDim(val(field));
+      var v = evalDim(val(insertLockElId(field, scope)));
       if (isNaN(v)){ NX.setStatus('Zamknúť sa dá len platná hodnota (mm).', true); return; }
       // (hodnota sa nastavi v NXInsert.setLock nizsie)
-      NXInsert.setLock(field, v);
+      NXInsert.setLock(field, v, scope);
     }
     renderInsertLocks();
-    pushInsertLocksNow(); // GH P3: klik na zamok = okamzity zapis do Ruby
+    // Doskove zamky su LEN v UI — server o nich nevie (vlastne kluce length/width,
+    // whitelist Panel::INSERT_LOCK_FIELDS je korpusovy). Posiela sa preto len
+    // korpusova sada; doskovy zamok zomrie so zatvorenim panela.
+    if (scope !== 'board') pushInsertLocksNow(); // GH P3: klik na zamok = okamzity zapis do Ruby
+  }
+  // Edit rozmeru vkladanej DOSKY: zamok drzi to, co pouzivatel vidi (rovnaka
+  // zasada ako D-39 pri korpuse v onField), plus zive info a nahlad.
+  function onInsertBoardField(){
+    NXInsert.lockedFields('board').forEach(function(f){
+      var v = evalDim(val(insertLockElId(f, 'board')));
+      if (!isNaN(v)) NXInsert.updateLockValue(f, v, 'board');
+    });
+    refreshInsertBoardInfo();
+    schedulePreview();
   }
   var insertLocksTimer = null;
   function pushInsertLocksNow(){
@@ -669,5 +870,12 @@
     row.scrollIntoView({ block: 'nearest' });
     var fh = row.querySelector('.fh');
     if (fh) fh.focus();
+  }
+
+  // Node testy (tests/js/test_uic1b_vkladanie.js) — v CEF je module undefined
+  // a zvysok suboru bezi normalne (vzor board_card.js / preview.js). Exportuju
+  // sa LEN ciste funkcie kreslenia dlazdic sablon (ziadny DOM).
+  if (typeof module !== 'undefined' && module.exports){
+    module.exports = { nxTplGlyph: nxTplGlyph, nxTplBadge: nxTplBadge };
   }
 

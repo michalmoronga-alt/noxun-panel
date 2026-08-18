@@ -58,8 +58,8 @@ eq(usage.clickKey(btn), '?/button:openProductionDialog', 'klik na button');
 const span = elm('SPAN', { parent: btn });
 eq(usage.clickKey(span), '?/button:openProductionDialog', 'klik cez vnoreny span');
 // input/select sa na klik NEpocita (tika cez change — ziadne dvojite pocitanie)
-eq(usage.clickKey(elm('INPUT', { type: 'radio', parent: body, attrs: { onchange: 'onTypeChange()' } }), 'korpus'),
-  null, 'radio klik nepocita');
+eq(usage.clickKey(elm('INPUT', { type: 'checkbox', parent: body, attrs: { onchange: 'toggleZones()' } }), 'korpus'),
+  null, 'checkbox klik nepocita');
 // neklikatelny div bez vsetkeho = null
 eq(usage.clickKey(elm('DIV', { parent: body }), 'korpus'), null, 'plain div nepocita');
 
@@ -111,12 +111,12 @@ eq(usage.clickKey(elm('text', { parent: fgrpG }), 'cela'), 'preview/fgrp', 'klik
 eq(String(usage.clickKey(elm('rect', { parent: fgrpG }), 'cela')).indexOf('F1abc'), -1, 'data-front-id NESMIE preniknut');
 
 // --- changeKey: len formularove prvky; id ma prednost ---
-eq(usage.changeKey(elm('SELECT', { id: 'template' })), 'template', 'select s id');
+eq(usage.changeKey(elm('SELECT', { id: 'ib_grain' })), 'ib_grain', 'select s id');
 eq(usage.changeKey(elm('INPUT', { id: 'zonesChk', type: 'checkbox' })), 'zonesChk', 'checkbox s id');
 eq(usage.changeKey(elm('DIV', { id: 'idbar' })), null, 'div change nepocita');
-const insertKindRow = elm('DIV', { id: 'insertKindRow' });
-eq(usage.changeKey(elm('INPUT', { type: 'radio', parent: insertKindRow, attrs: { onchange: 'onInsertKindChange()' } })),
-  'insertKindRow/input.radio:onInsertKindChange', 'radio bez id');
+const zoneRow = elm('DIV', { id: 'zoneCard' });
+eq(usage.changeKey(elm('INPUT', { type: 'text', parent: zoneRow, attrs: { oninput: 'onBoardField()' } })),
+  'zoneCard/input.text:onBoardField', 'pole bez id');
 
 // --- ochrana sukromia: data-* hodnoty a argumenty sa NIKDY nedostanu do kluca ---
 const hw = elm('DIV', { id: 'hwRows' });

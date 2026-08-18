@@ -96,9 +96,6 @@
   .row input.bad { border-color: var(--nx-danger-line); background: var(--nx-danger-bg-soft); }
   .row .unit { flex: 0 0 26px; text-align: right; color: var(--nx-ink-faint); font-size: 11px; padding-left: 4px; }
   .row input[readonly] { background: var(--nx-surface-readonly); color: var(--nx-ink-soft); border-style: dashed; }
-  .typerow { display: flex; gap: 16px; padding: 2px 2px 6px; }
-  .typerow label { display: flex; align-items: center; color: var(--nx-ink-strong); font-weight: 600; cursor: pointer; }
-  .typerow input { margin-right: 6px; }
   button { padding: 7px 8px; border: 0; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
   .wide { width: 100%; margin-top: 4px; padding: 8px; font-size: 13px; }
   .primary { background: var(--nx-action); color: var(--nx-on-accent); } .primary:hover { background: var(--nx-action-hover); }
@@ -549,8 +546,8 @@
   /* Vkladanie: materialy SKRINKY sa nastavuju az nad oznacenym korpusom (cab_*
      selecty su bez vyberu disabled), ale sektor sa NESKRYVA — ostava v nom
      „Materiály projektu…", jediny vstup do katalogu z panela (Codex #168 P2). */
-  /* Vkladanie DOSKY: korpusovy nahlad je bezpredmetny (ako doteraz). */
-  .nx-inspector body[data-insert-kind="board"].mode-insert #secPreview { display: none; }
+  /* UI-C1b: vkladanie DOSKY uz nahlad MA (N10 — obdlznik so sipkami smeru
+     dekoru), preto sa sektor S1 nezakryva. */
 
   /* --- VIDITELNOST S2/S3 PODLA KONTEXTU RAILY (kontrakt UI 2.0, Kostra) ---
      Zakladne a Materialy su vlastnosti SKRINKY a patria kontextu KORPUS
@@ -581,7 +578,6 @@
   .nx-inspector body.mode-part #partSvg { display: block; }
   .nx-inspector body.mode-board #boardSvg { display: block; }
   .nx-inspector body.mode-board .pvbox { display: none; }
-  .nx-inspector body[data-insert-kind="board"].mode-insert .pvbox { display: none; }
   #boardSvg { width: 100%; max-height: 200px; border: 1px solid var(--nx-border); border-radius: 6px;
               background: var(--nx-surface); margin: 4px 0 6px; }
   /* Zaskrtnutie "zony ghost" patri ku kontextu Zony. */
@@ -592,14 +588,71 @@
   /* Vkladaci prepinac: data-insert-kind atribut na <body> (PREZIJE setUiMode
      className prepis — Codex audit c, blocker G). */
   .nx-inspector body:not([data-insert-kind="board"]) #insertBoardForm { display: none; }
-  .nx-inspector body[data-insert-kind="board"].mode-insert #insertCabForm { display: none; }
   .nx-inspector body[data-insert-kind="board"].mode-insert #basicCard { display: none; }
-  #insertKindRow { border-bottom: 1px dashed var(--nx-border); padding-bottom: 6px; margin-bottom: 8px; }
+  /* UI-C1b: vo vkladani KORPUSU nesie informacny stlpec ODHAD zo sablony —
+     „Vnút. hĺbka" a „Hmotnosť" tam mockup nema (vertikalny priestor). */
+  .nx-inspector body.mode-insert #infIntDepth,
+  .nx-inspector body.mode-insert #infWeight { display: none; }
+
+  /* --- UI-C1b: typ vkladaneho objektu = tri segmentove tlacidla ----------- */
+  .nx-inspector .segrow { display: flex; gap: 6px; margin: 0 0 8px; }
+  .nx-inspector .segrow button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+            padding: 8px 4px; border: 1px solid var(--nx-border); border-radius: 6px;
+            background: var(--nx-surface); cursor: pointer; font: inherit; font-size: 12px;
+            color: var(--nx-ink-strong); }
+  .nx-inspector .segrow button:hover { border-color: var(--nx-select); }
+  /* Vybrany typ = VYBEROVA rodina (teal), nie zelena akcia (UI_DIZAJN §1). */
+  .nx-inspector .segrow button.on { background: var(--nx-select-bg); border-color: var(--nx-select);
+            color: var(--nx-select-strong); font-weight: 600; }
+  .nx-inspector .segrow button .ic { width: 18px; height: 18px; }
+
+  /* --- UI-C1b: sektor Sablona (zrolovatelny) + dlazdice ------------------- */
+  .nx-inspector .insect { border: 1px solid var(--nx-border); border-radius: 6px;
+            background: var(--nx-surface); margin: 0 0 8px; }
+  .nx-inspector .insect > summary { display: flex; align-items: baseline; gap: 8px; padding: 5px 8px;
+            cursor: pointer; font-size: 12px; font-weight: 600; color: var(--nx-ink-strong); }
+  /* Chevron je flex polozka — medzeru rieši `gap`, nie jeho vlastny margin. */
+  .nx-inspector .insect > summary::before { margin-right: 0; }
+  .nx-inspector .insect > summary .meta { margin-left: auto; font-weight: 400; font-size: 10.8px;
+            color: var(--nx-ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nx-inspector .insect > .body { padding: 0 8px 6px; }
+  /* Mriezka dlazdic — 3 stlpce, vyska dlazdice ~56 px (vzor mockupu .tpltiles). */
+  .nx-inspector .tpltiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 4px 0 6px; }
+  .nx-inspector .tpltile { border: 1px solid var(--nx-border); border-radius: 6px; padding: 5px 4px;
+            background: var(--nx-surface); cursor: pointer; text-align: center; font-size: 11px;
+            color: var(--nx-ink-strong); font-family: inherit; }
+  .nx-inspector .tpltile:hover { border-color: var(--nx-select); }
+  .nx-inspector .tpltile.on { border-color: var(--nx-select); background: var(--nx-select-bg); }
+  .nx-inspector .tpltile svg { width: 100%; height: 38px; display: block; margin-bottom: 3px; }
+  /* Schematicka kresba dlazdice nesie NULA farieb — obrys aj vypln su tokeny
+     (kresba v form.js je len geometria; PNG nahlady prinesie UI-D2). */
+  .nx-inspector .tpltile svg rect { fill: var(--nx-surface); stroke: var(--nx-border-strong); stroke-width: 1.5; }
+  .nx-inspector .tpltile svg path { fill: none; stroke: var(--nx-border-strong); stroke-width: 1.5; }
+  .nx-inspector .tpltile.on svg rect { fill: var(--nx-surface); stroke: var(--nx-select); }
+  /* „Bez šablóny" = návrat na predvolby typu; prerušovaný obrys hovorí, že to
+     nie je uložená šablóna, ale prázdny štart (Codex #175 P2). */
+  .nx-inspector .tplclear { color: var(--nx-ink-muted); }
+  .nx-inspector .tplclear svg rect { fill: var(--nx-surface-sunken); }
+  .nx-inspector .tpltile span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nx-inspector .tpltile i { font-style: normal; color: var(--nx-ink-faint); }
+  /* Hlavicka skupiny dlazdic (Naposledy pouzite / Vsetky sablony) — rovnaky
+     vzhlad ako sekcia v comboboxe (.cbsec), aby panel hovoril jednym jazykom. */
+  .nx-inspector .tplsec { padding: 2px 0 0; font-size: 10.5px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: .04em; color: var(--nx-ink-faint); }
+  .nx-inspector .tplempty { padding: 6px 0; font-size: 11px; color: var(--nx-ink-faint); }
+  .nx-inspector .tplfoot { display: flex; align-items: center; gap: 6px; }
+  .nx-inspector .tplfoot .hint { flex: 1 1 auto; margin: 0; }
+  .nx-inspector .tplfoot .tplmng { flex: 0 0 auto; }
 
   /* --- S3: materialy skrinky vs. materialy vkladanej dosky --------------- */
   .nx-inspector #insertBoardMatForm { display: none; }
   .nx-inspector body[data-insert-kind="board"].mode-insert #insertBoardMatForm { display: block; }
   .nx-inspector body.mode-insert #cabMatBlock { display: none; }
+  /* Zelene „Vložiť" je POSLEDNE v karte (vzor mockupu) — mimo vkladania nie je. */
+  .nx-inspector #insertGoRow { display: none; }
+  .nx-inspector body.mode-insert #insertGoRow { display: block; }
+  .nx-inspector body:not([data-insert-kind="board"]) #insertGoBoard { display: none; }
+  .nx-inspector body[data-insert-kind="board"] #insertGoCab { display: none; }
 
   /* --- S4: skupiny podla KONTEXTU (data-view-ctx na <body>) --------------
      Skupina nesie `data-s4="<kontext>"`. Zakladne pravidlo vsetky skryje,

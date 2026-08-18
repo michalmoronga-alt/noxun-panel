@@ -9,13 +9,27 @@
   var NXInsert = (function(){
     'use strict';
     var LOCK_FIELDS = ['width', 'height', 'depth', 'thickness', 'floor_height'];
+    // UI-C1b: doska ma VLASTNE kluce zamkov (`length`/`width`) a VLASTNE
+    // ulozisko. Zamerne ziadne mapovanie na korpusove width/height (Codex FIX
+    // 12): su to ine veliciny a Ruby o doskovych zamkoch NEVIE — server cita
+    // vyhradne korpusovy whitelist (Panel::INSERT_LOCK_FIELDS), takze doskovy
+    // zamok drzi hodnotu LEN v UI pri prepnuti sablony (presne ako korpusovy
+    // pred odoslanim). Do `locksFlat()` (kanal do Ruby) sa preto NIKDY nedostane.
+    var BOARD_LOCK_FIELDS = ['length', 'width'];
     var MATERIAL_KEYS = ['material_id', 'front_material_id', 'back_material_id'];
     // H2 (D-76): kovanie zo sablony — mapovanie setov + zmrazene definicie.
     var HARDWARE_KEYS = ['hardware_sets', 'hardware_set_defs'];
+    // UI-C1b: typ vkladaneho objektu = JEDNA volba z troch segmentovych
+    // tlacidiel (Dolna · Horna · Doska). Nahradila dvojicu radiov kind+ctype;
+    // stav je tu, nie v DOM (kostra panela sa neprekresluje).
+    var INSERT_TYPES = ['lower', 'upper', 'board'];
     var state = {
-      type: 'lower',
-      template: '',   // nazov zvolenej sablony ('' = defaulty typu)
+      type: 'lower',  // typ KORPUSU (lower|upper) — drzi sa aj kym je zvolena Doska
+      kind: 'cabinet',// co sa vklada: 'cabinet' | 'board'
+      template: '',   // nazov zvolenej KORPUSOVEJ sablony ('' = defaulty typu)
+      boardTemplate: '', // nazov zvolenej DOSKOVEJ sablony ('' = predvolene rozmery karty)
       locks: {},      // { width: { locked:true, value:950 }, ... } — chybajuci kluc = odomknute
+      boardLocks: {}, // to iste pre dosku (kluce length/width) — NIKDY do Ruby
       materials: { material_id: null, front_material_id: null, back_material_id: null },
       hardware: { hardware_sets: null, hardware_set_defs: null }, // H2 (D-76)
       lastMode: null  // posledny UI rezim (insert|cab|part|board); null = pred prvym initom
@@ -39,34 +53,76 @@
       return reset;
     }
 
-    // --- zamky poli (D-39) ---------------------------------------------------
-    function lockableField(f){ return LOCK_FIELDS.indexOf(f) >= 0; }
-    function isLocked(f){ return !!(state.locks[f] && state.locks[f].locked); }
-    function setLock(f, value){
-      if (!lockableField(f)) return false;
-      var v = num(value);
-      if (v === null) return false;
-      state.locks[f] = { locked: true, value: v };
+    // --- typ vkladaneho objektu (UI-C1b) -------------------------------------
+    // Jedna hodnota pre segmentove tlacidla: 'lower' | 'upper' | 'board'.
+    function insertType(){ return state.kind === 'board' ? 'board' : state.type; }
+    // Prepnutie typu. Vracia true = stav sa naozaj zmenil (volajuci prekresli).
+    // Zmena TYPU KORPUSU zahadzuje vyber korpusovej sablony (ponuka je typovo
+    // filtrovana — D-32); prepnutie Korpus<->Doska vybery NEZAHADZUJE, kazdy
+    // druh si drzi svoj (navrat na Dolnu ukaze presne to, co bolo).
+    function setInsertType(t){
+      var next = (INSERT_TYPES.indexOf(t) >= 0) ? t : 'lower';
+      if (next === insertType()) return false;
+      if (next === 'board'){
+        state.kind = 'board';
+        return true;
+      }
+      var typeChanged = (state.type !== next);
+      state.kind = 'cabinet';
+      state.type = next;
+      if (typeChanged) state.template = '';
       return true;
     }
-    function clearLock(f){ delete state.locks[f]; }
-    // Edit uz zamknuteho pola aktualizuje hodnotu zamku (zamok = "prezije sablonu
-    // a reset", nie "read-only"); na odomknutom poli nic nerobi.
-    function updateLockValue(f, value){
-      if (!isLocked(f)) return false;
+    // Nazov sablony podla druhu — jedno miesto, aby sa dva sklady nemiesali.
+    function templateName(kind){ return kind === 'board' ? state.boardTemplate : state.template; }
+    function setTemplateName(kind, name){
+      var n = (name === undefined || name === null) ? '' : String(name);
+      if (kind === 'board') state.boardTemplate = n; else state.template = n;
+    }
+    // Identita zvolenej sablony do insert payloadu (UI-C1a kontrakt) —
+    // null = vklada sa bez sablony a peciatka sa neposiela.
+    function templateRef(){
+      var kind = state.kind === 'board' ? 'board' : 'cabinet';
+      var name = templateName(kind);
+      return name ? { kind: kind, name: name } : null;
+    }
+
+    // --- zamky poli (D-39) ---------------------------------------------------
+    // Korpus a doska maju VLASTNE whitelisty aj vlastne ulozisko (`scope`);
+    // meno 'width' je v oboch, ale znamena inu velicinu.
+    function fieldsOf(scope){ return scope === 'board' ? BOARD_LOCK_FIELDS : LOCK_FIELDS; }
+    function bagOf(scope){ return scope === 'board' ? state.boardLocks : state.locks; }
+    function lockableField(f, scope){ return fieldsOf(scope).indexOf(f) >= 0; }
+    function isLocked(f, scope){
+      var b = bagOf(scope);
+      return !!(b[f] && b[f].locked);
+    }
+    function setLock(f, value, scope){
+      if (!lockableField(f, scope)) return false;
       var v = num(value);
       if (v === null) return false;
-      state.locks[f].value = v;
+      bagOf(scope)[f] = { locked: true, value: v };
+      return true;
+    }
+    function clearLock(f, scope){ delete bagOf(scope)[f]; }
+    // Edit uz zamknuteho pola aktualizuje hodnotu zamku (zamok = "prezije sablonu
+    // a reset", nie "read-only"); na odomknutom poli nic nerobi.
+    function updateLockValue(f, value, scope){
+      if (!isLocked(f, scope)) return false;
+      var v = num(value);
+      if (v === null) return false;
+      bagOf(scope)[f].value = v;
       return true;
     }
     // Serializacia pre Ruby (audit B5: zamky ziju v pamati Panel modulu):
-    // plochy tvar { width: 950 } LEN zamknutych poli.
-    function lockedFields(){
-      return Object.keys(state.locks);
+    // plochy tvar { width: 950 } LEN zamknutych poli. UI-C1b: `scope` je LEN
+    // pre UI (doskove zamky do Ruby nikdy nejdu — server ich nepozna).
+    function lockedFields(scope){
+      return Object.keys(bagOf(scope));
     }
-    function locksFlat(){
+    function locksFlat(scope){
       var out = {};
-      LOCK_FIELDS.forEach(function(f){ if (isLocked(f)) out[f] = state.locks[f].value; });
+      fieldsOf(scope).forEach(function(f){ if (isLocked(f, scope)) out[f] = bagOf(scope)[f].value; });
       return out;
     }
     // Obnova z Ruby (push_init) — neplatne/nezname kluce sa zahodia.
@@ -94,8 +150,8 @@
     }
     // Krok 2 poradia F7: zamknute hodnoty prebiju zdroj (sablonu aj defaulty).
     // Mutuje ODOVZDANY objekt (volat na cerstvom compose vysledku, nie na sablone).
-    function applyLocks(values){
-      LOCK_FIELDS.forEach(function(f){ if (isLocked(f)) values[f] = state.locks[f].value; });
+    function applyLocks(values, scope){
+      fieldsOf(scope).forEach(function(f){ if (isLocked(f, scope)) values[f] = bagOf(scope)[f].value; });
       return values;
     }
     // Draft materialov zo zdroja (D-33/F6): sablonove material_id/front/back;
@@ -150,6 +206,58 @@
       var want = (kind === 'board') ? 'board' : 'cabinet';
       return (list || []).filter(function(tp){ return templateKind(tp) === want; });
     }
+    // Typ korpusovej sablony (legacy zaznam bez `type` je dolna skrinka).
+    function templateType(tp){
+      var t = tp && tp.config && tp.config.type;
+      return (t === 'upper') ? 'upper' : 'lower';
+    }
+    // UI-C1b: ponuka pre ZVOLENY typ vkladania. 'board' = doskove sablony,
+    // 'lower'/'upper' = korpusove sablony toho typu.
+    function templatesForType(list, type){
+      if (type === 'board') return templatesOfKind(list, 'board');
+      var want = (type === 'upper') ? 'upper' : 'lower';
+      return templatesOfKind(list, 'cabinet').filter(function(tp){ return templateType(tp) === want; });
+    }
+    // Poradove cislo posledneho pouzitia (UI-C1a: `used_seq` z template_usage.json;
+    // chybajuce/neplatne = nikdy nepouzita). Je to MONOTONNE POCITADLO, nie cas.
+    function usedSeq(tp){
+      var v = tp ? tp.used_seq : null;
+      if (v === undefined || v === null) return null;
+      var n = parseFloat(v);
+      return (isNaN(n) || !isFinite(n)) ? null : n;
+    }
+    // N16 „nedavne prve": max `max` naposledy pouzitych, od najnovsieho.
+    // Tie-break je PORADIE V KNIZNICI (stabilne triedenie) — dve rovnake cisla
+    // by inak medzi prekresleniami preskakovali.
+    function recentTemplates(list, max){
+      var n = (max === undefined || max === null) ? 3 : max;
+      var idx = 0;
+      return (list || []).filter(function(tp){ return usedSeq(tp) !== null; })
+        .map(function(tp){ return { tp: tp, i: idx++ }; })
+        .sort(function(a, b){
+          var d = usedSeq(b.tp) - usedSeq(a.tp);
+          return d !== 0 ? d : (a.i - b.i);
+        })
+        .slice(0, n)
+        .map(function(x){ return x.tp; });
+    }
+    // Dve skupiny dlazdic sektora Sablona: „Naposledy pouzite" (moze byt prazdna
+    // — potom sa hlavicka vobec nekresli) + „Vsetky sablony" (v poradi kniznice).
+    function templateGroups(list, type, maxRecent){
+      var all = templatesForType(list, type);
+      return { recent: recentTemplates(all, maxRecent), all: all };
+    }
+    // Zaznam podla identity (kind, name) — rovnomenna sablona ineho druhu NIE JE tato.
+    function findTemplate(list, kind, name){
+      if (!name) return null;
+      var want = (kind === 'board') ? 'board' : 'cabinet';
+      var found = null;
+      (list || []).forEach(function(tp){
+        if (found || !tp || tp.name !== name) return;
+        if (templateKind(tp) === want) found = tp;
+      });
+      return found;
+    }
     // Kluce do insert payloadu — prazdne kluce sa NEposielaju.
     function hardwarePayload(){
       var hw = state.hardware || {};
@@ -161,8 +269,21 @@
     return {
       state: state,
       LOCK_FIELDS: LOCK_FIELDS,
+      BOARD_LOCK_FIELDS: BOARD_LOCK_FIELDS,
+      INSERT_TYPES: INSERT_TYPES,
       MATERIAL_KEYS: MATERIAL_KEYS,
       HARDWARE_KEYS: HARDWARE_KEYS,
+      insertType: insertType,
+      setInsertType: setInsertType,
+      templateName: templateName,
+      setTemplateName: setTemplateName,
+      templateRef: templateRef,
+      templateType: templateType,
+      templatesForType: templatesForType,
+      usedSeq: usedSeq,
+      recentTemplates: recentTemplates,
+      templateGroups: templateGroups,
+      findTemplate: findTemplate,
       needsReset: needsReset,
       trackMode: trackMode,
       lockableField: lockableField,

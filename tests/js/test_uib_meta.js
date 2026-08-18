@@ -34,7 +34,9 @@ eq(meta({ mode: 'cab', ctx: 'cela' }).s1, 'Čelá', 'S1 cela');
 eq(meta({ mode: 'cab', ctx: 'kovanie' }).s1, 'Kovanie — pozície', 'S1 kovanie');
 eq(meta({ mode: 'part', ctx: 'kovanie' }).s1, 'Dielec — hrany', 'dielec ma vlastnu projekciu bez ohladu na kontext');
 eq(meta({ mode: 'board', ctx: 'korpus' }).s1, 'Doska — hrany', 'doska ma vlastnu projekciu');
-eq(meta({ mode: 'insert', insert_kind: 'cabinet' }).s1, 'Náhľad šablóny', 'vkladanie korpusu');
+// UI-C1b: vkladanie kresli sablonu TAK, AKO BUDE VLOZENA (N9) — nazov projekcie
+// je zrkadlom mockupu (mockup_inspector_c.html, sectPreview).
+eq(meta({ mode: 'insert', insert_kind: 'cabinet' }).s1, 'Šablóna — ako bude vložená', 'vkladanie korpusu');
 eq(meta({ mode: 'insert', insert_kind: 'board' }).s1, 'Doska — smer dekoru', 'vkladanie dosky');
 // Neznamy kontext neprepadne na prazdno (normCtx -> korpus).
 eq(meta({ mode: 'cab', ctx: 'nieco' }).s1, 'Čelný rez + kóty', 'neznamy kontext = Korpus');

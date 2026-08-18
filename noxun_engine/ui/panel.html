@@ -12,7 +12,7 @@
      Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
      bezpecne zdielatelny so satelitnymi oknami. -->
 <script>document.documentElement.className = 'nx-inspector';</script>
-<link rel="stylesheet" href="css/panel.css?v=0.7.10">
+<link rel="stylesheet" href="css/panel.css?v=0.7.11">
 
 <!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
      Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
@@ -99,34 +99,61 @@
 <details class="sect" id="secBasic" data-key="s2" open>
   <summary class="secthead"><span class="sn">Základné</span><span class="meta" id="s2Meta"></span></summary>
   <div class="sectbody">
-    <!-- VKLADACIA KARTA (len ked nic nie je oznacene). D2: quick-pick sablony priamo tu;
-         sprava sablon (ulozit/vymazat/pouzit na oznaceny) = okno Sablony.
-         V0.4.7c: prepinac Korpus/Doska — rezim drzi atribut data-insert-kind na <body>
-         (NIE body class; setUiMode prepisuje cely className — Codex audit c). -->
+    <!-- VKLADACIA KARTA (len ked nic nie je oznacene).
+         UI-C1b: TYP objektu su TRI segmentove tlacidla (Dolná · Horná · Doska) —
+         nahradili dvojicu radiov kind+ctype. Stav zije v NXInsert (kostra sa
+         neprekresluje), do CSS ho nesie atribut data-insert-kind na <body>
+         (NIE body class; setUiMode prepisuje cely className — Codex audit c).
+         Sablona je zrolovatelny sektor s DLAZDICAMI (N16 nedavne prve, N17
+         dvojklik vlozi); sprava sablon (ulozit/vymazat/pouzit na oznaceny)
+         ostava v okne Sablony (ikona vpravo pod dlazdicami). -->
     <fieldset id="insertCard">
       <legend>Nový objekt</legend>
-      <div class="typerow" id="insertKindRow">
-        <label><input type="radio" name="ikind" value="cabinet" checked onchange="onInsertKindChange()"> Korpus</label>
-        <label><input type="radio" name="ikind" value="board" onchange="onInsertKindChange()"> Doska</label>
+      <div class="segrow" id="insertTypeRow">
+        <button type="button" id="insTypeLower" data-ins-type="lower" onclick="onInsertType('lower')" aria-pressed="true" title="Dolná skrinka — stojí na sokli alebo nohách"><svg class="ic" aria-hidden="true"><use href="#i-cab-low"/></svg><span>Dolná</span></button>
+        <button type="button" id="insTypeUpper" data-ins-type="upper" onclick="onInsertType('upper')" aria-pressed="false" title="Horná skrinka — zavesená, bez sokla"><svg class="ic" aria-hidden="true"><use href="#i-cab-high"/></svg><span>Horná</span></button>
+        <button type="button" id="insTypeBoard" data-ins-type="board" onclick="onInsertType('board')" aria-pressed="false" title="Samostatná doska — krycia doska, blenda, zástena"><svg class="ic" aria-hidden="true"><use href="#i-slab"/></svg><span>Doska</span></button>
       </div>
-      <div id="insertCabForm">
-        <div class="typerow">
-          <label><input type="radio" name="ctype" value="lower" onchange="onTypeChange()"> Dolná</label>
-          <label><input type="radio" name="ctype" value="upper" onchange="onTypeChange()"> Horná</label>
+      <!-- Sektor Sablona: `details` ako skupiny v S4 (zbalenie si pamata
+           bindDetails cez data-key) — vertikalny priestor panela je vzacny.
+           Mriezku kresli form.js do #tplTiles; klik/dvojklik chyta JEDNA
+           delegacia na kontajneri (per-dlazdicove onclick by pri prekresleni
+           zomreli a klik by v CEF stihol zabit uzol pred dvojklikom). -->
+      <details class="insect" id="insTplBox" data-key="itpl" open>
+        <summary><span class="sn">Šablóna</span><span class="meta" id="insTplMeta"></span></summary>
+        <div class="body">
+          <!-- Obal je BEZNY blok — mriezky `.tpltiles` su az skupiny vnutri
+               (Naposledy použité / Všetky šablóny), inak by hlavicky skupin
+               sadli do stlpcov mriezky. -->
+          <div class="tplbox" id="tplTiles"></div>
+          <div class="tplfoot">
+            <span class="hint" id="tplHint">Klik = vybrať a doladiť · dvojklik = vlož hneď.</span>
+            <button id="insTplMng" class="ghostbtn tplmng" onclick="openTemplatesDialog()" title="Šablóny — uložiť / vymazať / použiť na označený" aria-label="Šablóny — uložiť / vymazať / použiť na označený"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg></button>
+          </div>
         </div>
-        <div class="row"><label>Šablóna</label>
-          <select id="template" onchange="onTemplateChange()"><option value="">— vyber —</option></select>
-          <button class="ghostbtn tplmng" onclick="openTemplatesDialog()" title="Šablóny — uložiť / vymazať / použiť na označený" aria-label="Šablóny — uložiť / vymazať / použiť na označený"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg></button>
-        </div>
-        <button class="primary wide" onclick="insertCabinet()">Vložiť korpus</button>
-      </div>
+      </details>
+      <!-- Rozmery KORPUSU su v #basicCard nizsie (ten isty 2-stlpcovy vzor ako
+           pri oznacenej skrinke) — vkladacia karta pre korpus uz nema vlastne
+           polia. Zelene „Vložiť" stoji AZ NA KONCI sektora Materiály. -->
       <div id="insertBoardForm">
-        <div class="hint">Samostatný výrobný dielec — krycia doska, blenda, výplň… Hrúbku určuje materiál (pri UNI ju zadáš sám); ABS nastavíš po vložení na karte dosky.</div>
+        <div class="hint">Samostatný výrobný dielec — krycia doska, blenda, výplň… Hrúbku určuje materiál (pri UNI a doskovej šablóne ju zadáš sám); ABS nastavíš po vložení na karte dosky.</div>
         <div class="row"><label>Názov</label><input id="ib_name" type="text" placeholder="Doska"><span class="unit"></span></div>
-        <div class="row"><label>Dĺžka</label><input id="ib_length" type="text" value="800"><span class="unit">mm</span></div>
-        <div class="row"><label>Šírka</label><input id="ib_width" type="text" value="600"><span class="unit">mm</span></div>
-        <!-- (zelené „Vložiť dosku" je AŽ ZA materiálom — v sektore Materiály;
-             primárna akcia musí byť posledná, nie pred voľbou materiálu.) -->
+        <!-- 2 stlpce ako UI-B3: vlavo VSTUPY (s D-39 zamkami dosky — vlastne
+             kluce length/width), vpravo DOPOCITANE udaje ako TEXT. -->
+        <div class="basicgrid">
+          <div class="dimcol">
+            <div class="rowc"><label for="ib_length"><svg class="ic" aria-hidden="true"><use href="#i-arr-h"/></svg>Dĺžka</label>
+              <span class="dwrap"><input id="ib_length" type="text" value="800" oninput="onInsertBoardField()"></span>
+              <button class="inslock" data-lock="length" data-lock-scope="board" onclick="toggleInsertLock('length', 'board')" aria-label="Zamknúť dĺžku dosky" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
+            <div class="rowc"><label for="ib_width"><svg class="ic" aria-hidden="true"><use href="#i-arr-v"/></svg>Šírka</label>
+              <span class="dwrap"><input id="ib_width" type="text" value="600" oninput="onInsertBoardField()"></span>
+              <button class="inslock" data-lock="width" data-lock-scope="board" onclick="toggleInsertLock('width', 'board')" aria-label="Zamknúť šírku dosky" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
+          </div>
+          <div class="infocol">
+            <div class="inforow" id="infBoardTh" title="Hrúbku určuje materiál; pri UNI materiáli (aj doskovej šablóne) ju zadáš v sekcii Materiály"><span>Hrúbka</span><b id="inf_b_th">—</b></div>
+            <div class="inforow" id="infBoardArea" title="Plocha dosky (dĺžka × šírka)"><span>Plocha</span><b id="inf_b_area">—</b></div>
+          </div>
+        </div>
       </div>
     </fieldset>
 
@@ -164,13 +191,16 @@
              (available_*), pocet dielcov a plochu tiez (parts_count/parts_area_m2
              — ciste citanie snapshotov). Klikatelne su LEN tie, ktore niekam
              vedu (N13): Dielcov = oznaci ich v modeli. -->
+        <!-- UI-C1b: vo VKLADANI su „Vnút. hĺbka" a „Hmotnosť" skryte (CSS) —
+             mockup ich v navrhu nema a vertikalny priestor je vzacny; „Dielcov"
+             a „Materiál" tam nesu ODHAD zo sablony (znacka ≈, klikanie vypnute). -->
         <div class="infocol">
           <div class="inforow" title="Svetlá šírka vnútra (mm)"><span>Vnút. šírka</span><b id="av_width">—</b></div>
-          <div class="inforow" title="Svetlá hĺbka vnútra (mm)"><span>Vnút. hĺbka</span><b id="av_depth">—</b></div>
+          <div class="inforow" id="infIntDepth" title="Svetlá hĺbka vnútra (mm)"><span>Vnút. hĺbka</span><b id="av_depth">—</b></div>
           <div class="inforow" title="Úložná výška vnútra (mm)"><span>Úložná výška</span><b id="av_height">—</b></div>
           <button type="button" class="inforow click" id="infParts" onclick="onInfoParts()" data-nx-usage="info:dielce" title="Klik = označí výrobné dielce tejto skrinky v modeli"><span>Dielcov</span><b id="inf_parts">—</b></button>
           <button type="button" class="inforow click" id="infArea" onclick="onInfoArea()" data-nx-usage="info:material" title="Plocha dosky tejto skrinky — kusovník s filtrom príde v Štúdiu"><span>Materiál</span><b id="inf_area">—</b></button>
-          <div class="inforow" title="Hmotnosť príde s kovaním (fáza 3) — podklad pre výklopy"><span>Hmotnosť</span><b>—</b></div>
+          <div class="inforow" id="infWeight" title="Hmotnosť príde s kovaním (fáza 3) — podklad pre výklopy"><span>Hmotnosť</span><b>—</b></div>
         </div>
       </div>
     </fieldset>
@@ -199,8 +229,10 @@
       <!-- D-85 combobox; E-03/D-86 guardy visia na onInsertBoardMaterial a combobox
            ich necha bezat po TEJ ISTEJ ceste (zapis value + change). -->
       <div class="row"><label>Materiál</label><select id="ib_material" data-nx-combo="decor" onchange="onInsertBoardMaterial()"></select><span class="unit"></span></div>
-      <!-- E-03: pri UNI materiali sa pole odomyka (readOnly riadi board_card.js) -->
-      <div class="row"><label>Hrúbka</label><input id="ib_thickness" type="text" readonly><span class="unit">mm</span></div>
+      <!-- E-03: pri UNI materiali sa pole odomyka (readOnly riadi board_card.js).
+           UI-C1b: informacny riadok „Hrúbka" v Základných je jeho ZRKADLO —
+           autorita hrubky ostava TU (a na serveri insert_thickness_for). -->
+      <div class="row"><label>Hrúbka</label><input id="ib_thickness" type="text" readonly oninput="refreshInsertBoardInfo()"><span class="unit">mm</span></div>
       <div class="row"><label>Smer dekoru</label>
         <!-- D-86: onchange oznaci volbu za vedomu — refresh katalogu ju uz neprepise.
              onblur (Codex #163 P2) dokona odlozeny zapis, ak katalog vymenil material,
@@ -211,7 +243,6 @@
           <option value="none">Bez smeru</option>
         </select><span class="unit"></span>
       </div>
-      <button class="primary wide" onclick="insertBoard()">Vložiť dosku</button>
     </div>
     <!-- Katalog a predvolby projektu su dostupne VZDY (Codex #168 P2, 2. kolo):
          po zruseni satelitnych tlacidiel hlavicky je toto jediny vstup do okna
@@ -219,6 +250,13 @@
          PRED prvym vkladom, teda presne v rezime, kde este niet skrinky. -->
     <div class="btnrow" id="matProjRow">
       <button class="ghostbtn" onclick="openProjectMaterialsDialog()"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg> Materiály projektu…</button>
+    </div>
+    <!-- UI-C1b: PRIMARNA AKCIA je POSLEDNA (vzor mockupu) — az za rozmermi aj
+         materialom. Ktore z dvoch tlacidiel je vidiet, rozhoduje data-insert-kind
+         (CSS); obe idu TOU ISTOU validovanou cestou ako dvojklik na dlazdicu. -->
+    <div id="insertGoRow">
+      <button class="primary wide" id="insertGoCab" onclick="insertCabinet()">Vložiť korpus</button>
+      <button class="primary wide" id="insertGoBoard" onclick="insertBoard()">Vložiť dosku</button>
     </div>
   </div>
 </details>
@@ -561,34 +599,34 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.7.10"></script>
+<script src="js/errors.js?v=0.7.11"></script>
 <!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
      jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
      pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
-<script src="js/win_fit.js?v=0.7.10"></script>
-<script src="js/icons.js?v=0.7.10"></script>
+<script src="js/win_fit.js?v=0.7.11"></script>
+<script src="js/icons.js?v=0.7.11"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.7.10"></script>
-<script src="js/core.js?v=0.7.10"></script>
-<script src="js/expr.js?v=0.7.10"></script>
-<script src="js/insert_state.js?v=0.7.10"></script>
-<script src="js/form.js?v=0.7.10"></script>
-<script src="js/zone_tree.js?v=0.7.10"></script>
-<script src="js/preview.js?v=0.7.10"></script>
+<script src="js/nx_combo.js?v=0.7.11"></script>
+<script src="js/core.js?v=0.7.11"></script>
+<script src="js/expr.js?v=0.7.11"></script>
+<script src="js/insert_state.js?v=0.7.11"></script>
+<script src="js/form.js?v=0.7.11"></script>
+<script src="js/zone_tree.js?v=0.7.11"></script>
+<script src="js/preview.js?v=0.7.11"></script>
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
-<script src="js/shell.js?v=0.7.10"></script>
-<script src="js/actions.js?v=0.7.10"></script>
+<script src="js/shell.js?v=0.7.11"></script>
+<script src="js/actions.js?v=0.7.11"></script>
 <!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
      bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
-<script src="js/settings.js?v=0.7.10"></script>
-<script src="js/bridge.js?v=0.7.10"></script>
-<script src="js/materials.js?v=0.7.10"></script>
-<script src="js/part_card.js?v=0.7.10"></script>
-<script src="js/board_card.js?v=0.7.10"></script>
-<script src="js/hardware.js?v=0.7.10"></script>
-<script src="js/usage.js?v=0.7.10"></script>
-<script src="js/boot.js?v=0.7.10"></script>
+<script src="js/settings.js?v=0.7.11"></script>
+<script src="js/bridge.js?v=0.7.11"></script>
+<script src="js/materials.js?v=0.7.11"></script>
+<script src="js/part_card.js?v=0.7.11"></script>
+<script src="js/board_card.js?v=0.7.11"></script>
+<script src="js/hardware.js?v=0.7.11"></script>
+<script src="js/usage.js?v=0.7.11"></script>
+<script src="js/boot.js?v=0.7.11"></script>

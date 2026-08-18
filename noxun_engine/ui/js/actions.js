@@ -101,7 +101,7 @@
     }
     renderPreview();
     if (selectedCabId) pushFieldCuts(localId, index);
-    else refreshZoneUI();
+    else { refreshZoneUI(); nxDraftChanged(); }
   }
   function toggleFieldLock(localId, index, elBtn){
     var node0 = navTree(sanitizeTree(currentZoneTree), pathOf(localId));
@@ -114,7 +114,7 @@
     persistLayout(localId, index, anchorSize, newLocked);
     renderPreview();
     if (selectedCabId) pushFieldCuts(localId, index);
-    else refreshZoneUI();
+    else { refreshZoneUI(); nxDraftChanged(); }
   }
 
   // --- strom zon (citatelne nazvy) ---
@@ -149,7 +149,7 @@
         node.children=[];
         for(var i=0;i<count;i++) node.children.push(defaultTree(0, newStableId('Z')));
       }
-      currentZoneTree = tree; renderPreview(); refreshZoneUI();
+      currentZoneTree = tree; renderPreview(); refreshZoneUI(); nxDraftChanged();
     }
   }
   function setZoneShelves(){
@@ -160,7 +160,7 @@
     } else {
       var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localZoneId(activeZoneId)));
       if (node){ node.split=null; node.children=[]; node.shelves=n; }
-      currentZoneTree = tree; renderPreview(); refreshZoneUI();
+      currentZoneTree = tree; renderPreview(); refreshZoneUI(); nxDraftChanged();
     }
   }
   function cleanZone(){
@@ -170,7 +170,7 @@
     } else {
       var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localZoneId(activeZoneId)));
       if (node){ node.split=null; node.children=[]; node.shelves=0; }
-      currentZoneTree = tree; renderPreview(); refreshZoneUI();
+      currentZoneTree = tree; renderPreview(); refreshZoneUI(); nxDraftChanged();
     }
   }
 
@@ -196,9 +196,10 @@
     // UI-C1a: identita pouzitej sablony (kind + nazov) — server si zaznam znovu
     // najde, metadata odstrani PRED builderom a az po uspesnom vlozeni z nich
     // spravi peciatku „naposledy pouzite". Do configu skrinky sa nedostanu.
-    if (NXInsert.state.template){
-      p.template_kind = 'cabinet';
-      p.template_name = NXInsert.state.template;
+    var ref = NXInsert.templateRef();
+    if (ref && ref.kind === 'cabinet'){
+      p.template_kind = ref.kind;
+      p.template_name = ref.name;
     }
     if (window.sketchup && sketchup.insert_cabinet) sketchup.insert_cabinet(JSON.stringify(p));
   }

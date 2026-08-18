@@ -173,4 +173,106 @@ eq(ins.templatesOfKind(LIB, 'cabinet').concat(ins.templatesOfKind(LIB, 'board'))
   'neznamy druh sa NEPONUKNE ani ako korpus, ani ako doska');
 eq(ins.templatesOfKind(null, 'cabinet'), [], 'prazdna kniznica nespadne');
 
+// ===== UI-C1b: typ vkladania, vyber sablony, zamky dosky, poradie dlazdic =====
+
+// --- typ = JEDNA volba z troch (segmentove tlacidla) ---
+ins.state.type = 'lower'; ins.state.kind = 'cabinet';
+ins.state.template = ''; ins.state.boardTemplate = '';
+eq(ins.insertType(), 'lower', 'vychodzi typ je dolna skrinka');
+eq(ins.setInsertType('lower'), false, 'klik na uz zvoleny typ nic nemeni');
+eq(ins.setInsertType('upper'), true, 'prepnutie na hornu');
+eq(ins.insertType(), 'upper', 'typ sa zapamatal');
+eq(ins.setInsertType('nezmysel'), true, 'neznamy typ padne na dolnu…');
+eq(ins.insertType(), 'lower', '…a je to dolna skrinka');
+eq(ins.setInsertType('board'), true, 'prepnutie na dosku');
+eq(ins.insertType(), 'board', 'doska je vlastny typ');
+eq(ins.state.type, 'lower', 'typ KORPUSU sa pri doske nezabuda');
+eq(ins.setInsertType('lower'), true, 'navrat na korpus');
+eq(ins.state.kind, 'cabinet', 'druh je zase korpus');
+
+// --- vyber sablony: dva sklady (korpus / doska), identita = kind + name ---
+ins.setTemplateName('cabinet', 'Dolna klasik');
+ins.setTemplateName('board', 'Zástena');
+eq(ins.templateName('cabinet'), 'Dolna klasik', 'korpusovy vyber');
+eq(ins.templateName('board'), 'Zástena', 'doskovy vyber je INY sklad');
+eq(ins.templateRef(), { kind: 'cabinet', name: 'Dolna klasik' }, 'payload ref podla zvoleneho typu');
+ins.setInsertType('board');
+eq(ins.templateRef(), { kind: 'board', name: 'Zástena' }, 'pri doske ide do payloadu doskova sablona');
+ins.setInsertType('lower');
+eq(ins.templateRef(), { kind: 'cabinet', name: 'Dolna klasik' }, 'navrat ukaze povodny korpusovy vyber');
+// Zmena TYPU KORPUSU vyber zahadzuje (ponuka je typovo filtrovana — D-32),
+// prepnutie Korpus<->Doska NIE (kazdy druh si drzi svoj).
+ins.setInsertType('upper');
+eq(ins.templateName('cabinet'), '', 'zmena typu korpusu zahodila sablonu');
+eq(ins.templateName('board'), 'Zástena', 'doskovy vyber zmenou typu korpusu netrpi');
+ins.setInsertType('board');
+ins.setInsertType('upper');
+eq(ins.templateName('board'), 'Zástena', 'prepnutie Doska->Korpus doskovy vyber nezhodilo');
+ins.setTemplateName('cabinet', null);
+eq(ins.templateRef(), null, 'bez sablony sa peciatka neposiela');
+
+// --- zamky DOSKY: vlastne kluce a VLASTNE ulozisko (Codex FIX 12) ---
+ins.setLocksFlat({ width: 950 });                  // korpusovy zamok
+eq(ins.setLock('length', 2600, 'board'), true, 'zamok dlzky dosky');
+eq(ins.setLock('width', 580, 'board'), true, 'zamok sirky dosky');
+eq(ins.setLock('height', 700, 'board'), false, 'korpusove pole doska nezamkne');
+eq(ins.isLocked('width', 'board'), true, 'doskova sirka je zamknuta');
+eq(ins.locksFlat('board'), { length: 2600, width: 580 }, 'doskove zamky maju vlastnu sadu');
+eq(ins.locksFlat(), { width: 950 },
+  'kanal do Ruby nesie LEN korpusove zamky (server doskove nepozna)');
+eq(ins.applyLocks({ length: 800, width: 600 }, 'board'), { length: 2600, width: 580 },
+  'doskovy zamok prebije sablonu');
+eq(ins.applyLocks({ width: 450, height: 720 }), { width: 950, height: 720 },
+  'korpusovy zamok pracuje nezmenene (rovnake meno, ina velicina)');
+ins.clearLock('length', 'board');
+eq(ins.locksFlat('board'), { width: 580 }, 'odomknutie dosky');
+eq(ins.updateLockValue('width', 620, 'board'), true, 'edit zamknuteho doskoveho pola');
+eq(ins.locksFlat('board').width, 620, 'zamok drzi to, co pouzivatel vidi');
+eq(ins.locksFlat().width, 950, 'korpusovy zamok sa tym NEZMENIL');
+ins.clearLock('width', 'board');
+ins.setLocksFlat(null);
+
+// --- ponuka dlazdic: filter podla typu + „nedavne prve" (N16) ---
+const LIB2 = [
+  { name: 'Dolna 2 dvierka', kind: 'cabinet', config: { type: 'lower' }, used_seq: 2 },
+  { name: 'Horna klasik', kind: 'cabinet', config: { type: 'upper' }, used_seq: 9 },
+  { name: 'Drezova 900', kind: 'cabinet', config: { type: 'lower' }, used_seq: 7 },
+  { name: 'Legacy dolna', config: { type: 'lower' } },              // bez kind aj bez pouzitia
+  { name: 'Varna 600', kind: 'cabinet', config: { type: 'lower' }, used_seq: 5 },
+  { name: 'Diel', kind: 'board', config: { type: 'board', thickness: 18 }, used_seq: 3 },
+  { name: 'Pracovná doska', kind: 'board', config: { type: 'board', thickness: 38 } }
+];
+eq(ins.templatesForType(LIB2, 'lower').map(function(t){ return t.name; }),
+  ['Dolna 2 dvierka', 'Drezova 900', 'Legacy dolna', 'Varna 600'],
+  'dolna: korpusove sablony typu lower (legacy bez type = lower)');
+eq(ins.templatesForType(LIB2, 'upper').map(function(t){ return t.name; }), ['Horna klasik'],
+  'horna: len upper');
+eq(ins.templatesForType(LIB2, 'board').map(function(t){ return t.name; }), ['Diel', 'Pracovná doska'],
+  'doska: len doskove sablony');
+eq(ins.usedSeq({ used_seq: 4 }), 4, 'used_seq je cislo');
+eq(ins.usedSeq({ used_seq: null }), null, 'nikdy nepouzita');
+eq(ins.usedSeq({ used_seq: 'x' }), null, 'nezmysel = nikdy nepouzita');
+eq(ins.recentTemplates(ins.templatesForType(LIB2, 'lower'), 3).map(function(t){ return t.name; }),
+  ['Drezova 900', 'Varna 600', 'Dolna 2 dvierka'],
+  'nedavne prve: od najvyssieho used_seq, max 3, nepouzite von');
+eq(ins.recentTemplates(ins.templatesForType(LIB2, 'lower'), 2).length, 2, 'limit sa dodrzi');
+eq(ins.recentTemplates([{ name: 'A', kind: 'cabinet', config: {}, used_seq: 5 },
+                        { name: 'B', kind: 'cabinet', config: {}, used_seq: 5 }], 2)
+     .map(function(t){ return t.name; }), ['A', 'B'],
+  'rovnake poradove cislo = stabilne poradie kniznice (ziadne preskakovanie)');
+const G = ins.templateGroups(LIB2, 'board', 3);
+eq(G.recent.map(function(t){ return t.name; }), ['Diel'], 'skupina Naposledy pouzite (doska)');
+eq(G.all.map(function(t){ return t.name; }), ['Diel', 'Pracovná doska'], 'skupina Vsetky sablony');
+eq(ins.templateGroups(LIB2, 'upper', 3).recent.map(function(t){ return t.name; }), ['Horna klasik'],
+  'nedavne su LEN z ponuky daneho typu');
+eq(ins.templateGroups([], 'lower', 3), { recent: [], all: [] }, 'prazdna kniznica nespadne');
+
+// --- findTemplate: identita je DVOJICA (kind, name) ---
+eq(ins.findTemplate(LIB2, 'board', 'Diel').name, 'Diel', 'doskova sablona podla mena');
+eq(ins.findTemplate(LIB2, 'cabinet', 'Diel'), null, 'rovnomenna korpusova NEEXISTUJE');
+eq(ins.findTemplate(LIB, 'board', 'Zástena').kind, 'board',
+  'rovnake meno v dvoch druhoch: vrati sa ten spravny');
+eq(ins.findTemplate(LIB2, 'cabinet', ''), null, 'prazdne meno = ziadna sablona');
+eq(ins.findTemplate(null, 'cabinet', 'A'), null, 'prazdna kniznica nespadne');
+
 console.log(JSON.stringify({ passed: n, failed: 0 }));

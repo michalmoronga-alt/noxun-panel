@@ -242,7 +242,9 @@ Korpus · Čelá · Kovanie · ABS kontrola · dočasný dielec/doska),
 `arr-h` / `arr-v` / `arr-d` / `plinth` (UI-B3 — rozmery v sektore Základné),
 `p-top` / `p-bottom` / `p-side` / `p-back` / `brace` (UI-B3 — ikony skupín
 Nastavení; `brace` čaká na skupinu Výstuhy z bloku UI-C),
-`palette` (UI-B3 — sekcia Vzhľad v koliesku).
+`palette` (UI-B3 — sekcia Vzhľad v koliesku),
+`cab-low` / `cab-high` (UI-C1b — typ vkladaného objektu: skrinka na sokli vs.
+zavesená; tretí typ „Doska" používa existujúci `slab`).
 
 > Okno **Výroba** načítava `icons.js` od v0.5.44 (predtým sprite nemalo) — nové
 > ovládacie prvky v ňom používajú sprite, nie glyfy.
@@ -566,7 +568,35 @@ sekcie podľa kontraktu: **Vzhľad** (téma) · **Rozmerové rady** (editor — 
 oddelené čiarkou, čistenie a poradie robí server) · **O plugine** (logo +
 verzia z Ruby).
 
-### 5.4 Ostatné vzory
+### 5.4 Vkladacia karta — typ, dlaždice šablón (UI-C1b)
+
+Vkladanie je **jediné miesto, kde sa objekt vytvára**, preto má vlastný vzor.
+Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html`
+(`insTypeRow` / `sectInsertTpl` / `.segrow` / `.tpltiles`).
+
+- **Typ objektu = tri segmentové tlačidlá** (`.segrow`): Dolná · Horná · Doska.
+  Rádiá zanikli — je to jedna voľba z troch, nie dve nezávislé otázky. Aktívne
+  tlačidlo nesie **výberovú rodinu** (teal), nie zelenú: je to *stav*, nie akcia.
+  Ikona ukazuje, **kde objekt stojí** (`cab-low` na sokli · `cab-high` zavesená ·
+  `slab` doska).
+- **Šablóny sú dlaždice** (`.tpltiles` / `.tpltile`, 3 stĺpce, výška ~56 px) v
+  **zrolovateľnej** sekcii — vertikálny priestor je vzácny a mriežka je aj tak
+  vidieť „na jeden pohľad". Dve skupiny: **Naposledy použité** (max 3, N16 — vynechá
+  sa, keď ešte nie je čo ukázať) a **Všetky šablóny**.
+- **Klik vyberá, dvojklik vkladá (N17).** Obe cesty idú cez **tú istú validovanú**
+  insert funkciu ako zelené tlačidlo. Výber **nesmie prestavať mriežku** — mení sa
+  len trieda `.on`; prestavba patrí zmene typu a novej knižnici. (Klik, ktorý
+  zahodí uzol, by v CEF druhému kliku dvojkliku nenechal cieľ.)
+- **Kresba dlaždice nenesie farbu.** Schéma z configu (riadky čiel, krídla, police)
+  je len geometria; obrys a výplň dávajú tokeny v CSS. Reálne PNG náhľady prídu
+  s UI-D2.
+- **Primárna akcia je posledná** — zelené „Vložiť" stojí až za rozmermi *aj* za
+  materiálom (rovnaký dôvod, prečo tam už stálo „Vložiť dosku").
+- **Odhad namiesto ticha:** dopočítané údaje, ktoré pre nevložený návrh nemá kto
+  spočítať presne, sa ukazujú so značkou **≈** a s vysvetlením v tooltipe —
+  nikdy nie pomlčka a nikdy nie číslo, ktoré sa tvári ako presné.
+
+### 5.5 Ostatné vzory
 
 - **Sticky hlavička (Inspector):** jednoradová, zostáva pri scrollovaní
   (`position: sticky`, `z-index` pod modalom 60): logo + ID + názov s ceruzkou
