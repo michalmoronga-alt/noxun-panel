@@ -225,6 +225,9 @@
   function onInsertType(t){
     if (!NXInsert.setInsertType(t)) return; // klik na uz zvoleny typ nic nerobi
     onInsertKindChange();                   // body atribut + material dosky (board_card.js)
+    // Novy vyjav = cisty fit (rovnaka zasada ako pri prepnuti kontextu raily):
+    // zoom na 600 mm skrinke by na 2600 mm doske mieril mimo.
+    pvUserView = false; pvView = null;
     materializeInsertCard();
   }
   function syncInsertTypeButtons(){
