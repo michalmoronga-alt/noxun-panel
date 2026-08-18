@@ -69,14 +69,29 @@
   // Ciste (Node testy).
   function pvDepthDimZ(H, sk){ return H + sk + DIM_DEPTH_OFF; }
   function pvSceneTopZ(H, sk){ return sk > 0 ? (H + sk + DIM_TOP) : H; }
+  // UI-C1b: scena vkladanej DOSKY je samotna doska (dlzka x sirka) + rezerva na
+  // koty. Vlastna funkcia — korpusove polia (#width/#height) v tomto rezime nic
+  // neznamenaju. Ciste (Node testy): rozmery dnu, obdlznik sceny von.
+  // Vlavo a hore staci obycajny padding, vpravo (kota sirky) a dole (kota dlzky)
+  // musi ostat miesto na ciaru aj text — inak by ich fit orezal.
+  function pvBoardScene(L, Wd){
+    var l = Math.max(1, nxNumOr(L, 0)), w = Math.max(1, nxNumOr(Wd, 0));
+    return { x: -PV_PAD, y: -PV_PAD, w: l + PV_PAD + DIM_EXT, h: w + PV_PAD + DIM_EXT };
+  }
+  // Je prave kreslena vkladana DOSKA? (projekcia 'insert' ma dve podoby)
+  function pvInsertBoard(){
+    return previewMode === 'insert' && typeof getInsertKind === 'function' && getInsertKind() === 'board';
+  }
   function sceneSize(){
+    if (pvInsertBoard()) return pvBoardScene(numv('ib_length'), numv('ib_width'));
     var W = numv('width')||600, H = numv('height')||720;
     var solid = (previewMode === 'cab' || previewMode === 'hw');
     var e = solid ? null : frontsExtent();
     var minX = e ? e.minX : 0, maxX = e ? e.maxX : W;
     var minZ = e ? e.minZ : 0, maxZ = e ? e.maxZ : H;
-    if (previewMode === 'cab'){
+    if (previewMode === 'cab' || previewMode === 'insert'){
       // D-11: vlavo koty sokla/tela, vpravo vyska, dole sirka, hore naznak hlbky
+      // (UI-C1b: vkladanie kresli sablonu tym istym celnym rezom + kotami)
       var sk = pvDepthSkew();
       minX = -DIM_EXT; maxX = W + DIM_EXT + sk; minZ = -DIM_EXT;
       // Codex #169 P2: nad skosenim este LEZI KOTA hlbky — scene musi patrit aj
@@ -124,7 +139,13 @@
     var LABEL = { zony: 'Zóny', cela: 'Čelá', kovanie: 'Kovanie', olep: 'Olep' };
     // Ktora vrstva je ZAKLADOM ktorej projekcie. Zakladny chip sa neda zhasnut
     // (je to sam pohlad), preto nema stav zap/vyp.
-    var BASE = { cab: null, zones: 'zony', fronts: 'cela', hw: 'kovanie', part: 'olep' };
+    // UI-C1b: projekcia 'insert' (sablona ako bude vlozena) zakladnu vrstvu NEMA
+    // — kresli sa korpus a CELA su prepinatelna vrstva, aby sa dalo pozriet
+    // dovnutra (kontrakt UI 2.0, N9). Preto je tu explicitne `null`.
+    var BASE = { cab: null, insert: null, zones: 'zony', fronts: 'cela', hw: 'kovanie', part: 'olep' };
+    // Vrstvy, ktore su v danej projekcii zapnute UZ PRI PRVOM otvoreni. Vkladanie
+    // ukazuje sablonu tak, ako naozaj vyzera — teda s celami; zhasnut sa daju.
+    var DEFAULT_ON = { insert: { cela: true } };
     // Olep = farby ABS hran. Tie nesie VYHRADNE payload dielca (part_card);
     // korpusovy payload o hranach jednotlivych dielcov nic nevie, takze chip je
     // mimo kontextu Dielec zamerne NEAKTIVNY s vysvetlenim — nie ticho mrtvy.
@@ -135,7 +156,14 @@
       return mode !== 'part';
     }
     var state = {};   // rezim projekcie -> { kluc: true }
-    function bag(mode){ return (state[mode] = state[mode] || {}); }
+    function bag(mode){
+      if (!state[mode]){
+        var d = DEFAULT_ON[mode], out = {}, k;
+        for (k in (d || {})){ if (Object.prototype.hasOwnProperty.call(d, k)) out[k] = d[k]; }
+        state[mode] = out;
+      }
+      return state[mode];
+    }
     function baseOf(mode){ return BASE[mode] || null; }
     function has(avail, key){ return !avail || avail[key] !== false; }
     // Stav jedneho chipu: 'base' | 'on' | 'off' | 'disabled'.
@@ -196,8 +224,99 @@
              D: numv('depth')||0,
              fh: (getType()==='upper') ? 0 : (numv('floor_height')||0),
              topNone: val('top_mode') === 'none',
+             // UI-C1b: konstrukcne volby pre ODHAD kusov/plochy navrhu (nxDraftStats).
+             topMode: val('top_mode'), backMode: val('back_mode'),
+             bottomBetween: val('bottom_mode') === 'between_sides',
+             railDepth: numv('rail_depth') || 100,
              gapSides: gs, gap: gap,
-             fronts: frontItems || [] };
+             // UI-C1b: vo VKLADANI server resolved cela nema (skrinka este
+             // neexistuje a `frontItems` je tu null — pasca Codex FIX 11),
+             // preto ich dopocita cisty draft resolver z hodnot karty.
+             fronts: (previewMode === 'insert') ? pvInsertFronts() : (frontItems || []) };
+  }
+
+  // ---- UI-C1b: cela NAVRHU (draft resolver) --------------------------------
+  // ZRKADLO Fronts.layout (modules/fronts.rb): fixne vysky sa scitaju, zvysok
+  // sa rozdeli rovnomerne medzi AUTO riadky a cela sa kladu ODSPODU
+  // (z = floor_height + gap_bottom). ZIADNA validacia — nahlad nesmie padnut na
+  // nezmyselnej sablone; autoritou pri vlozeni ostava server.
+  // Ciste (Node testy).
+  function nxNumOr(v, dflt){
+    var n = parseFloat(v);
+    return (isNaN(n) || !isFinite(n)) ? dflt : n;
+  }
+  function nxFrontsResolve(cfg, H, fh){
+    var out = [];
+    var items = (cfg && cfg.items) ? cfg.items : [];
+    if (!items.length) return out;
+    var gap = nxNumOr(cfg.gap, 3), gt = nxNumOr(cfg.gap_top, 2), gb = nxNumOr(cfg.gap_bottom, 2);
+    var fixedSum = 0, autoCount = 0;
+    items.forEach(function(it){
+      if (it && it.mode === 'fixed') fixedSum += nxNumOr(it.height, 0);
+      else autoCount++;
+    });
+    var remaining = nxNumOr(H, 0) - nxNumOr(fh, 0) - gt - gb - (items.length - 1) * gap - fixedSum;
+    var autoH = autoCount ? (remaining / autoCount) : 0;
+    if (!(autoH > 0)) autoH = 0; // prepchata sablona: AUTO riadok ma nulu, nie zaporno
+    var z = nxNumOr(fh, 0) + gb;
+    items.forEach(function(it, i){
+      var fixed = !!(it && it.mode === 'fixed');
+      var h = fixed ? nxNumOr(it.height, 0) : autoH;
+      out.push({ id: (it && it.id) || ('F' + (i + 1)), type: (it && it.type) || 'door',
+                 mode: fixed ? 'fixed' : 'auto', wings: it ? it.wings : 'auto',
+                 profile: (it && it.profile) || 'none',
+                 height: Math.round(h * 100) / 100, z: Math.round(z * 100) / 100 });
+      z += h + gap;
+    });
+    return out;
+  }
+  // Draft ciel z aktualnej vkladacej karty (DOM -> cisty resolver). Doska cela
+  // nema; mimo vkladania sa nevola vobec.
+  function pvInsertFronts(){
+    if (typeof collectFronts !== 'function') return [];
+    if (typeof getInsertKind === 'function' && getInsertKind() === 'board') return [];
+    return nxFrontsResolve(collectFronts(), numv('height') || 0,
+                           (getType() === 'upper') ? 0 : (numv('floor_height') || 0));
+  }
+
+  // ---- UI-C1b: ODHAD kusov a plochy pre NAVRH -------------------------------
+  // Server dopocet (`Panel.cabinet_stats`) cita snapshoty UZ VLOZENEJ skrinky —
+  // pre navrh neexistuje a builder sa kvoli informacnemu riadku nespusta. Toto
+  // je preto vedomy ODHAD zo sablony (v UI je oznaceny znackou ≈): pocita
+  // VELKE plosne dielce, nie kazdu lastu. Ciste (Node testy).
+  function nxDraftStats(g, zones, fronts){
+    var W = nxNumOr(g && g.W, 0), H = nxNumOr(g && g.H, 0), D = nxNumOr(g && g.D, 0);
+    var t = nxNumOr(g && g.t, 18), fh = nxNumOr(g && g.fh, 0);
+    if (!(W > 0 && H > 0)) return { count: 0, area: 0 };
+    var bodyH = Math.max(0, H - fh);
+    var n = 0, mm2 = 0;
+    function add(k, a){ n += k; mm2 += k * Math.max(0, a); }
+    add(2, bodyH * D);                                        // boky
+    add(1, (g.bottomBetween ? Math.max(0, W - 2 * t) : W) * D); // dno
+    if (g.topMode === 'two_rails') add(2, Math.max(0, W - 2 * t) * nxNumOr(g.railDepth, 100));
+    else if (g.topMode !== 'none') add(1, Math.max(0, W - 2 * t) * D);
+    if (g.backMode && g.backMode !== 'none') add(1, W * bodyH);
+    (zones || []).forEach(function(z){
+      if (!z) return;
+      if (z.leaf){
+        var sh = parseInt(z.shelves, 10) || 0;
+        if (sh > 0) add(sh, nxNumOr(z.w, 0) * D);
+      } else if (z.split){
+        var c = (parseInt(z.split.count, 10) || 1) - 1;
+        if (c > 0) add(c, (z.split.axis === 'v' ? nxNumOr(z.h, 0) : nxNumOr(z.w, 0)) * D);
+      }
+    });
+    var gs = nxNumOr(g.gapSides, 2), ow = Math.max(0, W - 2 * gs);
+    (fronts || []).forEach(function(it){
+      if (!it || it.type === 'none' || !(it.height > 0)) return;
+      var wn = parseInt(it.wings_n, 10);
+      if (!(wn >= 1)){
+        var wex = parseInt(it.wings, 10);
+        wn = (wex >= 1 && wex <= 4) ? wex : (ow > 600 ? 2 : 1);
+      }
+      add(wn, (ow / wn) * it.height);
+    });
+    return { count: n, area: Math.round(mm2 / 1000) / 1000 }; // mm2 -> m2 (3 des. miesta)
   }
 
   // Kontexty chipov: chip patri tomu, CO POUZIVATEL VIDI. Pri oznacenom dielci
@@ -209,8 +328,13 @@
   }
   // Ktore vrstvy maju vobec z coho kreslit (poctivo — chip bez dat je neaktivny).
   function pvAvail(){
+    // UI-C1b: vkladana DOSKA nema zony, cela, kovanie ani hranove data — vsetky
+    // chipy su neaktivne s vysvetlenim (nie ticho mrtve).
+    if (pvInsertBoard()) return { zony: false, cela: false, kovanie: false, olep: false };
     return { zony: !!currentZoneTree,
-             cela: !!(frontItems && frontItems.length),
+             // Vo vkladani su cela DRAFT z karty (server ich este nema).
+             cela: (previewMode === 'insert') ? pvInsertFronts().length > 0
+                                              : !!(frontItems && frontItems.length),
              kovanie: !!(hwItems && hwItems.length),
              olep: !!partCard };
   }
@@ -267,6 +391,9 @@
   function renderPreview(){
     var svg = el('preview'); if (!svg) return;
     clearFrontHover(); // D-23: rerender/tab/vyber rusi hover uzly — stav ide s nimi
+    // UI-C1b (N10): vkladana DOSKA ma vlastnu projekciu — obdlznik so sipkami
+    // smeru dekoru. Kresli sa z poli vkladacej karty, nie z korpusovych.
+    if (pvInsertBoard()){ renderInsertBoardPreview(svg); renderPvBar(); return; }
     var g = pvGeom(), W = g.W, H = g.H;
     if (!(W>0 && H>0)){ svg.innerHTML=''; renderPvBar(); return; }
     var pad = PV_PAD;
@@ -275,7 +402,7 @@
     // helper: model (x,z) -> svg (flip Z). y = pad + (H - z)
     function rx(x){ return pad + x; }
     function ry(z){ return pad + (H - z); }
-    drawCarcass(S, rx, ry, g, previewMode === 'cab' ? pvDepthSkew() : 0);
+    drawCarcass(S, rx, ry, g, (previewMode === 'cab' || previewMode === 'insert') ? pvDepthSkew() : 0);
 
     if (previewMode==='zones'){
       drawZonesBase(S, rx, ry, g);
@@ -286,6 +413,12 @@
     } else if (previewMode === 'hw'){
       // UI-B2: kontext Kovanie ma vlastnu projekciu — pozicie kovania
       drawHwBase(S, rx, ry, g);
+    } else if (previewMode === 'insert'){
+      // UI-C1b (N9): sablona TAK, AKO BUDE VLOZENA. Cela su PREPINATELNA vrstva
+      // (chip Čelá je defaultne zapnuty) — po zhasnuti vidno vnutro sablony.
+      if (NXLayers.stateOf('insert', 'cela', pvAvail()) === 'on') renderFrontsPreview(S, rx, ry, g);
+      else drawZonesGhost(S, rx, ry, g);
+      renderCabOutline(S, rx, ry, W, H, g.fh);
     } else {
       // D-08: kontext Korpus — kotovany celny rez (Š/V/sokel + naznak hlbky)
       renderCabOutline(S, rx, ry, W, H, g.fh);
@@ -599,10 +732,68 @@
     var mode = pvChipMode();
     if (mode === 'part') return;
     NXLayers.ghosts(mode, pvAvail()).forEach(function(k){
+      // UI-C1b: vo vkladani su zapnute Cela PLNA kresba (sablona tak, ako bude
+      // vlozena) — uz ich nakreslil zakladny beh, ghost by isiel do SVG druhykrat.
+      if (mode === 'insert' && k === 'cela') return;
       if (k === 'zony') drawZonesGhost(S, rx, ry, g);
       else if (k === 'cela') drawFrontsGhost(S, rx, ry, g);
       else if (k === 'kovanie') drawHwGhost(S, rx, ry, g);
     });
+  }
+
+  // ---- UI-C1b (N10): projekcia vkladanej DOSKY ------------------------------
+  // Obdlznik v mierke (dlzka vodorovne) + SIPKY SMERU DEKORU + koty. Smer je
+  // jediny udaj, ktory na doske pri vkladani vidno „naostro" — orientaciu
+  // (lezi/stoji/na stenu) prinesie az UI-C1c.
+  function renderInsertBoardPreview(svg){
+    var L = numv('ib_length') || 0, Wd = numv('ib_width') || 0;
+    if (!(L > 0 && Wd > 0)){ svg.innerHTML = ''; return; }
+    applyViewBox(svg);
+    var grain = val('ib_grain') || 'none';
+    var S = [];
+    function rx(x){ return x; }
+    function ry(y){ return Wd - y; } // model (x,y) -> svg (flip Y): dlzka vodorovne
+    S.push('<rect x="0" y="0" width="' + L + '" height="' + Wd + '" fill="' + PV_FRONT_DOOR +
+           '" fill-opacity=".55" stroke="' + PV_FRONT_STROKE + '" stroke-width="2"/>');
+    var arrows = nxGrainArrows(L, Wd, grain);
+    if (arrows.length){
+      var d = arrows.map(function(a){
+        return 'M' + a.x1 + ' ' + ry(a.y1) + 'L' + a.x2 + ' ' + ry(a.y2) +
+               'M' + a.hx1 + ' ' + ry(a.hy1) + 'L' + a.x2 + ' ' + ry(a.y2) +
+               'L' + a.hx2 + ' ' + ry(a.hy2);
+      }).join(' ');
+      S.push('<path d="' + d + '" stroke="' + PV_DIM + '" stroke-width="' +
+             Math.max(2, Math.round(Math.min(L, Wd) / 90)) + '" fill="none" pointer-events="none"/>');
+    } else {
+      pvText(S, L / 2, ry(Wd / 2), 'bez smeru dekoru', pvBoardFont(L, Wd));
+    }
+    // Popisky su v mm SCENY — velkost sa odvija od VACSIEHO rozmeru, inak by
+    // kota na 2600 mm doske bola necitatelne drobna a na 300 mm obria.
+    pvDimH(S, rx, ry, 0, L, -26, String(Math.round(L)), pvBoardFont(L, Wd));
+    pvDimV(S, rx, ry, L + 26, 0, Wd, String(Math.round(Wd)), pvBoardFont(L, Wd));
+    svg.innerHTML = S.join('');
+  }
+  // Velkost pisma projekcie dosky (mm sceny). Ciste (Node testy).
+  function pvBoardFont(L, Wd){ return Math.max(16, Math.round(Math.max(L, Wd) / 30)); }
+  // Ciste (Node testy): tri sipky smeru dekoru v mm sceny dosky.
+  // 'length' = po dlzke (vodorovne), 'width' = po sirke (zvisle), inak ziadne.
+  function nxGrainArrows(L, Wd, grain){
+    if (!(L > 0 && Wd > 0)) return [];
+    if (grain !== 'length' && grain !== 'width') return [];
+    var horiz = (grain === 'length');
+    var len = (horiz ? L : Wd) * 0.42;         // dlzka sipky
+    var head = Math.max(6, len * 0.12);        // ramienka hrotu
+    var out = [];
+    for (var i = 1; i <= 3; i++){
+      var off = (horiz ? Wd : L) * i / 4;      // rozlozenie naprieč doskou
+      var s = (horiz ? L : Wd) * 0.5 - len / 2;
+      var x1 = horiz ? s : off, y1 = horiz ? off : s;
+      var x2 = horiz ? (s + len) : off, y2 = horiz ? off : (s + len);
+      out.push({ x1: x1, y1: y1, x2: x2, y2: y2,
+                 hx1: horiz ? (x2 - head) : (x2 - head), hy1: horiz ? (y1 - head) : (y2 - head),
+                 hx2: horiz ? (x2 - head) : (x2 + head), hy2: horiz ? (y1 + head) : (y2 - head) });
+    }
+    return out;
   }
   function drawZonesGhost(S, rx, ry, g){
     var zones;
@@ -936,6 +1127,9 @@
     module.exports = { NXLayers: NXLayers, cabTabPreview: cabTabPreview,
                        nxHwMarks: nxHwMarks, nxHwSummary: nxHwSummary,
                        nxFrontDims: nxFrontDims, nxZoneSpans: nxZoneSpans,
-                       pvDepthDimZ: pvDepthDimZ, pvSceneTopZ: pvSceneTopZ };
+                       pvDepthDimZ: pvDepthDimZ, pvSceneTopZ: pvSceneTopZ,
+                       // UI-C1b: draft ciel, odhad navrhu a doskova projekcia
+                       nxFrontsResolve: nxFrontsResolve, nxDraftStats: nxDraftStats,
+                       nxGrainArrows: nxGrainArrows, pvBoardScene: pvBoardScene };
   }
 

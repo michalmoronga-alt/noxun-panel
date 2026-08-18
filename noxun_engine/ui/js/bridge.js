@@ -194,11 +194,14 @@
       refreshMaterialFilters(); // (projektove predvolby zobrazi okno Materialy projektu)
       el('zonesChk').checked = !!data.zones_visible;
       // V0.4.7c: uz oznacena DOSKA pri otvoreni panela (selected_kind z Ruby)
-      if (data.selected_kind === 'board' && data.selected){ setType('lower'); setDefaults('lower'); currentZoneTree = defaultTree(); renderFilteredTemplates(); NX.loadBoard(data.selected); }
+      if (data.selected_kind === 'board' && data.selected){ setType('lower'); setDefaults('lower'); currentZoneTree = defaultTree(); renderTemplateTiles(true); NX.loadBoard(data.selected); }
       else if (data.selected){ NX.loadSelected(data.selected); }
-      else { setType('lower'); setDefaults('lower'); currentZoneTree = defaultTree(); renderFilteredTemplates(); NX.clearSelected(); onField(); }
+      else { setType('lower'); setDefaults('lower'); currentZoneTree = defaultTree(); renderTemplateTiles(true); NX.clearSelected(); onField(); }
     },
-    setTemplates: function(list){ TEMPLATES = list || []; renderFilteredTemplates(); refreshTplModalWarn(); }, // D-14: varovanie kolizie zije aj pri otvorenom modale
+    // UI-C1b: nova kniznica = PRESTAVBA dlazdic (force) — po vlozeni zo sablony
+    // posiela server push_templates s cerstvym `used_seq`, takze sa poradie
+    // „Naposledy použité“ prekresli bez restartu panela.
+    setTemplates: function(list){ TEMPLATES = list || []; renderTemplateTiles(true); refreshTplModalWarn(); }, // D-14: varovanie kolizie zije aj pri otvorenom modale
     // V0.5 B (Codex B1): okno Vyroba pyta select cez panel — najprv flush
     // rozpisanych editov (400 ms debounce) KORPUSU AJ DOSKY (Codex GH #48 P2:
     // zmena selection by boardPending zrusila), az potom sa meni selection.
@@ -351,7 +354,7 @@
       setSelected(c.cabinet_id || null);
       refreshMaterialFilters(); // FIX 2: prefiltruj podla hrubok tohto korpusu (pred nastavenim hodnot)
       setCabinetMaterials(c); // V0.3 korpusove material selecty (prazdne = dedi)
-      renderFilteredTemplates();
+      renderTemplateTiles(true);
       setIdbar(c);
       // Kontextovy riadok (nahrada S2/S3 v Zonach/Celach/Kovani) — PRED
       // setUiMode, aby nxShellApply uz pisal cerstvy suhrn. Ziadne nove data:
@@ -411,10 +414,12 @@
       setCabInfo(null);       // UI-B3: bez skrinky niet dielcov ani plochy
       setCtxNote(null);       // ani suhrn skrinky do kontextoveho riadku
       setIdbar(null);
+      // UI-C1b (N9/N10): vkladanie ma VLASTNU projekciu — sablona tak, ako bude
+      // vlozena (korpus s celami), pri doske obdlznik so smerom dekoru. Kontexty
+      // raily su vo vkladani neaktivne (D-78 / UI-B1), takze o pohlade nerozhoduju.
+      // Nastavuje sa PRED setUiMode: ten cez materializeInsertCard uz kresli.
+      previewMode = 'insert';
       setUiMode('insert', null);
-      // D-78 / UI-B1: vo vkladani su kontexty neaktivne a platí Korpus
-      // (NXShell.effectiveCtx) — nad navrhom niet zon ani ciel.
-      previewMode = cabTabPreview(NXShell.effectiveCtx());
       invalidateFrontPlaceholders(); // D-23: navrhovy rezim nema resolved vysky
       if (lastCabForFit !== null){ lastCabForFit = null; fitPreview(); }
       renderPartCard(null);      // schovaj kartu dielca

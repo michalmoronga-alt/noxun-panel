@@ -286,9 +286,10 @@
   // do druheho (drzanie kvoli fokusu v smere by pri UNI zmazalo draft hrubky).
   var insertGrainMatLast = null;
   var insertGrainTouched = false; // D-86: siahol pouzivatel na smer dekoru pri tomto materiali?
+  // UI-C1b: druh vkladaneho objektu uz nedrzia radia (nahradili ich segmentove
+  // tlacidla) — autorita je cisty stav NXInsert, DOM je jeho zrkadlo.
   function getInsertKind(){
-    var r = document.querySelector('input[name=ikind]:checked');
-    return r ? r.value : 'cabinet';
+    return (typeof NXInsert !== 'undefined' && NXInsert.state.kind === 'board') ? 'board' : 'cabinet';
   }
   function onInsertKindChange(){
     var kind = getInsertKind();
@@ -421,7 +422,12 @@
   }
   // D-86: pouzivatel prave vedome zmenil smer dekoru — od tejto chvile ho zivy
   // refresh katalogu (pri NEZMENENOM materiali) nesmie prepisat.
-  function onInsertGrainChange(){ insertGrainTouched = true; }
+  // UI-C1b: smer dekoru je jediny udaj, ktory pri vkladani dosky vidno v nahlade
+  // (N10 sipky) — vedoma volba ho musi prekreslit hned.
+  function onInsertGrainChange(){
+    insertGrainTouched = true;
+    if (typeof renderPreview === 'function') renderPreview();
+  }
   // Zmena materialu vo vkladacej karte: dosad hrubku + default smer dekoru z katalogu.
   function onInsertBoardMaterial(){
     var ms = el('ib_material'); if (!ms) return;
@@ -457,6 +463,10 @@
     } else {
       insertGrainMatLast = ms.value;
     }
+    // UI-C1b: informacny stlpec Zakladnych je zrkadlom tychto poli.
+    if (typeof refreshInsertBoardInfo === 'function') refreshInsertBoardInfo();
+    // N10: smer dekoru kresli aj nahlad vkladanej dosky.
+    if (typeof renderPreview === 'function' && typeof previewMode !== 'undefined' && previewMode === 'insert') renderPreview();
   }
   function insertBoard(){
     var ms = el('ib_material');
@@ -469,7 +479,96 @@
       thickness: el('ib_thickness') ? el('ib_thickness').value : ''
     }, findSheetIn(MATERIALS.sheets, ms ? ms.value : ''));
     if (!res.ok){ NX.setStatus(res.error, true); return; }
+    // UI-C1a: identita pouzitej sablony (kind + nazov) — server ju z payloadu
+    // odstrani PRED builderom a po uspesnom vlozeni ju opeciatkuje ako
+    // „naposledy pouzite" (poradie dlazdic sa prekresli bez restartu).
+    var ref = (typeof NXInsert !== 'undefined') ? NXInsert.templateRef() : null;
+    if (ref && ref.kind === 'board'){
+      res.payload.template_kind = ref.kind;
+      res.payload.template_name = ref.name;
+    }
     if (window.sketchup && sketchup.insert_board) sketchup.insert_board(JSON.stringify(res.payload));
+  }
+
+  // ===== UI-C1b: DOSKOVA SABLONA VO VKLADACEJ KARTE =========================
+  // KONTRAKT HRUBKY (Codex #174 P2, zapisany v core/templates.rb board_tpl):
+  // doskova sablona ma `material_id` EXPLICITNE nil => vklada sa cez UNI
+  // mechanizmus (E-03 odomknuta hrubka), aby deklarovana hrubka sablony VZDY
+  // platila. `BoardBuilder.insert_thickness_for` je a ostava JEDINOU autoritou:
+  // hrubku z payloadu prijme LEN pri UNI materiali, pri realnom ju urcuje
+  // katalog. Tu sa preto NEZAVADZA ziadna nova autorita — karta len predvyplni
+  // UNI material a do (vtedy odomknuteho) pola dosadi hrubku sablony.
+  // Ciste funkcie (Node testy): vyber materialu je oddeleny od DOM.
+  function uniBoardSheetId(sheets){
+    var any = null;
+    for (var i = 0; i < (sheets || []).length; i++){
+      var s = sheets[i];
+      if (!s || s.uni !== true) continue;
+      if (s.uni_role === 'board') return s.id; // UNI rola „Doska" ma prednost
+      if (any === null) any = s.id;
+    }
+    return any;
+  }
+  // Ktory katalogovy material dosadit pre doskovu sablonu: ked ho sablona
+  // vyslovne nesie (a este existuje), pouzije sa on; inak UNI (kontrakt vyssie).
+  // null = katalog nema co dosadit — karta si necha svoj vyber.
+  function boardTemplateMaterialId(sheets, wanted){
+    var id = (wanted === undefined || wanted === null) ? '' : String(wanted);
+    if (id && findSheetIn(sheets, id)) return id;
+    return uniBoardSheetId(sheets);
+  }
+  // Aplikacia doskovej sablony na kartu. PORADIE JE KONTRAKT:
+  //   1) material (onInsertBoardMaterial odomkne hrubku a dosadi katalogovy
+  //      default UNI materialu — inak by prepisal nas draft),
+  //   2) AZ POTOM hrubka sablony (dalsie refreshe ju uz drzia — E-03: ten isty
+  //      UNI material sa neprepisuje),
+  //   3) rozmery (zamky dosky prebiju sablonu — D-39),
+  //   4) smer dekoru = VEDOMA volba (D-86 priznak, refresh katalogu ju nezmeni).
+  function applyBoardTemplate(cfg){
+    cfg = cfg || {};
+    var ms = el('ib_material');
+    if (ms){
+      if (!ms.options.length) fillBoardMaterialSelect(ms, '');
+      var want = boardTemplateMaterialId(MATERIALS.sheets, cfg.material_id);
+      if (want && ms.value !== want){ ms.value = want; nxComboSync(); }
+      onInsertBoardMaterial();
+    }
+    var th = el('ib_thickness');
+    if (th && cfg.thickness !== undefined && cfg.thickness !== null){
+      if (th.readOnly){
+        // Realny material hrubku diktuje (D-45) — sablonovu by server aj tak
+        // zahodil, preto sa nepredstiera, ze plati.
+        NX.setStatus('Hrúbku ' + mmLabel(cfg.thickness) + ' mm zo šablóny drží len UNI materiál — ' +
+                     'pri tomto materiáli platí katalógová hrúbka.');
+      } else {
+        th.value = fmtmm(cfg.thickness);
+        // Zivy nahlad vyrazu visi na `input` — po programovom prepise ho zosynchronizuj.
+        th.dispatchEvent(new Event('input'));
+      }
+    }
+    if (cfg.length !== undefined && cfg.length !== null && !NXInsert.isLocked('length', 'board'))
+      setNum('ib_length', cfg.length);
+    if (cfg.width !== undefined && cfg.width !== null && !NXInsert.isLocked('width', 'board'))
+      setNum('ib_width', cfg.width);
+    var gs = el('ib_grain');
+    if (gs && cfg.grain_direction){
+      gs.value = cfg.grain_direction;
+      insertGrainTouched = true; // D-86: volba zo sablony je vedoma, refresh ju nesmie prepisat
+    }
+  }
+  // Informacny stlpec vkladanej dosky (VYSTUPY su text, nie polia): hrubka je
+  // zrkadlom pola v sekcii Materialy (jedina autorita ostava tam), plocha je
+  // dlzka x sirka. Ciste jadro je nxBoardArea (Node testy).
+  function nxBoardArea(length, width){
+    var l = parseFloat(length), w = parseFloat(width);
+    if (isNaN(l) || isNaN(w) || l <= 0 || w <= 0) return null;
+    return Math.round(l * w / 1000) / 1000; // mm2 -> m2 (3 des. miesta)
+  }
+  function refreshInsertBoardInfo(){
+    var th = el('ib_thickness');
+    setOut('inf_b_th', (th && th.value !== '') ? (mmLabel(evalDim(th.value)) + ' mm') : '—');
+    var a = nxBoardArea(numv('ib_length'), numv('ib_width'));
+    setOut('inf_b_area', a === null ? '—' : (mmLabel(a) + ' m²'));
   }
 
   // Node testy (tests/js/test_e03_board_insert.js) — v CEF je module undefined,
@@ -480,5 +579,9 @@
                        insertThicknessShouldWrite: insertThicknessShouldWrite,
                        insertGrainShouldWrite: insertGrainShouldWrite,
                        insertMatMarkAdvances: insertMatMarkAdvances,
-                       insertGrainSync: insertGrainSync };
+                       insertGrainSync: insertGrainSync,
+                       // UI-C1b: doskova sablona vo vkladacej karte
+                       uniBoardSheetId: uniBoardSheetId,
+                       boardTemplateMaterialId: boardTemplateMaterialId,
+                       nxBoardArea: nxBoardArea };
   }

@@ -466,7 +466,15 @@ module Noxun
                        # by kompakt/postforming otvaral modal "Vytvorit pasku".
                        'type' => s['type'] }
               base['pd_edge_subtype'] = s['pd_edge_subtype'] unless s['pd_edge_subtype'].to_s.empty?
-              base['uni'] = true if Materials.uni?(s)
+              # UI-C1b: `uni_role` je ZRKADLO katalogoveho pola (rovnaky vzor ako
+              # pd_edge_subtype) — vkladacia karta z neho vyberie UNI material
+              # ROLY DOSKA, ked doskova sablona nesie material_id: nil (kontrakt
+              # hrubky, viz core/templates.rb board_tpl). Bez roly by karta
+              # dosadila ktorykolvek UNI zaznam (napr. Korpus UNI).
+              if Materials.uni?(s)
+                base['uni'] = true
+                base['uni_role'] = s['uni_role'] unless s['uni_role'].to_s.empty?
+              end
               base.merge(schema2_mirror_fields(s))
             },
             'edges' => Materials.edges.map { |a|

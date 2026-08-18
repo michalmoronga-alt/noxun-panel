@@ -525,8 +525,16 @@
     e.textContent = (v === null || v === undefined || v === '') ? '—' : String(v);
   }
   function setNum(id, v){ var e = el(id); if (e && v !== null && v !== undefined) e.value = String(parseFloat(v)); }
-  function getType(){ var r = document.querySelector('input[name=ctype]:checked'); return r ? r.value : 'lower'; }
-  function setType(t){ var r = document.querySelector('input[name=ctype][value="' + t + '"]'); if (r) r.checked = true; }
+  // UI-C1b: typ korpusu uz nedrzia radia (nahradili ich segmentove tlacidla
+  // vkladacej karty), ale PREMENNA. Pri oznacenej skrinke je to zrkadlo JEJ typu
+  // (setType v loadSelected), vo vkladani ho nastavuju tlacidla cez NXInsert —
+  // jedna hodnota pre collectConstruction, defaulty aj modal „Uložiť ako šablónu".
+  var cabTypeVal = 'lower';
+  function getType(){ return cabTypeVal; }
+  function setType(t){
+    cabTypeVal = (t === 'upper') ? 'upper' : 'lower';
+    if (typeof syncInsertTypeButtons === 'function') syncInsertTypeButtons();
+  }
 
   // ===== D-80: VNUTRO A HORNE VYSTUHY (zrkadlo Ruby Construction) ==============
   // JEDINA JS autorita svetlej vysky. Pouzivaju ju VSETCI traja: zone_tree.js
@@ -590,7 +598,7 @@
   }
 
   // JEDINY zoznam konstrukcnych poli panela (predtym duplikovany na 6 miestach:
-  // collectConstruction, setDefaults, onTemplateChange, NX.loadSelected + 2x Ruby whitelist).
+  // collectConstruction, setDefaults, materializeInsertCard, NX.loadSelected + 2x Ruby whitelist).
   // Nove pole (napr. kovanie) = pridat TU + <input>/<select> v HTML + kluc v Ruby PARAM_KEYS.
   // kind: 'num' (setNum) / 'sel' (setVal); dflt = fallback pri prazdnej/falsy hodnote zdroja.
   var CONSTRUCTION_FIELDS = [

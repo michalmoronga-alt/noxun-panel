@@ -140,7 +140,14 @@
     // 'brace' (vystuhy) patri skupine, ktora vznikne az pri rozdeleni Korpusu
     // v bloku UI-C — symbol je tu, aby sa mapa GRPICON z mockupu nemusela
     // dopisovat po castiach.
-    'brace': '<rect x="4" y="5" width="16" height="3"/><rect x="4" y="11" width="16" height="3"/><path d="M4 20h16"/>'
+    'brace': '<rect x="4" y="5" width="16" height="3"/><rect x="4" y="11" width="16" height="3"/><path d="M4 20h16"/>',
+    // ===== UI-C1b: typ vkladaneho objektu (3 segmentove tlacidla) =============
+    // Prevzate 1:1 z mockupu SYSTEM/zdroje/ui20/mockup_inspector_c.html. Ikona
+    // ukazuje, KDE objekt stoji: 'cab-low' = skrinka na sokli (nohy/sokel pod
+    // korpusom), 'cab-high' = zavesena skrinka (zavesna lista nad korpusom).
+    // Tretim typom je doska — ta ma uz vlastny symbol 'slab' (rail UI-B1).
+    'cab-low': '<rect x="4" y="4" width="16" height="12" rx="1"/><path d="M12 4v12"/><path d="M9.5 9h.01"/><path d="M14.5 9h.01"/><rect x="6" y="18" width="12" height="3" rx="1" fill="currentColor" stroke="none"/>',
+    'cab-high': '<path d="M3 3h18"/><path d="M7 3v3"/><path d="M17 3v3"/><rect x="4" y="6" width="16" height="12" rx="1"/><path d="M12 6v12"/><path d="M9.5 15h.01"/><path d="M14.5 15h.01"/>'
   };
 
   // Firemne logo — ZROLOVANA ZNACKA z ORIGINALNYCH kriviek webu (pismena

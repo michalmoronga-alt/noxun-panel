@@ -134,8 +134,9 @@ NxTest.test('UI-03: kazdy materialovy/ABS select panela ma marker data-nx-combo'
     NxTest.assert(src.include?("setAttribute('data-nx-combo', 'abs')"),
                   "#{f}: hrany musia byt ABS combobox")
   end
-  # Smer dekoru ani sablona materialy NIE su — combobox tam nepatri.
-  %w[ib_grain bc_grain template].each do |id|
+  # Smer dekoru nie je material — combobox tam nepatri. (Select sablony zanikol
+  # v UI-C1b: nahradili ho dlazdice, preto uz v zozname nie je.)
+  %w[ib_grain bc_grain].each do |id|
     NxTest.refute(UI03_PANEL_HTML[/<select id="#{id}"[^>]*data-nx-combo/],
                   "select ##{id} nie je material/ABS — combobox sem nepatri")
   end

@@ -196,9 +196,10 @@
     // UI-C1a: identita pouzitej sablony (kind + nazov) — server si zaznam znovu
     // najde, metadata odstrani PRED builderom a az po uspesnom vlozeni z nich
     // spravi peciatku „naposledy pouzite". Do configu skrinky sa nedostanu.
-    if (NXInsert.state.template){
-      p.template_kind = 'cabinet';
-      p.template_name = NXInsert.state.template;
+    var ref = NXInsert.templateRef();
+    if (ref && ref.kind === 'cabinet'){
+      p.template_kind = ref.kind;
+      p.template_name = ref.name;
     }
     if (window.sketchup && sketchup.insert_cabinet) sketchup.insert_cabinet(JSON.stringify(p));
   }

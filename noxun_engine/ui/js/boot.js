@@ -76,4 +76,6 @@
   // Dynamicke (hrany dielca a dosky) si ho beru vlastnym nxComboSync pri renderi.
   // UI-B1: nxShellApply nahradilo setCabTab('korpus') — nasadi data-view-ctx,
   // stav raily aj nazov sektora S4 este pred prvym setUiMode.
-  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupFieldEditorDelegation(); nxComboSync(); document.body.setAttribute('data-insert-kind', getInsertKind()); nxShellApply(); if (window.sketchup && sketchup.ready) sketchup.ready(); };
+  // UI-C1b: setupTemplateTiles = JEDNA delegacia nad mriezkou dlazdic sablon
+  // (klik = vybrat, dvojklik = vlozit) — dlazdice sa prekresluju, listener nie.
+  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupFieldEditorDelegation(); setupTemplateTiles(); nxComboSync(); document.body.setAttribute('data-insert-kind', getInsertKind()); nxShellApply(); if (window.sketchup && sketchup.ready) sketchup.ready(); };
