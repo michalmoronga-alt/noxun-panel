@@ -384,20 +384,20 @@
   }
   // Skupiny S4 patria KONTEXTU (data-s4). Nazov otvorenej skupiny sa cita z jej
   // <summary> — slovenske nazvy tak ziju len v HTML (ikona je SVG, textContent
-  // ju neberie). `data-s4-solo` (strom zon) do poctu nepatri, rovnako ako je
-  // vynaty z exkluzivity.
+  // ju neberie).
+  //
+  // Codex #173 P2: `data-s4-solo` (strom zon) je vynaty z EXKLUZIVITY, NIE zo
+  // zberu udajov — je to plnohodnotna skupina sektora. Ked sa preskakoval, mal
+  // kontext Zony (jedine dieta S4 je prave solo strom) meta trvalo prazdne.
   function nxMetaGroups(){
     var mode = NXShell.mode();
     if (mode === 'part' || mode === 'board') return { open: '', count: 0 };
     var nodes = document.querySelectorAll('#secSet details[data-s4="' + NXShell.effectiveCtx() + '"]');
-    var count = 0, open = '', i, s;
+    var count = nodes.length, open = '', i, s;
     for (i = 0; i < nodes.length; i++){
-      if (nodes[i].hasAttribute('data-s4-solo')) continue;
-      count++;
-      if (nodes[i].open && !open){
-        s = nodes[i].querySelector('summary');
-        open = s ? (s.textContent || '').trim() : '';
-      }
+      if (!nodes[i].open || open) continue;
+      s = nodes[i].querySelector('summary');
+      open = s ? (s.textContent || '').trim() : '';
     }
     return { open: open, count: count };
   }

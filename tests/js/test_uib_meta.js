@@ -78,6 +78,12 @@ eq(meta({ mode: 'cab', groups: { open: '', count: 4 } }).s4, '4 skupiny · všet
 eq(meta({ mode: 'cab', groups: { open: '', count: 1 } }).s4, '1 skupina · všetko zbalené', 'jedna skupina');
 eq(meta({ mode: 'cab', groups: { open: '', count: 5 } }).s4, '5 skupín · všetko zbalené', '5+ skupín');
 eq(meta({ mode: 'cab', groups: { open: '', count: 0 } }).s4, '', 'kontext bez skupin = ziadne meta');
+// Codex #173 P2: kontext Zony ma jedinu skupinu a je to `data-s4-solo` strom.
+// Solo je vynate z EXKLUZIVITY, nie zo zberu udajov — meta ho musi vidiet.
+eq(meta({ mode: 'cab', ctx: 'zony', groups: { open: 'Štruktúra zón', count: 1 }, s4_name: 'Zóny' }).s4,
+  'Štruktúra zón', 'solo skupina (strom zon) ma v meta svoje meno');
+eq(meta({ mode: 'cab', ctx: 'zony', groups: { open: '', count: 1 }, s4_name: 'Zóny' }).s4,
+  '1 skupina · všetko zbalené', 'zbalena solo skupina sa pocita');
 eq(meta({ mode: 'part', groups: { open: '', count: 0 } }).s4, '', 'dielec: karta, nie skupiny');
 eq(meta({ mode: 'cab' }).s4, '', 'chybajuce skupiny = ziadne meta');
 

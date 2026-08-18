@@ -132,6 +132,24 @@ NxTest.test('UI-B: lista kazdeho sektora ma ZIVY meta suhrn') do
   # Meta je len ZOBRAZENIE — obnova visi na udalostiach, nie na zapisovej ceste.
   NxTest.assert(UIB1_SHELL_CODE.include?('nxSectorMetaApply()'),
                 'meta sa musi obnovovat (nxSectorMetaApply)')
+  # Codex #173 P2: `data-s4-solo` je vynate z EXKLUZIVITY, NIE zo zberu udajov.
+  # Kontext Zony ma jedine dieta S4 a je to prave solo strom — jeho preskocenie
+  # znamena trvalo prazdnu listu sektora.
+  zber = UIB1_SHELL_CODE[/function nxMetaGroups\(\).*?\n  \}/m].to_s
+  NxTest.refute(zber.empty?, 'shell.js musi mat zber skupin pre meta (nxMetaGroups)')
+  NxTest.refute(zber.include?('data-s4-solo'),
+                'meta nesmie solo skupinu preskocit — vynimka patri len exkluzivite')
+end
+
+NxTest.test('UI-B: PROGRAMOVE zmeny karty obnovia meta (Codex #173 P2)') do
+  # Delegovany input/change listener zachyti len RUCNE zmeny. Cesty, ktore
+  # prepisu polia alebo popisy zvnutra kodu, musia meta obnovit vyslovne.
+  { 'js/form.js' => 'materializeInsertCard (sablona a typ prepisu rozmery)',
+    'js/board_card.js' => 'onInsertKindChange (Korpus/Doska meni ukazane polia)',
+    'js/bridge.js' => 'NX.setMaterials (premenovanie dekoru meni popis)' }.each do |file, why|
+    src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', file), encoding: 'UTF-8')
+    NxTest.assert(src.include?('nxSectorMetaApply()'), "#{file}: #{why} — meta ostane stara")
+  end
 end
 
 NxTest.test('UI-B1: strom zon je z exkluzivity vynaty (data-s4-solo)') do

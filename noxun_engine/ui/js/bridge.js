@@ -298,6 +298,9 @@
       // Codex #171 P2: premenovanie dekoru v okne Materialy chodi TOUTO cestou
       // (bez loadSelected) — kontextovy riadok si preto popis prelozi znova.
       renderCtxNote();
+      // Codex #173 P2: z rovnakeho dovodu aj meta lista sektora Materialy —
+      // je to PROGRAMOVA zmena popisu, ziadne `change` sa nevystreli.
+      if (typeof nxSectorMetaApply === 'function') nxSectorMetaApply();
     },
     // D-75 (H1b): živý zoznam setov kovania po zmene v okne Katalóg kovania.
     // Obnoví LEN možnosti selectov setu (skrinka aj dielce) — riadky, rozpísané
