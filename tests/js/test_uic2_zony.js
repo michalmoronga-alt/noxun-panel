@@ -139,6 +139,78 @@ t('vsetky ostatne zamknute a sucet nesedi = jasne odmietnutie', () => {
   assert.ok(!ok.error, ok.error);
 });
 
+// --- 3b) nálezy Codex review #177 -------------------------------------------
+
+t('#177 P2: zvyšok sa po orezaní na minimum PREPOČÍTA (žiadne falošné odmietnutie)', () => {
+  // váhy [20, 440, 440], zvyšok 60 mm — platné riešenie je [20, 20, 20].
+  // Jednorazový clamp posledné pole podstrelil a funkcia vrátila chybu.
+  const c4 = [{ size: null, locked: false }, { size: null, locked: false },
+              { size: null, locked: false }, { size: null, locked: false }];
+  const res = zt.nxZoneExactCuts(c4, [900, 20, 440, 440], 4, 960, 0, 900, true);
+  assert.ok(!res.error, 'malo prejsť, ale: ' + res.error);
+  near(res.cuts[0].size, 900);
+  [1, 2, 3].forEach(i => assert.ok(res.cuts[i].size >= NXZ.MIN_FIELD - NXZ.EPS,
+    'pole ' + i + ' pod minimom: ' + res.cuts[i].size));
+  near(res.cuts.reduce((s, c) => s + c.size, 0), 960);
+});
+
+t('#177 P2: naozaj nemožné rozdelenie sa stále odmietne', () => {
+  const c4 = [{ size: null, locked: false }, { size: null, locked: false },
+              { size: null, locked: false }, { size: null, locked: false }];
+  const res = zt.nxZoneExactCuts(c4, [900, 20, 440, 440], 4, 960, 0, 910, true);
+  assert.ok(res.error, 'pre 3 polia by ostalo 50 mm — musí sa odmietnuť');
+});
+
+t('#177 P2: water-filling zafixuje podstrelené polia a zvyšok prepočíta', () => {
+  const sp = zt.nxZoneSpread([1, 2, 3], [0, 20, 440, 440], 60);
+  assert.deepStrictEqual(Object.keys(sp.fixed).sort(), ['1', '2', '3']);
+  near(sp.remaining, 0);
+  assert.strictEqual(sp.pending.length, 0);
+});
+
+t('#177 P2: zámok editovaného poľa sa preberá, nie natvrdo zamyká', () => {
+  const fn = ACTIONS.match(/function setFieldSize\([\s\S]*?\n  \}/)[0];
+  assert.ok(/function setFieldSize\(localId, index, value, lockEdited\)/.test(fn),
+    'setFieldSize musí prijímať zámok ako parameter');
+  assert.ok(fn.indexOf('(lockEdited === undefined) ? !!curCut.locked') >= 0,
+    'vynechaný parameter = ponechaj existujúci zámok riadku');
+  assert.ok(fn.indexOf(', sz, lock)') >= 0, 'do presnej cesty musí ísť odvodený zámok, nie true');
+  const shortcut = ACTIONS.match(/function setZoneFirstSize\([\s\S]*?\n  \}/)[0];
+  assert.ok(/setFieldSize\(z\.id, 0, [^;]*, true\)/.test(shortcut),
+    'skratka „Prvá zóna" naopak zamyká vždy (B5)');
+});
+
+t('#177 P2: draft odmietne počet políc, ktorý sa do zóny nezmestí', () => {
+  const sh = ACTIONS.match(/function setZoneShelves\([\s\S]*?\n  \}/)[0];
+  assert.ok(sh.indexOf('(n + 1) * NXZ.MIN_FIELD') >= 0,
+    'chýba zrkadlo ZoneTree.validate_shelves!');
+  assert.ok(sh.indexOf('needMm > z.h') >= 0, 'výška zóny sa musí porovnať s potrebou');
+  assert.ok(sh.indexOf('needMm > z.h') < sh.indexOf('if (selectedCabId)'),
+    'kontrola musí bežať PRED vetvou draft/server');
+});
+
+t('#177 P1: tlačidlo „Vyčistiť zónu" nesmie mať natívne disabled', () => {
+  const html = fs.readFileSync(path.join(JS, '..', 'panel.html'), 'utf8');
+  const btn = html.match(/<button[^>]*id="zoneCleanBtn"[\s\S]*?>/)[0];
+  assert.ok(!/\sdisabled/.test(btn),
+    'setZoneCtl natívne disabled nikdy nezhodí — tlačidlo by ostalo mŕtve navždy');
+  assert.ok(btn.indexOf('aria-disabled="true"') >= 0, 'východzí stav sa píše rečou setZoneCtl');
+  assert.ok(/class="[^"]*\boff\b/.test(btn), 'a aj triedou .off');
+});
+
+t('#177 P1: pointer capture drží SVG, nie prekresľovaný uzol priečky', () => {
+  const start = PREVIEW.match(/function startDivDrag\([\s\S]*?\n  \}/)[0];
+  assert.ok(start.indexOf('svg.setPointerCapture') >= 0,
+    'renderPreview() uzol priečky pri prvom pohybe zahodí aj s capture');
+  ['pointermove', 'pointerup', 'pointercancel'].forEach(evn => {
+    assert.ok(start.indexOf("svg.addEventListener('" + evn + "'") >= 0,
+      'listener ' + evn + ' musí visieť na SVG');
+  });
+  assert.ok(start.indexOf("d.addEventListener(") < 0, 'na uzle priečky nesmie visieť nič');
+  const endl = PREVIEW.match(/function endDivListeners\([\s\S]*?\n  \}/)[0];
+  assert.ok(endl.indexOf('dragState.svg') >= 0 && endl.indexOf('releasePointerCapture') >= 0);
+});
+
 // --- 4) draft parita + guardy klienta ---------------------------------------
 
 t('draft rezim vkladania nesie TIE ISTE guardy ako server (F10)', () => {

@@ -10,7 +10,7 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
-### D-09 — snap body pri presúvaní priečok (19.8.2026, PR UI-C2, v0.7.13)
+### D-09 — snap body pri presúvaní priečok (19.8.2026, PR UI-C2, v0.7.14)
 
 **Pôvodné znenie D-09 · Snap body pri presúvaní priečok** (1/4, 1/2, 3/4…) v zónovom náhľade. *(Stav bol: nápad, D-08 hotové — môže sa rozpracovať.)*
 

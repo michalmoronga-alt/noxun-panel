@@ -1138,32 +1138,39 @@
     dragState = { zid: zid, idx: idx, axis: axis, parent: parent, span: span, t: t,
                   count: parent.split.count,
                   sizes: parent.split.sizes.slice(), startX: ev.clientX, startY: ev.clientY,
-                  svg: svg, node: d, pid: (ev.pointerId != null ? ev.pointerId : null) };
+                  svg: svg, pid: (ev.pointerId != null ? ev.pointerId : null) };
     // POINTER CAPTURE: `mouseup` mimo okna panela (CEF, pretiahnutie cez okraj)
     // sa do dokumentu uz nedostane — drag potom ostal visiet a neulozeny stav
-    // sa stratil. Capture drzi udalosti na uzle priecky az do pointerup/cancel.
-    if (d.setPointerCapture && dragState.pid != null){
-      try { d.setPointerCapture(dragState.pid); } catch (e) { /* starsi CEF — ostava fallback nizsie */ }
-      d.addEventListener('pointermove', onDivDrag);
-      d.addEventListener('pointerup', endDivDrag);
-      d.addEventListener('pointercancel', endDivDrag);
+    // sa stratil.
+    //
+    // Codex #177 P1: capture aj listenery patria SVG kontajneru, NIE uzlu
+    // priecky. `onDivDrag` volá `renderPreview()`, ktorý prekresli obsah SVG —
+    // tahany `.divh` uzol pri prvom pohybe ZANIKNE, capture s nim padne a
+    // `pointerup` uz nema kam prist (drag by ostal visiet a layout by sa do
+    // Ruby nikdy neulozil). SVG prekreslenie prezije.
+    if (svg.setPointerCapture && dragState.pid != null){
+      try { svg.setPointerCapture(dragState.pid); } catch (e) { /* starsi CEF — ostava fallback nizsie */ }
+      svg.addEventListener('pointermove', onDivDrag);
+      svg.addEventListener('pointerup', endDivDrag);
+      svg.addEventListener('pointercancel', endDivDrag);
       dragState.captured = true;
     } else {
       document.addEventListener('mousemove', onDivDrag);
       document.addEventListener('mouseup', endDivDrag);
-      window.addEventListener('blur', endDivDrag); // strata fokusu = koniec tahania
     }
+    window.addEventListener('blur', endDivDrag); // strata fokusu okna = koniec tahania
   }
   function endDivListeners(){
     document.removeEventListener('mousemove', onDivDrag);
     document.removeEventListener('mouseup', endDivDrag);
     window.removeEventListener('blur', endDivDrag);
-    if (dragState && dragState.captured && dragState.node){
-      dragState.node.removeEventListener('pointermove', onDivDrag);
-      dragState.node.removeEventListener('pointerup', endDivDrag);
-      dragState.node.removeEventListener('pointercancel', endDivDrag);
-      if (dragState.node.releasePointerCapture && dragState.pid != null){
-        try { dragState.node.releasePointerCapture(dragState.pid); } catch (e) { /* uz uvolnene */ }
+    if (dragState && dragState.captured && dragState.svg){
+      var s = dragState.svg;
+      s.removeEventListener('pointermove', onDivDrag);
+      s.removeEventListener('pointerup', endDivDrag);
+      s.removeEventListener('pointercancel', endDivDrag);
+      if (s.releasePointerCapture && dragState.pid != null){
+        try { s.releasePointerCapture(dragState.pid); } catch (e) { /* uz uvolnene */ }
       }
     }
   }

@@ -173,7 +173,7 @@
   .ztile:hover .ic { color: var(--nx-select); }
   /* NEAKTIVNY stav je `.off` + aria-disabled (vzor D-78) — HTML `disabled` by
      zhltol hover aj tooltip a pouzivatel by sa dovod nedozvedel. */
-  .ztile.off, .npills button.off { opacity: .45; cursor: not-allowed; }
+  .ztile.off, .npills button.off, .btnrow .danger.off, .pbtn.off { opacity: .45; cursor: not-allowed; }
   .ztile.off:hover { border-color: var(--nx-border); }
   .ztile.off:hover .ic { color: var(--nx-ink-muted); }
   /* Pilulky poctu polic 0–6 (Shelves::MAX). */

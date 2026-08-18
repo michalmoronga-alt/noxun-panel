@@ -423,8 +423,14 @@ module Noxun
         end
         return nil if clear.nil? || sizes.length != count
 
+        # Codex #177 P2: tolerancia RASTIE S POCTOM POLI. Kazda hodnota prichadza
+        # z panela zaokruhlena na 0,01 mm, takze pri styroch poliach sa moze sucet
+        # od skutocneho svetleho priestoru lisit az o 4 × pol jednotky. Prisnejsia
+        # tolerancia by odmietala rozdelenia, ktore su geometricky v poriadku;
+        # 0,04 mm je v nabytkarstve stale pod hranicou merania.
         total = sizes.reduce(0.0, :+)
-        return nil if (total - clear.to_f).abs <= FIELD_EPS
+        tol = FIELD_EPS * [count, 1].max
+        return nil if (total - clear.to_f).abs <= tol
 
         if total > clear.to_f
           "Polia sa do zóny nezmestia: #{fmt(total)} mm proti #{fmt(clear.to_f)} mm svetlého priestoru."

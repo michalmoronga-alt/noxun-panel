@@ -83,24 +83,63 @@
     out[index] = { size: nxRound2(newSize), locked: !!lockEdited };
     keep.forEach(function(j){ out[j] = { size: nxRound2(Math.max(NXZ.MIN_FIELD, cuts[j].size)), locked: true }; });
     if (flex.length){
-      var base = 0;
-      flex.forEach(function(j){ base += (sizes && sizes[j] > 0) ? sizes[j] : 0; });
-      var acc = 0;
-      flex.forEach(function(j, k){
-        var v;
-        if (k === flex.length - 1) v = nxRound2(rest - acc);          // dorovnanie zvysku
-        else {
-          v = base > 0 ? (rest * ((sizes && sizes[j] > 0 ? sizes[j] : 0) / base)) : (rest / flex.length);
-          v = Math.max(NXZ.MIN_FIELD, nxRound2(v));
-          acc += v;
-        }
-        out[j] = { size: v, locked: false };
-      });
-      var last = flex[flex.length - 1];
-      if (out[last].size < NXZ.MIN_FIELD - NXZ.EPS)
-        return { error: 'nezmestí sa — poslednému poľu by ostalo ' + Math.round(out[last].size) + ' mm.' };
+      var sp = nxZoneSpread(flex, sizes, rest);
+      if (sp.remaining < -NXZ.EPS)
+        return { error: 'nezmestí sa — pre ostatné polia treba aspoň ' + (flex.length * NXZ.MIN_FIELD) + ' mm.' };
+      flex.forEach(function(j){ if (sp.fixed[j] != null) out[j] = { size: sp.fixed[j], locked: false }; });
+      var pend = sp.pending;
+      if (!pend.length){
+        // vsetky odomknute polia sedia na minime — zvysok deterministicky poslednemu
+        var lastF = flex[flex.length - 1];
+        out[lastF] = { size: nxRound2(out[lastF].size + sp.remaining), locked: false };
+      } else {
+        var base = 0;
+        pend.forEach(function(j){ base += (sizes && sizes[j] > 0) ? sizes[j] : 0; });
+        var acc = 0;
+        pend.forEach(function(j, k){
+          var v;
+          if (k === pend.length - 1) v = nxRound2(sp.remaining - acc);   // dorovnanie zvysku
+          else {
+            v = base > 0 ? (sp.remaining * ((sizes && sizes[j] > 0 ? sizes[j] : 0) / base)) : (sp.remaining / pend.length);
+            v = nxRound2(v);
+            acc += v;
+          }
+          out[j] = { size: v, locked: false };
+        });
+        var last = pend[pend.length - 1];
+        if (out[last].size < NXZ.MIN_FIELD - NXZ.EPS)
+          return { error: 'nezmestí sa — poslednému poľu by ostalo ' + Math.round(out[last].size) + ' mm.' };
+      }
     }
     return { cuts: out };
+  }
+
+  // Rozdelenie zvysku medzi odomknute polia s REŠPEKTOM k minimu (water-filling).
+  //
+  // Codex #177 P2: proporcny podiel sa nesmie len „orezat na MIN_FIELD" — ten
+  // rozdiel treba odobrat z toho, co ostava ostatnym, inak posledne pole spadne
+  // pod minimum a funkcia ODMIETNE hodnotu, ktora sa v skutocnosti zmesti.
+  // Priklad: vahy [20, 440, 440] a zvysok 60 mm — platne riesenie je [20,20,20],
+  // ale jednorazovy clamp vratil chybu. Pole, ktore by proporcne dostalo menej
+  // nez minimum, sa preto ZAFIXUJE na minimum a zvysok sa prepocita pre ostatne;
+  // opakuje sa, kym sa nieco meni (konverguje — poli je najviac 4).
+  function nxZoneSpread(idxs, sizes, total){
+    var pending = idxs.slice(), fixed = {}, remaining = total, changed = true;
+    var wOf = function(j){ return (sizes && sizes[j] > 0) ? sizes[j] : 0; };
+    while (changed && pending.length){
+      changed = false;
+      var base = 0, keep = [], i, j, w;
+      for (i = 0; i < pending.length; i++) base += wOf(pending[i]);
+      for (i = 0; i < pending.length; i++){
+        j = pending[i];
+        w = base > 0 ? (wOf(j) / base) : (1 / pending.length);
+        if (remaining * w < NXZ.MIN_FIELD - NXZ.EPS){
+          fixed[j] = NXZ.MIN_FIELD; remaining -= NXZ.MIN_FIELD; changed = true;
+        } else keep.push(j);
+      }
+      pending = keep;
+    }
+    return { fixed: fixed, pending: pending, remaining: remaining };
   }
 
   function defaultTree(sh, nodeId){
@@ -266,6 +305,7 @@
                        nxZoneCumForFraction: nxZoneCumForFraction,
                        nxZoneFractionOptions: nxZoneFractionOptions,
                        nxZoneSnapCum: nxZoneSnapCum, nxZoneExactCuts: nxZoneExactCuts,
+                       nxZoneSpread: nxZoneSpread,
                        nxRound2: nxRound2,
                        sanitizeTree: sanitizeTree, sanitizeCuts: sanitizeCuts,
                        resolveFields: resolveFields, pathOf: pathOf, navTree: navTree };

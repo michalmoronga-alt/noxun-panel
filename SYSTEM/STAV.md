@@ -5,11 +5,11 @@
 
 ## Stav
 
-**v0.7.13 · 19.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
+**v0.7.14 · 19.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
 
 **Beží blok UI 2.0.** Koncept Inspectora je uzavretý (Michal 18.8.) — záväzný kontrakt a mockupy sú v repe: [zdroje/ui20/](zdroje/ui20/) ([UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) + mockupy Inspector C, štúdio, dizajnový lístok); práca je narezaná do dávok UI-A → UI-B → UI-C → UI-D a fázy ŠTÚDIO ([PLAN.md](PLAN.md)).
 
-Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-C2 · Zóny** — kontext Zóny má štruktúru navrchu so stromovými spojnicami, delenie cez dlaždice, police ako pilulky 0–6, presné delenie prvej zóny v mm aj zlomkom a magnet pri ťahaní priečky v náhľade. Testy: **1348 headless · 40 JS sád**; posledný **plný in-SketchUp beh 427 PASS / 0 FAIL** — vrátane novej sekcie `run_uic2` (delenie, police, presná cesta, guardy a undo na živej skrinke).
+Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-C2 · Zóny** — kontext Zóny má štruktúru navrchu so stromovými spojnicami, delenie cez dlaždice, police ako pilulky 0–6, presné delenie prvej zóny v mm aj zlomkom a magnet pri ťahaní priečky v náhľade. Testy: **1350 headless · 40 JS sád**; posledný **plný in-SketchUp beh 427 PASS / 0 FAIL** — vrátane novej sekcie `run_uic2` (delenie, police, presná cesta, guardy a undo na živej skrinke).
 
 ## Robí sa
 
@@ -21,7 +21,7 @@ Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolova
 
 ## Posledné uzávery
 
-- **UI-C2 Zóny** (štruktúra navrchu so stromovými spojnicami a najviac 3 úrovňami · delenie na štyri dlaždice · police ako pilulky **0–6** · presné delenie prvej zóny v mm aj zlomkom 1/4·1/3·1/2 · magnet 1/4·1/2·3/4 pri ťahaní priečky, Alt ho vypína · rozmer, ktorý sa nezmestí, sa **odmietne** namiesto tichého zmenšenia · deliť a dávať police smie len nerozdelená zóna, jedinou deštruktívnou cestou ostáva „Vyčistiť zónu" · poškodené označenie zóny už nepadne na koreň a nezmaže vnútro skrinky) — PR **tento**, v0.7.13 (19.8.)
+- **UI-C2 Zóny** (štruktúra navrchu so stromovými spojnicami a najviac 3 úrovňami · delenie na štyri dlaždice · police ako pilulky **0–6** · presné delenie prvej zóny v mm aj zlomkom 1/4·1/3·1/2 · magnet 1/4·1/2·3/4 pri ťahaní priečky, Alt ho vypína · rozmer, ktorý sa nezmestí, sa **odmietne** namiesto tichého zmenšenia · deliť a dávať police smie len nerozdelená zóna, jedinou deštruktívnou cestou ostáva „Vyčistiť zónu" · poškodené označenie zóny už nepadne na koreň a nezmaže vnútro skrinky) — PR **tento**, v0.7.14 (19.8.)
 
 - **BLOK UI-C1 UZAVRETÝ — Vkladanie** (**C1a** šablóna má druh `cabinet`/`board`, identita je dvojica druh+názov, seed troch doskových šablón, poradie „naposledy použité" vo vlastnom súbore · **C1b** typové tlačidlá, dlaždice šablón s náhľadmi a dvojklikom, doskové zámky, náhľad vkladania · **C1c** umiestnenie dosky naležato/nastojato/na stenu ako otočenie vloženej dosky, výrobné dáta sa ním nemenia) — PR **#174 · #175 · tento**, v0.7.10 → **v0.7.12** (18.8.)
 

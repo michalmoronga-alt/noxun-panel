@@ -211,16 +211,23 @@
   function setZoneFirstSize(value){
     var z = activeZoneOf(computeZones());
     if (!z || z.leaf){ NX.setStatus('Presný rozmer sa zadáva až na delenej zóne.', true); return; }
-    setFieldSize(z.id, 0, (value === null || value === undefined) ? '' : String(value));
+    setFieldSize(z.id, 0, (value === null || value === undefined) ? '' : String(value), true);
   }
   // PRESNA CESTA (N21, audit F7): zadane cislo sa BUD zmesti, ALEBO sa odmietne.
   // Ziadne tiche zmensovanie — pouzivatel by vyrobil iny nabytok, nez zadal.
   // Zvysok sa deterministicky dorovna do posledneho odomknuteho pola a vsetko
   // sa uklada s presnostou 0,01 mm (mm Float; zaokruhlovanie na cele mm by pri
   // troch poliach „zjedlo" z korpusu az 2 mm).
-  function setFieldSize(localId, index, value){
+  // `lockEdited` (Codex #177 P2): zámok editovaného poľa. VYNECHANÝ = ponechaj
+  // ten, ktorý pole má — cez túto funkciu chodí aj úplný zoznam polí, kde má
+  // zámok VLASTNÝ ovládač; natvrdo `true` by vedome odomknutý riadok pri každom
+  // prepísaní hodnoty potichu zamkol a ten by potom držal rozmer pri resize
+  // korpusu. `true` posiela iba skratka „Prvá zóna" (B5: vypísané ⇒ zamknuté).
+  function setFieldSize(localId, index, value, lockEdited){
     var node0 = navTree(sanitizeTree(currentZoneTree), pathOf(localId));
     if (!node0 || !node0.split) return;
+    var curCut = node0.split.cuts[index] || { size: null, locked: false };
+    var lock = (lockEdited === undefined) ? !!curCut.locked : !!lockEdited;
     // V0.4.7e: evalDim (vyraz uz je commitnuty na cislo, toto je belt-and-braces);
     // neplatny vstup NEmeni strom (parseFloat by '650-36' orezal na 650)
     var sz = (value===''||value===null||value===undefined) ? null : evalDim(value);
@@ -235,7 +242,7 @@
       var t = numv('thickness')||18;
       var span = (z.split.axis==='v') ? z.w : z.h;
       var clear = nxZoneClear(span, z.split.count, t);
-      var res = nxZoneExactCuts(node0.split.cuts, z.split.sizes, z.split.count, clear, index, sz, true);
+      var res = nxZoneExactCuts(node0.split.cuts, z.split.sizes, z.split.count, clear, index, sz, lock);
       if (res.error){
         NX.setStatus('Pole ' + (index+1) + ': ' + res.error, true);
         refreshZoneUI(); // vrat do poli hodnoty, ktore naozaj platia
@@ -332,6 +339,18 @@
     var z = zoneGuard('Police sa nenastavili'); if (!z) return;
     n = Math.min(NXZ.MAX_SHELVES, Math.max(0, parseInt(n, 10) || 0));
     if (!z.leaf){ NX.setStatus('Zóna je delená — police patria konkrétnemu stĺpcu/riadku.', true); return; }
+    // Codex #177 P2: ZMESTIA SA vôbec? Zrkadlo `ZoneTree.validate_shelves!` —
+    // n polic potrebuje n*hrúbka + (n+1)*MIN_FIELD svetlej výšky. Kontrola stojí
+    // PRED vetvou draft/server, takže platí aj v návrhu vkladania, kde server
+    // neexistuje: bez nej by nový počet 5–6 ticho prekreslil náhľad a skrinka by
+    // sa potom nedala vložiť (builder ju odmietne až na konci).
+    var tth = numv('thickness') || 18;
+    var needMm = n * tth + (n + 1) * NXZ.MIN_FIELD;
+    if (n > 0 && needMm > z.h + NXZ.EPS){
+      NX.setStatus('Zóna je príliš nízka na ' + n + ' ' + shelfWord(n) + ' — potrebuje aspoň ' +
+                   Math.ceil(needMm) + ' mm svetlej výšky (má ' + Math.round(z.h) + ' mm).', true);
+      return;
+    }
     if (selectedCabId){
       if (window.sketchup && sketchup.set_zone_shelves)
         sketchup.set_zone_shelves(nxZonePayload({ zone_id: activeZoneId, count: n }));

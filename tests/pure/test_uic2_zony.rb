@@ -188,6 +188,27 @@ NxTest.test('UI-C2 (F8): cuts z panela musia sediet poctom, minimom aj suctom') 
   NxTest.assert_equal(nil, ZT.validate_cuts([{ 'size' => 423.004 }, { 'size' => 423.0 }], 2, clear: 846.0))
 end
 
+NxTest.test('UI-C2 (Codex #177 P2): tolerancia suctu rastie s poctom poli') do
+  # Kazda hodnota z panela je zaokruhlena na 0,01 mm — pri 4 poliach sa sucet
+  # moze od skutocneho svetleho priestoru lisit az o 4 pol-jednotky. Prisnejsia
+  # tolerancia by odmietala geometricky spravne rozdelenia.
+  four = Array.new(4) { { 'size' => 201.78 } } # skutocnost 4 x 201.775 = 807.1
+  NxTest.assert_equal(nil, ZT.validate_cuts(four, 4, clear: 807.1))
+  # a naozaj zla hodnota sa aj tak odmietne
+  NxTest.assert(ZT.validate_cuts(four, 4, clear: 900.0).to_s.include?('nevyplnia'))
+end
+
+NxTest.test('UI-C2 (Codex #177 P2): svetly priestor sa cita z ROZPATIA, nie zo suctu poli') do
+  body = UIC2_ZONES_RB[/def zone_clear_span\(.*?\n        end\n/m].to_s
+  NxTest.refute(body.empty?, 'zone_clear_span sa nenasiel')
+  NxTest.assert(body.include?('ZoneTree.clear_space('),
+                'clear sa musi pocitat z rozpatia — sucet poli je uz zaokruhleny (r2 na kazdom poli)')
+  NxTest.refute(body.include?('[:fields]'), 'sucet zaokruhlenych poli sa uz pouzivat nesmie')
+  # a zdielana funkcia naozaj odratava priecky
+  NxTest.assert_close(846.0, ZT.clear_space(864.0, 2, 18.0))
+  NxTest.assert_close(807.1, ZT.clear_space(861.1, 4, 18.0))
+end
+
 # --- 5) handlery: identita dokumentu, listovost, navratova hodnota ------------
 
 NxTest.test('UI-C2 (F9): KAZDY zonovy callback overuje dokument aj skrinku') do

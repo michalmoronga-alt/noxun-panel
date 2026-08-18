@@ -243,17 +243,25 @@ module Noxun
           nil
         end
 
-        # Svetly priestor delenej zony (mm) — sucet rozmerov jej poli z PLANU.
-        # Sluzi validacii poli (F8). Plan je ta ista cesta, akou pocita builder,
-        # takze sa kontrola a stavba nemozu rozist. Zlyhanie = nil (kontrola suctu
-        # sa preskoci, ostatne pravidla platia — radsej mensia kontrola nez pad).
+        # Svetly priestor delenej zony (mm) pre validaciu poli (F8). Plan je ta
+        # ista cesta, akou pocita builder, takze sa kontrola a stavba nemozu
+        # rozist. Zlyhanie = nil (kontrola suctu sa preskoci, ostatne pravidla
+        # platia — radsej mensia kontrola nez pad).
+        #
+        # Codex #177 P2: pocita sa z ROZPATIA zony (`width`/`height` mínus
+        # priecky), NIE zo suctu jej poli. Kazde pole je v plane zaokruhlene na
+        # 2 desatinne miesta (`field_info` -> `r2`), takze styri polia po
+        # 201,775 mm sa v plane javia ako 4 × 201,78 = o 0,02 mm viac — a klient,
+        # ktory posle sucet zodpovedajuci SKUTOCNEMU rozpatiu, by dostal falosne
+        # „nezmestia sa". Rozpatie je zaokruhlene raz (chyba <= 0,005 mm).
         def zone_clear_span(ctx)
           cfg = CabinetBuilder.normalize(existing_params(ctx[:cab]))
           plan = Construction.build_plan(cfg, ctx[:cabinet_id])
           zone = Array(plan[:zones]).find { |z| z[:id].to_s == ctx[:zone_id] }
           return nil unless zone && zone[:split]
 
-          Array(zone[:split][:fields]).reduce(0.0) { |sum, f| sum + f[:size].to_f }
+          span = zone[:split][:axis].to_s == 'v' ? zone[:width].to_f : zone[:height].to_f
+          ZoneTree.clear_space(span, zone[:split][:count].to_i, cfg[:thickness].to_f)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.zone_clear_span')
           nil
