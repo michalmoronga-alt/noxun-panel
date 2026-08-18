@@ -292,6 +292,32 @@ akcia, preto výberová a nie zelená), **pravá** (užšia,
 - Prázdny výber pri zapnutom „len vybrané" sa **povie nahlas** („označ skrinky
   v modeli"), nikdy sa ticho nezobrazí všetko.
 
+### 4.1 SketchUp toolbar (UI-02)
+
+Toolbar „Noxun Engine" je **jediné miesto, kde značka vystupuje mimo panela**.
+Štyri tlačidlá v poradí podľa kontraktu UI 2.0 (N4):
+
+| Tlačidlo | Ikona | Správanie |
+|---|---|---|
+| Inspector | `noxun_logo.svg` (zrolovaná značka) | prepínač — otvorí panel, druhý klik ho zavrie |
+| Štúdio | `noxun_studio.svg` (layers) | dočasne otvára okno Výroba (tooltip to priznáva) |
+| ABS kontrola hrán | `noxun_abs.svg` (shell) | prepínač zvýraznenia olepu (to isté ako D-105 v okne Výroba) |
+| Vložiť skrinku | `noxun_insert.svg` (skrinka + plus) | otvorí panel vo vkladacom režime (zhodí výber) |
+
+Pravidlá ikon toolbaru (líšia sa od spritu v paneli):
+
+- **Samostatné SVG súbory** v `noxun_engine/ui/icons/`, nie sprite — SketchUp číta
+  súbor, nie HTML. Jeden súbor slúži ako `small_icon` aj `large_icon`.
+- **Žiadny `currentColor`** — mimo HTML nemá od koho farbu zdediť a vykreslil by
+  sa čierny. Kreslia pevnou `#37474f` (hodnota `--nx-ink-strong`). Stráži to guard
+  test `tests/pure/test_ui02_toolbar.rb`.
+- Kresba je **Lucide** (24×24, stroke 2) rovnako ako sprite; logo je fill-ová
+  výnimka s vlastným viewBoxom originálnych kriviek značky.
+- **Zapnutý stav musí byť na tlačidle vidno** — prepínače majú validation proc
+  (`MF_CHECKED`), nedostupná kontrola hrán je `MF_GRAYED`, nikdy ticho mŕtve tlačidlo.
+- Toolbar **nikdy nesiaha na model** (žiadna operácia, žiadne Späť) — len otvára
+  okná a prepína zobrazenie.
+
 ### Pravidlo: žiadne emoji v UI chrome
 Emoji/unicode glyfy (🔒 ✕ ↺ ⚙ 📋 ★ ⧉ ⛶ ⚠ 🔗 …) sa v ovládacích prvkoch panela
 nepoužívajú — nahrádza ich ikona zo spritu. Kde SVG nejde (napr. `<option>`,
