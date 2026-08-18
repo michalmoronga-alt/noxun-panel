@@ -3060,13 +3060,14 @@ module NoxunSuRunner
       rec = []
       install_js_recorder(rec)
       begin
-        e::Panel.handle_clear_selection({ 'board_id' => 'BRD-NEEXISTUJE' }.to_json)
+        e::Panel.handle_clear_selection({ 'board_id' => 'BRD-NEEXISTUJE',
+                                          'model_guid' => e::Panel.model_guid(model) }.to_json)
       ensure
         remove_js_recorder
       end
       ok('UI-B1: krizik STAREJ dosky vyber NEZHODI (identity guard)',
          model.selection.to_a.include?(board) &&
-           rec.none? { |s| s.include?('NX.clearSelected()') })
+           rec.none? { |s| s.include?('NX.clearSelected(') })
 
       # Codex #168 P2 (2. kolo): ID dosky je jedinecne LEN v ramci modelu —
       # callback z INEHO dokumentu nesmie zhodit vyber tu, aj keby ID sedelo.
@@ -3079,12 +3080,26 @@ module NoxunSuRunner
       end
       ok('UI-B1: krizik z INEHO dokumentu vyber NEZHODI (guard dokumentu)',
          model.selection.to_a.include?(board) &&
-           rec.none? { |s| s.include?('NX.clearSelected()') })
+           rec.none? { |s| s.include?('NX.clearSelected(') })
 
+      # Codex #168 P2 (5. kolo): guard je PRISNY — aj CHYBAJUCA identita sa
+      # odmieta (okno, ktoremu este nedosiel NX.init, nesmie cistit vyber).
       rec = []
       install_js_recorder(rec)
       begin
         e::Panel.handle_clear_selection({ 'board_id' => bid }.to_json)
+      ensure
+        remove_js_recorder
+      end
+      ok('UI-B1: krizik BEZ identity dokumentu vyber NEZHODI (prisny guard)',
+         model.selection.to_a.include?(board) &&
+           rec.none? { |s| s.include?('NX.clearSelected(') })
+
+      rec = []
+      install_js_recorder(rec)
+      begin
+        e::Panel.handle_clear_selection({ 'board_id' => bid,
+                                          'model_guid' => e::Panel.model_guid(model) }.to_json)
       ensure
         remove_js_recorder
       end
@@ -3114,6 +3129,11 @@ module NoxunSuRunner
       # Guard dokumentu: klik z INEHO dokumentu nesmie zapnut overlay tu.
       e::Panel.handle_edge_toggle({ 'model_guid' => 'CUDZI-GUID' }.to_json)
       ok('UI-B1: ABS toggle z INEHO dokumentu zvyraznenie NEZAPNE (guard dokumentu)',
+         e::EdgeCheck.active?(model) == false)
+      # Codex #168 P2 (5. kolo): guard je PRISNY — chybajuca identita sa tiez odmieta
+      # (okno, ktoremu este nedosiel NX.init, nesmie prepnut prave aktivny model).
+      e::Panel.handle_edge_toggle(nil)
+      ok('UI-B1: ABS toggle BEZ identity dokumentu sa odmietne (prisny guard)',
          e::EdgeCheck.active?(model) == false)
 
       e::Panel.handle_edge_toggle({ 'model_guid' => e::Panel.model_guid(model) }.to_json)

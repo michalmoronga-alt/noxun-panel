@@ -251,8 +251,10 @@ module Noxun
           # (Ids.next_board_id pocita v kazdom dokumente od zaciatku), takze dva
           # otvorene dokumenty bezne obsahuju BRD-001 — bez guidu by oneskoreny
           # callback zhodil vyber v CUDZOM dokumente.
-          want_guid = data['model_guid'].to_s
-          return push_selected(model, dedup: false) if !want_guid.empty? && want_guid != model_guid(model)
+          # PRISNE porovnanie (Codex #168 P2, 5. kolo): `clear_selection` je tiez
+          # novy callback — prazdny guid nie je starsi klient, ale okno bez
+          # dobehnuteho NX.init, a to nesmie cistit vyber v cudzom dokumente.
+          return push_selected(model, dedup: false) if data['model_guid'].to_s != model_guid(model)
 
           want = data['board_id'].to_s
           board = find_board(model)

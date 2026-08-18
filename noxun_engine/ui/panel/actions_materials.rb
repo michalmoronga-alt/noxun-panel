@@ -106,8 +106,12 @@ module Noxun
             return set_status('Zvýraznenie hrán vyžaduje SketchUp 2023 alebo novší.', true)
           end
 
-          want = payload ? parse(payload)['model_guid'].to_s : ''
-          unless want.empty? || want == model_guid(model)
+          # PRISNE porovnanie (Codex #168 P2, 5. kolo) — zhoda, nie „prazdne
+          # preskoc". `nx_edge_toggle` je NOVY callback bez starsich klientov,
+          # takze prazdna hodnota nie je spatna kompatibilita, ale diera: klik
+          # z okna, ktoremu este nedosiel NX.init, by prepol PRAVE AKTIVNY model.
+          # Rovnaky tvar guardu ma ProductionDialog#edge_check_guard.
+          unless (payload ? parse(payload)['model_guid'].to_s : '') == model_guid(model)
             push_edge_check
             return set_status('Model sa medzitým prepol — stav obnovený, klikni znova.', true)
           end
