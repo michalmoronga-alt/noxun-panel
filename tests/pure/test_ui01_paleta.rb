@@ -86,19 +86,49 @@ end
 
 # --- 2) radius ----------------------------------------------------------------
 
-NxTest.test('UI-01: komponentovy radius je zjednoteny na 6 px (ziadne 4px/7px)') do
+NxTest.test('UI-01: komponentovy radius je zjednoteny na 6 px (ziadne 4/5/7 px)') do
+  # Zakazane su MEDZIHODNOTY 4/5/7 px — presne ten mix, ktory O3 rusi. Vedome
+  # povolene ostavaju: 8 px (karty, modaly, dlazdice, boxy), 9 px (badge),
+  # 2-3 px (farebne stvorceky), 12px/99px (pill) a 50 % (kruh) — nie su to
+  # komponentove ramy. Ked pribudne odovodnena vynimka, patri do WHITELISTU
+  # nizsie AJ do docs/UI_DIZAJN.md (inak invariant „vsetko 6" prestane platit
+  # potichu).
+  whitelist = [] # zatial ziadna vynimka nie je potrebna
   offenders = []
   ui01_ui_files.each do |path|
     next unless path.end_with?('.css', '.html')
 
     File.read(path, encoding: 'UTF-8').each_line.with_index do |line, i|
-      next unless line =~ /border-radius:\s*(4|7)px/
+      next unless line =~ /border-radius:\s*(4|5|7)px/
 
-      offenders << "#{File.basename(path)}:#{i + 1}"
+      misto = "#{File.basename(path)}:#{i + 1}"
+      offenders << misto unless whitelist.include?(misto)
     end
   end
   NxTest.assert(offenders.empty?,
-                "radius 4px/7px prezil zjednotenie na 6 px (O3): #{offenders.join(', ')}")
+                "radius 4/5/7 px prezil zjednotenie na 6 px (O3): #{offenders.join(', ')}")
+end
+
+NxTest.test('UI-01: vyberove tokeny sa nepouzivaju ako farba AKCIE') do
+  # Kontrakt temy: „vykonaj" je ZELENE na oboch pocitacoch. Vyplnene tlacidlo
+  # akcie preto nesmie brat --nx-select* (v teme Lucia by zruzovelo). Zapnuty
+  # stav prepinaca, aktivny tab, hover a odkazy su VYBER — tie farbu menit smu.
+  akcne_triedy = %w[.baddbig .primary].freeze
+  offenders = []
+  ui01_ui_files.each do |path|
+    next unless path.end_with?('.css', '.html')
+
+    src = File.read(path, encoding: 'UTF-8').gsub(%r{/\*.*?\*/}m, '') # komentare von
+    # Hrube delenie na CSS pravidla (selektor { deklaracie }) — na nasu potrebu staci.
+    src.scan(/([^{}]+)\{([^{}]*)\}/) do |selector, body|
+      next unless akcne_triedy.any? { |cls| selector.include?(cls) }
+      next unless body.include?('--nx-select')
+
+      offenders << "#{File.basename(path)}: #{selector.strip.split("\n").last.strip}"
+    end
+  end
+  NxTest.assert(offenders.empty?,
+                "akcne tlacidlo pouziva vyberovy token (v teme Lucia by zruzovelo): #{offenders.join(', ')}")
 end
 
 # --- 3) + 4) tema: rozsah, whitelist, fallback --------------------------------

@@ -7,7 +7,7 @@
 
 **v0.7.1 · 18.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
 
-**Beží blok UI 2.0.** Koncept Inspectora je uzavretý (Michal 18.8.) — záväzná referencia je mockup `_dev/mockup_inspector_c.html` a slovný kontrakt v `_dev/UI20_PODKLAD.md`; práca je narezaná do dávok UI-A → UI-B → UI-C → UI-D a fázy ŠTÚDIO ([PLAN.md](PLAN.md)).
+**Beží blok UI 2.0.** Koncept Inspectora je uzavretý (Michal 18.8.) — záväzný kontrakt a mockupy sú v repe: [zdroje/ui20/](zdroje/ui20/) ([UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) + mockupy Inspector C, štúdio, dizajnový lístok); práca je narezaná do dávok UI-A → UI-B → UI-C → UI-D a fázy ŠTÚDIO ([PLAN.md](PLAN.md)).
 
 Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-01** — plugin je v firemnej NOXUN teal farbe s jednotným rádiusom 6 px a pripravenou témou „Lucia". Testy: **1195 headless · 32 JS sád · in-SketchUp 334 PASS / 0 FAIL** (posledný beh pri D-101; UI dávky bez buildera/observera in-SU beh nepotrebujú — vizuál overuje Michal).
 

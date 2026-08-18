@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Noxun Engine — Inspector C · doladené</title>
+<style>
+  /* ===== TOKENY — kópia :root z noxun_engine/ui/css/panel.css ===== */
+  :root{
+    --nx-bg:#f4f5f7; --nx-surface:#fff; --nx-surface-sunken:#eceff1; --nx-surface-readonly:#f4f6f8;
+    --nx-surface-preview:#fafcff; --nx-surface-th:#f5f7f8; --nx-part-bg:#f2fafb;
+    --nx-ink:#263238; --nx-ink-title:#1b3a4b; --nx-ink-strong:#37474f; --nx-ink-label:#455a64;
+    --nx-ink-muted:#607d8b; --nx-ink-soft:#78909c; --nx-ink-faint:#90a4ae;
+    --nx-border:#cfd8dc; --nx-border-strong:#b0bec5; --nx-border-soft:#eceff1;
+    --nx-action:#2e7d32; --nx-action-hover:#1b5e20; --nx-on-accent:#fff;
+    /* O1 (15.8.): akcent výberu = NOXUN TEAL — brand rodina */
+    --nx-select:#107787; --nx-select-strong:#0B5661; --nx-select-accent:#0e6b7a;
+    --nx-select-bg:#e0f2f4; --nx-select-bg-soft:#f0f9fa; --nx-select-bg-hover:#d6eef1;
+    --nx-part-border:#7fc4cf;
+    --nx-ok-bg:#e8f5e9; --nx-ok-fg:#1b5e20; --nx-ok-border:#c8e6c9;
+    --nx-err-bg:#fdecea; --nx-err-fg:#b71c1c; --nx-err-border:#f5c6cb;
+    --nx-danger:#c62828; --nx-danger-bg:#fbe9e7; --nx-danger-border:#ffccbc;
+    --nx-danger-line:#e53935; --nx-danger-bg-soft:#fff5f5;
+    --nx-warn:#ffb74d; --nx-warn-bg:#fff8ef; --nx-warn-bg-soft:#fff3e0; --nx-warn-fg:#e65100;
+    --nx-warnchip-fg:#b26a00; --nx-warnchip-border:#ffcc80;
+    --nx-warnrow-fg:#7a5000; --nx-warnrow-border:#ffe0b2;
+    --nx-modalwarn-fg:#8d5a00; --nx-wbadge-fg:#4e2e00; --nx-ghost-hover:#e0e4e7;
+    --nx-abs-1mm:#e53935; --nx-abs-2mm:#43a047; --nx-abs-none:#b0bec5; --nx-abs-tape-bg:#faf6ee;
+    --nx-edge-missing:#e24b4a; --nx-edge-extra:#ff8c00; --nx-edge-taped:#1d9e75;
+    --nx-scrim:rgba(38,50,56,0.45); --nx-modal-shadow:rgba(0,0,0,0.25);
+    --nx-state-red:#d32f2f; --nx-state-orange:#f9a825; --nx-state-green:#388e3c;
+    --nx-logo:#78909c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:"Segoe UI",Tahoma,sans-serif; font-size:13px; color:var(--nx-ink); background:#e6e9ec; padding:0 0 40px}
+
+  /* ===== chrome mockupu ===== */
+  .mockbar{display:flex; align-items:center; gap:12px; padding:9px 16px; background:#2b3a42; color:#dfe7ec}
+  .mockbar .mb-logo{width:17px; height:17px; color:#9fb3bf}
+  .mockbar .mb-title{font-weight:600; font-size:13px}
+  .mockbar .mb-ver{font-size:11px; color:#8ea3ae}
+  .notestrip{display:flex; align-items:center; gap:8px; padding:6px 16px; font-size:11.5px;
+             background:var(--nx-warn-bg-soft); color:var(--nx-warnchip-fg); border-bottom:1px solid var(--nx-warnchip-border)}
+  .stagewrap{padding:16px}
+  .selsim{max-width:470px; margin:0 auto 10px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;
+          border:1px dashed #b0bec5; border-radius:8px; padding:6px 8px; background:#fbfcfd}
+  .selsim .lbl{font-size:10.5px; color:var(--nx-ink-faint); width:100%; margin-bottom:1px}
+  .selsim button{font:inherit; font-size:11px; padding:3px 8px; border-radius:11px; cursor:pointer;
+                 border:1px solid var(--nx-border); background:var(--nx-surface); color:var(--nx-ink-muted)}
+  .selsim button.on{background:var(--nx-select-bg); border-color:var(--nx-select); color:var(--nx-select); font-weight:600}
+  .stage{max-width:470px; margin:0 auto}
+  .win{background:var(--nx-surface); border:1px solid #b6c0c6; border-radius:9px;
+       box-shadow:0 12px 34px rgba(20,30,45,.16); overflow:hidden}
+  .winhead{display:flex; align-items:center; gap:8px; padding:6px 10px; background:#dfe4e7;
+           border-bottom:1px solid var(--nx-border); font-size:12px; font-weight:600; color:var(--nx-ink-strong)}
+  .winhead .wdots{display:flex; gap:4px}
+  .winhead .wdots i{width:9px; height:9px; border-radius:50%; background:#bcc6cc; display:block}
+  .winhead .wsize{margin-left:auto; font-weight:400; font-size:11px; color:var(--nx-ink-faint)}
+  .mocknote{max-width:820px; margin:12px auto 0; background:#fffdf3; border:1px dashed #d8cfa8; border-radius:8px;
+            padding:9px 12px; font-size:12px; color:#6b5d1f; line-height:1.55}
+  .mocknote b{display:block; margin-bottom:2px; color:#5b4f18}
+
+  /* ===== panel 470 px ===== */
+  .panel{background:var(--nx-bg); height:780px; position:relative; overflow:hidden; display:flex}
+  .ic{width:15px; height:15px; flex:0 0 auto; vertical-align:middle; fill:none; stroke:currentColor;
+      stroke-width:2; stroke-linecap:round; stroke-linejoin:round; pointer-events:none}
+  .ic-inline{width:1em; height:1em; vertical-align:-.15em}
+  .nx-logo{width:24px; height:24px; color:var(--nx-logo); flex:0 0 24px}
+  /* N14 — návrh SketchUp toolbaru pluginu */
+  .sutb{max-width:470px; margin:0 auto 8px; display:flex; align-items:center; gap:3px; padding:4px 8px;
+        background:#e9ebee; border:1px solid #c9ced6; border-radius:6px; box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .sutb .lbl{font-size:10px; color:#7a838e; margin-right:6px; text-transform:uppercase; letter-spacing:.05em}
+  .sutb button{width:30px; height:28px; padding:0; border:1px solid transparent; border-radius:6px; background:none;
+               cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#3a434d}
+  .sutb button:hover{border-color:#aeb6c0; background:#f4f6f8}
+  .sutb button.on{background:var(--nx-select-bg); border-color:var(--nx-select); color:var(--nx-select-strong)}
+  .sutb button .ic{width:17px; height:17px}
+  .sutb .sep{width:1px; height:20px; background:#c9ced6; margin:0 4px}
+  button{font-family:inherit}
+
+  /* rail */
+  .crail{position:relative; flex:0 0 44px; background:var(--nx-bg); border-right:1px solid var(--nx-border); padding:6px 0;
+         display:flex; flex-direction:column; align-items:center; gap:4px}
+  .railbtn{width:34px; height:32px; border-radius:6px; border:1px solid transparent; background:none;
+           color:var(--nx-ink-muted); cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+           position:relative}
+  .railbtn:hover{background:var(--nx-select-bg-soft); color:var(--nx-select)}
+  .railbtn.on{background:var(--nx-select-bg); color:var(--nx-select); border-color:var(--nx-select);
+              box-shadow:inset 2px 0 0 var(--nx-select)}
+  .railbtn.ctxi{border:1px dashed var(--nx-part-border); background:var(--nx-part-bg); color:var(--nx-select)}
+  .railbtn.ctxi.on{border-style:solid}
+  .railbtn .ic{width:17px; height:17px}
+  .railbtn .rx{position:absolute; top:-2px; right:-2px; width:13px; height:13px; border-radius:50%;
+               background:var(--nx-surface); border:1px solid var(--nx-border); color:var(--nx-ink-faint);
+               display:inline-flex; align-items:center; justify-content:center; font-size:9px; line-height:1}
+  .railtip{position:absolute; left:40px; top:50%; transform:translateY(-50%); background:rgba(38,50,56,.94);
+           color:#fff; font-size:11px; padding:2px 8px; border-radius:6px; white-space:nowrap; opacity:0;
+           pointer-events:none; transition:opacity .1s; z-index:60}
+  .railbtn:hover .railtip{opacity:1}
+  .raildiv{width:24px; height:1px; background:var(--nx-border); margin:4px 0}
+
+  .cmain{flex:1; min-width:0; display:flex; flex-direction:column}
+  .chdr{display:flex; align-items:center; gap:7px; padding:7px 10px; background:var(--nx-bg);
+        border-bottom:1px solid var(--nx-border)}
+  .cid{font-weight:700; font-size:14px; color:var(--nx-select); flex:0 0 auto}
+  .cname{color:var(--nx-ink-strong); font-size:12px; display:inline-flex; align-items:center; gap:4px; padding:0;
+         border:0; background:none; cursor:pointer; min-width:0; overflow:hidden}
+  .cname span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .cname .ic{width:12px; height:12px; color:var(--nx-ink-faint)}
+  .cname:hover,.cname:hover .ic{color:var(--nx-select)}
+  .warnchip{display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600;
+            color:var(--nx-warnchip-fg); background:var(--nx-warn-bg-soft); border:1px solid var(--nx-warnchip-border);
+            border-radius:99px; padding:1px 8px; cursor:pointer; font-family:inherit; flex:0 0 auto}
+  .warnchip .ic{width:13px; height:13px}
+  .cbody{flex:1; overflow:auto; padding:9px 10px 4px}
+  .nxfoot{padding:6px 10px; border-top:1px solid var(--nx-border-soft); font-size:10.5px; color:var(--nx-ink-faint);
+          text-align:center; background:var(--nx-bg)}
+
+  /* ===== SEKTOR (S1–S4) — zrolovateľný ===== */
+  .sect{border:1px solid var(--nx-border); border-radius:6px; background:var(--nx-surface); margin-bottom:8px}
+  .secthead{border-radius:6px 6px 0 0}
+  .sect:not(.open) .secthead{border-radius:6px}
+  .sectbody.nopad{overflow:hidden; border-radius:0 0 6px 6px}
+  .secthead{display:flex; align-items:center; gap:7px; width:100%; padding:6px 9px; background:var(--nx-surface-sunken);
+            border:0; cursor:pointer; text-align:left; font:inherit}
+  .sect.open .secthead{border-bottom:1px solid var(--nx-border-soft)}
+  .secthead:hover{background:var(--nx-select-bg-soft)}
+  .secthead .chev{width:6px; height:6px; border-right:2px solid var(--nx-ink-faint); border-bottom:2px solid var(--nx-ink-faint);
+                  transform:rotate(-45deg); flex:0 0 6px; position:relative; top:-1px; transition:transform .12s}
+  .sect.open .secthead .chev{transform:rotate(45deg); top:-2px}
+  .secthead .sn{font-weight:600; font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--nx-ink-muted)}
+  .secthead .meta{margin-left:auto; font-size:11px; color:var(--nx-ink-soft); overflow:hidden;
+                  text-overflow:ellipsis; white-space:nowrap; font-variant-numeric:tabular-nums; padding-left:8px}
+  .sectbody{padding:7px 9px 9px}
+  .sectbody.nopad{padding:0}
+
+  /* náhľad v S1 — dole tenký fixný pás vrstiev a nástrojov (rozhodnutie 15.8.) */
+  .pvbox{position:relative; background:var(--nx-surface-preview); height:252px; display:flex; flex-direction:column}
+  .pvbox>svg.proj{width:100%; flex:1; min-height:0; display:block}
+  .pvbar{display:flex; align-items:center; gap:4px; padding:3px 6px; border-top:1px solid var(--nx-border-soft);
+         background:rgba(255,255,255,.94)}
+  .pvbar .sp{flex:1}
+  .pvtool{width:24px; height:22px; padding:0; border-radius:5px; background:var(--nx-surface);
+          border:1px solid var(--nx-border); color:var(--nx-ink-strong); cursor:pointer;
+          display:inline-flex; align-items:center; justify-content:center}
+  .pvtool:hover{border-color:var(--nx-select); color:var(--nx-select)}
+  .pvchips{display:flex; gap:4px}
+  .lchip{display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:99px; font-size:10.5px;
+         font-weight:600; cursor:pointer; background:rgba(255,255,255,.94); color:var(--nx-ink-muted);
+         border:1px solid var(--nx-border); box-shadow:0 1px 2px var(--nx-modal-shadow); font-family:inherit}
+  .lchip:hover{border-color:var(--nx-select); color:var(--nx-select)}
+  .lchip.on{background:var(--nx-select); color:#fff; border-color:var(--nx-select)}
+  .lchip.base{background:var(--nx-select-bg); color:var(--nx-select-strong); border-color:var(--nx-select); cursor:default}
+  .lchip .ic{width:12px; height:12px}
+  .pvfit{position:absolute; top:7px; right:7px; width:24px; height:24px; padding:0; border-radius:5px;
+         background:rgba(255,255,255,.92); border:1px solid var(--nx-border); color:var(--nx-ink-strong);
+         cursor:pointer; display:inline-flex; align-items:center; justify-content:center}
+  .pvtitle{position:absolute; top:7px; left:7px; font-size:10.5px; color:var(--nx-ink-muted);
+           background:rgba(255,255,255,.9); border:1px solid var(--nx-border-soft); border-radius:99px; padding:1px 8px}
+
+  /* ===== S4 — skupiny s EXKLUZÍVNYM otváraním ===== */
+  .grp{border-bottom:1px solid var(--nx-border-soft)}
+  .grp:last-child{border-bottom:0}
+  .grphead{display:flex; align-items:center; gap:7px; width:100%; padding:6px 9px; background:none; border:0;
+           cursor:pointer; text-align:left; font:inherit}
+  .grphead:hover{background:var(--nx-select-bg-soft)}
+  .grphead .chev{width:5px; height:5px; border-right:2px solid var(--nx-ink-faint); border-bottom:2px solid var(--nx-ink-faint);
+                 transform:rotate(-45deg); flex:0 0 5px; transition:transform .12s}
+  .grp.open .grphead{background:var(--nx-select-bg-soft)}
+  .grp.open .grphead .chev{transform:rotate(45deg)}
+  .grphead .gic{display:inline-flex}
+  .grphead .gic .ic{width:13px; height:13px; color:var(--nx-ink-faint)}
+  .grp.open .grphead .gic .ic{color:var(--nx-select)}
+  .grphead .gn{font-weight:600; font-size:12px; color:var(--nx-ink-strong)}
+  .grphead .gs{margin-left:auto; font-size:10.5px; color:var(--nx-ink-faint); overflow:hidden;
+               text-overflow:ellipsis; white-space:nowrap; padding-left:8px}
+  .grpbody{padding:4px 9px 9px}
+
+  /* ===== polia ===== */
+  .row{display:flex; align-items:center; margin:5px 0}
+  .row label{flex:0 0 128px; color:var(--nx-ink-label); display:flex; align-items:center; gap:6px}
+  .row label .ic{width:13px; height:13px; color:var(--nx-ink-faint); flex:0 0 13px}
+  /* Základné — 2 stĺpce: vľavo editovateľné rozmery (nahustené), vpravo dopočítané info */
+  .basicgrid{display:grid; grid-template-columns:auto 1fr; gap:2px 14px; align-items:start}
+  .rowc{display:flex; align-items:center; gap:5px; margin:4px 0}
+  .rowc label{display:flex; align-items:center; gap:5px; color:var(--nx-ink-label); font-size:12.5px; flex:0 0 64px}
+  .rowc label .ic{width:14px; height:14px; color:var(--nx-ink-faint); flex:0 0 14px}
+  .rowc input{width:58px; padding:4px 6px; text-align:right; border:1px solid var(--nx-border-strong);
+              border-radius:6px; font:inherit; font-size:13.5px; font-weight:600; color:var(--nx-ink)}
+  .rowc .unit{color:var(--nx-ink-faint); font-size:10.5px}
+  .miniedit{border-top:1px solid var(--nx-border-soft); color:var(--nx-ink-faint) !important;
+            display:flex !important; align-items:center; gap:5px}
+  .miniedit .ic{width:11px; height:11px}
+  .dwrap{position:relative; display:inline-flex; align-items:center; gap:2px}
+  .pbtn{border:1px solid var(--nx-border); background:var(--nx-surface-sunken); border-radius:6px; width:17px;
+        height:25px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; padding:0;
+        color:var(--nx-ink-muted)}
+  .pbtn .ic{width:11px; height:11px}
+  .miniopts{display:none; position:absolute; top:calc(100% + 2px); left:0; z-index:120; background:var(--nx-surface);
+            border:1px solid var(--nx-border); border-radius:6px; box-shadow:0 6px 16px var(--nx-modal-shadow)}
+  .miniopts button{display:block; width:100%; padding:4px 16px; border:0; background:none; cursor:pointer;
+                   font:inherit; font-size:12px; text-align:left}
+  .miniopts button:hover{background:var(--nx-select-bg)}
+  /* Zóny — strom so spojnicami, delenie dlaždice, police pills */
+  .zkids{margin-left:9px; border-left:1px solid var(--nx-border); padding-left:9px}
+  .zkids .znode{position:relative}
+  .zkids .znode::before{content:''; position:absolute; left:-9px; top:50%; width:7px; height:1px; background:var(--nx-border)}
+  .ztiles{display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:2px 0 8px}
+  .ztile{display:flex; flex-direction:column; align-items:center; gap:3px; padding:7px 2px;
+         border:1px solid var(--nx-border); border-radius:6px; background:var(--nx-surface); cursor:pointer;
+         font:inherit; font-size:10.5px; color:var(--nx-ink-strong)}
+  .ztile:hover{border-color:var(--nx-select); color:var(--nx-select)}
+  .npills{display:flex; gap:4px; flex:1}
+  .npills button{width:26px; height:24px; padding:0; border:1px solid var(--nx-border); border-radius:6px;
+                 background:var(--nx-surface); cursor:pointer; font:inherit; font-size:12px; color:var(--nx-ink-strong)}
+  .npills button:hover{border-color:var(--nx-select)}
+  .npills button.on{background:var(--nx-select-bg); border-color:var(--nx-select); color:var(--nx-select-strong); font-weight:600}
+  /* Inspector toolbar — funkčné ikony v raile */
+  .railbtn.fn{position:relative}
+  .railbtn.fn .ic{color:var(--nx-ink-faint)}
+  .railbtn.fn.on{background:var(--nx-select-bg)}
+  .railbtn.fn.on .ic{color:var(--nx-select)}
+  .rarrow{position:absolute; right:1px; bottom:1px; width:13px; height:13px; display:inline-flex;
+          align-items:center; justify-content:center; border-radius:3px; color:var(--nx-ink-faint)}
+  .rarrow:hover{background:var(--nx-surface-sunken); color:var(--nx-select)}
+  .rarrow .ic{width:10px; height:10px}
+  .railfly{position:absolute; left:47px; top:212px; z-index:95; width:225px; background:var(--nx-surface);
+           border:1px solid var(--nx-border); border-radius:6px; box-shadow:0 8px 22px var(--nx-modal-shadow); padding:5px}
+  .flyrow{display:flex; align-items:center; gap:7px; padding:4px 6px; font-size:12px; color:var(--nx-ink)}
+  .flyrow i{width:11px; height:11px; border-radius:3px; flex:0 0 11px}
+  .flyrow b{margin-left:auto; font-size:11px; color:var(--nx-ink-muted)}
+  .flyrow.sub{padding-left:24px; color:var(--nx-ink-muted)}
+  .flyrow input{accent-color:var(--nx-select)}
+  /* Kovanie — boxy podľa vlastníka */
+  .hwown{border:1px solid var(--nx-border-soft); border-radius:6px; margin:6px 0; overflow:hidden}
+  .hwownh{display:flex; align-items:center; gap:6px; padding:4px 8px; background:var(--nx-surface-sunken);
+          font-size:11px; font-weight:600; color:var(--nx-ink-strong); cursor:pointer}
+  .hwownh:hover{color:var(--nx-select)}
+  .hwownsub{margin-left:auto; font-weight:400; font-size:10.5px; color:var(--nx-ink-faint)}
+  .hwownb{padding:2px 8px 6px}
+  /* Čelá — naviazané kovanie pod riadkom (klik = Kovanie) */
+  .fhwline{margin:-1px 0 5px 42px; font-size:10.5px; color:var(--nx-ink-faint); cursor:pointer;
+           display:flex; align-items:center; gap:5px}
+  .fhwline:hover{color:var(--nx-select)}
+  .fhwline .ic{width:11px; height:11px}
+  .infocol{padding:2px 0 0 12px; border-left:1px solid var(--nx-border-soft); align-self:stretch}
+  .inforow{display:flex; justify-content:space-between; gap:8px; font-size:10.8px; color:var(--nx-ink-soft);
+           padding:2px 0}
+  .inforow b{color:var(--nx-ink-strong); font-variant-numeric:tabular-nums; font-weight:600; font-size:11.2px}
+  .inforow.click{cursor:pointer}
+  .inforow.click:hover span,.inforow.click:hover b{color:var(--nx-select)}
+  /* warnlist pod hlavičkou (N5) */
+  .chdr{position:relative}
+  .warnpanel{position:absolute; top:calc(100% + 2px); right:8px; z-index:80; width:300px; background:var(--nx-surface);
+             border:1px solid var(--nx-warnchip-border); border-radius:6px; box-shadow:0 8px 22px var(--nx-modal-shadow);
+             padding:6px}
+  .warnrow{display:flex; align-items:center; gap:6px; padding:5px 4px; font-size:12px; color:var(--nx-warnrow-fg);
+           border-bottom:1px solid var(--nx-warnrow-border)}
+  .warnrow span{flex:1}
+  .wgoto{display:block; width:100%; margin-top:5px; padding:5px; border:0; background:none; cursor:pointer;
+         font:inherit; font-size:12px; color:var(--nx-select); text-align:center}
+  .wgoto:hover{text-decoration:underline}
+  .typbadge{font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:1px 7px;
+            border-radius:9px; background:var(--nx-surface-sunken); color:var(--nx-ink-muted); border:1px solid var(--nx-border-soft)}
+  .mmask{position:fixed; inset:0; background:var(--nx-scrim); display:none; align-items:center; justify-content:center; z-index:99}
+  .mbox{background:var(--nx-surface); border-radius:9px; padding:14px; width:300px; box-shadow:0 10px 30px var(--nx-modal-shadow)}
+  .mbox h3{font-size:13px; margin-bottom:10px; color:var(--nx-ink-strong)}
+  .mbox .foot{display:flex; gap:6px; justify-content:flex-end; margin-top:12px}
+  .row input,.row select{flex:1; padding:4px 6px; border:1px solid var(--nx-border-strong); border-radius:6px;
+                         font-size:13px; min-width:0; font-family:inherit; color:var(--nx-ink)}
+  .row .unit{flex:0 0 26px; text-align:right; color:var(--nx-ink-faint); font-size:11px; padding-left:4px}
+  .row input[readonly]{background:var(--nx-surface-readonly); color:var(--nx-ink-soft); border-style:dashed}
+  .row.mm input{flex:0 0 78px}
+  .row.mm .fill{flex:1}
+  .dimline{display:flex; gap:6px; align-items:flex-end; margin:5px 0}
+  .dimline .dg{flex:1; min-width:0}
+  .dimline .dl{font-size:9.5px; color:var(--nx-ink-faint); display:block; text-transform:uppercase; letter-spacing:.04em}
+  .dimline input{width:100%; min-width:0; padding:4px 5px; border:1px solid var(--nx-border-strong); border-radius:6px;
+                 font-family:inherit; font-size:12.5px; text-align:right}
+  .dimline .lk,.row .lk{flex:0 0 26px; height:27px; border:1px solid var(--nx-border); border-radius:6px;
+               background:var(--nx-surface-sunken); color:var(--nx-ink-muted); cursor:pointer;
+               display:inline-flex; align-items:center; justify-content:center}
+  .dimline .lk.on,.row .lk.on{background:var(--nx-warn-bg-soft); border-color:var(--nx-warn); color:var(--nx-warn-fg)}
+  /* vkladanie: typ objektu ako logické buttony */
+  .segrow{display:flex; gap:6px; margin:0 0 8px}
+  .segrow button{flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 4px;
+                 border:1px solid var(--nx-border); border-radius:6px; background:var(--nx-surface);
+                 cursor:pointer; font:inherit; font-size:12px; color:var(--nx-ink-strong)}
+  .segrow button:hover{border-color:var(--nx-select)}
+  .segrow button.on{background:var(--nx-select-bg); border-color:var(--nx-select); color:var(--nx-select-strong); font-weight:600}
+  .ghostwide{width:100%; margin:2px 0 8px; padding:7px; border:1px solid var(--nx-border); border-radius:6px;
+             background:var(--nx-surface); cursor:pointer; font:inherit; color:var(--nx-ink-strong);
+             display:flex; align-items:center; justify-content:center; gap:6px}
+  .ghostwide:hover{border-color:var(--nx-select); color:var(--nx-select)}
+  .matrow{display:flex; align-items:center; margin:5px 0; gap:6px}
+  .matrow label{flex:0 0 96px; color:var(--nx-ink-label); font-size:12px}
+  .matrow .grow{flex:1; min-width:0}
+  .sel{width:100%; padding:4px 6px; border:1px solid var(--nx-border-strong); border-radius:6px;
+       font-family:inherit; font-size:12px; background:var(--nx-surface); color:var(--nx-ink)}
+  .hint{font-size:10.5px; color:var(--nx-ink-faint); margin:3px 0 5px; line-height:1.45}
+  .subhead{font-size:11px; font-weight:600; color:var(--nx-ink-muted); margin:8px 0 3px;
+           text-transform:uppercase; letter-spacing:.03em}
+  .crumb{font-size:11.5px; color:var(--nx-ink-muted); margin-bottom:6px}
+  .crumb b{color:var(--nx-ink)}
+  .crumb .backlink{color:var(--nx-select); cursor:pointer; text-decoration:underline}
+  .primary{background:var(--nx-action); color:var(--nx-on-accent); border:0; border-radius:5px; padding:7px 8px;
+           font-size:12px; font-weight:600; cursor:pointer}
+  .primary:hover{background:var(--nx-action-hover)}
+  .ghostbtn{background:var(--nx-surface-sunken); color:var(--nx-ink-strong); border:1px solid var(--nx-border);
+            border-radius:5px; padding:6px 8px; font-size:12px; font-weight:600; cursor:pointer;
+            display:inline-flex; align-items:center; justify-content:center; gap:5px}
+  .ghostbtn:hover{background:var(--nx-ghost-hover)}
+  .danger{background:var(--nx-danger-bg); color:var(--nx-danger); border:1px solid var(--nx-danger-border);
+          border-radius:5px; padding:6px 8px; font-size:12px; font-weight:600; cursor:pointer}
+  .wide{width:100%; margin-top:4px; padding:8px; font-size:13px}
+  .btnrow{display:flex; gap:6px; margin-top:6px}
+  .btnrow button{flex:1}
+  /* čelá / ABS / kovanie */
+  .frow{display:flex; gap:5px; align-items:center; margin:4px 0; padding:2px 4px; border-radius:6px; cursor:pointer}
+  .frow.sel{background:var(--nx-select-bg)}
+  .frow .fnum{flex:0 0 22px; color:var(--nx-ink-faint); font-size:11px; text-align:center}
+  .frow select.ftype{flex:1 1 auto; min-width:88px; padding:3px; border:1px solid var(--nx-border-strong);
+                     border-radius:6px; font-family:inherit; font-size:12px}
+  .frow .funit{flex:0 0 auto; font-size:10px; color:var(--nx-ink-faint)}
+  .frow .fauto{flex:0 0 auto; padding:2px 6px; font-size:9.5px; font-weight:700; letter-spacing:.03em;
+               border:1px solid var(--nx-border); border-radius:6px; background:var(--nx-surface-sunken);
+               color:var(--nx-ink-muted); cursor:pointer}
+  .frow .fauto:hover{border-color:var(--nx-select); color:var(--nx-select)}
+  .frow .ftico{flex:0 0 15px; display:inline-flex; color:var(--nx-ink-faint)}
+  .frow .ftico .ic{width:14px; height:14px}
+  .frow input.fh{flex:0 0 46px; width:46px; min-width:0; padding:3px 4px; border:1px solid var(--nx-border-strong);
+                 border-radius:6px; font-family:inherit; font-size:12px; text-align:right}
+  .frow .dwrap{flex:0 0 auto}
+  .frow .fprof,.frow .flock{flex:0 0 22px; padding:2px 0; background:var(--nx-surface-sunken);
+        color:var(--nx-ink-muted); border:1px solid var(--nx-border-strong); border-radius:6px; line-height:0; cursor:pointer}
+  .frow .fprof.on{background:var(--nx-select-bg); color:var(--nx-select); border-color:var(--nx-select)}
+  .frow .flock.on{background:var(--nx-warn-bg-soft); border-color:var(--nx-warn); color:var(--nx-warn-fg)}
+  .frow .fdel{flex:0 0 22px; background:var(--nx-danger-bg); color:var(--nx-danger); border:1px solid var(--nx-danger-border);
+              border-radius:6px; padding:2px 0; line-height:0; cursor:pointer}
+  .absleg{display:flex; flex-wrap:wrap; gap:8px; font-size:10px; color:var(--nx-ink-muted); margin:2px 0 7px; align-items:center}
+  .absleg span{display:inline-flex; align-items:center; gap:3px}
+  .absleg i{width:11px; height:11px; border-radius:2px; display:inline-block}
+  .absall{margin-left:auto; width:22px; height:15px; padding:0; border:1px solid var(--nx-border-strong);
+          border-radius:3px; background:var(--nx-surface); display:inline-flex; align-items:center;
+          justify-content:center; cursor:pointer}
+  .absall i{width:12px; height:8px; border:2px solid var(--nx-abs-1mm); border-radius:2px; display:block;
+            background:var(--nx-abs-tape-bg)}
+  .edgerow{display:flex; gap:5px; align-items:center; margin:3px 0}
+  .edgerow .en{flex:0 0 70px; font-size:12px; color:var(--nx-ink-label); display:flex; align-items:center; gap:5px}
+  .edgerow .en i{width:11px; height:11px; border-radius:2px; display:inline-block; flex:0 0 11px}
+  .edgerow .grow{flex:1; min-width:0}
+  .hwrow{display:flex; align-items:center; gap:5px; margin:4px 0}
+  .hwrow .hwname{flex:1; font-size:12px; color:var(--nx-ink-strong); min-width:0}
+  .hwrow .hwext{color:var(--nx-ink-faint); font-size:11px}
+  .hwrow .hwqty{flex:0 0 50px; padding:3px 5px; border:1px solid var(--nx-border-strong); border-radius:6px;
+                font-size:12px; text-align:right; font-family:inherit}
+  .hwbuy{font-size:11px; color:var(--nx-ink-muted); margin:1px 0 5px 2px; overflow:hidden;
+         text-overflow:ellipsis; white-space:nowrap}
+  .hwbuy-warn{color:var(--nx-warnchip-fg)}
+  .znode{padding:4px 6px; font-size:12px; border-bottom:1px solid var(--nx-bg); cursor:pointer}
+  .znode:hover{background:var(--nx-select-bg-soft)}
+  .znode.active{background:var(--nx-select-bg); box-shadow:inset 3px 0 0 var(--nx-select)}
+  .znode .dim{color:var(--nx-ink-faint); font-size:10.5px}
+  .partnote{background:var(--nx-part-bg); border:1px solid var(--nx-part-border); border-radius:6px; padding:6px 8px;
+            font-size:11px; color:var(--nx-ink-muted); margin-bottom:7px}
+  .tpltiles{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin:4px 0 8px}
+  .tpltile{border:1px solid var(--nx-border); border-radius:6px; padding:5px 4px; background:var(--nx-surface);
+           cursor:pointer; text-align:center; font-size:11px; color:var(--nx-ink-strong); font-family:inherit}
+  .tpltile.on{border-color:var(--nx-select); background:var(--nx-select-bg)}
+  .tpltile svg{width:100%; height:38px; display:block; margin-bottom:3px}
+  .tpltile span{display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+  /* ===== D-85 combobox ===== */
+  .nxcombo{position:relative; min-width:0}
+  .cbtrigger{display:flex; align-items:center; gap:6px; width:100%; padding:4px 6px; font:inherit; font-size:12px;
+             background:var(--nx-surface); border:1px solid var(--nx-border-strong); border-radius:6px;
+             cursor:pointer; color:var(--nx-ink); text-align:left; min-height:27px}
+  .cbtrigger:hover{border-color:var(--nx-select)}
+  .cbtrigger .sw{width:14px; height:14px; border-radius:3px; border:1px solid rgba(0,0,0,.14); flex:0 0 14px}
+  .cbtrigger .lbl{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .cbtrigger .ic{width:13px; height:13px; color:var(--nx-ink-faint); flex:0 0 13px}
+  .cbpop{position:absolute; z-index:110; top:calc(100% + 3px); left:auto; right:0; width:max(100%, 270px);
+         background:var(--nx-surface); border:1px solid var(--nx-border); border-radius:6px;
+         box-shadow:0 8px 22px var(--nx-modal-shadow); overflow:hidden}
+  .cbpop.up{top:auto; bottom:calc(100% + 3px)}
+  .cbsearch{display:flex; align-items:center; gap:6px; padding:6px 8px; border-bottom:1px solid var(--nx-border-soft)}
+  .cbsearch .ic{width:14px; height:14px; color:var(--nx-ink-faint)}
+  .cbsearch input{flex:1; border:0; outline:0; font:inherit; font-size:12.5px; background:transparent; min-width:0}
+  .cblist{max-height:230px; overflow:auto}
+  .cbsec{font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--nx-ink-faint);
+         padding:6px 9px 2px}
+  .cbopt{display:flex; align-items:center; gap:8px; padding:5px 9px; cursor:pointer; font-size:12.5px}
+  .cbopt .sw{width:18px; height:18px; border-radius:3px; border:1px solid rgba(0,0,0,.14); flex:0 0 18px}
+  .cbopt .t{flex:1; min-width:0; overflow:hidden}
+  .cbopt .t i{font-style:normal; color:var(--nx-ink-faint); font-size:10.5px; display:block}
+  .cbopt .meta{font-size:10.5px; color:var(--nx-ink-faint)}
+  .cbopt.act{background:var(--nx-select-bg)}
+  .cbopt mark{background:#fff3b0; color:inherit; padding:0}
+  .cbfoot{padding:5px 9px; border-top:1px solid var(--nx-border-soft); font-size:10.5px; color:var(--nx-ink-faint);
+          display:flex; gap:8px; align-items:center}
+  .kbd{border:1px solid var(--nx-border); border-bottom-width:2px; border-radius:3px; padding:0 4px; font-size:10px;
+       background:var(--nx-surface-sunken); color:var(--nx-ink-muted)}
+  .cbempty{padding:10px 9px; font-size:12px; color:var(--nx-ink-faint)}
+
+  #toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(14px); z-index:200;
+         background:#263238; color:#fff; font-size:12.5px; padding:9px 14px; border-radius:6px;
+         box-shadow:0 8px 22px rgba(0,0,0,.3); opacity:0; pointer-events:none; transition:opacity .16s,transform .16s;
+         display:flex; align-items:center; gap:8px; max-width:min(560px,86vw)}
+  #toast.on{opacity:1; transform:translateX(-50%) translateY(0)}
+  #toast .ic{color:#8bc7ff}
+</style>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-maximize" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+<symbol id="i-lock-open" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 11 7 11 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 1 12s4 7 11 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="m2 2 20 20"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
+<symbol id="i-rotate-ccw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+<symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></symbol>
+<symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></symbol>
+<symbol id="i-layout-grid" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></symbol>
+<symbol id="i-columns-2" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></symbol>
+<symbol id="i-columns-3" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></symbol>
+<symbol id="i-rows-2" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/></symbol>
+<symbol id="i-rows-3" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+<symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+<symbol id="i-profile" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="5" rx="1.5"/><path d="M6 8v13h12V8"/></symbol>
+<symbol id="i-slab" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="1.5"/><path d="M2 10h20"/></symbol>
+<symbol id="i-arr-h" viewBox="0 0 24 24"><path d="M8 8 4 12l4 4"/><path d="m16 8 4 4-4 4"/><path d="M4 12h16"/></symbol>
+<symbol id="i-arr-v" viewBox="0 0 24 24"><path d="m8 8 4-4 4 4"/><path d="m8 16 4 4 4-4"/><path d="M12 4v16"/></symbol>
+<symbol id="i-arr-d" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="M6 11v7h7"/><path d="M18 13V6h-7"/></symbol>
+<symbol id="i-plinth" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="13" rx="2"/><rect x="6" y="19" width="12" height="3" rx="1" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-cab-low" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="12" rx="1"/><path d="M12 4v12"/><path d="M9.5 9h.01"/><path d="M14.5 9h.01"/><rect x="6" y="18" width="12" height="3" rx="1" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-cab-high" viewBox="0 0 24 24"><path d="M3 3h18"/><path d="M7 3v3"/><path d="M17 3v3"/><rect x="4" y="6" width="16" height="12" rx="1"/><path d="M12 6v12"/><path d="M9.5 15h.01"/><path d="M14.5 15h.01"/></symbol>
+<symbol id="i-edge" viewBox="0 0 24 24"><path d="M3 4h18" stroke-width="3"/><path d="M3 9v3" /><path d="M3 17v3"/><path d="M21 9v3"/><path d="M21 17v3"/><path d="M8 20h3"/><path d="M15 20h3"/></symbol>
+<symbol id="i-shell" viewBox="0 0 24 24"><path d="M14 11a2 2 0 1 1-4 0 4 4 0 0 1 8 0 6 6 0 0 1-12 0 8 8 0 0 1 16 0 10 10 0 1 1-20 0 11.93 11.93 0 0 1 2.42-7.22 2 2 0 1 1 3.16 2.44"/></symbol>
+<symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/></symbol>
+<symbol id="i-hammer" viewBox="0 0 24 24"><path d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></symbol>
+<symbol id="i-cabinet" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="15" rx="1"/><path d="M12 3v15"/><path d="M6 21v-3"/><path d="M18 21v-3"/><path d="M9.5 10h.01"/><path d="M14.5 10h.01"/></symbol>
+<symbol id="i-door" viewBox="0 0 24 24"><path d="M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14"/><path d="M2 20h20"/><path d="M14 12v.01"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+<symbol id="i-p-top" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4"/><path d="M5 8v12"/><path d="M19 8v12"/></symbol>
+<symbol id="i-p-bottom" viewBox="0 0 24 24"><rect x="3" y="16" width="18" height="4"/><path d="M5 4v12"/><path d="M19 4v12"/></symbol>
+<symbol id="i-p-side" viewBox="0 0 24 24"><rect x="3" y="4" width="4" height="16"/><rect x="17" y="4" width="4" height="16"/><path d="M7 6h10"/><path d="M7 18h10"/></symbol>
+<symbol id="i-p-back" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/><path d="m4 20 16-16"/></symbol>
+<symbol id="i-brace" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="3"/><rect x="4" y="11" width="16" height="3"/><path d="M4 20h16"/></symbol>
+<symbol id="i-front" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1"/><rect x="8" y="7" width="8" height="2" rx="1"/></symbol>
+<symbol id="i-screw" viewBox="0 0 24 24"><circle cx="12" cy="6" r="3.5"/><path d="m9.8 3.8 4.4 4.4"/><path d="M12 9.5V21"/><path d="m9 12.5 6-2"/><path d="m9 16 6-2"/><path d="m9 19.5 6-2"/></symbol>
+<symbol id="i-handle" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="3" rx="1.5"/><path d="M8 13v4"/><path d="M16 13v4"/></symbol>
+<symbol id="i-plinth-b" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="12"/><rect x="7" y="17" width="10" height="4"/></symbol>
+<symbol id="i-plinth-c" viewBox="0 0 24 24"><path d="M4 3v11h5v7h11V3"/></symbol>
+<symbol id="i-logo2" viewBox="0 0 100 100"><g stroke="currentColor" fill="none" stroke-width="7" stroke-linecap="square"><circle cx="50" cy="50" r="15"/><path d="M50 6v20"/><path d="M50 74v20"/><path d="M6 50h20"/><path d="M74 50h20"/><path d="M28 68V50a11 11 0 0 1 11-11"/><path d="M72 32v18a11 11 0 0 1-11 11"/></g></symbol>
+<symbol id="i-logo3" viewBox="0 0 100 100"><g fill="currentColor"><path d="M50 32a18 18 0 1 0 0 36 18 18 0 0 0 0-36Zm0 8a10 10 0 1 1 0 20 10 10 0 0 1 0-20Z"/><polygon points="45,28 45,10 50,4 55,10 55,28"/><polygon points="45,72 45,90 50,96 55,90 55,72"/><polygon points="28,45 10,45 4,50 10,55 28,55"/><polygon points="72,45 90,45 96,50 90,55 72,55"/><path d="M24 70V52a14 14 0 0 1 14-14v8a6 6 0 0 0-6 6v18Z"/><path d="M76 30v18a14 14 0 0 1-14 14v-8a6 6 0 0 0 6-6V30Z"/></g></symbol>
+<symbol id="i-logo" viewBox="7071.5 11779.5 6054 6054"><g transform="translate(6842.5 56)"><path d="M4814 14749c0,521 0,1041 0,1561 -145,0 -291,0 -436,0 0,-517 0,-1035 0,-1552l436 -9zm0 3c-12,-788 -622,-1561 -1566,-1556 -944,6 -1549,792 -1550,1556l0 100 0 1458 433 0 0 -1474 0 -84c21,-630 497,-1124 1124,-1136 577,-12 1127,493 1123,1146l436 -10z"/></g><g transform="translate(3466.5 59.5)"><path d="M8203 14742c0,-9 0,-7 -1,-16 -25,-784 -637,-1547 -1578,-1542 -951,6 -1562,787 -1563,1558l437 -1c21,-635 501,-1121 1133,-1134 569,-11 1113,476 1132,1114 0,14 0,5 0,19l440 2zm-3142 -1c12,794 627,1574 1579,1569 951,-5 1562,-798 1563,-1568l-437 0c-21,634 -501,1132 -1133,1145 -568,12 -1112,-473 -1134,-1107 0,-16 -2,-23 -2,-39l-436 0z"/></g><g transform="rotate(45 10098.5 14806.5) translate(222 0)"><polygon points="7673,12911 8290,12911 9876,14498 11463,12911 12080,12911 10185,14806 12080,16702 11464,16702 9876,15114 8289,16702 7673,16702 9568,14806"/></g><g transform="translate(-3489.5 -25)"><path d="M12030 14746c0,-520 0,-868 0,-1388 145,0 290,0 436,0 0,517 0,863 0,1380l-436 8zm0 -2c12,787 622,1561 1565,1555 944,-5 1550,-791 1551,-1555l0 -100 0 -1286 -433 0 0 1302 0 84c-21,630 -497,1123 -1124,1136 -577,12 -1128,-493 -1123,-1146l-436 10z"/></g><g transform="translate(-6842.5 61)"><path d="M18499 14744c0,520 0,1040 0,1561 -145,0 -291,0 -436,0 0,-518 0,-1035 0,-1553l436 -8zm0 2c-12,-787 -622,-1560 -1566,-1555 -943,5 -1549,791 -1550,1555l0 100 0 1459 433 0 0 -1475 0 -84c21,-629 497,-1123 1124,-1136 577,-12 1127,494 1123,1146l436 -10z"/></g></symbol>
+</defs></svg>
+
+<div class="mockbar">
+  <svg class="mb-logo" viewBox="0 0 100 100" aria-hidden="true"><use href="#i-logo"/></svg>
+  <span class="mb-title">Inspector — variant C, doladený</span>
+  <span class="mb-ver">470 px · 4 sektory · kontextová projekcia s kótami · vrstvové chipy</span>
+</div>
+<div class="notestrip">
+  <svg class="ic" aria-hidden="true"><use href="#i-info"/></svg>
+  mockup — dáta sú vymyslené (CAB-005 „Dolná drezová 900", zákazka KLINIKA). Nič sa nezapisuje.
+</div>
+
+<div class="stagewrap">
+  <div class="sutb" id="sutb"></div>
+  <div class="selsim" id="selsim"></div>
+  <div class="stage">
+    <div class="win">
+      <div class="winhead"><span class="wdots"><i></i><i></i><i></i></span> Noxun Engine — Inspector
+        <span class="wsize">470 × 810 px</span></div>
+      <div class="panel" id="panel"></div>
+    </div>
+  </div>
+  <div class="mocknote" id="mocknote"></div>
+</div>
+
+<div id="toast"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span id="toastText"></span></div>
+
+<script>
+/* =====================================================================
+   Inspector — variant C doladený.
+   Rail (kontext) · 4 zrolovateľné sektory · kontextová projekcia + vrstvy.
+   Skrinka: CAB-005 „Dolná drezová 900" · 900 × 720 × 560 · sokel 100
+            K2738 Cremona Oak 18 · F1 dvierka AUTO 356 + F2/F3 zásuvky 180
+   ===================================================================== */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ico = (n, cls) => '<svg class="ic'+(cls?' '+cls:'')+'" aria-hidden="true"><use href="#i-'+n+'"/></svg>';
+const norm = s => String(s).normalize('NFD').split('').filter(function(ch){ var c = ch.charCodeAt(0); return c < 0x300 || c > 0x36f; }).join('').toLowerCase();
+
+/* ---------------------- katalóg ---------------------- */
+const DECORS = [
+  {id:'k2738', code:'K2738 MO',     name:'Cremona Oak',          man:'Kronospan · MO',  c:'#b98d5c', th:'18',      use:'projekt', used:'24 dielcov'},
+  {id:'m500',  code:'500 SM',       name:'Biela',                man:'Kronospan · SM',  c:'#f6f6f3', th:'18 / 36', use:'projekt', used:'42 dielcov'},
+  {id:'k686',  code:'K686 PE',      name:'Powder Pink',          man:'Kronospan · PE',  c:'#e6bfc4', th:'18',      use:'projekt', used:'18 čiel'},
+  {id:'u636',  code:'U636 ST9',     name:'Pastelová modrá',      man:'Egger · ST9',     c:'#a9c3d2', th:'18',      use:'projekt', used:'6 čiel'},
+  {id:'f800',  code:'KOMPAKT F800', name:'Grafit',               man:'Kompakt · 12 mm', c:'#3a3f44', th:'12',      use:'recent'},
+  {id:'u999',  code:'U999 ST2',     name:'Čierna',               man:'Egger · ST2',     c:'#23272b', th:'18',      use:'recent'},
+  {id:'h1193', code:'H1193 ST12',   name:'Dub Halifax tabakový', man:'Egger · ST12',    c:'#8a6a4a', th:'18',      use:'recent'},
+  {id:'hdf',   code:'HDF Biela',    name:'chrbty 3 mm',          man:'Kronospan',       c:'#f0efe9', th:'3'},
+  {id:'k003',  code:'K003 PW',      name:'Sand Barbados',        man:'Kronospan · PW',  c:'#d9c9a8', th:'18'},
+  {id:'u732',  code:'U732 ST9',     name:'Kašmírová šedá',       man:'Egger · ST9',     c:'#b4b1a8', th:'18'},
+  {id:'k350',  code:'K350 SN',      name:'Antracit Metallic',    man:'Kronospan · SN',  c:'#4a4f55', th:'18'},
+  {id:'w1000', code:'W1000 ST9',    name:'Premium biela',        man:'Egger · ST9',     c:'#fbfbf8', th:'18 / 36'},
+  {id:'u963',  code:'U963 ST9',     name:'Fjord modrá',          man:'Egger · ST9',     c:'#4f6b80', th:'18'},
+  {id:'h1180', code:'H1180 ST37',   name:'Dub Halifax prírodný', man:'Egger · ST37',    c:'#c8a878', th:'18'},
+  {id:'f812',  code:'F812 ST9',     name:'Levanto Bianco',       man:'Egger · PD 38',   c:'#ece9e4', th:'38'},
+  {id:'uni_k', code:'UNI Korpus',   name:'materiál neurčený',    man:'pracovný — bez záväzku', c:'#c3c8cd', th:'18'}
+];
+const ABSY = [
+  {id:'a_2738_1', code:'ABS K2738', name:'22 × 1,0 mm', man:'k dekoru K2738 Cremona Oak', c:'#b98d5c', use:'projekt', mm:1},
+  {id:'a_2738_2', code:'ABS K2738', name:'22 × 2,0 mm', man:'k dekoru K2738 Cremona Oak', c:'#b98d5c', use:'projekt', mm:2},
+  {id:'a_500_1',  code:'ABS 500 SM',name:'22 × 1,0 mm', man:'k dekoru 500 SM Biela',      c:'#f6f6f3', use:'projekt', mm:1},
+  {id:'a_686_2',  code:'ABS K686',  name:'22 × 2,0 mm', man:'k dekoru K686 Powder Pink',  c:'#e6bfc4', use:'projekt', mm:2},
+  {id:'a_636_1',  code:'ABS U636',  name:'22 × 1,0 mm', man:'k dekoru U636 Pastelová modrá', c:'#a9c3d2', use:'recent', mm:1},
+  {id:'a_999_2',  code:'ABS U999',  name:'22 × 2,0 mm', man:'k dekoru U999 Čierna',       c:'#23272b', use:'recent', mm:2},
+  {id:'a_2738_43',code:'ABS K2738', name:'43 × 2,0 mm', man:'na hrubé čelá a dosky',      c:'#b98d5c', mm:2},
+  {id:'a_uni_1',  code:'UNI ABS',   name:'22 × 1,0 mm', man:'univerzálna páska (bez dekoru)', c:'#c3c8cd', mm:1},
+  {id:'none',     code:'Bez ABS',   name:'hrana sa nelepí', man:'',                       c:'#b0bec5', mm:0}
+];
+const D = id => DECORS.find(d => d.id === id) || ABSY.find(a => a.id === id);
+
+/* ---------------------- stav ---------------------- */
+const S = {
+  ctx:'cab',                                   // cab | zones | fronts | hw | part | insert
+  insType:'dolna',                             // vkladanie: dolna | horna | doska
+  ilocks:{w:false, h:true, d:false, p:false},  // D-39 zámky rozmerov pri vkladaní (výška drží zo šablóny)
+  sect:{pv:true, basic:true, mat:true, set:true, itpl:true, ibasic:true, pbasic:true},   // zrolovanie sektorov — DRŽÍ pri prepínaní kontextov
+  s4:{cab:'strop', zones:'delenie', fronts:'zoznam', hw:'polozky', part:'material', insert:'sablona', cfg:'vzhlad'},
+  structOpen:true,                             // štruktúra zón — vlastné rozrolovanie mimo exkluzivity
+  layers:{zony:false, cela:false, kovanie:false},   // vrstvové chipy (ghost D-27)
+  combo:{ body:'k2738', front:'k2738', back:'hdf', part_mat:'k2738',
+          e_front:'a_2738_1', e_back:'none', e_left:'a_2738_1', e_right:'none', ins_mat:'k2738' },
+  recent:['f800','u999','h1193'], recentAbs:['a_636_1','a_999_2'],
+  zone:'Z1.2', tpl:'t5', shelves:2, frontSel:'F1',
+  fronts:[{id:'F3', type:'zas', h:180}, {id:'F2', type:'zas', h:180}, {id:'F1', type:'dvere', h:null}]
+};
+const CAB = {id:'CAB-005', name:'Dolná drezová 900', w:900, h:720, d:560, plinth:100, th:18};
+
+let toastT = null;
+function toast(msg, icon){
+  const box = document.getElementById('toast');
+  box.querySelector('use').setAttribute('href','#i-'+(icon||'check'));
+  document.getElementById('toastText').textContent = msg;
+  box.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(()=>box.classList.remove('on'), 2300);
+}
+
+/* =====================================================================
+   D-85 COMBOBOX — nezmenený z variantu C (Michal: „super aj umiestnením")
+   ===================================================================== */
+let cbOpen = null, cbActive = 0, cbItems = [];
+function comboHtml(id, kind){
+  const v = D(S.combo[id]);
+  return '<div class="nxcombo" data-cb="'+id+'" data-kind="'+kind+'">' +
+    '<button type="button" class="cbtrigger" onclick="cbToggle(\''+id+'\',event)">' +
+    (v ? '<i class="sw" style="background:'+v.c+'"></i>' : '') +
+    '<span class="lbl">'+esc(v ? v.code+' · '+v.name : '— vyber —')+'</span>' + ico('chevron-down') + '</button></div>';
+}
+function cbSections(kind, q){
+  const src = kind === 'abs' ? ABSY : DECORS, rec = kind === 'abs' ? S.recentAbs : S.recent;
+  const hit = it => !q || norm(it.code+' '+it.name+' '+it.man).includes(norm(q));
+  const proj = src.filter(it => it.use === 'projekt' && hit(it));
+  const recent = rec.map(id => src.find(x => x.id === id)).filter(x => x && hit(x));
+  const used = new Set([].concat(proj.map(x=>x.id), recent.map(x=>x.id)));
+  const rest = src.filter(it => !used.has(it.id) && hit(it));
+  const out = [];
+  if (proj.length)   out.push({t:'Použité v projekte', items:proj});
+  if (recent.length) out.push({t:'Naposledy použité',  items:recent});
+  if (rest.length)   out.push({t:(kind==='abs'?'Katalóg ABS pások':'Katalóg dekorov')+' ('+rest.length+')', items:rest});
+  return out;
+}
+function hl(txt, q){
+  if (!q) return esc(txt);
+  const i = norm(txt).indexOf(norm(q));
+  if (i < 0) return esc(txt);
+  return esc(txt.slice(0,i)) + '<mark>' + esc(txt.slice(i,i+q.length)) + '</mark>' + esc(txt.slice(i+q.length));
+}
+function cbRenderList(id, q){
+  const wrap = document.querySelector('.nxcombo[data-cb="'+id+'"]'); if (!wrap) return;
+  const list = wrap.querySelector('.cblist'), secs = cbSections(wrap.dataset.kind, q);
+  cbItems = []; secs.forEach(s => s.items.forEach(it => cbItems.push(it)));
+  if (cbActive >= cbItems.length) cbActive = 0;
+  if (!cbItems.length){ list.innerHTML = '<div class="cbempty">Nič nesedí — hľadá sa aj bez diakritiky.</div>'; return; }
+  let n = 0, h = '';
+  secs.forEach(s => {
+    h += '<div class="cbsec">'+esc(s.t)+'</div>';
+    s.items.forEach(it => {
+      h += '<div class="cbopt'+(n===cbActive?' act':'')+'" data-i="'+n+'" onclick="cbPick(\''+id+'\','+n+')">' +
+        '<i class="sw" style="background:'+it.c+'"></i><span class="t"><b>'+hl(it.code+' · '+it.name,q)+'</b>' +
+        '<i>'+esc(it.man||'')+'</i></span><span class="meta">'+esc(it.used || (it.th ? it.th+' mm' : ''))+'</span></div>';
+      n++;
+    });
+  });
+  list.innerHTML = h;
+  const a = list.querySelector('.cbopt.act'); if (a) a.scrollIntoView({block:'nearest'});
+}
+function cbToggle(id, ev){
+  if (ev) ev.stopPropagation();
+  if (cbOpen === id){ cbClose(); return; }
+  cbClose();
+  const wrap = document.querySelector('.nxcombo[data-cb="'+id+'"]'); if (!wrap) return;
+  const pop = document.createElement('div');
+  pop.className = 'cbpop';
+  pop.innerHTML = '<div class="cbsearch">'+ico('search')+
+    '<input type="text" placeholder="Píš názov alebo kód… (aj bez diakritiky)" autocomplete="off"></div>' +
+    '<div class="cblist"></div><div class="cbfoot"><span class="kbd">↑ ↓</span> výber ' +
+    '<span class="kbd">Enter</span> potvrdí <span class="kbd">Esc</span> zavrie</div>';
+  wrap.appendChild(pop);
+  cbOpen = id; cbActive = 0; cbRenderList(id, '');
+  const r = wrap.getBoundingClientRect();
+  if (r.bottom + 300 > window.innerHeight) pop.classList.add('up');
+  const inp = pop.querySelector('input');
+  inp.addEventListener('input', () => { cbActive = 0; cbRenderList(id, inp.value.trim()); });
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown'){ cbActive = Math.min(cbActive+1, cbItems.length-1); cbRenderList(id, inp.value.trim()); e.preventDefault(); }
+    else if (e.key === 'ArrowUp'){ cbActive = Math.max(cbActive-1, 0); cbRenderList(id, inp.value.trim()); e.preventDefault(); }
+    else if (e.key === 'Enter'){ cbPick(id, cbActive); e.preventDefault(); }
+    else if (e.key === 'Escape'){ cbClose(); e.preventDefault(); }
+  });
+  setTimeout(()=>inp.focus(), 10);
+}
+function cbClose(){ document.querySelectorAll('.cbpop').forEach(p => p.remove()); cbOpen = null; }
+function cbPick(id, i){
+  const it = cbItems[i]; if (!it) return;
+  const kind = document.querySelector('.nxcombo[data-cb="'+id+'"]').dataset.kind;
+  S.combo[id] = it.id;
+  const rec = kind === 'abs' ? S.recentAbs : S.recent;
+  if (it.use !== 'projekt'){ const k = rec.indexOf(it.id); if (k>=0) rec.splice(k,1); rec.unshift(it.id); rec.length = Math.min(rec.length,3); }
+  cbClose(); toast('Nastavené: ' + it.code + ' · ' + it.name, 'check'); render();
+}
+document.addEventListener('click', e => { if (cbOpen && !e.target.closest('.nxcombo')) cbClose(); });
+
+/* =====================================================================
+   KONTEXTOVÁ PROJEKCIA — pohľad sa VYMIENA podľa railu (žiadne vrstvy cez seba),
+   ghost vrstvy sa dajú prisvietiť chipmi. Kóty decentne (--nx-ink-faint).
+   Súradnice: viewBox 0 0 400 250; korpus 66..326 × 26..196, sokel 196..216.
+   ===================================================================== */
+const FAINT = 'var(--nx-ink-faint)';
+const GH = 'var(--nx-border-strong)';   /* ghost vrstva — tlmené šedé linky */
+function txt(x, y, s, o){
+  o = o || {};
+  return '<text x="'+x+'" y="'+y+'" font-family="Segoe UI" font-size="'+(o.size||9.5)+'" ' +
+    'fill="'+(o.fill||FAINT)+'" text-anchor="'+(o.anchor||'middle')+'"' +
+    (o.rot ? ' transform="rotate('+o.rot+' '+x+' '+y+')"' : '') + '>'+esc(s)+'</text>';
+}
+/* vodorovná kóta */
+function dimH(x1, x2, y, label){
+  return '<g stroke="'+FAINT+'" stroke-width="1">' +
+    '<path d="M'+x1+' '+(y-4)+'V'+(y+4)+'M'+x2+' '+(y-4)+'V'+(y+4)+'"/>' +
+    '<path d="M'+x1+' '+y+'H'+x2+'"/></g>' +
+    '<rect x="'+((x1+x2)/2-15)+'" y="'+(y-7)+'" width="30" height="12" fill="var(--nx-surface-preview)"/>' +
+    txt((x1+x2)/2, y+3.5, label);
+}
+/* zvislá kóta */
+function dimV(x, y1, y2, label){
+  return '<g stroke="'+FAINT+'" stroke-width="1">' +
+    '<path d="M'+(x-4)+' '+y1+'H'+(x+4)+'M'+(x-4)+' '+y2+'H'+(x+4)+'"/>' +
+    '<path d="M'+x+' '+y1+'V'+y2+'"/></g>' +
+    '<rect x="'+(x-8)+'" y="'+((y1+y2)/2-15)+'" width="16" height="30" fill="var(--nx-surface-preview)"/>' +
+    txt(x, (y1+y2)/2, label, {rot:-90});
+}
+/* ghost vrstvy — kreslia sa LEN ako tlmené linky, nikdy neprekryjú základný pohľad */
+function ghostZones(){
+  return '<g stroke="'+GH+'" stroke-width="1" stroke-dasharray="3 3" fill="none">' +
+    '<path d="M196 34V188"/><path d="M74 84H196M74 136H196"/></g>' +
+    txt(135, 60, 'ghost: zóny', {size:8});
+}
+function ghostFronts(){
+  return '<g stroke="'+GH+'" stroke-width="1" stroke-dasharray="4 3" fill="none">' +
+    '<rect x="64" y="24" width="264" height="40"/><rect x="64" y="67" width="264" height="40"/>' +
+    '<rect x="64" y="110" width="264" height="88"/></g>' +
+    txt(300, 20, 'ghost: čelá', {size:8, anchor:'end'});
+}
+function ghostHw(){
+  return '<g stroke="'+GH+'" stroke-width="1" fill="none">' +
+    '<circle cx="76" cy="212" r="4"/><circle cx="316" cy="212" r="4"/>' +
+    '<rect x="68" y="60" width="10" height="24" rx="2"/><rect x="68" y="130" width="10" height="24" rx="2"/>' +
+    '<path d="M300 78h18M300 92h18" stroke-dasharray="3 2"/></g>' +
+    txt(96, 232, 'ghost: kovanie', {size:8});
+}
+function ghostLayers(skip){
+  let g = '';
+  if (S.layers.zony && skip !== 'zony') g += ghostZones();
+  if (S.layers.cela && skip !== 'cela') g += ghostFronts();
+  if (S.layers.kovanie && skip !== 'kovanie') g += ghostHw();
+  return g;
+}
+const PROJ_TITLE = {cab:'Čelný rez + kóty', zones:'Zóny', fronts:'Čelá', part:'Dielec — hrany',
+                    hw:'Kovanie — pozície', insert:'Náhľad šablóny'};
+
+function projSvg(){
+  const body = D(S.combo.body).c, front = D(S.combo.front).c;
+  const open = '<svg class="proj" viewBox="0 0 400 250" preserveAspectRatio="xMidYMid meet">';
+  const corpus = (fill) =>
+    '<rect x="66" y="26" width="260" height="170" fill="var(--nx-surface)" stroke="var(--nx-border-strong)"/>' +
+    '<rect x="66" y="26" width="8" height="170" fill="'+fill+'" stroke="var(--nx-border-strong)"/>' +
+    '<rect x="318" y="26" width="8" height="170" fill="'+fill+'" stroke="var(--nx-border-strong)"/>' +
+    '<rect x="66" y="26" width="260" height="8" fill="'+fill+'" stroke="var(--nx-border-strong)"/>' +
+    '<rect x="66" y="188" width="260" height="8" fill="'+fill+'" stroke="var(--nx-border-strong)"/>';
+
+  /* --- VKLADANIE (N9/N10): šablóna ako bude vložená — s čelami, prepínateľné vrstvy --- */
+  if (S.ctx === 'insert'){
+    if (S.insType === 'doska'){
+      const dc = D(S.combo.ins_mat).c;
+      const bt = BOARD_TPL[(S.tpl || '').replace('b_', '')] || BOARD_TPL.diel;
+      return open +
+        '<rect x="56" y="62" width="284" height="126" fill="'+dc+'" fill-opacity=".8" stroke="var(--nx-border-strong)"/>' +
+        '<g stroke="var(--nx-ink-soft)" stroke-width="1.4" fill="none">' +
+          '<path d="M92 100h60m-8-5 8 5-8 5"/><path d="M170 125h60m-8-5 8 5-8 5"/><path d="M92 150h60m-8-5 8 5-8 5"/></g>' +
+        dimH(56, 340, 214, String(bt.w)) + dimV(368, 62, 188, String(bt.h)) +
+        txt(198, 235, bt.n + ' · ' + bt.th + ' mm · ' + bt.ori + ' · smer po dĺžke (N10)', {size:8.5}) +
+        '</svg>';
+    }
+    const fr = (y, h, hy) =>
+      '<rect x="72" y="'+y+'" width="248" height="'+h+'" fill="'+front+'" fill-opacity=".9" stroke="var(--nx-select)"/>' +
+      '<rect x="150" y="'+hy+'" width="92" height="3.5" rx="1.75" fill="var(--nx-ink-soft)"/>';
+    return open +
+      '<polygon points="66,26 326,26 344,10 84,10" fill="'+body+'" fill-opacity=".35" stroke="var(--nx-border-strong)"/>' +
+      corpus(body) +
+      (S.insType === 'dolna' ? '<rect x="78" y="196" width="236" height="18" fill="'+body+'" fill-opacity=".7" stroke="var(--nx-border-strong)"/>' : '') +
+      (S.layers.cela
+        ? fr(30, 36, 34) + fr(70, 36, 74) + fr(110, 82, 116)
+        : '<path d="M196 34v154" stroke="var(--nx-border-strong)" stroke-dasharray="3 3"/>' +
+          '<path d="M74 110h122" stroke="var(--nx-border-strong)" stroke-dasharray="3 3"/>' +
+          txt(196, 118, 'vnútro šablóny — police a delenie', {size:9, fill:'var(--nx-ink-muted)'})) +
+      ghostLayers() +
+      dimH(66, 326, 234, '600') + dimV(360, 26, 196, S.insType === 'horna' ? '720' : '820') +
+      '</svg>';
+  }
+
+  /* --- KORPUS: čelný rez s kótami --- */
+  if (S.ctx === 'cab'){
+    const ph = Math.max(6, Math.min(32, Math.round((CAB.plinth || 0) * 0.2))); /* N12: sokel živo z poľa */
+    return open +
+      /* skosená horná plocha = náznak hĺbky */
+      '<polygon points="66,26 326,26 344,10 84,10" fill="'+body+'" fill-opacity=".35" stroke="var(--nx-border-strong)"/>' +
+      corpus(body) +
+      /* výstuhy (strop = dve výstuhy) */
+      '<path d="M74 34h244M74 44h244" stroke="var(--nx-border-strong)" stroke-dasharray="2 2"/>' +
+      /* sokel */
+      (ph > 0 ? '<rect x="78" y="196" width="236" height="'+ph+'" fill="'+body+'" fill-opacity=".7" stroke="var(--nx-border-strong)"/>' : '') +
+      ghostLayers() +
+      /* kóty */
+      dimH(66, 326, 234, '900') +
+      dimV(360, 26, 196, '720') +
+      (ph > 0 ? dimV(360, 196, 196 + ph, String(CAB.plinth)) : '') +
+      dimH(326, 344, 18, '560') +
+      txt(352, 233, 'sokel', {size:8, anchor:'end'}) +
+      txt(196, 118, 'K2738 · hrúbka 18', {size:9.5, fill:'var(--nx-ink-muted)'}) +
+      '</svg>';
+  }
+
+  /* --- ZÓNY: čistá zónová schéma (bez čiel); zóny sú KLIKATEĽNÉ (N18) --- */
+  if (S.ctx === 'zones'){
+    const selL = S.zone === 'Z1.1', selR = S.zone === 'Z1.2';
+    const shelfLines = Array.from({length: S.shelves}, (_, i) => {
+      const y = Math.round(34 + (154 / (S.shelves + 1)) * (i + 1));
+      return '<path d="M74 '+y+'h122" stroke="var(--nx-border-strong)"/>';
+    }).join('');
+    return open + corpus(body) +
+      '<rect x="196" y="34" width="8" height="154" fill="'+body+'" stroke="var(--nx-border-strong)"/>' +
+      '<rect x="74" y="34" width="122" height="154" fill="'+(selL?'var(--nx-select-bg)':'none')+'" ' +
+        'style="cursor:pointer" onclick="S.zone=\'Z1.1\';render()" ' +
+        'stroke="'+(selL?'var(--nx-select)':'var(--nx-border-strong)')+'" stroke-width="'+(selL?2:1)+'" stroke-dasharray="'+(selL?'0':'3 3')+'"/>' +
+      shelfLines +
+      '<rect x="204" y="34" width="114" height="154" fill="'+(selR?'var(--nx-select-bg)':'none')+'" ' +
+        'style="cursor:pointer" onclick="S.zone=\'Z1.2\';render()" ' +
+        'stroke="'+(selR?'var(--nx-select)':'var(--nx-border-strong)')+'" stroke-width="'+(selR?2:1)+'" stroke-dasharray="'+(selR?'0':'3 3')+'"/>' +
+      '<g stroke="var(--nx-border-strong)" fill="none" stroke-dasharray="2 2">' +
+        '<rect x="210" y="40" width="102" height="44"/><rect x="210" y="90" width="102" height="44"/>' +
+        '<rect x="210" y="140" width="102" height="42"/></g>' +
+      ghostLayers('zony') +
+      txt(135, 116, 'Z1.1 · 2 police', {size:10, fill:'var(--nx-ink-muted)'}) +
+      txt(261, 116, 'Z1.2 · zásuvky', {size:10, fill:'var(--nx-ink-muted)'}) +
+      dimH(74, 196, 210, '414') + dimH(204, 318, 210, '414') +
+      '</svg>';
+  }
+
+  /* --- ČELÁ: predný pohľad len čiel, medzery + výšky --- */
+  if (S.ctx === 'fronts'){
+    const f = (y, h, id, lab) => {
+      const sel = S.frontSel === id;
+      return '<rect x="64" y="'+y+'" width="264" height="'+h+'" fill="'+front+'" ' +
+        'style="cursor:pointer" onclick="S.frontSel=\''+id+'\';render()" ' +
+        'stroke="'+(sel?'var(--nx-select)':'var(--nx-border-strong)')+'" stroke-width="'+(sel?2.5:1)+'"/>' +
+        '<rect x="150" y="'+(y+3)+'" width="92" height="4" rx="2" fill="var(--nx-ink-soft)" pointer-events="none"/>' +
+        txt(72, y+13, id, {size:9, fill:sel?'var(--nx-select-strong)':'var(--nx-ink-muted)', anchor:'start'}) +
+        txt(196, y+h/2+4, lab, {size:10, fill:'var(--nx-ink-muted)'});
+    };
+    const gapsOn = S.s4.fronts === 'medzery'; /* N26: pri otvorenej skupine Medzery sa medzery podfarbia */
+    const gap = (y, h) => gapsOn ? '<rect x="60" y="'+y+'" width="272" height="'+h+'" fill="var(--nx-warn)" fill-opacity=".45"/>' : '';
+    return open +
+      '<rect x="60" y="20" width="272" height="182" fill="none" stroke="var(--nx-border-strong)" stroke-dasharray="3 3"/>' +
+      gap(20, 4) + gap(64, 3) + gap(107, 3) + gap(198, 4) +
+      f(24, 40, 'F3', 'zásuvka') + f(67, 40, 'F2', 'zásuvka') + f(110, 88, 'F1', 'dvierka (AUTO)') +
+      ghostLayers('cela') +
+      dimV(348, 24, 64, '180') + dimV(348, 67, 107, '180') + dimV(348, 110, 198, '356') +
+      dimH(64, 328, 226, '896') +
+      txt(40, 66, '3', {size:8}) + txt(40, 109, '3', {size:8}) +
+      txt(196, 240, 'medzera 3 mm · okraje 2 mm · profil UKW-7', {size:8.5}) +
+      '</svg>';
+  }
+
+  /* --- KOVANIE: korpus so zvýraznenými pozíciami --- */
+  if (S.ctx === 'hw'){
+    /* prepracované značky (18.8.): záves = kruh s X · výsuv = koľajnica spredu · noha = obdĺžnik;
+       značky sedia na REÁLNYCH miestach (závesy na závesovej hrane dvierok, koľajnice po bokoch
+       zásuvky, nohy pod korpusom) a klik označí vlastníka */
+    const mk = (html, owner, tip) => '<g style="cursor:pointer" onclick="toast(\''+tip+'\',\'hammer\')">'+html+'</g>';
+    const hinge = (cx, cy) => '<circle cx="'+cx+'" cy="'+cy+'" r="7" fill="var(--nx-select-bg)" stroke="var(--nx-select)" stroke-width="1.6"/>' +
+      '<path d="M'+(cx-4)+' '+(cy-4)+' l8 8 M'+(cx-4)+' '+(cy+4)+' l8 -8" stroke="var(--nx-select)" stroke-width="1.4"/>';
+    const rail = (x, y, w) => '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="5" rx="1.5" fill="var(--nx-select-bg)" stroke="var(--nx-select)" stroke-width="1.3"/>' +
+      '<path d="M'+(x+3)+' '+(y+2.5)+' h'+(w-6)+'" stroke="var(--nx-select)" stroke-width="1" stroke-dasharray="3 2.5"/>';
+    const leg = (x) => '<rect x="'+x+'" y="200" width="10" height="14" rx="1.5" fill="var(--nx-select-bg)" stroke="var(--nx-select)" stroke-width="1.4"/>';
+    return open + corpus(body) +
+      /* zóny naznačené, nech je čitateľné KDE kovanie sedí */
+      '<rect x="196" y="34" width="8" height="154" fill="'+body+'" fill-opacity=".5" stroke="var(--nx-border-soft)"/>' +
+      mk(hinge(84, 70) + hinge(84, 150), 'F1', 'Závesy 2× CLIP top — čelo F1 (závesová hrana vľavo)') +
+      mk(rail(206, 52, 108) + rail(206, 58, 108), 'F3', 'Výsuv NL 470 — čelo F3 (koľajnice po bokoch)') +
+      mk(rail(206, 104, 108) + rail(206, 110, 108), 'F2', 'Výsuv NL 470 — čelo F2') +
+      mk(leg(80) + leg(148) + leg(236) + leg(302), 'cab', 'Nohy 4× 100 mm — skrinka') +
+      ghostLayers('kovanie') +
+      txt(84, 46, 'závesy', {size:8}) + txt(262, 46, 'výsuvy', {size:8}) + txt(196, 226, 'nohy', {size:8}) +
+      txt(196, 240, 'klik na značku = označí vlastníka · 4 nohy · 2 závesy · 2 výsuvy NL 470', {size:8.5, fill:'var(--nx-ink-muted)'}) +
+      '</svg>';
+  }
+
+  /* --- DIELEC: hrany + ABS farby --- */
+  const eCol = k => { const a = D(S.combo['e_'+k]); return a.id==='none' ? 'var(--nx-abs-none)' : (a.mm===2 ? 'var(--nx-abs-2mm)' : 'var(--nx-abs-1mm)'); };
+  const eLab = k => { const a = D(S.combo['e_'+k]); return a.id==='none' ? 'bez ABS' : a.name.replace(' mm',''); };
+  return open +
+    '<rect x="86" y="42" width="220" height="150" fill="'+D(S.combo.part_mat).c+'" stroke="var(--nx-border-strong)"/>' +
+    '<rect x="86" y="35" width="220" height="7" fill="'+eCol('front')+'"><title>Predná hrana</title></rect>' +
+    '<rect x="86" y="192" width="220" height="7" fill="'+eCol('back')+'"><title>Zadná hrana</title></rect>' +
+    '<rect x="79" y="42" width="7" height="150" fill="'+eCol('left')+'"><title>Ľavá hrana</title></rect>' +
+    '<rect x="306" y="42" width="7" height="150" fill="'+eCol('right')+'"><title>Pravá hrana</title></rect>' +
+    txt(196, 30, 'predná · '+eLab('front'), {size:8.5}) +
+    txt(196, 212, 'zadná · '+eLab('back'), {size:8.5}) +
+    txt(70, 117, 'ľavá · '+eLab('left'), {size:8.5, rot:-90}) +
+    txt(322, 117, 'pravá · '+eLab('right'), {size:8.5, rot:-90}) +
+    dimH(86, 306, 236, '720') + dimV(350, 42, 192, '560') +
+    txt(196, 120, 'Bok ľavý · hrúbka 18', {size:10, fill:'var(--nx-ink-muted)'}) +
+    '</svg>';
+}
+
+/* =====================================================================
+   SEKTORY
+   ===================================================================== */
+function sect(key, name, meta, body, nopad){
+  const open = !!S.sect[key];
+  return '<section class="sect'+(open?' open':'')+'" data-sect="'+key+'">' +
+    '<button class="secthead" onclick="S.sect.'+key+'=!S.sect.'+key+';render()" aria-expanded="'+open+'">' +
+      '<span class="chev"></span><span class="sn">'+esc(name)+'</span>' +
+      '<span class="meta">'+esc(meta)+'</span></button>' +
+    (open ? '<div class="sectbody'+(nopad?' nopad':'')+'">'+body+'</div>' : '') +
+    '</section>';
+}
+/* skupina v S4 — EXKLUZÍVNA (otvorenie zavrie ostatné v tomto sektore) */
+/* N3b: ikony skupín Nastavení — mapa podľa kľúča */
+const GRPICON = {strop:'p-top', dno:'p-bottom', boky:'p-side', chrbat:'p-back', sokel:'plinth', vystuhy:'brace',
+                 zoznam:'front', uchytky:'handle', medzery:'columns-2',
+                 polozky:'hammer', sety:'layers', pravidla:'settings',
+                 material:'slab', rozmery:'arr-h', delenie:'layout-grid', police:'rows-2', struktura:'layout-grid', vnutro:'box'};
+function grp(key, name, summary, body, icn){
+  icn = icn || GRPICON[key];
+  const open = S.s4[S.ctx] === key;
+  return '<div class="grp'+(open?' open':'')+'">' +
+    '<button class="grphead" onclick="s4open(\''+key+'\')" aria-expanded="'+open+'">' +
+      '<span class="chev"></span>'+(icn?'<span class="gic">'+ico(icn)+'</span>':'')+'<span class="gn">'+esc(name)+'</span>' +
+      '<span class="gs">'+esc(summary)+'</span></button>' +
+    (open ? '<div class="grpbody">'+body+'</div>' : '') + '</div>';
+}
+function s4open(key){ S.s4[S.ctx] = (S.s4[S.ctx] === key) ? null : key; cbClose(); render(); }
+
+/* --- S1 náhľad --- */
+function layerChips(){
+  const base = {cab:null, zones:'zony', fronts:'cela', hw:'kovanie', part:'olep', insert:null}[S.ctx];
+  const chip = (k, t) => {
+    if (base === k)
+      return '<span class="lchip base" title="Základný pohľad tohto kontextu">'+ico('eye')+t+'</span>';
+    return '<button class="lchip'+(S.layers[k]?' on':'')+'" onclick="S.layers.'+k+'=!S.layers.'+k+';render()" ' +
+      'title="Prisvietiť ako ghost vrstvu">'+ico(S.layers[k]?'eye':'eye-off')+t+'</button>';
+  };
+  return '<div class="pvchips">'+chip('zony','Zóny')+chip('cela','Čelá')+chip('kovanie','Kovanie')+chip('olep','Olep')+'</div>';
+}
+function sectPreview(){
+  /* dolný FIXNÝ pás: vrstvové chipy vľavo, nástroje vpravo (kamera N7 + fit) — kóty majú SVG pre seba */
+  const title = S.ctx === 'insert'
+    ? (S.insType === 'doska' ? 'Doska — smer dekoru' : 'Šablóna — ako bude vložená')
+    : PROJ_TITLE[S.ctx];
+  return sect('pv', 'Náhľad', title,
+    '<div class="pvbox">' + projSvg() +
+      '<div class="pvbar">' + layerChips() + '<span class="sp"></span>' +
+        '<button class="pvtool" title="Pohľad na skrinku — zarovná kameru v SketchUpe (čelný pohľad)" onclick="toast(\'Kamera zarovnaná na CAB-005 — čelný pohľad\',\'camera\')">'+ico('camera')+'</button>' +
+        '<button class="pvtool" title="Prispôsobiť náhľad" onclick="toast(\'Náhľad prispôsobený\',\'maximize\')">'+ico('maximize')+'</button>' +
+      '</div></div>', true);
+}
+/* --- S2 základné --- */
+/* čelá — živý stav riadkov */
+function fType(id, idx){
+  const t = ['dvere', 'zas', 'vyklop', 'slepe'][idx];
+  S.fronts.find(f => f.id === id).type = t;
+  if (t === 'vyklop') toast('Výklop: kovanie (AVENTOS) sa zatiaľ negeneruje — pridaj ručne; automatika príde v kovaní fáza 3', 'alert');
+  render();
+}
+function fH(id, v){
+  const f = S.fronts.find(x => x.id === id);
+  f.h = (v == null || v === '') ? null : (parseInt(v) || null);
+  render();
+}
+function togglePre(e){
+  e.stopPropagation();
+  const m = e.currentTarget.nextElementSibling;
+  m.style.display = m.style.display === 'block' ? 'none' : 'block';
+}
+function setPre(e, v){
+  e.stopPropagation();
+  e.currentTarget.closest('.dwrap').querySelector('input').value = v;
+  e.currentTarget.parentElement.style.display = 'none';
+  toast('Hodnota ' + v + ' — z rozmerového radu (N6)', 'check');
+}
+function sectBasic(){
+  const dim = (icn, l, v, pre, chg) => '<div class="rowc"><label>'+ico(icn)+l+'</label><span class="dwrap">' +
+    '<input value="'+v+'"'+(chg?' onchange="'+chg+'"':'')+'>' +
+    (pre ? '<button class="pbtn" title="Rozmerový rad — bežné hodnoty" onclick="togglePre(event)">'+ico('chevron-down')+'</button>' +
+      '<span class="miniopts">'+pre.map(x => '<button onclick="setPre(event,'+x+')">'+x+'</button>').join('') +
+      '<button class="miniedit" onclick="event.stopPropagation();toast(\'Rozmerové rady upravíš v Štúdio → Nastavenia → Rozmerové rady (návrh)\',\'settings\')">'+ico('settings')+'Upraviť rad…</button></span>' : '') +
+    '</span><span class="unit">mm</span></div>';
+  const info = (l, v, t, click) => '<div class="inforow'+(click?' click':'')+'"'+(t?' title="'+esc(t)+'"':'')+
+    (click?' onclick="'+click+'"':'')+'><span>'+l+'</span><b>'+v+'</b></div>';
+  return sect('basic', 'Základné', CAB.w+' × '+CAB.h+' × '+CAB.d+' · sokel '+CAB.plinth,
+    '<div class="basicgrid"><div>' +
+      dim('arr-h', 'Šírka', 900, [400, 450, 500, 600, 800, 900]) + dim('arr-v', 'Výška', 720, [720, 820, 900]) +
+      dim('arr-d', 'Hĺbka', 560, [320, 510, 560]) +
+      dim('plinth', 'Sokel', CAB.plinth, [100, 120, 150], 'CAB.plinth=parseInt(this.value)||0;render()') +
+    '</div><div class="infocol">' +
+      info('Vnút. šírka', '864') + info('Vnút. hĺbka', '542') + info('Úložná výška', '586') +
+      info('Dielcov', '9', 'klik = označí dielce skrinky v modeli (N13)', 'toast(\'Označených 9 dielcov CAB-005 v modeli\',\'eye\')') +
+      info('Materiál', '2,9 m²', 'klik = Štúdio → Kusovník s filtrom na skrinku (N13)', 'toast(\'Deep-link: Štúdio → Kusovník, filter CAB-005\',\'chevron-right\')') +
+      info('Hmotnosť', '≈ 41 kg', 'odhad z materiálov — podklad pre výklopy podľa hmotnosti (kovanie fáza 3)') +
+    '</div></div>');
+}
+/* --- S3 materiály (PRESNE ako vo variante C) --- */
+function sectMaterials(){
+  const m = k => D(S.combo[k]).code;
+  return sect('mat', 'Materiály', m('body')+' · '+m('front')+' · '+m('back'),
+    '<div class="matrow"><label>Korpus</label><div class="grow">'+comboHtml('body','decor')+'</div></div>' +
+    '<div class="matrow"><label>Čelá</label><div class="grow">'+comboHtml('front','decor')+'</div></div>' +
+    '<div class="matrow"><label>Chrbát</label><div class="grow">'+comboHtml('back','decor')+'</div></div>' +
+    '<div class="hint">Prázdne = dediť z projektu. Katalóg a projektové predvoľby žijú v Štúdiu → Materiály.</div>');
+}
+
+/* --- S4 obsah podľa kontextu (skupiny sú exkluzívne) --- */
+function s4Cab(){
+  return grp('strop','Strop','2 výstuhy · naplocho',
+      '<div class="row"><label>Konštrukcia</label><select class="sel"><option selected>Dve výstuhy</option><option>Plný panel</option><option>Bez stropu</option></select><span class="unit"></span></div>' +
+      '<div class="row"><label>Orientácia výstuh</label><select class="sel"><option selected>Naplocho</option><option>Na výšku</option></select><span class="unit"></span></div>' +
+      '<div class="row mm"><label>Odsadenie od vrchu</label><input value="0"><span class="unit">mm</span><span class="fill"></span></div>' +
+      '<div class="row mm"><label>Hĺbka pásu</label><input value="80"><span class="unit">mm</span><span class="fill"></span></div>') +
+    grp('dno','Dno','boky na dne',
+      '<div class="row"><label>Dno</label><select class="sel"><option selected>Boky na dne</option><option>Dno medzi bokmi</option></select><span class="unit"></span></div>' +
+      '<div class="row mm"><label>Odsadenie dna</label><input value="0"><span class="unit">mm</span><span class="fill"></span></div>' +
+      '<div class="hint">Drezová skrinka — dno bez výrezu; výrez rieši doska, nie korpus.</div>') +
+    grp('boky','Boky','plné · 18 mm',
+      '<div class="row"><label>Ľavý bok</label><select class="sel"><option selected>Plný</option><option>Zdvojený</option><option>Bez boku (spoločný)</option></select><span class="unit"></span></div>' +
+      '<div class="row"><label>Pravý bok</label><select class="sel"><option selected>Plný</option><option>Zdvojený</option><option>Bez boku (spoločný)</option></select><span class="unit"></span></div>' +
+      '<div class="hint">Rohové spoje a per-bok odsadenia pribudnú v ďalšej verzii.</div>') +
+    grp('chrbat','Chrbát','v drážke · HDF 3',
+      '<div class="row"><label>Konštrukcia</label><select class="sel"><option selected>V drážke</option><option>Naložený zozadu</option><option>Vložený medzi boky</option><option>Bez chrbta</option></select><span class="unit"></span></div>' +
+      '<div class="row"><label>Hrúbka chrbta</label><select class="sel"><option selected>HDF 3 mm</option><option>Pevný 18 mm</option></select><span class="unit"></span></div>' +
+      '<div class="row mm"><label>Odsadenie drážky</label><input value="12"><span class="unit">mm</span><span class="fill"></span></div>' +
+      '<div class="hint">Hĺbka korpusu je CELKOVÁ vrátane chrbta.</div>') +
+    grp('sokel','Sokel','predný panel · 100 · zapustenie 50',
+      '<div class="row"><label>Režim sokla</label><select class="sel"><option selected>Predný soklový panel</option><option>Bez sokla — nohy</option></select><span class="unit"></span></div>' +
+      '<div class="row mm"><label>Výška sokla</label><input value="100"><span class="unit">mm</span><span class="fill"></span></div>' +
+      '<div class="row mm"><label>Zapustenie sokla</label><input value="50"><span class="unit">mm</span><span class="fill"></span></div>') +
+    grp('vystuhy','Výstuhy','2 zadné · naplocho',
+      '<div class="row"><label>Zadné výstuhy</label><select class="sel"><option selected>Dve (hore + dole)</option><option>Jedna hore</option><option>Žiadne</option></select><span class="unit"></span></div>' +
+      '<div class="row"><label>Orientácia</label><select class="sel"><option selected>Naplocho</option><option>Na výšku</option></select><span class="unit"></span></div>' +
+      '<div class="row mm"><label>Výška pásu</label><input value="100"><span class="unit">mm</span><span class="fill"></span></div>');
+}
+function s4Zones(){
+  /* ŠTRUKTÚRA navrchu s VLASTNÝM rozrolovaním (mimo exkluzivity) + stromové spojnice (15.8.) */
+  const zn = (id, label, dim, active) =>
+    '<div class="znode'+(active?' active':'')+'" onclick="S.zone=\''+id+'\';render()">'+label+' <span class="dim">'+dim+'</span></div>';
+  const struct =
+    '<div class="grp'+(S.structOpen?' open':'')+'">' +
+      '<button class="grphead" onclick="S.structOpen=!S.structOpen;render()">' +
+        '<span class="chev"></span><span class="gic">'+ico('layout-grid')+'</span><span class="gn">Štruktúra zón</span>' +
+        '<span class="gs">3 zóny · max 3 úrovne · nezatvára sa</span></button>' +
+      (S.structOpen ? '<div class="grpbody">' +
+        zn('Z1', 'Z1 — celý korpus', '864 × 686', false) +
+        '<div class="zkids">' +
+          zn('Z1.1', 'Z1.1', '414 × 686 · '+S.shelves+' police', S.zone==='Z1.1') +
+          zn('Z1.2', 'Z1.2', '414 × 686 · delená vodorovne', S.zone==='Z1.2') +
+          '<div class="zkids">' +
+            zn('Z1.2.1', 'Z1.2.1', '414 × 340 · zásuvky', S.zone==='Z1.2.1') +
+            zn('Z1.2.2', 'Z1.2.2', '414 × 340 · polica', S.zone==='Z1.2.2') +
+          '</div>' +
+        '</div>' +
+      '</div>' : '') +
+    '</div>';
+  const tile = (icn, lab) => '<button class="ztile" onclick="toast(\'Delenie: '+lab+' (jeden Undo krok)\',\'check\')">'+ico(icn)+'<span>'+lab+'</span></button>';
+  return struct +
+    grp('delenie','Delenie zóny','Z1.2 · vodorovne',
+      '<div class="ztiles">' + tile('columns-2','2 stĺpce') + tile('columns-3','3 stĺpce') +
+        tile('rows-2','2 riadky') + tile('rows-3','3 riadky') + '</div>' +
+      '<div class="rowc"><label>'+ico('arr-h')+'Prvá zóna</label><span class="dwrap"><input value="414">' +
+        '<button class="pbtn" title="Zlomky šírky" onclick="togglePre(event)">'+ico('chevron-down')+'</button>' +
+        '<span class="miniopts"><button onclick="setPre(event,216)">216 (1/4)</button><button onclick="setPre(event,288)">288 (1/3)</button><button onclick="setPre(event,432)">432 (1/2)</button></span>' +
+      '</span><span class="unit">mm</span></div>' +
+      '<div class="hint">N21: presné delenie číslom. Ťah priečky v náhľade ostáva — so snap bodmi 1/4 · 1/2 · 3/4 (N20, D-09).</div>' +
+      '<div class="btnrow"><button class="danger">Vyčistiť zónu (zruš delenie/police)</button></div>') +
+    grp('police','Police',S.shelves+' políc · nastaviteľné',
+      '<div class="row"><label>'+ico('rows-2')+'Počet políc</label><div class="npills">' +
+        [0,1,2,3,4,5,6].map(n => '<button class="'+(n===S.shelves?'on':'')+'" onclick="S.shelves='+n+';render()">'+n+'</button>').join('') +
+      '</div></div>' +
+      '<div class="row"><label>Typ</label><select class="sel"><option selected>Nastaviteľná (kolíky)</option><option>Pevná</option></select><span class="unit"></span></div>' +
+      '<div class="row mm"><label>Odsadenie od čela</label><input value="10"><span class="unit">mm</span><span class="fill"></span></div>' +
+      '<div class="hint">N19: počet políc sa hneď prekreslí v náhľade aj v strome.</div>') +
+    grp('vnutro','Vnútro','pripravené — po V1',
+      '<div class="hint">Budúci domov vnútorného vybavenia zóny: vnútorné zásuvky (StrongBox), koše, šatníkové tyče. UI slot rezervovaný (prieskum budúcich funkcií, bod 3) — zatiaľ bez polí.</div>');
+}
+/* Nastavenia Inspectora (ozubené koliesko v raile, 15.8.) — téma a menej používané veci */
+function s4Cfg(){
+  const tbtn = (id, lab, sw) => '<button class="ztile'+((S.theme||null)===id?' on':'')+'" style="flex-direction:row;gap:6px" ' +
+    'onclick="S.theme='+(id?'\''+id+'\'':'null')+';applyTheme();render()"><i style="width:14px;height:14px;border-radius:4px;background:'+sw+';border:1px solid rgba(0,0,0,.15)"></i><span>'+lab+'</span></button>';
+  return grp('vzhlad','Vzhľad','téma '+(S.theme==='lucia'?'Lucia':'NOXUN'),
+      '<div class="row"><label>Téma</label><div style="flex:1;display:flex;gap:6px">' +
+        tbtn(null, 'NOXUN teal', '#107787') + tbtn('lucia', 'Lucia ružová', '#c2185b') + '</div></div>' +
+      '<div class="hint">O4: téma mení len výberovú rodinu farieb; chyby, upozornenia, ABS a semafor ostávajú. Ukladá sa per počítač (%APPDATA%).</div>') +
+    grp('rady','Rozmerové rady','šírky · výšky · hĺbky · sokle',
+      '<div class="hint">Hodnoty ponúkané pri rozmeroch (N6). Upravujú sa v Štúdio → Nastavenia → Rozmerové rady — tu je len skratka.</div>' +
+      '<div class="btnrow"><button class="ghostbtn" onclick="toast(\'Deep-link: Štúdio → Nastavenia → Rozmerové rady\',\'chevron-right\')">'+ico('settings')+' Otvoriť rady…</button></div>') +
+    grp('oplugine','O plugine','v0.7.0',
+      '<div class="row" style="align-items:center;gap:8px"><svg style="width:28px;height:28px;color:var(--nx-ink-strong);flex:0 0 28px" viewBox="0 0 100 100"><use href="#i-logo"/></svg>' +
+      '<span style="font-size:12px;color:var(--nx-ink-muted)">Noxun Engine v0.7.0 — mockup UI 2.0</span></div>');
+}
+function s4Fronts(){
+  /* obojsmerný výber + živé AUTO/mm (15.8.): stav v S.fronts, návrat na AUTO jedným klikom */
+  const TICO = {dvere:'door', zas:'rows-2', vyklop:'p-top', slepe:'front'};
+  const r = f => {
+    const auto = f.h == null, n = f.id.slice(1);
+    return '<div class="frow'+(S.frontSel===f.id?' sel':'')+'" onclick="S.frontSel=\''+f.id+'\';render()"><span class="fnum">'+f.id+'</span>' +
+    '<span class="ftico" title="Typ čela (N27)">'+ico(TICO[f.type]||'front')+'</span>' +
+    '<select class="ftype" onclick="event.stopPropagation()" onchange="fType(\''+f.id+'\',this.selectedIndex)">' +
+      '<option'+(f.type==='dvere'?' selected':'')+'>dvierka</option>' +
+      '<option'+(f.type==='zas'?' selected':'')+'>zásuvka</option>' +
+      '<option'+(f.type==='vyklop'?' selected':'')+'>výklopná klapka</option>' +
+      '<option'+(f.type==='slepe'?' selected':'')+'>slepé čelo</option></select>' +
+    '<span class="dwrap"><input class="fh" value="'+(auto?'':f.h)+'"'+(auto?' placeholder="AUTO"':'') +
+      ' onchange="fH(\''+f.id+'\',this.value)" onclick="event.stopPropagation()">' +
+      '<button class="pbtn" title="Výškový rad čiel (N25)" onclick="togglePre(event)">'+ico('chevron-down')+'</button>' +
+      '<span class="miniopts">'+[140,180,280,356].map(x => '<button onclick="event.stopPropagation();fH(\''+f.id+'\','+x+');this.parentElement.style.display=\'none\'">'+x+'</button>').join('') +
+      '<button class="miniedit" onclick="event.stopPropagation();toast(\'Rozmerové rady upravíš v Štúdio → Nastavenia → Rozmerové rady\',\'settings\')">'+ico('settings')+'Upraviť rad…</button></span></span>' +
+    (auto ? '' : '<span class="funit">mm</span><button class="fauto" title="Vrátiť na AUTO — výška sa dopočíta z voľného miesta" onclick="event.stopPropagation();fH(\''+f.id+'\',null)">AUTO</button>') +
+    '<button class="fprof on" title="Úchytkový profil UKW-7">'+ico('profile')+'</button>' +
+    '<button class="fdel" title="Odstrániť čelo" onclick="event.stopPropagation();toast(\'Čelo '+f.id+' odstránené\',\'x\')">'+ico('x')+'</button></div>' +
+    /* naviazané kovanie pod riadkom — klik prejde do Kovania (18.8.) */
+    (f.type === 'slepe' ? '' :
+      '<div class="fhwline" title="Kovanie viazané na toto čelo — klik otvorí Kovanie" onclick="event.stopPropagation();S.frontSel=\''+f.id+'\';setCtx(\'hw\')">' +
+      ico('link') + (f.type === 'dvere' ? '2× záves CLIP top · profil UKW-7'
+        : f.type === 'vyklop' ? 'kovanie výklopu ručne (fáza 3) · profil UKW-7'
+        : 'výsuv NL 470 · profil UKW-7') + '</div>');
+  };
+  return grp('zoznam','Zoznam čiel','2 zásuvky + dvierka',
+      S.fronts.map(r).join('') +
+      '<div class="btnrow">' +
+        '<button class="ghostbtn" onclick="toast(\'Pridané dvierka F4\',\'plus\')">'+ico('plus')+' pridaj dvierka</button>' +
+        '<button class="ghostbtn" onclick="toast(\'Pridaná zásuvka F4\',\'plus\')">'+ico('plus')+' pridaj zásuvku</button>' +
+      '</div>' +
+      '<div class="hint">D-84: reč stolára — „− riadok" zanikol, čelo sa ruší krížikom pri svojom riadku.</div>' +
+      '<div class="matrow"><label>Materiál čiel</label><div class="grow">'+comboHtml('front','decor')+'</div></div>') +
+    grp('uchytky','Úchytky','UKW-7 · horná hrana · všetky čelá',
+      '<div class="row"><label>Profil</label><select class="sel"><option selected>UKW-7 — frézovaná úchytka</option><option>Hliníkový profil C</option><option>Bez profilu (madlo)</option></select><span class="unit"></span></div>' +
+      '<div class="row"><label>Hrana osadenia</label><select class="sel"><option selected>Horná hrana čela</option><option>Dolná hrana čela</option><option>Bočná hrana</option></select><span class="unit"></span></div>' +
+      '<div class="row"><label>Rozsah</label><select class="sel"><option selected>Všetky čelá skrinky</option><option>Len zásuvky</option><option>Len dvierka</option></select><span class="unit"></span></div>' +
+      '<div class="hint">D-96: ikona '+ico('profile','ic-inline')+' v riadku čela je len indikátor — profil sa nastavuje tu, raz pre skrinku.</div>') +
+    grp('medzery','Medzery a presahy','3 / 2 mm · limit ±100',
+      '<div class="row mm"><label>Medzi čelami</label><input value="3"><span class="unit">mm</span><span class="fill"></span></div>' +
+      '<div class="row mm"><label>Okraj hore</label><input value="2"><span class="unit">mm</span><span class="fill"></span></div>' +
+      '<div class="row mm"><label>Okraj dole</label><input value="2"><span class="unit">mm</span><span class="fill"></span></div>' +
+      '<div class="row mm"><label>Okraj po stranách</label><input value="2"><span class="unit">mm</span><span class="fill"></span></div>' +
+      '<div class="btnrow"><button class="ghostbtn">'+ico('rotate-ccw')+' Predvolené (3 / 2 mm)</button></div>');
+}
+function s4Hw(){
+  /* 18.8.: položky rozdelené HORIZONTÁLNE podľa VLASTNÍKA — kovanie viazané na čelo je v boxe
+     svojho čela (zrkadlí realitu dát: owner_part_key), skrinkové kovanie v boxe skrinky */
+  const own = (title, sub, body) =>
+    '<div class="hwown"><div class="hwownh" onclick="toast(\'Označené v modeli: '+title+'\',\'eye\')">' +
+      '<span>'+title+'</span><span class="hwownsub">'+sub+'</span></div><div class="hwownb">'+body+'</div></div>';
+  const vysuv = (f, nl) =>
+    '<div class="hwrow"><span class="hwname">Výsuv</span>' +
+    '<select class="sel" style="flex:1;min-width:0" onclick="event.stopPropagation()"><option selected>K-Atira čelný biely, 30 kg, SiSy</option><option>K-Blum Tandembox 500</option><option>— bez setu —</option></select>' +
+    '<select class="sel" style="flex:0 0 76px" title="Nominálna dĺžka radu" onclick="event.stopPropagation()"><option'+(nl==='470'?' selected':'')+'>NL 470</option><option'+(nl==='500'?' selected':'')+'>NL 500</option><option>NL 620</option></select>' +
+    '<button class="lk on" title="D-93: dĺžka zamknutá ručne — drží aj pri zmene hĺbky" onclick="event.stopPropagation();toast(\'D-93: zámok dĺžky odomknutý — automat vyberie podľa hĺbky\',\'lock\')">'+ico('lock')+'</button></div>' +
+    '<div class="hwbuy">UKW 7 → 774519 · Profil UKW 7</div>' +
+    '<div class="hwbuy">Atira biela H70 (rad podľa NL) → 357696 · K-InnoTech Atira čelný biely '+nl+'/70, 30 kg, SiSy</div>';
+  return grp('polozky','Položky z pravidiel','skrinka + 3 čelá',
+      own('Skrinka CAB-005', '4 položky',
+        '<div class="hwrow"><span class="hwname">Nohy <span class="hwext">100 mm</span></span>' +
+        '<input class="hwqty" value="4" onclick="event.stopPropagation()"><button class="ghostbtn" style="padding:3px 6px" title="Vrátiť pravidlo">'+ico('rotate-ccw')+'</button></div>' +
+        '<div class="hwbuy">Demos 357120 · noha nastaviteľná 100/130</div>') +
+      own('Čelo F1 — dvierka', 'závesy + profil',
+        '<div class="hwrow"><span class="hwname">Závesy <span class="hwext">110° clip-on</span></span>' +
+        '<input class="hwqty" value="2" onclick="event.stopPropagation()"><button class="ghostbtn" style="padding:3px 6px">'+ico('rotate-ccw')+'</button></div>' +
+        '<div class="hwbuy">Blum CLIP top 71B3550 → 357783</div>' +
+        '<div class="hwbuy">UKW 7 → 774519 · Profil UKW 7</div>') +
+      own('Čelo F2 — zásuvkové', 'výsuv + profil', vysuv('F2', '470')) +
+      own('Čelo F3 — zásuvkové', 'výsuv + profil', vysuv('F3', '470'))) +
+    grp('sety','Sety','zásuvka Atira · bez setu',
+      '<div class="row"><label>Set zásuvky</label><select class="sel"><option selected>— vyber set —</option><option>K-Atira 620/50 kg</option><option>K-Blum Tandembox 500</option></select><span class="unit"></span></div>' +
+      '<div class="hint">Set nesie pásmo (dĺžky/nosnosti) — z neho vie Nákup vybrať správny kód.</div>') +
+    grp('pravidla','Pravidlá','nohy podľa šírky · závesy podľa výšky',
+      '<div class="hint">Počty určujú pravidlá; ručná zmena je override pre túto skrinku a '+ico('rotate-ccw','ic-inline')+' vráti pravidlo.</div>' +
+      '<div class="btnrow"><button class="ghostbtn">'+ico('settings')+' Pravidlá kovania…</button></div>');
+}
+function s4Part(){
+  /* hranová ikona (18.8.): square-dashed-top-solid rotovaná — predná 0° · zadná 180° · ľavá 90° · pravá 270° */
+  const EROT = {front:0, back:180, left:90, right:270};
+  const row = (k, name) => '<div class="edgerow"><span class="en" onmouseenter="toast(\'Zvýrazňujem hranu '+name+' v MODELI\',\'eye\')">' +
+    '<svg class="ic" style="width:14px;height:14px;flex:0 0 14px;color:var(--nx-ink-faint);transform:rotate('+EROT[k]+'deg)" aria-hidden="true"><use href="#i-edge"/></svg>' +
+    '<i style="background:'+(S.combo['e_'+k]==='none'?'var(--nx-abs-none)':(D(S.combo['e_'+k]).mm===2?'var(--nx-abs-2mm)':'var(--nx-abs-1mm)'))+'"></i>'+name+'</span>' +
+    '<span class="grow">'+comboHtml('e_'+k,'abs')+'</span></div>';
+  return grp('material','Materiál a hrany','K2738 · P:1 · Ľ:1',
+      '<div class="matrow"><label>Materiál</label><div class="grow">'+comboHtml('part_mat','decor')+'</div></div>' +
+      '<div class="absleg"><span><i style="background:var(--nx-abs-1mm)"></i>1,0 mm</span>' +
+      '<span><i style="background:var(--nx-abs-2mm)"></i>2,0 mm</span>' +
+      '<span><i style="background:var(--nx-abs-none)"></i>bez ABS</span>' +
+      '<button class="absall" title="Olepiť všetky 4 hrany" onclick="toast(\'Olepené všetky 4 hrany — ABS K2738 22/1\',\'check\')"><i></i></button></div>' +
+      row('front','Predná') + row('back','Zadná') + row('left','Ľavá') + row('right','Pravá') +
+      '<div class="btnrow"><button class="ghostbtn" onclick="toast(\'Dielec zvýraznený a označený v modeli\',\'eye\')">'+ico('eye')+' Označiť v modeli</button>' +
+      '<button class="ghostbtn" onclick="toast(\'ABS z tohto dielca použité na 6 podobných dielcov\',\'copy\')">'+ico('copy')+' Použiť na podobné…</button></div>');
+}
+/* Základné dielca — vlastný sektor HORE ako pri korpuse (18.8.); rozmery sú VÝSTUP (text), smer je nastavenie */
+function sectPartBasic(){
+  return sect('pbasic', 'Základné', '720 × 560 × 18 · po dĺžke',
+    '<div class="basicgrid"><div>' +
+      '<div class="row"><label>'+ico('arr-h')+'Smer dekoru</label><select class="sel"><option selected>Po dĺžke</option><option>Po šírke</option><option>Bez smeru</option></select><span class="unit"></span></div>' +
+    '</div><div class="infocol">' +
+      '<div class="inforow"><span>Dĺžka</span><b>720</b></div>' +
+      '<div class="inforow"><span>Šírka</span><b>560</b></div>' +
+      '<div class="inforow" title="hrúbku určuje materiál"><span>Hrúbka</span><b>18</b></div>' +
+    '</div></div>' +
+    '<div class="hint">Rozmery dielca počíta korpus — menia sa v Korpus → Základné.</div>');
+}
+/* ===== VKLADANIE — typ ako buttony, šablóna, rozmery so zámkami (D-39), materiály, vlož ===== */
+function insTypeRow(){
+  const b = (id, icn, n) => '<button class="'+(S.insType===id?'on':'')+'" onclick="S.insType=\''+id+'\';render()">'+ico(icn)+'<span>'+n+'</span></button>';
+  return '<div class="segrow">'+b('dolna','cab-low','Dolná skrinka')+b('horna','cab-high','Horná skrinka')+b('doska','slab','Doska')+'</div>';
+}
+/* šablóny dosiek — každá nesie hrúbku, rozmery a orientáciu (rozhodnutie 15.8.) */
+const BOARD_TPL = {
+  diel:    {n:'Diel',            th:18, w:800,  h:600, ori:'stojaca', hint:'bežný dielec — dekor projektu'},
+  pd:      {n:'Pracovná doska',  th:38, w:2600, h:600, ori:'ležiaca', hint:'postforming PD — smer po dĺžke'},
+  zastena: {n:'Zástena',         th:10, w:2600, h:580, ori:'na stenu', hint:'zástena — tenká, kotví sa na stenu'}
+};
+function sectInsertTpl(){
+  const box = inner => '<svg viewBox="0 0 60 40"><rect x="2" y="2" width="56" height="36" fill="var(--nx-surface)" stroke="var(--nx-border-strong)"/>'+inner+'</svg>';
+  /* N17: dvojklik = rovno vlož */
+  const t = (id, n, inner, badge) => '<button class="tpltile'+(S.tpl===id?' on':'')+'" onclick="S.tpl=\''+id+'\';render()" ' +
+    'ondblclick="toast(\'N17: dvojklik — vložené hneď zo šablóny '+n+'\',\'check\')" title="klik = vybrať · dvojklik = vlož hneď">' +
+    box(inner)+'<span>'+n+(badge?' <i style="font-style:normal;color:var(--nx-ink-faint)">· '+badge+'</i>':'')+'</span></button>';
+  if (S.insType === 'doska'){
+    const bt = (id) => { const b = BOARD_TPL[id];
+      return t('b_'+id, b.n, '<path d="M8 30 52 10" stroke="var(--nx-border-strong)"/>', b.th+' mm'); };
+    return sect('itpl', 'Šablóna dosky', BOARD_TPL[(S.tpl||'').replace('b_','')] ? BOARD_TPL[S.tpl.replace('b_','')].n : 'Diel',
+      '<div class="tpltiles">' + bt('diel') + bt('pd') + bt('zastena') + '</div>' +
+      '<div class="hint">Každá šablóna nesie hrúbku, rozmery aj orientáciu — rýchle vloženie na klik. Hrúbku vždy určuje materiál šablóny.</div>');
+  }
+  /* N16: naposledy použité prvé (poradie podľa merača používania) */
+  return sect('itpl', 'Šablóna', S.tpl==='t5'?'Drezová 900':'vlastný výber',
+      '<div class="cbsec" style="padding:0 0 2px">Naposledy použité</div>' +
+      '<div class="tpltiles">' +
+        t('t5','Drezová 900','<circle cx="30" cy="13" r="7" fill="none" stroke="var(--nx-border-strong)"/><path d="M2 22h56" stroke="var(--nx-border-strong)"/>') +
+        t('t2','Dolná 3 zásuvky','<path d="M2 14h56M2 26h56" stroke="var(--nx-border-strong)"/>') +
+        t('t2b','Varná 600','<path d="M2 14h56M2 26h56" stroke="var(--nx-border-strong)"/>') + '</div>' +
+      '<div class="cbsec" style="padding:4px 0 2px">Všetky šablóny</div>' +
+      '<div class="tpltiles">' +
+        t('t1','Dolná 2 dvierka','<path d="M30 2v36" stroke="var(--nx-border-strong)"/>') +
+        t('t4','Vysoká skriňa','<path d="M2 28h56" stroke="var(--nx-border-strong)"/>') +
+        t('t6','Prázdny korpus','') + '</div>' +
+      '<div class="hint">Klik = vybrať a doladiť · dvojklik = vlož hneď (N17). Vlastné šablóny vznikajú tlačidlom „Uložiť ako šablónu" na hotovej skrinke.</div>');
+}
+function sectInsertBasic(){
+  /* layout prevzatý zo schválených Základných korpusu (2 stĺpce), doplnený o D-39 zámky */
+  const lk = k => '<button class="lk'+(S.ilocks[k]?' on':'')+'" style="height:25px" title="'+(S.ilocks[k]?'Zamknuté — hodnota drží aj pri zmene šablóny/materiálu':'Odomknuté — riadi šablóna')+'"'+
+    ' onclick="S.ilocks.'+k+'=!S.ilocks.'+k+';render()">'+ico(S.ilocks[k]?'lock':'lock-open')+'</button>';
+  const dim = (icn, l, v, k, pre) => '<div class="rowc"><label>'+ico(icn)+l+'</label><span class="dwrap">' +
+    '<input value="'+v+'">' +
+    (pre ? '<button class="pbtn" title="Rozmerový rad" onclick="togglePre(event)">'+ico('chevron-down')+'</button>' +
+      '<span class="miniopts">'+pre.map(x => '<button onclick="setPre(event,'+x+')">'+x+'</button>').join('') +
+      '<button class="miniedit" onclick="event.stopPropagation();toast(\'Rozmerové rady upravíš v Štúdio → Nastavenia\',\'settings\')">'+ico('settings')+'Upraviť rad…</button></span>' : '') +
+    '</span><span class="unit">mm</span>'+lk(k)+'</div>';
+  const info = (l, v, t) => '<div class="inforow"'+(t?' title="'+esc(t)+'"':'')+'><span>'+l+'</span><b>'+v+'</b></div>';
+  const doska = S.insType === 'doska';
+  const bt = BOARD_TPL[(S.tpl || '').replace('b_', '')] || BOARD_TPL.diel;
+  const left = doska
+    ? dim('arr-h', 'Dĺžka', bt.w, 'w') + dim('arr-v', 'Šírka', bt.h, 'h')
+    : dim('arr-h', 'Šírka', 600, 'w', [400, 450, 500, 600, 800, 900]) +
+      dim('arr-v', 'Výška', S.insType==='horna'?720:820, 'h', [720, 820, 900]) +
+      dim('arr-d', 'Hĺbka', S.insType==='horna'?320:560, 'd', [320, 510, 560]) +
+      (S.insType==='dolna' ? dim('plinth', 'Sokel', 100, 'p', [100, 120, 150]) : '');
+  const right = doska
+    ? info('Hrúbka', bt.th + ' mm', 'z materiálu šablóny; UNI materiál pole odomkne') +
+      info('Orientácia', bt.ori, 'ako sa doska položí pri vložení — nesie ju šablóna') +
+      info('Plocha', (Math.round(bt.w * bt.h / 100000) / 10) + ' m²')
+    : info('Vnút. šírka', '564') + info('Úložná výška', S.insType==='horna'?'684':'686') +
+      info('Dielcov', '9', 'zo šablóny') + info('Materiál', '≈ 2,1 m²');
+  return sect('ibasic', 'Základné', doska ? bt.w+' × '+bt.h+' × '+bt.th : '600 × '+(S.insType==='horna'?'720 × 320':'820 × 560'),
+    '<div class="basicgrid"><div>'+left+'</div><div class="infocol">'+right+'</div></div>');
+}
+function sectInsertMat(){
+  if (S.insType !== 'doska') return sectMaterials();
+  return sect('mat', 'Materiály', D(S.combo.ins_mat).code,
+    '<div class="matrow"><label>Materiál</label><div class="grow">'+comboHtml('ins_mat','decor')+'</div></div>' +
+    '<div class="row"><label>Smer dekoru</label><select class="sel"><option selected>Po dĺžke</option><option>Po šírke</option><option>Bez smeru</option></select><span class="unit"></span></div>' +
+    '<div class="hint">D-86: vedome zvolený smer drží — refresh katalógu ho neprepíše.</div>');
+}
+const S4 = {cab:{n:'Nastavenia', f:s4Cab, cnt:6}, zones:{n:'Nastavenia zóny', f:s4Zones, cnt:3},
+            cfg:{n:'Nastavenia Inspectora', f:s4Cfg, cnt:3},
+            fronts:{n:'Nastavenia čiel', f:s4Fronts, cnt:3}, hw:{n:'Nastavenia kovania', f:s4Hw, cnt:3},
+            part:{n:'Nastavenia dielca', f:s4Part, cnt:1}};
+const S4LABEL = {strop:'Strop', dno:'Dno', boky:'Boky', chrbat:'Chrbát', sokel:'Sokel', vystuhy:'Výstuhy',
+                 delenie:'Delenie zóny', police:'Police', struktura:'Štruktúra zón',
+                 zoznam:'Zoznam čiel', uchytky:'Úchytky', medzery:'Medzery a presahy',
+                 polozky:'Položky', sety:'Sety', pravidla:'Pravidlá',
+                 material:'Materiál a hrany', rozmery:'Rozmery a smer', sablona:'Šablóna', typ:'Typ objektu'};
+
+/* =====================================================================
+   RAIL + render
+   ===================================================================== */
+function railBtn(ctx, icn, title, ctxi){
+  return '<button class="railbtn'+(S.ctx===ctx?' on':'')+(ctxi?' ctxi':'')+'" onclick="setCtx(\''+ctx+'\')" aria-label="'+esc(title)+'">' +
+    ico(icn) + (ctxi ? '<span class="rx" title="Zrušiť výber dielca" onclick="event.stopPropagation();setCtx(\'cab\')">×</span>' : '') +
+    '<span class="railtip">'+esc(title)+'</span></button>';
+}
+function setCtx(c){
+  S.ctx = c; cbClose(); S.warnOpen = false; S.absFly = false;
+  /* default vrstvy: zapnutá je vrstva kontextu, ostatné zhasnú (D-27 ghost logika) */
+  S.layers = {zony:false, cela:false, kovanie:false, olep:false};
+  const base = {zones:'zony', fronts:'cela', hw:'kovanie', part:'olep'}[c];
+  if (base) S.layers[base] = true;
+  if (c === 'insert') S.layers.cela = true; /* N9: šablóna sa ukáže AKO BUDE VLOŽENÁ — čelá zap., ale prepnuteľné */
+  render();
+}
+function renderToolbar(){
+  document.getElementById('sutb').innerHTML =
+    '<span class="lbl">SketchUp toolbar (N4)</span>' +
+    '<button title="Noxun Engine — otvor/zavri Inspector" onclick="toast(\'Inspector otvorený\',\'check\')">' +
+      '<svg style="width:19px;height:19px" viewBox="0 0 100 100"><use href="#i-logo"/></svg></button>' +
+    '<button title="Štúdio — kusovník, materiály, kontrola" onclick="toast(\'Otvorené Štúdio\',\'layers\')">'+ico('layers')+'</button>' +
+    '<div class="sep"></div>' +
+    '<button class="'+(S.toolAbs?'on':'')+'" title="ABS kontrola — zvýrazniť hrany v modeli (toggle, D-104/105)" ' +
+      'onclick="S.toolAbs=!S.toolAbs;renderToolbar();toast(S.toolAbs?\'Kontrola hrán ZAPNUTÁ — hrany svietia v modeli\':\'Kontrola hrán vypnutá\',\'eye\')">'+ico('shell')+'</button>' +
+    '<button title="Vložiť skrinku — vkladací režim" onclick="setCtx(\'insert\')">'+ico('plus')+'</button>';
+}
+function applyTheme(){
+  const r = document.documentElement.style;
+  if (S.theme === 'lucia'){
+    r.setProperty('--nx-select', '#c2185b'); r.setProperty('--nx-select-strong', '#880e4f');
+    r.setProperty('--nx-select-accent', '#ad1457'); r.setProperty('--nx-select-bg', '#fce4ec');
+    r.setProperty('--nx-select-bg-soft', '#fdf1f5'); r.setProperty('--nx-select-bg-hover', '#fce4ec');
+    r.setProperty('--nx-part-border', '#f48fb1'); r.setProperty('--nx-part-bg', '#fff5f9');
+  } else {
+    ['--nx-select','--nx-select-strong','--nx-select-accent','--nx-select-bg','--nx-select-bg-soft',
+     '--nx-select-bg-hover','--nx-part-border','--nx-part-bg'].forEach(p => r.removeProperty(p));
+  }
+}
+function render(){
+  renderToolbar();
+  const s4 = S4[S.ctx], openKey = s4 ? S.s4[S.ctx] : null;
+  const s4meta = s4 ? (openKey ? S4LABEL[openKey] : s4.cnt + ' skupín · všetko zbalené') : '';
+  document.getElementById('selsim').innerHTML =
+    '<span class="lbl">mockup: čo je označené v modeli (v pluginu to určuje výber v SketchUpe)</span>' +
+    [['insert','nič — vkladanie'],['cab','korpus CAB-005'],['zones','zóna Z1.2'],['fronts','čelá'],
+     ['hw','kovanie'],['part','dielec — bok ľavý']]
+      .map(c => '<button class="'+(S.ctx===c[0]?'on':'')+'" onclick="setCtx(\''+c[0]+'\')">'+esc(c[1])+'</button>').join('');
+  document.getElementById('panel').innerHTML =
+    '<nav class="crail">' +
+      railBtn('cab','cabinet','Korpus') + railBtn('zones','layout-grid','Zóny') +
+      railBtn('fronts','front','Čelá') + railBtn('hw','hammer','Kovanie') +
+      (S.ctx === 'part' ? '<div class="raildiv"></div>' + railBtn('part','slab','Dielec — Bok ľavý (dočasné)', true) : '') +
+      /* Inspector toolbar — FUNKČNÁ sekcia pod kontextami (15.8.): prvá funkcia = ABS kontrola */
+      '<div class="raildiv"></div>' +
+      '<button class="railbtn fn'+(S.absCheck?' on':'')+'" onclick="S.absCheck=!S.absCheck;S.absFly=false;render();toast(S.absCheck?\'ABS kontrola ZAPNUTÁ — hrany svietia v modeli\':\'ABS kontrola vypnutá\',\'shell\')">' +
+        ico('shell') +
+        '<span class="rarrow" title="Nastavenie kontroly" onclick="event.stopPropagation();S.absFly=!S.absFly;render()">'+ico('chevron-down')+'</span>' +
+        '<span class="railtip">ABS kontrola hrán (D-104/105) — klik zapne, šípka nastaví</span></button>' +
+      (S.absFly ? '<div class="railfly">' +
+        '<div class="flyrow"><input type="checkbox" checked onclick="toast(\'Stav: chýba podľa pravidla\',\'check\')"><i style="background:var(--nx-edge-missing)"></i>chýba podľa pravidla <b>2</b></div>' +
+        '<div class="flyrow"><input type="checkbox" onclick="toast(\'Stav: mimo pravidla\',\'check\')"><i style="background:var(--nx-edge-extra)"></i>neolepené mimo pravidla <b>1</b></div>' +
+        '<div class="flyrow"><input type="checkbox" onclick="toast(\'Stav: olepené\',\'check\')"><i style="background:var(--nx-edge-taped)"></i>olepené <b>18</b></div>' +
+        '<div class="flyrow sub"><input type="checkbox" checked onclick="toast(\'Len vybrané\',\'check\')">len vybrané</div>' +
+      '</div>' : '') +
+      '<span style="flex:1"></span><div class="raildiv"></div>' +
+      railBtn('cfg','settings','Nastavenia Inspectora — téma a menej používané') +
+      '<button class="railbtn" onclick="toast(\'Otvorené Štúdio — kusovník, materiály, kontrola\',\'chevron-right\')" aria-label="Štúdio">' +
+        ico('layers') + '<span class="railtip">Štúdio — kusovník, materiály, kontrola</span></button>' +
+    '</nav>' +
+    '<div class="cmain">' +
+      '<header class="chdr">' +
+        '<svg class="nx-logo" viewBox="0 0 100 100" aria-hidden="true"><use href="#i-logo"/></svg>' +
+        '<span class="cid">CAB-005</span>' +
+        '<button class="cname" title="Premenovať"><span>Dolná drezová 900</span>'+ico('pencil')+'</button>' +
+        '<span class="typbadge" title="Typ korpusu — určuje ho šablóna pri vložení">Dolná</span>' +
+        '<span style="flex:1"></span>' +
+        '<button class="warnchip" onclick="S.warnOpen=!S.warnOpen;render()">'+ico('alert')+'2</button>' +
+        (S.warnOpen ? '<div class="warnpanel">' +
+          '<div class="warnrow"><span>Výsuv F2 bez setu — nákup bude neúplný</span>' +
+            '<button class="ghostbtn" style="padding:2px 5px" title="Ukáž v modeli" onclick="toast(\'Zvýraznené v modeli: CAB-005 / F2\',\'eye\')">'+ico('eye')+'</button></div>' +
+          '<div class="warnrow"><span>Čelo F1 bez ABS pásky na spodnej hrane</span>' +
+            '<button class="ghostbtn" style="padding:2px 5px" title="Ukáž v modeli" onclick="toast(\'Zvýraznené v modeli: CAB-005 / F1, spodná hrana\',\'eye\')">'+ico('eye')+'</button></div>' +
+          '<button class="wgoto" onclick="toast(\'Deep-link: Štúdio → Kontrola, filter CAB-005 (N5)\',\'chevron-right\')">Otvoriť v Štúdiu → Kontrola</button>' +
+        '</div>' : '') +
+      '</header>' +
+      '<div class="cbody">' +
+        /* Základné a Materiály sú vlastnosti SKRINKY — žijú len v tabe Korpus
+           (Materiály aj pri Vkladaní: výber materiálu je tam najčastejšia akcia).
+           Ostatné kontexty = náhľad + vlastný obsah, nič cudzie pred ním. */
+        (S.ctx === 'cfg' ? '' : sectPreview()) +
+        (S.ctx === 'cab' ? sectBasic() + sectMaterials() : '') +
+        (S.ctx === 'insert' ?
+          insTypeRow() + sectInsertTpl() + sectInsertBasic() + sectInsertMat() +
+          '<button class="primary wide" onclick="toast(\'Vložen'+(S.insType==='doska'?'á doska BRD-006':'ý korpus CAB-016')+' (jeden Undo krok)\',\'check\')">Vložiť '+(S.insType==='doska'?'dosku':'skrinku')+'</button>' +
+          '<div class="hint" style="margin-top:6px">N11: po „Vložiť" bude objekt visieť na kurzore a klik ho umiestni (pripravené na Vkladanie na klik, V1-04).</div>' : '') +
+        (['zones','fronts','hw'].includes(S.ctx) ?
+          '<div class="partnote">Skrinka <b>900 × 720 × 560</b> · K2738 MO — rozmery a materiály ' +
+          '<span onclick="setCtx(\'cab\')" style="color:var(--nx-select);cursor:pointer;text-decoration:underline">upravíš v Korpuse</span>.</div>' : '') +
+        (S.ctx === 'part' ? '<div class="partnote">Dielec <b>Bok ľavý</b> — materiál dedí z korpusu ' +
+          '(<span class="backlink" onclick="setCtx(\'cab\')" style="color:var(--nx-select);cursor:pointer;text-decoration:underline">Korpus → Materiály</span>).</div>' + sectPartBasic() : '') +
+        (s4 ? sect('set', s4.n, s4meta, s4.f(), true) : '') +
+        (S.ctx === 'cab' ? '<button class="ghostwide" onclick="document.getElementById(\'tplmodal\').style.display=\'flex\'">'+ico('star')+' Uložiť ako šablónu…</button>' : '') +
+      '</div>' +
+      '<div class="nxfoot">Noxun Engine V0.7.0 — Inspector C (mockup)</div>' +
+    '</div>';
+  document.getElementById('mocknote').innerHTML =
+    '<b>Čo vyskúšať</b>Prepínaj kontexty v raile — náhľad sa VYMENÍ (čelný rez s kótami → zónová schéma → čelá s výškami → kovanie → dielec s ABS hranami) a titulok pohľadu je v lište sektora aj v rohu náhľadu. ' +
+    'Chipy vľavo dole prisvietia ostatné vrstvy ako tlmený ghost (vrstva aktuálneho kontextu je základ a je zamknutá). ' +
+    'V sektore Nastavenia sa skupiny otvárajú EXKLUZÍVNE (otvorenie jednej zavrie predošlú). ' +
+    'Základné a Materiály žijú LEN v tabe Korpus — ostatné taby majú náhľad + svoj obsah. ' +
+    'VKLADANIE (pruh „nič — vkladanie"): typ objektu ako buttony pod náhľadom → šablóna → rozmery so zámkami (D-39) → materiály (pri Doske aj smer dekoru D-86) → Vložiť. ' +
+    'V tabe Korpus je dole „Uložiť ako šablónu…"; v Kovaní má výsuv zámok dĺžky (D-93); dielec má „Označiť v modeli".' +
+    '<div style="margin-top:10px; padding-top:8px; border-top:1px solid var(--nx-border-soft); display:flex; align-items:center; gap:14px; flex-wrap:wrap">' +
+      '<span style="font-weight:600">LOGO — zrolované z originálnych SVG kriviek webu</span>' +
+      '<svg style="width:44px;height:44px;color:var(--nx-ink-strong)" viewBox="0 0 100 100"><use href="#i-logo"/></svg>' +
+      '<svg style="width:24px;height:24px;color:var(--nx-ink-strong)" viewBox="0 0 100 100"><use href="#i-logo"/></svg>' +
+      '<svg style="width:16px;height:16px;color:var(--nx-ink-strong)" viewBox="0 0 100 100"><use href="#i-logo"/></svg>' +
+      '<span style="color:var(--nx-ink-faint)">(44 / 24 / 16 px — 16 px = test toolbar veľkosti; rovnaká značka je aj v hlavičke panela)</span>' +
+    '</div>';
+}
+/* mini-modal „Uložiť ako šablónu" — Názov aj Typ žijú TU (N2: pri vybranom korpuse nemajú miesto v Základných) */
+const tplm = document.createElement('div');
+tplm.id = 'tplmodal'; tplm.className = 'mmask';
+tplm.innerHTML = '<div class="mbox"><h3>Uložiť ako šablónu</h3>' +
+  '<div class="row"><label>Názov šablóny</label><input id="tplname" value="Dolná drezová 900"><span class="unit"></span></div>' +
+  '<div class="row"><label>Typ</label><select class="sel"><option selected>Dolná</option><option>Horná</option></select><span class="unit"></span></div>' +
+  '<div class="hint">Šablóna uloží rozmery, konštrukciu, materiály aj kovanie tejto skrinky.</div>' +
+  '<div class="foot"><button class="ghostbtn" onclick="document.getElementById(\'tplmodal\').style.display=\'none\'">Zrušiť</button>' +
+  '<button class="primary" onclick="document.getElementById(\'tplmodal\').style.display=\'none\';toast(\'Šablóna uložená — nájdeš ju pri vkladaní\',\'star\')">Uložiť</button></div></div>';
+tplm.onclick = e => { if (e.target === tplm) tplm.style.display = 'none'; };
+document.body.appendChild(tplm);
+
+setCtx('cab');
+</script>
+</body>
+</html>

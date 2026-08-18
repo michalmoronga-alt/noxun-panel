@@ -94,7 +94,7 @@
   .typerow { display: flex; gap: 16px; padding: 2px 2px 6px; }
   .typerow label { display: flex; align-items: center; color: var(--nx-ink-strong); font-weight: 600; cursor: pointer; }
   .typerow input { margin-right: 6px; }
-  button { padding: 7px 8px; border: 0; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 600; }
+  button { padding: 7px 8px; border: 0; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
   .wide { width: 100%; margin-top: 4px; padding: 8px; font-size: 13px; }
   .primary { background: var(--nx-action); color: var(--nx-on-accent); } .primary:hover { background: var(--nx-action-hover); }
   .ghostbtn { background: var(--nx-surface-sunken); color: var(--nx-ink-strong); border: 1px solid var(--nx-border); }
@@ -135,10 +135,10 @@
   body.mode-insert .inslock { display: inline-flex; align-items: center; justify-content: center; }
   .inslock.on { background: var(--nx-warn-bg-soft); border-color: var(--nx-warn); }
   /* Nahlad (fit ⛶ presunuty do overlaya nahladu — D-29; rezimove taby su v sticky hlavicke) */
-  #preview { width: 100%; border: 1px solid var(--nx-border); border-radius: 5px; background: var(--nx-surface-preview); display: block; touch-action: none; }
+  #preview { width: 100%; border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface-preview); display: block; touch-action: none; }
   .pvhint { font-size: 10px; color: var(--nx-ink-faint); text-align: center; margin: 3px 0 4px; }
   /* Zony strom */
-  #zoneTree { border: 1px solid var(--nx-border-soft); border-radius: 5px; margin: 6px 0; max-height: 140px; overflow: auto; }
+  #zoneTree { border: 1px solid var(--nx-border-soft); border-radius: 6px; margin: 6px 0; max-height: 140px; overflow: auto; }
   .znode { padding: 4px 6px; cursor: pointer; border-bottom: 1px solid var(--nx-bg); font-size: 12px; }
   .znode:hover { background: var(--nx-select-bg-soft); }
   .znode.active { background: var(--nx-select-bg); box-shadow: inset 3px 0 0 var(--nx-select); }
@@ -158,7 +158,7 @@
   .zoneline { display: flex; align-items: center; margin: 8px 0 2px; }
   .zoneline input { margin-right: 7px; width: 15px; height: 15px; }
   .zoneline label { color: var(--nx-ink-label); }
-  #status { font-size: 11px; padding: 7px 9px; border-radius: 5px; background: var(--nx-surface-sunken); color: var(--nx-ink-label); border: 1px solid var(--nx-border); min-height: 16px; line-height: 1.35; margin-top: 8px; }
+  #status { font-size: 11px; padding: 7px 9px; border-radius: 6px; background: var(--nx-surface-sunken); color: var(--nx-ink-label); border: 1px solid var(--nx-border); min-height: 16px; line-height: 1.35; margin-top: 8px; }
   #status.err { background: var(--nx-err-bg); color: var(--nx-err-fg); border-color: var(--nx-err-border); }
   #status.ok  { background: var(--nx-ok-bg); color: var(--nx-ok-fg); border-color: var(--nx-ok-border); }
   /* V0.3 Materialy */
@@ -180,7 +180,7 @@
   .pchead { font-size: 12px; color: var(--nx-ink-strong); margin: 0 0 2px; }
   .pchead b { color: var(--nx-select); }
   .pcdim { font-size: 11px; color: var(--nx-ink-soft); margin: 0 0 8px; }
-  #partSvg { width: 100%; max-height: 200px; border: 1px solid var(--nx-border); border-radius: 5px; background: var(--nx-surface); display: block; margin: 4px 0 6px; }
+  #partSvg { width: 100%; max-height: 200px; border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface); display: block; margin: 4px 0 6px; }
   .absleg { display: flex; flex-wrap: wrap; gap: 8px; font-size: 10px; color: var(--nx-ink-muted); margin: 2px 0 8px; align-items: center; }
   .absleg span { display: inline-flex; align-items: center; gap: 3px; }
   .absleg i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
@@ -318,7 +318,7 @@
   #preview { height: clamp(210px, 38vh, 640px); }
   .pvfitwrap { position: absolute; top: 6px; right: 6px; pointer-events: none; }
   .pvfit { pointer-events: auto; width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
-           background: var(--nx-surface); color: var(--nx-ink-strong); border: 1px solid var(--nx-border); border-radius: 5px;
+           background: var(--nx-surface); color: var(--nx-ink-strong); border: 1px solid var(--nx-border); border-radius: 6px;
            box-shadow: 0 1px 2px var(--nx-modal-shadow); opacity: .9; }
   .pvfit:hover { opacity: 1; background: var(--nx-surface-sunken); }
   .pvfit .ic { width: 16px; height: 16px; }
@@ -491,7 +491,7 @@
   .tplrow .tpldel { flex: 0 0 28px; padding: 3px 0; color: var(--nx-danger); }
   /* D-42: hladacie pole katalogu (okno Materialy) — input s ikonou lupy */
   .mdsearch { position: relative; margin: 2px 0 8px; }
-  .mdsearch input { width: 100%; padding: 5px 8px 5px 30px; border: 1px solid var(--nx-border-strong); border-radius: 5px; font-size: 13px; }
+  .mdsearch input { width: 100%; padding: 5px 8px 5px 30px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 13px; }
   .mdsearch .mdsearch-ic { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--nx-ink-faint); pointer-events: none; }
   /* D-41 PR B: dekorove karty katalogu (okno Materialy) — kompaktne, chips wrapuju */
   .mdcard { border: 1px solid var(--nx-border-soft); border-radius: 6px; padding: 4px 8px; margin: 6px 0; background: var(--nx-surface); }
@@ -504,7 +504,7 @@
   /* D-42 PR B: top bar + mriezka dlazdic + detail dekoru (okno Materialy 640px) */
   .mdbar { display: flex; gap: 6px; align-items: center; margin: 2px 0 8px; }
   .mdbar .mdsearch { flex: 1; margin: 0; }
-  .mdbar select { flex: 0 0 auto; padding: 5px 6px; border: 1px solid var(--nx-border-strong); border-radius: 5px; font-size: 12px; }
+  .mdbar select { flex: 0 0 auto; padding: 5px 6px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 12px; }
   .mdbar .ghostbtn { flex: 0 0 auto; white-space: nowrap; padding: 5px 10px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
   .mdsechead { display: flex; align-items: center; gap: 6px; margin: 10px 2px 5px; font-size: 11px; font-weight: 600;
                text-transform: uppercase; letter-spacing: .05em; color: var(--nx-ink-muted); }
@@ -528,7 +528,7 @@
   .mddemos { flex: 0 0 auto; display: inline-flex; align-items: center; color: var(--nx-select-accent); }
   .mddemos .ic { width: 13px; height: 13px; }
   .mdtile-chips { display: flex; flex-wrap: wrap; gap: 3px; min-height: 18px; }
-  .vchip { display: inline-block; padding: 1px 7px; border-radius: 5px; font-size: 11px; background: var(--nx-surface-sunken);
+  .vchip { display: inline-block; padding: 1px 7px; border-radius: 6px; font-size: 11px; background: var(--nx-surface-sunken);
            color: var(--nx-ink-label); border: 1px solid var(--nx-border-soft); }
   .vchip-abs { background: var(--nx-abs-tape-bg); }
   /* Detail dekoru: riadky variantov rozmer · kod · cena · dodavatel + akcie.
@@ -601,7 +601,7 @@
      vyberu, meni sa patchom; pocas zapisu disabled */
   .mduni { flex: 0 0 26px; width: 26px; padding: 3px 0; display: inline-flex; align-items: center;
            justify-content: center; background: var(--nx-surface-sunken); color: var(--nx-ink-faint);
-           border: 1px solid var(--nx-border); border-radius: 5px; cursor: pointer; }
+           border: 1px solid var(--nx-border); border-radius: 6px; cursor: pointer; }
   .mduni.on { background: var(--nx-select-bg); color: var(--nx-select-strong); border-color: var(--nx-select-accent); }
   .mduni .ic { width: 14px; height: 14px; }
   /* M-A3b (D-60): vazba na Demos v riadku variantu — akcent, klik otvara stranku */
@@ -631,7 +631,7 @@
   /* V0.5 C: VEPO export lista v okne Vyroba */
   .vepobar { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; }
   .vepobar #vepoProject { flex: 1; min-width: 0; padding: 4px 8px; font-size: 12px;
-                          border: 1px solid var(--nx-border); border-radius: 5px; }
+                          border: 1px solid var(--nx-border); border-radius: 6px; }
   .vepobar .vepomerge { flex: 0 0 auto; display: flex; align-items: center; gap: 4px;
                         font-size: 11.5px; color: var(--nx-ink-label); white-space: nowrap; }
   .vepobar .vepobtn { flex: 0 0 auto; padding: 4px 12px; font-size: 12px; font-weight: 600; }
@@ -700,18 +700,18 @@
   .nxda-cd { flex: 0 0 62px; color: var(--nx-ink-muted); font-size: 11.5px; }
   .nxda-pr { flex: 0 0 96px; text-align: right; font-variant-numeric: tabular-nums; }
   .nxda-dis { opacity: .55; }
-  .nxda-fail { background: var(--nx-err-bg); border-radius: 5px; }
+  .nxda-fail { background: var(--nx-err-bg); border-radius: 6px; }
   .nxda-fail .nxda-why { color: var(--nx-err-fg); }
   .nxda-foot { display: flex; align-items: center; gap: 8px; justify-content: flex-end;
                border-top: 1px solid var(--nx-border-soft); margin-top: 8px; padding-top: 8px; }
   .nxda-count { margin-right: auto; color: var(--nx-ink-muted); font-size: 12px; }
-  .nxda-progress { height: 8px; background: var(--nx-surface-sunken); border-radius: 5px; overflow: hidden; margin: 8px 0; }
+  .nxda-progress { height: 8px; background: var(--nx-surface-sunken); border-radius: 6px; overflow: hidden; margin: 8px 0; }
   .nxda-progress i { display: block; height: 100%; width: 0%; background: var(--nx-select-accent); transition: width .4s; }
   .nxda-log { font-size: 12px; color: var(--nx-ink-muted); max-height: 40vh; overflow-y: auto; }
   .nxda-err { color: var(--nx-err-fg); }
   /* dlazdica: fotka dekoru prekryva farebny swatch (fallback = farba pod nou) */
   .mdsw { overflow: hidden; position: relative; }
-  .mdsw-photo { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 5px; }
+  .mdsw-photo { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 6px; }
   /* D-82: swatch v HLAVICKE detailu je zaroven vyber farby CELEHO dekoru
      (skupinovy — jedna zmena prefarbi dosky aj pasky). Native <input type=color>
      lezi cez swatch neviditelne, takze hlavicka nerastie ani o pixel
@@ -724,7 +724,7 @@
   .mddel-name { font-weight: 600; margin-bottom: 4px; }
   .mddel-line { color: var(--nx-ink-muted); padding: 1px 0; }
   .mddel-warn { background: var(--nx-warn-bg); border: 1px solid var(--nx-warnchip-border);
-                color: var(--nx-warn-fg); border-radius: 5px; padding: 5px 8px; margin-top: 6px; }
+                color: var(--nx-warn-fg); border-radius: 6px; padding: 5px 8px; margin-top: 6px; }
 
 /* ===== V0.6 D1b: Katalog kovania — taby Sety + Predvolby projektu ===== */
 #hwTabs { margin: 6px 0 8px; }
@@ -771,7 +771,7 @@
 .hwmanual .ic { width: 13px; height: 13px; }
 
 /* ===== V0.6 D2: Pridat z Demosu (katalog kovania) ===== */
-.hwdemos-hit { padding: 3px 8px; border: 1px solid var(--nx-border); border-radius: 5px;
+.hwdemos-hit { padding: 3px 8px; border: 1px solid var(--nx-border); border-radius: 6px;
                margin: 2px 0; cursor: pointer; font-size: 12px; }
 .hwdemos-hit:hover { background: var(--nx-ghost-hover); }
 #hwDemosPreview { border: 1px solid var(--nx-border-strong); border-radius: 8px;
@@ -779,5 +779,5 @@
 .hwdemos-head { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; }
 .hwdemos-meta { color: var(--nx-ink-muted); font-size: 12px; margin: 2px 0; }
 .hwdemos-warn { background: var(--nx-warn-bg); border: 1px solid var(--nx-warnchip-border);
-                color: var(--nx-warn-fg); border-radius: 5px; padding: 4px 8px; margin: 4px 0; font-size: 12px; }
+                color: var(--nx-warn-fg); border-radius: 6px; padding: 4px 8px; margin: 4px 0; font-size: 12px; }
 .hwdemos-rel { color: var(--nx-ink-muted); font-size: 11.5px; margin: 3px 0; }

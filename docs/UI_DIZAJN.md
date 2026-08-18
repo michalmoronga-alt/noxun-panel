@@ -19,9 +19,11 @@ dokument opisuje **prečo** a **ako** — tabuľka tokenov nižšie je zrkadlom 
   sa nemiešajú.
 - **Značka je len vo výberovej rodine.** Firemnú farbu nesie výber/aktívny stav —
   primárna akcia zostáva zelená (O2) a významové farby sa značkou neriadia.
-- **Rádius 6 px** na všetkých komponentoch (input, select, tlačidlo, chip, karta,
-  dlaždica). Výnimky sú len nekomponentové: farebné štvorčeky (2–3 px), pill/99 px,
-  50 % kruhy a väčšie plochy modalov/kariet (8 px).
+- **Rádius 6 px** na všetkých komponentoch (input, select, tlačidlo, chip, karta
+  dielca, náhľad, status, dlaždica). **Medzihodnoty 4 / 5 / 7 px sú zakázané** —
+  stráži to guard test (`tests/pure/test_ui01_paleta.rb`). Vedomé výnimky: väčšie
+  plochy (karty, modaly, dlaždice katalógu, boxy) **8 px** a badge **9 px** ·
+  nekomponentové — farebné štvorčeky 2–3 px, pill 12 px / 99 px, 50 % kruhy.
 - **Žiadna vizuálna zmena bez zámeru.** Nová farba sa nepridáva ako hex do súboru —
   pridáva sa token, alebo sa použije existujúci.
 
@@ -271,7 +273,8 @@ neutrálne „(podľa pravidla)". Farby pásov ostávajú na ABS tokenoch `--nx-
 
 ### D-105: split tlačidlo „Zvýrazniť hrany" (okno Výroba → KONTROLA)
 Jeden vizuálny celok, dve polovice: **ľavá** = zapnúť/vypnúť (zapnutý stav je
-zjavný — modré pozadie `--nx-select` + ikona `eye-off`), **pravá** (užšia,
+zjavný — pozadie `--nx-select` + ikona `eye-off`; je to **zapnutý stav**, nie
+akcia, preto výberová a nie zelená), **pravá** (užšia,
 `chevron-down`) = rozbaľovacie okno s nastavením. Vzory:
 - **Okno je overlay** (`position: absolute` pod tlačidlom), **nie nový riadok**
   layoutu — vertikálny priestor sa nemení ani keď je otvorené.

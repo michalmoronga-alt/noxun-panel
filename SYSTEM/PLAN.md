@@ -7,7 +7,7 @@
 
 ### 1 · UI 2.0 — štúdio okno a výbery
 
-**Cieľ:** satelitné okná → jedno štúdio okno s toolbarom a bočnou navigáciou; výber materiálu/ABS na jeden klik namiesto scrollovania. **Koncept Inspectora je uzavretý** (Michal, 18.8.2026) — záväzná vizuálna referencia je mockup `_dev/mockup_inspector_c.html` (v16) a slovný kontrakt v `_dev/UI20_PODKLAD.md` (sekcie „SCHVÁLENÉ ROZHODNUTIA" a „FINÁLNY KONCEPT INSPECTOR C"); implementácia ide po dávkach nižšie. Podklad: merač používania D-25 (materiály/ABS vyše 400 interakcií, taby 287×, satelitné okná 234×) a [UI_VIZIA.md](UI_VIZIA.md); cieľový obraz v [V1_VIZIA.md](V1_VIZIA.md) §6.
+**Cieľ:** satelitné okná → jedno štúdio okno s toolbarom a bočnou navigáciou; výber materiálu/ABS na jeden klik namiesto scrollovania. **Koncept Inspectora je uzavretý** (Michal, 18.8.2026) — záväzný slovný kontrakt je [zdroje/ui20/UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) (sekcie „SCHVÁLENÉ ROZHODNUTIA" a „FINÁLNY KONCEPT INSPECTOR C") a vizuálna referencia mockupy vedľa neho: [Inspector C v16](zdroje/ui20/mockup_inspector_c.html) · [štúdio okno](zdroje/ui20/mockup_ui20.html) · [dizajnový lístok](zdroje/ui20/dizajnovy_listok.html); implementácia ide po dávkach nižšie. Podklad: merač používania D-25 (materiály/ABS vyše 400 interakcií, taby 287×, satelitné okná 234×) a [UI_VIZIA.md](UI_VIZIA.md); cieľový obraz v [V1_VIZIA.md](V1_VIZIA.md) §6.
 
 **UI-A · Základ značky** *(nízke riziko, okamžite viditeľné)*
 - **UI-02 · Logo + SketchUp toolbar** — zrolovaná firemná značka ako ikony + `UI::Toolbar` so 4 tlačidlami (panel · Štúdio → dočasne okno Výroba · ABS toggle na EdgeCheck · vkladací režim).
@@ -29,7 +29,7 @@
 - **UI-D2 · Náhľady šablón** — PNG pri uložení + schéma ako fallback.
 - **UI-D3 · Klikateľnosť a uzávery (aj D-26)** — warnpanel deep-linky, klikateľné informačné údaje, **rozhodnutie D-26 Jednoduchý/Rozšírený** (v koncepte „Menej časté" neexistuje — potvrdí sa nad hotovým panelom) + doťaženie `UI_DIZAJN.md`.
 
-**Fáza ŠTÚDIO** *(záver bloku — vlastné dávky po sektorovej debate nad `_dev/mockup_ui20.html`)*
+**Fáza ŠTÚDIO** *(záver bloku — vlastné dávky po sektorovej debate nad [mockupom štúdia](zdroje/ui20/mockup_ui20.html))*
 - **D-50 · OCL inšpirácia UI/UX** — prebrať detaily z OCL flow (vzory áno, GPL kód nie); ťažisko je práve v štúdio okne (kusovník, kontrola, nákup, rozpočet).
 - **D-69 · Jednotný editor materiálov** — jedno modálne okno pre pridanie z Demosu / ručné pridanie / editáciu, rovnaké polia bez ohľadu na vstupný bod.
 - **D-15 · „Pridávačky" ako modal** — všetky akcie „pridať niečo" (šablóna, materiál, položka) na jeden UX vzor.

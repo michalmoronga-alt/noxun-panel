@@ -139,7 +139,7 @@
   .bold-price { color: var(--nx-warn-fg); background: var(--nx-warn-bg); border-radius: 6px; padding: 0 5px; }
 
   .bedit { font: inherit; font-size: 12px; border: 1px solid var(--nx-border-strong);
-           border-radius: 5px; padding: 2px 5px; background: var(--nx-surface); color: var(--nx-ink);
+           border-radius: 6px; padding: 2px 5px; background: var(--nx-surface); color: var(--nx-ink);
            width: 90px; }
   .btab td.bnum .bedit { text-align: right; font-variant-numeric: tabular-nums; }
   .bedit.bshort { width: 52px; }
@@ -154,11 +154,14 @@
   .bact.bdel:hover { color: var(--nx-danger); }
   .bact .ic { width: 14px; height: 14px; }
 
+  /* UI-01: je to primarna AKCIA („pridaj riadok"), preto ZELENA (--nx-action) —
+     nie vyberova rodina. Vyberove tokeny by sa v teme Lucia prefarbili na ruzovo
+     a tlacidlo „vykonaj" musi vyzerat rovnako na oboch pocitacoch. */
   .baddbig { display: block; width: calc(100% - 24px); margin: 6px 12px 10px; font: inherit;
              font-size: 13.5px; font-weight: 700; letter-spacing: .2px; color: var(--nx-on-accent);
-             background: var(--nx-select); border: 0; border-radius: 8px; padding: 9px 0;
+             background: var(--nx-action); border: 0; border-radius: 8px; padding: 9px 0;
              cursor: pointer; text-align: center; }
-  .baddbig:hover { background: var(--nx-select-strong); }
+  .baddbig:hover { background: var(--nx-action-hover); }
   .baddbig .ic { width: 15px; height: 15px; vertical-align: -0.15em; }
   .bdraft { display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
             padding: 8px 12px; background: var(--nx-select-bg-soft);
@@ -176,7 +179,7 @@
   .bfoot .bgear { margin-left: auto; }
 
   /* ===== V0.6 E-c: PREPOCITAT CENY (potvrdenie -> progres -> report) ===== */
-  .bprog { height: 8px; background: var(--nx-surface-sunken); border-radius: 5px;
+  .bprog { height: 8px; background: var(--nx-surface-sunken); border-radius: 6px;
            overflow: hidden; margin: 10px 0 6px; }
   .bprog i { display: block; height: 100%; width: 0; background: var(--nx-select); transition: width .3s; }
   /* Dovod chyby / poznamka "bez vazby" — na rozdiel od .bage sa SMIE zalomit. */
