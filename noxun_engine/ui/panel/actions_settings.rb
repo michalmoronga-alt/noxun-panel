@@ -1,0 +1,63 @@
+# frozen_string_literal: true
+# Noxun Engine - Panel: NASTAVENIA INSPECTORA (koliesko v raile, UI-B3).
+#
+# Dve veci, obe su nastavenie POCITACA (%APPDATA%), nie zakazky — do modelu sa
+# odtialto NIKDY nezapisuje a ziadna z ciest neotvara operaciu (ziadny krok Spat):
+#   * tema UI (NOXUN / Lucia) — zapis + ZIVE nasadenie vsetkym otvorenym oknam,
+#   * rozmerove rady (N6) — hodnoty ponukane pri rozmerovych poliach.
+# Cast modulu Panel (reopen) - zdiela ivary cez class << self.
+module Noxun
+  module Engine
+    module Panel
+      class << self
+        # Prepnutie temy z kolieska. Autorita whitelistu je Ruby
+        # (Engine.normalize_ui_theme) — HTML nie je ochrana. Odpoved sa NEPOSIELA
+        # zvlast: `apply_ui_theme` rozposle `nxThemeApply` VSETKYM zivym oknam
+        # vratane tohto panela, takze prepnutie vidno hned a bez restartu.
+        # Codex audit FIX 6: zlyhanie zapisu sa NEsmie hlasit ako uspech —
+        # apply_ui_theme vracia nil, ked sa tema neulozila (disk, prava).
+        # Okna aj tak dostanu PLATNU temu (rozposiela sa ta ulozena), takze
+        # panel nikdy neukazuje farbu, ktora nie je zapisana.
+        def handle_set_ui_theme(payload)
+          data = parse(payload)
+          theme = Engine.apply_ui_theme(data['theme'])
+          push_ui_settings
+          if theme.nil?
+            return set_status('Tému sa nepodarilo uložiť (disk/práva) — ostáva pôvodná.', true)
+          end
+
+          set_status(theme == 'lucia' ? 'Téma: Lucia (ružová).' : 'Téma: NOXUN (teal).')
+        end
+
+        # Ulozenie rozmerovych radov z editora. Normalizaciu (cisla, rozsah,
+        # duplicity, poradie, pocet) robi VYHRADNE DimSeries — panel posle, co
+        # pouzivatel napisal, a spat dostane presne to, co sa ulozilo.
+        def handle_set_dim_series(payload)
+          data = parse(payload)
+          stored = DimSeries.set(data['series'])
+          push_ui_settings # aj pri zlyhani: editor a ponuky ukazu, co NAOZAJ plati
+          return set_status('Rozmerové rady sa nepodarilo uložiť (disk/práva).', true) if stored.nil?
+
+          set_status('Rozmerové rady uložené.')
+        end
+
+        # Nastavenia pocitaca do panela (rady + tema). Chodia aj v push_init;
+        # tento maly push ich obnovi po zmene BEZ prekreslenia formulara.
+        def push_ui_settings
+          return unless dialog_alive?
+
+          js("if (window.NX && NX.setUiSettings) NX.setUiSettings(#{ui_settings_payload.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.push_ui_settings')
+        end
+
+        def ui_settings_payload
+          { 'dim_series' => DimSeries.get, 'ui_theme' => Engine.get_ui_theme }
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.ui_settings_payload')
+          { 'dim_series' => DimSeries::DEFAULTS, 'ui_theme' => Engine::UI_THEME_DEFAULT }
+        end
+      end
+    end
+  end
+end

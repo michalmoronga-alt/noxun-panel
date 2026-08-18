@@ -9,10 +9,7 @@
 
 **Cieľ:** satelitné okná → jedno štúdio okno s toolbarom a bočnou navigáciou; výber materiálu/ABS na jeden klik namiesto scrollovania. **Koncept Inspectora je uzavretý** (Michal, 18.8.2026) — záväzný slovný kontrakt je [zdroje/ui20/UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) (sekcie „SCHVÁLENÉ ROZHODNUTIA" a „FINÁLNY KONCEPT INSPECTOR C") a vizuálna referencia mockupy vedľa neho: [Inspector C v16](zdroje/ui20/mockup_inspector_c.html) · [štúdio okno](zdroje/ui20/mockup_ui20.html) · [dizajnový lístok](zdroje/ui20/dizajnovy_listok.html); implementácia ide po dávkach nižšie. Podklad: merač používania D-25 (materiály/ABS vyše 400 interakcií, taby 287×, satelitné okná 234×) a [UI_VIZIA.md](UI_VIZIA.md); cieľový obraz v [V1_VIZIA.md](V1_VIZIA.md) §6.
 
-**UI-B · Inspector kostra**
-- ~~**UI-B1 · Kostra panela (aj D-51)**~~ — **HOTOVO** (PR #168, v0.7.4): rail + 4 sektory s exkluzivitou skupín, presun existujúcich kariet, šírka 470 px, tabuľka rozmerov okien D-51 v [../docs/UI_DIZAJN.md](../docs/UI_DIZAJN.md). Uzatvára aj **D-91** (finálny domov satelitov = Štúdio v raile). *Zvyšok D-51 — riadky tabuľky pre satelitné okná — sa doplní, keď ich prevezme Štúdio.*
-- ~~**UI-B2 · Náhľad**~~ — **HOTOVO** (PR #169, v0.7.5): kontextové projekcie s kótami (Korpus čelný rez · Zóny šírky · Čelá výšky a medzery · **Kovanie nová projekcia s pozíciami** · Dielec hrany) + spodný pás — vrstvové chipy Zóny·Čelá·Kovanie·Olep (ghost prisvietenie), kamera N7 (zarovná pohľad SketchUpu na skrinku), fit. **D-27 ostáva OTVORENÉ:** chipy prepínajú vrstvy *náhľadu*, nie tagy modelu.
-- **UI-B3 · Obsah Korpusu + koliesko** — Základné v 2 stĺpcoch + informačný stĺpec, rozmerové rady, ikony skupín, modal „Uložiť ako šablónu", typ badge a kontext kolieska (**UI prepínač témy NOXUN/Lucia** · editor radov · O plugine).
+**~~UI-B · Inspector kostra~~ — BLOK KOMPLET** (UI-B1 #168 · UI-B2 #169 · UI-B3, v0.7.6): kostra (rail + 4 sektory), náhľad ako kontextová projekcia a obsah Korpusu vrátane kolieska. Plné texty v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 
 **UI-C · Kontexty**
 - **UI-C1 · Vkladanie** — typové tlačidlá, šablóny (nedávne prvé, dvojklik vloží, reálne náhľady), zámky D-39, doskové šablóny.

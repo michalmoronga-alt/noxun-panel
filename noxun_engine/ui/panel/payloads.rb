@@ -50,6 +50,10 @@ module Noxun
           params['available_height'] = cfg['available_height']
           params['available_depth'] = cfg['available_depth']
           params['warnings'] = cfg['warnings'] || [] # BuildPlan upozornenia (pre buduce UI)
+          # UI-B3: odvodene udaje informacneho stlpca (pocet dielcov + plocha
+          # dosky). TRANZIENTNE a CITACIE — ziadna zmena schemy, ziadny zapis;
+          # zdroj su snapshoty na dielcoch, rovnaky filter ako ma Bom.collect.
+          params.merge!(cabinet_stats(cab))
           params['template_name_suggestion'] = suggest_template_name(cab, nil) # D-14 modal (Codex F4)
           # V0.4 kovanie: vypocitane polozky (vystup planu) + rucne zasahy (identita
           # owner+type+rule_id). hardware_overrides su aj v params (config_to_params),

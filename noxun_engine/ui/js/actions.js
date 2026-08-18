@@ -214,6 +214,35 @@
   }
   function toggleZones(){ var on = el('zonesChk').checked; if (window.sketchup && sketchup.toggle_zones) sketchup.toggle_zones(on ? 'true' : 'false'); }
 
+  // ===== UI-B3 (N13): klikatelny informacny stlpec Zakladnych ================
+  // „Všetko informačné je klikateľné a vedie tam, kam ukazuje." Klik na pocet
+  // dielcov ich OZNACI v modeli — ciste citanie + zmena vyberu na serveri
+  // (ziadna operacia, ziadny krok Spat). Callback nesie identitu dokumentu aj
+  // skrinky: kym dobehne, mohol pouzivatel oznacit nieco ine.
+  //
+  // Codex audit BLOCKER 1: zmena vyberu si vypyta push CELEJ skrinky, ktory
+  // prepise formular — rozpisany edit caka 400 ms, takze bez flushu by sa ticho
+  // stratil. Preto rovnaky handshake ako ma „Vložiť kópiu" a relay cesty okna
+  // Vyroba: neplatne pole akciu ZASTAVI (flush by ju ticho neaplikoval),
+  // platne edity sa najprv odosielaju (callbacky sa spracuju v poradi).
+  function onInfoParts(){
+    if (!selectedCabId){ NX.setStatus('Označ skrinku v modeli.', true); return; }
+    if (typeof validateFields === 'function' && !validateFields()){
+      NX.setStatus('Skontroluj červené polia — rozpísaná úprava by sa pri označení dielcov stratila.', true);
+      return;
+    }
+    if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+    if (window.sketchup && sketchup.nx_select_parts)
+      sketchup.nx_select_parts(JSON.stringify({ cabinet_id: selectedCabId, model_guid: nxModelGuid }));
+  }
+  // Materiál m² — cielom je „Štúdio → Kusovník s filtrom na túto skrinku".
+  // Štúdio zatiaľ neexistuje (vlastná fáza po bloku UI-D), preto sa povie
+  // pravda a ponúkne dnešná cesta namiesto tichého nič.
+  function onInfoArea(){
+    if (!selectedCabId){ NX.setStatus('Označ skrinku v modeli.', true); return; }
+    NX.setStatus('Plocha dosky tejto skrinky. Kusovník s filtrom na skrinku pribudne v Štúdiu — zatiaľ ho nájdeš v okne Výroba (ikona Štúdio v lište vľavo).');
+  }
+
   function setSelected(cid){
     selectedCabId = cid;
     // (applyTplBtn zije v okne Sablony — disabled stav riesi TemplatesDialog.push_state)

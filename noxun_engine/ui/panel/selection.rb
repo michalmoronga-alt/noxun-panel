@@ -265,6 +265,44 @@ module Noxun
           push_selected(model, dedup: false)
         end
 
+        # UI-B3 (N13): klik na „Dielcov" v informacnom stlpci Zakladnych —
+        # oznaci VYROBNE dielce tejto skrinky v modeli.
+        #
+        # CISTE CITANIE MODELU + zmena VYBERU: ziadny `start_operation`, ziadny
+        # zapis do dictionary, ziadny krok Spat (lekcia D-103). Vyber sa meni
+        # pod `suspend_selection_sync` a panel sa obnovi PRESNE raz — je to ta
+        # ista cesta, akou uz oznacuje dielce okno Vyroba
+        # (ProductionDialog.do_select), takze sa spravanie nemoze rozist:
+        # panel po nej ukaze kartu prveho oznaceneho dielca (rail dostane
+        # docasnu polozku) a status povie, kolko ich je oznacenych.
+        #
+        # IDENTITY GUARD (vzor handle_camera_focus): callback HtmlDialogu je
+        # asynchronny — overuje sa DOKUMENT (prisne, ID skriniek sa naprie
+        # dokumentmi opakuju) aj to, ze ide stale o TU ISTU skrinku.
+        def handle_select_parts(payload = nil)
+          model = Sketchup.active_model
+          return if model.nil?
+
+          data = payload ? parse(payload) : {}
+          return set_status('Dielce sa neoznačili — panel patrí inému dokumentu.', true) if
+            data['model_guid'].to_s != model_guid(model)
+
+          cab = find_cabinet(model)
+          return refresh_after_stale(model) if cab.nil? ||
+                                               Store.get(cab, 'cabinet_id').to_s != data['cabinet_id'].to_s
+
+          parts = manufactured_parts(cab)
+          return set_status('Skrinka nemá výrobné dielce — nie je čo označiť.', true) if parts.empty?
+
+          suspend_selection_sync do
+            sel = model.selection
+            sel.clear
+            parts.each { |p| sel.add(p) }
+          end
+          push_selected(model, dedup: false)
+          set_status("Označených #{parts.size} dielcov skrinky #{Store.get(cab, 'cabinet_id')} v modeli.")
+        end
+
         # UI-B2 (N7): „Pohlad na skrinku" zo spodneho pasu nahladu. Zarovna
         # kameru na celny pohlad a doramuje ju na oznacenu skrinku.
         #

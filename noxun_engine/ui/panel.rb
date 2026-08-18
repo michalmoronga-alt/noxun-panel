@@ -125,8 +125,18 @@ module Noxun
           # oznacenu skrinku. Kamera nie su data modelu, takze ziadna operacia,
           # ziadny zapis a ziadny krok Spat (lekcia D-103).
           cb(dlg, 'nx_camera_focus')       { |p| handle_camera_focus(p) }
+          # UI-B3 (N13): klik na „Dielcov" v informacnom stlpci — oznaci vyrobne
+          # dielce TEJTO skrinky v modeli. CISTE CITANIE + zmena vyberu pod
+          # suspend guardom (vzor ProductionDialog.do_select) — ziadna operacia,
+          # ziadny zapis, ziadny krok Spat.
+          cb(dlg, 'nx_select_parts')       { |p| handle_select_parts(p) }
           # D-100: premenovanie skrinky (inline edit nazvu v hlavicke panela)
           cb(dlg, 'rename_cabinet')        { |p| handle_rename_cabinet(p) }
+          # UI-B3 (koliesko = Nastavenia Inspectora): tema UI a rozmerove rady.
+          # Obe su nastavenie POCITACA (%APPDATA%), nie zakazky — do modelu sa
+          # nezapisuje nic.
+          cb(dlg, 'nx_set_ui_theme')       { |p| handle_set_ui_theme(p) }
+          cb(dlg, 'nx_set_dim_series')     { |p| handle_set_dim_series(p) }
           # V0.4.5 D2: satelitne okna (projektove predvolby a sprava sablon mimo panela)
           cb(dlg, 'open_project_materials') { |_p| MaterialsDialog.show }
           cb(dlg, 'open_templates')         { |_p| TemplatesDialog.show }
@@ -197,6 +207,7 @@ Sketchup.require 'noxun_engine/ui/panel/actions_parts'
 Sketchup.require 'noxun_engine/ui/panel/actions_hardware'
 Sketchup.require 'noxun_engine/ui/panel/actions_board' # V0.4.7c samostatna doska
 Sketchup.require 'noxun_engine/ui/panel/actions_usage' # D-25 merac pouzivania panela
+Sketchup.require 'noxun_engine/ui/panel/actions_settings' # UI-B3 koliesko: tema UI + rozmerove rady
 Sketchup.require 'noxun_engine/ui/panel/sync'
 Sketchup.require 'noxun_engine/ui/panel/resolvers'
 Sketchup.require 'noxun_engine/ui/panel/payloads'

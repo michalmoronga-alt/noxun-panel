@@ -53,6 +53,10 @@ module Noxun
             # pri otvoreni panela; dalsie zmeny chodia pushom (push_edge_check)
             # z panela, z toolbaru aj z okna Vyroba. CISTE CITANIE.
             edge_check: edge_check_state,
+            # UI-B3 (koliesko): nastavenia POCITACA — rozmerove rady (N6) pre
+            # ponuky pri rozmeroch a meno aktualnej temy pre prepinac vzhladu.
+            # Nie su to data zakazky (ziju v %APPDATA%, nikdy v .skp).
+            ui_settings: ui_settings_payload,
             # Identita dokumentu pre stavovy stroj panela aj pre identity guardy
             # asynchronnych callbackov (Codex #168 P2).
             model_guid: model_guid(model)

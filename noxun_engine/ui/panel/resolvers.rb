@@ -109,6 +109,41 @@ module Noxun
           end
         end
 
+        # UI-B3: VYROBNE dielce korpusu — presne ten isty filter, aky ma
+        # `Bom.collect` (kusovnik, VEPO). Proxy kovania (nohy, profily) sa
+        # tak do poctu ani do plochy nikdy nedostanu.
+        def manufactured_parts(cab)
+          return [] unless cab && cab.valid? && cab.respond_to?(:definition)
+
+          cab.definition.entities.grep(Sketchup::ComponentInstance).select do |e|
+            e.valid? && Store.kind(e) == 'part' &&
+              Store.get(e, 'manufactured') == true &&
+              Store.get(e, 'production_class').to_s == 'sheet'
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.manufactured_parts')
+          []
+        end
+
+        # UI-B3 informacny stlpec: kolko dielcov a kolko m2 dosky skrinka drzi.
+        # CISTE CITANIE snapshotov na dielcoch (autorita vyrobneho zaznamu,
+        # standard 8.3) — ziadny prepocet planu a ziadny zapis. Hodnoty su
+        # TRANZIENTNE: do configu ani snapshotu sa NIKDY neukladaju.
+        def cabinet_stats(cab)
+          count = 0
+          area = 0.0
+          manufactured_parts(cab).each do |part|
+            cfg = Store.config(part) || {}
+            qty = [cfg['quantity'].to_i, 1].max
+            count += qty
+            area += cfg['length'].to_f * cfg['width'].to_f * qty
+          end
+          { 'parts_count' => count, 'parts_area_m2' => (area / 1_000_000.0).round(3) }
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.cabinet_stats')
+          { 'parts_count' => 0, 'parts_area_m2' => 0.0 }
+        end
+
         def truthy?(val)
           %w[true 1 yes].include?(val.to_s.downcase)
         end
