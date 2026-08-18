@@ -13,65 +13,11 @@ jobs:
           ruby-version: '3.2'
       - name: Headless testy (bez SketchUpu)
         run: ruby tests/run_all.rb
-      - name: JS testy (evalDim parser vyrazovych poli)
-        run: node tests/js/test_expr.js
-      - name: JS testy (klasifikacia klucov meraca D-25)
-        run: node tests/js/test_usage.js
-      - name: JS testy (stav vkladacej karty D-32/D-33/D-39)
-        run: node tests/js/test_insert_state.js
-      - name: JS testy (zoskupenie ABS pasok k dekoru D-36)
-        run: node tests/js/test_abs_groups.js
-      - name: JS testy (dekorove karty katalogu D-41)
-        run: node tests/js/test_decor_groups.js
-      - name: JS testy (hladanie katalogu D-42)
-        run: node tests/js/test_material_search.js
-      - name: JS testy (sekcie mriezky dekorov D-42 B)
-        run: node tests/js/test_decor_sections.js
-      - name: JS testy (hrubkove filtre a labely D-45)
-        run: node tests/js/test_thickness_labels.js
-      - name: JS testy (format platne pri cipoch + zapamatana sada D-44)
-        run: node tests/js/test_decor_formats.js
-      - name: JS testy (potvrdzovacia lista projektovej predvolby D-46)
-        run: node tests/js/test_proj_confirm.js
-      - name: JS testy — abs mirror (2A-3b)
-        run: node tests/js/test_abs_mirror.js
-      - name: JS testy — okno Materialy SCHEMA 2 (2A-4b)
-        run: node tests/js/test_md_schema2.js
-      - name: JS testy — Demos diff modal (V0.6 B-2b)
-        run: node tests/js/test_demos_diff.js
-      - name: JS testy — modal Pridat z Demosu (M-A2)
-        run: node tests/js/test_demos_add.js
-      - name: JS testy — okno Katalog kovania (V0.6 C-2)
-        run: node tests/js/test_hw_catalog.js
-      - name: JS testy — nahradenie UNI materialov (M-B2)
-        run: node tests/js/test_replace_uni.js
-      - name: JS testy — sety kovania v okne Katalog (D1b + H1b pasma/vyber)
-        run: node tests/js/test_hw_sets.js
-      - name: JS testy — ponuka setov v paneli (H1b, D-81)
-        run: node tests/js/test_hw_panel_sets.js
-      - name: JS testy — svetla vyska a vystuhy (H3, D-80)
-        run: node tests/js/test_interior_height.js
-      - name: JS testy — UI drobnosti H4 (farba dekoru D-82, skratka UNI D-83)
-        run: node tests/js/test_h4_ui.js
-      - name: JS testy — tab Rozpocet a Nastavenia (E-b) + Prepocitat ceny (E-c)
-        run: node tests/js/test_budget_ui.js
-      - name: JS testy — vkladanie dosky s UNI materialom (E-03)
-        run: node tests/js/test_e03_board_insert.js
-      - name: JS testy — volba uchytkoveho profilu v paneli (D-90)
-        run: node tests/js/test_d90_profil_ui.js
-      - name: JS testy — rozpis nakupu v sekcii Kovanie (D-92)
-        run: node tests/js/test_d92_hw_nakup.js
-      - name: JS testy — neznamy typ dosky (D-97) + dekor u dodavatela (D-98)
-        run: node tests/js/test_d97_98_ui.js
-      - name: JS testy — prepinac zvyraznenia hran bez olepu (D-104)
-        run: node tests/js/test_d104_kontrola_hran.js
-      - name: JS testy — prepinace kontroly hran, tri stavy (D-105)
-        run: node tests/js/test_d105_prepinace_hran.js
-      # Doplnene v D-105: sady D-100/D-102 sa do CI omylom nikdy nedostali,
-      # hoci lokalne aj v dokumentacii figuruju medzi „vsetkymi JS sadami".
-      - name: JS testy — inline premenovanie skrinky (D-100)
-        run: node tests/js/test_d100_nazvy.js
-      - name: JS testy — vyriesena ABS paska v rozbalovacke hrany (D-102)
-        run: node tests/js/test_d102_pravidlo.js
-      - name: JS testy — velkost okna pri otvoreni (D-77)
-        run: node tests/js/test_d77_okno_fit.js
+      # Vsetky JS sady globom — rucne vymenovane kroky uz dvakrat zabudli nove
+      # sady (D-100/D-102, potom cely blok UI 2.0). Glob novu sadu nikdy nevynecha.
+      - name: JS testy — vsetky sady (tests/js/test_*.js)
+        run: |
+          for f in tests/js/test_*.js; do
+            echo "== $f"
+            node "$f" || exit 1
+          done
