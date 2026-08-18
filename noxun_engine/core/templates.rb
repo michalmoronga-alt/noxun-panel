@@ -82,22 +82,29 @@ module Noxun
       end
 
       # Prida/prepise sablonu podla DVOJICE (kind, name). Vrati true/false.
+      # CELY read-modify-write bezi pod JEDNYM sidecar zamkom (Codex #174 P2):
+      # dve instancie SketchUpu si inak mohli cerstvo ulozenu sablonu prepisat
+      # stale nacitanym zoznamom.
       def upsert(kind, name, config)
         k = normalize_kind(kind)
         n = name.to_s
-        return false if refuse_write('upsert')
+        with_lock do
+          next false if refuse_write('upsert')
 
-        list = load.reject { |t| t['kind'] == k && t['name'] == n }
-        list << record(k, n, config)
-        write_list(list)
+          list = load.reject { |t| t['kind'] == k && t['name'] == n }
+          list << record(k, n, config)
+          write_list(list)
+        end
       end
 
       def delete(kind, name)
         k = normalize_kind(kind)
         n = name.to_s
-        return false if refuse_write('delete')
+        with_lock do
+          next false if refuse_write('delete')
 
-        write_list(load.reject { |t| t['kind'] == k && t['name'] == n })
+          write_list(load.reject { |t| t['kind'] == k && t['name'] == n })
+        end
       end
 
       # Peciatka pouzitia sablony pre poradie „Naposledy pouzite". Zapisuje do
@@ -131,22 +138,73 @@ module Noxun
         true
       end
 
-      # Chybajuci subor = cerstva instalacia (korpusovy aj doskovy seed naraz).
-      # std < STD = migracia: doplnenie `kind` + doseje doskovych sablon
-      # JEDNYM atomickym zapisom (ziadny medzistav na disku).
-      def ensure_current
-        return write_list(build_predefined + build_predefined_boards) unless JsonFileStore.available?(path)
+      # Marker suboru je uz aktualny? (rychla kontrola BEZ zamku — bezny beh)
+      def current?
+        return false unless JsonFileStore.available?(path)
 
         data = JsonFileStore.read(path, copy: false)
         std = data.is_a?(Hash) ? data['std'] : nil
-        return true if std.is_a?(Integer) && std >= STD
+        std.is_a?(Integer) && std >= STD
+      rescue StandardError => e
+        Engine.log_error(e, 'TemplateStore.current?')
+        false
+      end
 
+      # Lazy migracia. DVOJITA KONTROLA (Codex #174 P2): rychly test bez zamku
+      # (aby kazdy `load` nemusel otvarat a invalidovat), samotny read-modify-
+      # write az POD zamkom a s CERSTVE precitanym stavom — inu instanciu nas
+      # medzitym mohla migracia predbehnut.
+      def ensure_current
+        return true if current?
+
+        with_lock { migrate! }
+      end
+
+      # Bezi VYHRADNE pod zamkom (with_lock invaliduje cache, takze citame
+      # cerstvo z disku). Chybajuci subor = cerstva instalacia (korpusovy aj
+      # doskovy seed naraz); std < STD = doplnenie `kind` + doseje doskovych
+      # sablon JEDNYM atomickym zapisom (ziadny medzistav na disku).
+      def migrate!
+        return true if current? # medzitym to stihla ina instancia
+
+        return write_list(build_predefined + build_predefined_boards) unless JsonFileStore.available?(path)
+
+        data = JsonFileStore.read(path, copy: false)
         raw = data.is_a?(Hash) ? data['templates'] : nil
         list = normalize_list(raw.is_a?(Array) ? raw : build_predefined)
         write_list(list + missing_board_seed(list))
       rescue StandardError => e
-        Engine.log_error(e, 'TemplateStore.ensure_current')
+        Engine.log_error(e, 'TemplateStore.migrate!')
         false
+      end
+
+      # Exkluzivny zamok na SIDECAR subore (drzany handle by na Windows
+      # zablokoval atomicky rename JsonFileStore) — vzor UsageStats.with_lock.
+      # REENTRANTNY: verejna zapisova operacia berie zamok RAZ a vnutorne kroky
+      # (load -> ensure_current -> migrate!) uz bezia pod nim; druhy flock v tom
+      # istom procese by sa zablokoval sam na sebe.
+      def with_lock
+        return yield if @lock_held
+
+        FileUtils.mkdir_p(dir)
+        File.open(lock_path, File::RDWR | File::CREAT) do |f|
+          f.flock(File::LOCK_EX)
+          begin
+            @lock_held = true
+            JsonFileStore.invalidate(path) # pod zamkom sa cita CERSTVY stav disku
+            yield
+          ensure
+            @lock_held = false
+            f.flock(File::LOCK_UN)
+          end
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'TemplateStore.with_lock')
+        false
+      end
+
+      def lock_path
+        "#{path}.lock"
       end
 
       # Zapis so zalohou (JsonFileStore: .bak + .tmp + atomicky rename).
@@ -186,18 +244,26 @@ module Noxun
           name = raw['name'].to_s
           next if name.empty?
 
-          cfg = raw['config'].is_a?(Hash) ? raw['config'] : {}
-          out << { 'name' => name, 'kind' => kind_of_record(raw), 'config' => JsonFileStore.deep_copy(cfg) }
+          # Nezname kluce zaznamu prezijú (rovnaky forward kontrakt ako extras).
+          rec = JsonFileStore.deep_copy(raw)
+          rec['name'] = name
+          rec['kind'] = kind_of_record(raw)
+          rec['config'] = rec['config'].is_a?(Hash) ? rec['config'] : {}
+          out << rec
         end
         out
       end
 
-      # Druh zaznamu: explicitny `kind` vyhrava. Legacy zaznam (std 1) ho nema —
-      # 'board' sa da odvodit uz len z redundantneho `config.type` (rucne
-      # upraveny subor); vsetko ostatne je korpus.
+      # Druh zaznamu. Codex #174 P2: EXPLICITNY `kind` sa NIKDY nepreklasifikuje
+      # — ani neznamy. Zaznam z novsej verzie (napr. kind 'assembly') tak
+      # normalizaciu aj zapis PREZIJE nedotknuty, ale ziadny filter
+      # 'cabinet'/'board' ho nezachyti, takze sa nikde neponukne ani neaplikuje;
+      # tichy prevod na korpus by ho dovolil vlozit ako skrinku.
+      # Legacy zaznam (std 1) `kind` nema — 'board' sa da odvodit uz len
+      # z redundantneho `config.type`, vsetko ostatne je korpus.
       def kind_of_record(raw)
-        k = raw['kind'].to_s
-        return k if KINDS.include?(k)
+        k = raw['kind']
+        return k if k.is_a?(String) && !k.empty?
 
         cfg = raw['config']
         cfg.is_a?(Hash) && cfg['type'].to_s == 'board' ? 'board' : DEFAULT_KIND
@@ -233,8 +299,7 @@ module Noxun
 
       # Doskovy seed (UI-C1a). Rozmery su KANONICKE polia dosky podla
       # SYSTEM/STANDARD.md 8.3 — `length`/`width`/`thickness`/`grain_direction`;
-      # ziadny material (doplni ho projektovy default pri vlozeni) a ZIADNA
-      # orientacia (umiestnenie dosky riesi az UI-C1c).
+      # ZIADNA orientacia (umiestnenie dosky riesi az UI-C1c).
       def build_predefined_boards
         [
           board_tpl('Diel', 18.0, 800.0, 600.0),
@@ -247,8 +312,16 @@ module Noxun
         record('cabinet', name, config)
       end
 
+      # KONTRAKT doskovej sablony (Codex #174 P2): sablona bez materialu =
+      # vlozenie cez UNI mechanizmus (E-03 odomknuta hrubka), aby deklarovana
+      # hrubka VZDY platila; realny material si pouzivatel vyberie v karte
+      # a hrubka sa prisposobi — implementuje C1b.
+      # Preto je `material_id` v configu EXPLICITNE nil, nie chybajuci kluc:
+      # bez tohto zapisaneho kontraktu by builder dosadil projektovy default
+      # a `insert_thickness_for` (autorita realneho materialu) by hrubku
+      # sablony zahodil — Pracovna doska aj Zastena by sa vlozili na 18 mm.
       def board_tpl(name, thickness, length, width)
-        record('board', name, 'length' => length, 'width' => width,
+        record('board', name, 'material_id' => nil, 'length' => length, 'width' => width,
                               'thickness' => thickness, 'grain_direction' => 'length')
       end
 

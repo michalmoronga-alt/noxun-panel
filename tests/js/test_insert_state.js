@@ -148,21 +148,29 @@ eq(ins.templateKind({ name: 'A', config: { type: 'lower' } }), 'cabinet',
   'legacy zaznam bez kind je korpusovy');
 eq(ins.templateKind({ name: 'A', config: { type: 'board' } }), 'board',
   'bez kind sa druh odvodi z redundantneho config.type');
-eq(ins.templateKind({ name: 'A', kind: 'nezmysel', config: { type: 'lower' } }), 'cabinet',
-  'neznamy kind = korpusova sablona');
+// Codex #174 P2: EXPLICITNY neznamy kind (zaznam z novsej verzie) sa NIKDY
+// nepreklasifikuje na korpus — prejde filtrami ako „ani cabinet, ani board".
+eq(ins.templateKind({ name: 'A', kind: 'fancy', config: { type: 'lower' } }), 'fancy',
+  'neznamy kind ostava neznamy (nie korpusovy)');
+eq(ins.templateKind({ name: 'A', kind: '', config: { type: 'board' } }), 'board',
+  'prazdny kind = odvodenie z config.type');
 eq(ins.templateKind(null), 'cabinet', 'prazdny vstup nespadne');
 
 const LIB = [
   { name: 'Dolna klasik', kind: 'cabinet', config: { type: 'lower' } },
   { name: 'Zástena', kind: 'board', config: { type: 'board' } },
   { name: 'Zástena', kind: 'cabinet', config: { type: 'upper' } },
-  { name: 'Legacy', config: { type: 'lower' } }
+  { name: 'Legacy', config: { type: 'lower' } },
+  { name: 'Zostava', kind: 'fancy', config: { type: 'lower' } } // z novsej verzie
 ];
-eq(ins.templatesOfKind(LIB, 'cabinet').map(function(t){ return t.config.type; }),
-  ['lower', 'upper', 'lower'], 'filter kind: korpusove (vratane legacy bez kind)');
+eq(ins.templatesOfKind(LIB, 'cabinet').map(function(t){ return t.name; }),
+  ['Dolna klasik', 'Zástena', 'Legacy'], 'filter kind: korpusove (vratane legacy bez kind)');
 eq(ins.templatesOfKind(LIB, 'board').length, 1, 'filter kind: doskove');
 eq(ins.templatesOfKind(LIB, 'board')[0].name, 'Zástena',
   'rovnake meno v inom druhu je INA sablona');
+eq(ins.templatesOfKind(LIB, 'cabinet').concat(ins.templatesOfKind(LIB, 'board'))
+    .some(function(t){ return t.name === 'Zostava'; }), false,
+  'neznamy druh sa NEPONUKNE ani ako korpus, ani ako doska');
 eq(ins.templatesOfKind(null, 'cabinet'), [], 'prazdna kniznica nespadne');
 
 console.log(JSON.stringify({ passed: n, failed: 0 }));

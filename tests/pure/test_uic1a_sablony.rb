@@ -141,7 +141,22 @@ NxTest.test('UI-C1a seed dosiek: kanonicke polia dosky, redundantny type, ZIADNA
     NxTest.assert_equal('length', cfg['grain_direction'], "#{t['name']}: smer dekoru")
     NxTest.refute(cfg.key?('orientation'), "#{t['name']}: orientacia patri az do UI-C1c")
     NxTest.refute(cfg.key?('height'), "#{t['name']}: doska nema vysku (kanonicke su length/width)")
+    # Codex #174 P2: material_id musi byt EXPLICITNE nil (kluc existuje) —
+    # sablona bez materialu = vlozenie cez UNI mechanizmus s odomknutou
+    # hrubkou (E-03), inak by insert_thickness_for hrubku sablony zahodil.
+    NxTest.assert(cfg.key?('material_id'), "#{t['name']}: kontrakt „bez materialu“ je ZAPISANY")
+    NxTest.assert_equal(nil, cfg['material_id'], "#{t['name']}: material_id je nil")
   end
+end
+
+NxTest.test('UI-C1a seed dosiek: kontrakt „bez materialu“ prezije aj zapis na disk') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxC1a.reset!
+  NxC1a::TS.load
+  pd = NxC1a.raw['templates'].find { |t| t['kind'] == 'board' && t['name'] == 'Pracovná doska' }
+  NxTest.assert(pd['config'].key?('material_id'), 'kluc material_id je v ulozenom JSON')
+  NxTest.assert_equal(nil, pd['config']['material_id'], 'a ma hodnotu null')
+  NxTest.assert_close(38.0, pd['config']['thickness'], 0.01, 'deklarovana hrubka PD ostava 38')
 end
 
 NxTest.test('UI-C1a: upsert doskovej sablony dopise config.type = board (ochrana stareho klienta)') do
@@ -171,6 +186,33 @@ NxTest.test('UI-C1a identita: rovnake meno v inom druhu su DVE sablony') do
   NxTest.assert(NxC1a::TS.find('board', 'Zástena'), 'doskova Zastena mazanie prezila')
 end
 
+NxTest.test('UI-C1a identita: EXPLICITNY neznamy kind sa NEPREKLASIFIKUJE (Codex #174 P2)') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxC1a.reset!
+  # Zaznam z hypotetickej novsej verzie — druh, ktoremu tento plugin nerozumie.
+  NxC1a.write_raw!({ 'std' => 2,
+                     'templates' => [{ 'name' => 'Zostava', 'kind' => 'fancy',
+                                       'config' => { 'type' => 'lower' }, 'buduci_kluc' => 7 },
+                                     { 'name' => 'Dolna klasik', 'kind' => 'cabinet',
+                                       'config' => { 'type' => 'lower' } }] })
+
+  rec = NxC1a::TS.load.find { |t| t['name'] == 'Zostava' }
+  NxTest.assert_equal('fancy', rec['kind'], 'neznamy druh ostal, NEstal sa korpusom')
+  NxTest.assert_equal(7, rec['buduci_kluc'], 'nezname kluce zaznamu prezili normalizaciu')
+
+  # Nikde sa neponukne ani nenajde: ziadny filter cabinet/board ho nezachyti.
+  NxTest.assert_equal(nil, NxC1a::TS.find('cabinet', 'Zostava'), 'find cabinet ho nevrati')
+  NxTest.assert_equal(nil, NxC1a::TS.find('board', 'Zostava'), 'find board ho nevrati')
+  panel_cab = Noxun::Engine::Panel.template_list(kind: 'cabinet')
+  NxTest.refute(panel_cab.any? { |t| t['name'] == 'Zostava' }, 'okno Sablony ho neukaze')
+
+  # Prezije zapis (cudzi upsert) BEZ ZMENY — vratane neznameho kluca.
+  NxC1a::TS.upsert('cabinet', 'Nova', { 'type' => 'lower' })
+  stored = NxC1a.raw['templates'].find { |t| t['name'] == 'Zostava' }
+  NxTest.assert_equal('fancy', stored['kind'], 'zapis druh nezmenil')
+  NxTest.assert_equal(7, stored['buduci_kluc'], 'zapis neznamy kluc zaznamu zachoval')
+end
+
 # ---------------------------------------------------------------------------
 # forward guard — BLOCKER 2
 # ---------------------------------------------------------------------------
@@ -190,6 +232,51 @@ NxTest.test('UI-C1a guard: subor s novsou schemou je LEN NA CITANIE') do
   NxTest.assert_equal(false, NxC1a::TS.touch_used('cabinet', 'Z buducnosti'), 'peciatka odmietnuta')
   NxTest.assert_equal(before, File.binread(NxC1a::TS.path), 'subor sa NEZMENIL ani o bajt')
   NxTest.refute(File.exist?(NxC1a::TU.path), 'ani subor pouzitia nevznikol')
+end
+
+# ---------------------------------------------------------------------------
+# zamok read-modify-write (Codex #174 P2)
+# ---------------------------------------------------------------------------
+
+NxTest.test('UI-C1a zamok: zapis cita CERSTVY stav disku, nie stary snapshot') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxC1a.reset!
+  NxC1a::TS.load # naplni cache JsonFileStore
+
+  # Simulacia DRUHEJ instancie SketchUpu: subor sa medzitym zmenil, ale nasa
+  # cache o tom nevie (cache ma 1 s okno bez kontroly podpisu). Bez zamku,
+  # ktory cache pod nim invaliduje, by upsert zapisal stary zoznam a cudziu
+  # sablonu ticho zahodil.
+  data = NxC1a.raw
+  data['templates'] << { 'name' => 'Cudzia', 'kind' => 'cabinet',
+                         'config' => { 'type' => 'lower', 'width' => 700.0 } }
+  File.binwrite(NxC1a::TS.path, JSON.generate(data)) # ZAMERNE bez invalidate
+
+  NxTest.assert_equal(true, NxC1a::TS.upsert('cabinet', 'Moja', { 'type' => 'lower' }))
+  names = NxC1a.raw['templates'].map { |t| t['name'] }
+  NxTest.assert(names.include?('Cudzia'), 'cudzi zapis prezil — citalo sa cerstvo z disku')
+  NxTest.assert(names.include?('Moja'), 'vlastny zapis prebehol')
+end
+
+NxTest.test('UI-C1a zamok: je REENTRANTNY (verejny zapis pod uz drzanym zamkom)') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxC1a.reset!
+  # upsert -> load -> ensure_current -> with_lock: vnutorne kroky uz pod zamkom
+  # bezia. Druhy flock v tom istom procese by sa zablokoval sam na sebe, takze
+  # tento test by pri chybajucej reentrancii NEDOBEHOL.
+  res = NxC1a::TS.with_lock { NxC1a::TS.upsert('cabinet', 'Vnorena', { 'type' => 'lower' }) }
+  NxTest.assert_equal(true, res, 'vnoreny zapis prebehol bez deadlocku')
+  NxTest.assert(NxC1a::TS.find('cabinet', 'Vnorena'), 'sablona sa naozaj ulozila')
+  NxTest.assert(File.exist?("#{NxC1a::TS.path}.lock"), 'zamok je SIDECAR subor, nie datovy')
+end
+
+NxTest.test('UI-C1a zamok: migracia sa pod zamkom znovu overi (dvojita kontrola)') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxC1a.reset!
+  NxC1a::TS.load # marker uz je 2
+  before = File.binread(NxC1a::TS.path)
+  NxTest.assert_equal(true, NxC1a::TS.migrate!, 'migrate! nad aktualnym markerom je no-op')
+  NxTest.assert_equal(before, File.binread(NxC1a::TS.path), 'a nic nezapisal')
 end
 
 # ---------------------------------------------------------------------------
@@ -285,6 +372,21 @@ NxTest.test('UI-C1a guard: zdrojak okna Sablony filtruje kind aj v serverovych a
   NxTest.assert(src.include?("TemplateStore.find('cabinet', name)"), 'apply hlada len korpusove')
   NxTest.assert(src.include?("TemplateStore.delete('cabinet', name)"), 'delete maze len korpusove')
   NxTest.assert(src.include?("TemplateStore.upsert('cabinet', name, config)"), 'save uklada korpusovu')
+end
+
+NxTest.test('UI-C1a guard: okno Sablony vetvi na ZLYHANY zapis (Codex #174 P2)') do
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog.rb'), encoding: 'UTF-8')
+  NxTest.assert(src.include?("unless TemplateStore.upsert('cabinet', name, config)"),
+                'save vetvi na navratovu hodnotu — ziadny falosny uspech')
+  NxTest.assert(src.include?("unless TemplateStore.delete('cabinet', name)"),
+                'delete vetvi na navratovu hodnotu')
+  # after_change (hlaska o uspechu + refresh) smie bezat LEN po uspesnom zapise:
+  # v oboch vetvach musi byt medzi volanim store a after_change chybovy return.
+  %w[upsert delete].each do |op|
+    seg = src[/unless TemplateStore\.#{op}\('cabinet'.*?after_change/m]
+    NxTest.assert(seg && seg.include?('set_status(') && seg.include?('return'),
+                  "#{op}: pri zlyhani sa vracia chybovy status, nie hlaska o uspechu")
+  end
 end
 
 # ---------------------------------------------------------------------------

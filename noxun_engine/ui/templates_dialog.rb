@@ -145,7 +145,14 @@ module Noxun
              UI.messagebox("Sablona \"#{name}\" existuje. Prepisat?", MB_YESNO) != IDYES
             return set_status('Zrušené — šablóna nezmenená.')
           end
-          TemplateStore.upsert('cabinet', name, config)
+          # Codex #174 P2: navratovu hodnotu NIKDY neignorovat — read-only
+          # kniznica (subor z novsej verzie) alebo zlyhanie disku by inak
+          # ohlasili uspech a pouzivatel by sa spoliehal na sablonu, ktora
+          # nevznikla (rovnaky vzor ako save cesta v paneli).
+          unless TemplateStore.upsert('cabinet', name, config)
+            return set_status('Šablónu sa nepodarilo zapísať — knižnica je z novšej verzie ' \
+                              'Noxunu alebo zlyhal zápis na disk. Nič sa neuložilo.', true)
+          end
           after_change("Šablóna \"#{name}\" uložená.#{hw_note}")
         end
 
@@ -156,7 +163,11 @@ module Noxun
 
           # Guard kind: okno vidi len korpusove, takze aj mazat smie len tie —
           # rovnomenna doskova sablona sa odtialto nikdy nezmaze.
-          TemplateStore.delete('cabinet', name)
+          # Codex #174 P2: pri odmietnutom zapise ZIADNA hlaska o uspechu.
+          unless TemplateStore.delete('cabinet', name)
+            return set_status('Šablónu sa nepodarilo vymazať — knižnica je z novšej verzie ' \
+                              'Noxunu alebo zlyhal zápis na disk. Nič sa nezmenilo.', true)
+          end
           after_change("Šablóna \"#{name}\" vymazaná.")
         end
 

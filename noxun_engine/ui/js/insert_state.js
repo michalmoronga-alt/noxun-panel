@@ -138,9 +138,12 @@
     // Zaznam zo servera nesie `kind` ('cabinet' | 'board'). Zaznam BEZ neho je
     // legacy korpusova sablona; 'board' sa da odvodit este z redundantneho
     // `config.type` (to isté poistne pole, ktore chrani starsieho klienta).
+    // ZRKADLO Ruby kind_of_record (Codex #174 P2): EXPLICITNY kind sa NIKDY
+    // nepreklasifikuje — neznamy druh z novsej verzie prejde filtrami ako
+    // „ani cabinet, ani board", takze sa nikde neponukne.
     function templateKind(tp){
       var k = tp && tp.kind;
-      if (k === 'board' || k === 'cabinet') return k;
+      if (typeof k === 'string' && k !== '') return k;
       return (tp && tp.config && tp.config.type === 'board') ? 'board' : 'cabinet';
     }
     function templatesOfKind(list, kind){
