@@ -195,6 +195,20 @@ module Noxun
           push_selected(model)
         end
 
+        # UI-B1: krizik docasnej polozky raily pri oznacenej DOSKE — doska nema
+        # rodica, na ktoreho by sa dalo vratit, takze sa vyber jednoducho zhodi
+        # a panel sa prepne do vkladacieho rezimu. Presne vzor Panel.show_insert
+        # (toolbar „Vložiť"): vycistenie pod SUSPEND guardom (inak by observer
+        # spustil vlastny druhy refresh) a refresh `dedup: false` — dedup MENI
+        # model a z UI akcie sa do modelu nikdy nezapisuje (lekcia D-103).
+        def handle_clear_selection
+          model = Sketchup.active_model
+          return if model.nil?
+
+          suspend_selection_sync { model.selection.clear }
+          push_selected(model, dedup: false)
+        end
+
       end
 
       # Observer musi zit ako objekt s referenciou (Panel modul ju drzi v @observer).

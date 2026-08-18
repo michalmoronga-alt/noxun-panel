@@ -3,7 +3,7 @@
   var TEMPLATES = [];
   var activeZoneId = null;
   var cabEditsInFlight = false; // D-07 Codex B2: apply odoslany, echo este nedoslo
-  var currentCabTab = 'korpus'; // D-08: aktivny rezimovy tab (korpus|zony|cela) — drzi sa cez zmeny vyberu
+  // (D-08 currentCabTab zanikol v UI-B1 — aktivny kontext drzi NXShell v js/shell.js)
   var tplNameSuggestion = '';   // D-14: navrh nazvu sablony z Ruby (cabinet_payload)
   var selectedCabId = null;
   var currentZoneTree = null;   // strukturny strom zon (nový vklad aj oznaceny)

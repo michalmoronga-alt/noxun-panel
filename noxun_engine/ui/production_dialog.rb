@@ -304,8 +304,10 @@ module Noxun
           model = Sketchup.active_model
           return unless edge_check_guard(data, model)
 
-          state = EdgeCheck.toggle(model)
-          push_edge_check(state)
+          # UI-B1 (audit A2): prepnutie ide cez ZDIELANU Engine.toggle_edge_check —
+          # tá zavola EdgeCheck.toggle a novy stav rozposle VSETKYM oknam (aj
+          # railu Inspectora). Vlastny push tu uz netreba, status je lokalny.
+          state = Engine.toggle_edge_check(model)
           set_status(edge_check_status(state))
         rescue StandardError => e
           Engine.log_error(e, 'ProductionDialog.do_edge_check')

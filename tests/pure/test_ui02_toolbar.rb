@@ -114,29 +114,48 @@ end
 
 # --- 4) ABS: len prepnutie existujucej kontroly hran ---------------------------
 
+# Telo ZDIELANEHO prepnutia (UI-B1) — toolbar, rail Inspectora aj okno Vyroba
+# musia ist tou istou cestou, inak sa ich spravanie casom rozide.
+def ui02_toggle_shared
+  UI02_MAIN[/def self\.toggle_edge_check.*?\n    end\n/m].to_s
+end
+
 NxTest.test('UI-02: ABS tlacidlo len prepina existujuce EdgeCheck API (D-104/D-105)') do
   body = ui02_install_toolbar
-  NxTest.assert(body.include?('EdgeCheck.toggle(Sketchup.active_model)'),
+  shared = ui02_toggle_shared
+  NxTest.refute(shared.empty?, 'Engine.toggle_edge_check je zdielany vstupny bod prepnutia')
+  NxTest.assert(shared.include?('EdgeCheck.toggle('),
                 'zapnutie/vypnutie robi EdgeCheck.toggle — ziadna nova logika')
+  NxTest.assert(body.include?('toggle_edge_check'),
+                'toolbar musi volat ZDIELANU metodu, nie vlastnu kopiu prepnutia')
+  NxTest.refute(body.include?('EdgeCheck.toggle('),
+                'duplikat prepnutia v toolbari — logika patri do Engine.toggle_edge_check')
   NxTest.assert(body.include?('EdgeCheck.available?') && body.include?('EdgeCheck.active?'),
                 'stav tlacidla cita EdgeCheck (available? / active?)')
-  NxTest.assert(body.include?('defined?(EdgeCheck)'),
+  NxTest.assert(body.include?('defined?(EdgeCheck)') && shared.include?('defined?(EdgeCheck)'),
                 'EdgeCheck sa pouziva len ked je nacitany (starsi SketchUp nema Overlay)')
 end
 
-NxTest.test('UI-02: prepnutie ABS z toolbaru obnovi ovladanie v okne Vyroba (D-105)') do
-  # Okno Vyroba ma vlastne split tlacidlo hran so stavmi a poctami. Bez pushu
-  # noveho stavu by po prepnuti z toolbaru ukazovalo stary — presne to robi aj
-  # existujuca cesta ProductionDialog#do_edge_check.
-  body = ui02_install_toolbar
-  NxTest.assert(body.include?('ProductionDialog.push_edge_check(state)'),
-                'toolbar musi poslat novy stav oknu Vyroba (inak ostane split tlacidlo na starom)')
-  NxTest.assert(body.include?('defined?(ProductionDialog)'),
+NxTest.test('UI-02/UI-B1: prepnutie ABS obnovi ovladanie vo VSETKYCH oknach') do
+  # Okno Vyroba ma vlastne split tlacidlo hran so stavmi a poctami, Inspector ma
+  # ikonu v raile. Bez pushu noveho stavu by po prepnuti inde ukazovali stary.
+  cast = UI02_MAIN[/def self\.broadcast_edge_check.*?\n    end\n/m].to_s
+  NxTest.refute(cast.empty?, 'Engine.broadcast_edge_check rozposiela novy stav')
+  NxTest.assert(ui02_toggle_shared.include?('broadcast_edge_check(state)'),
+                'po prepnuti sa stav VZDY rozposle (inak okna ostanu na starom)')
+  NxTest.assert(cast.include?('ProductionDialog.push_edge_check(state)'),
+                'okno Vyroba musi dostat novy stav (split tlacidlo D-105)')
+  NxTest.assert(cast.include?('Panel.push_edge_check(state)'),
+                'rail Inspectora musi dostat novy stav (UI-B1)')
+  NxTest.assert(cast.include?('defined?(ProductionDialog)') && cast.include?('defined?(Panel)'),
                 'push je defenzivny — pri zavretom/nenacitanom okne sa ticho zahodi')
   prod = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_dialog.rb'), encoding: 'UTF-8')
   verejne = prod[/\A.*?\n\s*private\b/m].to_s # cast triedy PRED `private` (lekcia A-05)
   NxTest.assert(verejne.include?('def push_edge_check'),
                 'push_edge_check musi ostat verejne — vola ho aj EdgeCheck a toolbar')
+  panel_sync = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'sync.rb'), encoding: 'UTF-8')
+  NxTest.assert(panel_sync.include?('def push_edge_check'),
+                'Panel.push_edge_check je protajsok v paneli (rail)')
 end
 
 # --- 5) ziadny zapis do modelu z toolbaru -------------------------------------

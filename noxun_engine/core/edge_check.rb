@@ -752,13 +752,16 @@ module Noxun
       # Po prepocte (draw / zmena vyberu): okno Vyroba dostane cerstve cisla.
       # Burst eventov sa zluci do JEDNEHO pushu (timer + pending guard).
       def notify_count_changed
-        return unless defined?(ProductionDialog)
+        return unless defined?(ProductionDialog) || defined?(Panel)
         return if @notify_pending
         @notify_pending = true
         UI.start_timer(0, false) do
           begin
             @notify_pending = false
-            ProductionDialog.push_edge_check
+            ProductionDialog.push_edge_check if defined?(ProductionDialog)
+            # UI-B1: rail Inspectora ukazuje ten isty stav — bez tohto by po
+            # prepocte (draw / zmena vyberu) ostal na starom pocte.
+            Panel.push_edge_check if defined?(Panel)
           rescue StandardError => e
             Engine.log_error(e, 'EdgeCheck.notify_count_changed')
           end

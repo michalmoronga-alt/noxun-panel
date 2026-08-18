@@ -3,7 +3,11 @@
   // (CSS: mode-insert zobrazi vkladaciu kartu; mode-cab nastavenia korpusu; mode-part
   // kartu dielca a skryje korpusove sekcie). Identita hore = setIdbar.
   var lastCabForFit = null;
-  function setUiMode(mode){
+  // UI-B1 (audit A1): JEDINE miesto zmeny rezimu je aj jedine miesto, kde sa
+  // vyhodnocuje IDENTITA vyberu. `sel` je serverovy payload toho, co je
+  // oznacene (cabinet_payload / part_card / board_payload; null = nic) — z neho
+  // NXShell odvodi identitu aj popis docasnej polozky raily.
+  function setUiMode(mode, sel){
     document.body.className = 'mode-' + mode;
     // D-14 (Codex F5): modal patri k oznacenemu korpusu — mimo mode-cab sa zatvara
     if (mode !== 'cab' && typeof closeSaveTemplateModal === 'function') closeSaveTemplateModal();
@@ -12,9 +16,20 @@
     // rozpisane upravy v karte preziju. Jedine miesto zmeny rezimu = jedine
     // miesto resetu — plati pre kazdu buducu cestu do mode-insert.
     if (NXInsert.trackMode(mode)) materializeInsertCard();
-    // D-78: rezimove taby su v mode-insert neaktivne — aria stav drzime pri KAZDEJ
-    // zmene rezimu (className vyssie zmazal aj pripadne stare priznaky).
-    if (typeof syncCabTabsLocked === 'function') syncCabTabsLocked();
+    // UI-B1: nova identita vyberu => viewContext spat na Korpus; ECHO push tej
+    // istej identity kontext NEMENI (rozpisana praca musi prezit).
+    NXShell.setLabel(nxTempLabel(mode, sel));
+    NXShell.track(mode, NXShell.identityOf(mode, sel));
+    // Zrkadlo stavu do DOM (rail + data-view-ctx) — className vyssie zmazal
+    // aj pripadne stare priznaky, preto pri KAZDEJ zmene rezimu.
+    if (typeof nxShellApply === 'function') nxShellApply();
+  }
+  // Popis docasnej polozky raily — meno dielca/dosky, alebo rola dielca.
+  function nxTempLabel(mode, sel){
+    if (!sel) return '';
+    if (mode === 'part') return sel.name || (typeof roleLabel === 'function' ? roleLabel(sel.role) : '');
+    if (mode === 'board') return sel.name || '';
+    return '';
   }
   // D-100: inline premenovanie skrinky. Editor zije v hlavicke (ziadny novy
   // riadok) a jeho stav je viazany na cabinet_id — Codex audit FIX 4: debounced
@@ -153,6 +168,9 @@
       // aby ich prvy reset karty (clearSelected -> materializeInsertCard) aplikoval.
       NXInsert.setLocksFlat(data.insert_locks);
       if (data.version) el('verline').textContent = 'V' + data.version; // verzia z Ruby (jediny zdroj)
+      // UI-B1 (audit A2): stav ABS kontroly hran pri OTVORENI panela (pull).
+      // Dalsie zmeny chodia pushom — z panela, z toolbaru aj z okna Vyroba.
+      if (typeof nxApplyEdgeCheck === 'function') nxApplyEdgeCheck(data.edge_check);
       refreshMaterialFilters(); // (projektove predvolby zobrazi okno Materialy projektu)
       el('zonesChk').checked = !!data.zones_visible;
       // V0.4.7c: uz oznacena DOSKA pri otvoreni panela (selected_kind z Ruby)
@@ -306,11 +324,11 @@
       setCabinetMaterials(c); // V0.3 korpusove material selecty (prazdne = dedi)
       renderFilteredTemplates();
       setIdbar(c);
-      setUiMode(c.part_card ? 'part' : 'cab');
+      setUiMode(c.part_card ? 'part' : 'cab', c.part_card ? c.part_card : c);
       // D-08 (Codex F3): dielec = vzdy ZONOVY nahlad (klik na zonu = vedomy odchod
-      // z dielca, povodne spravanie); currentCabTab sa NEMENI — navrat do cab
-      // obnovi pracovny tab. Atribut prezije setUiMode (className prepis).
-      previewMode = c.part_card ? 'zones' : cabTabPreview(currentCabTab);
+      // z dielca, povodne spravanie). Atribut data-view-ctx prezije setUiMode
+      // (className prepis) — nastavuje ho nxShellApply.
+      previewMode = c.part_card ? 'zones' : cabTabPreview(NXShell.effectiveCtx());
       // pohlad: ina skrinka -> fit; ta ista (auto-apply rebuild) -> pohlad DRZI
       if (c.cabinet_id !== lastCabForFit){ lastCabForFit = c.cabinet_id; fitPreview(); }
       // svetle rozmery presne z backendu ak su
@@ -337,7 +355,7 @@
       if (lastCabForFit !== null){ lastCabForFit = null; }
       renderBoardCard(b);
       setBoardIdbar(b);
-      setUiMode('board');
+      setUiMode('board', b);
       refreshZoneUI(); renderPreview();
     },
     clearSelected: function(){
@@ -350,10 +368,10 @@
       activeZoneId = null; frontItems = null;
       buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
       setIdbar(null);
-      setUiMode('insert');
-      // D-78: vo vkladani su taby neaktivne a zobrazuje sa Korpus (effectiveCabTab);
-      // zapamatany pracovny tab prezije a obnovi sa pri oznaceni korpusu.
-      previewMode = cabTabPreview(effectiveCabTab());
+      setUiMode('insert', null);
+      // D-78 / UI-B1: vo vkladani su kontexty neaktivne a platí Korpus
+      // (NXShell.effectiveCtx) — nad navrhom niet zon ani ciel.
+      previewMode = cabTabPreview(NXShell.effectiveCtx());
       invalidateFrontPlaceholders(); // D-23: navrhovy rezim nema resolved vysky
       if (lastCabForFit !== null){ lastCabForFit = null; fitPreview(); }
       renderPartCard(null);      // schovaj kartu dielca
@@ -361,7 +379,11 @@
       clearCabinetMaterials();   // korpusove material selecty na "dedi" + disabled
       refreshZoneUI(); renderPreview();
     },
-    setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; }
+    setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; },
+    // UI-B1 (audit A2): stav ABS kontroly hran do raily. Rovnaky kanal ako ma
+    // okno Vyroba (D-105) — panel si ZIADNY vlastny stav nedrzi, len zobrazuje
+    // to, co posle server (klik z panela, z toolbaru aj z okna Vyroba).
+    setEdgeCheck: function(state){ if (typeof nxApplyEdgeCheck === 'function') nxApplyEdgeCheck(state); }
   };
 
   // Identita dosky v idbar (BRD-xxx + nazov; bez warnchipu — dosky warnings zatial nemaju).

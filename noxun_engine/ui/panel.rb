@@ -61,13 +61,16 @@ module Noxun
             preferences_key: DLG_KEY,
             scrollable: true,
             resizable: true,
-            # D-77: rezim dielca (nahlad + karta dielca s riadkami hran) potrebuje
-            # vysku — pri 640 px konci spodok karty pod okrajom okna. Rozmery tu
-            # platia LEN pri prvom otvoreni; zapamatane male okno dorovna nx_fit.
-            width: 400,
-            height: 720,
-            min_width: 360,
-            min_height: 560,
+            # D-77 / D-51 (UI-B1, audit A7): JEDNA PRAVDA sirky Inspectora je
+            # OBSAHOVY viewport 470 px (rail 44 + karta). Rozmery tu su VONKAJSIE
+            # (ramik + titulok okna), preto 470 + ~16 px ramika = 486; vyska
+            # 810 obsahu + ~40 px titulku = 850. Platia LEN pri PRVOM otvoreni —
+            # zapamatane male okno dorovna nx_fit podla NX_FIT_MIN v panel.html
+            # (tam su OBSAHOVE hodnoty; tabulka je v docs/UI_DIZAJN.md).
+            width: 486,
+            height: 850,
+            min_width: 486,
+            min_height: 600,
             style: UI::HtmlDialog::STYLE_DIALOG
           )
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'panel.html'))
@@ -108,8 +111,16 @@ module Noxun
           # D-91: Katalog kovania priamo z hlavicky panela (docasne miesto "za
           # Vyrobou" — finalny domov rozhodne UI 2.0). Len otvorenie satelitu.
           cb(dlg, 'open_hardware_catalog') { |_p| HardwareCatalogDialog.show }
-          # V0.4.5 D1: omrvinka karty dielca — spat na korpus (oznaci ho v modeli)
+          # V0.4.5 D1: omrvinka karty dielca — spat na korpus (oznaci ho v modeli).
+          # UI-B1: tou istou cestou ide aj krizik docasnej polozky raily (dielec).
           cb(dlg, 'select_cabinet')        { |p| handle_select_cabinet(p) }
+          # UI-B1: krizik docasnej polozky raily pri DOSKE — vycistenie vyberu.
+          # Ziadna operacia, ziadny zapis do modelu (vzor Panel.show_insert).
+          cb(dlg, 'clear_selection')       { |_p| handle_clear_selection }
+          # UI-B1 (audit A2): ABS kontrola hran z raily Inspectora. Vola TU ISTU
+          # zdielanu logiku ako toolbar aj okno Vyroba (Engine.toggle_edge_check)
+          # — ziadny duplikat a ziadny zapis do modelu (lekcia D-103).
+          cb(dlg, 'nx_edge_toggle')        { |_p| handle_edge_toggle }
           # D-100: premenovanie skrinky (inline edit nazvu v hlavicke panela)
           cb(dlg, 'rename_cabinet')        { |p| handle_rename_cabinet(p) }
           # V0.4.5 D2: satelitne okna (projektove predvolby a sprava sablon mimo panela)

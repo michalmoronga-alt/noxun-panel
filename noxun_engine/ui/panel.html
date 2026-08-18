@@ -1,336 +1,396 @@
 <!-- Noxun Engine — panel (vanilla JS, ziadne CDN, slovensky). Verziu zobrazuje NX.init z Ruby. -->
-<!-- V0.4.5 Inspector: identita hore, nahlad = fixne OKNO so zoom/pan, kontextove karty
-     (nic=vkladacia / korpus=nastavenia / zona=karta pod nahladom / dielec=karta s omrvinkou);
-     rezimy = body class mode-insert/cab/part (bridge.js). D2: projektove materialy a sprava
-     sablon ziju v satelitnych oknach (proj_materials.html, templates.html) — panel ma len
-     quick-pick sablony a materialy oznacenej skrinky. -->
+<!-- UI-B1 (kostra Inspectora): vlavo RAIL kontextov (Korpus·Zony·Cela·Kovanie +
+     docasny Dielec/Doska + ABS kontrola + koliesko + Studio), vpravo jednoradova
+     hlavicka a obsah v 4 SEKTOROCH (Nahlad · Zakladne · Materialy · Nastavenia).
+     Kostra je STATICKA (A4) — prepinanie kontextov/rezimov meni LEN triedy a
+     atributy na <body> (mode-* trieda, data-view-ctx, data-insert-kind); ziadny
+     innerHTML re-render kostry (znicil by listenery, comboboxy a rozpisane hodnoty).
+     Scroll ostava DOKUMENTOVY (A6): rail je fixny lavy stlpec, hlavicka sticky. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.7.3">
+<!-- A8: korenova trieda Inspectora. Zije na <html> (nie na <body>) zamerne —
+     setUiMode prepisuje CELY body.className, takze trieda na body by zmizla.
+     Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
+     bezpecne zdielatelny so satelitnymi oknami. -->
+<script>document.documentElement.className = 'nx-inspector';</script>
+<link rel="stylesheet" href="css/panel.css?v=0.7.4">
 
-<!-- D-29: STICKY dvojradova hlavicka Inspectora. Rad 1 = firemne logo + identita
-     objektu (bridge.js setIdbar) + warn chip. Rad 2 = rezimove taby (setCabTab,
-     data-cab-tab na <body>) vlavo + tlacidlo Vyroba vpravo (oddelene — otvara
-     satelitne okno, NIE je to tab). Nazov pluginu je v paticke, nie tu. -->
+<!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
+     Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
+     su neaktivne (aria-disabled + guard v setViewContext, vzor D-78: HTML
+     `disabled` sa zamerne nepouziva, aby tlacidla ostali fokusovatelne a
+     niesli title). -->
+<nav class="crail" id="nxRail" aria-label="Kontexty a nástroje Inspectora">
+  <button type="button" id="railKorpus" data-nx-usage="rail:korpus" class="railbtn" data-nx-ctx="korpus" onclick="setViewContext('korpus')" aria-pressed="true" aria-label="Korpus"><svg class="ic" aria-hidden="true"><use href="#i-cabinet"/></svg><span class="railtip">Korpus</span></button>
+  <button type="button" id="railZony" data-nx-usage="rail:zony" class="railbtn" data-nx-ctx="zony" onclick="setViewContext('zony')" aria-pressed="false" aria-label="Zóny"><svg class="ic" aria-hidden="true"><use href="#i-layout-grid"/></svg><span class="railtip">Zóny</span></button>
+  <button type="button" id="railCela" data-nx-usage="rail:cela" class="railbtn" data-nx-ctx="cela" onclick="setViewContext('cela')" aria-pressed="false" aria-label="Čelá"><svg class="ic" aria-hidden="true"><use href="#i-front"/></svg><span class="railtip">Čelá</span></button>
+  <button type="button" id="railKovanie" data-nx-usage="rail:kovanie" class="railbtn" data-nx-ctx="kovanie" onclick="setViewContext('kovanie')" aria-pressed="false" aria-label="Kovanie"><svg class="ic" aria-hidden="true"><use href="#i-hammer"/></svg><span class="railtip">Kovanie</span></button>
+  <!-- DOCASNA polozka: oznaceny dielec / doska. Krizik vrati vyber (dielec ->
+       rodicovska skrinka, doska -> prazdny vyber). Zobrazuje ju shell.js. -->
+  <div class="raildiv" id="railTempDiv"></div>
+  <button type="button" id="railTemp" data-nx-usage="rail:docasny" class="railbtn ctxi on" aria-label="Označený objekt"><svg class="ic" id="railTempIc" aria-hidden="true"><use href="#i-slab"/></svg><span class="rx" id="railTempX" data-nx-usage="rail:zrusit" role="button" tabindex="0" onclick="railTempClose()" title="Zrušiť výber"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></span><span class="railtip" id="railTempTip">Dielec</span></button>
+  <div class="raildiv"></div>
+  <!-- A2: ABS kontrola hran = FUNKCNY prepinac (to iste EdgeCheck API ako
+       toolbar a okno Vyroba). Ziadny flyout — 3-stavove nastavenie ostava
+       zatial v okne Vyroba. Ziadny zapis do modelu (lekcia D-103). -->
+  <button type="button" id="railAbs" data-nx-usage="rail:abs" class="railbtn fn" onclick="onEdgeCheckToggle()" aria-pressed="false" aria-label="ABS kontrola hrán"><svg class="ic" aria-hidden="true"><use href="#i-shell"/></svg><span class="railtip" id="railAbsTip">ABS kontrola hrán — zvýrazní olep v modeli</span></button>
+  <span class="railgap"></span>
+  <div class="raildiv"></div>
+  <button type="button" id="railCfg" data-nx-usage="rail:nastavenia" class="railbtn" onclick="onInspectorSettings()" aria-label="Nastavenia Inspectora"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg><span class="railtip">Nastavenia Inspectora — pripravujú sa</span></button>
+  <button type="button" id="railStudio" data-nx-usage="rail:studio" class="railbtn" onclick="openProductionDialog()" aria-label="Štúdio"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg><span class="railtip">Štúdio — kusovník, kontrola, výstupy</span></button>
+</nav>
+
+<!-- D-29 / UI-B1: STICKY JEDNORADOVA hlavicka. Logo + identita objektu
+     (bridge.js setIdbar: ID, nazov s ceruzkou, ⚠ chip). Rezimove taby
+     nahradil rail; typ badge pride v UI-B3. -->
 <header class="nxhdr">
   <div class="nxhdr-id">
     <svg class="nx-logo" viewBox="0 0 100 100" aria-hidden="true"><use href="#i-logo"/></svg>
     <div id="idbar" class="idbar"><span class="free">Nič nie je označené — návrh nového objektu</span></div>
-  </div>
-  <!-- D-47: 3 taby rovnako siroke s ikonami + satelitne akcie rovnako siroke
-       (Materialy · Vyroba · D-91 Kovanie). Pod ~480 px su akcie icon-only (CSS
-       media query .prodbtn span — ziadny treti riadok, vertikalny priestor). -->
-  <div class="nxhdr-modes">
-    <div class="cabtabs">
-      <button id="tabCab" class="cabtab on" onclick="setCabTab('korpus')" aria-pressed="true"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg><span>Korpus</span></button>
-      <button id="tabZones" class="cabtab" onclick="setCabTab('zony')" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-layout-grid"/></svg><span>Zóny</span></button>
-      <button id="tabFronts" class="cabtab" onclick="setCabTab('cela')" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-columns-2"/></svg><span>Čelá</span></button>
-    </div>
-    <div class="satbtns">
-      <button class="prodbtn" onclick="openProjectMaterialsDialog()" title="Materiály — katalóg a predvoľby projektu" aria-label="Materiály — katalóg a predvoľby projektu"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg><span>Materiály</span></button>
-      <button class="prodbtn" onclick="openProductionDialog()" title="Výroba — kusovník a súpisy" aria-label="Výroba — kusovník a súpisy"><svg class="ic" aria-hidden="true"><use href="#i-factory"/></svg><span>Výroba</span></button>
-      <!-- D-91: Katalóg kovania z hlavičky (dočasné miesto „za Výrobou" —
-           finálny domov rozhodne UI 2.0). Rovnaký mechanizmus ako ostatné
-           satelity: callback otvorí HardwareCatalogDialog. -->
-      <button class="prodbtn" onclick="openHardwareCatalogDialog()" title="Kovanie — katalóg položiek a sety" aria-label="Kovanie — katalóg položiek a sety"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg><span>Kovanie</span></button>
-    </div>
   </div>
 </header>
 
 <!-- warnlist ukotveny hned pod sticky hlavickou (A1) — toggle robi scroll-to-top -->
 <div id="warnList" class="warnlist" style="display:none"></div>
 
-<!-- NAHLAD: fixne okno + zoom/pan; fit (⛶ -> ikona maximize) je overlay v pravom
-     hornom rohu nahladu (A8 — pointer-events len na tlacidle, nesmie blokovat pan/zoom). -->
-<fieldset class="pvbox">
-  <div class="pvwrap">
-    <svg id="preview" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet"></svg>
-    <div class="pvfitwrap">
-      <button class="pvfit" onclick="fitPreview()" title="Prispôsobiť pohľad (reset zoomu)" aria-label="Prispôsobiť pohľad (reset zoomu)"><svg class="ic" aria-hidden="true"><use href="#i-maximize"/></svg></button>
-    </div>
+<!-- ===== S1 · NAHLAD =======================================================
+     Sektory su <details data-key="s…"> — rozbalenie si pamata bindDetails
+     (localStorage), takze PREZIJE echo push aj zmenu vyberu (A5). -->
+<details class="sect" id="secPreview" data-key="s1" open>
+  <summary class="secthead"><span class="sn">Náhľad</span><span class="meta" id="s1Meta"></span></summary>
+  <div class="sectbody">
+    <!-- NAHLAD: fixne okno + zoom/pan; fit (ikona maximize) je overlay v pravom
+         hornom rohu nahladu (A8 — pointer-events len na tlacidle, nesmie blokovat
+         pan/zoom/ťah priecky). -->
+    <fieldset class="pvbox">
+      <div class="pvwrap">
+        <svg id="preview" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="pvfitwrap">
+          <button class="pvfit" onclick="fitPreview()" title="Prispôsobiť pohľad (reset zoomu)" aria-label="Prispôsobiť pohľad (reset zoomu)"><svg class="ic" aria-hidden="true"><use href="#i-maximize"/></svg></button>
+        </div>
+      </div>
+      <!-- D-23: hint podla aktivneho kontextu (CSS cez data-view-ctx na <body>) —
+           v kontexte Cela pribudol klik na celo, zonova cast sa mimo Zon skryva -->
+      <div class="pvhint"><span class="ph-zones">Klik na zónu = výber (police, delenie) · ťahaj priečku = posun · </span><span class="ph-fronts">Klik na čelo = jeho riadok v zozname · </span>Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu</div>
+      <div class="zoneline">
+        <input id="zonesChk" type="checkbox" onchange="toggleZones()">
+        <label for="zonesChk">Zobraziť zóny (ghost) v modeli</label>
+      </div>
+    </fieldset>
+    <!-- A3: nahlady dielca a dosky patria do S1 (karty s poliami su v S4).
+         Viditelnost riadi CSS podla rezimu — obsah kresli part_card/board_card. -->
+    <svg id="partSvg" viewBox="0 0 300 200" preserveAspectRatio="xMidYMid meet"></svg>
+    <svg id="boardSvg" viewBox="0 0 300 200" preserveAspectRatio="xMidYMid meet"></svg>
   </div>
-  <!-- D-23: hint podla aktivneho tabu (CSS cez data-cab-tab na <body>) — v tabe
-       Cela pribudol klik na celo, zonova cast sa mimo tabu Zony skryva -->
-  <div class="pvhint"><span class="ph-zones">Klik na zónu = výber (police, delenie) · ťahaj priečku = posun · </span><span class="ph-fronts">Klik na čelo = jeho riadok v zozname · </span>Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu</div>
-  <div class="zoneline">
-    <input id="zonesChk" type="checkbox" onchange="toggleZones()">
-    <label for="zonesChk">Zobraziť zóny (ghost) v modeli</label>
-  </div>
-</fieldset>
+</details>
 
-<!-- KARTA ZONY: akcie kliknutej zony hned pod nahladom (actions.js refreshZoneUI) -->
-<fieldset id="zoneCard" style="display:none">
-  <legend>Zóna</legend>
-  <div id="zoneActive"></div>
-  <div id="leafActions">
-    <div class="zact"><label>Rozdeliť zvislo</label>
-      <select id="splitVCount"><option>2</option><option>3</option><option>4</option></select>
-      <button class="ghostbtn zbtn" onclick="splitZone('v')" disabled>na stĺpce</button></div>
-    <div class="zact"><label>Rozdeliť vodorovne</label>
-      <select id="splitHCount"><option>2</option><option>3</option><option>4</option></select>
-      <button class="ghostbtn zbtn" onclick="splitZone('h')" disabled>na riadky</button></div>
-    <div class="zact"><label>Police v zóne</label>
-      <select id="zoneShelves"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select>
-      <button class="ghostbtn zbtn" onclick="setZoneShelves()" disabled>nastav</button></div>
-  </div>
-  <div id="fieldEditor"></div>
-  <div class="btnrow">
-    <button class="danger zbtn" onclick="cleanZone()" disabled>Vyčistiť zónu (zruš delenie/police)</button>
-  </div>
-</fieldset>
+<!-- ===== S2 · ZAKLADNE =====================================================
+     Vkladacia karta (typ, sablona, rozmery dosky) + rozmery korpusu. Pri
+     oznacenom dielci/doske sa cely sektor skryva (A3). -->
+<details class="sect" id="secBasic" data-key="s2" open>
+  <summary class="secthead"><span class="sn">Základné</span><span class="meta" id="s2Meta"></span></summary>
+  <div class="sectbody">
+    <!-- VKLADACIA KARTA (len ked nic nie je oznacene). D2: quick-pick sablony priamo tu;
+         sprava sablon (ulozit/vymazat/pouzit na oznaceny) = okno Sablony.
+         V0.4.7c: prepinac Korpus/Doska — rezim drzi atribut data-insert-kind na <body>
+         (NIE body class; setUiMode prepisuje cely className — Codex audit c). -->
+    <fieldset id="insertCard">
+      <legend>Nový objekt</legend>
+      <div class="typerow" id="insertKindRow">
+        <label><input type="radio" name="ikind" value="cabinet" checked onchange="onInsertKindChange()"> Korpus</label>
+        <label><input type="radio" name="ikind" value="board" onchange="onInsertKindChange()"> Doska</label>
+      </div>
+      <div id="insertCabForm">
+        <div class="typerow">
+          <label><input type="radio" name="ctype" value="lower" onchange="onTypeChange()"> Dolná</label>
+          <label><input type="radio" name="ctype" value="upper" onchange="onTypeChange()"> Horná</label>
+        </div>
+        <div class="row"><label>Šablóna</label>
+          <select id="template" onchange="onTemplateChange()"><option value="">— vyber —</option></select>
+          <button class="ghostbtn tplmng" onclick="openTemplatesDialog()" title="Šablóny — uložiť / vymazať / použiť na označený" aria-label="Šablóny — uložiť / vymazať / použiť na označený"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg></button>
+        </div>
+        <button class="primary wide" onclick="insertCabinet()">Vložiť korpus</button>
+      </div>
+      <div id="insertBoardForm">
+        <div class="hint">Samostatný výrobný dielec — krycia doska, blenda, výplň… Hrúbku určuje materiál (pri UNI ju zadáš sám); ABS nastavíš po vložení na karte dosky.</div>
+        <div class="row"><label>Názov</label><input id="ib_name" type="text" placeholder="Doska"><span class="unit"></span></div>
+        <div class="row"><label>Dĺžka</label><input id="ib_length" type="text" value="800"><span class="unit">mm</span></div>
+        <div class="row"><label>Šírka</label><input id="ib_width" type="text" value="600"><span class="unit">mm</span></div>
+        <button class="primary wide" onclick="insertBoard()">Vložiť dosku</button>
+      </div>
+    </fieldset>
 
-<!-- KARTA DIELCA (ABS editor) — plny kontext s omrvinkou spat na korpus -->
-<fieldset id="partCard" style="display:none">
-  <div class="crumb"><span class="backlink" onclick="backToCabinet()" title="Späť na skrinku">‹ <span id="pcCab">—</span></span> › <b id="pcName2"></b></div>
-  <div class="pchead" id="pcName"></div>
-  <div class="pcdim" id="pcDim"></div>
-  <!-- D-85: data-nx-combo = tento select obsluhuje zdielany combobox (nx_combo.js).
-       Select ostava zdrojom pravdy — combobox mu len zapise hodnotu a vystreli
-       change, takze onPartMaterial (aj modal chybajucej pasky D-41) beziat ako doteraz. -->
-  <div class="pcmat"><label>Materiál</label>
-    <select id="pcMaterial" data-nx-combo="decor" onchange="onPartMaterial()"></select>
+    <!-- ZAKLADNE: rozmery + svetle (spolocne pre navrh aj oznaceny korpus).
+         D-39: .inslock v EXISTUJUCICH riadkoch (ziadny novy riadok — pravidlo
+         vertikalneho priestoru); CSS ich zobrazuje LEN v mode-insert. -->
+    <fieldset id="basicCard">
+      <legend>Rozmery</legend>
+      <div class="row"><label>Šírka</label><input id="width" type="text" oninput="onField()"><button class="inslock" data-lock="width" onclick="toggleInsertLock('width')" aria-label="Zamknúť šírku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
+      <div class="row"><label>Výška</label><input id="height" type="text" oninput="onField()"><button class="inslock" data-lock="height" onclick="toggleInsertLock('height')" aria-label="Zamknúť výšku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
+      <div class="row"><label>Hĺbka</label><input id="depth" type="text" oninput="onField()"><button class="inslock" data-lock="depth" onclick="toggleInsertLock('depth')" aria-label="Zamknúť hĺbku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
+      <div class="row"><label>Hrúbka materiálu</label><input id="thickness" type="text" oninput="onField()"><button class="inslock" data-lock="thickness" onclick="toggleInsertLock('thickness')" aria-label="Zamknúť hrúbku materiálu" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
+      <!-- D-11: vyska sokla patri k zakladnym rozmerom (pre hornu skrinku sa skryva — applyVisibility) -->
+      <div class="row" id="fhRow"><label>Výška sokla</label><input id="floor_height" type="text" oninput="onField()"><button class="inslock" data-lock="floor_height" onclick="toggleInsertLock('floor_height')" aria-label="Zamknúť výšku sokla" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
+      <div class="row"><label>Svetlá šírka</label><input id="av_width" type="text" readonly><span class="unit">mm</span></div>
+      <div class="row"><label>Svetlá hĺbka</label><input id="av_depth" type="text" readonly><span class="unit">mm</span></div>
+      <div class="row"><label>Úložná výška</label><input id="av_height" type="text" readonly><span class="unit">mm</span></div>
+    </fieldset>
   </div>
-  <svg id="partSvg" viewBox="0 0 300 200" preserveAspectRatio="xMidYMid meet"></svg>
-  <!-- D-35: kompaktna ikona v EXISTUJUCOM riadku legendy (ziadny novy riadok — pravidlo
-       vertikalneho priestoru); ramik ikony = "olepene dookola" vo farbe ABS 1,0 mm -->
-  <div class="absleg">
-    <span><i style="background:var(--nx-abs-1mm)"></i>1,0 mm</span>
-    <span><i style="background:var(--nx-abs-2mm)"></i>2,0 mm</span>
-    <span><i style="background:var(--nx-abs-none)"></i>bez ABS</span>
-    <span><i style="background:var(--nx-warn-bg);border:1px solid var(--nx-warn)"></i>ručný override</span>
-    <button class="absall" onclick="onEdgesAll()" title="Olepiť všetky 4 hrany páskou k materiálu"><i></i></button>
-  </div>
-  <div id="edgeRows"></div>
-</fieldset>
+</details>
 
-<!-- VKLADACIA KARTA (len ked nic nie je oznacene). D2: quick-pick sablony priamo tu;
-     sprava sablon (ulozit/vymazat/pouzit na oznaceny) = okno Sablony (tlacidlo ⚙).
-     V0.4.7c: prepinac Korpus/Doska — rezim drzi atribut data-insert-kind na <body>
-     (NIE body class; setUiMode prepisuje cely className — Codex audit c). -->
-<fieldset id="insertCard">
-  <legend>Nový objekt</legend>
-  <div class="typerow" id="insertKindRow">
-    <label><input type="radio" name="ikind" value="cabinet" checked onchange="onInsertKindChange()"> Korpus</label>
-    <label><input type="radio" name="ikind" value="board" onchange="onInsertKindChange()"> Doska</label>
-  </div>
-  <div id="insertCabForm">
-    <div class="typerow">
-      <label><input type="radio" name="ctype" value="lower" onchange="onTypeChange()"> Dolná</label>
-      <label><input type="radio" name="ctype" value="upper" onchange="onTypeChange()"> Horná</label>
+<!-- ===== S3 · MATERIALY ====================================================
+     Oznaceny korpus: materialy skrinky. Vkladanie DOSKY: material + hrubka +
+     smer dekoru vkladanej dosky (A3 — cab_* selecty su bez vyberu disabled,
+     preto sa vo vkladani vobec neukazuju). -->
+<details class="sect" id="secMat" data-key="s3" open>
+  <summary class="secthead"><span class="sn">Materiály</span><span class="meta" id="s3Meta"></span></summary>
+  <div class="sectbody">
+    <!-- MATERIALY (V0.3): materialy TEJTO skrinky. Projektove predvolby = okno
+         Materialy projektu (V0.4.5 D2 — sprava mimo Inspectora, vzor SYSTEM/07). -->
+    <div id="cabMatBlock">
+      <div class="hint" id="cabMatHint">Materiály tejto skrinky — prázdne = dediť z projektu. Označ skrinku pre nastavenie.</div>
+      <div class="matrow"><label>Korpus</label><select id="cab_body" data-nx-combo="decor" onchange="onCabinetMaterial('body', this.value)"></select></div>
+      <div class="matrow"><label>Čelá</label><select id="cab_front" data-nx-combo="decor" onchange="onCabinetMaterial('front', this.value)"></select></div>
+      <div class="matrow"><label>Chrbát</label><select id="cab_back" data-nx-combo="decor" onchange="onCabinetMaterial('back', this.value)"></select></div>
+      <div class="btnrow">
+        <button class="ghostbtn" onclick="openProjectMaterialsDialog()"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg> Materiály projektu…</button>
+      </div>
     </div>
-    <div class="row"><label>Šablóna</label>
-      <select id="template" onchange="onTemplateChange()"><option value="">— vyber —</option></select>
-      <button class="ghostbtn tplmng" onclick="openTemplatesDialog()" title="Šablóny — uložiť / vymazať / použiť na označený" aria-label="Šablóny — uložiť / vymazať / použiť na označený"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg></button>
-    </div>
-    <button class="primary wide" onclick="insertCabinet()">Vložiť korpus</button>
-  </div>
-  <div id="insertBoardForm">
-    <div class="hint">Samostatný výrobný dielec — krycia doska, blenda, výplň… Hrúbku určuje materiál (pri UNI ju zadáš sám); ABS nastavíš po vložení na karte dosky.</div>
-    <div class="row"><label>Názov</label><input id="ib_name" type="text" placeholder="Doska"><span class="unit"></span></div>
-    <div class="row"><label>Dĺžka</label><input id="ib_length" type="text" value="800"><span class="unit">mm</span></div>
-    <div class="row"><label>Šírka</label><input id="ib_width" type="text" value="600"><span class="unit">mm</span></div>
-    <!-- D-85 combobox; E-03/D-86 guardy visia na onInsertBoardMaterial a combobox
-         ich necha bezat po TEJ ISTEJ ceste (zapis value + change). -->
-    <div class="row"><label>Materiál</label><select id="ib_material" data-nx-combo="decor" onchange="onInsertBoardMaterial()"></select><span class="unit"></span></div>
-    <!-- E-03: pri UNI materiali sa pole odomyka (readOnly riadi board_card.js) -->
-    <div class="row"><label>Hrúbka</label><input id="ib_thickness" type="text" readonly><span class="unit">mm</span></div>
-    <div class="row"><label>Smer dekoru</label>
-      <!-- D-86: onchange oznaci volbu za vedomu — refresh katalogu ju uz neprepise.
-           onblur (Codex #163 P2) dokona odlozeny zapis, ak katalog vymenil material,
-           kym pouzivatel v selecte stal — nemusi sa cakat na dalsi refresh. -->
-      <select id="ib_grain" onchange="onInsertGrainChange()" onblur="onInsertBoardMaterial()">
-        <option value="length">Po dĺžke</option>
-        <option value="width">Po šírke</option>
-        <option value="none">Bez smeru</option>
-      </select><span class="unit"></span>
-    </div>
-    <button class="primary wide" onclick="insertBoard()">Vložiť dosku</button>
-  </div>
-</fieldset>
-
-<!-- KARTA DOSKY (V0.4.7c, mode-board) — editor samostatneho vyrobneho dielca -->
-<fieldset id="boardCard" style="display:none">
-  <div class="pchead" id="bcHead"></div>
-  <div class="row"><label>Názov</label><input id="bc_name" type="text" oninput="onBoardField('name', this.value)"><span class="unit"></span></div>
-  <div class="row"><label>Dĺžka</label><input id="bc_length" type="text" oninput="onBoardField('length', this.value)"><span class="unit">mm</span></div>
-  <div class="row"><label>Šírka</label><input id="bc_width" type="text" oninput="onBoardField('width', this.value)"><span class="unit">mm</span></div>
-  <div class="row"><label>Materiál</label><select id="bc_material" data-nx-combo="decor" onchange="onBoardMaterial(this.value)"></select><span class="unit"></span></div>
-  <!-- V0.6 M-B1: pri UNI materiali sa pole odomyka (readOnly riadi board_card.js) -->
-  <div class="row"><label>Hrúbka</label><input id="bc_thickness" type="text" readonly oninput="onBoardField('thickness', this.value)"><span class="unit">mm</span></div>
-  <div class="row"><label>Smer dekoru</label>
-    <select id="bc_grain" onchange="onBoardField('grain_direction', this.value)">
-      <option value="length">Po dĺžke</option>
-      <option value="width">Po šírke</option>
-      <option value="none">Bez smeru</option>
-    </select><span class="unit"></span>
-  </div>
-  <svg id="boardSvg" viewBox="0 0 300 200" preserveAspectRatio="xMidYMid meet"></svg>
-  <div class="absleg">
-    <span><i style="background:var(--nx-abs-1mm)"></i>1,0 mm</span>
-    <span><i style="background:var(--nx-abs-2mm)"></i>2,0 mm</span>
-    <span><i style="background:var(--nx-abs-none)"></i>bez ABS</span>
-    <button class="absall" onclick="onBoardEdgesAll()" title="Olepiť všetky 4 hrany páskou k materiálu"><i></i></button>
-  </div>
-  <div id="boardEdgeRows"></div>
-  <details data-key="board_adv">
-    <summary>Pokročilé</summary>
-    <div class="body">
-      <div class="row"><label>Počet</label><input id="bc_quantity" type="number" step="1" min="1" oninput="onBoardField('quantity', this.value)"><span class="unit">ks</span></div>
-      <div class="row"><label>Rola</label><input id="bc_role" type="text" readonly><span class="unit"></span></div>
-      <div class="hint" id="bc_diag"></div>
-    </div>
-  </details>
-</fieldset>
-
-<!-- ZAKLADNE: rozmery + svetle (spolocne pre navrh aj oznaceny korpus).
-     D-39: đź”’ .inslock v EXISTUJUCICH riadkoch (ziadny novy riadok — pravidlo
-     vertikalneho priestoru); CSS ich zobrazuje LEN v mode-insert. -->
-<fieldset id="basicCard">
-  <legend>Základné</legend>
-  <div class="row"><label>Šírka</label><input id="width" type="text" oninput="onField()"><button class="inslock" data-lock="width" onclick="toggleInsertLock('width')" aria-label="Zamknúť šírku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
-  <div class="row"><label>Výška</label><input id="height" type="text" oninput="onField()"><button class="inslock" data-lock="height" onclick="toggleInsertLock('height')" aria-label="Zamknúť výšku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
-  <div class="row"><label>Hĺbka</label><input id="depth" type="text" oninput="onField()"><button class="inslock" data-lock="depth" onclick="toggleInsertLock('depth')" aria-label="Zamknúť hĺbku" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
-  <div class="row"><label>Hrúbka materiálu</label><input id="thickness" type="text" oninput="onField()"><button class="inslock" data-lock="thickness" onclick="toggleInsertLock('thickness')" aria-label="Zamknúť hrúbku materiálu" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
-  <!-- D-11: vyska sokla patri k zakladnym rozmerom (pre hornu skrinku sa skryva — applyVisibility) -->
-  <div class="row" id="fhRow"><label>Výška sokla</label><input id="floor_height" type="text" oninput="onField()"><button class="inslock" data-lock="floor_height" onclick="toggleInsertLock('floor_height')" aria-label="Zamknúť výšku sokla" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-lock-open"/></svg></button><span class="unit">mm</span></div>
-  <div class="row"><label>Svetlá šírka</label><input id="av_width" type="text" readonly><span class="unit">mm</span></div>
-  <div class="row"><label>Svetlá hĺbka</label><input id="av_depth" type="text" readonly><span class="unit">mm</span></div>
-  <div class="row"><label>Úložná výška</label><input id="av_height" type="text" readonly><span class="unit">mm</span></div>
-</fieldset>
-
-<!-- KONSTRUKCIA per dielec (akordeony podla SYSTEM/06) -->
-<details data-key="top">
-  <summary>Strop</summary>
-  <div class="body">
-    <div class="row"><label>Konštrukcia</label>
-      <select id="top_mode" onchange="toggleTwoRails(); onField()">
-        <option value="full">Plný panel</option>
-        <option value="two_rails">Dve výstuhy</option>
-        <option value="none">Bez stropu</option>
-      </select><span class="unit"></span>
-    </div>
-    <div id="twoRailsGroup">
-      <div class="row"><label>Orientácia výstuh</label>
-        <select id="rails_orientation" onchange="onField()">
-          <option value="flat">Naplocho</option>
-          <option value="upright">Na výšku</option>
+    <!-- Materialove polia VKLADANEJ dosky (presun z #insertBoardForm — len DOM,
+         logika a callbacky su nedotknute; viditelnost riadi rovnaky atribut
+         data-insert-kind ako zvysok vkladacej karty dosky). -->
+    <div id="insertBoardMatForm">
+      <!-- D-85 combobox; E-03/D-86 guardy visia na onInsertBoardMaterial a combobox
+           ich necha bezat po TEJ ISTEJ ceste (zapis value + change). -->
+      <div class="row"><label>Materiál</label><select id="ib_material" data-nx-combo="decor" onchange="onInsertBoardMaterial()"></select><span class="unit"></span></div>
+      <!-- E-03: pri UNI materiali sa pole odomyka (readOnly riadi board_card.js) -->
+      <div class="row"><label>Hrúbka</label><input id="ib_thickness" type="text" readonly><span class="unit">mm</span></div>
+      <div class="row"><label>Smer dekoru</label>
+        <!-- D-86: onchange oznaci volbu za vedomu — refresh katalogu ju uz neprepise.
+             onblur (Codex #163 P2) dokona odlozeny zapis, ak katalog vymenil material,
+             kym pouzivatel v selecte stal — nemusi sa cakat na dalsi refresh. -->
+        <select id="ib_grain" onchange="onInsertGrainChange()" onblur="onInsertBoardMaterial()">
+          <option value="length">Po dĺžke</option>
+          <option value="width">Po šírke</option>
+          <option value="none">Bez smeru</option>
         </select><span class="unit"></span>
       </div>
-      <div class="row"><label>Odsadenie od vrchu</label><input id="rails_top_offset" type="text" oninput="onField()"><span class="unit">mm</span></div>
-      <div class="row"><label>Hĺbka/výška pásu</label><input id="rail_depth" type="text" oninput="onField()"><span class="unit">mm</span></div>
     </div>
   </div>
 </details>
 
-<details data-key="bottom">
-  <summary>Dno &amp; podstavec</summary>
-  <div class="body">
-    <div class="row"><label>Dno</label>
-      <select id="bottom_mode" onchange="onField()">
-        <option value="under_sides">Boky na dne</option>
-        <option value="between_sides">Dno medzi bokmi</option>
-      </select><span class="unit"></span>
-    </div>
-    <div id="plinthGroup">
-      <div class="row"><label>Sokel</label>
-        <select id="plinth_mode" onchange="toggleRecess(); onField()">
-          <option value="none">Bez sokla — nohy</option>
-          <option value="front">Predný soklový panel</option>
+<!-- ===== S4 · NASTAVENIA ===================================================
+     Obsah sektora urcuje KONTEXT raily (data-view-ctx na <body>): skupiny su
+     oznacene data-s4="<kontext>". Skupiny v ramci jedneho kontextu su
+     EXKLUZIVNE (A5 — otvorenie zavrie surodencov); vynimka data-s4-solo
+     (strom zon) ostava mimo exkluzivity. Nazov sektora prepisuje shell.js. -->
+<details class="sect" id="secSet" data-key="s4" open>
+  <summary class="secthead"><span class="sn" id="s4Name">Nastavenia</span><span class="meta" id="s4Meta"></span></summary>
+  <div class="sectbody">
+
+    <!-- --- kontext KORPUS: konstrukcia per dielec (akordeony podla SYSTEM/06) --- -->
+    <details data-key="top" data-s4="korpus">
+      <summary>Strop</summary>
+      <div class="body">
+        <div class="row"><label>Konštrukcia</label>
+          <select id="top_mode" onchange="toggleTwoRails(); onField()">
+            <option value="full">Plný panel</option>
+            <option value="two_rails">Dve výstuhy</option>
+            <option value="none">Bez stropu</option>
+          </select><span class="unit"></span>
+        </div>
+        <div id="twoRailsGroup">
+          <div class="row"><label>Orientácia výstuh</label>
+            <select id="rails_orientation" onchange="onField()">
+              <option value="flat">Naplocho</option>
+              <option value="upright">Na výšku</option>
+            </select><span class="unit"></span>
+          </div>
+          <div class="row"><label>Odsadenie od vrchu</label><input id="rails_top_offset" type="text" oninput="onField()"><span class="unit">mm</span></div>
+          <div class="row"><label>Hĺbka/výška pásu</label><input id="rail_depth" type="text" oninput="onField()"><span class="unit">mm</span></div>
+        </div>
+      </div>
+    </details>
+
+    <details data-key="bottom" data-s4="korpus">
+      <summary>Dno &amp; podstavec</summary>
+      <div class="body">
+        <div class="row"><label>Dno</label>
+          <select id="bottom_mode" onchange="onField()">
+            <option value="under_sides">Boky na dne</option>
+            <option value="between_sides">Dno medzi bokmi</option>
+          </select><span class="unit"></span>
+        </div>
+        <div id="plinthGroup">
+          <div class="row"><label>Sokel</label>
+            <select id="plinth_mode" onchange="toggleRecess(); onField()">
+              <option value="none">Bez sokla — nohy</option>
+              <option value="front">Predný soklový panel</option>
+            </select><span class="unit"></span>
+          </div>
+          <div class="row" id="recessRow"><label>Zapustenie sokla</label><input id="plinth_recess" type="text" oninput="onField()"><span class="unit">mm</span></div>
+        </div>
+      </div>
+    </details>
+
+    <details data-key="sides" data-s4="korpus">
+      <summary>Boky</summary>
+      <div class="body">
+        <div class="hint">Boky obaľujú korpus (hrúbka podľa Základné). Per-bok nastavenia (rohové spoje, odsadenia) pribudnú v ďalšej verzii.</div>
+      </div>
+    </details>
+
+    <details data-key="back" data-s4="korpus">
+      <summary>Chrbát</summary>
+      <div class="body">
+        <div class="row"><label>Konštrukcia</label>
+          <select id="back_mode" onchange="toggleBackTh(); onField()">
+            <option value="overlay">Naložený zozadu</option>
+            <option value="inset">Vložený medzi boky</option>
+            <option value="groove">V drážke</option>
+            <option value="none">Bez chrbta</option>
+          </select><span class="unit"></span>
+        </div>
+        <!-- D-31: pri "Bez chrbta" sa riadok skryva; HODNOTA sa zachovava (navrat
+             na overlay/drazku obnovi predchadzajucu volbu, sablony round-tripuju) -->
+        <div class="row" id="backThRow"><label>Hrúbka chrbta</label>
+          <select id="back_thickness" onchange="onField()">
+            <option value="3">HDF 3 mm</option>
+            <option value="18">Pevný 18 mm</option>
+          </select><span class="unit"></span>
+        </div>
+        <div class="hint">Hĺbka korpusu je CELKOVÁ vrátane chrbta — pri naloženom chrbte sa telo skráti o jeho hrúbku.</div>
+      </div>
+    </details>
+
+    <!-- --- kontext ZONY: karta kliknutej zony + strom (actions.js refreshZoneUI) --- -->
+    <fieldset id="zoneCard" data-s4="zony" style="display:none">
+      <legend>Zóna</legend>
+      <div id="zoneActive"></div>
+      <div id="leafActions">
+        <div class="zact"><label>Rozdeliť zvislo</label>
+          <select id="splitVCount"><option>2</option><option>3</option><option>4</option></select>
+          <button class="ghostbtn zbtn" onclick="splitZone('v')" disabled>na stĺpce</button></div>
+        <div class="zact"><label>Rozdeliť vodorovne</label>
+          <select id="splitHCount"><option>2</option><option>3</option><option>4</option></select>
+          <button class="ghostbtn zbtn" onclick="splitZone('h')" disabled>na riadky</button></div>
+        <div class="zact"><label>Police v zóne</label>
+          <select id="zoneShelves"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select>
+          <button class="ghostbtn zbtn" onclick="setZoneShelves()" disabled>nastav</button></div>
+      </div>
+      <div id="fieldEditor"></div>
+      <div class="btnrow">
+        <button class="danger zbtn" onclick="cleanZone()" disabled>Vyčistiť zónu (zruš delenie/police)</button>
+      </div>
+    </fieldset>
+
+    <!-- STRUKTURA ZON (strom — prehlad a vyber; akcie su v karte zony vyssie).
+         A5: data-s4-solo = MIMO exkluzivity (strom si v UI-C2 riadi rozrolovanie sam). -->
+    <details data-key="zones" data-s4="zony" data-s4-solo="1">
+      <summary>Štruktúra zón</summary>
+      <div class="body">
+        <div class="hint">Police a delenie nastavíš klikom na zónu v náhľade — otvorí sa karta Zóna.</div>
+        <div id="zoneTree"><div class="muted">Žiadny označený korpus.</div></div>
+      </div>
+    </details>
+
+    <!-- --- kontext CELA --- -->
+    <details data-key="fronts" data-s4="cela">
+      <summary>Čelá</summary>
+      <div class="body">
+        <div class="hint">Zoznam zodpovedá pohľadu na skrinku — F1 je spodné čelo. Výška prázdna = AUTO (sivé ≈ je dopočítaná výška). <svg class="ic ic-inline" aria-hidden="true"><use href="#i-lock"/></svg> zamkne pevnú výšku.</div>
+        <div id="frontRows"></div>
+        <div class="btnrow">
+          <button class="ghostbtn" onclick="addFrontRow(); onField()">+ riadok</button>
+          <button class="ghostbtn" onclick="removeLastFront(); onField()">− riadok</button>
+        </div>
+        <!-- D-07: medzery a presahy — hodnoty ziju vo fronts configu (nie construction params) -->
+        <div class="hint">Medzery a presahy (mm). Záporný okraj = čelo presahuje obrys korpusu. Čelá sa kladú odspodu — okraj hore sa prejaví cez AUTO čelo (pri samých pevných výškach je len rezervou).</div>
+        <div class="row"><label>Medzi čelami</label><input id="fr_gap" type="text" oninput="onField()"><span class="unit">mm</span></div>
+        <div class="row"><label>Okraj hore</label><input id="fr_gap_top" type="text" oninput="onField()"><span class="unit">mm</span></div>
+        <div class="row"><label>Okraj dole</label><input id="fr_gap_bottom" type="text" oninput="onField()"><span class="unit">mm</span></div>
+        <div class="row"><label>Okraj po stranách</label><input id="fr_gap_sides" type="text" oninput="onField()"><span class="unit">mm</span></div>
+        <!-- D-22: zamok limitu presahov — odomknutie povoli okraje az ±2000 mm (obklady, pilastre) -->
+        <div class="row"><label>Limit presahov</label>
+          <button id="edgeLimitLock" class="ghostbtn lockbtn" onclick="toggleEdgeLimit()" aria-pressed="true"
+            title="Zamknuté: okraje max ±100 mm. Odomkni pre veľké presahy čiel — obklady, pilastre (až ±2000 mm)."><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg><span class="lblLimit">±100 mm</span></button>
+          <span class="unit"></span></div>
+        <div class="btnrow">
+          <button class="ghostbtn" onclick="resetFrontGaps()"><svg class="ic" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> Predvolené (3 / 2 mm)</button>
+        </div>
+      </div>
+    </details>
+
+    <!-- --- kontext KOVANIE (V0.4) --- -->
+    <details data-key="hardware" data-s4="kovanie">
+      <summary>Kovanie</summary>
+      <div class="body">
+        <div class="hint">Počty z pravidiel (nohy, závesy, výsuvy). Zmena počtu = ručný zásah pre túto skrinku; <svg class="ic ic-inline" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> vráti pravidlo.</div>
+        <div id="hwRows"><div class="muted">Označ skrinku v modeli.</div></div>
+        <div class="btnrow">
+          <button class="ghostbtn" onclick="openRulesDialog()"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Pravidlá kovania…</button>
+          <!-- D-91: katalog kovania — po zruseni satelitnych tlacidiel v hlavicke
+               (rail ich nahradil) je toto jeho pristupovy bod v paneli. -->
+          <button class="ghostbtn" onclick="openHardwareCatalogDialog()"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg> Katalóg kovania…</button>
+        </div>
+      </div>
+    </details>
+
+    <!-- --- rezim DIELEC: karta dielca (ABS editor); nahlad #partSvg je v S1 --- -->
+    <fieldset id="partCard" style="display:none">
+      <div class="crumb"><span class="backlink" onclick="backToCabinet()" title="Späť na skrinku">‹ <span id="pcCab">—</span></span> › <b id="pcName2"></b></div>
+      <div class="pchead" id="pcName"></div>
+      <div class="pcdim" id="pcDim"></div>
+      <!-- D-85: data-nx-combo = tento select obsluhuje zdielany combobox (nx_combo.js).
+           Select ostava zdrojom pravdy — combobox mu len zapise hodnotu a vystreli
+           change, takze onPartMaterial (aj modal chybajucej pasky D-41) beziat ako doteraz. -->
+      <div class="pcmat"><label>Materiál</label>
+        <select id="pcMaterial" data-nx-combo="decor" onchange="onPartMaterial()"></select>
+      </div>
+      <!-- D-35: kompaktna ikona v EXISTUJUCOM riadku legendy (ziadny novy riadok — pravidlo
+           vertikalneho priestoru); ramik ikony = "olepene dookola" vo farbe ABS 1,0 mm -->
+      <div class="absleg">
+        <span><i style="background:var(--nx-abs-1mm)"></i>1,0 mm</span>
+        <span><i style="background:var(--nx-abs-2mm)"></i>2,0 mm</span>
+        <span><i style="background:var(--nx-abs-none)"></i>bez ABS</span>
+        <span><i style="background:var(--nx-warn-bg);border:1px solid var(--nx-warn)"></i>ručný override</span>
+        <button class="absall" onclick="onEdgesAll()" title="Olepiť všetky 4 hrany páskou k materiálu"><i></i></button>
+      </div>
+      <div id="edgeRows"></div>
+    </fieldset>
+
+    <!-- --- rezim DOSKA (V0.4.7c, mode-board) — editor samostatneho dielca --- -->
+    <fieldset id="boardCard" style="display:none">
+      <div class="pchead" id="bcHead"></div>
+      <div class="row"><label>Názov</label><input id="bc_name" type="text" oninput="onBoardField('name', this.value)"><span class="unit"></span></div>
+      <div class="row"><label>Dĺžka</label><input id="bc_length" type="text" oninput="onBoardField('length', this.value)"><span class="unit">mm</span></div>
+      <div class="row"><label>Šírka</label><input id="bc_width" type="text" oninput="onBoardField('width', this.value)"><span class="unit">mm</span></div>
+      <div class="row"><label>Materiál</label><select id="bc_material" data-nx-combo="decor" onchange="onBoardMaterial(this.value)"></select><span class="unit"></span></div>
+      <!-- V0.6 M-B1: pri UNI materiali sa pole odomyka (readOnly riadi board_card.js) -->
+      <div class="row"><label>Hrúbka</label><input id="bc_thickness" type="text" readonly oninput="onBoardField('thickness', this.value)"><span class="unit">mm</span></div>
+      <div class="row"><label>Smer dekoru</label>
+        <select id="bc_grain" onchange="onBoardField('grain_direction', this.value)">
+          <option value="length">Po dĺžke</option>
+          <option value="width">Po šírke</option>
+          <option value="none">Bez smeru</option>
         </select><span class="unit"></span>
       </div>
-      <div class="row" id="recessRow"><label>Zapustenie sokla</label><input id="plinth_recess" type="text" oninput="onField()"><span class="unit">mm</span></div>
-    </div>
-  </div>
-</details>
+      <div class="absleg">
+        <span><i style="background:var(--nx-abs-1mm)"></i>1,0 mm</span>
+        <span><i style="background:var(--nx-abs-2mm)"></i>2,0 mm</span>
+        <span><i style="background:var(--nx-abs-none)"></i>bez ABS</span>
+        <button class="absall" onclick="onBoardEdgesAll()" title="Olepiť všetky 4 hrany páskou k materiálu"><i></i></button>
+      </div>
+      <div id="boardEdgeRows"></div>
+      <details data-key="board_adv">
+        <summary>Pokročilé</summary>
+        <div class="body">
+          <div class="row"><label>Počet</label><input id="bc_quantity" type="number" step="1" min="1" oninput="onBoardField('quantity', this.value)"><span class="unit">ks</span></div>
+          <div class="row"><label>Rola</label><input id="bc_role" type="text" readonly><span class="unit"></span></div>
+          <div class="hint" id="bc_diag"></div>
+        </div>
+      </details>
+    </fieldset>
 
-<details data-key="sides">
-  <summary>Boky</summary>
-  <div class="body">
-    <div class="hint">Boky obaľujú korpus (hrúbka podľa Základné). Per-bok nastavenia (rohové spoje, odsadenia) pribudnú v ďalšej verzii.</div>
-  </div>
-</details>
-
-<details data-key="back">
-  <summary>Chrbát</summary>
-  <div class="body">
-    <div class="row"><label>Konštrukcia</label>
-      <select id="back_mode" onchange="toggleBackTh(); onField()">
-        <option value="overlay">Naložený zozadu</option>
-        <option value="inset">Vložený medzi boky</option>
-        <option value="groove">V drážke</option>
-        <option value="none">Bez chrbta</option>
-      </select><span class="unit"></span>
-    </div>
-    <!-- D-31: pri "Bez chrbta" sa riadok skryva; HODNOTA sa zachovava (navrat
-         na overlay/drazku obnovi predchadzajucu volbu, sablony round-tripuju) -->
-    <div class="row" id="backThRow"><label>Hrúbka chrbta</label>
-      <select id="back_thickness" onchange="onField()">
-        <option value="3">HDF 3 mm</option>
-        <option value="18">Pevný 18 mm</option>
-      </select><span class="unit"></span>
-    </div>
-    <div class="hint">Hĺbka korpusu je CELKOVÁ vrátane chrbta — pri naloženom chrbte sa telo skráti o jeho hrúbku.</div>
-  </div>
-</details>
-
-<details data-key="fronts">
-  <summary>Čelá</summary>
-  <div class="body">
-    <div class="hint">Zoznam zodpovedá pohľadu na skrinku — F1 je spodné čelo. Výška prázdna = AUTO (sivé ≈ je dopočítaná výška). <svg class="ic ic-inline" aria-hidden="true"><use href="#i-lock"/></svg> zamkne pevnú výšku.</div>
-    <div id="frontRows"></div>
-    <div class="btnrow">
-      <button class="ghostbtn" onclick="addFrontRow(); onField()">+ riadok</button>
-      <button class="ghostbtn" onclick="removeLastFront(); onField()">− riadok</button>
-    </div>
-    <!-- D-07: medzery a presahy — hodnoty ziju vo fronts configu (nie construction params) -->
-    <div class="hint">Medzery a presahy (mm). Záporný okraj = čelo presahuje obrys korpusu. Čelá sa kladú odspodu — okraj hore sa prejaví cez AUTO čelo (pri samých pevných výškach je len rezervou).</div>
-    <div class="row"><label>Medzi čelami</label><input id="fr_gap" type="text" oninput="onField()"><span class="unit">mm</span></div>
-    <div class="row"><label>Okraj hore</label><input id="fr_gap_top" type="text" oninput="onField()"><span class="unit">mm</span></div>
-    <div class="row"><label>Okraj dole</label><input id="fr_gap_bottom" type="text" oninput="onField()"><span class="unit">mm</span></div>
-    <div class="row"><label>Okraj po stranách</label><input id="fr_gap_sides" type="text" oninput="onField()"><span class="unit">mm</span></div>
-    <!-- D-22: zamok limitu presahov — odomknutie povoli okraje az ±2000 mm (obklady, pilastre) -->
-    <div class="row"><label>Limit presahov</label>
-      <button id="edgeLimitLock" class="ghostbtn lockbtn" onclick="toggleEdgeLimit()" aria-pressed="true"
-        title="Zamknuté: okraje max ±100 mm. Odomkni pre veľké presahy čiel — obklady, pilastre (až ±2000 mm)."><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg><span class="lblLimit">±100 mm</span></button>
-      <span class="unit"></span></div>
-    <div class="btnrow">
-      <button class="ghostbtn" onclick="resetFrontGaps()"><svg class="ic" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> Predvolené (3 / 2 mm)</button>
-    </div>
-  </div>
-</details>
-
-<!-- KOVANIE (V0.4) -->
-<details data-key="hardware">
-  <summary>Kovanie</summary>
-  <div class="body">
-    <div class="hint">Počty z pravidiel (nohy, závesy, výsuvy). Zmena počtu = ručný zásah pre túto skrinku; <svg class="ic ic-inline" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> vráti pravidlo.</div>
-    <div id="hwRows"><div class="muted">Označ skrinku v modeli.</div></div>
-    <div class="btnrow">
-      <button class="ghostbtn" onclick="openRulesDialog()"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Pravidlá kovania…</button>
-    </div>
-  </div>
-</details>
-
-<!-- MATERIALY (V0.3): materialy TEJTO skrinky. Projektove predvolby = okno
-     Materialy projektu (V0.4.5 D2 — sprava mimo Inspectora, vzor SYSTEM/07). -->
-<details data-key="materials">
-  <summary>Materiály</summary>
-  <div class="body">
-    <div class="hint" id="cabMatHint">Materiály tejto skrinky — prázdne = dediť z projektu. Označ skrinku pre nastavenie.</div>
-    <div class="matrow"><label>Korpus</label><select id="cab_body" data-nx-combo="decor" onchange="onCabinetMaterial('body', this.value)"></select></div>
-    <div class="matrow"><label>Čelá</label><select id="cab_front" data-nx-combo="decor" onchange="onCabinetMaterial('front', this.value)"></select></div>
-    <div class="matrow"><label>Chrbát</label><select id="cab_back" data-nx-combo="decor" onchange="onCabinetMaterial('back', this.value)"></select></div>
-    <div class="btnrow">
-      <button class="ghostbtn" onclick="openProjectMaterialsDialog()"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Materiály projektu…</button>
-    </div>
-  </div>
-</details>
-
-<!-- STRUKTURA ZON (strom — prehlad a vyber; akcie su v karte zony pod nahladom) -->
-<details data-key="zones">
-  <summary>Štruktúra zón</summary>
-  <div class="body">
-    <div class="hint">Police a delenie nastavíš klikom na zónu v náhľade — otvorí sa karta Zóna.</div>
-    <div id="zoneTree"><div class="muted">Žiadny označený korpus.</div></div>
   </div>
 </details>
 
@@ -381,29 +441,31 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.7.3"></script>
-<!-- D-77: minimalna OBSAHOVA velkost okna pri otvoreni. Panel v rezime dielca
-     (nahlad + karta dielca s hranami) potrebuje vysku — inak konci prava spodna
-     cast nastavenia hran pod okrajom. Dorovnava sa len smerom nahor, raz pri
+<script src="js/errors.js?v=0.7.4"></script>
+<!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
+     jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
+     pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
-<script>window.NX_FIT_MIN = { w: 380, h: 640 };</script>
-<script src="js/win_fit.js?v=0.7.3"></script>
-<script src="js/icons.js?v=0.7.3"></script>
+<script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
+<script src="js/win_fit.js?v=0.7.4"></script>
+<script src="js/icons.js?v=0.7.4"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.7.3"></script>
-<script src="js/core.js?v=0.7.3"></script>
-<script src="js/expr.js?v=0.7.3"></script>
-<script src="js/insert_state.js?v=0.7.3"></script>
-<script src="js/form.js?v=0.7.3"></script>
-<script src="js/zone_tree.js?v=0.7.3"></script>
-<script src="js/preview.js?v=0.7.3"></script>
-<script src="js/actions.js?v=0.7.3"></script>
-<script src="js/bridge.js?v=0.7.3"></script>
-<script src="js/materials.js?v=0.7.3"></script>
-<script src="js/part_card.js?v=0.7.3"></script>
-<script src="js/board_card.js?v=0.7.3"></script>
-<script src="js/hardware.js?v=0.7.3"></script>
-<script src="js/usage.js?v=0.7.3"></script>
-<script src="js/boot.js?v=0.7.3"></script>
+<script src="js/nx_combo.js?v=0.7.4"></script>
+<script src="js/core.js?v=0.7.4"></script>
+<script src="js/expr.js?v=0.7.4"></script>
+<script src="js/insert_state.js?v=0.7.4"></script>
+<script src="js/form.js?v=0.7.4"></script>
+<script src="js/zone_tree.js?v=0.7.4"></script>
+<script src="js/preview.js?v=0.7.4"></script>
+<!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
+<script src="js/shell.js?v=0.7.4"></script>
+<script src="js/actions.js?v=0.7.4"></script>
+<script src="js/bridge.js?v=0.7.4"></script>
+<script src="js/materials.js?v=0.7.4"></script>
+<script src="js/part_card.js?v=0.7.4"></script>
+<script src="js/board_card.js?v=0.7.4"></script>
+<script src="js/hardware.js?v=0.7.4"></script>
+<script src="js/usage.js?v=0.7.4"></script>
+<script src="js/boot.js?v=0.7.4"></script>

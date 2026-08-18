@@ -11,54 +11,14 @@
   var PV_FRONT_DRAWER = '#bfe3e8';  // tmavsi odtien rodiny (vypln zasuvky)
   var PV_FRONT_STROKE = '#7fc4cf';  // --nx-part-border (obrys cela)
   var dragState = null;
-  // ===== D-08: rezimove taby — tab prepina nahlad AJ viditelne sekcie (CSS cez
-  // data-cab-tab na <body>). refreshZoneUI ma mode guard (D-03 Codex F2 — karta
-  // zony sa mimo tabu Zony skryva a pri navrate obnovi vratane auto-selectu).
+  // ===== D-08 / UI-B1: kontext prepina nahlad AJ viditelne skupiny (CSS cez
+  // data-view-ctx na <body>). Rezimove taby v hlavicke nahradil RAIL — stavovy
+  // stroj a prepinanie ziju v js/shell.js (NXShell + setViewContext), tu ostava
+  // uz len prevod kontextu na rezim nahladu. Kovanie zatial kresli korpusovy
+  // pohlad (vlastnu projekciu dostane v UI-B2).
+  // refreshZoneUI ma mode guard (D-03 Codex F2 — karta zony sa mimo kontextu
+  // Zony skryva a pri navrate obnovi vratane auto-selectu).
   function cabTabPreview(t){ return t === 'zony' ? 'zones' : (t === 'cela' ? 'fronts' : 'cab'); }
-  // D-78: v rezime VKLADANIA su taby len viditelnou kotvou hlavicky — prepinat sa
-  // da az nad oznacenym korpusom (nad navrhom niet zon ani ciel). Autorita je TENTO
-  // guard, nie CSS: klik, Enter aj Space koncia tu a nemenia NIC (data-cab-tab,
-  // nahlad ani formular). Boot volanie setCabTab('korpus') bezi este pred prvym
-  // setUiMode (body bez mode- triedy), takze uvodny stav sa nastavi normalne.
-  function cabTabsLocked(){
-    return !!(document.body && document.body.classList.contains('mode-insert'));
-  }
-  // ZOBRAZENY tab: v zamknutom rezime vzdy Korpus, inak zapamatany pracovny tab.
-  // currentCabTab (pamat) sa TYM NEMENI — po oznaceni korpusu sa tab obnovi
-  // (kontrakt D-08). Bez tohto by pouzivatel, ktory odznaci vyber v tabe Zony,
-  // ostal vo vkladani bez karty rozmerov a bez cesty spat (taby su neaktivne).
-  function effectiveCabTab(){ return cabTabsLocked() ? 'korpus' : currentCabTab; }
-  // Zrkadlo zamku do DOM — vola setUiMode pri KAZDEJ zmene rezimu (className
-  // prepis tam predtym zmazal aj stare priznaky).
-  function syncCabTabsLocked(){
-    var locked = cabTabsLocked();
-    applyCabTabDom(effectiveCabTab());
-    ['tabCab', 'tabZones', 'tabFronts'].forEach(function(id){
-      var n = el(id);
-      if (n) n.setAttribute('aria-disabled', locked ? 'true' : 'false');
-    });
-  }
-  // Zapis tabu do DOM (atribut na <body> riadi CSS + stav tlacidiel).
-  function applyCabTabDom(t){
-    document.body.setAttribute('data-cab-tab', t);
-    // A10: taby drzia stav aj cez aria-pressed (nie len triedu .on).
-    setCabTabState(el('tabCab'), t === 'korpus');
-    setCabTabState(el('tabZones'), t === 'zony');
-    setCabTabState(el('tabFronts'), t === 'cela');
-  }
-  function setCabTab(t){
-    if (cabTabsLocked()) return;
-    currentCabTab = t;
-    applyCabTabDom(t);
-    previewMode = cabTabPreview(t);
-    pvUserView = false; pvView = null; // D-08 Codex F4: novy vyjav = cisty fit (stale zoom by ho minul)
-    renderPreview(); refreshZoneUI();
-  }
-  function setCabTabState(node, on){
-    if (!node) return;
-    node.classList.toggle('on', on);
-    node.setAttribute('aria-pressed', on ? 'true' : 'false');
-  }
 
   // --- POHLAD (V0.4.5 D1): nahlad je fixne OKNO — SVG ma pevnu vysku (CSS) a viewBox
   // je posuvatelne/zoomovatelne okno nad scenou v mm. Kym pouzivatel nezoomuje/nepanuje

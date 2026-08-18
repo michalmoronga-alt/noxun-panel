@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.7.3' unless defined?(VERSION)
+    VERSION = '0.7.4' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -148,6 +148,32 @@ module Noxun
       cmd.large_icon = path
     end
 
+    # --- UI-B1 (audit A2): zdielane prepnutie ABS kontroly hran ---------------
+    # JEDINE miesto, kde sa zvyraznenie olepu prepina. Volaju ho VSETCI klienti —
+    # toolbar (UI-02), rail Inspectora (UI-B1) aj okno Vyroba (D-105) — aby sa
+    # spravanie nemohlo rozist a novy stav dostali vsetky otvorene okna.
+    # Ziadna operacia a ziadny zapis do modelu (lekcia D-103/D-105): EdgeCheck
+    # je overlay NAD modelom, nie jeho obsah.
+    def self.toggle_edge_check(model = nil)
+      return nil unless defined?(EdgeCheck)
+
+      state = EdgeCheck.toggle(model || Sketchup.active_model)
+      broadcast_edge_check(state)
+      state
+    rescue StandardError => e
+      log_error(e, 'Engine.toggle_edge_check')
+      nil
+    end
+
+    # Rozoslanie stavu vsetkym oknam, ktore ho zobrazuju. Defenzivne: zavrete
+    # ani nenacitane okno push nezhodi (kazdy `push_edge_check` ma vlastny guard).
+    def self.broadcast_edge_check(state)
+      ProductionDialog.push_edge_check(state) if defined?(ProductionDialog)
+      Panel.push_edge_check(state) if defined?(Panel)
+    rescue StandardError => e
+      log_error(e, 'Engine.broadcast_edge_check')
+    end
+
     # Validation proc bezi pri KAZDOM prekresleni UI — musi byt lacny a nesmie
     # nikdy vyhodit vynimku (zlyhanie by SketchUp opakoval donekonecna).
     def self.toolbar_state(&block)
@@ -177,17 +203,11 @@ module Noxun
       toolbar_icon(cmd_studio, 'noxun_studio.svg')
       tb.add_item(cmd_studio)
 
-      cmd_abs = UI::Command.new('ABS kontrola hrán') do
-        next unless defined?(EdgeCheck)
-
-        state = EdgeCheck.toggle(Sketchup.active_model)
-        # D-105: okno Vyroba ma vlastne ovladanie hran (split tlacidlo so stavmi
-        # a poctami). Prepnutie z toolbaru mu preto musi poslat NOVY stav —
-        # inak by okno ostalo na starom (cesta ProductionDialog#do_edge_check
-        # posiela push_edge_check rovnako). Defenzivne: pri zavretom okne sa
-        # push ticho zahodi (`js` ma vlastny guard aj rescue).
-        ProductionDialog.push_edge_check(state) if defined?(ProductionDialog)
-      end
+      # UI-B1 (audit A2): prepnutie ide cez ZDIELANU metodu Engine.toggle_edge_check
+      # — tá zavola EdgeCheck.toggle a rozposle novy stav vsetkym oknam (okno
+      # Vyroba ma vlastne split tlacidlo D-105, Inspector ma ikonu v raile;
+      # bez pushu by obe ostali na starom stave).
+      cmd_abs = UI::Command.new('ABS kontrola hrán') { toggle_edge_check }
       cmd_abs.tooltip = 'ABS kontrola hrán — zvýrazní olep v modeli (prepínač)'
       cmd_abs.status_bar_text = 'Zapne/vypne farebné zvýraznenie olepu hrán. Nastavenie je v okne Výroba → Kontrola.'
       cmd_abs.set_validation_proc do

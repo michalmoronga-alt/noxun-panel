@@ -30,9 +30,36 @@ module Noxun
             insert_locks: insert_locks,
             # D-90: ponuka uchytkovych profilov (id/nazov/skratenie) — JEDINY
             # zdroj je registry FrontProfiles, JS si ziadny zoznam nedrzi.
-            front_profiles: FrontProfiles.options
+            front_profiles: FrontProfiles.options,
+            # UI-B1 (audit A2): stav ABS kontroly hran pre ikonu v raile. PULL
+            # pri otvoreni panela; dalsie zmeny chodia pushom (push_edge_check)
+            # z panela, z toolbaru aj z okna Vyroba. CISTE CITANIE.
+            edge_check: edge_check_state
           }
           js("NX.init(#{data.to_json})")
+        end
+
+        # UI-B1: stav zvyraznenia olepu pre rail. Nedostupny/nenacitany EdgeCheck
+        # (SketchUp bez Overlay API) = ikona zosedne, panel sa tym nezhodi.
+        def edge_check_state
+          return { 'available' => false, 'active' => false } unless defined?(EdgeCheck)
+
+          EdgeCheck.ui_state(Sketchup.active_model)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.edge_check_state')
+          { 'available' => false, 'active' => false }
+        end
+
+        # Maly echo push stavu hran (bez prepoctu panela) — vzor
+        # ProductionDialog#push_edge_check. Vola ho Engine.broadcast_edge_check
+        # (klik z panela, z toolbaru aj z okna Vyroba) a EdgeCheck po prepocte.
+        def push_edge_check(state = nil)
+          return unless dialog_alive?
+
+          st = state || edge_check_state
+          js("if (window.NX && NX.setEdgeCheck) NX.setEdgeCheck(#{st.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.push_edge_check')
         end
 
         # dedup: false = refresh po programovom selecte z okna Vyroba (V0.5 B,

@@ -223,7 +223,9 @@ tlačidla — D-105), `link`, `search`, `arrow-left`, `trash`,
 `more-horizontal` (⋯ ďalšie údaje riadku rozpočtu — kód/adresa/poznámka, E-b),
 `download` (⬇ export súboru — XLSX rozpočet, E-b),
 `profile` (vlastný symbol — úchytkový profil v riadku čela, D-90),
-`wrench` (Kovanie — satelitná akcia v hlavičke panela, D-91), `logo`.
+`wrench` (Kovanie — katalóg kovania), `logo`,
+`cabinet` / `front` / `hammer` / `shell` / `slab` (UI-B1 — rail Inspectora:
+Korpus · Čelá · Kovanie · ABS kontrola · dočasný dielec/doska).
 
 > Okno **Výroba** načítava `icons.js` od v0.5.44 (predtým sprite nemalo) — nové
 > ovládacie prvky v ňom používajú sprite, nie glyfy.
@@ -244,18 +246,13 @@ modeli). Vzory:
 - **Prepínače** (`.bseg`): s DPH / bez DPH je len zobrazenie (localStorage),
   režim €/€€/€€€ je zápis do zákazky; tooltipy nesú názvy režimov.
 
-### D-47 / D-91: hlavička panela (rad 2)
-Tri režimové taby (Korpus·Zóny·Čelá) sú **rovnako široké** (`flex: 1 1 0`)
-s ikonou + textom; satelitné akcie **Materiály · Výroba · Kovanie** sú rovnako
-široké (inline-grid `repeat(3, 1fr)`) a pri šírke panela pod ~480 px sa prepnú
-na **icon-only** (media query skryje `.prodbtn span`; `title`/`aria-label`
-ostávajú) — žiadny tretí riadok, vertikálny priestor panela sa nemení.
-Breakpoint je **vlastný** (nie spoločný s 400 px pravidlom pre `.hwext`):
-s treťou akciou musia texty ustúpiť skôr, inak by taby ostali bez miesta.
-
-> **D-91 (Michal 9.8.):** umiestnenie „za Výrobou" je **dočasné** — finálny
-> domov satelitných okien (toolbar: hlavná · materiály · výroba · kovanie)
-> rozhodne debata UI 2.0.
+### D-47 / D-91: hlavička panela — UZAVRETÉ dávkou UI-B1
+Dvojradová hlavička s tromi režimovými tabmi a satelitnými akciami
+(Materiály · Výroba · Kovanie) **zanikla**. Kontexty prevzal **rail** (sekcia
+5.1), Štúdio má v raile vlastnú ikonu, **Materiály projektu** žijú v sektore
+Materiály a **Katalóg kovania** v skupine Kovanie. Hlavička je jednoradová:
+logo · ID · názov s ceruzkou · ⚠ chip. Tým je odpovedané aj D-91 „finálny domov
+satelitných okien" — je ním Štúdio (rail), nie hlavička panela.
 
 ### D-92: nákup pod položkou kovania (`.hwitem` / `.hwbuy`)
 Položka sekcie Kovanie je **obal `.hwitem`** = pôvodný `.hwrow` (počet, výber
@@ -383,6 +380,10 @@ Pravidlá ikon toolbaru (líšia sa od spritu v paneli):
   test `tests/pure/test_ui02_toolbar.rb`.
 - Kresba je **Lucide** (24×24, stroke 2) rovnako ako sprite; logo je fill-ová
   výnimka s vlastným viewBoxom originálnych kriviek značky.
+- **Vnútorný okraj ~12 %** (UI-B1): `viewBox` je o 12 % väčší než kresba, takže
+  ikona pri rovnakej ploche tlačidla nelícuje s jeho okrajom. Robí sa to
+  **výhradne cez `viewBox`** (nie zmenou súradníc kresby) — pri prekreslení
+  ikony tak stačí prekresliť kresbu v pôvodnej 24×24 mriežke.
 - **Zapnutý stav musí byť na tlačidle vidno** — prepínače majú validation proc
   (`MF_CHECKED`), nedostupná kontrola hrán je `MF_GRAYED`, nikdy ticho mŕtve tlačidlo.
 - Toolbar **nikdy nesiaha na model** (žiadna operácia, žiadne Späť) — len otvára
@@ -397,11 +398,47 @@ alebo status v `textContent` ceste do Ruby), použije sa **čistý text**, nie g
 
 ## 5. Komponentové vzory
 
-- **Sticky hlavička (Inspector):** dvojradová, zostáva pri scrollovaní
-  (`position: sticky`, `z-index` pod modalom 60). Rad 1 = logo + identita objektu
-  + warn chip. Rad 2 = režimové taby (Korpus·Zóny·Čelá) + tlačidlo Výroba
-  (vizuálne oddelené, otvára satelit). `scroll-padding-top` = výška hlavičky, aby
-  fokusované pole neskončilo pod ňou.
+### 5.1 Kostra Inspectora — rail + 4 sektory (UI-B1)
+
+Inspector má **ľavú zvislú lištu (rail)** a obsah v **štyroch zrolovateľných
+sektoroch**. Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html`.
+
+- **Rail (44 px, fixný ľavý stĺpec):** kontexty **Korpus · Zóny · Čelá · Kovanie**
+  → pod oddeľovačom **dočasná položka** (označený dielec / doska, prerušovaný
+  rámik + krížik) → **funkčná sekcia** (ABS kontrola hrán) → dole **koliesko**
+  (Nastavenia Inspectora) a **Štúdio**. Aktívny kontext je teal, funkčné ikony sú
+  tlmené a rozsvietia sa až po zapnutí. Rail je úzky, preto názov nesie **bublina
+  pri hoveri** (`.railtip`) — nie natívny `title`, aby sa nezobrazovali dva
+  tooltipy naraz.
+- **Kontexty platia LEN nad označeným korpusom.** Pri dielci, doske aj vkladaní
+  sú **neaktívne** — sivé, s bublinou, ktorá povie prečo. Ochranu drží **guard
+  v JS** (`setViewContext`), nie CSS; `aria-disabled` namiesto HTML `disabled`,
+  aby tlačidlá ostali fokusovateľné (vzor D-78).
+- **Sektory:** `S1 Náhľad · S2 Základné · S3 Materiály · S4 Nastavenia`. Sú to
+  `<details>` — zbalenie si pamätá `localStorage`, takže **prežije prekreslenie
+  aj zatvorenie panela**. Lišta sektora je tmavšia než telo a má miesto na
+  **meta súhrn** vpravo (dopĺňa ho UI-B3).
+- **Skupiny v S4 sú EXKLUZÍVNE** v rámci jedného kontextu: otvorenie jednej
+  zavrie ostatné (aj ich zatvorenie sa uloží). Sektory samotné sú **nezávislé**.
+  Výnimka `data-s4-solo` (Štruktúra zón) do exkluzivity nepatrí.
+- **Kostra sa NEPREKRESĽUJE.** Prepínanie kontextov a režimov mení iba triedy
+  a atribúty na `<body>` (`mode-*`, `data-view-ctx`, `data-insert-kind`).
+  `innerHTML` re-render kostry by zabil listenery, otvorené comboboxy, rozpísané
+  hodnoty aj fokus.
+- **Scroll je dokumentový** (nie vnútorný panel) — sticky hlavička,
+  `scroll-padding-top` a `window.scrollTo` logika warn zoznamu ostávajú.
+- **CSS je scopnuté pod `.nx-inspector`** (koreňová trieda na `<html>`, lebo
+  `body.className` prepisuje `setUiMode`). `panel.css` zdieľajú satelitné okná —
+  tie o raile ani sektoroch nesmú vedieť.
+
+### 5.2 Ostatné vzory
+
+- **Sticky hlavička (Inspector):** jednoradová, zostáva pri scrollovaní
+  (`position: sticky`, `z-index` pod modalom 60): logo + ID + názov s ceruzkou
+  + ⚠ chip. Režimové taby aj satelitné tlačidlá (Materiály·Výroba·Kovanie)
+  **zanikli v UI-B1** — kontexty prevzal rail, Štúdio je v raile, Materiály
+  projektu žijú v sektore Materiály a Katalóg kovania v skupine Kovanie.
+  `scroll-padding-top` = výška hlavičky, aby fokusované pole neskončilo pod ňou.
 - **Pätička:** v normálnom toku na konci obsahu — `Noxun Engine V<verzia>`.
   Verzia príde z Ruby (`Engine::VERSION`), nikdy sa nedopĺňa prípona cache-bustu.
 - **Tlačidlá:** `.primary` (akcia, zelená), `.ghostbtn` (neutrál), `.danger`
@@ -421,7 +458,25 @@ alebo status v `textContent` ceste do Ruby), použije sa **čistý text**, nie g
   zapamätané z väčšieho monitora je inak orezané rovnako). **Plocha má prednosť
   pred minimom**; medzi minimom a plochou sa veľkosti okna nikto nedotkne, takže
   vedome zväčšené okno ostáva. Nové okno = nové `NX_FIT_MIN` (bez neho fit nebeží).
-  *Jednotný štandard šírok a rozmerov okien je úloha D-51 (UI 2.0).*
+
+### D-51: štandard rozmerov okien (UI-B1)
+
+**Jedna pravda je OBSAHOVÝ viewport** (`NX_FIT_MIN` v HTML). Rozmery
+v `HtmlDialog.new` sú **vonkajšie** — obsah + rámik okna (Windows ≈ 16 px šírka,
+≈ 40 px výška). Preto sa vždy zapisuje trojica **`NX_FIT_MIN` → `width`/`height`
+→ `min_width`/`min_height`** a musí si zodpovedať (stráži guard test
+`tests/pure/test_uib1_kostra.rb`).
+
+| Okno | Obsah (`NX_FIT_MIN`) | `width` × `height` | `min_width` × `min_height` |
+|---|---|---|---|
+| **Inspector** (`panel.html`) | 470 × 810 | 486 × 850 | 486 × 600 |
+| Výroba (`production.html`) | podľa deklarácie v HTML | — | — |
+| Materiály (`proj_materials.html`) | podľa deklarácie v HTML | 720 × 640 | — |
+| ostatné satelity | podľa deklarácie v HTML | — | — |
+
+> **470 px Inspectora** je obsah = rail 44 px + karta. Hodnota je záväzná pre
+> celý blok UI 2.0 — mockup, sektory aj šírky polí sa navrhujú na ňu.
+> Satelitné okná dostanú svoje riadky tabuľky, keď ich prevezme Štúdio.
 
 ---
 
