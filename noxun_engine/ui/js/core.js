@@ -127,9 +127,18 @@
     var u = MATERIALS.used_ids || {};
     return (kind === 'abs' ? u.edges : u.sheets) || [];
   }
+  // Codex #167 P2: zoznam pouzitych sa meni pri KAZDOM zapise materialu (vratane
+  // Spat/Znova a vkladania), ale CITA sa len pri otvoreni ponuky. Preto si ho
+  // combobox pri otvoreni VYPYTA — server tak nemusi robit plny scan modelu pri
+  // kazdom kliku vo vybere (push_selected je horuca cesta). Odpoved chodi cez
+  // NX.setUsedIds a prekresli uz otvoreny zoznam.
+  function nxComboRequestUsed(){
+    if (window.sketchup && sketchup.nx_used_ids) sketchup.nx_used_ids('');
+  }
   if (typeof NXCombo !== 'undefined' && NXCombo){
     NXCombo.setColorResolver(nxComboColorOf);
     NXCombo.setUsedResolver(nxComboUsedOf);
+    NXCombo.setUsedRefresher(nxComboRequestUsed);
   }
 
   // D-45: rozsah hrubky korpusu/cela — zrkadlo Ruby CabinetBuilder::THICKNESS_RANGE.

@@ -338,11 +338,18 @@ s `.kbd` nápovedou). Zvýraznenie zhody je `<mark>` s vlastným tokenom
   katalógu členený podľa `<optgroup>`. Položka sa objaví **práve raz**; aby sa
   členenie D-36 nestratilo, nesie riadok meno svojej skupiny ako podtitul.
 - **Dáta si komponent nedrží.** „Použité v projekte" je odvodený zoznam ID zo
-  servera (`materials.used_ids`), farbu štvorčeka dáva panel resolverom
-  (`nxComboColorOf` v `core.js`: dekor z katalógu, ABS **podľa hrúbky** — rovnaká
-  legenda ako `.absleg`). „Naposledy použité" je `localStorage` **tohto počítača**
-  (`nx_recent_decor` / `nx_recent_abs`, max 5, len ID) — nikdy nie model ani
-  `%APPDATA%`; fixné voľby sa nepamätajú.
+  servera; keďže sa mení pri každom zápise materiálu, ale **číta sa len pri
+  otvorení ponuky**, combobox si ho pri otvorení **vypýta** (`nx_used_ids` →
+  `NX.setUsedIds` → prekreslenie otvoreného zoznamu). Farbu štvorčeka dáva panel
+  resolverom (`nxComboColorOf` v `core.js`: dekor z katalógu — pozor, katalógová
+  farba je pole `[r,g,b]`, nie CSS reťazec; ABS **podľa hrúbky** — rovnaká
+  legenda ako `.absleg`); do `style` prejde len hex. „Naposledy použité" je
+  `localStorage` **tohto počítača** (`nx_recent_decor` / `nx_recent_abs`, max 5,
+  len ID) — nikdy nie model ani `%APPDATA%`; fixné voľby sa nepamätajú.
+- **Sync zvonka popup ZAVRIE.** Serverový push (iná skrinka, nový katalóg),
+  prestavba `<option>`ov aj odchod z okna zatvárajú otvorenú ponuku — drží
+  položky z času otvorenia, takže by klik potvrdil voľbu starého kontextu do
+  nového. Natívna rozbaľovačka sa pri prestavbe správa rovnako.
 - **Klávesnica:** ↑↓ (preskakujú `disabled`), Enter potvrdí, Esc zavrie a vráti
   fokus na trigger, Tab zavrie. Pri otvorení stojí kurzor na **aktuálnej hodnote**
   (Enter nič nezmení omylom), pri písaní skočí na prvú zhodu.

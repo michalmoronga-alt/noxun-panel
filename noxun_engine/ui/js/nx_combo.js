@@ -184,6 +184,7 @@
     var OPEN = null;                // { sel, pop, items, active, q }
     var colorResolver = null;       // fn(kind, value) -> css farba | ''
     var usedResolver = null;        // fn(kind) -> [id, …]
+    var usedRefresher = null;       // fn() -> vypyta si od servera cerstve used_ids
     var docBound = false;
 
     function esc(s){
@@ -301,7 +302,11 @@
       // o tom dozvediet. Callback bezi az po dobehnuti celeho bloku, takze uz vidi
       // aj dosadenu `value`.
       if (global.MutationObserver){
-        var mo = new global.MutationObserver(function(){ refresh(sel); });
+        var mo = new global.MutationObserver(function(){
+          // Codex #167 P2: prestavba volieb zvonka = ponuka v popupe uz neplati.
+          if (OPEN && OPEN.sel === sel) close();
+          refresh(sel);
+        });
         mo.observe(sel, { childList: true, subtree: true });
         sel.__nxc.mo = mo;
       }
@@ -314,6 +319,12 @@
     // Pripoji komponent na vsetky NEobsluzene selecty pod `root` a obnovi triggery
     // uz pripojenych (odpojene z DOM zahodi). Vola sa po kazdom renderi karty —
     // je to lacne (querySelectorAll nad atributom) a deterministicke.
+    //
+    // Codex #167 P2: sync ZVONKA (serverovy push — iny korpus cez NX.loadSelected,
+    // novy katalog cez NX.setMaterials) VZDY zavrie otvoreny popup. Popup si drzi
+    // zoznam poloziek z casu otvorenia; keby prezil, klik by potvrdil volbu STAREHO
+    // kontextu (iná skrinka, iny katalog) do NOVEHO. Nativna rozbalovacka sa pri
+    // prestavbe sprava rovnako — zavrie sa.
     function scan(root){
       var scope = root || document;
       var list = scope.querySelectorAll ? scope.querySelectorAll('select[' + KIND_ATTR + ']') : [];
@@ -326,6 +337,7 @@
           sel.__nxc = null;
           ATTACHED.splice(j, 1);
         } else {
+          if (OPEN && OPEN.sel === sel) close();
           refresh(sel);
         }
       }
@@ -378,8 +390,27 @@
         pick(parseInt(row.getAttribute('data-i'), 10));
       });
       render('', false); // render sam dopocita poziciu (vyska sa filtrom meni)
+      // Codex #167 P2: „Použité v projekte" sa meni pri KAZDOM zapise materialu,
+      // ale CITA sa len pri otvoreni ponuky. Preto sa cerstvy zoznam PYTA az tu
+      // (par desiatok krat za sedenie) namiesto toho, aby ho server tlacil pri
+      // kazdom kliku v modeli — plny scan modelu do cesty vyberu nepatri.
+      // Odpoved dobehne asynchronne a prekresli uz otvoreny zoznam (rerender()).
+      if (usedRefresher){ try { usedRefresher(); } catch (e){} }
       setTimeout(function(){ try { inp.focus(); } catch (e){} }, 0);
       return true;
+    }
+
+    // Prekresli OTVORENY zoznam novymi datami (napr. po dobehnuti used_ids).
+    // Rozpisany dotaz aj kurzor sa zachovaju — kurzor podla HODNOTY, nie indexu
+    // (polozka sa presunutim do inej sekcie posunie).
+    function rerender(){
+      if (!OPEN) return;
+      var active = (OPEN.active >= 0 && OPEN.items[OPEN.active]) ? OPEN.items[OPEN.active].value : null;
+      render(OPEN.q, false);
+      if (active === null) return;
+      for (var i = 0; i < OPEN.items.length; i++){
+        if (OPEN.items[i].value === active && !OPEN.items[i].disabled){ OPEN.active = i; paintActive(); return; }
+      }
     }
 
     function onKey(ev){
@@ -522,6 +553,10 @@
         close();
       }, true);
       global.addEventListener('resize', function(){ if (OPEN) close(); });
+      // Codex #167 P2: odchod z okna (klik do modelu, prepnutie okna) popup zavrie —
+      // nativna rozbalovacka sa sprava rovnako a visiaci popup nad SketchUpom by
+      // po navrate potvrdzoval volbu do medzicasom zmeneneho kontextu.
+      global.addEventListener('blur', function(){ if (OPEN) close(); });
     }
 
     // ---------------------------------------------------------------- verejne API
@@ -536,6 +571,10 @@
       // sam ZIADNY katalog nepozna — data mu dodava panel z MATERIALS payloadu.
       setColorResolver: function(fn){ colorResolver = fn; },
       setUsedResolver: function(fn){ usedResolver = fn; },
+      // Volitelny hook: ako si vypytat CERSTVE „Použité v projekte" pri otvoreni
+      // ponuky. Bez neho komponent funguje ďalej — len s tym, co uz v pameti ma.
+      setUsedRefresher: function(fn){ usedRefresher = fn; },
+      rerender: rerender,
       recentOf: loadRecent,
       RECENT_MAX: RECENT_MAX,
       // ciste funkcie (Node testy)

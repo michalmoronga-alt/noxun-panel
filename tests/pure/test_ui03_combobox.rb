@@ -35,6 +35,36 @@ NxTest.test('UI-03: materials_payload nesie odvodene used_ids (sheets + edges)')
                 'payload ma obe vetvy (dekory aj pasky)')
 end
 
+NxTest.test('UI-03: cerstve used_ids sa PYTAJU pri otvoreni ponuky, netlacia sa') do
+  # Codex #167 P2: zoznam sa meni pri kazdom zapise materialu (vratane Spat/Znova
+  # a vkladania), ale CITA sa len pri otvoreni ponuky. Kanal je preto PULL —
+  # `push_selected` (bezi pri kazdom kliku vo vybere) nesmie robit scan modelu.
+  sync = File.read(File.join(UI03_UI_DIR, 'panel', 'sync.rb'), encoding: 'UTF-8')
+  panel = File.read(File.join(UI03_UI_DIR, 'panel.rb'), encoding: 'UTF-8')
+  NxTest.assert(sync.include?('def push_used_ids'), 'chyba tenky push samotneho zoznamu')
+  NxTest.assert(sync[/def push_used_ids.+?\n        end/m].to_s.include?('NX.setUsedIds'),
+                'push_used_ids posiela NX.setUsedIds (NIE cely katalog — formular sa nesmie resetovat)')
+  NxTest.assert(panel.include?("cb(dlg, 'nx_used_ids')"), 'callback nx_used_ids nie je registrovany')
+  # Poistka proti „opravam", ktore by scan modelu vratili do horucej cesty vyberu.
+  NxTest.refute(sync[/def push_selected.+?\n        end/m].to_s.include?('used_ids'),
+                'push_selected NESMIE pocitat used_ids — je to plny scan modelu pri kazdom kliku')
+  combo = UI03_COMBO_JS
+  NxTest.assert(combo.include?('usedRefresher'), 'komponent si vie vypytat cerstvy zoznam')
+  NxTest.assert(combo.include?('function rerender'),
+                'odpoved musi vediet prekreslit UZ OTVORENY zoznam (dobehne asynchronne)')
+end
+
+NxTest.test('UI-03: sync zvonka zavrie otvoreny popup') do
+  # Codex #167 P2: popup drzi polozky z casu otvorenia. Ked medzitym pride
+  # serverovy push (iny korpus / novy katalog), klik by potvrdil volbu STAREHO
+  # kontextu do NOVEHO — preto sa zatvara (rovnako ako nativna rozbalovacka).
+  scan = UI03_COMBO_JS[/function scan\(root\).+?\n    \}/m].to_s
+  NxTest.assert(scan.include?('if (OPEN && OPEN.sel === sel) close();'),
+                'scan musi zavriet popup selectu, ktory sa prave resyncoval')
+  NxTest.assert(UI03_COMBO_JS.include?("global.addEventListener('blur'"),
+                'odchod z okna popup tiez zatvara')
+end
+
 NxTest.test('UI-03: odvodenie used_ids je CISTE CITANIE (ziadny zapis do modelu)') do
   # D-103 lekcia: cesta, ktora sa spusta pri kazdom pushi katalogu, sa NESMIE
   # dotknut modelu (ziadna operacia, ziadny undo krok, ziadny dedup).
@@ -66,7 +96,8 @@ NxTest.test('UI-03: nx_combo.js neobsahuje ziadny hex — farby dava panel') do
   # farba mimo systemu.
   offenders = []
   UI03_COMBO_JS.each_line.with_index do |line, i|
-    offenders << "nx_combo.js:#{i + 1}" if line =~ /#[0-9a-fA-F]{3,8}\b/
+    code = line.sub(%r{//.*$}, '') # komentare von — „Codex #167" nie je farba
+    offenders << "nx_combo.js:#{i + 1}" if code =~ /#[0-9a-fA-F]{3,8}\b/
   end
   NxTest.assert(offenders.empty?, "hex farba v komponente (patri do tokenu): #{offenders.join(', ')}")
 end
