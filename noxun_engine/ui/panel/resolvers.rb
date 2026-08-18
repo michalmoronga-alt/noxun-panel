@@ -71,11 +71,24 @@ module Noxun
           { 'value' => payload }
         end
 
-        def zone_path(zid)
-          m = zid.to_s.match(/-Z([\d.]+)$/)
-          return [1] unless m
+        # UI-C2: cesta zony z jej ID. POSKODENE ID VRACIA nil — NIE koren.
+        #
+        # Doteraz tu bol fallback `[1]`: preklep, orezany retazec ci callback zo
+        # zastaraneho panela tak trafil KOREN a „Vycistit zonu" zmazalo cely
+        # vnutro skrinky namiesto jednej zony. Zapisove cesty preto nil vetvia
+        # a povedia to nahlas (`handle_*` v actions_zones.rb).
+        ZONE_ID_RE = /\A(?:.+)-Z(\d+(?:\.\d+)*)\z/.freeze
 
-          m[1].split('.').map(&:to_i)
+        def zone_path(zid)
+          m = ZONE_ID_RE.match(zid.to_s)
+          return nil unless m
+
+          parts = m[1].split('.').map { |s| Integer(s, 10) }
+          return nil if parts.empty? || parts.first != 1 || parts.any? { |i| i < 1 }
+
+          parts
+        rescue ArgumentError, TypeError
+          nil
         end
 
         def cabinet_id_from_zone(zid)

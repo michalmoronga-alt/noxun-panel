@@ -317,7 +317,8 @@ module Noxun
           select_only(model, inst)
           cid = Store.get(inst, 'cabinet_id')
           status_with_warnings(inst, "Vlozeny #{cid} — #{part_count(inst)} dielcov." \
-                                     "#{pf ? pf[:note] : ''}#{hw_note}")
+                                     "#{pf ? pf[:note] : ''}#{hw_note}" \
+                                     "#{zone_depth_note((Store.config(inst) || {})['zone_tree'])}")
           push_selected(model)
           stamp_template_used(tpl_ref) # UI-C1a: az PO vlozeni, mimo operacie
         end

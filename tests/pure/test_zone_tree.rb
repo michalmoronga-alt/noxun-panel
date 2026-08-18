@@ -12,8 +12,8 @@ NxTest.test('zone_tree: default_tree vytvori koren Z1 bez splitu') do
   NxTest.assert_equal(nil, tree['split'])
   NxTest.assert_equal(2, tree['shelves'])
   NxTest.assert_equal([], tree['children'])
-  # default_node clampuje police cez Shelves.clamp a generation drzi >= 0
-  NxTest.assert_equal(4, zt.default_node(9)['shelves'])
+  # default_node clampuje police cez Shelves.clamp (UI-C2: strop 6) a generation drzi >= 0
+  NxTest.assert_equal(6, zt.default_node(9)['shelves'])
   NxTest.assert_equal(0, zt.default_node(-3)['shelves'])
   NxTest.assert_equal(0, zt.default_node(0, 'X', -5)['generation'])
 end
@@ -361,11 +361,16 @@ NxTest.test('zone_tree: set_field_cuts!, set_shelves! a clear_zone!') do
   # dlhsi zoznam sa oreze na count
   zt.set_field_cuts!(tree, [1], Array.new(5) { { 'size' => 50, 'locked' => false } })
   NxTest.assert_equal(3, tree['split']['cuts'].size)
-  # set_shelves! zrusi split a clampuje pocet
+  # UI-C2: police smie dostat LEN LIST — na delenej zone sa zapis ODMIETNE
+  # (zmazal by cely podstrom aj s materialmi dielcov; na to je „Vycistit zonu").
+  NxTest.assert_equal(false, zt.set_shelves!(tree, [1], 9))
+  NxTest.assert(tree['split'].is_a?(Hash), 'delenie muselo prezit odmietnuty zapis polic')
+  NxTest.assert_equal(true, zt.clear_zone!(tree, [1]))
+  # az na vycistenej (listovej) zone: zrusi split a clampuje pocet na MAX 6
   NxTest.assert_equal(true, zt.set_shelves!(tree, [1], 9))
   NxTest.assert_equal(nil, tree['split'])
   NxTest.assert_equal([], tree['children'])
-  NxTest.assert_equal(4, tree['shelves'])
+  NxTest.assert_equal(6, tree['shelves'])
   NxTest.assert_equal(false, zt.set_field_cuts!(tree, [1], [])) # list bez splitu = false
   # clear_zone! vynuluje zonu
   zt.set_shelves!(tree, [1], 2)

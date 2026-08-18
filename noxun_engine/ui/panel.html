@@ -12,7 +12,7 @@
      Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
      bezpecne zdielatelny so satelitnymi oknami. -->
 <script>document.documentElement.className = 'nx-inspector';</script>
-<link rel="stylesheet" href="css/panel.css?v=0.7.12">
+<link rel="stylesheet" href="css/panel.css?v=0.7.14">
 
 <!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
      Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
@@ -80,7 +80,7 @@
       </div>
       <!-- D-23: hint podla aktivneho kontextu (CSS cez data-view-ctx na <body>) —
            v kontexte Cela pribudol klik na celo, zonova cast sa mimo Zon skryva -->
-      <div class="pvhint"><span class="ph-zones">Klik na zónu = výber (police, delenie) · ťahaj priečku = posun · </span><span class="ph-fronts">Klik na čelo = jeho riadok v zozname · </span>Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu</div>
+      <div class="pvhint"><span class="ph-zones">Klik na zónu = výber (police, delenie) · ťahaj priečku = posun (magnet 1/4 · 1/2 · 3/4, Alt ho vypne) · </span><span class="ph-fronts">Klik na čelo = jeho riadok v zozname · </span>Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu</div>
       <div class="zoneline">
         <input id="zonesChk" type="checkbox" onchange="toggleZones()">
         <label for="zonesChk">Zobraziť zóny (ghost) v modeli</label>
@@ -365,34 +365,79 @@
       </div>
     </details>
 
-    <!-- --- kontext ZONY: karta kliknutej zony + strom (actions.js refreshZoneUI) --- -->
-    <fieldset id="zoneCard" data-s4="zony" style="display:none">
-      <legend>Zóna</legend>
-      <div id="zoneActive"></div>
-      <div id="leafActions">
-        <div class="zact"><label>Rozdeliť zvislo</label>
-          <select id="splitVCount"><option>2</option><option>3</option><option>4</option></select>
-          <button class="ghostbtn zbtn" onclick="splitZone('v')" disabled>na stĺpce</button></div>
-        <div class="zact"><label>Rozdeliť vodorovne</label>
-          <select id="splitHCount"><option>2</option><option>3</option><option>4</option></select>
-          <button class="ghostbtn zbtn" onclick="splitZone('h')" disabled>na riadky</button></div>
-        <div class="zact"><label>Police v zóne</label>
-          <select id="zoneShelves"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select>
-          <button class="ghostbtn zbtn" onclick="setZoneShelves()" disabled>nastav</button></div>
-      </div>
-      <div id="fieldEditor"></div>
-      <div class="btnrow">
-        <button class="danger zbtn" onclick="cleanZone()" disabled>Vyčistiť zónu (zruš delenie/police)</button>
-      </div>
-    </fieldset>
-
-    <!-- STRUKTURA ZON (strom — prehlad a vyber; akcie su v karte zony vyssie).
-         A5: data-s4-solo = MIMO exkluzivity (strom si v UI-C2 riadi rozrolovanie sam). -->
-    <details data-key="zones" data-s4="zony" data-s4-solo="1">
-      <summary>Štruktúra zón</summary>
+    <!-- ===== kontext ZONY (UI-C2, kontrakt UI 2.0 sekcia Zony) ==============
+         Poradie skupin je zavazne: STRUKTURA NAVRCH (mapa, v ktorej sa vybera),
+         pod nou Delenie · Police · Vnutro. Strom ma data-s4-solo = ostava mimo
+         exkluzivity, teda sa NEZATVARA pri otvoreni inej skupiny — pouzivatel
+         musi stale vidiet, s ktorou zonou pracuje.
+         Kostra je STATICKA (A4): JS pise len obsah #zoneTree / #zoneFields
+         a triedy/disabled na uz existujucich uzloch. -->
+    <details data-key="zones" data-s4="zony" data-s4-solo="1" open>
+      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-layout-grid"/></svg>Štruktúra zón</summary>
       <div class="body">
-        <div class="hint">Police a delenie nastavíš klikom na zónu v náhľade — otvorí sa karta Zóna.</div>
         <div id="zoneTree"><div class="muted">Žiadny označený korpus.</div></div>
+        <div class="hint">Klik na zónu (tu alebo v náhľade) ju vyberie — delenie a police
+          sa potom týkajú jej. Strom má najviac 3 úrovne.</div>
+      </div>
+    </details>
+
+    <!-- DELENIE ZONY — dlazdice + presna cesta cislom (N21) + zlomky.
+         Dlazdice su AKTIVNE LEN NA LISTOVEJ zone: opakovane delenie uz delenej
+         zony by ticho zmazalo cely podstrom aj s materialmi dielcov. Jedina
+         destruktivna cesta je „Vycistit zonu" (vedoma odchylka od mockupu). -->
+    <details data-key="zsplit" data-s4="zony">
+      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-columns-2"/></svg>Delenie zóny</summary>
+      <div class="body">
+        <div class="zsel" id="zoneActive">Žiadna označená zóna.</div>
+        <div class="ztiles" id="zoneTiles">
+          <button type="button" class="ztile" data-axis="v" data-count="2" data-nx-usage="zone:split-v2">
+            <svg class="ic" aria-hidden="true"><use href="#i-columns-2"/></svg><span>2 stĺpce</span></button>
+          <button type="button" class="ztile" data-axis="v" data-count="3" data-nx-usage="zone:split-v3">
+            <svg class="ic" aria-hidden="true"><use href="#i-columns-3"/></svg><span>3 stĺpce</span></button>
+          <button type="button" class="ztile" data-axis="h" data-count="2" data-nx-usage="zone:split-h2">
+            <svg class="ic" aria-hidden="true"><use href="#i-rows-2"/></svg><span>2 riadky</span></button>
+          <button type="button" class="ztile" data-axis="h" data-count="3" data-nx-usage="zone:split-h3">
+            <svg class="ic" aria-hidden="true"><use href="#i-rows-3"/></svg><span>3 riadky</span></button>
+        </div>
+        <div class="rowc" id="zoneFirstRow">
+          <label for="zoneFirst"><svg class="ic" aria-hidden="true"><use href="#i-arr-h"/></svg>Prvá zóna</label>
+          <span class="dwrap"><input id="zoneFirst" type="text" autocomplete="off" placeholder="AUTO">
+            <button type="button" class="pbtn" id="zoneFirstPre" title="Zlomky zóny" aria-label="Zlomky zóny"
+                    onclick="toggleZoneFractions(event)"><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>
+            <span class="miniopts" id="zoneFracOpts"></span></span>
+          <span class="unit">mm</span>
+        </div>
+        <!-- Uplna cesta: rozmer a zamok KAZDEHO pola (pole „Prva zona" je len skratka na pole 1) -->
+        <div id="zoneFields"></div>
+        <div class="hint" id="zoneSplitHint">Zadaná hodnota pole zamkne — prázdne pole je AUTO.
+          Priečku vieš ťahať aj v náhľade (magnet 1/4 · 1/2 · 3/4, Alt ho vypne).</div>
+        <div class="btnrow">
+          <!-- Codex #177 P1: NIE natívne `disabled` — stav tohto tlačidla riadi
+               `setZoneCtl` (trieda + aria-disabled + title, vzor D-78) a ten by
+               natívny atribút nikdy nezhodil; tlačidlo by ostalo mŕtve navždy
+               a jediná cesta na zrušenie delenia by bola nedostupná. Východzí
+               stav (bez označenej zóny) je preto zapísaný TOU ISTOU rečou. -->
+          <button type="button" class="danger off" id="zoneCleanBtn" aria-disabled="true"
+                  title="Najprv označ zónu." onclick="cleanZone()">Vyčistiť zónu (zruš delenie/police)</button>
+        </div>
+      </div>
+    </details>
+
+    <!-- POLICE — pilulky 0–6 (Shelves::MAX). Police su MODUL v zone, zonu nedelia. -->
+    <details data-key="zshelves" data-s4="zony">
+      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-rows-3"/></svg>Police</summary>
+      <div class="body">
+        <div class="row"><label>Počet políc</label><div class="npills" id="zoneShelfPills"></div></div>
+        <div class="hint" id="zoneShelfHint">Police sa rozložia rovnomerne a hneď sa prekreslia v náhľade aj v strome.</div>
+      </div>
+    </details>
+
+    <!-- VNUTRO — rezervovany slot (kontrakt UI 2.0: „pripravene, po V1"). -->
+    <details data-key="zinside" data-s4="zony">
+      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-box"/></svg>Vnútro</summary>
+      <div class="body">
+        <div class="hint">Budúci domov vnútorného vybavenia zóny — vnútorné zásuvky,
+          koše, šatníkové tyče. Slot je rezervovaný, funkcie prídu po V1.</div>
       </div>
     </details>
 
@@ -614,34 +659,34 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.7.12"></script>
+<script src="js/errors.js?v=0.7.14"></script>
 <!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
      jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
      pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
-<script src="js/win_fit.js?v=0.7.12"></script>
-<script src="js/icons.js?v=0.7.12"></script>
+<script src="js/win_fit.js?v=0.7.14"></script>
+<script src="js/icons.js?v=0.7.14"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.7.12"></script>
-<script src="js/core.js?v=0.7.12"></script>
-<script src="js/expr.js?v=0.7.12"></script>
-<script src="js/insert_state.js?v=0.7.12"></script>
-<script src="js/form.js?v=0.7.12"></script>
-<script src="js/zone_tree.js?v=0.7.12"></script>
-<script src="js/preview.js?v=0.7.12"></script>
+<script src="js/nx_combo.js?v=0.7.14"></script>
+<script src="js/core.js?v=0.7.14"></script>
+<script src="js/expr.js?v=0.7.14"></script>
+<script src="js/insert_state.js?v=0.7.14"></script>
+<script src="js/form.js?v=0.7.14"></script>
+<script src="js/zone_tree.js?v=0.7.14"></script>
+<script src="js/preview.js?v=0.7.14"></script>
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
-<script src="js/shell.js?v=0.7.12"></script>
-<script src="js/actions.js?v=0.7.12"></script>
+<script src="js/shell.js?v=0.7.14"></script>
+<script src="js/actions.js?v=0.7.14"></script>
 <!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
      bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
-<script src="js/settings.js?v=0.7.12"></script>
-<script src="js/bridge.js?v=0.7.12"></script>
-<script src="js/materials.js?v=0.7.12"></script>
-<script src="js/part_card.js?v=0.7.12"></script>
-<script src="js/board_card.js?v=0.7.12"></script>
-<script src="js/hardware.js?v=0.7.12"></script>
-<script src="js/usage.js?v=0.7.12"></script>
-<script src="js/boot.js?v=0.7.12"></script>
+<script src="js/settings.js?v=0.7.14"></script>
+<script src="js/bridge.js?v=0.7.14"></script>
+<script src="js/materials.js?v=0.7.14"></script>
+<script src="js/part_card.js?v=0.7.14"></script>
+<script src="js/board_card.js?v=0.7.14"></script>
+<script src="js/hardware.js?v=0.7.14"></script>
+<script src="js/usage.js?v=0.7.14"></script>
+<script src="js/boot.js?v=0.7.14"></script>

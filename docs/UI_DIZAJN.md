@@ -246,7 +246,9 @@ Nastavení; `brace` čaká na skupinu Výstuhy z bloku UI-C),
 `cab-low` / `cab-high` (UI-C1b — typ vkladaného objektu: skrinka na sokli vs.
 zavesená; tretí typ „Doska" používa existujúci `slab`),
 `ori-lying` / `ori-stand` / `ori-wall` (UI-C1c — umiestnenie dosky; v každej je
-**podlaha** ako vodorovná čiara, v `ori-wall` navyše zvislá čiara steny).
+**podlaha** ako vodorovná čiara, v `ori-wall` navyše zvislá čiara steny),
+`columns-3` / `rows-2` / `rows-3` (UI-C2 — dlaždice delenia zóny; spolu
+s existujúcim `columns-2` tvoria štvoricu „2/3 stĺpce · 2/3 riadky“).
 
 > Okno **Výroba** načítava `icons.js` od v0.5.44 (predtým sprite nemalo) — nové
 > ovládacie prvky v ňom používajú sprite, nie glyfy.
@@ -607,7 +609,44 @@ Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html`
   (žiadny prázdny krok Späť); na karte vloženej dosky sa pred odoslaním flushne
   čakajúci debounce ostatných polí.
 
-### 5.5 Ostatné vzory
+### 5.5 Zóny — štruktúra, dlaždice a presné delenie (UI-C2)
+
+Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Zones`).
+
+- **Štruktúra je NAVRCH kontextu** a má **vlastné rozrolovanie** (`data-s4-solo`,
+  mimo exkluzivity skupín). Je to mapa, v ktorej sa vyberá — nesmie zmiznúť
+  vtedy, keď používateľ otvorí Delenie alebo Police.
+- **Strom kreslí spojnice, nie odsadenie.** Každá úroveň má vlastný kontajner
+  `.zkids` s ľavou linkou a vodorovným „zubom“ pri uzle; prázdny kontajner
+  (listová zóna) sa nekreslí vôbec. Padding by čiaru nakresliť nevedel.
+- **Delenie sú 4 dlaždice** — „2 stĺpce · 3 stĺpce · 2 riadky · 3 riadky“.
+  Ikona JE odpoveď na otázku „čo sa stane“, text je len potvrdenie.
+- **Aktivita ovládača je pravidlo, nie kozmetika.** Dlaždice a pilulky políc
+  patria **listovej** zóne; na delenej sú viditeľné, ale neaktívne s vysvetlením
+  („Zóna je delená — najprv Vyčistiť zónu“). Pole **„Prvá zóna“ je naopak
+  aktívne len na delenej zóne**. Neaktívny stav je vždy `aria-disabled` +
+  trieda, **nikdy HTML `disabled`** (vzor D-78) — inak by prvok zhltol hover aj
+  tooltip a používateľ by sa dôvod nedozvedel; klik naň dôvod aj vypíše.
+- **Jediná deštruktívna cesta je „Vyčistiť zónu“.** Opakované delenie už delenej
+  zóny by ticho zmazalo celý podstrom aj s materiálmi a ABS dielcov, preto ho
+  odmieta aj server. **Vedomá odchýlka od mockupu**, ktorý dlaždice kreslí
+  aktívne aj nad delenou Z1.2 — mockup sa dorovná pri najbližšom 1:1 kole.
+- **Zámok = vypísaná hodnota** (rovnaké pravidlo ako výšky čiel): vyplnená
+  „Prvá zóna“ pole 1 zamkne, prázdne pole je AUTO a odomyká. Pole je **skratka**
+  na pole 1 — úplná cesta so zámkom každého poľa ostáva v zozname pod ním.
+- **Presné delenie číslom (N21) radšej ODMIETNE, než by ticho zmenšilo.**
+  Nezmestiteľná hodnota vypíše, koľko by ostatným poliam ostalo a koľko treba;
+  zvyšok sa dorovná do posledného odomknutého poľa. Presnosť je **0,01 mm** —
+  zaokrúhľovanie na celé mm by pri troch poliach z korpusu „zjedlo“ až 2 mm.
+- **Zlomky a magnet sú JEDNA geometria.** Oboje hovorí o tom istom: kde má sedieť
+  **stred priečky**. Ponúkajú sa 1/4 · 1/3 · 1/2 (magnet ťahania 1/4 · 1/2 · 3/4,
+  **Alt ho vypína**), nedosiahnuteľný zlomok sa neponúka. Číslo v poli je rozmer
+  vo **svetlom priestore**, takže 1/2 z 864 mm pri hrúbke 18 je 423, nie 432.
+- **Police sú pilulky 0–6** — jeden klik, žiadny select s tlačidlom „nastav“.
+- **Vnútro je rezervovaný slot** (vnútorné zásuvky, koše, tyče) — prázdna skupina
+  s vysvetlením je poctivejšia než chýbajúce miesto: hovorí, že sa naň myslelo.
+
+### 5.6 Ostatné vzory
 
 - **Sticky hlavička (Inspector):** jednoradová, zostáva pri scrollovaní
   (`position: sticky`, `z-index` pod modalom 60): logo + ID + názov s ceruzkou

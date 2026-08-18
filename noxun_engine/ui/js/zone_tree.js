@@ -1,4 +1,147 @@
   // ===================== ZONE TREE (JS zrkadlo ZoneTree) =====================
+  //
+  // UI-C2: konstanty a geometria su ZRKADLOM `core/zone_tree.rb` (MIN_FIELD,
+  // MAX_LEVELS, Shelves::MAX, FIELD_EPS, zlomky). Zhodu strazi test
+  // `tests/pure/test_uic2_zony.rb` — cislo sa nikdy nemeni len na jednej strane.
+  var NXZ = {
+    MIN_FIELD: 20,        // ZoneTree::MIN_FIELD
+    MAX_LEVELS: 3,        // ZoneTree::MAX_LEVELS (N22)
+    MAX_SHELVES: 6,       // Shelves::MAX (pills 0–6)
+    EPS: 0.01,            // ZoneTree::FIELD_EPS — mm Float, ziadne cele mm
+    MAX_FIELDS: 4,        // najviac 4 polia v jednom deleni
+    FIELD_FRACTIONS: [[1,4],[1,3],[1,2]], // ponuka pola „Prva zona" (N21)
+    SNAP_FRACTIONS: [[1,4],[1,2],[3,4]]   // magnet tahania priecky (N20)
+  };
+
+  // --- JEDNA geometria pre zlomky aj magnet (audit F6) -----------------------
+  // Zlomok aj magnet hovoria o TOM ISTOM: kde ma sediet STRED priecky.
+  //   stred priecky i        = frac * span
+  //   svetly sucet poli 0..i = frac * span - i*t - t/2
+  // Pri 2 poliach a 1/2 z toho vyjde polovica SVETLEHO priestoru (span - t)/2,
+  // nie polovica rozpatia — priecka tak stoji stredom presne v polovici zony.
+  function nxZoneClear(span, count, t){
+    return Math.max(0, span - (Math.max(1, count) - 1) * t);
+  }
+  function nxZoneCumForFraction(span, count, t, index, frac){
+    return frac * span - index * t - t / 2;
+  }
+  // Ktore zlomky su pre priecku `index` dosiahnutelne (ostatnym poliam musi
+  // ostat aspon MIN_FIELD). Vrati [{ label, frac, cum }].
+  function nxZoneFractionOptions(span, count, t, index, fracs){
+    var list = fracs || NXZ.FIELD_FRACTIONS, out = [], clear = nxZoneClear(span, count, t);
+    var lo = (index + 1) * NXZ.MIN_FIELD, hi = clear - (count - index - 1) * NXZ.MIN_FIELD;
+    list.forEach(function(fr){
+      var f = fr[0] / fr[1], cum = nxZoneCumForFraction(span, count, t, index, f);
+      if (cum >= lo - NXZ.EPS && cum <= hi + NXZ.EPS)
+        out.push({ label: fr[0] + '/' + fr[1], frac: f, cum: nxRound2(cum) });
+    });
+    return out;
+  }
+  // Magnet: prilep svetly sucet na najblizsi zlomok, ak je bliz nez tolMm.
+  // tolMm <= 0 (drzany Alt) = magnet vypnuty, vstup sa vrati nedotknuty.
+  function nxZoneSnapCum(span, count, t, index, cum, tolMm, fracs){
+    if (!(tolMm > 0)) return cum;
+    var list = fracs || NXZ.SNAP_FRACTIONS, best = null;
+    list.forEach(function(fr){
+      var target = nxZoneCumForFraction(span, count, t, index, fr[0] / fr[1]);
+      var d = Math.abs(target - cum);
+      if (d <= tolMm && (best === null || d < best.d)) best = { d: d, v: target };
+    });
+    return best ? best.v : cum;
+  }
+  // mm Float s presnostou 0,01 — ZIADNE zaokruhlovanie na cele mm (pri deleni
+  // na 3 polia by sa z korpusu „stratili" az 2 mm; STANDARD zna mm Float).
+  function nxRound2(v){ return Math.round(v * 100) / 100; }
+
+  // --- PRESNA CESTA: rozmer pola cislom (audit F7) ---------------------------
+  // Vrati { cuts: [...] } alebo { error: 'veta pre pouzivatela' }.
+  // Nezmestitelna hodnota sa ODMIETNE — nikdy sa ticho nezmensi. Zvysok po
+  // proporcnom rozdeleni sa deterministicky dorovna do POSLEDNEHO odomknuteho
+  // pola, takze sucet presne sedi na svetly priestor.
+  function nxZoneExactCuts(cuts, sizes, count, clear, index, newSize, lockEdited){
+    if (!(newSize > 0) || !isFinite(newSize))
+      return { error: 'rozmer nie je platné číslo.' };
+    if (newSize < NXZ.MIN_FIELD - NXZ.EPS)
+      return { error: 'najmenšie pole je ' + NXZ.MIN_FIELD + ' mm.' };
+
+    var i, keep = [], flex = [], lockedSum = 0;
+    for (i = 0; i < count; i++){
+      if (i === index) continue;
+      if (cuts[i] && cuts[i].locked && cuts[i].size != null){ keep.push(i); lockedSum += Math.max(NXZ.MIN_FIELD, cuts[i].size); }
+      else flex.push(i);
+    }
+    var rest = clear - newSize - lockedSum;
+    if (flex.length === 0){
+      if (Math.abs(rest) <= NXZ.EPS) { /* sedi presne */ }
+      else return { error: 'ostatné polia sú zamknuté — uvoľni aspoň jeden zámok.' };
+    } else if (rest < flex.length * NXZ.MIN_FIELD - NXZ.EPS){
+      return { error: 'nezmestí sa — pre ostatné polia by ostalo ' + Math.round(Math.max(0, rest)) +
+                      ' mm (treba aspoň ' + (flex.length * NXZ.MIN_FIELD) + ' mm).' };
+    }
+
+    var out = new Array(count);
+    out[index] = { size: nxRound2(newSize), locked: !!lockEdited };
+    keep.forEach(function(j){ out[j] = { size: nxRound2(Math.max(NXZ.MIN_FIELD, cuts[j].size)), locked: true }; });
+    if (flex.length){
+      var sp = nxZoneSpread(flex, sizes, rest);
+      if (sp.remaining < -NXZ.EPS)
+        return { error: 'nezmestí sa — pre ostatné polia treba aspoň ' + (flex.length * NXZ.MIN_FIELD) + ' mm.' };
+      flex.forEach(function(j){ if (sp.fixed[j] != null) out[j] = { size: sp.fixed[j], locked: false }; });
+      var pend = sp.pending;
+      if (!pend.length){
+        // vsetky odomknute polia sedia na minime — zvysok deterministicky poslednemu
+        var lastF = flex[flex.length - 1];
+        out[lastF] = { size: nxRound2(out[lastF].size + sp.remaining), locked: false };
+      } else {
+        var base = 0;
+        pend.forEach(function(j){ base += (sizes && sizes[j] > 0) ? sizes[j] : 0; });
+        var acc = 0;
+        pend.forEach(function(j, k){
+          var v;
+          if (k === pend.length - 1) v = nxRound2(sp.remaining - acc);   // dorovnanie zvysku
+          else {
+            v = base > 0 ? (sp.remaining * ((sizes && sizes[j] > 0 ? sizes[j] : 0) / base)) : (sp.remaining / pend.length);
+            v = nxRound2(v);
+            acc += v;
+          }
+          out[j] = { size: v, locked: false };
+        });
+        var last = pend[pend.length - 1];
+        if (out[last].size < NXZ.MIN_FIELD - NXZ.EPS)
+          return { error: 'nezmestí sa — poslednému poľu by ostalo ' + Math.round(out[last].size) + ' mm.' };
+      }
+    }
+    return { cuts: out };
+  }
+
+  // Rozdelenie zvysku medzi odomknute polia s REŠPEKTOM k minimu (water-filling).
+  //
+  // Codex #177 P2: proporcny podiel sa nesmie len „orezat na MIN_FIELD" — ten
+  // rozdiel treba odobrat z toho, co ostava ostatnym, inak posledne pole spadne
+  // pod minimum a funkcia ODMIETNE hodnotu, ktora sa v skutocnosti zmesti.
+  // Priklad: vahy [20, 440, 440] a zvysok 60 mm — platne riesenie je [20,20,20],
+  // ale jednorazovy clamp vratil chybu. Pole, ktore by proporcne dostalo menej
+  // nez minimum, sa preto ZAFIXUJE na minimum a zvysok sa prepocita pre ostatne;
+  // opakuje sa, kym sa nieco meni (konverguje — poli je najviac 4).
+  function nxZoneSpread(idxs, sizes, total){
+    var pending = idxs.slice(), fixed = {}, remaining = total, changed = true;
+    var wOf = function(j){ return (sizes && sizes[j] > 0) ? sizes[j] : 0; };
+    while (changed && pending.length){
+      changed = false;
+      var base = 0, keep = [], i, j, w;
+      for (i = 0; i < pending.length; i++) base += wOf(pending[i]);
+      for (i = 0; i < pending.length; i++){
+        j = pending[i];
+        w = base > 0 ? (wOf(j) / base) : (1 / pending.length);
+        if (remaining * w < NXZ.MIN_FIELD - NXZ.EPS){
+          fixed[j] = NXZ.MIN_FIELD; remaining -= NXZ.MIN_FIELD; changed = true;
+        } else keep.push(j);
+      }
+      pending = keep;
+    }
+    return { fixed: fixed, pending: pending, remaining: remaining };
+  }
+
   function defaultTree(sh, nodeId){
     return { id:(nodeId || 'Z1'), generation:0, split:null, shelves:(sh||0), children:[] };
   }
@@ -11,7 +154,7 @@
     var sp = node.split;
     if (sp && typeof sp === 'object'){
       var axis = (sp.axis === 'h') ? 'h' : 'v';
-      var count = Math.min(4, Math.max(2, parseInt(sp.count || 2, 10)));
+      var count = Math.min(NXZ.MAX_FIELDS, Math.max(2, parseInt(sp.count || 2, 10)));
       var cuts = sanitizeCuts(sp.cuts, count);
       var rawKids = node.children || [];
       var kids = [];
@@ -19,8 +162,9 @@
       return { id:nodeId, generation:generation,
         split:{ axis:axis, count:count, cuts:cuts }, shelves:0, children:kids };
     }
+    // UI-C2: strop polic je 6 (Shelves::MAX) — zrkadlo servera, nie nezavisla hodnota.
     return { id:nodeId, generation:generation, split:null,
-      shelves:Math.min(4, Math.max(0, parseInt(node.shelves||0,10) || 0)), children:[] };
+      shelves:Math.min(NXZ.MAX_SHELVES, Math.max(0, parseInt(node.shelves||0,10) || 0)), children:[] };
   }
   function sanitizeCuts(cuts, count){
     var arr = (cuts||[]).map(function(c){
@@ -34,7 +178,7 @@
   function navTree(tree, path){ var n = tree; for (var i=1;i<path.length;i++){ if(!n.children||!n.children[path[i]-1]) return null; n=n.children[path[i]-1]; } return n; }
   // fix #4: zvladne aj lokalne draft id 'Z1.2' (pred vlozenim korpusu), nielen 'CAB-001-Z1.2'.
   function pathOf(zid){ var s = String(zid); var m = s.match(/-Z([\d.]+)$/) || s.match(/^Z([\d.]+)$/); return m ? m[1].split('.').map(function(x){return parseInt(x,10);}) : [1]; }
-  var MINF = 20;
+  var MINF = NXZ.MIN_FIELD;
   // fix #1 (zrkadlo Ruby ZoneTree.resolve_fields): kumulativny clamp zamknutych poli — Sigma(locked)
   // nikdy nepresiahne dostupny priestor (aj po rezervovani MINF na kazde nezamknute) -> priecky/zony
   // nevzniknu mimo rodica. Nezamknute: proporcny prepocet (nositel fix #5).
@@ -117,7 +261,7 @@
     var sizes = resolveFields(tempCuts, count, span, t);
     for (var j=0;j<count;j++){
       var lk = (j===anchorIdx) ? anchorLocked : node.split.cuts[j].locked;
-      node.split.cuts[j] = { size: Math.round(sizes[j]), locked: lk };
+      node.split.cuts[j] = { size: nxRound2(sizes[j]), locked: lk };
     }
     currentZoneTree = tree;
   }
@@ -130,7 +274,7 @@
     computeZones().forEach(function(z){ if (z.id===localId && z.split) sizes = z.split.sizes; });
     if (!sizes) return;
     for (var j=0;j<node.split.count;j++){
-      node.split.cuts[j] = { size: Math.round(sizes[j]), locked: node.split.cuts[j].locked };
+      node.split.cuts[j] = { size: nxRound2(sizes[j]), locked: node.split.cuts[j].locked };
     }
     currentZoneTree = tree;
   }
@@ -139,6 +283,31 @@
     var node = navTree(sanitizeTree(currentZoneTree), pathOf(localId));
     if (!node || !node.split) return;
     if (selectedCabId && window.sketchup && sketchup.set_zone_field)
-      sketchup.set_zone_field(JSON.stringify({ zone_id: fullZoneId(localId), index: editedIndex, cuts: node.split.cuts }));
+      sketchup.set_zone_field(nxZonePayload({ zone_id: fullZoneId(localId), index: editedIndex, cuts: node.split.cuts }));
+  }
+
+  // UI-C2 (audit F9): KAZDY zonovy callback nesie identitu dokumentu a skrinky.
+  // ID zon sa medzi dokumentmi opakuju (`CAB-001-Z1.2` je v kazdom projekte),
+  // takze oneskoreny callback CEF by po prepnuti dokumentu prestaval CUDZI model.
+  // Server pri nezhode zmenu odmietne — jedno miesto, kde sa metadata pridavaju.
+  function nxZonePayload(obj){
+    var o = obj || {};
+    o.model_guid = (typeof nxModelGuid !== 'undefined') ? nxModelGuid : '';
+    o.cabinet_id = (typeof selectedCabId !== 'undefined' && selectedCabId) ? selectedCabId : '';
+    return JSON.stringify(o);
+  }
+
+  // Node testy (tests/js/test_uic2_zony.js) — LEN ciste jadro (zrkadlo konstant,
+  // geometria zlomkov/magnetu, presna cesta, sanitizacia stromu). DOM cast bezi
+  // v CEF normalne (vzor preview.js / shell.js).
+  if (typeof module !== 'undefined' && module.exports){
+    module.exports = { NXZ: NXZ, nxZoneClear: nxZoneClear,
+                       nxZoneCumForFraction: nxZoneCumForFraction,
+                       nxZoneFractionOptions: nxZoneFractionOptions,
+                       nxZoneSnapCum: nxZoneSnapCum, nxZoneExactCuts: nxZoneExactCuts,
+                       nxZoneSpread: nxZoneSpread,
+                       nxRound2: nxRound2,
+                       sanitizeTree: sanitizeTree, sanitizeCuts: sanitizeCuts,
+                       resolveFields: resolveFields, pathOf: pathOf, navTree: navTree };
   }
 

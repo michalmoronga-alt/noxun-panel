@@ -10,6 +10,16 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
+### D-09 — snap body pri presúvaní priečok (19.8.2026, PR UI-C2, v0.7.14)
+
+**Pôvodné znenie D-09 · Snap body pri presúvaní priečok** (1/4, 1/2, 3/4…) v zónovom náhľade. *(Stav bol: nápad, D-08 hotové — môže sa rozpracovať.)*
+
+**Ako sa to vyriešilo.** Ťahaná priečka sa v náhľade **prilepí na 1/4 · 1/2 · 3/4** zóny a status pri tom povie „magnet“; **Alt magnet vypína** (rozhodne sa PRED aplikáciou, takže sa dá doladiť na desatiny milimetra). Prah priľnutia je **v pixeloch prepočítaných aktuálnym zoomom** — pri priblíženom pohľade by pevný milimetrový prah presnú prácu znemožnil. To isté delenie sa dá zadať aj **číslom** v novom poli „Prvá zóna“ so zlomkovými presetmi **1/4 · 1/3 · 1/2** (N21).
+
+**Prečo je to jedna funkcia, nie dve.** Zlomok aj magnet hovoria o tom istom: **kde má sedieť STRED priečky**. Preto ich počíta jediná zdieľaná funkcia (`ZoneTree.cum_for_fraction` / `nxZoneCumForFraction`) a výsledný rozmer poľa sa meria vo **svetlom priestore** (rozpätie mínus priečky). Dôsledok, ktorý mockup nemal: 1/2 z 864 mm pri hrúbke 18 je **423 mm, nie 432** — inak by bok vyšiel posunutý o 9 mm. Keby to boli dve implementácie, číslo v poli a poloha priečky by sa časom rozišli.
+
+**Bonus tej istej cesty:** ťahanie dostalo **pointer capture** (`pointerdown` + `pointerup`/`pointercancel`) — dovtedy `mouseup` mimo okna panela ťahanie „zasekol“ a neuložený stav sa stratil.
+
 ### D-85 + D-16 — vyhľadávanie vo VŠETKÝCH selectoch materiálov a ABS (18.8.2026, PR #167, v0.7.3)
 
 **Pôvodné znenie D-85 · Vyhľadávanie vo VŠETKÝCH selectoch materiálov** (Michal 6.8., test dávky E na reálnej zákazke) — už pri dnešnom malom katalógu je scrollovanie rozbaľovačiek náročné, lebo jedna položka = **dekor × typ × hrúbka** (a s duplákmi ich ešte pribúda). Návrh: (a) jednotný **combobox s písaním** a filtrom **bez diakritiky** — vzor je hotový suggest dropdown z okna Materiály (D-67), takže sa tým zároveň napĺňa odložená **D-16** (autocomplete dekoru); (b) sekcia **„Použité v projekte" navrchu** ponuky (vzor pásu v Materiáloch); (c) **naposledy použité**. Odporúčanie: (a) + (b) ako **jeden zdieľaný komponent** pre všetky miesta výberu — panel (telo / dielec / doska / čelá / chrbát), karta Doska aj projektové predvoľby, a **rovnako aj selecty ABS pások** (výber hrany v karte dielca `part_card.js` a v karte Doska `board_card.js` — dnes sú to obyčajné rozbaľovačky a trpia tým istým); nie päť kópií.

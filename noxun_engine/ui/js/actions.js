@@ -8,21 +8,34 @@
   }
 
   // ===================== ZONA UI (akcie / rozmery poli) =====================
-  // V0.4.5 D1: karta zony (#zoneCard) sa zobrazuje LEN pri kliknutej zone — hned pod
-  // nahladom, kde na nu pouzivatel klikol. Bez vyberu je cela karta skryta.
+  // UI-C2: kontext Zony ma STATICKU kostru (Struktura · Delenie · Police · Vnutro)
+  // a JS meni LEN obsah #zoneTree / #zoneFields a stavy uz existujucich uzlov.
+  //
+  // KLUCOVE PRAVIDLO KONTEXTU: dlazdice delenia aj pilulky polic su AKTIVNE LEN
+  // NA LISTOVEJ zone. Na delenej zone su viditelne, ale neaktivne s vysvetlenim —
+  // opakovane delenie by ticho zmazalo cely podstrom aj s materialmi a ABS
+  // dielcov. Jedina destruktivna cesta je „Vycistit zonu". To iste pravidlo
+  // vynucuje SERVER (`actions_zones.rb`) — HTML `disabled` nie je ochrana stavu.
+  // Naopak pole „Prva zona" ma zmysel len na DELENEJ zone (edituje jej pole 1).
+  var ZONE_TILE_HINT_SPLIT = 'Zóna je delená — najprv „Vyčistiť zónu", potom ju rozdeľ nanovo.';
+  var ZONE_TILE_HINT_DEPTH = 'Hlbšie delenie sa nedá — strom zón má najviac 3 úrovne.';
+
+  function activeZoneOf(zones){
+    var z = null;
+    zones.forEach(function(x){ if (fullZoneId(x.id) === activeZoneId) z = x; });
+    return z;
+  }
   function refreshZoneUI(){
     var zones = computeZones();
-    var z = null; zones.forEach(function(x){ if (fullZoneId(x.id) === activeZoneId) z = x; });
-    var card = el('zoneCard'), leafBox = el('leafActions'), fieldBox = el('fieldEditor');
-    // D-03 (Codex F2): karta zony patri k zonovemu nahladu — v rezime Cela sa skryva
-    if (previewMode !== 'zones'){
-      if (card) card.style.display = 'none';
-      setZoneButtons(false); fieldBox.innerHTML=''; renderZoneTree(zones); return;
-    }
+    var z = activeZoneOf(zones);
+    // D-03 (Codex F2): karta zony patri k zonovemu nahladu — v inych kontextoch
+    // sa skupiny sice nezobrazuju (CSS podla data-view-ctx), ale stav ovladacov
+    // sa aj tak nesmie tvarit aktivny.
+    if (previewMode !== 'zones'){ applyZoneState(null); renderZoneTree(zones); return; }
     // D-03: jednozonova skrinka = karta rovno (discoverability polic). Podmienka !z
     // pokryva prazdne AJ neplatne stale ID (Codex F3). Lokalny vyber — select_zone
     // do modelu sa neposiela (to robi len klik v pickZone). Pri vkladani DOSKY sa
-    // auto-select nespusta (Codex GH #42: zoneCard by visela nad board formularom
+    // auto-select nespusta (Codex GH #42: karta zony by visela nad board formularom
     // a ovladala skryty korpusovy draft — CSS skrytie nie je ochrana stavu).
     if (!z && zones.length === 1 && zones[0].leaf &&
         !(!selectedCabId && getInsertKind() === 'board')){
@@ -30,31 +43,91 @@
       z = zones[0];
       renderPreview(); // nahlad sa kreslil pred auto-selectom — zvyrazni zonu (Codex F1)
     }
-    if (!z){
-      if (card) card.style.display = 'none';
-      setZoneButtons(false); fieldBox.innerHTML=''; renderZoneTree(zones); return;
-    }
-    if (card) card.style.display = '';
-    el('zoneActive').innerHTML = '<b>' + z.label + '</b> — ' + Math.round(z.w) + '×' + Math.round(z.h) + ' mm';
-    if (z.leaf){
-      leafBox.style.display=''; fieldBox.innerHTML='';
-      setVal('zoneShelves', z.shelves||0);
-      setZoneButtons(true);
-    } else {
-      leafBox.style.display='none';
-      renderFieldEditor(z);
-      var b = document.querySelectorAll('.zbtn'); for (var i=0;i<b.length;i++) b[i].disabled=false; // clean zostava aktivne
-    }
+    applyZoneState(z);
     renderZoneTree(zones);
   }
+
+  // Jedno miesto, kde sa stav kontextu Zony premieta do statickej kostry.
+  function applyZoneState(z){
+    var head = el('zoneActive');
+    var leaf = !!(z && z.leaf);
+    var deep = !!(z && z.path.length >= NXZ.MAX_LEVELS);
+    if (head) head.textContent = z
+      ? (z.label + ' — ' + mmLabel(z.w) + ' × ' + mmLabel(z.h) + ' mm'
+         + (leaf ? '' : (' · delená ' + (z.split.axis === 'h' ? 'vodorovne' : 'zvislo') + ' ×' + z.split.count)))
+      : 'Žiadna označená zóna.';
+
+    // Dlazdice delenia: aktivne len na liste a len do MAX_LEVELS urovni.
+    var why = !z ? 'Najprv označ zónu.' : (!leaf ? ZONE_TILE_HINT_SPLIT : (deep ? ZONE_TILE_HINT_DEPTH : ''));
+    var tiles = document.querySelectorAll('#zoneTiles .ztile');
+    for (var i = 0; i < tiles.length; i++) setZoneCtl(tiles[i], !why, why);
+
+    // Pilulky polic: to iste pravidlo (police su modul LISTOVEJ zony).
+    renderShelfPills(leaf ? (z.shelves || 0) : 0);
+    var pwhy = !z ? 'Najprv označ zónu.'
+                  : (!leaf ? 'Zóna je delená — police patria konkrétnemu stĺpcu/riadku. Označ zónu vnútri.' : '');
+    var pills = document.querySelectorAll('#zoneShelfPills button');
+    for (var p = 0; p < pills.length; p++) setZoneCtl(pills[p], !pwhy, pwhy);
+    var phint = el('zoneShelfHint');
+    if (phint) phint.textContent = pwhy || ('Police sa rozložia rovnomerne (0–' + NXZ.MAX_SHELVES +
+      ') a hneď sa prekreslia v náhľade aj v strome.');
+
+    // Presna cesta (pole „Prva zona" + rozmery vsetkych poli) zije na DELENEJ zone.
+    renderZoneFields(leaf ? null : z);
+    var first = el('zoneFirst'), pre = el('zoneFirstPre');
+    var firstOn = !!(z && !leaf);
+    if (first){
+      first.disabled = !firstOn;
+      if (!nxFieldBusy || !nxFieldBusy(first)){
+        var c0 = firstOn ? (z.split.cuts[0] || { size: null }) : { size: null };
+        first.value = (firstOn && c0.size != null) ? mmLabel(c0.size) : '';
+      }
+    }
+    if (pre) setZoneCtl(pre, firstOn, firstOn ? '' : 'Zlomky sa dajú použiť až na delenej zóne.');
+    var clean = el('zoneCleanBtn');
+    if (clean) setZoneCtl(clean, !!z, z ? '' : 'Najprv označ zónu.');
+    var hint = el('zoneSplitHint');
+    if (hint) hint.textContent = firstOn
+      ? 'Zadaná hodnota pole 1 zamkne — prázdne pole je AUTO. Priečku vieš ťahať aj v náhľade (magnet 1/4 · 1/2 · 3/4, Alt ho vypne).'
+      : 'Vyber delenie dlaždicou. Presný rozmer prvej zóny sa zadáva až po rozdelení.';
+  }
+  // Neaktivny prvok je `aria-disabled` + trieda (vzor D-78) — HTML `disabled`
+  // by zhltol hover aj tooltip a pouzivatel by sa dovod nedozvedel.
+  function setZoneCtl(node, on, why){
+    if (!node) return;
+    node.classList.toggle('off', !on);
+    node.setAttribute('aria-disabled', on ? 'false' : 'true');
+    if (on) node.removeAttribute('title'); else node.setAttribute('title', why || '');
+  }
+  function zoneCtlOn(node){ return !!node && node.getAttribute('aria-disabled') !== 'true'; }
+
+  function renderShelfPills(current){
+    var box = el('zoneShelfPills'); if (!box) return;
+    var want = NXZ.MAX_SHELVES + 1;
+    if (box.children.length !== want){
+      box.innerHTML = '';
+      for (var n = 0; n <= NXZ.MAX_SHELVES; n++){
+        var b = document.createElement('button');
+        b.type = 'button'; b.textContent = String(n);
+        b.setAttribute('data-n', String(n));
+        b.setAttribute('aria-label', n + ' políc v zóne');
+        box.appendChild(b);
+      }
+    }
+    for (var i = 0; i < box.children.length; i++)
+      box.children[i].classList.toggle('on', i === (current || 0));
+  }
+
   // Riadky poli cez data-atributy + delegaciu (setupFieldEditorDelegation) — ziadne inline
   // handlery na prerendrovanych elementoch (poucenie z drag bugu).
-  function renderFieldEditor(z){
-    var box = el('fieldEditor'); var html = '<div class="hint">Presné rozmery polí (mm). ' + NXIcons.svg('lock', 'ic-inline') + ' = drží rozmer pri zmene korpusu.</div>';
+  function renderZoneFields(z){
+    var box = el('zoneFields'); if (!box) return;
+    if (!z || !z.split){ box.innerHTML = ''; return; }
+    var html = '<div class="hint">Rozmery všetkých polí (mm). ' + NXIcons.svg('lock', 'ic-inline') + ' = drží rozmer pri zmene korpusu.</div>';
     var axisLbl = (z.split.axis==='h') ? 'Riadok' : 'Stĺpec';
     for (var i=0;i<z.split.count;i++){
       var c = z.split.cuts[i] || {size:null,locked:false};
-      var sz = Math.round(z.split.sizes[i]);
+      var sz = mmLabel(nxRound2(z.split.sizes[i]));
       html += '<div class="fldrow"><span class="fldn">'+axisLbl+' '+(i+1)+'</span>' +
         '<input type="text" value="'+sz+'" data-zid="'+esc(z.id)+'" data-idx="'+i+'">' +
         '<div class="lockbtn'+(c.locked?' on':'')+'" title="Zamknúť rozmer" role="button" aria-label="Zamknúť rozmer" aria-pressed="'+(c.locked?'true':'false')+'" data-zid="'+esc(z.id)+'" data-idx="'+i+'">'+NXIcons.svg(c.locked?'lock':'lock-open')+'</div></div>';
@@ -70,7 +143,7 @@
   var fieldEditorBound = false;
   function setupFieldEditorDelegation(){
     if (fieldEditorBound) return;
-    var box = el('fieldEditor'); if (!box) return;
+    var box = el('zoneFields'); if (!box) return;
     box.addEventListener('change', function(ev){
       var t = ev.target;
       if (t && t.tagName === 'INPUT' && t.getAttribute('data-zid'))
@@ -81,23 +154,102 @@
       if (t && t.getAttribute('data-zid'))
         toggleFieldLock(t.getAttribute('data-zid'), parseInt(t.getAttribute('data-idx'), 10), t);
     });
+    // Dlazdice delenia + pilulky polic: tiez delegaciou, na STATICKYCH uzloch.
+    var tiles = el('zoneTiles');
+    if (tiles) tiles.addEventListener('click', function(ev){
+      var t = closestClass(ev.target, 'ztile'); if (!t) return;
+      if (!zoneCtlOn(t)){ NX.setStatus(t.getAttribute('title') || 'Táto akcia tu nie je možná.', true); return; }
+      splitZone(t.getAttribute('data-axis'), parseInt(t.getAttribute('data-count'), 10));
+    });
+    var pills = el('zoneShelfPills');
+    if (pills) pills.addEventListener('click', function(ev){
+      var t = ev.target; while (t && t !== pills && t.tagName !== 'BUTTON') t = t.parentNode;
+      if (!t || t === pills || !t.getAttribute) return;
+      if (!zoneCtlOn(t)){ NX.setStatus(t.getAttribute('title') || 'Táto akcia tu nie je možná.', true); return; }
+      setZoneShelves(parseInt(t.getAttribute('data-n'), 10));
+    });
+    var first = el('zoneFirst');
+    if (first){
+      attachExprField(first, { commitEv: 'change' });
+      first.addEventListener('change', function(){ setZoneFirstSize(first.value); });
+    }
     fieldEditorBound = true;
   }
-  function setFieldSize(localId, index, value){
+
+  // --- zlomkove presety pola „Prva zona" (N21) -------------------------------
+  // Ponuka sa sklada zo ZDIELANEJ geometrie (nxZoneFractionOptions) — to iste
+  // pocitanie, ake pouziva magnet tahania priecky, takze sa cislo v poli a
+  // poloha priecky nemozu rozist. Nedosiahnutelny zlomok sa neponuka.
+  function toggleZoneFractions(ev){
+    if (ev) ev.stopPropagation();
+    var box = el('zoneFracOpts'), btn = el('zoneFirstPre');
+    if (!box) return;
+    if (!zoneCtlOn(btn)){ NX.setStatus(btn.getAttribute('title') || '', true); return; }
+    // Otvorena je vzdy NAJVIAC JEDNA mini-ponuka v paneli (vzor rozmerovych
+    // radov N6) — zatvara ju spolocny `nxDimCloseMenus` aj klik mimo nej.
+    var wasOn = box.classList.contains('on');
+    if (typeof nxDimCloseMenus === 'function') nxDimCloseMenus(); else box.classList.remove('on');
+    if (wasOn) return;
+    var z = activeZoneOf(computeZones());
+    if (!z || z.leaf) return;
+    var t = numv('thickness')||18;
+    var span = (z.split.axis === 'v') ? z.w : z.h;
+    var opts = nxZoneFractionOptions(span, z.split.count, t, 0, NXZ.FIELD_FRACTIONS);
+    if (!opts.length){ NX.setStatus('Žiadny zo zlomkov sa do tejto zóny nezmestí.', true); return; }
+    box.innerHTML = '';
+    opts.forEach(function(o){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = mmLabel(o.cum) + ' (' + o.label + ')';
+      b.onclick = function(e){ e.stopPropagation(); box.classList.remove('on'); setZoneFirstSize(o.cum); };
+      box.appendChild(b);
+    });
+    box.classList.add('on');
+  }
+  // Pole „Prva zona" = SKRATKA na pole 1 (B5): zadana hodnota pole ZAMKNE,
+  // prazdne pole ho odomkne. Per-pole zamky v zozname nizsie ostavaju v platnosti.
+  function setZoneFirstSize(value){
+    var z = activeZoneOf(computeZones());
+    if (!z || z.leaf){ NX.setStatus('Presný rozmer sa zadáva až na delenej zóne.', true); return; }
+    setFieldSize(z.id, 0, (value === null || value === undefined) ? '' : String(value), true);
+  }
+  // PRESNA CESTA (N21, audit F7): zadane cislo sa BUD zmesti, ALEBO sa odmietne.
+  // Ziadne tiche zmensovanie — pouzivatel by vyrobil iny nabytok, nez zadal.
+  // Zvysok sa deterministicky dorovna do posledneho odomknuteho pola a vsetko
+  // sa uklada s presnostou 0,01 mm (mm Float; zaokruhlovanie na cele mm by pri
+  // troch poliach „zjedlo" z korpusu az 2 mm).
+  // `lockEdited` (Codex #177 P2): zámok editovaného poľa. VYNECHANÝ = ponechaj
+  // ten, ktorý pole má — cez túto funkciu chodí aj úplný zoznam polí, kde má
+  // zámok VLASTNÝ ovládač; natvrdo `true` by vedome odomknutý riadok pri každom
+  // prepísaní hodnoty potichu zamkol a ten by potom držal rozmer pri resize
+  // korpusu. `true` posiela iba skratka „Prvá zóna" (B5: vypísané ⇒ zamknuté).
+  function setFieldSize(localId, index, value, lockEdited){
     var node0 = navTree(sanitizeTree(currentZoneTree), pathOf(localId));
     if (!node0 || !node0.split) return;
-    var locked = node0.split.cuts[index] ? node0.split.cuts[index].locked : false;
+    var curCut = node0.split.cuts[index] || { size: null, locked: false };
+    var lock = (lockEdited === undefined) ? !!curCut.locked : !!lockEdited;
     // V0.4.7e: evalDim (vyraz uz je commitnuty na cislo, toto je belt-and-braces);
     // neplatny vstup NEmeni strom (parseFloat by '650-36' orezal na 650)
-    var sz = (value===''? null : evalDim(value));
-    if (sz !== null && isNaN(sz)) return;
+    var sz = (value===''||value===null||value===undefined) ? null : evalDim(value);
+    if (sz !== null && isNaN(sz)){ NX.setStatus('Rozmer poľa nie je platné číslo.', true); return; }
     if (sz==null){
       // auto: toto pole na nil (ostatne necham; resolve ho rovnomerne dopocita)
       var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localId));
       node.split.cuts[index] = { size:null, locked:false }; currentZoneTree = tree;
     } else {
-      // fix #5: kotva na zadany rozmer + persistni cely layout -> zadany rozmer nezmizne
-      persistLayout(localId, index, sz, locked);
+      var z = null; computeZones().forEach(function(x){ if (x.id===localId && x.split) z = x; });
+      if (!z) return;
+      var t = numv('thickness')||18;
+      var span = (z.split.axis==='v') ? z.w : z.h;
+      var clear = nxZoneClear(span, z.split.count, t);
+      var res = nxZoneExactCuts(node0.split.cuts, z.split.sizes, z.split.count, clear, index, sz, lock);
+      if (res.error){
+        NX.setStatus('Pole ' + (index+1) + ': ' + res.error, true);
+        refreshZoneUI(); // vrat do poli hodnoty, ktore naozaj platia
+        return;
+      }
+      var tr = sanitizeTree(currentZoneTree); var nd = navTree(tr, pathOf(localId));
+      nd.split.cuts = res.cuts; currentZoneTree = tr;
     }
     renderPreview();
     if (selectedCabId) pushFieldCuts(localId, index);
@@ -117,29 +269,60 @@
     else { refreshZoneUI(); nxDraftChanged(); }
   }
 
-  // --- strom zon (citatelne nazvy) ---
+  // --- strom zon so STROMOVYMI SPOJNICAMI (kontrakt UI 2.0) ------------------
+  // Vnorenie sa stavia z ciest (zoznam z computeZones je pre-order DFS): kazda
+  // uroven dostane vlastny kontajner `.zkids`, ktoremu spojnice kresli CSS.
+  // Odsadenie paddingom by ziadnu spojnicu nakreslit nevedelo.
+  //
+  // NOTE 14: klikatelne su LEN skutocne zony. Uroven nad MAX_LEVELS (legacy
+  // strom alebo sablona z inej verzie) sa kresli VAROVNYM riadkom bez kliku —
+  // nedeli sa, ale ani sa neoreze (orezanie by zmazalo dielce zakazky).
   function renderZoneTree(zones){
-    var c = el('zoneTree'); c.innerHTML = '';
+    var c = el('zoneTree'); if (!c) return;
+    c.innerHTML = '';
     if (!zones || !zones.length){ c.innerHTML = '<div class="muted">Žiadny označený korpus.</div>'; return; }
+    var boxes = [c];
     zones.forEach(function(z){
       var depth = z.path.length - 1;
+      var host = boxes[depth] || c;
       var div = document.createElement('div');
-      div.className = 'znode' + (fullZoneId(z.id) === activeZoneId ? ' active' : '');
-      div.style.paddingLeft = (6 + depth * 14) + 'px';
-      var info = z.leaf ? (z.shelves>0 ? (z.shelves+' políc') : 'prázdna')
-                        : ('delené ' + (z.split.axis==='h'?'vodorovne':'zvislo') + ' ×' + z.split.count);
-      div.innerHTML = '<b>' + z.label + '</b> <span class="dim">' + Math.round(z.w) + '×' + Math.round(z.h) + '</span> <span class="zs">' + info + '</span>';
-      div.onclick = (function(zz){ return function(){ pickZone(zz.id); }; })(z);
-      c.appendChild(div);
+      var deep = z.path.length > NXZ.MAX_LEVELS;
+      div.className = 'znode' + (deep ? ' deep' : '') + (fullZoneId(z.id) === activeZoneId ? ' active' : '');
+      var info = z.leaf ? (z.shelves>0 ? (z.shelves + ' ' + shelfWord(z.shelves)) : 'prázdna')
+                        : ('delená ' + (z.split.axis==='h'?'vodorovne':'zvislo') + ' ×' + z.split.count);
+      div.innerHTML = '<b>' + esc(z.label) + '</b> <span class="dim">' + mmLabel(z.w) + ' × ' + mmLabel(z.h) +
+        '</span> <span class="zs">' + info + '</span>' +
+        (deep ? '<span class="zwarn" title="Táto úroveň je nad podporovanými 3 úrovňami — ostáva zachovaná, ale nedá sa deliť">' +
+                NXIcons.svg('alert', 'ic-inline') + ' 4. úroveň</span>' : '');
+      if (deep){ div.setAttribute('aria-disabled', 'true'); }
+      else { div.onclick = (function(zz){ return function(){ pickZone(zz.id); }; })(z); }
+      host.appendChild(div);
+      var kids = document.createElement('div');
+      kids.className = 'zkids';
+      host.appendChild(kids);
+      boxes[depth + 1] = kids;
     });
   }
-  function setZoneButtons(on){ var b = document.querySelectorAll('.zbtn'); for (var i=0;i<b.length;i++) b[i].disabled = !on; }
+  function shelfWord(n){ return n === 1 ? 'polica' : (n < 5 ? 'police' : 'políc'); }
 
-  function splitZone(axis){
-    if (!activeZoneId){ NX.setStatus('Najprv označ zónu.', true); return; }
-    var count = parseInt(axis === 'h' ? val('splitHCount') : val('splitVCount'), 10);
+  // Klientske zrkadlo serverovych guardov (audit F10): draft rezim vkladania
+  // nema server, takze rovnake pravidla musia platit LOKALNE — inak by sa dala
+  // v navrhu postavit struktura, ktoru skrinka po vlozeni odmietne.
+  function zoneGuard(what){
+    if (!activeZoneId){ NX.setStatus('Najprv označ zónu.', true); return null; }
+    var z = activeZoneOf(computeZones());
+    if (!z){ NX.setStatus(what + ' — označená zóna už neexistuje. Klikni na zónu znova.', true); return null; }
+    return z;
+  }
+  function splitZone(axis, count){
+    var z = zoneGuard('Zóna sa nerozdelila'); if (!z) return;
+    axis = (axis === 'h') ? 'h' : 'v';
+    count = Math.min(NXZ.MAX_FIELDS, Math.max(2, parseInt(count, 10) || 2));
+    if (!z.leaf){ NX.setStatus(ZONE_TILE_HINT_SPLIT, true); return; }
+    if (z.path.length >= NXZ.MAX_LEVELS){ NX.setStatus(ZONE_TILE_HINT_DEPTH, true); return; }
     if (selectedCabId){
-      if (window.sketchup && sketchup.split_zone) sketchup.split_zone(JSON.stringify({ zone_id: activeZoneId, axis: axis, count: count }));
+      if (window.sketchup && sketchup.split_zone)
+        sketchup.split_zone(nxZonePayload({ zone_id: activeZoneId, axis: axis, count: count }));
     } else {
       var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localZoneId(activeZoneId)));
       if (node){
@@ -152,11 +335,25 @@
       currentZoneTree = tree; renderPreview(); refreshZoneUI(); nxDraftChanged();
     }
   }
-  function setZoneShelves(){
-    if (!activeZoneId){ NX.setStatus('Najprv označ zónu.', true); return; }
-    var n = parseInt(val('zoneShelves'), 10);
+  function setZoneShelves(n){
+    var z = zoneGuard('Police sa nenastavili'); if (!z) return;
+    n = Math.min(NXZ.MAX_SHELVES, Math.max(0, parseInt(n, 10) || 0));
+    if (!z.leaf){ NX.setStatus('Zóna je delená — police patria konkrétnemu stĺpcu/riadku.', true); return; }
+    // Codex #177 P2: ZMESTIA SA vôbec? Zrkadlo `ZoneTree.validate_shelves!` —
+    // n polic potrebuje n*hrúbka + (n+1)*MIN_FIELD svetlej výšky. Kontrola stojí
+    // PRED vetvou draft/server, takže platí aj v návrhu vkladania, kde server
+    // neexistuje: bez nej by nový počet 5–6 ticho prekreslil náhľad a skrinka by
+    // sa potom nedala vložiť (builder ju odmietne až na konci).
+    var tth = numv('thickness') || 18;
+    var needMm = n * tth + (n + 1) * NXZ.MIN_FIELD;
+    if (n > 0 && needMm > z.h + NXZ.EPS){
+      NX.setStatus('Zóna je príliš nízka na ' + n + ' ' + shelfWord(n) + ' — potrebuje aspoň ' +
+                   Math.ceil(needMm) + ' mm svetlej výšky (má ' + Math.round(z.h) + ' mm).', true);
+      return;
+    }
     if (selectedCabId){
-      if (window.sketchup && sketchup.set_zone_shelves) sketchup.set_zone_shelves(JSON.stringify({ zone_id: activeZoneId, count: n }));
+      if (window.sketchup && sketchup.set_zone_shelves)
+        sketchup.set_zone_shelves(nxZonePayload({ zone_id: activeZoneId, count: n }));
     } else {
       var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localZoneId(activeZoneId)));
       if (node){ node.split=null; node.children=[]; node.shelves=n; }
@@ -164,9 +361,11 @@
     }
   }
   function cleanZone(){
-    if (!activeZoneId){ NX.setStatus('Najprv označ zónu.', true); return; }
+    if (!zoneCtlOn(el('zoneCleanBtn'))){ NX.setStatus('Najprv označ zónu.', true); return; }
+    var z = zoneGuard('Zóna sa nevyčistila'); if (!z) return;
     if (selectedCabId){
-      if (window.sketchup && sketchup.clean_zone) sketchup.clean_zone(JSON.stringify({ zone_id: activeZoneId }));
+      if (window.sketchup && sketchup.clean_zone)
+        sketchup.clean_zone(nxZonePayload({ zone_id: activeZoneId }));
     } else {
       var tree = sanitizeTree(currentZoneTree); var node = navTree(tree, pathOf(localZoneId(activeZoneId)));
       if (node){ node.split=null; node.children=[]; node.shelves=0; }

@@ -224,8 +224,11 @@ module Noxun
             end
             Panel.reselect(model, cab)
           end
+          # UI-C2 (B4): legacy sablona s viac nez 3 urovnami zon sa POUZIJE, ale
+          # povie sa to — orezanie stromu je zakazane.
           set_status("Šablóna \"#{name}\" použitá na #{Store.get(cab, 'cabinet_id')}." \
-                     "#{pf ? pf[:note] : ''}#{hw_note}")
+                     "#{pf ? pf[:note] : ''}#{hw_note}" \
+                     "#{Panel.zone_depth_note((Store.config(cab) || {})['zone_tree'])}")
           Panel.push_selected(model)
         end
 
