@@ -102,11 +102,26 @@
   //     (rovnaka legenda ako riadky hran a .absleg — standard 7.6),
   //   * "Pouzite v projekte": ciste odvodeny zoznam id zo serveroveho payloadu
   //     (materials.used_ids) — panel nic nedopocitava a nic si nepamata.
+  // Farba dekoru je v katalogu POLE [r,g,b] (tak ju drzi Materials aj payload),
+  // nie CSS retazec — do style atributu sa musi previest. Zrkadlo rgbToHex
+  // z okna Materialy, ale BEZ nahradnej farby: neznamy vstup = ziadny stvorcek
+  // (radsej nic nez vymyslena farba).
+  function nxRgbHex(rgb){
+    if (!rgb || rgb.length !== 3) return '';
+    var out = '#';
+    for (var i = 0; i < 3; i++){
+      var c = parseInt(rgb[i], 10);
+      if (isNaN(c)) return '';
+      c = Math.max(0, Math.min(255, c));
+      out += ('0' + c.toString(16)).slice(-2);
+    }
+    return out;
+  }
   function nxComboColorOf(kind, value){
     if (!value) return '';
     if (kind === 'abs') return absColorOf(value);
     var rec = sheetRecOf(value);
-    return (rec && rec.color) ? rec.color : '';
+    return rec ? nxRgbHex(rec.color) : '';
   }
   function nxComboUsedOf(kind){
     var u = MATERIALS.used_ids || {};
@@ -599,6 +614,9 @@
       frontProfileRec: frontProfileRec, frontProfileReduction: frontProfileReduction,
       frontProfileNext: frontProfileNext,
       // D-100 (tests/js/test_d100_nazvy.js) — zrkadlo ocistenia nazvu skrinky
-      cabNameValue: cabNameValue, CAB_NAME_MAX: CAB_NAME_MAX };
+      cabNameValue: cabNameValue, CAB_NAME_MAX: CAB_NAME_MAX,
+      // D-85 (tests/js/test_ui03_combobox.js) — prevod katalogovej farby [r,g,b]
+      // na hex pre stvorcek comboboxu (nxComboColorOf uz cita globalny MATERIALS)
+      nxRgbHex: nxRgbHex };
   }
 

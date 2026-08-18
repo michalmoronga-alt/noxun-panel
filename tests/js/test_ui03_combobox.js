@@ -11,6 +11,7 @@ const assert = require('node:assert');
 const path = require('node:path');
 const NXC = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'nx_combo.js'));
 const BOARD = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'board_card.js'));
+const CORE = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'core.js'));
 const fs = require('node:fs');
 
 const { nxNormText, nxComboSections, nxComboHighlight, nxComboStep, nxComboFirst,
@@ -191,6 +192,20 @@ const ABS = [
   eq(NXC.RECENT_MAX, 5, 'strop je 5 (zadanie D-85)');
 })();
 
+// --- farba stvorceka: katalog drzi [r,g,b], style atribut potrebuje hex --------
+// Katalogova farba dekoru NIE JE CSS retazec (Materials aj payload ju vedu ako
+// pole troch cisel) — bez prevodu by stvorcek ostal ticho bezfarebny.
+(function(){
+  eq(CORE.nxRgbHex([198, 168, 122]), '#c6a87a', 'prevod [r,g,b] -> hex');
+  eq(CORE.nxRgbHex([0, 0, 0]), '#000000', 'nuly maju dve cislice');
+  eq(CORE.nxRgbHex([255, 255, 255]), '#ffffff', 'biela');
+  eq(CORE.nxRgbHex([300, -5, 12]), '#ff000c', 'hodnoty mimo rozsahu sa orezu');
+  eq(CORE.nxRgbHex(null), '', 'ziadna farba = ziadny stvorcek (nie nahradna farba)');
+  eq(CORE.nxRgbHex([1, 2]), '', 'neuplne pole');
+  eq(CORE.nxRgbHex('#c6a87a'), '', 'retazec nie je [r,g,b] — radsej nic nez odhad');
+  eq(CORE.nxRgbHex(['a', 'b', 'c']), '', 'nezmysel neprepadne');
+})();
+
 // --- REGRESIA: guardy E-03 a D-86 prezili cestu comboboxu ----------------------
 // Combobox nemeni SPOSOB, akym sa hodnota dostane do panela: zapise `select.value`
 // a vystreli `change` — teda presne to, co robil nativny klik. Guardy vkladacej
@@ -222,6 +237,8 @@ const ABS = [
      'vyber MUSI ist cez `change` na povodnom <select>e — inak by guardy nikto nezavolal');
   ok(combo.indexOf('sel.value = it.value') >= 0,
      'hodnota sa zapisuje do povodneho <select>u (zdroj pravdy sa nemeni)');
+  ok(/\^#\[0-9a-fA-F\]\{3,8\}\$/.test(combo),
+     'farba do style atributu prejde LEN ako hex (uzky whitelist, nie dovera volajucemu)');
 
   const board = src(path.join('js', 'board_card.js'));
   ok(/if \(nxFieldBusy\(ms\)\) return;/.test(board),

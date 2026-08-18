@@ -234,9 +234,15 @@
       return o ? { value: o.value, label: (o.textContent || '').trim() } : null;
     }
 
+    // Farba stvorceka. Hodnota konci v `style` atribute, preto sa prijima LEN
+    // hex — nie lubovolny retazec od volajuceho (esc() sice uvodzovky zneskodni,
+    // ale uzky whitelist je lacnejsi nez dovera). Nic = ziadny stvorcek.
     function colorOf(kind, value){
       if (!colorResolver || nxComboIsFixed(value)) return '';
-      try { return colorResolver(kind, value) || ''; } catch (e){ return ''; }
+      var c;
+      try { c = colorResolver(kind, value); } catch (e){ return ''; }
+      c = String(c == null ? '' : c);
+      return /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : '';
     }
     function usedOf(kind){
       if (!usedResolver) return [];
