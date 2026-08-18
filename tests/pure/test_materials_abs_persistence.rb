@@ -476,7 +476,8 @@ NxTest.test('templates: prvy load seedne 4 korpusove + 3 doskove sablony') do
   NxTest.assert_equal('groove', horna['back_mode'])
   NxTest.assert_close(320.0, horna['depth'])
   parsed = JSON.parse(File.binread(tpl.path))
-  NxTest.assert_equal(2, parsed['std'], 'cerstva instalacia je rovno na marker 2')
+  NxTest.assert_equal(Noxun::Engine::TemplateStore::STD, parsed['std'],
+                      'cerstva instalacia je rovno na AKTUALNOM markeri (UI-C1c: 3)')
   NxTest.assert_equal(7, parsed['templates'].size)
 end
 

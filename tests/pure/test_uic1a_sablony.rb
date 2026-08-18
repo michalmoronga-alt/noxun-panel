@@ -7,7 +7,8 @@
 #   BLOCKER 1 — doskovy zaznam nesie REDUNDANTNE config['type'] = 'board'
 #   BLOCKER 2 — std > STD = read-only (upsert/delete/touch_used nezapisu)
 #   BLOCKER 3 — doskovy seed pouziva KANONICKE polia dosky (STANDARD 8.3)
-#   BLOCKER 4 — seed NEMA orientaciu (patri do UI-C1c)
+#   BLOCKER 4 — seed nemal orientaciu; UI-C1c ju doplnila (marker std 3,
+#               hodnoty a migraciu strazi tests/pure/test_uic1c_orientacia.rb)
 #   BLOCKER 5 — okno Sablony vidi VYHRADNE korpusove sablony
 #   BLOCKER 6 — rovnake meno v inom druhu je INA sablona (seed nic neprepise)
 #   BLOCKER 7 / FIX 13 — pouzitie zije v template_usage.json ako MONOTONNE
@@ -77,7 +78,9 @@ NxTest.test('UI-C1a migracia: std 1 -> 2 doplni kind a doseje doskove sablony JE
   NxTest.assert_equal('cabinet', legacy['kind'], 'zaznam bez kind je korpusovy')
 
   raw = NxC1a.raw
-  NxTest.assert_equal(2, raw['std'], 'marker posunuty na 2')
+  # UI-C1c: migracia je stupnovana — std 1 prejde rovno na AKTUALNY marker
+  # (seed uz s orientaciou), stale JEDNYM zapisom.
+  NxTest.assert_equal(NxC1a::TS::STD, raw['std'], 'marker posunuty na aktualny std')
   NxTest.assert_equal(%w[Diel Pracovná\ doska Zástena],
                       raw['templates'].select { |t| t['kind'] == 'board' }.map { |t| t['name'] })
 end
@@ -124,7 +127,7 @@ end
 # doskovy seed — kanonicke polia (BLOCKER 3) bez orientacie (BLOCKER 4)
 # ---------------------------------------------------------------------------
 
-NxTest.test('UI-C1a seed dosiek: kanonicke polia dosky, redundantny type, ZIADNA orientacia') do
+NxTest.test('UI-C1a seed dosiek: kanonicke polia dosky + redundantny type (orientaciu pridala UI-C1c)') do
   seeds = Noxun::Engine::TemplateStore.build_predefined_boards
   NxTest.assert_equal(%w[Diel Pracovná\ doska Zástena], seeds.map { |t| t['name'] })
   expected = { 'Diel' => [18.0, 800.0, 600.0],
@@ -139,7 +142,9 @@ NxTest.test('UI-C1a seed dosiek: kanonicke polia dosky, redundantny type, ZIADNA
     NxTest.assert_close(len, cfg['length'], 0.01, "#{t['name']}: dlzka")
     NxTest.assert_close(wid, cfg['width'], 0.01, "#{t['name']}: sirka")
     NxTest.assert_equal('length', cfg['grain_direction'], "#{t['name']}: smer dekoru")
-    NxTest.refute(cfg.key?('orientation'), "#{t['name']}: orientacia patri az do UI-C1c")
+    # UI-C1c: orientacia UZ v seede JE (slovnik a hodnoty strazi
+    # tests/pure/test_uic1c_orientacia.rb) — tu len, ze kluc existuje.
+    NxTest.assert(cfg.key?('orientation'), "#{t['name']}: orientaciu doplnila UI-C1c")
     NxTest.refute(cfg.key?('height'), "#{t['name']}: doska nema vysku (kanonicke su length/width)")
     # Codex #174 P2: material_id musi byt EXPLICITNE nil (kluc existuje) —
     # sablona bez materialu = vlozenie cez UNI mechanizmus s odomknutou

@@ -165,6 +165,22 @@ Diel 18·800×600·stojaca / PD 38·2600×600·ležiaca / Zástena 10·2600×580
 → Základné (2-stĺpce, zámky D-39, rady) → Materiály (Doska: materiál + smer dekoru D-86) → zelené
 Vložiť (N11 pripravené na vkladanie na klik).
 
+**Kontraktové spresnenia z implementácie UI-C1** *(doplnené pri uzávere dávky, 18.8. — PR #174/#175/C1c;
+plné odôvodnenia v [../../archiv/KRONIKA.md](../../archiv/KRONIKA.md) a [../../../docs/ARCHITEKTURA.md](../../../docs/ARCHITEKTURA.md))*
+- **Rozmery doskovej šablóny sú KANONICKÉ polia dosky** — `length`/`width`/`thickness`/`grain_direction`
+  podľa STANDARD 8.3. Doska nemá „šírku a výšku" ako skrinka; zápis „18·800×600" v koncepte čítaj ako
+  hrúbka · dĺžka × šírka.
+- **„Nedávne prvé" (N16) je LOKÁLNE POČÍTADLO použití, nie čas.** Poradie žije vo vlastnom súbore
+  `template_usage.json` ako monotónne číslo — nezávisí od systémových hodín, je **údaj tohto počítača**
+  a do budúcej zdieľanej knižnice šablón (D-48) nepatrí. Súbor šablón ostáva po vložení byte-nezmenený.
+- **Orientácia „stojaca" a „na stenu" majú DNES zhodnú maticu.** Je to údaj **umiestnenia so sémantikou**
+  (zadná plocha je pri stene, budúce prisatie na stenu / elevácia), nie iný tvar — geometricky sa zatiaľ
+  nelíšia a rozlišuje ich pole v configu, nikdy bounding box. Orientácia je transformácia inštancie,
+  takže **nemení kusovník, hrany, dekor ani VEPO**.
+- **Orientácia je na dlaždici v tooltipe, nie v badge** — badge nesie hrúbku a druhý riadok by dlaždicu
+  predĺžil (pravidlo „vertikálny priestor panela je vzácny").
+- **REÁLNE PNG náhľady dlaždíc ostávajú na UI-D2** — UI-C1 kreslí schematický fallback z configu.
+
 **Zóny:** Štruktúra NAVRCH so stromovými spojnicami, max 3 úrovne (N22), vlastné rozrolovanie ·
 Delenie = 4 dlaždice + pole „Prvá zóna" mm so zlomkami (N21) + drag so snap 1/4·1/2·3/4 (N20) ·
 Police = pills 0–6 · Vnútro = rezervovaný slot (po V1).

@@ -297,10 +297,24 @@
     var th = tp && tp.config ? parseFloat(tp.config.thickness) : NaN;
     return (isNaN(th) || th <= 0) ? '' : (mmLabel(th) + ' mm');
   }
+  // UI-C1c: doskova dlazdica hovori aj o UMIESTNENI. Text ide do TOOLTIPU (nie
+  // do popisku pod kresbou) — badge uz nesie hrubku a druhy riadok by dlazdicu
+  // predlzil (pravidlo „vertikalny priestor panela je vzacny“).
+  // Ciste (Node testy): vracia TEXT, escapuje az volajuci.
+  var TPL_ORI_LABELS = { leziaca: 'naležato', stojaca: 'nastojato', na_stenu: 'na stenu' };
+  function nxTplOrientationNote(tp){
+    if (NXInsert.templateKind(tp) !== 'board') return '';
+    var o = tp && tp.config ? tp.config.orientation : null;
+    return TPL_ORI_LABELS[o] || '';
+  }
+  function nxTplTitle(tp){
+    var note = nxTplOrientationNote(tp);
+    return tp.name + (note ? ' · ' + note : '') + ' — klik = vybrať · dvojklik = vlož hneď';
+  }
   function tplTileHtml(tp, sel){
     var badge = nxTplBadge(tp);
     return '<button type="button" class="tpltile' + (tp.name === sel ? ' on' : '') + '"' +
-      ' data-tpl-name="' + esc(tp.name) + '" title="' + esc(tp.name) + ' — klik = vybrať · dvojklik = vlož hneď">' +
+      ' data-tpl-name="' + esc(tp.name) + '" title="' + esc(nxTplTitle(tp)) + '">' +
       '<svg viewBox="0 0 60 40" aria-hidden="true">' + nxTplGlyph(tp) + '</svg>' +
       '<span>' + esc(tp.name) + (badge ? ' <i>· ' + esc(badge) + '</i>' : '') + '</span></button>';
   }
@@ -442,6 +456,11 @@
     var name = NXInsert.templateName('board');
     var tp = NXInsert.findTemplate(TEMPLATES, 'board', name);
     if (!tp && name) NXInsert.setTemplateName('board', ''); // zmazana sablona -> defaulty karty
+    // UI-C1c (Codex FIX 8): orientacia sa nastavuje EXPLICITNE pri KAZDEJ
+    // materializacii — aj bez sablony a pri sablone bez pola (vtedy 'leziaca').
+    // Preto stoji PRED applyBoardTemplate a nie je podmienena existenciou tp.
+    NXInsert.setBoardOrientation(NXInsert.orientationOf(tp ? tp.config : null));
+    syncInsertOrientation();
     if (tp) applyBoardTemplate(tp.config || {});
     applyInsertLockValues('board');       // krok 2: zamky prebiju sablonu (D-39)
     refreshInsertBoardInfo();
@@ -876,6 +895,7 @@
   // a zvysok suboru bezi normalne (vzor board_card.js / preview.js). Exportuju
   // sa LEN ciste funkcie kreslenia dlazdic sablon (ziadny DOM).
   if (typeof module !== 'undefined' && module.exports){
-    module.exports = { nxTplGlyph: nxTplGlyph, nxTplBadge: nxTplBadge };
+    module.exports = { nxTplGlyph: nxTplGlyph, nxTplBadge: nxTplBadge,
+                       nxTplOrientationNote: nxTplOrientationNote, nxTplTitle: nxTplTitle };
   }
 

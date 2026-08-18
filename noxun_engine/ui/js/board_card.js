@@ -128,6 +128,43 @@
         catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) }));
   }
 
+  // ===== UI-C1c: ORIENTACIA DOSKY (segmentove tlacidla) =====================
+  // Spolocne prekreslenie trojice segmentov (vkladanie aj karta oznacenej dosky).
+  // A11y (Codex audit C1c FIX 9): stav nesie `aria-pressed`, popis `aria-label`
+  // + `title` su v HTML (kostra je staticka — JS nikdy nepise innerHTML segmentov).
+  // Neznama hodnota (config z novsej verzie) NEROZSVIETI ziadny segment — karta
+  // radsej neklame, nez by podsunula „naležato".
+  function syncOrientationSegments(rowId, attr, cur){
+    var row = el(rowId); if (!row) return;
+    var btns = row.querySelectorAll('button[' + attr + ']');
+    for (var i = 0; i < btns.length; i++){
+      var on = btns[i].getAttribute(attr) === cur;
+      btns[i].classList.toggle('on', on);
+      btns[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+  }
+  function syncInsertOrientation(){
+    syncOrientationSegments('insBoardOriRow', 'data-ins-ori',
+      (typeof NXInsert !== 'undefined') ? NXInsert.boardOrientation() : 'leziaca');
+  }
+  // Klik v REZIME VKLADANIA — mení len draft karty (ziadny zapis do modelu).
+  function onInsertOrientation(o){
+    if (typeof NXInsert === 'undefined') return;
+    if (!NXInsert.setBoardOrientation(o)) return; // klik na uz zvolenu = no-op
+    syncInsertOrientation();
+  }
+  // Klik na karte UZ VLOZENEJ dosky = 1 rebuild = 1 krok Spat (server robi
+  // deltu transformacie). Codex audit C1c FIX 9: PRED odoslanim sa flushne
+  // cakajuci debounce ostatnych poli — callbacky sa vykonavaju v poradi
+  // odoslania a rozmer zapisany AZ PO otoceni by pracoval nad starym configom.
+  function onBoardOrientation(o){
+    if (!boardCard) return;
+    if (boardCard.orientation === o) return; // klik na uz zvolenu = no-op
+    flushBoardEditsNow();
+    if (window.sketchup && sketchup.set_board_orientation)
+      sketchup.set_board_orientation(JSON.stringify({ board_id: boardCard.board_id, orientation: o }));
+  }
+
   // Zapis hodnoty len ked pole NEMA fokus — refresh z backendu nesmie prepisat
   // rozpisanu hodnotu pouzivatela (echo po auto-apply).
   function bset(id, v){
@@ -164,6 +201,9 @@
       bcth.title = bc.uni === true ? 'UNI: hrúbku určuje doska (6–60 mm)' : 'Hrúbku určuje materiál';
     }
     if (el('bc_grain') && document.activeElement !== el('bc_grain')) el('bc_grain').value = bc.grain_direction || 'none';
+    // UI-C1c: umiestnenie dosky — server posiela ulozenu hodnotu (chybajuca =
+    // 'leziaca'), takze karta nikdy nehada.
+    syncOrientationSegments('boardOriRow', 'data-bc-ori', bc.orientation || 'leziaca');
     if (el('bc_diag')) el('bc_diag').textContent = 'Výrobná trieda: sheet · ide do výroby';
     var ms = el('bc_material');
     if (ms){ fillBoardMaterialSelect(ms, bc.material_id || '', true); }
@@ -392,6 +432,10 @@
   // vals: surove stringy {name,length,width,material_id,grain_direction,thickness}
   // sheet: katalogovy zaznam vybraneho materialu (alebo null)
   // -> { ok:true, payload:{...} } | { ok:false, error:'hlaska pre status' }
+  // UI-C1c: `orientation` je v payloade VZDY (nikdy sa nevynecha) — server
+  // whitelist ju prepusti do BoardBuilder.norm_orientation, ktora je jedina
+  // autorita slovnika. Prazdna/neznama hodnota z formulara sa tu NEOPRAVUJE:
+  // slovnik drzi NXInsert (setBoardOrientation) a chybu ma ohlasit server.
   function buildInsertBoardPayload(vals, sheet, evalFn){
     vals = vals || {};
     var ev = evalFn || (typeof evalDim === 'function' ? evalDim : null);
@@ -411,7 +455,8 @@
       length: l,
       width: w,
       material_id: String(vals.material_id === null || vals.material_id === undefined ? '' : vals.material_id),
-      grain_direction: String(vals.grain_direction === null || vals.grain_direction === undefined ? '' : vals.grain_direction)
+      grain_direction: String(vals.grain_direction === null || vals.grain_direction === undefined ? '' : vals.grain_direction),
+      orientation: String(vals.orientation === null || vals.orientation === undefined ? '' : vals.orientation)
     };
     if (sheetIsUni(sheet)){
       var t = dim(vals.thickness);
@@ -476,7 +521,10 @@
       width: el('ib_width') ? el('ib_width').value : '',
       material_id: ms ? ms.value : '',
       grain_direction: el('ib_grain') ? el('ib_grain').value : '',
-      thickness: el('ib_thickness') ? el('ib_thickness').value : ''
+      thickness: el('ib_thickness') ? el('ib_thickness').value : '',
+      // UI-C1c: orientacia NEZIJE v DOM poli — autorita je cisty stav NXInsert
+      // (segmenty su len jeho zrkadlo, rovnako ako typ vkladania).
+      orientation: (typeof NXInsert !== 'undefined') ? NXInsert.boardOrientation() : 'leziaca'
     }, findSheetIn(MATERIALS.sheets, ms ? ms.value : ''));
     if (!res.ok){ NX.setStatus(res.error, true); return; }
     // UI-C1a: identita pouzitej sablony (kind + nazov) — server ju z payloadu

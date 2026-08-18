@@ -12,7 +12,9 @@
 **~~UI-B · Inspector kostra~~ — BLOK KOMPLET** (UI-B1 #168 · UI-B2 #169 · UI-B3 #170, v0.7.7): kostra (rail + 4 sektory), náhľad ako kontextová projekcia a obsah Korpusu vrátane kolieska. **Bugfix po teste (18.8., v0.7.8):** Základné a Materiály patria kontextu Korpus, ostatné kontexty majú kontextový riadok — nedotiahnutá mapa viditeľnosti z UI-B1. **Dotiahnutie voči kontraktu (18.8., v0.7.9):** logo v hlavičke aj v „O plugine" je zrolovaná značka z originálnych kriviek (24 px) a lišty sektorov nesú meta súhrny (projekcia · rozmery · materiály · otvorená skupina). Plné texty v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 
 **UI-C · Kontexty**
-- **UI-C1 · Vkladanie** — typové tlačidlá, šablóny (nedávne prvé, dvojklik vloží, reálne náhľady), zámky D-39, doskové šablóny.
+
+**~~UI-C1 · Vkladanie~~ — DÁVKA KOMPLET** (C1a #174 · C1b #175 · C1c tento PR, **v0.7.12**): typové tlačidlá (Dolná · Horná · Doska), dlaždice šablón s „naposledy použitými" a dvojklikom (N16/N17), zámky D-39 pre dosku, doskové šablóny a **orientácia dosky** (naležato · nastojato · na stenu) pri vkladaní aj na karte vloženej dosky. Reálne PNG náhľady dlaždíc ostávajú vedome v **UI-D2** (dnes schematická kresba). Plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).
+
 - **UI-C2 · Zóny** — strom so spojnicami, dlaždice delenia, presné delenie v mm, snap 1/4·1/2·3/4 (D-09), police ako pills, slot „Vnútro".
 - **UI-C3 · Čelá (D-84, D-89a, D-96)** — riadky s ikonou typu, AUTO chip, rady výšok, naviazané kovanie pod riadkom, **reč stolára „+ pridaj čelo / + pridaj dvere" (D-84)**, **sekcia Úchytky (D-96)**, **hover hrany zvýrazní hranu v MODELI (D-89 otvorená časť)**.
 - **UI-C4 · Kovanie** — položky v boxoch podľa vlastníka (skrinka / každé čelo) + značky v náhľade.
