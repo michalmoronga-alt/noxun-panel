@@ -13,6 +13,24 @@ module Noxun
           # V0.4.7c: aj uz oznacena DOSKA pri otvoreni panela (Codex audit c, blocker B) —
           # priorita korpus -> doska -> nic, rovnaka ako push_selected.
           board = cab.nil? ? find_board(model) : nil
+          # Codex #168 P2 (3. kolo): pociatocny payload musi byt ZRKADLOM
+          # push_selected — inak sa panel pri otvoreni sprava inak nez pri
+          # kazdom dalsom pushi:
+          #   * bez model_guid by mala prva identita prazdny dokument a PRVE
+          #     bezne echo by vyzeralo ako novy vyber (kontext by skocil na Korpus),
+          #   * bez part_card by panel nad uz oznacenym DIELCOM otvoril rezim
+          #     skrinky — bez docasnej polozky raily a bez karty dielca.
+          initial = if cab
+                      p = cabinet_payload(cab)
+                      p['model_guid'] = model_guid(model)
+                      part = find_selected_part(model)
+                      p['part_card'] = part ? part_card_payload(model, cab, part) : nil
+                      p
+                    elsif board
+                      p = board_payload(board)
+                      p['model_guid'] = model_guid(model)
+                      p
+                    end
           data = {
             version: Engine::VERSION, # UI zobrazuje verziu odtialto — ziadny hardcode v HTML
             defaults: {
@@ -23,7 +41,7 @@ module Noxun
             templates: template_list,
             materials: materials_payload, # V0.3 katalog (dosky + ABS) pre selecty
             # (projektove predvolby zobrazuje okno MaterialsDialog — D2)
-            selected: cab ? cabinet_payload(cab) : (board ? board_payload(board) : nil),
+            selected: initial,
             selected_kind: cab ? 'cabinet' : (board ? 'board' : 'none'),
             # D-39 (audit B5): zamky vkladacej karty z Ruby pamate — preziju
             # zatvorenie panela; JS ich obnovi pri kazdom otvoreni (push_init).
@@ -93,7 +111,10 @@ module Noxun
               bp['model_guid'] = model_guid(model)
               return js("NX.loadBoard(#{bp.to_json})")
             end
-            return js('NX.clearSelected()')
+            # Codex #168 P2 (3. kolo): AJ prazdny vyber nesie identitu dokumentu.
+            # Prepnutie do dokumentu bez vyberu inak nechalo panel na guide
+            # STAREHO modelu a ABS prepinac by kazdy klik odmietal ako nezhodu.
+            return js("NX.clearSelected(#{model_guid(model).to_json})")
           end
           az = if zone && zone['cabinet_id'] == Store.get(cab, 'cabinet_id')
                  zone['zone_id']

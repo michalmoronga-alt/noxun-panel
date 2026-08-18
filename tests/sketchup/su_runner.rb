@@ -2954,6 +2954,8 @@ module NoxunSuRunner
     init = rec.find { |s| s.include?('NX.init(') }
     ok('UI-B1: push_init nesie stav ABS kontroly pre rail (edge_check)',
        !init.nil? && init.include?('"edge_check"'))
+    ok('UI-B1: push_init nesie identitu dokumentu (model_guid)',
+       !init.nil? && init.include?('"model_guid"'))
 
     # 2) oznaceny KORPUS -> rezim cab (rail ma aktivne kontexty)
     # Vlastne parametre (ziadny testovaci katalog — materialy dedia z projektu).
@@ -2999,6 +3001,20 @@ module NoxunSuRunner
       part_push = rec.find { |s| s.include?('NX.loadSelected(') }
       ok('UI-B1: oznaceny dielec posiela part_card (identita docasnej polozky raily)',
          !part_push.nil? && part_push.include?('"part_card":{') && part_push.include?('"role_key"'))
+
+      # Codex #168 P2 (3. kolo): panel OTVORENY nad uz oznacenym dielcom musi
+      # dostat rovnaky obraz ako pri beznom pushi — inak by sa otvoril v rezime
+      # skrinky (bez docasnej polozky raily a bez karty dielca).
+      rec = []
+      install_js_recorder(rec)
+      begin
+        e::Panel.push_init
+      ensure
+        remove_js_recorder
+      end
+      init2 = rec.find { |s| s.include?('NX.init(') }
+      ok('UI-B1: push_init nad oznacenym dielcom nesie part_card aj model_guid',
+         !init2.nil? && init2.include?('"part_card":{') && init2.include?('"model_guid"'))
 
       # 4) krizik pri DIELCI = existujuca cesta „spat na skrinku"
       before = model.entities.length
@@ -3060,7 +3076,12 @@ module NoxunSuRunner
         remove_js_recorder
       end
       ok('UI-B1: krizik pri doske posiela clearSelected (vkladaci rezim)',
-         rec.any? { |s| s.include?('NX.clearSelected()') })
+         rec.any? { |s| s.include?('NX.clearSelected(') })
+      # Codex #168 P2 (3. kolo): aj prazdny vyber nesie identitu dokumentu —
+      # bez nej by panel po prepnuti do dokumentu BEZ vyberu drzal stary guid
+      # a ABS prepinac by kazdy klik odmietal ako nezhodu modelu.
+      ok('UI-B1: clearSelected nesie identitu dokumentu',
+         rec.any? { |s| s.include?("NX.clearSelected(\"") })
       ok('UI-B1: vycistenie vyberu NEMENI model (ziadna entita naviac ani menej)',
          model.entities.length == before && model.selection.empty?)
       # Jeden krok Spat musi zmazat DOSKU — keby vycistenie vyberu bolo vlastnou

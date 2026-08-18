@@ -279,7 +279,9 @@
   // pushi (init aj loadSelected/loadBoard); pri prazdnom vybere sa drzi
   // posledna znama — vtedy sa aj tak nic neoznacuje.
   var nxModelGuid = '';
-  function nxSetModelGuid(g){ if (g) nxModelGuid = String(g); }
+  // Hodnota sa prepisuje LEN ked ju volajuci naozaj poslal — payload bez tohto
+  // pola (starsi push, vnoreny objekt) nesmie zmazat platnu identitu.
+  function nxSetModelGuid(g){ if (g !== undefined && g !== null) nxModelGuid = String(g); }
 
   function nxApplyEdgeCheck(st){
     var n = el('railAbs');

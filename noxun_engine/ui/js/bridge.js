@@ -364,7 +364,8 @@
       setUiMode('board', b);
       refreshZoneUI(); renderPreview();
     },
-    clearSelected: function(){
+    clearSelected: function(guid){
+      if (typeof nxSetModelGuid === 'function') nxSetModelGuid(guid); // identita dokumentu aj bez vyberu
       cancelBoardEdits();                    // V0.4.7c: koniec kontextu dosky
       renderBoardCard(null);
       if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; }
