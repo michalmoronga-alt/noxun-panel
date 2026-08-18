@@ -5,22 +5,24 @@
 
 ## Stav
 
-**v0.7.2 · 18.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
+**v0.7.3 · 18.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
 
 **Beží blok UI 2.0.** Koncept Inspectora je uzavretý (Michal 18.8.) — záväzný kontrakt a mockupy sú v repe: [zdroje/ui20/](zdroje/ui20/) ([UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) + mockupy Inspector C, štúdio, dizajnový lístok); práca je narezaná do dávok UI-A → UI-B → UI-C → UI-D a fázy ŠTÚDIO ([PLAN.md](PLAN.md)).
 
-Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-02** — plugin má vlastný SketchUp toolbar so 4 tlačidlami (logo · Štúdio · ABS kontrola · Vložiť) a firemná značka je prvýkrát vidieť priamo v SketchUpe. Testy: **1206 headless · 32 JS sád · in-SketchUp 334 PASS / 0 FAIL** (posledný beh pri D-101; UI dávky bez buildera/observera in-SU beh nepotrebujú — vizuál overuje Michal).
+Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-03** — vo výberoch materiálov a ABS sa konečne **píše** (jeden zdieľaný combobox s hľadaním bez diakritiky, „Použité v projekte" a „Naposledy použité" navrchu). Testy: **1213 headless · 33 JS sád · in-SketchUp 334 PASS / 0 FAIL** (posledný beh pri D-101; UI dávky bez buildera/observera in-SU beh nepotrebujú — vizuál overuje Michal).
 
 ## Robí sa
 
-**BLOK UI-A · základ značky.** Hotové **UI-01** (paleta + téma) a **UI-02** (logo + SketchUp toolbar), ďalej **UI-03** (zdieľaný combobox materiálov a ABS, D-85) — posledná dávka bloku.
+**BLOK UI-A JE KOMPLET** (UI-01 paleta a téma · UI-02 logo a toolbar · UI-03 combobox). Nasleduje **BLOK UI-B — kostra Inspectora**; prvá dávka je **UI-B1** (rail + 4 sektory, presun existujúcich kariet, šírka 470 px, štandard rozmerov okien D-51).
 
 ## Ďalší krok
 
-Po UI-A nasleduje **UI-B** (kostra Inspectora: rail + 4 sektory, náhľad, obsah Korpusu a koliesko s prepínačom témy). *(Štandard rozmerov okien D-51 sa rieši v UI-B1 a nadväzuje na D-77 — mechanika „okno sa pri otvorení dorovná na svoje minimum" už existuje, chýbajú len jednotné hodnoty.)*
+**UI-B1 · Kostra panela** — jediná dávka bloku UI-A/B, kde je audit dobrovoľne na mieste (veľký zásah do `panel.js` lifecycle), plus in-SketchUp smoke. Potom UI-B2 (náhľad + vrstvové chipy D-27) a UI-B3 (obsah Korpusu + koliesko s **UI prepínačom témy**). *(Štandard rozmerov okien D-51 sa rieši v UI-B1 a nadväzuje na D-77 — mechanika „okno sa pri otvorení dorovná na svoje minimum" už existuje, chýbajú len jednotné hodnoty.)*
 
 ## Posledné uzávery
 
+- **BLOK UI-A UZAVRETÝ** (UI-01 #165 · UI-02 #166 · UI-03 #167) — značka, toolbar a najčastejšia akcia merača sú hotové; **v0.7.3** (18.8.)
+- **UI-03 D-85 zdieľaný combobox materiálov a ABS** (písanie s filtrom bez diakritiky, „Použité v projekte" + „Naposledy použité"; jeden komponent na 12 miestach, rozbaľovačka ostala zdrojom pravdy → guardy E-03/D-86/D-41 bežia nezmenene; napĺňa aj odloženú D-16) — PR **#167**, v0.7.3 (18.8.)
 - **UI-02 logo ikony + SketchUp toolbar** (toolbar „Noxun Engine": Inspector ako prepínač · Štúdio (dočasne okno Výroba) · ABS kontrola hrán ako prepínač · Vložiť skrinku) — PR **#166**, v0.7.2 (18.8.)
 - **UI-01 paleta NOXUN teal + rádius 6 + mechanizmus témy Lucia** (prvá dávka bloku UI-A) — PR **#165**, v0.7.1 (18.8.)
 - **BLOK ŠTART AUTONÓMIE UZAVRETÝ** (D-101 #162 · D-86 #163 · D-77 #164) — checkpoint **v0.7.0** (12.8.)
