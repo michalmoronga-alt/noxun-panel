@@ -431,7 +431,59 @@ sektoroch**. Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html
   `body.className` prepisuje `setUiMode`). `panel.css` zdieľajú satelitné okná —
   tie o raile ani sektoroch nesmú vedieť.
 
-### 5.2 Ostatné vzory
+### 5.2 Náhľad — kontextové projekcie a spodný pás (UI-B2)
+
+Náhľad **nie je jeden obrázok s vrstvami** — je to **kontextová projekcia**:
+kontext railu určuje, ktorý pohľad sa kreslí, a pohľady sa **vymieňajú**.
+Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`projSvg`).
+
+| Kontext | Projekcia |
+|---|---|
+| **Korpus** | čelný rez s kótami: šírka dole · výška vpravo · sokel a telo vľavo · hĺbka kótou na náznaku skosenia hornej plochy |
+| **Zóny** | zónová schéma (klikateľné zóny, ťahateľné priečky) + kóty šírok stĺpcov |
+| **Čelá** | predný pohľad čiel + kóty výšok riadkov vpravo, medzery pri ľavom okraji, celková šírka dole |
+| **Kovanie** | korpus s **pozíciami kovania**: záves = krúžok s krížikom na závesovej hrane · výsuv = dvojica koľajníc vo výške zásuvky · nohy = obdĺžniky dole; pod projekciou súhrn všetkých položiek |
+| **Dielec** | hrany s ABS farbami (`#partSvg`, nezmenené) |
+
+Zásady kreslenia:
+
+- **Kóty sú decentné:** tenká čiara (1,4), tlmená farba `--nx-ink-faint`,
+  hodnota bez jednotky (jednotka len tam, kde je to prvý údaj). Kreslené farby
+  sú **zrkadlom tokenov** — SVG atribúty nevedia `var()` (rovnaký vzor ako
+  ostatné farby náhľadu).
+- **Náhľad nikdy nepočíta dáta.** Kreslí sa výhradne z payloadov, ktoré panel
+  už má (rozmery formulára, `front_items`, `config.hardware`, strom zón).
+  Odvodené hodnoty (pozícia značky, medzera medzi čelami) žijú v JS ako čisté
+  funkcie; do dát ani kontraktu nepribudlo nič.
+- **Značky kovania sú orientačné** — hovoria *čo, koľko a kde zhruba*, nie
+  presné miesto vŕtania (strana závesu jednokrídlových dvierok v dátach nie je).
+  Klik na značku vypíše jej popis do statusu; výber vlastníka v modeli patrí
+  dávke UI-C4.
+
+**Spodný pás (`.pvbar`)** je tenký pevný riadok pod SVG:
+
+- **Vľavo chipy vrstiev** `Zóny · Čelá · Kovanie · Olep` (`.lchip`). Chip
+  aktuálneho kontextu je **základ** (plná teal výplň, nie je to prepínač —
+  je to popis toho, čo sa kreslí). Ostatné sa dajú **prisvietiť ako ghost**:
+  tlmené čiarkované linky navrch projekcie, **bez výplní a bez interakcie** —
+  ghost nikdy neprebije základný pohľad.
+- **Olep** vie náhľad ukázať len pri označenom **dielci** (hranové dáta nesie
+  výhradne `part_card`) — inde je chip **neaktívny s vysvetlením**, nie ticho
+  mŕtvy. Rovnako je neaktívny každý chip, ktorý nemá čo kresliť.
+- **Vpravo nástroje:** **kamera** (zarovná pohľad SketchUpu na označenú skrinku
+  — čelný pohľad + doramovanie) a **fit** (reset zoomu). Fit sa sem presunul
+  z rohového overlayu — náhľad má **jedno miesto ovládania** a plocha SVG
+  ostáva čistá pre pan/zoom/ťah priečky.
+- **Stav chipov je per kontext** a žije v pamäti okna: **nová identita výberu ho
+  resetuje**, echo push ho nemení (tá istá zásada ako `viewContext` z UI-B1).
+- Chipy sú `<button>` s `aria-disabled` (nie HTML `disabled`) — ostávajú
+  fokusovateľné a nesú vysvetlenie (vzor D-78 / rail).
+
+> **D-27 (rýchle zobraziť/skryť) tým NIE JE uzavreté:** chipy prepínajú vrstvy
+> **náhľadu**, nie tagy modelu. Modelové tagy Čelá/Chrbát ostávajú na neskôr
+> (vzor je checkbox „Zobraziť zóny (ghost) v modeli").
+
+### 5.3 Ostatné vzory
 
 - **Sticky hlavička (Inspector):** jednoradová, zostáva pri scrollovaní
   (`position: sticky`, `z-index` pod modalom 60): logo + ID + názov s ceruzkou
@@ -443,9 +495,8 @@ sektoroch**. Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html
   Verzia príde z Ruby (`Engine::VERSION`), nikdy sa nedopĺňa prípona cache-bustu.
 - **Tlačidlá:** `.primary` (akcia, zelená), `.ghostbtn` (neutrál), `.danger`
   (mazanie, červená). Ikonové akcie sú kompaktné, s `aria-label`.
-- **Náhľad:** fixné okno so zoom/pan; **fit/reset (⛶ → ikona `maximize`)** je
-  overlay v pravom hornom rohu (`pointer-events` len na tlačidle, nesmie blokovať
-  pan/zoom/ťah priečky).
+- **Náhľad:** fixné okno so zoom/pan; ovládanie (kamera + fit) žije v **spodnom
+  páse** — viď 5.3.
 - **Karty:** `fieldset`/`details` na bielom povrchu, rámik `--nx-border`.
 - **Warn chip / warnlist:** klik na chip ukotvený zoznam upozornení hore (pri
   rozbalení návrat na začiatok, aby bol viditeľný aj po odscrollovaní).

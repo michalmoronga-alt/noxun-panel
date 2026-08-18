@@ -341,17 +341,31 @@
   /* nahlad = fixne okno (zoom/pan v preview.js). D-01a: vyska rastie s oknom
      panela (38vh), min 210 px / max 640 px — velke okno = velky nahlad. */
   .pvbox { padding-top: 8px; }
-  /* D-29 A8: fit overlay — bezvyskovy wrapper okolo SVG (position:relative);
-     overlay pointer-events:none, tlacidlo pointer-events:auto -> nesmie blokovat
-     pan/zoom/drag priecky v nahlade. */
   .pvwrap { position: relative; line-height: 0; }
   #preview { height: clamp(210px, 38vh, 640px); }
-  .pvfitwrap { position: absolute; top: 6px; right: 6px; pointer-events: none; }
-  .pvfit { pointer-events: auto; width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
-           background: var(--nx-surface); color: var(--nx-ink-strong); border: 1px solid var(--nx-border); border-radius: 6px;
-           box-shadow: 0 1px 2px var(--nx-modal-shadow); opacity: .9; }
-  .pvfit:hover { opacity: 1; background: var(--nx-surface-sunken); }
-  .pvfit .ic { width: 16px; height: 16px; }
+  /* UI-B2: spodny PEVNY pas nahladu — vlavo chipy vrstiev, vpravo nastroje
+     (kamera N7 + fit). Jeden riadok, kompaktne (vertikalny priestor panela je
+     vzacny); pas je mimo SVG, takze nikdy neblokuje pan/zoom/tah priecky. */
+  .pvbar { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+  .pvbar .pvsp { flex: 1; }
+  .pvchips { display: flex; align-items: center; gap: 3px; min-width: 0; flex-wrap: nowrap; overflow: hidden; }
+  .lchip { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; font-size: 10.5px;
+           background: var(--nx-surface); color: var(--nx-ink-muted); border: 1px solid var(--nx-border);
+           border-radius: 99px; cursor: pointer; white-space: nowrap; }
+  .lchip .ic { width: 12px; height: 12px; }
+  .lchip:hover { background: var(--nx-surface-sunken); }
+  .lchip.on { background: var(--nx-select-bg); border-color: var(--nx-select); color: var(--nx-select-strong); }
+  /* zakladny pohlad kontextu — nie je to prepinac, je to popis (kurzor tomu zodpoveda) */
+  .lchip.base { background: var(--nx-select); border-color: var(--nx-select); color: var(--nx-surface); cursor: default; }
+  .lchip.base:hover { background: var(--nx-select); }
+  /* neaktivny chip ostava citatelny a fokusovatelny (aria-disabled, nie HTML disabled) */
+  .lchip.off { color: var(--nx-ink-faint); border-style: dashed; cursor: not-allowed; }
+  .lchip.off:hover { background: var(--nx-surface); }
+  .pvtool { width: 26px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+            background: var(--nx-surface); color: var(--nx-ink-strong); border: 1px solid var(--nx-border); border-radius: 6px; }
+  .pvtool:hover { background: var(--nx-surface-sunken); }
+  .pvtool[aria-disabled="true"] { color: var(--nx-ink-faint); cursor: not-allowed; }
+  .pvtool .ic { width: 16px; height: 16px; }
   .zoneline { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--nx-ink-muted); margin-top: 4px; }
   /* paticka v normalnom toku (A12: #verline PRESUNUTY sem, nie fixed, nie duplikat) */
   .nxfoot { margin: 10px 0 0; padding-top: 8px; border-top: 1px solid var(--nx-border-soft);

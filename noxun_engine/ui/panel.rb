@@ -121,6 +121,10 @@ module Noxun
           # zdielanu logiku ako toolbar aj okno Vyroba (Engine.toggle_edge_check)
           # — ziadny duplikat a ziadny zapis do modelu (lekcia D-103).
           cb(dlg, 'nx_edge_toggle')        { |p| handle_edge_toggle(p) }
+          # UI-B2 (N7): kamera v spodnom pase nahladu — zarovna POHLAD na
+          # oznacenu skrinku. Kamera nie su data modelu, takze ziadna operacia,
+          # ziadny zapis a ziadny krok Spat (lekcia D-103).
+          cb(dlg, 'nx_camera_focus')       { |p| handle_camera_focus(p) }
           # D-100: premenovanie skrinky (inline edit nazvu v hlavicke panela)
           cb(dlg, 'rename_cabinet')        { |p| handle_rename_cabinet(p) }
           # V0.4.5 D2: satelitne okna (projektove predvolby a sprava sablon mimo panela)

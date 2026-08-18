@@ -24,8 +24,12 @@
   // staticke ID, no citatelny kluc („rail:zony") povie z odpoctu viac nez ID
   // tlacidla. Allowlist drzi invariant D-25 — kluc NIKDY nesmie prist z dat.
   // (docasna polozka raily je len UKAZOVATEL — klikatelny je jej krizik.)
+  // UI-B2: spodny pas nahladu — chipy vrstiev sa kreslia z JS, preto maju
+  // vlastne kluce (ID by boli generovane); zoznam ostava STATICKY.
   var USAGE_KEYS = ['rail:korpus', 'rail:zony', 'rail:cela', 'rail:kovanie',
-                    'rail:zrusit', 'rail:abs', 'rail:nastavenia', 'rail:studio'];
+                    'rail:zrusit', 'rail:abs', 'rail:nastavenia', 'rail:studio',
+                    'pv:kamera', 'pv:fit',
+                    'pv:vrstva:zony', 'pv:vrstva:cela', 'pv:vrstva:kovanie', 'pv:vrstva:olep'];
 
   // --- klasifikacia (cista logika, testovatelna v Node cez module.exports) ---
 

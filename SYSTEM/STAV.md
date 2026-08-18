@@ -5,22 +5,23 @@
 
 ## Stav
 
-**v0.7.4 · 18.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
+**v0.7.5 · 18.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
 
 **Beží blok UI 2.0.** Koncept Inspectora je uzavretý (Michal 18.8.) — záväzný kontrakt a mockupy sú v repe: [zdroje/ui20/](zdroje/ui20/) ([UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) + mockupy Inspector C, štúdio, dizajnový lístok); práca je narezaná do dávok UI-A → UI-B → UI-C → UI-D a fázy ŠTÚDIO ([PLAN.md](PLAN.md)).
 
-Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-B1** — Inspector dostal novú kostru (ľavá lišta kontextov + obsah v štyroch zrolovateľných sektoroch, šírka 470 px). Testy: **1226 headless · 34 JS sád · in-SketchUp 345 PASS / 0 FAIL** (čerstvý beh pri UI-B1).
+Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-B2** — náhľad sa stal kontextovou projekciou (každý kontext kreslí svoj pohľad s kótami, Kovanie dostalo vlastnú projekciu s pozíciami) a dole pribudol pás s vrstvovými chipmi, kamerou a fitom. Testy: **1239 headless · 35 JS sád**; in-SketchUp sada má novú sekciu `run_uib2` (kamera), ktorá **ešte nebežala** — posledný plný beh je z UI-B1 (345 PASS / 0 FAIL).
 
 ## Robí sa
 
-**BLOK UI-A JE KOMPLET** (UI-01 paleta a téma · UI-02 logo a toolbar · UI-03 combobox). Beží **BLOK UI-B — kostra Inspectora**; **UI-B1 je hotová** (rail + 4 sektory, presun existujúcich kariet, šírka 470 px, štandard rozmerov okien D-51).
+**BLOK UI-A JE KOMPLET** (UI-01 paleta a téma · UI-02 logo a toolbar · UI-03 combobox). Beží **BLOK UI-B — kostra Inspectora**; hotové sú **UI-B1** (rail + 4 sektory, šírka 470 px, štandard rozmerov okien D-51) a **UI-B2** (kontextové projekcie náhľadu + spodný pás).
 
 ## Ďalší krok
 
-**UI-B2 · Náhľad** — kontextové projekcie s kótami + spodná lišta náhľadu (vrstvové chipy D-27 + Olep + kamera N7). Potom **UI-B3** (obsah Korpusu: 2-stĺpcové Základné + info stĺpec, rozmerové rady N6, ikony skupín, šablóna-modal, typ badge a koliesko s **UI prepínačom témy**).
+**UI-B3 · Obsah Korpusu + koliesko** — Základné v 2 stĺpcoch + informačný stĺpec (serverové dopočty; hmotnosť zatiaľ „—"), rozmerové rady N6, ikony skupín, modal „Uložiť ako šablónu", typ badge a kontext kolieska (**UI prepínač témy NOXUN/Lucia** · editor radov · O plugine). Tým sa uzavrie blok UI-B.
 
 ## Posledné uzávery
 
+- **UI-B2 náhľad = kontextová projekcia + spodný pás** (Korpus čelný rez s kótami a náznakom hĺbky · Zóny + šírky · Čelá + výšky a medzery · **Kovanie nová projekcia**: závesy, koľajnice, nohy zo súpisu kovania · Dielec hrany; dole chipy vrstiev s ghost prisvietením, kamera N7 a fit) — PR **#169**, v0.7.5 (18.8.)
 - **UI-B1 kostra Inspectora** (ľavá lišta kontextov Korpus·Zóny·Čelá·Kovanie + dočasný dielec/doska s krížikom + ABS kontrola + Štúdio; obsah v 4 sektoroch Náhľad·Základné·Materiály·Nastavenia s exkluzívnymi skupinami; šírka 470 px a štandard rozmerov okien D-51; hlavička jednoradová, režimové taby a satelitné tlačidlá zanikli — uzatvára aj D-91) — PR **#168**, v0.7.4 (18.8.)
 - **BLOK UI-A UZAVRETÝ** (UI-01 #165 · UI-02 #166 · UI-03 #167) — značka, toolbar a najčastejšia akcia merača sú hotové; **v0.7.3** (18.8.)
 - **UI-03 D-85 zdieľaný combobox materiálov a ABS** (písanie s filtrom bez diakritiky, „Použité v projekte" + „Naposledy použité"; jeden komponent na 12 miestach, rozbaľovačka ostala zdrojom pravdy → guardy E-03/D-86/D-41 bežia nezmenene; napĺňa aj odloženú D-16) — PR **#167**, v0.7.3 (18.8.)

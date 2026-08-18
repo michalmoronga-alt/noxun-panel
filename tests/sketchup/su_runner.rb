@@ -3155,6 +3155,89 @@ module NoxunSuRunner
     log_line("FAIL: UI-B1 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
 
+  # --- UI-B2: kamera spodneho pasu nahladu (N7) ------------------------------
+  # Jedina serverova cast davky. Overuje sa presne to, co je na nej rizikove:
+  # zarovnanie pohladu je CISTE CITANIE — nesmie zmenit model, vyber ani
+  # pridat krok Spat (lekcia D-103). Projekcie samotne su ciste JS (sada
+  # tests/js/test_uib2_nahlad.js).
+  def run_uib2(model)
+    cleanup(model)
+
+    cfg = { 'type' => 'lower', 'width' => 900.0, 'height' => 720.0, 'depth' => 560.0,
+            'thickness' => 18.0, 'floor_height' => 100.0 }
+    inst = e::CabinetBuilder.build(model, cfg)
+    return ok('UI-B2: vlozenie skrinky pre kameru', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id').to_s
+    model.selection.clear
+    model.selection.add(inst)
+    before_ents = model.entities.length
+    before_sel = model.selection.to_a.dup
+    eye0 = model.active_view.camera.eye.clone
+
+    # Guard dokumentu: klik z INEHO dokumentu pohlad TU nezarovna.
+    e::Panel.handle_camera_focus({ 'cabinet_id' => cid, 'model_guid' => 'CUDZI-GUID' }.to_json)
+    ok('UI-B2: kamera z INEHO dokumentu pohlad NEZAROVNA (guard dokumentu)',
+       model.active_view.camera.eye == eye0)
+    # Prisny guard: aj CHYBAJUCA identita sa odmieta (okno bez dobehnuteho NX.init).
+    e::Panel.handle_camera_focus({ 'cabinet_id' => cid }.to_json)
+    ok('UI-B2: kamera BEZ identity dokumentu pohlad NEZAROVNA (prisny guard)',
+       model.active_view.camera.eye == eye0)
+    # Codex #169 P2: ID, ktore nesedi s AKTUALNYM vyberom (medzitym sa zmenil),
+    # sa odmieta — pohlad nesmie odskocit inam, nez kde pouzivatel je.
+    e::Panel.handle_camera_focus({ 'cabinet_id' => 'CAB-NEEXISTUJE',
+                                   'model_guid' => e::Panel.model_guid(model) }.to_json)
+    ok('UI-B2: kamera na INU nez oznacenu skrinku pohlad NEMENI (test cerstvosti)',
+       model.active_view.camera.eye == eye0)
+
+    e::Panel.handle_camera_focus({ 'cabinet_id' => cid,
+                                   'model_guid' => e::Panel.model_guid(model) }.to_json)
+    ok('UI-B2: kamera zarovnala pohlad na skrinku (zmenil sa bod oka)',
+       model.active_view.camera.eye != eye0)
+    # Celny pohlad = oko PRED skrinkou (v zapornom Y od jej stredu), hore +Z.
+    cam = model.active_view.camera
+    center = inst.bounds.center
+    ok('UI-B2: pohlad je CELNY (oko pred skrinkou, hore je Z)',
+       cam.eye.y < center.y && (cam.eye.x - center.x).abs < 1.0 && cam.up.z > 0.9)
+    ok('UI-B2: kamera NEMENI model (ziadna entita naviac ani menej)',
+       model.entities.length == before_ents)
+    ok('UI-B2: kamera NEMENI vyber', model.selection.to_a == before_sel)
+
+    # Keby zarovnanie bolo vlastnou operaciou, 1x Spat by vratilo JU a skrinka
+    # by ostala v modeli. Undo teda musi zmazat prave vlozenu skrinku.
+    # (Test ide TU — poslednou modelovou operaciou je zatial vlozenie skrinky.)
+    Sketchup.undo
+    ok('UI-B2: 1x Spat zmaze skrinku (zarovnanie pohladu NIE JE undo krok)',
+       inst.nil? || !inst.valid?)
+
+    # Codex #169 P2: OTOCENA skrinka — celo uz nemieri na globalne -Y, takze
+    # pevna os by ukazala bok. Smer musi vyjst z transformacie skrinky.
+    rot = e::CabinetBuilder.build(model, cfg)
+    if rot
+      model.start_operation('SU-TEST rotacia skrinky', true)
+      rot.transformation = rot.transformation *
+                           Geom::Transformation.rotation(ORIGIN, Z_AXIS, 90.degrees)
+      model.commit_operation
+      rid = e::Store.get(rot, 'cabinet_id').to_s
+      model.selection.clear
+      model.selection.add(rot)
+      e::Panel.handle_camera_focus({ 'cabinet_id' => rid,
+                                     'model_guid' => e::Panel.model_guid(model) }.to_json)
+      cam2 = model.active_view.camera
+      # Lokalne -Y otocenej skrinky ukazuje do globalneho +X (rotacia +90 okolo Z).
+      fwd = rot.transformation.yaxis
+      to_eye = cam2.eye - rot.bounds.center
+      ok('UI-B2: otocena skrinka — oko stoji pred JEJ celom (smer z transformacie)',
+         to_eye.dot(fwd) < 0 && cam2.up.z > 0.9)
+    else
+      info('UI-B2: druhu skrinku sa nepodarilo vlozit — rotacna cast preskocena')
+    end
+
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: UI-B2 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   # --- ASYNC: undo/redo scenare (retaz timerov, observer debounce 0.2 s) -----
 
   def run_async(model, done)
@@ -3817,6 +3900,7 @@ module NoxunSuRunner
     run_d104(model)          # D-104: overlay „hrany bez olepu" (lifecycle, pocty, ziadny undo krok)
     run_d105(model)          # D-105: tri stavy + filter podla vyberu (vyber NEMENI model)
     run_uib1(model)          # UI-B1: kostra Inspectora — payloady raily, krizik dielca/dosky, ABS toggle bez undo kroku
+    run_uib2(model)          # UI-B2: kamera nahladu — celny pohlad, guardy identity, ziadny zapis ani undo krok
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
