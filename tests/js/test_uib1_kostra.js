@@ -95,6 +95,19 @@ eq(NXShell.track('board', 'board:BRD-003'), false, 'echo push dosky nie je nova 
 eq(NXShell.track('insert', 'none'), true, 'zrusenie vyberu = nova identita (vkladanie)');
 eq(NXShell.track('insert', 'none'), false, 'echo push vkladania nie je nova identita');
 
+// ------------------------------- identita pre asynchronne callbacky (#168) ---
+// Krizik dosky posiela board_id — server ho porovna s tym, co je NAOZAJ vybrate
+// (kym callback dobehne, mohol pouzivatel oznacit nieco ine).
+reset();
+NXShell.track('board', NXShell.identityOf('board', { board_id: 'BRD-003' }));
+eq(NXShell.identityId(), 'BRD-003', 'z identity dosky sa da vytiahnut ciste ID');
+NXShell.track('cab', NXShell.identityOf('cab', { cabinet_id: 'CAB-005' }));
+eq(NXShell.identityId(), 'CAB-005', 'z identity korpusu tiez');
+NXShell.track('part', NXShell.identityOf('part', { cabinet_id: 'CAB-005', role_key: 'cabinet/side:left' }));
+eq(NXShell.identityId(), 'CAB-005/cabinet/side:left', 'dielec nesie skrinku aj rolu (dvojbodky v roli prezijú)');
+NXShell.track('insert', NXShell.identityOf('insert', null));
+eq(NXShell.identityId(), '', 'vkladanie nema co poslat');
+
 // --------------------------------------------- kluce zbalenia (A5) ----------
 eq(NXShell.secKey('s1', null), 'nxsec_s1', 'sektor ma vlastny nezavisly kluc');
 eq(NXShell.secKey('s4', null), 'nxsec_s4', 'sektor S4 je nezavisly od svojich skupin');

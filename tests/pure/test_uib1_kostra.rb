@@ -66,6 +66,30 @@ NxTest.test('UI-B1: kontexty raily volaju guard setViewContext (nie priamu zmenu
                 'guard: mimo oznaceneho korpusu sa kontext NESMIE prepnut (autorita je JS, nie CSS)')
 end
 
+NxTest.test('UI-B1: krizik docasnej polozky je REALNE tlacidlo (klavesnica)') do
+  # Codex #168 P2: span s role="button" sa neda aktivovat Enterom/medzernikom
+  # a tlacidlo vnorene v tlacidle je neplatne HTML — krizik preto stoji VEDLA
+  # ukazovatela ako samostatny <button>.
+  x = UIB1_HTML_CODE[/<[a-z]+ [^>]*id="railTempX"[^>]*>/].to_s
+  NxTest.assert(x.start_with?('<button'), 'krizik musi byt <button>, nie span s role')
+  NxTest.assert(x.include?('aria-label='), 'krizik nesie aria-label (citacka aj klavesnica)')
+  temp = UIB1_HTML_CODE[/<[a-z]+ id="railTemp"[^>]*>/].to_s
+  NxTest.refute(temp.start_with?('<button'), 'ukazovatel sam nic nerobi — nesmie byt tlacidlo')
+  NxTest.refute(temp.include?('railTempX'), 'krizik NESMIE byt vnoreny v ukazovateli')
+end
+
+NxTest.test('UI-B1: rail pouziva vlastnu bublinu, nie nativny title') do
+  # Dva tooltipy naraz (vlastna bublina + oneskoreny systemovy) su chyba —
+  # vysvetlenie neaktivneho kontextu ide do .railtip a do aria-label.
+  NxTest.refute(UIB1_SHELL_CODE.include?('.title ='), 'shell.js nesmie nasadzovat nativny title')
+  NxTest.assert(UIB1_SHELL_CODE.include?("querySelector('.railtip')"),
+                'popis kontextu sa pise do vlastnej bubliny')
+  UIB1_RAIL_IDS.each do |id|
+    tag = UIB1_HTML_CODE[/<[a-z]+ [^>]*id="#{id}"[^>]*>/].to_s
+    NxTest.refute(tag.include?(' title='), "#{id}: nativny title by zdvojil bublinu raily")
+  end
+end
+
 NxTest.test('UI-B1: ikony raily su v sprite icons.js') do
   %w[cabinet front hammer shell slab].each do |icon|
     NxTest.assert(UIB1_ICONS.include?("'#{icon}':"), "sprite nema ikonu '#{icon}'")

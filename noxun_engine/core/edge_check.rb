@@ -508,12 +508,28 @@ module Noxun
 
       # Prepnutie/otvorenie ineho dokumentu: stav sa NEPRENASA ticho — zvyraznenie
       # patri modelu, v ktorom bolo zapnute (vzor notifikacii dialogov).
+      # Prepnutie dokumentu: overlay patril STAREMU modelu, takze sa vypina.
+      # Codex #168 P2: vypnutie musia dostat aj OKNA — inak by okno Vyroba aj
+      # rail Inspectora dalej tvrdili „zapnute" nad novym dokumentom a dalsi
+      # klik by zvyraznenie zapol namiesto vypnutia.
       def on_model_changed(model)
         return if @overlay.nil?
         return if !model.nil? && same_model?(@model, model)
+
         disable!
+        notify_state_changed
       rescue StandardError => e
         Engine.log_error(e, 'EdgeCheck.on_model_changed')
+      end
+
+      # Rozposlanie AKTUALNEHO stavu vsetkym oknam. Defenzivne — zavrete ani
+      # nenacitane okno nic nezhodi (kazdy push ma vlastny guard aj rescue).
+      def notify_state_changed
+        st = ui_state(active_model)
+        ProductionDialog.push_edge_check(st) if defined?(ProductionDialog)
+        Panel.push_edge_check(st) if defined?(Panel)
+      rescue StandardError => e
+        Engine.log_error(e, 'EdgeCheck.notify_state_changed')
       end
 
       def remove_overlay(model, overlay)

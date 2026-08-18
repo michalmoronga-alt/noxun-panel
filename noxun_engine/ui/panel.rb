@@ -116,7 +116,7 @@ module Noxun
           cb(dlg, 'select_cabinet')        { |p| handle_select_cabinet(p) }
           # UI-B1: krizik docasnej polozky raily pri DOSKE — vycistenie vyberu.
           # Ziadna operacia, ziadny zapis do modelu (vzor Panel.show_insert).
-          cb(dlg, 'clear_selection')       { |_p| handle_clear_selection }
+          cb(dlg, 'clear_selection')       { |p| handle_clear_selection(p) }
           # UI-B1 (audit A2): ABS kontrola hran z raily Inspectora. Vola TU ISTU
           # zdielanu logiku ako toolbar aj okno Vyroba (Engine.toggle_edge_check)
           # — ziadny duplikat a ziadny zapis do modelu (lekcia D-103).

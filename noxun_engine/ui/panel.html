@@ -24,10 +24,16 @@
   <button type="button" id="railZony" data-nx-usage="rail:zony" class="railbtn" data-nx-ctx="zony" onclick="setViewContext('zony')" aria-pressed="false" aria-label="Zóny"><svg class="ic" aria-hidden="true"><use href="#i-layout-grid"/></svg><span class="railtip">Zóny</span></button>
   <button type="button" id="railCela" data-nx-usage="rail:cela" class="railbtn" data-nx-ctx="cela" onclick="setViewContext('cela')" aria-pressed="false" aria-label="Čelá"><svg class="ic" aria-hidden="true"><use href="#i-front"/></svg><span class="railtip">Čelá</span></button>
   <button type="button" id="railKovanie" data-nx-usage="rail:kovanie" class="railbtn" data-nx-ctx="kovanie" onclick="setViewContext('kovanie')" aria-pressed="false" aria-label="Kovanie"><svg class="ic" aria-hidden="true"><use href="#i-hammer"/></svg><span class="railtip">Kovanie</span></button>
-  <!-- DOCASNA polozka: oznaceny dielec / doska. Krizik vrati vyber (dielec ->
-       rodicovska skrinka, doska -> prazdny vyber). Zobrazuje ju shell.js. -->
+  <!-- DOCASNA polozka: oznaceny dielec / doska. Sama je len UKAZOVATEL (div —
+       nic nerobi), akciou je krizik: pri dielci vrati vyber na rodicovsku
+       skrinku, pri doske vyber zhodi. Krizik je SAMOSTATNE <button> VEDLA
+       ukazovatela (Codex #168 P2) — vnorene tlacidlo v tlacidle je neplatne HTML
+       a span s role="button" by neslo aktivovat klavesnicou. -->
   <div class="raildiv" id="railTempDiv"></div>
-  <button type="button" id="railTemp" data-nx-usage="rail:docasny" class="railbtn ctxi on" aria-label="Označený objekt"><svg class="ic" id="railTempIc" aria-hidden="true"><use href="#i-slab"/></svg><span class="rx" id="railTempX" data-nx-usage="rail:zrusit" role="button" tabindex="0" onclick="railTempClose()" title="Zrušiť výber"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></span><span class="railtip" id="railTempTip">Dielec</span></button>
+  <div class="railtempbox" id="railTempBox">
+    <div id="railTemp" class="railbtn ctxi on"><svg class="ic" id="railTempIc" aria-hidden="true"><use href="#i-slab"/></svg><span class="railtip" id="railTempTip">Dielec</span></div>
+    <button type="button" id="railTempX" data-nx-usage="rail:zrusit" class="rx" onclick="railTempClose()" aria-label="Zrušiť výber"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
+  </div>
   <div class="raildiv"></div>
   <!-- A2: ABS kontrola hran = FUNKCNY prepinac (to iste EdgeCheck API ako
        toolbar a okno Vyroba). Ziadny flyout — 3-stavove nastavenie ostava

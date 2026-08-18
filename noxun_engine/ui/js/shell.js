@@ -64,6 +64,14 @@
     // nemeni — po oznaceni skrinky sa aj tak resetuje, lebo identita je nova).
     function effectiveCtx(){ return ctxEnabled() ? state.ctx : 'korpus'; }
 
+    // SAMOTNE ID z identity ('board:BRD-003' -> 'BRD-003'). Pouziva ho identity
+    // guard asynchronnych callbackov — server ho porovna s tym, co je NAOZAJ
+    // vybrate (Codex #168 P2).
+    function identityId(){
+      var i = state.identity.indexOf(':');
+      return i < 0 ? '' : state.identity.slice(i + 1);
+    }
+
     function setLabel(t){ state.label = String(t == null ? '' : t); }
 
     // --- zbalenia sektorov a skupin (audit A5) -------------------------------
@@ -103,6 +111,7 @@
       track: track,
       setCtx: setCtx,
       effectiveCtx: effectiveCtx,
+      identityId: identityId,
       setLabel: setLabel,
       mode: function(){ return state.mode; },
       label: function(){ return state.label; }
@@ -157,20 +166,29 @@
       var n = el(o.id);
       if (!n) return;
       var on = enabled && ctx === o.ctx;
+      var txt = enabled ? o.label : (o.label + ' — ' + reason);
       n.classList.toggle('on', on);
       n.setAttribute('aria-pressed', on ? 'true' : 'false');
       n.setAttribute('aria-disabled', enabled ? 'false' : 'true');
-      n.title = enabled ? o.label : (o.label + ' — ' + reason);
+      // Codex #168 P2: vysvetlenie patri do VLASTNEJ bubliny raily — natívny
+      // `title` sa zámerne NEPOUŽÍVA (bublina sa ukazuje hneď a druhý,
+      // oneskorený systémový tooltip by ju len zdvojil). Čítačke to isté
+      // povie aria-label.
+      var b = n.querySelector('.railtip');
+      if (b) b.textContent = txt;
+      n.setAttribute('aria-label', txt);
     });
     // Docasna polozka (dielec/doska): viditelnost riadi CSS podla rezimu,
-    // popis je jediny udaj, ktory sa meni.
-    var tip = el('railTempTip'), temp = el('railTemp');
-    if (tip && temp){
-      var kind = (mode === 'board') ? 'Doska' : 'Dielec';
-      var txt = NXShell.label() ? (kind + ' — ' + NXShell.label()) : kind;
-      tip.textContent = txt;
-      temp.setAttribute('aria-label', txt);
-      temp.title = txt;
+    // popis je jediny udaj, ktory sa meni. Sama polozka je len ukazovatel —
+    // akciou je susedny krizik (#railTempX).
+    var tip = el('railTempTip'), close = el('railTempX');
+    var kind = (mode === 'board') ? 'Doska' : 'Dielec';
+    var label = NXShell.label() ? (kind + ' — ' + NXShell.label()) : kind;
+    if (tip) tip.textContent = label;
+    if (close){
+      close.setAttribute('aria-label', mode === 'board'
+        ? ('Zrušiť výber — ' + label)
+        : ('Späť na skrinku — zrušiť výber dielca (' + label + ')'));
     }
     var s4 = el('s4Name');
     if (s4) s4.textContent = nxS4Title(mode, ctx);
@@ -191,14 +209,23 @@
   // (select_cabinet -> handle_select_cabinet). DOSKA: vycistenie vyberu na
   // serveri pod suspend guardom (vzor toolbaru „Vložiť" — Panel.show_insert);
   // ziadna operacia, ziadny zapis do modelu.
+  //
+  // Codex #168 P1: odchod z karty MUSI najprv DOKONCIT rozpisany zapis. Zmeny
+  // dosky (nazov, rozmer, pocet, smer) su debounced 400 ms a `NX.clearSelected`
+  // ich cez `cancelBoardEdits` zahodi — pouzivatel by o poslednu upravu ticho
+  // prisiel. Rovnaky flush handshake maju vsetky relay cesty okna Vyroba.
+  // Codex #168 P2: callback je asynchronny, preto nesie IDENTITU dosky —
+  // ak sa vyber medzitym zmenil, server zapis odmietne a len obnovi panel.
   function railTempClose(){
     var mode = NXShell.mode();
     if (mode === 'part'){
       if (typeof backToCabinet === 'function') backToCabinet();
       return;
     }
-    if (mode === 'board' && window.sketchup && sketchup.clear_selection){
-      sketchup.clear_selection('');
+    if (mode !== 'board') return;
+    if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
+    if (window.sketchup && sketchup.clear_selection){
+      sketchup.clear_selection(JSON.stringify({ board_id: NXShell.identityId() }));
     }
   }
 

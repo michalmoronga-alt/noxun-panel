@@ -23,8 +23,9 @@
   // — ale LEN hodnotu z tohto allowlistu. Je to zamer: rail Inspectora ma
   // staticke ID, no citatelny kluc („rail:zony") povie z odpoctu viac nez ID
   // tlacidla. Allowlist drzi invariant D-25 — kluc NIKDY nesmie prist z dat.
+  // (docasna polozka raily je len UKAZOVATEL — klikatelny je jej krizik.)
   var USAGE_KEYS = ['rail:korpus', 'rail:zony', 'rail:cela', 'rail:kovanie',
-                    'rail:docasny', 'rail:zrusit', 'rail:abs', 'rail:nastavenia', 'rail:studio'];
+                    'rail:zrusit', 'rail:abs', 'rail:nastavenia', 'rail:studio'];
 
   // --- klasifikacia (cista logika, testovatelna v Node cez module.exports) ---
 

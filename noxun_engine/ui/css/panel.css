@@ -472,12 +472,16 @@
   /* Docasna polozka (dielec/doska) — prerusovany ramik = "je tu len docasne". */
   .nx-inspector .railbtn.ctxi { border: 1px dashed var(--nx-part-border);
             background: var(--nx-part-bg); color: var(--nx-select); }
-  .nx-inspector .railbtn .rx { position: absolute; top: -3px; right: -3px; width: 14px; height: 14px;
-            border-radius: 50%; background: var(--nx-surface); border: 1px solid var(--nx-border);
-            color: var(--nx-ink-muted); cursor: pointer;
+  /* Krizik je SAMOSTATNE tlacidlo vedla ukazovatela (nie v nom) — vnorene
+     tlacidlo je neplatne HTML a span s role="button" nejde aktivovat
+     klavesnicou (Codex #168 P2). Obal drzi ich vzajomnu poziciu. */
+  .nx-inspector .railtempbox { position: relative; flex: 0 0 auto; display: inline-flex; }
+  .nx-inspector .railtempbox .rx { position: absolute; top: -3px; right: -3px; width: 15px; height: 15px;
+            padding: 0; border-radius: 50%; background: var(--nx-surface); border: 1px solid var(--nx-border);
+            color: var(--nx-ink-muted); cursor: pointer; z-index: 1;
             display: inline-flex; align-items: center; justify-content: center; }
-  .nx-inspector .railbtn .rx .ic { width: 9px; height: 9px; stroke-width: 3; }
-  .nx-inspector .railbtn .rx:hover { border-color: var(--nx-danger); color: var(--nx-danger); }
+  .nx-inspector .railtempbox .rx .ic { width: 9px; height: 9px; stroke-width: 3; }
+  .nx-inspector .railtempbox .rx:hover { border-color: var(--nx-danger); color: var(--nx-danger); }
   /* Bublina s popisom — rail je uzky, nazov kontextu sa don nezmesti. */
   .nx-inspector .railtip { position: absolute; left: 40px; top: 50%; transform: translateY(-50%);
             background: var(--nx-ink); color: var(--nx-on-accent); font-size: 11px; font-weight: 400;
@@ -485,8 +489,8 @@
             pointer-events: none; transition: opacity .1s; z-index: 60; }
   .nx-inspector .railbtn:hover .railtip, .nx-inspector .railbtn:focus .railtip { opacity: 1; }
   /* Docasna polozka sa ukazuje LEN pri oznacenom dielci/doske. */
-  .nx-inspector #railTemp, .nx-inspector #railTempDiv { display: none; }
-  .nx-inspector body.mode-part #railTemp, .nx-inspector body.mode-board #railTemp { display: inline-flex; }
+  .nx-inspector #railTempBox, .nx-inspector #railTempDiv { display: none; }
+  .nx-inspector body.mode-part #railTempBox, .nx-inspector body.mode-board #railTempBox { display: inline-flex; }
   .nx-inspector body.mode-part #railTempDiv, .nx-inspector body.mode-board #railTempDiv { display: block; }
   /* Hlavicka je jednoradova — logo o nieco vacsie (koncept UI 2.0). */
   .nx-inspector .nxhdr .nx-logo { width: 20px; height: 20px; }

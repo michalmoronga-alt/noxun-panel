@@ -3025,10 +3025,24 @@ module NoxunSuRunner
       model.selection.clear
       model.selection.add(board)
       before = model.entities.length
+      bid = e::Store.get(board, 'id').to_s
+      # Codex #168 P2: identity guard — callback zo STAREJ dosky (medzitym sa
+      # vyber zmenil) NESMIE zhodit novy vyber. Panel sa len obnovi.
       rec = []
       install_js_recorder(rec)
       begin
-        e::Panel.handle_clear_selection
+        e::Panel.handle_clear_selection({ 'board_id' => 'BRD-NEEXISTUJE' }.to_json)
+      ensure
+        remove_js_recorder
+      end
+      ok('UI-B1: krizik STAREJ dosky vyber NEZHODI (identity guard)',
+         model.selection.to_a.include?(board) &&
+           rec.none? { |s| s.include?('NX.clearSelected()') })
+
+      rec = []
+      install_js_recorder(rec)
+      begin
+        e::Panel.handle_clear_selection({ 'board_id' => bid }.to_json)
       ensure
         remove_js_recorder
       end

@@ -201,9 +201,20 @@ module Noxun
         # (toolbar „Vložiť"): vycistenie pod SUSPEND guardom (inak by observer
         # spustil vlastny druhy refresh) a refresh `dedup: false` — dedup MENI
         # model a z UI akcie sa do modelu nikdy nezapisuje (lekcia D-103).
-        def handle_clear_selection
+        #
+        # IDENTITY GUARD (Codex #168 P2): callback z HtmlDialogu je asynchronny —
+        # kym dobehne, mohol pouzivatel oznacit nieco ine alebo prepnut dokument.
+        # Cisti sa preto LEN vtedy, ked je stale vybrata TA ISTA doska, ktoru
+        # panel zobrazoval; inak sa vyber nedotkne a panel sa len obnovi.
+        # Prazdny/chybajuci board_id = stary klient -> spravanie ako doteraz.
+        def handle_clear_selection(payload = nil)
           model = Sketchup.active_model
           return if model.nil?
+
+          want = payload ? parse(payload)['board_id'].to_s : ''
+          board = find_board(model)
+          have = board ? Store.get(board, 'id').to_s : ''
+          return push_selected(model, dedup: false) if !want.empty? && want != have
 
           suspend_selection_sync { model.selection.clear }
           push_selected(model, dedup: false)
