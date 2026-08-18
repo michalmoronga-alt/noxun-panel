@@ -3183,10 +3183,11 @@ module NoxunSuRunner
     e::Panel.handle_camera_focus({ 'cabinet_id' => cid }.to_json)
     ok('UI-B2: kamera BEZ identity dokumentu pohlad NEZAROVNA (prisny guard)',
        model.active_view.camera.eye == eye0)
-    # Neexistujuca skrinka: len hlaska, ziadna zmena pohladu.
+    # Codex #169 P2: ID, ktore nesedi s AKTUALNYM vyberom (medzitym sa zmenil),
+    # sa odmieta — pohlad nesmie odskocit inam, nez kde pouzivatel je.
     e::Panel.handle_camera_focus({ 'cabinet_id' => 'CAB-NEEXISTUJE',
                                    'model_guid' => e::Panel.model_guid(model) }.to_json)
-    ok('UI-B2: kamera na neexistujucu skrinku pohlad NEMENI',
+    ok('UI-B2: kamera na INU nez oznacenu skrinku pohlad NEMENI (test cerstvosti)',
        model.active_view.camera.eye == eye0)
 
     e::Panel.handle_camera_focus({ 'cabinet_id' => cid,
@@ -3204,9 +3205,33 @@ module NoxunSuRunner
 
     # Keby zarovnanie bolo vlastnou operaciou, 1x Spat by vratilo JU a skrinka
     # by ostala v modeli. Undo teda musi zmazat prave vlozenu skrinku.
+    # (Test ide TU — poslednou modelovou operaciou je zatial vlozenie skrinky.)
     Sketchup.undo
     ok('UI-B2: 1x Spat zmaze skrinku (zarovnanie pohladu NIE JE undo krok)',
        inst.nil? || !inst.valid?)
+
+    # Codex #169 P2: OTOCENA skrinka — celo uz nemieri na globalne -Y, takze
+    # pevna os by ukazala bok. Smer musi vyjst z transformacie skrinky.
+    rot = e::CabinetBuilder.build(model, cfg)
+    if rot
+      model.start_operation('SU-TEST rotacia skrinky', true)
+      rot.transformation = rot.transformation *
+                           Geom::Transformation.rotation(ORIGIN, Z_AXIS, 90.degrees)
+      model.commit_operation
+      rid = e::Store.get(rot, 'cabinet_id').to_s
+      model.selection.clear
+      model.selection.add(rot)
+      e::Panel.handle_camera_focus({ 'cabinet_id' => rid,
+                                     'model_guid' => e::Panel.model_guid(model) }.to_json)
+      cam2 = model.active_view.camera
+      # Lokalne -Y otocenej skrinky ukazuje do globalneho +X (rotacia +90 okolo Z).
+      fwd = rot.transformation.yaxis
+      to_eye = cam2.eye - rot.bounds.center
+      ok('UI-B2: otocena skrinka — oko stoji pred JEJ celom (smer z transformacie)',
+         to_eye.dot(fwd) < 0 && cam2.up.z > 0.9)
+    else
+      info('UI-B2: druhu skrinku sa nepodarilo vlozit — rotacna cast preskocena')
+    end
 
     cleanup(model)
   rescue StandardError => ex

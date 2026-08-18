@@ -273,11 +273,12 @@ module Noxun
         # spravil prazdny krok Spat, ktory by pouzivatelovi zjedol jeden Ctrl+Z
         # — lekcia D-103). Ziadny vyber sa tiez nemeni: pohlad je pohlad.
         #
-        # IDENTITY GUARD: callback HtmlDialogu je asynchronny a ID skriniek sa
-        # naprie dokumentmi opakuju, takze sa pohlad zarovnava LEN vtedy, ked
-        # payload sedi s AKTIVNYM dokumentom (rovnaky prisny guard ako
-        # `handle_clear_selection` — prazdny guid je okno bez dobehnuteho
-        # NX.init, nie stary klient).
+        # IDENTITY GUARD (Codex #169 P2): callback HtmlDialogu je asynchronny,
+        # takze sa overuje OBOJE — dokument aj VYBER. ID skriniek sa naprie
+        # dokumentmi opakuju (prisny guid guard, vzor `handle_clear_selection`)
+        # a kym callback dobehne, mohol pouzivatel oznacit inu skrinku; vtedy by
+        # pohlad odskocil na tu, ktoru uz needituje. Pri nezhode sa pohlad
+        # nedotkne a panel sa len zosuladi (vzor `handle_select_cabinet`).
         def handle_camera_focus(payload = nil)
           model = Sketchup.active_model
           return if model.nil?
@@ -286,28 +287,49 @@ module Noxun
           return set_status('Pohľad sa nezarovnal — panel patrí inému dokumentu.', true) if
             data['model_guid'].to_s != model_guid(model)
 
-          cab = find_cabinet_by_id(model, data['cabinet_id'].to_s)
-          return set_status('Skrinka sa nenašla — pohľad sa nezarovnal.', true) if cab.nil?
+          want = data['cabinet_id'].to_s
+          # Vybraty moze byt aj DIELEC skrinky (rail drzi docasnu polozku) —
+          # find_cabinet vrati jeho rodica, takze kamera funguje aj z karty dielca.
+          cab = find_cabinet(model)
+          return refresh_after_stale(model) if cab.nil? || Store.get(cab, 'cabinet_id').to_s != want
 
           focus_camera_on(model, cab)
           set_status('Pohľad zarovnaný na skrinku (čelný pohľad).', false)
         end
 
-        # Celny pohlad: oko pred skrinkou v osi -Y, ciel je stred jej obalky,
-        # hore je +Z. `view.zoom(entity)` potom ramec dotiahne na jej obsah
-        # (samotny `set` len urci SMER pohladu). Vzdialenost sa berie z uhlopriecky
-        # obalky, aby zoom nezacinal zvnutra skrinky.
+        # Celny pohlad na skrinku: oko PRED jej celom, ciel je stred obalky.
+        #
+        # Codex #169 P2: smer sa berie z TRANSFORMACIE skrinky, nie z globalnych
+        # osi. Otocena skrinka je podporovany stav (rotaciu zamerne zachovava
+        # ScaleWatch.clean_transform), takze pevne -Y by pri nej ukazalo bok
+        # alebo chrbat. Lokalne: hlbka rastie v +Y (celo je pri y=0), vyska v +Z
+        # — celny pohlad teda stoji v smere lokalneho -Y a hore je lokalne +Z.
+        # Vzdialenost z uhlopriecky obalky, aby oko nezacinalo vnutri skrinky;
+        # ramec potom dotiahne `view.zoom(entity)`.
         def focus_camera_on(model, ent)
           view = model.active_view
           bb = ent.bounds
           center = bb.center
           diag = bb.diagonal.to_f
           diag = 40.0 if diag <= 0 # ~1 m v palcoch (degenerovana obalka)
-          eye = Geom::Point3d.new(center.x, center.y - diag * 1.5, center.z)
-          view.camera.set(eye, center, Geom::Vector3d.new(0, 0, 1))
+          fwd = camera_axis(ent.transformation.yaxis, Geom::Vector3d.new(0, 1, 0))
+          up = camera_axis(ent.transformation.zaxis, Geom::Vector3d.new(0, 0, 1))
+          eye = center.offset(fwd.reverse, diag * 1.5)
+          view.camera.set(eye, center, up)
           view.zoom(ent)
           view.invalidate
           true
+        end
+
+        # Os transformacie ako JEDNOTKOVY vektor. Zoskalovana (alebo degenerovana)
+        # os by kameru rozhodila, preto sa normalizuje a pri nulovej dlzke sa
+        # pouzije globalna nahrada.
+        def camera_axis(vec, fallback)
+          return fallback if vec.nil? || vec.length.to_f <= 0
+
+          vec.normalize
+        rescue StandardError
+          fallback
         end
 
       end

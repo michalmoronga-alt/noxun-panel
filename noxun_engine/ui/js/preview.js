@@ -53,12 +53,22 @@
   // UI-B2: kazda projekcia si berie prave tolko miesta, kolko jej koty
   // potrebuju — inak by kota skoncila mimo okna a pouzivatel by ju nenasiel.
   var DIM_EXT = 70; // mm sceny pre kotovacie ciary a texty
+  // Rezerva NAD kotou hlbky: odsadenie ciary (14) + znacka (7) + text (9) + vzduch.
+  var DIM_TOP = 34;
+  // Odsadenie kotovacej ciary hlbky od skosenej hornej plochy (zdielane so
+  // scenou — inak by sa rezerva a kresba rozisli).
+  var DIM_DEPTH_OFF = 14;
   // Naznak hlbky v korpusovej projekcii (skosena horna plocha, vzor mockupu).
   // Nie je to mierka hlbky — je to citatelny NAZNAK; presnu hodnotu nesie kota.
   function pvDepthSkew(){
     var D = numv('depth') || 0;
     return D > 0 ? Math.min(Math.max(D * 0.18, 24), 130) : 0;
   }
+  // Kde LEZI kota hlbky a kam az musi siahat scena, aby ju fit neorezal.
+  // Obe hodnoty su TU, aby sa rezerva a kresba nemohli rozist (Codex #169 P2).
+  // Ciste (Node testy).
+  function pvDepthDimZ(H, sk){ return H + sk + DIM_DEPTH_OFF; }
+  function pvSceneTopZ(H, sk){ return sk > 0 ? (H + sk + DIM_TOP) : H; }
   function sceneSize(){
     var W = numv('width')||600, H = numv('height')||720;
     var solid = (previewMode === 'cab' || previewMode === 'hw');
@@ -68,7 +78,10 @@
     if (previewMode === 'cab'){
       // D-11: vlavo koty sokla/tela, vpravo vyska, dole sirka, hore naznak hlbky
       var sk = pvDepthSkew();
-      minX = -DIM_EXT; maxX = W + DIM_EXT + sk; minZ = -DIM_EXT; maxZ = H + sk;
+      minX = -DIM_EXT; maxX = W + DIM_EXT + sk; minZ = -DIM_EXT;
+      // Codex #169 P2: nad skosenim este LEZI KOTA hlbky — scene musi patrit aj
+      // jej ciara, znacky a text, inak ju fit orezal.
+      maxZ = pvSceneTopZ(H, sk);
     } else if (previewMode === 'fronts'){
       maxX = Math.max(maxX, W) + DIM_EXT; // koty vysok riadkov vpravo
       minX = Math.min(minX, 0) - 34;      // cisla medzier pri lavom okraji
@@ -414,7 +427,7 @@
     }
     // hlbka: kota na skosenej hornej ploche (naznak) — inak aspon text
     if (D > 0){
-      if (sk > 0) pvDimH(S, rx, ry, W, W + sk, H + sk + 14, 'H ' + Math.round(D), 18);
+      if (sk > 0) pvDimH(S, rx, ry, W, W + sk, pvDepthDimZ(H, sk), 'H ' + Math.round(D), 18);
       else pvText(S, rx(W/2), ry(H/2), 'hĺbka ' + Math.round(D) + ' mm', 20);
     }
   }
@@ -922,6 +935,7 @@
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { NXLayers: NXLayers, cabTabPreview: cabTabPreview,
                        nxHwMarks: nxHwMarks, nxHwSummary: nxHwSummary,
-                       nxFrontDims: nxFrontDims, nxZoneSpans: nxZoneSpans };
+                       nxFrontDims: nxFrontDims, nxZoneSpans: nxZoneSpans,
+                       pvDepthDimZ: pvDepthDimZ, pvSceneTopZ: pvSceneTopZ };
   }
 

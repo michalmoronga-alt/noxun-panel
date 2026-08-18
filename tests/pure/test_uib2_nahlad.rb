@@ -97,6 +97,30 @@ NxTest.test('UI-B2: kamera nesie identitu dokumentu aj skrinky (asynchronny call
   NxTest.assert(rb.include?("data['cabinet_id']"), 'server musi hladat skrinku podla ID z payloadu')
 end
 
+# Codex #169 P2: kym callback dobehne, mohol pouzivatel oznacit inu skrinku —
+# vtedy pohlad NESMIE odskocit na tu stara (ostatne asynchronne akcie panela
+# maju rovnaky test cerstvosti).
+NxTest.test('UI-B2: kamera sa odmietne, ked sa medzitym zmenil VYBER') do
+  rb = UIB2_SEL_CODE[/def handle_camera_focus.*?\n        end\n/m].to_s
+  NxTest.assert(rb.include?('find_cabinet(model)'),
+                'kamera musi vychadzat z AKTUALNEHO vyberu, nie len z ID v payloade')
+  NxTest.assert(rb.include?("Store.get(cab, 'cabinet_id')"),
+                'kamera musi porovnat oznacenu skrinku s ID z payloadu')
+  NxTest.assert(rb.include?('refresh_after_stale'),
+                'pri nezhode sa ma panel len zosuladit (ziadny pohyb pohladu)')
+end
+
+# Codex #169 P2: otocena skrinka je podporovany stav (rotaciu zachovava
+# ScaleWatch.clean_transform) — pevne globalne -Y by pri nej ukazalo bok.
+NxTest.test('UI-B2: celny pohlad sa odvodzuje z TRANSFORMACIE skrinky') do
+  rb = UIB2_SEL_CODE[/def focus_camera_on.*?\n        end\n/m].to_s
+  NxTest.assert(rb.include?('ent.transformation.yaxis') && rb.include?('ent.transformation.zaxis'),
+                'smer aj hore musia ist z transformacie skrinky (otocena skrinka)')
+  NxTest.refute(rb.include?('center.y -'), 'kamera nesmie pouzivat pevnu globalnu os')
+  NxTest.assert(UIB2_SEL_CODE.include?('def camera_axis'),
+                'os transformacie sa musi normalizovat (zoskalovana skrinka)')
+end
+
 # --- 3) nahlad kresli len z existujucich payloadov ---------------------------
 
 NxTest.test('UI-B2: projekcie nepytaju od servera ziadne nove data') do

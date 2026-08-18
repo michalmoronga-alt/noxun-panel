@@ -178,6 +178,16 @@ deq(PV.nxFrontDims([{ id: 'F1', z: 100, height: 0 }], GEOM), [],
 const withTop = PV.nxFrontDims([{ id: 'F1', z: 100, height: 500 }], GEOM);
 deq(withTop.map(d => d.kind), ['front', 'gap'], 'zvysok pod stropom je medzera');
 
+// Kota hlbky lezi NAD naznakom skosenia — scena jej musi nechat miesto na
+// ciaru, znacky aj text, inak ju fit oreze (Codex #169 P2).
+[ { H: 720, sk: 100.8 }, { H: 2000, sk: 24 }, { H: 400, sk: 130 } ].forEach(c => {
+  const dimZ = PV.pvDepthDimZ(c.H, c.sk);
+  const top = PV.pvSceneTopZ(c.H, c.sk);
+  ok(dimZ > c.H + c.sk, `kota hlbky lezi nad skosenim (H=${c.H})`);
+  ok(top >= dimZ + 16, `scena nechava miesto na kotu hlbky aj jej text (H=${c.H}): top=${top}, kota=${dimZ}`);
+});
+eq(PV.pvSceneTopZ(720, 0), 720, 'bez hlbky (bez skosenia) sa scena nad korpus nerozsiruje');
+
 // Koty sirok zon: distinct stlpce, zoradene zlava.
 deq(PV.nxZoneSpans([
   { leaf: true, x: 18, w: 414, z: 0, h: 500 },
