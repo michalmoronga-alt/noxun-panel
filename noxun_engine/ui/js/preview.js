@@ -78,6 +78,28 @@
     var l = Math.max(1, nxNumOr(L, 0)), w = Math.max(1, nxNumOr(Wd, 0));
     return { x: -PV_PAD, y: -PV_PAD, w: l + PV_PAD + DIM_EXT, h: w + PV_PAD + DIM_EXT };
   }
+  // Rozsah DRAFT ciel vkladanej sablony v mm modelu (Codex #175 P2). Zrkadlo
+  // `frontsExtent`, ale nad draftom — vo vkladani `frontItems` neexistuje.
+  // null = kresli sa doska alebo sablona ziadne cela nema. Ciste jadro je
+  // `nxFrontsExtent` (Node testy).
+  function insertFrontsExtent(){
+    if (previewMode !== 'insert' || pvInsertBoard()) return null;
+    var gs = 2; var gsv = numv('fr_gap_sides'); if (!isNaN(gsv)) gs = gsv;
+    return nxFrontsExtent(pvInsertFronts(), numv('width') || 0, numv('height') || 0, gs);
+  }
+  // Ciste (Node testy): obalka korpus ∪ cela. Zaporny bocny okraj = cela sirsie
+  // nez korpus; zaporne medzery hore/dole = cela nad/pod obrysom.
+  function nxFrontsExtent(items, W, H, gapSides){
+    if (!items || !items.length) return null;
+    var gs = nxNumOr(gapSides, 2), w = nxNumOr(W, 0), h = nxNumOr(H, 0);
+    var e = { minX: Math.min(0, gs), maxX: Math.max(w, w - gs), minZ: 0, maxZ: h };
+    items.forEach(function(it){
+      if (!it) return;
+      e.minZ = Math.min(e.minZ, nxNumOr(it.z, 0));
+      e.maxZ = Math.max(e.maxZ, nxNumOr(it.z, 0) + nxNumOr(it.height, 0));
+    });
+    return e;
+  }
   // Je prave kreslena vkladana DOSKA? (projekcia 'insert' ma dve podoby)
   function pvInsertBoard(){
     return previewMode === 'insert' && typeof getInsertKind === 'function' && getInsertKind() === 'board';
@@ -97,6 +119,15 @@
       // Codex #169 P2: nad skosenim este LEZI KOTA hlbky — scene musi patrit aj
       // jej ciara, znacky a text, inak ju fit orezal.
       maxZ = pvSceneTopZ(H, sk);
+      // Codex #175 P2: vo VKLADANI sa cela naozaj kreslia, a s odomknutym limitom
+      // presahov (D-22) mozu sablonove cela vytrcat MIMO obrys korpusu. Rezerva
+      // na koty ich nemusi pokryt, preto sa scena roztiahne o ich skutocny rozsah
+      // (frontsExtent cita `frontItems`, ktore su tu null — pasca FIX 11).
+      var ie = insertFrontsExtent();
+      if (ie){
+        minX = Math.min(minX, ie.minX); maxX = Math.max(maxX, ie.maxX);
+        minZ = Math.min(minZ, ie.minZ); maxZ = Math.max(maxZ, ie.maxZ);
+      }
     } else if (previewMode === 'fronts'){
       maxX = Math.max(maxX, W) + DIM_EXT; // koty vysok riadkov vpravo
       minX = Math.min(minX, 0) - 34;      // cisla medzier pri lavom okraji
@@ -416,8 +447,15 @@
     } else if (previewMode === 'insert'){
       // UI-C1b (N9): sablona TAK, AKO BUDE VLOZENA. Cela su PREPINATELNA vrstva
       // (chip Čelá je defaultne zapnuty) — po zhasnuti vidno vnutro sablony.
-      if (NXLayers.stateOf('insert', 'cela', pvAvail()) === 'on') renderFrontsPreview(S, rx, ry, g);
-      else drawZonesGhost(S, rx, ry, g);
+      if (NXLayers.stateOf('insert', 'cela', pvAvail()) === 'on'){
+        renderFrontsPreview(S, rx, ry, g);
+      } else if (NXLayers.stateOf('insert', 'zony', pvAvail()) !== 'on'){
+        // Codex #175 P2: zhasnute cela ODKRYVAJU vnutro — zony sa vtedy kreslia
+        // ako podklad. Ked ich uz prisvietil CHIP, kresli ich ghost vrstva, takze
+        // sa tu preskocia (inak by tie iste ciary isli do SVG dvakrat).
+        // Je to ten isty vzor ako v projekcii Kovanie (drawHwBase).
+        drawZonesGhost(S, rx, ry, g);
+      }
       renderCabOutline(S, rx, ry, W, H, g.fh);
     } else {
       // D-08: kontext Korpus — kotovany celny rez (Š/V/sokel + naznak hlbky)
@@ -1123,6 +1161,8 @@
     var i = dragState.idx, zid = dragState.zid;
     // fix #5: posli kompletny layout (vsetky polia uz maju explicitne sizes zo freeze + dragu)
     if (selectedCabId) pushFieldCuts(zid, i);
+    // Codex #175 P2: v navrhu tah priecky meni plochy polic — odhad musi ist s nimi.
+    else if (typeof nxDraftChanged === 'function') nxDraftChanged();
     dragState = null;
   }
 
@@ -1136,6 +1176,7 @@
                        pvDepthDimZ: pvDepthDimZ, pvSceneTopZ: pvSceneTopZ,
                        // UI-C1b: draft ciel, odhad navrhu a doskova projekcia
                        nxFrontsResolve: nxFrontsResolve, nxDraftStats: nxDraftStats,
-                       nxGrainArrows: nxGrainArrows, pvBoardScene: pvBoardScene };
+                       nxGrainArrows: nxGrainArrows, pvBoardScene: pvBoardScene,
+                       nxFrontsExtent: nxFrontsExtent };
   }
 

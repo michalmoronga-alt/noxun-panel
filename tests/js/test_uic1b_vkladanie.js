@@ -77,6 +77,18 @@ eq(legacy[0].mode, 'auto', 'chybajuci mode = AUTO');
 eq(legacy[0].type, 'door', 'chybajuci typ = dvierka');
 eq(legacy[0].profile, 'none', 'chybajuci profil = bez profilu');
 
+// --- rozsah draft ciel: scena vkladania musi obsiahnut PRESAHY (Codex #175) ---
+const E = pv.nxFrontsExtent;
+eq(E([], 600, 720, 2), null, 'bez ciel ziadny rozsah (scena ostava korpusova)');
+eq(E(null, 600, 720, 2), null, 'prazdny vstup nespadne');
+eq(E([{ z: 102, height: 600 }], 600, 720, 2), { minX: 0, maxX: 600, minZ: 0, maxZ: 720 },
+  'bezne cela sa zmestia do obrysu korpusu');
+// D-22: odomknuty limit dovoli ZAPORNE okraje = celo presahuje obrys.
+eq(E([{ z: -40, height: 800 }], 600, 720, -30),
+  { minX: -30, maxX: 630, minZ: -40, maxZ: 760 },
+  'presahujuce celo roztiahne rozsah na vsetky strany');
+eq(E([{ z: 'x', height: null }], 600, 720, 2).maxZ, 720, 'nezmyselne hodnoty rozsah nerozbiju');
+
 // ============ 2) ODHAD NAVRHU (Dielcov / Materiál) ==========================
 const S = pv.nxDraftStats;
 const G0 = { W: 600, H: 720, D: 510, t: 18, fh: 100, gapSides: 2,

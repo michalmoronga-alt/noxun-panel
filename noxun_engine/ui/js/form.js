@@ -192,6 +192,14 @@
     // a builder sa kvoli informacnemu riadku nespusta.
     if (!selectedCabId && NXInsert.state.kind !== 'board') setInsertCabInfo();
   }
+  // Codex #175 P2: zmena STROMU ZON v navrhu (delenie, police, vycistenie,
+  // rozmery poli) mala vlastnu cestu — renderPreview + refreshZoneUI — takze
+  // odhad „≈ Dielcov / ≈ Materiál" ostaval zatuchnuty az do editu ineho pola.
+  // Toto je jeho jediny obnovovaci bod mimo updateAvailable.
+  function nxDraftChanged(){
+    if (selectedCabId || NXInsert.state.kind === 'board') return;
+    setInsertCabInfo();
+  }
   // Odhad je ZNACENY (≈) a riadky ostavaju neklikatelne (nie je co oznacit v
   // modeli) — vzor D-78: aria-disabled + vysvetlenie, nikdy ticho mrtve.
   function setInsertCabInfo(){
@@ -296,6 +304,17 @@
       '<svg viewBox="0 0 60 40" aria-hidden="true">' + nxTplGlyph(tp) + '</svg>' +
       '<span>' + esc(tp.name) + (badge ? ' <i>· ' + esc(badge) + '</i>' : '') + '</span></button>';
   }
+  // Codex #175 P2: CESTA SPAT NA PREDVOLBY. Klik na uz vybranu dlazdicu je no-op
+  // (dvojklik posiela dva kliky za sebou), takze bez tejto dlazdice by sa vyber
+  // sablony nedal zrusit — najma pri doske, ktora si ho drzi aj cez prepnutie
+  // typu. Je to nahrada za zaniknutu volbu „— vyber —" v selecte.
+  function tplClearTileHtml(sel){
+    return '<button type="button" class="tpltile tplclear' + (sel ? '' : ' on') + '"' +
+      ' data-tpl-clear="1" title="Bez šablóny — vráti predvolené hodnoty tohto typu">' +
+      '<svg viewBox="0 0 60 40" aria-hidden="true">' +
+      '<rect x="2" y="2" width="56" height="36" stroke-dasharray="4 3"/></svg>' +
+      '<span>Bez šablóny</span></button>';
+  }
   function renderTemplateTiles(force){
     var box = el('tplTiles'); if (!box) return;
     var type = NXInsert.insertType();
@@ -310,11 +329,12 @@
       groups.recent.forEach(function(tp){ h += tplTileHtml(tp, sel); });
       h += '</div><div class="tplsec">Všetky šablóny</div>';
     }
-    if (groups.all.length){
-      h += '<div class="tpltiles">';
-      groups.all.forEach(function(tp){ h += tplTileHtml(tp, sel); });
-      h += '</div>';
-    } else {
+    // „Bez šablóny" stoji ako PRVA dlazdica skupiny „Všetky šablóny" — je to
+    // rovnocenna volba (predvolby typu), nie skryta akcia.
+    h += '<div class="tpltiles">' + tplClearTileHtml(sel);
+    groups.all.forEach(function(tp){ h += tplTileHtml(tp, sel); });
+    h += '</div>';
+    if (!groups.all.length){
       h += '<div class="tplempty">Zatiaľ žiadna šablóna tohto typu — ulož si ju z hotovej skrinky.</div>';
     }
     box.dataset.forType = type;
@@ -330,7 +350,10 @@
     var sel = NXInsert.templateName(kind);
     var tiles = box.querySelectorAll('.tpltile');
     for (var i = 0; i < tiles.length; i++){
-      tiles[i].classList.toggle('on', tiles[i].getAttribute('data-tpl-name') === sel);
+      var on = tiles[i].hasAttribute('data-tpl-clear')
+        ? !sel                                                   // „Bez šablóny"
+        : (tiles[i].getAttribute('data-tpl-name') === sel);
+      tiles[i].classList.toggle('on', on);
     }
     setTplMeta();
   }
@@ -344,29 +367,36 @@
   // Klik na UZ vybranu dlazdicu je NO-OP (nie odznacenie): dvojklik posiela dva
   // kliky za sebou a odznacenie by medzi nimi kartu vratilo na defaulty typu.
   // fix #2 plati dalej: ziadny apply_all, sablona meni len navrh karty.
+  // `name` = '' (dlazdica „Bez šablóny") vracia kartu na PREDVOLBY typu.
   function pickTemplateTile(name){
     var kind = (NXInsert.insertType() === 'board') ? 'board' : 'cabinet';
-    if (!name || NXInsert.templateName(kind) === name) return;
-    NXInsert.setTemplateName(kind, name);
+    var next = (name === undefined || name === null) ? '' : String(name);
+    if (NXInsert.templateName(kind) === next) return;
+    NXInsert.setTemplateName(kind, next);
     materializeInsertCard();
   }
   // JEDNA delegacia na kontajneri (Codex FIX 14): dlazdice sa prekresluju, ale
   // listener zije na statickom #tplTiles. Dvojklik vklada TOU ISTOU validovanou
   // cestou ako zelene tlacidlo (ziadne priame volanie bridgu odtialto — N17).
+  // Meno sablony z dlazdice; dlazdica „Bez šablóny" vracia prazdny retazec.
+  function tplTileName(node){
+    return node.hasAttribute('data-tpl-clear') ? '' : (node.getAttribute('data-tpl-name') || '');
+  }
   var tplTilesBound = false;
   function setupTemplateTiles(){
     if (tplTilesBound) return;
     var box = el('tplTiles'); if (!box) return;
     box.addEventListener('click', function(ev){
       var t = closestClass(ev.target, 'tpltile'); if (!t) return;
-      pickTemplateTile(t.getAttribute('data-tpl-name'));
+      pickTemplateTile(tplTileName(t));
     });
     box.addEventListener('dblclick', function(ev){
       var t = closestClass(ev.target, 'tpltile'); if (!t) return;
       // N17: klik uz sablonu vybral a karta sa z nej materializovala — dvojklik
       // len spusti TO ISTE vlozenie ako zelene tlacidlo (validacia, zamky aj
-      // peciatka pouzitia ostavaju v jednej ceste).
-      pickTemplateTile(t.getAttribute('data-tpl-name'));
+      // peciatka pouzitia ostavaju v jednej ceste). Na dlazdici „Bez šablóny"
+      // vlozi predvolby typu — tiez tou istou cestou.
+      pickTemplateTile(tplTileName(t));
       if (NXInsert.insertType() === 'board') insertBoard(); else insertCabinet();
     });
     tplTilesBound = true;

@@ -629,6 +629,10 @@
   .nx-inspector .tpltile svg rect { fill: var(--nx-surface); stroke: var(--nx-border-strong); stroke-width: 1.5; }
   .nx-inspector .tpltile svg path { fill: none; stroke: var(--nx-border-strong); stroke-width: 1.5; }
   .nx-inspector .tpltile.on svg rect { fill: var(--nx-surface); stroke: var(--nx-select); }
+  /* „Bez šablóny" = návrat na predvolby typu; prerušovaný obrys hovorí, že to
+     nie je uložená šablóna, ale prázdny štart (Codex #175 P2). */
+  .nx-inspector .tplclear { color: var(--nx-ink-muted); }
+  .nx-inspector .tplclear svg rect { fill: var(--nx-surface-sunken); }
   .nx-inspector .tpltile span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .nx-inspector .tpltile i { font-style: normal; color: var(--nx-ink-faint); }
   /* Hlavicka skupiny dlazdic (Naposledy pouzite / Vsetky sablony) — rovnaky

@@ -94,6 +94,55 @@ end
 
 # --- 3) delegacia + jedna insert cesta ---------------------------------------
 
+NxTest.test('UI-C1b: mriezka ponuka aj CESTU SPAT na predvolby (Codex #175 P2)') do
+  # Klik na uz vybranu dlazdicu je no-op (dvojklik posiela dva kliky), takze bez
+  # dlazdice „Bez šablóny" by sa vyber nedal zrusit — najma pri doske, ktora si
+  # ho drzi aj cez prepnutie typu. Je to nahrada za volbu „— vyber —" v selecte.
+  NxTest.assert(UIC1B_FORM_CODE.include?('function tplClearTileHtml('),
+                'chyba dlazdica „Bez šablóny"')
+  render = UIC1B_FORM_CODE[/function renderTemplateTiles\(force\).+?\n  \}/m].to_s
+  NxTest.assert(render.include?('tplClearTileHtml(sel)'),
+                'dlazdica „Bez šablóny" musi byt v mriezke, nie len v kode')
+  NxTest.assert(UIC1B_FORM_CODE.include?("data-tpl-clear=\"1\""),
+                'dlazdica sa musi dat rozoznat od sablony rovnakeho mena')
+  name_fn = UIC1B_FORM_CODE[/function tplTileName\(node\).+?\n  \}/m].to_s
+  NxTest.assert(name_fn.include?("hasAttribute('data-tpl-clear')"),
+                'delegacia musi z clear dlazdice vratit prazdne meno')
+  pick = UIC1B_FORM_CODE[/function pickTemplateTile\(name\).+?\n  \}/m].to_s
+  NxTest.refute(pick.include?('if (!name'),
+                'prazdne meno uz NIE JE no-op — je to navrat na predvolby typu')
+end
+
+NxTest.test('UI-C1b: odhad navrhu sa obnovi aj po zmene ZON (Codex #175 P2)') do
+  # Zonove operacie navrhu maju vlastnu cestu (renderPreview + refreshZoneUI) —
+  # bez tohto hooku ostal „≈ Dielcov / ≈ Materiál" zatuchnuty.
+  NxTest.assert(UIC1B_FORM_CODE.include?('function nxDraftChanged('),
+                'chyba obnovovaci bod odhadu mimo updateAvailable')
+  actions = uic1b_code(File.read(File.join(UIC1B_UI, 'js', 'actions.js'), encoding: 'UTF-8'), :js)
+  NxTest.assert(actions.scan('nxDraftChanged()').length >= 5,
+                'delenie, police, vycistenie aj rozmery poli musia odhad obnovit')
+  pvjs = uic1b_code(File.read(File.join(UIC1B_UI, 'js', 'preview.js'), encoding: 'UTF-8'), :js)
+  NxTest.assert(pvjs[/function endDivDrag\(ev\).+?\n  \}/m].to_s.include?('nxDraftChanged'),
+                'tah priecky v navrhu meni plochy polic — odhad ide s nimi')
+end
+
+NxTest.test('UI-C1b: scena vkladania obsiahne PRESAHY draft ciel (Codex #175 P2)') do
+  pvjs = uic1b_code(File.read(File.join(UIC1B_UI, 'js', 'preview.js'), encoding: 'UTF-8'), :js)
+  NxTest.assert(pvjs.include?('function nxFrontsExtent('),
+                'rozsah draft ciel je cista funkcia (Node testy)')
+  scene = pvjs[/function sceneSize\(\).+?\n  \}/m].to_s
+  NxTest.assert(scene.include?('insertFrontsExtent()'),
+                'scena vkladania musi ratat s celami mimo obrysu (D-22 odomknute presahy)')
+end
+
+NxTest.test('UI-C1b: zony sa vo vkladani nekreslia dvakrat (Codex #175 P2)') do
+  # Zhasnute cela odkryvaju vnutro — zony sa vtedy kreslia ako podklad. Ked ich
+  # uz prisvietil CHIP, kresli ich ghost vrstva; obe naraz = dvojity tah.
+  pvjs = uic1b_code(File.read(File.join(UIC1B_UI, 'js', 'preview.js'), encoding: 'UTF-8'), :js)
+  NxTest.assert(pvjs.include?("} else if (NXLayers.stateOf('insert', 'zony', pvAvail()) !== 'on'){"),
+                'podklad zon sa musi preskocit, ked je chip Zóny zapnuty (vzor drawHwBase)')
+end
+
 NxTest.test('UI-C1b: klik aj dvojklik idu cez JEDNU delegaciu na kontajneri') do
   tile = UIC1B_FORM_CODE[/function tplTileHtml\(tp, sel\).+?\n  \}/m].to_s
   NxTest.refute(tile.empty?, 'tplTileHtml sa nenasla')
