@@ -11,7 +11,7 @@
 
 **UI-B · Inspector kostra**
 - ~~**UI-B1 · Kostra panela (aj D-51)**~~ — **HOTOVO** (PR #168, v0.7.4): rail + 4 sektory s exkluzivitou skupín, presun existujúcich kariet, šírka 470 px, tabuľka rozmerov okien D-51 v [../docs/UI_DIZAJN.md](../docs/UI_DIZAJN.md). Uzatvára aj **D-91** (finálny domov satelitov = Štúdio v raile). *Zvyšok D-51 — riadky tabuľky pre satelitné okná — sa doplní, keď ich prevezme Štúdio.*
-- **UI-B2 · Náhľad (aj D-27)** — kontextové projekcie s kótami + spodný pás: vrstvové chipy Zóny·Čelá·Kovanie·Olep (rýchle zobraziť/skryť — D-27), kamera, fit.
+- ~~**UI-B2 · Náhľad**~~ — **HOTOVO** (PR #169, v0.7.5): kontextové projekcie s kótami (Korpus čelný rez · Zóny šírky · Čelá výšky a medzery · **Kovanie nová projekcia s pozíciami** · Dielec hrany) + spodný pás — vrstvové chipy Zóny·Čelá·Kovanie·Olep (ghost prisvietenie), kamera N7 (zarovná pohľad SketchUpu na skrinku), fit. **D-27 ostáva OTVORENÉ:** chipy prepínajú vrstvy *náhľadu*, nie tagy modelu.
 - **UI-B3 · Obsah Korpusu + koliesko** — Základné v 2 stĺpcoch + informačný stĺpec, rozmerové rady, ikony skupín, modal „Uložiť ako šablónu", typ badge a kontext kolieska (**UI prepínač témy NOXUN/Lucia** · editor radov · O plugine).
 
 **UI-C · Kontexty**

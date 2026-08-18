@@ -20,7 +20,10 @@
     // UI-B1: nova identita vyberu => viewContext spat na Korpus; ECHO push tej
     // istej identity kontext NEMENI (rozpisana praca musi prezit).
     NXShell.setLabel(nxTempLabel(mode, sel));
-    NXShell.track(mode, NXShell.identityOf(mode, sel));
+    // UI-B2: rovnaka zasada plati pre chipy vrstiev nahladu — nova identita
+    // zacina s cistym pasom, ECHO push prisvietene vrstvy NEZHASINA.
+    if (NXShell.track(mode, NXShell.identityOf(mode, sel)) &&
+        typeof NXLayers !== 'undefined') NXLayers.reset();
     // Zrkadlo stavu do DOM (rail + data-view-ctx) — className vyssie zmazal
     // aj pripadne stare priznaky, preto pri KAZDEJ zmene rezimu.
     if (typeof nxShellApply === 'function') nxShellApply();
@@ -302,6 +305,7 @@
       writeConstruction(c);
       applyVisibility(t);
       buildFrontHwBadges(c.hardware || []); // D3: badge kovania PRED renderom riadkov ciel
+      hwItems = c.hardware || [];           // UI-B2: ten isty payload kresli projekciu Kovanie
       // D-23 (audit F5/4): frontItems PRED renderFronts — placeholder ≈ vysky
       // paruje s CERSTVYM payloadom (povodne poradie by parovalo so starou skrinkou).
       frontItems = c.front_items || [];
@@ -352,7 +356,7 @@
       if (boardCard && b && boardCard.board_id !== b.board_id) cancelBoardEdits(); // ina doska
       if (applyTimer){ clearTimeout(applyTimer); applyTimer = null; } // korpusovy debounce nesmie strielat v kontexte dosky
       setSelected(null);
-      activeZoneId = null; frontItems = null;
+      activeZoneId = null; frontItems = null; hwItems = null;
       invalidateFrontPlaceholders(); // D-23: bez resolved dat ziadne ≈ odhady
       buildFrontHwBadges([]);
       renderPartCard(null);
@@ -372,7 +376,7 @@
       // D-32: identita prec PRED setUiMode — reset karty (materializeInsertCard
       // vnutri setUiMode) nesmie bezat nad zvyskami stareho vyberu.
       setSelected(null);
-      activeZoneId = null; frontItems = null;
+      activeZoneId = null; frontItems = null; hwItems = null;
       buildFrontHwBadges([]); // Codex PR #30: badge patria oznacenej skrinke — bez nej ziadne
       setIdbar(null);
       setUiMode('insert', null);

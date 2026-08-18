@@ -265,6 +265,51 @@ module Noxun
           push_selected(model, dedup: false)
         end
 
+        # UI-B2 (N7): „Pohlad na skrinku" zo spodneho pasu nahladu. Zarovna
+        # kameru na celny pohlad a doramuje ju na oznacenu skrinku.
+        #
+        # CISTE CITANIE MODELU: kamera nie su data modelu — nemeni sa geometria
+        # ani dictionary, takze sa NESMIE otvarat operacia (`start_operation` by
+        # spravil prazdny krok Spat, ktory by pouzivatelovi zjedol jeden Ctrl+Z
+        # — lekcia D-103). Ziadny vyber sa tiez nemeni: pohlad je pohlad.
+        #
+        # IDENTITY GUARD: callback HtmlDialogu je asynchronny a ID skriniek sa
+        # naprie dokumentmi opakuju, takze sa pohlad zarovnava LEN vtedy, ked
+        # payload sedi s AKTIVNYM dokumentom (rovnaky prisny guard ako
+        # `handle_clear_selection` — prazdny guid je okno bez dobehnuteho
+        # NX.init, nie stary klient).
+        def handle_camera_focus(payload = nil)
+          model = Sketchup.active_model
+          return if model.nil?
+
+          data = payload ? parse(payload) : {}
+          return set_status('Pohľad sa nezarovnal — panel patrí inému dokumentu.', true) if
+            data['model_guid'].to_s != model_guid(model)
+
+          cab = find_cabinet_by_id(model, data['cabinet_id'].to_s)
+          return set_status('Skrinka sa nenašla — pohľad sa nezarovnal.', true) if cab.nil?
+
+          focus_camera_on(model, cab)
+          set_status('Pohľad zarovnaný na skrinku (čelný pohľad).', false)
+        end
+
+        # Celny pohlad: oko pred skrinkou v osi -Y, ciel je stred jej obalky,
+        # hore je +Z. `view.zoom(entity)` potom ramec dotiahne na jej obsah
+        # (samotny `set` len urci SMER pohladu). Vzdialenost sa berie z uhlopriecky
+        # obalky, aby zoom nezacinal zvnutra skrinky.
+        def focus_camera_on(model, ent)
+          view = model.active_view
+          bb = ent.bounds
+          center = bb.center
+          diag = bb.diagonal.to_f
+          diag = 40.0 if diag <= 0 # ~1 m v palcoch (degenerovana obalka)
+          eye = Geom::Point3d.new(center.x, center.y - diag * 1.5, center.z)
+          view.camera.set(eye, center, Geom::Vector3d.new(0, 0, 1))
+          view.zoom(ent)
+          view.invalidate
+          true
+        end
+
       end
 
       # Observer musi zit ako objekt s referenciou (Panel modul ju drzi v @observer).

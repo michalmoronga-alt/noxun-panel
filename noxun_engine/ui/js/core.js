@@ -10,6 +10,11 @@
   var previewMode = 'zones';
   var applyTimer = null;
   var frontItems = null;        // rozlozene cela z backendu
+  // UI-B2: posledny payload kovania (config.hardware oznacenej skrinky). Drzi sa
+  // LEN preto, aby z neho vedel kreslit nahlad (projekcia Kovanie a ghost
+  // vrstva) — je to TEN ISTY payload, ktory dostava sekcia kovania, ziadne nove
+  // pole a ziadny vlastny vypocet. null = nic oznacene.
+  var hwItems = null;
   var PALETTE = ['#46beff','#6eff96','#ffaf50','#dc78ff','#ffeb5a'];
   // V0.3 materialy + ABS
   var MATERIALS = { sheets: [], edges: [] }; // katalog z backendu
