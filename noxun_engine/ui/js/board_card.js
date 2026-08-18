@@ -541,7 +541,9 @@
         NX.setStatus('Hrúbku ' + mmLabel(cfg.thickness) + ' mm zo šablóny drží len UNI materiál — ' +
                      'pri tomto materiáli platí katalógová hrúbka.');
       } else {
-        th.value = fmtmm(cfg.thickness);
+        // fmtdim (nie fmtmm): pole je pri UNI EDITOVATELNE, takze nesmie
+        // vizualne stratit desatiny (10,5 mm sablona nie je 10 mm).
+        th.value = fmtdim(cfg.thickness);
         // Zivy nahlad vyrazu visi na `input` — po programovom prepise ho zosynchronizuj.
         th.dispatchEvent(new Event('input'));
       }
@@ -566,7 +568,10 @@
   }
   function refreshInsertBoardInfo(){
     var th = el('ib_thickness');
-    setOut('inf_b_th', (th && th.value !== '') ? (mmLabel(evalDim(th.value)) + ' mm') : '—');
+    // Rozpisany vyraz („18-2") sa este necita ako cislo — radsej pomlcka nez
+    // prazdne „ mm" (vzor setOut: udaj, ktory nevieme, sa nevymysla).
+    var tv = (th && th.value !== '') ? evalDim(th.value) : NaN;
+    setOut('inf_b_th', isNaN(tv) ? '—' : (mmLabel(tv) + ' mm'));
     var a = nxBoardArea(numv('ib_length'), numv('ib_width'));
     setOut('inf_b_area', a === null ? '—' : (mmLabel(a) + ' m²'));
   }

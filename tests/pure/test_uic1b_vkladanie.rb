@@ -192,7 +192,7 @@ NxTest.test('UI-C1b: kontrakt hrubky doskovej sablony ma obe strany') do
                 'karta musi vediet najst UNI material (inak by hrubku sablony zahodil katalog)')
   fn = UIC1B_BOARD[/function applyBoardTemplate\(cfg\).+?\n  \}/m].to_s
   NxTest.refute(fn.empty?, 'applyBoardTemplate sa nenasla')
-  NxTest.assert(fn.index('onInsertBoardMaterial()') < fn.index("th.value = fmtmm(cfg.thickness)"),
+  NxTest.assert(fn.index('onInsertBoardMaterial()') < fn.index('th.value = fmtdim(cfg.thickness)'),
                 'PORADIE JE KONTRAKT: material najprv, hrubka sablony az po nom (inak ju prepise katalog)')
   NxTest.refute(fn.include?('sketchup.'), 'aplikacia sablony je NAVRH karty — nic sa nezapisuje')
   # Ziadna nova autorita hrubky: server ostava jediny, kto o nej rozhoduje.
