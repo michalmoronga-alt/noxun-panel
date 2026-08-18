@@ -211,7 +211,6 @@
       sel.value = curVal;
       sel.setAttribute('data-edge', code);
       sel.setAttribute('data-nx-combo', 'abs'); // D-85: hrany su ABS combobox
-
       sel.onchange = (function(cc, ss){ return function(){ onBoardEdgeChange(cc, ss.value); }; })(code, sel);
       row.appendChild(sel);
       box.appendChild(row);

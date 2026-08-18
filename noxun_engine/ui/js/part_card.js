@@ -58,7 +58,6 @@
       if (isOvr) sel.className='ovr';
       sel.setAttribute('data-edge', code);
       sel.setAttribute('data-nx-combo', 'abs'); // D-85: hrany su ABS combobox
-
       sel.onchange = (function(cc){ return function(){ onEdgeChange(cc, sel.value); }; })(code);
       row.appendChild(sel);
       box.appendChild(row);
