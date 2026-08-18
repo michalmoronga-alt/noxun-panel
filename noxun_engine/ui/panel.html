@@ -158,9 +158,6 @@
       <div class="matrow"><label>Korpus</label><select id="cab_body" data-nx-combo="decor" onchange="onCabinetMaterial('body', this.value)"></select></div>
       <div class="matrow"><label>Čelá</label><select id="cab_front" data-nx-combo="decor" onchange="onCabinetMaterial('front', this.value)"></select></div>
       <div class="matrow"><label>Chrbát</label><select id="cab_back" data-nx-combo="decor" onchange="onCabinetMaterial('back', this.value)"></select></div>
-      <div class="btnrow">
-        <button class="ghostbtn" onclick="openProjectMaterialsDialog()"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg> Materiály projektu…</button>
-      </div>
     </div>
     <!-- Materialove polia VKLADANEJ dosky (presun z #insertBoardForm — len DOM,
          logika a callbacky su nedotknute; viditelnost riadi rovnaky atribut
@@ -182,6 +179,13 @@
         </select><span class="unit"></span>
       </div>
       <button class="primary wide" onclick="insertBoard()">Vložiť dosku</button>
+    </div>
+    <!-- Katalog a predvolby projektu su dostupne VZDY (Codex #168 P2, 2. kolo):
+         po zruseni satelitnych tlacidiel hlavicky je toto jediny vstup do okna
+         Materialy z panela — a v prazdnom projekte sa materialy nastavuju
+         PRED prvym vkladom, teda presne v rezime, kde este niet skrinky. -->
+    <div class="btnrow" id="matProjRow">
+      <button class="ghostbtn" onclick="openProjectMaterialsDialog()"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg> Materiály projektu…</button>
     </div>
   </div>
 </details>

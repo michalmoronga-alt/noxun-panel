@@ -588,7 +588,13 @@ module Noxun
           @dialog.set_on_closed do
             @dialog = nil
             begin
-              EdgeCheck.disable! if defined?(EdgeCheck)
+              # Codex #168 P2 (2. kolo): vypnutie musi dostat aj rail Inspectora —
+              # inak by po zatvoreni okna Vyroba dalej ukazoval zapnute
+              # zvyraznenie a dalsi klik by ho zapol namiesto vypnutia.
+              if defined?(EdgeCheck)
+                EdgeCheck.disable!
+                EdgeCheck.notify_state_changed
+              end
             rescue StandardError => e
               Engine.log_error(e, 'ProductionDialog.on_closed edge_check')
             end

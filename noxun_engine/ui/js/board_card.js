@@ -269,6 +269,7 @@
       var sel = el('boardEdgeRows').querySelector('select[data-edge="' + code + '"]');
       // D-85: nativny select je skryty — klik na hranu rovno otvori combobox.
       if (sel){
+        if (typeof nxRevealTarget === 'function') nxRevealTarget(sel); // UI-B1: rozbal sektor
         if (!(typeof NXCombo !== 'undefined' && NXCombo && NXCombo.open(sel))) sel.focus();
         NX.setStatus('Hrana ' + code + ' — vyber ABS v zozname.', false);
       }

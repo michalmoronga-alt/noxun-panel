@@ -120,7 +120,7 @@ module Noxun
           # UI-B1 (audit A2): ABS kontrola hran z raily Inspectora. Vola TU ISTU
           # zdielanu logiku ako toolbar aj okno Vyroba (Engine.toggle_edge_check)
           # — ziadny duplikat a ziadny zapis do modelu (lekcia D-103).
-          cb(dlg, 'nx_edge_toggle')        { |_p| handle_edge_toggle }
+          cb(dlg, 'nx_edge_toggle')        { |p| handle_edge_toggle(p) }
           # D-100: premenovanie skrinky (inline edit nazvu v hlavicke panela)
           cb(dlg, 'rename_cabinet')        { |p| handle_rename_cabinet(p) }
           # V0.4.5 D2: satelitne okna (projektove predvolby a sprava sablon mimo panela)

@@ -529,9 +529,9 @@
   .nx-inspector body.mode-part #secBasic, .nx-inspector body.mode-part #secMat,
   .nx-inspector body.mode-board #secBasic, .nx-inspector body.mode-board #secMat,
   .nx-inspector body.mode-insert #secSet { display: none; }
-  /* Vkladanie KORPUSU: materialy skrinky sa nastavuju az nad oznacenym korpusom
-     (cab_* selecty su bez vyberu disabled — sektor by bol prazdny). */
-  .nx-inspector body.mode-insert:not([data-insert-kind="board"]) #secMat { display: none; }
+  /* Vkladanie: materialy SKRINKY sa nastavuju az nad oznacenym korpusom (cab_*
+     selecty su bez vyberu disabled), ale sektor sa NESKRYVA — ostava v nom
+     „Materiály projektu…", jediny vstup do katalogu z panela (Codex #168 P2). */
   /* Vkladanie DOSKY: korpusovy nahlad je bezpredmetny (ako doteraz). */
   .nx-inspector body[data-insert-kind="board"].mode-insert #secPreview { display: none; }
 

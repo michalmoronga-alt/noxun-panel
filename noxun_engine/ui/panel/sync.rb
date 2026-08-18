@@ -34,7 +34,10 @@ module Noxun
             # UI-B1 (audit A2): stav ABS kontroly hran pre ikonu v raile. PULL
             # pri otvoreni panela; dalsie zmeny chodia pushom (push_edge_check)
             # z panela, z toolbaru aj z okna Vyroba. CISTE CITANIE.
-            edge_check: edge_check_state
+            edge_check: edge_check_state,
+            # Identita dokumentu pre stavovy stroj panela aj pre identity guardy
+            # asynchronnych callbackov (Codex #168 P2).
+            model_guid: model_guid(model)
           }
           js("NX.init(#{data.to_json})")
         end
@@ -85,7 +88,11 @@ module Noxun
             @active_zone_id = nil
             # V0.4.7c: doska ma vlastnu kartu; korpus ma v Inspectore prednost.
             board = find_board(model)
-            return js("NX.loadBoard(#{board_payload(board).to_json})") if board
+            if board
+              bp = board_payload(board)
+              bp['model_guid'] = model_guid(model)
+              return js("NX.loadBoard(#{bp.to_json})")
+            end
             return js('NX.clearSelected()')
           end
           az = if zone && zone['cabinet_id'] == Store.get(cab, 'cabinet_id')
@@ -96,10 +103,26 @@ module Noxun
           @active_zone_id = az
           payload = cabinet_payload(cab)
           payload['active_zone'] = az
+          payload['model_guid'] = model_guid(model)
           # V0.3: ak je vo vybere DIELEC (kind=part), priloz kartu dielca (ABS/materialovy editor).
           part = find_selected_part(model)
           payload['part_card'] = part ? part_card_payload(model, cab, part) : nil
           js("NX.loadSelected(#{payload.to_json})")
+        end
+
+        # UI-B1 (Codex #168 P2, 2. kolo): IDENTITA DOKUMENTU. ID objektov su
+        # jedinecne LEN v ramci modelu (Ids.next_board_id pocita od zaciatku
+        # v kazdom dokumente), takze dva otvorene dokumenty bezne obsahuju
+        # BRD-001 aj CAB-001. Bez guidu by:
+        #   * prepnutie dokumentu vyzeralo pre panel ako ECHO push tej istej
+        #     identity (kontext by ostal na starom mieste namiesto resetu),
+        #   * oneskoreny callback (krizik dosky, ABS prepinac) trafil CUDZI
+        #     dokument. Zrkadlo ProductionDialog#model_guid.
+        def model_guid(model = nil)
+          m = model || Sketchup.active_model
+          m && m.respond_to?(:guid) ? m.guid.to_s : ''
+        rescue StandardError
+          ''
         end
 
         def push_templates

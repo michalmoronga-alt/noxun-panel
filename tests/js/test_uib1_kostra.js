@@ -33,15 +33,33 @@ function reset(){
 }
 
 // ---------------------------------------------------------------- identita ---
-eq(NXShell.identityOf('cab', { cabinet_id: 'CAB-005' }), 'cab:CAB-005', 'identita korpusu');
-eq(NXShell.identityOf('part', { cabinet_id: 'CAB-005', role_key: 'side_left' }), 'part:CAB-005/side_left',
-  'identita dielca nesie skrinku AJ rolu');
-eq(NXShell.identityOf('board', { board_id: 'BRD-003' }), 'board:BRD-003', 'identita dosky');
+// Identita nesie REZIM, ID aj DOKUMENT (Codex #168 P2): ID su jedinecne len
+// v ramci modelu, takze dva otvorene dokumenty bezne obsahuju CAB-001 aj BRD-001.
+const G1 = 'guid-A', G2 = 'guid-B';
+eq(NXShell.identityOf('cab', { cabinet_id: 'CAB-005', model_guid: G1 }), 'guid-A|cab:CAB-005',
+  'identita korpusu nesie dokument');
+eq(NXShell.identityOf('part', { cabinet_id: 'CAB-005', role_key: 'side_left', model_guid: G1 }),
+  'guid-A|part:CAB-005/side_left', 'identita dielca nesie skrinku AJ rolu');
+eq(NXShell.identityOf('board', { board_id: 'BRD-003', model_guid: G1 }), 'guid-A|board:BRD-003',
+  'identita dosky');
 eq(NXShell.identityOf('insert', null), 'none', 'vkladanie nema identitu');
 // Rovnake ID v inom rezime NIE je ta ista identita.
-assert.notStrictEqual(NXShell.identityOf('cab', { cabinet_id: 'CAB-005' }),
-  NXShell.identityOf('part', { cabinet_id: 'CAB-005', role_key: 'side_left' }));
+assert.notStrictEqual(NXShell.identityOf('cab', { cabinet_id: 'CAB-005', model_guid: G1 }),
+  NXShell.identityOf('part', { cabinet_id: 'CAB-005', role_key: 'side_left', model_guid: G1 }));
 n++;
+// Rovnake ID v INOM DOKUMENTE tiez NIE je ta ista identita — inak by prepnutie
+// dokumentu vyzeralo ako echo push a kontext by sa neresetoval.
+assert.notStrictEqual(NXShell.identityOf('cab', { cabinet_id: 'CAB-001', model_guid: G1 }),
+  NXShell.identityOf('cab', { cabinet_id: 'CAB-001', model_guid: G2 }));
+n++;
+reset();
+NXShell.track('cab', NXShell.identityOf('cab', { cabinet_id: 'CAB-001', model_guid: G1 }));
+NXShell.setCtx('kovanie');
+eq(NXShell.track('cab', NXShell.identityOf('cab', { cabinet_id: 'CAB-001', model_guid: G1 })), false,
+  'echo push v tom istom dokumente');
+eq(NXShell.track('cab', NXShell.identityOf('cab', { cabinet_id: 'CAB-001', model_guid: G2 })), true,
+  'rovnake ID v INOM dokumente = nova identita');
+eq(NXShell.effectiveCtx(), 'korpus', 'prepnutie dokumentu resetuje kontext na Korpus');
 
 // ------------------------------------------------- matica rezim x kontext ---
 // none/insert: kontexty neaktivne, prepnutie NEROBI NIC
@@ -99,14 +117,17 @@ eq(NXShell.track('insert', 'none'), false, 'echo push vkladania nie je nova iden
 // Krizik dosky posiela board_id — server ho porovna s tym, co je NAOZAJ vybrate
 // (kym callback dobehne, mohol pouzivatel oznacit nieco ine).
 reset();
-NXShell.track('board', NXShell.identityOf('board', { board_id: 'BRD-003' }));
+NXShell.track('board', NXShell.identityOf('board', { board_id: 'BRD-003', model_guid: G1 }));
 eq(NXShell.identityId(), 'BRD-003', 'z identity dosky sa da vytiahnut ciste ID');
-NXShell.track('cab', NXShell.identityOf('cab', { cabinet_id: 'CAB-005' }));
+eq(NXShell.identityGuid(), G1, 'a k nemu dokument');
+NXShell.track('cab', NXShell.identityOf('cab', { cabinet_id: 'CAB-005', model_guid: G2 }));
 eq(NXShell.identityId(), 'CAB-005', 'z identity korpusu tiez');
-NXShell.track('part', NXShell.identityOf('part', { cabinet_id: 'CAB-005', role_key: 'cabinet/side:left' }));
+eq(NXShell.identityGuid(), G2, 'dokument korpusu');
+NXShell.track('part', NXShell.identityOf('part', { cabinet_id: 'CAB-005', role_key: 'cabinet/side:left', model_guid: G1 }));
 eq(NXShell.identityId(), 'CAB-005/cabinet/side:left', 'dielec nesie skrinku aj rolu (dvojbodky v roli prezijú)');
 NXShell.track('insert', NXShell.identityOf('insert', null));
 eq(NXShell.identityId(), '', 'vkladanie nema co poslat');
+eq(NXShell.identityGuid(), '', 'ani dokument');
 
 // --------------------------------------------- kluce zbalenia (A5) ----------
 eq(NXShell.secKey('s1', null), 'nxsec_s1', 'sektor ma vlastny nezavisly kluc');

@@ -96,13 +96,23 @@ module Noxun
         # novy stav dostanu vsetky otvorene okna naraz.
         # ZIADNY zapis do modelu, ziadna operacia, ziadny undo krok — EdgeCheck
         # je overlay NAD modelom (lekcia D-103).
-        def handle_edge_toggle
-          unless defined?(EdgeCheck) && EdgeCheck.available?
+        # IDENTITY GUARD DOKUMENTU (Codex #168 P2, 2. kolo): callback HtmlDialogu
+        # je asynchronny — ak pouzivatel medzitym prepol dokument, prepinac by
+        # zapol overlay v CUDZOM modeli. Rovnaky guard ma D-105 v okne Vyroba.
+        def handle_edge_toggle(payload = nil)
+          model = Sketchup.active_model
+          unless defined?(EdgeCheck) && EdgeCheck.available?(model)
             push_edge_check
             return set_status('Zvýraznenie hrán vyžaduje SketchUp 2023 alebo novší.', true)
           end
 
-          state = Engine.toggle_edge_check
+          want = payload ? parse(payload)['model_guid'].to_s : ''
+          unless want.empty? || want == model_guid(model)
+            push_edge_check
+            return set_status('Model sa medzitým prepol — stav obnovený, klikni znova.', true)
+          end
+
+          state = Engine.toggle_edge_check(model)
           set_status(edge_toggle_status(state))
         end
 

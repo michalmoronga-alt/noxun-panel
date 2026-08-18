@@ -31,11 +31,16 @@
 
     // Identita vyberu z payloadu. Retazec zamerne: porovnava sa cely (rezim aj
     // ID naraz), takze cab -> part tej istej skrinky je SPRAVNE nova identita.
+    // Codex #168 P2 (2. kolo): identita nesie aj DOKUMENT — ID su jedinecne LEN
+    // v ramci modelu, takze dva otvorene dokumenty bezne obsahuju CAB-001 aj
+    // BRD-001. Bez guidu by prepnutie dokumentu vyzeralo ako echo push a panel
+    // by ostal v starom kontexte namiesto resetu na Korpus.
     function identityOf(mode, sel){
       var p = sel || {};
-      if (mode === 'cab')   return 'cab:' + String(p.cabinet_id || '');
-      if (mode === 'part')  return 'part:' + String(p.cabinet_id || '') + '/' + String(p.role_key || '');
-      if (mode === 'board') return 'board:' + String(p.board_id || '');
+      var g = String(p.model_guid || '');
+      if (mode === 'cab')   return g + '|cab:' + String(p.cabinet_id || '');
+      if (mode === 'part')  return g + '|part:' + String(p.cabinet_id || '') + '/' + String(p.role_key || '');
+      if (mode === 'board') return g + '|board:' + String(p.board_id || '');
       return 'none';
     }
 
@@ -64,12 +69,19 @@
     // nemeni — po oznaceni skrinky sa aj tak resetuje, lebo identita je nova).
     function effectiveCtx(){ return ctxEnabled() ? state.ctx : 'korpus'; }
 
-    // SAMOTNE ID z identity ('board:BRD-003' -> 'BRD-003'). Pouziva ho identity
-    // guard asynchronnych callbackov — server ho porovna s tym, co je NAOZAJ
-    // vybrate (Codex #168 P2).
+    // Rozlozenie identity na dokument a objekt — vstup identity guardov
+    // asynchronnych callbackov (server ich porovna s tym, co je NAOZAJ vybrate).
+    // '<guid>|board:BRD-003' -> { model_guid:'<guid>', id:'BRD-003' }.
     function identityId(){
-      var i = state.identity.indexOf(':');
-      return i < 0 ? '' : state.identity.slice(i + 1);
+      var s = state.identity;
+      var bar = s.indexOf('|');
+      if (bar < 0) return '';
+      var i = s.indexOf(':', bar);
+      return i < 0 ? '' : s.slice(i + 1);
+    }
+    function identityGuid(){
+      var bar = state.identity.indexOf('|');
+      return bar < 0 ? '' : state.identity.slice(0, bar);
     }
 
     function setLabel(t){ state.label = String(t == null ? '' : t); }
@@ -112,6 +124,7 @@
       setCtx: setCtx,
       effectiveCtx: effectiveCtx,
       identityId: identityId,
+      identityGuid: identityGuid,
       setLabel: setLabel,
       mode: function(){ return state.mode; },
       label: function(){ return state.label; }
@@ -225,7 +238,8 @@
     if (mode !== 'board') return;
     if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
     if (window.sketchup && sketchup.clear_selection){
-      sketchup.clear_selection(JSON.stringify({ board_id: NXShell.identityId() }));
+      sketchup.clear_selection(JSON.stringify({ board_id: NXShell.identityId(),
+                                                model_guid: NXShell.identityGuid() }));
     }
   }
 
@@ -236,12 +250,36 @@
       NX.setStatus('Nastavenia Inspectora (téma, rozmerové rady, o plugine) pribudnú v ďalšej dávke.', false);
   }
 
+  // Codex #168 P2 (2. kolo): akcie z NAHLADU (klik na celo, klik na hranu
+  // dielca/dosky, klik na zonu) mieria na ovladace v sektore Nastavenia. Ked je
+  // sektor alebo jeho skupina ZBALENA, ciel je skryty — fokus nema kam sadnut a
+  // combobox by sa otvoril z nulovej plochy. Preto sa pred takou akciou cesta
+  // k prvku ROZBALI (vsetky <details> predkovia). Exkluzivita S4 sa tym spusti
+  // normalne (toggle), takze zvysok kontextu sa poslusne zavrie.
+  function nxRevealTarget(node){
+    var n = node;
+    while (n && n !== document.body){
+      if (n.tagName && n.tagName.toLowerCase() === 'details' && !n.open) n.open = true;
+      n = n.parentNode;
+    }
+    return node;
+  }
+
   // ===== DOM: ABS kontrola hran v raile (audit A2) ===========================
   // Prepinac vola TU ISTU logiku ako toolbar aj okno Vyroba (EdgeCheck.toggle);
   // panel si ZIADNY vlastny stav nedrzi — zobrazuje presne to, co posle server.
+  // Codex #168 P2 (2. kolo): prepinac nesie DOKUMENT, z ktoreho klik vysiel —
+  // callback HtmlDialogu je asynchronny a bez neho by po prepnuti dokumentu
+  // zapol overlay v CUDZOM modeli (rovnaky guard ma D-105 v okne Vyroba).
   function onEdgeCheckToggle(){
-    if (window.sketchup && sketchup.nx_edge_toggle) sketchup.nx_edge_toggle('');
+    if (window.sketchup && sketchup.nx_edge_toggle)
+      sketchup.nx_edge_toggle(JSON.stringify({ model_guid: nxModelGuid }));
   }
+  // Identita dokumentu, ktoreho stav panel prave zobrazuje. Chodi v KAZDOM
+  // pushi (init aj loadSelected/loadBoard); pri prazdnom vybere sa drzi
+  // posledna znama — vtedy sa aj tak nic neoznacuje.
+  var nxModelGuid = '';
+  function nxSetModelGuid(g){ if (g) nxModelGuid = String(g); }
 
   function nxApplyEdgeCheck(st){
     var n = el('railAbs');

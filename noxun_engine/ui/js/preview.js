@@ -387,6 +387,10 @@
   function pickZone(localId){
     activeZoneId = fullZoneId(localId);
     refreshZoneUI();
+    // UI-B1 (Codex #168 P2): karta Zona zije v sektore Nastavenia — klik na zonu
+    // v nahlade ju musi aj UKAZAT (zbaleny sektor by ju schoval). Rozbaluje sa
+    // LEN na tejto pouzivatelskej ceste, nie pri kazdom serverovom refreshi.
+    if (typeof nxRevealTarget === 'function') nxRevealTarget(el('zoneCard'));
     renderPreview();
     if (selectedCabId && window.sketchup && sketchup.select_zone) sketchup.select_zone(JSON.stringify({ zone_id: activeZoneId }));
   }

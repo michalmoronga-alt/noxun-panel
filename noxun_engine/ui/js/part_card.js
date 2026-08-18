@@ -198,6 +198,9 @@
       // D-85: nativny select je skryty — klik na hranu preto rovno OTVORI combobox
       // (fokus zostava fallbackom, keby komponent nebezal).
       if (sel){
+        // UI-B1 (Codex #168 P2): karta dielca zije v sektore Nastavenia — zbaleny
+        // sektor by combobox otvoril z nulovej plochy, preto sa cesta rozbali.
+        if (typeof nxRevealTarget === 'function') nxRevealTarget(sel);
         if (!(typeof NXCombo !== 'undefined' && NXCombo && NXCombo.open(sel))) sel.focus();
         NX.setStatus('Hrana '+code+' — vyber ABS v zozname.', false);
       }

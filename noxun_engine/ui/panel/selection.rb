@@ -211,7 +211,15 @@ module Noxun
           model = Sketchup.active_model
           return if model.nil?
 
-          want = payload ? parse(payload)['board_id'].to_s : ''
+          data = payload ? parse(payload) : {}
+          # Codex #168 P2 (2. kolo): ID dosky je jedinecne LEN v ramci modelu
+          # (Ids.next_board_id pocita v kazdom dokumente od zaciatku), takze dva
+          # otvorene dokumenty bezne obsahuju BRD-001 — bez guidu by oneskoreny
+          # callback zhodil vyber v CUDZOM dokumente.
+          want_guid = data['model_guid'].to_s
+          return push_selected(model, dedup: false) if !want_guid.empty? && want_guid != model_guid(model)
+
+          want = data['board_id'].to_s
           board = find_board(model)
           have = board ? Store.get(board, 'id').to_s : ''
           return push_selected(model, dedup: false) if !want.empty? && want != have

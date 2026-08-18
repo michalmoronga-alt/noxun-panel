@@ -9,6 +9,7 @@
   // NXShell odvodi identitu aj popis docasnej polozky raily.
   function setUiMode(mode, sel){
     document.body.className = 'mode-' + mode;
+    if (sel && typeof nxSetModelGuid === 'function') nxSetModelGuid(sel.model_guid);
     // D-14 (Codex F5): modal patri k oznacenemu korpusu — mimo mode-cab sa zatvara
     if (mode !== 'cab' && typeof closeSaveTemplateModal === 'function') closeSaveTemplateModal();
     // D-32 (audit B2): SKUTOCNY prechod cab|part|board -> insert = reset karty
@@ -171,6 +172,9 @@
       // UI-B1 (audit A2): stav ABS kontroly hran pri OTVORENI panela (pull).
       // Dalsie zmeny chodia pushom — z panela, z toolbaru aj z okna Vyroba.
       if (typeof nxApplyEdgeCheck === 'function') nxApplyEdgeCheck(data.edge_check);
+      // Codex #168 P2 (2. kolo): identita DOKUMENTU — chodi v kazdom pushi a
+      // nesu ju identity guardy asynchronnych callbackov panela.
+      if (typeof nxSetModelGuid === 'function') nxSetModelGuid(data.model_guid);
       refreshMaterialFilters(); // (projektove predvolby zobrazi okno Materialy projektu)
       el('zonesChk').checked = !!data.zones_visible;
       // V0.4.7c: uz oznacena DOSKA pri otvoreni panela (selected_kind z Ruby)
@@ -324,6 +328,8 @@
       setCabinetMaterials(c); // V0.3 korpusove material selecty (prazdne = dedi)
       renderFilteredTemplates();
       setIdbar(c);
+      // part_card je vnoreny payload — identitu dokumentu nesie obalka.
+      if (c.part_card) c.part_card.model_guid = c.model_guid;
       setUiMode(c.part_card ? 'part' : 'cab', c.part_card ? c.part_card : c);
       // D-08 (Codex F3): dielec = vzdy ZONOVY nahlad (klik na zonu = vedomy odchod
       // z dielca, povodne spravanie). Atribut data-view-ctx prezije setUiMode

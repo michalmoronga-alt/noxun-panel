@@ -3039,6 +3039,19 @@ module NoxunSuRunner
          model.selection.to_a.include?(board) &&
            rec.none? { |s| s.include?('NX.clearSelected()') })
 
+      # Codex #168 P2 (2. kolo): ID dosky je jedinecne LEN v ramci modelu —
+      # callback z INEHO dokumentu nesmie zhodit vyber tu, aj keby ID sedelo.
+      rec = []
+      install_js_recorder(rec)
+      begin
+        e::Panel.handle_clear_selection({ 'board_id' => bid, 'model_guid' => 'CUDZI-GUID' }.to_json)
+      ensure
+        remove_js_recorder
+      end
+      ok('UI-B1: krizik z INEHO dokumentu vyber NEZHODI (guard dokumentu)',
+         model.selection.to_a.include?(board) &&
+           rec.none? { |s| s.include?('NX.clearSelected()') })
+
       rec = []
       install_js_recorder(rec)
       begin
@@ -3064,14 +3077,19 @@ module NoxunSuRunner
       was = e::EdgeCheck.active?(model)
       e::EdgeCheck.disable! if was
       marker = e::CabinetBuilder.build(model, uib1)
-      e::Panel.handle_edge_toggle
+      # Guard dokumentu: klik z INEHO dokumentu nesmie zapnut overlay tu.
+      e::Panel.handle_edge_toggle({ 'model_guid' => 'CUDZI-GUID' }.to_json)
+      ok('UI-B1: ABS toggle z INEHO dokumentu zvyraznenie NEZAPNE (guard dokumentu)',
+         e::EdgeCheck.active?(model) == false)
+
+      e::Panel.handle_edge_toggle({ 'model_guid' => e::Panel.model_guid(model) }.to_json)
       ok('UI-B1: ABS toggle z panela ZAPOL zvyraznenie (rovnaka cesta ako toolbar)',
          e::EdgeCheck.active?(model) == true)
       # Undo musi vratit POSLEDNU MODELOVU operaciu (vlozenie markera), nie toggle.
       Sketchup.undo
       ok('UI-B1: 1x Spat po ABS toggle vrati vlozenie skrinky (toggle nie je undo krok)',
          marker.nil? || !marker.valid?)
-      e::Panel.handle_edge_toggle
+      e::Panel.handle_edge_toggle({ 'model_guid' => e::Panel.model_guid(model) }.to_json)
       ok('UI-B1: opakovany klik zvyraznenie VYPOL', e::EdgeCheck.active?(model) == false)
     else
       info('UI-B1: SketchUp bez Overlay API — ABS cast preskocena')
