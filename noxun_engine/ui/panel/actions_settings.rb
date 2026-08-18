@@ -35,7 +35,12 @@ module Noxun
         def handle_set_dim_series(payload)
           data = parse(payload)
           stored = DimSeries.set(data['series'])
-          push_ui_settings # aj pri zlyhani: editor a ponuky ukazu, co NAOZAJ plati
+          # Codex #170 P2: `refill_editor` = prepis polia editora NORMALIZOVANOU
+          # podobou. Bez neho by v otvorenom modale ostal text, ktory pouzivatel
+          # napisal (neusporiadany, s duplicitami, s nezmyslami), hoci ulozilo sa
+          # nieco ine — a status by pritom hlasil uspech. Priznak nesie LEN tato
+          # cesta, aby iny push (tema) rozpisany draft neprepisal.
+          push_ui_settings(refill_editor: true)
           return set_status('Rozmerové rady sa nepodarilo uložiť (disk/práva).', true) if stored.nil?
 
           set_status('Rozmerové rady uložené.')
@@ -43,19 +48,21 @@ module Noxun
 
         # Nastavenia pocitaca do panela (rady + tema). Chodia aj v push_init;
         # tento maly push ich obnovi po zmene BEZ prekreslenia formulara.
-        def push_ui_settings
+        def push_ui_settings(refill_editor: false)
           return unless dialog_alive?
 
-          js("if (window.NX && NX.setUiSettings) NX.setUiSettings(#{ui_settings_payload.to_json});")
+          js("if (window.NX && NX.setUiSettings) NX.setUiSettings(#{ui_settings_payload(refill_editor: refill_editor).to_json});")
         rescue StandardError => e
           Engine.log_error(e, 'Panel.push_ui_settings')
         end
 
-        def ui_settings_payload
-          { 'dim_series' => DimSeries.get, 'ui_theme' => Engine.get_ui_theme }
+        def ui_settings_payload(refill_editor: false)
+          { 'dim_series' => DimSeries.get, 'ui_theme' => Engine.get_ui_theme,
+            'refill_editor' => refill_editor }
         rescue StandardError => e
           Engine.log_error(e, 'Panel.ui_settings_payload')
-          { 'dim_series' => DimSeries::DEFAULTS, 'ui_theme' => Engine::UI_THEME_DEFAULT }
+          { 'dim_series' => DimSeries::DEFAULTS, 'ui_theme' => Engine::UI_THEME_DEFAULT,
+            'refill_editor' => false }
         end
       end
     end

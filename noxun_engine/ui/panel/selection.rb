@@ -89,6 +89,9 @@ module Noxun
         def on_selection_changed
           return if @suspend_selection_sync # nase vlastne reselecty resyncnu panel explicitne
 
+          # Codex #170 P1: pouzivatel klikol v modeli = nova situacia; priznak
+          # odmietnuteho apply uz nepatri k tomu, co robi teraz.
+          @last_apply_error = nil
           push_selected(Sketchup.active_model)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.on_selection_changed')
@@ -286,6 +289,18 @@ module Noxun
           data = payload ? parse(payload) : {}
           return set_status('Dielce sa neoznačili — panel patrí inému dokumentu.', true) if
             data['model_guid'].to_s != model_guid(model)
+
+          # Codex #170 P1: klient pred touto akciou flushol rozpisany edit, ALE
+          # server ho mohol odmietnut (material_preflight). Vtedy uz bezal UI
+          # resync s POVODNYMI hodnotami — a keby sme teraz oznacili dielce a
+          # ohlasili uspech, prekryli by sme jedinu spravu, ktora hovori PRAVDU
+          # o tom, preco sa uprava neulozila. Odmietnutie sa preto zopakuje a
+          # priznak sa spotrebuje (dalsi klik uz prejde).
+          if @last_apply_error
+            msg = @last_apply_error
+            @last_apply_error = nil
+            return set_status("Dielce sa neoznačili — najprv oprav úpravu: #{msg}", true)
+          end
 
           cab = find_cabinet(model)
           return refresh_after_stale(model) if cab.nil? ||

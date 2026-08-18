@@ -455,10 +455,16 @@ module Noxun
           params['fronts'] = data['fronts'] if data.key?('fronts')
           pf = material_preflight(params, model) # D-45: telo + chrbat + ABS remap
           if pf && pf[:error]
+            # Codex #170 P1: ODMIETNUTY apply si zapamatame. Klient si ho totiz
+            # vyziada aj v handshaku pred inou akciou (napr. „Dielcov" v
+            # informacnom stlpci) — a ta akcia by svojim statusom prekryla
+            # PRAVU pricinu a tvarila sa, ze je vsetko v poriadku.
+            @last_apply_error = pf[:error]
             set_status(pf[:error], true)
             push_selected(model) # UI resync (auto-apply nesmie nechat select 18 nad modelom 3)
             return
           end
+          @last_apply_error = nil # uspesny apply pripadny stary odmietnutok maze
           suspend_selection_sync do
             CabinetBuilder.rebuild(model, cab, params)
             reselect(model, cab)

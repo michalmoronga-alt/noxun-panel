@@ -94,6 +94,17 @@ eq(NXDim.normalizeList(NXDim.parseText(NXDim.formatList(NXDim.DEFAULTS.sirka))),
 ok(!/apply_all|set_cabinet_material|insert_cabinet/.test(SETTINGS_SRC),
    'nastavenia Inspectora nesiahaju na zapisove cesty zakazky');
 
+// Codex #170 P2: po ULOZENI radov musi editor ukazat NORMALIZOVANU podobu —
+// inak by v otvorenom modale ostal povodny text a status by klamal o uspechu.
+ok(/if \(d\.refill_editor\) nxFillSeriesEditor\(\);/.test(SETTINGS_SRC),
+   'odpoved na ulozenie radov prepise polia editora ulozenymi hodnotami');
+(function(){
+  const body = SETTINGS_SRC.slice(SETTINGS_SRC.indexOf('function nxApplyUiSettings'));
+  ok(body.indexOf('refill_editor') > 0, 'priznak sa vyhodnocuje v nxApplyUiSettings');
+  ok((SETTINGS_SRC.match(/d\.refill_editor/g) || []).length === 1,
+     'refill je viazany LEN na odpoved z ulozenia — iny push draft neprepise');
+})();
+
 // --- 4b) klik na „Dielcov" nesmie zhltnut rozpisanu upravu (Codex BLOCKER 1) --
 
 (function(){

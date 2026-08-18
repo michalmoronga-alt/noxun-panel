@@ -112,17 +112,40 @@ module Noxun
         # UI-B3: VYROBNE dielce korpusu — presne ten isty filter, aky ma
         # `Bom.collect` (kusovnik, VEPO). Proxy kovania (nohy, profily) sa
         # tak do poctu ani do plochy nikdy nedostanu.
+        #
+        # Codex #170 P2: patria sem AJ odpojene (vytiahnute) dielce na najvyssej
+        # urovni modelu — standard 01 ich necha citatelne pre BOM a `Bom.collect`
+        # ich zbiera (bom.rb, vetva `when 'part'`). Bez nich by informacny stlpec
+        # Inspectora hlasil iny pocet a inu plochu nez kusovnik TEJ ISTEJ skrinky.
         def manufactured_parts(cab)
           return [] unless cab && cab.valid? && cab.respond_to?(:definition)
 
-          cab.definition.entities.grep(Sketchup::ComponentInstance).select do |e|
-            e.valid? && Store.kind(e) == 'part' &&
-              Store.get(e, 'manufactured') == true &&
-              Store.get(e, 'production_class').to_s == 'sheet'
+          out = cab.definition.entities.grep(Sketchup::ComponentInstance)
+                   .select { |e| manufactured_sheet_part?(e) }
+          cid = Store.get(cab, 'cabinet_id').to_s
+          model = cab.respond_to?(:model) ? cab.model : nil
+          if model && !cid.empty?
+            model.entities.grep(Sketchup::ComponentInstance).each do |e|
+              next unless manufactured_sheet_part?(e)
+              next unless Store.get(e, 'cabinet_id').to_s == cid
+
+              out << e
+            end
           end
+          out
         rescue StandardError => e
           Engine.log_error(e, 'Panel.manufactured_parts')
           []
+        end
+
+        # Jeden filter pre obe miesta (vnorene aj odpojene dielce) — zrkadlo
+        # podmienok v `Bom.collect`.
+        def manufactured_sheet_part?(ent)
+          ent.valid? && Store.kind(ent) == 'part' &&
+            Store.get(ent, 'manufactured') == true &&
+            Store.get(ent, 'production_class').to_s == 'sheet'
+        rescue StandardError
+          false
         end
 
         # UI-B3 informacny stlpec: kolko dielcov a kolko m2 dosky skrinka drzi.

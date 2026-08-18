@@ -166,4 +166,21 @@ NxTest.test('UI-B3 guard: vyber dielcov je citanie + vyber pod suspend guardom')
   NxTest.assert(body.include?('suspend_selection_sync'), 'zmena vyberu musi bezat pod suspend guardom')
   NxTest.assert(body.include?('model_guid'), 'asynchronny callback musi niest identitu dokumentu')
   NxTest.assert(body.include?('dedup: false'), 'refresh po vybere nesmie dedupovat (dedup MENI model)')
+  # Codex #170 P1: server mohol flushnuty apply ODMIETNUT (material_preflight) —
+  # vtedy sa vyber nevykona a zopakuje sa PRAVA pricina, nie hlaska o uspechu.
+  NxTest.assert(body.include?('@last_apply_error'), 'chyba osetrenie odmietnuteho apply pred vyberom')
+  cab = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_cabinet.rb'), encoding: 'UTF-8')
+  NxTest.assert(cab.include?('@last_apply_error = pf[:error]'), 'odmietnuty apply sa musi zapamatat')
+  NxTest.assert(cab.include?('@last_apply_error = nil'), 'uspesny apply musi priznak zmazat')
+end
+
+NxTest.test('UI-B3: informacny stlpec rata TIE ISTE dielce ako kusovnik (aj odpojene)') do
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'resolvers.rb'), encoding: 'UTF-8')
+  body = src[/def manufactured_parts.*?\n        end\n/m].to_s
+  NxTest.refute(body.empty?, 'helper manufactured_parts sa nenasiel')
+  # Bom.collect zbiera aj top-level `kind=part` (odpojeny/vytiahnuty dielec) —
+  # bez toho by Inspector hlasil iny pocet nez kusovnik TEJ ISTEJ skrinky.
+  NxTest.assert(body.include?('cab.definition.entities'), 'vnorene dielce sa musia ratat')
+  NxTest.assert(body.include?('model.entities'), 'odpojene top-level dielce sa musia ratat tiez')
+  NxTest.assert(body.include?("Store.get(e, 'cabinet_id').to_s == cid"), 'odpojeny dielec sa paruje cez cabinet_id')
 end

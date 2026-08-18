@@ -279,9 +279,15 @@
 
   // Nastavenia z Ruby (push_init aj maly push po zmene). Meni LEN rady a stav
   // prepinaca — ziadny render karty, ziadny zasah do rozpisaneho formulara.
+  //
+  // Codex #170 P2: `refill_editor` nesie LEN odpoved na ULOZENIE radov — vtedy
+  // sa polia editora prepisu NORMALIZOVANOU podobou, aby otvoreny modal ukazoval
+  // to, co sa naozaj ulozilo (nie povodny text s duplicitami a nezmyslami).
+  // Iny push (tema, otvorenie panela) rozpisany draft editora NIKDY neprepise.
   function nxApplyUiSettings(data){
     var d = data || {};
     NXDim.set(d.dim_series);
     nxDimRenderMenus();
     nxSyncThemeButtons();
+    if (d.refill_editor) nxFillSeriesEditor();
   }
