@@ -132,7 +132,7 @@
     // document), takze klik na samotny chip musi bublanie zastavit, inak by
     // sa panel v tom istom kliku otvoril a hned zavrel.
     var wHtml = warns.length
-      ? ' <button type="button" class="warnchip" onclick="toggleWarnList(event)" title="Zobraziť upozornenia stavby" aria-label="Zobraziť upozornenia stavby">' + NXIcons.svg('alert') + ' ' + warns.length + '</button>'
+      ? ' <button type="button" class="warnchip" data-nx-usage="warn:chip" onclick="toggleWarnList(event)" aria-expanded="false" title="Zobraziť upozornenia stavby" aria-label="Zobraziť upozornenia stavby">' + NXIcons.svg('alert') + ' ' + warns.length + '</button>'
       : '';
     // FIX 4: echo TEJ ISTEJ skrinky nesmie zhltnut rozpisany nazov — prekresli
     // sa vsetko okrem bunky nazvu, ktora ostane v editacnom rezime.
@@ -157,6 +157,9 @@
     if (list){
       if (warns.length){
         list.innerHTML = warnPanelHtml(warns, c.cabinet_id || '');
+        // Chip sa práve prekreslil (aria-expanded="false" v šablóne), ale panel
+        // mohol ostať otvorený — echo push tej istej skrinky ho nezatvára.
+        setWarnPanel(warnPanelOpen());
       } else {
         closeWarnPanel(); list.innerHTML = '';
       }
@@ -172,7 +175,8 @@
     var h = '';
     rows.forEach(function(r){
       h += '<div class="warnrow"><span>' + esc(r.text) + '</span>' +
-        '<button type="button" class="wgo" data-keys="' + esc(r.keys.join(',')) + '"' +
+        '<button type="button" class="wgo" data-nx-usage="warn:oko"' +
+        ' data-keys="' + esc(r.keys.join(',')) + '"' +
         ' data-cab="' + esc(cabId) + '" onclick="onWarnRowPick(this, event)"' +
         ' title="' + esc(r.tip) + '" aria-label="' + esc(r.tip) + '">' +
         NXIcons.svg('eye') + '</button></div>';
@@ -186,18 +190,23 @@
 
   // Panel je OVERLAY: otvara ho ⚠ chip, zatvara klik mimo, Escape a kazda
   // zmena vyberu, ktora zoznam prestavia (setIdbar bez upozorneni).
-  function closeWarnPanel(){
-    var list = el('warnList'); if (!list) return;
-    list.style.display = 'none';
-  }
+  function closeWarnPanel(){ setWarnPanel(false); }
   function warnPanelOpen(){
     var list = el('warnList');
     return !!(list && list.style.display && list.style.display !== 'none');
   }
+  // Jedno miesto, kde sa mení viditeľnosť — aj `aria-expanded` chipu tak
+  // hovorí pravdu bez ohľadu na to, ktorá cesta panel zatvorila.
+  function setWarnPanel(open){
+    var list = el('warnList'); if (!list) return;
+    list.style.display = open ? 'block' : 'none';
+    var chip = document.querySelector('#idbar .warnchip');
+    if (chip) chip.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
   function toggleWarnList(ev){
     if (ev && ev.stopPropagation) ev.stopPropagation();
     var list = el('warnList'); if (!list || !list.innerHTML) return;
-    list.style.display = warnPanelOpen() ? 'none' : 'block';
+    setWarnPanel(!warnPanelOpen());
   }
 
   // Oko v riadku: oznaci v modeli to, o com nalez hovori. Ide TOU ISTOU

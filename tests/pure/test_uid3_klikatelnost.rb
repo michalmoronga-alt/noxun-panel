@@ -63,6 +63,16 @@ end
 
 # --- 2) zatvaranie -----------------------------------------------------------
 
+NxTest.test('UI-D3: `aria-expanded` chipu hovori pravdu (jedno miesto zmeny)') do
+  # Panel zatvara viac ciest (chip, klik mimo, Escape, prazdny zoznam) — keby
+  # kazda menila `display` sama, chip by po niektorej z nich tvrdil opak.
+  NxTest.assert(UID3_BRIDGE_JS.include?('function setWarnPanel'), 'viditelnost meni JEDNA funkcia')
+  NxTest.assert(UID3_BRIDGE_JS.include?("chip.setAttribute('aria-expanded'"),
+                'a spolu s nou aj stav chipu')
+  NxTest.assert(UID3_BRIDGE_JS.include?('setWarnPanel(warnPanelOpen())'),
+                'prekreslenie chipu (echo push) stav NEPREPISE na zatvoreny')
+end
+
 NxTest.test('UI-D3: panel zatvara klik MIMO a Escape (jedna delegacia, nie per riadok)') do
   body = UID3_BOOT_JS[/function bindWarnPanel.*?\n  \}\n/m].to_s
   NxTest.assert(!body.empty?, 'bindWarnPanel existuje')
