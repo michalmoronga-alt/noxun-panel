@@ -265,6 +265,15 @@ boxu klik=označ v modeli. Sety a Pravidlá bez zmeny.
   `stopPropagation`, na ktoré by musel pamätať každý budúci ovládač v boxe. *Mockup rieši to isté
   cez `event.stopPropagation()` na každom ovládači.*
 - **Box sa NEZBAĽUJE** (kontrakt to tak žiada) — na skrátenie panela stačí exkluzivita skupín S4.
+- **Box vzniká LEN vlastníkovi, ktorý naozaj má položku** (alebo vypnutú kategóriu). Znenie
+  „Skrinka / každé čelo" čítame ako **rozdelenie položiek podľa vlastníka**, nie ako povinný
+  zoznam všetkých čiel — mockup `s4Hw` kreslí tri boxy pre tri čelá, ktoré kovanie majú.
+  Prázdny box by nič nevypísal a zabral dva riadky (pravidlo „vertikálny priestor je vzácny"),
+  a pri čele typu **„bez čela" (nika)** by dokonca ponúkal „označ v modeli" bez dielca, ktorý
+  by sa dal označiť. Zoznam všetkých čiel žije v kontexte Čelá; preklik odtiaľ už dnes povie
+  „Toto čelo zatiaľ nemá naviazané kovanie." *(Nález Codex #179 kolo 4 — vedome neprijatý;
+  ak by Michal pri kole 1:1 s mockupom chcel prázdne boxy, je to jednoriadková zmena
+  v `hwGroups`: predsiať `cab` + `frontIds`.)*
 
 **Dielec:** Základné hore (Smer dekoru = vstup; Dĺžka/Šírka/Hrúbka = info) · hrany s ikonou
 square-dashed-top rotovanou (predná 0°·zadná 180°·ľavá 90°·pravá 270°) + ABS štvorec · hover hrany
