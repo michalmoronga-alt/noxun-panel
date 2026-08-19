@@ -160,7 +160,14 @@
     //   ori-wall  = stoji pri stene (zvisla ciara vzadu = stena).
     'ori-lying': '<rect x="3" y="12" width="18" height="5" rx="1"/><path d="M2 21h20"/>',
     'ori-stand': '<rect x="9" y="5" width="6" height="16" rx="1"/><path d="M2 21h20"/>',
-    'ori-wall': '<path d="M5 2v19"/><rect x="8" y="5" width="6" height="16" rx="1"/><path d="M2 21h20"/>'
+    'ori-wall': '<path d="M5 2v19"/><rect x="8" y="5" width="6" height="16" rx="1"/><path d="M2 21h20"/>',
+    // ===== UI-C3: ikona TYPU CELA v riadku (N27) =============================
+    // Ikona odpoveda na otazku „co je toto za celo" skor, nez sa clovek dostane
+    // k textu rozbalovacky. Vlastny symbol (Lucide nabytkarske typy nema):
+    // krídlové dvierka = panel so ZVISLOU osou zavesu a uchytkou pri druhej
+    // hrane. Zasuvkove celo pouziva existujuci 'rows-2' (rad vodorovnych celo),
+    // vyklop 'p-top' (horna hrana = os otacania) a „Bez cela" 'front'.
+    'door': '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 3v18"/><path d="M16 11v2"/>'
   };
 
   // Firemne logo — ZROLOVANA ZNACKA z ORIGINALNYCH kriviek webu (pismena

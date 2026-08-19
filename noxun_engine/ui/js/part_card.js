@@ -14,6 +14,9 @@
   function renderPartCard(pc){
     partCard = pc;
     var box = el('partCard');
+    // D-89a: karta sa prekresluje — uzly pod kurzorom idu prec a ich `mouseout`
+    // uz nepride, takze zvyraznenie v modeli by ostalo visiet (vzor clearFrontHover).
+    if (typeof nxHoverEdgeClear === 'function') nxHoverEdgeClear();
     if (!pc){ box.style.display='none'; return; }
     box.style.display='';
     // V0.4.5 D1: omrvinka "‹ CAB-003 › Bok lavy" — klik na CAB = spat na skrinku
@@ -45,6 +48,10 @@
       var absId = pc.edges ? pc.edges[code] : null;
       var isOvr = hasOwn(pc.edge_overrides, code);
       var row = document.createElement('div'); row.className='edgerow';
+      // D-89a: cely riadok je hover-cielom (nielen rozbalovacka) — hrana sa
+      // rozsvieti v modeli uz pri prejdeni jej NAZVU.
+      row.setAttribute('data-edge', code);
+      row.title = 'Kurzor nad hranou ju zvýrazní priamo v modeli.';
       row.innerHTML = '<span class="en"><i style="background:'+absColorOf(absId)+'"></i>'+esc(lbl)+'</span>';
       var sel = document.createElement('select');
       // D-36: skupiny podla resolved materialu dielca (2A-3b: cez material_id —
@@ -194,6 +201,66 @@
         create_missing_abs: !!createAbs,
         catalog_schema: (typeof PANEL_CLIENT_SCHEMA !== 'undefined' ? PANEL_CLIENT_SCHEMA : 1) }));
   }
+  // ===== D-89 (a): HOVER HRANY -> ZVYRAZNENIE V MODELI =======================
+  // Kurzor nad hranou (riadok zoznamu ALEBO farebny pas v 2D nahlade) rozsvieti
+  // tu istu hranu priamo v modeli. Zvyraznenie kresli Ruby Overlay NAD modelom
+  // (HoverEdge) — ziadny zapis, ziadny krok Spat, po odchode kurzora v modeli
+  // nic neostane.
+  //
+  // Zasady:
+  //  * POSIELA SA LEN ZMENA. Pohyb mysou vystreli desiatky `mouseover` udalosti
+  //    v tom istom riadku — bez tohto filtra by kazda z nich bezala cez most do
+  //    Ruby a prekreslila pohlad.
+  //  * KOD HRANY je jediny udaj. Ktory dielec sa zvyraznuje, urcuje VYBER v
+  //    modeli (karta je jeho zrkadlo) — JS ziadnu identitu dielca neposiela.
+  //  * ZHASINA SA VZDY, ked karta zmizne alebo sa prekresli: `mouseout` na
+  //    prekreslenom uzle uz nepride (vzor clearFrontHover).
+  var nxHoverEdgeCode = '';
+  function nxHoverEdgeSend(code){
+    var c = String(code || '');
+    if (c === nxHoverEdgeCode) return;
+    nxHoverEdgeCode = c;
+    if (window.sketchup && sketchup.nx_hover_edge){
+      sketchup.nx_hover_edge(JSON.stringify({ code: c,
+        model_guid: (typeof NXShell !== 'undefined' && NXShell) ? NXShell.identityGuid() : '' }));
+    }
+  }
+  function nxHoverEdgeClear(){ nxHoverEdgeSend(''); }
+  // Kontajnery, v ktorych hover znamena „hrana dielca": zoznam hran a 2D nahlad
+  // karty DIELCA aj karty DOSKY. Mimo nich sa `data-edge` nevyskytuje, ale
+  // zoznam je explicitny zamerne — hover nesmie zacat svietit z ineho miesta.
+  var NX_HOVER_EDGE_BOXES = ['edgeRows', 'partSvg', 'boardEdgeRows', 'boardSvg'];
+  function nxHoverEdgeCodeAt(node){
+    var n = node;
+    while (n && n !== document.body){
+      if (n.getAttribute && n.getAttribute('data-edge')) return n.getAttribute('data-edge');
+      if (n.id && NX_HOVER_EDGE_BOXES.indexOf(n.id) >= 0) return '';
+      n = n.parentNode;
+    }
+    return '';
+  }
+  function nxHoverEdgeInBox(node){
+    var n = node;
+    while (n && n !== document.body){
+      if (n.id && NX_HOVER_EDGE_BOXES.indexOf(n.id) >= 0) return true;
+      n = n.parentNode;
+    }
+    return false;
+  }
+  function setupHoverEdge(){
+    if (typeof document === 'undefined') return;
+    document.addEventListener('mouseover', function(ev){
+      if (!nxHoverEdgeInBox(ev.target)){ nxHoverEdgeClear(); return; }
+      nxHoverEdgeSend(nxHoverEdgeCodeAt(ev.target));
+    }, true);
+    // Odchod kurzora z okna (CEF posiela relatedTarget null) — bez toho by
+    // ploska ostala svietit, kym sa pouzivatel nevrati do panela.
+    document.addEventListener('mouseout', function(ev){
+      if (ev.relatedTarget) return;
+      nxHoverEdgeClear();
+    }, true);
+  }
+
   // Klik na hranu v 2D dielci -> fokus jej dropdownu (delegovane, poucenie z drag fixu).
   function setupPartSvgDelegation(){
     var svg = el('partSvg'); if(!svg) return;

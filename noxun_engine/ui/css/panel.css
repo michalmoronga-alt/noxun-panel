@@ -114,17 +114,35 @@
   .frow .fnum { flex: 0 0 24px; color: var(--nx-ink-faint); font-size: 11px; text-align: center; } /* D-23: "F1" namiesto "1" */
   /* min-width: 0 — bez neho select nepusti pod sirku najdlhsej polozky a rad by
      sa pri uzkom paneli zalomil (D-90: v rade pribudla volba profilu). */
-  .frow select.ftype { flex: 1 1 auto; min-width: 0; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 6px; }
-  .frow input.fh { flex: 0 0 58px; padding: 3px 4px; border: 1px solid var(--nx-border-strong); border-radius: 6px; }
-  .frow select.fw { flex: 0 0 56px; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 6px; }
-  .frow .flock { flex: 0 0 20px; text-align: center; }
-  /* D-90: volba uchytkoveho profilu — ikonove tlacidlo v rade riadku cela
-     (bez popisku, stav nesie ramik + aria-pressed; zapnuty = akcent vyberu). */
-  .frow .fprof { flex: 0 0 22px; padding: 2px 0; background: var(--nx-surface-sunken);
-                 color: var(--nx-ink-muted); border: 1px solid var(--nx-border-strong);
-                 border-radius: 6px; line-height: 0; }
-  .frow .fprof.on { background: var(--nx-select-bg); color: var(--nx-select);
-                    border-color: var(--nx-select); }
+  /* UI-C3: `flex-basis` musi byt PEVNY (nie `auto`) — v zalamovacom rade
+     (`.frow` ma flex-wrap) by si select vypytal sirku svojej NAJSIRSEJ polozky
+     a odtlacil zvysok riadku na dalsi riadok. */
+  .frow select.ftype { flex: 1 1 70px; min-width: 0; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 6px; }
+  /* UI-C3 (N27): ikona TYPU cela pred rozbalovackou — cita sa skor nez text. */
+  .frow .ftico { flex: 0 0 15px; display: inline-flex; color: var(--nx-ink-faint); }
+  .frow .ftico .ic { width: 14px; height: 14px; }
+  /* UI-C3: pole vysky je UZKE (46 px) a hodnota zarovnana doprava — rozmer je
+     cislo, nie veta (UX-03). Jednotka „mm" stoji PRI HODNOTE, nie v hlavicke. */
+  .frow input.fh { flex: 0 0 46px; width: 46px; min-width: 0; padding: 3px 4px; text-align: right;
+                   border: 1px solid var(--nx-border-strong); border-radius: 6px; }
+  .frow .dwrap { flex: 0 0 auto; }
+  .frow .funit { flex: 0 0 auto; font-size: 10px; color: var(--nx-ink-faint); }
+  /* Chip AUTO = navrat na automat. Je to AKCIA nad hodnotou, nie stav — preto
+     neutralny ram a az hover nesie vyberovu farbu. */
+  .frow .fauto { flex: 0 0 auto; padding: 2px 6px; font-size: 9.5px; font-weight: 700; letter-spacing: .03em;
+                 border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface-sunken);
+                 color: var(--nx-ink-muted); }
+  .frow .fauto:hover { border-color: var(--nx-select); color: var(--nx-select); }
+  /* Zamknute ⇔ vypisane: pevna vyska je aj VIDNO (tucnejsia hodnota) — inak by
+     sa zamok stratil tym, ze prestal mat vlastnu ikonu. */
+  .frow.fixed input.fh { font-weight: 600; color: var(--nx-ink); }
+  .frow select.fw { flex: 0 0 46px; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 6px; }
+  /* D-90 + D-96: uchytkovy profil je v riadku uz LEN INDIKATOR (ovladac zije
+     v skupine „Úchytky") — preto ziadny ram tlacidla a ziadny kurzor akcie. */
+  .frow .fprof { flex: 0 0 18px; display: inline-flex; align-items: center;
+                 color: var(--nx-ink-faint); line-height: 0; }
+  .frow .fprof .ic { width: 15px; height: 15px; }
+  .frow .fprof.on { color: var(--nx-select); }
   .frow .fdel { flex: 0 0 22px; background: var(--nx-danger-bg); color: var(--nx-danger); border: 1px solid var(--nx-danger-border); border-radius: 6px; padding: 2px 0; }
   /* D-22: zamok limitu presahov (v riadku medzier sekcie Cela) — ikona + text v rade */
   .row .lockbtn { flex: 1; text-align: left; padding: 4px 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
@@ -925,7 +943,17 @@
   .warnlist .warnrow { font-size: 11.5px; color: var(--nx-warnrow-fg); padding: 2px 0; }
   .warnlist .warnrow + .warnrow { border-top: 1px dashed var(--nx-warnrow-border); }
   .frow { flex-wrap: wrap; }
-  .frow .fhw { flex: 1 0 100%; font-size: 10.5px; color: var(--nx-ink-muted); padding: 1px 0 0 22px; display: inline-flex; align-items: center; gap: 4px; }
+  /* UI-C3: NAVIAZANE KOVANIE pod riadkom cela — JEDEN drobny riadok (nie
+     tabulka: vertikalny priestor je vzacny), jednoriadkovy s ellipsis, plny
+     text v `title` (vzor .hwbuy z D-92). Klik vedie do kontextu Kovanie. */
+  .frow .fhw { flex: 1 0 100%; font-size: 10.5px; color: var(--nx-ink-faint); padding: 1px 0 0 42px;
+               display: flex; align-items: center; gap: 5px; cursor: pointer;
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .frow .fhw:hover, .frow .fhw:focus { color: var(--nx-select); outline: none; }
+  .frow .fhw .ic { flex: 0 0 auto; width: 11px; height: 11px; }
+  /* Kratke zvyraznenie ciela po skoku z riadku cela do sekcie Kovanie —
+     bez neho pouzivatel po prepnuti kontextu hlada, ktora polozka je „jeho". */
+  .hwitem.hwfocus, .hwrow.hwfocus { background: var(--nx-select-bg); border-radius: 6px; }
   /* D-19: odhad platni v tabe Materialy — nowrap, fallback stisene LEN tieto bunky */
   .bomtab td.estcell { white-space: nowrap; }
   .bomtab td.estfb { color: var(--nx-ink-faint); }

@@ -37,18 +37,65 @@
     var r = frontProfileRec(id, list);
     return (r && r.reduction > 0) ? r.reduction : 0;
   }
-  // Dalsia hodnota v cykle „bez profilu -> profily z registry -> bez profilu".
-  function frontProfileNext(id, list){
-    var ids = ['none'];
-    (list || FRONT_PROFILES).forEach(function(p){ ids.push(p.id); });
-    var i = ids.indexOf(id || 'none');
-    return ids[(i < 0 ? 0 : i + 1) % ids.length];
+  // ---- D-96: sekcia „Úchytky" (nahradila cyklenie ikonou v riadku) ---------
+  // Ponuka profilov: NEUTRAL „Bez profilu" prvy, potom registry vo VLASTNOM
+  // poradi (poradie urcuje Ruby, JS ho nemeni). -> [{ id, name }]
+  function frontProfileOptionList(list){
+    var out = [{ id: 'none', name: 'Bez profilu' }];
+    (list || FRONT_PROFILES).forEach(function(p){
+      if (p && p.id) out.push({ id: p.id, name: p.name || p.id });
+    });
+    return out;
+  }
+  // Cela, ktorych sa rozsah tyka. scope = 'all' | 'door' | 'drawer_front'.
+  // „Bez čela" (type 'none') NIKDY — nema na com profil drzat (rovnako to
+  // robi Ruby normalize, ktora mu profil zhodi na 'none').
+  function frontProfileScopeItems(items, scope){
+    return (items || []).filter(function(it){
+      if (!it || it.type === 'none') return false;
+      return scope === 'all' || it.type === scope;
+    });
+  }
+  // Spolocna hodnota profilu v rozsahu:
+  //   '<id>' = vsetky cela rozsahu maju ten isty profil ('none' = ziadny),
+  //   ''     = rozsah je PRAZDNY (nie je co nastavovat),
+  //   null   = cela rozsahu sa lisia (select ukaze „(rôzne)").
+  function frontProfileCommon(items, scope){
+    var list = frontProfileScopeItems(items, scope);
+    if (!list.length) return '';
+    var first = list[0].profile || 'none';
+    for (var i = 1; i < list.length; i++){
+      if ((list[i].profile || 'none') !== first) return null;
+    }
+    return first;
+  }
+  // Veta do skupiny Uchytky — co je NASADENE (nie co sa chysta).
+  // items = [{ label:'F1', type, profile }] v DATOVOM poradi; reg = registry.
+  function frontProfileStateText(items, reg){
+    var list = (items || []).filter(function(it){ return it && it.type !== 'none'; });
+    if (!list.length) return 'Skrinka zatiaľ nemá čelá, na ktorých by profil sedel.';
+    var order = [], byId = {};
+    list.forEach(function(it){
+      var id = it.profile || 'none';
+      if (!byId[id]){ byId[id] = []; order.push(id); }
+      byId[id].push(it.label);
+    });
+    if (order.length === 1 && order[0] === 'none') return 'Žiadne čelo nemá úchytkový profil.';
+    return order.map(function(id){
+      var rec = frontProfileRec(id, reg);
+      return (rec ? rec.short || rec.name : 'bez profilu') + ': ' + byId[id].join(', ');
+    }).join(' · ');
   }
   var partCard = null;                        // aktualna karta dielca (null = ziadny dielec)
   // D3: mapa front_id -> texty kovania ("4× záves", "NL 500") pre badge v riadkoch ciel.
   var HW_FRONT_BADGES = {};
+  // UI-C3: SETY, ktore sa pre cela naozaj kupia (D-92 `purchase.set_name`).
+  // Autorita je server (HardwareSets.explain) — JS nerozhoduje, co sa kupuje,
+  // len zbiera uz hotove nazvy pod ich vlastnika.
+  var HW_FRONT_BUY = {};
   function buildFrontHwBadges(hardware){
     HW_FRONT_BADGES = {};
+    HW_FRONT_BUY = {};
     var hinges = {}; // front_id -> sucet zavesov cez vsetky kridla
     (hardware || []).forEach(function(it){
       var m = String(it.owner_part_key || '').match(/^front:([^\/]+)\//);
@@ -61,6 +108,11 @@
         (HW_FRONT_BADGES[fid] = HW_FRONT_BADGES[fid] || [])
           .push(nl != null ? ('výsuv NL ' + Math.round(nl)) : (it.quantity + '× výsuv'));
       }
+      var setName = (it.purchase && it.purchase.set_name) ? String(it.purchase.set_name) : '';
+      if (setName){
+        var list = (HW_FRONT_BUY[fid] = HW_FRONT_BUY[fid] || []);
+        if (list.indexOf(setName) < 0) list.push(setName); // ten isty set pri viacerych kridlach = raz
+      }
     });
     for (var fid in hinges){
       var n = hinges[fid];
@@ -70,6 +122,10 @@
   }
   function frontHwBadge(fid){
     var arr = HW_FRONT_BADGES[fid];
+    return arr && arr.length ? arr.join(' · ') : null;
+  }
+  function frontHwBuy(fid){
+    var arr = HW_FRONT_BUY[fid];
     return arr && arr.length ? arr.join(' · ') : null;
   }
   var stableIdSeq = 0;
@@ -494,6 +550,7 @@
     fillSheetSelectFiltered(el('cab_body'), true, rangeMatch(), undefined, undefined,
       function(s){ return s.uni === true ? '' : bodyThicknessNote(s.thickness, bodyTh); }, true);
     fillSheetSelectFiltered(el('cab_front'), true, frontMatch());
+    fillSheetSelectFiltered(el('cab_front_c'), true, frontMatch()); // UI-C3: zrkadlo v zozname ciel
     fillSheetSelectFiltered(el('cab_back'), true, thMatch(backTh));
     nxComboSync(); // D-85: prekreslene <option>y -> obnov popisky comboboxov
   }
@@ -657,7 +714,12 @@
       // D-90 (tests/js/test_d90_profil_ui.js) — ciste funkcie volby profilu;
       // register sa testom odovzdava parametrom (global plni az NX.init z Ruby).
       frontProfileRec: frontProfileRec, frontProfileReduction: frontProfileReduction,
-      frontProfileNext: frontProfileNext,
+      // D-96 / UI-C3 (tests/js/test_uic3_cela.js) — sekcia „Úchytky" nahradila
+      // cyklenie ikonou v riadku, preto s nou zanikol aj `frontProfileNext`.
+      frontProfileOptionList: frontProfileOptionList,
+      frontProfileScopeItems: frontProfileScopeItems,
+      frontProfileCommon: frontProfileCommon,
+      frontProfileStateText: frontProfileStateText,
       // D-100 (tests/js/test_d100_nazvy.js) — zrkadlo ocistenia nazvu skrinky
       cabNameValue: cabNameValue, CAB_NAME_MAX: CAB_NAME_MAX,
       // UI-B3 (tests/js/test_uib3_korpus.js) — texty informacneho stlpca a typ badge

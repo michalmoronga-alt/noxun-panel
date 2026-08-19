@@ -89,6 +89,31 @@ module Noxun
           EdgeCheck.mark_dirty(model)
         end
       end
+
+      # D-89 (a): HRANA POD KURZOROM. Vlastny overlay (nie dalsi stav D-104) —
+      # hovori o INEJ veci: „toto je hrana, nad ktorou stojis v paneli", nie
+      # o stave olepu. Ziadny observer nepotrebuje: zvyraznenie zije len po dobu
+      # hoveru a stav si drzi HoverEdge (jedna ploska, ziadny scan).
+      class HoverEdgeOverlay < Sketchup::Overlay
+        def initialize
+          super(HoverEdge::OVERLAY_ID, HoverEdge::OVERLAY_NAME,
+                description: 'Zvyraznenie hrany, nad ktorou stoji kurzor v karte dielca (D-89a).')
+        end
+
+        def draw(view)
+          HoverEdge.draw(view)
+        rescue StandardError => e
+          Engine.log_error(e, 'HoverEdgeOverlay#draw')
+          nil
+        end
+
+        def getExtents # rubocop:disable Naming/MethodName — SketchUp API
+          HoverEdge.extents(respond_to?(:model) ? model : nil)
+        rescue StandardError => e
+          Engine.log_error(e, 'HoverEdgeOverlay#getExtents')
+          Geom::BoundingBox.new
+        end
+      end
     end
   end
 end

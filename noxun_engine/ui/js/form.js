@@ -24,7 +24,6 @@
       var r = rows[i];
       var type = r.querySelector('.ftype').value;
       var hv = r.querySelector('.fh').value.trim();
-      var locked = r.querySelector('.flock').checked;
       var wings = r.querySelector('.fw').value;
       var hasH = hv !== '';
       var hNum = hasH ? evalDim(hv) : NaN; // vyraz vo vyske cela -> cislo (NaN blokuje apply cez validateFields)
@@ -32,8 +31,11 @@
       // MUSI prezit round-trip — inak by kazda zmena ineho pola poslala riadok
       // bez profilu a server by ho znormalizoval na 'none' (celo by sa ticho
       // vratilo na plnu vysku a profil by vypadol z kovania).
+      // UI-C3: ZAMOK PRI VYSKE ZANIKOL — zamknute ⇔ vypisane. Samostatny
+      // checkbox (D-23) sa dal zapnut aj nad prazdnym polom a nerobil nic;
+      // teraz je `locked` presne to, co pouzivatel vidi: vypisana hodnota drzi.
       items.push({ id: r.dataset.frontId || newStableId('F'), type: type, mode: hasH ? 'fixed' : 'auto',
-        height: hasH ? (isNaN(hNum) ? null : hNum) : null, locked: hasH ? locked : false, wings: (type === 'door') ? wings : '1',
+        height: hasH ? (isNaN(hNum) ? null : hNum) : null, locked: hasH, wings: (type === 'door') ? wings : '1',
         profile: r.dataset.frontProfile || 'none' });
     }
     return { split_axis: 'height', gap: frontGapVal('fr_gap', 3.0), gap_top: frontGapVal('fr_gap_top', 2.0),
@@ -690,43 +692,77 @@
   // maju jedinu vkladaciu operaciu (insertBefore firstChild).
   // .fnum je kanonicka pozicia v DATACH (F1 dole) — sync bezi VYHRADNE cez
   // dataset.frontId; cislo sa NIKDY neparsuje z ID a ID sa pri precislovani neprepisuje.
-  function addFrontRow(item){
-    var userAdd = (item == null); // "+ riadok" (bez argumentu) vs render s datami
+  // UI-C3 (N27): IKONA TYPU CELA. Mapa je JEDINE miesto, kde typ -> symbol;
+  // rozbalovacka typu ostava (ikona je odpoved na „co to je" skor, nez sa oko
+  // dostane k textu, nie jej nahrada).
+  var FRONT_TYPE_ICON = { door: 'door', drawer_front: 'rows-2', none: 'front' };
+  var FRONT_TYPE_LABEL = { door: 'Dvierka', drawer_front: 'Zásuvkové čelo', none: 'Bez čela' };
+  function frontTypeIcon(t){ return FRONT_TYPE_ICON[t] || 'front'; }
+  function frontTypeLabel(t){ return FRONT_TYPE_LABEL[t] || 'Čelo'; }
+
+  // UI-C3: pole vysky ma svoje ID kvoli vyskovemu radu (N25) — `nxDimPick`
+  // zapisuje hodnotu cez `el(id)` a ohlasuje ju POVODNOU udalostou.
+  function frontHeightInputId(fid){ return 'fh_' + fid; }
+
+  function addFrontRow(item, userAdd){
+    // `userAdd` je od UI-C3 EXPLICITNY (D-84: „+ pridaj dvere / + pridaj čelo"
+    // posielaju typ, takze `item == null` uz uzivatelsky pridanok nerozlisi).
     item = item || {};
     var wrap = el('frontRows');
     var idx = wrap.querySelectorAll('.frow').length + 1; // novy riadok = datovo posledny = najvyssia pozicia
     var row = document.createElement('div');
     row.className = 'frow';
     row.dataset.frontId = item.id || newStableId('F');
-    // D-90: profil riadku zije v datasete (ovladac = tlacidlo .fprof nizsie) —
-    // collectFronts ho posiela spat, takze editacia inych poli profil nezhodi.
+    // D-90: profil riadku zije v datasete — collectFronts ho posiela spat, takze
+    // editacia inych poli profil nezhodi. D-96: ovladacom uz NIE je ikona v
+    // riadku (cyklila by sa nepouzitelne pri viacerych profiloch), ale skupina
+    // „Úchytky"; ikona ostala INDIKATOR.
     row.dataset.frontProfile = item.profile || 'none';
-    var badge = frontHwBadge(row.dataset.frontId); // D3: kovanie cela (zavesy/vysuv) z planu
+    var fhId = frontHeightInputId(row.dataset.frontId);
     row.innerHTML =
       '<span class="fnum">F' + idx + '</span>' +
-      '<select class="ftype" onchange="onFrontTypeChange(this); onField()">' +
+      '<span class="ftico" aria-hidden="true">' + NXIcons.svg(frontTypeIcon(item.type || 'door')) + '</span>' +
+      '<select class="ftype" aria-label="Typ čela"' +
+        ' title="Typ čela. Výklop: AVENTOS sa zatiaľ pridáva ručne, automatika príde vo fáze 3."' +
+        ' onchange="onFrontTypeChange(this); onField()">' +
         '<option value="door">Dvierka</option><option value="drawer_front">Zásuvkové čelo</option>' +
+        // Vyklop je v ponuke, aby bolo vidno, ze sa s nim rata — ale zatial sa
+        // NEDA zvolit: rola `flap` potrebuje vlastnu cestu cez builder, ABS a
+        // kusovnik (vedoma odchylka UI-C3, zapisana v UI20_KONTRAKT.md).
+        // Popis je KRATKY zamerne: dlha volba by v uzkom rade rozhodila layout
+        // (`flex-basis` selectu je jeho najsirsia polozka) — cela veta zije
+        // v `title` selectu a v hinte skupiny.
+        '<option value="flap" disabled>Výklop (fáza 3)</option>' +
         '<option value="none">Bez čela</option></select>' +
-      '<input class="fh" type="text" placeholder="auto" oninput="onField()">' +
-      '<select class="fw" onchange="onField()"><option value="auto">auto</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>' +
-      // D-90: volba uchytkoveho profilu — IKONOVE tlacidlo v EXISTUJUCOM rade
-      // (pravidlo vertikalneho priestoru; ziadny novy riadok ani popisok).
-      // Klik cykli „bez profilu -> profily z registry", stav drzi dataset +
-      // aria-pressed; ked Ruby ziadny profil nepozna, tlacidlo sa nevykresli.
-      (FRONT_PROFILES.length
-        ? '<button class="fprof" type="button" aria-pressed="false" onclick="toggleFrontProfile(this); onField()">' +
-          NXIcons.svg('profile') + '</button>'
-        : '') +
-      '<input class="flock" type="checkbox" title="Zamknúť pevnú výšku" onchange="onField()">' +
-      '<button class="fdel" title="Odstrániť" aria-label="Odstrániť čelo" onclick="delFrontRow(this); onField()">' + NXIcons.svg('x') + '</button>' +
-      (badge ? '<span class="fhw" title="Kovanie tohto čela (sekcia Kovanie)">' + NXIcons.svg('link') + esc(badge) + '</span>' : '');
+      // Uzke pole vysky (46 px) + sipka VYSKOVEHO RADU (N25). Rad len DOSADI
+      // hodnotu a ohlasi ju povodnou udalostou — vyrazy, validacia aj debounce
+      // apply beziat nezmenene.
+      '<span class="dwrap">' +
+        '<input class="fh" id="' + esc(fhId) + '" type="text" placeholder="auto" oninput="onFrontHeight(this)">' +
+        '<button type="button" class="pbtn" data-nx-usage="rad:vyska_cela" onclick="nxDimToggle(this, event)"' +
+          ' title="Výškový rad čiel" aria-label="Výškový rad čiel">' + NXIcons.svg('chevron-down') + '</button>' +
+        '<span class="miniopts" data-dim-key="vyska_cela" data-dim-input="' + esc(fhId) + '"></span>' +
+      '</span>' +
+      // „mm" pri hodnote + chip AUTO — obe sa ukazu LEN pri vypisanej vyske
+      // (prazdne pole je AUTO a nema co vracat). Zamok pri vyske ZANIKOL:
+      // zamknute ⇔ vypisane (to iste pravidlo ma pole „Prvá zóna" z UI-C2).
+      '<span class="funit">mm</span>' +
+      '<button type="button" class="fauto" onclick="frontHeightAuto(this, event)"' +
+        ' title="Vrátiť na AUTO — výška sa dopočíta z voľného miesta"' +
+        ' aria-label="Vrátiť výšku čela na AUTO">AUTO</button>' +
+      '<select class="fw" aria-label="Počet krídel" onchange="onField()"><option value="auto">auto</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>' +
+      (FRONT_PROFILES.length ? '<span class="fprof" aria-hidden="true">' + NXIcons.svg('profile') + '</span>' : '') +
+      '<button class="fdel" title="Odstrániť" aria-label="Odstrániť čelo" onclick="delFrontRow(this); onField()">' + NXIcons.svg('x') + '</button>';
     wrap.insertBefore(row, wrap.firstChild); // D-23: navrch — DOM je obrateny
     if (item.type) row.querySelector('.ftype').value = item.type;
     if (item.height !== null && item.height !== undefined && item.height !== '') row.querySelector('.fh').value = item.height;
     if (item.wings) row.querySelector('.fw').value = item.wings;
-    if (item.locked) row.querySelector('.flock').checked = true;
+    // UI-C3: `item.locked` sa uz necita — zamok JE vypisana hodnota.
     attachExprField(row.querySelector('.fh'), { flushFn: flushCabinetEditsNow }); // V0.4.7e vyrazy vo vyske cela
-    syncFrontProfileBtn(row); // D-90: stav tlacidla profilu z datasetu
+    nxDimFillRow(row);         // N25: hodnoty radu do mini-ponuky riadku
+    syncFrontProfileBtn(row);  // D-90/D-96: indikator profilu z datasetu
+    syncFrontAuto(row);        // chip AUTO + „mm" podla toho, ci je vyska vypisana
+    updateFrontRowBadge(row);  // naviazane kovanie pod riadkom
     onFrontTypeChange(row.querySelector('.ftype'));
     if (userAdd){
       // D-23: novy riadok vznika NAVRCHU zoznamu — dotiahni ho do pohladu a fokusni vysku
@@ -734,16 +770,55 @@
       var fh0 = row.querySelector('.fh'); if (fh0) fh0.focus();
     }
   }
+  // D-84: rec stolara — „+ pridaj dvere" (kridlove) a „+ pridaj čelo"
+  // (zasuvkove). Typ ide rovno do noveho riadku, aby ho pouzivatel nemusel
+  // prestavovat po pridani.
+  function addFrontKind(type){
+    addFrontRow({ type: type }, true);
+    onField();
+  }
+  // Vyska cela: chip AUTO a „mm" sa riadia TYM, ci je pole vypisane.
+  function onFrontHeight(inp){
+    var row = inp.closest('.frow');
+    if (row) syncFrontAuto(row);
+    onField();
+  }
+  // Chip AUTO = navrat na automat (vyprazdni pole). Udalost `input` sa vystreli
+  // vyslovne — bezi po nej presne to, co pri zmazani rukou (expr hint, validacia,
+  // debounce apply). stopPropagation: chip zije v riadku plnom ovladacov.
+  function frontHeightAuto(btn, ev){
+    if (ev) ev.stopPropagation();
+    var row = btn.closest('.frow'); if (!row) return;
+    var inp = row.querySelector('.fh'); if (!inp) return;
+    if (inp.value === '') return; // uz je AUTO — ziadny prazdny apply
+    inp.value = '';
+    inp.classList.remove('bad');
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  // „mm" a chip AUTO sa ukazu LEN pri vypisanej vyske. Prazdne pole je AUTO —
+  // vracat sa niet odkial a jednotka by patrila k nicomu.
+  function syncFrontAuto(row){
+    var inp = row.querySelector('.fh'); if (!inp) return;
+    var on = inp.value.trim() !== '';
+    var u = row.querySelector('.funit'), a = row.querySelector('.fauto');
+    if (u) u.style.display = on ? '' : 'none';
+    if (a) a.style.display = on ? '' : 'none';
+    row.classList.toggle('fixed', on);
+  }
   // D-18: pri 'none' (Bez čela) sa skryje výber krídel (ako pri drawer_front) a hneď
   // aj badge kovania (dátovo zmizne až po echu apply — bez dielcov niet kovania).
   // Badge span nemusí existovať (vzniká len pri neprázdnom badge) — null guard (Codex F3).
   function onFrontTypeChange(sel){
     var row = sel.closest('.frow');
     row.querySelector('.fw').style.visibility = (sel.value === 'door') ? 'visible' : 'hidden';
+    // N27: ikona typu je zrkadlom rozbalovacky — meni sa `href` v <use>, NIE
+    // innerHTML celeho span-u (vzor NXIcons.set pri zamkoch).
+    var ico = row.querySelector('.ftico');
+    if (ico && window.NXIcons) NXIcons.set(ico, frontTypeIcon(sel.value));
     var hw = row.querySelector('.fhw');
     if (hw) hw.style.display = (sel.value === 'none') ? 'none' : '';
-    // D-90: „Bez čela" nemá na čom profil držať — voľba zmizne a stav sa zhodí
-    // na 'none' (rovnako to robí Ruby normalize; UI sa mu nesmie rozísť).
+    // D-90: „Bez čela" nemá na čom profil držať — indikátor zmizne a stav sa
+    // zhodí na 'none' (rovnako to robí Ruby normalize; UI sa mu nesmie rozísť).
     var pb = row.querySelector('.fprof');
     if (pb){
       var off = (sel.value === 'none');
@@ -753,42 +828,99 @@
         syncFrontProfileBtn(row);
       }
     }
+    updateFrontRowBadge(row);   // D-18: „Bez čela" nema kovanie
+    refreshFrontProfileUI();    // D-96: zmena typu meni rozsah aj vetu stavu
   }
-  // D-90: klik cykli profil riadku (bez profilu -> UKW-7 -> …). Autorita je
-  // server (Fronts.normalize_config neznámu hodnotu zhodí na 'none'); tu ide
-  // len o pohodlie a čitateľný stav.
-  function toggleFrontProfile(btn){
-    var row = btn.closest('.frow'); if (!row) return;
-    row.dataset.frontProfile = frontProfileNext(row.dataset.frontProfile || 'none');
-    syncFrontProfileBtn(row);
+  // D-96: ikona profilu v riadku je LEN INDIKATOR (ovladac zije v skupine
+  // „Úchytky"). Preto uz nie je `<button>` ani nenesie `aria-pressed` — je to
+  // stav, nie prepinac; tooltip povie, kde sa meni.
+  function syntheticProfileTitle(rec){
+    return rec
+      ? ('Úchytkový profil: ' + rec.name + ' — čelo sa skráti o ' + Math.round(rec.reduction) +
+         ' mm (mení sa v skupine Úchytky)')
+      : 'Bez úchytkového profilu (profil sa volí v skupine Úchytky)';
   }
   function syncFrontProfileBtn(row){
-    var btn = row.querySelector('.fprof'); if (!btn) return;
-    var id = row.dataset.frontProfile || 'none';
-    var rec = frontProfileRec(id);
-    var nxt = frontProfileNext(id);
-    var nxtRec = frontProfileRec(nxt);
-    var nxtTxt = nxtRec ? nxtRec.name : 'bez profilu';
-    var txt = rec
-      ? ('Úchytkový profil: ' + rec.name + ' — čelo sa skráti o ' + Math.round(rec.reduction) +
-         ' mm (klik = ' + nxtTxt + ')')
-      : ('Úchytkový profil: bez profilu (klik = ' + nxtTxt + ')');
-    btn.classList.toggle('on', !!rec);
-    btn.setAttribute('aria-pressed', rec ? 'true' : 'false');
-    btn.title = txt;
-    btn.setAttribute('aria-label', txt);
+    var ind = row.querySelector('.fprof'); if (!ind) return;
+    var rec = frontProfileRec(row.dataset.frontProfile || 'none');
+    var txt = syntheticProfileTitle(rec);
+    // `aria-label` sa tu VEDOME nedava: span je `aria-hidden` (je to indikator,
+    // nie ovladac) a stav profilu cita citacka zo skupiny „Úchytky", kde sa aj
+    // meni. Dva popisy toho isteho by si odporovali.
+    ind.classList.toggle('on', !!rec);
+    ind.title = txt;
   }
-  function delFrontRow(btn){ btn.closest('.frow').remove(); renumberFronts(); }
-  // D-23: datovo posledne celo = HORNY riadok DOM (zoznam je obrateny); po
-  // odobrati udrz kontext — novy horny riadok dotiahni do pohladu.
-  function removeLastFront(){
-    var rows = el('frontRows').querySelectorAll('.frow');
-    if (!rows.length) return;
-    rows[0].remove();
-    renumberFronts();
-    var first = el('frontRows').querySelector('.frow');
-    if (first) first.scrollIntoView({ block: 'nearest' });
+  function delFrontRow(btn){ btn.closest('.frow').remove(); renumberFronts(); refreshFrontProfileUI(); }
+
+  // ===== D-96: skupina „Úchytky" ==========================================
+  // Cita a zapisuje PRESNE tie iste data ako riadky (`dataset.frontProfile`) —
+  // ziadne nove pole, ziadny novy callback. Zmena ide POVODNOU cestou
+  // (dataset -> collectFronts -> apply_all), takze vsetky guardy beziat
+  // nezmenene a server ostava autoritou (Fronts.normalize_config neznamy
+  // profil zhodi na 'none').
+  var FRONT_PROFILE_MIXED = '__mixed__'; // len ZOBRAZENIE stavu, nikdy sa nezapisuje
+  // Stav riadkov v DATOVOM poradi (DOM je obrateny — D-23).
+  function frontRowsState(){
+    var wrap = el('frontRows'); if (!wrap) return [];
+    var rows = wrap.querySelectorAll('.frow');
+    var out = [];
+    for (var i = rows.length - 1; i >= 0; i--){
+      var r = rows[i];
+      var num = r.querySelector('.fnum'), t = r.querySelector('.ftype');
+      out.push({ row: r, label: num ? num.textContent : '',
+                 type: t ? t.value : 'door',
+                 profile: r.dataset.frontProfile || 'none' });
+    }
+    return out;
   }
+  function frontProfileScopeNow(){ var s = el('frontProfileScope'); return s ? s.value : 'all'; }
+  function refreshFrontProfileUI(){
+    var sel = el('frontProfileSel'); if (!sel) return;
+    var items = frontRowsState();
+    var common = frontProfileCommon(items, frontProfileScopeNow());
+    var html = '';
+    if (common === null){
+      // Rozne profily v rozsahu: volba je viditelna, ale NEodosielatelna —
+      // inak by select klamal, ze vsetky cela maju to iste (vzor D-75 „podľa
+      // parametra" v sekcii Kovanie).
+      html += '<option value="' + FRONT_PROFILE_MIXED + '" selected disabled>(rôzne — vyber profil pre celý rozsah)</option>';
+    }
+    frontProfileOptionList().forEach(function(o){
+      html += '<option value="' + esc(o.id) + '"' + (common === o.id ? ' selected' : '') + '>' + esc(o.name) + '</option>';
+    });
+    sel.innerHTML = html;
+    // Prazdny rozsah = nie je co nastavovat. `aria-disabled` nestaci pri
+    // <select> (natívna rozbalovacka by sa aj tak otvorila), preto tu VEDOME
+    // ide o `disabled` — je to vstupne pole, nie akcny prvok vzoru D-78.
+    //
+    // Podmienkou je VYLUCNE obsah rozsahu, NIE `selectedCabId`: tato funkcia
+    // bezi z `renderFronts`, teda EST PRED tym, nez `loadSelected` nastavi
+    // identitu skrinky — gate na vybere by sekciu drzal navzdy neaktivnu.
+    var empty = (common === '');
+    sel.disabled = empty;
+    var st = el('frontProfileState');
+    if (st) st.textContent = empty ? 'V tomto rozsahu nie je žiadne čelo.' : frontProfileStateText(items);
+  }
+  // Vyber profilu = zapis do VSETKYCH ciel rozsahu naraz (D-96: „profil, hrana
+  // a rozsah na jednom mieste"). Jeden `onField` = jeden apply = jeden krok Spat.
+  function onFrontProfilePick(){
+    var sel = el('frontProfileSel'); if (!sel) return;
+    var id = sel.value;
+    if (id === FRONT_PROFILE_MIXED) return; // stav, nie volba
+    var changed = false;
+    frontProfileScopeItems(frontRowsState(), frontProfileScopeNow()).forEach(function(it){
+      if ((it.profile || 'none') === id) return;
+      it.row.dataset.frontProfile = id;
+      syncFrontProfileBtn(it.row);
+      changed = true;
+    });
+    refreshFrontProfileUI();
+    if (!changed) return;   // klik na uz nasadenu hodnotu = ziadny prazdny krok Spat
+    renderPreview();        // pasmo profilu nad celom sa meni hned
+    onField();
+  }
+  // Rozsah je FILTER, nie akcia — sam nic nemeni, len prestavi ponuku a vetu.
+  function onFrontProfileScope(){ refreshFrontProfileUI(); }
   // D-23: cislo = kanonicka pozicia v datach — SPODNY DOM riadok je F1.
   function renumberFronts(){ var rows = el('frontRows').querySelectorAll('.frow'); for (var i=0;i<rows.length;i++){ rows[i].querySelector('.fnum').textContent = 'F' + (rows.length - i); } }
   // D-07 Codex B2: keepGaps=true pri echu apply toho isteho korpusu s cakajucimi
@@ -821,6 +953,7 @@
     setNum('fr_gap_bottom', (fronts && fronts.gap_bottom != null) ? fronts.gap_bottom : 2);
     setNum('fr_gap_sides', (fronts && fronts.gap_sides != null) ? fronts.gap_sides : 2);
     setEdgeLimitOff(!!(fronts && fronts.edge_limit_off));
+    refreshFrontProfileUI(); // D-96: ponuka a veta stavu patria k prave vykreslenym riadkom
   }
 
   // --- D-23: placeholder ≈ dopocitanej vysky v AUTO poliach --------------------
@@ -847,30 +980,72 @@
       var inp = rows[i].querySelector('.fh'); if (inp) inp.placeholder = 'auto';
     }
   }
-  // D-23: obnova badge kovania podla ID bez prestavby riadkov (light-update pri
-  // echu). .fhw sa VZDY hlada/vklada cez triedu a appendChild na koniec riadku —
+  // D-23 / UI-C3: NAVIAZANE KOVANIE POD RIADKOM. Jeden DROBNY riadok (nie
+  // tabulka — vertikalny priestor je vzacny): „2× závesy · výsuv NL 470 →
+  // Atira biela H176". Text skladaju dohromady dva EXISTUJUCE zdroje: badge
+  // z planu (`frontHwBadge`, D-23) a nakupny rozpis servera (`frontHwBuy`,
+  // D-92) — panel nic nedopocitava a ziadne nove data neprisli.
+  //
+  // Riadok zije UVNUTRI `.frow` (flex-wrap, `flex: 1 0 100%`) — DOM zoznamu
+  // ostava „jeden .frow = jedno celo", takze obrateny render (D-23), citanie
+  // odspodu aj prestavba riadkov platia bez zmeny.
+  //
+  // .fhw sa VZDY hlada/vklada cez triedu a appendChild na koniec riadku —
   // NIKDY nie cez nextElementSibling/indexy deti (.exprhint zije hned za .fh).
+  function updateFrontRowBadge(row){
+    var fid = row.dataset.frontId;
+    var badge = frontHwBadge(fid);
+    var buy = (typeof frontHwBuy === 'function') ? frontHwBuy(fid) : null;
+    var text = [badge, buy].filter(function(t){ return !!t; }).join(' → ');
+    var span = row.querySelector('.fhw');
+    if (!text){ if (span) span.remove(); return; }
+    if (!span){
+      span = document.createElement('span');
+      span.className = 'fhw fhwline';
+      span.setAttribute('role', 'button');
+      span.setAttribute('tabindex', '0');
+      span.setAttribute('aria-label', 'Kovanie tohto čela — otvorí kontext Kovanie');
+      // stopPropagation: riadok je plny ovladacov a klik sem nesmie zamiesat
+      // nic ineho (lekcia „select sa zatvaral").
+      span.onclick = function(ev){ ev.stopPropagation(); openFrontHardware(fid); };
+      span.onkeydown = function(ev){
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault(); ev.stopPropagation(); openFrontHardware(fid);
+      };
+      row.appendChild(span);
+    }
+    // Riadok je JEDNORIADKOVY s ellipsis — plny text nesie `title` (vzor D-92).
+    span.title = text + ' — klik otvorí Kovanie';
+    span.innerHTML = NXIcons.svg('link') + esc(text); // B3/B9: ikona staticka, text cez esc
+    var tsel = row.querySelector('.ftype'); // D-18: pri 'none' riadok skryty
+    span.style.display = (tsel && tsel.value === 'none') ? 'none' : '';
+  }
   function updateFrontRowBadges(){
     var wrap = el('frontRows'); if (!wrap) return;
     var rows = wrap.querySelectorAll('.frow');
+    for (var i = 0; i < rows.length; i++) updateFrontRowBadge(rows[i]);
+  }
+  // Klik na naviazane kovanie: prepni kontext na Kovanie a dotiahni do pohladu
+  // BOX VLASTNIKA tohto cela. Ziadny zapis — je to navigacia (N13: klikatelne
+  // vedie tam, kam ukazuje).
+  function openFrontHardware(fid){
+    if (typeof setViewContext === 'function') setViewContext('kovanie');
+    var box = el('hwRows'); if (!box || !fid) return;
+    var rows = box.querySelectorAll('.hwrow[data-owner]');
+    var want = 'front:' + fid + '/';
     for (var i = 0; i < rows.length; i++){
-      var row = rows[i];
-      var badge = frontHwBadge(row.dataset.frontId);
-      var span = row.querySelector('.fhw');
-      if (badge){
-        if (!span){
-          span = document.createElement('span');
-          span.className = 'fhw';
-          span.title = 'Kovanie tohto čela (sekcia Kovanie)';
-          row.appendChild(span);
-        }
-        span.innerHTML = NXIcons.svg('link') + esc(badge); // B3/B9: ikona staticka, badge cez esc
-        var tsel = row.querySelector('.ftype'); // D-18: pri 'none' badge skryty
-        span.style.display = (tsel && tsel.value === 'none') ? 'none' : '';
-      } else if (span){
-        span.remove();
-      }
+      if (String(rows[i].getAttribute('data-owner')).indexOf(want) !== 0) continue;
+      var target = rows[i].parentNode && rows[i].parentNode.classList
+        && rows[i].parentNode.classList.contains('hwitem') ? rows[i].parentNode : rows[i];
+      if (typeof nxRevealTarget === 'function') nxRevealTarget(target);
+      target.scrollIntoView({ block: 'nearest' });
+      // Kratke zvyraznenie: bez neho by pouzivatel po skoku hladal, KTORY
+      // riadok je ten jeho (poloziek kovania byva viac nez sa zmesti na obraz).
+      target.classList.add('hwfocus');
+      (function(t){ setTimeout(function(){ t.classList.remove('hwfocus'); }, 1600); })(target);
+      return;
     }
+    NX.setStatus('Toto čelo zatiaľ nemá naviazané kovanie.', false);
   }
   // D-23: klik na celo v nahlade — otvor sekciu Cela, riadok do pohladu, fokus
   // pola vysky. Riadok sa hlada cez dataset.frontId (nie cez cislo).

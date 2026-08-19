@@ -12,7 +12,7 @@
      Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
      bezpecne zdielatelny so satelitnymi oknami. -->
 <script>document.documentElement.className = 'nx-inspector';</script>
-<link rel="stylesheet" href="css/panel.css?v=0.7.14">
+<link rel="stylesheet" href="css/panel.css?v=0.7.15">
 
 <!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
      Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
@@ -441,18 +441,68 @@
       </div>
     </details>
 
-    <!-- --- kontext CELA --- -->
+    <!-- ===== kontext CELA (UI-C3, kontrakt UI 2.0 sekcia Cela) ==============
+         Tri skupiny v zavaznom poradi: Zoznam ciel · Uchytky (D-96) · Medzery.
+         Kostra je STATICKA (A4) — JS pise len obsah #frontRows a stav uz
+         existujucich uzlov; skupiny sa NEPREKRESLUJU. -->
     <details data-key="fronts" data-s4="cela">
-      <summary>Čelá</summary>
+      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-front"/></svg>Zoznam čiel</summary>
       <div class="body">
-        <div class="hint">Zoznam zodpovedá pohľadu na skrinku — F1 je spodné čelo. Výška prázdna = AUTO (sivé ≈ je dopočítaná výška). <svg class="ic ic-inline" aria-hidden="true"><use href="#i-lock"/></svg> zamkne pevnú výšku.</div>
+        <!-- UI-C3: ZAMOK PRI VYSKE ZANIKOL — zamknute ⇔ vypisane. Vypisana
+             hodnota drzi, chip AUTO ju vrati na automat. Rovnake pravidlo ma
+             pole „Prvá zóna" z UI-C2. -->
+        <div class="hint">Zoznam zodpovedá pohľadu na skrinku — F1 je spodné čelo.
+          Vypísaná výška <b>drží</b>, prázdna je <b>AUTO</b> (sivé ≈ je dopočítaná výška);
+          chipom <b>AUTO</b> sa vrátiš na automat. Šípka pri poli ponúka výškový rad.
+          <b>Výklop</b> je v ponuke typov: <b>AVENTOS sa pridáva ručne</b>, automatika príde vo fáze 3.</div>
         <div id="frontRows"></div>
+        <!-- D-84: rec stolara. Odoberacie tlacidlo ZANIKLO — celo sa rusi
+             krizikom pri svojom riadku (jednoznacne, ktore mizne) a v rade sa
+             uvolni miesto. -->
         <div class="btnrow">
-          <button class="ghostbtn" onclick="addFrontRow(); onField()">+ riadok</button>
-          <button class="ghostbtn" onclick="removeLastFront(); onField()">− riadok</button>
+          <button class="ghostbtn" data-nx-usage="fronts:add-door" onclick="addFrontKind('door')"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> pridaj dvere</button>
+          <button class="ghostbtn" data-nx-usage="fronts:add-drawer" onclick="addFrontKind('drawer_front')"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> pridaj čelo</button>
         </div>
-        <!-- D-07: medzery a presahy — hodnoty ziju vo fronts configu (nie construction params) -->
-        <div class="hint">Medzery a presahy (mm). Záporný okraj = čelo presahuje obrys korpusu. Čelá sa kladú odspodu — okraj hore sa prejaví cez AUTO čelo (pri samých pevných výškach je len rezervou).</div>
+        <!-- UI-C3: material CIEL priamo v zozname. Sektor Materiály patrí
+             kontextu Korpus a v kontexte Čelá je skrytý — bez tohto ovládača
+             by sa dekor čiel musel meniť inde, než sa čelá kreslia. Je to DRUHY
+             OVLADAC toho isteho udaja (zrkadli sa s `cab_front`), nie nove data. -->
+        <div class="matrow"><label for="cab_front_c">Materiál čiel</label>
+          <select id="cab_front_c" data-nx-combo="decor" onchange="onCabinetMaterial('front', this.value)"></select></div>
+      </div>
+    </details>
+
+    <!-- D-96: UCHYTKY. Volba profilu (D-90) uz NIE JE cyklujuca ikona v riadku —
+         ikona v riadku ostala len INDIKATOR. Profil sa nastavuje TU, raz pre
+         zvoleny rozsah ciel. Hrana osadenia (dolna/bocna) v registry profilov
+         zatial NIE JE (core/front_profiles.rb pozna len skratenie hornej hrany),
+         preto ju sekcia zamerne NEPONUKA — pribudne s rozsirenim registry. -->
+    <details data-key="fhandles" data-s4="cela">
+      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-profile"/></svg>Úchytky</summary>
+      <div class="body">
+        <div class="row"><label for="frontProfileScope">Rozsah</label>
+          <select id="frontProfileScope" onchange="onFrontProfileScope()">
+            <option value="all">Všetky čelá skrinky</option>
+            <option value="drawer_front">Len zásuvkové čelá</option>
+            <option value="door">Len dvierka</option>
+          </select><span class="unit"></span></div>
+        <div class="row"><label for="frontProfileSel">Profil</label>
+          <select id="frontProfileSel" onchange="onFrontProfilePick()"></select><span class="unit"></span></div>
+        <div class="hint" id="frontProfileState">Označ skrinku.</div>
+        <div class="hint">Profil sa nasúva na hornú hranu čela — čelo sa o jeho výšku skráti,
+          ABS sa nemení (hrana sa olepuje aj pod profilom). Ikona
+          <svg class="ic ic-inline" aria-hidden="true"><use href="#i-profile"/></svg> v riadku čela je len
+          indikátor. Voľba hrany osadenia (dolná, bočné) pribudne s ďalšími profilmi.</div>
+      </div>
+    </details>
+
+    <!-- D-07: medzery a presahy — hodnoty ziju vo fronts configu (nie construction params).
+         N26: pri fokuse v ktoromkolvek z tychto poli sa medzery v projekcii Cela
+         prisvietia jantarovo (zvyraznenie kresli preview.js, ziadne nove data). -->
+    <details data-key="fgaps" data-s4="cela">
+      <summary><svg class="ic gic" aria-hidden="true"><use href="#i-columns-2"/></svg>Medzery a presahy</summary>
+      <div class="body">
+        <div class="hint">Záporný okraj = čelo presahuje obrys korpusu. Čelá sa kladú odspodu — okraj hore sa prejaví cez AUTO čelo (pri samých pevných výškach je len rezervou). Pri editácii sa medzery v náhľade prisvietia.</div>
         <div class="row"><label>Medzi čelami</label><input id="fr_gap" type="text" oninput="onField()"><span class="unit">mm</span></div>
         <div class="row"><label>Okraj hore</label><input id="fr_gap_top" type="text" oninput="onField()"><span class="unit">mm</span></div>
         <div class="row"><label>Okraj dole</label><input id="fr_gap_bottom" type="text" oninput="onField()"><span class="unit">mm</span></div>
@@ -622,7 +672,7 @@
           <div class="row"><label>Hĺbky</label><input id="ser_hlbka" type="text"><span class="unit">mm</span></div>
           <div class="row"><label>Sokle</label><input id="ser_sokel" type="text"><span class="unit">mm</span></div>
           <div class="row"><label>Výšky čiel</label><input id="ser_vyska_cela" type="text"><span class="unit">mm</span></div>
-          <div class="hint">Výšky čiel použije zoznam čiel (pribudne s dávkou UI-C3).</div>
+          <div class="hint">Výšky čiel ponúka šípka pri výške v zozname čiel (kontext Čelá).</div>
           <div class="btnrow">
             <button class="primary" onclick="saveDimSeries()">Uložiť rady</button>
             <button class="ghostbtn" onclick="resetDimSeriesFields()"><svg class="ic" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> Predvolené</button>
@@ -659,34 +709,34 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.7.14"></script>
+<script src="js/errors.js?v=0.7.15"></script>
 <!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
      jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
      pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
-<script src="js/win_fit.js?v=0.7.14"></script>
-<script src="js/icons.js?v=0.7.14"></script>
+<script src="js/win_fit.js?v=0.7.15"></script>
+<script src="js/icons.js?v=0.7.15"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.7.14"></script>
-<script src="js/core.js?v=0.7.14"></script>
-<script src="js/expr.js?v=0.7.14"></script>
-<script src="js/insert_state.js?v=0.7.14"></script>
-<script src="js/form.js?v=0.7.14"></script>
-<script src="js/zone_tree.js?v=0.7.14"></script>
-<script src="js/preview.js?v=0.7.14"></script>
+<script src="js/nx_combo.js?v=0.7.15"></script>
+<script src="js/core.js?v=0.7.15"></script>
+<script src="js/expr.js?v=0.7.15"></script>
+<script src="js/insert_state.js?v=0.7.15"></script>
+<script src="js/form.js?v=0.7.15"></script>
+<script src="js/zone_tree.js?v=0.7.15"></script>
+<script src="js/preview.js?v=0.7.15"></script>
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
-<script src="js/shell.js?v=0.7.14"></script>
-<script src="js/actions.js?v=0.7.14"></script>
+<script src="js/shell.js?v=0.7.15"></script>
+<script src="js/actions.js?v=0.7.15"></script>
 <!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
      bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
-<script src="js/settings.js?v=0.7.14"></script>
-<script src="js/bridge.js?v=0.7.14"></script>
-<script src="js/materials.js?v=0.7.14"></script>
-<script src="js/part_card.js?v=0.7.14"></script>
-<script src="js/board_card.js?v=0.7.14"></script>
-<script src="js/hardware.js?v=0.7.14"></script>
-<script src="js/usage.js?v=0.7.14"></script>
-<script src="js/boot.js?v=0.7.14"></script>
+<script src="js/settings.js?v=0.7.15"></script>
+<script src="js/bridge.js?v=0.7.15"></script>
+<script src="js/materials.js?v=0.7.15"></script>
+<script src="js/part_card.js?v=0.7.15"></script>
+<script src="js/board_card.js?v=0.7.15"></script>
+<script src="js/hardware.js?v=0.7.15"></script>
+<script src="js/usage.js?v=0.7.15"></script>
+<script src="js/boot.js?v=0.7.15"></script>

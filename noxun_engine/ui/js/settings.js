@@ -133,6 +133,24 @@
       var box = el('dimser_' + f.id);
       if (box) box.innerHTML = NXDim.menuHtml(f.key, f.id);
     });
+    nxDimFillRow(document); // UI-C3: aj riadky ciel (rad `vyska_cela`)
+  }
+
+  // UI-C3 (N25): DYNAMICKE mini-ponuky. Riadky ciel vznikaju az za behu, takze
+  // ich pole nie je v `NX_DIM_FIELDS` — svoj rad si nesu v ATRIBUTOCH
+  // (`data-dim-key` + `data-dim-input`) a plnia sa TOU ISTOU cestou. Vdaka tomu
+  // sa uprava radu v koliesku premietne aj do uz vykreslenych riadkov.
+  function nxDimFillMenu(box){
+    var key = box.getAttribute('data-dim-key');
+    var inputId = box.getAttribute('data-dim-input');
+    if (!key || !inputId) return;
+    box.innerHTML = NXDim.menuHtml(key, inputId);
+  }
+  function nxDimFillRow(root){
+    var r = root || document;
+    if (!r.querySelectorAll) return;
+    var boxes = r.querySelectorAll('.miniopts[data-dim-key]');
+    for (var i = 0; i < boxes.length; i++) nxDimFillMenu(boxes[i]);
   }
 
   function nxDimCloseMenus(){
