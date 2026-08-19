@@ -5,21 +5,23 @@
 
 ## Stav
 
-**v0.7.14 · 19.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
+**v0.7.15 · 19.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
 
 **Beží blok UI 2.0.** Koncept Inspectora je uzavretý (Michal 18.8.) — záväzný kontrakt a mockupy sú v repe: [zdroje/ui20/](zdroje/ui20/) ([UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) + mockupy Inspector C, štúdio, dizajnový lístok); práca je narezaná do dávok UI-A → UI-B → UI-C → UI-D a fázy ŠTÚDIO ([PLAN.md](PLAN.md)).
 
-Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-C2 · Zóny** — kontext Zóny má štruktúru navrchu so stromovými spojnicami, delenie cez dlaždice, police ako pilulky 0–6, presné delenie prvej zóny v mm aj zlomkom a magnet pri ťahaní priečky v náhľade. Testy: **1350 headless · 40 JS sád**; posledný **plný in-SketchUp beh 427 PASS / 0 FAIL** — vrátane novej sekcie `run_uic2` (delenie, police, presná cesta, guardy a undo na živej skrinke).
+Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-C3 · Čelá** — riadky s ikonou typu, chip AUTO namiesto zámku, výškové rady, naviazané kovanie pod riadkom, sekcia Úchytky a hover hrany zvýraznený priamo v modeli. Testy: **1365 headless · 41 JS sád**; posledný **plný in-SketchUp beh** viď posledný uzáver.
 
 ## Robí sa
 
-**BLOK UI-A JE KOMPLET** (UI-01 paleta a téma · UI-02 logo a toolbar · UI-03 combobox), **BLOK UI-B JE KOMPLET** (UI-B1 kostra · UI-B2 náhľad · UI-B3 obsah Korpusu + koliesko, vrátane dvoch dotiahnutí po teste a audite), **UI-C1 · Vkladanie JE KOMPLET** v troch PR (**C1a** #174 · **C1b** #175 · **C1c** #176) a **UI-C2 · Zóny JE HOTOVÁ** (tento PR). Inspector má celú kostru, kontextové projekcie a hotové kontexty Korpus, Vkladanie aj Zóny.
+**BLOK UI-A JE KOMPLET** (UI-01 paleta a téma · UI-02 logo a toolbar · UI-03 combobox), **BLOK UI-B JE KOMPLET** (UI-B1 kostra · UI-B2 náhľad · UI-B3 obsah Korpusu + koliesko, vrátane dvoch dotiahnutí po teste a audite), **UI-C1 · Vkladanie JE KOMPLET** v troch PR (**C1a** #174 · **C1b** #175 · **C1c** #176), **UI-C2 · Zóny JE HOTOVÁ** (#177) a **UI-C3 · Čelá JE HOTOVÁ** (tento PR). Inspector má celú kostru, kontextové projekcie a hotové kontexty Korpus, Vkladanie, Zóny aj Čelá.
 
 ## Ďalší krok
 
-**UI-C3 · Čelá** — obsah kontextu Čelá: riadky s ikonou typu (N27), úzke pole výšky s „mm" pri hodnote a chipom AUTO na návrat (zámok pri výške je zrušený — zamknuté ⇔ vypísané), výškové rady N25, naviazané kovanie pod riadkom s preklikom do Kovania, materiál čela priamo v zozname, výklopná klapka s upozornením „AVENTOS ručne". Audit pred implementáciou povinný nie je (dátový kontrakt ani observery sa nemenia); in-SketchUp beh áno, ak sa dávka dotkne builderov.
+**UI-C4 · Kovanie** — posledná dávka bloku UI-C: položky kovania v **horizontálnych boxoch podľa VLASTNÍKA** (skrinka / každé čelo), v boxe čela výber setu + rad nominálnych dĺžok s D-93 zámkom + nákupné riadky D-92; klik na hlavičku boxu označí vlastníka v modeli; značky kovania v náhľade dostanú výber vlastníka. Dáta owner už existujú — je to UI reorganizácia, takže audit pred implementáciou povinný nie je; in-SketchUp beh podľa reálneho zásahu. *(Riadok čela na svoj box už ukazuje — UI-C3 doň spravila preklik.)*
 
 ## Posledné uzávery
+
+- **UI-C3 Čelá** (riadok začína ikonou typu N27 · úzke pole výšky 46 px, „mm" pri hodnote a **chip AUTO** namiesto zámku — zamknuté ⇔ vypísané · **výškové rady N25** napojené na rad `vyska_cela` z kolieska · pod riadkom **jeden drobný riadok naviazaného kovania** s preklikom do Kovania · **D-84** „+ pridaj dvere / + pridaj čelo", odoberacie tlačidlo zaniklo · materiál čiel priamo v zozname · **D-96 sekcia Úchytky** (profil pre rozsah čiel, ikona v riadku už len indikátor) · **N26** medzery v projekcii Čelá jantárovo pri editácii · **D-89a** hover hrany v karte dielca/dosky zvýrazní hranu priamo v MODELI. Výklop je v ponuke typov, ale zatiaľ neaktívny — rola `flap` potrebuje vlastnú dávku cez builder/ABS/kusovník) — PR **tento**, v0.7.15 (19.8.)
 
 - **UI-C2 Zóny** (štruktúra navrchu so stromovými spojnicami a najviac 3 úrovňami · delenie na štyri dlaždice · police ako pilulky **0–6** · presné delenie prvej zóny v mm aj zlomkom 1/4·1/3·1/2 · magnet 1/4·1/2·3/4 pri ťahaní priečky, Alt ho vypína · rozmer, ktorý sa nezmestí, sa **odmietne** namiesto tichého zmenšenia · deliť a dávať police smie len nerozdelená zóna, jedinou deštruktívnou cestou ostáva „Vyčistiť zónu" · poškodené označenie zóny už nepadne na koreň a nezmaže vnútro skrinky) — PR **tento**, v0.7.14 (19.8.)
 

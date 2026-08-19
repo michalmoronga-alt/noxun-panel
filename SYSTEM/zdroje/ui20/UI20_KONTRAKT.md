@@ -212,6 +212,31 @@ Police = pills 0–6 · Vnútro = rezervovaný slot (po V1).
 stolára · D-96 Úchytky · materiál čiel aj priamo v zozname · interaktívne prvky v riadku STOPUJÚ
 bublanie (lekcia: select sa zatváral).
 
+**Čelá — vedomé odchýlky od konceptu (implementácia UI-C3, 19.8.2026):**
+- **Výklop je v ponuke typov, ale NEAKTÍVNY** (voľba s vysvetlením „AVENTOS ručne,
+  automatika fáza 3"). Koncept ho počítal ako bežný typ; v skutočnosti je rola `flap`
+  síce kanonická (STANDARD §2.4), ale **nikde sa nepoužíva** — sprevádzkovať ju znamená
+  zásah do **buildera, ABS pravidiel, kusovníka a VEPO**, teda zmenu dátového kontraktu
+  s Codex auditom a in-SketchUp behom. To je vlastná dávka, nie prílepok k UI
+  reorganizácii. Poctivejšie je povedať, že sa s výklopom ráta, než ho zamlčať (rovnaký
+  vzor ako rezervovaný slot „Vnútro" v Zónach). *Otvorené v [../../DOGFOODING.md](../../DOGFOODING.md).*
+- **Popis výklopovej voľby je KRÁTKY** („Výklop (fáza 3)"), celá veta žije v tooltipe
+  selectu a v hinte skupiny. Dôvod je layout: `flex-basis` selectu je jeho najširšia
+  položka, takže dlhý text odtlačí zvyšok riadku na ďalší riadok.
+- **Sekcia Úchytky NEPONÚKA hranu osadenia.** Koncept ju uvádza (profil + hrana +
+  rozsah); registry profilov (`core/front_profiles.rb`) však dnes pozná len skrátenie
+  hornej hrany. Ponúkať voľbu, ktorá nemá kam sadnúť, by bola lož — pribudne s ďalšími
+  profilmi, ako plánovala už D-90. Registry sa kvôli UI **nerozširoval**.
+- **„Rôzne profily v rozsahu" je neaktívna voľba „(rôzne)"** — v koncepte nebolo
+  riešené, čo select ukáže, keď sa čelá rozsahu líšia. Vzor je „podľa parametra" zo
+  sekcie Kovanie: select nikdy netvrdí zhodu, ktorá neplatí.
+- **Materiál čiel je DRUHÝ ovládač toho istého údaja** (zrkadlí sa so sektorom
+  Materiály), nie nové dáta — sektor Materiály patrí kontextu Korpus a v Čelách je
+  skrytý (UI-B1).
+- **N26 sa spúšťa OTVORENOU skupinou „Medzery a presahy"** (nielen fokusom v poli).
+  Stav sa číta z DOM, takže zbalenie skupiny zvýraznenie zhasne bez ďalšej
+  synchronizácie; mockup to riešil rovnako (`S.s4.fronts === 'medzery'`).
+
 **Kovanie:** Položky = HORIZONTÁLNE boxy podľa VLASTNÍKA (Skrinka / každé čelo) — v boxe čela
 select setu + rad NL s D-93 zámkom + nákupné riadky („UKW 7 → 774519 · Profil UKW 7"…); hlavička
 boxu klik=označ v modeli. Sety a Pravidlá bez zmeny.
