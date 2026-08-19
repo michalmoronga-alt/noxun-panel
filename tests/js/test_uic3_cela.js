@@ -6,7 +6,7 @@
 const assert = require('node:assert');
 const path = require('node:path');
 const { frontProfileOptionList, frontProfileScopeItems, frontProfileCommon,
-        frontProfileStateText } =
+        frontProfileStateText, collectFrontHwBuy } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'core.js'));
 
 let n = 0;
@@ -61,5 +61,29 @@ eq(frontProfileStateText([{ label: 'F1', type: 'door', profile: 'ukw99' }], REG)
 
 // --- ponuka je zdrojom hodnot selectu ----------------------------------------
 eq(frontProfileOptionList(REG).map(o => o.id), ['none', 'ukw7'], 'ponuka: neutral + registry');
+
+// --- naviazane kovanie: NAZVY SETOV pod riadkom cela (Codex #178 P2) ---------
+// Ten isty tvar chodi z `loadSelected` (plne polozky) aj zo ZIVEHO pushu
+// `push_hardware_sets` (identita + purchase, bez poctov) — preto sa mapa setov
+// pocita VYHRADNE z `owner_part_key` + `purchase.set_name`.
+const HW = [
+  { owner_part_key: 'front:F1/panel', generic_type: 'slide',
+    purchase: { set_name: 'Atira biela H176', members: [], problems: [] } },
+  { owner_part_key: 'front:F3/wing:left', generic_type: 'hinge',
+    purchase: { set_name: 'CLIP top 110', members: [], problems: [] } },
+  { owner_part_key: 'front:F3/wing:right', generic_type: 'hinge',
+    purchase: { set_name: 'CLIP top 110', members: [], problems: [] } },
+  { owner_part_key: 'front:F3/wing:left', generic_type: 'handle',
+    purchase: { set_name: 'UKW 7', members: [], problems: [] } },
+  { owner_part_key: 'cabinet/legs', generic_type: 'leg',
+    purchase: { set_name: 'Nohy 100', members: [], problems: [] } },
+  { owner_part_key: 'front:F2/panel', generic_type: 'slide', purchase: null }
+];
+eq(collectFrontHwBuy(HW), { F1: ['Atira biela H176'], F3: ['CLIP top 110', 'UKW 7'] },
+   'set sa zapise raz per čelo, kovanie skrinky do mapy čiel nepatrí, položka bez nákupu sa vynechá');
+eq(collectFrontHwBuy([]), {}, 'prázdny payload = prázdna mapa');
+eq(collectFrontHwBuy(null), {}, 'chýbajúce dáta nespadnú');
+eq(collectFrontHwBuy([{ owner_part_key: 'front:F1/panel', purchase: { set_name: '' } }]), {},
+   'prázdny názov setu sa netvári ako nákup');
 
 console.log(`OK test_uic3_cela.js — ${n} kontrol`);

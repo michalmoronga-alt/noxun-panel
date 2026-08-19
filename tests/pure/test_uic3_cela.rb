@@ -115,6 +115,13 @@ NxTest.test('UI-C3: naviazane kovanie je JEDEN drobny riadok a vedie do Kovania'
   NxTest.assert(UIC3_FORM_JS.include?("setViewContext('kovanie')"), 'klik vedie tam, kam ukazuje (N13)')
   NxTest.assert(UIC3_FORM_JS.include?('ev.stopPropagation()'),
                 'interaktivne prvky v riadku STOPUJU bublanie')
+  # Codex #178 P2: nazov setu pod celom sa meni ZIVYM pushom z Katalogu kovania —
+  # bez tejto cesty by pod celami visel stary set az do noveho oznacenia skrinky.
+  hw = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'hardware.js'), encoding: 'UTF-8')
+  NxTest.assert(hw.include?('refreshFrontHwBuy(items)'),
+                'zivy push kovania prestavi aj mapu setov pod riadkami ciel')
+  NxTest.assert(hw.include?('updateFrontRowBadges()'),
+                'a rovno obnovi riadky ciel (su MIMO #hwRows)')
   css = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'css', 'panel.css'), encoding: 'UTF-8')
   NxTest.assert(css.include?('.frow .fhw'), 'riadok kovania ma vlastny styl')
   NxTest.assert(css[/\.frow \.fhw \{[^}]*\}/m].include?('text-overflow: ellipsis'),

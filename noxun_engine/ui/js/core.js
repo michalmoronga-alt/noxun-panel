@@ -93,9 +93,23 @@
   // Autorita je server (HardwareSets.explain) — JS nerozhoduje, co sa kupuje,
   // len zbiera uz hotove nazvy pod ich vlastnika.
   var HW_FRONT_BUY = {};
+  // Ciste (Node testy): front_id -> [nazvy setov]. Ten isty set pri viacerych
+  // kridlach sa zapise RAZ. Polozka bez `purchase` (alebo bez setu) sa vynecha.
+  function collectFrontHwBuy(hardware){
+    var out = {};
+    (hardware || []).forEach(function(it){
+      var m = String((it && it.owner_part_key) || '').match(/^front:([^\/]+)\//);
+      if (!m) return;
+      var setName = (it.purchase && it.purchase.set_name) ? String(it.purchase.set_name) : '';
+      if (!setName) return;
+      var list = (out[m[1]] = out[m[1]] || []);
+      if (list.indexOf(setName) < 0) list.push(setName);
+    });
+    return out;
+  }
   function buildFrontHwBadges(hardware){
     HW_FRONT_BADGES = {};
-    HW_FRONT_BUY = {};
+    HW_FRONT_BUY = collectFrontHwBuy(hardware);
     var hinges = {}; // front_id -> sucet zavesov cez vsetky kridla
     (hardware || []).forEach(function(it){
       var m = String(it.owner_part_key || '').match(/^front:([^\/]+)\//);
@@ -108,17 +122,19 @@
         (HW_FRONT_BADGES[fid] = HW_FRONT_BADGES[fid] || [])
           .push(nl != null ? ('výsuv NL ' + Math.round(nl)) : (it.quantity + '× výsuv'));
       }
-      var setName = (it.purchase && it.purchase.set_name) ? String(it.purchase.set_name) : '';
-      if (setName){
-        var list = (HW_FRONT_BUY[fid] = HW_FRONT_BUY[fid] || []);
-        if (list.indexOf(setName) < 0) list.push(setName); // ten isty set pri viacerych kridlach = raz
-      }
     });
     for (var fid in hinges){
       var n = hinges[fid];
       (HW_FRONT_BADGES[fid] = HW_FRONT_BADGES[fid] || [])
         .unshift(n + '× ' + (n === 1 ? 'záves' : 'závesy'));
     }
+  }
+  // Codex #178 P2: ZIVY refresh po zmene v Katalógu kovania (`push_hardware_sets`).
+  // Ten payload nesie identitu riadku + `purchase`, ale NIE počty ani parametre —
+  // preto sa prestavuje LEN mapa setov. Badge z plánu (závesy, NL výsuvu) sa
+  // zmenou katalógu nemení a ostáva z posledného `loadSelected`.
+  function refreshFrontHwBuy(items){
+    HW_FRONT_BUY = collectFrontHwBuy(items);
   }
   function frontHwBadge(fid){
     var arr = HW_FRONT_BADGES[fid];
@@ -717,6 +733,7 @@
       // D-96 / UI-C3 (tests/js/test_uic3_cela.js) — sekcia „Úchytky" nahradila
       // cyklenie ikonou v riadku, preto s nou zanikol aj `frontProfileNext`.
       frontProfileOptionList: frontProfileOptionList,
+      collectFrontHwBuy: collectFrontHwBuy,
       frontProfileScopeItems: frontProfileScopeItems,
       frontProfileCommon: frontProfileCommon,
       frontProfileStateText: frontProfileStateText,
