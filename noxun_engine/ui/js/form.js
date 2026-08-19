@@ -721,7 +721,8 @@
     var fhId = frontHeightInputId(row.dataset.frontId);
     row.innerHTML =
       '<span class="fnum">F' + idx + '</span>' +
-      '<span class="ftico" aria-hidden="true">' + NXIcons.svg(frontTypeIcon(item.type || 'door')) + '</span>' +
+      '<span class="ftico" aria-hidden="true" title="' + esc(frontTypeLabel(item.type || 'door')) + '">' +
+        NXIcons.svg(frontTypeIcon(item.type || 'door')) + '</span>' +
       '<select class="ftype" aria-label="Typ čela"' +
         ' title="Typ čela. Výklop: AVENTOS sa zatiaľ pridáva ručne, automatika príde vo fáze 3."' +
         ' onchange="onFrontTypeChange(this); onField()">' +
@@ -814,7 +815,10 @@
     // N27: ikona typu je zrkadlom rozbalovacky — meni sa `href` v <use>, NIE
     // innerHTML celeho span-u (vzor NXIcons.set pri zamkoch).
     var ico = row.querySelector('.ftico');
-    if (ico && window.NXIcons) NXIcons.set(ico, frontTypeIcon(sel.value));
+    if (ico){
+      if (window.NXIcons) NXIcons.set(ico, frontTypeIcon(sel.value));
+      ico.title = frontTypeLabel(sel.value);
+    }
     var hw = row.querySelector('.fhw');
     if (hw) hw.style.display = (sel.value === 'none') ? 'none' : '';
     // D-90: „Bez čela" nemá na čom profil držať — indikátor zmizne a stav sa
