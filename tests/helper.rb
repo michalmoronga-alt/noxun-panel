@@ -153,6 +153,7 @@ unless NxTest::IN_SKETCHUP
     core/store
     core/ids
     core/templates
+    core/template_previews
     core/usage_stats
     core/cabinet_builder
     core/board_builder

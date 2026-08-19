@@ -48,9 +48,14 @@ module Noxun
           config = template_config_from(cab_cfg, model: model)
           hw_note = template_save_hardware_note(cab_cfg, config, model) # GH #133 P2
           type_note = apply_template_type!(config, data['type'])        # UI-B3 modal: Nazov + Typ
+          # UI-D2: nahlad sa foti AZ TERAZ — po VSETKYCH guardoch a z TOHO
+          # ISTEHO `cab`, z ktoreho vznikol config (inak by obrazok patril inej
+          # skrinke nez data). Zlyhany capture = nil -> pripadny stary PNG sa
+          # pri prepise zmaze (viz TemplateStore.upsert).
+          preview = TemplatePreviews.capture(model, cab)
           # UI-C1a: z panela sa uklada VZDY korpusova sablona (doskove vznikaju
           # inou cestou) — identita v sklade je dvojica (kind, name).
-          unless TemplateStore.upsert('cabinet', name, config)
+          unless TemplateStore.upsert('cabinet', name, config, preview)
             return set_status('Šablónu sa nepodarilo zapísať (disk/práva) — skús znova.', true)
           end
 

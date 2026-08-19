@@ -126,16 +126,20 @@ module Noxun
         # --- akcie (presunute z Panel actions_templates.rb) -----------------
 
         # Ulozi OZNACENY korpus ako sablonu (nazov cez inputbox, prepis s potvrdenim).
+        #
+        # UI-D2 (Codex audit FIX 5): PORADIE je kontrakt — najprv sa potvrdi
+        # nazov a pripadny prepis, az POTOM sa z JEDNEHO snapshotu (model + cab)
+        # sklada config a foti nahlad. Do UI-D2 sa config skladal PRED
+        # inputboxom; modalne okno medzitym pusti k slovu SketchUp, takze
+        # pouzivatel mohol oznacit inu skrinku — data a obrazok by potom
+        # pochadzali z dvoch roznych skriniek.
         def handle_save
           model = Sketchup.active_model
-          cab = Panel.find_cabinet(model)
-          return set_status('Najprv označ NOXUN korpus — šablóna sa ukladá z neho.', true) if cab.nil?
+          return set_status('Najprv označ NOXUN korpus — šablóna sa ukladá z neho.', true) if
+            Panel.find_cabinet(model).nil?
 
-          # H2 (D-76): model = zdroj ZMRAZENYCH definicii setov kovania.
-          cab_cfg = Store.config(cab) || {}
-          config = Panel.template_config_from(cab_cfg, model: model)
-          hw_note = Panel.template_save_hardware_note(cab_cfg, config, model) # GH #133 P2
-          res = UI.inputbox(['Nazov sablony:'], [Panel.suggest_template_name(cab, {})], 'Ulozit sablonu')
+          res = UI.inputbox(['Nazov sablony:'], [Panel.suggest_template_name(Panel.find_cabinet(model), {})],
+                            'Ulozit sablonu')
           return if res == false # zrusene
 
           name = res[0].to_s.strip
@@ -145,11 +149,22 @@ module Noxun
              UI.messagebox("Sablona \"#{name}\" existuje. Prepisat?", MB_YESNO) != IDYES
             return set_status('Zrušené — šablóna nezmenená.')
           end
+
+          # CERSTVY snapshot po dialogoch: vyber sa medzitym mohol zmenit alebo
+          # zaniknut. Config aj nahlad idu z TEJTO jednej skrinky.
+          cab = Panel.find_cabinet(model)
+          return set_status('Označený korpus zmizol — šablóna neuložená.', true) if cab.nil?
+
+          # H2 (D-76): model = zdroj ZMRAZENYCH definicii setov kovania.
+          cab_cfg = Store.config(cab) || {}
+          config = Panel.template_config_from(cab_cfg, model: model)
+          hw_note = Panel.template_save_hardware_note(cab_cfg, config, model) # GH #133 P2
+          preview = TemplatePreviews.capture(model, cab)                      # UI-D2
           # Codex #174 P2: navratovu hodnotu NIKDY neignorovat — read-only
           # kniznica (subor z novsej verzie) alebo zlyhanie disku by inak
           # ohlasili uspech a pouzivatel by sa spoliehal na sablonu, ktora
           # nevznikla (rovnaky vzor ako save cesta v paneli).
-          unless TemplateStore.upsert('cabinet', name, config)
+          unless TemplateStore.upsert('cabinet', name, config, preview)
             return set_status('Šablónu sa nepodarilo zapísať — knižnica je z novšej verzie ' \
                               'Noxunu alebo zlyhal zápis na disk. Nič sa neuložilo.', true)
           end

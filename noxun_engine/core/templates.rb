@@ -28,6 +28,12 @@
 # (upsert/delete/touch_used odmietnu zapis a zalogujú). Starsi kod nesmie
 # degradovat data, ktorym nerozumie.
 #
+# NAHLAD (UI-D2) zije ako SUBOR vedla — `template_previews\<kind>-<slug>-<sha1>.png`
+# (modul TemplatePreviews). Schema `templates.json` sa kvoli nemu NEMENI a v
+# zozname sablon nepribudol ziadny kluc; `upsert`/`delete` len menia obrazok
+# POD TYM ISTYM zamkom ako zaznam, aby sa dvojica zaznam+obrazok nikdy
+# nerozisla medzi dvoma instanciami SketchUpu.
+#
 # POUZITIE (recency) zije v INOM subore — `template_usage.json` (TemplateUsage
 # na konci suboru). Preto je subor sablon po vlozeni zo sablony BYTE-NEZMENENY
 # (invariant N11) a poradie „naposledy pouzite" je udaj TOHTO pocitaca.
@@ -89,26 +95,65 @@ module Noxun
       # CELY read-modify-write bezi pod JEDNYM sidecar zamkom (Codex #174 P2):
       # dve instancie SketchUpu si inak mohli cerstvo ulozenu sablonu prepisat
       # stale nacitanym zoznamom.
-      def upsert(kind, name, config)
+      #
+      # UI-D2 `preview:` — PNG nahlad (TemplatePreviews) sa meni POD TYM ISTYM
+      # zamkom ako zaznam, inak by dve instancie mali zaznam jednej a obrazok
+      # druhej. Hodnoty:
+      #   :keep  (default) — obrazka sa nedotykame (migracie, testy, stary kod)
+      #   String — cesta k capture TEMP suboru; presunie sa na finalne meno
+      #   nil    — capture ZLYHAL: stary PNG sa ZMAZE (obrazok stareho tvaru
+      #            k novemu configu je horsi nez schematicky fallback)
+      # ODMIETNUTY zapis (forward guard / chyba disku) sa PNG NEDOTKNE — len
+      # zahodi nepouzity temp subor.
+      #
+      # `preview` je zamerne POZICNY, nie klucovy: `config` sa bezne odovzdava
+      # ako holy hash (`upsert('board', n, 'type' => 'board', ...)`) a Ruby 3 by
+      # ho pri metode s klucovymi parametrami zhltol ako keywords — z volania
+      # by sa stal ArgumentError az za behu.
+      def upsert(kind, name, config, preview = :keep)
         k = normalize_kind(kind)
         n = name.to_s
         with_lock do
-          next false if refuse_write('upsert')
+          if refuse_write('upsert')
+            TemplatePreviews.discard(preview) unless preview == :keep
+            next false
+          end
 
           list = load.reject { |t| t['kind'] == k && t['name'] == n }
           list << record(k, n, config)
-          write_list(list)
+          ok = write_list(list)
+          apply_preview(k, n, preview, ok)
+          ok
         end
       end
 
+      # PNG nahlad zije a umiera SO ZAZNAMOM — mazanie je TU (jedine miesto,
+      # cez ktore zaznam mizne), nie v UI handleri.
       def delete(kind, name)
         k = normalize_kind(kind)
         n = name.to_s
         with_lock do
           next false if refuse_write('delete')
 
-          write_list(load.reject { |t| t['kind'] == k && t['name'] == n })
+          ok = write_list(load.reject { |t| t['kind'] == k && t['name'] == n })
+          TemplatePreviews.delete(k, n) if ok
+          ok
         end
+      end
+
+      # Bezi VYHRADNE pod zamkom `upsert`. Pri neuspesnom zapise zaznamu sa
+      # obrazok NEMENI (zostava sparovany s tym, co je na disku).
+      def apply_preview(kind, name, preview, written)
+        return if preview == :keep
+        return TemplatePreviews.discard(preview) unless written
+
+        if preview.is_a?(String) && !preview.empty?
+          TemplatePreviews.replace(kind, name, preview)
+        else
+          TemplatePreviews.delete(kind, name)
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'TemplateStore.apply_preview')
       end
 
       # Peciatka pouzitia sablony pre poradie „Naposledy pouzite". Zapisuje do

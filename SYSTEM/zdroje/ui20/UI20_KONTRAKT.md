@@ -179,7 +179,22 @@ plné odôvodnenia v [../../archiv/KRONIKA.md](../../archiv/KRONIKA.md) a [../..
   takže **nemení kusovník, hrany, dekor ani VEPO**.
 - **Orientácia je na dlaždici v tooltipe, nie v badge** — badge nesie hrúbku a druhý riadok by dlaždicu
   predĺžil (pravidlo „vertikálny priestor panela je vzácny").
-- **REÁLNE PNG náhľady dlaždíc ostávajú na UI-D2** — UI-C1 kreslí schematický fallback z configu.
+- **REÁLNE PNG náhľady dlaždíc doplnila UI-D2** — schematická kresba z configu ostáva ako fallback.
+
+**Kontraktové spresnenie z implementácie UI-D2** *(19.8., PR náhľady šablón)*
+- **Náhľad = KONTEXTOVÁ FOTOGRAFIA, nie izolovaný render — vedomé rozhodnutie.** Pri uložení šablóny sa
+  odfotí **aktuálny pohľad dorámovaný na skrinku**. Izolovaný render (samotná skrinka na čistom pozadí)
+  by vyžadoval skrývanie zvyšku modelu, teda zápisy do modelu a kroky Späť — a šablóna sa aj tak typicky
+  ukladá hneď po postavení skrinky na obrazovke. **Dôsledok, s ktorým sa počíta:** ak skrinku v tej chvíli
+  niečo zakrýva alebo je rezaná rovinou, taký bude aj náhľad. Riešenie pre používateľa je triviálne —
+  pozrieť sa na skrinku a šablónu uložiť znova.
+- **Náhľad nikdy nezasahuje do modelu.** Fotenie nevyrobí ani jeden krok Späť a **kamera sa vráti presne
+  tam, kde bola** (perspektíva aj ortogonálny pohľad).
+- **Bez náhľadu sa nič nezlomí.** Šablóny uložené pred UI-D2, neúspešné fotenie aj poškodený súbor končia
+  pri schematickej kresbe; **výška dlaždice sa nemení** ani v jednom prípade. Pri prepise šablóny, ktorej
+  sa fotka nepodarila, sa **starý obrázok zmaže** — obrázok starého tvaru pri novom obsahu klame viac než
+  schéma.
+- **Doskové šablóny náhľad nemajú** (ukladanie dosky ako šablóny z UI zatiaľ neexistuje).
 
 **Zóny:** Štruktúra NAVRCH so stromovými spojnicami, max 3 úrovne (N22), vlastné rozrolovanie ·
 Delenie = 4 dlaždice + pole „Prvá zóna" mm so zlomkami (N21) + drag so snap 1/4·1/2·3/4 (N20) ·

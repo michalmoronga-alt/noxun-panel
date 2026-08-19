@@ -313,12 +313,113 @@
     var note = nxTplOrientationNote(tp);
     return tp.name + (note ? ' · ' + note : '') + ' — klik = vybrať · dvojklik = vlož hneď';
   }
+  // UI-D2: KLUC nahladu v cache. Nahlad je viazany na TROJICU (druh, nazov,
+  // revizia suboru) — po prepise sablony sa `rev` zmeni a stary obrazok sa uz
+  // nikdy netrafi. ` ` ako oddelovac: v nazve sablony sa vyskytnut nemoze.
+  function tplPrevKey(kind, name, rev){
+    return String(kind || '') + ' ' + String(name || '') + ' ' + String(rev || '');
+  }
+  // Cache odpovedi servera: kluc -> data URI, alebo '' = „server nahlad nema"
+  // (zaporna odpoved sa cachuje TIEZ, inak by sa panel pytal donekonecna).
+  var TPL_PREVIEWS = {};
+  // Kluce, na ktore uz odisla ziadost — pull ide na kazdu reviziu PRESNE RAZ.
+  var TPL_PREV_ASKED = {};
+  // UI-D2: dlazdica ma PNG aj schemu v TOM ISTOM boxe — vyska sa nemeni ani
+  // ked nahlad chyba, prichadza neskoro alebo sa nepodari nacitat (pravidlo
+  // „vertikalny priestor panela je vzacny"). `<img>` sa NIKDY nevytvara ani
+  // neodstranuje dodatocne: je v dlazdici od zaciatku, len bez `src`. Vymena
+  // uzla by uprostred dvojkliku odpojila ciel udalosti (pasca CEF, FIX 14).
+  function tplPicHtml(tp){
+    return '<span class="tplpic"><img alt="" aria-hidden="true">' +
+      '<svg viewBox="0 0 60 40" aria-hidden="true">' + nxTplGlyph(tp) + '</svg></span>';
+  }
   function tplTileHtml(tp, sel){
     var badge = nxTplBadge(tp);
+    var rev = (tp && tp.preview_rev) ? String(tp.preview_rev) : '';
     return '<button type="button" class="tpltile' + (tp.name === sel ? ' on' : '') + '"' +
-      ' data-tpl-name="' + esc(tp.name) + '" title="' + esc(nxTplTitle(tp)) + '">' +
-      '<svg viewBox="0 0 60 40" aria-hidden="true">' + nxTplGlyph(tp) + '</svg>' +
+      ' data-tpl-name="' + esc(tp.name) + '"' +
+      ' data-tpl-kind="' + esc(NXInsert.templateKind(tp)) + '"' +
+      ' data-tpl-rev="' + esc(rev) + '" title="' + esc(nxTplTitle(tp)) + '">' +
+      tplPicHtml(tp) +
       '<span>' + esc(tp.name) + (badge ? ' <i>· ' + esc(badge) + '</i>' : '') + '</span></button>';
+  }
+  // Nasadenie data URI na jednu dlazdicu. `onload` az potom odkryje obrazok —
+  // `onerror` ho necha skryty, takze zostane vidiet SCHEMA (nikdy prazdny box).
+  function tplBindPreview(tile, png){
+    var pic = tile.querySelector('.tplpic');
+    var img = pic ? pic.querySelector('img') : null;
+    if (!img || !png) return;
+    if (img.getAttribute('src') === png) return;
+    img.onload = function(){ pic.classList.add('has'); };
+    img.onerror = function(){ pic.classList.remove('has'); img.removeAttribute('src'); };
+    img.src = png;
+  }
+  // CISTE JADRO rozhodovania (Node testy): pre zoznam popisov dlazdic
+  // `{ kind, name, rev }` povie, ktorym sa da nasadit uz znamy obrazok a na
+  // ktore treba poslat ziadost. Pravidla:
+  //   * dlazdica bez `rev` = sablona nahlad NEMA -> nic (ani ziadost),
+  //   * cache '' = server uz povedal „nemam" -> ziadna dalsia ziadost,
+  //   * `asked` sa PLNI TU, takze na jednu reviziu odide ziadost PRESNE RAZ
+  //     (opakovana prestavba mriezky most nezahlti).
+  function nxTplPreviewPlan(descs, cache, asked){
+    var out = { apply: [], ask: [] };
+    (descs || []).forEach(function(d){
+      if (!d || !d.rev || !d.name) return;
+      var k = tplPrevKey(d.kind, d.name, d.rev);
+      var hit = Object.prototype.hasOwnProperty.call(cache, k) ? cache[k] : null;
+      if (hit){ out.apply.push({ desc: d, png: hit }); return; }
+      if (hit === '') return;                       // zaporna odpoved je tiez odpoved
+      if (asked[k]) return;
+      asked[k] = true;
+      out.ask.push(d);
+    });
+    return out;
+  }
+  // CISTE JADRO odpovede servera: zapise ju do cache (aj ZAPORNU — inak by sa
+  // panel pytal donekonecna) a vrati normalizovany popis, alebo null pri
+  // nepouzitelnom payloade. Nasadenie na DOM robi az volajuci.
+  function nxTplPreviewStore(cache, data){
+    var d = data || {};
+    var kind = String(d.kind || '');
+    var name = String(d.name || '');
+    var rev = String(d.rev || '');
+    if (!name || !rev) return null;
+    var png = d.png ? String(d.png) : '';
+    cache[tplPrevKey(kind, name, rev)] = png;
+    return { kind: kind, name: name, rev: rev, png: png };
+  }
+  // Popisy dlazdic z DOM (jediny bod, kde sa cita mriezka).
+  function tplTileDescs(){
+    var box = el('tplTiles'); if (!box) return [];
+    var tiles = box.querySelectorAll('.tpltile[data-tpl-rev]');
+    var out = [];
+    for (var i = 0; i < tiles.length; i++){
+      var t = tiles[i];
+      out.push({ kind: t.getAttribute('data-tpl-kind') || '',
+                 name: t.getAttribute('data-tpl-name') || '',
+                 rev: t.getAttribute('data-tpl-rev') || '', node: t });
+    }
+    return out;
+  }
+  // Po kazdej prestavbe mriezky: dlazdicam s uz znamym nahladom ho nasadi,
+  // za zvysok posle PULL (raz na reviziu).
+  function refreshTemplatePreviews(){
+    var plan = nxTplPreviewPlan(tplTileDescs(), TPL_PREVIEWS, TPL_PREV_ASKED);
+    plan.apply.forEach(function(a){ tplBindPreview(a.desc.node, a.png); });
+    if (!(window.sketchup && sketchup.nx_template_preview)) return;
+    plan.ask.forEach(function(d){
+      sketchup.nx_template_preview(JSON.stringify({ kind: d.kind, name: d.name, rev: d.rev }));
+    });
+  }
+  // Odpoved servera (NX.setTemplatePreview). Nasadi sa LEN na dlazdice s TOU
+  // ISTOU reviziou — medzitym mohla prist nova kniznica a stary obrazok by
+  // prekryl novy tvar.
+  function applyTemplatePreview(data){
+    var hit = nxTplPreviewStore(TPL_PREVIEWS, data);
+    if (!hit || !hit.png) return;
+    tplTileDescs().forEach(function(d){
+      if (d.name === hit.name && d.kind === hit.kind && d.rev === hit.rev) tplBindPreview(d.node, hit.png);
+    });
   }
   // Codex #175 P2: CESTA SPAT NA PREDVOLBY. Klik na uz vybranu dlazdicu je no-op
   // (dvojklik posiela dva kliky za sebou), takze bez tejto dlazdice by sa vyber
@@ -355,6 +456,7 @@
     }
     box.dataset.forType = type;
     box.innerHTML = h;
+    refreshTemplatePreviews(); // UI-D2: znamy nahlad hned, za zvysok pull
     setTplMeta();
   }
   // Prepnutie vybranej dlazdice BEZ prestavby mriezky (ten isty nazov moze byt
@@ -1070,6 +1172,11 @@
   // sa LEN ciste funkcie kreslenia dlazdic sablon (ziadny DOM).
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { nxTplGlyph: nxTplGlyph, nxTplBadge: nxTplBadge,
-                       nxTplOrientationNote: nxTplOrientationNote, nxTplTitle: nxTplTitle };
+                       nxTplOrientationNote: nxTplOrientationNote, nxTplTitle: nxTplTitle,
+                       // UI-D2: dlazdica s PNG nahladom — kluc cache, ciste jadro
+                       // pull/cache rozhodovania a nasadenie obrazka na dlazdicu.
+                       tplPrevKey: tplPrevKey, tplPicHtml: tplPicHtml, tplTileHtml: tplTileHtml,
+                       nxTplPreviewPlan: nxTplPreviewPlan, nxTplPreviewStore: nxTplPreviewStore,
+                       tplBindPreview: tplBindPreview };
   }
 

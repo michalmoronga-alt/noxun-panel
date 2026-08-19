@@ -726,6 +726,17 @@
   .nx-inspector .tpltile:hover { border-color: var(--nx-select); }
   .nx-inspector .tpltile.on { border-color: var(--nx-select); background: var(--nx-select-bg); }
   .nx-inspector .tpltile svg { width: 100%; height: 38px; display: block; margin-bottom: 3px; }
+  /* UI-D2: PNG nahlad a schematicka kresba zdielaju TEN ISTY box — vyska
+     dlazdice sa nemeni ani ked nahlad chyba, prichadza neskoro alebo sa
+     nepodari nacitat („vertikalny priestor panela je vzacny"). Obrazok je
+     v dlazdici od zaciatku (bez src) a len sa odkryje — vymena uzla by
+     uprostred dvojkliku odpojila ciel udalosti. `cover` = orez, nie
+     deformacia (3:2 capture do 3:2 boxu). */
+  .nx-inspector .tplpic { display: block; height: 38px; margin-bottom: 3px; overflow: hidden; }
+  .nx-inspector .tplpic svg { margin-bottom: 0; }
+  .nx-inspector .tplpic img { display: none; width: 100%; height: 38px; object-fit: cover; }
+  .nx-inspector .tplpic.has img { display: block; }
+  .nx-inspector .tplpic.has svg { display: none; }
   /* Schematicka kresba dlazdice nesie NULA farieb — obrys aj vypln su tokeny
      (kresba v form.js je len geometria; PNG nahlady prinesie UI-D2). */
   .nx-inspector .tpltile svg rect { fill: var(--nx-surface); stroke: var(--nx-border-strong); stroke-width: 1.5; }

@@ -376,12 +376,13 @@ NxTest.test('UI-C1a guard: zdrojak okna Sablony filtruje kind aj v serverovych a
   NxTest.assert(src.include?("Panel.template_list(kind: 'cabinet')"), 'payload okna je filtrovany')
   NxTest.assert(src.include?("TemplateStore.find('cabinet', name)"), 'apply hlada len korpusove')
   NxTest.assert(src.include?("TemplateStore.delete('cabinet', name)"), 'delete maze len korpusove')
-  NxTest.assert(src.include?("TemplateStore.upsert('cabinet', name, config)"), 'save uklada korpusovu')
+  # UI-D2: save odovzdava aj capture nahladu (4. pozicny argument).
+  NxTest.assert(src.include?("TemplateStore.upsert('cabinet', name, config, preview)"), 'save uklada korpusovu')
 end
 
 NxTest.test('UI-C1a guard: okno Sablony vetvi na ZLYHANY zapis (Codex #174 P2)') do
   src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog.rb'), encoding: 'UTF-8')
-  NxTest.assert(src.include?("unless TemplateStore.upsert('cabinet', name, config)"),
+  NxTest.assert(src.include?("unless TemplateStore.upsert('cabinet', name, config, preview)"),
                 'save vetvi na navratovu hodnotu — ziadny falosny uspech')
   NxTest.assert(src.include?("unless TemplateStore.delete('cabinet', name)"),
                 'delete vetvi na navratovu hodnotu')

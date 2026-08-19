@@ -150,8 +150,34 @@ module Noxun
           ''
         end
 
+        # UI-D2: zoznam nesie aj `preview_rev` — dlaydica podla neho vie, ci
+        # ma o PNG vobec ziadat (a JS podla neho cachuje). Samotny obrazok ide
+        # samostatnym kanalom nizsie.
         def push_templates
-          js("NX.setTemplates(#{template_list.to_json})")
+          js("NX.setTemplates(#{template_list(previews: true).to_json})")
+        end
+
+        # UI-D2: PULL kanal nahladu. Panel si vypyta PNG pre (kind, name, rev)
+        # RAZ — data URI je radovo vacsie nez zvysok zoznamu a poslat ho pri
+        # kazdom `push_templates` by z kazdeho refreshu spravilo stovky kB.
+        # Vzor `nx_used_ids` (D-85): ciste citanie na VYZIADANIE, ziadny render
+        # karty, ziadny dotyk modelu. `rev` sa vracia SPAT nezmenene, aby si
+        # JS odpoved priradil k spravnej verzii (medzitym mohol prist novy
+        # nahlad); `png: nil` = bez nahladu — dlazdica ostane na scheme a JS
+        # si to zacachuje, takze sa nepyta dokola.
+        def push_template_preview(payload)
+          return unless dialog_alive?
+
+          data = JSON.parse(payload.to_s)
+          kind = data['kind'].to_s
+          name = data['name'].to_s
+          return if name.empty?
+
+          out = { 'kind' => kind, 'name' => name, 'rev' => data['rev'].to_s,
+                  'png' => TemplatePreviews.data_uri(kind, name) }
+          js("NX.setTemplatePreview(#{out.to_json})")
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.push_template_preview')
         end
 
         # D-05: zivy refresh katalogu materialov v paneli po CRUD v satelitnom okne
