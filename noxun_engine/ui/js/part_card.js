@@ -441,6 +441,14 @@
     simCount = (d.count === null || d.count === undefined) ? null : parseInt(d.count, 10);
     applySimCountView();
   }
+  // POZOR — TU SA FLUSH HANDSHAKE ZAMERNE NEROBI (na rozdiel od `onHwOwnerPick`,
+  // „Dielcov" a „Vložiť kópiu"). `flushCabinetEditsNow` posiela `apply_all`
+  // BEZPODMIENECNE a ten VZDY prestava korpus a spravi `reselect(model, cab)` —
+  // teda by (1) vyrobil prazdny krok Spat a (2) zhodil z vyberu DIELEC, takze by
+  // nasledny `nx_apply_edges_similar` uz nemal na com pracovat a akciu by odmietol.
+  // Karta dielca navyse ziadne debounce polia NEMA: material aj hrany sa posielaju
+  // okamzite na `change` — rovnako ako `onEdgeChange`, `onPartMaterial` a
+  // `onEdgesAll`, ktore tiez neflushuju. Toto je teda zhoda s okolim, nie vynimka.
   function applySimilarNow(){
     if (!simFor) return;
     var st = nxSimilarBtnState(simCount);

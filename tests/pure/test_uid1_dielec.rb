@@ -152,6 +152,17 @@ NxTest.test('UI-D1: prenasa sa LEN olep hran (material ani smer sa nedotknu)') d
                 'sticky remap dovody patria starym hranam — s prepisom zanikaju')
 end
 
+NxTest.test('UI-D1: karta dielca NEROBI flush handshake (a vie preco)') do
+  # `flushCabinetEditsNow` posiela `apply_all` BEZPODMIENECNE a ten vzdy prestava
+  # korpus + `reselect(model, cab)` — vyrobil by prazdny krok Spat a zhodil by
+  # z vyberu DIELEC, takze by nasledny zapis nemal na com pracovat. Karta dielca
+  # navyse ziadne debounce polia nema (material aj hrany idu okamzite).
+  NxTest.assert(!UID1_PART_JS.include?('flushCabinetEditsNow()'),
+                'karta dielca flush NEVOLA (zhoda s onEdgeChange/onPartMaterial/onEdgesAll)')
+  NxTest.assert(UID1_PART_JS.include?('FLUSH HANDSHAKE ZAMERNE NEROBI'),
+                'dovod je zapisany pri kode — inak to buduci citatel precita ako zabudnutie')
+end
+
 NxTest.test('UI-D1: zivy pocet aj zapis maju guard dokumentu') do
   NxTest.assert(UID1_COUNT.include?("data['model_guid'].to_s != model_guid(model)"), 'pocet: guard dokumentu')
   NxTest.assert(UID1_APPLY.include?("data['model_guid'].to_s != model_guid(model)"), 'zapis: guard dokumentu')
