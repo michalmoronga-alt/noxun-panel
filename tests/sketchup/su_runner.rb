@@ -3363,6 +3363,15 @@ module NoxunSuRunner
     ok('UI-C4: neznamy part_key vyber NEZHODI (prizna sa hlaskou)',
        model.selection.to_a.map { |x| e::Store.get(x, 'part_key').to_s }.uniq == one)
 
+    # 3b) Codex #179 P2: CIASTOCNE najdeny box — oznacia sa najdene dielce
+    # (dve kridla z troch su stale to, co pouzivatel chcel), ale chybajuce sa
+    # v statuse POMENUJU. Tu sa overuje aspon to, ze sa vyber neroztiahne na
+    # nic navyse a nezhodi.
+    e::Panel.handle_select_hw_owner({ 'model_guid' => guid, 'cabinet_id' => cid,
+                                      'part_keys' => one + ['front:NEEXISTUJE/wing:single'] }.to_json)
+    ok('UI-C4: ciastocne najdeny box oznaci LEN existujuce dielce',
+       model.selection.to_a.map { |x| e::Store.get(x, 'part_key').to_s }.uniq == one)
+
     # 4) box SKRINKA (prazdne kluce) -> oznaci sa cely korpus
     e::Panel.handle_select_hw_owner({ 'model_guid' => guid, 'cabinet_id' => cid,
                                       'part_keys' => [] }.to_json)

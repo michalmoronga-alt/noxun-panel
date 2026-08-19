@@ -120,6 +120,19 @@ NxTest.test('UI-C4: dielce sa hladaju podla part_key v ROVNAKOM rozsahu ako kuso
                 'nenajdeny dielec sa PRIZNA — nikdy tiche nic')
 end
 
+NxTest.test('UI-C4: ciastocne najdeny box status NEZAKLAME (Codex #179 P2)') do
+  # Box moze niest viac klucov (obe kridla, vsetky police vo „Vnútre"). Ked sa
+  # cast nenajde, vyber sa NEODMIETA (dve kridla z troch su stale to, co
+  # pouzivatel chcel), ale status sa pyta OZNACENYCH dielcov a chybajuce
+  # POMENUJE — inak by hlasil uspech pre nieco, co v modeli nie je.
+  NxTest.assert(UIC4_HANDLER.include?("parts.map { |p| Store.get(p, 'part_key').to_s }.uniq"),
+                'status sa pyta oznacenych dielcov, nie ziadanych klucov')
+  NxTest.assert(UIC4_HANDLER.include?('missing = keys - found'), 'chybajuce kluce sa dopocitaju')
+  NxTest.assert(UIC4_HANDLER.include?('Nenašlo sa:'), 'a POMENUJU sa v statuse')
+  NxTest.assert(UIC4_HANDLER.include?('set_status(msg, !missing.empty?)'),
+                'ciastocny vysledok sa oznaci ako upozornenie, nie ako cisty uspech')
+end
+
 # --- 4) znacky kovania v nahlade --------------------------------------------
 
 NxTest.test('UI-C4: znacka v nahlade nesie vlastnika a klik ho oznaci') do

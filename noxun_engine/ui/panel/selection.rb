@@ -371,8 +371,21 @@ module Noxun
             sel.clear
             parts.each { |p| sel.add(p) }
           end
-          set_status("Označené v modeli: #{hw_owner_status_label(cab, keys)} " \
-                     "(skrinka #{cid}) — panel ostáva v Kovaní.")
+          # Codex #179 P2: box moze niest VIAC klucov (obe kridla dvierok, vsetky
+          # police vo „Vnútre"). Ked sa cast z nich nenajde, vyber sa NEODMIETA —
+          # ukazat dve kridla z troch je stale to, co pouzivatel chcel — ale
+          # status sa musi pytat oznacenych dielcov, nie ziadanych klucov, a
+          # chybajuce POMENOVAT. Inak by hlasil uspech pre nieco, co v modeli nie
+          # je (zasada „nikdy netvrdit zhodu, ktora neplati").
+          found = parts.map { |p| Store.get(p, 'part_key').to_s }.uniq
+          missing = keys - found
+          msg = "Označené v modeli: #{hw_owner_status_label(cab, found)} " \
+                "(skrinka #{cid}) — panel ostáva v Kovaní."
+          unless missing.empty?
+            msg += " Nenašlo sa: #{hw_owner_status_label(cab, missing)} " \
+                   '— skrinka sa možno medzitým prestavala.'
+          end
+          set_status(msg, !missing.empty?)
         end
 
         # Popis oznaceneho vlastnika do statusu. Autorita nazvu je TA ISTA ako
