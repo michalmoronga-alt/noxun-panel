@@ -66,7 +66,10 @@ module Noxun
         quad = quad_for(target[0], target[1], code.to_s)
         return hide(model) if quad.nil?
 
-        ensure_overlay(model)
+        # Ked sa overlay nepodari zaregistrovat, quad by nemal kto nakreslit —
+        # nedrz ho (inak by ostal visiet ako „zvyraznene", co nikto nevidi).
+        return hide(model) unless ensure_overlay(model)
+
         @quad = quad
         invalidate(model)
         true
