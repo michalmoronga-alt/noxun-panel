@@ -3310,6 +3310,78 @@ module NoxunSuRunner
     log_line("FAIL: UI-B3 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
 
+  # === UI-C4: KOVANIE — oznacenie VLASTNIKA polozky v modeli =================
+  # Overuje presne to, co headless sada NEVIE: ci klik na hlavicku boxu (a na
+  # znacku v nahlade) naozaj oznaci SPRAVNE dielce zivej skrinky, ci pritom
+  # model NEMENI a ci nevznika krok Spat. Guardy identity sa skusaju na tom
+  # istom modeli, lebo callback HtmlDialogu je asynchronny.
+  def run_uic4(model)
+    cleanup(model)
+
+    cfg = { 'type' => 'lower', 'width' => 900.0, 'height' => 720.0, 'depth' => 560.0,
+            'thickness' => 18.0, 'floor_height' => 100.0,
+            'fronts' => { 'items' => [
+              { 'id' => 'F1', 'type' => 'drawer_front', 'mode' => 'fixed', 'height' => 200.0 },
+              { 'id' => 'F2', 'type' => 'door', 'mode' => 'auto' }
+            ] } }
+    inst = e::CabinetBuilder.build(model, cfg)
+    return ok('UI-C4: vlozenie skrinky s celami pre vyber vlastnika', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id').to_s
+    guid = e::Panel.model_guid(model)
+    model.selection.clear
+    model.selection.add(inst)
+    before_ents = model.entities.length
+
+    hw = Array((e::Store.config(inst) || {})['hardware'])
+    owners = hw.map { |h| h['owner_part_key'].to_s }.reject(&:empty?).uniq
+    front_keys = owners.select { |k| k.start_with?('front:') }
+    ok('UI-C4: kovanie skrinky ma vlastnikov na celach (podklad boxov)', !front_keys.empty?)
+
+    # 1) guardy identity — cudzi dokument ani ina skrinka vyber NEMENIA
+    e::Panel.handle_select_hw_owner({ 'model_guid' => 'CUDZI-GUID', 'cabinet_id' => cid,
+                                      'part_keys' => front_keys }.to_json)
+    ok('UI-C4: klik z INEHO dokumentu vyber NEMENI (guard dokumentu)',
+       model.selection.to_a == [inst])
+    e::Panel.handle_select_hw_owner({ 'model_guid' => guid, 'cabinet_id' => 'CAB-NEEXISTUJE',
+                                      'part_keys' => front_keys }.to_json)
+    ok('UI-C4: klik pre INU nez oznacenu skrinku vyber NEMENI',
+       model.selection.to_a == [inst])
+
+    # 2) box CELA -> oznacia sa PRESNE jeho dielce (a nie skrinka sama)
+    one = [front_keys.first]
+    e::Panel.handle_select_hw_owner({ 'model_guid' => guid, 'cabinet_id' => cid,
+                                      'part_keys' => one }.to_json)
+    sel = model.selection.to_a
+    keys_sel = sel.map { |x| e::Store.get(x, 'part_key').to_s }
+    ok("UI-C4: box vlastnika oznacil jeho dielec (#{one.first})",
+       !sel.empty? && sel.none? { |x| x == inst } && keys_sel.uniq == one)
+
+    # 3) neexistujuci kluc vyber NEZHODI (radsej nic nez prazdny vyber)
+    e::Panel.handle_select_hw_owner({ 'model_guid' => guid, 'cabinet_id' => cid,
+                                      'part_keys' => ['front:NEEXISTUJE/wing:single'] }.to_json)
+    ok('UI-C4: neznamy part_key vyber NEZHODI (prizna sa hlaskou)',
+       model.selection.to_a.map { |x| e::Store.get(x, 'part_key').to_s }.uniq == one)
+
+    # 4) box SKRINKA (prazdne kluce) -> oznaci sa cely korpus
+    e::Panel.handle_select_hw_owner({ 'model_guid' => guid, 'cabinet_id' => cid,
+                                      'part_keys' => [] }.to_json)
+    ok('UI-C4: box „Skrinka" oznaci cely korpus', model.selection.to_a == [inst])
+
+    ok('UI-C4: oznacenie vlastnika NEMENI model (ziadna entita naviac ani menej)',
+       model.entities.length == before_ents)
+
+    # Keby oznacenie bolo vlastnou operaciou, 1x Spat by vratilo JU a skrinka by
+    # v modeli ostala. Poslednou modelovou operaciou je vlozenie skrinky.
+    Sketchup.undo
+    ok('UI-C4: 1x Spat zmaze skrinku (oznacenie vlastnika NIE JE undo krok)',
+       inst.nil? || !inst.valid?)
+
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: UI-C4 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   # === UI-C2: ZONY ===========================================================
   # Overuje presne to, co headless sada NEVIE: ci sa zmena stromu naozaj
   # PRESTAVA v modeli (priecky, police), ci je to JEDEN krok Spat, ci vyber po
@@ -4369,6 +4441,7 @@ module NoxunSuRunner
     run_uib3(model)          # UI-B3: vyber dielcov z informacneho stlpca — ciste citanie, ziadny undo krok
     run_uic1c(model)         # UI-C1c: orientacia dosky — matice, delta, scale/dedup, vyrobne data nedotknute
     run_uic2(model)          # UI-C2: zony — delenie/police/presna cesta na zivej skrinke, guardy, undo, vyber
+    run_uic4(model)          # UI-C4: kovanie — oznacenie vlastnika polozky v modeli (guardy, ziadny undo krok)
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

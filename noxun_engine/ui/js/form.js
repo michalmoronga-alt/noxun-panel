@@ -1034,22 +1034,17 @@
   // vedie tam, kam ukazuje).
   function openFrontHardware(fid){
     if (typeof setViewContext === 'function') setViewContext('kovanie');
-    var box = el('hwRows'); if (!box || !fid) return;
-    var rows = box.querySelectorAll('.hwrow[data-owner]');
-    var want = 'front:' + fid + '/';
-    for (var i = 0; i < rows.length; i++){
-      if (String(rows[i].getAttribute('data-owner')).indexOf(want) !== 0) continue;
-      var target = rows[i].parentNode && rows[i].parentNode.classList
-        && rows[i].parentNode.classList.contains('hwitem') ? rows[i].parentNode : rows[i];
-      if (typeof nxRevealTarget === 'function') nxRevealTarget(target);
-      target.scrollIntoView({ block: 'nearest' });
-      // Kratke zvyraznenie: bez neho by pouzivatel po skoku hladal, KTORY
-      // riadok je ten jeho (poloziek kovania byva viac nez sa zmesti na obraz).
-      target.classList.add('hwfocus');
-      (function(t){ setTimeout(function(){ t.classList.remove('hwfocus'); }, 1600); })(target);
-      return;
-    }
-    NX.setStatus('Toto čelo zatiaľ nemá naviazané kovanie.', false);
+    if (!fid) return;
+    // UI-C4: cielom skoku je BOX VLASTNIKA (`.hwbox[data-group="front:<id>"]`),
+    // nie jednotlivy riadok — kluc skupiny sklada `hwFrontGroup`, teda JEDINE
+    // miesto konvencie, takze sa doskocenie a render nemozu rozist.
+    var target = (typeof hwBoxByGroup === 'function') ? hwBoxByGroup(hwFrontGroup(fid)) : null;
+    if (!target){ NX.setStatus('Toto čelo zatiaľ nemá naviazané kovanie.', false); return; }
+    if (typeof nxRevealTarget === 'function') nxRevealTarget(target);
+    target.scrollIntoView({ block: 'nearest' });
+    // Kratke zvyraznenie: bez neho by pouzivatel po skoku hladal, KTORY box je
+    // ten jeho (poloziek kovania byva viac, nez sa zmesti na obraz).
+    hwFlash(target);
   }
   // D-23: klik na celo v nahlade — otvor sekciu Cela, riadok do pohladu, fokus
   // pola vysky. Riadok sa hlada cez dataset.frontId (nie cez cislo).

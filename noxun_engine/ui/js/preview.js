@@ -703,7 +703,7 @@
     marks.forEach(function(m){ S.push(hwMarkSvg(m, rx, ry, false)); });
     var sum = nxHwSummary(hwItems);
     pvText(S, rx(g.W/2), ry(-44), sum || 'Skrinka zatiaľ nemá kovanie', 19);
-    if (marks.length) pvText(S, rx(g.W/2), ry(-70), 'klik na značku = popis položky · pozície sú orientačné', 15);
+    if (marks.length) pvText(S, rx(g.W/2), ry(-70), 'klik na značku = označí vlastníka v modeli · pozície sú orientačné', 15);
   }
 
   // Ciste (Node testy): odvodenie znaciek z payloadu kovania.
@@ -810,8 +810,11 @@
         '" rx="3" fill="'+fill+'" stroke="'+stroke+'" stroke-width="2"/>';
     }
     if (ghost) return '<g pointer-events="none" opacity="0.75">' + body + '</g>';
-    return '<g class="hwmk" data-tip="'+esc(m.title)+'" style="cursor:pointer"><title>'+esc(m.title)+'</title>' +
-           body + '</g>';
+    // UI-C4: znacka nesie VLASTNIKA (owner_part_key) — klik ho oznaci v modeli
+    // a dotiahne jeho box v sekcii Kovanie. Ziadne nove data: `owner` je presne
+    // ten kluc, ktorym uz polozka prisla z payloadu.
+    return '<g class="hwmk" data-owner="'+esc(m.owner||'')+'" data-tip="'+esc(m.title)+'" style="cursor:pointer">'
+         + '<title>'+esc(m.title)+'</title>' + body + '</g>';
   }
 
   // ---- GHOST vrstvy (chipy spodneho pasu) ---------------------------------
@@ -1016,11 +1019,12 @@
       // (.zrect) v tabe Zony bezi nedotknuty.
       var f = closestClass(ev.target, 'fgrp');
       if (f){ focusFrontRow(f.getAttribute('data-front-id')); return; }
-      // UI-B2: klik na znacku kovania = jej popis v statuse (co to je, ciej to
-      // je a kolko toho je). Vyber vlastnika v modeli patri az davke UI-C4,
-      // kde kovanie dostane owner boxy — dovtedy sa nic neoznacuje.
+      // UI-C4: klik na znacku kovania OZNACI VLASTNIKA v modeli a dotiahne jeho
+      // box v sekcii Kovanie (scroll + kratke prisvietenie). Ked box neexistuje
+      // (sekcia este nema data), ostava povodne spravanie z UI-B2 — popis
+      // polozky v statuse; nikdy sa nemlci.
       var hm = closestClass(ev.target, 'hwmk');
-      if (hm){ NX.setStatus(hm.getAttribute('data-tip') || '', false); return; }
+      if (hm){ nxHwMarkPick(hm.getAttribute('data-owner') || '', hm.getAttribute('data-tip') || ''); return; }
       var t = closestClass(ev.target, 'zrect');
       if (t) pickZone(t.getAttribute('data-zid'));
     });

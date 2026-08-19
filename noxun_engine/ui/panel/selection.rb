@@ -321,6 +321,86 @@ module Noxun
           set_status("Označených #{parts.size} dielcov skrinky #{Store.get(cab, 'cabinet_id')} v modeli.")
         end
 
+        # UI-C4: klik na HLAVICKU BOXU VLASTNIKA v sekcii Kovanie (a na znacku
+        # kovania v nahlade) — oznaci v modeli to, comu polozka patri: celu
+        # skrinku (prazdne `part_keys`) alebo konkretne dielce podla part_key
+        # (obe kridla cela, zasuvkove celo, police).
+        #
+        # CISTE CITANIE MODELU + zmena VYBERU: ziadny `start_operation`, ziadny
+        # zapis do dictionary, ziadny krok Spat (lekcia D-103) — presne ako
+        # `handle_select_parts` a `ProductionDialog.do_select`.
+        #
+        # VEDOMA ODCHYLKA (a jadro tejto davky): po vybere sa NEVOLA
+        # `push_selected`. Identita vyberu je autoritou rezimu panela, takze
+        # oznaceny DIELEC by panel prepol na kartu Dielec — a box, z ktoreho
+        # pouzivatel prave klikol, by mu zmizol pod rukami. Panel uz zobrazuje
+        # TU ISTU skrinku (dielec je jej sucast), takze sa nic nerozchadza vo
+        # veci, len rail nedostane docasnu polozku. Vzor je `EdgeSelectionWatch`,
+        # ktory na zmenu vyberu tiez zamerne nepusha. Najblizsi bezny push
+        # (undo, zmena katalogu, dalsi klik v modeli) panel zosuladi.
+        #
+        # IDENTITY GUARD (vzor handle_select_parts): PRISNE sa overuje dokument
+        # aj to, ze ide stale o TU ISTU skrinku — callback HtmlDialogu je
+        # asynchronny a ID skriniek sa naprie dokumentmi opakuju.
+        def handle_select_hw_owner(payload = nil)
+          model = Sketchup.active_model
+          return if model.nil?
+
+          data = payload ? parse(payload) : {}
+          return set_status('Vlastník sa neoznačil — panel patrí inému dokumentu.', true) if
+            data['model_guid'].to_s != model_guid(model)
+
+          cab = find_cabinet(model)
+          return refresh_after_stale(model) if cab.nil? ||
+                                               Store.get(cab, 'cabinet_id').to_s != data['cabinet_id'].to_s
+
+          keys = Array(data['part_keys']).map(&:to_s).reject(&:empty?)
+          cid = Store.get(cab, 'cabinet_id').to_s
+          if keys.empty?
+            reselect(model, cab) # sam si drzi suspend guard
+            return set_status("Označená skrinka #{cid} v modeli.")
+          end
+
+          parts = parts_by_keys(cab, keys)
+          if parts.empty?
+            return set_status('Dielec sa v modeli nenašiel — skrinka sa možno medzitým prestavala.', true)
+          end
+
+          suspend_selection_sync do
+            sel = model.selection
+            sel.clear
+            parts.each { |p| sel.add(p) }
+          end
+          set_status("Označené v modeli: #{hw_owner_status_label(cab, keys)} " \
+                     "(skrinka #{cid}) — panel ostáva v Kovaní.")
+        end
+
+        # Popis oznaceneho vlastnika do statusu. Autorita nazvu je TA ISTA ako
+        # v payloade kovania (PartKeys.human_label nad resolved celami) — panel
+        # ani status si nic nevymyslaju.
+        def hw_owner_status_label(cab, keys)
+          fronts = payload_fronts(Store.config(cab) || {})
+          names = keys.map { |k| PartKeys.human_label(k, fronts: fronts) }.compact.uniq
+          names.empty? ? keys.join(' + ') : names.join(' + ')
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.hw_owner_status_label')
+          keys.join(' + ')
+        end
+
+        # Vyrobne dielce skrinky s danymi part_key. Rovnaky rozsah ako
+        # `manufactured_parts` (vnorene AJ odpojene dielce na najvyssej urovni),
+        # len s filtrom kluca — kovanie sa viaze na part_key, nie na entitu.
+        def parts_by_keys(cab, keys)
+          want = {}
+          keys.each { |k| want[k.to_s] = true }
+          manufactured_parts(cab).select do |p|
+            want[Store.get(p, 'part_key').to_s]
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.parts_by_keys')
+          []
+        end
+
         # UI-B2 (N7): „Pohlad na skrinku" zo spodneho pasu nahladu. Zarovna
         # kameru na celny pohlad a doramuje ju na oznacenu skrinku.
         #
