@@ -120,6 +120,19 @@ NxTest.test('UI-C4: dielce sa hladaju podla part_key v ROVNAKOM rozsahu ako kuso
                 'nenajdeny dielec sa PRIZNA — nikdy tiche nic')
 end
 
+NxTest.test('UI-C4: odmietnuty edit sa oznacenim NEPREKRYJE (Codex #179 P2)') do
+  # `@last_apply_error` je JEDINA sprava o tom, preco sa rozpisana uprava
+  # nezapisala. Hlasit nad nou uspech oznacenia by ju prekrylo — a nespotrebovany
+  # priznak by sa neskor ozval pri kliku „Dielcov" k uprave, ktora uz nie je
+  # vidiet. Rovnaky guard ma `handle_select_parts`.
+  NxTest.assert(UIC4_HANDLER.include?('if @last_apply_error'), 'priznak sa kontroluje')
+  NxTest.assert(UIC4_HANDLER.include?('@last_apply_error = nil'), 'a SPOTREBUJE (dalsi klik prejde)')
+  NxTest.assert(UIC4_HANDLER.include?('najprv oprav úpravu'), 'pouzivatel dostane povodny dovod')
+  # Poradie je kontrakt: guard musi bezat PRED akoukolvek zmenou vyberu.
+  NxTest.assert(UIC4_HANDLER.index('if @last_apply_error') < UIC4_HANDLER.index('suspend_selection_sync'),
+                'guard bezi PRED zmenou vyberu, nie po nej')
+end
+
 NxTest.test('UI-C4: ciastocne najdeny box status NEZAKLAME (Codex #179 P2)') do
   # Box moze niest viac klucov (obe kridla, vsetky police vo „Vnútre"). Ked sa
   # cast nenajde, vyber sa NEODMIETA (dve kridla z troch su stale to, co

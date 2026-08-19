@@ -350,6 +350,18 @@ module Noxun
           return set_status('Vlastník sa neoznačil — panel patrí inému dokumentu.', true) if
             data['model_guid'].to_s != model_guid(model)
 
+          # Codex #179 P2 (kolo 3): rovnaky guard ako `handle_select_parts`.
+          # Rozpisany edit mohol server odmietnut (material_preflight) — vtedy uz
+          # bezal UI resync s POVODNYMI hodnotami a `@last_apply_error` je JEDINA
+          # sprava, ktora hovori PRAVDU o tom, preco sa uprava nezapisala. Hlasit
+          # nad nou uspech oznacenia by ju prekrylo; a nespotrebovany priznak by
+          # sa neskor ozval pri kliku „Dielcov" k uprave, ktora uz nie je vidiet.
+          if @last_apply_error
+            msg = @last_apply_error
+            @last_apply_error = nil
+            return set_status("Vlastník sa neoznačil — najprv oprav úpravu: #{msg}", true)
+          end
+
           cab = find_cabinet(model)
           return refresh_after_stale(model) if cab.nil? ||
                                                Store.get(cab, 'cabinet_id').to_s != data['cabinet_id'].to_s
