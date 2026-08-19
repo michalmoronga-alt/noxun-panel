@@ -5,25 +5,27 @@
 
 ## Stav
 
-**v0.7.17 · 19.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
+**v0.7.19 · 19.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
 
 **Beží blok UI 2.0.** Koncept Inspectora je uzavretý (Michal 18.8.) — záväzný kontrakt a mockupy sú v repe: [zdroje/ui20/](zdroje/ui20/) ([UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) + mockupy Inspector C, štúdio, dizajnový lístok); práca je narezaná do dávok UI-A → UI-B → UI-C → UI-D a fázy ŠTÚDIO ([PLAN.md](PLAN.md)).
 
-Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-D1 · Dielec** — karta dielca má Základné hore, hranové ikony, „Označiť v modeli" a „Použiť na podobné…" (prenos olepu na dielce s rovnakou rolou a materiálom). Testy: **1401 headless · 43 JS sád**; posledný **plný in-SketchUp beh 19.8. — 454 PASS, 0 FAIL** (vrátane novej sekcie `run_uid1`).
+Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-D2 · PNG náhľady šablón** — dlaždica šablóny ukazuje skutočnú fotku skrinky z chvíle uloženia, schéma ostáva ako fallback. Testy: **1417 headless · 44 JS sád**; posledný **plný in-SketchUp beh 19.8. — 476 PASS, 0 FAIL** (vrátane novej sekcie `run_uid2`).
 
 ## Robí sa
 
-**BLOK UI-D · Dotiahnutie** — beží. Hotová je **UI-D1 Dielec** (tento PR). Predošlé bloky UI 2.0 sú kompletné: **UI-A** (UI-01 paleta a téma · UI-02 logo a toolbar · UI-03 combobox), **UI-B** (UI-B1 kostra · UI-B2 náhľad · UI-B3 obsah Korpusu + koliesko) a **UI-C** (**C1 Vkladanie** #174 · #175 · #176 · **C2 Zóny** #177 · **C3 Čelá** #178 · **C4 Kovanie** #179). Inspector má celú kostru, kontextové projekcie a všetky kontexty — Korpus, Vkladanie, Zóny, Čelá aj Kovanie.
+**BLOK UI-D · Dotiahnutie** — beží. Hotové sú **UI-D1 Dielec** (#180) a **UI-D2 Náhľady šablón** (tento PR). Predošlé bloky UI 2.0 sú kompletné: **UI-A** (UI-01 paleta a téma · UI-02 logo a toolbar · UI-03 combobox), **UI-B** (UI-B1 kostra · UI-B2 náhľad · UI-B3 obsah Korpusu + koliesko) a **UI-C** (**C1 Vkladanie** #174 · #175 · #176 · **C2 Zóny** #177 · **C3 Čelá** #178 · **C4 Kovanie** #179). Inspector má celú kostru, kontextové projekcie a všetky kontexty — Korpus, Vkladanie, Zóny, Čelá aj Kovanie.
 
 ## Ďalší krok
 
-**UI-D2 reálne PNG náhľady šablón** (`view.write_image` pri uložení + schéma ako fallback; in-SketchUp beh) → **UI-D3 klikateľnosť zvyšku** (deep-linky warnpanela N5, kliky N13, aktualizácia UI_DIZAJN.md a uzávery D-77/84/89a/96 + rozhodnutie D-26). Po UI-D nasleduje fáza **ŠTÚDIO** (sektorová debata nad `mockup_ui20.html`).
+**UI-D3 klikateľnosť zvyšku** (deep-linky warnpanela N5, kliky N13, aktualizácia UI_DIZAJN.md a uzávery D-77/84/89a/96 + rozhodnutie D-26) — posledná dávka bloku UI-D. Po UI-D nasleduje fáza **ŠTÚDIO** (sektorová debata nad `mockup_ui20.html`).
 
 **Na Michalovo rozhodnutie:** dávka UI-D1 nechala **smer dekoru dielca ako informáciu**, nie ako nastavenie — per-dielec smer dnes neexistuje a jeho zavedenie mení výrobný kontrakt (kusovník, VEPO, nárez), takže je to samostatná dávka s auditom. Ak ho chce mať editovateľný, treba to zadať zvlášť.
 
 ## Posledné uzávery
 
-- **UI-D1 Dielec** (karta dielca má **Základné hore** — Dĺžka/Šírka/Hrúbka a smer dekoru ako dopočítané údaje, nie polia · každá hrana má **ikonu s rotáciou podľa strany v náhľade** + farebný štvorec ABS · **„Označiť v modeli"** označí dielec bez toho, aby čokoľvek zapísalo alebo vyrobilo krok Späť · **„Použiť na podobné…"** prenesie olep hrán na dielce s **rovnakou rolou a rovnakým materiálom** — v modale sa volí rozsah *táto skrinka* / *celý projekt* a **živý počet** hovorí vopred, koľkých dielcov sa to týka; celý zápis je **jeden krok Späť**, aj keď zasiahne viac skriniek) — PR **tento**, v0.7.17 (19.8.)
+- **UI-D2 PNG náhľady šablón** (pri uložení šablóny sa **odfotí pohľad na skrinku** a dlaždica v paneli ním nahradí schematickú kresbu · fotí sa **aktuálny pohľad dorámovaný na skrinku** — vedomé rozhodnutie, izolovaný render by musel skrývať zvyšok modelu, čiže zapisovať doň · **kamera sa vždy vráti presne tam, kde bola** (perspektíva aj orto) a nevznikne ani jeden krok Späť · staršie šablóny, neúspešná fotka aj poškodený obrázok končia pri **schéme** a výška dlaždice sa nemení nikdy · pri prepise šablóny bez úspešnej fotky sa **starý obrázok zmaže** · obrázky žijú ako súbory vedľa knižnice, schéma `templates.json` sa nemenila · okno Šablóny zosúladilo poradie ukladania — najprv názov a potvrdenie prepisu, až potom dáta aj fotka z jedného snímku) — PR **tento**, v0.7.19 (19.8.)
+
+- **UI-D1 Dielec** (karta dielca má **Základné hore** — Dĺžka/Šírka/Hrúbka a smer dekoru ako dopočítané údaje, nie polia · každá hrana má **ikonu s rotáciou podľa strany v náhľade** + farebný štvorec ABS · **„Označiť v modeli"** označí dielec bez toho, aby čokoľvek zapísalo alebo vyrobilo krok Späť · **„Použiť na podobné…"** prenesie olep hrán na dielce s **rovnakou rolou a rovnakým materiálom** — v modale sa volí rozsah *táto skrinka* / *celý projekt* a **živý počet** hovorí vopred, koľkých dielcov sa to týka; celý zápis je **jeden krok Späť**, aj keď zasiahne viac skriniek) — PR **#180**, v0.7.17 (19.8.)
 
 - **BLOK UI-C UZAVRETÝ — UI-C4 Kovanie** (položky sú **horizontálne boxy podľa vlastníka**: „Skrinka", box každého čela a spoločný box „Vnútro skrinky" pre podperky políc; v boxe čela ostal výber setu, rad nominálnych dĺžok so zámkom aj nákupné riadky — nič sa nezmenilo, len sa preskupili · **klik na hlavičku boxu označí vlastníka priamo v modeli** a panel pritom ostáva v Kovaní · **klik na značku kovania v náhľade** (záves, koľajnica, noha) označí vlastníka a dotiahne jeho box · hover nad boxom prisvieti jeho značky v náhľade · sekcia sa rozdelila na tri skupiny **Položky · Sety · Pravidlá**) — PR **tento**, v0.7.16 (19.8.)
 

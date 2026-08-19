@@ -3938,6 +3938,178 @@ module NoxunSuRunner
     log_line("FAIL: UI-D1 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
 
+  # =========================================================================
+  # UI-D2 — PNG NAHLADY SABLON (kamera + sklad)
+  #
+  # Headless sada overi meno suboru, zamok, transport aj forward guard; TU sa
+  # overuje to, co bez ziveho `Sketchup::View` overit NEDA:
+  #   * `write_image` naozaj vyrobi platny PNG,
+  #   * kamera je po capture KOMPLETNE obnovena — perspektivna AJ ortogonalna
+  #     (`write_image` prepisuje aj `aspect_ratio`, takze obnova samotneho
+  #     eye/target/up by nestacila) a obnovi sa aj vtedy, ked capture ZLYHA,
+  #   * capture ani ulozenie sablony NEVYROBI undo krok (ziadna model operacia).
+  #
+  # POZOR na sklad sablon: `scripts\run_su_tests.ps1` presmeruje %APPDATA% do
+  # sandboxu, ale pri RUCNOM `load` v konzole ziveho okna by sekcia siahla na
+  # skutocnu kniznicu — preto pracuje s jedinym docasnym nazvom `UID2_NAME`
+  # a upratuje ho na zaciatku aj v `ensure`.
+  UID2_NAME = 'SU-TEST nahlad (docasna)'
+
+  # Odtlacok CELEJ kamery — presne to, co musi capture vratit do povodneho stavu.
+  def uid2_cam(view)
+    c = view.camera
+    { eye: c.eye.to_a, target: c.target.to_a, up: c.up.to_a,
+      perspective: (c.perspective? ? true : false),
+      fov: c.fov.to_f, height: c.height.to_f, aspect: c.aspect_ratio.to_f }
+  end
+
+  def uid2_cam_same?(a, b)
+    return false unless a[:perspective] == b[:perspective]
+    return false unless %i[eye target up].all? { |k| uid2_vec_same?(a[k], b[k]) }
+    return false if (a[:aspect] - b[:aspect]).abs > 0.001
+
+    key = a[:perspective] ? :fov : :height
+    (a[key] - b[key]).abs <= (a[key].abs * 0.001 + 0.001)
+  end
+
+  def uid2_vec_same?(a, b)
+    a.each_with_index.all? { |v, i| (v.to_f - b[i].to_f).abs < 0.001 }
+  end
+
+  # Docasne rozbity capture: cielova cesta na neexistujucom disku, takze
+  # `write_image` nemoze uspiet. Povodna metoda sa vracia v `ensure` — inak by
+  # zvysok behu (a pri pade aj cele okno) ostal s rozbitym nahladom.
+  def uid2_with_broken_capture(tp)
+    orig = tp.method(:new_tmp_path)
+    tp.define_singleton_method(:new_tmp_path) { 'Z:/noxun-neexistujuci-disk/uid2.png' }
+    yield
+  ensure
+    tp.define_singleton_method(:new_tmp_path) { orig.call }
+  end
+
+  def uid2_cam_diff(a, b)
+    %i[eye target up perspective fov height aspect].reject { |k| a[k] == b[k] }
+                                                   .map { |k| "#{k}: #{a[k].inspect} -> #{b[k].inspect}" }
+                                                   .join(', ')
+  end
+
+  def run_uid2(model)
+    cleanup(model)
+    tp = e::TemplatePreviews
+    ts = e::TemplateStore
+    ts.delete('cabinet', UID2_NAME) # zvysky z predosleho behu
+
+    cfg = { 'type' => 'lower', 'width' => 800.0, 'height' => 720.0, 'depth' => 560.0,
+            'thickness' => 18.0, 'floor_height' => 100.0 }
+    inst = e::CabinetBuilder.build(model, cfg)
+    return ok('UI-D2: vlozenie skrinky pre nahlad', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id').to_s
+    guid = e::Panel.model_guid(model)
+    e::Panel.select_only(model, inst)
+    view = model.active_view
+    before_ents = model.entities.length
+
+    # --- 1) PERSPEKTIVNA kamera ---------------------------------------------
+    view.camera.perspective = true
+    view.camera.set(Geom::Point3d.new(200, -300, 200), Geom::Point3d.new(0, 0, 20), Z_AXIS)
+    view.camera.fov = 47.5
+    cam_before = uid2_cam(view)
+    tmp = tp.capture(model, inst)
+    ok('UI-D2: capture vyrobil subor', !tmp.nil? && File.file?(tmp.to_s))
+    ok('UI-D2: subor je platny PNG do stropu velkosti (magic + limit)', tp.valid_file?(tmp.to_s))
+    info("UI-D2: velkost capture PNG = #{tmp && File.file?(tmp) ? File.size(tmp) : '?'} B " \
+         "(strop #{tp::MAX_BYTES} B)")
+    cam_after = uid2_cam(view)
+    ok('UI-D2: PERSPEKTIVNA kamera je po capture KOMPLETNE obnovena (eye/target/up/fov/aspect)',
+       uid2_cam_same?(cam_before, cam_after))
+    info("UI-D2: rozdiel perspektivnej kamery: #{uid2_cam_diff(cam_before, cam_after)}") unless
+      uid2_cam_same?(cam_before, cam_after)
+    ok('UI-D2: capture NEMENI model (ziadna entita naviac ani menej)',
+       model.entities.length == before_ents)
+    ok('UI-D2: capture NEMENI vyber', model.selection.to_a == [inst])
+    tp.discard(tmp)
+
+    # --- 2) ORTOGONALNA kamera ----------------------------------------------
+    # Iny rezim = ina velicina zoomu (`height` namiesto `fov`). Keby sa obnovoval
+    # len `fov`, orto pohlad by po ulozeni sablony odskocil.
+    view.camera.perspective = false
+    view.camera.set(Geom::Point3d.new(0, -400, 100), Geom::Point3d.new(0, 0, 100), Z_AXIS)
+    view.camera.height = 120.0
+    cam_ortho = uid2_cam(view)
+    tmp2 = tp.capture(model, inst)
+    ok('UI-D2: capture funguje aj v orto pohlade', tp.valid_file?(tmp2.to_s))
+    cam_ortho_after = uid2_cam(view)
+    ok('UI-D2: ORTOGONALNA kamera je po capture KOMPLETNE obnovena (vratane height a rezimu)',
+       uid2_cam_same?(cam_ortho, cam_ortho_after))
+    info("UI-D2: rozdiel orto kamery: #{uid2_cam_diff(cam_ortho, cam_ortho_after)}") unless
+      uid2_cam_same?(cam_ortho, cam_ortho_after)
+    ok('UI-D2: orto rezim ostal orto (write_image ho neprepol)', view.camera.perspective? == false)
+    tp.discard(tmp2)
+    view.camera.perspective = true # naspat do bezneho rezimu pre zvysok behu
+
+    # --- 3) ZLYHANY capture: kamera sa OBNOVI aj tak ------------------------
+    # Simulacia zlou cielovou cestou — `write_image` na neexistujucom disku
+    # nemoze uspiet. Ide o vetvu `written == false` / vynimka: kamera musi ist
+    # spat z `ensure`, nie „po ceste".
+    cam_fail = uid2_cam(view)
+    failed = nil
+    uid2_with_broken_capture(tp) { failed = tp.capture(model, inst) }
+    ok('UI-D2: zlyhany capture vracia nil (write_image sa kontroluje, nie len vynimka)', failed.nil?)
+    ok('UI-D2: kamera je obnovena AJ pri zlyhanom capture', uid2_cam_same?(cam_fail, uid2_cam(view)))
+
+    # --- 4) ULOZENIE SABLONY z panela: zaznam + PNG -------------------------
+    e::Panel.handle_save_template_as({ 'name' => UID2_NAME, 'type' => 'lower',
+                                       'model_guid' => guid, 'cabinet_id' => cid }.to_json)
+    ok('UI-D2: sablona sa ulozila', !ts.find('cabinet', UID2_NAME).nil?)
+    png = tp.path_for('cabinet', UID2_NAME)
+    ok('UI-D2: ulozenie sablony vyrobilo PNG nahlad', tp.valid_file?(png))
+    rev1 = tp.rev_for('cabinet', UID2_NAME)
+    ok('UI-D2: zoznam sablon nesie reviziu nahladu (transport do dlazdice)',
+       !rev1.nil? && e::Panel.template_list(previews: true)
+                             .find { |t| t['name'] == UID2_NAME }['preview_rev'] == rev1)
+    ok('UI-D2: server posiela nahlad ako data URI',
+       tp.data_uri('cabinet', UID2_NAME).to_s.start_with?('data:image/png;base64,'))
+    ok('UI-D2: ulozenie sablony NEMENI model', model.entities.length == before_ents)
+
+    # --- 5) PREPIS so ZLYHANYM capture: stary PNG musi ZMIZNUT --------------
+    uid2_with_broken_capture(tp) do
+      e::Panel.handle_save_template_as({ 'name' => UID2_NAME, 'type' => 'upper',
+                                         'model_guid' => guid, 'cabinet_id' => cid }.to_json)
+    end
+    ok('UI-D2: prepis sablony prebehol aj bez nahladu',
+       (ts.find('cabinet', UID2_NAME) || {}).fetch('config', {})['type'] == 'upper')
+    ok('UI-D2: prepis so ZLYHANYM capture stary PNG ZMAZAL (radsej schema nez zly obrazok)',
+       !File.exist?(png.to_s))
+    ok('UI-D2: sablona bez nahladu ma v zozname preview_rev nil',
+       e::Panel.template_list(previews: true).find { |t| t['name'] == UID2_NAME }['preview_rev'].nil?)
+
+    # --- 6) VYMAZANIE sablony berie PNG so sebou ----------------------------
+    e::Panel.handle_save_template_as({ 'name' => UID2_NAME, 'type' => 'lower',
+                                       'model_guid' => guid, 'cabinet_id' => cid }.to_json)
+    ok('UI-D2: sablona ma pred mazanim zase nahlad', tp.valid_file?(png))
+    ok('UI-D2: vymazanie sablony prebehlo', ts.delete('cabinet', UID2_NAME))
+    ok('UI-D2: PNG zmizol SO ZAZNAMOM (mazanie zije v TemplateStore.delete)', !File.exist?(png.to_s))
+
+    # --- 7) ZIADNY undo krok ------------------------------------------------
+    # Poslednou MODELOVOU operaciou je stale vlozenie skrinky (kroky 1-6 su
+    # ciste citanie + subory). Keby capture ci ulozenie sablony boli vlastnou
+    # operaciou, 1x Spat by vratilo JU a skrinka by v modeli ostala.
+    Sketchup.undo
+    ok('UI-D2: 1x Spat zmazal skrinku — capture ani ulozenie sablony NIE JE undo krok',
+       inst.nil? || !inst.valid?)
+
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: UI-D2 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  ensure
+    begin
+      e::TemplateStore.delete('cabinet', UID2_NAME) # docasna sablona nesmie prezit beh
+    rescue StandardError
+      nil
+    end
+  end
+
   def run_async(model, done)
     state = {}
     steps = []
@@ -4604,6 +4776,7 @@ module NoxunSuRunner
     run_uic2(model)          # UI-C2: zony — delenie/police/presna cesta na zivej skrinke, guardy, undo, vyber
     run_uic4(model)          # UI-C4: kovanie — oznacenie vlastnika polozky v modeli (guardy, ziadny undo krok)
     run_uid1(model)          # UI-D1: dielec — „Použiť na podobné" (zapis do viacerych dielcov, 1 undo) + „Označiť v modeli"
+    run_uid2(model)          # UI-D2: PNG nahlady sablon — capture, KOMPLETNA obnova kamery (persp. aj orto), ziadny undo krok
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

@@ -206,6 +206,13 @@
     // posiela server push_templates s cerstvym `used_seq`, takze sa poradie
     // „Naposledy použité“ prekresli bez restartu panela.
     setTemplates: function(list){ TEMPLATES = list || []; renderTemplateTiles(true); refreshTplModalWarn(); }, // D-14: varovanie kolizie zije aj pri otvorenom modale
+    // UI-D2: odpoved na `nx_template_preview` — PNG nahlad JEDNEJ sablony ako
+    // data URI. Meni LEN obrazok v dlazdici (ziadny render karty, ziadna
+    // prestavba mriezky — vzor NX.setUsedIds); `png: null` = bez nahladu,
+    // dlazdica ostane na schematickej kresbe.
+    setTemplatePreview: function(data){
+      if (typeof applyTemplatePreview === 'function') applyTemplatePreview(data);
+    },
     // V0.5 B (Codex B1): okno Vyroba pyta select cez panel — najprv flush
     // rozpisanych editov (400 ms debounce) KORPUSU AJ DOSKY (Codex GH #48 P2:
     // zmena selection by boardPending zrusila), az potom sa meni selection.

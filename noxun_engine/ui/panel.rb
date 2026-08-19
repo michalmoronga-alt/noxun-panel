@@ -185,6 +185,9 @@ module Noxun
           # sa len pri otvoreni ponuky — plny scan modelu preto nepatri do
           # push_selected (bezi pri kazdom kliku vo vybere). CISTE CITANIE.
           cb(dlg, 'nx_used_ids')        { |_p| push_used_ids }
+          # UI-D2: PULL nahladu sablony (kind, name, rev) -> data URI. Ziada sa
+          # RAZ na revíziu — data URI nemoze cestovat v kazdom push_templates.
+          cb(dlg, 'nx_template_preview') { |p| push_template_preview(p) }
           # Diagnostika: JS chyby z HtmlDialogu (window.onerror) -> Engine.log. Priamo, NIE cez cb —
           # aby pripadna chyba v logovani nespustila set_status (dalsi execute_script) a slucku.
           dlg.add_action_callback('js_error') do |_ctx, msg|

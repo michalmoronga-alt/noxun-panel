@@ -433,12 +433,22 @@ module Noxun
         # sklada vkladacia karta poradie „Naposledy pouzite". Cislo zije v inom
         # subore (TemplateUsage), takze subor sablon sa vlozenim NEMENI (N11).
         # kind: filter pouziva okno Sablony — spravuje VYHRADNE korpusove.
-        def template_list(kind: nil)
+        # `previews:` (UI-D2) — pripoji TRANSIENTNE `preview_rev` (odtlacok PNG
+        # suboru, nil = sablona nahlad nema). Pripaja sa cez `t.merge` (novy
+        # hash, zaznam sa NEMUTUJE) presne ako `used_seq`, takze sa do
+        # `templates.json` nikdy nezapise — nezname kluce zaznamu inak zapis
+        # PREZIJU a schema by sa ticho rozsirila. Samotne PNG NEIDE tymto
+        # kanalom: panel si ho vypyta zvlast (`nx_template_preview`).
+        # Okno Sablony nahlady nekresli, preto ich ani nedostava (default false
+        # setri `File.stat` pri kazdom refreshi).
+        def template_list(kind: nil, previews: false)
           seq = TemplateUsage.map
           TemplateStore.load.each_with_object([]) do |t, out|
             next if kind && t['kind'] != kind
 
-            out << t.merge('used_seq' => seq["#{t['kind']}:#{t['name']}"])
+            rec = t.merge('used_seq' => seq["#{t['kind']}:#{t['name']}"])
+            rec = rec.merge('preview_rev' => TemplatePreviews.rev_for(t['kind'], t['name'])) if previews
+            out << rec
           end
         rescue StandardError => e
           Engine.log_error(e, 'template_list')
