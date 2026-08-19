@@ -388,8 +388,10 @@
       '" text-anchor="middle" dominant-baseline="middle" pointer-events="none" transform="rotate(-90 '+
       (rx(x)+10)+' '+ym+')">'+esc(label)+'</text>');
   }
-  function pvText(S, x, y, txt, size, anchor){
-    S.push('<text x="'+x+'" y="'+y+'" font-size="'+(size||18)+'" fill="'+PV_DIM+
+  // `fill` je volitelny (N26: medzery pri editacii svietia jantarovo) — bez
+  // neho plati tlmena kotova farba.
+  function pvText(S, x, y, txt, size, anchor, fill){
+    S.push('<text x="'+x+'" y="'+y+'" font-size="'+(size||18)+'" fill="'+(fill||PV_DIM)+
       '" text-anchor="'+(anchor||'middle')+'" pointer-events="none">'+esc(txt)+'</text>');
   }
 
@@ -603,17 +605,67 @@
     }
   }
 
+  // ---- N26: MEDZERY JANTAROVO PRI EDITACII --------------------------------
+  // Kym stoji kurzor v niektorom poli skupiny „Medzery a presahy", medzery v
+  // projekcii Cela sa prisvietia — clovek vidi, KTORU skaru prave meni.
+  // Je to LEN zvyraznenie: ziadne nove data, ziadny novy vypocet (pasy vznikaju
+  // z toho isteho `nxFrontDims`, ktorym sa uz kotuju).
+  var NX_GAP_FIELDS = { fr_gap: 1, fr_gap_top: 1, fr_gap_bottom: 1, fr_gap_sides: 1 };
+  var PV_GAP_FILL = '#fff3e0';   // --nx-warn-bg-soft
+  var PV_GAP_LINE = '#ffb74d';   // --nx-warn
+  var PV_GAP_TEXT = '#b26a00';   // --nx-warnchip-fg
+  // „Editacia" = OTVORENA skupina „Medzery a presahy" (to je stav, kvoli
+  // ktoremu clovek na projekciu pozera) ALEBO kurzor priamo v niektorom z jej
+  // poli. Stav sa CITA z DOM, nedrzi sa nikde bokom — zbalenie skupiny tak
+  // zvyraznenie zhasne bez akejkolvek dalsej synchronizacie.
+  var pvGapFocus = false;
+  function pvGapsHot(){
+    if (pvGapFocus) return true;
+    if (typeof document === 'undefined') return false;
+    var d = document.querySelector('details[data-key="fgaps"]');
+    return !!(d && d.open);
+  }
+  function pvSetGapFocus(on){
+    if (pvGapFocus === !!on) return;
+    pvGapFocus = !!on;
+    renderPreview();
+  }
+  if (typeof document !== 'undefined'){
+    document.addEventListener('focusin', function(ev){
+      pvSetGapFocus(!!(ev.target && ev.target.id && NX_GAP_FIELDS[ev.target.id]));
+    }, true);
+    document.addEventListener('focusout', function(ev){
+      if (ev.target && ev.target.id && NX_GAP_FIELDS[ev.target.id]) pvSetGapFocus(false);
+    }, true);
+    // `toggle` NEBUBLA — preto zachytavanie (capture). Rozbalenie/zbalenie
+    // skupiny medzier musi projekciu prekreslit.
+    document.addEventListener('toggle', function(ev){
+      var t = ev.target;
+      if (t && t.getAttribute && t.getAttribute('data-key') === 'fgaps') renderPreview();
+    }, true);
+  }
+
   // ---- ZAKLADNA vrstva: koty ciel (vysky riadkov + medzery) ---------------
   // Vysky su RESOLVED z payloadu (front_items), medzery su rozdiely medzi nimi
-  // — ziadny vlastny vzorec, ziadne nove pole. Jantarove zvyraznenie medzier
-  // pri otvorenej skupine Medzery (N26) pride s davkou UI-C3.
+  // — ziadny vlastny vzorec, ziadne nove pole.
   function drawFrontDims(S, rx, ry, g){
     var dims = nxFrontDims(g.fronts, g);
     if (!dims.length) return;
     var xr = Math.max(g.W, g.W - g.gapSides) + 26;
+    // N26: pasy medzier sa kreslia PRED kotami, aby cisla ostali navrchu.
+    var hot = pvGapsHot();
+    if (hot){
+      var x0 = Math.min(g.gapSides, 0), x1 = Math.max(g.W, g.W - g.gapSides);
+      dims.forEach(function(d){
+        if (d.kind !== 'gap') return;
+        S.push('<rect x="' + rx(x0) + '" y="' + ry(d.z2) + '" width="' + (x1 - x0) + '" height="' + (d.z2 - d.z1) +
+               '" fill="' + PV_GAP_FILL + '" stroke="' + PV_GAP_LINE + '" stroke-width="1.2"/>');
+      });
+    }
     dims.forEach(function(d){
       if (d.kind === 'front') pvDimV(S, rx, ry, xr, d.z1, d.z2, String(Math.round(d.size)), 18);
-      else pvText(S, rx(-14), ry((d.z1 + d.z2)/2), String(Math.round(d.size)), 15, 'end');
+      else pvText(S, rx(-14), ry((d.z1 + d.z2)/2), String(Math.round(d.size)), 15, 'end',
+                  hot ? PV_GAP_TEXT : null);
     });
     pvDimH(S, rx, ry, g.gapSides, g.W - g.gapSides, -26, String(Math.round(g.W - 2*g.gapSides)), 18);
   }

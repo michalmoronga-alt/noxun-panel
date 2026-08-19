@@ -248,7 +248,10 @@ zavesená; tretí typ „Doska" používa existujúci `slab`),
 `ori-lying` / `ori-stand` / `ori-wall` (UI-C1c — umiestnenie dosky; v každej je
 **podlaha** ako vodorovná čiara, v `ori-wall` navyše zvislá čiara steny),
 `columns-3` / `rows-2` / `rows-3` (UI-C2 — dlaždice delenia zóny; spolu
-s existujúcim `columns-2` tvoria štvoricu „2/3 stĺpce · 2/3 riadky“).
+s existujúcim `columns-2` tvoria štvoricu „2/3 stĺpce · 2/3 riadky“),
+`door` (UI-C3 — typ čela v riadku, N27: panel so zvislou osou závesu a
+úchytkou pri druhej hrane; zásuvkové čelo používa `rows-2`, výklop `p-top`
+a „Bez čela“ `front`).
 
 > Okno **Výroba** načítava `icons.js` od v0.5.44 (predtým sprite nemalo) — nové
 > ovládacie prvky v ňom používajú sprite, nie glyfy.
@@ -672,6 +675,79 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Zones`).
   zapamätané z väčšieho monitora je inak orezané rovnako). **Plocha má prednosť
   pred minimom**; medzi minimom a plochou sa veľkosti okna nikto nedotkne, takže
   vedome zväčšené okno ostáva. Nové okno = nové `NX_FIT_MIN` (bez neho fit nebeží).
+
+### 5.7 Čelá — riadky, AUTO chip, Úchytky (UI-C3)
+
+Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Fronts`).
+
+- **Kontext má tri skupiny v záväznom poradí:** Zoznam čiel · **Úchytky** ·
+  Medzery a presahy. Ikony skupín (N3b) ukazujú, o čom skupina hovorí
+  (`front` · `profile` · `columns-2`).
+- **Riadok začína ikonou typu (N27).** Ikona odpovedá na „čo to je" skôr, než
+  sa oko dostane k textu rozbaľovačky — nie je to jej náhrada, obe zostávajú.
+- **Zámok pri výške ZANIKOL: zamknuté ⇔ vypísané.** Vypísaná hodnota drží,
+  prázdne pole je AUTO. Samostatný checkbox vedel byť zapnutý aj nad prázdnym
+  poľom a nerobil nič — dve pravdy o tom istom. Návrat na automat robí **chip
+  AUTO**, ktorý sa (spolu s jednotkou „mm") ukazuje **len pri vypísanej
+  hodnote**: prázdnemu poľu niet čo vracať a jednotka by patrila k ničomu.
+  Pevná výška je aj **vidno** (tučnejšia hodnota, `.frow.fixed`) — zámok
+  nesmie zmiznúť tým, že prestal mať vlastnú ikonu. Rovnaké pravidlo má pole
+  „Prvá zóna" z UI-C2.
+- **Pole výšky je úzke (46 px) a hodnota zarovnaná doprava** — rozmer je číslo,
+  nie veta (UX-03). Jednotka stojí **pri hodnote**, nie v hlavičke stĺpca.
+- **Rozmerový rad je ponuka, nie ďalšie pole** (N25, rovnaký vzor ako pri
+  rozmeroch korpusu). Voľba len **dosadí** hodnotu a ohlási ju rovnakou
+  udalosťou ako písanie rukou.
+- **Naviazané kovanie je JEDEN drobný riadok pod čelom**, nie tabuľka
+  (vertikálny priestor je vzácny): jednoriadkový s ellipsis, plný text v
+  `title`, klik vedie **do kontextu Kovanie** a doskočí na položku vlastníka
+  (krátke zvýraznenie, aby ju používateľ po skoku nehľadal). Obsah skladajú
+  existujúce zdroje — badge z plánu a nákupný set z D-92; panel nič
+  nedopočítava.
+- **D-84 reč stolára:** „+ pridaj dvere" (krídlové) a „+ pridaj čelo"
+  (zásuvkové). Odoberacie tlačidlo **zaniklo** — mazanie ostáva krížikom pri
+  konkrétnom riadku (jednoznačné, ktorý mizne) a v rade sa uvoľní miesto.
+- **Materiál čiel stojí aj v zozname.** Sektor Materiály patrí kontextu Korpus
+  a tu je skrytý — bez druhého ovládača by sa dekor menil inde, než sa čelá
+  kreslia. Je to **ten istý údaj v dvoch ovládačoch**, nie nové dáta; synchro
+  drží každá cesta, ktorá siaha na materiál čiel.
+- **D-96 Úchytky:** profil sa nastavuje **v sekcii pre rozsah čiel**
+  (všetky / len zásuvkové / len dvierka), ikona v riadku je už len
+  **INDIKÁTOR** (žiaden rám tlačidla, žiaden kurzor akcie). Cyklenie klikom
+  bolo použiteľné len pri jednom profile. Rôzne profily v rozsahu ukáže
+  **disabled voľba „(rôzne)"** — select nikdy netvrdí zhodu, ktorá neplatí
+  (vzor „podľa parametra" zo sekcie Kovanie). **Hrana osadenia sa neponúka**,
+  kým ju registry profilov nepozná: ponúkať voľbu, ktorá nemá kam sadnúť, je
+  lož.
+- **Výklop je v ponuke typov, ale zatiaľ NEvyberateľný** — s upozornením
+  „AVENTOS ručne, automatika fáza 3". Vedomá odchýlka: rola `flap` potrebuje
+  vlastnú cestu cez builder, ABS a kusovník, čo je samostatná dávka.
+  Poctivejšie je povedať, že sa s ním ráta, než ho zamlčať (rovnaký vzor ako
+  rezervovaný slot „Vnútro" v Zónach).
+- **N26 medzery jantárovo:** pri otvorenej skupine „Medzery a presahy" (alebo
+  kurzore v jej poli) sa medzery v projekcii Čelá podfarbia. Je to **len
+  zvýraznenie** — pásy vznikajú z toho istého rozkladu, ktorým sa už kótuje.
+- **Interaktívne prvky v riadku STOPUJÚ bublanie** (lekcia: rozbaľovačka sa
+  zatvárala) — platí pre chip AUTO, šípku radu aj riadok kovania.
+
+### 5.8 D-89a — hover hrany zvýrazní hranu v MODELI
+
+- Kurzor nad hranou **v karte dielca alebo dosky** (riadok zoznamu aj farebný
+  pás 2D náhľadu) rozsvieti tú istú hranu priamo v modeli. Rieši
+  „ktorá hrana je ktorá strana" bez domýšľania z orientácie.
+- **Je to pohľad, nie dáta:** `Sketchup::Overlay` NAD modelom — žiadna
+  operácia, žiadny zápis, **žiadny krok Späť**, nič v .skp (lekcia D-103,
+  presne vzor D-104/D-105). Zhasína pri odchode kurzora, prekreslení karty,
+  zatvorení panela aj prepnutí dokumentu.
+- **Farba je výber** (`--nx-select`), zámerne **nie** `--nx-edge-*`: tie tri
+  farby hovoria o stave olepu a miešať ich s „toto je hrana pod kurzorom" by
+  používateľ čítal ako nález. Plôška leží o kúsok **nad** kontrolou olepu,
+  aby bola vidno aj pri zapnutom zvýraznení hrán.
+- **Nič sa nehľadá:** zvýrazňuje sa hrana **práve vybratého** dielca (karta je
+  jeho zrkadlo) — žiadny scan modelu, jedna plôška. Keď sa osi dielca nedajú
+  jednoznačne overiť, **nekreslí sa nič** (tá istá zásada ako D-104).
+- **Posiela sa len ZMENA** kódu hrany — pohyb myšou inak zaplaví most do Ruby
+  desiatkami volaní na jeden riadok.
 
 ### D-51: štandard rozmerov okien (UI-B1)
 

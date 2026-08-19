@@ -4,9 +4,14 @@
   // OZNACENEJ skrinky (override dedenia projekt -> skrinka).
   function setCabinetMaterials(c){
     var on = !!c.cabinet_id;
-    ['cab_body','cab_front','cab_back'].forEach(function(id){ var e=el(id); if(e) e.disabled = !on; });
+    // UI-C3: `cab_front_c` je DRUHY ovladac materialu ciel (zoznam ciel v
+    // kontexte Cela) — sektor Materialy patri Korpusu a v kontexte Cela je
+    // skryty. Ta ista hodnota, dva vstupne body; drzat ich v synchro MUSI
+    // KAZDA cesta, ktora sa dotkne `cab_front`.
+    ['cab_body','cab_front','cab_front_c','cab_back'].forEach(function(id){ var e=el(id); if(e) e.disabled = !on; });
     setVal('cab_body', c.material_id || '');
     setVal('cab_front', c.front_material_id || '');
+    setVal('cab_front_c', c.front_material_id || ''); // UI-C3: zrkadlo v zozname ciel
     setVal('cab_back', c.back_material_id || '');
     el('cabMatHint').textContent = on ? 'Materiály tejto skrinky — prázdne = dediť z projektu.'
                                       : 'Označ skrinku pre nastavenie jej materiálov.';
@@ -15,7 +20,11 @@
     nxComboSync();
   }
   function clearCabinetMaterials(){
-    ['cab_body','cab_front','cab_back'].forEach(function(id){ var e=el(id); if(e){ e.value=''; e.disabled=true; } });
+    // UI-C3: `cab_front_c` je DRUHY ovladac materialu ciel (zoznam ciel v
+    // kontexte Cela) — sektor Materialy patri Korpusu a v kontexte Cela je
+    // skryty. Ta ista hodnota, dva vstupne body; drzat ich v synchro MUSI
+    // KAZDA cesta, ktora sa dotkne `cab_front`.
+    ['cab_body','cab_front','cab_front_c','cab_back'].forEach(function(id){ var e=el(id); if(e){ e.value=''; e.disabled=true; } });
     el('cabMatHint').textContent = 'Označ skrinku pre nastavenie jej materiálov.';
     nxComboSync();
   }

@@ -77,6 +77,9 @@ module Noxun
           register_callbacks(@dialog) # pred show!
           @dialog.set_on_closed do
             detach_observer
+            # D-89a: zvyraznenie hrany zije len s otvorenou kartou — po zatvoreni
+            # panela sa overlay odpoji, aby v modeli neostala visiet ploska.
+            HoverEdge.release if defined?(HoverEdge)
             @dialog = nil
           end
           attach_observer
@@ -121,6 +124,9 @@ module Noxun
           # zdielanu logiku ako toolbar aj okno Vyroba (Engine.toggle_edge_check)
           # — ziadny duplikat a ziadny zapis do modelu (lekcia D-103).
           cb(dlg, 'nx_edge_toggle')        { |p| handle_edge_toggle(p) }
+          # D-89a: hover nad hranou v karte dielca rozsvieti tu istu hranu v
+          # MODELI. Overlay NAD modelom — ziadna operacia, ziadny krok Spat.
+          cb(dlg, 'nx_hover_edge')         { |p| handle_hover_edge(p) }
           # UI-B2 (N7): kamera v spodnom pase nahladu — zarovna POHLAD na
           # oznacenu skrinku. Kamera nie su data modelu, takze ziadna operacia,
           # ziadny zapis a ziadny krok Spat (lekcia D-103).

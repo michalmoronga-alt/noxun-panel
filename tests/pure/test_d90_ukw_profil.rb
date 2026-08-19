@@ -561,10 +561,15 @@ NxTest.test('D-90 UI: panel posiela register profilov a riadok cela ma volbu') d
   NxTest.assert(bridge.include?('FRONT_PROFILES = data.front_profiles'),
                 'NX.init register ulozi')
   form = File.read(File.join(root, 'noxun_engine', 'ui', 'js', 'form.js'), encoding: 'UTF-8')
-  NxTest.assert(form.include?('class="fprof"'), 'riadok cela ma tlacidlo profilu')
+  NxTest.assert(form.include?('class="fprof"'), 'riadok cela ma indikator profilu')
   NxTest.assert(form.include?("NXIcons.svg('profile')"), 'ikona zo spritu — ziadne emoji')
-  NxTest.assert(form.include?('frontProfileNext(row.dataset.frontProfile'),
-                'klik cykli hodnoty z registry')
+  # D-96 (UI-C3): ovladacom uz NIE JE cyklujuca ikona v riadku (pri viacerych
+  # profiloch a volbe hrany osadenia by bola nepouzitelna) — profil sa nastavuje
+  # v skupine „Úchytky" pre zvoleny ROZSAH ciel. Ikona ostala INDIKATOR.
+  NxTest.assert(form.include?('function onFrontProfilePick'),
+                'volba profilu zije v sekcii Uchytky (D-96)')
+  NxTest.assert(form.include?("it.row.dataset.frontProfile = id"),
+                'volba zapisuje do TYCH ISTYCH dat riadku (dataset) — ziadne nove pole')
   NxTest.assert(form.include?("row.dataset.frontProfile = 'none'"),
                 "prepnutie na „Bez cela\" zhodi profil (zrkadlo Ruby normalize)")
   icons = File.read(File.join(root, 'noxun_engine', 'ui', 'js', 'icons.js'), encoding: 'UTF-8')

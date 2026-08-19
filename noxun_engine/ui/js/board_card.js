@@ -182,6 +182,9 @@
     boardCard = bc;
     var box = el('boardCard');
     if (!box) return;
+    // D-89a: prekreslenie karty zahodi uzly pod kurzorom — zvyraznenie v modeli
+    // by ostalo visiet (`mouseout` na zmazanom uzle uz nepride).
+    if (typeof nxHoverEdgeClear === 'function') nxHoverEdgeClear();
     if (!bc){ box.style.display = 'none'; return; }
     box.style.display = '';
     if (el('bcHead')) el('bcHead').innerHTML = '<b>' + esc(bc.name || 'Doska') + '</b> · ' + esc(bc.role_label || bc.role || '');
@@ -239,6 +242,9 @@
       var lbl = (bc.edge_labels && bc.edge_labels[code]) || code;
       var absId = bc.edges ? bc.edges[code] : null;
       var row = document.createElement('div'); row.className = 'edgerow';
+      // D-89a: cely riadok je hover-cielom — hrana sa rozsvieti v modeli.
+      row.setAttribute('data-edge', code);
+      row.title = 'Kurzor nad hranou ju zvýrazní priamo v modeli.';
       row.innerHTML = '<span class="en"><i style="background:' + absColorOf(absId) + '"></i>' + esc(lbl) + '</span>';
       var sel = document.createElement('select');
       // D-36: skupiny podla resolved materialu dosky (2A-3b: cez material_id;

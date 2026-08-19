@@ -10,6 +10,43 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
+### D-84 — čelá rečou stolára (19.8.2026, PR UI-C3, v0.7.15)
+
+**Pôvodné znenie D-84 · Čelá: „+ riadok / − riadok" pomenovať podľa toho, čo pridávajú** (Michal 6.8., test dávky E na reálnej zákazke) — v karte Čelá má tlačidlo hovoriť rečou stolára: **„+ pridaj čelo"** (zásuvkové) a **„+ pridaj dvere"** (krídlové). Tlačidlo **„− riadok" odpadá úplne** — mazanie ostáva krížikom pri konkrétnom riadku (jednoznačné, ktorý riadok mizne) a zároveň sa uvoľní miesto v rade (pravidlo vertikálneho priestoru). *(Stav bol: malá UI dávka na karte čiel — patrí do bloku UI-B/UI-C.)*
+
+**Ako sa to vyriešilo.** Tlačidlá sa volajú presne tak, ako Michal navrhol, a **posielajú typ do nového riadku** — pridané čelo teda hneď je tým, čo si používateľ vypýtal, a nemusí sa prestavovať rozbaľovačkou. Odoberacie tlačidlo zaniklo aj s funkciou `removeLastFront` (žiadny mŕtvy kód); jedinou mazacou cestou ostal krížik pri riadku.
+
+**Prečo to bolo viac než premenovanie.** „+ riadok" nehovoril nič o tom, čo vznikne, a „− riadok" mazal *posledný* riadok — teda nie nutne ten, na ktorý sa človek práve pozeral. Dve nejednoznačnosti v jednom rade, obe zbytočné.
+
+### D-96 — úchytkový profil do vlastnej sekcie „Úchytky" (19.8.2026, PR UI-C3, v0.7.15)
+
+**Pôvodné znenie D-96 · Úchytkový profil preč z ikoniek pri čelách do vlastnej sekcie „Úchytky"** (Michal 9.8.) — voľba profilu (D-90) je dnes ikonové tlačidlo v riadku čela, ktoré klikom cykluje cez registry. Kým je profil jeden, stačí to; pri **viacerých profiloch a voľbe hrany osadenia** (dolná/bočné — odložené z D-90) sa cyklenie ikonou stane nepoužiteľným. Návrh: samostatná sekcia **Úchytky** v karte skrinky — výber profilu, hrany a rozsahu (ktoré čelá) na jednom mieste; ikona v riadku ostane len ako **indikátor** stavu, nie ovládač. *(Stav bol: OTVORENÉ — zvezie sa s rozšírením registry profilov a s UI 2.0.)*
+
+**Ako sa to vyriešilo.** Kontext Čelá má skupinu **Úchytky**: rozsah (**všetky čelá / len zásuvkové / len dvierka**) + profil. Voľba profilu sa nasadí na **všetky čelá rozsahu naraz** — jeden zápis, jeden krok Späť. Ikona v riadku čela stratila rám tlačidla aj kurzor akcie a je už len **indikátorom** stavu; tooltip povie, kde sa profil mení.
+
+**Rozhodnutia, ktoré k tomu patria.**
+- **Rôzne profily v rozsahu = neaktívna voľba „(rôzne)"** — select nikdy netvrdí zhodu, ktorá neplatí (rovnaký vzor ako „podľa parametra" v sekcii Kovanie). Prázdny rozsah select vypne a povie prečo.
+- **„Bez čela" do rozsahu nikdy nepatrí** — nemá na čom profil držať; rovnako to robí serverová normalizácia.
+- **Hrana osadenia sa NEPONÚKA**, kým ju registry profilov (`core/front_profiles.rb`) nepozná. Registry je na ňu pripravený, ale dnes drží len skrátenie hornej hrany — ponúkať voľbu, ktorá nemá kam sadnúť, by bola lož. Pribudne s ďalšími profilmi, ako pôvodne plánovala D-90.
+- **Žiadne nové dáta ani callback:** sekcia zapisuje do toho istého poľa riadku (`profile`), ktoré už round-tripovalo od D-90, a ide bežnou cestou `apply_all` — server ostáva autoritou.
+
+### D-89 (a) — hover hrany zvýrazní hranu v MODELI (19.8.2026, PR UI-C3, v0.7.15)
+
+**Pôvodné znenie D-89 · Olepenie — ktorá hrana je ktorá strana + „podľa pravidla" nepovie, čo vyšlo** (Michal 6.8., test dávky E na reálnej zákazke) — pri označenom dielci je mätúce, ktorá hrana **L1/L2/W1/W2** je ktorá strana reálneho dielca (človek si to musí domýšľať z orientácie), a údaj **„podľa pravidla"** nehovorí, ČO pravidlo reálne dalo — pri kontrole olepu sa tak nedá overiť nič. Návrh: (a) pri hoveri hrany v karte dielca / ABS editore **zvýrazniť zodpovedajúcu hranu priamo v MODELI** (obojsmerná orientácia), alebo aspoň slovné označenie; (b) **„podľa pravidla" rozpísať na resolved hodnotu**.
+
+**Časť (b)** bola vyriešená už ako **D-102 (PR #150, v0.5.57)** — voľba nesie výsledok („(podľa pravidla — 500 SM Biela 23/1 mm)"), náhľad má tooltipy a skratky.
+
+**Ako sa vyriešila časť (a).** Kurzor nad hranou — či už nad **riadkom v zozname hrán**, alebo nad jej **farebným pásom v 2D náhľade** — rozsvieti tú istú hranu **priamo v modeli**. Platí pre kartu dielca aj kartu dosky. Otázka „ktorá je ktorá" tým prestala existovať: odpoveď je vidieť v modeli, nie domýšľa sa z orientácie.
+
+**Ako je to postavené (a prečo tak).**
+- **Je to POHĽAD, nie dáta.** Kreslí `Sketchup::Overlay` NAD modelom — žiadna operácia, žiadny zápis, **žiadny krok Späť**, nič v `.skp` (lekcia D-103, presne vzor D-104/D-105). Zhasína pri odchode kurzora, prekreslení karty, zatvorení panela aj prepnutí dokumentu.
+- **Nič sa nehľadá.** Zvýrazňuje sa hrana **práve vybratého** dielca — karta je jeho zrkadlo, takže iný objekt nepripadá do úvahy. Žiadny scan modelu, jedna plôška, nulová cena.
+- **Geometria ide cez zdieľaný kontrakt `PartFaces`** — ten istý, ktorým kreslí kontrola olepu D-104. Keď sa osi dielca nedajú jednoznačne overiť, **nekreslí sa nič** („radšej žiadna farba než farba na zlej hrane").
+- **Farba je VÝBER (teal), nie stav olepu.** Miešať ju s červenou/oranžovou/zelenou z D-105 by znamenalo, že hover vyzerá ako nález. Plôška navyše leží o kúsok **nad** kontrolou hrán, takže je vidno aj pri zapnutom zvýraznení olepu.
+- **Posiela sa len ZMENA** kódu hrany — jeden pohyb myšou po riadku inak vystrelí desiatky udalostí a každá by bežala cez most do Ruby.
+
+**Týmto je D-89 uzavretá celá** (a + b).
+
 ### D-09 — snap body pri presúvaní priečok (19.8.2026, PR UI-C2, v0.7.14)
 
 **Pôvodné znenie D-09 · Snap body pri presúvaní priečok** (1/4, 1/2, 3/4…) v zónovom náhľade. *(Stav bol: nápad, D-08 hotové — môže sa rozpracovať.)*

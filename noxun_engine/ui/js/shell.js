@@ -422,7 +422,7 @@
   // rezimu aj serverovy push pokryva nxShellApply, otvorenie skupiny boot.js.
   var NX_META_FIELDS = ['width', 'height', 'depth', 'floor_height',
                         'ib_length', 'ib_width', 'ib_thickness',
-                        'cab_body', 'cab_front', 'cab_back', 'ib_material'];
+                        'cab_body', 'cab_front', 'cab_front_c', 'cab_back', 'ib_material'];
   if (typeof document !== 'undefined'){
     var nxMetaWatch = function(ev){
       var t = ev.target;

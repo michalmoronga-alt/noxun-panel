@@ -5,7 +5,7 @@
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
-const { frontProfileRec, frontProfileReduction, frontProfileNext } =
+const { frontProfileRec, frontProfileReduction, frontProfileOptionList } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'core.js'));
 
 let n = 0;
@@ -34,17 +34,17 @@ eq(frontProfileReduction('ukw7', []), 0, 'bez registry ziadne pasmo v nahlade');
 eq(frontProfileReduction('ukw7', [{ id: 'ukw7', name: 'x', short: 'x', reduction: 0 }]), 0,
    'nulove skratenie = ziadne pasmo (nekreslime pruh vysky 0)');
 
-// --- cyklus klikom -------------------------------------------------------------
-eq(frontProfileNext('none', REG), 'ukw7', 'prvy klik zapne profil');
-eq(frontProfileNext('ukw7', REG), 'none', 'dalsi klik ho vypne');
-eq(frontProfileNext(null, REG), 'ukw7', 'riadok bez hodnoty startuje z neutralu');
-eq(frontProfileNext('ukw11', REG), 'none', 'neznama hodnota sa klikom uprace na neutral');
-eq(frontProfileNext('none', []), 'none', 'bez registry sa niet kam prepnut');
-// rozsiritelnost: dalsi profil v registry sa do cyklu zaradi bez zmeny kodu
+// --- ponuka profilov (D-96 / UI-C3) --------------------------------------------
+// Cyklenie klikom na ikonu v riadku ZANIKLO — pri viacerych profiloch (a pri
+// buducej volbe hrany osadenia) by bolo nepouzitelne. Profil sa vybera v
+// skupine „Úchytky" pre zvoleny rozsah ciel; ikona v riadku ostala INDIKATOR.
+// Poradie ponuky drzi registry z Ruby, neutral stoji PRVY.
+eq(frontProfileOptionList(REG).map(o => o.id), ['none', 'ukw7'], 'neutral prvy, potom registry');
+eq(frontProfileOptionList(REG)[0].name, 'Bez profilu', 'neutral ma vlastny nazov (nie je v registry)');
+eq(frontProfileOptionList([]).map(o => o.id), ['none'], 'bez registry ostane len neutral');
+// rozsiritelnost: dalsi profil v registry sa do ponuky zaradi bez zmeny kodu
 const REG2 = REG.concat([{ id: 'ukw9', name: 'Profil UKW-9', short: 'UKW-9', reduction: 30.0 }]);
-eq(frontProfileNext('none', REG2), 'ukw7', 'poradie drzi registry');
-eq(frontProfileNext('ukw7', REG2), 'ukw9', 'druhy profil je dalsi v poradi');
-eq(frontProfileNext('ukw9', REG2), 'none', 'cyklus sa uzatvara na neutral');
+eq(frontProfileOptionList(REG2).map(o => o.id), ['none', 'ukw7', 'ukw9'], 'poradie drzi registry');
 eq(frontProfileReduction('ukw9', REG2), 30, 'kazdy profil ma vlastne skratenie');
 
 // --- geometria pasma v nahlade (zrkadlo vypoctu v preview.js) -------------------

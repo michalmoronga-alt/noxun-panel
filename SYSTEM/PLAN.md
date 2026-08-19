@@ -17,8 +17,9 @@
 
 **~~UI-C2 · Zóny~~ — DÁVKA HOTOVÁ** (tento PR, **v0.7.14**): štruktúra navrchu so stromovými spojnicami a najviac 3 úrovňami (N22), delenie na štyri dlaždice, presné delenie prvej zóny v mm aj zlomkom (N21), magnet 1/4·1/2·3/4 pri ťahaní priečky s vypnutím cez Alt (N20, **D-09 tým uzavreté**), police ako pilulky 0–6, rezervovaný slot „Vnútro". Vedomé odchýlky od mockupu (dlaždice a pilulky len na nerozdelenej zóne, pravidlo zámku poľa „Prvá zóna", strop políc) sú zapísané v [zdroje/ui20/UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md); plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 
-- **UI-C3 · Čelá (D-84, D-89a, D-96)** — riadky s ikonou typu, AUTO chip, rady výšok, naviazané kovanie pod riadkom, **reč stolára „+ pridaj čelo / + pridaj dvere" (D-84)**, **sekcia Úchytky (D-96)**, **hover hrany zvýrazní hranu v MODELI (D-89 otvorená časť)**.
-- **UI-C4 · Kovanie** — položky v boxoch podľa vlastníka (skrinka / každé čelo) + značky v náhľade.
+**~~UI-C3 · Čelá~~ — DÁVKA HOTOVÁ** (tento PR, **v0.7.15**): riadky s ikonou typu (N27), úzke pole výšky s „mm" pri hodnote a chipom **AUTO** namiesto zámku (zamknuté ⇔ vypísané), **výškové rady N25** napojené na rad `vyska_cela`, naviazané kovanie ako jeden drobný riadok s preklikom do Kovania, **D-84** („+ pridaj dvere / + pridaj čelo", odoberacie tlačidlo zaniklo), materiál čiel priamo v zozname, **D-96 sekcia Úchytky** (profil pre rozsah čiel, ikona v riadku už len indikátor), **N26** medzery jantárovo pri editácii a **D-89a** hover hrany zvýrazní hranu priamo v MODELI (tým je D-89 celá uzavretá). Vedomá odchýlka: **výklop je v ponuke typov, ale neaktívny** — rola `flap` potrebuje vlastnú dávku cez builder/ABS/kusovník (zapísané v [zdroje/ui20/UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) a v [DOGFOODING.md](DOGFOODING.md)); plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md).
+
+- **UI-C4 · Kovanie** — položky v boxoch podľa vlastníka (skrinka / každé čelo) + značky v náhľade. *(Riadok čela naň už ukazuje — preklik spravila UI-C3.)*
 
 **UI-D · Dotiahnutie**
 - **UI-D1 · Dielec** — Základné hore, hranové ikony, „Označiť v modeli", „Použiť na podobné".

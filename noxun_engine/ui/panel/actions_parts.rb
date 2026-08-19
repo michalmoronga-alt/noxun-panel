@@ -270,6 +270,31 @@ module Noxun
           reselect(model, part || cab)
         end
 
+        # ---- D-89 (a): HRANA POD KURZOROM -----------------------------------
+        # Hover nad hranou v karte dielca (zoznam hran aj 2D nahlad) rozsvieti
+        # tu istu hranu priamo v MODELI. Je to POHLAD: ziadna operacia, ziadny
+        # zapis, ziadny krok Spat (lekcia D-103) — kresli sa Overlay-om NAD
+        # modelom a po odchode kurzora v modeli nic neostane.
+        #
+        # `code` prazdny/neznamy = zhasnutie (mouseleave, prekreslenie karty).
+        # Status sa NEPISE: hover je pohyb mysou, nie akcia — hlaska pri kazdom
+        # prejdeni riadku by prebila to, co panel prave hovori.
+        #
+        # IDENTITY GUARD DOKUMENTU: callback HtmlDialogu je asynchronny; bez
+        # guardu by hover z panela patriaceho inemu dokumentu kreslil v prave
+        # aktivnom modeli (rovnaky tvar ako `nx_edge_toggle` a `nx_camera_focus`).
+        def handle_hover_edge(payload = nil)
+          return unless defined?(HoverEdge)
+
+          model = Sketchup.active_model
+          return if model.nil?
+
+          data = payload ? parse(payload) : {}
+          return HoverEdge.hide(model) if data['model_guid'].to_s != model_guid(model)
+
+          HoverEdge.show(model, data['code'].to_s)
+        end
+
         # Zapis/vycisti zaznam part_override pod klucom rk (prazdny zaznam sa odstrani).
         def store_override(ov, rk, rec)
           if rec.nil? || rec.empty? then ov.delete(rk) else ov[rk] = rec end

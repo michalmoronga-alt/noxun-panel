@@ -161,6 +161,7 @@ unless NxTest::IN_SKETCHUP
     core/sheet_estimate
     core/validation
     core/edge_check
+    core/hover_edge
     core/supplier_settings
     core/budget_store
     core/budget

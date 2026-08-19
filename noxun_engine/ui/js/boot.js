@@ -78,4 +78,4 @@
   // stav raily aj nazov sektora S4 este pred prvym setUiMode.
   // UI-C1b: setupTemplateTiles = JEDNA delegacia nad mriezkou dlazdic sablon
   // (klik = vybrat, dvojklik = vlozit) — dlazdice sa prekresluju, listener nie.
-  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupFieldEditorDelegation(); setupTemplateTiles(); nxComboSync(); document.body.setAttribute('data-insert-kind', getInsertKind()); nxShellApply(); if (window.sketchup && sketchup.ready) sketchup.ready(); };
+  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupHoverEdge(); setupFieldEditorDelegation(); setupTemplateTiles(); nxComboSync(); document.body.setAttribute('data-insert-kind', getInsertKind()); nxShellApply(); if (window.sketchup && sketchup.ready) sketchup.ready(); };

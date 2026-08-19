@@ -32,13 +32,16 @@
                     'rail:zrusit', 'rail:abs', 'rail:nastavenia', 'rail:studio',
                     'pv:kamera', 'pv:fit',
                     'pv:vrstva:zony', 'pv:vrstva:cela', 'pv:vrstva:kovanie', 'pv:vrstva:olep',
-                    'rad:sirka', 'rad:vyska', 'rad:hlbka', 'rad:sokel',
+                    'rad:sirka', 'rad:vyska', 'rad:hlbka', 'rad:sokel', 'rad:vyska_cela',
                     'info:dielce', 'info:material',
                     'ctx:korpus',
                     // UI-C2: dlazdice delenia zony. Kluc je STATICKY (os + pocet
                     // poli), nikdy z dat — merac tak povie, ktore delenie sa
                     // naozaj pouziva a ci ma zmysel drzat vsetky styri.
-                    'zone:split-v2', 'zone:split-v3', 'zone:split-h2', 'zone:split-h3'];
+                    'zone:split-v2', 'zone:split-v3', 'zone:split-h2', 'zone:split-h3',
+                    // UI-C3 / D-84: rec stolara — merac povie, ci sa cela
+                    // pridavaju castejsie ako dvierka alebo ako zasuvkove.
+                    'fronts:add-door', 'fronts:add-drawer'];
 
   // --- klasifikacia (cista logika, testovatelna v Node cez module.exports) ---
 

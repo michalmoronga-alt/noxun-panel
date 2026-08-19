@@ -52,6 +52,9 @@ module Noxun
 
           detach_observer
           attach_observer
+          # D-89a: zvyraznena hrana patrila STAREMU dokumentu — pri prepnuti sa
+          # overlay odpoji (rovnaka zasada ako EdgeCheck.on_model_changed).
+          HoverEdge.release if defined?(HoverEdge)
           push_selected(model || Sketchup.active_model)
         rescue StandardError => e
           Engine.log_error(e, 'Panel.on_model_switched')
