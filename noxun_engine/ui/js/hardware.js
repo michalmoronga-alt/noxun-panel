@@ -488,15 +488,22 @@
   // UI-B3). Panel po nej ZAMERNE ostava v Kovani (server nerobi push_selected),
   // aby box, z ktoreho pouzivatel klikol, nezmizol pod rukami.
   //
-  // A prave preto TU NIE JE flush handshake, aky ma „Dielcov" (UI-B3) a
-  // „Vložiť kópiu": ten existuje kvoli tomu, ze zmena vyberu si vypyta push
-  // CELEJ skrinky, ktory prepise formular a rozpisany edit (400 ms debounce) by
-  // sa ticho stratil. Tato cesta ziadny push nevyvola, takze nie je co chranit
-  // — a flush by naopak odoslal rozpisanu hodnotu skor, nez ju pouzivatel
-  // dopisal.
+  // FLUSH HANDSHAKE (Codex #179 P2, kolo 4) — rovnaky ako ma „Dielcov"
+  // (`onInfoParts`) a „Vložiť kópiu", ale z INEHO dovodu: nie kvoli prepisaniu
+  // formulara (tato cesta ziadny push nevyvola), ale kvoli VYBERU. Rozpisany
+  // edit caka 400 ms; keby timer dobehol AZ PO nasom vybere, `handle_apply_all`
+  // by skrinku prestaval a `finish_cab` by reselectol CELY korpus — vlastnik,
+  // ktoreho si pouzivatel prave klikol, by sa ticho stratil. Preto sa edit
+  // odosle EST PRED vyberom (callbacky sa spracuju v poradi odoslania) a
+  // NEPLATNE pole akciu ZASTAVI (flush by ju aj tak neaplikoval).
   function onHwOwnerPick(btn){
     var box = btn.closest ? btn.closest('.hwbox') : null;
     if (!box) return;
+    if (typeof validateFields === 'function' && !validateFields()){
+      NX.setStatus('Skontroluj červené polia — rozpísaná úprava by sa pri označení vlastníka stratila.', true);
+      return;
+    }
+    if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
     var raw = box.getAttribute('data-keys') || '';
     var keys = raw ? raw.split(',').filter(function(k){ return k !== ''; }) : [];
     hwFlash(box);

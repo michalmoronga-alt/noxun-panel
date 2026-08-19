@@ -58,6 +58,18 @@ NxTest.test('UI-C4: hlavicka boxu je TLACIDLO a nesie part_key vlastnikov') do
   NxTest.assert(UIC4_HW_JS.include?('onclick="onHwOwnerPick(this)"'), 'klik ma vlastnu cestu')
 end
 
+NxTest.test('UI-C4: klik na hlavicku ma FLUSH handshake (Codex #179 P2)') do
+  # Rozpisany edit caka 400 ms. Keby timer dobehol AZ PO vybere, `handle_apply_all`
+  # by skrinku prestaval a `finish_cab` by reselectol CELY korpus — vlastnik,
+  # ktoreho pouzivatel prave klikol, by sa ticho stratil. Vzor `onInfoParts`.
+  body = UIC4_HW_JS[/function onHwOwnerPick.*?\n  \}/m].to_s
+  NxTest.assert(!body.empty?, 'handler sa nasiel')
+  NxTest.assert(body.include?('flushCabinetEditsNow()'), 'rozpisany edit ide na server PRED vyberom')
+  NxTest.assert(body.include?('!validateFields()'), 'neplatne pole akciu ZASTAVI (flush by ju neaplikoval)')
+  NxTest.assert(body.index('!validateFields()') < body.index('nx_select_hw_owner'),
+                'kontrola aj flush bezia PRED odoslanim vyberu')
+end
+
 NxTest.test('UI-C4: hlavicka je SURODENEC tela boxu — ovladace sa k nej nedostanu') do
   # Silnejsie nez stopPropagation: klik na select setu, zamok NL ci pole poctu
   # bubla k `.hwboxb`, a ten hlavicku NEOBSAHUJE. Ziadny buduci ovladac v boxe
