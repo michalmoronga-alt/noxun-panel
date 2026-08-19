@@ -351,6 +351,13 @@
   var simScope = 'cabinet';
   var simCount = null; // null = este sa pocita
   var simBound = false;
+  // Codex #180 P2 (kolo 2): TOKEN DOPYTU. Kontrola samotneho rozsahu nestaci —
+  // po zatvoreni a otvoreni modalu nad INYM dielcom (alebo po prepnuti
+  // cabinet → project → cabinet) by oneskorena odpoved na STARY dopyt mala
+  // rovnaky rozsah a prepisala by pocet aj stav tlacidla noveho ciela. Kazdy
+  // dopyt preto nesie rastuce cislo a klient prijme LEN odpoved na ten posledny;
+  // zatvorenie modalu token tiez posunie, takze odpoved „do prazdna" prepadne.
+  var simReq = 0;
 
   function simModalOpen(){ var m = el('simModal'); return !!(m && m.style.display !== 'none'); }
   function simModalStale(pc){
@@ -379,6 +386,7 @@
   function closeSimilarModal(){
     simFor = null;
     simCount = null;
+    simReq++; // odpovede na uz nepotrebne dopyty prepadnu
     var m = el('simModal'); if (m) m.style.display = 'none';
   }
   function pickSimilarScope(scope){
@@ -427,18 +435,20 @@
   }
   function requestSimilarCount(){
     if (!simFor) return;
+    simReq++;
     if (window.sketchup && sketchup.nx_similar_parts_count){
       sketchup.nx_similar_parts_count(JSON.stringify({
         model_guid: simFor.guid, cabinet_id: simFor.cabinet_id,
-        role_key: simFor.role_key, scope: simScope }));
+        role_key: simFor.role_key, scope: simScope, req: simReq }));
     }
   }
-  // Odpoved servera. Zahadzuje sa vsetko, co nepatri PRAVE zobrazenemu rozsahu
-  // (pouzivatel mohol medzitym prepnut) — inak by pocet zaostal o jedno kolo.
+  // Odpoved servera. Prijme sa LEN odpoved na POSLEDNY odoslany dopyt (token),
+  // takze oneskorena odpoved na zavretý modal, na iny dielec ani na uz prepnuty
+  // rozsah nema ako prepisat to, co pouzivatel prave vidi.
   function setSimilarCount(data){
     if (!simModalOpen()) return;
     var d = data || {};
-    if (String(d.scope || '') !== simScope) return;
+    if (parseInt(d.req, 10) !== simReq) return;
     if (d.error){
       simCount = 0;
       applySimCountView();

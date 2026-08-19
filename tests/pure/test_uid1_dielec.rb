@@ -219,6 +219,37 @@ NxTest.test('UI-D1 (Codex #180 P2): prekreslenie karty si vypyta CERSTVY pocet')
                 'ta ista identita si vypyta cerstvy pocet a dovtedy nesluby nic')
 end
 
+NxTest.test('UI-D1 (Codex #180 P2, kolo 2): odpoved sa paruje TOKENOM dopytu') do
+  # Kontrola samotneho rozsahu nestacila: po zatvoreni a otvoreni modalu nad INYM
+  # dielcom (alebo po prepnuti cabinet -> project -> cabinet) ma oneskorena
+  # odpoved na STARY dopyt rovnaky rozsah — a prepisala by pocet aj stav
+  # tlacidla noveho ciela. Kazdy dopyt preto nesie rastuce cislo.
+  NxTest.assert(UID1_PART_JS.include?('scope: simScope, req: simReq'), 'dopyt nesie token')
+  NxTest.assert(UID1_PART_JS.include?('if (parseInt(d.req, 10) !== simReq) return;'),
+                'prijme sa LEN odpoved na posledny dopyt')
+  NxTest.assert(UID1_PART_JS.include?('simReq++; // odpovede na uz nepotrebne dopyty prepadnu'),
+                'zatvorenie modalu token posunie (odpoved „do prazdna" prepadne)')
+  NxTest.assert(UID1_PARTS_RB.include?("'req' => req"), 'server token vracia nezmeneny')
+end
+
+NxTest.test('UI-D1 (Codex #180 P2, kolo 2): chybova odpoved nesie SPRAVNY rozsah') do
+  # Keby rescue vetva vzdy hlasila `cabinet`, chyba pri rozsahu „celý projekt" by
+  # klientovi prisla ako cudzia, zahodil by ju a modal by navzdy visel na
+  # „počítam" s neaktivnym tlacidlom. Rozsah aj token sa preto citaju PRED
+  # akoukolvek rizikovou pracou (aj `parse` ma vlastny rescue).
+  body = UID1_PARTS_RB[/def handle_similar_parts_count\b.*?\n        end\n/m].to_s
+  NxTest.assert(!body.empty?, 'handler sa nasiel')
+  NxTest.assert(!body.include?('normalize_similar_scope(nil)'),
+                'rescue uz nehlasi natvrdo zakladny rozsah')
+  NxTest.assert(body.include?("push_similar_count(scope, nil, 'Počet sa nepodarilo zistiť.', req)"),
+                'rescue vracia POZADOVANY rozsah aj token')
+  NxTest.assert(body.index("scope = normalize_similar_scope(data['scope'])") <
+                body.index('rescue StandardError => e'),
+                'rozsah aj token sa citaju PRED chytenou chybou (su teda vzdy k dispozicii)')
+  NxTest.assert(body.include?("rescue StandardError\n            {}"),
+                'aj samotny `parse` ma vlastny rescue — poskodeny payload nesmie zhodit odpoved')
+end
+
 NxTest.test('UI-D1: rad akcii je JEDEN riadok dole (vertikalny priestor)') do
   row = UID1_CARD[/<div class="btnrow pcactions">.*?<\/div>/m].to_s
   NxTest.assert(!row.empty?, 'rad akcii sa nasiel')

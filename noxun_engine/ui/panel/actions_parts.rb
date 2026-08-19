@@ -435,26 +435,42 @@ module Noxun
         # ZIVY POCET pre otvoreny modal. Ciste citanie modelu — ziadna operacia,
         # ziadny zapis, ziadny krok Spat. Odpoved chodi do JS ako `NX.setSimilarCount`;
         # chyba nesie hlasku, aby modal nikdy neukazoval cislo, ktore neplati.
+        # Codex #180 P2 (kolo 2): ROZSAH aj TOKEN DOPYTU sa citaju PRED akoukolvek
+        # rizikovou pracou a odpoved ich vracia VZDY — aj z rescue vetvy. Inak by
+        # chyba pri rozsahu „celý projekt" prisla oznacena ako `cabinet`, klient by
+        # ju ako cudziu zahodil a modal by ostal navzdy visiet na „počítam".
         def handle_similar_parts_count(payload = nil)
           model = Sketchup.active_model
           return if model.nil?
 
-          data = payload ? parse(payload) : {}
+          data = begin
+            payload ? parse(payload) : {}
+          rescue StandardError
+            {}
+          end
           scope = normalize_similar_scope(data['scope'])
-          return push_similar_count(scope, nil, 'Panel patrí inému dokumentu.') if
-            data['model_guid'].to_s != model_guid(model)
+          req = data['req']
 
-          cab, part, scope2, err = similar_context(model, data)
-          return push_similar_count(scope, nil, err) if err
+          begin
+            return push_similar_count(scope, nil, 'Panel patrí inému dokumentu.', req) if
+              data['model_guid'].to_s != model_guid(model)
 
-          push_similar_count(scope2, similar_parts_count(similar_parts_map(model, cab, part, scope2)), nil)
-        rescue StandardError => e
-          Engine.log_error(e, 'Panel.handle_similar_parts_count')
-          push_similar_count(normalize_similar_scope(nil), nil, 'Počet sa nepodarilo zistiť.')
+            cab, part, _scope, err = similar_context(model, data)
+            return push_similar_count(scope, nil, err, req) if err
+
+            push_similar_count(scope, similar_parts_count(similar_parts_map(model, cab, part, scope)), nil, req)
+          rescue StandardError => e
+            Engine.log_error(e, 'Panel.handle_similar_parts_count')
+            push_similar_count(scope, nil, 'Počet sa nepodarilo zistiť.', req)
+          end
         end
 
-        def push_similar_count(scope, count, error)
-          js("NX.setSimilarCount(#{{ 'scope' => scope, 'count' => count, 'error' => error }.to_json})")
+        # `req` je TOKEN DOPYTU z klienta — vracia sa nezmeneny, aby si JS vedel
+        # spárovať odpoved s tym dopytom, ktory ju naozaj caka (oneskorena odpoved
+        # na uz zavretý alebo prepnutý modal sa zahodi).
+        def push_similar_count(scope, count, error, req = nil)
+          js("NX.setSimilarCount(#{{ 'scope' => scope, 'count' => count,
+                                     'error' => error, 'req' => req }.to_json})")
         end
 
         # ZAPIS. Vsetky dotknute korpusy sa prestavaju v JEDNEJ operacii

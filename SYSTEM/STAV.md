@@ -9,7 +9,7 @@
 
 **Beží blok UI 2.0.** Koncept Inspectora je uzavretý (Michal 18.8.) — záväzný kontrakt a mockupy sú v repe: [zdroje/ui20/](zdroje/ui20/) ([UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) + mockupy Inspector C, štúdio, dizajnový lístok); práca je narezaná do dávok UI-A → UI-B → UI-C → UI-D a fázy ŠTÚDIO ([PLAN.md](PLAN.md)).
 
-Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-D1 · Dielec** — karta dielca má Základné hore, hranové ikony, „Označiť v modeli" a „Použiť na podobné…" (prenos olepu na dielce s rovnakou rolou a materiálom). Testy: **1399 headless · 43 JS sád**; posledný **plný in-SketchUp beh 19.8. — 454 PASS, 0 FAIL** (vrátane novej sekcie `run_uid1`).
+Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **UI-D1 · Dielec** — karta dielca má Základné hore, hranové ikony, „Označiť v modeli" a „Použiť na podobné…" (prenos olepu na dielce s rovnakou rolou a materiálom). Testy: **1401 headless · 43 JS sád**; posledný **plný in-SketchUp beh 19.8. — 454 PASS, 0 FAIL** (vrátane novej sekcie `run_uid1`).
 
 ## Robí sa
 
