@@ -132,15 +132,26 @@ NxTest.test('UI-C4: znacka v nahlade nesie vlastnika a klik ho oznaci') do
                 'bez boxu ostava povodne spravanie (popis polozky) — nikdy sa nemlci')
 end
 
-NxTest.test('UI-C4: hover box <-> znacka bezi CSS triedou, ziadny rerender nahladu') do
-  NxTest.assert(UIC4_HW_JS.include?('function hwMarkHover'), 'prisvietenie znaciek ma vlastnu cestu')
+NxTest.test('UI-C4: hover box <-> znacka je OBOJSMERNY a bezi CSS triedou') do
+  # Codex #179 P2: prvé znenie prisvietilo len smer box -> znacka. Zvyraznenie
+  # nasadzuje JEDNA funkcia na OBE strany naraz, takze sa smery nemozu rozist.
+  NxTest.assert(UIC4_HW_JS.include?('function hwPaintHover'), 'obe strany nasadzuje jedna funkcia')
+  paint = UIC4_HW_JS[/function hwPaintHover.*?\n  \}/m].to_s
+  NxTest.assert(paint.include?('g.hwmk'), 'nasadzuje sa na znacky v nahlade')
+  NxTest.assert(paint.include?('hwBoxByGroup(groupKey)'), 'aj na box vlastnika')
+  NxTest.assert(UIC4_HW_JS.include?('function hwHoverByOwner'),
+                'nahlad o konvencii boxov nevie — pyta sa jedneho miesta pravdy')
+  NxTest.assert(UIC4_PREVIEW_JS.include?('hwHoverByOwner(m.getAttribute(\'data-owner\')'),
+                'hover nad ZNACKOU prisvieti box jej vlastnika (druhy smer)')
+  NxTest.assert(UIC4_PREVIEW_JS.include?('hwClearHover()'),
+                'prekreslenie nahladu zvyraznenie zhasne (uzly zaniknu)')
   NxTest.assert(UIC4_HW_JS.include?("box.dataset.hwHoverBound = '1'"),
                 'delegacia sa viaze RAZ na staticky kontajner (boxy sa prestavuju)')
   NxTest.assert(UIC4_BOOT_JS.include?('bindHwOwnerHover()'), 'delegacia sa naozaj pripaja pri starte')
   NxTest.assert(UIC4_CSS.include?('#preview g.hwmk.hov circle'),
                 'zvyraznenie prebija prezentacne atributy znacky (vzor D-23)')
-  NxTest.refute(UIC4_HW_JS[/function hwMarkHover.*?\n  \}/m].to_s.include?('renderPreview'),
-                'hover NIKDY nekresli nahlad nanovo (lekcia D-23)')
+  NxTest.assert(UIC4_CSS.include?('.hwbox.hov > .hwboxh'), 'a box ma svoj hover stav')
+  NxTest.refute(paint.include?('renderPreview'), 'hover NIKDY nekresli nahlad nanovo (lekcia D-23)')
 end
 
 # --- 5) preklik z kontextu Cela (UI-C3) -------------------------------------

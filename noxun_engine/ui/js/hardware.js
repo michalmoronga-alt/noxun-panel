@@ -450,6 +450,10 @@
   function renderHardware(items, overrides, setOptions, cabId){
     var box = el('hwRows'); if (!box) return;
     var setBox = el('hwSetRows');
+    // Prestavbou zaniknu uzly, na ktorych visi zvyraznenie hoveru (vzor
+    // clearFrontHover v renderPreview) — inak by v SVG ostala svietit znacka
+    // boxu, ktory uz neexistuje.
+    hwClearHover();
     HW_SET_OPTIONS = setOptions || [];
     if (items === null){
       box.innerHTML = '<div class="muted">Označ skrinku v modeli — kovanie sa počíta na vloženej skrinke.</div>';
@@ -530,28 +534,48 @@
     var head = box.querySelector('.hwboxh');
     if (head) onHwOwnerPick(head); else hwFlash(box);
   }
-  // Obojsmerne prepojenie box <-> znacka: hover nad hlavickou boxu prisvieti
-  // znacky toho vlastnika v projekcii. Je to CSS trieda nad uz vykreslenym SVG
-  // (renderPreview sa pocas hoveru NEVOLA — lekcia D-23), takze nulova cena.
-  function hwMarkHover(groupKey, on){
-    var svg = el('preview'); if (!svg) return;
-    var gs = svg.querySelectorAll('g.hwmk');
-    for (var i = 0; i < gs.length; i++){
-      var key = hwGroupKeyOf(gs[i].getAttribute('data-owner') || '');
-      if (key !== groupKey) continue;
-      if (on) gs[i].classList.add('hov'); else gs[i].classList.remove('hov');
-    }
+  // OBOJSMERNE prepojenie box <-> znacka. Zvyraznenie je CSS trieda `hov` nad
+  // UZ VYKRESLENYM SVG a nad boxom (renderPreview sa pocas hoveru NEVOLA —
+  // lekcia D-23), takze nulova cena; obe strany zapina JEDNA funkcia, aby sa
+  // smery nemohli rozist (vzor setFrontHover/clearFrontHover z D-23).
+  var hwHoverKey = null;
+  function hwSetHover(groupKey){
+    if (!groupKey || groupKey === hwHoverKey) return; // presun v ramci ciela = ziadne blikanie
+    hwClearHover();
+    hwHoverKey = groupKey;
+    hwPaintHover(groupKey, true);
   }
+  function hwClearHover(){
+    if (hwHoverKey == null) return;
+    hwPaintHover(hwHoverKey, false);
+    hwHoverKey = null;
+  }
+  function hwPaintHover(groupKey, on){
+    var svg = el('preview');
+    if (svg){
+      var gs = svg.querySelectorAll('g.hwmk');
+      for (var i = 0; i < gs.length; i++){
+        if (hwGroupKeyOf(gs[i].getAttribute('data-owner') || '') !== groupKey) continue;
+        if (on) gs[i].classList.add('hov'); else gs[i].classList.remove('hov');
+      }
+    }
+    var b = hwBoxByGroup(groupKey);
+    if (!b) return;
+    if (on) b.classList.add('hov'); else b.classList.remove('hov');
+  }
+  // Druha strana synku pre nahlad: prevod znacky na kluc skupiny. Nahlad o
+  // konvencii boxov nevie — pyta sa TEJTO funkcie (jedno miesto pravdy).
+  function hwHoverByOwner(owner){ hwSetHover(hwGroupKeyOf(owner)); }
   function bindHwOwnerHover(){
     var box = el('hwRows'); if (!box || box.dataset.hwHoverBound === '1') return;
     // Delegacia na STATICKOM kontajneri — boxy sa prestavuju pri kazdom pushi.
     box.addEventListener('mouseover', function(ev){
-      var b = hwBoxFrom(ev.target); if (b) hwMarkHover(b.getAttribute('data-group'), true);
+      var b = hwBoxFrom(ev.target); if (b) hwSetHover(b.getAttribute('data-group'));
     });
     box.addEventListener('mouseout', function(ev){
       var b = hwBoxFrom(ev.target); if (!b) return;
       if (ev.relatedTarget && hwBoxFrom(ev.relatedTarget) === b) return;
-      hwMarkHover(b.getAttribute('data-group'), false);
+      hwClearHover();
     });
     box.dataset.hwHoverBound = '1';
   }

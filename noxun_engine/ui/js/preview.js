@@ -424,6 +424,9 @@
   function renderPreview(){
     var svg = el('preview'); if (!svg) return;
     clearFrontHover(); // D-23: rerender/tab/vyber rusi hover uzly — stav ide s nimi
+    // UI-C4: to iste pre kovanie — prekreslenim zaniknu znacky, na ktorych
+    // zvyraznenie visi, a box by ostal prisvieteny bez svojho protajska.
+    if (typeof hwClearHover === 'function') hwClearHover();
     // UI-C1b (N10): vkladana DOSKA ma vlastnu projekciu — obdlznik so sipkami
     // smeru dekoru. Kresli sa z poli vkladacej karty, nie z korpusovych.
     if (pvInsertBoard()){ renderInsertBoardPreview(svg); renderPvBar(); return; }
@@ -1035,8 +1038,15 @@
     svg.addEventListener('mouseover', function(ev){
       var g = closestClass(ev.target, 'fgrp');
       if (g) setFrontHover(g.getAttribute('data-front-id'));
+      // UI-C4 (Codex #179 P2): DRUHY smer prepojenia box <-> znacka — hover nad
+      // znackou prisvieti aj box jej vlastnika. Nahlad o konvencii boxov nevie,
+      // preto sa pyta `hwHoverByOwner` (jedno miesto pravdy).
+      var m = closestClass(ev.target, 'hwmk');
+      if (m) hwHoverByOwner(m.getAttribute('data-owner') || '');
     });
     svg.addEventListener('mouseout', function(ev){
+      var m = closestClass(ev.target, 'hwmk');
+      if (m && !(ev.relatedTarget && closestClass(ev.relatedTarget, 'hwmk') === m)) hwClearHover();
       var g = closestClass(ev.target, 'fgrp');
       if (!g) return;
       if (ev.relatedTarget && closestClass(ev.relatedTarget, 'fgrp') === g) return;

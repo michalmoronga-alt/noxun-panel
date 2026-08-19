@@ -353,8 +353,13 @@
               flex: 0 0 auto; }
   .hwboxb { padding: 2px 8px 6px; }
   .hwboxb .hwitem:first-child, .hwboxb .hwrow:first-child { margin-top: 2px; }
-  /* Obojsmerne prepojenie box <-> znacka v projekcii (hover nad hlavickou). */
+  /* Obojsmerne prepojenie box <-> znacka v projekcii. `.hov` nasadzuje JS na
+     OBE strany naraz (hover nad boxom aj hover nad značkou v náhľade) — vzor
+     D-23 sync riadok <-> čelo. */
   .hwbox:hover { border-color: var(--nx-select-bg-hover); }
+  .hwbox.hov { border-color: var(--nx-select); }
+  .hwbox.hov > .hwboxh { background: var(--nx-select-bg-hover); color: var(--nx-select-strong); }
+  .hwbox.hov > .hwboxh .ic { color: var(--nx-select-strong); }
   /* PRAVIDLA KOVANIA (dialog) */
   .rrule { border: 1px solid var(--nx-border); border-radius: 6px; padding: 8px 10px; margin: 8px 0; background: var(--nx-surface); }
   .rrule .rhead { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
