@@ -295,6 +295,259 @@ module Noxun
           HoverEdge.show(model, data['code'].to_s)
         end
 
+        # ---- UI-D1: „OZNACIT V MODELI" --------------------------------------
+        # Klik v karte dielca oznaci TENTO dielec v modeli. CISTE CITANIE +
+        # zmena VYBERU: ziadny `start_operation`, ziadny zapis do dictionary,
+        # ziadny krok Spat (lekcia D-103) — presne ako `handle_select_parts`
+        # a `handle_select_hw_owner`.
+        #
+        # IDENTITY GUARD: callback HtmlDialogu je asynchronny, preto sa PRISNE
+        # overuje dokument (ID skriniek sa naprie dokumentmi opakuju) aj to, ze
+        # ide stale o TU ISTU skrinku. Dielec sa hlada podla `part_key`, nie
+        # podla entity — skrinka sa medzi klikom a callbackom mohla prestavat.
+        def handle_select_part(payload = nil)
+          model = Sketchup.active_model
+          return if model.nil?
+
+          data = payload ? parse(payload) : {}
+          return set_status('Dielec sa neoznačil — panel patrí inému dokumentu.', true) if
+            data['model_guid'].to_s != model_guid(model)
+
+          cab = find_cabinet(model)
+          return refresh_after_stale(model) if cab.nil? ||
+                                               Store.get(cab, 'cabinet_id').to_s != data['cabinet_id'].to_s
+
+          params = existing_params(cab)
+          rk = canonical_part_key(params, data['role_key'].to_s)
+          part = rk.empty? ? nil : find_part_by_role_key(cab, rk)
+          if part.nil?
+            return set_status('Dielec sa v modeli nenašiel — skrinka sa možno medzitým prestavala.', true)
+          end
+
+          suspend_selection_sync do
+            sel = model.selection
+            sel.clear
+            sel.add(part)
+          end
+          push_selected(model, dedup: false)
+          name = present_str(Store.get(part, 'name')) || rk
+          set_status("Dielec #{name} označený v modeli (skrinka #{Store.get(cab, 'cabinet_id')}).")
+        end
+
+        # ---- UI-D1: „POUZIT NA PODOBNE…" ------------------------------------
+        # Prepise OLEP HRAN (part_override 'edges') zdrojoveho dielca na vsetky
+        # PODOBNE dielce vo zvolenom rozsahu. Definicia „podobny" je zavazna a
+        # zije LEN tu (SYSTEM/zdroje/ui20/UI20_KONTRAKT.md, sekcia Dielec):
+        #
+        #   ROVNAKA ROLA (`role`) + ROVNAKY VYSLEDNY MATERIAL (`material_id`
+        #   zo snapshotu dielca) v zvolenom rozsahu, okrem zdroja samotneho.
+        #
+        # Rovnaka rola je podmienka, nie kozmetika: kody hran L1/L2/W1/W2
+        # znamenaju pri kazdej role INU fyzicku hranu (AbsRules::EDGE_LABELS),
+        # takze prenos medzi rolami by olep otocil. Rovnaky material zase drzi
+        # dekor pasky — ABS ineho dekoru by na cudzom dielci bola chyba.
+        # Samostatne DOSKY (kind=board) do vyberu nepatria: nemaju vrstvu
+        # overridov ani rolu korpusoveho dielca.
+        SIMILAR_SCOPES = %w[cabinet project].freeze
+
+        def normalize_similar_scope(raw)
+          s = raw.to_s
+          SIMILAR_SCOPES.include?(s) ? s : 'cabinet'
+        end
+
+        def similar_scope_label(scope)
+          scope == 'project' ? 'celý projekt' : 'táto skrinka'
+        end
+
+        # Dielce, ktore prestavba korpusu NAOZAJ prekresli — teda VYHRADNE tie
+        # VNORENE v jeho definicii.
+        #
+        # Codex #180 P1: `manufactured_parts` vracia navyse ODPOJENE dielce
+        # (vytiahnute na najvyssiu uroven, viazane uz len atributom `cabinet_id`).
+        # Tie `rebuild_many` nevie prekreslit — ostavaju s vlastnym snapshotom.
+        # Keby sa pocitali medzi podobne, modal by ich pripocital a hlaska by
+        # tvrdila, ze sa im olep zmenil, kym by ich vyrobne data (kusovnik, VEPO)
+        # niesli STARE hrany. Radsej ich nezapocitat, nez o nich klamat.
+        def regenerated_parts(cab)
+          return [] unless cab && cab.valid? && cab.respond_to?(:definition)
+
+          cab.definition.entities.grep(Sketchup::ComponentInstance)
+             .select { |e| manufactured_sheet_part?(e) }
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.regenerated_parts')
+          []
+        end
+
+        # JEDINA autorita vyberu podobnych dielcov — pocet aj zapis idu TOU
+        # ISTOU cestou (inak by modal ukazoval iny pocet, nez sa naozaj zapise).
+        # Vracia { cabinet_id => [cab_instance, [part_key, ...]] }.
+        def similar_parts_map(model, cab, part, scope)
+          role = Store.get(part, 'role').to_s
+          return {} if role.empty?
+
+          mat = (Store.config(part) || {})['material_id'].to_s
+          src_key = Store.get(part, 'part_key').to_s
+          src_cid = Store.get(cab, 'cabinet_id').to_s
+          cabs = scope == 'project' ? all_cabinets(model) : [cab]
+          out = {}
+          cabs.each do |c|
+            next unless c && c.valid?
+
+            cid = Store.get(c, 'cabinet_id').to_s
+            next if cid.empty? || out.key?(cid)
+
+            keys = regenerated_parts(c).select do |p|
+              Store.get(p, 'role').to_s == role &&
+                (Store.config(p) || {})['material_id'].to_s == mat
+            end.map { |p| Store.get(p, 'part_key').to_s }.reject(&:empty?).uniq
+            keys.delete(src_key) if cid == src_cid
+            out[cid] = [c, keys] unless keys.empty?
+          end
+          out
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.similar_parts_map')
+          {}
+        end
+
+        def similar_parts_count(map)
+          map.values.map { |(_c, keys)| keys.size }.inject(0) { |a, b| a + b }
+        end
+
+        # Spolocne guardy oboch ciest (pocet aj zapis). Vrati [cab, part, scope]
+        # alebo [nil, nil, nil] + hlasku.
+        def similar_context(model, data)
+          cab = find_cabinet(model)
+          return [nil, nil, nil, 'Skrinka sa nenašla — označ dielec znova.'] if
+            cab.nil? || Store.get(cab, 'cabinet_id').to_s != data['cabinet_id'].to_s
+
+          part = find_selected_part(model)
+          return [nil, nil, nil, 'Vo výbere nie je dielec — označ ho v modeli znova.'] if part.nil?
+
+          params = existing_params(cab)
+          want = canonical_part_key(params, data['role_key'].to_s)
+          have = canonical_part_key(params, part_identity(cab, part))
+          return [nil, nil, nil, 'Karta patrí inému dielcu — označ ho v modeli znova.'] if
+            want.empty? || want != have
+
+          [cab, part, normalize_similar_scope(data['scope']), nil]
+        end
+
+        # ZIVY POCET pre otvoreny modal. Ciste citanie modelu — ziadna operacia,
+        # ziadny zapis, ziadny krok Spat. Odpoved chodi do JS ako `NX.setSimilarCount`;
+        # chyba nesie hlasku, aby modal nikdy neukazoval cislo, ktore neplati.
+        # Codex #180 P2 (kolo 2): ROZSAH aj TOKEN DOPYTU sa citaju PRED akoukolvek
+        # rizikovou pracou a odpoved ich vracia VZDY — aj z rescue vetvy. Inak by
+        # chyba pri rozsahu „celý projekt" prisla oznacena ako `cabinet`, klient by
+        # ju ako cudziu zahodil a modal by ostal navzdy visiet na „počítam".
+        def handle_similar_parts_count(payload = nil)
+          model = Sketchup.active_model
+          return if model.nil?
+
+          data = begin
+            payload ? parse(payload) : {}
+          rescue StandardError
+            {}
+          end
+          scope = normalize_similar_scope(data['scope'])
+          req = data['req']
+
+          begin
+            return push_similar_count(scope, nil, 'Panel patrí inému dokumentu.', req) if
+              data['model_guid'].to_s != model_guid(model)
+
+            cab, part, _scope, err = similar_context(model, data)
+            return push_similar_count(scope, nil, err, req) if err
+
+            push_similar_count(scope, similar_parts_count(similar_parts_map(model, cab, part, scope)), nil, req)
+          rescue StandardError => e
+            Engine.log_error(e, 'Panel.handle_similar_parts_count')
+            push_similar_count(scope, nil, 'Počet sa nepodarilo zistiť.', req)
+          end
+        end
+
+        # `req` je TOKEN DOPYTU z klienta — vracia sa nezmeneny, aby si JS vedel
+        # spárovať odpoved s tym dopytom, ktory ju naozaj caka (oneskorena odpoved
+        # na uz zavretý alebo prepnutý modal sa zahodi).
+        def push_similar_count(scope, count, error, req = nil)
+          js("NX.setSimilarCount(#{{ 'scope' => scope, 'count' => count,
+                                     'error' => error, 'req' => req }.to_json})")
+        end
+
+        # ZAPIS. Vsetky dotknute korpusy sa prestavaju v JEDNEJ operacii
+        # (`CabinetBuilder.rebuild_many`) = JEDEN krok Spat — inak by pouzivatel
+        # musel Ctrl+Z toľkokrát, kolko skriniek sa zmenilo, a medzistavy by boli
+        # nekonzistentne (vzor D-35: nikdy slucka jednotlivych rebuildov).
+        #
+        # Prenasa sa ZAZNAM overridu, nie vysledok: prazdny/chybajuci override
+        # zdroja znamena „vsetko podľa pravidla" a ciele sa na pravidlo VRATIA.
+        # Je to to iste rozhodnutie, len prenesene — nie „nerob nic".
+        def handle_apply_edges_similar(payload = nil)
+          model = Sketchup.active_model
+          return if model.nil?
+
+          data = payload ? parse(payload) : {}
+          return set_status('ABS sa nepoužilo — panel patrí inému dokumentu.', true) if
+            data['model_guid'].to_s != model_guid(model)
+
+          cab, part, scope, err = similar_context(model, data)
+          return set_status("ABS sa nepoužilo — #{err}", true) if err
+
+          map = similar_parts_map(model, cab, part, scope)
+          if map.empty?
+            return set_status('Podobný dielec sa nenašiel — rovnakú rolu a materiál nemá žiadny iný dielec ' \
+                              "(#{similar_scope_label(scope)}).", true)
+          end
+
+          src_params = existing_params(cab)
+          src_rk = canonical_part_key(src_params, part_identity(cab, part))
+          src_edges = ((src_params['part_overrides'] || {})[src_rk] || {})['edges']
+          src_cid = Store.get(cab, 'cabinet_id').to_s
+
+          items = []
+          total = 0
+          map.each do |cid, (target_cab, keys)|
+            params = cid == src_cid ? src_params : existing_params(target_cab)
+            ov = (params['part_overrides'] ||= {})
+            keys.each do |k|
+              key = canonical_part_key(params, k)
+              rec = ov[key] || {}
+              # Sticky remap dovody patria STARYM hranam — s prepisom olepu
+              # strácajú platnost (inak by karta ukazovala varovanie k paske,
+              # ktora tam uz nie je).
+              rec.delete('edge_warnings')
+              if src_edges.is_a?(Hash) && !src_edges.empty?
+                rec['edges'] = JsonFileStore.deep_copy(src_edges)
+              else
+                rec.delete('edges')
+              end
+              store_override(ov, key, rec)
+              total += 1
+            end
+            items << [target_cab, params]
+          end
+
+          suspend_selection_sync do
+            CabinetBuilder.rebuild_many(model, items, op_name: 'NOXUN: ABS na podobne dielce')
+            focus_part(model, cab, src_rk)
+          end
+          set_status("Olep hrán použitý na #{total} #{similar_word(total)} " \
+                     "(#{similar_scope_label(scope)}, #{map.size} #{cabinet_word(map.size)}) — jeden krok Späť to vráti.")
+          push_selected(model)
+        end
+
+        # Slovenske tvary poctu (rovnaka zasada ako `warn_word`).
+        def similar_word(n)
+          return 'podobný dielec' if n == 1
+
+          n < 5 ? 'podobné dielce' : 'podobných dielcov'
+        end
+
+        def cabinet_word(n)
+          return 'skrinka' if n == 1
+
+          n < 5 ? 'skrinky' : 'skriniek'
+        end
+
         # Zapis/vycisti zaznam part_override pod klucom rk (prazdny zaznam sa odstrani).
         def store_override(ov, rk, rec)
           if rec.nil? || rec.empty? then ov.delete(rk) else ov[rk] = rec end

@@ -233,6 +233,11 @@
   .pchead { font-size: 12px; color: var(--nx-ink-strong); margin: 0 0 2px; }
   .pchead b { color: var(--nx-select); }
   .pcdim { font-size: 11px; color: var(--nx-ink-soft); margin: 0 0 8px; }
+  /* UI-D1 „Zakladne hore": rozmery dielca su VYSTUP (dopocitane korpusom), preto
+     su to informacne riadky, nie polia (trvala zasada „vystup nikdy nevyzera ako
+     vstup"). Pouziva sa ta ista dvojica tried ako v Zakladnych korpusu
+     (.basicgrid/.infocol/.inforow) — jeden vizualny jazyk, ziadne nove tokeny. */
+  .pcbasic { margin: 0 0 8px; }
   #partSvg { width: 100%; max-height: 200px; border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface); display: block; margin: 4px 0 6px; }
   .absleg { display: flex; flex-wrap: wrap; gap: 8px; font-size: 10px; color: var(--nx-ink-muted); margin: 2px 0 8px; align-items: center; }
   .absleg span { display: inline-flex; align-items: center; gap: 3px; }
@@ -244,8 +249,30 @@
   .absall i { width: 12px; height: 8px; border: 2px solid var(--nx-abs-1mm); border-radius: 2px; display: block; box-sizing: border-box; background: var(--nx-abs-tape-bg); }
   .absall:hover { border-color: var(--nx-abs-1mm); background: var(--nx-danger-bg-soft); }
   .edgerow { display: flex; gap: 5px; align-items: center; margin: 3px 0; }
-  .edgerow .en { flex: 0 0 78px; font-size: 12px; color: var(--nx-ink-label); display: flex; align-items: center; gap: 5px; }
+  /* UI-D1: nazov hrany nesie navyse hranovu ikonu — stlpec sa rozsiril zo 78 na
+     100 px, aby sa najdlhsi popis („Pozdĺžna 1") stale zmestil na jeden riadok. */
+  .edgerow .en { flex: 0 0 100px; font-size: 12px; color: var(--nx-ink-label); display: flex; align-items: center; gap: 5px; }
   .edgerow .en i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; flex: 0 0 11px; }
+  /* UI-D1: hranova ikona pred farebnym stvorcom. JEDNA kresba (#i-edge), styri
+     ROTACIE — ktoru stranu dielca riadok popisuje, hovori uhol, nie styri ikony.
+     Uhol sa odvodzuje zo strany v 2D nahlade (data-rot pise part_card.js), takze
+     ikona ukazuje presne tu hranu, ktoru nahlad nad zoznamom farebne kresli. */
+  .edgerow .en .eic { width: 14px; height: 14px; flex: 0 0 14px; color: var(--nx-ink-faint); }
+  .edgerow .en .eic[data-rot="90"] { transform: rotate(90deg); }
+  .edgerow .en .eic[data-rot="180"] { transform: rotate(180deg); }
+  .edgerow .en .eic[data-rot="270"] { transform: rotate(270deg); }
+  /* Rad akcii karty dielca: „Označiť v modeli" + „Použiť na podobné…" —
+     JEDEN riadok dole (mockup `s4Part`), nikdy dva. */
+  .pcactions { margin-top: 8px; }
+  /* Modal „Použiť na podobné…": rozsah je segmentovy prepinac (dva rovnocenne
+     stavy), zivy pocet je jeden vyrazny riadok nad tlacidlami. */
+  .nx-inspector .segrow.seginline button { flex-direction: row; gap: 6px; padding: 6px 8px; }
+  .simcount { font-size: 12px; color: var(--nx-ink-strong); font-weight: 600;
+              background: var(--nx-select-bg-soft); border: 1px solid var(--nx-part-border);
+              border-radius: 6px; padding: 6px 8px; margin: 0 0 6px; }
+  .simcount.none { background: var(--nx-warn-bg); border-color: var(--nx-warn);
+                   color: var(--nx-modalwarn-fg); font-weight: 400; }
+  .nxmodal .btnrow .primary.off { opacity: .45; cursor: not-allowed; }
   .edgerow select { flex: 1; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 12px; min-width: 0; }
   .edgerow select.ovr { border-color: var(--nx-warn); background: var(--nx-warn-bg); }
   .pcmat { display: flex; align-items: center; gap: 5px; margin: 2px 0 6px; }

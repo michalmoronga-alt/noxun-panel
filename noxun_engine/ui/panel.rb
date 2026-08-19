@@ -140,6 +140,12 @@ module Noxun
           # kovania v nahlade) — oznaci vlastnika polozky v modeli. CISTE
           # CITANIE + zmena vyberu; panel po nej ZAMERNE ostava v Kovani.
           cb(dlg, 'nx_select_hw_owner')    { |p| handle_select_hw_owner(p) }
+          # UI-D1: karta dielca — „Označiť v modeli" (ciste citanie + zmena
+          # vyberu, ziadny undo krok) a „Použiť na podobné…" (zivy pocet +
+          # zapis olepu do viacerych dielcov v JEDNEJ operacii = 1 krok Spat).
+          cb(dlg, 'nx_select_part')         { |p| handle_select_part(p) }
+          cb(dlg, 'nx_similar_parts_count') { |p| handle_similar_parts_count(p) }
+          cb(dlg, 'nx_apply_edges_similar') { |p| handle_apply_edges_similar(p) }
           # D-100: premenovanie skrinky (inline edit nazvu v hlavicke panela)
           cb(dlg, 'rename_cabinet')        { |p| handle_rename_cabinet(p) }
           # UI-B3 (koliesko = Nastavenia Inspectora): tema UI a rozmerove rady.

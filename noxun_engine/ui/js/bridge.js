@@ -12,6 +12,10 @@
     if (sel && typeof nxSetModelGuid === 'function') nxSetModelGuid(sel.model_guid);
     // D-14 (Codex F5): modal patri k oznacenemu korpusu — mimo mode-cab sa zatvara
     if (mode !== 'cab' && typeof closeSaveTemplateModal === 'function') closeSaveTemplateModal();
+    // UI-D1: modal „Použiť na podobné…" patri karte DIELCA — mimo mode-part sa
+    // zatvara (rovnaky dovod ako pri sablonovom modale: oneskorene rozhodnutie
+    // by zapisalo olep do dielca, ktory uz nie je na obrazovke).
+    if (mode !== 'part' && typeof closeSimilarModal === 'function') closeSimilarModal();
     // D-32 (audit B2): SKUTOCNY prechod cab|part|board -> insert = reset karty
     // z insert stavu (typ + sablona + zamky); insert -> insert sync NEresetuje,
     // rozpisane upravy v karte preziju. Jedine miesto zmeny rezimu = jedine
@@ -288,6 +292,12 @@
     // D-85 (Codex #167 P2): CERSTVE „Použité v projekte" pre otvoreny combobox.
     // Odpoved na nx_used_ids — meni LEN odvodeny zoznam id, ziadny render karty
     // (rozpisany formular sa nesmie dotknut). Otvoreny zoznam sa prekresli.
+    // UI-D1: odpoved na `nx_similar_parts_count` — ZIVY pocet podobnych dielcov
+    // pre otvoreny modal „Použiť na podobné…". Meni LEN obsah modalu (ziadny
+    // render karty, ziadny dotyk formulara — vzor NX.setUsedIds).
+    setSimilarCount: function(data){
+      if (typeof setSimilarCount === 'function') setSimilarCount(data);
+    },
     setUsedIds: function(data){
       MATERIALS.used_ids = data || { sheets: [], edges: [] };
       if (typeof NXCombo !== 'undefined' && NXCombo) NXCombo.rerender();

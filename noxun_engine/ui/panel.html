@@ -12,7 +12,7 @@
      Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
      bezpecne zdielatelny so satelitnymi oknami. -->
 <script>document.documentElement.className = 'nx-inspector';</script>
-<link rel="stylesheet" href="css/panel.css?v=0.7.16">
+<link rel="stylesheet" href="css/panel.css?v=0.7.17">
 
 <!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
      Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
@@ -563,7 +563,15 @@
     <fieldset id="partCard" style="display:none">
       <div class="crumb"><span class="backlink" onclick="backToCabinet()" title="Späť na skrinku">‹ <span id="pcCab">—</span></span> › <b id="pcName2"></b></div>
       <div class="pchead" id="pcName"></div>
-      <div class="pcdim" id="pcDim"></div>
+      <!-- UI-D1: ZAKLADNE HORE (kontrakt UI 2.0, sekcia Dielec). Rozmery dielca
+           su VYSTUP — pocita ich korpus, preto su to informacne riadky, nie
+           polia (trvala zasada „vystup nikdy nevyzera ako vstup"). Obsah pise
+           `renderPartBasic` z payloadu karty; kostra sa NEPREKRESLUJE. -->
+      <div class="pcbasic basicgrid" id="pcBasic">
+        <div id="pcBasicL"></div>
+        <div class="infocol" id="pcBasicR"></div>
+      </div>
+      <div class="hint" id="pcBasicHint">Rozmery dielca počíta korpus — menia sa v kontexte <b>Korpus → Základné</b>.</div>
       <!-- D-85: data-nx-combo = tento select obsluhuje zdielany combobox (nx_combo.js).
            Select ostava zdrojom pravdy — combobox mu len zapise hodnotu a vystreli
            change, takze onPartMaterial (aj modal chybajucej pasky D-41) beziat ako doteraz. -->
@@ -580,6 +588,17 @@
         <button class="absall" onclick="onEdgesAll()" title="Olepiť všetky 4 hrany páskou k materiálu"><i></i></button>
       </div>
       <div id="edgeRows"></div>
+      <!-- UI-D1: rad akcii karty — JEDEN riadok dole (mockup `s4Part`).
+           „Označiť v modeli" je zmena VYBERU (ziadny zapis, ziadny krok Späť);
+           „Použiť na podobné…" otvara modal s rozsahom a zivym poctom. -->
+      <div class="btnrow pcactions">
+        <button type="button" class="ghostbtn" data-nx-usage="part:select-in-model"
+                onclick="selectPartInModel()" title="Označí tento dielec v modeli (nič sa nezapisuje)">
+          <svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg> Označiť v modeli</button>
+        <button type="button" class="ghostbtn" data-nx-usage="part:apply-similar"
+                onclick="openSimilarModal()" title="Prenesie olep hrán tohto dielca na dielce s rovnakou rolou a materiálom">
+          <svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg> Použiť na podobné…</button>
+      </div>
     </fieldset>
 
     <!-- --- rezim DOSKA (V0.4.7c, mode-board) — editor samostatneho dielca --- -->
@@ -649,6 +668,35 @@
     <div class="btnrow">
       <button class="primary" onclick="saveTemplateAs()">Uložiť</button>
       <button class="ghostbtn" onclick="closeSaveTemplateModal()">Zrušiť</button>
+    </div>
+  </div>
+</div>
+
+<!-- UI-D1: modal „Použiť na podobné…" (vzor mini-modalu D-14/UI-B3).
+     Prenasa sa VYHRADNE olep hran (ABS) — materiál ani smer dekoru nie.
+     Rozsah je segmentovy prepinac, pocet je ZIVY a pocita ho SERVER tou istou
+     funkciou, ktorou potom aj zapisuje (JS posiela len kluc dielca + rozsah). -->
+<div id="simModal" class="nxmodal" style="display:none">
+  <div class="nxmodal-card">
+    <div class="nxmodal-title">Použiť olep na podobné dielce</div>
+    <div class="hint" id="simWhat">…</div>
+    <div class="segrow seginline" id="simScope" role="group" aria-label="Rozsah">
+      <button type="button" data-sim-scope="cabinet" aria-pressed="true"
+              title="Len dielce tejto skrinky" onclick="pickSimilarScope('cabinet')">Táto skrinka</button>
+      <button type="button" data-sim-scope="project" aria-pressed="false"
+              title="Dielce všetkých skriniek v projekte" onclick="pickSimilarScope('project')">Celý projekt</button>
+    </div>
+    <div class="simcount" id="simCount">Počítam podobné dielce…</div>
+    <div class="hint">Podobný = <b>rovnaká rola</b> (napr. všetky boky) a <b>rovnaký materiál</b>.
+      Prepíše sa len <b>olep hrán</b> — materiál, rozmery ani smer dekoru sa nemenia.
+      Všetko je <b>jeden krok Späť</b>.</div>
+    <div class="btnrow">
+      <!-- Stav tlacidla riadi JS (trieda + aria-disabled + title, vzor D-78):
+           natívne `disabled` by prvok vyradilo z fokusu aj z tooltipu a
+           pouzivatel by sa dovod nedozvedel. Server rozhoduje znova. -->
+      <button type="button" class="primary off" id="simApplyBtn" aria-disabled="true"
+              title="Počet podobných dielcov sa ešte zisťuje." onclick="applySimilarNow()">Použiť</button>
+      <button type="button" class="ghostbtn" onclick="closeSimilarModal()">Zrušiť</button>
     </div>
   </div>
 </div>
@@ -735,34 +783,34 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.7.16"></script>
+<script src="js/errors.js?v=0.7.17"></script>
 <!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
      jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
      pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
-<script src="js/win_fit.js?v=0.7.16"></script>
-<script src="js/icons.js?v=0.7.16"></script>
+<script src="js/win_fit.js?v=0.7.17"></script>
+<script src="js/icons.js?v=0.7.17"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.7.16"></script>
-<script src="js/core.js?v=0.7.16"></script>
-<script src="js/expr.js?v=0.7.16"></script>
-<script src="js/insert_state.js?v=0.7.16"></script>
-<script src="js/form.js?v=0.7.16"></script>
-<script src="js/zone_tree.js?v=0.7.16"></script>
-<script src="js/preview.js?v=0.7.16"></script>
+<script src="js/nx_combo.js?v=0.7.17"></script>
+<script src="js/core.js?v=0.7.17"></script>
+<script src="js/expr.js?v=0.7.17"></script>
+<script src="js/insert_state.js?v=0.7.17"></script>
+<script src="js/form.js?v=0.7.17"></script>
+<script src="js/zone_tree.js?v=0.7.17"></script>
+<script src="js/preview.js?v=0.7.17"></script>
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
-<script src="js/shell.js?v=0.7.16"></script>
-<script src="js/actions.js?v=0.7.16"></script>
+<script src="js/shell.js?v=0.7.17"></script>
+<script src="js/actions.js?v=0.7.17"></script>
 <!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
      bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
-<script src="js/settings.js?v=0.7.16"></script>
-<script src="js/bridge.js?v=0.7.16"></script>
-<script src="js/materials.js?v=0.7.16"></script>
-<script src="js/part_card.js?v=0.7.16"></script>
-<script src="js/board_card.js?v=0.7.16"></script>
-<script src="js/hardware.js?v=0.7.16"></script>
-<script src="js/usage.js?v=0.7.16"></script>
-<script src="js/boot.js?v=0.7.16"></script>
+<script src="js/settings.js?v=0.7.17"></script>
+<script src="js/bridge.js?v=0.7.17"></script>
+<script src="js/materials.js?v=0.7.17"></script>
+<script src="js/part_card.js?v=0.7.17"></script>
+<script src="js/board_card.js?v=0.7.17"></script>
+<script src="js/hardware.js?v=0.7.17"></script>
+<script src="js/usage.js?v=0.7.17"></script>
+<script src="js/boot.js?v=0.7.17"></script>

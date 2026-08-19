@@ -279,6 +279,28 @@ boxu klik=označ v modeli. Sety a Pravidlá bez zmeny.
 square-dashed-top rotovanou (predná 0°·zadná 180°·ľavá 90°·pravá 270°) + ABS štvorec · hover hrany
 zvýrazní v modeli (D-89a) · „Označiť v modeli" · „Použiť na podobné…".
 
+*Zápis dávky UI-D1 (v0.7.17) — definícia a dve vedomé odchýlky:*
+
+- **„Podobný dielec" = rovnaká ROLA + rovnaký VÝSLEDNÝ MATERIÁL** (`material_id` zo snapshotu
+  dielca) v zvolenom rozsahu (**táto skrinka** / **celý projekt**), okrem zdroja samotného.
+  Samostatné dosky (BRD) do výberu nepatria — nemajú vrstvu overridov ani rolu korpusového dielca.
+  Rovnaká rola je **podmienka, nie kozmetika**: kódy hrán `L1/L2/W1/W2` znamenajú pri každej role
+  inú fyzickú hranu, takže prenos medzi rolami by olep otočil. Prenáša sa **výhradne olep hrán**
+  (materiál, rozmery ani smer dekoru nie); prázdny override zdroja ciele **vráti na pravidlo** —
+  je to tiež rozhodnutie, nie „nerob nič". Počet aj zápis počíta **jedna serverová funkcia**
+  a celý zápis je **jedna operácia = jeden krok Späť** aj naprieč skrinkami.
+- **ODCHÝLKA 1 — `Smer dekoru` je INFO, nie vstup.** Per-dielec override smeru neexistuje: smer
+  určuje materiál (katalógové pole `grain`), `part_overrides` pozná len `material_id`, `edges`
+  a `edge_warnings`. Zavedenie takého overridu mení **výrobný kontrakt** (kusovník, rotácia VEPO,
+  kontrola nárezu) — je to vlastná dávka s auditom, nie „S" dotiahnutie UI. Karta preto smer
+  ukazuje ako text a povie, kde sa naozaj mení. *(Ak ho Michal bude chcieť editovateľný, je to
+  samostatné zadanie — UI zmena je pritom jednoriadková.)*
+- **ODCHÝLKA 2 — rotácia hranovej ikony ide podľa 2D náhľadu, nie podľa pevnej mapy.** Uhol dáva
+  strana dielca v náhľade (`AbsRules.edge_sides`), takže ikona ukazuje presne tú hranu, ktorú
+  karta hneď nad zoznamom farebne kreslí. Pevná mapa „predná 0°…" by pri ležiacich dielcoch
+  (police, boky, dná — teda pri väčšine) ukázala **inú stranu než náhľad**, a pre roly s labelmi
+  „Pozdĺžna/Priečna" (výstuhy, doska) by neexistovala vôbec.
+
 **Koliesko (Nastavenia Inspectora):** Vzhľad (téma NOXUN/Lucia so vzorkami) · Rozmerové rady
 (skratka) · O plugine (logo+verzia). **SketchUp toolbar N4:** logo(panel) · Štúdio · ABS shell
 toggle · Vložiť.
@@ -318,8 +340,9 @@ debate nad `mockup_ui20.html`.
   Plný beh in-SketchUp áno: dávka pridala novú serverovú cestu na zmenu výberu.
 
 **BLOK UI-D · Dotiahnutie**
-- UI-D1 (S) Dielec: Základné hore, hranové ikony, Označiť v modeli; **„Použiť na podobné" zapisuje
-  do viacerých dielcov ⇒ in-SU povinné.**
+- ~~UI-D1 (S) Dielec: Základné hore, hranové ikony, Označiť v modeli; **„Použiť na podobné" zapisuje
+  do viacerých dielcov ⇒ in-SU povinné.**~~ **HOTOVÉ** (v0.7.17) — definícia „podobné" a dve
+  vedomé odchýlky sú zapísané vyššie pri sekcii Dielec. Plný beh in-SketchUp áno.
 - UI-D2 (M) Šablónové PNG náhľady (view.write_image pri uložení + fallback schéma) — in-SU beh.
 - UI-D3 (S) Klikateľnosť zvyšok: warnpanel N5 deep-linky, N13 kliky, zvyšné prekliky; UI_DIZAJN.md
   aktualizácia (paleta, zásady, nové ikony do icons.js) + D-čísla uzávery (D-77/84/89a/96/26-rozhodnutie).
