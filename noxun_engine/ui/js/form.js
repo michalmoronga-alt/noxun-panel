@@ -404,9 +404,14 @@
   // Po kazdej prestavbe mriezky: dlazdicam s uz znamym nahladom ho nasadi,
   // za zvysok posle PULL (raz na reviziu).
   function refreshTemplatePreviews(){
-    var plan = nxTplPreviewPlan(tplTileDescs(), TPL_PREVIEWS, TPL_PREV_ASKED);
+    // Bez mosta do Ruby sa do `TPL_PREV_ASKED` NESMIE nic zapisat — zaznam je
+    // jednosmerny, takze by revizia ostala navzdy „vypytana" a nikdy by o nu
+    // ziadost neodisla. Vtedy sa planuje nad odhodenou mapou (len nasadenie
+    // uz znamych obrazkov) a pri dalsej prestavbe mriezky sa pyta znova.
+    var canAsk = !!(window.sketchup && sketchup.nx_template_preview);
+    var plan = nxTplPreviewPlan(tplTileDescs(), TPL_PREVIEWS, canAsk ? TPL_PREV_ASKED : {});
     plan.apply.forEach(function(a){ tplBindPreview(a.desc.node, a.png); });
-    if (!(window.sketchup && sketchup.nx_template_preview)) return;
+    if (!canAsk) return;
     plan.ask.forEach(function(d){
       sketchup.nx_template_preview(JSON.stringify({ kind: d.kind, name: d.name, rev: d.rev }));
     });
