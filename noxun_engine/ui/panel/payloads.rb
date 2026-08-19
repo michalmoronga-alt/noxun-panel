@@ -737,6 +737,10 @@ module Noxun
           {
             'role_key' => rk, 'role' => role, 'name' => Store.get(part, 'name'),
             'length' => cfg['length'], 'width' => cfg['width'], 'thickness' => cfg['thickness'],
+            # UI-D1: smer dekoru je v sektore „Základné" karty dielca INFORMACIA
+            # (urcuje ho material — katalogove pole `grain` sheetu). Ide o
+            # snapshot dielca (standard 8.3), nie o novy nastavitelny udaj.
+            'grain_direction' => cfg['grain_direction'] || 'none',
             'material_id' => cfg['material_id'],
             'edges' => cfg['edges'] || AbsRules.empty_edges,
             'edge_labels' => AbsRules.edge_labels(role),

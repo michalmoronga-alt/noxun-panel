@@ -41,7 +41,10 @@
                     'zone:split-v2', 'zone:split-v3', 'zone:split-h2', 'zone:split-h3',
                     // UI-C3 / D-84: rec stolara — merac povie, ci sa cela
                     // pridavaju castejsie ako dvierka alebo ako zasuvkove.
-                    'fronts:add-door', 'fronts:add-drawer'];
+                    'fronts:add-door', 'fronts:add-drawer',
+                    // UI-D1: rad akcii karty dielca — merac povie, ci sa olep
+                    // castejsie prenasa hromadne, alebo sa dielce hladaju rucne.
+                    'part:select-in-model', 'part:apply-similar'];
 
   // --- klasifikacia (cista logika, testovatelna v Node cez module.exports) ---
 

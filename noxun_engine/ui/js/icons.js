@@ -167,7 +167,15 @@
     // krídlové dvierka = panel so ZVISLOU osou zavesu a uchytkou pri druhej
     // hrane. Zasuvkove celo pouziva existujuci 'rows-2' (rad vodorovnych celo),
     // vyklop 'p-top' (horna hrana = os otacania) a „Bez cela" 'front'.
-    'door': '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 3v18"/><path d="M16 11v2"/>'
+    'door': '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 3v18"/><path d="M16 11v2"/>',
+    // ===== UI-D1: hrana dielca v karte (square-dashed-top) ==================
+    // JEDNA ikona pre vsetky styri hrany — ktora hrana to je, povie ROTACIA
+    // (CSS `.eic[data-rot]`), nie styri kresby. Plna hrubsia ciara = hrana, o
+    // ktorej riadok hovori; ostatne tri su prerusovane (naznak dielca dookola).
+    // Rotacia sa odvodzuje zo STRANY v 2D nahlade (AbsRules.edge_sides), takze
+    // ikona ukazuje presne tu stranu, ktoru karta nad nou farebne kresli.
+    'edge': '<path d="M3 4h18" stroke-width="3"/><path d="M3 9v3"/><path d="M3 17v3"/>' +
+            '<path d="M21 9v3"/><path d="M21 17v3"/><path d="M8 20h3"/><path d="M15 20h3"/>'
   };
 
   // Firemne logo — ZROLOVANA ZNACKA z ORIGINALNYCH kriviek webu (pismena

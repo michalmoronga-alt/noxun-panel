@@ -251,7 +251,10 @@ zavesená; tretí typ „Doska" používa existujúci `slab`),
 s existujúcim `columns-2` tvoria štvoricu „2/3 stĺpce · 2/3 riadky“),
 `door` (UI-C3 — typ čela v riadku, N27: panel so zvislou osou závesu a
 úchytkou pri druhej hrane; zásuvkové čelo používa `rows-2`, výklop `p-top`
-a „Bez čela“ `front`).
+a „Bez čela“ `front`),
+`edge` (UI-D1 — hrana dielca v karte: plná hrubšia čiara = hrana, o ktorej
+riadok hovorí, ostatné tri sú prerušované. **Jedna kresba, štyri rotácie**
+cez `data-rot` v CSS — nikdy štyri ikony).
 
 > Okno **Výroba** načítava `icons.js` od v0.5.44 (predtým sprite nemalo) — nové
 > ovládacie prvky v ňom používajú sprite, nie glyfy.
@@ -748,6 +751,45 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Fronts`).
   jednoznačne overiť, **nekreslí sa nič** (tá istá zásada ako D-104).
 - **Posiela sa len ZMENA** kódu hrany — pohyb myšou inak zaplaví most do Ruby
   desiatkami volaní na jeden riadok.
+
+### 5.9 Dielec — Základné hore, hranové ikony, rad akcií (UI-D1)
+
+Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Part`,
+`sectPartBasic`).
+
+- **Poradie karty je kontrakt:** Základné · Materiál · hrany · **rad akcií
+  dole**. Rozmery dielca sú **VÝSTUP** — počíta ich korpus — preto sú to
+  informačné riadky v tej istej mriežke ako Základné korpusu, **nikdy polia**
+  („výstup nikdy nevyzerá ako vstup"). Karta narástla o **jeden** riadok
+  (dva a dva údaje), nie o tri.
+- **Smer dekoru je INFORMÁCIA, nie rozbaľovačka** — *vedomá odchýlka od
+  mockupu*. Smer dielca korpusu určuje jeho **materiál** (katalógové pole
+  `grain`); per-dielec override neexistuje a jeho zavedenie je zmena
+  výrobného kontraktu (kusovník, VEPO, nárez), teda vlastná dávka s auditom.
+  Pole, ktoré by sa tvárilo, že niečo nastavuje, je lož — preto je to text
+  s vysvetlením, **kde sa smer naozaj mení** (rovnaký vzor ako „hrúbku určuje
+  materiál").
+- **Hranový riadok začína ikonou `edge` — jedna kresba, štyri rotácie.**
+  Uhol dáva **strana v 2D náhľade** (`AbsRules.edge_sides`), takže ikona
+  ukazuje presne tú hranu, ktorú náhľad nad zoznamom farebne kreslí. *Vedomá
+  odchýlka od mockupu*, ktorý rotuje podľa pevnej mapy „predná 0° · zadná
+  180° · ľavá 90° · pravá 270°": tá by pri ležiacich dielcoch ukázala inú
+  stranu než náhľad a pre roly s labelmi „Pozdĺžna/Priečna" (výstuhy, doska)
+  by neexistovala. Ikona je tlmená (`--nx-ink-faint`) — je to orientácia,
+  nie stav; stav olepu nesie farebný štvorec vedľa nej.
+- **Rad akcií je JEDEN riadok dole** (vertikálny priestor je vzácny):
+  **„Označiť v modeli"** (`eye`) a **„Použiť na podobné…"** (`copy`).
+  Označenie je **zmena pohľadu na model**, nie zápis — žiadny krok Späť
+  (rovnaká zásada ako kamera N7, „Dielcov" N13 a box vlastníka UI-C4).
+- **„Použiť na podobné…" je mini-modal** (vzor „Uložiť ako šablónu"):
+  rozsah ako **segmentový prepínač** (Táto skrinka / Celý projekt) + **živý
+  počet** jedným výrazným riadkom. Počet **počíta server** tou istou funkciou,
+  ktorou potom aj zapisuje — modal nesmie sľúbiť iné číslo, než sa zapíše.
+  Nula sa nezobrazí ako číslo, ale ako **dôvod** („rovnakú rolu a materiál
+  nemá v tomto rozsahu nikto iný") a tlačidlo je neaktívne s návodom
+  („skús celý projekt") — `aria-disabled`, nikdy HTML `disabled` (vzor D-78).
+  Modal vopred hovorí, že prenáša **len olep hrán** a že je to **jeden krok
+  Späť**.
 
 ### D-51: štandard rozmerov okien (UI-B1)
 

@@ -3786,6 +3786,158 @@ module NoxunSuRunner
 
   # --- ASYNC: undo/redo scenare (retaz timerov, observer debounce 0.2 s) -----
 
+  # === UI-D1: DIELEC — „Označiť v modeli" + „Použiť na podobné…" =============
+  # Overuje presne to, co headless sada NEVIE: ci sa olep naozaj zapise do
+  # VIACERYCH dielcov (aj naprie skrinkami), ci je to JEDEN krok Spat, ci
+  # „Označiť v modeli" model NEDOTKNE a ci guardy identity drzia na zivom modeli.
+  #
+  # Najdrahsia pasca tejto davky: hromadny zapis po jednom rebuilde by vyrobil
+  # tolko krokov Spat, kolko skriniek sa zmenilo — pouzivatel by sa z toho uz
+  # nedostal jednym Ctrl+Z. Preto sa tu meria PRESNE jedno undo.
+
+  # Kluce dielcov skrinky, ktore maju RUCNY override hrany L1.
+  def uid1_l1_override_keys(cab)
+    return [] unless cab && cab.valid?
+
+    ov = (e::Store.config(cab) || {})['part_overrides'] || {}
+    ov.select { |_k, v| v.is_a?(Hash) && v['edges'].is_a?(Hash) && v['edges'].key?('L1') }.keys.sort
+  end
+
+  def uid1_parts_of_role(cab, role)
+    e::Panel.manufactured_parts(cab).select { |p| e::Store.get(p, 'role').to_s == role }
+  end
+
+  def run_uid1(model)
+    cleanup(model)
+
+    cfg = { 'type' => 'lower', 'width' => 900.0, 'height' => 720.0, 'depth' => 560.0,
+            'thickness' => 18.0, 'floor_height' => 100.0 }
+    cab_a = e::CabinetBuilder.build(model, cfg)
+    cab_b = e::CabinetBuilder.build(model, cfg.merge('width' => 600.0))
+    return ok('UI-D1: vlozenie dvoch skriniek pre test podobnych dielcov', false) unless cab_a && cab_b
+
+    cid_a = e::Store.get(cab_a, 'cabinet_id').to_s
+    cid_b = e::Store.get(cab_b, 'cabinet_id').to_s
+    guid = e::Panel.model_guid(model)
+
+    # Po 3 police v kazdej skrinke — az tie vyrobia dielce ROVNAKEJ ROLY.
+    [[cab_a, cid_a], [cab_b, cid_b]].each do |inst, cid|
+      e::Panel.select_only(model, inst)
+      e::Panel.handle_set_zone_shelves({ 'zone_id' => "#{cid}-Z1", 'count' => 3,
+                                         'model_guid' => guid, 'cabinet_id' => cid }.to_json)
+    end
+    cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
+    cab_b = e::Panel.find_cabinet_by_id(model, cid_b)
+    shelves_a = uid1_parts_of_role(cab_a, 'shelf')
+    shelves_b = uid1_parts_of_role(cab_b, 'shelf')
+    ok("UI-D1: obe skrinky maju police (A=#{shelves_a.size}, B=#{shelves_b.size})",
+       shelves_a.size == 3 && shelves_b.size == 3)
+    return unless shelves_a.size == 3 && shelves_b.size == 3
+
+    src = shelves_a.first
+    src_key = e::Store.get(src, 'part_key').to_s
+    e::Panel.select_only(model, src)
+
+    # --- 1) DEFINICIA „podobny": rovnaka ROLA + rovnaky MATERIAL ------------
+    n_cab = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, src, 'cabinet'))
+    n_prj = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, src, 'project'))
+    ok("UI-D1: rozsah „táto skrinka\" = ostatne police tej istej skrinky (#{n_cab})", n_cab == 2)
+    ok("UI-D1: rozsah „celý projekt\" berie aj druhu skrinku (#{n_prj})", n_prj == 5)
+
+    top = uid1_parts_of_role(cab_a, 'top').first
+    if top
+      n_top_cab = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, top, 'cabinet'))
+      n_top_prj = e::Panel.similar_parts_count(e::Panel.similar_parts_map(model, cab_a, top, 'project'))
+      ok('UI-D1: rola s JEDINYM dielcom v skrinke ma v rozsahu skrinky 0 podobnych',
+         n_top_cab.zero?)
+      ok('UI-D1: ta ista rola ma v projekte 1 podobny (vrch druhej skrinky)', n_top_prj == 1)
+    else
+      info('UI-D1: skrinka nema dielec role `top` — test „0 podobnych" preskoceny.')
+    end
+
+    # --- 2) zdrojovy override: hrana L1 = BEZ ABS ----------------------------
+    e::Panel.handle_set_part_edge({ 'role_key' => src_key, 'edge' => 'L1', 'abs_id' => '',
+                                    'cabinet_id' => cid_a }.to_json)
+    cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
+    cab_b = e::Panel.find_cabinet_by_id(model, cid_b)
+    ok('UI-D1: zdrojovy dielec ma rucny override hrany L1',
+       uid1_l1_override_keys(cab_a) == [src_key])
+    ok('UI-D1: druha skrinka je zatial NEDOTKNUTA', uid1_l1_override_keys(cab_b).empty?)
+
+    # --- 3) GUARDY: cudzi dokument ani ina skrinka nezapisu NIC -------------
+    e::Panel.handle_apply_edges_similar({ 'model_guid' => 'CUDZI-GUID', 'cabinet_id' => cid_a,
+                                          'role_key' => src_key, 'scope' => 'project' }.to_json)
+    cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
+    cab_b = e::Panel.find_cabinet_by_id(model, cid_b)
+    ok('UI-D1: „Použiť na podobné" z INEHO dokumentu nezapise NIC (guard dokumentu)',
+       uid1_l1_override_keys(cab_a) == [src_key] && uid1_l1_override_keys(cab_b).empty?)
+
+    e::Panel.handle_apply_edges_similar({ 'model_guid' => guid, 'cabinet_id' => 'CAB-NEEXISTUJE',
+                                          'role_key' => src_key, 'scope' => 'project' }.to_json)
+    cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
+    cab_b = e::Panel.find_cabinet_by_id(model, cid_b)
+    ok('UI-D1: „Použiť na podobné" pre INU nez oznacenu skrinku nezapise NIC',
+       uid1_l1_override_keys(cab_a) == [src_key] && uid1_l1_override_keys(cab_b).empty?)
+
+    # --- 4) ZAPIS na cely projekt = JEDNA operacia --------------------------
+    cabs_before = cabinets(model).length
+    e::Panel.handle_apply_edges_similar({ 'model_guid' => guid, 'cabinet_id' => cid_a,
+                                          'role_key' => src_key, 'scope' => 'project' }.to_json)
+    cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
+    cab_b = e::Panel.find_cabinet_by_id(model, cid_b)
+    keys_a = uid1_l1_override_keys(cab_a)
+    keys_b = uid1_l1_override_keys(cab_b)
+    ok("UI-D1: olep sa zapisal VSETKYM policiam oboch skriniek (#{keys_a.size} + #{keys_b.size})",
+       keys_a.size == 3 && keys_b.size == 3)
+    ok('UI-D1: zapis nevyrobil ziadny novy NOXUN objekt', cabinets(model).length == cabs_before)
+    ok('UI-D1: po zapise ostava vo vybere ZDROJOVY dielec (karta sa nestrati)',
+       model.selection.to_a.map { |x| e::Store.get(x, 'part_key').to_s } == [src_key])
+
+    # --- 5) „Označiť v modeli" — ziadny zapis, ziadny krok Spat -------------
+    before_ents = model.entities.length
+    e::Panel.select_only(model, cab_a)
+    e::Panel.handle_select_part({ 'model_guid' => 'CUDZI-GUID', 'cabinet_id' => cid_a,
+                                  'role_key' => src_key }.to_json)
+    ok('UI-D1: „Označiť v modeli" z INEHO dokumentu vyber NEMENI',
+       model.selection.to_a == [cab_a])
+    e::Panel.handle_select_part({ 'model_guid' => guid, 'cabinet_id' => 'CAB-NEEXISTUJE',
+                                  'role_key' => src_key }.to_json)
+    ok('UI-D1: „Označiť v modeli" pre INU nez oznacenu skrinku vyber NEMENI',
+       model.selection.to_a == [cab_a])
+    e::Panel.handle_select_part({ 'model_guid' => guid, 'cabinet_id' => cid_a,
+                                  'role_key' => src_key }.to_json)
+    ok('UI-D1: „Označiť v modeli" oznaci PRESNE ten dielec',
+       model.selection.to_a.map { |x| e::Store.get(x, 'part_key').to_s } == [src_key])
+    ok('UI-D1: oznacenie dielca NEMENI model (ziadna entita naviac ani menej)',
+       model.entities.length == before_ents)
+
+    # --- 6) JEDEN krok Spat vrati VSETKO -------------------------------------
+    # Keby bolo „Označiť v modeli" vlastnou operaciou, toto undo by vratilo JU
+    # a olep by v modeli ostal. Keby bol hromadny zapis rebuildom po jednom,
+    # vratila by sa len POSLEDNA skrinka.
+    Sketchup.undo
+    cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
+    cab_b = e::Panel.find_cabinet_by_id(model, cid_b)
+    ok('UI-D1: 1x Spat vratil olep v OBOCH skrinkach naraz (ostal len zdrojovy override)',
+       uid1_l1_override_keys(cab_a) == [src_key] && uid1_l1_override_keys(cab_b).empty?)
+
+    # --- 7) 0 podobnych: nic sa nezapise ------------------------------------
+    top = uid1_parts_of_role(cab_a, 'top').first
+    if top
+      top_key = e::Store.get(top, 'part_key').to_s
+      e::Panel.select_only(model, top)
+      e::Panel.handle_apply_edges_similar({ 'model_guid' => guid, 'cabinet_id' => cid_a,
+                                            'role_key' => top_key, 'scope' => 'cabinet' }.to_json)
+      cab_a = e::Panel.find_cabinet_by_id(model, cid_a)
+      ok('UI-D1: pri 0 podobnych sa NEZAPISE nic (atomicky no-op)',
+         uid1_l1_override_keys(cab_a) == [src_key])
+    end
+
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: UI-D1 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   def run_async(model, done)
     state = {}
     steps = []
@@ -4451,6 +4603,7 @@ module NoxunSuRunner
     run_uic1c(model)         # UI-C1c: orientacia dosky — matice, delta, scale/dedup, vyrobne data nedotknute
     run_uic2(model)          # UI-C2: zony — delenie/police/presna cesta na zivej skrinke, guardy, undo, vyber
     run_uic4(model)          # UI-C4: kovanie — oznacenie vlastnika polozky v modeli (guardy, ziadny undo krok)
+    run_uid1(model)          # UI-D1: dielec — „Použiť na podobné" (zapis do viacerych dielcov, 1 undo) + „Označiť v modeli"
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
