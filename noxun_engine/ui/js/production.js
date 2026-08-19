@@ -22,7 +22,14 @@
       BOM = data || null;
       EDGE = (BOM && BOM.edge_check) ? BOM.edge_check : null;
       el('prodModel').textContent = BOM ? ('model: ' + BOM.model_title + ' · v' + BOM.version) : '…';
-      vepoSync(); renderSummary(); renderBadge(); renderEdgeBar(); renderBody();
+      vepoSync(); renderSummary(); renderBadge();
+      // UI-D3: deep-link z Inspectora (⚠ warnpanel -> Kontrola, „Materiál" ->
+      // Kusovník). Server posiela `open_tab` PRAVE RAZ; setProdTab uz kresli
+      // listu aj telo, takze sa nekresli dvakrat. Ked uz na tom tabe stojime
+      // (alebo deep-link nie je), ide bezna cesta.
+      var want = (BOM && BOM.open_tab) ? BOM.open_tab : null;
+      if (want && want !== prodTab){ setProdTab(want); return; }
+      renderEdgeBar(); renderBody();
     },
     // D-104: maly echo push (prepnutie / prepocet po prestavbe / zmena vyberu)
     // — prekresli sa LEN lista zvyraznenia, zoznam kontroly sa nedotkne

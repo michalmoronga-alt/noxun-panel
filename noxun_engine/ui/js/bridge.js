@@ -114,7 +114,7 @@
     inp.parentNode.replaceChild(span.firstChild, inp);
   }
 
-  // D3: klik na ⚠ chip rozbali/zbali zoznam upozorneni stavby pod identitou.
+  // D3 / UI-D3 (N5): klik na ⚠ chip rozbali/zbali WARNPANEL pod identitou.
   function setIdbar(c){
     var bar = el('idbar'), list = el('warnList');
     if (!bar) return;
@@ -128,8 +128,11 @@
     var warns = c.warnings || [];
     // A10: warn chip = skutocne <button> (fokusovatelne, klavesova aktivacia).
     // Ikona zo spritu (staticky markup); pocet je cislo — bezpecne (B9).
+    // UI-D3: klik nesie `event` — warnpanel zatvara KLIK MIMO (delegacia na
+    // document), takze klik na samotny chip musi bublanie zastavit, inak by
+    // sa panel v tom istom kliku otvoril a hned zavrel.
     var wHtml = warns.length
-      ? ' <button type="button" class="warnchip" onclick="toggleWarnList()" title="Zobraziť upozornenia stavby" aria-label="Zobraziť upozornenia stavby">' + NXIcons.svg('alert') + ' ' + warns.length + '</button>'
+      ? ' <button type="button" class="warnchip" onclick="toggleWarnList(event)" title="Zobraziť upozornenia stavby" aria-label="Zobraziť upozornenia stavby">' + NXIcons.svg('alert') + ' ' + warns.length + '</button>'
       : '';
     // FIX 4: echo TEJ ISTEJ skrinky nesmie zhltnut rozpisany nazov — prekresli
     // sa vsetko okrem bunky nazvu, ktora ostane v editacnom rezime.
@@ -153,23 +156,83 @@
     }
     if (list){
       if (warns.length){
-        var html = '';
-        warns.forEach(function(w){ html += '<div class="warnrow">' + esc(w.message || '') + '</div>'; });
-        list.innerHTML = html; // viditelnost necha na pouzivatelovi (toggle drzi stav)
-        if (!warns.length) list.style.display = 'none';
+        list.innerHTML = warnPanelHtml(warns, c.cabinet_id || '');
       } else {
-        list.style.display = 'none'; list.innerHTML = '';
+        closeWarnPanel(); list.innerHTML = '';
       }
     }
   }
-  function toggleWarnList(){
+
+  // UI-D3 (N5): obsah warnpanelu. Riadky sklada CISTA funkcia NXShell.warnRows
+  // (Node test) — tu sa uz len escapuje a vklada. Kazdy riadok ma OKO: klik
+  // oznaci dotknuty dielec v modeli (prazdne kluce = cela skrinka). Dole je
+  // JEDNA cesta von — deep-link do okna Vyroba na tab KONTROLA.
+  function warnPanelHtml(warns, cabId){
+    var rows = NXShell.warnRows(warns);
+    var h = '';
+    rows.forEach(function(r){
+      h += '<div class="warnrow"><span>' + esc(r.text) + '</span>' +
+        '<button type="button" class="wgo" data-keys="' + esc(r.keys.join(',')) + '"' +
+        ' data-cab="' + esc(cabId) + '" onclick="onWarnRowPick(this, event)"' +
+        ' title="' + esc(r.tip) + '" aria-label="' + esc(r.tip) + '">' +
+        NXIcons.svg('eye') + '</button></div>';
+    });
+    h += '<button type="button" class="wgoto" data-nx-usage="warn:studio"' +
+      ' onclick="onWarnStudio(event)"' +
+      ' title="Otvorí okno Výroba na tabe KONTROLA — celý zoznam nálezov zákazky">' +
+      'Otvoriť v Štúdiu → Kontrola</button>';
+    return h;
+  }
+
+  // Panel je OVERLAY: otvara ho ⚠ chip, zatvara klik mimo, Escape a kazda
+  // zmena vyberu, ktora zoznam prestavia (setIdbar bez upozorneni).
+  function closeWarnPanel(){
+    var list = el('warnList'); if (!list) return;
+    list.style.display = 'none';
+  }
+  function warnPanelOpen(){
+    var list = el('warnList');
+    return !!(list && list.style.display && list.style.display !== 'none');
+  }
+  function toggleWarnList(ev){
+    if (ev && ev.stopPropagation) ev.stopPropagation();
     var list = el('warnList'); if (!list || !list.innerHTML) return;
-    var willOpen = (list.style.display === 'none' || !list.style.display);
-    list.style.display = willOpen ? 'block' : 'none';
-    // A1: warnlist je ukotveny hned pod sticky hlavickou — pri rozbaleni sa vratime
-    // hore, aby bol viditelny aj po odscrollovani (klik na sticky ⚠ chip nesmie
-    // rozbalit zoznam mimo viewportu).
-    if (willOpen){ try { window.scrollTo(0, 0); } catch (e) {} }
+    list.style.display = warnPanelOpen() ? 'none' : 'block';
+  }
+
+  // Oko v riadku: oznaci v modeli to, o com nalez hovori. Ide TOU ISTOU
+  // serverovou cestou ako box vlastnika v Kovani (`nx_select_hw_owner`) —
+  // ciste citanie + zmena vyberu, ziadna operacia a ziadny krok Spat.
+  //
+  // FLUSH HANDSHAKE (vzor onInfoParts / onHwOwnerPick): rozpisany edit caka
+  // 400 ms; keby timer dobehol AZ PO vybere, prestavba skrinky by reselectla
+  // cely korpus a oznaceny dielec by sa ticho stratil. Neplatne (cervene) pole
+  // akciu ZASTAVI — flush by ju aj tak neaplikoval.
+  function onWarnRowPick(btn, ev){
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var cab = btn.getAttribute('data-cab') || '';
+    if (!cab){ NX.setStatus('Označ skrinku v modeli.', true); return; }
+    if (typeof validateFields === 'function' && !validateFields()){
+      NX.setStatus('Skontroluj červené polia — rozpísaná úprava by sa pri označení stratila.', true);
+      return;
+    }
+    if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+    var raw = btn.getAttribute('data-keys') || '';
+    var keys = raw ? raw.split(',').filter(function(k){ return k !== ''; }) : [];
+    if (window.sketchup && sketchup.nx_select_hw_owner){
+      sketchup.nx_select_hw_owner(JSON.stringify({
+        model_guid: (typeof nxModelGuid === 'string') ? nxModelGuid : '',
+        cabinet_id: cab, part_keys: keys, origin: 'warn' }));
+    }
+  }
+
+  // „Otvoriť v Štúdiu → Kontrola". Štúdio je zatial okno Vyroba, preto sa
+  // otvara ONO — a rovno na tabe KONTROLA (deep-link; whitelist tabov je na
+  // strane Ruby). Panel sa zavrie: pouzivatel odchadza do ineho okna.
+  function onWarnStudio(ev){
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    closeWarnPanel();
+    if (typeof openProductionDialog === 'function') openProductionDialog('control');
   }
 
   window.NX = {
@@ -492,7 +555,7 @@
     setOut('inf_area', info.area);
     var live = !!(c && c.cabinet_id);
     [['infParts', 'Klik = označí výrobné dielce tejto skrinky v modeli'],
-     ['infArea', 'Plocha dosky tejto skrinky — kusovník s filtrom príde v Štúdiu']].forEach(function(o){
+     ['infArea', 'Klik = otvorí Kusovník (okno Výroba); filter na jednu skrinku pribudne v Štúdiu']].forEach(function(o){
       var n = el(o[0]); if (!n) return;
       n.setAttribute('aria-disabled', live ? 'false' : 'true');
       n.title = live ? o[1] : 'Označ skrinku v modeli';

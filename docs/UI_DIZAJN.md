@@ -24,6 +24,27 @@ dokument opisuje **prečo** a **ako** — tabuľka tokenov nižšie je zrkadlom 
   stráži to guard test (`tests/pure/test_ui01_paleta.rb`). Vedomé výnimky: väčšie
   plochy (karty, modaly, dlaždice katalógu, boxy) **8 px** a badge **9 px** ·
   nekomponentové — farebné štvorčeky 2–3 px, pill 12 px / 99 px, 50 % kruhy.
+- **Výstup nikdy nevyzerá ako vstup.** Dopočítaný údaj je **text** (`.inforow`),
+  nie readonly pole — inak sa doň používateľ márne pokúša písať.
+- **Klikateľné je len to, čo niekam vedie** (N13, dotiahnuté v UI-D3). Informačný
+  údaj, ktorý má existujúci cieľ, je `<button>` a otvorí ho **rovno na správnom
+  mieste** (deep-link). Údaj bez cieľa ostáva textom — predstierať preklik do
+  nikam je horšie než nekliknuteľný riadok. Nedostupná akcia sa hlási cez
+  `aria-disabled` s vysvetlením, **nikdy** HTML `disabled` (vzor D-78).
+- **Zamknuté ⇔ vypísané.** Pri rozmerových poliach s automatikou (výšky čiel,
+  „Prvá zóna") drží **vypísaná hodnota**, prázdne pole je AUTO. Samostatný zámok
+  vedel byť zapnutý nad prázdnym poľom a nerobil nič — dve pravdy o tom istom.
+  Návrat na automat robí **chip AUTO**, ktorý sa ukazuje len pri vypísanej
+  hodnote.
+- **Jedna voľba z N je segmentový prepínač** (`.segrow`), nie rada rádií ani
+  select: typ vkladaného objektu, umiestnenie dosky, rozsah hromadnej zmeny.
+  Aktívny segment nesie **výberovú rodinu** (teal) — je to *stav*, nie akcia.
+- **Zbalený sektor musí povedať, čo skrýva** — meta súhrn v lište sektora je
+  vidno rovnako zbalený aj rozbalený a skladá sa **až pri kreslení** zo živého
+  stavu panela (nikdy sa necachuje ako hotový reťazec).
+- **Rozbaľovacie okno je overlay, nie nový riadok** (`position: absolute` —
+  warnpanel, `.miniopts` rozmerových radov, nastavenie zvýraznenia hrán):
+  vertikálny priestor sa nesmie meniť tým, že si niečo otvoríš.
 - **Žiadna vizuálna zmena bez zámeru.** Nová farba sa nepridáva ako hex do súboru —
   pridáva sa token, alebo sa použije existujúci.
 
@@ -145,7 +166,19 @@ natvrdo hex. Nedefinovaný token = zahodená vlastnosť (skontroluj preklepy).
 | Token | Hex | Použitie |
 |---|---|---|
 | `--nx-scrim` | `rgba(38,50,56,.45)` | tmavé pozadie modalu |
-| `--nx-modal-shadow` | `rgba(0,0,0,.25)` | tieň modalu / overlay |
+| `--nx-modal-shadow` | `rgba(0,0,0,.25)` | tieň modalu / overlay (warnpanel, `.miniopts`, split okno) |
+
+### Chróm panela a rozmery kostry (nie sú to „farby významu")
+| Token | Hodnota | Použitie |
+|---|---|---|
+| `--nx-ghost-hover` | `#e0e4e7` | hover neutrálneho (`ghost`) tlačidla |
+| `--nx-logo` | `#78909c` | firemné logo v hlavičke — zámerne tlmené |
+| `--nx-header-h` | `42px` | orientačná výška sticky hlavičky (`scroll-padding-top`) |
+| `--nx-rail-w` | `44px` | šírka railu kontextov (UI-B1) |
+
+> Posledné dva tokeny **nie sú farby** — sú to rozmery kostry a žijú v `:root`
+> preto, že ich potrebujú aj pravidlá mimo hlavičky (fokus nesmie skončiť pod
+> sticky lištou, obsah nesmie zaliezť pod rail). Téma sa ich netýka.
 
 ### Semafor — REZERVOVANÉ (nepoužívať)
 | Token | Hex | Poznámka |
@@ -255,6 +288,12 @@ a „Bez čela“ `front`),
 `edge` (UI-D1 — hrana dielca v karte: plná hrubšia čiara = hrana, o ktorej
 riadok hovorí, ostatné tri sú prerušované. **Jedna kresba, štyri rotácie**
 cez `data-rot` v CSS — nikdy štyri ikony).
+
+> **Inventár je úplný k v0.7.20** (blok UI-D uzavretý): zoznam vyššie zodpovedá
+> kľúčom v `icons.js` 1:1. Nová ikona sa pridáva **len keď pre ňu neexistuje
+> významovo správna existujúca** — UI-D3 napríklad nepridalo žiadnu, oko
+> warnpanelu je ten istý `eye` ako „Označiť v modeli" v karte dielca (rovnaký
+> význam = rovnaká kresba).
 
 > Okno **Výroba** načítava `icons.js` od v0.5.44 (predtým sprite nemalo) — nové
 > ovládacie prvky v ňom používajú sprite, nie glyfy.
@@ -598,8 +637,14 @@ Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html`
   len trieda `.on`; prestavba patrí zmene typu a novej knižnici. (Klik, ktorý
   zahodí uzol, by v CEF druhému kliku dvojkliku nenechal cieľ.)
 - **Kresba dlaždice nenesie farbu.** Schéma z configu (riadky čiel, krídla, police)
-  je len geometria; obrys a výplň dávajú tokeny v CSS. Reálne PNG náhľady prídu
-  s UI-D2.
+  je len geometria; obrys a výplň dávajú tokeny v CSS.
+- **Reálny PNG náhľad má prednosť pred schémou (UI-D2).** Fotka vzniká pri
+  UKLADANÍ šablóny (`view.write_image` nad práve postavenou skrinkou) a do
+  dlaždice sa doťahuje **na vyžiadanie, raz na revíziu** — data URI nemôže
+  cestovať v každom pushi knižnice. Keď fotka nie je (staršia šablóna, zlyhaný
+  capture), dlaždica **ostane na schéme** — nikdy prázdne miesto. Obrázok sa
+  vkladá `object-fit: contain` (nie `cover`): orezať skrinku, aby vyplnila
+  dlaždicu, by z nej spravilo iný nábytok.
 - **Primárna akcia je posledná** — zelené „Vložiť" stojí až za rozmermi *aj* za
   materiálom (rovnaký dôvod, prečo tam už stálo „Vložiť dosku").
 - **Odhad namiesto ticha:** dopočítané údaje, ktoré pre nevložený návrh nemá kto
@@ -667,8 +712,24 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Zones`).
 - **Náhľad:** fixné okno so zoom/pan; ovládanie (kamera + fit) žije v **spodnom
   páse** — viď 5.2.
 - **Karty:** `fieldset`/`details` na bielom povrchu, rámik `--nx-border`.
-- **Warn chip / warnlist:** klik na chip ukotvený zoznam upozornení hore (pri
-  rozbalení návrat na začiatok, aby bol viditeľný aj po odscrollovaní).
+- **Warn chip → warnpanel (N5, UI-D3):** klik na ⚠ chip otvorí **overlay** pod
+  hlavičkou — `position: absolute` **vnútri sticky `<header>`**, nie riadok
+  layoutu. Blokový zoznam (pôvodné riešenie D-29) otvorením posunul celý obsah
+  nadol a musel si pomáhať skokom na začiatok stránky; overlay nerobí ani jedno
+  a drží sa pri chipe aj po odscrollovaní. **Každý riadok má oko** — označí
+  v modeli to, o čom nález hovorí (dielec, alebo celú skrinku, keď nález patrí
+  korpusovej úrovni). Dole **jedna cesta von**: „Otvoriť v Štúdiu → Kontrola".
+  Zatvára ho **klik mimo a Escape** (fokus späť na chip); klik vnútri panela aj
+  na samotný chip **zastavuje bublanie** — inak by sa panel v tom istom kliku
+  otvoril a hneď zavrel. Šírka 300 px, tieň `--nx-modal-shadow`, rámik
+  `--nx-warnchip-border` (rovnaká jantárová rodina ako chip; modal ostáva nad
+  ním, lebo hlavička je `z-index: 50` a modal 60).
+- **Deep-link namiesto „nájdi si to sám" (UI-D3):** informačný údaj, ktorý na
+  niečo ukazuje, otvára cieľ **rovno na správnom mieste** — ⚠ panel na tabe
+  KONTROLA, „Materiál" na tabe Kusovník. Kým Štúdio neexistuje, je cieľom okno
+  Výroba a **hovorí sa to nahlas** (tooltip aj status). Čo cieľ **nevie**, sa
+  nepredstiera: kusovník nemá filter na jednu skrinku, takže sa nevymýšľa — len
+  sa povie, že vidno celú zákazku a filter príde so Štúdiom.
 - **Veľkosť okna pri otvorení (D-77):** žiadne okno sa nesmie otvoriť odseknuté.
   `width`/`height` v `HtmlDialog.new` platia len pri PRVOM otvorení (potom
   rozhoduje veľkosť zapamätaná pod `preferences_key`), preto každé okno deklaruje
@@ -790,6 +851,26 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Part`,
   („skús celý projekt") — `aria-disabled`, nikdy HTML `disabled` (vzor D-78).
   Modal vopred hovorí, že prenáša **len olep hrán** a že je to **jeden krok
   Späť**.
+
+### 5.10 Kovanie — boxy vlastníka a značky náhľadu (UI-C4)
+
+Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Hw`).
+
+- **Položky sú zoskupené podľa VLASTNÍKA, nie podľa typu** (`.hwbox`): „Skrinka" ·
+  box každého čela · spoločný box „Vnútro skrinky". Je to **iba iné zobrazenie
+  tých istých dát** — identita položky, zápisové cesty aj nákupný riadok D-92
+  ostávajú nedotknuté.
+- **Hlavička boxu je `<button>` a SÚRODENEC tela, nie jeho obal.** Klik na select
+  setu či pole počtu tak k hlavičke nemá ako dobublať — je to štrukturálne
+  silnejšie než `stopPropagation`, na ktorý by musel pamätať každý budúci ovládač.
+- **Klik na hlavičku označí vlastníka v modeli** (zmena pohľadu, nie zápis —
+  žiadny krok Späť, rovnaká zásada ako „Dielcov" N13 a kamera N7). Cieľ skoku sa
+  **krátko prisvieti** (`.hwfocus`): položiek býva viac, než sa zmestí na obraz.
+- **Box ↔ značka v náhľade sú prepojené OBOMA smermi** a nasadzuje ich **jedna**
+  funkcia, aby sa smery nemohli rozísť. Hover **nikdy nekreslí náhľad nanovo**
+  (lekcia D-23) — beží len CSS triedou nad už vykresleným SVG.
+- **Box sa nezbaľuje.** Na skrátenie panela stačí exkluzivita skupín S4; druhé
+  zbaľovanie v zbaľovaní je klik navyše bez zisku.
 
 ### D-51: štandard rozmerov okien (UI-B1)
 

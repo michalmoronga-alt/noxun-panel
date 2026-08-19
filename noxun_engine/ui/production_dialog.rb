@@ -18,8 +18,23 @@ module Noxun
     module ProductionDialog
       DLG_KEY = 'NoxunEngineProduction'
 
+      # UI-D3: taby okna. ZAVAZNY whitelist deep-linku — panel posiela len meno
+      # tabu a server je jedina autorita, ktora rozhodne, ci je platne (JS mirror
+      # `NXShell.STUDIO_TABS` je pohodlie, nie ochrana).
+      TABS = %w[rows sheets edging hardware budget control].freeze
+
       class << self
-        def show
+        # `open_tab` = deep-link z Inspectora (⚠ warnpanel -> KONTROLA, „Materiál"
+        # -> Kusovník). Bez neho sa tab NEPREPINA: pouzivatel, ktory si okno otvoril
+        # sam, ostava tam, kde naposledy skoncil.
+        #
+        # Tab sa NEPOSIELA hned — okno po `show` este nemusi mat nacitany HTML,
+        # takze `execute_script` by prisiel do prazdna. Odklada sa a spotrebuje ho
+        # NAJBLIZSI `push_state` (pri novom okne ho vyvola `ready`, pri uz otvorenom
+        # ho volame priamo tu). Vzor je stav ABS kontroly hran, ktory chodi tou
+        # istou cestou.
+        def show(open_tab: nil)
+          @pending_tab = TABS.include?(open_tab.to_s) ? open_tab.to_s : nil
           dlg = ensure_dialog
           if dlg.visible?
             dlg.bring_to_front
@@ -1211,9 +1226,20 @@ module Noxun
             # model_key = epocha prepnuti + cesta (GH P2: rovnake tituly nestacia)
             vepo: { default_project: default_project_name(model),
                     model_key: "#{@model_epoch.to_i}:#{model.path}",
-                    merge_18_36: vepo_settings['merge_18_36'] != false }
+                    merge_18_36: vepo_settings['merge_18_36'] != false },
+            # UI-D3: deep-link z Inspectora. Posiela sa PRAVE RAZ (hodnota sa tu
+            # spotrebuje) — inak by kazdy dalsi refresh okna vratil pouzivatela
+            # na tab, z ktoreho medzitym odisiel. nil = tab sa neprepina.
+            open_tab: consume_pending_tab
           }
           js("NX.setBom(#{data.to_json})")
+        end
+
+        # Jednorazove prevzatie deep-link tabu (viz `show`).
+        def consume_pending_tab
+          t = @pending_tab
+          @pending_tab = nil
+          TABS.include?(t.to_s) ? t.to_s : nil
         end
 
         def set_status(msg, error = false)

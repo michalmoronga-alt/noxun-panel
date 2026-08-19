@@ -80,4 +80,21 @@
   // (klik = vybrat, dvojklik = vlozit) — dlazdice sa prekresluju, listener nie.
   // UI-C4: bindHwOwnerHover = JEDNA delegacia nad #hwRows (hover boxu prisvieti
   // znacky kovania v projekcii) — boxy sa prestavuju, listener nie.
-  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupHoverEdge(); setupFieldEditorDelegation(); setupTemplateTiles(); bindHwOwnerHover(); nxComboSync(); document.body.setAttribute('data-insert-kind', getInsertKind()); nxShellApply(); if (window.sketchup && sketchup.ready) sketchup.ready(); };
+  // UI-D3 (N5): bindWarnPanel = zatvaranie warnpanelu (klik mimo + Escape).
+  // Listenery visia na STATICKOM #warnList a na document — obsah panela sa
+  // prekresluje pri kazdom pushi, listener nie.
+  function bindWarnPanel(){
+    var list = el('warnList'); if (!list) return;
+    // Klik VNUTRI panela sa k documentu nedostane (inak by sa panel zavrel
+    // skor, nez klik na oko doleti k svojmu handleru).
+    list.addEventListener('click', function(ev){ ev.stopPropagation(); });
+    document.addEventListener('click', function(){ closeWarnPanel(); });
+    document.addEventListener('keydown', function(ev){
+      if (ev.key !== 'Escape' || !warnPanelOpen()) return;
+      closeWarnPanel();
+      // Fokus patri spat na ⚠ chip — inak by po Escape skoncil v prazdne.
+      var chip = document.querySelector('#idbar .warnchip');
+      if (chip){ try { chip.focus(); } catch (e) {} }
+    });
+  }
+  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupHoverEdge(); setupFieldEditorDelegation(); setupTemplateTiles(); bindHwOwnerHover(); bindWarnPanel(); nxComboSync(); document.body.setAttribute('data-insert-kind', getInsertKind()); nxShellApply(); if (window.sketchup && sketchup.ready) sketchup.ready(); };

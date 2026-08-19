@@ -1,10 +1,15 @@
   // V0.5 B: otvorenie okna Vyroba (kusovnik/supisy). Najprv flush cakajucich
   // editov korpusu/dosky (Codex GH #48 P2) — BOM sa pocita az z cerstveho stavu
   // (callbacky sa spracuju v poradi: apply -> open -> push_state).
-  function openProductionDialog(){
+  // UI-D3: volitelny DEEP-LINK — `tab` otvori okno rovno na danom tabe
+  // (`rows` kusovnik, `control` kontrola…). Bez neho sa tab NEPREPINA a
+  // pouzivatel ostane tam, kde naposledy skoncil (rail Štúdio). Hodnotu
+  // preosieva NXShell.studioLink, ZAVAZNY whitelist je na strane Ruby.
+  function openProductionDialog(tab){
     if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
     if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
-    if (window.sketchup && sketchup.open_production) sketchup.open_production('');
+    if (window.sketchup && sketchup.open_production)
+      sketchup.open_production(JSON.stringify(NXShell.studioLink(tab)));
   }
 
   // ===================== ZONA UI (akcie / rozmery poli) =====================
@@ -442,12 +447,17 @@
     if (window.sketchup && sketchup.nx_select_parts)
       sketchup.nx_select_parts(JSON.stringify({ cabinet_id: selectedCabId, model_guid: nxModelGuid }));
   }
-  // Materiál m² — cielom je „Štúdio → Kusovník s filtrom na túto skrinku".
-  // Štúdio zatiaľ neexistuje (vlastná fáza po bloku UI-D), preto sa povie
-  // pravda a ponúkne dnešná cesta namiesto tichého nič.
+  // UI-D3 (N13): Materiál m² — klik vedie tam, kam ukazuje: do KUSOVNÍKA.
+  // Štúdio zatiaľ neexistuje (vlastná fáza po bloku UI-D), preto sa otvorí
+  // okno Výroba rovno na tabe Kusovník (deep-link). FILTER na skrinku sa
+  // NEVYMYSLA — kusovník ho nemá; povie sa to nahlas, aby používateľ vedel,
+  // že vidí celú zákazku (sľúbený filter príde so Štúdiom).
   function onInfoArea(){
     if (!selectedCabId){ NX.setStatus('Označ skrinku v modeli.', true); return; }
-    NX.setStatus('Plocha dosky tejto skrinky. Kusovník s filtrom na skrinku pribudne v Štúdiu — zatiaľ ho nájdeš v okne Výroba (ikona Štúdio v lište vľavo).');
+    // Status PRED otvorenim: pripadny flush rozpisaneho editu odpovie neskor
+    // a jeho sprava je dolezitejsia — nechame ju vyhrat.
+    NX.setStatus('Kusovník je otvorený — zatiaľ za celú zákazku, filter na jednu skrinku pribudne v Štúdiu.');
+    openProductionDialog('rows');
   }
 
   function setSelected(cid){

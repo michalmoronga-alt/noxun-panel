@@ -226,9 +226,53 @@
       return out;
     }
 
+    // ===== UI-D3 (N5): riadky warnpanelu ===================================
+    // Cista funkcia nad UZ PRIJATYMI upozorneniami stavby (BuildPlan kontrakt:
+    // code / severity / message / part_key / data). Panel z nich kresli riadky
+    // s okom — `keys` je presne to, co ma oko oznacit v modeli.
+    //
+    // PRAZDNE `keys` = korpusova uroven upozornenia (part_key nil): oznaci sa
+    // CELA skrinka. Je to ta ista konvencia, aku uz ma box „Skrinka" v Kovani
+    // (`handle_select_hw_owner` s prazdnym `part_keys`) — ziadna nova dohoda.
+    //
+    // Upozornenie bez textu sa ZAHODI: prazdny riadok s okom by sluboval, ze
+    // sa da niekam skocit, a pritom by nepovedal preco.
+    function warnRows(warnings){
+      var out = [];
+      var list = warnings || [];
+      for (var i = 0; i < list.length; i++){
+        var w = list[i];
+        if (!w) continue;
+        var msg = String(w.message == null ? '' : w.message);
+        if (!msg) continue;
+        var pk = (w.part_key == null) ? '' : String(w.part_key);
+        out.push({ text: msg, keys: pk ? [pk] : [],
+                   tip: pk ? 'Ukáž v modeli — označí dotknutý dielec'
+                           : 'Ukáž v modeli — označí celú skrinku' });
+      }
+      return out;
+    }
+
+    // ===== UI-D3: deep-link do okna Vyroba (docasne „Štúdio") ==============
+    // Taby okna Vyroba. Zoznam je ZRKADLO `ProductionDialog::TABS` — autoritou
+    // whitelistu je RUBY (HTML/JS nie je ochrana), tento mirror len zabrani,
+    // aby z panela vobec vyletela hodnota, ktora tab nepomenuva.
+    var STUDIO_TABS = ['rows', 'sheets', 'edging', 'hardware', 'budget', 'control'];
+    function studioTab(t){
+      var s = String(t == null ? '' : t);
+      return STUDIO_TABS.indexOf(s) >= 0 ? s : null;
+    }
+    // Payload prekliku. `tab: null` = „len otvor okno" (rail Štúdio) — server
+    // vtedy tab NEPREPINA a pouzivatel ostane tam, kde naposledy skoncil.
+    function studioLink(tab){ return { tab: studioTab(tab) }; }
+
     return {
       secKey: secKey,
       exclusiveClose: exclusiveClose,
+      warnRows: warnRows,
+      studioTab: studioTab,
+      studioLink: studioLink,
+      STUDIO_TABS: STUDIO_TABS,
       CONTEXTS: CONTEXTS,
       state: state,
       normCtx: normCtx,
