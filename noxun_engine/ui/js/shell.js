@@ -237,6 +237,18 @@
     //
     // Upozornenie bez textu sa ZAHODI: prazdny riadok s okom by sluboval, ze
     // sa da niekam skocit, a pritom by nepovedal preco.
+    //
+    // Codex #182 P2: NIEKTORE nalezy nesu `part_key` dielca, ktory sa do modelu
+    // NIKDY nedostal — `part_skipped_degenerate` je presne o tom, ze plan dielec
+    // VYRADIL (`construction.rb`), no kluc si v upozorneni ponechal, aby sa dalo
+    // povedat KTORY to bol. Poslat taky kluc na vyber znamena zarucene „Dielec
+    // sa v modeli nenašiel" — akcia, ktora nemoze uspiet. Preto taky nalez
+    // spadne na KORPUSOVU uroven (prazdne kluce = oznaci sa skrinka): to je
+    // najblizsia vec, ktora v modeli naozaj existuje.
+    //
+    // Zoznam je UZKY a explicitny — nie heuristika. Nepostavene dielce pozna
+    // plan, nie panel; keby pribudol dalsi taky kod, patri SEM (a do testu).
+    var WARN_PART_NOT_BUILT = ['part_skipped_degenerate'];
     function warnRows(warnings){
       var out = [];
       var list = warnings || [];
@@ -245,7 +257,9 @@
         if (!w) continue;
         var msg = String(w.message == null ? '' : w.message);
         if (!msg) continue;
-        var pk = (w.part_key == null) ? '' : String(w.part_key);
+        var code = String(w.code == null ? '' : w.code);
+        var built = WARN_PART_NOT_BUILT.indexOf(code) < 0;
+        var pk = (built && w.part_key != null) ? String(w.part_key) : '';
         out.push({ text: msg, keys: pk ? [pk] : [],
                    tip: pk ? 'Ukáž v modeli — označí dotknutý dielec'
                            : 'Ukáž v modeli — označí celú skrinku' });

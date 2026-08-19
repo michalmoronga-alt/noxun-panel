@@ -1009,12 +1009,22 @@
      pozicovany), takze panel drzi pri chipe aj po odscrollovani.
      z-index je LOKALNY v stacking kontexte hlavicky (z-index 50): staci 2, aby
      bol nad identitou, a modal (60) ostava nad celou hlavickou. */
+  /* Codex #182 P2: panel je MIMO dokumentoveho toku, takze pri mnohych nalezoch
+     by spodne riadky AJ tlacidlo „Otvoriť v Štúdiu" skoncili pod okrajom okna a
+     scrollovanie dokumentu by ich nedotiahlo. Preto je vyska OHRANICENA
+     viewportom a scrolluje sa VNUTRI panela: zoznam riadkov (`.wrows`) je jediny
+     scroller, cesta von ostava vzdy na ocnom mieste dole (vzor `.cbpop`). */
   .nx-inspector .nxhdr .warnpanel {
     position: absolute; top: calc(100% + 2px); right: 10px; z-index: 2;
     width: 300px; max-width: calc(100% - 20px); padding: 6px;
+    max-height: calc(100vh - var(--nx-header-h) - 18px);
+    display: flex; flex-direction: column;
     background: var(--nx-surface); border: 1px solid var(--nx-warnchip-border);
     border-radius: 6px; box-shadow: 0 8px 22px var(--nx-modal-shadow);
   }
+  /* min-height: 0 je nutne — flex polozka sa inak nezmensi pod svoj obsah a
+     `overflow` by sa nikdy neuplatnil. */
+  .warnpanel .wrows { overflow-y: auto; min-height: 0; }
   .warnpanel .warnrow { display: flex; align-items: center; gap: 6px; padding: 4px 3px;
                         font-size: 11.5px; color: var(--nx-warnrow-fg); }
   .warnpanel .warnrow span { flex: 1 1 auto; min-width: 0; }
@@ -1025,7 +1035,7 @@
   .warnpanel .wgo:hover { color: var(--nx-select); }
   .warnpanel .wgo .ic { width: 14px; height: 14px; }
   /* Deep-link do okna Vyroba (tab KONTROLA) — jedna cesta „von" na plnu sirku. */
-  .warnpanel .wgoto { display: block; width: 100%; margin-top: 4px; padding: 5px;
+  .warnpanel .wgoto { flex: 0 0 auto; display: block; width: 100%; margin-top: 4px; padding: 5px;
                       border: 0; border-top: 1px solid var(--nx-warnrow-border);
                       background: none; font: inherit; font-size: 11.5px;
                       color: var(--nx-select); text-align: center; cursor: pointer; }

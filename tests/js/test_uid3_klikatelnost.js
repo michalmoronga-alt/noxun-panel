@@ -43,6 +43,25 @@ eq(/dielec/.test(PART_LEVEL[0].tip), true, 'tooltip rozlisi dielec od skrinky');
 eq(NXShell.warnRows([{ message: 'x', part_key: 'zone:Z1.2/shelf:3' }])[0].keys,
    ['zone:Z1.2/shelf:3'], 'zlozeny kluc prejde bez zmeny');
 
+// Codex #182 P2: nalez o dielci, ktory sa NIKDY nepostavil, nesmie poslat jeho
+// kluc na vyber — skoncil by zarucene na "Dielec sa v modeli nenašiel".
+// `part_skipped_degenerate` je presne ten pripad: plan dielec vyradil, ale kluc
+// si v upozorneni ponechal, aby sa dalo povedat, ktory to bol.
+const SKIPPED = NXShell.warnRows([
+  { code: 'part_skipped_degenerate', message: 'Dielec Polica (Z1.2) ma nekladny rozmer — preskoceny.',
+    part_key: 'zone:Z1.2/shelf:1' }
+]);
+eq(SKIPPED[0].keys, [], 'vyradeny dielec spadne na korpusovu uroven (oznaci sa skrinka)');
+eq(/skrinku/.test(SKIPPED[0].tip), true, 'a tooltip to POVIE — nesluby o dielci, ktory neexistuje');
+eq(SKIPPED[0].text, 'Dielec Polica (Z1.2) ma nekladny rozmer — preskoceny.',
+   'text nalezu ostava nedotknuty — pouzivatel sa stale dozvie, o ktory dielec islo');
+// Rovnaky kluc pri INOM kode ostava cielom — vyradenie plati len pre vymenovane
+// kody, nie pre kazdy nalez so zonovym klucom.
+eq(NXShell.warnRows([{ code: 'rail_depth_clamped', message: 'x', part_key: 'zone:Z1.2/shelf:1' }])[0].keys,
+   ['zone:Z1.2/shelf:1'], 'ostatne kody svoj dielec dalej oznacia');
+eq(NXShell.warnRows([{ message: 'bez kodu', part_key: 'front:1' }])[0].keys, ['front:1'],
+   'chybajuci kod = bezny nalez (nevyhadzuje sa kluc naslepo)');
+
 // Prazdny/chybajuci text = riadok bez informacie: oko by slubilo skok a
 // nepovedalo preco. Taky nalez sa nekresli.
 eq(NXShell.warnRows([{ code: 'x', part_key: 'front:1' }]).length, 0, 'nalez bez textu sa zahodi');

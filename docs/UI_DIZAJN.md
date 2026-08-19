@@ -724,6 +724,16 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Zones`).
   otvoril a hneď zavrel. Šírka 300 px, tieň `--nx-modal-shadow`, rámik
   `--nx-warnchip-border` (rovnaká jantárová rodina ako chip; modal ostáva nad
   ním, lebo hlavička je `z-index: 50` a modal 60).
+- **Overlay musí mať strop výšky a vlastný scroller.** Prvok mimo dokumentového
+  toku sa **scrollom stránky nedá dotiahnuť**: pri dlhom obsahu skončia spodné
+  riadky *aj cesta von* pod okrajom okna a používateľ sa k nim nedostane.
+  Preto `max-height` viazaná na viewport + `overflow-y: auto` na **zozname**,
+  nie na celom paneli — akcia dole musí zostať na očnom mieste. (Vo flexe k
+  tomu patrí `min-height: 0`, inak sa položka pod svoj obsah nezmenší.)
+- **Overlay, ktorý zastavuje bublanie, vypadne z merača D-25** — preto merač
+  počíta klik v **capture fáze**. Nový overlay so zatváraním „klikom mimo" tak
+  nemusí na nič pamätať; nezabudni len pridať jeho `data-nx-usage` kľúče do
+  allowlistu (`USAGE_KEYS`), inak sa počítajú pod generickým kľúčom.
 - **Deep-link namiesto „nájdi si to sám" (UI-D3):** informačný údaj, ktorý na
   niečo ukazuje, otvára cieľ **rovno na správnom mieste** — ⚠ panel na tabe
   KONTROLA, „Materiál" na tabe Kusovník. Kým Štúdio neexistuje, je cieľom okno

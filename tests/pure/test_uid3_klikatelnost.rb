@@ -52,6 +52,21 @@ NxTest.test('UI-D3: warnpanel NEZABERA vertikalny priestor (position: absolute)'
   NxTest.refute(UID3_PANEL_HTML.include?('class="warnlist"'), 'a nikde sa uz nepouziva')
 end
 
+NxTest.test('UI-D3: dlhy zoznam nalezov sa scrolluje VNUTRI panela (Codex #182 P2)') do
+  # Panel je mimo dokumentoveho toku — pri mnohych nalezoch by spodne riadky AJ
+  # tlacidlo „Otvoriť v Štúdiu" skoncili pod okrajom okna a scroll dokumentu by
+  # ich nedotiahol. Vyska je preto ohranicena viewportom a scrolluje sa zoznam.
+  rule = UID3_CSS[/\.nx-inspector \.nxhdr \.warnpanel \{.*?\}/m].to_s
+  NxTest.assert(rule.include?('max-height: calc(100vh'), 'vyska panela je viazana na viewport')
+  NxTest.assert(rule.include?('flex-direction: column'), 'panel je flex stlpec (zoznam + cesta von)')
+  NxTest.assert(UID3_CSS.include?('.warnpanel .wrows { overflow-y: auto; min-height: 0; }'),
+                'scrolluje LEN zoznam riadkov — `min-height: 0` je nutne, inak sa flex polozka nezmensi')
+  NxTest.assert(UID3_CSS.match?(/\.warnpanel \.wgoto \{ flex: 0 0 auto;/),
+                'cesta von sa nescvrkne ani nescrolluje prec')
+  NxTest.assert(UID3_BRIDGE_JS.include?("var h = '<div class=\"wrows\">'"),
+                'riadky su naozaj v scrolleri (CSS bez wrappera by nic nerobilo)')
+end
+
 NxTest.test('UI-D3: scroll-to-top pri otvoreni ZANIKOL (overlay ho nepotrebuje)') do
   body = UID3_BRIDGE_JS[/function toggleWarnList.*?\n  \}/m].to_s
   NxTest.assert(!body.empty?, 'toggle sa nasiel')
@@ -102,6 +117,36 @@ NxTest.test('UI-D3: oko ma FLUSH handshake (vzor onInfoParts / onHwOwnerPick)') 
   NxTest.assert(body.include?('!validateFields()'), 'neplatne pole akciu ZASTAVI')
   NxTest.assert(body.index('!validateFields()') < body.index('nx_select_hw_owner'),
                 'kontrola aj flush bezia PRED odoslanim vyberu')
+end
+
+NxTest.test('UI-D3: nalez o NEPOSTAVENOM dielci nespusta akciu, co nemoze uspiet (Codex #182 P2)') do
+  # `part_skipped_degenerate` VYRADI dielec z planu, ale jeho `part_key` si v
+  # upozorneni ponecha (aby sa dalo povedat, ktory to bol). Poslat taky kluc na
+  # vyber = zarucene „Dielec sa v modeli nenašiel". Zoznam je UZKY a explicitny.
+  NxTest.assert(UID3_SHELL_JS.include?("var WARN_PART_NOT_BUILT = ['part_skipped_degenerate'];"),
+                'kod vyradeneho dielca je vymenovany, nie uhadnuty heuristikou')
+  body = UID3_SHELL_JS[/function warnRows.*?\n    \}/m].to_s
+  NxTest.assert(body.include?('WARN_PART_NOT_BUILT.indexOf(code) < 0'),
+                'nalez sa pyta kodu PRED tym, nez z neho spravi cielovy kluc')
+  # Zdroj pravdy o tom, ze taky dielec naozaj v modeli nie je:
+  cons = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'construction.rb'), encoding: 'UTF-8')
+  NxTest.assert(cons.include?("BuildPlan.warning('part_skipped_degenerate'"),
+                'kod stale existuje na strane planu (inak by zoznam mieril do prazdna)')
+end
+
+NxTest.test('UI-D3: kliky vo warnpaneli sa DOSTANU do meraca D-25 (Codex #182 P2)') do
+  # Panel zastavuje bublanie (potrebuje to na zatvaranie klikom mimo), takze
+  # merac v BUBBLE faze by o nom nevedel — a odpocet D-25, podla ktoreho sa
+  # rozhoduje o rezimoch panela, by tvrdil, ze warnpanel nikto nepouziva.
+  usage = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'usage.js'), encoding: 'UTF-8')
+  NxTest.assert(usage.include?("document.addEventListener('click', onClick, true)"),
+                'klik sa pocita v CAPTURE faze — stopPropagation ho uz neschova')
+  %w[warn:chip warn:oko warn:studio part:smer].each do |k|
+    NxTest.assert(usage.include?("'#{k}'"), "kluc #{k} je v allowliste USAGE_KEYS")
+    NxTest.assert(UID3_BRIDGE_JS.include?("data-nx-usage=\"#{k}\"") ||
+                  UID3_PART_JS.include?("data-nx-usage=\"#{k}\""),
+                  "kluc #{k} naozaj visi na prvku (allowlist bez prvku nic nezmeria)")
+  end
 end
 
 NxTest.test('UI-D3: statusy vyberu nesu podstatne meno podla povodu kliku') do

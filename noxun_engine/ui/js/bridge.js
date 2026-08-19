@@ -172,7 +172,9 @@
   // JEDNA cesta von — deep-link do okna Vyroba na tab KONTROLA.
   function warnPanelHtml(warns, cabId){
     var rows = NXShell.warnRows(warns);
-    var h = '';
+    // Codex #182 P2: riadky maju VLASTNY scroller (`.wrows`), aby dlhy zoznam
+    // nálezov nevytlacil cestu von pod okraj okna — tlacidlo ostava dole.
+    var h = '<div class="wrows">';
     rows.forEach(function(r){
       h += '<div class="warnrow"><span>' + esc(r.text) + '</span>' +
         '<button type="button" class="wgo" data-nx-usage="warn:oko"' +
@@ -181,6 +183,7 @@
         ' title="' + esc(r.tip) + '" aria-label="' + esc(r.tip) + '">' +
         NXIcons.svg('eye') + '</button></div>';
     });
+    h += '</div>';
     h += '<button type="button" class="wgoto" data-nx-usage="warn:studio"' +
       ' onclick="onWarnStudio(event)"' +
       ' title="Otvorí okno Výroba na tabe KONTROLA — celý zoznam nálezov zákazky">' +
