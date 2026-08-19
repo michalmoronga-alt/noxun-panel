@@ -122,6 +122,21 @@ NxTest.test('UI-D1: definicia „podobny" je ROLA + MATERIAL a zdroj sa vynecha'
                 'rozsah „celý projekt" ide cez vsetky korpusy modelu')
 end
 
+NxTest.test('UI-D1 (Codex #180 P1): ODPOJENE dielce sa medzi podobne NEPOCITAJU') do
+  # `manufactured_parts` vracia aj dielce vytiahnute na najvyssiu uroven (viazane
+  # uz len atributom `cabinet_id`). Tie `rebuild_many` neprekresli — ostali by so
+  # STARYM snapshotom, kym by hlaska tvrdila, ze sa im olep zmenil (a kusovnik aj
+  # VEPO by niesli stare hrany). Vyber preto berie VYHRADNE vnorene dielce.
+  fn = UID1_PARTS_RB[/def regenerated_parts\b.*?\n        end\n/m].to_s
+  NxTest.assert(!fn.empty?, 'vlastna funkcia pre prestavatelne dielce existuje')
+  NxTest.assert(fn.include?('cab.definition.entities.grep(Sketchup::ComponentInstance)'),
+                'cita LEN vnorene dielce definicie korpusu')
+  NxTest.assert(fn.include?('manufactured_sheet_part?'),
+                'filter vyrobneho dielca ostava zdielany s `manufactured_parts`')
+  NxTest.assert(UID1_MAP.include?('regenerated_parts(c)') && !UID1_MAP.include?('manufactured_parts(c)'),
+                'vyberova funkcia pouziva PRESTAVATELNE dielce, nie vsetky')
+end
+
 NxTest.test('UI-D1: POCET aj ZAPIS idu TOU ISTOU funkciou') do
   NxTest.assert(UID1_COUNT.include?('similar_parts_map('), 'pocet sa pyta vyberovej funkcie')
   NxTest.assert(UID1_APPLY.include?('similar_parts_map('), 'zapis sa pyta TEJ ISTEJ funkcie')
@@ -181,6 +196,27 @@ NxTest.test('UI-D1: modal ma rozsah, zivy pocet a NIE nativne disabled') do
   NxTest.assert(modal.include?('id="simApplyBtn"') && modal.include?('aria-disabled="true"'),
                 'neaktivne tlacidlo je aria-disabled (vzor D-78), nie nativne disabled')
   NxTest.assert(!modal.include?(' disabled'), 'nativne `disabled` by zhltlo hover aj vysvetlenie')
+end
+
+NxTest.test('UI-D1 (Codex #180 P1): modal NEODCHYTAVA Enter — tlacidla si ho riesia samy') do
+  # Modal nema textove pole; vsetko fokusovatelne su tlacidla. Globalny odchyt
+  # s `preventDefault()` by Enter nad „Zrušiť" premenil na POUZITIE hromadnej
+  # zmeny a prepinac rozsahu by sa klavesnicou neprepol.
+  bind = UID1_PART_JS[/function bindSimModal.*?\n  \}/m].to_s
+  NxTest.assert(!bind.empty?, 'viazanie modalu sa naslo')
+  NxTest.assert(bind.include?("ev.key === 'Escape'"), 'Escape modal zatvara')
+  NxTest.assert(!bind.include?("ev.key === 'Enter'"), 'Enter sa NEODCHYTAVA')
+  NxTest.assert(!bind.include?('applySimilarNow()'), 'klavesnica hromadny zapis NESPUSTA')
+end
+
+NxTest.test('UI-D1 (Codex #180 P2): prekreslenie karty si vypyta CERSTVY pocet') do
+  # Späť/Znova alebo zmena katalogu mozu zmenit material dielca aj pocet cielov
+  # bez zmeny identity — modal by inak drzal stary pocet a slubil zmenu, ktora
+  # sa uz netyka nikoho. Pocet sa najprv zhodi na „počítam" (tlacidlo neaktivne).
+  body = UID1_PART_JS[/function renderPartCard.*?\n  \}/m].to_s
+  NxTest.assert(body.include?('simModalStale(pc)'), 'iny dielec modal zavrie')
+  NxTest.assert(body.include?('simCount = null; applySimCountView(); requestSimilarCount();'),
+                'ta ista identita si vypyta cerstvy pocet a dovtedy nesluby nic')
 end
 
 NxTest.test('UI-D1: rad akcii je JEDEN riadok dole (vertikalny priestor)') do

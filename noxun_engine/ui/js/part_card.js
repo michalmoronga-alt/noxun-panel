@@ -30,6 +30,14 @@
     // inak by oneskorene „Použiť" zapisalo olep z dielca, ktory uz nie je na
     // obrazovke (vzor tplModalStale + absModalCloseSilent).
     if (simModalStale(pc)) closeSimilarModal();
+    // Codex #180 P2: prekreslenie karty s TOU ISTOU identitou (Späť/Znova, zmena
+    // katalógu, echo push) modal nezavrie — ale mohlo zmenit material dielca
+    // alebo pocet cielov. Bez noveho dopytu by okno drzalo STARY pocet a slubilo
+    // by zmenu piatich dielcov tam, kde uz ziadny nie je (server pri zapise ráta
+    // nanovo). Pocet sa preto vypyta znova; odpoved meni LEN obsah modalu.
+    // Pocet sa najprv zhodi na „počítam" (tlacidlo je dovtedy neaktivne) — inak
+    // by okno v case letu odpovede stale ukazovalo staru hodnotu ako platnu.
+    else if (simModalOpen()){ simCount = null; applySimCountView(); requestSimilarCount(); }
     // FIX 2: material dielca len z hrubkovo kompatibilnych dosiek (nekompatibilne disabled).
     // D-45: cela beru KATALOGOVU hrubku sveho materialu (frontMatch = rozsah dosky),
     // ostatne dielce presnu hrubku dielca — tu ju meni material/hrubka celej skrinky.
@@ -463,9 +471,14 @@
   function bindSimModal(){
     if (simBound) return; simBound = true;
     var m = el('simModal'); if (!m) return;
+    // Codex #180 P1: ENTER SA TU NEODCHYTAVA. Modal nema ziadne textove pole —
+    // vsetko fokusovatelne su TLACIDLA, takze Enter uz spravnu vec robi sam
+    // (nativna aktivacia toho, na com stoji fokus). Globalny odchyt s
+    // `preventDefault()` by naopak spravil presny opak toho, co pouzivatel
+    // chce: Enter nad „Zrušiť" by hromadnu zmenu POUZIL a Enter nad
+    // prepinacom rozsahu by ho neprepol.
     m.addEventListener('keydown', function(ev){
-      if (ev.key === 'Escape'){ ev.preventDefault(); closeSimilarModal(); return; }
-      if (ev.key === 'Enter'){ ev.preventDefault(); applySimilarNow(); }
+      if (ev.key === 'Escape'){ ev.preventDefault(); closeSimilarModal(); }
     });
     // klik na tmave pozadie = zrusit (klik v karte nie)
     m.addEventListener('mousedown', function(ev){ if (ev.target === m) closeSimilarModal(); });

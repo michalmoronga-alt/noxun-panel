@@ -359,6 +359,25 @@ module Noxun
           scope == 'project' ? 'celý projekt' : 'táto skrinka'
         end
 
+        # Dielce, ktore prestavba korpusu NAOZAJ prekresli — teda VYHRADNE tie
+        # VNORENE v jeho definicii.
+        #
+        # Codex #180 P1: `manufactured_parts` vracia navyse ODPOJENE dielce
+        # (vytiahnute na najvyssiu uroven, viazane uz len atributom `cabinet_id`).
+        # Tie `rebuild_many` nevie prekreslit — ostavaju s vlastnym snapshotom.
+        # Keby sa pocitali medzi podobne, modal by ich pripocital a hlaska by
+        # tvrdila, ze sa im olep zmenil, kym by ich vyrobne data (kusovnik, VEPO)
+        # niesli STARE hrany. Radsej ich nezapocitat, nez o nich klamat.
+        def regenerated_parts(cab)
+          return [] unless cab && cab.valid? && cab.respond_to?(:definition)
+
+          cab.definition.entities.grep(Sketchup::ComponentInstance)
+             .select { |e| manufactured_sheet_part?(e) }
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.regenerated_parts')
+          []
+        end
+
         # JEDINA autorita vyberu podobnych dielcov — pocet aj zapis idu TOU
         # ISTOU cestou (inak by modal ukazoval iny pocet, nez sa naozaj zapise).
         # Vracia { cabinet_id => [cab_instance, [part_key, ...]] }.
@@ -377,7 +396,7 @@ module Noxun
             cid = Store.get(c, 'cabinet_id').to_s
             next if cid.empty? || out.key?(cid)
 
-            keys = manufactured_parts(c).select do |p|
+            keys = regenerated_parts(c).select do |p|
               Store.get(p, 'role').to_s == role &&
                 (Store.config(p) || {})['material_id'].to_s == mat
             end.map { |p| Store.get(p, 'part_key').to_s }.reject(&:empty?).uniq
