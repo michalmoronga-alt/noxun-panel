@@ -136,6 +136,10 @@ module Noxun
           # suspend guardom (vzor ProductionDialog.do_select) — ziadna operacia,
           # ziadny zapis, ziadny krok Spat.
           cb(dlg, 'nx_select_parts')       { |p| handle_select_parts(p) }
+          # UI-C4: klik na hlavicku boxu vlastnika v sekcii Kovanie (a na znacku
+          # kovania v nahlade) — oznaci vlastnika polozky v modeli. CISTE
+          # CITANIE + zmena vyberu; panel po nej ZAMERNE ostava v Kovani.
+          cb(dlg, 'nx_select_hw_owner')    { |p| handle_select_hw_owner(p) }
           # D-100: premenovanie skrinky (inline edit nazvu v hlavicke panela)
           cb(dlg, 'rename_cabinet')        { |p| handle_rename_cabinet(p) }
           # UI-B3 (koliesko = Nastavenia Inspectora): tema UI a rozmerove rady.

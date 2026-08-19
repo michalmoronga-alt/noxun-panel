@@ -336,6 +336,30 @@
   /* nekompletny nakup (chyba set/kod/pasmo) = jantarove UPOZORNENIE;
      semaforove --nx-state-* su rezervovane a nesmu sa sem miesat */
   .hwbuy.hwbuy-warn { color: var(--nx-warnchip-fg); }
+  /* UI-C4: BOX VLASTNIKA (kontrakt UI 2.0 — Skrinka + kazde celo). Kompaktne:
+     hlavicka + obsah, ziadne vlastne zbalovanie (exkluzivita skupin S4 staci).
+     Trieda je `.hwbox` (nie `.hwown` z mockupu) — `.hwown` uz oznacuje popis
+     vlastnika VNUTRI riadku a dva vyznamy jednej triedy by sa poprali. */
+  .hwbox { border: 1px solid var(--nx-border-soft); border-radius: 6px; margin: 6px 0;
+           overflow: hidden; background: var(--nx-surface); }
+  .hwboxh { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 8px;
+            border: 0; background: var(--nx-surface-sunken); font: inherit; font-size: 11px;
+            font-weight: 600; color: var(--nx-ink-strong); cursor: pointer; text-align: left; }
+  .hwboxh:hover, .hwboxh:focus-visible { color: var(--nx-select); }
+  .hwboxh .ic { width: 12px; height: 12px; flex: 0 0 12px; color: var(--nx-ink-faint); }
+  .hwboxh:hover .ic, .hwboxh:focus-visible .ic { color: var(--nx-select); }
+  .hwboxt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hwboxsub { margin-left: auto; font-weight: 400; font-size: 10.5px; color: var(--nx-ink-faint);
+              flex: 0 0 auto; }
+  .hwboxb { padding: 2px 8px 6px; }
+  .hwboxb .hwitem:first-child, .hwboxb .hwrow:first-child { margin-top: 2px; }
+  /* Obojsmerne prepojenie box <-> znacka v projekcii. `.hov` nasadzuje JS na
+     OBE strany naraz (hover nad boxom aj hover nad značkou v náhľade) — vzor
+     D-23 sync riadok <-> čelo. */
+  .hwbox:hover { border-color: var(--nx-select-bg-hover); }
+  .hwbox.hov { border-color: var(--nx-select); }
+  .hwbox.hov > .hwboxh { background: var(--nx-select-bg-hover); color: var(--nx-select-strong); }
+  .hwbox.hov > .hwboxh .ic { color: var(--nx-select-strong); }
   /* PRAVIDLA KOVANIA (dialog) */
   .rrule { border: 1px solid var(--nx-border); border-radius: 6px; padding: 8px 10px; margin: 8px 0; background: var(--nx-surface); }
   .rrule .rhead { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
@@ -951,9 +975,12 @@
                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .frow .fhw:hover, .frow .fhw:focus { color: var(--nx-select); outline: none; }
   .frow .fhw .ic { flex: 0 0 auto; width: 11px; height: 11px; }
-  /* Kratke zvyraznenie ciela po skoku z riadku cela do sekcie Kovanie —
-     bez neho pouzivatel po prepnuti kontextu hlada, ktora polozka je „jeho". */
+  /* Kratke zvyraznenie ciela po skoku z riadku cela (alebo zo znacky v nahlade)
+     do sekcie Kovanie — bez neho pouzivatel po prepnuti kontextu hlada, ktora
+     polozka je „jeho". UI-C4: cielom je BOX vlastnika. */
   .hwitem.hwfocus, .hwrow.hwfocus { background: var(--nx-select-bg); border-radius: 6px; }
+  .hwbox.hwfocus { border-color: var(--nx-select); box-shadow: 0 0 0 2px var(--nx-select-bg); }
+  .hwbox.hwfocus > .hwboxh { background: var(--nx-select-bg); color: var(--nx-select-strong); }
   /* D-19: odhad platni v tabe Materialy — nowrap, fallback stisene LEN tieto bunky */
   .bomtab td.estcell { white-space: nowrap; }
   .bomtab td.estfb { color: var(--nx-ink-faint); }
@@ -978,6 +1005,12 @@
                             stroke-width: 1.5; }
   #preview g.fgrp.hov rect { stroke: var(--nx-select-strong); stroke-width: 3.5; }
   #preview g.fgrp.hov text { fill: var(--nx-select-strong); }
+  /* UI-C4: to iste pre ZNACKY KOVANIA — hover nad hlavickou boxu vlastnika
+     prisvieti jeho znacky v projekcii (a naopak). Ziadny rerender: CSS trieda
+     nad uz vykreslenym SVG prebije prezentacne atributy znacky. */
+  #preview g.hwmk.hov circle, #preview g.hwmk.hov rect { stroke: var(--nx-select-strong);
+                                                         stroke-width: 3.5; }
+  #preview g.hwmk.hov path { stroke: var(--nx-select-strong); }
   .frow.hov { background: var(--nx-select-bg-hover); border-radius: 6px; }
   .frow.hov .fnum { color: var(--nx-select-accent); font-weight: 600; }
   /* D-23: hint pod nahladom podla aktivneho kontextu (data-view-ctx, UI-B1) —

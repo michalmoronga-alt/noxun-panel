@@ -241,6 +241,40 @@ bublanie (lekcia: select sa zatváral).
 select setu + rad NL s D-93 zámkom + nákupné riadky („UKW 7 → 774519 · Profil UKW 7"…); hlavička
 boxu klik=označ v modeli. Sety a Pravidlá bez zmeny.
 
+**Kovanie — vedomé odchýlky od konceptu (implementácia UI-C4, 19.8.2026):**
+- **Panel po označení vlastníka NEPUSHA stav.** Identita výberu je autoritou režimu Inspectora,
+  takže označený DIELEC by panel prepol na kartu Dielec — a box, z ktorého používateľ práve
+  klikol, by mu zmizol pod rukami. Server preto po zmene výberu zámerne nevolá `push_selected`
+  (vzor `EdgeSelectionWatch`); panel už zobrazuje TÚ ISTÚ skrinku, takže sa nič nerozchádza vo
+  veci, len rail nedostane dočasnú položku. **Cena:** najbližší bežný push (Späť/Znova, zmena
+  katalógu, ďalší klik v modeli) panel zosúladí a vtedy sa karta Dielec ukáže.
+- **Ostatní vlastníci majú JEDEN spoločný box „Vnútro skrinky".** Koncept vymenúva „Skrinka +
+  každé čelo" a o iných vlastníkoch mlčí; podperky sú pritom viazané na JEDNOTLIVÉ police, takže
+  doslovné čítanie by pri šiestich policiach vyrobilo šesť boxov s jedným riadkom (proti pravidlu
+  „vertikálny priestor panela je vzácny"). V spoločnom boxe si riadok ponecháva **celý** popis
+  vlastníka („Podperky · Polica 2") a klik na hlavičku označí všetky police naraz.
+- **Sekcia sa rozdelila na TRI skupiny S4** — Položky z pravidiel · Sety · Pravidlá. Koncept ich
+  tak kreslí (mockup `s4Hw`), implementácia mala dovtedy jednu skupinu, v ktorej sa na konci
+  zoznamu položiek miešali riadky setov celej skrinky.
+- **Meta v hlavičke boxu je POČET položiek,** nie výpočet typov („závesy + profil" z mockupu).
+  Typy sú vypísané hneď pod hlavičkou — zopakovať ich by bola len redundancia.
+- **Trieda boxu je `.hwbox`, nie `.hwown` z mockupu** — `.hwown` už označuje popis vlastníka
+  VNÚTRI riadku (V0.4) a dva významy jednej triedy by sa poprali.
+- **Hlavička boxu je `<button>` a SÚRODENEC tela,** nie klikateľný obal. Klik na select setu,
+  zámok NL či pole počtu k nej preto nemá ako dobublať — štrukturálne silnejšie než
+  `stopPropagation`, na ktoré by musel pamätať každý budúci ovládač v boxe. *Mockup rieši to isté
+  cez `event.stopPropagation()` na každom ovládači.*
+- **Box sa NEZBAĽUJE** (kontrakt to tak žiada) — na skrátenie panela stačí exkluzivita skupín S4.
+- **Box vzniká LEN vlastníkovi, ktorý naozaj má položku** (alebo vypnutú kategóriu). Znenie
+  „Skrinka / každé čelo" čítame ako **rozdelenie položiek podľa vlastníka**, nie ako povinný
+  zoznam všetkých čiel — mockup `s4Hw` kreslí tri boxy pre tri čelá, ktoré kovanie majú.
+  Prázdny box by nič nevypísal a zabral dva riadky (pravidlo „vertikálny priestor je vzácny"),
+  a pri čele typu **„bez čela" (nika)** by dokonca ponúkal „označ v modeli" bez dielca, ktorý
+  by sa dal označiť. Zoznam všetkých čiel žije v kontexte Čelá; preklik odtiaľ už dnes povie
+  „Toto čelo zatiaľ nemá naviazané kovanie." *(Nález Codex #179 kolo 4 — vedome neprijatý;
+  ak by Michal pri kole 1:1 s mockupom chcel prázdne boxy, je to jednoriadková zmena
+  v `hwGroups`: predsiať `cab` + `frontIds`.)*
+
 **Dielec:** Základné hore (Smer dekoru = vstup; Dĺžka/Šírka/Hrúbka = info) · hrany s ikonou
 square-dashed-top rotovanou (predná 0°·zadná 180°·ľavá 90°·pravá 270°) + ABS štvorec · hover hrany
 zvýrazní v modeli (D-89a) · „Označiť v modeli" · „Použiť na podobné…".
@@ -280,7 +314,8 @@ debate nad `mockup_ui20.html`.
   (N21 — zásah do builder parametrov ⇒ in-SU POVINNÉ, codex-audit ÁNO)** + snap N20, police pills,
   Vnútro slot.
 - UI-C3 (M) Čelá: všetko z konceptu (riadky, AUTO, rady, naviazané kovanie, N26/N27, výklop hint).
-- UI-C4 (M) Kovanie: owner boxy + značky náhľadu. (Dáta owner existujú — UI reorganizácia.)
+- ~~UI-C4 (M) Kovanie: owner boxy + značky náhľadu.~~ **HOTOVÉ** (v0.7.16) — odchýlky vyššie.
+  Plný beh in-SketchUp áno: dávka pridala novú serverovú cestu na zmenu výberu.
 
 **BLOK UI-D · Dotiahnutie**
 - UI-D1 (S) Dielec: Základné hore, hranové ikony, Označiť v modeli; **„Použiť na podobné" zapisuje
