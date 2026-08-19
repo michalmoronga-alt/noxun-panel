@@ -44,6 +44,8 @@ eq(hwGroupTitle(HW_GROUP_CAB, null, 'CAB-005'), 'Skrinka CAB-005', 'box skrinky 
 eq(hwGroupTitle(HW_GROUP_CAB, null, ''), 'Skrinka', 'bez ID aspon „Skrinka"');
 eq(hwGroupTitle('front:F3', 'F3 · zásuvkové čelo', 'CAB-005'), 'Čelo F3', 'box cela je pomenovany celom');
 eq(hwGroupTitle('front:Fxyz', '', 'CAB-005'), 'Čelo', 'bez serveroveho popisu sa NIC nevymysla');
+eq(hwGroupTitle('front:Fxyz', 'front:Fxyz/wing:left', 'CAB-005'), 'Čelo',
+   'surovy kluc v hlavicke NIE — vyzeral by ako nazov a pritom nic nehovori');
 eq(hwGroupTitle(HW_GROUP_INSIDE, 'Polica 1', 'CAB-005'), 'Vnútro skrinky', 'spolocny box vnutra');
 
 // --- 4) pocty v hlavicke (slovenske tvary) -------------------------------------

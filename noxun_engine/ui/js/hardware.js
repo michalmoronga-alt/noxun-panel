@@ -130,7 +130,11 @@
     if (groupKey === HW_GROUP_CAB) return cabId ? ('Skrinka ' + cabId) : 'Skrinka';
     if (groupKey === HW_GROUP_INSIDE) return 'Vnútro skrinky';
     var head = hwLabelHead(sampleLabel);
-    return head ? ('Čelo ' + head) : 'Čelo';
+    // Ked server popis nedodal (alebo je to surovy kluc, lebo sa celo v resolved
+    // zozname nenaslo), NIC sa nevymysla — hlavicka ostane holy „Čelo". Surovy
+    // kluc v hlavicke by vyzeral ako nazov a pritom by nic nehovoril.
+    if (!head || head.indexOf('/') >= 0 || head.indexOf(':') >= 0) return 'Čelo';
+    return 'Čelo ' + head;
   }
   // Meta sumar v hlavicke boxu. Zamerne POCET (nie vypocet typov) — typy su
   // vypisane hned pod hlavickou a zopakovat ich by bola len redundancia.
@@ -479,6 +483,13 @@
   // Ziadny zapis, ziadny krok Spat — je to zmena VYBERU (vzor „Dielcov" z
   // UI-B3). Panel po nej ZAMERNE ostava v Kovani (server nerobi push_selected),
   // aby box, z ktoreho pouzivatel klikol, nezmizol pod rukami.
+  //
+  // A prave preto TU NIE JE flush handshake, aky ma „Dielcov" (UI-B3) a
+  // „Vložiť kópiu": ten existuje kvoli tomu, ze zmena vyberu si vypyta push
+  // CELEJ skrinky, ktory prepise formular a rozpisany edit (400 ms debounce) by
+  // sa ticho stratil. Tato cesta ziadny push nevyvola, takze nie je co chranit
+  // — a flush by naopak odoslal rozpisanu hodnotu skor, nez ju pouzivatel
+  // dopisal.
   function onHwOwnerPick(btn){
     var box = btn.closest ? btn.closest('.hwbox') : null;
     if (!box) return;
