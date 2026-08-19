@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **UI-D3 — KLIKATEĽNOSŤ A UZÁVERY · BLOK UI-D UZAVRETÝ (20.8.):** PR **tento**, v0.7.19 → **v0.7.20**. Posledná dávka bloku UI-D a zároveň **uzáver celého Inspector reworku** (bloky UI-A · UI-B · UI-C · UI-D).
+- **UI-D3 — KLIKATEĽNOSŤ A UZÁVERY · BLOK UI-D UZAVRETÝ (20.8.):** PR **#182**, v0.7.19 → **v0.7.20**. Posledná dávka bloku UI-D a zároveň **uzáver celého Inspector reworku** (bloky UI-A · UI-B · UI-C · UI-D).
 
   **Čo vidí používateľ.** ⚠ chip v hlavičke otvorí **panel upozornení**, ktorý sa vysunie *nad* obsah — nič sa neposunie a nemusí sa skákať na začiatok stránky ako predtým. Každý nález má vedľa seba **oko**: klik ním označí dotknutý dielec priamo v modeli (nález, ktorý patrí celej skrinke, označí skrinku). Dole je **jedna cesta von** — „Otvoriť v Štúdiu → Kontrola", ktorá otvorí okno Výroba rovno na tabe Kontrola. Panel zatvorí klik vedľa alebo Escape. V informačnom stĺpci Základných začal fungovať aj údaj **„Materiál"**: otvorí okno Výroba na tabe **Kusovník** (predtým len vypísal do statusu, že Štúdio ešte nie je). A v karte dielca je **„Smer dekoru" preklikom** — skočí na materiál, ktorý ten smer určuje.
 
