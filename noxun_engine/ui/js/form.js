@@ -315,9 +315,13 @@
   }
   // UI-D2: KLUC nahladu v cache. Nahlad je viazany na TROJICU (druh, nazov,
   // revizia suboru) — po prepise sablony sa `rev` zmeni a stary obrazok sa uz
-  // nikdy netrafi. ` ` ako oddelovac: v nazve sablony sa vyskytnut nemoze.
+  // nikdy netrafi. Oddelovac je NUL — v nazve sablony sa vyskytnut nemoze.
+  // Pise sa VYHRADNE ako escape `\u0000` (Codex #181 P2): surovy NUL bajt
+  // v zdrojaku by z form.js spravil pre rg/grep BINARNY subor a buduce
+  // hladanie handlerov ci regresii by ho ticho preskocilo.
+  var TPL_PREV_SEP = '\u0000';
   function tplPrevKey(kind, name, rev){
-    return String(kind || '') + ' ' + String(name || '') + ' ' + String(rev || '');
+    return String(kind || '') + TPL_PREV_SEP + String(name || '') + TPL_PREV_SEP + String(rev || '');
   }
   // Cache odpovedi servera: kluc -> data URI, alebo '' = „server nahlad nema"
   // (zaporna odpoved sa cachuje TIEZ, inak by sa panel pytal donekonecna).

@@ -17,7 +17,7 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **UI-D2 — PNG NÁHĽADY ŠABLÓN (19.8.):** PR **tento**, v0.7.17 → **v0.7.18**. Druhá dávka bloku UI-D. Dlaždice šablón vo vkladacej karte konečne ukazujú, ako tá skrinka naozaj vyzerá.
+- **UI-D2 — PNG NÁHĽADY ŠABLÓN (19.8.):** PR **tento**, v0.7.17 → **v0.7.19**. Druhá dávka bloku UI-D. Dlaždice šablón vo vkladacej karte konečne ukazujú, ako tá skrinka naozaj vyzerá.
 
   **Čo vidí používateľ.** Keď uloží skrinku ako šablónu, plugin si k nej **odfotí pohľad na ňu** a dlaždica v paneli potom namiesto schematickej kresby ukazuje **skutočný obrázok**. Fotenie je nenápadné: pohľad v SketchUpe **ostane presne tam, kde bol** a v Späť nepribudne ani jeden krok. Šablóny uložené pred touto dávkou ostávajú pri schéme, kým sa neuložia znova — a dlaždica má **stále rovnakú výšku**, či už nesie fotku alebo kresbu.
 

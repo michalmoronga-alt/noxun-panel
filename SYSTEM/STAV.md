@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.7.18 · 19.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
+**v0.7.19 · 19.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
 
 **Beží blok UI 2.0.** Koncept Inspectora je uzavretý (Michal 18.8.) — záväzný kontrakt a mockupy sú v repe: [zdroje/ui20/](zdroje/ui20/) ([UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) + mockupy Inspector C, štúdio, dizajnový lístok); práca je narezaná do dávok UI-A → UI-B → UI-C → UI-D a fázy ŠTÚDIO ([PLAN.md](PLAN.md)).
 
@@ -23,7 +23,7 @@ Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolova
 
 ## Posledné uzávery
 
-- **UI-D2 PNG náhľady šablón** (pri uložení šablóny sa **odfotí pohľad na skrinku** a dlaždica v paneli ním nahradí schematickú kresbu · fotí sa **aktuálny pohľad dorámovaný na skrinku** — vedomé rozhodnutie, izolovaný render by musel skrývať zvyšok modelu, čiže zapisovať doň · **kamera sa vždy vráti presne tam, kde bola** (perspektíva aj orto) a nevznikne ani jeden krok Späť · staršie šablóny, neúspešná fotka aj poškodený obrázok končia pri **schéme** a výška dlaždice sa nemení nikdy · pri prepise šablóny bez úspešnej fotky sa **starý obrázok zmaže** · obrázky žijú ako súbory vedľa knižnice, schéma `templates.json` sa nemenila · okno Šablóny zosúladilo poradie ukladania — najprv názov a potvrdenie prepisu, až potom dáta aj fotka z jedného snímku) — PR **tento**, v0.7.18 (19.8.)
+- **UI-D2 PNG náhľady šablón** (pri uložení šablóny sa **odfotí pohľad na skrinku** a dlaždica v paneli ním nahradí schematickú kresbu · fotí sa **aktuálny pohľad dorámovaný na skrinku** — vedomé rozhodnutie, izolovaný render by musel skrývať zvyšok modelu, čiže zapisovať doň · **kamera sa vždy vráti presne tam, kde bola** (perspektíva aj orto) a nevznikne ani jeden krok Späť · staršie šablóny, neúspešná fotka aj poškodený obrázok končia pri **schéme** a výška dlaždice sa nemení nikdy · pri prepise šablóny bez úspešnej fotky sa **starý obrázok zmaže** · obrázky žijú ako súbory vedľa knižnice, schéma `templates.json` sa nemenila · okno Šablóny zosúladilo poradie ukladania — najprv názov a potvrdenie prepisu, až potom dáta aj fotka z jedného snímku) — PR **tento**, v0.7.19 (19.8.)
 
 - **UI-D1 Dielec** (karta dielca má **Základné hore** — Dĺžka/Šírka/Hrúbka a smer dekoru ako dopočítané údaje, nie polia · každá hrana má **ikonu s rotáciou podľa strany v náhľade** + farebný štvorec ABS · **„Označiť v modeli"** označí dielec bez toho, aby čokoľvek zapísalo alebo vyrobilo krok Späť · **„Použiť na podobné…"** prenesie olep hrán na dielce s **rovnakou rolou a rovnakým materiálom** — v modale sa volí rozsah *táto skrinka* / *celý projekt* a **živý počet** hovorí vopred, koľkých dielcov sa to týka; celý zápis je **jeden krok Späť**, aj keď zasiahne viac skriniek) — PR **#180**, v0.7.17 (19.8.)
 

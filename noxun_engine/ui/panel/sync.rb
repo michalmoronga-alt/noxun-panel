@@ -38,7 +38,10 @@ module Noxun
               upper: CabinetBuilder::UPPER_DEFAULTS
             },
             zones_visible: Zones.visible?(model),
-            templates: template_list,
+            # UI-D2 (Codex #181 P1): aj PRVY payload nesie `preview_rev` — inak by
+            # panel po otvoreni povazoval vsetky sablony za bezobrazkove, o nahlad
+            # by si nepovedal a fotky by naskocili az po nesuvisiacom push_templates.
+            templates: template_list(previews: true),
             materials: materials_payload, # V0.3 katalog (dosky + ABS) pre selecty
             # (projektove predvolby zobrazuje okno MaterialsDialog — D2)
             selected: initial,

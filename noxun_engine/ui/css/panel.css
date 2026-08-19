@@ -730,11 +730,16 @@
      dlazdice sa nemeni ani ked nahlad chyba, prichadza neskoro alebo sa
      nepodari nacitat („vertikalny priestor panela je vzacny"). Obrazok je
      v dlazdici od zaciatku (bez src) a len sa odkryje — vymena uzla by
-     uprostred dvojkliku odpojila ciel udalosti. `cover` = orez, nie
-     deformacia (3:2 capture do 3:2 boxu). */
+     uprostred dvojkliku odpojila ciel udalosti.
+     `contain`, NIE `cover` (Codex #181 P2): dlazdica je pri sirke panela 470 px
+     asi 135x38, teda ~3,5:1, kym capture je 3:2 — `cover` by z fotky nechal
+     uzky vodorovny pruh cez stred skrinky. `contain` ukaze CELU skrinku (pri
+     38 px vysky ~57 px sirky, vycentrovanu) bez deformacie a bez zmeny vysky
+     dlazdice; boky vyplni utlmene pozadie, aby ramec vyzeral zameran. */
   .nx-inspector .tplpic { display: block; height: 38px; margin-bottom: 3px; overflow: hidden; }
   .nx-inspector .tplpic svg { margin-bottom: 0; }
-  .nx-inspector .tplpic img { display: none; width: 100%; height: 38px; object-fit: cover; }
+  .nx-inspector .tplpic img { display: none; width: 100%; height: 38px; object-fit: contain;
+            background: var(--nx-surface-sunken); }
   .nx-inspector .tplpic.has img { display: block; }
   .nx-inspector .tplpic.has svg { display: none; }
   /* Schematicka kresba dlazdice nesie NULA farieb — obrys aj vypln su tokeny
