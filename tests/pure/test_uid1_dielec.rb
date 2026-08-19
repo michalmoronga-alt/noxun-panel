@@ -63,7 +63,11 @@ NxTest.test('UI-D1 (vedoma odchylka): Smer dekoru je INFORMACIA, nie rozbalovack
   # ze nieco nastavuje, by bola lož — preto je to text s vysvetlenim.
   NxTest.assert(UID1_PART_JS.include?('Smer dekoru'), 'udaj sa v karte ukazuje')
   NxTest.assert(!UID1_CARD.include?('pc_grain'), 'karta dielca NEMA select smeru dekoru')
-  NxTest.assert(UID1_PART_JS.include?('mení sa v katalógu materiálov'),
+  # UI-D3 spresnilo znenie: karta uz nielen POVIE, kde sa smer meni, ale rovno
+  # tam VEDIE (klik otvori materialovy combobox tej istej karty). Podstata
+  # odchylky ostava — je to informacia + navigacia, NIE pole, ktore by sa
+  # tvarilo, ze smer nastavuje.
+  NxTest.assert(UID1_PART_JS.include?('Smer dekoru určuje materiál dielca'),
                 'karta povie, kde sa smer naozaj meni (nikdy ticho mŕtvy udaj)')
   NxTest.assert(UID1_PAYLOADS_RB.include?("'grain_direction' => cfg['grain_direction']"),
                 'payload karty nesie smer zo SNAPSHOTU dielca (server, nie JS)')

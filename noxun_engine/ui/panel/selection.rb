@@ -321,6 +321,22 @@ module Noxun
           set_status("Označených #{parts.size} dielcov skrinky #{Store.get(cab, 'cabinet_id')} v modeli.")
         end
 
+        # UI-D3: `handle_select_hw_owner` nizsie pouziva aj OKO v riadku
+        # warnpanelu (⚠ chip v hlavicke) — nalez stavby ukazuje na dielec presne
+        # tak ako polozka kovania na svojho vlastnika, takze duplikovat cely blok
+        # guardov by znamenalo dve miesta, ktore sa casom rozidu. Lisi sa LEN
+        # podstatne meno v statusoch (payload nesie `origin`), aby hlaska
+        # nehovorila o „vlastníkovi" a o Kovani tam, kde pouzivatel klikal na
+        # upozornenie. Neznamy/chybajuci povod = kovanie (spatna kompatibilita).
+        SELECT_OWNER_NOUNS = {
+          'warn' => { subject: 'Nález', stay: 'panel ostáva pri skrinke' },
+          'hardware' => { subject: 'Vlastník', stay: 'panel ostáva v Kovaní' }
+        }.freeze
+
+        def select_owner_nouns(raw)
+          SELECT_OWNER_NOUNS[raw.to_s] || SELECT_OWNER_NOUNS['hardware']
+        end
+
         # UI-C4: klik na HLAVICKU BOXU VLASTNIKA v sekcii Kovanie (a na znacku
         # kovania v nahlade) — oznaci v modeli to, comu polozka patri: celu
         # skrinku (prazdne `part_keys`) alebo konkretne dielce podla part_key
@@ -347,7 +363,8 @@ module Noxun
           return if model.nil?
 
           data = payload ? parse(payload) : {}
-          return set_status('Vlastník sa neoznačil — panel patrí inému dokumentu.', true) if
+          noun = select_owner_nouns(data['origin'])
+          return set_status("#{noun[:subject]} sa neoznačil — panel patrí inému dokumentu.", true) if
             data['model_guid'].to_s != model_guid(model)
 
           # Codex #179 P2 (kolo 3): rovnaky guard ako `handle_select_parts`.
@@ -359,7 +376,7 @@ module Noxun
           if @last_apply_error
             msg = @last_apply_error
             @last_apply_error = nil
-            return set_status("Vlastník sa neoznačil — najprv oprav úpravu: #{msg}", true)
+            return set_status("#{noun[:subject]} sa neoznačil — najprv oprav úpravu: #{msg}", true)
           end
 
           cab = find_cabinet(model)
@@ -392,7 +409,7 @@ module Noxun
           found = parts.map { |p| Store.get(p, 'part_key').to_s }.uniq
           missing = keys - found
           msg = "Označené v modeli: #{hw_owner_status_label(cab, found)} " \
-                "(skrinka #{cid}) — panel ostáva v Kovaní."
+                "(skrinka #{cid}) — #{noun[:stay]}."
           unless missing.empty?
             msg += " Nenašlo sa: #{hw_owner_status_label(cab, missing)} " \
                    '— skrinka sa možno medzitým prestavala.'

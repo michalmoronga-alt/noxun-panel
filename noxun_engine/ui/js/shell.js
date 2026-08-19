@@ -226,9 +226,67 @@
       return out;
     }
 
+    // ===== UI-D3 (N5): riadky warnpanelu ===================================
+    // Cista funkcia nad UZ PRIJATYMI upozorneniami stavby (BuildPlan kontrakt:
+    // code / severity / message / part_key / data). Panel z nich kresli riadky
+    // s okom — `keys` je presne to, co ma oko oznacit v modeli.
+    //
+    // PRAZDNE `keys` = korpusova uroven upozornenia (part_key nil): oznaci sa
+    // CELA skrinka. Je to ta ista konvencia, aku uz ma box „Skrinka" v Kovani
+    // (`handle_select_hw_owner` s prazdnym `part_keys`) — ziadna nova dohoda.
+    //
+    // Upozornenie bez textu sa ZAHODI: prazdny riadok s okom by sluboval, ze
+    // sa da niekam skocit, a pritom by nepovedal preco.
+    //
+    // Codex #182 P2: NIEKTORE nalezy nesu `part_key` dielca, ktory sa do modelu
+    // NIKDY nedostal — `part_skipped_degenerate` je presne o tom, ze plan dielec
+    // VYRADIL (`construction.rb`), no kluc si v upozorneni ponechal, aby sa dalo
+    // povedat KTORY to bol. Poslat taky kluc na vyber znamena zarucene „Dielec
+    // sa v modeli nenašiel" — akcia, ktora nemoze uspiet. Preto taky nalez
+    // spadne na KORPUSOVU uroven (prazdne kluce = oznaci sa skrinka): to je
+    // najblizsia vec, ktora v modeli naozaj existuje.
+    //
+    // Zoznam je UZKY a explicitny — nie heuristika. Nepostavene dielce pozna
+    // plan, nie panel; keby pribudol dalsi taky kod, patri SEM (a do testu).
+    var WARN_PART_NOT_BUILT = ['part_skipped_degenerate'];
+    function warnRows(warnings){
+      var out = [];
+      var list = warnings || [];
+      for (var i = 0; i < list.length; i++){
+        var w = list[i];
+        if (!w) continue;
+        var msg = String(w.message == null ? '' : w.message);
+        if (!msg) continue;
+        var code = String(w.code == null ? '' : w.code);
+        var built = WARN_PART_NOT_BUILT.indexOf(code) < 0;
+        var pk = (built && w.part_key != null) ? String(w.part_key) : '';
+        out.push({ text: msg, keys: pk ? [pk] : [],
+                   tip: pk ? 'Ukáž v modeli — označí dotknutý dielec'
+                           : 'Ukáž v modeli — označí celú skrinku' });
+      }
+      return out;
+    }
+
+    // ===== UI-D3: deep-link do okna Vyroba (docasne „Štúdio") ==============
+    // Taby okna Vyroba. Zoznam je ZRKADLO `ProductionDialog::TABS` — autoritou
+    // whitelistu je RUBY (HTML/JS nie je ochrana), tento mirror len zabrani,
+    // aby z panela vobec vyletela hodnota, ktora tab nepomenuva.
+    var STUDIO_TABS = ['rows', 'sheets', 'edging', 'hardware', 'budget', 'control'];
+    function studioTab(t){
+      var s = String(t == null ? '' : t);
+      return STUDIO_TABS.indexOf(s) >= 0 ? s : null;
+    }
+    // Payload prekliku. `tab: null` = „len otvor okno" (rail Štúdio) — server
+    // vtedy tab NEPREPINA a pouzivatel ostane tam, kde naposledy skoncil.
+    function studioLink(tab){ return { tab: studioTab(tab) }; }
+
     return {
       secKey: secKey,
       exclusiveClose: exclusiveClose,
+      warnRows: warnRows,
+      studioTab: studioTab,
+      studioLink: studioLink,
+      STUDIO_TABS: STUDIO_TABS,
       CONTEXTS: CONTEXTS,
       state: state,
       normCtx: normCtx,

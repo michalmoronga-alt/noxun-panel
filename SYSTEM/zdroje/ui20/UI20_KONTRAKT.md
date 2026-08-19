@@ -358,12 +358,23 @@ debate nad `mockup_ui20.html`.
 - ~~UI-D1 (S) Dielec: Základné hore, hranové ikony, Označiť v modeli; **„Použiť na podobné" zapisuje
   do viacerých dielcov ⇒ in-SU povinné.**~~ **HOTOVÉ** (v0.7.17) — definícia „podobné" a dve
   vedomé odchýlky sú zapísané vyššie pri sekcii Dielec. Plný beh in-SketchUp áno.
-- UI-D2 (M) Šablónové PNG náhľady (view.write_image pri uložení + fallback schéma) — in-SU beh.
-- UI-D3 (S) Klikateľnosť zvyšok: warnpanel N5 deep-linky, N13 kliky, zvyšné prekliky; UI_DIZAJN.md
-  aktualizácia (paleta, zásady, nové ikony do icons.js) + D-čísla uzávery (D-77/84/89a/96/26-rozhodnutie).
+- ~~UI-D2 (M) Šablónové PNG náhľady (view.write_image pri uložení + fallback schéma) — in-SU beh.~~
+  **HOTOVÉ** (v0.7.19) — kontextová fotografia namiesto izolovaného renderu je vedomé rozhodnutie
+  (izolácia by musela zapisovať do modelu); zapísané vyššie pri sekcii Vkladanie.
+- ~~UI-D3 (S) Klikateľnosť zvyšok: warnpanel N5 deep-linky, N13 kliky, zvyšné prekliky; UI_DIZAJN.md
+  aktualizácia (paleta, zásady, nové ikony do icons.js) + D-čísla uzávery.~~ **HOTOVÉ** (v0.7.20) —
+  warnpanel je **overlay** v hlavičke (nezaberá vertikálny priestor), oko riadku označuje v modeli
+  **existujúcou** cestou UI-C4, deep-link do okna Výroba má whitelist tabov na serveri a spotrebuje
+  sa raz. **Preklik sa implementoval LEN tam, kde cieľ existuje** — vnútorné rozmery, hmotnosť,
+  hrúbka dielca, odhady vkladania a nákupný riadok kovania ostali textom (nemajú kam viesť) a
+  **filter kusovníka na jednu skrinku sa nevymyslel** (kusovník ho nemá; povie sa to nahlas).
+  UI_DIZAJN.md doplnený o princípy blokov UI-A…D, chýbajúce tokeny, boxy vlastníka a warnpanel.
+  In-SU beh dávka nepotrebovala (žiadny builder/observer/nová zapisovacia cesta).
 
-Po UI-D: **fáza ŠTÚDIO** (sektorová debata nad mockup_ui20 → vlastné dávky; D-69, D-50 zvyšok,
-Kusovník/Kontrola/Nákup/Rozpočet sekcie, presuny satelitov).
+**Tým je INSPECTOR REWORK hotový** (UI-A · UI-B · UI-C · UI-D). Po ňom: **fáza ŠTÚDIO** (sektorová
+debata nad mockup_ui20 → vlastné dávky; D-69, D-50 zvyšok, Kusovník/Kontrola/Nákup/Rozpočet
+sekcie, presuny satelitov). **D-26** (režimy vs. akordeóny) ostáva otvorené — posudzuje sa až nad
+hotovým panelom a rozhoduje Michal.
 
 ## 6 · Otvorené otázky na večernú debatu
 

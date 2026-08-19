@@ -44,7 +44,13 @@
                     'fronts:add-door', 'fronts:add-drawer',
                     // UI-D1: rad akcii karty dielca — merac povie, ci sa olep
                     // castejsie prenasa hromadne, alebo sa dielce hladaju rucne.
-                    'part:select-in-model', 'part:apply-similar'];
+                    'part:select-in-model', 'part:apply-similar',
+                    // UI-D3: warnpanel (⚠ chip). Merac povie, ci sa upozornenia
+                    // vobec otvaraju, ci sa z nich skace do modelu (oko) alebo
+                    // do Kontroly — teda ci ma zmysel drzat obe cesty.
+                    'warn:chip', 'warn:oko', 'warn:studio',
+                    // UI-D3: preklik zo „Smeru dekoru" na material dielca.
+                    'part:smer'];
 
   // --- klasifikacia (cista logika, testovatelna v Node cez module.exports) ---
 
@@ -181,7 +187,13 @@
   }
 
   try {
-    document.addEventListener('click', onClick, false);
+    // Codex #182 P2: klik sa pocita v CAPTURE faze. Overlaye, ktore sa zatvaraju
+    // klikom mimo (warnpanel UI-D3, a rovnako kazdy buduci), musia klik VNUTRI
+    // seba zastavit — v bubble faze by sa k meracu uz nikdy nedostal a cele ich
+    // pouzitie by z odpoctu D-25 ticho vypadlo (skreslene cisla pre rozhodnutie
+    // o rezimoch panela). Capture bezi PRED handlermi, ale merac len CITA
+    // `data-nx-usage`/id ciela — poradie na vysledok nema vplyv.
+    document.addEventListener('click', onClick, true);
     document.addEventListener('change', onChange, false);
     setInterval(flush, FLUSH_MS);
     // Zatvaranie/skrytie panela: CEF negarantuje beforeunload — flushuje sa aj

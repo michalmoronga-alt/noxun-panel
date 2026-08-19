@@ -76,14 +76,34 @@
               { label: 'Šírka', value: fmtmm(p.width), unit: 'mm' } ],
       right: [ { label: 'Hrúbka', value: fmtmm(p.thickness), unit: 'mm',
                  title: 'Hrúbku dielca určuje materiál korpusu.' },
+               // UI-D3 (N13 „klikateľné je len to, čo niekam vedie"): smer
+               // dekoru urcuje MATERIAL DIELCA, a ten sa vybera o par riadkov
+               // nizsie v tej istej karte — klik tam preto doskoci. Hrúbka
+               // klikatelna NIE JE: urcuje ju material KORPUSU a ten sa v
+               // rezime dielca neda z panela otvorit (sektor Materiály patri
+               // kontextu Korpus). Nikam nevedie => nepredstiera, ze vedie.
                { label: 'Smer dekoru', value: nxGrainLabel(p.grain_direction), unit: '',
-                 title: 'Smer dekoru určuje materiál dielca — mení sa v katalógu materiálov.' } ]
+                 click: 'onPartInfoGrain(event)',
+                 title: 'Smer dekoru určuje materiál dielca — klik skočí na jeho výber.' } ]
     };
   }
   function nxInfoRowHtml(r){
     var v = esc(r.value) + (r.unit ? (' ' + esc(r.unit)) : '');
-    return '<div class="inforow"' + (r.title ? (' title="' + esc(r.title) + '"') : '') + '>' +
-           '<span>' + esc(r.label) + '</span><b>' + v + '</b></div>';
+    var body = '<span>' + esc(r.label) + '</span><b>' + v + '</b>';
+    var t = r.title ? (' title="' + esc(r.title) + '"') : '';
+    if (!r.click) return '<div class="inforow"' + t + '>' + body + '</div>';
+    return '<button type="button" class="inforow click" data-nx-usage="part:smer"' +
+           ' onclick="' + esc(r.click) + '"' + t + '>' + body + '</button>';
+  }
+  // Preklik zo „Smeru dekoru" na materiál dielca (v TEJ ISTEJ karte). Nie je to
+  // zapis — len navigacia: sektor sa rozbali, combobox otvori (vzor onEdgePick).
+  function onPartInfoGrain(ev){
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var sel = el('pcMaterial');
+    if (!sel){ NX.setStatus('Materiál dielca sa dá vybrať až pri označenom dielci.', true); return; }
+    if (typeof nxRevealTarget === 'function') nxRevealTarget(sel);
+    if (!(typeof NXCombo !== 'undefined' && NXCombo && NXCombo.open(sel))) sel.focus();
+    NX.setStatus('Smer dekoru nesie materiál dielca — vyber ho tu.', false);
   }
   function renderPartBasic(pc){
     var L = el('pcBasicL'), R = el('pcBasicR');

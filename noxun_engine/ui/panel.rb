@@ -157,7 +157,10 @@ module Noxun
           cb(dlg, 'open_project_materials') { |_p| MaterialsDialog.show }
           cb(dlg, 'open_templates')         { |_p| TemplatesDialog.show }
           cb(dlg, 'save_template_as')       { |p| handle_save_template_as(p) } # D-14 modal
-          cb(dlg, 'open_production')        { |_p| ProductionDialog.show }      # V0.5 B
+          # V0.5 B; UI-D3: volitelny DEEP-LINK na tab (⚠ warnpanel -> KONTROLA,
+          # „Materiál" -> Kusovník). Whitelist tabov je v ProductionDialog::TABS —
+          # server je autorita, panel posiela iba meno.
+          cb(dlg, 'open_production')        { |p| ProductionDialog.show(open_tab: studio_tab_of(p)) }
           # V0.5 B relay (Codex B1): panel JS uz flushol edity — vyber vykona Vyroba
           cb(dlg, 'production_do_select')   { |p| ProductionDialog.do_select(p) }
           # V0.5 C relay: export VEPO az PO flushi editov panela (stale data = zla objednavka)
