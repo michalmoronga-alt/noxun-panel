@@ -10,7 +10,7 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
-### D-108 — smer dekoru per dielec/čelo ako VSTUP (vyriešené 21.8.2026, dávka K1, PR #K1, v0.7.23)
+### D-108 — smer dekoru per dielec/čelo ako VSTUP (vyriešené 21.8.2026, dávka K1, PR #185, v0.7.23)
 
 **Pôvodné znenie D-108 · Smer dekoru per dielec/čelo ako VSTUP** (Michal 20.8., po smoke teste hotového Inspectora) — pri drevodekoroch sa pracuje s **kresbou**: Michal potrebuje **otočiť štruktúru konkrétneho dielca** tak, aby kresba sedela so susedným dielom (typicky blenda vs. dvere pod ňou, bok vs. čelo). Dovtedy smer dekoru **určoval výhradne materiál** a per-dielec override neexistoval — dielec ho ukazoval len ako informáciu (UI-D1/UI-D3). **Čo to znamená výrobne:** zmena smeru = **rotácia dielca o 90° v kusovníku** (2000 × 250 pozdĺžna ↔ 250 × 2000 priečna), teda **swap dĺžka/šírka** naprieč celým výstupom — VEPO, nárez (`fits_on_sheet` — otočený dielec sa nemusí zmestiť na platňu) aj **pozdĺžna/priečna hrana olepu** (ABS ide na inú dvojicu hrán). Zásah do **výrobného kontraktu** ⇒ povinný `codex-audit` PRED prácou + plný in-SketchUp beh.
 

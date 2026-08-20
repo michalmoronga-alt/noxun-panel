@@ -309,7 +309,7 @@ zvýrazní v modeli (D-89a) · „Označiť v modeli" · „Použiť na podobné
   je to tiež rozhodnutie, nie „nerob nič". Počet aj zápis počíta **jedna serverová funkcia**
   a celý zápis je **jedna operácia = jeden krok Späť** aj naprieč skrinkami.
 - ~~**ODCHÝLKA 1 — `Smer dekoru` je INFO, nie vstup.**~~ — **ZRUŠENÁ, kontrakt SPLNENÝ** dávkou
-  **K1 · D-108** (PR #K1, v0.7.23, 21.8.2026). Per-dielec override smeru existuje:
+  **K1 · D-108** (PR #185, v0.7.23, 21.8.2026). Per-dielec override smeru existuje:
   `part_overrides['grain_direction']` s enumom `length`/`width`, efektívny smer počíta
   `CabinetBuilder.effective_grain` (override → materiál) a materializuje ho do snapshotu dielca.
   Karta má segment **„Podľa materiálu — <výsledok>" / „Pozdĺžna" / „Priečna"** a každá voľba nesie
