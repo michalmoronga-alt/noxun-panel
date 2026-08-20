@@ -856,9 +856,9 @@
         // Vyklop je v ponuke, aby bolo vidno, ze sa s nim rata — ale zatial sa
         // NEDA zvolit: rola `flap` potrebuje vlastnu cestu cez builder, ABS a
         // kusovnik (vedoma odchylka UI-C3, zapisana v UI20_KONTRAKT.md).
-        // Popis je KRATKY zamerne: dlha volba by v uzkom rade rozhodila layout
-        // (`flex-basis` selectu je jeho najsirsia polozka) — cela veta zije
-        // v `title` selectu a v hinte skupiny.
+        // Popis je KRATKY zamerne: select je najuzsi prvok radu (SMOKE PACK 1 mu
+        // dal `flex-basis: 0`), takze dlha volba by sa len orezala a nic by
+        // nepovedala — cela veta zije v `title` selectu a v hinte skupiny.
         '<option value="flap" disabled>Výklop (fáza 3)</option>' +
         '<option value="none">Bez čela</option></select>' +
       // Uzke pole vysky (46 px) + sipka VYSKOVEHO RADU (N25). Rad len DOSADI
