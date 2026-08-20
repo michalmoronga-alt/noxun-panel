@@ -772,7 +772,10 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Fronts`).
   „mm" aj chip AUTO a krížik ✗ spadol o riadok nižšie. **Pravidlo pre budúce
   ovládače:** v takom rade smie **rásť jediný prvok** (tu `select.ftype`),
   všetko ostatné má pevnú stopu, a súčet stôp + medzier musí sedieť pri šírke
-  **470 px** — stráži to guard test, nie oko.
+  **470 px** — stráži to guard test, nie oko. **Do rozpočtu patrí aj to, čo sa
+  objaví len chvíľu**: živý náhľad výrazu („= 450") sa preto kreslí ako
+  **overlay pod poľom**, nie ako ďalšia položka radu — inak by riadok pretiekol
+  vždy, keď používateľ píše výraz.
 - **Predel medzi položkami je hairline, nie nový riadok.** Jemná linka
   (`--nx-border-soft`) sa platí **presunutím** existujúceho odstupu z `margin`
   do `padding`, nie jeho pripočítaním. Predel patrí pod **celú položku** — pri
@@ -911,9 +914,12 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Hw`).
   **editovateľnosť sa nesmie stratiť** (pod rozklikom sú pôvodné riadky, počet
   per polica sa mení ďalej) · **zbalené je default** a stav rozkliku je vec
   **počítača** (`localStorage`, vzor sektorov) · **neštandard musí byť vidieť aj
-  zbalený** — ručne upravená polica rozsvieti v súhrne jantárový štítok
-  „upravené" · **jedna položka sa nezbaľuje** (rozklik nad jediným riadkom je
-  klik navyše bez zisku) · dáta sa nemenia, je to **zoskupenie zobrazenia**.
+  zbalený** — ručne upravená **aj vypnutá** polica rozsvieti v súhrne jantárový
+  štítok „upravené" · **súhrn nesmie zamlčať vypnutú položku** (vypnutá polica
+  je stále polica: patrí pod ten istý rozklik, ráta sa do počtu a prispieva
+  0 ks — inak by súhrn hovoril „4 police" a piata by visela vedľa neho) ·
+  **jedna položka sa nezbaľuje** (rozklik nad jediným riadkom je klik navyše
+  bez zisku) · dáta sa nemenia, je to **zoskupenie zobrazenia**.
 
 ### D-51: štandard rozmerov okien (UI-B1)
 

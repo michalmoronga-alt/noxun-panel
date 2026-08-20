@@ -136,6 +136,11 @@ module Noxun
       #
       # Sablona, ktora medzitym z kniznice zmizla (druha instancia, rucny zasah),
       # osirely PNG NEDOSTANE — temp subor sa zahodi a vrati sa false.
+      #
+      # Codex #183 P2: pouziva sa `attach`, NIE `replace`. Rozdiel je v tom, co
+      # sa stane pri ZLYHANI presunu: `replace` (upsert cesta) stary obrazok
+      # zmaze, lebo uz patri inemu configu — tu sa vsak config NEMENI, takze
+      # doterajsi nahlad ostava platny a neuspesne prefotenie oň nesmie pripraviť.
       def set_preview(kind, name, tmp)
         k = normalize_kind(kind)
         n = name.to_s
@@ -145,7 +150,7 @@ module Noxun
             next false
           end
 
-          TemplatePreviews.replace(k, n, tmp)
+          TemplatePreviews.attach(k, n, tmp)
         end
       end
 

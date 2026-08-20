@@ -128,6 +128,20 @@ NxTest.test('SMOKE1 cela: sucet pevnych stop + medzier sa VOJDE do sirky karty')
                 "riadok cela pri 470 px: #{total.round} px <= #{SMOKE1_FRONT_BUDGET} px")
 end
 
+NxTest.test('SMOKE1 cela (Codex #183 P2): zivy nahlad vyrazu NEZABERA sirku radu') do
+  # `= 450` pri rozpisanom vyraze `300+150` je v riadku cela OVERLAY. Ako flex
+  # polozka (`flex: 0 0 auto`) by pridal ~34 px, na ktore rad pri `nowrap` uz
+  # nema rezervu — riadok by pretiekol presne tak, ako predtym zalamoval.
+  NxTest.assert_equal('absolute', smoke1_decl('.nx-inspector .frow .dwrap .exprhint', 'position'),
+                      'hint je mimo toku radu')
+  NxTest.assert_equal('none', smoke1_decl('.nx-inspector .frow .dwrap .exprhint', 'pointer-events'),
+                      'overlay nesmie kradnut kliky poliam pod nim')
+  # Pod `.miniopts` (120) — ked je otvoreny rozmerovy rad, hodnoty maju prednost.
+  NxTest.assert(smoke1_decl('.nx-inspector .frow .dwrap .exprhint', 'z-index').to_i <
+                smoke1_decl('.nx-inspector .miniopts', 'z-index').to_i,
+                'hint nesmie prekryt otvorenu ponuku rozmeroveho radu')
+end
+
 NxTest.test('SMOKE1 cela: rozbalovacka typu je JEDINY rastuci prvok (vyuzije zvysok sirky)') do
   flex = smoke1_decl('.frow select.ftype', 'flex').to_s
   NxTest.assert(flex.start_with?('1 1'), "`.ftype` rastie aj sa zmrsti (#{flex})")
@@ -208,6 +222,13 @@ NxTest.test('SMOKE1 podperky: zoskupenie sa DAT nedotyka (identita riadku ostava
   NxTest.assert(pins.include?('hwItemHtml(it, cabId, groupKey)'),
                 'pod rozklikom su POVODNE riadky — pocet per polica sa da dalej editovat')
   NxTest.assert_equal(false, pins.include?('quantity'), 'suhrn nic nedopocitava do riadku')
+  # Codex #183 P2: vypnuta polica patri POD ten isty rozklik.
+  NxTest.assert(pins.include?('hwOffHtml(ov, cabId, groupKey)'),
+                'vypnute podperky su v rozkliku, nie vedla neho')
+  box = hw[/function hwBoxHtml.*?\n  \}\n/m].to_s
+  NxTest.assert(box.include?('hwSplitShelfPins(g.key, g.items, g.offs)'),
+                'delenie vidi OBA zoznamy — inak by vypnuta polica utiekla vedla suhrnu')
+  NxTest.assert(box.include?('split.restOffs'), 'mimo suhrnu ostavaju len NEpodperkove vypnute kategorie')
   # Zivy refresh nakupu hlada riadky selektorom (nie indexom deti) — o uroven
   # hlbsie zanorenie mu preto nevadi.
   NxTest.assert(hw.include?("var row = box.querySelector(sel);"), 'refresh hlada riadok selektorom')

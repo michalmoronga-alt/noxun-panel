@@ -48,6 +48,19 @@ eq(hwShelfPinSummary([pin('Z1', 4), { generic_type: 'hinge', quantity: 2 }]),
 eq(hwShelfPinSummary([pin('Z1', null), pin('Z2', 'x'), pin('Z3', 4)]),
    { rows: 3, total: 4, edited: false }, 'necitatelny pocet sa NEPOCITA (nikdy NaN v texte)');
 
+// Codex #183 P2: VYPNUTA polica je stale polica — musi byt v pocte aj v `edited`.
+const OFF_PIN = { owner_part_key: 'zone:Z5/shelf:1', owner_label: 'Polica 5',
+                  generic_type: HW_SHELF_PIN, rule_id: 'podperky-policove', disabled: true };
+eq(hwShelfPinSummary([pin('Z1', 4), pin('Z2', 4), pin('Z3', 4), pin('Z4', 4)], [OFF_PIN]),
+   { rows: 5, total: 16, edited: true },
+   'styri zapnute + jedna vypnuta = 5 polic, 16 ks a priznany zasah');
+eq(hwShelfPinSummary([], [OFF_PIN]), { rows: 1, total: 0, edited: true },
+   'vypnuta polica prispieva 0 ks');
+eq(hwShelfPinSummary([pin('Z1', 4)], [{ generic_type: 'hinge', disabled: true }]),
+   { rows: 1, total: 4, edited: false }, 'vypnuty ZAVES do suhrnu podperiek nepatri');
+eq(hwShelfPinTitle(hwShelfPinSummary([pin('Z1', 4), pin('Z2', 4), pin('Z3', 4), pin('Z4', 4)], [OFF_PIN])),
+   'Podperky políc — 5 políc: 16 ks', 'suhrn nezamlci vypnutu policu');
+
 // --- 3) texty (slovenske tvary + presne znenie zo zadania) -------------------
 eq(hwShelfCountText(0), '0 políc', 'nula');
 eq(hwShelfCountText(1), '1 polica', 'jednotne cislo');
@@ -70,28 +83,52 @@ const HINGE = { owner_part_key: 'front:F1/wing:left', generic_type: 'hinge',
 
 eq(HW_PINS_MIN, 2, 'prah zoskupenia — jedna polica sa nezbaluje');
 
-let s = hwSplitShelfPins(HW_GROUP_INSIDE, PINS5);
+let s = hwSplitShelfPins(HW_GROUP_INSIDE, PINS5, []);
 eq(s.pins.length, 5, 'pat polic ide do rozkliku');
 eq(s.rest.length, 0, 'a mimo neho neostane nic');
 eq(s.pins[0] === PINS5[0], true, 'polozky sa odovzdavaju NEZMENENE (ta ista referencia)');
 
-s = hwSplitShelfPins(HW_GROUP_INSIDE, [pin('Z1', 4)]);
+s = hwSplitShelfPins(HW_GROUP_INSIDE, [pin('Z1', 4)], []);
 eq(s.pins.length, 0, 'jedna polica sa NEZBALUJE');
 eq(s.rest.length, 1, 'ostava normalnym riadkom');
 
-s = hwSplitShelfPins(HW_GROUP_INSIDE, [HINGE].concat(PINS5));
+s = hwSplitShelfPins(HW_GROUP_INSIDE, [HINGE].concat(PINS5), []);
 eq(s.rest.length, 1, 'ostatne polozky Vnutra ostavaju samostatne');
 eq(s.rest[0].generic_type, 'hinge', 'a v povodnom poradi');
 eq(s.pins.length, 5, 'podperky idu pod suhrn');
 
-s = hwSplitShelfPins(HW_GROUP_CAB, PINS5);
+s = hwSplitShelfPins(HW_GROUP_CAB, PINS5, []);
 eq(s.pins.length, 0, 'v boxe Skrinky sa nezoskupuje — suhrn patri VYHRADNE Vnutru');
 eq(s.rest.length, 5, 'vsetko ostava tak, ako prislo');
 
-s = hwSplitShelfPins('front:F1', PINS5);
+s = hwSplitShelfPins('front:F1', PINS5, []);
 eq(s.pins.length, 0, 'ani v boxe cela');
 
-eq(hwSplitShelfPins(HW_GROUP_INSIDE, null), { pins: [], rest: [] }, 'prazdny vstup nespadne');
+eq(hwSplitShelfPins(HW_GROUP_INSIDE, null, null), { pins: [], offs: [], rest: [], restOffs: [] },
+   'prazdny vstup nespadne');
+
+// Codex #183 P2: VYPNUTE podperky patria do TOHO ISTEHO rozkliku ---------------
+const OFF_HINGE = { owner_part_key: 'front:F1/wing:left', generic_type: 'hinge',
+                    rule_id: 'zavesy', disabled: true };
+
+s = hwSplitShelfPins(HW_GROUP_INSIDE, PINS5.slice(0, 4), [OFF_PIN]);
+eq(s.pins.length, 4, 'zapnute police pod suhrn');
+eq(s.offs.length, 1, 'a vypnuta s nimi — nie vedla suhrnu');
+eq(s.restOffs.length, 0, 'mimo suhrnu neostala ziadna vypnuta polica');
+
+s = hwSplitShelfPins(HW_GROUP_INSIDE, PINS5, [OFF_HINGE]);
+eq(s.offs.length, 0, 'vypnuty zaves do suhrnu podperiek nepatri');
+eq(s.restOffs.length, 1, 'ostava samostatnym riadkom boxu');
+
+// Prah rata POLICE SPOLU: jedna zapnuta + jedna vypnuta = uz sa zoskupuje.
+s = hwSplitShelfPins(HW_GROUP_INSIDE, [pin('Z1', 4)], [OFF_PIN]);
+eq(s.pins.length, 1, 'zapnuta polica pod suhrn');
+eq(s.offs.length, 1, 'aj vypnuta — spolu su dve, teda nad prahom');
+
+// Pod prahom sa nezoskupuje NIC a oba zoznamy ostavaju nedotknute.
+s = hwSplitShelfPins(HW_GROUP_INSIDE, [], [OFF_PIN]);
+eq(s.pins.length, 0, 'jedina (vypnuta) polica sa nezbaluje');
+eq(s.restOffs.length, 1, 'a ostava normalnym riadkom');
 
 // --- 5) kluc localStorage je stabilny (stav rozkliku prezije prekreslenie) ---
 eq(HW_PINS_KEY, 'nx_hw_shelfpins_open', 'kluc sa nemeni — inak by sa zabudlo nastavenie');

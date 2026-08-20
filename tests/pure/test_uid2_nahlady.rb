@@ -356,6 +356,52 @@ NxTest.test('SMOKE1 set_preview: forward guard (novsia schema) odmietne a PNG sa
   NxTest.assert_equal(before, File.binread(png_path), 'stary PNG ostal nedotknuty')
 end
 
+# Docasne nahradi presun suboru chybou disku (rovnaky vzor ako
+# `uid2_with_broken_capture` v in-SketchUp runneri) — inak sa zlyhanie `mv`
+# v teste nasimulovat neda.
+def smoke1_with_broken_move
+  tp = NxD2::TP
+  orig = tp.method(:move_into_place)
+  tp.define_singleton_method(:move_into_place) { |*| raise IOError, 'simulovana chyba disku' }
+  yield
+ensure
+  tp.define_singleton_method(:move_into_place, orig)
+end
+
+NxTest.test('SMOKE1 set_preview: ZLYHANY presun NECHA stary nahlad na mieste (Codex #183 P2)') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxD2.reset!
+  NxD2::TS.upsert('cabinet', 'Dolná klasik', NxD2.cfg, NxD2.tmp!(NxD2.png(200)))
+  png_path = NxD2::TP.path_for('cabinet', 'Dolná klasik')
+  before = File.binread(png_path)
+
+  # „Prefotiť" nad sablonou, ktora uz nahlad MA. Config sa nemeni, takze stary
+  # obrazok je stale platny — prechodna chyba disku oň nesmie pripraviť.
+  tmp = NxD2.tmp!(NxD2.png(400))
+  result = nil
+  smoke1_with_broken_move { result = NxD2::TS.set_preview('cabinet', 'Dolná klasik', tmp) }
+
+  NxTest.assert_equal(false, result, 'zlyhanie sa prizna (ziadny falosny uspech)')
+  NxTest.assert_equal(before, File.binread(png_path), 'POVODNY nahlad ostal nedotknuty')
+  NxTest.assert_equal(false, File.exist?(tmp), 'nepouzity capture temp sa zahodil')
+end
+
+NxTest.test('SMOKE1: upsert cesta sa sprava NAOPAK — zlyhany presun stary PNG ZMAZE') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxD2.reset!
+  NxD2::TS.upsert('cabinet', 'Dolná klasik', NxD2.cfg, NxD2.tmp!(NxD2.png(200)))
+  png_path = NxD2::TP.path_for('cabinet', 'Dolná klasik')
+
+  # Tu sa config MENI, takze stary obrazok uz patri inemu tvaru skrinky —
+  # radsej schema nez zly obrazok. Obe cesty sa teda lisia ZAMERNE.
+  tmp = NxD2.tmp!(NxD2.png(400))
+  smoke1_with_broken_move { NxD2::TS.upsert('cabinet', 'Dolná klasik', NxD2.cfg(900.0), tmp) }
+
+  NxTest.assert_equal(false, File.exist?(png_path), 'neplatny stary PNG je prec')
+  NxTest.assert_close(900.0, NxD2::TS.find('cabinet', 'Dolná klasik')['config']['width'], 0.01,
+                      'zaznam sa napriek tomu ulozil')
+end
+
 NxTest.test('SMOKE1 capture: cesta fotenia NEROBI operaciu ani zapis do modelu') do
   src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'template_previews.rb'), encoding: 'UTF-8')
   # Komentare o zakaze operacie sa nepocitaju — hlada sa REALNE volanie.

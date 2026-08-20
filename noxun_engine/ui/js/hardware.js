@@ -433,10 +433,11 @@
   function hwBoxHtml(g, cabId){
     // SMOKE PACK 1: podperky polic sa v boxe „Vnútro skrinky" zbalia pod JEDEN
     // suhrnny riadok (dat sa nedotyka — je to zoskupenie zobrazenia).
-    var split = hwSplitShelfPins(g.key, g.items);
+    var split = hwSplitShelfPins(g.key, g.items, g.offs);
+    var grouped = split.pins.length + split.offs.length;
     var body = split.rest.map(function(it){ return hwItemHtml(it, cabId, g.key); }).join('')
-             + (split.pins.length ? hwShelfPinsHtml(split.pins, cabId, g.key) : '')
-             + g.offs.map(function(ov){ return hwOffHtml(ov, cabId, g.key); }).join('');
+             + (grouped ? hwShelfPinsHtml(split.pins, split.offs, cabId, g.key) : '')
+             + split.restOffs.map(function(ov){ return hwOffHtml(ov, cabId, g.key); }).join('');
     var n = g.items.length + g.offs.length;
     var tip = (g.key === HW_GROUP_CAB)
       ? 'Označí skrinku v modeli'
@@ -475,7 +476,12 @@
   // Suhrn podperiek: kolko POLIC (riadkov) a kolko KUSOV spolu; `edited` = do
   // niektorej police niekto siahol rucne, takze suhrn nesmie tvrdit, ze je
   // vsetko podla pravidla. Ciste (Node testy).
-  function hwShelfPinSummary(items){
+  //
+  // Codex #183 P2: rata sa AJ z `offs` — VYPNUTA polica je stale polica.
+  // Bez toho by pri piatich policiach s jednou vypnutou suhrn tvrdil „4 police"
+  // a piata by visela mimo rozkliku ako samostatny riadok. Vypnuta polica
+  // prispieva 0 ks a VZDY zapina `edited` (vypnutie je rucny zasah).
+  function hwShelfPinSummary(items, offs){
     var out = { rows: 0, total: 0, edited: false };
     (items || []).forEach(function(it){
       if (!it || it.generic_type !== HW_SHELF_PIN) return;
@@ -483,6 +489,11 @@
       var q = parseInt(it.quantity, 10);
       out.total += (isFinite(q) && q > 0) ? q : 0;
       if (hwItemManual(it)) out.edited = true;
+    });
+    (offs || []).forEach(function(ov){
+      if (!ov || ov.generic_type !== HW_SHELF_PIN) return;
+      out.rows++;
+      out.edited = true;
     });
     return out;
   }
@@ -518,8 +529,8 @@
   // `<details>` zamerne (nie vlastny prepinac): nxRevealTarget vie otvorit
   // ZBALENEHO predka pri deep-linku, takze skok na konkretnu policu ju v
   // buducnosti najde aj zbalenu.
-  function hwShelfPinsHtml(pins, cabId, groupKey){
-    var s = hwShelfPinSummary(pins);
+  function hwShelfPinsHtml(pins, offs, cabId, groupKey){
+    var s = hwShelfPinSummary(pins, offs);
     return '<details class="hwgrp" data-hwgrp="' + esc(HW_SHELF_PIN) + '"'
       + (hwShelfPinsOpen() ? ' open' : '') + ' ontoggle="onHwGrpToggle(this)">'
       + '<summary class="hwgrph" title="' + esc(hwShelfPinTip(s)) + '">'
@@ -527,20 +538,33 @@
       + '<span class="hwgrpt">' + esc(hwShelfPinTitle(s)) + '</span>'
       + (s.edited ? '<span class="hwgrpw">upravené</span>' : '')
       + '</summary><div class="hwgrpb">'
-      + pins.map(function(it){ return hwItemHtml(it, cabId, groupKey); }).join('')
+      + (pins || []).map(function(it){ return hwItemHtml(it, cabId, groupKey); }).join('')
+      // Vypnuta polica patri POD ten isty rozklik ako zapnute — inak by suhrn
+      // sluboval jeden celok a jedna polica by mu utiekla vedla (Codex #183 P2).
+      + (offs || []).map(function(ov){ return hwOffHtml(ov, cabId, groupKey); }).join('')
       + '</div></details>';
   }
-  // Rozdelenie poloziek boxu na „podperky" a „zvysok". Ciste (Node testy):
-  // zoskupuje sa VYHRADNE v boxe Vnútro a az od HW_PINS_MIN poloziek.
-  // -> { pins: [], rest: [] } (pri nezoskupeni su vsetky v `rest`)
-  function hwSplitShelfPins(groupKey, items){
-    var pins = [], rest = [];
+  // Rozdelenie obsahu boxu na „podperky" a „zvysok" — a to v OBOCH zoznamoch:
+  // `items` (zive polozky) aj `offs` (vypnute kategorie), lebo vypnuta polica
+  // je stale polica. Ciste (Node testy): zoskupuje sa VYHRADNE v boxe Vnútro
+  // a az od HW_PINS_MIN polic SPOLU.
+  // -> { pins: [], offs: [], rest: [], restOffs: [] }
+  //    (pri nezoskupeni su vsetky v `rest` / `restOffs`)
+  function hwSplitShelfPins(groupKey, items, offs){
+    var inside = (groupKey === HW_GROUP_INSIDE);
+    var pins = [], rest = [], pinOffs = [], restOffs = [];
     (items || []).forEach(function(it){
-      if (groupKey === HW_GROUP_INSIDE && it && it.generic_type === HW_SHELF_PIN) pins.push(it);
+      if (inside && it && it.generic_type === HW_SHELF_PIN) pins.push(it);
       else rest.push(it);
     });
-    if (pins.length < HW_PINS_MIN) return { pins: [], rest: (items || []).slice() };
-    return { pins: pins, rest: rest };
+    (offs || []).forEach(function(ov){
+      if (inside && ov && ov.generic_type === HW_SHELF_PIN) pinOffs.push(ov);
+      else restOffs.push(ov);
+    });
+    if (pins.length + pinOffs.length < HW_PINS_MIN){
+      return { pins: [], offs: [], rest: (items || []).slice(), restOffs: (offs || []).slice() };
+    }
+    return { pins: pins, offs: pinOffs, rest: rest, restOffs: restOffs };
   }
 
   // items: config.hardware (pole) alebo null (nic neoznacene); overrides: hardware_overrides;

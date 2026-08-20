@@ -9,7 +9,7 @@
 
 **INSPECTOR REWORK (UI 2.0) JE HOTOVÝ.** Koncept bol uzavretý 18.8. (Michal) — záväzný kontrakt a mockupy sú v repe: [zdroje/ui20/](zdroje/ui20/) ([UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) + mockupy Inspector C, štúdio, dizajnový lístok). Všetky štyri bloky sú v maine: **UI-A · UI-B · UI-C · UI-D**. Zostáva fáza **ŠTÚDIO** ([PLAN.md](PLAN.md)).
 
-Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **SMOKE PACK 1** — štyri opravy z Michalovho smoke testu hotového Inspectora (rozbité riadky čiel, prekrytý text v kovaní, podperky súhrnne, ručné odfotenie náhľadu šablóny). Testy: **1452 headless · 46 JS sád**; **plný in-SketchUp beh 20.8. — 492 PASS, 0 FAIL** (vrátane novej sekcie `run_smoke1` — fotenie z označenej skrinky, guardy výberu, žiadny undo krok).
+Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **SMOKE PACK 1** — štyri opravy z Michalovho smoke testu hotového Inspectora (rozbité riadky čiel, prekrytý text v kovaní, podperky súhrnne, ručné odfotenie náhľadu šablóny). Testy: **1455 headless · 46 JS sád**; **plný in-SketchUp beh 20.8. — 492 PASS, 0 FAIL** (vrátane novej sekcie `run_smoke1` — fotenie z označenej skrinky, guardy výberu, žiadny undo krok).
 
 ## Robí sa
 
