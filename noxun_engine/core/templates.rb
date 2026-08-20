@@ -127,6 +127,28 @@ module Noxun
         end
       end
 
+      # SMOKE PACK 1 (6A): PRIRADENIE nahladu k UZ ULOZENEJ sablone — rucna
+      # akcia „Odfotiť náhľad z označenej skrinky" (dopĺňanie fotiek starym
+      # sablonam). Zaznam sa NEPREPISUJE: config, poradie ani `templates.json`
+      # sa nedotykaju, meni sa VYHRADNE obrazok — a to pod TYM ISTYM sidecar
+      # zamkom ako `upsert`/`delete`, aby dve instancie SketchUpu nemali zaznam
+      # jednej a obrazok druhej.
+      #
+      # Sablona, ktora medzitym z kniznice zmizla (druha instancia, rucny zasah),
+      # osirely PNG NEDOSTANE — temp subor sa zahodi a vrati sa false.
+      def set_preview(kind, name, tmp)
+        k = normalize_kind(kind)
+        n = name.to_s
+        with_lock do
+          if refuse_write('set_preview') || find(k, n).nil?
+            TemplatePreviews.discard(tmp)
+            next false
+          end
+
+          TemplatePreviews.replace(k, n, tmp)
+        end
+      end
+
       # PNG nahlad zije a umiera SO ZAZNAMOM — mazanie je TU (jedine miesto,
       # cez ktore zaznam mizne), nie v UI handleri.
       def delete(kind, name)

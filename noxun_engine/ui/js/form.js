@@ -337,6 +337,15 @@
     return '<span class="tplpic"><img alt="" aria-hidden="true">' +
       '<svg viewBox="0 0 60 40" aria-hidden="true">' + nxTplGlyph(tp) + '</svg></span>';
   }
+  // SMOKE PACK 1 (6A) — POZNAMKA, PRECO TU KAMERA NIE JE:
+  // Zadanie chcelo ikonu „Odfotiť náhľad z označenej skrinky" na vybranej
+  // dlazdici. Dlazdice ziju vo VKLADACEJ karte, ktora sa ukazuje VYHRADNE
+  // vtedy, ked nie je oznacene NIC (`clearSelected` -> `setUiMode('insert')`,
+  // `body.mode-cab #insertCard { display: none }`). Kamera by tam teda nemala
+  // ako najst oznacenu skrinku a bola by to trvalo mrtva ikona (presny opak
+  // pravidla „klikatelne je len to, co niekam vedie"). Akcia preto zije v okne
+  // Sablony (`js/templates_dialog.js`), kde vyber v modeli a zoznam sablon
+  // existuju SUCASNE — a foti sa TOU ISTOU cestou (TemplatePreviews.capture).
   function tplTileHtml(tp, sel){
     var badge = nxTplBadge(tp);
     var rev = (tp && tp.preview_rev) ? String(tp.preview_rev) : '';
@@ -830,7 +839,13 @@
     // „Úchytky"; ikona ostala INDIKATOR.
     row.dataset.frontProfile = item.profile || 'none';
     var fhId = frontHeightInputId(row.dataset.frontId);
-    row.innerHTML =
+    // SMOKE PACK 1: ovladace cela ziju v `.fmain` — PEVNOM, NEZALAMOVACOM rade.
+    // `.frow` je od tejto davky STLPEC (rad ovladacov + riadok kovania pod nim),
+    // takze pri vypisanej vyske (pribudne „mm" a chip AUTO) uz krizik ✗ nemoze
+    // spadnut o riadok nizsie. DOM zoznamu ostava „jeden .frow = jedno celo" —
+    // obrateny render (D-23), citanie odspodu aj `closest('.frow')` platia bez
+    // zmeny, lebo sa hlada VYHRADNE cez triedy, nikdy cez indexy deti.
+    row.innerHTML = '<span class="fmain">' +
       '<span class="fnum">F' + idx + '</span>' +
       '<span class="ftico" aria-hidden="true" title="' + esc(frontTypeLabel(item.type || 'door')) + '">' +
         NXIcons.svg(frontTypeIcon(item.type || 'door')) + '</span>' +
@@ -864,7 +879,8 @@
         ' aria-label="Vrátiť výšku čela na AUTO">AUTO</button>' +
       '<select class="fw" aria-label="Počet krídel" onchange="onField()"><option value="auto">auto</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>' +
       (FRONT_PROFILES.length ? '<span class="fprof" aria-hidden="true">' + NXIcons.svg('profile') + '</span>' : '') +
-      '<button class="fdel" title="Odstrániť" aria-label="Odstrániť čelo" onclick="delFrontRow(this); onField()">' + NXIcons.svg('x') + '</button>';
+      '<button class="fdel" title="Odstrániť" aria-label="Odstrániť čelo" onclick="delFrontRow(this); onField()">' + NXIcons.svg('x') + '</button>' +
+      '</span>';
     wrap.insertBefore(row, wrap.firstChild); // D-23: navrch — DOM je obrateny
     if (item.type) row.querySelector('.ftype').value = item.type;
     if (item.height !== null && item.height !== undefined && item.height !== '') row.querySelector('.fh').value = item.height;

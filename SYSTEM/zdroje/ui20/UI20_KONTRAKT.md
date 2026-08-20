@@ -371,6 +371,32 @@ debate nad `mockup_ui20.html`.
   UI_DIZAJN.md doplnený o princípy blokov UI-A…D, chýbajúce tokeny, boxy vlastníka a warnpanel.
   In-SU beh dávka nepotrebovala (žiadny builder/observer/nová zapisovacia cesta).
 
+**SMOKE PACK 1 — VEDOMÉ DOPLNKY PO MICHALOVOM TESTE** (20.8., v0.7.21, PR #183). Hotový panel sa
+testoval v praxi a vyšli z toho štyri opravy; dve z nich **menia kontrakt UI 2.0** a preto sú
+zapísané tu:
+
+- **DOPLNOK 1 — podperky políc sú v boxe „Vnútro skrinky" ZBALENÉ pod jeden súhrnný riadok**
+  („Podperky políc — 5 políc: 20 ks") s rozklikom. Kontrakt UI-C4 hovoril „box Vnútro so
+  zoznamom položiek"; pri piatich policiach to bolo päť riadkov, ktoré hovoria to isté.
+  **Dáta sa nemenili** — pod rozklikom sú tie isté položky s tou istou identitou, takže počet
+  per polica sa edituje ďalej; zbalené je default, stav rozkliku je vec **počítača**
+  (localStorage), ručne upravená polica rozsvieti v súhrne štítok **„upravené"** (neštandard
+  musí byť vidieť aj zbalený) a **jedna polica sa nezbaľuje**.
+- **DOPLNOK 2 — ručné „Odfotiť náhľad z označenej skrinky" žije v okne Šablóny, NIE na dlaždici.**
+  UI-D2 fotí náhľad **pri ukladaní** šablóny; staršie šablóny tak fotku nemajú a jediná cesta
+  k nej bola uložiť šablónu nanovo (čím sa prepíše aj jej config). Nová akcia pridá k existujúcej
+  šablóne **len obrázok**. Umiestnenie na dlaždici (pôvodná predstava) je **nemožné**: dlaždice
+  žijú vo vkladacej karte, ktorá je viditeľná výhradne keď **nie je označené nič**, takže by
+  kamera nemala ako nájsť skrinku a bola by to trvalo mŕtva ikona. V okne Šablóny existuje výber
+  v modeli aj zoznam šablón súčasne. Guardy sú serverové (existujúca korpusová šablóna + **práve
+  jedna** označená NOXUN skrinka), fotí sa **tou istou** cestou ako pri ukladaní (kamera sa
+  obnoví, **žiadny krok Späť**).
+- Zvyšné dve opravy kontrakt nemenia, len ho **dodržali**: riadok zoznamu čiel sa už nezalamuje
+  (rad ovládačov je pevný, rastie v ňom jediný prvok — a súčet šírok pri 470 px stráži guard test)
+  a názov položky kovania sa **oreže s `title`** namiesto toho, aby pretiekol cez susedný select.
+- **NEROBILO SA v tomto packu:** nové zobrazenie výsuvov v projekcii Kovanie (koľajnica „L" + telo
+  šuflíka) — návrh sa schvaľuje nad mini náhľadom a príde **samostatným PR**.
+
 **Tým je INSPECTOR REWORK hotový** (UI-A · UI-B · UI-C · UI-D). Po ňom: **fáza ŠTÚDIO** (sektorová
 debata nad mockup_ui20 → vlastné dávky; D-69, D-50 zvyšok, Kusovník/Kontrola/Nákup/Rozpočet
 sekcie, presuny satelitov). **D-26** (režimy vs. akordeóny) ostáva otvorené — posudzuje sa až nad

@@ -373,7 +373,10 @@ end
 
 NxTest.test('UI-C1a guard: zdrojak okna Sablony filtruje kind aj v serverovych akciach') do
   src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog.rb'), encoding: 'UTF-8')
-  NxTest.assert(src.include?("Panel.template_list(kind: 'cabinet')"), 'payload okna je filtrovany')
+  # SMOKE PACK 1: payload nesie navyse `previews: true` (riadok vie „Odfotiť"
+  # vs. „Prefotiť") — filter na kind ostava ten isty.
+  NxTest.assert(src.include?("Panel.template_list(kind: 'cabinet', previews: true)"),
+                'payload okna je filtrovany')
   NxTest.assert(src.include?("TemplateStore.find('cabinet', name)"), 'apply hlada len korpusove')
   NxTest.assert(src.include?("TemplateStore.delete('cabinet', name)"), 'delete maze len korpusove')
   # UI-D2: save odovzdava aj capture nahladu (4. pozicny argument).

@@ -17,6 +17,10 @@
 
 **Na Michalovo rozhodnutie (obe nad HOTOVÝM panelom, nie do ďalšej dávky bez neho):** **D-26** — režimy *Jednoduchý / Rozšírený* vs. akordeóny „menej časté" (v koncepte „Menej časté" neexistuje; posúdiť po dennej práci s hotovým Inspectorom) · **per-dielec smer dekoru** — dnes neexistuje a jeho zavedenie mení výrobný kontrakt (kusovník, VEPO, nárez), takže je to samostatná dávka s auditom.
 
+**Po smoke teste 20.8. (Michal, hotový Inspector)** — opravný pack **SMOKE PACK 1** je hotový (PR #183, v0.7.21): rozbité riadky zoznamu čiel · prekrytý text v boxe kovania · podperky políc súhrnne s rozklikom · ručné „Odfotiť" náhľadu k existujúcej šablóne. Otvorené zvyšky z toho istého testu:
+- **D-106 · Predbežná cena korpusu v informačnom stĺpci Základných** — orientačný náklad skrinky („≈ X €" s tooltipom rozpadu materiál/ABS/kovanie); odvodené čítanie, žiadny nový riadok. *Michal 20.8.: zapísať na neskôr — rieši sa s okruhom rozpočtu vo fáze ŠTÚDIO.*
+- **Nové zobrazenie výsuvov v mini náhľade** (koľajnica „L" + telo šuflíka) — návrh sa schvaľuje nad mini náhľadom, implementácia **samostatným PR**.
+
 **Fáza ŠTÚDIO** *(záver bloku — vlastné dávky po sektorovej debate nad [mockupom štúdia](zdroje/ui20/mockup_ui20.html))*
 - **D-50 · OCL inšpirácia UI/UX** — prebrať detaily z OCL flow (vzory áno, GPL kód nie); ťažisko je práve v štúdio okne (kusovník, kontrola, nákup, rozpočet).
 - **D-69 · Jednotný editor materiálov** — jedno modálne okno pre pridanie z Demosu / ručné pridanie / editáciu, rovnaké polia bez ohľadu na vstupný bod.
@@ -76,6 +80,7 @@
 
 ## Po V1 — zásobník (nezaradené, nestratiť)
 
+- **D-107 · Izolácia objektu pred fotením náhľadu šablóny** — automatické dočasné skrytie zvyšku modelu pred `view.write_image`. *Michal 20.8.: nízka priorita / vysoká náročnosť (skrývanie geometrie = zápis do modelu, undo kroky, observery). Medzitým stačí ručné „Odfotiť" v okne Šablóny — skrinku si naaranžuje a izoluje používateľ sám.*
 - Rohová a vysoká/potravinová skrinka ako **nové TYPY builderov** (odvodia sa od dolnej/hornej).
 - Zóny priamo vo viewporte (variant B vízie) — nadstavba 2D náhľadu.
 - **Interact pre čelá** — dráhy otvárania, klik = otvorenie, merač kolízií pri otvorení (dáta máme: origin čiel na hrane pántu; typ pántu určuje dráhu).
