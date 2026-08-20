@@ -415,7 +415,10 @@
   /* SMOKE PACK 1: SUHRNNY ROZKLIK podperiek polic v boxe „Vnútro skrinky".
      Zbaleny stav je default a pamata si ho POCITAC (localStorage) — dat sa to
      netyka, riadky pod nim su tie iste polozky s tou istou identitou. */
-  .hwgrp { margin: 4px 0; }
+  /* `border: 0` + `background: none` ZHADZUJU globalne `details` (karta na bielom
+     povrchu) — toto nie je karta v karte, ale zoskupenie riadkov VNUTRI boxu
+     vlastnika; ramik navyse by pridal vizualnu vahu bez vyznamu. */
+  .hwgrp { border: 0; background: none; margin: 4px 0; }
   .hwgrph { display: flex; align-items: center; gap: 5px; padding: 2px 0; cursor: pointer;
             font-size: 12px; color: var(--nx-ink-strong); list-style: none; user-select: none; }
   .hwgrph::-webkit-details-marker { display: none; }
