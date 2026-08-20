@@ -186,9 +186,17 @@ module Noxun
         # zvolil). Identity guard dokumentu/skrinky je rovnaky ako pri hranach.
         def handle_set_part_grain(payload)
           model = Sketchup.active_model
+          return if model.nil?
+          data = parse(payload)
+          # PRISNY GUARD DOKUMENTU (Codex #185 kolo 2, P2): callback HtmlDialogu
+          # je asynchronny a ID skriniek sa naprie dokumentmi OPAKUJU — bez
+          # neho by oneskoreny klik z CAB-001 v jednom dokumente prestaval
+          # rovnomennu skrinku v tom, ktory je prave aktivny. Vzor
+          # `handle_select_part` / `handle_apply_edges_similar`.
+          return set_status('Smer dekoru sa nezmenil — panel patrí inému dokumentu.', true) if
+            data['model_guid'].to_s != model_guid(model)
           cab = find_cabinet(model)
           return set_status('Najprv označ dielec v korpuse.', true) if cab.nil?
-          data = parse(payload)
           return if stale_cabinet_echo?(cab, data, 'smer dekoru dielca')
           rk = data['role_key'].to_s
           return set_status('Chyba identifikácie dielca.', true) if rk.empty?
@@ -199,6 +207,11 @@ module Noxun
           end
           params = existing_params(cab)
           rk = canonical_part_key(params, rk)
+          # IDENTITA DIELCA + ODPOJENOST (Codex #185 kolo 2, P2 a P1). Kluc z
+          # payloadu nestaci: medzi klikom a callbackom sa mohol vyber presunut
+          # na iny dielec, a odpojeny dielec by dokonca zmenil NIEKOHO INEHO.
+          err = grain_target_error(model, cab, params, rk)
+          return set_status(err, true) if err
           # Smer materialu sa cita PRED prestavbou (potom uz dielec nesie
           # VYSLEDOK) — hlaska musi vediet povedat, ze volba je zatial neucinna.
           mat_grain = part_material_grain(cab, rk)
@@ -207,6 +220,45 @@ module Noxun
           if raw == '__inherit__' then rec.delete('grain_direction') else rec['grain_direction'] = raw end
           store_override(ov, rk, rec)
           rebuild_focus_part(model, cab, rk, params, grain_status_msg(raw, mat_grain))
+        end
+
+        # Overi, ze zmena smeru dopadne PRESNE na ten dielec, ktory ma pouzivatel
+        # na obrazovke. Vrati hlasku alebo nil.
+        #
+        # DVE veci, ktore samotny `part_key` z payloadu nezachyti:
+        #   1) VYBER SA MEDZITYM POSUNUL (Codex #185 kolo 2, P2) — callback je
+        #      asynchronny; bez kontroly by sa prepisal dielec, ktory uz na
+        #      karte nie je. Vzor `similar_context` a `handle_set_part_edges_all`.
+        #   2) ODPOJENY DIELEC (Codex #185 kolo 2, P1) — dielec vytiahnuty na
+        #      najvyssiu uroven ostava viazany uz len atributom `cabinet_id`,
+        #      takze `find_cabinet` jeho povodneho vlastnika NAJDE. Prestavba by
+        #      potom zmenila INY, vnoreny dielec toho isteho `part_key`, kym
+        #      vybrany odpojeny dielec by si drzal svoj snapshot a do VEPO by
+        #      isiel po starom — a pouzivatel by pritom dostal hlasku o uspechu.
+        #      Radsej cestu ODMIETNUT nez ticho zmenit nieco ine (ta ista lekcia
+        #      ako `regenerated_parts` v UI-D1, Codex #180 P1).
+        def grain_target_error(model, cab, params, rk)
+          part = find_selected_part(model)
+          return 'Vo výbere nie je dielec — označ ho v modeli znova.' if part.nil?
+          return 'Karta patrí inému dielcu — označ ho v modeli znova.' if
+            canonical_part_key(params, part_identity(cab, part)) != rk
+          return nil if nested_part?(cab, part)
+
+          'Tento dielec je vytiahnutý zo skrinky — smer dekoru sa mu meniť nedá. ' \
+            'Vráť ho späť do skrinky (Späť po vytiahnutí), alebo zmeň smer na dielci v nej.'
+        end
+
+        # Je dielec naozaj VNORENY v definicii svojho korpusu? Odpojeny dielec
+        # (top-level instancia) ma za rodica MODEL, nie definiciu skrinky —
+        # a prestavba korpusu ho preto uz neprekresli.
+        def nested_part?(cab, part)
+          return false unless cab && cab.valid? && cab.respond_to?(:definition)
+          return false unless part && part.valid?
+
+          part.parent == cab.definition
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.nested_part?')
+          false
         end
 
         # Smer dekoru MATERIALU dielca ('length'|'width'|'none'). Cita sa zo

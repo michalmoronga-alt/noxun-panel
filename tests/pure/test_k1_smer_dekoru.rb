@@ -409,6 +409,55 @@ NxTest.test('K1: zapisova cesta ma enum guard, identity guard a JEDNU prestavbu'
                 'nikdy slucka viacerych prestavieb')
 end
 
+NxTest.test('K1: zapis overuje DOKUMENT aj to, ci je karta stale nad tym dielcom (Codex #185)') do
+  # Callback HtmlDialogu je asynchronny. Bez guardu dokumentu by oneskoreny klik
+  # prestaval rovnomennu skrinku v INOM modeli (ID sa naprie dokumentmi
+  # opakuju), bez kontroly vyberu by prepisal dielec, ktory uz na karte nie je.
+  NxTest.assert(K1_HANDLER.include?("data['model_guid'].to_s != model_guid(model)"),
+                'guard dokumentu je v zapisovej ceste')
+  NxTest.assert(K1_HANDLER.include?('grain_target_error(model, cab, params, rk)'),
+                'identita dielca sa overuje PRED zapisom')
+  NxTest.assert(K1_PART_JS.include?('model_guid: partCard.model_guid'),
+                'JS identitu dokumentu naozaj POSIELA (guard bez nej nic neochráni)')
+  target = K1_PARTS_RB[/def grain_target_error\b.*?\n        end\n/m].to_s
+  NxTest.assert(target.include?('find_selected_part(model)'), 'cita sa SKUTOCNY vyber')
+  NxTest.assert(target.include?('canonical_part_key(params, part_identity(cab, part)) != rk'),
+                'kluc vo vybere musi sediet s klucom z karty')
+end
+
+NxTest.test('K1: ODPOJENY dielec sa cez kartu menit NEDA (Codex #185 P1)') do
+  # `find_cabinet` najde vlastnika odpojeneho dielca podla `cabinet_id`, takze
+  # bez guardu by prestavba zmenila INY, vnoreny dielec rovnakeho part_key —
+  # kym vybrany odpojeny dielec by si drzal svoj snapshot a do VEPO by isiel
+  # po starom. A pouzivatel by dostal hlasku o USPECHU. Ta ista lekcia ako
+  # `regenerated_parts` v UI-D1 (Codex #180 P1).
+  target = K1_PARTS_RB[/def grain_target_error\b.*?\n        end\n/m].to_s
+  NxTest.assert(target.include?('nested_part?(cab, part)'), 'odpojenost sa kontroluje')
+  NxTest.assert(target.include?('vytiahnutý zo skrinky'),
+                'hlaska POVIE, preco sa nic nezmenilo (nikdy tichy no-op)')
+  nested = K1_PARTS_RB[/def nested_part\?.*?\n        end\n/m].to_s
+  NxTest.assert(nested.include?('part.parent == cab.definition'),
+                'vnoreny dielec ma za rodica DEFINICIU skrinky, odpojeny model')
+end
+
+NxTest.test('K1: po zmene KATALOGU dostane karta cerstvy serverovy payload (Codex #185)') do
+  sync = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'sync.rb'), encoding: 'UTF-8')
+  bridge = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'bridge.js'), encoding: 'UTF-8')
+  # `NX.setMaterials` prekresluje kartu z CACHOVANEHO payloadu — serverom
+  # skladany segment (zamok, hint, vyrobne rozmery) by ostal stary az do
+  # dalsieho prekliku vyberu.
+  push = sync[/def push_materials\b.*?\n        end\n/m].to_s
+  NxTest.assert(push.include?('push_part_card'), 'za katalogom ide cerstva karta')
+  card = sync[/def push_part_card\b.*?\n        end\n/m].to_s
+  NxTest.assert(card.include?('return if part.nil?'),
+                'bez oznaceneho dielca sa NEPOSIELA nic — zmena katalogu nesmie prepnut rezim panela')
+  NxTest.refute(card.include?('start_operation'), 'ciste citanie — ziadna operacia (lekcia D-103)')
+  NxTest.refute(card.include?('dedup'), 'a ziadny dedup — katalog nesmie siahnut na model')
+  NxTest.assert(bridge.include?('setPartCard: function(data){'), 'JS ma prijimaciu cestu')
+  NxTest.assert(bridge[/setPartCard: function\(data\)\{.*?\n    \},/m].to_s.include?('if (!data) return;'),
+                'null kartu NEschovava — to patri vyhradne push_selected')
+end
+
 NxTest.test('K1: „Použiť na podobné" smer dekoru NEPRENASA (prenasa sa len olep)') do
   apply = K1_PARTS_RB[/def handle_apply_edges_similar\b.*?\n        end\n/m].to_s
   NxTest.assert(!apply.empty?, 'handler sa nasiel')

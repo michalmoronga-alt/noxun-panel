@@ -96,6 +96,12 @@
   //    vysvetlenie. Klik v nom NEZAPISUJE — odvedie na material dielca, lebo
   //    tam sa smer naozaj berie.
   var PC_GRAIN_VALUES = ['inherit', 'length', 'width'];
+  // Zaloha popisov = PRESNE to, co stoji v statickej kostre `panel.html`.
+  // Pouzije sa, ked server volby neposle (payload rescueoval chybu, starsi
+  // backend). Bez nej by segment po prekresleni na INY dielec ostal s popismi
+  // a tooltipmi PREDOSLEHO dielca — teda s cudzim vyrobnym rozmerom
+  // (Codex #185 kolo 2, P2). Radsej neutralny text nez cudzie cislo.
+  var PC_GRAIN_FALLBACK = { inherit: 'Podľa materiálu', length: 'Pozdĺžna', width: 'Priečna' };
   // CISTY vypocet stavu segmentu (testovany v Node) — DOM sa dotyka az
   // `syncPartGrain`. Chybajuci payload nesmie kartu zhodit: bez `grain_options`
   // ostanu popisy z kostry a segment sa zamkne (radsej nic nez nahodny stav).
@@ -112,7 +118,7 @@
       buttons: PC_GRAIN_VALUES.map(function (v){
         var o = nxGrainOptionOf(opts, v);
         var on = (v === cur);
-        return { value: v, label: o ? o.label : null, title: o ? (o.title || '') : null,
+        return { value: v, label: o ? o.label : PC_GRAIN_FALLBACK[v], title: o ? (o.title || '') : '',
                  on: on,
                  // Rucny zasah (nie dedenie) sa oznacuje jantarovo — rovnaky
                  // jazyk ako `select.ovr` pri materiali a hranach.
@@ -133,7 +139,10 @@
       var s = st.buttons[i];
       var b = row.querySelector('button[data-pc-grain="' + s.value + '"]');
       if (!b) continue;
-      if (s.label !== null) { b.textContent = s.label; b.title = s.title; }
+      // Popis aj tooltip sa prepisuju VZDY — aj v degradovanom stave. Preskocenie
+      // by na novom dielci nechalo cudzi vyrobny rozmer (Codex #185 kolo 2, P2).
+      b.textContent = s.label;
+      b.title = s.title;
       b.classList.toggle('on', s.on);
       b.classList.toggle('ovr', s.ovr);
       b.setAttribute('aria-pressed', s.on ? 'true' : 'false');
@@ -154,7 +163,13 @@
     if (window.sketchup && sketchup.set_part_grain)
       sketchup.set_part_grain(JSON.stringify({ role_key: partCard.role_key,
                                                grain: nxGrainWire(v),
-                                               cabinet_id: partCard.cabinet_id }));
+                                               cabinet_id: partCard.cabinet_id,
+                                               // Identitu DOKUMENTU nesie obalka payloadu karty
+                                               // (`bridge.js` ju do nej doplní) — ID skriniek sa
+                                               // naprieč dokumentmi opakujú, takže bez nej by
+                                               // oneskorený klik prestaval rovnomennú skrinku
+                                               // v inom modeli (Codex #185 kolo 2, P2).
+                                               model_guid: partCard.model_guid || '' }));
   }
   // Hodnota NA DROT. Segment pouziva UI token `inherit`, ale zapisova cesta
   // pozna sentinel `__inherit__` — ten isty, akym sa hrana vracia „podľa

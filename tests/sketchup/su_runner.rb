@@ -4358,7 +4358,30 @@ module NoxunSuRunner
       ok("K1: korpus je spat na dedeni (#{k1_grain_of(inst, 'front_door')}), " \
          'ODPOJENY dielec drzi svoj snapshot „width"',
          k1_grain_of(inst, 'front_door') == 'length' && !det_rec.nil?)
+
+      # Codex #185 kolo 2 (P1): s OZNACENYM odpojenym dielcom sa zmena smeru
+      # MUSI odmietnut. `find_cabinet` jeho vlastnika najde, takze bez guardu by
+      # prestavba zmenila vnoreny dielec rovnakeho part_key — a pouzivatel by
+      # dostal hlasku o uspechu nad dielcom, ktoreho sa nic nedotklo.
+      cfg_nested_before = e::Store.get(inst, 'config').to_s
+      det_cfg_before = e::Store.get(detached, 'config').to_s
+      e::Panel.select_only(model, detached)
+      e::Panel.handle_set_part_grain({ 'role_key' => fkey, 'grain' => 'length',
+                                       'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      ok('K1: ODPOJENY dielec sa cez kartu menit NEDA — nezmenil sa ON ani vnoreny dielec',
+         e::Store.get(inst, 'config').to_s == cfg_nested_before &&
+         e::Store.get(detached, 'config').to_s == det_cfg_before)
       detached.erase! if detached && detached.valid?
+
+      # Codex #185 kolo 2 (P2): guard DOKUMENTU v zapisovej ceste.
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      e::Panel.select_only(model, k1_part(inst, 'front_door'))
+      cfg_guard_before = e::Store.get(inst, 'config').to_s
+      e::Panel.handle_set_part_grain({ 'role_key' => fkey, 'grain' => 'width',
+                                       'cabinet_id' => cid, 'model_guid' => 'CUDZI-GUID' }.to_json)
+      ok('K1: klik z INEHO dokumentu nezapise NIC (ID skriniek sa naprie dokumentmi opakuju)',
+         e::Store.get(inst, 'config').to_s == cfg_guard_before)
 
       # --- 10) UNI material: override sa NEMAZE, len neucinkuje --------------
       inst = e::Panel.find_cabinet_by_id(model, cid)
@@ -4405,6 +4428,19 @@ module NoxunSuRunner
          built == 'length' && spay['grain_effective'] == 'length' && spay['grain_pending'] == 'width')
       ok("K1: rozpor snapshot vs. katalog karta PRIZNA (#{spay['grain_hint']})",
          !spay['grain_hint'].to_s.empty? && spay['grain_hint'].to_s.include?('prestavbe'))
+      # Codex #185 kolo 2 (P2): `push_materials` musi za katalogom poslat aj
+      # CERSTVU kartu — inak by segment ostal na starom (cachovanom) stave az do
+      # dalsieho prekliku vyberu. Overuje sa to, co ide na drot.
+      pushed = []
+      install_js_recorder(pushed)
+      begin
+        e::Panel.push_materials
+      ensure
+        remove_js_recorder
+      end
+      ok("K1: po zmene katalogu ide na panel aj cerstva karta dielca (#{pushed.length} pushov)",
+         pushed.any? { |s| s.start_with?('NX.setPartCard(') } &&
+         pushed.any? { |s| s.start_with?('NX.setMaterials(') })
       File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(k1_catalog_json))
       e::Materials.reload!
 

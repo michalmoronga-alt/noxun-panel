@@ -92,9 +92,19 @@ eq(byValue(LOCKED, 'width').on, true,
 const NOPAY = nxGrainSegmentState(null);
 eq(NOPAY.locked, true, 'bez payloadu sa segment zamkne');
 eq(NOPAY.buttons.length, 3, 'kostra ostava — nic sa neprekresluje na prazdno');
-eq(NOPAY.buttons.map(b => b.label), [null, null, null],
-   'bez serverovych textov sa popisy NEPREPISUJU (ostanu z kostry)');
+// Codex #185 kolo 2 (P2): popisy sa RESETUJU na neutralnu zalohu z kostry.
+// Keby sa preskocili, segment by na novom dielci drzal popis a tooltip
+// PREDOSLEHO — teda cudzi vyrobny rozmer.
+eq(NOPAY.buttons.map(b => b.label), ['Podľa materiálu', 'Pozdĺžna', 'Priečna'],
+   'bez serverovych textov sa popisy vratia na zalohu z kostry, nie na cudzie');
+eq(NOPAY.buttons.map(b => b.title), ['', '', ''],
+   'a tooltip s vyrobnym rozmerom zmizne — cudzie cislo je horsie nez ziadne');
 eq(byValue(NOPAY, 'inherit').on, true, 'default je dedenie');
+
+// Prechod „dielec s payloadom -> dielec bez payloadu" nesmie nechat stary text.
+const AFTER = nxGrainSegmentState({ grain_value: 'inherit' });
+eq(byValue(AFTER, 'width').label, 'Priečna', 'popis je zo zalohy, nie z predosleho dielca');
+eq(byValue(AFTER, 'width').title, '', 'tooltip predosleho dielca sa NEPRENESIE');
 
 const BADVAL = nxGrainSegmentState(pcPayload({ grain_value: 'diagonal' }));
 eq(byValue(BADVAL, 'inherit').on, true,
