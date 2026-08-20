@@ -747,9 +747,9 @@ module Noxun
           {
             'role_key' => rk, 'role' => role, 'name' => Store.get(part, 'name'),
             'length' => cfg['length'], 'width' => cfg['width'], 'thickness' => cfg['thickness'],
-            # UI-D1: smer dekoru je v sektore „Základné" karty dielca INFORMACIA
-            # (urcuje ho material — katalogove pole `grain` sheetu). Ide o
-            # snapshot dielca (standard 8.3), nie o novy nastavitelny udaj.
+            # K1 / D-108: smer dekoru je od v0.7.23 VSTUP. Tu je EFEKTIVNY smer
+            # zo snapshotu dielca (standard 8.3) — ten isty udaj, z ktoreho pocita
+            # VEPO aj kontrola narezu. Stavy segmentu doda `part_grain_payload`.
             'grain_direction' => cfg['grain_direction'] || 'none',
             'material_id' => cfg['material_id'],
             'edges' => cfg['edges'] || AbsRules.empty_edges,
@@ -758,10 +758,83 @@ module Noxun
             'edge_overrides' => (ov['edges'] || {}), # ktore hrany maju rucny override (UI odlisi "dedi")
             'has_material_override' => !ov['material_id'].nil?,
             'cabinet_id' => Store.get(cab, 'cabinet_id')
-          }.merge(part_edge_texts(role, cfg))
+          }.merge(part_edge_texts(role, cfg)).merge(part_grain_payload(cfg, ov))
         rescue StandardError => e
           Engine.log_error(e, 'part_card_payload')
           nil
+        end
+
+        # K1 / D-108: stavy segmentu „Smer dekoru" v karte dielca. CELY TEXT
+        # SKLADA SERVER (vzor D-102) — JS len maluje.
+        #
+        # Karta musi povedat TRI veci naraz (inak by pouzivatel nevedel, co vlastne
+        # vidi): aky je VYSLEDOK, ci pochadza z materialu alebo z rucneho zasahu,
+        # a AKY VYROBNY ROZMER z toho vyjde. Preto:
+        #   * volba „Podľa materiálu" nesie v popise VYSLEDOK („— pozdĺžna"),
+        #     nie prazdne slovo „dedí" — presne to bol slepy bod incidentu 19.8.;
+        #   * KAZDA volba nesie v tooltipe vyrobny rozmer (2000×250 vs 250×2000),
+        #     takze otocenie kresby je vidiet PRED objednavkou.
+        #
+        # Rozmery v snapshote su GEOMETRICKE; vyrobny tvar = ten isty swap, aky
+        # robi `VepoExport.oriented` (grain 'width' => dlzka a sirka sa vymenia).
+        # Zdvojene sa tu NIC nepocita — je to len zobrazenie toho isteho pravidla.
+        GRAIN_WORD = { 'length' => 'pozdĺžna', 'width' => 'priečna', 'none' => 'bez smeru' }.freeze
+
+        def part_grain_payload(cfg, ov)
+          sheet = grain_sheet(cfg['material_id'])
+          mat = sheet ? sheet['grain'].to_s : ''
+          mat = 'none' unless %w[length width].include?(mat)
+          override = ov['grain_direction'].to_s
+          override = '' unless CabinetBuilder::GRAIN_OVERRIDES.include?(override)
+          locked = (mat == 'none')
+          effective = locked ? 'none' : (override.empty? ? mat : override)
+          l = cfg['length'].to_f
+          w = cfg['width'].to_f
+          {
+            'grain_value' => override.empty? ? 'inherit' : override,
+            'grain_material' => mat,
+            'grain_effective' => effective,
+            'grain_locked' => locked,
+            'grain_options' => [
+              grain_option('inherit', locked ? 'Podľa materiálu' : "Podľa materiálu — #{GRAIN_WORD[mat]}",
+                           locked ? 'none' : mat, l, w, locked),
+              grain_option('length', 'Pozdĺžna', 'length', l, w, locked),
+              grain_option('width', 'Priečna', 'width', l, w, locked)
+            ],
+            # Hint sa ukazuje LEN v zamknutom stave — inak by zabral riadok
+            # panela za nic (trvale pravidlo „vertikalny priestor je vzacny").
+            'grain_hint' => locked ? grain_locked_hint(override) : nil
+          }
+        rescue StandardError => e
+          Engine.log_error(e, 'part_grain_payload')
+          {}
+        end
+
+        # Katalogovy zaznam dosky pre smer dekoru; material mimo katalogu = nil
+        # (o kresbe nevieme nic, takze segment ostava zamknuty).
+        def grain_sheet(material_id)
+          return nil unless defined?(Materials) && material_id
+          Materials.sheet(material_id)
+        rescue StandardError
+          nil
+        end
+
+        def grain_option(value, label, result, l, w, locked)
+          dims = (result == 'width') ? [w, l] : [l, w]
+          title = if locked
+                    'Materiál dielca nemá smer dekoru — voľba je zatiaľ neúčinná.'
+                  else
+                    "#{GRAIN_WORD[result].capitalize} — výrobne #{fmt_mm(dims[0])}×#{fmt_mm(dims[1])} mm"
+                  end
+          { 'value' => value, 'label' => label, 'title' => title }
+        end
+
+        def grain_locked_hint(override)
+          base = 'Materiál dielca nemá smer dekoru (jednofarebný alebo UNI) — otáčať sa nemá čo.'
+          return base if override.empty?
+          # Override sa pri zmene materialu NEMAZE (kontrakt K1): rozhodnutie
+          # pouzivatela prezije aj docasny material bez kresby a ozije s dekorom.
+          "#{base} Uložený smer „#{GRAIN_WORD[override]}“ ostáva zapamätaný, ale je neúčinný."
         end
 
         # D-102: serverove texty hran karty DIELCA — volba „(podľa pravidla — …)"

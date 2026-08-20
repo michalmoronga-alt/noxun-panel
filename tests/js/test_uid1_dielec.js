@@ -28,26 +28,26 @@ eq(nxGrainLabel(null), 'Bez smeru', 'chybajuca hodnota = bez smeru');
 eq(nxGrainLabel('cudzia_hodnota'), 'Bez smeru',
    'neznamy kod sa NEUKAZE surovy — vyzeral by ako nazov a pritom nic nehovori');
 
-// --- 2) „Zakladne" su VYSTUP: styri informacne riadky, dva a dva -------------
+// --- 2) „Zakladne" su VYSTUP: informacne riadky, nikdy polia ----------------
+// K1 (D-108): „Smer dekoru" sa z informacneho stlpca PRESTAHOVAL do segmentu
+// (je to vstup) — vpravo ostala len Hrúbka. Stavy segmentu ma vlastnu sadu
+// tests/js/test_k1_smer_dekoru.js.
 const PC = { length: 720.6, width: 560, thickness: 18, grain_direction: 'length' };
 const rows = nxPartBasicRows(PC);
 eq(rows.left.length, 2, 'vlavo dva riadky');
-eq(rows.right.length, 2, 'vpravo dva riadky (karta narastie o JEDEN riadok, nie o tri)');
+eq(rows.right.length, 1, 'vpravo uz len hrubka');
 eq(rows.left.map(r => r.label), ['Dĺžka', 'Šírka'], 'vlavo rozmery plochy');
-eq(rows.right.map(r => r.label), ['Hrúbka', 'Smer dekoru'], 'vpravo hrubka a smer');
+eq(rows.right.map(r => r.label), ['Hrúbka'], 'vpravo hrubka');
 eq(rows.left[0].value, 721, 'rozmer je cele cislo (rozmer je cislo, nie veta)');
 eq(rows.right[0].unit, 'mm', 'hrubka ma jednotku');
-eq(rows.right[1].value, 'Po dĺžke', 'smer sa prelozi');
-eq(rows.right[1].unit, '', 'smer NEMA jednotku mm');
 // Kazdy udaj, ktory pouzivatel nemoze zmenit tu, musi povedat KDE sa meni.
 eq(typeof rows.right[0].title === 'string' && rows.right[0].title.length > 0, true,
    'hrubka vysvetli, ze ju urcuje material');
-eq(typeof rows.right[1].title === 'string' && rows.right[1].title.length > 0, true,
-   'smer vysvetli, ze ho urcuje material');
+eq(rows.right.some(r => !!r.click), false,
+   'hrubka nikam nevedie — urcuje ju material KORPUSU a ten sa v rezime dielca neotvori');
 
 const EMPTY = nxPartBasicRows({});
 eq(EMPTY.left[0].value, '?', 'chybajuci rozmer sa prizna otaznikom, nevymysla sa nula');
-eq(EMPTY.right[1].value, 'Bez smeru', 'chybajuci smer = bez smeru');
 eq(nxPartBasicRows(null).left.length, 2, 'bez payloadu sa nepada — kostra ostava');
 
 // --- 3) rotacia hranovej ikony sa berie zo STRANY 2D nahladu ----------------

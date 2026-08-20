@@ -166,6 +166,77 @@ module Noxun
           rebuild_focus_part(model, cab, rk, params, "Hrana #{code} — #{label}.")
         end
 
+        # ---- K1 / D-108: SMER DEKORU DIELCA ---------------------------------
+        # Per-dielec override smeru kresby (`part_override['grain_direction']`).
+        # `grain`: 'length' | 'width' | '__inherit__' (zrusenie overridu).
+        #
+        # PRECO to existuje: pri drevodekore musi kresba susednych dielcov sedet
+        # (blenda vs. dvere pod nou). Do 20.8.2026 urcoval smer VYHRADNE material,
+        # takze sa to v pluginu nedalo ani nastavit, ani skontrolovat — realny
+        # incident 19.8.2026 (blenda pozdlzna, dvere priecne) vysiel najavo az v
+        # objednavke.
+        #
+        # ZAPIS je jeden rebuild = JEDEN krok Spat (vzor D-35), efektivny smer
+        # dopocita `CabinetBuilder.effective_grain` a zapise ho do snapshotu
+        # dielca. Rozmery na entite sa NEMENIA — vymenu dlzka/sirka robia az
+        # vystupy (VEPO, kontrola narezu), presne ako doteraz.
+        #
+        # ENUM GUARD: neznama hodnota = ODMIETNUTY zapis s hlaskou, nikdy tichy
+        # fallback na 'length' (vyrobne data by klamali o tom, co pouzivatel
+        # zvolil). Identity guard dokumentu/skrinky je rovnaky ako pri hranach.
+        def handle_set_part_grain(payload)
+          model = Sketchup.active_model
+          cab = find_cabinet(model)
+          return set_status('Najprv označ dielec v korpuse.', true) if cab.nil?
+          data = parse(payload)
+          return if stale_cabinet_echo?(cab, data, 'smer dekoru dielca')
+          rk = data['role_key'].to_s
+          return set_status('Chyba identifikácie dielca.', true) if rk.empty?
+          raw = data['grain'].to_s
+          unless raw == '__inherit__' || CabinetBuilder::GRAIN_OVERRIDES.include?(raw)
+            Engine.log("smer dekoru: neznama hodnota #{raw.inspect} — zapis odmietnuty")
+            return set_status('Neznámy smer dekoru — nič sa nezmenilo.', true)
+          end
+          params = existing_params(cab)
+          rk = canonical_part_key(params, rk)
+          # Smer materialu sa cita PRED prestavbou (potom uz dielec nesie
+          # VYSLEDOK) — hlaska musi vediet povedat, ze volba je zatial neucinna.
+          mat_grain = part_material_grain(cab, rk)
+          ov = (params['part_overrides'] ||= {})
+          rec = ov[rk] || {}
+          if raw == '__inherit__' then rec.delete('grain_direction') else rec['grain_direction'] = raw end
+          store_override(ov, rk, rec)
+          rebuild_focus_part(model, cab, rk, params, grain_status_msg(raw, mat_grain))
+        end
+
+        # Smer dekoru MATERIALU dielca ('length'|'width'|'none'). Cita sa zo
+        # SNAPSHOTU dielca (vysledny material po dedeni aj overide) — to iste,
+        # co ukazuje karta. Material mimo katalogu = 'none' (o kresbe nevieme nic).
+        def part_material_grain(cab, rk)
+          part = find_part_by_role_key(cab, rk)
+          return 'none' unless part && defined?(Materials)
+          sheet = Materials.sheet((Store.config(part) || {})['material_id'])
+          g = sheet && sheet['grain'].to_s
+          %w[length width].include?(g) ? g : 'none'
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.part_material_grain')
+          'none'
+        end
+
+        # Hlaska po zapise. Priecny smer VYSLOVNE hovori, ze sa vymenia rozmery
+        # vo vystupe — to je cela podstata davky a pouzivatel to musi vidiet
+        # bez otvarania VEPO.
+        def grain_status_msg(raw, mat_grain)
+          base = case raw
+                 when '__inherit__' then 'Smer dekoru — podľa materiálu.'
+                 when 'width' then 'Smer dekoru — priečna: dĺžka a šírka sa vo výstupe (VEPO, nárez) vymenia.'
+                 else 'Smer dekoru — pozdĺžna.'
+                 end
+          return base if mat_grain != 'none'
+          "#{base} Materiál dielca nemá smer dekoru, takže voľba je zatiaľ neúčinná " \
+            '(uloží sa a ožije s dekorovým materiálom).'
+        end
+
         # D-35: olepenie VSETKYCH 4 hran dielca jednym klikom — ABS 1.0 mm dekoru
         # materialu dielca, JEDEN rebuild = JEDEN undo krok (audit FIX 7: nikdy
         # slucka 4x set_edge). Identity guard (audit BLOCKER 3): payload nesie
@@ -348,6 +419,13 @@ module Noxun
         # dekor pasky — ABS ineho dekoru by na cudzom dielci bola chyba.
         # Samostatne DOSKY (kind=board) do vyberu nepatria: nemaju vrstvu
         # overridov ani rolu korpusoveho dielca.
+        #
+        # K1 / D-108: prenasa sa VYHRADNE olep (`edges`) — SMER DEKORU sa NEPRENASA.
+        # Je to vedome: smer sa nastavuje preto, aby kresba sedela so SUSEDOM, a
+        # susedia sa lisia; hromadne prekopirovanie priecneho smeru na vsetky boky
+        # projektu by tichucko otocilo desiatky dielcov vo VEPO. Ciel si preto
+        # dalej nesie svoj vlastny `grain_direction` override — zapisova slucka
+        # nizsie sa dotyka len klucov `edges` a `edge_warnings`.
         SIMILAR_SCOPES = %w[cabinet project].freeze
 
         def normalize_similar_scope(raw)

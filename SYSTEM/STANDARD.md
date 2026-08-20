@@ -222,7 +222,8 @@ Toto je invariant a jeden z hlavných dôvodov existencie štandardu:
 
 - **Výrobné rozmery** dielca (`length`, `width`, `thickness`), **hrany** (L1/L2/W1/W2) a **smer dekoru** (`grain_direction`) sa určujú z **konfigurácie dielca**, nikdy z bounding boxu a nikdy z otočenia skrinky v miestnosti.
 - Keď používateľ otočí skrinku o 90° v pôdoryse, kusovník, hrany a dekor sa **nesmú zmeniť**. Rotácia je vec umiestnenia v modeli, nie výrobných dát.
-- `grain_direction`: `"length"` / `"width"` / `"none"` — smer dekoru vzhľadom na výrobný rozmer dielca (nie vzhľadom na os modelu). Explicitný atribút, nie odvodený z natočenia textúry.
+- `grain_direction`: `"length"` / `"width"` / `"none"` — smer dekoru vzhľadom na výrobný rozmer dielca (nie vzhľadom na os modelu). Explicitný atribút, nie odvodený z natočenia textúry ani z pomeru rozmerov (štvorcový dielec je nerozhodnuteľný).
+- **Rotácia dielca kvôli kresbe je vec VÝSTUPU, nie modelu** (K1, v0.7.23). Snapshot dielca nesie **geometrické** rozmery + `grain_direction`; výmenu `dĺžka ↔ šírka` **spolu s výmenou dvojíc hrán** `L↔W` robí výhradne export do VEPO (`VepoExport.oriented`) a zrkadlovo kontrola nárezu (`Validation.fits_on_sheet?`). Rovnaká výmena sa **nikdy nesmie zopakovať** na inom mieste reťazca — dvojitý swap by dielec objednal v pôvodnej orientácii. Bežné metre ABS sú voči otočeniu **invariantné** (tá istá fyzická hrana), a to je zároveň krížová kontrola, či niekde druhý swap nevznikol.
 
 Poučenie: v OCL sa opakovane zamieňala šírka s hrúbkou pri rotovaných dielcoch. Keď rozmery kladie Ruby z konfigurácie, tento problém nevzniká.
 
@@ -499,6 +500,26 @@ projektový default → skrinka dedí → modul dedí → konkrétny dielec over
 ```
 
 Napr.: projekt `K009_PW_DTDL_18` → korpus zdedí → police zdedia → jedna polica ručný override na iný dekor/hrúbku.
+
+#### `part_overrides` — vrstva ručných zásahov na dielci korpusu (ZÁVÄZNÝ TVAR)
+
+Žije v configu **korpusu** pod `part_overrides`, kľúčom je `part_key` (2.3). Doska (`kind: board`) túto vrstvu **nemá** — jej config je priamo zdroj pravdy (8.3).
+
+```json
+"part_overrides": {
+  "front:F1/wing:single": {
+    "material_id": "K009_PW_DTDL_18",
+    "grain_direction": "width",
+    "edges": { "L1": "ABS_K009_10", "L2": null }
+  }
+}
+```
+
+- **Povolené kľúče záznamu:** `material_id` · `grain_direction` · `edges` · `edge_warnings` (interné, sticky dôvody remapu ABS). Čokoľvek iné sa pri normalizácii configu **zahodí** — vrstva je uzavretý enum, nie voľný priestor.
+- **Chýbajúci kľúč = DEDENIE**, nikdy „prázdna hodnota". Preto sú staré modely bez `grain_direction` platné a ich otvorenie **nesmie nič zapísať, nič prestavať a nesmie vyrobiť krok Späť**.
+- **`grain_direction` (K1 / D-108, v0.7.23):** povolené hodnoty overridu sú **len `"length"` a `"width"`**. `"none"` sa nenastavuje — „bez smeru" je vlastnosť materiálu, nie rozhodnutie o dielci. **Neznáma hodnota sa odmietne** (zápisová cesta vráti chybu, čítacia ju zahodí) — nikdy tichý fallback, výrobné dáta by klamali o tom, čo používateľ zvolil.
+- **Efektívny smer = `override || materiál`, s jedinou výnimkou:** keď materiál dielca smer **nemá** (`grain: "none"` — jednofarebný dekor, UNI, materiál mimo katalógu), override sa **IGNORUJE** (výsledok `"none"`), ale **NEMAŽE sa**. Otáčať kresbu, ktorá neexistuje, by bola lož; zmazanie by pri dočasnej zmene materiálu zahodilo rozhodnutie používateľa. Po návrate dekorového materiálu override znovu platí.
+- **Výsledok sa materializuje RAZ** — pri stavbe do snapshotu dielca (8.2/8.3). Výstupy (kusovník, VEPO, kontrola nárezu, ABS) čítajú **výhradne snapshot**, nikdy živý katalóg ani `part_overrides`; preto odpojený dielec aj stará zákazka nesú presne to, s čím sa objednávali.
 
 ### 7.3 Výrobný materiál = zdroj pravdy; plochy = vizuál
 

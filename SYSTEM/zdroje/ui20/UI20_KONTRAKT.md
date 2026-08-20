@@ -308,12 +308,14 @@ zvýrazní v modeli (D-89a) · „Označiť v modeli" · „Použiť na podobné
   (materiál, rozmery ani smer dekoru nie); prázdny override zdroja ciele **vráti na pravidlo** —
   je to tiež rozhodnutie, nie „nerob nič". Počet aj zápis počíta **jedna serverová funkcia**
   a celý zápis je **jedna operácia = jeden krok Späť** aj naprieč skrinkami.
-- **ODCHÝLKA 1 — `Smer dekoru` je INFO, nie vstup.** Per-dielec override smeru neexistuje: smer
-  určuje materiál (katalógové pole `grain`), `part_overrides` pozná len `material_id`, `edges`
-  a `edge_warnings`. Zavedenie takého overridu mení **výrobný kontrakt** (kusovník, rotácia VEPO,
-  kontrola nárezu) — je to vlastná dávka s auditom, nie „S" dotiahnutie UI. Karta preto smer
-  ukazuje ako text a povie, kde sa naozaj mení. *(Ak ho Michal bude chcieť editovateľný, je to
-  samostatné zadanie — UI zmena je pritom jednoriadková.)*
+- ~~**ODCHÝLKA 1 — `Smer dekoru` je INFO, nie vstup.**~~ — **ZRUŠENÁ, kontrakt SPLNENÝ** dávkou
+  **K1 · D-108** (PR #K1, v0.7.23, 21.8.2026). Per-dielec override smeru existuje:
+  `part_overrides['grain_direction']` s enumom `length`/`width`, efektívny smer počíta
+  `CabinetBuilder.effective_grain` (override → materiál) a materializuje ho do snapshotu dielca.
+  Karta má segment **„Podľa materiálu — <výsledok>" / „Pozdĺžna" / „Priečna"** a každá voľba nesie
+  v tooltipe **výrobný rozmer** (2000×250 vs 250×2000). Výrobný kontrakt sa pritom nerozšíril o
+  žiadnu novú rotáciu — dĺžku/šírku a dvojice hrán vymieňa naďalej len VEPO a kontrola nárezu.
+  Materiál bez smeru (UNI, jednofarebný) segment zamkne a override si zapamätá, ale neuplatní.
 - **ODCHÝLKA 2 — rotácia hranovej ikony ide podľa 2D náhľadu, nie podľa pevnej mapy.** Uhol dáva
   strana dielca v náhľade (`AbsRules.edge_sides`), takže ikona ukazuje presne tú hranu, ktorú
   karta hneď nad zoznamom farebne kreslí. Pevná mapa „predná 0°…" by pri ležiacich dielcoch
