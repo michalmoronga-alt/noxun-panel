@@ -111,7 +111,7 @@ deq(NXLayers.ghosts('cab', ALL), [], 'reset zhasne vsetky prisvietene vrstvy');
 
 // ------------------------------------------------- 4) znacky kovania --------
 const GEOM = {
-  W: 900, H: 720, fh: 100, gapSides: 2, gap: 3,
+  W: 900, H: 720, t: 18, fh: 100, gapSides: 2, gap: 3,
   fronts: [
     { id: 'F1', type: 'drawer_front', z: 100, height: 180, wings_n: 1 },
     { id: 'F2', type: 'door', z: 283, height: 437, wings_n: 2 }
@@ -151,12 +151,19 @@ ok(hL.concat(hR).every(m => m.z >= 283 && m.z <= 283 + 437),
 const slideMarks = byKind('slide_rail').concat(byKind('drawer'));
 ok(slideMarks.every(m => m.z >= 100 && m.z + m.h <= 100 + 180),
   'kolajnice aj telo suflika su vo vyske zasuvky');
-// Kolajnice stoja pri VNUTORNYCH hranach bokov (lava na gs, prava na gs+ow)
-// a ich patka mieri DOVNUTRA.
+// Kolajnice drzi BOK KORPUSU, nie celo — kotvia sa na vnutorne lica bokov
+// (x = t … W-t, tie iste, ake kresli drawCarcass), NIE na `fr_gap_sides`.
+// Codex #184 P2: pri gs=2 a hrubke 18 by rail lezal NA doske boku.
 const rails = byKind('slide_rail');
 const rL = rails.find(m => m.side === 'left'), rR = rails.find(m => m.side === 'right');
-eq(rL.x, GEOM.gapSides, 'lava kolajnica sedi na vnutornej hrane laveho boku');
-eq(rR.x, GEOM.W - GEOM.gapSides, 'prava kolajnica sedi na vnutornej hrane praveho boku');
+eq(rL.x, GEOM.t, 'lava kolajnica sedi na vnutornom lici laveho boku');
+eq(rR.x, GEOM.W - GEOM.t, 'prava kolajnica sedi na vnutornom lici praveho boku');
+ok(rL.x !== GEOM.gapSides, 'kolajnica sa NEkotvi na bocnu medzeru cela');
+// Zaporny presah cela (celo uzsie nez korpus) kolajnicu z korpusu nevystrci.
+const negOv = PV.nxHwMarks([{ owner_part_key: 'front:F1/panel', generic_type: 'slide', quantity: 1 }],
+  Object.assign({}, GEOM, { gapSides: -25 })).filter(m => m.kind === 'slide_rail');
+ok(negOv.every(m => m.x >= GEOM.t && m.x <= GEOM.W - GEOM.t),
+  'kolajnice ostavaju v korpuse aj pri zapornom presahu cela');
 ok(rL.w > 0 && rR.w > 0, 'patka ma dlzku (smer urcuje `side`, nie znamienko)');
 ok(rL.z === rR.z && rL.h === rR.h, 'obe kolajnice su rovnake a v rovnakej vyske');
 // Telo suflika je INSET od bokov — za patkami kolajnic, nie cez ne.
@@ -167,7 +174,7 @@ eq(dr.z, rL.z, 'telo sedi na urovni kolajnic');
 ok(dr.h / 180 > 0.5 && dr.h / 180 < 0.65, 'vyska tela je proporcna vyske cela (~55–60 %)');
 // Viac zasuvok nad sebou: kazda ma SVOJU dvojicu kolajnic a svoje telo, a telo
 // vyssieho cela je vyssie (schvalene na rovnakych aj roznych vyskach).
-const stackG = { W: 900, H: 720, fh: 100, gapSides: 2, gap: 3, fronts: [
+const stackG = { W: 900, H: 720, t: 18, fh: 100, gapSides: 2, gap: 3, fronts: [
   { id: 'D1', type: 'drawer_front', z: 100, height: 140, wings_n: 1 },
   { id: 'D2', type: 'drawer_front', z: 243, height: 280, wings_n: 1 }
 ] };
@@ -181,9 +188,16 @@ const bodies = stack.filter(m => m.kind === 'drawer');
 ok(bodies[1].h > bodies[0].h, 'telo vyssieho cela je vyssie (vysky rastu s celami)');
 ok(bodies[0].z + bodies[0].h < bodies[1].z, 'tela sa navzajom neprekryvaju');
 // Uzka zasuvka: patky by sa prekryli, telo preto dostane nahradnu sirku (nikdy zapornu).
-const narrow = PV.nxSlideGeom({ z: 0, height: 120 }, 2, 20);
+const narrow = PV.nxSlideGeom({ z: 0, height: 120 }, 18, 38);
 ok(narrow.bw > 0, 'uzka zasuvka ma telo s kladnou sirkou');
-eq(PV.nxSlideGeom({ z: 0, height: 0 }, 2, 896), null, 'celo bez vysky znacku vysuvu nedostane');
+ok(narrow.bx >= 18 && narrow.bx + narrow.bw <= 38, 'nahradne telo ostava v korpuse');
+eq(PV.nxSlideGeom({ z: 0, height: 0 }, 18, 882), null, 'celo bez vysky znacku vysuvu nedostane');
+eq(PV.nxSlideGeom({ z: 0, height: 120 }, 400, 400), null, 'nulovy svetly priestor = ziadna geometria');
+// Nezmyselna hrubka (bok siri cez pol korpusu) nesmie znacku stratit — vtedy sa
+// berie cely korpus, radsej hruba poloha nez ziadna.
+const fatT = PV.nxHwMarks([{ owner_part_key: 'front:F1/panel', generic_type: 'slide', quantity: 1 }],
+  Object.assign({}, GEOM, { t: 600 }));
+eq(fatT.filter(m => m.kind === 'slide_rail').length, 2, 'aj pri nezmyselnej hrubke su kolajnice dve');
 // Tooltip pomenuva polozku, vlastnika aj pocet — presne to, co je v payloade.
 eq(hL[0].title, 'Závesy · F2 · ľavé krídlo · 2×', 'popis znacky je z payloadu');
 // Kovanie na cele, ktore v rade neexistuje (stary override), sa NEKRESLI.

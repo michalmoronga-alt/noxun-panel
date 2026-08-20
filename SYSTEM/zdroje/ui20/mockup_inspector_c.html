@@ -834,7 +834,8 @@ function projSvg(){
     const mk = (html, owner, tip) => '<g style="cursor:pointer" onclick="toast(\''+tip+'\',\'hammer\')">'+html+'</g>';
     const hinge = (cx, cy) => '<circle cx="'+cx+'" cy="'+cy+'" r="7" fill="var(--nx-select-bg)" stroke="var(--nx-select)" stroke-width="1.6"/>' +
       '<path d="M'+(cx-4)+' '+(cy-4)+' l8 8 M'+(cx-4)+' '+(cy+4)+' l8 -8" stroke="var(--nx-select)" stroke-width="1.4"/>';
-    /* x0/x1 = vnútorné hrany bokov zásuvky, y/h = pásmo jej čela */
+    /* x0/x1 = VNÚTORNÉ LÍCA bokov (priečka vľavo, bok korpusu vpravo) — výsuv drží
+       bok, nie čelo, takže sa nekotví na bočnú medzeru čela; y/h = pásmo jej čela */
     const vysuvMk = (x0, x1, y, h) => {
       const foot = 9, top = y + h*0.16, base = y + h*0.74;
       return '<path d="M'+x0+' '+top+'V'+base+'h'+foot+' M'+x1+' '+top+'V'+base+'h'+(-foot)+'" ' +
@@ -847,8 +848,8 @@ function projSvg(){
       /* zóny naznačené, nech je čitateľné KDE kovanie sedí */
       '<rect x="196" y="34" width="8" height="154" fill="'+body+'" fill-opacity=".5" stroke="var(--nx-border-soft)"/>' +
       mk(hinge(84, 70) + hinge(84, 150), 'F1', 'Závesy 2× CLIP top — čelo F1 (závesová hrana vľavo)') +
-      mk(vysuvMk(206, 314, 40, 42), 'F3', 'Výsuv NL 470 — čelo F3 (koľajnice L po bokoch + telo šuflíka)') +
-      mk(vysuvMk(206, 314, 92, 42), 'F2', 'Výsuv NL 470 — čelo F2') +
+      mk(vysuvMk(204, 318, 40, 42), 'F3', 'Výsuv NL 470 — čelo F3 (koľajnice L po bokoch + telo šuflíka)') +
+      mk(vysuvMk(204, 318, 92, 42), 'F2', 'Výsuv NL 470 — čelo F2') +
       mk(leg(80) + leg(148) + leg(236) + leg(302), 'cab', 'Nohy 4× 100 mm — skrinka') +
       ghostLayers('kovanie') +
       txt(84, 46, 'závesy', {size:8}) + txt(262, 46, 'výsuvy', {size:8}) + txt(196, 226, 'nohy', {size:8}) +

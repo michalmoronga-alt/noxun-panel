@@ -139,8 +139,12 @@ end
 
 NxTest.test('UI-B2: vysuv sa kresli ako „L" kolajnice + telo suflika (schvalene 20.8.)') do
   marks = UIB2_JS_CODE[/function nxHwMarks\(.*?\n  \}/m].to_s
-  NxTest.assert(marks.include?('nxSlideGeom(fr, gs, ow)'),
+  NxTest.assert(marks.include?('nxSlideGeom(fr, ix0, ix1)'),
                 'geometria vysuvu zije v jednej cistej funkcii (testovatelna v Node)')
+  # Codex #184 P2: vysuv drzi BOK korpusu — kotvi sa na vnutorne lica bokov
+  # (x = t … W-t, tie iste, ake kresli drawCarcass), nie na bocnu medzeru cela.
+  NxTest.assert(marks.match?(/ix0 = t, ix1 = W - t/),
+                'kolajnica sa kotvi na hrubku boku, nie na fr_gap_sides')
   %w[slide_rail drawer].each do |kind|
     NxTest.assert(marks.include?("kind: '#{kind}'"), "chyba znacka #{kind}")
   end

@@ -722,6 +722,10 @@
     var gs = (g.gapSides == null) ? 2 : g.gapSides;
     var gap = (g.gap == null) ? 3 : g.gap;
     var ow = W - 2*gs;
+    // Svetly priestor KORPUSU (vnutorne lica bokov) — kovanie, ktore sa montuje
+    // na bok (vysuv), sa kotvi sem; cela a ich kridla ostavaju na gs/ow.
+    var t = (g.t > 0) ? g.t : 0, ix0 = t, ix1 = W - t;
+    if (!(ix1 - ix0 > 0)){ ix0 = 0; ix1 = W; } // nezmyselna hrubka: radsej cely korpus nez ziadna znacka
     function frontOf(id){
       var fs = g.fronts || [];
       for (var i = 0; i < fs.length; i++){ if (String(fs[i].id) === id) return fs[i]; }
@@ -781,7 +785,11 @@
         // pri OBOCH bokoch KOLAJNICA ako „L" profil (zvisla nozicka + vodorovna
         // patka dovnutra) a medzi nimi TELO SUFLIKA. Vsetko sa odvodzuje z vysky
         // cela, takze pri viacerych zasuvkach nad sebou rastu tela s celami.
-        var sg = nxSlideGeom(fr, gs, ow);
+        // Codex #184 P2: kolajnica sa montuje na BOK KORPUSU, nie na hranu cela —
+        // kotvi sa preto na VNUTORNE LICA bokov (x = t … W-t, tie iste, ake kresli
+        // drawCarcass), nie na `fr_gap_sides`. Pri gs=2 a hrubke 18 by rail lezal
+        // NA doske boku a pri zapornom presahu cela dokonca mimo korpusu.
+        var sg = nxSlideGeom(fr, ix0, ix1);
         if (!sg) return;
         out.push({ kind: 'slide_rail', side: 'left', x: sg.xL, z: sg.z, w: sg.foot, h: sg.legH,
                    owner: owner, title: title });
@@ -795,19 +803,20 @@
   }
 
   // Ciste (Node testy): geometria znacky VYSUVU v mm sceny.
-  // fr = celo ({ z, height }), gs = bocna medzera, ow = svetla sirka radu ciel.
+  // fr = celo ({ z, height }), x0/x1 = VNUTORNE LICA BOKOV korpusu (x = t … W-t) —
+  // vysuv drzi bok, nie celo, preto sa nekotvi na `fr_gap_sides` (Codex #184 P2).
   // -> { z, foot, legH, xL, xR, bx, bw, bodyH } | null
   // Vsetko je pomer z vysky cela — ziadne nove data a ziadna konstanta, ktora by
   // pri vysokej zasuvke vyzerala inak nez pri nizkej.
-  function nxSlideGeom(fr, gs, ow){
-    var h = fr.height;
-    if (!(h > 0) || !(ow > 0)) return null;
-    var foot = Math.max(8, Math.min(ow * 0.12, 40));  // patka „L" smerom DOVNUTRA
+  function nxSlideGeom(fr, x0, x1){
+    var h = fr.height, iw = x1 - x0;
+    if (!(h > 0) || !(iw > 0)) return null;
+    var foot = Math.max(8, Math.min(iw * 0.12, 40));  // patka „L" smerom DOVNUTRA
     var bodyH = h * 0.58;                             // telo suflika (~55–60 % cela)
     var z = fr.z + h * 0.16;                          // uroven, na ktorej vysuv sedi
-    var bx = gs + foot + 2, bw = ow - 2*(foot + 2);   // telo je ZA patkami kolajnic
-    if (!(bw > 0)){ bx = gs + ow*0.25; bw = ow*0.5; } // uzka zasuvka: patky sa prekryju
-    return { z: z, foot: foot, legH: bodyH, xL: gs, xR: gs + ow, bx: bx, bw: bw, bodyH: bodyH };
+    var bx = x0 + foot + 2, bw = iw - 2*(foot + 2);   // telo je ZA patkami kolajnic
+    if (!(bw > 0)){ bx = x0 + iw*0.25; bw = iw*0.5; } // uzka zasuvka: patky sa prekryju
+    return { z: z, foot: foot, legH: bodyH, xL: x0, xR: x1, bx: bx, bw: bw, bodyH: bodyH };
   }
 
   // Ciste (Node testy): suhrn pod projekciou — VSETKY typy vratane tych bez

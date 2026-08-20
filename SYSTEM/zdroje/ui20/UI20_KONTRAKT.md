@@ -149,8 +149,9 @@ s warnpanelom (riadky s okom + „Otvoriť v Štúdiu → Kontrola").
 **Náhľad = kontextová projekcia** (výmena, nie vrstvenie): Korpus čelný rez s kótami (sokel živý
 N12) · Zóny čistá schéma (klikateľné zóny N18, police živé N19) · Čelá predný pohľad s výškami
 (obojsmerný výber, medzery jantárovo pri editácii N26) · Kovanie reálne pozície (záves=kruh s X na
-závesovej hrane · **výsuv = koľajnica „L" pri OBOCH bokoch (zvislá nožička + vodorovná pätka
-dovnútra) + telo šuflíka medzi nimi**, výška tela je pomer z výšky čela, takže pri viacerých
+závesovej hrane · **výsuv = koľajnica „L" na VNÚTORNÝCH LÍCACH OBOCH bokov (zvislá nožička +
+vodorovná pätka dovnútra; výsuv drží bok, nie čelo) + telo šuflíka medzi nimi**,
+výška tela je pomer z výšky čela, takže pri viacerých
 zásuvkách nad sebou telá rastú s čelami — *schválené Michalom 20.8. nad mini náhľadom, nahrádza
 pôvodné „koľajnice spredu po bokoch"* · nohy=obdĺžniky; klik označí vlastníka) ·
 Dielec hrany ABS farbami · Vkladanie šablóna ako bude vložená (čelá zap., vypnutím vidno vnútro;
