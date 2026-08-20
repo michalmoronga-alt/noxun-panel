@@ -4110,6 +4110,102 @@ module NoxunSuRunner
     end
   end
 
+  # ===========================================================================
+  # SMOKE PACK 1 (6A) — RUCNE odfotenie nahladu k UZ ULOZENEJ sablone.
+  # Nova serverova cesta s KAMEROU, preto in-SketchUp sekcia (headless sada
+  # `write_image` ani kameru neoveri). Dokazuje sa:
+  #   * bez oznacenia a pri VIACERYCH oznacenych skrinkach sa NEZAPISE nic,
+  #   * pri prave jednej oznacenej vznikne PNG a zaznam sablony sa NEZMENI,
+  #   * kamera je po fotenie kompletne obnovena,
+  #   * cela akcia NIE JE undo krok (1x Spat vrati este vlozenie skrinky).
+  # Docasny nazov sablony sa uprace na zaciatku aj v `ensure` (vzor UI-D2).
+  SMOKE1_NAME = 'SU-TEST odfotenie (docasna)'
+
+  def run_smoke1(model)
+    cleanup(model)
+    tp = e::TemplatePreviews
+    ts = e::TemplateStore
+    ts.delete('cabinet', SMOKE1_NAME)
+
+    cfg = { 'type' => 'lower', 'width' => 800.0, 'height' => 720.0, 'depth' => 560.0,
+            'thickness' => 18.0, 'floor_height' => 100.0 }
+    # Sablona vznikne BEZ nahladu (`preview` sa neodovzdava) — presne stav
+    # starych sablon, kvoli ktorym akcia vznikla.
+    ok('SMOKE1: sablona bez nahladu sa ulozila', ts.upsert('cabinet', SMOKE1_NAME, cfg))
+    png = tp.path_for('cabinet', SMOKE1_NAME)
+    ok('SMOKE1: sablona zacina BEZ nahladu', !File.exist?(png.to_s))
+    rec_before = ts.find('cabinet', SMOKE1_NAME).to_json
+
+    # --- 1) bez oznacenia: odmietnutie BEZ zapisu ---------------------------
+    model.selection.clear
+    okd, msg = e::Panel.capture_preview_for('cabinet', SMOKE1_NAME)
+    ok('SMOKE1: bez oznacenej skrinky sa foti ODMIETNE', okd == false)
+    info("SMOKE1: hlaska bez vyberu = #{msg.inspect}")
+    ok('SMOKE1: odmietnutie nevyrobilo ziadny PNG', !File.exist?(png.to_s))
+
+    inst = e::CabinetBuilder.build(model, cfg)
+    return ok('SMOKE1: vlozenie skrinky', false) unless inst
+
+    # --- 2) VIAC oznacenych skriniek: tiez odmietnutie ----------------------
+    inst2 = e::CabinetBuilder.build(model, cfg.merge('width' => 600.0))
+    # Odtlacok az TU — obe skrinky uz stoja, takze zmena poctu entit by mohla
+    # pochadzat uz len z fotenia.
+    before_ents = model.entities.length
+    model.selection.clear
+    model.selection.add([inst, inst2])
+    okd2, msg2 = e::Panel.capture_preview_for('cabinet', SMOKE1_NAME)
+    ok('SMOKE1: dve oznacene skrinky = ODMIETNUTIE (panel si nevyberie za pouzivatela)', okd2 == false)
+    info("SMOKE1: hlaska pri viacerych = #{msg2.inspect}")
+    ok('SMOKE1: ani tu nevznikol PNG', !File.exist?(png.to_s))
+
+    # --- 3) PRAVE JEDNA oznacena: fotka vznikne, zaznam sa nezmeni ----------
+    model.selection.clear
+    model.selection.add(inst)
+    view = model.active_view
+    view.camera.perspective = true
+    view.camera.set(Geom::Point3d.new(220, -320, 210), Geom::Point3d.new(0, 0, 20), Z_AXIS)
+    view.camera.fov = 47.5
+    cam_before = uid2_cam(view)
+
+    okd3, msg3 = e::Panel.capture_preview_for('cabinet', SMOKE1_NAME)
+    ok('SMOKE1: fotenie z prave jednej oznacenej skrinky prebehlo', okd3 == true)
+    info("SMOKE1: hlaska po fotenie = #{msg3.inspect}")
+    ok('SMOKE1: vznikol platny PNG nahlad', tp.valid_file?(png))
+    ok('SMOKE1: ZAZNAM sablony sa fotenim NEZMENIL',
+       ts.find('cabinet', SMOKE1_NAME).to_json == rec_before)
+    ok('SMOKE1: zoznam sablon uz nesie reviziu nahladu',
+       !e::Panel.template_list(previews: true)
+                .find { |t| t['name'] == SMOKE1_NAME }['preview_rev'].nil?)
+    ok('SMOKE1: kamera je po fotenie KOMPLETNE obnovena', uid2_cam_same?(cam_before, uid2_cam(view)))
+    info("SMOKE1: rozdiel kamery: #{uid2_cam_diff(cam_before, uid2_cam(view))}") unless
+      uid2_cam_same?(cam_before, uid2_cam(view))
+    ok('SMOKE1: fotenie NEMENI model', model.entities.length == before_ents)
+    ok('SMOKE1: fotenie NEMENI vyber', model.selection.to_a == [inst])
+
+    # --- 4) doskova sablona sa nefoti ---------------------------------------
+    okd4, = e::Panel.capture_preview_for('board', SMOKE1_NAME)
+    ok('SMOKE1: doskova sablona sa nefoti', okd4 == false)
+    okd5, = e::Panel.capture_preview_for('cabinet', 'SU-TEST neexistuje')
+    ok('SMOKE1: neexistujuca sablona sa odmietne', okd5 == false)
+
+    # --- 5) ZIADNY undo krok ------------------------------------------------
+    # Poslednou MODELOVOU operaciou je vlozenie druhej skrinky — keby bolo
+    # fotenie vlastnou operaciou, 1x Spat by vratilo JU.
+    Sketchup.undo
+    ok('SMOKE1: 1x Spat zmazal poslednu vlozenu skrinku — fotenie NIE JE undo krok',
+       inst2.nil? || !inst2.valid?)
+
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: SMOKE1 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  ensure
+    begin
+      e::TemplateStore.delete('cabinet', SMOKE1_NAME)
+    rescue StandardError
+      nil
+    end
+  end
+
   def run_async(model, done)
     state = {}
     steps = []
@@ -4777,6 +4873,7 @@ module NoxunSuRunner
     run_uic4(model)          # UI-C4: kovanie — oznacenie vlastnika polozky v modeli (guardy, ziadny undo krok)
     run_uid1(model)          # UI-D1: dielec — „Použiť na podobné" (zapis do viacerych dielcov, 1 undo) + „Označiť v modeli"
     run_uid2(model)          # UI-D2: PNG nahlady sablon — capture, KOMPLETNA obnova kamery (persp. aj orto), ziadny undo krok
+    run_smoke1(model)        # SMOKE PACK 1 (6A): rucne odfotenie nahladu k ULOZENEJ sablone — guardy vyberu, ziadny undo krok
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

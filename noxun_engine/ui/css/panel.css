@@ -109,15 +109,29 @@
   .selinfo b { color: var(--nx-select); }
   .muted { color: var(--nx-ink-faint); font-size: 11px; padding: 4px 0; }
   .hint { font-size: 10.5px; color: var(--nx-ink-faint); margin: 2px 0 6px; }
-  /* Cela riadky */
-  .frow { display: flex; gap: 5px; align-items: center; margin: 4px 0; }
-  .frow .fnum { flex: 0 0 24px; color: var(--nx-ink-faint); font-size: 11px; text-align: center; } /* D-23: "F1" namiesto "1" */
+  /* Cela riadky.
+     SMOKE PACK 1 (Michal 20.8.): riadok sa pri VYPISANEJ vyske rozbijal —
+     krizik ✗ padal o riadok nizsie. Pricina: `.frow` bol JEDEN zalamovaci flex
+     rad, do ktoreho pri vypisanej vyske pribudli „mm" + chip AUTO a sucet
+     presiahol sirku panela (470 px). Po novom je `.frow` STLPEC:
+       .fmain = ovladace cela v PEVNOM, NEZALAMOVACOM rade (flex-wrap: nowrap),
+       .fhw   = naviazane kovanie ako samostatny riadok pod nim (UI-C3).
+     Sucet pevnych stop + medzier musi ostat pod sirkou karty pri 470 px —
+     strazi to guard test `tests/pure/test_smoke1_riadky.rb`, aby buduci
+     ovladac v rade nezalomil to iste znova. Zvysnu sirku berie `select.ftype`
+     (jediny rastuci prvok), takze riadok vyuziva maximum sirky. */
+  .frow { display: flex; flex-direction: column; margin: 0; padding: 2px 0 1px; }
+  /* Jemne predelenie MEDZI celami — hairline, ZIADNY novy vertikalny priestor:
+     odstup 4 px sa presunul z `margin: 4px 0` do `padding` + 1 px linky
+     (1 + 2 + 1 = 4). Predel je pod CELYM celom, teda aj pod riadkom kovania. */
+  .frow + .frow { border-top: 1px solid var(--nx-border-soft); }
+  .frow .fmain { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; min-width: 0; }
+  .frow .fnum { flex: 0 0 22px; color: var(--nx-ink-faint); font-size: 11px; text-align: center; } /* D-23: "F1" namiesto "1" */
   /* min-width: 0 — bez neho select nepusti pod sirku najdlhsej polozky a rad by
-     sa pri uzkom paneli zalomil (D-90: v rade pribudla volba profilu). */
-  /* UI-C3: `flex-basis` musi byt PEVNY (nie `auto`) — v zalamovacom rade
-     (`.frow` ma flex-wrap) by si select vypytal sirku svojej NAJSIRSEJ polozky
-     a odtlacil zvysok riadku na dalsi riadok. */
-  .frow select.ftype { flex: 1 1 70px; min-width: 0; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 6px; }
+     sa pri uzkom paneli rozsiril nad ramec karty (D-90: v rade pribudla volba
+     profilu). Je to JEDINY prvok radu s `flex-grow` — dostane vsetko, co po
+     pevnych stopach ostane. */
+  .frow select.ftype { flex: 1 1 0; min-width: 56px; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 6px; }
   /* UI-C3 (N27): ikona TYPU cela pred rozbalovackou — cita sa skor nez text. */
   .frow .ftico { flex: 0 0 15px; display: inline-flex; color: var(--nx-ink-faint); }
   .frow .ftico .ic { width: 14px; height: 14px; }
@@ -126,17 +140,33 @@
   .frow input.fh { flex: 0 0 46px; width: 46px; min-width: 0; padding: 3px 4px; text-align: right;
                    border: 1px solid var(--nx-border-strong); border-radius: 6px; }
   .frow .dwrap { flex: 0 0 auto; }
+  /* Codex #183 P2: ZIVY NAHLAD VYRAZU („= 450" pri `300+150`) je v riadku cela
+     OVERLAY, nie flex polozka. Ako polozka mal `flex: 0 0 auto`, takze pri
+     rozpisanom vyraze pridal do radu ~34 px — a `flex-wrap: nowrap` uz nema
+     kam ustupit, takze by riadok pretiekol presne tak, ako pred touto davkou
+     zalamoval. Overlay je zaroven vzor repa („rozbalovacie okno je overlay,
+     nie novy riadok") a drzi rozpocet sirky pravdivy. `z-index` je POD
+     `.miniopts` (120) — ked je otvoreny rad, hodnoty maju prednost.
+     `display: none` (nasadzuje ho expr.js pri prazdnom vyraze) plati dalej.
+     Selektor je zamerne `.nx-inspector`-scopnuty (4 triedy): kompaktne
+     pravidlo `.nx-inspector .dwrap .exprhint` nizsie ma rovnaku specificitu
+     ako `.frow .dwrap .exprhint` a je v zdroji NESKOR, takze by prebilo
+     padding tohto overlaya. */
+  .nx-inspector .frow .dwrap .exprhint { position: absolute; top: calc(100% + 2px); right: 0; z-index: 110;
+              padding: 1px 5px; border: 1px solid var(--nx-border); border-radius: 6px;
+              background: var(--nx-surface); box-shadow: 0 2px 6px var(--nx-modal-shadow);
+              white-space: nowrap; pointer-events: none; }
   .frow .funit { flex: 0 0 auto; font-size: 10px; color: var(--nx-ink-faint); }
   /* Chip AUTO = navrat na automat. Je to AKCIA nad hodnotou, nie stav — preto
      neutralny ram a az hover nesie vyberovu farbu. */
-  .frow .fauto { flex: 0 0 auto; padding: 2px 6px; font-size: 9.5px; font-weight: 700; letter-spacing: .03em;
+  .frow .fauto { flex: 0 0 auto; padding: 2px 5px; font-size: 9.5px; font-weight: 700;
                  border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface-sunken);
                  color: var(--nx-ink-muted); }
   .frow .fauto:hover { border-color: var(--nx-select); color: var(--nx-select); }
   /* Zamknute ⇔ vypisane: pevna vyska je aj VIDNO (tucnejsia hodnota) — inak by
      sa zamok stratil tym, ze prestal mat vlastnu ikonu. */
   .frow.fixed input.fh { font-weight: 600; color: var(--nx-ink); }
-  .frow select.fw { flex: 0 0 46px; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 6px; }
+  .frow select.fw { flex: 0 0 46px; min-width: 0; padding: 3px; border: 1px solid var(--nx-border-strong); border-radius: 6px; }
   /* D-90 + D-96: uchytkovy profil je v riadku uz LEN INDIKATOR (ovladac zije
      v skupine „Úchytky") — preto ziadny ram tlacidla a ziadny kurzor akcie. */
   .frow .fprof { flex: 0 0 18px; display: inline-flex; align-items: center;
@@ -326,30 +356,48 @@
   .kbd { border: 1px solid var(--nx-border); border-bottom-width: 2px; border-radius: 3px;
          padding: 0 4px; font-size: 10px; background: var(--nx-surface-sunken); color: var(--nx-ink-muted); }
   /* KOVANIE (V0.4) */
-  .hwrow { display: flex; align-items: center; gap: 5px; margin: 4px 0; }
-  .hwrow .hwname { flex: 1; font-size: 12px; color: var(--nx-ink-strong); min-width: 0; }
+  /* SMOKE PACK 1 (Michal 20.8.): pri default sirke panela (470 px) sa v boxe
+     cela label „Výsuv zásuvkové čelo" PREKRYVAL so selectom dlzky/setu.
+     Pricina: `.hwname` mal `min-width: 0`, ale ZIADNY ellipsis — text sa
+     nezalomil ani neorezal, len pretiekol cez susedov. Po novom je nazov
+     jednoriadkovy s ellipsis (plny text uz nesie `title` riadku) a ovladace
+     maju pevne, spocitatelne stopy (guard `tests/pure/test_smoke1_riadky.rb`). */
+  .hwrow { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; margin: 4px 0; }
+  /* `flex-basis: 0` je zamer: nazov berie AZ to, co po pevnych stopach ostane,
+     takze nikdy netlaci ovladace von z riadku (okno Katalog kovania nizsie meni
+     len grow faktor — ellipsis plati aj tam). */
+  .hwrow .hwname { flex: 1 1 0; font-size: 12px; color: var(--nx-ink-strong); min-width: 0;
+                   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hwrow .hwown { color: var(--nx-ink-muted); font-size: 11px; }
   .hwrow .hwext { color: var(--nx-ink-faint); font-size: 11px; }
-  .hwrow .hwqty { flex: 0 0 52px; width: 52px; padding: 3px 5px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 12px; text-align: right; }
-  .hwrow .hwbtn { flex: 0 0 auto; padding: 2px 7px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
-  .hwrow .hwsrc { flex: 0 0 auto; width: 20px; }
+  .hwrow .hwqty { flex: 0 0 44px; width: 44px; padding: 3px 4px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 12px; text-align: right; }
+  /* Jednotka („ks" / „sada") sa nesmie zmrstit ani zalomit — je to poslednych
+     par pixelov, o ktore by sa riadok inak pobil. */
+  .hwrow .unit { flex: 0 0 auto; font-size: 10.5px; color: var(--nx-ink-faint); white-space: nowrap; }
+  .hwrow .hwbtn { flex: 0 0 auto; padding: 2px 5px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+  .hwrow .hwsrc { flex: 0 0 auto; width: 16px; }
   .hwrow.hwoff .hwname { color: var(--nx-ink-faint); }
   .hwrow .hwqty.manual, .hwrow.manual .hwqty { border-color: var(--nx-warn); background: var(--nx-warn-bg); }
   /* D-81: vyber setu PRIAMO v riadku kovania dielca — kompaktne, aby riadok
      ostal jeden (vertikalny priestor). Riadok setu CELEJ skrinky (.hwsetrow)
      ma vlastne pravidlo nizsie a tento kompakt sa ho NEDOTYKA. */
-  .hwrow:not(.hwsetrow) .hwsetsel { flex: 0 1 104px; min-width: 60px; max-width: 150px;
-                     padding: 2px 4px; border: 1px solid var(--nx-border-strong);
+  /* SMOKE PACK 1: sirka PODLA OBSAHU (vzor UX-03) v medziach — `flex-basis:
+     auto` necha select vypytat si sirku svojej najsirsej polozky, `max-width`
+     ho drzi v riadku aj pri dlhom nazve setu (zvysok orezhe sam, plny nazov je
+     vo `title`). Pevnych 104 px predtym pri kratkych nazvoch plytvalo a pri
+     dlhych aj tak nestacilo. */
+  .hwrow:not(.hwsetrow) .hwsetsel { flex: 0 1 auto; min-width: 56px; max-width: 124px;
+                     padding: 2px 3px; border: 1px solid var(--nx-border-strong);
                      border-radius: 6px; font-size: 11px; color: var(--nx-ink-muted); }
   /* D-93: rucny NL vysuvu — select dlzky + zamok v TOM ISTOM riadku (namiesto
      popisu „NL 470", ziadny novy riadok). Zamknuty stav = jantarovy override
      (rovnaka rec ako .hwqty.manual); semaforove --nx-state-* sa sem nemiesaju. */
-  .hwrow .hwnlsel { flex: 0 1 78px; min-width: 56px; padding: 2px 4px;
+  .hwrow .hwnlsel { flex: 0 1 auto; min-width: 52px; max-width: 92px; padding: 2px 3px;
                     border: 1px solid var(--nx-border-strong); border-radius: 6px;
                     font-size: 11px; color: var(--nx-ink-muted); }
   .hwrow .hwnlsel.manual { border-color: var(--nx-warn); background: var(--nx-warn-bg);
                            color: var(--nx-ink-strong); }
-  .hwrow .hwlock { color: var(--nx-ink-faint); padding: 2px 5px; }
+  .hwrow .hwlock { flex: 0 0 auto; color: var(--nx-ink-faint); padding: 2px 4px; }
   .hwrow .hwlock.on { color: var(--nx-warn-fg); background: var(--nx-warn-bg-soft);
                       border-color: var(--nx-warn); }
   /* D-92 „co sa realne kupi": JEDEN sekundarny riadok pod polozkou (set -> kody).
@@ -380,6 +428,29 @@
               flex: 0 0 auto; }
   .hwboxb { padding: 2px 8px 6px; }
   .hwboxb .hwitem:first-child, .hwboxb .hwrow:first-child { margin-top: 2px; }
+  /* SMOKE PACK 1: SUHRNNY ROZKLIK podperiek polic v boxe „Vnútro skrinky".
+     Zbaleny stav je default a pamata si ho POCITAC (localStorage) — dat sa to
+     netyka, riadky pod nim su tie iste polozky s tou istou identitou. */
+  /* `border: 0` + `background: none` ZHADZUJU globalne `details` (karta na bielom
+     povrchu) — toto nie je karta v karte, ale zoskupenie riadkov VNUTRI boxu
+     vlastnika; ramik navyse by pridal vizualnu vahu bez vyznamu. */
+  .hwgrp { border: 0; background: none; margin: 4px 0; }
+  .hwgrph { display: flex; align-items: center; gap: 5px; padding: 2px 0; cursor: pointer;
+            font-size: 12px; color: var(--nx-ink-strong); list-style: none; user-select: none; }
+  .hwgrph::-webkit-details-marker { display: none; }
+  .hwgrph::before { content: none; }
+  .hwgrph:hover, .hwgrph:focus-visible { color: var(--nx-select); }
+  .hwgrph .ic { flex: 0 0 12px; width: 12px; height: 12px; color: var(--nx-ink-faint);
+                transition: transform .12s ease; }
+  .hwgrp[open] > .hwgrph .ic { transform: rotate(90deg); }
+  .hwgrpt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* „upravené" = do niektorej police niekto siahol RUCNE. Jantarova rodina
+     (override), nie semaforove --nx-state-* — je to odchylka od pravidla,
+     nie chyba (rovnaka rec ako .hwqty.manual). */
+  .hwgrpw { flex: 0 0 auto; margin-left: auto; font-size: 10px; padding: 0 4px;
+            border: 1px solid var(--nx-warnchip-border); border-radius: 6px;
+            background: var(--nx-warn-bg-soft); color: var(--nx-warnchip-fg); }
+  .hwgrpb { padding-left: 15px; }
   /* Obojsmerne prepojenie box <-> znacka v projekcii. `.hov` nasadzuje JS na
      OBE strany naraz (hover nad boxom aj hover nad značkou v náhľade) — vzor
      D-23 sync riadok <-> čelo. */
@@ -878,6 +949,9 @@
   .tplrow .tplt { color: var(--nx-ink-faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
   .tplrow .tplbtn { flex: 0 0 auto; padding: 3px 10px; font-size: 11.5px; }
   .tplrow .tpldel { flex: 0 0 28px; padding: 3px 0; color: var(--nx-danger); }
+  /* SMOKE PACK 1 (6A): „Odfotiť / Prefotiť" — sekundarna akcia riadku (meni LEN
+     obrazok, nie data sablony), preto tlmena a bez vyberovej farby. */
+  .tplrow .tplcam { color: var(--nx-ink-muted); }
   /* D-42: hladacie pole katalogu (okno Materialy) — input s ikonou lupy */
   .mdsearch { position: relative; margin: 2px 0 8px; }
   .mdsearch input { width: 100%; padding: 5px 8px 5px 30px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 13px; }
@@ -1040,11 +1114,12 @@
                       background: none; font: inherit; font-size: 11.5px;
                       color: var(--nx-select); text-align: center; cursor: pointer; }
   .warnpanel .wgoto:hover { text-decoration: underline; }
-  .frow { flex-wrap: wrap; }
   /* UI-C3: NAVIAZANE KOVANIE pod riadkom cela — JEDEN drobny riadok (nie
      tabulka: vertikalny priestor je vzacny), jednoriadkovy s ellipsis, plny
-     text v `title` (vzor .hwbuy z D-92). Klik vedie do kontextu Kovanie. */
-  .frow .fhw { flex: 1 0 100%; font-size: 10.5px; color: var(--nx-ink-faint); padding: 1px 0 0 42px;
+     text v `title` (vzor .hwbuy z D-92). Klik vedie do kontextu Kovanie.
+     SMOKE PACK 1: `.frow` uz nie je zalamovaci rad, ale STLPEC — riadok preto
+     nepotrebuje `flex: 1 0 100%`, je to prosto druhy potomok stlpca. */
+  .frow .fhw { font-size: 10.5px; color: var(--nx-ink-faint); padding: 1px 0 0 41px;
                display: flex; align-items: center; gap: 5px; cursor: pointer;
                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .frow .fhw:hover, .frow .fhw:focus { color: var(--nx-select); outline: none; }

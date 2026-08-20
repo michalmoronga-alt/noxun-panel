@@ -264,7 +264,7 @@ NxTest.test('UI-D2 payload: preview_rev je len v zozname — subor sablon je BYT
   NxTest.assert_equal(false, rec2.key?('preview_rev'), 'ani po prepise sa revizia nezapisala')
 end
 
-NxTest.test('UI-D2 payload: bez `previews:` sa nahlady vobec nepytaju (okno Sablony)') do
+NxTest.test('UI-D2 payload: bez `previews:` sa nahlady vobec nepytaju') do
   NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
   NxD2.reset!
   NxD2::TS.upsert('cabinet', 'Dolná klasik', NxD2.cfg, NxD2.tmp!)
@@ -281,4 +281,163 @@ NxTest.test('UI-D2 payload: sablona BEZ nahladu ma preview_rev nil (dlazdica ost
 
   row = Noxun::Engine::Panel.template_list(previews: true).find { |t| t['name'] == 'Bez obrazka' }
   NxTest.assert_equal(nil, row['preview_rev'])
+end
+
+# ---------------------------------------------------------------------------
+# SMOKE PACK 1 (6A) — RUCNE odfotenie nahladu k UZ ULOZENEJ sablone.
+# `TemplateStore.set_preview` je JEDINA cesta, ktora meni obrazok BEZ zapisu
+# zaznamu — dokazuje sa, ze zaznam ostava byte-nedotknuty, ze osirely PNG
+# nevznikne a ze forward guard (novsia schema) akciu odmietne.
+# ---------------------------------------------------------------------------
+
+NxTest.test('SMOKE1 set_preview: prida PNG k existujucej sablone a ZAZNAM sa nezmeni') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxD2.reset!
+  NxD2::TS.upsert('cabinet', 'Bez obrazka', NxD2.cfg(720.0)) # stara sablona bez fotky
+  before = File.binread(NxD2::TS.path)
+  NxTest.assert_equal(nil, NxD2::TP.rev_for('cabinet', 'Bez obrazka'), 'zaciname bez nahladu')
+
+  tmp = NxD2.tmp!(NxD2.png(300))
+  NxTest.assert_equal(true, NxD2::TS.set_preview('cabinet', 'Bez obrazka', tmp))
+  NxTest.assert_equal(false, File.exist?(tmp), 'temp subor sa presunul na finalne meno')
+  NxTest.assert_equal(true, File.file?(NxD2::TP.path_for('cabinet', 'Bez obrazka')), 'PNG je na mieste')
+  NxTest.assert_equal(before, File.binread(NxD2::TS.path), 'templates.json ostal BYTE-NEZMENENY')
+  NxTest.assert_close(720.0, NxD2::TS.find('cabinet', 'Bez obrazka')['config']['width'], 0.01,
+                      'config sablony sa fotenim nemeni')
+end
+
+NxTest.test('SMOKE1 set_preview: prepis nahladu meni REVIZIU (dlazdica si vypyta novy obrazok)') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxD2.reset!
+  NxD2::TS.upsert('cabinet', 'Dolná klasik', NxD2.cfg, NxD2.tmp!(NxD2.png(200)))
+  r1 = NxD2::TP.rev_for('cabinet', 'Dolná klasik')
+
+  NxTest.assert_equal(true, NxD2::TS.set_preview('cabinet', 'Dolná klasik', NxD2.tmp!(NxD2.png(400))))
+  NxTest.assert_equal(false, r1 == NxD2::TP.rev_for('cabinet', 'Dolná klasik'), 'nova fotka = nova revizia')
+end
+
+NxTest.test('SMOKE1 set_preview: sablona, ktora uz neexistuje, OSIRELY PNG nedostane') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxD2.reset!
+  NxD2::TS.upsert('cabinet', 'Dolná klasik', NxD2.cfg)
+
+  tmp = NxD2.tmp!
+  NxTest.assert_equal(false, NxD2::TS.set_preview('cabinet', 'Neexistuje', tmp))
+  NxTest.assert_equal(false, File.exist?(tmp), 'nepouzity temp subor sa zahodil')
+  NxTest.assert_equal(false, File.exist?(NxD2::TP.path_for('cabinet', 'Neexistuje')), 'ziadny osirely PNG')
+end
+
+NxTest.test('SMOKE1 set_preview: doskova sablona rovnakeho mena je INA sablona (identita kind+name)') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxD2.reset!
+  NxD2::TS.upsert('board', 'Zástena', NxD2.cfg)
+
+  tmp = NxD2.tmp!
+  NxTest.assert_equal(false, NxD2::TS.set_preview('cabinet', 'Zástena', tmp),
+                      'korpusova sablona toho mena neexistuje')
+  NxTest.assert_equal(false, File.exist?(NxD2::TP.path_for('cabinet', 'Zástena')))
+  NxTest.assert_equal(nil, NxD2::TP.rev_for('board', 'Zástena'), 'doskova ostala bez nahladu')
+end
+
+NxTest.test('SMOKE1 set_preview: forward guard (novsia schema) odmietne a PNG sa NEDOTKNE') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxD2.reset!
+  NxD2::TS.upsert('cabinet', 'Dolná klasik', NxD2.cfg, NxD2.tmp!(NxD2.png(200)))
+  png_path = NxD2::TP.path_for('cabinet', 'Dolná klasik')
+  before = File.binread(png_path)
+
+  data = JSON.parse(File.binread(NxD2::TS.path))
+  File.binwrite(NxD2::TS.path, JSON.generate(data.merge('std' => NxD2::TS::STD + 5)))
+  NxD2::JFS.invalidate(NxD2::TS.path)
+
+  tmp = NxD2.tmp!(NxD2.png(400))
+  NxTest.assert_equal(false, NxD2::TS.set_preview('cabinet', 'Dolná klasik', tmp))
+  NxTest.assert_equal(false, File.exist?(tmp), 'odmietnuty capture sa zahodil')
+  NxTest.assert_equal(before, File.binread(png_path), 'stary PNG ostal nedotknuty')
+end
+
+# Docasne nahradi presun suboru chybou disku (rovnaky vzor ako
+# `uid2_with_broken_capture` v in-SketchUp runneri) — inak sa zlyhanie `mv`
+# v teste nasimulovat neda.
+def smoke1_with_broken_move
+  tp = NxD2::TP
+  orig = tp.method(:move_into_place)
+  tp.define_singleton_method(:move_into_place) { |*| raise IOError, 'simulovana chyba disku' }
+  yield
+ensure
+  tp.define_singleton_method(:move_into_place, orig)
+end
+
+NxTest.test('SMOKE1 set_preview: ZLYHANY presun NECHA stary nahlad na mieste (Codex #183 P2)') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxD2.reset!
+  NxD2::TS.upsert('cabinet', 'Dolná klasik', NxD2.cfg, NxD2.tmp!(NxD2.png(200)))
+  png_path = NxD2::TP.path_for('cabinet', 'Dolná klasik')
+  before = File.binread(png_path)
+
+  # „Prefotiť" nad sablonou, ktora uz nahlad MA. Config sa nemeni, takze stary
+  # obrazok je stale platny — prechodna chyba disku oň nesmie pripraviť.
+  tmp = NxD2.tmp!(NxD2.png(400))
+  result = nil
+  smoke1_with_broken_move { result = NxD2::TS.set_preview('cabinet', 'Dolná klasik', tmp) }
+
+  NxTest.assert_equal(false, result, 'zlyhanie sa prizna (ziadny falosny uspech)')
+  NxTest.assert_equal(before, File.binread(png_path), 'POVODNY nahlad ostal nedotknuty')
+  NxTest.assert_equal(false, File.exist?(tmp), 'nepouzity capture temp sa zahodil')
+end
+
+NxTest.test('SMOKE1: upsert cesta sa sprava NAOPAK — zlyhany presun stary PNG ZMAZE') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxD2.reset!
+  NxD2::TS.upsert('cabinet', 'Dolná klasik', NxD2.cfg, NxD2.tmp!(NxD2.png(200)))
+  png_path = NxD2::TP.path_for('cabinet', 'Dolná klasik')
+
+  # Tu sa config MENI, takze stary obrazok uz patri inemu tvaru skrinky —
+  # radsej schema nez zly obrazok. Obe cesty sa teda lisia ZAMERNE.
+  tmp = NxD2.tmp!(NxD2.png(400))
+  smoke1_with_broken_move { NxD2::TS.upsert('cabinet', 'Dolná klasik', NxD2.cfg(900.0), tmp) }
+
+  NxTest.assert_equal(false, File.exist?(png_path), 'neplatny stary PNG je prec')
+  NxTest.assert_close(900.0, NxD2::TS.find('cabinet', 'Dolná klasik')['config']['width'], 0.01,
+                      'zaznam sa napriek tomu ulozil')
+end
+
+NxTest.test('SMOKE1 capture: cesta fotenia NEROBI operaciu ani zapis do modelu') do
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'template_previews.rb'), encoding: 'UTF-8')
+  # Komentare o zakaze operacie sa nepocitaju — hlada sa REALNE volanie.
+  code = src.lines.reject { |l| l.strip.start_with?('#') }.join
+  NxTest.assert_equal(false, code.include?('start_operation'), 'capture nikdy nezacina operaciu')
+  NxTest.assert(src.include?('restore_camera(view, cam)'), 'kamera sa obnovuje')
+  NxTest.assert(src.include?('ensure'), 'obnova kamery bezi v ensure — aj pri vynimke')
+
+  ts = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'templates.rb'), encoding: 'UTF-8')
+  NxTest.assert(ts.include?('def set_preview'), 'sklad ma vlastnu cestu na vymenu obrazka')
+  NxTest.assert(ts[/def set_preview.*?\n      end\n/m].to_s.include?('with_lock'),
+                'set_preview bezi pod TYM ISTYM sidecar zamkom ako upsert/delete')
+end
+
+NxTest.test('SMOKE1 guard: „Odfotiť" pyta PRAVE JEDNU oznacenu skrinku a nefoti dosky') do
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_templates.rb'), encoding: 'UTF-8')
+  body = src[/def capture_preview_for.*?\n        end\n/m].to_s
+  NxTest.assert(body.include?("unless k == 'cabinet'"), 'doskova sablona sa nefoti')
+  NxTest.assert(body.include?('TemplateStore.find(k, n).nil?'), 'sablona musi existovat')
+  NxTest.assert(body.include?('cabs.empty?'), 'bez oznacenia sa odmieta')
+  NxTest.assert(body.include?('cabs.length > 1'), 'viac oznacenych skriniek sa odmieta')
+  NxTest.assert(body.include?('TemplateStore.set_preview(k, n, tmp)'), 'zapisuje sa cez sklad, nie priamo')
+  NxTest.assert_equal(false, body.include?('start_operation'), 'ziadny krok Späť')
+
+  sel = src[/def selected_cabinets.*?\n        end\n/m].to_s
+  NxTest.assert(sel.include?("Store.kind(e) == 'cabinet'"), 'berie sa LEN priamo oznaceny korpus')
+end
+
+NxTest.test('SMOKE1 okno Sablony: „Odfotiť" ma vlastny callback a nevola upsert') do
+  rb = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog.rb'), encoding: 'UTF-8')
+  NxTest.assert(rb.include?("cb(dlg, 'tpl_capture')"), 'callback je zaregistrovany')
+  body = rb[/def handle_capture.*?\n        end\n/m].to_s
+  NxTest.assert(body.include?("Panel.capture_preview_for('cabinet', name)"), 'jedna zdielana cesta')
+  NxTest.assert_equal(false, body.include?('upsert'), 'fotenie NEPREPISUJE zaznam sablony')
+
+  js = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'templates_dialog.js'), encoding: 'UTF-8')
+  NxTest.assert(js.include?('sketchup.tpl_capture'), 'okno posiela meno sablony na server')
+  NxTest.assert(js.include?('function captureLabel'), 'riadok rozlisuje Odfotiť / Prefotiť')
 end

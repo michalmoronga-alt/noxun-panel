@@ -384,8 +384,7 @@
     var extra = it.nl ? '' : hwParamsDesc(it);
     // D-93: „ručne" pri POČTE je vlastné pole overridu (samotný zámok dĺžky
     // už tiež robí položku manual, ale počet pravidla nemení).
-    var manual = (it.quantity_manual != null) ? (it.quantity_manual === true)
-                                              : (it.source === 'manual');
+    var manual = hwItemManual(it);
     var nlHtml = it.nl ? hwNlHtml(it.nl) : '';
     // D-81: kovanie viazane na DIELEC (čelo/zásuvka) má vlastný výber setu
     // PRIAMO v riadku — žiadny nový riadok (vertikálny priestor). Platí pre
@@ -420,7 +419,10 @@
     var full = ov.owner_label || hwOwnerDesc(ov.owner_part_key); // D-92
     var owner = hwRowOwnerText(groupKey, full);
     return '<div class="hwrow hwoff" data-owner="'+esc(ov.owner_part_key||'')+'" data-type="'+esc(ov.generic_type)+'" data-rule="'+esc(ov.rule_id)+'" data-cab="'+esc(cabId||'')+'">'
-      + '<span class="hwname">'+esc(hwLabel(ov.generic_type))+(owner?' <span class="hwown">'+esc(owner)+'</span>':'')
+      // SMOKE PACK 1: nazov je jednoriadkovy s ellipsis, takze plny text MUSI
+      // niest `title` — inak by sa orezany popis nedal precitat vobec.
+      + '<span class="hwname" title="'+esc(hwLabel(ov.generic_type)+(full?' · '+full:'')+' · vypnuté')+'">'
+      + esc(hwLabel(ov.generic_type))+(owner?' <span class="hwown">'+esc(owner)+'</span>':'')
       + ' <span class="hwext">vypnuté</span></span>'
       + '<button class="ghostbtn hwbtn" title="Obnoviť (platí pravidlo)" onclick="onHwEnable(this)">'+NXIcons.svg('rotate-ccw')+' obnoviť</button>'
       + '</div>';
@@ -429,8 +431,13 @@
   // `data-keys` = part_key vlastnikov, ktore ma klik oznacit v modeli. Box sa
   // NEZBALUJE — exkluzivita skupin S4 na skratenie panela staci.
   function hwBoxHtml(g, cabId){
-    var body = g.items.map(function(it){ return hwItemHtml(it, cabId, g.key); }).join('')
-             + g.offs.map(function(ov){ return hwOffHtml(ov, cabId, g.key); }).join('');
+    // SMOKE PACK 1: podperky polic sa v boxe „Vnútro skrinky" zbalia pod JEDEN
+    // suhrnny riadok (dat sa nedotyka — je to zoskupenie zobrazenia).
+    var split = hwSplitShelfPins(g.key, g.items, g.offs);
+    var grouped = split.pins.length + split.offs.length;
+    var body = split.rest.map(function(it){ return hwItemHtml(it, cabId, g.key); }).join('')
+             + (grouped ? hwShelfPinsHtml(split.pins, split.offs, cabId, g.key) : '')
+             + split.restOffs.map(function(ov){ return hwOffHtml(ov, cabId, g.key); }).join('');
     var n = g.items.length + g.offs.length;
     var tip = (g.key === HW_GROUP_CAB)
       ? 'Označí skrinku v modeli'
@@ -442,6 +449,122 @@
       + '<span class="hwboxt">'+esc(g.title)+'</span>'
       + '<span class="hwboxsub">'+esc(hwGroupCountText(n))+'</span></button>'
       + '<div class="hwboxb">'+body+'</div></div>';
+  }
+
+  // ---- SMOKE PACK 1: PODPERKY POLIC SUHRNNE (box „Vnútro skrinky") ---------
+  // Michal 20.8.: pri piatich policiach zabrali podperky pat riadkov, hoci
+  // hovoria to iste. Po novom je nad nimi JEDEN suhrnny riadok
+  // („Podperky políc — 5 políc: 20 ks") s rozklikom, pod ktorym ziju POVODNE
+  // riadky — editovatelnost poctu per polica teda OSTAVA, len je zbalena.
+  //
+  // Je to CISTE UI ZOSKUPENIE: identita polozky (owner_part_key, generic_type,
+  // rule_id), zapisove cesty, nakupny riadok D-92 aj `refreshHardwarePurchase`
+  // ostavaju nedotknute — riadky su len o uroven hlbsie v DOM a hladaju sa
+  // (ako doteraz) selektorom, nie indexom deti.
+  var HW_SHELF_PIN = 'shelf_pin';
+  // Prah zoskupenia: JEDNA polica sa nezbaluje — rozklik nad jedinym riadkom
+  // je klik navyse bez zisku (a suhrn by bol dlhsi nez to, co skryva).
+  var HW_PINS_MIN = 2;
+
+  // „Rucne" v zmysle D-93: server posiela `quantity_manual`, stary payload len
+  // `source`. Vytiahnute z hwItemHtml, aby o tom istom rozhodovalo JEDNO miesto
+  // (suhrn aj riadok) — a aby sa to dalo testovat bez DOM.
+  function hwItemManual(it){
+    if (!it) return false;
+    return (it.quantity_manual != null) ? (it.quantity_manual === true) : (it.source === 'manual');
+  }
+  // Suhrn podperiek: kolko POLIC (riadkov) a kolko KUSOV spolu; `edited` = do
+  // niektorej police niekto siahol rucne, takze suhrn nesmie tvrdit, ze je
+  // vsetko podla pravidla. Ciste (Node testy).
+  //
+  // Codex #183 P2: rata sa AJ z `offs` — VYPNUTA polica je stale polica.
+  // Bez toho by pri piatich policiach s jednou vypnutou suhrn tvrdil „4 police"
+  // a piata by visela mimo rozkliku ako samostatny riadok. Vypnuta polica
+  // prispieva 0 ks a VZDY zapina `edited` (vypnutie je rucny zasah).
+  function hwShelfPinSummary(items, offs){
+    var out = { rows: 0, total: 0, edited: false };
+    (items || []).forEach(function(it){
+      if (!it || it.generic_type !== HW_SHELF_PIN) return;
+      out.rows++;
+      var q = parseInt(it.quantity, 10);
+      out.total += (isFinite(q) && q > 0) ? q : 0;
+      if (hwItemManual(it)) out.edited = true;
+    });
+    (offs || []).forEach(function(ov){
+      if (!ov || ov.generic_type !== HW_SHELF_PIN) return;
+      out.rows++;
+      out.edited = true;
+    });
+    return out;
+  }
+  function hwShelfCountText(n){
+    var c = Math.max(0, parseInt(n, 10) || 0);
+    if (c === 1) return '1 polica';
+    if (c >= 2 && c <= 4) return c + ' police';
+    return c + ' políc';
+  }
+  function hwShelfPinTitle(s){
+    var d = s || { rows: 0, total: 0 };
+    return 'Podperky políc — ' + hwShelfCountText(d.rows) + ': ' + (d.total || 0) + ' ks';
+  }
+  function hwShelfPinTip(s){
+    var d = s || {};
+    return hwShelfPinTitle(d) + (d.edited ? ' · niektorá polica má ručne upravený počet' : '')
+         + ' — rozklikom upravíš počet pri konkrétnej polici';
+  }
+  // Stav rozkliku je vec POCITACA (localStorage), nie zakazky — rovnaky dovod
+  // ako pri sektoroch a teme: Michal a Lucia otvaraju tie iste zakazky.
+  // ZBALENY je default (chybajuci kluc = zbalene).
+  var HW_PINS_KEY = 'nx_hw_shelfpins_open';
+  function hwShelfPinsOpen(){
+    try {
+      return (typeof localStorage !== 'undefined') && localStorage.getItem(HW_PINS_KEY) === '1';
+    } catch (e) { return false; }
+  }
+  function onHwGrpToggle(node){
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(HW_PINS_KEY, node.open ? '1' : '0');
+    } catch (e) { /* bez perzistencie — zbalenie funguje aj tak */ }
+  }
+  // `<details>` zamerne (nie vlastny prepinac): nxRevealTarget vie otvorit
+  // ZBALENEHO predka pri deep-linku, takze skok na konkretnu policu ju v
+  // buducnosti najde aj zbalenu.
+  function hwShelfPinsHtml(pins, offs, cabId, groupKey){
+    var s = hwShelfPinSummary(pins, offs);
+    return '<details class="hwgrp" data-hwgrp="' + esc(HW_SHELF_PIN) + '"'
+      + (hwShelfPinsOpen() ? ' open' : '') + ' ontoggle="onHwGrpToggle(this)">'
+      + '<summary class="hwgrph" title="' + esc(hwShelfPinTip(s)) + '">'
+      + NXIcons.svg('chevron-right')
+      + '<span class="hwgrpt">' + esc(hwShelfPinTitle(s)) + '</span>'
+      + (s.edited ? '<span class="hwgrpw">upravené</span>' : '')
+      + '</summary><div class="hwgrpb">'
+      + (pins || []).map(function(it){ return hwItemHtml(it, cabId, groupKey); }).join('')
+      // Vypnuta polica patri POD ten isty rozklik ako zapnute — inak by suhrn
+      // sluboval jeden celok a jedna polica by mu utiekla vedla (Codex #183 P2).
+      + (offs || []).map(function(ov){ return hwOffHtml(ov, cabId, groupKey); }).join('')
+      + '</div></details>';
+  }
+  // Rozdelenie obsahu boxu na „podperky" a „zvysok" — a to v OBOCH zoznamoch:
+  // `items` (zive polozky) aj `offs` (vypnute kategorie), lebo vypnuta polica
+  // je stale polica. Ciste (Node testy): zoskupuje sa VYHRADNE v boxe Vnútro
+  // a az od HW_PINS_MIN polic SPOLU.
+  // -> { pins: [], offs: [], rest: [], restOffs: [] }
+  //    (pri nezoskupeni su vsetky v `rest` / `restOffs`)
+  function hwSplitShelfPins(groupKey, items, offs){
+    var inside = (groupKey === HW_GROUP_INSIDE);
+    var pins = [], rest = [], pinOffs = [], restOffs = [];
+    (items || []).forEach(function(it){
+      if (inside && it && it.generic_type === HW_SHELF_PIN) pins.push(it);
+      else rest.push(it);
+    });
+    (offs || []).forEach(function(ov){
+      if (inside && ov && ov.generic_type === HW_SHELF_PIN) pinOffs.push(ov);
+      else restOffs.push(ov);
+    });
+    if (pins.length + pinOffs.length < HW_PINS_MIN){
+      return { pins: [], offs: [], rest: (items || []).slice(), restOffs: (offs || []).slice() };
+    }
+    return { pins: pins, offs: pinOffs, rest: rest, restOffs: restOffs };
   }
 
   // items: config.hardware (pole) alebo null (nic neoznacene); overrides: hardware_overrides;
@@ -687,5 +810,11 @@
       hwRowOwnerText: hwRowOwnerText, hwGroupTitle: hwGroupTitle,
       hwGroupCountText: hwGroupCountText, hwGroupOrder: hwGroupOrder,
       hwGroups: hwGroups, hwDisabledOffs: hwDisabledOffs,
-      HW_GROUP_CAB: HW_GROUP_CAB, HW_GROUP_INSIDE: HW_GROUP_INSIDE };
+      HW_GROUP_CAB: HW_GROUP_CAB, HW_GROUP_INSIDE: HW_GROUP_INSIDE,
+      // SMOKE PACK 1: suhrnne podperky polic (tests/js/test_smoke1_ui.js) —
+      // ciste zoskupenie a texty, ziadny DOM.
+      hwItemManual: hwItemManual, hwShelfPinSummary: hwShelfPinSummary,
+      hwShelfCountText: hwShelfCountText, hwShelfPinTitle: hwShelfPinTitle,
+      hwShelfPinTip: hwShelfPinTip, hwSplitShelfPins: hwSplitShelfPins,
+      HW_SHELF_PIN: HW_SHELF_PIN, HW_PINS_MIN: HW_PINS_MIN, HW_PINS_KEY: HW_PINS_KEY };
   }

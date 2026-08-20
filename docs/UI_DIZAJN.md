@@ -645,6 +645,13 @@ Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html`
   capture), dlaždica **ostane na schéme** — nikdy prázdne miesto. Obrázok sa
   vkladá `object-fit: contain` (nie `cover`): orezať skrinku, aby vyplnila
   dlaždicu, by z nej spravilo iný nábytok.
+- **Akcia patrí tam, kde je na nej čo vykonať.** Ručné „Odfotiť náhľad
+  z označenej skrinky" (doplnenie fotiek starým šablónam) sa **nedá** dať na
+  dlaždicu panela: dlaždice sú viditeľné výhradne vtedy, keď **nie je označené
+  nič**, takže by kamera nikdy nenašla skrinku a bola by to trvalo mŕtva ikona
+  (opak zásady „klikateľné je len to, čo niekam vedie"). Žije preto v okne
+  **Šablóny**, kde výber v modeli a zoznam šablón existujú súčasne — presne tak,
+  ako tam už funguje „Použiť na označený".
 - **Primárna akcia je posledná** — zelené „Vložiť" stojí až za rozmermi *aj* za
   materiálom (rovnaký dôvod, prečo tam už stálo „Vložiť dosku").
 - **Odhad namiesto ticha:** dopočítané údaje, ktoré pre nevložený návrh nemá kto
@@ -759,6 +766,20 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Fronts`).
   (`front` · `profile` · `columns-2`).
 - **Riadok začína ikonou typu (N27).** Ikona odpovedá na „čo to je" skôr, než
   sa oko dostane k textu rozbaľovačky — nie je to jej náhrada, obe zostávajú.
+- **Rad ovládačov sa NEZALAMUJE** (smoke test 20.8.). Riadok čela je **stĺpec**:
+  hore pevný nezalamovací rad `.fmain`, pod ním riadok kovania. Zalamovací rad
+  vyzeral bezpečne, kým bola výška prázdna — vypísaná hodnota k nemu pridala
+  „mm" aj chip AUTO a krížik ✗ spadol o riadok nižšie. **Pravidlo pre budúce
+  ovládače:** v takom rade smie **rásť jediný prvok** (tu `select.ftype`),
+  všetko ostatné má pevnú stopu, a súčet stôp + medzier musí sedieť pri šírke
+  **470 px** — stráži to guard test, nie oko. **Do rozpočtu patrí aj to, čo sa
+  objaví len chvíľu**: živý náhľad výrazu („= 450") sa preto kreslí ako
+  **overlay pod poľom**, nie ako ďalšia položka radu — inak by riadok pretiekol
+  vždy, keď používateľ píše výraz.
+- **Predel medzi položkami je hairline, nie nový riadok.** Jemná linka
+  (`--nx-border-soft`) sa platí **presunutím** existujúceho odstupu z `margin`
+  do `padding`, nie jeho pripočítaním. Predel patrí pod **celú položku** — pri
+  čele teda až pod riadok naviazaného kovania, ktorý k nemu patrí.
 - **Zámok pri výške ZANIKOL: zamknuté ⇔ vypísané.** Vypísaná hodnota drží,
   prázdne pole je AUTO. Samostatný checkbox vedel byť zapnutý aj nad prázdnym
   poľom a nerobil nič — dve pravdy o tom istom. Návrat na automat robí **chip
@@ -881,6 +902,24 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Hw`).
   (lekcia D-23) — beží len CSS triedou nad už vykresleným SVG.
 - **Box sa nezbaľuje.** Na skrátenie panela stačí exkluzivita skupín S4; druhé
   zbaľovanie v zbaľovaní je klik navyše bez zisku.
+- **Dlhý názov sa OREŽE, nikdy nepretečie** (smoke test 20.8.). `.hwname` je
+  jednoriadkový s ellipsis a plný popis nesie `title`. Text bez orezu vyzerá
+  ako „len sa nezmestí", v skutočnosti **prekryje** susedný ovládač — a to je
+  horšie než skrátený názov. Selecty v riadku majú šírku **podľa obsahu
+  v medziach** (`flex: 0 1 auto` + min/max, vzor UX-03), nie pevných N px:
+  krátke názvy setov inak plytvali miestom a dlhé sa aj tak nezmestili.
+- **Rovnaké položky sa zbalia pod JEDEN súhrn** (smoke test 20.8.). Podperky
+  políc mali riadok na každú policu, hoci hovoria to isté — teraz je nad nimi
+  súhrn **„Podperky políc — 5 políc: 20 ks"** s rozklikom. Zásady:
+  **editovateľnosť sa nesmie stratiť** (pod rozklikom sú pôvodné riadky, počet
+  per polica sa mení ďalej) · **zbalené je default** a stav rozkliku je vec
+  **počítača** (`localStorage`, vzor sektorov) · **neštandard musí byť vidieť aj
+  zbalený** — ručne upravená **aj vypnutá** polica rozsvieti v súhrne jantárový
+  štítok „upravené" · **súhrn nesmie zamlčať vypnutú položku** (vypnutá polica
+  je stále polica: patrí pod ten istý rozklik, ráta sa do počtu a prispieva
+  0 ks — inak by súhrn hovoril „4 police" a piata by visela vedľa neho) ·
+  **jedna položka sa nezbaľuje** (rozklik nad jediným riadkom je klik navyše
+  bez zisku) · dáta sa nemenia, je to **zoskupenie zobrazenia**.
 
 ### D-51: štandard rozmerov okien (UI-B1)
 

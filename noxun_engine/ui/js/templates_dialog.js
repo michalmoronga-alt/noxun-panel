@@ -12,6 +12,21 @@
 
   function typeLabel(t){ return t === 'upper' ? 'horná' : 'dolná'; }
 
+  // SMOKE PACK 1 (6A): RUCNE odfotenie nahladu k UZ ULOZENEJ sablone.
+  // Preco TU a nie na dlazdici v paneli: dlazdice ziju vo vkladacej karte, ktora
+  // je viditelna VYHRADNE ked nie je oznacene nic — kamera by tam nemala ako
+  // najst skrinku, ktoru ma odfotit. V tomto okne vyber v modeli a zoznam
+  // sablon existuju sucasne (a okno uz tak funguje aj pri „Použiť").
+  // Tlacidlo je VZDY aktivne (vzor D-78): dovod, preco to teraz nejde, povie
+  // server v statuse — nikdy ticho mrtve tlacidlo.
+  function captureLabel(tp){ return tp && tp.preview_rev ? 'Prefotiť' : 'Odfotiť'; }
+  function captureTitle(tp, cab){
+    var base = (tp && tp.preview_rev)
+      ? 'Prepíše náhľad tejto šablóny fotkou označenej skrinky (dáta šablóny sa nemenia)'
+      : 'Pridá náhľad tejto šablóne z označenej skrinky (dáta šablóny sa nemenia)';
+    return base + (cab ? ' — odfotí sa ' + cab : ' — najprv označ v modeli práve jednu skrinku');
+  }
+
   function renderRows(){
     var box = el('tplRows');
     if (!TD_TPLS.length){
@@ -29,6 +44,8 @@
         + '<span class="tpln">'+esc(tp.name)+' <span class="tplt">'+typeLabel(t)+'</span></span>'
         + '<button class="ghostbtn tplbtn" onclick="tplApply(this)"'+(can?'':' disabled')
         + ' title="'+why+'">Použiť</button>'
+        + '<button class="ghostbtn tplbtn tplcam" onclick="tplCapture(this)"'
+        + ' title="'+esc(captureTitle(tp, TD_CAB))+'">'+esc(captureLabel(tp))+'</button>'
         + '<button class="ghostbtn tplbtn tpldel" title="Vymazať šablónu" onclick="tplDelete(this)">✕</button>'
         + '</div>';
     });
@@ -58,6 +75,12 @@
   }
   function tplSave(){
     if (window.sketchup && sketchup.tpl_save) sketchup.tpl_save('');
+  }
+  // SMOKE PACK 1 (6A): odfotenie nahladu k tejto sablone. Guard „prave jedna
+  // oznacena NOXUN skrinka" drzi SERVER — okno posiela len meno sablony.
+  function tplCapture(btn){
+    if (window.sketchup && sketchup.tpl_capture)
+      sketchup.tpl_capture(JSON.stringify({ template: tplName(btn) }));
   }
 
   if (window.sketchup && sketchup.ready) sketchup.ready('');

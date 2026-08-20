@@ -64,6 +64,63 @@ module Noxun
           set_status("Šablóna \"#{name}\" uložená do knižnice.#{type_note}#{hw_note}")
         end
 
+        # --- SMOKE PACK 1 (6A): rucne odfotenie nahladu k EXISTUJUCEJ sablone --
+        # Michal 20.8.: stare sablony nemaju fotku a jedina cesta k nej bola
+        # ulozit sablonu NANOVO — tym by sa vsak prepisal aj jej config. Tato
+        # akcia si skrinku necha naaranzovat rucne (izolacia, natocenie) a
+        # prida k ulozenej sablone LEN OBRAZOK; zaznam sa nedotkne.
+        #
+        # NEROBI NIC NOVE: foti sa TOU ISTOU cestou ako pri ulozeni sablony
+        # (`TemplatePreviews.capture` — kamera sa obnovuje v `ensure`, ziadna
+        # `start_operation`, ziadny krok Späť) a subor vymiena `TemplateStore
+        # .set_preview` pod sidecar zamkom. Guardy su SERVEROVE (HTML nie je
+        # ochrana): existujuca sablona druhu `cabinet` + PRAVE JEDNA oznacena
+        # NOXUN skrinka; ked nesedi cokolvek, NEZAPISE sa nic.
+        #
+        # Vracia dvojicu [ok, sprava] — hlasku vypisuje volajuce OKNO (panel aj
+        # okno Sablony maju vlastny status riadok), aby sa jedna logika nemusela
+        # duplikovat pre dva statusove kanaly.
+        def capture_preview_for(kind, name)
+          k = kind.to_s
+          n = name.to_s
+          return [false, 'Najprv vyber šablónu — náhľad sa priradí k nej.'] if n.empty?
+          # Doskove sablony sa nefotia: dlazdica dosky je schema, nie skrinka.
+          return [false, 'Náhľad sa fotí len pre šablóny skriniek.'] unless k == 'cabinet'
+          return [false, "Šablóna \"#{n}\" už v knižnici nie je."] if TemplateStore.find(k, n).nil?
+
+          model = Sketchup.active_model
+          cabs = selected_cabinets(model)
+          return [false, 'Označ v modeli práve jednu NOXUN skrinku — z nej sa náhľad odfotí.'] if cabs.empty?
+          if cabs.length > 1
+            return [false, "Označených je #{cabs.length} skriniek — nechaj označenú práve jednu."]
+          end
+
+          tmp = TemplatePreviews.capture(model, cabs.first)
+          return [false, 'Náhľad sa nepodarilo odfotiť — šablóna ostáva pri schéme.'] if tmp.nil?
+          unless TemplateStore.set_preview(k, n, tmp)
+            return [false, 'Náhľad sa nepodarilo uložiť (disk/práva) — skús znova.']
+          end
+
+          push_templates # dlazdice v paneli si novy `preview_rev` vypytaju samy
+          [true, "Náhľad šablóny \"#{n}\" je odfotený."]
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.capture_preview_for')
+          [false, 'Náhľad sa nepodarilo odfotiť.']
+        end
+
+        # PRIAMO oznacene NOXUN korpusy (nie `find_cabinet`, ktory dielec doriesi
+        # na jeho skrinku): akcia sa pyta „ktoru skrinku fotim", takze oznaceny
+        # dielec ani viacnasobny vyber nesmie ticho vybrat jednu za pouzivatela.
+        # Ciste citanie vyberu — ziadna operacia, ziadny zapis, ziadny krok Späť.
+        def selected_cabinets(model)
+          return [] unless model
+
+          model.selection.to_a.select { |e| e.valid? && Store.kind(e) == 'cabinet' }
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.selected_cabinets')
+          []
+        end
+
         # UI-B3: typ z mini-modalu „Uložiť ako šablónu". Typ je JEDINY udaj,
         # ktory sa v modale nastavuje nad ramec nazvu — riadi, pod ktorym typom
         # sa sablona ponuka pri vkladani (zoznam je typovo filtrovany).

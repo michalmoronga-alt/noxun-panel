@@ -72,6 +72,11 @@ module Noxun
           cb(dlg, 'tpl_apply')  { |p| handle_apply(p) }
           cb(dlg, 'tpl_delete') { |p| handle_delete(p) }
           cb(dlg, 'tpl_save')   { |_p| handle_save }
+          # SMOKE PACK 1 (6A): „Odfotiť" per riadok — prida nahlad k UZ ULOZENEJ
+          # sablone z PRAVE JEDNEJ oznacenej skrinky. Logika (guardy, capture,
+          # zamok) je v `Panel.capture_preview_for`; okno len vypise hlasku a
+          # obnovi zoznam (rovnaka delba ako pri apply/delete).
+          cb(dlg, 'tpl_capture') { |p| handle_capture(p) }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(templates): #{msg}")
@@ -105,7 +110,10 @@ module Noxun
             # UI-C1a: okno spravuje VYHRADNE korpusove sablony — doskove sa v nom
             # ani neukazu (payload je filtrovany a serverove akcie maju vlastny
             # guard na kind, HTML nie je ochrana).
-            templates: Panel.template_list(kind: 'cabinet'),
+            # `previews: true` (SMOKE PACK 1) — riadok podla `preview_rev` vie
+            # povedat „Odfotiť" vs. „Prefotiť"; je to TRANSIENTNY odtlacok
+            # suboru, do `templates.json` sa nezapisuje.
+            templates: Panel.template_list(kind: 'cabinet', previews: true),
             selected_cab: cab ? Store.get(cab, 'cabinet_id') : nil,
             selected_type: cab_type # guard: apply len na rovnaky typ (dolna/horna)
           }
@@ -169,6 +177,18 @@ module Noxun
                               'Noxunu alebo zlyhal zápis na disk. Nič sa neuložilo.', true)
           end
           after_change("Šablóna \"#{name}\" uložená.#{hw_note}")
+        end
+
+        # SMOKE PACK 1 (6A): „Odfotiť" — prida nahlad k UZ ULOZENEJ sablone.
+        # Zaznam sa NEPREPISUJE (na rozdiel od `handle_save`), meni sa VYHRADNE
+        # obrazok; vsetky guardy aj capture su v `Panel.capture_preview_for`
+        # (jedna cesta, jeden zamok). `push_state` obnovi zoznam, `Panel
+        # .push_templates` uz spravila zdielana funkcia.
+        def handle_capture(payload)
+          name = JSON.parse(payload.to_s)['template'].to_s
+          ok, msg = Panel.capture_preview_for('cabinet', name)
+          set_status(msg, !ok)
+          push_state if ok
         end
 
         def handle_delete(payload)

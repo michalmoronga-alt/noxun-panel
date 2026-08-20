@@ -238,19 +238,43 @@ module Noxun
 
       # --- zapis do skladu (VYHRADNE spod zamku TemplateStore) ----------------
 
-      # Presun capture temp suboru na finalne meno. Zlyhanie presunu sa berie
-      # rovnako ako zlyhany capture — stary (uz neplatny) PNG sa zmaze.
-      def replace(kind, name, tmp)
+      # Samotny presun capture temp suboru na finalne meno. NIC nemaze —
+      # o osude STAREHO obrazka rozhoduje volajuci (`replace` vs. `attach`),
+      # lebo odpoved zavisi od toho, ci sa medzitym zmenil config sablony.
+      # Nepouzitelny temp (chybajuca cesta, nie PNG, nad limitom) = false BEZ
+      # vynimky, takze sa nic nemaze ani v jednej ceste.
+      def move_into_place(kind, name, tmp)
         target = path_for(kind, name)
         return false unless target && valid_file?(tmp)
 
         FileUtils.mkdir_p(File.dirname(target))
         FileUtils.mv(tmp, target, force: true)
         true
+      end
+
+      # UPSERT cesta (config sablony sa PRAVE ZMENIL): zlyhanie presunu sa berie
+      # rovnako ako zlyhany capture — stary PNG uz patri inemu tvaru skrinky,
+      # takze sa zmaze (obrazok stareho tvaru k novemu configu je horsi nez
+      # schematicky fallback).
+      def replace(kind, name, tmp)
+        move_into_place(kind, name, tmp)
       rescue StandardError => e
         Engine.log_error(e, 'TemplatePreviews.replace')
         discard(tmp)
         delete(kind, name)
+        false
+      end
+
+      # SMOKE PACK 1 (Codex #183 P2): NEDESTRUKTIVNY protejsok — cesta, ktora
+      # meni VYHRADNE obrazok (`TemplateStore.set_preview`, rucne „Prefotiť").
+      # Config sablony sa nemeni, takze uz ulozeny nahlad je STALE PLATNY:
+      # prechodna chyba disku pri presune noveho suboru ho NESMIE zmazat, inak
+      # by neuspesne prefotenie zobralo pouzivatelovi aj to, co uz mal.
+      def attach(kind, name, tmp)
+        move_into_place(kind, name, tmp)
+      rescue StandardError => e
+        Engine.log_error(e, 'TemplatePreviews.attach')
+        discard(tmp)
         false
       end
 
