@@ -10,6 +10,20 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
+### D-26 — režim Jednoduchý/Rozšírený: ZAVRETÉ bez implementácie (20.8.2026, rozhodol Michal)
+
+**Pôvodné znenie D-26 · Režim Jednoduchý/Rozšírený** (Michal 19.7. večer, debata) — prepínač v UI: jednoduchý = najčastejšie polia, rozšírený = všetko (tvorba šablón, špeciálne zostavy). Rozhodnuté MIESTO samostatného okna Nastavenia (nastavenie ostáva pri svojom poli). *(Stav bol: **dáta z merača D-25 sú od 11.8. odčítané** ([../zdroje/MERAC_D25_odpocet_2026-08.md](../zdroje/MERAC_D25_odpocet_2026-08.md)) — kandidáti na skrytie sú známi (orientácia/odsadenie výstuh, vodorovné delenia, režim sokla, reset kovania); rozhodnutie ide spolu s UI 2.0, nie pred ním. **20.8. (UI-D3): Inspector rework je HOTOVÝ** (bloky UI-A…UI-D), takže sa D-26 dá konečne posúdiť na živom paneli — v koncepte UI 2.0 „Menej časté" neexistuje a obsah rozdeľujú kontexty raily + exkluzívne skupiny. **Rozhodnutie čaká na Michala** po dennej práci s hotovým panelom: buď sa D-26 zavrie ako nepotrebné, alebo sa zadá ako vlastná dávka. Agent ho neurobí za neho.)*
+
+**Rozhodnutie (Michal, 20.8.2026 nad hotovým panelom): ZAVRETÉ — režimy sa robiť nebudú.**
+
+**Prečo.** Otázku vyriešil samotný koncept Inspector C skôr, než sa k nej dalo dostať:
+- obsah je zbalený do **exkluzívnych skupín sektorov** (otvorenie jednej zavrie ostatné), takže naraz je vidieť práve to, čo človek rieši;
+- kontexty railu (Korpus · Zóny · Čelá · Kovanie) rozdelili panel podľa **práce**, nie podľa „častosti" — polia iného kontextu nikto nevidí, aj keď na ne nemá prepínač;
+- kategória **„Menej časté" v koncepte neexistuje** vôbec — nemá teda čo prepínač skrývať;
+- **kandidáti na skrytie z merača D-25** (orientácia a odsadenie výstuh, vodorovné delenia, režim sokla, reset kovania) ležia presne v tých zrolovateľných skupinách, ktoré sú zbalené štandardne.
+
+Prepínač *Jednoduchý / Rozšírený* by tak pridal **druhú os skrývania** nad už fungujúcu — teda dve pravdy o tom, prečo pole nevidno, a nové nastavenie, ktoré treba udržiavať. Zatvorené bez implementácie; ak by sa panel časom zahustil, otvára sa nové D-číslo s vlastnými dátami merača (číslovanie sa nerecykluje).
+
 ### D-84 — čelá rečou stolára (19.8.2026, PR UI-C3, v0.7.15)
 
 **Pôvodné znenie D-84 · Čelá: „+ riadok / − riadok" pomenovať podľa toho, čo pridávajú** (Michal 6.8., test dávky E na reálnej zákazke) — v karte Čelá má tlačidlo hovoriť rečou stolára: **„+ pridaj čelo"** (zásuvkové) a **„+ pridaj dvere"** (krídlové). Tlačidlo **„− riadok" odpadá úplne** — mazanie ostáva krížikom pri konkrétnom riadku (jednoznačné, ktorý riadok mizne) a zároveň sa uvoľní miesto v rade (pravidlo vertikálneho priestoru). *(Stav bol: malá UI dávka na karte čiel — patrí do bloku UI-B/UI-C.)*

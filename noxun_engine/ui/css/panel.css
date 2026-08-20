@@ -1159,7 +1159,9 @@
      nad uz vykreslenym SVG prebije prezentacne atributy znacky. */
   #preview g.hwmk.hov circle, #preview g.hwmk.hov rect { stroke: var(--nx-select-strong);
                                                          stroke-width: 3.5; }
-  #preview g.hwmk.hov path { stroke: var(--nx-select-strong); }
+  /* `.hwhit` je PRIEHLADNY siroky duplikat kolajnice (hit-oblast znacky vysuvu) —
+     zvyraznenie sa ho nesmie dotknut, inak by z neho spravilo hruby farebny pas. */
+  #preview g.hwmk.hov path:not(.hwhit) { stroke: var(--nx-select-strong); }
   .frow.hov { background: var(--nx-select-bg-hover); border-radius: 6px; }
   .frow.hov .fnum { color: var(--nx-select-accent); font-weight: 600; }
   /* D-23: hint pod nahladom podla aktivneho kontextu (data-view-ctx, UI-B1) —

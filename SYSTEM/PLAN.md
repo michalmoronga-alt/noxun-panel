@@ -15,11 +15,15 @@
 
 **~~UI-D · Dotiahnutie~~ — BLOK KOMPLET** (UI-D1 #180 · UI-D2 #181 · UI-D3 #182, **v0.7.20**) — **a tým je INSPECTOR REWORK HOTOVÝ** (UI-A · UI-B · UI-C · UI-D). **D1 Dielec** — Základné hore ako dopočítané údaje, hranové ikony s rotáciou podľa 2D náhľadu, „Označiť v modeli" (bez zápisu a bez kroku Späť) a „Použiť na podobné…" (prenos **olepu hrán** na dielce s rovnakou rolou a materiálom, rozsah *táto skrinka / celý projekt* so živým počtom, celý zápis **jeden krok Späť**). **D2 Náhľady šablón** — pri uložení šablóny sa odfotí **skutočný pohľad na skrinku** a dlaždica ním nahradí schematickú kresbu; kamera sa vždy vráti presne tam, kde bola, a nevznikne ani jeden krok Späť; staršie šablóny aj neúspešné fotenie končia pri schéme (obrázky žijú ako súbory vedľa knižnice, schéma `templates.json` sa nemenila). **D3 Klikateľnosť a uzávery** — ⚠ chip otvára **warnpanel ako overlay** (nič neposunie), každý nález má **oko** na označenie dotknutého dielca v modeli a dole deep-link **„Otvoriť v Štúdiu → Kontrola"**; „Materiál" v info stĺpci otvára **Kusovník**; v karte dielca je „Smer dekoru" preklikom na materiál; `UI_DIZAJN.md` doplnený o všetko, čo bloky UI-A…D zaviedli. Vedomé odchýlky (smer dekoru ostal informáciou; rotácia hranovej ikony podľa náhľadu, nie podľa pevnej mapy; kontextová fotografia namiesto izolovaného renderu) sú v [zdroje/ui20/UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md); plné texty v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 
-**Na Michalovo rozhodnutie (obe nad HOTOVÝM panelom, nie do ďalšej dávky bez neho):** **D-26** — režimy *Jednoduchý / Rozšírený* vs. akordeóny „menej časté" (v koncepte „Menej časté" neexistuje; posúdiť po dennej práci s hotovým Inspectorom) · **per-dielec smer dekoru** — dnes neexistuje a jeho zavedenie mení výrobný kontrakt (kusovník, VEPO, nárez), takže je to samostatná dávka s auditom.
+**Rozhodnuté 20.8. nad HOTOVÝM panelom:** **D-26** (režimy *Jednoduchý / Rozšírený* vs. akordeóny „menej časté") je **ZAVRETÉ bez implementácie** — koncept zbalil obsah do exkluzívnych skupín sektorov a „Menej časté" v ňom neexistuje, prepínač by pridal druhú os skrývania nad už fungujúcu (plný text v [archiv/DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md)) · **per-dielec smer dekoru** dostal číslo **D-108** a vlastný blok **KRESBA** nižšie.
 
 **Po smoke teste 20.8. (Michal, hotový Inspector)** — opravný pack **SMOKE PACK 1** je hotový (PR #183, v0.7.21): rozbité riadky zoznamu čiel · prekrytý text v boxe kovania · podperky políc súhrnne s rozklikom · ručné „Odfotiť" náhľadu k existujúcej šablóne. Otvorené zvyšky z toho istého testu:
 - **D-106 · Predbežná cena korpusu v informačnom stĺpci Základných** — orientačný náklad skrinky („≈ X €" s tooltipom rozpadu materiál/ABS/kovanie); odvodené čítanie, žiadny nový riadok. *Michal 20.8.: zapísať na neskôr — rieši sa s okruhom rozpočtu vo fáze ŠTÚDIO.*
-- **Nové zobrazenie výsuvov v mini náhľade** (koľajnica „L" + telo šuflíka) — návrh sa schvaľuje nad mini náhľadom, implementácia **samostatným PR**.
+- ~~**Nové zobrazenie výsuvov v mini náhľade**~~ — **HOTOVÉ** (PR #184, v0.7.22): výsuv sa v projekcii Kovanie kreslí ako **koľajnica „L" pri oboch bokoch + telo šuflíka**, výšky tiel rastú s čelami. Schválené Michalom 20.8. nad mini náhľadom.
+
+**BLOK KRESBA — smer dekoru** *(rozhodnuté Michalom 20.8.: ide **HNEĎ** po opravách zo smoke testu a **PRED fázou ŠTÚDIO**)* — dôvod je reálny incident z 19.8.: v objednávke naostro mala tenká horná blenda pozdĺžnu kresbu a vysoké úzke dvere pod ňou priečnu, a plugin to nevedel ani ukázať, ani skontrolovať.
+- **K1 · D-108 · Smer dekoru per dielec/čelo ako VSTUP** — dnes smer určuje výhradne materiál; potrebné je otočiť štruktúru konkrétneho dielca tak, aby kresba sedela so susedom. Zmena smeru = **rotácia dielca o 90° v kusovníku** (2000 × 250 pozdĺžna ↔ 250 × 2000 priečna), teda swap dĺžka/šírka vo VEPO, v náreze (`fits_on_sheet`) aj v tom, ktorá dvojica hrán je pozdĺžna/priečna pre olep. **Výrobný kontrakt ⇒ `codex-audit` PRED prácou + plný in-SketchUp beh sú povinné.**
+- **K2 · D-87 · Vizuálna kontrola smeru v modeli** — overlay čiar v smere dekoru na dielcoch (vzor kontroly hrán D-104/D-105: kreslí sa nad modelom, žiadny krok Späť). Presunuté sem z bloku RENDER M-R — bez vizuálnej kontroly nemá K1 ako overiť výsledok. *Orientácia TEXTÚR podľa smeru dekoru ostáva v M-R.*
 
 **Fáza ŠTÚDIO** *(záver bloku — vlastné dávky po sektorovej debate nad [mockupom štúdia](zdroje/ui20/mockup_ui20.html))*
 - **D-50 · OCL inšpirácia UI/UX** — prebrať detaily z OCL flow (vzory áno, GPL kód nie); ťažisko je práve v štúdio okne (kusovník, kontrola, nákup, rozpočet).
@@ -67,7 +71,7 @@
 **Cieľ:** materiál vyzerá v modeli ako v skutočnosti — Luciin nástroj na vizualizácie.
 
 - **D-28 · Textúry materiálov = M-R knižnica vzhľadov** (D-28 je do M-R zlúčená, samostatne sa nerieši): `texture_path` + render vlastnosti PBR + „Uložiť vzhľad do knižnice" + mierka rapportu; fáza 2 = orientácia textúry podľa smeru dekoru dielca. Zdroj JPG knižnica na firemnom Disku; väzba na D-48.
-- **D-87 · Vizuálne zobrazenie SMERU štruktúry v modeli** — overlay čiar v smere dekoru na dielcoch (vzor ghost zón) ako rýchla kontrola orientácie celej zákazky; logicky sa rieši s textúrami a nárezovým plánom.
+  *(**D-87** — overlay čiar v smere dekoru — sa 20.8. presunul do bloku **KRESBA** (K2); tu ostáva len **orientácia textúry** podľa smeru dekoru ako fáza 2 D-28.)*
 - **Nástroj „pixla"** (V1-06) — ikonka na dlaždici materiálu, klik prefarbuje dielce cez `part_override` cestu (1 klik = 1 undo).
 
 ### 6 · INFRA (priebežne, podľa potreby)
@@ -95,6 +99,8 @@
 **Píš postrehy HNEĎ, keď ich vidíš — hocikedy, hociktorú tému.** Nemusíš strážiť, čo je kedy v pláne — ja každý postreh zaradím: buď do bežiacej etapy (ak sa týka), alebo do backlogu nižšie s označením etapy. Nič sa nestratí. Krátka veta stačí („boky majú stáť na dne, nohy pod tým") — doplňujúce otázky si vyžiadam sám.
 
 **Triedenie hlásení (dohoda 25.7.):** bežiaca etapa · priebežné dopĺňanie · celková vízia · **odklad do V1** — kým sa k V1 dostaneme, zbierame dáta, a z odložených tém sa potom poskladajú ďalšie bloky V1–V2. Trvalé fakty domény (stolárske poznatky, pojmy) idú do [POJMY.md](POJMY.md).
+
+**Doplnok k triedeniu (dohoda 20.8.): z pluginu sa objednávajú REÁLNE ZÁKAZKY.** Nálezy z reálnej výroby (chybný rozmer, zlá orientácia, nesprávny olep, nekompletný nákup) a **chyby v cenách a rozpočtoch** majú **najvyššiu prioritu triedenia — nad plánované bloky**. Predbiehajú bežiacu etapu aj naplánované dávky: keď plugin pošle do výroby alebo do objednávky zlé číslo, stojí to peniaze a dôveru, a žiadna rozpracovaná dávka to nevyváži. Zaraďujú sa hneď, s plným kontextom incidentu (čo bolo objednané, čo prišlo, kde to plugin ukázal alebo neukázal) — vzor: **D-108** (kresba blendy vs. dverí, incident 19.8.).
 
 ## Trvalé UI/UX pravidlo (Michal 20.7. — platí pre všetku ďalšiu prácu na paneli)
 

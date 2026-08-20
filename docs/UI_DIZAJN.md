@@ -529,7 +529,7 @@ Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`projSvg`)
 | **Korpus** | čelný rez s kótami: šírka dole · výška vpravo · sokel a telo vľavo · hĺbka kótou na náznaku skosenia hornej plochy |
 | **Zóny** | zónová schéma (klikateľné zóny, ťahateľné priečky) + kóty šírok stĺpcov |
 | **Čelá** | predný pohľad čiel + kóty výšok riadkov vpravo, medzery pri ľavom okraji, celková šírka dole |
-| **Kovanie** | korpus s **pozíciami kovania**: záves = krúžok s krížikom na závesovej hrane · výsuv = dvojica koľajníc vo výške zásuvky · nohy = obdĺžniky dole; pod projekciou súhrn všetkých položiek |
+| **Kovanie** | korpus s **pozíciami kovania**: záves = krúžok s krížikom na závesovej hrane · **výsuv = koľajnica „L" pri OBOCH bokoch + telo šuflíka** (nižšie) · nohy = obdĺžniky dole; pod projekciou súhrn všetkých položiek |
 | **Dielec** | hrany s ABS farbami (`#partSvg`, nezmenené) |
 
 Zásady kreslenia:
@@ -546,6 +546,21 @@ Zásady kreslenia:
   presné miesto vŕtania (strana závesu jednokrídlových dvierok v dátach nie je).
   Klik na značku vypíše jej popis do statusu; výber vlastníka v modeli patrí
   dávke UI-C4.
+- **Výsuv sa kreslí tak, ako ho vidno spredu** (schválené Michalom 20.8. nad mini
+  náhľadom — nahradilo pás naprieč čelom): pri **oboch** bokoch **koľajnica ako
+  „L" profil** (zvislá nožička na **vnútornom líci boku** + vodorovná pätka smerom
+  dovnútra, na úrovni, na ktorej výsuv sedí) a medzi nimi **telo šuflíka** —
+  obdĺžnik odsadený **za** pätkami koľajníc, s jemnou teal výplňou ako ostatné
+  značky. Všetky rozmery sú **pomer z výšky čela** (telo ~58 %), takže pri
+  viacerých zásuvkách nad sebou telá rastú s čelami a žiadna konštanta nerozbije
+  vysokú ani nízku zásuvku. **Kotví sa na korpus, nie na čelo:** výsuv drží bok,
+  preto sú ankerom **vnútorné líca bokov** (`x = t … W−t`, tie isté, aké kreslí
+  korpus) — nie bočná medzera čela; inak by koľajnica pri medzere 2 mm a hrúbke
+  18 ležala *na* doske boku a pri zápornom presahu čela až mimo skrinky.
+  Koľajnica je **ťah**, nie plocha, preto má navyše
+  **priehľadný široký duplikát** (`.hwhit`) — hit-oblasť značky pokrýva koľajnice
+  aj telo, aby klik na vlastníka (UI-C4) fungoval rovnako ako pri závese a nohe;
+  hover zvýraznenie sa tohto duplikátu **nesmie dotknúť**.
 
 **Spodný pás (`.pvbar`)** je tenký pevný riadok pod SVG:
 

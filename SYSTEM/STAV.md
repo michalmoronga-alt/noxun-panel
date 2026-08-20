@@ -5,32 +5,32 @@
 
 ## Stav
 
-**v0.7.21 · 20.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
+**v0.7.22 · 20.8.2026.** Etapa V0.6 (katalógy a ceny) je obsahovo splnená — plugin vie zákazku od návrhu cez materiály, ABS a kovanie až po VEPO, kusovník, nákupné zoznamy, rozpočet a cenovú ponuku; upratovacia etapa U1–U4 uzavrela dokumentáciu a hygienu repa (checkpoint v0.6.0), blok ŠTART AUTONÓMIE (D-101 · D-86 · D-77, PR #162–#164) prebehol prvýkrát autonómne.
 
 **INSPECTOR REWORK (UI 2.0) JE HOTOVÝ.** Koncept bol uzavretý 18.8. (Michal) — záväzný kontrakt a mockupy sú v repe: [zdroje/ui20/](zdroje/ui20/) ([UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) + mockupy Inspector C, štúdio, dizajnový lístok). Všetky štyri bloky sú v maine: **UI-A · UI-B · UI-C · UI-D**. Zostáva fáza **ŠTÚDIO** ([PLAN.md](PLAN.md)).
 
-Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). Posledná zmena kódu: **SMOKE PACK 1** — štyri opravy z Michalovho smoke testu hotového Inspectora (rozbité riadky čiel, prekrytý text v kovaní, podperky súhrnne, ručné odfotenie náhľadu šablóny). Testy: **1455 headless · 46 JS sád**; **plný in-SketchUp beh 20.8. — 492 PASS, 0 FAIL** (vrátane novej sekcie `run_smoke1` — fotenie z označenej skrinky, guardy výberu, žiadny undo krok).
+Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). **Opravné kolo po smoke teste hotového Inspectora je KOMPLET:** SMOKE PACK 1 (#183 — rozbité riadky čiel, prekrytý text v kovaní, podperky súhrnne, ručné odfotenie náhľadu šablóny) + **nový vizuál výsuvov v mini náhľade** (#184). Testy: **1456 headless · 46 JS sád**; **plný in-SketchUp beh 20.8. — 492 PASS, 0 FAIL** (vrátane sekcie `run_smoke1`). PR #184 in-SketchUp beh nepotreboval — je to čisto kresba náhľadu v JS a dokumenty, Ruby sa nemenilo.
 
 ## Robí sa
 
-**Nič — čaká sa na Michala.** Blok UI-D je uzavretý (**UI-D1** #180 · **UI-D2** #181 · **UI-D3** #182) a nad hotovým panelom prebehol **smoke test (20.8.)**, z ktorého vzišiel opravný **SMOKE PACK 1** (#183, v0.7.21). Predošlé bloky: **UI-A** (UI-01 paleta a téma · UI-02 logo a toolbar · UI-03 combobox), **UI-B** (UI-B1 kostra · UI-B2 náhľad · UI-B3 obsah Korpusu + koliesko), **UI-C** (**C1 Vkladanie** #174 · #175 · #176 · **C2 Zóny** #177 · **C3 Čelá** #178 · **C4 Kovanie** #179). Inspector má celú kostru, kontextové projekcie, všetky kontexty (Korpus, Vkladanie, Zóny, Čelá, Kovanie, Dielec) aj dotiahnutú klikateľnosť.
+**Nič — čaká sa na Michala.** Blok UI-D je uzavretý (**UI-D1** #180 · **UI-D2** #181 · **UI-D3** #182) a nad hotovým panelom prebehol **smoke test (20.8.)**, z ktorého vzišiel opravný **SMOKE PACK 1** (#183, v0.7.21) a **nový vizuál výsuvov** (#184, v0.7.22) — tým je opravné kolo uzavreté. Predošlé bloky: **UI-A** (UI-01 paleta a téma · UI-02 logo a toolbar · UI-03 combobox), **UI-B** (UI-B1 kostra · UI-B2 náhľad · UI-B3 obsah Korpusu + koliesko), **UI-C** (**C1 Vkladanie** #174 · #175 · #176 · **C2 Zóny** #177 · **C3 Čelá** #178 · **C4 Kovanie** #179). Inspector má celú kostru, kontextové projekcie, všetky kontexty (Korpus, Vkladanie, Zóny, Čelá, Kovanie, Dielec) aj dotiahnutú klikateľnosť.
 
 ## Ďalší krok
 
-**Fáza ŠTÚDIO** — sektorová debata s Michalom nad `SYSTEM/zdroje/ui20/mockup_ui20.html` (Kusovník · Kontrola · Nákup · Rozpočet · presuny satelitných okien; D-69, zvyšok D-50). **NEZAČÍNAŤ bez Michala** — je to koncept, nie implementačná dávka: presne ako pri Inspectorovi sa najprv dohodne obsah sektorov a až potom sa reže na dávky.
+**BLOK KRESBA — dávka K1 (D-108: smer dekoru per dielec/čelo ako VSTUP).** Rozhodnuté Michalom 20.8.: ide **HNEĎ**, pred fázou ŠTÚDIO. Dôvod je reálny incident z 19.8. — v objednávke naostro mala tenká horná blenda pozdĺžnu kresbu a vysoké úzke dvere pod ňou priečnu a plugin to nevedel ani ukázať, ani skontrolovať. **Pozor:** zmena smeru = rotácia dielca o 90° v kusovníku (swap dĺžka/šírka vo VEPO, v náreze aj v tom, ktorá hrana je pozdĺžna pre olep) ⇒ **`codex-audit` PRED implementáciou a plný in-SketchUp beh sú povinné.** Za ňou **K2 = D-87** (overlay čiar smeru dekoru v modeli, vzor kontroly hrán). Plné znenia: [DOGFOODING.md](DOGFOODING.md) → skupina KRESBA.
 
-**Čaká na Michalovo posúdenie (zo smoke testu 20.8.):**
+**Až potom fáza ŠTÚDIO** — sektorová debata s Michalom nad `SYSTEM/zdroje/ui20/mockup_ui20.html` (Kusovník · Kontrola · Nákup · Rozpočet · presuny satelitných okien; D-69, zvyšok D-50). **NEZAČÍNAŤ bez Michala** — je to koncept, nie implementačná dávka: presne ako pri Inspectorovi sa najprv dohodne obsah sektorov a až potom sa reže na dávky.
 
-- **Nové zobrazenie výsuvov v mini náhľade** — v projekcii Kovanie kresliť výsuv ako **koľajnicu „L" + telo šuflíka** namiesto dvojice koľajníc. Návrh sa schvaľuje **nad mini náhľadom** na živom paneli; implementácia príde **samostatným PR** (do SMOKE PACKU 1 vedome nepatrila).
+**Odložené zo smoke testu 20.8.:**
+
 - **D-106 — predbežná cena korpusu** v informačnom stĺpci Základných („≈ X €" s tooltipom rozpadu). Zapísané na neskôr, rieši sa s okruhom rozpočtu vo fáze ŠTÚDIO.
 - **D-107 — izolácia objektu pred fotením náhľadu** — nízka priorita / vysoká náročnosť, odložené do „Po V1 — zásobník". Náhrada už existuje: ručné „Odfotiť" v okne Šablóny.
 
-**Otvorené rozhodnutia pre Michala (obe nad HOTOVÝM panelom):**
-
-1. **D-26 — režimy panela.** Kontrakt UI 2.0 nechal otvorené, či má panel mať prepínač *Jednoduchý / Rozšírený*, alebo majú stačiť akordeóny „menej časté". Inspector rework je hotový, takže sa to dá posúdiť na živom paneli: ak je po dennej práci prehľadný, D-26 sa zavrie ako nepotrebné.
-2. **Per-dielec smer dekoru.** UI-D1 nechala smer dekoru dielca ako **informáciu** (UI-D3 ju doplnila o preklik na materiál, ktorý smer určuje). Per-dielec override dnes neexistuje a jeho zavedenie mení výrobný kontrakt (kusovník, VEPO, nárez) — je to samostatná dávka s auditom, treba ju zadať zvlášť.
+**Rozhodnuté 20.8. (obe nad hotovým panelom):** **D-26 — režimy panela: ZAVRETÉ bez implementácie** (koncept zbalil obsah do exkluzívnych skupín sektorov, „Menej časté" v ňom neexistuje a kandidáti merača na skrytie sú v zrolovateľných skupinách — prepínač *Jednoduchý / Rozšírený* by pridal druhú os skrývania nad už fungujúcu) · **per-dielec smer dekoru** dostal číslo **D-108** a je to dávka **K1** vyššie.
 
 ## Posledné uzávery
+
+- **Výsuvy v náhľade + uzávery** (v projekcii **Kovanie** sa výsuv už nekreslí ako pás naprieč čelom — pri **oboch bokoch** je koľajnica ako **„L" profil** (zvislá nožička + vodorovná pätka dovnútra) a medzi nimi **telo šuflíka**; výška tela je pomer z výšky čela, takže pri viacerých zásuvkách nad sebou telá **rastú s čelami** · závesy a nohy sa nemenili · klik na značku ďalej **označí vlastníka** a hit-oblasť pokrýva koľajnice aj telo · **D-26 zavreté bez implementácie** · zapísaný **blok KRESBA** (K1 = D-108 smer dekoru per dielec, K2 = D-87 vizuálna kontrola) a dohoda, že nálezy z reálnej výroby a chyby v cenách majú **najvyššiu prioritu triedenia**) — PR **#184**, v0.7.22 (20.8.)
 
 - **SMOKE PACK 1 — opravy z Michalovho testu hotového panela** (**zoznam čiel sa už nerozbíja** — keď má čelo vypísanú výšku, krížik ✗ ostáva v rade a medzi čelami je jemná linka, ktorá nezaberá miesto navyše · **v kovaní sa už nič neprekrýva** — dlhý názov („Výsuv zásuvkové čelo") sa slušne oreže a celý je v tooltipe, rozbaľovačky majú šírku podľa obsahu · **podperky políc sú zbalené pod jeden riadok** „Podperky políc — 5 políc: 20 ks" s rozklikom; počet pri konkrétnej polici sa dá meniť ďalej, ručne upravená polica sa v súhrne prizná štítkom „upravené", zbalenie si pamätá počítač · **v okne Šablóny pribudlo „Odfotiť"** — starším šablónam sa dá doplniť fotka z práve označenej skrinky bez toho, aby sa prepísali ich dáta; skrinku si predtým naaranžuješ a izoluješ sám. Kamera sa vždy vráti tam, kde bola, a nevzniká krok Späť) — PR **#183**, v0.7.21 (20.8.)
 

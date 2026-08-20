@@ -824,21 +824,32 @@ function projSvg(){
 
   /* --- KOVANIE: korpus so zvýraznenými pozíciami --- */
   if (S.ctx === 'hw'){
-    /* prepracované značky (18.8.): záves = kruh s X · výsuv = koľajnica spredu · noha = obdĺžnik;
+    /* prepracované značky (18.8.): záves = kruh s X · výsuv = koľajnice · noha = obdĺžnik;
        značky sedia na REÁLNYCH miestach (závesy na závesovej hrane dvierok, koľajnice po bokoch
-       zásuvky, nohy pod korpusom) a klik označí vlastníka */
+       zásuvky, nohy pod korpusom) a klik označí vlastníka.
+       VÝSUV prepracovaný 20.8. (schválené Michalom nad mini náhľadom): namiesto pásu naprieč
+       čelom je pri OBOCH bokoch koľajnica ako „L" profil (zvislá nožička + vodorovná pätka
+       dovnútra) a medzi nimi TELO ŠUFLÍKA — výška tela je pomer z výšky čela, takže pri
+       viacerých zásuvkách nad sebou telá rastú s čelami */
     const mk = (html, owner, tip) => '<g style="cursor:pointer" onclick="toast(\''+tip+'\',\'hammer\')">'+html+'</g>';
     const hinge = (cx, cy) => '<circle cx="'+cx+'" cy="'+cy+'" r="7" fill="var(--nx-select-bg)" stroke="var(--nx-select)" stroke-width="1.6"/>' +
       '<path d="M'+(cx-4)+' '+(cy-4)+' l8 8 M'+(cx-4)+' '+(cy+4)+' l8 -8" stroke="var(--nx-select)" stroke-width="1.4"/>';
-    const rail = (x, y, w) => '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="5" rx="1.5" fill="var(--nx-select-bg)" stroke="var(--nx-select)" stroke-width="1.3"/>' +
-      '<path d="M'+(x+3)+' '+(y+2.5)+' h'+(w-6)+'" stroke="var(--nx-select)" stroke-width="1" stroke-dasharray="3 2.5"/>';
+    /* x0/x1 = VNÚTORNÉ LÍCA bokov (priečka vľavo, bok korpusu vpravo) — výsuv drží
+       bok, nie čelo, takže sa nekotví na bočnú medzeru čela; y/h = pásmo jej čela */
+    const vysuvMk = (x0, x1, y, h) => {
+      const foot = 9, top = y + h*0.16, base = y + h*0.74;
+      return '<path d="M'+x0+' '+top+'V'+base+'h'+foot+' M'+x1+' '+top+'V'+base+'h'+(-foot)+'" ' +
+        'fill="none" stroke="var(--nx-select)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '<rect x="'+(x0+foot+2)+'" y="'+top+'" width="'+(x1-x0-2*(foot+2))+'" height="'+(base-top)+'" ' +
+        'rx="1.5" fill="var(--nx-select-bg)" stroke="var(--nx-select)" stroke-width="1.3"/>';
+    };
     const leg = (x) => '<rect x="'+x+'" y="200" width="10" height="14" rx="1.5" fill="var(--nx-select-bg)" stroke="var(--nx-select)" stroke-width="1.4"/>';
     return open + corpus(body) +
       /* zóny naznačené, nech je čitateľné KDE kovanie sedí */
       '<rect x="196" y="34" width="8" height="154" fill="'+body+'" fill-opacity=".5" stroke="var(--nx-border-soft)"/>' +
       mk(hinge(84, 70) + hinge(84, 150), 'F1', 'Závesy 2× CLIP top — čelo F1 (závesová hrana vľavo)') +
-      mk(rail(206, 52, 108) + rail(206, 58, 108), 'F3', 'Výsuv NL 470 — čelo F3 (koľajnice po bokoch)') +
-      mk(rail(206, 104, 108) + rail(206, 110, 108), 'F2', 'Výsuv NL 470 — čelo F2') +
+      mk(vysuvMk(204, 318, 40, 42), 'F3', 'Výsuv NL 470 — čelo F3 (koľajnice L po bokoch + telo šuflíka)') +
+      mk(vysuvMk(204, 318, 92, 42), 'F2', 'Výsuv NL 470 — čelo F2') +
       mk(leg(80) + leg(148) + leg(236) + leg(302), 'cab', 'Nohy 4× 100 mm — skrinka') +
       ghostLayers('kovanie') +
       txt(84, 46, 'závesy', {size:8}) + txt(262, 46, 'výsuvy', {size:8}) + txt(196, 226, 'nohy', {size:8}) +
