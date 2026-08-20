@@ -776,13 +776,38 @@
         return;
       }
       if (it.generic_type === 'slide'){
-        // dvojica kolajnic spredu vo vyske zasuvky (vzor mockupu)
-        var rz = fr.z + fr.height * 0.42, rw = Math.max(40, ow - 36);
-        out.push({ kind: 'slide', x: gs + 18, z: rz, w: rw, h: 10, owner: owner, title: title });
-        out.push({ kind: 'slide', x: gs + 18, z: rz + 18, w: rw, h: 10, owner: owner, title: title });
+        // Vysuv (schvalene Michalom 20.8. nad mini nahladom): UZ NIE pas naprieč
+        // celom, ale to, co je pri otvorenej zasuvke naozaj vidno spredu —
+        // pri OBOCH bokoch KOLAJNICA ako „L" profil (zvisla nozicka + vodorovna
+        // patka dovnutra) a medzi nimi TELO SUFLIKA. Vsetko sa odvodzuje z vysky
+        // cela, takze pri viacerych zasuvkach nad sebou rastu tela s celami.
+        var sg = nxSlideGeom(fr, gs, ow);
+        if (!sg) return;
+        out.push({ kind: 'slide_rail', side: 'left', x: sg.xL, z: sg.z, w: sg.foot, h: sg.legH,
+                   owner: owner, title: title });
+        out.push({ kind: 'slide_rail', side: 'right', x: sg.xR, z: sg.z, w: sg.foot, h: sg.legH,
+                   owner: owner, title: title });
+        out.push({ kind: 'drawer', x: sg.bx, z: sg.z, w: sg.bw, h: sg.bodyH,
+                   owner: owner, title: title });
       }
     });
     return out;
+  }
+
+  // Ciste (Node testy): geometria znacky VYSUVU v mm sceny.
+  // fr = celo ({ z, height }), gs = bocna medzera, ow = svetla sirka radu ciel.
+  // -> { z, foot, legH, xL, xR, bx, bw, bodyH } | null
+  // Vsetko je pomer z vysky cela — ziadne nove data a ziadna konstanta, ktora by
+  // pri vysokej zasuvke vyzerala inak nez pri nizkej.
+  function nxSlideGeom(fr, gs, ow){
+    var h = fr.height;
+    if (!(h > 0) || !(ow > 0)) return null;
+    var foot = Math.max(8, Math.min(ow * 0.12, 40));  // patka „L" smerom DOVNUTRA
+    var bodyH = h * 0.58;                             // telo suflika (~55–60 % cela)
+    var z = fr.z + h * 0.16;                          // uroven, na ktorej vysuv sedi
+    var bx = gs + foot + 2, bw = ow - 2*(foot + 2);   // telo je ZA patkami kolajnic
+    if (!(bw > 0)){ bx = gs + ow*0.25; bw = ow*0.5; } // uzka zasuvka: patky sa prekryju
+    return { z: z, foot: foot, legH: bodyH, xL: gs, xR: gs + ow, bx: bx, bw: bw, bodyH: bodyH };
   }
 
   // Ciste (Node testy): suhrn pod projekciou — VSETKY typy vratane tych bez
@@ -808,6 +833,17 @@
         '<path d="M'+(rx(m.x)-m.r*0.55)+' '+(ry(m.z)-m.r*0.55)+' l'+(m.r*1.1)+' '+(m.r*1.1)+
         ' M'+(rx(m.x)-m.r*0.55)+' '+(ry(m.z)+m.r*0.55)+' l'+(m.r*1.1)+' '+(-m.r*1.1)+
         '" stroke="'+stroke+'" stroke-width="2.2" fill="none"/>';
+    } else if (m.kind === 'slide_rail'){
+      // „L" profil kolajnice z PREDNEHO pohladu: zvisla nozicka pri boku a na jej
+      // spodku vodorovna patka smerom DOVNUTRA (na urovni, na ktorej vysuv sedi).
+      var fx = rx(m.x + (m.side === 'right' ? -m.w : m.w));
+      var d = 'M'+rx(m.x)+' '+ry(m.z + m.h)+'V'+ry(m.z)+'H'+fx;
+      body = '<path d="'+d+'" fill="none" stroke="'+stroke+'" stroke-width="4"'+
+             ' stroke-linecap="round" stroke-linejoin="round"/>';
+      // Hit-oblast: samotny tah je na klik pritenky, preto ma kolajnica este
+      // PRIEHLADNY siroky duplikat. Trieda `hwhit` ho drzi mimo hover CSS —
+      // inak by sa pri prisvieteni boxu vyfarbil ako hruby pas cez zasuvku.
+      if (!ghost) body += '<path class="hwhit" d="'+d+'" fill="none" stroke="transparent" stroke-width="18"/>';
     } else {
       body = '<rect x="'+rx(m.x)+'" y="'+ry(m.z + m.h)+'" width="'+m.w+'" height="'+m.h+
         '" rx="3" fill="'+fill+'" stroke="'+stroke+'" stroke-width="2"/>';
@@ -1290,7 +1326,7 @@
   // module undefined a DOM cast bezi normalne (vzor shell.js / usage.js).
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { NXLayers: NXLayers, cabTabPreview: cabTabPreview,
-                       nxHwMarks: nxHwMarks, nxHwSummary: nxHwSummary,
+                       nxHwMarks: nxHwMarks, nxHwSummary: nxHwSummary, nxSlideGeom: nxSlideGeom,
                        nxFrontDims: nxFrontDims, nxZoneSpans: nxZoneSpans,
                        pvDepthDimZ: pvDepthDimZ, pvSceneTopZ: pvSceneTopZ,
                        // UI-C1b: draft ciel, odhad navrhu a doskova projekcia

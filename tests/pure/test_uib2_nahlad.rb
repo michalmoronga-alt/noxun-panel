@@ -137,6 +137,24 @@ NxTest.test('UI-B2: kontext Kovanie ma vlastnu projekciu') do
   NxTest.assert(UIB2_JS_CODE.include?('function drawHwBase'), 'chyba kresba projekcie kovania')
 end
 
+NxTest.test('UI-B2: vysuv sa kresli ako „L" kolajnice + telo suflika (schvalene 20.8.)') do
+  marks = UIB2_JS_CODE[/function nxHwMarks\(.*?\n  \}/m].to_s
+  NxTest.assert(marks.include?('nxSlideGeom(fr, gs, ow)'),
+                'geometria vysuvu zije v jednej cistej funkcii (testovatelna v Node)')
+  %w[slide_rail drawer].each do |kind|
+    NxTest.assert(marks.include?("kind: '#{kind}'"), "chyba znacka #{kind}")
+  end
+  NxTest.refute(marks.include?("kind: 'slide'"),
+                'stary pas naprieč celom sa uz nekresli')
+  mark = UIB2_JS_CODE[/function hwMarkSvg\(.*?\n  \}/m].to_s
+  NxTest.assert(mark.include?("m.kind === 'slide_rail'"), 'kolajnica ma vlastnu kresbu („L" profil)')
+  # Hit-oblast znacky: priehladny siroky duplikat tahu. Hover CSS ho MUSI
+  # vynechat, inak by sa pri prisvieteni boxu vyfarbil ako hruby pas.
+  NxTest.assert(mark.include?('class="hwhit"'), 'kolajnica ma hit-oblast pre klik')
+  NxTest.assert(UIB2_CSS.include?('#preview g.hwmk.hov path:not(.hwhit)'),
+                'zvyraznenie sa nesmie dotknut priehladnej hit-oblasti')
+end
+
 NxTest.test('UI-B2: ghost vrstvy nikdy neprebiju zakladny pohlad (nekliktelne)') do
   %w[drawZonesGhost drawFrontsGhost].each do |fn|
     body = UIB2_JS_CODE[/function #{fn}\(.*?\n  \}/m].to_s

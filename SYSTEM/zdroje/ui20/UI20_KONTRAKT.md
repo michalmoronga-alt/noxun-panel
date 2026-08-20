@@ -149,7 +149,10 @@ s warnpanelom (riadky s okom + „Otvoriť v Štúdiu → Kontrola").
 **Náhľad = kontextová projekcia** (výmena, nie vrstvenie): Korpus čelný rez s kótami (sokel živý
 N12) · Zóny čistá schéma (klikateľné zóny N18, police živé N19) · Čelá predný pohľad s výškami
 (obojsmerný výber, medzery jantárovo pri editácii N26) · Kovanie reálne pozície (záves=kruh s X na
-závesovej hrane · výsuv=koľajnice spredu po bokoch · nohy=obdĺžniky; klik označí vlastníka) ·
+závesovej hrane · **výsuv = koľajnica „L" pri OBOCH bokoch (zvislá nožička + vodorovná pätka
+dovnútra) + telo šuflíka medzi nimi**, výška tela je pomer z výšky čela, takže pri viacerých
+zásuvkách nad sebou telá rastú s čelami — *schválené Michalom 20.8. nad mini náhľadom, nahrádza
+pôvodné „koľajnice spredu po bokoch"* · nohy=obdĺžniky; klik označí vlastníka) ·
 Dielec hrany ABS farbami · Vkladanie šablóna ako bude vložená (čelá zap., vypnutím vidno vnútro;
 Doska so šípkami smeru N10). Dolný FIXNÝ pás: vrstvové chipy (Zóny·Čelá·Kovanie·Olep, D-27 ghost)
 + kamera N7 + fit.
@@ -395,12 +398,15 @@ zapísané tu:
   (rad ovládačov je pevný, rastie v ňom jediný prvok — a súčet šírok pri 470 px stráži guard test)
   a názov položky kovania sa **oreže s `title`** namiesto toho, aby pretiekol cez susedný select.
 - **NEROBILO SA v tomto packu:** nové zobrazenie výsuvov v projekcii Kovanie (koľajnica „L" + telo
-  šuflíka) — návrh sa schvaľuje nad mini náhľadom a príde **samostatným PR**.
+  šuflíka) — návrh sa schvaľoval nad mini náhľadom. **Michal ho 20.8. schválil** a prišiel
+  **samostatným PR** (v0.7.22); kontrakt projekcie Kovanie je prepísaný vyššie.
 
 **Tým je INSPECTOR REWORK hotový** (UI-A · UI-B · UI-C · UI-D). Po ňom: **fáza ŠTÚDIO** (sektorová
 debata nad mockup_ui20 → vlastné dávky; D-69, D-50 zvyšok, Kusovník/Kontrola/Nákup/Rozpočet
-sekcie, presuny satelitov). **D-26** (režimy vs. akordeóny) ostáva otvorené — posudzuje sa až nad
-hotovým panelom a rozhoduje Michal.
+sekcie, presuny satelitov). **D-26** (režimy vs. akordeóny) je **20.8. ZAVRETÉ bez implementácie** —
+koncept Inspector C zbalil obsah do exkluzívnych skupín sektorov, „Menej časté" neexistuje
+a merač-kandidáti na skrytie sú v zrolovateľných skupinách, takže prepínač
+*Jednoduchý / Rozšírený* stratil zmysel (rozhodol Michal nad hotovým panelom).
 
 ## 6 · Otvorené otázky na večernú debatu
 

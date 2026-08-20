@@ -131,8 +131,11 @@ const marks = PV.nxHwMarks(ITEMS, GEOM);
 const byKind = k => marks.filter(m => m.kind === k);
 eq(byKind('leg').length, 4, '4 nohy = 4 znacky');
 eq(byKind('hinge').length, 4, '2+2 zavesy = 4 znacky');
-eq(byKind('slide').length, 2, 'jeden vysuv = dvojica kolajnic');
-eq(marks.length, 10, 'podperky znacku nedostanu (nemaju kresitelnu poziciu)');
+// Vysuv (schvalene 20.8.): dve kolajnice „L" pri bokoch + TELO SUFLIKA medzi nimi.
+eq(byKind('slide_rail').length, 2, 'vysuv ma kolajnicu pri OBOCH bokoch');
+eq(byKind('drawer').length, 1, 'a jedno telo suflika');
+eq(byKind('slide').length, 0, 'stary pas naprieč celom uz neexistuje');
+eq(marks.length, 11, 'podperky znacku nedostanu (nemaju kresitelnu poziciu)');
 ok(byKind('leg').every(m => m.z === 0 && m.h <= GEOM.fh),
   'nohy sedia v pasme sokla, ked skrinka sokel ma');
 ok(byKind('leg').every(m => m.x >= 0 && m.x + m.w <= GEOM.W),
@@ -144,9 +147,43 @@ ok(hL.every(m => m.x < GEOM.W / 2), 'zavesy laveho kridla su na lavej polovici')
 ok(hR.every(m => m.x > GEOM.W / 2), 'zavesy praveho kridla su na pravej polovici');
 ok(hL.concat(hR).every(m => m.z >= 283 && m.z <= 283 + 437),
   'zavesy su vo vyske svojho cela');
-// Vysuv sedi vo vyske zasuvky F1, nie inde.
-ok(byKind('slide').every(m => m.z >= 100 && m.z <= 100 + 180),
-  'kolajnice su vo vyske zasuvky');
+// Vysuv sedi vo vyske zasuvky F1, nie inde — a to CELY (kolajnice aj telo).
+const slideMarks = byKind('slide_rail').concat(byKind('drawer'));
+ok(slideMarks.every(m => m.z >= 100 && m.z + m.h <= 100 + 180),
+  'kolajnice aj telo suflika su vo vyske zasuvky');
+// Kolajnice stoja pri VNUTORNYCH hranach bokov (lava na gs, prava na gs+ow)
+// a ich patka mieri DOVNUTRA.
+const rails = byKind('slide_rail');
+const rL = rails.find(m => m.side === 'left'), rR = rails.find(m => m.side === 'right');
+eq(rL.x, GEOM.gapSides, 'lava kolajnica sedi na vnutornej hrane laveho boku');
+eq(rR.x, GEOM.W - GEOM.gapSides, 'prava kolajnica sedi na vnutornej hrane praveho boku');
+ok(rL.w > 0 && rR.w > 0, 'patka ma dlzku (smer urcuje `side`, nie znamienko)');
+ok(rL.z === rR.z && rL.h === rR.h, 'obe kolajnice su rovnake a v rovnakej vyske');
+// Telo suflika je INSET od bokov — za patkami kolajnic, nie cez ne.
+const dr = byKind('drawer')[0];
+ok(dr.x >= rL.x + rL.w, 'telo suflika zacina az za patkou lavej kolajnice');
+ok(dr.x + dr.w <= rR.x - rR.w, 'a konci pred patkou pravej kolajnice');
+eq(dr.z, rL.z, 'telo sedi na urovni kolajnic');
+ok(dr.h / 180 > 0.5 && dr.h / 180 < 0.65, 'vyska tela je proporcna vyske cela (~55–60 %)');
+// Viac zasuvok nad sebou: kazda ma SVOJU dvojicu kolajnic a svoje telo, a telo
+// vyssieho cela je vyssie (schvalene na rovnakych aj roznych vyskach).
+const stackG = { W: 900, H: 720, fh: 100, gapSides: 2, gap: 3, fronts: [
+  { id: 'D1', type: 'drawer_front', z: 100, height: 140, wings_n: 1 },
+  { id: 'D2', type: 'drawer_front', z: 243, height: 280, wings_n: 1 }
+] };
+const stack = PV.nxHwMarks([
+  { owner_part_key: 'front:D1/panel', generic_type: 'slide', quantity: 1, label: 'Výsuv' },
+  { owner_part_key: 'front:D2/panel', generic_type: 'slide', quantity: 1, label: 'Výsuv' }
+], stackG);
+eq(stack.filter(m => m.kind === 'slide_rail').length, 4, 'dve zasuvky = dve dvojice kolajnic');
+eq(stack.filter(m => m.kind === 'drawer').length, 2, 'dve zasuvky = dve tela');
+const bodies = stack.filter(m => m.kind === 'drawer');
+ok(bodies[1].h > bodies[0].h, 'telo vyssieho cela je vyssie (vysky rastu s celami)');
+ok(bodies[0].z + bodies[0].h < bodies[1].z, 'tela sa navzajom neprekryvaju');
+// Uzka zasuvka: patky by sa prekryli, telo preto dostane nahradnu sirku (nikdy zapornu).
+const narrow = PV.nxSlideGeom({ z: 0, height: 120 }, 2, 20);
+ok(narrow.bw > 0, 'uzka zasuvka ma telo s kladnou sirkou');
+eq(PV.nxSlideGeom({ z: 0, height: 0 }, 2, 896), null, 'celo bez vysky znacku vysuvu nedostane');
 // Tooltip pomenuva polozku, vlastnika aj pocet — presne to, co je v payloade.
 eq(hL[0].title, 'Závesy · F2 · ľavé krídlo · 2×', 'popis znacky je z payloadu');
 // Kovanie na cele, ktore v rade neexistuje (stary override), sa NEKRESLI.
