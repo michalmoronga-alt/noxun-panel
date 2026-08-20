@@ -10,7 +10,7 @@ const path = require('node:path');
 // hwNlHtml v test_d93) — test si ho podstrci v tej istej podobe.
 global.fmtmm = function (v) { return (v == null || v === '') ? '?' : Math.round(parseFloat(v)); };
 
-const { nxGrainLabel, nxPartBasicRows, nxEdgeRotOf, nxSimilarCountText, nxSimilarBtnState } =
+const { nxPartBasicRows, nxEdgeRotOf, nxSimilarCountText, nxSimilarBtnState } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'part_card.js'));
 
 let n = 0;
@@ -19,16 +19,7 @@ function eq(actual, expected, msg){
   assert.deepStrictEqual(actual, expected, `${msg}: cakam ${JSON.stringify(expected)}, dostal ${JSON.stringify(actual)}`);
 }
 
-// --- 1) smer dekoru: preklad katalogovej hodnoty, nikdy surovy kod -----------
-eq(nxGrainLabel('length'), 'Po dĺžke', 'po dlzke');
-eq(nxGrainLabel('width'), 'Po šírke', 'po sirke');
-eq(nxGrainLabel('none'), 'Bez smeru', 'bez smeru');
-eq(nxGrainLabel(''), 'Bez smeru', 'prazdna hodnota = bez smeru');
-eq(nxGrainLabel(null), 'Bez smeru', 'chybajuca hodnota = bez smeru');
-eq(nxGrainLabel('cudzia_hodnota'), 'Bez smeru',
-   'neznamy kod sa NEUKAZE surovy — vyzeral by ako nazov a pritom nic nehovori');
-
-// --- 2) „Zakladne" su VYSTUP: informacne riadky, nikdy polia ----------------
+// --- 1) „Zakladne" su VYSTUP: informacne riadky, nikdy polia ----------------
 // K1 (D-108): „Smer dekoru" sa z informacneho stlpca PRESTAHOVAL do segmentu
 // (je to vstup) — vpravo ostala len Hrúbka. Stavy segmentu ma vlastnu sadu
 // tests/js/test_k1_smer_dekoru.js.
@@ -50,7 +41,7 @@ const EMPTY = nxPartBasicRows({});
 eq(EMPTY.left[0].value, '?', 'chybajuci rozmer sa prizna otaznikom, nevymysla sa nula');
 eq(nxPartBasicRows(null).left.length, 2, 'bez payloadu sa nepada — kostra ostava');
 
-// --- 3) rotacia hranovej ikony sa berie zo STRANY 2D nahladu ----------------
+// --- 2) rotacia hranovej ikony sa berie zo STRANY 2D nahladu ----------------
 // Mapa musi sediet s AbsRules.edge_sides: lezaci dielec ma L1='bottom'
 // (predna hrana je v nahlade dole), celo ma L1='left'. Ikona tak ukazuje
 // PRESNE tu hranu, ktoru nahlad nad zoznamom farebne kresli.
@@ -64,7 +55,7 @@ eq(nxEdgeRotOf(undefined), 0, 'chybajuca mapa nerotuje');
 const LYING = ['bottom', 'top', 'left', 'right'].map(nxEdgeRotOf);
 eq(new Set(LYING).size, 4, 'lezaci dielec: styri odlisne uhly');
 
-// --- 4) modal „Použiť na podobné…" — texty a stav tlacidla ------------------
+// --- 3) modal „Použiť na podobné…" — texty a stav tlacidla ------------------
 eq(nxSimilarCountText(null), 'Počítam podobné dielce…', 'kym pocet nie je, NEUKAZE sa nula');
 eq(nxSimilarCountText(undefined), 'Počítam podobné dielce…', 'to iste pre undefined');
 eq(nxSimilarCountText(0),

@@ -63,9 +63,10 @@
   // K1 (D-108, 21.8.2026): `Smer dekoru` uz NIE JE informacia — je to VSTUP
   // (segment `#pcGrainRow` pod mriezkou). Vedoma odchylka UI-D1 („smer je len
   // text") tym KONCI: per-dielec override `part_overrides['grain_direction']`
-  // existuje, prebehol auditom a zapisuje sa do snapshotu dielca.
-  var PC_GRAIN_LABEL = { length: 'Po dĺžke', width: 'Po šírke', none: 'Bez smeru' };
-  function nxGrainLabel(g){ return PC_GRAIN_LABEL[String(g == null ? '' : g)] || 'Bez smeru'; }
+  // existuje, prebehol auditom a zapisuje sa do snapshotu dielca. Preklad
+  // hodnoty na slovo tu uz NEZIJE — vsetky texty smeru sklada server
+  // (`Panel.part_grain_payload`, vzor D-102), aby panel nemohol povedat nieco
+  // ine, nez postavi builder.
   // Ciste skladanie riadkov (testovane v Node): dva vlavo, jeden vpravo.
   function nxPartBasicRows(pc){
     var p = pc || {};
@@ -609,7 +610,7 @@
   // ikon a texty modalu „Použiť na podobné…". V CEF je `module` undefined a
   // vetva sa preskoci (vzor hardware.js).
   if (typeof module !== 'undefined' && module.exports){
-    module.exports = { nxGrainLabel: nxGrainLabel, nxPartBasicRows: nxPartBasicRows,
+    module.exports = { nxPartBasicRows: nxPartBasicRows,
       nxEdgeRotOf: nxEdgeRotOf, nxSimilarCountText: nxSimilarCountText,
       nxSimilarBtnState: nxSimilarBtnState,
       // K1 (D-108): stav segmentu „Smer dekoru" (tests/js/test_k1_smer_dekoru.js).
