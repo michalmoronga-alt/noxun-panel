@@ -152,9 +152,17 @@
     if (nxGrainSegmentState(partCard).locked){ onPartInfoGrain(null); return; }
     if ((partCard.grain_value || 'inherit') === v) return; // klik na uz zvolenu = no-op
     if (window.sketchup && sketchup.set_part_grain)
-      sketchup.set_part_grain(JSON.stringify({ role_key: partCard.role_key, grain: v,
+      sketchup.set_part_grain(JSON.stringify({ role_key: partCard.role_key,
+                                               grain: nxGrainWire(v),
                                                cabinet_id: partCard.cabinet_id }));
   }
+  // Hodnota NA DROT. Segment pouziva UI token `inherit`, ale zapisova cesta
+  // pozna sentinel `__inherit__` — ten isty, akym sa hrana vracia „podľa
+  // pravidla" (`handle_set_part_edge`). Bez tohto prekladu by server klik na
+  // „Podľa materiálu" ODMIETOL ako neznamy smer (enum guard) a override by
+  // aj s rotaciou vo VEPO ticho ostal (Codex #185 P1). Zhodu oboch stran
+  // zamyka test `tests/pure/test_k1_smer_dekoru.rb`.
+  function nxGrainWire(v){ return v === 'inherit' ? '__inherit__' : v; }
   function nxInfoRowHtml(r){
     var v = esc(r.value) + (r.unit ? (' ' + esc(r.unit)) : '');
     var body = '<span>' + esc(r.label) + '</span><b>' + v + '</b>';
@@ -614,6 +622,6 @@
       nxEdgeRotOf: nxEdgeRotOf, nxSimilarCountText: nxSimilarCountText,
       nxSimilarBtnState: nxSimilarBtnState,
       // K1 (D-108): stav segmentu „Smer dekoru" (tests/js/test_k1_smer_dekoru.js).
-      nxGrainSegmentState: nxGrainSegmentState };
+      nxGrainSegmentState: nxGrainSegmentState, nxGrainWire: nxGrainWire };
   }
 

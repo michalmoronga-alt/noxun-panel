@@ -4248,6 +4248,14 @@ module NoxunSuRunner
       ok('K1: neznamy smer sa ODMIETNE — config sa nezmenil ani o bajt',
          e::Store.get(inst, 'config').to_s == cfg_before)
 
+      # Codex #185 P1: surovy UI token `inherit` NIE JE sentinel dedenia —
+      # server pozna `__inherit__`. Zhodu oboch stran zamyka headless test;
+      # tu sa dokazuje, ze druha (tichá) cesta naozaj neexistuje.
+      e::Panel.handle_set_part_grain({ 'role_key' => fkey, 'grain' => 'inherit',
+                                       'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      ok('K1: surovy token „inherit" server NEPRIJIMA (jediny sentinel je __inherit__)',
+         e::Store.get(inst, 'config').to_s == cfg_before)
+
       # --- 3) ZAPIS na zivej skrinke = PRESNE JEDEN krok Spat ----------------
       ents_before = model.entities.length
       e::Panel.select_only(model, front)
@@ -4370,6 +4378,35 @@ module NoxunSuRunner
       upay = ufront ? (e::Panel.part_card_payload(model, inst, ufront) || {}) : {}
       ok("K1: karta segment ZAMKNE a povie preco (#{upay['grain_hint']})",
          upay['grain_locked'] == true && !upay['grain_hint'].to_s.empty?)
+
+      # --- 10b) ZMENENY KATALOG: karta ukazuje SNAPSHOT, nie dopocet -------
+      # Codex #185 P1. Dielec je postaveny s kresbou po dlzke; katalogu sa
+      # potom `grain` prepise. Karta MUSI dalej hlasit to, s cim dielec ide do
+      # VEPO (snapshot), prospektivny vysledok drzat bokom a rozpor PRIZNAT.
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      e::Panel.select_only(model, k1_part(inst, 'front_door'))
+      e::Panel.handle_set_part_material({ 'role_key' => fkey, 'material_id' => 'K1DUB18',
+                                          'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      e::Panel.select_only(model, k1_part(inst, 'front_door'))
+      e::Panel.handle_set_part_grain({ 'role_key' => fkey, 'grain' => '__inherit__',
+                                       'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      sfront = k1_part(inst, 'front_door')
+      built = k1_grain_of(inst, 'front_door')
+      # katalog sa zmeni POD dielcom — bez prestavby (vzor „otvorenie .skp na
+      # stroji s inym katalogom")
+      cat = k1_catalog_json
+      cat['sheets'][0]['grain'] = 'width'
+      File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(cat))
+      e::Materials.reload!
+      spay = sfront ? (e::Panel.part_card_payload(model, inst, sfront) || {}) : {}
+      ok("K1: po zmene katalogu karta hlasi SNAPSHOT (#{spay['grain_effective']}), nie dopocet (#{spay['grain_pending']})",
+         built == 'length' && spay['grain_effective'] == 'length' && spay['grain_pending'] == 'width')
+      ok("K1: rozpor snapshot vs. katalog karta PRIZNA (#{spay['grain_hint']})",
+         !spay['grain_hint'].to_s.empty? && spay['grain_hint'].to_s.include?('prestavbe'))
+      File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(k1_catalog_json))
+      e::Materials.reload!
 
       # --- 11) STARA ZAKAZKA BEZ POLA: otvorenie nezapise NIC ---------------
       # Simulacia „otvorenia starej zakazky": config bez `grain_direction`

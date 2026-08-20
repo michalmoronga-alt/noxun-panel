@@ -352,7 +352,48 @@ end
 K1_PARTS_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_parts.rb'),
                         encoding: 'UTF-8')
 K1_PANEL_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.rb'), encoding: 'UTF-8')
+K1_PAYLOADS_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'payloads.rb'),
+                           encoding: 'UTF-8')
+K1_PART_JS  = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'part_card.js'),
+                        encoding: 'UTF-8')
 K1_HANDLER  = K1_PARTS_RB[/def handle_set_part_grain\b.*?\n        end\n/m].to_s
+
+NxTest.test('K1: JS posiela PRESNE ten sentinel dedenia, aky server prijima (Codex #185 P1)') do
+  # Segment pouziva UI token `inherit`, zapisova cesta sentinel `__inherit__`.
+  # Keby sa rozisli, klik na „Podľa materiálu" by server odmietol ako neznamy
+  # smer (enum guard) a override by aj s rotaciou vo VEPO TICHO ostal — chyba
+  # by sa prejavila az na objednavke. Zamykame OBE strany naraz.
+  wire = K1_PART_JS[/function nxGrainWire.*?\n  \}|function nxGrainWire[^\n]*\n/m].to_s
+  NxTest.assert(wire.include?("'__inherit__'"), 'JS preklada `inherit` na sentinel `__inherit__`')
+  send_body = K1_PART_JS[/function onPartGrain.*?\n  \}/m].to_s
+  NxTest.assert(send_body.include?('grain: nxGrainWire(v)'),
+                'zapis ide cez preklad, nie surovym UI tokenom')
+  NxTest.assert(K1_HANDLER.include?("raw == '__inherit__'"),
+                'server ten isty sentinel prijima')
+  NxTest.refute(K1_HANDLER.include?("raw == 'inherit'"),
+                'server NEMA druhy, tichy sentinel — jedna hodnota, jedno miesto')
+end
+
+NxTest.test('K1: karta cita EFEKTIVNY smer zo SNAPSHOTU, katalog len prospektivne (Codex #185 P1)') do
+  # Katalog sa medzi prestavbami meni (zmazany material, prepisany `grain`,
+  # .skp z ineho stroja). Keby karta pocitala vysledok z katalogu, tvrdila by
+  # iny smer a iny vyrobny rozmer, nez s akym dielec ide do VEPO.
+  body = K1_PAYLOADS_RB[/def part_grain_payload\b.*?\n        end\n/m].to_s
+  NxTest.assert(!body.empty?, 'payload segmentu sa nasiel')
+  NxTest.assert(body.include?("snapshot = norm_grain_value(cfg['grain_direction'])"),
+                'vysledok sa berie zo snapshotu dielca')
+  NxTest.assert(body.include?("'grain_effective' => snapshot"),
+                'efektivny smer = snapshot, nie dopocet z katalogu')
+  NxTest.assert(body.include?("'grain_pending' => pending"),
+                'prospektivny vysledok je SAMOSTATNY udaj, nezamiena sa s efektivnym')
+  NxTest.assert(body.include?('CabinetBuilder.effective_grain(sheet, override)'),
+                'prospektivny vysledok pocita TA ISTA funkcia ako builder (ziadny druhy vypocet)')
+  hint = K1_PAYLOADS_RB[/def grain_hint\b.*?\n        end\n/m].to_s
+  NxTest.assert(hint.include?('return nil if pending == snapshot'),
+                'bez rozporu sa hint nezobrazuje (vertikalny priestor)')
+  NxTest.assert(hint.include?('po najbližšej prestavbe'),
+                'rozpor snapshot vs. katalog karta POVIE, nezamlci ho')
+end
 
 NxTest.test('K1: zapisova cesta ma enum guard, identity guard a JEDNU prestavbu') do
   NxTest.assert(!K1_HANDLER.empty?, 'handler smeru dekoru existuje')

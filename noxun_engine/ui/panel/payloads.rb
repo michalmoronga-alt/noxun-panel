@@ -778,36 +778,59 @@ module Noxun
         # Rozmery v snapshote su GEOMETRICKE; vyrobny tvar = ten isty swap, aky
         # robi `VepoExport.oriented` (grain 'width' => dlzka a sirka sa vymenia).
         # Zdvojene sa tu NIC nepocita — je to len zobrazenie toho isteho pravidla.
+        #
+        # AUTORITA ZOBRAZENEHO VYSLEDKU JE SNAPSHOT DIELCA (`cfg['grain_direction']`),
+        # nikdy zivy katalog (Codex #185 P1). Katalog sa medzi prestavbami meni:
+        # material sa da zmazat, jeho `grain` prepisat a .skp sa da otvorit na
+        # stroji, ktory ten zaznam vobec nema. Keby karta pocitala vysledok z
+        # katalogu, tvrdila by iny smer (a iny vyrobny rozmer), nez s akym dielec
+        # naozaj ide do VEPO a do kontroly narezu — presne ten druh tichej
+        # nezhody, kvoli ktoremu vznikol incident 19.8.
+        # Katalog sa preto pouziva LEN na PROSPEKTIVNE udaje: co by z ktorej
+        # volby vyslo pri NAJBLIZSEJ prestavbe. Ked sa prospektivny vysledok
+        # rozide so snapshotom, karta to POVIE (`grain_hint`) — nezamlci to.
         GRAIN_WORD = { 'length' => 'pozdĺžna', 'width' => 'priečna', 'none' => 'bez smeru' }.freeze
 
         def part_grain_payload(cfg, ov)
+          snapshot = norm_grain_value(cfg['grain_direction'])
           sheet = grain_sheet(cfg['material_id'])
-          mat = sheet ? sheet['grain'].to_s : ''
-          mat = 'none' unless %w[length width].include?(mat)
+          mat = norm_grain_value(sheet && sheet['grain'])
           override = ov['grain_direction'].to_s
           override = '' unless CabinetBuilder::GRAIN_OVERRIDES.include?(override)
           locked = (mat == 'none')
-          effective = locked ? 'none' : (override.empty? ? mat : override)
+          # TA ISTA funkcia, akou pocita builder — ziadny druhy vypocet retaze.
+          pending = defined?(CabinetBuilder) ? CabinetBuilder.effective_grain(sheet, override) : snapshot
           l = cfg['length'].to_f
           w = cfg['width'].to_f
           {
             'grain_value' => override.empty? ? 'inherit' : override,
             'grain_material' => mat,
-            'grain_effective' => effective,
+            # S CIM DIELEC NAOZAJ IDE DO VYROBY (snapshot) — toto cita aj K2 overlay.
+            'grain_effective' => snapshot,
+            # Co by vyslo pri najblizsej prestavbe pri DNESNOM katalogu.
+            'grain_pending' => pending,
             'grain_locked' => locked,
             'grain_options' => [
               grain_option('inherit', locked ? 'Podľa materiálu' : "Podľa materiálu — #{GRAIN_WORD[mat]}",
-                           locked ? 'none' : mat, l, w, locked),
+                           mat, l, w, locked),
               grain_option('length', 'Pozdĺžna', 'length', l, w, locked),
               grain_option('width', 'Priečna', 'width', l, w, locked)
             ],
-            # Hint sa ukazuje LEN v zamknutom stave — inak by zabral riadok
-            # panela za nic (trvale pravidlo „vertikalny priestor je vzacny").
-            'grain_hint' => locked ? grain_locked_hint(override) : nil
+            # Hint sa ukazuje LEN ked je co povedat (zamok alebo rozpor so
+            # snapshotom) — inak by zabral riadok panela za nic (trvale
+            # pravidlo „vertikalny priestor je vzacny").
+            'grain_hint' => grain_hint(locked, override, snapshot, pending, l, w)
           }
         rescue StandardError => e
           Engine.log_error(e, 'part_grain_payload')
           {}
+        end
+
+        # 'length' / 'width' / 'none' — cokolvek ine (prazdne, nil, hodnota z
+        # novsej verzie) znamena „o kresbe nevieme nic", teda 'none'.
+        def norm_grain_value(v)
+          s = v.to_s
+          %w[length width].include?(s) ? s : 'none'
         end
 
         # Katalogovy zaznam dosky pre smer dekoru; material mimo katalogu = nil
@@ -820,13 +843,37 @@ module Noxun
         end
 
         def grain_option(value, label, result, l, w, locked)
-          dims = (result == 'width') ? [w, l] : [l, w]
           title = if locked
                     'Materiál dielca nemá smer dekoru — voľba je zatiaľ neúčinná.'
                   else
-                    "#{GRAIN_WORD[result].capitalize} — výrobne #{fmt_mm(dims[0])}×#{fmt_mm(dims[1])} mm"
+                    "#{GRAIN_WORD[result].capitalize} — výrobne #{grain_dims_text(result, l, w)}"
                   end
           { 'value' => value, 'label' => label, 'title' => title }
+        end
+
+        # Vyrobny tvar rozmerov pre dany smer — TEN ISTY swap, aky robi
+        # `VepoExport.oriented` (grain 'width' => dlzka a sirka sa vymenia).
+        # Je to zobrazenie pravidla, nie druhy vypocet: rotacia sa v paneli
+        # NIKDY nezapisuje, len sa ukazuje, co z nej vyjde.
+        def grain_dims_text(direction, length, width)
+          dims = (direction == 'width') ? [width, length] : [length, width]
+          "#{fmt_mm(dims[0])}×#{fmt_mm(dims[1])} mm"
+        end
+
+        # Hint pod segmentom. Dva dovody, preco vobec je:
+        #   1) ZAMOK — material nema smer, volba je zatial neucinna;
+        #   2) ROZPOR — dielec je POSTAVENY s inym smerom, nez aky by dnesny
+        #      katalog dal (material sa medzitym zmenil/zmazal, .skp je z ineho
+        #      stroja). Vtedy MUSI byt jasne, s cim dielec IDE DO VYROBY teraz
+        #      a co sa stane po prestavbe — inak by karta ticho ukazovala jedno
+        #      a VEPO poslalo druhe (Codex #185 P1).
+        # Inak nil = riadok sa vobec nezobrazi.
+        def grain_hint(locked, override, snapshot, pending, length, width)
+          return grain_locked_hint(override) if locked
+          return nil if pending == snapshot
+
+          "Dielec je postavený so smerom „#{GRAIN_WORD[snapshot]}“ (výrobne #{grain_dims_text(snapshot, length, width)}) " \
+            "— po najbližšej prestavbe skrinky sa použije „#{GRAIN_WORD[pending]}“."
         end
 
         def grain_locked_hint(override)

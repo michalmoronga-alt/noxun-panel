@@ -16,7 +16,7 @@ const path = require('node:path');
 
 global.fmtmm = function (v) { return (v == null || v === '') ? '?' : Math.round(parseFloat(v)); };
 
-const { nxGrainSegmentState } =
+const { nxGrainSegmentState, nxGrainWire } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'part_card.js'));
 
 let n = 0;
@@ -99,5 +99,14 @@ eq(byValue(NOPAY, 'inherit').on, true, 'default je dedenie');
 const BADVAL = nxGrainSegmentState(pcPayload({ grain_value: 'diagonal' }));
 eq(byValue(BADVAL, 'inherit').on, true,
    'neznama hodnota zo servera sa NEUKAZE ako aktivna volba — spadne na dedenie');
+
+// --- 6) HODNOTA NA DROT: dedenie ma sentinel, ktory server pozna ------------
+// Segment pouziva UI token `inherit`, zapisova cesta sentinel `__inherit__`
+// (ten isty, akym sa hrana vracia „podľa pravidla"). Keby sa rozisli, klik na
+// „Podľa materiálu" by server odmietol ako neznamy smer a override by aj
+// s rotaciou vo VEPO ticho ostal — Codex #185 P1.
+eq(nxGrainWire('inherit'), '__inherit__', 'dedenie ide na server ako sentinel');
+eq(nxGrainWire('length'), 'length', 'konkretny smer sa neprekladá');
+eq(nxGrainWire('width'), 'width', 'to iste pre priecnu');
 
 console.log(`OK test_k1_smer_dekoru.js — ${n} asertov`);
