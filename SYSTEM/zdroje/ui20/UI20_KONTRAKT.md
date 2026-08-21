@@ -3,8 +3,9 @@
 > **Toto je ZDROJ PRAVDY** pre blok UI 2.0 (presunuté do repa dávkou UI-01, 18.8.) —
 > pracovná kópia v `_dev/UI20_PODKLAD.md` už autoritou nie je. Mockupy k nemu patriace
 > sú vedľa: [mockup_inspector_c.html](mockup_inspector_c.html) (finálny koncept Inspectora,
-> v16) · [mockup_ui20.html](mockup_ui20.html) (štúdio okno) · [dizajnovy_listok.html](dizajnovy_listok.html)
-> (paleta, logo, dizajnové rozhodnutia).
+> v16) · [mockup_studio.html](mockup_studio.html) (**ŠTÚDIO — schválený koncept 22.8.2026**,
+> záväzná vizuálna referencia; nahrádza debatný [mockup_ui20.html](mockup_ui20.html)) ·
+> [dizajnovy_listok.html](dizajnovy_listok.html) (paleta, logo, dizajnové rozhodnutia).
 >
 > Podklad pre klikateľný mockup a večernú debatu. Vstupy: [UI_VIZIA](../../UI_VIZIA.md) ·
 > merač D-25 ([odpočet](../MERAC_D25_odpocet_2026-08.md)) · V1_VIZIA §6 ·
@@ -418,11 +419,116 @@ koncept Inspector C zbalil obsah do exkluzívnych skupín sektorov, „Menej ča
 a merač-kandidáti na skrytie sú v zrolovateľných skupinách, takže prepínač
 *Jednoduchý / Rozšírený* stratil zmysel (rozhodol Michal nad hotovým panelom).
 
-## 6 · Otvorené otázky na večernú debatu
+## ŠTÚDIO KONCEPT — UZAVRETÉ 22.8.2026 (referencia: [mockup_studio.html](mockup_studio.html))
 
-1. D-26: prepínač Jednoduchý/Rozšírený vs. akordeóny „Menej časté" (mockup ukáže akordeón).
-2. Tlačidlo Štúdio: jedno s deep-link šípkou vs. ponechať 2–3 priame tlačidlá? (mockup: jedno)
-3. Náhľad ako hlavný vizuál Inspectora — súhlas? (mockup to tak kreslí)
-4. D-69 jednotný editor materiálov — v štúdiu ako modal sekcie Materiály (mockup naznačí).
-5. Poradie implementačných dávok po schválení mockupu (návrh: D-85 combobox → štúdio skelet
-   + presun Výroby → Materiály → Kovanie/Pravidlá/Šablóny → Inspector hlavička/karty → zvyšok).
+Sektorová debata 21.–22.8.2026 (Michal product owner, 4 kolá nad klikateľným mockupom,
+návrhy Š1–Š19). Mockup je záväzná vizuálna referencia; tento súhrn je záväzný slovný kontrakt.
+Sekcie §3 tohto dokumentu platia ďalej (navigácia, deep-link `NX.studioOpen`, stav sekcie
+prežije prepnutie, exporty patria sekcii); nižšie sú schválené obsahy sekcií a odchýlky.
+
+**Rozhodnutia pred kolami (Michal 21.8.):** sekcia **Nákup kovania sa NENAVRHUJE** — dnešný
+tab Kovanie okna Výroba sa prenesie **1:1** a redizajn príde s blokom KOVANIE (Š7) ·
+**D-106** (cena korpusu) odložená · klik na materiál/ABS → **zvýraznenie miest použitia: ÁNO** ·
+poradie presunov satelitov schválené (nižšie) · deep-linky `NX.studioOpen` nahradia dnešný
+`open_tab` do okna Výroba · Codex do 25.8. nedostupný → náhradné nezávislé review
+(„slepý subagent") + post-hoc sweep.
+
+**KUSOVNÍK (Š1–Š6):**
+- **Š1** skupiny podľa materiálu — zbaliteľné hlavičky (vzorka dekoru, hrúbka, medzisúčet ks·m²)
+  + súčtový riadok celku (dielcov · m² · materiálov · ABS bm · odhad platní).
+- **Š2** voliteľné stĺpce (prepínač v rohu lišty; default Dielec·Skrinka·Dĺžka·Šírka·Hr.·ks·ABS,
+  voliteľné Smer dekoru·Rola·Poznámka; voľba per počítač).
+- **Š3** hover akcie riadku: **LEN oko** (označ v modeli — robí aj klik na riadok) **a ceruzka**
+  (uprav dielec v Inspectore); tretia akcia „detail/traceability" príde až s D-94.
+- **Š4** dnešné taby **Materiály a ABS okna Výroba = POHĽADY sekcie Kusovník** (segment
+  Dielce · Platne · ABS v lište), nie samostatné sekcie navigácie.
+- **Š5** exporty v lište sekcie: VEPO (primárna) · XLSX · CSV; „Etikety" sa **nezobrazuje** (po V1).
+- **Š6** živé hľadanie (bez diakritiky, hľadá dielec/skrinku/poznámku, prázdne skupiny sa skryjú,
+  súčtový riadok ukáže počítadlo filtra).
+
+**NÁKUP KOVANIA (Š7):** presun dnešného tabu Kovanie **1:1, bez redizajnu** — sekcia existuje,
+aby okno Výroba mohlo zaniknúť; wireframe z §3 (skupiny dodávateľov, jantárové nekompletné)
+je odložený do bloku KOVANIE.
+
+**KONTROLA (Š8–Š11):**
+- **Š8** semaforové chipy = **klikateľné filtre** (červený/oranžový zužujú zoznam, druhý klik
+  zruší; zelený je informačný).
+- **Š9** riadok nálezu: klik = označ v modeli; akcie vpravo: **kontextová oprava** (napr.
+  „Nahradiť UNI…" = deep-link do Materiálov) + oko + ceruzka do Inspectora (vzor Kusovník).
+- **Š10** lišta sekcie preberá **OBA prepínače** z okna Výroba → Kontrola: „Zvýrazniť hrany"
+  s **rohovým trojuholníkom** (3-stavové nastavenie = ten istý zdieľaný komponent
+  `edge_menu.js` a stav ako mušľa v raile, #190) a „Smer kresby" (K2/D-87). **Jeden stav,
+  tri vstupné body** — rail · okno/sekcia · (dovtedy) okno Výroba.
+- **Š11** živé počty RED/ORANGE v navigácii; deep-link „Otvoriť v Štúdiu → Kontrola"
+  z warnpanelu Inspectora vedie sem. **D-95** „diel po diele" vedome mimo (blok KONTROLA+VÝROBA).
+
+**ROZPOČET (Š12–Š13):**
+- **Š12** obsah dnešného tabu **1:1** (veľký súčet; zbaliteľné sekcie Materiál · Kovanie ·
+  Služby · Vlastné položky · Spotrebiče s medzisúčtami; spotrebiče opt-in so štítkom
+  „nezapočítané"); **prepínače s DPH / bez DPH + režim €·€€·€€€ + „Prepočítať ceny" sa
+  presúvajú do lišty sekcie**; jantárový chip pri súčte = ten istý nález ako v Kontrole
+  (klik prejde tam). Jediná sekcia, ktorá mení model — 1 zmena = 1 krok Späť.
+- **Š13** nulové riadky ostávajú viditeľné (kontrolný zoznam), riadok bez ceny je jantárový
+  s „—"; **nový vlastný riadok aj spotrebič idú cez D-15 modal — dnešný inline draft zaniká.**
+
+**CENOVÁ PONUKA (Š14–Š15):**
+- **Š14** = **SAMOSTATNÁ sekcia** (dnes zbaliteľný náhľad vnútri Rozpočtu): položky rečou
+  zákazníka, per-položka prepínač „samostatne", zaokrúhlenie, export „Cenová ponuka (zákazník)"
+  v lište; **DOCX/PDF generátor = priznaný wireframe placeholder** (po V1, vedome odložené z E).
+- **Š15** zásada „**upravuj pri zdroji**": odvodené sekcie rozpočtu majú preklik namiesto
+  editácie (Materiál → Kusovník, Kovanie → Nákup); chýbajúca cena v ponuke = jantárový chip
+  s preklikom do Rozpočtu (ponuka sa nikdy potichu nepodhodnotí).
+
+**MATERIÁLY — D-69 jednotný editor (SCHVÁLENÝ):** tri vstupy — „Pridať z Demosu"
+(predvyplní Demos) · „Pridať ručne" (prázdny) · „Upraviť" (predvyplní katalóg) — **jeden
+formulár**: identita dekoru (kód·názov·výrobca·vzorka) → dosky/hrúbky (varianty s kódom
+a cenou) → ABS rodina (pásky + univerzálna) → väzba na Demos (zdroj „Aktualizovať z Demosu";
+bez väzby je materiál plne ručný). Uloženie mení **len katalóg** — žiadny zápis do modelu.
+Detail dekoru má „Kde sa používa" s okom (zvýraznenie v modeli) — schválené pred kolami.
+
+**D-15 pridávačky ako modal (SCHVÁLENÝ VZOR):** jedna zdieľaná kostra (titulok · polia ·
+zelené potvrdenie · Esc/klik vedľa · fokus v prvom poli; vzor zdieľaného komponentu ako
+`edge_menu.js`). Inštancie sa napĺňajú postupne: šablóna (hotová) · materiál (=D-69) ·
+riadok rozpočtu a spotrebič (Š13) · položka/set kovania a pravidlo (s blokom KOVANIE).
+
+**KOVANIE — katalóg (Š16):** presun dnešného okna Katalóg kovania **1:1** — pohľady
+Položky · Sety + hľadanie v lište; redizajn a D-15 pridávačky až s blokom KOVANIE.
+
+**PRAVIDLÁ (Š17):** zjednotenie DVOCH dnešných okien do jednej sekcie — skupiny
+**ABS podľa roly** a **Kovanie podľa rozmerov**. Pravidlo je zdroj pravdy; ručný zásah
+z Inspectora je jantárový riadok so štítkom „override" a akciou **„vrátiť na pravidlo"**
+(1 klik = 1 krok Späť).
+
+**ŠABLÓNY (Š18):** dlaždice s PNG náhľadmi (schéma fallback; doskové šablóny náhľad nemajú)
+a akciami **použiť na označený · premenovať · odfotiť (SMOKE PACK 1) · zmazať** — sekcia
+preberá VŠETKO z dnešného okna Šablóny a **okno zaniká**; vkladanie novej skrinky zo šablóny
+ostáva vo vkladacej karte Inspectora.
+
+**NASTAVENIA (Š19):** Dodávateľ/Demos a Nastavenia rozpočtu = presun **1:1**; O plugine =
+zrkadlo obsahu kolieska Inspectora (jeden obsah, dva vstupy).
+
+**Ikony navigácie:** Kovanie = **hammer** (rovnaká ikona ako rail Inspectora — Michal 22.8.);
+ostatné podľa mockupu.
+
+**NÁVRH IMPLEMENTAČNÝCH DÁVOK ŠTÚDIA (poradie presunov schválil Michal 21.8.;
+rez podlieha bežnému schváleniu blokov):**
+- **ŠT-1a** (L) skelet Štúdia: okno `studio.html`, navigácia, deep-link `NX.studioOpen`,
+  sekcia **Kusovník** (Š1–Š6, pohľady Platne/ABS) — okno Výroba zatiaľ žije bez tabu Kusovník.
+- **ŠT-1b** (M) sekcia **Kontrola** (Š8–Š11, zdieľané prepínače) + presmerovanie deep-linkov
+  z Inspectora.
+- **ŠT-1c** (M) sekcie **Rozpočet + Cenová ponuka** (Š12–Š15) + **Nákup 1:1** (Š7) —
+  **okno Výroba zaniká**; toolbar tlačidlo „Štúdio" vedie sem.
+- **ŠT-2** (M) sekcia **Materiály** + **D-69 editor** + D-15 komponent — okno Materiály zaniká.
+- **ŠT-3** (M) sekcie **Kovanie · Pravidlá · Šablóny** (Š16–Š18, presuny 1:1 + zjednotenie
+  pravidiel) — tri okná zanikajú.
+- **ŠT-4** (S) **Nastavenia** (Š19) + upratanie: zánik zvyšných satelitov, `open_tab` →
+  `studioOpen` všade, docs.
+Každá dávka = plugin plne použiteľný; satelit zaniká až keď je jeho obsah plne v Štúdiu.
+
+## 6 · Otvorené otázky na večernú debatu *(historické — všetky zodpovedané)*
+
+1. D-26 — ZAVRETÉ bez implementácie (20.8., nad hotovým panelom).
+2. Tlačidlo Štúdio — jedno so šípkou (UI-B1).
+3. Náhľad ako hlavný vizuál — áno (UI-B2).
+4. D-69 jednotný editor materiálov — SCHVÁLENÝ v ŠTÚDIO KONCEPTE (22.8., vyššie).
+5. Poradie dávok — Inspector prebehol UI-A…D; Štúdio dávky ŠT-1a…ŠT-4 vyššie.
