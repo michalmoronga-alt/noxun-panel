@@ -293,8 +293,10 @@ teda miniatúra toho, čo overlay kreslí v modeli; čiary nedobiehajú k hrane
 rovnako ako v `core/grain_check.rb`. **Jedna kresba pre obe miesta** — rail
 Inspectora aj prepínač „Smer kresby" v okne Výroba).
 
-> **Inventár je úplný k v0.7.27** (blok UI-D uzavretý, `grain` doplnený dávkou
-> „Kontrola kresby v raile"): zoznam vyššie zodpovedá kľúčom v `icons.js` 1:1. Nová ikona sa pridáva **len keď pre ňu neexistuje
+> **Inventár je úplný k v0.7.28** (blok UI-D uzavretý, `grain` doplnený dávkou
+> „Kontrola kresby v raile"; dávka „ABS 3-stav v raile" **žiadnu ikonu
+> nepridala** — rohový trojuholník je CSS znamienko, nie symbol zo spritu, a
+> `shell` ostáva): zoznam vyššie zodpovedá kľúčom v `icons.js` 1:1. Nová ikona sa pridáva **len keď pre ňu neexistuje
 > významovo správna existujúca** — UI-D3 napríklad nepridalo žiadnu, oko
 > warnpanelu je ten istý `eye` ako „Označiť v modeli" v karte dielca (rovnaký
 > význam = rovnaká kresba).
@@ -350,6 +352,12 @@ neutrálne „(podľa pravidla)". Farby pásov ostávajú na ABS tokenoch `--nx-
 (semaforové `--nx-state-*` sa sem nemiešajú).
 
 ### D-105: split tlačidlo „Zvýrazniť hrany" (okno Výroba → KONTROLA)
+
+> **Od v0.7.28 je rozbaľovacie okno ZDIEĽANÝ komponent** (`ui/js/edge_menu.js` +
+> štýly `.ecmenu`/`.ecopt`/`.ecsw*` v `panel.css`): to isté nastavenie otvára aj
+> **rohový trojuholník pri ABS kontrole v raile Inspectora** (§5.11). Pravidlá
+> nižšie platia pre obe miesta; líšia sa len polohou okna a menom handlera.
+> Nová kópia markupu ani druhý stav vzniknúť nesmie.
 Jeden vizuálny celok, dve polovice: **ľavá** = zapnúť/vypnúť (zapnutý stav je
 zjavný — pozadie `--nx-select` + ikona `eye-off`; je to **zapnutý stav**, nie
 akcia, preto výberová a nie zelená), **pravá** (užšia,
@@ -477,13 +485,16 @@ sektoroch**. Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html
 
 - **Rail (44 px, fixný ľavý stĺpec):** kontexty **Korpus · Zóny · Čelá · Kovanie**
   → pod oddeľovačom **dočasná položka** (označený dielec / doska, prerušovaný
-  rámik + krížik) → **funkčná sekcia** (ABS kontrola hrán, pod ňou **Kontrola
+  rámik + krížik) → **funkčná sekcia** (ABS kontrola hrán **s rohovým flyoutom** —
+  klik na ikonu prepína zvýraznenie, klik na pravý dolný roh otvorí **3-stavové
+  nastavenie**, to isté, aké má okno Výroba (vzor §5.11); pod ňou **Kontrola
   kresby** — obyčajný toggle bez šípky, nie je čo nastavovať) → dole **koliesko**
   (Nastavenia Inspectora) a **Štúdio**. Aktívny kontext je teal, funkčné ikony sú
   tlmené a rozsvietia sa až po zapnutí. **Funkčný prepínač, ktorý má druhý domov
   (okno Výroba), NIKDY nemá druhý stav:** rail aj okno volajú tú istú serverovú
   cestu a zobrazujú ten istý stav, takže zapnutie na jednom mieste je hneď vidieť
-  na druhom (ABS kontrola aj Kontrola kresby). Rail je úzky, preto názov nesie **bublina
+  na druhom (ABS kontrola aj Kontrola kresby) — **to isté platí pre ich
+  nastavenia**: 3-stavové okno je jeden zdieľaný komponent nad jedným stavom. Rail je úzky, preto názov nesie **bublina
   pri hoveri** (`.railtip`) — nie natívny `title`, aby sa nezobrazovali dva
   tooltipy naraz.
 - **Kontexty platia LEN nad označeným korpusom.** Pri dielci, doske aj vkladaní
@@ -956,6 +967,43 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Hw`).
   0 ks — inak by súhrn hovoril „4 police" a piata by visela vedľa neho) ·
   **jedna položka sa nezbaľuje** (rozklik nad jediným riadkom je klik navyše
   bez zisku) · dáta sa nemenia, je to **zoskupenie zobrazenia**.
+
+### 5.11 Flyout roh — druhá akcia na ikonovom tlačidle (v0.7.28)
+
+Keď má ikonové tlačidlo (rail, toolbar) okrem svojej hlavnej akcie aj
+**nastavenie**, nesie ho **rohový flyout** — vzor prevzatý z nástrojov
+SketchUpu a Photoshopu, teda z prostredia, v ktorom stolár denne pracuje.
+Prvý výskyt: **ABS kontrola v raile** (toggle + 3-stavové nastavenie kontroly
+hrán). Pravidlá vzoru:
+
+- **Znamienko je malý PLNÝ trojuholník** v pravom dolnom rohu ikony (6 px, CSS
+  `border` trojuholník ako pseudo-prvok `::after`) — nie chevron, nie druhá
+  ikona, nič, čo by pýtalo ďalšie miesto. Farbu dedí od stavu tlačidla
+  (tlmená `--nx-ink-faint`, po zapnutí `--nx-select`).
+- **Klikacia zóna ≠ znamienko.** Terč je celý **pravý dolný kvadrant** tlačidla
+  (pri 34 × 32 px raile 17 × 16 px) — 6 px trojuholník sa myšou netrafí.
+- **Roh je SAMOSTATNÉ `<button>`** v spoločnom obale (`.railfly`), ležiace *nad*
+  hlavným tlačidlom (`z-index`), nikdy vnorené doň: tlačidlo v tlačidle je
+  neplatné HTML a `span` s `role="button"` sa nedá aktivovať klávesnicou
+  (rovnaká lekcia ako krížik dočasnej položky). Klik na roh sa tak k hlavnej
+  akcii **vôbec nedostane** — netreba naň spoliehať `stopPropagation`.
+- **Hlavná akcia sa nemení.** Klik na ikonu robí presne to, čo robil predtým.
+- **Dva rôzne `aria-label`** („ABS kontrola hrán" vs. „Nastavenie ABS kontroly")
+  + `aria-haspopup`/`aria-expanded` na rohu — čítačka musí vedieť, že sú to dve
+  akcie. Roh má **vlastnú bublinu** `.railtip` (rail nepoužíva natívny `title`).
+- **Vlastný kľúč merača** (D-25): `rail:abs-nastavenie` vedľa `rail:abs` — inak
+  by odpočet nevedel povedať, či sa nastavenie vôbec používa.
+- **Okno je overlay pri tlačidle** (`position: absolute`, `left` za railom), nie
+  modal v strede obrazovky a nikdy nie nový riadok layoutu. Zatvára ho **klik
+  mimo a Escape**, fokus sa vracia na roh (vzor warnpanelu).
+- **Ak to isté nastavenie žije aj inde, je to JEDEN komponent, nie kópia.**
+  Markup kreslí zdieľaný modul (`ui/js/edge_menu.js`), štýly sú v zdieľanom
+  `panel.css` (nescopnuté pod `.nx-inspector` — satelit o raile nevie) a stav
+  aj počty nesie výhradne server, ktorý po každom zápise pošle čerstvý stav
+  **obom oknám**. Dve kópie toho istého okna nesmú stáť na obrazovke naraz:
+  otvorenie na jednom mieste to druhé zavrie.
+- **Flyout dostane len tlačidlo, ktoré naozaj má čo nastavovať.** „Kontrola
+  kresby" ostáva obyčajný toggle bez trojuholníka — prázdny flyout by klamal.
 
 ### D-51: štandard rozmerov okien (UI-B1)
 

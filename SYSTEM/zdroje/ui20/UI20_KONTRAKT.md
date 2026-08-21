@@ -138,7 +138,12 @@ prešli Korpus · Vkladanie · Zóny · Čelá · Kovanie · Dielec, všetko sch
 
 **Kostra:** panel 470 px · rail 44 px (Korpus=skrinka ikona · Zóny=mriežka · Čelá=čelo s úchytkou ·
 Kovanie=hammer · dočasný Dielec s krížikom · FUNKČNÁ sekcia: ABS kontrola=shell so stavom a šípkou
-na 3-stavové nastavenie (zrkadlo D-105), **pod ňou Kontrola kresby=grain — obyčajný toggle bez
+na 3-stavové nastavenie (zrkadlo D-105) — **SPLNENÉ v0.7.28, vedomá odchýlka UI-B1 („nastavenie
+zatiaľ ostáva v okne Výroba") tým ZANIKÁ**; „šípka" je po Michalovom rozhodnutí (21.8.2026)
+**variant B — malý plný trojuholník v pravom dolnom rohu ikony** (flyout vzor nástrojov
+SketchUp/Photoshop), klikacia zóna je celý pravý dolný kvadrant tlačidla, ikona `shell` ostáva
+a toggle sa nemení; okno je **ten istý zdieľaný komponent a ten istý stav** ako chevron v okne
+Výroba (nikdy dve kópie naraz) — **pod ňou Kontrola kresby=grain — obyčajný toggle bez
 šípky (nie je čo nastavovať), zrkadlo prepínača „Smer kresby" v okne Výroba (K2/D-87, doplnené
 20.8.2026)** · dole koliesko=Nastavenia Inspectora · Štúdio=layers) ·
 obsah = 4 sektory: Náhľad · Základné · Materiály (len Korpus/Vkladanie) · Nastavenia (skupiny

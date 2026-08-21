@@ -48,7 +48,11 @@
       GRAIN = state || null;
       renderEdgeBar();
     },
-    setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; }
+    setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; },
+    // v0.7.28: to iste 3-stavove nastavenie sa da otvorit aj z railu Inspectora.
+    // Ked ho pouzivatel otvori tam, toto sa zavrie — na obrazovke nikdy nestoja
+    // dve kopie tych istych prepinacov.
+    closeEdgeMenu: function(){ edgeCheckMenuClose(); }
   };
 
   // ===================== VEPO export (V0.5 C) =====================
@@ -407,13 +411,15 @@
   // D-105 tvar: split tlacidlo (lava polovica = zap/vyp, prava = rozbalovacie
   // okno s tromi stavmi). Okno je OVERLAY pod tlacidlom — ziadny novy riadok
   // v layoute (vertikalny priestor je vzacny).
-  var EC_ROWS = [
-    { key: 'show_missing', state: 'missing', label: 'Chýba podľa pravidla' },
-    { key: 'show_extra',   state: 'extra',   label: 'Neolepené mimo pravidla' },
-    { key: 'show_taped',   state: 'taped',   label: 'Olepené' }
-  ];
+  //
+  // v0.7.28: samotne 3-stavove okno uz TU NEZIJE — je to ZDIELANY komponent
+  // (js/edge_menu.js), ktory to iste nastavenie kresli aj v raile Inspectora.
+  // Dva vstupne body, JEDEN markup a JEDEN stav (server).
+  var ECM = (typeof module !== 'undefined' && module.exports)
+    ? require('./edge_menu.js')            // Node testy
+    : (typeof window !== 'undefined' ? window.NXEdgeMenu : null);
 
-  function ecNum(v){ return (v == null || isNaN(v)) ? 0 : Number(v); }
+  function ecNum(v){ return ECM.num(v); }
 
   function edgeCheckBarHtml(st, menuOpen, grain){
     if (!st || !st.available){
@@ -479,35 +485,15 @@
     sketchup.grain_check_toggle(JSON.stringify(edgeCheckPayload(BOM)));
   }
 
-  // Rozbalovacie okno: tri stavy (checkbox + farebny stvorcek + nazov + ZIVY
-  // POCET) a pod zelenou odsadeny podriadeny prepinac „len vybrané".
+  // Rozbalovacie okno = ZDIELANY komponent (js/edge_menu.js). Okno Vyroba mu
+  // len povie, ktora funkcia posiela prepnutie do Ruby — markup, texty, farebne
+  // stvorceky aj zive pocty su spolocne s railom Inspectora.
   function edgeCheckMenuHtml(st, menuOpen){
-    var o = (st && st.options) || {};
-    var c = (st && st.counts) || null;
-    var h = '<div class="ecmenu' + (menuOpen ? ' open' : '') + '" id="ecMenu">';
-    EC_ROWS.forEach(function(r){
-      h += '<label class="ecopt"><input type="checkbox"' + (o[r.key] ? ' checked' : '') +
-           ' onchange="edgeCheckOption(\'' + r.key + '\', this.checked)">' +
-           '<i class="ecsw ecsw-' + r.state + '" aria-hidden="true"></i>' +
-           '<span>' + r.label + '</span>' +
-           '<b class="eccnt">' + (c ? ecNum(c[r.state]) : '—') + '</b></label>';
-      if (r.key !== 'show_taped') return;
-      h += '<label class="ecopt ecsub"><input type="checkbox"' +
-           (o.taped_selected_only ? ' checked' : '') +
-           ' onchange="edgeCheckOption(\'taped_selected_only\', this.checked)">' +
-           '<span>len vybrané</span>' +
-           (edgeCheckSelectionHint(st) ? '<b class="ecnote">označ skrinky v modeli</b>' : '') +
-           '</label>';
-    });
-    return h + '</div>';
+    return ECM.menuHtml(st, menuOpen, { fn: 'edgeCheckOption', id: 'ecMenu' });
   }
 
-  // Prazdny vyber pri zapnutom „len vybrané" = zelená sa nekreslí. Povedz to
-  // nahlas (tiché zobrazenie všetkého by klamalo).
   function edgeCheckSelectionHint(st){
-    if (!st || !st.active) return false;
-    var o = st.options || {};
-    return o.show_taped === true && o.taped_selected_only === true && st.selection_empty === true;
+    return ECM.selectionHint(st);
   }
 
   function edgeCheckText(st){
@@ -545,12 +531,10 @@
   }
 
   // D-105: klient posiela LEN kluc a boolean — o platnosti kluca aj o zapise
-  // rozhoduje server (whitelist + striktny boolean).
+  // rozhoduje server (whitelist + striktny boolean). Skladanie je v zdielanom
+  // komponente, aby rail Inspectora posielal BAJT-ROVNAKY tvar.
   function edgeCheckOptionPayload(bom, key, value){
-    var p = edgeCheckPayload(bom);
-    p.key = String(key == null ? '' : key);
-    p.value = value === true;
-    return p;
+    return ECM.optionPayload(edgeCheckPayload(bom), key, value);
   }
 
   function edgeCheckToggle(){
@@ -565,8 +549,13 @@
 
   // Otvorenie/zatvorenie rozbalovacieho okna je CISTO klientska vec (nikam sa
   // neuklada) — server ho neriesi; ecMenuOpen zije hore pri EDGE.
+  //
+  // v0.7.28: to iste nastavenie sa da otvorit aj z railu Inspectora. Aby na
+  // obrazovke nikdy neboli DVE kopie tych istych prepinacov, otvorenie tu
+  // zavrie to druhe (Ruby to len prepošle — ziadny stav, ziadny zapis).
   function edgeCheckMenuToggle(){
     ecMenuOpen = !ecMenuOpen;
+    if (ecMenuOpen && window.sketchup && sketchup.edge_menu_open) sketchup.edge_menu_open('');
     renderEdgeBar();
   }
 

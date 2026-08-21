@@ -125,6 +125,16 @@ module Noxun
           # zdielanu logiku ako toolbar aj okno Vyroba (Engine.toggle_edge_check)
           # — ziadny duplikat a ziadny zapis do modelu (lekcia D-103).
           cb(dlg, 'nx_edge_toggle')        { |p| handle_edge_toggle(p) }
+          # v0.7.28: 3-stavove nastavenie kontroly hran z ROHU ABS tlacidla.
+          # To iste nastavenie, ktore ma okno Vyroba pod chevronom — ide
+          # ZDIELANOU cestou Engine.set_edge_check_option (jeden zapis do
+          # %APPDATA%, jeden broadcast do oboch okien). Do modelu sa nezapisuje
+          # nic a nevznika krok Spat.
+          cb(dlg, 'nx_edge_option')        { |p| handle_edge_option(p) }
+          # Otvorenie rohoveho nastavenia zavrie to iste okno vo Vyrobe (a
+          # naopak) — na obrazovke nikdy nestoja dve kopie tych istych
+          # prepinacov. Cisto zobrazovacie: ziadny stav, ziadny zapis.
+          cb(dlg, 'nx_edge_menu_open')     { |_p| Engine.close_edge_menu(:panel) }
           # K2/D-87: KONTROLA KRESBY z raily Inspectora. Vola TU ISTU zdielanu
           # logiku ako okno Vyroba (Engine.toggle_grain_check) — jeden zdroj
           # stavu, dva vstupne body; ziadny zapis do modelu.

@@ -639,6 +639,34 @@
   .bomtab tr.bomrow:hover, .bomtab tr.hwrow:hover { background: var(--nx-select-bg); }
   .wbadge { background: var(--nx-warn); color: var(--nx-wbadge-fg); border-radius: 9px; padding: 0 6px;
             font-size: 11px; font-weight: 600; }
+
+  /* ===== D-105: ZDIELANE 3-STAVOVE NASTAVENIE KONTROLY HRAN ================
+     JEDNO nastavenie, DVA vstupne body — chevron v okne Vyroba (tab KONTROLA)
+     a rohovy trojuholnik pri ABS kontrole v raile Inspectora (v0.7.28). Markup
+     kresli zdielany js/edge_menu.js, preto su tieto pravidla ZAMERNE
+     NESCOPNUTE (`.nx-inspector` by ich pred oknom Vyroba schoval). Pozicovanie
+     je jediny rozdiel oboch miest — riesi ho modifikator `.ecmenu-rail` dole
+     v sekcii raily. Okno je vzdy OVERLAY (position: absolute), nikdy novy
+     riadok layoutu: vertikalny priestor je vzacny. */
+  .ecmenu { display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 5;
+            min-width: 250px; background: var(--nx-surface); border: 1px solid var(--nx-border);
+            border-radius: 8px; box-shadow: 0 4px 14px var(--nx-modal-shadow); padding: 5px 0; }
+  .ecmenu.open { display: block; }
+  .ecopt { display: flex; align-items: center; gap: 8px; padding: 4px 12px; font-size: 12px;
+           color: var(--nx-ink-label); cursor: pointer; }
+  .ecopt:hover { background: var(--nx-select-bg-soft); }
+  .ecopt input { accent-color: var(--nx-select); margin: 0; }
+  .ecopt > span { flex: 1; }
+  .ecopt .eccnt { font-variant-numeric: tabular-nums; color: var(--nx-ink-strong); }
+  /* Podriadeny prepinac patri VYHRADNE zelenej — odsadenie to hovori aj vizualne. */
+  .ecopt.ecsub { padding-left: 34px; font-size: 11.5px; color: var(--nx-ink-muted); }
+  .ecopt.ecsub .ecnote { font-weight: 400; font-size: 11px; color: var(--nx-warn-fg); }
+  /* Farebny stvorcek = presne farba plosky v modeli (EdgeCheck::COLORS). */
+  .ecsw { width: 11px; height: 11px; border-radius: 3px; flex: 0 0 auto; }
+  .ecsw-missing { background: var(--nx-edge-missing); }
+  .ecsw-extra { background: var(--nx-edge-extra); }
+  .ecsw-taped { background: var(--nx-edge-taped); }
+
   /* ===================================================================
      UI-B1 — KOSTRA INSPECTORA: rail (kontexty) + 4 sektory.
      VSETKY pravidla kostry su pod korenovou triedou `.nx-inspector`
@@ -683,6 +711,30 @@
             display: inline-flex; align-items: center; justify-content: center; }
   .nx-inspector .railtempbox .rx .ic { width: 9px; height: 9px; stroke-width: 3; }
   .nx-inspector .railtempbox .rx:hover { border-color: var(--nx-danger); color: var(--nx-danger); }
+  /* --- v0.7.28: FLYOUT ROH (ABS kontrola = toggle + 3-stavove nastavenie) ---
+     Vzor prevzaty z nastrojov SketchUpu/Photoshopu: maly PLNY trojuholnik
+     v pravom dolnom rohu ikony = „tu je este nastavenie". Trojuholnik je
+     ZNAMIENKO (pseudo-prvok prepinaca, 6 px), klikacia zona je CELY pravy
+     dolny KVADRANT tlacidla (17 x 16 px) — samotnych 6 px by bolo pre mys
+     neterc. Roh je SAMOSTATNE tlacidlo NAD prepinacom, takze klik nan sa
+     k toggle vobec nedostane (ziadne vnorene tlacidlo, ziadne bublanie). */
+  .nx-inspector .railfly { position: relative; flex: 0 0 auto; display: inline-flex; }
+  .nx-inspector .railfly .railbtn::after { content: ''; position: absolute; right: 3px; bottom: 3px;
+            width: 0; height: 0; border-left: 6px solid transparent;
+            border-bottom: 6px solid var(--nx-ink-faint); }
+  .nx-inspector .railfly .railbtn.on::after { border-bottom-color: var(--nx-select); }
+  .nx-inspector .railcorner { position: absolute; right: 0; bottom: 0; width: 17px; height: 16px;
+            padding: 0; border: 0; border-radius: 0 0 6px 0; background: none; cursor: pointer;
+            z-index: 2; }
+  /* Bublina rohu vychadza z jeho vlastneho rohu — musi stat vedla RAILY
+     (rovnaka os ako bubliny ostatnych tlacidiel), nie 20 px od nej. */
+  .nx-inspector .railcorner .railtip { left: 22px; top: auto; bottom: 0; transform: none; }
+  .nx-inspector .railcorner:hover .railtip, .nx-inspector .railcorner:focus .railtip { opacity: 1; }
+  .nx-inspector .railcorner[aria-disabled="true"] { cursor: default; }
+  /* Okno s nastavenim stoji PRI RAILE (vedla ikony), nie v strede obrazovky —
+     otvara sa tam, kam pouzivatel klikol. `.crail` nema overflow, takze
+     absolutne pozicovany potomok smie presahovat doprava nad obsah panela. */
+  .nx-inspector .ecmenu-rail { top: -6px; left: 40px; z-index: 60; }
   /* Bublina s popisom — rail je uzky, nazov kontextu sa don nezmesti. */
   .nx-inspector .railtip { position: absolute; left: 40px; top: 50%; transform: translateY(-50%);
             background: var(--nx-ink); color: var(--nx-on-accent); font-size: 11px; font-weight: 400;

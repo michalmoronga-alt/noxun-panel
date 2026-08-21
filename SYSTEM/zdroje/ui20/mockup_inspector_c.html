@@ -221,10 +221,14 @@
   .railbtn.fn .ic{color:var(--nx-ink-faint)}
   .railbtn.fn.on{background:var(--nx-select-bg)}
   .railbtn.fn.on .ic{color:var(--nx-select)}
-  .rarrow{position:absolute; right:1px; bottom:1px; width:13px; height:13px; display:inline-flex;
-          align-items:center; justify-content:center; border-radius:3px; color:var(--nx-ink-faint)}
-  .rarrow:hover{background:var(--nx-surface-sunken); color:var(--nx-select)}
-  .rarrow .ic{width:10px; height:10px}
+  /* Rozhodnutie Michal 21.8.2026 — VARIANT B: znamienko „je tu nastavenie" je
+     malý PLNÝ trojuholník v rohu (flyout vzor SketchUp/Photoshop), nie chevron.
+     Klikacia zóna je celý pravý dolný KVADRANT tlačidla (17 x 16 px), samotný
+     trojuholník má 6 px. Implementované vo v0.7.28. */
+  .rarrow{position:absolute; right:0; bottom:0; width:17px; height:16px; border-radius:0 0 6px 0}
+  .rarrow::after{content:''; position:absolute; right:3px; bottom:3px; width:0; height:0;
+          border-left:6px solid transparent; border-bottom:6px solid var(--nx-ink-faint)}
+  .railbtn.fn.on .rarrow::after{border-bottom-color:var(--nx-select)}
   .railfly{position:absolute; left:47px; top:212px; z-index:95; width:225px; background:var(--nx-surface);
            border:1px solid var(--nx-border); border-radius:6px; box-shadow:0 8px 22px var(--nx-modal-shadow); padding:5px}
   .flyrow{display:flex; align-items:center; gap:7px; padding:4px 6px; font-size:12px; color:var(--nx-ink)}
@@ -1319,8 +1323,8 @@ function render(){
       '<div class="raildiv"></div>' +
       '<button class="railbtn fn'+(S.absCheck?' on':'')+'" onclick="S.absCheck=!S.absCheck;S.absFly=false;render();toast(S.absCheck?\'ABS kontrola ZAPNUTÁ — hrany svietia v modeli\':\'ABS kontrola vypnutá\',\'shell\')">' +
         ico('shell') +
-        '<span class="rarrow" title="Nastavenie kontroly" onclick="event.stopPropagation();S.absFly=!S.absFly;render()">'+ico('chevron-down')+'</span>' +
-        '<span class="railtip">ABS kontrola hrán (D-104/105) — klik zapne, šípka nastaví</span></button>' +
+        '<span class="rarrow" title="Nastavenie ABS kontroly" onclick="event.stopPropagation();S.absFly=!S.absFly;render()"></span>' +
+        '<span class="railtip">ABS kontrola hrán (D-104/105) — klik zapne, roh nastaví</span></button>' +
       (S.absFly ? '<div class="railfly">' +
         '<div class="flyrow"><input type="checkbox" checked onclick="toast(\'Stav: chýba podľa pravidla\',\'check\')"><i style="background:var(--nx-edge-missing)"></i>chýba podľa pravidla <b>2</b></div>' +
         '<div class="flyrow"><input type="checkbox" onclick="toast(\'Stav: mimo pravidla\',\'check\')"><i style="background:var(--nx-edge-extra)"></i>neolepené mimo pravidla <b>1</b></div>' +

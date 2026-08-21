@@ -547,6 +547,10 @@
     // okno Vyroba (D-105) — panel si ZIADNY vlastny stav nedrzi, len zobrazuje
     // to, co posle server (klik z panela, z toolbaru aj z okna Vyroba).
     setEdgeCheck: function(state){ if (typeof nxApplyEdgeCheck === 'function') nxApplyEdgeCheck(state); },
+    // v0.7.28: to iste 3-stavove nastavenie sa da otvorit aj v okne Vyroba.
+    // Ked ho pouzivatel otvori tam, rohove okno v raile sa zavrie — na
+    // obrazovke nikdy nestoja dve kopie tych istych prepinacov.
+    closeEdgeMenu: function(){ if (typeof nxCloseEdgeMenu === 'function') nxCloseEdgeMenu(); },
     // K2/D-87: stav kontroly smeru kresby do raily. JEDEN zdroj stavu — ten
     // isty kanal pouziva okno Vyroba, takze prepnutie na jednom mieste je hned
     // vidiet aj na druhom (a naopak). Panel si nic nedrzi ani neprepocitava.

@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.7.27' unless defined?(VERSION)
+    VERSION = '0.7.28' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -235,6 +235,37 @@ module Noxun
       Panel.push_edge_check(state) if defined?(Panel)
     rescue StandardError => e
       log_error(e, 'Engine.broadcast_edge_check')
+    end
+
+    # --- v0.7.28: zdielane PREPNUTIE JEDNEHO STAVU (3-stavove nastavenie) ----
+    # Presny protajsok `toggle_edge_check`: JEDINE miesto, kde sa prepina, ktory
+    # stav olepu sa zvyrazni. Volaju ho OBA vstupne body — chevron v okne Vyroba
+    # (D-105) aj rohovy trojuholnik v raile Inspectora — takze sa nastavenie
+    # nemoze rozist a novy stav (aj s cerstvymi poctami) dostanu obe okna.
+    # Nastavenie zije v %APPDATA%, NIKDY v .skp: ziadna operacia, ziadny zapis
+    # do modelu, ziadny krok Spat.
+    # O platnosti kluca a striktnom booleane rozhoduje EdgeCheck.set_option.
+    def self.set_edge_check_option(key, value)
+      return nil unless defined?(EdgeCheck)
+
+      EdgeCheck.set_option(key, value)
+      state = EdgeCheck.ui_state(Sketchup.active_model)
+      broadcast_edge_check(state)
+      state
+    rescue StandardError => e
+      log_error(e, 'Engine.set_edge_check_option')
+      nil
+    end
+
+    # To iste nastavenie sa da otvorit z DVOCH miest. Aby na obrazovke nikdy
+    # nestali DVE kopie tych istych prepinacov, otvorenie na jednom mieste
+    # zavrie to druhe. Je to CISTO zobrazovacia vec — ziadny stav, ziadny zapis
+    # (`source` je okno, ktore prave otvorilo svoje).
+    def self.close_edge_menu(source)
+      ProductionDialog.close_edge_menu if source != :production && defined?(ProductionDialog)
+      Panel.close_edge_menu if source != :panel && defined?(Panel)
+    rescue StandardError => e
+      log_error(e, 'Engine.close_edge_menu')
     end
 
     # --- K2/D-87: zdielane prepnutie KONTROLY KRESBY -------------------------
