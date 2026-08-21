@@ -12,7 +12,7 @@
      Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
      bezpecne zdielatelny so satelitnymi oknami. -->
 <script>document.documentElement.className = 'nx-inspector';</script>
-<link rel="stylesheet" href="css/panel.css?v=0.7.26">
+<link rel="stylesheet" href="css/panel.css?v=0.7.27">
 
 <!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
      Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
@@ -39,6 +39,11 @@
        toolbar a okno Vyroba). Ziadny flyout — 3-stavove nastavenie ostava
        zatial v okne Vyroba. Ziadny zapis do modelu (lekcia D-103). -->
   <button type="button" id="railAbs" data-nx-usage="rail:abs" class="railbtn fn" onclick="onEdgeCheckToggle()" aria-pressed="false" aria-label="ABS kontrola hrán"><svg class="ic" aria-hidden="true"><use href="#i-shell"/></svg><span class="railtip" id="railAbsTip">ABS kontrola hrán — zvýrazní olep v modeli</span></button>
+  <!-- K2/D-87: KONTROLA KRESBY = druhy funkcny prepinac (to iste GrainCheck API
+       ako prepinac „Smer kresby" v okne Vyroba — jeden zdroj stavu, dva vstupne
+       body). Jednoduchy toggle bez sipky: nie je co nastavovat. Ziadny zapis do
+       modelu — kresli sa OVERLAY nad nim (lekcia D-103). -->
+  <button type="button" id="railKresba" data-nx-usage="rail:kresba" class="railbtn fn" onclick="onGrainCheckToggle()" aria-pressed="false" aria-label="Kontrola kresby"><svg class="ic" aria-hidden="true"><use href="#i-grain"/></svg><span class="railtip" id="railKresbaTip">Kontrola smeru kresby (zapnúť/vypnúť)</span></button>
   <span class="railgap"></span>
   <div class="raildiv"></div>
   <button type="button" id="railCfg" data-nx-usage="rail:nastavenia" class="railbtn" onclick="onInspectorSettings()" aria-label="Nastavenia Inspectora"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg><span class="railtip">Nastavenia Inspectora — téma, rozmerové rady, o plugine</span></button>
@@ -803,34 +808,34 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.7.26"></script>
+<script src="js/errors.js?v=0.7.27"></script>
 <!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
      jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
      pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
-<script src="js/win_fit.js?v=0.7.26"></script>
-<script src="js/icons.js?v=0.7.26"></script>
+<script src="js/win_fit.js?v=0.7.27"></script>
+<script src="js/icons.js?v=0.7.27"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.7.26"></script>
-<script src="js/core.js?v=0.7.26"></script>
-<script src="js/expr.js?v=0.7.26"></script>
-<script src="js/insert_state.js?v=0.7.26"></script>
-<script src="js/form.js?v=0.7.26"></script>
-<script src="js/zone_tree.js?v=0.7.26"></script>
-<script src="js/preview.js?v=0.7.26"></script>
+<script src="js/nx_combo.js?v=0.7.27"></script>
+<script src="js/core.js?v=0.7.27"></script>
+<script src="js/expr.js?v=0.7.27"></script>
+<script src="js/insert_state.js?v=0.7.27"></script>
+<script src="js/form.js?v=0.7.27"></script>
+<script src="js/zone_tree.js?v=0.7.27"></script>
+<script src="js/preview.js?v=0.7.27"></script>
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
-<script src="js/shell.js?v=0.7.26"></script>
-<script src="js/actions.js?v=0.7.26"></script>
+<script src="js/shell.js?v=0.7.27"></script>
+<script src="js/actions.js?v=0.7.27"></script>
 <!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
      bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
-<script src="js/settings.js?v=0.7.26"></script>
-<script src="js/bridge.js?v=0.7.26"></script>
-<script src="js/materials.js?v=0.7.26"></script>
-<script src="js/part_card.js?v=0.7.26"></script>
-<script src="js/board_card.js?v=0.7.26"></script>
-<script src="js/hardware.js?v=0.7.26"></script>
-<script src="js/usage.js?v=0.7.26"></script>
-<script src="js/boot.js?v=0.7.26"></script>
+<script src="js/settings.js?v=0.7.27"></script>
+<script src="js/bridge.js?v=0.7.27"></script>
+<script src="js/materials.js?v=0.7.27"></script>
+<script src="js/part_card.js?v=0.7.27"></script>
+<script src="js/board_card.js?v=0.7.27"></script>
+<script src="js/hardware.js?v=0.7.27"></script>
+<script src="js/usage.js?v=0.7.27"></script>
+<script src="js/boot.js?v=0.7.27"></script>

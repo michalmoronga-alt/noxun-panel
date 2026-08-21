@@ -20,7 +20,11 @@ UIB1_SHELL = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'shel
 UIB1_ICONS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'icons.js'), encoding: 'UTF-8')
 UIB1_BRIDGE = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'bridge.js'), encoding: 'UTF-8')
 
-UIB1_RAIL_IDS = %w[railKorpus railZony railCela railKovanie railTemp railAbs railCfg railStudio].freeze
+UIB1_RAIL_IDS = %w[railKorpus railZony railCela railKovanie railTemp railAbs railKresba
+                   railCfg railStudio].freeze
+# FUNKCNA sekcia raily (pod kontextami a docasnou polozkou). Poradie je
+# kontrakt: ABS kontrola hran, pod nou kontrola smeru kresby (K2/D-87).
+UIB1_RAIL_FN = %w[railAbs railKresba].freeze
 UIB1_CTX = %w[korpus zony cela kovanie].freeze
 
 # Guardy sa tykaju KODU, nie komentarov (v komentaroch tieto retazce zamerne
@@ -92,10 +96,38 @@ NxTest.test('UI-B1: rail pouziva vlastnu bublinu, nie nativny title') do
 end
 
 NxTest.test('UI-B1: ikony raily su v sprite icons.js') do
-  %w[cabinet front hammer shell slab].each do |icon|
+  %w[cabinet front hammer shell slab grain].each do |icon|
     NxTest.assert(UIB1_ICONS.include?("'#{icon}':"), "sprite nema ikonu '#{icon}'")
     NxTest.assert(UIB1_HTML.include?("#i-#{icon}"), "panel ikonu '#{icon}' nepouziva")
   end
+end
+
+NxTest.test('UI-B1/K2: FUNKCNA sekcia raily ma dva prepinace v danom poradi') do
+  # Funkcne ikony su tlmene a rozsvietia sa az po zapnuti — trieda `fn` je
+  # nositelom toho pravidla (CSS `.railbtn.fn .ic`). Bez nej by nova kontrola
+  # svietila vzdy a rail by tvrdil, ze je zapnuta.
+  pos = UIB1_RAIL_FN.map do |id|
+    tag = UIB1_HTML_CODE[/<button [^>]*id="#{id}"[^>]*>/].to_s
+    NxTest.refute(tag.empty?, "#{id}: funkcny prepinac chyba v raile")
+    NxTest.assert(tag.include?('class="railbtn fn"'), "#{id}: chyba trieda `fn` (tlmena ikona)")
+    NxTest.assert(tag.include?('aria-pressed="false"'), "#{id}: zapnutost musi vidiet aj citacka")
+    UIB1_HTML_CODE.index(tag)
+  end
+  NxTest.assert(pos[0] < pos[1], 'kontrola kresby stoji POD ABS kontrolou (kontrakt UI 2.0)')
+end
+
+NxTest.test('UI-B1/K2: prepinac kresby vola ZDIELANU cestu, nie vlastny kanal') do
+  btn = UIB1_HTML_CODE[/<button [^>]*id="railKresba"[^>]*>/].to_s
+  NxTest.assert(btn.include?('onclick="onGrainCheckToggle()"'), 'rail musi volat onGrainCheckToggle')
+  NxTest.assert(UIB1_SHELL_CODE.include?('sketchup.nx_grain_toggle'),
+                'shell.js posiela prepnutie do Ruby callbackom nx_grain_toggle')
+  NxTest.assert(UIB1_SHELL_CODE.include?('model_guid: nxModelGuid'),
+                'prepinac nesie identitu dokumentu (asynchronny callback HtmlDialogu)')
+  # Zobrazenie stavu je CISTA funkcia — DOM cast len nasadzuje jej vysledok.
+  NxTest.assert(UIB1_SHELL_CODE.include?('NXShell.grainRail(st)'),
+                'stav prisvietenia rozhoduje NXShell.grainRail (testovana v Node)')
+  NxTest.assert(UIB1_SHELL_CODE.include?('grainRail: grainRail'),
+                'grainRail sa exportuje (inak ju Node testy neuvidia)')
 end
 
 # --- 2) sektory a skupiny -----------------------------------------------------

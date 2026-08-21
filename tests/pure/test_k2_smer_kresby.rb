@@ -181,3 +181,70 @@ NxTest.test('K2: farba kresby sa NEMIESA so stavmi kontroly hrán') do
   NxTest.refute(states.include?(K2::COLOR.map(&:to_i)),
                 'farba smeru kresby sa zhoduje s niektorym stavom olepu')
 end
+
+# --- 7) JEDEN ZDROJ STAVU, DVA VSTUPNE BODY (v0.7.27, rail Inspectora) --------
+# Prepinac zije v raile aj v okne Vyroba. Keby si kazde okno prepinalo overlay
+# samo, stavy by sa rozisli: rail by tvrdil „zapnute" nad modelom, v ktorom uz
+# kresba nie je. Preto obe cesty vedu cez Engine.toggle_grain_check a citaju ten
+# isty GrainCheck.ui_state.
+
+K2_MAIN = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
+K2_PROD = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_dialog.rb'),
+                    encoding: 'UTF-8')
+K2_PANEL_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.rb'), encoding: 'UTF-8')
+K2_SYNC = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'sync.rb'), encoding: 'UTF-8')
+K2_ACT = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_materials.rb'),
+                   encoding: 'UTF-8')
+K2_CORE = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'grain_check.rb'),
+                    encoding: 'UTF-8')
+
+NxTest.test('K2: prepnutie ma JEDNU zdielanu cestu (Engine.toggle_grain_check)') do
+  shared = K2_MAIN[/def self\.toggle_grain_check.*?\n    end\n/m].to_s
+  NxTest.refute(shared.empty?, 'Engine.toggle_grain_check musi existovat')
+  NxTest.assert(shared.include?('GrainCheck.toggle('), 'zdielana cesta prepina samotny overlay')
+  NxTest.assert(shared.include?('broadcast_grain_check(state)'),
+                'po prepnuti sa stav VZDY rozposle (inak druhe okno ostane na starom)')
+  NxTest.assert(K2_PROD.include?('Engine.toggle_grain_check(model)'),
+                'okno Vyroba musi ist tou istou cestou (ziadny vlastny GrainCheck.toggle)')
+  NxTest.assert(K2_ACT.include?('Engine.toggle_grain_check(model)'),
+                'rail Inspectora musi ist tou istou cestou')
+end
+
+NxTest.test('K2: novy stav dostanu OBE okna (rail aj Vyroba)') do
+  cast = K2_MAIN[/def self\.broadcast_grain_check.*?\n    end\n/m].to_s
+  NxTest.refute(cast.empty?, 'Engine.broadcast_grain_check rozposiela novy stav')
+  NxTest.assert(cast.include?('ProductionDialog.push_grain_check(state)'),
+                'okno Vyroba musi dostat novy stav')
+  NxTest.assert(cast.include?('Panel.push_grain_check(state)'),
+                'rail Inspectora musi dostat novy stav')
+  NxTest.assert(cast.include?('defined?(ProductionDialog)') && cast.include?('defined?(Panel)'),
+                'push je defenzivny — zavrete okno ho ticho zahodi')
+  # Prepocet po prestavbe aj vypnutie pri prepnuti dokumentu idu TOU ISTOU
+  # cestou — inak by rail po Spat/Znova ukazoval stare cisla.
+  NxTest.assert(K2_CORE.include?('Engine.broadcast_grain_check'),
+                'GrainCheck po prepocte/zmene modelu rozposiela stav obom oknam')
+  NxTest.refute(K2_CORE.include?('ProductionDialog.push_grain_check'),
+                'core nesmie posielat stav LEN oknu Vyroba (rail by zamrzol)')
+end
+
+NxTest.test('K2: rail cita ten isty stav a nema vlastnu kopiu') do
+  NxTest.assert(K2_SYNC.include?('def grain_check_state'), 'Panel musi vediet stav prečítať')
+  NxTest.assert(K2_SYNC.include?('GrainCheck.ui_state(Sketchup.active_model)'),
+                'stav je VYHRADNE GrainCheck.ui_state — ziadny druhy vypocet')
+  NxTest.assert(K2_SYNC.include?('def push_grain_check'), 'Panel.push_grain_check je protajsok okna')
+  NxTest.assert(K2_SYNC.include?('grain_check: grain_check_state'),
+                'init panela nesie stav prepinaca (PULL pri otvoreni)')
+  NxTest.assert(K2_PANEL_RB.include?("cb(dlg, 'nx_grain_toggle')"),
+                'callback raily musi byt zaregistrovany')
+end
+
+NxTest.test('K2: rail ma identity guard dokumentu a NEZAPISUJE do modelu') do
+  h = K2_ACT[/def handle_grain_toggle.*?\n        end\n/m].to_s
+  NxTest.refute(h.empty?, 'handler raily musi existovat')
+  NxTest.assert(h.include?('GrainCheck.available?(model)'),
+                'starsi SketchUp bez Overlay API sa hlasi nahlas, nie tichym mrtvym tlacidlom')
+  NxTest.assert(h.include?("== model_guid(model)"),
+                'PRISNY guard dokumentu (asynchronny callback by zapol kresbu v cudzom modeli)')
+  NxTest.refute(h.include?('start_operation'), 'kresba je overlay NAD modelom — ziadna operacia')
+  NxTest.refute(h.include?('Store.set'), 'rail nesmie nic zapisat do modelu')
+end

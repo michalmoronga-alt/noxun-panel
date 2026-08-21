@@ -444,6 +444,8 @@
 <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
 <symbol id="i-profile" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="5" rx="1.5"/><path d="M6 8v13h12V8"/></symbol>
 <symbol id="i-slab" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="1.5"/><path d="M2 10h20"/></symbol>
+<!-- K2/D-87 (20.8.2026): kontrola smeru kresby — dielec so srafovanim, teda miniatura toho, co overlay kresli v modeli. -->
+<symbol id="i-grain" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="1.5"/><path d="M6 9.5h12"/><path d="M6 12h12"/><path d="M6 14.5h12"/></symbol>
 <symbol id="i-arr-h" viewBox="0 0 24 24"><path d="M8 8 4 12l4 4"/><path d="m16 8 4 4-4 4"/><path d="M4 12h16"/></symbol>
 <symbol id="i-arr-v" viewBox="0 0 24 24"><path d="m8 8 4-4 4 4"/><path d="m8 16 4 4 4-4"/><path d="M12 4v16"/></symbol>
 <symbol id="i-arr-d" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="M6 11v7h7"/><path d="M18 13V6h-7"/></symbol>
@@ -1325,6 +1327,11 @@ function render(){
         '<div class="flyrow"><input type="checkbox" onclick="toast(\'Stav: olepené\',\'check\')"><i style="background:var(--nx-edge-taped)"></i>olepené <b>18</b></div>' +
         '<div class="flyrow sub"><input type="checkbox" checked onclick="toast(\'Len vybrané\',\'check\')">len vybrané</div>' +
       '</div>' : '') +
+      /* K2/D-87 (20.8.2026): DRUHA funkcia raily — kontrola smeru kresby. Obycajny toggle
+         bez sipky (nie je co nastavovat) a stoji hned POD ABS kontrolou. */
+      '<button class="railbtn fn'+(S.grainCheck?' on':'')+'" onclick="S.grainCheck=!S.grainCheck;render();toast(S.grainCheck?\'Kontrola kresby ZAPNUTÁ — čiary smeru svietia v modeli\':\'Kontrola kresby vypnutá\',\'grain\')">' +
+        ico('grain') +
+        '<span class="railtip">Kontrola smeru kresby (zapnúť/vypnúť)</span></button>' +
       '<span style="flex:1"></span><div class="raildiv"></div>' +
       railBtn('cfg','settings','Nastavenia Inspectora — téma a menej používané') +
       '<button class="railbtn" onclick="toast(\'Otvorené Štúdio — kusovník, materiály, kontrola\',\'chevron-right\')" aria-label="Štúdio">' +

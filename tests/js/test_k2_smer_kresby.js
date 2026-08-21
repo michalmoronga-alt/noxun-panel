@@ -33,7 +33,7 @@ function grain(extra){
   ok(on.indexOf('gcbtn on') >= 0, 'zapnuty stav je na tlacidle');
   ok(on.indexOf('aria-pressed="true"') >= 0, 'zapnutost vidi aj citacka');
   ok(on.indexOf('Smer kresby') >= 0, 'nazov tlacidla');
-  ok(on.indexOf('#i-rows-3') >= 0, 'ikona zo spritu (ziadne emoji v ovladacom prvku)');
+  ok(on.indexOf('#i-grain') >= 0, 'ikona zo spritu — TA ISTA ako v raile (rovnaky vyznam = rovnaka kresba)');
   no(on.indexOf('ecmore') >= 0, 'smer kresby NEMA rozbalovacie okno — nie je co nastavovat');
 
   const off = P.grainBtnHtml(grain({ active: false, parts: null }));
@@ -92,6 +92,43 @@ function grain(extra){
 (function(){
   const p = P.edgeCheckPayload({ gen: 7, model_guid: 'G1' });
   eq(p, { gen: 7, model_guid: 'G1' }, 'smer kresby posiela TU ISTU identitu ako zvyraznenie hran');
+})();
+
+// --- prepinac v raile Inspectora (v0.7.27) ------------------------------------
+// Rail dostava PRESNE ten isty serverovy stav ako okno Vyroba (jeden zdroj
+// stavu, dva vstupne body). `NXShell.grainRail` je cista funkcia — z toho stavu
+// spravi prisvietenie a text bubliny; nic si neprepocitava ani nepamata.
+(function(){
+  const NXShell = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'shell.js'));
+
+  const on = NXShell.grainRail(grain());
+  eq(on.on, true, 'zapnuty stav prisvieti ikonu raily');
+  eq(on.available, true, 'dostupnost je zo servera');
+  ok(on.tip.indexOf('ZAPNUTÁ') >= 0, 'bublina povie, ze je kontrola zapnuta');
+  ok(on.tip.indexOf('12 dielcov s kresbou') >= 0, 'a nesie ZIVE cislo zo servera');
+
+  const off = NXShell.grainRail(grain({ active: false, parts: null }));
+  eq(off.on, false, 'vypnuty stav nesvieti');
+  eq(off.tip, 'Kontrola smeru kresby (zapnúť/vypnúť)', 'vypnuta bublina je pokyn, nie stav');
+
+  const skipped = NXShell.grainRail(grain({ parts: 4, skipped: 7 }));
+  ok(skipped.tip.indexOf('4 dielce s kresbou') >= 0, 'sklonovanie 2-4 je zhodne s oknom Vyroba');
+  ok(skipped.tip.indexOf('7 bez kresby') >= 0, 'preskocene dielce sa priznaju aj v raile');
+
+  // Stary SketchUp: tlacidlo NIE JE ticho mrtve — povie preco (vzor D-78).
+  const na = NXShell.grainRail({ available: false, active: true });
+  eq(na.available, false, 'bez Overlay API je prepinac neaktivny');
+  eq(na.on, false, 'nedostupna kontrola NIKDY nesvieti ako zapnuta');
+  ok(na.tip.indexOf('SketchUp 2023') >= 0, 'bublina povie dovod');
+
+  // Chybajuci stav = zhasnuty prepinac (radsej nic nez nahodne „zapnute").
+  eq(NXShell.grainRail(null).on, false, 'bez stavu prepinac nesvieti');
+  eq(NXShell.grainRail(null).available, true, 'a ostava klikatelny (server odpovie sam)');
+
+  // Sklonovanie je ZRKADLO Ruby `grain_part_plural` aj JS okna Vyroba.
+  [1, 2, 4, 5, 0].forEach(function(v){
+    eq(NXShell.grainPartWord(v), P.grainPartPluralSk(v), 'sklonovanie ' + v + ' sedi s oknom Vyroba');
+  });
 })();
 
 console.log(`test_k2_smer_kresby.js OK (${n} kontrol)`);

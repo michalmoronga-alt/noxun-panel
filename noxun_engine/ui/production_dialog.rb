@@ -437,8 +437,10 @@ module Noxun
           model = Sketchup.active_model
           return unless grain_check_guard(data, model)
 
-          state = GrainCheck.toggle(model)
-          push_grain_check(state)
+          # ZDIELANA cesta (v0.7.27) — presne ta ista, akou prepina rail
+          # Inspectora. Rozposlanie stavu robi `broadcast_grain_check`, takze
+          # sa dva vstupne body nemozu rozist.
+          state = Engine.toggle_grain_check(model)
           set_status(grain_check_status(state))
         rescue StandardError => e
           Engine.log_error(e, 'ProductionDialog.do_grain_check')

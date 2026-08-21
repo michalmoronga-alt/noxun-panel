@@ -56,6 +56,10 @@ module Noxun
             # pri otvoreni panela; dalsie zmeny chodia pushom (push_edge_check)
             # z panela, z toolbaru aj z okna Vyroba. CISTE CITANIE.
             edge_check: edge_check_state,
+            # K2/D-87: stav kontroly smeru kresby pre druhu funkcnu ikonu raily.
+            # Ten isty vzor ako `edge_check` — PULL pri otvoreni panela, dalsie
+            # zmeny pushom (z raily aj z okna Vyroba). CISTE CITANIE.
+            grain_check: grain_check_state,
             # UI-B3 (koliesko): nastavenia POCITACA — rozmerove rady (N6) pre
             # ponuky pri rozmeroch a meno aktualnej temy pre prepinac vzhladu.
             # Nie su to data zakazky (ziju v %APPDATA%, nikdy v .skp).
@@ -88,6 +92,30 @@ module Noxun
           js("if (window.NX && NX.setEdgeCheck) NX.setEdgeCheck(#{st.to_json});")
         rescue StandardError => e
           Engine.log_error(e, 'Panel.push_edge_check')
+        end
+
+        # K2/D-87: stav kontroly smeru kresby pre rail. Nedostupny/nenacitany
+        # GrainCheck (SketchUp bez Overlay API) = ikona zosedne, panel sa tym
+        # nezhodi. Cisla sklada VYHRADNE server (`GrainCheck.ui_state`).
+        def grain_check_state
+          return { 'available' => false, 'active' => false } unless defined?(GrainCheck)
+
+          GrainCheck.ui_state(Sketchup.active_model)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.grain_check_state')
+          { 'available' => false, 'active' => false }
+        end
+
+        # Protajsok ProductionDialog#push_grain_check. Vola ho
+        # Engine.broadcast_grain_check (klik z raily aj z okna Vyroba) a
+        # GrainCheck po prepocte cache (prestavba pri zapnutej kresbe).
+        def push_grain_check(state = nil)
+          return unless dialog_alive?
+
+          st = state || grain_check_state
+          js("if (window.NX && NX.setGrainCheck) NX.setGrainCheck(#{st.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.push_grain_check')
         end
 
         # dedup: false = refresh po programovom selecte z okna Vyroba (V0.5 B,

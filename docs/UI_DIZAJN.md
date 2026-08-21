@@ -287,10 +287,14 @@ s existujúcim `columns-2` tvoria štvoricu „2/3 stĺpce · 2/3 riadky“),
 a „Bez čela“ `front`),
 `edge` (UI-D1 — hrana dielca v karte: plná hrubšia čiara = hrana, o ktorej
 riadok hovorí, ostatné tri sú prerušované. **Jedna kresba, štyri rotácie**
-cez `data-rot` v CSS — nikdy štyri ikony).
+cez `data-rot` v CSS — nikdy štyri ikony),
+`grain` (K2/D-87 — kontrola smeru kresby: dielec naležato so **šrafovaním**,
+teda miniatúra toho, čo overlay kreslí v modeli; čiary nedobiehajú k hrane
+rovnako ako v `core/grain_check.rb`. **Jedna kresba pre obe miesta** — rail
+Inspectora aj prepínač „Smer kresby" v okne Výroba).
 
-> **Inventár je úplný k v0.7.20** (blok UI-D uzavretý): zoznam vyššie zodpovedá
-> kľúčom v `icons.js` 1:1. Nová ikona sa pridáva **len keď pre ňu neexistuje
+> **Inventár je úplný k v0.7.27** (blok UI-D uzavretý, `grain` doplnený dávkou
+> „Kontrola kresby v raile"): zoznam vyššie zodpovedá kľúčom v `icons.js` 1:1. Nová ikona sa pridáva **len keď pre ňu neexistuje
 > významovo správna existujúca** — UI-D3 napríklad nepridalo žiadnu, oko
 > warnpanelu je ten istý `eye` ako „Označiť v modeli" v karte dielca (rovnaký
 > význam = rovnaká kresba).
@@ -473,9 +477,13 @@ sektoroch**. Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html
 
 - **Rail (44 px, fixný ľavý stĺpec):** kontexty **Korpus · Zóny · Čelá · Kovanie**
   → pod oddeľovačom **dočasná položka** (označený dielec / doska, prerušovaný
-  rámik + krížik) → **funkčná sekcia** (ABS kontrola hrán) → dole **koliesko**
+  rámik + krížik) → **funkčná sekcia** (ABS kontrola hrán, pod ňou **Kontrola
+  kresby** — obyčajný toggle bez šípky, nie je čo nastavovať) → dole **koliesko**
   (Nastavenia Inspectora) a **Štúdio**. Aktívny kontext je teal, funkčné ikony sú
-  tlmené a rozsvietia sa až po zapnutí. Rail je úzky, preto názov nesie **bublina
+  tlmené a rozsvietia sa až po zapnutí. **Funkčný prepínač, ktorý má druhý domov
+  (okno Výroba), NIKDY nemá druhý stav:** rail aj okno volajú tú istú serverovú
+  cestu a zobrazujú ten istý stav, takže zapnutie na jednom mieste je hneď vidieť
+  na druhom (ABS kontrola aj Kontrola kresby). Rail je úzky, preto názov nesie **bublina
   pri hoveri** (`.railtip`) — nie natívny `title`, aby sa nezobrazovali dva
   tooltipy naraz.
 - **Kontexty platia LEN nad označeným korpusom.** Pri dielci, doske aj vkladaní
