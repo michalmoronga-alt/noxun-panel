@@ -38,6 +38,7 @@ GitHub Codex review beží automaticky na každý PR. **Nálezy sú v REVIEW THR
 ## Pasce
 
 - **Fix push nespúšťa nové kolo** — bez `@codex review` komentára čakáš na niečo, čo nebeží. Prvé kolo po `gh pr create` je jediné automatické.
+- **Ani prvé kolo nie je isté:** keď bot namiesto 👀 odpovie „To use Codex here, create an environment for this repo" (stalo sa na PR #186), automatické kolo NEBEŽÍ — vyžiadaj ho tým istým komentárom `@codex review` a budík počítaj odtiaľ. Preto sa stav vždy OVERUJE, nikdy sa nepredpokladá.
 - MERGED v `gh pr list` ≠ obsah v maine — po mergi vždy `git fetch` + `git log origin/main`.
 - Stacked PR: ak base vetva nebola zmazaná, over `gh pr view <N> --json baseRefName` a prípadne `gh pr edit <N> --base main`. (Repo má „Delete branch on merge" zapnuté, takže pasca hrozí len pri ručne vytvorených reťaziach.)
 - Slovenský text do PR/replies vždy cez `--body-file` alebo `-f body=` (nie here-string v PowerShelli).
