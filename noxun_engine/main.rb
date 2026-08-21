@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.7.25' unless defined?(VERSION)
+    VERSION = '0.7.26' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -346,7 +346,8 @@ Sketchup.require 'noxun_engine/core/debug'         # read-only diagnostika stavu
 Sketchup.require 'noxun_engine/core/validation'    # V0.5 D kontrolny semafor vyroby (RED/ORANGE)
 Sketchup.require 'noxun_engine/core/edge_check'     # D-104 kontrola hran (po validation — zdiela jeho definicie UNI/nelepitelnych)
 Sketchup.require 'noxun_engine/core/hover_edge'     # D-89a hrana pod kurzorom (pred edge_overlay — ten definuje jej Overlay triedu)
-Sketchup.require 'noxun_engine/core/edge_overlay'   # D-104 Sketchup::Overlay + ModelObserver (SU 2023+, guardovane) + D-89a HoverEdgeOverlay
+Sketchup.require 'noxun_engine/core/grain_check'    # K2/D-87 smer kresby (po edge_check — zdiela jeho prechod modelom; pred edge_overlay)
+Sketchup.require 'noxun_engine/core/edge_overlay'   # D-104 Sketchup::Overlay + ModelObserver (SU 2023+, guardovane) + D-89a HoverEdgeOverlay + K2 GrainOverlay
 Sketchup.require 'noxun_engine/core/supplier_settings' # V0.6 E-a: sadzby/rezimy/standardne riadky rozpoctu (globál)
 Sketchup.require 'noxun_engine/core/budget_store'  # V0.6 E-a: data rozpoctu v zakazke (po store + supplier_settings)
 Sketchup.require 'noxun_engine/core/budget'        # V0.6 E-a: vypocet rozpoctu (po bom/sheet_estimate/budget_store)

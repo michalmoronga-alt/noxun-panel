@@ -4558,6 +4558,175 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # ===== K2 / D-87: VIZUALNA KONTROLA SMERU KRESBY ==========================
+  # Overuje to, co headless sada NEVIE: zivotny cyklus overlayu v modeli, ze
+  # zapnutie NEVYROBI krok Spat ani nezmeni model, ze kresba naozaj sleduje
+  # snapshot dielca (aj po prestavbe s prepnutym smerom) a ze po vypnuti
+  # nic neostane.
+
+  def k2_overlay_present?(model)
+    return false unless model.respond_to?(:overlays)
+    model.overlays.to_a.any? { |o| o.respond_to?(:overlay_id) && o.overlay_id.to_s == e::GrainCheck::OVERLAY_ID }
+  end
+
+  def k2_state(model)
+    e::GrainCheck.ui_state(model)
+  end
+
+  # Zaznam kresby konkretneho VYSKYTU dielca zo scan cache.
+  def k2_occ(part)
+    cache = e::GrainCheck.instance_variable_get(:@cache)
+    pid = part && part.valid? && part.respond_to?(:entityID) ? part.entityID : nil
+    return nil if pid.nil?
+    Array(cache ? cache['occurrences'] : []).find { |o| o['part'] == pid }
+  end
+
+  # Dominantna OS prvej usecky dielca (0=X, 1=Y, 2=Z) alebo nil.
+  def k2_axis_of(part)
+    occ = k2_occ(part)
+    return nil unless occ && Array(occ['lines']).length >= 2
+    v = occ['lines'][1] - occ['lines'][0]
+    comps = [v.x.to_f.abs, v.y.to_f.abs, v.z.to_f.abs]
+    comps.index(comps.max)
+  end
+
+  def k2_lines_of(part)
+    occ = k2_occ(part)
+    occ ? Array(occ['lines']).length / 2 : 0
+  end
+
+  def run_k2(model)
+    unless e::GrainCheck.available?(model)
+      info('K2: SketchUp bez Overlay API (SU 2022 a starsi) — sekcia preskocena')
+      return
+    end
+    cleanup(model)
+    tmp = File.join(Dir.tmpdir, "noxun_k2_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(k1_catalog_json))
+    e::Materials.test_dir_override = tmp
+    e::Materials.reload!
+    begin
+      # 1) pred zapnutim: dostupne, vypnute, ziadne cisla
+      st = k2_state(model)
+      ok('K2: pred zapnutim je kresba smeru vypnuta a bez poctov',
+         st['available'] == true && st['active'] == false && st['parts'].nil?)
+
+      inst = e::CabinetBuilder.build(model, k1_params)
+      return ok('K2: vlozenie korpusu', false) unless inst
+
+      cid = e::Store.get(inst, 'cabinet_id').to_s
+      guid = e::Panel.model_guid(model)
+      front = k1_part(inst, 'front_door')
+      return ok('K2: korpus ma celo', false) unless front
+
+      fkey = e::Store.get(front, 'part_key').to_s
+      cfg_before = e::Store.get(inst, 'config').to_s
+      ents_before = model.entities.length
+
+      # 2) ZAPNUTIE: overlay v modeli, dielce sa kreslia, MODEL SA NEZMENIL
+      st = e::GrainCheck.toggle(model)
+      ok("K2: po zapnuti je overlay zaregistrovany a kresli (#{st['parts']} dielcov, #{st['lines']} ciar)",
+         st['active'] == true && k2_overlay_present?(model) && st['parts'].to_i.positive?)
+      ok('K2: zapnutie NEZMENILO model (ziadna nova entita, config skrinky bajt-presne rovnaky)',
+         model.entities.length == ents_before && e::Store.get(inst, 'config').to_s == cfg_before)
+      ok('K2: prepinac sa zapamatal (%APPDATA%, nie .skp)', e::GrainCheck.remembered? == true)
+
+      # 3) SMER Z SNAPSHOTU: dekor s kresbou po dlzke => ciary po VYSKE cela
+      axis_len = k2_axis_of(front)
+      lines_len = k2_lines_of(front)
+      ok("K2: celo s pozdlznou kresbou ma ciary po VYSKE (os #{axis_len}, #{lines_len} ciar)",
+         axis_len == 2 && lines_len.positive?)
+      ok('K2: ciary su na OBOCH dekorovych plochach (parny pocet)', lines_len.even?)
+
+      # 4) OVERRIDE „priecna" (cesta K1) => ciary sa otocia KOLMO
+      e::Panel.select_only(model, front)
+      e::Panel.handle_set_part_grain({ 'role_key' => fkey, 'grain' => 'width',
+                                       'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      front2 = k1_part(inst, 'front_door')
+      e::GrainCheck.refresh!(model)
+      axis_wid = k2_axis_of(front2)
+      ok("K2: po prepnuti na PRIECNU sa kresba otocila kolmo (#{axis_len} -> #{axis_wid})",
+         axis_wid == 0 && axis_wid != axis_len)
+      ok('K2: ostatne dielce (bez overridu) svoj smer nezmenili',
+         k2_axis_of(k1_part(inst, 'side_left')) == 2)
+
+      # 5) ZIADNY UNDO KROK: posledna transakcia je PRESTAVBA, nie zapnutie
+      Sketchup.undo
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      ok('K2: 1x Spat vratil prestavbu (kresba smeru nie je undo krok)',
+         k1_grain_of(inst, 'front_door') == 'length')
+      e::GrainCheck.refresh!(model)
+      ok('K2: a kresba sa po Spat vratila po vyske',
+         k2_axis_of(k1_part(inst, 'front_door')) == 2)
+
+      # 6) MATERIAL BEZ KRESBY sa preskoci (nie je co kreslit)
+      parts_before = k2_state(model)['parts'].to_i
+      skipped_before = k2_state(model)['skipped'].to_i
+      uni = e::BoardBuilder.build(model, { 'material_id' => 'K1UNI18', 'length' => 800.0,
+                                           'width' => 400.0 })
+      e::GrainCheck.refresh!(model)
+      st = k2_state(model)
+      ok("K2: UNI doska sa NEKRESLI, ale prizna sa (kresli #{st['parts']}, preskocene #{st['skipped']})",
+         uni && st['parts'].to_i == parts_before && st['skipped'].to_i == skipped_before + 1 &&
+         k2_lines_of(uni).zero?)
+
+      # 7) DOSKA S DEKOROM sa kresli (samostatna doska, nie len dielce korpusu)
+      dub = e::BoardBuilder.build(model, { 'material_id' => 'K1DUB18', 'length' => 800.0,
+                                           'width' => 400.0 })
+      e::GrainCheck.refresh!(model)
+      ok("K2: samostatna doska s dekorom sa kresli tiez (#{k2_lines_of(dub)} ciar)",
+         dub && k2_lines_of(dub).positive?)
+      uni.erase! if uni && uni.valid?
+      dub.erase! if dub && dub.valid?
+
+      # 8) VYPNUTIE: overlay prec, ziadne cisla, zapamatane vypnute
+      st = e::GrainCheck.toggle(model)
+      ok('K2: po vypnuti nie je overlay v modeli a stav je cisty',
+         st['active'] == false && st['parts'].nil? && !k2_overlay_present?(model))
+      ok('K2: vypnutie sa zapamatalo', e::GrainCheck.remembered? == false)
+
+      # 9) ON -> OFF -> ON v tom istom modeli (odstraneny Overlay je navzdy neplatny)
+      st = e::GrainCheck.toggle(model)
+      ok('K2: opatovne zapnutie v tom istom modeli funguje (nova instancia overlayu)',
+         st['active'] == true && k2_overlay_present?(model) && st['parts'].to_i.positive?)
+
+      # 10) OBNOVA ZAPAMATANEHO PREPINACA (otvorenie okna Vyroba)
+      e::GrainCheck.disable!
+      ok('K2: po disable! overlay v modeli nie je', !k2_overlay_present?(model))
+      st = e::GrainCheck.restore!(model)
+      ok('K2: zapamatany prepinac sa pri otvoreni okna obnovi',
+         st['active'] == true && k2_overlay_present?(model))
+      e::GrainCheck.toggle(model) # vypni + zapamataj vypnute (cisty stol pre dalsie behy)
+      ok('K2: cleanup prepinaca (vypnuty, nezapamatany)',
+         e::GrainCheck.remembered? == false && !k2_overlay_present?(model))
+    ensure
+      begin
+        e::GrainCheck.disable!
+        e::GrainCheck.remember!(false)
+      rescue StandardError
+        nil
+      end
+      e::Materials.test_dir_override = nil
+      e::Materials.reload!
+      cleanup(model)
+      begin
+        FileUtils.rm_rf(tmp)
+      rescue StandardError
+        nil
+      end
+    end
+    ok('K2: cleanup (override prec, overlay prec, model prazdny)',
+       e::Materials.test_dir_override.nil? && !k2_overlay_present?(model) &&
+       cabinets(model).empty? && boards(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: K2 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    e::Materials.test_dir_override = nil
+    e::Materials.reload!
+    cleanup(model)
+  end
+
   def run_smoke1(model)
     cleanup(model)
     tp = e::TemplatePreviews
@@ -5310,6 +5479,7 @@ module NoxunSuRunner
     run_uic4(model)          # UI-C4: kovanie — oznacenie vlastnika polozky v modeli (guardy, ziadny undo krok)
     run_uid1(model)          # UI-D1: dielec — „Použiť na podobné" (zapis do viacerych dielcov, 1 undo) + „Označiť v modeli"
     run_k1(model)            # K1/D-108: smer dekoru per dielec — 1 undo, geometria a D-88 nedotknute, VEPO otocene
+    run_k2(model)            # K2/D-87: kresba smeru v modeli — lifecycle overlayu, ziadny undo krok, otocenie po prestavbe
     run_uid2(model)          # UI-D2: PNG nahlady sablon — capture, KOMPLETNA obnova kamery (persp. aj orto), ziadny undo krok
     run_smoke1(model)        # SMOKE PACK 1 (6A): rucne odfotenie nahladu k ULOZENEJ sablone — guardy vyberu, ziadny undo krok
     run_async(model, nil)

@@ -4,7 +4,7 @@
      V0.6 E-b: pribudol tab ROZPOCET (js/budget.js) — jediny tab, ktory model
      MENI (data rozpoctu v NOXUN dict na modeli, kazda zmena = 1 undo krok). -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.7.25">
+<link rel="stylesheet" href="css/panel.css?v=0.7.26">
 <!-- V0.5 D: styly semaforu ZAMERNE inline v production.html (NIE v zdielanom
      panel.css — paralelna davka D-29 ho meni; ziadny cache-bust konflikt). -->
 <style>
@@ -35,11 +35,18 @@
   .ecbar.ecoff { font-size: 11.5px; color: var(--nx-ink-faint); }
   /* Split tlacidlo: lava polovica = zap/vyp, prava (uzsia) = nastavenie. */
   .ecsplit { position: relative; display: inline-flex; }
-  .ecsplit .ecbtn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
+  /* K2/D-87: „Smer kresby" je v TEJ ISTEJ vizualnej rodine ako „Zvýrazniť
+     hrany" — rovnaké tlačidlo, len bez pravej polovice s nastavením (nemá čo
+     nastavovať). Preto zdieľa deklarácie a líši sa iba zaoblením. */
+  .ecsplit .ecbtn, .ecbar .gcbtn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
                     padding: 5px 11px; white-space: nowrap; cursor: pointer; font: inherit;
                     font-size: 12px; background: var(--nx-surface-sunken);
                     color: var(--nx-ink-strong); border: 1px solid var(--nx-border); }
-  .ecsplit .ecbtn:hover { background: var(--nx-ghost-hover); }
+  .ecsplit .ecbtn:hover, .ecbar .gcbtn:hover { background: var(--nx-ghost-hover); }
+  .ecbar .gcbtn { border-radius: 6px; }
+  .ecbar .gcbtn.on { background: var(--nx-select); color: var(--nx-on-accent); border-color: var(--nx-select); }
+  .ecbar .gcbtn.on:hover { background: var(--nx-select-strong); }
+  .ecbar .gcbtn .ic { width: 14px; height: 14px; }
   .ecsplit .ecmain { border-radius: 6px 0 0 6px; border-right: 0; }
   .ecsplit .ecmore { border-radius: 0 6px 6px 0; padding: 5px 7px; }
   .ecsplit .ecbtn.on { background: var(--nx-select); color: var(--nx-on-accent); border-color: var(--nx-select); }
@@ -240,17 +247,17 @@
 <div id="prodBody" class="prodbody"><div class="muted">Načítavam…</div></div>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.7.25"></script>
+<script src="js/errors.js?v=0.7.26"></script>
 <!-- D-77: minimalna OBSAHOVA velkost okna pri otvoreni (js/win_fit.js). Tabulky
      kusovnika a rozpoctu maju editovatelne bunky a stlpec akcii vpravo — v uzkom
      okne konci prava cast riadku mimo. -->
 <script>window.NX_FIT_MIN = { w: 640, h: 540 };</script>
-<script src="js/win_fit.js?v=0.7.25"></script>
+<script src="js/win_fit.js?v=0.7.26"></script>
 <!-- D-83: sprite ikon (ziadne emoji v ovladacich prvkoch) — akcia „Nahradiť UNI…"
      v riadku KONTROLY. Musi byt PRED production.js (renderControl pouziva <use>). -->
-<script src="js/icons.js?v=0.7.25"></script>
-<script src="js/production.js?v=0.7.25"></script>
+<script src="js/icons.js?v=0.7.26"></script>
+<script src="js/production.js?v=0.7.26"></script>
 <!-- V0.6 E-b: tab Rozpocet. Az ZA production.js — cita jeho globalny BOM a
      vola renderBody()/NX.setStatus(); production.js volá renderBudget() az pri
      prepnuti tabu, takze poradie definicii sedi. -->
-<script src="js/budget.js?v=0.7.25"></script>
+<script src="js/budget.js?v=0.7.26"></script>

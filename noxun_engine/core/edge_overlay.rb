@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 # Noxun Engine — D-104/D-105: SketchUp objekty kontroly hran (Overlay +
-# ModelObserver + SelectionObserver).
-# Logika a stav ziju v core/edge_check.rb; tu su LEN tenke SketchUp obaly.
+# ModelObserver + SelectionObserver) + D-89a hover hrany + K2/D-87 smer kresby.
+# Logika a stav ziju v core/edge_check.rb, core/hover_edge.rb a
+# core/grain_check.rb; tu su LEN tenke SketchUp obaly.
 #
 # Cely subor je pod guardom `defined?(Sketchup::Overlay)` — Overlay API prislo v
 # SketchUp 2023. Na starsom SketchUpe (a v headless testoch) trieda vobec
@@ -87,6 +88,52 @@ module Noxun
 
         def onTransactionAbort(model) # rubocop:disable Naming/MethodName — SketchUp API
           EdgeCheck.mark_dirty(model)
+        end
+      end
+
+      # K2 / D-87: SMER KRESBY. Vlastny overlay (nie dalsi stav D-104) — hovori
+      # o INEJ veci: „takto bezie kresba dekoru", nie o stave olepu. Logika a
+      # stav ziju v core/grain_check.rb.
+      class GrainOverlay < Sketchup::Overlay
+        def initialize
+          super(GrainCheck::OVERLAY_ID, GrainCheck::OVERLAY_NAME,
+                description: 'Ciary v smere kresby dekoru na vyrobnych dielcoch — ' \
+                             'vizualna kontrola orientacie zakazky (K2/D-87).')
+        end
+
+        def draw(view)
+          GrainCheck.draw(view)
+        rescue StandardError => e
+          Engine.log_error(e, 'GrainOverlay#draw')
+          nil
+        end
+
+        def getExtents # rubocop:disable Naming/MethodName — SketchUp API
+          GrainCheck.extents(respond_to?(:model) ? model : nil)
+        rescue StandardError => e
+          Engine.log_error(e, 'GrainOverlay#getExtents')
+          Geom::BoundingBox.new
+        end
+      end
+
+      # K2: prestavba skrinky (alebo Spat/Znova) meni smer aj geometriu dielcov
+      # — cache kresby je vtedy stara. V callbacku sa NIC neskenuje ani nemeni
+      # (SketchUp to v observeroch zakazuje): len dirty + ziadost o prekreslenie.
+      class GrainModelWatch < Sketchup::ModelObserver
+        def onTransactionCommit(model) # rubocop:disable Naming/MethodName — SketchUp API
+          GrainCheck.mark_dirty(model)
+        end
+
+        def onTransactionUndo(model) # rubocop:disable Naming/MethodName — SketchUp API
+          GrainCheck.mark_dirty(model)
+        end
+
+        def onTransactionRedo(model) # rubocop:disable Naming/MethodName — SketchUp API
+          GrainCheck.mark_dirty(model)
+        end
+
+        def onTransactionAbort(model) # rubocop:disable Naming/MethodName — SketchUp API
+          GrainCheck.mark_dirty(model)
         end
       end
 
