@@ -125,6 +125,10 @@ module Noxun
           # zdielanu logiku ako toolbar aj okno Vyroba (Engine.toggle_edge_check)
           # — ziadny duplikat a ziadny zapis do modelu (lekcia D-103).
           cb(dlg, 'nx_edge_toggle')        { |p| handle_edge_toggle(p) }
+          # K2/D-87: KONTROLA KRESBY z raily Inspectora. Vola TU ISTU zdielanu
+          # logiku ako okno Vyroba (Engine.toggle_grain_check) — jeden zdroj
+          # stavu, dva vstupne body; ziadny zapis do modelu.
+          cb(dlg, 'nx_grain_toggle')       { |p| handle_grain_toggle(p) }
           # D-89a: hover nad hranou v karte dielca rozsvieti tu istu hranu v
           # MODELI. Overlay NAD modelom — ziadna operacia, ziadny krok Spat.
           cb(dlg, 'nx_hover_edge')         { |p| handle_hover_edge(p) }

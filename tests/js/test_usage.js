@@ -74,6 +74,7 @@ eq(usage.clickKey(fakeBtn), 'railFake', 'kluc mimo allowlistu NESMIE prejst — 
 eq(usage.declaredKey(fakeBtn), null, 'declaredKey odmieta hodnotu mimo allowlistu');
 eq(usage.declaredKey(railBtn), 'rail:zony', 'declaredKey pusti len allowlist');
 eq(usage.USAGE_KEYS.indexOf('rail:abs') >= 0, true, 'ABS kontrola ma vlastny kluc');
+eq(usage.USAGE_KEYS.indexOf('rail:kresba') >= 0, true, 'kontrola kresby ma VLASTNY kluc (nie spolocny s ABS)');
 
 // --- sec: kluce (sektory S1–S4 aj skupiny) ---
 const details = elm('DETAILS', { attrs: { 'data-key': 'fronts' } });

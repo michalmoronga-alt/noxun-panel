@@ -29,7 +29,11 @@
   // UI-B3: rozmerove rady (sipka pri poli) a klikatelny informacny stlpec —
   // merac tak povie, ci sa rady naozaj pouzivaju a ktore udaje lakaju na klik.
   var USAGE_KEYS = ['rail:korpus', 'rail:zony', 'rail:cela', 'rail:kovanie',
-                    'rail:zrusit', 'rail:abs', 'rail:nastavenia', 'rail:studio',
+                    // K2/D-87: `rail:kresba` = kontrola smeru kresby. Vlastny
+                    // kluc vedla `rail:abs` — merac povie, ktoru z dvoch
+                    // kontrol Michal naozaj zapina (a ci sa zapina z raily,
+                    // alebo len z okna Vyroba).
+                    'rail:zrusit', 'rail:abs', 'rail:kresba', 'rail:nastavenia', 'rail:studio',
                     'pv:kamera', 'pv:fit',
                     'pv:vrstva:zony', 'pv:vrstva:cela', 'pv:vrstva:kovanie', 'pv:vrstva:olep',
                     'rad:sirka', 'rad:vyska', 'rad:hlbka', 'rad:sokel', 'rad:vyska_cela',

@@ -286,6 +286,35 @@
     // vtedy tab NEPREPINA a pouzivatel ostane tam, kde naposledy skoncil.
     function studioLink(tab){ return { tab: studioTab(tab) }; }
 
+    // ===== K2/D-87: prepinac „Kontrola kresby" v raile =======================
+    // CISTA funkcia — z jedineho serveroveho stavu (`GrainCheck.ui_state`)
+    // spravi to, co ma DOM nasadit. Klient si NIC neprepocitava a NIC si
+    // nepamata: rovnaky vzor ako ABS kontrola, len s vlastnymi textami.
+    // Chybajuci stav = prepinac zhasne (radsej nic nez nahodne „zapnute").
+    // 1 dielec / 2–4 dielce / 5+ dielcov — zrkadlo `grain_part_plural` v Ruby.
+    function grainPartWord(n){
+      var v = Math.abs(Number(n) || 0);
+      if (v === 1) return 'dielec';
+      if (v >= 2 && v <= 4) return 'dielce';
+      return 'dielcov';
+    }
+    function grainRail(st){
+      var s = st || {};
+      var available = (s.available !== false);
+      var on = available && !!s.active;
+      var tip;
+      if (!available){
+        tip = 'Kontrola kresby — vyžaduje SketchUp 2023 alebo novší';
+      } else if (on){
+        tip = 'Kontrola smeru kresby je ZAPNUTÁ';
+        if (s.parts != null) tip += ' — ' + s.parts + ' ' + grainPartWord(s.parts) + ' s kresbou';
+        if (s.skipped) tip += ' · ' + s.skipped + ' bez kresby (materiál bez smeru)';
+      } else {
+        tip = 'Kontrola smeru kresby (zapnúť/vypnúť)';
+      }
+      return { available: available, on: on, tip: tip };
+    }
+
     return {
       secKey: secKey,
       exclusiveClose: exclusiveClose,
@@ -307,6 +336,8 @@
       sectorVis: sectorVis,
       ctxNoteText: ctxNoteText,
       sectorMeta: sectorMeta,
+      grainRail: grainRail,
+      grainPartWord: grainPartWord,
       mode: function(){ return state.mode; },
       label: function(){ return state.label; }
     };
@@ -566,6 +597,13 @@
     if (window.sketchup && sketchup.nx_edge_toggle)
       sketchup.nx_edge_toggle(JSON.stringify({ model_guid: nxModelGuid }));
   }
+  // K2/D-87: KONTROLA KRESBY z raily. Ta ista cesta ako prepinac v okne Vyroba
+  // (Engine.toggle_grain_check) — panel si ZIADNY vlastny stav nedrzi. Guard
+  // dokumentu je rovnaky ako pri ABS (asynchronny callback HtmlDialogu).
+  function onGrainCheckToggle(){
+    if (window.sketchup && sketchup.nx_grain_toggle)
+      sketchup.nx_grain_toggle(JSON.stringify({ model_guid: nxModelGuid }));
+  }
   // Identita dokumentu, ktoreho stav panel prave zobrazuje. Chodi v KAZDOM
   // pushi (init aj loadSelected/loadBoard); pri prazdnom vybere sa drzi
   // posledna znama — vtedy sa aj tak nic neoznacuje.
@@ -594,4 +632,17 @@
     } else {
       tip.textContent = 'ABS kontrola hrán — zvýrazní olep v modeli';
     }
+  }
+
+  // K2/D-87: to iste pre KONTROLU KRESBY. Rozhodovanie je v CISTEJ funkcii
+  // NXShell.grainRail (Node testy) — tu ostava len nasadenie do DOM.
+  function nxApplyGrainCheck(st){
+    var n = el('railKresba');
+    if (!n) return;
+    var s = NXShell.grainRail(st);
+    n.classList.toggle('on', s.on);
+    n.setAttribute('aria-pressed', s.on ? 'true' : 'false');
+    n.setAttribute('aria-disabled', s.available ? 'false' : 'true');
+    var tip = el('railKresbaTip');
+    if (tip) tip.textContent = s.tip;
   }

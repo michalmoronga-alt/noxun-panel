@@ -4701,6 +4701,43 @@ module NoxunSuRunner
       e::GrainCheck.toggle(model) # vypni + zapamataj vypnute (cisty stol pre dalsie behy)
       ok('K2: cleanup prepinaca (vypnuty, nezapamatany)',
          e::GrainCheck.remembered? == false && !k2_overlay_present?(model))
+
+      # 11) RAIL INSPECTORA (v0.7.27): DRUHY vstupny bod, JEDEN zdroj stavu.
+      #     Zapnutie z raily = ten isty overlay a to iste cislo, ktore vidi okno
+      #     Vyroba; vypnutie „z Vyroby" musi rail zhasnut. Ziadny undo krok.
+      rail = { 'model_guid' => guid }.to_json
+      # MARKER: posledna REALNA operacia pred prepnutim. Keby bolo zapnutie
+      # kresby undo krokom, 1x Spat by zhodilo jeho a marker by prezil.
+      model.start_operation('K2 marker', true)
+      marker = model.entities.add_group
+      model.commit_operation
+      ents_now = model.entities.length
+      cfg_now = e::Store.get(inst, 'config').to_s
+
+      e::Panel.handle_grain_toggle(rail)
+      st = k2_state(model)
+      ok("K2/rail: zapnutie z raily zaplo TEN ISTY overlay (#{st['parts']} dielcov)",
+         st['active'] == true && k2_overlay_present?(model) && st['parts'].to_i.positive?)
+      # Rail cita PRESNE ten isty stav ako okno Vyroba — ziadna vlastna kopia.
+      ok('K2/rail: stav raily je ten isty stav, ktory vidi okno Vyroba',
+         e::Panel.grain_check_state == st && e::GrainCheck.ui_state(model) == st)
+      ok('K2/rail: zapnutie z raily NEZMENILO model (ziadna entita, config nedotknuty)',
+         model.entities.length == ents_now && e::Store.get(inst, 'config').to_s == cfg_now)
+
+      Sketchup.undo
+      ok('K2/rail: prepnutie z raily NIE JE krok Spat (1x Spat vratilo marker, nie kresbu)',
+         !marker.valid? && k2_overlay_present?(model))
+
+      # Vypnutie „z okna Vyroba" tou istou zdielanou cestou => rail zhasne.
+      gen = e::ProductionDialog.instance_variable_get(:@generation).to_i
+      e::ProductionDialog.do_grain_check({ 'gen' => gen, 'model_guid' => guid })
+      ok('K2/rail: vypnutie z okna Vyroba zhasne aj rail (jeden zdroj stavu)',
+         e::Panel.grain_check_state['active'] == false && !k2_overlay_present?(model))
+
+      # Guard dokumentu: cudzi model_guid sa MUSI odmietnut (asynchronny callback).
+      e::Panel.handle_grain_toggle({ 'model_guid' => 'CUDZI-GUID' }.to_json)
+      ok('K2/rail: klik s cudzou identitou dokumentu NEZAPNE kresbu',
+         !k2_overlay_present?(model) && e::Panel.grain_check_state['active'] == false)
     ensure
       begin
         e::GrainCheck.disable!

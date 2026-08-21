@@ -132,6 +132,51 @@ module Noxun
             "(nastavenie stavov je v okne Výroba → Kontrola)."
         end
 
+        # K2/D-87: KONTROLA KRESBY z raily Inspectora. Presna kopia vzoru ABS
+        # kontroly vyssie — prepnutie robi ZDIELANA Engine.toggle_grain_check,
+        # teda ta ista cesta, akou prepina okno Vyroba (tab KONTROLA). Overlay
+        # sa kresli NAD modelom: ziadny zapis, ziadna operacia, ziadny undo krok.
+        # IDENTITY GUARD DOKUMENTU: callback HtmlDialogu je asynchronny — bez
+        # neho by klik po prepnuti dokumentu zapol kresbu v CUDZOM modeli.
+        def handle_grain_toggle(payload = nil)
+          model = Sketchup.active_model
+          unless defined?(GrainCheck) && GrainCheck.available?(model)
+            push_grain_check
+            return set_status('Kontrola kresby vyžaduje SketchUp 2023 alebo novší.', true)
+          end
+
+          # PRISNE porovnanie (rovnaky tvar ako `nx_edge_toggle`) — prazdna
+          # hodnota nie je spatna kompatibilita, ale diera.
+          unless (payload ? parse(payload)['model_guid'].to_s : '') == model_guid(model)
+            push_grain_check
+            return set_status('Model sa medzitým prepol — stav obnovený, klikni znova.', true)
+          end
+
+          state = Engine.toggle_grain_check(model)
+          set_status(grain_toggle_status(state))
+        end
+
+        # Kratke potvrdenie do statusu panela. Podrobny rozpis (dielce bez
+        # kresby, nenakreslitelne) nesie lista v okne Vyroba — rail je len
+        # prepinac.
+        def grain_toggle_status(state)
+          st = state.is_a?(Hash) ? state : {}
+          return 'Kontrola kresby vypnutá — v modeli nič neostalo.' unless st['active']
+
+          n = st['parts'].to_i
+          "Kontrola kresby zapnutá — #{n} #{grain_part_word(n)} s kresbou " \
+            '(materiál bez smeru sa nekreslí).'
+        end
+
+        # 1 dielec / 2–4 dielce / 5+ dielcov (zrkadlo ProductionDialog#grain_part_plural).
+        def grain_part_word(n)
+          v = n.abs
+          return 'dielec' if v == 1
+          return 'dielce' if v >= 2 && v <= 4
+
+          'dielcov'
+        end
+
       end
     end
   end

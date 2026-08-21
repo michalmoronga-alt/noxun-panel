@@ -84,6 +84,11 @@ module Noxun
       # Prepinac je vec POCITACA, nie zakazky — zije v %APPDATA%, NIKDY v .skp
       # (vzor EdgeCheck D-105). Pamata sa, aby sa kontrola smeru nemusela
       # zapinat pri kazdom otvoreni okna Vyroba.
+      #
+      # VSTUPNE BODY su DVA (od v0.7.27): prepinac „Smer kresby" v okne Vyroba
+      # a tlacidlo „Kontrola kresby" v raile Inspectora. Oba idu tou istou
+      # cestou `Engine.toggle_grain_check` a citaju ten isty `ui_state` —
+      # ZIADNY druhy kanal a ziadna vlastna kopia stavu (vzor ABS kontroly).
       SETTINGS_FILE = 'grain_check.json'
       SETTINGS_STD = 1
       ACTIVE_KEY = 'active'
@@ -380,8 +385,10 @@ module Noxun
         Engine.log_error(e, 'GrainCheck.on_model_changed')
       end
 
+      # Stav dostanu VSETKY okna, ktore prepinac zobrazuju — okno Vyroba aj rail
+      # Inspectora (jeden zdroj stavu, dva vstupne body).
       def notify_state_changed
-        ProductionDialog.push_grain_check(ui_state(active_model)) if defined?(ProductionDialog)
+        Engine.broadcast_grain_check(ui_state(active_model))
       rescue StandardError => e
         Engine.log_error(e, 'GrainCheck.notify_state_changed')
       end
@@ -530,13 +537,12 @@ module Noxun
       # Po prepocte (draw po prestavbe): okno Vyroba dostane cerstve cisla.
       # Burst eventov sa zluci do JEDNEHO pushu (timer + pending guard).
       def notify_count_changed
-        return unless defined?(ProductionDialog)
         return if @notify_pending
         @notify_pending = true
         UI.start_timer(0, false) do
           begin
             @notify_pending = false
-            ProductionDialog.push_grain_check if defined?(ProductionDialog)
+            Engine.broadcast_grain_check
           rescue StandardError => e
             Engine.log_error(e, 'GrainCheck.notify_count_changed')
           end

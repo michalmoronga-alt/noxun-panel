@@ -444,7 +444,10 @@
       ' onclick="grainCheckToggle()" aria-pressed="' + (on ? 'true' : 'false') + '"' +
       ' title="Nakreslí na dielce čiary v smere kresby dekoru — blenda vs. dvere na prvý pohľad.' +
       ' Model sa nemení, kreslí sa nad ním.">' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-rows-3"/></svg>Smer kresby</button>';
+      // v0.7.27: ta ista kresba ako prepinac v raile Inspectora — rovnaky
+      // vyznam = rovnaka ikona (UI_DIZAJN §4). Povodny `rows-3` bol nahrada,
+      // kym vlastny symbol neexistoval.
+      '<svg class="ic" aria-hidden="true"><use href="#i-grain"/></svg>Smer kresby</button>';
   }
 
   // Doveta k textu lišty. Vypnutý prepínač mlčí (o vypnutom stave už hovorí

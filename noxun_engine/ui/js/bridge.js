@@ -274,6 +274,8 @@
       // UI-B1 (audit A2): stav ABS kontroly hran pri OTVORENI panela (pull).
       // Dalsie zmeny chodia pushom — z panela, z toolbaru aj z okna Vyroba.
       if (typeof nxApplyEdgeCheck === 'function') nxApplyEdgeCheck(data.edge_check);
+      // K2/D-87: to iste pre kontrolu smeru kresby (druha funkcna ikona raily).
+      if (typeof nxApplyGrainCheck === 'function') nxApplyGrainCheck(data.grain_check);
       // Codex #168 P2 (2. kolo): identita DOKUMENTU — chodi v kazdom pushi a
       // nesu ju identity guardy asynchronnych callbackov panela.
       if (typeof nxSetModelGuid === 'function') nxSetModelGuid(data.model_guid);
@@ -544,7 +546,11 @@
     // UI-B1 (audit A2): stav ABS kontroly hran do raily. Rovnaky kanal ako ma
     // okno Vyroba (D-105) — panel si ZIADNY vlastny stav nedrzi, len zobrazuje
     // to, co posle server (klik z panela, z toolbaru aj z okna Vyroba).
-    setEdgeCheck: function(state){ if (typeof nxApplyEdgeCheck === 'function') nxApplyEdgeCheck(state); }
+    setEdgeCheck: function(state){ if (typeof nxApplyEdgeCheck === 'function') nxApplyEdgeCheck(state); },
+    // K2/D-87: stav kontroly smeru kresby do raily. JEDEN zdroj stavu — ten
+    // isty kanal pouziva okno Vyroba, takze prepnutie na jednom mieste je hned
+    // vidiet aj na druhom (a naopak). Panel si nic nedrzi ani neprepocitava.
+    setGrainCheck: function(state){ if (typeof nxApplyGrainCheck === 'function') nxApplyGrainCheck(state); }
   };
 
   // UI-B3: informacny stlpec Zakladnych. Texty sklada cista funkcia nxCabInfo

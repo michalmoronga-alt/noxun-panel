@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.7.26' unless defined?(VERSION)
+    VERSION = '0.7.27' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -235,6 +235,33 @@ module Noxun
       Panel.push_edge_check(state) if defined?(Panel)
     rescue StandardError => e
       log_error(e, 'Engine.broadcast_edge_check')
+    end
+
+    # --- K2/D-87: zdielane prepnutie KONTROLY KRESBY -------------------------
+    # Presna kopia vzoru vyssie. JEDINE miesto, kde sa smer kresby prepina —
+    # volaju ho VSETCI klienti: rail Inspectora aj okno Vyroba (tab KONTROLA).
+    # Dva vstupne body nesmu mat dva stavy: klik v raile musi byt vidiet v
+    # otvorenom okne Vyroba a naopak.
+    # Ziadna operacia a ziadny zapis do modelu: GrainCheck je overlay NAD
+    # modelom, nie jeho obsah (lekcia D-103/D-105).
+    def self.toggle_grain_check(model = nil)
+      return nil unless defined?(GrainCheck)
+
+      state = GrainCheck.toggle(model || Sketchup.active_model)
+      broadcast_grain_check(state)
+      state
+    rescue StandardError => e
+      log_error(e, 'Engine.toggle_grain_check')
+      nil
+    end
+
+    # `state = nil` je zamer: po PREPOCTE (prestavba pri zapnutej kresbe) sa
+    # cerstve cisla nikde nedrzia a kazde okno si ich vypyta samo.
+    def self.broadcast_grain_check(state = nil)
+      ProductionDialog.push_grain_check(state) if defined?(ProductionDialog)
+      Panel.push_grain_check(state) if defined?(Panel)
+    rescue StandardError => e
+      log_error(e, 'Engine.broadcast_grain_check')
     end
 
     # Validation proc bezi pri KAZDOM prekresleni UI — musi byt lacny a nesmie
