@@ -869,13 +869,26 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Part`,
   informačné riadky v tej istej mriežke ako Základné korpusu, **nikdy polia**
   („výstup nikdy nevyzerá ako vstup"). Karta narástla o **jeden** riadok
   (dva a dva údaje), nie o tri.
-- **Smer dekoru je INFORMÁCIA, nie rozbaľovačka** — *vedomá odchýlka od
-  mockupu*. Smer dielca korpusu určuje jeho **materiál** (katalógové pole
-  `grain`); per-dielec override neexistuje a jeho zavedenie je zmena
-  výrobného kontraktu (kusovník, VEPO, nárez), teda vlastná dávka s auditom.
-  Pole, ktoré by sa tvárilo, že niečo nastavuje, je lož — preto je to text
-  s vysvetlením, **kde sa smer naozaj mení** (rovnaký vzor ako „hrúbku určuje
-  materiál").
+- **Smer dekoru je VSTUP** (K1 / D-108, v0.7.23). Pôvodná odchýlka UI-D1
+  („smer je len informácia") **skončila** — per-dielec override existuje
+  (`part_overrides['grain_direction']`, enum `length`/`width`), prešiel
+  auditom a zapisuje sa do snapshotu dielca. Je to **segment troch volieb**
+  `Podľa materiálu · Pozdĺžna · Priečna` v riadkovom tvare „popisok +
+  ovládač" (trieda `.pcgrain`, rovnaká mriežka ako `Materiál`), takže karta
+  nenarástla o samostatný riadok. Pravidlá:
+  - **dedený stav ukazuje VÝSLEDOK** („Podľa materiálu — pozdĺžna"), nikdy
+    prázdne slovo „dedí" — nevidieť, ako kresba ide, bol presne slepý bod
+    výrobného incidentu 19.8.2026;
+  - **každá voľba nesie v tooltipe výrobný rozmer** (2000×250 vs 250×2000),
+    takže otočenie kresby je vidieť pred odoslaním objednávky;
+  - **všetky texty skladá server** (`Panel.part_grain_payload`, vzor D-102) —
+    JS iba maľuje; chýbajúci payload popisy vráti na neutrálnu zálohu
+    z kostry, nikdy nenechá tooltip predošlého dielca;
+  - **ručný zásah je jantárový** (`.ovr` — rovnaký jazyk ako `select.ovr` pri
+    materiáli a hranách), dedený stav tealový;
+  - **materiál bez smeru segment zamkne** cez `aria-disabled` (vzor D-78,
+    nikdy HTML `disabled`) + hint; klik vtedy nič nezapisuje, len odvedie na
+    materiál. Uložený smer sa **nemaže** — s dekorovým materiálom ožije.
 - **Hranový riadok začína ikonou `edge` — jedna kresba, štyri rotácie.**
   Uhol dáva **strana v 2D náhľade** (`AbsRules.edge_sides`), takže ikona
   ukazuje presne tú hranu, ktorú náhľad nad zoznamom farebne kreslí. *Vedomá
