@@ -72,6 +72,18 @@ module Noxun
           v.nil? ? nil : v.to_s
         end
 
+        # ST-1a: meno sekcie + kotva hladania z payloadu prekliku do okna Studio.
+        # TOLERANTNE rovnako ako `studio_tab_of` — prazdny payload (rail Štúdio,
+        # starsi cachovany panel) aj neznama hodnota = nil, teda „len otvor
+        # okno". Ci je meno platne, rozhoduje az `StudioDialog::SECTIONS`.
+        def studio_link_of(payload)
+          data = parse(payload)
+          sec = data['section']
+          anchor = data['anchor']
+          { section: (sec.nil? ? nil : sec.to_s),
+            anchor: (anchor.nil? ? nil : anchor.to_s) }
+        end
+
         def parse(payload)
           return {} if payload.nil? || payload.to_s.strip.empty?
 

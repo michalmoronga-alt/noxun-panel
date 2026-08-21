@@ -210,7 +210,10 @@ end
 NxTest.test('UI-D3: whitelist tabov je na strane RUBY a JS je jeho ZRKADLO') do
   rb = UID3_PROD_RB[/TABS = %w\[([a-z ]+)\]/, 1].to_s.split
   js = UID3_SHELL_JS[/var STUDIO_TABS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  NxTest.assert_equal(%w[rows sheets edging hardware budget control], rb, 'Ruby pozna vsetky taby okna')
+  # ST-1a: `rows`/`sheets`/`edging` ZANIKLI — kusovnik a supisy platni a ABS su
+  # sekciou Kusovnik okna Studio. Whitelist ich preto uz nesmie poznat, inak by
+  # deep-link otvoril tab, ktory v okne neexistuje.
+  NxTest.assert_equal(%w[hardware budget control], rb, 'Ruby pozna vsetky taby okna')
   NxTest.assert_equal(rb, js, 'JS mirror sa nesmie rozist s Ruby autoritou')
   NxTest.assert(UID3_PANEL_RB.include?('ProductionDialog.show(open_tab: studio_tab_of(p))'),
                 'panel posiela iba meno tabu — filtruje ho server')
@@ -232,13 +235,33 @@ end
 
 # --- 5) klikatelne je LEN to, co niekam vedie -------------------------------
 
-NxTest.test('UI-D3 (N13): „Materiál" vedie do Kusovnika, nie do statusu') do
+NxTest.test('UI-D3 (N13) + ST-1a: „Materiál" vedie do Kusovnika v ŠTÚDIU — a rovno na skrinku') do
   body = UID3_ACTIONS_JS[/function onInfoArea.*?\n  \}/m].to_s
   NxTest.assert(!body.empty?, 'handler sa nasiel')
-  NxTest.assert(body.include?("openProductionDialog('rows')"), 'otvori okno rovno na tabe Kusovník')
-  # Filter na jednu skrinku kusovnik NEMA — nevymysla sa, ale povie sa to nahlas.
-  NxTest.assert(body.include?('filter na jednu skrinku pribudne v Štúdiu'),
-                'chybajuci filter sa PRIZNA, nikdy sa nepredstiera')
+  # ST-1a (audit #12): kusovnik sa prestahoval do Studia a slub UI-D3 („filter
+  # na jednu skrinku pribudne v Štúdiu") sa SPLNIL — ID skrinky ide ako kotva,
+  # ktora predvyplni hladanie sekcie.
+  NxTest.assert(body.include?("openStudio('bom', selectedCabId)"),
+                'otvori Štúdio na sekcii Kusovník a kotvou je ID skrinky')
+  NxTest.refute(body.include?('openProductionDialog'),
+                'stara cesta do okna Výroba na tabe „rows" zanikla spolu s tym tabom')
+  NxTest.assert(body.include?('vyfiltrovaný na'),
+                'status povie, ze zoznam je ZUZENY — a ako sa zuzenie zrusi')
+end
+
+NxTest.test('ST-1a: deep-link do Studia ma whitelist sekcii v RUBY a JS je jeho ZRKADLO') do
+  studio_rb = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog.rb'),
+                        encoding: 'UTF-8')
+  rb = studio_rb[/SECTIONS = %w\[([a-z ]+)\]/, 1].to_s.split
+  js = UID3_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
+  NxTest.assert_equal(%w[bom], rb, 'v ST-1a zije jedina sekcia — Kusovník')
+  NxTest.assert_equal(rb, js, 'JS mirror sa nesmie rozist s Ruby autoritou')
+  NxTest.assert(UID3_PANEL_RB.include?("cb(dlg, 'open_studio')"),
+                'panel ma vlastny callback na otvorenie Studia')
+  NxTest.assert(UID3_RESOLV_RB.include?('def studio_link_of'),
+                'prazdny payload (rail Štúdio) sa tolerantne mapuje na nil')
+  NxTest.assert(UID3_ACTIONS_JS.include?('NXShell.studioOpenLink(section, anchor)'),
+                'panel posiela iba meno sekcie a kotvu — filtruje ich server')
 end
 
 NxTest.test('UI-D3: warnpanel ma JEDNU cestu von — deep-link na tab KONTROLA') do

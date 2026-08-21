@@ -277,14 +277,33 @@
     // Taby okna Vyroba. Zoznam je ZRKADLO `ProductionDialog::TABS` — autoritou
     // whitelistu je RUBY (HTML/JS nie je ochrana), tento mirror len zabrani,
     // aby z panela vobec vyletela hodnota, ktora tab nepomenuva.
-    var STUDIO_TABS = ['rows', 'sheets', 'edging', 'hardware', 'budget', 'control'];
+    // ST-1a: taby `rows`/`sheets`/`edging` ZANIKLI — kusovnik a supisy platni
+    // a ABS su od tejto davky sekciou Kusovnik v okne Studio.
+    var STUDIO_TABS = ['hardware', 'budget', 'control'];
     function studioTab(t){
       var s = String(t == null ? '' : t);
       return STUDIO_TABS.indexOf(s) >= 0 ? s : null;
     }
-    // Payload prekliku. `tab: null` = „len otvor okno" (rail Štúdio) — server
-    // vtedy tab NEPREPINA a pouzivatel ostane tam, kde naposledy skoncil.
+    // Payload prekliku. `tab: null` = „len otvor okno" — server vtedy tab
+    // NEPREPINA a pouzivatel ostane tam, kde naposledy skoncil.
     function studioLink(tab){ return { tab: studioTab(tab) }; }
+
+    // ===== ST-1a: deep-link do okna STUDIO ==================================
+    // Sekcie Studia. Zoznam je ZRKADLO `StudioDialog::SECTIONS` — autoritou je
+    // RUBY, tento mirror len zabrani, aby z panela vyletela hodnota, ktora
+    // sekciu nepomenuva. V ST-1a zije jedina sekcia (Kusovnik).
+    var STUDIO_SECTIONS = ['bom'];
+    function studioSection(s){
+      var v = String(s == null ? '' : s);
+      return STUDIO_SECTIONS.indexOf(v) >= 0 ? v : null;
+    }
+    // `anchor` predvyplni hladanie sekcie (N13 posiela ID skrinky). Bez sekcie
+    // kotva nema kam sadnut, preto ide von LEN spolu s nou.
+    function studioOpenLink(section, anchor){
+      var sec = studioSection(section);
+      var a = (anchor == null) ? '' : String(anchor).trim();
+      return { section: sec, anchor: (sec && a) ? a : null };
+    }
 
     // ===== K2/D-87: prepinac „Kontrola kresby" v raile =======================
     // CISTA funkcia — z jedineho serveroveho stavu (`GrainCheck.ui_state`)
@@ -322,6 +341,9 @@
       studioTab: studioTab,
       studioLink: studioLink,
       STUDIO_TABS: STUDIO_TABS,
+      studioSection: studioSection,
+      studioOpenLink: studioOpenLink,
+      STUDIO_SECTIONS: STUDIO_SECTIONS,
       CONTEXTS: CONTEXTS,
       state: state,
       normCtx: normCtx,

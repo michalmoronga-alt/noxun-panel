@@ -5,7 +5,9 @@
   // innerHTML a klik ide DELEGACIOU (Codex N9 — stovky riadkov bez lagov).
 
   var BOM = null;          // posledny push z Ruby
-  var prodTab = 'rows';
+  // ST-1a: taby Kusovník/Materiály/ABS sa presunuli do okna ŠTÚDIO (sekcia
+  // Kusovník, pohľady Dielce · Platne · ABS). Prvý tab zľava je odteraz Kovanie.
+  var prodTab = 'hardware';
   // D-104: stav zvyraznenia hran. SERVER je autorita (pocty, zapnutost aj stav
   // prepinacov) — JS si nic neprepocitava a stav si NEPAMATA sam (kazdy push ho
   // prepise). D-105: jedina vec, ktoru si drzi klient, je ci je rozbalovacie
@@ -27,7 +29,7 @@
       EDGE = (BOM && BOM.edge_check) ? BOM.edge_check : null;
       GRAIN = (BOM && BOM.grain_check) ? BOM.grain_check : null;
       el('prodModel').textContent = BOM ? ('model: ' + BOM.model_title + ' · v' + BOM.version) : '…';
-      vepoSync(); renderSummary(); renderBadge();
+      renderProject(); renderSummary(); renderBadge();
       // UI-D3: deep-link z Inspectora (⚠ warnpanel -> Kontrola, „Materiál" ->
       // Kusovník). Server posiela `open_tab` PRAVE RAZ; setProdTab uz kresli
       // listu aj telo, takze sa nekresli dvakrat. Ked uz na tom tabe stojime
@@ -55,49 +57,41 @@
     closeEdgeMenu: function(){ edgeCheckMenuClose(); }
   };
 
-  // ===================== VEPO export (V0.5 C) =====================
-  // Lifecycle inputu (Codex F10): nazov projektu sa predvyplni z Ruby LEN pri
-  // zmene modelu (novy model = novy default); pocas prace na tom istom modeli
-  // sa pouzivatelova uprava NIKDY neprepise. Merge checkbox sa inicializuje
-  // raz zo zapamataneho nastavenia.
-  var vepoModelSeen = null;
-  var vepoInited = false;
-
-  function vepoSync(){
-    if (!BOM || !BOM.vepo) return;
-    var inp = el('vepoProject');
-    // identita modelu = epocha prepnuti + cesta (GH P2: dva "Bez nazvu" modely
-    // maju rovnaky titul — nazov projektu sa musi resetnut aj vtedy)
-    var mkey = BOM.vepo.model_key || BOM.model_title;
-    if (inp && mkey !== vepoModelSeen){
-      inp.value = BOM.vepo.default_project || 'projekt';
-      vepoModelSeen = mkey;
-    }
-    if (!vepoInited){
-      var chk = el('vepoMerge');
-      if (chk) chk.checked = BOM.vepo.merge_18_36 !== false;
-      vepoInited = true;
-    }
-  }
-
-  function vepoExport(){
-    if (!BOM || !window.sketchup || !sketchup.vepo_export) return;
-    var p = { gen: BOM.gen,
-              project: (el('vepoProject') ? el('vepoProject').value : '').trim(),
-              merge: el('vepoMerge') ? el('vepoMerge').checked : true };
-    NX.setStatus('Exportujem VEPO…', false);
-    sketchup.vepo_export(JSON.stringify(p));
+  // ===================== NAZOV PROJEKTU (ST-1a, audit #1) =====================
+  // Nazov projektu je od tejto davky SERVEROVY udaj (mapa `project_names`
+  // v %APPDATA%, kluc = model_guid) a EDITUJE sa v liste Kusovnika v okne
+  // Studio. Okno Vyroba ho preto ukazuje ako TEXT — vystup sa nesmie tvarit
+  // ako vstup (trvala zasada UI 2.0). Bez toho by sa dve okna mohli rozist
+  // a exporty tej istej zakazky by niesli rozne mena.
+  function renderProject(){
+    var box = el('prodProject');
+    if (!box) return;
+    var v = (BOM && BOM.vepo) ? BOM.vepo : null;
+    box.textContent = v ? ('projekt: ' + (v.project || '—')) : '';
   }
 
   function requestRefresh(){ if (window.sketchup && sketchup.refresh_bom) sketchup.refresh_bom(''); }
 
+  // ST-1a (audit #9): zoznam tabov sa cita z DOM, nie z natvrdo pisaneho pola —
+  // odstranenie tabu by inak skoncilo na `el(null).classList` (TypeError) a
+  // okno by ostalo cierne.
+  function prodTabIds(){
+    var out = [];
+    var box = el('prodTabs');
+    if (!box) return out;
+    var btns = box.querySelectorAll('button[id^="pt_"]');
+    for (var i = 0; i < btns.length; i++) out.push(btns[i].id.slice(3));
+    return out;
+  }
+
   function setProdTab(t){
     prodTab = t;
-    ['rows','sheets','edging','hardware','budget','control'].forEach(function(k){
-      el('pt_' + k).classList.toggle('on', k === t);
+    prodTabIds().forEach(function(k){
+      var b = el('pt_' + k);
+      if (b) b.classList.toggle('on', k === t);
     });
-    // klik na riadok vybera v modeli v kusovniku, kovani AJ kontrole
-    el('prodHint').style.display = (t === 'rows' || t === 'hardware' || t === 'control') ? '' : 'none';
+    // klik na riadok vybera v modeli v kovani AJ kontrole
+    el('prodHint').style.display = (t === 'hardware' || t === 'control') ? '' : 'none';
     if (t !== 'control') ecMenuOpen = false; // odchod z tabu okno zavrie
     renderEdgeBar();
     renderBody();
@@ -150,160 +144,20 @@
     }
   }
 
-  function edgesLabel(edges){
-    var codes = ['L1','L2','W1','W2'];
-    var on = codes.filter(function(c){ return edges && edges[c]; });
-    return on.length ? on.join('+') : '—';
-  }
-
   function renderBody(){
     var box = el('prodBody');
     if (!BOM){ box.innerHTML = '<div class="muted">Načítavam…</div>'; return; }
-    if (prodTab === 'rows') return renderRows(box);
-    if (prodTab === 'sheets') return renderSheets(box);
-    if (prodTab === 'edging') return renderEdging(box);
     if (prodTab === 'hardware') return renderHardware(box);
     if (prodTab === 'budget') return renderBudget(box); // V0.6 E-b (js/budget.js)
     renderControl(box);
   }
 
-  // V0.6 E-b: cenove bunky tabov Materialy/ABS citaju TEN ISTY payload rozpoctu
-  // (BOM.budget) — okno nikde nema druhy vypocet ceny. Mapa podla identity
-  // zaznamu (material_id / abs_id), nie podla indexu.
-  function budgetRowMap(sectionKey, idField){
-    var out = {};
-    var b = BOM && BOM.budget;
-    if (!b) return out;
-    (b.sections || []).forEach(function(s){
-      if (s.key !== sectionKey) return;
-      (s.rows || []).forEach(function(r){ if (r[idField]) out[r[idField]] = r; });
-    });
-    return out;
-  }
-
-  function budgetSubtotal(sectionKey){
-    var b = BOM && BOM.budget;
-    if (!b || !b.totals || !b.totals.subtotals) return null;
-    var v = b.totals.subtotals[sectionKey];
-    return (v === undefined) ? null : v;
-  }
-
-  // Suma sekcie pod tabulkou — hodnota zo servera, JS ju NEskladá.
-  function budgetSumRow(sectionKey, cols, label){
-    var v = budgetSubtotal(sectionKey);
-    if (v === null) return '';
-    return '<tr class="hwsum"><td colspan="' + (cols - 1) + '">' + label + '</td>' +
-           '<td><b>' + price(v) + '</b></td></tr>';
-  }
-
-  function renderRows(box){
-    var rows = BOM.rows || [];
-    if (!rows.length){ box.innerHTML = '<div class="muted">Žiadne výrobné dielce v modeli — vlož korpus alebo dosku.</div>'; return; }
-    var h = '<table class="bomtab"><thead><tr><th>Názov</th><th>Dĺžka</th><th>Šírka</th><th>Hr.</th><th>ks</th><th>Materiál</th><th>ABS</th><th>Kde</th></tr></thead><tbody>';
-    rows.forEach(function(r, i){
-      var kde = (r.kde || []).map(function(k){ return esc(k.owner_id) + '×' + k.quantity; }).join(', ');
-      h += '<tr class="bomrow" data-i="' + i + '"><td>' + esc((r.names || []).join(' / ')) + '</td>' +
-           '<td>' + num(r.length) + '</td><td>' + num(r.width) + '</td><td>' + num(r.thickness) + '</td>' +
-           '<td><b>' + num(r.quantity) + '</b></td><td>' + esc(r.material_id) + '</td>' +
-           '<td>' + edgesLabel(r.edges) + '</td><td>' + kde + '</td></tr>';
-    });
-    box.innerHTML = h + '</tbody></table>';
-  }
-
-  function renderSheets(box){
-    var list = BOM.sheets || [];
-    if (!list.length){ box.innerHTML = '<div class="muted">Žiadne doskové materiály.</div>'; return; }
-    // D-19: odhad platni — parovanie VYHRADNE mapou podla material_id (Codex F7:
-    // indexy sa rozidu, ak material vypadol z katalogu; taky dostane fallback)
-    var est = {};
-    (BOM.sheet_estimate || []).forEach(function(e){ est[e.material_id] = e; });
-    // 2B-1 (D-43): duplak vazby z BOM riadkov — duplak material nema vlastnu
-    // platnu (kupuje sa zdroj), jeho bunka odhadu to povie namiesto pomlcky.
-    // GH #94 P2: rovnaky material moze niest ROZNE vazby (katalog zmeneny medzi
-    // rebuildmi — BOM ich drzi oddelene v kluci), preto zoznam, nie posledna.
-    var dupSrc = {};
-    (BOM.rows || []).forEach(function(r){
-      if (!r.material_source) return;
-      var lbl = 'lepí sa ' + r.material_source.multiplier + '× z ' + esc(r.material_source.material_id);
-      var list = dupSrc[r.material_id] = dupSrc[r.material_id] || [];
-      if (list.indexOf(lbl) < 0) list.push(lbl);
-    });
-    // D-61 (E-b): pri doske je primárna cena za TABUĽU, €/m² sekundárne.
-    var bmat = budgetRowMap('materials', 'material_id');
-    var seen = {};
-    var h = '<table class="bomtab"><thead><tr><th>Materiál</th><th>m²</th><th>dielcov</th><th>Formát</th><th>Platne (odhad)</th><th>Cena</th></tr></thead><tbody>';
-    list.forEach(function(s){
-      seen[s.material_id] = true;
-      var e = est[s.material_id];
-      var fb = e && e.fallback;
-      var fmt = e ? (num(e.sheet_size[0]) + '×' + num(e.sheet_size[1])) : '—';
-      var pl = e ? (num(e.count_min, 1) + ' – ' + num(e.count_max, 1)) : '—';
-      // V0.6 M-B1 (audit F7): UNI = material neurceny, pocet platni je len
-      // orientacny (format je pracovny default) — NIE nakupne cislo.
-      if (e && e.uni === true){ pl += ' <span class="muted">(orientačne — UNI)</span>'; }
-      var ds = dupSrc[s.material_id];
-      if (!e && ds){
-        fmt = '—';
-        pl = ds.join(' · ');
-      }
-      var m2cell = '<b>' + num(s.m2, 2) + '</b>';
-      if (e && e.doubled_m2){
-        m2cell = '<b>' + num(e.m2, 2) + '</b> <span class="muted" title="Nákup vrátane duplákov: vlastné dielce + ' +
-                 num(e.doubled_m2, 2) + ' m² z ' + num(e.doubled_quantity) + ' ks duplákov">(+' + num(e.doubled_m2, 2) + ' dupl.)</span>';
-      }
-      var cls = 'estcell' + (fb ? ' estfb' : '');
-      var tt = fb ? ' title="Materiál nemá formát v katalógu — použitý 2800×2070"' : '';
-      h += '<tr><td>' + esc(s.material_id) + '</td><td>' + m2cell + '</td><td>' + num(s.quantity) + '</td>' +
-           '<td class="' + cls + '"' + tt + '>' + fmt + '</td><td class="' + cls + '"' + tt + '><b>' + pl + '</b></td>' +
-           '<td class="estcell">' + plateCell(bmat[s.material_id]) + '</td></tr>';
-    });
-    // 2B-1: nakupny riadok zdroja, ktory NEMA vlastne dielce (odhad ho pozna,
-    // vyrobny zoznam nie) — bez neho by nakup zdrojovych platni z tabulky zmizol.
-    (BOM.sheet_estimate || []).forEach(function(e){
-      if (seen[e.material_id]) return;
-      var fb = e.fallback;
-      var cls = 'estcell' + (fb ? ' estfb' : '');
-      var tt = fb ? ' title="Materiál nemá formát v katalógu — použitý 2800×2070"' : '';
-      h += '<tr><td>' + esc(e.material_id) + ' <span class="muted">(nákup pre dupláky)</span></td>' +
-           '<td><b>' + num(e.m2, 2) + '</b></td><td>—</td>' +
-           '<td class="' + cls + '"' + tt + '>' + num(e.sheet_size[0]) + '×' + num(e.sheet_size[1]) + '</td>' +
-           '<td class="' + cls + '"' + tt + '><b>' + num(e.count_min, 1) + ' – ' + num(e.count_max, 1) + '</b></td>' +
-           '<td class="estcell">' + plateCell(bmat[e.material_id]) + '</td></tr>';
-    });
-    h += budgetSumRow('materials', 6, 'Odhad ceny — celé tabule (ceny s DPH)');
-    box.innerHTML = h + '</tbody></table>' +
-      '<div class="hint">Odhad = plocha × prerez 10–25 % ÷ platňa. Orientačný rozsah, NIE nárezový plán. Duplák sa lepí zo zdrojových platní — jeho plocha sa počíta do nákupu zdroja. Formát platne sa nastavuje v katalógu materiálov (okno Materiály projektu). Cena = celé tabule × cena za tabuľu; rozpis v tabe Rozpočet.</div>';
-  }
-
-  // D-61: „€ / tabuľa" primárne, €/m² v zátvorke. Obe čísla nesie payload
-  // rozpočtu (Budget.price_per_plate je JEDINÁ konverzia €/m² → €/tabuľa).
-  function plateCell(row){
-    if (!row) return '<span class="muted">—</span>';
-    if (row.price_missing) return '<span class="muted" title="Materiál nemá cenu v katalógu">chýba cena</span>';
-    var m2 = (row.price_per_m2 == null) ? '' :
-      ' <span class="muted">(' + num(row.price_per_m2, 2) + ' €/m²)</span>';
-    return '<b>' + price(row.cena_mj) + '</b>/tab.' + m2;
-  }
-
-  function renderEdging(box){
-    var list = BOM.edging || [];
-    if (!list.length){ box.innerHTML = '<div class="muted">Žiadne ABS hrany.</div>'; return; }
-    // E-b: nákupné bm (vrátane rezervy) aj cena idú z payloadu rozpočtu.
-    var babs = budgetRowMap('abs', 'abs_id');
-    var h = '<table class="bomtab"><thead><tr><th>ABS páska</th><th>bm</th><th>hrán</th><th>bm s rezervou</th><th>€ / bm</th></tr></thead><tbody>';
-    list.forEach(function(e){
-      var br = babs[e.abs_id];
-      var res = br ? ('<b>' + num(br.mnozstvo, 1) + '</b>') : '<span class="muted">—</span>';
-      var pb = br ? (br.price_missing ? '<span class="muted">chýba cena</span>' : price(br.cena_mj))
-                  : '<span class="muted">—</span>';
-      h += '<tr><td>' + esc(e.abs_id) + '</td><td><b>' + num(e.bm, 1) + '</b></td><td>' + num(e.edges) + '</td>' +
-           '<td>' + res + '</td><td>' + pb + '</td></tr>';
-    });
-    h += budgetSumRow('abs', 5, 'Odhad ceny — s rezervou (ceny s DPH)');
-    box.innerHTML = h + '</tbody></table>' +
-      '<div class="hint">Rezerva na olep sa nastavuje v ⚙ Nastaveniach rozpočtu; rozpis v tabe Rozpočet.</div>';
-  }
-
+  // ST-1a: `renderRows` / `renderSheets` / `renderEdging` a ich pomocníci
+  // (`edgesLabel`, `plateCell`, `budgetRowMap`, `budgetSubtotal`, `budgetSumRow`)
+  // ZANIKLI spolu s tabmi Kusovník, Materiály a ABS — ich obsah žije v okne
+  // ŠTÚDIO ako sekcia Kusovník (pohľady Dielce · Platne · ABS). Tab Rozpočet má
+  // vlastné helpery (`js/budget.js`); `price()` nižšie OSTÁVA — používa ho tab
+  // Kovanie. Payload z Ruby sa NEMENÍ: globálny `BOM` číta aj budget.js.
   // V0.6 D1b: cena — nil/undefined = „nezadaná" (—), NIKDY 0 (audit N11).
   function price(v){ return (v == null || isNaN(v)) ? '—' : num(v, 2) + ' €'; }
 
@@ -319,10 +173,10 @@
   function hwCsvExport(){
     if (!BOM || !window.sketchup || !sketchup.hw_csv_export) return;
     NX.setStatus('Exportujem nákupný zoznam…', false);
-    sketchup.hw_csv_export(JSON.stringify({
-      gen: BOM.gen,
-      project: (el('vepoProject') ? el('vepoProject').value : '').trim()
-    }));
+    // ST-1a (audit #1): nazov projektu sa uz NEPOSIELA z DOM — cita ho SERVER
+    // (`ProductionCore.project_name`), takze vsetky styri exporty pomenuju
+    // zakazku rovnako bez ohladu na to, z ktoreho okna ich pouzivatel spusti.
+    sketchup.hw_csv_export(JSON.stringify({ gen: BOM.gen }));
   }
 
   // V0.6 D1b: tab Kovanie = NÁKUPNÝ ZOZNAM zo setov (hore) + generika podľa

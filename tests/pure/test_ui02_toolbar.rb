@@ -128,12 +128,19 @@ NxTest.test('UI-02: toolbar ma presne styri tlacidla so svojimi ikonami') do
   end
 end
 
-NxTest.test('UI-02: kazde tlacidlo ma slovensky tooltip a Studio priznava docasny stav') do
+NxTest.test('UI-02 + ST-1a: kazde tlacidlo ma slovensky tooltip a Studio priznava, co v nom EST nie je') do
   body = ui02_install_toolbar
   NxTest.assert_equal(4, body.scan(/\.tooltip =/).length, 'tooltip patri ku kazdemu tlacidlu')
+  # ST-1a: tlacidlo uz otvara SKUTOCNE Studio (nie okno Vyroba). Tooltip preto
+  # nesmie hovorit „zatiaľ otvára okno Výroba" — musi ale poctivo povedat, ze
+  # kontrola a rozpocet su este v inom okne (premostenie v navigacii Studia).
+  NxTest.assert(body.include?('cmd_studio = UI::Command.new(\'Štúdio\') { StudioDialog.show }'),
+                'tlacidlo Štúdio otvara StudioDialog, nie ProductionDialog')
   studio = body[/cmd_studio\.tooltip = '([^']+)'/, 1].to_s
   NxTest.assert(studio.include?('Výroba'),
-                'tooltip Studia musi povedat, ze zatial otvara okno Vyroba (poctivy nazov)')
+                'tooltip musi povedat, co v Studiu este nie je (poctivy nazov cieloveho okna)')
+  NxTest.assert(studio.include?('Kusovník') || studio.include?('kusovník'),
+                'a zaroven co v nom UZ je')
 end
 
 # --- 3) prepinace: zapnuty stav je vidno --------------------------------------

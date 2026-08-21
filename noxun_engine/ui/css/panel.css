@@ -1211,13 +1211,9 @@
   /* D-19: dvojica poli formatu platne v editore materialov */
   .row input.sheetdim { flex: 1 1 0; min-width: 0; }
   .row .sheetx { flex: 0 0 auto; color: var(--nx-ink-faint); padding: 0 2px; }
-  /* V0.5 C: VEPO export lista v okne Vyroba */
-  .vepobar { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; }
-  .vepobar #vepoProject { flex: 1; min-width: 0; padding: 4px 8px; font-size: 12px;
-                          border: 1px solid var(--nx-border); border-radius: 6px; }
-  .vepobar .vepomerge { flex: 0 0 auto; display: flex; align-items: center; gap: 4px;
-                        font-size: 11.5px; color: var(--nx-ink-label); white-space: nowrap; }
-  .vepobar .vepobtn { flex: 0 0 auto; padding: 4px 12px; font-size: 12px; font-weight: 600; }
+  /* ST-1a: `.vepobar` (VEPO lista okna Vyroba) ZANIKLA — export aj nazov
+     projektu ziju v liste sekcie Kusovnik v okne Studio (`ui/studio.html`,
+     vlastne styly ako kazdy satelit). */
   /* ===== D-23: sync riadok <-> celo (hover trieda 'hov' na oboch stranach).
      Zvyraznenie bezi CISTO cez CSS — ziadny renderPreview pocas hoveru. CSS
      pravidla prebiju prezentacne ATRIBUTY rectov/textov (stroke/fill). */

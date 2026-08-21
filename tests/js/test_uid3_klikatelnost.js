@@ -86,11 +86,15 @@ eq(NXShell.warnRows([{ message: 'a' }, { message: 'b' }]).map(r => r.text), ['a'
 
 // --- 2) deep-link do okna Vyroba --------------------------------------------
 
-eq(NXShell.STUDIO_TABS, ['rows', 'sheets', 'edging', 'hardware', 'budget', 'control'],
+// ST-1a: `rows`/`sheets`/`edging` zanikli — kusovnik a supisy platni a ABS su
+// sekciou Kusovnik okna Studio.
+eq(NXShell.STUDIO_TABS, ['hardware', 'budget', 'control'],
    'zoznam tabov je ZRKADLO ProductionDialog::TABS');
 
 eq(NXShell.studioTab('control'), 'control', 'platny tab prejde');
-eq(NXShell.studioTab('rows'), 'rows', 'kusovnik prejde');
+eq(NXShell.studioTab('budget'), 'budget', 'rozpocet prejde');
+eq(NXShell.studioTab('rows'), null, 'zaniknuty tab kusovnika sa uz z panela nedostane von');
+eq(NXShell.studioTab('sheets'), null, 'zaniknuty tab platni tiez nie');
 eq(NXShell.studioTab('kontrola'), null, 'slovensky preklep nie je meno tabu');
 eq(NXShell.studioTab(''), null, 'prazdna hodnota = bez deep-linku');
 eq(NXShell.studioTab(null), null, 'chybajuca hodnota = bez deep-linku');
@@ -100,5 +104,25 @@ eq(NXShell.studioTab('__proto__'), null, 'zoznam sa pyta indexOf, nie vlastnosti
 eq(NXShell.studioLink('control'), { tab: 'control' }, 'payload nesie iba meno tabu');
 eq(NXShell.studioLink(), { tab: null }, 'bez tabu ide `null` — server vtedy tab nemeni');
 eq(NXShell.studioLink('nieco'), { tab: null }, 'nezname meno sa z panela vobec nedostane von');
+
+// --- 3) ST-1a: deep-link do okna STUDIO -------------------------------------
+
+eq(NXShell.STUDIO_SECTIONS, ['bom'], 'zoznam sekcii je ZRKADLO StudioDialog::SECTIONS');
+eq(NXShell.studioSection('bom'), 'bom', 'platna sekcia prejde');
+eq(NXShell.studioSection('ctrl'), null, 'premostenie NIE JE sekcia — Kontrola zije v okne Vyroba');
+eq(NXShell.studioSection(''), null, 'prazdna hodnota = bez deep-linku');
+eq(NXShell.studioSection(null), null, 'chybajuca hodnota = bez deep-linku');
+eq(NXShell.studioSection('__proto__'), null, 'zoznam sa pyta indexOf, nie vlastnosti objektu');
+
+eq(NXShell.studioOpenLink('bom', 'CAB-004'), { section: 'bom', anchor: 'CAB-004' },
+   'N13 posiela sekciu aj kotvu (ID skrinky predvyplni hladanie)');
+eq(NXShell.studioOpenLink(), { section: null, anchor: null },
+   'rail Štúdio (bez argumentov) sekciu NEPREPINA');
+eq(NXShell.studioOpenLink(null, 'CAB-004'), { section: null, anchor: null },
+   'kotva bez sekcie nema kam sadnut — von ide null');
+eq(NXShell.studioOpenLink('bom', '   '), { section: 'bom', anchor: null },
+   'prazdna kotva sa nepodstrci ako filter');
+eq(NXShell.studioOpenLink('nieco', 'CAB-004'), { section: null, anchor: null },
+   'nezname meno sekcie sa z panela vobec nedostane von');
 
 console.log(`test_uid3_klikatelnost: ${n} kontrol OK`);

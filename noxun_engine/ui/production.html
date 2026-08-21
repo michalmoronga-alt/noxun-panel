@@ -4,7 +4,7 @@
      V0.6 E-b: pribudol tab ROZPOCET (js/budget.js) — jediny tab, ktory model
      MENI (data rozpoctu v NOXUN dict na modeli, kazda zmena = 1 undo krok). -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.7.29">
+<link rel="stylesheet" href="css/panel.css?v=0.7.30">
 <!-- V0.5 D: styly semaforu ZAMERNE inline v production.html (NIE v zdielanom
      panel.css — paralelna davka D-29 ho meni; ziadny cache-bust konflikt). -->
 <style>
@@ -199,6 +199,10 @@
 <div class="prodhead">
   <h1>Výroba</h1>
   <span class="sub" id="prodModel">…</span>
+  <!-- ST-1a (audit #1): názov projektu je SERVEROVÝ údaj a edituje sa v lište
+       Kusovníka v okne ŠTÚDIO. Tu je to TEXT — výstup sa nesmie tváriť ako
+       vstup (trvalá zásada UI 2.0). -->
+  <span class="sub" id="prodProject" title="Názov projektu — nastavuje sa v Štúdiu → Kusovník; platí pre všetky exporty"></span>
   <!-- V0.5 D: semafor badge (🔴 kritické, 🟠 na kontrolu) — cisla zo servera,
        klik skoci na tab Kontrola. Skryty ak je vsetko ciste. -->
   <button id="ctrlBadge" class="ctrlbadge" style="display:none" onclick="setProdTab('control')"
@@ -207,23 +211,18 @@
 </div>
 <div id="prodSummary" class="prodsum">…</div>
 
-<!-- V0.5 C: VEPO export — nazov projektu (default z .skp, editovatelny), merge 18+36, export -->
-<div class="vepobar">
-  <input id="vepoProject" type="text" placeholder="projekt" title="Názov projektu — názov priečinka, súborov exportu aj titulku rozpočtu">
-  <label class="vepomerge" title="Materiály 18 a 36 mm do jedného súboru (bežná objednávka)"><input type="checkbox" id="vepoMerge" checked> 18+36 spolu</label>
-  <button class="vepobtn" onclick="vepoExport()" title="Exportuje prírezy (po odpočte ABS) do VEPO CSV — vyberieš priečinok">⇩ VEPO export</button>
-</div>
-
-<div class="pvtabs prodtabs">
-  <button id="pt_rows" class="on" onclick="setProdTab('rows')">Kusovník</button>
-  <button id="pt_sheets" onclick="setProdTab('sheets')">Materiály</button>
-  <button id="pt_edging" onclick="setProdTab('edging')">ABS</button>
-  <button id="pt_hardware" onclick="setProdTab('hardware')">Kovanie</button>
+<!-- ST-1a: VEPO export aj taby Kusovník / Materiály / ABS sa presunuli do okna
+     ŠTÚDIO (sekcia Kusovník, pohľady Dielce · Platne · ABS). Zvyšné tri taby sa
+     presťahujú dávkami ŠT-1b (Kontrola) a ŠT-1c (Kovanie, Rozpočet), potom toto
+     okno zanikne. Zoznam tabov číta production.js z DOM — pridanie či odobranie
+     tlačidla si tam nevyžaduje ďalšiu zmenu. -->
+<div class="pvtabs prodtabs" id="prodTabs">
+  <button id="pt_hardware" class="on" onclick="setProdTab('hardware')">Kovanie</button>
   <button id="pt_budget" onclick="setProdTab('budget')">Rozpočet</button>
   <button id="pt_control" onclick="setProdTab('control')">Kontrola <span id="ctrlTabBadge" class="wbadge" style="display:none">0</span></button>
 </div>
 
-<div class="hint" id="prodHint">Klik na riadok (kusovník, kovanie, kontrola) označí dielec/skrinku v modeli.</div>
+<div class="hint" id="prodHint">Klik na riadok (kovanie, kontrola) označí dielec/skrinku v modeli.</div>
 <!-- D-105: lišta zvýraznenia hrán je ZÁMERNE mimo #prodBody — ten scrolluje
      (overflow: auto) a orezal by rozbaľovacie okno prepínačov, ktoré je pod
      tlačidlom ako overlay. Mimo tabu Kontrola je div prázdny a skrytý, takže
@@ -232,21 +231,21 @@
 <div id="prodBody" class="prodbody"><div class="muted">Načítavam…</div></div>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.7.29"></script>
+<script src="js/errors.js?v=0.7.30"></script>
 <!-- D-77: minimalna OBSAHOVA velkost okna pri otvoreni (js/win_fit.js). Tabulky
      kusovnika a rozpoctu maju editovatelne bunky a stlpec akcii vpravo — v uzkom
      okne konci prava cast riadku mimo. -->
 <script>window.NX_FIT_MIN = { w: 640, h: 540 };</script>
-<script src="js/win_fit.js?v=0.7.29"></script>
+<script src="js/win_fit.js?v=0.7.30"></script>
 <!-- D-83: sprite ikon (ziadne emoji v ovladacich prvkoch) — akcia „Nahradiť UNI…"
      v riadku KONTROLY. Musi byt PRED production.js (renderControl pouziva <use>). -->
-<script src="js/icons.js?v=0.7.29"></script>
+<script src="js/icons.js?v=0.7.30"></script>
 <!-- v0.7.28: ZDIELANE 3-stavove nastavenie kontroly hran. TEN ISTY subor nacitava
      aj Inspector (rohovy trojuholnik pri ABS kontrole v raile) — jeden markup,
      jeden stav. Musi byt PRED production.js (lista Kontroly ho vola pri renderi). -->
-<script src="js/edge_menu.js?v=0.7.29"></script>
-<script src="js/production.js?v=0.7.29"></script>
+<script src="js/edge_menu.js?v=0.7.30"></script>
+<script src="js/production.js?v=0.7.30"></script>
 <!-- V0.6 E-b: tab Rozpocet. Az ZA production.js — cita jeho globalny BOM a
      vola renderBody()/NX.setStatus(); production.js volá renderBudget() az pri
      prepnuti tabu, takze poradie definicii sedi. -->
-<script src="js/budget.js?v=0.7.29"></script>
+<script src="js/budget.js?v=0.7.30"></script>

@@ -28,7 +28,12 @@ module Noxun
       # UI-D3: taby okna. ZAVAZNY whitelist deep-linku — panel posiela len meno
       # tabu a server je jedina autorita, ktora rozhodne, ci je platne (JS mirror
       # `NXShell.STUDIO_TABS` je pohodlie, nie ochrana).
-      TABS = %w[rows sheets edging hardware budget control].freeze
+      #
+      # ST-1a: taby `rows`/`sheets`/`edging` ZANIKLI — kusovnik a supisy platni
+      # a ABS su od tejto davky sekciou Kusovnik v okne Studio (pohlady Dielce ·
+      # Platne · ABS). Whitelist ich preto uz NEPOZNA; deep-link na ne ide cez
+      # `StudioDialog::SECTIONS`.
+      TABS = %w[hardware budget control].freeze
 
       class << self
         # `open_tab` = deep-link z Inspectora (⚠ warnpanel -> KONTROLA, „Materiál"
@@ -88,119 +93,24 @@ module Noxun
           Engine.log_error(e, 'ProductionDialog.on_model_changed')
         end
 
-        # V0.5 C: export VEPO — vstup po relay z panela (edity flushnute) alebo
-        # priamo (panel nezije). Poradie: gen check -> flush guard -> vyber
-        # priecinka -> CERSTVY BOM -> build -> atomicky zapis -> ulozit settings.
+        # V0.5 C: export VEPO. ST-1a PR B: telo zije v `ProductionCore` — to iste
+        # robi aj okno Studio a dva takmer rovnake exporty by sa casom rozisli
+        # (a rozdiel by sa ukazal az na vyrobnom vystupe). Okno odovzdava svoj
+        # generacny token, svoj status a svoj refresh.
         def do_export(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
-          unless data['gen'].to_i == @generation.to_i
-            push_state if @dialog && @dialog.visible?
-            return set_status('Dáta okna sa medzitým zmenili — skús export znova.', true)
-          end
-          if data['flush_blocked']
-            return set_status('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
-          end
-
-          settings = vepo_settings
-          last = settings['last_dir']
-          start_dir = last.is_a?(String) && File.directory?(last) ? last : nil
-          dir = UI.select_directory(title: 'Priečinok pre VEPO export', directory: start_dir)
-          return set_status('Export zrušený.') if dir.nil? || dir.to_s.empty?
-
-          model = Sketchup.active_model
-          # Nalez 5: JEDEN cerstvy RAW zber -> nad nim compute AJ Validation.run;
-          # validaciu EXPLICITNE odovzdame do build (prefix statusu + sekcia KONTROLA
-          # v LOGu z TOHO ISTEHO vysledku). Vysledok z DOM je po flushi zastaraly.
-          collected = fresh_collect(model)
-          bom = Bom.compute(collected)
-          control = Validation.run(collected, sheets: sheets_map, edges: edges_map,
-                                   hardware_expansion: hardware_expansion(model, collected),
-                                   placements: collected[:placements])
-          merge = data['merge'] != false
-          result = VepoExport.build(
-            bom[:rows],
-            project: data['project'].to_s,
-            materials: vepo_materials,
-            edge_thicknesses: vepo_edge_thicknesses,
-            validation: control,
-            version: Engine::VERSION,
-            generated_at: Time.now.strftime('%Y-%m-%d %H:%M'),
-            merge_18_36: merge
-          )
-          if result['groups'].empty? && result['errors'].empty?
-            return set_status('Niet čo exportovať — model nemá výrobné dielce.', true)
-          end
-          # GH P2: aj ked su VSETKY riadky chybne, LOG s dovodmi sa MUSI zapisat
-          # (inak by diagnostika chybala presne pri uplne zlyhanom exporte).
-          target = VepoExport.write(result, dir)
-          # Nalez 6: KONTROLA nikdy neblokuje export; jej suhrn ide do statusu.
-          ctrl = control_suffix(control)
-          if result['groups'].empty?
-            save_vepo_settings('last_dir' => dir, 'merge_18_36' => merge)
-            return set_status("Export nevytvoril žiadny CSV — #{result['errors'].length} chybných riadkov. Dôvody v LOGu: #{target}#{ctrl}", true)
-          end
-          save_vepo_settings('last_dir' => dir, 'merge_18_36' => merge)
-          err = result['errors'].empty? ? '' : " · #{result['errors'].length} vyradených riadkov (viď LOG)"
-          set_status("VEPO export hotový: #{result['groups'].length} súborov, #{result['total_rows']} riadkov " \
-                     "(#{result['total_pieces']} ks) → #{target}#{err}#{ctrl}", !result['errors'].empty?)
-        rescue StandardError => e
-          Engine.log_error(e, 'ProductionDialog.do_export')
-          set_status("Chyba exportu: #{e.message}", true)
+          ProductionCore.do_export(Sketchup.active_model, data, generation: @generation,
+                                                                status: status_proc, repush: repush_proc)
         end
 
         # Vstup pre relay z panela (B1): panel uz flushol edity, mozeme vyberat.
-        # Klik nesie KLUC riadku, nie pids (Codex GH #48 P2: flush mohol korpus
-        # rebuildnut a stare pids zomreli) — refs sa hladaju v CERSTVOM zbere.
+        # Telo je v `ProductionCore` (zdielane so Studiom).
         def do_select(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
-          unless data['gen'].to_i == @generation.to_i # B4: stale klik (iny model/stary DOM)
-            push_state if @dialog && @dialog.visible? # re-push len zivemu oknu
-            return
-          end
-
-          model = Sketchup.active_model
-          collected = fresh_collect(model)
-          # Nalez 4: semafor klik nesie STABILNY kluc problemu; validacia sa po
-          # flushi editov PREPOCITA NANOVO a entity sa dohladaju podla identity
-          # (owner_id + part_key), nie podla PID (rebuild ho meni).
-          if data['problem_key']
-            # GH #127 P2: klik-resolve MUSI ratat s rovnakym vstupom ako
-            # push_state — bez hardware_expansion by sa stable kluce novych
-            # ORANGE (hardware_unmapped/hardware_code) nikdy nenasli.
-            item = Validation.run(collected, sheets: sheets_map, edges: edges_map,
-                                  hardware_expansion: hardware_expansion(model, collected),
-                                  placements: collected[:placements])['items']
-                             .find { |it| it['stable_key'] == data['problem_key'] }
-            if item.nil?
-              push_state
-              return set_status('Kontrola sa medzitým zmenila — obnovené, klikni znova.', true)
-            end
-            pids = pids_for_problem(model, item)
-          else
-            pids = refs_for(Bom.compute(collected), data)
-          end
-          targets = pids.filter_map do |pid|
-            ent = model.find_entity_by_persistent_id(pid.to_i)
-            ent if ent && ent.valid? && ent.respond_to?(:definition)
-          end
-          if targets.empty?
-            # riadok/polozka medzitym zanikol (flush editov zmenil rozmery/model) —
-            # obnov data, nech pouzivatel klikne na aktualny riadok
-            push_state
-            return set_status('Zoznam sa medzitým zmenil — obnovené, klikni znova.', true)
-          end
-
-          Panel.suspend_selection_sync do
-            sel = model.selection
-            sel.clear
-            targets.each { |t| sel.add(t) }
-          end
-          Panel.push_selected(model, dedup: false) # B2: ziadna mutacia pri selecte
-          set_status("Vybraných #{targets.length} položiek v modeli.")
-        rescue StandardError => e
-          Engine.log_error(e, 'ProductionDialog.do_select')
-          set_status("Chyba výberu: #{e.message}", true)
+          ProductionCore.do_select(Sketchup.active_model, data, generation: @generation,
+                                                                status: status_proc, repush: repush_proc)
         end
+
 
         # CSV nakupneho zoznamu — server-side z CERSTVEHO modelu (audit N11;
         # flush/generation vzor VEPO: data z DOM su po editoch zastarale).
@@ -216,8 +126,9 @@ module Noxun
           if Array(exp['rows']).empty? && Array(exp['unmapped']).empty?
             return set_status('Model nemá žiadne kovanie — niet čo exportovať.', true)
           end
-          project = data['project'].to_s.strip
-          project = default_project_name(model) if project.empty?
+          # audit #1: nazov projektu je SERVEROVA autorita (jeden nazov pre
+          # VSETKY styri exporty) — z DOM uz nechodi.
+          project = project_name(model)
           fname = "kovanie_#{VepoExport.project_slug(project)}.csv"
           target = UI.savepanel('Uložiť nákupný zoznam kovania', vepo_settings['last_dir'], fname)
           return set_status('Export zrušený.') if target.nil? || target.to_s.empty?
@@ -252,8 +163,7 @@ module Noxun
           budget = budget_payload(model, bom, collected)
           return set_status('Rozpočet sa nepodarilo zostaviť (pozri Ruby konzolu).', true) if budget.nil?
 
-          project = data['project'].to_s.strip
-          project = default_project_name(model) if project.empty?
+          project = project_name(model) # audit #1: server je autorita nazvu
           now = Time.now
           fname = BudgetXlsx.file_name(project, now)
           target = UI.savepanel('Uložiť rozpočet (XLSX)', vepo_settings['last_dir'], fname)
@@ -309,8 +219,7 @@ module Noxun
           spec = CpExport.specification(collected[:records], sheets: smap,
                                                              hardware_expansion: hw_exp, budget: budget)
 
-          project = data['project'].to_s.strip
-          project = default_project_name(model) if project.empty?
+          project = project_name(model) # audit #1: server je autorita nazvu
           now = Time.now
           target = UI.savepanel('Uložiť cenovú ponuku (XLSX)', vepo_settings['last_dir'],
                                 CpXlsx.file_name(project, now))
@@ -540,6 +449,17 @@ module Noxun
         end
 
         private
+
+        # ST-1a PR B: callbacky, ktorymi sa okno prihlasi do zdielaneho jadra
+        # (`ProductionCore.do_export` / `do_select`). `repush` je zamerne
+        # „obnov, ak zijes" — zavretemu oknu netreba pocitat cely BOM.
+        def status_proc
+          ->(msg, error = false) { set_status(msg, error) }
+        end
+
+        def repush_proc
+          -> { refresh_if_open }
+        end
 
         # Jedna mutacia = jedna metoda BudgetStore = jeden undo krok. Validacia
         # aj rozsahy su v BudgetStore (server), tu sa len smeruje.
@@ -903,6 +823,9 @@ module Noxun
           begin
             MaterialsDialog.push_catalog if defined?(MaterialsDialog)
             Panel.push_materials if defined?(Panel)
+            # ST-1a: ceny sa prave zmenili GLOBALNE — otvorene Studio by inak
+            # drzalo stare cisla (audit #10: obe okna v tych istych 5 cestach).
+            StudioDialog.refresh_if_open if defined?(StudioDialog)
             # GH #140 P2: prepočet mení AJ ceny kovania — otvorené okno Katalóg
             # kovania by inak držalo starú cenu a starý row_rev (jeho ďalšia
             # úprava by skončila ako konflikt).
@@ -982,44 +905,22 @@ module Noxun
           ProductionCore.default_project_name(model)
         end
 
-        # Cerstvy RAW zber s dedup tickom (Codex GH #48 P2: cerstve kopie mozu
-        # zdielat ID — rovnaky sync tick ako push_selected, inak BOM zlieva
-        # vlastnikov a klik-select je nejednoznacny). JEDEN collect pre kusovnik,
-        # semafor aj VEPO (nalez 5) — compute/Validation citaju TEN ISTY zber.
-        def fresh_collect(model)
-          CabinetBuilder.dedup_copies(model) if defined?(CabinetBuilder)
-          BoardBuilder.dedup_copies(model) if defined?(BoardBuilder)
-          Bom.collect(model)
+        # ST-1a (audit #1): nazov projektu drzi SERVER (mapa `project_names`
+        # v %APPDATA%, kluc = model_guid) — vsetky styri exporty citaju TENTO
+        # nazov, aby sa dva vystupy tej istej zakazky nemohli volat rozne.
+        def project_name(model)
+          ProductionCore.project_name(model)
         end
 
-        # V0.6 D1b: nakupny zoznam kovania. Stav snapshotu setov (audit F9):
-        # :ok = snapshot projektu · :missing = projekt este sety nezmrazil ->
-        # global default LEN NA CITANIE (okno Vyroba je read-only; zmrazi ho az
-        # prva stavba/zmena predvolby) · :invalid = NIC sa nemapuje (vsetko
-        # unmapped ORANGE) + banner, NIKDY tichy fallback na dnesny global.
+        # Cerstvy RAW zber s dedup tickom (telo v ProductionCore — to iste
+        # potrebuje aj okno Studio).
+        def fresh_collect(model)
+          ProductionCore.fresh_collect(model)
+        end
+
+        # V0.6 D1b: nakupny zoznam kovania (telo v ProductionCore).
         def hardware_expansion(model, collected)
-          status, state = HardwareSets.project_state_status(model)
-          if status == :missing
-            lib = HardwareSets.load
-            by_id = {}
-            lib['sets'].each { |s| by_id[s['set_id']] = s }
-            state = { 'mapping' => lib['mapping'], 'sets' => by_id }
-          end
-          exp = HardwareSets.expand(
-            Array(collected[:hardware]), state,
-            cabinet_overrides: collected[:cabinet_sets].is_a?(Hash) ? collected[:cabinet_sets] : {},
-            catalog: HardwareCatalog.items
-          )
-          # H1b (audit FIX 9 UI): dovod dostane SK text uz na SERVERI — tab
-          # Kovanie aj CSV citaju to iste 'reason_sk' (JS ziadny vlastny
-          # preklad enumu nema).
-          exp['unmapped'] = Array(exp['unmapped']).map do |u|
-            u.is_a?(Hash) ? u.merge('reason_sk' => HardwareSets.unmapped_reason_sk(u)) : u
-          end
-          exp.merge('state_status' => status.to_s)
-        rescue StandardError => e
-          Engine.log_error(e, 'ProductionDialog.hardware_expansion')
-          nil
+          ProductionCore.hardware_expansion(model, collected)
         end
 
         # CSV kovania: vstup z okna — rovnaky flush handshake ako VEPO export
@@ -1084,10 +985,7 @@ module Noxun
 
         # Suhrn KONTROLY do statusu okna/exportu (nalez 6: RED neblokuje export).
         def control_suffix(control)
-          c = control.is_a?(Hash) ? (control['counts'] || {}) : {}
-          return '' if c['total'].to_i.zero?
-
-          " · KONTROLA: #{c['red'].to_i}× RED, #{c['orange'].to_i}× ORANGE (v LOGu)"
+          ProductionCore.control_suffix(control)
         end
 
         # ST-1a PR A: vyberove resolvery ziju v ProductionCore (to iste hladanie
@@ -1175,11 +1073,14 @@ module Noxun
             # K2/D-87: stav kresby smeru dekoru (tab KONTROLA, vedla zvyraznenia
             # hran). Vypnuta = ziadny sken.
             grain_check: (defined?(GrainCheck) ? GrainCheck.ui_state(model) : nil),
-            # V0.5 C: default projektu + zapamatany merge (JS input lifecycle F10);
+            # ST-1a (audit #1): nazov projektu je SERVEROVY UDAJ a okno Vyroba
+            # ho uz needituje — ukazuje ho ako TEXT v hlavicke (vystup sa nesmie
+            # tvarit ako vstup). Editovatelny input zije v liste Kusovnika
+            # v okne Studio; obe okna citaju tuto istu hodnotu.
             # model_key = epocha prepnuti + cesta (GH P2: rovnake tituly nestacia)
-            vepo: { default_project: default_project_name(model),
+            vepo: { project: project_name(model),
                     model_key: "#{@model_epoch.to_i}:#{model.path}",
-                    merge_18_36: vepo_settings['merge_18_36'] != false },
+                    merge_18_36: ProductionCore.merge_18_36 },
             # UI-D3: deep-link z Inspectora. Posiela sa PRAVE RAZ (hodnota sa tu
             # spotrebuje) — inak by kazdy dalsi refresh okna vratil pouzivatela
             # na tab, z ktoreho medzitym odisiel. nil = tab sa neprepina.

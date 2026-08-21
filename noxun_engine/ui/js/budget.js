@@ -661,10 +661,9 @@
   function budCpExport(){
     if (!BOM || !window.sketchup || !sketchup.cp_xlsx) return;
     NX.setStatus('Pripravujem cenovú ponuku…', false);
-    sketchup.cp_xlsx(JSON.stringify({
-      gen: BOM.gen,
-      project: (budEl('vepoProject') ? budEl('vepoProject').value : '').trim()
-    }));
+    // ST-1a (audit #1): nazov projektu je SERVEROVY udaj — z DOM sa uz
+    // neposiela (input zije v liste Kusovnika v okne Studio).
+    sketchup.cp_xlsx(JSON.stringify({ gen: BOM.gen }));
   }
 
   function budFootHtml(){
@@ -1051,10 +1050,8 @@
   function budXlsx(){
     if (!BOM || !window.sketchup || !sketchup.budget_xlsx) return;
     NX.setStatus('Pripravujem XLSX rozpočet…', false);
-    sketchup.budget_xlsx(JSON.stringify({
-      gen: BOM.gen,
-      project: (budEl('vepoProject') ? budEl('vepoProject').value : '').trim()
-    }));
+    // ST-1a (audit #1): nazov projektu cita SERVER — z DOM uz nechodi.
+    sketchup.budget_xlsx(JSON.stringify({ gen: BOM.gen }));
   }
 
   // GH #138 P2: draft sa NEZAHADZUJE pri odoslani. Server moze zapis odmietnut

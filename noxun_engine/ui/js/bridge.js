@@ -360,6 +360,33 @@
       p.flush_blocked = blocked;
       if (window.sketchup && sketchup.production_do_budget) sketchup.production_do_budget(JSON.stringify(p));
     },
+    // ST-1a (audit #3): okno ŠTÚDIO ma VLASTNY kanal. Tvar handshaku je
+    // identicky s `productionRelay*` — lisi sa LEN cielovy callback, aby
+    // odpoved prisla do TOHO okna, ktore klikalo (kazde okno ma vlastny `gen`
+    // a cudzi push by mu klik odmietol).
+    studioRelay: function(p){
+      if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+      if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
+      if (window.sketchup && sketchup.studio_do_select) sketchup.studio_do_select(JSON.stringify(p));
+    },
+    // Export VEPO zo Studia: pri neplatnych poliach panela sa export ZASTAVI
+    // (flush by edity ticho neaplikoval a exportoval by sa stary model = zla
+    // objednavka) — rovnake pravidlo ako pri okne Vyroba.
+    studioRelayExport: function(p){
+      var blocked = false;
+      try {
+        if (typeof validateFields === 'function' && typeof selectedCabId !== 'undefined' &&
+            selectedCabId && !validateFields()) blocked = true;
+        var badStudio = document.querySelector('#boardCard input.bad, #boardCard .bad');
+        if (badStudio) blocked = true;
+      } catch (e) { blocked = false; }
+      if (!blocked){
+        if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+        if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
+      }
+      p.flush_blocked = blocked;
+      if (window.sketchup && sketchup.studio_do_export) sketchup.studio_do_export(JSON.stringify(p));
+    },
     // V0.6 E-b2: cenova ponuka pre zakaznika — CP je VIEW nad rozpoctom, takze
     // potrebuje presne ten isty flush handshake (inak by zakaznik dostal sumu
     // zo stareho modelu).

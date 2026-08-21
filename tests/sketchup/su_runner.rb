@@ -4924,6 +4924,137 @@ module NoxunSuRunner
     end
   end
 
+  # ===== ST-1a: okno ŠTÚDIO — sekcia Kusovník ================================
+  # Preco to headless sada NEOVERI: Studio ma VLASTNY generacny token, vlastny
+  # relay a vlastnu cestu na zmenu vyberu v ZIVOM modeli. Tu sa dokazuje, ze
+  #   - `show` odlozi deep-link sekciu a `push_state` ju spotrebuje PRAVE RAZ,
+  #   - payload nesie cisla ZO ZIVEHO modelu (riadky, medzisucty, popisky),
+  #   - klik na riadok naozaj oznaci ten dielec — a NEPRIDA krok Spat,
+  #   - stary klik (zla generacia) vyber NEZMENI a export sa ODMIETNE,
+  #   - nazov projektu sa zapise a precita zo servera (a model ostane nedotknuty).
+  def run_st1a(model)
+    cleanup(model)
+    return ok('ST-1a: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
+
+    core = e::ProductionCore
+    inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 900.0,
+                                            'height' => 720.0, 'depth' => 560.0 })
+    return ok('ST-1a: vlozenie skrinky pre kusovnik', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id').to_s
+    before_ents = model.entities.length
+
+    # --- 1) deep-link: sekcia sa odlozi a spotrebuje sa PRAVE RAZ -------------
+    dlg = e::StudioDialog.show(open_section: 'bom', anchor: cid)
+    ok('ST-1a: show odlozil sekciu deep-linku', e::StudioDialog.instance_variable_get(:@pending_section) == 'bom')
+    ok('ST-1a: show odlozil aj kotvu hladania (N13 → ID skrinky)',
+       e::StudioDialog.instance_variable_get(:@pending_anchor) == cid)
+    # Okno hned zatvarame — test nesmie nechat visiet HtmlDialog (dalsie kroky
+    # bezia nad tou istou serverovou cestou, `js()` ma vlastny guard).
+    begin
+      dlg.close if dlg && dlg.respond_to?(:close)
+    rescue StandardError => ex
+      info("ST-1a: zatvorenie okna: #{ex.class}: #{ex.message}")
+    end
+
+    e::StudioDialog.send(:push_state)
+    gen = e::StudioDialog.instance_variable_get(:@generation).to_i
+    ok("ST-1a: push_state zdvihol vlastnu generaciu (gen=#{gen})", gen.positive?)
+    ok('ST-1a: deep-link sekcia sa SPOTREBOVALA (druhy push uz nic nevracia)',
+       e::StudioDialog.instance_variable_get(:@pending_section).nil?)
+    ok('ST-1a: a kotva tiez (inak by sa filter vracal po kazdom refreshi)',
+       e::StudioDialog.instance_variable_get(:@pending_anchor).nil?)
+
+    # --- 2) payload nesie cisla ZO ZIVEHO modelu -----------------------------
+    collected = core.fresh_collect(model)
+    bom = e::Bom.compute(collected)
+    rows = core.rows_with_roles(bom[:rows], collected)
+    ok("ST-1a: kusovnik ma riadky zo zivej skrinky (#{rows.length})", !rows.empty?)
+    ok('ST-1a: riadok nesie SERVEROVY text roly (stlpec Š2 „Rola")',
+       rows.any? { |r| !r['role_label'].to_s.empty? })
+    meta = core.materials_meta(bom)
+    mids = bom[:sheets].map { |s| s['material_id'] }
+    ok('ST-1a: materials_meta pozna KAZDY material kusovnika (skupiny Š1)',
+       mids.all? { |id| meta.key?(id) })
+    ok('ST-1a: medzisucet skupiny je SERVEROVE cislo (m² per material)',
+       bom[:sheets].all? { |s| s['m2'].to_f.positive? && s['quantity'].to_i.positive? })
+
+    # --- 3) klik na riadok oznaci dielec a NEPRIDA krok Spat -----------------
+    model.selection.clear
+    row = rows.first
+    e::StudioDialog.do_select({ 'gen' => gen, 'parts_key' => row['key'] }.to_json)
+    sel = model.selection.to_a
+    ok("ST-1a: klik na riadok kusovnika oznacil dielec v modeli (#{sel.length})", !sel.empty?)
+    ok('ST-1a: oznacene su DIELCE, nie cely korpus',
+       !sel.empty? && sel.none? { |x| x == inst })
+    ok('ST-1a: vyber NEMENI model (ziadna entita naviac ani menej)',
+       model.entities.length == before_ents)
+
+    # Ceruzka (Š3) = ten isty vyber + Inspector dopredu. Ked panel nezije,
+    # nesmie sa OTVORIT — akcia ma len zdvihnut existujuce okno.
+    panel_before = e::Panel.dialog_alive?
+    e::StudioDialog.do_select({ 'gen' => gen, 'parts_key' => row['key'],
+                                'focus_inspector' => true }.to_json)
+    ok('ST-1a: ceruzka Inspector NEOTVARA (len zdviha uz otvoreny)',
+       e::Panel.dialog_alive? == panel_before)
+    ok('ST-1a: ani ceruzka model nezmenila', model.entities.length == before_ents)
+
+    # --- 4) guard starej generacie ------------------------------------------
+    model.selection.clear
+    model.selection.add(inst)
+    e::StudioDialog.do_select({ 'gen' => gen - 1, 'parts_key' => row['key'] }.to_json)
+    ok('ST-1a: klik so STAROU generaciou vyber NEZMENI (stary DOM / iny model)',
+       model.selection.to_a == [inst])
+    # Export s neplatnou generaciou sa musi odmietnut EST PRED dialogom na vyber
+    # priecinka — inak by sa v teste otvorilo modalne okno a beh by zamrzol.
+    gen_before = e::StudioDialog.instance_variable_get(:@generation).to_i
+    e::StudioDialog.do_export({ 'gen' => gen_before - 99 }.to_json)
+    ok('ST-1a: export so STAROU generaciou sa odmietol (bez dialogu priecinka)',
+       model.entities.length == before_ents)
+    e::StudioDialog.do_export({ 'gen' => e::StudioDialog.instance_variable_get(:@generation).to_i,
+                                'flush_blocked' => true }.to_json)
+    ok('ST-1a: export s cervenym polom panela sa odmietol (flush guard)',
+       model.entities.length == before_ents)
+
+    # --- 5) nazov projektu je SERVEROVY (audit #1) ---------------------------
+    guid = core.model_guid(model)
+    if guid.empty?
+      info('ST-1a: model nema guid — zapis nazvu projektu sa preskocil (test okna).')
+    else
+      original = core.project_names[guid]
+      begin
+        saved = core.save_project_name(model, 'SU TEST PROJEKT')
+        ok('ST-1a: nazov projektu sa ULOZIL na serveri', saved == 'SU TEST PROJEKT')
+        ok('ST-1a: a cita ho ta ista cesta, akou ho citaju exporty',
+           core.project_name(model) == 'SU TEST PROJEKT')
+        ok('ST-1a: zapis nazvu NEMENI model (nastavenie pocitaca, nie zakazky)',
+           model.entities.length == before_ents)
+        core.save_project_name(model, '')
+        ok('ST-1a: vymazany nazov padne spat na nazov suboru zakazky',
+           core.project_name(model) == core.default_project_name(model))
+      ensure
+        # Testovaci zaznam po sebe upratame — je to realny %APPDATA% subor.
+        map = core.project_names.dup
+        if original.nil?
+          map.delete(guid)
+        else
+          map[guid] = original
+        end
+        core.save_vepo_settings(e::ProductionCore::PROJECT_NAMES_KEY => map)
+      end
+    end
+
+    # Poslednou modelovou operaciou je vlozenie skrinky — keby bol vyber alebo
+    # zapis nazvu vlastnou operaciou, 1x Spat by vratil JU a skrinka by ostala.
+    Sketchup.undo
+    ok('ST-1a: 1x Spat zmaze skrinku (Studio nepridalo ziadny krok Spat)',
+       inst.nil? || !inst.valid?)
+
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: ST-1a sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   def run_async(model, done)
     state = {}
     steps = []
@@ -5568,6 +5699,8 @@ module NoxunSuRunner
     # posielaju gen 0 a stale guard by ich falosne odmietol (nalez 30.7.:
     # 4x FAIL select-cez-kluc bez realnej regresie). Cerstva instancia ma nil.
     e::ProductionDialog.instance_variable_set(:@generation, 0) if defined?(e::ProductionDialog)
+    # ST-1a: to iste plati pre okno Studio — ma VLASTNY generacny token.
+    e::StudioDialog.instance_variable_set(:@generation, 0) if defined?(e::StudioDialog)
     run_sync(model)
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18
     run_sync_rails(model)    # H3/D-80: vnutro pod vystuhami (odsadenie, upright, chrbat, odmietnutie)
@@ -5594,6 +5727,7 @@ module NoxunSuRunner
     run_k2(model)            # K2/D-87: kresba smeru v modeli — lifecycle overlayu, ziadny undo krok, otocenie po prestavbe
     run_uid2(model)          # UI-D2: PNG nahlady sablon — capture, KOMPLETNA obnova kamery (persp. aj orto), ziadny undo krok
     run_smoke1(model)        # SMOKE PACK 1 (6A): rucne odfotenie nahladu k ULOZENEJ sablone — guardy vyberu, ziadny undo krok
+    run_st1a(model)          # ST-1a: okno Studio — deep-link sekcie, kusovnik zo ziveho modelu, klik-select bez undo kroku, serverovy nazov projektu
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

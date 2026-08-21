@@ -1435,6 +1435,9 @@ module Noxun
           # D-19 (Codex F3): otvorene okno Vyroba by inak drzalo stary odhad
           # platni (format sa prave mohol zmenit)
           ProductionDialog.refresh_if_open if defined?(ProductionDialog)
+          # ST-1a: to iste plati pre Studio — skupiny Kusovnika nesu farbu,
+          # nazov a hrubku PRIAMO z katalogu.
+          StudioDialog.refresh_if_open if defined?(StudioDialog)
         end
       end
     end

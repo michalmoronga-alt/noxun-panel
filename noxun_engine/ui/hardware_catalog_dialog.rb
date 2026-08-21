@@ -284,6 +284,7 @@ module Noxun
           push_sets
           Panel.push_hardware_sets if defined?(Panel) && Panel.dialog_alive?
           ProductionDialog.on_model_changed(model) if model && defined?(ProductionDialog)
+          StudioDialog.on_model_changed(model) if model && defined?(StudioDialog) # ST-1a
         end
 
         # Hodnota mapovania z okna: 'value' = set_id String ALEBO selector Hash
