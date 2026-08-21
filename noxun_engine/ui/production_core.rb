@@ -156,11 +156,19 @@ module Noxun
       # prepise nazov v Studiu, exportuje z Vyroby pod inym menom (a naopak) —
       # dva vystupy tej istej zakazky by sa volali rozne.
       #
-      # Preto nazov zije v `vepo_settings.json` pod mapou `project_names`
-      # (kluc = `model_guid`). Je to nastavenie POCITACA, presne ako
-      # `last_dir`/`merge_18_36`: ziadny zapis do modelu, ziadny krok Spat.
-      # VSETKY styri exporty (VEPO, CSV kovania, XLSX rozpoctu, XLSX cenovej
-      # ponuky) citaju `project_name(model)` — z klienta uz nazov neprichadza.
+      # Preto nazov zije v `vepo_settings.json` pod mapou `project_names`.
+      # Je to nastavenie POCITACA, presne ako `last_dir`/`merge_18_36`: ziadny
+      # zapis do modelu, ziadny krok Spat. VSETKY styri exporty (VEPO, CSV
+      # kovania, XLSX rozpoctu, XLSX cenovej ponuky) citaju `project_name(model)`
+      # — z klienta uz nazov neprichadza.
+      #
+      # KLUC JE CESTA SUBORU, NIE `model.guid` (review PR #193 P1). SketchUp
+      # dokumentuje, ze guid sa MENI po kazdom ulozeni modelu — na guid kluci by
+      # sa nazov po Ctrl+S ticho stratil (a v subore by rastli mrtve zaznamy).
+      # Cesta sa normalizuje (Windows je case-insensitive, oddelovace sa
+      # zjednocuju). NEULOZENY model cestu nema, takze dostane NAHRADNY kluc
+      # `guid:<guid>` — ten plati len v ramci sedenia; pri prvom zapise s
+      # platnou cestou sa zaznam ZMIGRUJE na cestu a guid zaznam zanikne.
       PROJECT_NAMES_KEY = 'project_names'
       PROJECT_NAME_MAX = 120 # strop proti nezmyslu z JS (nazov ide do mena suboru)
 
@@ -169,12 +177,39 @@ module Noxun
         v.is_a?(Hash) ? v : {}
       end
 
-      # Ulozeny nazov, inak default zo suboru zakazky. Model bez guid (a teda
-      # bez identity) ma vzdy default — inak by si dva dokumenty prepisovali
-      # ten isty zaznam.
-      def project_name(model)
+      # Stabilna identita zakazky pre nastavenia POCITACA. Windows nerozlisuje
+      # velkost pismen ani smer lomitka, takze „C:\Zakazky\Klinika.skp" a
+      # „c:/zakazky/klinika.skp" musia dat TEN ISTY kluc.
+      def normalize_project_path(path)
+        path.to_s.strip.tr('\\', '/').downcase
+      end
+
+      # Nahradny kluc neulozeneho modelu — plati LEN v ramci sedenia (guid sa
+      # po ulozeni zmeni). Preto ma vlastny prefix: aby sa dal rozoznat od
+      # cesty a pri prvom ulozeni zmigrovat.
+      def project_session_key(model)
         guid = model_guid(model)
-        saved = guid.empty? ? nil : project_names[guid]
+        guid.empty? ? '' : "guid:#{guid}"
+      end
+
+      # Primarny kluc: cesta, ak zakazka existuje na disku; inak sedenie.
+      def project_key(model)
+        path = normalize_project_path(model.respond_to?(:path) ? model.path : nil)
+        path.empty? ? project_session_key(model) : path
+      end
+
+      # Ulozeny nazov, inak default zo suboru zakazky.
+      #
+      # Ked uz zakazka MA cestu, ale zaznam pod nou este nie je, skusi sa este
+      # kluc sedenia — to je presne stav „pomenoval som neulozeny model a potom
+      # ho ulozil". Bez tejto zalozky by sa nazov pri Ctrl+S stratil.
+      def project_name(model)
+        map = project_names
+        saved = map[project_key(model)]
+        if saved.to_s.strip.empty?
+          session = project_session_key(model)
+          saved = map[session] unless session.empty? || session == project_key(model)
+        end
         s = saved.to_s.strip
         s.empty? ? default_project_name(model) : s
       end
@@ -182,16 +217,22 @@ module Noxun
       # Zapis nazvu. Prazdna hodnota (aj hodnota zhodna s defaultom) zaznam
       # ZMAZE — pomenovanie sa vtedy vrati na nazov .skp suboru a premenovanie
       # suboru sa v okne prejavi samo. Vracia nazov, ktory PLATI po zapise.
+      #
+      # MIGRACIA: ked zakazka uz ma cestu, zaznam pod klucom sedenia (guid) sa
+      # pri kazdom zapise ZAHADZUJE — jeho ulohu prebrala cesta a guid by po
+      # dalsom ulozeni aj tak prestal sediet.
       def save_project_name(model, name)
-        guid = model_guid(model)
-        return project_name(model) if guid.empty?
+        key = project_key(model)
+        return project_name(model) if key.empty?
 
         s = name.to_s.strip[0, PROJECT_NAME_MAX].to_s.strip
         map = project_names.dup
+        session = project_session_key(model)
+        map.delete(session) if !session.empty? && session != key
         if s.empty? || s == default_project_name(model)
-          map.delete(guid)
+          map.delete(key)
         else
-          map[guid] = s
+          map[key] = s
         end
         save_vepo_settings(PROJECT_NAMES_KEY => map)
         project_name(model)
@@ -575,8 +616,11 @@ module Noxun
       # modelu sa nezapisuje nic.
       def do_select(model, data, generation:, status:, repush:)
         unless data['gen'].to_i == generation.to_i # B4: stale klik (iny model/stary DOM)
+          # Review PR #193 P2: tichy no-op tu bol chyba — pouzivatel klikol,
+          # v modeli sa nic neoznacilo a okno mlcalo. Data sa obnovia A POVIE
+          # sa to (rovnaky vzor ako pri exporte).
           repush.call
-          return
+          return status.call('Dáta okna sa medzitým obnovili — klikni znova.', true)
         end
 
         collected = fresh_collect(model)

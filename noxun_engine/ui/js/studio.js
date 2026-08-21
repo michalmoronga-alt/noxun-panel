@@ -64,7 +64,8 @@
       { id: 'tpl',    ic: 'star',     t: 'Šablóny',   bridge: 'zatiaľ vlastné okno — presun v ŠT-3' }
     ] },
     { grp: 'NASTAVENIA', items: [
-      { id: 'sup',    ic: 'truck', t: 'Dodávateľ / Demos', bridge: 'zatiaľ vlastné okno — presun v ŠT-4' },
+      { id: 'sup',    ic: 'truck', t: 'Dodávateľ / Demos',
+        bridge: 'sadzby sú v okne Nastavenia rozpočtu, väzba na Demos v okne Materiály — spoja sa v ŠT-4' },
       { id: 'bset',   ic: 'euro',  t: 'Nastavenia rozpočtu', bridge: 'zatiaľ vlastné okno — presun v ŠT-4' },
       { id: 'about',  ic: 'info',  t: 'O plugine', bridge: 'obsah je v koliesku Inspectora' }
     ] }
@@ -162,7 +163,14 @@
   function cellValue(row, key){
     var r = row || {};
     if (key === 'name') return (r.names || []).join(' / ');
-    if (key === 'cab') return (r.kde || []).map(function(k){ return k.owner_id; }).join(', ');
+    // Skrinka nesie AJ pocet kusov na vlastnika (vzor okna Vyroba): riadok sa
+    // agreguje naprieč skrinkami, takze bez poctu by sa nedalo povedat, kolko
+    // ktora z nich potrebuje.
+    if (key === 'cab'){
+      return (r.kde || []).map(function(k){
+        return k.owner_id + (k.quantity == null ? '' : ' ×' + k.quantity);
+      }).join(', ');
+    }
     if (key === 'l') return r.length;
     if (key === 'w') return r.width;
     if (key === 'th') return r.thickness;
@@ -287,6 +295,22 @@
       if (!e) return;
       e.textContent = msg;
       e.className = err ? 'err' : 'ok';
+    },
+    // Maly echo push LISTY (nazov projektu + merge) po zapise nastavenia.
+    // ZAMERNE neprekresluje celu listu: pouzivatel moze mat kurzor v poli
+    // Projekt a re-render by mu ho vzal pod rukami. Hodnota inputu sa preto
+    // nasadzuje LEN ked v nom prave nepise.
+    setVepoBar: function(state){
+      if (!ST) return;
+      ST.vepo = state || ST.vepo;
+      var v = ST.vepo || {};
+      var inp = el('prjInput');
+      if (inp && (typeof document === 'undefined' || document.activeElement !== inp)){
+        inp.value = v.project || '';
+      }
+      if (inp) inp.placeholder = v.default_project || 'projekt';
+      var chk = el('mergeChk');
+      if (chk) chk.checked = v.merge_18_36 !== false;
     }
   };
 
@@ -365,7 +389,13 @@
       '<input type="checkbox" id="mergeChk"' + (v.merge_18_36 === false ? '' : ' checked') + '> 18+36 spolu</label>' +
       '<span class="spacer"></span>' +
       '<div class="searchbox">' + ico('search') +
-      '<input id="bomSearch" placeholder="Hľadať dielec / skrinku…" value="' + esc(bomQ) + '"></div>';
+      '<input id="bomSearch" placeholder="Hľadať dielec / skrinku…" value="' + esc(bomQ) + '"></div>' +
+      // Kusovnik je zivy (server pushuje pri prepnuti modelu a po zmene
+      // katalogu), ale prestavba skrinky z Inspectora sem sama nedorazi — okno
+      // musi mat rucnu cestu k cerstvym cislam, inak by sa VEPO exportovalo
+      // zo starych.
+      '<button type="button" class="ghostbtn" id="refreshBtn"' +
+      ' title="Prepočítať kusovník z aktuálneho modelu">' + ico('refresh-cw') + ' Obnoviť</button>';
     if (bomView === 'parts'){
       h += '<button type="button" class="ghostbtn" id="colBtn"' +
            ' title="Voliteľné stĺpce — voľba sa pamätá na tomto počítači" aria-expanded="' +
@@ -468,35 +498,81 @@
   }
 
   // ------------------------------------------------------- pohlad PLATNE
+  //
+  // 2B-1 / D-43 DUPLAK: material, ktoreho plocha vznikla LEN z duplakovych
+  // dielcov, NIE JE v `sheets` (nema vlastne vyrobne dielce), ale JE
+  // v `sheet_estimate` — lebo sa reálne nakupuje. Keby tabulka isla iba cez
+  // `sheets`, ten nakup by z nej zmizol a suctovy riadok (ktory rata cez VSETKY
+  // polozky odhadu) by s nou nesedel. Preto sa zoznam sklada z OBOCH zdrojov.
+  function sheetRows(sheets, estimate, rows){
+    var est = {};
+    (estimate || []).forEach(function(e){ est[e.material_id] = e; });
+    // Vazby duplakov z BOM riadkov. GH #94 P2: rovnaky material moze niest
+    // ROZNE vazby (katalog sa zmenil medzi rebuildmi — BOM ich drzi oddelene
+    // v kluci), preto ZOZNAM, nie posledna hodnota.
+    var dup = {};
+    (rows || []).forEach(function(r){
+      if (!r || !r.material_source) return;
+      var lbl = 'lepí sa ' + r.material_source.multiplier + '× z ' + r.material_source.material_id;
+      var list = dup[r.material_id] = dup[r.material_id] || [];
+      if (list.indexOf(lbl) < 0) list.push(lbl);
+    });
+    var out = [];
+    var seen = {};
+    (sheets || []).forEach(function(s){
+      seen[s.material_id] = true;
+      out.push({ mid: s.material_id, m2: s.m2, quantity: s.quantity,
+                 est: est[s.material_id] || null, dup: dup[s.material_id] || [],
+                 purchaseOnly: false });
+    });
+    (estimate || []).forEach(function(e){
+      if (seen[e.material_id]) return;
+      out.push({ mid: e.material_id, m2: e.m2, quantity: null, est: e,
+                 dup: dup[e.material_id] || [], purchaseOnly: true });
+    });
+    return out;
+  }
+
   function sheetsTable(){
     var meta = ST.materials_meta || {};
-    var est = {};
-    (ST.sheet_estimate || []).forEach(function(e){ est[e.material_id] = e; });
-    var list = (ST.sheets || []).filter(function(s){
+    var list = sheetRows(ST.sheets, ST.sheet_estimate, ST.rows).filter(function(s){
       if (!bomQ) return true;
-      var m = meta[s.material_id] || {};
-      return normText((m.label || '') + ' ' + s.material_id).indexOf(normText(bomQ)) >= 0;
+      var m = meta[s.mid] || {};
+      return normText((m.label || '') + ' ' + s.mid).indexOf(normText(bomQ)) >= 0;
     });
     var h = '<table class="bomtab flat"><thead><tr><th>Materiál</th><th class="num">Hrúbka</th>' +
       '<th>Formát platne</th><th class="num">Dielcov</th><th class="num">m² dielcov</th>' +
       '<th class="num">Odhad platní</th></tr></thead><tbody>';
     list.forEach(function(s){
-      var m = meta[s.material_id] || {};
-      var e = est[s.material_id];
+      var m = meta[s.mid] || {};
+      var e = s.est;
       var hex = rgbHex(m.color);
+      var fb = e && e.fallback;
       var fmt = e ? (num(e.sheet_size[0]) + ' × ' + num(e.sheet_size[1])) : '—';
       var pl = e ? (num(e.count_min, 1) + ' – ' + num(e.count_max, 1)) : '—';
-      var fb = e && e.fallback;
-      h += '<tr class="sheetrow" data-mid="' + esc(s.material_id) + '">' +
+      // M-B1 (audit F7): UNI = materiál neurčený — počet platní je len
+      // orientačný (formát je pracovný default), NIE nákupné číslo.
+      var plNote = (e && e.uni === true) ? ' <span class="muted">(orientačne — UNI)</span>' : '';
+      // Duplák bez vlastnej platne: kupuje sa ZDROJ, tak to bunka aj povie.
+      if (!e && s.dup.length){ pl = esc(s.dup.join(' · ')); plNote = ''; }
+      // Anotácia „+X dupl.": m² nákupu je väčšie než m² vlastných dielcov.
+      var m2cell = '<b>' + num(s.m2, 2) + '</b>';
+      if (e && e.doubled_m2){
+        m2cell = '<b>' + num(e.m2, 2) + '</b> <span class="muted" title="Nákup vrátane duplákov: ' +
+                 'vlastné dielce + ' + num(e.doubled_m2, 2) + ' m² z ' + num(e.doubled_quantity) +
+                 ' ks duplákov">(+' + num(e.doubled_m2, 2) + ' dupl.)</span>';
+      }
+      h += '<tr class="sheetrow" data-mid="' + esc(s.mid) + '">' +
         '<td>' + (hex ? '<span class="cellsw" style="background:' + hex + '"></span>' : '') +
-          esc(m.label || s.material_id) +
-          (e && e.uni === true ? ' <span class="wtagchip">UNI</span>' : '') + '</td>' +
+          esc(m.label || s.mid) +
+          (e && e.uni === true ? ' <span class="wtagchip">UNI</span>' : '') +
+          (s.purchaseOnly ? ' <span class="muted">(nákup pre dupláky)</span>' : '') + '</td>' +
         '<td class="num">' + (m.th == null ? '—' : num(m.th) + ' mm') + '</td>' +
         '<td' + (fb ? ' class="estfb" title="Materiál nemá formát v katalógu — použitý 2800×2070"' : '') +
           '>' + esc(fmt) + '</td>' +
-        '<td class="num">' + num(s.quantity) + '</td>' +
-        '<td class="num">' + num(s.m2, 2) + '</td>' +
-        '<td class="num"><b>' + esc(pl) + '</b></td></tr>';
+        '<td class="num">' + (s.quantity == null ? '—' : num(s.quantity)) + '</td>' +
+        '<td class="num">' + m2cell + '</td>' +
+        '<td class="num"><b>' + pl + '</b>' + plNote + '</td></tr>';
     });
     h += '</tbody></table>';
     if (!list.length) h += '<div class="muted" style="padding:14px 4px">Filtru nezodpovedá žiadny materiál.</div>';
@@ -504,7 +580,9 @@
     h += '<div class="totrow" style="margin-top:10px"><span>Spolu <b>odhad ' +
       num(t.plates_min, 1) + ' – ' + num(t.plates_max, 1) + ' platní</b> · ' + num(t.m2, 2) +
       ' m² dielcov</span><span class="spacer"></span>' +
-      '<span class="tmuted">orientačný rozsah (prerez 10–25 %), NIE nárezový plán</span></div>';
+      '<span class="tmuted">orientačný rozsah (prerez 10–25 %), NIE nárezový plán</span></div>' +
+      '<div class="hint">Duplák sa lepí zo zdrojových platní — jeho plocha sa počíta do nákupu ' +
+      'zdroja. Nákupné bm ABS s rezervou a ceny sú v Rozpočte (zatiaľ okno Výroba).</div>';
     return h;
   }
 
@@ -535,7 +613,13 @@
     var t = ST.totals || {};
     h += '<div class="totrow" style="margin-top:10px"><span>Spolu <b>' + num(t.bm, 1) +
       ' bm</b> · ' + num(t.edges) + ' pások</span><span class="spacer"></span>' +
-      '<span class="tmuted">bm bez rezervy — nákupné bm sú v Rozpočte</span></div>';
+      '<span class="tmuted">spotreba bez rezervy</span></div>' +
+      // VEDOMA ODCHYLKA ST-1a: stlpce „bm s rezervou" a „€/bm" tu NIE SU —
+      // obe cisla pochadzaju z payloadu ROZPOCTU, ktory Studio zatial nepocita
+      // (Rozpocet je premostenie do okna Vyroba, presun az v ŠT-1c). Prazdny
+      // stlpec by klamal, dopocitat rezervu v klientovi je zakazane.
+      '<div class="hint">Nákupné bm s rezervou a cena za bm sú v Rozpočte ' +
+      '(zatiaľ okno Výroba) — rezerva na olep sa nastavuje v Nastaveniach rozpočtu.</div>';
     return h;
   }
 
@@ -544,6 +628,12 @@
     if (!ST || typeof window === 'undefined' || !window.sketchup || !sketchup.nx_select) return;
     sketchup.nx_select(JSON.stringify({ gen: ST.gen, parts_key: key,
                                         focus_inspector: !!focusInspector }));
+  }
+
+  function requestRefresh(){
+    if (!window.sketchup || !sketchup.refresh_bom) return;
+    NX.setStatus('Prepočítavam kusovník…', false);
+    sketchup.refresh_bom('');
   }
 
   function vepoExport(){
@@ -599,6 +689,7 @@
       if (t.closest('[data-navmini]')){ navMini = !navMini; savePrefs(); renderNav(); return; }
       if (t.closest('#colBtn')){ colMenuOpen = !colMenuOpen; renderTools(); return; }
       if (t.closest('#vepoBtn')){ vepoExport(); return; }
+      if (t.closest('#refreshBtn')){ requestRefresh(); return; }
       var vbtn = t.closest('[data-view]');
       if (vbtn){ bomView = vbtn.getAttribute('data-view'); colMenuOpen = false; renderTools(); renderBody(); return; }
       var grp = t.closest('[data-grp]');
@@ -660,6 +751,7 @@
     module.exports = {
       STUDIO_SECTIONS: STUDIO_SECTIONS, COLS: COLS, NAV: NAV,
       normText: normText, rowText: rowText, rowHit: rowHit, groupBom: groupBom,
+      sheetRows: sheetRows,
       activeCols: activeCols, cellValue: cellValue, grainLabel: grainLabel,
       absCompact: absCompact, absFull: absFull, rgbHex: rgbHex,
       navBridgeIds: navBridgeIds, anchorFilter: anchorFilter, navItem: navItem

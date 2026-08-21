@@ -79,11 +79,61 @@ end
 
 NxTest.test('ST-1a: nazov projektu zije v ProductionCore (mapa project_names)') do
   core = Noxun::Engine::ProductionCore
-  %i[project_names project_name save_project_name merge_18_36 save_merge_18_36].each do |m|
+  %i[project_names project_name save_project_name merge_18_36 save_merge_18_36
+     project_key project_session_key normalize_project_path].each do |m|
     NxTest.assert(core.respond_to?(m), "ProductionCore neodpoveda na #{m}")
   end
   NxTest.assert_equal('project_names', Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY,
                       'kluc mapy je sucastou kontraktu suboru vepo_settings.json')
+end
+
+NxTest.test('ST-1a (review P1): klucom je CESTA, nie model.guid — guid sa meni pri ulozeni') do
+  # SketchUp dokumentuje, ze `Model#guid` sa MENI po kazdom ulozeni. Na guid
+  # kluci by sa nazov po Ctrl+S ticho stratil a v subore by rastli mrtve
+  # zaznamy. Tento test simuluje presne to: medzi zapisom a citanim sa guid
+  # zmeni, cesta ostane — a nazov MUSI prezit.
+  core = Noxun::Engine::ProductionCore
+  m1 = Struct.new(:path, :guid).new('C:/Zakazky/KLINIKA_v7.skp', 'GUID-PRED-ULOZENIM')
+  m2 = Struct.new(:path, :guid).new('C:/Zakazky/KLINIKA_v7.skp', 'GUID-PO-ULOZENI')
+  begin
+    core.save_project_name(m1, 'Klinika Bratislava')
+    NxTest.assert_equal('Klinika Bratislava', core.project_name(m2),
+                        'zmena guid (ulozenie modelu) nesmie nazov zahodit')
+    # Kluc je normalizovany — Windows nerozlisuje velkost pismen ani lomitka.
+    m3 = Struct.new(:path, :guid).new('c:\\zakazky\\KLINIKA_v7.skp', 'GUID-INY')
+    NxTest.assert_equal('Klinika Bratislava', core.project_name(m3),
+                        'ta ista cesta inak zapisana = ten isty zaznam')
+    NxTest.assert_equal('c:/zakazky/klinika_v7.skp', core.project_key(m3),
+                        'kluc je normalizovana cesta')
+  ensure
+    core.save_project_name(m1, '')
+  end
+end
+
+NxTest.test('ST-1a (review P1): neulozeny model ma NAHRADNY kluc a pri ulozeni sa ZMIGRUJE') do
+  core = Noxun::Engine::ProductionCore
+  untitled = Struct.new(:path, :guid).new('', 'GUID-UNTITLED')
+  saved = Struct.new(:path, :guid).new('C:/Zakazky/Nova.skp', 'GUID-UNTITLED')
+  begin
+    NxTest.assert_equal('guid:GUID-UNTITLED', core.project_key(untitled),
+                        'neulozeny model ma kluc sedenia (plati len dovtedy, kym sa neulozi)')
+    core.save_project_name(untitled, 'Rozrobena zakazka')
+    NxTest.assert_equal('Rozrobena zakazka', core.project_name(untitled))
+    # Ctrl+S: model teraz MA cestu. Zaznam sedenia je zaloha, takze nazov drzi.
+    NxTest.assert_equal('Rozrobena zakazka', core.project_name(saved),
+                        'po ulozeni sa nazov nestrati (citanie padne na kluc sedenia)')
+    # Prvy zapis s platnou cestou zaznam PRESUNIE a guid kluc zmaze.
+    core.save_project_name(saved, 'Rozrobena zakazka')
+    map = core.project_names
+    NxTest.assert(map.key?('c:/zakazky/nova.skp'), 'zaznam sadol na cestu')
+    NxTest.refute(map.key?('guid:GUID-UNTITLED'),
+                  'guid zaznam po migracii zanikol — inak by v subore rastli mrtve kluce')
+  ensure
+    core.save_project_name(saved, '')
+    map = core.project_names.dup
+    map.delete('guid:GUID-UNTITLED')
+    core.save_vepo_settings(Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY => map)
+  end
 end
 
 NxTest.test('ST-1a: nazov projektu je nastavenie POCITACA — nikdy sa nezapisuje do modelu') do
@@ -95,15 +145,18 @@ NxTest.test('ST-1a: nazov projektu je nastavenie POCITACA — nikdy sa nezapisuj
   NxTest.refute(body.include?('Store.'), 'ziadny zapis do NOXUN dictionary modelu')
 end
 
-NxTest.test('ST-1a: model bez identity dostane DEFAULT (dva dokumenty si zaznam neprepisu)') do
+NxTest.test('ST-1a: model bez akejkolvek identity dostane DEFAULT (nema sa kam zapisat)') do
   core = Noxun::Engine::ProductionCore
-  model = Struct.new(:path, :guid).new('C:/x/KLINIKA_v7.skp', '')
-  NxTest.assert_equal('KLINIKA_v7', core.project_name(model),
-                      'bez guid sa nazov berie zo suboru zakazky')
-  NxTest.assert_equal('KLINIKA_v7', core.save_project_name(model, 'ine meno'),
-                      'a zapis sa pre model bez identity NEUDEJE')
+  # Ani cesta, ani guid = neexistuje stabilny kluc. Vymyslat ho by znamenalo,
+  # ze si dva rozne dokumenty prepisu ten isty zaznam.
   empty = Struct.new(:path, :guid).new('', '')
+  NxTest.assert_equal('', core.project_key(empty), 'bez cesty aj bez guid nie je kluc')
   NxTest.assert_equal('projekt', core.project_name(empty), 'neulozena zakazka ma zastupny nazov')
+  NxTest.assert_equal('projekt', core.save_project_name(empty, 'ine meno'),
+                      'a zapis sa NEUDEJE')
+  named = Struct.new(:path, :guid).new('C:/x/KLINIKA_v7.skp', '')
+  NxTest.assert_equal('KLINIKA_v7', core.project_name(named),
+                      'bez ulozeneho zaznamu sa nazov berie zo suboru zakazky')
 end
 
 NxTest.test('ST-1a: VSETKY STYRI exporty citaju nazov zo SERVERA — z DOM uz nechodi') do
@@ -244,9 +297,43 @@ NxTest.test('ST-1a: gen mismatch = RE-PUSH a status, nikdy ticho') do
   NxTest.assert(!body.empty?, 'zdielane telo exportu sa nasiel')
   NxTest.assert(body.include?('repush.call'), 'stary DOM klik obnovi okno')
   NxTest.assert(body.include?('Dáta okna sa medzitým zmenili'), 'a povie preco')
+  # Review P2: vyber koncil TICHYM no-opom — pouzivatel klikol, nic sa
+  # neoznacilo a okno mlcalo.
+  sel = ST1B_CORE_RB[/def do_select\(model, data.*?\n      end\n/m].to_s
+  NxTest.assert(sel.include?('Dáta okna sa medzitým obnovili — klikni znova.'),
+                'aj vyber povie, PRECO sa nic neoznacilo')
   opts = ST1B_STUDIO_RB[/def do_set_vepo_opts.*?\n        end\n/m].to_s
   NxTest.assert(opts.include?('Okno sa medzitým prepočítalo'), 'to iste pri zapise nastaveni')
   NxTest.assert(opts.include?('Model sa medzitým prepol'), 'a pri prepnutom dokumente')
+end
+
+NxTest.test('ST-1a (review P2): zapis nastaveni NEZDVIHA generaciu (inak by prvy export spadol)') do
+  # `change` na inpute Projekt priletí tesne pred `click` na VEPO. Keby zapis
+  # koncil plnym push_state, generacia by sa zdvihla a prvy export by ZARUCENE
+  # spadol na „Dáta okna sa medzitým zmenili" — pritom kusovnik sa nezmenil.
+  opts = ST1B_STUDIO_RB[/def do_set_vepo_opts.*?\n        end\n/m].to_s
+  NxTest.assert(!opts.empty?, 'handler sa nasiel')
+  NxTest.assert(opts.include?('push_vepo_bar(model)'),
+                'lista sa synchronizuje CIELENYM echom (vzor push_edge_check)')
+  # Jediny push_state v handleri smie byt v ODMIETACICH vetvach (gen/model guard).
+  tail = opts.split('msg = []').last.to_s
+  NxTest.refute(tail.include?('push_state'),
+                'uspesny zapis NESMIE prepocitat cele okno — zdvihol by generaciu')
+  NxTest.assert(opts.include?('ProductionDialog.refresh_if_open'),
+                'okno Vyroba ma vlastnu generaciu — tam staci bezny refresh')
+  echo = ST1B_STUDIO_RB[/def push_vepo_bar.*?\n        end\n/m].to_s
+  NxTest.refute(echo.include?('@generation'), 'echo sa generacie NEDOTYKA')
+  NxTest.assert(echo.include?('NX.setVepoBar'), 'a meni LEN obsah listy')
+  NxTest.assert(ST1B_STUDIO_JS.include?('setVepoBar: function(state)'), 'klient echo pozna')
+  NxTest.assert(ST1B_STUDIO_JS.include?('document.activeElement !== inp'),
+                'hodnota inputu sa nenasadzuje, kym v nom pouzivatel pise')
+end
+
+NxTest.test('ST-1a (review P2): sekcia ma RUCNY refresh (prestavba z Inspectora sem sama nedorazi)') do
+  NxTest.assert(ST1B_STUDIO_RB.include?("cb(dlg, 'refresh_bom')"), 'callback existuje')
+  NxTest.assert(ST1B_STUDIO_JS.include?("id=\"refreshBtn\""),
+                'a MA ho co zavolat — inak by okno exportovalo VEPO zo starych cisel')
+  NxTest.assert(ST1B_STUDIO_JS.include?("sketchup.refresh_bom('')"), 'tlacidlo vola callback')
 end
 
 # --- 5) premostenia navigacie (audit #2) -------------------------------------

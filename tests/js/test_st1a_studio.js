@@ -107,7 +107,14 @@ eq(S.activeCols(OFF).map(c => c.k), ['name'], 'vypnute stlpce sa nekreslia');
 // --- 5) hodnoty buniek -------------------------------------------------------
 
 eq(S.cellValue(ROW_A, 'name'), 'Bok ľavý', 'nazov je zoznam mien riadku');
-eq(S.cellValue(ROW_A, 'cab'), 'CAB-004', 'skrinka sa berie z `kde`');
+// Riadok sa agreguje NAPRIEC skrinkami, takze bez poctu na vlastnika by sa
+// nedalo povedat, kolko kusov potrebuje ktora z nich (vzor okna Vyroba).
+eq(S.cellValue(ROW_A, 'cab'), 'CAB-004 ×1', 'skrinka nesie AJ pocet kusov');
+eq(S.cellValue(ROW_B, 'cab'), 'CAB-009 ×2', 'dva kusy v jednej skrinke');
+eq(S.cellValue({ kde: [{ owner_id: 'CAB-1', quantity: 2 }, { owner_id: 'CAB-2', quantity: 1 }] }, 'cab'),
+   'CAB-1 ×2, CAB-2 ×1', 'viac vlastnikov = zoznam s poctami');
+eq(S.cellValue({ kde: [{ owner_id: 'CAB-1' }] }, 'cab'), 'CAB-1',
+   'chybajuci pocet sa nevymysla (starsi payload)');
 eq(S.cellValue(ROW_A, 'th'), 18, 'hrubku urcuje DIELEC, nie skupina');
 eq(S.cellValue(ROW_A, 'role'), 'Bok ľavý', 'rolu sklada SERVER (`role_label`)');
 eq(S.cellValue({}, 'role'), '', 'riadok bez roly nic nevymysla');
@@ -157,6 +164,47 @@ S.NAV.forEach(function(g){
     ok(!!it.ic, `polozka „${it.t}" ma ikonu (zbalena navigacia ukazuje LEN ikony)`);
   });
 });
+
+// --- 8b) pohlad PLATNE: duplak (2B-1 / D-43) --------------------------------
+// Material, ktoreho plocha vznikla LEN z lepenych (duplakovych) dielcov, NEMA
+// vlastne vyrobne dielce — v `sheets` teda nie je, ale v `sheet_estimate` ANO,
+// lebo sa REALNE nakupuje. Keby tabulka isla iba cez `sheets`, ten nakup by
+// z nej zmizol a suctovy riadok (rata cez vsetky polozky odhadu) by s nou
+// nesedel. Presne to bol nalez review P2.
+const DUP_ROWS = [
+  { names: ['Doska'], kde: [{ owner_id: 'CAB-1', quantity: 1 }], material_id: 'DUP36',
+    material_source: { material_id: 'ZDROJ18', multiplier: 2 }, edges: {} }
+];
+const DUP_SHEETS = [{ material_id: 'DUP36', m2: 1.2, quantity: 1 }];
+const DUP_EST = [
+  { material_id: 'DUP36', m2: 1.2, sheet_size: [2800, 2070], count_min: 0.1, count_max: 0.2 },
+  { material_id: 'ZDROJ18', m2: 2.4, sheet_size: [2800, 2070], count_min: 0.2, count_max: 0.4,
+    doubled_m2: 2.4, doubled_quantity: 2 }
+];
+
+const SR = S.sheetRows(DUP_SHEETS, DUP_EST, DUP_ROWS);
+eq(SR.map(r => r.mid), ['DUP36', 'ZDROJ18'],
+   'zdrojovy material BEZ vlastnych dielcov ostava v tabulke (nakup by inak zmizol)');
+eq(SR[0].purchaseOnly, false, 'material s vlastnymi dielcami nie je „nakup pre dupláky"');
+eq(SR[1].purchaseOnly, true, 'zdroj duplaku JE nakupny riadok');
+eq(SR[1].quantity, null, 'a nema pocet dielcov (ziadne vlastne nema)');
+eq(SR[0].dup, ['lepí sa 2× z ZDROJ18'], 'vazba duplaku sa cita z BOM riadkov');
+eq(SR[1].est.doubled_m2, 2.4, 'anotacia „+X dupl." ma z coho vzniknut');
+
+// Ten isty material s ROZNYMI vazbami (katalog sa zmenil medzi rebuildmi) —
+// BOM ich drzi oddelene, takze zoznam, nie posledna hodnota (GH #94 P2).
+const TWO = S.sheetRows(
+  [{ material_id: 'DUP36', m2: 1, quantity: 2 }],
+  [],
+  [{ material_id: 'DUP36', material_source: { material_id: 'A', multiplier: 2 } },
+   { material_id: 'DUP36', material_source: { material_id: 'B', multiplier: 2 } },
+   { material_id: 'DUP36', material_source: { material_id: 'A', multiplier: 2 } }]
+);
+eq(TWO[0].dup, ['lepí sa 2× z A', 'lepí sa 2× z B'], 'dve vazby, bez duplicit');
+
+eq(S.sheetRows(null, null, null), [], 'chybajuce data nezhodia zoznam');
+eq(S.sheetRows([{ material_id: 'M1', m2: 1, quantity: 1 }], [], []).map(r => r.est), [null],
+   'material bez odhadu prizna, ze odhad nema');
 
 // --- 9) kotva deep-linku (audit #12) ----------------------------------------
 

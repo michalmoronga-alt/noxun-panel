@@ -5017,11 +5017,15 @@ module NoxunSuRunner
        model.entities.length == before_ents)
 
     # --- 5) nazov projektu je SERVEROVY (audit #1) ---------------------------
-    guid = core.model_guid(model)
-    if guid.empty?
-      info('ST-1a: model nema guid — zapis nazvu projektu sa preskocil (test okna).')
+    # Review P1: kluc je CESTA suboru, nie `model.guid` — guid sa meni pri
+    # kazdom ulozeni a nazov by sa po Ctrl+S ticho stratil.
+    key = core.project_key(model)
+    if key.empty?
+      info('ST-1a: model nema cestu ani guid — zapis nazvu projektu sa preskocil.')
     else
-      original = core.project_names[guid]
+      ok('ST-1a: kluc nazvu projektu je CESTA suboru, nie prchavy guid',
+         !key.start_with?('guid:') && key == core.normalize_project_path(model.path))
+      original = core.project_names[key]
       begin
         saved = core.save_project_name(model, 'SU TEST PROJEKT')
         ok('ST-1a: nazov projektu sa ULOZIL na serveri', saved == 'SU TEST PROJEKT')
@@ -5029,6 +5033,19 @@ module NoxunSuRunner
            core.project_name(model) == 'SU TEST PROJEKT')
         ok('ST-1a: zapis nazvu NEMENI model (nastavenie pocitaca, nie zakazky)',
            model.entities.length == before_ents)
+
+        # Zapis z LISTY Studia nesmie zdvihnut generaciu — inak by prvy export
+        # hned po editacii nazvu spadol na „Dáta okna sa medzitým zmenili".
+        gen_opts = e::StudioDialog.instance_variable_get(:@generation).to_i
+        e::StudioDialog.do_set_vepo_opts(
+          { 'gen' => gen_opts, 'model_guid' => core.model_guid(model),
+            'project' => 'SU TEST PROJEKT 2' }.to_json
+        )
+        ok('ST-1a: zapis z listy Studia NEZDVIHOL generaciu (review P2)',
+           e::StudioDialog.instance_variable_get(:@generation).to_i == gen_opts)
+        ok('ST-1a: a nazov sa naozaj zapisal', core.project_name(model) == 'SU TEST PROJEKT 2')
+        ok('ST-1a: zapis z listy model nezmenil', model.entities.length == before_ents)
+
         core.save_project_name(model, '')
         ok('ST-1a: vymazany nazov padne spat na nazov suboru zakazky',
            core.project_name(model) == core.default_project_name(model))
@@ -5036,13 +5053,20 @@ module NoxunSuRunner
         # Testovaci zaznam po sebe upratame — je to realny %APPDATA% subor.
         map = core.project_names.dup
         if original.nil?
-          map.delete(guid)
+          map.delete(key)
         else
-          map[guid] = original
+          map[key] = original
         end
         core.save_vepo_settings(e::ProductionCore::PROJECT_NAMES_KEY => map)
       end
     end
+
+    # --- 6) rucny refresh sekcie (review P2) ---------------------------------
+    gen_before_refresh = e::StudioDialog.instance_variable_get(:@generation).to_i
+    e::StudioDialog.send(:push_state)
+    ok('ST-1a: rucne „Obnoviť" prepocita kusovnik (nova generacia)',
+       e::StudioDialog.instance_variable_get(:@generation).to_i > gen_before_refresh)
+    ok('ST-1a: a prepocet model nezmenil', model.entities.length == before_ents)
 
     # Poslednou modelovou operaciou je vlozenie skrinky — keby bol vyber alebo
     # zapis nazvu vlastnou operaciou, 1x Spat by vratil JU a skrinka by ostala.

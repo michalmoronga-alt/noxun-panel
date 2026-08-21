@@ -60,7 +60,11 @@ module Noxun
         'hw' => 'Otváram okno Katalóg kovania (presun do Štúdia príde v dávke ŠT-3).',
         'rules' => 'Otváram okno Pravidlá kovania (presun do Štúdia príde v dávke ŠT-3).',
         'tpl' => 'Otváram okno Šablóny (presun do Štúdia príde v dávke ŠT-3).',
-        'sup' => 'Otváram okno Nastavenia (dodávateľ a Demos) — presun v dávke ŠT-4.',
+        # Poctivo: „Dodávateľ / Demos" nema DNES vlastne okno. Sadzby dodavatela
+        # ziju v okne Nastavenia rozpoctu, vazba na Demos v okne Materialy —
+        # spoja sa az v Studiu (Š19). Status to musi povedat, inak sa otvori
+        # okno s inym nadpisom a pouzivatel si mysli, ze klikol zle.
+        'sup' => 'Otváram okno Nastavenia rozpočtu — väzba na Demos je zatiaľ v okne Materiály (presun v ŠT-2).',
         'bset' => 'Otváram okno Nastavenia rozpočtu (presun do Štúdia príde v dávke ŠT-4).',
         'about' => 'O plugine nájdeš v koliesku Inspectora — otváram Inspector.'
       }.freeze
@@ -136,8 +140,15 @@ module Noxun
 
         # --- lista Kusovnika: nazov projektu + merge 18+36 (audit #1) --------
         # Obe hodnoty su nastavenim POCITACA (%APPDATA%), nie zakazky: ziadny
-        # zapis do modelu a ziadny krok Spat. Po zapise sa obnovia OBE okna —
-        # okno Vyroba ukazuje ten isty nazov ako TEXT v hlavicke.
+        # zapis do modelu a ziadny krok Spat.
+        #
+        # Zapis NEROBI plny `push_state` (review PR #193 P2): ten zdviha
+        # `@generation`, takze prvy klik ci export hned po editacii nazvu (change
+        # tesne pred clickom) by zarucene spadol na „Dáta okna sa medzitým
+        # zmenili". Kusovnik sa pritom nezmenil — zmenila sa LISTA. Ide preto
+        # cielene echo (vzor `push_edge_check`), ktore prepise len jej obsah
+        # a generaciu NECHA TAK. Okno Vyroba ma vlastnu generaciu, tam staci
+        # bezny refresh.
         def do_set_vepo_opts(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           model = Sketchup.active_model
@@ -146,7 +157,9 @@ module Noxun
             return set_status('Okno sa medzitým prepočítalo — obnovené, skús znova.', true)
           end
           guid = data['model_guid'].to_s
-          unless guid == ProductionCore.model_guid(model)
+          # Tolerantne ako `ProductionDialog.do_budget`: prazdny udaj z klienta
+          # (starsi cachovany DOM) guard neblokuje, nezhodne ID ano.
+          if !guid.empty? && guid != ProductionCore.model_guid(model)
             push_state
             return set_status('Model sa medzitým prepol — obnovené, skús znova.', true)
           end
@@ -162,9 +175,22 @@ module Noxun
           end
           return set_status('Nič sa nezmenilo.', true) if msg.empty?
 
-          push_state
+          push_vepo_bar(model)
           ProductionDialog.refresh_if_open if defined?(ProductionDialog)
           set_status("#{msg.join(' · ')}. Platí pre všetky exporty.")
+        end
+
+        # Maly echo push LISTY sekcie (nazov projektu + merge). Nezdviha
+        # generaciu a neprepocitava kusovnik — je to zobrazovacia synchronizacia
+        # toho, co uz je zapisane.
+        def push_vepo_bar(model = nil)
+          m = model || Sketchup.active_model
+          st = { 'project' => ProductionCore.project_name(m),
+                 'default_project' => ProductionCore.default_project_name(m),
+                 'merge_18_36' => ProductionCore.merge_18_36 }
+          js("if (window.NX && NX.setVepoBar) NX.setVepoBar(#{st.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.push_vepo_bar')
         end
 
         # --- premostenia navigacie (audit #2) --------------------------------
