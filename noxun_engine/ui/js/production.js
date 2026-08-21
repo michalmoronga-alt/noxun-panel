@@ -12,6 +12,10 @@
   // okno prepinacov otvorene (cisto zobrazovacia vec, nikam sa neuklada).
   var EDGE = null;
   var ecMenuOpen = false;
+  // K2/D-87: stav kresby smeru dekoru. Rovnaké pravidlo ako pri EDGE — SERVER
+  // je autorita (zapnutosť aj počty), JS si nič neprepočítava a nič si
+  // nepamätá; každý push stav prepíše.
+  var GRAIN = null;
 
   function el(id){ return document.getElementById(id); }
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -21,6 +25,7 @@
     setBom: function(data){
       BOM = data || null;
       EDGE = (BOM && BOM.edge_check) ? BOM.edge_check : null;
+      GRAIN = (BOM && BOM.grain_check) ? BOM.grain_check : null;
       el('prodModel').textContent = BOM ? ('model: ' + BOM.model_title + ' · v' + BOM.version) : '…';
       vepoSync(); renderSummary(); renderBadge();
       // UI-D3: deep-link z Inspectora (⚠ warnpanel -> Kontrola, „Materiál" ->
@@ -36,6 +41,11 @@
     // (pri zmene vyberu chodi casto a tabulka moze mat stovky riadkov).
     setEdgeCheck: function(state){
       EDGE = state || null;
+      renderEdgeBar();
+    },
+    // K2/D-87: to isté pre kresbu smeru (prepnutie / prepočet po prestavbe).
+    setGrainCheck: function(state){
+      GRAIN = state || null;
       renderEdgeBar();
     },
     setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; }
@@ -101,7 +111,9 @@
       return;
     }
     box.style.display = '';
-    box.innerHTML = edgeCheckBarHtml(EDGE, ecMenuOpen);
+    // K2/D-87: dva nástroje TEJ ISTEJ lišty — zvýraznenie hrán (split tlačidlo
+    // s nastavením) a smer kresby (obyčajný prepínač). Žiadny nový riadok.
+    box.innerHTML = edgeCheckBarHtml(EDGE, ecMenuOpen, GRAIN);
   }
 
   function renderSummary(){
@@ -403,9 +415,9 @@
 
   function ecNum(v){ return (v == null || isNaN(v)) ? 0 : Number(v); }
 
-  function edgeCheckBarHtml(st, menuOpen){
+  function edgeCheckBarHtml(st, menuOpen, grain){
     if (!st || !st.available){
-      return '<div class="ecbar ecoff">Zvýraznenie hrán vyžaduje SketchUp 2023 alebo novší.</div>';
+      return '<div class="ecbar ecoff">Zvýraznenie hrán a smer kresby vyžadujú SketchUp 2023 alebo novší.</div>';
     }
     var on = st.active === true;
     return '<div class="ecbar"><div class="ecsplit">' +
@@ -419,7 +431,49 @@
       ' aria-label="Nastavenie zvýraznenia hrán" title="Nastavenie — ktoré stavy hrán sa zvýraznia">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>' +
       edgeCheckMenuHtml(st, menuOpen) +
-      '</div><span class="ecinfo">' + edgeCheckText(st) + '</span></div>';
+      '</div>' + grainBtnHtml(grain) +
+      '<span class="ecinfo">' + edgeCheckText(st) + grainInfoHtml(grain) + '</span></div>';
+  }
+
+  // K2/D-87: prepínač smeru kresby. ZÁMERNE obyčajné tlačidlo (nie split ako
+  // zvýraznenie hrán) — nemá čo nastavovať: buď kresbu vidíš, alebo nie.
+  function grainBtnHtml(g){
+    if (!g || !g.available) return '';
+    var on = g.active === true;
+    return '<button type="button" id="gcBtn" class="ecbtn gcbtn' + (on ? ' on' : '') + '"' +
+      ' onclick="grainCheckToggle()" aria-pressed="' + (on ? 'true' : 'false') + '"' +
+      ' title="Nakreslí na dielce čiary v smere kresby dekoru — blenda vs. dvere na prvý pohľad.' +
+      ' Model sa nemení, kreslí sa nad ním.">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-rows-3"/></svg>Smer kresby</button>';
+  }
+
+  // Doveta k textu lišty. Vypnutý prepínač mlčí (o vypnutom stave už hovorí
+  // samotné tlačidlo) — inak by lišta niesla dve „vypnuté" vety vedľa seba.
+  function grainInfoHtml(g){
+    var t = grainCheckText(g);
+    return t ? ' · <span class="gcinfo">' + t + '</span>' : '';
+  }
+
+  function grainCheckText(g){
+    if (!g || !g.available || !g.active) return '';
+    var parts = ecNum(g.parts);
+    var t = parts + ' ' + grainPartPluralSk(parts) + ' s kresbou';
+    if (ecNum(g.skipped)) t += ' · ' + ecNum(g.skipped) + ' bez kresby (materiál bez smeru)';
+    if (ecNum(g.unresolved)) t += ' · ' + ecNum(g.unresolved) + ' sa nedá nakresliť (neznáma orientácia dielca)';
+    return t;
+  }
+
+  // 1 dielec / 2–4 dielce / 5+ dielcov (slovenske sklonovanie poctu)
+  function grainPartPluralSk(n){
+    var v = Math.abs(n);
+    if (v === 1) return 'dielec';
+    if (v >= 2 && v <= 4) return 'dielce';
+    return 'dielcov';
+  }
+
+  function grainCheckToggle(){
+    if (!BOM || !window.sketchup || !sketchup.grain_check_toggle) return;
+    sketchup.grain_check_toggle(JSON.stringify(edgeCheckPayload(BOM)));
   }
 
   // Rozbalovacie okno: tri stavy (checkbox + farebny stvorcek + nazov + ZIVY
@@ -617,6 +671,9 @@
       edgePluralSk: edgePluralSk, edgeCheckPayload: edgeCheckPayload,
       edgeCheckMenuHtml: edgeCheckMenuHtml, edgeCheckOptionPayload: edgeCheckOptionPayload,
       edgeCheckSelectionHint: edgeCheckSelectionHint,
+      // K2/D-87 smer kresby (tests/js/test_k2_smer_kresby.js)
+      grainBtnHtml: grainBtnHtml, grainCheckText: grainCheckText,
+      grainPartPluralSk: grainPartPluralSk,
       // D-93 znamienko rucneho zasahu (tests/js/test_d93_nl_override.js)
       hwManualMark: hwManualMark };
   }

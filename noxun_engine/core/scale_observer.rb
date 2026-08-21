@@ -579,6 +579,10 @@ module Noxun
           # D-104: zvyraznenie hran patri modelu, v ktorom sa zaplo — pri prepnuti
           # dokumentu sa vypne PRED notifikaciou okien (aby uz hlasili cerstvy stav).
           EdgeCheck.on_model_changed(model) if defined?(EdgeCheck)
+          # K2/D-87: to iste plati pre kresbu smeru dekoru — overlay patri
+          # modelu, v ktorom sa zapol (zapamatany prepinac ostava, je to
+          # nastavenie pocitaca).
+          GrainCheck.on_model_changed(model) if defined?(GrainCheck)
           RulesDialog.on_model_changed(model) if defined?(RulesDialog)
           MaterialsDialog.on_model_changed(model) if defined?(MaterialsDialog)
           ProductionDialog.on_model_changed(model) if defined?(ProductionDialog) # V0.5 B (nova generacia dat)

@@ -36,6 +36,10 @@ module Noxun
         def show(open_tab: nil)
           @pending_tab = TABS.include?(open_tab.to_s) ? open_tab.to_s : nil
           dlg = ensure_dialog
+          # K2/D-87: zapamataný prepínač „Smer kresby" (%APPDATA%, nastavenie
+          # počítača) sa obnoví PRED prvým push_state — inak by okno hlásilo
+          # vypnuté a v modeli by sa kreslilo. Vypnutý prepínač nerobí nič.
+          restore_grain_check
           if dlg.visible?
             dlg.bring_to_front
             push_state
@@ -45,6 +49,15 @@ module Noxun
           dlg
         rescue StandardError => e
           Engine.log_error(e, 'ProductionDialog.show')
+        end
+
+        # K2/D-87: obnova zapamataneho prepinaca kresby smeru. Chranene vlastnym
+        # blokom — zlyhanie NESMIE zabranit otvoreniu okna Vyroba.
+        def restore_grain_check
+          return unless defined?(GrainCheck)
+          GrainCheck.restore!(Sketchup.active_model)
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.restore_grain_check')
         end
 
         # D-19 (Codex F3): verejny bezpecny refresh — vola ho editor materialov
@@ -413,6 +426,64 @@ module Noxun
           "#{EDGE_OPTION_LABELS[key] || key}: #{value ? 'zapnuté' : 'vypnuté'}."
         end
 
+        # ================= K2 / D-87: SMER KRESBY ================================
+        # Prepinac vedla „Zvýrazniť hrany" (tab KONTROLA). Model sa NEMENI —
+        # ciary sa kreslia NAD nim (ziadna operacia, ziadny undo krok). Guardy
+        # su TIE ISTE ako pri zvyrazneni hran (gen + model_guid + Overlay API),
+        # preto ide o zdielanu `edge_check_guard` — dva takmer rovnake guardy by
+        # sa casom rozisli.
+        def do_grain_check(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          model = Sketchup.active_model
+          return unless grain_check_guard(data, model)
+
+          state = GrainCheck.toggle(model)
+          push_grain_check(state)
+          set_status(grain_check_status(state))
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.do_grain_check')
+          set_status("Chyba kresby smeru: #{e.message}", true)
+        end
+
+        # Vlastny guard len kvoli hlaske o dostupnosti Overlay API (zvysok je
+        # zhodny so zvyraznenim hran a ide cez `edge_check_guard`).
+        def grain_check_guard(data, model)
+          unless defined?(GrainCheck) && GrainCheck.available?(model)
+            push_grain_check
+            set_status('Smer kresby vyžaduje SketchUp 2023 alebo novší.', true)
+            return false
+          end
+          edge_check_guard(data, model)
+        end
+
+        # Maly echo push (prepnutie / prepocet po prestavbe) — prekresli sa LEN
+        # lista, zoznam kontroly sa nedotkne.
+        def push_grain_check(state = nil)
+          return unless defined?(GrainCheck)
+          st = state || GrainCheck.ui_state(Sketchup.active_model)
+          js("if (window.NX && NX.setGrainCheck) NX.setGrainCheck(#{st.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.push_grain_check')
+        end
+
+        def grain_check_status(state)
+          st = state.is_a?(Hash) ? state : {}
+          return 'Smer kresby vypnutý — v modeli nič neostalo.' unless st['active']
+
+          parts = ["#{st['parts'].to_i} #{grain_part_plural(st['parts'].to_i)} s kresbou"]
+          parts << "#{st['skipped'].to_i} bez kresby (materiál bez smeru)" if st['skipped'].to_i.positive?
+          parts << "#{st['unresolved'].to_i} sa nedá nakresliť" if st['unresolved'].to_i.positive?
+          "Smer kresby zapnutý — #{parts.join(' · ')}."
+        end
+
+        # 1 dielec / 2–4 dielce / 5+ dielcov
+        def grain_part_plural(n)
+          v = n.abs
+          return 'dielec' if v == 1
+          return 'dielce' if v >= 2 && v <= 4
+          'dielcov'
+        end
+
         # V0.6 E-b: mutacie rozpoctu (rezim, prepis sumy, nasobok, m2, spotrebice
         # v sucte, vlastne polozky). Guardy bezia na SERVERI — HTML disabled ani
         # klientske echo nie su ochrana:
@@ -610,6 +681,11 @@ module Noxun
                 EdgeCheck.disable!
                 EdgeCheck.notify_state_changed
               end
+              # K2/D-87: to iste plati pre kresbu smeru — po zatvoreni okna
+              # v modeli nesmie ostat nic, co sa neda vypnut. ZAPAMATANY
+              # prepinac sa NEMENI (je to nastavenie pocitaca): pri dalsom
+              # otvoreni okna sa kresba obnovi.
+              GrainCheck.disable! if defined?(GrainCheck)
             rescue StandardError => e
               Engine.log_error(e, 'ProductionDialog.on_closed edge_check')
             end
@@ -631,6 +707,9 @@ module Noxun
           cb(dlg, 'edge_check_toggle') { |p| do_edge_check(p) }
           # D-105: prepínače stavov v rozbaľovacom okne (zapisujú sa do %APPDATA%).
           cb(dlg, 'edge_check_option') { |p| do_edge_check_option(p) }
+          # K2/D-87: prepínač „Smer kresby" (tab KONTROLA). Rovnako bez flush
+          # handshaku — model sa nemení, len sa nad ním kreslí.
+          cb(dlg, 'grain_check_toggle') { |p| do_grain_check(p) }
           # V0.6 E-b: tab Rozpočet — mutácie, XLSX export, ⚙ Nastavenia, ↗ URL.
           cb(dlg, 'budget_mutate')   { |p| do_budget(p) }
           cb(dlg, 'budget_xlsx')     { |p| handle_budget_xlsx(p) }
@@ -1222,6 +1301,9 @@ module Noxun
             # D-104: stav zvyraznenia hran bez olepu (tab KONTROLA). Ked je
             # vypnute, NIC sa neskenuje — okno platí nulu navyše.
             edge_check: (defined?(EdgeCheck) ? EdgeCheck.ui_state(model) : nil),
+            # K2/D-87: stav kresby smeru dekoru (tab KONTROLA, vedla zvyraznenia
+            # hran). Vypnuta = ziadny sken.
+            grain_check: (defined?(GrainCheck) ? GrainCheck.ui_state(model) : nil),
             # V0.5 C: default projektu + zapamatany merge (JS input lifecycle F10);
             # model_key = epocha prepnuti + cesta (GH P2: rovnake tituly nestacia)
             vepo: { default_project: default_project_name(model),
