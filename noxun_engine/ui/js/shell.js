@@ -612,7 +612,13 @@
   // pola (starsi push, vnoreny objekt) nesmie zmazat platnu identitu.
   function nxSetModelGuid(g){ if (g !== undefined && g !== null) nxModelGuid = String(g); }
 
+  // Posledny STAV zo servera. Drzi sa LEN preto, aby sa dalo rohove nastavenie
+  // prekreslit s cerstvymi poctami — panel si z neho nic neodvodzuje ani nic
+  // nedopocitava (kazdy push ho cely prepise).
+  var nxEdgeState = null;
+
   function nxApplyEdgeCheck(st){
+    nxEdgeState = st || null;
     var n = el('railAbs');
     if (!n) return;
     var s = st || {};
@@ -621,6 +627,13 @@
     n.classList.toggle('on', on);
     n.setAttribute('aria-pressed', on ? 'true' : 'false');
     n.setAttribute('aria-disabled', avail ? 'false' : 'true');
+    // Rohovy trojuholnik (flyout) ma zmysel len tam, kde je co nastavovat —
+    // bez Overlay API sa nastavenie neotvara a nesvieti.
+    var more = el('railAbsMore');
+    if (more) more.setAttribute('aria-disabled', avail ? 'false' : 'true');
+    // Okno s nastavenim je otvorene? Prekresli ho — POCTY su zive (zmena vyberu
+    // aj prestavba skrinky posielaju novy stav).
+    if (nxEdgeMenuOpen()) nxRenderEdgeMenu(true);
     var tip = el('railAbsTip');
     if (!tip) return;
     if (!avail){
@@ -632,6 +645,64 @@
     } else {
       tip.textContent = 'ABS kontrola hrán — zvýrazní olep v modeli';
     }
+  }
+
+  // ===== v0.7.28: ROHOVE 3-STAVOVE NASTAVENIE ABS KONTROLY ==================
+  // Vzor flyoutu (SketchUp/Photoshop): maly plny trojuholnik v pravom dolnom
+  // rohu ikony hovori „tu je este nastavenie". KLIKACIA zona je cely pravy
+  // dolny KVADRANT tlacidla (samotny trojuholnik by bol pre mys neterc), a je
+  // to SAMOSTATNE tlacidlo vedla prepinaca (vnorene tlacidlo je neplatne HTML —
+  // lekcia krizika docasnej polozky), takze klik na roh sa k toggle nikdy
+  // nedostane.
+  //
+  // Obsah okna je ZDIELANY komponent (js/edge_menu.js) — to iste nastavenie,
+  // ktore ma okno Vyroba pod chevronom. JEDEN stav (server, %APPDATA%), JEDEN
+  // markup; panel si drzi len to, ci je okno otvorene.
+  function nxEdgeMenuNode(){ return el('railAbsMenu'); }
+
+  function nxEdgeMenuOpen(){
+    var m = nxEdgeMenuNode();
+    return !!(m && m.classList && m.classList.contains('open'));
+  }
+
+  // Jedno miesto, kde sa meni obsah aj viditelnost — `aria-expanded` rohoveho
+  // tlacidla tak hovori pravdu bez ohladu na to, ktora cesta okno zavrela.
+  function nxRenderEdgeMenu(open){
+    var m = nxEdgeMenuNode();
+    if (!m || !window.NXEdgeMenu) return;
+    m.outerHTML = NXEdgeMenu.menuHtml(nxEdgeState, open === true,
+                                      { fn: 'onEdgeMenuOption', id: 'railAbsMenu', cls: 'ecmenu-rail' });
+    var more = el('railAbsMore');
+    if (more) more.setAttribute('aria-expanded', open === true ? 'true' : 'false');
+  }
+
+  function nxCloseEdgeMenu(){
+    if (!nxEdgeMenuOpen()) return;
+    nxRenderEdgeMenu(false);
+  }
+
+  // Klik na rohovu zonu. Bublanie sa zastavuje z toho isteho dovodu ako pri ⚠
+  // chipe: okno zatvara KLIK MIMO (delegacia na document), takze klik na roh by
+  // ho inak v tom istom kliku otvoril a hned zavrel.
+  function onEdgeMenuToggle(ev){
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var more = el('railAbsMore');
+    if (more && more.getAttribute('aria-disabled') === 'true') return;
+    var open = !nxEdgeMenuOpen();
+    nxRenderEdgeMenu(open);
+    // Aby na obrazovke nikdy neboli DVE kopie tych istych prepinacov: otvorenie
+    // tu zavrie rozbalovacie okno v otvorenom okne Vyroba (a naopak).
+    if (open && window.sketchup && sketchup.nx_edge_menu_open) sketchup.nx_edge_menu_open('');
+  }
+
+  // Prepnutie jedneho stavu. Ide TOU ISTOU serverovou cestou ako okno Vyroba
+  // (Engine.set_edge_check_option): nastavenie zije v %APPDATA%, do modelu sa
+  // NEZAPISUJE nic a nevznika krok Spat. Novy stav rozposle server obom oknam.
+  function onEdgeMenuOption(key, value){
+    if (!window.sketchup || !sketchup.nx_edge_option) return;
+    if (!window.NXEdgeMenu) return;
+    sketchup.nx_edge_option(JSON.stringify(
+      NXEdgeMenu.optionPayload({ model_guid: nxModelGuid }, key, value)));
   }
 
   // K2/D-87: to iste pre KONTROLU KRESBY. Rozhodovanie je v CISTEJ funkcii

@@ -33,7 +33,12 @@
                     // kluc vedla `rail:abs` — merac povie, ktoru z dvoch
                     // kontrol Michal naozaj zapina (a ci sa zapina z raily,
                     // alebo len z okna Vyroba).
-                    'rail:zrusit', 'rail:abs', 'rail:kresba', 'rail:nastavenia', 'rail:studio',
+                    // v0.7.28: `rail:abs-nastavenie` = rohovy trojuholnik pri ABS
+                    // kontrole (3-stavove nastavenie). Vlastny kluc vedla
+                    // `rail:abs` — merac povie, ci sa stavy olepu naozaj
+                    // prestavuju z panela, alebo len z okna Vyroba.
+                    'rail:zrusit', 'rail:abs', 'rail:abs-nastavenie', 'rail:kresba',
+                    'rail:nastavenia', 'rail:studio',
                     'pv:kamera', 'pv:fit',
                     'pv:vrstva:zony', 'pv:vrstva:cela', 'pv:vrstva:kovanie', 'pv:vrstva:olep',
                     'rad:sirka', 'rad:vyska', 'rad:hlbka', 'rad:sokel', 'rad:vyska_cela',

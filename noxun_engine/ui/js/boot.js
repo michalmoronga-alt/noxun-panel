@@ -97,4 +97,21 @@
       if (chip){ try { chip.focus(); } catch (e) {} }
     });
   }
-  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupHoverEdge(); setupFieldEditorDelegation(); setupTemplateTiles(); bindHwOwnerHover(); bindWarnPanel(); nxComboSync(); document.body.setAttribute('data-insert-kind', getInsertKind()); nxShellApply(); if (window.sketchup && sketchup.ready) sketchup.ready(); };
+  // v0.7.28: rohove 3-stavove nastavenie ABS kontroly v raile. Zatvara ho KLIK
+  // MIMO a Escape — presne ako warnpanel vyssie. Listenery visia na document a
+  // na STATICKOM raile; samotne okno sa prekresluje (zive pocty), listener nie.
+  function bindEdgeMenu(){
+    var box = document.getElementById('railAbsBox'); if (!box) return;
+    // Klik VNUTRI okna (checkbox) sa k documentu nedostane — inak by sa okno
+    // zavrelo skor, nez prepnutie doleti k svojmu handleru.
+    box.addEventListener('click', function(ev){ ev.stopPropagation(); });
+    document.addEventListener('click', function(){ nxCloseEdgeMenu(); });
+    document.addEventListener('keydown', function(ev){
+      if (ev.key !== 'Escape' || !nxEdgeMenuOpen()) return;
+      nxCloseEdgeMenu();
+      // Fokus patri spat na rohove tlacidlo — inak by po Escape skoncil v prazdne.
+      var more = document.getElementById('railAbsMore');
+      if (more){ try { more.focus(); } catch (e) {} }
+    });
+  }
+  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupHoverEdge(); setupFieldEditorDelegation(); setupTemplateTiles(); bindHwOwnerHover(); bindWarnPanel(); bindEdgeMenu(); nxComboSync(); document.body.setAttribute('data-insert-kind', getInsertKind()); nxShellApply(); if (window.sketchup && sketchup.ready) sketchup.ready(); };

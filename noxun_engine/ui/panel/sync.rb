@@ -94,6 +94,18 @@ module Noxun
           Engine.log_error(e, 'Panel.push_edge_check')
         end
 
+        # v0.7.28: zatvorenie rohoveho 3-stavoveho nastavenia v raile. Vola ho
+        # Engine.close_edge_menu, ked pouzivatel otvoril TO ISTE nastavenie
+        # v okne Vyroba — dve kopie tych istych prepinacov na obrazovke naraz
+        # by len mylili. Cisto zobrazovacie: ziadny stav, ziadny zapis.
+        def close_edge_menu
+          return unless dialog_alive?
+
+          js('if (window.NX && NX.closeEdgeMenu) NX.closeEdgeMenu();')
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.close_edge_menu')
+        end
+
         # K2/D-87: stav kontroly smeru kresby pre rail. Nedostupny/nenacitany
         # GrainCheck (SketchUp bez Overlay API) = ikona zosedne, panel sa tym
         # nezhodi. Cisla sklada VYHRADNE server (`GrainCheck.ui_state`).

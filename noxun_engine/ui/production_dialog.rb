@@ -358,8 +358,10 @@ module Noxun
             push_edge_check
             return set_status('Neznáme nastavenie zvýraznenia — nič sa nezmenilo.', true)
           end
-          EdgeCheck.set_option(key, value)
-          push_edge_check
+          # v0.7.28: zapis ide cez ZDIELANU Engine.set_edge_check_option — to iste
+          # nastavenie sa da otvorit aj z rohu ABS ikony v raile Inspectora, takze
+          # novy stav (aj s poctami) musi dostat OBOJE. Vlastny push tu uz netreba.
+          Engine.set_edge_check_option(key, value)
           set_status(edge_check_option_status(key, value))
         rescue StandardError => e
           Engine.log_error(e, 'ProductionDialog.do_edge_check_option')
@@ -397,6 +399,15 @@ module Noxun
           js("if (window.NX && NX.setEdgeCheck) NX.setEdgeCheck(#{st.to_json});")
         rescue StandardError => e
           Engine.log_error(e, 'ProductionDialog.push_edge_check')
+        end
+
+        # v0.7.28: zatvorenie rozbalovacieho okna prepinacov. Vola ho
+        # Engine.close_edge_menu, ked pouzivatel otvoril TO ISTE nastavenie
+        # z rohu ABS ikony v raile Inspectora. Cisto zobrazovacie.
+        def close_edge_menu
+          js('if (window.NX && NX.closeEdgeMenu) NX.closeEdgeMenu();')
+        rescue StandardError => e
+          Engine.log_error(e, 'ProductionDialog.close_edge_menu')
         end
 
         def edge_check_status(state)
@@ -709,6 +720,9 @@ module Noxun
           cb(dlg, 'edge_check_toggle') { |p| do_edge_check(p) }
           # D-105: prepínače stavov v rozbaľovacom okne (zapisujú sa do %APPDATA%).
           cb(dlg, 'edge_check_option') { |p| do_edge_check_option(p) }
+          # v0.7.28: to isté nastavenie sa dá otvoriť aj z rohu ABS ikony v raile
+          # Inspectora — otvorenie tu zavrie to druhé (nikdy dve kópie naraz).
+          cb(dlg, 'edge_menu_open')    { |_p| Engine.close_edge_menu(:production) }
           # K2/D-87: prepínač „Smer kresby" (tab KONTROLA). Rovnako bez flush
           # handshaku — model sa nemení, len sa nad ním kreslí.
           cb(dlg, 'grain_check_toggle') { |p| do_grain_check(p) }

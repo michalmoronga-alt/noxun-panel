@@ -2564,6 +2564,73 @@ module NoxunSuRunner
         info('D-104: Sketchup::Overlay#enabled= nie je k dispozicii — nativny toggle netestovany')
       end
 
+      # 9d) v0.7.28 — 3-STAVOVE NASTAVENIE Z ROHU ABS IKONY V RAILE.
+      #     DRUHY vstupny bod, JEDNO nastavenie: prepnutie z raily musi zmenit
+      #     TEN ISTY stav, ktory vidi okno Vyroba (vratane poctov), nesmie
+      #     vyrobit krok Spat a nesmie sa dotknut modelu.
+      guid = e::Panel.model_guid(model)
+      opts_before = e::EdgeCheck.options.dup
+      st = d104_state(model)
+      ok('D-104/rail: pred prepnutim svieti len cervena (default nastavenia)',
+         st['options']['show_extra'] == false && st['counts']['extra'].to_i.positive?)
+
+      # MARKER: posledna REALNA operacia. Keby bolo nastavenie undo krokom,
+      # 1x Spat by zhodilo jeho a marker by prezil.
+      model.start_operation('D-104 marker', true)
+      marker = model.entities.add_group
+      model.commit_operation
+      ents_now = model.entities.length
+      cfg_now = e::Store.get(inst, 'config').to_s
+
+      e::Panel.handle_edge_option({ 'model_guid' => guid, 'key' => 'show_extra',
+                                    'value' => true }.to_json)
+      st = d104_state(model)
+      ok('D-104/rail: rohove nastavenie zaplo stav „mimo pravidla" (kresli sa viac plosok)',
+         e::EdgeCheck.options['show_extra'] == true && st['options']['show_extra'] == true &&
+         st['drawn'].to_i > 1)
+      # Rail cita PRESNE ten isty stav ako okno Vyroba — ziadna vlastna kopia.
+      ok('D-104/rail: stav raily je ten isty stav, ktory vidi okno Vyroba',
+         e::Panel.edge_check_state == st && e::EdgeCheck.ui_state(model) == st)
+      ok('D-104/rail: nastavenie NEZMENILO model (ziadna entita, config nedotknuty)',
+         model.entities.length == ents_now && e::Store.get(inst, 'config').to_s == cfg_now)
+
+      Sketchup.undo
+      ok('D-104/rail: nastavenie NIE JE krok Spat (1x Spat vratilo marker, nie prepinac)',
+         !marker.valid? && e::EdgeCheck.options['show_extra'] == true &&
+         d104_overlay_present?(model))
+
+      # GUARDY: cudzi dokument, neznamy kluc a nebooleovska hodnota NEZAPISU nic
+      # (server je autorita — HTML `disabled` nie je ochrana).
+      e::Panel.handle_edge_option({ 'model_guid' => 'CUDZI-GUID', 'key' => 'show_taped',
+                                    'value' => true }.to_json)
+      ok('D-104/rail: klik s cudzou identitou dokumentu NIC nenastavi',
+         e::EdgeCheck.options['show_taped'] == opts_before['show_taped'])
+      e::Panel.handle_edge_option({ 'model_guid' => guid, 'key' => 'hack', 'value' => true }.to_json)
+      ok('D-104/rail: neznamy kluc sa NEZAPISE',
+         e::EdgeCheck.options.keys.sort == e::EdgeCheck::OPTION_KEYS.sort)
+      e::Panel.handle_edge_option({ 'model_guid' => guid, 'key' => 'show_taped',
+                                    'value' => 'true' }.to_json)
+      ok('D-104/rail: retazec "true" NIE JE boolean — nic sa nezmenilo',
+         e::EdgeCheck.options['show_taped'] == opts_before['show_taped'])
+
+      # Zatvorenie okna s nastavenim je CISTO zobrazovacie — nesmie nic zhodit
+      # ani vtedy, ked ziadne okno otvorene nie je.
+      closed_ok = begin
+        e.close_edge_menu(:panel)
+        e.close_edge_menu(:production)
+        true
+      rescue StandardError => ex
+        log_line("INFO: D-104 close_edge_menu vynimka: #{ex.class}: #{ex.message}")
+        false
+      end
+      ok('D-104/rail: zatvorenie nastavenia prebehne cisto (aj bez otvorenych okien)', closed_ok)
+
+      # Navrat na povodne nastavenie (dalsie sekcie ratajú s defaultom).
+      e::Panel.handle_edge_option({ 'model_guid' => guid, 'key' => 'show_extra',
+                                    'value' => false }.to_json)
+      ok('D-104/rail: navrat na povodne nastavenie',
+         e::EdgeCheck.options['show_extra'] == false && d104_state(model)['count'].to_i == 1)
+
       # 10) kreslenie nespadne a obal kresby nie je prazdny
       begin
         e::EdgeCheck.draw(model.active_view)
@@ -2583,6 +2650,14 @@ module NoxunSuRunner
     ensure
       begin
         e::EdgeCheck.disable!
+      rescue StandardError
+        nil
+      end
+      # Prepinace stavov sa pocas sekcie zapisovali do TESTOVACIEHO %APPDATA%
+      # (override adresara) — cache v pamati sa zahodi, aby si dalsie zapnutie
+      # nacitalo SKUTOCNE nastavenie pouzivatela.
+      begin
+        e::EdgeCheck.instance_variable_set(:@options, nil)
       rescue StandardError
         nil
       end

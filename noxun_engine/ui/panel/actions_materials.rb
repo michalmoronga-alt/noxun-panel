@@ -120,16 +120,62 @@ module Noxun
           set_status(edge_toggle_status(state))
         end
 
-        # Kratke potvrdenie do statusu panela. Podrobne nastavenie stavov
-        # (chyba / mimo pravidla / olepene) zostava v okne Vyroba — rail je len
-        # prepinac (3-stavove nastavenie pride neskor).
+        # Kratke potvrdenie do statusu panela. Podrobny rozpis (ktore stavy sa
+        # zvyraznuju) nesie 3-stavove nastavenie pod rohovym trojuholnikom.
         def edge_toggle_status(state)
           st = state.is_a?(Hash) ? state : {}
           return 'Zvýraznenie hrán vypnuté — v modeli nič neostalo.' unless st['active']
 
           counts = st['counts'].is_a?(Hash) ? st['counts'] : {}
           "Zvýraznenie hrán zapnuté — #{counts['missing'].to_i} chýba podľa pravidla " \
-            "(nastavenie stavov je v okne Výroba → Kontrola)."
+            '(ktoré stavy sa zvýraznia, nastavíš v rohu ikony).'
+        end
+
+        # v0.7.28: 3-STAVOVE NASTAVENIE z rohu ABS tlacidla (chýba podľa pravidla /
+        # mimo pravidla / olepené + „len vybrané"). NIE JE to druhe nastavenie:
+        # zapisuje sa TOU ISTOU zdielanou cestou ako chevron v okne Vyroba
+        # (Engine.set_edge_check_option), takze obe okna citaju jeden stav
+        # z %APPDATA% a novy stav aj s poctami dostanu naraz.
+        # Do modelu sa NEZAPISUJE nic — ziadna operacia, ziadny krok Spat.
+        # Guardy su rovnake ako pri prepinaci: dostupnost Overlay API + PRISNA
+        # zhoda dokumentu (callback HtmlDialogu je asynchronny).
+        # O platnosti kluca a striktnom booleane rozhoduje SERVER (HTML nie je
+        # ochrana): retazec "false" je v Ruby pravdivy, preto sa hodnota
+        # porovnava vyslovne.
+        def handle_edge_option(payload = nil)
+          model = Sketchup.active_model
+          data = payload ? parse(payload) : {}
+          unless defined?(EdgeCheck) && EdgeCheck.available?(model)
+            push_edge_check
+            return set_status('Zvýraznenie hrán vyžaduje SketchUp 2023 alebo novší.', true)
+          end
+
+          unless data['model_guid'].to_s == model_guid(model)
+            push_edge_check
+            return set_status('Model sa medzitým prepol — stav obnovený, klikni znova.', true)
+          end
+
+          key = data['key'].to_s
+          value = data['value']
+          unless EdgeCheck::OPTION_KEYS.include?(key) && (value == true || value == false)
+            push_edge_check
+            return set_status('Neznáme nastavenie zvýraznenia — nič sa nezmenilo.', true)
+          end
+
+          Engine.set_edge_check_option(key, value)
+          set_status(edge_option_status(key, value))
+        end
+
+        # Potvrdenie sklada TA ISTA metoda ako v okne Vyroba — nazvy stavov maju
+        # jediny zdroj (ProductionDialog::EDGE_OPTION_LABELS), rail si ich
+        # nevymysla ani nekopiruje. Zaloha je len pre pripad, ze okno Vyroba
+        # este nie je nacitane.
+        def edge_option_status(key, value)
+          if defined?(ProductionDialog) && ProductionDialog.respond_to?(:edge_check_option_status)
+            return ProductionDialog.edge_check_option_status(key, value)
+          end
+
+          "#{key}: #{value ? 'zapnuté' : 'vypnuté'}."
         end
 
         # K2/D-87: KONTROLA KRESBY z raily Inspectora. Presna kopia vzoru ABS
