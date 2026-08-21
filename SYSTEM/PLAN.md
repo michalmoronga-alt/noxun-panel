@@ -25,12 +25,25 @@
 
 **~~ABS kontrola v raile — 3-stavové nastavenie~~ — HOTOVÉ** (PR #190, **v0.7.28**, 21.8.) — drobná dávka z debaty o ikone ABS kontroly. Michal si vybral **variant B: malý plný trojuholník v pravom dolnom rohu** ikony (flyout vzor nástrojov SketchUp/Photoshop); ikona `shell` ostáva a **toggle sa nemení** — klik na roh otvorí **3-stavové nastavenie kontroly hrán** (chýba podľa pravidla / mimo pravidla / olepené + „len vybrané" so živými počtami), teda presne to, čo má okno Výroba pod chevronom. Tým je **splnený pôvodný kontrakt UI 2.0 „ABS kontrola = shell so stavom a šípkou na 3-stavové nastavenie"** a vedomá odchýlka z UI-B1 zaniká. Kľúčové rozhodnutie: nastavenie sa **nekopírovalo** — vyčlenilo sa do zdieľaného komponentu (`ui/js/edge_menu.js` + štýly v zdieľanom `panel.css`) a **obe okná zapisujú jednou serverovou cestou** (`Engine.set_edge_check_option` → broadcast), takže stav aj počty sú vždy rovnaké a dve kópie okna nikdy nestoja na obrazovke naraz. Nový vzor „flyout roh" je zapísaný v [../docs/UI_DIZAJN.md](../docs/UI_DIZAJN.md) §5.11.
 
-**Fáza ŠTÚDIO** *(záver bloku — vlastné dávky po sektorovej debate nad [mockupom štúdia](zdroje/ui20/mockup_ui20.html))*
-- **D-50 · OCL inšpirácia UI/UX** — prebrať detaily z OCL flow (vzory áno, GPL kód nie); ťažisko je práve v štúdio okne (kusovník, kontrola, nákup, rozpočet).
-- **D-69 · Jednotný editor materiálov** — jedno modálne okno pre pridanie z Demosu / ručné pridanie / editáciu, rovnaké polia bez ohľadu na vstupný bod.
-- **D-15 · „Pridávačky" ako modal** — všetky akcie „pridať niečo" (šablóna, materiál, položka) na jeden UX vzor.
-- **Klik na materiál/ABS → zvýraznenie miest použitia v projekte** — z katalógu vidieť, kde presne dekor v zákazke je.
-- Presun satelitných okien do štúdia po jednom (Materiály · Výroba · Kovanie · Pravidlá · Šablóny · Nastavenia) — satelity zanikajú postupne, plugin je použiteľný po každej dávke.
+**Fáza ŠTÚDIO — KONCEPT SCHVÁLENÝ 22.8.2026** *(sektorová debata 21.–22.8., 4 kolá nad
+klikateľným mockupom, návrhy Š1–Š19 — všetko schválené; záväzný slovný kontrakt je sekcia
+**ŠTÚDIO KONCEPT** v [zdroje/ui20/UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md), vizuálna
+referencia [zdroje/ui20/mockup_studio.html](zdroje/ui20/mockup_studio.html)).* Do konceptu sú
+zapracované a ním uzavreté: **D-50** (OCL vzory — skupiny kusovníka, hover akcie, voliteľné
+stĺpce, klik-select), **D-69** (jednotný editor materiálov: 3 vstupy → 1 formulár) a **D-15**
+(pridávačky ako zdieľaný modal) + klik na materiál → zvýraznenie použitia; D-čísla sa vyriešia
+implementáciou príslušných dávok. Vedomé odklady: Nákup kovania a Katalóg kovania **presun 1:1
+bez redizajnu** (redizajn s blokom KOVANIE) · D-106 s okruhom rozpočtu · D-95 s blokom
+KONTROLA+VÝROBA · DOCX/PDF generátor ponuky po V1.
+
+Implementačné dávky (poradie presunov schválil Michal; každá dávka = plugin plne použiteľný,
+satelit zaniká až po plnej náhrade):
+- **ŠT-1a** (L) skelet Štúdia: okno `studio.html` + navigácia + deep-link `NX.studioOpen` + sekcia **Kusovník** (Š1–Š6, pohľady Dielce·Platne·ABS).
+- **ŠT-1b** (M) sekcia **Kontrola** (Š8–Š11, zdieľané prepínače hrán a kresby) + presmerovanie deep-linkov z Inspectora.
+- **ŠT-1c** (M) **Rozpočet + Cenová ponuka** (Š12–Š15) + **Nákup 1:1** (Š7) — **okno Výroba zaniká**, toolbar „Štúdio" vedie sem.
+- **ŠT-2** (M) sekcia **Materiály** + **D-69 editor** + D-15 komponent — okno Materiály zaniká.
+- **ŠT-3** (M) **Kovanie · Pravidlá · Šablóny** (Š16–Š18) — tri okná zanikajú.
+- **ŠT-4** (S) **Nastavenia** (Š19) + upratanie (`open_tab` → `studioOpen` všade, docs, zánik zvyšných satelitov).
 
 *(Z vízie V1 sú v koncepte zapracované: header ako prístup ku všetkému UX-02 → UI-B1 · karta Zóna so smerovými ikonami UX-06 → UI-C2 · polia šírkou podľa obsahu UX-03 → UI-B1/UI-C.)*
 
