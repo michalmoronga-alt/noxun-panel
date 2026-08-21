@@ -384,6 +384,16 @@
       MATERIALS.used_ids = data || { sheets: [], edges: [] };
       if (typeof NXCombo !== 'undefined' && NXCombo) NXCombo.rerender();
     },
+    // K1 (Codex #185 kolo 2, P2): CERSTVY payload karty dielca po zmene katalogu.
+    // `setMaterials` nizsie kartu prekresluje z CACHOVANEHO payloadu, takze
+    // serverom skladane udaje (segment „Smer dekoru", texty hran D-102) by
+    // ostali stare. Ruby posiela tento push HNED za katalogom; posiela ho LEN
+    // ked je vo vybere dielec, takze `null` sem nechodi a rezim panela sa
+    // nemeni (schovanie karty patri vyhradne push_selected).
+    setPartCard: function(data){
+      if (!data) return;
+      if (typeof renderPartCard === 'function') renderPartCard(data);
+    },
     setMaterials: function(data){
       MATERIALS = data || { sheets: [], edges: [] };
       refreshMaterialFilters();

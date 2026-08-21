@@ -49,8 +49,12 @@
                     // vobec otvaraju, ci sa z nich skace do modelu (oko) alebo
                     // do Kontroly — teda ci ma zmysel drzat obe cesty.
                     'warn:chip', 'warn:oko', 'warn:studio',
-                    // UI-D3: preklik zo „Smeru dekoru" na material dielca.
-                    'part:smer'];
+                    // K1 (D-108): segment „Smer dekoru" v karte dielca. Merac
+                    // povie, ako casto sa kresba naozaj otaca rucne a ci sa
+                    // pouzivatel vracia na dedenie — teda ci ma volba zmysel
+                    // tam, kde je. (Nahradil povodny kluc `part:smer` z UI-D3:
+                    // informacny riadok s preklikom uz neexistuje.)
+                    'part:smer-dedi', 'part:smer-pozdlz', 'part:smer-priecna'];
 
   // --- klasifikacia (cista logika, testovatelna v Node cez module.exports) ---
 

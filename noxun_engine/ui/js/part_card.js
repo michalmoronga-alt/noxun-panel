@@ -60,33 +60,124 @@
   // Preto su to informacne riadky (text), nie polia: „vystup nikdy nevyzera ako
   // vstup" (trvala zasada z kol 15.8., rovnaky vzor ako `.infocol` Zakladnych).
   //
-  // VEDOMA ODCHYLKA od mockupu: `Smer dekoru` je tu tiez INFORMACIA, nie
-  // rozbalovacka. Smer dielca korpusu urcuje jeho MATERIAL (katalogove pole
-  // `grain` sheetu) — per-dielec override by bol novy kluc v `part_overrides`,
-  // teda zmena vyrobneho kontraktu (kusovnik, VEPO rotacia, validacia narezu).
-  // To je vlastna davka s auditom; tvarit sa, ze pole funguje, by bola lož.
-  var PC_GRAIN_LABEL = { length: 'Po dĺžke', width: 'Po šírke', none: 'Bez smeru' };
-  function nxGrainLabel(g){ return PC_GRAIN_LABEL[String(g == null ? '' : g)] || 'Bez smeru'; }
-  // Ciste skladanie riadkov (testovane v Node): dva a dva, aby karta narastla
-  // o JEDEN riadok oproti povodnemu `pcDim` — vertikalny priestor je vzacny.
+  // K1 (D-108, 21.8.2026): `Smer dekoru` uz NIE JE informacia — je to VSTUP
+  // (segment `#pcGrainRow` pod mriezkou). Vedoma odchylka UI-D1 („smer je len
+  // text") tym KONCI: per-dielec override `part_overrides['grain_direction']`
+  // existuje, prebehol auditom a zapisuje sa do snapshotu dielca. Preklad
+  // hodnoty na slovo tu uz NEZIJE — vsetky texty smeru sklada server
+  // (`Panel.part_grain_payload`, vzor D-102), aby panel nemohol povedat nieco
+  // ine, nez postavi builder.
+  // Ciste skladanie riadkov (testovane v Node): dva vlavo, jeden vpravo.
   function nxPartBasicRows(pc){
     var p = pc || {};
     return {
       left: [ { label: 'Dĺžka', value: fmtmm(p.length), unit: 'mm' },
               { label: 'Šírka', value: fmtmm(p.width), unit: 'mm' } ],
+      // Hrúbka klikatelna NIE JE: urcuje ju material KORPUSU a ten sa v rezime
+      // dielca neda z panela otvorit (sektor Materiály patri kontextu Korpus).
+      // Nikam nevedie => nepredstiera, ze vedie (UI-D3, N13).
       right: [ { label: 'Hrúbka', value: fmtmm(p.thickness), unit: 'mm',
-                 title: 'Hrúbku dielca určuje materiál korpusu.' },
-               // UI-D3 (N13 „klikateľné je len to, čo niekam vedie"): smer
-               // dekoru urcuje MATERIAL DIELCA, a ten sa vybera o par riadkov
-               // nizsie v tej istej karte — klik tam preto doskoci. Hrúbka
-               // klikatelna NIE JE: urcuje ju material KORPUSU a ten sa v
-               // rezime dielca neda z panela otvorit (sektor Materiály patri
-               // kontextu Korpus). Nikam nevedie => nepredstiera, ze vedie.
-               { label: 'Smer dekoru', value: nxGrainLabel(p.grain_direction), unit: '',
-                 click: 'onPartInfoGrain(event)',
-                 title: 'Smer dekoru určuje materiál dielca — klik skočí na jeho výber.' } ]
+                 title: 'Hrúbku dielca určuje materiál korpusu.' } ]
     };
   }
+  // ===== K1 (D-108): SMER DEKORU = VSTUP ====================================
+  // Tri volby: „Podľa materiálu — <výsledok>" / „Pozdĺžna" / „Priečna".
+  //
+  // ZASADY (kontrakt davky K1):
+  //  * VSETKY TEXTY SKLADA SERVER (`pc.grain_options`, vzor D-102). JS nepozna
+  //    ani slovo „pozdĺžna", ani rozmery — inak by panel vedel povedat nieco ine
+  //    nez to, co postavi builder.
+  //  * Dedeny stav ukazuje VYSLEDOK, nie prazdne „dedí" — slepy bod incidentu
+  //    19.8. bol prave v tom, ze smer nebolo VIDIET.
+  //  * Kazda volba nesie v tooltipe VYROBNY rozmer (2000×250 vs 250×2000), takze
+  //    otocenie kresby je vidiet pred objednavkou.
+  //  * ZAMKNUTY stav (material bez smeru) pouziva `aria-disabled`, nie HTML
+  //    `disabled` (vzor D-78): tlacidlo ostava fokusovatelne a nesie
+  //    vysvetlenie. Klik v nom NEZAPISUJE — odvedie na material dielca, lebo
+  //    tam sa smer naozaj berie.
+  var PC_GRAIN_VALUES = ['inherit', 'length', 'width'];
+  // Zaloha popisov = PRESNE to, co stoji v statickej kostre `panel.html`.
+  // Pouzije sa, ked server volby neposle (payload rescueoval chybu, starsi
+  // backend). Bez nej by segment po prekresleni na INY dielec ostal s popismi
+  // a tooltipmi PREDOSLEHO dielca — teda s cudzim vyrobnym rozmerom
+  // (Codex #185 kolo 2, P2). Radsej neutralny text nez cudzie cislo.
+  var PC_GRAIN_FALLBACK = { inherit: 'Podľa materiálu', length: 'Pozdĺžna', width: 'Priečna' };
+  // CISTY vypocet stavu segmentu (testovany v Node) — DOM sa dotyka az
+  // `syncPartGrain`. Chybajuci payload nesmie kartu zhodit: bez `grain_options`
+  // ostanu popisy z kostry a segment sa zamkne (radsej nic nez nahodny stav).
+  function nxGrainSegmentState(pc){
+    var p = pc || {};
+    var opts = p.grain_options || [];
+    var known = false;
+    for (var k = 0; k < opts.length; k++){ if (opts[k] && opts[k].value) { known = true; break; } }
+    var cur = PC_GRAIN_VALUES.indexOf(p.grain_value) >= 0 ? p.grain_value : 'inherit';
+    var locked = !!p.grain_locked || !known;
+    return {
+      locked: locked,
+      hint: p.grain_hint || '',
+      buttons: PC_GRAIN_VALUES.map(function (v){
+        var o = nxGrainOptionOf(opts, v);
+        var on = (v === cur);
+        return { value: v, label: o ? o.label : PC_GRAIN_FALLBACK[v], title: o ? (o.title || '') : '',
+                 on: on,
+                 // Rucny zasah (nie dedenie) sa oznacuje jantarovo — rovnaky
+                 // jazyk ako `select.ovr` pri materiali a hranach.
+                 ovr: on && v !== 'inherit',
+                 disabled: locked };
+      })
+    };
+  }
+  function nxGrainOptionOf(opts, value){
+    for (var i = 0; i < opts.length; i++){ if (opts[i] && opts[i].value === value) return opts[i]; }
+    return null;
+  }
+  function syncPartGrain(pc){
+    var row = el('pcGrainRow');
+    if (!row) return;
+    var st = nxGrainSegmentState(pc);
+    for (var i = 0; i < st.buttons.length; i++){
+      var s = st.buttons[i];
+      var b = row.querySelector('button[data-pc-grain="' + s.value + '"]');
+      if (!b) continue;
+      // Popis aj tooltip sa prepisuju VZDY — aj v degradovanom stave. Preskocenie
+      // by na novom dielci nechalo cudzi vyrobny rozmer (Codex #185 kolo 2, P2).
+      b.textContent = s.label;
+      b.title = s.title;
+      b.classList.toggle('on', s.on);
+      b.classList.toggle('ovr', s.ovr);
+      b.setAttribute('aria-pressed', s.on ? 'true' : 'false');
+      if (s.disabled) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled');
+    }
+    var hint = el('pcGrainHint');
+    if (hint){
+      hint.textContent = st.hint;
+      hint.style.display = st.hint ? '' : 'none';
+    }
+  }
+  function onPartGrain(v){
+    if (!partCard) return;
+    // Zamknuty material: nic sa nezapisuje — karta odvedie tam, kde sa smer
+    // naozaj berie (vzor UI-D3 „klikateľné vedie tam, kam ukazuje").
+    if (nxGrainSegmentState(partCard).locked){ onPartInfoGrain(null); return; }
+    if ((partCard.grain_value || 'inherit') === v) return; // klik na uz zvolenu = no-op
+    if (window.sketchup && sketchup.set_part_grain)
+      sketchup.set_part_grain(JSON.stringify({ role_key: partCard.role_key,
+                                               grain: nxGrainWire(v),
+                                               cabinet_id: partCard.cabinet_id,
+                                               // Identitu DOKUMENTU nesie obalka payloadu karty
+                                               // (`bridge.js` ju do nej doplní) — ID skriniek sa
+                                               // naprieč dokumentmi opakujú, takže bez nej by
+                                               // oneskorený klik prestaval rovnomennú skrinku
+                                               // v inom modeli (Codex #185 kolo 2, P2).
+                                               model_guid: partCard.model_guid || '' }));
+  }
+  // Hodnota NA DROT. Segment pouziva UI token `inherit`, ale zapisova cesta
+  // pozna sentinel `__inherit__` — ten isty, akym sa hrana vracia „podľa
+  // pravidla" (`handle_set_part_edge`). Bez tohto prekladu by server klik na
+  // „Podľa materiálu" ODMIETOL ako neznamy smer (enum guard) a override by
+  // aj s rotaciou vo VEPO ticho ostal (Codex #185 P1). Zhodu oboch stran
+  // zamyka test `tests/pure/test_k1_smer_dekoru.rb`.
+  function nxGrainWire(v){ return v === 'inherit' ? '__inherit__' : v; }
   function nxInfoRowHtml(r){
     var v = esc(r.value) + (r.unit ? (' ' + esc(r.unit)) : '');
     var body = '<span>' + esc(r.label) + '</span><b>' + v + '</b>';
@@ -97,13 +188,15 @@
   }
   // Preklik zo „Smeru dekoru" na materiál dielca (v TEJ ISTEJ karte). Nie je to
   // zapis — len navigacia: sektor sa rozbali, combobox otvori (vzor onEdgePick).
+  // K1: od zavedenia segmentu sem vedie uz LEN zamknuty stav (materiál bez
+  // smeru) — jediny pripad, ked sa smer naozaj meni inde nez v segmente.
   function onPartInfoGrain(ev){
     if (ev && ev.stopPropagation) ev.stopPropagation();
     var sel = el('pcMaterial');
     if (!sel){ NX.setStatus('Materiál dielca sa dá vybrať až pri označenom dielci.', true); return; }
     if (typeof nxRevealTarget === 'function') nxRevealTarget(sel);
     if (!(typeof NXCombo !== 'undefined' && NXCombo && NXCombo.open(sel))) sel.focus();
-    NX.setStatus('Smer dekoru nesie materiál dielca — vyber ho tu.', false);
+    NX.setStatus('Tento materiál nemá smer dekoru — kresbu určuje dekor, vyber ho tu.', false);
   }
   function renderPartBasic(pc){
     var L = el('pcBasicL'), R = el('pcBasicR');
@@ -111,6 +204,7 @@
     var rows = nxPartBasicRows(pc);
     L.innerHTML = rows.left.map(nxInfoRowHtml).join('');
     R.innerHTML = rows.right.map(nxInfoRowHtml).join('');
+    syncPartGrain(pc);
   }
 
   // Hranova ikona: JEDNA kresba (#i-edge), styri ROTACIE. Uhol sa berie zo
@@ -539,8 +633,10 @@
   // ikon a texty modalu „Použiť na podobné…". V CEF je `module` undefined a
   // vetva sa preskoci (vzor hardware.js).
   if (typeof module !== 'undefined' && module.exports){
-    module.exports = { nxGrainLabel: nxGrainLabel, nxPartBasicRows: nxPartBasicRows,
+    module.exports = { nxPartBasicRows: nxPartBasicRows,
       nxEdgeRotOf: nxEdgeRotOf, nxSimilarCountText: nxSimilarCountText,
-      nxSimilarBtnState: nxSimilarBtnState };
+      nxSimilarBtnState: nxSimilarBtnState,
+      // K1 (D-108): stav segmentu „Smer dekoru" (tests/js/test_k1_smer_dekoru.js).
+      nxGrainSegmentState: nxGrainSegmentState, nxGrainWire: nxGrainWire };
   }
 

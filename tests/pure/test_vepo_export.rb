@@ -59,6 +59,11 @@ NxTest.test('vepo: kod dvojice hran z pritomnosti ABS (nie hrubky)') do
 end
 
 NxTest.test('vepo: rotacia dekoru width prehodi rozmery AJ dvojice hran') do
+  # K1 (D-108, v0.7.23) TENTO KONTRAKT NEMENI — rotaciu robi VYHRADNE VEPO (a
+  # zrkadlovo `Validation.fits_on_sheet?`). Zmenil sa len ZDROJ smeru: do
+  # snapshotu dielca ho kladie `CabinetBuilder.effective_grain` (override ->
+  # material). Ziadny druhy swap tu nepribudol a NIKDY pribudnut nesmie —
+  # rotovat dvakrat by znamenalo objednat dielec v povodnej orientacii.
   r = NxVepo.vrow('grain_direction' => 'width',
                   'edges' => { 'L1' => 'ABS1', 'L2' => nil, 'W1' => 'ABS2', 'W2' => nil })
   o = NxVepo.vepo.oriented(r)

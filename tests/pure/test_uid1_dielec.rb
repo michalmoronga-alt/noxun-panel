@@ -3,9 +3,9 @@
 #
 # Co sa tu strazi (a preco to nestaci overit klikanim):
 #   1) „Zakladne hore" — rozmery dielca su VYSTUP (informacne riadky), nikdy
-#      polia. Vedoma odchylka: aj `Smer dekoru` je informacia, lebo per-dielec
-#      override smeru neexistuje (urcuje ho material) — karta preto nesmie mat
-#      rozbalovacku, ktora by sa tvarila, ze nieco nastavuje.
+#      polia. POZOR: povodna vedoma odchylka („aj Smer dekoru je informacia")
+#      SKONCILA davkou K1 (D-108, v0.7.23) — smer je od nej VSTUP (segment
+#      `#pcGrainRow`) a override zije v `part_overrides['grain_direction']`.
 #   2) Hranova ikona je JEDNA kresba a STYRI ROTACIE, odvodene zo strany 2D
 #      nahladu (`edge_sides`) — nie styri ikony a nie pevna mapa nazvov.
 #   3) „Označiť v modeli" je CISTE CITANIE + zmena vyberu: ziadna operacia,
@@ -56,21 +56,26 @@ NxTest.test('UI-D1: rozmery dielca su VYSTUP — informacne riadky, nie polia') 
                 'pouziva sa TA ISTA mriezka ako v Zakladnych korpusu — jeden vizualny jazyk')
 end
 
-NxTest.test('UI-D1 (vedoma odchylka): Smer dekoru je INFORMACIA, nie rozbalovacka') do
-  # Per-dielec override smeru dekoru neexistuje: `part_overrides` pozna len
-  # `material_id`, `edges` a `edge_warnings` (CabinetBuilder.norm_overrides),
-  # smer urcuje katalogove pole `grain` materialu. Pole, ktore by sa tvarilo,
-  # ze nieco nastavuje, by bola lož — preto je to text s vysvetlenim.
-  NxTest.assert(UID1_PART_JS.include?('Smer dekoru'), 'udaj sa v karte ukazuje')
-  NxTest.assert(!UID1_CARD.include?('pc_grain'), 'karta dielca NEMA select smeru dekoru')
-  # UI-D3 spresnilo znenie: karta uz nielen POVIE, kde sa smer meni, ale rovno
-  # tam VEDIE (klik otvori materialovy combobox tej istej karty). Podstata
-  # odchylky ostava — je to informacia + navigacia, NIE pole, ktore by sa
-  # tvarilo, ze smer nastavuje.
-  NxTest.assert(UID1_PART_JS.include?('Smer dekoru určuje materiál dielca'),
-                'karta povie, kde sa smer naozaj meni (nikdy ticho mŕtvy udaj)')
+NxTest.test('K1 (D-108): odchylka UI-D1 ZRUSENA — Smer dekoru je VSTUP') do
+  # UI-D1 (v0.7.17) vedome nechal smer dekoru ako informaciu: per-dielec override
+  # by menil VYROBNY kontrakt (kusovnik, rotacia VEPO, kontrola narezu) a to je
+  # vlastna davka s auditom. Davka K1 (v0.7.23) ju spravila — odchylka konci.
+  #
+  # Kontrakt, ktory tento test zamyka: smer sa nastavuje SEGMENTOM v karte,
+  # override zije v `part_overrides['grain_direction']` a payload nesie VSETKY
+  # TRI udaje (vysledok, zdroj, default materialu) — inak by karta nevedela
+  # ukazat, ci je smer zdedeny alebo rucny.
+  NxTest.assert(UID1_CARD.include?('id="pcGrainRow"'), 'karta ma segment smeru dekoru')
+  %w[inherit length width].each do |v|
+    NxTest.assert(UID1_CARD.include?("data-pc-grain=\"#{v}\""), "segment ma volbu #{v}")
+  end
+  NxTest.assert(UID1_PART_JS.include?('function onPartGrain'), 'klik ma zapisovu cestu')
+  NxTest.assert(UID1_PART_JS.include?('sketchup.set_part_grain'), 'zapis ide cez vlastny callback')
   NxTest.assert(UID1_PAYLOADS_RB.include?("'grain_direction' => cfg['grain_direction']"),
-                'payload karty nesie smer zo SNAPSHOTU dielca (server, nie JS)')
+                'payload karty nesie EFEKTIVNY smer zo SNAPSHOTU dielca (server, nie JS)')
+  %w[grain_value grain_material grain_effective grain_locked grain_options].each do |k|
+    NxTest.assert(UID1_PAYLOADS_RB.include?("'#{k}'"), "payload nesie #{k}")
+  end
 end
 
 # --- 2) hranove ikony --------------------------------------------------------

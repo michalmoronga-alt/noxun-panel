@@ -107,6 +107,7 @@ module Noxun
           cb(dlg, 'set_part_material')    { |p| handle_set_part_material(p) }    # per-dielec override
           cb(dlg, 'set_part_edge')        { |p| handle_set_part_edge(p) }        # ABS hrana dielca
           cb(dlg, 'set_part_edges_all')   { |p| handle_set_part_edges_all(p) }   # D-35 olep vsetky 4 hrany (1 undo)
+          cb(dlg, 'set_part_grain')       { |p| handle_set_part_grain(p) }       # K1/D-108 smer dekoru dielca (1 undo)
           # V0.4 kovanie: rucny pocet / vypnutie / reset polozky + editor pravidiel
           cb(dlg, 'set_hardware_override') { |p| handle_set_hardware_override(p) }
           cb(dlg, 'set_hardware_set')      { |p| handle_set_hardware_set(p) } # V0.6 D1b: set na skrinke

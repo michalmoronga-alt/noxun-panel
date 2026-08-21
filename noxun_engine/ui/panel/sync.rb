@@ -187,6 +187,42 @@ module Noxun
         # (BEZ push_init — nesmie resetovat rozpisany formular).
         def push_materials
           js("NX.setMaterials(#{materials_payload.to_json})")
+          push_part_card
+        end
+
+        # K1 (Codex #185 kolo 2, P2): CERSTVY payload karty dielca po zmene
+        # KATALOGU. `NX.setMaterials` kartu prekresluje z CACHOVANEHO payloadu,
+        # takze vsetko, co sklada SERVER, by ostalo stare az do dalsieho prekliku
+        # vyberu — segment „Smer dekoru" by ostal ZAMKNUTY na materiali, ktoremu
+        # prave pribudol smer (alebo naopak ponukal otacanie tam, kde uz nie je
+        # co otacat), a rovnako by zamrzli texty hran D-102.
+        #
+        # Je to CISTE CITANIE (vzor `push_used_ids`): ziadna operacia, ziadny
+        # dedup, ziadny zapis do modelu (lekcia D-103). Ked vo vybere dielec nie
+        # je, NEPOSIELA sa nic — `renderPartCard(null)` by kartu schoval a
+        # zmena katalogu nesmie prepnut rezim panela.
+        # `dialog_alive?` sa tu NEKONTROLUJE zamerne (na rozdiel od
+        # `push_used_ids`, ktory nim obchadza drahy scan modelu): payload jednej
+        # karty je citanie configu jedneho dielca — lacnejsie nez katalog, ktory
+        # `push_materials` postavil o riadok vyssie — a samotne odoslanie uz
+        # strazi `js`. Guard navyse robil metodu nepozorovatelnou pre testy.
+        def push_part_card
+          model = Sketchup.active_model
+          return if model.nil?
+
+          cab = find_cabinet(model)
+          part = cab ? find_selected_part(model) : nil
+          return if part.nil?
+
+          payload = part_card_payload(model, cab, part)
+          return if payload.nil?
+
+          # Identitu dokumentu nesie obalka push_selected; tento push je
+          # samostatny, takze si ju musi doniest sam (JS ju cita pri zapise).
+          payload['model_guid'] = model_guid(model)
+          js("NX.setPartCard(#{payload.to_json})")
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.push_part_card')
         end
 
         # D-85 (Codex #167 P2): SAMOTNY odvodeny zoznam „Použité v projekte" pre

@@ -309,6 +309,23 @@
   .pcmat label { flex: 0 0 78px; font-size: 12px; color: var(--nx-ink-label); }
   .pcmat select { flex: 1; padding: 4px 6px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 12px; min-width: 0; }
   .pcmat select.ovr { border-color: var(--nx-warn); background: var(--nx-warn-bg); }
+  /* K1 (D-108): „Smer dekoru" v karte dielca — segment v TOM ISTOM riadkovom
+     tvare ako „Materiál" (popisok 78 px + ovládač), takže karta nenarástla
+     o samostatný riadok. Prefix `.nx-inspector` je tu kvôli špecificite:
+     prebíja spoločné `.nx-inspector .segrow button` nižšie v súbore. */
+  .pcgrain { display: flex; align-items: center; gap: 5px; margin: 2px 0 6px; }
+  .pcgrain label { flex: 0 0 78px; font-size: 12px; color: var(--nx-ink-label); }
+  .nx-inspector .pcgrain .segrow { flex: 1; margin: 0; min-width: 0; }
+  .nx-inspector .pcgrain .segrow button { padding: 4px 6px; font-size: 11px; min-width: 0;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Ručný zásah = varovná rodina (rovnaký jazyk ako `select.ovr` pri materiáli
+     a hranách): teal hovorí „vybraté", jantár „vybral to človek". */
+  .nx-inspector .pcgrain .segrow button.ovr { border-color: var(--nx-warn); background: var(--nx-warn-bg);
+            color: var(--nx-ink-strong); }
+  /* Neaktívny stav drží `aria-disabled` (vzor D-78) — tlačidlo ostáva
+     fokusovateľné a nesie vysvetlenie; HTML `disabled` sa nepoužíva. */
+  .nx-inspector .pcgrain .segrow button[aria-disabled="true"] { opacity: .55; cursor: default; }
+  .nx-inspector .pcgrain .segrow button[aria-disabled="true"]:hover { border-color: var(--nx-border); }
   /* ===== D-85 / UI-03 ZDIELANY COMBOBOX (js/nx_combo.js) =====================
      Nativny <select> ostava v DOM ako zdroj pravdy — len sa neukazuje. Skryva ho
      ATRIBUT (nie trieda): panel selectom prepisuje className ('ovr'), takze

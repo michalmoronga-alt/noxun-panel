@@ -38,6 +38,13 @@ module Noxun
       GAP_BETWEEN_CABS = 50.0    # medzera medzi korpusmi pri vkladani vedla seba
       UPPER_HANG_Z     = 1400.0  # vyska zavesenia hornej skrinky (Z pri vlozeni)
 
+      # K1 / D-108: per-dielec SMER DEKORU ako vstup. Povolene hodnoty OVERRIDU
+      # su LEN 'length'/'width' — „bez smeru" sa nenastavuje, to je vlastnost
+      # MATERIALU. Chybajuci kluc = dedi z materialu (dnesne spravanie, stare
+      # modely su platne bez jedineho zapisu). Neznama hodnota sa NIKDY ticho
+      # neprelozi (enum guard v norm_overrides aj v zapisovej ceste panela).
+      GRAIN_OVERRIDES = %w[length width].freeze
+
       MIN = { width: 200.0, height: 200.0, depth: 150.0 }.freeze
       # D-45: povoleny rozsah hrubky korpusu (mm) — JEDINY zdroj pravdy pre clamp
       # v normalize, pre prevzatie hrubky z materialu aj pre projektovy guard.
@@ -413,13 +420,36 @@ module Noxun
             ov.delete('edge_warnings') if ew.empty?
           end
           edges = base_edges.merge(known_edges(ov_edges))
-          grain = sheet && sheet['grain'].to_s
-          grain = 'none' unless %w[length width none].include?(grain)
+          grain = effective_grain(sheet, ov['grain_direction'])
           # V0.6 M-B1: UNI sheet_thickness sa NEexportuje (nil) — materialized_part
           # cela nepretvaruje na katalogovy default a vyrobny udaj drzi config.
           { part_key: part_key, role_key: part_key, material_id: mat_id, edges: edges,
             grain_direction: grain, sheet_thickness: (uni_sheet ? nil : (sheet && sheet['thickness'])),
             material_source: mat_source }
+        end
+
+        # K1 / D-108: JEDINA autorita EFEKTIVNEHO smeru dekoru dielca korpusu.
+        # Retaz je `override -> material` a vysledok sa MATERIALIZUJE do snapshotu
+        # dielca (add_part) — vystupy (kusovnik, VEPO, kontrola narezu, ABS) citaju
+        # UZ LEN snapshot, nikdy zivy katalog ani `part_overrides`. Vdaka tomu drzi
+        # odpojeny dielec aj stara zakazka presne to, s cim sa objednavala.
+        #
+        # ROTACIA SA TU NEROBI: rozmery v snapshote ostavaju GEOMETRICKE (pd[:prod]).
+        # Vymenu dlzka<->sirka a dvojic hran robi VEPO (`VepoExport.oriented`) a
+        # kontrola narezu (`Validation.fits_on_sheet?`) — presne ako doteraz. K1
+        # meni JEDINE zdroj smeru, takze ziadny druhy swap nevznika.
+        #
+        # STALE OVERRIDE (kontrakt): ked material smer NEMA ('none' — napr. UNI
+        # alebo jednofarebny dekor), override sa NEMAZE, len sa IGNORUJE (efekt
+        # 'none'). Otacat kresbu, ktora neexistuje, by bola lož vo vyrobnych
+        # datach; a mazanie by po docasnej zmene materialu zahodilo rozhodnutie
+        # pouzivatela, ktore chcel mat spat.
+        def effective_grain(sheet, override)
+          base = sheet && sheet['grain'].to_s
+          base = 'none' unless %w[length width none].include?(base)
+          return base if base == 'none'
+          ov = override.to_s
+          GRAIN_OVERRIDES.include?(ov) ? ov : base
         end
 
         # D-41 (audit FIX 10) + D-102: JEDINA autorita hrubky, s ktorou sa pyta ABS
@@ -1386,7 +1416,8 @@ module Noxun
           }
         end
 
-        # Ocisti part_overrides na { part_key => { 'material_id'=>..|nil, 'edges'=>{L1..W2} } }.
+        # Ocisti part_overrides na { part_key => { 'material_id'=>..|nil,
+        # 'edges'=>{L1..W2}, 'grain_direction'=>'length'|'width' } }.
         # Zahodi prazdne / neplatne zaznamy. Zachova nil hrany (explicitne "bez ABS").
         def norm_overrides(raw_ov)
           return {} unless raw_ov.is_a?(Hash)
@@ -1396,6 +1427,12 @@ module Noxun
             rec = {}
             mat = present(ov['material_id'] || ov[:material_id])
             rec['material_id'] = mat if mat
+            # K1 / D-108: smer dekoru dielca. WHITELIST — do configu sa dostane
+            # LEN 'length'/'width'; cokolvek ine (aj 'none' a hodnota z novsej
+            # verzie) vypadne, aby sa neznamy vstup NIKDY nepreklopil na tichy
+            # fallback vo vyrobnych datach. Chybajuci kluc = dedi z materialu.
+            grain = (ov['grain_direction'] || ov[:grain_direction]).to_s
+            rec['grain_direction'] = grain if GRAIN_OVERRIDES.include?(grain)
             edges = ov['edges'] || ov[:edges]
             if edges.is_a?(Hash)
               e = {}

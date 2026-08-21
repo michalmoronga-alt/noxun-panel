@@ -4121,6 +4121,380 @@ module NoxunSuRunner
   # Docasny nazov sablony sa uprace na zaciatku aj v `ensure` (vzor UI-D2).
   SMOKE1_NAME = 'SU-TEST odfotenie (docasna)'
 
+  # =========================================================================
+  # K1 / D-108 — SMER DEKORU PER DIELEC ako VSTUP
+  #
+  # Headless sada overi retaz `override -> material -> snapshot` aj vystupy;
+  # TU sa overuje to, co bez ziveho modelu overit NEDA:
+  #   * zapis z panela na ZIVEJ skrinke je PRESNE JEDEN krok Spat,
+  #   * GEOMETRIA sa nezmenila (rozmery kvadra ostali) — otaca sa VYSTUP,
+  #     nie model; kresba je vyrobny udaj, nie transformacia,
+  #   * D-88 farbenie hran je po otoceni NEZMENENE (osi dielca sa nehybu),
+  #   * kopia skrinky (dedup) si override NESIE,
+  #   * ODPOJENY dielec drzi svoj snapshot aj ked sa korpus vrati na dedenie,
+  #   * otvorenie STAREJ zakazky bez pola nezapise NIC,
+  #   * VEPO CSV naozaj obsahuje OTOCENY riadok.
+  #
+  # Bezi nad IZOLOVANYM katalogom (Materials.test_dir_override, vzor D-88) —
+  # fresh seed su UNI materialy BEZ smeru, na ktorych by sa otacanie nedalo
+  # ani vyskusat.
+  def k1_catalog_json
+    sheet = lambda do |id, grain, extra|
+      { 'material_id' => id, 'manufacturer' => 'Egger', 'decor' => "DEC-#{id}",
+        'type' => 'DTDL', 'thickness' => 18.0, 'grain' => grain,
+        'sheet_size' => [2800.0, 2070.0], 'color' => [200, 190, 170],
+        'production_class' => 'sheet', 'group_id' => "GRP-#{id}", 'structure' => 'SM' }.merge(extra)
+    end
+    {
+      'std' => 1, 'schema' => 2,
+      'sheets' => [
+        sheet.call('K1DUB18', 'length', {}),                            # dekor s kresbou
+        sheet.call('K1UNI18', 'none', 'uni' => true, 'uni_role' => 'body')
+      ],
+      'edges' => [
+        { 'abs_id' => 'K1E_DUB_23X10', 'decor' => 'DEC-K1DUB18', 'thickness' => 1.0,
+          'width' => 23.0, 'color' => [120, 80, 40], 'group_id' => 'GRP-K1DUB18',
+          'structure' => 'SM' }
+      ]
+    }
+  end
+
+  def k1_params(extra = {})
+    { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 510.0,
+      'thickness' => 18.0, 'material_id' => 'K1DUB18', 'front_material_id' => 'K1DUB18',
+      'fronts' => { 'items' => [{ 'id' => 'F1', 'type' => 'door', 'mode' => 'auto', 'wings' => '1' }] },
+      'zone_tree' => { 'id' => 'Z1', 'shelves' => 1, 'children' => [] } }.merge(extra)
+  end
+
+  def k1_part(inst, role)
+    inst.definition.entities.grep(Sketchup::ComponentInstance)
+        .find { |i| e::Store.kind(i) == 'part' && e::Store.get(i, 'role').to_s == role }
+  end
+
+  def k1_grain_of(inst, role)
+    p = k1_part(inst, role)
+    p ? (e::Store.config(p) || {})['grain_direction'].to_s : nil
+  end
+
+  def k1_override_of(inst, key)
+    ov = (e::Store.config(inst) || {})['part_overrides'] || {}
+    (ov[key] || {})['grain_direction']
+  end
+
+  # Vonkajsie rozmery kvadra dielca v mm (zoradene) — otocenie kresby ich
+  # NESMIE zmenit ani o desatinu.
+  def k1_box(part)
+    return nil unless part && part.valid?
+    b = part.definition.bounds
+    [mm(b.width), mm(b.height), mm(b.depth)].map { |v| v.round(2) }.sort
+  end
+
+  # VEPO riadok TOHTO dielca — hlada sa cez presnu hrubku a mnozinu rozmerov.
+  def k1_vepo_csv(model)
+    collected = e::Bom.collect(model)
+    bom = e::Bom.compute(collected)
+    mats = e::Materials.sheets.each_with_object({}) { |s, o| o[s['material_id']] = s }
+    eths = e::Materials.edges.each_with_object({}) { |a, o| o[a['abs_id']] = a['thickness'].to_f }
+    res = e::VepoExport.build(bom[:rows], project: 'SU-TEST K1', materials: mats,
+                              edge_thicknesses: eths, version: e::VERSION,
+                              generated_at: '2026-08-21 00:00', merge_18_36: true)
+    Array(res['groups']).map { |g| g['csv'].to_s }.join
+  end
+
+  def run_k1(model)
+    cleanup(model)
+    tmp = File.join(Dir.tmpdir, "noxun_k1_#{Process.pid}")
+    FileUtils.mkdir_p(tmp)
+    File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(k1_catalog_json))
+    e::Materials.test_dir_override = tmp
+    e::Materials.reload!
+    hneda = e::Materials.su_edge_material_name('K1E_DUB_23X10')
+    begin
+      ok('K1: izolovany katalog aktivny (dekor s kresbou po dlzke)',
+         (e::Materials.sheet('K1DUB18') || {})['grain'].to_s == 'length')
+
+      inst = e::CabinetBuilder.build(model, k1_params)
+      return ok('K1: vlozenie korpusu', false) unless inst
+
+      cid = e::Store.get(inst, 'cabinet_id').to_s
+      guid = e::Panel.model_guid(model)
+      front = k1_part(inst, 'front_door')
+      return ok('K1: korpus ma celo', false) unless front
+
+      fkey = e::Store.get(front, 'part_key').to_s
+      fcfg = e::Store.config(front) || {}
+      box_before = k1_box(front)
+      dims_before = [fcfg['length'].to_f.round(2), fcfg['width'].to_f.round(2)]
+
+      # --- 1) DEDENIE = dnesne spravanie pred K1 -----------------------------
+      ok("K1: celo bez zasahu dedi smer materialu (#{k1_grain_of(inst, 'front_door')})",
+         k1_grain_of(inst, 'front_door') == 'length')
+      pay = e::Panel.part_card_payload(model, inst, front) || {}
+      ok("K1: karta hlasi zdedeny stav a VYSLEDOK (#{pay['grain_value']} / #{pay['grain_effective']})",
+         pay['grain_value'] == 'inherit' && pay['grain_effective'] == 'length' &&
+         pay['grain_locked'] == false)
+      inh = Array(pay['grain_options']).find { |o| o['value'] == 'inherit' }
+      ok("K1: volba „Podľa materiálu\" nesie VYSLEDOK, nie prazdne „dedí\" (#{inh && inh['label']})",
+         inh && inh['label'].to_s.include?('pozdĺžna'))
+      wopt = Array(pay['grain_options']).find { |o| o['value'] == 'width' }
+      ok("K1: tooltip priecnej volby ukazuje VYROBNY rozmer (#{wopt && wopt['title']})",
+         wopt && wopt['title'].to_s.include?("#{dims_before[1].round}×#{dims_before[0].round}"))
+
+      # --- 2) ENUM GUARD: neznama hodnota nezapise NIC -----------------------
+      e::Panel.select_only(model, front)
+      cfg_before = e::Store.get(inst, 'config').to_s
+      e::Panel.handle_set_part_grain({ 'role_key' => fkey, 'grain' => 'diagonal',
+                                       'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      ok('K1: neznamy smer sa ODMIETNE — config sa nezmenil ani o bajt',
+         e::Store.get(inst, 'config').to_s == cfg_before)
+
+      # Codex #185 P1: surovy UI token `inherit` NIE JE sentinel dedenia —
+      # server pozna `__inherit__`. Zhodu oboch stran zamyka headless test;
+      # tu sa dokazuje, ze druha (tichá) cesta naozaj neexistuje.
+      e::Panel.handle_set_part_grain({ 'role_key' => fkey, 'grain' => 'inherit',
+                                       'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      ok('K1: surovy token „inherit" server NEPRIJIMA (jediny sentinel je __inherit__)',
+         e::Store.get(inst, 'config').to_s == cfg_before)
+
+      # --- 3) ZAPIS na zivej skrinke = PRESNE JEDEN krok Spat ----------------
+      ents_before = model.entities.length
+      e::Panel.select_only(model, front)
+      e::Panel.handle_set_part_grain({ 'role_key' => fkey, 'grain' => 'width',
+                                       'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      front2 = k1_part(inst, 'front_door')
+      ok("K1: celo ma po zasahu PRIECNU kresbu (#{k1_grain_of(inst, 'front_door')})",
+         k1_grain_of(inst, 'front_door') == 'width')
+      ok('K1: override zije v configu korpusu (prezije rebuild aj ulozenie)',
+         k1_override_of(inst, fkey) == 'width')
+      ok('K1: zapis nevyrobil ziadny novy NOXUN objekt v modeli',
+         model.entities.length == ents_before)
+
+      # --- 4) GEOMETRIA SA NEHYBE — otaca sa VYSTUP, nie model ---------------
+      fcfg2 = e::Store.config(front2) || {}
+      ok("K1: rozmery dielca ostali GEOMETRICKE (#{fcfg2['length']}×#{fcfg2['width']})",
+         [fcfg2['length'].to_f.round(2), fcfg2['width'].to_f.round(2)] == dims_before)
+      ok('K1: kvader dielca v modeli ma nezmenene rozmery',
+         k1_box(front2) == box_before)
+
+      # --- 5) D-88 farbenie hran NEZMENENE ----------------------------------
+      # Osi dielca su explicitny udaj deskriptora — smer dekoru sa ich netyka.
+      # Keby otocenie hybalo osami, paska by po zmene kresby skocila na inu hranu.
+      ok('K1: celo ma pasku na vsetkych 4 bocnych ploskach aj po otoceni kresby',
+         [[0, :min], [0, :max], [2, :min], [2, :max]].all? { |a, s| d88_face_mat(front2, a, s) == hneda })
+      ok('K1: velke dekorove plochy ostali bez materialu (D-88 kontrakt nedotknuty)',
+         d88_face_mat(front2, 1, :min).nil? && d88_face_mat(front2, 1, :max).nil?)
+
+      # --- 6) VEPO CSV nesie OTOCENY riadok ----------------------------------
+      csv = k1_vepo_csv(model)
+      want = "\"#{dims_before[1].round}\";"
+      ok("K1: VEPO CSV zacina riadok celu OTOCENOU dlzkou (#{dims_before[1].round} mm)",
+         csv.include?(want))
+      ok("K1: povodna (geometricka) dlzka #{dims_before[0].round} mm je vo VEPO ako SIRKA",
+         csv.include?("\";\"#{dims_before[0].round}\";"))
+
+      # --- 7) JEDEN krok Spat vrati vsetko ----------------------------------
+      Sketchup.undo
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      ok('K1: 1x Spat vratil smer aj override naraz (jedna operacia)',
+         k1_grain_of(inst, 'front_door') == 'length' && k1_override_of(inst, fkey).nil?)
+
+      # --- 8) KOPIA SKRINKY si override nesie -------------------------------
+      e::Panel.select_only(model, k1_part(inst, 'front_door'))
+      e::Panel.handle_set_part_grain({ 'role_key' => fkey, 'grain' => 'width',
+                                       'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      # Kopia zdiela definiciu AJ cabinet_id — presne to, co robi Ctrl+C/Ctrl+V
+      # v modeli (atributy nesie INSTANCIA, preto sa prenesu rucne);
+      # `dedup_copies` jej potom pridelí nove ID a prestavi ju.
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST K1 kopia', true)
+        tr = inst.transformation * Geom::Transformation.translation(e::Units.vector(1000, 0, 0))
+        copy = model.entities.add_instance(inst.definition, tr)
+        %w[std kind id cabinet_id template_id role part_key_schema manufactured
+           production_class config].each do |k|
+          v = e::Store.get(inst, k)
+          copy.set_attribute(e::Store::DICT, k, v) unless v.nil?
+        end
+        model.commit_operation
+      end
+      e::CabinetBuilder.dedup_copies(model)
+      new_cab = cabinets(model).find { |c| e::Store.get(c, 'cabinet_id').to_s != cid }
+      ok('K1: kopia skrinky dostala nove ID a prestavala sa', !new_cab.nil?)
+      if new_cab
+        ok("K1: kopia si NESIE priecnu kresbu (#{k1_grain_of(new_cab, 'front_door')})",
+           k1_grain_of(new_cab, 'front_door') == 'width')
+        new_key = e::Store.get(k1_part(new_cab, 'front_door'), 'part_key').to_s
+        ok('K1: aj zaznam overridu presiel do configu kopie',
+           k1_override_of(new_cab, new_key) == 'width')
+      end
+
+      # --- 9) ODPOJENY dielec drzi SVOJ snapshot -----------------------------
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      src = k1_part(inst, 'front_door')
+      detached = nil
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST K1 odpojeny dielec', true)
+        detached = model.entities.add_instance(
+          src.definition, Geom::Transformation.translation(e::Units.vector(0, 2000, 0))
+        )
+        # Kopia instancie zdiela definiciu, ale NOXUN atributy nesie INSTANCIA —
+        # prenesieme ich, presne ako ked pouzivatel vytiahne dielec z korpusu.
+        %w[std kind id part_id cabinet_id role name part_key part_key_schema role_key
+           manufactured production_class config].each do |k|
+          v = src.get_attribute(e::Store::DICT, k)
+          detached.set_attribute(e::Store::DICT, k, v) unless v.nil?
+        end
+        model.commit_operation
+      end
+      # korpus sa VRATI na dedenie — odpojeny dielec sa uz neprestavuje
+      e::Panel.select_only(model, k1_part(inst, 'front_door'))
+      e::Panel.handle_set_part_grain({ 'role_key' => fkey, 'grain' => '__inherit__',
+                                       'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      det_rec = e::Bom.collect(model)[:records].find do |r|
+        r['owner_id'].to_s == cid && r['part_key'].to_s == fkey && r['grain_direction'] == 'width'
+      end
+      ok("K1: korpus je spat na dedeni (#{k1_grain_of(inst, 'front_door')}), " \
+         'ODPOJENY dielec drzi svoj snapshot „width"',
+         k1_grain_of(inst, 'front_door') == 'length' && !det_rec.nil?)
+
+      # Codex #185 kolo 2 (P1): s OZNACENYM odpojenym dielcom sa zmena smeru
+      # MUSI odmietnut. `find_cabinet` jeho vlastnika najde, takze bez guardu by
+      # prestavba zmenila vnoreny dielec rovnakeho part_key — a pouzivatel by
+      # dostal hlasku o uspechu nad dielcom, ktoreho sa nic nedotklo.
+      cfg_nested_before = e::Store.get(inst, 'config').to_s
+      det_cfg_before = e::Store.get(detached, 'config').to_s
+      e::Panel.select_only(model, detached)
+      e::Panel.handle_set_part_grain({ 'role_key' => fkey, 'grain' => 'length',
+                                       'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      ok('K1: ODPOJENY dielec sa cez kartu menit NEDA — nezmenil sa ON ani vnoreny dielec',
+         e::Store.get(inst, 'config').to_s == cfg_nested_before &&
+         e::Store.get(detached, 'config').to_s == det_cfg_before)
+      detached.erase! if detached && detached.valid?
+
+      # Codex #185 kolo 2 (P2): guard DOKUMENTU v zapisovej ceste.
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      e::Panel.select_only(model, k1_part(inst, 'front_door'))
+      cfg_guard_before = e::Store.get(inst, 'config').to_s
+      e::Panel.handle_set_part_grain({ 'role_key' => fkey, 'grain' => 'width',
+                                       'cabinet_id' => cid, 'model_guid' => 'CUDZI-GUID' }.to_json)
+      ok('K1: klik z INEHO dokumentu nezapise NIC (ID skriniek sa naprie dokumentmi opakuju)',
+         e::Store.get(inst, 'config').to_s == cfg_guard_before)
+
+      # --- 10) UNI material: override sa NEMAZE, len neucinkuje --------------
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      e::Panel.select_only(model, k1_part(inst, 'front_door'))
+      e::Panel.handle_set_part_grain({ 'role_key' => fkey, 'grain' => 'width',
+                                       'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      e::Panel.select_only(model, k1_part(inst, 'front_door'))
+      e::Panel.handle_set_part_material({ 'role_key' => fkey, 'material_id' => 'K1UNI18',
+                                          'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      ufront = k1_part(inst, 'front_door')
+      ok("K1: na materiali BEZ smeru je vysledok „none\" (#{k1_grain_of(inst, 'front_door')})",
+         k1_grain_of(inst, 'front_door') == 'none')
+      ok('K1: ulozeny override sa pritom NEZMAZAL (rozhodnutie pouzivatela prezije)',
+         k1_override_of(inst, fkey) == 'width')
+      upay = ufront ? (e::Panel.part_card_payload(model, inst, ufront) || {}) : {}
+      ok("K1: karta segment ZAMKNE a povie preco (#{upay['grain_hint']})",
+         upay['grain_locked'] == true && !upay['grain_hint'].to_s.empty?)
+
+      # --- 10b) ZMENENY KATALOG: karta ukazuje SNAPSHOT, nie dopocet -------
+      # Codex #185 P1. Dielec je postaveny s kresbou po dlzke; katalogu sa
+      # potom `grain` prepise. Karta MUSI dalej hlasit to, s cim dielec ide do
+      # VEPO (snapshot), prospektivny vysledok drzat bokom a rozpor PRIZNAT.
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      e::Panel.select_only(model, k1_part(inst, 'front_door'))
+      e::Panel.handle_set_part_material({ 'role_key' => fkey, 'material_id' => 'K1DUB18',
+                                          'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      e::Panel.select_only(model, k1_part(inst, 'front_door'))
+      e::Panel.handle_set_part_grain({ 'role_key' => fkey, 'grain' => '__inherit__',
+                                       'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      sfront = k1_part(inst, 'front_door')
+      built = k1_grain_of(inst, 'front_door')
+      # katalog sa zmeni POD dielcom — bez prestavby (vzor „otvorenie .skp na
+      # stroji s inym katalogom")
+      cat = k1_catalog_json
+      cat['sheets'][0]['grain'] = 'width'
+      File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(cat))
+      e::Materials.reload!
+      spay = sfront ? (e::Panel.part_card_payload(model, inst, sfront) || {}) : {}
+      ok("K1: po zmene katalogu karta hlasi SNAPSHOT (#{spay['grain_effective']}), nie dopocet (#{spay['grain_pending']})",
+         built == 'length' && spay['grain_effective'] == 'length' && spay['grain_pending'] == 'width')
+      ok("K1: rozpor snapshot vs. katalog karta PRIZNA (#{spay['grain_hint']})",
+         !spay['grain_hint'].to_s.empty? && spay['grain_hint'].to_s.include?('prestavbe'))
+      # Codex #185 kolo 2 (P2): `push_materials` musi za katalogom poslat aj
+      # CERSTVU kartu — inak by segment ostal na starom (cachovanom) stave az do
+      # dalsieho prekliku vyberu. Overuje sa to, co ide na drot.
+      pushed = []
+      install_js_recorder(pushed)
+      begin
+        e::Panel.push_materials
+      ensure
+        remove_js_recorder
+      end
+      ok("K1: po zmene katalogu ide na panel aj cerstva karta dielca (#{pushed.length} pushov)",
+         pushed.any? { |s| s.start_with?('NX.setPartCard(') } &&
+         pushed.any? { |s| s.start_with?('NX.setMaterials(') })
+      # Codex #185 kolo 3 (P1): ked material smer STRATI, segment sa zamkne —
+      # ale dielec je stale POSTAVENY s pozdlznou kresbou a VEPO ju pouziva.
+      # Hint preto MUSI povedat OBOJE a nesmie si protirecit s `grain_effective`.
+      cat_none = k1_catalog_json
+      cat_none['sheets'][0]['grain'] = 'none'
+      File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(cat_none))
+      e::Materials.reload!
+      npay = sfront ? (e::Panel.part_card_payload(model, inst, sfront) || {}) : {}
+      nhint = npay['grain_hint'].to_s
+      ok("K1: material stratil smer — karta ZAMKNE segment, ale drzi snapshot (#{npay['grain_effective']})",
+         npay['grain_locked'] == true && npay['grain_effective'] == 'length' &&
+         npay['grain_pending'] == 'none')
+      ok("K1: zamknuty hint POVIE postaveny smer a „bez smeru“ az ako buduci stav (#{nhint})",
+         nhint.include?('postavený so smerom „pozdĺžna') && nhint.include?('bez smeru') &&
+         nhint.include?('nemá smer dekoru') &&
+         nhint.index('postavený so smerom') < nhint.index('nemá smer dekoru'))
+      File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(k1_catalog_json))
+      e::Materials.reload!
+
+      # --- 11) STARA ZAKAZKA BEZ POLA: otvorenie nezapise NIC ---------------
+      # Simulacia „otvorenia starej zakazky": config bez `grain_direction`
+      # prejde CITACOU cestou panela (vyber -> karta) a nesmie sa zmenit.
+      old = e::CabinetBuilder.build(model, k1_params('width' => 800.0))
+      old_cfg = e::Store.get(old, 'config').to_s
+      old_ents = model.entities.length
+      e::Panel.select_only(model, old)
+      e::Panel.push_selected(model)
+      oldp = k1_part(old, 'front_door')
+      e::Panel.select_only(model, oldp)
+      e::Panel.push_selected(model)
+      e::Panel.part_card_payload(model, old, oldp)
+      ok('K1: otvorenie starej zakazky BEZ pola nezapisalo nic (config bajt-presne rovnaky)',
+         e::Store.get(old, 'config').to_s == old_cfg && model.entities.length == old_ents)
+      ok('K1: a v jej configu ziadny smer dekoru nepribudol',
+         !old_cfg.include?('grain_direction'))
+    ensure
+      e::Materials.test_dir_override = nil
+      e::Materials.reload!
+      cleanup(model)
+      begin
+        FileUtils.rm_rf(tmp)
+      rescue StandardError
+        nil
+      end
+    end
+    ok('K1: cleanup (override prec, model prazdny)',
+       e::Materials.test_dir_override.nil? && cabinets(model).empty? && boards(model).empty?)
+  rescue StandardError => ex
+    log_line("FAIL: K1 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    e::Materials.test_dir_override = nil
+    e::Materials.reload!
+    cleanup(model)
+  end
+
   def run_smoke1(model)
     cleanup(model)
     tp = e::TemplatePreviews
@@ -4872,6 +5246,7 @@ module NoxunSuRunner
     run_uic2(model)          # UI-C2: zony — delenie/police/presna cesta na zivej skrinke, guardy, undo, vyber
     run_uic4(model)          # UI-C4: kovanie — oznacenie vlastnika polozky v modeli (guardy, ziadny undo krok)
     run_uid1(model)          # UI-D1: dielec — „Použiť na podobné" (zapis do viacerych dielcov, 1 undo) + „Označiť v modeli"
+    run_k1(model)            # K1/D-108: smer dekoru per dielec — 1 undo, geometria a D-88 nedotknute, VEPO otocene
     run_uid2(model)          # UI-D2: PNG nahlady sablon — capture, KOMPLETNA obnova kamery (persp. aj orto), ziadny undo krok
     run_smoke1(model)        # SMOKE PACK 1 (6A): rucne odfotenie nahladu k ULOZENEJ sablone — guardy vyberu, ziadny undo krok
     run_async(model, nil)

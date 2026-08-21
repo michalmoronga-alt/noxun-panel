@@ -141,12 +141,18 @@ NxTest.test('UI-D3: kliky vo warnpaneli sa DOSTANU do meraca D-25 (Codex #182 P2
   usage = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'usage.js'), encoding: 'UTF-8')
   NxTest.assert(usage.include?("document.addEventListener('click', onClick, true)"),
                 'klik sa pocita v CAPTURE faze — stopPropagation ho uz neschova')
-  %w[warn:chip warn:oko warn:studio part:smer].each do |k|
+  # K1 (D-108): `part:smer` nahradili TRI kluce segmentu smeru dekoru a ziju
+  # v `panel.html` (statická kostra), nie v JS — allowlist bez prvku nic nezmeria.
+  panel_html = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.html'), encoding: 'UTF-8')
+  %w[warn:chip warn:oko warn:studio part:smer-dedi part:smer-pozdlz part:smer-priecna].each do |k|
     NxTest.assert(usage.include?("'#{k}'"), "kluc #{k} je v allowliste USAGE_KEYS")
     NxTest.assert(UID3_BRIDGE_JS.include?("data-nx-usage=\"#{k}\"") ||
-                  UID3_PART_JS.include?("data-nx-usage=\"#{k}\""),
+                  UID3_PART_JS.include?("data-nx-usage=\"#{k}\"") ||
+                  panel_html.include?("data-nx-usage=\"#{k}\""),
                   "kluc #{k} naozaj visi na prvku (allowlist bez prvku nic nezmeria)")
   end
+  NxTest.refute(usage.include?("'part:smer'"),
+                'mrtvy kluc `part:smer` z allowlistu zmizol — merac by ho uz nikdy nenaplnil')
 end
 
 NxTest.test('UI-D3: statusy vyberu nesu podstatne meno podla povodu kliku') do
@@ -204,14 +210,21 @@ NxTest.test('UI-D3: warnpanel ma JEDNU cestu von — deep-link na tab KONTROLA')
   NxTest.assert(body.include?('closeWarnPanel()'), 'pri odchode do ineho okna sa panel zavrie')
 end
 
-NxTest.test('UI-D3: v karte dielca vedie „Smer dekoru", „Hrúbka" NIE') do
+NxTest.test('UI-D3 + K1: „Hrúbka" nikam nevedie; zamknuty smer vedie na material') do
   rows = UID3_PART_JS[/function nxPartBasicRows.*?\n  \}/m].to_s
   NxTest.assert(!rows.empty?, 'skladanie riadkov sa naslo')
   hr = rows[/\{ label: 'Hrúbka'.*?\},/m].to_s
-  gr = rows[/\{ label: 'Smer dekoru'.*?\} \]/m].to_s
   NxTest.refute(hr.include?('click:'),
                 'hrubku urcuje material KORPUSU — v rezime dielca sa neda otvorit, teda nikam nevedie')
-  NxTest.assert(gr.include?("click: 'onPartInfoGrain(event)'"), 'smer vedie na material dielca')
+  # K1 (D-108): „Smer dekoru" uz NIE JE informacny riadok — je to segment
+  # (vstup). Preklik na material prezil pre JEDINY pripad, ked sa smer naozaj
+  # meni inde: material BEZ smeru (zamknuty segment). Klik vtedy nezapisuje.
+  NxTest.refute(rows.include?("label: 'Smer dekoru'"),
+                'smer dekoru uz nie je informacny riadok — je to vstup')
+  body = UID3_PART_JS[/function onPartGrain.*?\n  \}/m].to_s
+  NxTest.assert(body.include?('nxGrainSegmentState(partCard).locked'),
+                'zamknuty stav sa cita z TEJ ISTEJ ciste funkcie, ako maluje segment')
+  NxTest.assert(body.include?('onPartInfoGrain(null)'), 'zamknuty klik vedie na material dielca')
   NxTest.assert(UID3_PART_JS.include?('function onPartInfoGrain'), 'preklik ma svoju cestu')
   NxTest.assert(UID3_PART_JS.include?('nxRevealTarget(sel)'),
                 'zbaleny sektor sa najprv rozbali (combobox by sa otvoril z nulovej plochy)')
