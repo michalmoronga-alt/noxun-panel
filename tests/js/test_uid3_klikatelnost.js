@@ -55,6 +55,18 @@ eq(SKIPPED[0].keys, [], 'vyradeny dielec spadne na korpusovu uroven (oznaci sa s
 eq(/skrinku/.test(SKIPPED[0].tip), true, 'a tooltip to POVIE — nesluby o dielci, ktory neexistuje');
 eq(SKIPPED[0].text, 'Dielec Polica (Z1.2) ma nekladny rozmer — preskoceny.',
    'text nalezu ostava nedotknuty — pouzivatel sa stale dozvie, o ktory dielec islo');
+// Sweep review P2: plytka zona police NEPOSTAVI (`zone_tree.rb`), ale kluc
+// prvej z nich si v upozorneni ponecha — kod v allowliste chybal, takze oko na
+// tom riadku koncilo hlaskou „Dielec sa v modeli nenašiel".
+const SHALLOW = NXShell.warnRows([
+  { code: 'shelf_skipped_shallow_zone', message: 'Zona Z2: prilis plytka na police (3 ks preskocenych).',
+    part_key: 'zone:Z2/shelf:1' }
+]);
+eq(SHALLOW[0].keys, [], 'preskocena polica spadne na korpusovu uroven (oznaci sa skrinka)');
+eq(/skrinku/.test(SHALLOW[0].tip), true, 'a tooltip to POVIE');
+eq(SHALLOW[0].text, 'Zona Z2: prilis plytka na police (3 ks preskocenych).',
+   'text nalezu ostava nedotknuty — pouzivatel sa dozvie, o ktoru zonu islo');
+
 // Rovnaky kluc pri INOM kode ostava cielom — vyradenie plati len pre vymenovane
 // kody, nie pre kazdy nalez so zonovym klucom.
 eq(NXShell.warnRows([{ code: 'rail_depth_clamped', message: 'x', part_key: 'zone:Z1.2/shelf:1' }])[0].keys,

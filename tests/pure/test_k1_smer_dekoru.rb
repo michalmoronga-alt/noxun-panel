@@ -452,9 +452,16 @@ NxTest.test('K1: ODPOJENY dielec sa cez kartu menit NEDA (Codex #185 P1)') do
   # kym vybrany odpojeny dielec by si drzal svoj snapshot a do VEPO by isiel
   # po starom. A pouzivatel by dostal hlasku o USPECHU. Ta ista lekcia ako
   # `regenerated_parts` v UI-D1 (Codex #180 P1).
+  # v0.7.24: guard uz nie je len grainovy — hlasku aj kontrolu drzi SPOLOCNY
+  # `detached_part_error`, ktorym prechadzaju VSETKY zapisove cesty karty
+  # (ABS hrana, bulk olep, material, „Použiť na podobné"). Grain sa nan len
+  # napoji, aby hlaska existovala na JEDNOM mieste.
   target = K1_PARTS_RB[/def grain_target_error\b.*?\n        end\n/m].to_s
-  NxTest.assert(target.include?('nested_part?(cab, part)'), 'odpojenost sa kontroluje')
-  NxTest.assert(target.include?('vytiahnutý zo skrinky'),
+  NxTest.assert(target.include?("detached_part_error(cab, part, 'smer dekoru')"),
+                'odpojenost sa kontroluje spolocnym guardom')
+  shared = K1_PARTS_RB[/def detached_part_error\b.*?\n        end\n/m].to_s
+  NxTest.assert(shared.include?('nested_part?(cab, part)'), 'spolocny guard cita vnorenost')
+  NxTest.assert(shared.include?('vytiahnutý zo skrinky'),
                 'hlaska POVIE, preco sa nic nezmenilo (nikdy tichy no-op)')
   nested = K1_PARTS_RB[/def nested_part\?.*?\n        end\n/m].to_s
   NxTest.assert(nested.include?('part.parent == cab.definition'),

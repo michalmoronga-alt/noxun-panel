@@ -248,7 +248,13 @@
     //
     // Zoznam je UZKY a explicitny — nie heuristika. Nepostavene dielce pozna
     // plan, nie panel; keby pribudol dalsi taky kod, patri SEM (a do testu).
-    var WARN_PART_NOT_BUILT = ['part_skipped_degenerate'];
+    //
+    // Sweep review P2: `shelf_skipped_shallow_zone` (`zone_tree.rb`) je presne
+    // ten isty pripad — prilis plytka zona police NEPOSTAVI, ale kluc prvej z
+    // nich si v upozorneni ponecha. V zozname chybal, takze oko na tom riadku
+    // koncilo hlaskou „Dielec sa v modeli nenašiel". Serverova strana obe kody
+    // uz drzi spolu (`production_dialog.rb`) — panel sa tym zrovnal.
+    var WARN_PART_NOT_BUILT = ['part_skipped_degenerate', 'shelf_skipped_shallow_zone'];
     function warnRows(warnings){
       var out = [];
       var list = warnings || [];

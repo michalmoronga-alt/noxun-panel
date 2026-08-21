@@ -4372,6 +4372,43 @@ module NoxunSuRunner
       ok('K1: ODPOJENY dielec sa cez kartu menit NEDA — nezmenil sa ON ani vnoreny dielec',
          e::Store.get(inst, 'config').to_s == cfg_nested_before &&
          e::Store.get(detached, 'config').to_s == det_cfg_before)
+
+      # v0.7.24 (nalez z review K1, PR #185): TA ISTA pasca plati pre ABS a
+      # material. Zapis hrany, bulk olep aj material dielca dostali ten isty
+      # guard — inak by zmena presla na VNORENE dvojca rovnakeho part_key,
+      # vybrany odpojeny dielec by ostal so starym olepom a do OBJEDNAVKY by
+      # isla paska, ktoru pouzivatel na karte nikdy nevidel.
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      # MARKER: jedna povolena zmena = jeden krok Spat. Ked odmietnute cesty
+      # nevyrobia ziadnu operaciu, JEDEN undo musi vratit prave tento marker.
+      e::Panel.select_only(model, k1_part(inst, 'front_door'))
+      e::Panel.handle_set_part_grain({ 'role_key' => fkey, 'grain' => 'width',
+                                       'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      cfg_abs_before = e::Store.get(inst, 'config').to_s
+      det_abs_before = e::Store.get(detached, 'config').to_s
+      edges_abs_before = ((e::Store.config(k1_part(inst, 'front_door')) || {})['edges'] || {}).dup
+      e::Panel.select_only(model, detached)
+      e::Panel.handle_set_part_edge({ 'role_key' => fkey, 'edge' => 'L1', 'abs_id' => '',
+                                      'cabinet_id' => cid }.to_json)
+      e::Panel.handle_set_part_edges_all({ 'role_key' => fkey, 'cabinet_id' => cid }.to_json)
+      e::Panel.handle_set_part_material({ 'role_key' => fkey, 'material_id' => 'K1UNI18',
+                                          'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      # „Použiť na podobné" uz odpojene dielce vylucila z CIELOV (UI-D1), ale
+      # ZDROJ sa cital podla kluca — teda z overridu vnoreneho dvojcata.
+      e::Panel.handle_apply_edges_similar({ 'model_guid' => guid, 'cabinet_id' => cid,
+                                            'role_key' => fkey, 'scope' => 'project' }.to_json)
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      edges_abs_after = ((e::Store.config(k1_part(inst, 'front_door')) || {})['edges'] || {})
+      ok('K1/ABS: s OZNACENYM odpojenym dielcom neprejde hrana, bulk olep, material ani „Použiť na podobné"',
+         e::Store.get(inst, 'config').to_s == cfg_abs_before &&
+         e::Store.get(detached, 'config').to_s == det_abs_before &&
+         edges_abs_after == edges_abs_before)
+      Sketchup.undo
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      ok('K1/ABS: odmietnute cesty nevyrobili ZIADEN krok Spat (1x undo vratil marker)',
+         k1_override_of(inst, fkey).nil?)
+
       detached.erase! if detached && detached.valid?
 
       # Codex #185 kolo 2 (P2): guard DOKUMENTU v zapisovej ceste.

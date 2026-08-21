@@ -123,8 +123,12 @@ NxTest.test('UI-D3: nalez o NEPOSTAVENOM dielci nespusta akciu, co nemoze uspiet
   # `part_skipped_degenerate` VYRADI dielec z planu, ale jeho `part_key` si v
   # upozorneni ponecha (aby sa dalo povedat, ktory to bol). Poslat taky kluc na
   # vyber = zarucene „Dielec sa v modeli nenašiel". Zoznam je UZKY a explicitny.
-  NxTest.assert(UID3_SHELL_JS.include?("var WARN_PART_NOT_BUILT = ['part_skipped_degenerate'];"),
-                'kod vyradeneho dielca je vymenovany, nie uhadnuty heuristikou')
+  NxTest.assert(
+    UID3_SHELL_JS.include?(
+      "var WARN_PART_NOT_BUILT = ['part_skipped_degenerate', 'shelf_skipped_shallow_zone'];"
+    ),
+    'kody nepostavenych dielcov su vymenovane, nie uhadnute heuristikou'
+  )
   body = UID3_SHELL_JS[/function warnRows.*?\n    \}/m].to_s
   NxTest.assert(body.include?('WARN_PART_NOT_BUILT.indexOf(code) < 0'),
                 'nalez sa pyta kodu PRED tym, nez z neho spravi cielovy kluc')
@@ -132,6 +136,40 @@ NxTest.test('UI-D3: nalez o NEPOSTAVENOM dielci nespusta akciu, co nemoze uspiet
   cons = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'construction.rb'), encoding: 'UTF-8')
   NxTest.assert(cons.include?("BuildPlan.warning('part_skipped_degenerate'"),
                 'kod stale existuje na strane planu (inak by zoznam mieril do prazdna)')
+  # Sweep review P2: plytka zona police NEPOSTAVI, ale kluc prvej z nich si v
+  # upozorneni ponecha — v allowliste chybal, takze oko na tom riadku koncilo
+  # hlaskou „Dielec sa v modeli nenašiel".
+  zt = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'zone_tree.rb'), encoding: 'UTF-8')
+  NxTest.assert(zt.include?("BuildPlan.warning('shelf_skipped_shallow_zone'"),
+                'plytka zona naozaj hlasi preskocene police')
+  NxTest.assert(zt[/shelf_skipped_shallow_zone.*?\n.*?\n.*?part_key:/m],
+                'a nesie pritom part_key nepostavenej police (preto patri do allowlistu)')
+end
+
+NxTest.test('SWEEP: warnpanel sa otvara TRIEDOU, nie inline `display` (scroller by inak bol mrtvy)') do
+  # Inline `display: block` prebijalo `display: flex` z CSS — panel prestal byt
+  # stlpcovy flex, `.wrows` uz nebola flex polozka a `min-height: 0` nemalo co
+  # obmedzit, takze scroller z #182 fixu NEROBIL NIC a dlhy zoznam sa neposuval.
+  body = UID3_BRIDGE_JS[/function setWarnPanel.*?\n  \}/m].to_s
+  NxTest.assert(!body.empty?, 'setWarnPanel sa nasiel')
+  NxTest.refute(body.include?("list.style.display = open"),
+                'viditelnost sa uz NENASTAVUJE inline hodnotou')
+  NxTest.assert(body.include?("classList.add('open')") && body.include?("classList.remove('open')"),
+                'prepina sa trieda `open`')
+  NxTest.assert(body.include?("list.style.display = ''"),
+                'stary inline stav (CEF cache) sa CISTI — inak by trieda nemala sancu')
+  NxTest.assert(UID3_BRIDGE_JS.scan(/list\.style\.display = 'none'/).empty?,
+                'ziadna cesta uz panel nezatvara inline — vsetky idu cez setWarnPanel')
+  open_fn = UID3_BRIDGE_JS[/function warnPanelOpen.*?\n  \}/m].to_s
+  NxTest.assert(open_fn.include?("classList.contains('open')"),
+                'stav sa CITA z tej istej triedy, akou sa nastavuje')
+  NxTest.assert(UID3_CSS.include?('.nx-inspector .nxhdr .warnpanel.open { display: flex; }'),
+                'CSS otvoreny stav vracia na flex (scroller ozije)')
+  rule = UID3_CSS[/\.nx-inspector \.nxhdr \.warnpanel \{.*?\}/m].to_s
+  NxTest.assert(rule.include?('display: none'), 'zavrety stav je default v CSS, nie v HTML atribute')
+  html = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.html'), encoding: 'UTF-8')
+  NxTest.assert(html.include?('<div id="warnList" class="warnpanel"></div>'),
+                'kostra uz nenesie inline `display` (jedno miesto pravdy)')
 end
 
 NxTest.test('UI-D3: kliky vo warnpaneli sa DOSTANU do meraca D-25 (Codex #182 P2)') do
