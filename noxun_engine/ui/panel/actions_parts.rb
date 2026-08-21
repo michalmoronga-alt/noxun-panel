@@ -18,6 +18,11 @@ module Noxun
           return if stale_cabinet_echo?(cab, data, 'material dielca')
           rk = data['role_key'].to_s
           return set_status('Chyba identifikacie dielca.', true) if rk.empty?
+          # ODPOJENY DIELEC (nalez z review K1, PR #185) — PRED katalogovymi
+          # kontrolami aj pred pripadnou tvorbou ABS: cesta, ktora nesmie
+          # zapisat do modelu, nesmie nechat stopu ani v globalnom katalogu.
+          err = detached_part_error(cab, find_selected_part(model), 'materiál dielca')
+          return set_status(err, true) if err
           mat = present_str(data['material_id'])
           params = existing_params(cab)
           old_overrides = JsonFileStore.deep_copy(params['part_overrides'] || {})
@@ -149,6 +154,12 @@ module Noxun
           rk = data['role_key'].to_s
           code = data['edge'].to_s
           return set_status('Chyba identifikacie dielca/hrany.', true) if rk.empty? || !%w[L1 L2 W1 W2].include?(code)
+          # ODPOJENY DIELEC — pred akymkolvek zapisom (nalez z review K1, PR #185).
+          # Bez neho by sa ABS zapisala VNORENEMU dvojcatu rovnakeho `part_key`,
+          # vybrany odpojeny dielec by ostal so starym olepom a do objednavky by
+          # isla hrana, ktoru pouzivatel nikdy nevidel.
+          err = detached_part_error(cab, find_selected_part(model), 'ABS hrana')
+          return set_status(err, true) if err
           raw = data['abs_id']
           params = existing_params(cab)
           rk = canonical_part_key(params, rk)
@@ -242,10 +253,37 @@ module Noxun
           return 'Vo výbere nie je dielec — označ ho v modeli znova.' if part.nil?
           return 'Karta patrí inému dielcu — označ ho v modeli znova.' if
             canonical_part_key(params, part_identity(cab, part)) != rk
-          return nil if nested_part?(cab, part)
 
-          'Tento dielec je vytiahnutý zo skrinky — smer dekoru sa mu meniť nedá. ' \
-            'Vráť ho späť do skrinky (Späť po vytiahnutí), alebo zmeň smer na dielci v nej.'
+          detached_part_error(cab, part, 'smer dekoru')
+        end
+
+        # ODPOJENY DIELEC — SPOLOCNY GUARD VSETKYCH ZAPISOVYCH CIEST KARTY.
+        # Vrati hlasku (volajuci ODMIETNE zapis) alebo nil.
+        #
+        # `what` je predmet zmeny v 1. pade ('smer dekoru', 'ABS hrana',
+        # 'olep hrán', 'materiál dielca') — hlaska musi povedat, CO sa nezmenilo.
+        #
+        # PRECO to musia mat VSETKY cesty rovnako (nalez z review K1, PR #185):
+        # dielec vytiahnuty zo skrinky na najvyssiu uroven ostava viazany uz len
+        # atributom `cabinet_id`, takze `find_cabinet` jeho povodneho vlastnika
+        # NAJDE. Prestavba korpusu by potom prestavala INY, vnoreny dielec toho
+        # isteho `part_key`, kym vybrany odpojeny dielec by si drzal svoj
+        # snapshot a do VEPO by isiel PO STAROM — a pouzivatel by pritom dostal
+        # hlasku o uspechu. Z pluginu sa objednava realna zakazka, takze taka
+        # cesta posle do objednavky ABS, ktoru nikto nevidel na obrazovke.
+        # Radsej cestu ODMIETNUT nez ticho zmenit nieco ine (ta ista lekcia ako
+        # `regenerated_parts` v UI-D1, Codex #180 P1).
+        #
+        # `part.nil?` = PRIEPUSTNE. Guard hovori len o tom, co v modeli naozaj
+        # vidno: ked vo vybere dielec nie je, o odpojenosti sa neda tvrdit nic
+        # a cesta si svoje vlastne kontroly (echo, kluc) riesi sama — pasca
+        # vznika VYHRADNE vtedy, ked je odpojeny dielec OZNACENY a karta je
+        # jeho zrkadlom.
+        def detached_part_error(cab, part, what)
+          return nil if part.nil? || nested_part?(cab, part)
+
+          "Tento dielec je vytiahnutý zo skrinky — #{what} sa preto zmeniť nedá. " \
+            'Vráť ho späť do skrinky (Späť po vytiahnutí), alebo zmenu urob na dielci v nej.'
         end
 
         # Je dielec naozaj VNORENY v definicii svojho korpusu? Odpojeny dielec
@@ -318,6 +356,11 @@ module Noxun
             Engine.log("bulk hrany zahodene — echo kluca #{rk} nesedi s oznacenym dielcom")
             return
           end
+          # ODPOJENY DIELEC (nalez z review K1, PR #185): na rozdiel od echa sa
+          # NEZAHADZUJE TICHO — pouzivatel na tlacidlo prave klikol a musi sa
+          # dozvediet, ze sa nic neolepilo (inak by veril, ze dielec ma 4 hrany).
+          err = detached_part_error(cab, part, 'olep hrán')
+          return set_status(err, true) if err
           cfgp = Store.config(part) || {}
           abs_note = ''
           # D-41 C2: modal "Vytvorit a pokracovat" pri bulk olepe — dovytvorenie
@@ -558,6 +601,15 @@ module Noxun
           have = canonical_part_key(params, part_identity(cab, part))
           return [nil, nil, nil, 'Karta patrí inému dielcu — označ ho v modeli znova.'] if
             want.empty? || want != have
+
+          # ODPOJENY ZDROJ (nalez z review K1, PR #185). UI-D1 uz odpojene dielce
+          # vylucila z CIELOV (`regenerated_parts`), ale ZDROJ sa cital podla
+          # kluca z params — teda z overridu VNORENEHO dvojcata, nie z hran,
+          # ktore ma vybrany odpojeny dielec naozaj. Hromadna zmena by tak
+          # rozniesla po projekte olep, ktory pouzivatel na karte nevidel.
+          # Guard drzi obe cesty (zivy pocet aj zapis) — modal cislo ani neponukne.
+          err = detached_part_error(cab, part, 'olep hrán')
+          return [nil, nil, nil, err] if err
 
           [cab, part, normalize_similar_scope(data['scope']), nil]
         end
