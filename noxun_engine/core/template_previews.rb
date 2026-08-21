@@ -243,12 +243,27 @@ module Noxun
       # lebo odpoved zavisi od toho, ci sa medzitym zmenil config sablony.
       # Nepouzitelny temp (chybajuca cesta, nie PNG, nad limitom) = false BEZ
       # vynimky, takze sa nic nemaze ani v jednej ceste.
+      #
+      # SWEEP REVIEW (P2): `force: true` v `FileUtils.mv` NEZNAMENA „prepis" —
+      # znamena „chyby IGNORUJ". Zlyhanie presunu (zamknuty subor, plny disk,
+      # prava) preto preslo TICHO a metoda aj tak vratila true: `replace` nechal
+      # v configu NOVY tvar skrinky so STARYM obrazkom, `attach` potvrdil
+      # prefotenie, ktore sa nestalo, a temp subor ostal visiet v %TEMP%.
+      # Teraz sa chyba nesie VON a vysledok sa navyse OVERI na disku — aj tichy
+      # no-op skonci vynimkou, takze obe cesty bezia svojim upratovanim
+      # (`replace` stary PNG zmaze, `attach` ho NECHA, oboje zahodi temp).
       def move_into_place(kind, name, tmp)
         target = path_for(kind, name)
         return false unless target && valid_file?(tmp)
 
         FileUtils.mkdir_p(File.dirname(target))
-        FileUtils.mv(tmp, target, force: true)
+        FileUtils.mv(tmp, target)
+        # Overuje sa AJ zdroj: ked uz na cieli STARY nahlad je, samotna
+        # existencia cieloveho suboru o novom presune nehovori vobec nic —
+        # dokazom je az to, ze temp po presune ZMIZOL.
+        raise IOError, "presun nahladu na #{target} sa neprejavil" if
+          File.exist?(tmp) || !File.file?(target)
+
         true
       end
 

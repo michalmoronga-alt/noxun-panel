@@ -1105,14 +1105,20 @@
      scrollovanie dokumentu by ich nedotiahlo. Preto je vyska OHRANICENA
      viewportom a scrolluje sa VNUTRI panela: zoznam riadkov (`.wrows`) je jediny
      scroller, cesta von ostava vzdy na ocnom mieste dole (vzor `.cbpop`). */
+  /* Sweep review P2: viditelnost drzi TRIEDA `.open`, nie inline `display`.
+     Inline `display: block` z JS prebijalo `display: flex` odtialto, cim sa
+     zrusil stlpcovy flex — `.wrows` uz nebola flex polozka, `min-height: 0`
+     nemalo co obmedzit a scroller z fixu vyssie bol MRTVY: dlhy zoznam sa
+     jednoducho neposuval. Zavretie je `display: none` na tom istom pravidle. */
   .nx-inspector .nxhdr .warnpanel {
     position: absolute; top: calc(100% + 2px); right: 10px; z-index: 2;
     width: 300px; max-width: calc(100% - 20px); padding: 6px;
     max-height: calc(100vh - var(--nx-header-h) - 18px);
-    display: flex; flex-direction: column;
+    display: none; flex-direction: column;
     background: var(--nx-surface); border: 1px solid var(--nx-warnchip-border);
     border-radius: 6px; box-shadow: 0 8px 22px var(--nx-modal-shadow);
   }
+  .nx-inspector .nxhdr .warnpanel.open { display: flex; }
   /* min-height: 0 je nutne — flex polozka sa inak nezmensi pod svoj obsah a
      `overflow` by sa nikdy neuplatnil. */
   .warnpanel .wrows { overflow-y: auto; min-height: 0; }

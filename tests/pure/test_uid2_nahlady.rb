@@ -386,6 +386,59 @@ NxTest.test('SMOKE1 set_preview: ZLYHANY presun NECHA stary nahlad na mieste (Co
   NxTest.assert_equal(false, File.exist?(tmp), 'nepouzity capture temp sa zahodil')
 end
 
+# Zlyhanie SAMOTNEHO `FileUtils.mv` (nie stub celej `move_into_place`) — presne
+# to, co `force: true` predtym prehltlo. `mode`:
+#   :raise — realna chyba FS (zamknuty subor, plny disk)
+#   :silent — mv sa TVARI, ze presunul, ale na disku nie je nic
+def smoke1_with_broken_fs_mv(mode)
+  fu = FileUtils
+  orig = fu.method(:mv)
+  fu.define_singleton_method(:mv) do |*|
+    raise Errno::EACCES, 'simulovana chyba FS' if mode == :raise
+
+    nil
+  end
+  yield
+ensure
+  fu.define_singleton_method(:mv, orig)
+end
+
+[:raise, :silent].each do |mode|
+  NxTest.test("SWEEP: zlyhane `FileUtils.mv` (#{mode}) NIKDY nevrati falosny uspech") do
+    NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+    NxD2.reset!
+    NxD2::TS.upsert('cabinet', 'Dolná klasik', NxD2.cfg, NxD2.tmp!(NxD2.png(200)))
+    png_path = NxD2::TP.path_for('cabinet', 'Dolná klasik')
+    before = File.binread(png_path)
+
+    # Nedestruktivna cesta „Prefotiť": config sa nemeni, takze uz ulozeny nahlad
+    # ostava platny a neuspesny presun oň nesmie pripraviť — ale ani nesmie
+    # tvrdit, ze sa prefotilo. TICHY no-op (mode :silent) je pritom to, co
+    # `force: true` robilo pri KAZDEJ chybe.
+    tmp = NxD2.tmp!(NxD2.png(400))
+    result = nil
+    smoke1_with_broken_fs_mv(mode) { result = NxD2::TS.set_preview('cabinet', 'Dolná klasik', tmp) }
+
+    NxTest.assert_equal(false, result, 'zlyhanie presunu sa prizna (ziadny falosny uspech)')
+    NxTest.assert_equal(before, File.binread(png_path), 'POVODNY nahlad ostal nedotknuty')
+    NxTest.assert_equal(false, File.exist?(tmp), 'nepouzity capture temp NEOSTAL visiet')
+  end
+end
+
+NxTest.test('SWEEP: zlyhane `FileUtils.mv` v upsert ceste stary PNG ZMAZE (schema > zly obrazok)') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxD2.reset!
+  NxD2::TS.upsert('cabinet', 'Dolná klasik', NxD2.cfg, NxD2.tmp!(NxD2.png(200)))
+  png_path = NxD2::TP.path_for('cabinet', 'Dolná klasik')
+
+  tmp = NxD2.tmp!(NxD2.png(400))
+  smoke1_with_broken_fs_mv(:silent) { NxD2::TS.upsert('cabinet', 'Dolná klasik', NxD2.cfg(900.0), tmp) }
+
+  NxTest.assert_equal(false, File.exist?(png_path),
+                      'config sa zmenil — obrazok stareho tvaru sa NESMIE parovat s novym')
+  NxTest.assert_equal(false, File.exist?(tmp), 'nepouzity capture temp sa zahodil')
+end
+
 NxTest.test('SMOKE1: upsert cesta sa sprava NAOPAK — zlyhany presun stary PNG ZMAZE') do
   NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
   NxD2.reset!

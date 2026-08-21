@@ -121,7 +121,7 @@
     if (!c){
       dropCabRename(); // vyber zmizol — rozpisany nazov konci bez zapisu
       bar.innerHTML = '<span class="free">Nič nie je označené — návrh nového objektu</span>';
-      if (list){ list.style.display = 'none'; list.innerHTML = ''; }
+      if (list){ setWarnPanel(false); list.innerHTML = ''; }
       return;
     }
     lastCabName = c.name || '';
@@ -196,13 +196,20 @@
   function closeWarnPanel(){ setWarnPanel(false); }
   function warnPanelOpen(){
     var list = el('warnList');
-    return !!(list && list.style.display && list.style.display !== 'none');
+    return !!(list && list.classList && list.classList.contains('open'));
   }
   // Jedno miesto, kde sa mení viditeľnosť — aj `aria-expanded` chipu tak
   // hovorí pravdu bez ohľadu na to, ktorá cesta panel zatvorila.
+  //
+  // Sweep review P2: prepína sa TRIEDA, nie inline `display`. Inline
+  // `display: block` prebíjalo `display: flex` z CSS, takže panel prestal byť
+  // stĺpcový flex a `.wrows` scroller bol mŕtvy — dlhý zoznam nálezov sa
+  // neposúval. Inline hodnota sa navyše ČISTÍ (staré okno z CEF cache ju môže
+  // mať zapečenú v HTML), inak by trieda nemala šancu sa presadiť.
   function setWarnPanel(open){
     var list = el('warnList'); if (!list) return;
-    list.style.display = open ? 'block' : 'none';
+    if (list.style.display) list.style.display = '';
+    if (open) list.classList.add('open'); else list.classList.remove('open');
     var chip = document.querySelector('#idbar .warnchip');
     if (chip) chip.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
@@ -589,7 +596,7 @@
     var bar = el('idbar'), list = el('warnList');
     if (!bar) return;
     dropCabRename(); // D-100: prechod na dosku ukoncuje rozpisany nazov skrinky bez zapisu
-    if (list){ list.style.display = 'none'; list.innerHTML = ''; }
+    if (list){ setWarnPanel(false); list.innerHTML = ''; }
     if (!b){ setIdbar(null); return; }
     bar.innerHTML = '<span class="cid">' + esc(b.board_id || '?') + '</span>' +
       '<span class="cname">' + esc(b.name || '') + '</span>';
