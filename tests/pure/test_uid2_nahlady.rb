@@ -455,6 +455,63 @@ NxTest.test('SMOKE1: upsert cesta sa sprava NAOPAK — zlyhany presun stary PNG 
                       'zaznam sa napriek tomu ulozil')
 end
 
+# Zlyhanie SAMOTNEHO `File.rename` — posledny krok stagingu (Codex #186 P2).
+# `mv` medzi zvazkami (presmerovany %TEMP% vs. %APPDATA%) nie je rename, ale
+# STREAMOVANA KOPIA. Kym isla priamo do cieloveho suboru, chyba v polovici uz
+# stary PNG orezala. Teraz sa kompletizuje `<ciel>.new` a padnut moze len
+# rename v ramci JEDNEHO priecinka — ciel preto ostava nedotknuty.
+#
+# Padnut smie LEN posledny krok: `FileUtils.mv` si vnutorne tiez sklada rename,
+# takze stub sa viaze na ZDROJ koncaci `.new` — inak by sa staging vobec
+# nestihol vyrobit a test by dokazoval nieco ine, nez tvrdi.
+def smoke1_with_broken_rename
+  orig = File.method(:rename)
+  File.define_singleton_method(:rename) do |src, dst|
+    raise Errno::EACCES, 'simulovana chyba FS' if src.to_s.end_with?('.new')
+
+    orig.call(src, dst)
+  end
+  yield
+ensure
+  File.define_singleton_method(:rename, orig)
+end
+
+NxTest.test('SWEEP: zlyhany RENAME nechá starý náhľad BAJT PO BAJTE (Codex #186 P2)') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxD2.reset!
+  NxD2::TS.upsert('cabinet', 'Dolná klasik', NxD2.cfg, NxD2.tmp!(NxD2.png(200)))
+  png_path = NxD2::TP.path_for('cabinet', 'Dolná klasik')
+  before = File.binread(png_path)
+
+  tmp = NxD2.tmp!(NxD2.png(400))
+  result = nil
+  smoke1_with_broken_rename { result = NxD2::TS.set_preview('cabinet', 'Dolná klasik', tmp) }
+
+  NxTest.assert_equal(false, result, 'zlyhanie sa prizna (ziadny falosny uspech)')
+  NxTest.assert_equal(before, File.binread(png_path),
+                      'POVODNY nahlad je nedotknuty — nie orezany, nie prepisany')
+  NxTest.assert_equal(false, File.exist?("#{png_path}.new"),
+                      'staging subor po sebe NEOSTAL visiet v priecinku nahladov')
+  NxTest.assert_equal(false, File.exist?(tmp), 'nepouzity capture temp sa zahodil')
+end
+
+NxTest.test('SWEEP: uspesny presun po sebe staging subor NENECHA') do
+  NxTest.skip!('TemplateStore testy bezia len headless (realny %APPDATA%)') unless NxTest.headless?
+  NxD2.reset!
+  NxD2::TS.upsert('cabinet', 'Dolná klasik', NxD2.cfg, NxD2.tmp!(NxD2.png(200)))
+  png_path = NxD2::TP.path_for('cabinet', 'Dolná klasik')
+
+  novy = NxD2.png(400)
+  tmp = NxD2.tmp!(novy)
+  NxTest.assert_equal(true, NxD2::TS.set_preview('cabinet', 'Dolná klasik', tmp))
+
+  NxTest.assert_equal(novy, File.binread(png_path), 'na cieli je NOVY obrazok')
+  NxTest.assert_equal(false, File.exist?("#{png_path}.new"), 'staging subor je prec')
+  NxTest.assert_equal(false, File.exist?(tmp), 'capture temp je prec')
+  NxTest.assert_equal(1, Dir.children(NxD2::TP.dir).count { |f| f.end_with?('.png') },
+                      'v priecinku nahladov nepribudol ziadny odpad')
+end
+
 NxTest.test('SMOKE1 capture: cesta fotenia NEROBI operaciu ani zapis do modelu') do
   src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'template_previews.rb'), encoding: 'UTF-8')
   # Komentare o zakaze operacie sa nepocitaju — hlada sa REALNE volanie.

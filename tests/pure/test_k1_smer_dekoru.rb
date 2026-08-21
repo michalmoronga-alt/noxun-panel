@@ -436,11 +436,11 @@ NxTest.test('K1: zapis overuje DOKUMENT aj to, ci je karta stale nad tym dielcom
   # opakuju), bez kontroly vyberu by prepisal dielec, ktory uz na karte nie je.
   NxTest.assert(K1_HANDLER.include?("data['model_guid'].to_s != model_guid(model)"),
                 'guard dokumentu je v zapisovej ceste')
-  NxTest.assert(K1_HANDLER.include?('grain_target_error(model, cab, params, rk)'),
+  NxTest.assert(K1_HANDLER.include?("part_target_error(model, cab, params, rk, 'smer dekoru')"),
                 'identita dielca sa overuje PRED zapisom')
   NxTest.assert(K1_PART_JS.include?('model_guid: partCard.model_guid'),
                 'JS identitu dokumentu naozaj POSIELA (guard bez nej nic neochráni)')
-  target = K1_PARTS_RB[/def grain_target_error\b.*?\n        end\n/m].to_s
+  target = K1_PARTS_RB[/def part_target_error\b.*?\n        end\n/m].to_s
   NxTest.assert(target.include?('find_selected_part(model)'), 'cita sa SKUTOCNY vyber')
   NxTest.assert(target.include?('canonical_part_key(params, part_identity(cab, part)) != rk'),
                 'kluc vo vybere musi sediet s klucom z karty')
@@ -456,9 +456,12 @@ NxTest.test('K1: ODPOJENY dielec sa cez kartu menit NEDA (Codex #185 P1)') do
   # `detached_part_error`, ktorym prechadzaju VSETKY zapisove cesty karty
   # (ABS hrana, bulk olep, material, „Použiť na podobné"). Grain sa nan len
   # napoji, aby hlaska existovala na JEDNOM mieste.
-  target = K1_PARTS_RB[/def grain_target_error\b.*?\n        end\n/m].to_s
-  NxTest.assert(target.include?("detached_part_error(cab, part, 'smer dekoru')"),
-                'odpojenost sa kontroluje spolocnym guardom')
+  # v0.7.25 (Codex #186 P1): spolocna je uz aj CELA brana ciela — z
+  # `grain_target_error` sa stal `part_target_error(…, what)`, lebo delenie na
+  # „prisnu" grainovu a „volnejsiu" hranovu cestu nedrzalo.
+  target = K1_PARTS_RB[/def part_target_error\b.*?\n        end\n/m].to_s
+  NxTest.assert(target.include?('detached_part_error(cab, part, what)'),
+                'odpojenost sa kontroluje spolocnym guardom, predmet zmeny sa predava')
   shared = K1_PARTS_RB[/def detached_part_error\b.*?\n        end\n/m].to_s
   NxTest.assert(shared.include?('nested_part?(cab, part)'), 'spolocny guard cita vnorenost')
   NxTest.assert(shared.include?('vytiahnutý zo skrinky'),

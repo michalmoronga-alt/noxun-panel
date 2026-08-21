@@ -18,15 +18,15 @@ module Noxun
           return if stale_cabinet_echo?(cab, data, 'material dielca')
           rk = data['role_key'].to_s
           return set_status('Chyba identifikacie dielca.', true) if rk.empty?
-          # ODPOJENY DIELEC (nalez z review K1, PR #185) — PRED katalogovymi
-          # kontrolami aj pred pripadnou tvorbou ABS: cesta, ktora nesmie
-          # zapisat do modelu, nesmie nechat stopu ani v globalnom katalogu.
-          err = detached_part_error(cab, find_selected_part(model), 'materiál dielca')
-          return set_status(err, true) if err
           mat = present_str(data['material_id'])
           params = existing_params(cab)
           old_overrides = JsonFileStore.deep_copy(params['part_overrides'] || {})
           rk = canonical_part_key(params, rk)
+          # CIEL ZMENY (nalez z review K1 #185 + Codex #186 P1) — PRED katalogovymi
+          # kontrolami aj pred pripadnou tvorbou ABS: cesta, ktora nesmie zapisat
+          # do modelu, nesmie nechat stopu ani v globalnom katalogu.
+          err = part_target_error(model, cab, params, rk, 'materiál dielca')
+          return set_status(err, true) if err
           # D-49 (audit F4 + GH #116 P2): virtualny duplak — hrubkovy guard
           # najprv PROBE hodnotou BEZ zapisu (odmietnuty dielec nesmie nechat
           # nepouzity globalny zaznam), resolver az po guarde; dalsie kroky
@@ -154,15 +154,15 @@ module Noxun
           rk = data['role_key'].to_s
           code = data['edge'].to_s
           return set_status('Chyba identifikacie dielca/hrany.', true) if rk.empty? || !%w[L1 L2 W1 W2].include?(code)
-          # ODPOJENY DIELEC — pred akymkolvek zapisom (nalez z review K1, PR #185).
-          # Bez neho by sa ABS zapisala VNORENEMU dvojcatu rovnakeho `part_key`,
-          # vybrany odpojeny dielec by ostal so starym olepom a do objednavky by
-          # isla hrana, ktoru pouzivatel nikdy nevidel.
-          err = detached_part_error(cab, find_selected_part(model), 'ABS hrana')
-          return set_status(err, true) if err
           raw = data['abs_id']
           params = existing_params(cab)
           rk = canonical_part_key(params, rk)
+          # CIEL ZMENY — pred akymkolvek zapisom (nalez z review K1, PR #185;
+          # dotiahnute Codex #186 P1). Bez neho by sa ABS zapisala VNORENEMU
+          # dvojcatu rovnakeho `part_key`, vybrany dielec by ostal so starym
+          # olepom a do objednavky by isla hrana, ktoru nikto nevidel.
+          err = part_target_error(model, cab, params, rk, 'ABS hrana')
+          return set_status(err, true) if err
           ov = (params['part_overrides'] ||= {})
           rec = ov[rk] || {}
           edges = rec['edges'] || {}
@@ -221,7 +221,7 @@ module Noxun
           # IDENTITA DIELCA + ODPOJENOST (Codex #185 kolo 2, P2 a P1). Kluc z
           # payloadu nestaci: medzi klikom a callbackom sa mohol vyber presunut
           # na iny dielec, a odpojeny dielec by dokonca zmenil NIEKOHO INEHO.
-          err = grain_target_error(model, cab, params, rk)
+          err = part_target_error(model, cab, params, rk, 'smer dekoru')
           return set_status(err, true) if err
           # Smer materialu sa cita PRED prestavbou (potom uz dielec nesie
           # VYSLEDOK) — hlaska musi vediet povedat, ze volba je zatial neucinna.
@@ -233,10 +233,21 @@ module Noxun
           rebuild_focus_part(model, cab, rk, params, grain_status_msg(raw, mat_grain))
         end
 
-        # Overi, ze zmena smeru dopadne PRESNE na ten dielec, ktory ma pouzivatel
-        # na obrazovke. Vrati hlasku alebo nil.
+        # Overi, ze zmena dopadne PRESNE na ten dielec, ktory ma pouzivatel na
+        # obrazovke. Vrati hlasku alebo nil. `what` = predmet zmeny v 1. pade
+        # ('ABS hrana', 'materiál dielca', 'smer dekoru').
         #
-        # DVE veci, ktore samotny `part_key` z payloadu nezachyti:
+        # Do v0.7.24 to bol `grain_target_error` — guard smeru dekoru. Codex #186
+        # (P1) ukazal, ze rozdelenie na „prisnu" a „volnejsiu" cestu nedrzi: ked
+        # sa vyber medzi klikom a callbackom presunie z dielca na SKRINKU,
+        # `find_cabinet` skrinku najde, ale `find_selected_part` vrati nil — a
+        # cesta bez kontroly by dopisala stary `role_key` na vnorene dvojca.
+        # Preto tou istou branou prechadzaju VSETKY zapisove cesty karty.
+        #
+        # TRI veci, ktore samotny `part_key` z payloadu nezachyti:
+        #   0) VYBER UZ DIELEC NEOBSAHUJE — karta zmizla, ale callback este
+        #      leti; zapisat „naslepo" podla kluca znamena zmenit nieco, na co
+        #      sa uz nikto nepozera.
         #   1) VYBER SA MEDZITYM POSUNUL (Codex #185 kolo 2, P2) — callback je
         #      asynchronny; bez kontroly by sa prepisal dielec, ktory uz na
         #      karte nie je. Vzor `similar_context` a `handle_set_part_edges_all`.
@@ -248,13 +259,13 @@ module Noxun
         #      isiel po starom — a pouzivatel by pritom dostal hlasku o uspechu.
         #      Radsej cestu ODMIETNUT nez ticho zmenit nieco ine (ta ista lekcia
         #      ako `regenerated_parts` v UI-D1, Codex #180 P1).
-        def grain_target_error(model, cab, params, rk)
+        def part_target_error(model, cab, params, rk, what)
           part = find_selected_part(model)
           return 'Vo výbere nie je dielec — označ ho v modeli znova.' if part.nil?
           return 'Karta patrí inému dielcu — označ ho v modeli znova.' if
             canonical_part_key(params, part_identity(cab, part)) != rk
 
-          detached_part_error(cab, part, 'smer dekoru')
+          detached_part_error(cab, part, what)
         end
 
         # ODPOJENY DIELEC — SPOLOCNY GUARD VSETKYCH ZAPISOVYCH CIEST KARTY.
@@ -274,11 +285,11 @@ module Noxun
         # Radsej cestu ODMIETNUT nez ticho zmenit nieco ine (ta ista lekcia ako
         # `regenerated_parts` v UI-D1, Codex #180 P1).
         #
-        # `part.nil?` = PRIEPUSTNE. Guard hovori len o tom, co v modeli naozaj
-        # vidno: ked vo vybere dielec nie je, o odpojenosti sa neda tvrdit nic
-        # a cesta si svoje vlastne kontroly (echo, kluc) riesi sama — pasca
-        # vznika VYHRADNE vtedy, ked je odpojeny dielec OZNACENY a karta je
-        # jeho zrkadlom.
+        # `part.nil?` sem UZ NEDOJDE — chybajuci vyber odmieta kazdy volajuci
+        # sam (`part_target_error` hlaskou, bulk tichym zahodenim, lebo tam ide
+        # o stale echo). Vetva ostava len ako poistka: mlcky prejst je bezpecne
+        # jedine vtedy, ked uz niekto pred nou povedal nie (Codex #186 P1 —
+        # povodne bola priepustna zamerne a bola to diera).
         def detached_part_error(cab, part, what)
           return nil if part.nil? || nested_part?(cab, part)
 

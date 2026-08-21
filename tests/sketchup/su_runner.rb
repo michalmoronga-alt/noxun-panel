@@ -697,7 +697,15 @@ module NoxunSuRunner
       ov41u = ((e::Store.config(inst) || {})['part_overrides'] || {})[rk41] || {}
       ok('sync-abs C2: 1x undo vratil material aj hranu, paska v katalogu OSTAVA (NOTE 9)',
          (ov41u['edges'] || {})['L1'] == 'ABS_K009_10' && !e::Materials.edge(created41).nil?)
-      # upratanie: override hrany prec + docasne katalogove zaznamy prec
+      # upratanie: override hrany prec + docasne katalogove zaznamy prec.
+      # Dielec si treba ZNOVU oznacit — undo prestaval korpus, takze povodna
+      # instancia uz vo vybere nie je a zapisova cesta karty od v0.7.25 bez
+      # dielca vo vybere NEPREJDE (spolocna brana `part_target_error`); inak by
+      # tu ostal visiet ABS override a znecistil nasledujuce scenare.
+      inst41 = e::Panel.find_cabinet_by_id(model, cid41) || inst
+      shelf41c = inst41.definition.entities.grep(Sketchup::ComponentInstance)
+                       .find { |i| e::Store.get(i, 'part_key').to_s == rk41 }
+      e::Panel.select_only(model, shelf41c) if shelf41c
       e::Panel.handle_set_part_edge({ 'cabinet_id' => cid41, 'role_key' => rk41,
                                       'edge' => 'L1', 'abs_id' => '__inherit__' }.to_json)
       e::Materials.delete_edge(created41) if created41
@@ -4404,6 +4412,24 @@ module NoxunSuRunner
          e::Store.get(inst, 'config').to_s == cfg_abs_before &&
          e::Store.get(detached, 'config').to_s == det_abs_before &&
          edges_abs_after == edges_abs_before)
+
+      # Codex #186 (P1): VYBER PRESUNUTY NA SKRINKU. Medzi klikom na karte a
+      # callbackom sa vyber posunie z dielca na cely korpus — `find_cabinet` ho
+      # najde, ale `find_selected_part` vrati nil. Kym bola tato vetva
+      # priepustna, hrana aj material sa zapisali NASLEPO podla `role_key` z
+      # payloadu, teda na vnorene dvojca: do objednavky by tak isla ABS paska,
+      # ktoru nikto nevidel na obrazovke. Assert je spolocny s odpojenym
+      # dielcom — nic sa nesmie zmenit.
+      e::Panel.select_only(model, inst)
+      e::Panel.handle_set_part_edge({ 'role_key' => fkey, 'edge' => 'L1', 'abs_id' => '',
+                                      'cabinet_id' => cid }.to_json)
+      e::Panel.handle_set_part_material({ 'role_key' => fkey, 'material_id' => 'K1UNI18',
+                                          'cabinet_id' => cid, 'model_guid' => guid }.to_json)
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      ok('K1/ABS: s vyberom presunutym na SKRINKU neprejde hrana ani material (Codex #186)',
+         e::Store.get(inst, 'config').to_s == cfg_abs_before &&
+         ((e::Store.config(k1_part(inst, 'front_door')) || {})['edges'] || {}) == edges_abs_before)
+
       Sketchup.undo
       inst = e::Panel.find_cabinet_by_id(model, cid)
       ok('K1/ABS: odmietnute cesty nevyrobili ZIADEN krok Spat (1x undo vratil marker)',

@@ -257,14 +257,34 @@ module Noxun
         return false unless target && valid_file?(tmp)
 
         FileUtils.mkdir_p(File.dirname(target))
-        FileUtils.mv(tmp, target)
-        # Overuje sa AJ zdroj: ked uz na cieli STARY nahlad je, samotna
-        # existencia cieloveho suboru o novom presune nehovori vobec nic —
-        # dokazom je az to, ze temp po presune ZMIZOL.
-        raise IOError, "presun nahladu na #{target} sa neprejavil" if
-          File.exist?(tmp) || !File.file?(target)
+        stage_then_rename(tmp, target)
+      end
 
-        true
+      # Presun cez BOKOVY subor v cielovom priecinku (Codex #186 P2). `mv` medzi
+      # ZVAZKAMI (presmerovany `%TEMP%` vs. `%APPDATA%`) nie je rename, ale
+      # STREAMOVANA KOPIA — a kopiruje sa priamo do cieloveho suboru. Ked dojde
+      # miesto alebo pride I/O chyba v polovici, stary PNG je uz orezany, hoci
+      # `attach` sa tvari, ze nedestruktivny („Prefotiť" by tak zobralo aj to,
+      # co pouzivatel uz mal). Preto sa najprv skompletizuje `.new` vedla ciela,
+      # OVERI sa (PNG magic + limit) a az potom sa premenuje — rename v ramci
+      # jedneho priecinka je atomicky a nedokoncena kopia sa ciela nedotkne.
+      def stage_then_rename(tmp, target)
+        staged = "#{target}.new"
+        FileUtils.rm_f(staged) # zvysok po predchadzajucom pade
+        begin
+          FileUtils.mv(tmp, staged)
+          # Kontroluje sa AJ zdroj: dokazom presunu je, ze temp ZMIZOL.
+          raise IOError, "presun nahladu do #{staged} sa neprejavil" if
+            File.exist?(tmp) || !valid_file?(staged)
+
+          File.rename(staged, target)
+          raise IOError, "premenovanie nahladu na #{target} sa neprejavilo" unless File.file?(target)
+
+          true
+        rescue StandardError
+          FileUtils.rm_f(staged) # stary nahlad na cieli ostava NEDOTKNUTY
+          raise
+        end
       end
 
       # UPSERT cesta (config sablony sa PRAVE ZMENIL): zlyhanie presunu sa berie
