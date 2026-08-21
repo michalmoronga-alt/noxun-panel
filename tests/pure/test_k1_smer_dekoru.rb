@@ -389,10 +389,31 @@ NxTest.test('K1: karta cita EFEKTIVNY smer zo SNAPSHOTU, katalog len prospektivn
   NxTest.assert(body.include?('CabinetBuilder.effective_grain(sheet, override)'),
                 'prospektivny vysledok pocita TA ISTA funkcia ako builder (ziadny druhy vypocet)')
   hint = K1_PAYLOADS_RB[/def grain_hint\b.*?\n        end\n/m].to_s
-  NxTest.assert(hint.include?('return nil if pending == snapshot'),
-                'bez rozporu sa hint nezobrazuje (vertikalny priestor)')
-  NxTest.assert(hint.include?('po najbližšej prestavbe'),
+  NxTest.assert(hint.include?('out.empty? ? nil : out.join'),
+                'bez dovodu sa hint nezobrazuje (vertikalny priestor)')
+  NxTest.assert(hint.include?('prestavbe skrinky sa použije'),
                 'rozpor snapshot vs. katalog karta POVIE, nezamlci ho')
+end
+
+NxTest.test('K1: ZAMKNUTY hint si NESMIE protirecit so snapshotom (Codex #185 kolo 3, P1)') do
+  # Ked material stratí smer (zmazany z katalogu, prepisany na jednofarebny,
+  # .skp z ineho stroja), segment sa zamkne — ale dielec moze byt POSTAVENY
+  # s pozdlznou/priecnou kresbou a VEPO ju stale pouziva. Povodna verzia sa pri
+  # zamku vracala HNED a tvrdila „materiál nemá smer — otáčať sa nemá čo",
+  # cize karta si protirecila so svojim vlastnym `grain_effective`.
+  # ZAMOK a ROZPOR NIE SU vylucne: musia sa vediet povedat OBA, a vyrobna
+  # realita (s cim dielec ide do VEPO teraz) ide PRVA.
+  hint = K1_PAYLOADS_RB[/def grain_hint\b.*?\n        end\n/m].to_s
+  NxTest.assert(!hint.empty?, 'skladanie hintu sa naslo')
+  NxTest.refute(hint.include?('return grain_locked_hint(override) if locked'),
+                'zamok uz NESMIE obchadzat snapshot skorym navratom')
+  # Poradie: veta o postavenom smere sa sklada PRED zamkovym vysvetlenim.
+  built = hint.index('Dielec je postavený so smerom')
+  lock  = hint.index('grain_locked_hint(override) if locked')
+  NxTest.assert(built && lock && built < lock,
+                'prv sa povie, s cim dielec IDE DO VYROBY, az potom preco je segment zamknuty')
+  NxTest.assert(hint.include?('out << grain_locked_hint(override) if locked'),
+                'zamkove vysvetlenie sa PRIDA, nenahradi rozpor')
 end
 
 NxTest.test('K1: zapisova cesta ma enum guard, identity guard a JEDNU prestavbu') do

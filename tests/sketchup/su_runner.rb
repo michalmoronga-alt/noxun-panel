@@ -4441,6 +4441,22 @@ module NoxunSuRunner
       ok("K1: po zmene katalogu ide na panel aj cerstva karta dielca (#{pushed.length} pushov)",
          pushed.any? { |s| s.start_with?('NX.setPartCard(') } &&
          pushed.any? { |s| s.start_with?('NX.setMaterials(') })
+      # Codex #185 kolo 3 (P1): ked material smer STRATI, segment sa zamkne —
+      # ale dielec je stale POSTAVENY s pozdlznou kresbou a VEPO ju pouziva.
+      # Hint preto MUSI povedat OBOJE a nesmie si protirecit s `grain_effective`.
+      cat_none = k1_catalog_json
+      cat_none['sheets'][0]['grain'] = 'none'
+      File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(cat_none))
+      e::Materials.reload!
+      npay = sfront ? (e::Panel.part_card_payload(model, inst, sfront) || {}) : {}
+      nhint = npay['grain_hint'].to_s
+      ok("K1: material stratil smer — karta ZAMKNE segment, ale drzi snapshot (#{npay['grain_effective']})",
+         npay['grain_locked'] == true && npay['grain_effective'] == 'length' &&
+         npay['grain_pending'] == 'none')
+      ok("K1: zamknuty hint POVIE postaveny smer a „bez smeru“ az ako buduci stav (#{nhint})",
+         nhint.include?('postavený so smerom „pozdĺžna') && nhint.include?('bez smeru') &&
+         nhint.include?('nemá smer dekoru') &&
+         nhint.index('postavený so smerom') < nhint.index('nemá smer dekoru'))
       File.binwrite(File.join(tmp, 'materials.json'), JSON.pretty_generate(k1_catalog_json))
       e::Materials.reload!
 

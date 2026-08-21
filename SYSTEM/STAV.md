@@ -9,7 +9,7 @@
 
 **INSPECTOR REWORK (UI 2.0) JE HOTOVÝ.** Koncept bol uzavretý 18.8. (Michal) — záväzný kontrakt a mockupy sú v repe: [zdroje/ui20/](zdroje/ui20/) ([UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) + mockupy Inspector C, štúdio, dizajnový lístok). Všetky štyri bloky sú v maine: **UI-A · UI-B · UI-C · UI-D**. Zostáva fáza **ŠTÚDIO** ([PLAN.md](PLAN.md)).
 
-Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). **Opravné kolo po smoke teste hotového Inspectora je KOMPLET:** SMOKE PACK 1 (#183 — rozbité riadky čiel, prekrytý text v kovaní, podperky súhrnne, ručné odfotenie náhľadu šablóny) + **nový vizuál výsuvov v mini náhľade** (#184). Testy: **1472 headless · 47 JS sád**; **plný in-SketchUp beh 21.8. — 518 PASS, 0 FAIL** (vrátane novej sekcie `run_k1`). **Z bloku KRESBA je hotová K1** — smer kresby sa dá po novom nastaviť **na konkrétnom dielci a čele**, nie len na materiáli (presne to, čo chýbalo pri incidente z 19.8.); ostáva **K2 (D-87)**.
+Zákazka **KLINIKA** (254 dielcov) je postavená čisto z pluginu, prekontrolovaná a overená veľkým testom (porovnanie s ručným rozpočtom). **Opravné kolo po smoke teste hotového Inspectora je KOMPLET:** SMOKE PACK 1 (#183 — rozbité riadky čiel, prekrytý text v kovaní, podperky súhrnne, ručné odfotenie náhľadu šablóny) + **nový vizuál výsuvov v mini náhľade** (#184). Testy: **1478 headless · 47 JS sád**; **plný in-SketchUp beh 21.8. — 526 PASS, 0 FAIL** (vrátane novej sekcie `run_k1`). **Z bloku KRESBA je hotová K1** — smer kresby sa dá po novom nastaviť **na konkrétnom dielci a čele**, nie len na materiáli (presne to, čo chýbalo pri incidente z 19.8.); ostáva **K2 (D-87)**.
 
 ## Robí sa
 

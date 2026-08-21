@@ -860,20 +860,31 @@ module Noxun
           "#{fmt_mm(dims[0])}×#{fmt_mm(dims[1])} mm"
         end
 
-        # Hint pod segmentom. Dva dovody, preco vobec je:
-        #   1) ZAMOK — material nema smer, volba je zatial neucinna;
-        #   2) ROZPOR — dielec je POSTAVENY s inym smerom, nez aky by dnesny
+        # Hint pod segmentom. Dva dovody, preco vobec je — a NIE SU navzajom
+        # vylucne (Codex #185 kolo 3, P1):
+        #   1) ROZPOR — dielec je POSTAVENY s inym smerom, nez aky by dnesny
         #      katalog dal (material sa medzitym zmenil/zmazal, .skp je z ineho
-        #      stroja). Vtedy MUSI byt jasne, s cim dielec IDE DO VYROBY teraz
-        #      a co sa stane po prestavbe — inak by karta ticho ukazovala jedno
-        #      a VEPO poslalo druhe (Codex #185 P1).
-        # Inak nil = riadok sa vobec nezobrazi.
+        #      stroja);
+        #   2) ZAMOK — material uz smer nema, takze segment sa neda pouzit.
+        #
+        # PORADIE JE ZAVAZNE: prv sa povie VYROBNA REALITA (s cim dielec ide do
+        # VEPO TERAZ), az potom vysvetlenie zamku. Povodna verzia sa pri zamku
+        # vracala HNED a tvrdila „materiál nemá smer dekoru — otáčať sa nemá čo"
+        # aj vtedy, ked snapshot dielca stale niesol `length`/`width` a VEPO ho
+        # pouzivalo — karta si tak PROTIRECILA so svojim vlastnym
+        # `grain_effective`. „Bez smeru" je pri zamku vzdy az PROSPEKTIVNY
+        # vysledok (co nastane po najblizsej prestavbe), nikdy nie tvrdenie
+        # o tom, co uz je postavene.
+        # Ziadny dovod => nil = riadok sa vobec nezobrazi.
         def grain_hint(locked, override, snapshot, pending, length, width)
-          return grain_locked_hint(override) if locked
-          return nil if pending == snapshot
-
-          "Dielec je postavený so smerom „#{GRAIN_WORD[snapshot]}“ (výrobne #{grain_dims_text(snapshot, length, width)}) " \
-            "— po najbližšej prestavbe skrinky sa použije „#{GRAIN_WORD[pending]}“."
+          out = []
+          if pending != snapshot
+            out << "Dielec je postavený so smerom „#{GRAIN_WORD[snapshot]}“ " \
+                   "(výrobne #{grain_dims_text(snapshot, length, width)}) — po najbližšej " \
+                   "prestavbe skrinky sa použije „#{GRAIN_WORD[pending]}“."
+          end
+          out << grain_locked_hint(override) if locked
+          out.empty? ? nil : out.join(' ')
         end
 
         def grain_locked_hint(override)
