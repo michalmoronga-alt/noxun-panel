@@ -10,6 +10,12 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
+### D-15 — UX vzor: „pridávačky" ako modal (vyriešené 22.8.2026, ŠTÚDIO KONCEPT + dávka ŠT-1c PR #199, v0.7.38)
+
+**Pôvodné znenie (Michal 19.7.):** všetky akcie „pridať niečo" (šablóna, materiál, …) zjednotiť na modal s formulárom. Napĺňa sa postupne (prvý bol D-14; materiál formulár sa prerobí neskôr).
+
+**Riešenie:** vzor bol schválený v ŠTÚDIO KONCEPTE (jedna kostra: titulok · polia · zelené potvrdenie · Esc/klik vedľa · fokus v prvom poli) a dávka ŠT-1c PR #199 dodala **zdieľaný komponent `ui/js/nx_modal.js`** — prvé kódové inštancie sú pridanie vlastnej položky a spotrebiča v sekcii Rozpočet (nahradili inline drafty). Komponent nesie navyše: **busy zámok** proti dvojitému odoslaniu (server by druhý zápis prijal — dokázané in-SU), **focus trap** (Tab cyklí v karte), **pamäť hodnôt per druh pridávačky** (Esc/klik vedľa nie je tichá strata — hodnoty sa vrátia pri ďalšom otvorení) a kontrakt, že odmietnutý serverový zápis modal NEZATVÁRA. Ďalšie inštancie pribúdajú s dávkami: materiál = D-69 (ŠT-2), položka/set kovania a pravidlo (blok KOVANIE); mini-modal „Uložiť ako šablónu" v paneli sa prepojí pri najbližšom zásahu do panela. Vzor je zapísaný v `docs/UI_DIZAJN.md` §5.12.
+
 ### D-50 — OCL inšpirácia UI/UX (vyriešené 22.8.2026, ŠTÚDIO KONCEPT + dávka ŠT-1a, PR #191 + #192 + #193, v0.7.30)
 
 **Pôvodné znenie (Michal 31.7. večer):** pár detailov z OCL flow prevziať; najprv slovné prebratie (sedenie), potom zapracovanie.
