@@ -1093,6 +1093,17 @@ meno už používa pre SCRIM starších modalov — preto `.nxmcard`.
   volajúceho: zavrieť ho smie **len potvrdenie servera**. Odmietnutý zápis
   musí používateľ nájsť **s rozpísanými hodnotami na mieste** — má opraviť
   svoje číslo, nie písať celý formulár znova.
+- **jedno odoslanie naraz.** Prvý `submit` modal zamkne a potvrdzovacie
+  tlačidlo zošedne; ďalšie kliky a Entery sa zahadzujú. Odomyká **volajúci**
+  (`NXModal.setBusy(false)`) v **oboch** vetvách výsledku. Dôvod: zápis do
+  modelu je asynchrónny, takže druhý Enter by neprepadol — počkal by si vo
+  fronte a odišiel s čerstvou generáciou, ktorú server **prijme**. Výsledok by
+  bola tá istá položka dvakrát a dva kroky Späť.
+- **rozpísané hodnoty prežijú zatvorenie.** Esc ani klik vedľa nesmú byť tichá
+  strata — hodnoty sa pamätajú per pridávačka a nasledujúce otvorenie ich
+  predvyplní; zmaže ich až úspešný zápis.
+- **fokus zostáva v karte.** Tab z posledného prvku cyklí na prvý (Shift+Tab
+  naopak) — inak skočí do obsahu za modalom, ktorý sa práve ovládať nedá.
 - **Kotva `#nxModalRoot` žije mimo tela sekcie**, takže prekreslenie obsahu
   po zápise modal nezhodí.
 
@@ -1102,10 +1113,17 @@ zavrieť nesmie, lebo beh by ostal visieť bez okna. Také okno si markup kresl�
 samo a s komponentom nemá nič spoločné.
 
 **Escape v okne, ktoré má vlastný Escape handler** (Štúdio zatvára ním
-rozbaľovacie nastavenie hrán), sa musí podmieniť `!NXModal.isOpen()`. Oba
-listenery visia na `document` a `stopPropagation` medzi nimi **nefunguje** —
-je to tá istá lekcia ako pri zatváraní menu klikom mimo: rieši sa v jednom
-listeneri, nie druhým poslucháčom.
+rozbaľovacie nastavenie hrán) sa rieši **dvoma poistkami naraz**:
+
+1. modal Escape **spotrebuje** — `stopImmediatePropagation()`. Obyčajný
+   `stopPropagation` by nestačil: oba listenery visia na tom **istom** uzle
+   (`document`) a ten ich nezastaví; zastaví ich až „immediate" variant. Platí
+   to preto, že komponent sa načítava **pred** oknom (jeho listener je prvý).
+2. okno si napriek tomu podmieni svoj handler `!NXModal.isOpen()` — pre prípad,
+   že by sa poradie skriptov niekedy zmenilo.
+
+Bez toho by jedno stlačenie Escape zavrelo **oboje** a používateľ by prišiel
+o nastavenie, ktorého sa ani nedotkol.
 
 ---
 

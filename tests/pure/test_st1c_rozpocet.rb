@@ -224,8 +224,11 @@ end
 # --- 5) CSS presun + okno Vyroba ako prazdna skrupina ------------------------
 
 NxTest.test('ŠT-1c B1: styly rozpoctu sa PRESUNULI (nie skopirovali)') do
+  # `.bdraft*` v zozname ZAMERNE NIE JE — inline draft noveho riadku zanikol
+  # v ŠT-1c PR B2 (pridavanie je D-15 modal), takze jeho styly nemali co
+  # obliekat a zmizli z OBOCH suborov (review #5).
   %w[.bsum .btotal .bseg .bchip .blist .bsec .bcnt .bsubt .btab .bedit .bacts
-     .baddbig .bdraft .broundrow .bprog .bcpband .bcpmerged].each do |sel|
+     .baddbig .broundrow .bprog .bcpband .bcpmerged].each do |sel|
     NxTest.assert(S1CB_STUDIO_HTML.include?(sel), "#{sel} je v studio.html")
     NxTest.refute(S1CB_PROD_HTML.include?("  #{sel} {"),
                   "#{sel} uz v production.html NIE JE (kopia by sa rozisla)")

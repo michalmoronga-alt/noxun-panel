@@ -114,8 +114,14 @@ NxTest.test('ŠT-1c B2 (audit #9): Escape Studia sa podmienuje otvorenym modalom
                 'Escape zatvara `ecMenu` LEN vtedy, ked nezije D-15 modal')
   NxTest.assert(S1C2_STUDIO_JS.include?('function nxModalOpen'),
                 'a otazka ma jedno miesto (nie tri kopie podmienky)')
-  NxTest.assert(S1C2_MODAL_JS.include?("if (ev.key === 'Escape'){ close(); return; }"),
+  NxTest.assert(S1C2_MODAL_JS.include?("if (ev.key === 'Escape'){"),
                 'komponent si Escape rieši sam — kazdy vo svojom listeneri')
+  # Review #10: o poradi rozhoduje poradie skriptov, takze modal Escape
+  # SPOTREBUJE. `stopPropagation` by nestacilo — oba listenery visia na TOM
+  # ISTOM uzle (`document`) a ten ich nezastavi; musi to byt
+  # `stopImmediatePropagation`. Behavioralny scenar je v tests/js/test_st1c_ponuka.js.
+  NxTest.assert(S1C2_MODAL_JS.include?('ev.stopImmediatePropagation()'),
+                'a Escape SPOTREBUJE — inak by jedno stlacenie zavrelo aj nastavenie hran')
 end
 
 NxTest.test('ŠT-1c B2 (audit #10): odmietnuty zapis modal NEZATVARA') do
@@ -165,6 +171,11 @@ NxTest.test('ŠT-1c B2 (Š13): inline draft v tele sekcie ZANIKOL') do
     NxTest.refute(S1C2_BUDGET_JS.include?(dead),
                   "zvysok inline draftu `#{dead}` uz v kode nie je")
   end
+  # Review #5: a s nim aj jeho STYLY — mrtve CSS by pri dalsom citani vyzeralo
+  # ako zivy vzor, ktory ma niekto pouzit.
+  NxTest.refute(S1C2_STUDIO_HTML.include?('.bdraft {'),
+                'mrtve `.bdraft` styly su prec z studio.html')
+  NxTest.refute(S1C2_STUDIO_HTML.include?('.bdraft .bedit'), 'vratane odvodenych pravidiel')
   NxTest.assert(S1C2_BUDGET_JS.include?('function budDraftFields'),
                 'polia draftu su CISTA funkcia (kostru kresli komponent)')
   NxTest.assert(S1C2_BUDGET_JS.include?('function budOpenDraft'), 'a otvara ich jedno miesto')
@@ -175,15 +186,94 @@ end
 
 # --- 5) relay retaz exportu cenovej ponuky (review #7) -----------------------
 
-NxTest.test('ŠT-1c B2 (review #7): oba XLSX handlery beru payload TOLERANTNE') do
-  %w[handle_budget_xlsx handle_cp_xlsx].each do |m|
-    body = S1C2_STUDIO_RB[/def #{m}\(payload\).*?\n        end\n/m].to_s
-    NxTest.refute(body.empty?, "#{m} sa nasiel")
-    NxTest.assert(body.include?('payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)'),
-                  "#{m}: Hash aj JSON retazec (vetva bez panela odovzdava uz Hash)")
+# POZOR na to, CO tento test naozaj overuje (review #9): je to ZDROJOVY GUARD
+# (grep), nie behaviorálny scenár. Relay vetvu `if Panel.dialog_alive?` sa
+# headless odsimulovať nedá (`Panel` je HtmlDialog vrstva a `Panel.js` by v nej
+# nemalo kam písať), takže sa kontroluje TVAR kódu: že obe okná parsujú payload
+# tolerantne. Skutočné prevolanie oboch vetiev robí in-SketchUp sekcia.
+NxTest.test('ŠT-1c B2 (review #7 a #9): XLSX handlery OBOCH okien maju Hash-tolerantny TVAR') do
+  prod_rb = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_dialog.rb'),
+                      encoding: 'UTF-8')
+  [['studio_dialog.rb', S1C2_STUDIO_RB], ['production_dialog.rb', prod_rb]].each do |(name, src)|
+    %w[handle_budget_xlsx handle_cp_xlsx].each do |m|
+      body = src[/def #{m}\(payload\).*?\n        end\n/m].to_s
+      NxTest.refute(body.empty?, "#{name}: #{m} sa nasiel")
+      NxTest.assert(body.include?('payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)'),
+                    "#{name}: #{m} berie Hash aj JSON retazec (vetva bez panela odovzdava uz Hash)")
+    end
   end
   # Relay vetva musi ist do TOHTO okna — cudzi push by mu klik odmietol.
   NxTest.assert(S1C2_STUDIO_RB.include?('NX.studioRelayCp('), 'cenova ponuka ide vlastnym relayom')
   NxTest.assert(Noxun::Engine::StudioDialog.respond_to?(:do_cp_xlsx),
                 'a telo je verejne (vola ho relay z panela)')
+end
+
+# --- 6) zamok odoslania + pamat rozpisanych hodnot (review #2, #3+#4) --------
+
+NxTest.test('ŠT-1c B2 (review #2): zamok odoslania zije v KOMPONENTE, nie v rozpocte') do
+  NxTest.assert(S1C2_MODAL_JS.include?('if (OPEN.busy) return;'),
+                'druhy submit sa zahadzuje priamo v kostre')
+  NxTest.assert(S1C2_MODAL_JS.include?('function setBusy(flag)'),
+                'a odomknutie ma verejnu cestu (`setBusy`)')
+  NxTest.assert(S1C2_MODAL_JS.include?("btn.setAttribute('disabled', 'disabled')"),
+                'beziaci zapis je VIDNO — potvrdzovacie tlacidlo zosedne')
+  # Odomknutie MUSI byt v OBOCH vetvach vysledku, inak by odmietnuty zapis
+  # nechal okno navzdy zamknute s hodnotami, ktore sa uz nedaju odoslat.
+  res = S1C2_BUDGET_JS[/NX\.budgetResult = function.*?\n    \};/m].to_s
+  NxTest.assert(res.include?('if (ok) budCloseDraft();') && res.include?('else budUnlockDraft();'),
+                'rozpocet pusta zamok v OBOCH vetvach (uspech zatvara, odmietnutie odomyka)')
+  NxTest.assert(S1C2_BUDGET_JS.include?('budUnlockDraft();') &&
+                S1C2_BUDGET_JS[/function budAfterPush.*?\n  \}/m].to_s.include?('budUnlockDraft'),
+                'a poistka pre spadnuty Ruby callback visi na cerstvom payloade')
+end
+
+NxTest.test('ŠT-1c B2 (review #3+#4): rozpisane hodnoty prezijú zatvorenie modalu') do
+  NxTest.assert(S1C2_BUDGET_JS.include?("var BUD_DRAFT_VALUES = { custom: null, appliance: null };"),
+                'pamat je PER DRUH pridavacky (polia vlastnej polozky a spotrebica su ine)')
+  NxTest.assert(S1C2_BUDGET_JS.include?('function budDraftMemory'),
+                'a cita sa cez jedno miesto')
+  NxTest.assert(S1C2_BUDGET_JS.include?('fields: budDraftFields(kind, budDraftMemory(kind))'),
+                'otvorenie modalu hodnoty PREDVYPLNI (Escape uz nie je ticha strata)')
+  NxTest.assert(S1C2_BUDGET_JS[/function budCloseDraft.*?\n  \}/m].to_s
+                  .include?('BUD_DRAFT_VALUES[BUD_DRAFT] = null'),
+                'zmaze ich az USPESNY zapis — vtedy riadok v rozpocte naozaj je')
+end
+
+# --- 7) varovny pas ponuky (review #1) --------------------------------------
+
+NxTest.test('ŠT-1c B2 (review #1): sekcia Ponuka nesie CELY varovny pas') do
+  body = S1C2_BUDGET_JS[/function budOfferHtml.*?\n  \}/m].to_s
+  NxTest.refute(body.empty?, 'telo sekcie sa naslo')
+  NxTest.assert(body.include?('budWarnChips(b).forEach'),
+                'chipy su TIE ISTE, ake pocita Rozpocet — jedno miesto, jedno cislo')
+  NxTest.assert(body.include?('budOfferGuardHtml(band)'), 'plus vlastny CP guard')
+  chip = S1C2_BUDGET_JS[/function budOfferChipHtml.*?\n  \}/m].to_s
+  NxTest.refute(chip.empty?, 'chip ponuky ma vlastnu funkciu')
+  # Rozdiel oproti Rozpoctu je LEN ciel kliku — v ponuke sa needituje (Š15).
+  NxTest.refute(chip.include?("data-bud=\"stale\""),
+                'chip starych cien v ponuke NEROZBALUJE zoznam (ten tu nie je)')
+  NxTest.assert(chip.include?("data-bud=\"to_budget\""), 'ale VEDIE do Rozpoctu')
+  NxTest.assert(chip.include?("data-bud=\"ctrl\""), 'a rozpoctove nalezy do Kontroly')
+end
+
+NxTest.test('ŠT-1c B2 (review #8): zoznam zlucenych polozek si pamata rozbalenie') do
+  NxTest.assert(S1C2_BUDGET_JS.include?("budSectionOpen('cp_merged')"),
+                'stav rozbalenia ide cez tu istu mapu ako sekcie rozpoctu')
+  NxTest.assert(S1C2_BUDGET_JS.include?('cp_merged: false'),
+                'standardne ZBALENY (vertikalny priestor je vzacny)')
+  toggle = S1C2_BUDGET_JS[/document\.addEventListener\('toggle'.*?\n    \}, true\);/m].to_s
+  NxTest.assert(toggle.include?("classList.contains('bcpmerged')"),
+                'a listener stavu ho pozna (inak by sa po kazdom prepnuti sam zabalil)')
+end
+
+# --- 8) texty podla mockupu a kontraktu (review #6) --------------------------
+
+NxTest.test('ŠT-1c B2 (review #6): lista ponuky pouziva texty z mockupu a kontraktu') do
+  tools = S1C2_BUDGET_JS[/function budOfferToolsHtml\(\)\{.*?\n  \}/m].to_s
+  NxTest.assert(tools.include?('Cenová ponuka (zákazník)'),
+                'tlacidlo si nechalo meno z mockupu — je to TO ISTE, len sa prestahovalo')
+  # Text je v zdrojaku zalomeny cez dva riadky — hlada sa preto po castiach.
+  NxTest.assert(tools.include?('Súčet preberá z Rozpočtu — riadok bez ceny do ponuky') &&
+                tools.include?('nevstúpi potichu.'),
+                'hint je doslovne z kontraktu Š14–Š15')
 end

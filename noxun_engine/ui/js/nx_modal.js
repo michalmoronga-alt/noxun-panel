@@ -110,6 +110,37 @@
 
     function spec(){ return OPEN ? OPEN.spec : null; }
 
+    // --- ZAMOK ODOSLANIA (review #2) -----------------------------------------
+    // `sketchup.*` je ASYNCHRONNE. Bez zamku by dvojity Enter (alebo dvojklik na
+    // „Pridať") odoslal DVE mutacie: prva ide na server, druha padne do fronty
+    // klienta (BUD_BUSY/BUD_QUEUE) a odosle sa AZ s cerstvou generaciou — cize
+    // ju server PRIJME. Vysledok: polozka v rozpocte DVAKRAT a dva kroky Spat.
+    // Zamok patri do KOMPONENTU, nie do rozpoctu: je to zdielana kostra a tu
+    // istu pascu by inak zdedila kazda dalsia „pridavacka" (D-69 editor
+    // materialu, polozka/set kovania).
+    //
+    // Odomyka VYHRADNE volajuci — az ked vie, ako zapis dopadol (`setBusy(false)`
+    // v OBOCH vetvach vysledku). Modal si to sam odhadnut nevie.
+    function isBusy(){ return !!(OPEN && OPEN.busy); }
+
+    function setBusy(flag){
+      if (!OPEN) return;
+      OPEN.busy = flag === true;
+      if (typeof document === 'undefined') return;
+      var r = document.getElementById(ROOT_ID);
+      var btn = r && r.querySelector ? r.querySelector('[data-nxm-act="submit"]') : null;
+      if (!btn) return;
+      // Zosednute tlacidlo je JEDINY viditelny znak, ze zapis prave bezi —
+      // bez neho by pouzivatel klikal dalej do zamknuteho okna.
+      if (OPEN.busy){
+        btn.setAttribute('disabled', 'disabled');
+        btn.setAttribute('aria-busy', 'true');
+      } else {
+        btn.removeAttribute('disabled');
+        btn.removeAttribute('aria-busy');
+      }
+    }
+
     // Hodnoty polí -> objekt { key: retazec }. Cita sa VZDY z DOM, aby to, co
     // pouzivatel vidi, bolo presne to, co sa odosle.
     function values(){
@@ -128,7 +159,7 @@
       if (!r) return;
       var trigger = document.activeElement || null;
       close(); // dva modaly naraz su vzdy chyba navrhu
-      OPEN = { spec: s, trigger: trigger };
+      OPEN = { spec: s, trigger: trigger, busy: false };
       r.innerHTML = modalHtml(s);
       // Fokus do PRVEHO pola (kontrakt D-15). `setTimeout` preto, ze CEF
       // priradi fokus az po dokresleni — okamzity `focus()` by sa stratil.
@@ -155,10 +186,50 @@
     function submit(){
       var s = OPEN && OPEN.spec;
       if (!s) return;
+      if (OPEN.busy) return; // review #2: druhy Enter/klik sa ZAHADZUJE
       var v = values();
+      setBusy(true);
       // Zatvorenie je na volajucom (audit #10) — server moze zapis odmietnut
-      // a modal musi ostat otvoreny s hodnotami.
+      // a modal musi ostat otvoreny s hodnotami. Odomknutie tiez: volajuci
+      // vola `setBusy(false)` v OBOCH vetvach vysledku.
       if (typeof s.onSubmit === 'function') s.onSubmit(v);
+    }
+
+    // --- FOKUS ZOSTAVA V KARTE (review #7) -----------------------------------
+    // Tab z posledneho prvku modalu by inak skocil do okna ZA nim — do tabulky
+    // rozpoctu, ktoru pouzivatel prave nemoze ovladat. Je to vzor pre VSETKY
+    // buduce pridavacky, preto to zije v komponente.
+    function focusables(){
+      if (typeof document === 'undefined') return [];
+      var r = document.getElementById(ROOT_ID);
+      var card = r && r.querySelector ? r.querySelector('.nxmcard') : null;
+      if (!card || !card.querySelectorAll) return [];
+      var all = card.querySelectorAll('input, select, textarea, button, [href], [tabindex]');
+      var out = [];
+      for (var i = 0; i < all.length; i++){
+        var n = all[i];
+        if (n.hasAttribute && n.hasAttribute('disabled')) continue;
+        if (n.getAttribute && n.getAttribute('tabindex') === '-1') continue;
+        out.push(n);
+      }
+      return out;
+    }
+
+    function trapTab(ev){
+      var list = focusables();
+      if (!list.length) return;           // prazdna karta = niet co cyklit
+      var first = list[0];
+      var last = list[list.length - 1];
+      var at = document.activeElement;
+      if (ev.shiftKey){
+        if (at !== first && list.indexOf(at) >= 0) return;
+        ev.preventDefault();
+        try { last.focus(); } catch (e) { /* fokus nie je kriticky */ }
+        return;
+      }
+      if (at !== last && list.indexOf(at) >= 0) return;
+      ev.preventDefault();
+      try { first.focus(); } catch (e) { /* fokus nie je kriticky */ }
     }
 
     if (typeof document !== 'undefined'){
@@ -178,7 +249,21 @@
 
       document.addEventListener('keydown', function(ev){
         if (!OPEN) return;
-        if (ev.key === 'Escape'){ close(); return; }
+        if (ev.key === 'Escape'){
+          close();
+          // Escape SPOTREBUJE modal — okno za nim (Studio zatvara Escapom svoje
+          // rozbalovacie nastavenie hran) ho uz vidiet nesmie, inak by jedno
+          // stlacenie zavrelo OBOJE. `stopPropagation` by nestacilo: oba
+          // listenery visia na TOM ISTOM uzle (`document`) a ten ich nezastavi
+          // — musi to byt `stopImmediatePropagation`, ktore zastavi aj dalsich
+          // poslucháčov toho isteho uzla. Funguje to preto, ze `nx_modal.js` sa
+          // nacitava PRED `studio.js` (stráži guard test), takze jeho listener
+          // je v poradi prvy; podmienka `!nxModalOpen()` v Studiu ostava ako
+          // druha poistka pre pripad opacneho poradia.
+          if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+          return;
+        }
+        if (ev.key === 'Tab'){ trapTab(ev); return; }
         // Enter v poli = potvrdenie (vzor formulara). Do <select> nezasahuje —
         // tam Enter otvara/potvrdzuje vlastnu ponuku prehliadaca.
         if (ev.key !== 'Enter') return;
@@ -192,7 +277,8 @@
 
     var API = { ROOT_ID: ROOT_ID, modalHtml: modalHtml, fieldHtml: fieldHtml,
                 open: open, close: close, submit: submit,
-                isOpen: isOpen, values: values, spec: spec };
+                isOpen: isOpen, isBusy: isBusy, setBusy: setBusy,
+                values: values, spec: spec };
     global.NXModal = API;
     if (typeof module !== 'undefined' && module.exports) module.exports = API;
   })(typeof window !== 'undefined' ? window : globalThis);

@@ -5679,6 +5679,29 @@ module NoxunSuRunner
                   { 'attrs' => { 'popis' => 'SU modal položka', 'pocet' => '1', 'cena' => '12' } },
                   ->(m) { bs.custom_items(m) }, 'B2')
 
+      # DVOJITE ODOSLANIE (review #2). Zamok zije v KLIENTOVI (`nx_modal.js`),
+      # takze tu sa dokazuje to DRUHE: keby zlyhal, server by druhu mutaciu
+      # PRIJAL — polozka by v rozpocte bola dvakrat a Spat by ju vracalo na dva
+      # kroky. Simuluje sa presne to, co by fronta klienta poslala: ten isty
+      # zapis dvakrat za sebou, druhy uz s CERSTVOU generaciou.
+      custom_before = bs.custom_items(model).length
+      e::StudioDialog.do_budget(
+        st1c_bud_payload('custom_add',
+                         'attrs' => { 'popis' => 'SU dvojklik', 'pocet' => '1', 'cena' => '9' }).to_json
+      )
+      e::StudioDialog.do_budget(
+        st1c_bud_payload('custom_add',
+                         'attrs' => { 'popis' => 'SU dvojklik', 'pocet' => '1', 'cena' => '9' }).to_json
+      )
+      dup = bs.custom_items(model).count { |i| i.to_h['popis'].to_s == 'SU dvojklik' }
+      ok("ŠT-1c B2 (review #2): server dva ROVNAKE zápisy nezlučuje (#{dup}) — " \
+         'zámok proti dvojitému odoslaniu MUSÍ držať klient (nx_modal `OPEN.busy`)',
+         dup == 2)
+      Sketchup.undo
+      Sketchup.undo
+      ok('ŠT-1c B2: oba zápisy sa vrátili — každý bol vlastný krok Späť',
+         bs.custom_items(model).length == custom_before)
+
       scripts = st1c_capture(e::StudioDialog) do
         e::StudioDialog.do_budget(
           st1c_bud_payload('custom_add',

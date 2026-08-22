@@ -38,6 +38,7 @@ function mkNode(tag, attrs, owner){
     classList: { add(){}, remove(){}, toggle(){}, contains(){ return false; } },
     getAttribute(k){ return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; },
     setAttribute(k, v){ this.attrs[k] = String(v); },
+    removeAttribute(k){ delete this.attrs[k]; },
     hasAttribute(k){ return Object.prototype.hasOwnProperty.call(this.attrs, k); },
     get innerHTML(){ return this._html; },
     set innerHTML(v){ this._html = String(v == null ? '' : v); this.children = []; },
@@ -86,10 +87,20 @@ doc.body = mkNode('body', {}, doc);
   els[id] = mkNode('div', { id: id }, doc);
   doc.body.appendChild(els[id]);
 });
+// `stopImmediatePropagation` MUSI stub podporovat — presne na nom stoji
+// kontrakt „Escape patri modalu" (oba listenery visia na `document`, takze
+// bezny `stopPropagation` medzi nimi nefunguje).
 function fire(type, target, extra){
-  (listeners[type] || []).forEach(function(fn){
-    fn(Object.assign({ type: type, target: target, preventDefault(){}, stopPropagation(){} }, extra || {}));
-  });
+  const list = (listeners[type] || []).slice();
+  let stopped = false;
+  const ev = Object.assign({
+    type: type, target: target, preventDefault(){}, stopPropagation(){},
+    stopImmediatePropagation(){ stopped = true; }
+  }, extra || {});
+  for (let i = 0; i < list.length; i++){
+    list[i](ev);
+    if (stopped) break;
+  }
 }
 
 const sent = [];   // vsetko, co islo do Ruby
@@ -253,6 +264,43 @@ ok(body.indexOf('CP = Rozpočet') > -1, 'zeleny pas: ponuka sedi s rozpoctom');
   ok(sel.indexOf('<option value="rura" selected>Rúra</option>') > -1, 'predvolena moznost je oznacena');
 })();
 
+// --- 5b) review #1: varovny pas patri AJ do PONUKY ---------------------------
+// Export zakazníckeho dokumentu je od tejto davky JEDINE v tejto sekcii —
+// keby chipy ostali len v Rozpocte, dala by sa ponuka poslat zakaznikovi zo
+// starych cien bez toho, aby o tom okno cokolvek povedalo. Cisla su TIE ISTE
+// (`budWarnChips`), meni sa LEN ciel kliku.
+(function(){
+  const WARN = {
+    vat_divisor: 1.23,
+    totals: { total: 100, total_novat: 81.3, appliances_subtotal: 649, appliances_included: false },
+    stale: { stale_days: 30, counts: { stale: 3 },
+             items: [{ kind: 'sheet', id: 'S1', label: 'H3303', state: 'stale', age_days: 44 }] },
+    budget_check: [{ stable_key: 'budget|services|no_rate', section: 'services' }],
+    sections: [], cp_preview: CP
+  };
+  const chips = sandbox.budWarnChips(WARN);
+  eq(chips.length, 3, 'server hlasi tri druhy upozorneni (stare ceny, spotrebice, nalezy)');
+
+  const h = sandbox.budOfferHtml(WARN, 1.23);
+  ok(h.indexOf('3 ceny staršie ako 30 dní') > -1,
+     'review #1: chip starych cien je AJ v ponuke (inak by dokument isiel z neaktualnych cien)');
+  ok(h.indexOf('data-bud="to_budget" data-bkey="ostale"') > -1,
+     'a vedie do Rozpoctu — tam je „Prepočítať ceny" (Š15: v ponuke sa needituje)');
+  ok(h.indexOf('Spotrebiče') > -1 && h.indexOf('data-section="appliances"') > -1,
+     'chip spotrebicov vedie rovno na ICH sekciu Rozpoctu');
+  ok(h.indexOf('data-bud="ctrl" data-bkey="octrl"') > -1,
+     'rozpoctove upozornenia vedu do KONTROLY — to iste miesto ako z Rozpoctu');
+
+  // Ciste: ten isty chip v Rozpocte a v Ponuke nesie ROVNAKY TEXT (jedno cislo),
+  // lisi sa iba akciou.
+  const inBudget = sandbox.budChipHtml(chips[0], WARN, 1.23);
+  const inOffer = sandbox.budOfferChipHtml(chips[0], WARN, 1.23);
+  ok(inBudget.indexOf('3 ceny staršie ako 30 dní') > -1 &&
+     inOffer.indexOf('3 ceny staršie ako 30 dní') > -1, 'rovnaky text v oboch sekciach');
+  ok(inBudget.indexOf('data-bud="stale"') > -1 && inOffer.indexOf('data-bud="stale"') === -1,
+     'v Rozpocte chip rozbaluje zoznam, v ponuke tam VEDIE (zoznam tu nie je)');
+})();
+
 // --- 6) polia oboch instancii (drafty rozpoctu) ------------------------------
 (function(){
   // POZOR: pole zo sandboxu ma INY Array prototyp (vlastny vm kontext) —
@@ -276,62 +324,112 @@ ok(body.indexOf('CP = Rozpočet') > -1, 'zeleny pas: ponuka sedi s rozpoctom');
   doc.activeElement = trigger;
   // Prve pole musi vediet querySelector kotvy — stub ho vrati na poziadanie.
   const first = mkNode('input', { id: 'nxm_popis', 'data-nxm': 'popis' }, doc);
+  const submitNode = mkNode('button', { 'data-nxm-act': 'submit' }, doc);
   els.nxModalRoot.querySelector = function(sel){
-    return sel.indexOf('.mbody') === 0 ? first : null;
+    if (sel.indexOf('.mbody') === 0) return first;
+    if (sel.indexOf('[data-nxm-act="submit"]') === 0) return submitNode;
+    return null;
   };
   fire('click', trigger);
   ok(sandbox.NXModal.isOpen(), 'klik na „Pridať položku" otvoril D-15 modal');
   ok(els.nxModalRoot.innerHTML.indexOf('class="nxscrim"') > -1, 'kostra sa vykreslila do kotvy');
   ok(els.nxModalRoot.innerHTML.indexOf('Pridať položku rozpočtu') > -1, 's titulkom pridavacky');
   eq(doc.activeElement, first, 'fokus je v PRVOM poli (kontrakt D-15)');
-
-  // --- 8) KONTRAKT #9: Escape patri modalu, nie ecMenu ----------------------
   ok(sandbox.nxModalOpen(), 'Studio vidi, ze modal zije');
 
-  // --- 9) odoslanie: NEZATVARA, posiela mutaciu ------------------------------
+  // --- 8) review #2: DVOJITE odoslanie sa ZAHADZUJE -------------------------
+  // `sketchup.*` je asynchronne: druhy Enter by prvu mutaciu nepredbehol, ale
+  // padol by do fronty klienta a odosla sa AZ s cerstvou generaciou — server
+  // by ho PRIJAL a polozka by v rozpocte bola dvakrat (dva kroky Späť).
   sent.length = 0;
   first.value = 'Likvidácia';
-  const submitBtn = mkNode('button', { 'data-nxm-act': 'submit' }, doc);
-  // `values()` cita polia podla id — stub ich musi vediet nájsť.
   els.nxm_popis = first;
   const origGet = doc.getElementById;
   doc.getElementById = function(id){ return els[id] || null; };
+  const submitBtn = mkNode('button', { 'data-nxm-act': 'submit' }, doc);
   fire('click', submitBtn);
-  eq(sent.length, 1, 'odoslanie poslalo jednu mutaciu');
+  fire('click', submitBtn);                       // druhy klik hned za prvym
+  fire('keydown', first, { key: 'Enter' });       // a este Enter v poli
+  eq(sent.length, 1, 'review #2: tri pokusy = JEDNA mutacia (zamok drzi)');
   eq(sent[0][1].op, 'custom_add', 'a je to pridanie vlastnej polozky');
   eq(sent[0][1].attrs.popis, 'Likvidácia', 'so zadanym popisom');
+  ok(sandbox.NXModal.isBusy(), 'modal je po odoslani ZAMKNUTY');
+  ok(submitNode.hasAttribute('disabled'),
+     'a potvrdzovacie tlacidlo zosedlo — beziaci zapis musi byt vidno');
   ok(sandbox.NXModal.isOpen(),
      'audit #10: modal po odoslani ZOSTAVA otvoreny — caka na potvrdenie servera');
 
-  // --- 10) ODMIETNUTY zapis modal NEZATVARA ---------------------------------
+  // --- 9) ODMIETNUTY zapis: nezatvara, ale ODOMYKA --------------------------
   sandbox.NX.budgetResult('custom_add', false);
   ok(sandbox.NXModal.isOpen(),
      'audit #10: odmietnuty zapis necha modal otvoreny (hodnoty ostanu na mieste)');
   eq(els.nxm_popis.value, 'Likvidácia', 'a rozpisana hodnota sa nestratila');
+  ok(!sandbox.NXModal.isBusy(),
+     'review #2: zamok sa pusta AJ v neuspesnej vetve — inak by sa uz nedalo odoslat');
+  ok(!submitNode.hasAttribute('disabled'), 'tlacidlo ozilo');
 
-  // --- 11) POTVRDENY zapis modal zatvara a vracia fokus na spustac -----------
+  // Opravene cislo sa uz odoslat DA (dokaz, ze odomknutie nie je len priznak).
+  sent.length = 0;
+  sandbox.NX.setStudio(PAYLOAD); // uvolni frontu zapisov po odmietnutom kole
+  fire('click', submitBtn);
+  eq(sent.length, 1, 'po odomknuti sa opraveny zapis odosle');
+
+  // --- 10) POTVRDENY zapis modal zatvara a vracia fokus na spustac -----------
   sandbox.NX.budgetResult('custom_add', true);
   ok(!sandbox.NXModal.isOpen(), 'uspesny zapis modal zavrie');
   eq(els.nxModalRoot.innerHTML, '', 'a kotva ostane prazdna');
   eq(doc.activeElement, trigger, 'fokus sa vratil na spustac (kontrakt D-15)');
   doc.getElementById = origGet;
   delete els.nxm_popis;
+  sandbox.NX.setStudio(PAYLOAD);
 })();
 
-// --- 12) Escape a klik na scrim zatvaraju ------------------------------------
+// --- 11) review #3+#4: rozpisane hodnoty prezijú Escape ---------------------
+// Zatvorenie Escapom bolo dovtedy TICHA STRATA rozpisaneho riadku. Hodnoty sa
+// pamataju PER DRUH pridavacky a najblizsie otvorenie ich predvyplni; zmaze
+// ich az USPESNY zapis.
+(function(){
+  const origGet = doc.getElementById;
+  const popis = mkNode('input', { id: 'nxm_popis', 'data-nxm': 'popis' }, doc);
+  const pocet = mkNode('input', { id: 'nxm_pocet', 'data-nxm': 'pocet' }, doc);
+  const cena = mkNode('input', { id: 'nxm_cena', 'data-nxm': 'cena' }, doc);
+  els.nxm_popis = popis; els.nxm_pocet = pocet; els.nxm_cena = cena;
+  doc.getElementById = function(id){ return els[id] || null; };
+  els.nxModalRoot.querySelector = function(sel){ return sel.indexOf('.mbody') === 0 ? popis : null; };
+
+  eq(sandbox.budDraftMemory('custom'), null, 'na zaciatku pamat prazdna');
+  sandbox.budOpenDraft('custom');
+  popis.value = 'Rozpísaná položka'; pocet.value = '2'; cena.value = '30';
+  fire('click', mkNode('button', { 'data-nxm-act': 'submit' }, doc));
+  sandbox.NX.budgetResult('custom_add', false);   // server odmietol
+  sandbox.NX.setStudio(PAYLOAD);
+  fire('keydown', popis, { key: 'Escape' });      // pouzivatel okno zavrel
+  ok(!sandbox.NXModal.isOpen(), 'Escape modal zavrel');
+  eq(sandbox.budDraftMemory('custom').popis, 'Rozpísaná položka',
+     'review #3+#4: hodnoty prezili zatvorenie (uz to nie je ticha strata)');
+
+  sandbox.budOpenDraft('custom');
+  const fields = sandbox.budDraftFields('custom', sandbox.budDraftMemory('custom'));
+  eq(fields[0].value, 'Rozpísaná položka', 'a dalsie otvorenie ich PREDVYPLNI');
+  eq(fields[1].value, '2', 'vratane poctu');
+  // Pamat je PER DRUH — spotrebic o vlastnej polozke nevie.
+  eq(sandbox.budDraftMemory('appliance'), null, 'pamat spotrebica ostala prazdna');
+
+  // Uspesny zapis pamat zmaze — dalsie „Pridať položku" zacina od nuly.
+  sandbox.NX.budgetResult('custom_add', true);
+  eq(sandbox.budDraftMemory('custom'), null, 'uspesny zapis pamat zahodi');
+  doc.getElementById = origGet;
+  delete els.nxm_popis; delete els.nxm_pocet; delete els.nxm_cena;
+})();
+
+// --- 12) klik na scrim zatvara, klik do karty nie ---------------------------
 (function(){
   els.nxModalRoot.querySelector = function(){ return null; };
   sandbox.NXModal.open({ title: 'X', fields: [] });
-  ok(sandbox.NXModal.isOpen(), 'modal je otvoreny');
-  fire('keydown', mkNode('input', {}, doc), { key: 'Escape' });
-  ok(!sandbox.NXModal.isOpen(), 'Escape ho zavrel');
-
-  sandbox.NXModal.open({ title: 'X', fields: [] });
   const scrim = mkNode('div', { 'data-nxm-scrim': '1' }, doc);
   fire('click', scrim);
-  ok(!sandbox.NXModal.isOpen(), 'klik VEDLA karty (na scrim) ho tiez zavrel');
+  ok(!sandbox.NXModal.isOpen(), 'klik VEDLA karty (na scrim) modal zavrel');
 
-  // Klik DOVNUTRA karty ho zavriet NESMIE.
   sandbox.NXModal.open({ title: 'X', fields: [] });
   const card = mkNode('div', { class: 'nxmcard' }, doc);
   const inside = mkNode('div', {}, doc);
@@ -341,7 +439,77 @@ ok(body.indexOf('CP = Rozpočet') > -1, 'zeleny pas: ponuka sedi s rozpoctom');
   sandbox.NXModal.close();
 })();
 
-// --- 13) KONTRAKT #9: `#budPrModal` komponent NEPREBERA ----------------------
+// --- 13) review #10: Escape patri modalu — BEHAVIORALNE ---------------------
+// Oba listenery visia na `document`, takze o poradí rozhoduje poradie skriptov
+// (`nx_modal.js` pred `studio.js`). Keby modal Escape nespotreboval, jedno
+// stlacenie by zavrelo AJ rozbaľovacie nastavenie hrán v Štúdiu — a pouzivatel
+// by prisiel o nastavenie, ktoreho sa ani nedotkol.
+(function(){
+  els.nxModalRoot.querySelector = function(){ return null; };
+  sandbox.ecMenuOpen = true;
+  sandbox.NXModal.open({ title: 'X', fields: [] });
+  ok(sandbox.NXModal.isOpen() && sandbox.ecMenuOpen === true,
+     'vychodisko: otvorene OBOJE — modal aj nastavenie hran');
+
+  fire('keydown', mkNode('input', {}, doc), { key: 'Escape' });
+  ok(!sandbox.NXModal.isOpen(), 'prvy Escape zavrel MODAL');
+  eq(sandbox.ecMenuOpen, true,
+     'review #10: a nastavenie hran OSTALO otvorene (Escape spotreboval modal)');
+
+  fire('keydown', mkNode('input', {}, doc), { key: 'Escape' });
+  eq(sandbox.ecMenuOpen, false, 'az DRUHY Escape zavrel nastavenie hran');
+})();
+
+// --- 14) review #7: fokus zostava v karte (Tab cykli) -----------------------
+(function(){
+  const a = mkNode('input', { id: 'nxm_a' }, doc);
+  const b = mkNode('input', { id: 'nxm_b' }, doc);
+  const c = mkNode('button', { 'data-nxm-act': 'submit' }, doc);
+  const card = mkNode('div', { class: 'nxmcard' }, doc);
+  card.querySelectorAll = function(){ return [a, b, c]; };
+  els.nxModalRoot.querySelector = function(sel){ return sel === '.nxmcard' ? card : null; };
+  sandbox.NXModal.open({ title: 'X', fields: [] });
+
+  doc.activeElement = c;                                   // stojim na poslednom
+  let prevented = false;
+  fire('keydown', c, { key: 'Tab', shiftKey: false, preventDefault(){ prevented = true; } });
+  ok(prevented, 'Tab z posledneho prvku sa zachyti');
+  eq(doc.activeElement, a, 'a fokus skoci na PRVY prvok karty (necekne do okna za nou)');
+
+  prevented = false;
+  fire('keydown', a, { key: 'Tab', shiftKey: true, preventDefault(){ prevented = true; } });
+  ok(prevented, 'Shift+Tab z prveho prvku sa zachyti');
+  eq(doc.activeElement, c, 'a fokus skoci na POSLEDNY prvok karty');
+
+  // Tab UPROSTRED zoznamu komponent nechava tak — prehliadac to zvladne sam.
+  doc.activeElement = a;
+  prevented = false;
+  fire('keydown', a, { key: 'Tab', shiftKey: false, preventDefault(){ prevented = true; } });
+  ok(!prevented, 'Tab medzi polami sa nezachytava (prirodzene poradie ostava)');
+  sandbox.NXModal.close();
+  els.nxModalRoot.querySelector = function(){ return null; };
+})();
+
+// --- 15) review #8: zoznam „Zlúčené v zostave" si pamata rozbalenie ---------
+(function(){
+  const closed = sandbox.budCpMergedHtml(CP, 1.23);
+  ok(closed.indexOf('data-section="cp_merged"') > -1,
+     'zoznam nesie kluc stavu (inak by sa po kazdom prepnuti sam zabalil)');
+  ok(closed.indexOf('<details class="bcpmerged" data-section="cp_merged">') > -1,
+     'standardne ZBALENY — vertikalny priestor je vzacny');
+  // Po otvoreni pouzivatelom ostane otvoreny aj cez prekreslenie.
+  const details = mkNode('details', { class: 'bcpmerged', 'data-section': 'cp_merged' }, doc);
+  details.classList = { contains(cls){ return cls === 'bcpmerged'; } };
+  details.open = true;
+  fire('toggle', details);
+  ok(sandbox.budCpMergedHtml(CP, 1.23).indexOf('data-section="cp_merged" open>') > -1,
+     'review #8: po otvoreni ostava otvoreny — fokus na prepinaci „samostatne" ma kam sadnut');
+})();
+
+// --- 16) KONTRAKT #9: `#budPrModal` komponent NEPREBERA ---------------------
+// Toto su ZDROJOVE guardy (grep), nie behaviorálne scenáre: fázové okno riadi
+// server a jeho beh sa v Node stube simulovať nedá. Overuje sa presne to, čo
+// grep vie — že sa cesty nikde nepretínajú.
 (function(){
   const src = fs.readFileSync(path.join(JS_DIR, 'budget.js'), 'utf8');
   const pr = src.slice(src.indexOf('function budPrModalHtml'), src.indexOf('function budPrStart'));
@@ -354,10 +522,10 @@ ok(body.indexOf('CP = Rozpočet') > -1, 'zeleny pas: ponuka sedi s rozpoctom');
   ok(modalSrc.split('\n').filter(function(l){ return l.indexOf('budPrModal') > -1; })
        .every(function(l){ return l.trim().indexOf('//') === 0; }),
      'komponent sa `#budPrModal` nikde nedotyka (spomina ho len kontrakt v komentari)');
-  // Escape Studia je podmieneny — inak by jedno stlacenie zavrelo OBOJE.
+  // Druha poistka poradia listenerov (prva je behaviorálny scenár vyššie).
   const studioSrc = fs.readFileSync(path.join(JS_DIR, 'studio.js'), 'utf8');
   ok(studioSrc.indexOf("ev.key === 'Escape' && ecMenuOpen && !nxModalOpen()") > -1,
-     'Escape Studia bezi LEN ked nezije ziadny D-15 modal');
+     'Studio ma NAVYSE podmienku „ziadny modal otvoreny" (poistka pre opacne poradie skriptov)');
 })();
 
 console.log('test_st1c_ponuka.js: ' + n + ' OK');

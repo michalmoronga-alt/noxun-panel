@@ -28,12 +28,20 @@
   var BUD_OPEN = null;         // { sekcia -> otvorena? } — prezije re-render
   var BUD_STALE_OPEN = false;
   // ŠT-1c PR B2: rozpisany novy riadok uz nie je INLINE draft v tele sekcie —
-  // je to D-15 modal (`js/nx_modal.js`). Drzi sa LEN to, ktora „pridavacka" je
-  // otvorena ('custom' | 'appliance') a jej hodnoty: server moze zapis
-  // odmietnut a vtedy modal OSTAVA otvoreny s tym, co pouzivatel napisal
-  // (audit #10, povodne GH #138 P2).
+  // je to D-15 modal (`js/nx_modal.js`). `BUD_DRAFT` = ktora „pridavacka" je
+  // prave otvorena ('custom' | 'appliance').
   var BUD_DRAFT = null;
-  var BUD_DRAFT_VALUES = null;
+  // ROZPISANE HODNOTY PER DRUH (review #3+#4). Dva dovody, preco to nie je
+  // jednorazova premenna:
+  //   1. ODMIETNUTY ZAPIS (audit #10) — modal ostava otvoreny s tym, co
+  //      pouzivatel napisal, a opravuje sa JEDNO cislo;
+  //   2. ZATVORENIE Escapom alebo klikom vedla — dovtedy to bola TICHA STRATA
+  //      rozpisaneho riadku. Hodnoty prezijú v pamati a najblizsie otvorenie
+  //      TEJ ISTEJ pridavacky ich predvyplni; zmaze ich az USPESNY zapis
+  //      (`budCloseDraft`), lebo vtedy uz riadok v rozpocte naozaj je.
+  // Per DRUH preto, ze polia vlastnej polozky a spotrebica su ine — spolocna
+  // pamat by ich miesala.
+  var BUD_DRAFT_VALUES = { custom: null, appliance: null };
   var BUD_MODAL = null;        // { kind, id } — otvoreny ⋯ modal
   var BUD_FOCUS = null;        // obnova fokusu/hodnoty cez re-render
   // E-c „Prepočítať ceny": { phase:'confirm'|'run'|'report', pid, total, done,
@@ -169,8 +177,12 @@
     if (BUD_OPEN === null){
       // Predvolene otvorene sekcie = mock v4 (materiál, služby, štandardné
       // riadky, vlastné položky, spotrebiče); ABS a kovanie sú zbalené.
+      // `cp_merged` = zoznam „Zlúčené v zostave" v sekcii Ponuka. Standardne
+      // ZBALENY (vertikalny priestor), ale ked ho pouzivatel raz otvori, ostane
+      // otvoreny aj cez prekreslenia po prepnuti „samostatne" (review #8).
       BUD_OPEN = { materials: true, abs: false, hardware: false, services: true,
-                   standard_rows: true, custom: true, appliances: true };
+                   standard_rows: true, custom: true, appliances: true,
+                   cp_merged: false };
     }
     return BUD_OPEN[key] !== false;
   }
@@ -700,25 +712,38 @@
                        'a nezapočítaná suma svieti oranžovo hore.' }
   };
 
-  // Otvorenie modalu. Hodnoty su bud prazdne (novy zaznam), alebo tie, ktore
-  // server prave ODMIETOL (audit #10) — pouzivatel ich musi najst na mieste.
-  function budOpenDraft(kind, values){
+  // Zapamatane hodnoty tej istej pridavacky (null = este sa nic nepisalo).
+  function budDraftMemory(kind){
+    return BUD_DRAFT_VALUES[kind] || null;
+  }
+
+  // Otvorenie modalu. Polia sa predvyplnia tym, co v tejto pridavacke naposledy
+  // ostalo nedokoncene — ci uz preto, ze server zapis ODMIETOL (audit #10),
+  // alebo preto, ze pouzivatel okno zavrel Escapom (review #3+#4).
+  function budOpenDraft(kind){
     if (typeof window === 'undefined' || !window.NXModal) return;
     var meta = BUD_DRAFT_META[kind];
     if (!meta) return;
     BUD_DRAFT = kind;
-    BUD_DRAFT_VALUES = values || null;
     NXModal.open({
       title: meta.title, sub: meta.sub, note: meta.note, okLabel: 'Pridať',
-      fields: budDraftFields(kind, BUD_DRAFT_VALUES),
+      fields: budDraftFields(kind, budDraftMemory(kind)),
       onSubmit: function(v){ budDraftCommit(kind, v); }
     });
   }
 
+  // Zatvorenie PO USPESNOM zapise — riadok uz v rozpocte je, takze pamat
+  // rozpisanych hodnot sa zahadzuje (inak by sa pri dalsom „Pridať položku"
+  // predvyplnila polozka, ktora uz existuje).
   function budCloseDraft(){
+    if (BUD_DRAFT) BUD_DRAFT_VALUES[BUD_DRAFT] = null;
     BUD_DRAFT = null;
-    BUD_DRAFT_VALUES = null;
     if (typeof window !== 'undefined' && window.NXModal) NXModal.close();
+  }
+
+  // Odomknutie potvrdzovacieho tlacidla po odmietnutom zapise (review #2).
+  function budUnlockDraft(){
+    if (typeof window !== 'undefined' && window.NXModal) NXModal.setBusy(false);
   }
 
   function budRoundingHtml(sec, b, d){
@@ -785,9 +810,13 @@
   // to isté číslo na dvoch miestach by bolo mätúce; v akom režime sa práve
   // zobrazuje, priznáva `<small>` pri sume.
   function budOfferToolsHtml(){
+    // Popisok je ZAMERNE ten isty, aky mal v mockupe aj v lište Rozpočtu
+    // („Cenová ponuka (zákazník)") — je to to isté tlačidlo, len sa presťahovalo
+    // k dokumentu, ktorý vyrába; premenovať ho by znamenalo, že si používateľ
+    // hľadá nový ovládač namiesto známeho.
     return '<button type="button" class="primary" data-bud="cp" data-bkey="cp"' +
       ' title="Zákaznícky dokument: cenová tabuľka + špecifikácia (bez interných pojmov a kódov)">' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> XLSX ponuka</button>' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Cenová ponuka (zákazník)</button>' +
       // Prestavba skrinky z Inspectora sem sama nedorazí — bez „Obnoviť" by sa
       // dala poslať zákazníkovi ponuka zo starých rozmerov (rovnaký dôvod ako
       // v lište Kusovníka, Nákupu aj Rozpočtu; handler je zdieľaný `#refreshBtn`).
@@ -795,7 +824,10 @@
       ' title="Prepočítať ponuku z aktuálneho modelu">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Obnoviť</button>' +
       '<span class="spacer"></span>' +
-      '<span class="sechint">Sumy sa upravujú v Rozpočte — tu sa rozhoduje len o zaradení položiek.</span>';
+      // Text je doslovne z kontraktu UI 2.0 (Š14–Š15) — hovorí OBE veci naraz:
+      // odkiaľ suma je a že podhodnotenie nie je tiché.
+      '<span class="sechint">Súčet preberá z Rozpočtu — riadok bez ceny do ponuky ' +
+      'nevstúpi potichu.</span>';
   }
 
   function budDrawOfferTools(){
@@ -832,11 +864,19 @@
              '(bez rozpočtu nie je z čoho robiť ponuku).</div>';
     }
     var band = budCpBand(cp);
+    // Review #1: varovny pas patri AJ SEM. Export zakazníckeho dokumentu je od
+    // tejto davky JEDINE v tejto sekcii — keby tu chipy neboli, dala by sa
+    // ponuka poslat zakaznikovi zo starych cien alebo s nedoriesenymi nalezmi
+    // bez toho, aby o tom okno cokolvek povedalo. Su to TIE ISTE chipy ako
+    // v Rozpocte (`budWarnChips` = jedno miesto, jedno cislo) — lisia sa LEN
+    // klikom: v ponuke sa nic needituje, takze KAZDY vedie tam, kde sa to rieši.
     var h = '<div class="bsum">' +
       '<div><div class="blbl">Suma ponuky</div>' +
       '<div class="btotal">' + bEsc(budSub(cp.total, d)) +
       ' <small>' + (BUD_VAT ? 's DPH' : 'bez DPH') + ' · z Rozpočtu</small></div></div>' +
-      '<div class="bwarns">' + budOfferGuardHtml(band) + '</div></div>';
+      '<div class="bwarns">' + budOfferGuardHtml(band);
+    budWarnChips(b).forEach(function(c){ h += budOfferChipHtml(c, b, d); });
+    h += '</div></div>';
     h += '<div class="subhead">Položky dokumentu (rečou zákazníka)</div>';
     h += budCpTableHtml(cp, d);
     h += budCpMergedHtml(cp, d);
@@ -847,6 +887,31 @@
       '(hranica je ' + bEsc(budFmtEur(cp.threshold)) + '). Export je vždy s DPH (ceny sú konečné).</div>';
     h += budOfferWireHtml();
     return h;
+  }
+
+  // Chip varovného pásu v PONUKE. Text aj počty su tie iste, co v Rozpocte
+  // (`budWarnChips` — server ich sklada raz); ZMENENY je LEN cieľ kliku, lebo
+  // v ponuke sa needituje nic (Š15 „upravuj pri zdroji"):
+  //   · staré ceny  -> Rozpočet (tam je „Prepočítať ceny" aj zoznam riadkov),
+  //   · spotrebiče  -> Rozpočet, rovno na ich sekciu,
+  //   · upozornenia -> Kontrola (to isté miesto ako z Rozpočtu — jeden zoznam).
+  function budOfferChipHtml(c, b, d){
+    if (c.id === 'stale'){
+      return '<button type="button" class="bchip" data-bud="to_budget" data-bkey="ostale"' +
+        ' title="Staré ceny sa obnovujú v Rozpočte tlačidlom „Prepočítať ceny" —' +
+        ' ponuka by inak išla zákazníkovi z neaktuálnych cien.">' +
+        '<svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> ' + bEsc(c.text) + '</button>';
+    }
+    if (c.id === 'appl'){
+      var amt = bEsc(budFmtEur(budDisplay(c.amount, BUD_VAT, d)));
+      var txt = c.included ? ('Spotrebiče (' + amt + ') sú započítané v SPOLU')
+                           : ('Spotrebiče (' + amt + ') NIE SÚ v súčte — platia sa osobitne?');
+      return '<button type="button" class="bchip" data-bud="to_budget" data-section="appliances"' +
+        ' data-bkey="oappl" title="Prejdi na sekciu Spotrebiče v Rozpočte">' + txt + '</button>';
+    }
+    return '<button type="button" class="bchip" data-bud="ctrl" data-bkey="octrl"' +
+      ' title="Ten istý nález ako v Kontrole — klik prejde na jeho zoznam">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> ' + bEsc(c.text) + '</button>';
   }
 
   // Š15: podhodnotená ponuka NIE JE tichá — jantárový chip s preklikom do
@@ -911,10 +976,18 @@
 
   // Zbalene (vertikalny priestor!) — otvara sa len ked chce Michal nieco
   // vytiahnut zo zostavy. Zoznam pocita a zoradi server.
+  //
+  // Review #8: stav rozbalenia PREZIJE prekreslenie (`BUD_OPEN`, rovnako ako
+  // sekcie rozpoctu). Bez toho by sa zoznam po KAZDOM prepnuti „samostatne"
+  // sam zabalil — a fokus, ktory na prepinaci stal (`data-bkey="sep:…"`), by
+  // sa nemal kam vratit a spadol by na <body>. Prave tu sa pritom kliká
+  // najviac: polozka sa vytiahne zo zostavy a hned sa rieši dalšia.
   function budCpMergedHtml(cp, d){
     var merged = (cp.candidates || []).filter(function(c){ return c.state !== 'samostatne'; });
     if (!merged.length) return '';
-    var h = '<details class="bcpmerged"><summary>Zlúčené v zostave (' + merged.length + ')</summary>';
+    var open = budSectionOpen('cp_merged');
+    var h = '<details class="bcpmerged" data-section="cp_merged"' + (open ? ' open' : '') +
+      '><summary>Zlúčené v zostave (' + merged.length + ')</summary>';
     merged.forEach(function(c){
       h += '<div class="bcpmrow"><span>' + bEsc(c.label) +
         (c.overridden ? ' <span class="bfnt">· ručne v zostave</span>' : '') + '</span>' +
@@ -1278,6 +1351,11 @@
   function budAfterPush(){
     if (budBusyTimer){ clearTimeout(budBusyTimer); budBusyTimer = null; }
     BUD_BUSY = false;
+    // Poistka k zamku modalu (review #2): keby Ruby callback spadol EST PRED
+    // `budgetResult`, zostal by modal zosednuty navzdy. Cerstvy payload (alebo
+    // 6 s timer) je posledny bod, v ktorom sa to da odomknut. Pri normalnom
+    // behu je uz odomknute — `setBusy(false)` na odomknutom modale nic nerobi.
+    budUnlockDraft();
     if (!BUD_QUEUE.length) return;
     var next = BUD_QUEUE.shift();
     budSend(next[0], next[1]);
@@ -1318,9 +1396,11 @@
   // az POTVRDENIE zo servera (`NX.budgetResult(op, true)`).
   function budDraftCommit(kind, values){
     var attrs = budDraftAttrs(kind, values || {});
-    BUD_DRAFT_VALUES = attrs; // hodnoty su zapamatane PRED odoslanim
+    BUD_DRAFT_VALUES[kind] = attrs; // hodnoty su zapamatane PRED odoslanim
     var missing = budDraftMissing(kind, attrs);
-    if (missing){ NX.setStatus(missing, true); return; }
+    // Klientske odmietnutie (chyba povinne pole) — na server sa nic neposlalo,
+    // takze zamok treba pustit HNED, inak by okno ostalo zosednute navzdy.
+    if (missing){ NX.setStatus(missing, true); budUnlockDraft(); return; }
     budSend(kind === 'custom' ? 'custom_add' : 'appliance_add', { attrs: attrs });
   }
 
@@ -1378,7 +1458,12 @@
     // hladat a pisat znova.
     NX.budgetResult = function(op, ok){
       if (op !== 'custom_add' && op !== 'appliance_add') return;
+      // Review #2: zamok odoslania sa pusta v OBOCH vetvach. Pri uspechu to
+      // spravi uz `budCloseDraft` (zavrety modal zamok nema), pri odmietnuti
+      // musi tlacidlo ozit — inak by pouzivatel videl svoje hodnoty, ale
+      // nemohol ich znova odoslat.
       if (ok) budCloseDraft();
+      else budUnlockDraft();
     };
     // E-c: eventy prepočtu cien (start/progress/item/complete). Po `complete`
     // príde zo servera aj čerstvý payload — re-render odblokuje tlačidlo
@@ -1417,10 +1502,15 @@
         // ŠT-1c PR B2: Cenová ponuka je SEKCIA toho istého okna — len prepnutie.
         if (typeof studioGoSection === 'function') studioGoSection('offer');
       } else if (a === 'to_budget'){
-        // Š15 „upravuj pri zdroji": chýbajúcu cenu doplní Rozpočet, nie ponuka.
+        // Š15 „upravuj pri zdroji": ponuka sa needituje — každý jej chip vedie
+        // do Rozpočtu (voliteľne rovno na sekciu, ktorej sa nález týka).
+        // `studioGoSection` prekreslí okno SYNCHRÓNNE, takže `budGoto` už nájde
+        // rozbaľovacie sekcie rozpočtu v DOM.
         if (typeof studioGoSection === 'function') studioGoSection('budget');
+        var toSec = b.getAttribute('data-section');
+        if (toSec) budGoto(toSec);
       } else if (a === 'draft'){
-        budOpenDraft(b.getAttribute('data-kind'), null);
+        budOpenDraft(b.getAttribute('data-kind'));
       } else if (a === 'remove'){
         budSend(b.getAttribute('data-kind') === 'appliance' ? 'appliance_remove' : 'custom_remove',
                 { id: b.getAttribute('data-id') });
@@ -1500,10 +1590,15 @@
     });
 
     // Stav rozbalenia sekcii prezije prekreslenie (payload chodi po kazdom zapise).
+    // Stav rozbalenia si pamataju sekcie rozpoctu (`.bsec`) AJ zoznam
+    // zlucenych polozek ponuky (`.bcpmerged`, review #8) — obidve nesu
+    // `data-section` a obidve sa prekresluju po kazdom zapise.
     document.addEventListener('toggle', function(ev){
       var d = ev.target;
-      if (!d || !d.classList || !d.classList.contains('bsec')) return;
+      if (!d || !d.classList) return;
+      if (!d.classList.contains('bsec') && !d.classList.contains('bcpmerged')) return;
       var key = d.getAttribute('data-section');
+      if (!key) return;
       budSectionOpen(key); // prvy pristup inicializuje BUD_OPEN default mapou
       BUD_OPEN[key] = d.open;
     }, true);
@@ -1531,6 +1626,7 @@
       budCpTableHtml: budCpTableHtml, budCpMergedHtml: budCpMergedHtml,
       budCpSepHtml: budCpSepHtml, budCpLinkHtml: budCpLinkHtml,
       budOfferWireHtml: budOfferWireHtml, budDraftFields: budDraftFields,
+      budOfferChipHtml: budOfferChipHtml, budDraftMemory: budDraftMemory,
       // E-c „Prepočítať ceny"
       budPrTargets: budPrTargets, budPrEta: budPrEta, budPrConfirmText: budPrConfirmText,
       budPrEvent: budPrEvent, budPrSummary: budPrSummary, budPrSummaryText: budPrSummaryText,
