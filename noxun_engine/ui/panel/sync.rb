@@ -54,11 +54,11 @@ module Noxun
             front_profiles: FrontProfiles.options,
             # UI-B1 (audit A2): stav ABS kontroly hran pre ikonu v raile. PULL
             # pri otvoreni panela; dalsie zmeny chodia pushom (push_edge_check)
-            # z panela, z toolbaru aj z okna Vyroba. CISTE CITANIE.
+            # z panela, z toolbaru aj zo Studia. CISTE CITANIE.
             edge_check: edge_check_state,
             # K2/D-87: stav kontroly smeru kresby pre druhu funkcnu ikonu raily.
             # Ten isty vzor ako `edge_check` — PULL pri otvoreni panela, dalsie
-            # zmeny pushom (z raily aj z okna Vyroba). CISTE CITANIE.
+            # zmeny pushom (z raily aj zo Studia). CISTE CITANIE.
             grain_check: grain_check_state,
             # UI-B3 (koliesko): nastavenia POCITACA — rozmerove rady (N6) pre
             # ponuky pri rozmeroch a meno aktualnej temy pre prepinac vzhladu.
@@ -83,8 +83,8 @@ module Noxun
         end
 
         # Maly echo push stavu hran (bez prepoctu panela) — vzor
-        # ProductionDialog#push_edge_check. Vola ho Engine.broadcast_edge_check
-        # (klik z panela, z toolbaru aj z okna Vyroba) a EdgeCheck po prepocte.
+        # StudioDialog#push_edge_check. Vola ho Engine.broadcast_edge_check
+        # (klik z panela, z toolbaru aj zo Studia) a EdgeCheck po prepocte.
         def push_edge_check(state = nil)
           return unless dialog_alive?
 
@@ -96,7 +96,7 @@ module Noxun
 
         # v0.7.28: zatvorenie rohoveho 3-stavoveho nastavenia v raile. Vola ho
         # Engine.close_edge_menu, ked pouzivatel otvoril TO ISTE nastavenie
-        # v okne Vyroba — dve kopie tych istych prepinacov na obrazovke naraz
+        # v Studiu — dve kopie tych istych prepinacov na obrazovke naraz
         # by len mylili. Cisto zobrazovacie: ziadny stav, ziadny zapis.
         def close_edge_menu
           return unless dialog_alive?
@@ -118,8 +118,8 @@ module Noxun
           { 'available' => false, 'active' => false }
         end
 
-        # Protajsok ProductionDialog#push_grain_check. Vola ho
-        # Engine.broadcast_grain_check (klik z raily aj z okna Vyroba) a
+        # Protajsok StudioDialog#push_grain_check. Vola ho
+        # Engine.broadcast_grain_check (klik z raily aj zo Studia) a
         # GrainCheck po prepocte cache (prestavba pri zapnutej kresbe).
         def push_grain_check(state = nil)
           return unless dialog_alive?
@@ -130,7 +130,7 @@ module Noxun
           Engine.log_error(e, 'Panel.push_grain_check')
         end
 
-        # dedup: false = refresh po programovom selecte z okna Vyroba (V0.5 B,
+        # dedup: false = refresh po programovom selecte zo Studia (V0.5 B,
         # Codex B2) — vyber NESMIE mutovat model (dedup meni ID a stavia).
         #
         # D-103 (9.8.2026, ziva reprodukcia): sync vyberu uz dedup NEVYKONAVA, len si
@@ -185,7 +185,7 @@ module Noxun
         #   * prepnutie dokumentu vyzeralo pre panel ako ECHO push tej istej
         #     identity (kontext by ostal na starom mieste namiesto resetu),
         #   * oneskoreny callback (krizik dosky, ABS prepinac) trafil CUDZI
-        #     dokument. Zrkadlo ProductionDialog#model_guid.
+        #     dokument. Zrkadlo ProductionCore#model_guid.
         def model_guid(model = nil)
           m = model || Sketchup.active_model
           m && m.respond_to?(:guid) ? m.guid.to_s : ''
@@ -347,7 +347,7 @@ module Noxun
           Engine.log_error(e, 'Panel.js')
         end
 
-        # V0.5 B: relay handshake okna Vyroba potrebuje vediet, ci panel zije.
+        # V0.5 B: relay handshake satelitnych okien potrebuje vediet, ci panel zije.
         def dialog_alive?
           !!(@dialog && @dialog.visible?)
         end

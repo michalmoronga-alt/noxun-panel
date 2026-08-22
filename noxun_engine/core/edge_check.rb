@@ -509,7 +509,7 @@ module Noxun
       # Prepnutie/otvorenie ineho dokumentu: stav sa NEPRENASA ticho — zvyraznenie
       # patri modelu, v ktorom bolo zapnute (vzor notifikacii dialogov).
       # Prepnutie dokumentu: overlay patril STAREMU modelu, takze sa vypina.
-      # Codex #168 P2: vypnutie musia dostat aj OKNA — inak by okno Vyroba aj
+      # Codex #168 P2: vypnutie musia dostat aj OKNA — inak by Studio aj
       # rail Inspectora dalej tvrdili „zapnute" nad novym dokumentom a dalsi
       # klik by zvyraznenie zapol namiesto vypnutia.
       def on_model_changed(model)
@@ -748,7 +748,8 @@ module Noxun
 
       # ================= STAV PRE OKNO =========================================
 
-      # Tvar pre okno Vyroba. Cisla su VYHRADNE zo servera (JS si nic neprepocitava).
+      # Tvar pre listu sekcie Kontrola v Studiu. Cisla su VYHRADNE zo servera
+      # (JS si nic neprepocitava).
       def ui_state(model = nil)
         m = model || active_model
         on = active?(m)

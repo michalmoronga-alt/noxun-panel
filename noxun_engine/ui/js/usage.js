@@ -32,11 +32,11 @@
                     // K2/D-87: `rail:kresba` = kontrola smeru kresby. Vlastny
                     // kluc vedla `rail:abs` — merac povie, ktoru z dvoch
                     // kontrol Michal naozaj zapina (a ci sa zapina z raily,
-                    // alebo len z okna Vyroba).
+                    // alebo len zo Studia).
                     // v0.7.28: `rail:abs-nastavenie` = rohovy trojuholnik pri ABS
                     // kontrole (3-stavove nastavenie). Vlastny kluc vedla
                     // `rail:abs` — merac povie, ci sa stavy olepu naozaj
-                    // prestavuju z panela, alebo len z okna Vyroba.
+                    // prestavuju z panela, alebo len zo Studia.
                     'rail:zrusit', 'rail:abs', 'rail:abs-nastavenie', 'rail:kresba',
                     'rail:nastavenia', 'rail:studio',
                     'pv:kamera', 'pv:fit',

@@ -47,7 +47,7 @@
 # ============================ CO SA NEDEJE ====================================
 # ZIADNA mutacia modelu: kreslenie ide cez Sketchup::Overlay (SU 2023+) NAD
 # modelom — ziadna operacia, ziadny undo krok, nic sa neuklada do .skp. Sken je
-# READ-ONLY (ziadny dedup tik). Po vypnuti aj po zatvoreni okna Vyroba v modeli
+# READ-ONLY (ziadny dedup tik). Po vypnuti aj po zatvoreni Studia v modeli
 # neostane NIC.
 #
 # ============================ ROZSAH ==========================================
@@ -83,9 +83,9 @@ module Noxun
 
       # Prepinac je vec POCITACA, nie zakazky — zije v %APPDATA%, NIKDY v .skp
       # (vzor EdgeCheck D-105). Pamata sa, aby sa kontrola smeru nemusela
-      # zapinat pri kazdom otvoreni okna Vyroba.
+      # zapinat pri kazdom otvoreni Studia.
       #
-      # VSTUPNE BODY su DVA (od v0.7.27): prepinac „Smer kresby" v okne Vyroba
+      # VSTUPNE BODY su DVA (od v0.7.27): prepinac „Smer kresby" v Studiu
       # a tlacidlo „Kontrola kresby" v raile Inspectora. Oba idu tou istou
       # cestou `Engine.toggle_grain_check` a citaju ten isty `ui_state` —
       # ZIADNY druhy kanal a ziadna vlastna kopia stavu (vzor ABS kontroly).
@@ -361,7 +361,7 @@ module Noxun
         ui_state(nil)
       end
 
-      # Obnovenie zapamataneho stavu pri otvoreni okna Vyroba. Prepinac je vec
+      # Obnovenie zapamataneho stavu pri otvoreni Studia. Prepinac je vec
       # POCITACA — zakazka o nom nevie. Zapamatany stav sa NEPREPISUJE (nie je
       # to pouzivatelov klik), takze zlyhanie obnovy nastavenie nezrusi.
       def restore!(model)
@@ -385,7 +385,7 @@ module Noxun
         Engine.log_error(e, 'GrainCheck.on_model_changed')
       end
 
-      # Stav dostanu VSETKY okna, ktore prepinac zobrazuju — okno Vyroba aj rail
+      # Stav dostanu VSETKY okna, ktore prepinac zobrazuju — Studio aj rail
       # Inspectora (jeden zdroj stavu, dva vstupne body).
       def notify_state_changed
         Engine.broadcast_grain_check(ui_state(active_model))
@@ -517,7 +517,7 @@ module Noxun
 
       # ================= STAV PRE OKNO =========================================
 
-      # Tvar pre okno Vyroba. Cisla su VYHRADNE zo servera (JS si nic
+      # Tvar pre listu sekcie Kontrola v Studiu. Cisla su VYHRADNE zo servera (JS si nic
       # neprepocitava) a nesmu byt stare — pri oznacenej cache sa prepocitaju TU.
       def ui_state(model = nil)
         m = model || active_model
@@ -534,7 +534,7 @@ module Noxun
         { 'available' => false, 'active' => false }
       end
 
-      # Po prepocte (draw po prestavbe): okno Vyroba dostane cerstve cisla.
+      # Po prepocte (draw po prestavbe): Studio dostane cerstve cisla.
       # Burst eventov sa zluci do JEDNEHO pushu (timer + pending guard).
       def notify_count_changed
         return if @notify_pending

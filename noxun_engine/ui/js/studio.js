@@ -68,7 +68,7 @@
       // Š11: pri Kontrole visia ZIVE pocty RED/ORANGE z posledneho pushu.
       { id: 'ctrl',   ic: 'clipboard-check', t: 'Kontrola', badge: true },
       // ŠT-1c PR A (Š7): Nákup kovania je od tejto dávky SEKCIA — presun tabu
-      // Kovanie okna Výroba 1:1, bez redizajnu (ten príde s blokom KOVANIE).
+      // Kovanie zo zaniknutého okna Výroba 1:1, bez redizajnu (ten príde s blokom KOVANIE).
       { id: 'buy',    ic: 'cart',            t: 'Nákup kovania' },
       // ŠT-1c PR B1 (Š12): Rozpočet je od tejto dávky SEKCIA — JEDINÁ, ktorá
       // zapisuje do modelu (1 zmena = 1 krok Späť).
@@ -641,7 +641,7 @@
       if (chk) chk.checked = v.merge_18_36 !== false;
     },
     // Š10: malé echo pushe stavu prepínačov (prepnutie odkiaľkoľvek — rail,
-    // toto okno, okno Výroba — aj prepočet po prestavbe). Prekreslí sa LEN
+    // toto okno aj rail Inspectora — aj prepočet po prestavbe). Prekreslí sa LEN
     // lišta sekcie, zoznam nálezov sa nedotkne.
     setEdgeCheck: function(state){
       EDGE = state || null;
@@ -1151,7 +1151,7 @@
   }
 
   // Otvorenie/zatvorenie nastavenia je CISTO klientska vec (nikam sa neukladá).
-  // Otvorenie tu zavrie tú istú kópiu v raile Inspectora aj v okne Výroba —
+  // Otvorenie tu zavrie tú istú kópiu v raile Inspectora —
   // Ruby to len prepošle (žiadny stav, žiadny zápis).
   function edgeMenuToggle(){
     ecMenuOpen = !ecMenuOpen;

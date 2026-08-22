@@ -25,8 +25,6 @@ UID3_BOOT_JS    = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 
 UID3_ACTIONS_JS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'actions.js'), encoding: 'UTF-8')
 UID3_SHELL_JS   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'shell.js'), encoding: 'UTF-8')
 UID3_PART_JS    = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'part_card.js'), encoding: 'UTF-8')
-UID3_PROD_JS    = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'production.js'), encoding: 'UTF-8')
-UID3_PROD_RB    = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_dialog.rb'), encoding: 'UTF-8')
 UID3_PANEL_RB   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.rb'), encoding: 'UTF-8')
 UID3_RESOLV_RB  = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'resolvers.rb'), encoding: 'UTF-8')
 UID3_SEL_RB     = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'selection.rb'), encoding: 'UTF-8')
@@ -205,42 +203,31 @@ NxTest.test('UI-D3: statusy vyberu nesu podstatne meno podla povodu kliku') do
                 'veta o Kovani uz nie je natvrdo v statuse — sklada ju povod kliku')
 end
 
-# --- 4) deep-link do okna Vyroba --------------------------------------------
+# --- 4) deep-link: uz LEN do sekcii Studia ----------------------------------
 
-NxTest.test('UI-D3: whitelist tabov je na strane RUBY a JS je jeho ZRKADLO') do
-  rb = Noxun::Engine::ProductionDialog::TABS
-  js = UID3_SHELL_JS[/var STUDIO_TABS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  # ST-1a: `rows`/`sheets`/`edging` ZANIKLI — kusovnik a supisy platni a ABS su
-  # sekciou Kusovnik okna Studio. ŠT-1b: to iste sa stalo tabu `control`.
-  # Whitelist ich preto uz nesmie poznat, inak by deep-link otvoril tab, ktory
-  # v okne neexistuje.
-  # ŠT-1c PR A: a tabu `hardware` (sekcia `buy` Studia); PR B1 POSLEDNEMU tabu
-  # `budget` (sekcia `budget`). Zoznam je PRAZDNY — deep-link do okna Vyroba
-  # uz nema kam mierit a `studioTab` vracia vzdy nil.
-  NxTest.assert_equal([], rb, 'whitelist tabov je prazdny (okno nema ziadny tab)')
-  NxTest.assert_equal(rb, js, 'JS mirror sa nesmie rozist s Ruby autoritou')
-  NxTest.assert(UID3_PANEL_RB.include?('ProductionDialog.show(open_tab: studio_tab_of(p))'),
-                'panel posiela iba meno tabu — filtruje ho server')
-  NxTest.assert(UID3_RESOLV_RB.include?('def studio_tab_of'),
-                'prazdny payload (rail Štúdio, stary panel) sa tolerantne mapuje na nil')
+NxTest.test('ŠT-1c PR B3: deep-link na TAB zanikol spolu s oknom Vyroba') do
+  # ST-1a odviedla taby `rows`/`sheets`/`edging` do sekcie Kusovnik, ŠT-1b tab
+  # `control`, ŠT-1c PR A tab `hardware` a PR B1 posledny tab `budget`. PR B3
+  # zmazala okno aj CELU mechaniku deep-linku na tab (Ruby whitelist, JS mirror
+  # aj tolerantny resolver panela).
+  NxTest.refute(defined?(Noxun::Engine::ProductionDialog), 'modul okna uz neexistuje')
+  NxTest.refute(UID3_SHELL_JS.include?('STUDIO_TABS'), 'JS mirror tabov je PREC')
+  NxTest.refute(UID3_SHELL_JS.include?('function studioLink'), 'a s nim skladanie payloadu')
+  NxTest.refute(UID3_PANEL_RB.include?('open_tab:'), 'panel uz ziadny tab neposiela')
+  NxTest.refute(UID3_RESOLV_RB.include?('def studio_tab_of'),
+                'a mrtvy resolver tabu zanikol tiez')
 end
 
-NxTest.test('UI-D3: deep-link sa spotrebuje PRAVE RAZ') do
-  body = UID3_PROD_RB[/def consume_pending_tab.*?\n        end\n/m].to_s
-  NxTest.assert(!body.empty?, 'spotreba ma vlastnu funkciu')
-  NxTest.assert(body.include?('@pending_tab = nil'),
-                'bez vynulovania by kazdy refresh vratil pouzivatela na stary tab')
-  NxTest.assert(body.include?('TABS.include?'), 'aj pri spotrebe plati whitelist')
-  NxTest.assert(UID3_PROD_RB.include?('open_tab: consume_pending_tab'),
-                'tab cestuje v tom istom pushi ako data (okno po `show` este nemusi mat HTML)')
-  # ŠT-1c PR B1: JS strana deep-linku ZANIKLA spolu s poslednym tabom — okno
-  # nema co prepinat. Deep-link ZIJE, ale do SEKCII okna Studio.
-  NxTest.refute(UID3_PROD_JS.include?('setProdTab('),
-                'okno Vyroba uz taby neprepina (ziadne nema)')
+NxTest.test('UI-D3: deep-link sa spotrebuje PRAVE RAZ (uz len sekcia Studia)') do
   studio_rb = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog.rb'),
                         encoding: 'UTF-8')
+  body = studio_rb[/def consume_pending_section.*?\n        end\n/m].to_s
+  NxTest.assert(!body.empty?, 'spotreba ma vlastnu funkciu')
+  NxTest.assert(body.include?('@pending_section = nil'),
+                'bez vynulovania by kazdy refresh vratil pouzivatela na staru sekciu')
+  NxTest.assert(body.include?('SECTIONS.include?'), 'aj pri spotrebe plati whitelist')
   NxTest.assert(studio_rb.include?('open_section: consume_pending_section'),
-                'deep-link zije v okne Studio — a sekciu tiez spotrebuje PRAVE RAZ')
+                'sekcia cestuje v tom istom pushi ako data (okno po `show` este nemusi mat HTML)')
 end
 
 # --- 5) klikatelne je LEN to, co niekam vedie -------------------------------

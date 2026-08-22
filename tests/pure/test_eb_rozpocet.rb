@@ -316,10 +316,17 @@ NxTest.test('nastavenia: patch prejde a revizia sa posunie (baseline guard fungu
   NxTest.refute(r1 == ss.revision(sup), 'po zapise musi byt revizia ina')
 end
 
-NxTest.test('production_dialog: relay XLSX rozpoctu je public (vola ho panel.rb)') do
-  require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_dialog') if NxTest.headless?
-  pd = Noxun::Engine::ProductionDialog
+NxTest.test('studio_dialog: relay XLSX rozpoctu je public (vola ho panel.rb)') do
+  # ŠT-1c PR B3: relay viedol do okna Vyroba — to zaniklo, rozpocet je sekcia
+  # `budget` okna ŠTUDIO a telo mutacii aj exportu zije v `ProductionCore`.
+  if NxTest.headless?
+    require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core')
+    require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog')
+  end
   %i[do_budget_xlsx do_budget].each do |m|
-    NxTest.assert(pd.respond_to?(m), "ProductionDialog.#{m} musi byt PUBLIC (relay z panel.rb / callback)")
+    NxTest.assert(Noxun::Engine::StudioDialog.respond_to?(m),
+                  "StudioDialog.#{m} musi byt PUBLIC (relay z panel.rb / callback)")
+    NxTest.assert(Noxun::Engine::ProductionCore.respond_to?(m),
+                  "ProductionCore.#{m} musi byt PUBLIC (vola ho obal okna)")
   end
 end

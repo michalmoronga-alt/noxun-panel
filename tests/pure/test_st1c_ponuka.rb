@@ -191,10 +191,9 @@ end
 # headless odsimulovať nedá (`Panel` je HtmlDialog vrstva a `Panel.js` by v nej
 # nemalo kam písať), takže sa kontroluje TVAR kódu: že obe okná parsujú payload
 # tolerantne. Skutočné prevolanie oboch vetiev robí in-SketchUp sekcia.
-NxTest.test('ŠT-1c B2 (review #7 a #9): XLSX handlery OBOCH okien maju Hash-tolerantny TVAR') do
-  prod_rb = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_dialog.rb'),
-                      encoding: 'UTF-8')
-  [['studio_dialog.rb', S1C2_STUDIO_RB], ['production_dialog.rb', prod_rb]].each do |(name, src)|
+NxTest.test('ŠT-1c B2 (review #7 a #9): XLSX handlery maju Hash-tolerantny TVAR') do
+  # ŠT-1c PR B3: druhym oknom bola Vyroba — zanikla, ostal JEDEN handler.
+  [['studio_dialog.rb', S1C2_STUDIO_RB]].each do |(name, src)|
     %w[handle_budget_xlsx handle_cp_xlsx].each do |m|
       body = src[/def #{m}\(payload\).*?\n        end\n/m].to_s
       NxTest.refute(body.empty?, "#{name}: #{m} sa nasiel")

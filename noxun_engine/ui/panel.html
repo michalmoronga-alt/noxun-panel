@@ -12,7 +12,7 @@
      Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
      bezpecne zdielatelny so satelitnymi oknami. -->
 <script>document.documentElement.className = 'nx-inspector';</script>
-<link rel="stylesheet" href="css/panel.css?v=0.7.38">
+<link rel="stylesheet" href="css/panel.css?v=0.7.39">
 
 <!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
      Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
@@ -36,12 +36,12 @@
   </div>
   <div class="raildiv"></div>
   <!-- A2: ABS kontrola hran = FUNKCNY prepinac (to iste EdgeCheck API ako
-       toolbar a okno Vyroba). Ziadny zapis do modelu (lekcia D-103).
+       toolbar a Studio). Ziadny zapis do modelu (lekcia D-103).
        v0.7.28 (kontrakt UI 2.0 „shell so stavom a sipkou"): tlacidlo ma v
        pravom dolnom rohu maly PLNY TROJUHOLNIK (vzor flyoutu nastrojov
        SketchUp/Photoshop) = „tu je este nastavenie". Klik na ikonu = doterajsi
        toggle (nemeni sa), klik na ROH = 3-stavove nastavenie kontroly hran —
-       TO ISTE, ktore ma okno Vyroba pod chevronom (zdielany js/edge_menu.js).
+       TO ISTE, ktore ma lista sekcie Kontrola v Studiu (zdielany js/edge_menu.js).
        Roh je SAMOSTATNE <button> vedla prepinaca (vnorene tlacidlo je neplatne
        HTML — lekcia krizika docasnej polozky) a jeho klikacia zona je cely
        pravy dolny KVADRANT, nie 6 px trojuholnika. -->
@@ -51,7 +51,7 @@
     <div class="ecmenu ecmenu-rail" id="railAbsMenu"></div>
   </div>
   <!-- K2/D-87: KONTROLA KRESBY = druhy funkcny prepinac (to iste GrainCheck API
-       ako prepinac „Smer kresby" v okne Vyroba — jeden zdroj stavu, dva vstupne
+       ako prepinac „Smer kresby" v Studiu — jeden zdroj stavu, dva vstupne
        body). Jednoduchy toggle bez sipky: nie je co nastavovat. Ziadny zapis do
        modelu — kresli sa OVERLAY nad nim (lekcia D-103). -->
   <button type="button" id="railKresba" data-nx-usage="rail:kresba" class="railbtn fn" onclick="onGrainCheckToggle()" aria-pressed="false" aria-label="Kontrola kresby"><svg class="ic" aria-hidden="true"><use href="#i-grain"/></svg><span class="railtip" id="railKresbaTip">Kontrola smeru kresby (zapnúť/vypnúť)</span></button>
@@ -227,7 +227,7 @@
           <div class="inforow" id="infIntDepth" title="Svetlá hĺbka vnútra (mm)"><span>Vnút. hĺbka</span><b id="av_depth">—</b></div>
           <div class="inforow" title="Úložná výška vnútra (mm)"><span>Úložná výška</span><b id="av_height">—</b></div>
           <button type="button" class="inforow click" id="infParts" onclick="onInfoParts()" data-nx-usage="info:dielce" title="Klik = označí výrobné dielce tejto skrinky v modeli"><span>Dielcov</span><b id="inf_parts">—</b></button>
-          <button type="button" class="inforow click" id="infArea" onclick="onInfoArea()" data-nx-usage="info:material" title="Klik = otvorí Kusovník (okno Výroba); filter na jednu skrinku pribudne v Štúdiu"><span>Materiál</span><b id="inf_area">—</b></button>
+          <button type="button" class="inforow click" id="infArea" onclick="onInfoArea()" data-nx-usage="info:material" title="Klik = otvorí ŠTÚDIO → Kusovník, zúžený na túto skrinku"><span>Materiál</span><b id="inf_area">—</b></button>
           <div class="inforow" id="infWeight" title="Hmotnosť príde s kovaním (fáza 3) — podklad pre výklopy"><span>Hmotnosť</span><b>—</b></div>
         </div>
       </div>
@@ -819,38 +819,38 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.7.38"></script>
+<script src="js/errors.js?v=0.7.39"></script>
 <!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
      jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
      pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
-<script src="js/win_fit.js?v=0.7.38"></script>
-<script src="js/icons.js?v=0.7.38"></script>
+<script src="js/win_fit.js?v=0.7.39"></script>
+<script src="js/icons.js?v=0.7.39"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.7.38"></script>
+<script src="js/nx_combo.js?v=0.7.39"></script>
 <!-- v0.7.28: ZDIELANE 3-stavove nastavenie kontroly hran (rohovy trojuholnik pri
-     ABS kontrole v raile). TEN ISTY subor nacitava aj okno Vyroba — jeden markup,
+     ABS kontrole v raile). TEN ISTY subor nacitava aj okno Studio — jeden markup,
      jeden stav. Musi byt PRED shell.js (rohove okno kresli NXEdgeMenu). -->
-<script src="js/edge_menu.js?v=0.7.38"></script>
-<script src="js/core.js?v=0.7.38"></script>
-<script src="js/expr.js?v=0.7.38"></script>
-<script src="js/insert_state.js?v=0.7.38"></script>
-<script src="js/form.js?v=0.7.38"></script>
-<script src="js/zone_tree.js?v=0.7.38"></script>
-<script src="js/preview.js?v=0.7.38"></script>
+<script src="js/edge_menu.js?v=0.7.39"></script>
+<script src="js/core.js?v=0.7.39"></script>
+<script src="js/expr.js?v=0.7.39"></script>
+<script src="js/insert_state.js?v=0.7.39"></script>
+<script src="js/form.js?v=0.7.39"></script>
+<script src="js/zone_tree.js?v=0.7.39"></script>
+<script src="js/preview.js?v=0.7.39"></script>
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
-<script src="js/shell.js?v=0.7.38"></script>
-<script src="js/actions.js?v=0.7.38"></script>
+<script src="js/shell.js?v=0.7.39"></script>
+<script src="js/actions.js?v=0.7.39"></script>
 <!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
      bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
-<script src="js/settings.js?v=0.7.38"></script>
-<script src="js/bridge.js?v=0.7.38"></script>
-<script src="js/materials.js?v=0.7.38"></script>
-<script src="js/part_card.js?v=0.7.38"></script>
-<script src="js/board_card.js?v=0.7.38"></script>
-<script src="js/hardware.js?v=0.7.38"></script>
-<script src="js/usage.js?v=0.7.38"></script>
-<script src="js/boot.js?v=0.7.38"></script>
+<script src="js/settings.js?v=0.7.39"></script>
+<script src="js/bridge.js?v=0.7.39"></script>
+<script src="js/materials.js?v=0.7.39"></script>
+<script src="js/part_card.js?v=0.7.39"></script>
+<script src="js/board_card.js?v=0.7.39"></script>
+<script src="js/hardware.js?v=0.7.39"></script>
+<script src="js/usage.js?v=0.7.39"></script>
+<script src="js/boot.js?v=0.7.39"></script>

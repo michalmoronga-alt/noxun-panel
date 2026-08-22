@@ -92,13 +92,13 @@ module Noxun
 
         # UI-B1 (audit A2): ABS kontrola hran z raily Inspectora. Prepnutie robi
         # ZDIELANA Engine.toggle_edge_check — presne tá istá cesta ako toolbar
-        # (UI-02) aj okno Vyroba (D-105), takze sa spravanie nemoze rozist a
+        # (UI-02) aj lista sekcie Kontrola v Studiu (D-105), takze sa spravanie nemoze rozist a
         # novy stav dostanu vsetky otvorene okna naraz.
         # ZIADNY zapis do modelu, ziadna operacia, ziadny undo krok — EdgeCheck
         # je overlay NAD modelom (lekcia D-103).
         # IDENTITY GUARD DOKUMENTU (Codex #168 P2, 2. kolo): callback HtmlDialogu
         # je asynchronny — ak pouzivatel medzitym prepol dokument, prepinac by
-        # zapol overlay v CUDZOM modeli. Rovnaky guard ma D-105 v okne Vyroba.
+        # zapol overlay v CUDZOM modeli. Rovnaky guard ma D-105 v Štúdiu.
         def handle_edge_toggle(payload = nil)
           model = Sketchup.active_model
           unless defined?(EdgeCheck) && EdgeCheck.available?(model)
@@ -110,7 +110,7 @@ module Noxun
           # preskoc". `nx_edge_toggle` je NOVY callback bez starsich klientov,
           # takze prazdna hodnota nie je spatna kompatibilita, ale diera: klik
           # z okna, ktoremu este nedosiel NX.init, by prepol PRAVE AKTIVNY model.
-          # Rovnaky tvar guardu ma ProductionDialog#edge_check_guard.
+          # Rovnaky tvar guardu ma ProductionCore#edge_check_guard.
           unless (payload ? parse(payload)['model_guid'].to_s : '') == model_guid(model)
             push_edge_check
             return set_status('Model sa medzitým prepol — stav obnovený, klikni znova.', true)
@@ -133,8 +133,8 @@ module Noxun
 
         # v0.7.28: 3-STAVOVE NASTAVENIE z rohu ABS tlacidla (chýba podľa pravidla /
         # mimo pravidla / olepené + „len vybrané"). NIE JE to druhe nastavenie:
-        # zapisuje sa TOU ISTOU zdielanou cestou ako chevron v okne Vyroba
-        # (Engine.set_edge_check_option), takze obe okna citaju jeden stav
+        # zapisuje sa TOU ISTOU zdielanou cestou ako roh v liste sekcie
+        # Kontrola v Štúdiu (Engine.set_edge_check_option), takze obe okna citaju jeden stav
         # z %APPDATA% a novy stav aj s poctami dostanu naraz.
         # Do modelu sa NEZAPISUJE nic — ziadna operacia, ziadny krok Spat.
         # Guardy su rovnake ako pri prepinaci: dostupnost Overlay API + PRISNA
@@ -168,11 +168,13 @@ module Noxun
 
         # Potvrdenie sklada TA ISTA metoda ako v ostatnych oknach — nazvy stavov
         # maju jediny zdroj (`ProductionCore::EDGE_OPTION_LABELS`), rail si ich
-        # nevymysla ani nekopiruje. Zaloha je len pre pripad, ze okno Vyroba
-        # (tenky obal nad jadrom) este nie je nacitane.
+        # nevymysla ani nekopiruje.
+        # ŠT-1c PR B3: text sa berie PRIAMO zo zdielaneho jadra. Doteraz sa
+        # pytal okna Vyroba (tenky obal nad tym istym jadrom) — okno zaniklo,
+        # jadro ostava. Zaloha je len pre pripad, ze jadro este nie je nacitane.
         def edge_option_status(key, value)
-          if defined?(ProductionDialog) && ProductionDialog.respond_to?(:edge_check_option_status)
-            return ProductionDialog.edge_check_option_status(key, value)
+          if defined?(ProductionCore) && ProductionCore.respond_to?(:edge_check_option_status)
+            return ProductionCore.edge_check_option_status(key, value)
           end
 
           "#{key}: #{value ? 'zapnuté' : 'vypnuté'}."
@@ -180,7 +182,7 @@ module Noxun
 
         # K2/D-87: KONTROLA KRESBY z raily Inspectora. Presna kopia vzoru ABS
         # kontroly vyssie — prepnutie robi ZDIELANA Engine.toggle_grain_check,
-        # teda ta ista cesta, akou prepina okno Vyroba (tab KONTROLA). Overlay
+        # teda ta ista cesta, akou prepina sekcia Kontrola v Štúdiu. Overlay
         # sa kresli NAD modelom: ziadny zapis, ziadna operacia, ziadny undo krok.
         # IDENTITY GUARD DOKUMENTU: callback HtmlDialogu je asynchronny — bez
         # neho by klik po prepnuti dokumentu zapol kresbu v CUDZOM modeli.
@@ -203,8 +205,8 @@ module Noxun
         end
 
         # Kratke potvrdenie do statusu panela. Podrobny rozpis (dielce bez
-        # kresby, nenakreslitelne) nesie lista v okne Vyroba — rail je len
-        # prepinac.
+        # kresby, nenakreslitelne) nesie lista sekcie Kontrola v okne ŠTÚDIO —
+        # rail je len prepinac.
         def grain_toggle_status(state)
           st = state.is_a?(Hash) ? state : {}
           return 'Kontrola kresby vypnutá — v modeli nič neostalo.' unless st['active']
@@ -214,8 +216,16 @@ module Noxun
             '(materiál bez smeru sa nekreslí).'
         end
 
-        # 1 dielec / 2–4 dielce / 5+ dielcov (zrkadlo ProductionDialog#grain_part_plural).
+        # 1 dielec / 2–4 dielce / 5+ dielcov.
+        # ŠT-1c PR B3: tvar slova sklada ZDIELANE jadro (`ProductionCore`) —
+        # doteraz tu bola vlastna kopia toho isteho pravidla a druhy vypis
+        # („zrkadlo" okna Vyroba) sa mohol casom rozist. Zaloha (nenacitane
+        # jadro) drzi povodne pravidlo, aby rail nikdy nepadol na texte.
         def grain_part_word(n)
+          if defined?(ProductionCore) && ProductionCore.respond_to?(:grain_part_plural)
+            return ProductionCore.grain_part_plural(n)
+          end
+
           v = n.abs
           return 'dielec' if v == 1
           return 'dielce' if v >= 2 && v <= 4

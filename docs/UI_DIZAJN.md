@@ -63,14 +63,14 @@ natvrdo hex. Nedefinovaný token = zahodená vlastnosť (skontroluj preklepy).
 | `--nx-surface-sunken` | `#eceff1` | status, ghost tlačidlo, disabled, zámky |
 | `--nx-surface-readonly` | `#f4f6f8` | readonly input |
 | `--nx-surface-preview` | `#fafcff` | pozadie 2D náhľadu |
-| `--nx-surface-th` | `#f5f7f8` | hlavička tabuľky (okno Výroba) |
+| `--nx-surface-th` | `#f5f7f8` | hlavička tabuľky (Štúdio) |
 | `--nx-part-bg` | `#f2fafb` | karta dielca (bledý teal — patrí do výberovej rodiny) |
 
 ### Text / ink
 | Token | Hex | Použitie |
 |---|---|---|
 | `--nx-ink` | `#263238` | základný text |
-| `--nx-ink-title` | `#1b3a4b` | `h1` (okno Výroba) |
+| `--nx-ink-title` | `#1b3a4b` | `h1` (satelitné okná) |
 | `--nx-ink-strong` | `#37474f` | nadpisy, legendy |
 | `--nx-ink-label` | `#455a64` | labely polí |
 | `--nx-ink-muted` | `#607d8b` | sekundárny text |
@@ -131,7 +131,7 @@ natvrdo hex. Nedefinovaný token = zahodená vlastnosť (skontroluj preklepy).
 | `--nx-warnrow-fg` | `#7a5000` | text riadku upozornenia |
 | `--nx-warnrow-border` | `#ffe0b2` | rozdeľovník upozornení |
 | `--nx-modalwarn-fg` | `#8d5a00` | text upozornenia v modale |
-| `--nx-wbadge-fg` | `#4e2e00` | text badge (okno Výroba) |
+| `--nx-wbadge-fg` | `#4e2e00` | text badge (Štúdio) |
 
 ### ABS hrany (vlastné tokeny — oddelené od stavov)
 | Token | Hex | Použitie |
@@ -264,7 +264,7 @@ tlačidla — D-105), `link`, `search`, `arrow-left`, `trash`,
 `refresh-cw` (Aktualizovať z Demosu — detail dekoru),
 `cloud-download` (Pridať z Demosu; aj badge väzby na dlaždici — D-56),
 `external-link` (Otvoriť u dodávateľa — riadok variantu, D-60),
-`arrow-left-right` (Nahradiť UNI… — riadok KONTROLY v okne Výroba, D-83),
+`arrow-left-right` (Nahradiť UNI… — riadok KONTROLY v Štúdiu, D-83),
 `more-horizontal` (⋯ ďalšie údaje riadku rozpočtu — kód/adresa/poznámka, E-b),
 `download` (⬇ export súboru — XLSX rozpočet, E-b),
 `profile` (vlastný symbol — úchytkový profil v riadku čela, D-90),
@@ -291,7 +291,7 @@ cez `data-rot` v CSS — nikdy štyri ikony),
 `grain` (K2/D-87 — kontrola smeru kresby: dielec naležato so **šrafovaním**,
 teda miniatúra toho, čo overlay kreslí v modeli; čiary nedobiehajú k hrane
 rovnako ako v `core/grain_check.rb`. **Jedna kresba pre obe miesta** — rail
-Inspectora aj prepínač „Smer kresby" v okne Výroba).
+Inspectora aj prepínač „Smer kresby" v lište sekcie Kontrola v Štúdiu).
 
 > **Inventár je úplný k v0.7.28** (blok UI-D uzavretý, `grain` doplnený dávkou
 > „Kontrola kresby v raile"; dávka „ABS 3-stav v raile" **žiadnu ikonu
@@ -301,11 +301,12 @@ Inspectora aj prepínač „Smer kresby" v okne Výroba).
 > warnpanelu je ten istý `eye` ako „Označiť v modeli" v karte dielca (rovnaký
 > význam = rovnaká kresba).
 
-> Okno **Výroba** načítava `icons.js` od v0.5.44 (predtým sprite nemalo) — nové
+> Okno **Štúdio** načítava `icons.js` (okno Výroba ho malo od v0.5.44, kým
+> v ŠT-1c PR B3 nezaniklo) — nové
 > ovládacie prvky v ňom používajú sprite, nie glyfy.
 
-### E-b: tab Rozpočet (okno Výroba)
-Jediný tab okna Výroba, ktorý model **mení** (dáta rozpočtu v `NOXUN` dict na
+### E-b: Rozpočet (od ŠT-1c PR B1 sekcia Štúdia)
+Jediná sekcia, ktorá model **mení** (dáta rozpočtu v `NOXUN` dict na
 modeli). Vzory:
 - **Sekcie = `<details>`** s medzisúčtom v hlavičke; stav rozbalenia prežije
   prekreslenie (payload chodí po každom zápise).
@@ -351,7 +352,7 @@ materiálu sa serverový text vedome NEPOUŽIJE (patrí starému materiálu) a u
 neutrálne „(podľa pravidla)". Farby pásov ostávajú na ABS tokenoch `--nx-abs-*`
 (semaforové `--nx-state-*` sa sem nemiešajú).
 
-### D-105: split tlačidlo „Zvýrazniť hrany" (okno Výroba → KONTROLA)
+### D-105: tlačidlo „Zvýrazniť hrany" s rohom (Štúdio → KONTROLA)
 
 > **Od v0.7.28 je rozbaľovacie okno ZDIEĽANÝ komponent** (`ui/js/edge_menu.js` +
 > štýly `.ecmenu`/`.ecopt`/`.ecsw*` v `panel.css`): to isté nastavenie otvára aj
@@ -447,8 +448,8 @@ Toolbar „Noxun Engine" je **jediné miesto, kde značka vystupuje mimo panela*
 | Tlačidlo | Ikona | Správanie |
 |---|---|---|
 | Inspector | `noxun_logo.svg` (zrolovaná značka) | prepínač — otvorí panel, druhý klik ho zavrie |
-| Štúdio | `noxun_studio.svg` (layers) | dočasne otvára okno Výroba (tooltip to priznáva) |
-| ABS kontrola hrán | `noxun_abs.svg` (shell) | prepínač zvýraznenia olepu (to isté ako D-105 v okne Výroba) |
+| Štúdio | `noxun_studio.svg` (layers) | otvára ŠTÚDIO — jediné okno výstupov zákazky |
+| ABS kontrola hrán | `noxun_abs.svg` (shell) | prepínač zvýraznenia olepu (to isté ako D-105 v Štúdiu) |
 | Vložiť skrinku | `noxun_insert.svg` (skrinka + plus) | otvorí panel vo vkladacom režime (zhodí výber) |
 
 Pravidlá ikon toolbaru (líšia sa od spritu v paneli):
@@ -487,11 +488,11 @@ sektoroch**. Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html
   → pod oddeľovačom **dočasná položka** (označený dielec / doska, prerušovaný
   rámik + krížik) → **funkčná sekcia** (ABS kontrola hrán **s rohovým flyoutom** —
   klik na ikonu prepína zvýraznenie, klik na pravý dolný roh otvorí **3-stavové
-  nastavenie**, to isté, aké má okno Výroba (vzor §5.11); pod ňou **Kontrola
+  nastavenie**, to isté, aké má Štúdio (vzor §5.11); pod ňou **Kontrola
   kresby** — obyčajný toggle bez šípky, nie je čo nastavovať) → dole **koliesko**
   (Nastavenia Inspectora) a **Štúdio**. Aktívny kontext je teal, funkčné ikony sú
   tlmené a rozsvietia sa až po zapnutí. **Funkčný prepínač, ktorý má druhý domov
-  (okno Výroba), NIKDY nemá druhý stav:** rail aj okno volajú tú istú serverovú
+  (Štúdio), NIKDY nemá druhý stav:** rail aj okno volajú tú istú serverovú
   cestu a zobrazujú ten istý stav, takže zapnutie na jednom mieste je hneď vidieť
   na druhom (ABS kontrola aj Kontrola kresby) — **to isté platí pre ich
   nastavenia**: 3-stavové okno je jeden zdieľaný komponent nad jedným stavom. Rail je úzky, preto názov nesie **bublina
@@ -636,7 +637,7 @@ Sektor **Základné** je rozdelený na **vstupy vľavo a dopočítané údaje vp
 - **Klik na informačný údaj, ktorý mení výber, má flush handshake:** rozpísaná
   úprava sa najprv odošle a **červené pole akciu zastaví** — inak by ju
   serverový push prepísal a úprava by ticho zmizla (rovnako ako „Vložiť kópiu"
-  a exporty okna Výroba).
+  a exporty Štúdia).
 - **Skupiny v Nastaveniach majú ikony** (N3b) — ikona ukazuje **dielec, o ktorom
   skupina hovorí** (Strop · Dno · Boky · Chrbát) a rozsvieti sa s otvorenou
   skupinou. Ostatné kontexty ikony dostanú s blokom UI-C.
@@ -776,11 +777,11 @@ Vizuálna referencia: `SYSTEM/zdroje/ui20/mockup_inspector_c.html` (`s4Zones`).
   nemusí na nič pamätať; nezabudni len pridať jeho `data-nx-usage` kľúče do
   allowlistu (`USAGE_KEYS`), inak sa počítajú pod generickým kľúčom.
 - **Deep-link namiesto „nájdi si to sám" (UI-D3):** informačný údaj, ktorý na
-  niečo ukazuje, otvára cieľ **rovno na správnom mieste** — ⚠ panel na tabe
-  KONTROLA, „Materiál" na tabe Kusovník. Kým Štúdio neexistuje, je cieľom okno
-  Výroba a **hovorí sa to nahlas** (tooltip aj status). Čo cieľ **nevie**, sa
-  nepredstiera: kusovník nemá filter na jednu skrinku, takže sa nevymýšľa — len
-  sa povie, že vidno celú zákazku a filter príde so Štúdiom.
+  niečo ukazuje, otvára cieľ **rovno na správnom mieste** — ⚠ panel na sekcii
+  KONTROLA, „Materiál" na sekcii Kusovník. Od ŠT-1c je cieľom vždy **ŠTÚDIO**
+  (okno Výroba zaniklo) a sľub „filter na jednu skrinku" sa splnil — ID skrinky
+  ide ako kotva, ktorá predvyplní hľadanie sekcie, a status to povie nahlas aj
+  s tým, ako sa zúženie zruší.
 - **Veľkosť okna pri otvorení (D-77):** žiadne okno sa nesmie otvoriť odseknuté.
   `width`/`height` v `HtmlDialog.new` platia len pri PRVOM otvorení (potom
   rozhoduje veľkosť zapamätaná pod `preferences_key`), preto každé okno deklaruje
@@ -1026,7 +1027,6 @@ v `HtmlDialog.new` sú **vonkajšie** — obsah + rámik okna (Windows ≈ 16 px
 |---|---|---|---|
 | **Inspector** (`panel.html`) | 470 × 810 | 486 × 850 | 486 × 600 |
 | **Štúdio** (`studio.html`) | 1060 × 640 | 1076 × 680 | 1076 × 520 |
-| Výroba (`production.html`) | podľa deklarácie v HTML | — | — |
 | Materiály (`proj_materials.html`) | podľa deklarácie v HTML | 720 × 640 | — |
 | ostatné satelity | podľa deklarácie v HTML | — | — |
 
@@ -1038,7 +1038,8 @@ v `HtmlDialog.new` sú **vonkajšie** — obsah + rámik okna (Windows ≈ 16 px
 > **ŠT-1c PR B1 hodnotu preverila na najširšej tabuľke rozpočtu** (Spotrebiče:
 > typ · názov · dodávateľ · cena · stĺpec akcií · medzisúčet, teda editovateľné
 > bunky aj akcie vpravo): telo sekcie má pri 1060 px ≈ 828 px, čo je viac než
-> šírka, na ktorej tá istá tabuľka žila v okne Výroba (obsah 640 px) aj než
+> šírka, na ktorej tá istá tabuľka žila v (dnes zaniknutom) okne Výroba
+> (obsah 640 px) aj než
 > minimum mockupu (`#stageStudio` 900 px vrátane navigácie). **Hodnota sa preto
 > NEMENÍ** — zdvihnúť ju kvôli sekcii, ktorá sa zmestí, by len zbytočne
 > zväčšilo okno na malých obrazovkách.
@@ -1056,7 +1057,7 @@ v `HtmlDialog.new` sú **vonkajšie** — obsah + rámik okna (Windows ≈ 16 px
   ovládač vyzerá ako chyba implementácie, priznaný ovládač ako plán.
 - **Výstup sa nikdy netvári ako vstup.** Údaj, ktorý sa edituje inde, je
   v ostatných oknách TEXT (názov projektu: input v Štúdiu → Kusovník,
-  text v hlavičke okna Výroba).
+  text v lište Kusovníka v Štúdiu).
 - **Voľba zobrazenia je vec POČÍTAČA, nie zákazky.** Voliteľné stĺpce,
   zbalené skupiny a zbalená navigácia žijú v `localStorage` (nikdy v `.skp`
   a nikdy v `%APPDATA%` — nie je to nastavenie pluginu, len tohto okna).

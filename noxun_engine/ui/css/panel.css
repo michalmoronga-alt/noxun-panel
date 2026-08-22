@@ -8,11 +8,11 @@
     --nx-surface-sunken:#eceff1;   /* status, ghost, disabled, zamky */
     --nx-surface-readonly:#f4f6f8; /* readonly input */
     --nx-surface-preview:#fafcff;  /* pozadie 2D nahladu */
-    --nx-surface-th:#f5f7f8;       /* hlavicka tabulky (okno Vyroba) */
+    --nx-surface-th:#f5f7f8;       /* hlavicka tabulky (okno Studio) */
     --nx-part-bg:#f2fafb;          /* karta dielca (bledy teal) */
     /* text / ink */
     --nx-ink:#263238;              /* zakladny text */
-    --nx-ink-title:#1b3a4b;        /* h1 (okno Vyroba) */
+    --nx-ink-title:#1b3a4b;        /* h1 (satelitne okna) */
     --nx-ink-strong:#37474f;       /* nadpisy, legendy */
     --nx-ink-label:#455a64;        /* labely poli */
     --nx-ink-muted:#607d8b;        /* sekundarny text */
@@ -617,13 +617,13 @@
   .hwprice { align-items: center; }
   .hwtoggle .ic { transition: transform 0.12s ease; }
   .hwtoggle.hwopen .ic { transform: rotate(90deg); }
-  /* ===== V0.5 B: okno Vyroba (kusovnik/supisy) ===== */
+  /* ===== V0.5 B: kusovnik/supisy (od ŠT-1a sekcie okna Studio) ===== */
   .prodhead { display: flex; align-items: center; gap: 10px; }
   .prodhead h1 { margin: 0; }
   .prodhead .sub { flex: 1; }
   .prodsum { background: var(--nx-surface-sunken); border: 1px solid var(--nx-border); border-radius: 6px;
              padding: 7px 10px; font-size: 12.5px; margin: 8px 0; color: var(--nx-ink-strong); }
-  /* Codex GH #66 P2: .pvtabs pravidla POUZIVA aj okno Vyroba (production.html
+  /* Codex GH #66 P2: .pvtabs pravidla POUZIVA aj okno Studio (studio.html
      ma <div class="pvtabs prodtabs">) — panel ich po presune tabov do hlavicky
      uz nepotrebuje, ale zdielane CSS ich musi drzat pre produkcne taby. */
   .pvtabs { display: flex; gap: 6px; margin: 2px 0 6px; }
@@ -641,7 +641,7 @@
             font-size: 11px; font-weight: 600; }
 
   /* ===== D-105: ZDIELANE 3-STAVOVE NASTAVENIE KONTROLY HRAN ================
-     JEDNO nastavenie, DVA vstupne body — chevron v okne Vyroba (tab KONTROLA)
+     JEDNO nastavenie, DVA vstupne body — roh v liste sekcie KONTROLA v Studiu
      a rohovy trojuholnik pri ABS kontrole v raile Inspectora (v0.7.28). Markup
      kresli zdielany js/edge_menu.js, preto su tieto pravidla ZAMERNE
      NESCOPNUTE (`.nx-inspector` by ich pred oknom Vyroba schoval). Pozicovanie
@@ -669,12 +669,12 @@
 
   /* --- ŠT-1b (audit #7): SPUSTACE oboch prepinacov -------------------------
      „Zvýrazniť hrany" a „Smer kresby" ziju od tejto davky v liste sekcie
-     KONTROLA okna Studio (predtym v tabe Kontrola okna Vyroba). Styly su
+     KONTROLA okna Studio (predtym v tabe Kontrola zaniknuteho okna Vyroba). Styly su
      preto TU, v zdielanom panel.css, a ZAMERNE NESCOPNUTE — kopia v HTML okna
      by bola druha pravda o tom, ako prepinac vyzera.
      VEDOMA ODCHYLKA od auditu #7: presunute su `.ecbtn` a `.gcbtn`; `.ecbar`
      a `.ecsplit` (kontajner riadku a geometria split tlacidla) sa NEPRESUNULI,
-     ale ZANIKLI — lista okna Vyroba sa maze cela (audit #9) a v Studiu ma
+     ale ZANIKLI — lista zaniknuteho okna Vyroba sa zmazala cela (audit #9) a v Studiu ma
      spustac tvar ROHOVEHO TROJUHOLNIKA (audit #15, mockup), takze by to bolo
      mrtve CSS v zdielanom subore. */
   .ecbtn, .gcbtn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
@@ -1218,7 +1218,7 @@
                     color: var(--nx-warnchip-fg); cursor: pointer; line-height: 0; }
   .warnpanel .wgo:hover { color: var(--nx-select); }
   .warnpanel .wgo .ic { width: 14px; height: 14px; }
-  /* Deep-link do okna Vyroba (tab KONTROLA) — jedna cesta „von" na plnu sirku. */
+  /* Deep-link do Studia (sekcia KONTROLA) — jedna cesta „von" na plnu sirku. */
   .warnpanel .wgoto { flex: 0 0 auto; display: block; width: 100%; margin-top: 4px; padding: 5px;
                       border: 0; border-top: 1px solid var(--nx-warnrow-border);
                       background: none; font: inherit; font-size: 11.5px;
@@ -1246,7 +1246,7 @@
   /* D-19: dvojica poli formatu platne v editore materialov */
   .row input.sheetdim { flex: 1 1 0; min-width: 0; }
   .row .sheetx { flex: 0 0 auto; color: var(--nx-ink-faint); padding: 0 2px; }
-  /* ST-1a: `.vepobar` (VEPO lista okna Vyroba) ZANIKLA — export aj nazov
+  /* ST-1a: `.vepobar` (VEPO lista zaniknuteho okna Vyroba) ZANIKLA — export aj nazov
      projektu ziju v liste sekcie Kusovnik v okne Studio (`ui/studio.html`,
      vlastne styly ako kazdy satelit). */
   /* ===== D-23: sync riadok <-> celo (hover trieda 'hov' na oboch stranach).
@@ -1388,7 +1388,7 @@
 .hwbanner { background: var(--nx-warn-bg); border: 1px solid var(--nx-warnchip-border);
             color: var(--nx-warn-fg); border-radius: 6px; padding: 6px 10px; margin: 6px 0; font-size: 12px; }
 .hwsetrow .hwsetsel { flex: 1 1 auto; min-width: 120px; font-size: 11.5px; }
-/* D-93: znamienko rucneho zasahu pri pocte (okno Vyroba) — drobna ikona
+/* D-93: znamienko rucneho zasahu pri pocte (sekcia Nakup Studia) — drobna ikona
    s tooltipom zo servera, jantarova ako ostatne override znaky. */
 .hwmanual { color: var(--nx-warnchip-fg); display: inline-flex; vertical-align: -2px; }
 .hwmanual .ic { width: 13px; height: 13px; }

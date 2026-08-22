@@ -660,8 +660,15 @@ NxTest.test('katalog: cp_nazov sa uklada, patchuje a da sa vymazat') do
   NxTest.assert(err.to_s.include?('Obchodný názov'))
 end
 
-NxTest.test('production_dialog: relay cenovej ponuky je public (vola ho panel.rb)') do
-  require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_dialog') if NxTest.headless?
-  NxTest.assert(Noxun::Engine::ProductionDialog.respond_to?(:do_cp_xlsx),
-                'ProductionDialog.do_cp_xlsx musi byt PUBLIC (relay z panel.rb)')
+NxTest.test('studio_dialog: relay cenovej ponuky je public (vola ho panel.rb)') do
+  # ŠT-1c PR B3: relay viedol do okna Vyroba — to zaniklo, cenova ponuka je
+  # sekcia `offer` okna ŠTUDIO a telo exportu zije v `ProductionCore`.
+  if NxTest.headless?
+    require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core')
+    require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog')
+  end
+  NxTest.assert(Noxun::Engine::StudioDialog.respond_to?(:do_cp_xlsx),
+                'StudioDialog.do_cp_xlsx musi byt PUBLIC (relay z panel.rb)')
+  NxTest.assert(Noxun::Engine::ProductionCore.respond_to?(:do_cp_xlsx),
+                'a telo zije v zdielanom jadre')
 end

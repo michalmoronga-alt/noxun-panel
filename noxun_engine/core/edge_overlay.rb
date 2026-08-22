@@ -6,7 +6,7 @@
 #
 # Cely subor je pod guardom `defined?(Sketchup::Overlay)` — Overlay API prislo v
 # SketchUp 2023. Na starsom SketchUpe (a v headless testoch) trieda vobec
-# nevznikne a EdgeCheck.available? vrati false; okno Vyroba to povie vetou,
+# nevznikne a EdgeCheck.available? vrati false; Studio to povie vetou,
 # zvysok pluginu bezi nezmeneny.
 module Noxun
   module Engine

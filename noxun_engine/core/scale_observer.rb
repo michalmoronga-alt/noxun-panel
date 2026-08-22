@@ -585,7 +585,8 @@ module Noxun
           GrainCheck.on_model_changed(model) if defined?(GrainCheck)
           RulesDialog.on_model_changed(model) if defined?(RulesDialog)
           MaterialsDialog.on_model_changed(model) if defined?(MaterialsDialog)
-          ProductionDialog.on_model_changed(model) if defined?(ProductionDialog) # V0.5 B (nova generacia dat)
+          # ŠT-1c PR B3: okno Vyroba tu ZANIKLO — jedine okno s vlastnym
+          # generacnym tokenom nad cislami zakazky je Studio.
           # ST-1a: okno Studio ma VLASTNY generacny token — bez tohto riadku by
           # po prepnuti dokumentu drzalo cisla starej zakazky a jeho klik by
           # mieril do modelu, ktory uz nie je aktivny.

@@ -1,9 +1,10 @@
 # frozen_string_literal: true
-# Noxun Engine — ST-1a PR A: ZDIELANE CISTE JADRO okna Vyroba (a od davky
+# Noxun Engine — ST-1a PR A: ZDIELANE CISTE JADRO vystupov zakazky (povodne
+# okna Vyroba, a od davky
 # ST-1a aj okna Studio).
 #
 # Preco vlastny modul: kusovnik, supisy platni/ABS a VEPO export sa stahuju
-# z okna Vyroba do noveho okna Studio. Obe okna musia citat TIE ISTE cisla —
+# z okna Vyroba do noveho okna Studio. Vsetci klienti musia citat TIE ISTE cisla —
 # dve kopie tych istych pomocnikov by sa casom rozisli (a rozdiel by sa
 # prejavil az na vyrobnom vystupe).
 #
@@ -12,7 +13,8 @@
 # cista funkcia alebo citanie katalogu/modelu: rovnaky vstup = rovnaky vystup,
 # ziadny zapis do modelu, ziadny undo krok.
 #
-# `ProductionDialog` si ponechava TENKE OBALY s povodnymi menami a signaturami
+# ŠT-1c PR B3: okno Vyroba (`ui/production_dialog.rb`), ktore si tieto mena
+# ponechavalo ako TENKE OBALY, ZANIKLO — jadro je jedina autorita
 # (vratane privatnosti) — panel, pure testy aj in-SketchUp runner tieto metody
 # volaju presne takto a refactor sa ich nesmie dotknut.
 module Noxun
@@ -151,7 +153,7 @@ module Noxun
 
       # --- ST-1a: nazov projektu je SERVEROVA autorita (audit #1) -----------
       #
-      # Do ST-1a zil nazov projektu v INPUTE okna Vyroba a kazdy export si ho
+      # Do ST-1a zil nazov projektu v INPUTE zaniknuteho okna Vyroba a kazdy export si ho
       # bral z DOM (`data['project']`). Odkedy su okna DVE, je to pasca: kto
       # prepise nazov v Studiu, exportuje z Vyroby pod inym menom (a naopak) —
       # dva vystupy tej istej zakazky by sa volali rozne.
@@ -636,7 +638,7 @@ module Noxun
 
       # --- ŠT-1c: CSV nakupneho zoznamu kovania (Š7) ------------------------
       #
-      # Telo sa sem prestahovalo z okna Vyroba spolu s tabom Kovanie (sekcia
+      # Telo sa sem prestahovalo zo zaniknuteho okna Vyroba spolu s tabom Kovanie (sekcia
       # `buy` v Studiu). Poradie je vzor VEPO exportu: gen guard -> flush guard
       # -> CERSTVY zber modelu -> vyber suboru -> zapis.
       #
@@ -761,7 +763,7 @@ module Noxun
       # warnings PRAVE OZNACENEJ skrinky, nie kontrola celej zakazky. Inspector
       # sem len VEDIE (deep-link „Otvoriť v Štúdiu → Kontrola").
       #
-      # `budget` je HOTOVY payload rozpoctu (okno Vyroba ho aj tak pocita pre
+      # `budget` je HOTOVY payload rozpoctu (Studio ho aj tak pocita pre
       # svoj tab, tak ho odovzda a nepocita sa dvakrat); nil = rozpocet sa
       # nepodaril zostavit a jeho ORANGE do zoznamu nepribudnu.
       def control_payload(collected, hardware_expansion: nil, budget: nil, sheets: nil)
@@ -840,7 +842,7 @@ module Noxun
       # --- D-104 / D-105 / K2 (audit #5): ZDIELANE PREPINACE OVERLAYOV ------
       #
       # „Zvýrazniť hrany" a „Smer kresby" su od ŠT-1b v liste sekcie Kontrola
-      # (Studio) — a dovtedy boli v tabe Kontrola okna Vyroba. Rovnaka akcia
+      # (Studio) — a dovtedy boli v tabe Kontrola zaniknuteho okna Vyroba. Rovnaka akcia
       # v dvoch oknach = telo MUSI byt jedno; okno odovzdava LEN svoj generacny
       # token, svoj status, svoj refresh a svoje echo (maly push stavu).
       #
@@ -982,7 +984,7 @@ module Noxun
       # ==================== ŠT-1c PR B1: ROZPOCET ============================
       #
       # Rozpocet je JEDINA cesta, ktora ZAPISUJE do modelu — a od tejto davky
-      # zije v sekcii `budget` okna Studio. Telo sa presunulo sem z okna Vyroba
+      # zije v sekcii `budget` okna Studio. Telo sa presunulo sem zo zaniknuteho okna Vyroba
       # z toho isteho dovodu ako vsetko ostatne: dve kopie zapisovacej cesty by
       # sa casom rozisli a rozdiel by sa ukazal az na cenovej ponuke.
       #

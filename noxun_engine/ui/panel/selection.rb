@@ -277,8 +277,8 @@ module Noxun
         # CISTE CITANIE MODELU + zmena VYBERU: ziadny `start_operation`, ziadny
         # zapis do dictionary, ziadny krok Spat (lekcia D-103). Vyber sa meni
         # pod `suspend_selection_sync` a panel sa obnovi PRESNE raz — je to ta
-        # ista cesta, akou uz oznacuje dielce okno Vyroba
-        # (ProductionDialog.do_select), takze sa spravanie nemoze rozist:
+        # ista cesta, akou uz oznacuje dielce okno Studio
+        # (ProductionCore.do_select), takze sa spravanie nemoze rozist:
         # panel po nej ukaze kartu prveho oznaceneho dielca (rail dostane
         # docasnu polozku) a status povie, kolko ich je oznacenych.
         #
@@ -344,7 +344,7 @@ module Noxun
         #
         # CISTE CITANIE MODELU + zmena VYBERU: ziadny `start_operation`, ziadny
         # zapis do dictionary, ziadny krok Spat (lekcia D-103) — presne ako
-        # `handle_select_parts` a `ProductionDialog.do_select`.
+        # `handle_select_parts` a `ProductionCore.do_select`.
         #
         # VEDOMA ODCHYLKA (a jadro tejto davky): po vybere sa NEVOLA
         # `push_selected`. Identita vyberu je autoritou rezimu panela, takze

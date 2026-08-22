@@ -1,5 +1,5 @@
   // ====== SEKCIE ROZPOCET + CENOVA PONUKA okna STUDIO (ŠT-1c PR B1/B2) ======
-  // Do ŠT-1c to bol TAB okna Vyroba; od PR B1 je to SEKCIA `budget` okna
+  // Do ŠT-1c to bol TAB zaniknuteho okna Vyroba; od PR B1 je to SEKCIA `budget` okna
   // Studio. Presun je 1:1 v OBSAHU (Š12) — nie v kode: render sa rozrezal na
   // LISTU sekcie (`budToolsHtml` — DPH, rezim, prepocet cien, export, ⚙) a
   // TELO (`budDrawBody`), lebo v Studiu su to dve rozne miesta v DOM.

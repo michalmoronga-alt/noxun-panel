@@ -577,25 +577,27 @@ module NoxunSuRunner
       model.commit_operation
     end
 
-    # 13) V0.5 B: klik-select z okna Vyroba — do_select cez persistent_id,
+    # 13) V0.5 B: klik-select z okna vystupov — do_select cez persistent_id,
     #     ziadna mutacia modelu, stale generacia sa odmietne.
+    #     ŠT-1c PR B3: okno Vyroba zaniklo — TA ISTA cesta (zdielane telo
+    #     `ProductionCore.do_select`) sa volá cez okno ŠTÚDIO.
     col3 = e::Bom.collect(model)
     bom3 = e::Bom.compute(col3)
     row = bom3[:rows].find { |r| r['refs'].length >= 2 }
-    ok('sync-vyroba: riadok kusovnika nesie refs s pid',
+    ok('sync-studio: riadok kusovnika nesie refs s pid',
        !row.nil? && row['refs'].all? { |r| r['pid'].is_a?(Integer) })
     cfg_before = (e::Store.config(inst) || {})['width']
-    e::ProductionDialog.do_select({ 'gen' => 0, 'parts_key' => row['key'] })
-    ok("sync-vyroba: select cez KLUC riadku oznacil #{model.selection.size} dielcov (#{row['refs'].length} refs)",
+    e::StudioDialog.do_select({ 'gen' => 0, 'parts_key' => row['key'] })
+    ok("sync-studio: select cez KLUC riadku oznacil #{model.selection.size} dielcov (#{row['refs'].length} refs)",
        model.selection.size == row['refs'].length)
-    ok('sync-vyroba: select NEzmutoval model (config drzi, ziadny dedup)',
+    ok('sync-studio: select NEzmutoval model (config drzi, ziadny dedup)',
        ((e::Store.config(inst) || {})['width'] == cfg_before))
-    e::ProductionDialog.do_select({ 'gen' => -99, 'pids' => row['refs'].map { |r| r['pid'] } })
-    ok('sync-vyroba: stale generacia odmietnuta — selection sa nezmenil',
+    e::StudioDialog.do_select({ 'gen' => -99, 'pids' => row['refs'].map { |r| r['pid'] } })
+    ok('sync-studio: stale generacia odmietnuta — selection sa nezmenil',
        model.selection.size == row['refs'].length)
     hwrow = bom3[:hardware].find { |g| g['generic_type'] == 'leg' }
-    e::ProductionDialog.do_select({ 'gen' => 0, 'hw_key' => hwrow['key'] })
-    ok('sync-vyroba: klik na kovanie (hw_key) oznacil oba korpusy',
+    e::StudioDialog.do_select({ 'gen' => 0, 'hw_key' => hwrow['key'] })
+    ok('sync-studio: klik na kovanie (hw_key) oznacil oba korpusy',
        model.selection.size == 2 && model.selection.all? { |s| e::Store.kind(s) == 'cabinet' })
 
     # 14) D-35 bulk ABS (audit FIX 8): olepenie vsetkych 4 hran JEDNYM callbackom
@@ -739,7 +741,7 @@ module NoxunSuRunner
       ok('sync-semafor: vypnute kovanie = ORANGE polozka so stabilnym klucom',
          !hwitem.nil? && hwitem['severity'] == 'orange' && !hwitem['stable_key'].to_s.empty?)
       # klik-select semaforovej polozky (bez part_key = korpus ako celok) oznaci OWNER korpus
-      e::ProductionDialog.do_select({ 'gen' => 0, 'problem_key' => hwitem['stable_key'] })
+      e::StudioDialog.do_select({ 'gen' => 0, 'problem_key' => hwitem['stable_key'] })
       ok('sync-semafor: klik na semafor polozku oznacil owner korpus',
          model.selection.size == 1 && e::Store.get(model.selection.first, 'cabinet_id').to_s == cid15)
       # STABILNY kluc prezije rebuild (pending-edit flush simulovany zmenou sirky):
@@ -752,12 +754,12 @@ module NoxunSuRunner
       ok('sync-semafor: semafor polozka prezila rebuild (stabilny kluc nezmeneny)',
          !hwitem2.nil? && hwitem2['stable_key'] == hwitem['stable_key'])
       model.selection.clear
-      e::ProductionDialog.do_select({ 'gen' => 0, 'problem_key' => hwitem2['stable_key'] })
+      e::StudioDialog.do_select({ 'gen' => 0, 'problem_key' => hwitem2['stable_key'] })
       ok('sync-semafor: klik po rebuilde znova oznacil korpus (dohladanie podla identity, nie PID)',
          model.selection.size == 1 && e::Store.get(model.selection.first, 'cabinet_id').to_s == cid15)
       # stale generacia (iny model / stary DOM) sa odmietne — selection nezmeneny
       sz15 = model.selection.size
-      e::ProductionDialog.do_select({ 'gen' => -99, 'problem_key' => hwitem2['stable_key'] })
+      e::StudioDialog.do_select({ 'gen' => -99, 'problem_key' => hwitem2['stable_key'] })
       ok('sync-semafor: stale generacia odmietnuta — selection nezmeneny', model.selection.size == sz15)
       # reset kovania: ORANGE polozka zmizne z CERSTVEHO zberu (kanon je aktualny stav)
       e::Panel.select_only(model, inst)
@@ -2566,7 +2568,8 @@ module NoxunSuRunner
 
       # 9d) v0.7.28 — 3-STAVOVE NASTAVENIE Z ROHU ABS IKONY V RAILE.
       #     DRUHY vstupny bod, JEDNO nastavenie: prepnutie z raily musi zmenit
-      #     TEN ISTY stav, ktory vidi okno Vyroba (vratane poctov), nesmie
+      #     TEN ISTY stav, ktory vidi lista sekcie Kontrola v ŠTÚDIU (vratane
+      #     poctov), nesmie
       #     vyrobit krok Spat a nesmie sa dotknut modelu.
       guid = e::Panel.model_guid(model)
       opts_before = e::EdgeCheck.options.dup
@@ -2588,8 +2591,8 @@ module NoxunSuRunner
       ok('D-104/rail: rohove nastavenie zaplo stav „mimo pravidla" (kresli sa viac plosok)',
          e::EdgeCheck.options['show_extra'] == true && st['options']['show_extra'] == true &&
          st['drawn'].to_i > 1)
-      # Rail cita PRESNE ten isty stav ako okno Vyroba — ziadna vlastna kopia.
-      ok('D-104/rail: stav raily je ten isty stav, ktory vidi okno Vyroba',
+      # Rail cita PRESNE ten isty stav ako ŠTÚDIO — ziadna vlastna kopia.
+      ok('D-104/rail: stav raily je ten isty stav, ktory vidi ŠTÚDIO',
          e::Panel.edge_check_state == st && e::EdgeCheck.ui_state(model) == st)
       ok('D-104/rail: nastavenie NEZMENILO model (ziadna entita, config nedotknuty)',
          model.entities.length == ents_now && e::Store.get(inst, 'config').to_s == cfg_now)
@@ -2617,7 +2620,7 @@ module NoxunSuRunner
       # ani vtedy, ked ziadne okno otvorene nie je.
       closed_ok = begin
         e.close_edge_menu(:panel)
-        e.close_edge_menu(:production)
+        e.close_edge_menu(:studio) # ŠT-1c PR B3: `:production` zanikol s oknom
         true
       rescue StandardError => ex
         log_line("INFO: D-104 close_edge_menu vynimka: #{ex.class}: #{ex.message}")
@@ -4767,7 +4770,7 @@ module NoxunSuRunner
       ok('K2: opatovne zapnutie v tom istom modeli funguje (nova instancia overlayu)',
          st['active'] == true && k2_overlay_present?(model) && st['parts'].to_i.positive?)
 
-      # 10) OBNOVA ZAPAMATANEHO PREPINACA (otvorenie okna Vyroba)
+      # 10) OBNOVA ZAPAMATANEHO PREPINACA (otvorenie okna ŠTÚDIO)
       e::GrainCheck.disable!
       ok('K2: po disable! overlay v modeli nie je', !k2_overlay_present?(model))
       st = e::GrainCheck.restore!(model)
@@ -4778,8 +4781,8 @@ module NoxunSuRunner
          e::GrainCheck.remembered? == false && !k2_overlay_present?(model))
 
       # 11) RAIL INSPECTORA (v0.7.27): DRUHY vstupny bod, JEDEN zdroj stavu.
-      #     Zapnutie z raily = ten isty overlay a to iste cislo, ktore vidi okno
-      #     Vyroba; vypnutie „z Vyroby" musi rail zhasnut. Ziadny undo krok.
+      #     Zapnutie z raily = ten isty overlay a to iste cislo, ktore vidi
+      #     ŠTÚDIO; vypnutie „zo Štúdia" musi rail zhasnut. Ziadny undo krok.
       rail = { 'model_guid' => guid }.to_json
       # MARKER: posledna REALNA operacia pred prepnutim. Keby bolo zapnutie
       # kresby undo krokom, 1x Spat by zhodilo jeho a marker by prezil.
@@ -4793,8 +4796,8 @@ module NoxunSuRunner
       st = k2_state(model)
       ok("K2/rail: zapnutie z raily zaplo TEN ISTY overlay (#{st['parts']} dielcov)",
          st['active'] == true && k2_overlay_present?(model) && st['parts'].to_i.positive?)
-      # Rail cita PRESNE ten isty stav ako okno Vyroba — ziadna vlastna kopia.
-      ok('K2/rail: stav raily je ten isty stav, ktory vidi okno Vyroba',
+      # Rail cita PRESNE ten isty stav ako ŠTÚDIO — ziadna vlastna kopia.
+      ok('K2/rail: stav raily je ten isty stav, ktory vidi ŠTÚDIO',
          e::Panel.grain_check_state == st && e::GrainCheck.ui_state(model) == st)
       ok('K2/rail: zapnutie z raily NEZMENILO model (ziadna entita, config nedotknuty)',
          model.entities.length == ents_now && e::Store.get(inst, 'config').to_s == cfg_now)
@@ -4803,10 +4806,13 @@ module NoxunSuRunner
       ok('K2/rail: prepnutie z raily NIE JE krok Spat (1x Spat vratilo marker, nie kresbu)',
          !marker.valid? && k2_overlay_present?(model))
 
-      # Vypnutie „z okna Vyroba" tou istou zdielanou cestou => rail zhasne.
-      gen = e::ProductionDialog.instance_variable_get(:@generation).to_i
-      e::ProductionDialog.do_grain_check({ 'gen' => gen, 'model_guid' => guid })
-      ok('K2/rail: vypnutie z okna Vyroba zhasne aj rail (jeden zdroj stavu)',
+      # Vypnutie „zo Štúdia" tou istou zdielanou cestou => rail zhasne.
+      # ŠT-1c PR B3: cesta viedla cez okno Vyroba — to zaniklo, prepinac zije
+      # v liste sekcie Kontrola okna ŠTÚDIO (telo je v oboch pripadoch
+      # `ProductionCore.do_grain_check`).
+      gen = e::StudioDialog.instance_variable_get(:@generation).to_i
+      e::StudioDialog.do_grain_check({ 'gen' => gen, 'model_guid' => guid }.to_json)
+      ok('K2/rail: vypnutie zo Štúdia zhasne aj rail (jeden zdroj stavu)',
          e::Panel.grain_check_state['active'] == false && !k2_overlay_present?(model))
 
       # Guard dokumentu: cudzi model_guid sa MUSI odmietnut (asynchronny callback).
@@ -5079,13 +5085,18 @@ module NoxunSuRunner
     log_line("FAIL: ST-1a sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
 
-  # ŠT-1b (review #9): odchytenie SKUTOCNYCH payloadov oboch okien. `js` je
-  # privatna metoda modulu okna, takze sa docasne prealiasuje (vzor
+  # ŠT-1b (review #9): odchytenie SKUTOCNEHO payloadu okna. `js` je privatna
+  # metoda modulu okna, takze sa docasne prealiasuje (vzor
   # `install_js_recorder` pre Panel) a po zbere sa VZDY vrati spat.
+  #
+  # ŠT-1c PR B3: povodne sa porovnavali payloady DVOCH okien (Studio vs
+  # Vyroba) — druhe okno zaniklo, takze sa uz nie je s cim porovnavat. Kontrola
+  # ostava v zmysluplnom ekvivalente: DVA po sebe iduce pushe TOHO ISTEHO okna
+  # nad nezmenenym modelom musia dat BAJT-ROVNAKE `counts` (jedno cislo, ziadny
+  # nedeterminizmus v zdielanom jadre) a payload musi niest zeleny chip.
   def st1b_capture_counts(_model)
     rec_studio = []
-    rec_prod = []
-    pairs = [[e::StudioDialog, rec_studio], [e::ProductionDialog, rec_prod]]
+    pairs = [[e::StudioDialog, rec_studio]]
     pairs.each do |(mod, rec)|
       mod.singleton_class.class_eval do
         alias_method :nx_js_orig_st1b, :js
@@ -5094,7 +5105,7 @@ module NoxunSuRunner
     end
     begin
       e::StudioDialog.send(:push_state)
-      e::ProductionDialog.send(:push_state)
+      e::StudioDialog.send(:push_state)
     ensure
       pairs.each do |(mod, _rec)|
         sc = mod.singleton_class
@@ -5106,15 +5117,14 @@ module NoxunSuRunner
         end
       end
     end
-    st_payload = rec_studio.find { |s| s.start_with?('NX.setStudio(') }
-    pr_payload = rec_prod.find { |s| s.start_with?('NX.setBom(') }
-    if st_payload.nil? || pr_payload.nil?
-      return info('ŠT-1b: payload jedneho z okien sa nepodarilo odchytit — porovnanie counts preskocene.')
+    payloads = rec_studio.select { |s| s.start_with?('NX.setStudio(') }
+    if payloads.length < 2
+      return info('ŠT-1b: payloady Studia sa nepodarilo odchytit — porovnanie counts preskocene.')
     end
 
-    st_counts = st_payload[/"counts":\{[^}]*\}/]
-    pr_counts = pr_payload[/"counts":\{[^}]*\}/]
-    ok("ŠT-1b: counts v ODCHYTENYCH payloadoch oboch okien su BAJT-ROVNAKE (#{st_counts})",
+    st_counts = payloads[0][/"counts":\{[^}]*\}/]
+    pr_counts = payloads[1][/"counts":\{[^}]*\}/]
+    ok("ŠT-1b: counts v DVOCH ODCHYTENYCH payloadoch su BAJT-ROVNAKE (#{st_counts})",
        !st_counts.nil? && st_counts == pr_counts)
     # Zeleny chip semaforu nesmie z payloadu vypadnut — bez neho by okno
     # ukazalo pomlcku namiesto poctu skriniek.
@@ -5126,13 +5136,13 @@ module NoxunSuRunner
 
   # ============ ŠT-1b: sekcia KONTROLA v okne ŠTÚDIO (Š8–Š11) ================
   # Co sa tu overuje (a co headless sada neuvidi):
-  #   1) JEDNO CISLO — semafor Studia sa sklada z TOHO ISTEHO jadra ako okno
-  #      Vyroba (vratane rozpoctovych ORANGE) a nesie ZELENE cislo skriniek,
+  #   1) JEDNO CISLO — semafor Studia sa sklada zo ZDIELANEHO jadra (vratane
+  #      rozpoctovych ORANGE) a nesie ZELENE cislo skriniek,
   #   2) klik na nalez OZNACI entitu v modeli a NEPRIDA krok Spat,
   #   3) prepinace hran a kresby z cesty Studia naozaj prepinaju SERVEROVY stav
   #      (ten isty, ktory vidi rail) a guardy odmietnu stary DOM klik,
-  #   4) rozpoctovy nalez sa da PREMOSTIT do okna Vyroba,
-  #   5) MERANIE (audit #17): trvanie push_state pri OBOCH otvorenych oknach.
+  #   4) rozpoctovy nalez vedie do SEKCIE Rozpocet (premostenie zaniklo),
+  #   5) MERANIE (audit #17): trvanie push_state okna Studio.
   def run_st1b(model)
     cleanup(model)
     return ok('ŠT-1b: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
@@ -5161,7 +5171,7 @@ module NoxunSuRunner
        counts['cabinets'].to_i >= 1)
     ok('ŠT-1b: skriniek bez nalezu nikdy nie je viac nez skriniek',
        counts['clean'].to_i <= counts['cabinets'].to_i && counts['clean'].to_i >= 0)
-    # To iste cislo musi dat aj okno Vyroba — cita to iste jadro.
+    # To iste cislo musi dat aj druhe volanie — jadro je deterministicke.
     prod_control = core.control_payload(core.fresh_collect(model), hardware_expansion: hw_exp,
                                                                    budget: budget, sheets: smap)
     ok('ŠT-1b: zdielane jadro da pri dvoch volaniach ROVNAKE counts',
@@ -5262,14 +5272,13 @@ module NoxunSuRunner
     else
       ok('ŠT-1b: rozpoctovy nalez nesie adresu sekcie rozpoctu (server sklada `budget_section`)',
          bud.key?('budget_section'))
-      ok('ŠT-1c B1: premostenia do okna Vyroba uz NEEXISTUJU',
-         e::StudioDialog::PRODUCTION_BRIDGES.empty?)
+      ok('ŠT-1c B3: mapa premosteni do okna Vyroba uz NEEXISTUJE',
+         !e::StudioDialog.const_defined?(:PRODUCTION_BRIDGES))
       scripts = st1c_capture(e::StudioDialog) do
         e::StudioDialog.do_bridge({ 'section' => 'budget' }.to_json)
       end
-      prod_dlg = e::ProductionDialog.instance_variable_get(:@dialog)
-      ok('ŠT-1c B1: ziadost o premostenie `budget` uz okno Vyroba NEOTVORI',
-         prod_dlg.nil?)
+      ok('ŠT-1c B3: a modul zaniknuteho okna Vyroba uz vobec nie je nacitany',
+         !defined?(e::ProductionDialog))
       ok('ŠT-1c B1: a server to povie nahlas (neznamy kluc = nie ticho)',
          scripts.any? { |s| s.include?('Táto sekcia zatiaľ neexistuje') })
       ok('ŠT-1b: ziadost model nezmenila', model.entities.length == before_ents)
@@ -5281,30 +5290,26 @@ module NoxunSuRunner
     ok('ŠT-1b: 1x Spat zmaze skrinku (sekcia Kontrola nepridala ziadny krok Spat)',
        inst.nil? || !inst.valid?)
 
-    # --- 5) MERANIE (audit #17): push_state pri OBOCH otvorenych oknach ------
-    # Od ŠT-1b pocita KONTROLU (a kvoli jej ORANGE aj rozpocet) aj Studio, takze
-    # pri dvoch otvorenych oknach bezi cely pipeline dvakrat. Meria sa na VIAC
-    # skrinkach — na jednej by cislo nepovedalo nic. Bezi AZ PO undo kontrole,
-    # aby si stavanie skriniek nepomiesalo poradie krokov Spat.
+    # --- 5) MERANIE (audit #17): trvanie push_state okna Studio -------------
+    # Studio pocita KONTROLU (a kvoli jej ORANGE aj rozpocet) v jednom pushi.
+    # Meria sa na VIAC skrinkach — na jednej by cislo nepovedalo nic. Bezi AZ
+    # PO undo kontrole, aby si stavanie skriniek nepomiesalo poradie krokov
+    # Spat. (ŠT-1c PR B3: druhe okno zaniklo, meria sa uz len jedno.)
     begin
       cleanup(model)
       6.times do |i|
         e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0 + (i * 50),
                                          'height' => 720.0, 'depth' => 560.0 })
       end
-      e::ProductionDialog.show
       e::StudioDialog.show
       ents_before_push = model.entities.length
       t0 = Time.now
       e::StudioDialog.send(:push_state)
       t_studio = ((Time.now - t0) * 1000).round(1)
-      t1 = Time.now
-      e::ProductionDialog.send(:push_state)
-      t_prod = ((Time.now - t1) * 1000).round(1)
       cabs = model.entities.grep(Sketchup::ComponentInstance).length
       info("ŠT-1b MERANIE (audit #17): push_state Studio #{t_studio} ms · " \
-           "Vyroba #{t_prod} ms · top-level instancii v modeli: #{cabs}")
-      ok('ŠT-1b: push_state oboch okien model NEZMENIL',
+           "top-level instancii v modeli: #{cabs}")
+      ok('ŠT-1b: push_state okna model NEZMENIL',
          model.entities.length == ents_before_push)
 
       # Review #9: porovnanie „ta ista funkcia s tymi istymi argumentmi" je
@@ -5315,7 +5320,7 @@ module NoxunSuRunner
     rescue StandardError => ex
       info("ŠT-1b: meranie pushov zlyhalo: #{ex.class}: #{ex.message}")
     ensure
-      [e::ProductionDialog, e::StudioDialog].each do |mod|
+      [e::StudioDialog].each do |mod|
         dlg = mod.instance_variable_get(:@dialog)
         begin
           dlg.close if dlg && dlg.respond_to?(:close)
@@ -5333,8 +5338,7 @@ module NoxunSuRunner
   # ============ ŠT-1c PR A: sekcia NAKUP KOVANIA v STUDIU (Š7) ===============
   # Co sa tu overuje (a co headless sada neuvidi):
   #   1) PAYLOAD — okno Studio naozaj dostava `hardware_sets` aj `hardware`
-  #      s OBOMA serverovymi textami (label + params_label); okno Vyroba ich
-  #      po presune tabu uz NEDOSTAVA (mrtve pole = zbytocny prenos),
+  #      s OBOMA serverovymi textami (label + params_label),
   #   2) KLIK-SELECT vlastnika polozky kovania zo sekcie `buy` OZNACI entitu
   #      a NEPRIDA krok Spat,
   #   3) GEN GUARD CSV kovania (audit #15, vedoma zmena): stara generacia
@@ -5633,8 +5637,8 @@ module NoxunSuRunner
 
     ok('ŠT-1c B2: `offer` je SEKCIA Studia (serverovy whitelist)',
        e::StudioDialog::SECTIONS.include?('offer'))
-    ok('ŠT-1c B2: a do okna Vyroba po nej nezostalo premostenie',
-       !e::StudioDialog::PRODUCTION_BRIDGES.key?('offer'))
+    ok('ŠT-1c B3: a premostenia do zaniknuteho okna Vyroba uz vobec neexistuju',
+       !e::StudioDialog.const_defined?(:PRODUCTION_BRIDGES))
 
     begin
       # `show` uz otvorene okno pushne SAM (a deep-link tym spotrebuje), zavrete
@@ -5787,7 +5791,6 @@ module NoxunSuRunner
 
     # --- 1) payload sekcie Nakup kovania (Š7) --------------------------------
     st_scripts = st1c_capture(e::StudioDialog) { e::StudioDialog.send(:push_state) }
-    pr_scripts = st1c_capture(e::ProductionDialog) { e::ProductionDialog.send(:push_state) }
     payload = st1c_studio_payload(st_scripts)
     if payload.nil?
       ok('ŠT-1c: payload Studia sa podarilo odchytit', false)
@@ -5803,28 +5806,12 @@ module NoxunSuRunner
        !hs.empty? && labeled)
     lbl = hs.map { |g| g['label'] }.compact.reject(&:empty?).first
     ok("ŠT-1c: label je slovensky text zo servera (napr. #{lbl.inspect})", !lbl.to_s.empty?)
-    # POZOR: hladat retazec „hardware" v surovom skripte NESTACI — rozpocet ma
-    # vlastnu sekciu toho mena. Porovnavaju sa preto KLUCE NAJVYSSEJ urovne.
-    pr_raw = pr_scripts.find { |x| x.start_with?('NX.setBom(') }
-    pr_data = begin
-      pr_raw && JSON.parse(pr_raw.sub(/\ANX\.setBom\(/, '').sub(/\)\z/, ''))
-    rescue StandardError
-      nil
-    end
-    if pr_data.nil?
-      info('ŠT-1c: payload okna Vyroba sa nepodarilo odchytit — porovnanie preskocene.')
-    else
-      ok('ŠT-1c: okno Vyroba uz nakupny zoznam NEDOSTAVA (pole zaniklo s tabom)',
-         !pr_data.key?('hardware_sets'))
-      ok('ŠT-1c: ani generiku kovania', !pr_data.key?('hardware'))
-      # ŠT-1c PR B1: a od tejto davky ani ROZPOCET — pole `budget` citalo
-      # VYHRADNE telo tabu, ktory sa presunul do Studia. Rozpocet sa v okne
-      # Vyroba pocita DALEJ (kvoli ORANGE nalezom KONTROLY pod ⚠ chipom), len
-      # sa uz neposiela klientovi.
-      ok('ŠT-1c B1: okno Vyroba uz NEDOSTAVA ani rozpocet (pole zaniklo s tabom)',
-         !pr_data.key?('budget'))
-      ok('ŠT-1c B1: KONTROLA v nom vsak zije dalej (⚠ chip ma z coho kreslit)',
-         pr_data.key?('counts') && pr_data.key?('control'))
+    # ŠT-1c PR B3: povodne sa tu porovnaval payload DRUHEHO okna (Vyroba), ci
+    # uz mrtve polia NEDOSTAVA. Okno zaniklo, takze porovnanie stratilo predmet
+    # — kontrola sa presunula na to, ze JEDINY payload nesie VSETKO, co sekcie
+    # potrebuju (kusovnik + kontrola + nakup + rozpocet naraz, jeden push).
+    %w[rows sheets edging counts control hardware hardware_sets budget].each do |k|
+      ok("ŠT-1c B3: jediny payload Studia nesie `#{k}`", payload.key?(k))
     end
 
     # --- 2) klik na riadok generiky OZNACI vlastnika a NEPRIDA krok Spat -----
@@ -5875,14 +5862,12 @@ module NoxunSuRunner
     if defined?(e::EdgeCheck) && e::EdgeCheck.available?(model)
       was = e::EdgeCheck.active?
       e::EdgeCheck.enable!(model) unless was
-      st_rec = nil
-      pr_rec = st1c_capture(e::ProductionDialog) do
-        st_rec = st1c_capture(e::StudioDialog) { e::EdgeCheck.notify_state_changed }
-      end
-      ok('ŠT-1c (audit #2): rozposlanie stavu hran dorucilo cerstve cisla aj STUDIU',
+      st_rec = st1c_capture(e::StudioDialog) { e::EdgeCheck.notify_state_changed }
+      ok('ŠT-1c (audit #2): rozposlanie stavu hran dorucilo cerstve cisla STUDIU',
          st_rec.any? { |s| s.include?('NX.setEdgeCheck(') })
-      ok('ŠT-1c: a okno Vyroba o ne neprislo (broadcast pozna obe okna)',
-         pr_rec.any? { |s| s.include?('NX.setEdgeCheck(') })
+      # ŠT-1c PR B3: druhym prijimatelom bolo okno Vyroba — zaniklo, takze
+      # kontrola „dostal ho aj on" stratila predmet. Rail dostava ten isty
+      # broadcast (overuje sekcia D-104/rail vyssie).
 
       # Pocty v liste sa naozaj VIAZU NA VYBER — bez toho by fix nemal co
       # dorucovat. (Prepocet po zmene vyberu bezi cez UI.start_timer, teda
@@ -5919,9 +5904,107 @@ module NoxunSuRunner
     ok('ŠT-1c: 1x Spat zmaze skrinku (sekcie Nákup kovania ani Rozpočet nenechali krok Spat navyse)',
        inst.nil? || !inst.valid?)
 
+    # --- 7) ŠT-1c PR B3: UPLNY ZANIK OKNA VYROBA ----------------------------
+    st1c_b3_zanik(model)
+
     cleanup(model)
   rescue StandardError => ex
     log_line("FAIL: ŠT-1c sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
+  # ŠT-1c PR B3: okno Vyroba definitivne ZANIKLO. Headless sada dokaze len to,
+  # ze subory a mena su prec — TU sa overuje, ze v BEZIACOM SketchUpe:
+  #   1) modul `ProductionDialog` naozaj neexistuje (loader ho nenacitava),
+  #   2) prepinace hran aj kresby fungujú z RAILU aj zo ŠTÚDIA (broadcast
+  #      schudnuty o zaniknute okno nikomu stav nezhltol),
+  #   3) deep-linky (N13 „Materiál", ⚠ warnpanel, toolbar) vedu do ŠTÚDIA,
+  #   4) cely smoke retazec sekcii (bom · ctrl · buy · budget · offer) zije.
+  def st1c_b3_zanik(model)
+    inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 800.0,
+                                            'height' => 720.0, 'depth' => 560.0 })
+    return ok('ŠT-1c B3: vlozenie skrinky pre zaverecnu kontrolu', false) unless inst
+
+    before_ents = model.entities.length
+
+    # 1) modul zaniknuteho okna NEEXISTUJE
+    ok('ŠT-1c B3: modul ProductionDialog v beziacom SketchUpe NEEXISTUJE',
+       !defined?(e::ProductionDialog))
+    ok('ŠT-1c B3: zdielane jadro ProductionCore vsak zije (autorita vystupov)',
+       defined?(e::ProductionCore) ? true : false)
+    ok('ŠT-1c B3: premostenia do zaniknuteho okna uz konstantu nemaju',
+       !e::StudioDialog.const_defined?(:PRODUCTION_BRIDGES))
+
+    # 2) prepinace: rail aj Studio prepinaju TEN ISTY serverovy stav
+    stgen = -> { e::StudioDialog.instance_variable_get(:@generation).to_i }
+    guid = e::ProductionCore.model_guid(model)
+    if defined?(e::EdgeCheck) && e::EdgeCheck.available?(model)
+      was = e::EdgeCheck.active?
+      e::Panel.handle_edge_toggle({ 'model_guid' => guid }.to_json)
+      after_rail = e::EdgeCheck.active?
+      ok('ŠT-1c B3: ABS prepinac z RAILU prepol serverovy stav', after_rail != was)
+      e::StudioDialog.send(:push_state)
+      e::StudioDialog.do_edge_check({ 'gen' => stgen.call, 'model_guid' => guid }.to_json)
+      ok('ŠT-1c B3: a prepinac zo ŠTÚDIA ho prepol spat (jeden zdroj stavu)',
+         e::EdgeCheck.active? == was)
+      ok('ŠT-1c B3: zvyraznenie hran model NEMENI', model.entities.length == before_ents)
+      e::EdgeCheck.disable! unless was
+    else
+      info('ŠT-1c B3: Overlay API nie je k dispozicii — ABS prepinac sa preskocil.')
+    end
+
+    if defined?(e::GrainCheck) && e::GrainCheck.available?(model)
+      was = e::GrainCheck.active?
+      e::Panel.handle_grain_toggle({ 'model_guid' => guid }.to_json)
+      ok('ŠT-1c B3: „Smer kresby" z RAILU prepol serverovy stav',
+         e::GrainCheck.active? != was)
+      e::StudioDialog.send(:push_state)
+      e::StudioDialog.do_grain_check({ 'gen' => stgen.call, 'model_guid' => guid }.to_json)
+      ok('ŠT-1c B3: a zo ŠTÚDIA spat (broadcast bez zaniknuteho okna nikomu stav nezhltol)',
+         e::GrainCheck.active? == was)
+      ok('ŠT-1c B3: kresba smeru model NEMENI', model.entities.length == before_ents)
+      e::GrainCheck.disable!
+    else
+      info('ŠT-1c B3: Overlay API nie je k dispozicii — prepinac kresby sa preskocil.')
+    end
+
+    # 3) deep-linky vedu do ŠTÚDIA (server je autorita whitelistu sekcii)
+    %w[bom ctrl budget].each do |sec|
+      scripts = st1c_capture(e::StudioDialog) do
+        e::StudioDialog.show(open_section: sec)
+        e::StudioDialog.send(:push_state)
+      end
+      payload = st1c_studio_payload(scripts)
+      ok("ŠT-1c B3: deep-link na sekciu `#{sec}` otvoril ŠTÚDIO a spotreboval sa",
+         !payload.nil? && payload['open_section'] == sec)
+    end
+    ok('ŠT-1c B3: deep-link model NEZMENIL', model.entities.length == before_ents)
+
+    # 4) smoke retazec: JEDEN push nesie VSETKYCH PAT sekcii
+    scripts = st1c_capture(e::StudioDialog) { e::StudioDialog.send(:push_state) }
+    payload = st1c_studio_payload(scripts)
+    if payload.nil?
+      ok('ŠT-1c B3: payload Studia sa podarilo odchytit', false)
+    else
+      { 'rows' => 'bom', 'counts' => 'ctrl', 'hardware_sets' => 'buy',
+        'budget' => 'budget/offer' }.each do |key, sec|
+        ok("ŠT-1c B3: payload nesie data sekcie #{sec} (`#{key}`)", payload.key?(key))
+      end
+      ok('ŠT-1c B3: sekcie Studia su vsetky (bom · ctrl · buy · budget · offer)',
+         e::StudioDialog::SECTIONS == %w[bom ctrl buy budget offer])
+    end
+
+    dlg = e::StudioDialog.instance_variable_get(:@dialog)
+    begin
+      dlg.close if dlg && dlg.respond_to?(:close)
+    rescue StandardError
+      nil
+    end
+
+    Sketchup.undo
+    ok('ŠT-1c B3: 1x Spat zmaze skrinku (zaverecna kontrola nepridala krok Spat)',
+       inst.nil? || !inst.valid?)
+  rescue StandardError => ex
+    log_line("FAIL: ŠT-1c B3 kontrola vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
 
   def run_async(model, done)
@@ -6516,7 +6599,7 @@ module NoxunSuRunner
       ok("async S6b: KONTROLA hlasi dve dosky na jednom mieste ako ORANGE (#{dups.map { |d| d['message_sk'] }.join(' | ')})",
          dups.length == 1 && dups.first['severity'] == 'orange' &&
          dups.first['dup_owner_ids'] == ids && dups.first['dup_kind'] == 'board')
-      pids = e::ProductionDialog.send(:pids_for_problem, model, dups.first) unless dups.empty?
+      pids = e::ProductionCore.pids_for_problem(model, dups.first) unless dups.empty?
       ok("async S6b: klik na nalez oznaci OBE dosky (#{Array(pids).length} entit)",
          Array(pids).length == 2)
       cleanup(model)
@@ -6564,11 +6647,10 @@ module NoxunSuRunner
     log_line("INFO: verzia pluginu #{Noxun::Engine::VERSION}, model '#{File.basename(model.path.to_s)}'")
     cleanup(model) # cisty stol (zvysky z predoslych behov)
     # Opakovany beh v TOM ISTOM okne (MCP replay): predosly beh mohol cez
-    # observer/push_state zdvihnut generation counter okna Vyroba — klik testy
+    # observer/push_state zdvihnut generation counter okna — klik testy
     # posielaju gen 0 a stale guard by ich falosne odmietol (nalez 30.7.:
     # 4x FAIL select-cez-kluc bez realnej regresie). Cerstva instancia ma nil.
-    e::ProductionDialog.instance_variable_set(:@generation, 0) if defined?(e::ProductionDialog)
-    # ST-1a: to iste plati pre okno Studio — ma VLASTNY generacny token.
+    # ŠT-1c PR B3: okno Vyroba zaniklo — generacny token ma uz len Studio.
     e::StudioDialog.instance_variable_set(:@generation, 0) if defined?(e::StudioDialog)
     run_sync(model)
     run_sync_back(model)     # davka Chrbat: D-37 hlbka, D-31 none, D-38 pevny 18

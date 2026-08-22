@@ -62,20 +62,16 @@ module Noxun
             'shelves' => cfg['shelves'] }
         end
 
-        # UI-D3: meno tabu z payloadu prekliku do okna Vyroba („Štúdio").
-        # TOLERANTNE: prazdny payload (rail Štúdio, starsi cachovany panel)
-        # aj neznama hodnota = nil, teda „len otvor okno, tab nemen". Ci je
-        # meno platne, rozhoduje az ProductionDialog::TABS — tu sa nic nefiltruje
-        # nadvakrat, aby whitelist zil na JEDNOM mieste.
-        def studio_tab_of(payload)
-          v = parse(payload)['tab']
-          v.nil? ? nil : v.to_s
-        end
+        # ŠT-1c PR B3: `studio_tab_of` (meno tabu prekliku do okna Vyroba)
+        # ZANIKOL spolu s oknom aj s relayom `open_production`, ktory ho
+        # jediny volal. Deep-link ZIJE — ale do SEKCII Studia, cez
+        # `studio_link_of` nizsie.
 
         # ST-1a: meno sekcie + kotva hladania z payloadu prekliku do okna Studio.
-        # TOLERANTNE rovnako ako `studio_tab_of` — prazdny payload (rail Štúdio,
-        # starsi cachovany panel) aj neznama hodnota = nil, teda „len otvor
-        # okno". Ci je meno platne, rozhoduje az `StudioDialog::SECTIONS`.
+        # TOLERANTNE: prazdny payload (rail Štúdio, starsi cachovany panel) aj
+        # neznama hodnota = nil, teda „len otvor okno". Ci je meno platne,
+        # rozhoduje az `StudioDialog::SECTIONS` — tu sa nic nefiltruje nadvakrat,
+        # aby whitelist zil na JEDNOM mieste.
         def studio_link_of(payload)
           data = parse(payload)
           sec = data['section']

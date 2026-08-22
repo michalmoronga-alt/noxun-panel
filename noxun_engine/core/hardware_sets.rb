@@ -1118,7 +1118,7 @@ module Noxun
 
       # D-93 (audit B4): nakupny riadok nesie ZNAMIENKO rucneho zasahu — pocet
       # kusov z poloziek so source 'manual' + hodnoty, ktore by dal automat.
-      # Nakupny CSV kontrakt sa TYM NEMENI (znamienko zije v okne Vyroba).
+      # Nakupny CSV kontrakt sa TYM NEMENI (znamienko zije v sekcii Nakup Studia).
       def note_manual(row, it, quantity)
         return unless it.is_a?(Hash) && it['source'].to_s == 'manual'
         row['manual_quantity'] = row['manual_quantity'].to_i + quantity
@@ -1129,7 +1129,7 @@ module Noxun
         list << label unless list.include?(label)
       end
 
-      # Hotovy slovensky text znamienka (tooltip v okne Vyroba). Text sklada
+      # Hotovy slovensky text znamienka (tooltip v sekcii Nakup Studia). Text sklada
       # VYHRADNE server — JS ho len vypise vedla ikony.
       def manual_note(row)
         q = row['manual_quantity'].to_i
@@ -1241,7 +1241,7 @@ module Noxun
 
       # „Co sa realne kupi" pre JEDNU polozku config.hardware[] — podklad sekcie
       # Kovanie v karte skrinky (D-92). Doteraz sa v paneli nedalo zistit, ktory
-      # set a ktore KODY z polozky vzniknu; supis to ukazal az v okne Vyroba.
+      # set a ktore KODY z polozky vzniknu; supis to ukazal az v sekcii Nakup.
       #
       # Vsetky rozhodnutia robia TIE ISTE autority ako expand (jeden vyklad
       # nakupu — panel a supis sa nesmu rozist): resolve_set_id (override
@@ -1261,7 +1261,7 @@ module Noxun
       # POZOR na per 'owner': expand deduplikuje clena na (korpus, vlastnik,
       # set, kod) cez VSETKY polozky, explain vidi len jednu — pri dvoch
       # pravidlach na tom istom vlastnikovi ho preto ukaze pri oboch, hoci sa
-      # kupi raz. Je to POHLAD NA POLOZKU, nie nakupny zoznam (ten je vo Vyrobe).
+      # kupi raz. Je to POHLAD NA POLOZKU, nie nakupny zoznam (ten je v Studiu).
       #
       # Cista funkcia: ziadne IO, ziadny SketchUp, vstup sa NEMENI.
       # -> { 'set_id', 'set_name', 'members' => [...], 'problems' => [SK texty] }
@@ -1321,7 +1321,7 @@ module Noxun
             'qty' => (per == 'owner' ? m['qty'].to_i : qty * m['qty'].to_i),
             'per' => per,
             'label' => m['label'],
-            # Rad podla dlzky: hodnota, ktora kod vybrala (tooltip vo Vyrobe aj
+            # Rad podla dlzky: hodnota, ktora kod vybrala (tooltip v Studiu aj
             # v paneli) — pri pevnom kode nil.
             'nominal_length' => (m['code_by_nl'].is_a?(Hash) ? numeric_param(it, 'nominal_length') : nil)
           }
