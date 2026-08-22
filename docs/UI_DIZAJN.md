@@ -1099,6 +1099,9 @@ Schválený vzor kontraktu UI 2.0 (`SYSTEM/zdroje/ui20/UI20_KONTRAKT.md`, sekcia
 „D-15 pridávačky ako modal"). **Každé okno typu „pridaj niečo" je TÁ ISTÁ
 kostra, len s inými poľami** — nikdy vlastný formulár. Prvá kódová inštancia
 prišla s ŠT-1c PR B2 (drafty rozpočtu); ďalšie sa napájajú bez kopírovania.
+ŠT-2c PR 2c-1 kostru rozšírila o to, čo potrebuje **dlhší** formulár (D-69
+editor materiálu): nadpisy sekcií, opakovateľné riadky, zaškrtávatká, farbu,
+širšiu kartu a **pamäť rozpísaných hodnôt priamo v komponente**.
 
 **Kostra (mockup `mockup_studio.html`):**
 
@@ -1108,9 +1111,34 @@ prišla s ŠT-1c PR B2 (drafty rozpočtu); ďalšie sa napájajú bez kopírovan
 | telo | `.mbody` | riadky `.mrow` = `<label>` + pole; pod nimi voliteľný `.hint` |
 | pätka | `.mfoot` | `.spacer` · **Zrušiť** (`ghostbtn`) · **zelené potvrdenie** (`primary`) |
 
-Scrim je `.nxscrim` (`--nx-scrim`), karta `.nxmcard` (`.sm` = 420 px, inak
-560 px). **Pozor:** mockup kreslí kartu ako `.nxmodal`, lenže `panel.css` toto
-meno už používa pre SCRIM starších modalov — preto `.nxmcard`.
+Scrim je `.nxscrim` (`--nx-scrim`), karta `.nxmcard`. **Pozor:** mockup kreslí
+kartu ako `.nxmodal`, lenže `panel.css` toto meno už používa pre SCRIM starších
+modalov — preto `.nxmcard`.
+
+**Šírka karty** (`size`, ŠT-2c): `sm` = 420 px (**predvolená**; `small` je jej
+alias a starý prepínač `small: false` = `md` naďalej platí) · `md` = 560 px ·
+`wide` = 640 px. `wide` je pre formuláre s opakovateľnými riadkami — riadok
+dosky nesie kód · hrúbku · formát · cenu naraz a na užšej karte sa stĺpce
+zlomia pod seba.
+
+**Typy polí** (`fields[].type`):
+
+| `type` | Čo je to | Hodnota vo `values()` |
+|---|---|---|
+| `text` (default) | jednoriadkový vstup | reťazec |
+| `select` | rozbaľovacie (`options` = `[hodnota, popis]`) | reťazec |
+| `checkbox` | zaškrtávatko | **boolean** |
+| `color` | vzorka + text `#RRGGBB` (hodnotu musí byť vidno a dať skopírovať) | reťazec |
+| `group` | **nadpis sekcie** formulára (`.mgroup`) | **žiadna** — vo `values()` nie je |
+| `rows` | opakovateľné riadky (`cols` = pod-polia, `+` / `−`) | **pole hashov** |
+
+`rows` čítajú hodnoty **z DOM**, nie z držaného stavu: pridanie aj odobranie
+riadku kontajner prekresľuje, takže rozpísané hodnoty ostatných riadkov musia
+prežiť práve cez tento zápis. Existujúce riadky nesú **skryté kľúče**
+(`hidden`, typicky `material_id`/`row_rev`) — podľa nich server odlíši úpravu
+variantu od nového; riadok pridaný tlačidlom ich nemá. **Identita variantu sa
+nikdy neodvodzuje od kódu, ktorý používateľ práve prepisuje.** Ploché polia
+ostávajú reťazcami — drafty rozpočtu na tom stoja.
 
 **Správanie (záväzné pre každú inštanciu):**
 
@@ -1129,8 +1157,17 @@ meno už používa pre SCRIM starších modalov — preto `.nxmcard`.
   fronte a odišiel s čerstvou generáciou, ktorú server **prijme**. Výsledok by
   bola tá istá položka dvakrát a dva kroky Späť.
 - **rozpísané hodnoty prežijú zatvorenie.** Esc ani klik vedľa nesmú byť tichá
-  strata — hodnoty sa pamätajú per pridávačka a nasledujúce otvorenie ich
-  predvyplní; zmaže ich až úspešný zápis.
+  strata — hodnoty sa pamätajú a nasledujúce otvorenie ich predvyplní; zmaže
+  ich až úspešný zápis. **Pamäť drží komponent** (od ŠT-2c), nie volajúci:
+  je to súčasť kontraktu D-15, takže ju každá ďalšia pridávačka dostane
+  rovnakú. Volajúci povie iba `memoryKey` a pri úspechu ju zahodí
+  (`setBusy(false, {clear:true})` alebo `clearMemory(key)` — kostra sama
+  nevie, či server zápis prijal).
+- **kľúč pamäte je `mode + cieľ`**, nie druh okna: `custom`, `appliance`, ale
+  aj `edit:H3303`. Editor **iného** dekoru je preto **čistý formulár** a stará
+  rozpísaná verzia zaniká hneď pri otvorení. Bez toho by sa hodnoty dekoru A
+  predvyplnili do dekoru B a uložili do nesprávneho záznamu. Prázdny formulár
+  sa nepamätá.
 - **fokus zostáva v karte.** Tab z posledného prvku cyklí na prvý (Shift+Tab
   naopak) — inak skočí do obsahu za modalom, ktorý sa práve ovládať nedá.
 - **Kotva `#nxModalRoot` žije mimo tela sekcie**, takže prekreslenie obsahu
@@ -1153,6 +1190,22 @@ rozbaľovacie nastavenie hrán) sa rieši **dvoma poistkami naraz**:
 
 Bez toho by jedno stlačenie Escape zavrelo **oboje** a používateľ by prišiel
 o nastavenie, ktorého sa ani nedotkol.
+
+**Prekryvné ovládače vnútri modalu** (našepkávač `#mdSgBox` v materiáloch;
+ŠT-2c, audit #10/#11) majú **opačné** pravidlo než okno za modalom:
+
+1. **Escape patrí najprv im.** Ich listener visí na **inpute**, kým modal počúva
+   na `document` — stačí teda obyčajný `ev.stopPropagation()` a bublanie sa
+   zastaví ešte pred modalom. `stopImmediatePropagation` by tu **nepomohol**:
+   zastavil by len ďalších poslucháčov toho istého inputu, dokumentový by aj
+   tak zabral a formulár by sa zavrel spolu s dropdownom.
+2. **Scroll vnútri karty ich zatvára.** Overlay je `position: fixed`, takže po
+   odscrollovaní `.mbody` by visel nad cudzím riadkom. Listener preto musí byť
+   v **capture** fáze na `window` — `scroll` z vnútorného kontajnera nebublá.
+3. **Vrstvenie sa odvodzuje z jednej definície.** Pri `.nxscrim` v
+   `studio.html` žijú `--nx-z-scrim` a `--nx-z-suggest`; `panel.css` číta
+   `var(--nx-z-suggest, 80)`. Vlastné číslo v `panel.css` by pri prvej zmene
+   scrimu poslalo dropdown **pod** modal — viditeľný, ale neklikateľný.
 
 ---
 

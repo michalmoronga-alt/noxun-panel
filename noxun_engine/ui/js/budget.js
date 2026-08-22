@@ -31,17 +31,21 @@
   // je to D-15 modal (`js/nx_modal.js`). `BUD_DRAFT` = ktora „pridavacka" je
   // prave otvorena ('custom' | 'appliance').
   var BUD_DRAFT = null;
-  // ROZPISANE HODNOTY PER DRUH (review #3+#4). Dva dovody, preco to nie je
-  // jednorazova premenna:
+  // ROZPISANE HODNOTY PER DRUH (review #3+#4). Dva dovody, preco sa vobec
+  // pamataju:
   //   1. ODMIETNUTY ZAPIS (audit #10) — modal ostava otvoreny s tym, co
   //      pouzivatel napisal, a opravuje sa JEDNO cislo;
   //   2. ZATVORENIE Escapom alebo klikom vedla — dovtedy to bola TICHA STRATA
   //      rozpisaneho riadku. Hodnoty prezijú v pamati a najblizsie otvorenie
   //      TEJ ISTEJ pridavacky ich predvyplni; zmaze ich az USPESNY zapis
   //      (`budCloseDraft`), lebo vtedy uz riadok v rozpocte naozaj je.
-  // Per DRUH preto, ze polia vlastnej polozky a spotrebica su ine — spolocna
-  // pamat by ich miesala.
-  var BUD_DRAFT_VALUES = { custom: null, appliance: null };
+  // ŠT-2c (audit #12): SKLAD tejto pamate uz NIE JE tu — presunul sa do
+  // zdielanej kostry (`NXModal`, kluc `memoryKey`), lebo je to sucast
+  // kontraktu D-15, nie vlastnost rozpoctu; kazda dalsia pridavacka (D-69
+  // editor materialu) ju tak dostane zadarmo a rovnako. Rozpocet si necháva
+  // len TENKY pristupovy bod `budDraftMemory(kind)`. Kluc = druh pridavacky
+  // ('custom' | 'appliance') — polia vlastnej polozky a spotrebica su ine,
+  // spolocna pamat by ich miesala.
   var BUD_MODAL = null;        // { kind, id } — otvoreny ⋯ modal
   var BUD_FOCUS = null;        // obnova fokusu/hodnoty cez re-render
   // E-c „Prepočítať ceny": { phase:'confirm'|'run'|'report', pid, total, done,
@@ -754,8 +758,11 @@
   };
 
   // Zapamatane hodnoty tej istej pridavacky (null = este sa nic nepisalo).
+  // Sklad je v komponente (ŠT-2c #12) — toto je jedine miesto, cez ktore sa
+  // rozpocet pyta, takze pripadna dalsia zmena skladu sa uz budget.js netyka.
   function budDraftMemory(kind){
-    return BUD_DRAFT_VALUES[kind] || null;
+    if (typeof window === 'undefined' || !window.NXModal) return null;
+    return NXModal.memory(kind);
   }
 
   // Otvorenie modalu. Polia sa predvyplnia tym, co v tejto pridavacke naposledy
@@ -768,6 +775,7 @@
     BUD_DRAFT = kind;
     NXModal.open({
       title: meta.title, sub: meta.sub, note: meta.note, okLabel: 'Pridať',
+      memoryKey: kind,
       fields: budDraftFields(kind, budDraftMemory(kind)),
       onSubmit: function(v){ budDraftCommit(kind, v); }
     });
@@ -777,9 +785,11 @@
   // rozpisanych hodnot sa zahadzuje (inak by sa pri dalsom „Pridať položku"
   // predvyplnila polozka, ktora uz existuje).
   function budCloseDraft(){
-    if (BUD_DRAFT) BUD_DRAFT_VALUES[BUD_DRAFT] = null;
+    if (typeof window !== 'undefined' && window.NXModal){
+      if (BUD_DRAFT) NXModal.clearMemory(BUD_DRAFT);
+      NXModal.close();
+    }
     BUD_DRAFT = null;
-    if (typeof window !== 'undefined' && window.NXModal) NXModal.close();
   }
 
   // Odomknutie potvrdzovacieho tlacidla po odmietnutom zapise (review #2).
@@ -1434,8 +1444,9 @@
   // pouzivatel najst svoje hodnoty na mieste, nie prazdny formular. Zavrie ho
   // az POTVRDENIE zo servera (`NX.budgetResult(op, true)`).
   function budDraftCommit(kind, values){
+    // Hodnoty su zapamatane PRED odoslanim — zapisuje ich sama kostra
+    // (`NXModal`, kluc `memoryKey`), takze rozpocet uz o sklade nevie.
     var attrs = budDraftAttrs(kind, values || {});
-    BUD_DRAFT_VALUES[kind] = attrs; // hodnoty su zapamatane PRED odoslanim
     var missing = budDraftMissing(kind, attrs);
     // Klientske odmietnutie (chyba povinne pole) — na server sa nic neposlalo,
     // takze zamok treba pustit HNED, inak by okno ostalo zosednute navzdy.

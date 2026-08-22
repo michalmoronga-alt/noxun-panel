@@ -5,7 +5,7 @@
      to isté zdieľané jadro `ProductionCore`).
      Vizuálna referencia: SYSTEM/zdroje/ui20/mockup_studio.html -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.7.48">
+<link rel="stylesheet" href="css/panel.css?v=0.7.49">
 <style>
   /* Štýly sú ZÁMERNE inline v studio.html (rovnaký dôvod, aký mala production.html):
      panel.css je zdieľaný s Inspectorom a rozloženie tohto okna doňho nepatrí.
@@ -436,12 +436,24 @@
      (polia) · mfoot (Zrušiť + zelené potvrdenie). POZOR na mená: `panel.css`
      už používa `.nxmodal` pre SCRIM starších modalov, preto sa karta tejto
      kostry volá `.nxmcard` (mockup ju kreslí ako `.nxmodal`). */
-  .nxscrim { position: fixed; inset: 0; z-index: 150; background: var(--nx-scrim);
+  /* Z-VRSTVY MODALU (audit ŠT-2c #11). Hodnoty žijú TU, pri definícii scrimu,
+     a von sa dávajú premennou. Dôvod: prekrytie našepkávača (`#mdSgBox`
+     v `panel.css`) je vzťah DVOCH vrstiev — keby v `panel.css` sedelo vlastné
+     číslo, prvá zmena scrimu by ho ticho poslala POD modal a dropdown by sa
+     v editore materiálu prestal dať kliknúť. `panel.css` preto číta
+     `var(--nx-z-suggest, 80)`; fallback 80 platí v paneli, kde D-15 modal
+     ani scrim nie sú. */
+  :root { --nx-z-scrim: 150; --nx-z-suggest: 151; }
+  .nxscrim { position: fixed; inset: 0; z-index: var(--nx-z-scrim); background: var(--nx-scrim);
              display: flex; align-items: flex-start; justify-content: center; padding: 48px 16px; }
   .nxmcard { background: var(--nx-surface); border: 1px solid var(--nx-border); border-radius: 9px;
              box-shadow: 0 18px 50px var(--nx-modal-shadow); width: 560px; max-width: 96vw;
              max-height: calc(100vh - 96px); display: flex; flex-direction: column; }
   .nxmcard.sm { width: 420px; }
+  /* `wide` = formuláre s opakovateľnými riadkami (D-69 editor materiálu):
+     riadok dosky nesie kód · hrúbku · formát · cenu naraz, na 560 px by sa
+     stĺpce zlomili pod seba a tabuľka by prestala byť čitateľná. */
+  .nxmcard.wide { width: 640px; }
   .mhead { display: flex; align-items: center; gap: 8px; padding: 11px 14px;
            border-bottom: 1px solid var(--nx-border); }
   .mhead h3 { margin: 0; font-size: 13.5px; color: var(--nx-ink-title); }
@@ -464,6 +476,42 @@
                               background: var(--nx-surface); color: var(--nx-ink); }
   .mrow input.mshort, .mrow select.mshort { flex: 0 0 96px; }
   .mrow .munit { font-size: 11px; color: var(--nx-ink-faint); }
+  /* ŠT-2c: typy polí pre dlhšie formuláre (D-69 editor materiálu).
+     `group` = nadpis sekcie — dlhý formulár bez predelov sa číta ako jedna
+     kopa políčok a používateľ v ňom stratí, kde končí identita a začínajú
+     dosky. */
+  .mgroup { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 4px;
+            padding-top: 8px; border-top: 1px solid var(--nx-border-soft); }
+  .mgroup:first-child { margin-top: 2px; padding-top: 0; border-top: 0; }
+  .mgroup h4 { margin: 0; font-size: 12px; letter-spacing: .3px; text-transform: uppercase;
+               color: var(--nx-ink-soft); }
+  .mgroup span { font-size: 11px; color: var(--nx-ink-faint); }
+  .mrow.mcheck input { flex: 0 0 auto; width: 14px; height: 14px; }
+  /* `color` = vzorka + text #RRGGBB (hodnotu musí byť vidno a dať skopírovať) */
+  .mrow .mswatch { flex: 0 0 20px; height: 20px; border-radius: 6px;
+                   border: 1px solid var(--nx-border-strong); background: var(--nx-surface-sunken); }
+  /* `rows` = opakovateľné riadky (dosky, ABS) — tabuľka s + / − */
+  .mrows { margin: 6px 0 10px; }
+  .mrhead { font-size: 12px; color: var(--nx-ink-label); margin-bottom: 4px; }
+  .mrcols, .mrline { display: flex; align-items: center; gap: 6px; }
+  .mrcols { font-size: 10.5px; color: var(--nx-ink-faint); padding: 0 2px 2px; }
+  .mrcols span { flex: 1; min-width: 0; }
+  .mrcols .mrgap { flex: 0 0 26px; }
+  .mrline { margin: 3px 0; }
+  .mrline input, .mrline select { flex: 1; min-width: 0; padding: 4px 6px; font: inherit;
+                                  font-size: 12.5px; border: 1px solid var(--nx-border-strong);
+                                  border-radius: 6px; background: var(--nx-surface); color: var(--nx-ink); }
+  .mrline input[type="checkbox"] { flex: 0 0 14px; width: 14px; height: 14px; }
+  .mrline .mrdel { flex: 0 0 26px; display: inline-flex; align-items: center; justify-content: center;
+                   padding: 3px 0; background: var(--nx-surface-sunken); color: var(--nx-ink-faint);
+                   border: 1px solid var(--nx-border); border-radius: 6px; cursor: pointer; }
+  .mrline .mrdel:hover:not([disabled]) { color: var(--nx-danger); border-color: var(--nx-danger); }
+  .mrline .mrdel[disabled] { opacity: .4; cursor: default; }
+  .mrline .mrdel .ic { width: 13px; height: 13px; }
+  .mrempty { font-size: 11px; color: var(--nx-ink-faint); padding: 4px 2px; }
+  .mradd { margin-top: 4px; }
+  .mradd .mrbtn { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
+  .mradd .mrbtn .ic { width: 13px; height: 13px; }
   .btab tr.bcpasm td { font-weight: 600; }
   .btab tr.bcptotal td { font-weight: 700; border-top: 2px solid var(--nx-border-strong);
                          color: var(--nx-ink-title); }
@@ -728,34 +776,34 @@
 </template>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.7.48"></script>
+<script src="js/errors.js?v=0.7.49"></script>
 <!-- D-51/D-77: minimálna OBSAHOVÁ veľkosť okna pri otvorení (js/win_fit.js).
      Navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami a stĺpcom akcií — v užšom
      okne končí pravá časť riadku mimo. Trojica NX_FIT_MIN → width/height →
      min_width/min_height je v docs/UI_DIZAJN.md (tabuľka D-51). -->
 <script>window.NX_FIT_MIN = { w: 1060, h: 640 };</script>
-<script src="js/win_fit.js?v=0.7.48"></script>
+<script src="js/win_fit.js?v=0.7.49"></script>
 <!-- Sprite ikon (žiadne emoji v ovládacích prvkoch). Musí byť PRED studio.js —
      navigácia aj hover akcie riadkov používajú <use href="#i-…">. -->
-<script src="js/icons.js?v=0.7.48"></script>
+<script src="js/icons.js?v=0.7.49"></script>
 <!-- ŠT-1b: ZDIELANE 3-stavove nastavenie kontroly hran. TEN ISTY subor nacitava
      aj Inspector (rohovy trojuholnik pri ABS kontrole v raile) — jeden markup,
      jeden stav. Musi byt PRED studio.js (lista sekcie Kontrola ho vola pri
      renderi). ŠT-1c PR B3: okno Vyroba zaniklo — prepinace su TU. -->
-<script src="js/edge_menu.js?v=0.7.48"></script>
+<script src="js/edge_menu.js?v=0.7.49"></script>
 <!-- ŠT-1c PR B2 (D-15): ZDIELANA kostra modalov („pridávačiek"). Musí byť PRED
      studio.js aj budget.js — Escape handler Štúdia sa pýta `NXModal.isOpen()`
      a rozpočet ním otvára svoje pridávačky. Ďalšie inštancie (D-69 editor
      materiálu, položka/set kovania) sa naň napoja bez kopírovania. -->
-<script src="js/nx_modal.js?v=0.7.48"></script>
-<script src="js/studio.js?v=0.7.48"></script>
+<script src="js/nx_modal.js?v=0.7.49"></script>
+<script src="js/studio.js?v=0.7.49"></script>
 <!-- ŠT-1c PR B1: sekcia ROZPOČET (Š12–Š13). MUSÍ byť AŽ ZA studio.js — číta
      jeho globálny payload `ST` a hlavne OBALUJE `NX.setStudio` (uvoľnenie
      frontu zápisov po príchode čerstvej generácie). studio.js pritom NX
      PRIRAĎUJE celý (`window.NX = {…}`), takže v opačnom poradí by obal aj
      `NX.budgetResult`/`NX.priceRefresh` prepísal a rozpočet by po prvom zápise
      zamrzol. Poradie stráži guard test (tests/pure/test_st1c_rozpocet.rb). -->
-<script src="js/budget.js?v=0.7.48"></script>
+<script src="js/budget.js?v=0.7.49"></script>
 <!-- ŠT-2a/2b: sekcia MATERIÁLY. Okno „Materiály projektu" ZANIKLO, takže tento
      súbor beží už len TU; príznak nižšie ostáva ako explicitné prihlásenie sa
      do režimu sekcie (a ako poistka Node testov, ktoré ho nenastavujú).
@@ -769,6 +817,6 @@
      handlerov; `demos_add.js` nesie modal „Pridať z Demosu". Oba používajú
      výhradne vlastné prefixy (`mdd*` / `nxda*`), takže v okne so studio.js
      a budget.js nič neprepisujú (stráži guard test). -->
-<script src="js/demos_diff.js?v=0.7.48"></script>
-<script src="js/demos_add.js?v=0.7.48"></script>
-<script src="js/proj_materials.js?v=0.7.48"></script>
+<script src="js/demos_diff.js?v=0.7.49"></script>
+<script src="js/demos_add.js?v=0.7.49"></script>
+<script src="js/proj_materials.js?v=0.7.49"></script>

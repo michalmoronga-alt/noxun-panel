@@ -1172,7 +1172,12 @@
   .mddm { color: var(--nx-select-accent); }
   /* M-A3c (D-67): vlastny suggest dropdown (CEF datalist klik bug) — jeden
      zdielany overlay, position:fixed nad formularmi (ziadne clipovanie). */
-  #mdSgBox { position: fixed; z-index: 80; background: var(--nx-surface);
+  /* ŠT-2c (audit #11): v Štúdiu beží ten istý formulár aj VNÚTRI D-15 modalu,
+     ktorého scrim je vrstva `--nx-z-scrim`. Vlastné číslo by tu bolo magické
+     a pri prvej zmene scrimu by dropdown ticho zapadol POD modal (viditeľný,
+     ale neklikateľný). Preto sa číta premenná definovaná pri `.nxscrim`
+     v `studio.html`; fallback 80 platí v paneli, kde D-15 modal nie je. */
+  #mdSgBox { position: fixed; z-index: var(--nx-z-suggest, 80); background: var(--nx-surface);
              border: 1px solid var(--nx-border-strong); border-radius: 6px;
              box-shadow: 0 4px 14px var(--nx-modal-shadow); max-height: 200px; overflow-y: auto; }
   .mdsg-row { padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--nx-ink); }
