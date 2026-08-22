@@ -32,10 +32,18 @@ module Noxun
 
       # ZAVAZNY whitelist sekcii Studia. ŠT-1a priniesla Kusovnik, ŠT-1b
       # KONTROLU (`ctrl`), ŠT-1c PR A NAKUP KOVANIA (`buy`), ŠT-1c PR B1
-      # ROZPOCET (`budget`) a PR B2 CENOVU PONUKU (`offer`). JS zrkadla
+      # ROZPOCET (`budget`), PR B2 CENOVU PONUKU (`offer`) a ŠT-2a MATERIALY
+      # (`mat` — prva ziva polozka skupiny KATALOGY). JS zrkadla
       # (`studio.js`, `NXShell.STUDIO_SECTIONS`) su pohodlie, nie ochrana
       # (zhodu strazi guard test): autoritou je VZDY Ruby.
-      SECTIONS = %w[bom ctrl buy budget offer].freeze
+      SECTIONS = %w[bom ctrl buy budget offer mat].freeze
+
+      # ŠT-2a: akcie katalogu materialov, ktore smie poslat SEKCIA `mat`, ziju
+      # v JEDINOM zozname — `MaterialsDialog::SECTION_ACTIONS`. Telo kazdej
+      # z nich je tam (jedina autorita katalogu, audit #21 — modul sa
+      # NEPREMENUVA); toto okno je len DALSI vstup a odpoved si necha
+      # presmerovat cez `MaterialsDialog.dispatch`. Druhy zoznam TU by sa
+      # casom rozisiel, preto sa cita az pri registracii callbackov.
 
       # ŠT-1c PR B3: `PRODUCTION_BRIDGES` (premostenia do TABOV okna Vyroba)
       # ZANIKLI spolu s oknom — kusovnik, kontrola, nakup kovania, rozpocet aj
@@ -43,15 +51,18 @@ module Noxun
 
       # Premostenia do satelitnych okien (KATALOGY + NASTAVENIA). Hodnota je
       # meno modulu — volat sa smie LEN to, co je TU (klient posiela iba kluc).
+      # ŠT-2a: `mat` z tejto tabulky VYPADLO — Materialy su ZIVA sekcia tohto
+      # okna. Okno „Materiály projektu" este zije (zanikne v ŠT-2b), ale uz sa
+      # neotvara z navigacie; sekcia si ho otvara VLASTNOU cestou
+      # (`mat_open_window`) a LEN pre toky, ktore este nevie (Demos).
       WINDOW_BRIDGES = {
-        'mat' => 'MaterialsDialog', 'hw' => 'HardwareCatalogDialog',
+        'hw' => 'HardwareCatalogDialog',
         'rules' => 'RulesDialog', 'tpl' => 'TemplatesDialog',
         'sup' => 'SupplierSettingsDialog', 'bset' => 'SupplierSettingsDialog'
       }.freeze
 
       # Slovenske hlasky premosteni — texty sklada SERVER (jedna autorita).
       BRIDGE_STATUS = {
-        'mat' => 'Otváram okno Materiály (presun do Štúdia príde v dávke ŠT-2).',
         'hw' => 'Otváram okno Katalóg kovania (presun do Štúdia príde v dávke ŠT-3).',
         'rules' => 'Otváram okno Pravidlá kovania (presun do Štúdia príde v dávke ŠT-3).',
         'tpl' => 'Otváram okno Šablóny (presun do Štúdia príde v dávke ŠT-3).',
@@ -59,13 +70,25 @@ module Noxun
         # ziju v okne Nastavenia rozpoctu, vazba na Demos v okne Materialy —
         # spoja sa az v Studiu (Š19). Status to musi povedat, inak sa otvori
         # okno s inym nadpisom a pouzivatel si mysli, ze klikol zle.
-        'sup' => 'Otváram okno Nastavenia rozpočtu — väzba na Demos je zatiaľ v okne Materiály (presun v ŠT-2).',
+        'sup' => 'Otváram okno Nastavenia rozpočtu — väzba na Demos je zatiaľ v okne Materiály (presun v ŠT-4).',
         # ŠT-1c PR B1 (#20): to iste okno otvara aj ⚙ v liste sekcie Rozpocet —
         # kontextova skratka k sadzbam, ktore rozpocet POCITAJU. Text to musi
         # povedat, inak vyzeraju ako dve rozne nastavenia.
         'bset' => 'Otváram Nastavenia rozpočtu — sadzby, režimy a prahy platia pre celý ' \
                   'rozpočet (presun do Štúdia príde v dávke ŠT-4).',
         'about' => 'O plugine nájdeš v koliesku Inspectora — otváram Inspector.'
+      }.freeze
+
+      # ŠT-2a: hlasky premostenia Z VNUTRA sekcie Materialy. Nie je to
+      # navigacne premostenie (sekcia je ziva) — su to TRI toky, ktore drzia
+      # dlhy beh viazany na instanciu okna Materialy (Demos fetch, replace UNI
+      # s odlozenou poziadavkou). Presunie ich ŠT-2b; do vtedy sa poctivo
+      # priznaju namiesto mrtveho tlacidla.
+      MAT_BRIDGE_STATUS = {
+        'demos_add' => 'Pridávanie z Demosu beží zatiaľ v okne Materiály — otváram ho (presun do Štúdia príde v dávke ŠT-2b).',
+        'demos_update' => 'Aktualizácia z Demosu beží zatiaľ v okne Materiály — otváram ho (presun do Štúdia príde v dávke ŠT-2b).',
+        'replace_uni' => 'Nahradenie UNI beží zatiaľ v okne Materiály — otváram ho (presun do Štúdia príde v dávke ŠT-2b).',
+        'other' => 'Otváram okno Materiály — táto časť sa do Štúdia presunie v dávke ŠT-2b.'
       }.freeze
 
       # --- INDIKATOR NEAKTUALNOSTI (tlacidlo „Obnoviť" zozltne) --------------
@@ -155,10 +178,13 @@ module Noxun
         # Bezpecny refresh — volaju ho editor materialov, nastavenia, katalog
         # kovania aj prepocet cien (audit #10: Studio musi byt vo VSETKYCH
         # refresh cestach, inak by drzalo stare cisla).
-        def refresh_if_open
+        # ŠT-2a: `bump: false` = payload je PLNY, ale generacia sa NEDVIHA.
+        # Pouziva ho katalogovy zapis (`MaterialsDialog.after_catalog_change`):
+        # cisla sa menia, identita riadkov nie — pending klik ostava platny.
+        def refresh_if_open(bump: true)
           return unless @dialog && @dialog.visible?
 
-          push_state
+          push_state(bump: bump)
         rescue StandardError => e
           Engine.log_error(e, 'StudioDialog.refresh_if_open')
         end
@@ -178,6 +204,10 @@ module Noxun
           # nie je prepnuty (poradie observerov pri New/Open), observer by ostal
           # visiet na STAROM dokumente — a indikator by uz NIKDY nezozltol.
           attach_stale_observer(model || Sketchup.active_model)
+          # ŠT-2a: novy dokument = novy modelovy kontext sekcie Materialy;
+          # katalog sa posle CELY (jeho identita `row_rev` sa medzitym mohla
+          # zmenit v inom okne a klient nema ako to vediet).
+          @mat_full_pending = true
           push_state
         rescue StandardError => e
           Engine.log_error(e, 'StudioDialog.on_model_changed')
@@ -503,6 +533,94 @@ module Noxun
           Engine.log_error(e, 'StudioDialog.push_vepo_bar')
         end
 
+        # --- ŠT-2a: sekcia MATERIALY -----------------------------------------
+        #
+        # Kanal je zamerne DELENY na dve cesty:
+        #   * KATALOGOVE ECHO (`push_mat_catalog`) — vzor `push_vepo_bar`:
+        #     prepise LEN katalog v okne, NEPREPOCITAVA kusovnik a hlavne
+        #     NEDVIHA generaciu. Katalogovy zapis nemeni model, takze rozkliknuty
+        #     riadok Kusovnika ani rozrobeny export inej sekcie po nom nesmie
+        #     zastarat (audit #4).
+        #   * PLNY PUSH (`push_state`) — nesie modelovy kontext sekcie
+        #     (predvolby, pocty, „Použité v projekte") a pri PRVOM pushi aj cely
+        #     katalog. Zdvih generacie ostava na tom, co ho zasluzi: zmena
+        #     modelu.
+        def mat_actions
+          defined?(MaterialsDialog) ? MaterialsDialog::SECTION_ACTIONS : []
+        end
+
+        def do_mat(name, payload)
+          unless defined?(MaterialsDialog)
+            return set_status('Katalóg materiálov nie je načítaný.', true)
+          end
+
+          MaterialsDialog.dispatch(name, payload, mat_sink)
+        end
+
+        # Adresat odpovedi: TOTO okno. `MaterialsDialog` posiela `MD.*` volania
+        # (`MD.init`, `MD.setCatalog`, `MD.setStatus`, `MD.confirmDelete`…) —
+        # sekcia ma presne tie iste prijimace, lebo bezi na TOM ISTOM
+        # `js/proj_materials.js`.
+        def mat_sink
+          ->(script) { js(script) }
+        end
+
+        # Premostenie tokov, ktore ostali v okne Materialy (ŠT-2b). Hlasku
+        # sklada SERVER — pouzivatel musi vediet, PRECO sa mu otvorilo ine okno.
+        def do_mat_open_window(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          unless defined?(MaterialsDialog)
+            return set_status('Okno Materiály sa nepodarilo otvoriť (nie je načítané).', true)
+          end
+
+          MaterialsDialog.show
+          set_status(MAT_BRIDGE_STATUS[data['what'].to_s] || MAT_BRIDGE_STATUS['other'])
+        end
+
+        # Katalogove echo. Payload sa smie PODAT (after_catalog_change ho uz
+        # zostavil — druhy `Materials.load` a druhy vypocet `row_rev` pre kazdy
+        # zaznam by bol zbytocny).
+        def push_mat_catalog(payload = nil)
+          return unless defined?(MaterialsDialog)
+
+          data = payload || MaterialsDialog.catalog_payload
+          js("if (window.NX && NX.setMatCatalog) NX.setMatCatalog(#{data.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.push_mat_catalog')
+        end
+
+        # Modelovy kontext sekcie. `used` sa pocita z UZ zozbieraneho kusovnika
+        # (audit #15) — okno Materialy na to malo vlastny `Ids` sken modelu
+        # a v Studiu by to bol DRUHY prechod modelom pri KAZDOM prepocte.
+        # Rozdiel oproti oknu je priznany a vedomy: sekcia rata to, co je
+        # naozaj vo VYROBE (ten isty zdroj ako Kusovnik).
+        def mat_payload(model, collected)
+          out = { 'project' => Materials.project_defaults(model),
+                  'cabinets' => collected[:cabinets].to_i,
+                  'model_guid' => ProductionCore.model_guid(model),
+                  'used' => mat_used(collected) }
+          # Cely katalog LEN pri prvom pushi okna a po prepnuti dokumentu;
+          # inak ho drzi klient a zmeny mu chodia echom.
+          out['catalog'] = MaterialsDialog.catalog_payload if @mat_full_pending && defined?(MaterialsDialog)
+          out
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.mat_payload')
+          nil
+        end
+
+        def mat_used(collected)
+          key_by_id = Materials.decor_key_by_material_id
+          usage = Hash.new(0)
+          Array(collected[:records]).each do |r|
+            key = key_by_id[r['material_id']]
+            next if key.nil? || key.empty?
+
+            qty = r['quantity'].to_i
+            usage[key] += qty.positive? ? qty : 1
+          end
+          usage
+        end
+
         # --- premostenia navigacie (audit #2) --------------------------------
         # Klient posiela LEN meno polozky; ci sa smie otvorit a CO sa otvori,
         # rozhoduje whitelist TU (HTML nie je ochrana).
@@ -596,6 +714,9 @@ module Noxun
           lambda do
             push_state
             MaterialsDialog.push_catalog if defined?(MaterialsDialog)
+            # ŠT-2a: cerstve ceny potrebuje aj SEKCIA Materialy tohto okna —
+            # `push_state` vyssie nesie modelovy kontext, nie katalog.
+            push_mat_catalog
             Panel.push_materials if defined?(Panel)
             HardwareCatalogDialog.push_items if defined?(HardwareCatalogDialog)
           end
@@ -631,11 +752,22 @@ module Noxun
             style: UI::HtmlDialog::STYLE_DIALOG
           )
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'studio.html'))
+          # ŠT-2a (audit #8, vzor MaterialsDialog): HTML okna este NEBEZI —
+          # `execute_script` poslany pred nacitanim CEF potichu ZAHODI. Priznak
+          # sa zapne az v `ready` callbacku. Dnes ho nikto nekontroluje (kazdy
+          # push ide reaktivne az po `ready`), ŠT-2b na nom postavi odlozenu
+          # poziadavku „Nahradiť UNI…" v tomto okne.
+          @ready = false
+          # Prvy push po otvoreni musi niest CELY katalog materialov — sekcia
+          # `mat` zacina s prazdnymi rukami (dalsie pushe uz len echo, audit #15).
+          @mat_full_pending = true
           register_callbacks(@dialog) # pred show!
           # Bez vynulovania by dalsie otvorenie ozivilo referenciu na mrtve
           # okno a kazdy push by tichol na vynimke (audit #14).
           @dialog.set_on_closed do
             detach_stale_observer
+            @ready = false
+            @mat_full_pending = true # dalsie otvorenie zacina bez katalogu
             @dialog = nil
           end
           # Indikator neaktualnosti zije PRESNE tak dlho ako okno.
@@ -645,7 +777,7 @@ module Noxun
 
         def register_callbacks(dlg)
           Engine.register_dialog_fit(dlg, 'studio') # D-77 + UI-01 tema
-          cb(dlg, 'ready')        { |_p| push_state }
+          cb(dlg, 'ready')        { |_p| @ready = true; push_state }
           # SMOKE 22.8.: NIE `push_state` priamo — po prepocte musi prist aj
           # hlaska, inak v okne navzdy visi klientske „Prepočítavam…".
           cb(dlg, 'refresh_bom')  { |_p| do_refresh_bom }
@@ -680,6 +812,15 @@ module Noxun
           # E-c: „Prepočítať ceny" — hromadne obnovenie cien z Demosu.
           cb(dlg, 'price_refresh')        { |p| handle_price_refresh(p) }
           cb(dlg, 'price_refresh_cancel') { |_p| ProductionCore.price_refresh_cancel(status: status_proc) }
+          # ŠT-2a, sekcia MATERIALY. Mena callbackov su TIE ISTE ako v okne
+          # Materialy — presunuty JS (`js/proj_materials.js`) tak vola presne
+          # to, co volal doteraz, a nikde nevznika druha kopia payloadu.
+          # Telo je v `MaterialsDialog`, sem chodi len odpoved (`mat_sink`).
+          mat_actions.each { |name| cb(dlg, name) { |p| do_mat(name, p) } }
+          # Toky, ktore sekcia zatial NEVIE (Demos add/diff, „Nahradiť UNI…") —
+          # ich zivotnost visi na instancii okna Materialy, takze ich presunie
+          # az ŠT-2b. Do vtedy ich sekcia POCTIVO premosti do toho okna.
+          cb(dlg, 'mat_open_window')      { |p| do_mat_open_window(p) }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(studio): #{msg}")
@@ -858,6 +999,13 @@ module Noxun
             # Š10: stav oboch prepinacov listy. Vypnuty prepinac nic neskenuje.
             edge_check: (defined?(EdgeCheck) ? EdgeCheck.ui_state(model) : nil),
             grain_check: (defined?(GrainCheck) ? GrainCheck.ui_state(model) : nil),
+            # ŠT-2a, sekcia MATERIALY: modelovy kontext (predvolby projektu,
+            # pocet skriniek, identita dokumentu a pocty „Použité v projekte").
+            # KATALOG v nom je LEN pri prvom pushi okna a po prepnuti dokumentu
+            # — inak ho klient drzi a zmeny mu chodia lacnym echom
+            # (`push_mat_catalog`). Bez toho by KAZDY prepocet kusovnika
+            # prepocitaval aj `row_rev` kazdeho zaznamu katalogu.
+            mat: mat_payload(model, collected),
             # Deep-link: sekcia sa posiela PRAVE RAZ (inak by kazdy refresh
             # vratil pouzivatela tam, odkial medzitym odisiel).
             open_section: consume_pending_section,
@@ -878,6 +1026,10 @@ module Noxun
           # prepocte NEZOZLTNE. A LEN ked payload naozaj odosiel (review #6):
           # co klient nedostal, to v okne aktualne nie je.
           @pushed_epoch = @epoch.to_i if sent
+          # Katalog materialov je v okne AZ TERAZ — dalsie pushe uz nesu len
+          # modelovy kontext. A LEN ked payload naozaj odosiel (rovnaky dovod
+          # ako pri epoche: co klient nedostal, to v okne nie je).
+          @mat_full_pending = false if sent
           sent
         end
 

@@ -283,7 +283,8 @@
     // sekciu nepomenuva. ST-1a priniesla Kusovnik, ŠT-1b Kontrolu, ŠT-1c PR A
     // Nakup kovania (`buy`), ŠT-1c PR B1 Rozpocet (`budget`), ŠT-1c PR B2
     // Cenovu ponuku (`offer`).
-    var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer'];
+    // ŠT-2a: + `mat` (Materialy su ziva sekcia Studia; okno zanikne v ŠT-2b).
+    var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat'];
     function studioSection(s){
       var v = String(s == null ? '' : s);
       return STUDIO_SECTIONS.indexOf(v) >= 0 ? v : null;

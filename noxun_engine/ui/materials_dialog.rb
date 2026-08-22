@@ -26,7 +26,81 @@ module Noxun
         'default_back_material_id'  => ['back_material_id', 'back', 'back_thickness']
       }.freeze
 
+      # --- ŠT-2a: sekcia MATERIALY v Studiu ---------------------------------
+      #
+      # Od tejto davky ma katalog DVE UI: toto satelitne okno a sekciu `mat`
+      # v Studiu (okno zanikne az v ŠT-2b). Telo VSETKYCH katalogovych akcii
+      # ostava TU — modul `MaterialsDialog` je jedina serverova autorita
+      # katalogu a NEPREMENUVA sa (audit #21). Sekcia posiela TIE ISTE payloady
+      # pod TYMI ISTYMI menami; lisi sa LEN adresat odpovede, ktoreho drzi
+      # `with_client` (viz `js`).
+      #
+      # Zoznam je UZAVRETY whitelist: klient (Studio) posiela iba meno akcie,
+      # co sa smie zavolat rozhoduje SERVER. Asynchronne Demos behy tu ZAMERNE
+      # NIE SU — ich zivotnost visi na instancii okna (`demos_alive_proc`),
+      # takze do sekcie ich presunie az ŠT-2b (dovtedy ich sekcia premosti do
+      # tohto okna). Z toho isteho dovodu tu nie je ani `open_search_url`
+      # (vola ho naseptavac modalu „Pridať z Demosu") a dvojica
+      # `replace_uni_preview`/`replace_uni_apply` — v sekcii sa dnes ziadny
+      # z tychto modalov neotvara, takze by to bola mrtva cesta.
+      SECTION_ACTIONS = %w[
+        set_project_material
+        add_sheet update_sheet delete_sheet create_duplak
+        add_edge update_edge delete_edge
+        add_decor_batch rename_decor set_decor_name set_decor_manufacturer set_decor_color
+        patch_sheet patch_edge
+        delete_preflight restore_pre_schema2
+        open_demos_url
+      ].freeze
+
       class << self
+        # Vykona akciu katalogu v mene INEHO okna (sekcia Studia). `sink` je
+        # proc, ktory dostane hotovy JS retazec a posle ho tomu, KTO sa pytal —
+        # inak by odpoved (`MD.setStatus`, `MD.init`, `MD.confirmDelete`)
+        # skoncila v okne, ktoreho sa pouzivatel ani nedotkol. Volanie je
+        # synchronne, takze sink zije presne jeden callback.
+        def dispatch(name, payload, sink)
+          key = name.to_s
+          unless SECTION_ACTIONS.include?(key)
+            return sink.call("MD.setStatus(#{'Neznáma akcia katalógu.'.to_json}, true)")
+          end
+
+          with_client(sink) { run_section_action(key, payload) }
+        end
+
+        def run_section_action(key, payload)
+          case key
+          when 'set_project_material'    then handle_set_project_material(payload)
+          when 'add_sheet'               then handle_save_sheet(payload, create: true)
+          when 'update_sheet'            then handle_save_sheet(payload, create: false)
+          when 'delete_sheet'            then handle_delete_sheet(payload)
+          when 'create_duplak'           then handle_create_duplak(payload)
+          when 'add_edge'                then handle_save_edge(payload, create: true)
+          when 'update_edge'             then handle_save_edge(payload, create: false)
+          when 'delete_edge'             then handle_delete_edge(payload)
+          when 'add_decor_batch'         then handle_add_decor_batch(payload)
+          when 'rename_decor'            then handle_rename_decor(payload)
+          when 'set_decor_name'          then handle_set_decor_name(payload)
+          when 'set_decor_manufacturer'  then handle_set_decor_manufacturer(payload)
+          when 'set_decor_color'         then handle_set_decor_color(payload)
+          when 'patch_sheet'             then handle_patch(payload, 'sheet')
+          when 'patch_edge'              then handle_patch(payload, 'edge')
+          when 'delete_preflight'        then handle_delete_preflight(payload)
+          when 'restore_pre_schema2'     then handle_restore_backup(payload)
+          when 'open_demos_url'          then handle_open_demos_url(payload)
+          end
+        end
+
+        # Presmerovanie odpovedi na cas jedneho volania. `ensure` je povinne:
+        # vynimka v handleri nesmie nechat sink viset, inak by dalsia odpoved
+        # tohto okna odisla do Studia.
+        def with_client(sink)
+          prev = @client_sink
+          @client_sink = sink
+          yield
+        ensure
+          @client_sink = prev
+        end
         def show
           dlg = ensure_dialog
           if dlg.visible?
@@ -334,7 +408,20 @@ module Noxun
           js("MD.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})")
         end
 
+        # ŠT-2a: odpoved ide TOMU, KTO sa pytal. Bez sinku (bezny callback tohto
+        # okna, refresh cesty zvonku) je to vlastny HtmlDialog — presne ako
+        # doteraz.
         def js(script)
+          sink = @client_sink
+          return sink.call(script) if sink
+
+          dialog_js(script)
+        end
+
+        # Vzdy do VLASTNEHO okna — aj ked prave bezi akcia sekcie. Pouziva to
+        # `after_catalog_change`: katalog je jeden, takze cerstve zaznamy musia
+        # dostat OBE UI, nielen to, ktore pisalo.
+        def dialog_js(script)
           return unless @dialog && @dialog.visible?
           @dialog.execute_script(script)
         rescue StandardError => e
@@ -793,6 +880,26 @@ module Noxun
           set_status(ru_done_msg(plan['summary']))
           push_state
           Panel.push_selected(model) # refresh Inspectora (selecty, karta dielca/dosky)
+          refresh_studio_after_model_write
+        end
+
+        # ŠT-2a (audit #4): DVE cesty tohto suboru menia MODEL — projektova
+        # predvolba a „Nahradiť UNI…". Obe prestavaju skrinky, takze Studio
+        # musi dostat PLNY push AJ so zdvihom generacie: kusovnik, kontrola aj
+        # rozpocet su po nich naozaj ine cisla a stary klik sa uz odmietnut MA.
+        # (Katalogovy zapis je opak — ten ide s `bump: false`, viz
+        # `after_catalog_change`.)
+        #
+        # Poradie (nota #20): AZ ZA `Panel.push_selected`. Ten cez
+        # `ScaleWatch.request_dedup` moze naplanovat opravu identity kopii;
+        # keby push sla pred nim, jantarove „Obnoviť" by hned po prepocte
+        # znovu zozltlo. Overene: dedup otvara operaciu LEN ked naozaj nieco
+        # meni — vtedy je jantar pravdivy a `dedup: false` by len zahodil
+        # opravu, ktoru prave tato (hromadna) prestavba potrebuje.
+        def refresh_studio_after_model_write
+          StudioDialog.refresh_if_open if defined?(StudioDialog)
+        rescue StandardError => e
+          Engine.log_error(e, 'MaterialsDialog.refresh_studio_after_model_write')
         end
 
         # Spolocna stavba planu: guardy katalogu/zaznamov -> scan -> klasifikacia.
@@ -971,6 +1078,7 @@ module Noxun
           set_status(msg)
           push_state
           Panel.push_selected(model) # refresh Inspectora (korpusove selecty, karta dielca)
+          refresh_studio_after_model_write
         end
 
         # --- D-46: predvolba korpusu s inou hrubkou ---------------------------
@@ -1425,7 +1533,15 @@ module Noxun
           # D-42 (audit FIX 13): katalogovy zapis NEskenuje model — pouzite dekory
           # a predvolby sa zapisom do katalogu nemenia; plny push_state ostava pre
           # ready/on_model_changed/projektove predvolby.
-          push_catalog
+          #
+          # ŠT-2a: katalog je JEDEN, UI su DVE (toto okno + sekcia `mat`
+          # Studia). Echo preto dostanu OBE — a z JEDNEHO payloadu: druhy
+          # `catalog_payload` by znamenal druhy `Materials.load` a druhy vypocet
+          # `row_rev` pre kazdy zaznam. Ide zamerne mimo `js` (ten by pri akcii
+          # sekcie posial echo len sekcii a toto okno by drzalo stare ceny).
+          payload = catalog_payload
+          dialog_js("MD.setCatalog(#{payload.to_json})")
+          StudioDialog.push_mat_catalog(payload) if defined?(StudioDialog)
           Panel.push_materials if defined?(Panel)
           # D-104 (Codex GH #152 P2): katalogovy zapis NIE JE modelova transakcia,
           # takze ModelObserver zvyraznenia hran o nom nevie — a pritom prave
@@ -1438,7 +1554,12 @@ module Noxun
           # ŠT-1c PR B3: vetva okna Vyroba tu zanikla spolu s oknom.
           # ST-1a: Studio — skupiny Kusovnika nesu farbu, nazov a hrubku
           # PRIAMO z katalogu.
-          StudioDialog.refresh_if_open if defined?(StudioDialog)
+          # ŠT-2a (audit #4): payload je PLNY, ale generacia sa NEDVIHA. Zapis
+          # do katalogu nemeni `rows` ani `refs` (dielec drzi svoje
+          # `material_id`) — rozkliknuty riadok Kusovnika ani rozrobeny export
+          # inej sekcie preto nesmie zastarat len preto, ze niekto opravil cenu.
+          # Vzor je rozpoctovy push (`budget_repush_proc`).
+          StudioDialog.refresh_if_open(bump: false) if defined?(StudioDialog)
         end
       end
     end
