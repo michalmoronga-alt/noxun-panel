@@ -281,7 +281,11 @@
     // a ABS su od tejto davky sekciou Kusovnik v okne Studio.
     // ŠT-1b: to iste sa stalo tabu `control` — KONTROLA je sekcia `ctrl` Studia.
     // ŠT-1c PR A: a tabu `hardware` — NAKUP KOVANIA je sekcia `buy` Studia.
-    var STUDIO_TABS = ['budget'];
+    // ŠT-1c PR B1: a POSLEDNEMU tabu `budget` — ROZPOCET je sekcia `budget`
+    // Studia. Zoznam je PRAZDNY: okno Vyroba uz nema kam deep-linkovat, takze
+    // `studioTab` vracia vzdy null a `open_production` okno len OTVORI. Cela
+    // dvojica (`studioTab`/`studioLink`) zanikne s oknom v PR B3.
+    var STUDIO_TABS = [];
     function studioTab(t){
       var s = String(t == null ? '' : t);
       return STUDIO_TABS.indexOf(s) >= 0 ? s : null;
@@ -294,8 +298,8 @@
     // Sekcie Studia. Zoznam je ZRKADLO `StudioDialog::SECTIONS` — autoritou je
     // RUBY, tento mirror len zabrani, aby z panela vyletela hodnota, ktora
     // sekciu nepomenuva. ST-1a priniesla Kusovnik, ŠT-1b Kontrolu, ŠT-1c PR A
-    // Nakup kovania (`buy`).
-    var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy'];
+    // Nakup kovania (`buy`), ŠT-1c PR B1 Rozpocet (`budget`).
+    var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget'];
     function studioSection(s){
       var v = String(s == null ? '' : s);
       return STUDIO_SECTIONS.indexOf(v) >= 0 ? v : null;

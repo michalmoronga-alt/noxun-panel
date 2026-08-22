@@ -30,8 +30,8 @@ function ok(cond, msg){ n++; assert.ok(cond, msg); }
 
 // ŠT-1b: pribudla sekcia Kontrola (`ctrl`) — dovtedy bola premostenim do
 // okna Vyroba. Zoznam je ZRKADLO `StudioDialog::SECTIONS`.
-eq(S.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy'],
-   'v Studiu ziju sekcie Kusovník, Kontrola a Nákup kovania');
+eq(S.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget'],
+   'v Studiu ziju sekcie Kusovník, Kontrola, Nákup kovania a Rozpočet');
 
 // --- 2) hladanie bez diakritiky (Š6) ----------------------------------------
 
@@ -147,9 +147,23 @@ eq(S.rgbHex([300, -5, 12]), '#ff000c', 'hodnoty mimo rozsahu sa orezu, nie zahod
 // --- 8) navigacia: premostenia vs. neaktivne polozky ------------------------
 
 // ŠT-1c PR A: `buy` (Nákup kovania) uz NIE JE premostenie — je to ziva sekcia.
+// ŠT-1c PR B1: to iste `budget` (Rozpocet). Polozka `offer` uz tiez NIE JE
+// premostenim do ineho okna — nahlad cenovej ponuky je CASTOU sekcie Rozpocet,
+// takze klik ostava v tomto okne (`goto`).
 eq(S.navBridgeIds().sort(),
-   ['about', 'bset', 'budget', 'hw', 'mat', 'offer', 'rules', 'sup', 'tpl'].sort(),
-   'ZRKADLO whitelistu premosteni v StudioDialog (PRODUCTION_BRIDGES + WINDOW_BRIDGES + about)');
+   ['about', 'bset', 'hw', 'mat', 'rules', 'sup', 'tpl'].sort(),
+   'ZRKADLO whitelistu premosteni v StudioDialog (WINDOW_BRIDGES + about)');
+
+const BUDGET_ITEM = S.navItem('budget');
+ok(BUDGET_ITEM && !BUDGET_ITEM.bridge && !BUDGET_ITEM.disabled,
+   'Rozpočet je ZIVA sekcia tohto okna (ŠT-1c PR B1)');
+
+const OFFER_ITEM = S.navItem('offer');
+ok(OFFER_ITEM && !OFFER_ITEM.bridge, 'Cenová ponuka uz nepremostuje do ineho okna');
+eq(OFFER_ITEM.goto, { sec: 'budget', open: 'cp' },
+   'vedie na nahlad VNUTRI sekcie Rozpocet (vlastnu sekciu prinesie PR B2)');
+ok(/vlastná sekcia príde/.test(OFFER_ITEM.hint),
+   'a tooltip priznava, ze vlastnu sekciu este nema');
 
 const BUY_ITEM = S.navItem('buy');
 ok(BUY_ITEM && !BUY_ITEM.bridge && !BUY_ITEM.disabled, 'Nákup kovania je ZIVA sekcia tohto okna');
@@ -166,8 +180,8 @@ ok(BOM_ITEM && !BOM_ITEM.bridge && !BOM_ITEM.disabled, 'Kusovník je ZIVA sekcia
 // Polozka bez jedneho z troch by bola tichy mrtvy klik.
 S.NAV.forEach(function(g){
   g.items.forEach(function(it){
-    ok(S.STUDIO_SECTIONS.indexOf(it.id) >= 0 || it.bridge || it.disabled,
-       `polozka navigacie „${it.t}" musi byt sekcia, premostenie alebo mat dovod`);
+    ok(S.STUDIO_SECTIONS.indexOf(it.id) >= 0 || it.bridge || it.disabled || it.goto,
+       `polozka navigacie „${it.t}" musi byt sekcia, premostenie, preklik alebo mat dovod`);
     ok(!!it.ic, `polozka „${it.t}" ma ikonu (zbalena navigacia ukazuje LEN ikony)`);
   });
 });

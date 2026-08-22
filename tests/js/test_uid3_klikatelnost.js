@@ -88,13 +88,15 @@ eq(NXShell.warnRows([{ message: 'a' }, { message: 'b' }]).map(r => r.text), ['a'
 
 // ST-1a: `rows`/`sheets`/`edging` zanikli — kusovnik a supisy platni a ABS su
 // sekciou Kusovnik okna Studio. ŠT-1b: to iste sa stalo tabu `control`,
-// ŠT-1c PR A tabu `hardware` (sekcia `buy` Studia) — ostal jediny tab.
-eq(NXShell.STUDIO_TABS, ['budget'],
-   'zoznam tabov je ZRKADLO ProductionDialog::TABS');
+// ŠT-1c PR A tabu `hardware` (sekcia `buy` Studia) a ŠT-1c PR B1 POSLEDNEMU
+// tabu `budget` (sekcia `budget`). Okno Vyroba tak nema kam deep-linkovat —
+// zoznam je PRAZDNY a `studioTab` vracia vzdy null.
+eq(NXShell.STUDIO_TABS, [],
+   'zoznam tabov je ZRKADLO ProductionDialog::TABS (prazdne — okno nema taby)');
 
 eq(NXShell.studioTab('control'), null, 'zaniknuty tab kontroly sa uz z panela nedostane von');
 eq(NXShell.studioTab('hardware'), null, 'ani zaniknuty tab kovania (je to sekcia `buy` Studia)');
-eq(NXShell.studioTab('budget'), 'budget', 'rozpocet prejde');
+eq(NXShell.studioTab('budget'), null, 'ani rozpocet (je to sekcia `budget` Studia)');
 eq(NXShell.studioTab('rows'), null, 'zaniknuty tab kusovnika sa uz z panela nedostane von');
 eq(NXShell.studioTab('sheets'), null, 'zaniknuty tab platni tiez nie');
 eq(NXShell.studioTab('kontrola'), null, 'slovensky preklep nie je meno tabu');
@@ -103,17 +105,18 @@ eq(NXShell.studioTab(null), null, 'chybajuca hodnota = bez deep-linku');
 eq(NXShell.studioTab(undefined), null, 'rail Štúdio (bez argumentu) tab NEPREPINA');
 eq(NXShell.studioTab('__proto__'), null, 'zoznam sa pyta indexOf, nie vlastnosti objektu');
 
-eq(NXShell.studioLink('budget'), { tab: 'budget' }, 'payload nesie iba meno tabu');
+eq(NXShell.studioLink('budget'), { tab: null }, 'deep-link na zaniknuty tab z panela nevyleti');
 eq(NXShell.studioLink(), { tab: null }, 'bez tabu ide `null` — server vtedy tab nemeni');
 eq(NXShell.studioLink('nieco'), { tab: null }, 'nezname meno sa z panela vobec nedostane von');
 
 // --- 3) ST-1a: deep-link do okna STUDIO -------------------------------------
 
-eq(NXShell.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy'],
+eq(NXShell.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget'],
    'zoznam sekcii je ZRKADLO StudioDialog::SECTIONS');
 eq(NXShell.studioSection('bom'), 'bom', 'platna sekcia prejde');
 eq(NXShell.studioSection('ctrl'), 'ctrl', 'ŠT-1b: Kontrola je ZIVA sekcia Studia (uz nie premostenie)');
 eq(NXShell.studioSection('buy'), 'buy', 'ŠT-1c: Nákup kovania je ZIVA sekcia Studia (uz nie premostenie)');
+eq(NXShell.studioSection('budget'), 'budget', 'ŠT-1c PR B1: Rozpočet je ZIVA sekcia Studia');
 eq(NXShell.studioSection('mat'), null, 'premostenie do ineho okna NIE JE sekcia');
 eq(NXShell.studioSection(''), null, 'prazdna hodnota = bez deep-linku');
 eq(NXShell.studioSection(null), null, 'chybajuca hodnota = bez deep-linku');

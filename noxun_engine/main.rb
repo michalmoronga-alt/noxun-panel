@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.7.34' unless defined?(VERSION)
+    VERSION = '0.7.35' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -324,11 +324,11 @@ module Noxun
       toolbar_icon(cmd_panel, 'noxun_logo.svg')
       tb.add_item(cmd_panel)
 
-      # ST-1a (audit #2): tlačidlo sa volá Štúdio a otvára ŠTÚDIO. Obsah, ktorý
-      # sa doň zatiaľ nepresťahoval, je v navigácii Štúdia ako PREMOSTENIE do
-      # okna Výroba — nie je to teda skrytá cesta, len ešte nie konečný domov.
+      # ST-1a (audit #2): tlačidlo sa volá Štúdio a otvára ŠTÚDIO.
+      # ŠT-1c PR B1: v Štúdiu už žijú VŠETKY štyri obsahy okna Výroba (Kusovník ·
+      # Kontrola · Nákup kovania · Rozpočet); premostenia do neho zanikli.
       cmd_studio = UI::Command.new('Štúdio') { StudioDialog.show }
-      cmd_studio.tooltip = 'Štúdio — kusovník zákazky (kontrola a rozpočet zatiaľ v okne Výroba)'
+      cmd_studio.tooltip = 'Štúdio — kusovník, kontrola, nákup kovania a rozpočet zákazky'
       cmd_studio.status_bar_text = 'Kusovník, kontrola, rozpočet a výstupy zákazky.'
       toolbar_icon(cmd_studio, 'noxun_studio.svg')
       tb.add_item(cmd_studio)

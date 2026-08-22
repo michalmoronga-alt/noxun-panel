@@ -1,10 +1,11 @@
-<!-- Noxun Engine — okno VYROBA (V0.5 B): kusovnik + supisy + klik-select.
-     Vanilla JS, ziadne CDN, slovensky. READ-ONLY nad modelom — klik iba vybera.
-     Data: NX.setBom push z production_dialog.rb.
-     V0.6 E-b: pribudol tab ROZPOCET (js/budget.js) — jediny tab, ktory model
-     MENI (data rozpoctu v NOXUN dict na modeli, kazda zmena = 1 undo krok). -->
+<!-- Noxun Engine — okno VYROBA. ŠT-1c PR B1: PRAZDNA SKRUPINA.
+     Vsetky styri taby (Kusovnik/Materialy/ABS · Kontrola · Kovanie · Rozpocet)
+     sa presunuli do okna ŠTÚDIO. Okno tu ostava JEDNU davku navyse zamerne:
+     este do neho vedu vstupne body (menu, relaye panela, broadcasty) a tiche
+     zmiznutie by ich zlomilo. Zanikne v ŠT-1c PR B3.
+     Data: NX.setBom push z production_dialog.rb — uz len pre ⚠ chip a suhrn. -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.7.34">
+<link rel="stylesheet" href="css/panel.css?v=0.7.35">
 <!-- V0.5 D: styly semaforu ZAMERNE inline v production.html (NIE v zdielanom
      panel.css — paralelna davka D-29 ho meni; ziadny cache-bust konflikt). -->
 <style>
@@ -21,132 +22,10 @@
      .hwcat/.hwmiss/.hwsum) — PRESUNULI sa (nie kopírovali) do studio.html,
      kde žije sekcia „Nákup kovania". */
 
-  /* ============ V0.6 E-b: tab ROZPOCET (mock v4) ============
-     Farby VYHRADNE cez --nx-* tokeny (docs/UI_DIZAJN.md). Styly su inline
-     z rovnakeho dovodu ako semafor vyssie — panel.css je zdielany. */
-  .bsum { display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-          background: var(--nx-surface); border: 1px solid var(--nx-border);
-          border-radius: 8px; padding: 10px 14px; margin: 6px 0 10px; }
-  .blbl { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--nx-ink-muted); }
-  .btotal { font-size: 24px; font-weight: 700; color: var(--nx-ink-title); font-variant-numeric: tabular-nums; }
-  .btotal small { font-size: 12px; font-weight: 400; color: var(--nx-ink-muted); }
-  .bswitch { display: flex; flex-direction: column; gap: 5px; }
-  .bseg { display: flex; border: 1px solid var(--nx-border-strong); border-radius: 6px;
-          overflow: hidden; font-size: 11.5px; }
-  .bseg button { border: 0; background: var(--nx-surface); padding: 4px 0; cursor: pointer;
-                 color: var(--nx-ink-label); font: inherit; font-size: 11.5px; flex: 1; min-width: 46px; }
-  .bseg button + button { border-left: 1px solid var(--nx-border-soft); }
-  .bseg button.on { background: var(--nx-select); color: var(--nx-on-accent); font-weight: 600; }
-  .bseg.bmode button { font-variant-numeric: tabular-nums; letter-spacing: .5px; }
-  .bwarns { margin-left: auto; display: flex; flex-direction: column; gap: 5px; align-items: flex-end; }
-  .bchip { display: inline-flex; align-items: center; gap: 6px; background: var(--nx-warn-bg);
-           border: 1px solid var(--nx-warnchip-border); color: var(--nx-warn-fg);
-           border-radius: 6px; padding: 5px 10px; font-size: 11.5px; cursor: pointer;
-           font: inherit; text-align: left; }
-  .bchip .ic { width: 12px; height: 12px; transition: transform .12s; }
-  .bchip.open .ic { transform: rotate(90deg); }
-  .blist { background: var(--nx-warn-bg); border: 1px solid var(--nx-warnchip-border);
-           border-radius: 8px; padding: 6px 12px; font-size: 11.5px;
-           color: var(--nx-warnrow-fg); margin: 0 0 10px; }
-  .blist > div { display: flex; justify-content: space-between; gap: 14px; padding: 2px 0; }
-  .blist .bage { font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .blist .bwrow { cursor: pointer; }
-  .blist .bwrow:hover { text-decoration: underline; }
-
-  details.bsec { background: var(--nx-surface); border: 1px solid var(--nx-border);
-                 border-radius: 8px; margin: 0 0 8px; overflow: hidden; }
-  details.bsec > summary { display: flex; align-items: center; gap: 9px; padding: 7px 12px;
-                           flex-wrap: wrap; font-weight: 400; }
-  details.bsec > summary h3 { margin: 0; font-size: 11.5px; text-transform: uppercase;
-                              letter-spacing: .7px; color: var(--nx-ink-strong); font-weight: 600; }
-  .bcnt { font-size: 11px; color: var(--nx-ink-faint); }
-  .bsubt { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums;
-           color: var(--nx-ink-title); font-size: 13px; }
-  .bsubt.off { color: var(--nx-ink-faint); text-decoration: line-through; }
-  .bappl { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px;
-           color: var(--nx-ink-label); cursor: pointer; }
-  .bappl input { accent-color: var(--nx-select); }
-
-  .btab { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .btab th { background: var(--nx-surface-th); color: var(--nx-ink-label); font-weight: 600;
-             text-align: left; font-size: 10.5px; padding: 4px 12px;
-             border-top: 1px solid var(--nx-border-soft); border-bottom: 1px solid var(--nx-border); }
-  .btab td { padding: 3px 10px; border-bottom: 1px solid var(--nx-border-soft); vertical-align: middle; }
-  .btab tr:last-child td { border-bottom: 0; }
-  .btab th.bnum, .btab td.bnum { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .btab td.bmut, .bmut { color: var(--nx-ink-muted); }
-  .bfnt { color: var(--nx-ink-faint); font-size: 11px; }
-  .bstrike { text-decoration: line-through; color: var(--nx-ink-faint); margin-right: 6px; }
-  .bpen { width: 12px; height: 12px; color: var(--nx-warn-fg); vertical-align: -0.1em; }
-  .btab tr.bzero td { color: var(--nx-ink-faint); }
-  .btab tr.bmiss td { background: var(--nx-warn-bg); }
-  .bmisslbl { color: var(--nx-warn-fg); font-size: 11px; }
-  .bold-price { color: var(--nx-warn-fg); background: var(--nx-warn-bg); border-radius: 6px; padding: 0 5px; }
-
-  .bedit { font: inherit; font-size: 12px; border: 1px solid var(--nx-border-strong);
-           border-radius: 6px; padding: 2px 5px; background: var(--nx-surface); color: var(--nx-ink);
-           width: 90px; }
-  .btab td.bnum .bedit { text-align: right; font-variant-numeric: tabular-nums; }
-  .bedit.bshort { width: 52px; }
-  .bedit.bwide { width: 100%; min-width: 80px; }
-  .bedit.bad { border-color: var(--nx-danger-line); background: var(--nx-danger-bg-soft); }
-  .bmcell { white-space: nowrap; }
-  .bacts { white-space: nowrap; width: 64px; padding-left: 2px; padding-right: 6px; }
-  .bact { background: none; border: 0; padding: 0 3px; cursor: pointer; color: var(--nx-select);
-          line-height: 1; vertical-align: -0.15em; }
-  .bact:hover { color: var(--nx-select-strong); }
-  .bact.bdel { color: var(--nx-ink-faint); }
-  .bact.bdel:hover { color: var(--nx-danger); }
-  .bact .ic { width: 14px; height: 14px; }
-
-  /* UI-01: je to primarna AKCIA („pridaj riadok"), preto ZELENA (--nx-action) —
-     nie vyberova rodina. Vyberove tokeny by sa v teme Lucia prefarbili na ruzovo
-     a tlacidlo „vykonaj" musi vyzerat rovnako na oboch pocitacoch. */
-  .baddbig { display: block; width: calc(100% - 24px); margin: 6px 12px 10px; font: inherit;
-             font-size: 13.5px; font-weight: 700; letter-spacing: .2px; color: var(--nx-on-accent);
-             background: var(--nx-action); border: 0; border-radius: 8px; padding: 9px 0;
-             cursor: pointer; text-align: center; }
-  .baddbig:hover { background: var(--nx-action-hover); }
-  .baddbig .ic { width: 15px; height: 15px; vertical-align: -0.15em; }
-  .bdraft { display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
-            padding: 8px 12px; background: var(--nx-select-bg-soft);
-            border-top: 1px solid var(--nx-border-soft); }
-  .bdraft .bedit.bwide { width: auto; flex: 1 1 160px; }
-  .bdraft button { font-size: 12px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px; }
-  .bnote { font-size: 10.5px; color: var(--nx-ink-faint); padding: 2px 12px 8px; line-height: 1.45; }
-
-  .broundrow { display: flex; align-items: center; gap: 10px; background: var(--nx-surface);
-               border: 1px solid var(--nx-border); border-radius: 8px; padding: 7px 14px;
-               font-size: 12px; margin: 0 0 8px; }
-  .bfoot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 2px 0 4px; }
-  .bfoot button { font-size: 12px; padding: 6px 12px; display: inline-flex; align-items: center; gap: 5px; }
-  .bfoot button[disabled] { opacity: .55; cursor: not-allowed; }
-  .bfoot .bgear { margin-left: auto; }
-
-  /* ===== V0.6 E-c: PREPOCITAT CENY (potvrdenie -> progres -> report) ===== */
-  .bprog { height: 8px; background: var(--nx-surface-sunken); border-radius: 6px;
-           overflow: hidden; margin: 10px 0 6px; }
-  .bprog i { display: block; height: 100%; width: 0; background: var(--nx-select); transition: width .3s; }
-  /* Dovod chyby / poznamka "bez vazby" — na rozdiel od .bage sa SMIE zalomit. */
-  .bprwhy { color: var(--nx-warn-fg); text-align: right; }
-  #budPrModal .btab { margin: 4px 0; }
-  #budPrModal .blist { margin: 8px 0 0; }
-  #budPrModal .bnote { padding: 4px 0; }
-
-  /* ===== V0.6 E-b2: CENOVA PONUKA — nahlad (zakaznicky pohlad na rozpocet) ===== */
-  .bcpband { display: flex; align-items: center; gap: 6px; margin: 0; padding: 5px 12px;
-             font-size: 11.5px; background: var(--nx-warn-bg); color: var(--nx-warn-fg);
-             border-bottom: 1px solid var(--nx-border-soft); }
-  .bcpband.ok { background: var(--nx-ok-bg); color: var(--nx-ok-fg); }
-  .bcpband .ic { width: 13px; height: 13px; }
-  .btab tr.bcpasm td { font-weight: 600; }
-  .btab tr.bcptotal td { font-weight: 700; border-top: 2px solid var(--nx-border-strong);
-                         color: var(--nx-ink-title); }
-  .bcpmerged { border-top: 1px solid var(--nx-border-soft); }
-  .bcpmerged > summary { padding: 5px 12px; font-size: 11.5px; color: var(--nx-ink-muted); cursor: pointer; }
-  .bcpmrow { display: flex; align-items: center; gap: 10px; padding: 2px 12px; font-size: 12px; }
-  .bcpmrow > span:first-child { flex: 1; }
-  .bcpmrow .bnum { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  /* ŠT-1c PR B1: štýly TABU ROZPOČET (.bsum/.bseg/.bchip/.blist/.bsec/.btab/
+     .bedit/.bacts/.baddbig/.bdraft/.broundrow/.bfoot/.bprog + náhľad cenovej
+     ponuky .bcp*) tu ZANIKLI spolu s tabom — PRESUNULI sa (nie kopírovali) do
+     studio.html, kde žije sekcia „Rozpočet". Oknu neostal ŽIADNY tab. */
 </style>
 
 <div class="prodhead">
@@ -165,32 +44,20 @@
 </div>
 <div id="prodSummary" class="prodsum">…</div>
 
-<!-- ST-1a: VEPO export aj taby Kusovník / Materiály / ABS sa presunuli do okna
-     ŠTÚDIO (sekcia Kusovník, pohľady Dielce · Platne · ABS); ŠT-1b vzala tab
-     Kontrola a ŠT-1c PR A tab Kovanie (sekcia „Nákup kovania", Š7). Ostal
-     POSLEDNÝ tab Rozpočet — po jeho presune (ŠT-1c PR B) okno zanikne.
-     Zoznam tabov číta production.js z DOM — odobranie tlačidla si tam
-     nevyžaduje ďalšiu zmenu. -->
-<div class="pvtabs prodtabs" id="prodTabs">
-  <button id="pt_budget" class="on" onclick="setProdTab('budget')">Rozpočet</button>
-</div>
-
+<!-- ŠT-1c PR B1: LISTA TABOV ZANIKLA — okno uz nema ziadny tab (whitelist
+     `TABS` v production_dialog.rb je prazdne pole). Telo nizsie ukazuje jedinu
+     vetu o tom, kam sa obsah prestahoval. -->
 <div id="prodBody" class="prodbody"><div class="muted">Načítavam…</div></div>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.7.34"></script>
-<!-- D-77: minimalna OBSAHOVA velkost okna pri otvoreni (js/win_fit.js). Tabulky
-     kusovnika a rozpoctu maju editovatelne bunky a stlpec akcii vpravo — v uzkom
-     okne konci prava cast riadku mimo. -->
+<script src="js/errors.js?v=0.7.35"></script>
+<!-- D-77: minimalna OBSAHOVA velkost okna pri otvoreni (js/win_fit.js).
+     ŠT-1c PR B1: okno uz nekresli ziadnu tabulku, cislo vsak ostava — okno
+     zanika v PR B3 a menit ho tesne predtym by len zmiatlo zapamatane rozmery. -->
 <script>window.NX_FIT_MIN = { w: 640, h: 540 };</script>
-<script src="js/win_fit.js?v=0.7.34"></script>
-<!-- Sprite ikon (ziadne emoji v ovladacich prvkoch) — pouziva ho tab Rozpocet
-     (ikony akcii riadkov). Musi byt PRED production.js.
-     ŠT-1b: zdielany modul 3-stavoveho nastavenia hran sa uz tu NENACITAVA —
-     prepinace su v sekcii Kontrola okna ŠTÚDIO. -->
-<script src="js/icons.js?v=0.7.34"></script>
-<script src="js/production.js?v=0.7.34"></script>
-<!-- V0.6 E-b: tab Rozpocet. Az ZA production.js — cita jeho globalny BOM a
-     vola renderBody()/NX.setStatus(); production.js volá renderBudget() az pri
-     prepnuti tabu, takze poradie definicii sedi. -->
-<script src="js/budget.js?v=0.7.34"></script>
+<script src="js/win_fit.js?v=0.7.35"></script>
+<!-- Sprite ikon (ziadne emoji v ovladacich prvkoch). Musi byt PRED
+     production.js. ŠT-1c PR B1: js/budget.js sa uz tu NENACITAVA — sekcia
+     Rozpocet zije v okne ŠTÚDIO (nacita ho studio.html AZ ZA studio.js). -->
+<script src="js/icons.js?v=0.7.35"></script>
+<script src="js/production.js?v=0.7.35"></script>

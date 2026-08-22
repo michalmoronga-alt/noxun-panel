@@ -131,16 +131,19 @@ end
 NxTest.test('UI-02 + ST-1a: kazde tlacidlo ma slovensky tooltip a Studio priznava, co v nom EST nie je') do
   body = ui02_install_toolbar
   NxTest.assert_equal(4, body.scan(/\.tooltip =/).length, 'tooltip patri ku kazdemu tlacidlu')
-  # ST-1a: tlacidlo uz otvara SKUTOCNE Studio (nie okno Vyroba). Tooltip preto
-  # nesmie hovorit „zatiaľ otvára okno Výroba" — musi ale poctivo povedat, ze
-  # kontrola a rozpocet su este v inom okne (premostenie v navigacii Studia).
+  # ST-1a: tlacidlo uz otvara SKUTOCNE Studio (nie okno Vyroba).
+  # ŠT-1c PR B1: v Studiu ziju VSETKY styri obsahy okna Vyroba (Kusovnik ·
+  # Kontrola · Nakup kovania · Rozpocet), takze tooltip uz NESMIE posielat
+  # pouzivatela inam — okno Vyroba je prazdna skrupina.
   NxTest.assert(body.include?('cmd_studio = UI::Command.new(\'Štúdio\') { StudioDialog.show }'),
                 'tlacidlo Štúdio otvara StudioDialog, nie ProductionDialog')
   studio = body[/cmd_studio\.tooltip = '([^']+)'/, 1].to_s
-  NxTest.assert(studio.include?('Výroba'),
-                'tooltip musi povedat, co v Studiu este nie je (poctivy nazov cieloveho okna)')
+  NxTest.refute(studio.include?('Výroba'),
+                'tooltip uz neposiela do okna Vyroba (nema tam co ukazat)')
   NxTest.assert(studio.include?('Kusovník') || studio.include?('kusovník'),
-                'a zaroven co v nom UZ je')
+                'a povie, co v Studiu je')
+  NxTest.assert(studio.downcase.include?('rozpočet'),
+                'vratane rozpoctu — od ŠT-1c PR B1 je to jeho sekcia')
 end
 
 # --- 3) prepinace: zapnuty stav je vidno --------------------------------------

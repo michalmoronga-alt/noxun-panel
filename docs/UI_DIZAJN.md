@@ -1035,6 +1035,13 @@ v `HtmlDialog.new` sú **vonkajšie** — obsah + rámik okna (Windows ≈ 16 px
 > **1060 px Štúdia** je navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami
 > a stĺpcom hover akcií; v užšom okne končí pravá časť riadku mimo. Výška 640
 > nechá pod lištou sekcie vidieť aspoň dve skupiny materiálu naraz.
+> **ŠT-1c PR B1 hodnotu preverila na najširšej tabuľke rozpočtu** (Spotrebiče:
+> typ · názov · dodávateľ · cena · stĺpec akcií · medzisúčet, teda editovateľné
+> bunky aj akcie vpravo): telo sekcie má pri 1060 px ≈ 828 px, čo je viac než
+> šírka, na ktorej tá istá tabuľka žila v okne Výroba (obsah 640 px) aj než
+> minimum mockupu (`#stageStudio` 900 px vrátane navigácie). **Hodnota sa preto
+> NEMENÍ** — zdvihnúť ju kvôli sekcii, ktorá sa zmestí, by len zbytočne
+> zväčšilo okno na malých obrazovkách.
 > Satelitné okná dostanú svoje riadky tabuľky, keď ich prevezme Štúdio.
 
 ### Vzory okna Štúdio (ŠT-1a)

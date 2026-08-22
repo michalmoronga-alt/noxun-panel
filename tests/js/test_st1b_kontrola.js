@@ -106,8 +106,11 @@ const COUNTS = { red: 2, orange: 2, total: 4, cabinets: 20, clean: 17 };
 
   const bud = S.ctrlRowHtml(ITEMS[3], 3);
   ok(bud.indexOf('Rozpočet') >= 0, 'rozpoctovy nalez NEMA entitu — miesto je „Rozpočet"');
-  ok(bud.indexOf('data-act="budget"') >= 0, 'a ma vlastnu akciu (premostenie)');
-  ok(bud.indexOf('okne Výroba') >= 0, 'tooltip PRIZNA, ze Rozpocet je zatial v okne Vyroba');
+  ok(bud.indexOf('data-act="budget"') >= 0, 'a ma vlastnu akciu (preklik do Rozpoctu)');
+  // ŠT-1c PR B1: Rozpocet je SEKCIA toho isteho okna — tooltip uz nesmie
+  // posielat pouzivatela do okna Vyroba (to je prazdna skrupina).
+  no(bud.indexOf('okne Výroba') >= 0, 'tooltip uz NEHOVORI o okne Vyroba');
+  ok(bud.indexOf('sekcie Rozpočet') >= 0, 'ale o sekcii Rozpocet tohto okna');
   no(bud.indexOf('data-act="eye"') >= 0, 'oko pri nom nie je — niet co oznacit');
 })();
 

@@ -211,6 +211,10 @@ module Noxun
           # ŠT-1c PR A: CSV nakupneho zoznamu kovania zo sekcie Nakup — rovnaky
           # flush handshake ako VEPO, vlastnym kanalom Studia.
           cb(dlg, 'studio_do_hw_csv')       { |p| StudioDialog.do_hw_csv(p) }
+          # ŠT-1c PR B1: XLSX rozpoctu a zakaznicka cenova ponuka zo sekcie
+          # Rozpocet — ten isty flush handshake, vlastnym kanalom Studia.
+          cb(dlg, 'studio_do_budget_xlsx')  { |p| StudioDialog.do_budget_xlsx(p) }
+          cb(dlg, 'studio_do_cp_xlsx')      { |p| StudioDialog.do_cp_xlsx(p) }
           # V0.4.7c: samostatna doska — vlozenie + karta (fields/material/ABS hrana)
           cb(dlg, 'insert_board')       { |p| handle_insert_board(p) }
           cb(dlg, 'set_board_fields')   { |p| handle_set_board_fields(p) }
