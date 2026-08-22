@@ -381,8 +381,18 @@ module Noxun
         # ŠT-1c PR B1 (audit #1): refresh po mutacii ROZPOCTU. Plny payload,
         # ale BEZ zdvihu generacie — inak by kazdy prepis sumy zneplatnil
         # rozkliknuty riadok Kusovnika a rozrobeny export inej sekcie.
+        #
+        # Review #3: JEDINA refresh cesta okna, ktora si nesmie dovolit vynimku.
+        # `ProductionCore.do_budget` vola `repush` aj vo svojej rescue vetve —
+        # keby prvy pokus vybuchol, druhy by uz bezal MIMO rescue, vyletel by
+        # z callbacku a klient by nedostal payload; jeho fronta zapisov by
+        # potom visela az do 6 s poistky (`BUD_BUSY_MS`).
         def budget_repush_proc
-          -> { push_state(bump: false) if @dialog && @dialog.visible? }
+          lambda do
+            push_state(bump: false) if @dialog && @dialog.visible?
+          rescue StandardError => e
+            Engine.log_error(e, 'StudioDialog.budget_repush')
+          end
         end
 
         # Vysledok mutacie ide do okna PRED cerstvym payloadom — rozpisany
@@ -410,14 +420,21 @@ module Noxun
         # Po dobehnuti prepoctu: ceny sa zmenili GLOBALNE, takze cerstve cisla
         # potrebuje aj katalog materialov, panel a katalog kovania. Tento push
         # generaciu ZDVIHA (nie je to mutacia rozpoctu — zmenil sa katalog).
-        # Okno Vyroba uz v zozname NIE JE: rozpocet nezobrazuje (jeho `counts`
-        # aj tak obnovi najblizsi vlastny refresh).
+        #
+        # Review #1: okno Vyroba je v zozname TIEZ — hoci rozpocet uz
+        # NEZOBRAZUJE, jeho ⚠ chip nesie `counts` KONTROLY a tie zahrnaju aj
+        # ROZPOCTOVE oranzove nalezy (zlucuje ich zdielana `control_payload`).
+        # Prepocet cien ich vie zmenit (riadok bez ceny cenu dostane), takze bez
+        # by chip ukazoval stare cislo — presne ten druh tichej nezhody, ktory
+        # kontrakt „KAZDE okno s cislami zakazky je vo VSETKYCH refresh
+        # cestach" zakazuje. Zanikne az s oknom v PR B3.
         def price_refresh_after_proc
           lambda do
             push_state
             MaterialsDialog.push_catalog if defined?(MaterialsDialog)
             Panel.push_materials if defined?(Panel)
             HardwareCatalogDialog.push_items if defined?(HardwareCatalogDialog)
+            ProductionDialog.refresh_if_open if defined?(ProductionDialog)
           end
         end
 

@@ -109,13 +109,16 @@
     if (appl > 0){
       out.push({ id: 'appl', included: t.appliances_included === true, amount: appl });
     }
-    // Zvysok upozorneni rozpoctu (bez spotrebicoveho — ten ma vlastny chip).
-    var rest = (b.budget_check || []).filter(function(w){
-      return w.stable_key !== 'budget|appliances|not_included';
-    });
-    if (rest.length){
-      out.push({ id: 'check', count: rest.length, list: rest,
-                 text: rest.length + ' ' + budPluralSk(rest.length,
+    // Upozornenia rozpoctu. Do ŠT-1c PR B1 sa spotrebicove upozornenie ODPOCITALO
+    // (chip pod sebou rozbaloval vlastny zoznam, v ktorom uz malo vlastny chip
+    // vyssie). Odkedy chip VEDIE DO KONTROLY, musi ukazovat TO ISTE cislo, ake
+    // tam pouzivatel uvidi — a Kontrola nesie VSETKY rozpoctove nalezy vratane
+    // spotrebicoveho (`Validation.with_budget`, kontrakt counts z ŠT-1b sa
+    // nemeni). Chip spotrebicov ostava ako SPECIFICKA skratka na ich sekciu.
+    var all = b.budget_check || [];
+    if (all.length){
+      out.push({ id: 'check', count: all.length, list: all,
+                 text: all.length + ' ' + budPluralSk(all.length,
                    ['upozornenie rozpočtu', 'upozornenia rozpočtu', 'upozornení rozpočtu']) });
     }
     return out;
@@ -257,6 +260,12 @@
   // ⚙ OSTAVA (#20) ako KONTEXTOVA skratka: sadzby a prahy rozpocet pocitaju,
   // takze cesta k nim patri sem — polozka navigacie „Nastavenia rozpočtu"
   // otvara TO ISTE okno, len z iného miesta.
+  //
+  // KAZDE tlacidlo listy nesie `data-bkey` — lista sa prekresluje aj vtedy, ked
+  // ju pouzivatel prave ovlada (prepnutie DPH, dobehnutie prepoctu cien), a bez
+  // kluca by mu fokus po prekresleni spadol na <body>. Klavesnicova cesta by sa
+  // tym prerusila presne v momente, ked na nej zalezi najviac (Tab z „Prepočítať
+  // ceny" na export).
   function budToolsHtml(b){
     var running = !!(BUD_PR && BUD_PR.phase === 'run');
     var h = '<div class="bseg" role="group" aria-label="Zobrazenie DPH">' +
@@ -265,24 +274,25 @@
       '<button type="button" class="' + (BUD_VAT ? '' : 'on') + '" data-bud="vat" data-v="0"' +
       ' data-bkey="vat:0" title="Len ZOBRAZENIE bez DPH — rozpočet sa počíta v brutto">bez DPH</button>' +
       '</div>' + budModeSegHtml(b) +
-      '<button type="button" class="ghostbtn" data-bud="refresh"' + (running ? ' disabled' : '') +
+      '<button type="button" class="ghostbtn" data-bud="refresh" data-bkey="pr"' +
+      (running ? ' disabled' : '') +
       ' title="Stiahne aktuálne ceny všetkých položiek zákazky viazaných na Demos' +
       ' (medzi položkami je 3 s pauza — pravidlo Demosu)">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Prepočítať ceny</button>' +
       // Prestavba skrinky z Inspectora sem sama nedorazi — bez „Obnoviť" by sa
       // dal exportovať rozpočet zo starých rozmerov (rovnaký dôvod ako v lište
       // Kusovníka a Nákupu; handler je zdieľaný `#refreshBtn` v studio.js).
-      '<button type="button" class="ghostbtn" id="refreshBtn"' +
+      '<button type="button" class="ghostbtn" id="refreshBtn" data-bkey="refresh"' +
       ' title="Prepočítať rozpočet z aktuálneho modelu">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Obnoviť</button>' +
       '<span class="spacer"></span>' +
-      '<button type="button" class="primary" data-bud="xlsx"' +
+      '<button type="button" class="primary" data-bud="xlsx" data-bkey="xlsx"' +
       ' title="Interný rozpočet v presnom formáte tvojich hárkov">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> XLSX rozpočet</button>' +
-      '<button type="button" class="primary" data-bud="cp"' +
+      '<button type="button" class="primary" data-bud="cp" data-bkey="cp"' +
       ' title="Zákaznícky dokument: cenová tabuľka + špecifikácia (bez interných pojmov a kódov)">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Cenová ponuka (zákazník)</button>' +
-      '<button type="button" class="ghostbtn" data-bud="settings"' +
+      '<button type="button" class="ghostbtn" data-bud="settings" data-bkey="settings"' +
       ' title="Sadzby, režimy a prahy — globálne nastavenie, platí pre každú zákazku">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Nastavenia</button>';
     return h;

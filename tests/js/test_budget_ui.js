@@ -75,8 +75,13 @@ function payload(over){
   eq(chips[1].id, 'appl', 'druhy su spotrebice');
   eq(chips[1].included, false, 'spotrebice mimo suctu');
   eq(chips[1].amount, 649, 'suma spotrebicov ide z payloadu, JS ju neskladá');
-  eq(chips[2].count, 1, 'spotrebicove upozornenie sa v tretom chipe NEopakuje');
-  eq(chips[2].text, '1 upozornenie rozpočtu', 'sklonovany text chipu');
+  // ŠT-1c PR B1 (review #2): chip VEDIE DO KONTROLY, takze musi ukazovat TO
+  // ISTE cislo, ake tam pouzivatel uvidi — a Kontrola nesie VSETKY rozpoctove
+  // nalezy vratane spotrebicoveho. Do tejto davky sa spotrebicove odpocitalo
+  // (chip pod sebou rozbaloval vlastny zoznam); teraz by to bola tichá nezhoda.
+  eq(chips[2].count, 2, 'chip pocita VSETKY rozpoctove nalezy — presne tie, co ukaze Kontrola');
+  eq(chips[2].text, '2 upozornenia rozpočtu', 'sklonovany text chipu');
+  eq(chips[2].list.length, 2, 'a nesie ich cely zoznam (poradie urcuje server)');
 })();
 
 (function(){
@@ -378,9 +383,14 @@ function payload(over){
   eq(B.budToolsHtml(null).indexOf('class="on" data-bud="mode"'), -1,
      'chybajuci payload nezhodi listu a ziadny rezim nepodsvieti');
 
-  // Fokus prezije prekreslenie aj v LISTE — tlacidla nesu `data-bkey`.
-  ok(tools.indexOf('data-bkey="vat:1"') > -1 && tools.indexOf('data-bkey="mode:nizky"') > -1,
-     'polia listy nesu kluc pre obnovu fokusu');
+  // Fokus prezije prekreslenie aj v LISTE — KAZDE tlacidlo nesie `data-bkey`
+  // (lista sa prekresluje aj pocas toho, ako ju pouzivatel ovlada: prepnutie
+  // DPH, dobehnutie prepoctu cien; bez kluca by fokus spadol na <body>).
+  ['vat:1', 'vat:0', 'mode:nizky', 'pr', 'refresh', 'xlsx', 'cp', 'settings'].forEach(function(k){
+    ok(tools.indexOf('data-bkey="' + k + '"') > -1, 'tlacidlo listy `' + k + '` nesie kluc fokusu');
+  });
+  eq(tools.split('<button').length - 1, tools.split('data-bkey=').length - 1,
+     'ZIADNE tlacidlo listy nezostalo bez kluca (pocet tlacidiel == pocet klucov)');
 
   // Pocas behu prepoctu je tlacidlo zamknute — ale LEN ono.
   const sum = B.budSummaryHtml(B_BUDGET, 1.23);

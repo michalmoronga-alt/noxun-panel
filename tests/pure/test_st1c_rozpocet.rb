@@ -99,6 +99,12 @@ NxTest.test('ŠT-1c B1 (audit #1): rozpoctovy push NEZDVIHA generaciu okna') do
   NxTest.refute(repush.empty?, 'rozpocet ma VLASTNY repush proc')
   NxTest.assert(repush.include?('push_state(bump: false)'),
                 'a ten generaciu NEDVIHA (pending klik inej sekcie ostava platny)')
+  # Review #3: `ProductionCore.do_budget` vola `repush` AJ vo svojej rescue
+  # vetve — vynimka v prvom pokuse by druhy pokus poslala uz MIMO rescue, ten
+  # by vyletel z callbacku a klientovi by nedosiel payload; jeho fronta zapisov
+  # by potom visela az do 6 s poistky.
+  NxTest.assert(repush.include?('rescue StandardError') && repush.include?('Engine.log_error'),
+                'repush rozpoctu nesmie pustit vynimku von (fronta klienta by visela)')
   NxTest.assert(S1CB_STUDIO_RB.include?('repush: budget_repush_proc'),
                 'do_budget ho naozaj odovzdava jadru')
   # Vsetko ostatne (export, klik, prepocet cien, refresh z inych okien) bumpuje
@@ -178,8 +184,13 @@ NxTest.test('ŠT-1c B1 (audit #12): prepocet cien obnovi okna nad KATALOGOM, nie
      HardwareCatalogDialog.push_items].each do |call|
     NxTest.assert(after.include?(call), "#{call} je v refresh cestach")
   end
-  NxTest.refute(after.include?('ProductionDialog'),
-                'okno Vyroba uz rozpocet nema — refreshovat ho po zmene cien netreba')
+  # Review #1: okno Vyroba je v zozname TIEZ. Rozpocet uz nezobrazuje, ale jeho
+  # ⚠ chip nesie `counts` KONTROLY — a tie zahrnaju ROZPOCTOVE oranzove nalezy,
+  # ktore prepocet cien vie zmenit (riadok bez ceny cenu dostane). Bez toho by
+  # chip ukazoval stare cislo (kontrakt „KAZDE okno s cislami zakazky je vo
+  # VSETKYCH refresh cestach"). Zanikne az s oknom v PR B3.
+  NxTest.assert(after.include?('ProductionDialog.refresh_if_open'),
+                'okno Vyroba dostane cerstve counts pre svoj ⚠ chip')
   alive = S1CB_STUDIO_RB[/def price_refresh_alive_proc.*?\n        end\n/m].to_s
   NxTest.assert(alive.include?('@dialog.equal?(dlg)'),
                 'beh visi na TEJ ISTEJ instancii okna (znovuotvorenie ho neozivi)')
