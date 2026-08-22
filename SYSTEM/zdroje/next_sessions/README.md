@@ -18,7 +18,7 @@ Východiskový plán po UI reworku je:
 Tento priečinok obsahuje osem kandidátov na budúce návrhové sessions:
 
 1. [01_D95_PLOSNA_VYROBNA_KONTROLA.md](01_D95_PLOSNA_VYROBNA_KONTROLA.md) — plošná vizuálna kontrola projektu; pôvodný „diel po diele“ koncept sa po diskusii opúšťa.
-2. [02_ZOSTAVY_SEGMENTY.md](02_ZOSTAVY_SEGMENTY.md) — dátový a UX model zostáv/segmentov, attachmentov a spoločných prvkov.
+2. [02_ZOSTAVY_SEGMENTY.md](02_ZOSTAVY_SEGMENTY.md) — dátový a UX model zostáv/segmentov, scoped pravidiel, attachmentov, živých/spoločných prvkov a odložený Room/MagicPlan smer.
 3. [03_KOVANIE_FAZA3.md](03_KOVANIE_FAZA3.md) — univerzálnejší rule model pre automatiku kovania, výklopy a vyrábané dielce zásuviek.
 4. [04_SPOTREBICE_S1.md](04_SPOTREBICE_S1.md) — katalóg, projektové položky, väzba na skrinku/zónu, niche kontrola a rozpočet.
 5. [05_SHARED_LIBRARY_UPDATE.md](05_SHARED_LIBRARY_UPDATE.md) — D-48/D-52: zdieľané firemné knižnice pre viac PC a distribúcia/updater.
@@ -81,3 +81,15 @@ Odporúčaný vstup pre AI:
 > „Načítaj aktuálny STAV/PLAN/ARCHITEKTURU/STANDARD a potom `SYSTEM/zdroje/next_sessions/<téma>.md`. Najprv porovnaj koncept s dnešnou realitou. Nič neimplementuj. Vypíš potvrdené body, konflikty, otvorené rozhodnutia a otázky na Michala.“
 
 Až po uzavretí tejto diskusie vzniká implementačné zadanie.
+
+## Parking lot pre najbližšiu session
+
+Michal 23. 8. 2026 explicitne pomenoval praktickú bolesť, ktorú chce prebrať **pred pokračovaním ďalšími veľkými bodmi**:
+
+### Základné vkladanie skriniek / V1-04
+
+Dnešný problém: novo vložená skrinka sa objaví niekde pri `0,0,0`, často mimo aktuálneho pohľadu. Používateľ ju potom musí hľadať a ručne prenášať, čo reálne brzdí každodennú prácu.
+
+Ďalšia session má najprv rozobrať minimálny, robustný insertion workflow — napr. objekt na kurzore / umiestnenie do aktuálneho pohľadu / klik do modelu — a až potom rozhodnúť rozsah. **Tento README záznam nie je návrh riešenia ani task package; iba poistka, aby sa téma nestratila.**
+
+Po uzavretí vkladania sa pokračuje ďalšími koncepčnými bodmi z tohto balíka.
