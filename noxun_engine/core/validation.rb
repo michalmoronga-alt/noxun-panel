@@ -138,7 +138,22 @@ module Noxun
         check_placements(placements, items)
         Array(collected[:warnings]).each { |w| check_build(w, items, uni_parts) }
         items = sort_items(dedup(items))
-        { 'items' => items, 'counts' => counts(items) }
+        { 'items' => items, 'counts' => counts(items, cabinet_ids: cabinet_ids(placements)) }
+      end
+
+      # ŠT-1b (Š8): ID vsetkych top-level SKRINIEK zakazky. Zdrojom su
+      # `placements` (Bom.collect) — tie nesu prave top-level objekty a ich druh.
+      # nil = zoznam NEDODANY (legacy volania a headless testy bez placements):
+      # vtedy sa zeleny pocet vobec nepocita a tvar counts sa NEMENI.
+      def cabinet_ids(placements)
+        return nil if placements.nil?
+
+        Array(placements).each_with_object([]) do |p, out|
+          next unless p.is_a?(Hash) && p['kind'].to_s == 'cabinet'
+
+          id = p['owner_id'].to_s
+          out << id unless id.empty? || out.include?(id)
+        end
       end
 
       # V0.6 E-b: KONTROLA + upozornenia ROZPOCTU v JEDNOM zozname.
@@ -158,7 +173,13 @@ module Noxun
           items << budget_item(b)
         end
         merged = sort_items(dedup(items))
-        { 'items' => merged, 'counts' => counts(merged) }
+        # ŠT-1b: zelene cislo semaforu (skrinky bez nalezu) sa PRENASA z pôvodných
+        # counts — rozpoctove polozky nemaju vlastnika, takze ho zmenit nemozu,
+        # a druhy vypocet by potreboval placements, ktore sem uz nechodia.
+        c = counts(merged)
+        base_counts = base['counts'].is_a?(Hash) ? base['counts'] : {}
+        %w[cabinets clean].each { |k| c[k] = base_counts[k] if base_counts.key?(k) }
+        { 'items' => merged, 'counts' => c }
       end
 
       # Tvar riadku KONTROLY z rozpoctoveho upozornenia (E-a nesie 'message' a
@@ -575,10 +596,23 @@ module Noxun
       end
 
       # Counts PRIAMO z finalneho zoznamu — JS ich NIKDY neprepocitava (nalez 11).
-      def counts(items)
+      #
+      # ŠT-1b (Š8, audit #4): ked volajuci dodá ZOZNAM SKRINIEK, pribuda aj
+      # ZELENE cislo semaforu — „skriniek bez nalezu" = pocet korpusov minus
+      # tie, ktore v zozname nalezov figuruju ako vlastnik. Pocita ho SERVER
+      # (klient si zo zoznamu nic neodvodzuje); rozpoctove polozky vlastnika
+      # nemaju, takze zelene cislo neovplyvnuju.
+      # Bez zoznamu (`cabinet_ids: nil`) je tvar counts PRESNE taky, aky bol —
+      # legacy volania a headless testy sa nemenia.
+      def counts(items, cabinet_ids: nil)
         red = items.count { |it| it['severity'] == RED }
         orange = items.count { |it| it['severity'] == ORANGE }
-        { 'red' => red, 'orange' => orange, 'total' => red + orange }
+        out = { 'red' => red, 'orange' => orange, 'total' => red + orange }
+        return out if cabinet_ids.nil?
+
+        owners = items.map { |it| it['owner_id'].to_s }.reject(&:empty?).uniq
+        dirty = cabinet_ids.count { |id| owners.include?(id) }
+        out.merge('cabinets' => cabinet_ids.length, 'clean' => cabinet_ids.length - dirty)
       end
 
       def present?(v)

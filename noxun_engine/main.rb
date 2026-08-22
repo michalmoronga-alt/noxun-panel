@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.7.30' unless defined?(VERSION)
+    VERSION = '0.7.31' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -232,6 +232,9 @@ module Noxun
     # ani nenacitane okno push nezhodi (kazdy `push_edge_check` ma vlastny guard).
     def self.broadcast_edge_check(state)
       ProductionDialog.push_edge_check(state) if defined?(ProductionDialog)
+      # ŠT-1b: TRETI vstupny bod — lista sekcie Kontrola v okne Studio. Bez neho
+      # by prepnutie z railu nebolo v otvorenom Studiu vidiet.
+      StudioDialog.push_edge_check(state) if defined?(StudioDialog)
       Panel.push_edge_check(state) if defined?(Panel)
     rescue StandardError => e
       log_error(e, 'Engine.broadcast_edge_check')
@@ -263,6 +266,8 @@ module Noxun
     # (`source` je okno, ktore prave otvorilo svoje).
     def self.close_edge_menu(source)
       ProductionDialog.close_edge_menu if source != :production && defined?(ProductionDialog)
+      # ŠT-1b: tretia instancia toho isteho nastavenia — lista sekcie Kontrola.
+      StudioDialog.close_edge_menu if source != :studio && defined?(StudioDialog)
       Panel.close_edge_menu if source != :panel && defined?(Panel)
     rescue StandardError => e
       log_error(e, 'Engine.close_edge_menu')
@@ -290,6 +295,7 @@ module Noxun
     # cerstve cisla nikde nedrzia a kazde okno si ich vypyta samo.
     def self.broadcast_grain_check(state = nil)
       ProductionDialog.push_grain_check(state) if defined?(ProductionDialog)
+      StudioDialog.push_grain_check(state) if defined?(StudioDialog) # ŠT-1b: sekcia Kontrola
       Panel.push_grain_check(state) if defined?(Panel)
     rescue StandardError => e
       log_error(e, 'Engine.broadcast_grain_check')
