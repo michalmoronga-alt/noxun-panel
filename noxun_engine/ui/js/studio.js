@@ -503,7 +503,10 @@
       // Deep-link sekcie sa posiela PRAVE RAZ; kotva s nou.
       if (ST && ST.open_section && STUDIO_SECTIONS.indexOf(ST.open_section) >= 0){
         studioSec = ST.open_section;
-        var a = anchorFilter(ST);
+        // Kotva predvyplna hladanie KUSOVNIKA (N13 posiela ID skrinky). Pri inej
+        // sekcii by potichu prestavila filter, ktory pouzivatel ani nevidí —
+        // preto sa aplikuje LEN so sekciou, do ktorej patri (review #7).
+        var a = (studioSec === 'bom') ? anchorFilter(ST) : null;
         if (a) bomQ = a;
       }
       render();

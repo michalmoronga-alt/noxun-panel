@@ -5079,6 +5079,51 @@ module NoxunSuRunner
     log_line("FAIL: ST-1a sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
 
+  # ŠT-1b (review #9): odchytenie SKUTOCNYCH payloadov oboch okien. `js` je
+  # privatna metoda modulu okna, takze sa docasne prealiasuje (vzor
+  # `install_js_recorder` pre Panel) a po zbere sa VZDY vrati spat.
+  def st1b_capture_counts(_model)
+    rec_studio = []
+    rec_prod = []
+    pairs = [[e::StudioDialog, rec_studio], [e::ProductionDialog, rec_prod]]
+    pairs.each do |(mod, rec)|
+      mod.singleton_class.class_eval do
+        alias_method :nx_js_orig_st1b, :js
+        define_method(:js) { |script| rec << script.to_s; nil }
+      end
+    end
+    begin
+      e::StudioDialog.send(:push_state)
+      e::ProductionDialog.send(:push_state)
+    ensure
+      pairs.each do |(mod, _rec)|
+        sc = mod.singleton_class
+        next unless sc.method_defined?(:nx_js_orig_st1b) || sc.private_method_defined?(:nx_js_orig_st1b)
+
+        sc.class_eval do
+          alias_method :js, :nx_js_orig_st1b
+          remove_method :nx_js_orig_st1b
+        end
+      end
+    end
+    st_payload = rec_studio.find { |s| s.start_with?('NX.setStudio(') }
+    pr_payload = rec_prod.find { |s| s.start_with?('NX.setBom(') }
+    if st_payload.nil? || pr_payload.nil?
+      return info('ŠT-1b: payload jedneho z okien sa nepodarilo odchytit — porovnanie counts preskocene.')
+    end
+
+    st_counts = st_payload[/"counts":\{[^}]*\}/]
+    pr_counts = pr_payload[/"counts":\{[^}]*\}/]
+    ok("ŠT-1b: counts v ODCHYTENYCH payloadoch oboch okien su BAJT-ROVNAKE (#{st_counts})",
+       !st_counts.nil? && st_counts == pr_counts)
+    # Zeleny chip semaforu nesmie z payloadu vypadnut — bez neho by okno
+    # ukazalo pomlcku namiesto poctu skriniek.
+    ok('ŠT-1b: payload Studia nesie zelene cislo semaforu (cabinets + clean)',
+       st_counts.to_s.include?('"cabinets"') && st_counts.to_s.include?('"clean"'))
+  rescue StandardError => ex
+    info("ŠT-1b: porovnanie payloadov zlyhalo: #{ex.class}: #{ex.message}")
+  end
+
   # ============ ŠT-1b: sekcia KONTROLA v okne ŠTÚDIO (Š8–Š11) ================
   # Co sa tu overuje (a co headless sada neuvidi):
   #   1) JEDNO CISLO — semafor Studia sa sklada z TOHO ISTEHO jadra ako okno
@@ -5119,7 +5164,7 @@ module NoxunSuRunner
     # To iste cislo musi dat aj okno Vyroba — cita to iste jadro.
     prod_control = core.control_payload(core.fresh_collect(model), hardware_expansion: hw_exp,
                                                                    budget: budget, sheets: smap)
-    ok('ŠT-1b: obe okna dostanu ROVNAKE counts (jedno jadro, jedno cislo)',
+    ok('ŠT-1b: zdielane jadro da pri dvoch volaniach ROVNAKE counts',
        prod_control['counts'] == counts)
 
     # --- 2) klik na nalez oznaci entitu a NEPRIDA krok Spat ------------------
@@ -5254,6 +5299,12 @@ module NoxunSuRunner
            "Vyroba #{t_prod} ms · top-level instancii v modeli: #{cabs}")
       ok('ŠT-1b: push_state oboch okien model NEZMENIL',
          model.entities.length == ents_before_push)
+
+      # Review #9: porovnanie „ta ista funkcia s tymi istymi argumentmi" je
+      # slabe. Silny dokaz je ODCHYTENY payload — to, co kazde okno naozaj
+      # posle svojmu klientovi. Meria sa AZ TERAZ (nie pri casoch vyssie),
+      # aby stub `js` neskreslil trvanie.
+      st1b_capture_counts(model)
     rescue StandardError => ex
       info("ŠT-1b: meranie pushov zlyhalo: #{ex.class}: #{ex.message}")
     ensure

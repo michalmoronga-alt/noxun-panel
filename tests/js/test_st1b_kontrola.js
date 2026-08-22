@@ -3,7 +3,8 @@
 // Co tato sada strazi (a preco to klikanim neoveris):
 //   1. SEMAFOR ukazuje VYHRADNE serverove cisla — vratane zeleneho „skriniek
 //      bez nalezu". Keby si klient cokolvek dopocital, Kontrola by hlasila ine
-//      cislo nez ⚠ chip Inspectora a nez suhrn v LOGu exportu.
+//      cislo nez badge navigacie, nez ⚠ chip hlavicky okna Vyroba a nez suhrn
+//      v statuse a LOGu VEPO exportu.
 //   2. FILTER je cisto zobrazovaci: LEN skryva, nikdy nepreusporadúva ani
 //      neprepocitava (poradie urcuje server) a druhy klik ho zrusi.
 //   3. Riadok nesie STABILNY kluc problemu a spravne AKCIE — kontextova oprava

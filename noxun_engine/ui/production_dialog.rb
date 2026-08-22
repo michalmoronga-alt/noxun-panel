@@ -38,11 +38,6 @@ module Noxun
       # zive badge navigacie); deep-link na nu ide cez `StudioDialog::SECTIONS`.
       TABS = %w[hardware budget].freeze
 
-      # D-105: nazvy stavov zvyraznenia. Autoritou je od ŠT-1b `ProductionCore`
-      # (texty potrebuje aj Studio); tato konstanta ostava, lebo pod tymto menom
-      # ju pozna rail Inspectora aj zdielany js/edge_menu.js.
-      EDGE_OPTION_LABELS = ProductionCore::EDGE_OPTION_LABELS
-
       class << self
         # `open_tab` = deep-link z Inspectora (⚠ warnpanel -> KONTROLA, „Materiál"
         # -> Kusovník). Bez neho sa tab NEPREPINA: pouzivatel, ktory si okno otvoril
@@ -338,7 +333,6 @@ module Noxun
           ProductionCore.do_grain_check(Sketchup.active_model, data, generation: @generation,
                                                                      status: status_proc,
                                                                      repush: repush_proc,
-                                                                     echo: edge_echo_proc,
                                                                      grain_echo: grain_echo_proc)
         end
 
@@ -948,7 +942,8 @@ module Noxun
           # V0.5 D: KONTROLA z TOHO ISTEHO cerstveho zberu (nalez 5).
           # ŠT-1b (audit #2): vypocet vratane zlucenia s upozorneniami ROZPOCTU
           # zije v `ProductionCore` — sekcia Kontrola okna Studio cita PRESNE
-          # to iste cislo (semafor, badge navigacie aj ⚠ chip Inspectora).
+          # to iste cislo (semafor sekcie, badge navigacie, ⚠ chip TEJTO
+          # hlavicky aj suhrn exportu).
           control = ProductionCore.control_payload(collected, hardware_expansion: hw_exp,
                                                               budget: budget, sheets: smap)
           data = {

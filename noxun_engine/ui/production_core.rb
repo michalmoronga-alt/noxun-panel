@@ -564,14 +564,22 @@ module Noxun
         dir = UI.select_directory(title: 'Priečinok pre VEPO export', directory: start_dir)
         return status.call('Export zrušený.') if dir.nil? || dir.to_s.empty?
 
-        # Nalez 5: JEDEN cerstvy RAW zber -> nad nim compute AJ Validation.run;
+        # Nalez 5: JEDEN cerstvy RAW zber -> nad nim compute AJ kontrola;
         # validaciu EXPLICITNE odovzdame do build (prefix statusu + sekcia
         # KONTROLA v LOGu z TOHO ISTEHO vysledku).
+        #
+        # Review #1 (ŠT-1b): kontrola sa tu pocita ZDIELANOU `control_payload`,
+        # teda VRATANE upozorneni rozpoctu. Bez toho by LOG a status exportu
+        # hlasili ine cislo nez semafor sekcie Kontrola a badge navigacie —
+        # a pouzivatel by nevedel, ktore z dvoch cisel plati.
         collected = fresh_collect(model)
         bom = Bom.compute(collected)
-        control = Validation.run(collected, sheets: sheets_map, edges: edges_map,
-                                 hardware_expansion: hardware_expansion(model, collected),
-                                 placements: collected[:placements])
+        smap = sheets_map
+        hw_exp = hardware_expansion(model, collected)
+        control = control_payload(collected, hardware_expansion: hw_exp,
+                                             budget: budget_payload(model, bom, collected,
+                                                                    nil, hw_exp, smap),
+                                             sheets: smap)
         # audit #1: nazov projektu aj merge su SERVEROVE — z DOM uz nechodia.
         merge = merge_18_36
         result = VepoExport.build(
@@ -671,11 +679,15 @@ module Noxun
 
       # --- ŠT-1b (audit #2): JEDNO CISLO KONTROLY PRE VSETKY OKNA ----------
       #
-      # Semafor sekcie Kontrola (Studio), badge navigacie, ⚠ chip Inspectora aj
-      # suhrn v statuse exportu musia ukazovat TO ISTE. Preto sa cely vypocet
-      # KONTROLY — vratane zlucenia s upozorneniami ROZPOCTU — robi TU a obe
-      # okna volaju tuto jednu metodu. Dva takmer rovnake vypocty by sa casom
-      # rozisli a pouzivatel by videl v dvoch oknach dve rozne cisla.
+      # Semafor sekcie Kontrola (Studio), badge navigacie, ⚠ chip hlavicky okna
+      # Vyroba aj suhrn v statuse a LOGu exportu musia ukazovat TO ISTE. Preto
+      # sa cely vypocet KONTROLY — vratane zlucenia s upozorneniami ROZPOCTU —
+      # robi TU a obe okna volaju tuto jednu metodu. Dva takmer rovnake vypocty
+      # by sa casom rozisli a pouzivatel by videl dve rozne cisla.
+      #
+      # POZOR na zamenu: ⚠ chip v INSPECTORE je nieco INE — su to build
+      # warnings PRAVE OZNACENEJ skrinky, nie kontrola celej zakazky. Inspector
+      # sem len VEDIE (deep-link „Otvoriť v Štúdiu → Kontrola").
       #
       # `budget` je HOTOVY payload rozpoctu (okno Vyroba ho aj tak pocita pre
       # svoj tab, tak ho odovzda a nepocita sa dvakrat); nil = rozpocet sa
@@ -774,6 +786,14 @@ module Noxun
           status.call('Zvýraznenie hrán vyžaduje SketchUp 2023 alebo novší.', true)
           return false
         end
+        identity_guard(data, model, generation: generation, status: status, repush: repush)
+      end
+
+      # Identita kliku (BEZ otazky na konkretny overlay): generacia okna +
+      # dokument. Review #6: kresba smeru si dostupnost API overuje SAMA a jej
+      # hlaska musi hovorit o KRESBE — nie o hranach; preto je tato cast
+      # vyclenena a zdielaju ju obe akcie.
+      def identity_guard(data, model, generation:, status:, repush:)
         unless data['gen'].to_i == generation.to_i
           repush.call
           status.call('Okno sa medzitým prepočítalo — obnovené, klikni znova.', true)
@@ -821,15 +841,18 @@ module Noxun
         status.call("Chyba nastavenia zvýraznenia: #{e.message}", true)
       end
 
-      # K2/D-87: prepinac „Smer kresby". Guardy su TIE ISTE (gen + model_guid +
-      # Overlay API) — vlastna je len hlaska o dostupnosti a vlastne echo.
-      def do_grain_check(model, data, generation:, status:, repush:, echo:, grain_echo:)
+      # K2/D-87: prepinac „Smer kresby". Identita kliku (gen + model_guid) je
+      # ZDIELANA so zvyraznenim hran; dostupnost Overlay API si vsak overuje
+      # VLASTNU (`GrainCheck.available?`) a hlasi ju VLASTNOU vetou — review #6:
+      # pouzivatel klikol na kresbu, takze hlaska o hranach by ho poslala hladat
+      # chybu inam.
+      def do_grain_check(model, data, generation:, status:, repush:, grain_echo:)
         unless defined?(GrainCheck) && GrainCheck.available?(model)
           grain_echo.call
           return status.call('Smer kresby vyžaduje SketchUp 2023 alebo novší.', true)
         end
-        return unless edge_check_guard(data, model, generation: generation, status: status,
-                                                    repush: repush, echo: echo)
+        return unless identity_guard(data, model, generation: generation, status: status,
+                                                  repush: repush)
 
         state = Engine.toggle_grain_check(model)
         status.call(grain_check_status(state))

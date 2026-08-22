@@ -189,7 +189,6 @@ module Noxun
           ProductionCore.do_grain_check(Sketchup.active_model, data, generation: @generation,
                                                                      status: status_proc,
                                                                      repush: repush_proc,
-                                                                     echo: edge_echo_proc,
                                                                      grain_echo: grain_echo_proc)
         end
 
@@ -445,7 +444,9 @@ module Noxun
           )
           # ŠT-1b (audit #2): KONTROLA z TOHO ISTEHO cerstveho zberu a z TOHO
           # ISTEHO jadra ako okno Vyroba — vratane upozorneni ROZPOCTU. Semafor
-          # sekcie, badge navigacie aj ⚠ chip Inspectora tak ukazuju JEDNO cislo.
+          # sekcie, badge navigacie aj suhrn exportu tak ukazuju JEDNO cislo.
+          # (⚠ chip Inspectora je nieco ine — build warnings oznacenej skrinky;
+          # do tejto sekcie len VEDIE deep-linkom.)
           # Rozpocet sa pocita LEN kvoli jeho ORANGE nalezom (sekcia Rozpocet
           # pride v ŠT-1c) a berie uz hotovy odhad platni — ziadny druhy vypocet.
           hw_exp = ProductionCore.hardware_expansion(model, collected)

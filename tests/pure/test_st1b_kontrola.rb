@@ -3,11 +3,15 @@
 #
 # Co tato sada strazi (a preco to klikanim neoveris):
 #   1. JEDNO CISLO PRE VSETKYCH (audit #2). Semafor sekcie, badge navigacie,
-#      ⚠ chip Inspectora aj suhrn v LOGu exportu musia ukazovat TO ISTE — teda
-#      vypocet KONTROLY (vratane rozpoctovych ORANGE) smie zit na JEDNOM mieste.
-#      Dve kopie by sa casom rozisli a rozdiel by sa ukazal az na objednavke.
+#      ⚠ chip hlavicky okna Vyroba aj suhrn v statuse a LOGu VEPO exportu musia
+#      ukazovat TO ISTE — teda vypocet KONTROLY (vratane rozpoctovych ORANGE)
+#      smie zit na JEDNOM mieste. Dve kopie by sa casom rozisli a rozdiel by sa
+#      ukazal az na objednavke. (⚠ chip INSPECTORA je nieco INE — build warnings
+#      oznacenej skrinky; do sekcie Kontrola len VEDIE deep-linkom.)
 #   2. ZELENE CISLO semaforu (audit #4) pocita SERVER vo `Validation.counts`.
-#      Tvar counts je kontrakt — klient si pocet skriniek nedopocitava.
+#      Tvar counts je kontrakt — klient si pocet skriniek nedopocitava; a jeho
+#      MENOVATEL je skutocny pocet skriniek zo zberu, nie dlzka zoznamu ID
+#      z placements (review #2 — kopie so zhodnym ID a skrinky bez ID).
 #   3. ZDIELANY GUARD prepinacov (audit #5) nesmie mat OKENNY STAV: telo zije
 #      v `ProductionCore`, okna su len tenke obaly nad vlastnou generaciou.
 #   4. TRETIE OKNO v broadcaste (audit #6). Bez neho by prepnutie z railu nebolo
@@ -98,6 +102,24 @@ NxTest.test('ŠT-1b: KONTROLU pocita JEDNO miesto — obe okna volaju to iste') 
                 'payload Studia nesie zoznam AJ counts (JS si nic neprepocitava)')
 end
 
+NxTest.test('ŠT-1b (review #1): aj VEPO export cita to iste cislo kontroly') do
+  # Export pisal suhrn KONTROLY do statusu aj do LOGu z vlastneho
+  # `Validation.run` BEZ rozpoctovych ORANGE — a hlasil teda ine cislo nez
+  # semafor sekcie. Teraz ide tou istou zdielanou cestou.
+  body = S1B_CORE_RB[/def do_export\(model, data.*?\n      end\n/m].to_s
+  NxTest.refute(body.empty?, 'telo exportu sa nasiel')
+  NxTest.assert(body.include?('control_payload('),
+                'export pocita kontrolu ZDIELANOU cestou')
+  NxTest.assert(body.include?('budget: budget_payload('),
+                'a to VRATANE rozpoctovych nalezov (inak by hlasil mensie cislo)')
+  NxTest.refute(body.include?('Validation.run('),
+                'ziadny vlastny vypocet kontroly v exporte')
+  NxTest.assert(body.include?('validation: control'),
+                'ten isty vysledok ide do VEPO LOGu')
+  NxTest.assert(body.include?('control_suffix(control)'),
+                'a do suhrnu v statuse okna')
+end
+
 NxTest.test('ŠT-1b: rozpoctove nalezy su v zozname a maju kam viest (audit #3)') do
   NxTest.assert(S1B_STUDIO_JS.include?("it.category === 'budget'"),
                 'rozpoctovy nalez ma vlastnu vetvu')
@@ -135,14 +157,45 @@ NxTest.test('ŠT-1b: zoznam skriniek berie run() z placements (a bez nich mlci)'
             { 'kind' => 'cabinet', 'owner_id' => 'CAB-1' }, # kopia toho isteho ID
             { 'kind' => 'board', 'owner_id' => 'BRD-9' },
             { 'kind' => 'cabinet', 'owner_id' => '' }]
-  NxTest.assert_equal(%w[CAB-1], v.cabinet_ids(places), 'ratame LEN korpusy a KAZDY raz')
+  NxTest.assert_equal(%w[CAB-1], v.cabinet_ids(places),
+                      'mnozina ID = LEN korpusy a KAZDE ID raz')
   NxTest.assert_equal(nil, v.cabinet_ids(nil), 'bez placements sa zelene cislo nepocita')
 
-  out = v.run({ records: [] }, placements: places)
-  NxTest.assert_equal(1, out['counts']['cabinets'], 'run zelene cislo doplni')
-  NxTest.assert_equal(1, out['counts']['clean'], 'ciste korpusy bez nalezov')
+  out = v.run({ records: [], cabinets: 3 }, placements: places)
+  NxTest.assert_equal(3, out['counts']['cabinets'], 'run zelene cislo doplni')
+  NxTest.assert_equal(3, out['counts']['clean'], 'ciste korpusy bez nalezov')
   NxTest.refute(v.run({ records: [] })['counts'].key?('clean'),
                 'legacy volanie bez placements ma NEZMENENY tvar')
+end
+
+NxTest.test('ŠT-1b (review #2): MENOVATEL je skutocny pocet skriniek, nie dlzka zoznamu ID') do
+  # Presny scenar z review: TRI skrinky v modeli — dve kopie so ZHODNYM ID
+  # (`Bom.add_placement` ich zbiera raz) a jedna BEZ ID (placement nedostane
+  # vobec). Kym sa menovatel bral z placements, semafor tvrdil „1 skrinka",
+  # hoci v zakazke stali tri — a zelene cislo klamalo.
+  v = Noxun::Engine::Validation
+  places = [{ 'kind' => 'cabinet', 'owner_id' => 'CAB-1' },
+            { 'kind' => 'cabinet', 'owner_id' => 'CAB-1' }]
+  collected = { records: [], cabinets: 3, placements: places }
+  out = v.run(collected, placements: places)
+  NxTest.assert_equal(3, out['counts']['cabinets'],
+                      'pocet skriniek je zo ZBERU (collected[:cabinets])')
+  NxTest.assert_equal(3, out['counts']['clean'], 'ziadna z nich nema nalez')
+
+  # Nalez na zdielanom ID „spini" prave jednu (viac ich rozlisit nevieme —
+  # dve kopie maju to iste ID; menovatel vsak ostava pravdivy).
+  items = [{ 'severity' => 'red', 'owner_id' => 'CAB-1', 'stable_key' => 'x' }]
+  dirty = v.counts(items, cabinet_ids: %w[CAB-1], cabinets: 3)
+  NxTest.assert_equal(3, dirty['cabinets'])
+  NxTest.assert_equal(2, dirty['clean'])
+
+  # Bez `cabinets:` (spatna kompatibilita) sa pocet odvodi zo zoznamu ID.
+  legacy = v.counts([], cabinet_ids: %w[CAB-1 CAB-2])
+  NxTest.assert_equal(2, legacy['cabinets'])
+  NxTest.assert_equal(2, legacy['clean'])
+  # Menovatel a citatel su z dvoch zdrojov — zaporne cislo sa NIKDY neukaze.
+  NxTest.assert_equal(0, v.counts(items, cabinet_ids: %w[CAB-1], cabinets: 0)['clean'],
+                      'zelene cislo sa nikdy nedostane pod nulu')
 end
 
 NxTest.test('ŠT-1b: zlucenie s rozpoctom zelene cislo NEZAHODI (rozpocet nema vlastnika)') do
@@ -166,14 +219,18 @@ NxTest.test('ŠT-1b: guard prepinacov zije v ProductionCore a NEMA okenny stav')
     NxTest.assert(core.respond_to?(m), "ProductionCore neodpoveda na #{m}")
   end
   guard = S1B_CORE_RB[/def edge_check_guard.*?\n      end\n/m].to_s
-  NxTest.refute(guard.empty?, 'guard sa nasiel')
-  %w[@dialog @generation @pending].each do |state|
-    NxTest.refute(guard.include?(state), "zdielane jadro nesmie siahat na okenny stav #{state}")
+  ident = S1B_CORE_RB[/def identity_guard.*?\n      end\n/m].to_s
+  NxTest.refute(guard.empty? || ident.empty?, 'oba guardy sa nasli')
+  [guard, ident].each do |src|
+    %w[@dialog @generation @pending].each do |state|
+      NxTest.refute(src.include?(state), "zdielane jadro nesmie siahat na okenny stav #{state}")
+    end
   end
   NxTest.assert(guard.include?('EdgeCheck.available?(model)'), 'bez Overlay API sa nic nezapina')
-  NxTest.assert(guard.include?("data['gen'].to_i == generation.to_i"),
+  NxTest.assert(guard.include?('identity_guard('), 'zvyrazenie hran zdiela identitu kliku')
+  NxTest.assert(ident.include?("data['gen'].to_i == generation.to_i"),
                 'generaciu odovzdava OKNO (kazde ma vlastnu)')
-  NxTest.assert(guard.include?("data['model_guid'].to_s == model_guid(model)"),
+  NxTest.assert(ident.include?("data['model_guid'].to_s == model_guid(model)"),
                 'PRISNA zhoda dokumentu (callback HtmlDialogu je asynchronny)')
   # Obe okna su len obaly — vlastne telo by znamenalo dve rozne spravania.
   NxTest.assert(S1B_STUDIO_RB.include?('ProductionCore.do_edge_check(') &&
@@ -181,6 +238,18 @@ NxTest.test('ŠT-1b: guard prepinacov zije v ProductionCore a NEMA okenny stav')
                 'Studio odovzdava svoju generaciu zdielanemu jadru')
   NxTest.assert(S1B_PROD_RB.include?('ProductionCore.do_edge_check('),
                 'okno Vyroba tiez (kym zije)')
+end
+
+NxTest.test('ŠT-1b (review #6): kresba hlasi NEDOSTUPNE API vlastnou vetou') do
+  body = S1B_CORE_RB[/def do_grain_check\(model, data.*?\n      end\n/m].to_s
+  NxTest.refute(body.empty?, 'telo prepinaca kresby sa nasiel')
+  NxTest.assert(body.include?('GrainCheck.available?(model)'),
+                'dostupnost si overuje VLASTNU (nie cez zvyraznenie hran)')
+  NxTest.assert(body.include?('Smer kresby vyžaduje SketchUp 2023 alebo novší.'),
+                'a hlasi ju vetou o KRESBE')
+  NxTest.refute(body.include?('edge_check_guard'),
+                'nesmie ist cez guard hran — pri starom SketchUpe by hlasil text o hranach')
+  NxTest.assert(body.include?('identity_guard('), 'identita kliku ostava ZDIELANA')
 end
 
 NxTest.test('ŠT-1b: prepinace sa NEDOTYKAJU modelu (ziadna operacia, ziadny krok Spat)') do

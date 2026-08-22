@@ -698,7 +698,6 @@
   .echk .ecbtn.on::after { border-bottom-color: var(--nx-on-accent); }
   .cornerzone { position: absolute; right: 0; bottom: 0; width: 16px; height: 15px; padding: 0;
             border: 0; border-radius: 0 0 6px 0; background: none; cursor: pointer; z-index: 2; }
-  .cornerzone[aria-disabled="true"] { cursor: default; }
   /* Okno nastavenia visi POD spustacom (nie v strede obrazovky) — lista sekcie
      ma `position: relative`, takze overlay nezaberie ziadny riadok layoutu. */
   .ecmenu-studio { top: calc(100% + 4px); left: 0; z-index: 60; }
