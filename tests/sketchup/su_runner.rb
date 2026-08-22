@@ -5416,13 +5416,13 @@ module NoxunSuRunner
 
   # Jedna operacia rozpoctu: zapis MUSI zmenit stav a JEDEN krok Spat ho MUSI
   # vratit presne tam, kde bol.
-  def st1c_bud_op(model, label, op, extra, read)
+  def st1c_bud_op(model, label, op, extra, read, tag = 'B1')
     before = read.call(model)
     e::StudioDialog.do_budget(st1c_bud_payload(op, extra).to_json)
     changed = read.call(model)
-    ok("ŠT-1c B1: `#{op}` (#{label}) zapisal zmenu do modelu", changed != before)
+    ok("ŠT-1c #{tag}: `#{op}` (#{label}) zapisal zmenu do modelu", changed != before)
     Sketchup.undo
-    ok("ŠT-1c B1: `#{op}` = PRESNE 1 krok Späť", read.call(model) == before)
+    ok("ŠT-1c #{tag}: `#{op}` = PRESNE 1 krok Späť", read.call(model) == before)
   end
 
   def st1c_budget(model, inst)
@@ -5665,10 +5665,10 @@ module NoxunSuRunner
       # --- 2) prepinac „samostatne" = 1 zmena, 1 krok Spat (oba smery) -------
       st1c_bud_op(model, 'samostatne v ponuke', 'cp_group',
                   { 'source_key' => cp_key, 'group' => 'samostatne' },
-                  ->(m) { bs.cp_overrides(m) })
+                  ->(m) { bs.cp_overrides(m) }, 'B2')
       st1c_bud_op(model, 'späť do zostavy', 'cp_group',
                   { 'source_key' => cp_key, 'group' => 'zostava' },
-                  ->(m) { bs.cp_overrides(m) })
+                  ->(m) { bs.cp_overrides(m) }, 'B2')
       ok('ŠT-1c B2: zaradenie v ponuke NEMENÍ geometriu',
          model.entities.length == before_ents)
 
@@ -5677,7 +5677,7 @@ module NoxunSuRunner
       # a vediet nemá; jeho jediná úloha voci modalu je povedať ÁNO/NIE.
       st1c_bud_op(model, 'položka z D-15 modalu', 'custom_add',
                   { 'attrs' => { 'popis' => 'SU modal položka', 'pocet' => '1', 'cena' => '12' } },
-                  ->(m) { bs.custom_items(m) })
+                  ->(m) { bs.custom_items(m) }, 'B2')
 
       scripts = st1c_capture(e::StudioDialog) do
         e::StudioDialog.do_budget(

@@ -1185,6 +1185,10 @@
   }
 
   // --- ⋯ modal (kód / adresa / poznámka) -----------------------------------
+  // VEDOME NEMIGROVANY na D-15 kostru (ŠT-1c PR B2): nie je to „pridávačka",
+  // ale editor uz existujuceho riadku — a jeho polia sa lisia podla typu
+  // polozky. Patri k D-69 rodine editorov, ktoru prinesie ŠT-2; presuvat ho
+  // teraz by znamenalo dvakrat prerabat to iste okno.
 
   function budModalHtml(){
     if (!BUD_MODAL) return '';
@@ -1435,8 +1439,8 @@
         budXlsx();
       } else if (a === 'cp'){
         budCpExport();
-      } else if (a === 'cp_group'){
-        budSend('cp_group', { source_key: b.getAttribute('data-source'), group: b.getAttribute('data-group') });
+      // ŠT-1c PR B2: `cp_group` uz nie je KLIK (sipka v nahlade) ale PREPINAC
+      // „samostatne" — jeho vetva zije v listeneri `change` nizsie.
       } else if (a === 'settings'){
         if (window.sketchup && sketchup.budget_settings) sketchup.budget_settings('');
       } else if (a === 'refresh'){
