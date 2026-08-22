@@ -991,17 +991,17 @@ module NoxunSuRunner
       if b3.nil? || b18.nil?
         ok("back D-38: seed nevratil oba varianty (3mm #{b3.inspect}, 18mm #{b18.inspect})", false)
       else
-      pf_params = e::CabinetBuilder.config_to_params(e::Store.config(inst))
-                                   .merge('back_mode' => 'overlay', 'back_thickness' => 18.0,
-                                          'back_material_id' => b3)
-      pf = e::Panel.send(:back_preflight, pf_params, model)
-      ok('back D-38: preflight vybral 18 mm material rovnakej skupiny (note + back_material_id)',
-         pf && pf[:error].nil? && pf[:note] && pf_params['back_material_id'] == b18)
-      e::CabinetBuilder.rebuild(model, inst, pf_params)
-      s18 = find_part(inst, 'cabinet/side:left')
-      ok('back D-38: rebuild s pevnym 18 PRESIEL — telo 492, chrbat konci na 510',
-         s18 && (part_depth(s18) - 492.0).abs < TOL &&
-         (part_y_end(find_part(inst, 'cabinet/back')) - 510.0).abs < TOL)
+        pf_params = e::CabinetBuilder.config_to_params(e::Store.config(inst))
+                                     .merge('back_mode' => 'overlay', 'back_thickness' => 18.0,
+                                            'back_material_id' => b3)
+        pf = e::Panel.send(:back_preflight, pf_params, model)
+        ok('back D-38: preflight vybral 18 mm material rovnakej skupiny (note + back_material_id)',
+           pf && pf[:error].nil? && pf[:note] && pf_params['back_material_id'] == b18)
+        e::CabinetBuilder.rebuild(model, inst, pf_params)
+        s18 = find_part(inst, 'cabinet/side:left')
+        ok('back D-38: rebuild s pevnym 18 PRESIEL — telo 492, chrbat konci na 510',
+           s18 && (part_depth(s18) - 492.0).abs < TOL &&
+           (part_y_end(find_part(inst, 'cabinet/back')) - 510.0).abs < TOL)
       end
     end
 
@@ -6735,13 +6735,15 @@ module NoxunSuRunner
         'batch_schema' => 3, 'decor' => 'SU ST2B FRONT',
         'sheet_variants' => [{ 'thickness' => 18.0 }]
       )
+      # tvrdy assert — neuspesny seed nesmie kontrolu ticho preskocit
+      ok("ŠT-2b: seed 18 mm dosky pre kontrolu predvolby (#{ok_tf ? 'ok' : res_tf.inspect})", ok_tf)
       if ok_tf
         tmp_front = res_tf
         target = pick_front.call.map { |s| s['material_id'].to_s }.find { |id| id != orig }
       end
     end
     if target.nil?
-      info('ŠT-2b: v katalogu nie su dve 18 mm dosky (seed zlyhal?) — kontrola 1 undo preskocena')
+      info('ŠT-2b: 18 mm doska pre kontrolu predvolby sa nenasla — kontrola 1 undo preskocena')
     else
       write_rec = []
       md.dispatch('set_project_material',
