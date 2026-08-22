@@ -170,7 +170,9 @@ end
 NxTest.test('ŠT-1c B1 (audit #12): prepocet cien obnovi VSETKY okna nad KATALOGOM') do
   after = S1CB_STUDIO_RB[/def price_refresh_after_proc.*?\n        end\n/m].to_s
   NxTest.refute(after.empty?, 'refresh cesty su na jednom mieste')
-  %w[push_state MaterialsDialog.push_catalog Panel.push_materials
+  # ŠT-2b: `MaterialsDialog.push_catalog` z tohto zoznamu VYPADLO — okno
+  # Materialy zaniklo a katalog v jeho sekcii obnovuje `push_mat_catalog`.
+  %w[push_state push_mat_catalog Panel.push_materials
      HardwareCatalogDialog.push_items].each do |call|
     NxTest.assert(after.include?(call), "#{call} je v refresh cestach")
   end

@@ -279,7 +279,7 @@
       // Codex #168 P2 (2. kolo): identita DOKUMENTU — chodi v kazdom pushi a
       // nesu ju identity guardy asynchronnych callbackov panela.
       if (typeof nxSetModelGuid === 'function') nxSetModelGuid(data.model_guid);
-      refreshMaterialFilters(); // (projektove predvolby zobrazi okno Materialy projektu)
+      refreshMaterialFilters(); // (projektove predvolby zobrazuje sekcia Materialy v Studiu)
       el('zonesChk').checked = !!data.zones_visible;
       // V0.4.7c: uz oznacena DOSKA pri otvoreni panela (selected_kind z Ruby)
       if (data.selected_kind === 'board' && data.selected){ setType('lower'); setDefaults('lower'); currentZoneTree = defaultTree(); renderTemplateTiles(true); NX.loadBoard(data.selected); }
@@ -383,7 +383,7 @@
       p.flush_blocked = blocked;
       if (window.sketchup && sketchup.studio_do_cp_xlsx) sketchup.studio_do_cp_xlsx(JSON.stringify(p));
     },
-    // D-05: zivy katalog materialov po CRUD v okne Materialy projektu. Obnovi
+    // D-05: zivy katalog materialov po CRUD v sekcii Materialy (Studio). Obnovi
     // vsetky selecty s materialmi BEZ resetu formulara; zachovava vybrane hodnoty.
     // D-85 (Codex #167 P2): CERSTVE „Použité v projekte" pre otvoreny combobox.
     // Odpoved na nx_used_ids — meni LEN odvodeny zoznam id, ziadny render karty
@@ -414,7 +414,7 @@
       if (typeof refreshInsertBoardMaterials === 'function') refreshInsertBoardMaterials();
       if (typeof partCard !== 'undefined' && partCard) renderPartCard(partCard);
       if (typeof boardCard !== 'undefined' && boardCard) renderBoardCard(boardCard);
-      // Codex #171 P2: premenovanie dekoru v okne Materialy chodi TOUTO cestou
+      // Codex #171 P2: premenovanie dekoru v sekcii Materialy chodi TOUTO cestou
       // (bez loadSelected) — kontextovy riadok si preto popis prelozi znova.
       renderCtxNote();
       // Codex #173 P2: z rovnakeho dovodu aj meta lista sektora Materialy —

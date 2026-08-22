@@ -631,7 +631,7 @@ module Noxun
         mat_type = DemosNameSearch.type_of(DemosSlugMatcher.slug_of(final_url))
         if mat_type
           return { 'ok' => false,
-                   'error' => "toto je materiál (#{mat_type}), nie kovanie — zakladá sa v okne Materiály" }
+                   'error' => "toto je materiál (#{mat_type}), nie kovanie — zakladá sa v sekcii Materiály (Štúdio)" }
         end
         parsed = DemosProductParser.parse(res['body'])
         return { 'ok' => false, 'error' => 'stránka nie je produktový detail' } unless parsed['ok']

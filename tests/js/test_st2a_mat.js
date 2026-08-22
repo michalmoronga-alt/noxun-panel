@@ -69,18 +69,20 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
 // --- 1) LISTA sekcie (#17) — cista funkcia ----------------------------------
 
 (function(){
-  const h = M.matToolsHtml({ ro: false, q: 'halifax', mode: 'man', section: true,
+  const h = M.matToolsHtml({ ro: false, q: 'halifax', mode: 'man',
                              backup: false, stale: false });
   ok(/id="mdDemosAddBtn"/.test(h), '„Pridať z Demosu" je v liste');
   ok(h.indexOf('id="mdDemosAddBtn"') < h.indexOf('id="mdSearch"'),
      'pridavacie akcie su VLAVO od nastrojov (vzor listy Studia)');
   ok(/id="mdNewDecorBtn"/.test(h), 'aj rucna cesta');
-  // Review #9: v sekcii je Demos zatial PREMOSTENIE do okna — najvyraznejsie
-  // tlacidlo novej sekcie preto nesmie byt ono. Roly sa vymenia spat v ŠT-2b.
-  ok(/class="primary" id="mdNewDecorBtn"/.test(h),
-     'v SEKCII je primarna rucna cesta — tá funguje TU');
-  ok(/class="ghostbtn" id="mdDemosAddBtn"/.test(h),
-     'a premostenie do okna je len ghost (nie hlavna vyzva sekcie)');
+  // ŠT-2b (review ŠT-2a #9): Demos uz nie je premostenie — bezi TU, takze sa
+  // vratil na miesto PRIMARNEJ akcie sekcie.
+  ok(/class="primary" id="mdDemosAddBtn"/.test(h),
+     'v sekcii je primarny Demos — je to hlavna cesta zakladania dekoru');
+  ok(/class="ghostbtn" id="mdNewDecorBtn"/.test(h),
+     'a rucne pridanie je zalozna cesta (ghost)');
+  ok(!/okne Materiály/.test(h),
+     'ziadny tooltip uz nesmie posielat do okna, ktore neexistuje');
   ok(/value="halifax"/.test(h), 'hladanie si nesie dotaz — lista sa prekresluje pri kazdom pushi');
   ok(/id="mdGroupMode"/.test(h) && /value="man"[^>]*selected/.test(h),
      'zoskupenie dlazdic ostava a pamata si vybrany rezim');
@@ -89,7 +91,7 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
 })();
 
 (function(){
-  const h = M.matToolsHtml({ ro: true, q: '', mode: 'az', section: true, backup: true });
+  const h = M.matToolsHtml({ ro: true, q: '', mode: 'az', backup: true });
   const add = h.match(/<button[^>]*id="mdDemosAddBtn"[^>]*>/)[0];
   const man = h.match(/<button[^>]*id="mdNewDecorBtn"[^>]*>/)[0];
   ok(/disabled/.test(add) && /disabled/.test(man),
@@ -100,20 +102,16 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
 })();
 
 (function(){
-  const h = M.matToolsHtml({ ro: false, q: '', mode: 'man', section: true, backup: true });
+  const h = M.matToolsHtml({ ro: false, q: '', mode: 'man', backup: true });
   ok(/id="mdRestoreBtn"/.test(h),
      'pri zdravom katalogu so zalohou je rollback dostupny aj bez banneru (GH #93 P2)');
 })();
 
-// Premostenie sa PRIZNAVA v tooltipe — tlacidlo nesmie vyzerat, ze robi nieco ine.
+// ŠT-2b: lista uz nema dva rezimy — okno zaniklo, `section` z jej stavu vypadol.
 (function(){
-  const insec = M.matToolsHtml({ section: true });
-  const inwin = M.matToolsHtml({ section: false });
-  ok(/okne Materiály/.test(insec),
-     'v sekcii tooltip prizna, ze Demos beží zatiaľ v okne Materiály (ŠT-2b)');
-  ok(!/okne Materiály/.test(inwin), 'v samotnom okne taky tooltip nedava zmysel');
-  ok(/class="primary" id="mdDemosAddBtn"/.test(inwin),
-     'v OKNE ostava Demos primarny — tam naozaj bezi (roly su spravne uz teraz)');
+  const h = M.matToolsHtml({});
+  ok(/class="primary" id="mdDemosAddBtn"/.test(h),
+     'lista ma JEDEN tvar bez ohladu na to, co jej kto podа — druhy rezim neexistuje');
 })();
 
 // Jantarove „Obnoviť" je ZDIELANY markup celeho okna — sekcia ho nekresli vlastne.
@@ -227,25 +225,40 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   // Ten isty subor bezi vedla `studio.js` a `budget.js`. Rovnake meno na
   // top-level urovni by ticho prepisalo cudziu funkciu — a padlo by nieco
   // uplne ine nez materialy.
-  const files = ['studio.js', 'budget.js', 'proj_materials.js', 'nx_modal.js', 'edge_menu.js'];
+  // ŠT-2b: do okna Studio pribudli `demos_diff.js` a `demos_add.js` — ich
+  // funkcie ziju na top-level urovni BEZ odsadenia, preto regex pusta 0 aj 2
+  // medzery. Kontrola je teraz KAZDY s KAZDYM: prvym pouzivatelom tejto sady
+  // bol prave `demos_diff.js`, ktory po ŠT-2a premenovani volal `el(...)` —
+  // v okne Materialy uz neexistujuce, v Studiu CUDZIE (studio.js).
+  const files = ['studio.js', 'budget.js', 'proj_materials.js', 'nx_modal.js',
+                 'edge_menu.js', 'demos_diff.js', 'demos_add.js'];
   const names = {};
   files.forEach(function(f){
     const src = fs.readFileSync(path.join(JS, f), 'utf8');
     const set = new Set();
-    const re = /^ {2}(?:function\s+(\w+)|var\s+(\w+))/gm;
+    const re = /^ {0,2}(?:function\s+(\w+)|var\s+(\w+))/gm;
     let m;
     while ((m = re.exec(src)) !== null) set.add(m[1] || m[2]);
     names[f] = set;
   });
-  const mine = names['proj_materials.js'];
-  ok(mine.size > 50, 'zoznam mien sa naozaj nacital (inak by test nic nestrazil)');
-  files.forEach(function(f){
-    if (f === 'proj_materials.js') return;
-    const clash = [...mine].filter(function(x){ return names[f].has(x); });
-    eq(clash, [], `js/proj_materials.js nesmie prepisat globaly z ${f}`);
+  ok(names['proj_materials.js'].size > 50,
+     'zoznam mien sa naozaj nacital (inak by test nic nestrazil)');
+  files.forEach(function(a){
+    files.forEach(function(b){
+      if (a >= b) return;
+      const clash = [...names[a]].filter(function(x){ return names[b].has(x); });
+      eq(clash, [], `js/${a} a js/${b} nesmu zdielat globalne meno`);
+    });
   });
-  ok(mine.has('mdEl') && mine.has('mdEsc') && !mine.has('el') && !mine.has('esc'),
+  ok(names['proj_materials.js'].has('mdEl') && !names['proj_materials.js'].has('el'),
      'preto sa helpery volaju mdEl/mdEsc (nie el/esc)');
+  // REGRESIA ŠT-2a: `demos_diff.js` volal `el(...)` z proj_materials.js. Po
+  // premenovani na `mdEl` padal modal „Aktualizovať z Demosu" na ReferenceError
+  // — a v Studiu by ticho chytil CUDZI `el` zo studio.js. Vlastny `mddId`.
+  const dd = fs.readFileSync(path.join(JS, 'demos_diff.js'), 'utf8');
+  ok(/function mddId\(/.test(dd), 'demos_diff.js ma VLASTNY pomocnik na getElementById');
+  ok(!/(?<![A-Za-z0-9_.$])el\(/.test(dd.replace(/^\s*\/\/.*$/gm, '')),
+     'a nikde uz nevola cudzie globalne `el(`');
 })();
 
 // --- 5) presun do Studia: ready a poradie skriptov --------------------------
@@ -255,9 +268,9 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   // Volanie (nie zmienka v komentari): `sketchup.ready(` na zaciatku vyrazu.
   ok(!/^[^/\n]*\bsketchup\.ready\(/m.test(src),
      'audit #7: `ready` sa uz z tohto suboru NEPOSIELA — v Studiu ho posiela studio.js');
-  const html = fs.readFileSync(path.join(JS, '..', 'proj_materials.html'), 'utf8');
-  ok(/sketchup\.ready\(/.test(html),
-     'okno Materialy si ho posiela z vlastneho HTML (o nic neprislo)');
+  // ŠT-2b: okno Materialy ZANIKLO — jeho HTML uz neexistuje.
+  ok(!fs.existsSync(path.join(JS, '..', 'proj_materials.html')),
+     'proj_materials.html je zmazany (dve UI nad jednym katalogom by sa rozisli)');
   const sjs = fs.readFileSync(path.join(JS, 'studio.js'), 'utf8');
   const bodyFn = sjs.match(/function renderBody\(\)\{[\s\S]*?\n  \}/)[0];
   ok(/studioSec === 'mat'/.test(bodyFn) && /matRenderBody\(\)/.test(bodyFn),
@@ -272,6 +285,34 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
      'a aj za budget.js — kazdy dalsi obal musi vidiet ten predchadzajuci');
   ok(studio.indexOf('NX_MAT_SECTION') < studio.indexOf('js/proj_materials.js'),
      'priznak sekcie musi byt nastaveny PRED nacitanim suboru');
+  // ŠT-2b: Demos toky bezia v sekcii — ich moduly musia byt v okne (a PRED
+  // proj_materials.js, ktoreho onclick handlery volaju `mddLookup`/`nxdaOpen`).
+  ok(studio.indexOf('js/demos_diff.js') > 0 && studio.indexOf('js/demos_add.js') > 0,
+     'studio.html nacitava oba Demos moduly');
+  ok(studio.indexOf('js/demos_diff.js') < studio.indexOf('js/proj_materials.js'),
+     'demos_diff.js pred proj_materials.js');
+  ok(studio.indexOf('js/demos_add.js') < studio.indexOf('js/proj_materials.js'),
+     'demos_add.js tiez');
+  // Modaly Demosu + „Nahradiť UNI…" ziju v kotve MIMO tela sekcie.
+  const root = studio.match(/<div id="matModalRoot">[\s\S]*?\n<\/div>/)[0];
+  ['demosModal', 'nxdaModal', 'mdUniModal', 'mdDeleteModal', 'mdRestoreModal'].forEach(function(id){
+    ok(root.indexOf('id="' + id + '"') >= 0, `modal ${id} je v #matModalRoot`);
+  });
+  // Odchod zo sekcie ich musi zavriet a zrusit bezaci fetch — inak by modal
+  // visel nad Kusovnikom a stahovanie by dobehlo do nikam.
+  // Preč zo sekcie sa dá DVOMA cestami — klik v navigacii (`studioGoSection`)
+  // a DEEP-LINK zo servera (`open_section` v payloade). Obe musia modaly
+  // zavriet, inak visia nad novou sekciou.
+  ok(/studioSec === 'mat' && id !== 'mat'/.test(sjs),
+     'studioGoSection ohlasi odchod zo sekcie Materialy');
+  ok(/studioSec === 'mat' && ST\.open_section !== 'mat'/.test(sjs),
+     'a deep-link zo servera tiez');
+  eq((sjs.match(/matOnLeaveSection\(\)/g) || []).length, 2,
+     'obe cesty volaju TEN ISTY odchodovy hook');
+  ok(/sketchup\.mat_leave/.test(src), 'a klient to hlasi SERVERU (ten beh rusi)');
+  const leave = src.match(/function matOnLeaveSection\(\)\{[\s\S]*?\n  \}/)[0];
+  ok(leave.indexOf('mat_leave') < leave.indexOf('matCloseModals'),
+     'poradie: najprv server (zrusi a povie preco), az potom lokalne zatvorenie modalov');
 })();
 
-console.log(`OK ${n} kontrol (ŠT-2a sekcia Materiály)`);
+console.log(`OK ${n} kontrol (ŠT-2a/2b sekcia Materiály)`);

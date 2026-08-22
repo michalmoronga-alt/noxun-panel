@@ -583,9 +583,12 @@ NxTest.test('ST-1a: Studio je vo VSETKYCH refresh cestach (audit #10)') do
                   "#{rel} este obsahuje vetvu zaniknuteho okna Vyroba")
   end
   after = ST1B_STUDIO_RB[/def price_refresh_after_proc.*?\n        end\n/m].to_s
-  NxTest.assert(after.include?('MaterialsDialog.push_catalog') && after.include?('Panel.push_materials') &&
+  # ŠT-2b: satelit Materialy zanikol — katalog dostava SEKCIA `mat` tohto okna.
+  NxTest.assert(after.include?('push_mat_catalog') && after.include?('Panel.push_materials') &&
                 after.include?('HardwareCatalogDialog.push_items'),
-                'po prepocte cien dostanu cerstve cisla vsetky okna nad katalogom')
+                'po prepocte cien dostanu cerstve cisla vsetci odberatelia katalogu')
+  NxTest.refute(after.include?('MaterialsDialog.push_catalog'),
+                'vetva zaniknuteho satelitu Materialy je PREC')
   NxTest.refute(after.include?('ProductionDialog'), 'okrem zaniknuteho okna Vyroba')
 end
 

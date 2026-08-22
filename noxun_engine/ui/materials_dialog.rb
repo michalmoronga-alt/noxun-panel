@@ -1,23 +1,25 @@
 # frozen_string_literal: true
-# Noxun Engine — dialog "Materialy projektu" (V0.4.5 D2). Satelitne okno (vzor
-# RulesDialog): projektove predvolby materialov sa nastavuju raz za projekt,
-# nie popri kresleni — preto neziju v Inspector paneli (SYSTEM/07: sprava
-# katalogov mimo hlavneho panela). V paneli ostavaju len materialy oznacenej
-# skrinky; logika projektoveho defaultu sa PRESUNULA sem z Panel
-# (handle_set_project_material) — panel ju uz nevola.
+# Noxun Engine — SERVEROVA AUTORITA KATALOGU MATERIALOV.
 #
-# Data su per MODEL (NOXUN dict, Materials.project_defaults) — pri prepnuti
-# dokumentu formular obnovi EngineAppObserver (on_model_changed, vzor PR #26).
+# ŠT-2b: satelitne okno „Materiály projektu" ZANIKLO (HtmlDialog, `DLG_KEY`,
+# `proj_materials.html`, menu polozka aj panelove tlacidlo). Jedine UI katalogu
+# je odteraz SEKCIA `mat` v okne ŠTÚDIO. Modul sa pritom ZAMERNE NEPREMENUVA
+# (audit #21): zaniklo OKNO, nie serverova autorita — telo kazdej katalogovej
+# akcie, vsetky guardy (schema, `catalog_rev`, `row_rev`), Demos konektor aj
+# „Nahradiť UNI…" ziju dalej TU. Zmenil sa jediny detail: ADRESAT odpovede.
+#
+#   * pocas synchronneho volania sekcie ho drzi `with_client(sink)`,
+#   * mimo neho (asynchronne Demos emity, refresh cesty zvonku) ide vsetko do
+#     Studia cez `StudioDialog.mat_js` — druhe okno uz neexistuje.
+#
+# Projektove predvolby su per MODEL (NOXUN dict, `Materials.project_defaults`);
+# katalog je GLOBALNY (%APPDATA%). Logika projektoveho defaultu sa V0.4.5 D2
+# presunula sem z Panel (`handle_set_project_material`) — panel ju uz nevola.
 require 'json'
 
 module Noxun
   module Engine
     module MaterialsDialog
-      # D-42 PR B: kluc bumpnuty (v2) — preferences_key drzi ulozenu geometriu
-      # okna a stara 420x360 by mriezku dlazdic stlacila (audit FIX 14). Bump =
-      # jednorazovo cerstvy default 640x560; layout ostava responzivny.
-      DLG_KEY = 'noxun_engine_materials_v2'
-
       # key -> [config kluc korpusu, rola pre hrubkovu kontrolu, pole hrubky]
       # (presunute z Panel::PROJECT_MATERIAL_TARGETS — jediny pouzivatel je tento dialog)
       TARGETS = {
@@ -26,23 +28,16 @@ module Noxun
         'default_back_material_id'  => ['back_material_id', 'back', 'back_thickness']
       }.freeze
 
-      # --- ŠT-2a: sekcia MATERIALY v Studiu ---------------------------------
+      # --- sekcia MATERIALY v Studiu (ŠT-2a kanal, ŠT-2b uplny presun) -------
       #
-      # Od tejto davky ma katalog DVE UI: toto satelitne okno a sekciu `mat`
-      # v Studiu (okno zanikne az v ŠT-2b). Telo VSETKYCH katalogovych akcii
-      # ostava TU — modul `MaterialsDialog` je jedina serverova autorita
-      # katalogu a NEPREMENUVA sa (audit #21). Sekcia posiela TIE ISTE payloady
-      # pod TYMI ISTYMI menami; lisi sa LEN adresat odpovede, ktoreho drzi
-      # `with_client` (viz `js`).
+      # Zoznam je UZAVRETY whitelist: klient (Studio) posiela iba MENO akcie,
+      # co sa smie zavolat rozhoduje SERVER (HTML ani JS nie su ochrana).
       #
-      # Zoznam je UZAVRETY whitelist: klient (Studio) posiela iba meno akcie,
-      # co sa smie zavolat rozhoduje SERVER. Asynchronne Demos behy tu ZAMERNE
-      # NIE SU — ich zivotnost visi na instancii okna (`demos_alive_proc`),
-      # takze do sekcie ich presunie az ŠT-2b (dovtedy ich sekcia premosti do
-      # tohto okna). Z toho isteho dovodu tu nie je ani `open_search_url`
-      # (vola ho naseptavac modalu „Pridať z Demosu") a dvojica
-      # `replace_uni_preview`/`replace_uni_apply` — v sekcii sa dnes ziadny
-      # z tychto modalov neotvara, takze by to bola mrtva cesta.
+      # ŠT-2b: pribudli VSETKY toky, ktore v ŠT-2a este drzali dlhy beh viazany
+      # na instanciu satelitneho okna — Demos lookup/apply, „Pridať z Demosu"
+      # (rodina + naseptavac) a dvojica `replace_uni_preview`/`replace_uni_apply`.
+      # Ich zivotnost sa presunula na SEKCIU (`demos_alive_proc` +
+      # `cancel_demos_on_leave`), takze premostenie do okna zaniklo spolu s nim.
       SECTION_ACTIONS = %w[
         set_project_material
         add_sheet update_sheet delete_sheet create_duplak
@@ -50,15 +45,17 @@ module Noxun
         add_decor_batch rename_decor set_decor_name set_decor_manufacturer set_decor_color
         patch_sheet patch_edge
         delete_preflight restore_pre_schema2
-        open_demos_url
+        open_demos_url open_search_url
+        demos_lookup demos_manual_url demos_apply demos_cancel
+        demos_name_search demos_family demos_family_create demos_family_cancel
+        replace_uni_preview replace_uni_apply
       ].freeze
 
       class << self
-        # Vykona akciu katalogu v mene INEHO okna (sekcia Studia). `sink` je
-        # proc, ktory dostane hotovy JS retazec a posle ho tomu, KTO sa pytal —
-        # inak by odpoved (`MD.setStatus`, `MD.init`, `MD.confirmDelete`)
-        # skoncila v okne, ktoreho sa pouzivatel ani nedotkol. Volanie je
-        # synchronne, takze sink zije presne jeden callback.
+        # Vykona akciu katalogu v mene SEKCIE `mat`. `sink` je proc, ktory
+        # dostane hotovy JS retazec a posle ho tomu, KTO sa pytal. Volanie je
+        # synchronne, takze sink zije presne jeden callback — asynchronne
+        # pokracovanie (Demos fetch) uz ide default cestou do Studia.
         def dispatch(name, payload, sink)
           key = name.to_s
           unless SECTION_ACTIONS.include?(key)
@@ -88,12 +85,26 @@ module Noxun
           when 'delete_preflight'        then handle_delete_preflight(payload)
           when 'restore_pre_schema2'     then handle_restore_backup(payload)
           when 'open_demos_url'          then handle_open_demos_url(payload)
+          when 'open_search_url'         then handle_open_search_url(payload)
+          # ŠT-2b: Demos toky. Su ASYNCHRONNE — dispatch len STARTUJE beh
+          # a hned sa vracia; emity dobiehaju z `UI.start_timer` uz BEZ sinku,
+          # takze `js` ich posle do Studia (jedine zive UI katalogu).
+          when 'demos_lookup'            then handle_demos_lookup(payload)
+          when 'demos_manual_url'        then handle_demos_manual(payload)
+          when 'demos_apply'             then handle_demos_apply(payload)
+          when 'demos_cancel'            then handle_demos_cancel
+          when 'demos_name_search'       then handle_demos_name_search(payload)
+          when 'demos_family'            then handle_demos_family(payload)
+          when 'demos_family_create'     then handle_demos_family_create(payload)
+          when 'demos_family_cancel'     then handle_demos_family_cancel
+          when 'replace_uni_preview'     then handle_replace_uni_preview(payload)
+          when 'replace_uni_apply'       then handle_replace_uni_apply(payload)
           end
         end
 
         # Presmerovanie odpovedi na cas jedneho volania. `ensure` je povinne:
-        # vynimka v handleri nesmie nechat sink viset, inak by dalsia odpoved
-        # tohto okna odisla do Studia.
+        # vynimka v handleri nesmie nechat sink viset, inak by ho zdedila
+        # NASLEDUJUCA (aj asynchronna) odpoved a poslala ju do mrtveho kanala.
         def with_client(sink)
           prev = @client_sink
           @client_sink = sink
@@ -101,158 +112,63 @@ module Noxun
         ensure
           @client_sink = prev
         end
-        def show
-          dlg = ensure_dialog
-          if dlg.visible?
-            dlg.bring_to_front
-          else
-            dlg.show
-          end
-          dlg
+        # --- ŠT-2b: ZIVOTNY CYKLUS (okno zaniklo, ostava sekcia) -------------
+        #
+        # Modul uz nevlastni ziadny HtmlDialog. To, co predtym riesil
+        # `set_on_closed` satelitu, teraz hlasi Studio:
+        #   * `on_ui_closed`   — zatvorene okno Studio (ABA guard: nova
+        #     instancia okna NESMIE dostat eventy behu, ktory patril starej),
+        #   * `cancel_demos_on_leave` — odchod zo SEKCIE `mat` pocas dlheho
+        #     behu (vedome rozhodnutie ŠT-2b, viz `demos_alive_proc`).
+
+        # Zatvorene Studio = ziadne UI katalogu. Bezaci Demos fetch sa zneplatni
+        # (session bump) a odlozena poziadavka „Nahradiť UNI…" zomiera s nim.
+        def on_ui_closed
+          demos_bump_session
+          demos_forget_runs
+          @pending_replace_uni = nil
         rescue StandardError => e
-          Engine.log_error(e, 'MaterialsDialog.show')
+          Engine.log_error(e, 'MaterialsDialog.on_ui_closed')
         end
 
-        def ensure_dialog
-          return @dialog if @dialog
+        # VEDOME ROZHODNUTIE ŠT-2b (audit #5): dlhy beh Demosu je viazany na
+        # SEKCIU, nie len na okno. Odchod do Kusovnika pocas stahovania beh
+        # ZRUSI — a povie to nahlas. Alternativa (nechat bezat na pozadi) by
+        # znamenala, ze sa modal po navrate otvori sam nad inou sekciou alebo
+        # ze zapis dobehne bez toho, aby ho niekto videl; potvrdzovaci dialog
+        # pri kazdom prepnuti sekcie by zas otravoval. Zrusenie je jednoduche
+        # a PREDVIDATELNE.
+        #
+        # Hlasku posiela LEN vtedy, ked naozaj nieco bezalo — inak by kazde
+        # prepnutie sekcie prepisalo stav okna zbytocnou vetou.
+        def cancel_demos_on_leave
+          return unless @demos_running
 
-          # D-42 PR B: sirsie okno pre mriezku dlazdic + detail (Michal: ~640 px);
-          # vyssi default, aby pod predvolbami a top barom ostal priestor gridu.
-          @dialog = UI::HtmlDialog.new(
-            dialog_title: 'Noxun Engine — Materiály projektu',
-            preferences_key: DLG_KEY,
-            scrollable: true,
-            resizable: true,
-            # D-77: detail dekoru (riadky variantov min-width 430 px + editovatelne
-            # bunky) a modaly sirky 560 px sa musia zmestit bez rucneho zvacsovania.
-            # Rozmery platia LEN pri prvom otvoreni — zapamatane male okno dorovna nx_fit.
-            width: 720,
-            height: 640,
-            min_width: 560,
-            min_height: 460,
-            style: UI::HtmlDialog::STYLE_DIALOG
-          )
-          @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'proj_materials.html'))
-          @ready = false # D-83: HTML este nebezi — execute_script by sa stratil
-          register_callbacks(@dialog) # pred show!
-          # B-2b (audit BLOCKER 5): zatvorenie okna zneplatni bezaci Demos
-          # lookup (session bump) — nova instancia okna nesmie dostat eventy
-          # starej (ABA: visible? by po reopene patrilo NOVEMU oknu).
-          @dialog.set_on_closed do
-            demos_bump_session
-            @ready = false
-            @pending_replace_uni = nil # D-83: zatvorene okno poziadavku zahadzuje
-            @dialog = nil
-          end
-          @dialog
+          demos_bump_session
+          demos_forget_runs
+          set_status('Sťahovanie z Demosu zrušené — opustil si sekciu Materiály.')
+        rescue StandardError => e
+          Engine.log_error(e, 'MaterialsDialog.cancel_demos_on_leave')
         end
 
-        def register_callbacks(dlg)
-          Engine.register_dialog_fit(dlg, 'materials') # D-77: zapamatane male okno sa dorovna
-          # D-83: pending poziadavka („Nahradiť UNI…" zo ŠTÚDIA) sa spusta AZ
-          # tu — po push_state, ked JS uz ma katalog. Volanie pred nacitanim HTML
-          # by CEF zahodil.
-          cb(dlg, 'ready') { |_p| @ready = true; push_state; flush_pending_replace_uni }
-          cb(dlg, 'set_project_material') { |p| handle_set_project_material(p) }
-          # Davka 2 (D-05): sprava katalogu — create/edit ODDELENE (edit nikdy
-          # nemeni ID a negeneruje ho; create ID generuje server, JS mu never).
-          cb(dlg, 'add_sheet')    { |p| handle_save_sheet(p, create: true) }
-          cb(dlg, 'update_sheet') { |p| handle_save_sheet(p, create: false) }
-          cb(dlg, 'delete_sheet') { |p| handle_delete_sheet(p) }
-          # 2B-1 (D-43): duplak — jedina cesta vzniku (guardy zdroja pod zamkom).
-          cb(dlg, 'create_duplak') { |p| handle_create_duplak(p) }
-          cb(dlg, 'add_edge')     { |p| handle_save_edge(p, create: true) }
-          cb(dlg, 'update_edge')  { |p| handle_save_edge(p, create: false) }
-          cb(dlg, 'delete_edge')  { |p| handle_delete_edge(p) }
-          # D-41 PR B: dekorove karty — batch "Novy dekor" + atomicke premenovanie skupiny.
-          cb(dlg, 'add_decor_batch') { |p| handle_add_decor_batch(p) }
-          cb(dlg, 'rename_decor')    { |p| handle_rename_decor(p) }
-          cb(dlg, 'set_decor_name')  { |p| handle_set_decor_name(p) }
-          # D-42: vyrobca je vlastnost dekoru — zmena atomicky pre celu skupinu.
-          cb(dlg, 'set_decor_manufacturer') { |p| handle_set_decor_manufacturer(p) }
-          # D-82: farba je rovnako vlastnost dekoru — jedna zmena prefarbi
-          # dosky AJ pasky celej skupiny (koniec "hnedeho mora").
-          cb(dlg, 'set_decor_color') { |p| handle_set_decor_color(p) }
-          # D-42 PR C (audit BLOCKER 1): inline bunky detailu — patch protokol
-          # (whitelist poli, merge s cerstvym zaznamom, baseline per RIADOK).
-          cb(dlg, 'patch_sheet') { |p| handle_patch(p, 'sheet') }
-          cb(dlg, 'patch_edge')  { |p| handle_patch(p, 'edge') }
-          # 2A-4b (audit B2): rollback na predmigracnu zalohu z read-only banneru.
-          cb(dlg, 'restore_pre_schema2') { |p| handle_restore_backup(p) }
-          # V0.6 B-2b: Demos lookup + apply dekorovej skupiny (diff modal).
-          cb(dlg, 'demos_lookup')     { |p| handle_demos_lookup(p) }
-          cb(dlg, 'demos_manual_url') { |p| handle_demos_manual(p) }
-          cb(dlg, 'demos_apply')      { |p| handle_demos_apply(p) }
-          cb(dlg, 'demos_cancel')     { |_p| handle_demos_cancel }
-          # V0.6 M-A2: modal "Pridat z Demosu" — nazvove hladanie, rodina
-          # dekoru zo stranky, atomicke zalozenie skupiny (family store TU).
-          cb(dlg, 'demos_name_search')   { |p| handle_demos_name_search(p) }
-          cb(dlg, 'demos_family')        { |p| handle_demos_family(p) }
-          cb(dlg, 'demos_family_create') { |p| handle_demos_family_create(p) }
-          cb(dlg, 'demos_family_cancel') { |_p| handle_demos_family_cancel }
-          # V0.6 M-A2 (audit F9 / Halifax lekcia): potvrdenie mazania s
-          # variantovo presnym rozpisom zo SERVERA (nie plain confirm).
-          cb(dlg, 'delete_preflight') { |p| handle_delete_preflight(p) }
-          # M-A3b D-60: "Otvorit u dodavatela" z riadku variantu.
-          cb(dlg, 'open_demos_url') { |p| handle_open_demos_url(p) }
-          # D-74: kontrola zhody naseptavaca priamo na Demose (sanitize server).
-          cb(dlg, 'open_search_url') { |p| handle_open_search_url(p) }
-          # V0.6 M-B2: „Nahradit UNI…" — rozpis dopadu + potvrdenie odtlackom.
-          cb(dlg, 'replace_uni_preview') { |p| handle_replace_uni_preview(p) }
-          cb(dlg, 'replace_uni_apply')   { |p| handle_replace_uni_apply(p) }
-          dlg.add_action_callback('js_error') do |_ctx, msg|
-            begin
-              Engine.log("JS(materials): #{msg}")
-            rescue StandardError => e
-              Engine.log_error(e, 'materials js_error')
-            end
-            next
-          end
-        end
-
-        def cb(dlg, name)
-          dlg.add_action_callback(name) do |_ctx, *args|
-            begin
-              yield(args.first)
-            rescue StandardError => e
-              Engine.log_error(e, "materials cb #{name}")
-              set_status("Chyba: #{e.message}", true)
-            end
-            next
-          end
+        # Serverovy stav dlhych behov (proposal store, rodina, baseline row_rev).
+        # Session token uz bumpol volajuci — toto je upratanie po nom.
+        def demos_forget_runs
+          @demos_running = false
+          @demos_family = nil
+          @demos_proposals = {}
+          @demos_base_revs = {}
         end
 
         # --- Ruby -> JS -----------------------------------------------------
-
-        # PLNY stav: katalog + modelovy kontext (predvolby, pocty, pouzite dekory).
-        # Vola sa pri ready a pri prepnuti modelu. Katalogove echa po zapisoch idu
-        # cez push_catalog — model sa pri nich NEskenuje (audit FIX 13).
-        def push_state
-          js("MD.init(#{state_payload.to_json})")
-        end
-
-        def state_payload
-          model = Sketchup.active_model
-          catalog_payload.merge(
-            version: Engine::VERSION,
-            project: Materials.project_defaults(model),       # aktualne predvolby modelu
-            cabinets: Panel.all_cabinets(model).size,
-            model_guid: model_guid(model),                    # D-42: identita modelu pre projektove predvolby
-            used: Materials.model_decor_usage(model)          # D-42 PR B: pas "Pouzite v projekte"
-          )
-        end
-
-        # ŠT-2a (review #2): PLNY stav do OBOCH UI — vzor `after_catalog_change`.
-        # Pouzivaju ho cesty, ktore zmenili PROJEKTOVE PREDVOLBY (predvolba
-        # korpusu/ciel/chrbta, apply „Nahradiť UNI…"). Bez toho by zapis zo
-        # sekcie prisiel len sekcii (odpoved chodi cez sink) a ZIVE okno by
-        # ukazovalo stare predvolby — dva formulare nad jednym modelom
-        # s roznym obsahom. Payload sa stava RAZ (je v nom cely katalog).
-        def push_state_both
-          data = state_payload
-          dialog_js("MD.init(#{data.to_json})")
-          StudioDialog.push_mat_state(data) if defined?(StudioDialog)
-        end
+        #
+        # ŠT-2b: `push_state` (PLNY stav s `MD.init`) a `state_payload` ZANIKLI
+        # spolu s oknom. Modelovy kontext sekcie — projektove predvolby, pocet
+        # skriniek, identita dokumentu a pas „Použité v projekte" — nesie UZ
+        # payload Studia (`StudioDialog#mat_payload`), a ten ho rata z UZ
+        # zozbieraneho kusovnika. S oknom preto zmizol aj DRUHY sken modelu
+        # (`Materials.model_decor_usage`), ktory tento subor robil pri kazdom
+        # plnom pushi (review ŠT-2a #4). Ostava JEDNA cesta: katalogove echo.
 
         # LEN katalogova cast (po zapise do katalogu) — ziadny scan modelu,
         # modelovy kontext (predvolby/pouzite) v JS ostava (audit FIX 13).
@@ -315,7 +231,7 @@ module Noxun
           rev = data['catalog_rev'].to_s
           return true if rev.empty? || rev == Materials.catalog_revision
           set_status('Katalóg sa medzitým zmenil — zoznamy sa obnovili, over a ulož znova.', true)
-          push_state
+          push_catalog
           false
         end
 
@@ -324,11 +240,13 @@ module Noxun
         # o novych poliach nevie — jeho payload by identitu variantu zahodil.
         # V SCHEMA 1 sa nedeje NIC (spatna kompatibilita: prazdna hodnota prejde).
         # Rozhodnutie je na serveri (Materials.schema_write_allowed?) — tu ostava
-        # len hlaska a refresh okna.
+        # len hlaska a refresh sekcie.
         def schema_ok?(data)
           return true if Materials.schema_write_allowed?(data['catalog_schema'])
-          set_status('Katalóg je v novom formáte — zavri a znova otvor okno Materiály, potom ulož.', true)
-          push_state
+          # ŠT-2b: text uz nesmie posielat do okna, ktore neexistuje — obnovu
+          # katalogu robi „Obnoviť" v liste sekcie (alebo tento push).
+          set_status('Katalóg je v novom formáte — obnov Štúdio (Obnoviť) a potom ulož.', true)
+          push_catalog
           false
         end
 
@@ -415,7 +333,6 @@ module Noxun
           # dostat aj panel a otvorene okno Studio (rovnako ako bezna mutacia),
           # inak by drzali predrollbackovy SCHEMA 2 obsah.
           after_catalog_change
-          push_state
           set_status('Katalóg obnovený z predmigračnej zálohy. Pri najbližšom štarte SketchUpu sa migrácia jednorazovo preskočí.')
         end
 
@@ -423,41 +340,46 @@ module Noxun
           js("MD.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})")
         end
 
-        # ŠT-2a: odpoved ide TOMU, KTO sa pytal. Bez sinku (bezny callback tohto
-        # okna, refresh cesty zvonku) je to vlastny HtmlDialog — presne ako
-        # doteraz.
+        # ŠT-2b: odpoved ide TOMU, KTO sa pytal. Sink zije PRESNE jeden
+        # synchronny callback sekcie (`with_client`); mimo neho — refresh cesty
+        # zvonku aj ASYNCHRONNE Demos emity, ktore dobiehaju z casovaca uz po
+        # navrate z `dispatch` — je adresat JEDINY mozny: okno Studio.
         def js(script)
           sink = @client_sink
           return sink.call(script) if sink
 
-          dialog_js(script)
+          studio_js(script)
         end
 
-        # Vzdy do VLASTNEHO okna — aj ked prave bezi akcia sekcie. Pouziva to
-        # `after_catalog_change`: katalog je jeden, takze cerstve zaznamy musia
-        # dostat OBE UI, nielen to, ktore pisalo.
-        def dialog_js(script)
-          return unless @dialog && @dialog.visible?
-          @dialog.execute_script(script)
+        # Jedine zive UI katalogu. Studio nacitava loader (`main.rb`) EST PRED
+        # tymto suborom; `defined?` je poistka pre headless testy, ktore si
+        # tento subor requiruju samostatne.
+        def studio_js(script)
+          return false unless defined?(StudioDialog)
+
+          StudioDialog.mat_js(script)
         rescue StandardError => e
-          Engine.log_error(e, 'MaterialsDialog.js')
+          Engine.log_error(e, 'MaterialsDialog.studio_js')
+          false
         end
 
-        # Volane z EngineAppObserver: predvolby su per model — otvoreny formular
-        # sa pri File > New/Open/Activate naplni z prave aktivneho modelu.
+        # Volane z EngineAppObserver (`scale_observer`). Od ŠT-2b tento modul uz
+        # ziadne UI nevlastni — refresh sekcie robi Studio samo
+        # (`StudioDialog.on_model_changed`). Ostava tu VYHRADNE zivotny cyklus
+        # serverovych behov: cudzi dokument nesmie dostat vysledky behu, ktory
+        # patril predoslemu.
         def on_model_changed(_model)
           demos_bump_session # B-2b: prepnuty model rusi bezaci Demos lookup
+          demos_forget_runs
           @pending_replace_uni = nil # D-83: poziadavka patrila PREDOSLEMU modelu
-          return unless @dialog && @dialog.visible?
-          push_state
-          set_status('Aktívny model sa zmenil — predvoľby načítané z tohto modelu.')
         rescue StandardError => e
           Engine.log_error(e, 'MaterialsDialog.on_model_changed')
         end
 
         # --- V0.6 B-2b: Demos lookup / apply (audit BLOCKER 5/6, FIX 13/14) ---
         # Session token je MONOTONNE Ruby cislo — jedina autorita zivotnosti
-        # lookupu. Bump: novy lookup, cancel, zatvorenie okna, prepnuty model.
+        # lookupu. Bump: novy lookup, cancel, ZATVORENIE STUDIA (`on_ui_closed`),
+        # ODCHOD ZO SEKCIE `mat` (`cancel_demos_on_leave`), prepnuty model.
         # JS generation sa NEpouziva (close/reopen ABA). Proposal store zije
         # TU (server) — apply berie hodnoty z neho, JS posiela len flagy.
 
@@ -483,8 +405,21 @@ module Noxun
           cat['sheets'].select(&sel) + cat['edges'].select(&sel)
         end
 
-        def demos_alive_proc(session, dlg)
-          -> { @demos_session.to_i == session && @dialog && @dialog.equal?(dlg) && @dialog.visible? }
+        # ŠT-2b (audit #5): zivotnost dlheho behu. Do ŠT-2a visela na INSTANCII
+        # satelitneho okna; teraz na SESSION TOKENE — a ten zhasina KAZDA
+        # udalost, po ktorej uz vysledok nema komu prist:
+        #   * zatvorenie Studia (`on_ui_closed` — ABA: nova instancia okna nesmie
+        #     dostat eventy behu, ktory patril starej),
+        #   * ODCHOD ZO SEKCIE `mat` (`cancel_demos_on_leave` — vedome
+        #     rozhodnutie: beh sa zrusi a povie sa to, viz tam),
+        #   * prepnutie dokumentu, cancel, novy beh.
+        # Druha podmienka je „je vobec kam kreslit" — mrtve Studio znamena
+        # ziadny dalsi fetch (throttle 3 s / zaznam je drahy).
+        def demos_alive_proc(session)
+          lambda do
+            @demos_session.to_i == session &&
+              defined?(StudioDialog) && StudioDialog.dialog_alive?
+          end
         end
 
         # Emit: proposal matche sa odkladaju do @demos_proposals (apply z nich
@@ -497,6 +432,9 @@ module Noxun
                 (@demos_proposals ||= {})[[p['kind'].to_s, p['record_id'].to_s]] = p
               end
             end
+            # Terminalny event = beh dobehol; `cancel_demos_on_leave` uz nema
+            # co rusit (a nema o com hlasit).
+            @demos_running = false if %w[complete error].include?(event['type'].to_s)
             js("MDD.event(#{event.merge('session' => session).to_json})")
           end
         end
@@ -519,7 +457,8 @@ module Noxun
             @demos_base_revs[[kind, id]] = Materials.record_rev(r)
           end
           session = @demos_session
-          DemosLookup.run(recs, alive: demos_alive_proc(session, @dialog),
+          @demos_running = true # ŠT-2b: odchod zo sekcie takyto beh ZRUSI
+          DemosLookup.run(recs, alive: demos_alive_proc(session),
                                 emit: demos_emit_proc(session))
         end
 
@@ -538,13 +477,14 @@ module Noxun
           id = kind == 'edge' ? rec['abs_id'].to_s : rec['material_id'].to_s
           (@demos_base_revs ||= {})[[kind, id]] = Materials.record_rev(rec)
           manufacturer = demos_group_manufacturer(rec)
+          @demos_running = true
           group_emit = demos_emit_proc(session)
           manual_emit = lambda do |event|
             event = event.merge('type' => 'manual_done') if event['type'] == 'complete'
             group_emit.call(event)
           end
           DemosLookup.manual(rec, data['url'].to_s,
-                             alive: demos_alive_proc(session, @dialog),
+                             alive: demos_alive_proc(session),
                              emit: manual_emit,
                              manufacturer: manufacturer)
         end
@@ -587,7 +527,7 @@ module Noxun
         def handle_demos_apply(payload)
           data = JSON.parse(payload.to_s)
           unless catalog_write_ok?(data)
-            return js("MDD.fail(#{{ 'msg' => 'Katalóg sa zmenil — zavri okno a skús znova.' }.to_json})")
+            return js("MDD.fail(#{{ 'msg' => 'Katalóg sa zmenil — zavri rozpis a skús znova.' }.to_json})")
           end
           # GH #98 P2: row_rev VYHRADNE zo serveroveho baseline z casu lookupu
           # (@demos_base_revs) — klientske row_rev sa ignoruju. Zaznam zmeneny
@@ -602,6 +542,7 @@ module Noxun
           case status
           when :ok
             demos_bump_session
+            @demos_running = false
             @demos_proposals = {}
             @demos_base_revs = {}
             after_catalog_change
@@ -627,6 +568,7 @@ module Noxun
 
         def handle_demos_cancel
           demos_bump_session
+          @demos_running = false
           set_status('Aktualizácia z Demosu zrušená.')
         end
 
@@ -645,10 +587,16 @@ module Noxun
           data = JSON.parse(payload.to_s)
           gen = data['gen'].to_i
           if DemosSitemapCache.load.nil?
-            dlg = @dialog
+            # ŠT-2b: zivotnost dorobenia sitemapy je TA ISTA ako pri lookupe —
+            # session token (zhasne ho zatvorenie Studia, odchod zo sekcie aj
+            # prepnutie dokumentu). Refresh je pritom ZDIELANY single-flight,
+            # takze sa tu NEbumpuje: pisanie do naseptavaca nesmie zrusit nic,
+            # co uz bezi.
+            session = @demos_session.to_i
+            alive = demos_alive_proc(session)
             js("NXDA.suggest(#{{ 'gen' => gen, 'refreshing' => true }.to_json})")
             DemosLookup.start_refresh do |ok, err|
-              next unless @dialog && @dialog.equal?(dlg) && @dialog.visible?
+              next unless alive.call
               if ok
                 js("NXDA.suggest(#{{ 'refresh_done' => true }.to_json})")
               else
@@ -668,10 +616,11 @@ module Noxun
           data = JSON.parse(payload.to_s)
           demos_bump_session
           @demos_family = nil
+          @demos_running = true # ŠT-2b: dlhy beh viazany na sekciu
           session = @demos_session
           emit = demos_family_emit(session)
           DemosFamily.load_family(data['url'].to_s,
-                                  alive: demos_alive_proc(session, @dialog),
+                                  alive: demos_alive_proc(session),
                                   emit: emit)
         end
 
@@ -723,21 +672,23 @@ module Noxun
         def handle_demos_family_create(payload)
           data = JSON.parse(payload.to_s)
           unless catalog_write_ok?(data)
-            return js("NXDA.fail(#{{ 'msg' => 'Katalóg sa medzitým zmenil — zavri okno Pridať z Demosu a skús znova.' }.to_json})")
+            return js("NXDA.fail(#{{ 'msg' => 'Katalóg sa medzitým zmenil — zavri „Pridať z Demosu“ a skús znova.' }.to_json})")
           end
           family = @demos_family
           unless family.is_a?(Hash) && family['session'].to_i == @demos_session.to_i
-            return js("NXDA.fail(#{{ 'msg' => 'Rodina už nie je načítaná (okno/model sa medzitým zmenili) — začni odznova.' }.to_json})")
+            return js("NXDA.fail(#{{ 'msg' => 'Rodina už nie je načítaná (Štúdio/model sa medzitým zmenili) — začni odznova.' }.to_json})")
           end
           session = @demos_session
+          @demos_running = true
           DemosFamily.create(family['header'], family['items'], Array(data['iids']),
-                             alive: demos_alive_proc(session, @dialog),
+                             alive: demos_alive_proc(session),
                              emit: demos_family_emit(session))
         end
 
         def handle_demos_family_cancel
           demos_bump_session
           @demos_family = nil
+          @demos_running = false
         end
 
         # M-A3b D-60 (audit BLOCKER 2): URL sa NIKDY neberie z klienta — klient
@@ -791,19 +742,31 @@ module Noxun
           js("MD.confirmDelete(#{info.to_json})")
         end
 
-        # --- D-83: „Nahradiť UNI…" spustene zo ŠTÚDIA -----------------------
+        # --- D-83 / ŠT-2b: „Nahradiť UNI…" v JEDNOM okne --------------------
         # Vstup zo zdielaneho jadra `ProductionCore.replace_uni` (to uz overilo
-        # gen, model a ze uni_id JE UNI).
-        # Ak okno bezi a JS je pripraveny, modal sa otvori hned; inak sa
-        # poziadavka ODLOZI a spusti ju `ready` callback po push_state — CEF
-        # zahodi execute_script poslany pred nacitanim HTML, takze slepy skript
-        # hned po `show` by sa stratil. Poziadavka je JEDNORAZOVA a zomiera pri
-        # zatvoreni okna aj pri prepnuti modelu.
+        # gen, model a ze uni_id JE UNI) — teda z KONTROLY, ktora je sekciou
+        # TOHO ISTEHO okna. Do ŠT-2a to bola cesta do satelitu; teraz je to
+        # prepnutie sekcie na `mat` + otvorenie modalu.
+        #
+        # Poziadavka sa NEPOSIELA slepo hned: pri zatvorenom okne CEF
+        # `execute_script` pred nacitanim HTML potichu zahodi, a aj pri
+        # otvorenom okne musi modalu predchadzat `push_state` (klient
+        # potrebuje CELY katalog, aby k `uni_id` nasiel dlazdicu). Preto sa
+        # ODLOZI a spusti ju:
+        #   * hned za `show` — ak okno uz bezalo a ohlasilo `ready` (`show`
+        #     v tom pripade sam posiela `push_state` s deep-linkom na sekciu),
+        #   * inak `ready` callback Studia, hned po jeho prvom `push_state`.
+        # Je JEDNORAZOVA a zomiera so zatvorenim Studia aj s prepnutim modelu.
         # Vrati true, ak sa okno podarilo otvorit/aktivovat.
         def request_replace_uni(uni_id, model)
+          return false unless defined?(StudioDialog)
+
           @pending_replace_uni = { 'uni_id' => uni_id.to_s, 'model_guid' => model_guid(model) }
-          live = @dialog && @dialog.visible? && @ready
-          return false unless show
+          live = StudioDialog.dialog_alive? && StudioDialog.ready?
+          # Deep-link na sekciu `mat`: bez neho by sa modal otvoril nad
+          # Kontrolou (kotva modalov `#matModalRoot` je mimo tela sekcie).
+          return false unless StudioDialog.show(open_section: 'mat')
+
           flush_pending_replace_uni if live
           true
         rescue StandardError => e
@@ -811,9 +774,15 @@ module Noxun
           false
         end
 
+        # Zatvorene UI poziadavku zahadzuje (vola `StudioDialog#set_on_closed`).
+        def forget_pending_replace_uni
+          @pending_replace_uni = nil
+        end
+
         # Spusti odlozenu poziadavku — s CERSTVYM overenim (audit F5): medzi
-        # klikom v Štúdiu a nacitanim okna sa mohol prepnut model alebo zmenit
-        # katalog. Neplatna poziadavka konci stavovou hlaskou, modal sa neotvori.
+        # klikom v Kontrole a vykreslenim sekcie sa mohol prepnut model alebo
+        # zmenit katalog. Neplatna poziadavka konci stavovou hlaskou, modal sa
+        # neotvori.
         def flush_pending_replace_uni
           req = @pending_replace_uni
           return unless req
@@ -838,7 +807,7 @@ module Noxun
         def handle_replace_uni_preview(payload)
           data = JSON.parse(payload.to_s)
           model = Sketchup.active_model
-          return push_state if ru_stale_model?(data, model)
+          return push_catalog if ru_stale_model?(data, model)
           plan, err = replace_uni_plan(model, data['uni_id'], data['target_id'])
           return set_status(err, true) if err
           if Materials.replace_uni_empty?(plan)
@@ -856,7 +825,7 @@ module Noxun
         def handle_replace_uni_apply(payload)
           data = JSON.parse(payload.to_s)
           model = Sketchup.active_model
-          return push_state if ru_stale_model?(data, model)
+          return push_catalog if ru_stale_model?(data, model)
           confirm = data['confirm']
           return set_status('Potvrdenie nahradenia je neúplné — otvor rozpis znova.', true) unless confirm.is_a?(Hash)
           plan, err = replace_uni_plan(model, confirm['uni_id'], confirm['target_id'])
@@ -893,7 +862,8 @@ module Noxun
             Panel.reselect(model, selected) if selected && selected.valid?
           end
           set_status(ru_done_msg(plan['summary']))
-          push_state_both # review #2: nahradenie meni aj PREDVOLBY — vidia to obe UI
+          # ŠT-2b: predvolby uz nesu DVE UI — nesie ich `mat` payload Studia,
+          # ktory dorazi z `refresh_studio_after_model_write` nizsie.
           Panel.push_selected(model) # refresh Inspectora (selecty, karta dielca/dosky)
           refresh_studio_after_model_write
         end
@@ -926,7 +896,7 @@ module Noxun
           uni = Materials.sheet(uni_id.to_s)
           return [nil, 'UNI materiál sa nenašiel v katalógu.'] unless uni && Materials.uni?(uni)
           target = Materials.sheet(target_id.to_s)
-          return [nil, 'Cieľový materiál sa nenašiel v katalógu — obnov okno.'] unless target
+          return [nil, 'Cieľový materiál sa nenašiel v katalógu — obnov Štúdio.'] unless target
           return [nil, 'Cieľom nahradenia nemôže byť ďalší UNI materiál.'] if Materials.uni?(target)
           scan = Materials.replace_uni_scan(model, uni['material_id'])
           [Materials.replace_uni_classify(scan, uni, target), nil]
@@ -973,7 +943,7 @@ module Noxun
           if data.key?('model_guid') && !data['model_guid'].to_s.empty? &&
              data['model_guid'].to_s != model_guid(model)
             Engine.log("projektova predvolba zahodena — echo modelu #{data['model_guid']} nesedi s aktivnym")
-            return push_state
+            return push_catalog
           end
           key = data['key'].to_s
           value = Panel.present_str(data['value'])
@@ -1091,7 +1061,7 @@ module Noxun
           msg += " ABS hrany prevedené na nový dekor (#{remap_changed}× dielec)." if remap_changed.positive?
           msg += " Bez náhrady: #{remap_lost.join(', ')}." unless remap_lost.empty?
           set_status(msg)
-          push_state_both # review #2: predvolby vidia OBE UI, nielen to, ktore pisalo
+          # ŠT-2b: predvolby nesie `mat` payload Studia (push nizsie).
           Panel.push_selected(model) # refresh Inspectora (korpusove selecty, karta dielca)
           refresh_studio_after_model_write
         end
@@ -1264,7 +1234,7 @@ module Noxun
           else
             id = data['material_id'].to_s
             existing = Materials.sheet(id)
-            return set_status('Materiál sa nenašiel — obnov okno.', true) unless existing
+            return set_status('Materiál sa nenašiel — obnov Štúdio.', true) unless existing
             # GH #103 P2: UNI formularovy edit nesmie obist inline patch guard —
             # nakupne polia (kod/dodavatel/cena) sa pri UNI odmietaju aj tu.
             if (uni_err = Materials.uni_edit_error(existing, data))
@@ -1442,7 +1412,7 @@ module Noxun
           else
             id = data['abs_id'].to_s
             existing = Materials.edge(id)
-            return set_status('ABS páska sa nenašla — obnov okno.', true) unless existing
+            return set_status('ABS páska sa nenašla — obnov Štúdio.', true) unless existing
             # Hrubka ABS je pri edite NEMENNA (zrkadlo sheet guardu, Codex GH #39):
             # ID nesie hrubku (_10/_20) a dielce ju drzia len cez ID — zmena by ich
             # potichu prepla na inu hranu a ID by klamalo.
@@ -1542,27 +1512,24 @@ module Noxun
           set_status("Dekor premenovaný na #{data['new_decor'].to_s.strip} (#{result} záznamov).")
         end
 
-        # Po kazdej zmene katalogu: refresh tohto okna + zivy katalog v paneli
-        # (NX.setMaterials — BEZ resetu formulara panela).
+        # Po kazdej zmene katalogu: cerstvy katalog do sekcie Materialy + zivy
+        # katalog v paneli (NX.setMaterials — BEZ resetu formulara panela).
         def after_catalog_change
-          # D-42 (audit FIX 13): katalogovy zapis NEskenuje model — pouzite dekory
-          # a predvolby sa zapisom do katalogu nemenia; plny push_state ostava pre
-          # ready/on_model_changed/projektove predvolby.
+          # D-42 (audit FIX 13): katalogovy zapis NEskenuje model — pouzite
+          # dekory a predvolby sa zapisom do katalogu nemenia.
           #
-          # ŠT-2a: katalog je JEDEN, UI su DVE (toto okno + sekcia `mat`
-          # Studia). Echo preto dostanu OBE — a z JEDNEHO payloadu: druhy
-          # `catalog_payload` by znamenal druhy `Materials.load` a druhy vypocet
-          # `row_rev` pre kazdy zaznam. Ide zamerne mimo `js` (ten by pri akcii
-          # sekcie posial echo len sekcii a toto okno by drzalo stare ceny).
-          payload = catalog_payload
-          dialog_js("MD.setCatalog(#{payload.to_json})")
-          StudioDialog.push_mat_catalog(payload) if defined?(StudioDialog)
+          # ŠT-2b: UI je JEDNO (sekcia `mat` Studia), takze aj echo je JEDNO.
+          # Ide ZAMERNE mimo `js`: pocas akcie sekcie by `js` poslal echo cez
+          # sink, cize tomu istemu oknu — ale asynchronny Demos apply bezi UZ
+          # BEZ sinku a musi trafit rovnaky kanal. Jedna cesta = jeden vysledok
+          # bez ohladu na to, odkial zapis prisiel.
+          StudioDialog.push_mat_catalog(catalog_payload) if defined?(StudioDialog)
           Panel.push_materials if defined?(Panel)
           # D-104 (Codex GH #152 P2): katalogovy zapis NIE JE modelova transakcia,
           # takze ModelObserver zvyraznenia hran o nom nevie — a pritom prave
           # zmena typu/podtypu dosky (napr. PD abs <-> postforming) meni, ktore
           # hrany su lepitelne. Cache sa preto oznaci za starú TU; prepocet bezi
-          # lazy (push_state nizsie / najblizsie prekreslenie).
+          # lazy (refresh Studia nizsie / najblizsie prekreslenie).
           EdgeCheck.invalidate! if defined?(EdgeCheck)
           # D-19 (Codex F3): otvorene okno s cislami zakazky by inak drzalo
           # stary odhad platni (format sa prave mohol zmenit).

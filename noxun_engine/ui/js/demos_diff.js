@@ -15,6 +15,16 @@
 
   var MDD_STATE = null;
 
+  // ŠT-2b (REGRESIA z ŠT-2a): tento subor volal globalne `el(id)`. To bola
+  // funkcia z `proj_materials.js`, ktora sa v ŠT-2a premenovala na `mdEl`
+  // (kolizia mien v okne Studio) — a modal „Aktualizovať z Demosu" tak od
+  // v0.7.45 padal na `ReferenceError: el is not defined` hned pri otvoreni.
+  // Vlastny pomocnik s prefixom modulu je jedina cesta, ktora sa uz nema ako
+  // rozist: nezavisi na poradí skriptov ani na cudzich menach.
+  function mddId(id){
+    return (typeof document === 'undefined') ? null : document.getElementById(id);
+  }
+
   function mddNewModel(session){
     return { session: session, order: [], byKey: {}, accessories: [],
              warnings: [], complete: null, progress: { done: 0, total: 0 },
@@ -230,12 +240,12 @@
   }
 
   function mddRender(){
-    var body = el('mddBody');
+    var body = mddId('mddBody');
     if (!body) return;
     body.textContent = '';
     var m = MDD_STATE;
     var v = mddBuildView(m);
-    var status = el('mddStatus');
+    var status = mddId('mddStatus');
     if (status){
       var txt;
       if (!m) txt = '';
@@ -276,17 +286,17 @@
           (a.name || a.code) + ' · kód ' + a.code + (a.price_vat != null ? ' · ' + mddFmtPrice(a.price_vat) : '')));
       });
     }
-    var apply = el('mddApplyBtn');
+    var apply = mddId('mddApplyBtn');
     if (apply) apply.disabled = !(m && m.complete && m.complete.ok && v.updates.length && !MD_RO);
   }
 
   function mddOpen(){
-    var modal = el('demosModal');
+    var modal = mddId('demosModal');
     if (modal) modal.style.display = '';
   }
 
   function mddClose(){
-    var modal = el('demosModal');
+    var modal = mddId('demosModal');
     if (modal) modal.style.display = 'none';
   }
 
@@ -296,7 +306,7 @@
     MDD_STATE = null;
     mddOpen();
     mddRender();
-    var status = el('mddStatus');
+    var status = mddId('mddStatus');
     if (status) status.textContent = 'Hľadám produkty skupiny…';
     if (window.sketchup && sketchup.demos_lookup)
       sketchup.demos_lookup(JSON.stringify({ group_key: groupKey, catalog_schema: MD_CLIENT_SCHEMA }));
@@ -321,7 +331,7 @@
     });
     var accepts = mddAccepts(v, checks, MD_CATALOG);
     if (!accepts.length) return;
-    var btn = el('mddApplyBtn');
+    var btn = mddId('mddApplyBtn');
     if (btn) btn.disabled = true; // pocas zapisu; vysledok pride cez done/fail
     if (window.sketchup && sketchup.demos_apply)
       sketchup.demos_apply(JSON.stringify({ accepts: accepts, catalog_rev: MD_REV,
@@ -343,9 +353,9 @@
   // konflikte zneplatnil navrhy (baseline z casu lookupu) — dalsi zapis
   // vyzaduje novy lookup, hlaska to hovori.
   function mddFail(r){
-    var apply = el('mddApplyBtn');
+    var apply = mddId('mddApplyBtn');
     if (apply) apply.disabled = false;
-    var status = el('mddStatus');
+    var status = mddId('mddStatus');
     if (status && r && r.msg) status.textContent = r.msg;
     if (r && r.id){
       document.querySelectorAll('#mddBody .mddrow').forEach(function(row){
