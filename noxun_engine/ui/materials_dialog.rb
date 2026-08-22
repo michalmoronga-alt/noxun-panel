@@ -650,6 +650,12 @@ module Noxun
               after_catalog_change
               set_status("Skupina založená z Demosu (#{Array(event['result']['sheets']).length + Array(event['result']['edges']).length} položiek).")
             end
+            # Review #1 (P2): DLHY BEH konci aj eventom `family` — vtedy je
+            # rodina stiahnuta a dalej sa uz LEN kliká vo vybere. Bez toho by
+            # odchod zo sekcie po nacitani rodiny (alebo po NEUSPESNOM create)
+            # falosne hlasil „Sťahovanie z Demosu zrušené…", hoci uz nic nebezalo.
+            # `complete` pokryva create (uspesny aj neuspesny), `error` pad behu.
+            @demos_running = false if %w[family complete error].include?(event['type'].to_s)
             js("NXDA.event(#{event.merge('session' => session).to_json})")
           end
         end
@@ -761,22 +767,25 @@ module Noxun
         def request_replace_uni(uni_id, model)
           return false unless defined?(StudioDialog)
 
-          @pending_replace_uni = { 'uni_id' => uni_id.to_s, 'model_guid' => model_guid(model) }
+          req = { 'uni_id' => uni_id.to_s, 'model_guid' => model_guid(model) }
           live = StudioDialog.dialog_alive? && StudioDialog.ready?
           # Deep-link na sekciu `mat`: bez neho by sa modal otvoril nad
           # Kontrolou (kotva modalov `#matModalRoot` je mimo tela sekcie).
+          #
+          # Review #8: poziadavka sa odklada AZ PO tom, co sa okno naozaj
+          # otvorilo — inak by po zlyhanom `show` (alebo po vynimke v nom)
+          # ostala visiet a modal by vystrelil pri NAJBLIZSOM otvoreni Studia,
+          # ktore si ho nikto nevyziadal. Z toho isteho dovodu ju `rescue`
+          # zahadzuje.
           return false unless StudioDialog.show(open_section: 'mat')
 
+          @pending_replace_uni = req
           flush_pending_replace_uni if live
           true
         rescue StandardError => e
           Engine.log_error(e, 'MaterialsDialog.request_replace_uni')
-          false
-        end
-
-        # Zatvorene UI poziadavku zahadzuje (vola `StudioDialog#set_on_closed`).
-        def forget_pending_replace_uni
           @pending_replace_uni = nil
+          false
         end
 
         # Spusti odlozenu poziadavku — s CERSTVYM overenim (audit F5): medzi

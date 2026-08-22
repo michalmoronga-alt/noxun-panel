@@ -311,3 +311,103 @@ NxTest.test('ŠT-2a: cache-bust presunutych skriptov sedi s VERSION') do
   NxTest.assert(ST2A_STUDIO_HTML.include?('window.NX_MAT_SECTION = true'),
                 'okno Studio prepina zdielany subor do rezimu SEKCIE')
 end
+
+# --- 7) ŠT-2b: priznak beziaceho Demos behu (review #1/#2) -------------------
+#
+# `cancel_demos_on_leave` pise hlasku „Sťahovanie z Demosu zrušené…" LEN ked
+# `@demos_running` plati. Priznak preto musi REALNE zhasnut na kazdom
+# terminalnom evente — inak by odchod zo sekcie po dobehnutom (alebo padnutom)
+# behu klamal. Kontrola nad SPRAVANIM emit procov, nie nad rucne nastavenym
+# ivarom: rucne nastavenie by prezilo aj to, keby sa riadok z kodu stratil.
+NxTest.test('ŠT-2b (review #1): terminalny event Demosu ZHASNE priznak beziaceho behu') do
+  md = Noxun::Engine::MaterialsDialog
+  running = lambda { md.instance_variable_get(:@demos_running) }
+  arm = lambda do
+    md.instance_variable_set(:@demos_running, true)
+    NxTest.assert(running.call, 'priprava: priznak je zapnuty')
+  end
+
+  # (a) rodina sa STIAHLA — dalej sa uz len klika vo vybere, nic nebezi.
+  #     Session zamerne SEDI, takze prejde aj vetva obohatenia poloziek.
+  session = md.send(:demos_bump_session)
+  emit = md.send(:demos_family_emit, session)
+  arm.call
+  emit.call('type' => 'family', 'header' => { 'manufacturer' => 'X', 'decor' => 'Y' }, 'items' => [])
+  NxTest.refute(running.call, 'event `family` = koniec dlheho behu')
+
+  # (b) NEUSPESNY create (ok=false) — vetva zapisu do katalogu sa nespusti,
+  #     ale beh skoncil rovnako ako pri uspechu.
+  arm.call
+  emit.call('type' => 'complete', 'ok' => false, 'error' => 'skus znova')
+  NxTest.refute(running.call, 'neuspesny `complete` priznak tiez zhasina')
+
+  # (c) pad behu.
+  arm.call
+  emit.call('type' => 'error', 'error' => 'sitemap')
+  NxTest.refute(running.call, '`error` tiez')
+
+  # (d) prubezny event NESMIE priznak zhodit — beh este bezi.
+  arm.call
+  emit.call('type' => 'progress', 'done' => 1, 'total' => 3)
+  NxTest.assert(running.call, 'prubezny `progress` beh NEUKONCUJE')
+
+  # (e) ta ista poistka na druhom emit proce (lookup „Aktualizovať z Demosu").
+  session2 = md.send(:demos_bump_session)
+  emit2 = md.send(:demos_emit_proc, session2)
+  arm.call
+  emit2.call('type' => 'progress', 'done' => 1, 'total' => 2)
+  NxTest.assert(running.call, 'lookup: `progress` beh NEUKONCUJE')
+  emit2.call('type' => 'complete', 'ok' => true)
+  NxTest.refute(running.call, 'lookup: `complete` priznak zhasina')
+ensure
+  md = Noxun::Engine::MaterialsDialog
+  md.instance_variable_set(:@demos_running, false)
+  md.instance_variable_set(:@demos_family, nil)
+end
+
+NxTest.test('ŠT-2b (review #1): zhasnuty priznak znamena TICHY odchod zo sekcie') do
+  md = Noxun::Engine::MaterialsDialog
+  sent = []
+  md.singleton_class.class_eval do
+    alias_method :nx_js_orig_st2b, :js
+    define_method(:js) { |script| sent << script.to_s; true }
+  end
+  begin
+    md.instance_variable_set(:@demos_running, true)
+    md.cancel_demos_on_leave
+    NxTest.assert(sent.any? { |x| x.include?('opustil si sekciu Materiály') },
+                  'odchod POCAS behu sa priznane hlasi')
+    sent.clear
+    md.cancel_demos_on_leave
+    NxTest.assert(sent.empty?,
+                  'druhy odchod uz nema co rusit — prepinanie sekcii nesmie prepisovat status')
+  ensure
+    sc = md.singleton_class
+    sc.class_eval do
+      alias_method :js, :nx_js_orig_st2b
+      remove_method :nx_js_orig_st2b
+    end
+    md.instance_variable_set(:@demos_running, false)
+  end
+end
+
+NxTest.test('ŠT-2b (review #7/#8): odlozena poziadavka „Nahradiť UNI…" ma JEDEN zivotny cyklus') do
+  md = Noxun::Engine::MaterialsDialog
+  # #7: jedno API — `on_ui_closed` zahadzuje aj pending (druhe by sa rozislo).
+  NxTest.refute(md.respond_to?(:forget_pending_replace_uni),
+                'druhe API na to iste zaniklo')
+  closed = ST2A_STUDIO_RB[/@dialog\.set_on_closed do.*?\n          end\n/m].to_s
+  NxTest.assert(closed.include?('MaterialsDialog.on_ui_closed'),
+                'zatvorenie okna ide JEDNOU cestou')
+  md.instance_variable_set(:@pending_replace_uni, { 'uni_id' => 'X', 'model_guid' => 'G' })
+  md.on_ui_closed
+  NxTest.assert(md.instance_variable_get(:@pending_replace_uni).nil?,
+                'a poziadavka s nim naozaj zomiera')
+  # #8: pending sa nastavuje AZ ZA `show` — inak by po zlyhanom otvoreni
+  # visel a modal by vystrelil pri najblizsom (nevyziadanom) otvoreni okna.
+  req = ST2A_MAT_RB[/def request_replace_uni\(uni_id, model\).*?\n        end\n/m].to_s
+  NxTest.assert(req.index('StudioDialog.show(open_section:') < req.index('@pending_replace_uni = req'),
+                'poziadavka sa odklada az po uspesnom otvoreni okna')
+  NxTest.assert(req[/rescue StandardError.*/m].to_s.include?('@pending_replace_uni = nil'),
+                'a vynimka ju zahadzuje')
+end

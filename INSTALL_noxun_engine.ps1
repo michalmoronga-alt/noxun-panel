@@ -53,13 +53,37 @@ $srcRel = @{}
 Get-ChildItem $plugdir -Recurse -File | ForEach-Object {
   $srcRel[$_.FullName.Substring($plugdir.Length).TrimStart('\')] = $true
 }
+# Review #3: mazanie NESMIE zhodit skript. Kopirovanie uz prebehlo, plugin je
+# nainstalovany — zamknuty subor (otvoreny SketchUp, antivirus, indexer) je
+# kozmeticky problem, nie dovod skoncit chybou pri `$ErrorActionPreference =
+# 'Stop'`. Preto try/catch s konkretnou hlaskou.
 Get-ChildItem $destPlug -Recurse -File | ForEach-Object {
   $rel = $_.FullName.Substring($destPlug.Length).TrimStart('\')
   if (-not $srcRel.ContainsKey($rel)) {
-    Remove-Item $_.FullName -Force
-    Write-Host ('  odstranene (uz nie je sucastou pluginu): ' + $rel) -ForegroundColor DarkYellow
+    try {
+      Remove-Item $_.FullName -Force -ErrorAction Stop
+      Write-Host ('  odstranene (uz nie je sucastou pluginu): ' + $rel) -ForegroundColor DarkYellow
+    } catch {
+      Write-Host ('  nepodarilo sa odstranit (subor je zamknuty): ' + $rel) -ForegroundColor Yellow
+    }
   }
 }
+# Prazdny priecinok po zmazanom obsahu (napr. cely zaniknuty modul) by ostal
+# visiet — od najhlbsieho po najplytkejsi, aby sa upratali aj vnorene.
+Get-ChildItem $destPlug -Recurse -Directory |
+  Sort-Object { $_.FullName.Length } -Descending |
+  ForEach-Object {
+    if (-not (Get-ChildItem $_.FullName -Force | Select-Object -First 1)) {
+      try {
+        Remove-Item $_.FullName -Force -ErrorAction Stop
+        Write-Host ('  odstraneny prazdny priecinok: ' +
+                    $_.FullName.Substring($destPlug.Length).TrimStart('\')) -ForegroundColor DarkYellow
+      } catch {
+        Write-Host ('  nepodarilo sa odstranit (priecinok je zamknuty): ' +
+                    $_.FullName.Substring($destPlug.Length).TrimStart('\')) -ForegroundColor Yellow
+      }
+    }
+  }
 
 Write-Host 'HOTOVO. Plugin nainstalovany.' -ForegroundColor Green
 Write-Host 'Restartuj SketchUp, alebo v Ruby konzole: load "noxun_engine.rb"'

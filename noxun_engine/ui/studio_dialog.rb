@@ -793,10 +793,10 @@ module Noxun
             # ŠT-2b: zatvorenim tohto okna zaniklo JEDINE UI katalogu — bezaci
             # Demos fetch sa zneplatni (ABA: nova instancia okna nesmie dostat
             # eventy starej) a odlozena poziadavka „Nahradiť UNI…" zomiera s nim.
-            if defined?(MaterialsDialog)
-              MaterialsDialog.on_ui_closed
-              MaterialsDialog.forget_pending_replace_uni
-            end
+            # Review #7: JEDNA cesta — `on_ui_closed` zahadzuje aj odlozenu
+            # poziadavku „Nahradiť UNI…" (dve API na to iste by sa casom
+            # rozisli a jedno by sa zabudlo zavolat).
+            MaterialsDialog.on_ui_closed if defined?(MaterialsDialog)
             @dialog = nil
           end
           # Indikator neaktualnosti zije PRESNE tak dlho ako okno.

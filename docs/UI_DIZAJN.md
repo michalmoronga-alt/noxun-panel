@@ -1042,8 +1042,11 @@ v `HtmlDialog.new` sú **vonkajšie** — obsah + rámik okna (Windows ≈ 16 px
 |---|---|---|---|
 | **Inspector** (`panel.html`) | 470 × 810 | 486 × 850 | 486 × 600 |
 | **Štúdio** (`studio.html`) | 1060 × 640 | 1076 × 680 | 1076 × 520 |
-| Materiály (`proj_materials.html`) | podľa deklarácie v HTML | 720 × 640 | — |
 | ostatné satelity | podľa deklarácie v HTML | — | — |
+
+> Riadok **Materiály (`proj_materials.html`)** z tabuľky **vypadol v ŠT-2b** —
+> okno zaniklo, katalóg je sekcia `mat` v Štúdiu a rozmery mu diktuje jeho
+> riadok vyššie.
 
 > **470 px Inspectora** je obsah = rail 44 px + karta. Hodnota je záväzná pre
 > celý blok UI 2.0 — mockup, sektory aj šírky polí sa navrhujú na ňu.
