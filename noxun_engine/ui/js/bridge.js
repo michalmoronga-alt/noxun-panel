@@ -186,7 +186,7 @@
     h += '</div>';
     h += '<button type="button" class="wgoto" data-nx-usage="warn:studio"' +
       ' onclick="onWarnStudio(event)"' +
-      ' title="Otvorí okno Výroba na tabe KONTROLA — celý zoznam nálezov zákazky">' +
+      ' title="Otvorí ŠTÚDIO na sekcii KONTROLA — celý zoznam nálezov zákazky">' +
       'Otvoriť v Štúdiu → Kontrola</button>';
     return h;
   }
@@ -245,13 +245,13 @@
     }
   }
 
-  // „Otvoriť v Štúdiu → Kontrola". Štúdio je zatial okno Vyroba, preto sa
-  // otvara ONO — a rovno na tabe KONTROLA (deep-link; whitelist tabov je na
-  // strane Ruby). Panel sa zavrie: pouzivatel odchadza do ineho okna.
+  // „Otvoriť v Štúdiu → Kontrola". ŠT-1b: KONTROLA je sekcia okna ŠTÚDIO, takze
+  // deep-link vedie TAM (whitelist sekcii je na strane Ruby — panel posiela iba
+  // meno). Panel sa zavrie: pouzivatel odchadza do ineho okna.
   function onWarnStudio(ev){
     if (ev && ev.stopPropagation) ev.stopPropagation();
     closeWarnPanel();
-    if (typeof openProductionDialog === 'function') openProductionDialog('control');
+    if (typeof openStudio === 'function') openStudio('ctrl');
   }
 
   window.NX = {
