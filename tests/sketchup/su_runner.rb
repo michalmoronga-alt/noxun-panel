@@ -3232,10 +3232,13 @@ module NoxunSuRunner
       ok('STALE (c): dedup kopii prebehol PRIAMO v prepocte okna (vlastna operacia vo `fresh_collect`) — ' \
          "duplikatov po prepocte #{state[:stale_dups_after]}",
          state[:stale_dups_after].zero?)
-      # Kolko udalosti observer za tu operaciu naozaj dostal, sa lisi podla toho,
-      # kedy ich SketchUp dorucuje — preto je to INFO. TVRDY dokaz pohltenia
-      # vlastneho ticku je scenar (d) nizsie: tam observer vstup PREUKAZATELNE
-      # dostal (txn > 0) a signal aj tak neprisiel.
+      # POZOROVANIE, NIE KONTRAKT: v behu 22.8. tu pocitadlo ukazalo 0 vstupov,
+      # hoci dedup bezi ako NORMALNA (netransparentna) operacia a udalost by
+      # prist mala — DOVOD NIE JE OVERENY, preto to ostava INFO a nie `ok`
+      # s ocakavanou hodnotou (zafixovat neoverene cislo by znamenalo, ze test
+      # zacne padat, ked sa spravanie API vysvetli alebo zmeni).
+      # TVRDY dokaz pohltenia vlastneho ticku je scenar (d) nizsie: tam observer
+      # vstup PREUKAZATELNE dostal (txn > 0) a signal aj tak neprisiel.
       info("STALE (c): vstupov do handlera pocas prepoctu #{state[:stale_txn_sync]}, po ustaleni #{st[:txn]}")
       ok('STALE (c): Obnoviť nad modelom s duplikatmi NEZOZLTLO tlacidlo — vlastny tick sa pohltil ' \
          "(pushov #{st[:push]}, signalov #{st[:mark]})",

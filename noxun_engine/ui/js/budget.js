@@ -222,11 +222,18 @@
   }
 
   // `tip` = tooltip TEJ sekcie; `data-bkey` drzi fokus pri prekresleni listy.
+  //
+  // Review #4: ked helper NIE JE dostupny (parse chyba v studio.js, zle poradie
+  // skriptov), kresli sa NEUTRALNE tlacidlo — nie prazdno. Rozpocet a Ponuka by
+  // inak prisli o JEDINU cestu k cerstvym cislam a exportoval by sa rozpocet zo
+  // starych rozmerov; jantar je v takom stave to najmensie, co sa strati.
   function budRefreshBtnHtml(tip){
     var f = (typeof refreshBtnHtml === 'function')
       ? refreshBtnHtml
       : (BUD_STUDIO ? BUD_STUDIO.refreshBtnHtml : null);
-    return f ? f(budStaleFlag(), tip, ' data-bkey="refresh"') : '';
+    if (f) return f(budStaleFlag(), tip, ' data-bkey="refresh"');
+    return '<button type="button" class="ghostbtn" id="refreshBtn" data-bkey="refresh" title="' +
+      bEsc(tip) + '"><svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Obnoviť</button>';
   }
 
   // --- kreslenie BEZ fokusu ------------------------------------------------

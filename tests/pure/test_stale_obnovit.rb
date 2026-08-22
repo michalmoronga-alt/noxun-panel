@@ -66,6 +66,12 @@ NxTest.test('STALE: latch zluci burst commitov do JEDNEHO js') do
                 'dalsia udalost pocas pending uz dalsi timer nepridava (vzor Panel.request_txn_refresh)')
   NxTest.assert(body.include?('UI.start_timer(0, false)'),
                 'flush bezi az MIMO observer kontextu')
+  # Review #6: zapadka sa zamyka AZ PO tom, co timer vznikol — inak by vynimka
+  # z `UI.start_timer` nechala okno TICHE az do zatvorenia.
+  NxTest.assert(body.index('UI.start_timer(0, false)') < body.index('@stale_pending = true'),
+                'zapadka sa zamyka az za planovanim timera')
+  NxTest.assert(body.match?(/rescue StandardError => e\n\s*@stale_pending = false/),
+                'a pri zlyhani sa OTVARA spat (ziadny trvaly tichy vypadok)')
 end
 
 # --- 2) POROVNANIE EPOCH (jadro riesenia self-tickov) ------------------------
@@ -108,9 +114,19 @@ NxTest.test('STALE: observer zije presne tak dlho ako okno') do
                 'otvorenie okna observer zavesi')
   closed = NxStale::RB[/@dialog\.set_on_closed do.*?\n          end\n/m].to_s
   NxTest.assert(closed.include?('detach_stale_observer'), 'zatvorenie okna ho odvesi')
-  chg = NxStale.body(NxStale::RB, 'def on_model_changed(_model)')
-  NxTest.assert(chg.include?('attach_stale_observer(Sketchup.active_model)'),
-                'prepnutie dokumentu observer PREVESI (epocha je per dokument)')
+  chg = NxStale.body(NxStale::RB, 'def on_model_changed(model)')
+  # Review #1: PODANY model, nie `active_model` — pri zlom nacasovani broadcastu
+  # by observer ostal visiet na starom dokumente a indikator by uz nikdy
+  # nezozltol. `active_model` je tu len zaloha, ked broadcast model nenesie.
+  NxTest.assert(chg.include?('attach_stale_observer(model || Sketchup.active_model)'),
+                'prepnutie dokumentu observer PREVESI na PODANY model (epocha je per dokument)')
+  # Druha poistka: okno, ktore pocita cisla z ineho modelu, nez na akom visi
+  # observer, sa prevesi samo (zmeskany broadcast tak nie je trvaly vypadok).
+  push = NxStale::RB[/def push_state\(bump: true\).*?\n        end\n/m].to_s
+  NxTest.assert(push.include?('attach_stale_observer(model) if @observer_model && @observer_model != model'),
+                'push_state ma SAMOLIECBU — prevesi observer na model, z ktoreho prave pocita')
+  NxTest.assert(push.index('attach_stale_observer(model) if') < push.index('sent = js('),
+                'a robi to PRED odoslanim payloadu (epocha sa nuluje spolu s prevesenim)')
   att = NxStale.body(NxStale::RB, 'def attach_stale_observer(model = nil)')
   NxTest.assert(att.include?('m.remove_observer(@stale_observer)') && att.include?('m.add_observer(@stale_observer)'),
                 'anti-double: remove PRED add (vzor EdgeCheck.attach_observer)')
@@ -120,6 +136,10 @@ NxTest.test('STALE: observer zije presne tak dlho ako okno') do
                 'zlyhanie odvesenia nesmie preskocit zavesenie (kazdy krok vlastny rescue)')
   det = NxStale.body(NxStale::RB, 'def detach_stale_observer')
   NxTest.assert(det.include?('reset_stale_epoch'), 'detach nuluje epochu')
+  # Review #5: odvesenie z uz zavreteho dokumentu je OCAKAVANY stav — do logu
+  # nepatri (rovnako ako v attachi).
+  NxTest.refute(det.include?('log_error'),
+                'zlyhanie odvesenia sa hlta TICHO (nie je to chyba)')
   reset = NxStale.body(NxStale::RB, 'def reset_stale_epoch')
   NxTest.assert(reset.include?('@epoch = 0') && reset.include?('@pushed_epoch = 0'),
                 'nuluju sa OBE — inak by nove okno zacalo s cudzim rozdielom')
@@ -141,8 +161,17 @@ NxTest.test('STALE: tlacidlo „Obnoviť" ma JEDEN markup pre vsetkych 5 mist') 
   NxTest.assert_equal(1, NxStale::JS.scan(/id="refreshBtn"/).length,
                       'markup tlacidla je v celom studio.js PRAVE RAZ (5 kopii = 5 miest, ' \
                       'kde by sa jantar casom rozisiel)')
-  NxTest.refute(NxStale::BUD.include?('id="refreshBtn"'),
-                'budget.js si vlastnu kopiu tlacidla nekresli — vola zdielany helper')
+  # V budget.js smie `id="refreshBtn"` zit PRAVE RAZ — v NUDZOVEJ vetve mosta
+  # (review #4): ked by helper zo studio.js nebol dostupny (parse chyba, zle
+  # poradie skriptov), sekcie Rozpocet a Ponuka nesmu prist o JEDINU cestu
+  # k cerstvym cislam. Lista sekcie ho nikdy nekresli priamo.
+  NxTest.assert_equal(1, NxStale::BUD.scan(/id="refreshBtn"/).length,
+                      'budget.js si vlastnu kopiu tlacidla nekresli — okrem nudzovej vetvy')
+  bridge = NxStale::BUD[/function budRefreshBtnHtml\(tip\)\{.*?\n  \}/m].to_s
+  NxTest.assert(bridge.include?('id="refreshBtn"'),
+                'a ta jedna kopia je PRAVE v nudzovej vetve mosta')
+  NxTest.refute(bridge.include?('nxstale'),
+                'nudzove tlacidlo je NEUTRALNE — bez helpera nie je z coho jantar odvodit')
   # 3 volania v studio.js (Kusovnik, Kontrola, Nakup) + 2 v budget.js
   # (Rozpocet, Ponuka) = 5 mist, jeden markup.
   # `-1` = samotna definicia funkcie; zvysok su volacie miesta.

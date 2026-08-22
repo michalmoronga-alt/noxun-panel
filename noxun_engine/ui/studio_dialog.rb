@@ -165,13 +165,19 @@ module Noxun
 
         # EngineAppObserver: prepnutie/otvorenie modelu = nove data + NOVA
         # generacia (stary DOM klik sa odmietne genom, aj keby ID sedeli).
-        def on_model_changed(_model)
+        def on_model_changed(model)
           return unless @dialog && @dialog.visible?
 
           # Novy dokument = NOVY observer a NOVA epocha. Epocha je zamerne per
           # dokument: pocet zmien v jednom dokumente nesmie rozhodovat o tom,
           # ci su neaktualne cisla toho druheho.
-          attach_stale_observer(Sketchup.active_model)
+          #
+          # Review #1: observer sa vesa na PODANY model, nie na `active_model`.
+          # Vsetci ostatni odberatelia tohto broadcastu pracuju s podanym
+          # modelom; keby toto okno siahlo po `active_model` v momente, ked este
+          # nie je prepnuty (poradie observerov pri New/Open), observer by ostal
+          # visiet na STAROM dokumente — a indikator by uz NIKDY nezozltol.
+          attach_stale_observer(model || Sketchup.active_model)
           push_state
         rescue StandardError => e
           Engine.log_error(e, 'StudioDialog.on_model_changed')
@@ -200,7 +206,10 @@ module Noxun
         def request_stale_flush(model)
           return if @stale_pending
 
-          @stale_pending = true
+          # Review #6: zapadka sa zamyka AZ PO tom, co timer naozaj vznikol.
+          # Keby `UI.start_timer` hodil vynimku (alebo ju hodilo cokolvek pred
+          # nim), `@stale_pending` by ostalo natrvalo `true` a okno by uz do
+          # zatvorenia NEPOSLALO ani jeden signal — tichy, trvaly vypadok.
           UI.start_timer(0, false) do
             begin
               @stale_pending = false
@@ -209,6 +218,10 @@ module Noxun
               Engine.log_error(e, 'StudioDialog.request_stale_flush')
             end
           end
+          @stale_pending = true
+        rescue StandardError => e
+          @stale_pending = false
+          Engine.log_error(e, 'StudioDialog.request_stale_flush(plan)')
         end
 
         # POROVNANIE EPOCH je jadro celej veci: transakcie, ktore spustil SAM
@@ -258,8 +271,11 @@ module Noxun
           m = @observer_model
           begin
             m.remove_observer(@stale_observer) if m && @stale_observer
-          rescue StandardError => e
-            Engine.log_error(e, 'StudioDialog.detach_stale_observer')
+          rescue StandardError
+            # Review #5: TICHO (rovnako ako v attachi). Odvesenie z uz zavreteho
+            # dokumentu je OCAKAVANY stav (okno sa zatvara spolu s modelom) —
+            # zaznam v logu by hlasil chybu tam, kde ziadna nie je.
+            nil
           end
           @observer_model = nil
           reset_stale_epoch
@@ -850,6 +866,11 @@ module Noxun
           # Review #6: vysledok `js` sa PREPOSIELA — `do_refresh_bom` podla neho
           # rozhoduje, ci smie napisat „Prepočítané.". Ostatni volajuci ho
           # ignoruju (push do zavreteho okna nie je chyba).
+          # SAMOLIECBA (review #1): okno prave pocita cisla z `model` — ak na nom
+          # observer nevisi (zmeskany alebo zle nacasovany broadcast prepnutia
+          # dokumentu), prevesi sa TERAZ. Bez toho by okno tichlo navzdy: cisla
+          # by chodili z jedneho dokumentu a signal o zmene z ineho.
+          attach_stale_observer(model) if @observer_model && @observer_model != model
           sent = js("NX.setStudio(#{data.to_json})")
           # EPOCHA „co uz je v okne". Uklada sa AZ TU — po `fresh_collect`
           # (ten sam vie otvorit operaciu: dedup kopii) aj po zapise rozpoctu,
