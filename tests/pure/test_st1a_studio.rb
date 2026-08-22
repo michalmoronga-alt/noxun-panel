@@ -48,7 +48,9 @@ NxTest.test('ST-1a: SECTIONS je whitelist v RUBY a JS je jeho ZRKADLO') do
   rb = ST1B_STUDIO_RB[/SECTIONS = %w\[([a-z ]+)\]/, 1].to_s.split
   js = ST1B_STUDIO_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
   # ŠT-1b pridala sekciu Kontrola (`ctrl`) — dovtedy premostenie do okna Vyroba.
-  NxTest.assert_equal(%w[bom ctrl], rb, 'v Studiu ziju sekcie Kusovník a Kontrola')
+  # ŠT-1c PR A pridala Nakup kovania (`buy`) — presun tabu Kovanie 1:1 (Š7).
+  NxTest.assert_equal(%w[bom ctrl buy], rb,
+                      'v Studiu ziju sekcie Kusovník, Kontrola a Nákup kovania')
   NxTest.assert_equal(rb, js, 'JS zoznam sekcii sa nesmie rozist s Ruby autoritou')
   NxTest.assert_equal(rb, Noxun::Engine::StudioDialog::SECTIONS,
                       'konstanta a zdrojak hovoria to iste')
@@ -165,8 +167,12 @@ NxTest.test('ST-1a: VSETKY STYRI exporty citaju nazov zo SERVERA — z DOM uz ne
   # pravdy a ta ista zakazka sa v dvoch vystupoch volala inak.
   NxTest.assert(ST1B_CORE_RB.include?('project: project_name(model)'),
                 'VEPO export cita nazov v Ruby')
-  NxTest.assert_equal(3, ST1B_PROD_RB.scan(/project = project_name\(model\)/).length,
-                      'CSV kovania, XLSX rozpoctu aj XLSX cenovej ponuky citaju nazov v Ruby')
+  # ŠT-1c PR A: telo CSV kovania sa prestahovalo do jadra, takze jeden z troch
+  # vyskytov je odteraz TAM (okno ma len tenky obal).
+  NxTest.assert_equal(2, ST1B_PROD_RB.scan(/project = project_name\(model\)/).length,
+                      'XLSX rozpoctu aj XLSX cenovej ponuky citaju nazov v Ruby')
+  NxTest.assert_equal(1, ST1B_CORE_RB.scan(/project = project_name\(model\)/).length,
+                      'a CSV kovania rovnako — v zdielanom jadre')
   # Komentare (ktore o zaniknutej ceste hovoria) sa vynechavaju — hlada sa KOD.
   strip = ->(src) { src.lines.map { |l| l.sub(/#.*$/, '') }.join }
   NxTest.refute(strip.call(ST1B_PROD_RB).include?("data['project']"),
@@ -342,10 +348,15 @@ end
 NxTest.test('ST-1a: premostenia su UZAVRETY whitelist v Ruby, klient posiela iba kluc') do
   st = Noxun::Engine::StudioDialog
   # ŠT-1b: `ctrl` uz NIE JE premostenie — Kontrola je ziva sekcia tohto okna.
-  NxTest.assert_equal(%w[budget buy offer].sort, st::PRODUCTION_BRIDGES.keys.sort,
-                      'do okna Vyroba vedu uz len tri polozky navigacie')
-  NxTest.refute(st::PRODUCTION_BRIDGES.key?('ctrl'),
-                'Kontrola sa presunula do Studia — premostenie zaniklo')
+  # ŠT-1c PR A: to iste plati pre `buy` (Nakup kovania).
+  NxTest.assert_equal(%w[budget offer].sort, st::PRODUCTION_BRIDGES.keys.sort,
+                      'do okna Vyroba vedu uz len dve polozky navigacie')
+  %w[ctrl buy].each do |k|
+    NxTest.refute(st::PRODUCTION_BRIDGES.key?(k),
+                  "#{k} sa presunula do Studia — premostenie zaniklo")
+    NxTest.assert(st::BRIDGE_STATUS[k].to_s.empty?,
+                  "a s nou aj jej hlaska (#{k} je sekcia, nie premostenie)")
+  end
   NxTest.assert_equal(%w[bset hw mat rules sup tpl].sort, st::WINDOW_BRIDGES.keys.sort,
                       'satelitne okna otvara sest poloziek')
   st::PRODUCTION_BRIDGES.each_value do |tab|
@@ -376,14 +387,15 @@ end
 
 NxTest.test('ST-1a: okno Vyroba stratilo taby Kusovník / Materiály / ABS') do
   # ŠT-1b: a k nim aj tab Kontrola (sekcia `ctrl` okna Studio).
-  NxTest.assert_equal(%w[hardware budget], Noxun::Engine::ProductionDialog::TABS,
+  # ŠT-1c PR A: aj tab Kovanie (sekcia `buy`) — ostal POSLEDNY tab Rozpocet.
+  NxTest.assert_equal(%w[budget], Noxun::Engine::ProductionDialog::TABS,
                       'whitelist tabov uz zaniknute taby nepozna')
-  %w[pt_rows pt_sheets pt_edging].each do |id|
+  %w[pt_rows pt_sheets pt_edging pt_hardware].each do |id|
     NxTest.refute(ST1B_PROD_HTML.include?("id=\"#{id}\""), "tlacidlo #{id} zaniklo")
   end
   NxTest.refute(ST1B_PROD_HTML.include?('class="vepobar"'), 'VEPO lista okna Vyroba zanikla')
-  NxTest.assert(ST1B_PROD_JS.include?("var prodTab = 'hardware'"),
-                'prvy tab zlava je odteraz Kovanie')
+  NxTest.assert(ST1B_PROD_JS.include?("var prodTab = 'budget'"),
+                'jediny (a teda vychodzi) tab je Rozpocet')
   # audit #9: zoznam tabov sa cita z DOM — natvrdo pisane pole by po odstraneni
   # tabu skoncilo na `el(null).classList` (TypeError) a okno by ostalo cierne.
   NxTest.assert(ST1B_PROD_JS.include?('function prodTabIds'), 'zoznam tabov sa odvodzuje z DOM')
@@ -392,16 +404,23 @@ NxTest.test('ST-1a: okno Vyroba stratilo taby Kusovník / Materiály / ABS') do
   NxTest.assert(ST1B_PROD_HTML.include?('id="prodTabs"'), 'kontajner tabov ma ID, z ktoreho sa cita')
 end
 
-NxTest.test('ST-1a: `price()` v okne Vyroba OSTAVA — pouziva ho tab Kovanie (audit #9)') do
-  NxTest.assert(ST1B_PROD_JS.include?('function price(v)'), 'helper zije dalej')
-  NxTest.assert(ST1B_PROD_JS.include?('price(r.price_eur_vat)'), 'a naozaj sa pouziva')
-  %w[renderRows renderSheets renderEdging edgesLabel plateCell budgetRowMap budgetSumRow].each do |fn|
+NxTest.test('ŠT-1c: `price()` odisiel z okna Vyroba do Studia (sekcia Nakup)') do
+  # ST-1a ho tu este drzal tab Kovanie (audit #9). ŠT-1c PR A tab presunula,
+  # takze helper — a s nim CELY nakupny zoznam — zije v studio.js.
+  %w[renderRows renderSheets renderEdging edgesLabel plateCell budgetRowMap budgetSumRow
+     price hwManualMark hwCsvExport renderHardware].each do |fn|
     NxTest.refute(ST1B_PROD_JS.include?("function #{fn}"),
                   "mrtvy helper #{fn} sa mal odstranit spolu s tabmi")
   end
-  # Payload sa NEMENI: globalny BOM cita budget.js aj tab Kontrola/Kovanie.
+  NxTest.assert(ST1B_STUDIO_JS.include?('function price(v)'), 'helper zije v Studiu')
+  NxTest.assert(ST1B_STUDIO_JS.include?('price(r.price_eur_vat)'), 'a naozaj sa pouziva')
+  # Payload okna Vyroba stratil PRESNE polia zaniknuteho tabu — nic viac.
   NxTest.assert(ST1B_PROD_RB.include?('rows: bom[:rows], sheets: bom[:sheets], edging: bom[:edging]'),
-                'push_state okna Vyroba nesie rovnake polia ako pred davkou')
+                'push_state okna Vyroba nesie kusovnikove polia dalej (cita ich rozpocet)')
+  NxTest.refute(ST1B_PROD_RB.include?('hardware_sets: hw_exp'),
+                'nakupny zoznam uz okno Vyroba nedostava')
+  NxTest.assert(ST1B_STUDIO_RB.include?('hardware_sets: hw_exp'),
+                'zato ho dostava Studio (sekcia Nakup kovania)')
 end
 
 # --- 7) lifecycle okna a refresh cesty (audit #10, #14) ----------------------

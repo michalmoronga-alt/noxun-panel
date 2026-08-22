@@ -5323,6 +5323,206 @@ module NoxunSuRunner
     log_line("FAIL: ŠT-1b sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
 
+  # ============ ŠT-1c PR A: sekcia NAKUP KOVANIA v STUDIU (Š7) ===============
+  # Co sa tu overuje (a co headless sada neuvidi):
+  #   1) PAYLOAD — okno Studio naozaj dostava `hardware_sets` aj `hardware`
+  #      s OBOMA serverovymi textami (label + params_label); okno Vyroba ich
+  #      po presune tabu uz NEDOSTAVA (mrtve pole = zbytocny prenos),
+  #   2) KLIK-SELECT vlastnika polozky kovania zo sekcie `buy` OZNACI entitu
+  #      a NEPRIDA krok Spat,
+  #   3) GEN GUARD CSV kovania (audit #15, vedoma zmena): stara generacia
+  #      NESMIE otvorit ani dialog na ulozenie suboru,
+  #   4) FIX #2: `EdgeCheck.notify_state_changed` dorucuje cerstvy stav aj
+  #      STUDIU (dovtedy poznal zoznam len Vyrobu a Inspector).
+
+  # Odchytenie toho, co okno naozaj posle svojmu klientovi (vzor
+  # `st1b_capture_counts`) — silnejsi dokaz nez volanie tej istej funkcie.
+  def st1c_capture(mod)
+    rec = []
+    mod.singleton_class.class_eval do
+      alias_method :nx_js_orig_st1c, :js
+      define_method(:js) { |script| rec << script.to_s; nil }
+    end
+    begin
+      yield
+    ensure
+      sc = mod.singleton_class
+      if sc.method_defined?(:nx_js_orig_st1c) || sc.private_method_defined?(:nx_js_orig_st1c)
+        sc.class_eval do
+          alias_method :js, :nx_js_orig_st1c
+          remove_method :nx_js_orig_st1c
+        end
+      end
+    end
+    rec
+  end
+
+  # Export sa v teste NIKDY nesmie dostat k ZIVEMU dialogu — modalne okno by
+  # runner zastavilo navzdy. Savepanel sa preto na cas testu nahradi (vrati nil
+  # = „pouzivatel zrusil") a zaroven POCITA, kolkokrat ho cesta zavolala:
+  # prave tym sa da dokazat, ze gen guard zastavil export EST PRED dialogom.
+  def st1c_without_savepanel
+    calls = [0]
+    UI.singleton_class.class_eval do
+      alias_method :nx_savepanel_orig_st1c, :savepanel
+      define_method(:savepanel) { |*_args| calls[0] += 1; nil }
+    end
+    begin
+      yield calls
+    ensure
+      sc = UI.singleton_class
+      if sc.method_defined?(:nx_savepanel_orig_st1c) || sc.private_method_defined?(:nx_savepanel_orig_st1c)
+        sc.class_eval do
+          alias_method :savepanel, :nx_savepanel_orig_st1c
+          remove_method :nx_savepanel_orig_st1c
+        end
+      end
+    end
+  end
+
+  def st1c_studio_payload(scripts)
+    s = scripts.find { |x| x.start_with?('NX.setStudio(') }
+    return nil if s.nil?
+
+    JSON.parse(s.sub(/\ANX\.setStudio\(/, '').sub(/\)\z/, ''))
+  rescue StandardError
+    nil
+  end
+
+  def run_st1c(model)
+    cleanup(model)
+    return ok('ŠT-1c: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
+
+    inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 900.0,
+                                            'height' => 720.0, 'depth' => 560.0 })
+    return ok('ŠT-1c: vlozenie skrinky pre nakupny zoznam', false) unless inst
+
+    before_ents = model.entities.length
+    stgen = -> { e::StudioDialog.instance_variable_get(:@generation).to_i }
+
+    # --- 1) payload sekcie Nakup kovania (Š7) --------------------------------
+    st_scripts = st1c_capture(e::StudioDialog) { e::StudioDialog.send(:push_state) }
+    pr_scripts = st1c_capture(e::ProductionDialog) { e::ProductionDialog.send(:push_state) }
+    payload = st1c_studio_payload(st_scripts)
+    if payload.nil?
+      ok('ŠT-1c: payload Studia sa podarilo odchytit', false)
+      return cleanup(model)
+    end
+
+    ok('ŠT-1c: payload Studia nesie NAKUPNY ZOZNAM zo setov (`hardware_sets`)',
+       payload.key?('hardware_sets'))
+    hs = payload['hardware'] || []
+    ok("ŠT-1c: payload Studia nesie generiku kovania (#{hs.length} poloziek)", !hs.empty?)
+    labeled = hs.all? { |g| g.is_a?(Hash) && g.key?('label') && g.key?('params_label') }
+    ok('ŠT-1c: KAZDA polozka generiky ma OBA serverove texty (label + params_label)',
+       !hs.empty? && labeled)
+    lbl = hs.map { |g| g['label'] }.compact.reject(&:empty?).first
+    ok("ŠT-1c: label je slovensky text zo servera (napr. #{lbl.inspect})", !lbl.to_s.empty?)
+    # POZOR: hladat retazec „hardware" v surovom skripte NESTACI — rozpocet ma
+    # vlastnu sekciu toho mena. Porovnavaju sa preto KLUCE NAJVYSSEJ urovne.
+    pr_raw = pr_scripts.find { |x| x.start_with?('NX.setBom(') }
+    pr_data = begin
+      pr_raw && JSON.parse(pr_raw.sub(/\ANX\.setBom\(/, '').sub(/\)\z/, ''))
+    rescue StandardError
+      nil
+    end
+    if pr_data.nil?
+      info('ŠT-1c: payload okna Vyroba sa nepodarilo odchytit — porovnanie preskocene.')
+    else
+      ok('ŠT-1c: okno Vyroba uz nakupny zoznam NEDOSTAVA (pole zaniklo s tabom)',
+         !pr_data.key?('hardware_sets'))
+      ok('ŠT-1c: ani generiku kovania', !pr_data.key?('hardware'))
+      ok('ŠT-1c: rozpocet okna Vyroba pritom ostal netknuty (kovanie v nom zije dalej)',
+         pr_data.key?('budget'))
+    end
+
+    # --- 2) klik na riadok generiky OZNACI vlastnika a NEPRIDA krok Spat -----
+    row = hs.find { |g| !g['key'].to_s.empty? }
+    if row.nil?
+      info('ŠT-1c: model nema generiku kovania — klik-select sa preskocil.')
+    else
+      model.selection.clear
+      e::StudioDialog.do_select({ 'gen' => stgen.call, 'hw_key' => row['key'] }.to_json)
+      sel = model.selection.to_a
+      ok("ŠT-1c: klik na riadok kovania oznacil vlastnika v modeli (#{sel.length}; #{row['label']})",
+         !sel.empty?)
+      ok('ŠT-1c: klik NEMENI model (ziadna entita naviac ani menej)',
+         model.entities.length == before_ents)
+      # Stary DOM klik (ina generacia) vyber NEZMENI.
+      model.selection.clear
+      model.selection.add(inst)
+      e::StudioDialog.do_select({ 'gen' => stgen.call - 99, 'hw_key' => row['key'] }.to_json)
+      ok('ŠT-1c: klik so STAROU generaciou vyber nezmeni (stary DOM / iny model)',
+         model.selection.to_a == [inst])
+    end
+
+    # --- 3) CSV kovania: GEN GUARD zastavi export PRED dialogom (audit #15) --
+    st1c_without_savepanel do |calls|
+      scripts = st1c_capture(e::StudioDialog) do
+        e::StudioDialog.do_hw_csv({ 'gen' => stgen.call - 99 }.to_json)
+      end
+      ok('ŠT-1c (audit #15): CSV kovania so STAROU generaciou NEOTVORI dialog na ulozenie',
+         calls[0].zero?)
+      ok('ŠT-1c: a odmietnutie nie je tiche — okno to povie statusom',
+         scripts.any? { |s| s.include?('Dáta okna sa medzitým zmenili') })
+      ok('ŠT-1c: odmietnuty export model NEZMENIL', model.entities.length == before_ents)
+
+      # S CERSTVOU generaciou uz cesta dobehne az k vyberu suboru (a tam
+      # „pouzivatel" zrusi) — dokaz, ze guard nie je natvrdo zavrety.
+      before_calls = calls[0]
+      scripts = st1c_capture(e::StudioDialog) do
+        e::StudioDialog.do_hw_csv({ 'gen' => stgen.call }.to_json)
+      end
+      ok('ŠT-1c: s CERSTVOU generaciou export dobehne az k vyberu suboru',
+         calls[0] == before_calls + 1)
+      ok('ŠT-1c: zruseny export nic nezapisal a povedal to',
+         scripts.any? { |s| s.include?('Export zrušený') })
+      ok('ŠT-1c: ani zruseny export model NEZMENIL', model.entities.length == before_ents)
+    end
+
+    # --- 4) FIX #2: cerstvy stav hran dorazi aj do STUDIA --------------------
+    if defined?(e::EdgeCheck) && e::EdgeCheck.available?(model)
+      was = e::EdgeCheck.active?
+      e::EdgeCheck.enable!(model) unless was
+      st_rec = nil
+      pr_rec = st1c_capture(e::ProductionDialog) do
+        st_rec = st1c_capture(e::StudioDialog) { e::EdgeCheck.notify_state_changed }
+      end
+      ok('ŠT-1c (audit #2): rozposlanie stavu hran dorucilo cerstve cisla aj STUDIU',
+         st_rec.any? { |s| s.include?('NX.setEdgeCheck(') })
+      ok('ŠT-1c: a okno Vyroba o ne neprislo (broadcast pozna obe okna)',
+         pr_rec.any? { |s| s.include?('NX.setEdgeCheck(') })
+
+      # Pocty v liste sa naozaj VIAZU NA VYBER — bez toho by fix nemal co
+      # dorucovat. (Prepocet po zmene vyberu bezi cez UI.start_timer, teda
+      # asynchronne; tu sa overuje SERVEROVY stav, ktory broadcast posiela.)
+      model.selection.clear
+      empty_sel = e::EdgeCheck.ui_state(model)['selection_empty']
+      model.selection.add(inst)
+      picked_sel = e::EdgeCheck.ui_state(model)['selection_empty']
+      ok("ŠT-1c: stav listy sa meni so zmenou vyberu (prazdny=#{empty_sel.inspect}, " \
+         "oznacene=#{picked_sel.inspect})",
+         empty_sel == true && picked_sel == false)
+      ok('ŠT-1c: zvyraznenie hran model NEMENI (overlay kresli NAD nim)',
+         model.entities.length == before_ents)
+      e::EdgeCheck.disable! unless was
+    else
+      info('ŠT-1c: Overlay API nie je k dispozicii — kontrola broadcastu hran sa preskocila.')
+    end
+
+    # Poslednou modelovou operaciou je vlozenie skrinky — keby bol klik na
+    # riadok kovania, export alebo prepinac vlastnou operaciou, 1x Spat by
+    # vratil JU.
+    model.selection.clear
+    Sketchup.undo
+    ok('ŠT-1c: 1x Spat zmaze skrinku (sekcia Nákup kovania nepridala ziadny krok Spat)',
+       inst.nil? || !inst.valid?)
+
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: ŠT-1c sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   def run_async(model, done)
     state = {}
     steps = []
@@ -5997,6 +6197,7 @@ module NoxunSuRunner
     run_smoke1(model)        # SMOKE PACK 1 (6A): rucne odfotenie nahladu k ULOZENEJ sablone — guardy vyberu, ziadny undo krok
     run_st1a(model)          # ST-1a: okno Studio — deep-link sekcie, kusovnik zo ziveho modelu, klik-select bez undo kroku, serverovy nazov projektu
     run_st1b(model)          # ŠT-1b: sekcia Kontrola v Studiu — jedno cislo semaforu, klik na nalez bez undo kroku, zdielane prepinace, trvanie pushov
+    run_st1c(model)          # ŠT-1c PR A: sekcia Nákup kovania v Studiu — payload so setmi a labelmi, klik-select vlastnika, gen guard CSV, broadcast stavu hran
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

@@ -214,7 +214,8 @@ NxTest.test('UI-D3: whitelist tabov je na strane RUBY a JS je jeho ZRKADLO') do
   # sekciou Kusovnik okna Studio. ŠT-1b: to iste sa stalo tabu `control`.
   # Whitelist ich preto uz nesmie poznat, inak by deep-link otvoril tab, ktory
   # v okne neexistuje.
-  NxTest.assert_equal(%w[hardware budget], rb, 'Ruby pozna vsetky taby okna')
+  # ŠT-1c PR A: a tabu `hardware` (sekcia `buy` Studia) — ostal POSLEDNY tab.
+  NxTest.assert_equal(%w[budget], rb, 'Ruby pozna vsetky taby okna')
   NxTest.assert_equal(rb, js, 'JS mirror sa nesmie rozist s Ruby autoritou')
   NxTest.assert(UID3_PANEL_RB.include?('ProductionDialog.show(open_tab: studio_tab_of(p))'),
                 'panel posiela iba meno tabu — filtruje ho server')
@@ -255,7 +256,8 @@ NxTest.test('ST-1a: deep-link do Studia ma whitelist sekcii v RUBY a JS je jeho 
                         encoding: 'UTF-8')
   rb = studio_rb[/SECTIONS = %w\[([a-z ]+)\]/, 1].to_s.split
   js = UID3_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  NxTest.assert_equal(%w[bom ctrl], rb, 'v Studiu ziju sekcie Kusovník a Kontrola')
+  NxTest.assert_equal(%w[bom ctrl buy], rb,
+                      'v Studiu ziju sekcie Kusovník, Kontrola a Nákup kovania')
   NxTest.assert_equal(rb, js, 'JS mirror sa nesmie rozist s Ruby autoritou')
   NxTest.assert(UID3_PANEL_RB.include?("cb(dlg, 'open_studio')"),
                 'panel ma vlastny callback na otvorenie Studia')

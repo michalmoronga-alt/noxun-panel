@@ -87,12 +87,13 @@ eq(NXShell.warnRows([{ message: 'a' }, { message: 'b' }]).map(r => r.text), ['a'
 // --- 2) deep-link do okna Vyroba --------------------------------------------
 
 // ST-1a: `rows`/`sheets`/`edging` zanikli — kusovnik a supisy platni a ABS su
-// sekciou Kusovnik okna Studio. ŠT-1b: to iste sa stalo tabu `control`.
-eq(NXShell.STUDIO_TABS, ['hardware', 'budget'],
+// sekciou Kusovnik okna Studio. ŠT-1b: to iste sa stalo tabu `control`,
+// ŠT-1c PR A tabu `hardware` (sekcia `buy` Studia) — ostal jediny tab.
+eq(NXShell.STUDIO_TABS, ['budget'],
    'zoznam tabov je ZRKADLO ProductionDialog::TABS');
 
 eq(NXShell.studioTab('control'), null, 'zaniknuty tab kontroly sa uz z panela nedostane von');
-eq(NXShell.studioTab('hardware'), 'hardware', 'kovanie prejde');
+eq(NXShell.studioTab('hardware'), null, 'ani zaniknuty tab kovania (je to sekcia `buy` Studia)');
 eq(NXShell.studioTab('budget'), 'budget', 'rozpocet prejde');
 eq(NXShell.studioTab('rows'), null, 'zaniknuty tab kusovnika sa uz z panela nedostane von');
 eq(NXShell.studioTab('sheets'), null, 'zaniknuty tab platni tiez nie');
@@ -108,9 +109,11 @@ eq(NXShell.studioLink('nieco'), { tab: null }, 'nezname meno sa z panela vobec n
 
 // --- 3) ST-1a: deep-link do okna STUDIO -------------------------------------
 
-eq(NXShell.STUDIO_SECTIONS, ['bom', 'ctrl'], 'zoznam sekcii je ZRKADLO StudioDialog::SECTIONS');
+eq(NXShell.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy'],
+   'zoznam sekcii je ZRKADLO StudioDialog::SECTIONS');
 eq(NXShell.studioSection('bom'), 'bom', 'platna sekcia prejde');
 eq(NXShell.studioSection('ctrl'), 'ctrl', 'ŠT-1b: Kontrola je ZIVA sekcia Studia (uz nie premostenie)');
+eq(NXShell.studioSection('buy'), 'buy', 'ŠT-1c: Nákup kovania je ZIVA sekcia Studia (uz nie premostenie)');
 eq(NXShell.studioSection('mat'), null, 'premostenie do ineho okna NIE JE sekcia');
 eq(NXShell.studioSection(''), null, 'prazdna hodnota = bez deep-linku');
 eq(NXShell.studioSection(null), null, 'chybajuca hodnota = bez deep-linku');

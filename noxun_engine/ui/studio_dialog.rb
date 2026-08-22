@@ -29,16 +29,18 @@ module Noxun
       DLG_KEY = 'noxun_engine_studio'
 
       # ZAVAZNY whitelist sekcii Studia. ŠT-1a priniesla Kusovnik, ŠT-1b
-      # KONTROLU (`ctrl`). JS zrkadlo `NXShell.STUDIO_SECTIONS` je pohodlie,
-      # nie ochrana (zhodu strazi guard test): autoritou je VZDY Ruby.
-      SECTIONS = %w[bom ctrl].freeze
+      # KONTROLU (`ctrl`), ŠT-1c PR A NAKUP KOVANIA (`buy`). JS zrkadlo
+      # `NXShell.STUDIO_SECTIONS` je pohodlie, nie ochrana (zhodu strazi guard
+      # test): autoritou je VZDY Ruby.
+      SECTIONS = %w[bom ctrl buy].freeze
 
       # PREMOSTENIA (audit #2) — polozky navigacie, ktorych obsah zatial zije
       # v inom okne. Nie su `disabled`: klik otvori TO okno, kde obsah naozaj
       # je (a tooltip to prizna). Kluc je meno polozky navigacie, hodnota tab
       # okna Vyroba — whitelist tabov si aj tak overi `ProductionDialog`.
+      # ŠT-1c PR A: premostenie `buy` ZANIKLO — Nakup kovania je sekcia.
       PRODUCTION_BRIDGES = {
-        'buy' => 'hardware', 'budget' => 'budget', 'offer' => 'budget'
+        'budget' => 'budget', 'offer' => 'budget'
       }.freeze
 
       # Premostenia do satelitnych okien (KATALOGY + NASTAVENIA). Hodnota je
@@ -51,7 +53,6 @@ module Noxun
 
       # Slovenske hlasky premosteni — texty sklada SERVER (jedna autorita).
       BRIDGE_STATUS = {
-        'buy' => 'Otváram okno Výroba → Kovanie (presun do Štúdia príde v dávke ŠT-1c).',
         'budget' => 'Otváram okno Výroba → Rozpočet (presun do Štúdia príde v dávke ŠT-1c).',
         'offer' => 'Otváram okno Výroba → Rozpočet — cenová ponuka je zatiaľ jeho súčasťou (ŠT-1c).',
         'mat' => 'Otváram okno Materiály (presun do Štúdia príde v dávke ŠT-2).',
@@ -148,6 +149,15 @@ module Noxun
         def do_export(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           ProductionCore.do_export(Sketchup.active_model, data, generation: @generation,
+                                                                status: status_proc, repush: repush_proc)
+        end
+
+        # ŠT-1c PR A (Š7): CSV nakupneho zoznamu kovania z listy sekcie Nakup.
+        # Telo je v `ProductionCore` (to iste, ake volal tab Kovanie okna
+        # Vyroba) — okno odovzdava LEN svoj generacny token, status a refresh.
+        def do_hw_csv(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          ProductionCore.do_hw_csv(Sketchup.active_model, data, generation: @generation,
                                                                 status: status_proc, repush: repush_proc)
         end
 
@@ -370,6 +380,9 @@ module Noxun
           # Inspector (`focus_inspector`). Obe cesty su ten isty handler.
           cb(dlg, 'nx_select')    { |p| handle_select(p) }
           cb(dlg, 'vepo_export')  { |p| handle_export(p) }
+          # ŠT-1c PR A: CSV nakupneho zoznamu (lista sekcie Nakup kovania) —
+          # ten isty flush handshake ako VEPO, len vlastnym kanalom Studia.
+          cb(dlg, 'hw_csv_export') { |p| handle_hw_csv(p) }
           cb(dlg, 'studio_set_vepo_opts') { |p| do_set_vepo_opts(p) }
           cb(dlg, 'studio_bridge')        { |p| do_bridge(p) }
           # ŠT-1b, sekcia KONTROLA. Klik na riadok ide uz existujucou cestou
@@ -425,6 +438,19 @@ module Noxun
           end
         end
 
+        # ŠT-1c PR A: CSV kovania ide TYM ISTYM flush handshakom ako VEPO —
+        # rozpisany edit panela meni pocty kovania, takze by sa objednavalo zo
+        # starych cisel. Vlastny relay (`studioRelayHwCsv`), aby odpoved prisla
+        # do TOHTO okna a nezhodila `gen` okna Vyroba.
+        def handle_hw_csv(payload)
+          data = JSON.parse(payload.to_s)
+          if Panel.dialog_alive?
+            Panel.js("NX.studioRelayHwCsv(#{data.to_json})")
+          else
+            do_hw_csv(data)
+          end
+        end
+
         # Payload OKNA (sekcie Kusovnik + Kontrola). Cisla su TIE ISTE, ktore
         # cita okno Vyroba (`ProductionCore`) — Studio nema vlastny vypocet a JS
         # si NIC neprepocitava (ani sumy, ani medzisucty skupin, ani counts).
@@ -461,6 +487,15 @@ module Noxun
             # Š2: riadky obohatene o `role_label` (server sklada aj tento text).
             rows: ProductionCore.rows_with_roles(bom[:rows], collected),
             sheets: bom[:sheets], edging: bom[:edging],
+            # ŠT-1c PR A (Š7), sekcia NAKUP KOVANIA — presun tabu Kovanie 1:1.
+            # `hardware_sets` = nakupny zoznam zo setov (rows/unmapped/summary
+            # + stav snapshotu setov projektu: invalid = banner, missing =
+            # global default); `hardware` = generika podla pravidiel, obohatena
+            # o SERVEROVE texty `label` a `params_label` (audit #3 — obohatenie
+            # zije v jadre, nie v okne). Zoznam sa POCITA UZ VYSSIE (`hw_exp`)
+            # kvoli ORANGE nalezom Kontroly — ziadny druhy vypocet.
+            hardware: ProductionCore.hardware_labeled(bom),
+            hardware_sets: hw_exp,
             summary: bom[:summary],
             sheet_estimate: estimate,
             # Š1 sucty: KAZDE cislo suctoveho riadku pocita SERVER — JS si

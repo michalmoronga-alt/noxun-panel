@@ -524,10 +524,16 @@ module Noxun
 
       # Rozposlanie AKTUALNEHO stavu vsetkym oknam. Defenzivne — zavrete ani
       # nenacitane okno nic nezhodi (kazdy push ma vlastny guard aj rescue).
+      #
+      # ŠT-1c (audit #2): rozposiela ZDIELANY `Engine.broadcast_edge_check`, nie
+      # vlastny zoznam okien. Dovod je ziva chyba: tento zoznam poznal LEN
+      # Vyrobu a Inspector, takze lista sekcie Kontrola v Studiu po prepnuti
+      # dokumentu (a po prepocte cache nizsie) ostala na starom stave. Kazde
+      # nove okno sa odteraz pridava na JEDNOM mieste (`main.rb`).
       def notify_state_changed
-        st = ui_state(active_model)
-        ProductionDialog.push_edge_check(st) if defined?(ProductionDialog)
-        Panel.push_edge_check(st) if defined?(Panel)
+        return unless Engine.respond_to?(:broadcast_edge_check)
+
+        Engine.broadcast_edge_check(ui_state(active_model))
       rescue StandardError => e
         Engine.log_error(e, 'EdgeCheck.notify_state_changed')
       end
@@ -765,19 +771,22 @@ module Noxun
         { 'available' => false, 'active' => false, 'options' => DEFAULT_OPTIONS.dup }
       end
 
-      # Po prepocte (draw / zmena vyberu): okno Vyroba dostane cerstve cisla.
+      # Po prepocte (draw / zmena vyberu) dostanu VSETKY okna cerstve cisla.
       # Burst eventov sa zluci do JEDNEHO pushu (timer + pending guard).
+      #
+      # ŠT-1c (audit #2): TOTO bola ziva chyba — zoznam tu menoval len Vyrobu a
+      # Inspector, takze po zmene vyberu (filter „len vybrané") ukazovala lista
+      # sekcie Kontrola v Studiu STARE pocty. Rozposiela sa preto zdielanym
+      # `Engine.broadcast_edge_check` a stav sa pocita RAZ pre vsetky okna.
       def notify_count_changed
-        return unless defined?(ProductionDialog) || defined?(Panel)
+        return unless Engine.respond_to?(:broadcast_edge_check)
         return if @notify_pending
+
         @notify_pending = true
         UI.start_timer(0, false) do
           begin
             @notify_pending = false
-            ProductionDialog.push_edge_check if defined?(ProductionDialog)
-            # UI-B1: rail Inspectora ukazuje ten isty stav — bez tohto by po
-            # prepocte (draw / zmena vyberu) ostal na starom pocte.
-            Panel.push_edge_check if defined?(Panel)
+            Engine.broadcast_edge_check(ui_state(active_model))
           rescue StandardError => e
             Engine.log_error(e, 'EdgeCheck.notify_count_changed')
           end

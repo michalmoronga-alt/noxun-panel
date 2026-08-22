@@ -280,7 +280,8 @@
     // ST-1a: taby `rows`/`sheets`/`edging` ZANIKLI — kusovnik a supisy platni
     // a ABS su od tejto davky sekciou Kusovnik v okne Studio.
     // ŠT-1b: to iste sa stalo tabu `control` — KONTROLA je sekcia `ctrl` Studia.
-    var STUDIO_TABS = ['hardware', 'budget'];
+    // ŠT-1c PR A: a tabu `hardware` — NAKUP KOVANIA je sekcia `buy` Studia.
+    var STUDIO_TABS = ['budget'];
     function studioTab(t){
       var s = String(t == null ? '' : t);
       return STUDIO_TABS.indexOf(s) >= 0 ? s : null;
@@ -292,8 +293,9 @@
     // ===== ST-1a: deep-link do okna STUDIO ==================================
     // Sekcie Studia. Zoznam je ZRKADLO `StudioDialog::SECTIONS` — autoritou je
     // RUBY, tento mirror len zabrani, aby z panela vyletela hodnota, ktora
-    // sekciu nepomenuva. ST-1a priniesla Kusovnik, ŠT-1b Kontrolu.
-    var STUDIO_SECTIONS = ['bom', 'ctrl'];
+    // sekciu nepomenuva. ST-1a priniesla Kusovnik, ŠT-1b Kontrolu, ŠT-1c PR A
+    // Nakup kovania (`buy`).
+    var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy'];
     function studioSection(s){
       var v = String(s == null ? '' : s);
       return STUDIO_SECTIONS.indexOf(v) >= 0 ? v : null;

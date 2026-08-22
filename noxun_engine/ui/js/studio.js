@@ -34,7 +34,7 @@
 
   // ZRKADLO `StudioDialog::SECTIONS` — autoritou whitelistu je RUBY, tento
   // zoznam len zabrani, aby z okna vyletela hodnota, ktora sekciu nepomenuva.
-  var STUDIO_SECTIONS = ['bom', 'ctrl'];
+  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy'];
 
   // ŠT-1b (Š10): 3-stavove nastavenie kontroly hran je ZDIELANY komponent —
   // TEN ISTY markup kresli rail Inspectora (rohovy trojuholnik pri ABS ikone)
@@ -67,8 +67,9 @@
       { id: 'bom',    ic: 'list',            t: 'Kusovník' },
       // Š11: pri Kontrole visia ZIVE pocty RED/ORANGE z posledneho pushu.
       { id: 'ctrl',   ic: 'clipboard-check', t: 'Kontrola', badge: true },
-      { id: 'buy',    ic: 'cart',            t: 'Nákup kovania',
-        bridge: 'zatiaľ v okne Výroba — presun v ŠT-1c' },
+      // ŠT-1c PR A (Š7): Nákup kovania je od tejto dávky SEKCIA — presun tabu
+      // Kovanie okna Výroba 1:1, bez redizajnu (ten príde s blokom KOVANIE).
+      { id: 'buy',    ic: 'cart',            t: 'Nákup kovania' },
       { id: 'budget', ic: 'euro',            t: 'Rozpočet',
         bridge: 'zatiaľ v okne Výroba — presun v ŠT-1c' },
       { id: 'offer',  ic: 'file-text',       t: 'Cenová ponuka',
@@ -92,7 +93,8 @@
 
   var SEC_META = {
     bom: { t: 'Kusovník', hint: 'skupiny podľa materiálu · pohľady Dielce / Platne / ABS · živý zoznam' },
-    ctrl: { t: 'Kontrola', hint: 'semafor filtruje zoznam · klik na nález ho označí v modeli · prepínače hrán a kresby' }
+    ctrl: { t: 'Kontrola', hint: 'semafor filtruje zoznam · klik na nález ho označí v modeli · prepínače hrán a kresby' },
+    buy: { t: 'Nákup kovania', hint: 'nákupný zoznam zo setov · nekompletné položky jantárovo · CSV pre objednávku' }
   };
 
   // ---------------------------------------------------------------- helpers
@@ -343,6 +345,104 @@
     if (!r && !o) return '';
     return '<span class="nbadge">' + (r ? '<i class="r">' + num(r) + '</i>' : '') +
            (o ? '<i class="o">' + num(o) + '</i>' : '') + '</span>';
+  }
+
+  // ============ ŠT-1c PR A: sekcia NÁKUP KOVANIA (Š7) — CISTE funkcie ======
+  // PRESUN 1:1 z `js/production.js` (tab Kovanie okna Výroba zanikol). Š7
+  // ZAKAZUJE redizajn — obsah, poradie stĺpcov aj texty ostávajú, mení sa
+  // jedine to, že CSV export je v LIŠTE SEKCIE namiesto hlavičky tabuľky.
+  // Dáta sú VÝHRADNE zo servera (`hardware_sets` = HardwareSets.expand,
+  // `hardware` = generika obohatená v ProductionCore) — JS len renderuje.
+
+  // V0.6 D1b: cena — nil/undefined = „nezadaná" (—), NIKDY 0 (audit N11).
+  function price(v){ return (v == null || isNaN(v)) ? '—' : num(v, 2) + ' €'; }
+
+  // D-93: drobné znamienko „ručne prepísané" pri počte. Text skladá VÝHRADNE
+  // server (HardwareSets.manual_note / Bom.manual_note) — JS ho len vypíše;
+  // žiadne emoji, sprite ikona (ceruzka = ručný zásah).
+  function hwManualMark(note){
+    if (!note) return '';
+    return ' <span class="hwmanual" title="' + esc(note) + '">'
+         + '<svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></span>';
+  }
+
+  // Telo sekcie: NÁKUPNÝ ZOZNAM zo setov (hore) + generika podľa pravidiel
+  // (dole, klik-select cez .hwrow ostáva). Vracia HTML — sekcie Štúdia si
+  // telo skladajú do reťazca (na rozdiel od okna Výroba, ktoré písalo priamo
+  // do boxu); obsah je inak znak po znaku ten istý.
+  function buySection(hs, list){
+    var h = '<div class="hwsec"><span>Nákupný zoznam (sety)</span></div>';
+    if (!hs){
+      h += '<div class="muted">Nákupný zoznam sa nepodarilo zostaviť (pozri Ruby konzolu).</div>';
+    } else {
+      if (hs.state_status === 'invalid'){
+        h += '<div class="hwbanner">Sety projektu sú poškodené — nič sa nemapuje. Otvor Katalóg kovania → Predvoľby projektu a vyber sety nanovo.</div>';
+      }
+      var rows = hs.rows || [];
+      if (!rows.length){
+        h += '<div class="muted">Žiadne namapované kovanie' + ((hs.unmapped || []).length ? '' : ' (model nemá kovanie)') + '.</div>';
+      } else {
+        h += '<table class="bomtab hwtab"><thead><tr><th>Kód</th><th>Názov</th><th>ks</th><th>MJ</th><th>€ s DPH</th><th>Spolu</th></tr></thead><tbody>';
+        var cat = null;
+        rows.forEach(function(r){
+          var c = r.missing ? 'MIMO KATALÓGU' : (r.category || '—');
+          if (c !== cat){ cat = c; h += '<tr class="hwcat"><td colspan="6">' + esc(c) + '</td></tr>'; }
+          h += '<tr' + (r.missing ? ' class="hwmiss"' : '') + '><td>' + esc(r.code) + '</td>'
+             + '<td>' + esc(r.missing ? 'nie je v katalógu kovania' : (r.name_sk || '')) + '</td>'
+             + '<td><b>' + num(r.quantity) + '</b>' + hwManualMark(r.manual_note) + '</td>'
+             + '<td>' + esc(r.unit || '—') + '</td>'
+             + '<td>' + price(r.price_eur_vat) + '</td><td>' + price(r.subtotal_eur_vat) + '</td></tr>';
+        });
+        var sum = hs.summary || {};
+        h += '<tr class="hwsum"><td colspan="5">SPOLU — len známe ceny'
+           + (sum.unknown_prices ? ' (' + sum.unknown_prices + '× cena nezadaná)' : '')
+           + '</td><td><b>' + price(sum.total_eur_vat) + '</b></td></tr></tbody></table>';
+      }
+      var un = hs.unmapped || [];
+      if (un.length){
+        // ŠT-1c: pôvodný text hovoril „detail v tabe Kontrola" — Kontrola je od
+        // ŠT-1b SEKCIA tohto okna, takže by veta klamala o mieste.
+        h += '<div class="hwsec hwsec-warn"><span>Bez kódov (' + un.length + ') — nenacenené, detail v sekcii Kontrola</span></div>'
+           + '<table class="bomtab hwtab"><tbody>';
+        un.forEach(function(u){
+          // H1b: krátky SK text dôvodu skladá SERVER (HardwareSets.unmapped_reason_sk
+          // → payload 'reason_sk') — ten istý text ide aj do CSV. JS už žiadny
+          // vlastný preklad enumu nemá; fallback je len pre starý payload.
+          var reason = u.reason_sk || ('bez kódov (' + (u.reason || '?') + ')');
+          // D-90: 'params_label' („rez 597 mm") zo servera — bez neho by pri
+          // dĺžkovom kovaní nebolo v zozname vidieť, aký rozmer objednať.
+          if (u.params_label) reason += ' · ' + u.params_label;
+          h += '<tr class="hwmiss"><td>' + esc(u.generic_type) + '</td>'
+             + '<td>' + esc(u.cabinet_id + (u.owner_part_key ? ' · ' + u.owner_part_key : '')) + '</td>'
+             + '<td>' + num(u.quantity) + '</td><td>' + esc(reason) + '</td></tr>';
+        });
+        h += '</tbody></table>';
+      }
+    }
+    h += '<div class="hwsec"><span>Podľa pravidiel (generika)</span></div>';
+    if (!(list || []).length){
+      h += '<div class="muted">Žiadne kovanie (kovanie sa počíta z pravidiel korpusov).</div>';
+      return h;
+    }
+    h += '<table class="bomtab hwtab"><thead><tr><th>Typ</th><th>Parametre</th><th>ks</th><th>Kde</th></tr></thead><tbody>';
+    list.forEach(function(g, i){
+      // D-90: 'params_label' je SERVEROVY text („rez 597 mm") — ked ho polozka
+      // ma, zobrazi sa NAMIESTO surovych key/value (JS nic neformatuje).
+      var params = g.params_label
+        ? esc(g.params_label)
+        : (Object.keys(g.params || {}).map(function(k){ return esc(k) + ' ' + esc(g.params[k]); }).join(', ') || '—');
+      // D-93: pri ručne zamknutej dĺžke nesie riadok serverový popis
+      // („ručne prepísaná dĺžka (automat: 470 mm)") ako tooltip.
+      var kde = (g.breakdown || []).map(function(b){
+        var t = esc(b.owner_id) + '×' + b.quantity + (b.source === 'manual' ? ' (ručne)' : '');
+        return b.manual_note ? '<span title="' + esc(b.manual_note) + '">' + t + '</span>' : t;
+      }).join(', ');
+      // V0.6 C-2 (audit F11): slovensky label zo SERVERA (fallback surovy typ)
+      h += '<tr class="hwrow" data-i="' + i + '"><td>' + esc(g.label || g.generic_type) + '</td><td>' + params + '</td>' +
+           '<td><b>' + num(g.quantity) + '</b></td><td>' + kde + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    return h;
   }
 
   // ---- Š10: prepínače lišty (zvýraznenie hrán + smer kresby) --------------
@@ -611,6 +711,25 @@
         '<span class="sechint">Zoradené podľa závažnosti — poradie určuje server.</span>';
       return;
     }
+    // ŠT-1c PR A (Š7): lišta sekcie Nákup kovania. Export patrí SEKCII
+    // (kontrakt §3) — v okne Výroba visel v hlavičke tabuľky, tu je jediná
+    // vec v lište; hint nahrádza pôvodný riadok nad tabuľkou (vertikálny
+    // priestor je vzácny, preto NEIDE na vlastný riadok).
+    if (studioSec === 'buy'){
+      box.innerHTML = '<button type="button" class="ghostbtn" id="hwCsvBtn"' +
+        ' title="CSV nákupného zoznamu — počíta sa z čerstvého modelu">' +
+        ico('download') + ' CSV kovania</button>' +
+        // Review P3: sekcia musí mať vlastnú cestu k čerstvým číslam. Prestavba
+        // skrinky z Inspectora sem sama nedorazí, takže bez „Obnoviť" by sa dal
+        // objednávať nákupný zoznam zo starých počtov — a odísť po ne do
+        // Kusovníka je skrytá cesta (rovnaký dôvod ako v lište Kusovníka).
+        '<button type="button" class="ghostbtn" id="refreshBtn"' +
+        ' title="Prepočítať nákupný zoznam z aktuálneho modelu">' +
+        ico('refresh-cw') + ' Obnoviť</button>' +
+        '<span class="spacer"></span>' +
+        '<span class="sechint">Klik na riadok generiky označí vlastníka v modeli.</span>';
+      return;
+    }
     var vw = function(id, t, tip){
       return '<button type="button" class="bomvw' + (bomView === id ? ' on' : '') +
              '" data-view="' + id + '" title="' + esc(tip) + '">' + esc(t) + '</button>';
@@ -671,6 +790,7 @@
     if (!box) return;
     if (!ST){ box.innerHTML = '<div class="muted">Načítavam…</div>'; return; }
     if (studioSec === 'ctrl') box.innerHTML = ctrlSection();
+    else if (studioSec === 'buy') box.innerHTML = buySection(ST.hardware_sets || null, ST.hardware || []);
     else if (bomView === 'sheets') box.innerHTML = sheetsTable();
     else if (bomView === 'abs') box.innerHTML = absTable();
     else box.innerHTML = partsTable();
@@ -905,9 +1025,12 @@
                                         focus_inspector: !!focusInspector }));
   }
 
+  // Jeden push prináša VŠETKY sekcie, takže sa prepočíta všetko — status ale
+  // hovorí o tom, na čo sa používateľ práve pozerá (inak by po kliku v Nákupe
+  // hlásil kusovník a vyzeralo by to ako zlé tlačidlo).
   function requestRefresh(){
     if (!window.sketchup || !sketchup.refresh_bom) return;
-    NX.setStatus('Prepočítavam kusovník…', false);
+    NX.setStatus(studioSec === 'buy' ? 'Prepočítavam nákupný zoznam…' : 'Prepočítavam kusovník…', false);
     sketchup.refresh_bom('');
   }
 
@@ -915,6 +1038,25 @@
     if (!ST || !window.sketchup || !sketchup.vepo_export) return;
     NX.setStatus('Exportujem VEPO…', false);
     sketchup.vepo_export(JSON.stringify({ gen: ST.gen }));
+  }
+
+  // ŠT-1c PR A: CSV nákupného zoznamu kovania. Názov projektu sa NEPOSIELA —
+  // číta ho SERVER (`ProductionCore.project_name`), aby všetky exporty
+  // pomenovali zákazku rovnako. Od tejto dávky nesie aj `gen` (audit #15):
+  // nákupný dokument nesmie vzniknúť z okna so zastaranými dátami.
+  function hwCsvExport(){
+    if (!ST || !window.sketchup || !sketchup.hw_csv_export) return;
+    NX.setStatus('Exportujem nákupný zoznam…', false);
+    sketchup.hw_csv_export(JSON.stringify({ gen: ST.gen }));
+  }
+
+  // Klik na riadok generiky = OZNAC VLASTNIKA v modeli. Posiela sa KLUC
+  // riadku (nie pids) — Ruby si po flushi editov nájde čerstvé refs (Codex
+  // GH #48 P2: rebuild po flushi mení persistent id). Ide TOU ISTOU cestou
+  // ako klik v Kusovníku (`nx_select` → relay cez panel).
+  function selectHwRow(key){
+    if (!ST || typeof window === 'undefined' || !window.sketchup || !sketchup.nx_select) return;
+    sketchup.nx_select(JSON.stringify({ gen: ST.gen, hw_key: key }));
   }
 
   // Nazov projektu aj merge zapisuje SERVER (audit #1) — okno posiela iba
@@ -1054,7 +1196,16 @@
       if (t.closest('[data-navmini]')){ navMini = !navMini; savePrefs(); renderNav(); return; }
       if (t.closest('#colBtn')){ colMenuOpen = !colMenuOpen; renderTools(); return; }
       if (t.closest('#vepoBtn')){ vepoExport(); return; }
+      if (t.closest('#hwCsvBtn')){ hwCsvExport(); return; }
       if (t.closest('#refreshBtn')){ requestRefresh(); return; }
+      // ŠT-1c PR A: riadok generiky kovania — klik označí vlastníka v modeli.
+      var hwr = t.closest('tr.hwrow');
+      if (hwr){
+        var hi = parseInt(hwr.getAttribute('data-i'), 10);
+        var g = (ST && ST.hardware) ? ST.hardware[hi] : null;
+        if (g && g.key) selectHwRow(g.key);
+        return;
+      }
       var vbtn = t.closest('[data-view]');
       if (vbtn){ bomView = vbtn.getAttribute('data-view'); colMenuOpen = false; renderTools(); renderBody(); return; }
       var grp = t.closest('[data-grp]');
@@ -1133,6 +1284,9 @@
       // ŠT-1b sekcia Kontrola (Š8–Š11)
       semaforHtml: semaforHtml, ctrlRows: ctrlRows, ctrlRowHtml: ctrlRowHtml,
       ctrlActionsHtml: ctrlActionsHtml, navBadgeHtml: navBadgeHtml,
+      // ŠT-1c PR A sekcia Nákup kovania (Š7) + D-93 znamienko ručného zásahu
+      // (sada tests/js/test_d93_nl_override.js sa sem presunula z production.js)
+      buySection: buySection, price: price, hwManualMark: hwManualMark,
       // Š10 prepinace (sady D-104 / D-105 / K2 / ABS rail 3-stav)
       edgeCheckBarHtml: edgeCheckBarHtml, edgeCheckText: edgeCheckText,
       edgePluralSk: edgePluralSk, edgeCheckPayload: edgeCheckPayload,
