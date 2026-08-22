@@ -586,6 +586,10 @@ module Noxun
           RulesDialog.on_model_changed(model) if defined?(RulesDialog)
           MaterialsDialog.on_model_changed(model) if defined?(MaterialsDialog)
           ProductionDialog.on_model_changed(model) if defined?(ProductionDialog) # V0.5 B (nova generacia dat)
+          # ST-1a: okno Studio ma VLASTNY generacny token — bez tohto riadku by
+          # po prepnuti dokumentu drzalo cisla starej zakazky a jeho klik by
+          # mieril do modelu, ktory uz nie je aktivny.
+          StudioDialog.on_model_changed(model) if defined?(StudioDialog)
           # V0.6 D1b: tab "Predvolby projektu" v okne Katalog kovania je viazany
           # na model — po prepnuti sa mapovanie nacita z noveho modelu.
           HardwareCatalogDialog.on_model_changed(model) if defined?(HardwareCatalogDialog)

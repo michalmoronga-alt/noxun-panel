@@ -25,6 +25,20 @@ module Noxun
           Engine.log_error(e, 'Panel.show')
         end
 
+        # ST-1a (Š3 ceruzka): „uprav dielec v Inspectore" — po vybere v modeli
+        # sa panel zdvihne dopredu, aby sa dal dielec hned upravit. Panel sa TU
+        # NEOTVARA (o tom rozhoduje volajuci cez `dialog_alive?`) a do modelu sa
+        # nezapisuje nic.
+        def bring_to_front
+          return false unless @dialog && @dialog.visible?
+
+          @dialog.bring_to_front
+          true
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.bring_to_front')
+          false
+        end
+
         # UI-02: toolbar tlacidlo loga je PREPINAC — druhy klik panel zavrie.
         # Zatvorenie ide cez `set_on_closed` (detach observera + @dialog = nil),
         # takze stav panela ostava konzistentny s beznym zavretim krizikom.
@@ -186,6 +200,14 @@ module Noxun
           cb(dlg, 'production_do_budget')   { |p| ProductionDialog.do_budget_xlsx(p) }
           # V0.6 E-b2 relay: zakaznicka cenova ponuka (cenova tabulka + specifikacia)
           cb(dlg, 'production_do_cp')       { |p| ProductionDialog.do_cp_xlsx(p) }
+          # ST-1a: okno STUDIO. Deep-link nesie meno sekcie (+ volitelnu kotvu
+          # hladania — N13 posiela ID skrinky); whitelist je v
+          # StudioDialog::SECTIONS, panel posiela iba meno.
+          cb(dlg, 'open_studio')            { |p| open_studio(p) }
+          # ST-1a relay (audit #3): Studio ma VLASTNY kanal — inak by odpoved
+          # prisla do okna Vyroba a jeho `gen` by klik odmietol.
+          cb(dlg, 'studio_do_select')       { |p| StudioDialog.do_select(p) }
+          cb(dlg, 'studio_do_export')       { |p| StudioDialog.do_export(p) }
           # V0.4.7c: samostatna doska — vlozenie + karta (fields/material/ABS hrana)
           cb(dlg, 'insert_board')       { |p| handle_insert_board(p) }
           cb(dlg, 'set_board_fields')   { |p| handle_set_board_fields(p) }
@@ -216,6 +238,14 @@ module Noxun
             end
             next
           end
+        end
+
+        # ST-1a: otvorenie okna Studio z panela (rail „Štúdio", N13 „Materiál",
+        # warnpanel). Payload nesie meno sekcie a volitelnu kotvu hladania —
+        # o platnosti rozhoduje `StudioDialog::SECTIONS`, nie panel.
+        def open_studio(payload)
+          data = studio_link_of(payload)
+          StudioDialog.show(open_section: data[:section], anchor: data[:anchor])
         end
 
         # Wrapper: begin/rescue + slovensky status pri chybe; nikdy 'return' v bloku (pouzi next).

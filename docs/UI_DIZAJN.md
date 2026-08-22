@@ -1016,13 +1016,37 @@ v `HtmlDialog.new` sú **vonkajšie** — obsah + rámik okna (Windows ≈ 16 px
 | Okno | Obsah (`NX_FIT_MIN`) | `width` × `height` | `min_width` × `min_height` |
 |---|---|---|---|
 | **Inspector** (`panel.html`) | 470 × 810 | 486 × 850 | 486 × 600 |
+| **Štúdio** (`studio.html`) | 1060 × 640 | 1076 × 680 | 1076 × 520 |
 | Výroba (`production.html`) | podľa deklarácie v HTML | — | — |
 | Materiály (`proj_materials.html`) | podľa deklarácie v HTML | 720 × 640 | — |
 | ostatné satelity | podľa deklarácie v HTML | — | — |
 
 > **470 px Inspectora** je obsah = rail 44 px + karta. Hodnota je záväzná pre
 > celý blok UI 2.0 — mockup, sektory aj šírky polí sa navrhujú na ňu.
+> **1060 px Štúdia** je navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami
+> a stĺpcom hover akcií; v užšom okne končí pravá časť riadku mimo. Výška 640
+> nechá pod lištou sekcie vidieť aspoň dve skupiny materiálu naraz.
 > Satelitné okná dostanú svoje riadky tabuľky, keď ich prevezme Štúdio.
+
+### Vzory okna Štúdio (ŠT-1a)
+
+- **Nemigrovaná položka navigácie NIE JE `disabled` — je to PREMOSTENIE.**
+  Klik otvorí okno, kde obsah dnes naozaj je, a tooltip prizná v ktorej dávke
+  sa presunie sem. `aria-disabled` (vzor D-78) dostane len to, čo **nikde
+  neexistuje** — v ŠT-1a jediný Nárezový plán („fáza 2"). Rozdiel je vecný:
+  premostenie vedie tam, kam ukazuje; disabled hovorí, prečo zatiaľ nikam.
+- **Neexistujúci export je viditeľné `aria-disabled` tlačidlo s dôvodom,
+  nie skryté tlačidlo.** Michal porovnáva panel 1:1 s mockupom — chýbajúci
+  ovládač vyzerá ako chyba implementácie, priznaný ovládač ako plán.
+- **Výstup sa nikdy netvári ako vstup.** Údaj, ktorý sa edituje inde, je
+  v ostatných oknách TEXT (názov projektu: input v Štúdiu → Kusovník,
+  text v hlavičke okna Výroba).
+- **Voľba zobrazenia je vec POČÍTAČA, nie zákazky.** Voliteľné stĺpce,
+  zbalené skupiny a zbalená navigácia žijú v `localStorage` (nikdy v `.skp`
+  a nikdy v `%APPDATA%` — nie je to nastavenie pluginu, len tohto okna).
+- **Kódy hrán `L1/L2/W1/W2` sa v tabuľkách neprekladajú** na „predná/zadná" —
+  ten istý kód znamená pri každej role inú fyzickú hranu. Fyzickú stranu
+  ukazuje karta dielca v Inspectore, ktorá ju zároveň kreslí.
 
 ---
 

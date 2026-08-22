@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.7.29' unless defined?(VERSION)
+    VERSION = '0.7.30' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -318,8 +318,11 @@ module Noxun
       toolbar_icon(cmd_panel, 'noxun_logo.svg')
       tb.add_item(cmd_panel)
 
-      cmd_studio = UI::Command.new('Štúdio') { ProductionDialog.show }
-      cmd_studio.tooltip = 'Štúdio — zatiaľ otvára okno Výroba (plné Štúdio príde v ďalšej fáze)'
+      # ST-1a (audit #2): tlačidlo sa volá Štúdio a otvára ŠTÚDIO. Obsah, ktorý
+      # sa doň zatiaľ nepresťahoval, je v navigácii Štúdia ako PREMOSTENIE do
+      # okna Výroba — nie je to teda skrytá cesta, len ešte nie konečný domov.
+      cmd_studio = UI::Command.new('Štúdio') { StudioDialog.show }
+      cmd_studio.tooltip = 'Štúdio — kusovník zákazky (kontrola a rozpočet zatiaľ v okne Výroba)'
       cmd_studio.status_bar_text = 'Kusovník, kontrola, rozpočet a výstupy zákazky.'
       toolbar_icon(cmd_studio, 'noxun_studio.svg')
       tb.add_item(cmd_studio)
@@ -414,6 +417,7 @@ Sketchup.require 'noxun_engine/core/cp_export'     # V0.6 E-b2: cenova ponuka (v
 Sketchup.require 'noxun_engine/core/price_refresh' # V0.6 E-c: hromadne obnovenie cien z Demosu (po demos/lookup + hardware_catalog)
 Sketchup.require 'noxun_engine/ui/production_core'   # ST-1a: zdielane ciste jadro (Vyroba + Studio) — PRED oknom
 Sketchup.require 'noxun_engine/ui/production_dialog' # V0.5 B okno Vyroba
+Sketchup.require 'noxun_engine/ui/studio_dialog'     # ST-1a okno Studio (skelet + Kusovnik)
 Sketchup.require 'noxun_engine/ui/panel'
 Sketchup.require 'noxun_engine/ui/rules_dialog'     # V0.4 editor pravidiel kovania
 Sketchup.require 'noxun_engine/ui/materials_dialog' # V0.4.5 D2 projektove predvolby materialov
@@ -449,6 +453,11 @@ module Noxun
 
         menu = UI.menu('Extensions').add_submenu('Noxun Engine')
         menu.add_item('Panel') { Panel.show }
+        menu.add_item('Štúdio') { StudioDialog.show } # ST-1a
+        # ST-1a (audit #2): DOCASNA polozka — okno Vyroba uz nema vlastne
+        # tlacidlo v toolbare (to patri Studiu). Zanikne s davkou ŠT-1c, kedy
+        # sa posledne taby presunu do Studia a okno Vyroba zmizne uplne.
+        menu.add_item('Výroba (dočasné — presúva sa do Štúdia)') { ProductionDialog.show }
         menu.add_item('Pravidlá kovania') { RulesDialog.show }
         menu.add_item('Materiály projektu') { MaterialsDialog.show }
         menu.add_item('Katalóg kovania') { HardwareCatalogDialog.show } # V0.6 C-2

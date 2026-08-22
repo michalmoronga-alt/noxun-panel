@@ -149,6 +149,106 @@ module Noxun
         p.empty? ? 'projekt' : File.basename(p, '.*')
       end
 
+      # --- ST-1a: nazov projektu je SERVEROVA autorita (audit #1) -----------
+      #
+      # Do ST-1a zil nazov projektu v INPUTE okna Vyroba a kazdy export si ho
+      # bral z DOM (`data['project']`). Odkedy su okna DVE, je to pasca: kto
+      # prepise nazov v Studiu, exportuje z Vyroby pod inym menom (a naopak) —
+      # dva vystupy tej istej zakazky by sa volali rozne.
+      #
+      # Preto nazov zije v `vepo_settings.json` pod mapou `project_names`.
+      # Je to nastavenie POCITACA, presne ako `last_dir`/`merge_18_36`: ziadny
+      # zapis do modelu, ziadny krok Spat. VSETKY styri exporty (VEPO, CSV
+      # kovania, XLSX rozpoctu, XLSX cenovej ponuky) citaju `project_name(model)`
+      # — z klienta uz nazov neprichadza.
+      #
+      # KLUC JE CESTA SUBORU, NIE `model.guid` (review PR #193 P1). SketchUp
+      # dokumentuje, ze guid sa MENI po kazdom ulozeni modelu — na guid kluci by
+      # sa nazov po Ctrl+S ticho stratil (a v subore by rastli mrtve zaznamy).
+      # Cesta sa normalizuje (Windows je case-insensitive, oddelovace sa
+      # zjednocuju). NEULOZENY model cestu nema, takze dostane NAHRADNY kluc
+      # `guid:<guid>` — ten plati len v ramci sedenia; pri prvom zapise s
+      # platnou cestou sa zaznam ZMIGRUJE na cestu a guid zaznam zanikne.
+      PROJECT_NAMES_KEY = 'project_names'
+      PROJECT_NAME_MAX = 120 # strop proti nezmyslu z JS (nazov ide do mena suboru)
+
+      def project_names
+        v = vepo_settings[PROJECT_NAMES_KEY]
+        v.is_a?(Hash) ? v : {}
+      end
+
+      # Stabilna identita zakazky pre nastavenia POCITACA. Windows nerozlisuje
+      # velkost pismen ani smer lomitka, takze „C:\Zakazky\Klinika.skp" a
+      # „c:/zakazky/klinika.skp" musia dat TEN ISTY kluc.
+      def normalize_project_path(path)
+        path.to_s.strip.tr('\\', '/').downcase
+      end
+
+      # Nahradny kluc neulozeneho modelu — plati LEN v ramci sedenia (guid sa
+      # po ulozeni zmeni). Preto ma vlastny prefix: aby sa dal rozoznat od
+      # cesty a pri prvom ulozeni zmigrovat.
+      def project_session_key(model)
+        guid = model_guid(model)
+        guid.empty? ? '' : "guid:#{guid}"
+      end
+
+      # Primarny kluc: cesta, ak zakazka existuje na disku; inak sedenie.
+      def project_key(model)
+        path = normalize_project_path(model.respond_to?(:path) ? model.path : nil)
+        path.empty? ? project_session_key(model) : path
+      end
+
+      # Ulozeny nazov, inak default zo suboru zakazky.
+      #
+      # Ked uz zakazka MA cestu, ale zaznam pod nou este nie je, skusi sa este
+      # kluc sedenia — to je presne stav „pomenoval som neulozeny model a potom
+      # ho ulozil". Bez tejto zalozky by sa nazov pri Ctrl+S stratil.
+      def project_name(model)
+        map = project_names
+        saved = map[project_key(model)]
+        if saved.to_s.strip.empty?
+          session = project_session_key(model)
+          saved = map[session] unless session.empty? || session == project_key(model)
+        end
+        s = saved.to_s.strip
+        s.empty? ? default_project_name(model) : s
+      end
+
+      # Zapis nazvu. Prazdna hodnota (aj hodnota zhodna s defaultom) zaznam
+      # ZMAZE — pomenovanie sa vtedy vrati na nazov .skp suboru a premenovanie
+      # suboru sa v okne prejavi samo. Vracia nazov, ktory PLATI po zapise.
+      #
+      # MIGRACIA: ked zakazka uz ma cestu, zaznam pod klucom sedenia (guid) sa
+      # pri kazdom zapise ZAHADZUJE — jeho ulohu prebrala cesta a guid by po
+      # dalsom ulozeni aj tak prestal sediet.
+      def save_project_name(model, name)
+        key = project_key(model)
+        return project_name(model) if key.empty?
+
+        s = name.to_s.strip[0, PROJECT_NAME_MAX].to_s.strip
+        map = project_names.dup
+        session = project_session_key(model)
+        map.delete(session) if !session.empty? && session != key
+        if s.empty? || s == default_project_name(model)
+          map.delete(key)
+        else
+          map[key] = s
+        end
+        save_vepo_settings(PROJECT_NAMES_KEY => map)
+        project_name(model)
+      end
+
+      # „18 a 36 mm do jedneho suboru" — GLOBALNE nastavenie (audit #1: ostava
+      # take, ake bolo). Default je zapnute.
+      def merge_18_36
+        vepo_settings['merge_18_36'] != false
+      end
+
+      def save_merge_18_36(value)
+        save_vepo_settings('merge_18_36' => (value == true))
+        merge_18_36
+      end
+
       # --- Mapy katalogov + identita modelu --------------------------------
 
       # Stabilna identita modelu — zrkadlo MaterialsDialog.model_guid (oneskoreny
@@ -258,6 +358,315 @@ module Noxun
         else
           Array(data['pids'])
         end.compact.uniq
+      end
+
+      # --- Zber modelu (ST-1a PR B) ----------------------------------------
+
+      # Cerstvy RAW zber s dedup tickom (Codex GH #48 P2: cerstve kopie mozu
+      # zdielat ID — rovnaky sync tick ako push_selected, inak BOM zlieva
+      # vlastnikov a klik-select je nejednoznacny). JEDEN collect pre kusovnik,
+      # semafor aj VEPO (nalez 5) — compute/Validation citaju TEN ISTY zber.
+      def fresh_collect(model)
+        CabinetBuilder.dedup_copies(model) if defined?(CabinetBuilder)
+        BoardBuilder.dedup_copies(model) if defined?(BoardBuilder)
+        Bom.collect(model)
+      end
+
+      # V0.6 D1b: nakupny zoznam kovania. Stav snapshotu setov (audit F9):
+      # :ok = snapshot projektu · :missing = projekt este sety nezmrazil ->
+      # global default LEN NA CITANIE (okna su read-only; zmrazi ho az prva
+      # stavba/zmena predvolby) · :invalid = NIC sa nemapuje (vsetko unmapped
+      # ORANGE) + banner, NIKDY tichy fallback na dnesny global.
+      def hardware_expansion(model, collected)
+        status, state = HardwareSets.project_state_status(model)
+        if status == :missing
+          lib = HardwareSets.load
+          by_id = {}
+          lib['sets'].each { |s| by_id[s['set_id']] = s }
+          state = { 'mapping' => lib['mapping'], 'sets' => by_id }
+        end
+        exp = HardwareSets.expand(
+          Array(collected[:hardware]), state,
+          cabinet_overrides: collected[:cabinet_sets].is_a?(Hash) ? collected[:cabinet_sets] : {},
+          catalog: HardwareCatalog.items
+        )
+        # H1b (audit FIX 9 UI): dovod dostane SK text uz na SERVERI — tab
+        # Kovanie aj CSV citaju to iste 'reason_sk' (JS ziadny vlastny preklad
+        # enumu nema).
+        exp['unmapped'] = Array(exp['unmapped']).map do |u|
+          u.is_a?(Hash) ? u.merge('reason_sk' => HardwareSets.unmapped_reason_sk(u)) : u
+        end
+        exp.merge('state_status' => status.to_s)
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.hardware_expansion')
+        nil
+      end
+
+      # Suhrn KONTROLY do statusu okna/exportu (nalez 6: RED neblokuje export).
+      def control_suffix(control)
+        c = control.is_a?(Hash) ? (control['counts'] || {}) : {}
+        return '' if c['total'].to_i.zero?
+
+        " · KONTROLA: #{c['red'].to_i}× RED, #{c['orange'].to_i}× ORANGE (v LOGu)"
+      end
+
+      # --- ST-1a (audit #4): popisky materialov pre skupiny Kusovnika -------
+      #
+      # Skupina kusovnika ma v Studiu farebnu vzorku, ludsky nazov dekoru a
+      # hrubku. Ziadny z tychto udajov v BOM riadku NIE JE (riadok nesie
+      # `material_id`), takze by si ich klient musel dopytovat z katalogu —
+      # a mal by tak DRUHU pravdu o tom, ako sa material vola. Preto ich
+      # sklada SERVER, presne ako slovenske labely kovania.
+      #
+      # `color` je katalogove pole `[r, g, b]` (nie CSS retazec) — prevod na
+      # hex robi klient, ktory farbu aj kresli.
+      def materials_meta(bom)
+        smap = sheets_map
+        ids = []
+        Array(bom[:rows]).each { |r| ids << row_value(r, 'material_id').to_s }
+        Array(bom[:sheets]).each { |s| ids << row_value(s, 'material_id').to_s }
+        ids.reject(&:empty?).uniq.each_with_object({}) do |id, out|
+          sheet = smap[id]
+          out[id] = { 'label' => material_label(sheet, id),
+                      'color' => catalog_color(sheet),
+                      'th' => sheet ? sheet['thickness'].to_f : nil,
+                      'uni' => !sheet.nil? && Materials.uni?(sheet) }
+        end
+      end
+
+      # To iste pre ABS pasky (pohlad ABS): popis, farba a dekor, ku ktoremu
+      # paska patri. Bez toho by supis pasok ukazoval len `abs_id`.
+      def edges_meta(bom)
+        emap = edges_map || {}
+        Array(bom[:edging]).each_with_object({}) do |e, out|
+          id = row_value(e, 'abs_id').to_s
+          next if id.empty? || out.key?(id)
+
+          rec = emap[id]
+          out[id] = { 'label' => edge_label(rec, id), 'color' => catalog_color(rec),
+                      'decor' => rec ? rec['decor'].to_s : '',
+                      'th' => rec ? rec['thickness'].to_f : nil,
+                      'width' => (rec && rec['width'] ? rec['width'].to_f : nil),
+                      'code' => rec ? rec['code'].to_s : '' }
+        end
+      end
+
+      # --- ST-1a (Š2): volitelny stlpec „Rola" ------------------------------
+      #
+      # BOM riadok rolu NENESIE (agreguje sa podla vyrobnych parametrov, nie
+      # podla roly — zrkadlove dielce sa zliavaju zamerne). Rola vsak V ZAZNAME
+      # je (`Bom.record` ju cita z entity), takze sa da doplnit READ-ONLY
+      # obohatenim: zaznamy sa zoskupia TYM ISTYM `Bom.row_key`, akym vznikli
+      # riadky, a k riadku sa priradi zoznam rol. Menit kluc agregacie by zmenilo
+      # kusovnik AJ VEPO — to sa kvoli jednemu volitelnemu stlpcu nerobi.
+      #
+      # Slovensky text sklada SERVER (jedna autorita nazvov, JS ziadny preklad
+      # enumu nema — vzor `HardwareRules.label_for`).
+      ROLE_LABELS = {
+        'side_left' => 'Bok ľavý', 'side_right' => 'Bok pravý',
+        'top' => 'Strop', 'bottom' => 'Dno', 'back' => 'Chrbát',
+        'shelf' => 'Polica', 'divider_v' => 'Zvislá priečka', 'divider_h' => 'Vodorovná priečka',
+        'rail_front' => 'Výstuha predná', 'rail_back' => 'Výstuha zadná',
+        'plinth' => 'Sokel', 'front_door' => 'Dvierka', 'drawer_front' => 'Čelo zásuvky',
+        'free_panel' => 'Voľná doska'
+      }.freeze
+
+      def role_label(role)
+        r = role.to_s
+        ROLE_LABELS[r] || (r.empty? ? '' : r)
+      end
+
+      def row_roles(collected)
+        Array(collected[:records]).each_with_object({}) do |r, out|
+          next unless r.is_a?(Hash)
+
+          key = Bom.row_key(r)
+          list = (out[key] ||= [])
+          label = role_label(r['role'])
+          list << label unless label.empty? || list.include?(label)
+        end
+      end
+
+      # Riadky kusovnika obohatene o `role_label` (Š2). Parovanie ide cez
+      # RUBY hash (kluc riadku je POLE — v JSON by sa uz neparovalo), takze
+      # klient dostane hotovy text priamo v riadku.
+      def rows_with_roles(rows, collected)
+        roles = row_roles(collected)
+        Array(rows).map do |r|
+          next r unless r.is_a?(Hash)
+
+          list = roles[r['key']]
+          list.nil? || list.empty? ? r : r.merge('role_label' => list.join(' · '))
+        end
+      end
+
+      # BOM riadky chodia raz so String, raz so Symbol klucmi (Bom.compute vs
+      # to_json cesta) — jedno miesto, kde sa to rozhoduje.
+      def row_value(row, key)
+        return nil unless row.is_a?(Hash)
+
+        row[key].nil? ? row[key.to_sym] : row[key]
+      end
+
+      # Ludsky nazov dekoru pre UI (NIE exportny label — ten sklada
+      # `vepo_base_label` a nesie navyse typ aj disambiguatory).
+      def material_label(sheet, id)
+        return id if sheet.nil?
+
+        txt = [sheet['decor'], sheet['structure'], sheet['decor_name']]
+              .map { |v| v.to_s.strip }.reject(&:empty?).join(' ')
+        txt = sheet['family'].to_s.strip if txt.empty?
+        txt.empty? ? id : txt
+      end
+
+      def edge_label(rec, id)
+        return id if rec.nil?
+
+        dims = [rec['width'], rec['thickness']].compact.map { |v| format('%g', v.to_f) }
+        base = rec['decor'].to_s.strip
+        base = id if base.empty?
+        dims.length == 2 ? "#{base} #{dims[0]}×#{dims[1]}" : base
+      end
+
+      # Katalogova farba ako [r, g, b]; chybajuca/poskodena = nil (klient vtedy
+      # nekresli ziadnu vzorku — radsej nic nez nahodna farba).
+      def catalog_color(rec)
+        c = rec.is_a?(Hash) ? rec['color'] : nil
+        c.is_a?(Array) && c.length == 3 ? c.map(&:to_i) : nil
+      end
+
+      # --- ST-1a PR B: zdielane telo EXPORTU a VYBERU ----------------------
+      #
+      # Obe okna (Vyroba aj Studio) robia presne to iste — len s vlastnym
+      # `generation` a vlastnym statusom. Preto telo zije TU a okno odovzdava
+      # svoj stav EXPLICITNE:
+      #   generation — okenny generacny token (B4 guard stareho DOM kliku),
+      #   status     — ->(msg, error) do TOHO okna,
+      #   repush     — -> { } cerstvy payload TOMU oknu (ak zije).
+      # Dva takmer rovnake exporty by sa casom rozisli a rozdiel by sa ukazal
+      # az na vyrobnom vystupe.
+
+      # V0.5 C: export VEPO — vstup po relay z panela (edity flushnute) alebo
+      # priamo (panel nezije). Poradie: gen check -> flush guard -> vyber
+      # priecinka -> CERSTVY BOM -> build -> atomicky zapis -> ulozit settings.
+      def do_export(model, data, generation:, status:, repush:)
+        unless data['gen'].to_i == generation.to_i
+          repush.call
+          return status.call('Dáta okna sa medzitým zmenili — skús export znova.', true)
+        end
+        if data['flush_blocked']
+          return status.call('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
+        end
+
+        settings = vepo_settings
+        last = settings['last_dir']
+        start_dir = last.is_a?(String) && File.directory?(last) ? last : nil
+        dir = UI.select_directory(title: 'Priečinok pre VEPO export', directory: start_dir)
+        return status.call('Export zrušený.') if dir.nil? || dir.to_s.empty?
+
+        # Nalez 5: JEDEN cerstvy RAW zber -> nad nim compute AJ Validation.run;
+        # validaciu EXPLICITNE odovzdame do build (prefix statusu + sekcia
+        # KONTROLA v LOGu z TOHO ISTEHO vysledku).
+        collected = fresh_collect(model)
+        bom = Bom.compute(collected)
+        control = Validation.run(collected, sheets: sheets_map, edges: edges_map,
+                                 hardware_expansion: hardware_expansion(model, collected),
+                                 placements: collected[:placements])
+        # audit #1: nazov projektu aj merge su SERVEROVE — z DOM uz nechodia.
+        merge = merge_18_36
+        result = VepoExport.build(
+          bom[:rows],
+          project: project_name(model),
+          materials: vepo_materials,
+          edge_thicknesses: vepo_edge_thicknesses,
+          validation: control,
+          version: Engine::VERSION,
+          generated_at: Time.now.strftime('%Y-%m-%d %H:%M'),
+          merge_18_36: merge
+        )
+        if result['groups'].empty? && result['errors'].empty?
+          return status.call('Niet čo exportovať — model nemá výrobné dielce.', true)
+        end
+
+        # GH P2: aj ked su VSETKY riadky chybne, LOG s dovodmi sa MUSI zapisat
+        # (inak by diagnostika chybala presne pri uplne zlyhanom exporte).
+        target = VepoExport.write(result, dir)
+        # Nalez 6: KONTROLA nikdy neblokuje export; jej suhrn ide do statusu.
+        ctrl = control_suffix(control)
+        save_vepo_settings('last_dir' => dir)
+        if result['groups'].empty?
+          return status.call("Export nevytvoril žiadny CSV — #{result['errors'].length} chybných riadkov. " \
+                             "Dôvody v LOGu: #{target}#{ctrl}", true)
+        end
+
+        err = result['errors'].empty? ? '' : " · #{result['errors'].length} vyradených riadkov (viď LOG)"
+        status.call("VEPO export hotový: #{result['groups'].length} súborov, #{result['total_rows']} riadkov " \
+                    "(#{result['total_pieces']} ks) → #{target}#{err}#{ctrl}", !result['errors'].empty?)
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.do_export')
+        status.call("Chyba exportu: #{e.message}", true)
+      end
+
+      # Vstup pre relay z panela (B1): panel uz flushol edity, mozeme vyberat.
+      # Klik nesie KLUC riadku, nie pids (Codex GH #48 P2: flush mohol korpus
+      # rebuildnut a stare pids zomreli) — refs sa hladaju v CERSTVOM zbere.
+      #
+      # `focus_inspector` (ST-1a, Š3 ceruzka): po vybere sa Inspector zdvihne
+      # dopredu, aby sa dielec dal rovno upravit. Vyber sa tym NEMENI a do
+      # modelu sa nezapisuje nic.
+      def do_select(model, data, generation:, status:, repush:)
+        unless data['gen'].to_i == generation.to_i # B4: stale klik (iny model/stary DOM)
+          # Review PR #193 P2: tichy no-op tu bol chyba — pouzivatel klikol,
+          # v modeli sa nic neoznacilo a okno mlcalo. Data sa obnovia A POVIE
+          # sa to (rovnaky vzor ako pri exporte).
+          repush.call
+          return status.call('Dáta okna sa medzitým obnovili — klikni znova.', true)
+        end
+
+        collected = fresh_collect(model)
+        # Nalez 4: semafor klik nesie STABILNY kluc problemu; validacia sa po
+        # flushi editov PREPOCITA NANOVO a entity sa dohladaju podla identity
+        # (owner_id + part_key), nie podla PID (rebuild ho meni).
+        if data['problem_key']
+          # GH #127 P2: klik-resolve MUSI ratat s rovnakym vstupom ako
+          # push_state — bez hardware_expansion by sa stable kluce novych
+          # ORANGE (hardware_unmapped/hardware_code) nikdy nenasli.
+          item = Validation.run(collected, sheets: sheets_map, edges: edges_map,
+                                hardware_expansion: hardware_expansion(model, collected),
+                                placements: collected[:placements])['items']
+                           .find { |it| it['stable_key'] == data['problem_key'] }
+          if item.nil?
+            repush.call
+            return status.call('Kontrola sa medzitým zmenila — obnovené, klikni znova.', true)
+          end
+          pids = pids_for_problem(model, item)
+        else
+          pids = refs_for(Bom.compute(collected), data)
+        end
+        targets = pids.filter_map do |pid|
+          ent = model.find_entity_by_persistent_id(pid.to_i)
+          ent if ent && ent.valid? && ent.respond_to?(:definition)
+        end
+        if targets.empty?
+          # riadok/polozka medzitym zanikol (flush editov zmenil rozmery/model) —
+          # obnov data, nech pouzivatel klikne na aktualny riadok
+          repush.call
+          return status.call('Zoznam sa medzitým zmenil — obnovené, klikni znova.', true)
+        end
+
+        Panel.suspend_selection_sync do
+          sel = model.selection
+          sel.clear
+          targets.each { |t| sel.add(t) }
+        end
+        Panel.push_selected(model, dedup: false) # B2: ziadna mutacia pri selecte
+        focus = data['focus_inspector'] == true && Panel.dialog_alive?
+        Panel.bring_to_front if focus
+        status.call("Vybraných #{targets.length} položiek v modeli." \
+                    "#{focus ? ' Inspector je vpredu — dielec sa dá hneď upraviť.' : ''}")
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.do_select')
+        status.call("Chyba výberu: #{e.message}", true)
       end
     end
   end

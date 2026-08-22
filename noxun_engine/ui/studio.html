@@ -1,0 +1,181 @@
+<!-- Noxun Engine — okno ŠTÚDIO (ST-1a): navigácia + sekcia Kusovník.
+     Vanilla JS, žiadne CDN, slovensky. READ-ONLY nad modelom — klik iba vyberá
+     entity; do .skp sa odtiaľto nezapisuje nič a nevzniká krok Späť.
+     Dáta: NX.setStudio push zo studio_dialog.rb (čísla počíta ProductionCore —
+     to isté jadro, aké číta okno Výroba).
+     Vizuálna referencia: SYSTEM/zdroje/ui20/mockup_studio.html -->
+<meta charset="utf-8">
+<link rel="stylesheet" href="css/panel.css?v=0.7.30">
+<style>
+  /* Štýly sú ZÁMERNE inline v studio.html (rovnaký dôvod ako production.html):
+     panel.css je zdieľaný s Inspectorom a rozloženie tohto okna doňho nepatrí.
+     Farby VÝHRADNE cez --nx-* tokeny (docs/UI_DIZAJN.md). */
+  html, body { height: 100%; }
+  body { padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+  .studio { flex: 1; display: flex; min-height: 0; }
+
+  /* ---------- navigácia ---------- */
+  .snav { flex: 0 0 208px; background: var(--nx-bg); border-right: 1px solid var(--nx-border);
+          padding: 8px 6px; overflow: auto; transition: flex-basis .12s; }
+  .studio.navmini .snav { flex-basis: 48px; }
+  .studio.navmini .snav .sgrp,
+  .studio.navmini .snav .navitem span,
+  .studio.navmini .snav .navitem .nbridge { display: none; }
+  .studio.navmini .navitem { justify-content: center; padding: 7px 0; }
+  .sgrp { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+          color: var(--nx-ink-faint); padding: 9px 8px 3px; }
+  .sgrp:first-child { padding-top: 2px; }
+  .navitem { display: flex; width: 100%; align-items: center; gap: 8px; padding: 6px 8px; margin: 1px 0;
+             border: 0; border-radius: 6px; background: none; cursor: pointer; font: inherit;
+             font-size: 12.5px; font-weight: 400; color: var(--nx-ink-strong); text-align: left; }
+  .navitem:hover { background: var(--nx-select-bg-soft); }
+  .navitem.on { background: var(--nx-select-bg); color: var(--nx-select); font-weight: 600;
+                box-shadow: inset 3px 0 0 var(--nx-select); }
+  .navitem .ic { width: 15px; height: 15px; color: var(--nx-ink-muted); flex: 0 0 15px; }
+  .navitem.on .ic { color: var(--nx-select); }
+  .navitem span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Premostenie = obsah je (zatiaľ) v inom okne. Šípka to prizná na prvý pohľad,
+     tooltip povie, v ktorej dávke sa presunie sem. */
+  .navitem .nbridge { flex: 0 0 auto; font-style: normal; font-size: 11px; color: var(--nx-ink-faint); }
+  .navitem[aria-disabled="true"] { color: var(--nx-ink-faint); cursor: not-allowed; }
+  .navitem[aria-disabled="true"] .ic { color: var(--nx-ink-faint); }
+  .navitem[aria-disabled="true"]:hover { background: none; }
+  .navfoot { margin-top: 10px; padding-top: 6px; border-top: 1px solid var(--nx-border-soft); }
+
+  /* ---------- telo sekcie ---------- */
+  .sbody { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--nx-surface); }
+  .sechead { display: flex; align-items: baseline; gap: 8px; padding: 9px 12px;
+             border-bottom: 1px solid var(--nx-border); background: var(--nx-bg); }
+  .sechead h2 { font-size: 14px; margin: 0; color: var(--nx-ink-title); font-weight: 700; }
+  .sechead .sechint { font-size: 11px; color: var(--nx-ink-soft); }
+  .sechead .secmodel { margin-left: auto; font-size: 11px; color: var(--nx-ink-faint); white-space: nowrap; }
+  .sectools { display: flex; align-items: center; gap: 6px; padding: 8px 12px;
+              border-bottom: 1px solid var(--nx-border-soft); flex-wrap: wrap; position: relative; }
+  .sectools .spacer { flex: 1; }
+  .sectools .primary { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; }
+  .sectools .ghostbtn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; }
+  .sectools .ghostbtn .ic, .sectools .primary .ic { width: 14px; height: 14px; }
+  /* D-78: viditeľné, ale neaktívne — dôvod je v tooltipe, nie v tichu. */
+  .sectools [aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+  .secscroll { flex: 1; overflow: auto; padding: 10px 12px 20px; }
+
+  .searchbox { display: flex; align-items: center; gap: 6px; border: 1px solid var(--nx-border-strong);
+               border-radius: 6px; padding: 4px 8px; background: var(--nx-surface); min-width: 180px; }
+  .searchbox input { border: 0; outline: 0; font: inherit; font-size: 12px; flex: 1;
+                     background: transparent; min-width: 0; }
+  .searchbox .ic { width: 14px; height: 14px; color: var(--nx-ink-faint); }
+
+  /* Názov projektu a merge 18+36 — SERVER je autorita (audit #1); okno posiela
+     iba hodnotu a po zápise dostane čerstvý payload (rovnako ako okno Výroba). */
+  .prjbox { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--nx-ink-label); }
+  .prjbox input { font: inherit; font-size: 12px; padding: 4px 8px; width: 150px;
+                  border: 1px solid var(--nx-border-strong); border-radius: 6px;
+                  background: var(--nx-surface); color: var(--nx-ink); }
+  .mergebox { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px;
+              color: var(--nx-ink-label); white-space: nowrap; cursor: pointer; }
+  .mergebox input { accent-color: var(--nx-select); }
+
+  /* ---------- pohľady sekcie (Š4) ---------- */
+  .bomviews { display: flex; border: 1px solid var(--nx-border-strong); border-radius: 6px;
+              overflow: hidden; margin-right: 4px; }
+  .bomvw { font: inherit; font-size: 12px; font-weight: 600; padding: 6px 12px; border: 0;
+           border-radius: 0; cursor: pointer; background: var(--nx-surface); color: var(--nx-ink-muted); }
+  .bomvw + .bomvw { border-left: 1px solid var(--nx-border); }
+  .bomvw:hover { background: var(--nx-select-bg-soft); }
+  .bomvw.on { background: var(--nx-select-bg); color: var(--nx-select); }
+
+  /* ---------- Š2: voliteľné stĺpce (overlay, nie ďalší riadok layoutu) ---------- */
+  .colmenu { position: absolute; top: calc(100% - 2px); right: 12px; z-index: 60; width: 196px;
+             background: var(--nx-surface); border: 1px solid var(--nx-border); border-radius: 6px;
+             box-shadow: 0 6px 18px var(--nx-modal-shadow); padding: 5px; }
+  .colmenu .mgrp { font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+                   color: var(--nx-ink-faint); padding: 3px 6px; }
+  .colmenu label { display: flex; align-items: center; gap: 7px; padding: 4px 6px; border-radius: 6px;
+                   font-size: 12px; cursor: pointer; color: var(--nx-ink); }
+  .colmenu label:hover { background: var(--nx-select-bg-soft); }
+  .colmenu label.fixed { color: var(--nx-ink-faint); cursor: not-allowed; }
+  .colmenu input { width: 14px; height: 14px; margin: 0; accent-color: var(--nx-select); }
+
+  /* ---------- Š1: skupiny podľa materiálu ---------- */
+  .grp { border: 1px solid var(--nx-border); border-radius: 6px; margin-bottom: 10px; overflow: hidden; }
+  .grphead { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px;
+             background: var(--nx-surface-th); border: 0; border-bottom: 1px solid var(--nx-border);
+             border-radius: 0; cursor: pointer; font: inherit; text-align: left; }
+  .grp.closed .grphead { border-bottom: 0; }
+  .grphead .chev { width: 6px; height: 6px; border-right: 2px solid var(--nx-ink-faint);
+                   border-bottom: 2px solid var(--nx-ink-faint); transform: rotate(45deg);
+                   flex: 0 0 6px; position: relative; top: -2px; transition: transform .12s; }
+  .grp.closed .grphead .chev { transform: rotate(-45deg); top: 0; }
+  .grphead .sw { width: 16px; height: 16px; border-radius: 6px; flex: 0 0 16px;
+                 border: 1px solid var(--nx-border-strong); background: var(--nx-surface-sunken); }
+  .grphead .gname { font-weight: 600; font-size: 12.5px; color: var(--nx-ink-strong); }
+  .grphead .gsub { color: var(--nx-ink-muted); font-size: 11px; }
+  .grphead .gsum { margin-left: auto; font-size: 11.5px; color: var(--nx-ink-muted);
+                   font-variant-numeric: tabular-nums; }
+  .grphead .gsum b { color: var(--nx-ink-strong); }
+  .grp.closed .bomtab { display: none; }
+
+  /* ---------- tabuľka ---------- */
+  .bomtab { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .bomtab.flat { border: 1px solid var(--nx-border); border-radius: 6px; overflow: hidden;
+                 border-collapse: separate; border-spacing: 0; }
+  .bomtab th { background: var(--nx-surface-th); color: var(--nx-ink-label); font-weight: 600;
+               font-size: 11px; text-align: left; padding: 5px 8px;
+               border-bottom: 1px solid var(--nx-border); white-space: nowrap; }
+  .bomtab td { padding: 4px 8px; border-bottom: 1px solid var(--nx-border-soft); color: var(--nx-ink); }
+  .bomtab tr:last-child td { border-bottom: 0; }
+  .bomtab th.num, .bomtab td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .bomtab th.acth, .bomtab td.acth { width: 56px; padding-left: 2px; padding-right: 6px; }
+  .bomtab tbody tr { cursor: pointer; }
+  .bomtab tbody tr:hover { background: var(--nx-select-bg-soft); }
+  .bomtab tbody tr:hover .rowact { opacity: 1; }
+  td.absc { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--nx-ink-muted); cursor: help; }
+  .estfb { color: var(--nx-warn-fg); }
+  .cellsw { display: inline-block; width: 13px; height: 13px; border-radius: 3px;
+            border: 1px solid var(--nx-border-strong); vertical-align: -2px; margin-right: 7px; }
+  .wtagchip { display: inline-block; font-size: 9.5px; font-weight: 700; color: var(--nx-warnchip-fg);
+              border: 1px solid var(--nx-warnchip-border); background: var(--nx-warn-bg-soft);
+              border-radius: 9px; padding: 0 6px; vertical-align: 1px; }
+
+  /* Š3: hover akcie riadku — oko (označ) a ceruzka (označ + Inspector dopredu).
+     Tretia akcia „detail/traceability" tu ZÁMERNE nie je (príde s D-94). */
+  .rowact { display: flex; gap: 3px; opacity: 0; transition: opacity .1s; justify-content: flex-end; }
+  .rowact button { width: 22px; height: 20px; padding: 0; border: 1px solid var(--nx-border);
+                   border-radius: 6px; background: var(--nx-surface); color: var(--nx-ink-muted);
+                   cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+  .rowact button:hover { color: var(--nx-select); border-color: var(--nx-select); }
+  .rowact .ic { width: 13px; height: 13px; }
+
+  /* ---------- súčtový riadok (čísla zo servera) ---------- */
+  .totrow { display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+            border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface-th);
+            font-size: 12.5px; color: var(--nx-ink-strong); }
+  .totrow b { color: var(--nx-ink-title); }
+  .totrow .spacer { flex: 1; }
+  .totrow .tmuted { color: var(--nx-ink-muted); }
+
+  #status { margin: 0; border-radius: 0; border-left: 0; border-right: 0; border-bottom: 0; }
+</style>
+
+<div class="studio" id="studio">
+  <nav class="snav" id="snav"></nav>
+  <div class="sbody">
+    <div class="sechead" id="sechead"></div>
+    <div class="sectools" id="sectools"></div>
+    <div class="secscroll" id="secbody"><div class="muted">Načítavam…</div></div>
+  </div>
+</div>
+<div id="status">Pripravené.</div>
+
+<script src="js/errors.js?v=0.7.30"></script>
+<!-- D-51/D-77: minimálna OBSAHOVÁ veľkosť okna pri otvorení (js/win_fit.js).
+     Navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami a stĺpcom akcií — v užšom
+     okne končí pravá časť riadku mimo. Trojica NX_FIT_MIN → width/height →
+     min_width/min_height je v docs/UI_DIZAJN.md (tabuľka D-51). -->
+<script>window.NX_FIT_MIN = { w: 1060, h: 640 };</script>
+<script src="js/win_fit.js?v=0.7.30"></script>
+<!-- Sprite ikon (žiadne emoji v ovládacích prvkoch). Musí byť PRED studio.js —
+     navigácia aj hover akcie riadkov používajú <use href="#i-…">. -->
+<script src="js/icons.js?v=0.7.30"></script>
+<script src="js/studio.js?v=0.7.30"></script>

@@ -12,6 +12,18 @@
       sketchup.open_production(JSON.stringify(NXShell.studioLink(tab)));
   }
 
+  // ST-1a: otvorenie okna ŠTÚDIO. Rovnaky flush handshake ako pri Vyrobe —
+  // kusovnik sa pocita az z cerstveho stavu. `section` je volitelny deep-link
+  // (bez neho okno ostane tam, kde pouzivatel naposledy skoncil) a `anchor`
+  // predvyplni hladanie sekcie (N13 posiela ID skrinky). ZAVAZNY whitelist
+  // sekcii je na strane Ruby — tu sa hodnota len preosieva.
+  function openStudio(section, anchor){
+    if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+    if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
+    if (window.sketchup && sketchup.open_studio)
+      sketchup.open_studio(JSON.stringify(NXShell.studioOpenLink(section, anchor)));
+  }
+
   // ===================== ZONA UI (akcie / rozmery poli) =====================
   // UI-C2: kontext Zony ma STATICKU kostru (Struktura · Delenie · Police · Vnutro)
   // a JS meni LEN obsah #zoneTree / #zoneFields a stavy uz existujucich uzlov.
@@ -448,16 +460,17 @@
       sketchup.nx_select_parts(JSON.stringify({ cabinet_id: selectedCabId, model_guid: nxModelGuid }));
   }
   // UI-D3 (N13): Materiál m² — klik vedie tam, kam ukazuje: do KUSOVNÍKA.
-  // Štúdio zatiaľ neexistuje (vlastná fáza po bloku UI-D), preto sa otvorí
-  // okno Výroba rovno na tabe Kusovník (deep-link). FILTER na skrinku sa
-  // NEVYMYSLA — kusovník ho nemá; povie sa to nahlas, aby používateľ vedel,
-  // že vidí celú zákazku (sľúbený filter príde so Štúdiom).
+  // ST-1a (audit #12): kusovník je od tejto dávky sekciou okna ŠTÚDIO a
+  // sľúbený filter na jednu skrinku sa SPLNIL — ID skrinky ide ako `anchor`,
+  // ktorý predvyplní hľadanie sekcie (Š6). Status to hovorí nahlas, aby bolo
+  // jasné, že zoznam je zúžený a ako sa zúženie zruší.
   function onInfoArea(){
     if (!selectedCabId){ NX.setStatus('Označ skrinku v modeli.', true); return; }
     // Status PRED otvorenim: pripadny flush rozpisaneho editu odpovie neskor
     // a jeho sprava je dolezitejsia — nechame ju vyhrat.
-    NX.setStatus('Kusovník je otvorený — zatiaľ za celú zákazku, filter na jednu skrinku pribudne v Štúdiu.');
-    openProductionDialog('rows');
+    NX.setStatus('Kusovník je otvorený v Štúdiu a vyfiltrovaný na ' + selectedCabId +
+                 ' — vymazaním hľadania uvidíš celú zákazku.');
+    openStudio('bom', selectedCabId);
   }
 
   function setSelected(cid){
