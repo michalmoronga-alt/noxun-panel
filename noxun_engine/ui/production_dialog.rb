@@ -430,8 +430,12 @@ module Noxun
         end
 
         # V0.6 E-b: XLSX rozpočtu — rovnaký flush handshake ako VEPO/CSV.
+        # Review PR #199 #9: payload sa berie TOLERANTNE (`Hash` alebo JSON
+        # retazec) — vetva `else` odovzdava uz rozparsovany Hash a
+        # `JSON.parse(hash.to_s)` by na nom spadol. Okno v ŠT-1c PR B3 zanika,
+        # ale kym zije, nesmie klamat inym vzorom nez zvysok suboru.
         def handle_budget_xlsx(payload)
-          data = JSON.parse(payload.to_s)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           if Panel.dialog_alive?
             Panel.js("NX.productionRelayBudget(#{data.to_json})")
           else
@@ -441,7 +445,7 @@ module Noxun
 
         # V0.6 E-b2: cenová ponuka — rovnaký flush handshake ako XLSX rozpočtu.
         def handle_cp_xlsx(payload)
-          data = JSON.parse(payload.to_s)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           if Panel.dialog_alive?
             Panel.js("NX.productionRelayCp(#{data.to_json})")
           else

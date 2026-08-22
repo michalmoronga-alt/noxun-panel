@@ -5416,13 +5416,13 @@ module NoxunSuRunner
 
   # Jedna operacia rozpoctu: zapis MUSI zmenit stav a JEDEN krok Spat ho MUSI
   # vratit presne tam, kde bol.
-  def st1c_bud_op(model, label, op, extra, read)
+  def st1c_bud_op(model, label, op, extra, read, tag = 'B1')
     before = read.call(model)
     e::StudioDialog.do_budget(st1c_bud_payload(op, extra).to_json)
     changed = read.call(model)
-    ok("ŠT-1c B1: `#{op}` (#{label}) zapisal zmenu do modelu", changed != before)
+    ok("ŠT-1c #{tag}: `#{op}` (#{label}) zapisal zmenu do modelu", changed != before)
     Sketchup.undo
-    ok("ŠT-1c B1: `#{op}` = PRESNE 1 krok Späť", read.call(model) == before)
+    ok("ŠT-1c #{tag}: `#{op}` = PRESNE 1 krok Späť", read.call(model) == before)
   end
 
   def st1c_budget(model, inst)
@@ -5615,6 +5615,156 @@ module NoxunSuRunner
     log_line("FAIL: ŠT-1c B1 rozpocet vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
 
+  # ============ ŠT-1c PR B2: sekcia CENOVA PONUKA (Š14–Š15) =================
+  # Ponuka je PROJEKCIA rozpoctu — vlastny vypocet nema, ale MA vlastne zapisy
+  # (`cp_group` = zaradenie polozky) a vlastny export. Tu sa dokazuje:
+  #   1) `offer` je serverova sekcia a deep-link ju otvori PRAVE RAZ,
+  #   2) prepinac „samostatne" = 1 zmena, 1 krok Spat — v OBOCH smeroch,
+  #   3) pridanie polozky cez D-15 modal ide TOU ISTOU cestou (1 krok Spat)
+  #      a ODMIETNUTY zapis neposle NIC, co by modal zavrelo (audit #10),
+  #   4) export cenovej ponuky ma gen guard, ktory zastavi cestu EST PRED
+  #      dialogom na ulozenie suboru,
+  #   5) prepnutie sekcie je CISTO klientska vec — server o nom nevie, takze
+  #      rozpisany zapis (fronta klienta) nemoze zhodit.
+  def st1c_offer(model)
+    bs = e::BudgetStore
+    before_ents = model.entities.length
+    cp_key = 'material:SU-TEST-OFFER'
+
+    ok('ŠT-1c B2: `offer` je SEKCIA Studia (serverovy whitelist)',
+       e::StudioDialog::SECTIONS.include?('offer'))
+    ok('ŠT-1c B2: a do okna Vyroba po nej nezostalo premostenie',
+       !e::StudioDialog::PRODUCTION_BRIDGES.key?('offer'))
+
+    begin
+      # `show` uz otvorene okno pushne SAM (a deep-link tym spotrebuje), zavrete
+      # nie — preto sa oba pripady odchytavaju NARAZ a berie sa PRVY payload.
+      scripts = st1c_capture(e::StudioDialog) do
+        e::StudioDialog.show(open_section: 'offer')
+        e::StudioDialog.send(:push_state)
+      end
+      payload = st1c_studio_payload(scripts)
+      if payload.nil?
+        ok('ŠT-1c B2: payload Studia sa podarilo odchytit', false)
+        return
+      end
+      ok('ŠT-1c B2: deep-link otvori rovno sekciu Cenová ponuka',
+         payload['open_section'] == 'offer')
+      cp = (payload['budget'] || {})['cp_preview']
+      ok('ŠT-1c B2: payload nesie cenovú ponuku (`cp_preview`) — sekcia má z čoho kresliť',
+         cp.is_a?(Hash))
+      if cp.is_a?(Hash)
+        ok('ŠT-1c B2: a všetky čísla ponuky sú SERVEROVÉ (suma + prah „samostatne")',
+           cp.key?('total') && cp.key?('threshold') && cp.key?('rows'))
+      end
+      scripts = st1c_capture(e::StudioDialog) { e::StudioDialog.send(:push_state) }
+      payload = st1c_studio_payload(scripts)
+      ok('ŠT-1c B2: deep-link sa spotrebuje PRÁVE RAZ (ďalší refresh sekciu nepreberá)',
+         payload && payload['open_section'].nil?)
+
+      # --- 2) prepinac „samostatne" = 1 zmena, 1 krok Spat (oba smery) -------
+      st1c_bud_op(model, 'samostatne v ponuke', 'cp_group',
+                  { 'source_key' => cp_key, 'group' => 'samostatne' },
+                  ->(m) { bs.cp_overrides(m) }, 'B2')
+      st1c_bud_op(model, 'späť do zostavy', 'cp_group',
+                  { 'source_key' => cp_key, 'group' => 'zostava' },
+                  ->(m) { bs.cp_overrides(m) }, 'B2')
+      ok('ŠT-1c B2: zaradenie v ponuke NEMENÍ geometriu',
+         model.entities.length == before_ents)
+
+      # --- 3) D-15 modal: prijaty vs odmietnuty zapis -------------------------
+      # Modal posiela TO ISTE, co posielal inline draft — server o nom nevie
+      # a vediet nemá; jeho jediná úloha voci modalu je povedať ÁNO/NIE.
+      st1c_bud_op(model, 'položka z D-15 modalu', 'custom_add',
+                  { 'attrs' => { 'popis' => 'SU modal položka', 'pocet' => '1', 'cena' => '12' } },
+                  ->(m) { bs.custom_items(m) }, 'B2')
+
+      # DVOJITE ODOSLANIE (review #2). Zamok zije v KLIENTOVI (`nx_modal.js`),
+      # takze tu sa dokazuje to DRUHE: keby zlyhal, server by druhu mutaciu
+      # PRIJAL — polozka by v rozpocte bola dvakrat a Spat by ju vracalo na dva
+      # kroky. Simuluje sa presne to, co by fronta klienta poslala: ten isty
+      # zapis dvakrat za sebou, druhy uz s CERSTVOU generaciou.
+      custom_before = bs.custom_items(model).length
+      e::StudioDialog.do_budget(
+        st1c_bud_payload('custom_add',
+                         'attrs' => { 'popis' => 'SU dvojklik', 'pocet' => '1', 'cena' => '9' }).to_json
+      )
+      e::StudioDialog.do_budget(
+        st1c_bud_payload('custom_add',
+                         'attrs' => { 'popis' => 'SU dvojklik', 'pocet' => '1', 'cena' => '9' }).to_json
+      )
+      dup = bs.custom_items(model).count { |i| i.to_h['popis'].to_s == 'SU dvojklik' }
+      ok("ŠT-1c B2 (review #2): server dva ROVNAKE zápisy nezlučuje (#{dup}) — " \
+         'zámok proti dvojitému odoslaniu MUSÍ držať klient (nx_modal `OPEN.busy`)',
+         dup == 2)
+      Sketchup.undo
+      Sketchup.undo
+      ok('ŠT-1c B2: oba zápisy sa vrátili — každý bol vlastný krok Späť',
+         bs.custom_items(model).length == custom_before)
+
+      scripts = st1c_capture(e::StudioDialog) do
+        e::StudioDialog.do_budget(
+          st1c_bud_payload('custom_add',
+                           'attrs' => { 'popis' => 'SU modal chybná', 'cena' => 'nie je číslo' }).to_json
+        )
+      end
+      ok('ŠT-1c B2 (audit #10): odmietnutý zápis nič nezapísal',
+         bs.custom_items(model).empty?)
+      ok('ŠT-1c B2 (audit #10): server pošle `budgetResult(custom_add, false)`',
+         scripts.any? { |s| s.include?('NX.budgetResult("custom_add", false)') })
+      # DOKAZ, ze modal ostane otvoreny AJ S HODNOTAMI: server neposiela NIC,
+      # co by ho zavrelo — jedina zatvaracia cesta je `ok == true` v budget.js
+      # (`if (ok) budCloseDraft();`), a ta sa teraz nespustila. Keby server
+      # niekedy zacal posielat vlastne zatvorenie, pouzivatel by po odmietnutom
+      # zapise nasiel prazdny formular a svoje cislo by pisal znova.
+      ok('ŠT-1c B2 (audit #10): a NIČ, čo by modal zavrelo (hodnoty ostanú na mieste)',
+         scripts.none? { |s| s.include?('NXModal.close') || s.include?('budCloseDraft') } &&
+         scripts.none? { |s| s.include?('NX.budgetResult("custom_add", true)') })
+
+      # --- 4) export cenovej ponuky: gen guard PRED dialogom -----------------
+      st1c_without_savepanel do |calls|
+        scripts = st1c_capture(e::StudioDialog) do
+          e::StudioDialog.do_cp_xlsx({ 'gen' => st1c_gen - 99 }.to_json)
+        end
+        ok('ŠT-1c B2: cenová ponuka zo STAREJ generácie NEOTVORÍ dialóg na uloženie',
+           calls[0].zero?)
+        ok('ŠT-1c B2: a odmietnutie povie prečo',
+           scripts.any? { |s| s.include?('Dáta okna sa medzitým zmenili') })
+        before_calls = calls[0]
+        scripts = st1c_capture(e::StudioDialog) do
+          e::StudioDialog.do_cp_xlsx({ 'gen' => st1c_gen }.to_json)
+        end
+        ok('ŠT-1c B2: s ČERSTVOU generáciou dobehne až k výberu súboru (guard nie je natvrdo zavretý)',
+           calls[0] == before_calls + 1)
+        ok('ŠT-1c B2: zrušený export nič nezapísal a povedal to',
+           scripts.any? { |s| s.include?('Export zrušený') })
+      end
+
+      # --- 5) prepnutie sekcie je KLIENTSKA vec ------------------------------
+      # Server o aktivnej sekcii nevie (`push_state` ju neposiela — okrem
+      # jednorazoveho deep-linku vyssie), takze prepnutie Rozpocet <-> Ponuka
+      # NEMOZE zhodit rozpisany zapis ani frontu klienta. Dokaz: dva pushe za
+      # sebou nesu ten isty payload sekcie a generacia stupa normalne.
+      gen_before = st1c_gen
+      e::StudioDialog.send(:push_state)
+      ok("ŠT-1c B2: bežný push generáciu zdvihol (#{gen_before} -> #{st1c_gen})",
+         st1c_gen > gen_before)
+      ok('ŠT-1c B2: po celom bloku ponuky je stav zákazky čistý',
+         bs.custom_items(model).empty? && bs.cp_overrides(model).to_h.empty?)
+      ok('ŠT-1c B2: a model má stále presne toľko entít ako pred ponukou',
+         model.entities.length == before_ents)
+    ensure
+      dlg = e::StudioDialog.instance_variable_get(:@dialog)
+      begin
+        dlg.close if dlg && dlg.respond_to?(:close)
+      rescue StandardError
+        nil
+      end
+    end
+  rescue StandardError => ex
+    log_line("FAIL: ŠT-1c B2 ponuka vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   def st1c_studio_payload(scripts)
     s = scripts.find { |x| x.start_with?('NX.setStudio(') }
     return nil if s.nil?
@@ -5755,6 +5905,11 @@ module NoxunSuRunner
     # Jedina sekcia, ktora ZAPISUJE do modelu. Kazdy jej zapis sa tu aj vracia
     # (jeden krok Spat), takze zaverecne „1x Spat" nizsie stale vracia SKRINKU.
     st1c_budget(model, inst)
+
+    # --- 6) ŠT-1c PR B2: sekcia CENOVA PONUKA (Š14–Š15) ---------------------
+    # Vlastny vypocet nema (je to projekcia rozpoctu), ale MA vlastne zapisy
+    # (`cp_group`) a vlastny export — a oboje musi drzat ten isty undo kontrakt.
+    st1c_offer(model)
 
     # Poslednou modelovou operaciou je vlozenie skrinky — keby bol klik na
     # riadok kovania, export, prepinac ALEBO nevrateny zapis rozpoctu vlastnou

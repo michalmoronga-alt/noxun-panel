@@ -34,7 +34,7 @@
 
   // ZRKADLO `StudioDialog::SECTIONS` — autoritou whitelistu je RUBY, tento
   // zoznam len zabrani, aby z okna vyletela hodnota, ktora sekciu nepomenuva.
-  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget'];
+  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer'];
 
   // ŠT-1b (Š10): 3-stavove nastavenie kontroly hran je ZDIELANY komponent —
   // TEN ISTY markup kresli rail Inspectora (rohovy trojuholnik pri ABS ikone)
@@ -73,13 +73,9 @@
       // ŠT-1c PR B1 (Š12): Rozpočet je od tejto dávky SEKCIA — JEDINÁ, ktorá
       // zapisuje do modelu (1 zmena = 1 krok Späť).
       { id: 'budget', ic: 'euro',            t: 'Rozpočet' },
-      // Cenová ponuka ešte NEMÁ vlastnú sekciu (príde v ŠT-1c PR B2) — jej
-      // náhľad je zbaliteľnou časťou Rozpočtu. Položka preto nie je mŕtve
-      // tlačidlo ani premostenie do iného okna: prepne na Rozpočet a otvorí
-      // ten náhľad (`goto`), tooltip to priznáva.
-      { id: 'offer',  ic: 'file-text',       t: 'Cenová ponuka',
-        goto: { sec: 'budget', open: 'cp' },
-        hint: 'náhľad je zatiaľ vnútri Rozpočtu — vlastná sekcia príde v ďalšej dávke' },
+      // ŠT-1c PR B2 (Š14–Š15): Cenová ponuka je od tejto dávky VLASTNÁ sekcia
+      // — zákaznícka projekcia toho istého rozpočtu (suma sa nikdy nelíši).
+      { id: 'offer',  ic: 'file-text',       t: 'Cenová ponuka' },
       { id: 'cut',    ic: 'scissors',        t: 'Nárezový plán',
         disabled: 'fáza 2 — nárezový plán zatiaľ neexistuje' }
     ] },
@@ -102,7 +98,9 @@
     ctrl: { t: 'Kontrola', hint: 'semafor filtruje zoznam · klik na nález ho označí v modeli · prepínače hrán a kresby' },
     buy: { t: 'Nákup kovania', hint: 'nákupný zoznam zo setov · nekompletné položky jantárovo · CSV pre objednávku' },
     budget: { t: 'Rozpočet',
-              hint: 'jediná sekcia, ktorá mení model — každá zmena = 1 krok Späť · sumy počíta server' }
+              hint: 'jediná sekcia, ktorá mení model — každá zmena = 1 krok Späť · sumy počíta server' },
+    offer: { t: 'Cenová ponuka',
+             hint: 'zákaznícky pohľad na ten istý rozpočet · rečou zákazníka, bez interných kódov' }
   };
 
   // ---------------------------------------------------------------- helpers
@@ -720,6 +718,13 @@
       else box.innerHTML = '';
       return;
     }
+    // ŠT-1c PR B2 (Š14): lišta sekcie Cenová ponuka (XLSX ponuky + Obnoviť) —
+    // ten istý súbor, lebo ponuka je projekciou toho istého payloadu.
+    if (studioSec === 'offer'){
+      if (typeof budRenderOfferTools === 'function') budRenderOfferTools();
+      else box.innerHTML = '';
+      return;
+    }
     // Š10: lišta sekcie Kontrola nesie OBA prepínače (a nič iné — exporty
     // kontrola nemá). Jeden riadok, žiadny nový blok: vertikálny priestor
     // je vzácny a nastavenie hrán je overlay pod tlačidlom.
@@ -813,6 +818,11 @@
     if (studioSec === 'budget'){
       if (typeof budRenderBody === 'function') budRenderBody();
       else box.innerHTML = '<div class="muted">Rozpočet sa nenačítal (js/budget.js).</div>';
+      return;
+    }
+    if (studioSec === 'offer'){
+      if (typeof budRenderOfferBody === 'function') budRenderOfferBody();
+      else box.innerHTML = '<div class="muted">Cenová ponuka sa nenačítala (js/budget.js).</div>';
       return;
     }
     if (studioSec === 'ctrl') box.innerHTML = ctrlSection();
@@ -1054,7 +1064,8 @@
   // Jeden push prináša VŠETKY sekcie, takže sa prepočíta všetko — status ale
   // hovorí o tom, na čo sa používateľ práve pozerá (inak by po kliku v Nákupe
   // hlásil kusovník a vyzeralo by to ako zlé tlačidlo).
-  var REFRESH_STATUS = { buy: 'Prepočítavam nákupný zoznam…', budget: 'Prepočítavam rozpočet…' };
+  var REFRESH_STATUS = { buy: 'Prepočítavam nákupný zoznam…', budget: 'Prepočítavam rozpočet…',
+                         offer: 'Prepočítavam cenovú ponuku…' };
 
   function requestRefresh(){
     if (!window.sketchup || !sketchup.refresh_bom) return;
@@ -1154,6 +1165,13 @@
     renderTools();
   }
 
+  // ŠT-1c PR B2 (kontrakt #9): žije práve teraz D-15 modal? Komponent
+  // `js/nx_modal.js` sa načítava PRED studio.js, ale v Node testoch nemusí
+  // existovať vôbec — preto obozretne.
+  function nxModalOpen(){
+    return typeof window !== 'undefined' && !!window.NXModal && NXModal.isOpen() === true;
+  }
+
   function navItem(id){
     var found = null;
     NAV.forEach(function(g){
@@ -1167,14 +1185,9 @@
     if (!it) return;
     if (it.disabled){ NX.setStatus(it.t + ' — ' + it.disabled, true); return; }
     if (it.bridge){ bridgeTo(id); return; }
-    // ŠT-1c PR B1: položka, ktorej obsah je (zatiaľ) ČASŤOU inej sekcie —
-    // prepne na ňu a otvorí tú časť. Žiadny server, žiadne premostenie.
-    if (it.goto){
-      studioGoSection(it.goto.sec);
-      if (it.goto.open && typeof budGoto === 'function') budGoto(it.goto.open);
-      NX.setStatus(it.t + ' — ' + it.hint, false);
-      return;
-    }
+    // ŠT-1c PR B2: klientske `goto` (položka navigácie, ktorej obsah bol ČASŤOU
+    // inej sekcie) ZANIKLO spolu s náhľadom cenovej ponuky vnútri Rozpočtu —
+    // `offer` je od tejto dávky plnohodnotná sekcia.
     studioGoSection(id);
   }
 
@@ -1305,7 +1318,11 @@
       // Š10 (audit #6): nastavenie zatvára klik mimo AJ Escape — vzor
       // warnpanelu a railu Inspectora. Fokus patrí späť na rohové tlačidlo,
       // inak by po Escape skončil v prázdne.
-      if (ev.key === 'Escape' && ecMenuOpen){
+      // ŠT-1c PR B2 (kontrakt #9): keď je otvorený D-15 modal, Escape patrí
+      // JEMU. Oba listenery visia na `document`, takže `stopPropagation`
+      // medzi nimi NEFUNGUJE — podmienka musí byť tu (rovnaká lekcia ako pri
+      // zatváraní `ecMenu` klikom mimo: rieši sa v JEDNOM listeneri).
+      if (ev.key === 'Escape' && ecMenuOpen && !nxModalOpen()){
         edgeMenuClose();
         var more = el('ecMore');
         if (more){ try { more.focus(); } catch (e) {} }
@@ -1331,6 +1348,7 @@
       activeCols: activeCols, cellValue: cellValue, grainLabel: grainLabel,
       absCompact: absCompact, absFull: absFull, rgbHex: rgbHex,
       navBridgeIds: navBridgeIds, anchorFilter: anchorFilter, navItem: navItem,
+      nxModalOpen: nxModalOpen,
       // ŠT-1b sekcia Kontrola (Š8–Š11)
       semaforHtml: semaforHtml, ctrlRows: ctrlRows, ctrlRowHtml: ctrlRowHtml,
       ctrlActionsHtml: ctrlActionsHtml, navBadgeHtml: navBadgeHtml,

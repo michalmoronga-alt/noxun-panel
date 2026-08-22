@@ -168,7 +168,10 @@ function payload(over){
   eq(B.budCpBand(null).ok, true, 'null payload nezhodi render');
 })();
 
-// --- E-b2: render nahladu CP (data VYHRADNE z payloadu, ziadny vypocet) -------
+// --- ŠT-1c PR B2: render sekcie CENOVA PONUKA (data VYHRADNE z payloadu) -----
+// Bola to `budCpHtml` (zbalitelny nahlad vnutri Rozpoctu); od PR B2 je to telo
+// VLASTNEJ sekcie `offer`. Plne pokrytie ma tests/js/test_st1c_ponuka.js — tu
+// ostava len to, co bolo v tejto sade uz predtym (escapovanie, zlucene, riadky).
 (function(){
   const cp = {
     total: 18800, budget_total: 18800, diff: 0, consistent: true, threshold: 150,
@@ -184,18 +187,19 @@ function payload(over){
       { source_key: 'custom:U1', label: 'LED <b>pás</b>', amount: 85, state: 'zostava', overridden: true }
     ]
   };
-  const h = B.budCpHtml({ cp_preview: cp, vat_divisor: 1.23 }, 1.23);
-  ok(h.indexOf('Cenová ponuka — náhľad') > -1, 'sekcia ma nadpis');
+  const h = B.budOfferHtml({ cp_preview: cp, vat_divisor: 1.23 }, 1.23);
+  ok(h.indexOf('Suma ponuky') > -1, 'sekcia ma velky sucet');
   ok(h.indexOf('CP = Rozpočet') > -1, 'kontrolny pas');
   ok(h.indexOf('Nábytková zostava') > -1 && h.indexOf('VÝSUVY Quadro') > -1, 'riadky CP');
-  ok(h.indexOf('data-bud="cp_group" data-source="hw:317642" data-group="zostava"') > -1,
-     'samostatny riadok ponuka zlucenie do zostavy');
-  ok(h.indexOf('data-group="samostatne"') > -1, 'zlucena polozka sa da vytiahnut');
+  ok(h.indexOf('data-bud="cp_sep" data-source="hw:317642"') > -1,
+     'samostatny riadok nesie prepinac „samostatne"');
+  ok(h.indexOf('data-source="custom:U1"') > -1, 'zlucena polozka sa da vytiahnut');
   ok(h.indexOf('Zlúčené v zostave (1)') > -1, 'zoznam zlucenych je zbaleny a spocitany');
   ok(h.indexOf('LED &lt;b&gt;pás&lt;/b&gt;') > -1, 'nazvy polozek su escapovane');
   ok(h.indexOf('<b>pás</b>') === -1, 'ziadne surove HTML z dat');
-  eq(B.budCpHtml({}, 1.23), '', 'bez cp_preview sa sekcia nevykresli');
-  eq(B.budCpHtml(null, 1.23), '', 'null payload nezhodi render');
+  ok(B.budOfferHtml({}, 1.23).indexOf('muted') > -1,
+     'bez cp_preview sekcia POVIE, ze niet z coho robit ponuku (nie prazdno)');
+  ok(B.budOfferHtml(null, 1.23).indexOf('muted') > -1, 'null payload nezhodi render');
 })();
 
 // --- XSS: data do innerHTML idu VZDY escapovane -------------------------------
@@ -370,8 +374,12 @@ function payload(over){
   ok(tools.indexOf('data-bud="refresh"') > -1, '„Prepočítať ceny" je v liste');
   ok(tools.indexOf('id="refreshBtn"') > -1,
      'a „Obnoviť" — prestavba skrinky z Inspectora sem sama nedorazi');
-  ok(tools.indexOf('data-bud="xlsx"') > -1 && tools.indexOf('data-bud="cp"') > -1,
-     'oba exporty su v liste (kontrakt §3 — akcie sekcie patria do listy)');
+  ok(tools.indexOf('data-bud="xlsx"') > -1,
+     'export XLSX rozpoctu je v liste (kontrakt §3 — akcie sekcie patria do listy)');
+  // ŠT-1c PR B2: „Cenová ponuka (zákazník)" je export DOKUMENTU, ktory vyraba
+  // sekcia Ponuka — v liste Rozpoctu uz nema co robit (a lista tym schudla
+  // o najdlhsi popisok; review PR #198 #4 hlasil lamanie pri sirke 1060 px).
+  eq(tools.indexOf('data-bud="cp"'), -1, 'export cenovej ponuky sa presunul do sekcie Ponuka');
   ok(tools.indexOf('data-bud="settings"') > -1, '⚙ ostava ako kontextova skratka (#20)');
   ok(tools.indexOf('<span class="spacer">') > -1, 'exporty su az za medzerou (vpravo)');
 
@@ -386,7 +394,7 @@ function payload(over){
   // Fokus prezije prekreslenie aj v LISTE — KAZDE tlacidlo nesie `data-bkey`
   // (lista sa prekresluje aj pocas toho, ako ju pouzivatel ovlada: prepnutie
   // DPH, dobehnutie prepoctu cien; bez kluca by fokus spadol na <body>).
-  ['vat:1', 'vat:0', 'mode:nizky', 'pr', 'refresh', 'xlsx', 'cp', 'settings'].forEach(function(k){
+  ['vat:1', 'vat:0', 'mode:nizky', 'pr', 'refresh', 'xlsx', 'settings'].forEach(function(k){
     ok(tools.indexOf('data-bkey="' + k + '"') > -1, 'tlacidlo listy `' + k + '` nesie kluc fokusu');
   });
   eq(tools.split('<button').length - 1, tools.split('data-bkey=').length - 1,

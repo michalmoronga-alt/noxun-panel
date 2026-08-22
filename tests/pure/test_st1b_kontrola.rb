@@ -54,8 +54,8 @@ NxTest.test('ŠT-1b: sekcia `ctrl` je v RUBY whiteliste a JS je jeho ZRKADLO') d
   shell = S1B_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
   # ŠT-1c PR A pribudla sekcia `buy` (Nakup kovania), PR B1 sekcia `budget`
   # (Rozpocet) — zoznam musi sediet vo VSETKYCH TROCH suboroch.
-  NxTest.assert_equal(%w[bom ctrl buy budget], rb,
-                      'v Studiu ziju sekcie Kusovník, Kontrola, Nákup kovania a Rozpočet')
+  NxTest.assert_equal(%w[bom ctrl buy budget offer], rb,
+                      'v Studiu ziju sekcie Kusovník, Kontrola, Nákup kovania, Rozpočet a Cenová ponuka')
   NxTest.assert_equal(rb, js, 'zoznam v studio.js sa nesmie rozist s Ruby autoritou')
   NxTest.assert_equal(rb, shell, 'ani zrkadlo v paneli (shell.js)')
 end
