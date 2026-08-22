@@ -1374,6 +1374,10 @@
         mdSgPick(parseInt(r.getAttribute('data-i'), 10) || 0);
       });
       // fixed pozicia sa pri scrolle rozide s inputom — radsej zavriet.
+      // CAPTURE (`true`) je tu POVINNE: `scroll` z vnutorneho kontajnera
+      // NEBUBLA, takze bez neho by scrollovanie VNUTRI karty D-15 modalu
+      // (`.mbody`) nechalo dropdown visiet na starom mieste — nad cudzim
+      // riadkom, do ktoreho by klik zapisal nespravnu hodnotu.
       window.addEventListener('scroll', mdSgClose, true);
     }
     return b;
@@ -1426,14 +1430,27 @@
       inp.setAttribute('data-sg', '1');
       inp.setAttribute('autocomplete', 'off');
       inp.addEventListener('focus', function(){ mdSg.input = inp; mdSg.getList = inp._sgList; mdSg.onPick = inp._sgPick; mdSgUpdate(); });
-      inp.addEventListener('input', function(){ if (mdSg.input === inp) mdSgUpdate(); });
+      // ŠT-2c #9: pisanie do pola nasepkavac VZDY obnovi — aj ked ho pouzivatel
+      // predtym zavrel Escapom. Bez toho by sa dropdown vratil az po opusteni
+      // a novom kliknuti do pola, cize by Escape pole „vypol" na celu editaciu.
+      inp.addEventListener('input', function(){
+        mdSg.input = inp; mdSg.getList = inp._sgList; mdSg.onPick = inp._sgPick;
+        mdSgUpdate();
+      });
       inp.addEventListener('blur', function(){ setTimeout(function(){ if (mdSg.input === inp) mdSgClose(); }, 120); });
       inp.addEventListener('keydown', function(ev){
         if (mdSg.input !== inp || !mdSg.items.length) return;
         if (ev.key === 'ArrowDown'){ ev.preventDefault(); mdSg.active = (mdSg.active + 1) % mdSg.items.length; mdSgRender(); }
         else if (ev.key === 'ArrowUp'){ ev.preventDefault(); mdSg.active = (mdSg.active - 1 + mdSg.items.length) % mdSg.items.length; mdSgRender(); }
         else if (ev.key === 'Enter'){ ev.preventDefault(); mdSgPick(mdSg.active >= 0 ? mdSg.active : 0); }
-        else if (ev.key === 'Escape'){ mdSgClose(); }
+        // ŠT-2 audit #13: Escape patri NAJPRV nasepkavacu. Listener visi na
+        // INPUTE, kdezto D-15 modal pocuva na `document` — bez zastavenia by
+        // jedno stlacenie zavrelo dropdown AJ cely formular a pouzivatel by
+        // prisiel o rozpisany dekor. `stopPropagation` staci a je SPRAVNY:
+        // dokumentovy poslucháč je na INOM uzle, takze bublanie sa zastavi
+        // uz tu (`stopImmediatePropagation` by zastavil len dalsich
+        // poslucháčov toho isteho inputu — modal by sa aj tak zavrel).
+        else if (ev.key === 'Escape'){ ev.stopPropagation(); mdSgClose(); }
       });
     }
     inp._sgList = getList;
@@ -2302,6 +2319,11 @@
       mdDetailHtml: mdDetailHtml,
       // M-A3c — editor variantov (D-67 suggest, D-68 gramatika + pruhy vynimiek)
       mdNormText: mdNormText, mdSuggestFilter: mdSuggestFilter,
+      // ŠT-2c (audit #10/#11): nasepkavac ma DVA kontrakty voci D-15 modalu —
+      // Escape patri jemu (nie modalu) a scroll VNUTRI karty ho zatvara.
+      // Oba sa daju overit iba behom, preto sa `mdSgBind`/`mdSgClose`
+      // exportuju (tests/js/test_st2c_modal.js).
+      mdSgBind: mdSgBind, mdSgClose: mdSgClose,
       mdSplitExtraTokens: mdSplitExtraTokens, mdExtraKey: mdExtraKey,
       mdExtraFmtChips: mdExtraFmtChips,
       // M-A3e — rucna vazba (D-71): klientske zrkadlo serverovej validacie

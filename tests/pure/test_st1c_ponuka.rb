@@ -220,7 +220,10 @@ end
 NxTest.test('ŠT-1c B2 (review #2): zamok odoslania zije v KOMPONENTE, nie v rozpocte') do
   NxTest.assert(S1C2_MODAL_JS.include?('if (OPEN.busy) return;'),
                 'druhy submit sa zahadzuje priamo v kostre')
-  NxTest.assert(S1C2_MODAL_JS.include?('function setBusy(flag)'),
+  # ŠT-2c: `setBusy` dostal druhy, NEPOVINNY argument (`{clear:true}` = server
+  # potvrdil, pamat rozpisanych hodnot prec) — jednoargumentove volania
+  # rozpoctu ostavaju platne.
+  NxTest.assert(S1C2_MODAL_JS.include?('function setBusy(flag, opts)'),
                 'a odomknutie ma verejnu cestu (`setBusy`)')
   NxTest.assert(S1C2_MODAL_JS.include?("btn.setAttribute('disabled', 'disabled')"),
                 'beziaci zapis je VIDNO — potvrdzovacie tlacidlo zosedne')
@@ -235,14 +238,21 @@ NxTest.test('ŠT-1c B2 (review #2): zamok odoslania zije v KOMPONENTE, nie v roz
 end
 
 NxTest.test('ŠT-1c B2 (review #3+#4): rozpisane hodnoty prezijú zatvorenie modalu') do
-  NxTest.assert(S1C2_BUDGET_JS.include?("var BUD_DRAFT_VALUES = { custom: null, appliance: null };"),
-                'pamat je PER DRUH pridavacky (polia vlastnej polozky a spotrebica su ine)')
-  NxTest.assert(S1C2_BUDGET_JS.include?('function budDraftMemory'),
-                'a cita sa cez jedno miesto')
-  NxTest.assert(S1C2_BUDGET_JS.include?('fields: budDraftFields(kind, budDraftMemory(kind))'),
-                'otvorenie modalu hodnoty PREDVYPLNI (Escape uz nie je ticha strata)')
+  # ŠT-2c #12: SKLAD pamate sa presunul do zdielanej kostry (`NXModal`,
+  # kluc `memoryKey`) — rozpocet si necháva len tenky pristupovy bod.
+  # Spravanie je NEZMENENE a overuje ho tests/js/test_st1c_ponuka.js.
+  NxTest.refute(S1C2_BUDGET_JS.include?('BUD_DRAFT_VALUES'),
+                'rozpocet uz vlastny sklad rozpisanych hodnot NEMA (je v kostre)')
+  NxTest.assert(S1C2_BUDGET_JS.include?('memoryKey: budDraftKey(kind)') &&
+                S1C2_BUDGET_JS.include?("function budDraftKey(kind){ return 'bud:' + kind; }"),
+                'pamat je PER DRUH pridavacky a nesie prefix okna (`bud:custom`, `bud:appliance`)')
+  NxTest.assert(S1C2_BUDGET_JS[/function budDraftMemory.*?\n  \}/m].to_s
+                  .include?('NXModal.memory(budDraftKey(kind))'),
+                'a cita sa cez JEDNO miesto — tenky pristupovy bod nad kostrou')
+  NxTest.assert(S1C2_BUDGET_JS.include?('fields: budDraftFields(kind, null)'),
+                'polia sa podavaju VYCHODISKOVE — predvyplnenie robi kostra (a prizna ho pásom)')
   NxTest.assert(S1C2_BUDGET_JS[/function budCloseDraft.*?\n  \}/m].to_s
-                  .include?('BUD_DRAFT_VALUES[BUD_DRAFT] = null'),
+                  .include?('NXModal.clearMemory(budDraftKey(BUD_DRAFT))'),
                 'zmaze ich az USPESNY zapis — vtedy riadok v rozpocte naozaj je')
 end
 
