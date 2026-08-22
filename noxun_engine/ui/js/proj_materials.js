@@ -1611,6 +1611,13 @@
   }
 
   function mdSaveSheet(){
+    // Formular je od zaniku add_sheet VYHRADNE edit — create cesta bola z UI
+    // nedosiahnutelna a payload bez group_id by nad skupinovym katalogom padol
+    // na serverovom write guarde. Novy zaznam = batch (+ variant / Pridat rucne).
+    if (!(mdEditing && mdEditing.id)){
+      MD.setStatus('Nový materiál sa pridáva cez „+ variant" alebo „Pridať materiál ručne" — tento formulár upravuje existujúci záznam.', true);
+      return;
+    }
     var payload = {
       material_id: mdEditing && mdEditing.id ? mdEditing.id : null,
       catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA,
@@ -1660,11 +1667,15 @@
     // (server inak merge-om stary par podrzi a "bez formatu" sa neda dosiahnut).
     else if (mdEditing && mdEditing.id) payload.clear_sheet_size = true;
     mdLastAttempt = { kind: 'sheet', payload: payload };
-    var fn = mdEditing && mdEditing.id ? 'update_sheet' : 'add_sheet';
-    if (window.sketchup && sketchup[fn]) sketchup[fn](JSON.stringify(payload));
+    if (window.sketchup && sketchup.update_sheet) sketchup.update_sheet(JSON.stringify(payload));
     mdCloseForms();
   }
   function mdSaveEdge(){
+    // Edit-only — zrkadlo mdSaveSheet (add_edge zanikol s add_sheet).
+    if (!(mdEditing && mdEditing.id)){
+      MD.setStatus('Nová ABS páska sa pridáva cez „+ variant" (dávka dekoru) — tento formulár upravuje existujúci záznam.', true);
+      return;
+    }
     var payload = {
       abs_id: mdEditing && mdEditing.id ? mdEditing.id : null,
       catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA,
@@ -1681,8 +1692,7 @@
     var due = mdDemosUrlLocalError(payload.demos_url);
     if (due){ MD.setStatus(due, true); return; }
     mdLastAttempt = { kind: 'edge', payload: payload };
-    var fn = mdEditing && mdEditing.id ? 'update_edge' : 'add_edge';
-    if (window.sketchup && sketchup[fn]) sketchup[fn](JSON.stringify(payload));
+    if (window.sketchup && sketchup.update_edge) sketchup.update_edge(JSON.stringify(payload));
     mdCloseForms();
   }
   // D-42 (audit FIX 8): server pri duplicitnom kode odmietne 1. ulozenie a zavola

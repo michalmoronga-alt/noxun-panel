@@ -40,8 +40,8 @@ module Noxun
       # `cancel_demos_on_leave`), takze premostenie do okna zaniklo spolu s nim.
       SECTION_ACTIONS = %w[
         set_project_material
-        add_sheet update_sheet delete_sheet create_duplak
-        add_edge update_edge delete_edge
+        update_sheet delete_sheet create_duplak
+        update_edge delete_edge
         add_decor_batch rename_decor set_decor_name set_decor_manufacturer set_decor_color
         patch_sheet patch_edge
         delete_preflight restore_pre_schema2
@@ -68,12 +68,10 @@ module Noxun
         def run_section_action(key, payload)
           case key
           when 'set_project_material'    then handle_set_project_material(payload)
-          when 'add_sheet'               then handle_save_sheet(payload, create: true)
-          when 'update_sheet'            then handle_save_sheet(payload, create: false)
+          when 'update_sheet'            then handle_save_sheet(payload)
           when 'delete_sheet'            then handle_delete_sheet(payload)
           when 'create_duplak'           then handle_create_duplak(payload)
-          when 'add_edge'                then handle_save_edge(payload, create: true)
-          when 'update_edge'             then handle_save_edge(payload, create: false)
+          when 'update_edge'             then handle_save_edge(payload)
           when 'delete_edge'             then handle_delete_edge(payload)
           when 'add_decor_batch'         then handle_add_decor_batch(payload)
           when 'rename_decor'            then handle_rename_decor(payload)
@@ -1196,7 +1194,12 @@ module Noxun
         # Zapis je single-writer kompromis (atomicky rename + .bak; bez locku medzi
         # SketchUp procesmi — vedome akceptovane, katalog edituje jeden pouzivatel).
 
-        def handle_save_sheet(payload, create:)
+        # Formularovy save je od zaniku create cesty VYHRADNE EDIT existujuceho
+        # zaznamu. Create (akcia add_sheet) ZANIKOL: z UI bol nedosiahnutelny
+        # (formular sa otvara len s id; novy dekor/variant = batch v3) a payload
+        # formulara nenesie group_id, takze nad SCHEMA >= 2 by zapis skoncil na
+        # write_unlocked completeness guarde len s generickym "Ulozenie zlyhalo".
+        def handle_save_sheet(payload)
           data = JSON.parse(payload.to_s)
           return unless catalog_write_ok?(data)
           # 2B-1 (audit F4): duplak vznika VYHRADNE cez create_duplak (vlastne
@@ -1215,109 +1218,83 @@ module Noxun
           end
           th = data['thickness'].to_s.tr(',', '.').to_f
 
-          if create
-            # D-41 (audit BLOCKER 1 + FIX 16): near-match dekor = preklep, dup
-            # variant identity (dekor+typ+hrubka) = duplicitny zaznam. Oboje stop.
-            if (near = Materials.decor_conflict(data['decor']))
-              return set_status("Dekor sa líši od existujúceho „#{near}“ len zápisom — použi presný tvar.", true)
-            end
-            # 2B-2: novy variant typu s formatom v identite (PD + ZASTENA)
-            # format VYZADUJE — bez neho by identita bola trvalo neuplna
-            # (first-fill je vynimka pre LEGACY zaznamy, nie novy zapis).
-            if Materials.format_in_identity?(data['type']) && Materials.size_key(data['sheet_size']).nil? &&
-               Materials.catalog_schema >= Materials::SCHEMA_GROUPS
-              return set_status('Tento typ potrebuje formát platne (je súčasťou identity variantu).', true)
-            end
-            # 2A-1: struktura (a pri PD/zastene format + rub) su v SCHEMA 2
-            # sucastou identity variantu — v SCHEMA 1 ich kluc ignoruje.
-            if (dup = Materials.find_sheet_variant(data['decor'], data['type'], th, data['structure'],
-                                                   data['sheet_size'], group_id: data['group_id'],
-                                                   manufacturer: data['manufacturer'],
-                                                   back_decor: data['back_decor'],
-                                                   back_structure: data['back_structure']))
-              return set_status("Variant už v katalógu je (#{dup['material_id']}).", true)
-            end
-            id = Materials.generate_sheet_id(data['decor'], data['type'], th,
-                                             structure: data['structure'], sheet_size: data['sheet_size'],
-                                             back_decor: data['back_decor'])
-          else
-            id = data['material_id'].to_s
-            existing = Materials.sheet(id)
-            return set_status('Materiál sa nenašiel — obnov Štúdio.', true) unless existing
-            # GH #103 P2: UNI formularovy edit nesmie obist inline patch guard —
-            # nakupne polia (kod/dodavatel/cena) sa pri UNI odmietaju aj tu.
-            if (uni_err = Materials.uni_edit_error(existing, data))
-              return set_status(uni_err, true)
-            end
-            # 2B-1: duplak nema editovatelne polia — vsetko derivuje zo zdroja.
-            if (dup_err = Materials.duplak_edit_error(existing))
-              return set_status(dup_err, true)
-            end
-            # Hrubka existujuceho variantu je NEMENNA (hrubka definuje variant;
-            # zatvorene projekty sa neskontroluju — zmena by im rozbila rebuild).
-            if (existing['thickness'].to_f - th).abs > 0.01
-              return set_status('Hrúbka definuje variant — pre inú hrúbku pridaj nový materiál.', true)
-            end
-            # D-41 (audit FIX 12): dekor je identita skupiny a riadi vazbu na ABS —
-            # pri edite je NEMENNY; premenovanie celej skupiny je samostatna akcia.
-            if data.key?('decor') && data['decor'].to_s.strip != existing['decor'].to_s
-              return set_status('Dekor je identita skupiny — premenuj celú skupinu (Premenovať dekor), nie jeden záznam.', true)
-            end
-            # D-42 (audit BLOCKER 3): typ je sucast variant identity — pri edite je
-            # NEMENNY (zrkadlo hrubky/dekoru). Iny typ = novy variant. Duplicitna
-            # kontrola uz NESTACI — zmena typu sa vobec nepripusti.
-            if data.key?('type') && data['type'].to_s.strip.upcase != existing['type'].to_s.strip.upcase
-              return set_status('Typ dosky definuje variant — pre iný typ pridaj nový materiál.', true)
-            end
-            # D-42 (audit FIX 7): vyrobca je vlastnost DEKORU (skupiny) — jednotlivy
-            # variant ho nemeni; zmena celej skupiny je samostatna akcia.
-            if data.key?('manufacturer') && data['manufacturer'].to_s.strip != existing['manufacturer'].to_s.strip
-              return set_status('Výrobca je vlastnosť dekoru — zmeň ho pre celú skupinu, nie jeden záznam.', true)
-            end
-            # 2A-1 (standard 7.1): v SCHEMA 2 je identita variantu pri edite
-            # NEMENNA aj v novych poliach — struktura, kotva skupiny a pri type
-            # PD aj FORMAT platne. Iny format = novy variant (F800 PD 38 4100x600
-            # a 4100x920 su dve rozne dosky), nie prepis existujuceho.
-            if (err = Materials.identity_edit_error(data, existing))
-              return set_status(err, true)
-            end
-            # 2B-2 (F11): first-fill MENI identitu (prazdne -> hodnota) — nova
-            # identita nesmie narazit na existujuci variant (dup check, ktory
-            # pri bezych editoch nebezi, lebo identita je nemenna).
-            candidate = existing.merge(data)
-            if Materials.catalog_schema >= Materials::SCHEMA_GROUPS &&
-               (dup = Materials.find_sheet_variant(candidate['decor'], candidate['type'], th,
-                                                   candidate['structure'], candidate['sheet_size'],
-                                                   group_id: candidate['group_id'],
-                                                   manufacturer: candidate['manufacturer'],
-                                                   back_decor: candidate['back_decor'],
-                                                   back_structure: candidate['back_structure'])) &&
-               dup['material_id'] != id
-              return set_status("Doplnená identita koliduje s existujúcim variantom (#{dup['material_id']}).", true)
-            end
+          id = data['material_id'].to_s
+          existing = Materials.sheet(id)
+          unless existing
+            return set_status('Materiál sa nenašiel — nový záznam sa pridáva cez „+ variant" alebo „Pridať materiál ručne".', true)
+          end
+          # GH #103 P2: UNI formularovy edit nesmie obist inline patch guard —
+          # nakupne polia (kod/dodavatel/cena) sa pri UNI odmietaju aj tu.
+          if (uni_err = Materials.uni_edit_error(existing, data))
+            return set_status(uni_err, true)
+          end
+          # 2B-1: duplak nema editovatelne polia — vsetko derivuje zo zdroja.
+          if (dup_err = Materials.duplak_edit_error(existing))
+            return set_status(dup_err, true)
+          end
+          # Hrubka existujuceho variantu je NEMENNA (hrubka definuje variant;
+          # zatvorene projekty sa neskontroluju — zmena by im rozbila rebuild).
+          if (existing['thickness'].to_f - th).abs > 0.01
+            return set_status('Hrúbka definuje variant — pre inú hrúbku pridaj nový materiál.', true)
+          end
+          # D-41 (audit FIX 12): dekor je identita skupiny a riadi vazbu na ABS —
+          # pri edite je NEMENNY; premenovanie celej skupiny je samostatna akcia.
+          if data.key?('decor') && data['decor'].to_s.strip != existing['decor'].to_s
+            return set_status('Dekor je identita skupiny — premenuj celú skupinu (Premenovať dekor), nie jeden záznam.', true)
+          end
+          # D-42 (audit BLOCKER 3): typ je sucast variant identity — pri edite je
+          # NEMENNY (zrkadlo hrubky/dekoru). Iny typ = novy variant. Duplicitna
+          # kontrola uz NESTACI — zmena typu sa vobec nepripusti.
+          if data.key?('type') && data['type'].to_s.strip.upcase != existing['type'].to_s.strip.upcase
+            return set_status('Typ dosky definuje variant — pre iný typ pridaj nový materiál.', true)
+          end
+          # D-42 (audit FIX 7): vyrobca je vlastnost DEKORU (skupiny) — jednotlivy
+          # variant ho nemeni; zmena celej skupiny je samostatna akcia.
+          if data.key?('manufacturer') && data['manufacturer'].to_s.strip != existing['manufacturer'].to_s.strip
+            return set_status('Výrobca je vlastnosť dekoru — zmeň ho pre celú skupinu, nie jeden záznam.', true)
+          end
+          # 2A-1 (standard 7.1): v SCHEMA 2 je identita variantu pri edite
+          # NEMENNA aj v novych poliach — struktura, kotva skupiny a pri type
+          # PD aj FORMAT platne. Iny format = novy variant (F800 PD 38 4100x600
+          # a 4100x920 su dve rozne dosky), nie prepis existujuceho.
+          if (err = Materials.identity_edit_error(data, existing))
+            return set_status(err, true)
+          end
+          # 2B-2 (F11): first-fill MENI identitu (prazdne -> hodnota) — nova
+          # identita nesmie narazit na existujuci variant (dup check, ktory
+          # pri bezych editoch nebezi, lebo identita je nemenna).
+          candidate = existing.merge(data)
+          if Materials.catalog_schema >= Materials::SCHEMA_GROUPS &&
+             (dup = Materials.find_sheet_variant(candidate['decor'], candidate['type'], th,
+                                                 candidate['structure'], candidate['sheet_size'],
+                                                 group_id: candidate['group_id'],
+                                                 manufacturer: candidate['manufacturer'],
+                                                 back_decor: candidate['back_decor'],
+                                                 back_structure: candidate['back_structure'])) &&
+             dup['material_id'] != id
+            return set_status("Doplnená identita koliduje s existujúcim variantom (#{dup['material_id']}).", true)
           end
 
           # D-42 (audit FIX 8): duplicitny kod v ramci dosiek a rovnakeho dodavatela
           # sa nezapise potichu — vyzaduje potvrdenie (allow_duplicate_code).
-          conflict = maybe_code_conflict(data, 'sheet', create ? nil : id)
+          conflict = maybe_code_conflict(data, 'sheet', id)
           return conflict if conflict
 
-          # D-19 (Codex F5): pri edite sa payload MERGUJE s existujucim zaznamom —
-          # klient, ktory nove pole (napr. sheet_size) neposle, ho nesmie ticho
-          # resetnut na default cez normalize_sheet.
-          base = create ? {} : existing
-          rec = base.merge(data).merge('material_id' => id, 'thickness' => th)
+          # D-19 (Codex F5): payload sa MERGUJE s existujucim zaznamom — klient,
+          # ktory nove pole (napr. sheet_size) neposle, ho nesmie ticho resetnut
+          # na default cez normalize_sheet.
+          rec = existing.merge(data).merge('material_id' => id, 'thickness' => th)
           # D-44 (GH P2): edit s prazdnymi polami formatu = vedome VYMAZANIE —
           # bez explicitneho flagu by merge stary sheet_size ticho podrzal a stav
           # "bez overeneho formatu" by sa pri existujucom zazname nedal dosiahnut.
-          rec.delete('sheet_size') if !create && data['clear_sheet_size']
+          rec.delete('sheet_size') if data['clear_sheet_size']
           rec.delete('clear_sheet_size')
           # M-A3e D-71: rucna vazba na dodavatela — cerstvy sanitize (zly host/
           # tvar = save ODMIETNUTY), prazdne pole = vedome zmazanie vazby; zmena
           # alebo zmazanie rusi price_checked_at (cena uz nie je overena).
           if data.key?('demos_url')
             st, val, invalidate = Materials.manual_demos_url(data['demos_url'],
-                                                             create ? nil : existing['demos_url'])
+                                                             existing['demos_url'])
             return set_status(val, true) if st == :invalid
             val ? rec['demos_url'] = val : rec.delete('demos_url')
             rec.delete('price_checked_at') if invalidate
@@ -1325,16 +1302,16 @@ module Noxun
           # D-98 (audit B2): zmena ALEBO vymazanie dekoru u dodavatela rusi datum
           # overenia ceny rovnako ako zmena adresy — cena, kod aj URL ostavaju,
           # ale uz nie su overene voci tomu, co dodavatel vedie pod novym cislom.
-          if !create && data.key?('supplier_decor') &&
+          if data.key?('supplier_decor') &&
              data['supplier_decor'].to_s.strip != existing['supplier_decor'].to_s.strip
             rec.delete('price_checked_at')
           end
           # 2B-1: edit zdroja drzi zdielane polia duplakov v synchre (format/
-          # grain/farba) v JEDNOM atomickom zapise; create nema co synchrovat.
-          saved = create ? Materials.upsert_sheet(rec) : Materials.upsert_sheet_with_duplak_sync(rec)
+          # grain/farba) v JEDNOM atomickom zapise.
+          saved = Materials.upsert_sheet_with_duplak_sync(rec)
           return set_status('Uloženie katalógu zlyhalo.', true) unless saved
           after_catalog_change
-          set_status(create ? "Materiál pridaný (#{id})." : "Materiál #{id} upravený.")
+          set_status("Materiál #{id} upravený.")
         end
 
         # D-42 (audit FIX 8): ak payload nesie kod a existuje kolizia (rovnaky kod
@@ -1395,72 +1372,58 @@ module Noxun
           end
         end
 
-        def handle_save_edge(payload, create:)
+        # EDIT existujucej pasky — create (akcia add_edge) zanikol spolu s
+        # add_sheet (rovnaky dovod: z UI nedosiahnutelny, payload bez group_id
+        # by nad SCHEMA >= 2 padol na write guarde; nove pasky = batch v3).
+        def handle_save_edge(payload)
           data = JSON.parse(payload.to_s)
           return unless catalog_write_ok?(data)
           ok, err = Materials.validate_edge_attrs(data)
           return set_status(err, true) unless ok
           th = data['thickness'].to_s.tr(',', '.').to_f
-          if create
-            # GH #103 P2: ABS do UNI skupiny sa netvori ani formularom.
-            if Materials.uni_group?(data['group_id'], data['decor'])
-              return set_status('UNI je pracovný materiál bez ABS pások — pásky dostane až reálny dekor.', true)
-            end
-            # D-41: near-match dekor + dup variant (dekor+sirka+hrubka) guardy.
-            if (near = Materials.decor_conflict(data['decor']))
-              return set_status("Dekor sa líši od existujúceho „#{near}“ len zápisom — použi presný tvar.", true)
-            end
-            # 2A-1: struktura je v SCHEMA 2 sucastou identity pasky (5981 ma DVE
-            # rozne 23/1 pasky — MG vs UM/AF); v SCHEMA 1 ju kluc ignoruje.
-            if (dup = Materials.find_edge_variant(data['decor'], data['width'], th,
-                                                  data['structure'], group_id: data['group_id']))
-              return set_status("ABS variant už v katalógu je (#{dup['abs_id']}).", true)
-            end
-            id = Materials.generate_edge_id(data['decor'], th, data['width'], structure: data['structure'])
-            rec = data.merge('abs_id' => id, 'thickness' => th)
+          id = data['abs_id'].to_s
+          existing = Materials.edge(id)
+          unless existing
+            return set_status('ABS páska sa nenašla — nová páska sa pridáva cez „+ variant" (dávka dekoru).', true)
+          end
+          # Hrubka ABS je pri edite NEMENNA (zrkadlo sheet guardu, Codex GH #39):
+          # ID nesie hrubku (_10/_20) a dielce ju drzia len cez ID — zmena by ich
+          # potichu prepla na inu hranu a ID by klamalo.
+          if (existing['thickness'].to_f - th).abs > 0.01
+            return set_status('Hrúbka definuje ABS variant — pre inú hrúbku pridaj novú pásku.', true)
+          end
+          # D-41 (audit FIX 12): dekor nemenny pri edite (identita skupiny).
+          if data.key?('decor') && data['decor'].to_s.strip != existing['decor'].to_s
+            return set_status('Dekor je identita skupiny — premenuj celú skupinu (Premenovať dekor), nie jeden záznam.', true)
+          end
+          # 2A-1: struktura/skupina su v SCHEMA 2 identita — pri edite nemenne.
+          if (err = Materials.identity_edit_error(data, existing))
+            return set_status(err, true)
+          end
+          # D-41 (audit FIX 12+13): sirka je sucast variant identity — pri edite
+          # NEMENNA a payload ju nesmie ani ticho zmazat (stary CEF klient bez
+          # pola width): MERGE s existujucim zaznamom (vzor sheet D-19) + sirka
+          # sa VZDY berie z existujuceho zaznamu.
+          rec = existing.merge(data).merge('abs_id' => id, 'thickness' => th)
+          if existing.key?('width')
+            rec['width'] = existing['width']
           else
-            id = data['abs_id'].to_s
-            existing = Materials.edge(id)
-            return set_status('ABS páska sa nenašla — obnov Štúdio.', true) unless existing
-            # Hrubka ABS je pri edite NEMENNA (zrkadlo sheet guardu, Codex GH #39):
-            # ID nesie hrubku (_10/_20) a dielce ju drzia len cez ID — zmena by ich
-            # potichu prepla na inu hranu a ID by klamalo.
-            if (existing['thickness'].to_f - th).abs > 0.01
-              return set_status('Hrúbka definuje ABS variant — pre inú hrúbku pridaj novú pásku.', true)
-            end
-            # D-41 (audit FIX 12): dekor nemenny pri edite (identita skupiny).
-            if data.key?('decor') && data['decor'].to_s.strip != existing['decor'].to_s
-              return set_status('Dekor je identita skupiny — premenuj celú skupinu (Premenovať dekor), nie jeden záznam.', true)
-            end
-            # 2A-1: struktura/skupina su v SCHEMA 2 identita — pri edite nemenne.
-            if (err = Materials.identity_edit_error(data, existing))
-              return set_status(err, true)
-            end
-            # D-41 (audit FIX 12+13): sirka je sucast variant identity — pri edite
-            # NEMENNA a payload ju nesmie ani ticho zmazat (stary CEF klient bez
-            # pola width): MERGE s existujucim zaznamom (vzor sheet D-19) + sirka
-            # sa VZDY berie z existujuceho zaznamu.
-            rec = existing.merge(data).merge('abs_id' => id, 'thickness' => th)
-            if existing.key?('width')
-              rec['width'] = existing['width']
-            else
-              rec.delete('width')
-            end
+            rec.delete('width')
           end
           # D-42 (audit FIX 8): duplicitny kod ABS (rovnaky dodavatel) -> potvrdenie.
-          conflict = maybe_code_conflict(data, 'edge', create ? nil : id)
+          conflict = maybe_code_conflict(data, 'edge', id)
           return conflict if conflict
           # M-A3e D-71: rucna vazba pasky — rovnaky kontrakt ako doska.
           if data.key?('demos_url')
             st, val, invalidate = Materials.manual_demos_url(data['demos_url'],
-                                                             create ? nil : existing['demos_url'])
+                                                             existing['demos_url'])
             return set_status(val, true) if st == :invalid
             val ? rec['demos_url'] = val : rec.delete('demos_url')
             rec.delete('price_checked_at') if invalidate
           end
           return set_status('Uloženie katalógu zlyhalo.', true) unless Materials.upsert_edge(rec)
           after_catalog_change
-          set_status(create ? "ABS páska pridaná (#{id})." : "ABS #{id} upravená.")
+          set_status("ABS #{id} upravená.")
         end
 
         def handle_delete_edge(payload)
