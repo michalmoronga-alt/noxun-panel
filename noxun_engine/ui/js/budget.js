@@ -331,11 +331,7 @@
       '<button type="button" class="' + (BUD_VAT ? '' : 'on') + '" data-bud="vat" data-v="0"' +
       ' data-bkey="vat:0" title="Len ZOBRAZENIE bez DPH — rozpočet sa počíta v brutto">bez DPH</button>' +
       '</div>' + budModeSegHtml(b) +
-      '<button type="button" class="ghostbtn" data-bud="refresh" data-bkey="pr"' +
-      (running ? ' disabled' : '') +
-      ' title="Stiahne aktuálne ceny všetkých položiek zákazky viazaných na Demos' +
-      ' (medzi položkami je 3 s pauza — pravidlo Demosu)">' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Prepočítať ceny</button>' +
+      budPriceBtnHtml(b, running) +
       // Prestavba skrinky z Inspectora sem sama nedorazi — bez „Obnoviť" by sa
       // dal exportovať rozpočet zo starých rozmerov (rovnaký dôvod ako v lište
       // Kusovníka a Nákupu; handler je zdieľaný `#refreshBtn` v studio.js).
@@ -354,6 +350,26 @@
       ' title="Sadzby, režimy a prahy — globálne nastavenie, platí pre každú zákazku">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Nastavenia</button>';
     return h;
+  }
+
+  // SMOKE 22.8. (schválené): „Prepočítať ceny" je JANTÁROVÉ, keď zákazka nesie
+  // staré ceny — inak neutrálne. Je to ČISTÁ PROJEKCIA payloadu (`b.stale`,
+  // ten istý zdroj, z ktorého sa kreslí jantárový chip pri súčte aj zoznam
+  // starých riadkov): ŽIADEN nový výpočet a nič sa nikam neposiela.
+  // Dôvod: rozpočet vyzeral rovnako s čerstvými aj s polročnými cenami, takže
+  // sa dalo objednávať zo starých čísel bez toho, aby to čokoľvek povedalo.
+  // ZELENÁ tu vedome NIE JE — významové farby ostávajú semaforu Kontroly.
+  // Počas behu prepočtu tlačidlo zošedne (disabled) a jantár sa nekreslí:
+  // dve signalizácie naraz by si protirečili.
+  function budPriceBtnHtml(b, running){
+    var stale = budStaleLabel(b && b.stale);
+    var warn = !!stale && !running;
+    return '<button type="button" class="ghostbtn' + (warn ? ' bstalebtn' : '') + '"' +
+      ' data-bud="refresh" data-bkey="pr"' + (running ? ' disabled' : '') +
+      ' title="' + (stale ? bEsc(stale) + ' — ' : '') +
+      'Stiahne aktuálne ceny všetkých položiek zákazky viazaných na Demos' +
+      ' (medzi položkami je 3 s pauza — pravidlo Demosu)">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Prepočítať ceny</button>';
   }
 
   function budChipHtml(c, b, d){
@@ -1617,7 +1633,7 @@
       budSectionCount: budSectionCount, budEsc: bEsc,
       // ŠT-1c PR B1: rozrezany render — LISTA sekcie vs TELO (Š12 „1:1" je
       // 1:1 OBSAH, nie kod). Obe funkcie su ciste (HTML z payloadu).
-      budToolsHtml: budToolsHtml, budSummaryHtml: budSummaryHtml,
+      budToolsHtml: budToolsHtml, budPriceBtnHtml: budPriceBtnHtml, budSummaryHtml: budSummaryHtml,
       budModeSegHtml: budModeSegHtml, budChipHtml: budChipHtml,
       budDraftAttrs: budDraftAttrs, budDraftMissing: budDraftMissing,
       // ŠT-1c PR B2: sekcia CENOVA PONUKA (Š14–Š15) + D-15 modal pridavaciek

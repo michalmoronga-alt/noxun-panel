@@ -167,7 +167,13 @@ NxTest.test('ABS rail: okno zatvara klik mimo aj Escape (vzor warnpanelu)') do
   studio_js = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'studio.js'),
                         encoding: 'UTF-8')
   NxTest.assert(studio_js.include?("!t.closest('.echk')"), 'klik mimo spustaca zatvara okno')
-  NxTest.assert(studio_js =~ /ev\.key === 'Escape' && ecMenuOpen/, 'Escape zatvara okno aj v Studiu')
+  # SMOKE 22.8.: Studio ma od tejto davky DVE rohove nastavenia (kontrola hran
+  # + VEPO export), takze Escape vetva zacina JEDNOU brankou a az za nou riesi
+  # jednotlive okna. Kontrola je preto na obe casti.
+  NxTest.assert(studio_js.include?("if (ev.key !== 'Escape' || nxModalOpen()) return;"),
+                'Escape vetva Studia zacina brankou (modal ma prednost)')
+  NxTest.assert(studio_js =~ /if \(ev\.key !== 'Escape'.*?if \(ecMenuOpen\)\{\s*\n\s*edgeMenuClose\(\);/m,
+                'Escape zatvara okno aj v Studiu')
 end
 
 # --- 4) serverove guardy panela ----------------------------------------------

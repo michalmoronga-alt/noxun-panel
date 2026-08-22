@@ -272,6 +272,32 @@ module Noxun
           Engine.log_error(e, 'StudioDialog.close_edge_menu')
         end
 
+        # --- rucny prepocet okna („Obnoviť" v liste KAZDEJ sekcie) -----------
+        # SMOKE 22.8.: klient si pred volanim nastavi hlasku „Prepočítavam…"
+        # a NIKTO ju nezhodil — po dobehnutom prepocte v okne visela dalej
+        # a vyzeralo to, ze sa okno zaseklo. Hlasku preto zhadzuje SERVER: on
+        # jediny vie, ci prepocet dobehol. Plati pre VSETKY sekcie (jeden push
+        # nesie kusovnik, kontrolu, nakup, rozpocet aj ponuku naraz).
+        #
+        # Rescue tu je ZAMERNE aj napriek spolocnemu rescue v `cb`: hlaska
+        # „Prepočítavam…" nesmie ostat visiet ANI pri vynimke, a chybu treba mat
+        # v logu s menom TEJTO cesty.
+        #
+        # Review #6: „Prepočítané." sa posiela LEN ked payload naozaj ODOSIEL.
+        # `js` hltá výnimky `execute_script` (a mlčí, ked okno nezije), takze
+        # `push_state` mohol skoncit BEZ toho, aby klient cokolvek dostal —
+        # a server by mu napriek tomu potvrdil hotovo. Preto `js` (a s nim
+        # `push_state`) vracia true/false a tato cesta sa podla toho rozhoduje:
+        # server nesmie potvrdit, co neoveril.
+        def do_refresh_bom
+          return unless push_state
+
+          set_status('Prepočítané.')
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.do_refresh_bom')
+          set_status("Prepočet zlyhal: #{e.message}", true)
+        end
+
         # --- lista Kusovnika: nazov projektu + merge 18+36 (audit #1) --------
         # Obe hodnoty su nastavenim POCITACA (%APPDATA%), nie zakazky: ziadny
         # zapis do modelu a ziadny krok Spat.
@@ -463,7 +489,9 @@ module Noxun
         def register_callbacks(dlg)
           Engine.register_dialog_fit(dlg, 'studio') # D-77 + UI-01 tema
           cb(dlg, 'ready')        { |_p| push_state }
-          cb(dlg, 'refresh_bom')  { |_p| push_state }
+          # SMOKE 22.8.: NIE `push_state` priamo — po prepocte musi prist aj
+          # hlaska, inak v okne navzdy visi klientske „Prepočítavam…".
+          cb(dlg, 'refresh_bom')  { |_p| do_refresh_bom }
           # Š3: klik na riadok / oko = oznac v modeli, ceruzka = oznac + zdvihni
           # Inspector (`focus_inspector`). Obe cesty su ten isty handler.
           cb(dlg, 'nx_select')    { |p| handle_select(p) }
@@ -678,6 +706,9 @@ module Noxun
             open_section: consume_pending_section,
             anchor: consume_pending_anchor
           }
+          # Review #6: vysledok `js` sa PREPOSIELA — `do_refresh_bom` podla neho
+          # rozhoduje, ci smie napisat „Prepočítané.". Ostatni volajuci ho
+          # ignoruju (push do zavreteho okna nie je chyba).
           js("NX.setStudio(#{data.to_json})")
         end
 
@@ -713,12 +744,18 @@ module Noxun
           js("NX.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})")
         end
 
+        # Review #6: vracia, CI script naozaj odosiel klientovi. Mrtve okno aj
+        # vynimka `execute_script` su tu tiche (a maju byt — push do zavreteho
+        # okna nie je chyba), ale volajuci, ktory pouzivatelovi nieco POTVRDZUJE,
+        # to musi vediet rozlisit.
         def js(script)
-          return unless @dialog && @dialog.visible?
+          return false unless @dialog && @dialog.visible?
 
           @dialog.execute_script(script)
+          true
         rescue StandardError => e
           Engine.log_error(e, 'StudioDialog.js')
+          false
         end
       end
     end

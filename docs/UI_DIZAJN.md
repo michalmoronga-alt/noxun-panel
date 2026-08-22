@@ -997,6 +997,21 @@ hrán). Pravidlá vzoru:
 - **Okno je overlay pri tlačidle** (`position: absolute`, `left` za railom), nie
   modal v strede obrazovky a nikdy nie nový riadok layoutu. Zatvára ho **klik
   mimo a Escape**, fokus sa vracia na roh (vzor warnpanelu).
+- **Zdieľa sa ZÓNA a SPRÁVANIE, obsah len keď je to TO ISTÉ nastavenie.**
+  Vzor má dve vrstvy a miešať ich je chyba. **Vždy spoločné:** klikacia zóna
+  `.cornerzone` (pravý dolný kvadrant, rozmery aj `z-index` zo zdieľaného
+  `panel.css`), znamienko ako `::after` pseudo-prvok a **správanie okna** —
+  otvára klik na roh, zatvára **klik mimo obalu aj Escape**, fokus sa vracia
+  na roh, modal má pred menu prednosť. **Spoločný obsah len vtedy, keď je za
+  oboma rohmi TO ISTÉ nastavenie** (vtedy platí odrážka nižšie o jednom
+  komponente). Iné nastavenie = **vlastný malý markup**; natiahnuť naň
+  zdieľaný komponent by z neho spravilo `if`-y pre každé volajúce miesto.
+  **Tri dnešné výskyty:** (1) **ABS kontrola v raile Inspectora** a (2)
+  **„Zvýrazniť hrany" v lište sekcie Kontrola** — to isté 3-stavové
+  nastavenie, teda JEDEN markup (`ui/js/edge_menu.js`), jeden serverový stav;
+  (3) **„VEPO export" v lište Kusovníka** (SMOKE 22.8.) — vlastné okno
+  s jediným prepínačom „18 + 36 spolu", zdieľaná je zóna a správanie, nie
+  obsah. Každé okno nesie hlavičku `.mgrp` s tým, čo nastavuje.
 - **Ak to isté nastavenie žije aj inde, je to JEDEN komponent, nie kópia.**
   Markup kreslí zdieľaný modul (`ui/js/edge_menu.js`), štýly sú v zdieľanom
   `panel.css` (nescopnuté pod `.nx-inspector` — satelit o raile nevie) a stav
@@ -1052,9 +1067,19 @@ v `HtmlDialog.new` sú **vonkajšie** — obsah + rámik okna (Windows ≈ 16 px
   sa presunie sem. `aria-disabled` (vzor D-78) dostane len to, čo **nikde
   neexistuje** — v ŠT-1a jediný Nárezový plán („fáza 2"). Rozdiel je vecný:
   premostenie vedie tam, kam ukazuje; disabled hovorí, prečo zatiaľ nikam.
-- **Neexistujúci export je viditeľné `aria-disabled` tlačidlo s dôvodom,
-  nie skryté tlačidlo.** Michal porovnáva panel 1:1 s mockupom — chýbajúci
-  ovládač vyzerá ako chyba implementácie, priznaný ovládač ako plán.
+- **Neexistujúci export je viditeľné `aria-disabled` tlačidlo s dôvodom —
+  ale LEN keď ten dôvod má dátum.** Michal porovnáva panel 1:1 s mockupom,
+  takže chýbajúci ovládač vyzerá ako chyba implementácie a priznaný ovládač
+  ako plán — to platí ďalej. **Pravidlo sa revíziou 22.8.2026 (smoke test,
+  verdikt Michal) ZÚŽILO:** priznaný `aria-disabled` platí na sľub, ktorý
+  príde **najbližšou dávkou**; ovládač, ktorý visí neaktívne **celý blok**,
+  sa **skryje** a vráti sa až s funkciou. Sivé tlačidlo prestane po pár dňoch
+  čítať ako plán a začne čítať ako rozbitý ovládač — a používateľ, ktorý naň
+  klikne trikrát, prestane veriť aj tým aktívnym. Prvý prípad: XLSX/CSV
+  kusovníka viseli neaktívne celý blok ŠT-1 a v SMOKE dávke z lišty odišli
+  (kontrakt `SYSTEM/zdroje/ui20/UI20_KONTRAKT.md`, **Š5 revízia 22.8.**).
+  `aria-disabled` teda **nie je** náhrada za chýbajúcu funkciu, ale za
+  **funkciu, ktorá je na ceste**.
 - **Výstup sa nikdy netvári ako vstup.** Údaj, ktorý sa edituje inde, je
   v ostatných oknách TEXT (názov projektu: input v Štúdiu → Kusovník,
   text v lište Kusovníka v Štúdiu).

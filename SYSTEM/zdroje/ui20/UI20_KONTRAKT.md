@@ -443,6 +443,16 @@ poradie presunov satelitov schválené (nižšie) · deep-linky `NX.studioOpen` 
 - **Š4** dnešné taby **Materiály a ABS okna Výroba = POHĽADY sekcie Kusovník** (segment
   Dielce · Platne · ABS v lište), nie samostatné sekcie navigácie.
 - **Š5** exporty v lište sekcie: VEPO (primárna) · XLSX · CSV; „Etikety" sa **nezobrazuje** (po V1).
+  **Revízia 22.8.2026 (smoke test, verdikt Michal):** XLSX a CSV kusovníka **tlačidlá sa NEZOBRAZUJÚ,
+  kým export neexistuje** — vrátia sa až s reálnym exportom (vlastná dávka). Priznaný `aria-disabled`
+  placeholder (D-78) platí na sľub, ktorý príde hneď; tieto dva viseli neaktívne celý blok ŠT-1
+  a v okne pôsobili ako rozbité tlačidlá. **VEPO export dostal ROHOVÉ NASTAVENIE** (vzor „flyout roh"
+  §5.11 UI_DIZAJN): klik na telo exportuje, klik na pravý dolný roh otvorí malé okno s checkboxom
+  **„18 + 36 spolu"** — ten sa tým z lišty odsťahoval k exportu, ku ktorému patrí (klikacia zóna
+  `.cornerzone` je zdieľaná s railom a lištou Kontroly, obsah okna je vlastný). **Poradie lišty**
+  (schválené 22.8.): `[Dielce · Platne · ABS] · [Projekt] · [hľadanie] · ⟶ · [VEPO export ▸] ·
+  [Stĺpce] · [Obnoviť]` — vľavo „čo pozerám", vpravo „čo s tým robím". **Pole „Projekt" má viditeľný
+  štítok a vlastný rám**: je to jediný vstup v lište a pomenúva zákazku pre všetky exporty.
 - **Š6** živé hľadanie (bez diakritiky, hľadá dielec/skrinku/poznámku, prázdne skupiny sa skryjú,
   súčtový riadok ukáže počítadlo filtra).
 
@@ -468,6 +478,10 @@ je odložený do bloku KOVANIE.
   „nezapočítané"); **prepínače s DPH / bez DPH + režim €·€€·€€€ + „Prepočítať ceny" sa
   presúvajú do lišty sekcie**; jantárový chip pri súčte = ten istý nález ako v Kontrole
   (klik prejde tam). Jediná sekcia, ktorá mení model — 1 zmena = 1 krok Späť.
+  **Revízia 22.8.2026 (smoke test):** „Prepočítať ceny" je **jantárové, keď zákazka nesie staré ceny**
+  (tooltip povie „N cien starších ako X dní"), inak neutrálne — čistá projekcia už existujúceho poľa
+  `stale` v payloade, žiaden nový výpočet. **Zelená sa nepoužíva**: významové farby ostávajú semaforu
+  Kontroly.
 - **Š13** nulové riadky ostávajú viditeľné (kontrolný zoznam), riadok bez ceny je jantárový
   s „—"; **nový vlastný riadok aj spotrebič idú cez D-15 modal — dnešný inline draft zaniká.**
 

@@ -150,9 +150,23 @@ ok(body.indexOf('class="bdraft"') === -1,
 ok(body.indexOf('class="bfoot"') === -1, 'patka s exportmi zanikla — exporty su v liste');
 ok(body.indexOf('data-bud="vat"') === -1, 'a prepinac DPH v tele NIE JE (zdvojenie by klamalo)');
 
+// SMOKE 22.8.: payload nesie JEDNU staru cenu — „Prepočítať ceny" to musí
+// priznať jantárom aj tooltipom. Je to projekcia UZ PRITOMNYCH dat (`stale`),
+// nie nový výpočet: to isté číslo kreslí chip aj zoznam pod ním.
+ok(tools.indexOf('bstalebtn') > -1, 'stara cena zafarbi „Prepočítať ceny" na jantar');
+ok(tools.indexOf('1 cena staršia ako 30 dní') > -1, 'a tooltip povie kolko a ako starych');
+
 // Prepnutie na inu sekciu telo prepise — a nie je to pad.
 sandbox.studioGoSection('bom');
 ok(els.secbody.innerHTML.indexOf('class="btotal"') === -1,
    'prepnutie sekcie telo rozpoctu odstrani');
+
+// SMOKE 1A–1D: a lista Kusovnika je v novom tvare aj v REALNOM okne (nielen
+// v ciste funkcii) — jeden scope, jeden render.
+const bomTools = els.sectools.innerHTML;
+ok(bomTools.indexOf('id="vepoMore"') > -1, 'VEPO export ma rohove nastavenie');
+ok(bomTools.indexOf('id="mergeChk"') > -1, 'a checkbox „18+36 spolu" zije v nom');
+ok(bomTools.indexOf('aria-disabled') === -1, 'neaktivne XLSX/CSV placeholdery su prec');
+ok(bomTools.indexOf('class="prjlbl"') > -1, 'pole Projekt ma viditelny stitok');
 
 console.log('test_st1c_rozpocet.js: ' + n + ' OK');

@@ -31,6 +31,9 @@
   var EDGE = null;
   var GRAIN = null;
   var ecMenuOpen = false;
+  // SMOKE 1A: to iste plati pre rohove nastavenie VEPO exportu — otvorenost je
+  // CISTO klientska (nikam sa neuklada), hodnota checkboxu je zo servera.
+  var vepoMenuOpen = false;
 
   // ZRKADLO `StudioDialog::SECTIONS` — autoritou whitelistu je RUBY, tento
   // zoznam len zabrani, aby z okna vyletela hodnota, ktora sekciu nepomenuva.
@@ -609,6 +612,10 @@
       if (mdl) mdl.textContent = ST ? ('zákazka: ' + ST.model_title + ' · v' + ST.version) : '…';
       // Deep-link sekcie sa posiela PRAVE RAZ; kotva s nou.
       if (ST && ST.open_section && STUDIO_SECTIONS.indexOf(ST.open_section) >= 0){
+        // Review #8: deep-link je PRESKOK do inej sekcie — otvorené rohové menu
+        // patrilo tej, z ktorej sme odišli. Bez vynulovania by sa `vepoMenuOpen`
+        // vrátilo pri najbližšom návrate do Kusovníka „samo otvorené".
+        closeSectionMenus();
         studioSec = ST.open_section;
         // Kotva predvyplna hladanie KUSOVNIKA (N13 posiela ID skrinky). Pri inej
         // sekcii by potichu prestavila filter, ktory pouzivatel ani nevidí —
@@ -637,6 +644,10 @@
         inp.value = v.project || '';
       }
       if (inp) inp.placeholder = v.default_project || 'projekt';
+      // SMOKE 1A: checkbox uz nie je v liste, ale v rohovom nastaveni VEPO.
+      // V DOM je VZDY (okno sa len skryva triedou), takze echo prepise jeho
+      // stav aj vtedy, ked ho ma pouzivatel prave otvoreny — a otvorene okno
+      // sa nikdy nerozide s tym, co plati pre export.
       var chk = el('mergeChk');
       if (chk) chk.checked = v.merge_18_36 !== false;
     },
@@ -731,7 +742,15 @@
     if (studioSec === 'ctrl'){
       box.innerHTML = edgeCheckBarHtml(EDGE, ecMenuOpen, GRAIN) +
         '<span class="spacer"></span>' +
-        '<span class="sechint">Zoradené podľa závažnosti — poradie určuje server.</span>';
+        '<span class="sechint">Zoradené podľa závažnosti — poradie určuje server.</span>' +
+        // Review #7: Kontrola bola JEDINA sekcia BEZ „Obnoviť" — a pritom je to
+        // sekcia, kvoli ktorej sa clovek do okna vracia po oprave v Inspectore.
+        // Prestavba skrinky sem sama nedorazi, takze zoznam nalezov mohol
+        // ukazovat uz opravenu chybu (rovnaky dovod ako v Kusovniku a Nakupe).
+        // Zdielany `#refreshBtn` — jeden handler, jedna serverova cesta.
+        '<button type="button" class="ghostbtn" id="refreshBtn"' +
+        ' title="Prepočítať kontrolu z aktuálneho modelu">' +
+        ico('refresh-cw') + ' Obnoviť</button>';
       return;
     }
     // ŠT-1c PR A (Š7): lišta sekcie Nákup kovania. Export patrí SEKCII
@@ -753,52 +772,105 @@
         '<span class="sechint">Klik na riadok generiky označí vlastníka v modeli.</span>';
       return;
     }
+    box.innerHTML = bomToolsHtml(ST.vepo || {},
+                                 { view: bomView, q: bomQ,
+                                   cols: colMenuOpen, vepo: vepoMenuOpen });
+  }
+
+  // LISTA sekcie KUSOVNIK — cista funkcia (testuje ju tests/js/test_st1a_studio.js).
+  //
+  // SMOKE 22.8. (1B/1C/1D), poradie schvalene Michalom: vlavo „co pozeram"
+  // (pohlady · Projekt · hladanie), vpravo „co s tym robim" (VEPO · Stlpce ·
+  // Obnoviť). Konkretne zmeny oproti ŠT-1a:
+  //   * XLSX a CSV placeholdery su PREC. D-78 („neexistujuci export je
+  //     viditelny a priznany") plati na sluby, ktore prichadzaju hned —
+  //     tieto dva viseli neaktivne cez cely blok ŠT-1 a v smoke teste
+  //     pusobili ako rozbite tlacidla. Vratia sa s REALNYM exportom.
+  //   * checkbox „18+36 spolu" sa z listy odstahoval do ROHOVEHO NASTAVENIA
+  //     tlacidla VEPO (patri k exportu, nie k pohladu na kusovnik).
+  //   * „Projekt" dostal stitok a ram — je to VSTUP, ktory pomenuva zakazku
+  //     pre vsetky exporty, takze nesmie vyzerat ako popisok medzi tlacidlami.
+  //
+  // Stav lišty chodí ARGUMENTOM (`st` = pohľad · hľadanie · otvorené menu),
+  // nie z modulových premenných: rovnaký vzor ako zdieľaný `edge_menu.js`
+  // (`menuHtml(st, open, opts)`) — funkcia je tým testovateľná bez DOM.
+  function bomToolsHtml(vepo, st){
+    var v = vepo || {};
+    var s = st || {};
     var vw = function(id, t, tip){
-      return '<button type="button" class="bomvw' + (bomView === id ? ' on' : '') +
+      return '<button type="button" class="bomvw' + (s.view === id ? ' on' : '') +
              '" data-view="' + id + '" title="' + esc(tip) + '">' + esc(t) + '</button>';
     };
-    var v = ST.vepo || {};
     var h = '<div class="bomviews">' +
       vw('parts', 'Dielce', 'Výrobné dielce po materiáloch') +
       vw('sheets', 'Platne', 'Súpis platní — odvodený z kusovníka') +
       vw('abs', 'ABS', 'Súpis ABS pások — odvodený z kusovníka') + '</div>' +
+      '<label class="prjbox" title="Názov zákazky — pomenuje priečinok a súbory VEPO exportu,' +
+      ' titulok rozpočtu aj cenovej ponuky. Platí pre všetky exporty.">' +
+      '<span class="prjlbl">Projekt</span><input id="prjInput" type="text" value="' + esc(v.project || '') +
+      '" placeholder="' + esc(v.default_project || 'projekt') + '"></label>' +
+      '<div class="searchbox">' + ico('search') +
+      '<input id="bomSearch" placeholder="Hľadať dielec / skrinku…" value="' + esc(s.q || '') + '"></div>' +
+      '<span class="spacer"></span>' +
+      vepoBtnHtml(v, s.vepo === true);
+    if (s.view === 'parts'){
+      // Review #1: menu stlpcov visi na SVOJOM tlacidle, nie na lište. Kym bolo
+      // kotvene na `.sectools` (`right: 12px`), po presune tlacidla doprava sa
+      // od neho vizualne odtrhlo — vzor je ten isty obal ako pri VEPO rohu.
+      h += '<span class="colfly"><button type="button" class="ghostbtn" id="colBtn"' +
+           ' title="Voliteľné stĺpce — voľba sa pamätá na tomto počítači" aria-expanded="' +
+           (s.cols ? 'true' : 'false') + '">' + ico('columns-3') + ' Stĺpce ' +
+           ico('chevron-down') + '</button>' + colMenuHtml(s.cols === true) + '</span>';
+    }
+    // Kusovnik je zivy (server pushuje pri prepnuti modelu a po zmene
+    // katalogu), ale prestavba skrinky z Inspectora sem sama nedorazi — okno
+    // musi mat rucnu cestu k cerstvym cislam, inak by sa VEPO exportovalo
+    // zo starych.
+    h += '<button type="button" class="ghostbtn" id="refreshBtn"' +
+         ' title="Prepočítať kusovník z aktuálneho modelu">' + ico('refresh-cw') + ' Obnoviť</button>';
+    return h;
+  }
+
+  // SMOKE 1A: VEPO export s ROHOVYM NASTAVENIM — vzor „flyout roh"
+  // (docs/UI_DIZAJN.md §5.11): klik na TELO exportuje ako doteraz, klik na
+  // pravy dolny ROH otvori male nastavenie. Roh je SAMOSTATNE tlacidlo v
+  // spolocnom obale (tlacidlo v tlacidle je neplatne HTML), znamienko je
+  // pseudo-prvok. Klikaciu zonu `.cornerzone` a jej rozmery zdiela s railom
+  // Inspectora aj s listou Kontroly; OBSAH okna je vlastny (jeden checkbox),
+  // preto NIE zdielany edge_menu.js — ten kresli 3-stavovu kontrolu hran.
+  function vepoBtnHtml(v, open){
+    return '<span class="vepofly">' +
       '<button type="button" class="primary" id="vepoBtn"' +
       ' title="Exportuje prírezy (po odpočte ABS) do VEPO CSV — vyberieš priečinok">' +
       ico('download') + ' VEPO export</button>' +
-      // audit #18: exporty, ktore este neexistuju, su VIDITELNE a neaktivne
-      // s dovodom (D-78) — nie skryte a nie mrtve.
-      '<button type="button" class="ghostbtn" aria-disabled="true"' +
-      ' title="Export kusovníka do XLSX zatiaľ neexistuje — príde v ďalšej dávke">' +
-      ico('download') + ' XLSX</button>' +
-      '<button type="button" class="ghostbtn" aria-disabled="true"' +
-      ' title="Export kusovníka do CSV zatiaľ neexistuje — príde v ďalšej dávke">' +
-      ico('download') + ' CSV</button>' +
-      '<label class="prjbox" title="Názov projektu — priečinok a súbory exportu, titulok rozpočtu aj cenovej ponuky">' +
-      '<span>Projekt</span><input id="prjInput" type="text" value="' + esc(v.project || '') +
-      '" placeholder="' + esc(v.default_project || 'projekt') + '"></label>' +
-      // audit #16: stav checkboxu sa berie z payloadu pri KAZDOM pushi.
-      '<label class="mergebox" title="Materiály 18 a 36 mm do jedného súboru (bežná objednávka)">' +
-      '<input type="checkbox" id="mergeChk"' + (v.merge_18_36 === false ? '' : ' checked') + '> 18+36 spolu</label>' +
-      '<span class="spacer"></span>' +
-      '<div class="searchbox">' + ico('search') +
-      '<input id="bomSearch" placeholder="Hľadať dielec / skrinku…" value="' + esc(bomQ) + '"></div>' +
-      // Kusovnik je zivy (server pushuje pri prepnuti modelu a po zmene
-      // katalogu), ale prestavba skrinky z Inspectora sem sama nedorazi — okno
-      // musi mat rucnu cestu k cerstvym cislam, inak by sa VEPO exportovalo
-      // zo starych.
-      '<button type="button" class="ghostbtn" id="refreshBtn"' +
-      ' title="Prepočítať kusovník z aktuálneho modelu">' + ico('refresh-cw') + ' Obnoviť</button>';
-    if (bomView === 'parts'){
-      h += '<button type="button" class="ghostbtn" id="colBtn"' +
-           ' title="Voliteľné stĺpce — voľba sa pamätá na tomto počítači" aria-expanded="' +
-           (colMenuOpen ? 'true' : 'false') + '">' + ico('columns-3') + ' Stĺpce ' +
-           ico('chevron-down') + '</button>' + colMenuHtml();
-    }
-    box.innerHTML = h;
+      '<button type="button" id="vepoMore" class="cornerzone" data-vepo="menu"' +
+      ' aria-expanded="' + (open ? 'true' : 'false') + '" aria-haspopup="true"' +
+      ' aria-label="Nastavenie VEPO exportu"' +
+      ' title="Nastavenie exportu — čo sa spojí do jedného súboru"></button>' +
+      vepoMenuHtml(v, open) + '</span>';
   }
 
-  function colMenuHtml(){
-    if (!colMenuOpen) return '';
+  // Male okno nastavenia (overlay pod spustacom, nikdy novy riadok layoutu).
+  // Uzol je v DOM VZDY (skryva ho trieda, nie podmienka v markupe) — echo
+  // `NX.setVepoBar` tak nasadzuje `checked` bez ohladu na to, ci je okno
+  // otvorene. audit #16 ŠT-1a plati dalej: hodnota je Z PAYLOADU pri KAZDOM
+  // pushi, klient si ju NIKDY neodvodzuje.
+  function vepoMenuHtml(v, open){
+    var s = v || {};
+    return '<div class="vepomenu' + (open ? ' open' : '') + '" id="vepoMenu" role="group"' +
+      ' aria-label="Nastavenie VEPO exportu">' +
+      // Review #4: hlavicka `.mgrp` — TEN ISTY vzor ako menu stlpcov aj
+      // zdielane nastavenie hran (a zhoda s mockupom). Bez nej sa okno otvara
+      // rovno checkboxom a nepovie, co vlastne nastavuje.
+      '<div class="mgrp">Nastavenie VEPO exportu</div>' +
+      '<label class="vopt"><input type="checkbox" id="mergeChk"' +
+      (s.merge_18_36 === false ? '' : ' checked') + '><span>18 + 36 spolu</span></label>' +
+      '<div class="vnote">Materiály 18 a 36 mm idú do jedného súboru (bežná objednávka).</div>' +
+      '</div>';
+  }
+
+  function colMenuHtml(open){
+    if (!open) return '';
     var h = '<div class="colmenu" id="colMenu"><div class="mgrp">Stĺpce tabuľky</div>';
     COLS.forEach(function(c, i){
       h += '<label class="' + (c.fixed ? 'fixed' : '') + '"><input type="checkbox" data-col="' + i + '"' +
@@ -1064,7 +1136,8 @@
   // Jeden push prináša VŠETKY sekcie, takže sa prepočíta všetko — status ale
   // hovorí o tom, na čo sa používateľ práve pozerá (inak by po kliku v Nákupe
   // hlásil kusovník a vyzeralo by to ako zlé tlačidlo).
-  var REFRESH_STATUS = { buy: 'Prepočítavam nákupný zoznam…', budget: 'Prepočítavam rozpočet…',
+  var REFRESH_STATUS = { ctrl: 'Prepočítavam kontrolu…',
+                         buy: 'Prepočítavam nákupný zoznam…', budget: 'Prepočítavam rozpočet…',
                          offer: 'Prepočítavam cenovú ponuku…' };
 
   function requestRefresh(){
@@ -1165,6 +1238,31 @@
     renderTools();
   }
 
+  // SMOKE 1A: rohove nastavenie VEPO. Otvorenost je cisto klientska —
+  // na rozdiel od kontroly hran to NIE JE zdielane nastavenie, takze sa
+  // nikomu inemu neohlasuje (druha kopia tohto okna nikde neexistuje).
+  function vepoMenuToggle(){
+    vepoMenuOpen = !vepoMenuOpen;
+    renderTools();
+  }
+
+  function vepoMenuClose(){
+    if (!vepoMenuOpen) return;
+    vepoMenuOpen = false;
+    renderTools();
+  }
+
+  // Review #8: otvorené overlaye lišty patria SEKCII, v ktorej vznikli. Pri
+  // odchode z nej sa zhasínajú NAraz a BEZ prekreslenia — volajúci kreslí celé
+  // okno hneď za tým (`render()`), takže druhý render by bol zbytočný.
+  // Menu stĺpcov si zatváranie pri prepnutí pohľadu rieši samo (`data-view`),
+  // ale prepnutie SEKCIE je ten istý prípad — preto je tu tiež.
+  function closeSectionMenus(){
+    vepoMenuOpen = false;
+    ecMenuOpen = false;
+    colMenuOpen = false;
+  }
+
   // ŠT-1c PR B2 (kontrakt #9): žije práve teraz D-15 modal? Komponent
   // `js/nx_modal.js` sa načítava PRED studio.js, ale v Node testoch nemusí
   // existovať vôbec — preto obozretne.
@@ -1196,6 +1294,7 @@
   // súborom a vlastný stav sekcií nemá.
   function studioGoSection(id){
     if (STUDIO_SECTIONS.indexOf(id) < 0) return;
+    closeSectionMenus();   // review #8 — overlay patrí sekcii, z ktorej odchádzame
     studioSec = id;
     render();
   }
@@ -1215,6 +1314,11 @@
       // Rieši sa TU a nie druhým listenerom: stopPropagation medzi dvoma
       // listenermi na TOM ISTOM uzle nefunguje.
       if (ecMenuOpen && !t.closest('.echk')) edgeMenuClose();
+      // SMOKE 1A: to iste pre rohove nastavenie VEPO — a z TOHO ISTEHO dovodu
+      // v tomto jedinom listeneri (stopPropagation medzi dvoma listenermi na
+      // tom istom uzle nefunguje). Klik na roh sa nizsie este spracuje, klik
+      // vnutri okna (checkbox) ho nezavrie.
+      if (vepoMenuOpen && !t.closest('.vepofly')) vepoMenuClose();
       // Prepínače lišty Kontroly.
       var ec = t.closest('[data-ec]');
       if (ec){
@@ -1258,6 +1362,9 @@
       }
       if (t.closest('[data-navmini]')){ navMini = !navMini; savePrefs(); renderNav(); return; }
       if (t.closest('#colBtn')){ colMenuOpen = !colMenuOpen; renderTools(); return; }
+      // SMOKE 1A: roh je SAMOSTATNE tlacidlo NAD telom exportu — klik nan sa
+      // teda k hlavnej akcii vobec nedostane (`#vepoBtn` ho neobsahuje).
+      if (t.closest('[data-vepo]')){ vepoMenuToggle(); return; }
       if (t.closest('#vepoBtn')){ vepoExport(); return; }
       if (t.closest('#hwCsvBtn')){ hwCsvExport(); return; }
       if (t.closest('#refreshBtn')){ requestRefresh(); return; }
@@ -1322,10 +1429,20 @@
       // JEMU. Oba listenery visia na `document`, takže `stopPropagation`
       // medzi nimi NEFUNGUJE — podmienka musí byť tu (rovnaká lekcia ako pri
       // zatváraní `ecMenu` klikom mimo: rieši sa v JEDNOM listeneri).
-      if (ev.key === 'Escape' && ecMenuOpen && !nxModalOpen()){
+      // SMOKE 1A: rohove nastavenia su od tejto davky DVE (kontrola hran
+      // v sekcii Kontrola, VEPO v Kusovníku). Su to sekcie, ktore nemozu byt
+      // otvorene naraz, ale poradie je aj tak explicitne: MODAL > menu.
+      if (ev.key !== 'Escape' || nxModalOpen()) return;
+      if (ecMenuOpen){
         edgeMenuClose();
         var more = el('ecMore');
         if (more){ try { more.focus(); } catch (e) {} }
+        return;
+      }
+      if (vepoMenuOpen){
+        vepoMenuClose();
+        var vmore = el('vepoMore');
+        if (vmore){ try { vmore.focus(); } catch (e) {} }
       }
     });
   }
@@ -1349,6 +1466,10 @@
       absCompact: absCompact, absFull: absFull, rgbHex: rgbHex,
       navBridgeIds: navBridgeIds, anchorFilter: anchorFilter, navItem: navItem,
       nxModalOpen: nxModalOpen,
+      // SMOKE 1A–1D: lista sekcie Kusovnik + rohove nastavenie VEPO.
+      // Testy nastavuju stav cez `setBomState` (bomView/bomQ/menu) — inak by
+      // museli sahat do modulovych premennych, ktore Node nevidi.
+      bomToolsHtml: bomToolsHtml, vepoBtnHtml: vepoBtnHtml, vepoMenuHtml: vepoMenuHtml,
       // ŠT-1b sekcia Kontrola (Š8–Š11)
       semaforHtml: semaforHtml, ctrlRows: ctrlRows, ctrlRowHtml: ctrlRowHtml,
       ctrlActionsHtml: ctrlActionsHtml, navBadgeHtml: navBadgeHtml,
