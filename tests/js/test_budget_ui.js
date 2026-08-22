@@ -75,8 +75,13 @@ function payload(over){
   eq(chips[1].id, 'appl', 'druhy su spotrebice');
   eq(chips[1].included, false, 'spotrebice mimo suctu');
   eq(chips[1].amount, 649, 'suma spotrebicov ide z payloadu, JS ju neskladá');
-  eq(chips[2].count, 1, 'spotrebicove upozornenie sa v tretom chipe NEopakuje');
-  eq(chips[2].text, '1 upozornenie rozpočtu', 'sklonovany text chipu');
+  // ŠT-1c PR B1 (review #2): chip VEDIE DO KONTROLY, takze musi ukazovat TO
+  // ISTE cislo, ake tam pouzivatel uvidi — a Kontrola nesie VSETKY rozpoctove
+  // nalezy vratane spotrebicoveho. Do tejto davky sa spotrebicove odpocitalo
+  // (chip pod sebou rozbaloval vlastny zoznam); teraz by to bola tichá nezhoda.
+  eq(chips[2].count, 2, 'chip pocita VSETKY rozpoctove nalezy — presne tie, co ukaze Kontrola');
+  eq(chips[2].text, '2 upozornenia rozpočtu', 'sklonovany text chipu');
+  eq(chips[2].list.length, 2, 'a nesie ich cely zoznam (poradie urcuje server)');
 })();
 
 (function(){
@@ -349,6 +354,61 @@ function payload(over){
   const manual = B.budStaleActionHtml({ kind: 'sheet', id: 'S9', label: 'Ručná', state: 'manual' });
   eq(manual.indexOf('data-bud'), -1, 'polozka bez vazby sa NEDA stiahnut');
   ok(manual.indexOf('over v katalógu ručne') > -1, 'namiesto akcie odporucanie');
+})();
+
+// --- ŠT-1c PR B1: rozrezany render (LISTA sekcie vs TELO) --------------------
+// Š12 hovori „1:1" o OBSAHU, nie o kode: v Studiu su lista a telo dve rozne
+// miesta v DOM, takze render sa musel rozdelit. Tieto testy strazia, ze sa pri
+// tom nic nestratilo a nic sa NEZDVOJILO (dva prepinace DPH by boli horsie nez
+// ziadny — kazdy by ukazoval iny stav).
+(function(){
+  const B_BUDGET = { mode: 'nizky', mode_label: '€', vat_divisor: 1.23,
+                     totals: { total: 1000, total_novat: 813.01 }, budget_check: [] };
+  const tools = B.budToolsHtml(B_BUDGET);
+  ok(tools.indexOf('data-bud="vat"') > -1, 'prepinac DPH je v LISTE sekcie');
+  ok(tools.indexOf('data-bud="mode"') > -1, 'a rezim €·€€·€€€ tiez');
+  ok(tools.indexOf('data-bud="refresh"') > -1, '„Prepočítať ceny" je v liste');
+  ok(tools.indexOf('id="refreshBtn"') > -1,
+     'a „Obnoviť" — prestavba skrinky z Inspectora sem sama nedorazi');
+  ok(tools.indexOf('data-bud="xlsx"') > -1 && tools.indexOf('data-bud="cp"') > -1,
+     'oba exporty su v liste (kontrakt §3 — akcie sekcie patria do listy)');
+  ok(tools.indexOf('data-bud="settings"') > -1, '⚙ ostava ako kontextova skratka (#20)');
+  ok(tools.indexOf('<span class="spacer">') > -1, 'exporty su az za medzerou (vpravo)');
+
+  // Rezim sa berie z PAYLOADU (server je autorita) — nie z klientskej pamate.
+  ok(B.budToolsHtml({ mode: 'vysoky' }).indexOf('data-v="vysoky" data-bkey="mode:vysoky"') > -1,
+     'aktivny rezim sa cita z payloadu');
+  ok(B.budModeSegHtml({ mode: 'vysoky' }).indexOf('class="on" data-bud="mode" data-v="vysoky"') > -1,
+     'a je oznaceny ako zapnuty');
+  eq(B.budToolsHtml(null).indexOf('class="on" data-bud="mode"'), -1,
+     'chybajuci payload nezhodi listu a ziadny rezim nepodsvieti');
+
+  // Fokus prezije prekreslenie aj v LISTE — KAZDE tlacidlo nesie `data-bkey`
+  // (lista sa prekresluje aj pocas toho, ako ju pouzivatel ovlada: prepnutie
+  // DPH, dobehnutie prepoctu cien; bez kluca by fokus spadol na <body>).
+  ['vat:1', 'vat:0', 'mode:nizky', 'pr', 'refresh', 'xlsx', 'cp', 'settings'].forEach(function(k){
+    ok(tools.indexOf('data-bkey="' + k + '"') > -1, 'tlacidlo listy `' + k + '` nesie kluc fokusu');
+  });
+  eq(tools.split('<button').length - 1, tools.split('data-bkey=').length - 1,
+     'ZIADNE tlacidlo listy nezostalo bez kluca (pocet tlacidiel == pocet klucov)');
+
+  // Pocas behu prepoctu je tlacidlo zamknute — ale LEN ono.
+  const sum = B.budSummaryHtml(B_BUDGET, 1.23);
+  eq(sum.indexOf('data-bud="vat"'), -1, 'telo uz prepinac DPH NEMA (zdvojenie by klamalo)');
+  eq(sum.indexOf('data-bud="mode"'), -1, 'ani prepinac rezimu');
+  ok(sum.indexOf('class="btotal"') > -1, 'zato nesie VELKY SUCET zakazky');
+  ok(sum.indexOf('režim €') > -1, 'a povie, v ktorom rezime cislo plati');
+  eq(sum.indexOf('class="bfoot"'), -1, 'patka s exportmi zanikla (su v liste)');
+})();
+
+// Jantarovy chip suctu vedie do KONTROLY (ten isty nalez, jedno miesto).
+(function(){
+  const chip = B.budChipHtml({ id: 'check', count: 2, text: '2 upozornenia rozpočtu' }, {}, 1.23);
+  ok(chip.indexOf('data-bud="ctrl"') > -1, 'chip vedie do sekcie Kontrola');
+  eq(chip.indexOf('data-bud="warns"'), -1, 'uz nerozbaluje DRUHU kopiu zoznamu nalezov');
+  const appl = B.budChipHtml({ id: 'appl', included: false, amount: 649 }, {}, 1.23);
+  ok(appl.indexOf('data-bud="goto" data-section="appliances"') > -1,
+     'spotrebicovy chip stale skace na svoju sekciu rozpoctu');
 })();
 
 console.log('test_budget_ui.js: ' + passed + ' OK');

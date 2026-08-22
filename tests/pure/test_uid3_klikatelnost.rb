@@ -208,14 +208,16 @@ end
 # --- 4) deep-link do okna Vyroba --------------------------------------------
 
 NxTest.test('UI-D3: whitelist tabov je na strane RUBY a JS je jeho ZRKADLO') do
-  rb = UID3_PROD_RB[/TABS = %w\[([a-z ]+)\]/, 1].to_s.split
+  rb = Noxun::Engine::ProductionDialog::TABS
   js = UID3_SHELL_JS[/var STUDIO_TABS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
   # ST-1a: `rows`/`sheets`/`edging` ZANIKLI — kusovnik a supisy platni a ABS su
   # sekciou Kusovnik okna Studio. ŠT-1b: to iste sa stalo tabu `control`.
   # Whitelist ich preto uz nesmie poznat, inak by deep-link otvoril tab, ktory
   # v okne neexistuje.
-  # ŠT-1c PR A: a tabu `hardware` (sekcia `buy` Studia) — ostal POSLEDNY tab.
-  NxTest.assert_equal(%w[budget], rb, 'Ruby pozna vsetky taby okna')
+  # ŠT-1c PR A: a tabu `hardware` (sekcia `buy` Studia); PR B1 POSLEDNEMU tabu
+  # `budget` (sekcia `budget`). Zoznam je PRAZDNY — deep-link do okna Vyroba
+  # uz nema kam mierit a `studioTab` vracia vzdy nil.
+  NxTest.assert_equal([], rb, 'whitelist tabov je prazdny (okno nema ziadny tab)')
   NxTest.assert_equal(rb, js, 'JS mirror sa nesmie rozist s Ruby autoritou')
   NxTest.assert(UID3_PANEL_RB.include?('ProductionDialog.show(open_tab: studio_tab_of(p))'),
                 'panel posiela iba meno tabu — filtruje ho server')
@@ -231,8 +233,14 @@ NxTest.test('UI-D3: deep-link sa spotrebuje PRAVE RAZ') do
   NxTest.assert(body.include?('TABS.include?'), 'aj pri spotrebe plati whitelist')
   NxTest.assert(UID3_PROD_RB.include?('open_tab: consume_pending_tab'),
                 'tab cestuje v tom istom pushi ako data (okno po `show` este nemusi mat HTML)')
-  NxTest.assert(UID3_PROD_JS.include?('if (want && want !== prodTab){ setProdTab(want); return; }'),
-                'JS prepne tab len ked treba — inak bezna cesta (ziadne dvojite kreslenie)')
+  # ŠT-1c PR B1: JS strana deep-linku ZANIKLA spolu s poslednym tabom — okno
+  # nema co prepinat. Deep-link ZIJE, ale do SEKCII okna Studio.
+  NxTest.refute(UID3_PROD_JS.include?('setProdTab('),
+                'okno Vyroba uz taby neprepina (ziadne nema)')
+  studio_rb = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog.rb'),
+                        encoding: 'UTF-8')
+  NxTest.assert(studio_rb.include?('open_section: consume_pending_section'),
+                'deep-link zije v okne Studio — a sekciu tiez spotrebuje PRAVE RAZ')
 end
 
 # --- 5) klikatelne je LEN to, co niekam vedie -------------------------------
@@ -256,8 +264,8 @@ NxTest.test('ST-1a: deep-link do Studia ma whitelist sekcii v RUBY a JS je jeho 
                         encoding: 'UTF-8')
   rb = studio_rb[/SECTIONS = %w\[([a-z ]+)\]/, 1].to_s.split
   js = UID3_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  NxTest.assert_equal(%w[bom ctrl buy], rb,
-                      'v Studiu ziju sekcie Kusovník, Kontrola a Nákup kovania')
+  NxTest.assert_equal(%w[bom ctrl buy budget], rb,
+                      'v Studiu ziju sekcie Kusovník, Kontrola, Nákup kovania a Rozpočet')
   NxTest.assert_equal(rb, js, 'JS mirror sa nesmie rozist s Ruby autoritou')
   NxTest.assert(UID3_PANEL_RB.include?("cb(dlg, 'open_studio')"),
                 'panel ma vlastny callback na otvorenie Studia')

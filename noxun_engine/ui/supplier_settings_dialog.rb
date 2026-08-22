@@ -142,7 +142,8 @@ module Noxun
           # Sadzby su vstup rozpoctu — otvorene okno Vyroba musi ukazat nove cisla.
           ProductionDialog.refresh_if_open if defined?(ProductionDialog)
           StudioDialog.refresh_if_open if defined?(StudioDialog) # ST-1a
-          set_status('Nastavenia uložené. Rozpočet v okne Výroba je prepočítaný.')
+          # ŠT-1c PR B1: rozpočet žije v sekcii Rozpočet okna ŠTÚDIO.
+          set_status('Nastavenia uložené. Rozpočet v Štúdiu je prepočítaný.')
         end
 
         def set_status(msg, error = false)

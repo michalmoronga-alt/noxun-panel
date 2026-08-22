@@ -1,18 +1,27 @@
-  // ===================== TAB ROZPOCET (V0.6 E-b) =====================
-  // Zobrazuje payload z Budget.compute (Ruby). ZELEZNE PRAVIDLO: JS NEPOCITA
-  // ZIADNE SUMY — vsetky medzisucty, zaokruhlenie aj SPOLU su hotove cisla zo
-  // servera (vzor KONTROLA counts). JEDINA povolena aritmetika je delenie
-  // `vat_divisor` pri prepnuti na "bez DPH" — cisto ZOBRAZOVACI prepocet
-  // (firma je neplatca DPH, katalogove ceny su konecne), oznaceny nizsie.
+  // ============ SEKCIA ROZPOCET okna STUDIO (ŠT-1c PR B1) ============
+  // Do ŠT-1c to bol TAB okna Vyroba; od tejto davky je to SEKCIA `budget` okna
+  // Studio. Presun je 1:1 v OBSAHU (Š12) — nie v kode: render sa rozrezal na
+  // LISTU sekcie (`budToolsHtml` — DPH, rezim, prepocet cien, exporty, ⚙) a
+  // TELO (`budRenderBody`), lebo v Studiu su to dve rozne miesta v DOM.
+  //
+  // Subor sa nacitava AZ ZA `studio.js` (studio.html): cita jeho globalny
+  // payload `ST` (pole `ST.budget`) a OBALUJE `NX.setStudio`.
+  //
+  // ZELEZNE PRAVIDLO: JS NEPOCITA ZIADNE SUMY — vsetky medzisucty, zaokruhlenie
+  // aj SPOLU su hotove cisla zo servera (vzor KONTROLA counts). JEDINA povolena
+  // aritmetika je delenie `vat_divisor` pri prepnuti na "bez DPH" — cisto
+  // ZOBRAZOVACI prepocet (firma je neplatca DPH, katalogove ceny su konecne),
+  // oznaceny nizsie.
   //
   // Mutacie (rezim, prepis sumy, nasobok, m2, vlastne polozky, spotrebice) idu
   // cez JEDEN callback `budget_mutate` s gen + model_guid; server ich overi,
   // zapise (1 undo krok) a posle CERSTVY payload. Klient si stav nedopocitava.
+  // Tento payload chodi s `bump: false` (StudioDialog) — generacia okna sa
+  // NEDVIHA, lebo mutacia rozpoctu nemeni riadky kusovnika ani ich refs.
 
   var BUD_VAT = true;          // prepinac zobrazenia (localStorage, len UX)
   var BUD_OPEN = null;         // { sekcia -> otvorena? } — prezije re-render
   var BUD_STALE_OPEN = false;
-  var BUD_WARN_OPEN = false;
   var BUD_DRAFT = null;        // rozpisany novy riadok: 'custom' | 'appliance'
   var BUD_DRAFT_VALUES = null; // GH #138 P2: hodnoty draftu prezijú odmietnutý zápis
   var BUD_MODAL = null;        // { kind, id } — otvoreny ⋯ modal
@@ -100,19 +109,24 @@
     if (appl > 0){
       out.push({ id: 'appl', included: t.appliances_included === true, amount: appl });
     }
-    // Zvysok upozorneni rozpoctu (bez spotrebicoveho — ten ma vlastny chip).
-    var rest = (b.budget_check || []).filter(function(w){
-      return w.stable_key !== 'budget|appliances|not_included';
-    });
-    if (rest.length){
-      out.push({ id: 'check', count: rest.length, list: rest,
-                 text: rest.length + ' ' + budPluralSk(rest.length,
+    // Upozornenia rozpoctu. Do ŠT-1c PR B1 sa spotrebicove upozornenie ODPOCITALO
+    // (chip pod sebou rozbaloval vlastny zoznam, v ktorom uz malo vlastny chip
+    // vyssie). Odkedy chip VEDIE DO KONTROLY, musi ukazovat TO ISTE cislo, ake
+    // tam pouzivatel uvidi — a Kontrola nesie VSETKY rozpoctove nalezy vratane
+    // spotrebicoveho (`Validation.with_budget`, kontrakt counts z ŠT-1b sa
+    // nemeni). Chip spotrebicov ostava ako SPECIFICKA skratka na ich sekciu.
+    var all = b.budget_check || [];
+    if (all.length){
+      out.push({ id: 'check', count: all.length, list: all,
+                 text: all.length + ' ' + budPluralSk(all.length,
                    ['upozornenie rozpočtu', 'upozornenia rozpočtu', 'upozornení rozpočtu']) });
     }
     return out;
   }
 
   // Payload mutacie — jedno miesto, kde sa sklada identita zapisu.
+  // (Argument sa vola `bom` z historickych dovodov; od ŠT-1c PR B1 do neho
+  // chodi payload OKNA STUDIO `ST` — tvar `gen` + `model_guid` je ten isty.)
   function budMutation(bom, op, extra){
     var p = { op: op, gen: bom ? bom.gen : 0, model_guid: (bom && bom.model_guid) || '' };
     for (var k in (extra || {})){
@@ -155,8 +169,24 @@
     return budFmtEur(budDisplay(value, BUD_VAT, divisor));
   }
 
-  function renderBudget(box){
-    var b = (BOM && BOM.budget) ? BOM.budget : null;
+  // Payload sekcie. Cita sa VYHRADNE cez tuto funkciu — `ST` je globál okna
+  // Studio (studio.js) a v Node testoch neexistuje.
+  function budData(){
+    if (typeof ST === 'undefined' || !ST) return null;
+    return ST;
+  }
+
+  function budBudget(){
+    var st = budData();
+    return (st && st.budget) ? st.budget : null;
+  }
+
+  // TELO sekcie (#secbody). Lista sekcie ma vlastnu funkciu — v Studiu su to
+  // dve rozne miesta v DOM (kontrakt §3: akcie sekcie patria do listy).
+  function budRenderBody(){
+    var box = budEl('secbody');
+    if (!box) return;
+    var b = budBudget();
     if (!b){
       box.innerHTML = '<div class="muted">Rozpočet sa nepodarilo zostaviť (pozri Ruby konzolu).</div>';
       return;
@@ -169,9 +199,30 @@
       else h += budSectionHtml(sec, b, d);
     });
     h += budCpHtml(b, d);
-    h += budFootHtml();
     box.innerHTML = h;
     budRestoreFocus();
+  }
+
+  // LISTA sekcie (#sectools): prepinace DPH a rezimu, prepocet cien, obnovenie,
+  // exporty a ⚙. Prekresluje sa pri KAZDOM prekresleni tela (rezim aj DPH menia
+  // jej stav) a navyse pri fazovom okne prepoctu cien (tlacidlo pocas behu
+  // zosedne). Focus-restore je TU tiez — tlacidla nesu `data-bkey`, takze
+  // klavesnicovy fokus prezije prekreslenie.
+  function budRenderTools(){
+    var box = budEl('sectools');
+    if (!box) return;
+    budCaptureFocus();
+    box.innerHTML = budToolsHtml(budBudget());
+    budRestoreFocus();
+  }
+
+  // Prekreslenie CELEJ sekcie (lista + telo). Volaju ho vsetky klientske
+  // prepinace aj fazove okno prepoctu; ked pouzivatel medzitym prepol sekciu,
+  // nerobi NIC (do cudzieho tela sa nikdy nepise).
+  function budRerender(){
+    if (typeof studioSec !== 'undefined' && studioSec !== 'budget') return;
+    budRenderTools();
+    budRenderBody();
   }
 
   function budSummaryHtml(b, d){
@@ -180,17 +231,12 @@
     var h = '<div class="bsum">' +
       '<div><div class="blbl">Spolu za zákazku</div>' +
       '<div class="btotal">' + bEsc(budFmtEur(total)) +
-      ' <small>' + (BUD_VAT ? 's DPH' : 'bez DPH') + '</small></div></div>' +
-      '<div class="bswitch">' +
-      '<div class="bseg" role="group" aria-label="Zobrazenie DPH">' +
-      '<button type="button" class="' + (BUD_VAT ? 'on' : '') + '" data-bud="vat" data-v="1">s DPH</button>' +
-      '<button type="button" class="' + (BUD_VAT ? '' : 'on') + '" data-bud="vat" data-v="0">bez DPH</button>' +
-      '</div>' + budModeSegHtml(b) + '</div>';
+      ' <small>' + (BUD_VAT ? 's DPH' : 'bez DPH') +
+      (b.mode_label ? ' · režim ' + bEsc(b.mode_label) : '') + '</small></div></div>';
     h += '<div class="bwarns">';
     budWarnChips(b).forEach(function(c){ h += budChipHtml(c, b, d); });
     h += '</div></div>';
     h += budStaleListHtml(b);
-    h += budWarnListHtml(b);
     return h;
   }
 
@@ -199,12 +245,57 @@
                       ['vysoky', '€€€', 'Vysoký režim — kde vieme pridať']];
 
   function budModeSegHtml(b){
+    var mode = (b || {}).mode;
     var h = '<div class="bseg bmode" role="group" aria-label="Cenový režim zákazky">';
     BUD_MODE_SEG.forEach(function(m){
-      h += '<button type="button" class="' + (b.mode === m[0] ? 'on' : '') + '"' +
-           ' data-bud="mode" data-v="' + m[0] + '" title="' + bEsc(m[2]) + '">' + m[1] + '</button>';
+      h += '<button type="button" class="' + (mode === m[0] ? 'on' : '') + '"' +
+           ' data-bud="mode" data-v="' + m[0] + '" data-bkey="mode:' + m[0] + '"' +
+           ' title="' + bEsc(m[2]) + '">' + m[1] + '</button>';
     });
     return h + '</div>';
+  }
+
+  // LISTA sekcie — cisty HTML (testuje ju tests/js/test_budget_ui.js).
+  // Poradie: prepinace zobrazenia · prepocet a obnovenie · exporty · ⚙.
+  // ⚙ OSTAVA (#20) ako KONTEXTOVA skratka: sadzby a prahy rozpocet pocitaju,
+  // takze cesta k nim patri sem — polozka navigacie „Nastavenia rozpočtu"
+  // otvara TO ISTE okno, len z iného miesta.
+  //
+  // KAZDE tlacidlo listy nesie `data-bkey` — lista sa prekresluje aj vtedy, ked
+  // ju pouzivatel prave ovlada (prepnutie DPH, dobehnutie prepoctu cien), a bez
+  // kluca by mu fokus po prekresleni spadol na <body>. Klavesnicova cesta by sa
+  // tym prerusila presne v momente, ked na nej zalezi najviac (Tab z „Prepočítať
+  // ceny" na export).
+  function budToolsHtml(b){
+    var running = !!(BUD_PR && BUD_PR.phase === 'run');
+    var h = '<div class="bseg" role="group" aria-label="Zobrazenie DPH">' +
+      '<button type="button" class="' + (BUD_VAT ? 'on' : '') + '" data-bud="vat" data-v="1"' +
+      ' data-bkey="vat:1" title="Ceny s DPH — katalógové ceny sú konečné">s DPH</button>' +
+      '<button type="button" class="' + (BUD_VAT ? '' : 'on') + '" data-bud="vat" data-v="0"' +
+      ' data-bkey="vat:0" title="Len ZOBRAZENIE bez DPH — rozpočet sa počíta v brutto">bez DPH</button>' +
+      '</div>' + budModeSegHtml(b) +
+      '<button type="button" class="ghostbtn" data-bud="refresh" data-bkey="pr"' +
+      (running ? ' disabled' : '') +
+      ' title="Stiahne aktuálne ceny všetkých položiek zákazky viazaných na Demos' +
+      ' (medzi položkami je 3 s pauza — pravidlo Demosu)">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Prepočítať ceny</button>' +
+      // Prestavba skrinky z Inspectora sem sama nedorazi — bez „Obnoviť" by sa
+      // dal exportovať rozpočet zo starých rozmerov (rovnaký dôvod ako v lište
+      // Kusovníka a Nákupu; handler je zdieľaný `#refreshBtn` v studio.js).
+      '<button type="button" class="ghostbtn" id="refreshBtn" data-bkey="refresh"' +
+      ' title="Prepočítať rozpočet z aktuálneho modelu">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Obnoviť</button>' +
+      '<span class="spacer"></span>' +
+      '<button type="button" class="primary" data-bud="xlsx" data-bkey="xlsx"' +
+      ' title="Interný rozpočet v presnom formáte tvojich hárkov">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> XLSX rozpočet</button>' +
+      '<button type="button" class="primary" data-bud="cp" data-bkey="cp"' +
+      ' title="Zákaznícky dokument: cenová tabuľka + špecifikácia (bez interných pojmov a kódov)">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Cenová ponuka (zákazník)</button>' +
+      '<button type="button" class="ghostbtn" data-bud="settings" data-bkey="settings"' +
+      ' title="Sadzby, režimy a prahy — globálne nastavenie, platí pre každú zákazku">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Nastavenia</button>';
+    return h;
   }
 
   function budChipHtml(c, b, d){
@@ -219,8 +310,12 @@
       return '<button type="button" class="bchip" data-bud="goto" data-section="appliances"' +
              ' title="Prejdi na sekciu Spotrebiče">' + txt + '</button>';
     }
-    return '<button type="button" class="bchip' + (BUD_WARN_OPEN ? ' open' : '') + '" data-bud="warns">' +
-           '<svg class="ic" aria-hidden="true"><use href="#i-chevron-right"/></svg> ' + bEsc(c.text) + '</button>';
+    // ŠT-1c PR B1: rozpoctove upozornenia su TIE ISTE nalezy, ake ukazuje
+    // sekcia KONTROLA toho isteho okna — chip preto VEDIE TAM namiesto toho,
+    // aby pod sebou rozbalil DRUHU kopiu zoznamu (jedna pravda, jedno miesto).
+    return '<button type="button" class="bchip" data-bud="ctrl"' +
+           ' title="Ten istý nález ako v Kontrole — klik prejde na jeho zoznam">' +
+           '<svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> ' + bEsc(c.text) + '</button>';
   }
 
   function budStaleListHtml(b){
@@ -252,19 +347,10 @@
       '<svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg></button>';
   }
 
-  function budWarnListHtml(b){
-    if (!BUD_WARN_OPEN) return '';
-    var items = (b.budget_check || []).filter(function(w){
-      return w.stable_key !== 'budget|appliances|not_included';
-    });
-    if (!items.length) return '';
-    var h = '<div class="blist">';
-    items.forEach(function(w){
-      h += '<div class="bwrow" data-bud="goto" data-section="' + bEsc(w.section) + '"' +
-           ' title="Prejsť na sekciu rozpočtu"><span>' + bEsc(w.message) + '</span></div>';
-    });
-    return h + '</div>';
-  }
+  // ŠT-1c PR B1: `budWarnListHtml` ZANIKOL — bola to druha kopia zoznamu
+  // nalezov, ktory od ŠT-1b zije v sekcii KONTROLA toho isteho okna. Chip
+  // vyssie tam vedie a Kontrola naopak vie preklikom otvorit prislusnu sekciu
+  // rozpoctu (`budget_section` v naleze).
 
   // --- sekcie --------------------------------------------------------------
 
@@ -659,27 +745,12 @@
   }
 
   function budCpExport(){
-    if (!BOM || !window.sketchup || !sketchup.cp_xlsx) return;
+    var st = budData();
+    if (!st || !window.sketchup || !sketchup.cp_xlsx) return;
     NX.setStatus('Pripravujem cenovú ponuku…', false);
     // ST-1a (audit #1): nazov projektu je SERVEROVY udaj — z DOM sa uz
     // neposiela (input zije v liste Kusovnika v okne Studio).
-    sketchup.cp_xlsx(JSON.stringify({ gen: BOM.gen }));
-  }
-
-  function budFootHtml(){
-    var running = !!(BUD_PR && BUD_PR.phase === 'run');
-    return '<div class="bfoot">' +
-      '<button type="button" class="ghostbtn" data-bud="refresh"' + (running ? ' disabled' : '') +
-      ' title="Stiahne aktuálne ceny všetkých položiek zákazky viazaných na Demos' +
-      ' (medzi položkami je 3 s pauza — pravidlo Demosu)">' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Prepočítať ceny</button>' +
-      '<button type="button" class="primary" data-bud="xlsx" title="Interný rozpočet v presnom formáte tvojich hárkov">' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> XLSX rozpočet</button>' +
-      '<button type="button" class="primary" data-bud="cp"' +
-      ' title="Zákaznícky dokument: cenová tabuľka + špecifikácia (bez interných pojmov a kódov)">' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Cenová ponuka (zákazník)</button>' +
-      '<button type="button" class="ghostbtn bgear" data-bud="settings" title="Sadzby, režimy a prahy — globálne">' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Nastavenia</button></div>';
+    sketchup.cp_xlsx(JSON.stringify({ gen: st.gen }));
   }
 
   // --- E-c: PREPOČÍTAŤ CENY ------------------------------------------------
@@ -894,7 +965,7 @@
 
   function budPrStart(single){
     if (BUD_PR && BUD_PR.phase === 'run') return;
-    var targets = budPrTargets((BOM && BOM.budget) ? BOM.budget : null);
+    var targets = budPrTargets(budBudget());
     if (single){
       targets = targets.filter(function(t){
         return t.kind === single.kind && String(t.id) === String(single.id);
@@ -915,14 +986,15 @@
 
   function budPrSend(){
     if (!BUD_PR || BUD_PR.phase !== 'confirm') return;
-    if (!BOM || !window.sketchup || !sketchup.price_refresh) return;
+    var st = budData();
+    if (!st || !window.sketchup || !sketchup.price_refresh) return;
     var single = BUD_PR.single;
     var extra = single ? { kind: single.kind, id: single.id } : {};
     BUD_PR = { phase: 'run', pid: null, total: BUD_PR.total, done: 0, label: '',
                report: null, single: single, cancelling: false };
     budPrRenderModal();
-    renderBody(); // footer tlačidlo počas behu zošedne
-    sketchup.price_refresh(JSON.stringify(budMutation(BOM, 'price_refresh', extra)));
+    budRerender(); // tlačidlo „Prepočítať ceny" v lište počas behu zošedne
+    sketchup.price_refresh(JSON.stringify(budMutation(st, 'price_refresh', extra)));
   }
 
   function budPrCancel(){
@@ -957,7 +1029,7 @@
   }
 
   function budFindItem(kind, id){
-    var b = (BOM && BOM.budget) ? BOM.budget : null;
+    var b = budBudget();
     if (!b) return null;
     var key = kind === 'appliance' ? 'appliances' : 'custom';
     var sec = (b.sections || []).filter(function(s){ return s.key === key; })[0];
@@ -1008,12 +1080,13 @@
   // GH #138 P2: kym bezi predchadzajuci zapis, dalsi ide DO FRONTY (nie do
   // koša) — odosle sa hned po prichode cerstveho payloadu, uz s novou `gen`.
   function budSend(op, extra){
-    if (!BOM || !window.sketchup || !sketchup.budget_mutate) return;
+    var st = budData();
+    if (!st || !window.sketchup || !sketchup.budget_mutate) return;
     if (BUD_BUSY){ BUD_QUEUE.push([op, extra]); return; }
     BUD_BUSY = true;
     if (budBusyTimer) clearTimeout(budBusyTimer);
     budBusyTimer = setTimeout(budAfterPush, BUD_BUSY_MS);
-    sketchup.budget_mutate(JSON.stringify(budMutation(BOM, op, extra)));
+    sketchup.budget_mutate(JSON.stringify(budMutation(st, op, extra)));
   }
 
   // Vola sa po KAZDOM prichode payloadu (aj po odmietnutom zapise — server
@@ -1048,10 +1121,11 @@
   }
 
   function budXlsx(){
-    if (!BOM || !window.sketchup || !sketchup.budget_xlsx) return;
+    var st = budData();
+    if (!st || !window.sketchup || !sketchup.budget_xlsx) return;
     NX.setStatus('Pripravujem XLSX rozpočet…', false);
     // ST-1a (audit #1): nazov projektu cita SERVER — z DOM uz nechodi.
-    sketchup.budget_xlsx(JSON.stringify({ gen: BOM.gen }));
+    sketchup.budget_xlsx(JSON.stringify({ gen: st.gen }));
   }
 
   // GH #138 P2: draft sa NEZAHADZUJE pri odoslani. Server moze zapis odmietnut
@@ -1103,13 +1177,19 @@
     budSend(op, { id: id, attrs: attrs });
   }
 
-  // GH #138 P2: napojenie na zivotny cyklus payloadu. budget.js sa nacitava AZ
-  // ZA production.js, takze NX uz existuje — obalime setBom (uvolnenie fronty
-  // po prichode novej generacie) a doplnime budgetResult (vysledok zapisu).
-  if (typeof window !== 'undefined' && window.NX && typeof NX.setBom === 'function'){
-    var budPrevSetBom = NX.setBom;
-    NX.setBom = function(data){
-      budPrevSetBom(data);
+  // GH #138 P2 + ŠT-1c PR B1 (audit #6): napojenie na zivotny cyklus payloadu.
+  // budget.js sa nacitava AZ ZA studio.js, takze `NX` uz existuje — obalime
+  // `NX.setStudio` (uvolnenie fronty zapisov po prichode cerstveho payloadu)
+  // a doplnime `budgetResult` + `priceRefresh`.
+  //
+  // Fronta sa uvolnuje VYHRADNE tu. Okno ma aj MALE ECHA (`setVepoBar`,
+  // `setEdgeCheck`, `setGrainCheck`), ktore NENESU cerstvu generaciu — keby sa
+  // fronta uvolnovala na nich, dalsi zapis by odisiel so STAROU `gen` a server
+  // by ho odmietol ako zastaraly (hoci je uplne v poriadku).
+  if (typeof window !== 'undefined' && window.NX && typeof NX.setStudio === 'function'){
+    var budPrevSetStudio = NX.setStudio;
+    NX.setStudio = function(data){
+      budPrevSetStudio(data);
       budAfterPush(); // fronta sa odosiela AZ s cerstvou gen z tohto payloadu
     };
     // Server hlasi vysledok mutacie PRED push_state — draft sa zavrie LEN pri
@@ -1121,16 +1201,16 @@
       }
     };
     // E-c: eventy prepočtu cien (start/progress/item/complete). Po `complete`
-    // príde zo servera aj čerstvý payload — re-render odblokuje footer a
-    // ukáže nové ceny AJ obnovený pás cenovej čerstvosti za modalom.
+    // príde zo servera aj čerstvý payload — re-render odblokuje tlačidlo
+    // v lište a ukáže nové ceny AJ obnovený pás cenovej čerstvosti za modalom.
     NX.priceRefresh = function(ev){
       var wasRunning = !!(BUD_PR && BUD_PR.phase === 'run');
       BUD_PR = budPrEvent(BUD_PR, ev);
       budPrRenderModal();
-      // Telo tabu sa prekresľuje LEN pri prechode z behu (dobehnutie AJ
-      // odmietnutý štart) — footer tlačidlo sa musí odomknúť. Počas behu sa
-      // prekresľuje iba modal (progres by inak trhal celý tab).
-      if (wasRunning && !(BUD_PR && BUD_PR.phase === 'run')) renderBody();
+      // Sekcia sa prekresľuje LEN pri prechode z behu (dobehnutie AJ odmietnutý
+      // štart) — tlačidlo „Prepočítať ceny" sa musí odomknúť. Počas behu sa
+      // prekresľuje iba modal (progres by inak trhal celú sekciu).
+      if (wasRunning && !(BUD_PR && BUD_PR.phase === 'run')) budRerender();
     };
   }
 
@@ -1142,19 +1222,21 @@
       if (a === 'vat'){
         BUD_VAT = b.getAttribute('data-v') === '1';
         try { window.localStorage.setItem(BUD_VAT_KEY, BUD_VAT ? '1' : '0'); } catch (e) { /* len UX */ }
-        renderBody();
+        budRerender();
       } else if (a === 'mode'){
         budSend('mode', { mode: b.getAttribute('data-v') });
       } else if (a === 'stale'){
-        BUD_STALE_OPEN = !BUD_STALE_OPEN; renderBody();
-      } else if (a === 'warns'){
-        BUD_WARN_OPEN = !BUD_WARN_OPEN; renderBody();
+        BUD_STALE_OPEN = !BUD_STALE_OPEN; budRerender();
+      } else if (a === 'ctrl'){
+        // ŠT-1c PR B1: jantárový chip súčtu = nález KONTROLY. Sme v tom istom
+        // okne, takže sa len prepne sekcia (žiadne premostenie, žiadny server).
+        if (typeof studioGoSection === 'function') studioGoSection('ctrl');
       } else if (a === 'goto'){
         budGoto(b.getAttribute('data-section'));
       } else if (a === 'draft'){
-        BUD_DRAFT = b.getAttribute('data-kind'); BUD_DRAFT_VALUES = null; renderBody();
+        BUD_DRAFT = b.getAttribute('data-kind'); BUD_DRAFT_VALUES = null; budRerender();
       } else if (a === 'draft_cancel'){
-        BUD_DRAFT = null; BUD_DRAFT_VALUES = null; renderBody();
+        BUD_DRAFT = null; BUD_DRAFT_VALUES = null; budRerender();
       } else if (a === 'draft_ok'){
         budDraftCommit(b.getAttribute('data-kind'));
       } else if (a === 'remove'){
@@ -1191,7 +1273,7 @@
       } else if (a === 'pr_close'){
         BUD_PR = null;
         budPrRenderModal();
-        renderBody();
+        budRerender();
       }
     });
 
@@ -1254,6 +1336,10 @@
       budPluralSk: budPluralSk, budStaleLabel: budStaleLabel, budWarnChips: budWarnChips,
       budMutation: budMutation, budParse: budParse, budNumText: budNumText,
       budSectionCount: budSectionCount, budEsc: bEsc,
+      // ŠT-1c PR B1: rozrezany render — LISTA sekcie vs TELO (Š12 „1:1" je
+      // 1:1 OBSAH, nie kod). Obe funkcie su ciste (HTML z payloadu).
+      budToolsHtml: budToolsHtml, budSummaryHtml: budSummaryHtml,
+      budModeSegHtml: budModeSegHtml, budChipHtml: budChipHtml,
       budDraftAttrs: budDraftAttrs, budDraftMissing: budDraftMissing,
       budCpBand: budCpBand, budCpHtml: budCpHtml,
       // E-c „Prepočítať ceny"

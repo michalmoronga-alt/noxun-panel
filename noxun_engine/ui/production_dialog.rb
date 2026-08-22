@@ -37,9 +37,13 @@ module Noxun
       # sekcia `ctrl` okna Studio (semafor-filter, prepinace hran a kresby,
       # zive badge navigacie); deep-link na nu ide cez `StudioDialog::SECTIONS`.
       # ŠT-1c PR A: a to iste tabu `hardware` — NAKUP KOVANIA je sekcia `buy`
-      # okna Studio (presun 1:1 podla Š7). Oknu ostal posledny tab Rozpocet;
-      # PR B ho zoberie tiez a okno zanikne.
-      TABS = %w[budget].freeze
+      # okna Studio (presun 1:1 podla Š7).
+      # ŠT-1c PR B1: a POSLEDNEMU tabu `budget` — ROZPOCET je sekcia `budget`
+      # okna Studio (vratane nahladu cenovej ponuky). Okno Vyroba tak nema
+      # ZIADNY tab: ostala z neho prazdna skrupina s vetou, kam sa obsah
+      # prestahoval, a ⚠ chipom do sekcie Kontrola. Zanikne v PR B3 — dovtedy
+      # by tichy vymaz okna zlomil vstupne body, ktore este vedu semka.
+      TABS = [].freeze
 
       class << self
         # `open_tab` = deep-link z Inspectora (⚠ warnpanel -> KONTROLA, „Materiál"
@@ -133,97 +137,28 @@ module Noxun
                                                                 repush: repush_proc)
         end
 
-        # V0.6 E-b: XLSX rozpocet v "Luciinom formate". Rovnaky flush/generation
-        # handshake ako VEPO — cisla harku musia sediet s modelom PO flushi
-        # rozpisaneho editu panela, nie s tym, co drzi DOM okna.
+        # V0.6 E-b: XLSX rozpocet v "Luciinom formate".
+        #
+        # ŠT-1c PR B1 — DOCASNE: telo sa presunulo do `ProductionCore` spolu
+        # so sekciou Rozpocet (okno Vyroba uz rozpocet NEZOBRAZUJE). Obal tu
+        # ostava VEREJNY, lebo ho vola relay `production_do_budget` z panela
+        # a strazi ho pure sada `test_eb_rozpocet`. Zanikne v ŠT-1c PR B3
+        # spolu s celym oknom.
         def do_budget_xlsx(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
-          unless data['gen'].to_i == @generation.to_i
-            push_state if @dialog && @dialog.visible?
-            return set_status('Dáta okna sa medzitým zmenili — skús export znova.', true)
-          end
-          if data['flush_blocked']
-            return set_status('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
-          end
-
-          model = Sketchup.active_model
-          collected = fresh_collect(model)
-          bom = Bom.compute(collected)
-          budget = budget_payload(model, bom, collected)
-          return set_status('Rozpočet sa nepodarilo zostaviť (pozri Ruby konzolu).', true) if budget.nil?
-
-          project = project_name(model) # audit #1: server je autorita nazvu
-          now = Time.now
-          fname = BudgetXlsx.file_name(project, now)
-          target = UI.savepanel('Uložiť rozpočet (XLSX)', vepo_settings['last_dir'], fname)
-          return set_status('Export zrušený.') if target.nil? || target.to_s.empty?
-
-          # Bez pripony by Excel subor neotvoril dvojklikom — savepanel ju
-          # nedoplna, ked ju pouzivatel v nazve prepise.
-          target = "#{target}.xlsx" unless File.extname(target.to_s).downcase == '.xlsx'
-          XlsxWriter.write(target, BudgetXlsx.sheet(budget, project: project, now: now), now: now)
-          save_vepo_settings('last_dir' => File.dirname(target))
-          totals = budget['totals'] || {}
-          miss = totals['unknown_count_in_total'].to_i
-          set_status("Rozpočet uložený: #{fmt_eur(totals['total'])} → #{target}" \
-                     "#{miss.positive? ? " · #{miss} riadkov bez ceny sa nezapočítalo" : ''}", miss.positive?)
-        rescue StandardError => e
-          Engine.log_error(e, 'ProductionDialog.do_budget_xlsx')
-          set_status("Export rozpočtu zlyhal: #{e.message}", true)
+          ProductionCore.do_budget_xlsx(Sketchup.active_model, data, generation: @generation,
+                                                                     status: status_proc,
+                                                                     repush: repush_proc)
         end
 
-        # V0.6 E-b2: ZAKAZNICKA CENOVA PONUKA (XLSX, 2 harky). Rovnaky
-        # flush/generation handshake ako rozpocet — CP je VIEW nad TYM ISTYM
-        # payloadom, takze cisla musia sediet s modelom PO flushi editov panela.
-        #
-        # FIREWALL: pred zapisom sa cely vysledny harok prejde blocklistom
-        # (CpExport.firewall_hits). Nalez export NEBLOKUJE (rovnaky kontrakt ako
-        # KONTROLA pri VEPO), ale ide do statusu aj do logu — Michal musi
-        # vediet, ze do zakaznickeho dokumentu presiel interny pojem.
-        #
-        # GH #139 P1/P2: status hlasi AJ neuplnost cisel — riadok bez ceny
-        # (suma ponuky je podhodnotena, hoci polozka v specifikacii je) a
-        # zapornu "Nábytkovú zostavu". Zakaznicky dokument sa nesmie tvarit
-        # ako v poriadku, ked cislo v nom nie je cele.
+        # V0.6 E-b2: ZAKAZNICKA CENOVA PONUKA (XLSX, 2 harky).
+        # ŠT-1c PR B1 — DOCASNE: telo v `ProductionCore` (viz `do_budget_xlsx`),
+        # obal ostava kvoli relayu `production_do_cp` a zanikne v PR B3.
         def do_cp_xlsx(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
-          unless data['gen'].to_i == @generation.to_i
-            push_state if @dialog && @dialog.visible?
-            return set_status('Dáta okna sa medzitým zmenili — skús export znova.', true)
-          end
-          if data['flush_blocked']
-            return set_status('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
-          end
-
-          model = Sketchup.active_model
-          collected = fresh_collect(model)
-          bom = Bom.compute(collected)
-          smap = sheets_map
-          hw_exp = hardware_expansion(model, collected)
-          budget = budget_payload(model, bom, collected, nil, hw_exp, smap)
-          return set_status('Rozpočet sa nepodarilo zostaviť (pozri Ruby konzolu).', true) if budget.nil?
-
-          cp = budget['cp_preview']
-          cp ||= CpExport.preview(budget, BudgetStore.cp_overrides(model), SupplierSettings.active)
-          spec = CpExport.specification(collected[:records], sheets: smap,
-                                                             hardware_expansion: hw_exp, budget: budget)
-
-          project = project_name(model) # audit #1: server je autorita nazvu
-          now = Time.now
-          target = UI.savepanel('Uložiť cenovú ponuku (XLSX)', vepo_settings['last_dir'],
-                                CpXlsx.file_name(project, now))
-          return set_status('Export zrušený.') if target.nil? || target.to_s.empty?
-
-          target = "#{target}.xlsx" unless File.extname(target.to_s).downcase == '.xlsx'
-          sheets = CpXlsx.sheets(cp, spec, project: project, now: now)
-          hits = CpExport.firewall_hits(CpXlsx.text_cells(sheets))
-          XlsxWriter.write_book(target, sheets, now: now)
-          save_vepo_settings('last_dir' => File.dirname(target))
-          warnings = cp_warnings(cp, budget, hits)
-          set_status(cp_status(cp, spec, target, warnings), !warnings.empty?)
-        rescue StandardError => e
-          Engine.log_error(e, 'ProductionDialog.do_cp_xlsx')
-          set_status("Export cenovej ponuky zlyhal: #{e.message}", true)
+          ProductionCore.do_cp_xlsx(Sketchup.active_model, data, generation: @generation,
+                                                                 status: status_proc,
+                                                                 repush: repush_proc)
         end
 
         # D-104/D-105: prepinac zvyraznenia hran (tab KONTROLA). Model sa NEMENI
@@ -342,38 +277,15 @@ module Noxun
         end
 
         # V0.6 E-b: mutacie rozpoctu (rezim, prepis sumy, nasobok, m2, spotrebice
-        # v sucte, vlastne polozky). Guardy bezia na SERVERI — HTML disabled ani
-        # klientske echo nie su ochrana:
-        #   gen        — zapis zo stareho DOM (medzitym prepocitane okno),
-        #   model_guid — medzitym prepnuty dokument (zapis by sadol do cudzej zakazky).
-        # Po KAZDOM zapise ide cerstvy payload (push_state) — klient si sumy
-        # NIKDY neprepocitava.
+        # v sucte, vlastne polozky).
+        # ŠT-1c PR B1 — DOCASNE: telo v `ProductionCore` (sekcia Rozpocet zije
+        # v Studiu). Obal ostava verejny kvoli callbacku okna a zanikne v PR B3.
         def do_budget(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
-          model = Sketchup.active_model
-          unless data['gen'].to_i == @generation.to_i
-            push_state if @dialog && @dialog.visible?
-            return set_status('Rozpočet sa medzitým prepočítal — obnovené, skús znova.', true)
-          end
-          guid = data['model_guid'].to_s
-          if !guid.empty? && guid != model_guid(model)
-            push_state
-            return set_status('Model sa medzitým prepol — obnovené, skús znova.', true)
-          end
-          ok, errors = apply_budget_op(model, data)
-          # GH #138 P2: vysledok ide do okna PRED cerstvym payloadom — rozpisany
-          # novy riadok sa smie zavriet LEN pri uspechu (inak by pouzivatel po
-          # odmietnutom zapise prisiel o vsetky vyplnene hodnoty).
-          js("if (window.NX && NX.budgetResult) NX.budgetResult(#{data['op'].to_s.to_json}, #{ok ? 'true' : 'false'});")
-          push_state
-          return set_status("Nezapísané: #{Array(errors).join(' · ')}", true) unless ok
-          set_status(budget_op_status(data))
-        rescue StandardError => e
-          Engine.log_error(e, 'ProductionDialog.do_budget')
-          # Aj po vynimke musi prist payload — inak by okno ostalo v stave
-          # „cakam na odpoved" a fronta zapisov by sa neuvolnila.
-          push_state
-          set_status("Chyba rozpočtu: #{e.message}", true)
+          ProductionCore.do_budget(Sketchup.active_model, data, generation: @generation,
+                                                                status: status_proc,
+                                                                repush: repush_proc,
+                                                                result: budget_result_proc)
         end
 
         private
@@ -389,102 +301,13 @@ module Noxun
           -> { refresh_if_open }
         end
 
-        # Jedna mutacia = jedna metoda BudgetStore = jeden undo krok. Validacia
-        # aj rozsahy su v BudgetStore (server), tu sa len smeruje.
-        # -> [ok, errors]
-        def apply_budget_op(model, data)
-          attrs = data['attrs'].is_a?(Hash) ? data['attrs'] : {}
-          id = data['id'].to_s
-          case data['op'].to_s
-          when 'mode'            then BudgetStore.set_mode!(model, data['mode'])
-          when 'override'        then BudgetStore.set_override!(model, data['row_key'], data['amount'])
-          when 'multiplier'      then BudgetStore.set_std_multiplier!(model, data['row_key'], data['multiplier'])
-          when 'viz_m2'          then BudgetStore.set_viz_m2!(model, data['value'])
-          when 'appl_included'   then BudgetStore.set_appliances_included!(model, data['included'])
-          when 'custom_add'      then ok_pair(BudgetStore.add_custom_item!(model, attrs))
-          when 'custom_update'   then ok_pair(BudgetStore.update_custom_item!(model, id, attrs))
-          when 'custom_remove'   then BudgetStore.remove_custom_item!(model, id)
-          when 'appliance_add'   then ok_pair(BudgetStore.add_appliance!(model, attrs))
-          when 'appliance_update' then ok_pair(BudgetStore.update_appliance!(model, id, attrs))
-          when 'appliance_remove' then BudgetStore.remove_appliance!(model, id)
-          when 'cp_group'        then BudgetStore.set_cp_group!(model, data['source_key'], data['group'])
-          else [false, ['neznáma operácia rozpočtu']]
+        # ŠT-1c PR B1: vysledok mutacie do TOHTO okna PRED cerstvym payloadom
+        # (rozpisany draft sa smie zavriet LEN pri uspechu). Telo mutacii,
+        # exportov aj prepoctu cien zije v `ProductionCore`.
+        def budget_result_proc
+          lambda do |op, ok|
+            js("if (window.NX && NX.budgetResult) NX.budgetResult(#{op.to_s.to_json}, #{ok ? 'true' : 'false'});")
           end
-        end
-
-        # GH #139 P1/P2: JEDEN zoznam dovodov, preco zakaznicky dokument NIE JE
-        # v poriadku — rozhoduje aj o farbe statusu, aby sa zelene "uložené"
-        # nikdy neobjavilo nad podhodnotenou alebo zápornou sumou.
-        def cp_warnings(cp, budget, hits)
-          c = cp.is_a?(Hash) ? cp : {}
-          totals = budget.is_a?(Hash) && budget['totals'].is_a?(Hash) ? budget['totals'] : {}
-          out = []
-          miss = totals['unknown_count_in_total'].to_i
-          if miss.positive?
-            out << "#{miss} riadkov rozpočtu nemá cenu — suma ponuky je PODHODNOTENÁ " \
-                   '(položky v špecifikácii sú, v cene nie)'
-          end
-          if c['assembly_negative']
-            out << "„Nábytková zostava“ vyšla záporná (#{fmt_eur(c['assembly'])}) — " \
-                   'samostatné riadky prevyšujú rozpočet'
-          end
-          out << "CP nesedí s rozpočtom o #{fmt_eur(c['diff'])}" if c['consistent'] == false
-          unless Array(hits).empty?
-            terms = hits.map { |h| h['term'] }.uniq.first(5).join(', ')
-            out << "v dokumente ostali interné pojmy (#{terms}) — oprav názvy a exportuj znova"
-          end
-          out
-        end
-
-        def cp_status(cp, spec, target, warnings)
-          c = cp.is_a?(Hash) ? cp : {}
-          items = spec.is_a?(Hash) ? spec['item_count'].to_i : 0
-          msg = "Cenová ponuka uložená: #{fmt_eur(c['total'])} · #{c['rows'].to_a.length} riadkov · " \
-                "špecifikácia #{items} položiek → #{target}"
-          return msg if Array(warnings).empty?
-
-          "#{msg} · POZOR: #{warnings.join(' · ')}"
-        end
-
-        # add_/update_ vracaju [polozka|nil, chyby] — zjednotenie na [ok, chyby].
-        def ok_pair(result)
-          item, errors = result
-          [!item.nil? && Array(errors).empty?, errors]
-        end
-
-        BUDGET_OP_STATUS = {
-          'mode' => 'Cenový režim zmenený.', 'override' => 'Suma riadku prepísaná.',
-          'multiplier' => 'Násobok riadku uložený.', 'viz_m2' => 'm² vizualizácie uložené.',
-          'appl_included' => 'Spotrebiče v súčte — prepnuté.',
-          'custom_add' => 'Položka pridaná.', 'custom_update' => 'Položka upravená.',
-          'custom_remove' => 'Položka zmazaná.', 'appliance_add' => 'Spotrebič pridaný.',
-          'appliance_update' => 'Spotrebič upravený.', 'appliance_remove' => 'Spotrebič zmazaný.',
-          'cp_group' => 'Zaradenie v cenovej ponuke zmenené.'
-        }.freeze
-
-        def budget_op_status(data)
-          BUDGET_OP_STATUS[data['op'].to_s] || 'Rozpočet uložený.'
-        end
-
-        # ↗ v riadku: URL sa NEBERIE z klienta — dohladava sa v modeli podla ID
-        # polozky a este raz sanitizuje (BudgetStore.sanitize_url povoluje LEN
-        # http/https). Klient tak nema ako podstrcit javascript:/file: adresu.
-        def handle_budget_url(payload)
-          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
-          model = Sketchup.active_model
-          id = data['id'].to_s
-          list = data['kind'].to_s == 'appliance' ? BudgetStore.appliances(model) : BudgetStore.custom_items(model)
-          item = list.find { |it| it['id'] == id }
-          return set_status('Položka sa nenašla — obnov okno.', true) if item.nil?
-          url = BudgetStore.sanitize_url(item['url'])
-          return set_status('Položka nemá platnú adresu (http:// alebo https://).', true) if url.nil?
-          UI.openURL(url)
-          set_status("Otváram #{url}")
-        end
-
-        def fmt_eur(value)
-          f = value.to_f
-          format('%.2f €', f).tr('.', ',')
         end
 
         # V0.6 E-b: payload rozpoctu z TYCH ISTYCH dat ako kusovnik/semafor
@@ -627,79 +450,29 @@ module Noxun
         end
 
         # --- V0.6 E-c: Prepočítať ceny --------------------------------------
-        # Jedno tlačidlo obnoví ceny VŠETKÝCH položiek zákazky, ktoré majú väzbu
-        # na Demos (dosky, ABS, kovanie). Guardy ako pri každej inej akcii tabu
-        # (gen + model_guid — klik zo starého DOM sa odmietne). Zoznam cieľov
-        # skladá SERVER z čerstvého rozpočtu: klient posiela len „spusti"
-        # (prípadne kind+id JEDNÉHO riadku zo zoznamu starých cien), nikdy nie
-        # adresu ani cenu.
+        # ŠT-1c PR B1 — DOCASNE: telo (guardy, ciele, fazove eventy, refresh
+        # ciest po dobehnuti) zije v `ProductionCore`. Okno odovzdava LEN svoje
+        # echo, svoju zivotnost a svoje refresh cesty. Zanikne v PR B3.
         def handle_price_refresh(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
-          model = Sketchup.active_model
-          unless data['gen'].to_i == @generation.to_i
-            push_state if @dialog && @dialog.visible?
-            return price_refresh_reject('Rozpočet sa medzitým prepočítal — obnovené, skús znova.')
-          end
-          guid = data['model_guid'].to_s
-          if !guid.empty? && guid != model_guid(model)
-            push_state
-            return price_refresh_reject('Model sa medzitým prepol — obnovené, skús znova.')
-          end
-          return price_refresh_reject('Prepočet cien už beží.') if PriceRefresh.running?
-
-          targets = price_refresh_targets(model, data)
-          if targets.empty?
-            push_state
-            return price_refresh_reject('Nie je čo obnoviť — položka už nie je v rozpočte alebo nemá väzbu na Demos.')
-          end
-          pid = PriceRefresh.run(targets, alive: price_refresh_alive(@dialog), emit: price_refresh_emit)
-          return price_refresh_reject('Prepočet cien sa nepodarilo spustiť.') if pid.nil?
-          # GH #140 P2: beh mohol dobehnúť UŽ TERAZ (synchrónne — napr. bez
-          # sieťového transportu alebo samé chybné väzby). Vtedy status už nesie
-          # VÝSLEDOK a „Sťahujem…" by ho prepísalo klamlivým priebehom.
-          return if PriceRefresh.running_pid != pid
-
-          set_status("Sťahujem ceny z Demosu (#{targets.length}) — medzi položkami je 3 s pauza (pravidlo Demosu).")
+          ProductionCore.do_price_refresh(Sketchup.active_model, data,
+                                          generation: @generation, status: status_proc,
+                                          repush: repush_proc, emit: price_refresh_emit_proc,
+                                          alive: price_refresh_alive(@dialog),
+                                          after: price_refresh_after_proc)
         end
 
-        # GH #140 P2: okno prepne modal do „beží" HNEĎ po kliku (odpoveď servera
-        # je asynchrónna). Každé odmietnutie štartu preto musí poslať TERMINÁLNY
-        # event — inak by progres aj tlačidlo ostali zamknuté a Zrušiť by nemalo
-        # čo zrušiť (žiadny beh na serveri neexistuje).
-        def price_refresh_reject(msg)
-          js("if (window.NX && NX.priceRefresh) NX.priceRefresh(#{{ 'type' => 'rejected', 'error' => msg }.to_json});")
-          set_status(msg, true)
-        end
-
-        # Zrušenie: ďalšie položky sa už nestiahnu, rozbehnutá dobehne a zapíše
-        # sa (jej cena je reálne overená — zahodiť ju by bolo horšie).
         def handle_price_refresh_cancel
-          if PriceRefresh.cancel!
-            set_status('Prepočet cien sa ukončí po dobehnutí prebiehajúcej položky.')
-          else
-            set_status('Žiadny prepočet cien nebeží.')
-          end
+          ProductionCore.price_refresh_cancel(status: status_proc)
         end
 
-        # Ciele = viazané položky POUŽITÉ v ČERSTVOM rozpočte. kind+id (jeden
-        # riadok zo zoznamu starých cien) sa použije len ako FILTER nad týmto
-        # serverovým zoznamom — položka mimo rozpočtu sa nefetchuje.
-        def price_refresh_targets(model, data)
-          collected = fresh_collect(model)
-          bom = Bom.compute(collected)
-          budget = budget_payload(model, bom, collected)
-          return [] unless budget
-
-          all = PriceRefresh.targets_from_budget(budget)
-          kind = data['kind'].to_s
-          id = data['id'].to_s
-          return all if kind.empty? || id.empty?
-
-          all.select { |t| t['kind'] == kind && t['id'] == id }
+        # Echo fazoveho okna do TOHTO okna.
+        def price_refresh_emit_proc
+          ->(event) { js("if (window.NX && NX.priceRefresh) NX.priceRefresh(#{event.to_json});") }
         end
 
-        # Životnosť behu = TÁ ISTÁ inštancia okna Výroba, z ktorej sa spustil
-        # (vzor MaterialsDialog.demos_alive_proc). GH #140 P2: samotné `@dialog`
+        # Životnosť behu = TÁ ISTÁ inštancia okna, z ktorej sa spustil (vzor
+        # MaterialsDialog.demos_alive_proc). GH #140 P2: samotné `@dialog`
         # nestačí — zavretie okna počas fetchu a jeho znovuotvorenie by opustený
         # beh „oživilo" (dofetchoval by zvyšok fronty a posielal eventy do NOVÉHO
         # okna). Prepnutie MODELU beh nezastaví: ceny idú do katalógu, ktorý je
@@ -708,57 +481,28 @@ module Noxun
           -> { !dlg.nil? && !@dialog.nil? && @dialog.equal?(dlg) && dlg.visible? }
         end
 
-        def price_refresh_emit
-          lambda do |event|
-            js("if (window.NX && NX.priceRefresh) NX.priceRefresh(#{event.to_json});")
-            next unless event['type'] == 'complete'
-
-            after_price_refresh(event['report'])
-          end
-        end
-
-        # Po dobehnutí: čerstvý rozpočet (sumy AJ pás cenovej čerstvosti) + refresh
-        # ostatných okien nad katalógom — ceny sa práve zmenili globálne.
-        def after_price_refresh(report)
-          push_state
-          begin
+        # Po dobehnutí: čerstvé čísla do všetkých okien nad katalógom — ceny sa
+        # práve zmenili GLOBÁLNE.
+        def price_refresh_after_proc
+          lambda do
+            push_state
             MaterialsDialog.push_catalog if defined?(MaterialsDialog)
             Panel.push_materials if defined?(Panel)
-            # ST-1a: ceny sa prave zmenili GLOBALNE — otvorene Studio by inak
-            # drzalo stare cisla (audit #10: obe okna v tych istych 5 cestach).
             StudioDialog.refresh_if_open if defined?(StudioDialog)
-            # GH #140 P2: prepočet mení AJ ceny kovania — otvorené okno Katalóg
-            # kovania by inak držalo starú cenu a starý row_rev (jeho ďalšia
-            # úprava by skončila ako konflikt).
             HardwareCatalogDialog.push_items if defined?(HardwareCatalogDialog)
-          rescue StandardError => e
-            Engine.log_error(e, 'ProductionDialog.after_price_refresh refresh')
           end
-          set_status(price_refresh_status(report), price_refresh_report_error?(report))
-        rescue StandardError => e
-          Engine.log_error(e, 'ProductionDialog.after_price_refresh')
         end
 
-        def price_refresh_report_error?(report)
-          report.is_a?(Hash) && report['errors'].to_i.positive?
-        end
-
-        def price_refresh_status(report)
-          # Vetné tvary bez skloňovania počtu (status je jednoriadkový; plné
-          # sklonované zhrnutie ukazuje report v okne).
-          r = report.is_a?(Hash) ? report : {}
-          parts = ["zmenené #{r['changed'].to_i}", "bez zmeny #{r['unchanged'].to_i}"]
-          parts << "chyby #{r['errors'].to_i}" if r['errors'].to_i.positive?
-          parts << "zrušené (preskočené #{r['skipped'].to_i})" if r['cancelled']
-          "Prepočet cien hotový — #{parts.join(' · ')}."
-        end
-
-        # ⚙ z tabu Rozpočet — satelit Nastavenia (sadzby sú GLOBÁLNE, nie per model).
+        # ⚙ z listy sekcie Rozpočet — satelit Nastavenia (sadzby sú GLOBÁLNE).
         def open_budget_settings
-          return set_status('Okno Nastavenia nie je k dispozícii.', true) unless defined?(SupplierSettingsDialog)
+          ProductionCore.open_budget_settings(status: status_proc)
+        end
 
-          SupplierSettingsDialog.show
-          set_status('Otváram Nastavenia rozpočtu.')
+        # ↗ v riadku rozpočtu — telo v `ProductionCore` (adresa sa dohľadáva
+        # v modeli a sanitizuje, z klienta nechodí).
+        def handle_budget_url(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          ProductionCore.budget_open_url(Sketchup.active_model, data, status: status_proc)
         end
 
         # --- VEPO pomocnici (V0.5 C) ---------------------------------------
@@ -954,9 +698,11 @@ module Noxun
             # D-19: odhad platni per material (rozsah 10-25 %; JS paruje mapou
             # podla material_id — nie indexom, Codex F7)
             sheet_estimate: estimate,
-            # V0.6 E-b: celý rozpočet zákazky (sekcie, sumy, vek cien, kontrola).
-            # JS z neho LEN číta — žiadne sumy sa v prehliadači nepočítajú.
-            budget: budget,
+            # ŠT-1c PR B1: pole `budget` tu ZANIKLO spolu s tabom Rozpočet —
+            # čítalo ho VÝHRADNE jeho telo (js/budget.js). Rozpočet sa vyššie
+            # počíta ĎALEJ, ale len kvôli svojim ORANGE nálezom v KONTROLE
+            # (`counts` pod ⚠ chipom hlavičky). Celý payload rozpočtu dnes
+            # dostáva okno ŠTÚDIO (sekcia `budget`).
             # D-104: stav zvyraznenia hran bez olepu (tab KONTROLA). Ked je
             # vypnute, NIC sa neskenuje — okno platí nulu navyše.
             edge_check: (defined?(EdgeCheck) ? EdgeCheck.ui_state(model) : nil),

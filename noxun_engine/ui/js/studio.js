@@ -34,7 +34,7 @@
 
   // ZRKADLO `StudioDialog::SECTIONS` — autoritou whitelistu je RUBY, tento
   // zoznam len zabrani, aby z okna vyletela hodnota, ktora sekciu nepomenuva.
-  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy'];
+  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget'];
 
   // ŠT-1b (Š10): 3-stavove nastavenie kontroly hran je ZDIELANY komponent —
   // TEN ISTY markup kresli rail Inspectora (rohovy trojuholnik pri ABS ikone)
@@ -70,10 +70,16 @@
       // ŠT-1c PR A (Š7): Nákup kovania je od tejto dávky SEKCIA — presun tabu
       // Kovanie okna Výroba 1:1, bez redizajnu (ten príde s blokom KOVANIE).
       { id: 'buy',    ic: 'cart',            t: 'Nákup kovania' },
-      { id: 'budget', ic: 'euro',            t: 'Rozpočet',
-        bridge: 'zatiaľ v okne Výroba — presun v ŠT-1c' },
+      // ŠT-1c PR B1 (Š12): Rozpočet je od tejto dávky SEKCIA — JEDINÁ, ktorá
+      // zapisuje do modelu (1 zmena = 1 krok Späť).
+      { id: 'budget', ic: 'euro',            t: 'Rozpočet' },
+      // Cenová ponuka ešte NEMÁ vlastnú sekciu (príde v ŠT-1c PR B2) — jej
+      // náhľad je zbaliteľnou časťou Rozpočtu. Položka preto nie je mŕtve
+      // tlačidlo ani premostenie do iného okna: prepne na Rozpočet a otvorí
+      // ten náhľad (`goto`), tooltip to priznáva.
       { id: 'offer',  ic: 'file-text',       t: 'Cenová ponuka',
-        bridge: 'zatiaľ v okne Výroba (súčasť Rozpočtu) — presun v ŠT-1c' },
+        goto: { sec: 'budget', open: 'cp' },
+        hint: 'náhľad je zatiaľ vnútri Rozpočtu — vlastná sekcia príde v ďalšej dávke' },
       { id: 'cut',    ic: 'scissors',        t: 'Nárezový plán',
         disabled: 'fáza 2 — nárezový plán zatiaľ neexistuje' }
     ] },
@@ -94,7 +100,9 @@
   var SEC_META = {
     bom: { t: 'Kusovník', hint: 'skupiny podľa materiálu · pohľady Dielce / Platne / ABS · živý zoznam' },
     ctrl: { t: 'Kontrola', hint: 'semafor filtruje zoznam · klik na nález ho označí v modeli · prepínače hrán a kresby' },
-    buy: { t: 'Nákup kovania', hint: 'nákupný zoznam zo setov · nekompletné položky jantárovo · CSV pre objednávku' }
+    buy: { t: 'Nákup kovania', hint: 'nákupný zoznam zo setov · nekompletné položky jantárovo · CSV pre objednávku' },
+    budget: { t: 'Rozpočet',
+              hint: 'jediná sekcia, ktorá mení model — každá zmena = 1 krok Späť · sumy počíta server' }
   };
 
   // ---------------------------------------------------------------- helpers
@@ -301,12 +309,13 @@
 
   // Š9: riadok nálezu — bodka závažnosti · text · miesto · akcie vpravo.
   // Text aj miesto skladá SERVER; „Rozpočet" je jediné miesto bez entity
-  // v modeli (klik tam premostí do okna Výroba).
+  // v modeli — klik prepne na sekciu Rozpočet a otvorí TÚ jeho časť, ktorej sa
+  // nález týka (`budget_section` nesie server).
   function ctrlRowHtml(it, i){
     var red = it.severity === 'red';
     var bud = it.category === 'budget';
     return '<div class="ctrlrow ' + (red ? 'ctrl-red' : 'ctrl-orange') + '" data-ci="' + i + '"' +
-      ' title="' + esc(bud ? 'Otvorí Rozpočet v okne Výroba (kotva na sekciu tam zatiaľ nevedie).'
+      ' title="' + esc(bud ? 'Prejde do sekcie Rozpočet — rovno na časť, ktorej sa nález týka.'
                            : 'Klik označí nález v modeli.') + '">' +
       '<span class="dot" aria-hidden="true"></span>' +
       '<span class="msg">' + esc(it.message_sk) + '</span>' +
@@ -320,8 +329,8 @@
   function ctrlActionsHtml(it){
     if (it.category === 'budget'){
       return '<button type="button" class="goact" data-act="budget"' +
-        ' title="Otvoriť Rozpočet — je zatiaľ v okne Výroba (presun v ŠT-1c)"' +
-        ' aria-label="Otvoriť Rozpočet v okne Výroba">' + ico('euro') + '</button>';
+        ' title="Otvoriť sekciu Rozpočet na mieste nálezu"' +
+        ' aria-label="Otvoriť sekciu Rozpočet">' + ico('euro') + '</button>';
     }
     var h = '';
     // D-83: uni_id nesie SERVER — klient si ho nevymýšľa.
@@ -670,7 +679,8 @@
       g.items.forEach(function(it){
         var on = (it.id === studioSec && !it.bridge && !it.disabled);
         var tip = it.disabled ? (it.t + ' — ' + it.disabled)
-                              : (it.bridge ? (it.t + ' — ' + it.bridge) : it.t);
+                : (it.bridge ? (it.t + ' — ' + it.bridge)
+                : (it.hint ? (it.t + ' — ' + it.hint) : it.t));
         h += '<button type="button" class="navitem' + (on ? ' on' : '') + '"' +
              (it.disabled ? ' aria-disabled="true"' : '') +
              ' data-nav="' + esc(it.id) + '" title="' + esc(tip) + '">' +
@@ -702,6 +712,14 @@
     var box = el('sectools');
     if (!box) return;
     if (!ST){ box.innerHTML = ''; return; }
+    // ŠT-1c PR B1: lišta sekcie Rozpočet (prepínače DPH a režimu, prepočet
+    // cien, obnovenie, exporty, ⚙) si kreslí js/budget.js — ten sa načítava
+    // AŽ ZA týmto súborom, preto sa volá cez `typeof`.
+    if (studioSec === 'budget'){
+      if (typeof budRenderTools === 'function') budRenderTools();
+      else box.innerHTML = '';
+      return;
+    }
     // Š10: lišta sekcie Kontrola nesie OBA prepínače (a nič iné — exporty
     // kontrola nemá). Jeden riadok, žiadny nový blok: vertikálny priestor
     // je vzácny a nastavenie hrán je overlay pod tlačidlom.
@@ -789,6 +807,14 @@
     var box = el('secbody');
     if (!box) return;
     if (!ST){ box.innerHTML = '<div class="muted">Načítavam…</div>'; return; }
+    // ŠT-1c PR B1: telo sekcie Rozpočet kreslí js/budget.js (píše si do
+    // `#secbody` samo — potrebuje okolo zápisu obnovu fokusu v rozpísaných
+    // políčkach).
+    if (studioSec === 'budget'){
+      if (typeof budRenderBody === 'function') budRenderBody();
+      else box.innerHTML = '<div class="muted">Rozpočet sa nenačítal (js/budget.js).</div>';
+      return;
+    }
     if (studioSec === 'ctrl') box.innerHTML = ctrlSection();
     else if (studioSec === 'buy') box.innerHTML = buySection(ST.hardware_sets || null, ST.hardware || []);
     else if (bomView === 'sheets') box.innerHTML = sheetsTable();
@@ -977,7 +1003,7 @@
       ' m² dielcov</span><span class="spacer"></span>' +
       '<span class="tmuted">orientačný rozsah (prerez 10–25 %), NIE nárezový plán</span></div>' +
       '<div class="hint">Duplák sa lepí zo zdrojových platní — jeho plocha sa počíta do nákupu ' +
-      'zdroja. Nákupné bm ABS s rezervou a ceny sú v Rozpočte (zatiaľ okno Výroba).</div>';
+      'zdroja. Nákupné bm ABS s rezervou a ceny sú v sekcii Rozpočet.</div>';
     return h;
   }
 
@@ -1009,12 +1035,12 @@
     h += '<div class="totrow" style="margin-top:10px"><span>Spolu <b>' + num(t.bm, 1) +
       ' bm</b> · ' + num(t.edges) + ' pások</span><span class="spacer"></span>' +
       '<span class="tmuted">spotreba bez rezervy</span></div>' +
-      // VEDOMA ODCHYLKA ST-1a: stlpce „bm s rezervou" a „€/bm" tu NIE SU —
-      // obe cisla pochadzaju z payloadu ROZPOCTU, ktory Studio zatial nepocita
-      // (Rozpocet je premostenie do okna Vyroba, presun az v ŠT-1c). Prazdny
-      // stlpec by klamal, dopocitat rezervu v klientovi je zakazane.
-      '<div class="hint">Nákupné bm s rezervou a cena za bm sú v Rozpočte ' +
-      '(zatiaľ okno Výroba) — rezerva na olep sa nastavuje v Nastaveniach rozpočtu.</div>';
+      // VEDOMA ODCHYLKA ST-1a (drzi dalej): stlpce „bm s rezervou" a „€/bm" tu
+      // NIE SU — obe cisla pochadzaju z payloadu ROZPOCTU a patria do JEHO
+      // sekcie ABS. Prazdny stlpec by klamal, dopocitat rezervu v klientovi je
+      // zakazane; od ŠT-1c PR B1 je Rozpocet o jeden klik vedla (sekcia).
+      '<div class="hint">Nákupné bm s rezervou a cena za bm sú v sekcii Rozpočet — ' +
+      'rezerva na olep sa nastavuje v Nastaveniach rozpočtu.</div>';
     return h;
   }
 
@@ -1028,9 +1054,11 @@
   // Jeden push prináša VŠETKY sekcie, takže sa prepočíta všetko — status ale
   // hovorí o tom, na čo sa používateľ práve pozerá (inak by po kliku v Nákupe
   // hlásil kusovník a vyzeralo by to ako zlé tlačidlo).
+  var REFRESH_STATUS = { buy: 'Prepočítavam nákupný zoznam…', budget: 'Prepočítavam rozpočet…' };
+
   function requestRefresh(){
     if (!window.sketchup || !sketchup.refresh_bom) return;
-    NX.setStatus(studioSec === 'buy' ? 'Prepočítavam nákupný zoznam…' : 'Prepočítavam kusovník…', false);
+    NX.setStatus(REFRESH_STATUS[studioSec] || 'Prepočítavam kusovník…', false);
     sketchup.refresh_bom('');
   }
 
@@ -1139,9 +1167,26 @@
     if (!it) return;
     if (it.disabled){ NX.setStatus(it.t + ' — ' + it.disabled, true); return; }
     if (it.bridge){ bridgeTo(id); return; }
+    // ŠT-1c PR B1: položka, ktorej obsah je (zatiaľ) ČASŤOU inej sekcie —
+    // prepne na ňu a otvorí tú časť. Žiadny server, žiadne premostenie.
+    if (it.goto){
+      studioGoSection(it.goto.sec);
+      if (it.goto.open && typeof budGoto === 'function') budGoto(it.goto.open);
+      NX.setStatus(it.t + ' — ' + it.hint, false);
+      return;
+    }
+    studioGoSection(id);
+  }
+
+  // Prepnutie sekcie z KÓDU (navigácia, chip súčtu v Rozpočte, nález Kontroly).
+  // Musí byť globálna — volá ju aj js/budget.js, ktorý sa načítava za týmto
+  // súborom a vlastný stav sekcií nemá.
+  function studioGoSection(id){
+    if (STUDIO_SECTIONS.indexOf(id) < 0) return;
     studioSec = id;
     render();
   }
+  if (typeof window !== 'undefined') window.studioGoSection = studioGoSection;
 
   // ------------------------------------------------------------- listenery
   if (typeof document !== 'undefined'){
@@ -1186,9 +1231,14 @@
         var cact = t.closest('button.goact');
         var what = cact ? cact.getAttribute('data-act') : '';
         if (what === 'uni'){ requestReplaceUni(cact.getAttribute('data-uni')); return; }
-        // Rozpočtové upozornenie NEMÁ entitu v modeli — vedie do Rozpočtu,
-        // ktorý je zatiaľ tabom okna Výroba (premostenie, tooltip to priznáva).
-        if (it.category === 'budget'){ bridgeTo('budget'); return; }
+        // ŠT-1c PR B1: rozpočtové upozornenie NEMÁ entitu v modeli — vedie do
+        // sekcie Rozpočet TOHO ISTÉHO okna, rovno na časť, ktorej sa týka
+        // (`budget_section` skladá server). Žiadne premostenie do iného okna.
+        if (it.category === 'budget'){
+          studioGoSection('budget');
+          if (typeof budGoto === 'function') budGoto(it.budget_section);
+          return;
+        }
         if (!it.stable_key) return;
         selectProblem(it.stable_key, what === 'edit');
         return;

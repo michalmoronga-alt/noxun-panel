@@ -52,9 +52,10 @@ NxTest.test('ŠT-1b: sekcia `ctrl` je v RUBY whiteliste a JS je jeho ZRKADLO') d
   rb = Noxun::Engine::StudioDialog::SECTIONS
   js = S1B_STUDIO_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
   shell = S1B_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  # ŠT-1c PR A pribudla sekcia `buy` (Nakup kovania) — zoznam musi sediet.
-  NxTest.assert_equal(%w[bom ctrl buy], rb,
-                      'v Studiu ziju sekcie Kusovník, Kontrola a Nákup kovania')
+  # ŠT-1c PR A pribudla sekcia `buy` (Nakup kovania), PR B1 sekcia `budget`
+  # (Rozpocet) — zoznam musi sediet vo VSETKYCH TROCH suboroch.
+  NxTest.assert_equal(%w[bom ctrl buy budget], rb,
+                      'v Studiu ziju sekcie Kusovník, Kontrola, Nákup kovania a Rozpočet')
   NxTest.assert_equal(rb, js, 'zoznam v studio.js sa nesmie rozist s Ruby autoritou')
   NxTest.assert_equal(rb, shell, 'ani zrkadlo v paneli (shell.js)')
 end
@@ -62,8 +63,9 @@ end
 NxTest.test('ŠT-1b: okno Vyroba stratilo tab `control` (a jeho UI s nim)') do
   rb = Noxun::Engine::ProductionDialog::TABS
   js = S1B_SHELL_JS[/var STUDIO_TABS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  # ŠT-1c PR A vzala oknu aj tab Kovanie — ostal POSLEDNY tab Rozpocet.
-  NxTest.assert_equal(%w[budget], rb, 'whitelist tabov uz Kontrolu ani Kovanie nepozna')
+  # ŠT-1c PR A vzala oknu aj tab Kovanie, PR B1 POSLEDNY tab Rozpocet — okno
+  # uz nema ZIADNY tab.
+  NxTest.assert_equal([], rb, 'whitelist tabov je prazdny (okno nema co prepinat)')
   NxTest.assert_equal(rb, js, 'JS mirror sa nesmie rozist s Ruby autoritou')
   NxTest.refute(S1B_PROD_HTML.include?('id="pt_control"'), 'tlacidlo tabu zaniklo')
   NxTest.refute(S1B_PROD_HTML.include?('id="ctrlTabBadge"'), 'badge tabu zanikol s nim')
@@ -76,11 +78,12 @@ NxTest.test('ŠT-1b: okno Vyroba stratilo tab `control` (a jeho UI s nim)') do
   %w[setEdgeCheck setGrainCheck closeEdgeMenu].each do |fn|
     NxTest.refute(S1B_PROD_JS.include?("#{fn}: function"), "prijimac #{fn} sa mal odstranit")
   end
-  # DEFAULT vetva tela okna musi ukazovat na ZIVY tab — inak by okno skoncilo
-  # na neexistujucej vetve a ostalo prazdne. ŠT-1c PR A: je to Rozpocet
-  # (jediny zostavajuci tab; Kovanie odislo do sekcie `buy` Studia).
-  NxTest.assert(S1B_PROD_JS.include?('renderBudget(box);'), 'default vetva je Rozpocet')
+  # ŠT-1c PR B1: telo okna uz nekresli ZIADNY tab — ukazuje jedinu vetu o tom,
+  # kam sa obsah presunul (prazdna plocha bez vysvetlenia vyzera ako chyba).
+  NxTest.refute(S1B_PROD_JS.include?('renderBudget('), 'render rozpoctu odisiel do Studia')
   NxTest.refute(S1B_PROD_JS.include?("prodTab === 'control'"), 'ziadna vetva tabu Kontrola')
+  NxTest.assert(S1B_PROD_JS.include?('presťahoval do <b>Štúdia</b>'),
+                'telo okna POVIE, kam sa obsah presunul')
 end
 
 # --- 2) JEDNO cislo kontroly (audit #2) --------------------------------------
@@ -127,12 +130,19 @@ end
 NxTest.test('ŠT-1b: rozpoctove nalezy su v zozname a maju kam viest (audit #3)') do
   NxTest.assert(S1B_STUDIO_JS.include?("it.category === 'budget'"),
                 'rozpoctovy nalez ma vlastnu vetvu')
-  NxTest.assert(S1B_STUDIO_JS.include?("bridgeTo('budget')"),
-                'klik na neho premosti do Rozpoctu (okno Vyroba)')
-  NxTest.assert(S1B_STUDIO_JS.include?('okne Výroba'),
-                'a tooltip to PRIZNA (kotva na sekciu tam nevedie)')
-  NxTest.assert(Noxun::Engine::StudioDialog::PRODUCTION_BRIDGES['budget'] == 'budget',
-                'premostenie mieri na tab Rozpocet, ktory okno Vyroba pozna')
+  # ŠT-1c PR B1 (audit #11): Rozpocet je SEKCIA toho isteho okna, takze klik uz
+  # nepremostuje do okna Vyroba — prepne sekciu a otvori TU jeho cast, ktorej
+  # sa nalez tyka (`budget_section` sklada server).
+  NxTest.refute(S1B_STUDIO_JS.include?("bridgeTo('budget')"),
+                'ziadne premostenie do okna Vyroba')
+  NxTest.assert(S1B_STUDIO_JS.include?("studioGoSection('budget')"),
+                'klik prepne na sekciu Rozpocet')
+  NxTest.assert(S1B_STUDIO_JS.include?('budGoto(it.budget_section)'),
+                'a skoci na cast rozpoctu, ktorej sa nalez tyka')
+  NxTest.assert(S1B_STUDIO_JS.include?('sekcie Rozpočet'),
+                'tooltip hovori o sekcii, nie o okne Vyroba')
+  NxTest.refute(Noxun::Engine::StudioDialog::PRODUCTION_BRIDGES.key?('budget'),
+                'premostenie do okna Vyroba zaniklo')
 end
 
 # --- 3) zelene cislo semaforu (audit #4) -------------------------------------

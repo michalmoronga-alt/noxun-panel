@@ -405,6 +405,42 @@
       p.flush_blocked = blocked;
       if (window.sketchup && sketchup.studio_do_hw_csv) sketchup.studio_do_hw_csv(JSON.stringify(p));
     },
+    // ŠT-1c PR B1 (Š12): XLSX rozpoctu zo sekcie Rozpocet. Ten isty flush guard
+    // ako pri VEPO — rozpisany edit korpusu meni kusovnik, teda aj platne, olep
+    // a montaz v rozpocte (cervene pole preto export ZASTAVI).
+    studioRelayBudget: function(p){
+      var blocked = false;
+      try {
+        if (typeof validateFields === 'function' && typeof selectedCabId !== 'undefined' &&
+            selectedCabId && !validateFields()) blocked = true;
+        var badBud = document.querySelector('#boardCard input.bad, #boardCard .bad');
+        if (badBud) blocked = true;
+      } catch (e) { blocked = false; }
+      if (!blocked){
+        if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+        if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
+      }
+      p.flush_blocked = blocked;
+      if (window.sketchup && sketchup.studio_do_budget_xlsx) sketchup.studio_do_budget_xlsx(JSON.stringify(p));
+    },
+    // ŠT-1c PR B1: zakaznicka cenova ponuka zo sekcie Rozpocet (nahlad CP je
+    // v B1 jej sucastou) — CP je VIEW nad rozpoctom, takze potrebuje presne ten
+    // isty flush handshake (inak by zakaznik dostal sumu zo stareho modelu).
+    studioRelayCp: function(p){
+      var blocked = false;
+      try {
+        if (typeof validateFields === 'function' && typeof selectedCabId !== 'undefined' &&
+            selectedCabId && !validateFields()) blocked = true;
+        var badStCp = document.querySelector('#boardCard input.bad, #boardCard .bad');
+        if (badStCp) blocked = true;
+      } catch (e) { blocked = false; }
+      if (!blocked){
+        if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+        if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
+      }
+      p.flush_blocked = blocked;
+      if (window.sketchup && sketchup.studio_do_cp_xlsx) sketchup.studio_do_cp_xlsx(JSON.stringify(p));
+    },
     // V0.6 E-b2: cenova ponuka pre zakaznika — CP je VIEW nad rozpoctom, takze
     // potrebuje presne ten isty flush handshake (inak by zakaznik dostal sumu
     // zo stareho modelu).

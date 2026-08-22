@@ -61,8 +61,9 @@ NxTest.test('ŠT-1c: `buy` je SEKCIA Studia — a premostenie do okna Vyroba zan
 end
 
 NxTest.test('ŠT-1c: okno Vyroba stratilo tab Kovanie CELY (JS aj HTML aj CSS)') do
-  NxTest.assert_equal(%w[budget], Noxun::Engine::ProductionDialog::TABS,
-                      'whitelist tabov uz Kovanie nepozna')
+  # PR B1 vzala oknu aj POSLEDNY tab (Rozpocet) — whitelist je uz prazdny.
+  NxTest.assert_equal([], Noxun::Engine::ProductionDialog::TABS,
+                      'whitelist tabov uz Kovanie (ani nic ine) nepozna')
   NxTest.refute(S1C_PROD_HTML.include?('id="pt_hardware"'), 'tlacidlo tabu zaniklo')
   NxTest.refute(S1C_PROD_HTML.include?('id="prodHint"'),
                 'hint „klik na riadok kovania" zanikol s nim (patri sekcii)')
@@ -116,7 +117,7 @@ NxTest.test('ŠT-1c (review P3): sekcia Nakup ma vlastnu cestu k cerstvym cislam
                 'takze bez neho by sa objednavalo zo starych poctov')
   NxTest.assert(S1C_STUDIO_JS.include?("t.closest('#refreshBtn')"),
                 'tlacidlo ma handler (ten isty ako v Kusovniku)')
-  NxTest.assert(S1C_STUDIO_JS.include?("studioSec === 'buy' ? 'Prepočítavam nákupný zoznam…'"),
+  NxTest.assert(S1C_STUDIO_JS.include?("buy: 'Prepočítavam nákupný zoznam…'"),
                 'status hovori o TEJ sekcii, na ktoru sa pouzivatel pozera')
 end
 

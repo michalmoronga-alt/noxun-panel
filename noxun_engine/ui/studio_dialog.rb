@@ -29,19 +29,20 @@ module Noxun
       DLG_KEY = 'noxun_engine_studio'
 
       # ZAVAZNY whitelist sekcii Studia. ŠT-1a priniesla Kusovnik, ŠT-1b
-      # KONTROLU (`ctrl`), ŠT-1c PR A NAKUP KOVANIA (`buy`). JS zrkadlo
-      # `NXShell.STUDIO_SECTIONS` je pohodlie, nie ochrana (zhodu strazi guard
-      # test): autoritou je VZDY Ruby.
-      SECTIONS = %w[bom ctrl buy].freeze
+      # KONTROLU (`ctrl`), ŠT-1c PR A NAKUP KOVANIA (`buy`), ŠT-1c PR B1
+      # ROZPOCET (`budget`). JS zrkadlo `NXShell.STUDIO_SECTIONS` je pohodlie,
+      # nie ochrana (zhodu strazi guard test): autoritou je VZDY Ruby.
+      SECTIONS = %w[bom ctrl buy budget].freeze
 
       # PREMOSTENIA (audit #2) — polozky navigacie, ktorych obsah zatial zije
-      # v inom okne. Nie su `disabled`: klik otvori TO okno, kde obsah naozaj
-      # je (a tooltip to prizna). Kluc je meno polozky navigacie, hodnota tab
-      # okna Vyroba — whitelist tabov si aj tak overi `ProductionDialog`.
+      # v inom okne. Kluc je meno polozky navigacie, hodnota tab okna Vyroba.
       # ŠT-1c PR A: premostenie `buy` ZANIKLO — Nakup kovania je sekcia.
-      PRODUCTION_BRIDGES = {
-        'budget' => 'budget', 'offer' => 'budget'
-      }.freeze
+      # ŠT-1c PR B1: zanikli aj POSLEDNE DVE (`budget`, `offer`) — Rozpocet je
+      # sekcia a nahlad cenovej ponuky je zatial jeho sucastou (vlastnu sekciu
+      # `offer` prinesie PR B2). Okno Vyroba uz nema ZIADNY tab, takze
+      # premostenie do neho by otvorilo prazdnu skrupinu. Mapa ostava (prazdna)
+      # ako VETVA `do_bridge` — cela zanikne s oknom v PR B3.
+      PRODUCTION_BRIDGES = {}.freeze
 
       # Premostenia do satelitnych okien (KATALOGY + NASTAVENIA). Hodnota je
       # meno modulu — volat sa smie LEN to, co je TU (klient posiela iba kluc).
@@ -53,8 +54,6 @@ module Noxun
 
       # Slovenske hlasky premosteni — texty sklada SERVER (jedna autorita).
       BRIDGE_STATUS = {
-        'budget' => 'Otváram okno Výroba → Rozpočet (presun do Štúdia príde v dávke ŠT-1c).',
-        'offer' => 'Otváram okno Výroba → Rozpočet — cenová ponuka je zatiaľ jeho súčasťou (ŠT-1c).',
         'mat' => 'Otváram okno Materiály (presun do Štúdia príde v dávke ŠT-2).',
         'hw' => 'Otváram okno Katalóg kovania (presun do Štúdia príde v dávke ŠT-3).',
         'rules' => 'Otváram okno Pravidlá kovania (presun do Štúdia príde v dávke ŠT-3).',
@@ -64,7 +63,11 @@ module Noxun
         # spoja sa az v Studiu (Š19). Status to musi povedat, inak sa otvori
         # okno s inym nadpisom a pouzivatel si mysli, ze klikol zle.
         'sup' => 'Otváram okno Nastavenia rozpočtu — väzba na Demos je zatiaľ v okne Materiály (presun v ŠT-2).',
-        'bset' => 'Otváram okno Nastavenia rozpočtu (presun do Štúdia príde v dávke ŠT-4).',
+        # ŠT-1c PR B1 (#20): to iste okno otvara aj ⚙ v liste sekcie Rozpocet —
+        # kontextova skratka k sadzbam, ktore rozpocet POCITAJU. Text to musi
+        # povedat, inak vyzeraju ako dve rozne nastavenia.
+        'bset' => 'Otváram Nastavenia rozpočtu — sadzby, režimy a prahy platia pre celý ' \
+                  'rozpočet (presun do Štúdia príde v dávke ŠT-4).',
         'about' => 'O plugine nájdeš v koliesku Inspectora — otváram Inspector.'
       }.freeze
 
@@ -159,6 +162,46 @@ module Noxun
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           ProductionCore.do_hw_csv(Sketchup.active_model, data, generation: @generation,
                                                                 status: status_proc, repush: repush_proc)
+        end
+
+        # --- ŠT-1c PR B1: sekcia ROZPOCET -----------------------------------
+        #
+        # JEDINA sekcia, ktora ZAPISUJE do modelu (1 mutacia = 1 krok Spat).
+        # Vsetky tela su v `ProductionCore` — okno odovzdava LEN svoj generacny
+        # token, svoj status, svoje echo a SVOJ REFRESH.
+        #
+        # GENERACNY KONTRAKT (audit #1): budget-iniciovany push ide s
+        # `bump: false` — payload je PLNY (Kontrola dostane cerstve rozpoctove
+        # ORANGE), ale generacia okna sa NEDVIHA. Mutacia rozpoctu nemeni
+        # `rows`/`refs`, takze rozkliknuty riadok Kusovnika ani rozrobeny export
+        # inej sekcie nesmie zastarat len preto, ze niekto prepisal sumu.
+        # Ochranu proti zastaranemu ZAPISU drzi to, ze KAZDA ina zmena (model,
+        # katalog, prepnutie dokumentu) generaciu bumpne ako doteraz — a mutacia
+        # so starym `gen` sa odmietne.
+        def do_budget(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          ProductionCore.do_budget(Sketchup.active_model, data, generation: @generation,
+                                                                status: status_proc,
+                                                                repush: budget_repush_proc,
+                                                                result: budget_result_proc)
+        end
+
+        # XLSX rozpoctu — flush handshake (rozpisany edit panela meni kusovnik,
+        # teda aj platne, olep a montaz v rozpocte).
+        def do_budget_xlsx(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          ProductionCore.do_budget_xlsx(Sketchup.active_model, data, generation: @generation,
+                                                                     status: status_proc,
+                                                                     repush: repush_proc)
+        end
+
+        # Zakaznicka cenova ponuka (XLSX) — v PR B1 este export SEKCIE Rozpocet
+        # (nahlad CP je jej sucastou); vlastnu sekciu `offer` prinesie PR B2.
+        def do_cp_xlsx(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          ProductionCore.do_cp_xlsx(Sketchup.active_model, data, generation: @generation,
+                                                                 status: status_proc,
+                                                                 repush: repush_proc)
         end
 
         # --- ŠT-1b: sekcia KONTROLA -----------------------------------------
@@ -335,6 +378,66 @@ module Noxun
           -> { refresh_if_open }
         end
 
+        # ŠT-1c PR B1 (audit #1): refresh po mutacii ROZPOCTU. Plny payload,
+        # ale BEZ zdvihu generacie — inak by kazdy prepis sumy zneplatnil
+        # rozkliknuty riadok Kusovnika a rozrobeny export inej sekcie.
+        #
+        # Review #3: JEDINA refresh cesta okna, ktora si nesmie dovolit vynimku.
+        # `ProductionCore.do_budget` vola `repush` aj vo svojej rescue vetve —
+        # keby prvy pokus vybuchol, druhy by uz bezal MIMO rescue, vyletel by
+        # z callbacku a klient by nedostal payload; jeho fronta zapisov by
+        # potom visela az do 6 s poistky (`BUD_BUSY_MS`).
+        def budget_repush_proc
+          lambda do
+            push_state(bump: false) if @dialog && @dialog.visible?
+          rescue StandardError => e
+            Engine.log_error(e, 'StudioDialog.budget_repush')
+          end
+        end
+
+        # Vysledok mutacie ide do okna PRED cerstvym payloadom — rozpisany
+        # draft sa smie zavriet LEN pri uspechu (GH #138 P2).
+        def budget_result_proc
+          lambda do |op, ok|
+            js("if (window.NX && NX.budgetResult) NX.budgetResult(#{op.to_s.to_json}, #{ok ? 'true' : 'false'});")
+          end
+        end
+
+        # E-c „Prepočítať ceny": fazove okno riadi SERVER, toto je len echo do
+        # TOHTO okna.
+        def price_refresh_emit_proc
+          ->(event) { js("if (window.NX && NX.priceRefresh) NX.priceRefresh(#{event.to_json});") }
+        end
+
+        # Zivotnost behu = TA ISTA instancia okna, z ktorej sa spustil (vzor
+        # MaterialsDialog.demos_alive_proc): zavretie okna pocas fetchu a jeho
+        # znovuotvorenie NESMIE opusteny beh „ozivit". Prepnutie MODELU beh
+        # nezastavi — ceny idu do katalogu, ktory je globalny.
+        def price_refresh_alive_proc(dlg)
+          -> { !dlg.nil? && !@dialog.nil? && @dialog.equal?(dlg) && dlg.visible? }
+        end
+
+        # Po dobehnuti prepoctu: ceny sa zmenili GLOBALNE, takze cerstve cisla
+        # potrebuje aj katalog materialov, panel a katalog kovania. Tento push
+        # generaciu ZDVIHA (nie je to mutacia rozpoctu — zmenil sa katalog).
+        #
+        # Review #1: okno Vyroba je v zozname TIEZ — hoci rozpocet uz
+        # NEZOBRAZUJE, jeho ⚠ chip nesie `counts` KONTROLY a tie zahrnaju aj
+        # ROZPOCTOVE oranzove nalezy (zlucuje ich zdielana `control_payload`).
+        # Prepocet cien ich vie zmenit (riadok bez ceny cenu dostane), takze bez
+        # by chip ukazoval stare cislo — presne ten druh tichej nezhody, ktory
+        # kontrakt „KAZDE okno s cislami zakazky je vo VSETKYCH refresh
+        # cestach" zakazuje. Zanikne az s oknom v PR B3.
+        def price_refresh_after_proc
+          lambda do
+            push_state
+            MaterialsDialog.push_catalog if defined?(MaterialsDialog)
+            Panel.push_materials if defined?(Panel)
+            HardwareCatalogDialog.push_items if defined?(HardwareCatalogDialog)
+            ProductionDialog.refresh_if_open if defined?(ProductionDialog)
+          end
+        end
+
         # Echo prepinacov (ŠT-1b): odmietnuta akcia musi vratit listu sekcie na
         # PRAVDIVY stav — bez prepoctu celej sekcie.
         def edge_echo_proc
@@ -395,6 +498,18 @@ module Noxun
           # Vyroba (nikdy dve naraz).
           cb(dlg, 'edge_menu_open')       { |_p| Engine.close_edge_menu(:studio) }
           cb(dlg, 'grain_check_toggle')   { |p| do_grain_check(p) }
+          # ŠT-1c PR B1, sekcia ROZPOCET. Mutacia (`budget_mutate`) ide PRIAMO —
+          # nie je to export a flush handshake by pri kazdom prepise sumy
+          # zbytocne prehnal rozpisane edity panela. Oba XLSX exporty naopak
+          # flush handshake MAJU (cisla harku musia sediet s modelom po flushi).
+          cb(dlg, 'budget_mutate')   { |p| do_budget(p) }
+          cb(dlg, 'budget_xlsx')     { |p| handle_budget_xlsx(p) }
+          cb(dlg, 'cp_xlsx')         { |p| handle_cp_xlsx(p) }
+          cb(dlg, 'budget_open_url') { |p| handle_budget_url(p) }
+          cb(dlg, 'budget_settings') { |_p| ProductionCore.open_budget_settings(status: status_proc) }
+          # E-c: „Prepočítať ceny" — hromadne obnovenie cien z Demosu.
+          cb(dlg, 'price_refresh')        { |p| handle_price_refresh(p) }
+          cb(dlg, 'price_refresh_cancel') { |_p| ProductionCore.price_refresh_cancel(status: status_proc) }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(studio): #{msg}")
@@ -451,13 +566,56 @@ module Noxun
           end
         end
 
+        # ŠT-1c PR B1: XLSX rozpoctu a zakaznicka cenova ponuka — TEN ISTY flush
+        # handshake ako VEPO/CSV, vlastnym kanalom Studia (odpoved musi prist do
+        # TOHTO okna; cudzi push by mu klik odmietol).
+        def handle_budget_xlsx(payload)
+          data = JSON.parse(payload.to_s)
+          if Panel.dialog_alive?
+            Panel.js("NX.studioRelayBudget(#{data.to_json})")
+          else
+            do_budget_xlsx(data)
+          end
+        end
+
+        def handle_cp_xlsx(payload)
+          data = JSON.parse(payload.to_s)
+          if Panel.dialog_alive?
+            Panel.js("NX.studioRelayCp(#{data.to_json})")
+          else
+            do_cp_xlsx(data)
+          end
+        end
+
+        # ↗ v riadku rozpoctu — adresa sa dohladava v modeli podla ID polozky a
+        # este raz sanitizuje (z klienta nechodi).
+        def handle_budget_url(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          ProductionCore.budget_open_url(Sketchup.active_model, data, status: status_proc)
+        end
+
+        # E-c: beh riadi SERVER (`core/price_refresh.rb`) — okno odovzdava svoje
+        # echo, svoju zivotnost a svoje refresh cesty.
+        def handle_price_refresh(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          ProductionCore.do_price_refresh(Sketchup.active_model, data,
+                                          generation: @generation, status: status_proc,
+                                          repush: repush_proc, emit: price_refresh_emit_proc,
+                                          alive: price_refresh_alive_proc(@dialog),
+                                          after: price_refresh_after_proc)
+        end
+
         # Payload OKNA (sekcie Kusovnik + Kontrola). Cisla su TIE ISTE, ktore
         # cita okno Vyroba (`ProductionCore`) — Studio nema vlastny vypocet a JS
         # si NIC neprepocitava (ani sumy, ani medzisucty skupin, ani counts).
         # JEDEN push nesie obe sekcie zamerne: prepnutie sekcie je cisto
         # zobrazovacie, takze nesmie chodit na server po data.
-        def push_state
-          @generation = @generation.to_i + 1
+        # `bump: false` = ROZPOCTOVY push (audit #1). Payload je plny, ale
+        # generacia okna sa NEDVIHA: mutacia rozpoctu nemeni `rows`/`refs`,
+        # takze pending klik ci export inej sekcie ostava platny. Prvy push
+        # generaciu zdvihne VZDY (gen 0 by sa rovnal „ziadne data").
+        def push_state(bump: true)
+          @generation = @generation.to_i + 1 if bump || @generation.to_i.zero?
           model = Sketchup.active_model
           collected = ProductionCore.fresh_collect(model)
           bom = Bom.compute(collected)
@@ -473,8 +631,10 @@ module Noxun
           # sekcie, badge navigacie aj suhrn exportu tak ukazuju JEDNO cislo.
           # (⚠ chip Inspectora je nieco ine — build warnings oznacenej skrinky;
           # do tejto sekcie len VEDIE deep-linkom.)
-          # Rozpocet sa pocita LEN kvoli jeho ORANGE nalezom (sekcia Rozpocet
-          # pride v ŠT-1c) a berie uz hotovy odhad platni — ziadny druhy vypocet.
+          # ŠT-1c PR B1: rozpocet uz nie je len zdroj ORANGE nalezov — je to
+          # payload SEKCIE `budget` tohto okna. Pocita sa RAZ a slúzi obom
+          # (Kontrola z neho berie svoje upozornenia), z uz hotoveho odhadu
+          # platni — ziadny druhy vypocet.
           hw_exp = ProductionCore.hardware_expansion(model, collected)
           budget = ProductionCore.budget_payload(model, bom, collected, estimate, hw_exp, smap)
           control = ProductionCore.control_payload(collected, hardware_expansion: hw_exp,
@@ -515,6 +675,10 @@ module Noxun
             # („skriniek bez nálezu") — JS si zo zoznamu NIC neprepocitava, ani
             # badge navigacie. Filter chipov je cisto zobrazovacia vec klienta.
             control: control['items'], counts: control['counts'],
+            # ŠT-1c PR B1, sekcia ROZPOCET (Š12–Š13): cely rozpocet zakazky
+            # (sekcie, sumy, vek cien, upozornenia, nahlad cenovej ponuky).
+            # JS z neho LEN cita — ZIADNA suma sa v prehliadaci nepocita.
+            budget: budget,
             # Š10: stav oboch prepinacov listy. Vypnuty prepinac nic neskenuje.
             edge_check: (defined?(EdgeCheck) ? EdgeCheck.ui_state(model) : nil),
             grain_check: (defined?(GrainCheck) ? GrainCheck.ui_state(model) : nil),

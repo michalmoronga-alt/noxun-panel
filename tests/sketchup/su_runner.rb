@@ -5251,21 +5251,28 @@ module NoxunSuRunner
       info('ŠT-1b: Overlay API nie je k dispozicii — prepinac kresby sa preskocil.')
     end
 
-    # --- 4) rozpoctovy nalez premosti do okna Vyroba (audit #3) --------------
+    # --- 4) rozpoctovy nalez vedie do SEKCIE Rozpocet (ŠT-1c PR B1) ---------
+    # Do ŠT-1c PR B1 to bolo PREMOSTENIE do okna Vyroba. Odkedy je Rozpocet
+    # sekciou TOHO ISTEHO okna, klik ostava v nom (klientska cesta
+    # `studioGoSection('budget')` + `budGoto(budget_section)`), takze zo
+    # servera sa uz NESMIE otvorit ziadne okno.
     bud = Array(control['items']).find { |it| it['category'].to_s == 'budget' }
     if bud.nil?
-      info('ŠT-1b: model nema rozpoctovy nalez — premostenie sa preskocilo.')
+      info('ŠT-1b: model nema rozpoctovy nalez — kontrola cesty sa preskocila.')
     else
-      e::StudioDialog.do_bridge({ 'section' => 'budget' }.to_json)
-      prod_dlg = e::ProductionDialog.instance_variable_get(:@dialog)
-      ok('ŠT-1b: rozpoctovy nalez otvoril okno Vyroba (premostenie do Rozpoctu)',
-         !prod_dlg.nil?)
-      ok('ŠT-1b: premostenie model nezmenilo', model.entities.length == before_ents)
-      begin
-        prod_dlg.close if prod_dlg && prod_dlg.respond_to?(:close)
-      rescue StandardError
-        nil
+      ok('ŠT-1b: rozpoctovy nalez nesie adresu sekcie rozpoctu (server sklada `budget_section`)',
+         bud.key?('budget_section'))
+      ok('ŠT-1c B1: premostenia do okna Vyroba uz NEEXISTUJU',
+         e::StudioDialog::PRODUCTION_BRIDGES.empty?)
+      scripts = st1c_capture(e::StudioDialog) do
+        e::StudioDialog.do_bridge({ 'section' => 'budget' }.to_json)
       end
+      prod_dlg = e::ProductionDialog.instance_variable_get(:@dialog)
+      ok('ŠT-1c B1: ziadost o premostenie `budget` uz okno Vyroba NEOTVORI',
+         prod_dlg.nil?)
+      ok('ŠT-1c B1: a server to povie nahlas (neznamy kluc = nie ticho)',
+         scripts.any? { |s| s.include?('Táto sekcia zatiaľ neexistuje') })
+      ok('ŠT-1b: ziadost model nezmenila', model.entities.length == before_ents)
     end
 
     # Poslednou modelovou operaciou je vlozenie skrinky — keby bol klik na nalez
@@ -5380,6 +5387,234 @@ module NoxunSuRunner
     end
   end
 
+  # ============ ŠT-1c PR B1: sekcia ROZPOCET (Š12–Š13) =======================
+  # Rozpocet je JEDINA cesta, ktora ZAPISUJE do modelu — a headless sada undo
+  # neoveri. Tu sa dokazuje:
+  #   1) KAZDA z 12 operacii = PRESNE JEDEN krok Spat (`BudgetStore.write!`),
+  #   2) guardy: stara generacia aj CUDZI model_guid zapis ODMIETNU,
+  #   3) odmietnuty zapis posle `NX.budgetResult(op,false)` — draft v okne
+  #      ostane otvoreny aj s rozpisanymi hodnotami (GH #138 P2),
+  #   4) GENERACNY KONTRAKT (audit #1): mutacia rozpoctu generaciu NEZDVIHA,
+  #      takze klik v Kusovniku s POVODNOU `gen` po nej stale prejde,
+  #   5) oba XLSX exporty maju gen guard, ktory zastavi cestu EST PRED
+  #      dialogom na ulozenie suboru,
+  #   6) MERANIE (audit #19): trvanie `push_state` proti poistke BUD_BUSY_MS
+  #      (6 s) — keby sa priblizilo, fronta zapisov by sa uvolnovala timerom
+  #      namiesto payloadu.
+  # POZOR (audit #18): testovaci model NESMIE mat duplicitne kopie — `fresh_collect`
+  # v pushi by spustil `dedup_copies`, ktory pridava VLASTNY krok Spat a merania
+  # undo krokov by boli nezmysel. Runner stavia JEDNU skrinku.
+
+  def st1c_gen
+    e::StudioDialog.instance_variable_get(:@generation).to_i
+  end
+
+  def st1c_bud_payload(op, extra = {})
+    { 'op' => op, 'gen' => st1c_gen,
+      'model_guid' => e::ProductionCore.model_guid(Sketchup.active_model) }.merge(extra)
+  end
+
+  # Jedna operacia rozpoctu: zapis MUSI zmenit stav a JEDEN krok Spat ho MUSI
+  # vratit presne tam, kde bol.
+  def st1c_bud_op(model, label, op, extra, read)
+    before = read.call(model)
+    e::StudioDialog.do_budget(st1c_bud_payload(op, extra).to_json)
+    changed = read.call(model)
+    ok("ŠT-1c B1: `#{op}` (#{label}) zapisal zmenu do modelu", changed != before)
+    Sketchup.undo
+    ok("ŠT-1c B1: `#{op}` = PRESNE 1 krok Späť", read.call(model) == before)
+  end
+
+  def st1c_budget(model, inst)
+    bs = e::BudgetStore
+    before_ents = model.entities.length
+    e::StudioDialog.send(:push_state)
+
+    custom = ->(m) { bs.custom_items(m) }
+    appl = ->(m) { bs.appliances(m) }
+
+    # --- 1) 12 operacii = 12x „jedna zmena, jeden krok Späť" ----------------
+    st1c_bud_op(model, 'cenový režim', 'mode', { 'mode' => 'vysoky' },
+                ->(m) { bs.mode(m) })
+    st1c_bud_op(model, 'prepis sumy', 'override',
+                { 'row_key' => 'service:montaz', 'amount' => 123.45 },
+                ->(m) { bs.overrides(m) })
+    st1c_bud_op(model, 'násobok riadku', 'multiplier',
+                { 'row_key' => 'std:doprava', 'multiplier' => 2.0 },
+                ->(m) { bs.std_multipliers(m) })
+    st1c_bud_op(model, 'm² vizualizácie', 'viz_m2', { 'value' => 12.5 },
+                ->(m) { bs.viz_m2(m) })
+    st1c_bud_op(model, 'spotrebiče v súčte', 'appl_included', { 'included' => true },
+                ->(m) { bs.appliances_included?(m) })
+    st1c_bud_op(model, 'zaradenie v CP', 'cp_group',
+                { 'source_key' => 'material:SU-TEST', 'group' => 'samostatne' },
+                ->(m) { bs.cp_overrides(m) })
+    st1c_bud_op(model, 'nová položka', 'custom_add',
+                { 'attrs' => { 'popis' => 'SU test položka', 'pocet' => '2', 'cena' => '10' } },
+                custom)
+    st1c_bud_op(model, 'nový spotrebič', 'appliance_add',
+                { 'attrs' => { 'typ' => 'rura', 'nazov' => 'SU test rúra', 'cena' => '100' } },
+                appl)
+
+    # Uprava a mazanie potrebuju polozku, ktora UZ existuje — fixture je vlastny
+    # krok Spat a odstrani sa hned po dvojici testov (aby zaverecne „1x Späť"
+    # v run_st1c vratilo skrinku, nie zvysok rozpoctu).
+    bs.add_custom_item!(model, 'popis' => 'SU fixture', 'pocet' => '1', 'cena' => '5')
+    cid = custom.call(model).last.to_h['id'].to_s
+    if cid.empty?
+      ok('ŠT-1c B1: fixture vlastnej položky sa vytvorila', false)
+    else
+      st1c_bud_op(model, 'úprava položky', 'custom_update',
+                  { 'id' => cid, 'attrs' => { 'popis' => 'SU test zmena' } }, custom)
+      st1c_bud_op(model, 'zmazanie položky', 'custom_remove', { 'id' => cid }, custom)
+    end
+    Sketchup.undo # fixture prec
+
+    bs.add_appliance!(model, 'typ' => 'umyvacka', 'nazov' => 'SU fixture', 'cena' => '5')
+    aid = appl.call(model).last.to_h['id'].to_s
+    if aid.empty?
+      ok('ŠT-1c B1: fixture spotrebica sa vytvorila', false)
+    else
+      st1c_bud_op(model, 'úprava spotrebiča', 'appliance_update',
+                  { 'id' => aid, 'attrs' => { 'nazov' => 'SU test zmena' } }, appl)
+      st1c_bud_op(model, 'zmazanie spotrebiča', 'appliance_remove', { 'id' => aid }, appl)
+    end
+    Sketchup.undo # fixture prec
+
+    ok('ŠT-1c B1: rozpočet po všetkých krokoch Späť nemá žiadny zvyšok',
+       custom.call(model).empty? && appl.call(model).empty? &&
+       bs.mode(model) == e::SupplierSettings::DEFAULT_MODE)
+    ok('ŠT-1c B1: zápisy rozpočtu NEMENIA geometriu (žiadna entita naviac ani menej)',
+       model.entities.length == before_ents)
+
+    # --- 2) guardy: stara generacia a CUDZI dokument -------------------------
+    mode_before = bs.mode(model)
+    scripts = st1c_capture(e::StudioDialog) do
+      e::StudioDialog.do_budget({ 'op' => 'mode', 'mode' => 'vysoky',
+                                  'gen' => st1c_gen - 99,
+                                  'model_guid' => e::ProductionCore.model_guid(model) }.to_json)
+    end
+    ok('ŠT-1c B1: zápis so STAROU generáciou sa ODMIETOL (nič sa nezapísalo)',
+       bs.mode(model) == mode_before)
+    ok('ŠT-1c B1: a odmietnutie nie je tiché — okno to povie statusom',
+       scripts.any? { |s| s.include?('Rozpočet sa medzitým prepočítal') })
+
+    scripts = st1c_capture(e::StudioDialog) do
+      e::StudioDialog.do_budget(st1c_bud_payload('mode', 'mode' => 'vysoky')
+                                  .merge('model_guid' => 'CUDZI-GUID').to_json)
+    end
+    ok('ŠT-1c B1: zápis z CUDZIEHO dokumentu sa ODMIETOL',
+       bs.mode(model) == mode_before)
+    ok('ŠT-1c B1: a povie to (model sa medzitým prepol)',
+       scripts.any? { |s| s.include?('Model sa medzitým prepol') })
+
+    # --- 3) odmietnuty zapis NECHAVA draft otvoreny (GH #138 P2) -------------
+    scripts = st1c_capture(e::StudioDialog) do
+      e::StudioDialog.do_budget(
+        st1c_bud_payload('custom_add',
+                         'attrs' => { 'popis' => 'SU chybná', 'cena' => 'nie je číslo' }).to_json
+      )
+    end
+    ok('ŠT-1c B1: chybná cena sa NEZAPÍŠE (žiadna nová položka)',
+       custom.call(model).empty?)
+    ok('ŠT-1c B1: server pošle `budgetResult(custom_add, false)` — draft ostane otvorený',
+       scripts.any? { |s| s.include?('NX.budgetResult("custom_add", false)') })
+    ok('ŠT-1c B1: a dôvod ide do statusu (nie tiché zlyhanie)',
+       scripts.any? { |s| s.include?('Nezapísané') && s.include?('cena musí byť číslo') })
+
+    # --- 4) GENERACNY KONTRAKT (audit #1) -----------------------------------
+    # Toto je jadro dávky: mutácia rozpočtu POSIELA plný payload, ale generáciu
+    # NEZDVÍHA — inak by každý prepis sumy zneplatnil rozkliknutý riadok
+    # Kusovníka („Dáta okna sa medzitým obnovili").
+    e::StudioDialog.show
+    begin
+      e::StudioDialog.send(:push_state)
+      gen_before = st1c_gen
+      e::StudioDialog.do_budget(st1c_bud_payload('mode', 'mode' => 'vysoky').to_json)
+      gen_after = st1c_gen
+      ok("ŠT-1c B1 (audit #1): mutácia rozpočtu NEZDVIHLA generáciu okna " \
+         "(#{gen_before} -> #{gen_after})", gen_after == gen_before)
+
+      # DOKAZ, PRECO na tom zalezi: klik v Kusovniku s PÔVODNOU generáciou
+      # (používateľ ho mal rozkliknutý ešte pred zápisom) MUSÍ prejsť.
+      collected = e::ProductionCore.fresh_collect(model)
+      row = e::Bom.compute(collected)[:rows].find { |r| !r['key'].to_s.empty? }
+      if row.nil?
+        info('ŠT-1c B1: model nemá riadok kusovníka — dôkaz bump:false sa preskočil.')
+      else
+        model.selection.clear
+        scripts = st1c_capture(e::StudioDialog) do
+          e::StudioDialog.do_select({ 'gen' => gen_before, 'parts_key' => row['key'] }.to_json)
+        end
+        ok('ŠT-1c B1 (audit #1): klik v Kusovníku s pôvodnou gen PO zápise rozpočtu PREJDE',
+           !model.selection.to_a.empty?)
+        ok('ŠT-1c B1: a neskončí na „Dáta okna sa medzitým obnovili"',
+           scripts.none? { |s| s.include?('Dáta okna sa medzitým obnovili') })
+        model.selection.clear
+      end
+      # Kontrolná vzorka: BEŽNÝ push (refresh, prepnutý model, iné okno)
+      # generáciu zdvíha ĎALEJ — inak by guard prestal chrániť.
+      gen_mid = st1c_gen
+      e::StudioDialog.refresh_if_open
+      ok("ŠT-1c B1: bežný refresh generáciu ZDVIHOL (#{gen_mid} -> #{st1c_gen})",
+         st1c_gen > gen_mid)
+      Sketchup.undo # režim späť
+
+      # --- 5) XLSX guardy: stara generacia NESMIE otvorit dialog na ulozenie --
+      st1c_without_savepanel do |calls|
+        scripts = st1c_capture(e::StudioDialog) do
+          e::StudioDialog.do_budget_xlsx({ 'gen' => st1c_gen - 99 }.to_json)
+        end
+        ok('ŠT-1c B1: XLSX rozpočtu so STAROU generáciou NEOTVORÍ dialóg na uloženie',
+           calls[0].zero?)
+        ok('ŠT-1c B1: a odmietnutie povie prečo',
+           scripts.any? { |s| s.include?('Dáta okna sa medzitým zmenili') })
+        scripts = st1c_capture(e::StudioDialog) do
+          e::StudioDialog.do_cp_xlsx({ 'gen' => st1c_gen - 99 }.to_json)
+        end
+        ok('ŠT-1c B1: to isté platí pre cenovú ponuku (zákaznícky dokument)',
+           calls[0].zero?)
+        ok('ŠT-1c B1: aj tá povie prečo',
+           scripts.any? { |s| s.include?('Dáta okna sa medzitým zmenili') })
+        # Červené pole panela export zastaví aj s ČERSTVOU generáciou.
+        scripts = st1c_capture(e::StudioDialog) do
+          e::StudioDialog.do_budget_xlsx({ 'gen' => st1c_gen, 'flush_blocked' => true }.to_json)
+        end
+        ok('ŠT-1c B1: neplatné pole panela export ZASTAVÍ (bez dialógu)',
+           calls[0].zero? && scripts.any? { |s| s.include?('neplatné polia') })
+      end
+
+      # --- 6) MERANIE (audit #19): push_state proti poistke BUD_BUSY_MS ------
+      t0 = Time.now
+      e::StudioDialog.send(:push_state)
+      t_push = ((Time.now - t0) * 1000).round(1)
+      t1 = Time.now
+      e::StudioDialog.do_budget(st1c_bud_payload('viz_m2', 'value' => 3.5).to_json)
+      t_mut = ((Time.now - t1) * 1000).round(1)
+      Sketchup.undo
+      info("ŠT-1c B1 MERANIE (audit #19): push_state Studia #{t_push} ms · " \
+           "mutácia rozpočtu vrátane repushu #{t_mut} ms · poistka klienta BUD_BUSY_MS = 6000 ms")
+      ok('ŠT-1c B1 (audit #19): mutácia dobehne hlboko pod poistkou fronty (6 s)',
+         t_mut < 6000)
+    ensure
+      dlg = e::StudioDialog.instance_variable_get(:@dialog)
+      begin
+        dlg.close if dlg && dlg.respond_to?(:close)
+      rescue StandardError
+        nil
+      end
+    end
+
+    ok('ŠT-1c B1: po celom bloku rozpočtu je stav zákazky čistý',
+       bs.custom_items(model).empty? && bs.appliances(model).empty? &&
+       bs.viz_m2(model).nil? && bs.mode(model) == e::SupplierSettings::DEFAULT_MODE)
+    ok('ŠT-1c B1: a model má stále presne toľko entít ako pred rozpočtom',
+       model.entities.length == before_ents)
+    inst
+  rescue StandardError => ex
+    log_line("FAIL: ŠT-1c B1 rozpocet vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   def st1c_studio_payload(scripts)
     s = scripts.find { |x| x.start_with?('NX.setStudio(') }
     return nil if s.nil?
@@ -5432,8 +5667,14 @@ module NoxunSuRunner
       ok('ŠT-1c: okno Vyroba uz nakupny zoznam NEDOSTAVA (pole zaniklo s tabom)',
          !pr_data.key?('hardware_sets'))
       ok('ŠT-1c: ani generiku kovania', !pr_data.key?('hardware'))
-      ok('ŠT-1c: rozpocet okna Vyroba pritom ostal netknuty (kovanie v nom zije dalej)',
-         pr_data.key?('budget'))
+      # ŠT-1c PR B1: a od tejto davky ani ROZPOCET — pole `budget` citalo
+      # VYHRADNE telo tabu, ktory sa presunul do Studia. Rozpocet sa v okne
+      # Vyroba pocita DALEJ (kvoli ORANGE nalezom KONTROLY pod ⚠ chipom), len
+      # sa uz neposiela klientovi.
+      ok('ŠT-1c B1: okno Vyroba uz NEDOSTAVA ani rozpocet (pole zaniklo s tabom)',
+         !pr_data.key?('budget'))
+      ok('ŠT-1c B1: KONTROLA v nom vsak zije dalej (⚠ chip ma z coho kreslit)',
+         pr_data.key?('counts') && pr_data.key?('control'))
     end
 
     # --- 2) klik na riadok generiky OZNACI vlastnika a NEPRIDA krok Spat -----
@@ -5510,12 +5751,17 @@ module NoxunSuRunner
       info('ŠT-1c: Overlay API nie je k dispozicii — kontrola broadcastu hran sa preskocila.')
     end
 
+    # --- 5) ŠT-1c PR B1: sekcia ROZPOCET (Š12–Š13) --------------------------
+    # Jedina sekcia, ktora ZAPISUJE do modelu. Kazdy jej zapis sa tu aj vracia
+    # (jeden krok Spat), takze zaverecne „1x Spat" nizsie stale vracia SKRINKU.
+    st1c_budget(model, inst)
+
     # Poslednou modelovou operaciou je vlozenie skrinky — keby bol klik na
-    # riadok kovania, export alebo prepinac vlastnou operaciou, 1x Spat by
-    # vratil JU.
+    # riadok kovania, export, prepinac ALEBO nevrateny zapis rozpoctu vlastnou
+    # operaciou, 1x Spat by vratil JU (a tento test by padol).
     model.selection.clear
     Sketchup.undo
-    ok('ŠT-1c: 1x Spat zmaze skrinku (sekcia Nákup kovania nepridala ziadny krok Spat)',
+    ok('ŠT-1c: 1x Spat zmaze skrinku (sekcie Nákup kovania ani Rozpočet nenechali krok Spat navyse)',
        inst.nil? || !inst.valid?)
 
     cleanup(model)
@@ -6197,7 +6443,7 @@ module NoxunSuRunner
     run_smoke1(model)        # SMOKE PACK 1 (6A): rucne odfotenie nahladu k ULOZENEJ sablone — guardy vyberu, ziadny undo krok
     run_st1a(model)          # ST-1a: okno Studio — deep-link sekcie, kusovnik zo ziveho modelu, klik-select bez undo kroku, serverovy nazov projektu
     run_st1b(model)          # ŠT-1b: sekcia Kontrola v Studiu — jedno cislo semaforu, klik na nalez bez undo kroku, zdielane prepinace, trvanie pushov
-    run_st1c(model)          # ŠT-1c PR A: sekcia Nákup kovania v Studiu — payload so setmi a labelmi, klik-select vlastnika, gen guard CSV, broadcast stavu hran
+    run_st1c(model)          # ŠT-1c: sekcia Nákup kovania (PR A) + sekcia ROZPOCET (PR B1) — 12 mutacii = 12x jeden krok Spat, gen a guid guardy, bump:false kontrakt, XLSX guardy, meranie pushov
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

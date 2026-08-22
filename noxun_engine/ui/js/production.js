@@ -12,8 +12,12 @@
   // okna ŠTÚDIO. Tu ostal len ⚠ chip hlavičky, ktorý tam vedie.
   // ŠT-1c PR A: a to isté tabu KOVANIE — nákupný zoznam (sety, generika,
   // CSV export, klik-select vlastníka) je sekcia „Nákup kovania" okna ŠTÚDIO
-  // (presun 1:1 podľa Š7). Oknu ostal POSLEDNÝ tab Rozpočet.
-  var prodTab = 'budget';
+  // (presun 1:1 podľa Š7).
+  // ŠT-1c PR B1: a POSLEDNÉMU tabu ROZPOČET — celý rozpočet zákazky vrátane
+  // náhľadu cenovej ponuky, exportov XLSX a prepočtu cien je sekcia „Rozpočet"
+  // okna ŠTÚDIO (js/budget.js sa načítava TAM). Oknu tak neostal ŽIADNY tab:
+  // ostal ⚠ chip do sekcie Kontrola, súhrn zákazky a veta, kam sa obsah
+  // presťahoval. Celé okno zanikne v PR B3.
 
   function el(id){ return document.getElementById(id); }
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -24,12 +28,9 @@
       BOM = data || null;
       el('prodModel').textContent = BOM ? ('model: ' + BOM.model_title + ' · v' + BOM.version) : '…';
       renderProject(); renderSummary(); renderWarnChip();
-      // UI-D3: deep-link z Inspectora („Materiál" -> Kusovník). Server posiela
-      // `open_tab` PRAVE RAZ; setProdTab uz kresli listu aj telo, takze sa
-      // nekresli dvakrat. Ked uz na tom tabe stojime (alebo deep-link nie je),
-      // ide bezna cesta.
-      var want = (BOM && BOM.open_tab) ? BOM.open_tab : null;
-      if (want && want !== prodTab){ setProdTab(want); return; }
+      // ŠT-1c PR B1: deep-link na tab tu ZANIKOL spolu s poslednym tabom
+      // (`TABS` je prazdne pole, takze `open_tab` je vzdy null). Deep-link
+      // ZIJE — ale do SEKCII okna Studio (`StudioDialog::SECTIONS`).
       renderBody();
     },
     setStatus: function(msg, err){ var e = el('status'); e.textContent = msg; e.className = err ? 'err' : 'ok'; }
@@ -56,26 +57,8 @@
 
   function requestRefresh(){ if (window.sketchup && sketchup.refresh_bom) sketchup.refresh_bom(''); }
 
-  // ST-1a (audit #9): zoznam tabov sa cita z DOM, nie z natvrdo pisaneho pola —
-  // odstranenie tabu by inak skoncilo na `el(null).classList` (TypeError) a
-  // okno by ostalo cierne.
-  function prodTabIds(){
-    var out = [];
-    var box = el('prodTabs');
-    if (!box) return out;
-    var btns = box.querySelectorAll('button[id^="pt_"]');
-    for (var i = 0; i < btns.length; i++) out.push(btns[i].id.slice(3));
-    return out;
-  }
-
-  function setProdTab(t){
-    prodTab = t;
-    prodTabIds().forEach(function(k){
-      var b = el('pt_' + k);
-      if (b) b.classList.toggle('on', k === t);
-    });
-    renderBody();
-  }
+  // ST-1a (audit #9): `prodTabIds` / `setProdTab` ZANIKLI — okno uz nema
+  // ziadny tab, takze nie je co prepinat (ŠT-1c PR B1).
 
   function renderSummary(){
     if (!BOM){ el('prodSummary').textContent = '…'; return; }
@@ -102,10 +85,16 @@
                   (orange ? '<span class="cb-orange">🟠 ' + orange + '</span>' : '');
   }
 
+  // ŠT-1c PR B1: okno uz nema OBSAH — vsetkych pat tabov zije v Studiu. Telo
+  // to POVIE nahlas namiesto prazdnej plochy: prazdne okno bez vysvetlenia
+  // vyzera ako chyba (a Michal by hladal, kde sa rozpocet stratil). Okno
+  // zanikne v PR B3, ktora sem uz nema co pisat.
   function renderBody(){
     var box = el('prodBody');
-    if (!BOM){ box.innerHTML = '<div class="muted">Načítavam…</div>'; return; }
-    renderBudget(box); // V0.6 E-b (js/budget.js) — jediny zostavajuci tab
+    if (!box) return;
+    box.innerHTML = '<div class="muted">Obsah tohto okna sa presťahoval do <b>Štúdia</b> ' +
+      '(Kusovník · Kontrola · Nákup kovania · Rozpočet). Okno Výroba zanikne v ďalšej dávke — ' +
+      'otvor Štúdio z panela alebo z lišty nástrojov.</div>';
   }
 
   // ST-1a: `renderRows` / `renderSheets` / `renderEdging` a ich pomocníci
@@ -116,9 +105,12 @@
   // ŠT-1c PR A: to isté sa stalo tabu KOVANIE — `renderHardware`, `price`,
   // `hwManualMark`, `hwCsvExport` aj delegovaný klik na riadok generiky ŽIJÚ
   // v `js/studio.js` ako sekcia „Nákup kovania" (Š7, presun 1:1). S nimi
-  // odišli aj payload polia `hardware` a `hardware_sets` — okno Výroba ich
-  // už nedostáva. Tab Rozpočet má vlastné helpery (`js/budget.js`) a globálny
-  // `BOM` číta ďalej.
+  // odišli aj payload polia `hardware` a `hardware_sets`.
+  //
+  // ŠT-1c PR B1: a to isté tabu ROZPOČET — `js/budget.js` sa načítava v okne
+  // ŠTÚDIO (za `studio.js`) a číta jeho payload `ST.budget`; okno Výroba už
+  // pole `budget` NEDOSTÁVA. Zostal mu globálny `BOM` s `summary`, `vepo`
+  // a `counts` — teda presne to, čo kreslí hlavička a ⚠ chip.
 
   window.onload = function(){ if (window.sketchup && sketchup.ready) sketchup.ready(''); };
 
