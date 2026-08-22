@@ -37,6 +37,27 @@ NxTest.test('ŠT-2c 2c-1: kostra pozna nove typy poli (group / rows / checkbox /
                 'pridanie aj odobranie riadku ide cez akcie kostry (jeden delegovany listener)')
   NxTest.assert(S2C1_MODAL_JS.include?('<input type="hidden" data-nxm-col='),
                 'existujuci riadok nesie SKRYTE id/rev — identita variantu sa neodvodzuje od kodu')
+  NxTest.assert(S2C1_MODAL_JS.include?("id=\"nxmr_") &&
+                S2C1_MODAL_JS.include?("return document.getElementById('nxmr_' + key);"),
+                'kontajner repeatera ma VLASTNY prefix id — kluce sa nezrazia s plochymi polami')
+  NxTest.assert(S2C1_MODAL_JS.include?('function warnDupKeys'),
+                'a duplicitny kluc v specifikacii sa OHLASI (inak by sa hodnoty ticho prepisali)')
+  # D-78: ziadne mrtve tlacidlo. `aria-disabled` ostava v Tab poradi
+  # (`focusables` ho NEVYHADZUJE) a klik povie dovod.
+  NxTest.assert(S2C1_MODAL_JS.include?("(locked ? ' aria-disabled=\"true\"' : '')"),
+                'zamknute „−" je aria-disabled, nie HTML disabled')
+  NxTest.refute(S2C1_MODAL_JS.include?("(arr.length <= min ? ' disabled' : '')"),
+                'tvrdy `disabled` by tlacidlo vyhodil z klavesnice a mlcal by')
+  NxTest.assert(S2C1_MODAL_JS[/function rowDel.*?\n    \}/m].to_s.include?("aria-disabled") &&
+                S2C1_MODAL_JS.include?('function rowNote'),
+                'klik na zamknute „−" napise DOVOD')
+end
+
+NxTest.test('ŠT-2c 2c-1 (audit #5): neznama akcia modal NEZATVARA') do
+  NxTest.assert(S2C1_MODAL_JS.include?("else if (a === 'close') close();"),
+                'zatvara VYSLOVNE `close`, nie catch-all vetva')
+  NxTest.assert(S2C1_MODAL_JS.include?("else warn('neznáma akcia"),
+                'neznama akcia je no-op s hlaskou do konzoly — nie tiche zmiznutie formulara')
 end
 
 NxTest.test('ŠT-2c 2c-1 (audit #14): TVAR values() je kontrakt') do
@@ -56,10 +77,19 @@ NxTest.test('ŠT-2c 2c-1 (audit #12): pamat hodnot je v kostre a kluc je mode+ci
   NxTest.assert(S2C1_MODAL_JS.include?('memory: memory, clearMemory: clearMemory'),
                 'API pamate je sucastou verejneho rozhrania komponentu')
   NxTest.assert(S2C1_MODAL_JS.include?('function memSlot(key)') &&
-                S2C1_MODAL_JS.include?("var i = k.indexOf(':');"),
-                'kluc sa deli na REZIM a CIEL — `edit:H3303` nie je to iste co `edit:H1180`')
+                S2C1_MODAL_JS.include?("return parts.length >= 3 ? parts.slice(0, -1).join(':') : String(key);"),
+                'konvencia `<okno>:<mode>[:<ciel>]` — `mat:edit:H3303` a `mat:edit:H1180` ' \
+                'zdielaju slot, `bud:custom` a `bud:appliance` NIE')
   NxTest.assert(S2C1_MODAL_JS.include?('function dropForeign'),
                 'zmena ciela stary rozpis zahadzuje HNED (nie az pri zapise)')
+  NxTest.assert(S2C1_MODAL_JS.include?('function defaultsOf') &&
+                S2C1_MODAL_JS[/function remember.*?\n    \}/m].to_s.include?('sameValue(v[k], def[k])'),
+                'pamataju sa LEN polia odlisne od VYCHODISKOVYCH (predvolba selectu ju nezaklada)')
+  NxTest.assert(S2C1_MODAL_JS.include?('OPEN.memSkip = false;'),
+                'prve pisanie po „server potvrdil" pamat opat zapina (scenar „ulozil som a pisem dalej")')
+  NxTest.assert(S2C1_MODAL_JS.include?('data-nxm-act="memreset"') &&
+                S2C1_MODAL_JS.include?('function memReset'),
+                'predvyplnenie z pamate je VIDNO a ma cestu von („Začať odznova")')
   NxTest.assert(S2C1_MODAL_JS[/function close\(\).*?\n    \}/m].to_s.include?('remember();'),
                 'zatvorenie hodnoty zapamätáva — Esc nesmie byt ticha strata')
   NxTest.assert(S2C1_MODAL_JS[/function submit\(\).*?\n    \}/m].to_s.include?('remember();'),
@@ -85,6 +115,9 @@ NxTest.test('ŠT-2c 2c-1 (audit #10/#11): nasepkavac vs D-15 modal') do
                 'Escape nasepkavaca zastavi BUBLANIE na inpute — modal pod nim sa zavriet nesmie')
   NxTest.refute(bind.include?('ev.stopImmediatePropagation()'),
                 'a `stopImmediatePropagation` by nepomohol: dokumentovy poslucháč je na INOM uzle')
+  NxTest.assert(bind.include?('mdSg.input = inp; mdSg.getList = inp._sgList; mdSg.onPick = inp._sgPick;') &&
+                bind[/addEventListener\('input'.*?\}\);/m].to_s.include?('mdSg.input = inp;'),
+                'pisanie do pola nasepkavac VZDY obnovi — Escape nesmie pole „vypnut" na celu editaciu')
   NxTest.assert(S2C1_MAT_JS.include?("window.addEventListener('scroll', mdSgClose, true);"),
                 'scroll listener je v CAPTURE faze — scroll vnutri karty modalu NEBUBLA')
   NxTest.assert(S2C1_PANEL_CSS.include?('z-index: var(--nx-z-suggest, 80)'),

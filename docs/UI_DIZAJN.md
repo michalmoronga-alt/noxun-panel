@@ -1115,6 +1115,11 @@ Scrim je `.nxscrim` (`--nx-scrim`), karta `.nxmcard`. **Pozor:** mockup kreslí
 kartu ako `.nxmodal`, lenže `panel.css` toto meno už používa pre SCRIM starších
 modalov — preto `.nxmcard`.
 
+**Kde žijú štýly kostry:** v `<style>` bloku `studio.html`, lebo Štúdio je
+**jediné okno, ktoré komponent načítava**. Keď ho začne používať druhé okno,
+štýly sa presunú do `panel.css` (a `--nx-z-scrim`/`--nx-z-suggest` s nimi) —
+dovtedy by tam boli mŕtvym kódom pre všetkých ostatných.
+
 **Šírka karty** (`size`, ŠT-2c): `sm` = 420 px (**predvolená**; `small` je jej
 alias a starý prepínač `small: false` = `md` naďalej platí) · `md` = 560 px ·
 `wide` = 640 px. `wide` je pre formuláre s opakovateľnými riadkami — riadok
@@ -1140,6 +1145,11 @@ variantu od nového; riadok pridaný tlačidlom ich nemá. **Identita variantu s
 nikdy neodvodzuje od kódu, ktorý používateľ práve prepisuje.** Ploché polia
 ostávajú reťazcami — drafty rozpočtu na tom stoja.
 
+Pri dosiahnutom `min` tlačidlo **−** nezmizne ani neztvrdne na `disabled`:
+dostane `aria-disabled` (ostáva v Tab poradí, `focusables()` `aria-disabled`
+prvky **nevyhadzuje**) a klik napíše **dôvod** do `.mrnote` — pravidlo D-78,
+žiadne mŕtve tlačidlo bez vysvetlenia.
+
 **Správanie (záväzné pre každú inštanciu):**
 
 - **Esc** aj **klik na scrim** (nie do karty) modal zatvárajú;
@@ -1163,11 +1173,24 @@ ostávajú reťazcami — drafty rozpočtu na tom stoja.
   rovnakú. Volajúci povie iba `memoryKey` a pri úspechu ju zahodí
   (`setBusy(false, {clear:true})` alebo `clearMemory(key)` — kostra sama
   nevie, či server zápis prijal).
-- **kľúč pamäte je `mode + cieľ`**, nie druh okna: `custom`, `appliance`, ale
-  aj `edit:H3303`. Editor **iného** dekoru je preto **čistý formulár** a stará
-  rozpísaná verzia zaniká hneď pri otvorení. Bez toho by sa hodnoty dekoru A
-  predvyplnili do dekoru B a uložili do nesprávneho záznamu. Prázdny formulár
-  sa nepamätá.
+- **kľúč pamäte má konvenciu `<okno/doména>:<mode>[:<cieľ>]`** — `bud:custom`,
+  `bud:appliance`, `mat:create`, `mat:edit:H3303`. Slot (to, čo sa navzájom
+  prepisuje) je všetko okrem **posledného** segmentu, keď sú segmenty aspoň
+  tri. Dôsledok: `bud:custom` a `bud:appliance` sú nezávislé, ale
+  `mat:edit:A` a `mat:edit:B` sa delia o jeden slot — editor **iného** dekoru
+  je preto **čistý formulár** a stará rozpísaná verzia zaniká hneď pri
+  otvorení. Bez toho by sa hodnoty dekoru A predvyplnili do dekoru B a uložili
+  do nesprávneho záznamu.
+- **pamätá sa len to, čo sa líši od východiskových hodnôt.** Predvoľba
+  v rozbaľovacom poli ani „Počet = 1" nie sú nič, čo by používateľ rozpísal —
+  otvoriť a zavrieť okno teda pamäť nezaloží.
+- **predvyplnenie z pamäte je VIDNO.** Nad poľami sa rozsvieti pás
+  *„Predvyplnené z rozpísaného konceptu"* s odkazom **Začať odznova** (vráti
+  východiskové hodnoty a pamäť zahodí). Pohodlie nesmie byť pasca: bez pásu
+  by používateľ v editore materiálu uložil cenu, ktorú písal minule.
+- **po potvrdenom zápise sa pamäť zapaľuje späť pri prvom písaní.** Signál
+  „server potvrdil" zápis pamäte zhasne, ale scenár *„uložil som a píšem ďalšiu
+  položku"* nesmie byť tichá strata — prvý `input`/`change` v karte ho zapne.
 - **fokus zostáva v karte.** Tab z posledného prvku cyklí na prvý (Shift+Tab
   naopak) — inak skočí do obsahu za modalom, ktorý sa práve ovládať nedá.
 - **Kotva `#nxModalRoot` žije mimo tela sekcie**, takže prekreslenie obsahu
@@ -1202,6 +1225,9 @@ o nastavenie, ktorého sa ani nedotkol.
 2. **Scroll vnútri karty ich zatvára.** Overlay je `position: fixed`, takže po
    odscrollovaní `.mbody` by visel nad cudzím riadkom. Listener preto musí byť
    v **capture** fáze na `window` — `scroll` z vnútorného kontajnera nebublá.
+   **Písanie ich naopak vracia:** po Escape sa našepkávač obnoví hneď pri
+   ďalšom `input` do poľa, nie až po opustení a novom kliknutí doň — inak by
+   jedno Escape pole „vyplo" na celú editáciu.
 3. **Vrstvenie sa odvodzuje z jednej definície.** Pri `.nxscrim` v
    `studio.html` žijú `--nx-z-scrim` a `--nx-z-suggest`; `panel.css` číta
    `var(--nx-z-suggest, 80)`. Vlastné číslo v `panel.css` by pri prvej zmene

@@ -290,7 +290,8 @@ DOC.body.appendChild(ROOT);
                      { key: 'hr', label: 'Hrúbka', type: 'select', options: [['18', '18'], ['36', '36']] }],
               empty: 'Zatiaľ žiadna doska.' };
   const h = NXModal.rowsHtml(f, [{ material_id: 'M1', kod: 'H3303', hr: '36' }]);
-  ok(h.indexOf('id="nxm_sheets" data-nxm-rows="sheets"') > -1, 'repeater ma svoj kontajner');
+  ok(h.indexOf('id="nxmr_sheets" data-nxm-rows="sheets"') > -1,
+     'repeater ma svoj kontajner s VLASTNYM prefixom id (nezrazi sa s plochym polom)');
   ok(h.indexOf('data-nxm-row="sheets"') > -1, 'a riadok, ktory sa da najst');
   ok(h.indexOf('<input type="hidden" data-nxm-col="material_id" value="M1">') > -1,
      'existujuci riadok nesie SKRYTE id variantu — podla neho server pozna UPRAVU');
@@ -298,8 +299,13 @@ DOC.body.appendChild(ROOT);
   ok(h.indexOf('<option value="36" selected>36</option>') > -1, 'aj v rozbalovacich bunkach');
   ok(h.indexOf('data-nxm-act="rowadd"') > -1 && h.indexOf('Pridať dosku') > -1, 'tlacidlo „+"');
   ok(h.indexOf('data-nxm-act="rowdel"') > -1, 'a „−" v riadku');
-  ok(h.indexOf('<button type="button" class="mrdel" data-nxm-act="rowdel" disabled') > -1,
-     'pri dosiahnutom minime sa posledny riadok odobrat NEDA');
+  // D-78: ziadne MRTVE tlacidlo — pri minime je `aria-disabled` (ostava
+  // v Tab poradi) a titulok nesie DOVOD.
+  ok(h.indexOf('aria-disabled="true"') > -1 && h.indexOf('Musí zostať aspoň jeden riadok.') > -1,
+     'pri dosiahnutom minime je „−" aria-disabled a povie DOVOD');
+  ok(h.indexOf('class="mrdel off" data-nxm-act="rowdel" disabled') === -1 &&
+     h.indexOf("data-nxm-act=\"rowdel\" disabled") === -1,
+     'tvrdy HTML `disabled` sa nepouziva — vyhodil by tlacidlo z klavesnice a mlcal by');
   const empty = NXModal.rowsHtml(f, []);
   ok(empty.indexOf('Zatiaľ žiadna doska.') > -1, 'prazdny repeater povie, ze je prazdny');
   ok(empty.indexOf('data-nxm-row=') === -1, 'a ziadny riadok nekresli');
@@ -323,7 +329,7 @@ DOC.body.appendChild(ROOT);
 // ===================== 2) values(): TVAR kontraktu ===========================
 
 const SPEC = {
-  title: 'Upraviť dekor', size: 'wide', memoryKey: 'edit:H3303',
+  title: 'Upraviť dekor', size: 'wide', memoryKey: 'mat:edit:H3303',
   fields: [
     { type: 'group', label: 'Identita' },
     { key: 'kod', label: 'Kód', value: 'H3303' },
@@ -386,6 +392,37 @@ let submitted = null;
      'novy riadok id stale nema (odobranie neprepisalo identitu susedov)');
 })();
 
+(function(){
+  // D-78: pri minime „−" NEZMIZNE a nie je mrtve — klik povie DOVOD.
+  // (SPEC repeater `min` nema, takze si ho na chvilu nastavime cez spec.)
+  const f = NXModal.spec().fields.filter(function(x){ return x.type === 'rows'; })[0];
+  f.min = 1;
+  const add = DOC.querySelector('[data-nxm-act="rowadd"]');
+  dispatch(add, 'click');
+  const dels = DOC.querySelectorAll('[data-nxm-act="rowdel"]');
+  dispatch(dels[0], 'click');                 // dolu na jeden riadok
+  const del = DOC.querySelector('[data-nxm-act="rowdel"]');
+  eq(del.getAttribute('aria-disabled'), 'true', 'pri minime je „−" aria-disabled…');
+  eq(del.hasAttribute('disabled'), false, '…ale NIE tvrdo disabled (ostava na klavesnici)');
+  ok(NXModal.values().sheets.length === 1, 'vychodisko: zostal jeden riadok');
+  dispatch(del, 'click');
+  eq(NXModal.values().sheets.length, 1, 'klik riadok NEODOBRAL');
+  eq(DOC.querySelector('.mrnote').textContent, 'Musí zostať aspoň jeden riadok.',
+     'a POVEDAL preco — ziadne tiche nic');
+  f.min = 0;
+})();
+
+(function(){
+  // Audit #5: neznama akcia bola dovtedy „vsetko ostatne = zavri". Tlacidlo
+  // s preklepom v `data-nxm-act` by tak zmazalo rozpisany formular.
+  const card = DOC.querySelector('.nxmcard');
+  const bogus = mkEl('button');
+  bogus.attrs['data-nxm-act'] = 'neznama';
+  card.appendChild(bogus);
+  dispatch(bogus, 'click');
+  ok(NXModal.isOpen(), 'audit #5: neznama akcia modal NEZATVORILA');
+})();
+
 // ===================== 4) zamok, fokus, Escape — REGRESIA ====================
 
 (function(){
@@ -416,7 +453,7 @@ let submitted = null;
   // a ikony (`<svg><use href="#i-…">`). Ani jedno nesmie byt zastavkou Tabu —
   // inak by cyklus skoncil na kuse ikony a fokus by zmizol.
   NXModal.close();
-  NXModal.open(Object.assign({}, SPEC, { memoryKey: 'fokus:test' }));
+  NXModal.open(Object.assign({}, SPEC, { memoryKey: 'mat:fokus:test' }));
   ok(DOC.querySelectorAll('.nxmcard [type="hidden"]').length > 0,
      'vychodisko: karta SKUTOCNE obsahuje skryte polia riadkov');
   ok(DOC.querySelectorAll('.nxmcard [href]').length > 0, 'aj ikony s `href`');
@@ -438,62 +475,107 @@ let submitted = null;
 // ===================== 5) pamat hodnot v komponente ==========================
 
 (function(){
-  // Escape zavrie modal a hodnoty ostanu v pamati POD KLUCOM mode+ciel.
+  // Cisty start: predchadzajuce bloky s formularom pracovali, takze pamat
+  // po nich vynulujeme (inak by tento blok testoval ich vysledok).
+  NXModal.clearMemory('mat:edit:H3303');
+  // Otvoril som a hned zavrel — NIC som nerozpisal, takze niet co pamatat.
+  // Bez porovnania s VYCHODISKOVYMI hodnotami (audit #2) by sa pamat zalozila
+  // uz tu a nabuduce by nad formularom svietil pas „predvyplnené" bez dôvodu.
   NXModal.open(SPEC);
+  dispatch(DOC.querySelector('[data-nxm="kod"]'), 'keydown', { key: 'Escape' });
+  eq(NXModal.memory('mat:edit:H3303'), null,
+     'samotne otvorenie a zavretie okna pamat NEZAKLADA');
+
+  // Escape PO ZMENE hodnoty — rozpis prezije (kontrakt D-15 z PR B2).
+  NXModal.open(SPEC);
+  DOC.querySelector('[data-nxm="kod"]').value = 'H3303 UPRAVENY';
   const ev = dispatch(DOC.querySelector('[data-nxm="kod"]'), 'keydown', { key: 'Escape' });
   ok(!NXModal.isOpen(), 'Escape modal zavrel');
   ok(ev._immediate, 'a Escape SPOTREBOVAL (okno za nim ho vidiet nesmie)');
-  const mem = NXModal.memory('edit:H3303');
-  ok(mem && mem.kod === 'H3303', 'rozpisane hodnoty prezili zatvorenie');
-  eq(mem.sheets.length, 1, 'vratane opakovatelnych riadkov');
-  eq(NXModal.memory('edit:H1180'), null, 'INY ciel ma vlastnu (prazdnu) pamat');
+  const mem = NXModal.memory('mat:edit:H3303');
+  eq(mem, { kod: 'H3303 UPRAVENY' },
+     'zapamätalo sa LEN pole, ktore sa lisi od vychodiskovych hodnot');
+  eq(NXModal.memory('mat:edit:H1180'), null, 'INY ciel ma vlastnu (prazdnu) pamat');
 
-  // Otvorenie modalu s TYM ISTYM klucom hodnoty PREDVYPLNI — volajuci o pamati
-  // vediet nemusi, posiela cistu specifikaciu.
+  // Otvorenie s TYM ISTYM klucom hodnoty PREDVYPLNI — a MUSI to priznat.
   NXModal.open(SPEC);
-  eq(NXModal.values().kod, 'H3303', 'to iste okno sa otvorilo s hodnotami');
-  DOC.querySelector('[data-nxm="kod"]').value = 'H3303 UPRAVENY';
-  dispatch(DOC.querySelector('[data-nxm="kod"]'), 'keydown', { key: 'Escape' });
-  eq(NXModal.memory('edit:H3303').kod, 'H3303 UPRAVENY', 'a zapisala sa novsia verzia');
+  eq(NXModal.values().kod, 'H3303 UPRAVENY', 'to iste okno sa otvorilo s rozpisom');
+  ok(DOC.querySelector('.mmemo') !== null,
+     'audit #1: nad formularom svieti pas „Predvyplnené z rozpísaného konceptu"');
+  ok(DOC.querySelector('[data-nxm-act="memreset"]') !== null, 'a s cestou von');
+
+  // „Začať odznova" = vychodiskove hodnoty + pamat prec.
+  dispatch(DOC.querySelector('[data-nxm-act="memreset"]'), 'click');
+  ok(NXModal.isOpen(), 'formular ostal otvoreny');
+  eq(NXModal.values().kod, 'H3303', 'a vratil sa na VYCHODISKOVE hodnoty');
+  eq(DOC.querySelector('.mmemo'), null, 'pas zmizol — uz to nie je koncept');
+  eq(NXModal.memory('mat:edit:H3303'), null, 'a pamat zanikla');
+  NXModal.close();
+  eq(NXModal.memory('mat:edit:H3303'), null, 'zatvorenie ju uz neobnovi');
 
   // ZMENA CIELA: editor ineho dekoru je CISTY formular a stara rozpisana
   // verzia zanika — inak by sa hodnoty dekoru A ulozili do dekoru B.
-  NXModal.open({ title: 'Upraviť dekor', memoryKey: 'edit:H1180',
+  NXModal.open(SPEC);
+  DOC.querySelector('[data-nxm="kod"]').value = 'ROZPÍSANÉ A';
+  NXModal.close();
+  ok(NXModal.memory('mat:edit:H3303') !== null, 'vychodisko: dekor A ma rozpis');
+  NXModal.open({ title: 'Upraviť dekor', memoryKey: 'mat:edit:H1180',
                  fields: [{ key: 'kod', label: 'Kód', value: 'H1180' }] });
   eq(NXModal.values().kod, 'H1180', 'iny ciel = ziadne cudzie predvyplnenie');
-  eq(NXModal.memory('edit:H3303'), null, 'a pamat predchadzajuceho ciela ZANIKLA');
+  eq(DOC.querySelector('.mmemo'), null, 'a ziadny pas — nie je z coho');
+  eq(NXModal.memory('mat:edit:H3303'), null, 'pamat predchadzajuceho ciela ZANIKLA');
   NXModal.close();
+})();
+
+(function(){
+  // #3: „ulož a pokračuj" nesmie byt ticha strata. Po `clear` (server potvrdil)
+  // je zapis pamate zhasnuty — prve pisanie do karty ho MUSI zapalit spat,
+  // inak by sa druha rozpisana polozka pri Escape stratila.
+  NXModal.open({ title: 'A', memoryKey: 'bud:custom',
+                 fields: [{ key: 'popis', label: 'Popis' }] });
+  NXModal.setBusy(true);
+  NXModal.setBusy(false, { clear: true });      // server potvrdil prvu polozku
+  const inp = DOC.querySelector('[data-nxm="popis"]');
+  inp.value = 'Druhá položka';
+  dispatch(inp, 'input');                        // pouzivatel pise dalej
+  NXModal.close();
+  eq(NXModal.memory('bud:custom').popis, 'Druhá položka',
+     '#3: pisanie po potvrdenom zapise pamat opat zapalilo');
+  NXModal.clearMemory('bud:custom');
 })();
 
 (function(){
   // Rezimy su NEZAVISLE sloty — „Pridať položku" a „Pridať spotrebič"
   // sa nemiesaju (regresia draftov rozpoctu).
-  NXModal.open({ title: 'A', memoryKey: 'custom', fields: [{ key: 'popis', label: 'Popis' }] });
+  NXModal.open({ title: 'A', memoryKey: 'bud:custom', fields: [{ key: 'popis', label: 'Popis' }] });
   DOC.querySelector('[data-nxm="popis"]').value = 'Likvidácia';
   NXModal.close();
-  NXModal.open({ title: 'B', memoryKey: 'appliance', fields: [{ key: 'nazov', label: 'Názov' }] });
+  NXModal.open({ title: 'B', memoryKey: 'bud:appliance', fields: [{ key: 'nazov', label: 'Názov' }] });
   DOC.querySelector('[data-nxm="nazov"]').value = 'Bosch';
   NXModal.close();
-  eq(NXModal.memory('custom').popis, 'Likvidácia', 'vlastna polozka si pamata svoje');
-  eq(NXModal.memory('appliance').nazov, 'Bosch', 'spotrebic tiez — su to ine rezimy');
+  eq(NXModal.memory('bud:custom').popis, 'Likvidácia', 'vlastna polozka si pamata svoje');
+  eq(NXModal.memory('bud:appliance').nazov, 'Bosch', 'spotrebic tiez — su to ine rezimy');
 
-  // Uspesny zapis pamat zahadzuje. Dve cesty, obe musia fungovat.
-  NXModal.open({ title: 'A', memoryKey: 'custom', fields: [{ key: 'popis', label: 'Popis' }] });
+  // Uspesny zapis pamat zahadzuje. Dve cesty, obe musia fungovat — a obe
+  // s ROZPISANOU hodnotou v poli, inak by test prechadzal aj bez mazania.
+  NXModal.open({ title: 'A', memoryKey: 'bud:custom', fields: [{ key: 'popis', label: 'Popis' }] });
+  DOC.querySelector('[data-nxm="popis"]').value = 'Likvidácia';
   NXModal.setBusy(true);
   NXModal.setBusy(false, { clear: true });
   NXModal.close();
-  eq(NXModal.memory('custom'), null, '`setBusy(false, {clear:true})` = server potvrdil, pamat prec');
+  eq(NXModal.memory('bud:custom'), null, '`setBusy(false, {clear:true})` = server potvrdil, pamat prec');
 
-  NXModal.open({ title: 'B', memoryKey: 'appliance', fields: [{ key: 'nazov', label: 'Názov' }] });
-  NXModal.clearMemory('appliance');
+  NXModal.open({ title: 'B', memoryKey: 'bud:appliance', fields: [{ key: 'nazov', label: 'Názov' }] });
+  DOC.querySelector('[data-nxm="nazov"]').value = 'Bosch';
+  NXModal.clearMemory('bud:appliance');
   NXModal.close();
-  eq(NXModal.memory('appliance'), null,
+  eq(NXModal.memory('bud:appliance'), null,
      '`clearMemory` pred zatvorenim pamat NEobnovi (inak by ju close() zapisal spat)');
 
   // Prazdny formular sa nepamata — inak by v pamati zostal balast.
-  NXModal.open({ title: 'A', memoryKey: 'custom', fields: [{ key: 'popis', label: 'Popis' }] });
+  NXModal.open({ title: 'A', memoryKey: 'bud:custom', fields: [{ key: 'popis', label: 'Popis' }] });
   NXModal.close();
-  eq(NXModal.memory('custom'), null, 'zatvorenie prazdneho formulara pamat nezaklada');
+  eq(NXModal.memory('bud:custom'), null, 'zatvorenie prazdneho formulara pamat nezaklada');
 })();
 
 // ===================== 6) nasepkavac materialov vs modal =====================
@@ -520,13 +602,21 @@ const M = require(path.join(JS, 'proj_materials.js'));
   ok(box && box.style.display === '', 'nasepkavac sa otvoril (dva navrhy)');
 
   // Modal zije POD nim. Escape musi zavriet LEN dropdown.
-  NXModal.open({ title: 'Upraviť dekor', memoryKey: 'edit:X',
+  NXModal.open({ title: 'Upraviť dekor', memoryKey: 'mat:edit:X',
                  fields: [{ key: 'kod', label: 'Kód' }] });
   const ev = dispatch(inp, 'keydown', { key: 'Escape' });
   eq(box.style.display, 'none', 'audit ŠT-2c #10: Escape zavrel nasepkavac');
   ok(ev._stopped, 'a bublanie ZASTAVIL na inpute');
   ok(NXModal.isOpen(),
      'takze formular pod nim OSTAL otvoreny — jedno stlacenie nesmie zmazat rozpisany dekor');
+
+  // #9: pisanie do pola nasepkavac VRATI — bez toho by Escape pole „vypol"
+  // az do opustenia a noveho kliknutia don.
+  inp.value = 'H11';
+  dispatch(inp, 'input');
+  eq(box.style.display, '', 'audit ŠT-2c #9: pisanie nasepkavac obnovilo');
+  dispatch(inp, 'keydown', { key: 'Escape' });
+  eq(box.style.display, 'none', 'a Escape ho vie zavriet znova');
 
   // Druhy Escape (dropdown uz zavrety) uz patri modalu — inak by sa okno
   // nedalo zavriet vobec.

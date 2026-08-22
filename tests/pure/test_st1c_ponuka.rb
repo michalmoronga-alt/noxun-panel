@@ -243,15 +243,16 @@ NxTest.test('ŠT-1c B2 (review #3+#4): rozpisane hodnoty prezijú zatvorenie mod
   # Spravanie je NEZMENENE a overuje ho tests/js/test_st1c_ponuka.js.
   NxTest.refute(S1C2_BUDGET_JS.include?('BUD_DRAFT_VALUES'),
                 'rozpocet uz vlastny sklad rozpisanych hodnot NEMA (je v kostre)')
-  NxTest.assert(S1C2_BUDGET_JS.include?('memoryKey: kind'),
-                'pamat je PER DRUH pridavacky (polia vlastnej polozky a spotrebica su ine)')
+  NxTest.assert(S1C2_BUDGET_JS.include?('memoryKey: budDraftKey(kind)') &&
+                S1C2_BUDGET_JS.include?("function budDraftKey(kind){ return 'bud:' + kind; }"),
+                'pamat je PER DRUH pridavacky a nesie prefix okna (`bud:custom`, `bud:appliance`)')
   NxTest.assert(S1C2_BUDGET_JS[/function budDraftMemory.*?\n  \}/m].to_s
-                  .include?('NXModal.memory(kind)'),
+                  .include?('NXModal.memory(budDraftKey(kind))'),
                 'a cita sa cez JEDNO miesto — tenky pristupovy bod nad kostrou')
-  NxTest.assert(S1C2_BUDGET_JS.include?('fields: budDraftFields(kind, budDraftMemory(kind))'),
-                'otvorenie modalu hodnoty PREDVYPLNI (Escape uz nie je ticha strata)')
+  NxTest.assert(S1C2_BUDGET_JS.include?('fields: budDraftFields(kind, null)'),
+                'polia sa podavaju VYCHODISKOVE — predvyplnenie robi kostra (a prizna ho pásom)')
   NxTest.assert(S1C2_BUDGET_JS[/function budCloseDraft.*?\n  \}/m].to_s
-                  .include?('NXModal.clearMemory(BUD_DRAFT)'),
+                  .include?('NXModal.clearMemory(budDraftKey(BUD_DRAFT))'),
                 'zmaze ich az USPESNY zapis — vtedy riadok v rozpocte naozaj je')
 end
 

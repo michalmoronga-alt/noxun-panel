@@ -762,8 +762,12 @@
   // rozpocet pyta, takze pripadna dalsia zmena skladu sa uz budget.js netyka.
   function budDraftMemory(kind){
     if (typeof window === 'undefined' || !window.NXModal) return null;
-    return NXModal.memory(kind);
+    return NXModal.memory(budDraftKey(kind));
   }
+
+  // Kluc pamate podla konvencie `<okno/domena>:<mode>[:<ciel>]` — prefix `bud:`
+  // drzi rozpocet oddeleny od materialov aj kovania (ŠT-2c #7).
+  function budDraftKey(kind){ return 'bud:' + kind; }
 
   // Otvorenie modalu. Polia sa predvyplnia tym, co v tejto pridavacke naposledy
   // ostalo nedokoncene — ci uz preto, ze server zapis ODMIETOL (audit #10),
@@ -773,10 +777,15 @@
     var meta = BUD_DRAFT_META[kind];
     if (!meta) return;
     BUD_DRAFT = kind;
+    // Polia sa podavaju VYCHODISKOVE (`null`) — rozpisane hodnoty do nich
+    // vlieva sama kostra podla `memoryKey` a zaroven ich VIDITELNE prizna
+    // pásom „Predvyplnené z rozpísaného konceptu". Keby ich predvyplnil uz
+    // rozpocet, kostra by nemala proti comu porovnavat, co je default,
+    // a pamat by zakladalo aj samotne otvorenie okna.
     NXModal.open({
       title: meta.title, sub: meta.sub, note: meta.note, okLabel: 'Pridať',
-      memoryKey: kind,
-      fields: budDraftFields(kind, budDraftMemory(kind)),
+      memoryKey: budDraftKey(kind),
+      fields: budDraftFields(kind, null),
       onSubmit: function(v){ budDraftCommit(kind, v); }
     });
   }
@@ -786,7 +795,7 @@
   // predvyplnila polozka, ktora uz existuje).
   function budCloseDraft(){
     if (typeof window !== 'undefined' && window.NXModal){
-      if (BUD_DRAFT) NXModal.clearMemory(BUD_DRAFT);
+      if (BUD_DRAFT) NXModal.clearMemory(budDraftKey(BUD_DRAFT));
       NXModal.close();
     }
     BUD_DRAFT = null;

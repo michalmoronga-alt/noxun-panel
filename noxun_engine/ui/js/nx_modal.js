@@ -31,28 +31,41 @@
     'use strict';
 
     var ROOT_ID = 'nxModalRoot';
-    // Otvoreny modal: { spec, trigger } — trigger je uzol, na ktory sa vracia
-    // fokus po zatvoreni. Naraz zije NAJVIAC JEDEN (dve „pridavacky" na
-    // obrazovke naraz su vzdy chyba navrhu, nie stav).
+    // Otvoreny modal: { base, spec, trigger, busy, memSkip }.
+    //   `base` = specifikacia, ako ju PODAL volajuci (cize VYCHODISKOVE hodnoty),
+    //   `spec` = to iste, ale s vliatou pamatou rozpisanych hodnot.
+    // `trigger` je uzol, na ktory sa vracia fokus po zatvoreni. Naraz zije
+    // NAJVIAC JEDEN modal (dve „pridavacky" na obrazovke naraz su vzdy chyba
+    // navrhu, nie stav).
     var OPEN = null;
 
     // --- PAMAT ROZPISANYCH HODNOT (audit ŠT-2c #12) --------------------------
     // Do ŠT-2c ju drzal KAZDY volajuci sam (rozpocet cez `BUD_DRAFT_VALUES`).
     // Teraz je v komponente, lebo je to sucast kontraktu D-15 („Esc nesmie byt
-    // ticha strata rozpisaneho riadku") — nie vlastnost rozpoctu.
+    // ticha strata rozpisaneho riadku" — ŠT-1c PR B2) — nie vlastnost rozpoctu.
     //
-    // Kluc `memoryKey` je MODE + CIEL, nie len druh okna: `custom`,
-    // `appliance`, ale aj `edit:H3303`. Drzi sa NAJVIAC JEDEN zaznam na „mode"
-    // (cast pred prvou dvojbodkou), takze otvorenie EDITORA INEHO dekoru je iny
-    // ciel a stara rozpisana verzia ZANIKA — formular je cisty. Bez toho by sa
-    // do dekoru B predvyplnili hodnoty, ktore pouzivatel pisal do dekoru A,
-    // a ulozil by ich do nespravneho zaznamu.
+    // KONVENCIA KLUCA: `<okno/domena>:<mode>[:<ciel>]` — napr. `bud:custom`,
+    // `mat:create`, `mat:edit:H3303`. Slot (co sa navzajom PREPISUJE) je vsetko
+    // okrem posledneho segmentu, ked je segmentov aspon TRI; inak cely kluc.
+    // Dosledok: `bud:custom` a `bud:appliance` su NEZAVISLE, ale `mat:edit:A`
+    // a `mat:edit:B` sa delia o jeden slot — otvorenie editora INEHO dekoru je
+    // iny ciel, takze stary rozpis zanika a formular je cisty. Bez toho by sa
+    // do dekoru B predvyplnili hodnoty pisane do dekoru A a ulozili by sa do
+    // nespravneho zaznamu.
+    //
+    // Pamataju sa LEN polia, ktore sa lisia od VYCHODISKOVYCH hodnot (`base`):
+    // predvolba v rozbalovacom poli ani „Počet = 1" nie su nic, co by
+    // pouzivatel rozpisal, takze pamat nezakladaju.
     var MEM = {};
 
     function esc(s){
       return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+    }
+
+    function warn(msg){
+      if (typeof console !== 'undefined' && console && console.warn) console.warn('NXModal: ' + msg);
     }
 
     function ico(n){ return '<svg class="ic" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; }
@@ -125,11 +138,17 @@
     // variantu od NOVEHO: riadok pridany tlacidlom „+" ich nema, takze je novy.
     // Identita variantu sa tym padom NIKDY neodvodzuje od kodu, ktory
     // pouzivatel prave prepisuje.
+    //
+    // Kontajner ma VLASTNY prefix id (`nxmr_`, audit #6): kluc repeatera a kluc
+    // plocheho pola sa tak nemozu zrazit o ten isty `id`.
     function rowsInnerHtml(f, data){
       var d = f || {};
       var key = esc(d.key);
       var arr = (data && data.length) ? data : [];
       var min = Number(d.min || 0);
+      var locked = arr.length <= min;
+      var note = d.minNote || (min === 1 ? 'Musí zostať aspoň jeden riadok.'
+                                         : 'Riadkov musí zostať aspoň ' + min + '.');
       var h = '';
       if (d.label) h += '<div class="mrhead">' + esc(d.label) + '</div>';
       if (arr.length && (d.cols || []).length){
@@ -147,12 +166,17 @@
           h += '<input type="hidden" data-nxm-col="' + esc(hk) + '" value="' + esc(hv) + '">';
         });
         (d.cols || []).forEach(function(c){ h += rowCellHtml(c, row ? row[c.key] : ''); });
-        h += '<button type="button" class="mrdel" data-nxm-act="rowdel"' +
-             (arr.length <= min ? ' disabled' : '') +
-             ' title="Odobrať riadok" aria-label="Odobrať riadok">' + ico('trash') + '</button>' +
+        // D-78: ziadne MRTVE tlacidlo. Posledny riadok sa odobrat neda, ale
+        // tlacidlo ostava zameratelne a klik POVIE DOVOD — HTML `disabled` by
+        // ho vyhodilo z Tab poradia a mlcalo by.
+        h += '<button type="button" class="mrdel' + (locked ? ' off' : '') + '"' +
+             ' data-nxm-act="rowdel"' + (locked ? ' aria-disabled="true"' : '') +
+             ' title="' + esc(locked ? note : 'Odobrať riadok') + '"' +
+             ' aria-label="Odobrať riadok">' + ico('trash') + '</button>' +
              '</div>';
       });
       h += '</div>';
+      h += '<div class="mrnote" role="status"></div>';
       h += '<div class="mradd"><button type="button" class="ghostbtn mrbtn"' +
            ' data-nxm-act="rowadd" data-nxm-rows="' + key + '">' + ico('plus') + ' ' +
            esc(d.addLabel || 'Pridať riadok') + '</button></div>';
@@ -161,7 +185,7 @@
 
     function rowsHtml(f, data){
       var key = esc((f || {}).key);
-      return '<div class="mrows" id="nxm_' + key + '" data-nxm-rows="' + key + '">' +
+      return '<div class="mrows" id="nxmr_' + key + '" data-nxm-rows="' + key + '">' +
              rowsInnerHtml(f, data) + '</div>';
     }
 
@@ -201,6 +225,10 @@
     // `.nxmodal` — lenze `panel.css` (nacitava ho aj Studio) uz meno `.nxmodal`
     // pouziva pre SCRIM starsich modalov. Karta sa tu preto vola `.nxmcard`;
     // `mhead`/`mbody`/`mfoot`/`mrow` z mockupu ostavaju doslovne.
+    //
+    // `fromMemory: true` prida navrch tela INFO PAS (audit ŠT-2c #1): rozpis
+    // z pamate je pohodlie, ale pouzivatel MUSI vidiet, ze pozera na svoj stary
+    // koncept — inak by pri editore materialu ulozil cenu, ktoru pisal minule.
     function modalHtml(spec){
       var s = spec || {};
       var h = '<div class="nxscrim" data-nxm-scrim="1"><div class="nxmcard' +
@@ -211,6 +239,10 @@
         '<button type="button" class="mx" data-nxm-act="close"' +
         ' title="Zavrieť (Esc)" aria-label="Zavrieť">' + ico('x') + '</button></div>' +
         '<div class="mbody">';
+      if (s.fromMemory === true){
+        h += '<div class="mmemo" role="status"><span>Predvyplnené z rozpísaného konceptu</span>' +
+             '<button type="button" class="linkbtn" data-nxm-act="memreset">Začať odznova</button></div>';
+      }
       (s.fields || []).forEach(function(f){ h += fieldHtml(f); });
       if (s.note) h += '<div class="hint">' + esc(s.note) + '</div>';
       h += '</div><div class="mfoot"><span class="spacer"></span>' +
@@ -255,7 +287,7 @@
     function setBusy(flag, opts){
       if (!OPEN) return;
       OPEN.busy = flag === true;
-      if (opts && opts.clear === true) clearMemory(OPEN.spec ? OPEN.spec.memoryKey : null);
+      if (opts && opts.clear === true) clearMemory(OPEN.base ? OPEN.base.memoryKey : null);
       if (typeof document === 'undefined') return;
       var r = document.getElementById(ROOT_ID);
       var btn = r && r.querySelector ? r.querySelector('[data-nxm-act="submit"]') : null;
@@ -274,10 +306,14 @@
     // Riadky repeatera sa citaju z DOM (nie z drzaneho pola) — pridanie
     // a odobranie riadku prekresluje LEN kontajner, takze rozpisane hodnoty
     // ostatnych riadkov musia prezit prave cez tento zapis.
+    function rowsBox(key){
+      if (typeof document === 'undefined') return null;
+      return document.getElementById('nxmr_' + key);
+    }
+
     function readRows(key){
       var out = [];
-      if (typeof document === 'undefined') return out;
-      var box = document.getElementById('nxm_' + key);
+      var box = rowsBox(key);
       if (!box || !box.querySelectorAll) return out;
       var lines = box.querySelectorAll('[data-nxm-row]');
       for (var i = 0; i < lines.length; i++){
@@ -303,9 +339,17 @@
     }
 
     function renderRows(f, data){
-      var box = document.getElementById('nxm_' + f.key);
+      var box = rowsBox(f.key);
       if (!box) return;
       box.innerHTML = rowsInnerHtml(f, data);
+    }
+
+    // Vysvetlenie pri zamknutom „−" (D-78: dovod patri na obrazovku, nie do
+    // ticha). Prezije do najblizsieho prekreslenia kontajnera.
+    function rowNote(key, msg){
+      var box = rowsBox(key);
+      var n = box && box.querySelector ? box.querySelector('.mrnote') : null;
+      if (n) n.textContent = msg;
     }
 
     function rowAdd(key){
@@ -316,7 +360,7 @@
       renderRows(f, cur);
       // Fokus do prveho pola PRAVE pridaneho riadku — pridanie riadku je
       // zaciatok pisania, nie samoucelne kliknutie.
-      var box = document.getElementById('nxm_' + key);
+      var box = rowsBox(key);
       var lines = box && box.querySelectorAll ? box.querySelectorAll('[data-nxm-row]') : [];
       var last = lines.length ? lines[lines.length - 1] : null;
       var cells = last && last.querySelectorAll ? last.querySelectorAll('[data-nxm-col]') : [];
@@ -334,7 +378,11 @@
       var key = line.getAttribute('data-nxm-row');
       var f = fieldByKey(key);
       if (!f) return;
-      var box = document.getElementById('nxm_' + key);
+      if (btn.getAttribute && btn.getAttribute('aria-disabled') === 'true'){
+        rowNote(key, btn.getAttribute('title') || 'Tento riadok sa odobrať nedá.');
+        return;
+      }
+      var box = rowsBox(key);
       var lines = box && box.querySelectorAll ? box.querySelectorAll('[data-nxm-row]') : [];
       var idx = -1;
       for (var i = 0; i < lines.length; i++){ if (lines[i] === line) idx = i; }
@@ -364,10 +412,11 @@
     }
 
     // --- pamat: kluc, citanie, mazanie, zapis --------------------------------
+    // Slot = kluc bez posledneho segmentu, ked su segmenty aspon TRI
+    // (`mat:edit:H3303` -> `mat:edit`); inak cely kluc (`bud:custom`).
     function memSlot(key){
-      var k = String(key);
-      var i = k.indexOf(':');
-      return i > 0 ? k.slice(0, i) : k;
+      var parts = String(key).split(':');
+      return parts.length >= 3 ? parts.slice(0, -1).join(':') : String(key);
     }
 
     function memory(key){
@@ -382,41 +431,83 @@
       if (MEM[s] && MEM[s].key === String(key)) delete MEM[s];
       // Zatvorenie modalu hodnoty zapamätáva — keby sa pamat mazala PRED nim,
       // close() by ju hned zapisal spat. Preto sa zaroven zhasina zapis.
-      if (OPEN && OPEN.spec && String(OPEN.spec.memoryKey) === String(key)) OPEN.memSkip = true;
+      // Zhasnutie je DOCASNE: prve pisanie do karty ho zapali spat (#3), aby
+      // scenar „ulozil som a pisem dalej" nebol tichou stratou.
+      if (OPEN && OPEN.base && String(OPEN.base.memoryKey) === String(key)) OPEN.memSkip = true;
     }
 
-    function hasContent(v){
-      var any = false;
-      Object.keys(v || {}).forEach(function(k){
-        var x = v[k];
-        if (x === true) any = true;
-        else if (typeof x === 'string' && x !== '') any = true;
-        else if (x && typeof x.forEach === 'function'){
-          x.forEach(function(r){
-            Object.keys(r || {}).forEach(function(rk){
-              var rv = r[rk];
-              if (rv === true || (typeof rv === 'string' && rv !== '')) any = true;
-            });
-          });
+    // VYCHODISKOVE hodnoty (to, co podal volajuci) — proti nim sa porovnava,
+    // ci pouzivatel vobec nieco rozpisal.
+    function defaultsOf(){
+      var d = {};
+      ((OPEN && OPEN.base && OPEN.base.fields) || []).forEach(function(f){
+        if (!f || f.type === 'group') return;
+        if (f.type === 'rows'){ d[f.key] = f.value || []; return; }
+        if (f.type === 'checkbox'){ d[f.key] = f.value === true; return; }
+        if (f.type === 'select'){
+          var dv = f.value == null ? '' : String(f.value);
+          // Bez `value` ukaze prehliadac PRVU moznost — to je default, nie zapis.
+          if (dv === '' && (f.options || []).length) dv = String(f.options[0][0]);
+          d[f.key] = dv;
+          return;
         }
+        d[f.key] = String(f.value == null ? '' : f.value);
       });
-      return any;
+      return d;
+    }
+
+    // Porovnanie hodnoty pola s jeho defaultom. Riadky su pole hashov, takze
+    // sa porovnavaju po prvkoch a poradie klucov nesmie rozhodovat; prazdne
+    // hodnoty sa na OBOCH stranach ignoruju (skryte pole s prazdnou hodnotou
+    // sa vobec nevykresli).
+    function sameRow(a, b){
+      var ka = Object.keys(a || {}).filter(function(k){ return a[k] !== '' && a[k] !== false; });
+      var kb = Object.keys(b || {}).filter(function(k){ return b[k] !== '' && b[k] !== false; });
+      if (ka.length !== kb.length) return false;
+      for (var i = 0; i < ka.length; i++){
+        var k = ka[i];
+        if (!Object.prototype.hasOwnProperty.call(b || {}, k)) return false;
+        if (String(a[k]) !== String(b[k])) return false;
+      }
+      return true;
+    }
+
+    function sameValue(a, b){
+      var aArr = a && typeof a.forEach === 'function';
+      var bArr = b && typeof b.forEach === 'function';
+      if (aArr || bArr){
+        if (!aArr || !bArr) return false;
+        if (a.length !== b.length) return false;
+        for (var i = 0; i < a.length; i++){ if (!sameRow(a[i], b[i])) return false; }
+        return true;
+      }
+      if (a === true || b === true || a === false || b === false) return a === b;
+      return String(a == null ? '' : a) === String(b == null ? '' : b);
     }
 
     // Zapamätanie prebieha pri ODOSLANI aj pri ZATVORENI — Escape ani klik
-    // vedla nesmie byt ticha strata rozpisaneho formulara. Prazdny formular sa
-    // NEPAMÄTÁ (inak by v pamati zostal balast, ktory nikomu nic nepredvyplni).
+    // vedla nesmie byt ticha strata rozpisaneho formulara (kontrakt D-15 z PR
+    // B2). Ukladaju sa VYHRADNE polia, ktore sa lisia od defaultov (#2), takze
+    // „nic som nepisal, len som okno otvoril a zavrel" pamat nezaklada.
     function remember(){
       if (!OPEN || OPEN.memSkip) return;
-      var key = OPEN.spec ? OPEN.spec.memoryKey : null;
+      var key = OPEN.base ? OPEN.base.memoryKey : null;
       if (key == null || key === '') return;
       var v = values();
-      if (!hasContent(v)){
-        var s = memSlot(key);
+      var def = defaultsOf();
+      var out = {};
+      var any = false;
+      Object.keys(v).forEach(function(k){
+        if (sameValue(v[k], def[k])) return;
+        out[k] = v[k];
+        any = true;
+      });
+      var s = memSlot(key);
+      if (!any){
         if (MEM[s] && MEM[s].key === String(key)) delete MEM[s];
         return;
       }
-      MEM[memSlot(key)] = { key: String(key), values: v };
+      MEM[s] = { key: String(key), values: out };
     }
 
     // Otvorenie INEHO ciela v tom istom rezime stary rozpis ZAHADZUJE — nie
@@ -429,13 +520,14 @@
     }
 
     // Zapamätane hodnoty sa vlievaju do POLI specifikacie — volajuci teda
-    // nemusi o pamati vediet vobec.
+    // nemusi o pamati vediet vobec. `fromMemory` rozsvieti info pas.
     function withMemory(s){
       dropForeign(s.memoryKey);
       var mem = memory(s.memoryKey);
       if (!mem) return s;
       var out = {}, k;
       for (k in s){ if (Object.prototype.hasOwnProperty.call(s, k)) out[k] = s[k]; }
+      out.fromMemory = true;
       out.fields = (s.fields || []).map(function(f){
         if (!f || f.type === 'group') return f;
         if (!Object.prototype.hasOwnProperty.call(mem, f.key)) return f;
@@ -445,6 +537,19 @@
         return g;
       });
       return out;
+    }
+
+    // „Začať odznova" — pas z pamate ponuka CESTU VON: formular sa prekresli
+    // z VYCHODISKOVYCH hodnot a pamat zanikne.
+    function memReset(){
+      if (!OPEN || typeof document === 'undefined') return;
+      clearMemory(OPEN.base ? OPEN.base.memoryKey : null);
+      OPEN.spec = OPEN.base;
+      OPEN.memSkip = true;
+      var r = document.getElementById(ROOT_ID);
+      if (!r) return;
+      r.innerHTML = modalHtml(OPEN.base);
+      focusFirst(r);
     }
 
     // Prve pole na fokus. Skryte polia riadkov (`type="hidden"`) sa preskakuju
@@ -461,22 +566,36 @@
       return r.querySelector ? r.querySelector('.mbody input, .mbody select') : null;
     }
 
+    function focusFirst(r){
+      // Fokus do PRVEHO pola (kontrakt D-15). `setTimeout` preto, ze CEF
+      // priradi fokus az po dokresleni — okamzity `focus()` by sa stratil.
+      var first = firstField(r);
+      if (!first) return;
+      try { first.focus(); } catch (e) { /* fokus nie je kriticky */ }
+      setTimeout(function(){ try { first.focus(); } catch (e) {} }, 20);
+    }
+
+    function warnDupKeys(s){
+      var seen = {};
+      ((s || {}).fields || []).forEach(function(f){
+        if (!f || f.type === 'group' || f.key == null) return;
+        var k = String(f.key);
+        if (seen[k]) warn('duplicitný kľúč poľa „' + k + '" — hodnoty sa navzájom prepíšu.');
+        seen[k] = true;
+      });
+    }
+
     function open(s){
       if (!s || typeof document === 'undefined') return;
       var r = root();
       if (!r) return;
       var trigger = document.activeElement || null;
       close(); // dva modaly naraz su vzdy chyba navrhu
+      warnDupKeys(s);
       var eff = withMemory(s);
-      OPEN = { spec: eff, trigger: trigger, busy: false, memSkip: false };
+      OPEN = { base: s, spec: eff, trigger: trigger, busy: false, memSkip: false };
       r.innerHTML = modalHtml(eff);
-      // Fokus do PRVEHO pola (kontrakt D-15). `setTimeout` preto, ze CEF
-      // priradi fokus az po dokresleni — okamzity `focus()` by sa stratil.
-      var first = firstField(r);
-      if (first){
-        try { first.focus(); } catch (e) { /* fokus nie je kriticky */ }
-        setTimeout(function(){ try { first.focus(); } catch (e) {} }, 20);
-      }
+      focusFirst(r);
     }
 
     function close(){
@@ -523,6 +642,8 @@
       var out = [];
       for (var i = 0; i < all.length; i++){
         var n = all[i];
+        // `aria-disabled` prvky sa NEVYHADZUJU (D-78): su zameratelne a klik
+        // povie dovod. Vyhadzuje sa len tvrdy `disabled` a `tabindex="-1"`.
         if (n.hasAttribute && n.hasAttribute('disabled')) continue;
         if (n.getAttribute && n.getAttribute('tabindex') === '-1') continue;
         // Skryte polia riadkov (id/rev variantu) nie su ovladacie prvky.
@@ -560,15 +681,32 @@
           if (a === 'submit') submit();
           else if (a === 'rowadd') rowAdd(act.getAttribute('data-nxm-rows'));
           else if (a === 'rowdel') rowDel(act);
-          else close();
+          else if (a === 'memreset') memReset();
+          else if (a === 'close') close();
+          // Ziadny catch-all: neznama akcia MLCKY ZATVARALA modal a rozpisany
+          // formular by zmizol po kliku na tlacidlo, ktore malo robit nieco ine.
+          else warn('neznáma akcia „' + a + '" — modal ostáva otvorený.');
           return;
         }
         // Klik VEDLA karty (priamo na scrim) zatvara; klik dovnutra nie.
         if (t.getAttribute && t.getAttribute('data-nxm-scrim') === '1') close();
       });
 
+      // Prve pisanie do karty PO signale „server potvrdil" pamat opat zapina
+      // (#3): scenar „ulozil som a pisem dalsiu polozku" nesmie byt ticha
+      // strata len preto, ze predchadzajuci zapis presiel.
+      function touched(ev){
+        if (!OPEN) return;
+        var t = ev.target;
+        if (!t || !t.getAttribute) return;
+        if (!t.getAttribute('data-nxm') && !t.getAttribute('data-nxm-col')) return;
+        OPEN.memSkip = false;
+      }
+      document.addEventListener('change', touched);
+
       // Vzorka farby ide za textom — pouzivatel musi vidiet, co si prave napisal.
       document.addEventListener('input', function(ev){
+        touched(ev);
         if (!OPEN) return;
         var t = ev.target;
         if (!t || !t.getAttribute || t.getAttribute('data-nxm-color') !== '1') return;

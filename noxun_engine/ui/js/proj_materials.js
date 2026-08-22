@@ -1430,7 +1430,13 @@
       inp.setAttribute('data-sg', '1');
       inp.setAttribute('autocomplete', 'off');
       inp.addEventListener('focus', function(){ mdSg.input = inp; mdSg.getList = inp._sgList; mdSg.onPick = inp._sgPick; mdSgUpdate(); });
-      inp.addEventListener('input', function(){ if (mdSg.input === inp) mdSgUpdate(); });
+      // ŠT-2c #9: pisanie do pola nasepkavac VZDY obnovi — aj ked ho pouzivatel
+      // predtym zavrel Escapom. Bez toho by sa dropdown vratil az po opusteni
+      // a novom kliknuti do pola, cize by Escape pole „vypol" na celu editaciu.
+      inp.addEventListener('input', function(){
+        mdSg.input = inp; mdSg.getList = inp._sgList; mdSg.onPick = inp._sgPick;
+        mdSgUpdate();
+      });
       inp.addEventListener('blur', function(){ setTimeout(function(){ if (mdSg.input === inp) mdSgClose(); }, 120); });
       inp.addEventListener('keydown', function(ev){
         if (mdSg.input !== inp || !mdSg.items.length) return;
