@@ -211,9 +211,10 @@ NxTest.test('UI-D3: whitelist tabov je na strane RUBY a JS je jeho ZRKADLO') do
   rb = UID3_PROD_RB[/TABS = %w\[([a-z ]+)\]/, 1].to_s.split
   js = UID3_SHELL_JS[/var STUDIO_TABS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
   # ST-1a: `rows`/`sheets`/`edging` ZANIKLI — kusovnik a supisy platni a ABS su
-  # sekciou Kusovnik okna Studio. Whitelist ich preto uz nesmie poznat, inak by
-  # deep-link otvoril tab, ktory v okne neexistuje.
-  NxTest.assert_equal(%w[hardware budget control], rb, 'Ruby pozna vsetky taby okna')
+  # sekciou Kusovnik okna Studio. ŠT-1b: to iste sa stalo tabu `control`.
+  # Whitelist ich preto uz nesmie poznat, inak by deep-link otvoril tab, ktory
+  # v okne neexistuje.
+  NxTest.assert_equal(%w[hardware budget], rb, 'Ruby pozna vsetky taby okna')
   NxTest.assert_equal(rb, js, 'JS mirror sa nesmie rozist s Ruby autoritou')
   NxTest.assert(UID3_PANEL_RB.include?('ProductionDialog.show(open_tab: studio_tab_of(p))'),
                 'panel posiela iba meno tabu — filtruje ho server')
@@ -254,7 +255,7 @@ NxTest.test('ST-1a: deep-link do Studia ma whitelist sekcii v RUBY a JS je jeho 
                         encoding: 'UTF-8')
   rb = studio_rb[/SECTIONS = %w\[([a-z ]+)\]/, 1].to_s.split
   js = UID3_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  NxTest.assert_equal(%w[bom], rb, 'v ST-1a zije jedina sekcia — Kusovník')
+  NxTest.assert_equal(%w[bom ctrl], rb, 'v Studiu ziju sekcie Kusovník a Kontrola')
   NxTest.assert_equal(rb, js, 'JS mirror sa nesmie rozist s Ruby autoritou')
   NxTest.assert(UID3_PANEL_RB.include?("cb(dlg, 'open_studio')"),
                 'panel ma vlastny callback na otvorenie Studia')
@@ -264,10 +265,12 @@ NxTest.test('ST-1a: deep-link do Studia ma whitelist sekcii v RUBY a JS je jeho 
                 'panel posiela iba meno sekcie a kotvu — filtruje ich server')
 end
 
-NxTest.test('UI-D3: warnpanel ma JEDNU cestu von — deep-link na tab KONTROLA') do
+NxTest.test('UI-D3 + ŠT-1b: warnpanel ma JEDNU cestu von — deep-link do ŠTÚDIA na KONTROLU') do
   NxTest.assert(UID3_BRIDGE_JS.include?('Otvoriť v Štúdiu → Kontrola'), 'tlacidlo nesie znenie kontraktu')
   body = UID3_BRIDGE_JS[/function onWarnStudio.*?\n  \}/m].to_s
-  NxTest.assert(body.include?("openProductionDialog('control')"), 'vedie na tab KONTROLA')
+  # ŠT-1b: KONTROLA je sekcia okna Studio — deep-link uz nevedie do okna Vyroba.
+  NxTest.assert(body.include?("openStudio('ctrl')"), 'vedie na sekciu KONTROLA v Studiu')
+  NxTest.refute(body.include?('openProductionDialog'), 'stara cesta do okna Vyroba zanikla')
   NxTest.assert(body.include?('closeWarnPanel()'), 'pri odchode do ineho okna sa panel zavrie')
 end
 

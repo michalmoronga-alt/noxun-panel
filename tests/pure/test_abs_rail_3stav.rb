@@ -17,6 +17,12 @@ require_relative '../helper' unless defined?(NxTest)
 
 A3S_HTML   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.html'), encoding: 'UTF-8')
 A3S_PROD_H = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production.html'), encoding: 'UTF-8')
+# ŠT-1b: druhym vstupnym bodom uz nie je okno Vyroba, ale sekcia KONTROLA
+# v okne Studio — tvrdenia o nacitani zdielaneho modulu a o stavoch sa presunuli
+# na studio.html / studio_dialog.rb / production_core.rb.
+A3S_STUDIO_H = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio.html'), encoding: 'UTF-8')
+A3S_STUDIO = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog.rb'), encoding: 'UTF-8')
+A3S_PCORE  = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core.rb'), encoding: 'UTF-8')
 A3S_CSS    = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'css', 'panel.css'), encoding: 'UTF-8')
 A3S_PANEL  = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.rb'), encoding: 'UTF-8')
 A3S_ACT    = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_materials.rb'), encoding: 'UTF-8')
@@ -80,7 +86,10 @@ end
 
 NxTest.test('ABS rail: 3-stavove UI je JEDEN zdielany modul (nacitany v OBOCH oknach)') do
   NxTest.assert(A3S_HTML.include?('js/edge_menu.js'), 'panel nacitava zdielany modul')
-  NxTest.assert(A3S_PROD_H.include?('js/edge_menu.js'), 'okno Vyroba nacitava TEN ISTY modul')
+  NxTest.assert(A3S_STUDIO_H.include?('js/edge_menu.js'),
+                'okno Studio (sekcia Kontrola) nacitava TEN ISTY modul')
+  NxTest.refute(A3S_PROD_H.include?('js/edge_menu.js'),
+                'okno Vyroba ho uz nenacitava — prepinace sa presunuli (ŠT-1b)')
   NxTest.assert(A3S_MENU.include?('global.NXEdgeMenu = API'), 'modul sa vystavuje ako NXEdgeMenu')
   NxTest.assert(A3S_SHELL.include?('NXEdgeMenu.menuHtml'), 'rail kresli okno modulom')
 end
@@ -88,12 +97,20 @@ end
 NxTest.test('ABS rail: styly okna su v ZDIELANOM panel.css (nie dve kopie)') do
   NxTest.assert(A3S_CSS.include?('.ecmenu {') && A3S_CSS.include?('.ecsw-missing'),
                 'zdielany komponent musi mat styly v panel.css')
-  code = A3S_PROD_H.gsub(%r{/\*.*?\*/}m, ' ')
-  NxTest.refute(code.include?('.ecmenu {'), 'okno Vyroba uz nesmie mat vlastnu kopiu stylov okna')
-  NxTest.refute(code.include?('.ecsw-taped'), 'farebne stvorceky ziju na JEDNOM mieste')
-  # Pravidla zdielaneho okna NESMU byt scopnute pod `.nx-inspector` — okno
-  # Vyroba o raile nevie a nasadenu triedu nema.
+  # ŠT-1b: aj SPUSTACE (.ecbtn/.gcbtn) a rohova zona ziju v zdielanom
+  # panel.css — studio.html ich kopiu mat NESMIE.
+  NxTest.assert(A3S_CSS.include?('.ecbtn, .gcbtn {') && A3S_CSS.include?('.cornerzone {'),
+                'spustace prepinacov maju styly v panel.css')
+  [['production.html', A3S_PROD_H], ['studio.html', A3S_STUDIO_H]].each do |(name, html)|
+    code = html.gsub(%r{/\*.*?\*/}m, ' ')
+    NxTest.refute(code.include?('.ecmenu {'), "#{name} nesmie mat vlastnu kopiu stylov okna")
+    NxTest.refute(code.include?('.ecsw-taped'), "#{name}: farebne stvorceky ziju na JEDNOM mieste")
+    NxTest.refute(code.include?('.ecbtn'), "#{name}: spustac ma styl v zdielanom panel.css")
+  end
+  # Pravidla zdielaneho okna NESMU byt scopnute pod `.nx-inspector` — satelitne
+  # okna o raile nevedia a nasadenu triedu nemaju.
   NxTest.refute(A3S_CSS =~ /\.nx-inspector \.ecmenu \{/, 'zdielane pravidla nesmu byt scopnute na Inspector')
+  NxTest.refute(A3S_CSS =~ /\.nx-inspector \.ecbtn/, 'ani spustac')
 end
 
 # --- 3) JEDEN zdroj stavu ----------------------------------------------------
@@ -103,9 +120,16 @@ NxTest.test('ABS rail: obe okna zapisuju ZDIELANOU cestou Engine.set_edge_check_
   NxTest.assert(A3S_MAIN =~ /def self\.set_edge_check_option.*?broadcast_edge_check/m,
                 'zdielana cesta rozposiela novy stav OBOM oknam')
   NxTest.assert(A3S_ACT.include?('Engine.set_edge_check_option'), 'rail ide zdielanou cestou')
-  NxTest.assert(A3S_PROD.include?('Engine.set_edge_check_option'), 'okno Vyroba ide tou istou cestou')
+  # ŠT-1b: telo je v ProductionCore a obe okna su len tenke obaly — trojica
+  # vstupnych bodov tak nemoze mat tri rozne cesty.
+  NxTest.assert(A3S_PCORE.include?('Engine.set_edge_check_option'),
+                'zdielane jadro ide tou istou cestou')
+  NxTest.assert(A3S_STUDIO.include?('ProductionCore.do_edge_check_option'),
+                'sekcia Kontrola v Studiu vola zdielane jadro')
+  NxTest.assert(A3S_PROD.include?('ProductionCore.do_edge_check_option'),
+                'a okno Vyroba (kym zije) tiez')
   # Priamy zapis mimo zdielanej cesty by rozdelil stav na dva.
-  [A3S_ACT, A3S_PROD].each do |src|
+  [A3S_ACT, A3S_PROD, A3S_STUDIO].each do |src|
     NxTest.refute(src.gsub(/#.*$/, '').include?('EdgeCheck.set_option'),
                   'okna nesmu volat EdgeCheck.set_option priamo — obislo by to broadcast')
   end
@@ -118,17 +142,33 @@ NxTest.test('ABS rail: rail si nedrzi vlastny stav prepinacov (server je autorit
   NxTest.assert(code.include?('nxEdgeState = st'), 'rail si drzi LEN posledny stav zo servera (zive pocty)')
 end
 
-NxTest.test('ABS rail: nikdy dve kopie okna naraz — otvorenie zavrie to druhe') do
+NxTest.test('ABS rail: nikdy dve kopie okna naraz — otvorenie zavrie OSTATNE') do
   NxTest.assert(A3S_MAIN.include?('def self.close_edge_menu'), 'zdielana cesta zatvarania')
+  cast = A3S_MAIN[/def self\.close_edge_menu.*?\n    end\n/m].to_s
   NxTest.assert(A3S_PANEL.include?("cb(dlg, 'nx_edge_menu_open')"), 'panel hlasi otvorenie')
   NxTest.assert(A3S_PROD.include?("cb(dlg, 'edge_menu_open')"), 'okno Vyroba hlasi otvorenie')
   NxTest.assert(A3S_PROD.include?('def close_edge_menu'), 'okno Vyroba vie svoje okno zavriet')
+  # ŠT-1b: TRETIA instancia — sekcia Kontrola v okne Studio. Bez vlastnej
+  # vetvy v `close_edge_menu` by ostali na obrazovke dve kopie naraz.
+  NxTest.assert(A3S_STUDIO.include?("cb(dlg, 'edge_menu_open')"), 'Studio hlasi otvorenie')
+  NxTest.assert(A3S_STUDIO.include?('Engine.close_edge_menu(:studio)'),
+                'a hlasi ho pod VLASTNYM zdrojom (inak by zavrelo samo seba)')
+  NxTest.assert(A3S_STUDIO.include?('def close_edge_menu'), 'Studio vie svoje okno zavriet')
+  NxTest.assert(cast.include?('source != :studio') && cast.include?('StudioDialog.close_edge_menu'),
+                'zdielana cesta pozna vetvu Studia')
+  NxTest.assert(cast.include?('source != :production') && cast.include?('source != :panel'),
+                'a povodne dve vetvy ostavaju')
 end
 
 NxTest.test('ABS rail: okno zatvara klik mimo aj Escape (vzor warnpanelu)') do
   NxTest.assert(A3S_BOOT.include?('bindEdgeMenu()'), 'zatvaranie sa naozaj pripaja pri starte')
   NxTest.assert(A3S_BOOT =~ /function bindEdgeMenu\(\).*?Escape/m, 'Escape zatvara okno')
   NxTest.assert(A3S_BOOT =~ /function bindEdgeMenu\(\).*?nxCloseEdgeMenu/m, 'klik mimo zatvara okno')
+  # ŠT-1b: to iste musi platit pre tretiu instanciu v Studiu.
+  studio_js = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'studio.js'),
+                        encoding: 'UTF-8')
+  NxTest.assert(studio_js.include?("!t.closest('.echk')"), 'klik mimo spustaca zatvara okno')
+  NxTest.assert(studio_js =~ /ev\.key === 'Escape' && ecMenuOpen/, 'Escape zatvara okno aj v Studiu')
 end
 
 # --- 4) serverove guardy panela ----------------------------------------------

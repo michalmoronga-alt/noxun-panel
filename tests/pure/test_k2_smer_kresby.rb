@@ -197,6 +197,12 @@ K2_ACT = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actio
                    encoding: 'UTF-8')
 K2_CORE = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'grain_check.rb'),
                     encoding: 'UTF-8')
+# ŠT-1b: prepinac sa presunul do sekcie Kontrola okna Studio; telo prepnutia
+# (spolocne pre obe okna) zije v ProductionCore.
+K2_PCORE = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core.rb'),
+                     encoding: 'UTF-8')
+K2_STUDIO = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog.rb'),
+                      encoding: 'UTF-8')
 
 NxTest.test('K2: prepnutie ma JEDNU zdielanu cestu (Engine.toggle_grain_check)') do
   shared = K2_MAIN[/def self\.toggle_grain_check.*?\n    end\n/m].to_s
@@ -204,20 +210,31 @@ NxTest.test('K2: prepnutie ma JEDNU zdielanu cestu (Engine.toggle_grain_check)')
   NxTest.assert(shared.include?('GrainCheck.toggle('), 'zdielana cesta prepina samotny overlay')
   NxTest.assert(shared.include?('broadcast_grain_check(state)'),
                 'po prepnuti sa stav VZDY rozposle (inak druhe okno ostane na starom)')
-  NxTest.assert(K2_PROD.include?('Engine.toggle_grain_check(model)'),
-                'okno Vyroba musi ist tou istou cestou (ziadny vlastny GrainCheck.toggle)')
+  # ŠT-1b: telo prepnutia je v ProductionCore — obe okna (Studio aj Vyroba)
+  # su uz len tenke obaly nad nim, takze tretia cesta nemoze vzniknut.
+  NxTest.assert(K2_PCORE.include?('Engine.toggle_grain_check(model)'),
+                'zdielane jadro musi ist tou istou cestou (ziadny vlastny GrainCheck.toggle)')
+  NxTest.assert(K2_STUDIO.include?('ProductionCore.do_grain_check'),
+                'sekcia Kontrola v Studiu ide cez zdielane jadro')
+  NxTest.assert(K2_PROD.include?('ProductionCore.do_grain_check'),
+                'a okno Vyroba (kym zije) tiez')
   NxTest.assert(K2_ACT.include?('Engine.toggle_grain_check(model)'),
                 'rail Inspectora musi ist tou istou cestou')
 end
 
-NxTest.test('K2: novy stav dostanu OBE okna (rail aj Vyroba)') do
+NxTest.test('K2: novy stav dostanu VSETKY okna (rail, Studio aj Vyroba)') do
   cast = K2_MAIN[/def self\.broadcast_grain_check.*?\n    end\n/m].to_s
   NxTest.refute(cast.empty?, 'Engine.broadcast_grain_check rozposiela novy stav')
   NxTest.assert(cast.include?('ProductionDialog.push_grain_check(state)'),
                 'okno Vyroba musi dostat novy stav')
+  # ŠT-1b: prepinac zije v sekcii Kontrola okna Studio — bez tohto pushu by
+  # prepnutie z railu v otvorenom Studiu nebolo vidiet.
+  NxTest.assert(cast.include?('StudioDialog.push_grain_check(state)'),
+                'okno Studio (sekcia Kontrola) musi dostat novy stav')
   NxTest.assert(cast.include?('Panel.push_grain_check(state)'),
                 'rail Inspectora musi dostat novy stav')
-  NxTest.assert(cast.include?('defined?(ProductionDialog)') && cast.include?('defined?(Panel)'),
+  NxTest.assert(cast.include?('defined?(ProductionDialog)') && cast.include?('defined?(Panel)') &&
+                cast.include?('defined?(StudioDialog)'),
                 'push je defenzivny — zavrete okno ho ticho zahodi')
   # Prepocet po prestavbe aj vypnutie pri prepnuti dokumentu idu TOU ISTOU
   # cestou — inak by rail po Spat/Znova ukazoval stare cisla.

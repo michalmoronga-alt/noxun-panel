@@ -1,5 +1,10 @@
-// Testy D-105 (JS zrkadlo) — split tlacidlo „Zvyraznit hrany" + rozbalovacie okno
-// s tromi stavmi v tabe KONTROLA okna Vyroba.
+// Testy D-105 (JS zrkadlo) — tlacidlo „Zvyraznit hrany" + rozbalovacie okno
+// s tromi stavmi v LISTE SEKCIE Kontrola okna STUDIO.
+//
+// ŠT-1b: prepinac sa presunul z tabu KONTROLA okna Vyroba a jeho spustac ma
+// odteraz tvar ROHOVEHO TROJUHOLNIKA (mockup, audit #15) namiesto split
+// tlacidla s chevronom — samotne okno nastavenia je NEZMENENY zdielany
+// komponent (js/edge_menu.js).
 //
 // JS je LEN zobrazenie: stav prepinacov, pocty aj zapnutost nesie SERVER; klient
 // si nic neprepocitava, nic si nepamata (okrem toho, ci je okno rozbalene) a do
@@ -10,7 +15,7 @@ const path = require('node:path');
 
 global.window = {};
 global.document = { addEventListener: function(){}, getElementById: function(){ return null; } };
-const P = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'production.js'));
+const P = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'studio.js'));
 
 let n = 0;
 function eq(actual, expected, msg){
@@ -26,13 +31,14 @@ function state(options, counts, extra){
   return Object.assign({ available: true, active: true, options: options, counts: counts }, extra || {});
 }
 
-// --- split tlacidlo -----------------------------------------------------------
+// --- spustac s rohovym trojuholnikom ------------------------------------------
 (function(){
   const on = P.edgeCheckBarHtml(state(DEFAULTS, { missing: 3, extra: 9, taped: 40 }), false);
-  ok(on.indexOf('class="ecsplit"') >= 0, 'tlacidlo je jeden vizualny celok (split)');
-  ok(on.indexOf('ecbtn ecmain on') >= 0, 'lava polovica nesie zapnuty stav');
-  ok(on.indexOf('ecbtn ecmore on') >= 0, 'prava polovica je sucastou toho isteho celku');
-  ok(on.indexOf('#i-chevron-down') >= 0, 'prava polovica ma chevron zo spritu (ziadne emoji)');
+  ok(on.indexOf('class="echk"') >= 0, 'tlacidlo a jeho roh su jeden vizualny celok');
+  ok(on.indexOf('class="ecbtn on"') >= 0, 'telo tlacidla nesie zapnuty stav');
+  ok(on.indexOf('class="cornerzone"') >= 0,
+     'roh je SAMOSTATNE tlacidlo (vnorene tlacidlo je neplatne HTML)');
+  ok(on.indexOf('aria-haspopup="true"') >= 0, 'roh hlasi citacke, ze otvara nastavenie');
   ok(on.indexOf('#i-eye-off') >= 0, 'zapnute = ikona eye-off');
   ok(on.indexOf('aria-expanded="false"') >= 0, 'zatvorene okno je aj pre citacku');
   ok(on.indexOf('Zvýrazniť hrany') >= 0, 'novy nazov tlacidla');
@@ -40,11 +46,12 @@ function state(options, counts, extra){
 
   const off = P.edgeCheckBarHtml(state(DEFAULTS, null, { active: false }), false);
   ok(off.indexOf('#i-eye"') >= 0, 'vypnute = ikona eye');
-  ok(off.indexOf('class="ecbtn ecmain"') >= 0, 'vypnute tlacidlo nema triedu on');
+  ok(off.indexOf('class="ecbtn"') >= 0, 'vypnute tlacidlo nema triedu on');
 
   const opened = P.edgeCheckBarHtml(state(DEFAULTS, { missing: 3, extra: 9, taped: 40 }), true);
   ok(opened.indexOf('aria-expanded="true"') >= 0, 'otvorene okno je aj pre citacku');
-  ok(opened.indexOf('ecmenu open') >= 0, 'otvorene okno ma triedu open');
+  // Okno je zdielany komponent; Studio mu prida len polohovaciu triedu.
+  ok(opened.indexOf('ecmenu ecmenu-studio open') >= 0, 'otvorene okno ma triedu open');
 })();
 
 // --- rozbalovacie okno: tri stavy + zive pocty --------------------------------
@@ -107,7 +114,7 @@ eq(P.edgeCheckText(state(DEFAULTS, { missing: 0, extra: 5, taped: 40 })),
    'ciel zakazky: nula cervenych pri zapnutej iba cervenej');
 eq(P.edgeCheckText(state({ show_missing: false, show_extra: false, show_taped: false,
                            taped_selected_only: true }, { missing: 4, extra: 4, taped: 4 })),
-   'Žiadny stav nie je zapnutý — otvor nastavenie (▾).',
+   'Žiadny stav nie je zapnutý — otvor nastavenie (roh tlačidla).',
    'vsetko vypnute = povie, kde to zapnut (nie tiche prazdno)');
 ok(P.edgeCheckText(state(DEFAULTS, { missing: 3 }, { unresolved: 2 })).indexOf('2 sa nedá zvýrazniť') >= 0,
    'nezvyraznitelne hrany sa priznaju aj v novom texte');

@@ -1,13 +1,15 @@
 // Testy „ABS kontrola v raile: 3-stavove nastavenie" (v0.7.28).
 //
 // Kontrakt davky: rohovy trojuholnik pri ABS ikone otvara TO ISTE nastavenie,
-// ktore ma okno Vyroba pod chevronom — NIE druhu kopiu. Preto je markup aj
-// payload v JEDNOM zdielanom module (ui/js/edge_menu.js) a okno Vyroba ho uz
-// len vola. Tieto testy stoja presne na tom:
+// ake ma sekcia Kontrola v okne STUDIO — NIE druhu kopiu. Preto je markup aj
+// payload v JEDNOM zdielanom module (ui/js/edge_menu.js) a okna ho uz len
+// volaju. ŠT-1b: TRETIA instancia (do vtedy to bolo okno Vyroba pod chevronom,
+// odkial sa prepinace presunuli). Tieto testy stoja presne na tom:
 //   1) modul kresli tri stavy + podriadeny prepinac a ZIVE POCTY zo servera,
-//   2) rail a okno Vyroba dostanu BAJT-ROVNAKY obsah (lisi sa len obal),
+//   2) rail a Studio dostanu BAJT-ROVNAKY obsah (lisi sa len obal),
 //   3) payload do Ruby je bajt-rovnaky (identita + kluc + STRIKTNY boolean),
-//   4) okno Vyroba naozaj deleguje (ziadna druha kopia markupu v production.js).
+//   4) Studio naozaj deleguje (ziadna druha kopia markupu v studio.js) a
+//      v production.js po presune neostala ziadna tretia.
 'use strict';
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -17,7 +19,7 @@ global.window = {};
 global.document = { addEventListener: function(){}, getElementById: function(){ return null; } };
 const ROOT = path.join(__dirname, '..', '..');
 const M = require(path.join(ROOT, 'noxun_engine', 'ui', 'js', 'edge_menu.js'));
-const P = require(path.join(ROOT, 'noxun_engine', 'ui', 'js', 'production.js'));
+const P = require(path.join(ROOT, 'noxun_engine', 'ui', 'js', 'studio.js'));
 
 let n = 0;
 function eq(actual, expected, msg){
@@ -57,19 +59,21 @@ function state(options, counts, extra){
   ok(off.indexOf('<b class="eccnt">—</b>') >= 0, 'vypnute zvyraznenie neskenuje — pocet je pomlcka');
 })();
 
-// --- 2) JEDNO nastavenie: rail a okno Vyroba maju ROVNAKY obsah ---------------
+// --- 2) JEDNO nastavenie: rail a Studio maju ROVNAKY obsah --------------------
 (function(){
   const st = state({ show_missing: true, show_extra: true, show_taped: true, taped_selected_only: false },
                    { missing: 1, extra: 2, taped: 3 });
   const rail = M.menuHtml(st, true, { fn: 'F', id: 'railAbsMenu', cls: 'ecmenu-rail' });
-  const prod = P.edgeCheckMenuHtml(st, true);
+  const studio = P.edgeCheckMenuHtml(st, true);
   // Zhoda sa porovnava na tom, co pouzivatel vidi — riadky, stvorceky, pocty.
-  // (Lisia sa len id uzla, doplnkova trieda a meno handlera.)
+  // (Lisia sa len id uzla, polohovacia trieda a meno handlera.)
   const strip = function(h){
-    return h.replace(/id="[^"]*"/, '').replace(/ ecmenu-rail/, '').replace(/onchange="[^"]*"/g, '');
+    return h.replace(/id="[^"]*"/, '')
+            .replace(/ ecmenu-(rail|studio)/, '')
+            .replace(/onchange="[^"]*"/g, '');
   };
-  eq(strip(rail), strip(prod), 'rail a okno Vyroba kreslia TO ISTE nastavenie (ziadna druha kopia)');
-  eq((prod.match(/ checked onchange/g) || []).length, (rail.match(/ checked onchange/g) || []).length,
+  eq(strip(rail), strip(studio), 'rail a Studio kreslia TO ISTE nastavenie (ziadna druha kopia)');
+  eq((studio.match(/ checked onchange/g) || []).length, (rail.match(/ checked onchange/g) || []).length,
      'zaskrtnutia su z JEDNEHO serveroveho stavu');
 })();
 
@@ -79,7 +83,7 @@ function state(options, counts, extra){
                       { missing: 2, extra: 0, taped: 0 }, { selection_empty: true });
   ok(M.selectionHint(empty), 'prazdny vyber + „len vybrané" + zelena = hint');
   ok(M.menuHtml(empty, true, {}).indexOf('označ skrinky v modeli') >= 0, 'hint je pri podriadenom prepinaci');
-  eq(M.selectionHint(empty), P.edgeCheckSelectionHint(empty), 'okno Vyroba pouziva TO ISTE rozhodnutie');
+  eq(M.selectionHint(empty), P.edgeCheckSelectionHint(empty), 'Studio pouziva TO ISTE rozhodnutie');
   no(M.selectionHint(Object.assign({}, empty, { active: false })), 'vypnute = ziadny hint');
 })();
 
@@ -94,17 +98,29 @@ function state(options, counts, extra){
      'bez dat sa nepada');
   eq(M.optionPayload({ gen: 7, model_guid: 'G-1' }, 'show_extra', true),
      P.edgeCheckOptionPayload({ gen: 7, model_guid: 'G-1' }, 'show_extra', true),
-     'okno Vyroba posiela BAJT-ROVNAKY tvar (jedna cesta do Ruby)');
+     'Studio posiela BAJT-ROVNAKY tvar (jedna cesta do Ruby)');
   no(Object.keys(M.optionPayload({ gen: 1 }, 'show_extra', true)).indexOf('options') >= 0,
      'klient NEPOSIELA cely stav prepinacov — meni sa vzdy jeden kluc');
 })();
 
-// --- 5) v production.js uz ziadna druha kopia markupu neexistuje ---------------
+// --- 5) v studio.js uz ziadna druha kopia markupu neexistuje ------------------
 (function(){
-  const src = fs.readFileSync(path.join(ROOT, 'noxun_engine', 'ui', 'js', 'production.js'), 'utf8');
+  const src = fs.readFileSync(path.join(ROOT, 'noxun_engine', 'ui', 'js', 'studio.js'), 'utf8');
   no(src.indexOf('Chýba podľa pravidla') >= 0, 'nazvy stavov ziju LEN v zdielanom module');
   no(src.indexOf('ecsw ecsw-') >= 0, 'farebne stvorceky kresli LEN zdielany modul');
-  ok(src.indexOf('edge_menu.js') >= 0, 'okno Vyroba zdielany modul naozaj pouziva');
+  ok(src.indexOf('edge_menu.js') >= 0, 'Studio zdielany modul naozaj pouziva');
+
+  // ŠT-1b: po presune do Studia nesmie v okne Vyroba ostat ani zvysok
+  // prepinacov — inak by tam visela mrtva (a casom rozidena) tretia kopia.
+  const prod = fs.readFileSync(path.join(ROOT, 'noxun_engine', 'ui', 'js', 'production.js'), 'utf8');
+  no(prod.indexOf('edge_menu.js') >= 0, 'okno Vyroba zdielany modul uz nenacitava');
+  no(prod.indexOf('edgeCheckBarHtml') >= 0, 'a nema ani vlastnu listu prepinacov');
+  const prodHtml = fs.readFileSync(path.join(ROOT, 'noxun_engine', 'ui', 'production.html'), 'utf8');
+  no(prodHtml.indexOf('js/edge_menu.js') >= 0, 'ani jeho HTML modul uz nenacitava');
+  const studioHtml = fs.readFileSync(path.join(ROOT, 'noxun_engine', 'ui', 'studio.html'), 'utf8');
+  ok(studioHtml.indexOf('js/edge_menu.js') >= 0, 'zato Studio ho nacitava PRED studio.js');
+  ok(studioHtml.indexOf('js/edge_menu.js') < studioHtml.indexOf('js/studio.js'),
+     'poradie skriptov: zdielany modul musi byt skor nez okno, ktore ho vola');
 
   const shell = fs.readFileSync(path.join(ROOT, 'noxun_engine', 'ui', 'js', 'shell.js'), 'utf8');
   ok(shell.indexOf('NXEdgeMenu.menuHtml') >= 0, 'rail kresli okno tym istym modulom');
