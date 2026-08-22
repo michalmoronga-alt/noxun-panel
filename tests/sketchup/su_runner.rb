@@ -615,7 +615,7 @@ module NoxunSuRunner
       # Codex GH #39: hrubka ABS pri edite nemenna (jednotkove ID nesmie zacat znamenat 2mm)
       e::MaterialsDialog.handle_save_edge({ 'abs_id' => k_abs10, 'decor' => SYNC_DECOR_K,
                                             'thickness' => '2.0', 'price_per_bm' => '1',
-                                            'catalog_schema' => cs11 }.to_json, create: false)
+                                            'catalog_schema' => cs11 }.to_json)
       abs10 = e::Materials.edge(k_abs10)
       ok('katalog: zmena hrubky existujucej ABS odmietnuta (ostava 1.0)',
          !abs10.nil? && (abs10['thickness'].to_f - 1.0).abs < 0.01)
