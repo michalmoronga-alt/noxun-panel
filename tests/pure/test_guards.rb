@@ -27,6 +27,20 @@ NxTest.test('guard: kazdy ?v= cache-bust v ui/*.html sedi s VERSION') do
                 "?v= cache-bust nesedi s VERSION '#{NxTest::LOADER_VERSION}': #{offenders.join(', ')}")
 end
 
+NxTest.test('guard: MD_CLIENT_SCHEMA v proj_materials.js sedi so SCHEMA_CURRENT') do
+  # Klient sekcie Materialy posiela PEVNU konstantu (schema, ktorej rozumie) —
+  # server ju porovnava v schema_write_allowed? (client >= server). Pri bumpe
+  # SCHEMA_CURRENT bez bumpu JS konstanty by cela sprava katalogu v UI spadla
+  # do read-only ("Katalog je v novom formate...") a nic by to nechytilo.
+  js = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'proj_materials.js'),
+                 encoding: 'UTF-8')
+  n = js[/MD_CLIENT_SCHEMA\s*=\s*(\d+)/, 1]
+  NxTest.refute(n.nil?, 'MD_CLIENT_SCHEMA sa v proj_materials.js nenasla')
+  NxTest.assert_equal(Noxun::Engine::Materials::SCHEMA_CURRENT, n.to_i,
+                      "klientska schema (#{n}) nesedi so SCHEMA_CURRENT " \
+                      "(#{Noxun::Engine::Materials::SCHEMA_CURRENT}) — pri novom markeri bumpni OBE")
+end
+
 NxTest.test('guard: Numeric#mm sa nepouziva mimo units.rb') do
   offenders = []
   Dir[File.join(NxTest::ROOT, 'noxun_engine', '**', '*.rb')].sort.each do |path|

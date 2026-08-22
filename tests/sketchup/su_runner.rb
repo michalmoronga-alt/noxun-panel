@@ -151,20 +151,30 @@ module NoxunSuRunner
   SYNC_DECOR_K = 'SU SYNC KORPUS'
   SYNC_DECOR_B = 'SU SYNC BIELA'
 
+  # Self-heal po SPADNUTOM predchadzajucom behu: zmaze VSETKY zaznamy danych
+  # TESTOVACICH dekorov (mena su namespacovane — 'SU ...' / 'Runner ...';
+  # bezny pouzivatelsky dekor sa takto NIKDY nemaze). Bez tohto by leftover
+  # sposobil, ze batch hlasi "varianty uz su" a scenar by sa bud opakovane
+  # FAILoval (run_sync), alebo TICHO preskocil (info nie je FAIL) — strata
+  # pokrytia, ktoru by nikto nezbadal. Zasah do katalogu sa prizna v logu.
+  def sync_purge_test_decors(*decors)
+    removed = 0
+    decors.each do |d|
+      e::Materials.edges.select { |a| a['decor'] == d }
+                  .each { |a| removed += 1 if e::Materials.delete_edge(a['abs_id']) }
+      e::Materials.sheets.select { |s| s['decor'] == d }
+                  .each { |s| removed += 1 if e::Materials.delete_sheet(s['material_id']) }
+    end
+    info("self-heal: z katalogu odstranenych #{removed} leftover zaznamov (#{decors.join(', ')})") if removed.positive?
+    removed
+  end
+
   def sync_seed_decors
     # PRVY dotyk katalogu v celom behu moze byt prave tento seed — subor este
     # neexistuje a catalog_schema by vratil legacy 1 (batch v3 by odmietol).
     # load spusti ensure_seeded (cerstvy katalog = nativne UNI sada, SCHEMA 7).
     e::Materials.load
-    # leftover po SPADNUTOM predchadzajucom behu: SU SYNC su VYHRADNE nase
-    # testovacie dekory — uprac ich, inak by batch hlasil "varianty uz su"
-    # a cely run_sync by opakovane padal na seede.
-    [SYNC_DECOR_K, SYNC_DECOR_B].each do |d|
-      e::Materials.edges.select { |a| a['decor'] == d }
-                  .each { |a| e::Materials.delete_edge(a['abs_id']) }
-      e::Materials.sheets.select { |s| s['decor'] == d }
-                  .each { |s| e::Materials.delete_sheet(s['material_id']) }
-    end
+    sync_purge_test_decors(SYNC_DECOR_K, SYNC_DECOR_B)
     okk, resk = e::Materials.add_decor_batch(
       'batch_schema' => 3, 'decor' => SYNC_DECOR_K, 'type' => 'DTDL', 'grain' => 'length',
       'sheet_variants' => [{ 'thickness' => 18.0, 'structure' => 'PW' }],
@@ -230,7 +240,10 @@ module NoxunSuRunner
                                   { 'id' => 'ZR', 'shelves' => 0, 'children' => [] }
                                 ] } }
     inst = e::CabinetBuilder.build(model, params)
-    return ok('sync: vlozenie korpusu', false) unless inst
+    unless inst
+      sync_cleanup_decors(seed[:k], seed[:b]) # early return NESMIE nechat dekory v katalogu
+      return ok('sync: vlozenie korpusu', false)
+    end
 
     cid = e::Store.get(inst, 'cabinet_id')
     cfg = e::Store.config(inst) || {}
@@ -471,7 +484,11 @@ module NoxunSuRunner
     binst = e::BoardBuilder.build(model, { 'material_id' => kmat,
                                            'length' => 720.0, 'width' => 580.0,
                                            'name' => 'Testovacia doska' })
-    return ok('sync-board: vlozenie dosky', false) unless binst
+    unless binst
+      cleanup(model)
+      sync_cleanup_decors(seed[:k], seed[:b]) # early return NESMIE nechat dekory v katalogu
+      return ok('sync-board: vlozenie dosky', false)
+    end
 
     bid = e::Store.get(binst, 'id')
     ok("sync-board: identita a ploche atributy (#{bid})",
@@ -567,9 +584,12 @@ module NoxunSuRunner
     #     formularovy add_sheet je "+ variant" existujucej skupiny), doska ho
     #     prevezme (hrubka z katalogu), delete guardy cez dialogove handlery.
     #     Handlery su schema-gatovane (schema_write_allowed?) — payload nesie
-    #     catalog_schema servera, presne ako zivy klient (MD_CLIENT_SCHEMA).
-    cs11 = e::Materials.catalog_schema
+    #     PEVNU konstantu "schema, ktorej tento kod rozumie" (SCHEMA_CURRENT),
+    #     presne ako zivy klient (MD_CLIENT_SCHEMA — synchro strazi guard test).
+    #     Echo servera by branu urobilo tautologickou.
+    cs11 = e::Materials::SCHEMA_CURRENT
     begin
+      sync_purge_test_decors('Runner Pracovna') # leftover by zhodil batch aj asserty
       ok38, res38 = e::Materials.add_decor_batch(
         'batch_schema' => 3, 'decor' => 'Runner Pracovna', 'grain' => 'length',
         'color' => [50, 60, 70], 'sheet_variants' => [{ 'thickness' => 38.0 }]
@@ -600,8 +620,11 @@ module NoxunSuRunner
       ok('katalog: zmena hrubky existujucej ABS odmietnuta (ostava 1.0)',
          !abs10.nil? && (abs10['thickness'].to_f - 1.0).abs < 0.01)
     ensure
-      # uprac: dosku vrat na seed material a testovaci zaznam zmaz (uz nepouzity)
+      # uprac: dosku vrat na seed material a testovaci zaznam zmaz (uz nepouzity).
+      # Fallback dohladanim podla dekoru — keby batch zlyhal na leftoveri,
+      # ensure ho aj tak uprace (samoliecba dalsieho behu).
       e::BoardBuilder.rebuild(model, binst, { 'material_id' => kmat }) rescue nil
+      wt38 ||= (e::Materials.sheets.find { |s| s['decor'] == 'Runner Pracovna' } || {})['material_id']
       e::Materials.delete_sheet(wt38) if wt38
     end
     ok('katalog: nepouzity testovaci material zmazany (cleanup)',
@@ -743,6 +766,7 @@ module NoxunSuRunner
     # Batch v3 (nad SCHEMA >= 2 legacy stringove polia neplatia); doska BEZ
     # struktury -> dovytvorena paska dostane universal:true (GH #90 O-ensure)
     # a ID bez strukturneho segmentu (rovnake ako historicky ABS_SU_D41_DEKOR_23X10).
+    sync_purge_test_decors('SU D41 Dekor')
     ok41, res41 = e::Materials.add_decor_batch('batch_schema' => 3, 'decor' => 'SU D41 Dekor',
                                                'sheet_variants' => [{ 'thickness' => 18.0 }])
     if ok41
@@ -759,7 +783,7 @@ module NoxunSuRunner
       # rozumiet skupinam (catalog_schema), inak ensure vrati :schema_read_only.
       e::Panel.handle_set_part_material({ 'cabinet_id' => cid41, 'role_key' => rk41,
                                           'material_id' => sid41, 'create_missing_abs' => true,
-                                          'catalog_schema' => e::Materials.catalog_schema }.to_json)
+                                          'catalog_schema' => e::Materials::SCHEMA_CURRENT }.to_json)
       created41 = e::Materials.abs_for_sheet(e::Materials.sheet(sid41), :jednotka, 18.0).first
       part41 = inst.definition.entities.grep(Sketchup::ComponentInstance)
                    .find { |i| e::Store.get(i, 'part_key').to_s == rk41 }
@@ -852,9 +876,10 @@ module NoxunSuRunner
     # v stave pred run_sync.
     cleanup(model)
     sync_cleanup_decors(seed[:k], seed[:b])
-    ok('sync: cleanup (0 korpusov, 0 dosiek, SU SYNC dekory prec z katalogu)',
+    ok('sync: cleanup (0 korpusov, 0 dosiek, SU SYNC dekory AJ pasky prec z katalogu)',
        cabinets(model).empty? && boards(model).empty? &&
-       e::Materials.sheets.none? { |s| [SYNC_DECOR_K, SYNC_DECOR_B].include?(s['decor']) })
+       e::Materials.sheets.none? { |s| [SYNC_DECOR_K, SYNC_DECOR_B].include?(s['decor']) } &&
+       e::Materials.edges.none? { |a| [SYNC_DECOR_K, SYNC_DECOR_B].include?(a['decor']) })
   rescue StandardError => ex
     log_line("FAIL: sync vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
     cleanup(model)
@@ -952,21 +977,20 @@ module NoxunSuRunner
     # lubovolnu hrubku, preflight vracia nil). Scenar si preto REALNU dvojicu
     # variantov jednej skupiny (3 mm chrbat + 18 mm telo, rovnaka struktura)
     # doseje sam cez batch v3 a po sebe ju uprace.
-    d38 = nil
-    if e::Materials.sheets.any? { |s| s['decor'] == 'SU BACK D38' }
-      info('back D-38: dekor SU BACK D38 uz v katalogu existuje — scenar preskoceny (chranime pouzivatelske data)')
-    else
-      ok_d38, res_d38 = e::Materials.add_decor_batch(
-        'batch_schema' => 3, 'decor' => 'SU BACK D38', 'grain' => 'none',
-        'sheet_variants' => [{ 'type' => 'HDF', 'thickness' => 3.0, 'structure' => 'SM' },
-                             { 'thickness' => 18.0, 'structure' => 'SM' }]
-      )
-      d38 = ok_d38 ? res_d38 : nil
-      info("back D-38: seed katalogu zlyhal (#{res_d38.inspect}) — scenar preskoceny") unless ok_d38
-    end
+    sync_purge_test_decors('SU BACK D38') # leftover = tichy skip = strata pokrytia
+    ok_d38, res_d38 = e::Materials.add_decor_batch(
+      'batch_schema' => 3, 'decor' => 'SU BACK D38', 'grain' => 'none',
+      'sheet_variants' => [{ 'type' => 'HDF', 'thickness' => 3.0, 'structure' => 'SM' },
+                           { 'thickness' => 18.0, 'structure' => 'SM' }]
+    )
+    d38 = ok_d38 ? res_d38 : nil
+    ok("back D-38: seed dvojice variantov (#{ok_d38 ? d38['sheets'].join(', ') : res_d38.inspect})", ok_d38)
     if d38
       b3 = d38['sheets'].find { |id| (e::Materials.sheet(id) || {})['thickness'].to_f < 10.0 }
       b18 = (d38['sheets'] - [b3]).first
+      if b3.nil? || b18.nil?
+        ok("back D-38: seed nevratil oba varianty (3mm #{b3.inspect}, 18mm #{b18.inspect})", false)
+      else
       pf_params = e::CabinetBuilder.config_to_params(e::Store.config(inst))
                                    .merge('back_mode' => 'overlay', 'back_thickness' => 18.0,
                                           'back_material_id' => b3)
@@ -978,6 +1002,7 @@ module NoxunSuRunner
       ok('back D-38: rebuild s pevnym 18 PRESIEL — telo 492, chrbat konci na 510',
          s18 && (part_depth(s18) - 492.0).abs < TOL &&
          (part_y_end(find_part(inst, 'cabinet/back')) - 510.0).abs < TOL)
+      end
     end
 
     cleanup(model)
@@ -1090,18 +1115,14 @@ module NoxunSuRunner
     # material (UNI hrubku nediktuje — E-03) a B3 kopia REALNU ABS pasku
     # (norm_overrides neznamy abs_id zahadzuje na nil). Jeden docasny dekor
     # pokryje oboje a na konci sa uprace.
-    vklad_res = nil
-    if e::Materials.sheets.any? { |s| s['decor'] == 'SU VKLAD' }
-      info('vklad: dekor SU VKLAD uz v katalogu existuje — katalogove scenare bezia bez seedu (chranime pouzivatelske data)')
-    else
-      ok_v, res_v = e::Materials.add_decor_batch(
-        'batch_schema' => 3, 'decor' => 'SU VKLAD', 'type' => 'HDF', 'grain' => 'none',
-        'sheet_variants' => [{ 'thickness' => 3.0 }],
-        'edge_variants' => [{ 'width' => 23.0, 'thickness' => 1.0, 'universal' => true }]
-      )
-      vklad_res = ok_v ? res_v : nil
-      info("vklad: seed dekoru SU VKLAD zlyhal (#{res_v.inspect})") unless ok_v
-    end
+    sync_purge_test_decors('SU VKLAD') # leftover = tichy skip = strata pokrytia
+    ok_v, res_v = e::Materials.add_decor_batch(
+      'batch_schema' => 3, 'decor' => 'SU VKLAD', 'type' => 'HDF', 'grain' => 'none',
+      'sheet_variants' => [{ 'thickness' => 3.0 }],
+      'edge_variants' => [{ 'width' => 23.0, 'thickness' => 1.0, 'universal' => true }]
+    )
+    vklad_res = ok_v ? res_v : nil
+    ok("vklad: seed dekoru SU VKLAD (#{ok_v ? 'ok' : res_v.inspect})", ok_v)
 
     # 0) D-39: sanitizacia zamkov v Ruby pamati (whitelist poli + cisla)
     e::Panel.handle_set_insert_locks({ 'locks' => { 'height' => 950.0, 'bogus' => 5,
@@ -1254,9 +1275,11 @@ module NoxunSuRunner
 
     cleanup(model)
     sync_cleanup_decors(vklad_res) if vklad_res
-    ok('vklad: cleanup (0 korpusov, seedovany SU VKLAD dekor prec)',
+    ok('vklad: cleanup (0 korpusov, seedovany SU VKLAD dekor aj paska prec)',
        cabinets(model).empty? &&
-       (vklad_res.nil? || e::Materials.sheets.none? { |s| s['decor'] == 'SU VKLAD' }))
+       (vklad_res.nil? ||
+        (e::Materials.sheets.none? { |s| s['decor'] == 'SU VKLAD' } &&
+         e::Materials.edges.none? { |a| a['decor'] == 'SU VKLAD' })))
   rescue StandardError => ex
     log_line("FAIL: sync-vkladanie vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
     remove_js_recorder
@@ -6701,10 +6724,13 @@ module NoxunSuRunner
       e::Materials.sheets.reject { |s| e::Materials.uni?(s) }
                   .select { |s| (s['thickness'].to_f - 18.0).abs < 0.01 && s['source_material_id'].to_s.empty? }
     end
+    # purge PRED vypoctom targetu — leftover SU ST2B FRONT by inak posluzil ako
+    # target a v katalogu by ostal navzdy (cleanup bezi len nad vlastnym seedom)
+    sync_purge_test_decors('SU ST2B FRONT')
     orig = e::Materials.project_defaults(model)['default_front_material_id'].to_s
     target = pick_front.call.map { |s| s['material_id'].to_s }.find { |id| id != orig }
     tmp_front = nil
-    if target.nil? && e::Materials.sheets.none? { |s| s['decor'] == 'SU ST2B FRONT' }
+    if target.nil?
       ok_tf, res_tf = e::Materials.add_decor_batch(
         'batch_schema' => 3, 'decor' => 'SU ST2B FRONT',
         'sheet_variants' => [{ 'thickness' => 18.0 }]
@@ -6730,11 +6756,11 @@ module NoxunSuRunner
            e::Materials.project_defaults(model)['default_front_material_id'].to_s == orig)
       end
     end
-    sync_cleanup_decors(tmp_front) if tmp_front
-
     cleanup(model)
+    sync_cleanup_decors(tmp_front) if tmp_front
   rescue StandardError => ex
     log_line("FAIL: ŠT-2b vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
     sync_cleanup_decors(tmp_front) if defined?(tmp_front) && tmp_front
   end
 
