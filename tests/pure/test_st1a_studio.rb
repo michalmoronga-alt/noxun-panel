@@ -372,6 +372,47 @@ NxTest.test('SMOKE 22.8. (1A–1D): LISTA Kusovnika a rohove nastavenie VEPO —
                       'zapis nastavenia ma jedinu cestu (`studio_set_vepo_opts`)')
   NxTest.assert(kontrakt.include?('ROHOVÉ NASTAVENIE'), 'kontrakt roh pozna')
 
+  # Review #1: obe menu listy visia na SVOJOM tlacidle (vlastny pozicovaci
+  # obal), nie na `.sectools` — inak sa po presune tlacidla od neho odtrhnu.
+  NxTest.assert(ST1B_STUDIO_JS.include?('<span class="colfly">'), 'menu stlpcov ma obal')
+  NxTest.assert(ST1B_STUDIO_HTML.include?('.colfly { position: relative;'),
+                'a obal je pozicovaci kontext')
+  colcss = ST1B_STUDIO_HTML[/\.colmenu \{[^}]*\}/m].to_s
+  NxTest.assert(colcss.include?('right: 0;'), 'menu je kotvene na tlacidlo, nie na okraj listy')
+  NxTest.refute(colcss.include?('right: 12px'), 'stare kotvenie na listu je PREC')
+  NxTest.assert(mockup.include?('colfly'), 'mockup drzi ten isty vzor (1:1)')
+
+  # Review #4: obe rohove/rozbalovacie okna maju hlavicku `.mgrp`.
+  NxTest.assert(ST1B_STUDIO_JS.include?('<div class="mgrp">Nastavenie VEPO exportu</div>'),
+                'nastavenie VEPO ma hlavicku')
+  NxTest.assert(ST1B_STUDIO_HTML.include?('.vepomenu .mgrp'), 'a jej styl (klon .colmenu .mgrp)')
+
+  # Review #5: pravidlo pre neaktivne ovladace listy ZANIKLO spolu s poslednym
+  # z nich — mrtve CSS sluby vzor, ktory sa uz nekresli.
+  NxTest.refute(ST1B_STUDIO_HTML.include?('.sectools [aria-disabled="true"]'),
+                'mrtve pravidlo `.sectools [aria-disabled]` je zmazane')
+
+  # Review #7: KAZDA sekcia ma vlastnu cestu k cerstvym cislam. Kontrola bola
+  # posledna bez nej — a je to sekcia, kvoli ktorej sa clovek do okna vracia.
+  ctrl = ST1B_STUDIO_JS[/if \(studioSec === 'ctrl'\)\{.*?\n    \}/m].to_s
+  NxTest.assert(ctrl.include?('id="refreshBtn"'), 'lista Kontroly ma „Obnoviť"')
+  NxTest.assert(ctrl.include?('Prepočítať kontrolu z aktuálneho modelu'),
+                'a tooltip hovori o KONTROLE')
+  NxTest.assert(ST1B_STUDIO_JS.include?("ctrl: 'Prepočítavam kontrolu…'"),
+                'aj priebezna hlaska je per sekciu')
+  NxTest.assert_equal(1, ST1B_STUDIO_JS.scan(/t\.closest\('#refreshBtn'\)/).length,
+                      'vsetky sekcie idu JEDNYM handlerom (ziadna druha serverova cesta)')
+  NxTest.assert(mockup.include?('Kontrola prepočítaná z modelu'), 'mockup Kontroly to drzi tiez')
+
+  # Review #8: otvoreny overlay patri sekcii, z ktorej odchadzame.
+  NxTest.assert(ST1B_STUDIO_JS.include?('function closeSectionMenus'),
+                'zhasnutie overlayov ma JEDNO miesto')
+  go = ST1B_STUDIO_JS[/function studioGoSection\(id\)\{.*?\n  \}/m].to_s
+  NxTest.assert(go.include?('closeSectionMenus();'), 'prepnutie sekcie ich zhasne')
+  NxTest.assert(ST1B_STUDIO_JS[/if \(ST && ST\.open_section.*?\n      \}/m].to_s
+                              .include?('closeSectionMenus();'),
+                'a deep-link zo servera tiez')
+
   # 1D: „Projekt" je VSTUP so stitkom, nie popisok medzi tlacidlami.
   NxTest.assert(ST1B_STUDIO_JS.include?('<span class="prjlbl">Projekt</span>'),
                 'pole ma viditelny stitok')
@@ -409,6 +450,23 @@ NxTest.test('SMOKE 22.8.: „Obnoviť" hlasku VZDY zhodi — nikdy vecne „Prep
   NxTest.assert(body.include?('push_state'), 'USPESNA vetva okno prepocita')
   NxTest.assert(body.include?("set_status('Prepočítané.')"),
                 'a HNED za tym zhodi hlasku (echo NX.setStatus)')
+  # Review #6: potvrdenie LEN ked payload naozaj odosiel. `js` hlta vynimky
+  # `execute_script` a mlci pri mrtvom okne — bez navratovej hodnoty by server
+  # potvrdil prepocet, ktory sa ku klientovi nikdy nedostal.
+  NxTest.assert(body.include?('return unless push_state'),
+                'review #6: „Prepočítané." az po OVERENOM odoslani payloadu')
+  jsm = ST1B_STUDIO_RB[/def js\(script\).*?\n        end\n/m].to_s
+  NxTest.assert(jsm.include?('return false unless'), 'review #6: `js` prizna mrtve okno')
+  NxTest.assert(jsm.match?(/execute_script\(script\)\s*\n\s*true/),
+                'review #6: a uspesne odoslanie vracia true')
+  NxTest.assert(jsm.match?(/log_error.*\n\s*false\n/),
+                'review #6: vynimka konci false (nie tichym nil, ktore by sa citalo ako uspech)')
+  push = ST1B_STUDIO_RB[/def push_state\(bump: true\).*?\n        end\n/m].to_s
+  # POSLEDNY VYRAZ metody = jej navratova hodnota. Hlada sa posledny riadok
+  # s kodom (komentare a zatvaracie `end` sa vynechavaju).
+  last = push.lines.map(&:strip).reject { |l| l.empty? || l.start_with?('#') || l == 'end' }.last
+  NxTest.assert_equal('js("NX.setStudio(#{data.to_json})")', last,
+                      'review #6: push_state vysledok `js` PREPOSIELA (posledny vyraz metody)')
   # Rescue vetva: hlaska sa nesmie zaseknut ANI pri vynimke a chyba patri do logu.
   NxTest.assert(body.include?('rescue StandardError => e'), 'ma rescue vetvu')
   NxTest.assert(body.include?("Engine.log_error(e, 'StudioDialog.do_refresh_bom')"),

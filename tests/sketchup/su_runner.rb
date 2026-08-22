@@ -5100,7 +5100,8 @@ module NoxunSuRunner
     pairs.each do |(mod, rec)|
       mod.singleton_class.class_eval do
         alias_method :nx_js_orig_st1b, :js
-        define_method(:js) { |script| rec << script.to_s; nil }
+        # Review #6: stub zastupuje ZIVE okno — vracia true (viz `st1c_capture`).
+        define_method(:js) { |script| rec << script.to_s; true }
       end
     end
     begin
@@ -5352,7 +5353,10 @@ module NoxunSuRunner
     rec = []
     mod.singleton_class.class_eval do
       alias_method :nx_js_orig_st1c, :js
-      define_method(:js) { |script| rec << script.to_s; nil }
+      # Review #6: stub musi vracat TRUE — `js` od tejto davky hlasi, CI script
+      # naozaj odosiel, a cesty, ktore pouzivatelovi nieco potvrdzuju
+      # (`do_refresh_bom`), sa podla toho rozhoduju. Stub zastupuje ZIVE okno.
+      define_method(:js) { |script| rec << script.to_s; true }
     end
     begin
       yield

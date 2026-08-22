@@ -612,6 +612,10 @@
       if (mdl) mdl.textContent = ST ? ('zákazka: ' + ST.model_title + ' · v' + ST.version) : '…';
       // Deep-link sekcie sa posiela PRAVE RAZ; kotva s nou.
       if (ST && ST.open_section && STUDIO_SECTIONS.indexOf(ST.open_section) >= 0){
+        // Review #8: deep-link je PRESKOK do inej sekcie — otvorené rohové menu
+        // patrilo tej, z ktorej sme odišli. Bez vynulovania by sa `vepoMenuOpen`
+        // vrátilo pri najbližšom návrate do Kusovníka „samo otvorené".
+        closeSectionMenus();
         studioSec = ST.open_section;
         // Kotva predvyplna hladanie KUSOVNIKA (N13 posiela ID skrinky). Pri inej
         // sekcii by potichu prestavila filter, ktory pouzivatel ani nevidí —
@@ -738,7 +742,15 @@
     if (studioSec === 'ctrl'){
       box.innerHTML = edgeCheckBarHtml(EDGE, ecMenuOpen, GRAIN) +
         '<span class="spacer"></span>' +
-        '<span class="sechint">Zoradené podľa závažnosti — poradie určuje server.</span>';
+        '<span class="sechint">Zoradené podľa závažnosti — poradie určuje server.</span>' +
+        // Review #7: Kontrola bola JEDINA sekcia BEZ „Obnoviť" — a pritom je to
+        // sekcia, kvoli ktorej sa clovek do okna vracia po oprave v Inspectore.
+        // Prestavba skrinky sem sama nedorazi, takze zoznam nalezov mohol
+        // ukazovat uz opravenu chybu (rovnaky dovod ako v Kusovniku a Nakupe).
+        // Zdielany `#refreshBtn` — jeden handler, jedna serverova cesta.
+        '<button type="button" class="ghostbtn" id="refreshBtn"' +
+        ' title="Prepočítať kontrolu z aktuálneho modelu">' +
+        ico('refresh-cw') + ' Obnoviť</button>';
       return;
     }
     // ŠT-1c PR A (Š7): lišta sekcie Nákup kovania. Export patrí SEKCII
@@ -802,10 +814,13 @@
       '<span class="spacer"></span>' +
       vepoBtnHtml(v, s.vepo === true);
     if (s.view === 'parts'){
-      h += '<button type="button" class="ghostbtn" id="colBtn"' +
+      // Review #1: menu stlpcov visi na SVOJOM tlacidle, nie na lište. Kym bolo
+      // kotvene na `.sectools` (`right: 12px`), po presune tlacidla doprava sa
+      // od neho vizualne odtrhlo — vzor je ten isty obal ako pri VEPO rohu.
+      h += '<span class="colfly"><button type="button" class="ghostbtn" id="colBtn"' +
            ' title="Voliteľné stĺpce — voľba sa pamätá na tomto počítači" aria-expanded="' +
            (s.cols ? 'true' : 'false') + '">' + ico('columns-3') + ' Stĺpce ' +
-           ico('chevron-down') + '</button>' + colMenuHtml(s.cols === true);
+           ico('chevron-down') + '</button>' + colMenuHtml(s.cols === true) + '</span>';
     }
     // Kusovnik je zivy (server pushuje pri prepnuti modelu a po zmene
     // katalogu), ale prestavba skrinky z Inspectora sem sama nedorazi — okno
@@ -844,6 +859,10 @@
     var s = v || {};
     return '<div class="vepomenu' + (open ? ' open' : '') + '" id="vepoMenu" role="group"' +
       ' aria-label="Nastavenie VEPO exportu">' +
+      // Review #4: hlavicka `.mgrp` — TEN ISTY vzor ako menu stlpcov aj
+      // zdielane nastavenie hran (a zhoda s mockupom). Bez nej sa okno otvara
+      // rovno checkboxom a nepovie, co vlastne nastavuje.
+      '<div class="mgrp">Nastavenie VEPO exportu</div>' +
       '<label class="vopt"><input type="checkbox" id="mergeChk"' +
       (s.merge_18_36 === false ? '' : ' checked') + '><span>18 + 36 spolu</span></label>' +
       '<div class="vnote">Materiály 18 a 36 mm idú do jedného súboru (bežná objednávka).</div>' +
@@ -1117,7 +1136,8 @@
   // Jeden push prináša VŠETKY sekcie, takže sa prepočíta všetko — status ale
   // hovorí o tom, na čo sa používateľ práve pozerá (inak by po kliku v Nákupe
   // hlásil kusovník a vyzeralo by to ako zlé tlačidlo).
-  var REFRESH_STATUS = { buy: 'Prepočítavam nákupný zoznam…', budget: 'Prepočítavam rozpočet…',
+  var REFRESH_STATUS = { ctrl: 'Prepočítavam kontrolu…',
+                         buy: 'Prepočítavam nákupný zoznam…', budget: 'Prepočítavam rozpočet…',
                          offer: 'Prepočítavam cenovú ponuku…' };
 
   function requestRefresh(){
@@ -1232,6 +1252,17 @@
     renderTools();
   }
 
+  // Review #8: otvorené overlaye lišty patria SEKCII, v ktorej vznikli. Pri
+  // odchode z nej sa zhasínajú NAraz a BEZ prekreslenia — volajúci kreslí celé
+  // okno hneď za tým (`render()`), takže druhý render by bol zbytočný.
+  // Menu stĺpcov si zatváranie pri prepnutí pohľadu rieši samo (`data-view`),
+  // ale prepnutie SEKCIE je ten istý prípad — preto je tu tiež.
+  function closeSectionMenus(){
+    vepoMenuOpen = false;
+    ecMenuOpen = false;
+    colMenuOpen = false;
+  }
+
   // ŠT-1c PR B2 (kontrakt #9): žije práve teraz D-15 modal? Komponent
   // `js/nx_modal.js` sa načítava PRED studio.js, ale v Node testoch nemusí
   // existovať vôbec — preto obozretne.
@@ -1263,6 +1294,7 @@
   // súborom a vlastný stav sekcií nemá.
   function studioGoSection(id){
     if (STUDIO_SECTIONS.indexOf(id) < 0) return;
+    closeSectionMenus();   // review #8 — overlay patrí sekcii, z ktorej odchádzame
     studioSec = id;
     render();
   }

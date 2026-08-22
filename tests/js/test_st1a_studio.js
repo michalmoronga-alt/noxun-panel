@@ -312,6 +312,23 @@ ok(S.vepoMenuHtml({ merge_18_36: false }, true).indexOf('checked') < 0,
    '1A: stav checkboxu je Z PAYLOADU — vypnuty merge sa naozaj nekresli');
 ok(S.vepoMenuHtml({}, true).indexOf('checked') > -1,
    '1A: chybajuca hodnota = zapnute (zhodne so serverovym defaultom)');
+// Review #4: okno ma HLAVICKU — inak sa otvara rovno checkboxom a nepovie,
+// co vlastne nastavuje (vzor `.colmenu .mgrp` aj zdielaneho nastavenia hran).
+ok(S.vepoMenuHtml(VEPO, true).indexOf('<div class="mgrp">Nastavenie VEPO exportu</div>') > -1,
+   'review #4: nastavenie ma hlavicku .mgrp (zhoda s mockupom aj susednym menu)');
+
+// Review #1: menu stlpcov visi na SVOJOM tlacidle — obal `.colfly` (vzor
+// `.vepofly`). Kym bolo kotvene na lište, po presune tlacidla doprava sa od
+// neho vizualne odtrhlo.
+{
+  const cols = S.bomToolsHtml(VEPO, { view: 'parts', q: '', cols: true, vepo: false });
+  const fly = cols.indexOf('<span class="colfly">');
+  ok(fly > -1, 'review #1: tlacidlo Stĺpce ma vlastny pozicovaci obal');
+  ok(fly < cols.indexOf('id="colBtn"') && cols.indexOf('id="colBtn"') < cols.indexOf('id="colMenu"'),
+     'review #1: a menu je V NOM, hned za tlacidlom');
+  ok(cols.indexOf('id="colMenu"') < cols.indexOf('</span>', cols.indexOf('id="colMenu"')),
+     'review #1: obal sa uzatvara az za menu');
+}
 
 (function(){
   // Minimalny DOM: `renderTools` musi mat kam pisat, inak sa vrati hned.
@@ -376,6 +393,40 @@ ok(S.vepoMenuHtml({}, true).indexOf('checked') > -1,
   eq(sent[sent.length - 1], 'export', '1A: klik na telo exportuje ako doteraz');
   fire('click', CORNER);
   eq(sent[sent.length - 1], 'export', '1A: a klik na roh NEEXPORTUJE (otvara nastavenie)');
+
+  // --- review #8: otvorene menu patri SEKCII, z ktorej odchadzame -----------
+  // Bez vynulovania by sa nastavenie pri navrate do Kusovnika otvorilo „samo".
+  ok(box.innerHTML.indexOf('class="vepomenu open"') > -1, 'nastavenie je pred prepnutim OTVORENE');
+  global.window.studioGoSection('ctrl');
+  global.window.studioGoSection('bom');
+  ok(box.innerHTML.indexOf('class="vepomenu open"') < 0,
+     'review #8: po prepnuti sekcie a navrate je nastavenie ZAVRETE');
+
+  // Deep-link je ten isty pripad — sekciu prepina server, nie klik.
+  fire('click', CORNER);
+  ok(box.innerHTML.indexOf('class="vepomenu open"') > -1, 'a znova otvorene');
+  global.window.NX.setStudio({ version: '0.7.42', gen: 4, model_title: 'ENGINEtests',
+                               rows: [], sheets: [], counts: {}, vepo: VEPO,
+                               open_section: 'bom' });
+  ok(box.innerHTML.indexOf('class="vepomenu open"') < 0,
+     'review #8: deep-link do sekcie otvorene menu tiez zhasne');
+
+  // --- review #7: sekcia Kontrola MA „Obnoviť" ------------------------------
+  // Bola jedina sekcia bez neho — a pritom je to sekcia, kvoli ktorej sa clovek
+  // do okna vracia po oprave v Inspectore.
+  global.window.NX.setStudio({ version: '0.7.42', gen: 5, model_title: 'ENGINEtests',
+                               rows: [], sheets: [], counts: {}, control: [], vepo: VEPO,
+                               edge_check: { available: true, active: false, options: {}, counts: {} },
+                               open_section: 'ctrl' });
+  ok(box.innerHTML.indexOf('id="refreshBtn"') > -1, 'review #7: lista Kontroly ma „Obnoviť"');
+  ok(box.innerHTML.indexOf('Prepočítať kontrolu z aktuálneho modelu') > -1,
+     'review #7: a tooltip hovori o KONTROLE, nie o kusovniku');
+  const before = sent.length;
+  fire('click', tgt({ '#refreshBtn': {} }));
+  eq(sent[sent.length - 1], 'refresh', 'review #7: a tlacidlo vola ZDIELANU serverovu cestu');
+  ok(sent.length === before + 1, 'jedno kliknutie = jedna ziadost');
+  eq(ELS.status.textContent, 'Prepočítavam kontrolu…',
+     'review #7: a hlaska hovori o kontrole (REFRESH_STATUS.ctrl)');
 })();
 
 console.log(`test_st1a_studio: ${n} kontrol OK`);

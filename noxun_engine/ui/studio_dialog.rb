@@ -282,8 +282,16 @@ module Noxun
         # Rescue tu je ZAMERNE aj napriek spolocnemu rescue v `cb`: hlaska
         # „Prepočítavam…" nesmie ostat visiet ANI pri vynimke, a chybu treba mat
         # v logu s menom TEJTO cesty.
+        #
+        # Review #6: „Prepočítané." sa posiela LEN ked payload naozaj ODOSIEL.
+        # `js` hltá výnimky `execute_script` (a mlčí, ked okno nezije), takze
+        # `push_state` mohol skoncit BEZ toho, aby klient cokolvek dostal —
+        # a server by mu napriek tomu potvrdil hotovo. Preto `js` (a s nim
+        # `push_state`) vracia true/false a tato cesta sa podla toho rozhoduje:
+        # server nesmie potvrdit, co neoveril.
         def do_refresh_bom
-          push_state
+          return unless push_state
+
           set_status('Prepočítané.')
         rescue StandardError => e
           Engine.log_error(e, 'StudioDialog.do_refresh_bom')
@@ -698,6 +706,9 @@ module Noxun
             open_section: consume_pending_section,
             anchor: consume_pending_anchor
           }
+          # Review #6: vysledok `js` sa PREPOSIELA — `do_refresh_bom` podla neho
+          # rozhoduje, ci smie napisat „Prepočítané.". Ostatni volajuci ho
+          # ignoruju (push do zavreteho okna nie je chyba).
           js("NX.setStudio(#{data.to_json})")
         end
 
@@ -733,12 +744,18 @@ module Noxun
           js("NX.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})")
         end
 
+        # Review #6: vracia, CI script naozaj odosiel klientovi. Mrtve okno aj
+        # vynimka `execute_script` su tu tiche (a maju byt — push do zavreteho
+        # okna nie je chyba), ale volajuci, ktory pouzivatelovi nieco POTVRDZUJE,
+        # to musi vediet rozlisit.
         def js(script)
-          return unless @dialog && @dialog.visible?
+          return false unless @dialog && @dialog.visible?
 
           @dialog.execute_script(script)
+          true
         rescue StandardError => e
           Engine.log_error(e, 'StudioDialog.js')
+          false
         end
       end
     end

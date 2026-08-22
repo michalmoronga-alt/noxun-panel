@@ -331,7 +331,7 @@
   .sectools .spacer{flex:1}
   .secscroll{flex:1; overflow:auto; padding:10px 12px 24px}
   .searchbox{display:flex; align-items:center; gap:6px; border:1px solid var(--nx-border-strong); border-radius:5px;
-             padding:4px 8px; background:var(--nx-surface); min-width:180px}
+             padding:4px 8px; background:var(--nx-surface); min-width:150px}   /* review #9: jednoriadková lišta */
   .searchbox input{border:0; outline:0; font:inherit; font-size:12px; flex:1; background:transparent; min-width:0}
   .searchbox .ic{width:14px; height:14px; color:var(--nx-ink-faint)}
 
@@ -370,7 +370,9 @@
           border-radius:7px; background:var(--nx-surface-th); font-size:12.5px; color:var(--nx-ink-strong)}
   .totrow b{color:var(--nx-ink-title)}
   .totrow .spacer{flex:1}
-  .colmenu{position:absolute; top:calc(100% - 2px); right:12px; z-index:60; width:196px; background:var(--nx-surface);
+  /* Review #1: menu visí na svojom tlačidle (obal .colfly), nie na lište. */
+  .colfly{position:relative; display:inline-flex}
+  .colmenu{position:absolute; top:calc(100% + 4px); right:0; z-index:60; width:196px; background:var(--nx-surface);
            border:1px solid var(--nx-border); border-radius:6px; box-shadow:0 6px 18px var(--nx-modal-shadow); padding:5px}
   .colmenu .mgrp{font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--nx-ink-faint); padding:3px 6px}
   .colmenu label{display:flex; align-items:center; gap:7px; padding:4px 6px; border-radius:4px; font-size:12px;
@@ -420,7 +422,7 @@
           border-radius:5px; background:var(--nx-surface-sunken); color:var(--nx-ink-label)}
   .prjbox .prjlbl{font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
                   color:var(--nx-ink-faint)}
-  .prjbox input{font:inherit; font-size:12px; font-weight:600; padding:4px 8px; width:150px;
+  .prjbox input{font:inherit; font-size:12px; font-weight:600; padding:4px 8px; width:120px;
                 border:1px solid var(--nx-border-strong); border-radius:5px; background:var(--nx-surface);
                 color:var(--nx-ink-strong)}
   .ghostbtn.bstalebtn{border-color:var(--nx-warnchip-border); background:var(--nx-warn-bg); color:var(--nx-warn-fg)}
@@ -1325,8 +1327,9 @@ function studioTools(){
         '<button class="cornerzone" title="Nastavenie exportu — čo sa spojí do jedného súboru"' +
         ' onclick="event.stopPropagation();S.vepoMenu=!S.vepoMenu;render()"></button>' + vepoMenuHtml() + '</span>';
     if (S.bomView === 'parts')
-      h += '<button class="ghostbtn" data-colbtn onclick="S.colMenu=!S.colMenu;render();event.stopPropagation()" title="Voliteľné stĺpce — voľba sa pamätá per počítač">'+
-        ico('columns-3')+' Stĺpce '+ico('chevron-down')+'</button>' + colMenuHtml();
+      // Review #1: menu stĺpcov visí na SVOJOM tlačidle (obal `.colfly`), nie na lište.
+      h += '<span class="colfly"><button class="ghostbtn" data-colbtn onclick="S.colMenu=!S.colMenu;render();event.stopPropagation()" title="Voliteľné stĺpce — voľba sa pamätá per počítač">'+
+        ico('columns-3')+' Stĺpce '+ico('chevron-down')+'</button>' + colMenuHtml() + '</span>';
     h += '<button class="ghostbtn" onclick="toast(\'Kusovník prepočítaný z modelu\',\'refresh-cw\')">'+
       ico('refresh-cw')+' Obnoviť</button>';
     return h;
@@ -1341,7 +1344,11 @@ function studioTools(){
       '<button class="ghostbtn'+(S.grainChk?' on':'')+'" onclick="S.grainChk=!S.grainChk;render();' +
         'toast(S.grainChk?\'Smer kresby: kreslí sa na 21 dielcoch (zrkadlo prepínača v raile a vo Výrobe)\':\'Smer kresby vypnutý — v modeli nič neostáva\',\'check\')">' +
         ico('profile')+' Smer kresby</button>' +
-      '<span class="spacer"></span><span class="sechint">Zoradené podľa závažnosti — poradie určuje server.</span>';
+      '<span class="spacer"></span><span class="sechint">Zoradené podľa závažnosti — poradie určuje server.</span>' +
+      // SMOKE 22.8. (review #7): Kontrola bola jediná sekcia bez „Obnoviť" —
+      // a pritom je to sekcia, kvôli ktorej sa človek vracia po oprave v Inspectore.
+      '<button class="ghostbtn" onclick="toast(\'Kontrola prepočítaná z modelu\',\'refresh-cw\')">'+
+        ico('refresh-cw')+' Obnoviť</button>';
   }
   if (sec === 'mat'){
     if (S.matDetail)
