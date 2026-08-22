@@ -52,6 +52,12 @@
 #        legacy numericke ID -> priama invokacia onTransactionRedo. Cesta sa
 #        kvalifikuje UCINKOM, nie navratovou hodnotou (numericke ID vracia na
 #        Windows true a nespravi nic); pouzita cesta sa vzdy prizna v INFO riadku.
+#     STALE jantarove „Obnoviť" v Studiu (StudioModelWatch): commit = 1 signal,
+#        burst 3 commitov = 1, VLASTNY tick prepoctu (dedup kopii vo fresh_collect,
+#        zapis rozpoctu) = 0 signalov, Spat/Znova = 1, cudzi dokument = 0,
+#        po zatvoreni okna 0 VSTUPOV do handlera. Ta ista dokazova zasada ako
+#        D-101 (pocitadla vstupov aj odoslanych signalov) a ta ista vrstvena
+#        redo cesta.
 #     S6 nasobenie kopii `*N` (D-103): kopia s OTVORENYM Inspectorom (Panel.push_selected)
 #        -> interne undo nastroja MUSI odstranit kopiu (ziadna zombie) -> pole 4 kopii
 #        = presne 5 dosiek s 5 ID na 5 roznych miestach; S6b = zachytna siet v KONTROLE
@@ -3037,6 +3043,310 @@ module NoxunSuRunner
     e::Panel.attach_observer if prev
   rescue StandardError
     nil
+  end
+
+  # --- STALE: jantarove „Obnoviť" v Studiu (StudioModelWatch lifecycle) ------
+  # Okno cisla neprepocitava samo — kym sa nestlaci „Obnoviť", visia v nom cisla
+  # z posledneho prepoctu. Od 22.8. to okno PRIZNA: server posle `NX.markStale()`
+  # a tlacidlo zozltne.
+  #
+  # DOKAZOVA ZASADA (D-101, FIX D): „neprisiel signal" NEdokazuje nic — handler
+  # sam konci na guardoch (dialog, dokument, porovnanie epoch). Preto sa ratau
+  # VSTUPY do handlera (`on_model_txn`, PRED kazdym guardom) aj POCET naozaj
+  # odoslanych `NX.markStale()`. Scenare (c) a (d) su tym najtvrdsie: observer
+  # transakciu VIDEL (txn > 0), a signal NEPRISIEL (mark == 0), lebo vlastny
+  # tick prepoctu pohltilo porovnanie epoch.
+
+  # Okno musi „zit", inak je `flush_stale` no-op (rovnaky dovod ako D101FakeDialog).
+  class StaleFakeDialog
+    def visible?
+      true
+    end
+
+    def execute_script(_script)
+      nil
+    end
+  end
+
+  def stale_state
+    { txn: 0, mark: 0, push: 0 }
+  end
+
+  def stale_reset(st)
+    st[:txn] = 0
+    st[:mark] = 0
+    st[:push] = 0
+  end
+
+  def stale_install_probe(st)
+    e::StudioDialog.singleton_class.class_eval do
+      alias_method :nx_stale_txn, :on_model_txn
+      alias_method :nx_stale_js, :js
+      define_method(:on_model_txn) do |model|
+        st[:txn] += 1
+        nx_stale_txn(model)
+      end
+      # Stub zastupuje ZIVE okno: `js` od ŠT-1c hlasi, CI payload naozaj odosiel
+      # (`push_state` podla toho zapisuje epochu) — musi teda vracat true.
+      define_method(:js) do |script|
+        s = script.to_s
+        st[:mark] += 1 if s.include?('NX.markStale')
+        st[:push] += 1 if s.include?('NX.setStudio')
+        true
+      end
+    end
+  end
+
+  # Idempotentny teardown — bezi aj z FAIL cesty async walku.
+  def stale_remove_probe
+    sc = e::StudioDialog.singleton_class
+    return unless sc.method_defined?(:nx_stale_txn) || sc.private_method_defined?(:nx_stale_txn)
+
+    sc.class_eval do
+      alias_method :on_model_txn, :nx_stale_txn
+      alias_method :js, :nx_stale_js
+      remove_method :nx_stale_txn
+      remove_method :nx_stale_js
+    end
+  end
+
+  # POUZIVATELSKA transakcia bez geometrie: zapis atributu na model. Kazdy
+  # `commit_operation` fire-uje `onTransactionCommit` — presne to, co observer
+  # okna pocuva. ScaleWatch guard sa tu ZAMERNE nepouziva (simulujeme cudziu
+  # zmenu, nie vlastne upratovanie).
+  def stale_touch(model, tag)
+    model.start_operation("SU-TEST stale #{tag}", true)
+    model.set_attribute('NOXUN_SUTEST', 'stale', "#{tag}-#{Time.now.to_f}")
+    model.commit_operation
+  end
+
+  def stale_copy_cabinet(model, inst)
+    attrs = %w[std kind id cabinet_id template_id role part_key_schema manufactured
+               production_class config]
+    copy = nil
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST stale kopia', true)
+      tr = inst.transformation * Geom::Transformation.translation(e::Units.vector(1200, 0, 0))
+      copy = model.entities.add_instance(inst.definition, tr)
+      attrs.each do |k|
+        v = e::Store.get(inst, k)
+        copy.set_attribute('NOXUN', k, v) unless v.nil?
+      end
+      model.commit_operation
+    end
+    copy
+  end
+
+  # Vrati Studio do stavu spred sekcie. Idempotentne (aj z FAIL cesty).
+  def stale_teardown(state)
+    stale_remove_probe
+    return unless state && state[:stale_active]
+
+    state[:stale_active] = false
+    begin
+      e::StudioDialog.instance_variable_set(:@observer_model, state[:stale_model] || Sketchup.active_model)
+      e::StudioDialog.detach_stale_observer
+    rescue StandardError
+      nil
+    end
+    # Ak bolo pri manualnom spusteni Studio realne otvorene, vratime mu jeho
+    # dialog aj observer (runner nesmie zabit zive okno).
+    prev = state[:stale_prev_dialog]
+    e::StudioDialog.instance_variable_set(:@dialog, prev)
+    e::StudioDialog.attach_stale_observer(state[:stale_model]) if prev
+  rescue StandardError
+    nil
+  end
+
+  # Testovacia stopa v slovniku modelu (zapis atributu = transakcia).
+  def stale_wipe_marker(model)
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST stale wipe', true)
+      dicts = model.attribute_dictionaries
+      dicts.delete('NOXUN_SUTEST') if dicts && dicts['NOXUN_SUTEST']
+      model.commit_operation
+    end
+  rescue StandardError
+    nil
+  end
+
+  # Scenare (a)–(g) + REDO. Kroky sa pripajaju do async retazca `run_async`
+  # (signal chodi z timera, takze medzi „urob zmenu" a „over signal" musi byt
+  # settle krok — presne ako pri D-101).
+  def run_stale(model, state, steps)
+    steps << [0.5, lambda do
+      cleanup(model)
+      st = stale_state
+      state[:stale] = st
+      state[:stale_prev_dialog] = e::StudioDialog.instance_variable_get(:@dialog)
+      state[:stale_model] = model
+      state[:stale_active] = true
+      e::StudioDialog.instance_variable_set(:@dialog, StaleFakeDialog.new)
+      stale_install_probe(st)
+      e::StudioDialog.attach_stale_observer(model)
+      ok('STALE: attach zavesil observer okna a vynuloval epochu',
+         !e::StudioDialog.instance_variable_get(:@stale_observer).nil? &&
+         e::StudioDialog.instance_variable_get(:@observer_model) == model &&
+         e::StudioDialog.instance_variable_get(:@epoch).to_i.zero?)
+      e::StudioDialog.send(:push_state) # okno ma cerstve cisla (epocha zosynchronizovana)
+      stale_reset(st)
+      # (a) JEDNA uzivatelska zmena = PRESNE jeden signal
+      stale_touch(model, 'a')
+    end]
+    steps << [SETTLE, lambda do
+      st = state[:stale]
+      ok("STALE (a): commit v modeli = presne JEDEN markStale (vstupov #{st[:txn]}, signalov #{st[:mark]})",
+         st[:txn] == 1 && st[:mark] == 1)
+      # (b) BURST: tri rychle zmeny za sebou = jeden signal (latch)
+      stale_reset(st)
+      stale_touch(model, 'b1')
+      stale_touch(model, 'b2')
+      stale_touch(model, 'b3')
+    end]
+    steps << [SETTLE, lambda do
+      st = state[:stale]
+      ok("STALE (b): tri rychle commity = 3 udalosti, ale JEDEN signal (vstupov #{st[:txn]}, signalov #{st[:mark]})",
+         st[:txn] == 3 && st[:mark] == 1)
+      # (c) VLASTNY TICK PREPOCTU: model s duplicitnou kopiou. `fresh_collect`
+      # v pushi spusti `dedup_copies` = REALNA operacia = commit — a ten NESMIE
+      # nechat tlacidlo jantarove hned po tom, co ho pouzivatel stlacil.
+      # Priprava aj prepocet bezia v JEDNOM kroku ZAMERNE: medzi krokmi sa
+      # dostane k slovu debounce timer ScaleWatchu a kopiu by dedupol on —
+      # potom by uz `fresh_collect` nemal co robit a scenar by meral prazdno.
+      inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
+                                              'height' => 720.0, 'depth' => 510.0 })
+      state[:stale_cab] = inst
+      state[:stale_copy] = stale_copy_cabinet(model, inst)
+      dups_before = e::Ids.duplicate_cabinets(model).length
+      ok("STALE (c): pripraveny model s duplicitnou kopiou (duplikatov #{dups_before})",
+         dups_before.positive?)
+      stale_reset(st)
+      e::StudioDialog.do_refresh_bom # presne to, co robi tlacidlo „Obnoviť"
+      # Merane HNED — dokaz, ze operaciu otvoril PRAVE prepocet okna, nie
+      # debounce timer ScaleWatchu medzi krokmi.
+      state[:stale_dups_after] = e::Ids.duplicate_cabinets(model).length
+      state[:stale_txn_sync] = st[:txn]
+    end]
+    steps << [SETTLE, lambda do
+      st = state[:stale]
+      ok('STALE (c): dedup kopii prebehol PRIAMO v prepocte okna (vlastna operacia vo `fresh_collect`) — ' \
+         "duplikatov po prepocte #{state[:stale_dups_after]}",
+         state[:stale_dups_after].zero?)
+      # POZOROVANIE, NIE KONTRAKT: v behu 22.8. tu pocitadlo ukazalo 0 vstupov,
+      # hoci dedup bezi ako NORMALNA (netransparentna) operacia a udalost by
+      # prist mala — DOVOD NIE JE OVERENY, preto to ostava INFO a nie `ok`
+      # s ocakavanou hodnotou (zafixovat neoverene cislo by znamenalo, ze test
+      # zacne padat, ked sa spravanie API vysvetli alebo zmeni).
+      # TVRDY dokaz pohltenia vlastneho ticku je scenar (d) nizsie: tam observer
+      # vstup PREUKAZATELNE dostal (txn > 0) a signal aj tak neprisiel.
+      info("STALE (c): vstupov do handlera pocas prepoctu #{state[:stale_txn_sync]}, po ustaleni #{st[:txn]}")
+      ok('STALE (c): Obnoviť nad modelom s duplikatmi NEZOZLTLO tlacidlo — vlastny tick sa pohltil ' \
+         "(pushov #{st[:push]}, signalov #{st[:mark]})",
+         st[:push].positive? && st[:mark].zero?)
+      # (d) MUTACIA ROZPOCTU: zapis do modelu (1 krok Spat) + vlastny repush.
+      stale_reset(st)
+      e::StudioDialog.do_budget({ 'op' => 'mode', 'mode' => 'vysoky',
+                                  'gen' => st1c_gen,
+                                  'model_guid' => e::ProductionCore.model_guid(model) }.to_json)
+    end]
+    steps << [SETTLE, lambda do
+      st = state[:stale]
+      ok("STALE (d): zapis rozpoctu okno NEOZNACI za neaktualne (vstupov #{st[:txn]}, " \
+         "pushov #{st[:push]}, signalov #{st[:mark]})",
+         st[:txn].positive? && st[:push].positive? && st[:mark].zero?)
+      # Pocitadla sa nuluju PRED undo — callback observera bezi uz pocas
+      # `Sketchup.undo` (synchronne), takze reset za nim by ho zmazal.
+      stale_reset(st)
+      Sketchup.undo # vrat rezim rozpoctu (mutacia = presne 1 krok Spat)
+    end]
+    steps << [SETTLE, lambda do
+      st = state[:stale]
+      # (e) SPAT: model sa zmenil, aj ked to nikto „nespravil" — okno to musi
+      # priznat (undo z predosleho kroku).
+      ok("STALE (e): Ctrl+Z = JEDEN signal (vstupov #{st[:txn]}, signalov #{st[:mark]})",
+         st[:txn].positive? && st[:mark] == 1)
+      # ZNOVA — vrstvenou cestou z D-101 (Windows nema spolahlivu redo akciu):
+      # 1) editRedo, 2) legacy numericke ID, 3) priama invokacia callbacku.
+      stale_reset(st)
+      state[:stale_redo_sent] =
+        if d101_send_action('editRedo') then :action_name
+        elsif d101_send_action(21836) then :action_id
+        end
+    end]
+    steps << [SETTLE, lambda do
+      st = state[:stale]
+      sent = state[:stale_redo_sent]
+      if sent && st[:txn].positive?
+        info("STALE REDO: pouzita cesta #{sent == :action_name ? "send_action('editRedo')" : 'send_action(21836)'}")
+        ok("STALE (redo): Znova ide TOU ISTOU cestou — jeden signal (vstupov #{st[:txn]}, signalov #{st[:mark]})",
+           st[:mark] == 1)
+        state[:stale_redo_direct] = false
+      else
+        info('STALE REDO: redo akcia Ruby API nezabrala — prepadam na priamu invokaciu callbacku.')
+        obs = e::StudioDialog.instance_variable_get(:@stale_observer)
+        ok('STALE (redo): observer je drzany v okne (bez neho by nebolo na com redo overit)', !obs.nil?)
+        state[:stale_redo_direct] = true
+        stale_reset(st)
+        obs.onTransactionRedo(model) if obs
+      end
+    end]
+    steps << [SETTLE, lambda do
+      st = state[:stale]
+      if state[:stale_redo_direct]
+        ok("STALE (redo): `onTransactionRedo` -> epocha -> latch -> jeden signal (vstupov #{st[:txn]}, signalov #{st[:mark]})",
+           st[:txn] == 1 && st[:mark] == 1)
+      end
+      # (f) CUDZI DOKUMENT: udalost z ineho okna nesmie oznacit cisla tohto
+      # za neaktualne (dokumenty maju vlastne epochy).
+      e::StudioDialog.instance_variable_set(:@observer_model, Object.new)
+      stale_reset(st)
+      stale_touch(model, 'f')
+    end]
+    steps << [SETTLE, lambda do
+      st = state[:stale]
+      ok("STALE (f): zmena v INOM dokumente sa zastavi na guarde (vstupov #{st[:txn]}, signalov #{st[:mark]})",
+         st[:txn].positive? && st[:mark].zero?)
+      # ODLOZENY callback: guard sa overuje ZNOVA tesne pred odoslanim —
+      # dokument sa moze prepnut medzi udalostou a timerom.
+      e::StudioDialog.instance_variable_set(:@observer_model, model)
+      stale_reset(st)
+      e::StudioDialog.on_model_txn(model)
+      e::StudioDialog.instance_variable_set(:@observer_model, Object.new)
+    end]
+    steps << [SETTLE, lambda do
+      st = state[:stale]
+      ok("STALE: odlozeny signal po prepnuti dokumentu sa uz NEODOSLE (signalov #{st[:mark]})",
+         st[:mark].zero?)
+      # ANTI-DOUBLE: dvojity attach nesmie dorucit udalost dvakrat.
+      e::StudioDialog.attach_stale_observer(model)
+      e::StudioDialog.attach_stale_observer(model)
+      e::StudioDialog.send(:push_state)
+      stale_reset(st)
+      stale_touch(model, 'double')
+    end]
+    steps << [SETTLE, lambda do
+      st = state[:stale]
+      ok("STALE: dvojity attach = PRESNE jeden vstup a jeden signal (vstupov #{st[:txn]}, signalov #{st[:mark]})",
+         st[:txn] == 1 && st[:mark] == 1)
+      # (g) ZATVORENIE OKNA (`set_on_closed`): observer sa odvesi — dokazom je
+      # POCITADLO VSTUPOV, nie „neprisiel signal".
+      e::StudioDialog.detach_stale_observer
+      stale_reset(st)
+      stale_touch(model, 'g')
+    end]
+    steps << [SETTLE, lambda do
+      st = state[:stale]
+      ok("STALE (g): po zatvoreni okna neprisiel do handlera ANI JEDEN vstup (#{st[:txn]}) — observer je odvesany",
+         st[:txn].zero? && st[:mark].zero?)
+      ok('STALE (g): a epocha je vynulovana (dalsie otvorenie zacina cisto)',
+         e::StudioDialog.instance_variable_get(:@epoch).to_i.zero? &&
+         e::StudioDialog.instance_variable_get(:@pushed_epoch).to_i.zero?)
+      stale_teardown(state)
+      stale_wipe_marker(model)
+      cleanup(model)
+      ok('STALE: cleanup (0 korpusov, sonda odstranena)',
+         cabinets(model).empty? && !e::StudioDialog.singleton_class.method_defined?(:nx_stale_txn))
+    end]
   end
 
   # --- UI-B1: kostra Inspectora (rail + sektory) — SERVEROVA cast smoke testu --
@@ -6525,6 +6835,10 @@ module NoxunSuRunner
          cabinets(model).empty? && !e::Panel.singleton_class.method_defined?(:nx_d101_txn))
     end]
 
+    # STALE (22.8.): jantarove „Obnoviť" v Studiu — ta ista dokazova zasada
+    # (pocitadla vstupov a signalov), len nad observerom OKNA.
+    run_stale(model, state, steps)
+
     # S5 (V0.4.7d): scale absorpcia DOSKY — X/Y sa preberaju do length/width,
     # hrubku RIADI material (Z faktor sa zahadzuje), reject pri neplatnom rebuilde.
     steps << [0.5, lambda do
@@ -6710,6 +7024,7 @@ module NoxunSuRunner
           begin
             remove_js_recorder # idempotentne — D-34 recorder nesmie prezit FAIL
             d101_teardown(state) # idempotentne — sonda a fake dialog panela tiez nie
+            stale_teardown(state) # a to iste pre sondu okna Studio (STALE)
             cleanup(model)
           rescue StandardError
             nil

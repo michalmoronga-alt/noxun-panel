@@ -209,6 +209,33 @@
     return (typeof studioSec === 'undefined') ? 'budget' : studioSec;
   }
 
+  // NEAKTUALNOST okna (jantarove „Obnoviť"). Stav aj markup ziju v `studio.js`
+  // — cita sa odtial presne tak, ako `ST` a `studioSec`: v prehliadaci su to
+  // globaly suboru, ktory sa nacitava PRED tymto. Ziadna druha kopia tlacidla:
+  // 5 kopii = 5 miest, kde by sa jantar casom rozisiel.
+  var BUD_STUDIO = (typeof module !== 'undefined' && module.exports)
+    ? require('./studio.js')          // Node testy — TEN ISTY helper
+    : null;
+
+  function budStaleFlag(){
+    return (typeof staleFlag === 'undefined') ? false : staleFlag === true;
+  }
+
+  // `tip` = tooltip TEJ sekcie; `data-bkey` drzi fokus pri prekresleni listy.
+  //
+  // Review #4: ked helper NIE JE dostupny (parse chyba v studio.js, zle poradie
+  // skriptov), kresli sa NEUTRALNE tlacidlo — nie prazdno. Rozpocet a Ponuka by
+  // inak prisli o JEDINU cestu k cerstvym cislam a exportoval by sa rozpocet zo
+  // starych rozmerov; jantar je v takom stave to najmensie, co sa strati.
+  function budRefreshBtnHtml(tip){
+    var f = (typeof refreshBtnHtml === 'function')
+      ? refreshBtnHtml
+      : (BUD_STUDIO ? BUD_STUDIO.refreshBtnHtml : null);
+    if (f) return f(budStaleFlag(), tip, ' data-bkey="refresh"');
+    return '<button type="button" class="ghostbtn" id="refreshBtn" data-bkey="refresh" title="' +
+      bEsc(tip) + '"><svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Obnoviť</button>';
+  }
+
   // --- kreslenie BEZ fokusu ------------------------------------------------
   // Review PR #198 #5: obnova fokusu patri na JEDNO miesto na prekreslenie.
   // Kym mala kazda z tychto funkcii vlastnu dvojicu capture/restore, jedno
@@ -334,10 +361,8 @@
       budPriceBtnHtml(b, running) +
       // Prestavba skrinky z Inspectora sem sama nedorazi — bez „Obnoviť" by sa
       // dal exportovať rozpočet zo starých rozmerov (rovnaký dôvod ako v lište
-      // Kusovníka a Nákupu; handler je zdieľaný `#refreshBtn` v studio.js).
-      '<button type="button" class="ghostbtn" id="refreshBtn" data-bkey="refresh"' +
-      ' title="Prepočítať rozpočet z aktuálneho modelu">' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Obnoviť</button>' +
+      // Kusovníka a Nákupu; handler aj markup su zdielane so studio.js).
+      budRefreshBtnHtml('Prepočítať rozpočet z aktuálneho modelu') +
       '<span class="spacer"></span>' +
       // ŠT-1c PR B2: export „Cenová ponuka (zákazník)" sa PRESUNUL do lišty
       // sekcie Cenová ponuka — patrí k dokumentu, ktorý vyrába. Lišta Rozpočtu
@@ -835,10 +860,8 @@
       '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Cenová ponuka (zákazník)</button>' +
       // Prestavba skrinky z Inspectora sem sama nedorazí — bez „Obnoviť" by sa
       // dala poslať zákazníkovi ponuka zo starých rozmerov (rovnaký dôvod ako
-      // v lište Kusovníka, Nákupu aj Rozpočtu; handler je zdieľaný `#refreshBtn`).
-      '<button type="button" class="ghostbtn" id="refreshBtn" data-bkey="refresh"' +
-      ' title="Prepočítať ponuku z aktuálneho modelu">' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-refresh-cw"/></svg> Obnoviť</button>' +
+      // v lište Kusovníka, Nákupu aj Rozpočtu; handler aj markup su zdielane).
+      budRefreshBtnHtml('Prepočítať ponuku z aktuálneho modelu') +
       '<span class="spacer"></span>' +
       // Text je doslovne z kontraktu UI 2.0 (Š14–Š15) — hovorí OBE veci naraz:
       // odkiaľ suma je a že podhodnotenie nie je tiché.
@@ -1634,6 +1657,8 @@
       // ŠT-1c PR B1: rozrezany render — LISTA sekcie vs TELO (Š12 „1:1" je
       // 1:1 OBSAH, nie kod). Obe funkcie su ciste (HTML z payloadu).
       budToolsHtml: budToolsHtml, budPriceBtnHtml: budPriceBtnHtml, budSummaryHtml: budSummaryHtml,
+      // Jantarove „Obnoviť" — markup je ZDIELANY so studio.js, tu je len most.
+      budRefreshBtnHtml: budRefreshBtnHtml, budStaleFlag: budStaleFlag,
       budModeSegHtml: budModeSegHtml, budChipHtml: budChipHtml,
       budDraftAttrs: budDraftAttrs, budDraftMissing: budDraftMissing,
       // ŠT-1c PR B2: sekcia CENOVA PONUKA (Š14–Š15) + D-15 modal pridavaciek

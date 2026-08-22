@@ -395,7 +395,9 @@ NxTest.test('SMOKE 22.8. (1A–1D): LISTA Kusovnika a rohove nastavenie VEPO —
   # Review #7: KAZDA sekcia ma vlastnu cestu k cerstvym cislam. Kontrola bola
   # posledna bez nej — a je to sekcia, kvoli ktorej sa clovek do okna vracia.
   ctrl = ST1B_STUDIO_JS[/if \(studioSec === 'ctrl'\)\{.*?\n    \}/m].to_s
-  NxTest.assert(ctrl.include?('id="refreshBtn"'), 'lista Kontroly ma „Obnoviť"')
+  # Od 22.8. kresli tlacidlo ZDIELANY helper `refreshBtnHtml` (jeden markup pre
+  # vsetkych 5 mist) — sekcia si ho pyta aj s vlastnym tooltipom.
+  NxTest.assert(ctrl.include?('refreshBtnHtml(staleFlag,'), 'lista Kontroly ma „Obnoviť"')
   NxTest.assert(ctrl.include?('Prepočítať kontrolu z aktuálneho modelu'),
                 'a tooltip hovori o KONTROLE')
   NxTest.assert(ST1B_STUDIO_JS.include?("ctrl: 'Prepočítavam kontrolu…'"),
@@ -431,7 +433,9 @@ NxTest.test('SMOKE 22.8.: „Prepočítať ceny" prizna stare ceny (projekcia pa
   NxTest.assert(body.include?('bstalebtn'), 'a menia LEN triedu (farba je v CSS tokene)')
   NxTest.refute(body.match?(/Date|now|age_days\s*>/),
                 'ziadny vypocet veku v klientovi — server je autorita')
-  css = ST1B_STUDIO_HTML[/\.sectools \.ghostbtn\.bstalebtn \{[^}]*\}/m].to_s
+  # Od 22.8. zdiela pravidlo s jantarovym „Obnoviť" (`.nxstale`) — obe tlacidla
+  # hovoria to iste („cisla mozu byt stare"), takze maju aj ten isty vzhlad.
+  css = ST1B_STUDIO_HTML[/\.sectools \.ghostbtn\.bstalebtn,[^{]*\{[^}]*\}/m].to_s
   NxTest.assert(css.include?('--nx-warn'), 'farba ide cez jantarove tokeny')
   NxTest.refute(css.match?(/green|--nx-state-green|--nx-ok/),
                 'ZIADNA zelena — vyznamove farby ostavaju semaforu Kontroly')
@@ -463,9 +467,13 @@ NxTest.test('SMOKE 22.8.: „Obnoviť" hlasku VZDY zhodi — nikdy vecne „Prep
                 'review #6: vynimka konci false (nie tichym nil, ktore by sa citalo ako uspech)')
   push = ST1B_STUDIO_RB[/def push_state\(bump: true\).*?\n        end\n/m].to_s
   # POSLEDNY VYRAZ metody = jej navratova hodnota. Hlada sa posledny riadok
-  # s kodom (komentare a zatvaracie `end` sa vynechavaju).
-  last = push.lines.map(&:strip).reject { |l| l.empty? || l.start_with?('#') || l == 'end' }.last
-  NxTest.assert_equal('js("NX.setStudio(#{data.to_json})")', last,
+  # s kodom (komentare a zatvaracie `end` sa vynechavaju). Od jantaroveho
+  # „Obnoviť" si vysledok drzi premenna `sent` (medzi nou a returnom sa zapisuje
+  # epocha) — PREPOSIELA sa nadalej.
+  code = push.lines.map(&:strip).reject { |l| l.empty? || l.start_with?('#') || l == 'end' }
+  NxTest.assert(code.include?('sent = js("NX.setStudio(#{data.to_json})")'),
+                'review #6: push_state si vysledok `js` odklada')
+  NxTest.assert_equal('sent', code.last,
                       'review #6: push_state vysledok `js` PREPOSIELA (posledny vyraz metody)')
   # Rescue vetva: hlaska sa nesmie zaseknut ANI pri vynimke a chyba patri do logu.
   NxTest.assert(body.include?('rescue StandardError => e'), 'ma rescue vetvu')
@@ -542,7 +550,10 @@ end
 # --- 7) lifecycle okna a refresh cesty (audit #10, #14) ----------------------
 
 NxTest.test('ST-1a: okno sa po zatvoreni vynuluje a JS chyby idu do logu (audit #14)') do
-  NxTest.assert(ST1B_STUDIO_RB.include?('@dialog.set_on_closed { @dialog = nil }'),
+  # Od jantaroveho „Obnoviť" (22.8.) je v bloku aj odvesenie observera —
+  # kontrakt „referencia sa vynuluje" plati nezmeneny.
+  closed = ST1B_STUDIO_RB[/@dialog\.set_on_closed do.*?\n          end\n/m].to_s
+  NxTest.assert(closed.include?('@dialog = nil'),
                 'referencia na mrtve okno by tichla na vynimke pri kazdom pushi')
   NxTest.assert(ST1B_STUDIO_RB.include?("add_action_callback('js_error')"),
                 'JS chyby okna sa daju precitat (konzolu HtmlDialogu nevidno)')

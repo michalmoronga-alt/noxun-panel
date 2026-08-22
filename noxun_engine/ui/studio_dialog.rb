@@ -68,6 +68,45 @@ module Noxun
         'about' => 'O plugine nájdeš v koliesku Inspectora — otváram Inspector.'
       }.freeze
 
+      # --- INDIKATOR NEAKTUALNOSTI (tlacidlo „Obnoviť" zozltne) --------------
+      #
+      # Studio cisla NEPREPOCITAVA samo — kazdy prepocet je RUCNY („Obnoviť").
+      # Do tejto davky sa nedalo poznat, ci uz su cisla v okne stare: model sa
+      # medzitym mohol zmenit (prestavba z Inspectora, posun, Spat/Znova)
+      # a okno vyzeralo uplne rovnako — dalo sa teda exportovat zo starych
+      # cisel. Preto ma okno VLASTNY observer transakcii.
+      #
+      # KONTRAKT CALLBACKU (pravidla observerov + lekcia D-103): v callbacku sa
+      # NIC nepocita, necita ani nezapisuje — LEN sa zdvihne epocha a naplanuje
+      # latch (`UI.start_timer(0)`), takze burst commitov = jeden js do okna.
+      # PanelModelObserver ani ScaleWatch sa NEDOTYKAJU: prvy pocuje len
+      # Spat/Znova/Abort, druhy vedome filtruje vlastne prestavby — ani jeden
+      # teda nevidi hlavny pripad (prestavba skrinky z Inspectora).
+      #
+      # Guard `defined?` je nutny: headless testy tento subor requiruju bez
+      # SketchUpu (vzor `core/edge_overlay.rb`).
+      if defined?(Sketchup::ModelObserver)
+        class StudioModelWatch < Sketchup::ModelObserver
+          def onTransactionCommit(model) # rubocop:disable Naming/MethodName — SketchUp API
+            StudioDialog.on_model_txn(model)
+          end
+
+          def onTransactionUndo(model) # rubocop:disable Naming/MethodName — SketchUp API
+            StudioDialog.on_model_txn(model)
+          end
+
+          def onTransactionRedo(model) # rubocop:disable Naming/MethodName — SketchUp API
+            StudioDialog.on_model_txn(model)
+          end
+
+          # Abort je zadarmo (vzor EdgeModelWatch): zrusena operacia model vratila
+          # do stavu, z ktoreho sa cisla nemusia rovnat tomu, co je v okne.
+          def onTransactionAbort(model) # rubocop:disable Naming/MethodName — SketchUp API
+            StudioDialog.on_model_txn(model)
+          end
+        end
+      end
+
       class << self
         # `open_section` = deep-link (rail Štúdio, toolbar, N13 „Materiál").
         # `anchor` predvyplni hladanie sekcie (N13 posiela ID skrinky, audit #12).
@@ -126,12 +165,125 @@ module Noxun
 
         # EngineAppObserver: prepnutie/otvorenie modelu = nove data + NOVA
         # generacia (stary DOM klik sa odmietne genom, aj keby ID sedeli).
-        def on_model_changed(_model)
+        def on_model_changed(model)
           return unless @dialog && @dialog.visible?
 
+          # Novy dokument = NOVY observer a NOVA epocha. Epocha je zamerne per
+          # dokument: pocet zmien v jednom dokumente nesmie rozhodovat o tom,
+          # ci su neaktualne cisla toho druheho.
+          #
+          # Review #1: observer sa vesa na PODANY model, nie na `active_model`.
+          # Vsetci ostatni odberatelia tohto broadcastu pracuju s podanym
+          # modelom; keby toto okno siahlo po `active_model` v momente, ked este
+          # nie je prepnuty (poradie observerov pri New/Open), observer by ostal
+          # visiet na STAROM dokumente — a indikator by uz NIKDY nezozltol.
+          attach_stale_observer(model || Sketchup.active_model)
           push_state
         rescue StandardError => e
           Engine.log_error(e, 'StudioDialog.on_model_changed')
+        end
+
+        # --- indikator neaktualnosti: callback, latch, porovnanie epoch -------
+        #
+        # Callback je PRAZDNY (viz kontrakt pri `StudioModelWatch`): zdvihne
+        # epochu a naplanuje flush. Guard dokumentu sa overuje TU aj ZNOVA
+        # v flushi (vzor `Panel.txn_model_ok?`) — udalost z ineho dokumentu
+        # nesmie oznacit cisla aktivneho za neaktualne a dokument sa moze
+        # prepnut aj MEDZI udalostou a timerom.
+        def on_model_txn(model)
+          return unless @dialog
+          return unless txn_model_ok?(model)
+
+          @epoch = @epoch.to_i + 1
+          request_stale_flush(model)
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.on_model_txn')
+        end
+
+        # Coalescing (vzor `Panel.request_txn_refresh`): burst commitov —
+        # tahanie mysou, prestavba skrinky, viac Spat za sebou — je JEDEN
+        # js do okna, nie jeden na kazdu transakciu.
+        def request_stale_flush(model)
+          return if @stale_pending
+
+          # Review #6: zapadka sa zamyka AZ PO tom, co timer naozaj vznikol.
+          # Keby `UI.start_timer` hodil vynimku (alebo ju hodilo cokolvek pred
+          # nim), `@stale_pending` by ostalo natrvalo `true` a okno by uz do
+          # zatvorenia NEPOSLALO ani jeden signal — tichy, trvaly vypadok.
+          UI.start_timer(0, false) do
+            begin
+              @stale_pending = false
+              flush_stale(model)
+            rescue StandardError => e
+              Engine.log_error(e, 'StudioDialog.request_stale_flush')
+            end
+          end
+          @stale_pending = true
+        rescue StandardError => e
+          @stale_pending = false
+          Engine.log_error(e, 'StudioDialog.request_stale_flush(plan)')
+        end
+
+        # POROVNANIE EPOCH je jadro celej veci: transakcie, ktore spustil SAM
+        # prepocet okna, su v `@pushed_epoch` uz zapocitane (`push_state` si ju
+        # uklada AZ PO zbere) — dedup kopii vo `fresh_collect` ani zapis
+        # rozpoctu teda tlacidlo nezozltia. Preto ziadne volacie miesto
+        # nepotrebuje vynimku ani „suspend" prepinac.
+        def flush_stale(model)
+          return unless txn_model_ok?(model)
+          return unless @dialog && @dialog.visible?
+          return unless @epoch.to_i > @pushed_epoch.to_i
+
+          js('if (window.NX && NX.markStale) NX.markStale();')
+        end
+
+        def txn_model_ok?(model)
+          !model.nil? && model == @observer_model && model == Sketchup.active_model
+        end
+
+        # Lifecycle (vzor `EdgeCheck.attach_observer`): anti-double `remove -> add`
+        # a KAZDY krok vlastny rescue — zlyhanie odvesenia nesmie preskocit
+        # zavesenie (a naopak). Vola sa pri otvoreni okna a pri prepnuti modelu.
+        def attach_stale_observer(model = nil)
+          return unless defined?(StudioModelWatch)
+
+          m = model || Sketchup.active_model
+          return if m.nil?
+
+          @stale_observer ||= StudioModelWatch.new
+          detach_stale_observer if @observer_model && @observer_model != m
+          begin
+            m.remove_observer(@stale_observer)
+          rescue StandardError
+            nil
+          end
+          m.add_observer(@stale_observer)
+          @observer_model = m
+          reset_stale_epoch
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.attach_stale_observer')
+        end
+
+        # Zatvorene okno nema co znacit — observer sa odvesi a epocha padne na
+        # nulu, takze dalsie otvorenie zacina cistym stavom (a prvy push mu aj
+        # tak donesie cerstve cisla).
+        def detach_stale_observer
+          m = @observer_model
+          begin
+            m.remove_observer(@stale_observer) if m && @stale_observer
+          rescue StandardError
+            # Review #5: TICHO (rovnako ako v attachi). Odvesenie z uz zavreteho
+            # dokumentu je OCAKAVANY stav (okno sa zatvara spolu s modelom) —
+            # zaznam v logu by hlasil chybu tam, kde ziadna nie je.
+            nil
+          end
+          @observer_model = nil
+          reset_stale_epoch
+        end
+
+        def reset_stale_epoch
+          @epoch = 0
+          @pushed_epoch = 0
         end
 
         # --- relay z panela (audit #3) ---------------------------------------
@@ -482,7 +634,12 @@ module Noxun
           register_callbacks(@dialog) # pred show!
           # Bez vynulovania by dalsie otvorenie ozivilo referenciu na mrtve
           # okno a kazdy push by tichol na vynimke (audit #14).
-          @dialog.set_on_closed { @dialog = nil }
+          @dialog.set_on_closed do
+            detach_stale_observer
+            @dialog = nil
+          end
+          # Indikator neaktualnosti zije PRESNE tak dlho ako okno.
+          attach_stale_observer(Sketchup.active_model)
           @dialog
         end
 
@@ -709,7 +866,19 @@ module Noxun
           # Review #6: vysledok `js` sa PREPOSIELA — `do_refresh_bom` podla neho
           # rozhoduje, ci smie napisat „Prepočítané.". Ostatni volajuci ho
           # ignoruju (push do zavreteho okna nie je chyba).
-          js("NX.setStudio(#{data.to_json})")
+          # SAMOLIECBA (review #1): okno prave pocita cisla z `model` — ak na nom
+          # observer nevisi (zmeskany alebo zle nacasovany broadcast prepnutia
+          # dokumentu), prevesi sa TERAZ. Bez toho by okno tichlo navzdy: cisla
+          # by chodili z jedneho dokumentu a signal o zmene z ineho.
+          attach_stale_observer(model) if @observer_model && @observer_model != model
+          sent = js("NX.setStudio(#{data.to_json})")
+          # EPOCHA „co uz je v okne". Uklada sa AZ TU — po `fresh_collect`
+          # (ten sam vie otvorit operaciu: dedup kopii) aj po zapise rozpoctu,
+          # takze vlastne ticky okna sa pohltia a tlacidlo po vlastnom
+          # prepocte NEZOZLTNE. A LEN ked payload naozaj odosiel (review #6):
+          # co klient nedostal, to v okne aktualne nie je.
+          @pushed_epoch = @epoch.to_i if sent
+          sent
         end
 
         # Sucty suctoveho riadku (Š1) a hlavicky pohladov Platne/ABS.

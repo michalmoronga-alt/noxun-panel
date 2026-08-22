@@ -77,7 +77,9 @@ NxTest.test('ŠT-1c B2: nahlad CP sa PRESUNUL — v tele Rozpoctu ostal len prek
   NxTest.assert(otools.include?('data-bud="cp"'), 'zato v liste sekcie Ponuka ano')
   NxTest.refute(otools.include?('data-bud="vat"'),
                 'prepinac DPH sa NEZDVOJIL (dve miesta by ukazovali iny stav)')
-  NxTest.assert(otools.include?('id="refreshBtn"'),
+  # Markup tlacidla je od 22.8. ZDIELANY so studio.js (`budRefreshBtnHtml` je
+  # len most k nemu) — jantarovy indikator neaktualnosti tak plati aj tu.
+  NxTest.assert(otools.include?('budRefreshBtnHtml('),
                 'sekcia ma vlastnu cestu k cerstvym cislam (ponuka zo starych rozmerov = chyba)')
 end
 

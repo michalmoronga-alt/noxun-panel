@@ -98,7 +98,9 @@ NxTest.test('ŠT-1c (review P3): sekcia Nakup ma vlastnu cestu k cerstvym cislam
   tools = S1C_STUDIO_JS[/if \(studioSec === 'buy'\)\{.*?\n    \}/m].to_s
   NxTest.refute(tools.empty?, 'lista sekcie sa nasla')
   NxTest.assert(tools.include?('id="hwCsvBtn"'), 'export je v liste sekcie (kontrakt §3)')
-  NxTest.assert(tools.include?('id="refreshBtn"'),
+  # Markup je od 22.8. ZDIELANY (`refreshBtnHtml` v studio.js) — tlacidlo aj
+  # jantarovy indikator neaktualnosti su na vsetkych 5 mistach rovnake.
+  NxTest.assert(tools.include?('refreshBtnHtml(staleFlag,'),
                 'a je tam aj „Obnoviť" — prestavba skrinky sem sama nedorazi, ' \
                 'takze bez neho by sa objednavalo zo starych poctov')
   NxTest.assert(S1C_STUDIO_JS.include?("t.closest('#refreshBtn')"),
