@@ -83,7 +83,7 @@ NxTest.test('ŠT-1c B1 (audit #1): rozpoctovy push NEZDVIHA generaciu okna') do
   sig = S1CB_STUDIO_RB[/def push_state\(([^)]*)\)/, 1].to_s
   NxTest.assert_equal('bump: true', sig.strip,
                       'push_state ma prepinac `bump` s bezpecnym defaultom')
-  body = S1CB_STUDIO_RB[/def push_state\(bump: true\).*?\n          js\("NX\.setStudio/m].to_s
+  body = S1CB_STUDIO_RB[/def push_state\(bump: true\).*?\n          sent = js\("NX\.setStudio/m].to_s
   NxTest.assert(body.include?('@generation = @generation.to_i + 1 if bump || @generation.to_i.zero?'),
                 'generacia sa zdviha LEN pri bump (prvy push vzdy — gen 0 = „ziadne data")')
   # Mutacia rozpoctu ide VYHRADNE cez `bump: false` proc.

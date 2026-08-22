@@ -35,6 +35,20 @@
   // CISTO klientska (nikam sa neuklada), hodnota checkboxu je zo servera.
   var vepoMenuOpen = false;
 
+  // SMOKE 22.8. (schvalene): NEAKTUALNOST okna. Studio cisla neprepocitava samo
+  // — kym sa nestlaci „Obnoviť", visia v nom cisla z posledneho prepoctu. Server
+  // (StudioModelWatch) posle `NX.markStale()`, ked sa v modeli OD TOHO PREPOCTU
+  // nieco zmenilo; tlacidlo zozltne. Je to stav OKNA (nie zakazky): nikam sa
+  // neuklada a zhadzuje ho VYHRADNE prichod plneho payloadu (`setStudio`).
+  // Premennú číta aj `js/budget.js` (lišty Rozpočtu a Ponuky) — presne tak, ako
+  // číta `ST` a `studioSec`.
+  var staleFlag = false;
+  // Sirka signalu je PRIZNANA: server nevie, ci zmena naozaj hla kusovnikom
+  // (posun cudzieho objektu ho nezmeni) — hovori „mozno neaktualne", nie
+  // „urcite zmenene". Radsej jantar navyse ako export zo starych cisel.
+  var STALE_TIP = 'V modeli nastali zmeny od posledného prepočtu — čísla môžu byť neaktuálne. ' +
+                  'Platí pre akúkoľvek zmenu v dokumente, aj mimo skriniek.';
+
   // ZRKADLO `StudioDialog::SECTIONS` — autoritou whitelistu je RUBY, tento
   // zoznam len zabrani, aby z okna vyletela hodnota, ktora sekciu nepomenuva.
   var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer'];
@@ -116,6 +130,23 @@
     return (v == null || isNaN(v)) ? '—' : Number(v).toFixed(dec == null ? 0 : dec).replace('.', ',');
   }
   function ico(n){ return '<svg class="ic" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; }
+
+  // JEDINY markup tlacidla „Obnoviť" v celom okne. Pouzivaju ho VSETKY sekcie:
+  // Kusovnik, Kontrola a Nakup tu, Rozpocet a Ponuka v `js/budget.js` (subor sa
+  // nacitava AZ ZA týmto, takze funkciu vidi ako globalnu — rovnako ako `ST`).
+  // Preco JEDEN helper: 5 kopii toho isteho tlacidla by znamenalo 5 miest, kde
+  // sa jantarovy stav casom rozide — a sekcia bez neho by tvrdila, ze cisla su
+  // v poriadku, hoci nie su.
+  //   `stale` = jantarovy stav, `tip` = tooltip TEJ sekcie (co presne prepocita),
+  //   `attrs` = doplnkove atributy volajuceho (lista Rozpoctu a Ponuky si nesie
+  //   `data-bkey`, aby jej po prekresleni nespadol fokus).
+  // ZELENA tu vedome NIE JE — vyznamove farby ostavaju semaforu Kontroly.
+  function refreshBtnHtml(stale, tip, attrs){
+    var s = stale === true;
+    return '<button type="button" class="ghostbtn' + (s ? ' nxstale' : '') + '" id="refreshBtn"' +
+      (attrs || '') + ' title="' + esc(s ? (tip + ' · ' + STALE_TIP) : tip) + '">' +
+      ico('refresh-cw') + ' Obnoviť</button>';
+  }
 
   // Hex zo serveroveho pola [r,g,b] (katalogova farba NIE JE CSS retazec).
   // Cokolvek ine = prazdny retazec, teda ziadna vzorka — radsej nic nez
@@ -601,9 +632,19 @@
   }
 
   // ------------------------------------------------------------ Ruby -> JS
-  window.NX = {
+  // Priradenie do `window` je pod guardom: `js/budget.js` si TENTO subor v Node
+  // testoch requiruje kvoli zdielanemu `refreshBtnHtml` (v prehliadaci ho vidi
+  // ako globalnu funkciu) a bez guardu by mu holy `window` spadol. V prehliadaci
+  // sa NIC nemeni — `window.NX` vznika presne ako doteraz, PRED nacitanim
+  // budget.js, ktory ho obaluje.
+  var NXAPI = {
     setStudio: function(data){
       ST = data || null;
+      // PLNY payload = cerstve cisla zo servera, takze „neaktuálne" padá —
+      // a to PRED renderom, inak by lišta este raz nakreslila jantar.
+      // Zhadzuje ho VYHRADNE tento push: echa nizsie (lista VEPO, prepinace,
+      // vysledok zapisu rozpoctu) cisla NENESU.
+      staleFlag = false;
       // Š10: stav prepínačov chodí v KAŽDOM pushi (a medzitým aj samostatným
       // echom nižšie) — klient si ho nikdy neodvodzuje.
       EDGE = (ST && ST.edge_check) ? ST.edge_check : null;
@@ -662,6 +703,15 @@
       GRAIN = state || null;
       if (studioSec === 'ctrl') renderTools();
     },
+    // Server hlási, že sa v modeli OD POSLEDNÉHO PREPOČTU niečo zmenilo.
+    // NIČ sa neprepočítava a na server sa nič neposiela — prekreslí sa LEN
+    // lišta práve otvorenej sekcie (tabuľka aj zoznam nálezov ostávajú, sú to
+    // stále tie čísla, ktoré sem prišli naposledy).
+    markStale: function(){
+      if (staleFlag) return;
+      staleFlag = true;
+      renderTools();
+    },
     // To isté nastavenie sa dá otvoriť z troch miest — keď ho používateľ
     // otvorí inde, toto sa zavrie (nikdy dve kópie naraz).
     closeEdgeMenu: function(){
@@ -670,6 +720,7 @@
       if (studioSec === 'ctrl') renderTools();
     }
   };
+  if (typeof window !== 'undefined') window.NX = NXAPI;
 
   // --------------------------------------------------------------- render
   function render(){
@@ -747,10 +798,9 @@
         // sekcia, kvoli ktorej sa clovek do okna vracia po oprave v Inspectore.
         // Prestavba skrinky sem sama nedorazi, takze zoznam nalezov mohol
         // ukazovat uz opravenu chybu (rovnaky dovod ako v Kusovniku a Nakupe).
-        // Zdielany `#refreshBtn` — jeden handler, jedna serverova cesta.
-        '<button type="button" class="ghostbtn" id="refreshBtn"' +
-        ' title="Prepočítať kontrolu z aktuálneho modelu">' +
-        ico('refresh-cw') + ' Obnoviť</button>';
+        // Zdielany `#refreshBtn` — jeden handler, jedna serverova cesta,
+        // a od tejto davky aj JEDEN markup (`refreshBtnHtml`).
+        refreshBtnHtml(staleFlag, 'Prepočítať kontrolu z aktuálneho modelu');
       return;
     }
     // ŠT-1c PR A (Š7): lišta sekcie Nákup kovania. Export patrí SEKCII
@@ -765,16 +815,14 @@
         // skrinky z Inspectora sem sama nedorazí, takže bez „Obnoviť" by sa dal
         // objednávať nákupný zoznam zo starých počtov — a odísť po ne do
         // Kusovníka je skrytá cesta (rovnaký dôvod ako v lište Kusovníka).
-        '<button type="button" class="ghostbtn" id="refreshBtn"' +
-        ' title="Prepočítať nákupný zoznam z aktuálneho modelu">' +
-        ico('refresh-cw') + ' Obnoviť</button>' +
+        refreshBtnHtml(staleFlag, 'Prepočítať nákupný zoznam z aktuálneho modelu') +
         '<span class="spacer"></span>' +
         '<span class="sechint">Klik na riadok generiky označí vlastníka v modeli.</span>';
       return;
     }
     box.innerHTML = bomToolsHtml(ST.vepo || {},
                                  { view: bomView, q: bomQ,
-                                   cols: colMenuOpen, vepo: vepoMenuOpen });
+                                   cols: colMenuOpen, vepo: vepoMenuOpen, stale: staleFlag });
   }
 
   // LISTA sekcie KUSOVNIK — cista funkcia (testuje ju tests/js/test_st1a_studio.js).
@@ -826,8 +874,9 @@
     // katalogu), ale prestavba skrinky z Inspectora sem sama nedorazi — okno
     // musi mat rucnu cestu k cerstvym cislam, inak by sa VEPO exportovalo
     // zo starych.
-    h += '<button type="button" class="ghostbtn" id="refreshBtn"' +
-         ' title="Prepočítať kusovník z aktuálneho modelu">' + ico('refresh-cw') + ' Obnoviť</button>';
+    // Jantarovy stav chodi ARGUMENTOM (`s.stale`) z toho isteho dovodu ako
+    // pohlad a hladanie — funkcia ostava testovatelna bez DOM.
+    h += refreshBtnHtml(s.stale === true, 'Prepočítať kusovník z aktuálneho modelu');
     return h;
   }
 
@@ -1470,6 +1519,10 @@
       // Testy nastavuju stav cez `setBomState` (bomView/bomQ/menu) — inak by
       // museli sahat do modulovych premennych, ktore Node nevidi.
       bomToolsHtml: bomToolsHtml, vepoBtnHtml: vepoBtnHtml, vepoMenuHtml: vepoMenuHtml,
+      // Jantarovy indikator neaktualnosti: JEDEN markup pre vsetkych 5 mist
+      // (Kusovnik · Kontrola · Nakup tu, Rozpocet · Ponuka v budget.js —
+      // ten si ho v Node testoch berie requirom TOHTO suboru).
+      refreshBtnHtml: refreshBtnHtml, STALE_TIP: STALE_TIP,
       // ŠT-1b sekcia Kontrola (Š8–Š11)
       semaforHtml: semaforHtml, ctrlRows: ctrlRows, ctrlRowHtml: ctrlRowHtml,
       ctrlActionsHtml: ctrlActionsHtml, navBadgeHtml: navBadgeHtml,

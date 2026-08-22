@@ -301,7 +301,7 @@ NxTest.test('ŠT-1b: zatvorenie okna overlaye NEVYPINA (vedoma zmena)') do
   NxTest.refute(S1B_STUDIO_RB.include?('EdgeCheck.disable!'),
                 'Studio prepinac pri zatvoreni NEVYPINA')
   NxTest.refute(S1B_STUDIO_RB.include?('GrainCheck.disable!'), 'ani kresbu')
-  NxTest.assert(S1B_STUDIO_RB.include?('@dialog.set_on_closed { @dialog = nil }'),
+  NxTest.assert(S1B_STUDIO_RB[/@dialog\.set_on_closed do.*?\n          end\n/m].to_s.include?('@dialog = nil'),
                 'referencia na mrtve okno sa NADALEJ vynuluje')
 end
 
