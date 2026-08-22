@@ -242,11 +242,11 @@ NxTest.test('ŠT-1c B3: okno Vyroba ZANIKLO (posledna skrupina je prec)') do
   end
   NxTest.refute(defined?(Noxun::Engine::ProductionDialog), 'modul uz neexistuje')
   # Payload rozpoctu nesie Studio — a pocita sa RAZ (Kontrola z neho berie
-  # svoje ORANGE nalezy).
+  # svoje ORANGE nalezy cez `control_payload(budget: ...)`).
   NxTest.assert(S1CB_STUDIO_RB.match?(/^\s{12}budget: budget,$/),
                 'sekcia Rozpocet dostava svoj payload')
-  NxTest.assert(S1CB_STUDIO_RB.include?('budget: budget'),
-                'a KONTROLA z neho berie rozpoctove ORANGE')
+  NxTest.assert(S1CB_STUDIO_RB.match?(/control_payload\(.*budget: budget/m),
+                'a KONTROLA berie rozpoctove ORANGE z TOHO ISTEHO vypoctu')
 end
 
 # --- 6) klamuce texty, ktore tato davka opravila -----------------------------

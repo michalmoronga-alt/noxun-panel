@@ -1,22 +1,20 @@
 # frozen_string_literal: true
-# Noxun Engine — ST-1a PR A: ZDIELANE CISTE JADRO vystupov zakazky (povodne
-# okna Vyroba, a od davky
-# ST-1a aj okna Studio).
+# Noxun Engine — ST-1a PR A: ZDIELANE CISTE JADRO vystupov zakazky.
 #
-# Preco vlastny modul: kusovnik, supisy platni/ABS a VEPO export sa stahuju
-# z okna Vyroba do noveho okna Studio. Vsetci klienti musia citat TIE ISTE cisla —
-# dve kopie tych istych pomocnikov by sa casom rozisli (a rozdiel by sa
-# prejavil az na vyrobnom vystupe).
+# Preco vlastny modul: kusovnik, supisy platni/ABS a VEPO export sa v davke
+# ST-1a stahovali zo starsieho okna Vyroba do noveho okna Studio. Obe okna
+# museli citat TIE ISTE cisla — dve kopie tych istych pomocnikov by sa casom
+# rozisli a rozdiel by sa prejavil az na vyrobnom vystupe.
+#
+# ŠT-1c PR B3: okno Vyroba zaniklo. Modul tym neprestal davat zmysel — cita ho
+# okno Studio, rail Inspectora aj vsetky styri exporty, takze ostava JEDINOU
+# autoritou cisel, guardov a slovenskych textov.
 #
 # ZAVAZNE PRAVIDLO MODULU: ziadny OKENNY STAV. Sem NEPATRI `@dialog`,
 # `@generation` ani `@pending_*` — to su veci konkretneho okna. Vsetko tu je
 # cista funkcia alebo citanie katalogu/modelu: rovnaky vstup = rovnaky vystup,
-# ziadny zapis do modelu, ziadny undo krok.
-#
-# ŠT-1c PR B3: okno Vyroba (`ui/production_dialog.rb`), ktore si tieto mena
-# ponechavalo ako TENKE OBALY, ZANIKLO — jadro je jedina autorita
-# (vratane privatnosti) — panel, pure testy aj in-SketchUp runner tieto metody
-# volaju presne takto a refactor sa ich nesmie dotknut.
+# ziadny zapis do modelu, ziadny undo krok (jedina vynimka je sekcia Rozpocet,
+# ktora zapisuje VEDOME: 1 mutacia = 1 krok Spat).
 module Noxun
   module Engine
     module ProductionCore
@@ -153,10 +151,10 @@ module Noxun
 
       # --- ST-1a: nazov projektu je SERVEROVA autorita (audit #1) -----------
       #
-      # Do ST-1a zil nazov projektu v INPUTE zaniknuteho okna Vyroba a kazdy export si ho
-      # bral z DOM (`data['project']`). Odkedy su okna DVE, je to pasca: kto
-      # prepise nazov v Studiu, exportuje z Vyroby pod inym menom (a naopak) —
-      # dva vystupy tej istej zakazky by sa volali rozne.
+      # Do ST-1a zil nazov projektu v INPUTE (vtedy este) okna Vyroba a kazdy
+      # export si ho bral z DOM (`data['project']`). Odkedy su klienti DVAJA,
+      # je to pasca: kto prepise nazov v jednom okne, exportoval by z druheho
+      # pod inym menom — dva vystupy tej istej zakazky by sa volali rozne.
       #
       # Preto nazov zije v `vepo_settings.json` pod mapou `project_names`.
       # Je to nastavenie POCITACA, presne ako `last_dir`/`merge_18_36`: ziadny
@@ -558,14 +556,15 @@ module Noxun
 
       # --- ST-1a PR B: zdielane telo EXPORTU a VYBERU ----------------------
       #
-      # Obe okna (Vyroba aj Studio) robia presne to iste — len s vlastnym
-      # `generation` a vlastnym statusom. Preto telo zije TU a okno odovzdava
-      # svoj stav EXPLICITNE:
+      # Telo zije TU a volajuci (okno Studio, po in-SU testy) odovzdava svoj
+      # stav EXPLICITNE:
       #   generation — okenny generacny token (B4 guard stareho DOM kliku),
       #   status     — ->(msg, error) do TOHO okna,
       #   repush     — -> { } cerstvy payload TOMU oknu (ak zije).
-      # Dva takmer rovnake exporty by sa casom rozisli a rozdiel by sa ukazal
-      # az na vyrobnom vystupe.
+      # Parametre ostavaju aj po zaniku druheho okna (ŠT-1c PR B3): drzia
+      # ZAVAZNU BEZSTAVOVOST tela. Keby si jadro siahlo na `@generation` alebo
+      # `js` samo, prestalo by byt cistou funkciou a kazdy dalsi klient by
+      # musel obchadzat cudzi okenny stav.
 
       # V0.5 C: export VEPO — vstup po relay z panela (edity flushnute) alebo
       # priamo (panel nezije). Poradie: gen check -> flush guard -> vyber
@@ -638,9 +637,9 @@ module Noxun
 
       # --- ŠT-1c: CSV nakupneho zoznamu kovania (Š7) ------------------------
       #
-      # Telo sa sem prestahovalo zo zaniknuteho okna Vyroba spolu s tabom Kovanie (sekcia
-      # `buy` v Studiu). Poradie je vzor VEPO exportu: gen guard -> flush guard
-      # -> CERSTVY zber modelu -> vyber suboru -> zapis.
+      # Telo sa sem prestahovalo spolu s tabom Kovanie zaniknuteho okna Vyroba
+      # (dnes sekcia `buy` v Studiu). Poradie je vzor VEPO exportu: gen guard
+      # -> flush guard -> CERSTVY zber modelu -> vyber suboru -> zapis.
       #
       # VEDOMA ZMENA (audit #15): export dostal GENERACNY GUARD, ktory predtym
       # NEMAL — ako jediny zo styroch exportov. Zosuladenie, nie nova ochrana:
@@ -751,13 +750,13 @@ module Noxun
         status.call("Chyba výberu: #{e.message}", true)
       end
 
-      # --- ŠT-1b (audit #2): JEDNO CISLO KONTROLY PRE VSETKY OKNA ----------
+      # --- ŠT-1b (audit #2): JEDNO CISLO KONTROLY PRE VSETKYCH ------------
       #
-      # Semafor sekcie Kontrola (Studio), badge navigacie, ⚠ chip hlavicky okna
-      # Vyroba aj suhrn v statuse a LOGu exportu musia ukazovat TO ISTE. Preto
-      # sa cely vypocet KONTROLY — vratane zlucenia s upozorneniami ROZPOCTU —
-      # robi TU a obe okna volaju tuto jednu metodu. Dva takmer rovnake vypocty
-      # by sa casom rozisli a pouzivatel by videl dve rozne cisla.
+      # Semafor sekcie Kontrola (Studio), badge navigacie aj suhrn v statuse
+      # a LOGu exportu musia ukazovat TO ISTE. Preto sa cely vypocet KONTROLY —
+      # vratane zlucenia s upozorneniami ROZPOCTU — robi TU a vsetci volaju
+      # tuto jednu metodu. Dva takmer rovnake vypocty by sa casom rozisli
+      # a pouzivatel by videl dve rozne cisla.
       #
       # POZOR na zamenu: ⚠ chip v INSPECTORE je nieco INE — su to build
       # warnings PRAVE OZNACENEJ skrinky, nie kontrola celej zakazky. Inspector
@@ -842,9 +841,10 @@ module Noxun
       # --- D-104 / D-105 / K2 (audit #5): ZDIELANE PREPINACE OVERLAYOV ------
       #
       # „Zvýrazniť hrany" a „Smer kresby" su od ŠT-1b v liste sekcie Kontrola
-      # (Studio) — a dovtedy boli v tabe Kontrola zaniknuteho okna Vyroba. Rovnaka akcia
-      # v dvoch oknach = telo MUSI byt jedno; okno odovzdava LEN svoj generacny
-      # token, svoj status, svoj refresh a svoje echo (maly push stavu).
+      # (Studio); dovtedy boli v tabe Kontrola zaniknuteho okna Vyroba. Ta ista
+      # akcia ma DVA vstupne body (okno + rail Inspectora), takze telo MUSI byt
+      # jedno; okno odovzdava LEN svoj generacny token, svoj status, svoj
+      # refresh a svoje echo (maly push stavu).
       #
       # Model sa NEMENI — overlay kresli NAD nim (ziadna operacia, ziadny undo
       # krok, ziadny zapis do .skp; nastavenie zije v %APPDATA%).
@@ -882,8 +882,8 @@ module Noxun
       end
 
       # Prepnutie zvyraznenia. Ide ZDIELANOU Engine.toggle_edge_check — tá stav
-      # rozposle VSETKYM oknam (rail Inspectora, Studio, Vyroba), takze vlastny
-      # push tu netreba; lokalny je uz len status.
+      # rozposle OBOM prijimatelom (lista sekcie Kontrola v Studiu a rail
+      # Inspectora), takze vlastny push tu netreba; lokalny je uz len status.
       def do_edge_check(model, data, generation:, status:, repush:, echo:)
         return unless edge_check_guard(data, model, generation: generation, status: status,
                                                     repush: repush, echo: echo)
@@ -984,9 +984,10 @@ module Noxun
       # ==================== ŠT-1c PR B1: ROZPOCET ============================
       #
       # Rozpocet je JEDINA cesta, ktora ZAPISUJE do modelu — a od tejto davky
-      # zije v sekcii `budget` okna Studio. Telo sa presunulo sem zo zaniknuteho okna Vyroba
-      # z toho isteho dovodu ako vsetko ostatne: dve kopie zapisovacej cesty by
-      # sa casom rozisli a rozdiel by sa ukazal az na cenovej ponuke.
+      # zije v sekcii `budget` okna Studio. Telo sa sem presunulo zo (vtedy
+      # este ziveho) okna Vyroba z toho isteho dovodu ako vsetko ostatne: dve
+      # kopie zapisovacej cesty by sa casom rozisli a rozdiel by sa ukazal az
+      # na cenovej ponuke.
       #
       # Okno odovzdava LEN svoj stav:
       #   generation — okenny generacny token (zapis zo stareho DOM sa odmietne),

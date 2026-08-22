@@ -617,20 +617,17 @@
   .hwprice { align-items: center; }
   .hwtoggle .ic { transition: transform 0.12s ease; }
   .hwtoggle.hwopen .ic { transform: rotate(90deg); }
-  /* ===== V0.5 B: kusovnik/supisy (od ŠT-1a sekcie okna Studio) ===== */
-  .prodhead { display: flex; align-items: center; gap: 10px; }
-  .prodhead h1 { margin: 0; }
-  .prodhead .sub { flex: 1; }
-  .prodsum { background: var(--nx-surface-sunken); border: 1px solid var(--nx-border); border-radius: 6px;
-             padding: 7px 10px; font-size: 12.5px; margin: 8px 0; color: var(--nx-ink-strong); }
-  /* Codex GH #66 P2: .pvtabs pravidla POUZIVA aj okno Studio (studio.html
-     ma <div class="pvtabs prodtabs">) — panel ich po presune tabov do hlavicky
-     uz nepotrebuje, ale zdielane CSS ich musi drzat pre produkcne taby. */
+  /* ===== V0.5 B: kusovnik/supisy (od ŠT-1a sekcie okna Studio) =====
+     ŠT-1c PR B3: `.prodhead*`, `.prodsum`, `.prodtabs` a `.prodbody` tu ZANIKLI
+     spolu s oknom Vyroba — obliekali VYHRADNE jeho hlavicku, suhrn, listu tabov
+     a telo. Tabulky (`.bomtab`) a `.wbadge` ostavaju: kresli ich okno Studio. */
+  /* Codex GH #66 P2: `.pvtabs` je ZDIELANY pas tabov v satelitnom okne. Panel
+     ho po presune tabov do hlavicky uz nepotrebuje, ale zdielane CSS ho musi
+     drzat pre svojho JEDINEHO dnesneho konzumenta — `hardware_catalog.html`
+     (`<div class="pvtabs" id="hwTabs">`). */
   .pvtabs { display: flex; gap: 6px; margin: 2px 0 6px; }
   .pvtabs button { flex: 1; padding: 5px; font-size: 11px; }
   .pvtabs button.on { background: var(--nx-select); color: var(--nx-on-accent); }
-  .prodtabs { margin-bottom: 6px; }
-  .prodbody { max-height: calc(100vh - 220px); overflow: auto; border: 1px solid var(--nx-border); border-radius: 6px; }
   .bomtab { width: 100%; border-collapse: collapse; font-size: 12px; }
   .bomtab th { position: sticky; top: 0; background: var(--nx-surface-th); text-align: left;
                padding: 6px 8px; border-bottom: 2px solid var(--nx-border); z-index: 2; }
@@ -644,7 +641,7 @@
      JEDNO nastavenie, DVA vstupne body — roh v liste sekcie KONTROLA v Studiu
      a rohovy trojuholnik pri ABS kontrole v raile Inspectora (v0.7.28). Markup
      kresli zdielany js/edge_menu.js, preto su tieto pravidla ZAMERNE
-     NESCOPNUTE (`.nx-inspector` by ich pred oknom Vyroba schoval). Pozicovanie
+     NESCOPNUTE (`.nx-inspector` by ich pred oknom Studio schoval). Pozicovanie
      je jediny rozdiel oboch miest — riesi ho modifikator `.ecmenu-rail` dole
      v sekcii raily. Okno je vzdy OVERLAY (position: absolute), nikdy novy
      riadok layoutu: vertikalny priestor je vzacny. */

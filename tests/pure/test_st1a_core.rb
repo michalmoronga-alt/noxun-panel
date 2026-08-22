@@ -89,14 +89,28 @@ NxTest.test('ST-1a: loader nacitava production_core PRED oknom, ktore ho vola') 
                 'loader uz nesmie nacitavat zaniknute okno Vyroba')
 end
 
-NxTest.test('ST-1a: vepo_materials je cista funkcia nad katalogom') do
+NxTest.test('ST-1a: vepo_materials drzi kontrakt mapy material_id -> zaznam') do
   # Headless nad sandbox katalogom helpera (APPDATA je presmerovana) — metoda
   # cita LEN katalog materialov, ziadny SketchUp model.
+  #
+  # Tvrdenie je o TVARE vysledku, nie o „dve volania daju to iste" (to by bola
+  # tautologia a==a): kluc je `material_id` z katalogu, hodnota VZDY nesie
+  # neprazdny `label` (VEPO bucket) a volitelny `display` (ludsky zaklad pre
+  # LOG), ktory sa uklada LEN ked sa od labelu lisi.
   NxTest.skip!('vyzaduje headless sandbox katalogu') unless NxTest.headless?
-  a = Noxun::Engine::ProductionCore.vepo_materials
-  b = Noxun::Engine::ProductionCore.vepo_materials
-  NxTest.assert(a.is_a?(Hash), 'vepo_materials vracia mapu material_id -> zaznam')
-  NxTest.assert_equal(a, b, 'dve volania nad tym istym katalogom daju to iste')
+  mats = Noxun::Engine::ProductionCore.vepo_materials
+  NxTest.assert(mats.is_a?(Hash), 'vepo_materials vracia mapu material_id -> zaznam')
+  ids = Noxun::Engine::Materials.sheets.map { |s| s['material_id'] }
+  NxTest.assert_equal(ids.sort, mats.keys.sort,
+                      'mapa pokryva PRESNE dosky katalogu (ziadna navyse, ziadna nechyba)')
+  bad_label = mats.reject { |_id, e| e.is_a?(Hash) && e['label'].is_a?(String) && !e['label'].empty? }
+  NxTest.assert(bad_label.empty?,
+                "zaznam bez neprazdneho `label`: #{bad_label.keys.join(', ')} — VEPO bucket by nemal meno")
+  bad_display = mats.reject { |_id, e| !e.key?('display') || (e['display'].is_a?(String) && e['display'] != e['label']) }
+  NxTest.assert(bad_display.empty?,
+                "`display` sa uklada LEN ked sa lisi od labelu (porusene: #{bad_display.keys.join(', ')})")
+  NxTest.assert_equal(mats.keys.length, mats.values.map { |e| e['label'] }.uniq.length,
+                      'labely su JEDNOZNACNE — dva materialy sa nesmu zliat do jedneho VEPO bucketu')
 end
 
 NxTest.test('ST-1a: refs_for je cista funkcia') do

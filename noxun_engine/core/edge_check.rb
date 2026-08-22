@@ -62,8 +62,9 @@ module Noxun
       # Posun plosky VON z telesa (mm) — bez neho by farba bojovala o hlbku
       # s plochou dielca (z-fighting).
       OUT_MM = 0.5
-      # Farby su zrkadlom tokenov --nx-edge-* v ui/css/panel.css (svorka v okne
-      # Vyroba musi mat PRESNE farbu plosky v modeli).
+      # Farby su zrkadlom tokenov --nx-edge-* v ui/css/panel.css (stvorcek
+      # v 3-stavovom nastaveni — rail Inspectora aj lista sekcie Kontrola
+      # v Studiu — musi mat PRESNE farbu plosky v modeli).
       # EXTRA bola povodne fialova — v modeli splyvala s modrym zvyraznenim
       # vyberu aj s osami (Michal 11.8.); jasna oranzova je v drevodekorovom
       # modeli nepravdepodobna, takze je jednoznacna.

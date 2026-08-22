@@ -7,16 +7,18 @@
 # su PREMOSTENIA do dnesnych okien (audit #2), aby sa nikde neobjavilo mrtve
 # tlacidlo bez vysvetlenia.
 #
-# Vztah k oknu Vyroba:
-#   - CISLA su tie iste — obe okna citaju `ProductionCore` (jedno jadro, jeden
-#     vypocet; dve kopie by sa casom rozisli a rozdiel by sa ukazal az na
-#     vyrobnom vystupe),
+# Okno Vyroba, z ktoreho sa obsah stahoval, ZANIKLO v ŠT-1c PR B3 — Studio je
+# odvtedy JEDINE okno vystupov zakazky. Co z toho vztahu ostalo:
+#   - CISLA pocita zdielane jadro `ProductionCore` (jeden vypocet pre okno,
+#     rail Inspectora aj exporty; druha kopia by sa casom rozisla a rozdiel by
+#     sa ukazal az na vyrobnom vystupe),
 #   - KANAL je vlastny (audit #3) — vlastny `@generation`, vlastny relay cez
 #     panel (`NX.studioRelay*` -> `studio_do_select` / `studio_do_export`),
-#     takze push jedneho okna nezhodi guard druheho,
-#   - Studio do modelu NEZAPISUJE: klik iba vybera entity (pod
-#     `Panel.suspend_selection_sync`, refresh panela s `dedup: false`) a nazov
-#     projektu je nastavenie POCITACA v %APPDATA%, nie zakazky.
+#     takze cudzi push nezhodi guard tohto okna,
+#   - Studio do modelu ZAPISUJE JEDINE cez sekciu Rozpocet (1 mutacia = 1 krok
+#     Spat); klik iba vybera entity (pod `Panel.suspend_selection_sync`,
+#     refresh panela s `dedup: false`) a nazov projektu je nastavenie POCITACA
+#     v %APPDATA%, nie zakazky.
 #
 # ST-1a: zdielane ciste jadro nacitava loader (main.rb) EST PRED tymto suborom;
 # headless pure testy si vsak `ui/studio_dialog.rb` requiruju samostatne —
@@ -38,6 +40,7 @@ module Noxun
       # ŠT-1c PR B3: `PRODUCTION_BRIDGES` (premostenia do TABOV okna Vyroba)
       # ZANIKLI spolu s oknom — kusovnik, kontrola, nakup kovania, rozpocet aj
       # cenova ponuka su SEKCIAMI tohto okna, takze niet kam premostovat.
+
       # Premostenia do satelitnych okien (KATALOGY + NASTAVENIA). Hodnota je
       # meno modulu — volat sa smie LEN to, co je TU (klient posiela iba kluc).
       WINDOW_BRIDGES = {
@@ -133,8 +136,8 @@ module Noxun
 
         # --- relay z panela (audit #3) ---------------------------------------
         # Panel uz flushol rozpisane edity — az potom sa vybera/exportuje.
-        # Telo je ZDIELANE s oknom Vyroba (`ProductionCore`), okno odovzdava
-        # LEN svoj generacny token, svoj status a svoj refresh.
+        # Telo je v ZDIELANOM jadre (`ProductionCore`), okno odovzdava LEN svoj
+        # generacny token, svoj status a svoj refresh.
 
         def do_select(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
@@ -149,8 +152,8 @@ module Noxun
         end
 
         # ŠT-1c PR A (Š7): CSV nakupneho zoznamu kovania z listy sekcie Nakup.
-        # Telo je v `ProductionCore` (to iste, ake volal tab Kovanie okna
-        # Vyroba) — okno odovzdava LEN svoj generacny token, status a refresh.
+        # Telo je v `ProductionCore` (to iste, ake volal zaniknuty tab Kovanie)
+        # — okno odovzdava LEN svoj generacny token, status a refresh.
         def do_hw_csv(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           ProductionCore.do_hw_csv(Sketchup.active_model, data, generation: @generation,
@@ -259,9 +262,10 @@ module Noxun
           Engine.log_error(e, 'StudioDialog.push_grain_check')
         end
 
-        # To iste nastavenie sa da otvorit z TROCH miest (rail · Studio · okno
-        # Vyroba). Otvorenie na jednom zavrie ostatne — na obrazovke nikdy
-        # nestoja dve kopie tych istych prepinacov. Cisto zobrazovacie.
+        # To iste nastavenie ma DVA vstupne body (rail Inspectora · lista tejto
+        # sekcie); tretim bolo okno Vyroba, ktore zaniklo v ŠT-1c PR B3.
+        # Otvorenie na jednom zavrie druhy — na obrazovke nikdy nestoja dve
+        # kopie tych istych prepinacov. Cisto zobrazovacie.
         def close_edge_menu
           js('if (window.NX && NX.closeEdgeMenu) NX.closeEdgeMenu();')
         rescue StandardError => e
@@ -475,8 +479,8 @@ module Noxun
           cb(dlg, 'replace_uni')          { |p| do_replace_uni(p) }
           cb(dlg, 'edge_check_toggle')    { |p| do_edge_check(p) }
           cb(dlg, 'edge_check_option')    { |p| do_edge_check_option(p) }
-          # Otvorenie 3-stavoveho nastavenia zavrie jeho kopiu v raile aj v okne
-          # Vyroba (nikdy dve naraz).
+          # Otvorenie 3-stavoveho nastavenia zavrie jeho kopiu v raile
+          # (nikdy dve naraz).
           cb(dlg, 'edge_menu_open')       { |_p| Engine.close_edge_menu(:studio) }
           cb(dlg, 'grain_check_toggle')   { |p| do_grain_check(p) }
           # ŠT-1c PR B1, sekcia ROZPOCET. Mutacia (`budget_mutate`) ide PRIAMO —
@@ -514,8 +518,8 @@ module Noxun
         end
 
         # Klik z okna: cez panel (flush handshake) alebo priamo, ak panel nezije.
-        # Relay ma VLASTNE meno (`studioRelay`) — inak by odpoved prisla do okna
-        # Vyroba a jeho `gen` by klik odmietol.
+        # Relay ma VLASTNE meno (`studioRelay`), aby odpoved prisla do TOHTO
+        # okna — kazdy klient ma vlastny `gen` a cudzi push by klik odmietol.
         def handle_select(payload)
           data = JSON.parse(payload.to_s)
           if Panel.dialog_alive?
