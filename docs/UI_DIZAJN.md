@@ -1064,6 +1064,49 @@ v `HtmlDialog.new` sú **vonkajšie** — obsah + rámik okna (Windows ≈ 16 px
   ten istý kód znamená pri každej role inú fyzickú hranu. Fyzickú stranu
   ukazuje karta dielca v Inspectore, ktorá ju zároveň kreslí.
 
+### 5.12 D-15 — zdieľaná kostra modalov „pridávačiek" (`ui/js/nx_modal.js`)
+
+Schválený vzor kontraktu UI 2.0 (`SYSTEM/zdroje/ui20/UI20_KONTRAKT.md`, sekcia
+„D-15 pridávačky ako modal"). **Každé okno typu „pridaj niečo" je TÁ ISTÁ
+kostra, len s inými poľami** — nikdy vlastný formulár. Prvá kódová inštancia
+prišla s ŠT-1c PR B2 (drafty rozpočtu); ďalšie sa napájajú bez kopírovania.
+
+**Kostra (mockup `mockup_studio.html`):**
+
+| Časť | Trieda | Obsah |
+|---|---|---|
+| hlavička | `.mhead` | `<h3>` titulok · `.msub` podtitul (kontext) · `.mx` krížik vpravo |
+| telo | `.mbody` | riadky `.mrow` = `<label>` + pole; pod nimi voliteľný `.hint` |
+| pätka | `.mfoot` | `.spacer` · **Zrušiť** (`ghostbtn`) · **zelené potvrdenie** (`primary`) |
+
+Scrim je `.nxscrim` (`--nx-scrim`), karta `.nxmcard` (`.sm` = 420 px, inak
+560 px). **Pozor:** mockup kreslí kartu ako `.nxmodal`, lenže `panel.css` toto
+meno už používa pre SCRIM starších modalov — preto `.nxmcard`.
+
+**Správanie (záväzné pre každú inštanciu):**
+
+- **Esc** aj **klik na scrim** (nie do karty) modal zatvárajú;
+- **fokus ide do prvého poľa** pri otvorení a **vracia sa na spúšťač** pri
+  zatvorení — inak by klávesnicová cesta skončila na `<body>`;
+- **Enter v poli = potvrdenie** (do `<select>` sa nezasahuje);
+- **potvrdenie modal NEZATVÁRA.** Odošle hodnoty a zatvorenie je rozhodnutie
+  volajúceho: zavrieť ho smie **len potvrdenie servera**. Odmietnutý zápis
+  musí používateľ nájsť **s rozpísanými hodnotami na mieste** — má opraviť
+  svoje číslo, nie písať celý formulár znova.
+- **Kotva `#nxModalRoot` žije mimo tela sekcie**, takže prekreslenie obsahu
+  po zápise modal nezhodí.
+
+**Čo kostra NEPREBERÁ:** okná s **vlastným životným cyklom riadeným serverom** —
+napr. fázové okno „Prepočítať ceny" (`#budPrModal`): vo fáze behu sa Escapom
+zavrieť nesmie, lebo beh by ostal visieť bez okna. Také okno si markup kreslí
+samo a s komponentom nemá nič spoločné.
+
+**Escape v okne, ktoré má vlastný Escape handler** (Štúdio zatvára ním
+rozbaľovacie nastavenie hrán), sa musí podmieniť `!NXModal.isOpen()`. Oba
+listenery visia na `document` a `stopPropagation` medzi nimi **nefunguje** —
+je to tá istá lekcia ako pri zatváraní menu klikom mimo: rieši sa v jednom
+listeneri, nie druhým poslucháčom.
+
 ---
 
 ## 6. Cache-busting

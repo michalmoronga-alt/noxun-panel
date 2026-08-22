@@ -298,8 +298,9 @@
     // Sekcie Studia. Zoznam je ZRKADLO `StudioDialog::SECTIONS` — autoritou je
     // RUBY, tento mirror len zabrani, aby z panela vyletela hodnota, ktora
     // sekciu nepomenuva. ST-1a priniesla Kusovnik, ŠT-1b Kontrolu, ŠT-1c PR A
-    // Nakup kovania (`buy`), ŠT-1c PR B1 Rozpocet (`budget`).
-    var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget'];
+    // Nakup kovania (`buy`), ŠT-1c PR B1 Rozpocet (`budget`), ŠT-1c PR B2
+    // Cenovu ponuku (`offer`).
+    var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer'];
     function studioSection(s){
       var v = String(s == null ? '' : s);
       return STUDIO_SECTIONS.indexOf(v) >= 0 ? v : null;

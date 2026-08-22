@@ -65,10 +65,8 @@ NxTest.test('ŠT-1c B1: `budget` je SEKCIA Studia — premostenia do okna Vyroba
                 'polozka navigacie je ZIVA sekcia, nie premostenie')
   NxTest.assert(S1CB_STUDIO_JS.include?("budget: { t: 'Rozpočet',"),
                 'sekcia ma vlastnu hlavicku a hint')
-  # Cenova ponuka este NEMA vlastnu sekciu (PR B2) — ale uz ani nepremostuje do
-  # ineho okna: jej nahlad je CASTOU Rozpoctu, takze klik ostava tu.
-  NxTest.assert(nav.include?("goto: { sec: 'budget', open: 'cp' }"),
-                'Cenová ponuka preklikne na nahlad vnutri Rozpoctu')
+  # ŠT-1c PR B2: Cenova ponuka uz ma VLASTNU sekciu — jej kontrakt strazi
+  # `tests/pure/test_st1c_ponuka.rb`; tu staci, ze uz nikam nepremostuje.
   NxTest.assert(S1CB_STUDIO_JS.include?('function studioGoSection'),
                 'prepnutie sekcie z kodu ma jedno miesto')
   NxTest.assert(S1CB_STUDIO_JS.include?('window.studioGoSection = studioGoSection'),
@@ -80,7 +78,7 @@ NxTest.test('ŠT-1c B1: zrkadla whitelistu sekcii sedia vo VSETKYCH TROCH suboro
   js = S1CB_STUDIO_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
   shell = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'shell.js'), encoding: 'UTF-8')
   shell_list = shell[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  NxTest.assert_equal(%w[bom ctrl buy budget], rb, 'Ruby je autorita zoznamu')
+  NxTest.assert_equal(%w[bom ctrl buy budget offer], rb, 'Ruby je autorita zoznamu')
   NxTest.assert_equal(rb, js, 'studio.js je jeho zrkadlo')
   NxTest.assert_equal(rb, shell_list, 'a shell.js (panel) tiez')
 end

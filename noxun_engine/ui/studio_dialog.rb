@@ -30,9 +30,10 @@ module Noxun
 
       # ZAVAZNY whitelist sekcii Studia. ŠT-1a priniesla Kusovnik, ŠT-1b
       # KONTROLU (`ctrl`), ŠT-1c PR A NAKUP KOVANIA (`buy`), ŠT-1c PR B1
-      # ROZPOCET (`budget`). JS zrkadlo `NXShell.STUDIO_SECTIONS` je pohodlie,
-      # nie ochrana (zhodu strazi guard test): autoritou je VZDY Ruby.
-      SECTIONS = %w[bom ctrl buy budget].freeze
+      # ROZPOCET (`budget`) a PR B2 CENOVU PONUKU (`offer`). JS zrkadla
+      # (`studio.js`, `NXShell.STUDIO_SECTIONS`) su pohodlie, nie ochrana
+      # (zhodu strazi guard test): autoritou je VZDY Ruby.
+      SECTIONS = %w[bom ctrl buy budget offer].freeze
 
       # PREMOSTENIA (audit #2) — polozky navigacie, ktorych obsah zatial zije
       # v inom okne. Kluc je meno polozky navigacie, hodnota tab okna Vyroba.
@@ -195,8 +196,8 @@ module Noxun
                                                                      repush: repush_proc)
         end
 
-        # Zakaznicka cenova ponuka (XLSX) — v PR B1 este export SEKCIE Rozpocet
-        # (nahlad CP je jej sucastou); vlastnu sekciu `offer` prinesie PR B2.
+        # Zakaznicka cenova ponuka (XLSX) — od ŠT-1c PR B2 export SEKCIE
+        # `offer` (vlastna sekcia Studia); telo je v jadre ako ostatne exporty.
         def do_cp_xlsx(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           ProductionCore.do_cp_xlsx(Sketchup.active_model, data, generation: @generation,
@@ -569,8 +570,14 @@ module Noxun
         # ŠT-1c PR B1: XLSX rozpoctu a zakaznicka cenova ponuka — TEN ISTY flush
         # handshake ako VEPO/CSV, vlastnym kanalom Studia (odpoved musi prist do
         # TOHTO okna; cudzi push by mu klik odmietol).
+        #
+        # Review PR #198 #7: payload sa berie TOLERANTNE (`Hash` alebo JSON
+        # retazec) ako vsade inde v tomto subore. Ked panel nezije, vetva
+        # `else` odovzdava uz ROZPARSOVANY Hash — a `JSON.parse(hash.to_s)` by
+        # na nom spadol; rovnaka pastka by cakala na kazde volanie z testu ci
+        # z ineho Ruby miesta.
         def handle_budget_xlsx(payload)
-          data = JSON.parse(payload.to_s)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           if Panel.dialog_alive?
             Panel.js("NX.studioRelayBudget(#{data.to_json})")
           else
@@ -579,7 +586,7 @@ module Noxun
         end
 
         def handle_cp_xlsx(payload)
-          data = JSON.parse(payload.to_s)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           if Panel.dialog_alive?
             Panel.js("NX.studioRelayCp(#{data.to_json})")
           else

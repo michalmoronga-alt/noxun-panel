@@ -50,8 +50,8 @@ NxTest.test('ST-1a: SECTIONS je whitelist v RUBY a JS je jeho ZRKADLO') do
   # ŠT-1b pridala sekciu Kontrola (`ctrl`) — dovtedy premostenie do okna Vyroba.
   # ŠT-1c PR A pridala Nakup kovania (`buy`) — presun tabu Kovanie 1:1 (Š7).
   # ŠT-1c PR B1 pridala Rozpocet (`budget`) — POSLEDNY tab okna Vyroba.
-  NxTest.assert_equal(%w[bom ctrl buy budget], rb,
-                      'v Studiu ziju sekcie Kusovník, Kontrola, Nákup kovania a Rozpočet')
+  NxTest.assert_equal(%w[bom ctrl buy budget offer], rb,
+                      'v Studiu ziju sekcie Kusovník, Kontrola, Nákup kovania, Rozpočet a Cenová ponuka')
   NxTest.assert_equal(rb, js, 'JS zoznam sekcii sa nesmie rozist s Ruby autoritou')
   NxTest.assert_equal(rb, Noxun::Engine::StudioDialog::SECTIONS,
                       'konstanta a zdrojak hovoria to iste')

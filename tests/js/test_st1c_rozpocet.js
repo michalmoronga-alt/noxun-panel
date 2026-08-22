@@ -121,8 +121,11 @@ const body = els.secbody.innerHTML;
 // LISTA sekcie
 ok(tools.indexOf('data-bud="vat"') > -1, 'lista nesie prepinac DPH');
 ok(tools.indexOf('data-bud="mode"') > -1, 'aj cenovy rezim');
-ok(tools.indexOf('data-bud="xlsx"') > -1 && tools.indexOf('data-bud="cp"') > -1,
-   'aj oba exporty');
+ok(tools.indexOf('data-bud="xlsx"') > -1, 'aj export XLSX rozpoctu');
+// ŠT-1c PR B2: export cenovej ponuky sa PRESUNUL do listy sekcie `offer` —
+// v liste Rozpoctu uz nema co robit (a lista tym schudla o najdlhsi popisok).
+ok(tools.indexOf('data-bud="cp"') === -1,
+   'export cenovej ponuky uz v liste Rozpoctu NIE JE (presunul sa do sekcie Ponuka)');
 
 // TELO sekcie
 ok(body.indexOf('class="btotal"') > -1, 'telo nesie velky sucet zakazky');
@@ -135,10 +138,15 @@ ok(body.indexOf('data-bud="ctrl"') > -1, 'jantarovy chip vedie do sekcie Kontrol
   }
 );
 ok(body.indexOf('Zaokrúhlenie ponuky') > -1, 'riadok zaokruhlenia tiez');
-ok(body.indexOf('Cenová ponuka — náhľad') > -1,
-   'nahlad cenovej ponuky je v PR B1 este SUCASTOU sekcie Rozpocet');
+// ŠT-1c PR B2: nahlad CP sa odstahoval do vlastnej sekcie — v Rozpocte ostal
+// LEN tenky preklik (ziadna druha kopia tabulky, ktora by sa casom rozisla).
+ok(body.indexOf('Cenová ponuka — náhľad') === -1,
+   'nahlad cenovej ponuky uz v tele Rozpoctu NIE JE');
+ok(body.indexOf('data-bud="offer"') > -1, 'ostal po nom tenky preklik do sekcie Ponuka');
 ok(body.indexOf('data-bud="draft" data-kind="custom"') > -1,
-   'inline draft vlastnej polozky ostava 1:1 (D-15 modal robi az PR B2)');
+   'tlacidlo „Pridať položku" ostava na svojom mieste (otvara D-15 modal)');
+ok(body.indexOf('class="bdraft"') === -1,
+   'inline draft v tele sekcie ZANIKOL — pridavanie je D-15 modal');
 ok(body.indexOf('class="bfoot"') === -1, 'patka s exportmi zanikla — exporty su v liste');
 ok(body.indexOf('data-bud="vat"') === -1, 'a prepinac DPH v tele NIE JE (zdvojenie by klamalo)');
 
