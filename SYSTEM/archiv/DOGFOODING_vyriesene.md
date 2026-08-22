@@ -10,7 +10,11 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
-### D-87 — vizuálne zobrazenie SMERU štruktúry v modeli (vyriešené 21.8.2026, dávka K2, PR #188, v0.7.26)
+### D-50 — OCL inšpirácia UI/UX (vyriešené 22.8.2026, ŠTÚDIO KONCEPT + dávka ŠT-1a, PR #191 + #192 + #193, v0.7.30)
+
+**Pôvodné znenie (Michal 31.7. večer):** pár detailov z OCL flow prevziať; najprv slovné prebratie (sedenie), potom zapracovanie.
+
+**Riešenie:** slovné prebratie prebehlo v dvoch krokoch — výber vzorov v UI20 podklade (§2 „OCL vzory — prevziať/neprevziať") a ich schválenie v sektorovej debate ŠTÚDIO KONCEPTU (21.–22.8., mockup kolo 1). Zapracovanie doručila dávka ŠT-1a: **skupiny kusovníka podľa materiálu** so zbaliteľnými hlavičkami a medzisúčtami, **hover akcie riadku** (oko · ceruzka), **voliteľné stĺpce** (Lucia nemusí vidieť to, čo Michal), **klik na riadok = zvýraznenie v modeli** ako štandard tabuliek a **per-sekčné exporty** (žiadna globálna lišta). Vedome NEPREVZATÉ (zapísané v kontrakte): Generate/Refresh tlačidlo ako režim (Noxun má živý push; ručné „Obnoviť" v Štúdiu je doplnok, nie režim), materiály cez SketchUp Materials, nárezový plán UI (fáza 2). Zvyšné OCL-inšpirované sekcie (kusovník má, ostatné preberajú vzor) prídu s dávkami ŠT-1b…ŠT-4 — vzor je však ustanovený a D-50 tým je vybavené.
 
 **Pôvodné znenie D-87 · Vizuálne zobrazenie SMERU štruktúry v modeli** (Michal 6.8., test dávky E na reálnej zákazke) — tlačidlo (kontext Kontroly/Výroby), ktoré po zapnutí nakreslí na dielce **čiary v smere dekoru/štruktúry** — rýchla vizuálna kontrola orientácie celej zákazky pred odoslaním do výroby (dnes sa smer dá overiť len po jednom dielci v kartách). Návrh: overlay **vzorom kontroly hrán D-104/D-105** (Sketchup::Overlay — kreslí sa NAD modelom, žiadny krok Späť, po vypnutí v modeli nič neostane), čiary z `grain_direction` dielca. *(Presunuté 20.8. zo skupiny RENDER M-R do bloku KRESBA ako dávka K2 — bez vizuálnej kontroly nemá D-108 ako overiť výsledok.)*
 
