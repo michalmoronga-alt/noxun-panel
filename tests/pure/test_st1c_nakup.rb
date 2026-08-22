@@ -90,6 +90,36 @@ NxTest.test('ŠT-1c: styly nakupneho zoznamu sa PRESUNULI (nie skopirovali)') do
                 'farby su VYHRADNE cez --nx-* tokeny (hex by v teme Lucia svietil)')
 end
 
+NxTest.test('ŠT-1c (review P3): sekcia Nakup nesľubuje klik tam, kde sa nic nedeje') do
+  # `.bomtab tbody tr` ma kvoli Kusovniku ruku aj hover. V Nakupe reaguje LEN
+  # riadok generiky — kategorie, sucet, polozky setov a jantarove riadky nie.
+  # Tabulky sekcie preto nesu marker `.hwtab` a afordancia sa vracia adresne.
+  NxTest.assert_equal(3, S1C_STUDIO_JS.scan(/class="bomtab hwtab"/).length,
+                      'vsetky TRI tabulky sekcie nesu marker (sety · bez kodov · generika)')
+  NxTest.assert(S1C_STUDIO_HTML.include?('.bomtab.hwtab tbody tr { cursor: default; }'),
+                'riadok sekcie standardne NEMA ruku')
+  NxTest.assert(S1C_STUDIO_HTML.include?('.bomtab.hwtab tbody tr.hwrow { cursor: pointer; }'),
+                'ruku dostane VYHRADNE riadok, ktory naozaj reaguje')
+  NxTest.assert(S1C_STUDIO_HTML.include?('.bomtab.hwtab tbody tr:hover { background: none; }'),
+                'a rovnako sa vracia aj podsvietenie pri prejdeni mysou')
+  # Kusovnik vedla NESMIE o afordanciu prist — marker je len na tabulkach Nakupu.
+  NxTest.assert(S1C_STUDIO_HTML.include?('.bomtab tbody tr { cursor: pointer; }'),
+                'povodne pravidlo Kusovnika ostava nedotknute')
+end
+
+NxTest.test('ŠT-1c (review P3): sekcia Nakup ma vlastnu cestu k cerstvym cislam') do
+  tools = S1C_STUDIO_JS[/if \(studioSec === 'buy'\)\{.*?\n    \}/m].to_s
+  NxTest.refute(tools.empty?, 'lista sekcie sa nasla')
+  NxTest.assert(tools.include?('id="hwCsvBtn"'), 'export je v liste sekcie (kontrakt §3)')
+  NxTest.assert(tools.include?('id="refreshBtn"'),
+                'a je tam aj „Obnoviť" — prestavba skrinky sem sama nedorazi, ' \
+                'takze bez neho by sa objednavalo zo starych poctov')
+  NxTest.assert(S1C_STUDIO_JS.include?("t.closest('#refreshBtn')"),
+                'tlacidlo ma handler (ten isty ako v Kusovniku)')
+  NxTest.assert(S1C_STUDIO_JS.include?("studioSec === 'buy' ? 'Prepočítavam nákupný zoznam…'"),
+                'status hovori o TEJ sekcii, na ktoru sa pouzivatel pozera')
+end
+
 # --- 2) obohatenie generiky zije v ZDIELANOM jadre (audit #3) -----------------
 
 NxTest.test('ŠT-1c: `label`/`params_label` sklada JADRO, nie okno (audit #3)') do
@@ -131,6 +161,8 @@ NxTest.test('ŠT-1c: telo CSV kovania je v jadre a obe okna su len obaly') do
   %i[do_export do_select do_hw_csv].each do |m|
     NxTest.assert(Noxun::Engine::StudioDialog.respond_to?(m),
                   "StudioDialog.#{m} je VEREJNY (vola ho relay z panela)")
+    # DOCASNE — obal v okne Vyroba zanika v ŠT-1c PR B3 spolu s celym oknom
+    # (review #4). Dovtedy ho vola relay `production_do_hw_csv` z panela.
     NxTest.assert(Noxun::Engine::ProductionDialog.respond_to?(m),
                   "ProductionDialog.#{m} ostava verejny (relay `production_do_hw_csv`)")
   end
@@ -154,6 +186,16 @@ NxTest.test('ŠT-1c (audit #15): CSV kovania dostal GENERACNY GUARD — vedoma z
                 'nazov projektu je SERVEROVA autorita (z DOM nechodi)')
   NxTest.assert(body.include?('fresh_collect(model)'),
                 'zoznam sa pocita z CERSTVEHO modelu, nie z payloadu okna')
+  # Review P3: komentar nesmie slubovat ochranu, ktoru guard nema — prestavba
+  # skrinky z Inspectora generaciu NEZDVIHA (chyta ju az cerstvy zber nizsie).
+  note = S1C_CORE_RB[/VEDOMA ZMENA \(audit #15\).*?def do_hw_csv/m].to_s
+  NxTest.refute(note.empty?, 'komentar guardu sa nasiel')
+  NxTest.refute(note.include?('prestavana skrinka'),
+                'komentar netvrdi, ze guard chyta prestavbu skrinky (nechyta)')
+  NxTest.assert(note.include?('PREPNUTY DOKUMENT'),
+                'a pomenuje, co guard NAOZAJ chyta')
+  NxTest.assert(note.include?('fresh_collect'),
+                'aj to, co je poistkou proti zastaranym poctom (cerstvy zber)')
   # Klient posiela `gen` — bez neho by guard odmietol KAZDY export.
   NxTest.assert(S1C_STUDIO_JS.include?('sketchup.hw_csv_export(JSON.stringify({ gen: ST.gen }))'),
                 'lista sekcie posiela generaciu okna')

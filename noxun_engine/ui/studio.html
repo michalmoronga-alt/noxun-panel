@@ -5,7 +5,7 @@
      to isté jadro, aké číta okno Výroba).
      Vizuálna referencia: SYSTEM/zdroje/ui20/mockup_studio.html -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.7.33">
+<link rel="stylesheet" href="css/panel.css?v=0.7.34">
 <style>
   /* Štýly sú ZÁMERNE inline v studio.html (rovnaký dôvod ako production.html):
      panel.css je zdieľaný s Inspectorom a rozloženie tohto okna doňho nepatrí.
@@ -219,6 +219,19 @@
                         color: var(--nx-ink-label); padding: 2px 6px; }
   .bomtab tr.hwmiss td { color: var(--nx-warn-fg); }
   .bomtab tr.hwsum td { font-weight: 600; border-top: 2px solid var(--nx-border-strong); }
+  /* Review P3 — ŽIADNA FALOŠNÁ AFORDANCIA. `.bomtab tbody tr` má kvôli
+     Kusovníku ruku aj hover, lenže v tejto sekcii je klikateľný LEN riadok
+     generiky (`.hwrow`, označí vlastníka v modeli). Kategórie, súčet, položky
+     zoznamu setov, riadky mimo katalógu ani zoznam „Bez kódov" klikom nerobia
+     NIČ — ruka tam sľubuje akciu, ktorá neexistuje (najhoršie pri jantárovom
+     riadku, kde používateľ čaká opravu). Tabuľky sekcie preto nesú marker
+     `.hwtab` a ruku dostane VÝHRADNE to, čo naozaj reaguje; Kusovník vedľa
+     ostáva nedotknutý (to je pôvodné správanie okna Výroba, kde ruku mali
+     len `tr.bomrow` a `tr.hwrow`). */
+  .bomtab.hwtab tbody tr { cursor: default; }
+  .bomtab.hwtab tbody tr:hover { background: none; }
+  .bomtab.hwtab tbody tr.hwrow { cursor: pointer; }
+  .bomtab.hwtab tbody tr.hwrow:hover { background: var(--nx-select-bg-soft); }
 
   /* ---------- súčtový riadok (čísla zo servera) ---------- */
   .totrow { display: flex; align-items: center; gap: 10px; padding: 8px 10px;
@@ -241,19 +254,19 @@
 </div>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.7.33"></script>
+<script src="js/errors.js?v=0.7.34"></script>
 <!-- D-51/D-77: minimálna OBSAHOVÁ veľkosť okna pri otvorení (js/win_fit.js).
      Navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami a stĺpcom akcií — v užšom
      okne končí pravá časť riadku mimo. Trojica NX_FIT_MIN → width/height →
      min_width/min_height je v docs/UI_DIZAJN.md (tabuľka D-51). -->
 <script>window.NX_FIT_MIN = { w: 1060, h: 640 };</script>
-<script src="js/win_fit.js?v=0.7.33"></script>
+<script src="js/win_fit.js?v=0.7.34"></script>
 <!-- Sprite ikon (žiadne emoji v ovládacích prvkoch). Musí byť PRED studio.js —
      navigácia aj hover akcie riadkov používajú <use href="#i-…">. -->
-<script src="js/icons.js?v=0.7.33"></script>
+<script src="js/icons.js?v=0.7.34"></script>
 <!-- ŠT-1b: ZDIELANE 3-stavove nastavenie kontroly hran. TEN ISTY subor nacitava
      aj Inspector (rohovy trojuholnik pri ABS kontrole v raile) — jeden markup,
      jeden stav. Musi byt PRED studio.js (lista sekcie Kontrola ho vola pri
      renderi). Okno Vyroba ho uz nenacitava — prepinace su tu. -->
-<script src="js/edge_menu.js?v=0.7.33"></script>
-<script src="js/studio.js?v=0.7.33"></script>
+<script src="js/edge_menu.js?v=0.7.34"></script>
+<script src="js/studio.js?v=0.7.34"></script>

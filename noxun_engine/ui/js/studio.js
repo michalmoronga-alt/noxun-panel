@@ -382,7 +382,7 @@
       if (!rows.length){
         h += '<div class="muted">Žiadne namapované kovanie' + ((hs.unmapped || []).length ? '' : ' (model nemá kovanie)') + '.</div>';
       } else {
-        h += '<table class="bomtab"><thead><tr><th>Kód</th><th>Názov</th><th>ks</th><th>MJ</th><th>€ s DPH</th><th>Spolu</th></tr></thead><tbody>';
+        h += '<table class="bomtab hwtab"><thead><tr><th>Kód</th><th>Názov</th><th>ks</th><th>MJ</th><th>€ s DPH</th><th>Spolu</th></tr></thead><tbody>';
         var cat = null;
         rows.forEach(function(r){
           var c = r.missing ? 'MIMO KATALÓGU' : (r.category || '—');
@@ -403,7 +403,7 @@
         // ŠT-1c: pôvodný text hovoril „detail v tabe Kontrola" — Kontrola je od
         // ŠT-1b SEKCIA tohto okna, takže by veta klamala o mieste.
         h += '<div class="hwsec hwsec-warn"><span>Bez kódov (' + un.length + ') — nenacenené, detail v sekcii Kontrola</span></div>'
-           + '<table class="bomtab"><tbody>';
+           + '<table class="bomtab hwtab"><tbody>';
         un.forEach(function(u){
           // H1b: krátky SK text dôvodu skladá SERVER (HardwareSets.unmapped_reason_sk
           // → payload 'reason_sk') — ten istý text ide aj do CSV. JS už žiadny
@@ -424,7 +424,7 @@
       h += '<div class="muted">Žiadne kovanie (kovanie sa počíta z pravidiel korpusov).</div>';
       return h;
     }
-    h += '<table class="bomtab"><thead><tr><th>Typ</th><th>Parametre</th><th>ks</th><th>Kde</th></tr></thead><tbody>';
+    h += '<table class="bomtab hwtab"><thead><tr><th>Typ</th><th>Parametre</th><th>ks</th><th>Kde</th></tr></thead><tbody>';
     list.forEach(function(g, i){
       // D-90: 'params_label' je SERVEROVY text („rez 597 mm") — ked ho polozka
       // ma, zobrazi sa NAMIESTO surovych key/value (JS nic neformatuje).
@@ -719,6 +719,13 @@
       box.innerHTML = '<button type="button" class="ghostbtn" id="hwCsvBtn"' +
         ' title="CSV nákupného zoznamu — počíta sa z čerstvého modelu">' +
         ico('download') + ' CSV kovania</button>' +
+        // Review P3: sekcia musí mať vlastnú cestu k čerstvým číslam. Prestavba
+        // skrinky z Inspectora sem sama nedorazí, takže bez „Obnoviť" by sa dal
+        // objednávať nákupný zoznam zo starých počtov — a odísť po ne do
+        // Kusovníka je skrytá cesta (rovnaký dôvod ako v lište Kusovníka).
+        '<button type="button" class="ghostbtn" id="refreshBtn"' +
+        ' title="Prepočítať nákupný zoznam z aktuálneho modelu">' +
+        ico('refresh-cw') + ' Obnoviť</button>' +
         '<span class="spacer"></span>' +
         '<span class="sechint">Klik na riadok generiky označí vlastníka v modeli.</span>';
       return;
@@ -1018,9 +1025,12 @@
                                         focus_inspector: !!focusInspector }));
   }
 
+  // Jeden push prináša VŠETKY sekcie, takže sa prepočíta všetko — status ale
+  // hovorí o tom, na čo sa používateľ práve pozerá (inak by po kliku v Nákupe
+  // hlásil kusovník a vyzeralo by to ako zlé tlačidlo).
   function requestRefresh(){
     if (!window.sketchup || !sketchup.refresh_bom) return;
-    NX.setStatus('Prepočítavam kusovník…', false);
+    NX.setStatus(studioSec === 'buy' ? 'Prepočítavam nákupný zoznam…' : 'Prepočítavam kusovník…', false);
     sketchup.refresh_bom('');
   }
 

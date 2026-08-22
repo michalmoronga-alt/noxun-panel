@@ -641,10 +641,15 @@ module Noxun
       # -> CERSTVY zber modelu -> vyber suboru -> zapis.
       #
       # VEDOMA ZMENA (audit #15): export dostal GENERACNY GUARD, ktory predtym
-      # NEMAL. Je to NAKUPNY dokument — objednava sa podla neho kovanie, takze
-      # nesmie vzniknut z tlacidla v okne, ktore uz nezobrazuje aktualne data
-      # (medzitym prepnuty model, prestavana skrinka). Ostatne tri exporty ho
-      # maju odjakziva; odmietnutie nie je tiche — okno sa obnovi a povie to.
+      # NEMAL — ako jediny zo styroch exportov. Zosuladenie, nie nova ochrana:
+      # CO GUARD NAOZAJ CHYTA je klik z okna, ktoreho payload uz neplati —
+      # medzitym PREPNUTY DOKUMENT (`on_model_changed` zdvihne generaciu) alebo
+      # push, ktory si okno medzitym vyziadalo odinakial (refresh, zmena
+      # katalogu, zapis z ineho okna). CO NECHYTA: prestavbu skrinky
+      # z Inspectora — tá generaciu NEZDVIHA. Na tú je poistkou to, ze zoznam
+      # sa aj tak pocita z CERSTVEHO zberu (`fresh_collect` nizsie) az v tejto
+      # metode, nie z toho, co drzi DOM. Odmietnutie nie je tiche — okno sa
+      # obnovi a povie to.
       def do_hw_csv(model, data, generation:, status:, repush:)
         unless data['gen'].to_i == generation.to_i
           repush.call
