@@ -5,7 +5,7 @@
      to isté zdieľané jadro `ProductionCore`).
      Vizuálna referencia: SYSTEM/zdroje/ui20/mockup_studio.html -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.7.44">
+<link rel="stylesheet" href="css/panel.css?v=0.7.46">
 <style>
   /* Štýly sú ZÁMERNE inline v studio.html (rovnaký dôvod, aký mala production.html):
      panel.css je zdieľaný s Inspectorom a rozloženie tohto okna doňho nepatrí.
@@ -495,33 +495,229 @@
 <!-- D-15: kotva zdieľaných modalov (js/nx_modal.js). Modal žije MIMO tela
      sekcie, takže ho prekreslenie rozpočtu po zápise nezhodí. -->
 <div id="nxModalRoot"></div>
+
+<!-- ŠT-2a: modály sekcie MATERIÁLY. Ten istý dôvod ako pri #nxModalRoot —
+     žijú MIMO #secbody, takže ich neshodí ani prekreslenie sekcie, ani
+     prepnutie na Kusovník. Markup je presun 1:1 z proj_materials.html
+     (okno žije do ŠT-2b, potom ostane už len táto kópia).
+     Modály tokov, ktoré sekcia zatiaľ nevie (Demos add/diff, „Nahradiť UNI…"),
+     tu ZÁMERNE nie sú — tie sa premosťujú do okna a mŕtvy markup by len
+     sľuboval, čo sa nekreslí. Prídu s nimi v ŠT-2b. -->
+<div id="matModalRoot">
+  <!-- 2A-4b (audit B2): potvrdenie obnovy predmigračnej zálohy (NIE UI.messagebox). -->
+  <div id="mdRestoreModal" class="nxmodal" style="display:none">
+    <div class="nxmodal-card">
+      <div class="nxmodal-title">Obnoviť predmigračnú zálohu</div>
+      <div class="hint">Aktuálny katalóg sa odloží bokom (materials.rolledback-…) a nasadí sa záloha <b>materials.pre-schema-2.json</b> z času pred migráciou. Nič sa nemaže.</div>
+      <div class="nxmodal-warn">Pri najbližšom štarte SketchUpu sa migrácia jednorazovo preskočí — katalóg ostane v pôvodnom formáte na opravu. Ďalší štart už migruje normálne.</div>
+      <div class="btnrow">
+        <button class="primary" onclick="mdRestoreConfirm()">Obnoviť</button>
+        <button class="ghostbtn" onclick="mdRestoreClose()">Zrušiť</button>
+      </div>
+    </div>
+  </div>
+  <!-- V0.6 M-A2 (Halifax lekcia / audit F9): potvrdenie mazania variantu
+       s rozpisom zo SERVERA (delete_preflight). -->
+  <div id="mdDeleteModal" class="nxmodal" style="display:none">
+    <div class="nxmodal-card">
+      <div class="nxmodal-title">Zmazať z katalógu?</div>
+      <div id="mdDelBody"></div>
+      <div class="btnrow">
+        <button class="danger" id="mdDelConfirmBtn" onclick="mdDeleteConfirm()">Zmazať</button>
+        <button class="ghostbtn" onclick="mdDeleteClose()">Zrušiť</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ŠT-2a: TELO sekcie MATERIÁLY. Je to ŠABLÓNA, nie živý obsah: `matRenderBody`
+     ju naklonuje RAZ a ten istý uzol potom putuje do #secbody a späť. Vďaka tomu
+     prežije rozpísaný formulár „Nový dekor" aj rozpísaná bunka ceny prepnutie
+     sekcie — a hlavne ich nezmaže push zo servera (audit #2).
+     Obsah je presun 1:1 z proj_materials.html BEZ hornej lišty `.mdbar` —
+     hľadanie, zoskupenie a pridávanie patria do LIŠTY sekcie (`matToolsHtml`,
+     audit #17). Bannery ostávajú prvými riadkami obsahu. -->
+<template id="matBodyTpl">
+  <!-- 2A-4b (audit B4/O1): READ-ONLY banner — katalóg v núdzovom režime. -->
+  <div id="mdRoBanner" class="mdbanner mdbanner-ro" style="display:none">
+    <svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>
+    <span id="mdRoText">…</span>
+    <button class="ghostbtn" id="mdRoRestoreBtn" onclick="mdRestoreOpen()">Obnoviť predmigračnú zálohu</button>
+  </div>
+  <!-- 2A-4b (audit O2): pásky bez štruktúry a bez universal — picker ich nevyberie. -->
+  <div id="mdEdgeBanner" class="mdbanner" style="display:none">
+    <svg class="ic" aria-hidden="true"><use href="#i-info"/></svg>
+    <span id="mdEdgeBannerText">…</span>
+  </div>
+  <!-- GH #93 P2: dôvod nevykonaného cutoveru — katalóg beží ďalej, mutácie NEblokuje. -->
+  <div id="mdCutoverBanner" class="mdbanner" style="display:none">
+    <svg class="ic" aria-hidden="true"><use href="#i-info"/></svg>
+    <span id="mdCutoverBannerText">…</span>
+  </div>
+
+  <!-- D-42 PR B: predvoľby zbalené do <details> — sekcia je primárne KATALÓG,
+       projektové predvoľby sa nastavujú občas (vertikálny priestor). -->
+  <details>
+    <summary>Predvoľby projektu (korpus · čelá · chrbát)</summary>
+    <div class="body">
+      <div class="hint">Predvolené materiály pre <b>všetky skrinky projektu</b>, ktoré nemajú vlastný materiál (dedenie projekt → skrinka → dielec). Zmena sa hneď premietne do všetkých dediacich skriniek (1 krok Späť).</div>
+      <div class="matrow"><label>Korpus</label><select id="md_body" onchange="onProjMaterial('default_material_id', this.value)"></select></div>
+      <!-- D-46: potvrdzovacia lišta — ukazuje ju VÝHRADNE server (MD.confirmDefault). -->
+      <div class="mdconfirm" id="mdConfirmBar" style="display:none">
+        <span id="mdConfirmText"></span>
+        <button class="primary" onclick="mdConfirmProject()">Potvrdiť</button>
+        <button class="ghostbtn" onclick="mdCancelProject()">Zrušiť</button>
+      </div>
+      <div class="matrow"><label>Čelá</label><select id="md_front" onchange="onProjMaterial('default_front_material_id', this.value)"></select></div>
+      <div class="matrow"><label>Chrbát</label><select id="md_back" onchange="onProjMaterial('default_back_material_id', this.value)"></select></div>
+    </div>
+  </details>
+
+  <fieldset>
+    <legend>Katalóg podľa dekorov</legend>
+    <!-- Mriežka dlaždíc ALEBO detail dekoru (drill-in) — prepína mdView v JS. -->
+    <div id="mdDecorList"></div>
+    <!-- D-41: batch formulár — dekor + vlastnosti RAZ, hrúbky a ABS ako zoznamy. -->
+    <div id="mdDecorForm" style="display:none">
+      <div class="row"><label>Číslo dekoru *</label><input id="nd_decor" type="text" placeholder="napr. K009 (alebo vlastný názov)"><span class="unit"></span></div>
+      <div class="row"><label>Názov</label><input id="nd_decor_name" type="text" placeholder="napr. Dub Halifax prírodný — voliteľné"><span class="unit"></span></div>
+      <div class="row"><label>Výrobca</label><input id="nd_manufacturer" type="text" placeholder="napr. Egger"><span class="unit"></span></div>
+      <div class="row"><label>Štruktúra</label><input id="nd_structure" type="text" placeholder="napr. PW / ST9 — voliteľné" oninput="mdCommonStructureChanged()"><span class="unit"></span></div>
+      <div class="row"><label>Typ dosiek</label><input id="nd_type" type="text" value="DTDL" onchange="mdTypeChanged()"><span class="unit"></span></div>
+      <div class="row"><label>Smer dekoru</label>
+        <select id="nd_grain">
+          <option value="length">Po dĺžke</option>
+          <option value="width">Po šírke</option>
+          <option value="none">Bez smeru</option>
+        </select><span class="unit"></span>
+      </div>
+      <!-- D-82: farba je vlastnosť SKUPINY — zadáva sa len pri zakladaní dekoru. -->
+      <div class="row" id="nd_color_row"><label>Farba</label><input id="nd_color" type="color" value="#d8c4a0"><span class="unit"></span></div>
+      <!-- D-44 (audit F5): data-key = STABILNÁ identita čipu (nie textContent). -->
+      <div class="row"><label>Dosky</label>
+        <div class="mdpcrow" id="nd_sheet_chips">
+          <span class="mdpc" data-key="18" data-th="18">18</span>
+          <span class="mdpc" data-key="36" data-th="36">36</span>
+          <span class="mdpc" data-key="PD 38" data-type="PD" data-th="38">PD 38</span>
+          <span class="mdpc" data-key="16" data-th="16">16</span>
+          <span class="mdpc" data-key="25" data-th="25">25</span>
+        </div><span class="unit"></span>
+      </div>
+      <div class="row" id="nd_fmt_row" style="display:none"><label>Detail dosiek</label>
+        <div class="mdfmtrow" id="nd_fmt_fields"></div><span class="unit">mm</span>
+      </div>
+      <div class="row"><label>ABS</label>
+        <div class="mdpcrow" id="nd_edge_chips">
+          <span class="mdpc" data-key="23/1" data-w="23" data-t="1">23/1</span>
+          <span class="mdpc" data-key="43/1" data-w="43" data-t="1">43/1</span>
+          <span class="mdpc" data-key="43/2" data-w="43" data-t="2">43/2</span>
+        </div><span class="unit"></span>
+      </div>
+      <div class="row" id="nd_abs_row" style="display:none"><label>Detail ABS</label>
+        <div class="mdfmtrow" id="nd_abs_fields"></div><span class="unit"></span>
+      </div>
+      <div class="row"><label>Ďalšie hrúbky</label><input id="nd_ths" type="text" placeholder="voliteľné, napr. 18.5, 9,2" oninput="mdRenderExtraFmtRow()"><span class="unit">mm</span></div>
+      <div class="row" id="nd_xfmt_row" style="display:none"><label>Formát výnimiek</label>
+        <div class="mdfmtrow" id="nd_xfmt_fields"></div><span class="unit">mm</span>
+      </div>
+      <div class="row"><label>Ďalšie ABS</label><input id="nd_abs" type="text" placeholder="voliteľné, napr. 28/2, 23/0,8"><span class="unit">š/hr</span></div>
+      <div class="hint">Klikaj čipy, výnimky dopíš — oddeľuj medzerou za čiarkou, desatiny 9,2 aj 9.2. Štruktúru a formát uprav pri čipe (PD/zástena formát zadaj — je súčasť identity). Dopísané výnimky preberú spoločnú štruktúru. Ceny a kódy doplníš v detaile dekoru.</div>
+      <div class="btnrow">
+        <button class="primary" onclick="mdSaveDecorBatch()">Vytvoriť</button>
+        <button class="ghostbtn" onclick="mdCloseForms()">Zrušiť</button>
+      </div>
+    </div>
+    <!-- Edit dosky (create beží cez Nový dekor / + variant) -->
+    <div id="mdSheetForm" style="display:none">
+      <div class="row"><label>Dekor</label><input id="ms_decor" type="text" placeholder="napr. Dub Halifax prírodný"><span class="unit"></span></div>
+      <div class="hint" id="ms_decor_hint" style="display:none">Dekor je identita skupiny — premení sa tlačidlom Premenovať na karte dekoru.</div>
+      <div class="row"><label>Typ *</label><input id="ms_type" type="text" placeholder="DTDL / MDF / HDF / kompakt" oninput="mdSheetTypeChanged()"><span class="unit"></span></div>
+      <div class="hint" id="ms_type_warn" style="display:none"></div>
+      <div class="row"><label>Hrúbka *</label><input id="ms_thickness" type="text"><span class="unit">mm</span></div>
+      <div class="hint" id="ms_thick_hint" style="display:none">Hrúbka definuje variant — pre inú hrúbku pridaj nový materiál.</div>
+      <div class="row"><label>Smer dekoru</label>
+        <select id="ms_grain">
+          <option value="length">Po dĺžke</option>
+          <option value="width">Po šírke</option>
+          <option value="none">Bez smeru</option>
+        </select><span class="unit"></span>
+      </div>
+      <div class="row"><label>Cena</label><input id="ms_price" type="text" placeholder="nezadaná"><span class="unit">€/m²</span></div>
+      <div class="row"><label>Kód</label><input id="ms_code" type="text" placeholder="dodávateľský kód"><span class="unit"></span></div>
+      <div class="row"><label>Dodávateľ</label><input id="ms_supplier" type="text" placeholder="napr. Demos"><span class="unit"></span></div>
+      <div class="row" id="ms_sd_row"><label>Dekor u dodávateľa</label><input id="ms_supplier_decor" type="text" placeholder="napr. F8001"><span class="unit"></span></div>
+      <div class="hint" id="ms_sd_hint">Len ak dodávateľ používa iné číslo dekoru — napr. Egger kompakt F8001 pre dekor F800.</div>
+      <div class="row"><label>Demos URL</label><input id="ms_demos_url" type="text" placeholder="https://www.demos-trade.sk/…"><span class="unit"></span></div>
+      <div class="hint" id="ms_demos_hint" style="display:none"></div>
+      <div class="row"><label>Rodina</label><input id="ms_family" type="text" placeholder="voliteľné"><span class="unit"></span></div>
+      <div class="row"><label>Výrobca</label><input id="ms_manufacturer" type="text" placeholder="voliteľné" disabled><span class="unit"></span></div>
+      <div class="hint" id="ms_man_hint" style="display:none">Výrobca je vlastnosť dekoru — mení sa pre celú skupinu (tlačidlo Výrobca na karte).</div>
+      <div class="row"><label>Formát platne</label><input id="ms_sheet_l" type="text" placeholder="2800" class="sheetdim"><span class="sheetx">×</span><input id="ms_sheet_w" type="text" placeholder="2070" class="sheetdim"><span class="unit">mm</span></div>
+      <div class="row" id="ms_back_row" style="display:none"><label>Rubový dekor</label><input id="ms_back_decor" type="text" placeholder="napr. K552" class="sheetdim"><input id="ms_back_structure" type="text" placeholder="štruktúra" class="sheetdim"><span class="unit"></span></div>
+      <div class="row" id="ms_pd_row" style="display:none"><label>Hranová úprava</label><select id="ms_pd_edge"><option value="">(neurčená — bežné ABS)</option><option value="postforming">Postforming (neolepuje sa)</option><option value="abs">ABS rovná hrana</option></select><span class="unit"></span></div>
+      <div class="hint" id="ms_back_hint" style="display:none">Zástena máva každú stranu iný dekor (líce/rub). Rub je identita variantu — po vyplnení sa nemení.</div>
+      <div class="btnrow">
+        <button class="primary" onclick="mdSaveSheet()">Uložiť</button>
+        <button class="ghostbtn" onclick="mdCloseForms()">Zrušiť</button>
+      </div>
+    </div>
+    <!-- Edit ABS pásky (šírka aj hrúbka sú identita variantu — pri edite nemenné) -->
+    <div id="mdEdgeForm" style="display:none">
+      <div class="row"><label>Dekor</label><input id="me_decor" type="text"><span class="unit"></span></div>
+      <div class="hint" id="me_decor_hint" style="display:none">Dekor je identita skupiny — premení sa tlačidlom Premenovať na karte dekoru.</div>
+      <div class="row"><label>Šírka</label><input id="me_width" type="text" disabled placeholder="—"><span class="unit">mm</span></div>
+      <div class="row"><label>Hrúbka *</label>
+        <select id="me_thickness"><option value="0.4">0,4</option><option value="0.8">0,8</option><option value="1.0">1,0</option><option value="1.2">1,2</option><option value="1.5">1,5</option><option value="2.0">2,0</option></select><span class="unit">mm</span>
+      </div>
+      <div class="row"><label>Cena</label><input id="me_price" type="text" placeholder="nezadaná"><span class="unit">€/bm</span></div>
+      <div class="row"><label>Kód</label><input id="me_code" type="text" placeholder="dodávateľský kód"><span class="unit"></span></div>
+      <div class="row"><label>Dodávateľ</label><input id="me_supplier" type="text" placeholder="napr. Demos"><span class="unit"></span></div>
+      <div class="row"><label>Demos URL</label><input id="me_demos_url" type="text" placeholder="https://www.demos-trade.sk/…"><span class="unit"></span></div>
+      <div class="hint" id="me_demos_hint" style="display:none"></div>
+      <div class="btnrow">
+        <button class="primary" onclick="mdSaveEdge()">Uložiť</button>
+        <button class="ghostbtn" onclick="mdCloseForms()">Zrušiť</button>
+      </div>
+    </div>
+  </fieldset>
+</template>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.7.44"></script>
+<script src="js/errors.js?v=0.7.46"></script>
 <!-- D-51/D-77: minimálna OBSAHOVÁ veľkosť okna pri otvorení (js/win_fit.js).
      Navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami a stĺpcom akcií — v užšom
      okne končí pravá časť riadku mimo. Trojica NX_FIT_MIN → width/height →
      min_width/min_height je v docs/UI_DIZAJN.md (tabuľka D-51). -->
 <script>window.NX_FIT_MIN = { w: 1060, h: 640 };</script>
-<script src="js/win_fit.js?v=0.7.44"></script>
+<script src="js/win_fit.js?v=0.7.46"></script>
 <!-- Sprite ikon (žiadne emoji v ovládacích prvkoch). Musí byť PRED studio.js —
      navigácia aj hover akcie riadkov používajú <use href="#i-…">. -->
-<script src="js/icons.js?v=0.7.44"></script>
+<script src="js/icons.js?v=0.7.46"></script>
 <!-- ŠT-1b: ZDIELANE 3-stavove nastavenie kontroly hran. TEN ISTY subor nacitava
      aj Inspector (rohovy trojuholnik pri ABS kontrole v raile) — jeden markup,
      jeden stav. Musi byt PRED studio.js (lista sekcie Kontrola ho vola pri
      renderi). ŠT-1c PR B3: okno Vyroba zaniklo — prepinace su TU. -->
-<script src="js/edge_menu.js?v=0.7.44"></script>
+<script src="js/edge_menu.js?v=0.7.46"></script>
 <!-- ŠT-1c PR B2 (D-15): ZDIELANA kostra modalov („pridávačiek"). Musí byť PRED
      studio.js aj budget.js — Escape handler Štúdia sa pýta `NXModal.isOpen()`
      a rozpočet ním otvára svoje pridávačky. Ďalšie inštancie (D-69 editor
      materiálu, položka/set kovania) sa naň napoja bez kopírovania. -->
-<script src="js/nx_modal.js?v=0.7.44"></script>
-<script src="js/studio.js?v=0.7.44"></script>
+<script src="js/nx_modal.js?v=0.7.46"></script>
+<script src="js/studio.js?v=0.7.46"></script>
 <!-- ŠT-1c PR B1: sekcia ROZPOČET (Š12–Š13). MUSÍ byť AŽ ZA studio.js — číta
      jeho globálny payload `ST` a hlavne OBALUJE `NX.setStudio` (uvoľnenie
      frontu zápisov po príchode čerstvej generácie). studio.js pritom NX
      PRIRAĎUJE celý (`window.NX = {…}`), takže v opačnom poradí by obal aj
      `NX.budgetResult`/`NX.priceRefresh` prepísal a rozpočet by po prvom zápise
      zamrzol. Poradie stráži guard test (tests/pure/test_st1c_rozpocet.rb). -->
-<script src="js/budget.js?v=0.7.44"></script>
+<script src="js/budget.js?v=0.7.46"></script>
+<!-- ŠT-2a: sekcia MATERIÁLY. Ten istý súbor obsluhuje aj (zatiaľ žijúce) okno
+     „Materiály projektu" — príznak nižšie mu povie, že beží ako SEKCIA:
+     toky s dlhým behom viazaným na okno (Demos, „Nahradiť UNI…") sa v nej
+     poctivo premostia späť do okna, kým ich neprevezme ŠT-2b.
+     MUSÍ byť AŽ ZA studio.js aj budget.js — obaľuje `NX.setStudio` (rovnaký
+     dôvod ako rozpočet) a lištu/telo sekcie kreslí cez `matRenderTools`
+     a `matRenderBody`, ktoré studio.js volá cez `typeof`. Poradie stráži
+     guard test (tests/pure/test_st2a_mat.rb). -->
+<script>window.NX_MAT_SECTION = true;</script>
+<script src="js/proj_materials.js?v=0.7.46"></script>

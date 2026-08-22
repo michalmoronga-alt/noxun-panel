@@ -230,11 +230,16 @@ module Noxun
           when :ok
             # F5: novy zaznam musi byt v selectoch SKOR, nez sa posle payload
             # objektu — inak sa select po rebuilde zobrazi prazdny.
-            push_materials
+            # ŠT-2a (review #3): a ide TOU ISTOU fan-out cestou ako ABS pasky —
+            # duplak je katalogovy zapis, takze o nom musi vediet aj sekcia
+            # Materialy v Studiu (inak jej ostane stary `catalog_rev`).
+            broadcast_catalog_change
             [rec['material_id'],
              " Duplák #{fmt_mm(rec['thickness'])} mm pripravený v katalógu (globálna položka — krok Späť ju neodstráni)."]
           when :exists_regular
             # B2: identitu drzi KUPOVANA doska — pouzije sa ona, nie duplak.
+            # Katalog sa TU nemeni (nic nevzniklo), takze staci obnovit panel —
+            # plny fan-out by hlasil zmenu, ktora sa nestala.
             push_materials
             if rec
               [rec['material_id'], " Hrúbku #{fmt_mm(rec['thickness'])} mm už drží kupovaná doska — použila sa tá."]

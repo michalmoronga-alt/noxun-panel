@@ -230,6 +230,25 @@ module Noxun
           push_part_card
         end
 
+        # ŠT-2a (review #3): KATALOGOVY ZAPIS Z INSPECTORA (dovytvorena ABS
+        # paska D-41, automaticky duplak D-49) ma JEDINU fan-out cestu —
+        # `MaterialsDialog.after_catalog_change`. Doteraz si tieto miesta
+        # posielali refresh samy (`push_materials` + `MaterialsDialog.push_state`)
+        # a odvtedy, co katalog ma DVE UI, to bola diera: sekcia Materialy
+        # v Studiu o novej paske nevedela a hlavne jej ostal STARY `catalog_rev`
+        # — najblizsi zapis z nej by server odmietol hlaskou „Katalóg sa
+        # medzitým zmenil". Fan-out okrem toho zneplatnuje cache kontroly hran
+        # a obnovuje cisla Studia; kopirovat to na kazde volacie miesto by
+        # znamenalo, ze na jednom z nich to casom bude chybat.
+        #
+        # Fallback je poctivy: bez nacitaneho satelitu (headless, ciastocny
+        # load) sa aspon obnovi panel — mlcanie by bolo horsie.
+        def broadcast_catalog_change
+          return MaterialsDialog.after_catalog_change if defined?(MaterialsDialog)
+
+          push_materials
+        end
+
         # K1 (Codex #185 kolo 2, P2): CERSTVY payload karty dielca po zmene
         # KATALOGU. `NX.setMaterials` kartu prekresluje z CACHOVANEHO payloadu,
         # takze vsetko, co sklada SERVER, by ostalo stare az do dalsieho prekliku

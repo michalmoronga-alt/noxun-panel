@@ -64,6 +64,24 @@ module Noxun
       # "pouzitie v projekte") a bez projektovych predvolieb. Nikdy nezapisuje.
       # Vrati mapu {kluc skupiny => pocet kusov} pre pas "Pouzite v projekte".
       #
+      # ŠT-2a (audit #15): mapa `material_id => kluc dekorovej skupiny`. Bola
+      # vnutrom `model_decor_usage`; sekcia Materialy v Studiu ju potrebuje
+      # SAMOSTATNE — pocty „Použité v projekte" si totiz odvodzuje z UZ
+      # zozbieraneho kusovnika (`Bom.collect`), aby okno neskenovalo model
+      # DRUHYKRAT pri kazdom prepocte. Kluc je zrkadlo `mdGroupKeyOf` v JS.
+      def decor_key_by_material_id
+        schema2 = catalog_schema >= SCHEMA_GROUPS
+        out = {}
+        sheets.each do |s|
+          gid = schema2 ? s['group_id'].to_s.strip : ''
+          out[s['material_id']] = gid.empty? ? s['decor'].to_s : gid
+        end
+        out
+      rescue StandardError => e
+        Engine.log_error(e, 'Materials.decor_key_by_material_id') if defined?(Engine)
+        {}
+      end
+
       # 2A-4a (audit B3): kluc mapy je SCHEMA-AWARE — SCHEMA 1 = text dekoru
       # (dnesne UI), SCHEMA 2 = group_id (rovnake cislo dekoru dvoch vyrobcov
       # su DVE skupiny a ich pocty sa nesmu zliat; klienta karty skupiny doda
@@ -71,12 +89,7 @@ module Noxun
       def model_decor_usage(model)
         usage = Hash.new(0)
         return {} unless model && defined?(Ids)
-        schema2 = catalog_schema >= SCHEMA_GROUPS
-        key_by_id = {}
-        sheets.each do |s|
-          gid = schema2 ? s['group_id'].to_s.strip : ''
-          key_by_id[s['material_id']] = gid.empty? ? s['decor'].to_s : gid
-        end
+        key_by_id = decor_key_by_material_id
         %w[part board].each do |kind|
           Ids.each_of_kind(model, kind) do |inst|
             cfg = Store.config(inst) || {}

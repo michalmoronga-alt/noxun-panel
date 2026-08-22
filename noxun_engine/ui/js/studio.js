@@ -51,7 +51,7 @@
 
   // ZRKADLO `StudioDialog::SECTIONS` — autoritou whitelistu je RUBY, tento
   // zoznam len zabrani, aby z okna vyletela hodnota, ktora sekciu nepomenuva.
-  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer'];
+  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat'];
 
   // ŠT-1b (Š10): 3-stavove nastavenie kontroly hran je ZDIELANY komponent —
   // TEN ISTY markup kresli rail Inspectora (rohovy trojuholnik pri ABS ikone)
@@ -97,7 +97,11 @@
         disabled: 'fáza 2 — nárezový plán zatiaľ neexistuje' }
     ] },
     { grp: 'KATALÓGY', items: [
-      { id: 'mat',    ic: 'layers',   t: 'Materiály', bridge: 'zatiaľ vlastné okno — presun v ŠT-2' },
+      // ŠT-2a (Š?): Materiály sú od tejto dávky SEKCIA — prvá živá položka
+      // skupiny KATALÓGY. Okno „Materiály projektu" ešte žije (zanikne v ŠT-2b),
+      // ale navigácia doň už NEVEDIE: sekcia si ho otvára sama a len pre toky,
+      // ktoré zatiaľ nevie (Demos, „Nahradiť UNI…").
+      { id: 'mat',    ic: 'layers',   t: 'Materiály' },
       { id: 'hw',     ic: 'hammer',   t: 'Kovanie',   bridge: 'zatiaľ vlastné okno — presun v ŠT-3' },
       { id: 'rules',  ic: 'settings', t: 'Pravidlá',  bridge: 'zatiaľ vlastné okno — presun v ŠT-3' },
       { id: 'tpl',    ic: 'star',     t: 'Šablóny',   bridge: 'zatiaľ vlastné okno — presun v ŠT-3' }
@@ -117,7 +121,11 @@
     budget: { t: 'Rozpočet',
               hint: 'jediná sekcia, ktorá mení model — každá zmena = 1 krok Späť · sumy počíta server' },
     offer: { t: 'Cenová ponuka',
-             hint: 'zákaznícky pohľad na ten istý rozpočet · rečou zákazníka, bez interných kódov' }
+             hint: 'zákaznícky pohľad na ten istý rozpočet · rečou zákazníka, bez interných kódov' },
+    // ŠT-2a: hint nesie to, co v okne Materialy stal podtitul (`#mdline`) —
+    // co sekcia spravuje a co je v nej GLOBALNE (katalog) vs projektove.
+    mat: { t: 'Materiály',
+           hint: 'katalóg dekorov je spoločný pre všetky zákazky · predvoľby projektu platia pre túto' }
   };
 
   // ---------------------------------------------------------------- helpers
@@ -787,6 +795,14 @@
       else box.innerHTML = '';
       return;
     }
+    // ŠT-2a: listu sekcie Materialy kresli `js/proj_materials.js` (nacitava sa
+    // AZ ZA tymto suborom, preto cez `typeof`). Jantarovy priznak mu podavame
+    // — `staleFlag` ma jedinu autoritu, tu.
+    if (studioSec === 'mat'){
+      if (typeof matRenderTools === 'function') matRenderTools(staleFlag);
+      else box.innerHTML = '';
+      return;
+    }
     // Š10: lišta sekcie Kontrola nesie OBA prepínače (a nič iné — exporty
     // kontrola nemá). Jeden riadok, žiadny nový blok: vertikálny priestor
     // je vzácny a nastavenie hrán je overlay pod tlačidlom.
@@ -944,6 +960,15 @@
     if (studioSec === 'offer'){
       if (typeof budRenderOfferBody === 'function') budRenderOfferBody();
       else box.innerHTML = '<div class="muted">Cenová ponuka sa nenačítala (js/budget.js).</div>';
+      return;
+    }
+    // ŠT-2a (audit #2): telo sekcie Materialy si kresli `js/proj_materials.js`
+    // SAM a ZAMERNE ho tento render NEPREPISUJE — v sekcii moze byt rozpisany
+    // formular „Nový dekor" alebo rozpisana bunka ceny a `NX.setStudio` (napr.
+    // po prepocte kusovnika) ich nesmie zmazat.
+    if (studioSec === 'mat'){
+      if (typeof matRenderBody === 'function') matRenderBody();
+      else box.innerHTML = '<div class="muted">Materiály sa nenačítali (js/proj_materials.js).</div>';
       return;
     }
     if (studioSec === 'ctrl') box.innerHTML = ctrlSection();
@@ -1187,7 +1212,12 @@
   // hlásil kusovník a vyzeralo by to ako zlé tlačidlo).
   var REFRESH_STATUS = { ctrl: 'Prepočítavam kontrolu…',
                          buy: 'Prepočítavam nákupný zoznam…', budget: 'Prepočítavam rozpočet…',
-                         offer: 'Prepočítavam cenovú ponuku…' };
+                         offer: 'Prepočítavam cenovú ponuku…',
+                         // ŠT-2a: v Materiáloch sa z modelu prepočítava JEDINÉ —
+                         // koľko dielcov ktorý dekor používa (katalóg je globálny
+                         // a chodí echom). Hláška to musí povedať presne, inak
+                         // vyzerá, že sa prepočítava katalóg.
+                         mat: 'Prepočítavam použitie dekorov v projekte…' };
 
   function requestRefresh(){
     if (!window.sketchup || !sketchup.refresh_bom) return;
