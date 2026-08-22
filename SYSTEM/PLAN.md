@@ -41,7 +41,7 @@ satelit zaniká až po plnej náhrade):
 - ~~**ŠT-1a** skelet Štúdia + sekcia **Kusovník**~~ — **HOTOVÉ** (PR #192 + #193, v0.7.30, 22.8.; audit aj review „slepým subagentom" — Codex mimo; serverový názov projektu, premostenia v navigácii; vedomé odchýlky: XLSX/CSV disabled, bez stĺpca Poznámka, ABS pohľad bez cien — plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md)).
 - ~~**ŠT-1b** sekcia **Kontrola**~~ — **HOTOVÉ** (PR #195, v0.7.32, 22.8.; jedno číslo cez zdieľaný control_payload vrátane rozpočtu, tretia inštancia edge_menu, zmena lifecycle overlayov — plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md)).
 - ~~**ŠT-1c** Rozpočet + Cenová ponuka + Nákup — zánik okna Výroba~~ — **HOTOVÉ** (PR #197–#200, v0.7.40, 22.8.; 4 PR podľa auditu — bump:false generačný kontrakt, D-15 modal kostra `nx_modal.js`, nová in-SU sada rozpočtu; plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md)).
-- **ŠT-2** (M) sekcia **Materiály** + **D-69 editor** + D-15 komponent — okno Materiály zaniká.
+- **ŠT-2** (M) sekcia **Materiály** + **D-69 editor** — okno Materiály zaniká. *Rez auditom na 4 PR:* ~~2a sekcia (kanál, obsah 1:1, #205)~~ · ~~2b Demos+UNI+zánik okna (#206, v0.7.48)~~ — **HOTOVÉ**; zostáva **2c** D-69 editor (atomická `Materials.save_decor`, rozšírenie nx_modal — vlastný audit) a **2d** „Kde sa používa" + deep-link z karty dielca (in-SU povinné; smie sa odložiť za ŠT-3).
 - **ŠT-3** (M) **Kovanie · Pravidlá · Šablóny** (Š16–Š18) — tri okná zanikajú.
 - **ŠT-4** (S) **Nastavenia** (Š19) + upratanie (`open_tab` → `studioOpen` všade, docs, zánik zvyšných satelitov).
 
