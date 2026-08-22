@@ -5,7 +5,7 @@
      to isté jadro, aké číta okno Výroba).
      Vizuálna referencia: SYSTEM/zdroje/ui20/mockup_studio.html -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.7.30">
+<link rel="stylesheet" href="css/panel.css?v=0.7.31">
 <style>
   /* Štýly sú ZÁMERNE inline v studio.html (rovnaký dôvod ako production.html):
      panel.css je zdieľaný s Inspectorom a rozloženie tohto okna doňho nepatrí.
@@ -147,6 +147,60 @@
   .rowact button:hover { color: var(--nx-select); border-color: var(--nx-select); }
   .rowact .ic { width: 13px; height: 13px; }
 
+  /* ---------- ŠT-1b: sekcia KONTROLA (Š8–Š11) ----------
+     Semaforové chipy sú KLIKATEĽNÉ FILTRE (červený/oranžový), zelený je
+     informačný. Riadok nálezu je karta, nie tabuľka — nálezy majú rôzne dlhé
+     texty a akcie vpravo. Farby VÝHRADNE cez --nx-* tokeny.
+     Prepínače lišty (.ecbtn/.gcbtn/.echk/.cornerzone) a rozbaľovacie okno
+     (.ecmenu) sú v ZDIEĽANOM css/panel.css — kreslí ich ten istý komponent
+     ako v raile Inspectora, takže tu ich kópia byť NESMIE. */
+  .semafor { display: flex; gap: 8px; margin-bottom: 10px; }
+  /* UI-01/O3: komponentový radius je v celom plugine 6 px (mockup mal 7). */
+  .schip { flex: 1; border: 1px solid var(--nx-border); border-radius: 6px; padding: 8px 10px;
+           background: var(--nx-surface); display: flex; align-items: center; gap: 8px;
+           font: inherit; text-align: left; }
+  button.schip { cursor: pointer; }
+  button.schip:hover { border-color: var(--nx-select); background: var(--nx-select-bg-soft); }
+  .schip.on { border-color: var(--nx-select); background: var(--nx-select-bg);
+              box-shadow: 0 0 0 1px var(--nx-select); }
+  .schip .dot { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 12px; }
+  .schip .n { font-size: 19px; font-weight: 700; color: var(--nx-ink-title); line-height: 1; }
+  .schip .t { font-size: 11px; color: var(--nx-ink-muted); }
+  .schip.s-red .dot { background: var(--nx-state-red); }
+  .schip.s-orange .dot { background: var(--nx-state-orange); }
+  .schip.s-green .dot { background: var(--nx-state-green); }
+  .hint.ctrlfilter { margin: -4px 0 8px; }
+
+  .ctrlrow { display: flex; align-items: center; gap: 9px; padding: 7px 9px;
+             border: 1px solid var(--nx-border); border-radius: 6px; margin-bottom: 6px;
+             background: var(--nx-surface); cursor: pointer; font-size: 12.5px; }
+  .ctrlrow:hover { background: var(--nx-select-bg-soft); border-color: var(--nx-select); }
+  .ctrlrow .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 10px; }
+  .ctrlrow.ctrl-red .dot { background: var(--nx-state-red); }
+  .ctrlrow.ctrl-orange .dot { background: var(--nx-state-orange); }
+  .ctrlrow .msg { flex: 1; min-width: 0; color: var(--nx-ink); }
+  .ctrlrow .where { color: var(--nx-ink-muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .ctrlrow .rowact { display: flex; gap: 3px; opacity: 1; }
+  .ctrlrow .goact { width: 24px; height: 22px; padding: 0; border: 1px solid var(--nx-border);
+                    border-radius: 6px; background: var(--nx-surface); color: var(--nx-ink-muted);
+                    cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+  .ctrlrow .goact:hover { color: var(--nx-select); border-color: var(--nx-select); }
+  .ctrlrow .goact .ic { width: 13px; height: 13px; }
+
+  /* Š11: živé počty pri navigačnej položke Kontrola (v zbalenej navigácii sa
+     skryjú spolu s názvom — na 48 px ikonu sa dve čísla nezmestia). */
+  .nbadge { display: inline-flex; gap: 3px; align-items: center; flex: 0 0 auto; }
+  .nbadge i { font-style: normal; font-size: 10px; font-weight: 700; border-radius: 9px;
+              padding: 0 5px; line-height: 15px; }
+  .nbadge i.r { background: var(--nx-err-bg); color: var(--nx-err-fg); border: 1px solid var(--nx-err-border); }
+  .nbadge i.o { background: var(--nx-warn-bg-soft); color: var(--nx-wbadge-fg);
+                border: 1px solid var(--nx-warnchip-border); }
+  .studio.navmini .snav .nbadge { display: none; }
+
+  /* Text vedľa prepínačov lišty (počty zo servera) a veta pre starý SketchUp. */
+  .sectools .ecinfo { font-size: 11.5px; color: var(--nx-ink-muted); }
+  .sectools .ecoff { font-size: 11.5px; color: var(--nx-ink-faint); }
+
   /* ---------- súčtový riadok (čísla zo servera) ---------- */
   .totrow { display: flex; align-items: center; gap: 10px; padding: 8px 10px;
             border: 1px solid var(--nx-border); border-radius: 6px; background: var(--nx-surface-th);
@@ -168,14 +222,19 @@
 </div>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.7.30"></script>
+<script src="js/errors.js?v=0.7.31"></script>
 <!-- D-51/D-77: minimálna OBSAHOVÁ veľkosť okna pri otvorení (js/win_fit.js).
      Navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami a stĺpcom akcií — v užšom
      okne končí pravá časť riadku mimo. Trojica NX_FIT_MIN → width/height →
      min_width/min_height je v docs/UI_DIZAJN.md (tabuľka D-51). -->
 <script>window.NX_FIT_MIN = { w: 1060, h: 640 };</script>
-<script src="js/win_fit.js?v=0.7.30"></script>
+<script src="js/win_fit.js?v=0.7.31"></script>
 <!-- Sprite ikon (žiadne emoji v ovládacích prvkoch). Musí byť PRED studio.js —
      navigácia aj hover akcie riadkov používajú <use href="#i-…">. -->
-<script src="js/icons.js?v=0.7.30"></script>
-<script src="js/studio.js?v=0.7.30"></script>
+<script src="js/icons.js?v=0.7.31"></script>
+<!-- ŠT-1b: ZDIELANE 3-stavove nastavenie kontroly hran. TEN ISTY subor nacitava
+     aj Inspector (rohovy trojuholnik pri ABS kontrole v raile) — jeden markup,
+     jeden stav. Musi byt PRED studio.js (lista sekcie Kontrola ho vola pri
+     renderi). Okno Vyroba ho uz nenacitava — prepinace su tu. -->
+<script src="js/edge_menu.js?v=0.7.31"></script>
+<script src="js/studio.js?v=0.7.31"></script>

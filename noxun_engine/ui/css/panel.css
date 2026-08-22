@@ -667,6 +667,42 @@
   .ecsw-extra { background: var(--nx-edge-extra); }
   .ecsw-taped { background: var(--nx-edge-taped); }
 
+  /* --- ŠT-1b (audit #7): SPUSTACE oboch prepinacov -------------------------
+     „Zvýrazniť hrany" a „Smer kresby" ziju od tejto davky v liste sekcie
+     KONTROLA okna Studio (predtym v tabe Kontrola okna Vyroba). Styly su
+     preto TU, v zdielanom panel.css, a ZAMERNE NESCOPNUTE — kopia v HTML okna
+     by bola druha pravda o tom, ako prepinac vyzera.
+     VEDOMA ODCHYLKA od auditu #7: presunute su `.ecbtn` a `.gcbtn`; `.ecbar`
+     a `.ecsplit` (kontajner riadku a geometria split tlacidla) sa NEPRESUNULI,
+     ale ZANIKLI — lista okna Vyroba sa maze cela (audit #9) a v Studiu ma
+     spustac tvar ROHOVEHO TROJUHOLNIKA (audit #15, mockup), takze by to bolo
+     mrtve CSS v zdielanom subore. */
+  .ecbtn, .gcbtn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+            cursor: pointer; font: inherit; font-size: 12px; padding: 5px 11px; border-radius: 6px;
+            background: var(--nx-surface-sunken); color: var(--nx-ink-strong);
+            border: 1px solid var(--nx-border); }
+  .ecbtn:hover, .gcbtn:hover { background: var(--nx-ghost-hover); }
+  .ecbtn.on, .gcbtn.on { background: var(--nx-select); color: var(--nx-on-accent);
+            border-color: var(--nx-select); }
+  .ecbtn.on:hover, .gcbtn.on:hover { background: var(--nx-select-strong); }
+  .ecbtn .ic, .gcbtn .ic { width: 14px; height: 14px; }
+  /* Rohovy trojuholnik pri „Zvýrazniť hrany" (audit #15) — TEN ISTY vzor ako
+     v raile Inspectora: trojuholnik je ZNAMIENKO (pseudo-prvok), klikacia zona
+     je SAMOSTATNE tlacidlo v pravom dolnom rohu (vnorene tlacidlo je neplatne
+     HTML). Klik na telo = prepnutie, klik na roh = nastavenie. */
+  .echk { position: relative; display: inline-flex; }
+  .echk .ecbtn { padding-right: 18px; }
+  .echk .ecbtn::after { content: ''; position: absolute; right: 4px; bottom: 4px; width: 0; height: 0;
+            border-left: 6px solid transparent; border-bottom: 6px solid var(--nx-ink-faint);
+            pointer-events: none; }
+  .echk .ecbtn.on::after { border-bottom-color: var(--nx-on-accent); }
+  .cornerzone { position: absolute; right: 0; bottom: 0; width: 16px; height: 15px; padding: 0;
+            border: 0; border-radius: 0 0 6px 0; background: none; cursor: pointer; z-index: 2; }
+  .cornerzone[aria-disabled="true"] { cursor: default; }
+  /* Okno nastavenia visi POD spustacom (nie v strede obrazovky) — lista sekcie
+     ma `position: relative`, takze overlay nezaberie ziadny riadok layoutu. */
+  .ecmenu-studio { top: calc(100% + 4px); left: 0; z-index: 60; }
+
   /* ===================================================================
      UI-B1 — KOSTRA INSPECTORA: rail (kontexty) + 4 sektory.
      VSETKY pravidla kostry su pod korenovou triedou `.nx-inspector`
