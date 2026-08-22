@@ -228,15 +228,30 @@ module Noxun
         # Vola sa pri ready a pri prepnuti modelu. Katalogove echa po zapisoch idu
         # cez push_catalog — model sa pri nich NEskenuje (audit FIX 13).
         def push_state
+          js("MD.init(#{state_payload.to_json})")
+        end
+
+        def state_payload
           model = Sketchup.active_model
-          data = catalog_payload.merge(
+          catalog_payload.merge(
             version: Engine::VERSION,
             project: Materials.project_defaults(model),       # aktualne predvolby modelu
             cabinets: Panel.all_cabinets(model).size,
             model_guid: model_guid(model),                    # D-42: identita modelu pre projektove predvolby
             used: Materials.model_decor_usage(model)          # D-42 PR B: pas "Pouzite v projekte"
           )
-          js("MD.init(#{data.to_json})")
+        end
+
+        # ŠT-2a (review #2): PLNY stav do OBOCH UI — vzor `after_catalog_change`.
+        # Pouzivaju ho cesty, ktore zmenili PROJEKTOVE PREDVOLBY (predvolba
+        # korpusu/ciel/chrbta, apply „Nahradiť UNI…"). Bez toho by zapis zo
+        # sekcie prisiel len sekcii (odpoved chodi cez sink) a ZIVE okno by
+        # ukazovalo stare predvolby — dva formulare nad jednym modelom
+        # s roznym obsahom. Payload sa stava RAZ (je v nom cely katalog).
+        def push_state_both
+          data = state_payload
+          dialog_js("MD.init(#{data.to_json})")
+          StudioDialog.push_mat_state(data) if defined?(StudioDialog)
         end
 
         # LEN katalogova cast (po zapise do katalogu) — ziadny scan modelu,
@@ -878,7 +893,7 @@ module Noxun
             Panel.reselect(model, selected) if selected && selected.valid?
           end
           set_status(ru_done_msg(plan['summary']))
-          push_state
+          push_state_both # review #2: nahradenie meni aj PREDVOLBY — vidia to obe UI
           Panel.push_selected(model) # refresh Inspectora (selecty, karta dielca/dosky)
           refresh_studio_after_model_write
         end
@@ -1076,7 +1091,7 @@ module Noxun
           msg += " ABS hrany prevedené na nový dekor (#{remap_changed}× dielec)." if remap_changed.positive?
           msg += " Bez náhrady: #{remap_lost.join(', ')}." unless remap_lost.empty?
           set_status(msg)
-          push_state
+          push_state_both # review #2: predvolby vidia OBE UI, nielen to, ktore pisalo
           Panel.push_selected(model) # refresh Inspectora (korpusove selecty, karta dielca)
           refresh_studio_after_model_write
         end

@@ -117,6 +117,17 @@ NxTest.test('ŠT-2a (audit #4): zapis do MODELU dostane PLNY push AJ so zdvihom'
   proj = ST2A_MAT_RB[/def handle_set_project_material.*?\n        end\n/m].to_s
   NxTest.assert(proj.include?('refresh_studio_after_model_write'),
                 'projektova predvolba prestavia skrinky — Studio to musi vediet')
+  # Review #2: zmena PREDVOLIEB sa musi objavit v OBOCH UI. Odpoved cez sink
+  # by prisla len tomu, kto o nu poziadal, a druhy formular by drzal stary vyber.
+  NxTest.assert(proj.include?('push_state_both'), 'predvolby vidia obe UI naraz')
+  uni = ST2A_MAT_RB[/def handle_replace_uni_apply.*?\n        end\n/m].to_s
+  NxTest.assert(uni.include?('push_state_both'), 'to iste plati pre apply „Nahradiť UNI…"')
+  both = ST2A_MAT_RB[/def push_state_both.*?\n        end\n/m].to_s
+  NxTest.assert(both.include?('dialog_js(') && both.include?('StudioDialog.push_mat_state(data)'),
+                'okno priamo, sekcia cez Studio — vzor after_catalog_change')
+  code = both.lines.reject { |l| l.strip.start_with?('#') }.join
+  NxTest.assert_equal(1, code.scan(/state_payload/).length,
+                      'payload sa stava RAZ (je v nom cely katalog)')
   # Nota #20: poradie proti bliknutiu jantaru — AZ ZA refreshom Inspectora.
   NxTest.assert(proj.index('Panel.push_selected') < proj.index('refresh_studio_after_model_write'),
                 'push ide AZ ZA push_selected (dedup by inak zozltil prave prepocitane okno)')
@@ -142,8 +153,13 @@ NxTest.test('ŠT-2a (audit #15): CELY katalog chodi LEN pri prvom pushi a po pre
   pay = ST2A_STUDIO_RB[/def mat_payload\(model, collected\).*?\n        end\n/m].to_s
   NxTest.assert(pay.include?("out['catalog'] = MaterialsDialog.catalog_payload if @mat_full_pending"),
                 'inak by sa `row_rev` kazdeho zaznamu pocital pri KAZDOM prepocte kusovnika')
-  NxTest.assert(ST2A_STUDIO_RB.include?('@mat_full_pending = false if sent'),
-                'priznak padne AZ ked payload naozaj odosiel klientovi')
+  # Review #1: zapadka sa gasi LEN ked katalog v odoslanom payloade REALNE bol.
+  # Holy `if sent` by pri zlyhanom `mat_payload` (rescue -> nil) nechal sekciu
+  # NAVZDY prazdnu a bez hlasky.
+  NxTest.assert(ST2A_STUDIO_RB.include?("@mat_full_pending = false if sent && data[:mat].is_a?(Hash) && data[:mat]['catalog']"),
+                'priznak padne AZ ked katalog naozaj odosiel klientovi')
+  NxTest.assert(pay.include?("Engine.log_error(e, 'StudioDialog.mat_payload')"),
+                'zlyhanie payloadu sekcie sa NEZAMLCUJE — inak niet stopy, preco je prazdna')
   changed = ST2A_STUDIO_RB[/def on_model_changed\(model\).*?\n        end\n/m].to_s
   NxTest.assert(changed.include?('@mat_full_pending = true'),
                 'novy dokument = katalog sa posle cely (klient nema ako vediet o cudzich zmenach)')
@@ -188,11 +204,44 @@ NxTest.test('ŠT-2a (audit #21): odpoved dostane TEN, KTO sa pytal') do
   NxTest.assert(defined?(Noxun::Engine::MaterialsDialog), 'modul MaterialsDialog zije dalej')
 end
 
+NxTest.test('ŠT-2a (review #3): katalogovy zapis Z INSPECTORA ma JEDNU fan-out cestu') do
+  # D-41 dovytvorena ABS paska a D-49 automaticky duplak zapisuju do
+  # GLOBALNEHO katalogu. Kym si refresh posielali samy, sekcia Materialy
+  # o zmene nevedela — a hlavne jej ostal STARY `catalog_rev`, takze jej
+  # najblizsi zapis by server odmietol ako „katalóg sa medzitým zmenil".
+  sync = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'sync.rb'),
+                   encoding: 'UTF-8')
+  helper = sync[/def broadcast_catalog_change.*?\n        end\n/m].to_s
+  NxTest.assert(helper.include?('MaterialsDialog.after_catalog_change'),
+                'jedina cesta je fan-out katalogu')
+  NxTest.assert(helper.include?('push_materials'),
+                'bez nacitaneho satelitu sa aspon obnovi panel — mlcanie by bolo horsie')
+  parts = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_parts.rb'),
+                    encoding: 'UTF-8')
+  abs = parts[/def ensure_missing_abs.*?\n        end\n/m].to_s
+  NxTest.assert(abs.include?('broadcast_catalog_change'), 'D-41: dovytvorena paska ide cezen')
+  NxTest.refute(abs.include?('MaterialsDialog.push_state'),
+                'a NIE vlastnym refreshom (ten sekciu obisiel)')
+  res = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'resolvers.rb'),
+                  encoding: 'UTF-8')
+  dup = res[/def resolve_virtual_material.*?\n        end\n/m].to_s
+  NxTest.assert(dup.include?('broadcast_catalog_change'), 'D-49: automaticky duplak tiez')
+  NxTest.assert_equal(1, dup.scan(/broadcast_catalog_change/).length,
+                      'vetva :exists_regular NIC nezapisala — plny fan-out by hlasil zmenu, ktora sa nestala')
+end
+
 # --- 5) `@ready` lifecycle (audit #8) ----------------------------------------
 
-NxTest.test('ŠT-2a (audit #8): Studio ma `@ready` a nastavuje ho na spravnych miestach') do
+NxTest.test('ŠT-2a (audit #8 / review #6): `@ready` naozaj RIADI odosielanie skriptov') do
+  # Nestaci, ze priznak existuje — musi mat spotrebitela. Inak je to mrtva
+  # premenna, na ktorej ŠT-2b postavi odlozenu poziadavku.
+  js = ST2A_STUDIO_RB[/def js\(script\).*?\n        end\n/m].to_s
+  NxTest.assert(js.include?('return false unless @ready'),
+                'push pred nacitanim HTML sa PRIZNANE zahodi (CEF ho zahodi tak ci tak)')
+  NxTest.assert(js.index('return false unless @dialog') < js.index('return false unless @ready'),
+                'najprv zive okno, potom pripravenost — poradie guardov')
   NxTest.assert(ST2A_STUDIO_RB.include?("cb(dlg, 'ready')        { |_p| @ready = true; push_state }"),
-                'priznak sa zapina AZ ked HTML naozaj bezi')
+                'priznak sa zapina AZ ked HTML naozaj bezi — a PRED prvym pushom')
   ensure_dlg = ST2A_STUDIO_RB[/def ensure_dialog.*?\n        end\n/m].to_s
   NxTest.assert(ensure_dlg.include?('@ready = false'),
                 'nove okno zacina ako NEPRIPRAVENE (CEF by skript pred nacitanim zahodil)')

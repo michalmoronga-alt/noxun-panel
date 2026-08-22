@@ -105,8 +105,11 @@ module Noxun
           when :exists
             [true, '']
           when :created
-            push_materials
-            MaterialsDialog.push_state if defined?(MaterialsDialog)
+            # ŠT-2a (review #3): JEDNA fan-out cesta katalogoveho zapisu —
+            # panel, okno Materialy AJ sekcia Materialy v Studiu (tá inak
+            # ostala so starym `catalog_rev` a jej najblizsi zapis by server
+            # odmietol), plus invalidacia kontroly hran a cisla Studia.
+            broadcast_catalog_change
             rec = Materials.edge(abs_id)
             # 2A-3 (audit F15): hlaska cita SKUTOCNY zaznam (sirka aj hrubka) —
             # ziadne natvrdo "/1"; cena je "nezadana" (D-42), nie 0.

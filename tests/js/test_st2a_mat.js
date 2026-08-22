@@ -21,16 +21,25 @@ const path = require('node:path');
 // nastavi `parentNode`. Vdaka tomu vidno, ci telo sekcie prezilo push.
 const ELS = {};
 function stubEl(id){
-  const n = { id, style: {}, children: [], parentNode: null, _html: '' };
+  const n = { id, style: {}, children: [], parentNode: null, _html: '', _attrs: {} };
   Object.defineProperty(n, 'innerHTML', {
     get(){ return n._html; },
     set(v){ n._html = v; n.children.forEach(function(c){ c.parentNode = null; }); n.children = []; }
   });
   n.appendChild = function(c){ c.parentNode = n; n.children.push(c); return c; };
   n.cloneNode = function(){ return stubEl(id + '-clone'); };
+  n.setAttribute = function(k, v){ n._attrs[k] = String(v); };
+  n.getAttribute = function(k){ return Object.prototype.hasOwnProperty.call(n._attrs, k) ? n._attrs[k] : null; };
+  n.focus = function(){ n._focused = true; };
+  n.setSelectionRange = function(){};
   return n;
 }
-['snav', 'sechead', 'sectools', 'secbody', 'status', 'studio'].forEach(function(id){
+// Uzly, ktore `mdRenderAll` naozaj hlada. `mdDecorList` a `mdDecorForm` su tu
+// ZAMERNE (review #5): bez nich by `mdRenderLists` hned vypadol a test by
+// tvrdil kontrakt, ktory nic nevykonal.
+['snav', 'sechead', 'sectools', 'secbody', 'status', 'studio',
+ 'mdDecorList', 'mdDecorForm', 'mdSheetForm', 'mdEdgeForm',
+ 'md_body', 'md_front', 'md_back'].forEach(function(id){
   ELS[id] = stubEl(id);
 });
 // <template> — `content` je fragment, ktory sa klonuje.
@@ -39,12 +48,13 @@ ELS.matBodyTpl.content = stubEl('matBodyTplContent');
 
 global.window = { NX_MAT_SECTION: true };
 const LISTEN = {};
+let QUERY_HIT = null;   // co vrati document.querySelector (obnova rozpisanej bunky)
 global.document = {
   activeElement: null,
   addEventListener: function(type, fn){ (LISTEN[type] || (LISTEN[type] = [])).push(fn); },
   getElementById: function(id){ return ELS[id] || null; },
   createElement: function(tag){ return stubEl('new-' + tag); },
-  querySelector: function(){ return null; }
+  querySelector: function(){ return QUERY_HIT; }
 };
 
 const JS = path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js');
@@ -61,10 +71,16 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
 (function(){
   const h = M.matToolsHtml({ ro: false, q: 'halifax', mode: 'man', section: true,
                              backup: false, stale: false });
-  ok(/id="mdDemosAddBtn"/.test(h), 'primarna akcia „Pridať z Demosu" je v liste');
+  ok(/id="mdDemosAddBtn"/.test(h), '„Pridať z Demosu" je v liste');
   ok(h.indexOf('id="mdDemosAddBtn"') < h.indexOf('id="mdSearch"'),
-     'primarna akcia je VLAVO od nastrojov (vzor listy Studia)');
-  ok(/id="mdNewDecorBtn"/.test(h), 'zalozna cesta „ručne…" ostava');
+     'pridavacie akcie su VLAVO od nastrojov (vzor listy Studia)');
+  ok(/id="mdNewDecorBtn"/.test(h), 'aj rucna cesta');
+  // Review #9: v sekcii je Demos zatial PREMOSTENIE do okna — najvyraznejsie
+  // tlacidlo novej sekcie preto nesmie byt ono. Roly sa vymenia spat v ŠT-2b.
+  ok(/class="primary" id="mdNewDecorBtn"/.test(h),
+     'v SEKCII je primarna rucna cesta — tá funguje TU');
+  ok(/class="ghostbtn" id="mdDemosAddBtn"/.test(h),
+     'a premostenie do okna je len ghost (nie hlavna vyzva sekcie)');
   ok(/value="halifax"/.test(h), 'hladanie si nesie dotaz — lista sa prekresluje pri kazdom pushi');
   ok(/id="mdGroupMode"/.test(h) && /value="man"[^>]*selected/.test(h),
      'zoskupenie dlazdic ostava a pamata si vybrany rezim');
@@ -96,6 +112,8 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   ok(/okne Materiály/.test(insec),
      'v sekcii tooltip prizna, ze Demos beží zatiaľ v okne Materiály (ŠT-2b)');
   ok(!/okne Materiály/.test(inwin), 'v samotnom okne taky tooltip nedava zmysel');
+  ok(/class="primary" id="mdDemosAddBtn"/.test(inwin),
+     'v OKNE ostava Demos primarny — tam naozaj bezi (roly su spravne uz teraz)');
 })();
 
 // Jantarove „Obnoviť" je ZDIELANY markup celeho okna — sekcia ho nekresli vlastne.
@@ -153,6 +171,42 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   M.matRenderBody();
   ok(body.children[0] === node, 'navrat do sekcie vrati TEN ISTY uzol');
   ok(node.children.indexOf(draft) >= 0, 'aj s rozpisanym formularom');
+
+  // Review #5: kontrakt musi nieco NAOZAJ vykonat. Dlazdice sa prekreslit MAJU
+  // (menia sa pocty „Použité v projekte"), ale otvoreny formular a rozpisana
+  // bunka to prezit MUSIA.
+  ELS.mdDecorList.innerHTML = 'STARE';
+  ELS.mdDecorForm.style.display = '';        // otvoreny batch „Nový dekor"
+  // Rozpisana (dirty) bunka ceny: baseline `r1`, pouzivatel dopisal „12,5".
+  const dirty = stubEl('cell');
+  dirty.classList = { contains: function(c){ return c === 'mdcell'; } };
+  dirty.value = '12,5';
+  dirty.setAttribute('data-kind', 'sheet');
+  dirty.setAttribute('data-id', 'M1');
+  dirty.setAttribute('data-field', 'price_per_m2');
+  dirty.setAttribute('data-rev', 'r1');
+  dirty.setAttribute('data-orig', '10');
+  dirty.selectionStart = 4;
+  dirty.selectionEnd = 4;
+  document.activeElement = dirty;
+  // Po prekresleni je v DOM NOVY input s CERSTVYM `data-rev` zo servera.
+  const fresh = stubEl('cell-fresh');
+  fresh.value = '10';
+  fresh.setAttribute('data-rev', 'r2');
+  fresh.setAttribute('data-orig', '10');
+  QUERY_HIT = fresh;
+
+  M.matRenderBody();
+
+  ok(ELS.mdDecorList.innerHTML !== 'STARE', 'zoznam dlazdic sa prekreslil (pocty su cerstve)');
+  eq(ELS.mdDecorForm.style.display, '', 'ale rozpisany formular „Nový dekor" ostal OTVORENY');
+  eq(fresh.value, '12,5', 'a rozpisana hodnota bunky prezila push');
+  eq(fresh.getAttribute('data-rev'), 'r1',
+     'baseline dirty bunky sa NEPREBLIKOL na cerstvy — inak by jej blur ticho prepisal cudziu zmenu');
+  eq(fresh.getAttribute('data-orig'), '10', 'a povodna hodnota drzi, cim sa meria dirty');
+  ok(fresh._focused === true, 'fokus sa vratil do bunky (pouzivatel pise dalej)');
+  document.activeElement = null;
+  QUERY_HIT = null;
 })();
 
 // --- 3) katalogove echo: BEZ generacie, funguje aj mimo sekcie --------------

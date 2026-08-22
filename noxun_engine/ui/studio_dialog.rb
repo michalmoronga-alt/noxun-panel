@@ -589,6 +589,19 @@ module Noxun
           Engine.log_error(e, 'StudioDialog.push_mat_catalog')
         end
 
+        # Review #2: PLNY stav materialov (predvolby + pouzitie + katalog) do
+        # sekcie. Vola ho `MaterialsDialog.push_state_both` po zapise, ktory
+        # zmenil PREDVOLBY — ten sa musi objavit v OBOCH UI naraz, nielen
+        # v tom, ktore o zmenu poziadalo.
+        def push_mat_state(payload = nil)
+          return unless defined?(MaterialsDialog)
+
+          data = payload || MaterialsDialog.state_payload
+          js("if (window.MD && MD.init) MD.init(#{data.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.push_mat_state')
+        end
+
         # Modelovy kontext sekcie. `used` sa pocita z UZ zozbieraneho kusovnika
         # (audit #15) — okno Materialy na to malo vlastny `Ids` sken modelu
         # a v Studiu by to bol DRUHY prechod modelom pri KAZDOM prepocte.
@@ -604,6 +617,9 @@ module Noxun
           out['catalog'] = MaterialsDialog.catalog_payload if @mat_full_pending && defined?(MaterialsDialog)
           out
         rescue StandardError => e
+          # Review #1: zlyhanie sa NEZAMLCUJE. Sekcia ostane bez dat a jedina
+          # stopa po tom, PRECO, je tento zaznam — zapadka `@mat_full_pending`
+          # pritom ostava zdvihnuta, takze najblizsi push katalog dosle.
           Engine.log_error(e, 'StudioDialog.mat_payload')
           nil
         end
@@ -1027,9 +1043,15 @@ module Noxun
           # co klient nedostal, to v okne aktualne nie je.
           @pushed_epoch = @epoch.to_i if sent
           # Katalog materialov je v okne AZ TERAZ — dalsie pushe uz nesu len
-          # modelovy kontext. A LEN ked payload naozaj odosiel (rovnaky dovod
-          # ako pri epoche: co klient nedostal, to v okne nie je).
-          @mat_full_pending = false if sent
+          # modelovy kontext.
+          #
+          # Review #1: zapadka sa NESMIE gasit len preto, ze payload odosiel.
+          # `mat_payload` ma vlastny rescue (vracia `nil`) a katalog v nom je
+          # podmieneny — keby sa vtedy zapadka zhasla, sekcia Materialy by
+          # ostala NAVZDY prazdna a BEZ hlasky: dalsie pushe uz katalog
+          # neposielaju a echo prichadza az po cudzom zapise. Preto sa gasi
+          # LEN vtedy, ked katalog v odoslanom payloade REALNE bol.
+          @mat_full_pending = false if sent && data[:mat].is_a?(Hash) && data[:mat]['catalog']
           sent
         end
 
@@ -1071,6 +1093,15 @@ module Noxun
         # to musi vediet rozlisit.
         def js(script)
           return false unless @dialog && @dialog.visible?
+          # ŠT-2a review #6: kym okno neohlasilo `ready`, jeho HTML EST NEBEZI
+          # — CEF taky `execute_script` potichu ZAHODI. Doteraz to bolo
+          # neviditelne (`js` vracal true, hoci klient nedostal nic), takze
+          # napr. broadcast echo prepinaca hran tesne po otvoreni okna sa
+          # tvarilo ako dorucene. Odteraz sa taky push priznane zahodi: `false`
+          # znamena „klient to nedostal" a volajuci, ktory nieco POTVRDZUJE
+          # (`do_refresh_bom`), sa podla toho vie rozhodnut. Prvy push posiela
+          # sam `ready` callback — ten priznak zapina PRED nim.
+          return false unless @ready
 
           @dialog.execute_script(script)
           true

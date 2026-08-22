@@ -2166,14 +2166,24 @@
   function matToolsHtml(st){
     var s = st || {};
     var dis = s.ro ? ' disabled' : '';
-    var h = '<button type="button" class="primary" id="mdDemosAddBtn"' + dis +
+    // Review #9 (VEDOMA DOCASNA ZMENA, vrati sa v ŠT-2b): v sekcii je „Pridať
+    // z Demosu" zatial PREMOSTENIE do okna — najvyraznejsie tlacidlo novej
+    // sekcie by teda otvaralo ine okno. Primarna je preto rucna cesta, ktora
+    // funguje TU; Demos ostava plnohodnotny, len ako `ghostbtn`. Ked ŠT-2b
+    // presunie Demos toky do sekcie, roly sa vymenia spat (v okne su uz teraz
+    // spravne — tam Demos naozaj bezi).
+    var demosPrimary = !s.section;
+    var h = '<button type="button" class="' + (demosPrimary ? 'primary' : 'ghostbtn') +
+      '" id="mdDemosAddBtn"' + dis +
       ' title="' + mdEsc(s.section
         ? 'Pridať dekor z Demosu — beží zatiaľ v okne Materiály (otvorí sa)'
         : 'Pridať dekor z Demosu') + '" onclick="mdDemosAdd()">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-cloud-download"/></svg> Pridať z Demosu</button>' +
-      '<button type="button" class="ghostbtn" id="mdNewDecorBtn"' + dis +
+      '<button type="button" class="' + (demosPrimary ? 'ghostbtn' : 'primary') +
+      '" id="mdNewDecorBtn"' + dis +
       ' title="Pridať materiál ručne (bez Demosu)" onclick="mdOpenDecorForm(null)">' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> ručne…</button>' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>' +
+      (s.section ? ' Pridať ručne' : ' ručne…') + '</button>' +
       '<div class="searchbox"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>' +
       '<input id="mdSearch" type="text" placeholder="Hľadať dekor, výrobcu alebo kód"' +
       ' value="' + mdEsc(s.q || '') + '" oninput="mdSearchInput()"></div>' +
