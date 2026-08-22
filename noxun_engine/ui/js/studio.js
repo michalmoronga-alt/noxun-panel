@@ -14,16 +14,35 @@
   // vlastny generacny token).
 
   var ST = null;             // posledny push z Ruby
-  var studioSec = 'bom';     // aktivna sekcia (v ST-1a je zivá jedina)
+  var studioSec = 'bom';     // aktivna sekcia (ST-1a Kusovnik, ŠT-1b Kontrola)
   var bomView = 'parts';     // Š4: parts | sheets | abs
   var bomQ = '';             // Š6: text hladania
   var colMenuOpen = false;   // Š2: rozbalene okno stlpcov (cisto zobrazovacie)
   var navMini = false;       // zbalena navigacia na ikony
   var groupClosed = {};      // Š1: zbalene skupiny per material_id
+  // Š8: filter semaforu — all | red | orange. Je to stav OKNA (nie zakazky):
+  // neuklada sa nikam a zatvorenie okna ho zabudne. Zoznam sa nim LEN zuzuje,
+  // poradie urcuje server.
+  var ctrlFilter = 'all';
+  // Š10: stav oboch prepinacov. SERVER je autorita (zapnutost, pocty aj stav
+  // trojstavoveho nastavenia) — JS si nic neprepocitava a nic si nepamata;
+  // kazdy push stav prepise. Jedina klientska vec je, ci je rozbalovacie okno
+  // nastavenia otvorene (cisto zobrazovacie, nikam sa neuklada).
+  var EDGE = null;
+  var GRAIN = null;
+  var ecMenuOpen = false;
 
   // ZRKADLO `StudioDialog::SECTIONS` — autoritou whitelistu je RUBY, tento
   // zoznam len zabrani, aby z okna vyletela hodnota, ktora sekciu nepomenuva.
-  var STUDIO_SECTIONS = ['bom'];
+  var STUDIO_SECTIONS = ['bom', 'ctrl'];
+
+  // ŠT-1b (Š10): 3-stavove nastavenie kontroly hran je ZDIELANY komponent —
+  // TEN ISTY markup kresli rail Inspectora (rohovy trojuholnik pri ABS ikone)
+  // aj toto okno. TRETIA instancia, ale ziadna tretia kopia: jeden markup,
+  // jeden stav (server, %APPDATA%), jedna serverova cesta.
+  var ECM = (typeof module !== 'undefined' && module.exports)
+    ? require('./edge_menu.js')            // Node testy
+    : (typeof window !== 'undefined' ? window.NXEdgeMenu : null);
 
   // Š2: stlpce tabulky Dielce. `fixed` sa neda vypnut (bez nazvu dielca by
   // riadok nic nehovoril). „Poznámka" tu ZAMERNE nie je — v Ruby pre nu
@@ -46,8 +65,8 @@
   var NAV = [
     { grp: 'ZÁKAZKA', items: [
       { id: 'bom',    ic: 'list',            t: 'Kusovník' },
-      { id: 'ctrl',   ic: 'clipboard-check', t: 'Kontrola',
-        bridge: 'zatiaľ v okne Výroba — presun v ŠT-1b' },
+      // Š11: pri Kontrole visia ZIVE pocty RED/ORANGE z posledneho pushu.
+      { id: 'ctrl',   ic: 'clipboard-check', t: 'Kontrola', badge: true },
       { id: 'buy',    ic: 'cart',            t: 'Nákup kovania',
         bridge: 'zatiaľ v okne Výroba — presun v ŠT-1c' },
       { id: 'budget', ic: 'euro',            t: 'Rozpočet',
@@ -72,7 +91,8 @@
   ];
 
   var SEC_META = {
-    bom: { t: 'Kusovník', hint: 'skupiny podľa materiálu · pohľady Dielce / Platne / ABS · živý zoznam' }
+    bom: { t: 'Kusovník', hint: 'skupiny podľa materiálu · pohľady Dielce / Platne / ABS · živý zoznam' },
+    ctrl: { t: 'Kontrola', hint: 'semafor filtruje zoznam · klik na nález ho označí v modeli · prepínače hrán a kresby' }
   };
 
   // ---------------------------------------------------------------- helpers
@@ -237,6 +257,200 @@
     return out;
   }
 
+  // ============ ŠT-1b: sekcia KONTROLA (Š8–Š11) — CISTE funkcie ============
+  // Testuje ich tests/js/test_st1b_kontrola.js (a prepinace hran/kresby sady
+  // test_d104/test_d105/test_k2/test_abs_rail_3stav, ktore sa sem presunuli
+  // spolu s UI). ZELEZNE PRAVIDLO sekcie: KAZDE cislo je zo servera —
+  // `counts` (vratane zeleneho „skriniek bez nálezu"), poradie aj text nalezu.
+  // Klient rozhoduje VYHRADNE o tom, co je prave vidiet (filter, otvorene menu).
+
+  // Š8: klikatelny semafor. RED a ORANGE su FILTRE (druhy klik zrusi), GREEN je
+  // informacny — niet co filtrovat. Chybajuce zelene cislo (starsi payload) sa
+  // priznane ukaze ako „—"; nikdy sa nedopocitava v prehliadaci.
+  function semaforHtml(counts, filter){
+    var c = counts || {};
+    var chip = function(sev, n, t, hint){
+      return '<button type="button" class="schip s-' + sev + (filter === sev ? ' on' : '') +
+        '" data-sev="' + sev + '" title="' + esc(hint) + '" aria-pressed="' +
+        (filter === sev ? 'true' : 'false') + '"><span class="dot"></span><span>' +
+        '<span class="n">' + num(n) + '</span> <span class="t">' + esc(t) + '</span></span></button>';
+    };
+    return '<div class="semafor">' +
+      chip('red', c.red || 0, 'blokuje výrobu',
+           'Klik zúži zoznam na červené nálezy — druhý klik filter zruší.') +
+      chip('orange', c.orange || 0, 'skontroluj pred objednávkou',
+           'Klik zúži zoznam na oranžové nálezy — druhý klik filter zruší.') +
+      '<div class="schip s-green" title="Skrinky, ktoré v zozname nálezov nefigurujú — počíta ich server.">' +
+      '<span class="dot"></span><span><span class="n">' +
+      (c.clean == null ? '—' : num(c.clean)) +
+      '</span> <span class="t">skriniek bez nálezu</span></span></div></div>';
+  }
+
+  // Š8: filter LEN skryva — poradie ani obsah zoznamu sa nemeni (urcuje ich
+  // server). Vracia POLE PAROV [nalez, index v serverovom zozname], aby klik
+  // vedel adresovat povodny riadok aj pri zapnutom filtri.
+  function ctrlRows(list, filter){
+    var out = [];
+    (list || []).forEach(function(it, i){
+      if (filter === 'all' || it.severity === filter) out.push([it, i]);
+    });
+    return out;
+  }
+
+  // Š9: riadok nálezu — bodka závažnosti · text · miesto · akcie vpravo.
+  // Text aj miesto skladá SERVER; „Rozpočet" je jediné miesto bez entity
+  // v modeli (klik tam premostí do okna Výroba).
+  function ctrlRowHtml(it, i){
+    var red = it.severity === 'red';
+    var bud = it.category === 'budget';
+    return '<div class="ctrlrow ' + (red ? 'ctrl-red' : 'ctrl-orange') + '" data-ci="' + i + '"' +
+      ' title="' + esc(bud ? 'Otvorí Rozpočet v okne Výroba (kotva na sekciu tam zatiaľ nevedie).'
+                           : 'Klik označí nález v modeli.') + '">' +
+      '<span class="dot" aria-hidden="true"></span>' +
+      '<span class="msg">' + esc(it.message_sk) + '</span>' +
+      '<span class="where">' + (bud ? 'Rozpočet' : esc(it.owner_id || '—')) + '</span>' +
+      '<span class="rowact">' + ctrlActionsHtml(it) + '</span></div>';
+  }
+
+  // Š9: akcie riadku. Kontextová oprava je LEN tam, kde naozaj existuje
+  // (UNI nález → „Nahradiť UNI…", rozpočtový nález → prechod do Rozpočtu);
+  // oko a ceruzka sú vzor Kusovníka (Š3).
+  function ctrlActionsHtml(it){
+    if (it.category === 'budget'){
+      return '<button type="button" class="goact" data-act="budget"' +
+        ' title="Otvoriť Rozpočet — je zatiaľ v okne Výroba (presun v ŠT-1c)"' +
+        ' aria-label="Otvoriť Rozpočet v okne Výroba">' + ico('euro') + '</button>';
+    }
+    var h = '';
+    // D-83: uni_id nesie SERVER — klient si ho nevymýšľa.
+    if (it.category === 'uni_material' && it.uni_id){
+      h += '<button type="button" class="goact" data-act="uni" data-uni="' + esc(it.uni_id) + '"' +
+        ' title="Nahradiť UNI…" aria-label="Nahradiť UNI reálnym dekorom">' +
+        ico('arrow-left-right') + '</button>';
+    }
+    return h +
+      '<button type="button" class="goact" data-act="eye" title="Označiť v modeli">' + ico('eye') + '</button>' +
+      '<button type="button" class="goact" data-act="edit"' +
+      ' title="Označiť a upraviť v Inspectore">' + ico('pencil') + '</button>';
+  }
+
+  // Š11: živé počty pri navigačnej položke Kontrola. Čísla sú zo `counts`
+  // KAŽDÉHO pushu — čistá zákazka badge nekreslí vôbec.
+  function navBadgeHtml(counts){
+    var c = counts || {};
+    var r = c.red || 0;
+    var o = c.orange || 0;
+    if (!r && !o) return '';
+    return '<span class="nbadge">' + (r ? '<i class="r">' + num(r) + '</i>' : '') +
+           (o ? '<i class="o">' + num(o) + '</i>' : '') + '</span>';
+  }
+
+  // ---- Š10: prepínače lišty (zvýraznenie hrán + smer kresby) --------------
+  // Spúšťač zvýraznenia má tvar ROHOVÉHO TROJUHOLNÍKA (mockup): klik na telo
+  // prepína, klik na roh otvára 3-stavové nastavenie. Roh je SAMOSTATNÉ
+  // tlačidlo vedľa (vnorené tlačidlo je neplatné HTML) — vzor railu Inspectora.
+  function ecNum(v){ return ECM.num(v); }
+
+  function edgeCheckBarHtml(st, menuOpen, grain){
+    if (!st || !st.available){
+      return '<span class="ecoff">Zvýraznenie hrán a smer kresby vyžadujú SketchUp 2023 alebo novší.</span>';
+    }
+    var on = st.active === true;
+    return '<span class="echk"><button type="button" id="ecBtn" class="ecbtn' + (on ? ' on' : '') + '"' +
+      ' data-ec="toggle" aria-pressed="' + (on ? 'true' : 'false') + '"' +
+      ' title="Farebné zvýraznenie stavu olepu priamo v modeli. Model sa nemení — kreslí sa nad ním.">' +
+      ico(on ? 'eye-off' : 'eye') + 'Zvýrazniť hrany</button>' +
+      '<button type="button" id="ecMore" class="cornerzone" data-ec="menu"' +
+      ' aria-expanded="' + (menuOpen ? 'true' : 'false') + '" aria-haspopup="true"' +
+      ' aria-label="Nastavenie zvýraznenia hrán" title="Nastavenie — ktoré stavy hrán sa zvýraznia"></button>' +
+      edgeCheckMenuHtml(st, menuOpen) + '</span>' + grainBtnHtml(grain) +
+      '<span class="ecinfo">' + edgeCheckText(st) + grainInfoHtml(grain) + '</span>';
+  }
+
+  // Rozbaľovacie okno = ZDIELANY komponent (js/edge_menu.js). Okno mu len
+  // povie, ktorá funkcia posiela prepnutie do Ruby a kde má stáť — markup,
+  // texty, farebné štvorčeky aj živé počty sú spoločné s railom Inspectora.
+  function edgeCheckMenuHtml(st, menuOpen){
+    return ECM.menuHtml(st, menuOpen, { fn: 'edgeCheckOption', id: 'ecMenu', cls: 'ecmenu-studio' });
+  }
+
+  function edgeCheckSelectionHint(st){ return ECM.selectionHint(st); }
+
+  function edgeCheckText(st){
+    if (!st || !st.active) return 'Vypnuté — v modeli nie je nič nakreslené.';
+    var o = st.options || {};
+    var c = st.counts || {};
+    var miss = ecNum(c.missing);
+    var parts = [];
+    if (o.show_missing) parts.push(miss + ' ' + edgePluralSk(miss) + ' bez olepu');
+    if (o.show_extra) parts.push(ecNum(c.extra) + ' mimo pravidla');
+    if (o.show_taped) parts.push(ecNum(c.taped) + ' olepených');
+    if (!parts.length) return 'Žiadny stav nie je zapnutý — otvor nastavenie (roh tlačidla).';
+    if (o.show_missing && !o.show_extra && !o.show_taped && miss === 0){
+      return 'Všetky hrany podľa pravidla sú olepené.';
+    }
+    var t = parts.join(' · ');
+    if (edgeCheckSelectionHint(st)) t += ' · označ skrinky v modeli';
+    if (st.unresolved) t += ' · ' + st.unresolved + ' sa nedá zvýrazniť (neznáma orientácia dielca)';
+    if (st.multi) t += ' · dielec s viac kusmi je v modeli nakreslený raz';
+    return t;
+  }
+
+  // 1 hrana / 2–4 hrany / 5+ hrán (slovenske sklonovanie poctu)
+  function edgePluralSk(n){
+    var v = Math.abs(n);
+    if (v === 1) return 'hrana';
+    if (v >= 2 && v <= 4) return 'hrany';
+    return 'hrán';
+  }
+
+  // K2/D-87: prepínač smeru kresby. ZÁMERNE obyčajné tlačidlo (nemá čo
+  // nastavovať: buď kresbu vidíš, alebo nie).
+  function grainBtnHtml(g){
+    if (!g || !g.available) return '';
+    var on = g.active === true;
+    return '<button type="button" id="gcBtn" class="gcbtn' + (on ? ' on' : '') + '"' +
+      ' data-gc="toggle" aria-pressed="' + (on ? 'true' : 'false') + '"' +
+      ' title="Nakreslí na dielce čiary v smere kresby dekoru — blenda vs. dvere na prvý pohľad.' +
+      ' Model sa nemení, kreslí sa nad ním.">' + ico('grain') + 'Smer kresby</button>';
+  }
+
+  // Dovetá k textu lišty. Vypnutý prepínač mlčí (o vypnutom stave už hovorí
+  // samotné tlačidlo) — inak by lišta niesla dve „vypnuté" vety vedľa seba.
+  function grainInfoHtml(g){
+    var t = grainCheckText(g);
+    return t ? ' · <span class="gcinfo">' + t + '</span>' : '';
+  }
+
+  function grainCheckText(g){
+    if (!g || !g.available || !g.active) return '';
+    var parts = ecNum(g.parts);
+    var t = parts + ' ' + grainPartPluralSk(parts) + ' s kresbou';
+    if (ecNum(g.skipped)) t += ' · ' + ecNum(g.skipped) + ' bez kresby (materiál bez smeru)';
+    if (ecNum(g.unresolved)) t += ' · ' + ecNum(g.unresolved) + ' sa nedá nakresliť (neznáma orientácia dielca)';
+    return t;
+  }
+
+  // 1 dielec / 2–4 dielce / 5+ dielcov (slovenske sklonovanie poctu)
+  function grainPartPluralSk(n){
+    var v = Math.abs(n);
+    if (v === 1) return 'dielec';
+    if (v >= 2 && v <= 4) return 'dielce';
+    return 'dielcov';
+  }
+
+  // Relay do Ruby — gen aj model_guid overuje SERVER (starý DOM / prepnutý
+  // dokument sa odmietne a v modeli sa nič nezapne).
+  function edgeCheckPayload(st){
+    return { gen: (st && st.gen) || 0, model_guid: (st && st.model_guid) || '' };
+  }
+
+  // Klient posiela LEN kľúč a boolean; skladanie je v zdieľanom komponente,
+  // aby všetky tri vstupné body posielali BAJT-ROVNAKÝ tvar.
+  function edgeCheckOptionPayload(st, key, value){
+    return ECM.optionPayload(edgeCheckPayload(st), key, value);
+  }
+
   // Deep-link kotva (audit #12): N13 „Materiál" posiela ID skrinky a to sa
   // stane textom hladania. Spotrebuje sa PRAVE RAZ — server ju v dalsom pushi
   // uz neposle, takze pouzivatelovo vymazanie filtra prezije refresh.
@@ -280,12 +494,19 @@
   window.NX = {
     setStudio: function(data){
       ST = data || null;
+      // Š10: stav prepínačov chodí v KAŽDOM pushi (a medzitým aj samostatným
+      // echom nižšie) — klient si ho nikdy neodvodzuje.
+      EDGE = (ST && ST.edge_check) ? ST.edge_check : null;
+      GRAIN = (ST && ST.grain_check) ? ST.grain_check : null;
       var mdl = el('stModel');
       if (mdl) mdl.textContent = ST ? ('zákazka: ' + ST.model_title + ' · v' + ST.version) : '…';
       // Deep-link sekcie sa posiela PRAVE RAZ; kotva s nou.
       if (ST && ST.open_section && STUDIO_SECTIONS.indexOf(ST.open_section) >= 0){
         studioSec = ST.open_section;
-        var a = anchorFilter(ST);
+        // Kotva predvyplna hladanie KUSOVNIKA (N13 posiela ID skrinky). Pri inej
+        // sekcii by potichu prestavila filter, ktory pouzivatel ani nevidí —
+        // preto sa aplikuje LEN so sekciou, do ktorej patri (review #7).
+        var a = (studioSec === 'bom') ? anchorFilter(ST) : null;
         if (a) bomQ = a;
       }
       render();
@@ -311,6 +532,24 @@
       if (inp) inp.placeholder = v.default_project || 'projekt';
       var chk = el('mergeChk');
       if (chk) chk.checked = v.merge_18_36 !== false;
+    },
+    // Š10: malé echo pushe stavu prepínačov (prepnutie odkiaľkoľvek — rail,
+    // toto okno, okno Výroba — aj prepočet po prestavbe). Prekreslí sa LEN
+    // lišta sekcie, zoznam nálezov sa nedotkne.
+    setEdgeCheck: function(state){
+      EDGE = state || null;
+      if (studioSec === 'ctrl') renderTools();
+    },
+    setGrainCheck: function(state){
+      GRAIN = state || null;
+      if (studioSec === 'ctrl') renderTools();
+    },
+    // To isté nastavenie sa dá otvoriť z troch miest — keď ho používateľ
+    // otvorí inde, toto sa zavrie (nikdy dve kópie naraz).
+    closeEdgeMenu: function(){
+      if (!ecMenuOpen) return;
+      ecMenuOpen = false;
+      if (studioSec === 'ctrl') renderTools();
     }
   };
 
@@ -336,6 +575,8 @@
              (it.disabled ? ' aria-disabled="true"' : '') +
              ' data-nav="' + esc(it.id) + '" title="' + esc(tip) + '">' +
              ico(it.ic) + '<span>' + esc(it.t) + '</span>' +
+             // Š11: živé počty pri Kontrole — z counts KAŽDÉHO pushu.
+             (it.badge ? navBadgeHtml(ST ? ST.counts : null) : '') +
              (it.bridge ? '<i class="nbridge" aria-hidden="true">↗</i>' : '') + '</button>';
       });
     });
@@ -361,6 +602,15 @@
     var box = el('sectools');
     if (!box) return;
     if (!ST){ box.innerHTML = ''; return; }
+    // Š10: lišta sekcie Kontrola nesie OBA prepínače (a nič iné — exporty
+    // kontrola nemá). Jeden riadok, žiadny nový blok: vertikálny priestor
+    // je vzácny a nastavenie hrán je overlay pod tlačidlom.
+    if (studioSec === 'ctrl'){
+      box.innerHTML = edgeCheckBarHtml(EDGE, ecMenuOpen, GRAIN) +
+        '<span class="spacer"></span>' +
+        '<span class="sechint">Zoradené podľa závažnosti — poradie určuje server.</span>';
+      return;
+    }
     var vw = function(id, t, tip){
       return '<button type="button" class="bomvw' + (bomView === id ? ' on' : '') +
              '" data-view="' + id + '" title="' + esc(tip) + '">' + esc(t) + '</button>';
@@ -420,13 +670,38 @@
     var box = el('secbody');
     if (!box) return;
     if (!ST){ box.innerHTML = '<div class="muted">Načítavam…</div>'; return; }
-    if (bomView === 'sheets') box.innerHTML = sheetsTable();
+    if (studioSec === 'ctrl') box.innerHTML = ctrlSection();
+    else if (bomView === 'sheets') box.innerHTML = sheetsTable();
     else if (bomView === 'abs') box.innerHTML = absTable();
     else box.innerHTML = partsTable();
   }
 
   // Š6: pri pisani sa prekresluje LEN telo — inak by input stratil fokus.
   function renderBomBody(){ renderBody(); }
+
+  // ---------------------------------------------------- sekcia KONTROLA
+  // Zoznam skladá SERVER (poradie, dedup, texty aj počty) — klient LEN kreslí
+  // a filtruje. „Kontrola bez nálezov" hovorí o VÝROBNÝCH dátach: hrany bez
+  // olepu nie sú položkou semaforu (na tie je prepínač v lište).
+  function ctrlSection(){
+    var all = ST.control || [];
+    var rows = ctrlRows(all, ctrlFilter);
+    var h = semaforHtml(ST.counts, ctrlFilter);
+    if (ctrlFilter !== 'all'){
+      h += '<div class="hint ctrlfilter">Filter: len ' +
+        (ctrlFilter === 'red' ? 'červené' : 'oranžové') +
+        ' nálezy (' + rows.length + ' z ' + all.length + ') — klik na chip ho zruší.</div>';
+    }
+    if (!all.length){
+      return h + '<div class="muted">Kontrola bez nálezov — dáta výroby čisté.</div>';
+    }
+    if (!rows.length){
+      return h + '<div class="muted">Filtru nezodpovedá žiadny nález — klik na chip filter zruší.</div>';
+    }
+    rows.forEach(function(pair){ h += ctrlRowHtml(pair[0], pair[1]); });
+    return h + '<div class="hint">Klik na riadok označí nález v modeli. Ceruzka ho navyše otvorí ' +
+      'v Inspectore. Hrany bez olepu nie sú nálezom semaforu — na tie je prepínač v lište.</div>';
+  }
 
   // ------------------------------------------------------- pohlad DIELCE
   function partsTable(){
@@ -657,6 +932,58 @@
     sketchup.studio_bridge(JSON.stringify({ section: id }));
   }
 
+  // ---- ŠT-1b: akcie sekcie Kontrola -> Ruby -------------------------------
+
+  // Š9: klik na nález. Posiela sa STABILNY kluc problemu (nie pids) — Ruby po
+  // flushi editov validáciu prepočíta a entity dohľadá podľa identity.
+  // Ceruzka navyše zdvihne Inspector (`focus_inspector`, vzor Kusovníka).
+  function selectProblem(key, focusInspector){
+    if (!ST || typeof window === 'undefined' || !window.sketchup || !sketchup.nx_select) return;
+    sketchup.nx_select(JSON.stringify({ gen: ST.gen, problem_key: key,
+                                        focus_inspector: !!focusInspector }));
+  }
+
+  // D-83: „Nahradiť UNI…" — modal patrí oknu Materiály, sem chodí len žiadosť.
+  // Identitu (gen + model_guid) overuje SERVER.
+  function requestReplaceUni(uniId){
+    if (!uniId || !ST || !window.sketchup || !sketchup.replace_uni) return;
+    sketchup.replace_uni(JSON.stringify({ uni_id: uniId, gen: ST.gen,
+                                          model_guid: ST.model_guid || '' }));
+  }
+
+  function edgeCheckToggle(){
+    if (!ST || !window.sketchup || !sketchup.edge_check_toggle) return;
+    sketchup.edge_check_toggle(JSON.stringify(edgeCheckPayload(ST)));
+  }
+
+  // Volá ju zdieľané rozbaľovacie okno (`fn` v edge_menu.js) — musí byť
+  // globálna, preto ju vešiame na window (súbor beží aj v Node testoch).
+  function edgeCheckOption(key, value){
+    if (!ST || !window.sketchup || !sketchup.edge_check_option) return;
+    sketchup.edge_check_option(JSON.stringify(edgeCheckOptionPayload(ST, key, value)));
+  }
+  if (typeof window !== 'undefined') window.edgeCheckOption = edgeCheckOption;
+
+  function grainCheckToggle(){
+    if (!ST || !window.sketchup || !sketchup.grain_check_toggle) return;
+    sketchup.grain_check_toggle(JSON.stringify(edgeCheckPayload(ST)));
+  }
+
+  // Otvorenie/zatvorenie nastavenia je CISTO klientska vec (nikam sa neukladá).
+  // Otvorenie tu zavrie tú istú kópiu v raile Inspectora aj v okne Výroba —
+  // Ruby to len prepošle (žiadny stav, žiadny zápis).
+  function edgeMenuToggle(){
+    ecMenuOpen = !ecMenuOpen;
+    if (ecMenuOpen && window.sketchup && sketchup.edge_menu_open) sketchup.edge_menu_open('');
+    renderTools();
+  }
+
+  function edgeMenuClose(){
+    if (!ecMenuOpen) return;
+    ecMenuOpen = false;
+    renderTools();
+  }
+
   function navItem(id){
     var found = null;
     NAV.forEach(function(g){
@@ -684,8 +1011,46 @@
         colMenuOpen = false;
         renderTools();
       }
+      // Š10: klik MIMO spúšťača zatvára 3-stavové nastavenie (vzor railu).
+      // Rieši sa TU a nie druhým listenerom: stopPropagation medzi dvoma
+      // listenermi na TOM ISTOM uzle nefunguje.
+      if (ecMenuOpen && !t.closest('.echk')) edgeMenuClose();
+      // Prepínače lišty Kontroly.
+      var ec = t.closest('[data-ec]');
+      if (ec){
+        if (ec.getAttribute('data-ec') === 'menu') edgeMenuToggle();
+        else edgeCheckToggle();
+        return;
+      }
+      if (t.closest('[data-gc]')){ grainCheckToggle(); return; }
       var nav = t.closest('[data-nav]');
       if (nav){ onNav(nav.getAttribute('data-nav')); return; }
+      // Š8: semaforový chip = filter (druhý klik ho zruší). Je to čisto
+      // klientska vec — server sa nevolá a zoznam sa neprepočítava.
+      var chip = t.closest('[data-sev]');
+      if (chip){
+        var sev = chip.getAttribute('data-sev');
+        ctrlFilter = (ctrlFilter === sev) ? 'all' : sev;
+        renderBody();
+        return;
+      }
+      // Š9: riadok nálezu — klik/oko = označ, ceruzka = označ + Inspector
+      // dopredu, „Nahradiť UNI…" a rozpočtové premostenie majú vlastnú akciu.
+      var crow = t.closest('[data-ci]');
+      if (crow){
+        var ci = parseInt(crow.getAttribute('data-ci'), 10);
+        var it = (ST && ST.control) ? ST.control[ci] : null;
+        if (!it) return;
+        var cact = t.closest('button.goact');
+        var what = cact ? cact.getAttribute('data-act') : '';
+        if (what === 'uni'){ requestReplaceUni(cact.getAttribute('data-uni')); return; }
+        // Rozpočtové upozornenie NEMÁ entitu v modeli — vedie do Rozpočtu,
+        // ktorý je zatiaľ tabom okna Výroba (premostenie, tooltip to priznáva).
+        if (it.category === 'budget'){ bridgeTo('budget'); return; }
+        if (!it.stable_key) return;
+        selectProblem(it.stable_key, what === 'edit');
+        return;
+      }
       if (t.closest('[data-navmini]')){ navMini = !navMini; savePrefs(); renderNav(); return; }
       if (t.closest('#colBtn')){ colMenuOpen = !colMenuOpen; renderTools(); return; }
       if (t.closest('#vepoBtn')){ vepoExport(); return; }
@@ -736,6 +1101,14 @@
 
     document.addEventListener('keydown', function(ev){
       if (ev.key === 'Enter' && ev.target && ev.target.id === 'prjInput') ev.target.blur();
+      // Š10 (audit #6): nastavenie zatvára klik mimo AJ Escape — vzor
+      // warnpanelu a railu Inspectora. Fokus patrí späť na rohové tlačidlo,
+      // inak by po Escape skončil v prázdne.
+      if (ev.key === 'Escape' && ecMenuOpen){
+        edgeMenuClose();
+        var more = el('ecMore');
+        if (more){ try { more.focus(); } catch (e) {} }
+      }
     });
   }
 
@@ -746,7 +1119,9 @@
     };
   }
 
-  // Node testy (tests/js/test_st1a_studio.js) — LEN ciste funkcie bez DOM.
+  // Node testy (tests/js/test_st1a_studio.js, test_st1b_kontrola.js a od ŠT-1b
+  // aj test_d104/test_d105/test_k2/test_abs_rail_3stav) — LEN ciste funkcie
+  // bez DOM.
   if (typeof module !== 'undefined' && module.exports){
     module.exports = {
       STUDIO_SECTIONS: STUDIO_SECTIONS, COLS: COLS, NAV: NAV,
@@ -754,6 +1129,16 @@
       sheetRows: sheetRows,
       activeCols: activeCols, cellValue: cellValue, grainLabel: grainLabel,
       absCompact: absCompact, absFull: absFull, rgbHex: rgbHex,
-      navBridgeIds: navBridgeIds, anchorFilter: anchorFilter, navItem: navItem
+      navBridgeIds: navBridgeIds, anchorFilter: anchorFilter, navItem: navItem,
+      // ŠT-1b sekcia Kontrola (Š8–Š11)
+      semaforHtml: semaforHtml, ctrlRows: ctrlRows, ctrlRowHtml: ctrlRowHtml,
+      ctrlActionsHtml: ctrlActionsHtml, navBadgeHtml: navBadgeHtml,
+      // Š10 prepinace (sady D-104 / D-105 / K2 / ABS rail 3-stav)
+      edgeCheckBarHtml: edgeCheckBarHtml, edgeCheckText: edgeCheckText,
+      edgePluralSk: edgePluralSk, edgeCheckPayload: edgeCheckPayload,
+      edgeCheckMenuHtml: edgeCheckMenuHtml, edgeCheckOptionPayload: edgeCheckOptionPayload,
+      edgeCheckSelectionHint: edgeCheckSelectionHint,
+      grainBtnHtml: grainBtnHtml, grainCheckText: grainCheckText,
+      grainPartPluralSk: grainPartPluralSk
     };
   }

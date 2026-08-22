@@ -138,7 +138,30 @@ module Noxun
         check_placements(placements, items)
         Array(collected[:warnings]).each { |w| check_build(w, items, uni_parts) }
         items = sort_items(dedup(items))
-        { 'items' => items, 'counts' => counts(items) }
+        # ŠT-1b (Š8): MENOVATEL zeleneho cisla je SKUTOCNY pocet skriniek zo
+        # zberu (`collected[:cabinets]`), NIE dlzka zoznamu ID z placements —
+        # `Bom.add_placement` zaznam vynechava (prazdne ID, degenerovane rozmery)
+        # a rovnake ID zbiera raz, takze poskodena skrinka alebo dve kopie s tym
+        # istym ID by pocet skriniek TICHO ZMENSILI (nalez review #2).
+        { 'items' => items,
+          'counts' => counts(items, cabinet_ids: cabinet_ids(placements),
+                                    cabinets: collected[:cabinets]) }
+      end
+
+      # ŠT-1b (Š8): ID top-level SKRINIEK, ktore sa daju spojit s nalezom.
+      # Zdrojom su `placements` (Bom.collect). Je to VYHRADNE mnozina „ktore ID
+      # patri skrinke" (nie pocet — ten je `collected[:cabinets]`).
+      # nil = zoznam NEDODANY (legacy volania a headless testy bez placements):
+      # vtedy sa zeleny pocet vobec nepocita a tvar counts sa NEMENI.
+      def cabinet_ids(placements)
+        return nil if placements.nil?
+
+        Array(placements).each_with_object([]) do |p, out|
+          next unless p.is_a?(Hash) && p['kind'].to_s == 'cabinet'
+
+          id = p['owner_id'].to_s
+          out << id unless id.empty? || out.include?(id)
+        end
       end
 
       # V0.6 E-b: KONTROLA + upozornenia ROZPOCTU v JEDNOM zozname.
@@ -158,7 +181,13 @@ module Noxun
           items << budget_item(b)
         end
         merged = sort_items(dedup(items))
-        { 'items' => merged, 'counts' => counts(merged) }
+        # ŠT-1b: zelene cislo semaforu (skrinky bez nalezu) sa PRENASA z pôvodných
+        # counts — rozpoctove polozky nemaju vlastnika, takze ho zmenit nemozu,
+        # a druhy vypocet by potreboval placements, ktore sem uz nechodia.
+        c = counts(merged)
+        base_counts = base['counts'].is_a?(Hash) ? base['counts'] : {}
+        %w[cabinets clean].each { |k| c[k] = base_counts[k] if base_counts.key?(k) }
+        { 'items' => merged, 'counts' => c }
       end
 
       # Tvar riadku KONTROLY z rozpoctoveho upozornenia (E-a nesie 'message' a
@@ -575,10 +604,37 @@ module Noxun
       end
 
       # Counts PRIAMO z finalneho zoznamu — JS ich NIKDY neprepocitava (nalez 11).
-      def counts(items)
+      #
+      # ŠT-1b (Š8, audit #4): ked volajuci dodá ZOZNAM ID SKRINIEK, pribuda aj
+      # ZELENE cislo semaforu — „skriniek bez nalezu" = pocet korpusov minus
+      # tie, ktore v zozname nalezov figuruju ako vlastnik. Pocita ho SERVER
+      # (klient si zo zoznamu nic neodvodzuje); rozpoctove polozky vlastnika
+      # nemaju, takze zelene cislo neovplyvnuju.
+      #
+      # `cabinets:` je SKUTOCNY pocet skriniek zo zberu (`collected[:cabinets]`)
+      # a je to MENOVATEL — `cabinet_ids` je len mnozina ID, ktore sa daju
+      # spojit s nalezom, a moze byt MENSIA (kopie so zhodnym ID, skrinka bez ID
+      # ci s degenerovanymi rozmermi placement nedostane). Bez neho sa pocet
+      # odvodi zo zoznamu ID (spatna kompatibilita a headless testy).
+      # Bez zoznamu (`cabinet_ids: nil`) je tvar counts PRESNE taky, aky bol.
+      #
+      # PRIJATY LIMIT (review #8): nalez „dva kusy na jednom mieste" nesie
+      # owner_id PRVEHO vlastnika skupiny, takze zo skupiny „spini" zelene cislo
+      # len jedna skrinka. Vedome sa nerozvadza — nalez aj tak vedie k oprave
+      # celej skupiny a rozpad na viac vlastnikov by zmenil `stable_key`
+      # (a s nim klik-select aj dedup).
+      def counts(items, cabinet_ids: nil, cabinets: nil)
         red = items.count { |it| it['severity'] == RED }
         orange = items.count { |it| it['severity'] == ORANGE }
-        { 'red' => red, 'orange' => orange, 'total' => red + orange }
+        out = { 'red' => red, 'orange' => orange, 'total' => red + orange }
+        return out if cabinet_ids.nil?
+
+        total = cabinets.nil? ? cabinet_ids.length : cabinets.to_i
+        owners = items.map { |it| it['owner_id'].to_s }.reject(&:empty?).uniq
+        dirty = cabinet_ids.count { |id| owners.include?(id) }
+        # Menovatel a citatel su z dvoch zdrojov (pocet zo zberu, ID z placements),
+        # takze zaporne cislo je teoreticky mozne — nikdy sa nezobrazi.
+        out.merge('cabinets' => total, 'clean' => [total - dirty, 0].max)
       end
 
       def present?(v)

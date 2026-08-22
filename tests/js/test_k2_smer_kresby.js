@@ -1,5 +1,6 @@
-// Testy K2 / D-87 (JS zrkadlo) — prepinac „Smer kresby" v tabe KONTROLA okna
-// Vyroba (vedla „Zvyraznit hrany").
+// Testy K2 / D-87 (JS zrkadlo) — prepinac „Smer kresby" v LISTE SEKCIE Kontrola
+// okna STUDIO, vedla „Zvyraznit hrany" (ŠT-1b: presun z tabu KONTROLA okna
+// Vyroba — ta ista serverova cesta, ten isty stav).
 //
 // JS je LEN zobrazenie: zapnutost aj pocty nesie SERVER, klient si nic
 // neprepocitava a nic si nepamata. Tento subor testuje CISTE funkcie bez DOM.
@@ -9,7 +10,7 @@ const path = require('node:path');
 
 global.window = {};
 global.document = { addEventListener: function(){}, getElementById: function(){ return null; } };
-const P = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'production.js'));
+const P = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'studio.js'));
 
 let n = 0;
 function eq(actual, expected, msg){
@@ -74,14 +75,17 @@ function grain(extra){
 // --- lista: dva nastroje, JEDEN riadok ----------------------------------------
 (function(){
   const bar = P.edgeCheckBarHtml(EDGE, false, grain());
-  ok(bar.indexOf('class="ecsplit"') >= 0, 'zvyraznenie hran ostava split tlacidlom');
+  ok(bar.indexOf('class="echk"') >= 0, 'zvyraznenie hran ostava tlacidlom s rohom');
   ok(bar.indexOf('id="gcBtn"') >= 0, 'smer kresby je v TEJ ISTEJ liste');
-  eq(bar.split('class="ecbar"').length - 1, 1, 'stale JEDEN riadok listy (vertikalny priestor)');
+  // ŠT-1b: oba prepinace ziju v liste SEKCIE (`.sectools`), takze vlastny
+  // riadkovy kontajner uz nemaju — o to viac plati, ze pribudnut NESMIE.
+  eq(bar.split('<span class="ecinfo">').length - 1, 1,
+     'stale JEDEN text listy (vertikalny priestor je vzacny)');
   ok(bar.indexOf('12 dielcov s kresbou') >= 0, 'text smeru je pripojeny k textu listy');
 
   const without = P.edgeCheckBarHtml(EDGE, false);
   no(without.indexOf('id="gcBtn"') >= 0, 'bez stavu smeru sa prepinac nekresli');
-  ok(without.indexOf('class="ecsplit"') >= 0, 'a zvyraznenie hran tym netrpi');
+  ok(without.indexOf('class="echk"') >= 0, 'a zvyraznenie hran tym netrpi');
 
   const na = P.edgeCheckBarHtml({ available: false }, false, grain());
   ok(na.indexOf('SketchUp 2023') >= 0, 'stary SketchUp dostane vetu za oba nastroje');

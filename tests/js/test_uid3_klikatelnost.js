@@ -87,11 +87,12 @@ eq(NXShell.warnRows([{ message: 'a' }, { message: 'b' }]).map(r => r.text), ['a'
 // --- 2) deep-link do okna Vyroba --------------------------------------------
 
 // ST-1a: `rows`/`sheets`/`edging` zanikli — kusovnik a supisy platni a ABS su
-// sekciou Kusovnik okna Studio.
-eq(NXShell.STUDIO_TABS, ['hardware', 'budget', 'control'],
+// sekciou Kusovnik okna Studio. ŠT-1b: to iste sa stalo tabu `control`.
+eq(NXShell.STUDIO_TABS, ['hardware', 'budget'],
    'zoznam tabov je ZRKADLO ProductionDialog::TABS');
 
-eq(NXShell.studioTab('control'), 'control', 'platny tab prejde');
+eq(NXShell.studioTab('control'), null, 'zaniknuty tab kontroly sa uz z panela nedostane von');
+eq(NXShell.studioTab('hardware'), 'hardware', 'kovanie prejde');
 eq(NXShell.studioTab('budget'), 'budget', 'rozpocet prejde');
 eq(NXShell.studioTab('rows'), null, 'zaniknuty tab kusovnika sa uz z panela nedostane von');
 eq(NXShell.studioTab('sheets'), null, 'zaniknuty tab platni tiez nie');
@@ -101,15 +102,16 @@ eq(NXShell.studioTab(null), null, 'chybajuca hodnota = bez deep-linku');
 eq(NXShell.studioTab(undefined), null, 'rail Štúdio (bez argumentu) tab NEPREPINA');
 eq(NXShell.studioTab('__proto__'), null, 'zoznam sa pyta indexOf, nie vlastnosti objektu');
 
-eq(NXShell.studioLink('control'), { tab: 'control' }, 'payload nesie iba meno tabu');
+eq(NXShell.studioLink('budget'), { tab: 'budget' }, 'payload nesie iba meno tabu');
 eq(NXShell.studioLink(), { tab: null }, 'bez tabu ide `null` — server vtedy tab nemeni');
 eq(NXShell.studioLink('nieco'), { tab: null }, 'nezname meno sa z panela vobec nedostane von');
 
 // --- 3) ST-1a: deep-link do okna STUDIO -------------------------------------
 
-eq(NXShell.STUDIO_SECTIONS, ['bom'], 'zoznam sekcii je ZRKADLO StudioDialog::SECTIONS');
+eq(NXShell.STUDIO_SECTIONS, ['bom', 'ctrl'], 'zoznam sekcii je ZRKADLO StudioDialog::SECTIONS');
 eq(NXShell.studioSection('bom'), 'bom', 'platna sekcia prejde');
-eq(NXShell.studioSection('ctrl'), null, 'premostenie NIE JE sekcia — Kontrola zije v okne Vyroba');
+eq(NXShell.studioSection('ctrl'), 'ctrl', 'ŠT-1b: Kontrola je ZIVA sekcia Studia (uz nie premostenie)');
+eq(NXShell.studioSection('mat'), null, 'premostenie do ineho okna NIE JE sekcia');
 eq(NXShell.studioSection(''), null, 'prazdna hodnota = bez deep-linku');
 eq(NXShell.studioSection(null), null, 'chybajuca hodnota = bez deep-linku');
 eq(NXShell.studioSection('__proto__'), null, 'zoznam sa pyta indexOf, nie vlastnosti objektu');

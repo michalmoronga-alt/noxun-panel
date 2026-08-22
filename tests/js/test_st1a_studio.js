@@ -28,7 +28,9 @@ function ok(cond, msg){ n++; assert.ok(cond, msg); }
 
 // --- 1) whitelist sekcii (zrkadlo StudioDialog::SECTIONS) --------------------
 
-eq(S.STUDIO_SECTIONS, ['bom'], 'v ST-1a zije jedina sekcia — Kusovník');
+// ŠT-1b: pribudla sekcia Kontrola (`ctrl`) — dovtedy bola premostenim do
+// okna Vyroba. Zoznam je ZRKADLO `StudioDialog::SECTIONS`.
+eq(S.STUDIO_SECTIONS, ['bom', 'ctrl'], 'v Studiu ziju sekcie Kusovník a Kontrola');
 
 // --- 2) hladanie bez diakritiky (Š6) ----------------------------------------
 
@@ -144,7 +146,7 @@ eq(S.rgbHex([300, -5, 12]), '#ff000c', 'hodnoty mimo rozsahu sa orezu, nie zahod
 // --- 8) navigacia: premostenia vs. neaktivne polozky ------------------------
 
 eq(S.navBridgeIds().sort(),
-   ['about', 'bset', 'budget', 'buy', 'ctrl', 'hw', 'mat', 'offer', 'rules', 'sup', 'tpl'].sort(),
+   ['about', 'bset', 'budget', 'buy', 'hw', 'mat', 'offer', 'rules', 'sup', 'tpl'].sort(),
    'ZRKADLO whitelistu premosteni v StudioDialog (PRODUCTION_BRIDGES + WINDOW_BRIDGES + about)');
 
 const CUT = S.navItem('cut');

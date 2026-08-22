@@ -5079,6 +5079,250 @@ module NoxunSuRunner
     log_line("FAIL: ST-1a sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
 
+  # ŠT-1b (review #9): odchytenie SKUTOCNYCH payloadov oboch okien. `js` je
+  # privatna metoda modulu okna, takze sa docasne prealiasuje (vzor
+  # `install_js_recorder` pre Panel) a po zbere sa VZDY vrati spat.
+  def st1b_capture_counts(_model)
+    rec_studio = []
+    rec_prod = []
+    pairs = [[e::StudioDialog, rec_studio], [e::ProductionDialog, rec_prod]]
+    pairs.each do |(mod, rec)|
+      mod.singleton_class.class_eval do
+        alias_method :nx_js_orig_st1b, :js
+        define_method(:js) { |script| rec << script.to_s; nil }
+      end
+    end
+    begin
+      e::StudioDialog.send(:push_state)
+      e::ProductionDialog.send(:push_state)
+    ensure
+      pairs.each do |(mod, _rec)|
+        sc = mod.singleton_class
+        next unless sc.method_defined?(:nx_js_orig_st1b) || sc.private_method_defined?(:nx_js_orig_st1b)
+
+        sc.class_eval do
+          alias_method :js, :nx_js_orig_st1b
+          remove_method :nx_js_orig_st1b
+        end
+      end
+    end
+    st_payload = rec_studio.find { |s| s.start_with?('NX.setStudio(') }
+    pr_payload = rec_prod.find { |s| s.start_with?('NX.setBom(') }
+    if st_payload.nil? || pr_payload.nil?
+      return info('ŠT-1b: payload jedneho z okien sa nepodarilo odchytit — porovnanie counts preskocene.')
+    end
+
+    st_counts = st_payload[/"counts":\{[^}]*\}/]
+    pr_counts = pr_payload[/"counts":\{[^}]*\}/]
+    ok("ŠT-1b: counts v ODCHYTENYCH payloadoch oboch okien su BAJT-ROVNAKE (#{st_counts})",
+       !st_counts.nil? && st_counts == pr_counts)
+    # Zeleny chip semaforu nesmie z payloadu vypadnut — bez neho by okno
+    # ukazalo pomlcku namiesto poctu skriniek.
+    ok('ŠT-1b: payload Studia nesie zelene cislo semaforu (cabinets + clean)',
+       st_counts.to_s.include?('"cabinets"') && st_counts.to_s.include?('"clean"'))
+  rescue StandardError => ex
+    info("ŠT-1b: porovnanie payloadov zlyhalo: #{ex.class}: #{ex.message}")
+  end
+
+  # ============ ŠT-1b: sekcia KONTROLA v okne ŠTÚDIO (Š8–Š11) ================
+  # Co sa tu overuje (a co headless sada neuvidi):
+  #   1) JEDNO CISLO — semafor Studia sa sklada z TOHO ISTEHO jadra ako okno
+  #      Vyroba (vratane rozpoctovych ORANGE) a nesie ZELENE cislo skriniek,
+  #   2) klik na nalez OZNACI entitu v modeli a NEPRIDA krok Spat,
+  #   3) prepinace hran a kresby z cesty Studia naozaj prepinaju SERVEROVY stav
+  #      (ten isty, ktory vidi rail) a guardy odmietnu stary DOM klik,
+  #   4) rozpoctovy nalez sa da PREMOSTIT do okna Vyroba,
+  #   5) MERANIE (audit #17): trvanie push_state pri OBOCH otvorenych oknach.
+  def run_st1b(model)
+    cleanup(model)
+    return ok('ŠT-1b: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
+
+    core = e::ProductionCore
+    inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 900.0,
+                                            'height' => 720.0, 'depth' => 560.0 })
+    return ok('ŠT-1b: vlozenie skrinky pre kontrolu', false) unless inst
+
+    before_ents = model.entities.length
+
+    # --- 1) JEDNO cislo kontroly (audit #2 + #4) -----------------------------
+    collected = core.fresh_collect(model)
+    bom = e::Bom.compute(collected)
+    smap = core.sheets_map
+    hw_exp = core.hardware_expansion(model, collected)
+    budget = core.budget_payload(model, bom, collected, nil, hw_exp, smap)
+    control = core.control_payload(collected, hardware_expansion: hw_exp,
+                                              budget: budget, sheets: smap)
+    counts = control['counts'] || {}
+    ok('ŠT-1b: counts nesie cervene aj oranzove cislo',
+       counts.key?('red') && counts.key?('orange') && counts.key?('total'))
+    ok("ŠT-1b: counts nesie ZELENE cislo skriniek (cabinets=#{counts['cabinets']}, clean=#{counts['clean']})",
+       counts.key?('cabinets') && counts.key?('clean'))
+    ok('ŠT-1b: pocet korpusov je aspon 1 (prave sme jeden vlozili)',
+       counts['cabinets'].to_i >= 1)
+    ok('ŠT-1b: skriniek bez nalezu nikdy nie je viac nez skriniek',
+       counts['clean'].to_i <= counts['cabinets'].to_i && counts['clean'].to_i >= 0)
+    # To iste cislo musi dat aj okno Vyroba — cita to iste jadro.
+    prod_control = core.control_payload(core.fresh_collect(model), hardware_expansion: hw_exp,
+                                                                   budget: budget, sheets: smap)
+    ok('ŠT-1b: zdielane jadro da pri dvoch volaniach ROVNAKE counts',
+       prod_control['counts'] == counts)
+
+    # --- 2) klik na nalez oznaci entitu a NEPRIDA krok Spat ------------------
+    # POZOR: kazde odmietnutie guardu vola `repush` a ten (pri otvorenom okne)
+    # zdvihne generaciu — presne ako v realnom UI, kde klient dostane cerstvy
+    # payload. Test preto cita generaciu VZDY tesne pred akciou, nie raz na
+    # zaciatku; inak by druha akcia spadla na „stary DOM" a merala by sa pasca
+    # testu, nie spravanie okna.
+    stgen = -> { e::StudioDialog.instance_variable_get(:@generation).to_i }
+    e::StudioDialog.send(:push_state)
+    gen = stgen.call
+    ok("ŠT-1b: push_state zdvihol generaciu Studia (gen=#{gen})", gen.positive?)
+    item = Array(control['items']).find do |it|
+      it['category'].to_s != 'budget' && !it['owner_id'].to_s.empty?
+    end
+    if item.nil?
+      info('ŠT-1b: model nema ziadny modelovy nalez — klik-select sa preskocil (kontrola je cista).')
+    else
+      model.selection.clear
+      e::StudioDialog.do_select({ 'gen' => stgen.call, 'problem_key' => item['stable_key'] }.to_json)
+      sel = model.selection.to_a
+      ok("ŠT-1b: klik na nalez oznacil entitu v modeli (#{sel.length}; #{item['category']})",
+         !sel.empty?)
+      ok('ŠT-1b: klik na nalez NEMENI model (ziadna entita naviac ani menej)',
+         model.entities.length == before_ents)
+      # Stary DOM klik (ina generacia) vyber NEZMENI.
+      model.selection.clear
+      model.selection.add(inst)
+      e::StudioDialog.do_select({ 'gen' => stgen.call - 99, 'problem_key' => item['stable_key'] }.to_json)
+      ok('ŠT-1b: nalez so STAROU generaciou vyber nezmeni (stary DOM / iny model)',
+         model.selection.to_a == [inst])
+    end
+
+    # --- 3) prepinace z cesty Studia (audit #5, #6) --------------------------
+    if defined?(e::EdgeCheck) && e::EdgeCheck.available?(model)
+      guid = core.model_guid(model)
+      was = e::EdgeCheck.active?
+      e::StudioDialog.do_edge_check({ 'gen' => stgen.call, 'model_guid' => guid }.to_json)
+      ok('ŠT-1b: toggle z listy Studia PREPOL serverovy stav zvyraznenia (ten isty vidi rail)',
+         e::EdgeCheck.active? != was)
+      ok('ŠT-1b: zvyraznenie NEMENI model (overlay kresli NAD nim)',
+         model.entities.length == before_ents)
+      # Guard: stara generacia sa odmietne a stav sa NEZMENI.
+      state_before = e::EdgeCheck.active?
+      e::StudioDialog.do_edge_check({ 'gen' => stgen.call - 99, 'model_guid' => guid }.to_json)
+      ok('ŠT-1b: toggle so STAROU generaciou sa odmietol (stav sa nezmenil)',
+         e::EdgeCheck.active? == state_before)
+      # Guard: prepnuty dokument (cudzi guid) sa odmietne rovnako.
+      e::StudioDialog.do_edge_check({ 'gen' => stgen.call, 'model_guid' => 'CUDZI-GUID' }.to_json)
+      ok('ŠT-1b: toggle z CUDZIEHO dokumentu sa odmietol (stav sa nezmenil)',
+         e::EdgeCheck.active? == state_before)
+      # Nastavenie stavov ide ZDIELANOU cestou (%APPDATA%, nikdy model).
+      opt_before = e::EdgeCheck.ui_state(model)['options']['show_extra'] == true
+      e::StudioDialog.do_edge_check_option({ 'gen' => stgen.call, 'model_guid' => guid,
+                                             'key' => 'show_extra',
+                                             'value' => !opt_before }.to_json)
+      opt_after = e::EdgeCheck.ui_state(model)['options']['show_extra'] == true
+      ok("ŠT-1b: 3-stavove nastavenie z rohu Studia sa ZAPISALO (#{opt_before} -> #{opt_after})",
+         opt_after == !opt_before)
+      e::StudioDialog.do_edge_check_option({ 'gen' => stgen.call, 'model_guid' => guid,
+                                             'key' => 'show_extra',
+                                             'value' => opt_before }.to_json)
+      # Neznamy kluc sa NEZAPISE.
+      snapshot = e::EdgeCheck.ui_state(model)['options'].dup
+      e::StudioDialog.do_edge_check_option({ 'gen' => stgen.call, 'model_guid' => guid,
+                                             'key' => 'show_vsetko', 'value' => true }.to_json)
+      ok('ŠT-1b: neznamy kluc nastavenia sa NEZAPISAL',
+         e::EdgeCheck.ui_state(model)['options'] == snapshot)
+      e::StudioDialog.do_edge_check({ 'gen' => stgen.call, 'model_guid' => guid }.to_json) if was != e::EdgeCheck.active?
+      e::EdgeCheck.disable!
+    else
+      info('ŠT-1b: Overlay API nie je k dispozicii — prepinac hran sa preskocil.')
+    end
+
+    if defined?(e::GrainCheck) && e::GrainCheck.available?(model)
+      guid = core.model_guid(model)
+      was = e::GrainCheck.active?
+      e::StudioDialog.do_grain_check({ 'gen' => stgen.call, 'model_guid' => guid }.to_json)
+      ok('ŠT-1b: „Smer kresby" z listy Studia PREPOL serverovy stav',
+         e::GrainCheck.active? != was)
+      ok('ŠT-1b: kresba smeru NEMENI model', model.entities.length == before_ents)
+      e::GrainCheck.disable!
+    else
+      info('ŠT-1b: Overlay API nie je k dispozicii — prepinac kresby sa preskocil.')
+    end
+
+    # --- 4) rozpoctovy nalez premosti do okna Vyroba (audit #3) --------------
+    bud = Array(control['items']).find { |it| it['category'].to_s == 'budget' }
+    if bud.nil?
+      info('ŠT-1b: model nema rozpoctovy nalez — premostenie sa preskocilo.')
+    else
+      e::StudioDialog.do_bridge({ 'section' => 'budget' }.to_json)
+      prod_dlg = e::ProductionDialog.instance_variable_get(:@dialog)
+      ok('ŠT-1b: rozpoctovy nalez otvoril okno Vyroba (premostenie do Rozpoctu)',
+         !prod_dlg.nil?)
+      ok('ŠT-1b: premostenie model nezmenilo', model.entities.length == before_ents)
+      begin
+        prod_dlg.close if prod_dlg && prod_dlg.respond_to?(:close)
+      rescue StandardError
+        nil
+      end
+    end
+
+    # Poslednou modelovou operaciou je vlozenie skrinky — keby bol klik na nalez
+    # alebo prepnutie prepinaca vlastnou operaciou, 1x Spat by vratil JU.
+    Sketchup.undo
+    ok('ŠT-1b: 1x Spat zmaze skrinku (sekcia Kontrola nepridala ziadny krok Spat)',
+       inst.nil? || !inst.valid?)
+
+    # --- 5) MERANIE (audit #17): push_state pri OBOCH otvorenych oknach ------
+    # Od ŠT-1b pocita KONTROLU (a kvoli jej ORANGE aj rozpocet) aj Studio, takze
+    # pri dvoch otvorenych oknach bezi cely pipeline dvakrat. Meria sa na VIAC
+    # skrinkach — na jednej by cislo nepovedalo nic. Bezi AZ PO undo kontrole,
+    # aby si stavanie skriniek nepomiesalo poradie krokov Spat.
+    begin
+      cleanup(model)
+      6.times do |i|
+        e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0 + (i * 50),
+                                         'height' => 720.0, 'depth' => 560.0 })
+      end
+      e::ProductionDialog.show
+      e::StudioDialog.show
+      ents_before_push = model.entities.length
+      t0 = Time.now
+      e::StudioDialog.send(:push_state)
+      t_studio = ((Time.now - t0) * 1000).round(1)
+      t1 = Time.now
+      e::ProductionDialog.send(:push_state)
+      t_prod = ((Time.now - t1) * 1000).round(1)
+      cabs = model.entities.grep(Sketchup::ComponentInstance).length
+      info("ŠT-1b MERANIE (audit #17): push_state Studio #{t_studio} ms · " \
+           "Vyroba #{t_prod} ms · top-level instancii v modeli: #{cabs}")
+      ok('ŠT-1b: push_state oboch okien model NEZMENIL',
+         model.entities.length == ents_before_push)
+
+      # Review #9: porovnanie „ta ista funkcia s tymi istymi argumentmi" je
+      # slabe. Silny dokaz je ODCHYTENY payload — to, co kazde okno naozaj
+      # posle svojmu klientovi. Meria sa AZ TERAZ (nie pri casoch vyssie),
+      # aby stub `js` neskreslil trvanie.
+      st1b_capture_counts(model)
+    rescue StandardError => ex
+      info("ŠT-1b: meranie pushov zlyhalo: #{ex.class}: #{ex.message}")
+    ensure
+      [e::ProductionDialog, e::StudioDialog].each do |mod|
+        dlg = mod.instance_variable_get(:@dialog)
+        begin
+          dlg.close if dlg && dlg.respond_to?(:close)
+        rescue StandardError
+          nil
+        end
+      end
+    end
+
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: ŠT-1b sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   def run_async(model, done)
     state = {}
     steps = []
@@ -5752,6 +5996,7 @@ module NoxunSuRunner
     run_uid2(model)          # UI-D2: PNG nahlady sablon — capture, KOMPLETNA obnova kamery (persp. aj orto), ziadny undo krok
     run_smoke1(model)        # SMOKE PACK 1 (6A): rucne odfotenie nahladu k ULOZENEJ sablone — guardy vyberu, ziadny undo krok
     run_st1a(model)          # ST-1a: okno Studio — deep-link sekcie, kusovnik zo ziveho modelu, klik-select bez undo kroku, serverovy nazov projektu
+    run_st1b(model)          # ŠT-1b: sekcia Kontrola v Studiu — jedno cislo semaforu, klik na nalez bez undo kroku, zdielane prepinace, trvanie pushov
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

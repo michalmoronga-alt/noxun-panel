@@ -564,14 +564,22 @@ module Noxun
         dir = UI.select_directory(title: 'Priečinok pre VEPO export', directory: start_dir)
         return status.call('Export zrušený.') if dir.nil? || dir.to_s.empty?
 
-        # Nalez 5: JEDEN cerstvy RAW zber -> nad nim compute AJ Validation.run;
+        # Nalez 5: JEDEN cerstvy RAW zber -> nad nim compute AJ kontrola;
         # validaciu EXPLICITNE odovzdame do build (prefix statusu + sekcia
         # KONTROLA v LOGu z TOHO ISTEHO vysledku).
+        #
+        # Review #1 (ŠT-1b): kontrola sa tu pocita ZDIELANOU `control_payload`,
+        # teda VRATANE upozorneni rozpoctu. Bez toho by LOG a status exportu
+        # hlasili ine cislo nez semafor sekcie Kontrola a badge navigacie —
+        # a pouzivatel by nevedel, ktore z dvoch cisel plati.
         collected = fresh_collect(model)
         bom = Bom.compute(collected)
-        control = Validation.run(collected, sheets: sheets_map, edges: edges_map,
-                                 hardware_expansion: hardware_expansion(model, collected),
-                                 placements: collected[:placements])
+        smap = sheets_map
+        hw_exp = hardware_expansion(model, collected)
+        control = control_payload(collected, hardware_expansion: hw_exp,
+                                             budget: budget_payload(model, bom, collected,
+                                                                    nil, hw_exp, smap),
+                                             sheets: smap)
         # audit #1: nazov projektu aj merge su SERVEROVE — z DOM uz nechodia.
         merge = merge_18_36
         result = VepoExport.build(
@@ -667,6 +675,236 @@ module Noxun
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_select')
         status.call("Chyba výberu: #{e.message}", true)
+      end
+
+      # --- ŠT-1b (audit #2): JEDNO CISLO KONTROLY PRE VSETKY OKNA ----------
+      #
+      # Semafor sekcie Kontrola (Studio), badge navigacie, ⚠ chip hlavicky okna
+      # Vyroba aj suhrn v statuse a LOGu exportu musia ukazovat TO ISTE. Preto
+      # sa cely vypocet KONTROLY — vratane zlucenia s upozorneniami ROZPOCTU —
+      # robi TU a obe okna volaju tuto jednu metodu. Dva takmer rovnake vypocty
+      # by sa casom rozisli a pouzivatel by videl dve rozne cisla.
+      #
+      # POZOR na zamenu: ⚠ chip v INSPECTORE je nieco INE — su to build
+      # warnings PRAVE OZNACENEJ skrinky, nie kontrola celej zakazky. Inspector
+      # sem len VEDIE (deep-link „Otvoriť v Štúdiu → Kontrola").
+      #
+      # `budget` je HOTOVY payload rozpoctu (okno Vyroba ho aj tak pocita pre
+      # svoj tab, tak ho odovzda a nepocita sa dvakrat); nil = rozpocet sa
+      # nepodaril zostavit a jeho ORANGE do zoznamu nepribudnu.
+      def control_payload(collected, hardware_expansion: nil, budget: nil, sheets: nil)
+        smap = sheets || sheets_map
+        control = Validation.run(collected, sheets: smap, edges: edges_map,
+                                 hardware_expansion: hardware_expansion,
+                                 placements: collected[:placements])
+        return control unless budget.is_a?(Hash)
+
+        Validation.with_budget(control, budget['budget_check'])
+      end
+
+      # V0.6 E-b: payload rozpoctu z TYCH ISTYCH dat ako kusovnik/semafor (jedna
+      # autorita cisel). ŠT-1b: telo sa stahuje sem, lebo rozpoctove upozornenia
+      # su sucastou KONTROLY a tu uz cita aj Studio. Zlyhanie NIKDY nezhodi okno —
+      # vrati nil a zvysok okna zije dalej.
+      def budget_payload(model, bom, collected, estimate = nil, hw_exp = nil, smap = nil)
+        smap ||= sheets_map
+        est = estimate || SheetEstimate.estimate(
+          bom[:rows],
+          sheet_sizes: smap.each_with_object({}) { |(id, s), out| out[id] = s['sheet_size'] },
+          uni_ids: smap.each_with_object({}) { |(id, s), out| out[id] = true if Materials.uni?(s) }
+        )
+        exp = hw_exp || hardware_expansion(model, collected)
+        Budget.payload_for(model, bom, sheets: smap, edges: (edges_map || {}),
+                           hardware_expansion: exp, hardware_catalog: hardware_catalog_items,
+                           sheet_estimate: est)
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.budget_payload')
+        nil
+      end
+
+      # Katalog kovania pre scan veku cien; chyba katalogu = scan sa preskoci
+      # (vzor edges_map), rozpocet sa nezhodi.
+      def hardware_catalog_items
+        return nil unless defined?(HardwareCatalog)
+
+        HardwareCatalog.items
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.hardware_catalog_items')
+        nil
+      end
+
+      # --- D-83 / ŠT-1b (audit #13): skratka „Nahradiť UNI…" ---------------
+      #
+      # Riadok KONTROLY „materiál neurčený" ponuka rovno zamenu UNI za realny
+      # dekor. Modal patri oknu Materialy, tu je len cesta k nemu. Okno NEMUTI
+      # model — otvara sa okno, preto ziadny flush handshake.
+      # Vsetky tri guardy bezia na SERVERI (klientovi sa neveri):
+      #   gen        — riadok zo stareho DOM (medzitym prepocitana kontrola),
+      #   model_guid — medzitym prepnuty dokument,
+      #   uni_id     — material medzitym zmazany/nahradeny/uz nie je UNI.
+      def replace_uni(model, data, generation:, status:, repush:)
+        unless data['gen'].to_i == generation.to_i
+          repush.call
+          return status.call('Kontrola sa medzitým zmenila — obnovené, klikni znova.', true)
+        end
+        guid = data['model_guid'].to_s
+        if !guid.empty? && guid != model_guid(model)
+          repush.call
+          return status.call('Model sa medzitým prepol — obnovené, klikni znova.', true)
+        end
+        uni_id = data['uni_id'].to_s
+        sheet = defined?(Materials) ? Materials.sheet(uni_id) : nil
+        unless sheet && Materials.uni?(sheet)
+          repush.call
+          return status.call('Materiál už nie je UNI (medzitým sa zmenil) — kontrola obnovená.', true)
+        end
+        unless defined?(MaterialsDialog) && MaterialsDialog.request_replace_uni(uni_id, model)
+          return status.call('Okno Materiály sa nepodarilo otvoriť.', true)
+        end
+
+        status.call("Otváram „Nahradiť UNI…“ pre #{uni_id}.")
+      end
+
+      # --- D-104 / D-105 / K2 (audit #5): ZDIELANE PREPINACE OVERLAYOV ------
+      #
+      # „Zvýrazniť hrany" a „Smer kresby" su od ŠT-1b v liste sekcie Kontrola
+      # (Studio) — a dovtedy boli v tabe Kontrola okna Vyroba. Rovnaka akcia
+      # v dvoch oknach = telo MUSI byt jedno; okno odovzdava LEN svoj generacny
+      # token, svoj status, svoj refresh a svoje echo (maly push stavu).
+      #
+      # Model sa NEMENI — overlay kresli NAD nim (ziadna operacia, ziadny undo
+      # krok, ziadny zapis do .skp; nastavenie zije v %APPDATA%).
+
+      # Spolocne serverove guardy (HTML disabled nie je ochrana):
+      #   available  — SketchUp bez Overlay API (2022 a starsi),
+      #   gen        — klik zo stareho DOM (medzitym prepocitane okno),
+      #   model_guid — medzitym prepnuty dokument (zaplo by sa v cudzej zakazke).
+      # false = akcia sa NEVYKONA (volajucemu uz odisiel status aj cerstvy stav).
+      def edge_check_guard(data, model, generation:, status:, repush:, echo:)
+        unless defined?(EdgeCheck) && EdgeCheck.available?(model)
+          echo.call
+          status.call('Zvýraznenie hrán vyžaduje SketchUp 2023 alebo novší.', true)
+          return false
+        end
+        identity_guard(data, model, generation: generation, status: status, repush: repush)
+      end
+
+      # Identita kliku (BEZ otazky na konkretny overlay): generacia okna +
+      # dokument. Review #6: kresba smeru si dostupnost API overuje SAMA a jej
+      # hlaska musi hovorit o KRESBE — nie o hranach; preto je tato cast
+      # vyclenena a zdielaju ju obe akcie.
+      def identity_guard(data, model, generation:, status:, repush:)
+        unless data['gen'].to_i == generation.to_i
+          repush.call
+          status.call('Okno sa medzitým prepočítalo — obnovené, klikni znova.', true)
+          return false
+        end
+        unless data['model_guid'].to_s == model_guid(model)
+          repush.call
+          status.call('Model sa medzitým prepol — obnovené, klikni znova.', true)
+          return false
+        end
+        true
+      end
+
+      # Prepnutie zvyraznenia. Ide ZDIELANOU Engine.toggle_edge_check — tá stav
+      # rozposle VSETKYM oknam (rail Inspectora, Studio, Vyroba), takze vlastny
+      # push tu netreba; lokalny je uz len status.
+      def do_edge_check(model, data, generation:, status:, repush:, echo:)
+        return unless edge_check_guard(data, model, generation: generation, status: status,
+                                                    repush: repush, echo: echo)
+
+        state = Engine.toggle_edge_check(model)
+        status.call(edge_check_status(state))
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.do_edge_check')
+        status.call("Chyba zvýraznenia hrán: #{e.message}", true)
+      end
+
+      # D-105: prepinace stavov (chyba / mimo pravidla / olepene + „len vybrané").
+      # Codex audit FIX 4: kluc musi byt z whitelistu a hodnota VYSLOVNE
+      # true/false (retazec "false" je v Ruby pravdivy) — inak sa NEZAPISE nic.
+      def do_edge_check_option(model, data, generation:, status:, repush:, echo:)
+        return unless edge_check_guard(data, model, generation: generation, status: status,
+                                                    repush: repush, echo: echo)
+
+        key = data['key'].to_s
+        value = data['value']
+        unless EdgeCheck::OPTION_KEYS.include?(key) && (value == true || value == false)
+          echo.call
+          return status.call('Neznáme nastavenie zvýraznenia — nič sa nezmenilo.', true)
+        end
+        Engine.set_edge_check_option(key, value)
+        status.call(edge_check_option_status(key, value))
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.do_edge_check_option')
+        status.call("Chyba nastavenia zvýraznenia: #{e.message}", true)
+      end
+
+      # K2/D-87: prepinac „Smer kresby". Identita kliku (gen + model_guid) je
+      # ZDIELANA so zvyraznenim hran; dostupnost Overlay API si vsak overuje
+      # VLASTNU (`GrainCheck.available?`) a hlasi ju VLASTNOU vetou — review #6:
+      # pouzivatel klikol na kresbu, takze hlaska o hranach by ho poslala hladat
+      # chybu inam.
+      def do_grain_check(model, data, generation:, status:, repush:, grain_echo:)
+        unless defined?(GrainCheck) && GrainCheck.available?(model)
+          grain_echo.call
+          return status.call('Smer kresby vyžaduje SketchUp 2023 alebo novší.', true)
+        end
+        return unless identity_guard(data, model, generation: generation, status: status,
+                                                  repush: repush)
+
+        state = Engine.toggle_grain_check(model)
+        status.call(grain_check_status(state))
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.do_grain_check')
+        status.call("Chyba kresby smeru: #{e.message}", true)
+      end
+
+      def edge_check_status(state)
+        st = state.is_a?(Hash) ? state : {}
+        return 'Zvýraznenie hrán vypnuté — v modeli nič neostalo.' unless st['active']
+
+        opts = st['options'].is_a?(Hash) ? st['options'] : {}
+        counts = st['counts'].is_a?(Hash) ? st['counts'] : {}
+        parts = []
+        parts << "#{counts['missing'].to_i} chýba podľa pravidla" if opts['show_missing']
+        parts << "#{counts['extra'].to_i} neolepených mimo pravidla" if opts['show_extra']
+        parts << "#{counts['taped'].to_i} olepených" if opts['show_taped']
+        return 'Zvýraznenie zapnuté — žiadny stav nie je zapnutý (otvor nastavenie ▾).' if parts.empty?
+
+        extra = st['unresolved'].to_i.positive? ? " · #{st['unresolved'].to_i} sa nedá zvýrazniť" : ''
+        "Zvýraznenie zapnuté — #{parts.join(' · ')}#{extra}."
+      end
+
+      # D-105: kratke potvrdenie prepnutia (nazvy su TIE ISTE ako v rozbalovacom
+      # okne — server je jediny zdroj textov; zrkadli ich js/edge_menu.js).
+      EDGE_OPTION_LABELS = {
+        'show_missing' => 'Chýba podľa pravidla', 'show_extra' => 'Neolepené mimo pravidla',
+        'show_taped' => 'Olepené', 'taped_selected_only' => 'Olepené — len vybrané'
+      }.freeze
+
+      def edge_check_option_status(key, value)
+        "#{EDGE_OPTION_LABELS[key] || key}: #{value ? 'zapnuté' : 'vypnuté'}."
+      end
+
+      def grain_check_status(state)
+        st = state.is_a?(Hash) ? state : {}
+        return 'Smer kresby vypnutý — v modeli nič neostalo.' unless st['active']
+
+        parts = ["#{st['parts'].to_i} #{grain_part_plural(st['parts'].to_i)} s kresbou"]
+        parts << "#{st['skipped'].to_i} bez kresby (materiál bez smeru)" if st['skipped'].to_i.positive?
+        parts << "#{st['unresolved'].to_i} sa nedá nakresliť" if st['unresolved'].to_i.positive?
+        "Smer kresby zapnutý — #{parts.join(' · ')}."
+      end
+
+      # 1 dielec / 2–4 dielce / 5+ dielcov
+      def grain_part_plural(n)
+        v = n.abs
+        return 'dielec' if v == 1
+        return 'dielce' if v >= 2 && v <= 4
+
+        'dielcov'
       end
     end
   end

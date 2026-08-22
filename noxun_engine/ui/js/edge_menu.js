@@ -13,7 +13,7 @@
   (function(global){
     'use strict';
 
-    // Poradie = poradie v UI. Nazvy su ZRKADLOM ProductionDialog::EDGE_OPTION_LABELS
+    // Poradie = poradie v UI. Nazvy su ZRKADLOM ProductionCore::EDGE_OPTION_LABELS
     // (server je jediny zdroj textov) a klucov EdgeCheck::SHOW_KEY.
     var ROWS = [
       { key: 'show_missing', state: 'missing', label: 'Chýba podľa pravidla' },

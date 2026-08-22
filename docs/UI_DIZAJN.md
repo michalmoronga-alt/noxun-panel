@@ -1000,10 +1000,19 @@ hrán). Pravidlá vzoru:
   Markup kreslí zdieľaný modul (`ui/js/edge_menu.js`), štýly sú v zdieľanom
   `panel.css` (nescopnuté pod `.nx-inspector` — satelit o raile nevie) a stav
   aj počty nesie výhradne server, ktorý po každom zápise pošle čerstvý stav
-  **obom oknám**. Dve kópie toho istého okna nesmú stáť na obrazovke naraz:
-  otvorenie na jednom mieste to druhé zavrie.
+  **všetkým oknám**. Dve kópie toho istého okna nesmú stáť na obrazovke naraz:
+  otvorenie na jednom mieste ostatné zavrie.
 - **Flyout dostane len tlačidlo, ktoré naozaj má čo nastavovať.** „Kontrola
   kresby" ostáva obyčajný toggle bez trojuholníka — prázdny flyout by klamal.
+- **Vzor platí aj pre TEXTOVÉ tlačidlo v lište sekcie (ŠT-1b).** „Zvýrazniť
+  hrany" v lište sekcie Kontrola (Štúdio) nesie ten istý rohový trojuholník ako
+  ikona v raile: znamienko je `::after` pseudo-prvok tlačidla (po zapnutí dedí
+  `--nx-on-accent`, aby na farebnom podklade nezmizlo), klikacia zóna je
+  samostatný `.cornerzone` v pravom dolnom rohu a text tlačidla má o toľko
+  väčší pravý padding, aby sa naň roh nepoložil. **Spúšťač je tvarom per okno,
+  samotné okno nastavenia je zdieľaný komponent** — líši sa iba polohovacou
+  triedou (`.ecmenu-rail` vs. `.ecmenu-studio`). Split tlačidlo s chevronom
+  (pôvodná podoba v okne Výroba) tým **zaniklo** — jeden vzor, nie dva.
 
 ### D-51: štandard rozmerov okien (UI-B1)
 

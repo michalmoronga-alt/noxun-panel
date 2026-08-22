@@ -1,15 +1,17 @@
-// Testy D-104 (JS zrkadlo) — prepinac „Zvyraznit hrany bez olepu" v tabe KONTROLA.
+// Testy D-104 (JS zrkadlo) — prepinac „Zvyraznit hrany bez olepu".
+// ŠT-1b: prepinac sa presunul z tabu KONTROLA okna Vyroba do LISTY SEKCIE
+// Kontrola v okne STUDIO, preto tato sada testuje studio.js.
 // JS je LEN zobrazenie: pocet, dostupnost aj zapnutost nesie SERVER; klient si nic
 // neprepocitava a do Ruby posiela iba identitu (gen + model_guid), nikdy stav.
 'use strict';
 const assert = require('node:assert');
 const path = require('node:path');
 
-// production.js sa v prehliadaci vesa na window/document — pre node stacia tenke
+// studio.js sa v prehliadaci vesa na window/document — pre node stacia tenke
 // atrapy (subor okrem toho pri nacitani nic nerobi).
 global.window = {};
 global.document = { addEventListener: function(){}, getElementById: function(){ return null; } };
-const P = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'production.js'));
+const P = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'studio.js'));
 
 let n = 0;
 function eq(actual, expected, msg){
@@ -52,10 +54,10 @@ ok(P.edgeCheckText(red(3, { multi: 1 })).indexOf('nakreslený raz') >= 0,
   ok(off.indexOf('Zvýrazniť hrany') >= 0, 'tlacidlo nesie nazov akcie');
   ok(off.indexOf('#i-eye') >= 0, 'ikona zo spritu (ziadne emoji)');
   ok(off.indexOf('aria-pressed="false"') >= 0, 'vypnuty stav je aj pre citacku');
-  ok(off.indexOf('class="ecbtn ecmain"') >= 0, 'vypnute tlacidlo nema triedu on');
+  ok(off.indexOf('class="ecbtn"') >= 0, 'vypnute tlacidlo nema triedu on');
 
   const on = P.edgeCheckBarHtml(red(2), false);
-  ok(on.indexOf('ecmain on') >= 0, 'zapnuty stav je ZJAVNY (trieda on)');
+  ok(on.indexOf('class="ecbtn on"') >= 0, 'zapnuty stav je ZJAVNY (trieda on)');
   ok(on.indexOf('#i-eye-off') >= 0, 'zapnute tlacidlo ponuka vypnutie');
   ok(on.indexOf('aria-pressed="true"') >= 0, 'zapnuty stav je aj pre citacku');
   ok(on.indexOf('2 hrany bez olepu') >= 0, 'pocet zo servera je v liste');

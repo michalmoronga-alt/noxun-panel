@@ -33,7 +33,10 @@ module Noxun
       # a ABS su od tejto davky sekciou Kusovnik v okne Studio (pohlady Dielce ·
       # Platne · ABS). Whitelist ich preto uz NEPOZNA; deep-link na ne ide cez
       # `StudioDialog::SECTIONS`.
-      TABS = %w[hardware budget control].freeze
+      # ŠT-1b: to iste sa stalo tabu `control` — KONTROLA je od tejto davky
+      # sekcia `ctrl` okna Studio (semafor-filter, prepinace hran a kresby,
+      # zive badge navigacie); deep-link na nu ide cez `StudioDialog::SECTIONS`.
+      TABS = %w[hardware budget].freeze
 
       class << self
         # `open_tab` = deep-link z Inspectora (⚠ warnpanel -> KONTROLA, „Materiál"
@@ -243,19 +246,17 @@ module Noxun
         #   gen        — klik zo stareho DOM (medzitym prepocitane okno),
         #   model_guid — medzitym prepnuty dokument (zaplo by sa v cudzej zakazke),
         #   available  — SketchUp bez Overlay API (SU 2022 a starsi).
+        # ŠT-1b (audit #5): telo zije v `ProductionCore` — to iste robi sekcia
+        # Kontrola okna Studio a dva takmer rovnake guardy by sa casom rozisli.
+        # Okno odovzdava LEN svoju generaciu, svoj status, svoj refresh a svoje
+        # echo. Viditelne UI tychto prepinacov okno Vyroba uz nema (presunulo sa
+        # do Studia); cesty tu OSTAVAJU, kym okno v ŠT-1c nezanikne.
         def do_edge_check(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
-          model = Sketchup.active_model
-          return unless edge_check_guard(data, model)
-
-          # UI-B1 (audit A2): prepnutie ide cez ZDIELANU Engine.toggle_edge_check —
-          # tá zavola EdgeCheck.toggle a novy stav rozposle VSETKYM oknam (aj
-          # railu Inspectora). Vlastny push tu uz netreba, status je lokalny.
-          state = Engine.toggle_edge_check(model)
-          set_status(edge_check_status(state))
-        rescue StandardError => e
-          Engine.log_error(e, 'ProductionDialog.do_edge_check')
-          set_status("Chyba zvýraznenia hrán: #{e.message}", true)
+          ProductionCore.do_edge_check(Sketchup.active_model, data, generation: @generation,
+                                                                    status: status_proc,
+                                                                    repush: repush_proc,
+                                                                    echo: edge_echo_proc)
         end
 
         # D-105: prepinace stavov (chyba / mimo pravidla / olepene + „len vybrané").
@@ -265,46 +266,29 @@ module Noxun
         # pravdivy) — inak sa NEZAPISE nic.
         def do_edge_check_option(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
-          model = Sketchup.active_model
-          return unless edge_check_guard(data, model)
-
-          key = data['key'].to_s
-          value = data['value']
-          unless EdgeCheck::OPTION_KEYS.include?(key) && (value == true || value == false)
-            push_edge_check
-            return set_status('Neznáme nastavenie zvýraznenia — nič sa nezmenilo.', true)
-          end
-          # v0.7.28: zapis ide cez ZDIELANU Engine.set_edge_check_option — to iste
-          # nastavenie sa da otvorit aj z rohu ABS ikony v raile Inspectora, takze
-          # novy stav (aj s poctami) musi dostat OBOJE. Vlastny push tu uz netreba.
-          Engine.set_edge_check_option(key, value)
-          set_status(edge_check_option_status(key, value))
-        rescue StandardError => e
-          Engine.log_error(e, 'ProductionDialog.do_edge_check_option')
-          set_status("Chyba nastavenia zvýraznenia: #{e.message}", true)
+          ProductionCore.do_edge_check_option(Sketchup.active_model, data, generation: @generation,
+                                                                           status: status_proc,
+                                                                           repush: repush_proc,
+                                                                           echo: edge_echo_proc)
         end
 
-        # Spolocne serverove guardy oboch akcii zvyraznenia. false = akcia sa
-        # NEVYKONA (volajuci uz poslal status aj cerstvy payload).
+        # Spolocne serverove guardy oboch akcii zvyraznenia (telo v ProductionCore).
         # Codex audit FIX 4: guid sa porovnava STRIKTNE — prazdny udaj z klienta
         # uz guard NEOBIDE (obe strany citaju to iste `model_guid`).
         def edge_check_guard(data, model)
-          unless defined?(EdgeCheck) && EdgeCheck.available?(model)
-            push_edge_check
-            set_status('Zvýraznenie hrán vyžaduje SketchUp 2023 alebo novší.', true)
-            return false
-          end
-          unless data['gen'].to_i == @generation.to_i
-            push_state if @dialog && @dialog.visible?
-            set_status('Okno sa medzitým prepočítalo — obnovené, klikni znova.', true)
-            return false
-          end
-          unless data['model_guid'].to_s == model_guid(model)
-            push_state
-            set_status('Model sa medzitým prepol — obnovené, klikni znova.', true)
-            return false
-          end
-          true
+          ProductionCore.edge_check_guard(data, model, generation: @generation, status: status_proc,
+                                                       repush: repush_proc, echo: edge_echo_proc)
+        end
+
+        # Echo prepinacov: maly push stavu do TOHTO okna (bez prepoctu celeho
+        # okna). Zdielane jadro ho vola pri odmietnuti akcie, aby okno ukazalo
+        # PRAVDIVY stav.
+        def edge_echo_proc
+          -> { push_edge_check }
+        end
+
+        def grain_echo_proc
+          -> { push_grain_check }
         end
 
         # Maly echo push (bez prepoctu celeho okna) — vola ho aj EdgeCheck po
@@ -327,30 +311,15 @@ module Noxun
         end
 
         def edge_check_status(state)
-          st = state.is_a?(Hash) ? state : {}
-          return 'Zvýraznenie hrán vypnuté — v modeli nič neostalo.' unless st['active']
-
-          opts = st['options'].is_a?(Hash) ? st['options'] : {}
-          counts = st['counts'].is_a?(Hash) ? st['counts'] : {}
-          parts = []
-          parts << "#{counts['missing'].to_i} chýba podľa pravidla" if opts['show_missing']
-          parts << "#{counts['extra'].to_i} neolepených mimo pravidla" if opts['show_extra']
-          parts << "#{counts['taped'].to_i} olepených" if opts['show_taped']
-          return 'Zvýraznenie zapnuté — žiadny stav nie je zapnutý (otvor nastavenie ▾).' if parts.empty?
-
-          extra = st['unresolved'].to_i.positive? ? " · #{st['unresolved'].to_i} sa nedá zvýrazniť" : ''
-          "Zvýraznenie zapnuté — #{parts.join(' · ')}#{extra}."
+          ProductionCore.edge_check_status(state)
         end
 
-        # D-105: kratke potvrdenie prepnutia (nazvy su TIE ISTE ako v rozbalovacom
-        # okne — server je jediny zdroj textov).
-        EDGE_OPTION_LABELS = {
-          'show_missing' => 'Chýba podľa pravidla', 'show_extra' => 'Neolepené mimo pravidla',
-          'show_taped' => 'Olepené', 'taped_selected_only' => 'Olepené — len vybrané'
-        }.freeze
-
+        # D-105: kratke potvrdenie prepnutia. Metoda je ZAMERNE public — rail
+        # Inspectora (`actions_materials.rb`) ju vola zvonku, aby mali obe
+        # miesta ten isty slovensky text. Nazvy stavov ziju v ProductionCore
+        # (a zrkadli ich js/edge_menu.js).
         def edge_check_option_status(key, value)
-          "#{EDGE_OPTION_LABELS[key] || key}: #{value ? 'zapnuté' : 'vypnuté'}."
+          ProductionCore.edge_check_option_status(key, value)
         end
 
         # ================= K2 / D-87: SMER KRESBY ================================
@@ -361,28 +330,10 @@ module Noxun
         # sa casom rozisli.
         def do_grain_check(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
-          model = Sketchup.active_model
-          return unless grain_check_guard(data, model)
-
-          # ZDIELANA cesta (v0.7.27) — presne ta ista, akou prepina rail
-          # Inspectora. Rozposlanie stavu robi `broadcast_grain_check`, takze
-          # sa dva vstupne body nemozu rozist.
-          state = Engine.toggle_grain_check(model)
-          set_status(grain_check_status(state))
-        rescue StandardError => e
-          Engine.log_error(e, 'ProductionDialog.do_grain_check')
-          set_status("Chyba kresby smeru: #{e.message}", true)
-        end
-
-        # Vlastny guard len kvoli hlaske o dostupnosti Overlay API (zvysok je
-        # zhodny so zvyraznenim hran a ide cez `edge_check_guard`).
-        def grain_check_guard(data, model)
-          unless defined?(GrainCheck) && GrainCheck.available?(model)
-            push_grain_check
-            set_status('Smer kresby vyžaduje SketchUp 2023 alebo novší.', true)
-            return false
-          end
-          edge_check_guard(data, model)
+          ProductionCore.do_grain_check(Sketchup.active_model, data, generation: @generation,
+                                                                     status: status_proc,
+                                                                     repush: repush_proc,
+                                                                     grain_echo: grain_echo_proc)
         end
 
         # Maly echo push (prepnutie / prepocet po prestavbe) — prekresli sa LEN
@@ -396,21 +347,12 @@ module Noxun
         end
 
         def grain_check_status(state)
-          st = state.is_a?(Hash) ? state : {}
-          return 'Smer kresby vypnutý — v modeli nič neostalo.' unless st['active']
-
-          parts = ["#{st['parts'].to_i} #{grain_part_plural(st['parts'].to_i)} s kresbou"]
-          parts << "#{st['skipped'].to_i} bez kresby (materiál bez smeru)" if st['skipped'].to_i.positive?
-          parts << "#{st['unresolved'].to_i} sa nedá nakresliť" if st['unresolved'].to_i.positive?
-          "Smer kresby zapnutý — #{parts.join(' · ')}."
+          ProductionCore.grain_check_status(state)
         end
 
         # 1 dielec / 2–4 dielce / 5+ dielcov
         def grain_part_plural(n)
-          v = n.abs
-          return 'dielec' if v == 1
-          return 'dielce' if v >= 2 && v <= 4
-          'dielcov'
+          ProductionCore.grain_part_plural(n)
         end
 
         # V0.6 E-b: mutacie rozpoctu (rezim, prepis sumy, nasobok, m2, spotrebice
@@ -562,31 +504,16 @@ module Noxun
         # V0.6 E-b: payload rozpoctu z TYCH ISTYCH dat ako kusovnik/semafor
         # (jedna autorita cisel). Zlyhanie NIKDY nezhodi okno — tab Rozpocet
         # ukaze hlasku, zvysok okna zije dalej.
+        # ŠT-1b (audit #2): telo v `ProductionCore` — rozpoctove upozornenia su
+        # sucastou KONTROLY, ktoru od tejto davky pocita aj okno Studio.
         def budget_payload(model, bom, collected, estimate = nil, hw_exp = nil, smap = nil)
-          smap ||= sheets_map
-          est = estimate || SheetEstimate.estimate(
-            bom[:rows],
-            sheet_sizes: smap.each_with_object({}) { |(id, s), out| out[id] = s['sheet_size'] },
-            uni_ids: smap.each_with_object({}) { |(id, s), out| out[id] = true if Materials.uni?(s) }
-          )
-          exp = hw_exp || hardware_expansion(model, collected)
-          Budget.payload_for(model, bom, sheets: smap, edges: (edges_map || {}),
-                             hardware_expansion: exp, hardware_catalog: hardware_catalog_items,
-                             sheet_estimate: est)
-        rescue StandardError => e
-          Engine.log_error(e, 'ProductionDialog.budget_payload')
-          nil
+          ProductionCore.budget_payload(model, bom, collected, estimate, hw_exp, smap)
         end
 
         # Katalog kovania pre scan veku cien; chyba katalogu = scan sa preskoci
         # (vzor edges_map), rozpocet sa nezhodi.
         def hardware_catalog_items
-          return nil unless defined?(HardwareCatalog)
-
-          HardwareCatalog.items
-        rescue StandardError => e
-          Engine.log_error(e, 'ProductionDialog.hardware_catalog_items')
-          nil
+          ProductionCore.hardware_catalog_items
         end
 
         def ensure_dialog
@@ -608,28 +535,15 @@ module Noxun
           )
           @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'production.html'))
           register_callbacks(@dialog) # pred show!
-          # D-104: zvyraznenie hran je nastroj TOHTO okna — zatvorenie ho vypne,
-          # aby v modeli neostalo nic, co sa neda vypnut (kontrakt „vypneš a nič
-          # v modeli neostane").
-          @dialog.set_on_closed do
-            @dialog = nil
-            begin
-              # Codex #168 P2 (2. kolo): vypnutie musi dostat aj rail Inspectora —
-              # inak by po zatvoreni okna Vyroba dalej ukazoval zapnute
-              # zvyraznenie a dalsi klik by ho zapol namiesto vypnutia.
-              if defined?(EdgeCheck)
-                EdgeCheck.disable!
-                EdgeCheck.notify_state_changed
-              end
-              # K2/D-87: to iste plati pre kresbu smeru — po zatvoreni okna
-              # v modeli nesmie ostat nic, co sa neda vypnut. ZAPAMATANY
-              # prepinac sa NEMENI (je to nastavenie pocitaca): pri dalsom
-              # otvoreni okna sa kresba obnovi.
-              GrainCheck.disable! if defined?(GrainCheck)
-            rescue StandardError => e
-              Engine.log_error(e, 'ProductionDialog.on_closed edge_check')
-            end
-          end
+          # ŠT-1b (audit #1) — VEDOMA ZMENA ZIVOTNEHO CYKLU: zatvorenie okna
+          # Vyroba uz zvyraznenie hran ani kresbu smeru NEVYPINA. Dovod: oba
+          # prepinace sa presunuli do sekcie Kontrola okna Studio a ich TRVALY
+          # vstupny bod je rail Inspectora — vypinat ich pri zatvoreni okna,
+          # ktore ich uz ani nezobrazuje, by pouzivatelovi zhaslo zvyraznenie
+          # zapnute uplne inde. Kontrakt „vypneš a nič v modeli neostane" drzi
+          # dalej: stav zije v %APPDATA%, v .skp neostava NIKDY nic a vypnut sa
+          # da z railu aj zo Studia. (Detail v docs/ARCHITEKTURA.md.)
+          @dialog.set_on_closed { @dialog = nil }
           @dialog
         end
 
@@ -640,18 +554,19 @@ module Noxun
           cb(dlg, 'select_row')  { |p| handle_select(p) }
           cb(dlg, 'vepo_export') { |p| handle_export(p) } # V0.5 C
           cb(dlg, 'hw_csv_export') { |p| handle_hw_csv(p) } # V0.6 D1b
+          # ŠT-1b: ⚠ chip v hlavičke — jediná cesta z okna Výroba k zoznamu
+          # nálezov. Tab Kontrola zanikol, obsah je v Štúdiu (sekcia `ctrl`).
+          cb(dlg, 'open_studio') { |_p| open_studio_control }
           # D-83: skratka z riadku KONTROLY do „Nahradiť UNI…" (okno Materiály).
+          # ŠT-1b: riadky kontroly sa presunuli do Štúdia — cesta tu ostáva pre
+          # kompatibilitu, kým okno v ŠT-1c nezanikne.
           cb(dlg, 'replace_uni') { |p| handle_replace_uni(p) }
-          # D-104: prepínač zvýraznenia hrán (tab KONTROLA). Žiadny flush
-          # handshake — model sa nemení, len sa nad ním kreslí.
+          # D-104/D-105/K2: prepínače zvýraznenia hrán a smeru kresby. Viditeľné
+          # UI sa presunulo do lišty sekcie Kontrola v Štúdiu; tieto cesty ostávajú
+          # (sú to aj prijímače broadcastu) a zaniknú s oknom v ŠT-1c.
           cb(dlg, 'edge_check_toggle') { |p| do_edge_check(p) }
-          # D-105: prepínače stavov v rozbaľovacom okne (zapisujú sa do %APPDATA%).
           cb(dlg, 'edge_check_option') { |p| do_edge_check_option(p) }
-          # v0.7.28: to isté nastavenie sa dá otvoriť aj z rohu ABS ikony v raile
-          # Inspectora — otvorenie tu zavrie to druhé (nikdy dve kópie naraz).
           cb(dlg, 'edge_menu_open')    { |_p| Engine.close_edge_menu(:production) }
-          # K2/D-87: prepínač „Smer kresby" (tab KONTROLA). Rovnako bez flush
-          # handshaku — model sa nemení, len sa nad ním kreslí.
           cb(dlg, 'grain_check_toggle') { |p| do_grain_check(p) }
           # V0.6 E-b: tab Rozpočet — mutácie, XLSX export, ⚙ Nastavenia, ↗ URL.
           cb(dlg, 'budget_mutate')   { |p| do_budget(p) }
@@ -942,28 +857,23 @@ module Noxun
         #   gen        — riadok zo stareho DOM (medzitym prepocitany kusovnik),
         #   model_guid — medzitym prepnuty dokument,
         #   uni_id     — material medzitym zmazany/nahradeny/uz nie je UNI.
+        # ŠT-1b (audit #10): ⚠ chip hlavicky. Tab Kontrola zanikol, tak chip
+        # otvara Studio rovno na sekcii Kontrola — ziadne mrtve tlacidlo a
+        # ziadny druhy zoznam nalezov.
+        def open_studio_control
+          return set_status('Okno Štúdio nie je k dispozícii.', true) unless defined?(StudioDialog)
+
+          StudioDialog.show(open_section: 'ctrl')
+          set_status('Otváram Štúdio → Kontrola.')
+        end
+
+        # ŠT-1b (audit #13): telo v `ProductionCore` — tu istu skratku ponuka
+        # riadok KONTROLY v sekcii `ctrl` okna Studio.
         def handle_replace_uni(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
-          model = Sketchup.active_model
-          unless data['gen'].to_i == @generation.to_i
-            push_state if @dialog && @dialog.visible?
-            return set_status('Kontrola sa medzitým zmenila — obnovené, klikni znova.', true)
-          end
-          guid = data['model_guid'].to_s
-          if !guid.empty? && guid != model_guid(model)
-            push_state
-            return set_status('Model sa medzitým prepol — obnovené, klikni znova.', true)
-          end
-          uni_id = data['uni_id'].to_s
-          sheet = defined?(Materials) ? Materials.sheet(uni_id) : nil
-          unless sheet && Materials.uni?(sheet)
-            push_state
-            return set_status('Materiál už nie je UNI (medzitým sa zmenil) — kontrola obnovená.', true)
-          end
-          unless defined?(MaterialsDialog) && MaterialsDialog.request_replace_uni(uni_id, model)
-            return set_status('Okno Materiály sa nepodarilo otvoriť.', true)
-          end
-          set_status("Otváram „Nahradiť UNI…“ pre #{uni_id}.")
+          ProductionCore.replace_uni(Sketchup.active_model, data, generation: @generation,
+                                                                  status: status_proc,
+                                                                  repush: repush_proc)
         end
 
         # ST-1a PR A: obaly nad ProductionCore (telo tam, mena a privatnost tu).
@@ -1030,12 +940,12 @@ module Noxun
           # V0.6 E-b: rozpočet z TÝCH ISTÝCH dát (BOM + odhad + katalógy + stav zákazky).
           budget = budget_payload(model, bom, collected, estimate, hw_exp, smap)
           # V0.5 D: KONTROLA z TOHO ISTEHO cerstveho zberu (nalez 5).
-          control = Validation.run(collected, sheets: smap, edges: edges_map,
-                                   hardware_expansion: hw_exp,
-                                   placements: collected[:placements])
-          # E-b: upozornenia rozpočtu sú kategória „budget" v TOM ISTOM zozname —
-          # counts (badge, tab, status) tak ostávajú jedno číslo zo servera.
-          control = Validation.with_budget(control, budget['budget_check']) if budget
+          # ŠT-1b (audit #2): vypocet vratane zlucenia s upozorneniami ROZPOCTU
+          # zije v `ProductionCore` — sekcia Kontrola okna Studio cita PRESNE
+          # to iste cislo (semafor sekcie, badge navigacie, ⚠ chip TEJTO
+          # hlavicky aj suhrn exportu).
+          control = ProductionCore.control_payload(collected, hardware_expansion: hw_exp,
+                                                              budget: budget, sheets: smap)
           data = {
             version: Engine::VERSION,
             gen: @generation,

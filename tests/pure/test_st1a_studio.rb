@@ -47,7 +47,8 @@ ST1B_PROD_HTML = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'produc
 NxTest.test('ST-1a: SECTIONS je whitelist v RUBY a JS je jeho ZRKADLO') do
   rb = ST1B_STUDIO_RB[/SECTIONS = %w\[([a-z ]+)\]/, 1].to_s.split
   js = ST1B_STUDIO_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  NxTest.assert_equal(%w[bom], rb, 'v ST-1a zije jedina sekcia — Kusovník')
+  # ŠT-1b pridala sekciu Kontrola (`ctrl`) — dovtedy premostenie do okna Vyroba.
+  NxTest.assert_equal(%w[bom ctrl], rb, 'v Studiu ziju sekcie Kusovník a Kontrola')
   NxTest.assert_equal(rb, js, 'JS zoznam sekcii sa nesmie rozist s Ruby autoritou')
   NxTest.assert_equal(rb, Noxun::Engine::StudioDialog::SECTIONS,
                       'konstanta a zdrojak hovoria to iste')
@@ -340,8 +341,11 @@ end
 
 NxTest.test('ST-1a: premostenia su UZAVRETY whitelist v Ruby, klient posiela iba kluc') do
   st = Noxun::Engine::StudioDialog
-  NxTest.assert_equal(%w[budget buy ctrl offer].sort, st::PRODUCTION_BRIDGES.keys.sort,
-                      'do okna Vyroba vedu prave styri polozky navigacie')
+  # ŠT-1b: `ctrl` uz NIE JE premostenie — Kontrola je ziva sekcia tohto okna.
+  NxTest.assert_equal(%w[budget buy offer].sort, st::PRODUCTION_BRIDGES.keys.sort,
+                      'do okna Vyroba vedu uz len tri polozky navigacie')
+  NxTest.refute(st::PRODUCTION_BRIDGES.key?('ctrl'),
+                'Kontrola sa presunula do Studia — premostenie zaniklo')
   NxTest.assert_equal(%w[bset hw mat rules sup tpl].sort, st::WINDOW_BRIDGES.keys.sort,
                       'satelitne okna otvara sest poloziek')
   st::PRODUCTION_BRIDGES.each_value do |tab|
@@ -371,7 +375,8 @@ end
 # --- 6) okno Vyroba prislo o tri taby ----------------------------------------
 
 NxTest.test('ST-1a: okno Vyroba stratilo taby Kusovník / Materiály / ABS') do
-  NxTest.assert_equal(%w[hardware budget control], Noxun::Engine::ProductionDialog::TABS,
+  # ŠT-1b: a k nim aj tab Kontrola (sekcia `ctrl` okna Studio).
+  NxTest.assert_equal(%w[hardware budget], Noxun::Engine::ProductionDialog::TABS,
                       'whitelist tabov uz zaniknute taby nepozna')
   %w[pt_rows pt_sheets pt_edging].each do |id|
     NxTest.refute(ST1B_PROD_HTML.include?("id=\"#{id}\""), "tlacidlo #{id} zaniklo")
@@ -467,6 +472,10 @@ NxTest.test('ST-1a: ceruzka riadku zdvihne Inspector — a NIC v modeli nezapise
   NxTest.refute(body.include?('start_operation'), 'vyber nie je operacia = ziadny krok Spat')
   NxTest.assert(ST1B_STUDIO_JS.include?("data-act=\"edit\""), 'ceruzka je vlastna akcia riadku')
   NxTest.assert(ST1B_STUDIO_JS.include?("data-act=\"eye\""), 'oko tiez')
-  NxTest.assert_equal(2, ST1B_STUDIO_JS.scan(/data-act="/).length,
-                      'Š3: PRAVE DVE hover akcie — tretia („detail") pride az s D-94')
+  # Š3: riadok KUSOVNIKA ma PRAVE DVE hover akcie — tretia („detail") pride az
+  # s D-94. Riadok KONTROLY (ŠT-1b) ma navyse KONTEXTOVU opravu, preto sa
+  # pocita len markup tabulky kusovnika.
+  parts = ST1B_STUDIO_JS[/function partsTable.*?\n  \}/m].to_s
+  NxTest.assert_equal(2, parts.scan(/data-act="/).length,
+                      'Š3: PRAVE DVE hover akcie v Kusovníku — tretia („detail") pride az s D-94')
 end

@@ -166,10 +166,10 @@ module Noxun
           set_status(edge_option_status(key, value))
         end
 
-        # Potvrdenie sklada TA ISTA metoda ako v okne Vyroba — nazvy stavov maju
-        # jediny zdroj (ProductionDialog::EDGE_OPTION_LABELS), rail si ich
+        # Potvrdenie sklada TA ISTA metoda ako v ostatnych oknach — nazvy stavov
+        # maju jediny zdroj (`ProductionCore::EDGE_OPTION_LABELS`), rail si ich
         # nevymysla ani nekopiruje. Zaloha je len pre pripad, ze okno Vyroba
-        # este nie je nacitane.
+        # (tenky obal nad jadrom) este nie je nacitane.
         def edge_option_status(key, value)
           if defined?(ProductionDialog) && ProductionDialog.respond_to?(:edge_check_option_status)
             return ProductionDialog.edge_check_option_status(key, value)
