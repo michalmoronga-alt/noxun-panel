@@ -283,7 +283,7 @@ module Noxun
         def after_sets_change(model = nil)
           push_sets
           Panel.push_hardware_sets if defined?(Panel) && Panel.dialog_alive?
-          ProductionDialog.on_model_changed(model) if model && defined?(ProductionDialog)
+          # ŠT-1c PR B3: vetva okna Vyroba tu zanikla spolu s oknom.
           StudioDialog.on_model_changed(model) if model && defined?(StudioDialog) # ST-1a
         end
 

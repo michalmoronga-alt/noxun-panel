@@ -327,14 +327,16 @@ NxTest.test('2a4b: GH P1 — VEPO exportny label je stabilny cez migraciu a NEZL
     ],
     'edges' => []
   ).b
-  require_relative '../../noxun_engine/ui/production_dialog' unless defined?(Noxun::Engine::ProductionDialog)
-  pd = Noxun::Engine::ProductionDialog
+  # ŠT-1c PR B3: okno Vyroba zaniklo — tenky obal `vepo_materials` s nim.
+  # Test cita PRIAMO zdielane jadro (jedina implementacia).
+  require_relative '../../noxun_engine/ui/production_core' unless defined?(Noxun::Engine::ProductionCore)
+  pd = Noxun::Engine::ProductionCore
   b4_with_catalog(legacy) do
-    NxTest.assert_equal('K009 PW DTDL', pd.send(:vepo_materials)['K1']['label'],
+    NxTest.assert_equal('K009 PW DTDL', pd.vepo_materials['K1']['label'],
                         'legacy label = presne dnesny tvar')
   end
   b4_with_catalog(migrated) do
-    mats = pd.send(:vepo_materials)
+    mats = pd.vepo_materials
     NxTest.assert_equal('K009 PW DTDL', mats['K1']['label'],
                         'zmigrovany zaznam reprodukuje POVODNY exportny text (cutover nemeni CSV/subory)')
     NxTest.assert_equal('K009 BS DTDL', mats['K2']['label'],
@@ -358,7 +360,7 @@ NxTest.test('2a4b: GH P1 — VEPO exportny label je stabilny cez migraciu a NEZL
     'edges' => []
   ).b
   b4_with_catalog(named) do
-    mats = pd.send(:vepo_materials)
+    mats = pd.vepo_materials
     NxTest.assert_equal('W1000 ST9 Biela DTDL', mats['W1']['label'],
                         'decor_name je sucast exportneho labelu (legacy text drzi)')
     NxTest.assert_equal('Egger K111 ST9 DTDL', mats['C1']['label'], 'kolizia = prefix vyrobcu')
@@ -379,7 +381,7 @@ NxTest.test('2a4b: GH P1 — VEPO exportny label je stabilny cez migraciu a NEZL
     'edges' => []
   ).b
   b4_with_catalog(patological) do
-    mats = pd.send(:vepo_materials)
+    mats = pd.vepo_materials
     NxTest.refute(mats['P1']['label'] == mats['P2']['label'],
                   "ani rovnaky vyrobca nesmie zliat buckety (#{mats['P1']['label']})")
     NxTest.assert(mats['P1']['label'].include?('GRP-AAA'))
@@ -417,7 +419,7 @@ end
 
 NxTest.test('2a4b: GH P1 kolo 4 — PD varianty s inym formatom maju ODDELENE VEPO buckety') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
-  require_relative '../../noxun_engine/ui/production_dialog' unless defined?(Noxun::Engine::ProductionDialog)
+  require_relative '../../noxun_engine/ui/production_core' unless defined?(Noxun::Engine::ProductionCore)
   data = JSON.pretty_generate(
     'std' => 1, 'schema' => 2,
     'sheets' => [
@@ -431,7 +433,7 @@ NxTest.test('2a4b: GH P1 kolo 4 — PD varianty s inym formatom maju ODDELENE VE
     'edges' => []
   ).b
   b4_with_catalog(data) do
-    mats = Noxun::Engine::ProductionDialog.send(:vepo_materials)
+    mats = Noxun::Engine::ProductionCore.vepo_materials
     NxTest.refute(mats['PD1']['label'] == mats['PD2']['label'],
                   "PD formaty sa nesmu zliat (#{mats['PD1']['label']})")
     NxTest.assert(mats['PD1']['label'].include?('4100') && mats['PD1']['label'].include?('600'))
@@ -467,7 +469,7 @@ end
 
 NxTest.test('2a4b: GH kolo 5 — PD sufix drzi desatiny (%g) a empty promote je CAS-chraneny') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
-  require_relative '../../noxun_engine/ui/production_dialog' unless defined?(Noxun::Engine::ProductionDialog)
+  require_relative '../../noxun_engine/ui/production_core' unless defined?(Noxun::Engine::ProductionCore)
   data = JSON.pretty_generate(
     'std' => 1, 'schema' => 2,
     'sheets' => [
@@ -481,7 +483,7 @@ NxTest.test('2a4b: GH kolo 5 — PD sufix drzi desatiny (%g) a empty promote je 
     'edges' => []
   ).b
   b4_with_catalog(data) do
-    mats = Noxun::Engine::ProductionDialog.send(:vepo_materials)
+    mats = Noxun::Engine::ProductionCore.vepo_materials
     NxTest.refute(mats['PDA']['label'] == mats['PDB']['label'],
                   "sub-mm formaty sa nesmu zliat (#{mats['PDA']['label']})")
     NxTest.assert(mats['PDA']['label'].include?('4100.1'), mats['PDA']['label'])
@@ -563,7 +565,7 @@ end
 
 NxTest.test('2a4b: GH kolo 9 — display nesie ludsky zaklad, ked label ma disambiguator') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
-  require_relative '../../noxun_engine/ui/production_dialog' unless defined?(Noxun::Engine::ProductionDialog)
+  require_relative '../../noxun_engine/ui/production_core' unless defined?(Noxun::Engine::ProductionCore)
   data = JSON.pretty_generate(
     'std' => 1, 'schema' => 2,
     'sheets' => [
@@ -580,7 +582,7 @@ NxTest.test('2a4b: GH kolo 9 — display nesie ludsky zaklad, ked label ma disam
     'edges' => []
   ).b
   b4_with_catalog(data) do
-    mats = Noxun::Engine::ProductionDialog.send(:vepo_materials)
+    mats = Noxun::Engine::ProductionCore.vepo_materials
     NxTest.assert_equal('K111 ST9 DTDL', mats['C1']['display'],
                         'disambiguovany label nesie ludsky display')
     NxTest.assert(mats['C1']['label'].include?('Egger'))

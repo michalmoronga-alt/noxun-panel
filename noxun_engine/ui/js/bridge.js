@@ -169,7 +169,7 @@
   // UI-D3 (N5): obsah warnpanelu. Riadky sklada CISTA funkcia NXShell.warnRows
   // (Node test) — tu sa uz len escapuje a vklada. Kazdy riadok ma OKO: klik
   // oznaci dotknuty dielec v modeli (prazdne kluce = cela skrinka). Dole je
-  // JEDNA cesta von — deep-link do okna Vyroba na tab KONTROLA.
+  // JEDNA cesta von — deep-link do ŠTÚDIA na sekciu KONTROLA.
   function warnPanelHtml(warns, cabId){
     var rows = NXShell.warnRows(warns);
     // Codex #182 P2: riadky maju VLASTNY scroller (`.wrows`), aby dlhy zoznam
@@ -272,7 +272,7 @@
       // zakazky; menia LEN ponuky pri rozmeroch a stav prepinaca v koliesku.
       if (typeof nxApplyUiSettings === 'function') nxApplyUiSettings(data.ui_settings);
       // UI-B1 (audit A2): stav ABS kontroly hran pri OTVORENI panela (pull).
-      // Dalsie zmeny chodia pushom — z panela, z toolbaru aj z okna Vyroba.
+      // Dalsie zmeny chodia pushom — z panela, z toolbaru aj zo ŠTÚDIA.
       if (typeof nxApplyEdgeCheck === 'function') nxApplyEdgeCheck(data.edge_check);
       // K2/D-87: to iste pre kontrolu smeru kresby (druha funkcna ikona raily).
       if (typeof nxApplyGrainCheck === 'function') nxApplyGrainCheck(data.grain_check);
@@ -297,73 +297,15 @@
     setTemplatePreview: function(data){
       if (typeof applyTemplatePreview === 'function') applyTemplatePreview(data);
     },
-    // V0.5 B (Codex B1): okno Vyroba pyta select cez panel — najprv flush
-    // rozpisanych editov (400 ms debounce) KORPUSU AJ DOSKY (Codex GH #48 P2:
-    // zmena selection by boardPending zrusila), az potom sa meni selection.
-    productionRelay: function(p){
-      if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
-      if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
-      if (window.sketchup && sketchup.production_do_select) sketchup.production_do_select(JSON.stringify(p));
-    },
-    // V0.5 C: export VEPO cez panel — flush ako pri selecte, ALE pri neplatnych
-    // poliach sa export zastavi (flushCabinetEdits by edity ticho neaplikoval
-    // a exportoval by sa stary model = zla objednavka).
-    productionRelayExport: function(p){
-      var blocked = false;
-      try {
-        if (typeof validateFields === 'function' && typeof selectedCabId !== 'undefined' &&
-            selectedCabId && !validateFields()) blocked = true;
-        // GH P1: board karta neplatne hodnoty NEqueue-uje (pole .bad) — flush by
-        // ich ticho obisiel a export by sol zo starych rozmerov. Cervene board
-        // pole = export stoji rovnako ako pri korpuse.
-        var badBoard = document.querySelector('#boardCard input.bad, #boardCard .bad');
-        if (badBoard) blocked = true;
-      } catch (e) { blocked = false; }
-      if (!blocked){
-        if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
-        if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
-      }
-      p.flush_blocked = blocked;
-      if (window.sketchup && sketchup.production_do_export) sketchup.production_do_export(JSON.stringify(p));
-    },
-    // V0.6 D1b (GH #127 P1): CSV kovania — rovnaky flush handshake ako VEPO
-    // (neplatne pole = export stoji; inak flush editov PRED zberom modelu).
-    productionRelayHwCsv: function(p){
-      var blocked = false;
-      try {
-        if (typeof validateFields === 'function' && typeof selectedCabId !== 'undefined' &&
-            selectedCabId && !validateFields()) blocked = true;
-        var badBoard = document.querySelector('#boardCard input.bad, #boardCard .bad');
-        if (badBoard) blocked = true;
-      } catch (e) { blocked = false; }
-      if (!blocked){
-        if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
-        if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
-      }
-      p.flush_blocked = blocked;
-      if (window.sketchup && sketchup.production_do_hw_csv) sketchup.production_do_hw_csv(JSON.stringify(p));
-    },
-    // V0.6 E-b: XLSX rozpoctu — rovnaky flush handshake (rozpisany edit korpusu
-    // meni kusovnik, teda aj platne, olep a montaz v rozpocte).
-    productionRelayBudget: function(p){
-      var blocked = false;
-      try {
-        if (typeof validateFields === 'function' && typeof selectedCabId !== 'undefined' &&
-            selectedCabId && !validateFields()) blocked = true;
-        var badBoard = document.querySelector('#boardCard input.bad, #boardCard .bad');
-        if (badBoard) blocked = true;
-      } catch (e) { blocked = false; }
-      if (!blocked){
-        if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
-        if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
-      }
-      p.flush_blocked = blocked;
-      if (window.sketchup && sketchup.production_do_budget) sketchup.production_do_budget(JSON.stringify(p));
-    },
-    // ST-1a (audit #3): okno ŠTÚDIO ma VLASTNY kanal. Tvar handshaku je
-    // identicky s `productionRelay*` — lisi sa LEN cielovy callback, aby
-    // odpoved prisla do TOHO okna, ktore klikalo (kazde okno ma vlastny `gen`
-    // a cudzi push by mu klik odmietol).
+    // ŠT-1c PR B3: pat relayov okna Vyroba (`productionRelay`,
+    // `productionRelayExport`, `productionRelayHwCsv`, `productionRelayBudget`
+    // a `productionRelayCp`) tu ZANIKLO spolu s oknom. Ten isty flush
+    // handshake — rozpisany edit korpusu/dosky sa najprv aplikuje, cervene
+    // pole akciu ZASTAVI — robia relaye Studia nizsie.
+    //
+    // ST-1a (audit #3): okno ŠTÚDIO ma VLASTNY kanal — odpoved prichadza do
+    // TOHO okna, ktore klikalo (kazde okno ma vlastny `gen` a cudzi push by
+    // mu klik odmietol).
     studioRelay: function(p){
       if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
       if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
@@ -371,7 +313,7 @@
     },
     // Export VEPO zo Studia: pri neplatnych poliach panela sa export ZASTAVI
     // (flush by edity ticho neaplikoval a exportoval by sa stary model = zla
-    // objednavka) — rovnake pravidlo ako pri okne Vyroba.
+    // objednavka) — rovnake pravidlo maju vsetky exporty Studia.
     studioRelayExport: function(p){
       var blocked = false;
       try {
@@ -389,7 +331,7 @@
     },
     // ŠT-1c PR A (Š7): CSV nakupneho zoznamu kovania zo sekcie Nakup. Ten isty
     // flush guard ako pri VEPO — cervene pole panela export ZASTAVI, inak by
-    // sa objednavalo kovanie pre stare rozmery (vzor `productionRelayHwCsv`).
+    // sa objednavalo kovanie pre stare rozmery (vzor `studioRelayExport`).
     studioRelayHwCsv: function(p){
       var blocked = false;
       try {
@@ -440,24 +382,6 @@
       }
       p.flush_blocked = blocked;
       if (window.sketchup && sketchup.studio_do_cp_xlsx) sketchup.studio_do_cp_xlsx(JSON.stringify(p));
-    },
-    // V0.6 E-b2: cenova ponuka pre zakaznika — CP je VIEW nad rozpoctom, takze
-    // potrebuje presne ten isty flush handshake (inak by zakaznik dostal sumu
-    // zo stareho modelu).
-    productionRelayCp: function(p){
-      var blocked = false;
-      try {
-        if (typeof validateFields === 'function' && typeof selectedCabId !== 'undefined' &&
-            selectedCabId && !validateFields()) blocked = true;
-        var badCp = document.querySelector('#boardCard input.bad, #boardCard .bad');
-        if (badCp) blocked = true;
-      } catch (e) { blocked = false; }
-      if (!blocked){
-        if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
-        if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
-      }
-      p.flush_blocked = blocked;
-      if (window.sketchup && sketchup.production_do_cp) sketchup.production_do_cp(JSON.stringify(p));
     },
     // D-05: zivy katalog materialov po CRUD v okne Materialy projektu. Obnovi
     // vsetky selecty s materialmi BEZ resetu formulara; zachovava vybrane hodnoty.
@@ -625,15 +549,15 @@
     // formular sa nesmie dotknut (vzor NX.setUsedIds).
     setUiSettings: function(data){ if (typeof nxApplyUiSettings === 'function') nxApplyUiSettings(data); },
     // UI-B1 (audit A2): stav ABS kontroly hran do raily. Rovnaky kanal ako ma
-    // okno Vyroba (D-105) — panel si ZIADNY vlastny stav nedrzi, len zobrazuje
-    // to, co posle server (klik z panela, z toolbaru aj z okna Vyroba).
+    // lista sekcie Kontrola v ŠTÚDIU — panel si ZIADNY vlastny stav nedrzi,
+    // len zobrazuje to, co posle server (klik z panela, z toolbaru aj zo Študia).
     setEdgeCheck: function(state){ if (typeof nxApplyEdgeCheck === 'function') nxApplyEdgeCheck(state); },
-    // v0.7.28: to iste 3-stavove nastavenie sa da otvorit aj v okne Vyroba.
+    // v0.7.28: to iste 3-stavove nastavenie sa da otvorit aj v ŠTÚDIU.
     // Ked ho pouzivatel otvori tam, rohove okno v raile sa zavrie — na
     // obrazovke nikdy nestoja dve kopie tych istych prepinacov.
     closeEdgeMenu: function(){ if (typeof nxCloseEdgeMenu === 'function') nxCloseEdgeMenu(); },
     // K2/D-87: stav kontroly smeru kresby do raily. JEDEN zdroj stavu — ten
-    // isty kanal pouziva okno Vyroba, takze prepnutie na jednom mieste je hned
+    // isty kanal pouziva ŠTÚDIO, takze prepnutie na jednom mieste je hned
     // vidiet aj na druhom (a naopak). Panel si nic nedrzi ani neprepocitava.
     setGrainCheck: function(state){ if (typeof nxApplyGrainCheck === 'function') nxApplyGrainCheck(state); }
   };
@@ -675,7 +599,7 @@
     setOut('inf_area', info.area);
     var live = !!(c && c.cabinet_id);
     [['infParts', 'Klik = označí výrobné dielce tejto skrinky v modeli'],
-     ['infArea', 'Klik = otvorí Kusovník (okno Výroba); filter na jednu skrinku pribudne v Štúdiu']].forEach(function(o){
+     ['infArea', 'Klik = otvorí ŠTÚDIO → Kusovník, zužený na túto skrinku']].forEach(function(o){
       var n = el(o[0]); if (!n) return;
       n.setAttribute('aria-disabled', live ? 'false' : 'true');
       n.title = live ? o[1] : 'Označ skrinku v modeli';

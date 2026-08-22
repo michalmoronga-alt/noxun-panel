@@ -186,20 +186,22 @@ NxTest.test('UI-02: ABS tlacidlo len prepina existujuce EdgeCheck API (D-104/D-1
 end
 
 NxTest.test('UI-02/UI-B1: prepnutie ABS obnovi ovladanie vo VSETKYCH oknach') do
-  # Okno Vyroba ma vlastne split tlacidlo hran so stavmi a poctami, Inspector ma
-  # ikonu v raile. Bez pushu noveho stavu by po prepnuti inde ukazovali stary.
+  # Lista sekcie Kontrola v ŠTÚDIU ma vlastne tlacidlo hran so stavmi a poctami,
+  # Inspector ma ikonu v raile. Bez pushu noveho stavu by po prepnuti inde
+  # ukazovali stary. (ŠT-1c PR B3: tretim klientom bolo okno Vyroba — zaniklo.)
   cast = UI02_MAIN[/def self\.broadcast_edge_check.*?\n    end\n/m].to_s
   NxTest.refute(cast.empty?, 'Engine.broadcast_edge_check rozposiela novy stav')
   NxTest.assert(ui02_toggle_shared.include?('broadcast_edge_check(state)'),
                 'po prepnuti sa stav VZDY rozposle (inak okna ostanu na starom)')
-  NxTest.assert(cast.include?('ProductionDialog.push_edge_check(state)'),
-                'okno Vyroba musi dostat novy stav (split tlacidlo D-105)')
+  NxTest.assert(cast.include?('StudioDialog.push_edge_check(state)'),
+                'okno Studio musi dostat novy stav (lista sekcie Kontrola)')
   NxTest.assert(cast.include?('Panel.push_edge_check(state)'),
                 'rail Inspectora musi dostat novy stav (UI-B1)')
-  NxTest.assert(cast.include?('defined?(ProductionDialog)') && cast.include?('defined?(Panel)'),
+  NxTest.assert(cast.include?('defined?(StudioDialog)') && cast.include?('defined?(Panel)'),
                 'push je defenzivny — pri zavretom/nenacitanom okne sa ticho zahodi')
-  prod = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_dialog.rb'), encoding: 'UTF-8')
-  verejne = prod[/\A.*?\n\s*private\b/m].to_s # cast triedy PRED `private` (lekcia A-05)
+  NxTest.refute(cast.include?('ProductionDialog'), 'vetva zaniknuteho okna Vyroba je PREC')
+  studio = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog.rb'), encoding: 'UTF-8')
+  verejne = studio[/\A.*?\n\s*private\b/m].to_s # cast triedy PRED `private` (lekcia A-05)
   NxTest.assert(verejne.include?('def push_edge_check'),
                 'push_edge_check musi ostat verejne — vola ho aj EdgeCheck a toolbar')
   panel_sync = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'sync.rb'), encoding: 'UTF-8')

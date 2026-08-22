@@ -178,8 +178,9 @@ NxTest.test('UI-01: temu dostane KAZDE okno (spolocny boot hook register_dialog_
   end
   # ST-1a: pribudlo okno Studio (8. okno) — hook je povinny pre KAZDE okno,
   # inak by nove okno ostalo bez temy aj bez dorovnania velkosti (D-77).
-  NxTest.assert_equal(8, volajuci.length,
-                      "spolocny boot hook musi volat VSETKYCH 8 okien (najdene: #{volajuci.map { |p| File.basename(p) }.join(', ')})")
+  # ŠT-1c PR B3: okno Vyroba zaniklo — ostalo ich SEDEM.
+  NxTest.assert_equal(7, volajuci.length,
+                      "spolocny boot hook musi volat VSETKYCH 7 okien (najdene: #{volajuci.map { |p| File.basename(p) }.join(', ')})")
   NxTest.assert(UI01_WIN_FIT.include?('sketchup.nx_theme'),
                 'okno si temu vypyta z win_fit.js (jediny skript nacitany vo vsetkych oknach)')
   chybajuce = Dir[File.join(UI01_UI_DIR, '*.html')].reject do |path|

@@ -75,7 +75,7 @@ module Noxun
 
         def register_callbacks(dlg)
           Engine.register_dialog_fit(dlg, 'materials') # D-77: zapamatane male okno sa dorovna
-          # D-83: pending poziadavka („Nahradiť UNI…" z okna Výroba) sa spusta AZ
+          # D-83: pending poziadavka („Nahradiť UNI…" zo ŠTÚDIA) sa spusta AZ
           # tu — po push_state, ked JS uz ma katalog. Volanie pred nacitanim HTML
           # by CEF zahodil.
           cb(dlg, 'ready') { |_p| @ready = true; push_state; flush_pending_replace_uni }
@@ -323,7 +323,7 @@ module Noxun
           ok, result = Materials.restore_pre_schema2!
           return set_status(result, true) unless ok
           # GH #93 P2 (4. kolo): rollback meni CELY katalog — refresh musia
-          # dostat aj panel a otvorene okno Vyroba (rovnako ako bezna mutacia),
+          # dostat aj panel a otvorene okno Studio (rovnako ako bezna mutacia),
           # inak by drzali predrollbackovy SCHEMA 2 obsah.
           after_catalog_change
           push_state
@@ -689,8 +689,9 @@ module Noxun
           js("MD.confirmDelete(#{info.to_json})")
         end
 
-        # --- D-83: „Nahradiť UNI…" spustene z okna Výroba --------------------
-        # Vstup z ProductionDialog (ten uz overil gen, model a ze uni_id JE UNI).
+        # --- D-83: „Nahradiť UNI…" spustene zo ŠTÚDIA -----------------------
+        # Vstup zo zdielaneho jadra `ProductionCore.replace_uni` (to uz overilo
+        # gen, model a ze uni_id JE UNI).
         # Ak okno bezi a JS je pripraveny, modal sa otvori hned; inak sa
         # poziadavka ODLOZI a spusti ju `ready` callback po push_state — CEF
         # zahodi execute_script poslany pred nacitanim HTML, takze slepy skript
@@ -709,7 +710,7 @@ module Noxun
         end
 
         # Spusti odlozenu poziadavku — s CERSTVYM overenim (audit F5): medzi
-        # klikom vo Výrobe a nacitanim okna sa mohol prepnut model alebo zmenit
+        # klikom v Štúdiu a nacitanim okna sa mohol prepnut model alebo zmenit
         # katalog. Neplatna poziadavka konci stavovou hlaskou, modal sa neotvori.
         def flush_pending_replace_uni
           req = @pending_replace_uni
@@ -1432,11 +1433,11 @@ module Noxun
           # hrany su lepitelne. Cache sa preto oznaci za starú TU; prepocet bezi
           # lazy (push_state nizsie / najblizsie prekreslenie).
           EdgeCheck.invalidate! if defined?(EdgeCheck)
-          # D-19 (Codex F3): otvorene okno Vyroba by inak drzalo stary odhad
-          # platni (format sa prave mohol zmenit)
-          ProductionDialog.refresh_if_open if defined?(ProductionDialog)
-          # ST-1a: to iste plati pre Studio — skupiny Kusovnika nesu farbu,
-          # nazov a hrubku PRIAMO z katalogu.
+          # D-19 (Codex F3): otvorene okno s cislami zakazky by inak drzalo
+          # stary odhad platni (format sa prave mohol zmenit).
+          # ŠT-1c PR B3: vetva okna Vyroba tu zanikla spolu s oknom.
+          # ST-1a: Studio — skupiny Kusovnika nesu farbu, nazov a hrubku
+          # PRIAMO z katalogu.
           StudioDialog.refresh_if_open if defined?(StudioDialog)
         end
       end

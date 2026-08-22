@@ -22,35 +22,29 @@ require_relative '../helper' unless defined?(NxTest)
 # Headless: ui/*.rb nie su v require zozname helpera (UI vrstva).
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core') if NxTest.headless?
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog') if NxTest.headless?
-require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_dialog') if NxTest.headless?
 
 S1C_CORE_RB   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core.rb'),
                           encoding: 'UTF-8')
 S1C_STUDIO_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog.rb'),
-                          encoding: 'UTF-8')
-S1C_PROD_RB   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_dialog.rb'),
                           encoding: 'UTF-8')
 S1C_PANEL_RB  = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.rb'), encoding: 'UTF-8')
 S1C_EDGE_RB   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'edge_check.rb'),
                           encoding: 'UTF-8')
 S1C_STUDIO_JS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'studio.js'),
                           encoding: 'UTF-8')
-S1C_PROD_JS   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'production.js'),
-                          encoding: 'UTF-8')
 S1C_BRIDGE_JS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'bridge.js'),
                           encoding: 'UTF-8')
 S1C_STUDIO_HTML = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio.html'),
                             encoding: 'UTF-8')
-S1C_PROD_HTML = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production.html'),
-                          encoding: 'UTF-8')
 
 # --- 1) sekcia `buy` je ZIVA a premostenie po nej nezostalo -------------------
 
 NxTest.test('ŠT-1c: `buy` je SEKCIA Studia — a premostenie do okna Vyroba zaniklo') do
   st = Noxun::Engine::StudioDialog
   NxTest.assert(st::SECTIONS.include?('buy'), 'Ruby whitelist sekciu pozna')
-  NxTest.refute(st::PRODUCTION_BRIDGES.key?('buy'), 'premostenie do tabu Kovanie zaniklo')
-  NxTest.assert(st::BRIDGE_STATUS['buy'].to_s.empty?, 'a s nim aj jeho hlaska')
+  NxTest.refute(st.const_defined?(:PRODUCTION_BRIDGES),
+                'premostenia do okna Vyroba zanikli uplne (ŠT-1c PR B3)')
+  NxTest.assert(st::BRIDGE_STATUS['buy'].to_s.empty?, 'a s nimi aj ich hlasky')
   # Navigacia okna: polozka `buy` uz NESMIE mat `bridge` (sipka + tooltip
   # „zatiaľ v okne Výroba") — inak by tvrdila, ze obsah je inde.
   nav = S1C_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s
@@ -60,29 +54,21 @@ NxTest.test('ŠT-1c: `buy` je SEKCIA Studia — a premostenie do okna Vyroba zan
                 'sekcia ma vlastnu hlavicku a hint')
 end
 
-NxTest.test('ŠT-1c: okno Vyroba stratilo tab Kovanie CELY (JS aj HTML aj CSS)') do
-  # PR B1 vzala oknu aj POSLEDNY tab (Rozpocet) — whitelist je uz prazdny.
-  NxTest.assert_equal([], Noxun::Engine::ProductionDialog::TABS,
-                      'whitelist tabov uz Kovanie (ani nic ine) nepozna')
-  NxTest.refute(S1C_PROD_HTML.include?('id="pt_hardware"'), 'tlacidlo tabu zaniklo')
-  NxTest.refute(S1C_PROD_HTML.include?('id="prodHint"'),
-                'hint „klik na riadok kovania" zanikol s nim (patri sekcii)')
-  %w[renderHardware hwCsvExport hwManualMark price].each do |fn|
-    NxTest.refute(S1C_PROD_JS.include?("function #{fn}"), "mrtvy helper #{fn} sa mal odstranit")
-    NxTest.assert(S1C_STUDIO_JS.include?("function #{fn}") || fn == 'renderHardware',
-                  "#{fn} zije v Studiu")
+NxTest.test('ŠT-1c: tab Kovanie (a s PR B3 cele okno Vyroba) je PREC') do
+  # PR B1 vzala oknu aj POSLEDNY tab (Rozpocet), PR B3 zmazala cele okno.
+  NxTest.refute(defined?(Noxun::Engine::ProductionDialog),
+                'modul zaniknuteho okna uz neexistuje')
+  %w[hwCsvExport hwManualMark price].each do |fn|
+    NxTest.assert(S1C_STUDIO_JS.include?("function #{fn}"), "#{fn} zije v Studiu")
   end
   NxTest.assert(S1C_STUDIO_JS.include?('function buySection'),
                 'render sekcie je v studio.js (v okne Vyroba sa volal renderHardware)')
-  NxTest.refute(S1C_PROD_JS.include?('tr.hwrow'), 'klik-select kovania odisiel s tabom')
-  NxTest.assert(S1C_STUDIO_JS.include?("t.closest('tr.hwrow')"), 'a zije v Studiu')
+  NxTest.assert(S1C_STUDIO_JS.include?("t.closest('tr.hwrow')"), 'klik-select kovania zije v Studiu')
 end
 
 NxTest.test('ŠT-1c: styly nakupneho zoznamu sa PRESUNULI (nie skopirovali)') do
   %w[.hwsec .hwbanner hwcat hwmiss hwsum].each do |sel|
     NxTest.assert(S1C_STUDIO_HTML.include?(sel), "#{sel} je v studio.html")
-    NxTest.refute(S1C_PROD_HTML.include?("  #{sel} {") || S1C_PROD_HTML.include?("tr.#{sel} td"),
-                  "#{sel} uz v production.html NIE JE (kopia by sa rozisla)")
   end
   # UI_DIZAJN: v Studiu ziadny natvrdo pisany hex — okno ma dve temy.
   block = S1C_STUDIO_HTML[/sekcia NÁKUP KOVANIA.*?súčtový riadok/m].to_s
@@ -130,12 +116,9 @@ NxTest.test('ŠT-1c: `label`/`params_label` sklada JADRO, nie okno (audit #3)') 
                 'payload Studia cita zdielane obohatenie')
   NxTest.assert(S1C_STUDIO_RB.include?('hardware_sets: hw_exp'),
                 'a nesie aj nakupny zoznam zo setov')
-  # Okno Vyroba stratilo OBE polia spolu s tabom — vlastne obohatenie by bolo
-  # druha pravda o tom, ako sa polozka vola.
-  NxTest.refute(S1C_PROD_RB.include?('hardware_sets: hw_exp'),
-                'okno Vyroba nakupny zoznam uz nedostava')
-  NxTest.refute(S1C_PROD_RB.include?('HardwareRules.label_for'),
-                'ani vlastne obohatenie generiky')
+  # Vlastne obohatenie v okne by bolo druha pravda o tom, ako sa polozka vola.
+  NxTest.refute(S1C_STUDIO_RB.include?('HardwareRules.label_for'),
+                'okno nema vlastne obohatenie generiky — sklada ho JADRO')
 end
 
 NxTest.test('ŠT-1c: hardware_labeled dopĺňa OBA texty a cudzie polia nechá tak') do
@@ -156,18 +139,15 @@ end
 
 # --- 3) CSV kovania: telo v jadre + GEN GUARD (audit #15) --------------------
 
-NxTest.test('ŠT-1c: telo CSV kovania je v jadre a obe okna su len obaly') do
+NxTest.test('ŠT-1c: telo CSV kovania je v jadre a okno je len obal') do
   core = Noxun::Engine::ProductionCore
   NxTest.assert(core.respond_to?(:do_hw_csv), 'ProductionCore.do_hw_csv existuje')
   %i[do_export do_select do_hw_csv].each do |m|
     NxTest.assert(Noxun::Engine::StudioDialog.respond_to?(m),
                   "StudioDialog.#{m} je VEREJNY (vola ho relay z panela)")
-    # DOCASNE — obal v okne Vyroba zanika v ŠT-1c PR B3 spolu s celym oknom
-    # (review #4). Dovtedy ho vola relay `production_do_hw_csv` z panela.
-    NxTest.assert(Noxun::Engine::ProductionDialog.respond_to?(m),
-                  "ProductionDialog.#{m} ostava verejny (relay `production_do_hw_csv`)")
   end
-  [['studio_dialog.rb', S1C_STUDIO_RB], ['production_dialog.rb', S1C_PROD_RB]].each do |(name, src)|
+  # ŠT-1c PR B3: druhym obalom bolo okno Vyroba — zaniklo, ostal JEDEN.
+  [['studio_dialog.rb', S1C_STUDIO_RB]].each do |(name, src)|
     NxTest.assert(src.include?('ProductionCore.do_hw_csv'), "#{name} vola zdielane telo")
     NxTest.refute(src.include?('HardwareSets.purchase_csv'),
                   "#{name} nesmie mat vlastny zapis CSV (dva exporty by sa rozisli)")
@@ -228,15 +208,17 @@ NxTest.test('ŠT-1c (audit #2): EdgeCheck rozposiela stav ZDIELANYM broadcastom'
     NxTest.refute(body.empty?, "#{m} sa nasla")
     NxTest.assert(body.include?('Engine.broadcast_edge_check'),
                   "#{m} rozposiela zdielanou cestou (nie vlastnym zoznamom okien)")
-    NxTest.refute(body.include?('ProductionDialog.push_edge_check'),
-                  "#{m} uz nemenuje jednotlive okna — Studio by v zozname chybalo")
+    NxTest.refute(body.include?('StudioDialog.push_edge_check'),
+                  "#{m} uz nemenuje jednotlive okna — rail by v zozname chybal")
     NxTest.refute(body.include?('Panel.push_edge_check'),
                   "#{m} nesmie obchadzat broadcast ani pri raile")
   end
-  # A broadcast pozna VSETKY tri okna (bez toho by fix nic neriesil).
+  # A broadcast pozna OBOCH prijimatelov (bez toho by fix nic neriesil).
+  # ŠT-1c PR B3: tretim bolo okno Vyroba — zaniklo s oknom.
   main = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
   body = main[/def self\.broadcast_edge_check.*?\n    end\n/m].to_s
-  %w[ProductionDialog StudioDialog Panel].each do |win|
+  %w[StudioDialog Panel].each do |win|
     NxTest.assert(body.include?("#{win}.push_edge_check"), "#{win} je v broadcaste")
   end
+  NxTest.refute(body.include?('ProductionDialog'), 'vetva zaniknuteho okna je PREC')
 end

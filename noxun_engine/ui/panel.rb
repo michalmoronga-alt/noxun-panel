@@ -127,7 +127,7 @@ module Noxun
           cb(dlg, 'set_hardware_set')      { |p| handle_set_hardware_set(p) } # V0.6 D1b: set na skrinke
           cb(dlg, 'open_rules')            { |_p| RulesDialog.show }
           # D-91: Katalog kovania priamo z hlavicky panela (docasne miesto "za
-          # Vyrobou" — finalny domov rozhodne UI 2.0). Len otvorenie satelitu.
+          # Studiom" — finalny domov rozhodne UI 2.0). Len otvorenie satelitu.
           cb(dlg, 'open_hardware_catalog') { |_p| HardwareCatalogDialog.show }
           # V0.4.5 D1: omrvinka karty dielca — spat na korpus (oznaci ho v modeli).
           # UI-B1: tou istou cestou ide aj krizik docasnej polozky raily (dielec).
@@ -136,21 +136,21 @@ module Noxun
           # Ziadna operacia, ziadny zapis do modelu (vzor Panel.show_insert).
           cb(dlg, 'clear_selection')       { |p| handle_clear_selection(p) }
           # UI-B1 (audit A2): ABS kontrola hran z raily Inspectora. Vola TU ISTU
-          # zdielanu logiku ako toolbar aj okno Vyroba (Engine.toggle_edge_check)
+          # zdielanu logiku ako toolbar aj lista sekcie Kontrola v Studiu (Engine.toggle_edge_check)
           # — ziadny duplikat a ziadny zapis do modelu (lekcia D-103).
           cb(dlg, 'nx_edge_toggle')        { |p| handle_edge_toggle(p) }
           # v0.7.28: 3-stavove nastavenie kontroly hran z ROHU ABS tlacidla.
-          # To iste nastavenie, ktore ma okno Vyroba pod chevronom — ide
+          # To iste nastavenie, ktore ma lista sekcie Kontrola v Studiu — ide
           # ZDIELANOU cestou Engine.set_edge_check_option (jeden zapis do
           # %APPDATA%, jeden broadcast do oboch okien). Do modelu sa nezapisuje
           # nic a nevznika krok Spat.
           cb(dlg, 'nx_edge_option')        { |p| handle_edge_option(p) }
-          # Otvorenie rohoveho nastavenia zavrie to iste okno vo Vyrobe (a
+          # Otvorenie rohoveho nastavenia zavrie to iste okno v Studiu (a
           # naopak) — na obrazovke nikdy nestoja dve kopie tych istych
           # prepinacov. Cisto zobrazovacie: ziadny stav, ziadny zapis.
           cb(dlg, 'nx_edge_menu_open')     { |_p| Engine.close_edge_menu(:panel) }
           # K2/D-87: KONTROLA KRESBY z raily Inspectora. Vola TU ISTU zdielanu
-          # logiku ako okno Vyroba (Engine.toggle_grain_check) — jeden zdroj
+          # logiku ako lista sekcie Kontrola v Studiu (Engine.toggle_grain_check) — jeden zdroj
           # stavu, dva vstupne body; ziadny zapis do modelu.
           cb(dlg, 'nx_grain_toggle')       { |p| handle_grain_toggle(p) }
           # D-89a: hover nad hranou v karte dielca rozsvieti tu istu hranu v
@@ -162,7 +162,7 @@ module Noxun
           cb(dlg, 'nx_camera_focus')       { |p| handle_camera_focus(p) }
           # UI-B3 (N13): klik na „Dielcov" v informacnom stlpci — oznaci vyrobne
           # dielce TEJTO skrinky v modeli. CISTE CITANIE + zmena vyberu pod
-          # suspend guardom (vzor ProductionDialog.do_select) — ziadna operacia,
+          # suspend guardom (vzor ProductionCore.do_select) — ziadna operacia,
           # ziadny zapis, ziadny krok Spat.
           cb(dlg, 'nx_select_parts')       { |p| handle_select_parts(p) }
           # UI-C4: klik na hlavicku boxu vlastnika v sekcii Kovanie (a na znacku
@@ -186,26 +186,16 @@ module Noxun
           cb(dlg, 'open_project_materials') { |_p| MaterialsDialog.show }
           cb(dlg, 'open_templates')         { |_p| TemplatesDialog.show }
           cb(dlg, 'save_template_as')       { |p| handle_save_template_as(p) } # D-14 modal
-          # V0.5 B; UI-D3: volitelny DEEP-LINK na tab (⚠ warnpanel -> KONTROLA,
-          # „Materiál" -> Kusovník). Whitelist tabov je v ProductionDialog::TABS —
-          # server je autorita, panel posiela iba meno.
-          cb(dlg, 'open_production')        { |p| ProductionDialog.show(open_tab: studio_tab_of(p)) }
-          # V0.5 B relay (Codex B1): panel JS uz flushol edity — vyber vykona Vyroba
-          cb(dlg, 'production_do_select')   { |p| ProductionDialog.do_select(p) }
-          # V0.5 C relay: export VEPO az PO flushi editov panela (stale data = zla objednavka)
-          cb(dlg, 'production_do_export')   { |p| ProductionDialog.do_export(p) }
-          # V0.6 D1b relay (GH #127 P1): CSV kovania — rovnaky flush handshake
-          cb(dlg, 'production_do_hw_csv')   { |p| ProductionDialog.do_hw_csv(p) }
-          # V0.6 E-b relay: XLSX rozpoctu — rovnaky flush handshake ako VEPO/CSV
-          cb(dlg, 'production_do_budget')   { |p| ProductionDialog.do_budget_xlsx(p) }
-          # V0.6 E-b2 relay: zakaznicka cenova ponuka (cenova tabulka + specifikacia)
-          cb(dlg, 'production_do_cp')       { |p| ProductionDialog.do_cp_xlsx(p) }
+          # ŠT-1c PR B3: pat relayov okna Vyroba (`open_production`,
+          # `production_do_select/_export/_hw_csv/_budget/_cp`) tu ZANIKLO
+          # spolu s oknom. Ten isty flush handshake robia relaye Studia nizsie
+          # — kazde okno ma vlastny kanal aj vlastny generacny token.
           # ST-1a: okno STUDIO. Deep-link nesie meno sekcie (+ volitelnu kotvu
           # hladania — N13 posiela ID skrinky); whitelist je v
           # StudioDialog::SECTIONS, panel posiela iba meno.
           cb(dlg, 'open_studio')            { |p| open_studio(p) }
           # ST-1a relay (audit #3): Studio ma VLASTNY kanal — inak by odpoved
-          # prisla do okna Vyroba a jeho `gen` by klik odmietol.
+          # prisla do ineho okna a jeho `gen` by klik odmietol.
           cb(dlg, 'studio_do_select')       { |p| StudioDialog.do_select(p) }
           cb(dlg, 'studio_do_export')       { |p| StudioDialog.do_export(p) }
           # ŠT-1c PR A: CSV nakupneho zoznamu kovania zo sekcie Nakup — rovnaky

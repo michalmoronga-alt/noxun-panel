@@ -253,7 +253,7 @@
     // ten isty pripad — prilis plytka zona police NEPOSTAVI, ale kluc prvej z
     // nich si v upozorneni ponecha. V zozname chybal, takze oko na tom riadku
     // koncilo hlaskou „Dielec sa v modeli nenašiel". Serverova strana obe kody
-    // uz drzi spolu (`production_dialog.rb`) — panel sa tym zrovnal.
+    // uz drzi spolu (`ui/production_core.rb`) — panel sa tym zrovnal.
     var WARN_PART_NOT_BUILT = ['part_skipped_degenerate', 'shelf_skipped_shallow_zone'];
     function warnRows(warnings){
       var out = [];
@@ -273,26 +273,9 @@
       return out;
     }
 
-    // ===== UI-D3: deep-link do okna Vyroba (docasne „Štúdio") ==============
-    // Taby okna Vyroba. Zoznam je ZRKADLO `ProductionDialog::TABS` — autoritou
-    // whitelistu je RUBY (HTML/JS nie je ochrana), tento mirror len zabrani,
-    // aby z panela vobec vyletela hodnota, ktora tab nepomenuva.
-    // ST-1a: taby `rows`/`sheets`/`edging` ZANIKLI — kusovnik a supisy platni
-    // a ABS su od tejto davky sekciou Kusovnik v okne Studio.
-    // ŠT-1b: to iste sa stalo tabu `control` — KONTROLA je sekcia `ctrl` Studia.
-    // ŠT-1c PR A: a tabu `hardware` — NAKUP KOVANIA je sekcia `buy` Studia.
-    // ŠT-1c PR B1: a POSLEDNEMU tabu `budget` — ROZPOCET je sekcia `budget`
-    // Studia. Zoznam je PRAZDNY: okno Vyroba uz nema kam deep-linkovat, takze
-    // `studioTab` vracia vzdy null a `open_production` okno len OTVORI. Cela
-    // dvojica (`studioTab`/`studioLink`) zanikne s oknom v PR B3.
-    var STUDIO_TABS = [];
-    function studioTab(t){
-      var s = String(t == null ? '' : t);
-      return STUDIO_TABS.indexOf(s) >= 0 ? s : null;
-    }
-    // Payload prekliku. `tab: null` = „len otvor okno" — server vtedy tab
-    // NEPREPINA a pouzivatel ostane tam, kde naposledy skoncil.
-    function studioLink(tab){ return { tab: studioTab(tab) }; }
+    // ŠT-1c PR B3: whitelist tabov okna Vyroba, jeho filter aj skladanie
+    // payloadu deep-linku na tab tu ZANIKLI spolu s oknom. Vsetky jeho obsahy
+    // su sekciami Studia, takze jediny deep-link je ten nizsie — na SEKCIU.
 
     // ===== ST-1a: deep-link do okna STUDIO ==================================
     // Sekcie Studia. Zoznam je ZRKADLO `StudioDialog::SECTIONS` — autoritou je
@@ -346,9 +329,6 @@
       secKey: secKey,
       exclusiveClose: exclusiveClose,
       warnRows: warnRows,
-      studioTab: studioTab,
-      studioLink: studioLink,
-      STUDIO_TABS: STUDIO_TABS,
       studioSection: studioSection,
       studioOpenLink: studioOpenLink,
       STUDIO_SECTIONS: STUDIO_SECTIONS,
@@ -576,7 +556,7 @@
   // Codex #168 P1: odchod z karty MUSI najprv DOKONCIT rozpisany zapis. Zmeny
   // dosky (nazov, rozmer, pocet, smer) su debounced 400 ms a `NX.clearSelected`
   // ich cez `cancelBoardEdits` zahodi — pouzivatel by o poslednu upravu ticho
-  // prisiel. Rovnaky flush handshake maju vsetky relay cesty okna Vyroba.
+  // prisiel. Rovnaky flush handshake maju vsetky relay cesty Studia.
   // Codex #168 P2: callback je asynchronny, preto nesie IDENTITU dosky —
   // ak sa vyber medzitym zmenil, server zapis odmietne a len obnovi panel.
   function railTempClose(){
@@ -618,16 +598,16 @@
   }
 
   // ===== DOM: ABS kontrola hran v raile (audit A2) ===========================
-  // Prepinac vola TU ISTU logiku ako toolbar aj okno Vyroba (EdgeCheck.toggle);
+  // Prepinac vola TU ISTU logiku ako toolbar aj ŠTÚDIO (EdgeCheck.toggle);
   // panel si ZIADNY vlastny stav nedrzi — zobrazuje presne to, co posle server.
   // Codex #168 P2 (2. kolo): prepinac nesie DOKUMENT, z ktoreho klik vysiel —
   // callback HtmlDialogu je asynchronny a bez neho by po prepnuti dokumentu
-  // zapol overlay v CUDZOM modeli (rovnaky guard ma D-105 v okne Vyroba).
+  // zapol overlay v CUDZOM modeli (rovnaky guard ma D-105 v ŠTÚDIU).
   function onEdgeCheckToggle(){
     if (window.sketchup && sketchup.nx_edge_toggle)
       sketchup.nx_edge_toggle(JSON.stringify({ model_guid: nxModelGuid }));
   }
-  // K2/D-87: KONTROLA KRESBY z raily. Ta ista cesta ako prepinac v okne Vyroba
+  // K2/D-87: KONTROLA KRESBY z raily. Ta ista cesta ako prepinac v ŠTÚDIU
   // (Engine.toggle_grain_check) — panel si ZIADNY vlastny stav nedrzi. Guard
   // dokumentu je rovnaky ako pri ABS (asynchronny callback HtmlDialogu).
   function onGrainCheckToggle(){
@@ -686,7 +666,7 @@
   // nedostane.
   //
   // Obsah okna je ZDIELANY komponent (js/edge_menu.js) — to iste nastavenie,
-  // ktore ma okno Vyroba pod chevronom. JEDEN stav (server, %APPDATA%), JEDEN
+  // ktore ma lista sekcie Kontrola v ŠTÚDIU. JEDEN stav (server, %APPDATA%), JEDEN
   // markup; panel si drzi len to, ci je okno otvorene.
   function nxEdgeMenuNode(){ return el('railAbsMenu'); }
 
@@ -721,11 +701,11 @@
     var open = !nxEdgeMenuOpen();
     nxRenderEdgeMenu(open);
     // Aby na obrazovke nikdy neboli DVE kopie tych istych prepinacov: otvorenie
-    // tu zavrie rozbalovacie okno v otvorenom okne Vyroba (a naopak).
+    // tu zavrie rozbalovacie okno v otvorenom ŠTÚDIU (a naopak).
     if (open && window.sketchup && sketchup.nx_edge_menu_open) sketchup.nx_edge_menu_open('');
   }
 
-  // Prepnutie jedneho stavu. Ide TOU ISTOU serverovou cestou ako okno Vyroba
+  // Prepnutie jedneho stavu. Ide TOU ISTOU serverovou cestou ako ŠTÚDIO
   // (Engine.set_edge_check_option): nastavenie zije v %APPDATA%, do modelu sa
   // NEZAPISUJE nic a nevznika krok Spat. Novy stav rozposle server obom oknam.
   function onEdgeMenuOption(key, value){

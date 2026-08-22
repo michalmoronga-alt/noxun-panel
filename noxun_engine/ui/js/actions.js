@@ -1,22 +1,13 @@
-  // V0.5 B: otvorenie okna Vyroba (kusovnik/supisy). Najprv flush cakajucich
-  // editov korpusu/dosky (Codex GH #48 P2) — BOM sa pocita az z cerstveho stavu
-  // (callbacky sa spracuju v poradi: apply -> open -> push_state).
-  // UI-D3: volitelny DEEP-LINK — `tab` otvori okno rovno na danom tabe
-  // (`rows` kusovnik, `control` kontrola…). Bez neho sa tab NEPREPINA a
-  // pouzivatel ostane tam, kde naposledy skoncil (rail Štúdio). Hodnotu
-  // preosieva NXShell.studioLink, ZAVAZNY whitelist je na strane Ruby.
-  function openProductionDialog(tab){
-    if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
-    if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
-    if (window.sketchup && sketchup.open_production)
-      sketchup.open_production(JSON.stringify(NXShell.studioLink(tab)));
-  }
+  // ŠT-1c PR B3: `openProductionDialog` (otvorenie okna Vyroba) ZANIKLA spolu
+  // s oknom — posledny volajuci ju stratil uz v ŠT-1b a od tejto davky nie je
+  // kam otvarat. Jedina cesta von je `openStudio` nizsie.
 
-  // ST-1a: otvorenie okna ŠTÚDIO. Rovnaky flush handshake ako pri Vyrobe —
-  // kusovnik sa pocita az z cerstveho stavu. `section` je volitelny deep-link
-  // (bez neho okno ostane tam, kde pouzivatel naposledy skoncil) a `anchor`
-  // predvyplni hladanie sekcie (N13 posiela ID skrinky). ZAVAZNY whitelist
-  // sekcii je na strane Ruby — tu sa hodnota len preosieva.
+  // ST-1a: otvorenie okna ŠTÚDIO. Najprv flush cakajucich editov korpusu/dosky
+  // (Codex GH #48 P2) — kusovnik sa pocita az z cerstveho stavu (callbacky sa
+  // spracuju v poradi: apply -> open -> push_state). `section` je volitelny
+  // deep-link (bez neho okno ostane tam, kde pouzivatel naposledy skoncil) a
+  // `anchor` predvyplni hladanie sekcie (N13 posiela ID skrinky). ZAVAZNY
+  // whitelist sekcii je na strane Ruby — tu sa hodnota len preosieva.
   function openStudio(section, anchor){
     if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
     if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
@@ -446,8 +437,8 @@
   //
   // Codex audit BLOCKER 1: zmena vyberu si vypyta push CELEJ skrinky, ktory
   // prepise formular — rozpisany edit caka 400 ms, takze bez flushu by sa ticho
-  // stratil. Preto rovnaky handshake ako ma „Vložiť kópiu" a relay cesty okna
-  // Vyroba: neplatne pole akciu ZASTAVI (flush by ju ticho neaplikoval),
+  // stratil. Preto rovnaky handshake ako ma „Vložiť kópiu" a relay cesty
+  // Štúdia: neplatne pole akciu ZASTAVI (flush by ju ticho neaplikoval),
   // platne edity sa najprv odosielaju (callbacky sa spracuju v poradi).
   function onInfoParts(){
     if (!selectedCabId){ NX.setStatus('Označ skrinku v modeli.', true); return; }

@@ -7,16 +7,18 @@
 # su PREMOSTENIA do dnesnych okien (audit #2), aby sa nikde neobjavilo mrtve
 # tlacidlo bez vysvetlenia.
 #
-# Vztah k oknu Vyroba:
-#   - CISLA su tie iste — obe okna citaju `ProductionCore` (jedno jadro, jeden
-#     vypocet; dve kopie by sa casom rozisli a rozdiel by sa ukazal az na
-#     vyrobnom vystupe),
+# Okno Vyroba, z ktoreho sa obsah stahoval, ZANIKLO v ŠT-1c PR B3 — Studio je
+# odvtedy JEDINE okno vystupov zakazky. Co z toho vztahu ostalo:
+#   - CISLA pocita zdielane jadro `ProductionCore` (jeden vypocet pre okno,
+#     rail Inspectora aj exporty; druha kopia by sa casom rozisla a rozdiel by
+#     sa ukazal az na vyrobnom vystupe),
 #   - KANAL je vlastny (audit #3) — vlastny `@generation`, vlastny relay cez
 #     panel (`NX.studioRelay*` -> `studio_do_select` / `studio_do_export`),
-#     takze push jedneho okna nezhodi guard druheho,
-#   - Studio do modelu NEZAPISUJE: klik iba vybera entity (pod
-#     `Panel.suspend_selection_sync`, refresh panela s `dedup: false`) a nazov
-#     projektu je nastavenie POCITACA v %APPDATA%, nie zakazky.
+#     takze cudzi push nezhodi guard tohto okna,
+#   - Studio do modelu ZAPISUJE JEDINE cez sekciu Rozpocet (1 mutacia = 1 krok
+#     Spat); klik iba vybera entity (pod `Panel.suspend_selection_sync`,
+#     refresh panela s `dedup: false`) a nazov projektu je nastavenie POCITACA
+#     v %APPDATA%, nie zakazky.
 #
 # ST-1a: zdielane ciste jadro nacitava loader (main.rb) EST PRED tymto suborom;
 # headless pure testy si vsak `ui/studio_dialog.rb` requiruju samostatne —
@@ -35,15 +37,9 @@ module Noxun
       # (zhodu strazi guard test): autoritou je VZDY Ruby.
       SECTIONS = %w[bom ctrl buy budget offer].freeze
 
-      # PREMOSTENIA (audit #2) — polozky navigacie, ktorych obsah zatial zije
-      # v inom okne. Kluc je meno polozky navigacie, hodnota tab okna Vyroba.
-      # ŠT-1c PR A: premostenie `buy` ZANIKLO — Nakup kovania je sekcia.
-      # ŠT-1c PR B1: zanikli aj POSLEDNE DVE (`budget`, `offer`) — Rozpocet je
-      # sekcia a nahlad cenovej ponuky je zatial jeho sucastou (vlastnu sekciu
-      # `offer` prinesie PR B2). Okno Vyroba uz nema ZIADNY tab, takze
-      # premostenie do neho by otvorilo prazdnu skrupinu. Mapa ostava (prazdna)
-      # ako VETVA `do_bridge` — cela zanikne s oknom v PR B3.
-      PRODUCTION_BRIDGES = {}.freeze
+      # ŠT-1c PR B3: `PRODUCTION_BRIDGES` (premostenia do TABOV okna Vyroba)
+      # ZANIKLI spolu s oknom — kusovnik, kontrola, nakup kovania, rozpocet aj
+      # cenova ponuka su SEKCIAMI tohto okna, takze niet kam premostovat.
 
       # Premostenia do satelitnych okien (KATALOGY + NASTAVENIA). Hodnota je
       # meno modulu — volat sa smie LEN to, co je TU (klient posiela iba kluc).
@@ -79,8 +75,7 @@ module Noxun
         # Sekcia sa NEPOSIELA hned — okno po `show` este nemusi mat nacitany
         # HTML, takze `execute_script` by prisiel do prazdna. Odklada sa a
         # spotrebuje ju NAJBLIZSI `push_state` (pri novom okne ho vyvola
-        # `ready`, pri uz otvorenom ho volame priamo tu). Vzor `@pending_tab`
-        # okna Vyroba.
+        # `ready`, pri uz otvorenom ho volame priamo tu).
         def show(open_section: nil, anchor: nil)
           @pending_section = SECTIONS.include?(open_section.to_s) ? open_section.to_s : nil
           @pending_anchor = @pending_section ? anchor.to_s.strip : nil
@@ -119,8 +114,8 @@ module Noxun
         end
 
         # Bezpecny refresh — volaju ho editor materialov, nastavenia, katalog
-        # kovania aj prepocet cien (audit #10: Studio musi byt v TYCH ISTYCH
-        # piatich cestach ako okno Vyroba, inak by drzalo stare cisla).
+        # kovania aj prepocet cien (audit #10: Studio musi byt vo VSETKYCH
+        # refresh cestach, inak by drzalo stare cisla).
         def refresh_if_open
           return unless @dialog && @dialog.visible?
 
@@ -141,8 +136,8 @@ module Noxun
 
         # --- relay z panela (audit #3) ---------------------------------------
         # Panel uz flushol rozpisane edity — az potom sa vybera/exportuje.
-        # Telo je ZDIELANE s oknom Vyroba (`ProductionCore`), okno odovzdava
-        # LEN svoj generacny token, svoj status a svoj refresh.
+        # Telo je v ZDIELANOM jadre (`ProductionCore`), okno odovzdava LEN svoj
+        # generacny token, svoj status a svoj refresh.
 
         def do_select(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
@@ -157,8 +152,8 @@ module Noxun
         end
 
         # ŠT-1c PR A (Š7): CSV nakupneho zoznamu kovania z listy sekcie Nakup.
-        # Telo je v `ProductionCore` (to iste, ake volal tab Kovanie okna
-        # Vyroba) — okno odovzdava LEN svoj generacny token, status a refresh.
+        # Telo je v `ProductionCore` (to iste, ake volal zaniknuty tab Kovanie)
+        # — okno odovzdava LEN svoj generacny token, status a refresh.
         def do_hw_csv(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           ProductionCore.do_hw_csv(Sketchup.active_model, data, generation: @generation,
@@ -248,7 +243,7 @@ module Noxun
 
         # Maly echo push stavu prepinaca (bez prepoctu celej sekcie) — vola ho
         # `Engine.broadcast_edge_check` po prepnuti Z HOCIJAKEHO vstupneho bodu
-        # (rail, Studio, okno Vyroba) aj EdgeCheck po prepocte cache.
+        # (rail Inspectora aj lista tejto sekcie) aj EdgeCheck po prepocte cache.
         def push_edge_check(state = nil)
           return unless defined?(EdgeCheck)
 
@@ -267,9 +262,10 @@ module Noxun
           Engine.log_error(e, 'StudioDialog.push_grain_check')
         end
 
-        # To iste nastavenie sa da otvorit z TROCH miest (rail · Studio · okno
-        # Vyroba). Otvorenie na jednom zavrie ostatne — na obrazovke nikdy
-        # nestoja dve kopie tych istych prepinacov. Cisto zobrazovacie.
+        # To iste nastavenie ma DVA vstupne body (rail Inspectora · lista tejto
+        # sekcie); tretim bolo okno Vyroba, ktore zaniklo v ŠT-1c PR B3.
+        # Otvorenie na jednom zavrie druhy — na obrazovke nikdy nestoja dve
+        # kopie tych istych prepinacov. Cisto zobrazovacie.
         def close_edge_menu
           js('if (window.NX && NX.closeEdgeMenu) NX.closeEdgeMenu();')
         rescue StandardError => e
@@ -285,8 +281,7 @@ module Noxun
         # tesne pred clickom) by zarucene spadol na „Dáta okna sa medzitým
         # zmenili". Kusovnik sa pritom nezmenil — zmenila sa LISTA. Ide preto
         # cielene echo (vzor `push_edge_check`), ktore prepise len jej obsah
-        # a generaciu NECHA TAK. Okno Vyroba ma vlastnu generaciu, tam staci
-        # bezny refresh.
+        # a generaciu NECHA TAK.
         def do_set_vepo_opts(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           model = Sketchup.active_model
@@ -295,7 +290,7 @@ module Noxun
             return set_status('Okno sa medzitým prepočítalo — obnovené, skús znova.', true)
           end
           guid = data['model_guid'].to_s
-          # Tolerantne ako `ProductionDialog.do_budget`: prazdny udaj z klienta
+          # Tolerantne ako `ProductionCore.do_budget`: prazdny udaj z klienta
           # (starsi cachovany DOM) guard neblokuje, nezhodne ID ano.
           if !guid.empty? && guid != ProductionCore.model_guid(model)
             push_state
@@ -314,7 +309,6 @@ module Noxun
           return set_status('Nič sa nezmenilo.', true) if msg.empty?
 
           push_vepo_bar(model)
-          ProductionDialog.refresh_if_open if defined?(ProductionDialog)
           set_status("#{msg.join(' · ')}. Platí pre všetky exporty.")
         end
 
@@ -337,12 +331,6 @@ module Noxun
         def do_bridge(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           key = data['section'].to_s
-          if PRODUCTION_BRIDGES.key?(key)
-            return set_status('Okno Výroba nie je k dispozícii.', true) unless defined?(ProductionDialog)
-
-            ProductionDialog.show(open_tab: PRODUCTION_BRIDGES[key])
-            return set_status(BRIDGE_STATUS[key])
-          end
           if WINDOW_BRIDGES.key?(key)
             mod = bridge_window(WINDOW_BRIDGES[key])
             return set_status('Okno sa nepodarilo otvoriť (nie je načítané).', true) if mod.nil?
@@ -422,20 +410,16 @@ module Noxun
         # potrebuje aj katalog materialov, panel a katalog kovania. Tento push
         # generaciu ZDVIHA (nie je to mutacia rozpoctu — zmenil sa katalog).
         #
-        # Review #1: okno Vyroba je v zozname TIEZ — hoci rozpocet uz
-        # NEZOBRAZUJE, jeho ⚠ chip nesie `counts` KONTROLY a tie zahrnaju aj
-        # ROZPOCTOVE oranzove nalezy (zlucuje ich zdielana `control_payload`).
-        # Prepocet cien ich vie zmenit (riadok bez ceny cenu dostane), takze bez
-        # by chip ukazoval stare cislo — presne ten druh tichej nezhody, ktory
-        # kontrakt „KAZDE okno s cislami zakazky je vo VSETKYCH refresh
-        # cestach" zakazuje. Zanikne az s oknom v PR B3.
+        # ŠT-1c PR B3: okno Vyroba zo zoznamu vypadlo — zaniklo. Kontrakt
+        # „KAZDE okno s cislami zakazky je vo VSETKYCH refresh cestach" plati
+        # dalej: prepocet cien meni cisla GLOBALNE, takze cerstve data dostane
+        # toto okno, katalog materialov, panel aj katalog kovania.
         def price_refresh_after_proc
           lambda do
             push_state
             MaterialsDialog.push_catalog if defined?(MaterialsDialog)
             Panel.push_materials if defined?(Panel)
             HardwareCatalogDialog.push_items if defined?(HardwareCatalogDialog)
-            ProductionDialog.refresh_if_open if defined?(ProductionDialog)
           end
         end
 
@@ -495,8 +479,8 @@ module Noxun
           cb(dlg, 'replace_uni')          { |p| do_replace_uni(p) }
           cb(dlg, 'edge_check_toggle')    { |p| do_edge_check(p) }
           cb(dlg, 'edge_check_option')    { |p| do_edge_check_option(p) }
-          # Otvorenie 3-stavoveho nastavenia zavrie jeho kopiu v raile aj v okne
-          # Vyroba (nikdy dve naraz).
+          # Otvorenie 3-stavoveho nastavenia zavrie jeho kopiu v raile
+          # (nikdy dve naraz).
           cb(dlg, 'edge_menu_open')       { |_p| Engine.close_edge_menu(:studio) }
           cb(dlg, 'grain_check_toggle')   { |p| do_grain_check(p) }
           # ŠT-1c PR B1, sekcia ROZPOCET. Mutacia (`budget_mutate`) ide PRIAMO —
@@ -534,8 +518,8 @@ module Noxun
         end
 
         # Klik z okna: cez panel (flush handshake) alebo priamo, ak panel nezije.
-        # Relay ma VLASTNE meno (`studioRelay`) — inak by odpoved prisla do okna
-        # Vyroba a jeho `gen` by klik odmietol.
+        # Relay ma VLASTNE meno (`studioRelay`), aby odpoved prisla do TOHTO
+        # okna — kazdy klient ma vlastny `gen` a cudzi push by klik odmietol.
         def handle_select(payload)
           data = JSON.parse(payload.to_s)
           if Panel.dialog_alive?
@@ -557,7 +541,7 @@ module Noxun
         # ŠT-1c PR A: CSV kovania ide TYM ISTYM flush handshakom ako VEPO —
         # rozpisany edit panela meni pocty kovania, takze by sa objednavalo zo
         # starych cisel. Vlastny relay (`studioRelayHwCsv`), aby odpoved prisla
-        # do TOHTO okna a nezhodila `gen` okna Vyroba.
+        # do TOHTO okna (kazde okno ma vlastny `gen`).
         def handle_hw_csv(payload)
           data = JSON.parse(payload.to_s)
           if Panel.dialog_alive?
@@ -613,7 +597,7 @@ module Noxun
         end
 
         # Payload OKNA (sekcie Kusovnik + Kontrola). Cisla su TIE ISTE, ktore
-        # cita okno Vyroba (`ProductionCore`) — Studio nema vlastny vypocet a JS
+        # nesie zdielane jadro (`ProductionCore`) — Studio nema vlastny vypocet a JS
         # si NIC neprepocitava (ani sumy, ani medzisucty skupin, ani counts).
         # JEDEN push nesie obe sekcie zamerne: prepnutie sekcie je cisto
         # zobrazovacie, takze nesmie chodit na server po data.
@@ -628,13 +612,13 @@ module Noxun
           bom = Bom.compute(collected)
           smap = ProductionCore.sheets_map
           sheet_sizes = smap.each_with_object({}) { |(id, s), out| out[id] = s['sheet_size'] }
-          # D-19: odhad platni per material — TEN ISTY vypocet ako v okne Vyroba.
+          # D-19: odhad platni per material — JEDEN vypocet pre kusovnik aj rozpocet.
           estimate = SheetEstimate.estimate(
             bom[:rows], sheet_sizes: sheet_sizes,
             uni_ids: smap.each_with_object({}) { |(id, s), out| out[id] = true if Materials.uni?(s) }
           )
           # ŠT-1b (audit #2): KONTROLA z TOHO ISTEHO cerstveho zberu a z TOHO
-          # ISTEHO jadra ako okno Vyroba — vratane upozorneni ROZPOCTU. Semafor
+          # ISTEHO jadra (`ProductionCore`) — vratane upozorneni ROZPOCTU. Semafor
           # sekcie, badge navigacie aj suhrn exportu tak ukazuju JEDNO cislo.
           # (⚠ chip Inspectora je nieco ine — build warnings oznacenej skrinky;
           # do tejto sekcie len VEDIE deep-linkom.)

@@ -90,7 +90,7 @@ module Noxun
       #   kovania sa vynecha (vzor Validation edges: — legacy volanie bez zmeny)
       # hardware_catalog — polozky katalogu kovania pre scan veku cien; nil =
       #   kovanie sa do scanu cerstvosti nezapocita
-      # sheet_estimate — hotovy odhad platni (okno Vyroba ho uz ma); nil =
+      # sheet_estimate — hotovy odhad platni (okno Studio ho uz ma); nil =
       #   Budget si ho spocita sam z TYCH ISTYCH dat (jedna autorita cisel)
       # =====================================================================
       def compute(bom, state, settings, sheets: {}, edges: {}, hardware_expansion: nil,

@@ -84,30 +84,16 @@ eq(NXShell.warnRows([null, undefined, { message: 'ok' }]).length, 1, 'dier v pol
 eq(NXShell.warnRows([{ message: 'a' }, { message: 'b' }]).map(r => r.text), ['a', 'b'],
    'poradie zo servera ostava');
 
-// --- 2) deep-link do okna Vyroba --------------------------------------------
+// --- 2) deep-link na TAB okna Vyroba: ZANIKOL --------------------------------
 
 // ST-1a: `rows`/`sheets`/`edging` zanikli — kusovnik a supisy platni a ABS su
 // sekciou Kusovnik okna Studio. ŠT-1b: to iste sa stalo tabu `control`,
 // ŠT-1c PR A tabu `hardware` (sekcia `buy` Studia) a ŠT-1c PR B1 POSLEDNEMU
-// tabu `budget` (sekcia `budget`). Okno Vyroba tak nema kam deep-linkovat —
-// zoznam je PRAZDNY a `studioTab` vracia vzdy null.
-eq(NXShell.STUDIO_TABS, [],
-   'zoznam tabov je ZRKADLO ProductionDialog::TABS (prazdne — okno nema taby)');
-
-eq(NXShell.studioTab('control'), null, 'zaniknuty tab kontroly sa uz z panela nedostane von');
-eq(NXShell.studioTab('hardware'), null, 'ani zaniknuty tab kovania (je to sekcia `buy` Studia)');
-eq(NXShell.studioTab('budget'), null, 'ani rozpocet (je to sekcia `budget` Studia)');
-eq(NXShell.studioTab('rows'), null, 'zaniknuty tab kusovnika sa uz z panela nedostane von');
-eq(NXShell.studioTab('sheets'), null, 'zaniknuty tab platni tiez nie');
-eq(NXShell.studioTab('kontrola'), null, 'slovensky preklep nie je meno tabu');
-eq(NXShell.studioTab(''), null, 'prazdna hodnota = bez deep-linku');
-eq(NXShell.studioTab(null), null, 'chybajuca hodnota = bez deep-linku');
-eq(NXShell.studioTab(undefined), null, 'rail Štúdio (bez argumentu) tab NEPREPINA');
-eq(NXShell.studioTab('__proto__'), null, 'zoznam sa pyta indexOf, nie vlastnosti objektu');
-
-eq(NXShell.studioLink('budget'), { tab: null }, 'deep-link na zaniknuty tab z panela nevyleti');
-eq(NXShell.studioLink(), { tab: null }, 'bez tabu ide `null` — server vtedy tab nemeni');
-eq(NXShell.studioLink('nieco'), { tab: null }, 'nezname meno sa z panela vobec nedostane von');
+// tabu `budget` (sekcia `budget`). ŠT-1c PR B3 zmazala okno aj celu mechaniku
+// deep-linku na tab — jediny deep-link mieri na SEKCIU (nizsie).
+eq(typeof NXShell.STUDIO_TABS, 'undefined', 'zoznam tabov zanikol spolu s oknom Vyroba');
+eq(typeof NXShell.studioTab, 'undefined', 'a s nim aj jeho filter');
+eq(typeof NXShell.studioLink, 'undefined', 'aj skladanie payloadu deep-linku na tab');
 
 // --- 3) ST-1a: deep-link do okna STUDIO -------------------------------------
 

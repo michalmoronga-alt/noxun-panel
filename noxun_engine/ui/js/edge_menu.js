@@ -1,6 +1,6 @@
   // ============ ZDIELANE 3-STAVOVE NASTAVENIE KONTROLY HRAN (D-105) =========
   // JEDNO nastavenie pre DVA vstupne body:
-  //   * okno Vyroba -> tab KONTROLA -> pravá polovica split tlačidla (chevron),
+  //   * okno Štúdio -> sekcia KONTROLA -> roh tlačidla „Zvýrazniť hrany",
   //   * Inspector   -> rail -> rohový trojuholník pri ABS kontrole (v0.7.28).
   // Nie su to dve kopie: markup, texty aj payload do Ruby zije TU, stav
   // prepinacov a pocty nesie VYHRADNE server (EdgeCheck v %APPDATA%) a chodi
@@ -36,7 +36,7 @@
     // POCET) a pod zelenou odsadeny podriadeny prepinac „len vybrané".
     //
     // opts.fn    — meno globalnej funkcie, ktora prepnutie posle do Ruby
-    //              (okno Vyroba `edgeCheckOption`, rail `onEdgeMenuOption`);
+    //              (Studio `edgeCheckOption`, rail `onEdgeMenuOption`);
     // opts.id    — id uzla (kazde okno ma vlastne),
     // opts.cls   — doplnkova trieda (rail pridava `ecmenu-rail` = ina pozicia).
     function menuHtml(st, open, opts){

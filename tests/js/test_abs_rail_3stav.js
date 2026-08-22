@@ -9,7 +9,7 @@
 //   2) rail a Studio dostanu BAJT-ROVNAKY obsah (lisi sa len obal),
 //   3) payload do Ruby je bajt-rovnaky (identita + kluc + STRIKTNY boolean),
 //   4) Studio naozaj deleguje (ziadna druha kopia markupu v studio.js) a
-//      v production.js po presune neostala ziadna tretia.
+//      po presune neostala ziadna tretia (okno Vyroba uz neexistuje).
 'use strict';
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -110,13 +110,12 @@ function state(options, counts, extra){
   no(src.indexOf('ecsw ecsw-') >= 0, 'farebne stvorceky kresli LEN zdielany modul');
   ok(src.indexOf('edge_menu.js') >= 0, 'Studio zdielany modul naozaj pouziva');
 
-  // ŠT-1b: po presune do Studia nesmie v okne Vyroba ostat ani zvysok
-  // prepinacov — inak by tam visela mrtva (a casom rozidena) tretia kopia.
-  const prod = fs.readFileSync(path.join(ROOT, 'noxun_engine', 'ui', 'js', 'production.js'), 'utf8');
-  no(prod.indexOf('edge_menu.js') >= 0, 'okno Vyroba zdielany modul uz nenacitava');
-  no(prod.indexOf('edgeCheckBarHtml') >= 0, 'a nema ani vlastnu listu prepinacov');
-  const prodHtml = fs.readFileSync(path.join(ROOT, 'noxun_engine', 'ui', 'production.html'), 'utf8');
-  no(prodHtml.indexOf('js/edge_menu.js') >= 0, 'ani jeho HTML modul uz nenacitava');
+  // ŠT-1b presunula prepinace do Studia; ŠT-1c PR B3 zmazala cele okno Vyroba,
+  // takze uz niet kde ostat mrtvej (a casom rozidenej) tretej kopii.
+  ['js/production.js', 'production.html'].forEach(function(rel){
+    no(fs.existsSync(path.join(ROOT, 'noxun_engine', 'ui', rel)),
+       'ui/' + rel + ' zanikol spolu s oknom Vyroba');
+  });
   const studioHtml = fs.readFileSync(path.join(ROOT, 'noxun_engine', 'ui', 'studio.html'), 'utf8');
   ok(studioHtml.indexOf('js/edge_menu.js') >= 0, 'zato Studio ho nacitava PRED studio.js');
   ok(studioHtml.indexOf('js/edge_menu.js') < studioHtml.indexOf('js/studio.js'),

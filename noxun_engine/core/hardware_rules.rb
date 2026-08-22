@@ -529,8 +529,9 @@ module Noxun
       end
 
       # D-90 (audit F5): SERVEROVY format params pre zobrazenie — „rez 597 mm".
-      # JEDINA autorita textu (tab Vyroba aj CSV kovania ho len vypisu; JS si nic
-      # neformatuje). nil = polozka nema co zobrazit navyse.
+      # JEDINA autorita textu (sekcia Nakup kovania v Studiu aj CSV kovania ho
+      # len vypisu; JS si nic neformatuje). nil = polozka nema co zobrazit
+      # navyse.
       def params_label(params)
         return nil unless params.is_a?(Hash)
         v = params['cut_length_mm'] || params[:cut_length_mm]

@@ -1746,7 +1746,7 @@
   }
 
   // Čistá funkcia (Node test): kľúč skupiny, ktorá nesie daný UNI materiál.
-  // D-83: skratka z okna Výroba pozná len uni_id — dlaždicu k nemu hľadá TU.
+  // D-83: skratka zo ŠTÚDIA pozná len uni_id — dlaždicu k nemu hľadá TU.
   function mdGroupKeyForUni(catalog, schema2, uniId){
     var id = String(uniId == null ? '' : uniId);
     if (!id) return null;
@@ -1994,7 +1994,7 @@
       var m = el('mdDeleteModal');
       if (m) m.style.display = '';
     },
-    // D-83: skratka z okna Výroba — otvor detail dekoru a rovno modal
+    // D-83: skratka zo ŠTÚDIA — otvor detail dekoru a rovno modal
     // „Nahradiť UNI…" s TÝM materiálom, na ktorý používateľ klikol v KONTROLE.
     // Server pred týmto volaním overil model aj to, že materiál je stále UNI;
     // tu ostáva už len zhoda s katalógom, ktorý má okno naozaj načítaný.

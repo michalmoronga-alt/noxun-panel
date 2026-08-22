@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.7.38' unless defined?(VERSION)
+    VERSION = '0.7.40' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -213,8 +213,9 @@ module Noxun
 
     # --- UI-B1 (audit A2): zdielane prepnutie ABS kontroly hran ---------------
     # JEDINE miesto, kde sa zvyraznenie olepu prepina. Volaju ho VSETCI klienti —
-    # toolbar (UI-02), rail Inspectora (UI-B1) aj okno Vyroba (D-105) — aby sa
-    # spravanie nemohlo rozist a novy stav dostali vsetky otvorene okna.
+    # toolbar (UI-02), rail Inspectora (UI-B1) aj lista sekcie Kontrola v okne
+    # Studio (ŠT-1b) — aby sa spravanie nemohlo rozist a novy stav dostali
+    # vsetky otvorene okna.
     # Ziadna operacia a ziadny zapis do modelu (lekcia D-103/D-105): EdgeCheck
     # je overlay NAD modelom, nie jeho obsah.
     def self.toggle_edge_check(model = nil)
@@ -231,9 +232,9 @@ module Noxun
     # Rozoslanie stavu vsetkym oknam, ktore ho zobrazuju. Defenzivne: zavrete
     # ani nenacitane okno push nezhodi (kazdy `push_edge_check` ma vlastny guard).
     def self.broadcast_edge_check(state)
-      ProductionDialog.push_edge_check(state) if defined?(ProductionDialog)
-      # ŠT-1b: TRETI vstupny bod — lista sekcie Kontrola v okne Studio. Bez neho
-      # by prepnutie z railu nebolo v otvorenom Studiu vidiet.
+      # ŠT-1c PR B3: okno Vyroba zaniklo — prijimatelia su uz len DVAJA.
+      # Lista sekcie Kontrola v okne Studio: bez nej by prepnutie z railu
+      # nebolo v otvorenom Studiu vidiet.
       StudioDialog.push_edge_check(state) if defined?(StudioDialog)
       Panel.push_edge_check(state) if defined?(Panel)
     rescue StandardError => e
@@ -242,9 +243,10 @@ module Noxun
 
     # --- v0.7.28: zdielane PREPNUTIE JEDNEHO STAVU (3-stavove nastavenie) ----
     # Presny protajsok `toggle_edge_check`: JEDINE miesto, kde sa prepina, ktory
-    # stav olepu sa zvyrazni. Volaju ho OBA vstupne body — chevron v okne Vyroba
-    # (D-105) aj rohovy trojuholnik v raile Inspectora — takze sa nastavenie
-    # nemoze rozist a novy stav (aj s cerstvymi poctami) dostanu obe okna.
+    # stav olepu sa zvyrazni. Volaju ho OBA vstupne body — rohovy trojuholnik
+    # v liste sekcie Kontrola okna Studio (ŠT-1b) aj rohovy trojuholnik v raile
+    # Inspectora — takze sa nastavenie nemoze rozist a novy stav (aj s cerstvymi
+    # poctami) dostanu obe okna.
     # Nastavenie zije v %APPDATA%, NIKDY v .skp: ziadna operacia, ziadny zapis
     # do modelu, ziadny krok Spat.
     # O platnosti kluca a striktnom booleane rozhoduje EdgeCheck.set_option.
@@ -265,8 +267,8 @@ module Noxun
     # zavrie to druhe. Je to CISTO zobrazovacia vec — ziadny stav, ziadny zapis
     # (`source` je okno, ktore prave otvorilo svoje).
     def self.close_edge_menu(source)
-      ProductionDialog.close_edge_menu if source != :production && defined?(ProductionDialog)
-      # ŠT-1b: tretia instancia toho isteho nastavenia — lista sekcie Kontrola.
+      # ŠT-1c PR B3: instancie su uz len DVE (okno Vyroba zaniklo) — lista
+      # sekcie Kontrola v Studiu a roh ABS ikony v raile Inspectora.
       StudioDialog.close_edge_menu if source != :studio && defined?(StudioDialog)
       Panel.close_edge_menu if source != :panel && defined?(Panel)
     rescue StandardError => e
@@ -275,9 +277,9 @@ module Noxun
 
     # --- K2/D-87: zdielane prepnutie KONTROLY KRESBY -------------------------
     # Presna kopia vzoru vyssie. JEDINE miesto, kde sa smer kresby prepina —
-    # volaju ho VSETCI klienti: rail Inspectora aj okno Vyroba (tab KONTROLA).
-    # Dva vstupne body nesmu mat dva stavy: klik v raile musi byt vidiet v
-    # otvorenom okne Vyroba a naopak.
+    # volaju ho VSETCI klienti: rail Inspectora aj lista sekcie Kontrola v okne
+    # Studio. Dva vstupne body nesmu mat dva stavy: klik v raile musi byt vidiet
+    # v otvorenom Studiu a naopak.
     # Ziadna operacia a ziadny zapis do modelu: GrainCheck je overlay NAD
     # modelom, nie jeho obsah (lekcia D-103/D-105).
     def self.toggle_grain_check(model = nil)
@@ -294,7 +296,7 @@ module Noxun
     # `state = nil` je zamer: po PREPOCTE (prestavba pri zapnutej kresbe) sa
     # cerstve cisla nikde nedrzia a kazde okno si ich vypyta samo.
     def self.broadcast_grain_check(state = nil)
-      ProductionDialog.push_grain_check(state) if defined?(ProductionDialog)
+      # ŠT-1c PR B3: okno Vyroba zaniklo — prijimatelia su uz len DVAJA.
       StudioDialog.push_grain_check(state) if defined?(StudioDialog) # ŠT-1b: sekcia Kontrola
       Panel.push_grain_check(state) if defined?(Panel)
     rescue StandardError => e
@@ -325,21 +327,21 @@ module Noxun
       tb.add_item(cmd_panel)
 
       # ST-1a (audit #2): tlačidlo sa volá Štúdio a otvára ŠTÚDIO.
-      # ŠT-1c PR B1: v Štúdiu už žijú VŠETKY štyri obsahy okna Výroba (Kusovník ·
-      # Kontrola · Nákup kovania · Rozpočet); premostenia do neho zanikli.
+      # ŠT-1c PR B3: okno Výroba zaniklo — Štúdio je JEDINÉ okno výstupov
+      # zákazky (Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka).
       cmd_studio = UI::Command.new('Štúdio') { StudioDialog.show }
-      cmd_studio.tooltip = 'Štúdio — kusovník, kontrola, nákup kovania a rozpočet zákazky'
-      cmd_studio.status_bar_text = 'Kusovník, kontrola, rozpočet a výstupy zákazky.'
+      cmd_studio.tooltip = 'Štúdio — kusovník, kontrola, nákup kovania, rozpočet a cenová ponuka'
+      cmd_studio.status_bar_text = 'Kusovník, kontrola, rozpočet, cenová ponuka a výstupy zákazky.'
       toolbar_icon(cmd_studio, 'noxun_studio.svg')
       tb.add_item(cmd_studio)
 
       # UI-B1 (audit A2): prepnutie ide cez ZDIELANU metodu Engine.toggle_edge_check
-      # — tá zavola EdgeCheck.toggle a rozposle novy stav vsetkym oknam (okno
-      # Vyroba ma vlastne split tlacidlo D-105, Inspector ma ikonu v raile;
-      # bez pushu by obe ostali na starom stave).
+      # — tá zavola EdgeCheck.toggle a rozposle novy stav vsetkym oknam (Studio
+      # ma prepinac v liste sekcie Kontrola, Inspector ikonu v raile; bez pushu
+      # by obe ostali na starom stave).
       cmd_abs = UI::Command.new('ABS kontrola hrán') { toggle_edge_check }
       cmd_abs.tooltip = 'ABS kontrola hrán — zvýrazní olep v modeli (prepínač)'
-      cmd_abs.status_bar_text = 'Zapne/vypne farebné zvýraznenie olepu hrán. Nastavenie je v okne Výroba → Kontrola.'
+      cmd_abs.status_bar_text = 'Zapne/vypne farebné zvýraznenie olepu hrán. Nastavenie je v Štúdiu → Kontrola.'
       cmd_abs.set_validation_proc do
         if !defined?(EdgeCheck) || !EdgeCheck.available?
           MF_GRAYED
@@ -421,8 +423,11 @@ Sketchup.require 'noxun_engine/core/budget'        # V0.6 E-a: vypocet rozpoctu 
 Sketchup.require 'noxun_engine/core/xlsx_writer'   # V0.6 E-b: pravy .xlsx bez gemov + Luciin harok rozpoctu
 Sketchup.require 'noxun_engine/core/cp_export'     # V0.6 E-b2: cenova ponuka (view nad rozpoctom) + zakaznicky xlsx
 Sketchup.require 'noxun_engine/core/price_refresh' # V0.6 E-c: hromadne obnovenie cien z Demosu (po demos/lookup + hardware_catalog)
-Sketchup.require 'noxun_engine/ui/production_core'   # ST-1a: zdielane ciste jadro (Vyroba + Studio) — PRED oknom
-Sketchup.require 'noxun_engine/ui/production_dialog' # V0.5 B okno Vyroba
+# ŠT-1c PR B3: `ui/production_dialog.rb` (okno Vyroba) ZANIKOL — cely jeho
+# obsah zije v okne Studio. Zdielane ciste jadro `production_core` ostava:
+# je to autorita exportov, mutacii rozpoctu, prepinacov a textov (Studio aj
+# rail Inspectora ho citaju). Nacita sa PRED oknom Studio, ktore ho vola.
+Sketchup.require 'noxun_engine/ui/production_core'   # ST-1a: zdielane ciste jadro vystupov — PRED oknom Studio
 Sketchup.require 'noxun_engine/ui/studio_dialog'     # ST-1a okno Studio (skelet + Kusovnik)
 Sketchup.require 'noxun_engine/ui/panel'
 Sketchup.require 'noxun_engine/ui/rules_dialog'     # V0.4 editor pravidiel kovania
@@ -460,10 +465,9 @@ module Noxun
         menu = UI.menu('Extensions').add_submenu('Noxun Engine')
         menu.add_item('Panel') { Panel.show }
         menu.add_item('Štúdio') { StudioDialog.show } # ST-1a
-        # ST-1a (audit #2): DOCASNA polozka — okno Vyroba uz nema vlastne
-        # tlacidlo v toolbare (to patri Studiu). Zanikne s davkou ŠT-1c, kedy
-        # sa posledne taby presunu do Studia a okno Vyroba zmizne uplne.
-        menu.add_item('Výroba (dočasné — presúva sa do Štúdia)') { ProductionDialog.show }
+        # ŠT-1c PR B3: docasna polozka „Výroba" tu ZANIKLA spolu s oknom —
+        # kusovnik, kontrola, nakup kovania, rozpocet aj cenova ponuka su
+        # sekciami Studia.
         menu.add_item('Pravidlá kovania') { RulesDialog.show }
         menu.add_item('Materiály projektu') { MaterialsDialog.show }
         menu.add_item('Katalóg kovania') { HardwareCatalogDialog.show } # V0.6 C-2

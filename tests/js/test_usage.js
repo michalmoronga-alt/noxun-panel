@@ -52,11 +52,11 @@ eq(usage.keyFor(elm('BUTTON', { attrs: { onclick: 'openRulesDialog()' } })),
 
 // --- clickKey: klikatelne prvky ---
 const body = elm('BODY');
-const btn = elm('BUTTON', { parent: body, attrs: { onclick: 'openProductionDialog()' } });
-eq(usage.clickKey(btn), '?/button:openProductionDialog', 'klik na button');
+const btn = elm('BUTTON', { parent: body, attrs: { onclick: 'openStudio()' } });
+eq(usage.clickKey(btn), '?/button:openStudio', 'klik na button');
 // klik na vnoreny span v buttone sa pripise buttonu
 const span = elm('SPAN', { parent: btn });
-eq(usage.clickKey(span), '?/button:openProductionDialog', 'klik cez vnoreny span');
+eq(usage.clickKey(span), '?/button:openStudio', 'klik cez vnoreny span');
 // input/select sa na klik NEpocita (tika cez change — ziadne dvojite pocitanie)
 eq(usage.clickKey(elm('INPUT', { type: 'checkbox', parent: body, attrs: { onchange: 'toggleZones()' } }), 'korpus'),
   null, 'checkbox klik nepocita');

@@ -24,24 +24,17 @@ require_relative '../helper' unless defined?(NxTest)
 # Headless: ui/*.rb nie su v require zozname helpera (UI vrstva).
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core') if NxTest.headless?
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog') if NxTest.headless?
-require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_dialog') if NxTest.headless?
 
 S1B_STUDIO_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog.rb'),
-                          encoding: 'UTF-8')
-S1B_PROD_RB   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_dialog.rb'),
                           encoding: 'UTF-8')
 S1B_CORE_RB   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core.rb'),
                           encoding: 'UTF-8')
 S1B_MAIN_RB   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
 S1B_STUDIO_JS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'studio.js'),
                           encoding: 'UTF-8')
-S1B_PROD_JS   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'production.js'),
-                          encoding: 'UTF-8')
 S1B_SHELL_JS  = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'shell.js'),
                           encoding: 'UTF-8')
 S1B_BRIDGE_JS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'bridge.js'),
-                          encoding: 'UTF-8')
-S1B_PROD_HTML = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production.html'),
                           encoding: 'UTF-8')
 S1B_STUDIO_HTML = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio.html'),
                             encoding: 'UTF-8')
@@ -60,30 +53,18 @@ NxTest.test('ŠT-1b: sekcia `ctrl` je v RUBY whiteliste a JS je jeho ZRKADLO') d
   NxTest.assert_equal(rb, shell, 'ani zrkadlo v paneli (shell.js)')
 end
 
-NxTest.test('ŠT-1b: okno Vyroba stratilo tab `control` (a jeho UI s nim)') do
-  rb = Noxun::Engine::ProductionDialog::TABS
-  js = S1B_SHELL_JS[/var STUDIO_TABS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  # ŠT-1c PR A vzala oknu aj tab Kovanie, PR B1 POSLEDNY tab Rozpocet — okno
-  # uz nema ZIADNY tab.
-  NxTest.assert_equal([], rb, 'whitelist tabov je prazdny (okno nema co prepinat)')
-  NxTest.assert_equal(rb, js, 'JS mirror sa nesmie rozist s Ruby autoritou')
-  NxTest.refute(S1B_PROD_HTML.include?('id="pt_control"'), 'tlacidlo tabu zaniklo')
-  NxTest.refute(S1B_PROD_HTML.include?('id="ctrlTabBadge"'), 'badge tabu zanikol s nim')
-  NxTest.refute(S1B_PROD_HTML.include?('id="ecBar"'), 'lista prepinacov v okne Vyroba zanikla')
-  %w[renderControl ctrlActionHtml edgeCheckBarHtml grainBtnHtml renderEdgeBar renderBadge].each do |fn|
-    NxTest.refute(S1B_PROD_JS.include?("function #{fn}"), "mrtvy helper #{fn} sa mal odstranit")
-  end
-  # Prijimace JS pushov zanikaju spolu s UI (Ruby push je guardovany
-  # `if (window.NX && ...)`, takze mu prazdno neprekaza).
-  %w[setEdgeCheck setGrainCheck closeEdgeMenu].each do |fn|
-    NxTest.refute(S1B_PROD_JS.include?("#{fn}: function"), "prijimac #{fn} sa mal odstranit")
-  end
-  # ŠT-1c PR B1: telo okna uz nekresli ZIADNY tab — ukazuje jedinu vetu o tom,
-  # kam sa obsah presunul (prazdna plocha bez vysvetlenia vyzera ako chyba).
-  NxTest.refute(S1B_PROD_JS.include?('renderBudget('), 'render rozpoctu odisiel do Studia')
-  NxTest.refute(S1B_PROD_JS.include?("prodTab === 'control'"), 'ziadna vetva tabu Kontrola')
-  NxTest.assert(S1B_PROD_JS.include?('presťahoval do <b>Štúdia</b>'),
-                'telo okna POVIE, kam sa obsah presunul')
+NxTest.test('ŠT-1b: tab `control` okna Vyroba (a s ŠT-1c cele okno) je PREC') do
+  # ŠT-1c PR A vzala oknu aj tab Kovanie, PR B1 POSLEDNY tab Rozpocet a PR B3
+  # zmazala cele okno — vratane JS mirroru tabov v paneli.
+  NxTest.refute(defined?(Noxun::Engine::ProductionDialog),
+                'modul zaniknuteho okna uz nesmie existovat')
+  NxTest.refute(S1B_SHELL_JS.include?('STUDIO_TABS'),
+                'JS mirror tabov zanikol spolu s oknom')
+  NxTest.refute(S1B_SHELL_JS.include?('function studioLink'),
+                'a s nim aj skladanie deep-linku na tab')
+  # ŠT-1c PR B3: obsah, ktory okno kreslilo, zije v sekciach Studia.
+  NxTest.assert(S1B_STUDIO_JS.include?('function ctrlSection'), 'Kontrola je sekcia Studia')
+  NxTest.assert(S1B_STUDIO_JS.include?("studioSec === 'budget'"), 'a Rozpocet tiez')
 end
 
 # --- 2) JEDNO cislo kontroly (audit #2) --------------------------------------
@@ -93,13 +74,11 @@ NxTest.test('ŠT-1b: KONTROLU pocita JEDNO miesto — obe okna volaju to iste') 
                 'ProductionCore.control_payload existuje')
   NxTest.assert(S1B_CORE_RB =~ /def control_payload.*?Validation\.with_budget/m,
                 'zlucenie s upozorneniami ROZPOCTU je SUCASTOU zdielaneho vypoctu')
-  NxTest.assert(S1B_PROD_RB.include?('ProductionCore.control_payload'),
-                'okno Vyroba cita zdielany vypocet')
   NxTest.assert(S1B_STUDIO_RB.include?('ProductionCore.control_payload'),
-                'a okno Studio ten isty')
+                'okno Studio cita zdielany vypocet')
   # Vlastny (druhy) vypocet v okne by sa casom rozisiel — v push_state uz
   # ziadne okno Validation.run nevola.
-  [['production_dialog.rb', S1B_PROD_RB], ['studio_dialog.rb', S1B_STUDIO_RB]].each do |(name, src)|
+  [['studio_dialog.rb', S1B_STUDIO_RB]].each do |(name, src)|
     NxTest.refute(src.include?('Validation.with_budget'),
                   "#{name} nesmie mat vlastne zlucenie rozpoctovych nalezov")
     NxTest.refute(src.include?('Validation.run('),
@@ -141,8 +120,8 @@ NxTest.test('ŠT-1b: rozpoctove nalezy su v zozname a maju kam viest (audit #3)'
                 'a skoci na cast rozpoctu, ktorej sa nalez tyka')
   NxTest.assert(S1B_STUDIO_JS.include?('sekcie Rozpočet'),
                 'tooltip hovori o sekcii, nie o okne Vyroba')
-  NxTest.refute(Noxun::Engine::StudioDialog::PRODUCTION_BRIDGES.key?('budget'),
-                'premostenie do okna Vyroba zaniklo')
+  NxTest.refute(Noxun::Engine::StudioDialog.const_defined?(:PRODUCTION_BRIDGES),
+                'premostenia do zaniknuteho okna Vyroba uz vobec neexistuju (ŠT-1c PR B3)')
 end
 
 # --- 3) zelene cislo semaforu (audit #4) -------------------------------------
@@ -246,12 +225,12 @@ NxTest.test('ŠT-1b: guard prepinacov zije v ProductionCore a NEMA okenny stav')
                 'generaciu odovzdava OKNO (kazde ma vlastnu)')
   NxTest.assert(ident.include?("data['model_guid'].to_s == model_guid(model)"),
                 'PRISNA zhoda dokumentu (callback HtmlDialogu je asynchronny)')
-  # Obe okna su len obaly — vlastne telo by znamenalo dve rozne spravania.
+  # Okno je len obal — vlastne telo by znamenalo dve rozne spravania.
   NxTest.assert(S1B_STUDIO_RB.include?('ProductionCore.do_edge_check(') &&
                 S1B_STUDIO_RB.include?('generation: @generation'),
                 'Studio odovzdava svoju generaciu zdielanemu jadru')
-  NxTest.assert(S1B_PROD_RB.include?('ProductionCore.do_edge_check('),
-                'okno Vyroba tiez (kym zije)')
+  NxTest.refute(S1B_STUDIO_RB.include?('EdgeCheck.toggle('),
+                'a NEMA vlastne telo prepnutia (dve kopie by sa rozisli)')
 end
 
 NxTest.test('ŠT-1b (review #6): kresba hlasi NEDOSTUPNE API vlastnou vetou') do
@@ -289,14 +268,15 @@ end
 
 # --- 5) tretie okno v broadcaste (audit #6) ----------------------------------
 
-NxTest.test('ŠT-1b: stav prepinacov dostanu VSETKY tri okna') do
+NxTest.test('ŠT-1b: stav prepinacov dostanu OBAJA prijimatelia (Studio + rail)') do
+  # ŠT-1c PR B3: tretim prijimatelom bolo okno Vyroba — zaniklo s oknom.
   edge = S1B_MAIN_RB[/def self\.broadcast_edge_check.*?\n    end\n/m].to_s
   grain = S1B_MAIN_RB[/def self\.broadcast_grain_check.*?\n    end\n/m].to_s
   [['edge', edge], ['grain', grain]].each do |(name, cast)|
     NxTest.refute(cast.empty?, "broadcast #{name} sa nasiel")
     NxTest.assert(cast.include?('StudioDialog.push_'), "#{name}: Studio musi dostat novy stav")
     NxTest.assert(cast.include?('Panel.push_'), "#{name}: rail musi dostat novy stav")
-    NxTest.assert(cast.include?('ProductionDialog.push_'), "#{name}: okno Vyroba tiez")
+    NxTest.refute(cast.include?('ProductionDialog'), "#{name}: vetva zaniknuteho okna je PREC")
     NxTest.assert(cast.include?('defined?(StudioDialog)'),
                   "#{name}: push je defenzivny — nenacitane okno ho ticho zahodi")
   end
@@ -313,17 +293,16 @@ end
 
 # --- 6) lifecycle overlayov (audit #1, #14) ----------------------------------
 
-NxTest.test('ŠT-1b: zatvorenie okna Vyroba uz overlaye NEVYPINA (vedoma zmena)') do
-  body = S1B_PROD_RB[/@dialog\.set_on_closed.*?\n          @dialog\n/m].to_s
-  NxTest.refute(body.include?('EdgeCheck.disable!'),
-                'okno, ktore prepinac uz nezobrazuje, ho nesmie vypinat')
-  NxTest.refute(body.include?('GrainCheck.disable!'), 'to iste pre kresbu smeru')
-  NxTest.assert(S1B_PROD_RB.include?('@dialog.set_on_closed { @dialog = nil }'),
-                'referencia na mrtve okno sa NADALEJ vynuluje')
-  # Studio disable NEPRIDAVA — trvalym vstupnym bodom je rail Inspectora.
+NxTest.test('ŠT-1b: zatvorenie okna overlaye NEVYPINA (vedoma zmena)') do
+  # ŠT-1b zrusila vypinanie pri zatvoreni okna Vyroba; ŠT-1c PR B3 to okno
+  # zmazala. Kontrakt drzi dalej pre Studio: trvalym vstupnym bodom oboch
+  # prepinacov je rail Inspectora, takze zatvorenie okna nesmie zhasnut
+  # zvyraznenie zapnute inde. V .skp neostava NIKDY nic (stav je v %APPDATA%).
   NxTest.refute(S1B_STUDIO_RB.include?('EdgeCheck.disable!'),
                 'Studio prepinac pri zatvoreni NEVYPINA')
   NxTest.refute(S1B_STUDIO_RB.include?('GrainCheck.disable!'), 'ani kresbu')
+  NxTest.assert(S1B_STUDIO_RB.include?('@dialog.set_on_closed { @dialog = nil }'),
+                'referencia na mrtve okno sa NADALEJ vynuluje')
 end
 
 NxTest.test('ŠT-1b: Studio obnovi zapamatanu kresbu PRED prvym pushom (audit #14)') do
@@ -348,14 +327,14 @@ NxTest.test('ŠT-1b: warnpanel Inspectora vedie do ŠTÚDIA na sekciu Kontrola')
                 'payload sklada zdielana cista funkcia (whitelist je aj tak v Ruby)')
 end
 
-NxTest.test('ŠT-1b: ⚠ chip okna Vyroba otvara Studio (ziadne mrtve tlacidlo)') do
-  NxTest.assert(S1B_PROD_HTML.include?('onclick="openStudioControl()"'),
-                'chip ma kam viest')
-  NxTest.assert(S1B_PROD_JS.include?('function openStudioControl'), 'klient ma handler')
-  NxTest.assert(S1B_PROD_JS.include?('sketchup.open_studio'), 'a vola serverovy callback')
-  NxTest.assert(S1B_PROD_RB.include?("cb(dlg, 'open_studio')"), 'okno Vyroba callback registruje')
-  NxTest.assert(S1B_PROD_RB.include?("StudioDialog.show(open_section: 'ctrl')"),
-                'a otvara Studio rovno na Kontrole')
+NxTest.test('ŠT-1c PR B3: ⚠ chip okna Vyroba zanikol spolu s oknom') do
+  # ŠT-1b nechala v prazdnej skrupine JEDINU cestu von — ⚠ chip do sekcie
+  # Kontrola. Okno zaniklo, takze nalezy uz maju len JEDEN vstupny bod:
+  # ⚠ warnpanel Inspectora (test vyssie) a semafor sekcie v Studiu.
+  NxTest.refute(File.exist?(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production.html')),
+                'HTML zaniknuteho okna uz v repe nie je')
+  NxTest.assert(S1B_STUDIO_RB.include?("SECTIONS = %w[bom ctrl buy budget offer]"),
+                'vsetkych pat obsahov zije ako sekcie Studia')
 end
 
 # --- 8) UI kontrakt sekcie ---------------------------------------------------

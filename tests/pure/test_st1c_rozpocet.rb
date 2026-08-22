@@ -25,13 +25,10 @@ require_relative '../helper' unless defined?(NxTest)
 # Headless: ui/*.rb nie su v require zozname helpera (UI vrstva).
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core') if NxTest.headless?
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog') if NxTest.headless?
-require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_dialog') if NxTest.headless?
 
 S1CB_CORE_RB   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core.rb'),
                            encoding: 'UTF-8')
 S1CB_STUDIO_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog.rb'),
-                           encoding: 'UTF-8')
-S1CB_PROD_RB   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_dialog.rb'),
                            encoding: 'UTF-8')
 S1CB_PANEL_RB  = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.rb'), encoding: 'UTF-8')
 S1CB_SUP_RB    = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'supplier_settings_dialog.rb'),
@@ -40,22 +37,19 @@ S1CB_STUDIO_JS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', '
                            encoding: 'UTF-8')
 S1CB_BUDGET_JS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'budget.js'),
                            encoding: 'UTF-8')
-S1CB_PROD_JS   = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'production.js'),
-                           encoding: 'UTF-8')
 S1CB_BRIDGE_JS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'bridge.js'),
                            encoding: 'UTF-8')
 S1CB_STUDIO_HTML = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio.html'),
                              encoding: 'UTF-8')
-S1CB_PROD_HTML = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production.html'),
-                           encoding: 'UTF-8')
 
 # --- 1) sekcia `budget` je ZIVA a premostenia po nej nezostali ----------------
 
 NxTest.test('ŠT-1c B1: `budget` je SEKCIA Studia — premostenia do okna Vyroba zanikli') do
   st = Noxun::Engine::StudioDialog
   NxTest.assert(st::SECTIONS.include?('budget'), 'Ruby whitelist sekciu pozna')
-  NxTest.assert_equal([], st::PRODUCTION_BRIDGES.keys,
-                      'do okna Vyroba uz nevedie ziadne premostenie')
+  # ŠT-1c PR B3: mapa premosteni do okna Vyroba ZANIKLA spolu s oknom.
+  NxTest.refute(st.const_defined?(:PRODUCTION_BRIDGES),
+                'do zaniknuteho okna Vyroba uz nevedie ziadne premostenie')
   %w[budget offer].each do |k|
     NxTest.assert(st::BRIDGE_STATUS[k].to_s.empty?, "a s nim aj hlaska premostenia `#{k}`")
   end
@@ -145,8 +139,8 @@ NxTest.test('ŠT-1c B1: poradie skriptov — budget.js AZ ZA studio.js') do
   NxTest.assert(budget_at > studio_at,
                 'budget.js MUSI byt za studio.js — inak `window.NX = {…}` prepise jeho obal')
   NxTest.assert(icons_at < budget_at, 'sprite ikon je pred nim (rozpocet kresli ikony akcii)')
-  NxTest.refute(S1CB_PROD_HTML.include?('<script src="js/budget.js'),
-                'okno Vyroba rozpocet uz nenacitava (kopia by sa rozisla)')
+  NxTest.assert_equal(1, S1CB_STUDIO_HTML.scan('js/budget.js').length,
+                      'rozpocet nacitava JEDINE okno (kopia by sa rozisla)')
 end
 
 # --- 3) telo v ZDIELANOM jadre, okna su len obaly -----------------------------
@@ -160,12 +154,10 @@ NxTest.test('ŠT-1c B1: mutacie, oba XLSX aj prepocet cien maju telo v jadre') d
   %i[do_budget do_budget_xlsx do_cp_xlsx].each do |m|
     NxTest.assert(Noxun::Engine::StudioDialog.respond_to?(m),
                   "StudioDialog.#{m} je VEREJNY (vola ho relay z panela)")
-    # DOCASNE — obal v okne Vyroba zanika v ŠT-1c PR B3 spolu s celym oknom.
-    NxTest.assert(Noxun::Engine::ProductionDialog.respond_to?(m),
-                  "ProductionDialog.#{m} ostava verejny (relay `production_do_*`)")
   end
-  # Ziadne okno nesmie mat VLASTNY zapis do BudgetStore ani vlastny XLSX.
-  [['studio_dialog.rb', S1CB_STUDIO_RB], ['production_dialog.rb', S1CB_PROD_RB]].each do |(name, src)|
+  # Okno nesmie mat VLASTNY zapis do BudgetStore ani vlastny XLSX.
+  # (ŠT-1c PR B3: druhy obal — okno Vyroba — zanikol.)
+  [['studio_dialog.rb', S1CB_STUDIO_RB]].each do |(name, src)|
     NxTest.refute(src.include?('BudgetStore.set_mode!'), "#{name} nesmie mat vlastnu mutaciu")
     NxTest.refute(src.include?('BudgetXlsx.sheet'), "#{name} nesmie mat vlastny zapis XLSX")
     NxTest.refute(src.include?('CpXlsx.sheets'), "#{name} nesmie mat vlastnu cenovu ponuku")
@@ -175,20 +167,17 @@ NxTest.test('ŠT-1c B1: mutacie, oba XLSX aj prepocet cien maju telo v jadre') d
                       'jadro pozna presne 12 operacii rozpoctu (jedna = jeden krok Spat)')
 end
 
-NxTest.test('ŠT-1c B1 (audit #12): prepocet cien obnovi okna nad KATALOGOM, nie Vyrobu') do
+NxTest.test('ŠT-1c B1 (audit #12): prepocet cien obnovi VSETKY okna nad KATALOGOM') do
   after = S1CB_STUDIO_RB[/def price_refresh_after_proc.*?\n        end\n/m].to_s
   NxTest.refute(after.empty?, 'refresh cesty su na jednom mieste')
   %w[push_state MaterialsDialog.push_catalog Panel.push_materials
      HardwareCatalogDialog.push_items].each do |call|
     NxTest.assert(after.include?(call), "#{call} je v refresh cestach")
   end
-  # Review #1: okno Vyroba je v zozname TIEZ. Rozpocet uz nezobrazuje, ale jeho
-  # ⚠ chip nesie `counts` KONTROLY — a tie zahrnaju ROZPOCTOVE oranzove nalezy,
-  # ktore prepocet cien vie zmenit (riadok bez ceny cenu dostane). Bez toho by
-  # chip ukazoval stare cislo (kontrakt „KAZDE okno s cislami zakazky je vo
-  # VSETKYCH refresh cestach"). Zanikne az s oknom v PR B3.
-  NxTest.assert(after.include?('ProductionDialog.refresh_if_open'),
-                'okno Vyroba dostane cerstve counts pre svoj ⚠ chip')
+  # ŠT-1c PR B3: piatym prijimatelom bolo okno Vyroba (kvoli `counts` pod jeho
+  # ⚠ chipom) — zaniklo s oknom, takze cesta uz nema komu chybat.
+  NxTest.refute(after.include?('ProductionDialog'),
+                'vetva zaniknuteho okna Vyroba je PREC')
   alive = S1CB_STUDIO_RB[/def price_refresh_alive_proc.*?\n        end\n/m].to_s
   NxTest.assert(alive.include?('@dialog.equal?(dlg)'),
                 'beh visi na TEJ ISTEJ instancii okna (znovuotvorenie ho neozivi)')
@@ -230,8 +219,6 @@ NxTest.test('ŠT-1c B1: styly rozpoctu sa PRESUNULI (nie skopirovali)') do
   %w[.bsum .btotal .bseg .bchip .blist .bsec .bcnt .bsubt .btab .bedit .bacts
      .baddbig .broundrow .bprog .bcpband .bcpmerged].each do |sel|
     NxTest.assert(S1CB_STUDIO_HTML.include?(sel), "#{sel} je v studio.html")
-    NxTest.refute(S1CB_PROD_HTML.include?("  #{sel} {"),
-                  "#{sel} uz v production.html NIE JE (kopia by sa rozisla)")
   end
   # UI_DIZAJN: v Studiu ziadny natvrdo pisany hex — okno ma dve temy.
   block = S1CB_STUDIO_HTML[/sekcia ROZPOČET \(Š12–Š13\).*?súčtový riadok/m].to_s
@@ -246,24 +233,20 @@ NxTest.test('ŠT-1c B1: styly rozpoctu sa PRESUNULI (nie skopirovali)') do
   NxTest.refute(rules.include?('.totrow'), 'ani suctoveho riadku Kusovnika')
 end
 
-NxTest.test('ŠT-1c B1: okno Vyroba je PRAZDNA SKRUPINA (a povie to)') do
-  NxTest.assert_equal([], Noxun::Engine::ProductionDialog::TABS, 'ziadny tab')
-  NxTest.refute(S1CB_PROD_HTML.include?('id="prodTabs"'), 'lista tabov zanikla')
-  NxTest.refute(S1CB_PROD_HTML.include?('id="pt_budget"'), 'tlacidlo posledneho tabu zaniklo')
-  NxTest.assert(S1CB_PROD_JS.include?('presťahoval do <b>Štúdia</b>'),
-                'telo POVIE, kam sa obsah presunul (prazdna plocha vyzera ako chyba)')
-  NxTest.assert(S1CB_PROD_JS.include?('id="ctrlBadge"') || S1CB_PROD_HTML.include?('id="ctrlBadge"'),
-                '⚠ chip do sekcie Kontrola v okne OSTAVA (zanikne az s oknom)')
-  NxTest.assert(S1CB_PROD_RB.include?("cb(dlg, 'open_studio')"), 'a jeho cesta do Studia tiez')
-  # Payload okna stratil pole `budget` — citalo ho VYHRADNE telo tabu.
-  NxTest.refute(S1CB_PROD_RB.match?(/^\s{12}budget: budget,$/),
-                'okno Vyroba rozpocet uz nedostava')
+NxTest.test('ŠT-1c B3: okno Vyroba ZANIKLO (posledna skrupina je prec)') do
+  # PR B1 nechala prazdnu skrupinu s vetou, kam sa obsah presťahoval — PR B3
+  # zmazala aj tu, vratane vsetkych vstupnych bodov (menu, relaye, broadcasty).
+  %w[production_dialog.rb production.html js/production.js].each do |rel|
+    NxTest.refute(File.exist?(File.join(NxTest::ROOT, 'noxun_engine', 'ui', *rel.split('/'))),
+                  "ui/#{rel} zanikol")
+  end
+  NxTest.refute(defined?(Noxun::Engine::ProductionDialog), 'modul uz neexistuje')
+  # Payload rozpoctu nesie Studio — a pocita sa RAZ (Kontrola z neho berie
+  # svoje ORANGE nalezy cez `control_payload(budget: ...)`).
   NxTest.assert(S1CB_STUDIO_RB.match?(/^\s{12}budget: budget,$/),
-                'zato Studio ano (sekcia ho kresli)')
-  # Rozpocet sa vsak v okne Vyroba POCITA dalej — kvoli ORANGE nalezom KONTROLY
-  # pod ⚠ chipom. Bez toho by chip ukazal ine cislo nez semafor v Studiu.
-  NxTest.assert(S1CB_PROD_RB.include?('budget = budget_payload(model, bom, collected, estimate, hw_exp, smap)'),
-                'rozpocet sa pocita dalej — jeho ORANGE patria do KONTROLY')
+                'sekcia Rozpocet dostava svoj payload')
+  NxTest.assert(S1CB_STUDIO_RB.match?(/control_payload\(.*budget: budget/m),
+                'a KONTROLA berie rozpoctove ORANGE z TOHO ISTEHO vypoctu')
 end
 
 # --- 6) klamuce texty, ktore tato davka opravila -----------------------------

@@ -15,7 +15,7 @@
 #    nacita nanovo (nikdy tichy prepis cudzej zmeny).
 # 2) VALIDACIA JE SERVEROVA — SupplierSettings.patch_active! je all-or-nothing
 #    (validate-all pred zapisom); HTML `disabled`/`type=number` nie su ochrana.
-# 3) Po uspesnom ulozeni sa OTVORENE okno Vyroba prepocita (refresh_if_open) —
+# 3) Po uspesnom ulozeni sa OTVORENE okno Studio prepocita (refresh_if_open) —
 #    sadzby su vstup rozpoctu, cisla by inak ostali stare.
 require 'json'
 
@@ -139,8 +139,8 @@ module Noxun
           # nezapisalo (patch je all-or-nothing), takze staci chybu ukazat.
           return set_status("Neuložené: #{Array(errors).join(' · ')}", true) unless ok
           push_state
-          # Sadzby su vstup rozpoctu — otvorene okno Vyroba musi ukazat nove cisla.
-          ProductionDialog.refresh_if_open if defined?(ProductionDialog)
+          # Sadzby su vstup rozpoctu — otvorene ŠTÚDIO musi ukazat nove cisla.
+          # ŠT-1c PR B3: vetva okna Vyroba tu zanikla spolu s oknom.
           StudioDialog.refresh_if_open if defined?(StudioDialog) # ST-1a
           # ŠT-1c PR B1: rozpočet žije v sekcii Rozpočet okna ŠTÚDIO.
           set_status('Nastavenia uložené. Rozpočet v Štúdiu je prepočítaný.')

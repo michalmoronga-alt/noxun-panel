@@ -62,8 +62,9 @@ module Noxun
       # Posun plosky VON z telesa (mm) — bez neho by farba bojovala o hlbku
       # s plochou dielca (z-fighting).
       OUT_MM = 0.5
-      # Farby su zrkadlom tokenov --nx-edge-* v ui/css/panel.css (svorka v okne
-      # Vyroba musi mat PRESNE farbu plosky v modeli).
+      # Farby su zrkadlom tokenov --nx-edge-* v ui/css/panel.css (stvorcek
+      # v 3-stavovom nastaveni — rail Inspectora aj lista sekcie Kontrola
+      # v Studiu — musi mat PRESNE farbu plosky v modeli).
       # EXTRA bola povodne fialova — v modeli splyvala s modrym zvyraznenim
       # vyberu aj s osami (Michal 11.8.); jasna oranzova je v drevodekorovom
       # modeli nepravdepodobna, takze je jednoznacna.
@@ -509,7 +510,7 @@ module Noxun
       # Prepnutie/otvorenie ineho dokumentu: stav sa NEPRENASA ticho — zvyraznenie
       # patri modelu, v ktorom bolo zapnute (vzor notifikacii dialogov).
       # Prepnutie dokumentu: overlay patril STAREMU modelu, takze sa vypina.
-      # Codex #168 P2: vypnutie musia dostat aj OKNA — inak by okno Vyroba aj
+      # Codex #168 P2: vypnutie musia dostat aj OKNA — inak by Studio aj
       # rail Inspectora dalej tvrdili „zapnute" nad novym dokumentom a dalsi
       # klik by zvyraznenie zapol namiesto vypnutia.
       def on_model_changed(model)
@@ -748,7 +749,8 @@ module Noxun
 
       # ================= STAV PRE OKNO =========================================
 
-      # Tvar pre okno Vyroba. Cisla su VYHRADNE zo servera (JS si nic neprepocitava).
+      # Tvar pre listu sekcie Kontrola v Studiu. Cisla su VYHRADNE zo servera
+      # (JS si nic neprepocitava).
       def ui_state(model = nil)
         m = model || active_model
         on = active?(m)
