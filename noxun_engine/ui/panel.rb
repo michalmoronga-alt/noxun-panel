@@ -208,6 +208,9 @@ module Noxun
           # prisla do okna Vyroba a jeho `gen` by klik odmietol.
           cb(dlg, 'studio_do_select')       { |p| StudioDialog.do_select(p) }
           cb(dlg, 'studio_do_export')       { |p| StudioDialog.do_export(p) }
+          # ŠT-1c PR A: CSV nakupneho zoznamu kovania zo sekcie Nakup — rovnaky
+          # flush handshake ako VEPO, vlastnym kanalom Studia.
+          cb(dlg, 'studio_do_hw_csv')       { |p| StudioDialog.do_hw_csv(p) }
           # V0.4.7c: samostatna doska — vlozenie + karta (fields/material/ABS hrana)
           cb(dlg, 'insert_board')       { |p| handle_insert_board(p) }
           cb(dlg, 'set_board_fields')   { |p| handle_set_board_fields(p) }

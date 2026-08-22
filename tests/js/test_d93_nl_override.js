@@ -17,7 +17,9 @@ const H = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', '
 
 global.window = {};
 global.document = { addEventListener: function(){}, getElementById: function(){ return null; } };
-const P = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'production.js'));
+// ŠT-1c PR A: `hwManualMark` sa presunul spolu s tabom Kovanie do okna ŠTÚDIO
+// (sekcia „Nákup kovania", js/studio.js) — sada ide za nim.
+const P = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'studio.js'));
 
 let n = 0;
 function eq(actual, expected, msg){
@@ -104,7 +106,7 @@ function flat(list){ return list.map(o => [o.value, o.text, o.selected]); }
      'korpusova polozka ma owner null, nie prazdny retazec');
 })();
 
-// --- znamienko rucneho zasahu v okne Vyroba -----------------------------------
+// --- znamienko rucneho zasahu v sekcii Nakup kovania (Studio) -----------------
 (function(){
   eq(P.hwManualMark(null), '', 'bez zasahu ziadne znamienko');
   const mark = P.hwManualMark('ručne prepísané: 4 ks (automat: 470 mm)');

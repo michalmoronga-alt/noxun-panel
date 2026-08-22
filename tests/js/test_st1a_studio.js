@@ -30,7 +30,8 @@ function ok(cond, msg){ n++; assert.ok(cond, msg); }
 
 // ŠT-1b: pribudla sekcia Kontrola (`ctrl`) — dovtedy bola premostenim do
 // okna Vyroba. Zoznam je ZRKADLO `StudioDialog::SECTIONS`.
-eq(S.STUDIO_SECTIONS, ['bom', 'ctrl'], 'v Studiu ziju sekcie Kusovník a Kontrola');
+eq(S.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy'],
+   'v Studiu ziju sekcie Kusovník, Kontrola a Nákup kovania');
 
 // --- 2) hladanie bez diakritiky (Š6) ----------------------------------------
 
@@ -145,9 +146,13 @@ eq(S.rgbHex([300, -5, 12]), '#ff000c', 'hodnoty mimo rozsahu sa orezu, nie zahod
 
 // --- 8) navigacia: premostenia vs. neaktivne polozky ------------------------
 
+// ŠT-1c PR A: `buy` (Nákup kovania) uz NIE JE premostenie — je to ziva sekcia.
 eq(S.navBridgeIds().sort(),
-   ['about', 'bset', 'budget', 'buy', 'hw', 'mat', 'offer', 'rules', 'sup', 'tpl'].sort(),
+   ['about', 'bset', 'budget', 'hw', 'mat', 'offer', 'rules', 'sup', 'tpl'].sort(),
    'ZRKADLO whitelistu premosteni v StudioDialog (PRODUCTION_BRIDGES + WINDOW_BRIDGES + about)');
+
+const BUY_ITEM = S.navItem('buy');
+ok(BUY_ITEM && !BUY_ITEM.bridge && !BUY_ITEM.disabled, 'Nákup kovania je ZIVA sekcia tohto okna');
 
 const CUT = S.navItem('cut');
 ok(CUT && CUT.disabled, 'Nárezový plán je JEDINA neaktivna polozka');

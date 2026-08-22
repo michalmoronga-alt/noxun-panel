@@ -387,6 +387,24 @@
       p.flush_blocked = blocked;
       if (window.sketchup && sketchup.studio_do_export) sketchup.studio_do_export(JSON.stringify(p));
     },
+    // ŠT-1c PR A (Š7): CSV nakupneho zoznamu kovania zo sekcie Nakup. Ten isty
+    // flush guard ako pri VEPO — cervene pole panela export ZASTAVI, inak by
+    // sa objednavalo kovanie pre stare rozmery (vzor `productionRelayHwCsv`).
+    studioRelayHwCsv: function(p){
+      var blocked = false;
+      try {
+        if (typeof validateFields === 'function' && typeof selectedCabId !== 'undefined' &&
+            selectedCabId && !validateFields()) blocked = true;
+        var badHw = document.querySelector('#boardCard input.bad, #boardCard .bad');
+        if (badHw) blocked = true;
+      } catch (e) { blocked = false; }
+      if (!blocked){
+        if (typeof flushCabinetEditsNow === 'function') flushCabinetEditsNow();
+        if (typeof flushBoardEditsNow === 'function') flushBoardEditsNow();
+      }
+      p.flush_blocked = blocked;
+      if (window.sketchup && sketchup.studio_do_hw_csv) sketchup.studio_do_hw_csv(JSON.stringify(p));
+    },
     // V0.6 E-b2: cenova ponuka pre zakaznika — CP je VIEW nad rozpoctom, takze
     // potrebuje presne ten isty flush handshake (inak by zakaznik dostal sumu
     // zo stareho modelu).

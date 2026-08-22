@@ -36,7 +36,10 @@ module Noxun
       # ŠT-1b: to iste sa stalo tabu `control` — KONTROLA je od tejto davky
       # sekcia `ctrl` okna Studio (semafor-filter, prepinace hran a kresby,
       # zive badge navigacie); deep-link na nu ide cez `StudioDialog::SECTIONS`.
-      TABS = %w[hardware budget].freeze
+      # ŠT-1c PR A: a to iste tabu `hardware` — NAKUP KOVANIA je sekcia `buy`
+      # okna Studio (presun 1:1 podla Š7). Oknu ostal posledny tab Rozpocet;
+      # PR B ho zoberie tiez a okno zanikne.
+      TABS = %w[budget].freeze
 
       class << self
         # `open_tab` = deep-link z Inspectora (⚠ warnpanel -> KONTROLA, „Materiál"
@@ -118,33 +121,16 @@ module Noxun
         # CSV nakupneho zoznamu — server-side z CERSTVEHO modelu (audit N11;
         # flush/generation vzor VEPO: data z DOM su po editoch zastarale).
         # Vstup po relay z panela (edity flushnute) alebo priamo bez panela.
+        #
+        # ŠT-1c: telo sa prestahovalo do `ProductionCore` spolu s tabom Kovanie
+        # (nakupny zoznam je od tejto davky sekcia `buy` okna Studio). Tu ostal
+        # tenky obal — panel ho vola relayom `production_do_hw_csv` a pure sada
+        # `test_production_dialog_api` strazi, ze je VEREJNY.
         def do_hw_csv(payload)
-          data = JSON.parse(payload.to_s)
-          if data['flush_blocked']
-            return set_status('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
-          end
-          model = Sketchup.active_model
-          exp = hardware_expansion(model, fresh_collect(model))
-          return set_status('Nákupný zoznam sa nedá zostaviť (pozri Ruby konzolu).', true) if exp.nil?
-          if Array(exp['rows']).empty? && Array(exp['unmapped']).empty?
-            return set_status('Model nemá žiadne kovanie — niet čo exportovať.', true)
-          end
-          # audit #1: nazov projektu je SERVEROVA autorita (jeden nazov pre
-          # VSETKY styri exporty) — z DOM uz nechodi.
-          project = project_name(model)
-          fname = "kovanie_#{VepoExport.project_slug(project)}.csv"
-          target = UI.savepanel('Uložiť nákupný zoznam kovania', vepo_settings['last_dir'], fname)
-          return set_status('Export zrušený.') if target.nil? || target.to_s.empty?
-          csv = HardwareSets.purchase_csv(exp, project: project,
-                                          generated_at: Time.now.strftime('%Y-%m-%d %H:%M'))
-          File.open(target, 'wb') { |f| f.write("\xEF\xBB\xBF" + csv) } # BOM pre Excel
-          save_vepo_settings('last_dir' => File.dirname(target))
-          n = Array(exp['rows']).length
-          un = Array(exp['unmapped']).length
-          set_status("Nákupný zoznam: #{n} položiek#{un.positive? ? " + #{un} nemapovaných (v CSV aj KONTROLE)" : ''} → #{target}", un.positive?)
-        rescue StandardError => e
-          Engine.log_error(e, 'ProductionDialog.handle_hw_csv')
-          set_status("Export zlyhal: #{e.message}", true)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          ProductionCore.do_hw_csv(Sketchup.active_model, data, generation: @generation,
+                                                                status: status_proc,
+                                                                repush: repush_proc)
         end
 
         # V0.6 E-b: XLSX rozpocet v "Luciinom formate". Rovnaky flush/generation
@@ -954,18 +940,12 @@ module Noxun
             # stareho okna po prepnuti dokumentu sa na serveri odmietne.
             model_guid: model_guid(model),
             rows: bom[:rows], sheets: bom[:sheets], edging: bom[:edging],
-            # V0.6 C-2 (audit F11): slovensky label kovania TRANZIENTNE —
-            # autorita HardwareRules.label_for; do BOM/snapshotu sa neuklada.
-            # D-90: to iste pre 'params_label' („rez 597 mm") — format je
-            # SERVEROVY (JS ho len vypise), aby tab Výroba a CSV hovorili rovnako.
-            hardware: (bom[:hardware] || []).map { |g|
-              next g unless g.is_a?(Hash)
-              g.merge('label' => HardwareRules.label_for(g['generic_type'] || g[:generic_type]),
-                      'params_label' => HardwareRules.params_label(g['params'] || g[:params]))
-            },
-            # V0.6 D1b: nakupny zoznam setov (rows/unmapped/summary + stav
-            # snapshotu setov projektu — invalid = banner, missing = global default).
-            hardware_sets: hw_exp,
+            # ŠT-1c PR A: `hardware` (generika s labelmi) a `hardware_sets`
+            # (nakupny zoznam) tu ZANIKLI spolu s tabom Kovanie — citalo ich
+            # VYHRADNE jeho telo. Nesie ich payload okna Studio (sekcia `buy`),
+            # obohatenie robi zdielana `ProductionCore.hardware_labeled`.
+            # `hw_exp` sa nizsie pocita dalej — rozpocet aj KONTROLA z neho
+            # beru svoje ORANGE nalezy.
             summary: bom[:summary],
             # V0.5 D: KONTROLA nahradza povodny warnings tab (nalez 9) — build warnings
             # su v control.items ako kategoria "stavba". counts zo servera (nalez 11) —

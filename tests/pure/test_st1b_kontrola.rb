@@ -52,7 +52,9 @@ NxTest.test('ŠT-1b: sekcia `ctrl` je v RUBY whiteliste a JS je jeho ZRKADLO') d
   rb = Noxun::Engine::StudioDialog::SECTIONS
   js = S1B_STUDIO_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
   shell = S1B_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  NxTest.assert_equal(%w[bom ctrl], rb, 'v Studiu ziju sekcie Kusovník a Kontrola')
+  # ŠT-1c PR A pribudla sekcia `buy` (Nakup kovania) — zoznam musi sediet.
+  NxTest.assert_equal(%w[bom ctrl buy], rb,
+                      'v Studiu ziju sekcie Kusovník, Kontrola a Nákup kovania')
   NxTest.assert_equal(rb, js, 'zoznam v studio.js sa nesmie rozist s Ruby autoritou')
   NxTest.assert_equal(rb, shell, 'ani zrkadlo v paneli (shell.js)')
 end
@@ -60,7 +62,8 @@ end
 NxTest.test('ŠT-1b: okno Vyroba stratilo tab `control` (a jeho UI s nim)') do
   rb = Noxun::Engine::ProductionDialog::TABS
   js = S1B_SHELL_JS[/var STUDIO_TABS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  NxTest.assert_equal(%w[hardware budget], rb, 'whitelist tabov uz Kontrolu nepozna')
+  # ŠT-1c PR A vzala oknu aj tab Kovanie — ostal POSLEDNY tab Rozpocet.
+  NxTest.assert_equal(%w[budget], rb, 'whitelist tabov uz Kontrolu ani Kovanie nepozna')
   NxTest.assert_equal(rb, js, 'JS mirror sa nesmie rozist s Ruby autoritou')
   NxTest.refute(S1B_PROD_HTML.include?('id="pt_control"'), 'tlacidlo tabu zaniklo')
   NxTest.refute(S1B_PROD_HTML.include?('id="ctrlTabBadge"'), 'badge tabu zanikol s nim')
@@ -73,9 +76,10 @@ NxTest.test('ŠT-1b: okno Vyroba stratilo tab `control` (a jeho UI s nim)') do
   %w[setEdgeCheck setGrainCheck closeEdgeMenu].each do |fn|
     NxTest.refute(S1B_PROD_JS.include?("#{fn}: function"), "prijimac #{fn} sa mal odstranit")
   end
-  # DEFAULT vetva tela okna musi byt Kovanie — inak by okno po zaniku Kontroly
-  # skoncilo na neexistujucej vetve a ostalo prazdne.
-  NxTest.assert(S1B_PROD_JS.include?('renderHardware(box);'), 'default vetva je Kovanie')
+  # DEFAULT vetva tela okna musi ukazovat na ZIVY tab — inak by okno skoncilo
+  # na neexistujucej vetve a ostalo prazdne. ŠT-1c PR A: je to Rozpocet
+  # (jediny zostavajuci tab; Kovanie odislo do sekcie `buy` Studia).
+  NxTest.assert(S1B_PROD_JS.include?('renderBudget(box);'), 'default vetva je Rozpocet')
   NxTest.refute(S1B_PROD_JS.include?("prodTab === 'control'"), 'ziadna vetva tabu Kontrola')
 end
 

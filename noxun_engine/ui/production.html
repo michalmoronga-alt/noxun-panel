@@ -4,7 +4,7 @@
      V0.6 E-b: pribudol tab ROZPOCET (js/budget.js) — jediny tab, ktory model
      MENI (data rozpoctu v NOXUN dict na modeli, kazda zmena = 1 undo krok). -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.7.32">
+<link rel="stylesheet" href="css/panel.css?v=0.7.33">
 <!-- V0.5 D: styly semaforu ZAMERNE inline v production.html (NIE v zdielanom
      panel.css — paralelna davka D-29 ho meni; ziadny cache-bust konflikt). -->
 <style>
@@ -16,17 +16,10 @@
   .ctrlbadge .cb-orange { color: #e65100; }
   /* ŠT-1b: styly TABU KONTROLA (riadky nálezov, akcia „Nahradiť UNI…", lišta
      prepínačov hrán a kresby) tu ZANIKLI spolu s tabom — obsah žije v sekcii
-     Kontrola okna ŠTÚDIO. Ostáva ⚠ chip hlavičky, ktorý tam vedie. */
-  /* V0.6 D1b: tab Kovanie — nakupny zoznam zo setov (styly ZAMERNE inline). */
-  .hwsec { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px;
-           font-weight: 700; font-size: 12.5px; color: #37474f; }
-  .hwsec-warn span { color: #e65100; }
-  .hwbanner { background: #fff3e0; border: 1px solid #ffb74d; border-radius: 6px;
-              padding: 6px 10px; margin: 4px 0; font-size: 12px; color: #7a3c00; }
-  .bomtab tr.hwcat td { background: #eceff1; font-weight: 700; font-size: 11.5px;
-                        color: #546e7a; padding: 2px 6px; }
-  .bomtab tr.hwmiss td { color: #b45309; }
-  .bomtab tr.hwsum td { font-weight: 600; border-top: 2px solid #cfd8dc; }
+     Kontrola okna ŠTÚDIO. Ostáva ⚠ chip hlavičky, ktorý tam vedie.
+     ŠT-1c PR A: to isté sa stalo štýlom TABU KOVANIE (.hwsec/.hwbanner/
+     .hwcat/.hwmiss/.hwsum) — PRESUNULI sa (nie kopírovali) do studio.html,
+     kde žije sekcia „Nákup kovania". */
 
   /* ============ V0.6 E-b: tab ROZPOCET (mock v4) ============
      Farby VYHRADNE cez --nx-* tokeny (docs/UI_DIZAJN.md). Styly su inline
@@ -173,32 +166,31 @@
 <div id="prodSummary" class="prodsum">…</div>
 
 <!-- ST-1a: VEPO export aj taby Kusovník / Materiály / ABS sa presunuli do okna
-     ŠTÚDIO (sekcia Kusovník, pohľady Dielce · Platne · ABS). Zvyšné tri taby sa
-     presťahujú dávkami ŠT-1b (Kontrola) a ŠT-1c (Kovanie, Rozpočet), potom toto
-     okno zanikne. Zoznam tabov číta production.js z DOM — pridanie či odobranie
-     tlačidla si tam nevyžaduje ďalšiu zmenu. -->
+     ŠTÚDIO (sekcia Kusovník, pohľady Dielce · Platne · ABS); ŠT-1b vzala tab
+     Kontrola a ŠT-1c PR A tab Kovanie (sekcia „Nákup kovania", Š7). Ostal
+     POSLEDNÝ tab Rozpočet — po jeho presune (ŠT-1c PR B) okno zanikne.
+     Zoznam tabov číta production.js z DOM — odobranie tlačidla si tam
+     nevyžaduje ďalšiu zmenu. -->
 <div class="pvtabs prodtabs" id="prodTabs">
-  <button id="pt_hardware" class="on" onclick="setProdTab('hardware')">Kovanie</button>
-  <button id="pt_budget" onclick="setProdTab('budget')">Rozpočet</button>
+  <button id="pt_budget" class="on" onclick="setProdTab('budget')">Rozpočet</button>
 </div>
 
-<div class="hint" id="prodHint">Klik na riadok kovania označí vlastníka v modeli.</div>
 <div id="prodBody" class="prodbody"><div class="muted">Načítavam…</div></div>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.7.32"></script>
+<script src="js/errors.js?v=0.7.33"></script>
 <!-- D-77: minimalna OBSAHOVA velkost okna pri otvoreni (js/win_fit.js). Tabulky
      kusovnika a rozpoctu maju editovatelne bunky a stlpec akcii vpravo — v uzkom
      okne konci prava cast riadku mimo. -->
 <script>window.NX_FIT_MIN = { w: 640, h: 540 };</script>
-<script src="js/win_fit.js?v=0.7.32"></script>
-<!-- Sprite ikon (ziadne emoji v ovladacich prvkoch) — pouziva ho tab Kovanie
-     (znamienko rucneho zasahu) aj Rozpocet. Musi byt PRED production.js.
+<script src="js/win_fit.js?v=0.7.33"></script>
+<!-- Sprite ikon (ziadne emoji v ovladacich prvkoch) — pouziva ho tab Rozpocet
+     (ikony akcii riadkov). Musi byt PRED production.js.
      ŠT-1b: zdielany modul 3-stavoveho nastavenia hran sa uz tu NENACITAVA —
      prepinace su v sekcii Kontrola okna ŠTÚDIO. -->
-<script src="js/icons.js?v=0.7.32"></script>
-<script src="js/production.js?v=0.7.32"></script>
+<script src="js/icons.js?v=0.7.33"></script>
+<script src="js/production.js?v=0.7.33"></script>
 <!-- V0.6 E-b: tab Rozpocet. Az ZA production.js — cita jeho globalny BOM a
      vola renderBody()/NX.setStatus(); production.js volá renderBudget() az pri
      prepnuti tabu, takze poradie definicii sedi. -->
-<script src="js/budget.js?v=0.7.32"></script>
+<script src="js/budget.js?v=0.7.33"></script>

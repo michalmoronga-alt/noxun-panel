@@ -402,6 +402,25 @@ module Noxun
         nil
       end
 
+      # --- ŠT-1c (audit #3): generika kovania s POPISKAMI --------------------
+      #
+      # Riadok „Podľa pravidiel (generika)" v sekcii Nákup kovania potrebuje
+      # dva SERVEROVE texty, ktore v BOM nie su a do snapshotu sa neukladaju:
+      #   `label`        — slovensky nazov typu (V0.6 C-2, audit F11),
+      #   `params_label` — „rez 597 mm" (D-90; bez neho by pri dlzkovom kovani
+      #                    nebolo v zozname vidiet, aky rozmer objednat).
+      # Obohatenie zije TU, aby ho okno, ktore zoznam kresli, nemuselo skladat
+      # samo — inak by sa dva klienty mohli rozist v tom, ako sa polozka vola.
+      def hardware_labeled(bom)
+        list = bom.is_a?(Hash) ? (bom[:hardware] || bom['hardware']) : bom
+        Array(list).map do |g|
+          next g unless g.is_a?(Hash)
+
+          g.merge('label' => HardwareRules.label_for(g['generic_type'] || g[:generic_type]),
+                  'params_label' => HardwareRules.params_label(g['params'] || g[:params]))
+        end
+      end
+
       # Suhrn KONTROLY do statusu okna/exportu (nalez 6: RED neblokuje export).
       def control_suffix(control)
         c = control.is_a?(Hash) ? (control['counts'] || {}) : {}
@@ -613,6 +632,54 @@ module Noxun
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_export')
         status.call("Chyba exportu: #{e.message}", true)
+      end
+
+      # --- ŠT-1c: CSV nakupneho zoznamu kovania (Š7) ------------------------
+      #
+      # Telo sa sem prestahovalo z okna Vyroba spolu s tabom Kovanie (sekcia
+      # `buy` v Studiu). Poradie je vzor VEPO exportu: gen guard -> flush guard
+      # -> CERSTVY zber modelu -> vyber suboru -> zapis.
+      #
+      # VEDOMA ZMENA (audit #15): export dostal GENERACNY GUARD, ktory predtym
+      # NEMAL. Je to NAKUPNY dokument — objednava sa podla neho kovanie, takze
+      # nesmie vzniknut z tlacidla v okne, ktore uz nezobrazuje aktualne data
+      # (medzitym prepnuty model, prestavana skrinka). Ostatne tri exporty ho
+      # maju odjakziva; odmietnutie nie je tiche — okno sa obnovi a povie to.
+      def do_hw_csv(model, data, generation:, status:, repush:)
+        unless data['gen'].to_i == generation.to_i
+          repush.call
+          return status.call('Dáta okna sa medzitým zmenili — skús export znova.', true)
+        end
+        if data['flush_blocked']
+          return status.call('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
+        end
+
+        exp = hardware_expansion(model, fresh_collect(model))
+        return status.call('Nákupný zoznam sa nedá zostaviť (pozri Ruby konzolu).', true) if exp.nil?
+
+        if Array(exp['rows']).empty? && Array(exp['unmapped']).empty?
+          return status.call('Model nemá žiadne kovanie — niet čo exportovať.', true)
+        end
+
+        # audit #1: nazov projektu je SERVEROVA autorita (jeden nazov pre
+        # VSETKY styri exporty) — z DOM uz nechodi.
+        project = project_name(model)
+        fname = "kovanie_#{VepoExport.project_slug(project)}.csv"
+        target = UI.savepanel('Uložiť nákupný zoznam kovania', vepo_settings['last_dir'], fname)
+        return status.call('Export zrušený.') if target.nil? || target.to_s.empty?
+
+        csv = HardwareSets.purchase_csv(exp, project: project,
+                                        generated_at: Time.now.strftime('%Y-%m-%d %H:%M'))
+        File.open(target, 'wb') { |f| f.write("\xEF\xBB\xBF" + csv) } # BOM pre Excel
+        save_vepo_settings('last_dir' => File.dirname(target))
+        n = Array(exp['rows']).length
+        un = Array(exp['unmapped']).length
+        status.call("Nákupný zoznam: #{n} položiek" \
+                    "#{un.positive? ? " + #{un} nemapovaných (v CSV aj KONTROLE)" : ''} → #{target}",
+                    un.positive?)
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.do_hw_csv')
+        status.call("Export zlyhal: #{e.message}", true)
       end
 
       # Vstup pre relay z panela (B1): panel uz flushol edity, mozeme vyberat.
