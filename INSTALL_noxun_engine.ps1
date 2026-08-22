@@ -44,6 +44,47 @@ $destPlug = Join-Path $dest 'noxun_engine'
 if (-not (Test-Path $destPlug)) { New-Item -ItemType Directory -Path $destPlug | Out-Null }
 Copy-Item (Join-Path $plugdir '*') -Destination $destPlug -Recurse -Force
 
+# ZRKADLENIE (ŠT-2b): kopirovanie samo o sebe nikdy nic nezmazalo, takze subory
+# zaniknutych casti pluginu (napr. `ui/production.html` po ŠT-1c alebo
+# `ui/proj_materials.html` po ŠT-2b) v cieli ostavali navzdy — a pri hladani
+# chyby vyzerali ako ziva sucast pluginu. Ciel je VYHRADNE zlozka pluginu,
+# takze sa nemoze zmazat nic cudzie.
+$srcRel = @{}
+Get-ChildItem $plugdir -Recurse -File | ForEach-Object {
+  $srcRel[$_.FullName.Substring($plugdir.Length).TrimStart('\')] = $true
+}
+# Review #3: mazanie NESMIE zhodit skript. Kopirovanie uz prebehlo, plugin je
+# nainstalovany — zamknuty subor (otvoreny SketchUp, antivirus, indexer) je
+# kozmeticky problem, nie dovod skoncit chybou pri `$ErrorActionPreference =
+# 'Stop'`. Preto try/catch s konkretnou hlaskou.
+Get-ChildItem $destPlug -Recurse -File | ForEach-Object {
+  $rel = $_.FullName.Substring($destPlug.Length).TrimStart('\')
+  if (-not $srcRel.ContainsKey($rel)) {
+    try {
+      Remove-Item $_.FullName -Force -ErrorAction Stop
+      Write-Host ('  odstranene (uz nie je sucastou pluginu): ' + $rel) -ForegroundColor DarkYellow
+    } catch {
+      Write-Host ('  nepodarilo sa odstranit (subor je zamknuty): ' + $rel) -ForegroundColor Yellow
+    }
+  }
+}
+# Prazdny priecinok po zmazanom obsahu (napr. cely zaniknuty modul) by ostal
+# visiet — od najhlbsieho po najplytkejsi, aby sa upratali aj vnorene.
+Get-ChildItem $destPlug -Recurse -Directory |
+  Sort-Object { $_.FullName.Length } -Descending |
+  ForEach-Object {
+    if (-not (Get-ChildItem $_.FullName -Force | Select-Object -First 1)) {
+      try {
+        Remove-Item $_.FullName -Force -ErrorAction Stop
+        Write-Host ('  odstraneny prazdny priecinok: ' +
+                    $_.FullName.Substring($destPlug.Length).TrimStart('\')) -ForegroundColor DarkYellow
+      } catch {
+        Write-Host ('  nepodarilo sa odstranit (priecinok je zamknuty): ' +
+                    $_.FullName.Substring($destPlug.Length).TrimStart('\')) -ForegroundColor Yellow
+      }
+    }
+  }
+
 Write-Host 'HOTOVO. Plugin nainstalovany.' -ForegroundColor Green
 Write-Host 'Restartuj SketchUp, alebo v Ruby konzole: load "noxun_engine.rb"'
 Write-Host ''

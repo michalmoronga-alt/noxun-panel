@@ -79,16 +79,16 @@ NxTest.test('2a3b: B5 matica — katalog 1 + batch 1/2 bezi presne ako dnes (dua
   (res['sheets'] + res2['sheets']).each { |id| B3MAT.delete_sheet(id) }
 end
 
-NxTest.test('2a3b: B5 matica — katalog 2 odmieta batch 1/2 (obnov okno), prijme len batch 3') do
+NxTest.test('2a3b: B5 matica — katalog 2 odmieta batch 1/2 (obnov sekciu), prijme len batch 3') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   b3_with_catalog([b3_sheet('S1', 'G1', 'ST9')], [], schema: 2) do
     ok, err = B3MAT.add_decor_batch('decor' => 'Novy', 'thicknesses' => '18')
     NxTest.refute(ok, 'batch 1 do katalogu 2 nesmie prejst')
-    NxTest.assert(err.include?('obnov okno'), err.to_s)
+    NxTest.assert(err.include?('obnov sekciu'), err.to_s)
     ok2, err2 = B3MAT.add_decor_batch('batch_schema' => 2, 'decor' => 'Novy',
                                       'sheet_variants' => [{ 'thickness' => 18.0 }])
     NxTest.refute(ok2, 'batch 2 do katalogu 2 nesmie prejst')
-    NxTest.assert(err2.include?('obnov okno'), err2.to_s)
+    NxTest.assert(err2.include?('obnov sekciu'), err2.to_s)
     ok3, res3 = B3MAT.add_decor_batch(b3_attrs)
     NxTest.assert(ok3, "plne validny batch 3 musi prejst: #{res3.inspect}")
   end

@@ -571,10 +571,10 @@ module Noxun
           # GH #91 P2 (3. kolo): PRESNE 3 — buducu schemu 4 nesmieme "ciastocne"
           # interpretovat ako v3 (nove polia by sa ticho ignorovali).
           if batch_schema < 3
-            return [false, 'Katalóg je v novom formáte — obnov okno „Materiály“ a skús znova.']
+            return [false, 'Katalóg je v novom formáte — obnov sekciu „Materiály“ (Obnoviť) a skús znova.']
           end
           if batch_schema > 3
-            return [false, 'Dávka je v novšom formáte, než tento katalóg podporuje — obnov okno „Materiály“.']
+            return [false, 'Dávka je v novšom formáte, než tento katalóg podporuje — obnov sekciu „Materiály“ (Obnoviť).']
           end
           return add_decor_batch_v3(attrs)
         end
@@ -736,7 +736,7 @@ module Noxun
         # subor (marker 1 + schema2 polia). Marker sa preto overuje CERSTVO
         # az pod zamkom.
         if catalog_schema_on_disk < SCHEMA_GROUPS
-          return [false, 'Katalóg sa medzitým vrátil na pôvodný formát — obnov okno „Materiály“ a skús znova.']
+          return [false, 'Katalóg sa medzitým vrátil na pôvodný formát — obnov sekciu „Materiály“ (Obnoviť) a skús znova.']
         end
         ok_g, group = resolve_batch_group(manufacturer, decor, decor_name)
         return [false, group] unless ok_g

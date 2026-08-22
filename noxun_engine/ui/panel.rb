@@ -182,8 +182,10 @@ module Noxun
           # nezapisuje nic.
           cb(dlg, 'nx_set_ui_theme')       { |p| handle_set_ui_theme(p) }
           cb(dlg, 'nx_set_dim_series')     { |p| handle_set_dim_series(p) }
-          # V0.4.5 D2: satelitne okna (projektove predvolby a sprava sablon mimo panela)
-          cb(dlg, 'open_project_materials') { |_p| MaterialsDialog.show }
+          # V0.4.5 D2: satelitne okna (sprava sablon mimo panela). ŠT-2b:
+          # `open_project_materials` ZANIKLO spolu s oknom Materialy — tlacidlo
+          # panela ide odteraz bezným deep-linkom `openStudio('mat')`, teda
+          # cestou `open_studio` nizsie (jeden whitelist sekcii, jedna cesta).
           cb(dlg, 'open_templates')         { |_p| TemplatesDialog.show }
           cb(dlg, 'save_template_as')       { |p| handle_save_template_as(p) } # D-14 modal
           # ŠT-1c PR B3: pat relayov okna Vyroba (`open_production`,

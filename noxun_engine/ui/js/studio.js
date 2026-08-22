@@ -97,10 +97,9 @@
         disabled: 'fáza 2 — nárezový plán zatiaľ neexistuje' }
     ] },
     { grp: 'KATALÓGY', items: [
-      // ŠT-2a (Š?): Materiály sú od tejto dávky SEKCIA — prvá živá položka
-      // skupiny KATALÓGY. Okno „Materiály projektu" ešte žije (zanikne v ŠT-2b),
-      // ale navigácia doň už NEVEDIE: sekcia si ho otvára sama a len pre toky,
-      // ktoré zatiaľ nevie (Demos, „Nahradiť UNI…").
+      // ŠT-2a: Materiály sú SEKCIA — prvá živá položka skupiny KATALÓGY.
+      // ŠT-2b: okno „Materiály projektu" ZANIKLO — sekcia vie všetko vrátane
+      // Demos tokov a „Nahradiť UNI…", takže niet kam premosťovať.
       { id: 'mat',    ic: 'layers',   t: 'Materiály' },
       { id: 'hw',     ic: 'hammer',   t: 'Kovanie',   bridge: 'zatiaľ vlastné okno — presun v ŠT-3' },
       { id: 'rules',  ic: 'settings', t: 'Pravidlá',  bridge: 'zatiaľ vlastné okno — presun v ŠT-3' },
@@ -108,7 +107,7 @@
     ] },
     { grp: 'NASTAVENIA', items: [
       { id: 'sup',    ic: 'truck', t: 'Dodávateľ / Demos',
-        bridge: 'sadzby sú v okne Nastavenia rozpočtu, väzba na Demos v okne Materiály — spoja sa v ŠT-4' },
+        bridge: 'sadzby sú v okne Nastavenia rozpočtu, väzba na Demos v sekcii Materiály — spoja sa v ŠT-4' },
       { id: 'bset',   ic: 'euro',  t: 'Nastavenia rozpočtu', bridge: 'zatiaľ vlastné okno — presun v ŠT-4' },
       { id: 'about',  ic: 'info',  t: 'O plugine', bridge: 'obsah je v koliesku Inspectora' }
     ] }
@@ -665,6 +664,13 @@
         // patrilo tej, z ktorej sme odišli. Bez vynulovania by sa `vepoMenuOpen`
         // vrátilo pri najbližšom návrate do Kusovníka „samo otvorené".
         closeSectionMenus();
+        // ŠT-2b: deep-link je DRUHA cesta preč zo sekcie (prvá je `onNav`) —
+        // modály Materiálov žijú mimo tela sekcie, takže by inak ostali visieť
+        // nad novou sekciou a Demos beh by dobehol do nikam.
+        if (studioSec === 'mat' && ST.open_section !== 'mat' &&
+            typeof matOnLeaveSection === 'function'){
+          matOnLeaveSection();
+        }
         studioSec = ST.open_section;
         // Kotva predvyplna hladanie KUSOVNIKA (N13 posiela ID skrinky). Pri inej
         // sekcii by potichu prestavila filter, ktory pouzivatel ani nevidí —
@@ -1374,6 +1380,14 @@
   function studioGoSection(id){
     if (STUDIO_SECTIONS.indexOf(id) < 0) return;
     closeSectionMenus();   // review #8 — overlay patrí sekcii, z ktorej odchádzame
+    // ŠT-2b: sekcia Materiály má modály MIMO tela sekcie (`#matModalRoot`) a
+    // dlhé behy Demosu na serveri. Odchod z nej preto musí modály zavrieť
+    // a beh zrušiť — inak by modal ostal visieť nad Kusovníkom a sťahovanie
+    // by dobehlo do sekcie, ktorú už nikto nepozerá. Autoritou zrušenia je
+    // server (`mat_leave`), toto je jeho jediný ohlasovač.
+    if (studioSec === 'mat' && id !== 'mat' && typeof matOnLeaveSection === 'function'){
+      matOnLeaveSection();
+    }
     studioSec = id;
     render();
   }

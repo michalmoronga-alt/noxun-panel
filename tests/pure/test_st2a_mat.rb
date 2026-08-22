@@ -40,6 +40,12 @@ ST2A_MAT_JS    = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', '
 ST2A_STUDIO_HTML = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio.html'),
                              encoding: 'UTF-8')
 
+# Zdrojak BEZ komentarov. Zanik okna sa overuje na KODE — v komentaroch mena
+# zaniknutych veci ZAMERNE ostavaju (vysvetluju, co a preco zmizlo).
+ST2A_MAT_CODE    = ST2A_MAT_RB.lines.reject { |l| l.strip.start_with?('#') }.join
+ST2A_STUDIO_CODE = ST2A_STUDIO_RB.lines.reject { |l| l.strip.start_with?('#') }.join
+ST2A_MAT_JS_CODE = ST2A_MAT_JS.lines.reject { |l| l.strip.start_with?('//') }.join
+
 # --- 1) `mat` je sekcia a premostenie zaniklo --------------------------------
 
 NxTest.test('ŠT-2a: `mat` je ZIVA sekcia vo VSETKYCH TROCH zrkadlach') do
@@ -63,22 +69,34 @@ NxTest.test('ŠT-2a: premostenie `mat` ZANIKLO — navigacia uz neotvara satelit
   NxTest.refute(mat_item.include?('disabled:'), 'a nie je ani neaktivna')
 end
 
-NxTest.test('ŠT-2a: okno Materialy ZIJE — sekcia si ho otvara VLASTNOU, priznanou cestou') do
-  # Prechodne obdobie: obsah je v Studiu, ale toky s dlhym behom viazanym na
-  # instanciu okna (Demos fetch, „Nahradiť UNI…") ostavaju v nom do ŠT-2b.
-  NxTest.assert(File.exist?(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'proj_materials.html')),
-                'okno este existuje (zanika az v ŠT-2b)')
-  NxTest.assert(ST2A_STUDIO_RB.include?("cb(dlg, 'mat_open_window')"),
-                'sekcia ma vlastnu cestu na otvorenie okna')
-  st = Noxun::Engine::StudioDialog
-  %w[demos_add demos_update replace_uni other].each do |k|
-    NxTest.assert(!st::MAT_BRIDGE_STATUS[k].to_s.empty?,
-                  "premostenie #{k} musi POVEDAT, preco sa otvorilo ine okno")
-    NxTest.assert(st::MAT_BRIDGE_STATUS[k].include?('Materiály'),
-                  "hlaska #{k} pomenuje okno, ktore sa otvara")
+NxTest.test('ŠT-2b: okno Materialy ZANIKLO — a s nim VSETKY jeho vstupy') do
+  # Zaniknut musi CELE, nie len z navigacie: kym existuje HTML, menu polozka
+  # alebo panelove tlacidlo, ziju nad jednym katalogom dve UI s roznym stavom.
+  NxTest.refute(File.exist?(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'proj_materials.html')),
+                'HTML satelitu je zmazane')
+  %w[DLG_KEY ensure_dialog register_callbacks dialog_js UI::HtmlDialog].each do |gone|
+    NxTest.refute(ST2A_MAT_CODE.include?(gone), "#{gone} je z materials_dialog.rb PREC")
   end
-  NxTest.assert(ST2A_MAT_JS.include?('function mdBridgeToWindow(what)'),
-                'klient posiela LEN dovod — co sa otvori, rozhoduje server')
+  NxTest.refute(ST2A_STUDIO_CODE.include?('mat_open_window'),
+                'premostenie zo sekcie do okna zaniklo spolu s oknom')
+  NxTest.assert(ST2A_STUDIO_RB.include?("cb(dlg, 'mat_leave')"),
+                'namiesto neho hlasi klient ODCHOD zo sekcie (zrusi bezaci Demos fetch)')
+  NxTest.refute(Noxun::Engine::StudioDialog.const_defined?(:MAT_BRIDGE_STATUS),
+                'a jeho hlasky tiez')
+  NxTest.refute(ST2A_MAT_JS_CODE.include?('mdBridgeToWindow'), 'klient uz nema kam premostovat')
+  NxTest.assert(ST2A_MAT_JS_CODE.include?('function matOnLeaveSection()'),
+                'namiesto toho hlasi odchod zo sekcie a zavrie modaly')
+  main = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
+  NxTest.assert(main.include?("menu.add_item('Materiály projektu') { StudioDialog.show(open_section: 'mat') }"),
+                'zauzivana polozka menu ostava, ale otvara SEKCIU')
+  NxTest.refute(main.include?('MaterialsDialog.show'), 'okno sa uz nikde neotvara')
+  panel_rb = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.rb'), encoding: 'UTF-8')
+                     .lines.reject { |l| l.strip.start_with?('#') }.join
+  NxTest.refute(panel_rb.include?('open_project_materials'),
+                'panelovy callback satelitu zanikol — tlacidlo ide deep-linkom openStudio')
+  panel_html = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.html'), encoding: 'UTF-8')
+  NxTest.assert(panel_html.include?(%q(onclick="openStudio('mat')")),
+                'tlacidlo „Materiály projektu…" vedie do sekcie')
 end
 
 # --- 2) generacny kontrakt kanala (audit #4) ---------------------------------
@@ -93,10 +111,10 @@ NxTest.test('ŠT-2a (audit #4): katalogove echo NEZDVIHA generaciu okna') do
   after = ST2A_MAT_RB[/def after_catalog_change.*?\n        end\n/m].to_s
   NxTest.assert(after.include?('StudioDialog.refresh_if_open(bump: false)'),
                 'katalogovy zapis nemeni model — pending klik ostava platny')
-  NxTest.assert(after.include?('StudioDialog.push_mat_catalog(payload)'),
+  NxTest.assert(after.include?('StudioDialog.push_mat_catalog(catalog_payload)'),
                 'a sekcia dostane cerstvy katalog echom')
-  NxTest.assert(after.include?('dialog_js('),
-                'satelitne okno dostane TO ISTE echo priamo (obe UI nad jednym katalogom)')
+  # ŠT-2b: druhe UI neexistuje, takze aj echo je JEDNO.
+  NxTest.refute(after.include?('dialog_js('), 'vetva satelitneho okna je PREC')
   code = after.lines.reject { |l| l.strip.start_with?('#') }.join
   NxTest.assert_equal(1, code.scan(/catalog_payload/).length,
                       'payload sa stava RAZ — druhy by znamenal druhy vypocet row_rev')
@@ -117,17 +135,15 @@ NxTest.test('ŠT-2a (audit #4): zapis do MODELU dostane PLNY push AJ so zdvihom'
   proj = ST2A_MAT_RB[/def handle_set_project_material.*?\n        end\n/m].to_s
   NxTest.assert(proj.include?('refresh_studio_after_model_write'),
                 'projektova predvolba prestavia skrinky — Studio to musi vediet')
-  # Review #2: zmena PREDVOLIEB sa musi objavit v OBOCH UI. Odpoved cez sink
-  # by prisla len tomu, kto o nu poziadal, a druhy formular by drzal stary vyber.
-  NxTest.assert(proj.include?('push_state_both'), 'predvolby vidia obe UI naraz')
+  # ŠT-2b: `push_state_both` (ten isty stav do DVOCH UI) zanikol spolu s druhym
+  # UI — predvolby nesie `mat` payload Studia z `refresh_studio_after_model_write`.
   uni = ST2A_MAT_RB[/def handle_replace_uni_apply.*?\n        end\n/m].to_s
-  NxTest.assert(uni.include?('push_state_both'), 'to iste plati pre apply „Nahradiť UNI…"')
-  both = ST2A_MAT_RB[/def push_state_both.*?\n        end\n/m].to_s
-  NxTest.assert(both.include?('dialog_js(') && both.include?('StudioDialog.push_mat_state(data)'),
-                'okno priamo, sekcia cez Studio — vzor after_catalog_change')
-  code = both.lines.reject { |l| l.strip.start_with?('#') }.join
-  NxTest.assert_equal(1, code.scan(/state_payload/).length,
-                      'payload sa stava RAZ (je v nom cely katalog)')
+  NxTest.assert(uni.include?('refresh_studio_after_model_write'),
+                'to iste plati pre apply „Nahradiť UNI…"')
+  %w[push_state_both state_payload model_decor_usage].each do |gone|
+    NxTest.refute(ST2A_MAT_CODE.include?(gone),
+                  "#{gone} zanikol s oknom — druhy sken modelu uz sekcia nepotrebuje")
+  end
   # Nota #20: poradie proti bliknutiu jantaru — AZ ZA refreshom Inspectora.
   NxTest.assert(proj.index('Panel.push_selected') < proj.index('refresh_studio_after_model_write'),
                 'push ide AZ ZA push_selected (dedup by inak zozltil prave prepocitane okno)')
@@ -176,12 +192,12 @@ NxTest.test('ŠT-2a: akcie katalogu maju JEDINY whitelist a JEDINE telo') do
      restore_pre_schema2].each do |a|
     NxTest.assert(actions.include?(a), "sekcia musi vediet #{a}")
   end
-  # Demos toky maju zivotnost viazanu na instanciu okna — do sekcie ich pusta
-  # az ŠT-2b (dovtedy premostenie).
-  %w[demos_lookup demos_apply demos_family_create replace_uni_apply
-     replace_uni_preview].each do |a|
-    NxTest.refute(actions.include?(a),
-                  "#{a} drzi dlhy beh viazany na okno — v ŠT-2a sa premosti, nie prepusti")
+  # ŠT-2b: Demos toky aj „Nahradiť UNI…" su UZ v sekcii — ich zivotnost sa
+  # presunula z instancie okna na SESSION token (viz `demos_alive_proc`).
+  %w[demos_lookup demos_manual_url demos_apply demos_cancel demos_name_search
+     demos_family demos_family_create demos_family_cancel open_search_url
+     replace_uni_preview replace_uni_apply].each do |a|
+    NxTest.assert(actions.include?(a), "sekcia musi vediet aj #{a}")
   end
   NxTest.refute(ST2A_STUDIO_RB.include?('MAT_ACTIONS = %w['),
                 'druhy zoznam v Studiu by sa casom rozisiel — cita sa ten z MaterialsDialog')
@@ -199,7 +215,11 @@ NxTest.test('ŠT-2a (audit #21): odpoved dostane TEN, KTO sa pytal') do
                 'vynimka v handleri nesmie nechat sink viset — dalsia odpoved by odisla do Studia')
   js = ST2A_MAT_RB[/def js\(script\).*?\n        end\n/m].to_s
   NxTest.assert(js.include?('sink.call(script) if sink'), 'sink ma prednost')
-  NxTest.assert(js.include?('dialog_js(script)'), 'bez neho ide vsetko do vlastneho okna ako doteraz')
+  # ŠT-2b: bez sinku (asynchronny Demos emit, refresh cesty zvonku) je jediny
+  # mozny adresat okno Studio — vlastne uz neexistuje.
+  NxTest.assert(js.include?('studio_js(script)'), 'bez neho ide vsetko do Studia')
+  NxTest.assert(ST2A_MAT_RB.include?('StudioDialog.mat_js(script)'),
+                'a to VEREJNYM mostom (kanalove `js` Studia je private)')
   # Modul sa NEPREMENUVA (audit #21) — zanika okno, nie serverova autorita.
   NxTest.assert(defined?(Noxun::Engine::MaterialsDialog), 'modul MaterialsDialog zije dalej')
 end
@@ -240,8 +260,11 @@ NxTest.test('ŠT-2a (audit #8 / review #6): `@ready` naozaj RIADI odosielanie sk
                 'push pred nacitanim HTML sa PRIZNANE zahodi (CEF ho zahodi tak ci tak)')
   NxTest.assert(js.index('return false unless @dialog') < js.index('return false unless @ready'),
                 'najprv zive okno, potom pripravenost — poradie guardov')
-  NxTest.assert(ST2A_STUDIO_RB.include?("cb(dlg, 'ready')        { |_p| @ready = true; push_state }"),
+  ready_cb = ST2A_STUDIO_RB[/cb\(dlg, 'ready'\) do.*?\n          end\n/m].to_s
+  NxTest.assert(ready_cb.include?('@ready = true') && ready_cb.include?('push_state'),
                 'priznak sa zapina AZ ked HTML naozaj bezi — a PRED prvym pushom')
+  NxTest.assert(ready_cb.index('push_state') < ready_cb.index('flush_pending_replace_uni'),
+                'ŠT-2b: odlozeny modal „Nahradiť UNI…" az ZA prvym pushom (potrebuje katalog)')
   ensure_dlg = ST2A_STUDIO_RB[/def ensure_dialog.*?\n        end\n/m].to_s
   NxTest.assert(ensure_dlg.include?('@ready = false'),
                 'nove okno zacina ako NEPRIPRAVENE (CEF by skript pred nacitanim zahodil)')
@@ -287,4 +310,104 @@ NxTest.test('ŠT-2a: cache-bust presunutych skriptov sedi s VERSION') do
                 'CEF cachuje js — `?v=` musi byt presne VERSION')
   NxTest.assert(ST2A_STUDIO_HTML.include?('window.NX_MAT_SECTION = true'),
                 'okno Studio prepina zdielany subor do rezimu SEKCIE')
+end
+
+# --- 7) ŠT-2b: priznak beziaceho Demos behu (review #1/#2) -------------------
+#
+# `cancel_demos_on_leave` pise hlasku „Sťahovanie z Demosu zrušené…" LEN ked
+# `@demos_running` plati. Priznak preto musi REALNE zhasnut na kazdom
+# terminalnom evente — inak by odchod zo sekcie po dobehnutom (alebo padnutom)
+# behu klamal. Kontrola nad SPRAVANIM emit procov, nie nad rucne nastavenym
+# ivarom: rucne nastavenie by prezilo aj to, keby sa riadok z kodu stratil.
+NxTest.test('ŠT-2b (review #1): terminalny event Demosu ZHASNE priznak beziaceho behu') do
+  md = Noxun::Engine::MaterialsDialog
+  running = lambda { md.instance_variable_get(:@demos_running) }
+  arm = lambda do
+    md.instance_variable_set(:@demos_running, true)
+    NxTest.assert(running.call, 'priprava: priznak je zapnuty')
+  end
+
+  # (a) rodina sa STIAHLA — dalej sa uz len klika vo vybere, nic nebezi.
+  #     Session zamerne SEDI, takze prejde aj vetva obohatenia poloziek.
+  session = md.send(:demos_bump_session)
+  emit = md.send(:demos_family_emit, session)
+  arm.call
+  emit.call('type' => 'family', 'header' => { 'manufacturer' => 'X', 'decor' => 'Y' }, 'items' => [])
+  NxTest.refute(running.call, 'event `family` = koniec dlheho behu')
+
+  # (b) NEUSPESNY create (ok=false) — vetva zapisu do katalogu sa nespusti,
+  #     ale beh skoncil rovnako ako pri uspechu.
+  arm.call
+  emit.call('type' => 'complete', 'ok' => false, 'error' => 'skus znova')
+  NxTest.refute(running.call, 'neuspesny `complete` priznak tiez zhasina')
+
+  # (c) pad behu.
+  arm.call
+  emit.call('type' => 'error', 'error' => 'sitemap')
+  NxTest.refute(running.call, '`error` tiez')
+
+  # (d) prubezny event NESMIE priznak zhodit — beh este bezi.
+  arm.call
+  emit.call('type' => 'progress', 'done' => 1, 'total' => 3)
+  NxTest.assert(running.call, 'prubezny `progress` beh NEUKONCUJE')
+
+  # (e) ta ista poistka na druhom emit proce (lookup „Aktualizovať z Demosu").
+  session2 = md.send(:demos_bump_session)
+  emit2 = md.send(:demos_emit_proc, session2)
+  arm.call
+  emit2.call('type' => 'progress', 'done' => 1, 'total' => 2)
+  NxTest.assert(running.call, 'lookup: `progress` beh NEUKONCUJE')
+  emit2.call('type' => 'complete', 'ok' => true)
+  NxTest.refute(running.call, 'lookup: `complete` priznak zhasina')
+ensure
+  md = Noxun::Engine::MaterialsDialog
+  md.instance_variable_set(:@demos_running, false)
+  md.instance_variable_set(:@demos_family, nil)
+end
+
+NxTest.test('ŠT-2b (review #1): zhasnuty priznak znamena TICHY odchod zo sekcie') do
+  md = Noxun::Engine::MaterialsDialog
+  sent = []
+  md.singleton_class.class_eval do
+    alias_method :nx_js_orig_st2b, :js
+    define_method(:js) { |script| sent << script.to_s; true }
+  end
+  begin
+    md.instance_variable_set(:@demos_running, true)
+    md.cancel_demos_on_leave
+    NxTest.assert(sent.any? { |x| x.include?('opustil si sekciu Materiály') },
+                  'odchod POCAS behu sa priznane hlasi')
+    sent.clear
+    md.cancel_demos_on_leave
+    NxTest.assert(sent.empty?,
+                  'druhy odchod uz nema co rusit — prepinanie sekcii nesmie prepisovat status')
+  ensure
+    sc = md.singleton_class
+    sc.class_eval do
+      alias_method :js, :nx_js_orig_st2b
+      remove_method :nx_js_orig_st2b
+    end
+    md.instance_variable_set(:@demos_running, false)
+  end
+end
+
+NxTest.test('ŠT-2b (review #7/#8): odlozena poziadavka „Nahradiť UNI…" ma JEDEN zivotny cyklus') do
+  md = Noxun::Engine::MaterialsDialog
+  # #7: jedno API — `on_ui_closed` zahadzuje aj pending (druhe by sa rozislo).
+  NxTest.refute(md.respond_to?(:forget_pending_replace_uni),
+                'druhe API na to iste zaniklo')
+  closed = ST2A_STUDIO_RB[/@dialog\.set_on_closed do.*?\n          end\n/m].to_s
+  NxTest.assert(closed.include?('MaterialsDialog.on_ui_closed'),
+                'zatvorenie okna ide JEDNOU cestou')
+  md.instance_variable_set(:@pending_replace_uni, { 'uni_id' => 'X', 'model_guid' => 'G' })
+  md.on_ui_closed
+  NxTest.assert(md.instance_variable_get(:@pending_replace_uni).nil?,
+                'a poziadavka s nim naozaj zomiera')
+  # #8: pending sa nastavuje AZ ZA `show` — inak by po zlyhanom otvoreni
+  # visel a modal by vystrelil pri najblizsom (nevyziadanom) otvoreni okna.
+  req = ST2A_MAT_RB[/def request_replace_uni\(uni_id, model\).*?\n        end\n/m].to_s
+  NxTest.assert(req.index('StudioDialog.show(open_section:') < req.index('@pending_replace_uni = req'),
+                'poziadavka sa odklada az po uspesnom otvoreni okna')
+  NxTest.assert(req[/rescue StandardError.*/m].to_s.include?('@pending_replace_uni = nil'),
+                'a vynimka ju zahadzuje')
 end

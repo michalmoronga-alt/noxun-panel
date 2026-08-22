@@ -1,7 +1,9 @@
   // ===================== V0.3 MATERIALY (korpus) =====================
-  // Projektove predvolby sa V0.4.5 D2 presunuli do okna Materialy projektu
-  // (proj_materials.html + js/proj_materials.js) — panel drzi len materialy
-  // OZNACENEJ skrinky (override dedenia projekt -> skrinka).
+  // Projektove predvolby sa V0.4.5 D2 presunuli do okna Materialy projektu;
+  // to v ŠT-2b ZANIKLO a katalog aj predvolby ziju v SEKCII `mat` okna Studio
+  // (js/proj_materials.js). Panel drzi len materialy OZNACENEJ skrinky
+  // (override dedenia projekt -> skrinka) a do katalogu vedie deep-linkom
+  // `openStudio('mat')` — vlastnu otvaraciu funkciu uz nema.
   function setCabinetMaterials(c){
     var on = !!c.cabinet_id;
     // UI-C3: `cab_front_c` je DRUHY ovladac materialu ciel (zoznam ciel v
@@ -35,9 +37,6 @@
     if (!selectedCabId){ NX.setStatus('Najprv označ skrinku.', true); return; }
     if (window.sketchup && sketchup.set_cabinet_material)
       sketchup.set_cabinet_material(JSON.stringify({ which: which, value: value, cabinet_id: selectedCabId }));
-  }
-  function openProjectMaterialsDialog(){
-    if (window.sketchup && sketchup.open_project_materials) sketchup.open_project_materials('');
   }
   function openTemplatesDialog(){
     if (window.sketchup && sketchup.open_templates) sketchup.open_templates('');

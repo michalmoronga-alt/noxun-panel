@@ -5,7 +5,7 @@
      to isté zdieľané jadro `ProductionCore`).
      Vizuálna referencia: SYSTEM/zdroje/ui20/mockup_studio.html -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.7.46">
+<link rel="stylesheet" href="css/panel.css?v=0.7.48">
 <style>
   /* Štýly sú ZÁMERNE inline v studio.html (rovnaký dôvod, aký mala production.html):
      panel.css je zdieľaný s Inspectorom a rozloženie tohto okna doňho nepatrí.
@@ -496,13 +496,13 @@
      sekcie, takže ho prekreslenie rozpočtu po zápise nezhodí. -->
 <div id="nxModalRoot"></div>
 
-<!-- ŠT-2a: modály sekcie MATERIÁLY. Ten istý dôvod ako pri #nxModalRoot —
+<!-- ŠT-2a/2b: modály sekcie MATERIÁLY. Ten istý dôvod ako pri #nxModalRoot —
      žijú MIMO #secbody, takže ich neshodí ani prekreslenie sekcie, ani
-     prepnutie na Kusovník. Markup je presun 1:1 z proj_materials.html
-     (okno žije do ŠT-2b, potom ostane už len táto kópia).
-     Modály tokov, ktoré sekcia zatiaľ nevie (Demos add/diff, „Nahradiť UNI…"),
-     tu ZÁMERNE nie sú — tie sa premosťujú do okna a mŕtvy markup by len
-     sľuboval, čo sa nekreslí. Prídu s nimi v ŠT-2b. -->
+     prepnutie na Kusovník. Markup je posledný presun z okna „Materiály
+     projektu", ktoré v ŠT-2b ZANIKLO (proj_materials.html je zmazaný).
+     ŠT-2b doniesla zvyšné štyri: Demos diff, „Pridať z Demosu" a „Nahradiť
+     UNI…". Modály sú viazané na SEKCIU — odchod z nej ich zatvorí
+     (`matOnLeaveSection`), inak by viseli nad Kusovníkom. -->
 <div id="matModalRoot">
   <!-- 2A-4b (audit B2): potvrdenie obnovy predmigračnej zálohy (NIE UI.messagebox). -->
   <div id="mdRestoreModal" class="nxmodal" style="display:none">
@@ -525,6 +525,51 @@
       <div class="btnrow">
         <button class="danger" id="mdDelConfirmBtn" onclick="mdDeleteConfirm()">Zmazať</button>
         <button class="ghostbtn" onclick="mdDeleteClose()">Zrušiť</button>
+      </div>
+    </div>
+  </div>
+  <!-- V0.6 B-2b: Demos diff modal — lookup a apply kódov/cien dekorovej skupiny.
+       Obsah stavia demos_diff.js VÝHRADNE cez DOM API (textContent — XSS audit
+       BLOCKER 6); ovládanie cez data-action delegáciu, žiadne inline handlery
+       s dátami. Server (Ruby) je autorita hodnôt — apply posiela len flagy. -->
+  <div id="demosModal" class="nxmodal" style="display:none">
+    <div class="nxmodal-card nxmodal-wide">
+      <div class="nxmodal-title">Aktualizovať z Demosu</div>
+      <div class="hint" id="mddStatus">…</div>
+      <div id="mddBody" class="mddbody"></div>
+      <div class="btnrow">
+        <button class="primary" id="mddApplyBtn" data-action="mdd-apply" disabled>Zapísať vybrané</button>
+        <button class="ghostbtn" data-action="mdd-cancel">Zavrieť</button>
+      </div>
+    </div>
+  </div>
+  <!-- V0.6 M-A2: modal "Pridať z Demosu" (mockup s1–s4). Obsah stavia demos_add.js
+       VÝHRADNE cez DOM API (textContent — XSS kontrakt); ovládanie data-action
+       delegáciou. Server drží family store — JS posiela len iid vybraných. -->
+  <div id="nxdaModal" class="nxmodal" style="display:none">
+    <div class="nxmodal-card nxmodal-wide">
+      <div class="nxmodal-title"><svg class="ic" aria-hidden="true"><use href="#i-cloud-download"/></svg> Pridať z Demosu</div>
+      <div class="hint" id="nxdaStatus">Vlož adresu produktu alebo hľadaj názvom.</div>
+      <div id="nxdaBody" class="nxdabody"></div>
+    </div>
+  </div>
+  <!-- V0.6 M-B2: „Nahradiť UNI…" — krok 1 výber cieľa, krok 2 rozpis dopadu zo
+       SERVERA (scan+klasifikácia+odtlačok plánu); telo skroluje, akcie sú fixné.
+       ŠT-2b: otvára ho aj KONTROLA toho istého okna (nález „materiál neurčený")
+       — server prepne sekciu na `mat` a modal spustí až po push_state. -->
+  <div id="mdUniModal" class="nxmodal" style="display:none">
+    <div class="nxmodal-card nxmodal-scroll">
+      <div class="nxmodal-title"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg> <span id="mdUniName">Nahradiť UNI</span></div>
+      <div id="mdUniStep1">
+        <div class="hint">Vyber reálny dekor, ktorý nahradí UNI v celom projekte.</div>
+        <div class="tplrow"><label class="mdunil">Dekor</label><select id="mdUniGroup" onchange="mdUniGroupChange()" style="flex:1"></select></div>
+        <div class="tplrow"><label class="mdunil">Variant</label><select id="mdUniVariant" style="flex:1"></select></div>
+      </div>
+      <div id="mdUniStep2" class="nxmodal-body" style="display:none"><div id="mdUniBody"></div></div>
+      <div class="btnrow">
+        <button class="primary" id="mdUniNextBtn" onclick="mdUniPreview()">Ukázať dopad</button>
+        <button class="primary" id="mdUniConfirmBtn" style="display:none" onclick="mdUniConfirm()">Nahradiť</button>
+        <button class="ghostbtn" onclick="mdUniClose()">Zrušiť</button>
       </div>
     </div>
   </div>
@@ -683,41 +728,47 @@
 </template>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.7.46"></script>
+<script src="js/errors.js?v=0.7.48"></script>
 <!-- D-51/D-77: minimálna OBSAHOVÁ veľkosť okna pri otvorení (js/win_fit.js).
      Navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami a stĺpcom akcií — v užšom
      okne končí pravá časť riadku mimo. Trojica NX_FIT_MIN → width/height →
      min_width/min_height je v docs/UI_DIZAJN.md (tabuľka D-51). -->
 <script>window.NX_FIT_MIN = { w: 1060, h: 640 };</script>
-<script src="js/win_fit.js?v=0.7.46"></script>
+<script src="js/win_fit.js?v=0.7.48"></script>
 <!-- Sprite ikon (žiadne emoji v ovládacích prvkoch). Musí byť PRED studio.js —
      navigácia aj hover akcie riadkov používajú <use href="#i-…">. -->
-<script src="js/icons.js?v=0.7.46"></script>
+<script src="js/icons.js?v=0.7.48"></script>
 <!-- ŠT-1b: ZDIELANE 3-stavove nastavenie kontroly hran. TEN ISTY subor nacitava
      aj Inspector (rohovy trojuholnik pri ABS kontrole v raile) — jeden markup,
      jeden stav. Musi byt PRED studio.js (lista sekcie Kontrola ho vola pri
      renderi). ŠT-1c PR B3: okno Vyroba zaniklo — prepinace su TU. -->
-<script src="js/edge_menu.js?v=0.7.46"></script>
+<script src="js/edge_menu.js?v=0.7.48"></script>
 <!-- ŠT-1c PR B2 (D-15): ZDIELANA kostra modalov („pridávačiek"). Musí byť PRED
      studio.js aj budget.js — Escape handler Štúdia sa pýta `NXModal.isOpen()`
      a rozpočet ním otvára svoje pridávačky. Ďalšie inštancie (D-69 editor
      materiálu, položka/set kovania) sa naň napoja bez kopírovania. -->
-<script src="js/nx_modal.js?v=0.7.46"></script>
-<script src="js/studio.js?v=0.7.46"></script>
+<script src="js/nx_modal.js?v=0.7.48"></script>
+<script src="js/studio.js?v=0.7.48"></script>
 <!-- ŠT-1c PR B1: sekcia ROZPOČET (Š12–Š13). MUSÍ byť AŽ ZA studio.js — číta
      jeho globálny payload `ST` a hlavne OBALUJE `NX.setStudio` (uvoľnenie
      frontu zápisov po príchode čerstvej generácie). studio.js pritom NX
      PRIRAĎUJE celý (`window.NX = {…}`), takže v opačnom poradí by obal aj
      `NX.budgetResult`/`NX.priceRefresh` prepísal a rozpočet by po prvom zápise
      zamrzol. Poradie stráži guard test (tests/pure/test_st1c_rozpocet.rb). -->
-<script src="js/budget.js?v=0.7.46"></script>
-<!-- ŠT-2a: sekcia MATERIÁLY. Ten istý súbor obsluhuje aj (zatiaľ žijúce) okno
-     „Materiály projektu" — príznak nižšie mu povie, že beží ako SEKCIA:
-     toky s dlhým behom viazaným na okno (Demos, „Nahradiť UNI…") sa v nej
-     poctivo premostia späť do okna, kým ich neprevezme ŠT-2b.
+<script src="js/budget.js?v=0.7.48"></script>
+<!-- ŠT-2a/2b: sekcia MATERIÁLY. Okno „Materiály projektu" ZANIKLO, takže tento
+     súbor beží už len TU; príznak nižšie ostáva ako explicitné prihlásenie sa
+     do režimu sekcie (a ako poistka Node testov, ktoré ho nenastavujú).
      MUSÍ byť AŽ ZA studio.js aj budget.js — obaľuje `NX.setStudio` (rovnaký
      dôvod ako rozpočet) a lištu/telo sekcie kreslí cez `matRenderTools`
      a `matRenderBody`, ktoré studio.js volá cez `typeof`. Poradie stráži
      guard test (tests/pure/test_st2a_mat.rb). -->
 <script>window.NX_MAT_SECTION = true;</script>
-<script src="js/proj_materials.js?v=0.7.46"></script>
+<!-- ŠT-2b: Demos toky sekcie. `demos_diff.js` (modal „Aktualizovať z Demosu")
+     musí byť PRED proj_materials.js — detail dekoru volá `mddLookup` z onclick
+     handlerov; `demos_add.js` nesie modal „Pridať z Demosu". Oba používajú
+     výhradne vlastné prefixy (`mdd*` / `nxda*`), takže v okne so studio.js
+     a budget.js nič neprepisujú (stráži guard test). -->
+<script src="js/demos_diff.js?v=0.7.48"></script>
+<script src="js/demos_add.js?v=0.7.48"></script>
+<script src="js/proj_materials.js?v=0.7.48"></script>

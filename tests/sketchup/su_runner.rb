@@ -6391,8 +6391,10 @@ module NoxunSuRunner
         'budget' => 'budget/offer' }.each do |key, sec|
         ok("ŠT-1c B3: payload nesie data sekcie #{sec} (`#{key}`)", payload.key?(key))
       end
-      ok('ŠT-1c B3: sekcie Studia su vsetky (bom · ctrl · buy · budget · offer)',
-         e::StudioDialog::SECTIONS == %w[bom ctrl buy budget offer])
+      # ŠT-2a pridala sestu sekciu `mat` (Materialy), ŠT-2b jej dala aj Demos
+      # toky a zrusila okno — zoznam je odvtedy sestpolozkovy.
+      ok('ŠT-1c B3: sekcie Studia su vsetky (bom · ctrl · buy · budget · offer · mat)',
+         e::StudioDialog::SECTIONS == %w[bom ctrl buy budget offer mat])
     end
 
     dlg = e::StudioDialog.instance_variable_get(:@dialog)
@@ -6407,6 +6409,198 @@ module NoxunSuRunner
        inst.nil? || !inst.valid?)
   rescue StandardError => ex
     log_line("FAIL: ŠT-1c B3 kontrola vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
+  # ===================== ŠT-2b: ZANIK OKNA MATERIALY =========================
+  #
+  # Co sa tu overuje (a preco to headless sada nevie):
+  #   1. KANAL — kto dostane odpoved. Pocas volania sekcie sink, mimo neho
+  #      Studio. Asynchronny Demos emit dobieha AZ PO navrate z `dispatch`,
+  #      takze keby sink zostal viset, odpoved by odisla do prazdna.
+  #   2. ZIVOTNOST dlheho behu — zatvorene Studio aj odchod zo sekcie ho musia
+  #      zabit. Headless to neoveri: `demos_alive_proc` sa pyta ZIVEHO okna.
+  #   3. „Nahradiť UNI…" v JEDNOM okne — nalez KONTROLY prepne sekciu na `mat`
+  #      a modal sa spusti az po pushi (klient potrebuje katalog).
+  #   4. Projektova predvolba zo sekcie = PRAVE JEDEN krok Spat.
+
+  # Zaznam toho, co by islo do klienta Studia (vzor `st1c_capture`).
+  def st2b_capture_studio(&blk)
+    st1c_capture(e::StudioDialog, &blk)
+  end
+
+  # Docasna nahrada `StudioDialog.show` — runner NESMIE otvorit skutocne okno
+  # (modalne/neriadene okno by beh zastavilo). Zaznamena argumenty.
+  def st2b_without_show(calls)
+    e::StudioDialog.singleton_class.class_eval do
+      alias_method :nx_show_orig_st2b, :show
+      define_method(:show) { |**kw| calls << kw; true }
+    end
+    begin
+      yield
+    ensure
+      sc = e::StudioDialog.singleton_class
+      if sc.method_defined?(:nx_show_orig_st2b) || sc.private_method_defined?(:nx_show_orig_st2b)
+        sc.class_eval do
+          alias_method :show, :nx_show_orig_st2b
+          remove_method :nx_show_orig_st2b
+        end
+      end
+    end
+  end
+
+  def st2b_first(scripts, prefix)
+    scripts.find { |x| x.to_s.start_with?(prefix) }
+  end
+
+  # Docasny UNI zaznam pre tok „Nahradiť UNI…" (zaklada sa len ked v katalogu
+  # ziadny nie je; na konci sekcie sa MAZE).
+  ST2B_TEMP_UNI = 'SU_TEST_UNI_ST2B'
+
+  def run_st2b(model)
+    cleanup(model)
+    return ok('ŠT-2b: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
+    return ok('ŠT-2b: modul MaterialsDialog zije dalej', false) unless defined?(e::MaterialsDialog)
+
+    md = e::MaterialsDialog
+
+    # --- 1) okno ZANIKLO, modul ZIJE -----------------------------------------
+    ok('ŠT-2b: sekcia `mat` je v zozname sekcii Studia',
+       e::StudioDialog::SECTIONS.include?('mat'))
+    %i[show ensure_dialog register_callbacks dialog_js].each do |gone|
+      ok("ŠT-2b: `MaterialsDialog.#{gone}` uz neexistuje", !md.respond_to?(gone))
+    end
+    html = File.join(e.plugin_dir, 'ui', 'proj_materials.html')
+    ok('ŠT-2b: nasadeny plugin uz NEOBSAHUJE proj_materials.html', !File.exist?(html))
+    ok('ŠT-2b: whitelist sekcie pozna Demos toky aj „Nahradiť UNI…"',
+       %w[demos_lookup demos_family_create replace_uni_preview replace_uni_apply
+          open_search_url].all? { |a| md::SECTION_ACTIONS.include?(a) })
+
+    # --- 2) KANAL: sink pocas volania, Studio mimo neho -----------------------
+    sink_rec = []
+    sink = ->(script) { sink_rec << script.to_s }
+    studio_rec = st2b_capture_studio do
+      md.dispatch('delete_preflight',
+                  { 'kind' => 'sheet', 'id' => 'NX_NEEXISTUJE_ST2B' }.to_json, sink)
+    end
+    ok('ŠT-2b: odpoved akcie sekcie ide DO SINKU', sink_rec.any? { |s| s.include?('MD.setStatus') })
+    ok('ŠT-2b: a NEIDE popri nom aj do kanala okna (dvojita odpoved)', studio_rec.empty?)
+
+    unknown = []
+    md.dispatch('nx_neznama_akcia', '{}', ->(s) { unknown << s.to_s })
+    ok('ŠT-2b: akcia MIMO whitelistu sa odmietne na SERVERI',
+       unknown.any? { |s| s.include?('MD.setStatus') && s.include?('Nezn') })
+
+    outside = st2b_capture_studio { md.set_status('ŠT-2b kanal test') }
+    ok('ŠT-2b: odpoved BEZ sinku (asynchronny emit) ide do Studia',
+       outside.any? { |s| s.include?('MD.setStatus') && s.include?('ŠT-2b kanal test') })
+    ok('ŠT-2b: sink po dobehnuti akcie NEVISI (`ensure` v with_client)',
+       sink_rec.length == 1)
+
+    # --- 3) ZIVOTNOST dlheho behu Demosu -------------------------------------
+    session = md.send(:demos_bump_session)
+    alive = md.send(:demos_alive_proc, session)
+    # Zivotnost = SESSION + zive Studio. Ci okno prave bezi, zavisi od toho, co
+    # runner robil predtym — testuje sa preto KONTRAKT, nie nahodny stav:
+    #   * s aktualnou session kopiruje proc odpoved `dialog_alive?`,
+    #   * po bumpe je MRTVY vzdy (novy beh / cancel / zatvorenie / iny model).
+    ok('ŠT-2b: beh Demosu zije presne dovtedy, dokedy zije Studio',
+       alive.call == e::StudioDialog.dialog_alive?)
+    md.send(:demos_bump_session)
+    ok('ŠT-2b: po bumpe session je stary beh MRTVY (ziadny dalsi fetch)',
+       alive.call == false)
+
+    md.instance_variable_set(:@demos_running, true)
+    leave_rec = st2b_capture_studio { md.cancel_demos_on_leave }
+    ok('ŠT-2b: odchod zo sekcie ZRUSI bezaci Demos beh (session bump)',
+       md.instance_variable_get(:@demos_session).to_i > session.to_i)
+    ok('ŠT-2b: a POVIE preco (status o opusteni sekcie)',
+       leave_rec.any? { |s| s.include?('opustil si sekciu Materiály') })
+    ok('ŠT-2b: beh sa oznaci za ukonceny', md.instance_variable_get(:@demos_running) == false)
+
+    quiet = st2b_capture_studio { md.cancel_demos_on_leave }
+    ok('ŠT-2b: odchod BEZ beziaceho stahovania NEPISE nic (prepinanie sekcii by inak rusilo status)',
+       quiet.empty?)
+
+    md.instance_variable_set(:@demos_running, true)
+    md.instance_variable_set(:@pending_replace_uni, { 'uni_id' => 'X', 'model_guid' => 'Y' })
+    before_close = md.instance_variable_get(:@demos_session).to_i
+    md.on_ui_closed
+    ok('ŠT-2b: zatvorene Studio zabije beh (ABA guard pri znovuotvoreni)',
+       md.instance_variable_get(:@demos_session).to_i > before_close)
+    ok('ŠT-2b: a zahodi odlozenu poziadavku „Nahradiť UNI…"',
+       md.instance_variable_get(:@pending_replace_uni).nil?)
+
+    # --- 4) „Nahradiť UNI…" z KONTROLY do sekcie `mat` ------------------------
+    # UNI zaznamy existuju AZ od SCHEMA 7 a v katalogu SCHEMA 1 sa ani nedaju
+    # zalozit (`write_unlocked` odmietne zaznam, ktory vyzaduje novsi marker).
+    # Ak testovaci katalog v %APPDATA% zostal legacy (rollback zo sekcie 2A-4b
+    # + `migration_hold` sa v tomto prostredi retazi z behu na beh), tok sa
+    # PRIZNANE preskoci — nie je nad cim ho spustit. Nad zdravym katalogom
+    # (SCHEMA >= 7) sa spusti a musi prejst.
+    uni = e::Materials.sheets.find { |x| e::Materials.uni?(x) }
+    temp_uni = nil
+    if uni.nil? && e::Materials.catalog_schema >= 7
+      # Farba je TROJICA zloziek (vzor `UNI_SEED`) — hex retazec by normalizacia
+      # zahodila a zaznam by nevznikol.
+      rec = e::Materials.uni_seed_record(ST2B_TEMP_UNI, 'SU TEST UNI ST2B', 'body', 18.0, [204, 204, 204])
+      if e::Materials.upsert_sheet(rec)
+        temp_uni = ST2B_TEMP_UNI
+        uni = e::Materials.sheet(temp_uni)
+      end
+    end
+    if uni.nil?
+      info("ŠT-2b: katalog nema UNI material (schema #{e::Materials.catalog_schema}) — " \
+           'tok „Nahradiť UNI…" preskoceny; overeny nad cerstvym katalogom SCHEMA 7')
+    else
+      shows = []
+      statuses = []
+      st2b_without_show(shows) do
+        e::ProductionCore.replace_uni(
+          model,
+          { 'gen' => 7, 'model_guid' => e::ProductionCore.model_guid(model),
+            'uni_id' => uni['material_id'] },
+          generation: 7,
+          status: ->(msg, err = false) { statuses << [msg.to_s, err] },
+          repush: -> {}
+        )
+      end
+      ok('ŠT-2b: nalez Kontroly otvara TO ISTE okno na sekcii `mat`',
+         shows.any? { |kw| kw[:open_section] == 'mat' })
+      ok('ŠT-2b: a status to potvrdi bez chyby',
+         statuses.any? { |(m, err)| !err && m.include?('Nahradiť UNI') })
+      flush_rec = st2b_capture_studio { md.flush_pending_replace_uni }
+      ok('ŠT-2b: odlozena poziadavka otvori modal v sekcii (MD.openReplaceUni)',
+         flush_rec.any? { |s| s.start_with?('MD.openReplaceUni(') && s.include?(uni['material_id']) })
+      ok('ŠT-2b: poziadavka je JEDNORAZOVA',
+         st2b_capture_studio { md.flush_pending_replace_uni }.empty?)
+    end
+    e::Materials.delete_sheet(temp_uni) if temp_uni
+
+    # --- 5) projektova predvolba ZO SEKCIE = PRAVE JEDEN krok Spat ------------
+    fronts = e::Materials.sheets.reject { |s| e::Materials.uni?(s) }
+                         .select { |s| (s['thickness'].to_f - 18.0).abs < 0.01 && s['source_material_id'].to_s.empty? }
+    orig = e::Materials.project_defaults(model)['default_front_material_id'].to_s
+    target = fronts.map { |s| s['material_id'].to_s }.find { |id| id != orig }
+    if target.nil?
+      info('ŠT-2b: v katalogu nie su dve 18 mm dosky — kontrola 1 undo preskocena')
+    else
+      write_rec = []
+      md.dispatch('set_project_material',
+                  { 'key' => 'default_front_material_id', 'value' => target,
+                    'model_guid' => md.model_guid(model) }.to_json,
+                  ->(s) { write_rec << s.to_s })
+      wrote = e::Materials.project_defaults(model)['default_front_material_id'].to_s == target
+      ok('ŠT-2b: zapis predvolby zo SEKCIE naozaj prebehol', wrote)
+      if wrote
+        Sketchup.undo
+        ok('ŠT-2b: PRAVE JEDEN krok Spat vrati predvolbu (zapis je jedna operacia)',
+           e::Materials.project_defaults(model)['default_front_material_id'].to_s == orig)
+      end
+    end
+
+    cleanup(model)
+  rescue StandardError => ex
+    log_line("FAIL: ŠT-2b vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
   end
 
   def run_async(model, done)
@@ -7065,6 +7259,10 @@ module NoxunSuRunner
     run_insert_batch(model)  # davka Vkladanie: D-33/F6 sablona+materialy, D-39/F8 zamky, B3 kopia, N11
     run_d45(model)           # D-45: hrubka <-> material tela (18,6 mm deadlock)
     run_d46(model)           # D-46: projektova predvolba korpusu s inou hrubkou (potvrdenie)
+    # ŠT-2b bezi ESTE PRED sekciami 2A: `run_2a4` konci ROLLBACKOM katalogu na
+    # predmigracnu (SCHEMA 1) zalohu, v ktorej neexistuju UNI zaznamy ani
+    # skupinova identita — tok „Nahradiť UNI…" by sa uz nemal na com overit.
+    run_st2b(model)          # ŠT-2b: zanik okna Materialy — kanal sink/Studio, zivotnost Demos behu (okno + odchod zo sekcie), „Nahradiť UNI…" v jednom okne, predvolba = 1 krok Spat
     run_2a2(model)           # 2A-2: migracia katalogu na SCHEMA 2 (izolovany katalog cez override)
     run_2a3(model)           # 2A-3: vyberove cesty ABS so strukturou (SCHEMA 2 sandbox katalog)
     run_2a4(model)           # 2A-4b: OSTRY cutover — boot_cutover!, picker, universal, rollback+hold

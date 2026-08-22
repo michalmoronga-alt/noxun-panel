@@ -4,18 +4,19 @@
   // Davka 2 (D-05): sprava GLOBALNEHO katalogu (dosky + ABS). ID generuje SERVER
   // (JS ho nikdy nevymysla); create/edit su oddelene callbacky; hrubka
   // existujuceho materialu je nemenna (hrubka definuje variant).
-  // MD.init NEZATVARA rozpisany formular (Codex audit) — prekresli len zoznamy
-  // a selecty; editor stav zije oddelene v mdEditing.
+  // Push zo servera NEZATVARA rozpisany formular (Codex audit) — prekresli len
+  // zoznamy a selecty; editor stav zije oddelene v mdEditing.
   //
-  // ŠT-2a: TEN ISTY subor obsluhuje DVE UI — satelitne okno „Materiály
-  // projektu" (`proj_materials.html`, zanikne v ŠT-2b) a SEKCIU `mat` v okne
-  // Studio (`studio.html`). Rozdiely su tri a vsetky su priznane:
-  //   1. `window.NX_MAT_SECTION` (nastavuje studio.html) prepina rezim sekcie,
-  //   2. v sekcii kresli LISTU cista funkcia `matToolsHtml` a TELO
-  //      `matRenderBody` — telo je JEDEN uzol, ktory prezije prepnutie sekcie
-  //      (rozpisany formular ani rozpisana bunka sa nesmu stratit),
-  //   3. toky s dlhym behom viazanym na okno (Demos pridat/aktualizovat,
-  //      „Nahradiť UNI…") sa v sekcii PREMOSTIA do okna — presun je ŠT-2b.
+  // ŠT-2b: satelitne okno „Materiály projektu" ZANIKLO — tento subor bezi UZ LEN
+  // ako SEKCIA `mat` okna Studio (`studio.html`), spolu s `demos_diff.js`
+  // a `demos_add.js`. Co z presunu ostava platne:
+  //   1. `window.NX_MAT_SECTION` (nastavuje studio.html) je explicitne
+  //      prihlasenie sa do rezimu sekcie,
+  //   2. LISTU kresli cista funkcia `matToolsHtml`, TELO `matRenderBody` —
+  //      telo je JEDEN uzol, ktory prezije prepnutie sekcie (rozpisany
+  //      formular ani rozpisana bunka sa nesmu stratit),
+  //   3. dlhe behy (Demos pridat/aktualizovat) su viazane na SEKCIU: odchod
+  //      z nej ich ZRUSI (`matOnLeaveSection` -> `mat_leave`) a modaly zavrie.
   // Pomocniky sa volaju `mdEl`/`mdEsc` (nie `el`/`esc`): v okne Studio bezi
   // tento subor vedla `studio.js` a `budget.js`, ktore maju vlastne `el`/`esc`
   // — rovnake meno by ticho prepisalo cudziu funkciu (guard test).
@@ -1869,8 +1870,8 @@
   var MD_USED = {};       // D-42 PR B: {dekor => pocet dielcov v aktivnom modeli}
   var MD_CABINETS = 0;    // pocet skriniek v modeli (podtitul okna / hint sekcie)
   var MD_PROJECT = {};    // posledne projektove predvolby (pre refill selectov pri setCatalog)
-  // Spolocna katalogova cast init/setCatalog (audit FIX 13: katalogove echo
-  // NEnesie modelovy kontext — ten ostava z posledneho MD.init).
+  // Spolocna katalogova cast (audit FIX 13: katalogove echo NEnesie modelovy
+  // kontext — ten ostava z posledneho `matApplyState`).
   // D-42 PR C (audit BLOCKER 1): re-render NESMIE znicit aktivnu bunku — pred
   // renderom sa zachyti fokus + ROZPISANA (dirty) hodnota a po renderi obnovi.
   // Cista bunka (value == orig) dostane cerstvu hodnotu z payloadu, dirty drzi
@@ -1986,18 +1987,10 @@
     mdSetCatalog(data);
     mdRenderAll();
   }
+  // ŠT-2b: `MD.init` (plny stav s modelovym kontextom) ZANIKLO spolu s oknom —
+  // v sekcii ho nesie payload Studia (`ST.mat` -> `matApplyState`), takze druha
+  // cesta by bola druhy zdroj pravdy o tych istych cislach.
   var MD = {
-    init: function(data){
-      MD_MODEL_GUID = data.model_guid || '';
-      MD_USED = data.used || {};
-      MD_PROJECT = data.project || {};
-      MD_CABINETS = data.cabinets || 0;
-      // ŠT-2a: podtitul okna. V sekcii Studia neexistuje (jeho obsah nesie
-      // hlavicka sekcie), preto guard — ten isty payload obsluhuje obe UI.
-      var line = mdEl('mdline');
-      if (line) line.textContent = 'V' + (data.version || '') + ' · skriniek v modeli: ' + MD_CABINETS;
-      mdApplyCatalog(data);
-    },
     // D-42 (audit FIX 13): echo po zapise do katalogu — bez scanu modelu,
     // modelovy kontext (predvolby/pouzite/guid) ostava.
     setCatalog: function(data){ mdApplyCatalog(data); },
@@ -2054,7 +2047,7 @@
     openReplaceUni: function(uniId){
       var key = mdGroupKeyForUni(MD_CATALOG, MD_SCHEMA2, uniId);
       if (!key){
-        MD.setStatus('UNI materiál sa v katalógu nenašiel — obnov okno Materiály.', true);
+        MD.setStatus('UNI materiál sa v katalógu nenašiel — obnov sekciu Materiály (Obnoviť).', true);
         return;
       }
       mdCloseForms();
@@ -2121,41 +2114,43 @@
     ? require('./studio.js')
     : null;
 
-  // Rezim sekcie zapina `studio.html` (`window.NX_MAT_SECTION`). V okne
-  // Materialy je nedefinovany — spravanie okna sa teda NEMENI.
-  function mdInSection(){
-    return typeof window !== 'undefined' && window.NX_MAT_SECTION === true;
-  }
+  // ŠT-2b: `mdInSection()` (prepinac medzi oknom a sekciou) ZANIKOL spolu
+  // s oknom — vetva „bezim v okne" uz neexistuje. `window.NX_MAT_SECTION`
+  // v `studio.html` ostava ako CITATELNE prihlasenie sa do rezimu sekcie
+  // (a ako marker pre guard test poradia skriptov).
 
-  // Premostenie do okna Materialy. NIE je to navigacne premostenie (sekcia je
-  // ziva) — su to toky, ktorych DLHY BEH je viazany na instanciu toho okna
-  // (Demos fetch, odlozena poziadavka „Nahradiť UNI…"). Presunie ich ŠT-2b;
-  // do vtedy sa priznaju hlaskou zo SERVERA namiesto tlacidla, ktore nic nerobi.
-  function mdBridgeToWindow(what){
-    if (window.sketchup && sketchup.mat_open_window)
-      sketchup.mat_open_window(JSON.stringify({ what: what }));
-  }
-  function mdDemosUpdateTip(){
-    return mdInSection()
-      ? 'Aktualizovať kódy a ceny z Demosu — beží zatiaľ v okne Materiály (otvorí sa)'
-      : 'Aktualizovať kódy a ceny z Demosu';
-  }
-  function mdUniTip(){
-    return mdInSection()
-      ? 'Nahradiť UNI reálnym dekorom — beží zatiaľ v okne Materiály (otvorí sa)'
-      : 'Nahradiť UNI reálnym dekorom v celom projekte';
-  }
+  // ŠT-2b: premostenie do okna Materialy (`mdBridgeToWindow`) ZANIKLO — vsetky
+  // tri toky bezia TU. Modaly ziju v kotve `#matModalRoot` MIMO tela sekcie
+  // (prekreslenie ich nezhodi), a preto ich musi zavriet ODCHOD zo sekcie —
+  // inak by viseli nad Kusovnikom.
+  function mdDemosUpdateTip(){ return 'Aktualizovať kódy a ceny z Demosu'; }
+  function mdUniTip(){ return 'Nahradiť UNI reálnym dekorom v celom projekte'; }
   function mdDemosUpdate(key){
-    if (mdInSection()) return mdBridgeToWindow('demos_update');
     if (typeof mddLookup === 'function') mddLookup(key);
   }
   function mdDemosAdd(){
-    if (mdInSection()) return mdBridgeToWindow('demos_add');
     if (typeof nxdaOpen === 'function') nxdaOpen();
   }
   function mdUniStart(key){
-    if (mdInSection()) return mdBridgeToWindow('replace_uni');
     if (!mdUniOpen(key)) MD.setStatus('UNI materiál sa medzitým zmenil.', true);
+  }
+
+  // Odchod zo sekcie `mat` (vola `studioGoSection` v studio.js PRED prepnutim).
+  // Poradie je zavazne: NAJPRV sa ohlasi SERVERU (ten zrusi bezaci Demos fetch
+  // a napise preco), az potom sa lokalne pozatvaraju modaly. Opacne poradie by
+  // `nxdaClose` poslal `demos_family_cancel` skor, server by uz nemal co rusit
+  // — a pouzivatel by sa nedozvedel, ze mu stahovanie skoncilo.
+  function matOnLeaveSection(){
+    if (window.sketchup && sketchup.mat_leave) sketchup.mat_leave('');
+    matCloseModals();
+  }
+  function matCloseModals(){
+    mdUniClose();
+    mdDeleteClose();
+    mdRestoreClose();
+    mdSgClose();
+    if (typeof mddClose === 'function') mddClose();
+    if (typeof nxdaClose === 'function') nxdaClose();
   }
 
   // LISTA sekcie (#17) — CISTA funkcia (Node test). Stav chodi ARGUMENTOM
@@ -2166,24 +2161,16 @@
   function matToolsHtml(st){
     var s = st || {};
     var dis = s.ro ? ' disabled' : '';
-    // Review #9 (VEDOMA DOCASNA ZMENA, vrati sa v ŠT-2b): v sekcii je „Pridať
-    // z Demosu" zatial PREMOSTENIE do okna — najvyraznejsie tlacidlo novej
-    // sekcie by teda otvaralo ine okno. Primarna je preto rucna cesta, ktora
-    // funguje TU; Demos ostava plnohodnotny, len ako `ghostbtn`. Ked ŠT-2b
-    // presunie Demos toky do sekcie, roly sa vymenia spat (v okne su uz teraz
-    // spravne — tam Demos naozaj bezi).
-    var demosPrimary = !s.section;
-    var h = '<button type="button" class="' + (demosPrimary ? 'primary' : 'ghostbtn') +
-      '" id="mdDemosAddBtn"' + dis +
-      ' title="' + mdEsc(s.section
-        ? 'Pridať dekor z Demosu — beží zatiaľ v okne Materiály (otvorí sa)'
-        : 'Pridať dekor z Demosu') + '" onclick="mdDemosAdd()">' +
+    // ŠT-2b (review ŠT-2a #9): „Pridať z Demosu" je zase PRIMARNA akcia. V ŠT-2a
+    // bola docasne `ghostbtn`, lebo v sekcii len premostovala do ineho okna —
+    // teraz Demos bezi TU, takze najvyraznejsie tlacidlo sekcie znovu vedie na
+    // hlavnu (a v praxi jedinu pouzivanu) cestu zakladania dekoru.
+    var h = '<button type="button" class="primary" id="mdDemosAddBtn"' + dis +
+      ' title="Pridať dekor z Demosu" onclick="mdDemosAdd()">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-cloud-download"/></svg> Pridať z Demosu</button>' +
-      '<button type="button" class="' + (demosPrimary ? 'ghostbtn' : 'primary') +
-      '" id="mdNewDecorBtn"' + dis +
+      '<button type="button" class="ghostbtn" id="mdNewDecorBtn"' + dis +
       ' title="Pridať materiál ručne (bez Demosu)" onclick="mdOpenDecorForm(null)">' +
-      '<svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>' +
-      (s.section ? ' Pridať ručne' : ' ručne…') + '</button>' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Pridať ručne</button>' +
       '<div class="searchbox"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>' +
       '<input id="mdSearch" type="text" placeholder="Hľadať dekor, výrobcu alebo kód"' +
       ' value="' + mdEsc(s.q || '') + '" oninput="mdSearchInput()"></div>' +
@@ -2215,7 +2202,7 @@
   // `stale` podava `studio.js` — jantarovy priznak je stav OKNA a ma jedinu
   // autoritu (`staleFlag`), sekcia si ho neodvodzuje.
   function matToolsState(stale){
-    return { ro: MD_RO, q: MD_Q, mode: mdGroupMode(), section: mdInSection(),
+    return { ro: MD_RO, q: MD_Q, mode: mdGroupMode(),
              backup: MD_SCHEMA2 && MD_HAS_BACKUP, stale: stale === true };
   }
   function matRenderTools(stale){
@@ -2328,10 +2315,12 @@
       // kontrakt „push zo servera nezmaze rozpisany formular" (audit #2) sa inak
       // nedal overit nicim nez klikanim. V prehliadaci ho `studio.js` vola ako
       // globalnu funkciu, nie cez export.
-      matToolsHtml: matToolsHtml, matRenderBody: matRenderBody };
+      matToolsHtml: matToolsHtml, matRenderBody: matRenderBody,
+      // ŠT-2b — odchod zo sekcie zavrie modaly a zrusi bezaci Demos fetch
+      matOnLeaveSection: matOnLeaveSection };
   }
   // ŠT-2a (audit #7): `sketchup.ready('')` tu ZANIKLO. V okne Materialy bol
   // tento subor POSLEDNY a jeho `ready` znamenal „HTML je nacitane". V Studiu
-  // uz `ready` posiela `studio.js` (window.onload) — druhe volanie by okno
-  // prinutilo poslat CELY payload dvakrat. Okno Materialy si `ready` posiela
-  // z vlastneho HTML (`proj_materials.html`), takze o nic neprislo.
+  // ho posiela `studio.js` (window.onload) — druhe volanie by okno prinutilo
+  // poslat CELY payload dvakrat. ŠT-2b: okno Materialy zaniklo, takze `ready`
+  // uz ma jedineho odosielatela.
