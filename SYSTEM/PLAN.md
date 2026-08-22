@@ -39,7 +39,7 @@ KONTROLA+VÝROBA · DOCX/PDF generátor ponuky po V1.
 Implementačné dávky (poradie presunov schválil Michal; každá dávka = plugin plne použiteľný,
 satelit zaniká až po plnej náhrade):
 - ~~**ŠT-1a** skelet Štúdia + sekcia **Kusovník**~~ — **HOTOVÉ** (PR #192 + #193, v0.7.30, 22.8.; audit aj review „slepým subagentom" — Codex mimo; serverový názov projektu, premostenia v navigácii; vedomé odchýlky: XLSX/CSV disabled, bez stĺpca Poznámka, ABS pohľad bez cien — plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md)).
-- **ŠT-1b** (M) sekcia **Kontrola** (Š8–Š11, zdieľané prepínače hrán a kresby) + presmerovanie deep-linkov z Inspectora.
+- ~~**ŠT-1b** sekcia **Kontrola**~~ — **HOTOVÉ** (PR #195, v0.7.32, 22.8.; jedno číslo cez zdieľaný control_payload vrátane rozpočtu, tretia inštancia edge_menu, zmena lifecycle overlayov — plný text v [archiv/KRONIKA.md](archiv/KRONIKA.md)).
 - **ŠT-1c** (M) **Rozpočet + Cenová ponuka** (Š12–Š15) + **Nákup 1:1** (Š7) — **okno Výroba zaniká**, toolbar „Štúdio" vedie sem.
 - **ŠT-2** (M) sekcia **Materiály** + **D-69 editor** + D-15 komponent — okno Materiály zaniká.
 - **ŠT-3** (M) **Kovanie · Pravidlá · Šablóny** (Š16–Š18) — tri okná zanikajú.
