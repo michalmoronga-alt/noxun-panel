@@ -419,4 +419,46 @@ function payload(over){
      'spotrebicovy chip stale skace na svoju sekciu rozpoctu');
 })();
 
+// --- SMOKE 22.8.: „Prepočítať ceny" prizna STARE CENY --------------------------
+// Rozpocet vyzeral rovnako s cerstvymi aj s polrocnymi cenami — dalo sa z neho
+// objednavat bez toho, aby to cokolvek povedalo. Tlacidlo je preto JANTAROVE,
+// ked su v zakazke stare ceny. Je to CISTA PROJEKCIA payloadu (`b.stale`,
+// ten isty zdroj ako chip a zoznam) — ZIADEN novy vypocet a ziadna zelena.
+(function(){
+  const STALE = { mode: 'nizky', budget_check: [],
+                  stale: { stale_days: 30, counts: { stale: 3 } } };
+  const FRESH = { mode: 'nizky', budget_check: [],
+                  stale: { stale_days: 30, counts: { stale: 0 } } };
+
+  const warn = B.budPriceBtnHtml(STALE, false);
+  ok(warn.indexOf('class="ghostbtn bstalebtn"') > -1,
+     'stare ceny = JANTAROVE tlacidlo (trieda `bstalebtn`)');
+  ok(warn.indexOf('title="3 ceny staršie ako 30 dní — ') > -1,
+     'tooltip nesie POCET aj prah — cislo, ktore uz payload obsahuje');
+  ok(warn.indexOf('Stiahne aktuálne ceny') > -1, 'a povodne vysvetlenie ostava za nim');
+
+  ok(B.budPriceBtnHtml(FRESH, false).indexOf('bstalebtn') < 0,
+     'ziadna stara cena = NEUTRALNE tlacidlo');
+  ok(B.budPriceBtnHtml(FRESH, false).indexOf('title="Stiahne aktuálne ceny') > -1,
+     'a tooltip bez poctu');
+  ok(B.budPriceBtnHtml(null, false).indexOf('bstalebtn') < 0,
+     'chybajuci payload nezhodi listu a NIC nefarbi');
+
+  // Prah je serverovy (nastavenie `stale_days`) — klient si ho nevymysla.
+  ok(B.budPriceBtnHtml({ stale: { stale_days: 45, counts: { stale: 1 } } }, false)
+      .indexOf('1 cena staršia ako 45 dní') > -1, 'prah aj sklonovanie idu z payloadu');
+
+  // Pocas behu prepoctu tlacidlo ZOSEDNE — dve signalizacie naraz by si
+  // protirecili („bez z toho" vs „prave bezi").
+  const running = B.budPriceBtnHtml(STALE, true);
+  ok(running.indexOf('disabled') > -1, 'pocas behu je tlacidlo zamknute');
+  ok(running.indexOf('bstalebtn') < 0, 'a jantar sa nekresli');
+
+  // A v LISTE to sedi tak isto (rovnaka funkcia, ziadna druha pravda).
+  ok(B.budToolsHtml(STALE).indexOf('bstalebtn') > -1, 'lista sekcie jantar prevzala');
+  ok(B.budToolsHtml(FRESH).indexOf('bstalebtn') < 0, 'a pri cerstvych cenach nie');
+  ok(B.budToolsHtml(STALE).indexOf('data-bkey="pr"') > -1,
+     'kluc fokusu tlacidlo nestratilo ani v jantarovej podobe');
+})();
+
 console.log('test_budget_ui.js: ' + passed + ' OK');

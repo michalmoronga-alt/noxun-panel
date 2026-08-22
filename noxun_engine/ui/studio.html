@@ -5,7 +5,7 @@
      to isté zdieľané jadro `ProductionCore`).
      Vizuálna referencia: SYSTEM/zdroje/ui20/mockup_studio.html -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.7.40">
+<link rel="stylesheet" href="css/panel.css?v=0.7.41">
 <style>
   /* Štýly sú ZÁMERNE inline v studio.html (rovnaký dôvod, aký mala production.html):
      panel.css je zdieľaný s Inspectorom a rozloženie tohto okna doňho nepatrí.
@@ -66,15 +66,40 @@
                      background: transparent; min-width: 0; }
   .searchbox .ic { width: 14px; height: 14px; color: var(--nx-ink-faint); }
 
-  /* Názov projektu a merge 18+36 — SERVER je autorita (audit #1); okno posiela
-     iba hodnotu a po zápise dostane čerstvý payload. */
-  .prjbox { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--nx-ink-label); }
-  .prjbox input { font: inherit; font-size: 12px; padding: 4px 8px; width: 150px;
+  /* Názov projektu — SERVER je autorita (audit #1); okno posiela iba hodnotu
+     a po zápise dostane čerstvý payload.
+     SMOKE 1D: pole dostalo ŠTÍTOK a vlastný rám. Je to jediný VSTUP v lište
+     plnej tlačidiel a pomenúva zákazku pre všetky exporty — bez rámu splýval
+     s popiskami a Michal ho v smoke teste prehliadol. */
+  .prjbox { display: flex; align-items: center; gap: 6px; padding: 2px 6px 2px 9px;
+            border: 1px solid var(--nx-border-strong); border-radius: 6px;
+            background: var(--nx-surface-sunken); color: var(--nx-ink-label); }
+  .prjbox .prjlbl { font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+                    letter-spacing: .05em; color: var(--nx-ink-faint); }
+  .prjbox input { font: inherit; font-size: 12px; font-weight: 600; padding: 4px 8px; width: 150px;
                   border: 1px solid var(--nx-border-strong); border-radius: 6px;
-                  background: var(--nx-surface); color: var(--nx-ink); }
-  .mergebox { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px;
-              color: var(--nx-ink-label); white-space: nowrap; cursor: pointer; }
-  .mergebox input { accent-color: var(--nx-select); }
+                  background: var(--nx-surface); color: var(--nx-ink-strong); }
+  .prjbox input:focus { outline: 0; border-color: var(--nx-select); }
+
+  /* SMOKE 1A: rohové nastavenie VEPO exportu (vzor „flyout roh", UI_DIZAJN §5.11).
+     Trojuholník je ZNAMIENKO (pseudo-prvok), klikacia zóna je samostatné
+     `.cornerzone` tlačidlo zo ZDIEĽANÉHO css/panel.css — tu je len obal,
+     posun textu a vlastné okno (jeden checkbox; 3-stavová kontrola hrán má
+     svoje `.ecmenu`). Okno je OVERLAY, nikdy ďalší riadok lišty. */
+  .vepofly { position: relative; display: inline-flex; }
+  .vepofly .primary { padding-right: 22px; }
+  .vepofly .primary::after { content: ''; position: absolute; right: 4px; bottom: 4px;
+            width: 0; height: 0; border-left: 6px solid transparent;
+            border-bottom: 6px solid var(--nx-on-accent); pointer-events: none; }
+  .vepomenu { display: none; position: absolute; top: calc(100% + 4px); right: 0; z-index: 60;
+              min-width: 232px; background: var(--nx-surface); border: 1px solid var(--nx-border);
+              border-radius: 6px; box-shadow: 0 6px 18px var(--nx-modal-shadow); padding: 6px; }
+  .vepomenu.open { display: block; }
+  .vepomenu .vopt { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px;
+                    font-size: 12px; color: var(--nx-ink); cursor: pointer; }
+  .vepomenu .vopt:hover { background: var(--nx-select-bg-soft); }
+  .vepomenu .vopt input { width: 14px; height: 14px; margin: 0; accent-color: var(--nx-select); }
+  .vepomenu .vnote { padding: 2px 6px 2px 28px; font-size: 11px; color: var(--nx-ink-soft); }
 
   /* ---------- pohľady sekcie (Š4) ---------- */
   .bomviews { display: flex; border: 1px solid var(--nx-border-strong); border-radius: 6px;
@@ -254,6 +279,13 @@
   .bseg button + button { border-left: 1px solid var(--nx-border-soft); }
   .bseg button.on { background: var(--nx-select); color: var(--nx-on-accent); font-weight: 600; }
   .bseg.bmode button { font-variant-numeric: tabular-nums; letter-spacing: .5px; }
+  /* SMOKE 22.8.: „Prepočítať ceny" je JANTÁROVÉ, keď zákazka nesie staré ceny
+     (počet aj prah povie tooltip). Rovnaká trojica tokenov ako jantárový chip
+     pri súčte — je to ten istý nález, len na tlačidle, ktoré ho rieši.
+     ŽIADNA zelená: významové farby ostávajú semaforu Kontroly. */
+  .sectools .ghostbtn.bstalebtn { border-color: var(--nx-warnchip-border);
+             background: var(--nx-warn-bg); color: var(--nx-warn-fg); }
+  .sectools .ghostbtn.bstalebtn:hover { background: var(--nx-warn-bg-soft); }
   .bwarns { margin-left: auto; display: flex; flex-direction: column; gap: 5px; align-items: flex-end; }
   .bchip { display: inline-flex; align-items: center; gap: 6px; background: var(--nx-warn-bg);
            border: 1px solid var(--nx-warnchip-border); color: var(--nx-warn-fg);
@@ -445,31 +477,31 @@
 <div id="nxModalRoot"></div>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.7.40"></script>
+<script src="js/errors.js?v=0.7.41"></script>
 <!-- D-51/D-77: minimálna OBSAHOVÁ veľkosť okna pri otvorení (js/win_fit.js).
      Navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami a stĺpcom akcií — v užšom
      okne končí pravá časť riadku mimo. Trojica NX_FIT_MIN → width/height →
      min_width/min_height je v docs/UI_DIZAJN.md (tabuľka D-51). -->
 <script>window.NX_FIT_MIN = { w: 1060, h: 640 };</script>
-<script src="js/win_fit.js?v=0.7.40"></script>
+<script src="js/win_fit.js?v=0.7.41"></script>
 <!-- Sprite ikon (žiadne emoji v ovládacích prvkoch). Musí byť PRED studio.js —
      navigácia aj hover akcie riadkov používajú <use href="#i-…">. -->
-<script src="js/icons.js?v=0.7.40"></script>
+<script src="js/icons.js?v=0.7.41"></script>
 <!-- ŠT-1b: ZDIELANE 3-stavove nastavenie kontroly hran. TEN ISTY subor nacitava
      aj Inspector (rohovy trojuholnik pri ABS kontrole v raile) — jeden markup,
      jeden stav. Musi byt PRED studio.js (lista sekcie Kontrola ho vola pri
      renderi). ŠT-1c PR B3: okno Vyroba zaniklo — prepinace su TU. -->
-<script src="js/edge_menu.js?v=0.7.40"></script>
+<script src="js/edge_menu.js?v=0.7.41"></script>
 <!-- ŠT-1c PR B2 (D-15): ZDIELANA kostra modalov („pridávačiek"). Musí byť PRED
      studio.js aj budget.js — Escape handler Štúdia sa pýta `NXModal.isOpen()`
      a rozpočet ním otvára svoje pridávačky. Ďalšie inštancie (D-69 editor
      materiálu, položka/set kovania) sa naň napoja bez kopírovania. -->
-<script src="js/nx_modal.js?v=0.7.40"></script>
-<script src="js/studio.js?v=0.7.40"></script>
+<script src="js/nx_modal.js?v=0.7.41"></script>
+<script src="js/studio.js?v=0.7.41"></script>
 <!-- ŠT-1c PR B1: sekcia ROZPOČET (Š12–Š13). MUSÍ byť AŽ ZA studio.js — číta
      jeho globálny payload `ST` a hlavne OBALUJE `NX.setStudio` (uvoľnenie
      frontu zápisov po príchode čerstvej generácie). studio.js pritom NX
      PRIRAĎUJE celý (`window.NX = {…}`), takže v opačnom poradí by obal aj
      `NX.budgetResult`/`NX.priceRefresh` prepísal a rozpočet by po prvom zápise
      zamrzol. Poradie stráži guard test (tests/pure/test_st1c_rozpocet.rb). -->
-<script src="js/budget.js?v=0.7.40"></script>
+<script src="js/budget.js?v=0.7.41"></script>

@@ -523,9 +523,18 @@ ok(body.indexOf('CP = Rozpočet') > -1, 'zeleny pas: ponuka sedi s rozpoctom');
        .every(function(l){ return l.trim().indexOf('//') === 0; }),
      'komponent sa `#budPrModal` nikde nedotyka (spomina ho len kontrakt v komentari)');
   // Druha poistka poradia listenerov (prva je behaviorálny scenár vyššie).
+  // SMOKE 1A: rohove nastavenia su od tejto davky DVE (kontrola hran + VEPO),
+  // takze podmienka uz nie je pribalena k jednemu z nich — je to JEDNA branka
+  // na zaciatku Escape vetvy. Poradie musi ostat MODAL > menu.
   const studioSrc = fs.readFileSync(path.join(JS_DIR, 'studio.js'), 'utf8');
-  ok(studioSrc.indexOf("ev.key === 'Escape' && ecMenuOpen && !nxModalOpen()") > -1,
+  ok(studioSrc.indexOf("if (ev.key !== 'Escape' || nxModalOpen()) return;") > -1,
      'Studio ma NAVYSE podmienku „ziadny modal otvoreny" (poistka pre opacne poradie skriptov)');
+  const escIdx = studioSrc.indexOf("if (ev.key !== 'Escape' || nxModalOpen()) return;");
+  const esc = studioSrc.slice(escIdx);
+  ok(esc.indexOf('if (ecMenuOpen){') > -1 && esc.indexOf('if (vepoMenuOpen){') > -1,
+     'obe rohove nastavenia Escape ZATVARA (ziadne nesmie ostat visiet)');
+  ok(esc.indexOf('if (ecMenuOpen){') < esc.indexOf('if (vepoMenuOpen){'),
+     'a obe su AZ ZA modalovou brankou — modal ma prednost');
 })();
 
 console.log('test_st1c_ponuka.js: ' + n + ' OK');

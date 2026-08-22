@@ -5391,6 +5391,91 @@ module NoxunSuRunner
     end
   end
 
+  # VEPO export si priecinok pyta cez `UI.select_directory` (nie savepanel) —
+  # ten isty dovod, tvar aj upratovanie ako `st1c_without_savepanel`.
+  def st1c_without_dirpanel
+    calls = [0]
+    UI.singleton_class.class_eval do
+      alias_method :nx_dirpanel_orig_st1c, :select_directory
+      define_method(:select_directory) { |*_args| calls[0] += 1; nil }
+    end
+    begin
+      yield calls
+    ensure
+      sc = UI.singleton_class
+      if sc.method_defined?(:nx_dirpanel_orig_st1c) || sc.private_method_defined?(:nx_dirpanel_orig_st1c)
+        sc.class_eval do
+          alias_method :select_directory, :nx_dirpanel_orig_st1c
+          remove_method :nx_dirpanel_orig_st1c
+        end
+      end
+    end
+  end
+
+  # ============ SMOKE 22.8. (davka fix/studio-smoke1) ========================
+  # Headless sada na oboch veciach vie len GREP — tu sa v BEZIACOM SketchUpe
+  # dokazuje spravanie:
+  #   1) „Obnoviť" konci hlaskou „Prepočítané." (klient si pred volanim nastavi
+  #      „Prepočítavam…" a sam ju nezhodi — kym to nerobil server, visela
+  #      v okne navzdy a vyzeralo to ako zamrznute okno),
+  #   2) zapis „18 + 36 spolu" z ROHOVEHO nastavenia VEPO sa naozaj ulozi
+  #      a vrati v payloade (checkbox sa presunul z listy, cesta ostala),
+  #   3) gen guard VEPO exportu je NEZMENENY — lista sa prekopala, guard nie.
+  def st1c_smoke(model, before_ents)
+    core = e::ProductionCore
+
+    scripts = st1c_capture(e::StudioDialog) { e::StudioDialog.do_refresh_bom }
+    ok('SMOKE: „Obnoviť" okno naozaj PREPOCITALO (payload odosiel)',
+       scripts.any? { |s| s.include?('NX.setStudio(') })
+    ok('SMOKE: a hlasku ZHODIL SERVER — „Prepočítané." (nikdy vecne „Prepočítavam…")',
+       scripts.any? { |s| s.include?('NX.setStatus(') && s.include?('Prepočítané.') })
+    ok('SMOKE: prepocet model NEZMENIL', model.entities.length == before_ents)
+
+    # Rohove nastavenie: zapis ide EXISTUJUCOU cestou `studio_set_vepo_opts`.
+    was = core.merge_18_36
+    guid = core.model_guid(model)
+    begin
+      echo = st1c_capture(e::StudioDialog) do
+        e::StudioDialog.do_set_vepo_opts({ 'gen' => st1c_gen, 'model_guid' => guid,
+                                           'merge' => !was }.to_json)
+      end
+      ok("SMOKE: „18 + 36 spolu\" z rohoveho nastavenia sa ULOZIL (#{was} -> #{!was})",
+         core.merge_18_36 == !was)
+      ok('SMOKE: a okno dostalo CIELENE echo listy (nie plny prepocet)',
+         echo.any? { |s| s.include?('NX.setVepoBar(') } &&
+         echo.none? { |s| s.include?('NX.setStudio(') })
+
+      scripts = st1c_capture(e::StudioDialog) { e::StudioDialog.send(:push_state) }
+      payload = st1c_studio_payload(scripts)
+      vepo = payload ? payload['vepo'] : nil
+      ok('SMOKE: hodnota sa vracia v KAZDOM pushi (lista sa nikdy nerozide s exportom)',
+         vepo.is_a?(Hash) && vepo['merge_18_36'] == !was)
+    ensure
+      # Je to realne nastavenie v %APPDATA% — vratime ho, ako bolo.
+      e::StudioDialog.do_set_vepo_opts({ 'gen' => st1c_gen, 'model_guid' => guid,
+                                         'merge' => was }.to_json)
+    end
+    ok('SMOKE: povodna hodnota nastavenia je vratena', core.merge_18_36 == was)
+    ok('SMOKE: zapis nastavenia model NEZMENIL', model.entities.length == before_ents)
+
+    # Gen guard VEPO exportu — NEZMENENY (prekopala sa lista, nie export).
+    # Dialog na vyber priecinka sa na cas testu NAHRADI (a POCITA sa, kolkokrat
+    # ho cesta zavolala) — prave tym sa da dokazat, ze guard zastavil export
+    # EST PRED nim. Bez nahrady by modalne okno beh runnera zastavilo navzdy.
+    st1c_without_dirpanel do |calls|
+      scripts = st1c_capture(e::StudioDialog) do
+        e::StudioDialog.do_export({ 'gen' => st1c_gen - 99 }.to_json)
+      end
+      ok('SMOKE: VEPO export so STAROU generaciou NEOTVORI dialog priecinka (guard nezmeneny)',
+         calls[0].zero?)
+      ok('SMOKE: a odmietnutie nie je tiche',
+         scripts.any? { |s| s.include?('Dáta okna sa medzitým zmenili') })
+      ok('SMOKE: odmietnuty export model NEZMENIL', model.entities.length == before_ents)
+    end
+  rescue StandardError => ex
+    log_line("FAIL: SMOKE sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
   # ============ ŠT-1c PR B1: sekcia ROZPOCET (Š12–Š13) =======================
   # Rozpocet je JEDINA cesta, ktora ZAPISUJE do modelu — a headless sada undo
   # neoveri. Tu sa dokazuje:
@@ -5885,6 +5970,9 @@ module NoxunSuRunner
     else
       info('ŠT-1c: Overlay API nie je k dispozicii — kontrola broadcastu hran sa preskocila.')
     end
+
+    # --- 4b) SMOKE 22.8.: hlaska po „Obnoviť" + rohove nastavenie VEPO ------
+    st1c_smoke(model, before_ents)
 
     # --- 5) ŠT-1c PR B1: sekcia ROZPOCET (Š12–Š13) --------------------------
     # Jedina sekcia, ktora ZAPISUJE do modelu. Kazdy jej zapis sa tu aj vracia

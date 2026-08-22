@@ -409,6 +409,21 @@
                      border-left:6px solid transparent; border-bottom:6px solid var(--nx-ink-muted)}
   .cornerzone:hover::after{border-bottom-color:var(--nx-select)}
   .edgemenu{left:0; right:auto; top:calc(100% + 4px); width:246px}
+  /* SMOKE 22.8.: rohové nastavenie VEPO exportu + zvýraznené pole Projekt
+     (lišta Kusovníka po revízii Š5 — verdikt Michal zo smoke testu). */
+  .vepofly{position:relative; display:inline-flex}
+  .vepofly .primary{padding-right:20px}
+  .vepofly .cornerzone::after{border-bottom-color:var(--nx-on-accent)}
+  .vepomenu{top:calc(100% + 4px); right:0; left:auto; width:232px}
+  .vepomenu .vnote{padding:2px 6px 2px 27px; font-size:11px; color:var(--nx-ink-soft)}
+  .prjbox{display:flex; align-items:center; gap:6px; padding:2px 6px 2px 9px; border:1px solid var(--nx-border-strong);
+          border-radius:5px; background:var(--nx-surface-sunken); color:var(--nx-ink-label)}
+  .prjbox .prjlbl{font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+                  color:var(--nx-ink-faint)}
+  .prjbox input{font:inherit; font-size:12px; font-weight:600; padding:4px 8px; width:150px;
+                border:1px solid var(--nx-border-strong); border-radius:5px; background:var(--nx-surface);
+                color:var(--nx-ink-strong)}
+  .ghostbtn.bstalebtn{border-color:var(--nx-warnchip-border); background:var(--nx-warn-bg); color:var(--nx-warn-fg)}
   .edgemenu .esq{width:12px; height:12px; border-radius:2px; display:inline-block; flex:0 0 12px}
   .edgemenu .ecnt{margin-left:auto; font-size:10.5px; color:var(--nx-ink-faint); font-variant-numeric:tabular-nums}
   .edgemenu label.esub{margin-left:20px; color:var(--nx-ink-muted)}
@@ -831,6 +846,8 @@ const S = {
   edgeChk:{on:false, missing:true, extra:true, taped:false, selOnly:false},   // Š10 — zdieľaný stav D-104/D-105
   grainChk:false,            // Š10 — zrkadlo prepínača „Smer kresby" (K2/D-87)
   edgeMenu:false,            // otvorené 3-stavové nastavenie
+  vepoMenu:false,            // SMOKE 22.8.: otvorené rohové nastavenie VEPO exportu
+  vepoMerge:true,            // „18 + 36 spolu" — presunuté z lišty do toho nastavenia
   groupClosed:{},
   combo:{                    // hodnoty všetkých D-85 comboboxov
     part_mat:'m500', part_e_front:'a_500_1', part_e_back:'none', part_e_left:'a_500_1', part_e_right:'none',
@@ -956,6 +973,7 @@ document.addEventListener('click', e => {
   if (S.colMenu && !e.target.closest('.colmenu') && !e.target.closest('[data-colbtn]')){ S.colMenu = false; render(); }
   if (S.stMenu && !e.target.closest('.stmenu') && !e.target.closest('.stwrap')){ S.stMenu = false; render(); }
   if (S.edgeMenu && !e.target.closest('.edgemenu') && !e.target.closest('.cornerzone')){ S.edgeMenu = false; render(); }
+  if (S.vepoMenu && !e.target.closest('.vepomenu') && !e.target.closest('.cornerzone')){ S.vepoMenu = false; render(); }
 });
 
 /* =====================================================================
@@ -1294,15 +1312,23 @@ function studioTools(){
       vbtn('parts','Dielce','Výrobné dielce po materiáloch') +
       vbtn('sheets','Platne','Súpis platní — odvodený z kusovníka (dnešný tab Materiály)') +
       vbtn('abs','ABS','Súpis ABS pások — odvodený z kusovníka (dnešný tab ABS)') + '</div>' +
-      '<button class="primary" onclick="toast(\'VEPO CSV pripravené — vyberieš priečinok\',\'download\')">'+ico('download')+' VEPO export</button>' +
-      '<button class="ghostbtn" onclick="toast(\'XLSX kusovník pripravený\',\'download\')">'+ico('download')+' XLSX</button>' +
-      '<button class="ghostbtn" onclick="toast(\'CSV kusovník pripravený\',\'download\')">'+ico('download')+' CSV</button>' +
-      '<span class="spacer"></span>' +
+      // SMOKE 22.8. (verdikt Michal): XLSX/CSV kusovníka sa NEZOBRAZUJÚ, kým
+      // export neexistuje · „18 + 36 spolu" je v ROHOVOM nastavení VEPO ·
+      // Projekt má štítok a rám · poradie = vľavo „čo pozerám", vpravo „čo robím".
+      '<label class="prjbox" title="Názov zákazky — pomenuje priečinok a súbory VEPO exportu, titulok rozpočtu aj cenovej ponuky">' +
+        '<span class="prjlbl">Projekt</span><input value="Kuchyňa Novák"></label>' +
       '<div class="searchbox">'+ico('search')+'<input id="bomSearch" placeholder="Hľadať dielec / skrinku…" value="'+esc(S.bomQ)+'"' +
-        ' oninput="S.bomQ=this.value;renderBomBody()"></div>';
+        ' oninput="S.bomQ=this.value;renderBomBody()"></div>' +
+      '<span class="spacer"></span>' +
+      '<span class="vepofly"><button class="primary" onclick="toast(\'VEPO CSV pripravené — vyberieš priečinok\',\'download\')">'+
+        ico('download')+' VEPO export</button>' +
+        '<button class="cornerzone" title="Nastavenie exportu — čo sa spojí do jedného súboru"' +
+        ' onclick="event.stopPropagation();S.vepoMenu=!S.vepoMenu;render()"></button>' + vepoMenuHtml() + '</span>';
     if (S.bomView === 'parts')
       h += '<button class="ghostbtn" data-colbtn onclick="S.colMenu=!S.colMenu;render();event.stopPropagation()" title="Voliteľné stĺpce — voľba sa pamätá per počítač">'+
         ico('columns-3')+' Stĺpce '+ico('chevron-down')+'</button>' + colMenuHtml();
+    h += '<button class="ghostbtn" onclick="toast(\'Kusovník prepočítaný z modelu\',\'refresh-cw\')">'+
+      ico('refresh-cw')+' Obnoviť</button>';
     return h;
   }
   if (sec === 'ctrl'){
@@ -1338,7 +1364,9 @@ function studioTools(){
         seg('budMode','nizky','€','Nízky režim — stáli zákazníci') +
         seg('budMode','standard','€€','Štandard') +
         seg('budMode','vysoky','€€€','Vysoký režim') + '</div>' +
-      '<button class="ghostbtn" onclick="toast(\'Prepočítať ceny — hromadná aktualizácia z Demosu (beh riadi server, ako dnes)\',\'refresh-cw\')">'+ico('refresh-cw')+' Prepočítať ceny</button>' +
+      // SMOKE 22.8.: jantárové, kým sú v zákazke staré ceny (počet povie tooltip).
+      '<button class="ghostbtn bstalebtn" title="3 ceny staršie ako 30 dní — stiahne aktuálne ceny z Demosu"'+
+        ' onclick="toast(\'Prepočítať ceny — hromadná aktualizácia z Demosu (beh riadi server, ako dnes)\',\'refresh-cw\')">'+ico('refresh-cw')+' Prepočítať ceny</button>' +
       '<span class="spacer"></span><span class="sechint">Š12: jediná sekcia, ktorá zapisuje do modelu — každá zmena = 1 krok Späť.</span>';
   }
   if (sec === 'hw'){
@@ -1507,6 +1535,17 @@ function matSection(){
     '<div class="subhead">Ostatné v mojej knižnici</div><div class="tiles">' + rest.map(tile).join('') + '</div>' +
     '<div class="infobar">'+ico('info')+'<div>D-69: „Pridať z Demosu", „Pridať ručne…" aj „Upraviť materiál…" (v detaile dekoru) otvárajú ' +
     '<b>ten istý formulár</b> — líši sa len predvyplnenie. Vyskúšaj všetky tri vstupy.</div></div>';
+}
+
+/* SMOKE 22.8.: rohové nastavenie VEPO exportu — ten istý vzor „flyout roh" ako
+   pri kontrole hrán, ale VLASTNÝ (jediný) obsah: „18 + 36 spolu". Checkbox sa
+   sem presťahoval z lišty Kusovníka — patrí k exportu, nie k pohľadu. */
+function vepoMenuHtml(){
+  if (!S.vepoMenu) return '';
+  return '<div class="colmenu vepomenu"><div class="mgrp">Nastavenie VEPO exportu</div>' +
+    '<label><input type="checkbox"'+(S.vepoMerge?' checked':'')+
+    ' onchange="S.vepoMerge=!S.vepoMerge;render();toast(S.vepoMerge?\'18 + 36 spolu: zapnuté\':\'18 + 36 spolu: vypnuté\',\'check\')"> 18 + 36 spolu</label>' +
+    '<div class="vnote">Materiály 18 a 36 mm idú do jedného súboru (bežná objednávka).</div></div>';
 }
 
 /* Š10: 3-stavové nastavenie kontroly hrán — TEN ISTÝ zdieľaný komponent (edge_menu.js z #190)

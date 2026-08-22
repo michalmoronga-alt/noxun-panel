@@ -110,8 +110,14 @@ NxTest.test('ŠT-1c B2 (audit #9): `#budPrModal` zdielanu kostru NEPREBERA') do
 end
 
 NxTest.test('ŠT-1c B2 (audit #9): Escape Studia sa podmienuje otvorenym modalom') do
-  NxTest.assert(S1C2_STUDIO_JS.include?("ev.key === 'Escape' && ecMenuOpen && !nxModalOpen()"),
+  # SMOKE 22.8.: rohove nastavenia su DVE (kontrola hran + VEPO), takze
+  # podmienka „nezije modal" uz nie je pribalena k jednemu z nich — je to JEDNA
+  # branka na zaciatku Escape vetvy. Prednost ostava: MODAL > rohove nastavenie.
+  NxTest.assert(S1C2_STUDIO_JS.include?("if (ev.key !== 'Escape' || nxModalOpen()) return;"),
                 'Escape zatvara `ecMenu` LEN vtedy, ked nezije D-15 modal')
+  esc = S1C2_STUDIO_JS.split("if (ev.key !== 'Escape' || nxModalOpen()) return;").last.to_s
+  NxTest.assert(esc.index('if (ecMenuOpen){') && esc.index('if (vepoMenuOpen){'),
+                'a zatvara OBE rohove nastavenia (ziadne nesmie ostat visiet)')
   NxTest.assert(S1C2_STUDIO_JS.include?('function nxModalOpen'),
                 'a otazka ma jedno miesto (nie tri kopie podmienky)')
   NxTest.assert(S1C2_MODAL_JS.include?("if (ev.key === 'Escape'){"),

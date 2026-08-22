@@ -186,8 +186,12 @@ NxTest.test('ST-1a: merge 18+36 je GLOBALNE nastavenie a chodi v KAZDOM pushi (a
                 'export cita merge zo SERVERA, nie z checkboxu')
   NxTest.assert(ST1B_STUDIO_RB.include?('merge_18_36: ProductionCore.merge_18_36'),
                 'stav checkboxu je v KAZDOM pushi Studia — cita sa zo SERVERA')
-  NxTest.assert(ST1B_STUDIO_JS.include?("(v.merge_18_36 === false ? '' : ' checked')"),
+  # SMOKE 22.8.: checkbox sa z listy prestahoval do ROHOVEHO nastavenia VEPO
+  # (`vepoMenuHtml`) — pravidlo „hodnota je z payloadu" plati bezo zmeny.
+  NxTest.assert(ST1B_STUDIO_JS.include?("(s.merge_18_36 === false ? '' : ' checked')"),
                 'checkbox sa NASADZUJE z payloadu (nie z pamate klienta)')
+  NxTest.assert(ST1B_STUDIO_JS.include?('NX.setVepoBar') || ST1B_STUDIO_JS.include?('setVepoBar:'),
+                'a echo servera ho dorovna aj v otvorenom nastaveni')
 end
 
 # --- 3) kontrakt payloadu Kusovnika (audit #4) -------------------------------
@@ -331,6 +335,86 @@ NxTest.test('ST-1a (review P2): sekcia ma RUCNY refresh (prestavba z Inspectora 
   NxTest.assert(ST1B_STUDIO_JS.include?("id=\"refreshBtn\""),
                 'a MA ho co zavolat — inak by okno exportovalo VEPO zo starych cisel')
   NxTest.assert(ST1B_STUDIO_JS.include?("sketchup.refresh_bom('')"), 'tlacidlo vola callback')
+end
+
+NxTest.test('SMOKE 22.8. (1A–1D): LISTA Kusovnika a rohove nastavenie VEPO — kontrakt') do
+  kontrakt = File.read(File.join(NxTest::ROOT, 'SYSTEM', 'zdroje', 'ui20', 'UI20_KONTRAKT.md'),
+                       encoding: 'UTF-8')
+  mockup = File.read(File.join(NxTest::ROOT, 'SYSTEM', 'zdroje', 'ui20', 'mockup_studio.html'),
+                     encoding: 'UTF-8')
+
+  # 1B: neaktivne XLSX/CSV placeholdery zanikli vo VSETKYCH TROCH miestach
+  # (pravidlo troch miest: kod · kontrakt · mockup) — inak by sa pri porovnani
+  # panela s mockupom 1:1 hlasil rozdiel, ktory je v skutocnosti rozhodnutim.
+  NxTest.refute(ST1B_STUDIO_JS.include?('XLSX zatiaľ neexistuje'),
+                'kod: placeholder XLSX kusovnika je prec')
+  NxTest.refute(ST1B_STUDIO_JS.include?('CSV zatiaľ neexistuje'),
+                'kod: a placeholder CSV kusovnika tiez')
+  NxTest.assert(kontrakt.include?('tlačidlá sa NEZOBRAZUJÚ'),
+                'kontrakt Š5 nesie verdikt zo smoke testu 22.8.')
+  NxTest.refute(mockup.include?('XLSX kusovník pripravený') || mockup.include?(' XLSX</button>'),
+                'mockup: lista Kusovnika uz XLSX/CSV nekresli')
+
+  # 1A: checkbox „18+36 spolu" sa PRESUNUL do rohoveho nastavenia VEPO.
+  NxTest.refute(ST1B_STUDIO_JS.include?('class="mergebox"'), 'z listy checkbox zmizol')
+  NxTest.refute(ST1B_STUDIO_HTML.include?('.mergebox'), 'a jeho styl v okne neostal mrtvy')
+  NxTest.assert(ST1B_STUDIO_JS.include?('function vepoMenuHtml'),
+                'nastavenie ma vlastny maly markup (obsah je iny nez 3-stavova kontrola hran)')
+  NxTest.assert(ST1B_STUDIO_JS.include?('id="vepoMore" class="cornerzone"'),
+                'ale klikaciu zonu ZDIELA s existujucim vzorom (rail + lista Kontroly)')
+  NxTest.assert(ST1B_STUDIO_JS.include?('id="mergeChk"'),
+                'checkbox zije dalej — len na inom mieste')
+  NxTest.assert(ST1B_STUDIO_JS.include?("if (vepoMenuOpen && !t.closest('.vepofly')) vepoMenuClose();"),
+                'zatvara ho klik mimo')
+  NxTest.assert(ST1B_STUDIO_JS.include?('if (vepoMenuOpen){'), 'aj Escape')
+  # Zapis ide EXISTUJUCOU cestou — ziadny druhy kanal na server.
+  NxTest.assert_equal(1, ST1B_STUDIO_JS.scan(/sketchup\.studio_set_vepo_opts\(/).length,
+                      'zapis nastavenia ma jedinu cestu (`studio_set_vepo_opts`)')
+  NxTest.assert(kontrakt.include?('ROHOVÉ NASTAVENIE'), 'kontrakt roh pozna')
+
+  # 1D: „Projekt" je VSTUP so stitkom, nie popisok medzi tlacidlami.
+  NxTest.assert(ST1B_STUDIO_JS.include?('<span class="prjlbl">Projekt</span>'),
+                'pole ma viditelny stitok')
+  NxTest.assert(ST1B_STUDIO_HTML.include?('.prjbox .prjlbl'), 'a stitok ma svoj styl')
+  NxTest.assert(mockup.include?('prjbox'), 'mockup pole Projekt tiez ukazuje')
+end
+
+NxTest.test('SMOKE 22.8.: „Prepočítať ceny" prizna stare ceny (projekcia payloadu)') do
+  # ZIADEN novy vypocet: `stale` uz v payloade JE (kresli sa z neho chip aj
+  # zoznam). Klient ho len premietne na tlacidlo, ktore ten stav riesi.
+  NxTest.assert(ST1B_BUDGET_JS.include?('function budPriceBtnHtml'),
+                'tlacidlo ma vlastnu cistu funkciu (testuje ju tests/js/test_budget_ui.js)')
+  body = ST1B_BUDGET_JS[/function budPriceBtnHtml.*?\n  \}\n/m].to_s
+  NxTest.assert(body.include?('budStaleLabel(b && b.stale)'),
+                'pocet aj prah beru z UZ EXISTUJUCEHO pasu cenovej cerstvosti')
+  NxTest.assert(body.include?('bstalebtn'), 'a menia LEN triedu (farba je v CSS tokene)')
+  NxTest.refute(body.match?(/Date|now|age_days\s*>/),
+                'ziadny vypocet veku v klientovi — server je autorita')
+  css = ST1B_STUDIO_HTML[/\.sectools \.ghostbtn\.bstalebtn \{[^}]*\}/m].to_s
+  NxTest.assert(css.include?('--nx-warn'), 'farba ide cez jantarove tokeny')
+  NxTest.refute(css.match?(/green|--nx-state-green|--nx-ok/),
+                'ZIADNA zelena — vyznamove farby ostavaju semaforu Kontroly')
+end
+
+NxTest.test('SMOKE 22.8.: „Obnoviť" hlasku VZDY zhodi — nikdy vecne „Prepočítavam…"') do
+  # Klient si pred volanim nastavi „Prepočítavam…" (per sekciu) a sam o vysledku
+  # nema ako vediet — prepocet bezi na SERVERI. Kym hlasku nikto nezhadzoval,
+  # visela v okne aj po dobehnutom prepocte a vyzeralo to ako zamrznute okno.
+  NxTest.assert(ST1B_STUDIO_JS.include?("var REFRESH_STATUS = {"),
+                'klient hlasku „Prepočítavam…" naozaj nastavuje (per sekciu)')
+  NxTest.assert(ST1B_STUDIO_RB.include?("cb(dlg, 'refresh_bom')  { |_p| do_refresh_bom }"),
+                'callback uz nevola holy push_state — ma vlastnu cestu s hlaskou')
+  body = ST1B_STUDIO_RB[/def do_refresh_bom.*?\n        end\n/m].to_s
+  NxTest.assert(!body.empty?, 'handler sa nasiel')
+  NxTest.assert(body.include?('push_state'), 'USPESNA vetva okno prepocita')
+  NxTest.assert(body.include?("set_status('Prepočítané.')"),
+                'a HNED za tym zhodi hlasku (echo NX.setStatus)')
+  # Rescue vetva: hlaska sa nesmie zaseknut ANI pri vynimke a chyba patri do logu.
+  NxTest.assert(body.include?('rescue StandardError => e'), 'ma rescue vetvu')
+  NxTest.assert(body.include?("Engine.log_error(e, 'StudioDialog.do_refresh_bom')"),
+                'vynimka ide do logu s menom TEJTO cesty')
+  NxTest.assert(body =~ /set_status\("Prepočet zlyhal.*?, true\)/,
+                'a pouzivatel dostane CHYBOVU hlasku, nie vecne „Prepočítavam…"')
 end
 
 # --- 5) premostenia navigacie (audit #2) -------------------------------------

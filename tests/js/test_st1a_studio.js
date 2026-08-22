@@ -15,8 +15,18 @@
 const assert = require('node:assert');
 const path = require('node:path');
 
+// DOM stub je ZAMERNE prazdny (getElementById vracia null) — vacsina sady su
+// ciste funkcie. Delegovane listenery si vsak PAMATA: sekcia 11 nimi klika na
+// rohove nastavenie VEPO a bez nich by sa spravanie „otvor / zavri / zapis"
+// dalo overit len grepom.
 global.window = {};
-global.document = { addEventListener: function(){}, getElementById: function(){ return null; } };
+const LISTEN = {};
+const ELS = {};
+global.document = {
+  activeElement: null,
+  addEventListener: function(type, fn){ (LISTEN[type] || (LISTEN[type] = [])).push(fn); },
+  getElementById: function(id){ return ELS[id] || null; }
+};
 const S = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'studio.js'));
 
 let n = 0;
@@ -236,5 +246,136 @@ eq(S.anchorFilter(null), null, 'chybajuci payload nezhodi kotvu');
 const GA = S.groupBom(ROWS, SHEETS, S.anchorFilter({ anchor: 'CAB-009' }));
 eq(GA.shown, 1, 'kotva CAB-009 necha jediny riadok tej skrinky');
 eq(GA.groups[0].rows[0].names, ['Polica'], 'a je to naozaj jej dielec');
+
+// --- 10) SMOKE 22.8.: LISTA sekcie Kusovnik (1B/1C/1D) ----------------------
+// Michalov smoke test hlasil tri veci naraz: neaktivne XLSX/CSV vyzeraju ako
+// rozbite tlacidla, checkbox „18+36 spolu" nema v liste pohladu co robit
+// (patri k EXPORTU) a pole Projekt splyva s popiskami. Lista sa tym prekopala,
+// takze tu je jej zavazny tvar — poradie aj obsah.
+
+const VEPO = { project: 'Kuchyňa Novák', default_project: 'projekt', merge_18_36: true };
+const BAR = S.bomToolsHtml(VEPO, { view: 'parts', q: '', cols: false, vepo: false });
+
+ok(BAR.indexOf('XLSX') < 0, '1B: neaktivne XLSX tlacidlo je z listy PREC (vrati sa s realnym exportom)');
+ok(BAR.indexOf('> CSV</button>') < 0, '1B: a to iste plati pre CSV kusovnika');
+ok(BAR.indexOf('zatiaľ neexistuje') < 0, '1B: v liste uz nie je ziadny slub „prijde v dalsej davke"');
+ok(BAR.indexOf('aria-disabled') < 0, '1B: v liste Kusovnika neostalo ZIADNE mrtve tlacidlo');
+// „CSV" v tooltipe VEPO exportu je nazov FORMATU, nie druhe tlacidlo.
+ok(/title="Exportuje prírezy[^"]*VEPO CSV/.test(BAR), 'VEPO export ostal a stale hovori, co robi');
+
+// 1C+1D poradie: vlavo „co pozeram", vpravo „co s tym robim".
+const ORDER = ['class="bomviews"', 'class="prjbox"', 'class="searchbox"', 'class="spacer"',
+               'id="vepoBtn"', 'id="colBtn"', 'id="refreshBtn"'];
+let last = -1;
+ORDER.forEach(function(mark){
+  const at = BAR.indexOf(mark);
+  ok(at > last, `1C: ${mark} je v liste na svojom mieste (poradie schvalene 22.8.)`);
+  last = at;
+});
+
+ok(BAR.indexOf('<span class="prjlbl">Projekt</span>') > -1,
+   '1D: pole Projekt ma VIDITELNY stitok (nie len placeholder)');
+ok(BAR.indexOf('value="Kuchyňa Novák"') > -1, '1D: a nesie hodnotu zo SERVERA');
+ok(BAR.indexOf('placeholder="projekt"') > -1, 'default projektu ostava placeholderom');
+ok(/title="Názov zákazky[^"]*exporty/.test(BAR),
+   '1D: tooltip povie, ze nazov plati pre VSETKY exporty');
+
+// Segment pohladov aj stlpce reaguju na stav, ktory pride ARGUMENTOM.
+const ABS_BAR = S.bomToolsHtml(VEPO, { view: 'abs', q: 'polica', cols: false, vepo: false });
+ok(ABS_BAR.indexOf('id="colBtn"') < 0, 'Stlpce ma len pohlad Dielce (Platne/ABS ich nemaju)');
+ok(ABS_BAR.indexOf('value="polica"') > -1, 'text hladania sa do listy vracia');
+ok(S.bomToolsHtml(VEPO, { view: 'parts', q: '', cols: true, vepo: false }).indexOf('id="colMenu"') > -1,
+   'otvorene menu stlpcov sa kresli');
+
+// --- 11) SMOKE 1A: rohove nastavenie VEPO exportu ---------------------------
+// Checkbox „18+36 spolu" sa z listy odstahoval do rohu tlacidla VEPO (vzor
+// „flyout roh", UI_DIZAJN §5.11). Overuje sa TVAR (roh je samostatne tlacidlo
+// nad telom, nie vnoreny span) aj SPRAVANIE (otvorenie, zatvorenie klikom mimo
+// a Escapom, zapis existujucou cestou).
+
+ok(BAR.indexOf('id="vepoMore"') > -1, '1A: VEPO export ma rohovu klikaciu zonu');
+ok(BAR.indexOf('id="mergeChk"') > -1, '1A: a checkbox „18+36 spolu" je v jeho nastaveni');
+ok(BAR.indexOf('class="mergebox"') < 0, '1A: z LISTY checkbox zmizol');
+{
+  const fly = BAR.slice(BAR.indexOf('<span class="vepofly">'));
+  const corner = fly.indexOf('id="vepoMore"');
+  const body = fly.indexOf('id="vepoBtn"');
+  ok(body < corner, '1A: roh je SUROdenec tela, nie jeho obsah (tlacidlo v tlacidle je neplatne HTML)');
+  ok(fly.slice(corner, fly.indexOf('</button>', corner)).indexOf('class="cornerzone"') > -1,
+     '1A: a pouziva ZDIELANU klikaciu zonu `.cornerzone` (rovnaky vzor ako rail a Kontrola)');
+}
+ok(S.vepoMenuHtml(VEPO, false).indexOf('class="vepomenu"') > -1, '1A: zavrete okno nema triedu `open`');
+ok(S.vepoMenuHtml(VEPO, true).indexOf('class="vepomenu open"') > -1, '1A: otvorene ju ma');
+ok(S.vepoBtnHtml(VEPO, true).indexOf('aria-expanded="true"') > -1,
+   '1A: citacka sa o otvorenom nastaveni dozvie (aria-expanded)');
+ok(S.vepoMenuHtml({ merge_18_36: false }, true).indexOf('checked') < 0,
+   '1A: stav checkboxu je Z PAYLOADU — vypnuty merge sa naozaj nekresli');
+ok(S.vepoMenuHtml({}, true).indexOf('checked') > -1,
+   '1A: chybajuca hodnota = zapnute (zhodne so serverovym defaultom)');
+
+(function(){
+  // Minimalny DOM: `renderTools` musi mat kam pisat, inak sa vrati hned.
+  const box = { innerHTML: '' };
+  ['snav', 'sechead', 'sectools', 'secbody', 'status', 'stModel'].forEach(function(id){
+    ELS[id] = (id === 'sectools') ? box : { innerHTML: '', textContent: '' };
+  });
+  const sent = [];
+  // V prehliadaci je `sketchup` globalny objekt — v Node ho treba mat na OBOCH
+  // menach (`window.sketchup` guard aj holy `sketchup` v tele funkcii).
+  const SU = {
+    ready: function(){},
+    studio_set_vepo_opts: function(p){ sent.push(JSON.parse(p)); },
+    refresh_bom: function(){ sent.push('refresh'); }
+  };
+  global.window.sketchup = SU;
+  global.sketchup = SU;
+  global.NX = global.window.NX;   // ten isty dovod ako pri `sketchup`
+  const fire = function(type, target, extra){
+    (LISTEN[type] || []).forEach(function(fn){
+      fn(Object.assign({ type: type, target: target, preventDefault: function(){} }, extra || {}));
+    });
+  };
+  // Ciel klikov: `closest` odpoveda LEN na selektory, ktore uzol naozaj ma.
+  const tgt = function(map){
+    return { closest: function(sel){ return map[sel] || null; },
+             hasAttribute: function(){ return false; } };
+  };
+  const CORNER = tgt({ '[data-vepo]': {}, '.vepofly': {} });
+  const OUTSIDE = tgt({});
+
+  global.window.NX.setStudio({ version: '0.7.41', gen: 3, model_title: 'ENGINEtests',
+                               rows: [], sheets: [], counts: {}, vepo: VEPO });
+  ok(box.innerHTML.indexOf('class="vepomenu"') > -1, '1A: po pushi je nastavenie ZAVRETE');
+
+  fire('click', CORNER);
+  ok(box.innerHTML.indexOf('class="vepomenu open"') > -1, '1A: klik na roh ho OTVORIL');
+  ok(box.innerHTML.indexOf('aria-expanded="true"') > -1, '1A: a roh to prizna');
+
+  fire('change', { id: 'mergeChk', checked: false, hasAttribute: function(){ return false; } });
+  eq(sent.length, 1, '1A: prepnutie islo do Ruby (jedna sprava)');
+  eq(sent[0].merge, false, '1A: EXISTUJUCOU cestou `studio_set_vepo_opts` s hodnotou');
+  eq(sent[0].gen, 3, '1A: a s identitou okna (server odmietne stary DOM)');
+
+  // Echo servera prepise stav checkboxu aj v OTVORENOM okne (audit #16).
+  ELS.mergeChk = { checked: false };
+  global.window.NX.setVepoBar({ project: 'Kuchyňa Novák', merge_18_36: true });
+  eq(ELS.mergeChk.checked, true, '1A: echo servera dorovna otvorene nastavenie');
+  delete ELS.mergeChk;
+
+  fire('click', OUTSIDE);
+  ok(box.innerHTML.indexOf('class="vepomenu open"') < 0, '1A: klik MIMO nastavenie zavrel');
+
+  fire('click', CORNER);
+  ok(box.innerHTML.indexOf('class="vepomenu open"') > -1, 'a znova otvoril');
+  fire('keydown', OUTSIDE, { key: 'Escape' });
+  ok(box.innerHTML.indexOf('class="vepomenu open"') < 0, '1A: Escape ho tiez zavrie');
+
+  // Klik na TELO exportu sa k nastaveniu nedostane a naopak (dve akcie, dva ciele).
+  SU.vepo_export = function(){ sent.push('export'); };
+  fire('click', tgt({ '#vepoBtn': {} }));
+  eq(sent[sent.length - 1], 'export', '1A: klik na telo exportuje ako doteraz');
+  fire('click', CORNER);
+  eq(sent[sent.length - 1], 'export', '1A: a klik na roh NEEXPORTUJE (otvara nastavenie)');
+})();
 
 console.log(`test_st1a_studio: ${n} kontrol OK`);
