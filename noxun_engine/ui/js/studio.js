@@ -415,7 +415,7 @@
   }
 
   // Telo sekcie: NÁKUPNÝ ZOZNAM zo setov (hore) + generika podľa pravidiel
-  // (dole, klik-select cez .hwrow ostáva). Vracia HTML — sekcie Štúdia si
+  // (dole, klik-select cez .hwgen ostáva). Vracia HTML — sekcie Štúdia si
   // telo skladajú do reťazca (na rozdiel od okna Výroba, ktoré písalo priamo
   // do boxu); obsah je inak znak po znaku ten istý.
   function buySection(hs, list){
@@ -486,7 +486,10 @@
         return b.manual_note ? '<span title="' + esc(b.manual_note) + '">' + t + '</span>' : t;
       }).join(', ');
       // V0.6 C-2 (audit F11): slovensky label zo SERVERA (fallback surovy typ)
-      h += '<tr class="hwrow" data-i="' + i + '"><td>' + esc(g.label || g.generic_type) + '</td><td>' + params + '</td>' +
+      // Trieda je `hwgen`, NIE `hwrow`: `.hwrow` je v zdielanom panel.css flex
+      // riadok kovania Inspectora/Katalogu — na `<tr>` by `display: flex`
+      // rozhodil stlpce pod hlavickou (guard tests/pure/test_tr_flex_kolizia.rb).
+      h += '<tr class="hwgen" data-i="' + i + '"><td>' + esc(g.label || g.generic_type) + '</td><td>' + params + '</td>' +
            '<td><b>' + num(g.quantity) + '</b></td><td>' + kde + '</td></tr>';
     });
     h += '</tbody></table>';
@@ -1474,7 +1477,7 @@
       if (t.closest('#hwCsvBtn')){ hwCsvExport(); return; }
       if (t.closest('#refreshBtn')){ requestRefresh(); return; }
       // ŠT-1c PR A: riadok generiky kovania — klik označí vlastníka v modeli.
-      var hwr = t.closest('tr.hwrow');
+      var hwr = t.closest('tr.hwgen');
       if (hwr){
         var hi = parseInt(hwr.getAttribute('data-i'), 10);
         var g = (ST && ST.hardware) ? ST.hardware[hi] : null;
