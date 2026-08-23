@@ -626,6 +626,18 @@ module Noxun
              clean['supplier_decor'].to_s.strip != existing['supplier_decor'].to_s.strip
             merged.delete('price_checked_at')
           end
+          # ŠT-2c 2c-2a (kontrakt save_decor, bod 9): RUCNE prepisana cena uz
+          # NIE JE cena overena voci stranke dodavatela. `price_checked_at`
+          # generuje VYHRADNE Demos apply — inline bunka ho preto pri zmene
+          # ceny rusi. Bez toho by v katalogu zilo „overené 9. 8." nad cislom,
+          # ktore odvtedy niekto prepisal rukou, a prepocet cien by taky
+          # zaznam povazoval za cerstvy. demos_url patchom zmenit NEDA
+          # (nie je v PATCHABLE), takze podmienka „bez zmeny vazby" plati vzdy.
+          price_key = kind == 'edge' ? 'price_per_bm' : 'price_per_m2'
+          if clean.key?(price_key) &&
+             normalize_price(clean[price_key]) != normalize_price(existing[price_key])
+            merged.delete('price_checked_at')
+          end
           ok, err = kind == 'edge' ? validate_edge_attrs(merged) : validate_sheet_attrs(merged)
           return [:invalid, err] unless ok
           # Codex GH #76: dup kontrola bezi pri zmene kodu AJ dodavatela — patch
