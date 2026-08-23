@@ -322,12 +322,18 @@
     }
     var us = hwEl('hn_unit');
     if (us){
+      // ŠT-3a-3 (zrkadlo P1 z #218): to iste plati pre MJ. Pole nikdy `keep`
+      // nemalo, takze rozpisanej polozke sa pri kazdom plnom pushi prepla
+      // merna jednotka na PRVU v zozname — a to je udaj, ktory ide rovno
+      // do objednavky.
+      var keepUnit = us.value;
       us.textContent = '';
       MDH_UNITS.forEach(function(u){
         var op = mdhMk('option', null, u);
         op.value = u;
         us.appendChild(op);
       });
+      if (keepUnit) us.value = keepUnit;
     }
   }
 
@@ -546,6 +552,18 @@
       });
       // GH #100 P2: nova polozka musi byt hned viditelna — filter sa vycisti
       // a poradie pride zo servera (ziadne lokalne doplnanie).
+      //
+      // ŠT-3a-3: filter zije v SEKCII na DVOCH miestach — v uzle listy a
+      // v premennej (`HW_Q`/`HW_CAT`), lebo listu prekresluje kazdy push.
+      // Cistilo sa len DOM, takze najblizsi push nakreslil listu so STARYM
+      // filtrom nad zoznamom, ktory server vratil NEFILTROVANY — a pouzivatel
+      // videl polozky, ktore filtru nezodpovedaju. Cistia sa preto OBE.
+      //
+      // Kategoria FORMULARA (`hn_category`) sa ZAMERNE necha — pri zakladani
+      // viacerych poloziek za sebou je lepkava kategoria zlepsenie (drzi ju
+      // `keep` v `mdhRenderEnums`). Cisti sa FILTER zoznamu, nie formular.
+      HW_Q = '';
+      HW_CAT = '';
       var q = hwEl('hwSearch');
       if (q) q.value = '';
       var c = hwEl('hwCategory');
@@ -804,7 +822,8 @@
     var box = hwEl('secbody');
     if (!box) return;
     var node = hwBodyNode();
-    if (node.parentNode !== box){
+    var entered = node.parentNode !== box; // vstup do sekcie (alebo prve kreslenie)
+    if (entered){
       box.innerHTML = '';
       box.appendChild(node);
     }
@@ -818,6 +837,13 @@
       MDH_ORDER_PENDING = false;
       mdhSearchNow();
     }
+    // ŠT-3a-3: pri NAVRATE do sekcie sa zhody „Pridať z Demosu" dorovnaju
+    // k hodnote pola. Odchod zo sekcie zrusi beziaci fetch (`hw_leave`)
+    // a zhody ostanu prazdne pod VYPLNENYM polom — vyzeralo to, ze Demos
+    // nic nenasiel. Doptavame sa LEN pri vstupe (nie pri kazdom pushi)
+    // a LEN ked ma pole zmysluplny dotaz; `mdhDemosInput` si drzi vlastny
+    // debounce a URL vetvu.
+    if (entered) mdhDemosInput();
   }
 
   // Odchod zo sekcie `hw` (vola `studioGoSection` v studio.js PRED prepnutim).
@@ -860,9 +886,13 @@
       mdhSetItemsState(h.catalog);
       MDH_ORDER_PENDING = true;   // poradie si vypyta render tela
     }
-    // Sety maju v OBOCH UI ten isty prijimac; jeho render je bezpecny aj ked
-    // telo sekcie este nie je pripojene (uzly sa nenajdu a funkcia vypadne).
-    if (h.sets && typeof HWSETS !== 'undefined') HWSETS.init(h.sets);
+    // ŠT-3a-3: LEN DATA. Render tela (a s nim aj setov) robi `hwRenderBody`
+    // hned za tymto — `HWSETS.init` (data + render) by znamenal DVA rendery
+    // na kazdy push: dvakrat zahodeny a znovu poskladany zoznam setov aj
+    // predvolieb. Ked je pouzivatel v inej sekcii, render nepride vobec
+    // a data pockaju na navrat (telo sa vtedy klonuje a `hwRenderBody`
+    // ich vykresli).
+    if (h.sets && typeof HWSETS !== 'undefined') HWSETS.setData(h.sets);
   }
 
   // Napojenie na kanal Studia. `studio.js` (a za nim `budget.js`
@@ -902,6 +932,9 @@
       // zo servera nezmaze rozpisany formular" sa inak nedal overit nicim
       // nez klikanim (rovnaky dovod ako pri `matRenderBody`).
       hwToolsHtml: hwToolsHtml, hwRenderBody: hwRenderBody, hwSetView: hwSetView,
+      // ŠT-3a-3: stav listy — bez neho sa nedá overit, ze `MDH.created`
+      // vycistil filter aj v PREMENNYCH, nielen v uzloch.
+      hwToolsState: hwToolsState,
       hwOnLeaveSection: hwOnLeaveSection, hwApplyState: hwApplyState, MDH: MDH };
   }
   // ŠT-3a-2 (vzor `proj_materials.js` po ŠT-2b): `sketchup.ready('')` tu

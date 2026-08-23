@@ -181,7 +181,19 @@
   // Top-level var = global v CEF (vzor MDH); ziadne window.* na module scope
   // (Node testy subor require-uju bez DOM).
   var HWSETS = {
-    init: function(data){
+    // ŠT-3a-3: kontrakt je ROZDELENY na „nastav data" a „kresli".
+    //
+    // V sekcii `hw` prichadzali sety DVAKRAT za sebou: `hwApplyState` volal
+    // `HWSETS.init` (data + render) a hned za nim `hwRenderBody` volal
+    // `hwsRenderAll` znova. Dva rendery = dvakrat zahodeny a znovu poskladany
+    // zoznam setov aj predvolieb pri KAZDOM pushi (a s nim dvakrat strateny
+    // fokus, kym ho nedrzal snapshot nizsie).
+    //
+    // `setData` je preto BEZ renderu — pouziva ho plny push, po ktorom telo
+    // sekcie aj tak kresli `hwRenderBody`. `init` (data + render) ostava pre
+    // ECHO, po ktorom uz ziadny render nepride (`NX.setHwSets` po odmietnutom
+    // zapise) a pre okno, ktore by si render samo nevyziadalo.
+    setData: function(data){
       var prev = HWS_DATA;
       HWS_DATA = data || null;
       // GH #132 P1: PREPNUTIE MODELU zahodi rozpracovane PROJEKTOVE pasma —
@@ -189,6 +201,12 @@
       // (model_guid guard by presiel, GUID sa berie z CERSTVEHO payloadu).
       // Globalne (kniznicne) drafty na modeli nezavisia — tie ostavaju.
       if (prev && HWS_DATA && prev.model_guid !== HWS_DATA.model_guid) hwsDropProjDrafts();
+    },
+    render: function(){
+      hwsRenderAll();
+    },
+    init: function(data){
+      HWSETS.setData(data);
       // Rozpracovany editor SETU NEZAHADZUJEME pri echu (vzor dirty buniek
       // okna Materialy) — render ho necha tak; zoznam a predvolby sa obnovia.
       hwsRenderAll();
@@ -215,6 +233,60 @@
     hwsRenderProj();
   }
 
+  // --- ŠT-3a-3: FOKUS PREZIJE PREKRESLENIE -----------------------------------
+  //
+  // `hwsRenderSets` aj `hwsRenderProj` skladaju svoj blok od nuly
+  // (`box.textContent = ''`). V OKNE to nevadilo — prekreslovalo sa len po
+  // zapise; v SEKCII ich vola KAZDY `NX.setStudio`, takze pouzivatelovi mizol
+  // kurzor z rozpisaneho editora setu (a z editora pasiem) uprostred pisania.
+  // Vzor je `mdhRender` v `hw_catalog.js`: snapshot pred prekreslenim, obnova
+  // po nom. Hodnoty poli sa NEOBNOVUJU — tie ziju v stave (`HWS_EDIT`,
+  // `HWS_SEL`) a render ich vykresli spravne sam.
+
+  // Kody a kluce su volny text (`hws-map-proj|hinge`) — do CSS selektora
+  // VZDY cez escape (vzor `mdhCssEscape`; vlastny, lebo tento subor sa v Node
+  // testoch nacitava samostatne).
+  function hwsCssEscape(s){
+    var v = String(s == null ? '' : s);
+    if (typeof CSS !== 'undefined' && CSS.escape) return CSS.escape(v);
+    return v.replace(/[^a-zA-Z0-9_-]/g, function(c){ return '\\' + c; });
+  }
+
+  // Atributy, ktore JEDNOZNACNE adresuju pole editora (index clena, riadku
+  // radu/pasma a kluc rozpracovaneho vyberu setu).
+  var HWS_FOCUS_ATTRS = ['data-hws-m', 'data-hws-s', 'data-hws-b', 'data-hws-sel'];
+
+  function hwsFocusSnapshot(){
+    if (typeof document === 'undefined') return null;
+    var ae = document.activeElement;
+    if (!ae || !ae.getAttribute || !ae.getAttribute('data-hws-field')) return null;
+
+    var snap = { field: ae.getAttribute('data-hws-field'),
+                 start: ae.selectionStart, end: ae.selectionEnd, at: {} };
+    HWS_FOCUS_ATTRS.forEach(function(a){ snap.at[a] = ae.getAttribute(a); });
+    return snap;
+  }
+
+  // Chybajuci atribut je SUCASTOU identity (`:not([...])`) — bez toho by sa
+  // fokus z pola clena mohol vratit do rovnomenneho pola v riadku radu.
+  function hwsFocusSelector(snap){
+    var sel = '[data-hws-field="' + hwsCssEscape(snap.field) + '"]';
+    HWS_FOCUS_ATTRS.forEach(function(a){
+      sel += (snap.at[a] == null)
+        ? ':not([' + a + '])'
+        : '[' + a + '="' + hwsCssEscape(snap.at[a]) + '"]';
+    });
+    return sel;
+  }
+
+  function hwsRestoreFocus(box, snap){
+    if (!snap || !box || !box.querySelector) return;
+    var node = box.querySelector(hwsFocusSelector(snap));
+    if (!node) return;
+    try { node.focus(); } catch (e) { /* uzol medzitym zmizol */ }
+    try { node.setSelectionRange(snap.start, snap.end); } catch (e2) { /* select nema range */ }
+  }
+
   // --- tab SETY ---------------------------------------------------------------
 
   function hwsTypeLabel(gt){
@@ -223,9 +295,17 @@
     return gt;
   }
 
+  // Obal so snapshotom fokusu — telo ma viac vystupov (prazdna kniznica),
+  // takze obnova patri SEM, nie na koniec tela.
   function hwsRenderSets(){
     var box = hwsEl('hwTabSets');
     if (!box || !HWS_DATA) return;
+    var focus = hwsFocusSnapshot();
+    hwsRenderSetsBody(box);
+    hwsRestoreFocus(box, focus);
+  }
+
+  function hwsRenderSetsBody(box){
     box.textContent = '';
     var bar = hwsMk('div', 'mdbar');
     var nb = hwsMk('button', 'ghostbtn', '+ Nový set');
@@ -478,9 +558,17 @@
   // ovladaca) zanikla spolu s read-only rezimom — predvolby projektu su
   // v sekcii plnohodnotne editovatelne, takze riadok kresli select.
 
+  // Ten isty obal pre PREDVOĽBY PROJEKTU: editor pasiem vyberu setu zije tu
+  // a `hwsRenderAll` ho prekresluje pri kazdom pushi rovnako ako zoznam setov.
   function hwsRenderProj(){
     var box = hwsEl('hwTabProj');
     if (!box || !HWS_DATA) return;
+    var focus = hwsFocusSnapshot();
+    hwsRenderProjBody(box);
+    hwsRestoreFocus(box, focus);
+  }
+
+  function hwsRenderProjBody(box){
     box.textContent = '';
     var proj = HWS_DATA.project || {};
     // Hlavička tabu: model + doplnenie nových predvolieb v JEDNOM rade.
@@ -870,5 +958,9 @@
       // H1b: pásma člena setu + výber setu podľa parametra
       hwsNum: hwsNum, hwsParamLabel: hwsParamLabel, hwsBandsSummary: hwsBandsSummary,
       hwsBuildBands: hwsBuildBands, hwsSelectorFrom: hwsSelectorFrom,
-      hwsBuildSelector: hwsBuildSelector, hwsProjDraftKeys: hwsProjDraftKeys };
+      hwsBuildSelector: hwsBuildSelector, hwsProjDraftKeys: hwsProjDraftKeys,
+      // ŠT-3a-3: `HWSETS` a helpery fokusu potrebuju DOM a exportuju sa
+      // ZAMERNE — kontrakty „setData NEKRESLI" a „fokus prezije prekreslenie"
+      // sa inak nedaju overit nicim nez klikanim (tests/js/test_st3a_hw.js).
+      HWSETS: HWSETS, hwsFocusSelector: hwsFocusSelector, hwsCssEscape: hwsCssEscape };
   }
