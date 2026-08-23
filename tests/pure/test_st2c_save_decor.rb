@@ -565,11 +565,13 @@ NxTest.test('save_decor (bod 10): tvar odpovede + „bez zmien" nerobi zbytocny 
   NxTest.assert_equal(rev, SDM.catalog_revision, 'nic sa nezmenilo => ziadny zapis')
 end
 
-NxTest.test('save_decor (bod 1): mode „create" a chybajuci group_id sa odmietaju') do
+NxTest.test('save_decor (bod 1): neznamy mode a chybajuci group_id sa odmietaju') do
   sd_headless!
   sd_seed!
   gid = sd_gid
-  st, info = SDM.save_decor(sd_payload(gid, 'mode' => 'create'))
+  # 2c-2b: `create` uz JE platny rezim (vlastna sada tests/pure/test_st2c_create.rb),
+  # cokolvek ine ale nie — rozbity klient nesmie trafit ziadnu vetvu.
+  st, info = SDM.save_decor(sd_payload(gid, 'mode' => 'nieco'))
   NxTest.assert_equal(:invalid, st)
   NxTest.assert_equal('mode', info['errors'].first['field'])
   st2, info2 = SDM.save_decor(sd_payload(gid, 'group_id' => ''))

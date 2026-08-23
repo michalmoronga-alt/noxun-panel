@@ -1,19 +1,22 @@
-// Testy D-44: format platne pri preset cipoch batchu "Novy dekor" a verziovana
-// zapamatana sada (proj_materials.js) — dependency-free Node
-// (node tests/js/test_decor_formats.js). Rovnaky vzor ako test_decor_groups.js.
-// Testuju sa LEN ciste funkcie bez DOM: navrh formatu podla typu, zlozenie
-// payloadu sheet_variants z aktivnych cipov a migracia starej ulozenej sady.
+// Testy D-44: format platne pri preset cipoch formulara „+ variant"
+// (proj_materials.js) — dependency-free Node (node tests/js/test_decor_formats.js).
+// Rovnaky vzor ako test_decor_groups.js. Testuju sa LEN ciste funkcie bez DOM:
+// navrh formatu podla typu a zlozenie payloadu sheet_variants z aktivnych cipov.
+// ŠT-2c 2c-2b: sada „posledny pouzity" ZANIKLA spolu so zakladanim dekoru
+// z tohto formulara — jej testy nahradil guard zaniku na konci suboru.
 'use strict';
 const assert = require('node:assert');
+const fs = require('node:fs');
 const path = require('node:path');
-const { mdFormatHint, mdBuildSheetVariants, mdMigrateLastSet, mdSheetDim, mdManualFormats } =
-  require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'proj_materials.js'));
+const MD_PATH = path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'proj_materials.js');
+const { mdFormatHint, mdBuildSheetVariants, mdSheetDim } = require(MD_PATH);
 
 let n = 0;
 function eq(actual, expected, msg){
   n++;
   assert.deepStrictEqual(actual, expected, `${msg}: cakam ${JSON.stringify(expected)}, dostal ${JSON.stringify(actual)}`);
 }
+function ok(cond, msg){ n++; assert.ok(cond, msg); }
 
 // --- mdFormatHint: navrhy stavia SERVER (Materials::TYPE_FORMAT_HINTS), JS ich
 //     len hlada podla napisaneho typu (case-insensitive, trim) ---
@@ -81,29 +84,17 @@ out = mdBuildSheetVariants([CHIPS[0]], { '18': { l: '2800', w: '2050' }, '36': {
 eq(out.variants, [{ type: '', thickness: '18', structure: '', sheet_size: [2800, 2050] }],
   'do payloadu ide LEN to, co je zapnute');
 
-// --- mdMigrateLastSet: stara sada (v1) prezije, ale BEZ vymyslenych formatov ---
-eq(mdMigrateLastSet({ sheet_keys: ['18', 'PD 38'], edge_keys: ['22/1'], ths: '18.5', abs: '28/2' }),
-  { schema: 2, sheet_keys: ['18', 'PD 38'], edge_keys: ['22/1'], ths: '18.5', abs: '28/2', formats: {} },
-  'v1 sada sa zmigruje 1:1, formaty ostanu prazdne');
-eq(mdMigrateLastSet({}), { schema: 2, sheet_keys: [], edge_keys: [], ths: '', abs: '', formats: {} },
-  'prazdny objekt = prazdna sada, ziadny pad');
-eq(mdMigrateLastSet({ sheet_keys: 'nezoznam', ths: 42 }),
-  { schema: 2, sheet_keys: [], edge_keys: [], ths: '', abs: '', formats: {} },
-  'poskodene typy sa zahodia (localStorage je len UX, nie autorita)');
-eq(mdMigrateLastSet(null), null, 'ziadna ulozena sada = null');
-eq(mdMigrateLastSet('retazec'), null, 'nepouzitelny obsah = null');
-
-// --- mdManualFormats (GH P2): do zapamatanej sady iba RUCNE formaty — auto
-//     navrh sa pri obnove dopocita z hintov a nesmie prezit zmenu typu ---
-const MF_CHIPS = [{ key: 'DTDL|18' }, { key: 'PD|38' }, { key: 'HDF|3' }];
-eq(mdManualFormats(MF_CHIPS, {
-  'DTDL|18': { l: '2800', w: '2070', auto: true },   // auto navrh — NEuklada sa
-  'PD|38':   { l: '4100', w: '600',  auto: false },  // rucne zadany — uklada sa
-  'HDF|3':   { l: '', w: '', auto: false }           // prazdny — nema co ulozit
-}), { 'PD|38': { l: '4100', w: '600' } }, 'auto navrhy sa nepamataju, rucne ano');
-eq(mdManualFormats(MF_CHIPS, {}), {}, 'ziadne formaty = prazdna mapa');
-eq(mdManualFormats([], { 'DTDL|18': { l: '1', w: '2', auto: false } }), {},
-  'format bez aktivneho cipu sa neuklada');
-eq(mdManualFormats(null, null), {}, 'null vstupy = prazdna mapa, ziadny pad');
+// --- ŠT-2c 2c-2b: pamat „poslednej pouzitej sady" ZANIKLA -------------------
+// Zakladanie dekoru z batch formulara skoncilo (D-69 editor v rezime create),
+// takze localStorage pamat preset cipov uz nema komu sluzit — a hlavne: dve
+// pamate rozpisu (localStorage + `NXModal`) by znamenali dve rozpisane verzie
+// toho isteho dekoru a ziadnu istotu, ktora sa naozaj odosle.
+const MD_SRC = fs.readFileSync(MD_PATH, 'utf8');
+ok(MD_SRC.indexOf('nx_decor_last_set') === -1,
+  'kluc localStorage je PREC (ziadny mrtvy zapis, ktory nikto necita)');
+ok(!/function md(LoadLastSet|StoreLastSet|MigrateLastSet|ManualFormats)\b/.test(MD_SRC),
+  'a s nim aj cela obsluha sady');
+ok(MD_SRC.indexOf('localStorage.setItem') === -1,
+  'sekcia Materialy uz do localStorage nezapisuje NIC');
 
 console.log(JSON.stringify({ passed: n, failed: 0 }));

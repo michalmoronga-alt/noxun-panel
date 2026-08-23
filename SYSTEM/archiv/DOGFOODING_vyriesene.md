@@ -10,6 +10,18 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
+### D-69 — Jednotný editor materiálov (vyriešené 23.8.2026, dávka ŠT-2c: PR #208 + #212 + #213, v0.7.55)
+
+**Pôvodné znenie (Michal 1.8. neskoro večer, smoke F8100/zástena):** editor variantov nie je prispôsobený novému systému — niektoré údaje server vyžaduje, ale používateľ ich nemá kde zadať/skontrolovať (formát, URL, dodávateľ, kód, stav väzby). Odporúčanie: JEDNO spoločné modálne okno pre pridanie z Demosu / ručné pridanie / editáciu / dopĺňanie / opravy — **rovnaké polia bez ohľadu na vstupný bod**.
+
+**Riešenie (tri PR):** **2c-1 (#208)** rozšírila zdieľanú kostru D-15 (`nx_modal.js`) o to, čo dlhý formulár potrebuje — nadpisy sekcií, opakovateľné riadky, zaškrtávatko, farbu, širokú kartu a **pamäť rozpísaných hodnôt v komponente**. **2c-2a (#212)** priniesla **atomickú zapisovaciu cestu `Materials.save_decor`** (jeden zámok, validate-all, JEDEN zápis — katalóg cien reálnych objednávok sa nesmie uložiť „spolovice") a nad ňou vstup **„Upraviť…"** v detaile dekoru. **2c-2b** napojila druhý vstup **„Pridať ručne"** na TEN ISTÝ formulár (režim `create`): identita novej skupiny je editovateľná celá, tabuľky dosiek a pások začínajú prázdne, stĺpce sú **jedna definícia** pre oba vstupy. Nový dekor sa po uložení rovno otvorí v detaile (ceny sa dopĺňajú tam).
+
+**Čo pri tom zaniklo:** batchový formulár s **preset-čipmi** prestal zakladať dekory (Michal 1.8.: „rovnaké polia bez ohľadu na vstup") — ostal **výhradne ako „+ variant"** do existujúcej skupiny, teda cesta pre typy, ktorých identitu editor nepokrýva (**zástena** = rubový dekor, **pracovná doska** = hranová úprava) a pre skupiny s viacerými štruktúrami; server na to v editore aj upozorní menom. S ním zanikla **localStorage pamäť „poslednej použitej sady"** (dve pamäte rozpísaného dekoru = dve verzie a žiadna istota, ktorá sa odošle) a pole farby v ňom (skupina svoju farbu má, server ju vnucuje).
+
+**Rozhodnutia zapracovaného slepého auditu (záväzné):** baseline sa **zmrazí pri otvorení** a každý riadok nesie vlastný odtlačok (`row_rev`) — konflikt sa pozná aj per záznam a cesta von je dorovnanie riadkov bez straty rozpísaných hodnôt · **identita variantu je nemenná** (material_id/abs_id), riadok s ID mení len obchodné polia · **editor nemaže** — mazanie ostáva na delete preflighte · **Demos nejde cez `save_decor`** (autorita položiek a dátumu overenia ceny ostáva serverovému Demos toku, „Pridať z Demosu" otvára svoj vlastný modál).
+
+**Testy:** `tests/pure/test_st2c_save_decor.rb` + `tests/pure/test_st2c_create.rb` (obe mutačné — odstránenie brány = padnutá sada), `tests/js/test_st2c_modal.js`, `tests/js/test_st2c_editor.js`, `tests/js/test_st2c_create.js`.
+
 ### D-15 — UX vzor: „pridávačky" ako modal (vyriešené 22.8.2026, ŠTÚDIO KONCEPT + dávka ŠT-1c PR #199, v0.7.38)
 
 **Pôvodné znenie (Michal 19.7.):** všetky akcie „pridať niečo" (šablóna, materiál, …) zjednotiť na modal s formulárom. Napĺňa sa postupne (prvý bol D-14; materiál formulár sa prerobí neskôr).
