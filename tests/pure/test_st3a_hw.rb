@@ -305,8 +305,14 @@ NxTest.test('ŠT-3a-3: vynimka medzi start_operation a commit NENECHA otvorenu o
   # by tak padol na zapise, ktory s tym prvym nema nic spolocne.
   helper = ST3A_HW_RB[/def abort_open_operation\(model, state\).*?\n        end\n/m].to_s
   NxTest.assert(!helper.empty?, 'zatvaranie operacie ma JEDNU cestu')
-  NxTest.assert(helper.include?('state[:open]'),
-                'rusi sa VYHRADNE operacia, ktoru handler otvoril a este nezavrel')
+  # Review #219 P2-1: `include?('state[:open]')` NESTACI — retazec ostane
+  # v suboru aj vtedy, ked sa VYPUSTI z podmienky (priradenie `state[:open] =
+  # false` nizsie ho drzi). Guard preto siaha priamo na GUARD RIADOK: oslabenie
+  # na `return unless model && state.is_a?(Hash)` musi sadu zhodit, inak by
+  # `rescue` po commite abortoval zapis, ktory sa uz potvrdil.
+  NxTest.assert(helper =~ /return unless [^\n]*state\[:open\]/,
+                'guard podmienka sa PYTA na `state[:open]` — rusi sa VYHRADNE operacia, ' \
+                'ktoru handler otvoril a este nezavrel')
   NxTest.assert(helper.index('state[:open] = false') < helper.index('model.abort_operation'),
                 'priznak padne PRED abortom — opakovany rescue nesmie abortovat druhykrat')
 

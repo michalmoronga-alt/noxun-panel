@@ -441,10 +441,21 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   const bodyFn = src.match(/function hwRenderBody\(\)\{[\s\S]*?\n  \}/)[0];
   ok(/var entered = node\.parentNode !== box/.test(bodyFn),
      'render tela rozli\u0161uje VSTUP do sekcie od be\u017en\u00e9ho pushu');
-  ok(/if \(entered\) mdhDemosInput\(\);/.test(bodyFn),
-     'zhody „Prida\u0165 z Demosu" sa dorovnaj\u00fa k hodnote po\u013ea LEN pri n\u00e1vrate');
-  ok(bodyFn.indexOf('if (entered) mdhDemosInput();') > bodyFn.indexOf('MDH_ORDER_PENDING'),
+  const demosCall = bodyFn.match(/if \(entered[^;]*\) mdhDemosInput\(\);/);
+  ok(!!demosCall,
+     'zhody \u201ePrida\u0165 z Demosu\u201c sa dorovnaj\u00fa LEN pri n\u00e1vrate do sekcie');
+  // Review #219 P2-2: a LEN ked je pole naozaj VIDIET \u2014 dopyt do Demosu za
+  // skryte pole (pohlad Sety, zavrety formular novej polozky) by isiel za nic.
+  ok(/HW_VIEW !== 'sets'/.test(demosCall[0]), 'v poh\u013eade Sety sa nedopytuje');
+  ok(/hwNewFormOpen\(\)/.test(demosCall[0]),
+     'ani pri zavretom formul\u00e1ri novej polo\u017eky');
+  ok(bodyFn.indexOf(demosCall[0]) > bodyFn.indexOf('MDH_ORDER_PENDING'),
      'a\u017e za vy\u017eiadan\u00edm serverov\u00e9ho poradia \u2014 nie namiesto neho');
+  // Naplanovany (debounced) dopyt MUSI zomriet s odchodom \u2014 inak dobehne do
+  // opustenej sekcie a najblizsi odchod vypise falosne \u201eZru\u0161en\u00e9\u2026\u201c.
+  const leaveFn2 = src.match(/function hwOnLeaveSection\(\)\{[\s\S]*?\n  \}/)[0];
+  ok(/clearTimeout\(mdhDemosTimer\)/.test(leaveFn2),
+     'odchod zo sekcie ru\u0161\u00ed aj napl\u00e1novan\u00fd dopyt do Demosu');
 })();
 
 console.log(`OK ${n} kontrol (ŠT-3a sekcia Kovanie)`);

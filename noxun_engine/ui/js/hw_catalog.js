@@ -562,6 +562,10 @@
       // Kategoria FORMULARA (`hn_category`) sa ZAMERNE necha — pri zakladani
       // viacerych poloziek za sebou je lepkava kategoria zlepsenie (drzi ju
       // `keep` v `mdhRenderEnums`). Cisti sa FILTER zoznamu, nie formular.
+      // ŠT-3a-3: od tejto davky je rovnako LEPKAVA aj MERNA JEDNOTKA
+      // (`hn_unit` dostal `keep`) — je to ZAMER, nie chyba: pri zakladani
+      // radu poloziek toho isteho druhu (ks za ks, par za par) sa nemusi
+      // znova nastavovat.
       HW_Q = '';
       HW_CAT = '';
       var q = hwEl('hwSearch');
@@ -843,15 +847,33 @@
     // nic nenasiel. Doptavame sa LEN pri vstupe (nie pri kazdom pushi)
     // a LEN ked ma pole zmysluplny dotaz; `mdhDemosInput` si drzi vlastny
     // debounce a URL vetvu.
-    if (entered) mdhDemosInput();
+    //
+    // Review #219 P2-2: a LEN ked je pole naozaj VIDIET — v pohlade Sety
+    // ani pri zatvorenom formulari novej polozky nie je co dorovnavat
+    // a dotaz do Demosu by isiel za nic.
+    if (entered && HW_VIEW !== 'sets' && hwNewFormOpen()) mdhDemosInput();
   }
 
   // Odchod zo sekcie `hw` (vola `studioGoSection` v studio.js PRED prepnutim).
   // Poradie je zavazne (lekcia ŠT-2b): NAJPRV sa ohlasi SERVERU (ten zrusi
   // beziace overenie ceny / nahlad a napise preco), az potom sa lokalne
   // zatvoria modaly.
+  // Formular novej polozky je viditelny? (`display: none` ho skryva.)
+  function hwNewFormOpen(){
+    var f = hwEl('hwNewForm');
+    return !!f && f.style.display !== 'none';
+  }
+
   function hwOnLeaveSection(){
     if (window.sketchup && sketchup.hw_leave) sketchup.hw_leave('');
+    // Review #219 P2-2: naplanovany (debounced) dotaz do Demosu MUSI zomriet
+    // s odchodom. Vstup do sekcie a rychly odchod by inak poslal
+    // `hw_demos_search` do sekcie, ktoru uz nikto nepozera — server by beh
+    // oznacil za beziaci a NAJBLIZSI odchod by vypisal falosne „Zrušené…".
+    if (mdhDemosTimer){
+      clearTimeout(mdhDemosTimer);
+      mdhDemosTimer = null;
+    }
     hwCloseModals();
   }
 
