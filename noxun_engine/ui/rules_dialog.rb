@@ -215,6 +215,18 @@ module Noxun
                               'Skontroluj a ulož znova.', true)
           end
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          # Review #220 P2: identita dokumentu Z PAYLOADU je DRUHA vrstva nad
+          # baseline — klient ju posiela z `RD_META.model_guid`, teda z toho
+          # istého payloadu, ktorým bol formulár naplnený. Guard je lacný
+          # a kryje aj prípad, keď by baseline z akéhokoľvek dôvodu prešiel.
+          # Tolerantne (vzor `do_budget`): PRAZDNY udaj zo starsieho cachovaneho
+          # DOM guard neblokuje, NEZHODNE ID ano.
+          guid = data['model_guid'].to_s
+          if !guid.empty? && guid != model_guid(model)
+            refresh_studio(bump: false)
+            return set_status('Model sa medzitým prepol — pravidlá sú načítané z tohto modelu. ' \
+                              'Skontroluj a ulož znova.', true)
+          end
           rules = HardwareRules.normalize_rules(data['rules'])
           return set_status('Žiadne platné pravidlá — nič sa neuložilo.', true) if rules.empty?
 

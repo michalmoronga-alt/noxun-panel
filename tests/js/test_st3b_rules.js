@@ -188,12 +188,30 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
      'zmena pravidiel na modeli formulár prekreslí');
   ok(/value="6"/.test(ELS.rulesBox.innerHTML), 'a to NOVOU hodnotou');
 
-  // (c) Odchod do inej sekcie telo odpojí, návrat ho vráti AJ s obsahom.
+  // (c) Odchod do inej sekcie telo odpojí, návrat ho vráti AJ S HODNOTAMI.
+  //
+  // Review #220 P1: prežiť MUSÍ `#rulesBox`, nie len uzol vedľa neho. Ručné
+  // hodnoty (počty, hranice pásiem, rad dĺžok) žijú LEN v DOM — do `RD_RULES`
+  // sa preberajú až cez `rdSyncFromForm` pri „+ pásmo"/„✕". Keď render beží pri
+  // každom pripojení tela, odchod do Kusovníka a návrat ich ticho zahodí.
+  ELS.rulesBox.innerHTML = 'ROZPISANE-2';
   body.innerHTML = '<div>Kusovník</div>';
   eq(node.parentNode, null, 'iná sekcia si telo Pravidiel odpojila (vzor prehliadača)');
   R.rulesRenderBody();
   ok(body.children[0] === node, 'návrat do sekcie vráti TEN ISTÝ uzol');
   ok(node.children.indexOf(draft) >= 0, 'aj s rozpísaným obsahom');
+  eq(ELS.rulesBox.innerHTML, 'ROZPISANE-2',
+     'a HODNOTY vo formulári prežili — návrat do sekcie ho NEPREKRESLIL');
+
+  // Zmena pravidiel, ktorá príde KÝM je telo ODPOJENÉ, sa nesmie stratiť:
+  // prekreslenie dobehne pri návrate (inak by sekcia ukazovala, čo už neplatí).
+  body.innerHTML = '<div>Kusovník</div>';
+  const later = JSON.parse(JSON.stringify(rules));
+  later.rules[0].quantity = 8;
+  R.rdApplyState(later);
+  R.rulesRenderBody();
+  ok(/value="8"/.test(ELS.rulesBox.innerHTML),
+     'zmena počas odpojenia sa dokreslí až pri návrate do sekcie');
 })();
 
 // --- 5) „Načítať globálne" nesmie push potichu prepísať --------------------
@@ -255,10 +273,17 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   ok(studio.indexOf('js/hw_catalog.js') < studio.indexOf('js/rules.js'),
      'a za všetkými predošlými obalmi');
 
-  // Uloženie posiela `model_guid` — server ho porovná s baseline dokumentu.
+  // Uloženie posiela `model_guid` a SERVER ho reálne overuje (review #220 P2)
+  // — druhá vrstva k baseline. Kým ho nečítal, bolo to mŕtve pole a toto
+  // tvrdenie klamalo.
   const saveFn = src.match(/function rdSaveRules\(\)\{[\s\S]*?\n  \}/)[0];
   ok(/model_guid: RD_META\.model_guid/.test(saveFn),
-     'zápis nesie identitu dokumentu (server odmietne zápis nad cudzím modelom)');
+     'zápis nesie identitu dokumentu');
+  const rb = fs.readFileSync(path.join(JS, '..', 'rules_dialog.rb'), 'utf8');
+  const iSave = rb.indexOf('def handle_save');
+  const iGuid = rb.indexOf('guid != model_guid(model)');
+  ok(iSave >= 0 && iGuid > iSave,
+     'a SERVER ho naozaj \u010d\u00edta v `handle_save` \u2014 inak by to bolo m\u0155tve pole');
   ok(/rdValidate\(rules\)/.test(saveFn),
      'a pred odoslaním beží klientska kontrola (prestavba VŠETKÝCH skriniek nie je lacná)');
 })();

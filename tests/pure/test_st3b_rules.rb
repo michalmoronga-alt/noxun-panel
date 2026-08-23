@@ -166,6 +166,21 @@ NxTest.test('ŠT-3b-1: baseline formulara stoji na `model.guid`, NIE na `model.p
                 'F4: model chodi ARGUMENTOM — inak by sekcia dostala pravidla STAREHO dokumentu')
 end
 
+NxTest.test('ŠT-3b-1 (review P2): SERVER overuje `model_guid` Z PAYLOADU') do
+  # Druha vrstva k baseline: klient posiela guid z TOHO ISTEHO payloadu,
+  # ktorym bol formular naplneny. Kym ho server necital, bolo to MRTVE pole.
+  save = ST3B_RULES_RB[/def handle_save\(payload\).*?\n        end\n/m].to_s
+  NxTest.assert(save.include?("guid = data['model_guid'].to_s"),
+                'guid z payloadu sa naozaj cita')
+  NxTest.assert(save.include?('!guid.empty? && guid != model_guid(model)'),
+                'a porovnava sa s modelom — TOLERANTNE (prazdny udaj guard neblokuje)')
+  guard = save[/if !guid\.empty\?.*?\n          end\n/m].to_s
+  NxTest.assert(guard.include?('refresh_studio(bump: false)'),
+                'odmietnutie nacita formular nanovo — BEZ zdvihu generacie (nic sa nezapisalo)')
+  NxTest.assert(save.index('guid != model_guid(model)') < save.index('rebuild_many'),
+                'guard je PRED prestavbou skriniek')
+end
+
 NxTest.test('ŠT-3b-1: odmietnuty zapis NIC nezapise a formular sa nacita nanovo') do
   save = ST3B_RULES_RB[/def handle_save\(payload\).*?\n        end\n/m].to_s
   head = save[/\A.*?baseline_valid\?\(model\).*?\n          end\n/m].to_s
@@ -237,6 +252,16 @@ NxTest.test('ŠT-3b-1: telo sekcie je SABLONA a lista je cista funkcia') do
   NxTest.refute(body.include?('<h1'), 'nazov nesie hlavicka sekcie')
   NxTest.assert(ST3B_RULES_JS.include?('function rulesToolsHtml(st)'),
                 'listu kresli cista funkcia (testuje ju tests/js/test_st3b_rules.js)')
+  # Review #220 P1: pripojenie tela pri NAVRATE do sekcie NESMIE prekreslit
+  # formular — rucne hodnoty ziju len v DOM.
+  body_js = ST3B_RULES_JS[/function rulesRenderBody\(\)\{.*?\n  \}/m].to_s
+  NxTest.assert(body_js.include?('if (RD_NEEDS_RENDER){'),
+                'render je PODMIENENY — nie bezpodmienecny pri kazdom pripojeni')
+  NxTest.assert(ST3B_RULES_JS.include?('RD_NEEDS_RENDER = false;'),
+                'priznak gasne AZ ked sa formular naozaj vykreslil')
+  apply_js = ST3B_RULES_JS[/function rdApplyState\(r\)\{.*?\n  \}/m].to_s
+  NxTest.assert(apply_js.include?('RD_NEEDS_RENDER = true;'),
+                'zmena pravidiel NA MODELI priznak zdvihne (dokresli sa aj po navrate)')
   body_fn = ST3B_STUDIO_JS[/function renderBody\(\)\{.*?\n  \}/m].to_s
   NxTest.assert(body_fn.include?("studioSec === 'rules'") && body_fn.include?('rulesRenderBody()'),
                 'telo sekcie kresli VYHRADNE rulesRenderBody')

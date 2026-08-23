@@ -17,6 +17,13 @@
   // ci push zo servera ma formular prekreslit — viz `rdApplyState`.
   var RD_SEED = null;
   var RD_META = { version: '', source: '', cabinets: 0 };
+  // Review #220 P1: „formular je vykresleny a jeho hodnoty ziju v DOM".
+  // Kym plati, prekreslit ho smie UZ LEN zmena pravidiel NA MODELI — nie
+  // pripojenie tela pri navrate do sekcie. Rucne hodnoty (`.rqty`, `.bmax`,
+  // `.bqty`, `.rseries`, `.rclr`) ziju totiz LEN v DOM: do `RD_RULES` sa
+  // preberaju az cez `rdSyncFromForm` pri „+ pásmo"/„✕". Uzol sa pri odchode
+  // zo sekcie IBA ODPOJI (hodnoty v nom ostanu), takze staci ho neprekreslit.
+  var RD_NEEDS_RENDER = true;
 
   function rdEl(id){ return document.getElementById(id); }
   function rdEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -48,6 +55,7 @@
   var RD = {
     init: function(data){
       rdSetState(data);
+      RD_NEEDS_RENDER = true;
       rdRender();
     },
     setRules: function(rules, _source){
@@ -55,6 +63,7 @@
       // „Načítať globálne predvoľby" je ZAMERNE zmena formulara, ktora este
       // NEPLATI — odtlacok sa preto NEobnovuje: najblizsi push zo servera
       // (s pravidlami projektu) by inak formular potichu prepisal spat.
+      RD_NEEDS_RENDER = true;
       rdRender();
     },
     setStatus: function(msg, err){
@@ -121,6 +130,9 @@
     });
     if (!html) html = '<div class="muted">Žiadne pravidlá — načítaj globálne predvoľby.</div>';
     box.innerHTML = html;
+    // Vykreslene: od tejto chvile su hodnoty formulara v DOM a pripojenie
+    // tela pri navrate do sekcie ich uz NESMIE prepisat.
+    RD_NEEDS_RENDER = false;
   }
 
   function rdRuleNode(node){ return node.closest('.rrule'); }
@@ -237,7 +249,7 @@
     var s = st || {};
     var ico = function(n){ return '<svg class="ic" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; };
     var h = '<button type="button" class="primary" id="rdSaveBtn" onclick="rdSaveRules()"' +
-      ' title="Uloží pravidlá do projektu a prestavá všetky skrinky — 1 krok Späť">' +
+      ' title="Uloží pravidlá do projektu a prestaví všetky skrinky — 1 krok Späť">' +
       ico('check') + ' Uložiť a prestavať skrinky</button>' +
       '<label class="rdchk" title="Zapíše pravidlá aj do globálnych predvolieb — platia pre NOVÉ projekty">' +
       '<input type="checkbox" id="alsoGlobal"' + (s.also_global ? ' checked' : '') +
@@ -291,13 +303,18 @@
     if (node.parentNode !== box){
       box.innerHTML = '';
       box.appendChild(node);
-      // Prvy vstup do sekcie (alebo navrat po odpojeni) — formular sa musi
-      // vykreslit z posledneho stavu, ktory zo servera prisiel.
+    }
+    // Formular sa kresli LEN ked to naozaj treba (prvy vstup do sekcie,
+    // alebo zmena pravidiel NA MODELI, ktora prisla, kym bolo telo
+    // odpojene). Pri NAVRATE do sekcie sa NEDOTYKA — rucne hodnoty ziju
+    // v DOM uzla, ktory odchodom iba vypadol z `#secbody` (review #220 P1;
+    // predtym ich kazdy navrat ticho zahodil).
+    if (RD_NEEDS_RENDER){
       rdRender();
       return;
     }
-    // Telo uz v DOM je: prekresluje sa LEN meta riadok. Formular sa NEDOTYKA —
-    // rozpisane hodnoty by push zo servera inak zmazal (viz `rdApplyState`).
+    // Meta riadok (zdroj, pocet skriniek) sa obnovuje VZDY — je to cislo
+    // zo servera, nie rozpisana hodnota.
     var line = rdEl('rdSrcLine');
     if (line) line.textContent = rdSrcLine();
   }
@@ -319,7 +336,12 @@
       return;
     }
     rdSetState(r);
-    rdRender();   // no-op, kym je telo sekcie odpojene (`rdEl` vrati null)
+    // Pravidla NA MODELI sa zmenili — formular UZ neplati a musi sa
+    // prekreslit. Ked je telo sekcie odpojene, `rdRender` je no-op
+    // (`rdEl` vrati null) a priznak ostane zdvihnuty, takze prekreslenie
+    // dobehne pri NAVRATE do sekcie.
+    RD_NEEDS_RENDER = true;
+    rdRender();
   }
 
   // Napojenie na kanal Studia. `studio.js` (a za nim `budget.js`,
