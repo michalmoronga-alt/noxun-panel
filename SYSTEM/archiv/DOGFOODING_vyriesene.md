@@ -10,7 +10,7 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 
 ## Vyriešené (plné texty)
 
-### D-69 — Jednotný editor materiálov (vyriešené 23.8.2026, dávka ŠT-2c: PR #208 + #212 + #213, v0.7.54)
+### D-69 — Jednotný editor materiálov (vyriešené 23.8.2026, dávka ŠT-2c: PR #208 + #212 + #213, v0.7.55)
 
 **Pôvodné znenie (Michal 1.8. neskoro večer, smoke F8100/zástena):** editor variantov nie je prispôsobený novému systému — niektoré údaje server vyžaduje, ale používateľ ich nemá kde zadať/skontrolovať (formát, URL, dodávateľ, kód, stav väzby). Odporúčanie: JEDNO spoločné modálne okno pre pridanie z Demosu / ručné pridanie / editáciu / dopĺňanie / opravy — **rovnaké polia bez ohľadu na vstupný bod**.
 

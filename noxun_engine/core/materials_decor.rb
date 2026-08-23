@@ -1254,8 +1254,24 @@ module Noxun
         save_decor_create_no_ids(sheet_rows, 'sheets', 'material_id', errors)
         save_decor_create_no_ids(edge_rows, 'edges', 'abs_id', errors)
         gid = save_decor_create_group(decor, manufacturer, sheet_rows, edge_rows, errors)
+        # (review 2c-2b #2) JEDNA struktura povrchu na skupinu. Skupina s dvoma
+        # strukturami je pre editor NEROZHODNUTELNA (`sd_new_structure`) —
+        # zalozit ju znamena vyrobit dekor, do ktoreho sa uz nikdy neda pridat
+        # riadok inak nez cez „+ variant".
+        save_decor_create_structures(sheet_rows, edge_rows, errors)
         plan = save_decor_create_plan(a, gid, decor, manufacturer, decor_name, errors)
         data = load
+        # (6 + review 2c-2b #1) NEZAVISLY snimok stavu PRED davkou.
+        # `save_decor_code_conflict` podla neho odlisi par, ktory zmenila TATO
+        # davka, od parov, ktore v katalogu uz boli. PRAZDNY snimok by znamenal,
+        # ze KAZDY zaznam je „novy" — a jedna stara, vedome potvrdena duplicita
+        # kod+dodavatel by potom zablokovala zalozenie KAZDEHO dalsieho dekoru.
+        orig = {}
+        base = load
+        %w[sheets edges].each do |k|
+          idk = k == 'edges' ? 'abs_id' : 'material_id'
+          Array(base[k]).each { |r| orig[[k, r[idk].to_s]] = r }
+        end
         # (5) Riadky sa validuju AJ ked identita neprešla — pouzivatel ma dostat
         # VSETKY chyby naraz, nie formular po jednom poli. Zapis je podmieneny
         # PRAZDNYM `errors`, takze provizorny `group_id` sa na disk nikdy
@@ -1282,15 +1298,39 @@ module Noxun
             created << rec[idk]
           end
         end
-        # (6) Duplicita kod+dodavatel sa vycita rovnako ako pri edite — `orig`
-        # je prazdny, lebo TU je kazdy zaznam novy (nedotknuty par neexistuje).
-        conflict = save_decor_code_conflict(data, {}, a['allow_duplicate_code'])
+        # (6) Duplicita kod+dodavatel sa vycita PRESNE ako pri edite — nad
+        # simulovanym finalnym stavom a proti snimku spred davky.
+        conflict = save_decor_code_conflict(data, orig, a['allow_duplicate_code'])
         return conflict if conflict
         # (10) JEDEN write na cely formular.
         return [:write_failed, { 'message' => 'Zápis katalógu zlyhal.' }] unless write_unlocked(data)
         [:ok, { 'mode' => 'create', 'group_id' => plan['gid'], 'decor' => decor,
                 'created' => created, 'updated' => [], 'skipped' => skipped,
                 'changed' => created.size }]
+      end
+
+      # (review 2c-2b #2) NOVA skupina smie mat PRAVE JEDNU strukturu povrchu.
+      # Nie je to kozmetika: `sd_new_structure` odmieta pridat riadok do
+      # skupiny s viacerymi strukturami (stlpec to nie je, dedi sa po skupine),
+      # takze dvojstrukturova skupina by vznikla rovno ako slepa ulicka —
+      # editor by do nej uz nikdy nic nepridal. Chyba sadne na riadky, ktore
+      # sa lisia od PRVEHO (ten urcuje strukturu skupiny).
+      def save_decor_create_structures(sheet_rows, edge_rows, errors)
+        first = nil
+        [['sheets', sheet_rows], ['edges', edge_rows]].each do |(listk, rows)|
+          rows.each_with_index do |raw, i|
+            next unless raw.is_a?(Hash)
+            st = identity_norm(sd_str(raw['structure'] || raw[:structure]))
+            if first.nil?
+              first = st
+              next
+            end
+            next if st == first
+            errors << sd_err("#{listk}:#{i}", 'structure',
+                             'Nový dekor musí mať jednu štruktúru povrchu — ďalšiu pridaj až hotovému dekoru cez „+ variant“.')
+          end
+        end
+        errors
       end
 
       # Riadok so skrytym ID v `create` = chyba (nie tichy edit cudzieho zaznamu).
@@ -1345,25 +1385,41 @@ module Noxun
                  'decor_name' => decor_name, 'color' => nil, 'grain' => nil,
                  'rename' => false, 'reman' => false, 'rename_name' => false,
                  'changed' => true }
-        if a.key?('color') && !sd_str(a['color']).empty?
-          rgb = parse_rgb(a['color'])
-          if rgb.nil?
-            errors << sd_err(nil, 'color', 'Neplatná farba — očakávam #RRGGBB alebo [r,g,b] 0–255.')
-          else
-            plan['color'] = rgb
-          end
-        end
-        if a.key?('grain')
-          want = sd_str(a['grain'])
-          unless want.empty?
-            if GRAINS.include?(want)
-              plan['grain'] = want
-            else
-              errors << sd_err(nil, 'grain', 'Smer dekoru musí byť length/width/none.')
-            end
-          end
-        end
+        # (review 2c-2b #3) Farba ide TOU ISTOU autoritou ako pri edite —
+        # vratane UNI zamku. Dnes je pri zakladani nedosiahnutelny (novy dekor
+        # sa nevola ako existujuca UNI skupina), ale dve kopie toho isteho
+        # pravidla sa casom rozidu a jedna z nich prestane platit.
+        plan['color'] = sd_color_plan(a, gid, decor, nil, errors)
+        plan['grain'] = sd_grain_plan(a, errors)
         plan
+      end
+
+      # Farba SKUPINY — jedna autorita pre `edit` aj `create`. Vrati rgb (ked sa
+      # ma zapisat), inak nil; chyby pise do `errors`.
+      def sd_color_plan(a, gid, decor, current_rgb, errors)
+        return nil unless a.key?('color') && !sd_str(a['color']).empty?
+        rgb = parse_rgb(a['color'])
+        if rgb.nil?
+          errors << sd_err(nil, 'color', 'Neplatná farba — očakávam #RRGGBB alebo [r,g,b] 0–255.')
+          return nil
+        end
+        # UNI ma farbu ZAMKNUTU — rozlisuje pracovnu rolu (D-82).
+        if uni_group?(gid, decor)
+          errors << sd_err(nil, 'color', uni_color_locked_message)
+          return nil
+        end
+        rgb == current_rgb ? nil : rgb
+      end
+
+      # Smer dekoru = default NOVYCH dosiek (vzor batchu) — jedna autorita
+      # pre oba rezimy. Vrati hodnotu alebo nil (nezadane).
+      def sd_grain_plan(a, errors)
+        return nil unless a.key?('grain')
+        want = sd_str(a['grain'])
+        return nil if want.empty?
+        return want if GRAINS.include?(want)
+        errors << sd_err(nil, 'grain', 'Smer dekoru musí byť length/width/none.')
+        nil
       end
 
       # (review #6) Druhy vyskyt toho isteho ID vo formulari = chyba validate-all.
@@ -1475,28 +1531,13 @@ module Noxun
           errors << sd_err(nil, 'manufacturer', 'Dekor nemá dosky (výrobcu nesie doska).')
         end
         # Farba je vlastnost SKUPINY (D-82); UNI ju ma zamknutu — rozlisuje rolu.
-        if a.key?('color') && !sd_str(a['color']).empty?
-          rgb = parse_rgb(a['color'])
-          if rgb.nil?
-            errors << sd_err(nil, 'color', 'Neplatná farba — očakávam #RRGGBB alebo [r,g,b] 0–255.')
-          elsif uni_group?(gid, group['decor'])
-            errors << sd_err(nil, 'color', uni_color_locked_message)
-          elsif rgb != group_color_in(data, gid, group['decor'])
-            plan['color'] = rgb
-          end
-        end
+        # Validacia je ZDIELANA s `create` (review 2c-2b #3): jedno pravidlo,
+        # jedna hlaska, ziadna kopia, ktora by sa casom rozisla.
+        plan['color'] = sd_color_plan(a, gid, group['decor'],
+                                      group_color_in(data, gid, group['decor']), errors)
         # Smer dekoru je default NOVYCH dosiek (vzor batchu) — existujucim
         # riadkom ho editor nemeni, to je vlastnost variantu vo formulari.
-        if a.key?('grain')
-          want = sd_str(a['grain'])
-          unless want.empty?
-            if GRAINS.include?(want)
-              plan['grain'] = want
-            else
-              errors << sd_err(nil, 'grain', 'Smer dekoru musí byť length/width/none.')
-            end
-          end
-        end
+        plan['grain'] = sd_grain_plan(a, errors)
         plan['changed'] = plan['rename'] || plan['reman'] || plan['rename_name'] || !plan['color'].nil?
         plan
       end

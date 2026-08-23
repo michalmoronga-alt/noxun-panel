@@ -284,6 +284,100 @@ NxTest.test('create (bod 10): duplicitny par kod+dodavatel pyta POTVRDENIE') do
                       'po potvrdeni su v katalogu obe')
 end
 
+# (review 2c-2b #1) NAJTICHSIA pasca celej vetvy: keby `save_decor_code_conflict`
+# dostal PRAZDNY snimok spred davky, kazdy zaznam katalogu by sa tvaril ako
+# „zmeneny touto davkou" — a JEDNA stara, vedome potvrdena duplicita kodu by
+# potom zablokovala zalozenie KAZDEHO dalsieho dekoru. Bez tohto testu by to
+# nikto nezistil, kym by sa katalog nezasekol.
+NxTest.test('create (bod 10): CUDZIA potvrdena duplicita NEBLOKUJE zalozenie ineho dekoru') do
+  sdc_headless!
+  sdc_fresh!
+  # dva existujuce dekory ZAMERNE zdielaju par kod+dodavatel (vedome potvrdena
+  # duplicita — presne stav, aky v katalogu realne vznika)
+  NxTest.assert_equal(:ok, SDC.save_decor(sdc_payload('edges' => [],
+                                                      'sheets' => [{ 'type' => 'DTDL', 'thickness' => '18',
+                                                                     'code' => 'SPOLOCNY', 'supplier' => 'Demos' }]))[0])
+  st_dup, = SDC.save_decor(sdc_payload('decor' => 'N9101', 'decor_name' => '', 'edges' => [],
+                                       'base_rev' => SDC.catalog_revision,
+                                       'allow_duplicate_code' => true,
+                                       'sheets' => [{ 'type' => 'DTDL', 'thickness' => '18',
+                                                      'code' => 'SPOLOCNY', 'supplier' => 'Demos' }]))
+  NxTest.assert_equal(:ok, st_dup, 'vychodisko: duplicita je v katalogu a bola POTVRDENA')
+  NxTest.assert_equal(2, SDC.sheets.count { |s| s['code'] == 'SPOLOCNY' })
+
+  # TRETI dekor s UPLNE INYM kodom — s duplicitou nema nic spolocne
+  st, info = SDC.save_decor(sdc_payload('decor' => 'N9102', 'decor_name' => '', 'edges' => [],
+                                        'base_rev' => SDC.catalog_revision,
+                                        'sheets' => [{ 'type' => 'DTDL', 'thickness' => '18',
+                                                       'code' => 'VLASTNY', 'supplier' => 'Demos' }]))
+  NxTest.assert_equal(:ok, st, "stara duplicita nesmie zamknut katalog: #{info.inspect}")
+  NxTest.assert(SDC.sheets.any? { |s| s['code'] == 'VLASTNY' }, 'dekor sa zalozil')
+  # a NOVA duplicita sa nadalej vycita (guard nezoslabol)
+  st2, info2 = SDC.save_decor(sdc_payload('decor' => 'N9103', 'decor_name' => '', 'edges' => [],
+                                          'base_rev' => SDC.catalog_revision,
+                                          'sheets' => [{ 'type' => 'DTDL', 'thickness' => '18',
+                                                         'code' => 'VLASTNY', 'supplier' => 'Demos' }]))
+  NxTest.assert_equal(:code_conflict, st2, info2.inspect)
+  NxTest.assert_equal('VLASTNY', info2['code'])
+end
+
+# (review 2c-2b #2) Skupina s dvoma strukturami je pre editor NEROZHODNUTELNA
+# (`sd_new_structure`) — zalozit ju znamena vyrobit dekor, do ktoreho sa uz
+# nikdy neda pridat riadok inak nez cez „+ variant".
+NxTest.test('create: dve rozne struktury v jednom formulari sa ODMIETNU') do
+  sdc_headless!
+  sdc_fresh!
+  rev = SDC.catalog_revision
+  st, info = SDC.save_decor(sdc_payload(
+                              'edges' => [],
+                              'sheets' => [{ 'type' => 'DTDL', 'thickness' => '18', 'structure' => 'ST10' },
+                                           { 'type' => 'DTDL', 'thickness' => '36', 'structure' => 'PW' }]
+                            ))
+  NxTest.assert_equal(:invalid, st)
+  err = info['errors'].find { |e| e['row'] == 'sheets:1' && e['field'] == 'structure' }
+  NxTest.assert(err, info.inspect)
+  NxTest.assert(err['msg'].include?('+ variant'), "hlaska povie, KDE sa dalsia struktura pridava: #{err['msg']}")
+  NxTest.assert_equal(rev, SDC.catalog_revision, 'ZIADNY zapis')
+
+  # rovnaka struktura (aj s inym zapisom) je v poriadku, aj krizom doska<->ABS
+  st2, info2 = SDC.save_decor(sdc_payload(
+                                'sheets' => [{ 'type' => 'DTDL', 'thickness' => '18', 'structure' => 'ST10' },
+                                             { 'type' => 'DTDL', 'thickness' => '36', 'structure' => 'st10' }],
+                                'edges' => [{ 'width' => '23', 'thickness' => '1', 'structure' => 'ST10' }]
+                              ))
+  NxTest.assert_equal(:ok, st2, info2.inspect)
+  # ABS s INOU strukturou nez dosky je tiez dvojstrukturova skupina
+  st3, info3 = SDC.save_decor(sdc_payload('decor' => 'N9201', 'decor_name' => '',
+                                          'base_rev' => SDC.catalog_revision,
+                                          'sheets' => [{ 'type' => 'DTDL', 'thickness' => '18', 'structure' => 'ST10' }],
+                                          'edges' => [{ 'width' => '23', 'thickness' => '1', 'structure' => 'PW' }]))
+  NxTest.assert_equal(:invalid, st3)
+  NxTest.assert(info3['errors'].any? { |e| e['row'] == 'edges:0' && e['field'] == 'structure' }, info3.inspect)
+end
+
+# (review 2c-2b #3) Farba ide OBOMA rezimami cez `sd_color_plan` — dve kopie
+# pravidla by sa casom rozisli a jedna z nich by prestala platit.
+NxTest.test('create: neplatna farba a UNI zamok su TA ISTA autorita ako pri edite') do
+  sdc_headless!
+  sdc_fresh!
+  st, info = SDC.save_decor(sdc_payload('color' => 'zelena'))
+  NxTest.assert_equal(:invalid, st)
+  NxTest.assert(info['errors'].any? { |e| e['field'] == 'color' }, info.inspect)
+
+  # UNI zamok: `uni_group?` pozna skupinu aj podla TEXTU dekoru, takze
+  # zalozenie dekoru s menom existujucej UNI skupiny narazi na to iste pravidlo
+  uni = SDC.sheets.find { |s| SDC.uni?(s) }
+  NxTest.assert(uni, 'seed nesie UNI sadu')
+  st2, info2 = SDC.save_decor(sdc_payload('decor' => uni['decor'], 'decor_name' => '',
+                                          'manufacturer' => '', 'edges' => [],
+                                          'color' => '#ff0000',
+                                          'sheets' => [{ 'type' => 'DTDL', 'thickness' => '18' }]))
+  NxTest.assert_equal(:invalid, st2)
+  err = info2['errors'].find { |e| e['field'] == 'color' }
+  NxTest.assert(err, info2.inspect)
+  NxTest.assert(err['msg'] == SDC.uni_color_locked_message, "TA ISTA hlaska ako v edite: #{err['msg']}")
+end
+
 NxTest.test('create: nudzovy (read-only) katalog zakladanie ODMIETNE') do
   sdc_headless!
   sdc_fresh!

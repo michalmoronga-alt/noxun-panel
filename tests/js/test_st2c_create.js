@@ -211,6 +211,13 @@ function catalogWithNew(rev){
   M.MD.editBlocked();
   ok(NXModal.isOpen(), 'okno zije dalej');
   eq(DOC.getElementById('nxm_decor').value, 'N9001', 'rozpisana identita ostala');
+  // (review 2c-2b #4) Pri ZAKLADANI sa nic nedorovnava — v katalogu ziadny nas
+  // riadok nie je, takze hlaska editu by klamala o tom, co sa stalo.
+  const blocked = String(STATUS.textContent);
+  ok(blocked.indexOf('skús uložiť znova') > -1,
+     'hlaska create vetvy hovori PRAVDU: „Katalóg sa medzitým zmenil — skús uložiť znova."');
+  ok(blocked.indexOf('dorovnali') === -1,
+     'a NEtvrdi, ze sa riadky dorovnali (to je vec editu)');
   SENT.length = 0;
   dispatch(DOC.querySelector('[data-nxm-act="submit"]'), 'click');
   eq(SENT[0].base_rev, 'R3', 'baseline OMLADOL — druhy pokus ma sancu prejst');

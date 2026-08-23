@@ -2366,8 +2366,16 @@
       m.setBusy(false);
       m.clearErrors();
       var stale = !!(mdEditBase && mdEditBase.rev !== MD_REV);
+      // Rezim treba precitat PRED refreshom — ten baseline omladi.
+      var creating = !!(mdEditBase && mdEditBase.mode === 'create');
       var res = mdEditRefresh();
       if (!stale || !res || !res.ok) return;
+      if (creating){
+        // Pri zakladani sa NEDOROVNAVA nic (v katalogu ziadny nas riadok
+        // nie je) — hlaska „riadky sme dorovnali" by klamala.
+        MD.setStatus('Katalóg sa medzitým zmenil — skús uložiť znova.', true);
+        return;
+      }
       MD.setStatus(res.touched
         ? 'Katalóg sa medzitým zmenil — riadky sme dorovnali, tvoje hodnoty ostali. Skontroluj označené riadky a ulož znova.'
         : 'Katalóg sa medzitým zmenil — riadky sme dorovnali, tvoje hodnoty ostali. Môžeš uložiť znova.', true);
