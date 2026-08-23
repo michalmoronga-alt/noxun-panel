@@ -5,7 +5,7 @@
      to isté zdieľané jadro `ProductionCore`).
      Vizuálna referencia: SYSTEM/zdroje/ui20/mockup_studio.html -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.7.58">
+<link rel="stylesheet" href="css/panel.css?v=0.7.59">
 <style>
   /* Štýly sú ZÁMERNE inline v studio.html (rovnaký dôvod, aký mala production.html):
      panel.css je zdieľaný s Inspectorom a rozloženie tohto okna doňho nepatrí.
@@ -664,6 +664,66 @@
   </div>
 </div>
 
+<!-- ŠT-3a-1: modály sekcie KOVANIE. Ten istý dôvod ako pri #matModalRoot —
+     žijú MIMO #secbody, takže ich neshodí ani prekreslenie sekcie, ani
+     prepnutie na Kusovník. Odchod zo sekcie ich zatvorí (`hwOnLeaveSection`). -->
+<div id="hwModalRoot">
+  <!-- Potvrdenie zmazania položky — in-window modal (NIE UI.messagebox). -->
+  <div id="hwDelModal" class="nxmodal" style="display:none">
+    <div class="nxmodal-card">
+      <div class="nxmodal-title">Zmazať položku</div>
+      <div class="hint" id="hwDelText">…</div>
+      <div class="nxmodal-warn">Zmazanie neruší históriu zákaziek — tie držia vlastné snapshoty.</div>
+      <div class="btnrow">
+        <!-- GH #100 P1: destruktivna akcia = .danger (UI_DIZAJN), nie primary -->
+        <button class="danger" data-action="hw-del-confirm">Zmazať</button>
+        <button class="ghostbtn" data-action="hw-del-close">Zrušiť</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ŠT-3a-1: TELO sekcie KOVANIE (Š16 — presun okna „Katalóg kovania" 1:1).
+     Rovnaká kostra ako pri Materiáloch: ŠABLÓNA, ktorú `hwRenderBody` naklonuje
+     RAZ a ten istý uzol potom putuje do #secbody a späť — vďaka tomu prežije
+     rozpísaný formulár novej položky aj rozpísaný editor setu prepnutie sekcie
+     a hlavne push zo servera.
+     Obsah je presun 1:1 z hardware_catalog.html BEZ hornej lišty `.mdbar`
+     a BEZ tabov: pohľady Položky · Sety aj hľadanie patria do LIŠTY sekcie
+     (`hwToolsHtml`). „Predvoľby projektu" sú v pohľade Sety a v sekcii sú
+     READ-ONLY — zapisujú do modelu, presun je ŠT-3a-2. -->
+<template id="hwBodyTpl">
+  <div id="hwRoBanner" class="mdbanner mdbanner-ro" style="display:none">
+    <svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>
+    <span id="hwRoText">…</span>
+  </div>
+  <div id="hwTabSets" style="display:none"></div>
+  <div id="hwTabProj" style="display:none"></div>
+  <div id="hwTabItems">
+    <div id="hwList"></div>
+    <!-- Formular novej polozky — enum selecty plni JS zo state payloadu. -->
+    <div id="hwNewForm" style="display:none">
+      <!-- V0.6 D2: Pridat z Demosu — jedno pole URL/nazov (vzor M-A), zhody zo
+           sitemap cache, nahlad zo stranky (server proposal), zapis s vazbou. -->
+      <div class="row"><label>Z Demosu</label><input id="hn_demos" type="text" placeholder="URL produktu alebo hľadaj názvom (3+ znaky)"><span class="unit"><button class="ghostbtn" data-action="hw-demos-load" title="Načíta produktovú stránku a predvyplní položku">Načítať</button></span></div>
+      <div id="hwDemosHits"></div>
+      <div id="hwDemosPreview" style="display:none"></div>
+      <div class="hint" id="hwManualHint">…alebo vyplň ručne:</div>
+      <div class="row"><label>Kód *</label><input id="hn_code" type="text" placeholder="Demos kód alebo vlastný"><span class="unit"></span></div>
+      <div class="row"><label>Názov *</label><input id="hn_name" type="text"><span class="unit"></span></div>
+      <div class="row"><label>Kategória</label><select id="hn_category"></select><span class="unit"></span></div>
+      <div class="row"><label>MJ</label><select id="hn_unit"></select><span class="unit"></span></div>
+      <div class="row"><label>Cena</label><input id="hn_price" type="text" placeholder="nezadaná"><span class="unit">€ s DPH</span></div>
+      <div class="row"><label>Dodávateľ</label><input id="hn_supplier" type="text" placeholder="napr. Demos"><span class="unit"></span></div>
+      <div class="row"><label>Poznámka</label><input id="hn_notes" type="text"><span class="unit"></span></div>
+      <div class="btnrow">
+        <button class="primary" data-action="hw-create">Vytvoriť</button>
+        <button class="ghostbtn" data-action="hw-new-close">Zrušiť</button>
+      </div>
+    </div>
+  </div>
+</template>
+
 <!-- ŠT-2a: TELO sekcie MATERIÁLY. Je to ŠABLÓNA, nie živý obsah: `matRenderBody`
      ju naklonuje RAZ a ten istý uzol potom putuje do #secbody a späť. Vďaka tomu
      prežije rozpísaný formulár „Nový dekor" aj rozpísaná bunka ceny prepnutie
@@ -824,34 +884,34 @@
 </template>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.7.58"></script>
+<script src="js/errors.js?v=0.7.59"></script>
 <!-- D-51/D-77: minimálna OBSAHOVÁ veľkosť okna pri otvorení (js/win_fit.js).
      Navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami a stĺpcom akcií — v užšom
      okne končí pravá časť riadku mimo. Trojica NX_FIT_MIN → width/height →
      min_width/min_height je v docs/UI_DIZAJN.md (tabuľka D-51). -->
 <script>window.NX_FIT_MIN = { w: 1060, h: 640 };</script>
-<script src="js/win_fit.js?v=0.7.58"></script>
+<script src="js/win_fit.js?v=0.7.59"></script>
 <!-- Sprite ikon (žiadne emoji v ovládacích prvkoch). Musí byť PRED studio.js —
      navigácia aj hover akcie riadkov používajú <use href="#i-…">. -->
-<script src="js/icons.js?v=0.7.58"></script>
+<script src="js/icons.js?v=0.7.59"></script>
 <!-- ŠT-1b: ZDIELANE 3-stavove nastavenie kontroly hran. TEN ISTY subor nacitava
      aj Inspector (rohovy trojuholnik pri ABS kontrole v raile) — jeden markup,
      jeden stav. Musi byt PRED studio.js (lista sekcie Kontrola ho vola pri
      renderi). ŠT-1c PR B3: okno Vyroba zaniklo — prepinace su TU. -->
-<script src="js/edge_menu.js?v=0.7.58"></script>
+<script src="js/edge_menu.js?v=0.7.59"></script>
 <!-- ŠT-1c PR B2 (D-15): ZDIELANA kostra modalov („pridávačiek"). Musí byť PRED
      studio.js aj budget.js — Escape handler Štúdia sa pýta `NXModal.isOpen()`
      a rozpočet ním otvára svoje pridávačky. Ďalšie inštancie (D-69 editor
      materiálu, položka/set kovania) sa naň napoja bez kopírovania. -->
-<script src="js/nx_modal.js?v=0.7.58"></script>
-<script src="js/studio.js?v=0.7.58"></script>
+<script src="js/nx_modal.js?v=0.7.59"></script>
+<script src="js/studio.js?v=0.7.59"></script>
 <!-- ŠT-1c PR B1: sekcia ROZPOČET (Š12–Š13). MUSÍ byť AŽ ZA studio.js — číta
      jeho globálny payload `ST` a hlavne OBALUJE `NX.setStudio` (uvoľnenie
      frontu zápisov po príchode čerstvej generácie). studio.js pritom NX
      PRIRAĎUJE celý (`window.NX = {…}`), takže v opačnom poradí by obal aj
      `NX.budgetResult`/`NX.priceRefresh` prepísal a rozpočet by po prvom zápise
      zamrzol. Poradie stráži guard test (tests/pure/test_st1c_rozpocet.rb). -->
-<script src="js/budget.js?v=0.7.58"></script>
+<script src="js/budget.js?v=0.7.59"></script>
 <!-- ŠT-2a/2b: sekcia MATERIÁLY. Okno „Materiály projektu" ZANIKLO, takže tento
      súbor beží už len TU; príznak nižšie ostáva ako explicitné prihlásenie sa
      do režimu sekcie (a ako poistka Node testov, ktoré ho nenastavujú).
@@ -865,6 +925,19 @@
      handlerov; `demos_add.js` nesie modal „Pridať z Demosu". Oba používajú
      výhradne vlastné prefixy (`mdd*` / `nxda*`), takže v okne so studio.js
      a budget.js nič neprepisujú (stráži guard test). -->
-<script src="js/demos_diff.js?v=0.7.58"></script>
-<script src="js/demos_add.js?v=0.7.58"></script>
-<script src="js/proj_materials.js?v=0.7.58"></script>
+<script src="js/demos_diff.js?v=0.7.59"></script>
+<script src="js/demos_add.js?v=0.7.59"></script>
+<script src="js/proj_materials.js?v=0.7.59"></script>
+<!-- ŠT-3a-1: sekcia KOVANIE (Š16). Okno „Katalóg kovania" ZATIAĽ ŽIJE (drží tri
+     modelové zápisy — predvoľby setov projektu; zanikne v ŠT-3a-2), takže oba
+     súbory bežia v DVOCH oknách. Príznak nižšie prepína zdieľaný súbor do režimu
+     SEKCIE: potlačí jeho vlastné `sketchup.ready('')` (v Štúdiu ho posiela
+     studio.js) a zapne read-only predvoľby projektu s premostením.
+     MUSÍ byť AŽ ZA studio.js, budget.js aj proj_materials.js — obaľuje
+     `NX.setStudio` (rovnaký dôvod ako rozpočet a materiály) a lištu/telo sekcie
+     kreslí cez `hwRenderTools`/`hwRenderBody`, ktoré studio.js volá cez `typeof`.
+     `hw_sets.js` musí byť PRED `hw_catalog.js` (ten mu pri načítaní zapína
+     read-only režim). Poradie stráži guard test (tests/pure/test_st3a_hw.rb). -->
+<script>window.NX_HW_SECTION = true;</script>
+<script src="js/hw_sets.js?v=0.7.59"></script>
+<script src="js/hw_catalog.js?v=0.7.59"></script>

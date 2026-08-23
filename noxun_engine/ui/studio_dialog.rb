@@ -42,7 +42,8 @@ module Noxun
       # (`mat` — prva ziva polozka skupiny KATALOGY). JS zrkadla
       # (`studio.js`, `NXShell.STUDIO_SECTIONS`) su pohodlie, nie ochrana
       # (zhodu strazi guard test): autoritou je VZDY Ruby.
-      SECTIONS = %w[bom ctrl buy budget offer mat].freeze
+      # ŠT-3a-1 pridala KOVANIE (`hw` — druha ziva polozka skupiny KATALOGY).
+      SECTIONS = %w[bom ctrl buy budget offer mat hw].freeze
 
       # ŠT-2a/2b: akcie katalogu materialov, ktore smie poslat SEKCIA `mat`,
       # ziju v JEDINOM zozname — `MaterialsDialog::SECTION_ACTIONS`. Telo
@@ -62,15 +63,24 @@ module Noxun
       # okna. ŠT-2b: okno „Materiály projektu" ZANIKLO uplne, takze zanikla aj
       # jeho vlastna cesta `mat_open_window` — sekcia dnes vie VSETKO vratane
       # Demos tokov a „Nahradiť UNI…".
+      # ŠT-3a-1: `hw` z tejto tabulky VYPADLO — Kovanie je ZIVA sekcia tohto
+      # okna. Okno „Katalóg kovania" ale ZIJE dalej: drzi este tri MODELOVE
+      # zapisy (predvolby setov projektu), ktore sekcia zatial nevie. Otvara
+      # ho preto vlastna cesta `hw_open_window` (premostenie Z VNUTRA sekcie,
+      # vzor `mat_open_window` zo ŠT-2a) — nie navigacia.
       WINDOW_BRIDGES = {
-        'hw' => 'HardwareCatalogDialog',
         'rules' => 'RulesDialog', 'tpl' => 'TemplatesDialog',
         'sup' => 'SupplierSettingsDialog', 'bset' => 'SupplierSettingsDialog'
       }.freeze
 
+      # ŠT-3a-1: hlaska premostenia Z VNUTRA sekcie `hw` do okna „Katalóg
+      # kovania" (vzor `MAT_BRIDGE_STATUS` zo ŠT-2a). Prizna, PRECO sa otvara
+      # ine okno a kedy to prestane platit.
+      HW_BRIDGE_STATUS = 'Otváram okno Katalóg kovania — predvoľby setov projektu ' \
+                         'zapisujú do modelu a do Štúdia sa presunú v dávke ŠT-3a-2.'
+
       # Slovenske hlasky premosteni — texty sklada SERVER (jedna autorita).
       BRIDGE_STATUS = {
-        'hw' => 'Otváram okno Katalóg kovania (presun do Štúdia príde v dávke ŠT-3).',
         'rules' => 'Otváram okno Pravidlá kovania (presun do Štúdia príde v dávke ŠT-3).',
         'tpl' => 'Otváram okno Šablóny (presun do Štúdia príde v dávke ŠT-3).',
         # Poctivo: „Dodávateľ / Demos" nema DNES vlastne okno. Sadzby dodavatela
@@ -214,6 +224,10 @@ module Noxun
           # katalog sa posle CELY (jeho identita `row_rev` sa medzitym mohla
           # zmenit v inom okne a klient nema ako to vediet).
           @mat_full_pending = true
+          # ŠT-3a-1: to iste pre katalog kovania — je sice GLOBALNY (nezavisi
+          # od dokumentu), ale jeho `row_rev` mohlo medzitym zmenit ZIJUCE
+          # okno „Katalóg kovania" a klient o tom nema ako vediet.
+          @hw_full_pending = true
           push_state
         rescue StandardError => e
           Engine.log_error(e, 'StudioDialog.on_model_changed')
@@ -478,6 +492,11 @@ module Noxun
         # `push_state`) vracia true/false a tato cesta sa podla toho rozhoduje:
         # server nesmie potvrdit, co neoveril.
         def do_refresh_bom
+          # ŠT-3a-1: rucne „Obnoviť" je jedina cesta, ako si vypytat CERSTVY
+          # katalog kovania (inak ho klient drzi a zmeny mu chodia echom).
+          # Sekcia `hw` inak nema z modelu co prepocitavat — bez tohto by jej
+          # tlacidlo klamalo.
+          @hw_full_pending = true
           return unless push_state
 
           set_status('Prepočítané.')
@@ -728,6 +747,111 @@ module Noxun
           end
         end
 
+        # --- ŠT-3a-1: sekcia KOVANIE (`hw`) ----------------------------------
+        #
+        # Kanal je ten isty vzor ako pri Materialoch:
+        #   * KATALOGOVE ECHO (`push_hw_catalog`) — prepise LEN zoznam poloziek
+        #     v okne, negeneruje prepocet a NEDVIHA generaciu,
+        #   * PLNY PUSH (`push_state`) — nesie sety (menia nakupny zoznam)
+        #     a pri prvom pushi aj cely katalog (`@hw_full_pending`).
+        #
+        # Telo kazdej akcie zije v `HardwareCatalogDialog` (modul sa
+        # NEPREMENUVA — zanikne az jeho OKNO, v ŠT-3a-2); toto okno je jej
+        # druhy vstup a odpoved si necha presmerovat cez `hw_sink`.
+        def hw_actions
+          defined?(HardwareCatalogDialog) ? HardwareCatalogDialog::SECTION_ACTIONS : []
+        end
+
+        def do_hw(name, payload)
+          unless defined?(HardwareCatalogDialog)
+            return set_status('Katalóg kovania nie je načítaný.', true)
+          end
+
+          HardwareCatalogDialog.dispatch(name, payload, hw_sink)
+        end
+
+        # Adresat odpovedi: TOTO okno. `HardwareCatalogDialog` posiela `MDH.*`
+        # a `HWSETS.*` volania — sekcia ma presne tie iste prijimace, lebo bezi
+        # na TOM ISTOM `js/hw_catalog.js` + `js/hw_sets.js`.
+        def hw_sink
+          ->(script) { js(script) }
+        end
+
+        # VEREJNY vstup pre `HardwareCatalogDialog` mimo synchronneho volania
+        # sekcie (asynchronne vysledky overenia ceny a nahladu z Demosu
+        # dobiehaju uz po navrate z `dispatch`). `js` je private, preto most.
+        def hw_js(script)
+          js(script)
+        end
+
+        # Odchod zo SEKCIE `hw`. Klient ho hlasi PRED prepnutim; server na to
+        # zrusi beziaci fetch (vedome rozhodnutie — dovod v
+        # `HardwareCatalogDialog#cancel_runs_on_leave`).
+        def do_hw_leave(_payload = nil)
+          return unless defined?(HardwareCatalogDialog)
+
+          HardwareCatalogDialog.cancel_runs_on_leave
+        end
+
+        # Premostenie Z VNUTRA sekcie do okna „Katalóg kovania" — jedina cesta
+        # k trom MODELOVYM zapisom (predvolby setov projektu), ktore sekcia
+        # v tejto davke este nevie. D-78: tlacidlo NIE JE mrtve, vedie tam, kde
+        # obsah naozaj je, a status prizna, kedy sa presunie sem.
+        def do_hw_open_window(_payload = nil)
+          unless defined?(HardwareCatalogDialog)
+            return set_status('Okno sa nepodarilo otvoriť (nie je načítané).', true)
+          end
+
+          HardwareCatalogDialog.show
+          set_status(HW_BRIDGE_STATUS)
+        end
+
+        # Katalogove echo. Payload sa smie PODAT (`push_items` ho uz zostavil —
+        # druhy vypocet `row_rev` pre kazdu polozku by bol zbytocny).
+        def push_hw_catalog(payload = nil)
+          return unless defined?(HardwareCatalogDialog)
+
+          data = payload || HardwareCatalogDialog.items_payload
+          js("if (window.NX && NX.setHwCatalog) NX.setHwCatalog(#{data.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.push_hw_catalog')
+        end
+
+        # ZOTAVOVACIE echo setov (review P1 #1). Posiela ho VYHRADNE
+        # `HardwareCatalogDialog#resync_sets` po ODMIETNUTOM zapise — sekcia
+        # potrebuje cerstvu `revision`, inak by dalsi zapis poslala so starym
+        # odtlackom a zacyklila sa v konfliktoch. Po USPESNOM zapise chodia
+        # sety plnym `push_state` (menia aj nakupny zoznam), takze tu sa
+        # generacia NEDVIHA a kusovnik sa neprepocitava.
+        def push_hw_sets(payload = nil)
+          return unless defined?(HardwareCatalogDialog)
+
+          data = payload || HardwareCatalogDialog.sets_payload
+          js("if (window.NX && NX.setHwSets) NX.setHwSets(#{data.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.push_hw_sets')
+        end
+
+        # Payload sekcie. SETY chodia VZDY (su modelovym kontextom — snapshot
+        # predvolieb zije na modeli a rozhoduje o nakupnom zozname); CELY
+        # KATALOG len pri prvom pushi okna, po prepnuti dokumentu a po rucnom
+        # „Obnoviť" — inak by sa `row_rev` kazdej polozky pocital pri KAZDOM
+        # prepocte kusovnika (ta ista lekcia ako `@mat_full_pending`).
+        def hw_payload(model)
+          return nil unless defined?(HardwareCatalogDialog)
+
+          out = { 'sets' => HardwareCatalogDialog.sets_payload,
+                  'model_guid' => ProductionCore.model_guid(model) }
+          out['catalog'] = HardwareCatalogDialog.state_payload if @hw_full_pending
+          out
+        rescue StandardError => e
+          # Zlyhanie sa NEZAMLCUJE (rovnaka lekcia ako `mat_payload`): sekcia
+          # ostane bez dat a jedinou stopou preco je tento zaznam. Zapadka
+          # `@hw_full_pending` pritom ostava zdvihnuta.
+          Engine.log_error(e, 'StudioDialog.hw_payload')
+          nil
+        end
+
         # --- premostenia navigacie (audit #2) --------------------------------
         # Klient posiela LEN meno polozky; ci sa smie otvorit a CO sa otvori,
         # rozhoduje whitelist TU (HTML nie je ochrana).
@@ -825,7 +949,11 @@ module Noxun
             # (Vetva satelitneho okna tu zanikla spolu s nim v ŠT-2b.)
             push_mat_catalog
             Panel.push_materials if defined?(Panel)
-            HardwareCatalogDialog.push_items if defined?(HardwareCatalogDialog)
+            # ŠT-3a-1: `push_items` uz obsluhuje OBA ciele (okno + sekcia `hw`)
+            # a vie si vypytat aj plny push Studia — ten sme ale prave spravili
+            # sami, takze `refresh_studio: false` (inak by sa cely kusovnik
+            # prepocital dvakrat za sebou).
+            HardwareCatalogDialog.push_items(refresh_studio: false) if defined?(HardwareCatalogDialog)
           end
         end
 
@@ -868,6 +996,7 @@ module Noxun
           # Prvy push po otvoreni musi niest CELY katalog materialov — sekcia
           # `mat` zacina s prazdnymi rukami (dalsie pushe uz len echo, audit #15).
           @mat_full_pending = true
+          @hw_full_pending = true # ŠT-3a-1: to iste pre sekciu `hw`
           register_callbacks(@dialog) # pred show!
           # Bez vynulovania by dalsie otvorenie ozivilo referenciu na mrtve
           # okno a kazdy push by tichol na vynimke (audit #14).
@@ -875,6 +1004,7 @@ module Noxun
             detach_stale_observer
             @ready = false
             @mat_full_pending = true # dalsie otvorenie zacina bez katalogu
+            @hw_full_pending = true  # ŠT-3a-1: to iste pre katalog kovania
             # ŠT-2b: zatvorenim tohto okna zaniklo JEDINE UI katalogu — bezaci
             # Demos fetch sa zneplatni (ABA: nova instancia okna nesmie dostat
             # eventy starej) a odlozena poziadavka „Nahradiť UNI…" zomiera s nim.
@@ -882,6 +1012,9 @@ module Noxun
             # poziadavku „Nahradiť UNI…" (dve API na to iste by sa casom
             # rozisli a jedno by sa zabudlo zavolat).
             MaterialsDialog.on_ui_closed if defined?(MaterialsDialog)
+            # ŠT-3a-1: to iste pre sekciu Kovanie — beziace overenie ceny
+            # ci nahlad z Demosu uz nema komu prist (session bump, ABA guard).
+            HardwareCatalogDialog.on_ui_closed if defined?(HardwareCatalogDialog)
             @dialog = nil
           end
           # Indikator neaktualnosti zije PRESNE tak dlho ako okno.
@@ -942,6 +1075,15 @@ module Noxun
           # Namiesto neho hlasi klient ODCHOD zo sekcie — bezaci Demos fetch
           # sa vtedy zrusi (vedome, viz `do_mat_leave`).
           cb(dlg, 'mat_leave')            { |p| do_mat_leave(p) }
+          # ŠT-3a-1, sekcia KOVANIE. Mena callbackov su TIE ISTE, ake pouziva
+          # okno „Katalóg kovania" — presunuty JS (`js/hw_catalog.js`,
+          # `js/hw_sets.js`) tak vola presne to, co volal doteraz, a nikde
+          # nevznika druha kopia payloadu. Telo je v `HardwareCatalogDialog`,
+          # sem chodi len odpoved (`hw_sink`).
+          hw_actions.each { |name| cb(dlg, name) { |p| do_hw(name, p) } }
+          cb(dlg, 'hw_leave')             { |p| do_hw_leave(p) }
+          # Premostenie k trom MODELOVYM zapisom, ktore sekcia zatial nevie.
+          cb(dlg, 'hw_open_window')       { |p| do_hw_open_window(p) }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(studio): #{msg}")
@@ -1127,6 +1269,11 @@ module Noxun
             # (`push_mat_catalog`). Bez toho by KAZDY prepocet kusovnika
             # prepocitaval aj `row_rev` kazdeho zaznamu katalogu.
             mat: mat_payload(model, collected),
+            # ŠT-3a-1, sekcia KOVANIE: sety (modelovy snapshot predvolieb)
+            # a pri prvom pushi / po prepnuti dokumentu / po rucnom „Obnoviť"
+            # aj cely katalog poloziek. Inak katalog drzi klient a zmeny mu
+            # chodia lacnym echom (`push_hw_catalog`).
+            hw: hw_payload(model),
             # Deep-link: sekcia sa posiela PRAVE RAZ (inak by kazdy refresh
             # vratil pouzivatela tam, odkial medzitym odisiel).
             open_section: consume_pending_section,
@@ -1157,6 +1304,10 @@ module Noxun
           # neposielaju a echo prichadza az po cudzom zapise. Preto sa gasi
           # LEN vtedy, ked katalog v odoslanom payloade REALNE bol.
           @mat_full_pending = false if sent && data[:mat].is_a?(Hash) && data[:mat]['catalog']
+          # ŠT-3a-1: ta ista lekcia pre katalog kovania — zapadka padne LEN
+          # ked katalog v odoslanom payloade REALNE bol (`hw_payload` ma
+          # vlastny rescue a vracia `nil`).
+          @hw_full_pending = false if sent && data[:hw].is_a?(Hash) && data[:hw]['catalog']
           sent
         end
 

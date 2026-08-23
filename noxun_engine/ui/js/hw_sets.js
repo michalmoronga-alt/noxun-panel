@@ -18,6 +18,15 @@
   // Hodnota volby „nastaviť podľa parametra…" v selecte mapovania — NIKDY sa
   // neposiela na server, len otvara editor pasiem.
   var HWS_PARAM_OPT = '__param__';
+  // ŠT-3a-1: v SEKCII `hw` okna Studio su PREDVOLBY PROJEKTU zatial LEN NA
+  // CITANIE — zapisuju do MODELU (`hws_map_project`, `hws_merge_seed`,
+  // `hws_reset_project`) a ich presun je davka ŠT-3a-2. Blok sa preto
+  // zobrazi (aby bolo vidiet, co v projekte plati), ale namiesto ovladacov
+  // nesie PREMOSTENIE do okna Katalog kovania (D-78: ziadne mrtve tlacidlo).
+  // Globalne predvolby (`hws_map_global`) su katalogovy zapis — te ostavaju
+  // plne editovatelne aj v sekcii.
+  var HWS_PROJ_RO = false;
+  function hwsSetProjReadOnly(v){ HWS_PROJ_RO = !!v; }
 
   function hwsEl(id){ return document.getElementById(id); }
   function hwsMk(tag, cls, text){
@@ -480,6 +489,44 @@
 
   // --- tab PREDVOLBY PROJEKTU ---------------------------------------------------
 
+  // ŠT-3a-1: CITATELNA hodnota mapovania (bez ovladaca). Cista funkcia —
+  // testuje ju tests/js/test_st3a_hw.js.
+  function hwsMappingValueText(value, opts, params){
+    if (!value) return '— bez setu (ORANGE)';
+    if (hwsIsSelector(value)){
+      var names = {};
+      (opts || []).forEach(function(s){ names[s.set_id] = s.name; });
+      return hwsParamLabel(value.param, params) + ': ' +
+             hwsBandsSummary(value.bands, 'set_id', names);
+    }
+    var found = (opts || []).filter(function(s){ return s.set_id === value; })[0];
+    return found ? found.name : (value + ' (chýba)');
+  }
+
+  // Read-only prehlad predvolieb projektu + premostenie do okna.
+  function hwsProjReadOnlyTable(mapping){
+    var t = hwsMk('div', 'hwsmap');
+    ((HWS_DATA && HWS_DATA.generic_types) || []).forEach(function(gt){
+      var opts = hwsProjOptions(gt.key);
+      var value = mapping[gt.key];
+      if (!opts.length && !value) return;
+      var row = hwsMk('div', 'hwsmap-row');
+      row.appendChild(hwsMk('label', null, gt.label));
+      row.appendChild(hwsMk('span', 'hwsproj-val',
+        hwsMappingValueText(value, opts, HWS_DATA && HWS_DATA.params)));
+      t.appendChild(row);
+    });
+    return t;
+  }
+
+  function hwsProjBridgeBtn(){
+    var b = hwsMk('button', 'ghostbtn', 'Upraviť v okne Katalóg kovania…');
+    b.setAttribute('data-action', 'hws-open-window');
+    b.title = 'Predvoľby setov projektu zapisujú do modelu (1 zmena = 1 krok Späť) — ' +
+              'do Štúdia sa presunú v dávke ŠT-3a-2.';
+    return b;
+  }
+
   function hwsRenderProj(){
     var box = hwsEl('hwTabProj');
     if (!box || !HWS_DATA) return;
@@ -488,17 +535,27 @@
     // Hlavička tabu: model + doplnenie nových predvolieb v JEDNOM rade.
     var head = hwsMk('div', 'hwsproj-head');
     head.appendChild(hwsMk('div', 'hwsproj-title', 'Model: ' + (HWS_DATA.model_title || '—')));
-    var mb = hwsMk('button', 'ghostbtn', 'Doplniť nové predvoľby');
-    mb.setAttribute('data-action', 'hws-merge-seed');
-    mb.title = 'Doplní do projektu globálne predvoľby, ktoré tu ešte nie sú (napr. nový typ kovania). Existujúce výbery nechá tak.';
-    head.appendChild(mb);
+    if (HWS_PROJ_RO){
+      head.appendChild(hwsProjBridgeBtn());
+    } else {
+      var mb = hwsMk('button', 'ghostbtn', 'Doplniť nové predvoľby');
+      mb.setAttribute('data-action', 'hws-merge-seed');
+      mb.title = 'Doplní do projektu globálne predvoľby, ktoré tu ešte nie sú (napr. nový typ kovania). Existujúce výbery nechá tak.';
+      head.appendChild(mb);
+    }
     box.appendChild(head);
     if (proj.status === 'invalid'){
       var ban = hwsMk('div', 'hwbanner',
         'Predvoľby setov v tomto projekte sú poškodené — súpis kovania sa nemapuje. ');
-      var rb = hwsMk('button', 'ghostbtn', 'Obnoviť z globálnych predvolieb');
-      rb.setAttribute('data-action', 'hws-reset-proj');
-      ban.appendChild(rb);
+      if (HWS_PROJ_RO){
+        // Obnova ZAPISUJE do modelu — v sekcii ju zatial nemame. Povedz to
+        // nahlas a posli tam, kde to naozaj ide.
+        ban.appendChild(hwsProjBridgeBtn());
+      } else {
+        var rb = hwsMk('button', 'ghostbtn', 'Obnoviť z globálnych predvolieb');
+        rb.setAttribute('data-action', 'hws-reset-proj');
+        ban.appendChild(rb);
+      }
       box.appendChild(ban);
       return;
     }
@@ -510,7 +567,9 @@
     // GH #127 P2 + H1b (audit BLOCKER 1): ponuku per typ sklada SERVER
     // (type_options) — pre set, ktory projekt uz pouziva, ukazuje nazov zo
     // SNAPSHOTU (podla neho sa nakupuje), nie neskor premenovany global.
-    box.appendChild(hwsMappingTable(mapping, 'hws-map-proj', hwsProjOptions));
+    box.appendChild(HWS_PROJ_RO
+      ? hwsProjReadOnlyTable(mapping)
+      : hwsMappingTable(mapping, 'hws-map-proj', hwsProjOptions));
 
     // Globalne defaulty novych projektov — zbalene (vertikalny priestor).
     var det = document.createElement('details');
@@ -721,6 +780,12 @@
           hwsSend('hws_reset_project', { model_guid: (HWS_DATA && HWS_DATA.model_guid) || '' });
           return;
         }
+        // ŠT-3a-1: premostenie zo SEKCIE do okna Katalóg kovania — jediná
+        // cesta k modelovým zápisom, kým ich ŠT-3a-2 neprenesie sem.
+        if (a === 'hws-open-window'){
+          hwsSend('hw_open_window', {});
+          return;
+        }
         // H1b (FIX 10): doplnenie chýbajúcich globálnych predvolieb do projektu
         if (a === 'hws-merge-seed'){
           hwsSend('hws_merge_seed', { model_guid: (HWS_DATA && HWS_DATA.model_guid) || '' });
@@ -765,9 +830,14 @@
         }
       }
       // klik mimo "Naozaj zmazat?" odzbroji potvrdenie
+      // ŠT-3a-1: prekresli sa VZDY. Podmienka `HWS_TAB === 'sets'` platila len
+      // pre TABY okna — v SEKCII Studia pohlad riadi lista (`HW_VIEW`)
+      // a `HWS_TAB` tam navzdy ostane 'items', takze by ozbrojene „Naozaj
+      // zmazať?" uz nikdy nezhaslo. `hwsRenderSets` je bez `#hwTabSets`
+      // no-op a nad skrytym uzlom lacne.
       if (HWS_DEL_ARM && !(t && t.getAttribute('data-action') === 'hws-del')){
         HWS_DEL_ARM = '';
-        if (HWS_TAB === 'sets') hwsRenderSets();
+        hwsRenderSets();
       }
     });
     // Editor setu aj editor pásiem: inputs píšu do stavu (input event — bez
@@ -872,5 +942,7 @@
       // H1b: pásma člena setu + výber setu podľa parametra
       hwsNum: hwsNum, hwsParamLabel: hwsParamLabel, hwsBandsSummary: hwsBandsSummary,
       hwsBuildBands: hwsBuildBands, hwsSelectorFrom: hwsSelectorFrom,
-      hwsBuildSelector: hwsBuildSelector, hwsProjDraftKeys: hwsProjDraftKeys };
+      hwsBuildSelector: hwsBuildSelector, hwsProjDraftKeys: hwsProjDraftKeys,
+      // ŠT-3a-1: read-only rezim predvolieb projektu (sekcia `hw`).
+      hwsMappingValueText: hwsMappingValueText, hwsSetProjReadOnly: hwsSetProjReadOnly };
   }

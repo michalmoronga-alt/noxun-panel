@@ -15,6 +15,12 @@
   var MDH_PRICE = {};   // item_code -> posledny priceResult (len UX render)
   var MDH_DEL = null;   // kod cakajuci na potvrdenie zmazania
   var mdhSearchTimer = null;
+  var MDH_VERSION = '';     // verzia do podtitulu okna
+  var MDH_RO_REASON = '';   // dovod read-only rezimu (banner)
+  // ŠT-3a-1: v SEKCII Studia telo este nemusi byt v DOM (uzol sa pripaja az
+  // pri prvom vykresleni sekcie). Serverove poradie sa vtedy nevypytava —
+  // vypyta si ho `hwRenderBody`, ked telo naozaj pripoji.
+  var MDH_ORDER_PENDING = false;
 
   function hwEl(id){ return document.getElementById(id); }
   function mdhMk(tag, cls, text){
@@ -70,11 +76,18 @@
     if (window.sketchup && sketchup[name]) sketchup[name](JSON.stringify(payload));
   }
 
+  // ŠT-3a-1: v SEKCII ziju filtre v LISTE, a tu NIE JE vykreslena, kym je
+  // otvoreny pohlad Sety. Bez fallbacku na stav by vtedy kazdy push poslal
+  // PRAZDNY dotaz — a navrat do pohladu Položky by ukazal nefiltrovany zoznam
+  // pod vyplnenym polom hladania. V okne sa nic nemeni: uzly tam su vzdy.
   function mdhSearchNow(){
+    var s = hwEl('hwSearch');
+    var c = hwEl('hwCategory');
+    var i = hwEl('hwInactive');
     mdhSend('hw_search', {
-      query: (hwEl('hwSearch') || {}).value || '',
-      category: (hwEl('hwCategory') || {}).value || '',
-      include_inactive: !!(hwEl('hwInactive') && hwEl('hwInactive').checked)
+      query: s ? (s.value || '') : HW_Q,
+      category: c ? (c.value || '') : HW_CAT,
+      include_inactive: i ? !!i.checked : HW_INACTIVE
     });
   }
 
@@ -254,20 +267,74 @@
     }
   }
 
-  function mdhApplyItems(data){
+  // ŠT-3a-1: rozdelene na STAV a DOM. Sekcia Studia dostava katalog uz
+  // v payloade okna — ale jej telo v tej chvili este nemusi byt pripojene
+  // (uzol sa klonuje az pri prvom vykresleni sekcie), takze render aj
+  // serverovy search musia pockat. V okne sa NIC nemeni: `mdhApplyItems`
+  // robi presne to, co robil.
+  function mdhSetItemsState(data){
     MDH_ITEMS = {};
     (data.items || []).forEach(function(i){ MDH_ITEMS[i.item_code] = i; });
     MDH_RO = data.state === 'read_only';
-    var banner = hwEl('hwRoBanner');
-    if (banner) banner.style.display = MDH_RO ? '' : 'none';
-    var txt = hwEl('hwRoText');
-    if (txt) txt.textContent = data.state_reason || 'Katalóg je len na čítanie.';
+    MDH_RO_REASON = data.state_reason || 'Katalóg je len na čítanie.';
     // GH #100 P2: poradie NIKDY nedoplna JS — zachovaju sa len kody
     // z posledneho SERVEROVEHO vysledku (zmiznute von) a hned sa vyziada
     // cerstvy search (mutacia mohla zmenit zhodu s filtrom/limitom).
     MDH_ORDER = MDH_ORDER.filter(function(c){ return !!MDH_ITEMS[c]; });
+  }
+
+  function mdhRenderBanner(){
+    var banner = hwEl('hwRoBanner');
+    if (banner) banner.style.display = MDH_RO ? '' : 'none';
+    var txt = hwEl('hwRoText');
+    if (txt) txt.textContent = MDH_RO_REASON;
+  }
+
+  // Enumy (kategorie, MJ, verzia) — opat stav zvlast od DOM.
+  function mdhApplyEnums(data){
+    if (data.categories) MDH_CATS = data.categories;
+    if (data.units) MDH_UNITS = data.units;
+    if (data.version) MDH_VERSION = data.version;
+  }
+
+  function mdhRenderEnums(){
+    var line = hwEl('hwline');
+    if (line) line.textContent = 'V' + MDH_VERSION + ' · položiek: ' + Object.keys(MDH_ITEMS).length;
+    ['hn_category', 'hwCategory'].forEach(function(id){
+      var sel = hwEl(id);
+      if (!sel) return;
+      var keep = sel.value;
+      sel.textContent = '';
+      if (id === 'hwCategory'){
+        var all = mdhMk('option', null, 'Všetky kategórie');
+        all.value = '';
+        sel.appendChild(all);
+      }
+      MDH_CATS.forEach(function(c){
+        var op = mdhMk('option', null, c);
+        op.value = c;
+        sel.appendChild(op);
+      });
+      if (keep) sel.value = keep; // filter prezije prekreslenie enumov
+    });
+    var us = hwEl('hn_unit');
+    if (us){
+      us.textContent = '';
+      MDH_UNITS.forEach(function(u){
+        var op = mdhMk('option', null, u);
+        op.value = u;
+        us.appendChild(op);
+      });
+    }
+  }
+
+  function mdhApplyItems(data){
+    mdhSetItemsState(data);
+    mdhRenderBanner();
     mdhRender();
-    mdhSearchNow();
+    // Bez tela v DOM sa nema kam vykreslit — poradie si vypyta az render.
+    if (hwEl('hwList')) mdhSearchNow();
+    else MDH_ORDER_PENDING = true;
   }
 
   // --- flush buniek / selectov / checkboxov -------------------------------
@@ -414,36 +481,9 @@
 
   var MDH = {
     init: function(data){
-      MDH_CATS = data.categories || [];
-      MDH_UNITS = data.units || [];
-      var line = hwEl('hwline');
-      if (line) line.textContent = 'V' + (data.version || '') + ' · položiek: ' + (data.items || []).length;
-      ['hn_category', 'hwCategory'].forEach(function(id){
-        var sel = hwEl(id);
-        if (!sel) return;
-        sel.textContent = '';
-        if (id === 'hwCategory'){
-          var all = mdhMk('option', null, 'Všetky kategórie');
-          all.value = '';
-          sel.appendChild(all);
-        }
-        MDH_CATS.forEach(function(c){
-          var op = mdhMk('option', null, c);
-          op.value = c;
-          sel.appendChild(op);
-        });
-      });
-      var us = hwEl('hn_unit');
-      if (us){
-        us.textContent = '';
-        MDH_UNITS.forEach(function(u){
-          var op = mdhMk('option', null, u);
-          op.value = u;
-          us.appendChild(op);
-        });
-      }
-      mdhApplyItems(data);
-      mdhSearchNow(); // prvotne serverove poradie
+      mdhApplyEnums(data);
+      mdhRenderEnums();
+      mdhApplyItems(data); // vratane prvotneho serveroveho poradia
     },
     setItems: function(data){ mdhApplyItems(data); },
     results: function(data){ MDH_ORDER = data.codes || []; mdhRender(); },
@@ -519,7 +559,10 @@
       if (!t) return;
       var action = t.getAttribute('data-action');
       var code = t.getAttribute('data-hw-code') || '';
-      if (action === 'hw-toggle'){
+      if (action === 'hw-view'){
+        // ŠT-3a-1: segment Položky · Sety v lište sekcie (Š16).
+        hwSetView(t.getAttribute('data-view'));
+      } else if (action === 'hw-toggle'){
         MDH_OPEN = MDH_OPEN === code ? null : code;
         mdhRender();
       } else if (action === 'hw-new'){
@@ -604,25 +647,272 @@
     document.addEventListener('change', function(ev){
       var t = ev.target;
       if (!t || !t.getAttribute) return;
+      // ŠT-3a-1: filtre ziju v SEKCII v liste, ktoru prekresluje KAZDY push —
+      // priama vazba pri nacitani by po prvom prekresleni zanikla. Delegacia
+      // funguje v obidvoch UI rovnako.
+      if (t.id === 'hwCategory'){ HW_CAT = t.value; mdhSearchNow(); return; }
+      if (t.id === 'hwInactive'){ HW_INACTIVE = !!t.checked; mdhSearchNow(); return; }
       if (t.tagName === 'SELECT' && t.getAttribute('data-hw-field')) mdhChanged(t);
       else if (t.type === 'checkbox' && t.getAttribute('data-hw-field')) mdhChanged(t);
     });
-    var si = hwEl('hwSearch');
-    if (si) si.addEventListener('input', mdhSearchDebounced);
-    var dii = hwEl('hn_demos');
-    if (dii) dii.addEventListener('input', mdhDemosInput);
-    var ci = hwEl('hwCategory');
-    if (ci) ci.addEventListener('change', mdhSearchNow);
-    var ii = hwEl('hwInactive');
-    if (ii) ii.addEventListener('change', mdhSearchNow);
+    // Ten isty dovod pre textove vstupy (hladanie zije v liste sekcie,
+    // pole „Z Demosu" v tele, ktore vznika az pri prvom vykresleni sekcie).
+    document.addEventListener('input', function(ev){
+      var t = ev.target;
+      if (!t || !t.id) return;
+      if (t.id === 'hwSearch'){ HW_Q = t.value; mdhSearchDebounced(); return; }
+      if (t.id === 'hn_demos') mdhDemosInput();
+    });
   }
 
-  // Node testy (tests/js/test_hw_catalog.js) — len ciste funkcie bez DOM.
+  // ================= ŠT-3a-1: SEKCIA `hw` v okne Studio =====================
+  //
+  // Bezi TU, nie v `studio.js`: obsah sekcie je presun 1:1 a jeho jedina
+  // autorita je tento subor (vzor `js/proj_materials.js` a `js/budget.js`,
+  // ktore si tiez kreslia listu aj telo svojej sekcie samy).
+
+  // Zdielane helpery okna Studio (jantarove „Obnoviť"). V prehliadaci su
+  // globalne — `studio.js` sa nacitava PRED tymto suborom; v Node testoch ich
+  // treba requirovat (vzor `MAT_STUDIO`). V okne Katalog kovania je premenna
+  // `null` a nikto ju nepouzije.
+  var HW_STUDIO = (typeof module !== 'undefined' && module.exports)
+    ? require('./studio.js')
+    : null;
+
+  // Sekcia sa prihlasi do READ-ONLY rezimu predvolieb projektu hned pri
+  // nacitani — este pred prvym `HWSETS.init` (ten uz kresli). `hw_sets.js`
+  // sa nacitava PRED tymto suborom v OBOCH HTML, takze funkcia uz existuje.
+  if (typeof window !== 'undefined' && window.NX_HW_SECTION &&
+      typeof hwsSetProjReadOnly === 'function'){
+    hwsSetProjReadOnly(true);
+  }
+
+  // Stav LISTY sekcie. Lista sa prekresluje pri KAZDOM pushi, takze hodnoty
+  // vstupov musia zit aj v premennych (vzor `MD_Q`/`MD_MODE` v Materialoch) —
+  // inak by pouzivatelovi zmizol filter pri prvom prepocte kusovnika.
+  var HW_VIEW = 'items';    // items | sets (Š16)
+  var HW_Q = '';
+  var HW_CAT = '';
+  var HW_INACTIVE = false;
+
+  // Cisla `hwToolsHtml` su cista funkcia (Node test) — stav chodi ARGUMENTOM,
+  // rovnaky vzor ako `bomToolsHtml` v studio.js a `matToolsHtml`.
+  // Poradie (vzor listy Studia): vlavo „co pozeram" (pohlady · pridavacia
+  // akcia · hladanie · filtre), vpravo „co s tym robim" (Obnoviť).
+  function hwToolsHtml(st){
+    var s = st || {};
+    var ico = function(n){ return '<svg class="ic" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; };
+    var vw = function(id, t, tip){
+      return '<button type="button" class="bomvw' + (s.view === id ? ' on' : '') +
+             '" data-action="hw-view" data-view="' + id + '" title="' + hwEsc(tip) + '">' +
+             hwEsc(t) + '</button>';
+    };
+    var h = '<div class="bomviews">' +
+      vw('items', 'Položky', 'Katalóg nakupovaných položiek (kódy, ceny, väzba na Demos)') +
+      vw('sets', 'Sety', 'Sety kovania + predvoľby, podľa ktorých sa skladá nákupný zoznam') +
+      '</div>';
+    if (s.view !== 'sets'){
+      h += '<button type="button" class="primary" id="hwNewBtn" data-action="hw-new"' +
+        (s.ro ? ' disabled' : '') + ' title="Pridať položku (z Demosu alebo ručne)">' +
+        ico('plus') + ' Nová položka</button>' +
+        '<div class="searchbox">' + ico('search') +
+        '<input id="hwSearch" type="text" placeholder="Hľadať kód, názov, dodávateľa"' +
+        ' value="' + hwEsc(s.q || '') + '"></div>' +
+        '<select id="hwCategory" title="Kategória">' + hwCatOptions(s) + '</select>' +
+        '<label class="hwinactive" title="Ukáž aj položky vyradené z ponuky">' +
+        '<input type="checkbox" id="hwInactive"' + (s.inactive ? ' checked' : '') +
+        '> neaktívne</label>';
+    } else {
+      h += '<span class="sechint">Set = kódy, ktoré sa objednajú za 1 kus kovania.</span>';
+    }
+    h += '<span class="spacer"></span>';
+    // Jantarove „Obnoviť" je ZDIELANY markup celeho okna (`studio.js`) — sekcia
+    // ho nesmie kreslit druhykrat (vzor `matToolsHtml`).
+    var refresh = (typeof refreshBtnHtml === 'function')
+      ? refreshBtnHtml
+      : (HW_STUDIO ? HW_STUDIO.refreshBtnHtml : null);
+    if (refresh) h += refresh(s.stale === true, 'Načítať čerstvý katalóg kovania a sety');
+    return h;
+  }
+
+  function hwEsc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function hwCatOptions(s){
+    var out = '<option value=""' + (s.cat ? '' : ' selected') + '>Všetky kategórie</option>';
+    (s.cats || []).forEach(function(c){
+      out += '<option value="' + hwEsc(c) + '"' + (s.cat === c ? ' selected' : '') + '>' +
+             hwEsc(c) + '</option>';
+    });
+    return out;
+  }
+
+  // `stale` podava `studio.js` — jantarovy priznak je stav OKNA a ma jedinu
+  // autoritu (`staleFlag`), sekcia si ho neodvodzuje.
+  function hwToolsState(stale){
+    return { view: HW_VIEW, q: HW_Q, cat: HW_CAT, cats: MDH_CATS,
+             inactive: HW_INACTIVE, ro: MDH_RO, stale: stale === true };
+  }
+
+  function hwRenderTools(stale){
+    var box = hwEl('sectools');
+    if (box) box.innerHTML = hwToolsHtml(hwToolsState(stale));
+  }
+
+  // TELO sekcie. Je to JEDEN uzol naklonovany RAZ zo sablony v studio.html
+  // a potom uz LEN putuje: prepnutie sekcie ho z `#secbody` vyberie, navrat
+  // ho vrati aj s rozpisanym formularom novej polozky a rozpisanym editorom
+  // setu. Bez toho by kazdy odchod do Kusovnika zmazal rozrobenu pracu.
+  var HW_BODY = null;
+  function hwBodyNode(){
+    if (HW_BODY) return HW_BODY;
+    var tpl = hwEl('hwBodyTpl');
+    HW_BODY = document.createElement('div');
+    HW_BODY.id = 'hwBody';
+    if (tpl && tpl.content) HW_BODY.appendChild(tpl.content.cloneNode(true));
+    else if (tpl) HW_BODY.innerHTML = tpl.innerHTML;
+    return HW_BODY;
+  }
+
+  // Pohlad sekcie riadi VIDITELNOST troch blokov tela. „Predvoľby projektu"
+  // patria k Setom (mockup ich kresli ako jeden pohlad) — su v nom READ-ONLY
+  // s premostenim do okna, lebo zapisuju do MODELU (presun v ŠT-3a-2).
+  function hwApplyView(){
+    var show = function(id, on){
+      var n = hwEl(id);
+      if (n) n.style.display = on ? '' : 'none';
+    };
+    show('hwTabItems', HW_VIEW !== 'sets');
+    show('hwTabSets', HW_VIEW === 'sets');
+    show('hwTabProj', HW_VIEW === 'sets');
+  }
+
+  function hwSetView(v){
+    HW_VIEW = (v === 'sets') ? 'sets' : 'items';
+    hwRenderTools(hwStale());
+    hwApplyView();
+  }
+
+  // Jantarovy priznak drzi `studio.js` — sekcia si ho pri vlastnom prekresleni
+  // (prepnutie pohladu) precita presne tak ako `js/budget.js` (`budStaleFlag`):
+  // v prehliadaci je to global suboru, ktory sa nacitava PRED tymto.
+  function hwStale(){
+    return (typeof staleFlag === 'undefined') ? false : staleFlag === true;
+  }
+
+  // KONTRAKT (vzor audit #2 zo ŠT-2a): `NX.setStudio` NESMIE zmazat rozpisany
+  // formular. Telo sa preto NEPREKRESLUJE — len sa (pripadne) vrati do
+  // `#secbody` a data sa nasadia do jeho uzlov.
+  function hwRenderBody(){
+    var box = hwEl('secbody');
+    if (!box) return;
+    var node = hwBodyNode();
+    if (node.parentNode !== box){
+      box.innerHTML = '';
+      box.appendChild(node);
+    }
+    mdhRenderEnums();
+    mdhRenderBanner();
+    mdhRender();
+    if (typeof hwsRenderAll === 'function') hwsRenderAll();
+    hwApplyView();
+    // Poradie zo servera sa nevypytalo, kym telo nebolo v DOM.
+    if (MDH_ORDER_PENDING){
+      MDH_ORDER_PENDING = false;
+      mdhSearchNow();
+    }
+  }
+
+  // Odchod zo sekcie `hw` (vola `studioGoSection` v studio.js PRED prepnutim).
+  // Poradie je zavazne (lekcia ŠT-2b): NAJPRV sa ohlasi SERVERU (ten zrusi
+  // beziace overenie ceny / nahlad a napise preco), az potom sa lokalne
+  // zatvoria modaly.
+  function hwOnLeaveSection(){
+    if (window.sketchup && sketchup.hw_leave) sketchup.hw_leave('');
+    hwCloseModals();
+  }
+
+  function hwCloseModals(){
+    var m = hwEl('hwDelModal');
+    if (m) m.style.display = 'none';
+    MDH_DEL = null;
+    // Review P2 #4: nahlad z Demosu NIE JE modal — zije v tele sekcie, ktore
+    // sa pri odchode UCHOVA. Bez tohto by v nom navzdy visel stav
+    // „Načítavam stránku…", hoci server beh uz zrusil (`hw_leave`).
+    //
+    // Review kolo 2 (P2-2): zhadza sa LEN NEDOKONCENY beh. DOKONCENY nahlad
+    // odchodom zo sekcie nezanika — serverovy proposal (`pid`) zije dalej
+    // a pouzivatel v nom moze mat rozpisanu kategoriu a poznamku; zahodit ich
+    // by bola strata prace, nie upratanie. (Rovnaka zasada ako
+    // `matCloseModals` v `proj_materials.js`: ten modaly ZATVARA, ale ich
+    // hodnoty NEZAHADZUJE.)
+    if (MDH_DEMOS && MDH_DEMOS.status === 'pending'){
+      MDH_DEMOS = null;
+      mdhRenderDemosPreview();
+      mdhRenderDemosHits([]);
+    }
+  }
+
+  // Modelovy kontext sekcie z payloadu Studia (`ST.hw`). Katalog je v nom LEN
+  // pri prvom pushi, po prepnuti dokumentu a po rucnom „Obnoviť" — inak chodi
+  // echom (`NX.setHwCatalog`), viz `StudioDialog#hw_payload`.
+  function hwApplyState(h){
+    if (!h) return;
+    if (h.catalog){
+      mdhApplyEnums(h.catalog);
+      mdhSetItemsState(h.catalog);
+      MDH_ORDER_PENDING = true;   // poradie si vypyta render tela
+    }
+    // Sety maju v OBOCH UI ten isty prijimac; jeho render je bezpecny aj ked
+    // telo sekcie este nie je pripojene (uzly sa nenajdu a funkcia vypadne).
+    if (h.sets && typeof HWSETS !== 'undefined') HWSETS.init(h.sets);
+  }
+
+  // Napojenie na kanal Studia. `studio.js` (a za nim `budget.js`
+  // a `proj_materials.js`) uz `window.NX` vytvorili — tento subor sa nacitava
+  // AZ ZA nimi, takze obal je bezpecny.
+  if (typeof window !== 'undefined' && window.NX && typeof NX.setStudio === 'function'){
+    var hwPrevSetStudio = NX.setStudio;
+    NX.setStudio = function(data){
+      // Stav sa nasadi PRED renderom Studia — `hwRenderBody` uz kresli
+      // z cerstvych dat a nikto nekresli dvakrat.
+      hwApplyState(data && data.hw);
+      hwPrevSetStudio(data);
+    };
+    // Katalogove echo (BEZ zdvihu generacie) — po kazdom zapise do katalogu.
+    NX.setHwCatalog = function(data){
+      if (!data) return;
+      mdhApplyItems(data);
+    };
+    // ZOTAVOVACIE echo setov (review P1 #1) — po ODMIETNUTOM zapise. Prijimac
+    // je ten isty ako v okne (`HWSETS.init`), takze sekcia dostane cerstvu
+    // `revision` a jej dalsi pokus uz nespadne na tom istom konflikte.
+    NX.setHwSets = function(data){
+      if (!data || typeof HWSETS === 'undefined') return;
+      HWSETS.init(data);
+    };
+  }
+
+  // Node testy (tests/js/test_hw_catalog.js, tests/js/test_st3a_hw.js).
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { mdhFmtPrice: mdhFmtPrice, mdhCheckedLabel: mdhCheckedLabel,
       mdhPatchPayload: mdhPatchPayload, mdhOrderItems: mdhOrderItems,
       mdhCreatePayload: mdhCreatePayload, mdhCssEscape: mdhCssEscape,
       mdhDemosIsUrl: mdhDemosIsUrl, mdhDemosCreatePayload: mdhDemosCreatePayload,
-      mdhRelatedLine: mdhRelatedLine };
+      mdhRelatedLine: mdhRelatedLine,
+      // ŠT-3a-1 — sekcia `hw`. `hwToolsHtml` je cista funkcia; `hwRenderBody`
+      // a `hwSetView` DOM potrebuju a exportuju sa ZAMERNE — kontrakt „push
+      // zo servera nezmaze rozpisany formular" sa inak nedal overit nicim
+      // nez klikanim (rovnaky dovod ako pri `matRenderBody`).
+      hwToolsHtml: hwToolsHtml, hwRenderBody: hwRenderBody, hwSetView: hwSetView,
+      hwOnLeaveSection: hwOnLeaveSection, hwApplyState: hwApplyState, MDH: MDH };
   }
-  if (typeof window !== 'undefined' && window.sketchup && sketchup.ready) sketchup.ready('');
+  // ŠT-3a-1 (vzor ŠT-2a audit #7): v okne ŠTÚDIO `ready` posiela `studio.js`
+  // (window.onload) — druhe volanie odtialto by Studio prinutilo poslat CELY
+  // payload dvakrat a spustit odlozene poziadavky znova. Okno „Katalóg
+  // kovania" ale ZIJE dalej a svoj `ready` potrebuje (je jedinou cestou
+  // k prvemu pushu), preto sa posiela LEN mimo sekcie.
+  if (typeof window !== 'undefined' && !window.NX_HW_SECTION &&
+      window.sketchup && sketchup.ready) sketchup.ready('');
