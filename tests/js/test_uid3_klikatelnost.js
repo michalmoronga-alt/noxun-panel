@@ -97,7 +97,7 @@ eq(typeof NXShell.studioLink, 'undefined', 'aj skladanie payloadu deep-linku na 
 
 // --- 3) ST-1a: deep-link do okna STUDIO -------------------------------------
 
-eq(NXShell.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw'],
+eq(NXShell.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'rules'],
    'zoznam sekcii je ZRKADLO StudioDialog::SECTIONS');
 eq(NXShell.studioSection('bom'), 'bom', 'platna sekcia prejde');
 eq(NXShell.studioSection('ctrl'), 'ctrl', 'ŠT-1b: Kontrola je ZIVA sekcia Studia (uz nie premostenie)');
@@ -106,7 +106,8 @@ eq(NXShell.studioSection('budget'), 'budget', 'ŠT-1c PR B1: Rozpočet je ZIVA s
 eq(NXShell.studioSection('offer'), 'offer', 'ŠT-1c PR B2: Cenová ponuka je ZIVA sekcia Studia');
 eq(NXShell.studioSection('mat'), 'mat', 'ŠT-2a: Materiály su ZIVA sekcia Studia');
 eq(NXShell.studioSection('hw'), 'hw', 'ŠT-3a-1: Kovanie je ZIVA sekcia Studia');
-eq(NXShell.studioSection('rules'), null, 'premostenie do ineho okna NIE JE sekcia');
+eq(NXShell.studioSection('rules'), 'rules', 'ŠT-3b-1: Pravidlá su ZIVA sekcia Studia');
+eq(NXShell.studioSection('tpl'), null, 'premostenie do ineho okna NIE JE sekcia');
 eq(NXShell.studioSection(''), null, 'prazdna hodnota = bez deep-linku');
 eq(NXShell.studioSection(null), null, 'chybajuca hodnota = bez deep-linku');
 eq(NXShell.studioSection('__proto__'), null, 'zoznam sa pyta indexOf, nie vlastnosti objektu');

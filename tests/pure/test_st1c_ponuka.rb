@@ -40,7 +40,7 @@ NxTest.test('ŠT-1c B2: `offer` je SEKCIA Studia — zrkadla whitelistu sedia vo
   rb = Noxun::Engine::StudioDialog::SECTIONS
   js = S1C2_STUDIO_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
   shell = S1C2_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  NxTest.assert_equal(%w[bom ctrl buy budget offer mat hw], rb, 'Ruby je autorita zoznamu')
+  NxTest.assert_equal(%w[bom ctrl buy budget offer mat hw rules], rb, 'Ruby je autorita zoznamu')
   NxTest.assert_equal(rb, js, 'studio.js je jeho zrkadlo')
   NxTest.assert_equal(rb, shell, 'a shell.js (panel) tiez')
 end
