@@ -785,11 +785,9 @@
   function openRulesDialog(){
     if (window.sketchup && sketchup.open_rules) sketchup.open_rules('');
   }
-  // D-91: Katalog kovania z hlavicky panela — rovnaky mechanizmus ako
-  // "Pravidla kovania..." (satelitne okno, ziadny zasah do modelu).
-  function openHardwareCatalogDialog(){
-    if (window.sketchup && sketchup.open_hardware_catalog) sketchup.open_hardware_catalog('');
-  }
+  // ŠT-3a-2: `openHardwareCatalogDialog` ZANIKOL spolu s oknom „Katalóg
+  // kovania" — tlacidlo panela ide priamo deep-linkom `openStudio('hw')`
+  // (`js/actions.js`), rovnako ako „Materiály projektu…" od ŠT-2b.
 
   // Node testy (tests/js/test_hw_panel_sets.js) — LEN ciste funkcie ponuky
   // setov (bez DOM). V CEF je module undefined a vetva sa preskoci.

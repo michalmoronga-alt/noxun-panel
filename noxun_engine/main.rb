@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.7.59' unless defined?(VERSION)
+    VERSION = '0.7.60' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -472,7 +472,9 @@ module Noxun
         # ŠT-2b: okno „Materiály projektu" zaniklo — polozka menu ostava ako
         # zauzivana skratka, ale otvara SEKCIU Materialy v Studiu.
         menu.add_item('Materiály projektu') { StudioDialog.show(open_section: 'mat') }
-        menu.add_item('Katalóg kovania') { HardwareCatalogDialog.show } # V0.6 C-2
+        # ŠT-3a-2: okno „Katalóg kovania" zaniklo — polozka menu ostava ako
+        # zauzivana skratka, ale otvara SEKCIU Kovanie v Studiu.
+        menu.add_item('Katalóg kovania') { StudioDialog.show(open_section: 'hw') }
         menu.add_item('Nastavenia rozpočtu') { SupplierSettingsDialog.show } # V0.6 E-b
         menu.add_item('Šablóny') { TemplatesDialog.show }
 

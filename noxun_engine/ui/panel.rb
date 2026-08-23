@@ -126,9 +126,9 @@ module Noxun
           cb(dlg, 'set_hardware_override') { |p| handle_set_hardware_override(p) }
           cb(dlg, 'set_hardware_set')      { |p| handle_set_hardware_set(p) } # V0.6 D1b: set na skrinke
           cb(dlg, 'open_rules')            { |_p| RulesDialog.show }
-          # D-91: Katalog kovania priamo z hlavicky panela (docasne miesto "za
-          # Studiom" — finalny domov rozhodne UI 2.0). Len otvorenie satelitu.
-          cb(dlg, 'open_hardware_catalog') { |_p| HardwareCatalogDialog.show }
+          # ŠT-3a-2: `open_hardware_catalog` ZANIKOL spolu s oknom — tlacidlo
+          # panela ide deep-linkom `openStudio('hw')` (vzor „Materiály
+          # projektu" zo ŠT-2b).
           # V0.4.5 D1: omrvinka karty dielca — spat na korpus (oznaci ho v modeli).
           # UI-B1: tou istou cestou ide aj krizik docasnej polozky raily (dielec).
           cb(dlg, 'select_cabinet')        { |p| handle_select_cabinet(p) }

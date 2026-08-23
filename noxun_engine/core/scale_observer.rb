@@ -591,8 +591,11 @@ module Noxun
           # po prepnuti dokumentu drzalo cisla starej zakazky a jeho klik by
           # mieril do modelu, ktory uz nie je aktivny.
           StudioDialog.on_model_changed(model) if defined?(StudioDialog)
-          # V0.6 D1b: tab "Predvolby projektu" v okne Katalog kovania je viazany
-          # na model — po prepnuti sa mapovanie nacita z noveho modelu.
+          # ŠT-3a-2: okno Katalog kovania zaniklo, ale vetva OSTAVA (precedens
+          # `MaterialsDialog` vyssie): telo uz nerobi refresh UI (ten robi
+          # Studio plnym pushom vyssie), ale MUSI zneplatnit beziaci serverovy
+          # beh sekcie — inak by vysledok stiahnutia z Demosu dobehol do
+          # NOVEHO dokumentu s datami stareho.
           HardwareCatalogDialog.on_model_changed(model) if defined?(HardwareCatalogDialog)
         end
       end

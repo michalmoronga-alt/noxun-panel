@@ -630,13 +630,9 @@
      ŠT-1c PR B3: `.prodhead*`, `.prodsum`, `.prodtabs` a `.prodbody` tu ZANIKLI
      spolu s oknom Vyroba — obliekali VYHRADNE jeho hlavicku, suhrn, listu tabov
      a telo. Tabulky (`.bomtab`) a `.wbadge` ostavaju: kresli ich okno Studio. */
-  /* Codex GH #66 P2: `.pvtabs` je ZDIELANY pas tabov v satelitnom okne. Panel
-     ho po presune tabov do hlavicky uz nepotrebuje, ale zdielane CSS ho musi
-     drzat pre svojho JEDINEHO dnesneho konzumenta — `hardware_catalog.html`
-     (`<div class="pvtabs" id="hwTabs">`). */
-  .pvtabs { display: flex; gap: 6px; margin: 2px 0 6px; }
-  .pvtabs button { flex: 1; padding: 5px; font-size: 11px; }
-  .pvtabs button.on { background: var(--nx-select); color: var(--nx-on-accent); }
+  /* ŠT-3a-2: `.pvtabs` (zdielany pas tabov satelitneho okna) tu ZANIKOL
+     spolu so svojim JEDINYM konzumentom `hardware_catalog.html` — sekcia
+     Kovanie ma pohlady v LISTE sekcie (`.bomviews`, vzor Kusovnika). */
   .bomtab { width: 100%; border-collapse: collapse; font-size: 12px; }
   .bomtab th { position: sticky; top: 0; background: var(--nx-surface-th); text-align: left;
                padding: 6px 8px; border-bottom: 2px solid var(--nx-border); z-index: 2; }
@@ -1379,8 +1375,8 @@
   .mddel-warn { background: var(--nx-warn-bg); border: 1px solid var(--nx-warnchip-border);
                 color: var(--nx-warn-fg); border-radius: 6px; padding: 5px 8px; margin-top: 6px; }
 
-/* ===== V0.6 D1b: Katalog kovania — taby Sety + Predvolby projektu ===== */
-#hwTabs { margin: 6px 0 8px; }
+/* ===== V0.6 D1b: Katalog kovania — sety + predvolby projektu ===== */
+/* ŠT-3a-2: `#hwTabs` zanikol s oknom (pohlady su v liste sekcie). */
 .hwsset { border: 1px solid var(--nx-border); border-radius: 8px; padding: 7px 10px; margin: 6px 0; }
 .hwsset-head { display: flex; align-items: center; gap: 8px; }
 .hwsset-head b { flex: 1 1 auto; font-size: 13px; }

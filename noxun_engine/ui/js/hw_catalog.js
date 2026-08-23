@@ -300,23 +300,19 @@
   function mdhRenderEnums(){
     var line = hwEl('hwline');
     if (line) line.textContent = 'V' + MDH_VERSION + ' · položiek: ' + Object.keys(MDH_ITEMS).length;
-    ['hn_category', 'hwCategory'].forEach(function(id){
-      var sel = hwEl(id);
-      if (!sel) return;
-      var keep = sel.value;
-      sel.textContent = '';
-      if (id === 'hwCategory'){
-        var all = mdhMk('option', null, 'Všetky kategórie');
-        all.value = '';
-        sel.appendChild(all);
-      }
+    // ŠT-3a-2 (dlh z review #216): `#hwCategory` (filter v LISTE sekcie) tu
+    // UŽ NIE JE. Mal dve autority — tuto a `hwToolsHtml`, ktora ho kresli
+    // z `HW_CAT`; ktora vyhrala, zaviselo od poradia renderu. Enumy TELA
+    // (formular novej polozky) siahaju uz len na svoje polia.
+    var cat = hwEl('hn_category');
+    if (cat){
+      cat.textContent = '';
       MDH_CATS.forEach(function(c){
         var op = mdhMk('option', null, c);
         op.value = c;
-        sel.appendChild(op);
+        cat.appendChild(op);
       });
-      if (keep) sel.value = keep; // filter prezije prekreslenie enumov
-    });
+    }
     var us = hwEl('hn_unit');
     if (us){
       us.textContent = '';
@@ -679,14 +675,6 @@
     ? require('./studio.js')
     : null;
 
-  // Sekcia sa prihlasi do READ-ONLY rezimu predvolieb projektu hned pri
-  // nacitani — este pred prvym `HWSETS.init` (ten uz kresli). `hw_sets.js`
-  // sa nacitava PRED tymto suborom v OBOCH HTML, takze funkcia uz existuje.
-  if (typeof window !== 'undefined' && window.NX_HW_SECTION &&
-      typeof hwsSetProjReadOnly === 'function'){
-    hwsSetProjReadOnly(true);
-  }
-
   // Stav LISTY sekcie. Lista sa prekresluje pri KAZDOM pushi, takze hodnoty
   // vstupov musia zit aj v premennych (vzor `MD_Q`/`MD_MODE` v Materialoch) —
   // inak by pouzivatelovi zmizol filter pri prvom prepocte kusovnika.
@@ -909,10 +897,10 @@
       hwToolsHtml: hwToolsHtml, hwRenderBody: hwRenderBody, hwSetView: hwSetView,
       hwOnLeaveSection: hwOnLeaveSection, hwApplyState: hwApplyState, MDH: MDH };
   }
-  // ŠT-3a-1 (vzor ŠT-2a audit #7): v okne ŠTÚDIO `ready` posiela `studio.js`
-  // (window.onload) — druhe volanie odtialto by Studio prinutilo poslat CELY
-  // payload dvakrat a spustit odlozene poziadavky znova. Okno „Katalóg
-  // kovania" ale ZIJE dalej a svoj `ready` potrebuje (je jedinou cestou
-  // k prvemu pushu), preto sa posiela LEN mimo sekcie.
-  if (typeof window !== 'undefined' && !window.NX_HW_SECTION &&
-      window.sketchup && sketchup.ready) sketchup.ready('');
+  // ŠT-3a-2 (vzor `proj_materials.js` po ŠT-2b): `sketchup.ready('')` tu
+  // ZANIKLO CELE. V okne „Katalóg kovania" bol tento subor POSLEDNY a jeho
+  // `ready` znamenal „HTML je nacitane"; okno zaniklo a v Studiu `ready`
+  // posiela `studio.js` (`window.onload`) — druhe volanie by prinutilo okno
+  // poslat CELY payload dvakrat. `window.NX_HW_SECTION` v `studio.html`
+  // ostava ako CITATELNE prihlasenie sa do rezimu sekcie (a marker poradia
+  // skriptov pre guard test).
