@@ -15,7 +15,7 @@ Východiskový plán po UI reworku je:
 3. audit kódu a prípadný refactor/hardening **iba ak audit preukáže potrebu**,
 4. pokračovať vo funkciách.
 
-Tento priečinok obsahuje osem kandidátov na budúce návrhové sessions:
+Tento priečinok obsahuje deväť kandidátov na budúce návrhové/implementačné sessions:
 
 1. [01_D95_PLOSNA_VYROBNA_KONTROLA.md](01_D95_PLOSNA_VYROBNA_KONTROLA.md) — plošná vizuálna kontrola projektu; pôvodný „diel po diele“ koncept sa po diskusii opúšťa.
 2. [02_ZOSTAVY_SEGMENTY.md](02_ZOSTAVY_SEGMENTY.md) — dátový a UX model zostáv/segmentov, scoped pravidiel, attachmentov, živých/spoločných prvkov a odložený Room/MagicPlan smer.
@@ -25,8 +25,9 @@ Tento priečinok obsahuje osem kandidátov na budúce návrhové sessions:
 6. [06_RENDER_MR.md](06_RENDER_MR.md) — appearance/render vrstva materiálov, textúry, PBR a orientácia kresby.
 7. [07_KONSTRUKCIA_V1.md](07_KONSTRUKCIA_V1.md) — per-dielec konštrukčné odsadenia a budúce produktové typy čiel.
 8. [08_PONUKA_DOKUMENTY_CENY.md](08_PONUKA_DOKUMENTY_CENY.md) — DOCX/PDF dokumenty, manuálna cenová čerstvosť a obchodný workflow.
+9. [09_GHOST_VKLADANIE.md](09_GHOST_VKLADANIE.md) — V1-04 ghost placement: skrinka na kurzore, rotácia šípkami, floor/free Z, 4 predné anchory korpusu cez TAB; obsahuje aj predbežný audit proti `main` v0.7.51. **Pravdepodobný prvý funkčný kandidát po hardeningu**, ak finálny audit nepotvrdí blokér.
 
-Dokumenty zámerne opisujú **problém, pracovnú predstavu a otázky**, nie konkrétne súbory, callbacky, API ani poradie commitov.
+Dokumenty zámerne opisujú **problém, pracovnú predstavu a otázky**, nie konkrétne súbory, callbacky, API ani poradie commitov. Dokument 09 ide o krok ďalej: obsahuje predbežný audit dnešných dotknutých ciest, ale stále **nie je task package**.
 
 ## B · Úloha AI, model, dostupný kontext a povinné upozornenie
 
@@ -82,14 +83,8 @@ Odporúčaný vstup pre AI:
 
 Až po uzavretí tejto diskusie vzniká implementačné zadanie.
 
-## Parking lot pre najbližšiu session
+## Prednostný kandidát po hardeningu
 
-Michal 23. 8. 2026 explicitne pomenoval praktickú bolesť, ktorú chce prebrať **pred pokračovaním ďalšími veľkými bodmi**:
+Téma pôvodne vedená v parking lote ako **Základné vkladanie skriniek / V1-04** bola 23. 8. 2026 prebratá a zúžená na samostatný **Ghost Placement**. Jej schválený produktový kontrakt a predbežný audit sú už v [09_GHOST_VKLADANIE.md](09_GHOST_VKLADANIE.md).
 
-### Základné vkladanie skriniek / V1-04
-
-Dnešný problém: novo vložená skrinka sa objaví niekde pri `0,0,0`, často mimo aktuálneho pohľadu. Používateľ ju potom musí hľadať a ručne prenášať, čo reálne brzdí každodennú prácu.
-
-Ďalšia session má najprv rozobrať minimálny, robustný insertion workflow — napr. objekt na kurzore / umiestnenie do aktuálneho pohľadu / klik do modelu — a až potom rozhodnúť rozsah. **Tento README záznam nie je návrh riešenia ani task package; iba poistka, aby sa téma nestratila.**
-
-Po uzavretí vkladania sa pokračuje ďalšími koncepčnými bodmi z tohto balíka.
+Poradie stále nie je záväzný implementačný plán: najprv treba dokončiť UI 2.0, checkpoint/docs clean a následný hardening audit. Ak po ňom Ghost nemá nový konflikt, je preferovaný ako **prvá malá funkčná dávka**, pretože rieši opakovanú bolesť pri každom vložení skrinky bez otvárania segmentového scope.
