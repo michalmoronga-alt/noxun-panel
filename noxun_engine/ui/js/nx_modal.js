@@ -166,6 +166,13 @@
       if (!arr.length && d.empty) h += '<div class="mrempty">' + esc(d.empty) + '</div>';
       arr.forEach(function(row){
         h += '<div class="mrline" data-nxm-row="' + key + '">';
+        // `_note` = STITOK riadku (nie hodnota — `readRows` ho necita, lebo
+        // nema `data-nxm-col`). Nesie ho zotavenie z konfliktu: riadok, ktory
+        // sa medzitym zmenil ZVONKU, musi byt VIDNO — inak by pouzivatel
+        // potvrdil zapis nad cudzou zmenou, o ktorej nevie.
+        if (row && row._note){
+          h += '<span class="mrflag" title="' + esc(row._note) + '">' + esc(row._note) + '</span>';
+        }
         (d.hidden || []).forEach(function(hk){
           var hv = row ? row[hk] : null;
           if (hv == null || hv === '') return;
@@ -456,6 +463,56 @@
       return found;
     }
 
+    // Pole VYCHODISKOVEJ specifikacie (to, co podal volajuci) — proti nemu sa
+    // porovnava pamat a dopĺňa sa obsah po zotaveni z konfliktu.
+    function baseFieldByKey(key){
+      var found = null;
+      ((OPEN && OPEN.base && OPEN.base.fields) || []).forEach(function(f){
+        if (f && String(f.key) === String(key)) found = f;
+      });
+      return found;
+    }
+
+    function shallow(o){
+      var out = {};
+      var k;
+      for (k in o){ if (Object.prototype.hasOwnProperty.call(o, k)) out[k] = o[k]; }
+      return out;
+    }
+
+    // POZOR: `withMemory` vracia pri prazdnej pamati TEN ISTY objekt, takze
+    // `OPEN.spec === OPEN.base` a rovnako aj ich POLIA su jeden a ten isty
+    // objekt. Zapis do „specifikacie" by potom prepisal aj VYCHODISKOVE
+    // hodnoty (a naopak) — pamat by prestala vidiet, co pouzivatel rozpisal.
+    // Pred zmenou obsahu za behu si preto spec rozdvojime.
+    function ownSpecField(key){
+      if (!OPEN) return null;
+      var f = fieldByKey(key);
+      var b = baseFieldByKey(key);
+      if (!f || f !== b) return f;
+      if (OPEN.spec === OPEN.base){
+        var copy = shallow(OPEN.base);
+        copy.fields = (OPEN.base.fields || []).slice();
+        OPEN.spec = copy;
+      }
+      var own = shallow(f);
+      OPEN.spec.fields = (OPEN.spec.fields || []).map(function(x){ return x === f ? own : x; });
+      return own;
+    }
+
+    // Vymena OBSAHU repeatera za behu (zotavenie z konfliktu — audit 2c-2a #1b):
+    // volajuci podá riadky uz zlucene (cerstvy katalog + hodnoty pouzivatela)
+    // a `opts.base` = CISTY stav zo servera, aby pamat rozpisu porovnavala
+    // proti tomu, co dnes naozaj je v katalogu, nie proti stavu spred konfliktu.
+    function setRows(key, data, opts){
+      var f = ownSpecField(key);
+      if (!f) return;
+      var b = baseFieldByKey(key);
+      if (b && opts && opts.base) b.value = opts.base;
+      f.value = data || [];
+      renderRows(f, f.value);
+    }
+
     function renderRows(f, data){
       var box = rowsBox(f.key);
       if (!box) return;
@@ -607,6 +664,61 @@
     // vedla nesmie byt ticha strata rozpisaneho formulara (kontrakt D-15 z PR
     // B2). Ukladaju sa VYHRADNE polia, ktore sa lisia od defaultov (#2), takze
     // „nic som nepisal, len som okno otvoril a zavrel" pamat nezaklada.
+    // --- PAMAT RIADKOV: LEN to, co pouzivatel napisal (audit 2c-2a #1a) ------
+    // Riadok nesie aj SERVER-OWNED skryte polia (`row_rev` = odtlacok zaznamu
+    // v case otvorenia). Keby ich pamat drzala a pri dalsom otvoreni vliala
+    // spat, formular by odosielal ZASTARANY odtlacok a server by ho odmietol
+    // ako konflikt — pamat by sa stala pascou, z ktorej niet cesty von.
+    // Pamataju sa preto LEN editovatelne stlpce + `rowKey` (identita riadku,
+    // podla ktorej sa hodnoty priradia k CERSTVYM riadkom).
+    function trimRowsValue(f, rows){
+      var keep = {};
+      (f.cols || []).forEach(function(c){ keep[c.key] = true; });
+      if (f.rowKey) keep[f.rowKey] = true;
+      return (rows || []).map(function(r){
+        var out = {};
+        var k;
+        for (k in r){
+          if (Object.prototype.hasOwnProperty.call(r, k) && keep[k]) out[k] = r[k];
+        }
+        return out;
+      });
+    }
+
+    // Vliatie pamate do CERSTVYCH riadkov: parovanie podla `rowKey`.
+    //   riadok, ktory v cerstvom katalogu JE   -> prepisu sa mu LEN stlpce,
+    //   riadok z pamate BEZ identity            -> je to novy, rozpisany riadok,
+    //   riadok z pamate, ktory uz neexistuje    -> ZAHODI sa (zaznam je prec).
+    function mergeRowsMemory(f, mem){
+      var base = f.value || [];
+      var rows = mem || [];
+      var keyName = f.rowKey;
+      if (!keyName) return rows.length ? rows : base;
+      var byKey = {};
+      rows.forEach(function(r){
+        var k = r && r[keyName];
+        if (k != null && k !== '') byKey[String(k)] = r;
+      });
+      var out = base.map(function(r){
+        var k = r && r[keyName];
+        var m = (k != null && k !== '') ? byKey[String(k)] : null;
+        if (!m) return r;
+        var g = {};
+        var kk;
+        for (kk in r){ if (Object.prototype.hasOwnProperty.call(r, kk)) g[kk] = r[kk]; }
+        (f.cols || []).forEach(function(c){
+          if (Object.prototype.hasOwnProperty.call(m, c.key)) g[c.key] = m[c.key];
+        });
+        delete byKey[String(k)];
+        return g;
+      });
+      rows.forEach(function(r){
+        var k = r && r[keyName];
+        if (k == null || k === '') out.push(r); // rozpisany NOVY riadok
+      });
+      return out;
+    }
+
     function remember(){
       if (!OPEN || OPEN.memSkip) return;
       var key = OPEN.base ? OPEN.base.memoryKey : null;
@@ -617,7 +729,8 @@
       var any = false;
       Object.keys(v).forEach(function(k){
         if (sameValue(v[k], def[k])) return;
-        out[k] = v[k];
+        var f = baseFieldByKey(k);
+        out[k] = (f && f.type === 'rows') ? trimRowsValue(f, v[k]) : v[k];
         any = true;
       });
       var s = memSlot(key);
@@ -651,7 +764,9 @@
         if (!Object.prototype.hasOwnProperty.call(mem, f.key)) return f;
         var g = {}, kk;
         for (kk in f){ if (Object.prototype.hasOwnProperty.call(f, kk)) g[kk] = f[kk]; }
-        g.value = mem[f.key];
+        // Riadky sa NEPREPISUJU cele — pamat nesie len stlpce, identita a
+        // odtlacok zaznamu prichadzaju CERSTVE z katalogu (audit 2c-2a #1a).
+        g.value = (f.type === 'rows') ? mergeRowsMemory(f, mem[f.key]) : mem[f.key];
         return g;
       });
       return out;
@@ -867,7 +982,7 @@
                 rowsHtml: rowsHtml, cardCls: cardCls,
                 open: open, close: close, submit: submit,
                 isOpen: isOpen, isBusy: isBusy, setBusy: setBusy,
-                values: values, spec: spec,
+                values: values, spec: spec, setRows: setRows,
                 showErrors: showErrors, clearErrors: clearErrors,
                 memory: memory, clearMemory: clearMemory };
     global.NXModal = API;

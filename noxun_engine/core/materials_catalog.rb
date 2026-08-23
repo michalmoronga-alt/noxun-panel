@@ -225,18 +225,32 @@ module Noxun
           data = load
           enforce_group_color!(rec, data, :sheet) # D-82: farbu drzi skupina, nie payload
           data['sheets'] = data['sheets'].reject { |m| m['material_id'] == rec['material_id'] } + [rec]
-          data['sheets'] = data['sheets'].map do |s|
-            next s unless s['source_material_id'].to_s == rec['material_id']
-            synced = s.merge('grain' => rec['grain'], 'color' => rec['color'])
-            if rec.key?('sheet_size')
-              synced['sheet_size'] = rec['sheet_size']
-            else
-              synced.delete('sheet_size')
-            end
-            synced
-          end
+          sync_duplaks_in!(data, rec)
           write_unlocked(data)
         end
+      end
+
+      # JEDINA autorita synchra duplakov na ZDROJOVEJ doske. Zdielane
+      # EDITOVATELNE polia (format platne, grain, farba) sa dorovnaju v datach
+      # V RUKE — bez vlastneho zapisu, takze to smie volat kazda transakcia
+      # (formularovy upsert aj ŠT-2c `save_decor`). Identitne polia su na
+      # zdroji nemenne, takze duplaky sa v identite nikdy nerozidu.
+      # Vrati ID duplakov, ktore sa REALNE zmenili (volajuci ich zaráta do
+      # poctu upravenych — tichy suvisiaci zapis by bol klamlivy).
+      def sync_duplaks_in!(data, rec)
+        changed = []
+        data['sheets'] = data['sheets'].map do |s|
+          next s unless s['source_material_id'].to_s == rec['material_id']
+          synced = s.merge('grain' => rec['grain'], 'color' => rec['color'])
+          if rec.key?('sheet_size')
+            synced['sheet_size'] = rec['sheet_size']
+          else
+            synced.delete('sheet_size')
+          end
+          changed << s['material_id'] unless synced == s
+          synced
+        end
+        changed
       end
 
       # 2A-4a (audit B1/B4): seed smie LEN skutocne panensky stav. Poskodeny
@@ -633,9 +647,20 @@ module Noxun
           # ktore odvtedy niekto prepisal rukou, a prepocet cien by taky
           # zaznam povazoval za cerstvy. demos_url patchom zmenit NEDA
           # (nie je v PATCHABLE), takze podmienka „bez zmeny vazby" plati vzdy.
+          # Review 2c-2a #3: TO ISTE plati pre KOD a DODAVATELA — datum overenia
+          # hovori „cena tohto KODU u tohto DODAVATELA bola vtedy overena";
+          # po zmene ktorejkolvek z tych dvoch vecí sa uz vztahuje na nieco ine
+          # (rovnaky kontrakt ako `supplier_decor` vyssie).
           price_key = kind == 'edge' ? 'price_per_bm' : 'price_per_m2'
-          if clean.key?(price_key) &&
-             normalize_price(clean[price_key]) != normalize_price(existing[price_key])
+          stamp_killers = [price_key, 'code', 'supplier']
+          if stamp_killers.any? { |k|
+               next false unless clean.key?(k)
+               if k == price_key
+                 normalize_price(clean[k]) != normalize_price(existing[k])
+               else
+                 clean[k].to_s.strip != existing[k].to_s.strip
+               end
+             }
             merged.delete('price_checked_at')
           end
           ok, err = kind == 'edge' ? validate_edge_attrs(merged) : validate_sheet_attrs(merged)

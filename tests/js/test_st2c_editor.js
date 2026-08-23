@@ -233,26 +233,120 @@ let editRoot = null;
 // ===================== 5) VYSLEDKY ZO SERVERA ================================
 
 (function(){
-  // Odmietnutie „katalog sa zmenil": odomkni, hodnoty OSTAVAJU.
+  // Odmietnutie „katalog sa zmenil": odomkni, hodnoty OSTAVAJU — a riadky sa
+  // DOROVNAJU z cerstveho katalogu (review #1b), inak by konflikt nemal cestu
+  // von: formular by drzal stare `row_rev` a kazdy dalsi pokus by skoncil
+  // rovnako.
   M.MD.editBlocked();
   ok(!NXModal.isBusy(), 'odomknute');
   ok(NXModal.isOpen(), 'okno zije dalej — pouzivatel ma opravit cislo, nie pisat znova');
-  eq(DOC.querySelectorAll('[data-nxm-row="sheets"]')[0]
-       .querySelector('[data-nxm-col="price_per_m2"]').value, '19,90',
+  const row = DOC.querySelectorAll('[data-nxm-row="sheets"]')[0];
+  eq(row.querySelector('[data-nxm-col="price_per_m2"]').value, '19,90',
      'rozpisana cena je stale na mieste');
+  eq(row.querySelector('[data-nxm-col="row_rev"]').value, 'r18',
+     'odtlacok riadku je CERSTVY z katalogu (echo R2 ho neprepisalo v pamati)');
+  ok(String(STATUS.textContent).indexOf('dorovnali') > -1,
+     'hlaska hovori PRAVDU o tom, co sa stalo (review #1c)');
 
-  // Duplicitny kod: druhe „Uložiť" ho POTVRDI.
+  // Duplicitny kod: druhe „Uložiť" ho POTVRDI — ale LEN pre TIE hodnoty.
   M.MD.editDuplicateCode();
   SENT.length = 0;
   dispatch(DOC.querySelector('[data-nxm-act="submit"]'), 'click');
   eq(SENT.length, 1);
   eq(SENT[0].allow_duplicate_code, true, 'druhy pokus nesie potvrdenie duplicity');
+  eq(SENT[0].base_rev, 'R2', 'a UZ OMLADENY baseline — druhe uloženie ma sancu prejst');
+
+  // review #5: po zmene ktorejkolvek hodnoty suhlas s duplicitou PADA.
+  M.MD.editDuplicateCode();
+  DOC.querySelectorAll('[data-nxm-row="sheets"]')[0]
+     .querySelector('[data-nxm-col="code"]').value = 'INY';
+  NXModal.setBusy(false);
+  SENT.length = 0;
+  dispatch(DOC.querySelector('[data-nxm-act="submit"]'), 'click');
+  eq(SENT.length, 1);
+  eq(SENT[0].allow_duplicate_code, false,
+     'zmena hodnoty rusi suhlas — blanket „raz som potvrdil" nesmie vzniknut');
 
   // Potvrdeny zapis: zatvor + zahod pamat rozpisu.
   M.MD.editSaved();
   ok(!NXModal.isOpen(), 'potvrdeny zapis modal ZATVARA');
   eq(NXModal.memory('mat:edit:GRP1'), null,
      'a pamat rozpisu zanika — inak by sa pri dalsom otvoreni vratila stara cena');
+})();
+
+// ===== 5b) SCENAR Z REVIEW: konflikt -> druhe ULOZENIE PREJDE ================
+
+(function(){
+  M.mdSetCatalog(catalog('K1'));
+  M.mdEditOpen(KEY);
+  DOC.querySelectorAll('[data-nxm-row="sheets"]')[0]
+     .querySelector('[data-nxm-col="price_per_m2"]').value = '25,00';
+  SENT.length = 0;
+  dispatch(DOC.querySelector('[data-nxm-act="submit"]'), 'click');
+  eq(SENT[0].base_rev, 'K1', 'prve odoslanie ide so starym baseline');
+  eq(SENT[0].sheets[0].row_rev, 'r18');
+
+  // server: :stale -> echo s NOVYM katalogom (cudzia zmena riadku) + editBlocked
+  const fresh = catalog('K2');
+  fresh.catalog.sheets[0].row_rev = 'r18-cudzi';
+  fresh.catalog.sheets[0].code = 'CUDZI';
+  M.mdSetCatalog(fresh);
+  M.MD.editBlocked();
+  ok(DOC.querySelector('.mrflag'), 'riadok zmeneny ZVONKU je VIDNO (jantárový štítok)');
+  eq(DOC.querySelectorAll('[data-nxm-row="sheets"]')[0]
+       .querySelector('[data-nxm-col="code"]').value, 'A18',
+     'kod ostal ten, ktory ma pouzivatel v ruke (jeho hodnota sa neprepisuje potichu)');
+
+  SENT.length = 0;
+  dispatch(DOC.querySelector('[data-nxm-act="submit"]'), 'click');
+  eq(SENT.length, 1, 'druhe odoslanie prebehlo');
+  eq(SENT[0].base_rev, 'K2', 'S OMLADENYM baseline…');
+  eq(SENT[0].sheets[0].row_rev, 'r18-cudzi', '…a s CERSTVYM odtlackom riadku — teraz to PREJDE');
+  eq(SENT[0].sheets[0].price_per_m2, '25,00', 'a stale s cenou, ktorú pouzivatel napisal');
+  M.MD.editSaved();
+})();
+
+// ===== 5c) PAMAT NESMIE VRACAT SERVER-OWNED ODTLACOK (review #1a) ============
+
+(function(){
+  M.mdSetCatalog(catalog('P1'));
+  M.mdEditOpen(KEY);
+  DOC.querySelectorAll('[data-nxm-row="sheets"]')[0]
+     .querySelector('[data-nxm-col="price_per_m2"]').value = '31,00';
+  NXModal.close(); // Esc — hodnoty sa zapamätaju
+  const mem = NXModal.memory('mat:edit:GRP1');
+  ok(mem && mem.sheets, 'pamat drzi riadky');
+  eq(Object.prototype.hasOwnProperty.call(mem.sheets[0], 'row_rev'), false,
+     'ale NIE server-owned odtlacok — inak by sa vratil zastarany a zapis by sa nikdy nepodaril');
+  eq(mem.sheets[0].material_id, 'H3303_ST10_DTDL_18', 'identitu riadku si pamat drzi (parovanie)');
+
+  // katalog sa medzitym zmenil: iny odtlacok + pribudla doska
+  const later = catalog('P2');
+  later.catalog.sheets[0].row_rev = 'r18-neskor';
+  later.catalog.sheets.push({ material_id: 'H3303_ST10_DTDL_10', group_id: 'GRP1', decor: 'H3303',
+                              type: 'DTDL', thickness: 10, structure: 'ST10', color: [200, 180, 150],
+                              row_rev: 'r10', label: 'H3303 DTDL 10' });
+  M.mdSetCatalog(later);
+  M.mdEditOpen(KEY);
+  const lines = DOC.querySelectorAll('[data-nxm-row="sheets"]');
+  eq(lines.length, 3, 'formular ukazuje CERSTVY pocet variantov (aj ten, co pribudol)');
+  // riadok sa hlada podla IDENTITY, nie podla poradia — katalog radi varianty
+  // podla hrubky, takze pribudnutá 10-ka posunula vsetko pod seba.
+  const mine = lines.filter(function(l){
+    return l.querySelector('[data-nxm-col="material_id"]').value === 'H3303_ST10_DTDL_18';
+  })[0];
+  ok(mine, 'nas riadok sa nasiel podla material_id');
+  eq(mine.querySelector('[data-nxm-col="price_per_m2"]').value, '31,00',
+     'rozpisana cena sa vratila…');
+  eq(mine.querySelector('[data-nxm-col="row_rev"]').value, 'r18-neskor',
+     '…ale odtlacok je CERSTVY z katalogu, nie z pamate');
+  SENT.length = 0;
+  dispatch(DOC.querySelector('[data-nxm-act="submit"]'), 'click');
+  const sent18 = SENT[0].sheets.filter(function(r){ return r.material_id === 'H3303_ST10_DTDL_18'; })[0];
+  eq(sent18.row_rev, 'r18-neskor', 'a taky sa aj odosle');
+  eq(sent18.price_per_m2, '31,00', 's cenou z pamate');
+  eq(SENT[0].base_rev, 'P2');
+  M.MD.editSaved();
 })();
 
 // ===================== 6) PAMAT ROZPISU vs ODMIETNUTIE =======================
@@ -297,6 +391,38 @@ let editRoot = null;
   M.mdSetCatalog(catalog('R6'));
   M.mdEditOpen('g:NEEXISTUJE');
   ok(!NXModal.isOpen(), 'neznamy dekor editor NEOTVARA');
+
+  // review #4: LEGACY katalog (SCHEMA 1) editor nedostava — formular stoji na
+  // `group_id`, ktore vtedy neexistuje (rovnaka brana ako susedny „Názov").
+  const legacy = catalog('R6b');
+  legacy.catalog_schema = 1;
+  M.mdSetCatalog(legacy);
+  M.mdEditOpen('d:H3303');
+  ok(!NXModal.isOpen(), 'v legacy katalogu sa editor NEOTVARA');
+  ok(String(STATUS.textContent).indexOf('migrácii') > -1, 'a povie preco');
+  const g1 = { key: 'd:H3303', gid: '', decor: 'H3303', sheets: [], edges: [], color: [1, 2, 3] };
+  ok(M.mdDetailHtml(g1).indexOf('mdEditOpen') === -1,
+     'a tlacidlo „Upraviť…" sa v legacy detaile ani nekresli');
+  M.mdSetCatalog(catalog('R6c'));
+  ok(M.mdDetailHtml(GROUP).indexOf('mdEditOpen') > -1, 'v SCHEMA 2 detail tlacidlo MA');
+  ok(M.mdDetailHtml({ key: 'g:U', gid: 'U', decor: 'Korpus UNI', uni: true, sheets: [], edges: [],
+                      color: [1, 2, 3] }).indexOf('mdEditOpen') === -1,
+     'UNI dlazdica ho nema');
+})();
+
+// ===================== 7b) POZNAMKA POD TABULKOU (review #8) =================
+
+(function(){
+  M.mdSetCatalog(catalog('R6d'));
+  M.mdEditOpen(KEY);
+  const note = DOC.querySelector('.mbody .hint');
+  ok(note, 'formular ma vysvetlujucu poznamku');
+  const t = String(note.textContent);
+  ok(t.indexOf('nemaže') > -1, 'povie, ze riadok mimo formulara sa nemaze');
+  ok(t.indexOf('+ variant') > -1 && t.indexOf('Zástenu') > -1,
+     'a ze zastenu/PD treba pridat cez „+ variant" — maju dalsie povinne udaje');
+  NXModal.close();
+  NXModal.clearMemory('mat:edit:GRP1');
 })();
 
 // ===================== 8) ODCHOD ZO SEKCIE ===================================

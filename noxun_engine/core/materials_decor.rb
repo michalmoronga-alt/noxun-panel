@@ -1097,6 +1097,14 @@ module Noxun
         end
         with_catalog_lock do
           JsonFileStore.invalidate(path)
+          # (3+17) Brany BEZIA ZNOVA POD ZAMKOM. Vyssie su len rychle odmietnutie,
+          # aby sa zamok nedrzal pre pozadavku, ktora aj tak nema sancu; TOTO je
+          # miesto, kde rozhodnutie plati — medzi kontrolou nad cache a zapisom
+          # sa stav katalogu moze zmenit (cudzi proces, boot cutover).
+          return [:catalog_read_only, { 'message' => catalog_read_only_message }] if catalog_read_only?
+          unless schema_write_allowed?(a['catalog_schema'])
+            return [:stale, { 'message' => 'Katalóg je v novom formáte — obnov Štúdio (Obnoviť) a potom ulož.' }]
+          end
           # (4) Marker CERSTVO z disku: rollback z ineho procesu mohol katalog
           # pod nami vratit na legacy a zapis so skupinovymi polami by vyrobil
           # hybridny subor (vzor add_decor_batch_v3).
@@ -1146,6 +1154,11 @@ module Noxun
         return gate if gate
 
         errors = []
+        # (review #6) TEN ISTY zaznam dvakrat v jednom formulari je nestrazeny
+        # vstup: druhy vyskyt by prepisal prvy, pocet „upravenych" by klamal
+        # a pouzivatel by nevedel, ktora z dvoch cien sa naozaj ulozila.
+        save_decor_dup_ids(sheet_rows, 'sheets', 'material_id', errors)
+        save_decor_dup_ids(edge_rows, 'edges', 'abs_id', errors)
         plan = save_decor_group_plan(a, group, data, errors)
         # (8) Skupinove polia sa do dat v ruke zapisuju PRED riadkami — inak by
         # zaznam prestavany z riadku formulara prepisal prave premenovany dekor
@@ -1173,6 +1186,11 @@ module Noxun
               next if idx.nil? || data[listk][idx] == rec # riadok sa nemeni
               data[listk][idx] = rec
               updated << rec[idk]
+              # (review #2) Duplak deriva format/grain/farbu zo ZDROJA. Keby sa
+              # dorovnal az niekedy inokedy, editor by rozbil parovanie: zdroj
+              # 2800x2070, duplak stale 4100x600 — a odhad platni by ucotoval
+              # plochu podla vymysleneho formatu. Preto v TEJ ISTEJ transakcii.
+              updated.concat(sync_duplaks_in!(data, rec)) if kind == :sheet
             when 'create'
               rec = enforce_group_color!(item['rec'], data, kind)
               data[listk] << rec
@@ -1184,6 +1202,7 @@ module Noxun
         # (6) Duplicitny par kod+dodavatel v SIMULOVANOM FINALNOM stave — vzor
         # apply_demos_batch: dve polozky formulara s rovnakym novym kodom sa
         # uvidia navzajom, nedotknute pary sa nevycitaju.
+        updated = updated.uniq
         conflict = save_decor_code_conflict(data, orig, a['allow_duplicate_code'])
         return conflict if conflict
 
@@ -1198,6 +1217,22 @@ module Noxun
                 'created' => created['sheets'] + created['edges'],
                 'updated' => updated, 'skipped' => skipped,
                 'changed' => created['sheets'].size + created['edges'].size + updated.size }]
+      end
+
+      # (review #6) Druhy vyskyt toho isteho ID vo formulari = chyba validate-all.
+      def save_decor_dup_ids(rows, listk, idk, errors)
+        seen = {}
+        rows.each_with_index do |raw, i|
+          next unless raw.is_a?(Hash)
+          id = sd_str(raw[idk] || raw[idk.to_sym])
+          next if id.empty?
+          if seen.key?(id)
+            errors << sd_err("#{listk}:#{i}", nil,
+                             "Ten istý variant (#{id}) je vo formulári dvakrát — nechaj len jeden riadok.")
+          end
+          seen[id] = true
+        end
+        errors
       end
 
       # (4) Brana existencie a odtlacku riadkov. Vrati nil (vsetko sedi) alebo
@@ -1357,6 +1392,32 @@ module Noxun
         [:ok, nums]
       end
 
+      # (9 + review #3) Rusi tento patch datum overenia ceny? Datum hovori
+      # „cena TOHTO kodu u TOHTO dodavatela bola vtedy overena" — takze ho
+      # zabija zmena ceny, kodu AJ dodavatela. JEDNA autorita pre dosku aj
+      # pasku (zrkadlo rovnakeho pravidla v `patch_record`).
+      def sd_stamp_killed?(patch, existing, price_key)
+        return true if patch.key?(price_key) &&
+                       normalize_price(patch[price_key]) != normalize_price(existing[price_key])
+        %w[code supplier].any? do |k|
+          patch.key?(k) && patch[k].to_s.strip != existing[k].to_s.strip
+        end
+      end
+
+      # (review #8) Typy s DALSIMI povinnymi udajmi, ktore editor nema ako
+      # stlpec: zastena (rubovy dekor je identita) a pracovna doska (hranova
+      # uprava riadi ABS defaulty aj semafor). Zalozit ich odtialto by znamenalo
+      # NEUPLNY variant, ktory sa tvari hotovo — radsej poctivy odkaz na
+      # „+ variant" v detaile, kde tie polia su.
+      def sd_new_row_type_error(type)
+        return nil if type.to_s.strip.empty?
+        if double_sided_type?(type)
+          return 'Zástenu pridaj cez „+ variant“ — má aj rubový dekor, ktorý je súčasťou identity.'
+        end
+        return nil if pd_edge_subtypes(type).empty?
+        'Pracovnú dosku pridaj cez „+ variant“ — potrebuje aj hranovú úpravu (postforming/ABS).'
+      end
+
       # Struktura NOVEHO riadku: skupina ju urcuje sama (stlpec to nie je).
       # Vrati [true, hodnota] alebo [false, hlaska].
       def sd_new_structure(structures)
@@ -1462,10 +1523,10 @@ module Noxun
         # (9) Zmena ceny rusi datum overenia. Vazbu na dodavatela (demos_url)
         # editor nemeni — allowlist ju nenesie — takze KAZDA rucna zmena ceny
         # znamena „cena uz nie je overena voci stranke dodavatela".
-        if patch.key?('price_per_m2') &&
-           normalize_price(patch['price_per_m2']) != normalize_price(existing['price_per_m2'])
-          merged.delete('price_checked_at')
-        end
+        # Review #3: rovnako KOD a DODAVATEL — datum hovori „cena TOHTO kodu
+        # u TOHTO dodavatela bola vtedy overena"; po ich zmene sa vztahuje na
+        # nieco ine (zrkadlo `patch_record`).
+        merged.delete('price_checked_at') if sd_stamp_killed?(patch, existing, 'price_per_m2')
         rec = normalize_sheet(merged)
         if rec.nil?
           errors << sd_err(tag, nil, 'Záznam sa nedá uložiť.')
@@ -1486,6 +1547,9 @@ module Noxun
         bad = false
         if type.empty?
           errors << sd_err(tag, 'type', 'Typ dosky je povinný (DTDL/MDF/HDF…).')
+          bad = true
+        elsif (type_err = sd_new_row_type_error(type))
+          errors << sd_err(tag, 'type', type_err)
           bad = true
         end
         th = strict_num(row['thickness'])
@@ -1641,11 +1705,8 @@ module Noxun
           bad = true
         end
         return nil if bad
-        # (9) rovnaky kontrakt ako pri doske
-        if patch.key?('price_per_bm') &&
-           normalize_price(patch['price_per_bm']) != normalize_price(existing['price_per_bm'])
-          merged.delete('price_checked_at')
-        end
+        # (9) rovnaky kontrakt ako pri doske (cena, kod aj dodavatel)
+        merged.delete('price_checked_at') if sd_stamp_killed?(patch, existing, 'price_per_bm')
         rec = normalize_edge(merged)
         if rec.nil?
           errors << sd_err(tag, nil, 'Pásku sa nepodarilo uložiť.')

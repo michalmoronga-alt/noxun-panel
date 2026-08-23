@@ -103,8 +103,10 @@ NxTest.test('save_decor (bod 1): server-owned polia sa STRHAVAJU — datum overe
   NxTest.assert_equal(:ok, st, info.inspect)
   after = SDM.sheet(s18['material_id'])
   NxTest.assert_equal('H3303-18', after['code'], 'povolene pole preslo')
-  NxTest.assert_equal('2026-08-09T10:00:00Z', after['price_checked_at'],
-                      'datum overenia si klient nastavit NEMOZE (cena sa nemenila)')
+  NxTest.refute(after.key?('price_checked_at'),
+                'datum overenia padol so zmenou kodu (bod 9) — a NIE je to hodnota z klienta')
+  NxTest.refute(after['price_checked_at'].to_s.start_with?('2099'),
+                'podvrhnuty datum overenia sa NIKDY nezapise')
   NxTest.refute(after['uni'], 'UNI priznak z klienta neprejde')
   NxTest.refute(after.key?('source_material_id'), 'duplakova vazba z klienta neprejde')
   NxTest.assert_equal([200, 180, 150], after['color'], 'farba je vlastnost SKUPINY, nie riadku')
@@ -286,22 +288,53 @@ NxTest.test('save_decor (bod 9): rucna zmena ceny rusi price_checked_at (doska a
   NxTest.refute(after_a.key?('price_checked_at'), 'ABS: datum overenia padol')
 end
 
-NxTest.test('save_decor (bod 9): NEZMENENA cena datum overenia NERUSI') do
+NxTest.test('save_decor (bod 9): nedotknuta cena/kod/dodavatel datum overenia NERUSIA') do
   sd_headless!
   sd_seed!
   gid = sd_gid
   s = sd_group_sheets(gid).first
-  NxTest.assert(SDM.upsert_sheet(s.merge('price_per_m2' => 20.0,
+  NxTest.assert(SDM.upsert_sheet(s.merge('price_per_m2' => 20.0, 'code' => 'K1',
                                          'price_checked_at' => '2026-08-09T10:00:00Z')))
+  # meni sa LEN format platne (pri DTDL nie je identita ani nakupny udaj)
   rows = sd_group_sheets(gid).map do |x|
-    x['material_id'] == s['material_id'] ? sd_sheet_row(x, 'code' => 'NOVYKOD') : sd_sheet_row(x)
+    x['material_id'] == s['material_id'] ? sd_sheet_row(x, 'sheet_size' => '2800×2070') : sd_sheet_row(x)
   end
   st, info = SDM.save_decor(sd_payload(gid, 'sheets' => rows))
   NxTest.assert_equal(:ok, st, info.inspect)
   after = SDM.sheet(s['material_id'])
-  NxTest.assert_equal('NOVYKOD', after['code'])
+  NxTest.assert_equal([2800.0, 2070.0], after['sheet_size'])
   NxTest.assert_equal('2026-08-09T10:00:00Z', after['price_checked_at'],
-                      'zmena kodu datum overenia nerusi (rusi ho LEN cena)')
+                      'zmena formatu datum overenia nerusi')
+end
+
+# --- review #3: kod a dodavatel rusia datum overenia rovnako ako cena --------
+
+NxTest.test('save_decor (review #3): zmena KODU aj DODAVATELA rusi price_checked_at') do
+  sd_headless!
+  [['code', 'INY_KOD'], ['supplier', 'Iný dodávateľ']].each do |field, value|
+    sd_seed!
+    gid = sd_gid
+    s = sd_group_sheets(gid).first
+    a = sd_group_edges(gid).first
+    stamp = '2026-08-09T10:00:00Z'
+    NxTest.assert(SDM.upsert_sheet(s.merge('code' => 'K1', 'supplier' => 'Demos',
+                                           'price_per_m2' => 20.0, 'price_checked_at' => stamp)))
+    NxTest.assert(SDM.upsert_edge(a.merge('code' => 'E1', 'supplier' => 'Demos',
+                                          'price_per_bm' => 1.2, 'price_checked_at' => stamp)))
+    s = SDM.sheet(s['material_id'])
+    a = SDM.edge(a['abs_id'])
+    rows = sd_group_sheets(gid).map do |x|
+      x['material_id'] == s['material_id'] ? sd_sheet_row(x, field => value) : sd_sheet_row(x)
+    end
+    st, info = SDM.save_decor(sd_payload(gid, 'sheets' => rows,
+                                              'edges' => [sd_edge_row(a, field => value)],
+                                              'allow_duplicate_code' => true))
+    NxTest.assert_equal(:ok, st, info.inspect)
+    NxTest.refute(SDM.sheet(s['material_id']).key?('price_checked_at'),
+                  "doska: zmena #{field} rusi datum overenia")
+    NxTest.refute(SDM.edge(a['abs_id']).key?('price_checked_at'),
+                  "ABS: zmena #{field} rusi datum overenia")
+  end
 end
 
 # ---------------------------------------------------------------------------
@@ -559,6 +592,116 @@ NxTest.test('save_decor (bod 6): UNI skupina nedostane ABS pasku ani novy varian
                                          'edges' => []))
   NxTest.assert_equal(:invalid, st2)
   NxTest.assert(info2['errors'].first['msg'].include?('UNI'), info2.inspect)
+end
+
+
+# ---------------------------------------------------------------------------
+# 14) REVIEW #2: duplak sa dorovna V TEJ ISTEJ transakcii
+#     zabija: volanie sync_duplaks_in! v update vetve save_decor
+# ---------------------------------------------------------------------------
+
+NxTest.test('save_decor (review #2): zmena formatu/farby zdroja DOROVNA duplak v tom istom zapise') do
+  sd_headless!
+  sd_seed!
+  gid = sd_gid
+  # zdroj = 36-ka (jej dvojnasobok 72 v katalogu este nie je; 18x2 by kolidovalo
+  # s uz existujucou kupovanou 36-kou a duplak by nevznikol)
+  src = sd_group_sheets(gid).last
+  st0, dup = SDM.create_duplak_sheet(src['material_id'], 2)
+  NxTest.assert_equal(:ok, st0, dup.inspect)
+  dup_id = dup['material_id']
+  NxTest.assert(SDM.sheet(dup_id), 'duplak vznikol')
+  rows = sd_group_sheets(gid).reject { |x| SDM.duplak?(x) }.map do |x|
+    x['material_id'] == src['material_id'] ? sd_sheet_row(x, 'sheet_size' => '2800×2070') : sd_sheet_row(x)
+  end
+  st, info = SDM.save_decor(sd_payload(gid, 'sheets' => rows, 'color' => '#102030'))
+  NxTest.assert_equal(:ok, st, info.inspect)
+  after_src = SDM.sheet(src['material_id'])
+  after_dup = SDM.sheet(dup_id)
+  NxTest.assert_equal([2800.0, 2070.0], after_src['sheet_size'], 'zdroj ma novy format')
+  NxTest.assert_equal([2800.0, 2070.0], after_dup['sheet_size'],
+                      'DUPLAK je dorovnany — inak by odhad platni ratal podla vymysleneho formatu')
+  NxTest.assert_equal([16, 32, 48], after_dup['color'], 'a farbu dedi tiez')
+  NxTest.assert(info['updated'].include?(dup_id), 'duplak je zaratany medzi upravene')
+  NxTest.assert_equal(src['material_id'], after_dup['source_material_id'], 'vazba drzi')
+end
+
+# ---------------------------------------------------------------------------
+# 15) REVIEW #6: ten isty variant dvakrat vo formulari
+# ---------------------------------------------------------------------------
+
+NxTest.test('save_decor (review #6): druhy vyskyt toho isteho ID je CHYBA, nie tichy prepis') do
+  sd_headless!
+  sd_seed!
+  gid = sd_gid
+  s = sd_group_sheets(gid).first
+  rows = [sd_sheet_row(s, 'code' => 'PRVY'), sd_sheet_row(s, 'code' => 'DRUHY')]
+  st, info = SDM.save_decor(sd_payload(gid, 'sheets' => rows))
+  NxTest.assert_equal(:invalid, st)
+  NxTest.assert(info['errors'].any? { |e| e['row'] == 'sheets:1' && e['msg'].include?('dvakrát') },
+                info.inspect)
+  NxTest.assert_equal(s['code'], SDM.sheet(s['material_id'])['code'], 'nic sa nezapisalo')
+  a = sd_group_edges(gid).first
+  st2, info2 = SDM.save_decor(sd_payload(gid, 'edges' => [sd_edge_row(a), sd_edge_row(a)]))
+  NxTest.assert_equal(:invalid, st2)
+  NxTest.assert(info2['errors'].any? { |e| e['row'] == 'edges:1' }, info2.inspect)
+end
+
+# ---------------------------------------------------------------------------
+# 16) REVIEW #8: nove riadky LEN pre typy bez dalsej identity
+# ---------------------------------------------------------------------------
+
+NxTest.test('save_decor (review #8): zastenu a PD editor nezaklada — odkaze na „+ variant"') do
+  sd_headless!
+  sd_seed!
+  gid = sd_gid
+  rows = sd_group_sheets(gid).map { |x| sd_sheet_row(x) }
+  st, info = SDM.save_decor(sd_payload(gid,
+                                       'sheets' => rows + [{ 'type' => 'ZASTENA', 'thickness' => '9,2',
+                                                             'sheet_size' => '4100×640' }]))
+  NxTest.assert_equal(:invalid, st)
+  NxTest.assert(info['errors'].first['msg'].include?('+ variant'), info.inspect)
+  st2, info2 = SDM.save_decor(sd_payload(gid,
+                                         'sheets' => rows + [{ 'type' => 'PD', 'thickness' => '38',
+                                                               'sheet_size' => '4100×600' }]))
+  NxTest.assert_equal(:invalid, st2)
+  NxTest.assert(info2['errors'].first['msg'].include?('hranovú úpravu'), info2.inspect)
+  NxTest.assert_equal(2, sd_group_sheets(gid).size, 'nic nepribudlo')
+  # bezny typ sa zalozit DA (brana je uzka, nie plosna)
+  st3, info3 = SDM.save_decor(sd_payload(gid,
+                                         'sheets' => rows + [{ 'type' => 'MDF', 'thickness' => '19' }]))
+  NxTest.assert_equal(:ok, st3, info3.inspect)
+  NxTest.assert_equal(1, info3['created'].size)
+end
+
+NxTest.test('patch_record (review #3): kod aj dodavatel rusia price_checked_at ako cena') do
+  sd_headless!
+  [['code', 'INY'], ['supplier', 'Iný'], ['price_per_m2', '33']].each do |field, value|
+    sd_seed!
+    gid = sd_gid
+    s = sd_group_sheets(gid).first
+    stamp = '2026-08-09T10:00:00Z'
+    NxTest.assert(SDM.upsert_sheet(s.merge('code' => 'K1', 'supplier' => 'Demos',
+                                           'price_per_m2' => 20.0, 'price_checked_at' => stamp)))
+    fresh = SDM.sheet(s['material_id'])
+    st, err = SDM.patch_record('sheet', fresh['material_id'], { field => value },
+                               row_rev: SDM.record_rev(fresh), allow_duplicate_code: true)
+    NxTest.assert_equal(:ok, st, err.inspect)
+    NxTest.refute(SDM.sheet(fresh['material_id']).key?('price_checked_at'),
+                  "inline bunka: zmena #{field} rusi datum overenia")
+  end
+  # kontrola opacnej strany: obchodny nazov datum NERUSI (nie je to nakupny udaj)
+  sd_seed!
+  gid = sd_gid
+  s = sd_group_sheets(gid).first
+  NxTest.assert(SDM.upsert_sheet(s.merge('price_per_m2' => 20.0,
+                                         'price_checked_at' => '2026-08-09T10:00:00Z')))
+  fresh = SDM.sheet(s['material_id'])
+  st, = SDM.patch_record('sheet', fresh['material_id'], { 'cp_nazov' => 'Dub Halifax prírodný' },
+                         row_rev: SDM.record_rev(fresh))
+  NxTest.assert_equal(:ok, st)
+  NxTest.assert_equal('2026-08-09T10:00:00Z', SDM.sheet(fresh['material_id'])['price_checked_at'],
+                      'obchodny nazov s overenim ceny nesuvisi')
 end
 
 NxTest.test('save_decor (bod 6): UNI zaznam nedostane nakupne polia ani cez editor') do

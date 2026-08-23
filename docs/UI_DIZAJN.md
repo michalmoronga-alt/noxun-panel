@@ -1153,6 +1153,20 @@ ostávajú reťazcami — drafty rozpočtu na tom stoja.
 | `roWhen` | kľúč, ktorého prítomnosť v riadku bunku **zamkne** (`roWhen: 'material_id'` = „riadok už je uložený variant, toto je jeho identita") |
 | `roTitle` | **dôvod** zámku do tooltipu — pravidlo D-78, žiadne mŕtve pole bez vysvetlenia |
 
+Repeater má aj **`rowKey`** (kľúč identity riadku). Pamäť rozpísaného formulára
+podľa neho **páruje hodnoty na čerstvé riadky** a ukladá **len editovateľné
+stĺpce** — server-owned skryté polia (`row_rev`) sa z pamäte nikdy nevracajú.
+Bez toho by okno po zatvorení a otvorení odosielalo zastaraný odtlačok záznamu
+a zápis by **už nikdy neprešiel**: pamäť by sa stala pascou. Riadok, ktorý
+v čerstvom zozname nie je, sa z pamäte zahodí; rozpísaný **nový** riadok (bez
+identity) prežije.
+
+Riadok smie niesť **`_note`** — štítok nad riadkom (nie hodnota, `values()` ho
+nevracia). Používa ho zotavenie z konfliktu: záznam zmenený **zvonku** musí byť
+vidno, inak by ho používateľ potvrdil bez toho, aby o zmene vedel.
+**`NXModal.setRows(key, rows, {base})`** vymení obsah repeatera za behu — to je
+cesta von z konfliktu (prekresliť z čerstvých dát, hodnoty používateľa nechať).
+
 Zamknutá bunka je `readonly`, **nikdy `disabled`**: hodnotu musí byť vidno, dať
 zamerať aj skopírovať — `disabled` ju vyhodí z klávesnice aj z čítačky obrazovky.
 Bunky nemajú `<label>` (nadpis je nad stĺpcom), preto dostávajú **`aria-label`**.

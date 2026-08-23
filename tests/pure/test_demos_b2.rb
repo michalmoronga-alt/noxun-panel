@@ -671,7 +671,9 @@ NxTest.test('demos b2: demos polia preziju cudzi patch (merge-safe normalize) a 
   )
   NxTest.assert_equal(:ok, st)
   fresh = MAT2.sheet('K009_PW_DTDL_18X')
-  st2, = MAT2.patch_record('sheet', 'K009_PW_DTDL_18X', { 'supplier' => 'Demos' },
+  # ŠT-2c: nakupne polia (cena/kod/dodavatel) datum overenia rusia, obchodny
+  # nazov nie — na nom sa preto testuje, ze cudzi patch demos polia NEZHODI.
+  st2, = MAT2.patch_record('sheet', 'K009_PW_DTDL_18X', { 'cp_nazov' => 'Buk prírodný' },
                            row_rev: MAT2.record_rev(fresh))
   NxTest.assert_equal(:ok, st2)
   after = MAT2.sheet('K009_PW_DTDL_18X')
