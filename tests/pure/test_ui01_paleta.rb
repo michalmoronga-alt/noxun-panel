@@ -180,10 +180,13 @@ NxTest.test('UI-01: temu dostane KAZDE okno (spolocny boot hook register_dialog_
   # inak by nove okno ostalo bez temy aj bez dorovnania velkosti (D-77).
   # ŠT-1c PR B3: okno Vyroba zaniklo — ostalo ich SEDEM.
   # ŠT-2b: okno Materialy zaniklo (obsah je sekcia `mat` Studia) — SEST.
-  NxTest.assert_equal(6, volajuci.length,
-                      "spolocny boot hook musi volat VSETKYCH 6 okien (najdene: #{volajuci.map { |p| File.basename(p) }.join(', ')})")
-  NxTest.refute(volajuci.any? { |p| File.basename(p) == 'materials_dialog.rb' },
-                'materials_dialog.rb uz ziadne okno nevlastni — hook by registroval do prazdna')
+  # ŠT-3a-2: okno Katalog kovania zaniklo (obsah je sekcia `hw`) — PAT.
+  NxTest.assert_equal(5, volajuci.length,
+                      "spolocny boot hook musi volat VSETKYCH 5 okien (najdene: #{volajuci.map { |p| File.basename(p) }.join(', ')})")
+  %w[materials_dialog.rb hardware_catalog_dialog.rb].each do |gone|
+    NxTest.refute(volajuci.any? { |p| File.basename(p) == gone },
+                  "#{gone} uz ziadne okno nevlastni — hook by registroval do prazdna")
+  end
   NxTest.assert(UI01_WIN_FIT.include?('sketchup.nx_theme'),
                 'okno si temu vypyta z win_fit.js (jediny skript nacitany vo vsetkych oknach)')
   chybajuce = Dir[File.join(UI01_UI_DIR, '*.html')].reject do |path|

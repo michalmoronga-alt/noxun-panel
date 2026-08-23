@@ -64,20 +64,16 @@ module Noxun
       # jeho vlastna cesta `mat_open_window` — sekcia dnes vie VSETKO vratane
       # Demos tokov a „Nahradiť UNI…".
       # ŠT-3a-1: `hw` z tejto tabulky VYPADLO — Kovanie je ZIVA sekcia tohto
-      # okna. Okno „Katalóg kovania" ale ZIJE dalej: drzi este tri MODELOVE
-      # zapisy (predvolby setov projektu), ktore sekcia zatial nevie. Otvara
-      # ho preto vlastna cesta `hw_open_window` (premostenie Z VNUTRA sekcie,
-      # vzor `mat_open_window` zo ŠT-2a) — nie navigacia.
+      # okna. ŠT-3a-2: okno „Katalóg kovania" ZANIKLO uplne (aj s troma
+      # MODELOVYMI zapismi predvolieb setov projektu), takze zanikla aj jeho
+      # vlastna cesta `hw_open_window` — sekcia dnes vie VSETKO.
       WINDOW_BRIDGES = {
         'rules' => 'RulesDialog', 'tpl' => 'TemplatesDialog',
         'sup' => 'SupplierSettingsDialog', 'bset' => 'SupplierSettingsDialog'
       }.freeze
 
-      # ŠT-3a-1: hlaska premostenia Z VNUTRA sekcie `hw` do okna „Katalóg
-      # kovania" (vzor `MAT_BRIDGE_STATUS` zo ŠT-2a). Prizna, PRECO sa otvara
-      # ine okno a kedy to prestane platit.
-      HW_BRIDGE_STATUS = 'Otváram okno Katalóg kovania — predvoľby setov projektu ' \
-                         'zapisujú do modelu a do Štúdia sa presunú v dávke ŠT-3a-2.'
+      # ŠT-3a-2: `HW_BRIDGE_STATUS` (hlaska premostenia Z VNUTRA sekcie do okna
+      # Katalóg kovania) ZANIKLO spolu s tym oknom — niet kam premostovat.
 
       # Slovenske hlasky premosteni — texty sklada SERVER (jedna autorita).
       BRIDGE_STATUS = {
@@ -793,19 +789,6 @@ module Noxun
           HardwareCatalogDialog.cancel_runs_on_leave
         end
 
-        # Premostenie Z VNUTRA sekcie do okna „Katalóg kovania" — jedina cesta
-        # k trom MODELOVYM zapisom (predvolby setov projektu), ktore sekcia
-        # v tejto davke este nevie. D-78: tlacidlo NIE JE mrtve, vedie tam, kde
-        # obsah naozaj je, a status prizna, kedy sa presunie sem.
-        def do_hw_open_window(_payload = nil)
-          unless defined?(HardwareCatalogDialog)
-            return set_status('Okno sa nepodarilo otvoriť (nie je načítané).', true)
-          end
-
-          HardwareCatalogDialog.show
-          set_status(HW_BRIDGE_STATUS)
-        end
-
         # Katalogove echo. Payload sa smie PODAT (`push_items` ho uz zostavil —
         # druhy vypocet `row_rev` pre kazdu polozku by bol zbytocny).
         def push_hw_catalog(payload = nil)
@@ -840,7 +823,11 @@ module Noxun
         def hw_payload(model)
           return nil unless defined?(HardwareCatalogDialog)
 
-          out = { 'sets' => HardwareCatalogDialog.sets_payload,
+          # F4: sets_payload dostava NAS model — pri prepnuti dokumentu by
+          # inak sekcia dostala predvolby STAREHO dokumentu vedla kusovnika
+          # noveho (`Sketchup.active_model` sa v case broadcastu este
+          # nemusel prepnut).
+          out = { 'sets' => HardwareCatalogDialog.sets_payload(model),
                   'model_guid' => ProductionCore.model_guid(model) }
           out['catalog'] = HardwareCatalogDialog.state_payload if @hw_full_pending
           out
@@ -1082,8 +1069,6 @@ module Noxun
           # sem chodi len odpoved (`hw_sink`).
           hw_actions.each { |name| cb(dlg, name) { |p| do_hw(name, p) } }
           cb(dlg, 'hw_leave')             { |p| do_hw_leave(p) }
-          # Premostenie k trom MODELOVYM zapisom, ktore sekcia zatial nevie.
-          cb(dlg, 'hw_open_window')       { |p| do_hw_open_window(p) }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(studio): #{msg}")

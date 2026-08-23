@@ -1,45 +1,43 @@
 # frozen_string_literal: true
-# Noxun Engine — V0.6 C-2: okno "Katalog kovania" (sprava HardwareCatalog).
+# Noxun Engine — SERVEROVA AUTORITA KATALOGU KOVANIA.
 #
-# Vzor materials_dialog: satelitne okno, callbacky PRED show, server je
-# autorita (search VYHRADNE Ruby — audit C F12; JS len renderuje), zapisy
-# s row_rev/revision guardmi, hlasky cez set_status + echo push_items.
-# Cenove overenie = serverovy proposal flow HardwareCatalog (BLOCKER 1) —
-# JS posiela len kod + accept, hodnoty nikdy.
+# ŠT-3a-2: satelitne okno „Katalóg kovania" ZANIKLO (HtmlDialog, `DLG_KEY`,
+# `hardware_catalog.html`, polozka menu aj panelove tlacidlo). Jedine UI
+# katalogu je odteraz SEKCIA `hw` v okne ŠTÚDIO. Modul sa pritom ZAMERNE
+# NEPREMENUVA (vzor audit #21 zo ŠT-2a): zaniklo OKNO, nie serverova
+# autorita — telo kazdej akcie, vsetky guardy (`row_rev`, `revision`,
+# `model_guid`), Demos konektor aj cenovy proposal flow ziju dalej TU.
 #
-# Request generation (F9): kazdy check_price nesie gen; vysledok so starym
-# gen alebo pre zavrete okno sa zahodi (bump: novy check, close).
+# Server je autorita: search VYHRADNE Ruby (audit C F12; JS len renderuje
+# vratene poradie), cenove overenie je serverovy proposal (BLOCKER 1) — JS
+# posiela len kod a `pid`, hodnoty nikdy.
 #
-# ŠT-3a-1: katalog ma od tejto davky DVE UI — toto okno (zije dalej, zanikne
-# v ŠT-3a-2) a SEKCIU `hw` okna ŠTÚDIO. Telo kazdej akcie ostava TU (vzor
-# audit #21 ŠT-2a: modul sa NEPREMENUVA), zmenil sa jediny detail: ADRESAT
-# odpovede.
-#
+# ADRESAT odpovede:
 #   * pocas synchronneho volania sekcie ho drzi `with_client(sink)`,
-#   * mimo neho ide odpoved do OKNA (`win_js`),
-#   * ASYNCHRONNY beh (overenie ceny, nahlad z Demosu) si pamata, KTO ho
-#     spustil (`run_target`): pre okno plati povodny okno-guard
-#     (`@dialog.equal?(dlg) && visible?`), pre sekciu SESSION TOKEN
-#     (`@section_session`), ktory zhasina zatvorenie Studia, prepnutie
-#     dokumentu a ODCHOD zo sekcie `hw`.
+#   * mimo neho (asynchronne emity, refresh cesty zvonku) ide vsetko do
+#     Studia cez `StudioDialog.hw_js` — druhe UI uz neexistuje.
+#
+# Request generation (F9): kazdy check_price/nahlad nesie gen; vysledok so
+# starym gen sa zahodi. ZIVOTNOST behu drzi SESSION TOKEN sekcie
+# (`@section_session`) — zhasina ho zatvorenie Studia, prepnutie dokumentu
+# a odchod zo sekcie `hw`; identitu behu drzi `run_id` (dve nezavisle
+# generacie nad jednym priznakom by si inak siahali na cudzie).
 require 'json'
 
 module Noxun
   module Engine
     module HardwareCatalogDialog
-      DLG_KEY = 'noxun_engine_hw_catalog_v1'
-
       # ŠT-3a-1: UZAVRETY whitelist akcii, ktore smie poslat SEKCIA `hw`.
       # Klient (Studio) posiela iba MENO akcie — co sa smie zavolat, rozhoduje
       # SERVER (HTML ani JS nie su ochrana).
       #
-      # Su tu LEN KATALOGOVE zapisy (globalny %APPDATA% katalog + kniznica
-      # setov). Tri akcie, ktore menia MODEL — `hws_map_project`,
-      # `hws_merge_seed`, `hws_reset_project` — v tejto davke ZAMERNE CHYBAJU:
-      # ich presun (a s nim aj zanik tohto okna) je dávka ŠT-3a-2. Sekcia ich
-      # preto nekresli ako ovladace, ale ako PREMOSTENIE do tohto okna
-      # (`hw_open_window` v `studio_dialog.rb`) — vzor `MAT_BRIDGE_STATUS`
-      # zo ŠT-2a.
+      # ŠT-3a-2: pribudli tri MODELOVE zapisy — `hws_map_project`,
+      # `hws_merge_seed`, `hws_reset_project` (predvolby setov PROJEKTU).
+      # Kazdy z nich je `start_operation` … `commit_operation`, teda 1 zmena =
+      # 1 krok Spat, a kazdy ma serverovy `model_guid` guard: zapis zo
+      # zastaraneho UI sa odmietne a stav sa obnovi. S nimi zanikol read-only
+      # rezim bloku „Predvoľby projektu" aj premostenie do okna — okno uz
+      # neexistuje.
       #
       # `ready` v zozname NIE JE (a byt nemoze): Studio registruje callbacky
       # pod TYMI ISTYMI menami, takze `ready` by prepisal jeho vlastny — okno
@@ -51,6 +49,7 @@ module Noxun
         hw_check_price hw_apply_price
         hw_demos_search hw_demos_preview hw_demos_cancel hw_demos_create
         hws_save_set hws_delete_set hws_map_global
+        hws_map_project hws_merge_seed hws_reset_project
       ].freeze
 
       class << self
@@ -87,6 +86,12 @@ module Noxun
           when 'hws_save_set'      then handle_set_save(payload)
           when 'hws_delete_set'    then handle_set_delete(payload)
           when 'hws_map_global'    then handle_map_global(payload)
+          # ŠT-3a-2: MODELOVE zapisy (predvolby setov projektu). Kazdy z nich
+          # otvara vlastnu operaciu (1 zmena = 1 krok Spat) a kazdy si overuje
+          # `model_guid` z payloadu — zapis zo zastaraneho UI sa odmietne.
+          when 'hws_map_project'   then handle_map_project(payload)
+          when 'hws_merge_seed'    then handle_merge_seed(payload)
+          when 'hws_reset_project' then handle_reset_project(payload)
           end
         end
 
@@ -143,29 +148,22 @@ module Noxun
           Engine.log_error(e, 'HardwareCatalogDialog.cancel_runs_on_leave')
         end
 
-        # Kto si vyziadal beh — vysledok musi prist JEMU (a len kym ma kam
-        # prist). Vnutri `with_client` je to sekcia, inak okno.
+        # ŠT-3a-2: adresat je uz LEN sekcia — okno zaniklo, takze `run_target`
+        # nesie iba to, co sa NESMIE stratit: SESSION TOKEN zachyteny pri
+        # STARTE behu. Bez neho by ABA (zatvorenie a znovuotvorenie Studia,
+        # prepnutie dokumentu) prepustilo vysledok stareho behu do noveho
+        # kontextu. Identitu behu drzi zvlast `run_id` (viz `mark_running`).
         def run_target
-          return { kind: :section, session: @section_session.to_i } if @client_sink
-
-          { kind: :window, dlg: @dialog }
+          { session: @section_session.to_i }
         end
 
         def target_alive?(target)
-          if target[:kind] == :section
-            @section_session.to_i == target[:session] &&
-              defined?(StudioDialog) && StudioDialog.dialog_alive?
-          else
-            !@dialog.nil? && @dialog.equal?(target[:dlg]) && @dialog.visible?
-          end
+          @section_session.to_i == target[:session] &&
+            defined?(StudioDialog) && StudioDialog.dialog_alive?
         end
 
-        def emit(target, script)
-          target[:kind] == :section ? studio_js(script) : win_js(script)
-        end
-
-        def emit_status(target, msg, error = false)
-          emit(target, status_script(msg, error))
+        def emit_status(msg, error = false)
+          studio_js(status_script(msg, error))
         end
 
         # Beziaci dlhy beh SEKCIE si pamatame kvoli hlaske pri odchode.
@@ -180,17 +178,17 @@ module Noxun
         # `mark_running` preto vracia ID behu a `clear_running` gasi LEN pri jeho
         # zhode. Volanie BEZ id (vyslovne zrusenie pouzivatelom) zhasina to,
         # co v sekcii prave bezi — to je jeho zmysel.
-        def mark_running(target, label)
-          return nil unless target[:kind] == :section
-
+        #
+        # ŠT-3a-2: rozlisenie `target` zaniklo spolu s oknom — bezat moze uz
+        # len sekcia. Identita behu (`run_id`) ostava: `@gen` a `@demos_gen` su
+        # dve nezavisle pocitadla nad JEDNYM priznakom.
+        def mark_running(label)
           id = (@section_run_id = @section_run_id.to_i + 1)
           @section_running = { 'label' => label.to_s, 'id' => id }
           id
         end
 
-        def clear_running(target, id = nil)
-          return unless target[:kind] == :section
-
+        def clear_running(id = nil)
           run = @section_running
           return unless run.is_a?(Hash)
           return if id && run['id'] != id
@@ -198,97 +196,16 @@ module Noxun
           @section_running = nil
         end
 
-        def show
-          dlg = ensure_dialog
-          if dlg.visible?
-            dlg.bring_to_front
-          else
-            dlg.show
-          end
-          dlg
-        rescue StandardError => e
-          Engine.log_error(e, 'HardwareCatalogDialog.show')
-        end
-
-        def ensure_dialog
-          return @dialog if @dialog
-
-          @dialog = UI::HtmlDialog.new(
-            dialog_title: 'Noxun Engine — Katalóg kovania',
-            preferences_key: DLG_KEY,
-            scrollable: true,
-            resizable: true,
-            # D-77: zoznam poloziek a editor setov maju siroke riadky s akciami
-            # vpravo. Rozmery platia LEN pri prvom otvoreni — zapamatane male okno
-            # dorovna nx_fit.
-            width: 760,
-            height: 620,
-            min_width: 560,
-            min_height: 420,
-            style: UI::HtmlDialog::STYLE_DIALOG
-          )
-          @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'hardware_catalog.html'))
-          register_callbacks(@dialog) # pred show!
-          @dialog.set_on_closed do
-            bump_gen       # F9: zavrete okno zneplatni bezace cenove overenia
-            bump_demos_gen # GH #128 P2: aj bezaci nahlad z Demosu
-            @dialog = nil
-          end
-          @dialog
-        end
-
-        def register_callbacks(dlg)
-          Engine.register_dialog_fit(dlg, 'hw_catalog') # D-77: zapamatane male okno sa dorovna
-          cb(dlg, 'ready')          { |_p| push_state; push_sets }
-          cb(dlg, 'hw_search')      { |p| handle_search(p) }
-          cb(dlg, 'hw_create')      { |p| handle_create(p) }
-          cb(dlg, 'hw_patch')       { |p| handle_patch(p) }
-          cb(dlg, 'hw_delete')      { |p| handle_delete(p) }
-          cb(dlg, 'hw_check_price') { |p| handle_check_price(p) }
-          cb(dlg, 'hw_apply_price') { |p| handle_apply_price(p) }
-          # V0.6 D2: "Pridat z Demosu" — zhody zo sitemap, nahlad, zapis
-          cb(dlg, 'hw_demos_search')  { |p| handle_demos_search(p) }
-          cb(dlg, 'hw_demos_preview') { |p| handle_demos_preview(p) }
-          cb(dlg, 'hw_demos_cancel')  { |p| handle_demos_cancel(p) }
-          cb(dlg, 'hw_demos_create')  { |p| handle_demos_create(p) }
-          # V0.6 D1b: sety kovania (tab Sety + Predvolby projektu)
-          cb(dlg, 'hws_save_set')      { |p| handle_set_save(p) }
-          cb(dlg, 'hws_delete_set')    { |p| handle_set_delete(p) }
-          cb(dlg, 'hws_map_project')   { |p| handle_map_project(p) }
-          cb(dlg, 'hws_map_global')    { |p| handle_map_global(p) }
-          cb(dlg, 'hws_reset_project') { |p| handle_reset_project(p) }
-          cb(dlg, 'hws_merge_seed')    { |p| handle_merge_seed(p) } # H1b (FIX 10)
-          dlg.add_action_callback('js_error') do |_ctx, msg|
-            begin
-              Engine.log("JS(hw_catalog): #{msg}")
-            rescue StandardError => e
-              Engine.log_error(e, 'hw_catalog js_error')
-            end
-            next
-          end
-        end
-
-        def cb(dlg, name)
-          dlg.add_action_callback(name) do |_ctx, *args|
-            begin
-              yield(args.first)
-            rescue StandardError => e
-              Engine.log_error(e, "hw_catalog cb #{name}")
-              set_status("Chyba: #{e.message}", true)
-            end
-            next
-          end
-        end
-
         # --- Ruby -> JS ------------------------------------------------------
+        #
+        # ŠT-3a-2: `push_state` (`MDH.init` do okna) ZANIKLO spolu s nim —
+        # prvotny stav sekcie nesie `push_state` Studia pod klucom `hw`
+        # (`state_payload` nizsie je jeho zdrojom). Ostava JEDNA cesta:
+        # katalogove echo.
 
-        def push_state
-          js("MDH.init(#{state_payload.to_json})")
-        end
-
-        # ŠT-3a-1: OBA ciele naraz. Katalogovy zapis nemeni model, takze sa
-        # posiela BEZ ohladu na to, kto ho vyvolal — okno aj sekcia musia
-        # ukazovat to iste (`js` so sinkom by obslúžil len volajuceho).
+        # ŠT-3a-1: katalogovy zapis sa posiela BEZ ohladu na to, kto ho vyvolal
+        # (`js` so sinkom by obsluzil len volajuceho) — po ŠT-3a-2 uz ma jediny
+        # ciel, sekciu.
         #
         # `refresh_studio` = plny payload Studia s `bump: false` (vzor
         # `MaterialsDialog.after_catalog_change`): ceny kovania vstupuju do
@@ -299,7 +216,6 @@ module Noxun
         # sa cely kusovnik prepocital dvakrat.
         def push_items(refresh_studio: true)
           payload = items_payload
-          win_js("MDH.setItems(#{payload.to_json})")
           StudioDialog.push_hw_catalog(payload) if defined?(StudioDialog)
           # D-92 (audit BLOCKER 2): sekcia Kovanie v paneli ukazuje KODY a NAZVY
           # kupovanych poloziek — po kazdej zmene katalogu ich treba obnovit,
@@ -330,9 +246,9 @@ module Noxun
           }
         end
 
-        # Stavovy riadok ma v OBOCH UI ten isty prijimac (`MDH.setStatus`) —
-        # sekcia bezi na TOM ISTOM `js/hw_catalog.js` a `#status` je aj
-        # v `studio.html`. Text sklada SERVER (jedna autorita).
+        # Stavovy riadok sekcie: prijimac `MDH.setStatus` je v tom istom
+        # `js/hw_catalog.js`, ktory sekcia nacitava, a `#status` je uzol
+        # `studio.html`. Text sklada SERVER (jedna autorita).
         def status_script(msg, error = false)
           "MDH.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})"
         end
@@ -352,23 +268,23 @@ module Noxun
           data = JSON.parse(payload.to_s)
           query = data['query'].to_s
           if DemosSitemapCache.load.nil?
-            # ŠT-3a-1: beh patri TOMU, kto ho spustil — okno drzi povodny
-            # okno-guard, sekcia session token.
+            # Zivotnost behu drzi SESSION TOKEN sekcie zachyteny pri
+            # STARTE (ABA); identitu behu `run_id` (viz `mark_running`).
             target = run_target
-            run_id = mark_running(target, 'sťahovanie zoznamu produktov Demosu')
+            run_id = mark_running('sťahovanie zoznamu produktov Demosu')
             js("MDH.demosResults(#{{ 'query' => query, 'results' => [],
                                      'refreshing' => true }.to_json})")
             DemosLookup.start_refresh do |ok, err|
               # Review kolo 2 (P2-1): gasi sa PRED guardom adresata (mrtve
               # Studio nie je dovod nechat priznak visiet) a VYHRADNE vlastny
               # beh — medzitym mohol v sekcii zacat iny.
-              clear_running(target, run_id)
+              clear_running(run_id)
               next unless target_alive?(target)
 
               if ok
-                emit(target, 'MDH.demosRefreshDone()')
+                studio_js('MDH.demosRefreshDone()')
               else
-                emit_status(target, "Zoznam produktov sa nepodarilo stiahnuť: #{err}", true)
+                emit_status("Zoznam produktov sa nepodarilo stiahnuť: #{err}", true)
               end
             end
             return
@@ -385,26 +301,26 @@ module Noxun
         end
 
         # Async nahlad produktu — gen guard (stary vysledok nesmie prepisat
-        # novsi nahlad, zrusenie pouzivatelom ani zavrete okno).
+        # novsi nahlad ani ozivit nahlad zruseny pouzivatelom).
         #
-        # ŠT-3a-1: `@demos_gen` ostava SPOLOCNY pre okno aj sekciu — vedome.
-        # Nahlad si server odklada do JEDNEHO proposal storu, takze dva
-        # subezne nahlady (jeden v okne, druhy v sekcii) by si aj tak siahali
-        # na to iste; generacia teda spravne hovori „posledny vyhrava".
+        # `@demos_gen` je generacia nahladu: server si odklada JEDEN proposal,
+        # takze dva subezne nahlady by si aj tak siahali na to iste — generacia
+        # spravne hovori „posledny vyhrava". (Do ŠT-3a-2 bola spolocna aj
+        # s oknom Katalog kovania; to zaniklo, klient je uz len jeden.)
         def handle_demos_preview(payload)
           data = JSON.parse(payload.to_s)
           gen = bump_demos_gen
           target = run_target
-          run_id = mark_running(target, 'náhľad položky z Demosu')
+          run_id = mark_running('náhľad položky z Demosu')
           HardwareCatalog.demos_preview!(data['url'].to_s) do |res|
             # Review kolo 2 (P2-1) — to iste ako pri overeni ceny: gasi sa
             # podla IDENTITY behu, nie podla generacie. `@gen` a `@demos_gen`
             # su dve pocitadla nad jednym priznakom, takze podmienka na
             # generaciu unikala na obe strany.
-            clear_running(target, run_id)
+            clear_running(run_id)
             next unless @demos_gen.to_i == gen && target_alive?(target)
 
-            emit(target, "MDH.demosPreview(#{res.merge('gen' => gen).to_json})")
+            studio_js("MDH.demosPreview(#{res.merge('gen' => gen).to_json})")
           end
         end
 
@@ -412,10 +328,9 @@ module Noxun
         # zahodi dobiehajúci vysledok (inak by sa zruseny nahlad znovu otvoril).
         def handle_demos_cancel(_payload)
           bump_demos_gen
-          # Priznak gasne len tomu, kto ho zapalil (z okna je to no-op).
           # ZAMERNE bez `run_id`: je to VYSLOVNE zrusenie pouzivatelom, takze
           # zhasina to, co v sekcii prave bezi — nie konkretny beh.
-          clear_running(run_target)
+          clear_running
         end
 
         def handle_demos_create(payload)
@@ -445,28 +360,23 @@ module Noxun
 
         # Prepnutie modelu (EngineAppObserver) — tab Predvolby projektu cita
         # NOVY aktivny model; polozky katalogu su globalne (netreba refresh).
+        # Prepnutie modelu (EngineAppObserver). ŠT-3a-2: modul uz ziadne UI
+        # nevlastni — refresh sekcie robi Studio samo (`StudioDialog
+        # .on_model_changed` z toho isteho broadcastu, plny push nesie sety
+        # v `hw` payloade). Ostava tu VYHRADNE zivotny cyklus serverovych
+        # behov: cudzi dokument nesmie dostat vysledok behu, ktory patril
+        # predoslemu — a `@section_running` po nom nesmie zostat horiet, inak
+        # by odchod zo sekcie hlasil zrusenie behu, ktory uz davno neexistuje.
+        # (Vetva sa NERUSI: precedens `MaterialsDialog.on_model_changed`.)
         def on_model_changed(_model)
-          # ŠT-3a-1: beziaci beh SEKCIE patril PREDOSLEMU dokumentu.
           section_bump_session
           @section_running = nil
-          # Sekcia dostane cerstve sety PLNYM pushom Studia — ten uz z toho
-          # isteho broadcastu robi `StudioDialog.on_model_changed`.
-          return unless @dialog && @dialog.visible?
-
-          push_sets
-        end
-
-        # LEN okno. Po USPESNOM zapise sety sekcia NEDOSTAVA echom: menia aj
-        # NAKUPNY zoznam (sekcia Nákup kovania), takze polovicny push by nechal
-        # cisla vedla seba rozidene — chodia preto plnym `push_state` (viz
-        # `after_sets_change`).
-        def push_sets
-          win_js("HWSETS.init(#{sets_payload.to_json})")
+        rescue StandardError => e
+          Engine.log_error(e, 'HardwareCatalogDialog.on_model_changed')
         end
 
         # ZOTAVOVACIA obnova po ODMIETNUTOM zapise (`:conflict`, `:not_found`,
-        # neznáme zlyhanie). Musi ist do OBOCH UI — a to je iny pripad než
-        # `push_sets`:
+        # neznáme zlyhanie). Je to iny pripad nez USPESNY zapis:
         #   * hlaska hovori „obnovené", takze klient MUSI dostat cerstvu
         #     `revision`. Kym ju sekcia nedostala, poslala by dalsi zapis so
         #     STARYM odtlackom a zacyklila by sa v konfliktoch;
@@ -475,17 +385,23 @@ module Noxun
         # NIE JE to `after_sets_change`: nic sa NEZAPISALO, takze nakupny zoznam
         # ani panel sa nemenia a plny push Studia by bol zbytocny prepocet
         # kusovnika (a druhe vykreslenie setov navyse).
+        #
+        # ŠT-3a-2: `push_sets` (win-only echo) ZANIKOL a VSETKYCH pat jeho
+        # volani v zotavovacich vetvach modelovych handlerov prislo sem —
+        # odmietnuty zapis musi obnovit UI, ktore o neho poziadalo, a to je
+        # uz len sekcia.
         def resync_sets
-          payload = sets_payload
-          win_js("HWSETS.init(#{payload.to_json})")
-          StudioDialog.push_hw_sets(payload) if defined?(StudioDialog)
+          StudioDialog.push_hw_sets(sets_payload) if defined?(StudioDialog)
         rescue StandardError => e
           Engine.log_error(e, 'HardwareCatalogDialog.resync_sets')
         end
 
-        def sets_payload
+        # F4: model chodi ARGUMENTOM. `hw_payload` Studia podava SVOJ model —
+        # pri prepnuti dokumentu by inak sekcia dostala predvolby STAREHO
+        # dokumentu vedla kusovnika noveho (broadcast prepnutia moze prist
+        # skor, nez sa `Sketchup.active_model` prepne).
+        def sets_payload(model = Sketchup.active_model)
           lib = HardwareSets.load
-          model = Sketchup.active_model
           status, state = HardwareSets.project_state_status(model)
           {
             'sets' => lib['sets'],
@@ -531,10 +447,10 @@ module Noxun
           out
         end
 
-        # D-75: po KAZDEJ uspesnej zmene setov/predvolieb — obnova okna +
-        # ZIVY push ponuky do panela (NX.setHardwareSets). NIKDY push_selected:
+        # D-75: po KAZDEJ uspesnej zmene setov/predvolieb — ZIVY push ponuky
+        # do panela (NX.setHardwareSets) + obnova Studia. NIKDY push_selected:
         # ten resetuje rozpracovany formular panela a dedup-uje kopie
-        # (= zmena v satelitnom okne by siahla na model).
+        # (a predvolba setu geometriu nemeni, takze dedup tik ani nehrozi).
         # ŠT-3a-1 (oprava nalezu auditu): tato cesta volala
         # `StudioDialog.on_model_changed(model)` — a to je vetva PREPNUTIA
         # DOKUMENTU: prevesila observer neaktualnosti a zdvihla zapadku
@@ -547,10 +463,17 @@ module Noxun
         #     Kusovnika ani rozrobeny export nesmie zastarat),
         #   * zmena PREDVOLIEB PROJEKTU (`model` je podany) — to uz je zapis
         #     do MODELU, takze generacia sa zdvihnut MA.
+        #
+        # ŠT-3a-2: vetva okna (`push_sets`) zanikla; panel ZOSTAVA (zije dalej
+        # a jeho selecty setov musia byt cerstve). Modelovy zapis ide
+        # `bump: true` — a to STACI: predvolba setu nemeni GEOMETRIU, takze
+        # `Panel.push_selected` (dedup kopii) sa vedome NEVOLA. Jantar
+        # „Obnoviť" po vlastnom zapise NEZOZLTNE: `push_state` si uklada
+        # `@pushed_epoch` az PO zbere, takze vlastnu transakciu pohlti.
         def after_sets_change(model = nil)
-          push_sets
           Panel.push_hardware_sets if defined?(Panel) && Panel.dialog_alive?
-          # ŠT-1c PR B3: vetva okna Vyroba tu zanikla spolu s oknom.
+          # ŠT-1c PR B3 tu zrusila vetvu okna Vyroba, ŠT-3a-2 vetvu okna
+          # Katalog kovania (`push_sets`) — sekcia dostava sety plnym pushom.
           StudioDialog.refresh_if_open(bump: !model.nil?) if defined?(StudioDialog) # ST-1a
         end
 
@@ -602,7 +525,10 @@ module Noxun
             resync_sets
             set_status('Knižnica setov sa medzitým zmenila — obnovené, skús znova.', true)
           when :not_found
+            # ŠT-3a-2 (dlh z review #216): vetva bola NEMA — zoznam sa pod
+            # rukami prekreslil a pouzivatel nevedel, ci sa nieco stalo.
             resync_sets # set uz niekto zmazal — sekcia ho nesmie dalej ukazovat
+            set_status('Set už neexistoval — zoznam obnovený.')
           else
             set_status('Zmazanie setu zlyhalo.', true)
           end
@@ -613,7 +539,7 @@ module Noxun
           model = Sketchup.active_model
           return set_status('Žiadny aktívny model.', true) if model.nil?
           if data['model_guid'].to_s != model.guid.to_s
-            push_sets
+            resync_sets
             return set_status('Model sa medzitým prepol — predvoľby sa obnovili, vyber znova.', true)
           end
           gt = data['generic_type'].to_s
@@ -629,7 +555,7 @@ module Noxun
 
             set_defs = refs.map { |sid| HardwareSets.resolve_set_def(model, sid) }
             if set_defs.any?(&:nil?)
-              push_sets
+              resync_sets
               return set_status('Set sa v knižnici nenašiel — obnovené.', true)
             end
             bad = set_defs.find { |d| d['generic_type'] != gt }
@@ -647,7 +573,7 @@ module Noxun
             set_status(mapping_status_txt(gt, value, set_defs))
           else
             model.abort_operation
-            push_sets
+            resync_sets
             set_status('Predvoľba sa nedá uložiť — sety projektu sú poškodené (tlačidlo Obnoviť).', true)
           end
         end
@@ -680,7 +606,7 @@ module Noxun
           model = Sketchup.active_model
           return set_status('Žiadny aktívny model.', true) if model.nil?
           if data['model_guid'].to_s != model.guid.to_s
-            push_sets
+            resync_sets
             return set_status('Model sa medzitým prepol — obnovené.', true)
           end
           status, = HardwareSets.project_state_status(model)
@@ -694,14 +620,20 @@ module Noxun
           model.start_operation('NOXUN: Doplnenie predvolieb setov', true)
           res, added_sets, added_map = HardwareSets.merge_project_sets_seed!(model)
           res == :updated ? model.commit_operation : model.abort_operation
-          after_sets_change(model)
-          if res == :updated
-            labels = added_map.map { |gt| HardwareRules.label_for(gt) }
-            set_status("Doplnené predvoľby: #{labels.join(', ')} (#{added_sets.length} " \
-                       "#{added_sets.length == 1 ? 'nový set' : 'nových setov'}). Existujúce zostali.")
-          else
-            set_status('Projekt už má všetky globálne predvoľby — nič sa nedopĺňalo.')
+          # F8 (fix nalezu auditu): pri NO-OPE (`abort_operation` — projekt uz
+          # ma vsetky globalne predvolby) sa NEVOLA `after_sets_change` VOBEC.
+          # Nic sa nezmenilo, takze plny prepocet kusovnika by bol zbytocny
+          # a zdvih generacie by navyse zneplatnil rozkliknuty riadok
+          # Kusovnika a rozrobeny export inej sekcie — po akcii, ktora
+          # NIC neurobila. Status staci.
+          unless res == :updated
+            return set_status('Projekt už má všetky globálne predvoľby — nič sa nedopĺňalo.')
           end
+
+          after_sets_change(model)
+          labels = added_map.map { |gt| HardwareRules.label_for(gt) }
+          set_status("Doplnené predvoľby: #{labels.join(', ')} (#{added_sets.length} " \
+                     "#{added_sets.length == 1 ? 'nový set' : 'nových setov'}). Existujúce zostali.")
         rescue StandardError => e
           model.abort_operation if model
           raise e
@@ -714,7 +646,7 @@ module Noxun
           model = Sketchup.active_model
           return set_status('Žiadny aktívny model.', true) if model.nil?
           if data['model_guid'].to_s != model.guid.to_s
-            push_sets
+            resync_sets
             return set_status('Model sa medzitým prepol — obnovené.', true)
           end
           # H1a: skladanie globalneho defaultu je JEDNA autorita v core
@@ -727,25 +659,15 @@ module Noxun
           set_status(ok ? 'Predvoľby projektu obnovené z globálnych.' : 'Obnova zlyhala.', !ok)
         end
 
-        # ŠT-3a-1: odpoved ide TOMU, KTO sa pytal. Sink zije PRESNE jeden
-        # synchronny callback sekcie (`with_client`); mimo neho je adresatom
-        # OKNO — asynchronny beh si adresata pamata sam (`run_target`).
+        # Odpoved ide TOMU, KTO sa pytal. Sink zije PRESNE jeden synchronny
+        # callback sekcie (`with_client`); mimo neho — refresh cesty zvonku
+        # aj ASYNCHRONNE emity, ktore dobiehaju z casovaca uz po navrate
+        # z `dispatch` — je adresat od ŠT-3a-2 JEDINY mozny: okno Studio.
         def js(script)
           sink = @client_sink
           return sink.call(script) if sink
 
-          win_js(script)
-        end
-
-        # Kanal OKNA (do ŠT-3a-1 sa volal `js`).
-        def win_js(script)
-          return false unless @dialog && @dialog.visible?
-
-          @dialog.execute_script(script)
-          true
-        rescue StandardError => e
-          Engine.log_error(e, 'HardwareCatalogDialog.js')
-          false
+          studio_js(script)
         end
 
         # Kanal SEKCIE. `js` Studia je private (patri jeho kanalu), preto
@@ -852,24 +774,25 @@ module Noxun
         # Zivy check ceny — vysledok pride async; gen + code echo strazi, aby
         # stary vysledok neprepisal detail inej polozky (F9).
         #
-        # ŠT-3a-1: `@gen` ostava SPOLOCNY pre okno aj sekciu — server drzi
-        # JEDEN cenovy navrh per kod (`pid`), takze dve subezne overenia by
-        # si aj tak siahali na to iste. Adresata vysledku urcuje `run_target`.
+        # `@gen` je generacia cenoveho overenia: server drzi JEDEN navrh per
+        # kod (`pid`), takze dve subezne overenia by si aj tak siahali na to
+        # iste. Zivotnost vysledku strazi `run_target` (session token sekcie).
+        # (Do ŠT-3a-2 bola generacia spolocna aj s oknom; to zaniklo.)
         def handle_check_price(payload)
           data = JSON.parse(payload.to_s)
           code = data['code'].to_s
           gen = bump_gen
           target = run_target
-          run_id = mark_running(target, 'overenie ceny z Demosu')
+          run_id = mark_running('overenie ceny z Demosu')
           HardwareCatalog.check_price!(code, url: data['url'].to_s) do |res|
             # Review kolo 2 (P2-1): priznak sa gasi AJ ked vysledok nikam
             # nepojde (zavrete Studio, odchod zo sekcie, prekonanie cudzou
             # generaciou) — a gasi VYHRADNE vlastny beh (`run_id`), takze
             # nesiahne na nahlad z Demosu, ktory medzitym zacal.
-            clear_running(target, run_id)
+            clear_running(run_id)
             next unless @gen.to_i == gen && target_alive?(target)
 
-            emit(target, "MDH.priceResult(#{res.merge('code' => code, 'gen' => gen).to_json})")
+            studio_js("MDH.priceResult(#{res.merge('code' => code, 'gen' => gen).to_json})")
           end
         end
 

@@ -6788,6 +6788,187 @@ module NoxunSuRunner
   # zo zasady nema) — na konci sekcie sa MAZE.
   ST2D_DECOR = 'SU ST2D DEKOR'
 
+
+  # ==========================================================================
+  # ŠT-3a-2 — MODELOVE zapisy predvolieb setov ZO SEKCIE `hw` + ZANIK OKNA
+  # ==========================================================================
+  #
+  # Headless sada dokaze len to, ze subory a mena su prec. TU sa overuje, co
+  # sa da overit VYHRADNE v beziacom SketchUpe:
+  #   1) okno naozaj neexistuje (ziadny `show`/`ensure_dialog`/`win_js`) a jeho
+  #      HTML nie je ani v NASADENOM plugine,
+  #   2) kazdy z troch modelovych zapisov je PRESNE JEDEN krok Spat,
+  #   3) `merge_seed` NO-OP nepridava krok Spat ANI push — merane cez to, ze
+  #      JEDEN Spat po nom vrati stav SPRED predchadzajuceho zapisu,
+  #      (redo sa na Windows netestuje — programovy `Sketchup.redo` neexistuje),
+  #   4) po zapise zo sekcie sa jantar „Obnoviť" NEROZSVIETI (`@epoch` ==
+  #      `@pushed_epoch`) a payload okna nesie NOVU hodnotu v `hw.sets`.
+  #
+  # Kniznica setov je GLOBALNA (%APPDATA%) a na cistom stroji prazdna, takze si
+  # scenar SEED setu zaklada sam — s TVRDYM assertom (bez neho by sa
+  # `hws_map_project` ticho odmietol a zvysok by meral prazdno) a na konci ho
+  # zase zmaze.
+  ST3A_SEED_ID = 'su-test-st3a'
+  ST3A_SEED_GT = 'hinge'
+
+  # Payload posledneho `NX.setStudio` zo zachytenych skriptov (`push_state`
+  # posiela presne `NX.setStudio(<json>)`).
+  def st3a_last_push(rec)
+    line = rec.reverse.find { |x| x.to_s.start_with?('NX.setStudio(') }
+    return nil unless line
+
+    JSON.parse(line.to_s[/\ANX\.setStudio\((.*)\)\z/m, 1].to_s)
+  rescue StandardError
+    nil
+  end
+
+  # Mapovanie predvolieb PROJEKTU pre dany typ kovania (priamo z modelu).
+  def st3a_mapping(model, gt)
+    status, state = e::HardwareSets.project_state_status(model)
+    return nil unless status == :ok && state.is_a?(Hash)
+
+    (state['mapping'] || {})[gt]
+  end
+
+  # Fake okno Studia + odchyt skriptov. Runner NESMIE otvorit skutocne okno
+  # (vzor `StaleFakeDialog` v sekcii STALE) — `@ready` musi byt true, inak by
+  # `js` kazdy push priznane zahodil a payload by sme nezachytili.
+  def st3a_with_fake_studio(rec)
+    sd = e::StudioDialog
+    prev_dlg = sd.instance_variable_get(:@dialog)
+    prev_ready = sd.instance_variable_get(:@ready)
+    sd.instance_variable_set(:@dialog, StaleFakeDialog.new)
+    sd.instance_variable_set(:@ready, true)
+    sd.singleton_class.class_eval do
+      alias_method :nx_st3a_js, :js
+      define_method(:js) do |script|
+        rec << script.to_s
+        true
+      end
+    end
+    begin
+      yield
+    ensure
+      sc = sd.singleton_class
+      if sc.method_defined?(:nx_st3a_js) || sc.private_method_defined?(:nx_st3a_js)
+        sc.class_eval do
+          alias_method :js, :nx_st3a_js
+          remove_method :nx_st3a_js
+        end
+      end
+      sd.instance_variable_set(:@dialog, prev_dlg)
+      sd.instance_variable_set(:@ready, prev_ready)
+    end
+  end
+
+  def run_st3a(model)
+    cleanup(model)
+    return ok('ŠT-3a-2: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
+    return ok('ŠT-3a-2: modul HardwareCatalogDialog zije dalej', false) unless defined?(e::HardwareCatalogDialog)
+
+    hw = e::HardwareCatalogDialog
+    sets = e::HardwareSets
+
+    # --- 1) OKNO ZANIKLO, MODUL ZIJE -----------------------------------------
+    %i[show ensure_dialog register_callbacks win_js push_sets push_state].each do |gone|
+      ok("ŠT-3a-2: `HardwareCatalogDialog.#{gone}` uz neexistuje", !hw.respond_to?(gone))
+    end
+    html = File.join(e.plugin_dir, 'ui', 'hardware_catalog.html')
+    ok('ŠT-3a-2: NASADENY plugin uz NEOBSAHUJE hardware_catalog.html', !File.exist?(html))
+    ok('ŠT-3a-2: sekcia `hw` je v zozname sekcii Studia',
+       e::StudioDialog::SECTIONS.include?('hw'))
+    ok('ŠT-3a-2: whitelist sekcie pozna VSETKY tri MODELOVE zapisy',
+       %w[hws_map_project hws_merge_seed hws_reset_project].all? { |a| hw::SECTION_ACTIONS.include?(a) })
+
+    # --- 2) SEED setu do GLOBALNEJ kniznice (tvrdy assert) -------------------
+    sets.delete_set!(ST3A_SEED_ID, revision: sets.revision) # zvysok z predosleho behu
+    seed_status, = sets.save_set!({ 'set_id' => ST3A_SEED_ID, 'name' => 'SU TEST ŠT-3a',
+                                    'generic_type' => ST3A_SEED_GT,
+                                    'members' => [{ 'per' => 'unit', 'qty' => 1,
+                                                    'code' => 'SU-TEST-ST3A' }] },
+                                  revision: sets.revision, create: true)
+    ok("ŠT-3a-2: seed setu do globalnej kniznice (#{seed_status})", seed_status == :ok)
+    return cleanup(model) unless seed_status == :ok
+
+    begin
+      st3a_scenar(model, hw, sets)
+    ensure
+      sets.delete_set!(ST3A_SEED_ID, revision: sets.revision)
+      cleanup(model)
+    end
+  rescue StandardError => ex
+    log_line("FAIL: ŠT-3a-2 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
+  def st3a_scenar(model, hw, sets)
+    guid = model.guid.to_s
+    rec = []
+    sink = ->(script) { rec << script.to_s }
+    gt = ST3A_SEED_GT
+
+    st3a_with_fake_studio(rec) do
+      e::StudioDialog.attach_stale_observer(model)
+      e::StudioDialog.send(:push_state) # epocha zosynchronizovana s modelom
+
+      # --- (a) OBNOVA predvolieb = 1 krok Spat -----------------------------
+      rec.clear
+      hw.dispatch('hws_reset_project', { 'model_guid' => guid }.to_json, sink)
+      ok('ŠT-3a-2 (a): obnova predvolieb projektu zo sekcie prebehla',
+         rec.any? { |x| x.include?('obnoven') })
+      status, = sets.project_state_status(model)
+      ok('ŠT-3a-2 (a): projekt ma odteraz VLASTNY snapshot predvolieb', status == :ok)
+
+      # --- (b) MERGE SEED NO-OP: ziadny push, ziadny krok Spat -------------
+      # Hned po obnove ma projekt PRESNE globalne predvolby, takze niet co
+      # doplnat. Zapis sa `abort_operation`-uje a F8 hovori, ze sa NESMIE
+      # zavolat ani `after_sets_change` (plny push so zdvihom generacie po
+      # akcii, ktora NIC neurobila).
+      rec.clear
+      gen_before = e::StudioDialog.instance_variable_get(:@generation).to_i
+      hw.dispatch('hws_merge_seed', { 'model_guid' => guid }.to_json, sink)
+      ok('ŠT-3a-2 (b): merge_seed nad cerstvym snapshotom je NO-OP a povie to',
+         rec.any? { |x| x.include?('nič sa nedopĺňalo') })
+      ok('ŠT-3a-2 (b): NO-OP neposiela plny push (ziadny NX.setStudio)',
+         rec.none? { |x| x.start_with?('NX.setStudio(') })
+      ok('ŠT-3a-2 (b): a NEZDVIHA generaciu okna (rozkliknuty riadok Kusovnika zije dalej)',
+         e::StudioDialog.instance_variable_get(:@generation).to_i == gen_before)
+
+      # --- (c) ZAPIS PREDVOLBY: 1 krok Spat, jantar NEZOZLTNE, payload sedi -
+      before_map = st3a_mapping(model, gt)
+      rec.clear
+      hw.dispatch('hws_map_project',
+                  { 'generic_type' => gt, 'value' => ST3A_SEED_ID,
+                    'ui_key' => "hws-map-proj|#{gt}", 'model_guid' => guid }.to_json, sink)
+      ok('ŠT-3a-2 (c): predvolba setu sa zapisala do MODELU',
+         st3a_mapping(model, gt).to_s == ST3A_SEED_ID)
+      ok('ŠT-3a-2 (c): editor pasiem sa zatvara AZ po uspesnom zapise (echo kluca)',
+         rec.any? { |x| x.include?('HWSETS.mapSaved') })
+      # Odpoved A: `refresh_if_open(bump: true)` STACI — a jantar sa po
+      # VLASTNOM prepocte rozsvietit NESMIE (`push_state` si uklada epochu AZ
+      # po zbere, takze vlastnu transakciu pohlti).
+      ep = e::StudioDialog.instance_variable_get(:@epoch).to_i
+      pep = e::StudioDialog.instance_variable_get(:@pushed_epoch).to_i
+      ok("ŠT-3a-2 (c): jantar Obnovit po vlastnom zapise NEZOZLTOL (epocha #{ep} == #{pep})",
+         ep == pep)
+      ok('ŠT-3a-2 (c): a klientovi NEPRISIEL signal markStale',
+         rec.none? { |x| x.include?('NX.markStale') })
+      push = st3a_last_push(rec)
+      mapped = push && push['hw'] && push['hw']['sets'] &&
+               push['hw']['sets']['project'] &&
+               (push['hw']['sets']['project']['mapping'] || {})[gt]
+      ok('ŠT-3a-2 (c): payload sekcie nesie NOVU hodnotu v `hw.sets`',
+         mapped.to_s == ST3A_SEED_ID)
+
+      # --- (d) JEDEN Spat vrati stav SPRED zapisu predvolby ----------------
+      # Toto je merane potvrdenie bodu (b): keby NO-OP `merge_seed` nechal
+      # vlastnu operaciu, JEDEN Spat by vratil JU a mapovanie by este stalo
+      # na sete zo (c).
+      Sketchup.undo
+      ok('ŠT-3a-2 (d): 1x Spat vratil predvolbu — NO-OP merge_seed nepridal krok Spat',
+         st3a_mapping(model, gt).to_s == before_map.to_s)
+    end
+  end
+
   def run_st2d(model)
     cleanup(model)
     return ok('ŠT-2d: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
@@ -7692,6 +7873,7 @@ module NoxunSuRunner
     run_st1b(model)          # ŠT-1b: sekcia Kontrola v Studiu — jedno cislo semaforu, klik na nalez bez undo kroku, zdielane prepinace, trvanie pushov
     run_st1c(model)          # ŠT-1c: sekcia Nákup kovania (PR A) + sekcia ROZPOCET (PR B1) — 12 mutacii = 12x jeden krok Spat, gen a guid guardy, bump:false kontrakt, XLSX guardy, meranie pushov
     run_st2d(model)          # ŠT-2d: „Kde sa používa" — vyber podla materialu (aj DEDENEHO) a ABS, zuzenie na vlastnika, jednorazova kotva sekcie `mat`, ⋯ editor rozpoctu = 1 krok Spat
+    run_st3a(model)          # ŠT-3a-2: modelove zapisy predvolieb setov ZO SEKCIE + zanik okna Katalog kovania — 1 zmena = 1 krok Spat, NO-OP merge_seed bez pushu aj bez undo kroku, jantar po vlastnom zapise nezozltne
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

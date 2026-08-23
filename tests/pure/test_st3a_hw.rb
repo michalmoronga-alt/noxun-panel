@@ -50,6 +50,7 @@ ST3A_STUDIO_HTML = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'stud
 
 # Zdrojak BEZ komentarov — mena zaniknutych veci v komentaroch ZAMERNE ostavaju.
 ST3A_STUDIO_CODE = ST3A_STUDIO_RB.lines.reject { |l| l.strip.start_with?('#') }.join
+ST3A_HW_CODE     = ST3A_HW_RB.lines.reject { |l| l.strip.start_with?('#') }.join
 ST3A_HW_JS_CODE  = ST3A_HW_JS.lines.reject { |l| l.strip.start_with?('//') }.join
 
 # --- 1) `hw` je sekcia a premostenie navigacie zaniklo -----------------------
@@ -75,27 +76,59 @@ NxTest.test('ŠT-3a-1: premostenie navigacie `hw` ZANIKLO, ale OKNO zije dalej')
   NxTest.refute(item.include?('disabled:'), 'a nie je ani neaktivna')
   NxTest.assert(item.include?("ic: 'hammer'"),
                 'ikona = hammer, ta ista ako rail Inspectora (kontrakt „Ikony navigácie")')
-  # Okno „Katalóg kovania" v TEJTO davke NEZANIKA — drzi tri modelove zapisy.
-  NxTest.assert(File.exist?(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'hardware_catalog.html')),
-                'HTML okna ostava (zanikne v ŠT-3a-2)')
-  NxTest.assert(ST3A_HW_RB.include?('DLG_KEY') && ST3A_HW_RB.include?('def ensure_dialog'),
-                'a s nim aj jeho HtmlDialog')
-  main = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
-  NxTest.assert(main.include?("menu.add_item('Katalóg kovania') { HardwareCatalogDialog.show }"),
-                'vstupne body okna (menu, tlacidlo panela) sa v tejto davke NEMENIA')
 end
 
-NxTest.test('ŠT-3a-1: okno sa otvara PREMOSTENIM Z VNUTRA sekcie, so statusom') do
+NxTest.test('ŠT-3a-2: okno Katalog kovania ZANIKLO — a s nim VSETKY jeho vstupy') do
+  # Zaniknut musi CELE, nie len z navigacie: kym existuje HTML, menu polozka
+  # alebo panelove tlacidlo, ziju nad jednym katalogom dve UI s roznym stavom.
+  NxTest.refute(File.exist?(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'hardware_catalog.html')),
+                'HTML satelitu je zmazane')
+  %w[DLG_KEY ensure_dialog register_callbacks UI::HtmlDialog win_js
+     @dialog def\ show].each do |gone|
+    NxTest.refute(ST3A_HW_CODE.include?(gone), "#{gone} je z hardware_catalog_dialog.rb PREC")
+  end
   st = Noxun::Engine::StudioDialog
-  NxTest.assert(st.const_defined?(:HW_BRIDGE_STATUS), 'hlaska premostenia zije v Ruby (jedna autorita)')
-  NxTest.assert(st::HW_BRIDGE_STATUS.include?('ŠT-3a-2'),
-                'a prizna, kedy sa obsah presunie sem (D-78: dovod, nie mlcanie)')
-  body = ST3A_STUDIO_RB[/def do_hw_open_window.*?\n        end\n/m].to_s
-  NxTest.assert(body.include?('HardwareCatalogDialog.show'), 'premostenie naozaj otvara okno')
-  NxTest.assert(body.include?('HW_BRIDGE_STATUS'), 'a povie preco')
-  NxTest.assert(ST3A_STUDIO_RB.include?("cb(dlg, 'hw_open_window')"), 'klient ma callback')
-  NxTest.assert(ST3A_HWSETS_JS.include?("hwsSend('hw_open_window'"),
-                'a tlacidlo v bloku „Predvoľby projektu" ho vola')
+  NxTest.refute(st.const_defined?(:HW_BRIDGE_STATUS),
+                'hlaska premostenia do okna zanikla spolu s nim')
+  NxTest.refute(ST3A_STUDIO_CODE.include?('hw_open_window'),
+                'premostenie zo sekcie do okna zaniklo (callback aj telo)')
+  NxTest.refute(ST3A_HWSETS_JS.include?('hws-open-window'), 'klient uz nema kam premostovat')
+  NxTest.refute(ST3A_HWSETS_JS.include?('HWS_PROJ_RO ='),
+                'read-only rezim predvolieb projektu zanikol — sekcia ich ovlada priamo')
+  main = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
+  NxTest.assert(main.include?("menu.add_item('Katalóg kovania') { StudioDialog.show(open_section: 'hw') }"),
+                'zauzivana polozka menu ostava, ale otvara SEKCIU')
+  NxTest.refute(main.include?('HardwareCatalogDialog.show'), 'okno sa uz nikde neotvara')
+  panel_rb = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.rb'), encoding: 'UTF-8')
+                    .lines.reject { |l| l.strip.start_with?('#') }.join
+  NxTest.refute(panel_rb.include?('open_hardware_catalog'),
+                'panelovy callback satelitu zanikol — tlacidlo ide deep-linkom openStudio')
+  panel_html = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel.html'), encoding: 'UTF-8')
+  NxTest.assert(panel_html.include?(%q(onclick="openStudio('hw')")),
+                'tlacidlo „Katalóg kovania…" vedie do sekcie')
+  hw_js = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'hardware.js'), encoding: 'UTF-8')
+               .lines.reject { |l| l.strip.start_with?('//') }.join
+  NxTest.refute(hw_js.include?('openHardwareCatalogDialog'), 'a jeho JS obal tiez zanikol')
+  css = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'css', 'panel.css'), encoding: 'UTF-8')
+             .gsub(%r{/\*.*?\*/}m, ' ')
+  NxTest.refute(css.include?('.pvtabs'), 'CSS tabov satelitu zaniklo s jeho jedinym konzumentom')
+  NxTest.refute(css.include?('#hwTabs'), 'a identifikator pasu tabov tiez')
+  NxTest.refute(ST3A_HWSETS_JS.include?('function hwsSetTab'),
+                'prepinac tabov OKNA zanikol — pohlady sekcie riadi lista')
+end
+
+NxTest.test('ŠT-3a-2 (B1): vetva prepnutia dokumentu OSTAVA — mení sa len telo') do
+  # Precedens `MaterialsDialog.on_model_changed`: modul uz ziadne UI nevlastni,
+  # ale MUSI zneplatnit beziaci serverovy beh — inak by vysledok stahovania
+  # z Demosu dobehol do NOVEHO dokumentu s datami stareho.
+  obs = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'scale_observer.rb'),
+                  encoding: 'UTF-8')
+  NxTest.assert(obs.include?('HardwareCatalogDialog.on_model_changed(model)'),
+                'broadcast prepnutia dokumentu vetvu drzi dalej')
+  body = ST3A_HW_RB[/def on_model_changed\(_model\).*?\n        end\n/m].to_s
+  NxTest.assert(body.include?('section_bump_session'), 'telo zneplatni beziaci beh sekcie')
+  NxTest.assert(body.include?('@section_running = nil'), 'a zhasne priznak behu')
+  NxTest.refute(body.include?('push_sets'), 'refresh UI uz nerobi — to je vec plneho pushu Studia')
 end
 
 # --- 2) whitelist akcii sekcie ----------------------------------------------
@@ -116,18 +149,42 @@ NxTest.test('ŠT-3a-1: akcie sekcie maju JEDINY whitelist a JEDINE telo') do
                 'callbacky vznikaju Z NEHO')
 end
 
-NxTest.test('ŠT-3a-1: MODELOVE zapisy do sekcie NEIDU (presun je ŠT-3a-2)') do
+NxTest.test('ŠT-3a-2: MODELOVE zapisy predvolieb projektu su UZ v sekcii') do
   actions = Noxun::Engine::HardwareCatalogDialog::SECTION_ACTIONS
   %w[hws_map_project hws_merge_seed hws_reset_project].each do |a|
-    NxTest.refute(actions.include?(a),
-                  "#{a} zapisuje do MODELU — v tejto davke sa zo sekcie volat NESMIE")
+    NxTest.assert(actions.include?(a), "sekcia musi vediet #{a}")
   end
-  # A ich telo sa NEDA zavolat ani oklukou: `run_section_action` je uzavrety case.
   runner = ST3A_HW_RB[/def run_section_action\(key, payload\).*?\n        end\n/m].to_s
-  NxTest.assert(!runner.empty?, 'rozvetvenie sa naslo')
   %w[handle_map_project handle_merge_seed handle_reset_project].each do |h|
-    NxTest.refute(runner.include?(h), "#{h} nesmie mat vetvu v ceste sekcie")
+    NxTest.assert(runner.include?(h), "#{h} ma vetvu v ceste sekcie")
   end
+  # KAZDY z troch je 1 zmena = 1 krok Spat a KAZDY ma serverovy `model_guid`
+  # guard — zapis zo zastaraneho UI sa musi odmietnut, nie prejst.
+  %w[handle_map_project handle_merge_seed handle_reset_project].each do |m|
+    body = ST3A_HW_RB[/def #{m}\(payload\).*?\n        end\n/m].to_s
+    NxTest.assert(body.include?("data['model_guid'].to_s != model.guid.to_s"),
+                  "#{m}: guard identity dokumentu")
+    NxTest.assert(body.include?('resync_sets'),
+                  "#{m}: odmietnutie MUSI obnovit sekciu (inak posle dalsi zapis so starym stavom)")
+  end
+  map = ST3A_HW_RB[/def handle_map_project\(payload\).*?\n        end\n/m].to_s
+  NxTest.assert(map.include?("model.start_operation('NOXUN: Predvoľba setu kovania', true)") &&
+                map.include?('model.commit_operation'),
+                'predvolba setu = JEDNA operacia (1 krok Spat)')
+  NxTest.assert(map.include?('after_sets_change(model)'),
+                'a po nej PLNY push so zdvihom generacie (model sa naozaj zmenil)')
+end
+
+NxTest.test('ŠT-3a-2 (F8): merge_seed NO-OP nerobi push ani nezdviha generaciu') do
+  body = ST3A_HW_RB[/def handle_merge_seed\(payload\).*?\n        end\n/m].to_s
+  noop = body[/unless res == :updated.*?end\n/m].to_s
+  NxTest.assert(!noop.empty?, 'no-op ma vlastnu vetvu')
+  NxTest.refute(noop.include?('after_sets_change'),
+                'NIC sa nezmenilo — plny prepocet by bol zbytocny a zdvih generacie by ' \
+                'zneplatnil rozkliknuty riadok Kusovnika po akcii, ktora nic neurobila')
+  NxTest.assert(noop.include?('nič sa nedopĺňalo'), 'status to povie nahlas')
+  NxTest.assert(body.index('unless res == :updated') < body.index('after_sets_change(model)'),
+                'push ide AZ v uspesnej vetve')
 end
 
 NxTest.test('ŠT-3a-1: `ready` NIE JE akciou sekcie — prepisal by callback Studia') do
@@ -158,7 +215,9 @@ NxTest.test('ŠT-3a-1: odpoved dostane TEN, KTO sa pytal') do
                 'vynimka v handleri nesmie nechat sink viset — dalsia odpoved by odisla cudziemu')
   js = ST3A_HW_RB[/def js\(script\).*?\n        end\n/m].to_s
   NxTest.assert(js.include?('sink.call(script) if sink'), 'sink ma prednost')
-  NxTest.assert(js.include?('win_js(script)'), 'bez neho je adresatom OKNO (zije dalej)')
+  # ŠT-3a-2 (B3): bez sinku uz nie je kam ist inam — okno zaniklo.
+  NxTest.assert(js.include?('studio_js(script)'), 'bez neho ide vsetko do Studia')
+  NxTest.refute(ST3A_HW_CODE.include?('def win_js'), 'kanal okna zanikol')
   NxTest.assert(ST3A_HW_RB.include?('StudioDialog.hw_js(script)'),
                 'do sekcie sa pise VEREJNYM mostom (kanalove `js` Studia je private)')
   NxTest.assert(ST3A_STUDIO_RB.include?('def hw_js(script)'), 'a ten most existuje')
@@ -175,14 +234,14 @@ end
 
 # --- 4) zivotnost asynchronneho behu ----------------------------------------
 
-NxTest.test('ŠT-3a-1: beh SEKCIE zomiera so session tokenom (zatvorenie · model · odchod)') do
+NxTest.test('ŠT-3a-2 (F7): beh zomiera so session tokenom (zatvorenie · model · odchod)') do
   hw = Noxun::Engine::HardwareCatalogDialog
-  # Beh spusteny „zo sekcie": `run_target` sa pyta na aktivny sink.
-  target = hw.with_client(->(_s) {}) { hw.run_target }
-  NxTest.assert_equal(:section, target[:kind], 'vnutri `with_client` je adresatom sekcia')
+  # Zjednodusenie po zaniku okna NESMIE stratit ABA guard: token sa zachytava
+  # pri STARTE behu, nie az pri jeho dobehnuti.
+  target = hw.run_target
+  NxTest.assert_equal([:session], target.keys, 'ciel nesie UZ LEN session token')
+  NxTest.refute(target.key?(:kind), 'rozlisenie okno/sekcia zaniklo s oknom')
 
-  # Studio zije? V headless behu ziadne nie je — token teda staci overit
-  # priamo: kazda z troch udalosti ho musi POSUNUT.
   before = hw.instance_variable_get(:@section_session).to_i
   hw.on_ui_closed
   after_close = hw.instance_variable_get(:@section_session).to_i
@@ -193,10 +252,8 @@ NxTest.test('ŠT-3a-1: beh SEKCIE zomiera so session tokenom (zatvorenie · mode
   hw.cancel_runs_on_leave
   NxTest.assert(hw.instance_variable_get(:@section_session).to_i > after_model,
                 'a odchod zo sekcie tiez')
-  # Stary token uz NIE JE zivy — to je cely zmysel (ABA: nova instancia okna
-  # nesmie dostat vysledok behu, ktory patril starej).
-  NxTest.refute(hw.target_alive?({ kind: :section, session: before }),
-                'vysledok so starym tokenom sa ZAHODI')
+  NxTest.refute(hw.target_alive?({ session: before }),
+                'vysledok so starym tokenom sa ZAHODI (ABA)')
 end
 
 NxTest.test('ŠT-3a-1: odchod zo sekcie POCAS behu sa priznane hlasi (a druhy uz mlci)') do
@@ -209,8 +266,7 @@ NxTest.test('ŠT-3a-1: odchod zo sekcie POCAS behu sa priznane hlasi (a druhy uz
   begin
     # Priznak sa zapaluje VYHRADNE cez `mark_running` (od kola 2 nesie identitu
     # behu) — rucne nastaveny retazec by testoval tvar, ktory uz neexistuje.
-    hw.mark_running({ kind: :section, session: hw.instance_variable_get(:@section_session).to_i },
-                    'overenie ceny z Demosu')
+    hw.mark_running('overenie ceny z Demosu')
     hw.cancel_runs_on_leave
     NxTest.assert(sent.any? { |x| x.include?('opustil si sekciu Kovanie') },
                   'odchod POCAS behu sa priznane hlasi')
@@ -226,17 +282,6 @@ NxTest.test('ŠT-3a-1: odchod zo sekcie POCAS behu sa priznane hlasi (a druhy uz
     end
     hw.instance_variable_set(:@section_running, nil)
   end
-end
-
-NxTest.test('ŠT-3a-1: vysledok pre OKNO ostava na povodnom okno-guarde') do
-  hw = Noxun::Engine::HardwareCatalogDialog
-  target = hw.run_target # bez sinku = okno
-  NxTest.assert_equal(:window, target[:kind], 'mimo `with_client` je adresatom okno')
-  NxTest.refute(hw.target_alive?(target),
-                'zavrete okno (nil dialog) beh zabija — presne ako pred touto davkou')
-  # Guard okna sa NEOPIERA o session token sekcie: zmena tokenu s nim nehne.
-  hw.section_bump_session
-  NxTest.refute(hw.target_alive?(target), 'a session sekcie sa ho netyka')
 end
 
 NxTest.test('ŠT-3a-1: asynchronne cesty naozaj pouzivaju `run_target`, nie `@dialog`') do
@@ -261,14 +306,19 @@ NxTest.test('ŠT-3a-1 (nalez auditu): `after_sets_change` uz NEJDE cez `on_model
                 'to je vetva PREPNUTIA DOKUMENTU — prevesila by observer a poslala cely katalog materialov')
   NxTest.assert(body.include?('StudioDialog.refresh_if_open(bump: !model.nil?)'),
                 'kniznicny zapis bez bumpu, MODELOVY zapis (predvolby projektu) so zdvihom')
-  NxTest.assert(body.include?('push_sets'), 'okno dostane sety dalej')
+  # Meno zaniknutej cesty smie ostat v HISTORICKEJ poznamke — kontroluje sa KOD.
+  NxTest.refute(body.lines.reject { |l| l.strip.start_with?('#') }.join.include?('push_sets'),
+                'ŠT-3a-2: vetva okna zanikla — sekcia dostava sety plnym pushom')
+  NxTest.assert(body.include?('Panel.push_hardware_sets'),
+                'panel ZIJE dalej a jeho selecty setov musia byt cerstve')
 end
 
 NxTest.test('ŠT-3a-1: `push_items` obsluhuje OBA ciele a NEDVIHA generaciu') do
   body = ST3A_HW_RB[/def push_items\(refresh_studio: true\).*?\n        end\n/m].to_s
   NxTest.assert(!body.empty?, 'cesta sa nasla')
-  NxTest.assert(body.include?('win_js("MDH.setItems'), 'okno dostane zoznam poloziek')
-  NxTest.assert(body.include?('StudioDialog.push_hw_catalog(payload)'), 'a sekcia katalogove echo')
+  NxTest.refute(body.include?('win_js'), 'ŠT-3a-2: vetva okna zanikla')
+  NxTest.assert(body.include?('StudioDialog.push_hw_catalog(payload)'),
+                'sekcia dostava katalogove echo — jediny ciel')
   NxTest.assert(body.include?('bump: false'),
                 'katalogovy zapis nemeni model — pending klik ani rozrobeny export nesmie zastarat')
   code = body.lines.reject { |l| l.strip.start_with?('#') }.join
@@ -287,11 +337,20 @@ NxTest.test('ŠT-3a-1 (review P1 #1): ZOTAVOVACIE vetvy setov obnovia OBE UI') d
   # na tom istom konflikte donekonecna (a `:not_found` by v nej nespravilo NIC).
   resync = ST3A_HW_RB[/def resync_sets.*?\n        end\n/m].to_s
   NxTest.assert(!resync.empty?, 'zotavovacia cesta ma vlastne meno (nie je to `push_sets`)')
-  NxTest.assert(resync.include?('win_js("HWSETS.init'), 'okno dostane cerstve sety')
-  NxTest.assert(resync.include?('StudioDialog.push_hw_sets(payload)'), 'a sekcia tiez')
+  NxTest.refute(resync.include?('win_js'), 'ŠT-3a-2: vetva okna zanikla')
+  NxTest.assert(resync.include?('StudioDialog.push_hw_sets(sets_payload)'),
+                'sekcia dostane cerstvu `revision` — inak slucka konfliktov')
   code = resync.lines.reject { |l| l.strip.start_with?('#') }.join
   NxTest.assert_equal(1, code.scan(/sets_payload/).length,
                       'payload sa stava RAZ — druhy by znamenal druhy `HardwareSets.load`')
+  # ŠT-3a-2 (B2): `push_sets` (win-only) zanikol a VSETKYCH pat jeho volani
+  # v zotavovacich vetvach MODELOVYCH handlerov preslo sem.
+  NxTest.refute(ST3A_HW_CODE.include?("\n            push_sets\n"),
+                'ziadna zotavovacia vetva uz nepise do zaniknuteho okna')
+  %w[handle_map_project handle_merge_seed handle_reset_project].each do |m|
+    b = ST3A_HW_RB[/def #{m}\(payload\).*?\n        end\n/m].to_s
+    NxTest.assert(b.include?('resync_sets'), "#{m}: odmietnutie obnovi SEKCIU")
+  end
   NxTest.refute(code.include?('refresh_if_open'),
                 'NIC sa nezapisalo — plny push Studia by bol zbytocny prepocet kusovnika')
   echo = ST3A_STUDIO_RB[/def push_hw_sets\(payload = nil\).*?\n        end\n/m].to_s
@@ -318,37 +377,31 @@ NxTest.test('ŠT-3a-1 (review kolo 2, P2-1): priznak behu nesie IDENTITU — cud
   #   (odchod potom o zruseni mlcal), a A zabite konkurencnou generaciou
   #   z OKNA sa neupratalo (odchod vypisal falosne „Zrušené: …").
   hw = Noxun::Engine::HardwareCatalogDialog
-  section = { kind: :section, session: hw.instance_variable_get(:@section_session).to_i }
-  window  = { kind: :window, dlg: nil }
   running = -> { hw.instance_variable_get(:@section_running) }
   begin
     hw.instance_variable_set(:@section_running, nil)
-    a = hw.mark_running(section, 'overenie ceny z Demosu')
-    b = hw.mark_running(section, 'náhľad položky z Demosu')
+    a = hw.mark_running('overenie ceny z Demosu')
+    b = hw.mark_running('náhľad položky z Demosu')
     NxTest.assert(!a.nil? && !b.nil? && a != b, 'kazdy beh dostane VLASTNU identitu')
 
     # (a) UNIK DNU: dobehne zahodene A, kym B este bezi.
-    hw.clear_running(section, a)
+    hw.clear_running(a)
     NxTest.assert(running.call.is_a?(Hash) && running.call['id'] == b,
                   'zahodeny beh A NESMIE zhasnut priznak beziaceho B')
     NxTest.assert_equal('náhľad položky z Demosu', running.call['label'],
                         'a hlaska pri odchode musi hovorit o B')
 
     # (b) UNIK VON: B dobehne (aj ked ho zabila cudzia generacia) a upratie SA.
-    hw.clear_running(section, b)
+    hw.clear_running(b)
     NxTest.assert(running.call.nil?, 'vlastny beh priznak zhasne — ziadne falosne „Zrušené"')
 
     # Vyslovne zrusenie pouzivatelom gasi bez ohladu na identitu.
-    hw.mark_running(section, 'náhľad položky z Demosu')
-    hw.clear_running(section)
+    hw.mark_running('náhľad položky z Demosu')
+    hw.clear_running
     NxTest.assert(running.call.nil?, 'zrusenie pouzivatelom zhasina to, co prave bezi')
 
-    # Beh OKNA sa priznaku sekcie NEDOTYKA (ani nezapaluje, ani nezhasina).
-    id = hw.mark_running(section, 'overenie ceny z Demosu')
-    NxTest.assert(hw.mark_running(window, 'x').nil?, 'okno si priznak sekcie nezapaluje')
-    NxTest.assert_equal(id, running.call['id'], 'a nepresvieti ten, ktory uz horí')
-    hw.clear_running(window)
-    NxTest.assert(running.call.is_a?(Hash), 'ani ho nezhasina')
+    # Po zaniku okna uz ziadny „cudzi" beh neexistuje — jediny bezec je
+    # sekcia, a tu chrani identita `run_id` (vyssie).
   ensure
     hw.instance_variable_set(:@section_running, nil)
   end
@@ -359,18 +412,18 @@ NxTest.test('ŠT-3a-1 (review kolo 2, P2-1): kazdy dlhy beh sekcie ma `run_id` a
   # guardom adresata) by mrtve Studio nechalo priznak visiet.
   %w[handle_check_price handle_demos_preview].each do |m|
     body = ST3A_HW_RB[/def #{m}\(payload\).*?\n        end\n/m].to_s
-    NxTest.assert(body.include?('run_id = mark_running(target'), "#{m}: beh si berie identitu")
-    NxTest.assert(body.include?('clear_running(target, run_id)'), "#{m}: a gasi VYHRADNE seba")
-    NxTest.assert(body.index('clear_running(target, run_id)') < body.index('next unless'),
+    NxTest.assert(body.include?('run_id = mark_running('), "#{m}: beh si berie identitu")
+    NxTest.assert(body.include?('clear_running(run_id)'), "#{m}: a gasi VYHRADNE seba")
+    NxTest.assert(body.index('clear_running(run_id)') < body.index('next unless'),
                   "#{m}: gasi sa PRED guardom adresata (mrtve Studio nie je dovod nechat priznak)")
   end
   # `handle_demos_search` (single-flight refresh sitemapy) guard dovtedy NEMAL.
   search = ST3A_HW_RB[/def handle_demos_search\(payload\).*?\n        end\n/m].to_s
-  NxTest.assert(search.include?('run_id = mark_running(target'), 'aj stahovanie zoznamu produktov')
-  NxTest.assert(search.include?('clear_running(target, run_id)'), 'a gasi sa rovnako')
+  NxTest.assert(search.include?('run_id = mark_running('), 'aj stahovanie zoznamu produktov')
+  NxTest.assert(search.include?('clear_running(run_id)'), 'a gasi sa rovnako')
   cancel = ST3A_HW_RB[/def handle_demos_cancel\(_payload\).*?\n        end\n/m].to_s
-  NxTest.assert(cancel.include?('clear_running(run_target)'),
-                'vyslovne zrusenie ZAMERNE bez identity (z okna je to no-op)')
+  NxTest.assert(cancel.include?('clear_running') && !cancel.include?('clear_running('),
+                'vyslovne zrusenie ZAMERNE bez identity — gasi to, co prave bezi')
 end
 
 NxTest.test('ŠT-3a-1: prepocet cien si plny push robi SAM (ziadny dvojity prepocet)') do
@@ -450,19 +503,19 @@ NxTest.test('ŠT-3a-1: cache-bust presunutych skriptov sedi s VERSION a poradie 
                 'kazdy dalsi obal musi vidiet ten predchadzajuci')
 end
 
-NxTest.test('ŠT-3a-1: `sketchup.ready` sa zo sekcie NEPOSIELA — ale OKNO ho potrebuje') do
-  # Volanie (nie zmienka v komentari).
-  call = ST3A_HW_JS_CODE[/^[^\n]*\bsketchup\.ready\([^\n]*/].to_s
-  NxTest.assert(!call.empty?, 'volanie tam ostava — okno je bez neho prazdne')
-  NxTest.assert(ST3A_HW_JS_CODE.include?('!window.NX_HW_SECTION'),
-                'ale v Studiu je POTLACENE — druhe `ready` by poslalo cely payload dvakrat')
-  NxTest.assert_equal(1, ST3A_HW_JS_CODE.scan(/\bsketchup\.ready\(/).length,
-                      '`ready` sa posiela z JEDINEHO miesta')
+NxTest.test('ŠT-3a-2 (F6): `sketchup.ready` z hw_catalog.js ZANIKOL CELY') do
+  # V okne bol tento subor POSLEDNY a jeho `ready` znamenal „HTML je nacitane".
+  # Okno zaniklo; v Studiu `ready` posiela `studio.js` (`window.onload`)
+  # a druhe volanie by prinutilo okno poslat CELY payload dvakrat.
+  NxTest.refute(ST3A_HW_JS_CODE.include?('sketchup.ready('),
+                'volanie je PREC (vzor `proj_materials.js` po ŠT-2b)')
   # Ziadne INE volanie `sketchup.*` sa pri nacitani suboru nesmie vykonat —
   # vsetky ostatne su vnutri funkcii (odsadene aspon 4 medzerami).
   top = ST3A_HW_JS_CODE.lines.select { |l| l =~ /\bsketchup\.[a-z_]+\(/ && l[/\A */].length < 4 }
-  NxTest.assert(top.all? { |l| l.include?('sketchup.ready(') },
-                "pri nacitani sa smie volat LEN `ready` (naslo sa: #{top.map(&:strip).inspect})")
+  NxTest.assert_equal([], top.map(&:strip),
+                      'pri nacitani sa uz nevola NIC')
+  NxTest.assert(ST3A_STUDIO_HTML.include?('window.NX_HW_SECTION = true'),
+                'priznak ostava ako citatelne prihlasenie sa do rezimu sekcie')
   NxTest.refute(ST3A_HWSETS_JS.include?('sketchup.ready'),
                 'hw_sets.js `ready` nikdy neposielal a ani nesmie zacat')
 end
