@@ -986,6 +986,759 @@ module Noxun
         "#{fmt_mm(it['width'])}/#{fmt_mm(it['thickness'])}#{st.empty? ? '' : " #{st}"}"
       end
 
+      # === ŠT-2c PR 2c-2a: ATOMICKY ZAPIS DEKORU (D-69 jednotny editor) ========
+      #
+      # JEDNA zapisova cesta pre CELY formular editora: identita dekorovej
+      # skupiny + riadky dosiek + riadky ABS. Vzor atomicity je
+      # add_decor_batch_v3 (jeden zamok, validate-all, JEDEN write), rozsireny
+      # o EDIT existujucich riadkov a o skupinove polia v TEJ ISTEJ transakcii.
+      #
+      # Preco vlastna cesta a nie N x upsert: katalog su CENY REALNYCH
+      # OBJEDNAVOK. Formular ulozeny „spolovice" (tri riadky presli, stvrty
+      # spadol na validacii) necha pouzivatela s katalogom, o ktorom nevie, co
+      # v nom je. Bud vsetko, alebo nic.
+      #
+      # KONTRAKT (zapracovany slepy audit ŠT-2c — 10 bodov; cisla su
+      # v komentaroch nizsie, aby sa dal kazdy bod najst aj o rok):
+      #   1 allowlist vstupu — server-owned polia sa STRHAVAJU,
+      #   2 riadok nesie material_id/abs_id + row_rev, alebo NIC (= novy),
+      #   3 brany PRED zamkom: read-only katalog, schema klienta,
+      #   4 POD zamkom: cerstvy marker, base_rev, row_rev KAZDEHO riadku,
+      #   5 validate-all (ziadny fail-fast) — vsetky chyby NARAZ,
+      #   6 validacie = zjednotenie dnesnych bran (formular + batch + patch),
+      #   7 riadok s ID meni LEN neidentitne polia; ziadny zaznam sa NEMAZE,
+      #   8 skupinove polia atomicky celej skupine v TEJ ISTEJ transakcii,
+      #   9 zmena ceny bez zmeny vazby na dodavatela rusi price_checked_at,
+      #  10 [:ok, {...}] | [:invalid|:stale|:conflict|:code_conflict|
+      #     :catalog_read_only|:write_failed, {...}]; pri :ok JEDEN write.
+
+      # (1) ALLOWLIST. Co v zozname NIE JE, sa strhne uz na vstupe — nie preto,
+      # ze by klient podvadzal, ale preto, ze formular posiela CELY zaznam
+      # a server-owned polia (price_checked_at, uni/uni_role, source_* duplaku,
+      # group_id/color/family na RIADKU) urcuje VYHRADNE server. Bez allowlistu
+      # by stacil jeden stary klient z CEF cache a datum overenia ceny alebo
+      # duplakova vazba by sa ticho prepisali hodnotou z obrazovky.
+      SAVE_DECOR_KEYS = %w[mode group_id decor decor_name manufacturer color grain
+                           sheets edges base_rev catalog_schema allow_duplicate_code].freeze
+      # Riadok dosky: identita variantu (typ/hrubka/format/struktura) + obchodne
+      # polia. demos_url tu ZAMERNE NIE JE — vazbu na dodavatela ma vlastnu
+      # autoritu (Demos modal / formular varianty, rozhodnutie auditu #4).
+      SAVE_DECOR_SHEET_KEYS = %w[material_id row_rev type thickness sheet_size structure
+                                 code supplier price_per_m2].freeze
+      # Riadok ABS: 'universal' tu NIE JE — je to vlastnost VYBERU a ostava
+      # patch-only (audit #8), inak by ho editor menil „mimochodom".
+      SAVE_DECOR_EDGE_KEYS = %w[abs_id row_rev width thickness structure
+                                code supplier price_per_bm].freeze
+
+      # Vstupny hash zredukovany na allowlist (string aj symbolove kluce —
+      # JSON z UI da stringy, testy a Ruby volania symboly).
+      def sd_pick(raw, keys)
+        out = {}
+        return out unless raw.is_a?(Hash)
+        keys.each do |k|
+          if raw.key?(k)
+            out[k] = raw[k]
+          elsif raw.key?(k.to_sym)
+            out[k] = raw[k.to_sym]
+          end
+        end
+        out
+      end
+
+      # (5) Jedna chyba validate-all. `row` = nil pre skupinove pole, inak
+      # "sheets:<index>" / "edges:<index>" (klient podla toho rozsvieti bunku
+      # PRI RIADKU); `field` = kluc pola formulara.
+      def sd_err(row, field, msg)
+        { 'row' => row, 'field' => field, 'msg' => msg }
+      end
+
+      def sd_str(v)
+        v.to_s.strip
+      end
+
+      def sd_rows(raw)
+        raw.is_a?(Array) ? raw : []
+      end
+
+      # Struktury povrchu, ktore skupina UZ ma: normalizovany kluc => zapis tak,
+      # ako je v katalogu. Novy riadok formulara strukturu NENESIE (nie je to
+      # stlpec) — dedi ju po skupine; skupina s VIACERYMI strukturami je
+      # nerozhodnutelna a povie to nahlas (variant sa pridava cez „+ variant").
+      def sd_group_structures(data, gid)
+        seen = {}
+        %w[sheets edges].each do |k|
+          Array(data[k]).each do |r|
+            next unless identity_norm(r['group_id']) == identity_norm(gid)
+            key = identity_norm(r['structure'])
+            seen[key] = r['structure'].to_s.strip unless seen.key?(key)
+          end
+        end
+        seen
+      end
+
+      # Zaznamy skupiny v datach V RUKE (pod zamkom).
+      def sd_group_rows(data, listk, gid)
+        Array(data[listk]).select { |r| identity_norm(r['group_id']) == identity_norm(gid) }
+      end
+
+      def save_decor(attrs)
+        a = sd_pick(attrs, SAVE_DECOR_KEYS)
+        mode = sd_str(a['mode'])
+        mode = 'edit' if mode.empty?
+        unless mode == 'edit'
+          return [:invalid, { 'errors' => [sd_err(nil, 'mode',
+                                                  'Editor upravuje existujúci dekor — nový sa zakladá vlastnou cestou.')] }]
+        end
+        # (3) BRANY PRED ZAMKOM. Read-only katalog aj stary klient sa odmietaju
+        # skor, nez sa cokolvek nacita — zamok drzi len skutocna praca.
+        return [:catalog_read_only, { 'message' => catalog_read_only_message }] if catalog_read_only?
+        unless schema_write_allowed?(a['catalog_schema'])
+          return [:stale, { 'message' => 'Katalóg je v novom formáte — obnov Štúdio (Obnoviť) a potom ulož.' }]
+        end
+        with_catalog_lock do
+          JsonFileStore.invalidate(path)
+          # (4) Marker CERSTVO z disku: rollback z ineho procesu mohol katalog
+          # pod nami vratit na legacy a zapis so skupinovymi polami by vyrobil
+          # hybridny subor (vzor add_decor_batch_v3).
+          if catalog_schema_on_disk < SCHEMA_GROUPS
+            return [:stale, { 'message' => 'Katalóg sa medzitým vrátil na pôvodný formát — obnov sekciu „Materiály“ a skús znova.' }]
+          end
+          base = sd_str(a['base_rev'])
+          if base.empty? || base != catalog_revision
+            return [:stale, { 'message' => 'Katalóg sa medzitým zmenil — hodnoty v okne ostali, over ich a ulož znova.' }]
+          end
+          save_decor_locked(a)
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'Materials.save_decor') if defined?(Engine)
+        [:write_failed, { 'message' => 'Uloženie katalógu zlyhalo.' }]
+      end
+
+      # Telo transakcie — bezi VYHRADNE zvnutra save_decor (zamok drzi volajuci).
+      def save_decor_locked(a)
+        gid_in = sd_str(a['group_id'])
+        if gid_in.empty?
+          return [:invalid, { 'errors' => [sd_err(nil, 'group_id',
+                                                  'Chýba identifikátor dekorovej skupiny — obnov sekciu „Materiály“ a skús znova.')] }]
+        end
+        ok, group = resolve_group_target(nil, gid_in)
+        return [:invalid, { 'errors' => [sd_err(nil, 'group_id', group)] }] unless ok
+        gid = group['group_id']
+        data = load
+        # NEZAVISLY snimok stavu, ktory klient videl. `load` vracia hlbku kopiu,
+        # takze `orig` neziju tie iste hashe ako `data` — skupinova zmena
+        # (premenovanie, farba) ich uz nesmie prepisat, inak by sa row_rev
+        # porovnaval proti zaznamu, ktory sme sami zmenili.
+        orig = {}
+        base = load
+        %w[sheets edges].each do |k|
+          idk = k == 'edges' ? 'abs_id' : 'material_id'
+          Array(base[k]).each { |r| orig[[k, r[idk].to_s]] = r }
+        end
+
+        sheet_rows = sd_rows(a['sheets'])
+        edge_rows  = sd_rows(a['edges'])
+
+        # (4) row_rev / existencia — TVRDE brany pred validate-all. Su to stavy
+        # sveta (niekto iny pisal), nie chyby formulara: pisat ich k poliam by
+        # bolo klamstvo, pouzivatel ma dostat cerstvy katalog.
+        gate = save_decor_row_gate(orig, gid, sheet_rows, edge_rows)
+        return gate if gate
+
+        errors = []
+        plan = save_decor_group_plan(a, group, data, errors)
+        # (8) Skupinove polia sa do dat v ruke zapisuju PRED riadkami — inak by
+        # zaznam prestavany z riadku formulara prepisal prave premenovany dekor
+        # (a farba noveho variantu by prisla zo stareho stavu skupiny).
+        # Zapis na disk to este nie je: pri chybe sa cela kopia zahodi.
+        save_decor_apply_group!(data, gid, plan)
+        sheets_out = save_decor_sheet_rows(data, group, plan, sheet_rows, errors)
+        edges_out  = save_decor_edge_rows(data, group, plan, edge_rows, errors)
+        # (5) Jediná chyba = ZIADNY zapis. Vsetky sa vracaju NARAZ — inak by
+        # pouzivatel opravoval formular po jednom poli a kazdy pokus by bol
+        # dalsi kruh cez server.
+        return [:invalid, { 'errors' => errors }] unless errors.empty?
+
+        created = { 'sheets' => [], 'edges' => [] }
+        updated = []
+        skipped = []
+        [['sheets', sheets_out, 'material_id'], ['edges', edges_out, 'abs_id']].each do |(listk, rows, idk)|
+          kind = listk == 'edges' ? :edge : :sheet
+          rows.each do |item|
+            case item['op']
+            when 'skip' then skipped << item['label']
+            when 'update'
+              rec = enforce_group_color!(item['rec'], data, kind)
+              idx = data[listk].index { |r| r[idk] == rec[idk] }
+              next if idx.nil? || data[listk][idx] == rec # riadok sa nemeni
+              data[listk][idx] = rec
+              updated << rec[idk]
+            when 'create'
+              rec = enforce_group_color!(item['rec'], data, kind)
+              data[listk] << rec
+              created[listk] << rec[idk]
+            end
+          end
+        end
+
+        # (6) Duplicitny par kod+dodavatel v SIMULOVANOM FINALNOM stave — vzor
+        # apply_demos_batch: dve polozky formulara s rovnakym novym kodom sa
+        # uvidia navzajom, nedotknute pary sa nevycitaju.
+        conflict = save_decor_code_conflict(data, orig, a['allow_duplicate_code'])
+        return conflict if conflict
+
+        if created['sheets'].empty? && created['edges'].empty? && updated.empty? && !plan['changed']
+          # Ziadna zmena = ziadny zapis (a teda ani zbytocny bump revizie).
+          return [:ok, { 'group_id' => gid, 'created' => [], 'updated' => [],
+                         'skipped' => skipped, 'changed' => 0 }]
+        end
+        # (10) JEDEN write_unlocked na cely formular.
+        return [:write_failed, { 'message' => 'Zápis katalógu zlyhal.' }] unless write_unlocked(data)
+        [:ok, { 'group_id' => gid,
+                'created' => created['sheets'] + created['edges'],
+                'updated' => updated, 'skipped' => skipped,
+                'changed' => created['sheets'].size + created['edges'].size + updated.size }]
+      end
+
+      # (4) Brana existencie a odtlacku riadkov. Vrati nil (vsetko sedi) alebo
+      # hotovu odpoved [:conflict|:stale, {...}].
+      def save_decor_row_gate(orig, gid, sheet_rows, edge_rows)
+        [['sheets', sheet_rows, 'material_id'], ['edges', edge_rows, 'abs_id']].each do |(listk, rows, idk)|
+          rows.each do |raw|
+            next unless raw.is_a?(Hash)
+            row = sd_pick(raw, listk == 'edges' ? SAVE_DECOR_EDGE_KEYS : SAVE_DECOR_SHEET_KEYS)
+            id = sd_str(row[idk])
+            next if id.empty? # (2) riadok bez ID = novy variant, niet co porovnavat
+            existing = orig[[listk, id]]
+            unless existing
+              return [:conflict, { 'id' => id,
+                                   'message' => 'Niektorý variant sa medzitým z katalógu stratil — hodnoty ostali, obnov sekciu a skús znova.' }]
+            end
+            unless identity_norm(existing['group_id']) == identity_norm(gid)
+              return [:conflict, { 'id' => id,
+                                   'message' => 'Variant patrí inej dekorovej skupine — obnov sekciu „Materiály“ a skús znova.' }]
+            end
+            rev = sd_str(row['row_rev'])
+            if rev.empty? || rev != record_rev(existing)
+              return [:stale, { 'id' => id,
+                                'message' => 'Niektorý variant medzitým zmenil niekto iný — hodnoty v okne ostali, over ich a ulož znova.' }]
+            end
+          end
+        end
+        nil
+      end
+
+      # (8) SKUPINOVE POLIA — plan zmien + ich validacie. Zapisuju sa CELEJ
+      # skupine (cislo dekoru, vyrobca, nazov, farba) a v TEJ ISTEJ transakcii
+      # ako riadky: dva zapisy by znamenali stav, v ktorom je dekor uz
+      # premenovany, ale ceny este nie.
+      def save_decor_group_plan(a, group, data, errors)
+        gid = group['group_id']
+        plan = { 'gid' => gid, 'decor' => group['decor'], 'manufacturer' => group['manufacturer'],
+                 'decor_name' => group['decor_name'], 'color' => nil, 'grain' => nil,
+                 'rename' => false, 'reman' => false, 'rename_name' => false, 'changed' => false }
+        # Cislo dekoru — povinne (je to identita skupiny a kluc vazby na ABS).
+        if a.key?('decor')
+          want = sd_str(a['decor'])
+          if want.empty?
+            errors << sd_err(nil, 'decor', 'Číslo dekoru je povinné.')
+          elsif want != group['decor']
+            plan['decor'] = want
+            plan['rename'] = true
+          end
+        end
+        # Vyrobca — vlastnost DEKORU. Prazdna hodnota na skupine, ktora vyrobcu
+        # MA, je takmer vzdy omyl (D-44 F9) — vymazanie ma vlastne tlacidlo.
+        if a.key?('manufacturer')
+          want = sd_str(a['manufacturer'])
+          if want.empty? && !sd_str(group['manufacturer']).empty?
+            errors << sd_err(nil, 'manufacturer',
+                             'Prázdny výrobca — na vymazanie použi tlačidlo „Zmazať výrobcu“.')
+          elsif want != sd_str(group['manufacturer'])
+            plan['manufacturer'] = want
+            plan['reman'] = true
+          end
+        end
+        if a.key?('decor_name')
+          want = sd_str(a['decor_name'])
+          if want != sd_str(group['decor_name'])
+            plan['decor_name'] = want
+            plan['rename_name'] = true
+          end
+        end
+        # Kolizia obchodnej identity skupiny (standard 7.1): rovnaky vyrobca
+        # nesmie mat dve skupiny s rovnakym (ani len zapisom odlisnym) cislom.
+        # Porovnava sa proti VYSLEDNEMU stavu — vyrobca sa moze menit v tom
+        # istom formulari ako cislo.
+        if plan['rename'] || plan['reman']
+          man_key = decor_norm_key(plan['manufacturer'])
+          v3_groups_registry.each_value do |g|
+            next if g['group_id'] == gid
+            next unless decor_norm_key(g['manufacturer']) == man_key
+            if g['decor'] == plan['decor']
+              label = [plan['manufacturer'], plan['decor']].reject { |v| v.to_s.empty? }.join(' ')
+              errors << sd_err(nil, plan['rename'] ? 'decor' : 'manufacturer',
+                               "Skupina „#{label}“ už existuje — dve skupiny nemôžu mať rovnakého výrobcu aj číslo dekoru.")
+              break
+            end
+            next unless decor_norm_key(g['decor']) == decor_norm_key(plan['decor'])
+            errors << sd_err(nil, 'decor',
+                             "Názov sa líši od existujúcej skupiny „#{g['decor']}“ len zápisom — použi presný tvar.")
+            break
+          end
+        end
+        # Vyrobcu NESIE DOSKA (standard 7.5) — skupina bez dosky ho nema kam
+        # zapisat a tichy no-op by pouzivatelovi klamal.
+        if plan['reman'] && sd_group_rows(data, 'sheets', gid).empty?
+          errors << sd_err(nil, 'manufacturer', 'Dekor nemá dosky (výrobcu nesie doska).')
+        end
+        # Farba je vlastnost SKUPINY (D-82); UNI ju ma zamknutu — rozlisuje rolu.
+        if a.key?('color') && !sd_str(a['color']).empty?
+          rgb = parse_rgb(a['color'])
+          if rgb.nil?
+            errors << sd_err(nil, 'color', 'Neplatná farba — očakávam #RRGGBB alebo [r,g,b] 0–255.')
+          elsif uni_group?(gid, group['decor'])
+            errors << sd_err(nil, 'color', uni_color_locked_message)
+          elsif rgb != group_color_in(data, gid, group['decor'])
+            plan['color'] = rgb
+          end
+        end
+        # Smer dekoru je default NOVYCH dosiek (vzor batchu) — existujucim
+        # riadkom ho editor nemeni, to je vlastnost variantu vo formulari.
+        if a.key?('grain')
+          want = sd_str(a['grain'])
+          unless want.empty?
+            if GRAINS.include?(want)
+              plan['grain'] = want
+            else
+              errors << sd_err(nil, 'grain', 'Smer dekoru musí byť length/width/none.')
+            end
+          end
+        end
+        plan['changed'] = plan['rename'] || plan['reman'] || plan['rename_name'] || !plan['color'].nil?
+        plan
+      end
+
+      # Zapis skupinovych poli do dat V RUKE (ziadny vlastny write — vsetko ide
+      # jednym write_unlocked na konci transakcie).
+      def save_decor_apply_group!(data, gid, plan)
+        return data unless plan['changed']
+        %w[sheets edges].each do |k|
+          Array(data[k]).each do |r|
+            next unless identity_norm(r['group_id']) == identity_norm(gid)
+            r['decor'] = plan['decor'] if plan['rename']
+            if plan['rename_name']
+              plan['decor_name'].to_s.empty? ? r.delete('decor_name') : r['decor_name'] = plan['decor_name']
+            end
+            r['color'] = plan['color'].dup if plan['color']
+            next unless k == 'sheets'
+            r['manufacturer'] = plan['manufacturer'] if plan['reman']
+            r['family'] = "#{r['manufacturer']} #{r['decor']}".strip if plan['rename'] || plan['reman']
+          end
+        end
+        data
+      end
+
+      # Format platne z JEDNEHO textoveho stlpca formulara ("2800x2070",
+      # "2800 × 2070", "4100/650"). Vrati [:ok, [l, w]] | [:ok, nil] (prazdne =
+      # bez overeneho formatu) | [:bad, hlaska]. Striktne — "2800" alebo
+      # "2800x2070x18" je preklep, nie hodnota na uhadnutie.
+      def sd_parse_size(raw)
+        text = sd_str(raw)
+        return [:ok, nil] if text.empty?
+        parts = text.split(/[x×*\/,;]/).map { |p| p.strip }.reject(&:empty?)
+        unless parts.length == 2
+          return [:bad, "Formát platne zadaj ako dĺžka × šírka (napr. 2800×2070)."]
+        end
+        nums = parts.map { |p| strict_num(p) }
+        unless nums.all? { |n| n && n.positive? && SHEET_SIZE_RANGE.cover?(n) }
+          return [:bad, "Formát platne musí byť dve čísla #{sheet_size_range_label} mm."]
+        end
+        [:ok, nums]
+      end
+
+      # Struktura NOVEHO riadku: skupina ju urcuje sama (stlpec to nie je).
+      # Vrati [true, hodnota] alebo [false, hlaska].
+      def sd_new_structure(structures)
+        return [true, ''] if structures.empty?
+        return [true, structures.values.first] if structures.size == 1
+        [false, 'Skupina má viac štruktúr povrchu — nový variant pridaj cez „+ variant“.']
+      end
+
+      # (5)(6)(7) RIADKY DOSIEK. Vrati pole poloziek {op, rec|label}; chyby
+      # pribudaju do `errors` (ziadny fail-fast).
+      def save_decor_sheet_rows(data, group, plan, rows, errors)
+        gid = group['group_id']
+        structures = sd_group_structures(data, gid)
+        taken = Array(data['sheets']).map { |s| s['material_id'].to_s.upcase } +
+                Array(data['edges']).map { |e| e['abs_id'].to_s.upcase }
+        seen_new = []
+        out = []
+        rows.each_with_index do |raw, i|
+          tag = "sheets:#{i}"
+          unless raw.is_a?(Hash)
+            errors << sd_err(tag, nil, 'Poškodený riadok dosky — obnov sekciu „Materiály“ a skús znova.')
+            next
+          end
+          row = sd_pick(raw, SAVE_DECOR_SHEET_KEYS)
+          item = if sd_str(row['material_id']).empty?
+                   save_decor_new_sheet(row, tag, data, plan, structures, taken, seen_new, errors)
+                 else
+                   save_decor_edit_sheet(row, tag, data, errors)
+                 end
+          out << item if item
+        end
+        out
+      end
+
+      # (7) EDIT: riadok s ID meni LEN NEIDENTITNE polia. Zmena identitneho pola
+      # nie je „oprava", ale INY produkt — a ten sa zaklada, nie prepisuje
+      # (zatvorene zakazky by inak dostali pod rukami iny material).
+      def save_decor_edit_sheet(row, tag, data, errors)
+        id = sd_str(row['material_id'])
+        existing = Array(data['sheets']).find { |r| r['material_id'] == id }
+        return nil unless existing # gate uz overila; poistka pre priame volania
+        patch = row.reject { |k, _| %w[material_id row_rev].include?(k) }
+        # (6) duplak deriva vsetko zo zdroja, UNI nema nakupne polia.
+        if (dup_err = duplak_edit_error(existing))
+          errors << sd_err(tag, nil, dup_err)
+          return nil
+        end
+        if (uni_err = uni_edit_error(existing, patch))
+          errors << sd_err(tag, nil, uni_err)
+          return nil
+        end
+        bad = false
+        if patch.key?('type') && identity_norm(patch['type']) != identity_norm(existing['type'])
+          errors << sd_err(tag, 'type', 'Typ dosky definuje variant — pre iný typ pridaj nový variant.')
+          bad = true
+        end
+        if patch.key?('thickness')
+          th = strict_num(patch['thickness'])
+          if th.nil? || !th.positive?
+            errors << sd_err(tag, 'thickness', 'Hrúbka musí byť kladné číslo.')
+            bad = true
+          elsif (th - existing['thickness'].to_f).abs > 0.01
+            errors << sd_err(tag, 'thickness', 'Hrúbka definuje variant — pre inú hrúbku pridaj nový variant.')
+            bad = true
+          end
+        end
+        if patch.key?('structure') &&
+           identity_norm(patch['structure']) != identity_norm(existing['structure'])
+          errors << sd_err(tag, 'structure',
+                           'Štruktúra povrchu definuje variant — pre inú štruktúru pridaj nový variant.')
+          bad = true
+        end
+        size_given = patch.key?('sheet_size')
+        if size_given
+          st, val, = sd_parse_size(patch['sheet_size'])
+          if st == :bad
+            errors << sd_err(tag, 'sheet_size', val)
+            bad = true
+            size_given = false
+            patch.delete('sheet_size')
+          else
+            patch['sheet_size'] = val
+          end
+        end
+        # Format je identita LEN pri typoch s format_in_identity? (PD, ZASTENA,
+        # KOMPAKT) — pri DTDL sa smie dopisat aj prepisat. Rozhodnutie patri
+        # JEDNEJ autorite (identity_edit_error), `structure` sa jej neposiela,
+        # lebo ju uz posudil riadok vyssie (inak by hlaska sadla na zle pole).
+        id_attrs = patch.reject { |k, _| k == 'structure' }
+        id_attrs['clear_sheet_size'] = true if size_given && patch['sheet_size'].nil?
+        if (err = identity_edit_error(id_attrs, existing))
+          errors << sd_err(tag, 'sheet_size', err)
+          bad = true
+        end
+        merged = existing.merge(patch)
+        merged.delete('sheet_size') if size_given && patch['sheet_size'].nil?
+        ok, verr = validate_sheet_attrs(merged)
+        unless ok
+          errors << sd_err(tag, nil, verr)
+          bad = true
+        end
+        return nil if bad
+        # (9) Zmena ceny rusi datum overenia. Vazbu na dodavatela (demos_url)
+        # editor nemeni — allowlist ju nenesie — takze KAZDA rucna zmena ceny
+        # znamena „cena uz nie je overena voci stranke dodavatela".
+        if patch.key?('price_per_m2') &&
+           normalize_price(patch['price_per_m2']) != normalize_price(existing['price_per_m2'])
+          merged.delete('price_checked_at')
+        end
+        rec = normalize_sheet(merged)
+        if rec.nil?
+          errors << sd_err(tag, nil, 'Záznam sa nedá uložiť.')
+          return nil
+        end
+        { 'op' => 'update', 'rec' => rec }
+      end
+
+      # (7) NOVY riadok (bez ID) = novy variant s PLNYMI create guardmi.
+      def save_decor_new_sheet(row, tag, data, plan, structures, taken, seen_new, errors)
+        gid = plan['gid']
+        # UNI je pracovny material — dalsie varianty sa don nepridavaju.
+        if uni_group?(gid, plan['decor'])
+          errors << sd_err(tag, nil, 'UNI je pracovný materiál — nové varianty dostane až reálny dekor.')
+          return nil
+        end
+        type = sd_str(row['type'])
+        bad = false
+        if type.empty?
+          errors << sd_err(tag, 'type', 'Typ dosky je povinný (DTDL/MDF/HDF…).')
+          bad = true
+        end
+        th = strict_num(row['thickness'])
+        if th.nil? || !th.positive?
+          errors << sd_err(tag, 'thickness', 'Hrúbka musí byť kladné číslo.')
+          bad = true
+        end
+        st, size, = sd_parse_size(row['sheet_size'])
+        if st == :bad
+          errors << sd_err(tag, 'sheet_size', size)
+          bad = true
+          size = nil
+        end
+        if !type.empty? && format_in_identity?(type) && size.nil?
+          errors << sd_err(tag, 'sheet_size',
+                           "Variant #{canonical_type(type)} potrebuje formát platne (pri tomto type je súčasťou identity).")
+          bad = true
+        end
+        struct = sd_str(row['structure'])
+        if struct.empty?
+          ok_st, struct = sd_new_structure(structures)
+          unless ok_st
+            errors << sd_err(tag, 'structure', struct)
+            bad = true
+            struct = ''
+          end
+        end
+        return nil if bad
+        # Duplicita v ramci JEDNEHO formulara je chyba (ziadny tichy
+        # prvy-vyhrava), duplicita s katalogom je „uz to tam je" = skip.
+        key = [identity_norm(type), thickness_key(th), identity_norm(struct),
+               format_in_identity?(type) ? size_key(size) : nil]
+        if seen_new.any? { |p| identity_keys_tolerant?(p, key) }
+          errors << sd_err(tag, nil, "Variant #{canonical_type(type)} #{fmt_mm(th)} je vo formulári dvakrát — nechaj len jeden.")
+          return nil
+        end
+        seen_new << key
+        if find_sheet_variant(plan['decor'], type, th, struct, size,
+                              group_id: gid, manufacturer: plan['manufacturer'])
+          return { 'op' => 'skip', 'label' => "#{canonical_type(type)} #{fmt_mm(th)} mm" }
+        end
+        attrs = { 'material_id' => generate_sheet_id(plan['decor'], type, th, structure: struct,
+                                                     sheet_size: size, taken: taken,
+                                                     schema: SCHEMA_GROUPS),
+                  'family' => "#{plan['manufacturer']} #{plan['decor']}".strip,
+                  'manufacturer' => plan['manufacturer'], 'decor' => plan['decor'],
+                  'decor_name' => plan['decor_name'], 'group_id' => gid,
+                  'type' => type, 'thickness' => th, 'structure' => struct,
+                  'sheet_size' => size, 'grain' => plan['grain'] || sd_group_grain(data, gid),
+                  'code' => row['code'], 'supplier' => row['supplier'],
+                  'price_per_m2' => row['price_per_m2'] }
+        ok, verr = validate_sheet_attrs(attrs)
+        unless ok
+          errors << sd_err(tag, nil, verr)
+          return nil
+        end
+        rec = normalize_sheet(attrs)
+        if rec.nil?
+          errors << sd_err(tag, nil, 'Záznam sa nedá uložiť.')
+          return nil
+        end
+        taken << rec['material_id'].to_s.upcase
+        { 'op' => 'create', 'rec' => rec }
+      end
+
+      # Smer dekoru NOVEJ dosky: co uz skupina pouziva (prva doska), inak
+      # 'length' ako batch. Existujucim riadkom ho editor nemeni.
+      def sd_group_grain(data, gid)
+        hit = Array(data['sheets']).find do |s|
+          identity_norm(s['group_id']) == identity_norm(gid) && GRAINS.include?(s['grain'].to_s)
+        end
+        hit ? hit['grain'].to_s : 'length'
+      end
+
+      # (5)(6)(7) RIADKY ABS. Sirka aj hrubka su identita variantu.
+      def save_decor_edge_rows(data, group, plan, rows, errors)
+        gid = group['group_id']
+        structures = sd_group_structures(data, gid)
+        taken = Array(data['sheets']).map { |s| s['material_id'].to_s.upcase } +
+                Array(data['edges']).map { |e| e['abs_id'].to_s.upcase }
+        seen_new = []
+        out = []
+        rows.each_with_index do |raw, i|
+          tag = "edges:#{i}"
+          unless raw.is_a?(Hash)
+            errors << sd_err(tag, nil, 'Poškodený riadok ABS — obnov sekciu „Materiály“ a skús znova.')
+            next
+          end
+          row = sd_pick(raw, SAVE_DECOR_EDGE_KEYS)
+          item = if sd_str(row['abs_id']).empty?
+                   save_decor_new_edge(row, tag, plan, structures, taken, seen_new, errors)
+                 else
+                   save_decor_edit_edge(row, tag, data, errors)
+                 end
+          out << item if item
+        end
+        out
+      end
+
+      def save_decor_edit_edge(row, tag, data, errors)
+        id = sd_str(row['abs_id'])
+        existing = Array(data['edges']).find { |r| r['abs_id'] == id }
+        return nil unless existing
+        patch = row.reject { |k, _| %w[abs_id row_rev].include?(k) }
+        bad = false
+        # Hrubka aj sirka su v ID pasky a dielce ju drzia LEN cez ID — zmena by
+        # ich potichu prepla na inu hranu a ID by klamalo.
+        if patch.key?('thickness')
+          th = strict_num(patch['thickness'])
+          if th.nil? || (th - existing['thickness'].to_f).abs > 0.01
+            errors << sd_err(tag, 'thickness', 'Hrúbka definuje ABS variant — pre inú hrúbku pridaj novú pásku.')
+            bad = true
+          end
+        end
+        if patch.key?('width')
+          raw_w = sd_str(patch['width'])
+          new_w = raw_w.empty? ? nil : strict_num(raw_w)
+          old_w = edge_width(existing)
+          differs = if old_w.nil?
+                      !raw_w.empty?
+                    elsif new_w.nil?
+                      true
+                    else
+                      (new_w - old_w).abs > 0.01
+                    end
+          if differs
+            errors << sd_err(tag, 'width', 'Šírka definuje ABS variant — pre inú šírku pridaj novú pásku.')
+            bad = true
+          end
+        end
+        if patch.key?('structure') &&
+           identity_norm(patch['structure']) != identity_norm(existing['structure'])
+          errors << sd_err(tag, 'structure',
+                           'Štruktúra povrchu definuje variant — pre inú štruktúru pridaj novú pásku.')
+          bad = true
+        end
+        if (err = identity_edit_error(patch.reject { |k, _| k == 'structure' }, existing))
+          errors << sd_err(tag, nil, err)
+          bad = true
+        end
+        # Sirka sa VZDY berie z existujuceho zaznamu (stary klient ju nemusi
+        # poslat vobec a merge by ju ticho zmazal).
+        merged = existing.merge(patch)
+        if existing.key?('width')
+          merged['width'] = existing['width']
+        else
+          merged.delete('width')
+        end
+        merged['thickness'] = existing['thickness']
+        ok, verr = validate_edge_attrs(merged)
+        unless ok
+          errors << sd_err(tag, nil, verr)
+          bad = true
+        end
+        return nil if bad
+        # (9) rovnaky kontrakt ako pri doske
+        if patch.key?('price_per_bm') &&
+           normalize_price(patch['price_per_bm']) != normalize_price(existing['price_per_bm'])
+          merged.delete('price_checked_at')
+        end
+        rec = normalize_edge(merged)
+        if rec.nil?
+          errors << sd_err(tag, nil, 'Pásku sa nepodarilo uložiť.')
+          return nil
+        end
+        { 'op' => 'update', 'rec' => rec }
+      end
+
+      def save_decor_new_edge(row, tag, plan, structures, taken, seen_new, errors)
+        gid = plan['gid']
+        # UNI pasky nema — olep sa riesi az s realnym dekorom (GH #103 P2).
+        if uni_group?(gid, plan['decor'])
+          errors << sd_err(tag, nil, 'UNI je pracovný materiál bez ABS pások — pásky dostane až reálny dekor.')
+          return nil
+        end
+        bad = false
+        w = strict_num(row['width'])
+        unless w && EDGE_WIDTH_RANGE.cover?(w)
+          errors << sd_err(tag, 'width', 'Šírka ABS musí byť 10–200 mm.')
+          bad = true
+        end
+        th = strict_num(row['thickness'])
+        unless th && supported_edge_thickness?(th, SCHEMA_GROUPS)
+          errors << sd_err(tag, 'thickness',
+                           "Hrúbka ABS musí byť #{edge_thickness_options_label(SCHEMA_GROUPS)} mm.")
+          bad = true
+        end
+        struct = sd_str(row['structure'])
+        if struct.empty?
+          ok_st, struct = sd_new_structure(structures)
+          unless ok_st
+            errors << sd_err(tag, 'structure', struct)
+            bad = true
+            struct = ''
+          end
+        end
+        return nil if bad
+        key = [width_key(w), thickness_key(th), identity_norm(struct)]
+        if seen_new.any? { |p| identity_keys_tolerant?(p, key) }
+          errors << sd_err(tag, nil, "ABS #{fmt_mm(w)}/#{fmt_mm(th)} je vo formulári dvakrát — nechaj len jednu.")
+          return nil
+        end
+        seen_new << key
+        if find_edge_variant(plan['decor'], w, th, struct, group_id: gid)
+          return { 'op' => 'skip', 'label' => "ABS #{fmt_mm(w)}/#{fmt_mm(th)} mm" }
+        end
+        attrs = { 'abs_id' => generate_edge_id(plan['decor'], th, w, structure: struct, taken: taken),
+                  'decor' => plan['decor'], 'decor_name' => plan['decor_name'], 'group_id' => gid,
+                  'thickness' => th, 'width' => w, 'structure' => struct,
+                  'code' => row['code'], 'supplier' => row['supplier'],
+                  'price_per_bm' => row['price_per_bm'] }
+        ok, verr = validate_edge_attrs(attrs)
+        unless ok
+          errors << sd_err(tag, nil, verr)
+          return nil
+        end
+        rec = normalize_edge(attrs)
+        if rec.nil?
+          errors << sd_err(tag, nil, 'Pásku sa nepodarilo uložiť.')
+          return nil
+        end
+        taken << rec['abs_id'].to_s.upcase
+        { 'op' => 'create', 'rec' => rec }
+      end
+
+      # (6)(10) Duplicitny par kod+dodavatel v FINALNOM stave. Vycita sa LEN
+      # zaznamom, ktorym sa par TOUTO davkou zmenil (vzor apply_demos_batch
+      # GH #97 P2) — inak by uz existujuca, vedome povolena duplicita zamrzla
+      # kazdy dalsi zapis toho dekoru.
+      def save_decor_code_conflict(data, orig, allow)
+        return nil if flag_true?(allow)
+        pair = ->(r) { [r['code'].to_s.strip.downcase, r['supplier'].to_s.strip.downcase] }
+        %w[sheets edges].each do |listk|
+          idk = listk == 'edges' ? 'abs_id' : 'material_id'
+          index = {}
+          Array(data[listk]).each do |r|
+            c = r['code'].to_s.strip.downcase
+            next if c.empty?
+            (index["#{c}|#{r['supplier'].to_s.strip.downcase}"] ||= []) << r[idk].to_s
+          end
+          Array(data[listk]).each do |r|
+            c = r['code'].to_s.strip.downcase
+            next if c.empty?
+            before = orig[[listk, r[idk].to_s]]
+            next if before && pair.call(before) == pair.call(r)
+            hits = index["#{c}|#{r['supplier'].to_s.strip.downcase}"].reject { |x| x == r[idk].to_s }
+            next if hits.empty?
+            return [:code_conflict, { 'id' => r[idk].to_s, 'code' => r['code'].to_s, 'hits' => hits }]
+          end
+        end
+        nil
+      end
+
       # --- D-44: polozky davky (zdroj, format platne, konflikty) ---------------
 
       # Polozky dosiek davky ako [typ, hrubka, format|nil, zdroj]. ZDROJ (:text
