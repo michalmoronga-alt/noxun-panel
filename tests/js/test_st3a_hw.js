@@ -28,7 +28,16 @@ function stubEl(id){
   });
   Object.defineProperty(n, 'textContent', {
     get(){ return n._text || ''; },
-    set(v){ n._text = v; n.children.forEach(function(c){ c.parentNode = null; }); n.children = []; }
+    set(v){
+      n._text = v;
+      n.children.forEach(function(c){ c.parentNode = null; });
+      // Vyprázdnenie `<select>` v prehliadači ZAHODÍ aj jeho hodnotu (options
+      // zmizli, nie je čo vybrať). Bez tejto vernosti by test na zachovanie
+      // rozpísanej kategórie (P1) nič nestrážil — hodnota by „prežila" aj bez
+      // `keep` v `mdhRenderEnums`.
+      if (n.children.length) n.value = '';
+      n.children = [];
+    }
   });
   n.appendChild = function(c){ c.parentNode = n; n.children.push(c); return c; };
   n.cloneNode = function(){ return stubEl(id + '-clone'); };
@@ -167,6 +176,18 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   H.hwRenderBody();
   ok(body.children[0] === node, 'návrat do sekcie vráti TEN ISTÝ uzol');
   ok(node.children.indexOf(draft) >= 0, 'aj s rozpísaným formulárom');
+
+  // Review #218 P1: neprežiť MUSÍ len uzol, ale aj HODNOTA v ňom. `hwRenderBody`
+  // volá `mdhRenderEnums` pri KAŽDOM plnom pushi a ten `<select>` kategórie
+  // prestavia — bez zachovania hodnoty by sa rozpísanej novej položke ticho
+  // prepla kategória na PRVÚ v zozname a používateľ by to zistil až po uložení.
+  eq(ELS.hn_category.children.length, 1, 'select kategórie sa naplnil z katalógu');
+  ELS.hn_category.value = 'závesy';          // používateľ vybral kategóriu
+  global.NX.setStudio(payload);              // medzitým príde plný push zo servera
+  H.hwRenderBody();
+  eq(ELS.hn_category.value, 'závesy',
+     'rozpísaná kategória PREŽILA push (mdhRenderEnums ju nesmie prepnúť na prvú)');
+  ELS.hn_category.value = '';
 })();
 
 // --- 3) prvý push si vypýta serverové poradie AŽ keď je telo v DOM ----------

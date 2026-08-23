@@ -306,12 +306,19 @@
     // (formular novej polozky) siahaju uz len na svoje polia.
     var cat = hwEl('hn_category');
     if (cat){
+      // Review #218 P1: hodnota MUSI prezit prekreslenie enumov. Telo sekcie
+      // sa nikdy neprekresluje (aby rozpisany formular „Nová položka" prezil
+      // push), ale TENTO select sa prestavia pri KAZDOM `NX.setStudio` —
+      // bez `keep` by sa rozpisanej polozke ticho prepla kategoria na PRVU
+      // v zozname a pouzivatel by to zistil az po ulozeni.
+      var keep = cat.value;
       cat.textContent = '';
       MDH_CATS.forEach(function(c){
         var op = mdhMk('option', null, c);
         op.value = c;
         cat.appendChild(op);
       });
+      if (keep) cat.value = keep;
     }
     var us = hwEl('hn_unit');
     if (us){

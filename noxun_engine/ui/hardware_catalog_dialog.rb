@@ -246,9 +246,9 @@ module Noxun
           }
         end
 
-        # Stavovy riadok ma v OBOCH UI ten isty prijimac (`MDH.setStatus`) —
-        # sekcia bezi na TOM ISTOM `js/hw_catalog.js` a `#status` je aj
-        # v `studio.html`. Text sklada SERVER (jedna autorita).
+        # Stavovy riadok sekcie: prijimac `MDH.setStatus` je v tom istom
+        # `js/hw_catalog.js`, ktory sekcia nacitava, a `#status` je uzol
+        # `studio.html`. Text sklada SERVER (jedna autorita).
         def status_script(msg, error = false)
           "MDH.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})"
         end
@@ -268,8 +268,8 @@ module Noxun
           data = JSON.parse(payload.to_s)
           query = data['query'].to_s
           if DemosSitemapCache.load.nil?
-            # ŠT-3a-1: beh patri TOMU, kto ho spustil — okno drzi povodny
-            # okno-guard, sekcia session token.
+            # Zivotnost behu drzi SESSION TOKEN sekcie zachyteny pri
+            # STARTE (ABA); identitu behu `run_id` (viz `mark_running`).
             target = run_target
             run_id = mark_running('sťahovanie zoznamu produktov Demosu')
             js("MDH.demosResults(#{{ 'query' => query, 'results' => [],
@@ -301,12 +301,12 @@ module Noxun
         end
 
         # Async nahlad produktu — gen guard (stary vysledok nesmie prepisat
-        # novsi nahlad, zrusenie pouzivatelom ani zavrete okno).
+        # novsi nahlad ani ozivit nahlad zruseny pouzivatelom).
         #
-        # ŠT-3a-1: `@demos_gen` ostava SPOLOCNY pre okno aj sekciu — vedome.
-        # Nahlad si server odklada do JEDNEHO proposal storu, takze dva
-        # subezne nahlady (jeden v okne, druhy v sekcii) by si aj tak siahali
-        # na to iste; generacia teda spravne hovori „posledny vyhrava".
+        # `@demos_gen` je generacia nahladu: server si odklada JEDEN proposal,
+        # takze dva subezne nahlady by si aj tak siahali na to iste — generacia
+        # spravne hovori „posledny vyhrava". (Do ŠT-3a-2 bola spolocna aj
+        # s oknom Katalog kovania; to zaniklo, klient je uz len jeden.)
         def handle_demos_preview(payload)
           data = JSON.parse(payload.to_s)
           gen = bump_demos_gen
@@ -328,7 +328,6 @@ module Noxun
         # zahodi dobiehajúci vysledok (inak by sa zruseny nahlad znovu otvoril).
         def handle_demos_cancel(_payload)
           bump_demos_gen
-          # Priznak gasne len tomu, kto ho zapalil (z okna je to no-op).
           # ZAMERNE bez `run_id`: je to VYSLOVNE zrusenie pouzivatelom, takze
           # zhasina to, co v sekcii prave bezi — nie konkretny beh.
           clear_running
@@ -377,8 +376,7 @@ module Noxun
         end
 
         # ZOTAVOVACIA obnova po ODMIETNUTOM zapise (`:conflict`, `:not_found`,
-        # neznáme zlyhanie). Musi ist do OBOCH UI — a to je iny pripad než
-        # `push_sets`:
+        # neznáme zlyhanie). Je to iny pripad nez USPESNY zapis:
         #   * hlaska hovori „obnovené", takze klient MUSI dostat cerstvu
         #     `revision`. Kym ju sekcia nedostala, poslala by dalsi zapis so
         #     STARYM odtlackom a zacyklila by sa v konfliktoch;
@@ -449,10 +447,10 @@ module Noxun
           out
         end
 
-        # D-75: po KAZDEJ uspesnej zmene setov/predvolieb — obnova okna +
-        # ZIVY push ponuky do panela (NX.setHardwareSets). NIKDY push_selected:
+        # D-75: po KAZDEJ uspesnej zmene setov/predvolieb — ZIVY push ponuky
+        # do panela (NX.setHardwareSets) + obnova Studia. NIKDY push_selected:
         # ten resetuje rozpracovany formular panela a dedup-uje kopie
-        # (= zmena v satelitnom okne by siahla na model).
+        # (a predvolba setu geometriu nemeni, takze dedup tik ani nehrozi).
         # ŠT-3a-1 (oprava nalezu auditu): tato cesta volala
         # `StudioDialog.on_model_changed(model)` — a to je vetva PREPNUTIA
         # DOKUMENTU: prevesila observer neaktualnosti a zdvihla zapadku
@@ -474,7 +472,8 @@ module Noxun
         # `@pushed_epoch` az PO zbere, takze vlastnu transakciu pohlti.
         def after_sets_change(model = nil)
           Panel.push_hardware_sets if defined?(Panel) && Panel.dialog_alive?
-          # ŠT-1c PR B3: vetva okna Vyroba tu zanikla spolu s oknom.
+          # ŠT-1c PR B3 tu zrusila vetvu okna Vyroba, ŠT-3a-2 vetvu okna
+          # Katalog kovania (`push_sets`) — sekcia dostava sety plnym pushom.
           StudioDialog.refresh_if_open(bump: !model.nil?) if defined?(StudioDialog) # ST-1a
         end
 
@@ -660,9 +659,10 @@ module Noxun
           set_status(ok ? 'Predvoľby projektu obnovené z globálnych.' : 'Obnova zlyhala.', !ok)
         end
 
-        # ŠT-3a-1: odpoved ide TOMU, KTO sa pytal. Sink zije PRESNE jeden
-        # synchronny callback sekcie (`with_client`); mimo neho je adresatom
-        # OKNO — asynchronny beh si adresata pamata sam (`run_target`).
+        # Odpoved ide TOMU, KTO sa pytal. Sink zije PRESNE jeden synchronny
+        # callback sekcie (`with_client`); mimo neho — refresh cesty zvonku
+        # aj ASYNCHRONNE emity, ktore dobiehaju z casovaca uz po navrate
+        # z `dispatch` — je adresat od ŠT-3a-2 JEDINY mozny: okno Studio.
         def js(script)
           sink = @client_sink
           return sink.call(script) if sink
@@ -774,9 +774,10 @@ module Noxun
         # Zivy check ceny — vysledok pride async; gen + code echo strazi, aby
         # stary vysledok neprepisal detail inej polozky (F9).
         #
-        # ŠT-3a-1: `@gen` ostava SPOLOCNY pre okno aj sekciu — server drzi
-        # JEDEN cenovy navrh per kod (`pid`), takze dve subezne overenia by
-        # si aj tak siahali na to iste. Adresata vysledku urcuje `run_target`.
+        # `@gen` je generacia cenoveho overenia: server drzi JEDEN navrh per
+        # kod (`pid`), takze dve subezne overenia by si aj tak siahali na to
+        # iste. Zivotnost vysledku strazi `run_target` (session token sekcie).
+        # (Do ŠT-3a-2 bola generacia spolocna aj s oknom; to zaniklo.)
         def handle_check_price(payload)
           data = JSON.parse(payload.to_s)
           code = data['code'].to_s

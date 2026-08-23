@@ -306,7 +306,8 @@ NxTest.test('ŠT-3a-1 (nalez auditu): `after_sets_change` uz NEJDE cez `on_model
                 'to je vetva PREPNUTIA DOKUMENTU — prevesila by observer a poslala cely katalog materialov')
   NxTest.assert(body.include?('StudioDialog.refresh_if_open(bump: !model.nil?)'),
                 'kniznicny zapis bez bumpu, MODELOVY zapis (predvolby projektu) so zdvihom')
-  NxTest.refute(body.include?('push_sets'),
+  # Meno zaniknutej cesty smie ostat v HISTORICKEJ poznamke — kontroluje sa KOD.
+  NxTest.refute(body.lines.reject { |l| l.strip.start_with?('#') }.join.include?('push_sets'),
                 'ŠT-3a-2: vetva okna zanikla — sekcia dostava sety plnym pushom')
   NxTest.assert(body.include?('Panel.push_hardware_sets'),
                 'panel ZIJE dalej a jeho selecty setov musia byt cerstve')

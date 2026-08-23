@@ -683,15 +683,15 @@
   </div>
 </div>
 
-<!-- ŠT-3a-1: TELO sekcie KOVANIE (Š16 — presun okna „Katalóg kovania" 1:1).
-     Rovnaká kostra ako pri Materiáloch: ŠABLÓNA, ktorú `hwRenderBody` naklonuje
-     RAZ a ten istý uzol potom putuje do #secbody a späť — vďaka tomu prežije
-     rozpísaný formulár novej položky aj rozpísaný editor setu prepnutie sekcie
-     a hlavne push zo servera.
-     Obsah je presun 1:1 z hardware_catalog.html BEZ hornej lišty `.mdbar`
+<!-- ŠT-3a-1/3a-2: TELO sekcie KOVANIE (Š16). ŠABLÓNA, ktorú `hwRenderBody`
+     naklonuje RAZ a ten istý uzol potom putuje do #secbody a späť — vďaka tomu
+     prežije rozpísaný formulár novej položky aj rozpísaný editor setu prepnutie
+     sekcie a hlavne push zo servera (rovnaká kostra ako pri Materiáloch).
+     Obsah prevzal zaniknuté okno „Katalóg kovania" BEZ hornej lišty `.mdbar`
      a BEZ tabov: pohľady Položky · Sety aj hľadanie patria do LIŠTY sekcie
-     (`hwToolsHtml`). „Predvoľby projektu" sú v pohľade Sety a v sekcii sú
-     READ-ONLY — zapisujú do modelu, presun je ŠT-3a-2. -->
+     (`hwToolsHtml`). „Predvoľby projektu" sú v pohľade Sety a od ŠT-3a-2 sú
+     PLNOHODNOTNÉ — zapisujú do modelu (1 zmena = 1 krok Späť, serverový
+     `model_guid` guard). -->
 <template id="hwBodyTpl">
   <div id="hwRoBanner" class="mdbanner mdbanner-ro" style="display:none">
     <svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>

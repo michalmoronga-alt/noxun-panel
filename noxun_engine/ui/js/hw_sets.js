@@ -761,7 +761,6 @@
           return;
         }
       }
-      // klik mimo "Naozaj zmazat?" odzbroji potvrdenie
       // klik mimo "Naozaj zmazat?" odzbroji potvrdenie — prekresli sa VZDY
       // (`hwsRenderSets` je bez `#hwTabSets` no-op a nad skrytym uzlom lacne).
       if (HWS_DEL_ARM && !(t && t.getAttribute('data-action') === 'hws-del')){
