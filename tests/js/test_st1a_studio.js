@@ -41,8 +41,9 @@ function ok(cond, msg){ n++; assert.ok(cond, msg); }
 // ŠT-1b: pribudla sekcia Kontrola (`ctrl`) — dovtedy bola premostenim do
 // okna Vyroba. Zoznam je ZRKADLO `StudioDialog::SECTIONS`.
 // ŠT-2a: pribudla sekcia Materiály (`mat`) — prva ziva polozka skupiny KATALÓGY.
-eq(S.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat'],
-   'v Studiu ziju sekcie Kusovník, Kontrola, Nákup kovania, Rozpočet, Cenová ponuka a Materiály');
+// ŠT-3a-1: a Kovanie (`hw`) — druha.
+eq(S.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw'],
+   'v Studiu ziju sekcie Kusovník, Kontrola, Nákup kovania, Rozpočet, Cenová ponuka, Materiály a Kovanie');
 
 // --- 2) hladanie bez diakritiky (Š6) ----------------------------------------
 
@@ -160,13 +161,20 @@ eq(S.rgbHex([300, -5, 12]), '#ff000c', 'hodnoty mimo rozsahu sa orezu, nie zahod
 // ŠT-1c PR A: `buy` (Nákup kovania) uz NIE JE premostenie — je to ziva sekcia.
 // ŠT-1c PR B1: to iste `budget` (Rozpocet), PR B2 `offer` (Cenova ponuka).
 // ŠT-2a: `mat` (Materiály) uz NIE JE premostenie — je to ziva sekcia.
+// ŠT-3a-1: to iste `hw` (Kovanie) — okno „Katalóg kovania" este zije, ale
+// otvara ho premostenie Z VNUTRA sekcie, nie polozka navigacie.
 eq(S.navBridgeIds().sort(),
-   ['about', 'bset', 'hw', 'rules', 'sup', 'tpl'].sort(),
+   ['about', 'bset', 'rules', 'sup', 'tpl'].sort(),
    'ZRKADLO whitelistu premosteni v StudioDialog (WINDOW_BRIDGES + about)');
 
 const MAT_ITEM = S.navItem('mat');
 ok(MAT_ITEM && !MAT_ITEM.bridge && !MAT_ITEM.disabled,
    'ŠT-2a: Materiály su ZIVA sekcia tohto okna (navigacia uz neotvara satelit)');
+
+const HW_ITEM = S.navItem('hw');
+ok(HW_ITEM && !HW_ITEM.bridge && !HW_ITEM.disabled,
+   'ŠT-3a-1: Kovanie je ZIVA sekcia tohto okna');
+eq(HW_ITEM.ic, 'hammer', 'ikona sekcie je hammer — ta ista ako rail Inspectora (kontrakt)');
 
 const BUDGET_ITEM = S.navItem('budget');
 ok(BUDGET_ITEM && !BUDGET_ITEM.bridge && !BUDGET_ITEM.disabled,

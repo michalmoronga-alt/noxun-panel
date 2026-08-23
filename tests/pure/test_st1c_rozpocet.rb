@@ -72,7 +72,7 @@ NxTest.test('ŠT-1c B1: zrkadla whitelistu sekcii sedia vo VSETKYCH TROCH suboro
   js = S1CB_STUDIO_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
   shell = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'shell.js'), encoding: 'UTF-8')
   shell_list = shell[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  NxTest.assert_equal(%w[bom ctrl buy budget offer mat], rb, 'Ruby je autorita zoznamu')
+  NxTest.assert_equal(%w[bom ctrl buy budget offer mat hw], rb, 'Ruby je autorita zoznamu')
   NxTest.assert_equal(rb, js, 'studio.js je jeho zrkadlo')
   NxTest.assert_equal(rb, shell_list, 'a shell.js (panel) tiez')
 end

@@ -251,8 +251,8 @@ NxTest.test('ST-1a: deep-link do Studia ma whitelist sekcii v RUBY a JS je jeho 
                         encoding: 'UTF-8')
   rb = studio_rb[/SECTIONS = %w\[([a-z ]+)\]/, 1].to_s.split
   js = UID3_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  NxTest.assert_equal(%w[bom ctrl buy budget offer mat], rb,
-                      'v Studiu ziju sekcie Kusovník, Kontrola, Nákup, Rozpočet, Ponuka a Materiály')
+  NxTest.assert_equal(%w[bom ctrl buy budget offer mat hw], rb,
+                      'v Studiu ziju sekcie Kusovník, Kontrola, Nákup, Rozpočet, Ponuka, Materiály a Kovanie')
   NxTest.assert_equal(rb, js, 'JS mirror sa nesmie rozist s Ruby autoritou')
   NxTest.assert(UID3_PANEL_RB.include?("cb(dlg, 'open_studio')"),
                 'panel ma vlastny callback na otvorenie Studia')
