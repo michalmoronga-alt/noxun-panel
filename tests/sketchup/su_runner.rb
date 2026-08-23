@@ -6846,6 +6846,34 @@ module NoxunSuRunner
        !only_b.empty? && sel_b.sort == only_b.sort)
     ok('ŠT-2d: a je ich menej nez pri celom dekore', sel_b.length < expect.length)
 
+    # --- 2b) klik NEVYROBI KROK SPAT (silny dokaz, vzor run_d105) ------------
+    # „Pocet entit sa nezmenil" je slaby dokaz: vyber by mohol otvorit operaciu,
+    # ktora nic nekresli, a undo krok by aj tak vznikol. Preto sa PRED klikmi
+    # spravi MARKER — skutocna prestavba skrinky — a po klikoch musi JEDEN krok
+    # Spat vratit prave JU. Keby ktorykolvek klik (vratane odmietnuteho stale
+    # genom) pridal vlastny krok, undo by zjedol jeho a sirka by ostala zmenena.
+    w_before = (e::Store.config(b) || {})['width'].to_f
+    params_b = e::CabinetBuilder.config_to_params(e::Store.config(b) || {})
+    params_b['width'] = w_before + 40.0
+    e::CabinetBuilder.rebuild(model, b, params_b)
+    w_marker = (e::Store.config(b) || {})['width'].to_f
+    marker_ok = (w_marker - (w_before + 40.0)).abs < 0.01
+    ok("ŠT-2d: marker prestavby zapisal (sirka #{w_before} -> #{w_marker})", marker_ok)
+    if marker_ok
+      e::StudioDialog.send(:push_state)
+      model.selection.clear
+      e::StudioDialog.do_select({ 'gen' => gen.call, 'material_key' => mat }.to_json)
+      e::StudioDialog.do_select({ 'gen' => gen.call, 'material_key' => [mat],
+                                  'owner_id' => bid }.to_json)
+      # Aj ODMIETNUTY klik (stary DOM) musi byt bez stopy — repush v nom bezi.
+      e::StudioDialog.do_select({ 'gen' => gen.call - 99, 'material_key' => mat }.to_json)
+      model.selection.clear
+      Sketchup.undo
+      ok('ŠT-2d: 1x Spat vratil PRESTAVBU — tri kliky „oko" nevyrobili ani jeden krok Spat',
+         ((e::Store.config(b) || {})['width'].to_f - w_before).abs < 0.01)
+      e::StudioDialog.send(:push_state)
+    end
+
     # --- 3) vyber podla ABS pasky -------------------------------------------
     # Cerstvy katalog ma len UNI zaznamy a UNI material pasky ZO ZASADY nema —
     # realna paska sa preto doseje (vzor `sync_seed_decors`) a na konci zmaze.
@@ -6873,16 +6901,23 @@ module NoxunSuRunner
       want = Array(after_edge[:records])
              .select { |r| r['edges'].is_a?(Hash) && r['edges'].values.map(&:to_s).include?(abs_id) }
              .map { |r| r['pid'] }.compact.uniq
-      e::StudioDialog.send(:push_state)
-      model.selection.clear
-      e::StudioDialog.do_select({ 'gen' => gen.call, 'abs_key' => abs_id }.to_json)
-      sel_abs = model.selection.to_a.map(&:persistent_id)
-      ok("ŠT-2d: oko pri paske oznacilo dielce s tou paskou (#{sel_abs.length})",
-         !want.empty? && sel_abs.sort == want.sort)
-      ok('ŠT-2d: a oznacene su LEN olepene dielce (nie cely korpus)',
-         sel_abs.length < expect.length && !sel_abs.include?(a.persistent_id))
-      Sketchup.undo # olep hrany bol vlastny krok Spat — vratime model do stavu 2 skriniek
-      e::StudioDialog.send(:push_state)
+      # Review #8: undo AZ PO OVERENI, ze olep naozaj prebehol. Keby handler
+      # zapis odmietol (ziadna operacia), bezpodmienecny `Sketchup.undo` by
+      # zjedol STAVBU SKRINKY a zvysok sekcie by testoval prazdny model.
+      taped = !want.empty?
+      ok('ŠT-2d: olep hrany pre test ABS naozaj prebehol', taped)
+      if taped
+        e::StudioDialog.send(:push_state)
+        model.selection.clear
+        e::StudioDialog.do_select({ 'gen' => gen.call, 'abs_key' => abs_id }.to_json)
+        sel_abs = model.selection.to_a.map(&:persistent_id)
+        ok("ŠT-2d: oko pri paske oznacilo dielce s tou paskou (#{sel_abs.length})",
+           sel_abs.sort == want.sort)
+        ok('ŠT-2d: a oznacene su LEN olepene dielce (nie cely korpus)',
+           sel_abs.length < expect.length && !sel_abs.include?(a.persistent_id))
+        Sketchup.undo # olep bol vlastny krok Spat — model spat na 2 skrinky
+        e::StudioDialog.send(:push_state)
+      end
     end
 
     # --- 4) rozpis „Kde sa používa" v payloade sekcie -----------------------
@@ -6896,10 +6931,26 @@ module NoxunSuRunner
       ok('ŠT-2d: rozpis pozna OBE skrinky ako vlastnikov',
          [aid, bid].all? { |o| owners.any? { |x| x['owner_id'].to_s == o } })
       ok('ŠT-2d: a kazdy vlastnik nesie pocet, roly aj adresu vyberu',
-         owners.all? { |x| x['parts'].to_i.positive? && !Array(x['roles']).empty? &&
-                           !Array(x['material_ids']).empty? })
+         owners.all? { |x| x['parts'].to_i.positive? && x['objects'].to_i.positive? &&
+                           !Array(x['roles']).empty? && !Array(x['material_ids']).empty? })
       ok('ŠT-2d: roly su SLOVENSKE texty zo servera',
          owners.any? { |x| Array(x['roles']).any? { |r| r.to_s =~ /[áäčďéíĺľňóôŕšťúýžÁČĎÉÍĽŇÓŠŤÚÝŽ]/ } })
+      # Review #4: kazdy riadok zoznamu je KLIKATELNA adresa — vlastnik bez
+      # identity by po kliku nemal co zuzit a oznacil by cely dekor.
+      ok('ŠT-2d: ziadny vlastnik BEZ IDENTITY (prazdny owner_id) sa nekresli',
+         owners.none? { |x| x['owner_id'].to_s.strip.empty? })
+      # Review #6: pocty musia sediet s tym, co po kliku napise stavovy riadok.
+      cab = owners.find { |x| x['owner_id'].to_s == aid }
+      sel_n = nil
+      if cab
+        model.selection.clear
+        e::StudioDialog.do_select({ 'gen' => gen.call, 'material_key' => cab['material_ids'],
+                                    'owner_id' => cab['owner_id'] }.to_json)
+        sel_n = model.selection.to_a.length
+        model.selection.clear
+      end
+      ok("ŠT-2d: `objects` je presne to, co sa v modeli oznaci (#{sel_n.inspect} == #{cab && cab['objects']})",
+         !cab.nil? && sel_n == cab['objects'].to_i)
     end
     payload = e::StudioDialog.mat_payload(model, core.fresh_collect(model))
     ok('ŠT-2d: `used_where` chodi v `mat` payloade vedla poctov `used`',
@@ -6934,11 +6985,17 @@ module NoxunSuRunner
         )
       end
       after_row = bs.custom_items(model)
-      ok('ŠT-2d: ⋯ editor zapisal kod/adresu/poznamku', after_row != before_row)
+      wrote_row = after_row != before_row
+      ok('ŠT-2d: ⋯ editor zapisal kod/adresu/poznamku', wrote_row)
       ok('ŠT-2d: a okno dostalo `budgetResult(custom_update, true)` (modal sa smie zavriet)',
          scripts.any? { |s| s.include?('NX.budgetResult("custom_update", true)') })
-      Sketchup.undo
-      ok('ŠT-2d: ⋯ editor = PRESNE 1 krok Späť', bs.custom_items(model) == before_row)
+      # Review #8: undo krokov ide presne tolko, kolko ich naozaj vzniklo.
+      # Bezpodmienecne dva by pri odmietnutom zapise zjedli fixture AJ stavbu
+      # skrinky — zaverecne upratanie by potom bezalo nad cudzim stavom.
+      if wrote_row
+        Sketchup.undo
+        ok('ŠT-2d: ⋯ editor = PRESNE 1 krok Späť', bs.custom_items(model) == before_row)
+      end
       Sketchup.undo # fixture riadok prec (aby zaverecny undo vratil skrinku)
     end
 

@@ -614,11 +614,17 @@ module Noxun
         # Rozdiel oproti oknu je priznany a vedomy: sekcia rata to, co je
         # naozaj vo VYROBE (ten isty zdroj ako Kusovnik).
         def mat_payload(model, collected)
+          # Mapy `material_id/abs_id => kluc skupiny` sa stavia RAZ (review #5):
+          # obidve prechadzaju cely katalog a pocty aj rozpis su dva pohlady na
+          # TEN ISTY zber — dva nezavisle prechody katalogom pri kazdom pushi by
+          # boli zbytocne (a mohli by sa rozist, keby medzi nimi prisiel zapis).
+          keys = Materials.decor_key_by_material_id
+          abs_keys = Materials.decor_key_by_abs_id
           out = { 'project' => Materials.project_defaults(model),
                   'cabinets' => collected[:cabinets].to_i,
                   'model_guid' => ProductionCore.model_guid(model),
-                  'used' => mat_used(collected),
-                  'used_where' => mat_used_where(collected) }
+                  'used' => mat_used(collected, keys),
+                  'used_where' => mat_used_where(collected, keys, abs_keys) }
           # Cely katalog LEN pri prvom pushi okna a po prepnuti dokumentu;
           # inak ho drzi klient a zmeny mu chodia echom.
           out['catalog'] = MaterialsDialog.catalog_payload if @mat_full_pending && defined?(MaterialsDialog)
@@ -631,8 +637,8 @@ module Noxun
           nil
         end
 
-        def mat_used(collected)
-          key_by_id = Materials.decor_key_by_material_id
+        def mat_used(collected, key_by_id = nil)
+          key_by_id ||= Materials.decor_key_by_material_id
           usage = Hash.new(0)
           Array(collected[:records]).each do |r|
             key = key_by_id[r['material_id']]
@@ -649,15 +655,22 @@ module Noxun
         # prechod TEN ISTY — zoznam vlastnikov nie je druhy sken modelu, len
         # druhy pohlad na jeden.
         #
-        # Tvar: { kluc skupiny => { 'owners' => [...], 'edges' => { abs_id => ks } } }
-        #   owners[] = { owner_id, parts, roles (SK text zo servera),
+        # Tvar: { kluc skupiny => { 'owners' => [...], 'edges' => { abs_id => {…} } } }
+        #   owners[] = { owner_id, parts, objects, roles (SK text zo servera),
         #                material_ids (co presne ma ten vlastnik z tejto
-        #                skupiny — adresa pre klik „oko") }.
+        #                skupiny — adresa pre klik „oko") },
+        #   edges[id] = { parts, objects }.
         # Roly sklada SERVER (`ProductionCore.role_label`) — klient ziadny
         # preklad enumu rol nema a mat ho nema ani zacat.
-        def mat_used_where(collected)
-          key_by_id = Materials.decor_key_by_material_id
-          abs_key_by_id = Materials.decor_key_by_abs_id
+        #
+        # DVE CISLA, DVE OTAZKY (review #6): `parts` = KUSY (doska s
+        # `quantity: 3` je 3 kusy do vyroby), `objects` = kolko ENTIT sa v
+        # modeli naozaj oznaci. Pri dielcoch su rovnake, pri doskach nie —
+        # a keby zoznam slubil „3 dielce" a stavovy riadok potom napisal
+        # „Vybraných 1 položiek", vyzeralo by to ako chyba vyberu.
+        def mat_used_where(collected, key_by_id = nil, abs_key_by_id = nil)
+          key_by_id ||= Materials.decor_key_by_material_id
+          abs_key_by_id ||= Materials.decor_key_by_abs_id
           out = {}
           Array(collected[:records]).each do |r|
             qty = r['quantity'].to_i
@@ -670,17 +683,25 @@ module Noxun
         end
 
         def mat_used_where_group(out, key)
-          out[key] ||= { 'owners' => {}, 'edges' => Hash.new(0) }
+          out[key] ||= { 'owners' => {}, 'edges' => {} }
         end
 
         def mat_used_where_owner(out, key, rec, qty)
           return if key.nil? || key.to_s.empty?
 
-          g = mat_used_where_group(out, key)
           oid = rec['owner_id'].to_s
-          o = (g['owners'][oid] ||= { 'owner_id' => oid, 'parts' => 0,
+          # Review #4: vlastnik BEZ IDENTITY sa nekresli. Riadok s prazdnym
+          # `owner_id` (odpojeny dielec, ktory stratil `cabinet_id`) by po kliku
+          # nemal co zuzit — server by dostal prazdne zuzenie a oznacil by cely
+          # dekor. Dielec sa tym nestraca: v poctoch `used` aj v riadku „celej
+          # skupiny" je dalej, len nema vlastny klikatelny riadok.
+          return if oid.empty?
+
+          g = mat_used_where_group(out, key)
+          o = (g['owners'][oid] ||= { 'owner_id' => oid, 'parts' => 0, 'objects' => 0,
                                       'roles' => [], 'material_ids' => [] })
           o['parts'] += qty
+          o['objects'] += 1
           label = ProductionCore.role_label(rec['role'])
           o['roles'] << label unless label.empty? || o['roles'].include?(label)
           mid = rec['material_id'].to_s
@@ -701,7 +722,9 @@ module Noxun
             key = abs_key_by_id[id]
             next if key.nil? || key.to_s.empty?
 
-            mat_used_where_group(out, key)['edges'][id] += qty
+            e = (mat_used_where_group(out, key)['edges'][id] ||= { 'parts' => 0, 'objects' => 0 })
+            e['parts'] += qty
+            e['objects'] += 1
           end
         end
 

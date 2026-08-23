@@ -383,12 +383,21 @@ module Noxun
         Array(value).map { |v| v.to_s.strip }.reject(&:empty?).uniq
       end
 
-      def refs_of_rows(rows, owner_id)
-        oid = owner_id.to_s
+      # POZOR na rozdiel medzi „kluc CHYBA" a „kluc je PRAZDNY" (review #4):
+      #   chyba          -> vyber sa NEZUZUJE (klik na cely dekor),
+      #   prazdna hodnota -> zuzenie na vlastnika BEZ IDENTITY.
+      # Keby sa oboje bralo ako „bez zuzenia", riadok vlastnika s prazdnym
+      # `owner_id` (odpojeny dielec bez `cabinet_id`) by ticho oznacil VSETKY
+      # dielce dekoru — pouzivatel by klikol na jeden riadok a dostal celu
+      # zakazku. Zoznam taky riadok uz ani nekresli (`mat_used_where_owner`),
+      # toto je druha poistka na serveri.
+      def refs_of_rows(rows, data)
+        scoped = data.is_a?(Hash) && data.key?('owner_id')
+        oid = data.is_a?(Hash) ? data['owner_id'].to_s : ''
         rows.flat_map do |r|
           Array(row_value(r, 'refs')).filter_map do |ref|
             next nil unless ref.is_a?(Hash)
-            next nil if !oid.empty? && ref['owner_id'].to_s != oid
+            next nil if scoped && ref['owner_id'].to_s != oid
 
             ref['pid']
           end
@@ -400,7 +409,7 @@ module Noxun
         return [] if ids.empty?
 
         rows = Array(bom[:rows]).select { |r| ids.include?(row_value(r, 'material_id').to_s) }
-        refs_of_rows(rows, data['owner_id'])
+        refs_of_rows(rows, data)
       end
 
       # Paska sa hlada vo VSETKYCH STYROCH hranach riadku (L1/L2/W1/W2) —
@@ -413,7 +422,7 @@ module Noxun
           edges = row_value(r, 'edges')
           edges.is_a?(Hash) && edges.values.any? { |v| ids.include?(v.to_s) }
         end
-        refs_of_rows(rows, data['owner_id'])
+        refs_of_rows(rows, data)
       end
 
       # --- Zber modelu (ST-1a PR B) ----------------------------------------

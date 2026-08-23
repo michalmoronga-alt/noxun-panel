@@ -681,8 +681,14 @@
         // hľadania, ale ako OTVORENIE DETAILU dekoru (deep-link z karty dielca
         // „klik na materiál"). Rovnako JEDNORAZOVO: server ju v ďalšom pushi
         // už neposiela, takže návrat do dlaždíc prežije refresh.
+        // Review #3: neúspešné otvorenie NIE JE tichý no-op. Dekor sa mohol
+        // medzitým zmazať alebo premenovať a používateľ, ktorý klikol na
+        // materiál dielca, by inak skončil v zozname dlaždíc bez slova —
+        // vyzeralo by to ako pokazený preklik.
         var ma = (studioSec === 'mat') ? anchorFilter(ST) : null;
-        if (ma && typeof matOpenAnchor === 'function') matOpenAnchor(ma);
+        if (ma && typeof matOpenAnchor === 'function' && !matOpenAnchor(ma)){
+          NXAPI.setStatus('Tento dekor už v katalógu nie je — otvorené v zozname materiálov.', true);
+        }
       }
       render();
     },

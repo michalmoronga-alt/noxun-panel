@@ -46,7 +46,11 @@
   // len TENKY pristupovy bod `budDraftMemory(kind)`. Kluc = druh pridavacky
   // ('custom' | 'appliance') — polia vlastnej polozky a spotrebica su ine,
   // spolocna pamat by ich miesala.
-  var BUD_MORE = null;         // { kind, id } — otvoreny ⋯ editor riadku (D-15 kostra)
+  // { kind, id, sent } — otvoreny ⋯ editor riadku (D-15 kostra). `sent` = tento
+  // modal ODOSLAL zapis a caka naň (review #1): `custom_update`/`appliance_update`
+  // posiela AJ inline editacia bunky v tabulke, takze bez korelacie by blur
+  // rozpisanej ceny zavrel prave otvoreny ⋯ modal (a naopak odomkol cudzi).
+  var BUD_MORE = null;
   var BUD_FOCUS = null;        // obnova fokusu/hodnoty cez re-render
   // E-c „Prepočítať ceny": { phase:'confirm'|'run'|'report', pid, total, done,
   // label, report, single, cancelling }. Beh riadi SERVER — toto je len okno.
@@ -1369,9 +1373,13 @@
 
   function budOpenMore(kind, id){
     if (typeof window === 'undefined' || !window.NXModal) return;
+    // Review #2: pozostatok po Escape/kliku vedľa — `NXModal.close()` sa
+    // rozpočtu neohlási, takže zvyšný `BUD_MORE` by koreloval odpoveď na
+    // zápis, ktorý už nemá okno.
+    BUD_MORE = null;
     var it = budFindItem(kind, id);
     if (!it){ NX.setStatus('Položka sa nenašla — obnov okno.', true); return; }
-    BUD_MORE = { kind: kind, id: id };
+    BUD_MORE = { kind: kind, id: id, sent: false };
     NXModal.open({
       title: it.nazov || 'Detail položky',
       sub: 'voliteľné údaje · v tabuľke sa nezobrazujú',
@@ -1384,7 +1392,15 @@
   function budMoreCommit(values){
     if (!BUD_MORE) return;
     var op = BUD_MORE.kind === 'appliance' ? 'appliance_update' : 'custom_update';
+    BUD_MORE.sent = true; // odteraz je najblizsi vysledok TOHO ISTEHO op-u NAS
     budSend(op, { id: BUD_MORE.id, attrs: budMoreAttrs(BUD_MORE.kind, values || {}) });
+  }
+
+  // Caka prave otvoreny ⋯ modal na vysledok VLASTNEHO zapisu? Zavrety modal
+  // (Escape, klik vedla) sa nerata — vysledok by nemal co zavriet.
+  function budMoreAwaiting(){
+    return !!(BUD_MORE && BUD_MORE.sent &&
+              typeof window !== 'undefined' && window.NXModal && NXModal.isOpen());
   }
 
   function budCloseMore(){
@@ -1444,6 +1460,13 @@
     // 6 s timer) je posledny bod, v ktorom sa to da odomknut. Pri normalnom
     // behu je uz odomknute — `setBusy(false)` na odomknutom modale nic nerobi.
     budUnlockDraft();
+    // Review #2: modal zavretý Escapom/klikom vedľa sa rozpočtu neohlási —
+    // čerstvý payload je najbližší bod, v ktorom sa dá zabudnutý `BUD_MORE`
+    // upratať. Otvorený modal si stav NECHÁVA (odmietnutý zápis v ňom ďalej
+    // drží rozpísané hodnoty).
+    if (BUD_MORE && !(typeof window !== 'undefined' && window.NXModal && NXModal.isOpen())){
+      BUD_MORE = null;
+    }
     if (!BUD_QUEUE.length) return;
     var next = BUD_QUEUE.shift();
     budSend(next[0], next[1]);
@@ -1536,7 +1559,10 @@
       // isty kontrakt (zapis nezatvara, potvrdenie zatvara, odmietnutie
       // odomyka), len iny modal.
       if (op === 'custom_update' || op === 'appliance_update'){
-        if (!BUD_MORE) return;
+        // Ten istý op posiela aj inline editácia bunky (blur ceny/popisu) —
+        // bez korelácie by cudzí výsledok zavrel rozpísaný ⋯ modal.
+        if (!budMoreAwaiting()) return;
+        BUD_MORE.sent = false; // vybavené — ďalší cudzí výsledok už nie je náš
         if (ok) budCloseMore();
         else budUnlockDraft();
         return;

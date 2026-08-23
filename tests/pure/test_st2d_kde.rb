@@ -90,6 +90,18 @@ NxTest.test('ŠT-2d: `material_key` smie byt POLE — dekor ma viac hrubkovych v
   NxTest.assert_equal([11, 12, 13, 14, 16], pids.sort)
 end
 
+NxTest.test('ŠT-2d (review #4): PRAZDNY `owner_id` NIE JE „bez zuzenia"') do
+  core = Noxun::Engine::ProductionCore
+  bom = NxSt2dFix.bom(NxSt2dFix.sample)
+  # Kluc CHYBA -> ziadne zuzenie (klik na cely dekor).
+  NxTest.assert_equal([11, 12, 14], core.refs_for(bom, 'material_key' => 'H3303_18').sort)
+  # Kluc JE, ale prazdny -> zuzenie na vlastnika BEZ IDENTITY. V tomto zbere
+  # taky nikto nie je, takze vyber je prazdny — NIE cely dekor. Keby sa oboje
+  # bralo rovnako, klik na riadok odpojeneho dielca by oznacil celu zakazku.
+  NxTest.assert_equal([], core.refs_for(bom, 'material_key' => 'H3303_18', 'owner_id' => ''))
+  NxTest.assert_equal([], core.refs_for(bom, 'abs_key' => 'ABS_H3303_22', 'owner_id' => ''))
+end
+
 NxTest.test('ŠT-2d: `owner_id` zuzi vyber na jedneho vlastnika (riadok zoznamu)') do
   core = Noxun::Engine::ProductionCore
   bom = NxSt2dFix.bom(NxSt2dFix.sample)
@@ -207,19 +219,66 @@ NxTest.test('ŠT-2d: `used_where` rozpise vlastnikov, ich roly a adresu vyberu')
   cab2 = owners.find { |o| o['owner_id'] == 'CAB-002' }
   NxTest.assert_equal(%w[H3303_18], cab2['material_ids'],
                       'dedena polica ma v adrese svoj ROZHODNUTY material')
-  NxTest.assert_equal({ 'ABS_H3303_22' => 3 }, a['edges'],
+  NxTest.assert_equal({ 'ABS_H3303_22' => { 'parts' => 3, 'objects' => 3 } }, a['edges'],
                       'paska sa rata za DIELEC, nie za hranu')
   NxTest.assert_equal(1, out['GRP-B']['owners'].length, 'chrbat je vlastny dekor')
-  NxTest.assert_equal({ 'ABS_INY_22' => 1 }, out['GRP-C']['edges'],
+  NxTest.assert_equal({ 'ABS_INY_22' => { 'parts' => 1, 'objects' => 1 } }, out['GRP-C']['edges'],
                       'dekor pouzity LEN ako paska je v rozpise tiez')
   NxTest.assert_equal([], out['GRP-C']['owners'], 'a nema ziadneho doskoveho vlastnika')
 end
 
+NxTest.test('ŠT-2d (review #6): `objects` je pocet ENTIT, `parts` su KUSY') do
+  f = NxSt2dFix
+  # Doska s troma kusmi je vo vyrobe 3 kusy, ale v modeli JEDNA entita —
+  # zoznam nesmie slubit „3 dielce" a stavovy riadok potom napisat
+  # „Vybraných 1 položiek".
+  recs = [f.rec(20, 'BOARD-1', 'Doska', 'H3303_36', {}, 'free_panel', 3),
+          f.rec(21, 'CAB-001', 'Bok', 'H3303_36', {}, 'side_left', 1)]
+  out = NxSt2dStub.with_keys({ 'H3303_36' => 'GRP-A' }, {}) do
+    Noxun::Engine::StudioDialog.mat_used_where(f.collected(recs))
+  end
+  board = out['GRP-A']['owners'].find { |o| o['owner_id'] == 'BOARD-1' }
+  NxTest.assert_equal(3, board['parts'], 'kusy do vyroby')
+  NxTest.assert_equal(1, board['objects'], 'ale JEDEN objekt v modeli')
+  cab = out['GRP-A']['owners'].find { |o| o['owner_id'] == 'CAB-001' }
+  NxTest.assert_equal([1, 1], [cab['parts'], cab['objects']], 'pri dielci su cisla zhodne')
+end
+
+NxTest.test('ŠT-2d (review #4): vlastnik BEZ IDENTITY nedostane klikatelny riadok') do
+  f = NxSt2dFix
+  # Odpojeny dielec, ktory stratil `cabinet_id` — riadok by po kliku nemal co
+  # zuzit a server by oznacil cely dekor.
+  recs = [f.rec(30, '', 'Odpojeny', 'H3303_18', {}, 'shelf'),
+          f.rec(31, 'CAB-001', 'Bok', 'H3303_18', {}, 'side_left')]
+  out = NxSt2dStub.with_keys({ 'H3303_18' => 'GRP-A' }, {}) do
+    Noxun::Engine::StudioDialog.mat_used_where(f.collected(recs))
+  end
+  owners = out['GRP-A']['owners']
+  NxTest.assert_equal(%w[CAB-001], owners.map { |o| o['owner_id'] },
+                      'vlastnik s prazdnym ID sa v zozname NEKRESLI')
+  # Dielec sa tym nestraca — v poctoch `used` je dalej.
+  used = NxSt2dStub.with_keys({ 'H3303_18' => 'GRP-A' }, {}) do
+    Noxun::Engine::StudioDialog.mat_used(f.collected(recs))
+  end
+  NxTest.assert_equal(2, used['GRP-A'], 'pocet „Použité v projekte" rata OBA dielce')
+end
+
+NxTest.test('ŠT-2d (review #5): mapy katalogu sa v payloade stavia RAZ') do
+  body = ST2D_STUDIO_SRC[/def mat_payload\(model, collected\).*?\n        end\n/m].to_s
+  NxTest.assert(body.include?('keys = Materials.decor_key_by_material_id'),
+                'mapa dosiek vznika v payloade')
+  NxTest.assert(body.include?('abs_keys = Materials.decor_key_by_abs_id'),
+                'a mapa pasok tiez')
+  NxTest.assert(body.include?('mat_used(collected, keys)') &&
+                body.include?('mat_used_where(collected, keys, abs_keys)'),
+                'obaja konzumenti dostanu TIE ISTE mapy (ziadny druhy prechod katalogom)')
+end
+
 NxTest.test('ŠT-2d: rozpis vznika z UZ zozbieraneho kusovnika (ziadny druhy sken)') do
-  body = ST2D_STUDIO_SRC[/def mat_used_where\(collected\).*?\n        end\n/m].to_s
+  body = ST2D_STUDIO_SRC[/def mat_used_where\(collected.*?\n        end\n/m].to_s
   NxTest.assert(body.include?('collected[:records]'), 'zdroj je ten isty zber ako Kusovnik')
   NxTest.assert(!body.include?('Ids.'), 'ziadny vlastny sken modelu (audit #15)')
-  NxTest.assert(ST2D_STUDIO_SRC.include?("'used_where' => mat_used_where(collected)"),
+  NxTest.assert(ST2D_STUDIO_SRC.include?("'used_where' => mat_used_where(collected"),
                 'rozpis chodi v `mat` payloade vedla poctov')
 end
 

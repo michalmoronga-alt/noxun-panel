@@ -54,6 +54,11 @@ require(path.join(JS, 'studio.js'));
 global.NX = global.window.NX;
 const B = require(path.join(JS, 'budget.js'));
 const M = require(path.join(JS, 'proj_materials.js'));
+// V CEF beží `proj_materials.js` v TOM ISTOM globálnom scope ako `studio.js`,
+// takže `matOpenAnchor` je preň globálna funkcia; v Node ju `require` izoluje.
+// Bez zrkadlenia by sa vetva kotvy v `studio.js` ticho preskočila a test by
+// overoval prázdno.
+global.matOpenAnchor = M.matOpenAnchor;
 
 // --- katalog jedneho dekoru (dve hrubky + dve pasky) -------------------------
 const CAT = {
@@ -75,15 +80,18 @@ const CAT = {
   }
 };
 
-// Rozpis zo servera (`StudioDialog#mat_used_where`).
+// Rozpis zo servera (`StudioDialog#mat_used_where`). `parts` = kusy do výroby,
+// `objects` = koľko entít sa v modeli naozaj označí (doska s 3 ks je 1 objekt).
 const WHERE = {
   GRP1: {
     owners: [
-      { owner_id: 'CAB-001', parts: 3, roles: ['Bok ľavý', 'Bok pravý', 'Strop'],
+      { owner_id: 'CAB-001', parts: 3, objects: 3, roles: ['Bok ľavý', 'Bok pravý', 'Strop'],
         material_ids: ['H3303_18', 'H3303_36'] },
-      { owner_id: 'CAB-002', parts: 1, roles: ['Polica'], material_ids: ['H3303_18'] }
+      { owner_id: 'CAB-002', parts: 1, objects: 1, roles: ['Polica'], material_ids: ['H3303_18'] },
+      { owner_id: 'BOARD-9', parts: 3, objects: 1, roles: ['Voľná doska'],
+        material_ids: ['H3303_36'] }
     ],
-    edges: { ABS_22: 5 }
+    edges: { ABS_22: { parts: 5, objects: 5 } }
   },
   GRP2: { owners: [], edges: {} }
 };
@@ -103,6 +111,14 @@ function group(key){
   eq(M.mdPartsSk(5), '5 dielcov');
   eq(M.mdPartsSk(0), '0 dielcov');
 
+  // Review #6: dve čísla, dve otázky — kusy vs. objekty v modeli.
+  eq(M.mdItemsSk(1), '1 položku');
+  eq(M.mdItemsSk(3), '3 položky');
+  eq(M.mdItemsSk(7), '7 položiek');
+  eq(M.mdWhereCount(3, 3), '3 dielce', 'pri dielcoch je to to isté číslo — ukáže sa raz');
+  eq(M.mdWhereCount(3, 1), '3 ks · 1 objekt', 'doska: kusy do výroby vs. jeden objekt v modeli');
+  eq(M.mdWhereCount(6, 2), '6 ks · 2 objekty');
+
   const empty = M.mdWhereHtml(group('g:GRP2'), null);
   ok(empty.indexOf('Kde sa používa') > -1, 'sekcia je v detaile VZDY — aj ked je prazdna');
   ok(empty.indexOf('zatiaľ nepoužíva') > -1, '„nic tu nie je" musi byt VIDNO, nie tiche prazdno');
@@ -117,6 +133,10 @@ function group(key){
   ok(h.indexOf('Bok ľavý · Bok pravý · Strop') > -1,
      'a ktore dielce to su — TEXTOM ZO SERVERA (klient preklad rol nema)');
   ok(h.indexOf('3 dielce') > -1 && h.indexOf('1 dielec') > -1, 'pocty su zo servera');
+  ok(h.indexOf('3 ks · 1 objekt') > -1,
+     'doska priznava kusy AJ objekty — inak by slubila 3 a oznacila 1');
+  ok(h.indexOf('title="Označiť v modeli — označí 3 položky"') > -1,
+     'tooltip hovori TYM ISTYM slovom ako stavovy riadok („Vybraných N položiek")');
   ok(h.indexOf('#i-eye') > -1, 'kazdy riadok ma OKO (Lucide sprite, ziadne emoji)');
   ok(h.indexOf('mdWhereOwner(&quot;g:GRP1&quot;, &quot;CAB-001&quot;)') > -1,
      'oko vlastnika nesie kluc skupiny + owner_id');
@@ -127,7 +147,8 @@ function group(key){
      'oko pasky nesie abs_id');
 
   // Nulovy pocet pasky sa NEKRESLI (paska katalogu, ktoru projekt nepouziva).
-  const none = M.mdWhereHtml(group('g:GRP1'), { owners: [], edges: { ABS_22: 0 } });
+  const none = M.mdWhereHtml(group('g:GRP1'),
+                             { owners: [], edges: { ABS_22: { parts: 0, objects: 0 } } });
   ok(none.indexOf('Páska') === -1, 'nepouzita paska v zozname nie je');
 })();
 
@@ -178,6 +199,25 @@ function group(key){
 
   eq(M.matOpenAnchor('H3303_18'), true, 'kotva otvorila detail dekoru');
   eq(M.matOpenAnchor('NEZNAMY'), false, 'neznama kotva necha sekciu tam, kde bola');
+})();
+
+(function(){
+  // Review #3: NEUSPESNA kotva NIE JE ticha. Dekor sa mohol medzitym zmazat
+  // alebo premenovat — bez hlasky by preklik z Inspectora skoncil v zozname
+  // dlazdic bez slova a vyzeralo by to ako pokazene tlacidlo.
+  STATUS.textContent = '';
+  NX.setStudio({ gen: 20, model_guid: 'G1', model_title: 't', version: '0',
+                 open_section: 'mat', anchor: 'UZ_NEEXISTUJE',
+                 mat: { model_guid: 'G1', used: {}, used_where: WHERE } });
+  ok(String(STATUS.textContent).indexOf('už v katalógu nie je') > -1,
+     'neúspešná kotva to POVIE (nie tichý no-op)');
+  eq(STATUS.className, 'err', 'a je to chybová hláška');
+
+  STATUS.textContent = '';
+  NX.setStudio({ gen: 21, model_guid: 'G1', model_title: 't', version: '0',
+                 open_section: 'mat', anchor: 'H3303_18',
+                 mat: { model_guid: 'G1', used: {}, used_where: WHERE } });
+  eq(STATUS.textContent, '', 'úspešná kotva mlčí — otvorila, čo mala');
 })();
 
 // ===================== 5) deep-link v karte dielca ===========================
@@ -248,8 +288,16 @@ const BUDGET = {
   ok(NXModal.isOpen(), 'odmietnutie NEZATVARA — pouzivatel opravuje svoje hodnoty');
   ok(!NXModal.isBusy(), 'a tlacidlo ozilo');
   eq(DOC.getElementById('nxm_url').value, 'https://demos.sk/lik', 'rozpisana hodnota je na mieste');
+  repush();
 
-  // POTVRDENY zapis zatvara.
+  // Opravene a odoslane ZNOVA — az POTVRDENIE zatvara. (Server posiela na
+  // jednu mutaciu prave jeden vysledok, takze druhy zapis potrebuje druhe
+  // odoslanie; vysledok bez odoslania je uz CUDZI — kryje to blok nizsie.)
+  SENT.length = 0;
+  DOC.getElementById('nxm_url').value = 'https://demos.sk/lik2';
+  dispatch(DOC.querySelector('[data-nxm-act="submit"]'), 'click');
+  eq(SENT.length, 1, 'opraveny zapis odisiel');
+  eq(SENT[0][1].attrs.url, 'https://demos.sk/lik2');
   NX.budgetResult('custom_update', true);
   ok(!NXModal.isOpen(), 'potvrdenie servera modal zatvara');
   repush();
@@ -277,6 +325,71 @@ function repush(){
      'aj ten isty riadok sa plni z payloadu — koncept editora by bol pascou');
   ok(!DOC.querySelector('.mmemo'), 'a ziadny pas „predvyplnené z konceptu"');
   NXModal.close();
+})();
+
+(function(){
+  // Review #1: TEN ISTY op posiela aj INLINE editacia bunky (blur ceny/popisu
+  // v tabulke). Scenar: pouzivatel doedituje cenu riadku C2 (blur = odoslanie),
+  // hned otvori ⋯ pri C1 — a az POTOM dorazi vysledok cudzieho zapisu.
+  // Bez korelacie by cudzi vysledok zavrel rozpisany ⋯ modal.
+  SENT.length = 0;
+  const cell = mkEl('input');
+  cell.attrs['data-bud'] = 'custom_field';
+  cell.attrs['data-field'] = 'cena';
+  cell.attrs['data-id'] = 'C2';
+  cell.value = '12,50';
+  DOC.body.appendChild(cell);
+  dispatch(cell, 'change');
+  eq(SENT.length, 1, 'inline blur odoslal vlastny custom_update');
+  eq(SENT[0][1].id, 'C2');
+
+  B.budOpenMore('custom', 'C1');
+  ok(NXModal.isOpen(), '⋯ modal je otvoreny');
+  DOC.getElementById('nxm_kod').value = 'ROZPISANE';
+  NX.budgetResult('custom_update', true); // vysledok INLINE zapisu
+  ok(NXModal.isOpen(), 'CUDZI vysledok ⋯ modal NEZAVREL');
+  eq(DOC.getElementById('nxm_kod').value, 'ROZPISANE', 'a rozpisana hodnota je na mieste');
+  repush(); // server po vysledku vzdy posle cerstvy payload (uvolni frontu)
+  ok(NXModal.isOpen(), 'ani cerstvy payload po cudzom zapise modal nezavrie');
+
+  // Vlastny zapis uz modal zavrie.
+  SENT.length = 0;
+  dispatch(DOC.querySelector('[data-nxm-act="submit"]'), 'click');
+  eq(SENT.length, 1, 'modal odoslal svoj zapis');
+  eq(SENT[0][1].id, 'C1');
+  NX.budgetResult('custom_update', true);
+  ok(!NXModal.isOpen(), 'vlastny potvrdeny zapis modal zavrie');
+  repush();
+
+  // A druhy (uz cudzi) vysledok po nom nesmie nic odomknut ani zavriet.
+  NX.budgetResult('custom_update', false);
+  ok(!NXModal.isOpen(), 'oneskoreny cudzi vysledok nic neotvara ani nemeni');
+})();
+
+(function(){
+  // Review #2: modal zavrety ESCAPOM sa rozpoctu neohlasi — zabudnuty stav by
+  // koreloval vysledok zapisu, ktory uz nema okno.
+  B.budOpenMore('custom', 'C1');
+  DOC.getElementById('nxm_kod').value = 'X';
+  dispatch(DOC.querySelector('[data-nxm-act="submit"]'), 'click');
+  ok(NXModal.isBusy(), 'zapis odosiel a zamok drzi');
+  NXModal.close(); // pouzivatel zavrel Escapom skor, nez prisla odpoved
+  ok(!NXModal.isOpen());
+  repush();        // cerstvy payload = miesto, kde sa zabudnuty stav upratuje
+
+  // Teraz inline editacia ineho riadku: jej vysledok nesmie nic „vybavovat".
+  SENT.length = 0;
+  const c2 = mkEl('input');
+  c2.attrs['data-bud'] = 'custom_field';
+  c2.attrs['data-field'] = 'popis';
+  c2.attrs['data-id'] = 'C2';
+  c2.value = 'Doprava mimo mesta';
+  DOC.body.appendChild(c2);
+  dispatch(c2, 'change');
+  eq(SENT.length, 1, 'inline zapis odisiel');
+  NX.budgetResult('custom_update', false);
+  ok(!NXModal.isOpen(), 'ziadny modal sa neotvoril ani neostal viset');
+  repush();
 })();
 
 (function(){

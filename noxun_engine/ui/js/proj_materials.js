@@ -573,13 +573,36 @@
     return v + ' dielcov';
   }
 
+  // Review #6: „položka" je to, co sa OZNACI V MODELI — rovnake slovo, akym
+  // to potvrdi stavovy riadok („Vybraných N položiek v modeli.").
+  function mdItemsSk(n){
+    var v = Number(n) || 0;
+    if (v === 1) return '1 položku';
+    if (v >= 2 && v <= 4) return v + ' položky';
+    return v + ' položiek';
+  }
+
+  // Pocet v riadku. KUSY a OZNACENE OBJEKTY nie su to iste: doska s
+  // `quantity: 3` je 3 kusy do vyroby, ale v modeli je JEDEN objekt. Kym sa
+  // cisla rovnaju (bezny dielec), ukaze sa len jedno; ked nie, priznaju sa
+  // obe — inak by riadok slubil „3 dielce" a stavovy riadok po kliku napisal
+  // „Vybraných 1 položiek", co vyzera ako chyba vyberu.
+  function mdWhereCount(parts, objects){
+    var p = Number(parts) || 0;
+    var o = Number(objects);
+    if (!o || o === p) return mdPartsSk(p);
+    return p + ' ks · ' + (o === 1 ? '1 objekt' : (o >= 2 && o <= 4 ? o + ' objekty' : o + ' objektov'));
+  }
+
   // Cista funkcia (Node test): rozpis pouzitia -> HTML. Prazdny rozpis kresli
   // priznanu hlasku — „nic tu nie je" musi byt VIDNO, inak by pouzivatel
   // hladal chybajucu sekciu.
   function mdWhereHtml(g, where){
     var owners = (where && where.owners) || [];
     var edges = (where && where.edges) || {};
-    var absIds = Object.keys(edges).filter(function(id){ return Number(edges[id]) > 0; });
+    var absIds = Object.keys(edges).filter(function(id){
+      return Number((edges[id] || {}).parts) > 0;
+    });
     var h = '<div class="mdsec mdwhead">Kde sa používa</div>';
     if (!owners.length && !absIds.length){
       return h + '<div class="muted mdwempty">Tento dekor sa v zákazke zatiaľ nepoužíva.</div>';
@@ -589,18 +612,19 @@
       h += '<div class="mdwrow"><span class="mdwn"><b>' + mdEsc(o.owner_id || '') + '</b>' +
         // Oddelovac „·" presne ako mockup („CAB-004 · boky, dno, police").
         (roles ? ' <span class="mdwr">· ' + mdEsc(roles) + '</span>' : '') + '</span>' +
-        '<span class="mdwq">' + mdEsc(mdPartsSk(o.parts)) + '</span>' +
+        '<span class="mdwq">' + mdEsc(mdWhereCount(o.parts, o.objects)) + '</span>' +
         '<span class="mdwact">' + mdWhereEyeHtml('mdWhereOwner', g.key, o.owner_id,
-                                                 'Označiť v modeli — ' + mdPartsSk(o.parts)) +
+                                                 'Označiť v modeli — označí ' + mdItemsSk(o.objects)) +
         '</span></div>';
     });
     absIds.forEach(function(id){
       var rec = (g.edges || []).filter(function(a){ return a.abs_id === id; })[0];
       var label = rec ? edgeChipLabel(rec) : id;
+      var e = edges[id] || {};
       h += '<div class="mdwrow"><span class="mdwn">Páska <b>' + mdEsc(label) + '</b></span>' +
-        '<span class="mdwq">' + mdEsc(mdPartsSk(edges[id])) + '</span>' +
+        '<span class="mdwq">' + mdEsc(mdWhereCount(e.parts, e.objects)) + '</span>' +
         '<span class="mdwact">' + mdWhereEyeHtml('mdWhereEdge', g.key, id,
-                                                 'Označiť dielce s touto páskou') +
+                                                 'Označiť dielce s touto páskou — označí ' + mdItemsSk(e.objects)) +
         '</span></div>';
     });
     return h;
@@ -2841,7 +2865,8 @@
       // su CISTE funkcie; `matOpenAnchor` a `mdWhereOwner` potrebuju stav sekcie
       // a exportuju sa ZAMERNE — kontrakty „kotva otvori detail" a „oko posiela
       // material_ids vlastnika" sa inak nedaju overit nicim nez klikanim.
-      mdWhereHtml: mdWhereHtml, mdPartsSk: mdPartsSk, mdAnchorGroupKey: mdAnchorGroupKey,
+      mdWhereHtml: mdWhereHtml, mdPartsSk: mdPartsSk, mdItemsSk: mdItemsSk,
+      mdWhereCount: mdWhereCount, mdAnchorGroupKey: mdAnchorGroupKey,
       matOpenAnchor: matOpenAnchor, mdWhereOwner: mdWhereOwner, mdWhereEdge: mdWhereEdge,
       // `matApplyState` je vstup payloadu `ST.mat` do stavu sekcie — exportuje
       // sa, aby sa dal rozpis „Kde sa používa" overit BEZ celeho renderu okna.
