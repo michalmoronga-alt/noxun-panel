@@ -1102,6 +1102,13 @@ prišla s ŠT-1c PR B2 (drafty rozpočtu); ďalšie sa napájajú bez kopírovan
 ŠT-2c PR 2c-1 kostru rozšírila o to, čo potrebuje **dlhší** formulár (D-69
 editor materiálu): nadpisy sekcií, opakovateľné riadky, zaškrtávatká, farbu,
 širšiu kartu a **pamäť rozpísaných hodnôt priamo v komponente**.
+ŠT-2c PR 2c-2b napojila **druhý vstup D-69 — „Pridať ručne"** (`mat:create`) na
+**tú istú špecifikáciu**: stĺpce repeaterov sú JEDNA definícia pre oba vstupy
+(`mdSheetCols`/`mdEdgeCols` v `proj_materials.js`), líšia sa len hodnoty
+(prázdne vs. z katalógu) a dve skupinové polia, ktoré existujúca skupina už má
+— **štruktúra** a **smer dekoru**. Dva zoznamy polí by znamenali dva formuláre,
+ktoré sa časom rozídu, a presne to D-69 ruší („rovnaké polia bez ohľadu na
+vstupný bod").
 
 **Kostra (mockup `mockup_studio.html`):**
 

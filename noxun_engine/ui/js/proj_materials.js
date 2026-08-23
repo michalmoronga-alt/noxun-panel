@@ -97,10 +97,10 @@
     if (!rgb || rgb.length !== 3) return '#d8c4a0';
     return '#' + rgb.map(function(c){ c = Math.max(0, Math.min(255, parseInt(c,10)||0)); return ('0'+c.toString(16)).slice(-2); }).join('');
   }
-  function hexToRgb(hex){
-    var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(hex||''));
-    return m ? [parseInt(m[1],16), parseInt(m[2],16), parseInt(m[3],16)] : [216,196,160];
-  }
+  // ŠT-2c 2c-2b: `hexToRgb` ZANIKLA spolu s poľom farby v batch formulari —
+  // farbu dnes posielaju obe zive cesty ako '#RRGGBB' (skupinovy swatch
+  // `mdColorSave`, D-69 editor) a rozklad na [r,g,b] robi VYHRADNE server
+  // (`parse_rgb`). Dva parsery tej istej hodnoty = dve pravdy o farbe.
 
   // --- D-41 PR B: katalog zoskupeny podla SKUPIN --------------------------
   // Cista funkcia (Node test): catalog {sheets,edges} -> pole skupin
@@ -811,11 +811,37 @@
              code: String(a.code || ''), price_per_bm: mdEditNum(a.price_per_bm) };
   }
 
+  // STLPCE REPEATEROV — JEDNA definicia pre OBA vstupy D-69 („Upraviť…" aj
+  // „Pridať ručne"). Dve kopie by znamenali dva formulare, ktore sa casom
+  // rozidu — presne to, co D-69 rusi („rovnaké polia bez ohľadu na vstup").
+  // `roWhen` zamyka IDENTITNE pole EXISTUJUCEHO riadku (server takú zmenu aj
+  // tak odmietne, UI ju nema PROVOKOVAT); novy riadok ID nenesie, takze
+  // v prázdnom formulari je editovatelne vsetko.
+  function mdSheetCols(){
+    return [
+      { key: 'type', label: 'Typ', cls: 'mtiny', roWhen: 'material_id',
+        roTitle: 'Typ dosky definuje variant — pre iný typ pridaj nový riadok.' },
+      { key: 'thickness', label: 'Hrúbka', cls: 'mtiny', roWhen: 'material_id',
+        roTitle: 'Hrúbka definuje variant — pre inú hrúbku pridaj nový riadok.' },
+      { key: 'sheet_size', label: 'Formát', cls: 'mshort', placeholder: '2800×2070' },
+      { key: 'code', label: 'Kód', placeholder: 'kód dodávateľa' },
+      { key: 'price_per_m2', label: '€/m²', cls: 'mtiny', placeholder: '—' }
+    ];
+  }
+  function mdEdgeCols(){
+    return [
+      { key: 'width', label: 'Šírka', cls: 'mtiny', roWhen: 'abs_id',
+        roTitle: 'Šírka definuje variant pásky — pre inú šírku pridaj nový riadok.' },
+      { key: 'thickness', label: 'Hrúbka', cls: 'mtiny', roWhen: 'abs_id',
+        roTitle: 'Hrúbka definuje variant pásky — pre inú hrúbku pridaj nový riadok.' },
+      { key: 'code', label: 'Kód', placeholder: 'kód dodávateľa' },
+      { key: 'price_per_bm', label: '€/bm', cls: 'mtiny', placeholder: '—' }
+    ];
+  }
+
   // Cista funkcia (Node test): skupina -> polia D-15 modalu.
-  // IDENTITNE polia existujuceho riadku su `readonly` s DOVODOM v tooltipe:
-  // server takú zmenu aj tak odmietne (kontrakt bod 7), ale UI ju nema
-  // PROVOKOVAT. Duplaky sa v editore nezobrazuju vobec — vsetko derivuju zo
-  // zdrojovej dosky a nemaju co editovat.
+  // Duplaky sa v editore nezobrazuju vobec — vsetko derivuju zo zdrojovej
+  // dosky a nemaju co editovat.
   function mdEditFields(g){
     var sheets = (g.sheets || []).filter(function(s){ return !s.source_material_id; });
     var edges = g.edges || [];
@@ -830,28 +856,43 @@
       { type: 'group', label: 'Dosky', hint: 'typ a hrúbka určujú variant' },
       { key: 'sheets', type: 'rows', addLabel: 'Pridať dosku', empty: 'Zatiaľ žiadna doska.',
         hidden: ['material_id', 'row_rev'], rowKey: 'material_id',
-        cols: [
-          { key: 'type', label: 'Typ', cls: 'mtiny', roWhen: 'material_id',
-            roTitle: 'Typ dosky definuje variant — pre iný typ pridaj nový riadok.' },
-          { key: 'thickness', label: 'Hrúbka', cls: 'mtiny', roWhen: 'material_id',
-            roTitle: 'Hrúbka definuje variant — pre inú hrúbku pridaj nový riadok.' },
-          { key: 'sheet_size', label: 'Formát', cls: 'mshort', placeholder: '2800×2070' },
-          { key: 'code', label: 'Kód', placeholder: 'kód dodávateľa' },
-          { key: 'price_per_m2', label: '€/m²', cls: 'mtiny', placeholder: '—' }
-        ],
+        cols: mdSheetCols(),
         value: sheets.map(mdEditSheetRow) },
       { type: 'group', label: 'ABS pásky', hint: 'šírka a hrúbka určujú variant' },
       { key: 'edges', type: 'rows', addLabel: 'Pridať pásku', empty: 'Zatiaľ žiadna páska.',
         hidden: ['abs_id', 'row_rev'], rowKey: 'abs_id',
-        cols: [
-          { key: 'width', label: 'Šírka', cls: 'mtiny', roWhen: 'abs_id',
-            roTitle: 'Šírka definuje variant pásky — pre inú šírku pridaj nový riadok.' },
-          { key: 'thickness', label: 'Hrúbka', cls: 'mtiny', roWhen: 'abs_id',
-            roTitle: 'Hrúbka definuje variant pásky — pre inú hrúbku pridaj nový riadok.' },
-          { key: 'code', label: 'Kód', placeholder: 'kód dodávateľa' },
-          { key: 'price_per_bm', label: '€/bm', cls: 'mtiny', placeholder: '—' }
-        ],
+        cols: mdEdgeCols(),
         value: edges.map(mdEditEdgeRow) }
+    ];
+  }
+
+  // === 2c-2b: „Pridať ručne" — TEN ISTY formular, len prazdny ===============
+  //
+  // Rozdiely oproti editu su presne dva a oba su vlastnostou ZAKLADANIA:
+  //   * identita skupiny je EDITOVATELNA cela (pri edite je cislo dekoru
+  //     a vyrobca tiez editovatelny, ale riadky su zamknute svojou identitou),
+  //   * pribudaju dve SKUPINOVE polia, ktore uz existujuca skupina ma a nova
+  //     ich nema odkial vziat: ŠTRUKTÚRA povrchu (je sucastou identity
+  //     variantu — dopisat sa uz NEDA) a SMER DEKORU (default novych dosiek).
+  function mdCreateFields(){
+    return [
+      { type: 'group', label: 'Dekor', hint: 'platí pre celú skupinu' },
+      { key: 'decor', label: 'Číslo dekoru', value: '', placeholder: 'napr. H3303' },
+      { key: 'decor_name', label: 'Názov', value: '', placeholder: 'napr. Dub Halifax' },
+      { key: 'manufacturer', label: 'Výrobca', value: '', placeholder: 'napr. Egger' },
+      { key: 'structure', label: 'Štruktúra', value: '', placeholder: 'napr. ST10 / PW' },
+      { key: 'grain', type: 'select', label: 'Smer dekoru', value: 'length',
+        options: [['length', 'Po dĺžke'], ['width', 'Po šírke'], ['none', 'Bez smeru']] },
+      { key: 'color', label: 'Farba', type: 'color', value: rgbToHex(null) },
+      { type: 'group', label: 'Dosky', hint: 'typ a hrúbka určujú variant' },
+      { key: 'sheets', type: 'rows', addLabel: 'Pridať dosku',
+        empty: 'Zatiaľ žiadna doska — pridaj aspoň jednu.',
+        hidden: ['material_id', 'row_rev'], rowKey: 'material_id',
+        cols: mdSheetCols(), value: [] },
+      { type: 'group', label: 'ABS pásky', hint: 'šírka a hrúbka určujú variant' },
+      { key: 'edges', type: 'rows', addLabel: 'Pridať pásku', empty: 'Zatiaľ žiadna páska.',
+        hidden: ['abs_id', 'row_rev'], rowKey: 'abs_id',
+        cols: mdEdgeCols(), value: [] }
     ];
   }
 
@@ -887,6 +928,34 @@
              allow_duplicate_code: !!(base && base.dup) };
   }
 
+  // Cista funkcia (Node test): hodnoty prazdneho formulara -> payload servera.
+  // ŠTRUKTÚRA je vlastnost SKUPINY, ale zapisuje sa na KAZDY zaznam (stlpec
+  // v tabulke nie je) — preto ju klient vlieva do riadkov, ktore vlastnu
+  // nemaju. Bez toho by novy dekor vznikol bez struktury a doplnit sa uz neda:
+  // struktura je sucast identity variantu.
+  function mdCreateRows(rows, structure){
+    var st = String(structure == null ? '' : structure).trim();
+    return (rows || []).map(function(r){
+      var out = {}, k;
+      for (k in r){ if (Object.prototype.hasOwnProperty.call(r, k)) out[k] = r[k]; }
+      if (st && !String(out.structure == null ? '' : out.structure).trim()) out.structure = st;
+      return out;
+    });
+  }
+
+  function mdCreatePayload(v, base){
+    var d = v || {};
+    return { mode: 'create', group_id: '',
+             // Baseline pri zakladani strazi jedinú vec, ktorá sa strážiť dá:
+             // že ten istý dekor medzitým nezaložil niekto iný.
+             base_rev: (base && base.rev) || '', catalog_schema: MD_CLIENT_SCHEMA,
+             decor: d.decor, decor_name: d.decor_name, manufacturer: d.manufacturer,
+             color: d.color, grain: d.grain,
+             sheets: mdCreateRows(d.sheets, d.structure),
+             edges: mdCreateRows(d.edges, d.structure),
+             allow_duplicate_code: !!(base && base.dup) };
+  }
+
   function mdEditOpen(key){
     var m = mdModal();
     if (!m) return;
@@ -902,7 +971,7 @@
       return;
     }
     var dropped = mdEditDropDirty(g);
-    mdEditBase = { key: key, gid: g.gid || '', rev: MD_REV, decor: g.decor };
+    mdEditBase = { mode: 'edit', key: key, gid: g.gid || '', rev: MD_REV, decor: g.decor };
     mdEditDupSnap = null;
     m.open({
       title: 'Upraviť dekor',
@@ -915,13 +984,38 @@
     if (dropped) MD.setStatus('Rozpísané bunky dekoru ' + g.decor + ' sa zahodili — uprav ich v tomto formulári.');
   }
 
+  // „Pridať ručne" — prazdny formular, TA ISTA kostra aj TEN ISTY odosielac.
+  // Kluc pamate `mat:create` je vlastny slot (dva segmenty = cely kluc), takze
+  // rozpisany NOVY dekor a rozpisana UPRAVA iného sa navzajom neprepisu.
+  function mdCreateOpen(){
+    var m = mdModal();
+    if (!m) return;
+    if (MD_RO){ MD.setStatus('Katalóg je len na čítanie — úpravy sú vypnuté.', true); return; }
+    if (!MD_SCHEMA2){
+      MD.setStatus('Zakladanie dekoru potrebuje katalóg po migrácii na skupiny — dokonči migráciu.', true);
+      return;
+    }
+    mdEditBase = { mode: 'create', key: null, gid: '', rev: MD_REV, decor: '' };
+    mdEditDupSnap = null;
+    m.open({
+      title: 'Pridať materiál ručne',
+      sub: 'prázdny formulár — rovnaké polia ako pri úprave',
+      size: 'wide', okLabel: 'Pridať do katalógu', memoryKey: 'mat:create',
+      note: 'Číslo dekoru je povinné a musí byť presné — dekor, ktorý sa od existujúceho líši len zápisom, sa neuloží. Zásteny a pracovné dosky sem nepatria (majú ďalšie povinné údaje — rub, hranová úprava): založ dekor bez nich a variant pridaj v detaile cez „+ variant“.',
+      fields: mdCreateFields(),
+      onSubmit: mdEditSubmit
+    });
+  }
+
   function mdEditSubmit(v){
     var m = mdModal();
     if (!mdEditBase){ if (m) m.setBusy(false); return; }
     // Suhlas s duplicitou plati LEN pre hodnoty, pri ktorych ho server vypytal
     // (review #5): akakolvek zmena vo formulari ho rusi.
     mdEditBase.dup = (mdEditDupSnap !== null && JSON.stringify(v) === mdEditDupSnap);
-    var payload = mdEditPayload(v, mdEditBase);
+    var payload = mdEditBase.mode === 'create'
+      ? mdCreatePayload(v, mdEditBase)
+      : mdEditPayload(v, mdEditBase);
     if (window.sketchup && sketchup.save_decor) sketchup.save_decor(JSON.stringify(payload));
     else if (m) m.setBusy(false); // bez mosta by okno ostalo navzdy zamknute
   }
@@ -935,6 +1029,14 @@
   function mdEditRefresh(){
     var m = mdModal();
     if (!m || !m.isOpen() || !mdEditBase) return false;
+    if (mdEditBase.mode === 'create'){
+      // Pri zakladani niet co dorovnavat — v katalogu este ziadny nas riadok
+      // nie je. Baseline sa ale MUSI omladit, inak by kazdy dalsi pokus
+      // skoncil tym istym konfliktom a cesta von by neexistovala.
+      mdEditBase.rev = MD_REV;
+      mdEditDupSnap = null;
+      return { ok: true, touched: false };
+    }
     var g = mdGroupByKey(mdEditBase.key);
     if (!g) return false;
     var cur = m.values();
@@ -1257,17 +1359,6 @@
     f[inp.getAttribute('data-dim')] = inp.value;
     f.auto = false; // rucna hodnota — navrh ju uz neprepise
   }
-  // GH P2: do zapamatanej sady iba MANUALNE formaty — auto-navrh sa pri obnove
-  // deterministicky dopocita z hintov (mdFmtPrefill), takze ulozeny auto-format
-  // by po zmene typu (DTDL -> PD) chybne prezil ako "rucny".
-  function mdManualFormats(chips, fmtMap){
-    var out = {};
-    (chips || []).forEach(function(c){
-      var f = fmtMap ? fmtMap[c.key] : null;
-      if (f && !f.auto && (f.l || f.w)) out[c.key] = { l: f.l, w: f.w };
-    });
-    return out;
-  }
   // Zmena spolocneho typu prepocita NAVRHY (PD navrh nema, takze DTDL -> PD
   // pole vyprazdni — inak by odoslal 2800x2070 pre pracovnu dosku).
   // M-A3c: + auto pruhy vynimiek (rucne hodnoty auto=false ostavaju).
@@ -1527,37 +1618,14 @@
     return { variants: out, error: null };
   }
 
-  // Posledna pouzita sada (Michal: "zapamatat poslednu sadu") — localStorage je
-  // len UX pohodlie (try/catch: CEF/file: ho moze zakazat), autorita je server.
-  // D-44: verziovany format (schema 2 + formaty). Stara sada (v1) formaty nemala
-  // a kluce v nej boli LABELY cipov — data-key je s labelmi zamerne zhodny,
-  // takze migracia = prevzatie klucov BEZ formatov (ziadne rozbitie, ziadny
-  // vymysleny format).
-  var MD_SET_KEY = 'nx_decor_last_set_v2';
-  var MD_SET_KEY_V1 = 'nx_decor_last_set';
-  function mdMigrateLastSet(v1){
-    if (!v1 || typeof v1 !== 'object') return null;
-    return { schema: 2,
-             sheet_keys: Array.isArray(v1.sheet_keys) ? v1.sheet_keys : [],
-             edge_keys: Array.isArray(v1.edge_keys) ? v1.edge_keys : [],
-             ths: typeof v1.ths === 'string' ? v1.ths : '',
-             abs: typeof v1.abs === 'string' ? v1.abs : '',
-             formats: {} };
-  }
-  function mdLoadLastSet(){
-    try {
-      var raw = localStorage.getItem(MD_SET_KEY);
-      if (raw){
-        var s = JSON.parse(raw);
-        return (s && s.schema === 2) ? s : mdMigrateLastSet(s);
-      }
-      var old = localStorage.getItem(MD_SET_KEY_V1);
-      return old ? mdMigrateLastSet(JSON.parse(old)) : null;
-    } catch (e2) { return null; }
-  }
-  function mdStoreLastSet(set){
-    try { localStorage.setItem(MD_SET_KEY, JSON.stringify(set)); } catch (e2) { /* bez perzistencie */ }
-  }
+  // ŠT-2c 2c-2b: „POSLEDNÁ POUŽITÁ SADA" (pamat preset cipov v localStorage)
+  // ZANIKLA spolu so zakladanim dekoru z tohto formulara. Bola to pamat
+  // preset cipov pre NOVY dekor — „+ variant" ju nikdy nepouzival (zacina
+  // prazdny) a novy dekor sa zaklada v D-69 editore, ktory ma vlastnu,
+  // VIDITELNU pamat rozpisu (`NXModal` + pas „Predvyplnené z konceptu").
+  // Dve pamate na to iste by znamenali dve rozpisane verzie a ziadnu istotu,
+  // ktora sa naozaj odosle.
+
   // 2A-4b (cista funkcia, Node test): spolocna struktura skupiny pre "+
   // variant" — prave JEDNA odlisna neprazdna struktura variantov = predvolba,
   // inak prazdne (zmiesane skupiny si strukturu urcia per cip).
@@ -1696,65 +1764,54 @@
     inp._sgPick = onPick;
   }
 
+  // ŠT-2c 2c-2b: formular je UZ LEN „+ variant" do EXISTUJUCEJ skupiny.
+  // Zakladanie dekoru odtialto ZANIKLO (D-69: jeden formular pre vsetky vstupy
+  // — `mdCreateOpen`), takze `key` je POVINNY: bez neho by payload zalozil
+  // skupinu s prazdnym cislom dekoru. Tento formular tu ostava pre typy,
+  // ktorych identitu editor nepokryva (zastena = rub, PD = hranova uprava)
+  // a pre skupiny s viacerymi strukturami.
   function mdOpenDecorForm(key){
     if (MD_RO){ MD.setStatus('Katalóg je len na čítanie — úpravy sú vypnuté.', true); return; }
+    var g = key ? mdGroupByKey(key) : null;
+    if (!g){
+      MD.setStatus('Nový dekor sa zakladá tlačidlom „Pridať ručne“ — tento formulár pridáva variant do existujúceho dekoru.', true);
+      return;
+    }
     mdCloseForms();
     mdBindChips();
-    var g = key ? mdGroupByKey(key) : null;
     mdEditing = { kind: 'decor', id: key };
-    mdEl('nd_decor').value = g ? g.decor : '';
-    mdEl('nd_decor').disabled = !!g;
-    // 2A-4b: nazov + vyrobca su vlastnosti SKUPINY — pri "+ variant" su
-    // zamknute (zmena by cielila inu/novu skupinu; menia sa v katalogu).
+    // Identita skupiny je tu LEN NA CITANIE — zmena by cielila inu/novu
+    // skupinu; meni sa v editore dekoru („Upraviť…").
+    mdEl('nd_decor').value = g.decor;
+    mdEl('nd_decor').disabled = true;
     if (mdEl('nd_decor_name')){
-      mdEl('nd_decor_name').value = g ? (g.decor_name || '') : '';
-      mdEl('nd_decor_name').disabled = !!g;
+      mdEl('nd_decor_name').value = g.decor_name || '';
+      mdEl('nd_decor_name').disabled = true;
     }
-    mdEl('nd_manufacturer').value = g ? (g.manufacturer || '') : '';
-    mdEl('nd_manufacturer').disabled = !!g;
-    // Spolocna struktura: pri "+ variant" predvolba z jedinej struktury skupiny.
-    if (mdEl('nd_structure')) mdEl('nd_structure').value = g ? mdGroupCommonStructure(g) : '';
-    var firstSheet = g && g.sheets.length ? g.sheets[0] : null;
+    mdEl('nd_manufacturer').value = g.manufacturer || '';
+    mdEl('nd_manufacturer').disabled = true;
+    // Spolocna struktura: predvolba z jedinej struktury skupiny.
+    if (mdEl('nd_structure')) mdEl('nd_structure').value = mdGroupCommonStructure(g);
+    var firstSheet = g.sheets.length ? g.sheets[0] : null;
     mdEl('nd_type').value = firstSheet ? (firstSheet.type || 'DTDL') : 'DTDL';
     mdEl('nd_grain').value = firstSheet ? (firstSheet.grain || 'length') : 'length';
-    // D-82: farba sa zadava LEN pri ZAKLADANI dekoru — „+ variant" do
-    // existujucej skupiny ju dedi (server ju vnuti bez ohladu na payload),
-    // preto riadok zmizne a nikoho neplete.
-    mdEl('nd_color').value = rgbToHex(g ? g.color : null);
-    if (mdEl('nd_color_row')) mdEl('nd_color_row').style.display = g ? 'none' : '';
     mdEl('nd_ths').value = '';
     mdEl('nd_abs').value = '';
-    // NOVY dekor = predvyplnit poslednou sadou; "+ variant" zacina prazdny
-    // (doplna sa konkretna vec do existujucej skupiny).
+    // „+ variant" zacina VZDY prazdny — doplna sa konkretna vec do existujucej
+    // skupiny. (Pamat poslednej sady patrila zaniknutemu zakladaniu dekoru.)
     mdFmt = {};
-    mdFmtX = {}; // M-A3c: pruhy vynimiek zacinaju cisto (audit NOTE 9: obnoveny
-                 // ths ich vyrenderuje s hintom podla typu — formaty vynimiek
-                 // sa do zapamatanej sady neukladaju)
+    mdFmtX = {}; // M-A3c: pruhy vynimiek zacinaju cisto
     mdStS = {};
     mdStE = {};
     mdUni = {};
-    var last = key ? null : mdLoadLastSet();
-    mdChipsSet('nd_sheet_chips', last && last.sheet_keys ? last.sheet_keys : []);
-    mdChipsSet('nd_edge_chips', last && last.edge_keys ? last.edge_keys : []);
-    if (last && !key){
-      mdEl('nd_ths').value = last.ths || '';
-      mdEl('nd_abs').value = last.abs || '';
-      // Ulozeny format = vedome zadany (auto=false) — navrh ho neprepise.
-      // (Struktura sa NEpamata — je dekorova, nie sadova; predvolbu dava
-      // spolocne pole nd_structure.)
-      var fmts = (last.formats && typeof last.formats === 'object') ? last.formats : {};
-      Object.keys(fmts).forEach(function(k){
-        var f = fmts[k] || {};
-        mdFmt[k] = { l: mdFmtStr(f.l), w: mdFmtStr(f.w), auto: false };
-      });
-    }
-    // Cipy bez ulozeneho formatu dostanu NAVRH podla typu (viditelne v poli).
-    mdActiveSheetChips().forEach(function(c){ mdFmtPrefill(c.key, c.hintType); });
+    mdChipsSet('nd_sheet_chips', []);
+    mdChipsSet('nd_edge_chips', []);
     mdRenderFmtRow();
     mdRenderAbsRow();
     mdRenderExtraFmtRow(); // M-A3c (D-68): pruhy pre obnovene "Dalsie hrubky"
     mdSgBind('nd_type', function(){ return MD_SUGGEST.types; }, mdTypeChanged);
-    mdSgBind('nd_manufacturer', function(){ return MD_SUGGEST.manufacturers; }, null);
+    // Naseptavac vyrobcov tu ZANIKOL spolu so zakladanim dekoru — pole je
+    // zamknute (vyrobcu meni editor dekoru), takze by nemal do coho pisat.
     mdEl('mdDecorForm').style.display = '';
   }
   // 2A-4b: pri SCHEMA 2 katalogu davka batch_schema 3 (skupiny/struktura/
@@ -1762,6 +1819,9 @@
   // dokumentovany rezim, mutacie bezia) klient posiela povodny D-44 tvar
   // (batch_schema 2 BEZ struktur/universal/nazvu) — server batch 3 do
   // katalogu 1 spravne odmieta a bez fallbacku by sa nedalo NIC zalozit.
+  // ŠT-2c 2c-2b: FARBA sa uz neposiela — skupina VZDY existuje („+ variant")
+  // a server jej ulozenu farbu aj tak vnucuje (D-82). Pole vo formulari
+  // zaniklo spolu so zakladanim dekoru.
   function mdSaveDecorBatch(){
     var sheetChips = mdActiveSheetChips();
     var edgeChips = mdActiveEdgeChips();
@@ -1787,7 +1847,6 @@
         manufacturer: mdEl('nd_manufacturer').value,
         type: mdEl('nd_type').value,
         grain: mdEl('nd_grain').value,
-        color: hexToRgb(mdEl('nd_color').value),
         sheet_variants: sheetVars,
         edge_variants: edgeVars
       };
@@ -1799,7 +1858,6 @@
         manufacturer: mdEl('nd_manufacturer').value,
         type: mdEl('nd_type').value,
         grain: mdEl('nd_grain').value,
-        color: hexToRgb(mdEl('nd_color').value),
         sheet_variants: sheetVars.map(function(v){
           var o = { thickness: v.thickness };
           if (v.type) o.type = v.type;
@@ -1811,12 +1869,6 @@
         })
       };
     }
-    if (!mdEditing || !mdEditing.id){
-      var formats = mdManualFormats(sheetChips, mdFmt);
-      mdStoreLastSet({ schema: 2, sheet_keys: sheetChips.map(function(c){ return c.key; }),
-                       edge_keys: edgeChips.map(function(c){ return c.key; }),
-                       ths: mdEl('nd_ths').value, abs: mdEl('nd_abs').value, formats: formats });
-    }
     if (window.sketchup && sketchup.add_decor_batch) sketchup.add_decor_batch(JSON.stringify(payload));
     mdCloseForms();
   }
@@ -1827,10 +1879,9 @@
     if (mdEl('mdSheetForm')) mdEl('mdSheetForm').style.display = 'none';
     if (mdEl('mdEdgeForm')) mdEl('mdEdgeForm').style.display = 'none';
     if (mdEl('mdDecorForm')) mdEl('mdDecorForm').style.display = 'none';
-    // 2A-4b: zamknute skupinove polia sa musia odomknut pre buduce "Novy dekor"
-    if (mdEl('nd_decor')) mdEl('nd_decor').disabled = false;
-    if (mdEl('nd_decor_name')) mdEl('nd_decor_name').disabled = false;
-    if (mdEl('nd_manufacturer')) mdEl('nd_manufacturer').disabled = false;
+    // ŠT-2c 2c-2b: odomykanie skupinovych poli ZANIKLO — „+ variant" ich drzi
+    // zamknute VZDY (identita skupiny sa meni v editore dekoru) a zakladanie
+    // dekoru z tohto formulara uz neexistuje.
   }
 
   // --- 2A-4b (audit B2): potvrdenie obnovy predmigracnej zalohy ------------
@@ -2271,13 +2322,24 @@
     // Modal zatvara VYHRADNE POTVRDENY zapis (kontrakt D-15): odmietnuty
     // necha pouzivatelovi rozpisany formular na mieste — ma opravit cislo,
     // nie pisat celu tabulku znova.
-    editSaved: function(){
+    editSaved: function(res){
       var m = mdModal();
+      var info = res || {};
       mdEditBase = null;
       mdEditDupSnap = null;
-      if (!m || !m.isOpen()) return;
-      m.setBusy(false, { clear: true }); // pamat rozpisu zanika az na potvrdenie
-      m.close();
+      if (m && m.isOpen()){
+        m.setBusy(false, { clear: true }); // pamat rozpisu zanika az na potvrdenie
+        m.close();
+      }
+      // 2c-2b: po ZALOZENI dekoru ma pouzivatel stat V NOM — inak by po
+      // zatvoreni formulara hladal v mriezke dlazdic, ci vobec vznikol
+      // (a ceny doplna prave tam, v detaile). Katalog uz prisiel echom PRED
+      // touto hlaskou, takze dlazdica existuje.
+      if (String(info.mode || '') !== 'create' || !info.group_id) return;
+      var key = 'g:' + info.group_id;
+      if (!mdGroupByKey(key)) return;
+      mdView = key;
+      mdRenderLists();
     },
     // Vsetky chyby NARAZ, kazda pri svojom poli (rows: pri svojom riadku).
     editErrors: function(list){
@@ -2481,8 +2543,12 @@
     var h = '<button type="button" class="primary" id="mdDemosAddBtn"' + dis +
       ' title="Pridať dekor z Demosu" onclick="mdDemosAdd()">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-cloud-download"/></svg> Pridať z Demosu</button>' +
+      // ŠT-2c 2c-2b: vedie na D-69 editor v rezime `create` (ten isty formular
+      // ako „Upraviť…"). Batchovy formular s preset cipmi tu ZANIKOL — ostal
+      // v detaile dekoru ako „+ variant" pre typy, ktore maju dalsiu identitu
+      // (zastena, PD).
       '<button type="button" class="ghostbtn" id="mdNewDecorBtn"' + dis +
-      ' title="Pridať materiál ručne (bez Demosu)" onclick="mdOpenDecorForm(null)">' +
+      ' title="Pridať materiál ručne (bez Demosu)" onclick="mdCreateOpen()">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Pridať ručne</button>' +
       '<div class="searchbox"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>' +
       '<input id="mdSearch" type="text" placeholder="Hľadať dekor, výrobcu alebo kód"' +
@@ -2591,8 +2657,7 @@
       edgeChipLabel: edgeChipLabel, mdMatchGroup: mdMatchGroup, mdBuildSections: mdBuildSections,
       // D-44 (tests/js/test_decor_formats.js) — ciste funkcie bez DOM
       mdFormatHint: mdFormatHint, mdBuildSheetVariants: mdBuildSheetVariants,
-      mdMigrateLastSet: mdMigrateLastSet, mdSheetDim: mdSheetDim,
-      mdManualFormats: mdManualFormats,
+      mdSheetDim: mdSheetDim,
       // D-46 (tests/js/test_proj_confirm.js) — ciste funkcie listy bez DOM
       mdProjectSelectId: mdProjectSelectId, mdConfirmPayload: mdConfirmPayload,
       // 2A-4b (tests/js/test_md_schema2.js) — skupiny, sekcie struktur, batch 3
@@ -2645,6 +2710,15 @@
       mdEditSheetRow: mdEditSheetRow, mdEditEdgeRow: mdEditEdgeRow,
       mdEditOpen: mdEditOpen, mdEditDropDirty: mdEditDropDirty, mdEditKey: mdEditKey,
       mdEditRefresh: mdEditRefresh,
+      // ŠT-2c 2c-2b — „Pridať ručne" (mode create). `mdCreateFields`/
+      // `mdCreatePayload`/`mdCreateRows` su CISTE funkcie; `mdCreateOpen`
+      // a `mdOpenDecorForm` potrebuju DOM a exportuju sa ZAMERNE — kontrakty
+      // „prazdny formular", „uspech otvori detail noveho dekoru" a „zakladanie
+      // z batch formulara ZANIKLO" sa inak overit nedaju
+      // (tests/js/test_st2c_create.js).
+      mdCreateFields: mdCreateFields, mdCreatePayload: mdCreatePayload,
+      mdCreateRows: mdCreateRows, mdCreateOpen: mdCreateOpen,
+      mdOpenDecorForm: mdOpenDecorForm,
       mdSetCatalog: mdSetCatalog, MD: MD };
   }
   // ŠT-2a (audit #7): `sketchup.ready('')` tu ZANIKLO. V okne Materialy bol

@@ -1194,8 +1194,10 @@ module Noxun
 
         # --- ŠT-2c 2c-2a: D-69 jednotny editor dekoru -------------------------
         #
-        # JEDNA akcia na CELY formular „Upraviť…" (identita skupiny + riadky
-        # dosiek + riadky ABS). Guardy si tu NEROBIME: `catalog_write_ok?` by
+        # JEDNA akcia na CELY formular (identita skupiny + riadky dosiek +
+        # riadky ABS) — a od 2c-2b pre OBA vstupy D-69: „Upraviť…" (mode edit)
+        # aj „Pridať ručne" (mode create). O rezime rozhoduje payload, telo je
+        # jedno. Guardy si tu NEROBIME: `catalog_write_ok?` by
         # brany (read-only, schema, baseline) vyhodnotil MIMO zamku a medzi
         # kontrolou a zapisom by sa katalog stihol zmenit. Cely kontrakt —
         # vratane `base_rev` a `row_rev` KAZDEHO riadku — bezi POD zamkom
@@ -1211,9 +1213,14 @@ module Noxun
           info = {} unless info.is_a?(Hash)
           case status
           when :ok
+            # PORADIE JE ZAVAZNE: najprv cerstvy katalog do sekcie, az potom
+            # „ulozene". Pri zakladani nového dekoru klient hned nato skace na
+            # jeho dlazdicu — a tú musí v katalógu UŽ MAŤ, inak by skok padol
+            # do prázdna.
             after_catalog_change
             set_status(save_decor_status(info))
-            js('MD.editSaved()')
+            js("MD.editSaved(#{{ 'mode' => info['mode'].to_s,
+                                 'group_id' => info['group_id'].to_s }.to_json})")
           when :invalid
             # Vsetky chyby NARAZ — modal ich rozsvieti pri poliach a ostava
             # otvoreny s hodnotami (pouzivatel ma opravit cislo, nie pisat
@@ -1245,7 +1252,17 @@ module Noxun
           updated = Array(info['updated'])
           parts << "#{created.size}× nový variant" unless created.empty?
           parts << "#{updated.size}× upravený variant" unless updated.empty?
-          msg = parts.empty? ? 'Dekor uložený — bez zmien vo variantoch.' : "Dekor uložený: #{parts.join(' + ')}."
+          # 2c-2b: zalozenie dekoru je INA udalost nez jeho uprava — hlaska to
+          # musi povedat menom dekoru, inak pouzivatel nevie, ci vznikol nový
+          # záznam, alebo prepísal starý.
+          msg = if info['mode'].to_s == 'create'
+                  head = "Dekor #{info['decor'].to_s.strip} pridaný do katalógu"
+                  parts.empty? ? "#{head}." : "#{head}: #{parts.join(' + ')}."
+                elsif parts.empty?
+                  'Dekor uložený — bez zmien vo variantoch.'
+                else
+                  "Dekor uložený: #{parts.join(' + ')}."
+                end
           skipped = Array(info['skipped'])
           msg += " Preskočené (už existujú): #{skipped.join(', ')}." unless skipped.empty?
           msg

@@ -1011,6 +1011,13 @@ module Noxun
       #   9 zmena ceny bez zmeny vazby na dodavatela rusi price_checked_at,
       #  10 [:ok, {...}] | [:invalid|:stale|:conflict|:code_conflict|
       #     :catalog_read_only|:write_failed, {...}]; pri :ok JEDEN write.
+      #
+      # 2c-2b: cesta ma DVA rezimy — `edit` (skupina existuje) a `create`
+      # (skupina PRAVE vznika, formular je prazdny). Vsetkych 10 bodov plati
+      # rovnako; `create` navyse rozhoduje IDENTITU skupiny (near-match,
+      # „taky dekor uz je", znackova skupina potrebuje dosku) a nesmie prijat
+      # riadok s ID existujuceho variantu. Riadky su v oboch rezimoch TA ISTA
+      # cesta (`save_decor_new_sheet`/`_edge`) — jedna autorita pravidiel.
 
       # (1) ALLOWLIST. Co v zozname NIE JE, sa strhne uz na vstupe — nie preto,
       # ze by klient podvadzal, ale preto, ze formular posiela CELY zaznam
@@ -1085,9 +1092,11 @@ module Noxun
         a = sd_pick(attrs, SAVE_DECOR_KEYS)
         mode = sd_str(a['mode'])
         mode = 'edit' if mode.empty?
-        unless mode == 'edit'
+        # 2c-2b: `create` = TEN ISTY formular, len prazdny (D-69: rovnake polia
+        # bez ohladu na vstupny bod). Cokolvek ine je rozbity klient.
+        unless %w[edit create].include?(mode)
           return [:invalid, { 'errors' => [sd_err(nil, 'mode',
-                                                  'Editor upravuje existujúci dekor — nový sa zakladá vlastnou cestou.')] }]
+                                                  'Neznámy režim editora — obnov sekciu „Materiály“ a skús znova.')] }]
         end
         # (3) BRANY PRED ZAMKOM. Read-only katalog aj stary klient sa odmietaju
         # skor, nez sa cokolvek nacita — zamok drzi len skutocna praca.
@@ -1115,7 +1124,10 @@ module Noxun
           if base.empty? || base != catalog_revision
             return [:stale, { 'message' => 'Katalóg sa medzitým zmenil — hodnoty v okne ostali, over ich a ulož znova.' }]
           end
-          save_decor_locked(a)
+          # Pri `create` je baseline JEDINY guard, ktory sa da urobit (riadky
+          # este ziadny odtlacok nemaju) — a je potrebny: medzi otvorenim
+          # formulara a ulozenim mohol ten isty dekor zalozit niekto iny.
+          mode == 'create' ? save_decor_create_locked(a) : save_decor_locked(a)
         end
       rescue StandardError => e
         Engine.log_error(e, 'Materials.save_decor') if defined?(Engine)
@@ -1217,6 +1229,141 @@ module Noxun
                 'created' => created['sheets'] + created['edges'],
                 'updated' => updated, 'skipped' => skipped,
                 'changed' => created['sheets'].size + created['edges'].size + updated.size }]
+      end
+
+      # --- ŠT-2c 2c-2b: CREATE — „Pridať ručne" TYM ISTYM formularom ----------
+      #
+      # Ten isty kontrakt, iny zaciatok. Pri edite skupina UZ existuje a jej
+      # identita je dana; tu sa o nej PRAVE rozhoduje — a to je presne miesto,
+      # kde vznikaju preklepy („H3303" vs „h 3303"), dva zapisy toho isteho
+      # cisla u toho isteho vyrobcu a dekory bez jedinej dosky. Preto sa najprv
+      # rozhodne SKUPINA (JEDNA autorita s davkou — `resolve_batch_group`)
+      # a riadky potom bezia UZ TOU ISTOU cestou ako nove riadky editora
+      # (`save_decor_new_sheet` / `save_decor_new_edge`). Ziadna druha sada
+      # pravidiel, ktora by sa casom rozisla s prvou.
+      def save_decor_create_locked(a)
+        decor = sd_str(a['decor'])
+        manufacturer = sd_str(a['manufacturer'])
+        decor_name = sd_str(a['decor_name'])
+        sheet_rows = sd_rows(a['sheets'])
+        edge_rows  = sd_rows(a['edges'])
+        errors = []
+        # (2)(7) Novy dekor nesmie niest EXISTUJUCI variant: riadok s ID patri
+        # inej skupine a create ho nema ako overit (`row_rev` gate je vec
+        # editu) — ticho by ho „presunul" do prave zakladanej skupiny.
+        save_decor_create_no_ids(sheet_rows, 'sheets', 'material_id', errors)
+        save_decor_create_no_ids(edge_rows, 'edges', 'abs_id', errors)
+        gid = save_decor_create_group(decor, manufacturer, sheet_rows, edge_rows, errors)
+        plan = save_decor_create_plan(a, gid, decor, manufacturer, decor_name, errors)
+        data = load
+        # (5) Riadky sa validuju AJ ked identita neprešla — pouzivatel ma dostat
+        # VSETKY chyby naraz, nie formular po jednom poli. Zapis je podmieneny
+        # PRAZDNYM `errors`, takze provizorny `group_id` sa na disk nikdy
+        # nedostane.
+        group = { 'group_id' => plan['gid'] }
+        sheets_out = save_decor_sheet_rows(data, group, plan, sheet_rows, errors)
+        edges_out  = save_decor_edge_rows(data, group, plan, edge_rows, errors)
+        return [:invalid, { 'errors' => errors }] unless errors.empty?
+
+        created = []
+        skipped = []
+        [['sheets', sheets_out, :sheet], ['edges', edges_out, :edge]].each do |(listk, rows, kind)|
+          idk = kind == :edge ? 'abs_id' : 'material_id'
+          rows.each do |item|
+            # „skip" v create nema ako vzniknut (skupina je nova, ziadny jej
+            # variant este neexistuje) — ale keby predsa, nesmie zmiznut
+            # z reportu bez slova.
+            if item['op'] == 'skip'
+              skipped << item['label']
+              next
+            end
+            rec = enforce_group_color!(item['rec'], data, kind)
+            data[listk] << rec
+            created << rec[idk]
+          end
+        end
+        # (6) Duplicita kod+dodavatel sa vycita rovnako ako pri edite — `orig`
+        # je prazdny, lebo TU je kazdy zaznam novy (nedotknuty par neexistuje).
+        conflict = save_decor_code_conflict(data, {}, a['allow_duplicate_code'])
+        return conflict if conflict
+        # (10) JEDEN write na cely formular.
+        return [:write_failed, { 'message' => 'Zápis katalógu zlyhal.' }] unless write_unlocked(data)
+        [:ok, { 'mode' => 'create', 'group_id' => plan['gid'], 'decor' => decor,
+                'created' => created, 'updated' => [], 'skipped' => skipped,
+                'changed' => created.size }]
+      end
+
+      # Riadok so skrytym ID v `create` = chyba (nie tichy edit cudzieho zaznamu).
+      def save_decor_create_no_ids(rows, listk, idk, errors)
+        rows.each_with_index do |raw, i|
+          next unless raw.is_a?(Hash)
+          id = sd_str(raw[idk] || raw[idk.to_sym])
+          next if id.empty?
+          errors << sd_err("#{listk}:#{i}", nil,
+                           "Riadok patrí existujúcemu variantu (#{id}) — nový dekor ho prevziať nemôže. Obnov sekciu „Materiály“ a skús znova.")
+        end
+        errors
+      end
+
+      # Identita NOVEJ skupiny. Vrati `group_id` (aj provizorny — validate-all
+      # musi dobehnut) a chyby pise do `errors`.
+      def save_decor_create_group(decor, manufacturer, sheet_rows, edge_rows, errors)
+        errors << sd_err(nil, 'decor', 'Číslo dekoru je povinné.') if decor.empty?
+        if sheet_rows.empty? && edge_rows.empty?
+          # Prazdny formular nie je „nova skupina", je to omyl — a ticho
+          # zalozena prazdna skupina by v katalogu ostala navzdy.
+          errors << sd_err(nil, nil, 'Nový dekor potrebuje aspoň jednu dosku alebo ABS pásku.')
+        elsif sheet_rows.empty? && !manufacturer.empty?
+          # Zrkadlo `add_decor_batch_v3` (GH #91 P2): vyrobcu NESIE DOSKA
+          # (standard 7.5) — znackova skupina bez nej by identitu stratila
+          # a jej group_id by ostal navzdy zablokovany koliziou.
+          errors << sd_err(nil, 'manufacturer',
+                           'Značková skupina potrebuje pri založení aspoň jednu dosku (výrobcu nesie doska) — pridaj dosku alebo výrobcu vynechaj.')
+        end
+        return group_id_for(manufacturer, decor) if decor.empty?
+        # `decor_name` sa do rozhodovania NEPOSIELA: pri existujucej skupine by
+        # `resolve_batch_group` vratil hlasku o NAZVE, kym skutocny problem je,
+        # ze skupina uz je (nizsie) — a hlaska by ukazovala na zle pole.
+        ok, group = resolve_batch_group(manufacturer, decor, '')
+        unless ok
+          errors << sd_err(nil, 'decor', group)
+          return group_id_for(manufacturer, decor)
+        end
+        unless group['new']
+          label = [manufacturer, decor].reject(&:empty?).join(' ')
+          errors << sd_err(nil, 'decor',
+                           "Dekor „#{label}“ v katalógu už je — otvor jeho dlaždicu a použi „Upraviť…“.")
+        end
+        group['group_id']
+      end
+
+      # Skupinove polia NOVEJ skupiny. Niet co porovnavat so „starym stavom" —
+      # vsetko je nove — takze plan nesie rovno hodnoty, ktore dostane KAZDY
+      # zakladany zaznam (farba aj smer dekoru su vlastnosti SKUPINY).
+      def save_decor_create_plan(a, gid, decor, manufacturer, decor_name, errors)
+        plan = { 'gid' => gid, 'decor' => decor, 'manufacturer' => manufacturer,
+                 'decor_name' => decor_name, 'color' => nil, 'grain' => nil,
+                 'rename' => false, 'reman' => false, 'rename_name' => false,
+                 'changed' => true }
+        if a.key?('color') && !sd_str(a['color']).empty?
+          rgb = parse_rgb(a['color'])
+          if rgb.nil?
+            errors << sd_err(nil, 'color', 'Neplatná farba — očakávam #RRGGBB alebo [r,g,b] 0–255.')
+          else
+            plan['color'] = rgb
+          end
+        end
+        if a.key?('grain')
+          want = sd_str(a['grain'])
+          unless want.empty?
+            if GRAINS.include?(want)
+              plan['grain'] = want
+            else
+              errors << sd_err(nil, 'grain', 'Smer dekoru musí byť length/width/none.')
+            end
+          end
+        end
+        plan
       end
 
       # (review #6) Druhy vyskyt toho isteho ID vo formulari = chyba validate-all.
@@ -1599,6 +1746,10 @@ module Noxun
                   'decor_name' => plan['decor_name'], 'group_id' => gid,
                   'type' => type, 'thickness' => th, 'structure' => struct,
                   'sheet_size' => size, 'grain' => plan['grain'] || sd_group_grain(data, gid),
+                  # Farba: pri EDITE ju aj tak prepise `enforce_group_color!`
+                  # (skupina uz nejakú má), pri CREATE je toto JEDINE miesto,
+                  # kde sa farba PRVEJ dosky novej skupiny berie.
+                  'color' => plan['color'],
                   'code' => row['code'], 'supplier' => row['supplier'],
                   'price_per_m2' => row['price_per_m2'] }
         ok, verr = validate_sheet_attrs(attrs)
@@ -1756,6 +1907,7 @@ module Noxun
         attrs = { 'abs_id' => generate_edge_id(plan['decor'], th, w, structure: struct, taken: taken),
                   'decor' => plan['decor'], 'decor_name' => plan['decor_name'], 'group_id' => gid,
                   'thickness' => th, 'width' => w, 'structure' => struct,
+                  'color' => plan['color'], # vid save_decor_new_sheet
                   'code' => row['code'], 'supplier' => row['supplier'],
                   'price_per_bm' => row['price_per_bm'] }
         ok, verr = validate_edge_attrs(attrs)
