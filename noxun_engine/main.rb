@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.7.61' unless defined?(VERSION)
+    VERSION = '0.7.62' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -468,7 +468,9 @@ module Noxun
         # ŠT-1c PR B3: docasna polozka „Výroba" tu ZANIKLA spolu s oknom —
         # kusovnik, kontrola, nakup kovania, rozpocet aj cenova ponuka su
         # sekciami Studia.
-        menu.add_item('Pravidlá kovania') { RulesDialog.show }
+        # ŠT-3b-1: okno „Pravidlá kovania" zaniklo — polozka menu ostava ako
+        # zauzivana skratka, ale otvara SEKCIU Pravidla v Studiu.
+        menu.add_item('Pravidlá kovania') { StudioDialog.show(open_section: 'rules') }
         # ŠT-2b: okno „Materiály projektu" zaniklo — polozka menu ostava ako
         # zauzivana skratka, ale otvara SEKCIU Materialy v Studiu.
         menu.add_item('Materiály projektu') { StudioDialog.show(open_section: 'mat') }

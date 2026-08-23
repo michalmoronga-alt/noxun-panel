@@ -51,7 +51,7 @@
 
   // ZRKADLO `StudioDialog::SECTIONS` — autoritou whitelistu je RUBY, tento
   // zoznam len zabrani, aby z okna vyletela hodnota, ktora sekciu nepomenuva.
-  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw'];
+  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'rules'];
 
   // ŠT-1b (Š10): 3-stavove nastavenie kontroly hran je ZDIELANY komponent —
   // TEN ISTY markup kresli rail Inspectora (rohovy trojuholnik pri ABS ikone)
@@ -106,7 +106,9 @@
       // setov projektu) — otvára ho premostenie Z VNÚTRA sekcie, nie
       // navigácia. Ikona = hammer (kontrakt „Ikony navigácie").
       { id: 'hw',     ic: 'hammer',   t: 'Kovanie' },
-      { id: 'rules',  ic: 'settings', t: 'Pravidlá',  bridge: 'zatiaľ vlastné okno — presun v ŠT-3' },
+      // ŠT-3b-1: Pravidlá sú SEKCIA (Š17). Okno „Pravidlá kovania" zaniklo;
+      // skupina „ABS podľa roly" pribudne v ŠT-3b-2.
+      { id: 'rules',  ic: 'settings', t: 'Pravidlá' },
       { id: 'tpl',    ic: 'star',     t: 'Šablóny',   bridge: 'zatiaľ vlastné okno — presun v ŠT-3' }
     ] },
     { grp: 'NASTAVENIA', items: [
@@ -131,6 +133,10 @@
            hint: 'katalóg dekorov je spoločný pre všetky zákazky · predvoľby projektu platia pre túto' },
     // ŠT-3a-1 (Š16): presun okna Katalóg kovania 1:1 — redizajn a D-15
     // pridávačky prídu s blokom KOVANIE.
+    // ŠT-3b-1 (Š17): zatiaľ LEN skupina „Kovanie podľa rozmerov" — hint to
+    // priznáva, aby prázdne miesto po ABS skupine nevyzeralo ako chyba.
+    rules: { t: 'Pravidlá',
+             hint: 'kovanie podľa rozmerov — platí pre tento projekt · ABS podľa roly dielca pribudne v ŠT-3b-2' },
     hw: { t: 'Kovanie',
           hint: 'katalóg položiek a sety sú spoločné pre všetky zákazky · predvoľby setov projektu zatiaľ v okne' }
   };
@@ -845,6 +851,12 @@
       else box.innerHTML = '';
       return;
     }
+    // ŠT-3b-1: to isté pre sekciu Pravidlá — lištu kreslí `js/rules.js`.
+    if (studioSec === 'rules'){
+      if (typeof rulesRenderTools === 'function') rulesRenderTools(staleFlag);
+      else box.innerHTML = '';
+      return;
+    }
     // Š10: lišta sekcie Kontrola nesie OBA prepínače (a nič iné — exporty
     // kontrola nemá). Jeden riadok, žiadny nový blok: vertikálny priestor
     // je vzácny a nastavenie hrán je overlay pod tlačidlom.
@@ -1020,6 +1032,13 @@
     if (studioSec === 'hw'){
       if (typeof hwRenderBody === 'function') hwRenderBody();
       else box.innerHTML = '<div class="muted">Kovanie sa nenačítalo (js/hw_catalog.js).</div>';
+      return;
+    }
+    // ŠT-3b-1: telo sekcie Pravidlá si kreslí `js/rules.js` SAM — v sekcii
+    // môže byť ROZPÍSANÝ formulár pravidiel a `NX.setStudio` ho nesmie zmazať.
+    if (studioSec === 'rules'){
+      if (typeof rulesRenderBody === 'function') rulesRenderBody();
+      else box.innerHTML = '<div class="muted">Pravidlá sa nenačítali (js/rules.js).</div>';
       return;
     }
     if (studioSec === 'ctrl') box.innerHTML = ctrlSection();
@@ -1269,6 +1288,9 @@
                          // a chodí echom). Hláška to musí povedať presne, inak
                          // vyzerá, že sa prepočítava katalóg.
                          mat: 'Prepočítavam použitie dekorov v projekte…',
+                         // ŠT-3b-1: v Pravidlách sa z modelu číta len počet skriniek,
+                         // ktoré uloženie prestavá (a či projekt už má vlastné pravidlá).
+                         rules: 'Načítavam pravidlá z aktuálneho modelu…',
                          // ŠT-3a-1: v Kovaní sa z modelu neprepočítava nič —
                          // „Obnoviť" si pýta čerstvý KATALÓG a sety z disku
                          // (mohlo ich zmeniť žijúce okno Katalóg kovania).

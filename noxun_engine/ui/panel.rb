@@ -125,7 +125,8 @@ module Noxun
           # V0.4 kovanie: rucny pocet / vypnutie / reset polozky + editor pravidiel
           cb(dlg, 'set_hardware_override') { |p| handle_set_hardware_override(p) }
           cb(dlg, 'set_hardware_set')      { |p| handle_set_hardware_set(p) } # V0.6 D1b: set na skrinke
-          cb(dlg, 'open_rules')            { |_p| RulesDialog.show }
+          # ŠT-3b-1: `open_rules` ZANIKOL spolu s oknom — tlacidlo panela ide
+          # deep-linkom `openStudio('rules')` (vzor „Materiály projektu" zo ŠT-2b).
           # ŠT-3a-2: `open_hardware_catalog` ZANIKOL spolu s oknom — tlacidlo
           # panela ide deep-linkom `openStudio('hw')` (vzor „Materiály
           # projektu" zo ŠT-2b).

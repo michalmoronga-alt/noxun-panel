@@ -782,9 +782,8 @@
     if (isNaN(v)){ NX.setStatus('Vyber dĺžku výsuvu.', true); return; }
     hwSend(hwPayload(btn, { field: 'nominal_length', value: v }));
   }
-  function openRulesDialog(){
-    if (window.sketchup && sketchup.open_rules) sketchup.open_rules('');
-  }
+  // ŠT-3b-1: `openRulesDialog` ZANIKOL spolu s oknom „Pravidlá kovania" —
+  // tlacidlo panela ide priamo deep-linkom `openStudio('rules')`.
   // ŠT-3a-2: `openHardwareCatalogDialog` ZANIKOL spolu s oknom „Katalóg
   // kovania" — tlacidlo panela ide priamo deep-linkom `openStudio('hw')`
   // (`js/actions.js`), rovnako ako „Materiály projektu…" od ŠT-2b.

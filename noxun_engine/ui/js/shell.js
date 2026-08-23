@@ -286,7 +286,7 @@
     // ŠT-2a: + `mat` (Materialy su ziva sekcia Studia; okno zanikne v ŠT-2b).
     // ŠT-3a-1: + `hw` (Kovanie je živá sekcia; okno Katalóg kovania zanikne
     // v ŠT-3a-2).
-    var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw'];
+    var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'rules'];
     function studioSection(s){
       var v = String(s == null ? '' : s);
       return STUDIO_SECTIONS.indexOf(v) >= 0 ? v : null;
