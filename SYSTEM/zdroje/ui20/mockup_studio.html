@@ -1526,11 +1526,22 @@ function matSection(){
       '<div class="subhead">Univerzálna ABS páska pre tento dekor</div>' +
       '<div style="max-width:340px">'+comboHtml('mat_uniabs','abs')+'</div>' +
       '<div class="hint" style="font-size:11.5px">Ten istý D-85 combobox ako v Inspectore — jeden komponent, päť miest.</div>' +
+      /* ŠT-2d (implementované): riadok vlastníka nesie SERVEROVÉ menovky rolí
+         (nie voľný text) a za doskovými riadkami idú riadky POUŽITÝCH PÁSOK
+         rodiny — páska je tiež „kde sa dekor používa". Doska s viacerými kusmi
+         priznáva kusy aj počet objektov, lebo v modeli je jeden objekt a
+         stavový riadok po kliku hlási práve objekty. */
       '<div class="subhead">Kde sa používa</div>' +
-      '<div class="lrow"><span class="lnm">CAB-004 · boky, dno, police</span><span class="lpr">10 dielcov</span>' +
-        '<span class="lact"><button title="Označiť v modeli" onclick="toast(\'Zvýraznené v modeli: 10 dielcov\',\'eye\')">'+ico('eye')+'</button></span></div>' +
-      '<div class="lrow"><span class="lnm">CAB-005 · boky, výstuhy</span><span class="lpr">6 dielcov</span>' +
-        '<span class="lact"><button title="Označiť v modeli" onclick="toast(\'Zvýraznené v modeli: 6 dielcov\',\'eye\')">'+ico('eye')+'</button></span></div>' +
+      '<div class="lrow"><span class="lnm">CAB-004 · Bok ľavý · Bok pravý · Dno · Polica</span><span class="lpr">10 dielcov</span>' +
+        '<span class="lact"><button title="Označiť v modeli — označí 10 položiek" onclick="toast(\'Zvýraznené v modeli: 10 dielcov\',\'eye\')">'+ico('eye')+'</button></span></div>' +
+      '<div class="lrow"><span class="lnm">CAB-005 · Bok ľavý · Bok pravý · Výstuha zadná</span><span class="lpr">6 dielcov</span>' +
+        '<span class="lact"><button title="Označiť v modeli — označí 6 položiek" onclick="toast(\'Zvýraznené v modeli: 6 dielcov\',\'eye\')">'+ico('eye')+'</button></span></div>' +
+      '<div class="lrow"><span class="lnm">Pracovná doska · Voľná doska</span><span class="lpr">3 ks · 1 objekt</span>' +
+        '<span class="lact"><button title="Označiť v modeli — označí 1 položku" onclick="toast(\'Zvýraznené v modeli: 1 objekt (3 ks)\',\'eye\')">'+ico('eye')+'</button></span></div>' +
+      '<div class="lrow"><span class="lnm">Páska <b>22 × 1,0 mm</b></span><span class="lpr">14 dielcov</span>' +
+        '<span class="lact"><button title="Označiť dielce s touto páskou — označí 14 položiek" onclick="toast(\'Zvýraznené v modeli: 14 dielcov s páskou 22 × 1,0\',\'eye\')">'+ico('eye')+'</button></span></div>' +
+      '<div class="lrow"><span class="lnm">Páska <b>22 × 2,0 mm</b></span><span class="lpr">4 dielce</span>' +
+        '<span class="lact"><button title="Označiť dielce s touto páskou — označí 4 položky" onclick="toast(\'Zvýraznené v modeli: 4 dielce s páskou 22 × 2,0\',\'eye\')">'+ico('eye')+'</button></span></div>' +
       '</div>';
   }
   const tile = d => '<button class="tile'+(S.matDetail===d.id?' on':'')+'" onclick="openMaterialDetail(\''+d.id+'\')">' +

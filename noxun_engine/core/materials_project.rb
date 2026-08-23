@@ -82,6 +82,25 @@ module Noxun
         {}
       end
 
+      # ŠT-2d: to iste pre ABS pasky ({ abs_id => kluc dekorovej skupiny }).
+      # „Kde sa používa" v detaile dekoru ukazuje aj pasky — a paska patri do
+      # skupiny presne tak ako doska (SCHEMA 2 = group_id, inak text dekoru),
+      # takze kluc MUSI vzniknut tym istym pravidlom. Vlastne odvodenie by
+      # znamenalo, ze pas „Použité v projekte" a zoznam „Kde sa používa" by
+      # mohli ukazovat na dve rozne skupiny.
+      def decor_key_by_abs_id
+        schema2 = catalog_schema >= SCHEMA_GROUPS
+        out = {}
+        edges.each do |a|
+          gid = schema2 ? a['group_id'].to_s.strip : ''
+          out[a['abs_id']] = gid.empty? ? a['decor'].to_s : gid
+        end
+        out
+      rescue StandardError => e
+        Engine.log_error(e, 'Materials.decor_key_by_abs_id') if defined?(Engine)
+        {}
+      end
+
       # 2A-4a (audit B3): kluc mapy je SCHEMA-AWARE — SCHEMA 1 = text dekoru
       # (dnesne UI), SCHEMA 2 = group_id (rovnake cislo dekoru dvoch vyrobcov
       # su DVE skupiny a ich pocty sa nesmu zliat; klienta karty skupiny doda

@@ -309,6 +309,15 @@
   .pcmat label { flex: 0 0 78px; font-size: 12px; color: var(--nx-ink-label); }
   .pcmat select { flex: 1; padding: 4px 6px; border: 1px solid var(--nx-border-strong); border-radius: 6px; font-size: 12px; min-width: 0; }
   .pcmat select.ovr { border-color: var(--nx-warn); background: var(--nx-warn-bg); }
+  /* ŠT-2d: preklik z karty dielca/dosky na DEKOR v Štúdiu. Bez materialu
+     (dielec bez rozhodnuteho materialu) je aria-disabled — zameratelny, klik
+     povie dovod (D-78), nikdy nemý mŕtvy prvok. */
+  .matlink { flex: 0 0 24px; width: 24px; padding: 3px 0; display: inline-flex; align-items: center;
+             justify-content: center; background: var(--nx-surface-sunken); color: var(--nx-ink-muted);
+             border: 1px solid var(--nx-border); border-radius: 6px; cursor: pointer; }
+  .matlink:hover { color: var(--nx-select-strong); border-color: var(--nx-select-accent); }
+  .matlink[aria-disabled="true"] { opacity: .45; cursor: default; }
+  .matlink .ic { width: 13px; height: 13px; }
   /* K1 (D-108): „Smer dekoru" v karte dielca — segment v TOM ISTOM riadkovom
      tvare ako „Materiál" (popisok 78 px + ovládač), takže karta nenarástla
      o samostatný riadok. Prefix `.nx-inspector` je tu kvôli špecificite:
@@ -1170,6 +1179,22 @@
   .mduni .ic { width: 14px; height: 14px; }
   /* M-A3b (D-60): vazba na Demos v riadku variantu — akcent, klik otvara stranku */
   .mddm { color: var(--nx-select-accent); }
+  /* ŠT-2d: „Kde sa používa" v detaile dekoru — vlastnik · roly · pocet + oko.
+     Ten isty riadkovy jazyk ako varianty (mdvrow), len bez editovatelnych buniek. */
+  .mdwhead { margin-top: 14px; }
+  .mdwempty { padding: 2px 6px 4px; font-size: 12px; }
+  .mdwrow { display: flex; align-items: center; gap: 8px; padding: 3px 6px;
+            border-top: 1px solid var(--nx-border-soft); }
+  .mdwrow:hover { background: var(--nx-select-bg-soft); }
+  .mdwn { flex: 1 1 0; min-width: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mdwr { color: var(--nx-ink-muted); }
+  .mdwq { flex: 0 0 84px; text-align: right; font-size: 12px; color: var(--nx-ink-muted); }
+  .mdwact { flex: 0 0 32px; display: inline-flex; justify-content: flex-end; }
+  .mdweye { width: 26px; padding: 3px 0; display: inline-flex; align-items: center; justify-content: center;
+            background: var(--nx-surface-sunken); color: var(--nx-ink-muted);
+            border: 1px solid var(--nx-border); border-radius: 6px; cursor: pointer; }
+  .mdweye:hover { color: var(--nx-select-strong); border-color: var(--nx-select-accent); }
+  .mdweye .ic { width: 14px; height: 14px; }
   /* M-A3c (D-67): vlastny suggest dropdown (CEF datalist klik bug) — jeden
      zdielany overlay, position:fixed nad formularmi (ziadne clipovanie). */
   /* ŠT-2c (audit #11): v Štúdiu beží ten istý formulár aj VNÚTRI D-15 modalu,

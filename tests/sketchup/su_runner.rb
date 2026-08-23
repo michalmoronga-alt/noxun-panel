@@ -6766,6 +6766,247 @@ module NoxunSuRunner
     sync_cleanup_decors(tmp_front) if defined?(tmp_front) && tmp_front
   end
 
+  # ===================== ŠT-2d: „KDE SA POUŽÍVA" =============================
+  #
+  # Co sa tu overuje (a preco to headless sada nevie):
+  #   1. NOVA SERVEROVA CESTA ZMENY VYBERU. Headless overi, ktore `pid` sa
+  #      vyratali; ci sa v modeli naozaj oznacia TIE entity — a ci sa pritom
+  #      nezmeni model ani nepribudne krok Spat — nie.
+  #   2. DEDENY MATERIAL na ZIVEJ skrinke. Fixture v headless sade ma material
+  #      „rozhodnuty" z definicie testu; tu ho rozhoduje BUILDER (dielec nema
+  #      v `part_overrides` nic) — presne ten pripad, ktory by textove
+  #      menovky dekorov nenasli (audit #14).
+  #   3. ZUZENIE NA VLASTNIKA nad DVOMA skrinkami toho isteho dekoru.
+  #   4. KOTVA sekcie `mat` — deep-link z karty dielca. Odklada sa v okne
+  #      a spotrebuva ju najblizsi push; jednorazovost sa da overit len na
+  #      zivom stave okna.
+  #   5. ⋯ EDITOR riadku rozpoctu = PRAVE JEDEN krok Spat (mutacia ide
+  #      nezmenenou `budget_mutate` cestou) + `budgetResult` do okna.
+
+  # Docasny dekor s REALNOU paskou (cerstvy katalog ma len UNI a UNI pasky
+  # zo zasady nema) — na konci sekcie sa MAZE.
+  ST2D_DECOR = 'SU ST2D DEKOR'
+
+  def run_st2d(model)
+    cleanup(model)
+    return ok('ŠT-2d: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
+
+    core = e::ProductionCore
+    a = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 900.0,
+                                         'height' => 720.0, 'depth' => 560.0 })
+    b = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
+                                         'height' => 720.0, 'depth' => 560.0 })
+    return ok('ŠT-2d: vlozenie dvoch skriniek pre „Kde sa používa"', false) unless a && b
+
+    aid = e::Store.get(a, 'cabinet_id').to_s
+    bid = e::Store.get(b, 'cabinet_id').to_s
+    before_ents = model.entities.length
+    e::StudioDialog.send(:push_state)
+    gen = -> { e::StudioDialog.instance_variable_get(:@generation).to_i }
+
+    collected = core.fresh_collect(model)
+    recs = Array(collected[:records])
+    counts = Hash.new(0)
+    recs.each { |r| counts[r['material_id'].to_s] += 1 }
+    mat = counts.reject { |k, _| k.empty? }.max_by { |_, v| v }&.first
+    if mat.nil?
+      ok('ŠT-2d: skrinky maju rozhodnuty material', false)
+      return cleanup(model)
+    end
+
+    # --- 1) DEDENY material sa MUSI oznacit tiez -----------------------------
+    ov = (e::Store.config(a) || {})['part_overrides']
+    ov = {} unless ov.is_a?(Hash)
+    inherited = recs.select do |r|
+      next false unless r['owner_id'].to_s == aid && r['material_id'].to_s == mat
+
+      (ov[r['part_key']].is_a?(Hash) ? ov[r['part_key']]['material_id'].to_s : '').empty?
+    end
+    ok("ŠT-2d: skrinka ma dielce s DEDENYM materialom (#{inherited.length})", !inherited.empty?)
+
+    expect = recs.select { |r| r['material_id'].to_s == mat }.map { |r| r['pid'] }.compact.uniq
+    model.selection.clear
+    e::StudioDialog.do_select({ 'gen' => gen.call, 'material_key' => mat }.to_json)
+    sel = model.selection.to_a.map(&:persistent_id)
+    ok("ŠT-2d: oko dekoru oznacilo VSETKY dielce dekoru v modeli (#{sel.length} z #{expect.length})",
+       sel.sort == expect.sort)
+    ok('ŠT-2d: vratane tych, ktore material len DEDIA po korpuse (audit #14)',
+       inherited.all? { |r| sel.include?(r['pid']) })
+    ok('ŠT-2d: vyber NEMENI model (ziadna entita naviac ani menej)',
+       model.entities.length == before_ents)
+
+    # --- 2) zuzenie na JEDNEHO vlastnika ------------------------------------
+    only_b = recs.select { |r| r['material_id'].to_s == mat && r['owner_id'].to_s == bid }
+                 .map { |r| r['pid'] }.compact.uniq
+    model.selection.clear
+    e::StudioDialog.do_select({ 'gen' => gen.call, 'material_key' => [mat],
+                                'owner_id' => bid }.to_json)
+    sel_b = model.selection.to_a.map(&:persistent_id)
+    ok("ŠT-2d: riadok vlastnika oznaci LEN jeho dielce (#{sel_b.length}); kluc smie byt POLE",
+       !only_b.empty? && sel_b.sort == only_b.sort)
+    ok('ŠT-2d: a je ich menej nez pri celom dekore', sel_b.length < expect.length)
+
+    # --- 2b) klik NEVYROBI KROK SPAT (silny dokaz, vzor run_d105) ------------
+    # „Pocet entit sa nezmenil" je slaby dokaz: vyber by mohol otvorit operaciu,
+    # ktora nic nekresli, a undo krok by aj tak vznikol. Preto sa PRED klikmi
+    # spravi MARKER — skutocna prestavba skrinky — a po klikoch musi JEDEN krok
+    # Spat vratit prave JU. Keby ktorykolvek klik (vratane odmietnuteho stale
+    # genom) pridal vlastny krok, undo by zjedol jeho a sirka by ostala zmenena.
+    w_before = (e::Store.config(b) || {})['width'].to_f
+    params_b = e::CabinetBuilder.config_to_params(e::Store.config(b) || {})
+    params_b['width'] = w_before + 40.0
+    e::CabinetBuilder.rebuild(model, b, params_b)
+    w_marker = (e::Store.config(b) || {})['width'].to_f
+    marker_ok = (w_marker - (w_before + 40.0)).abs < 0.01
+    ok("ŠT-2d: marker prestavby zapisal (sirka #{w_before} -> #{w_marker})", marker_ok)
+    if marker_ok
+      e::StudioDialog.send(:push_state)
+      model.selection.clear
+      e::StudioDialog.do_select({ 'gen' => gen.call, 'material_key' => mat }.to_json)
+      e::StudioDialog.do_select({ 'gen' => gen.call, 'material_key' => [mat],
+                                  'owner_id' => bid }.to_json)
+      # Aj ODMIETNUTY klik (stary DOM) musi byt bez stopy — repush v nom bezi.
+      e::StudioDialog.do_select({ 'gen' => gen.call - 99, 'material_key' => mat }.to_json)
+      model.selection.clear
+      Sketchup.undo
+      ok('ŠT-2d: 1x Spat vratil PRESTAVBU — tri kliky „oko" nevyrobili ani jeden krok Spat',
+         ((e::Store.config(b) || {})['width'].to_f - w_before).abs < 0.01)
+      e::StudioDialog.send(:push_state)
+    end
+
+    # --- 3) vyber podla ABS pasky -------------------------------------------
+    # Cerstvy katalog ma len UNI zaznamy a UNI material pasky ZO ZASADY nema —
+    # realna paska sa preto doseje (vzor `sync_seed_decors`) a na konci zmaze.
+    e::Materials.load
+    sync_purge_test_decors(ST2D_DECOR)
+    seed_ok, seed = e::Materials.add_decor_batch(
+      'batch_schema' => 3, 'decor' => ST2D_DECOR, 'type' => 'DTDL', 'grain' => 'length',
+      'sheet_variants' => [{ 'thickness' => 18.0, 'structure' => 'PW' }],
+      'edge_variants' => [{ 'width' => 23.0, 'thickness' => 1.0, 'structure' => 'PW' }]
+    )
+    ok("ŠT-2d: seed dekoru s paskou pre vyber podla ABS (#{seed_ok ? 'ok' : seed.inspect})", seed_ok)
+    abs_id = seed_ok ? Array(seed['edges']).first.to_s : ''
+    # Ktorykolvek vyrobny dielec skrinky — o com sekcia hovori, je PASKA, nie rola.
+    shelf = a.definition.entities.grep(Sketchup::ComponentInstance)
+             .find { |i| e::Store.kind(i) == 'part' && !e::Store.get(i, 'part_key').to_s.empty? }
+    if abs_id.empty? || shelf.nil?
+      info('ŠT-2d: pasku ani dielec sa nepodarilo pripravit — vyber podla ABS preskoceny ' \
+           '(logiku kryje headless sada)')
+    else
+      rk = e::Store.get(shelf, 'part_key').to_s
+      e::Panel.select_only(model, shelf) # handler pracuje s OZNACENYM dielcom
+      e::Panel.handle_set_part_edge({ 'cabinet_id' => aid, 'role_key' => rk,
+                                      'edge' => 'L1', 'abs_id' => abs_id }.to_json)
+      after_edge = core.fresh_collect(model)
+      want = Array(after_edge[:records])
+             .select { |r| r['edges'].is_a?(Hash) && r['edges'].values.map(&:to_s).include?(abs_id) }
+             .map { |r| r['pid'] }.compact.uniq
+      # Review #8: undo AZ PO OVERENI, ze olep naozaj prebehol. Keby handler
+      # zapis odmietol (ziadna operacia), bezpodmienecny `Sketchup.undo` by
+      # zjedol STAVBU SKRINKY a zvysok sekcie by testoval prazdny model.
+      taped = !want.empty?
+      ok('ŠT-2d: olep hrany pre test ABS naozaj prebehol', taped)
+      if taped
+        e::StudioDialog.send(:push_state)
+        model.selection.clear
+        e::StudioDialog.do_select({ 'gen' => gen.call, 'abs_key' => abs_id }.to_json)
+        sel_abs = model.selection.to_a.map(&:persistent_id)
+        ok("ŠT-2d: oko pri paske oznacilo dielce s tou paskou (#{sel_abs.length})",
+           sel_abs.sort == want.sort)
+        ok('ŠT-2d: a oznacene su LEN olepene dielce (nie cely korpus)',
+           sel_abs.length < expect.length && !sel_abs.include?(a.persistent_id))
+        Sketchup.undo # olep bol vlastny krok Spat — model spat na 2 skrinky
+        e::StudioDialog.send(:push_state)
+      end
+    end
+
+    # --- 4) rozpis „Kde sa používa" v payloade sekcie -----------------------
+    where = e::StudioDialog.mat_used_where(core.fresh_collect(model))
+    key = e::Materials.decor_key_by_material_id[mat].to_s
+    grp = where[key]
+    if grp.nil?
+      info("ŠT-2d: dekor #{mat} nema kluc skupiny v katalogu — rozpis sa preskocil")
+    else
+      owners = Array(grp['owners'])
+      ok('ŠT-2d: rozpis pozna OBE skrinky ako vlastnikov',
+         [aid, bid].all? { |o| owners.any? { |x| x['owner_id'].to_s == o } })
+      ok('ŠT-2d: a kazdy vlastnik nesie pocet, roly aj adresu vyberu',
+         owners.all? { |x| x['parts'].to_i.positive? && x['objects'].to_i.positive? &&
+                           !Array(x['roles']).empty? && !Array(x['material_ids']).empty? })
+      ok('ŠT-2d: roly su SLOVENSKE texty zo servera',
+         owners.any? { |x| Array(x['roles']).any? { |r| r.to_s =~ /[áäčďéíĺľňóôŕšťúýžÁČĎÉÍĽŇÓŠŤÚÝŽ]/ } })
+      # Review #4: kazdy riadok zoznamu je KLIKATELNA adresa — vlastnik bez
+      # identity by po kliku nemal co zuzit a oznacil by cely dekor.
+      ok('ŠT-2d: ziadny vlastnik BEZ IDENTITY (prazdny owner_id) sa nekresli',
+         owners.none? { |x| x['owner_id'].to_s.strip.empty? })
+      # Review #6: pocty musia sediet s tym, co po kliku napise stavovy riadok.
+      cab = owners.find { |x| x['owner_id'].to_s == aid }
+      sel_n = nil
+      if cab
+        model.selection.clear
+        e::StudioDialog.do_select({ 'gen' => gen.call, 'material_key' => cab['material_ids'],
+                                    'owner_id' => cab['owner_id'] }.to_json)
+        sel_n = model.selection.to_a.length
+        model.selection.clear
+      end
+      ok("ŠT-2d: `objects` je presne to, co sa v modeli oznaci (#{sel_n.inspect} == #{cab && cab['objects']})",
+         !cab.nil? && sel_n == cab['objects'].to_i)
+    end
+    payload = e::StudioDialog.mat_payload(model, core.fresh_collect(model))
+    ok('ŠT-2d: `used_where` chodi v `mat` payloade vedla poctov `used`',
+       payload.is_a?(Hash) && payload.key?('used_where') && payload.key?('used'))
+
+    # --- 5) kotva sekcie `mat` je JEDNORAZOVA -------------------------------
+    # Okno sa NEOTVARA (runner nesmie nechat viset HtmlDialog) — odlozeny
+    # deep-link sa nasadi rovno tam, kam ho `show` uklada.
+    e::StudioDialog.instance_variable_set(:@pending_section, 'mat')
+    e::StudioDialog.instance_variable_set(:@pending_anchor, mat)
+    e::StudioDialog.send(:push_state)
+    ok('ŠT-2d: deep-link z karty dielca sa SPOTREBOVAL (sekcia)',
+       e::StudioDialog.instance_variable_get(:@pending_section).nil?)
+    ok('ŠT-2d: aj kotva dekoru — inak by sa detail otvaral po kazdom refreshi',
+       e::StudioDialog.instance_variable_get(:@pending_anchor).nil?)
+    ok('ŠT-2d: spotreba kotvy model NEZMENILA', model.entities.length == before_ents)
+
+    # --- 6) ⋯ editor riadku rozpoctu = PRAVE JEDEN krok Spat ----------------
+    bs = e::BudgetStore
+    bs.add_custom_item!(model, 'popis' => 'SU ST2D položka', 'pocet' => '1', 'cena' => '5')
+    row_id = bs.custom_items(model).last.to_h['id'].to_s
+    if row_id.empty?
+      ok('ŠT-2d: fixture riadku rozpoctu vznikla', false)
+    else
+      before_row = bs.custom_items(model)
+      scripts = st1c_capture(e::StudioDialog) do
+        e::StudioDialog.do_budget(
+          { 'op' => 'custom_update', 'gen' => gen.call,
+            'model_guid' => core.model_guid(model), 'id' => row_id,
+            'attrs' => { 'kod' => 'ST2D', 'url' => 'https://example.org/x',
+                         'poznamka' => 'z ⋯ editora' } }.to_json
+        )
+      end
+      after_row = bs.custom_items(model)
+      wrote_row = after_row != before_row
+      ok('ŠT-2d: ⋯ editor zapisal kod/adresu/poznamku', wrote_row)
+      ok('ŠT-2d: a okno dostalo `budgetResult(custom_update, true)` (modal sa smie zavriet)',
+         scripts.any? { |s| s.include?('NX.budgetResult("custom_update", true)') })
+      # Review #8: undo krokov ide presne tolko, kolko ich naozaj vzniklo.
+      # Bezpodmienecne dva by pri odmietnutom zapise zjedli fixture AJ stavbu
+      # skrinky — zaverecne upratanie by potom bezalo nad cudzim stavom.
+      if wrote_row
+        Sketchup.undo
+        ok('ŠT-2d: ⋯ editor = PRESNE 1 krok Späť', bs.custom_items(model) == before_row)
+      end
+      Sketchup.undo # fixture riadok prec (aby zaverecny undo vratil skrinku)
+    end
+
+    cleanup(model)
+    sync_cleanup_decors(seed) if seed_ok
+  rescue StandardError => ex
+    log_line("FAIL: ŠT-2d vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+    sync_purge_test_decors(ST2D_DECOR)
+  end
+
   def run_async(model, done)
     state = {}
     steps = []
@@ -7449,6 +7690,7 @@ module NoxunSuRunner
     run_st1a(model)          # ST-1a: okno Studio — deep-link sekcie, kusovnik zo ziveho modelu, klik-select bez undo kroku, serverovy nazov projektu
     run_st1b(model)          # ŠT-1b: sekcia Kontrola v Studiu — jedno cislo semaforu, klik na nalez bez undo kroku, zdielane prepinace, trvanie pushov
     run_st1c(model)          # ŠT-1c: sekcia Nákup kovania (PR A) + sekcia ROZPOCET (PR B1) — 12 mutacii = 12x jeden krok Spat, gen a guid guardy, bump:false kontrakt, XLSX guardy, meranie pushov
+    run_st2d(model)          # ŠT-2d: „Kde sa používa" — vyber podla materialu (aj DEDENEHO) a ABS, zuzenie na vlastnika, jednorazova kotva sekcie `mat`, ⋯ editor rozpoctu = 1 krok Spat
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

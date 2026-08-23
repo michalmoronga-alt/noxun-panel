@@ -157,7 +157,10 @@ NxTest.test('ŠT-2a (audit #15): `used` vznika z UZ zozbieraneho kusovnika') do
                 'payload sekcie ide z TOHO ISTEHO zberu ako kusovnik')
   NxTest.refute(push.include?('model_decor_usage'),
                 'druhy sken modelu (Ids) v prepocte Studia NESMIE byt')
-  used = ST2A_STUDIO_RB[/def mat_used\(collected\).*?\n        end\n/m].to_s
+  # ŠT-2d (review #5): mapu kluca skupiny uz podava `mat_payload` (stavia sa
+  # RAZ pre pocty aj pre rozpis „Kde sa používa"), takze `mat_used` ju berie
+  # ako parameter s fallbackom. Zdroj poctov sa nemenil.
+  used = ST2A_STUDIO_RB[/def mat_used\(collected.*?\n        end\n/m].to_s
   NxTest.assert(used.include?('collected[:records]'), 'pocty sa ratajú z BOM zaznamov')
   NxTest.assert(used.include?('Materials.decor_key_by_material_id'),
                 'kluc skupiny podava katalog — JS ani Studio si ho neskladaju')
