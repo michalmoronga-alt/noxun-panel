@@ -5,7 +5,7 @@
      to isté zdieľané jadro `ProductionCore`).
      Vizuálna referencia: SYSTEM/zdroje/ui20/mockup_studio.html -->
 <meta charset="utf-8">
-<link rel="stylesheet" href="css/panel.css?v=0.7.51">
+<link rel="stylesheet" href="css/panel.css?v=0.7.52">
 <style>
   /* Štýly sú ZÁMERNE inline v studio.html (rovnaký dôvod, aký mala production.html):
      panel.css je zdieľaný s Inspectorom a rozloženie tohto okna doňho nepatrí.
@@ -518,6 +518,27 @@
      ostáva zamerateľné a klik povie dôvod do `.mrnote`. */
   .mrline .mrdel.off { opacity: .45; }
   .mrline .mrdel .ic { width: 13px; height: 13px; }
+  /* ŠT-2c 2c-2a (review 2c-1 #8): širka stĺpca musí sedieť v HLAVIČKE aj
+     v bunke — inak nadpis „Cena" visí nad polovicou tabuľky. Triedy sú
+     zdieľané (`colCls` ich dáva obom) a scope je `.mrline`, lebo `.mrow`
+     verzia `.mshort` platí pre ploché polia s inou šírkou. */
+  .mrcols span.mshort, .mrline input.mshort, .mrline select.mshort { flex: 0 0 96px; }
+  .mrcols span.mtiny, .mrline input.mtiny, .mrline select.mtiny { flex: 0 0 62px; }
+  .mrcols span.mcheckcol { flex: 0 0 14px; }
+  /* Zamknutá (identitná) bunka existujúceho variantu: `readonly`, NIE
+     `disabled` — hodnotu musí byť vidno, dať zamerať aj skopírovať. */
+  .mrline input[readonly] { background: var(--nx-surface-sunken); color: var(--nx-ink-soft); }
+  /* Serverové chyby PRI POLIACH (validate-all). Riadok sa zalamuje, aby veta
+     sadla pod pole, ktorého sa týka — modal sa pri odmietnutí nezatvára. */
+  .mrow, .mrline { flex-wrap: wrap; }
+  .merr { flex: 0 0 100%; font-size: 11px; color: var(--nx-danger); padding: 2px 0 0; }
+  .mrow > .merr { margin-left: 126px; }
+  .merr:empty, .merrtop:empty { display: none; }
+  .merrtop { margin: 0 0 8px; padding: 5px 8px; font-size: 11.5px; color: var(--nx-danger);
+             background: var(--nx-danger-bg-soft); border: 1px solid var(--nx-danger-border);
+             border-radius: 6px; }
+  .mrow input.bad, .mrow select.bad, .mrline input.bad, .mrline select.bad {
+    border-color: var(--nx-danger-line); background: var(--nx-danger-bg-soft); }
   .mrempty { font-size: 11px; color: var(--nx-ink-faint); padding: 4px 2px; }
   .mrnote:not(:empty) { font-size: 11px; color: var(--nx-warnchip-fg); padding: 3px 2px 0; }
   .mradd { margin-top: 4px; }
@@ -787,34 +808,34 @@
 </template>
 <div id="status">Pripravené.</div>
 
-<script src="js/errors.js?v=0.7.51"></script>
+<script src="js/errors.js?v=0.7.52"></script>
 <!-- D-51/D-77: minimálna OBSAHOVÁ veľkosť okna pri otvorení (js/win_fit.js).
      Navigácia 208 px + tabuľka Kusovníka so 7 stĺpcami a stĺpcom akcií — v užšom
      okne končí pravá časť riadku mimo. Trojica NX_FIT_MIN → width/height →
      min_width/min_height je v docs/UI_DIZAJN.md (tabuľka D-51). -->
 <script>window.NX_FIT_MIN = { w: 1060, h: 640 };</script>
-<script src="js/win_fit.js?v=0.7.51"></script>
+<script src="js/win_fit.js?v=0.7.52"></script>
 <!-- Sprite ikon (žiadne emoji v ovládacích prvkoch). Musí byť PRED studio.js —
      navigácia aj hover akcie riadkov používajú <use href="#i-…">. -->
-<script src="js/icons.js?v=0.7.51"></script>
+<script src="js/icons.js?v=0.7.52"></script>
 <!-- ŠT-1b: ZDIELANE 3-stavove nastavenie kontroly hran. TEN ISTY subor nacitava
      aj Inspector (rohovy trojuholnik pri ABS kontrole v raile) — jeden markup,
      jeden stav. Musi byt PRED studio.js (lista sekcie Kontrola ho vola pri
      renderi). ŠT-1c PR B3: okno Vyroba zaniklo — prepinace su TU. -->
-<script src="js/edge_menu.js?v=0.7.51"></script>
+<script src="js/edge_menu.js?v=0.7.52"></script>
 <!-- ŠT-1c PR B2 (D-15): ZDIELANA kostra modalov („pridávačiek"). Musí byť PRED
      studio.js aj budget.js — Escape handler Štúdia sa pýta `NXModal.isOpen()`
      a rozpočet ním otvára svoje pridávačky. Ďalšie inštancie (D-69 editor
      materiálu, položka/set kovania) sa naň napoja bez kopírovania. -->
-<script src="js/nx_modal.js?v=0.7.51"></script>
-<script src="js/studio.js?v=0.7.51"></script>
+<script src="js/nx_modal.js?v=0.7.52"></script>
+<script src="js/studio.js?v=0.7.52"></script>
 <!-- ŠT-1c PR B1: sekcia ROZPOČET (Š12–Š13). MUSÍ byť AŽ ZA studio.js — číta
      jeho globálny payload `ST` a hlavne OBALUJE `NX.setStudio` (uvoľnenie
      frontu zápisov po príchode čerstvej generácie). studio.js pritom NX
      PRIRAĎUJE celý (`window.NX = {…}`), takže v opačnom poradí by obal aj
      `NX.budgetResult`/`NX.priceRefresh` prepísal a rozpočet by po prvom zápise
      zamrzol. Poradie stráži guard test (tests/pure/test_st1c_rozpocet.rb). -->
-<script src="js/budget.js?v=0.7.51"></script>
+<script src="js/budget.js?v=0.7.52"></script>
 <!-- ŠT-2a/2b: sekcia MATERIÁLY. Okno „Materiály projektu" ZANIKLO, takže tento
      súbor beží už len TU; príznak nižšie ostáva ako explicitné prihlásenie sa
      do režimu sekcie (a ako poistka Node testov, ktoré ho nenastavujú).
@@ -828,6 +849,6 @@
      handlerov; `demos_add.js` nesie modal „Pridať z Demosu". Oba používajú
      výhradne vlastné prefixy (`mdd*` / `nxda*`), takže v okne so studio.js
      a budget.js nič neprepisujú (stráži guard test). -->
-<script src="js/demos_diff.js?v=0.7.51"></script>
-<script src="js/demos_add.js?v=0.7.51"></script>
-<script src="js/proj_materials.js?v=0.7.51"></script>
+<script src="js/demos_diff.js?v=0.7.52"></script>
+<script src="js/demos_add.js?v=0.7.52"></script>
+<script src="js/proj_materials.js?v=0.7.52"></script>

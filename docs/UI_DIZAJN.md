@@ -1145,6 +1145,27 @@ variantu od nového; riadok pridaný tlačidlom ich nemá. **Identita variantu s
 nikdy neodvodzuje od kódu, ktorý používateľ práve prepisuje.** Ploché polia
 ostávajú reťazcami — drafty rozpočtu na tom stoja.
 
+**Stĺpce riadku** (`cols[]`, doplnené ŠT-2c PR 2c-2a pre D-69 editor dekoru):
+
+| kľúč | Čo robí |
+|---|---|
+| `cls` | šírková trieda stĺpca — `mshort` (96 px), `mtiny` (62 px), inak pružný. Dostane ju **bunka aj hlavička** (`colCls`), inak nadpis „Cena" visí nad polovicou tabuľky |
+| `roWhen` | kľúč, ktorého prítomnosť v riadku bunku **zamkne** (`roWhen: 'material_id'` = „riadok už je uložený variant, toto je jeho identita") |
+| `roTitle` | **dôvod** zámku do tooltipu — pravidlo D-78, žiadne mŕtve pole bez vysvetlenia |
+
+Zamknutá bunka je `readonly`, **nikdy `disabled`**: hodnotu musí byť vidno, dať
+zamerať aj skopírovať — `disabled` ju vyhodí z klávesnice aj z čítačky obrazovky.
+Bunky nemajú `<label>` (nadpis je nad stĺpcom), preto dostávajú **`aria-label`**.
+
+**Chyby zo servera pri poliach** — `NXModal.showErrors([{row, field, msg}])`
+(a `clearErrors()`). Server validuje **celý formulár naraz** a modal sa pri
+odmietnutí nezatvára, takže hláška musí pristáť pri tom poli, ktorého sa týka:
+`row = null` ide pod `.mrow` plochého poľa, `"<kľúč>:<index>"` (napr.
+`"sheets:2"`) pod príslušný `.mrline`, nezaraditeľná do zberného pásu
+`.merrtop` navrchu tela. Chybné pole dostane `.bad` + `aria-invalid`. Každé
+ďalšie volanie predošlé chyby **prepíše** — inak by na obrazovke ostali vety
+o hodnotách, ktoré už používateľ opravil.
+
 Pri dosiahnutom `min` tlačidlo **−** nezmizne ani neztvrdne na `disabled`:
 dostane `aria-disabled` (ostáva v Tab poradí, `focusables()` `aria-disabled`
 prvky **nevyhadzuje**) a klik napíše **dôvod** do `.mrnote` — pravidlo D-78,

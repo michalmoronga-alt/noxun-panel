@@ -503,6 +503,13 @@
       // semafor ORANGE „material neurceny" nan odkazuje textom).
       (g.uni ? '<button class="primary tplbtn"' + dis + ' title="' + mdEsc(mdUniTip()) + '" onclick="mdUniStart(' + mdEsc(JSON.stringify(g.key)) + ')">Nahradiť UNI…</button>' : '') +
       (g.decor === '' ? '' :
+        // ŠT-2c 2c-2a (D-69): JEDEN formular na cely dekor — kod, nazov,
+        // vyrobca, farba, dosky aj pasky naraz. UNI ho nedostava (pracovny
+        // material sa nahradza, needituje). Doterajsie jednoucelove cesty
+        // (Výrobca/Názov/Premenovať) ostavaju do 2c-2b.
+        (g.uni ? '' :
+          '<button class="ghostbtn tplbtn"' + dis + ' title="Upraviť celý dekor — kód, názov, výrobca, farba, dosky aj ABS"' +
+          ' onclick="mdEditOpen(' + mdEsc(JSON.stringify(g.key)) + ')">Upraviť…</button>') +
         '<button class="ghostbtn tplbtn"' + dis + ' onclick="mdOpenDecorForm(' + mdEsc(JSON.stringify(g.key)) + ')">+ variant</button>' +
         '<button class="ghostbtn tplbtn"' + dis + ' onclick="mdManufacturerOpen(' + mdEsc(JSON.stringify(g.key)) + ')">Výrobca</button>' +
         (MD_SCHEMA2 ? '<button class="ghostbtn tplbtn"' + dis + ' onclick="mdNameOpen(' + mdEsc(JSON.stringify(g.key)) + ')">Názov</button>' : '') +
@@ -747,6 +754,171 @@
       sketchup.set_decor_manufacturer(JSON.stringify({ decor: g.decor, manufacturer: '',
         group_id: g.gid || '', clear_manufacturer: true, catalog_rev: MD_REV, catalog_schema: MD_CLIENT_SCHEMA }));
     mdManufacturing = null;
+  }
+
+  // === ŠT-2c PR 2c-2a: D-69 JEDNOTNY EDITOR DEKORU („Upraviť…") =============
+  //
+  // JEDEN formular na cely dekor: identita skupiny + riadky dosiek + riadky
+  // ABS. Vsetko odchadza JEDNOU akciou `save_decor`, ktorú server zapisuje
+  // ATOMICKY (jeden zamok, validate-all, jeden write) — katalog cien realnych
+  // objednavok sa nesmie ulozit „spolovice".
+  //
+  // BASELINE SA ZMRAZUJE PRI OTVORENI (audit ŠT-2c #1). `MD_REV` je ZIVA
+  // premenna, ktorú prepise KAZDE katalogove echo; keby ju formular cital az
+  // pri odoslani, guard by po cudzom zapise „omladol" a editor by prepisal
+  // zmenu, ktorú pouzivatel nikdy nevidel. Odtlacok KAZDEHO riadku (`row_rev`)
+  // ide so skrytymi polami riadku, takze konflikt sa pozna aj per zaznam.
+  var mdEditBase = null;      // { key, gid, rev, decor } — snimok z CASU OTVORENIA
+  var mdEditDupAllow = false; // druhe „Uložiť" potvrdzuje duplicitu kodu
+
+  // Kostra D-15 zije v `window.NXModal` (nacita ju `studio.html`). Pristupovy
+  // bod je funkcia, aby sa dal subor requirovat aj v Node testoch bez okna.
+  function mdModal(){
+    return (typeof window !== 'undefined' && window.NXModal) ? window.NXModal : null;
+  }
+
+  // Konvencia kluca pamate D-15: `<domena>:<mode>:<ciel>` — slot je `mat:edit`,
+  // takze otvorenie editora INEHO dekoru stary rozpis zahodi (inak by sa
+  // hodnoty dekoru A predvyplnili do dekoru B).
+  function mdEditKey(g){ return 'mat:edit:' + (g.gid || g.decor); }
+
+  // Cislo do pola formulara: prazdne ostava prazdne (cena NEZADANA nie je 0)
+  // a desatinna ciarka je SK zapis, ktory server aj tak parsuje oboma sposobmi.
+  function mdEditNum(v){
+    if (v === null || v === undefined || v === '') return '';
+    var f = parseFloat(v);
+    if (isNaN(f)) return String(v);
+    return String(f === Math.round(f) ? Math.round(f) : f).replace('.', ',');
+  }
+
+  function mdEditSheetRow(s){
+    return { material_id: s.material_id, row_rev: s.row_rev || '',
+             type: String(s.type || ''), thickness: mdEditNum(s.thickness),
+             sheet_size: (s.sheet_size && s.sheet_size.length === 2)
+               ? mdEditNum(s.sheet_size[0]) + '×' + mdEditNum(s.sheet_size[1]) : '',
+             code: String(s.code || ''), price_per_m2: mdEditNum(s.price_per_m2) };
+  }
+
+  function mdEditEdgeRow(a){
+    return { abs_id: a.abs_id, row_rev: a.row_rev || '',
+             width: mdEditNum(a.width), thickness: mdEditNum(a.thickness),
+             code: String(a.code || ''), price_per_bm: mdEditNum(a.price_per_bm) };
+  }
+
+  // Cista funkcia (Node test): skupina -> polia D-15 modalu.
+  // IDENTITNE polia existujuceho riadku su `readonly` s DOVODOM v tooltipe:
+  // server takú zmenu aj tak odmietne (kontrakt bod 7), ale UI ju nema
+  // PROVOKOVAT. Duplaky sa v editore nezobrazuju vobec — vsetko derivuju zo
+  // zdrojovej dosky a nemaju co editovat.
+  function mdEditFields(g){
+    var sheets = (g.sheets || []).filter(function(s){ return !s.source_material_id; });
+    var edges = g.edges || [];
+    return [
+      { type: 'group', label: 'Dekor', hint: 'platí pre celú skupinu' },
+      { key: 'decor', label: 'Číslo dekoru', value: String(g.decor || '') },
+      { key: 'decor_name', label: 'Názov', value: String(g.decor_name || ''),
+        placeholder: 'napr. Dub Halifax' },
+      { key: 'manufacturer', label: 'Výrobca', value: String(g.manufacturer || ''),
+        placeholder: 'napr. Egger' },
+      { key: 'color', label: 'Farba', type: 'color', value: rgbToHex(g.color) },
+      { type: 'group', label: 'Dosky', hint: 'typ a hrúbka určujú variant' },
+      { key: 'sheets', type: 'rows', addLabel: 'Pridať dosku', empty: 'Zatiaľ žiadna doska.',
+        hidden: ['material_id', 'row_rev'],
+        cols: [
+          { key: 'type', label: 'Typ', cls: 'mtiny', roWhen: 'material_id',
+            roTitle: 'Typ dosky definuje variant — pre iný typ pridaj nový riadok.' },
+          { key: 'thickness', label: 'Hrúbka', cls: 'mtiny', roWhen: 'material_id',
+            roTitle: 'Hrúbka definuje variant — pre inú hrúbku pridaj nový riadok.' },
+          { key: 'sheet_size', label: 'Formát', cls: 'mshort', placeholder: '2800×2070' },
+          { key: 'code', label: 'Kód', placeholder: 'kód dodávateľa' },
+          { key: 'price_per_m2', label: '€/m²', cls: 'mtiny', placeholder: '—' }
+        ],
+        value: sheets.map(mdEditSheetRow) },
+      { type: 'group', label: 'ABS pásky', hint: 'šírka a hrúbka určujú variant' },
+      { key: 'edges', type: 'rows', addLabel: 'Pridať pásku', empty: 'Zatiaľ žiadna páska.',
+        hidden: ['abs_id', 'row_rev'],
+        cols: [
+          { key: 'width', label: 'Šírka', cls: 'mtiny', roWhen: 'abs_id',
+            roTitle: 'Šírka definuje variant pásky — pre inú šírku pridaj nový riadok.' },
+          { key: 'thickness', label: 'Hrúbka', cls: 'mtiny', roWhen: 'abs_id',
+            roTitle: 'Hrúbka definuje variant pásky — pre inú hrúbku pridaj nový riadok.' },
+          { key: 'code', label: 'Kód', placeholder: 'kód dodávateľa' },
+          { key: 'price_per_bm', label: '€/bm', cls: 'mtiny', placeholder: '—' }
+        ],
+        value: edges.map(mdEditEdgeRow) }
+    ];
+  }
+
+  // (audit ŠT-2c #18) Otvorenie editora ZAHADZUJE rozpisane inline bunky toho
+  // isteho dekoru. Dva rozpisane stavy tej istej ceny (bunka + formular) by sa
+  // navzajom prepisali podla toho, kam pouzivatel nahodou klikne — a jeden
+  // z nich by bol cena, o ktorej uz nevie, ze ju pisal. Vrati POCET zahodenych.
+  function mdEditDropDirty(g){
+    if (typeof document === 'undefined' || !document.querySelectorAll) return 0;
+    var ids = {};
+    (g.sheets || []).forEach(function(s){ ids[s.material_id] = true; });
+    (g.edges || []).forEach(function(a){ ids[a.abs_id] = true; });
+    var cells = document.querySelectorAll('.mdcell');
+    var n = 0;
+    for (var i = 0; i < cells.length; i++){
+      var c = cells[i];
+      if (!ids[c.getAttribute('data-id')]) continue;
+      var orig = c.getAttribute('data-orig') || '';
+      if (String(c.value) === orig) continue;
+      c.value = orig; // blur uz nema co poslat (mdCellFlush porovnava s data-orig)
+      n++;
+    }
+    return n;
+  }
+
+  // Cista funkcia (Node test): hodnoty modalu -> payload servera.
+  function mdEditPayload(v, base){
+    var d = v || {};
+    return { mode: 'edit', group_id: (base && base.gid) || '',
+             base_rev: (base && base.rev) || '', catalog_schema: MD_CLIENT_SCHEMA,
+             decor: d.decor, decor_name: d.decor_name, manufacturer: d.manufacturer,
+             color: d.color, sheets: d.sheets || [], edges: d.edges || [],
+             allow_duplicate_code: !!(base && base.dup) };
+  }
+
+  function mdEditOpen(key){
+    var m = mdModal();
+    if (!m) return;
+    if (MD_RO){ MD.setStatus('Katalóg je len na čítanie — úpravy sú vypnuté.', true); return; }
+    var g = mdGroupByKey(key);
+    if (!g){ MD.setStatus('Dekor sa medzitým zmenil — obnov sekciu „Materiály“.', true); return; }
+    if (g.uni === true){
+      MD.setStatus('UNI je pracovný materiál — nahraď ho reálnym dekorom.', true);
+      return;
+    }
+    var dropped = mdEditDropDirty(g);
+    mdEditBase = { key: key, gid: g.gid || '', rev: MD_REV, decor: g.decor };
+    mdEditDupAllow = false;
+    m.open({
+      title: 'Upraviť dekor',
+      sub: g.decor + (g.decor_name ? ' · ' + g.decor_name : ''),
+      size: 'wide', okLabel: 'Uložiť', memoryKey: mdEditKey(g),
+      note: 'Typ, hrúbka a šírka existujúceho variantu sú jeho identita — pre iné hodnoty pridaj nový riadok. Riadok, ktorý tu nie je, sa nemaže.',
+      fields: mdEditFields(g),
+      onSubmit: mdEditSubmit
+    });
+    if (dropped) MD.setStatus('Rozpísané bunky dekoru ' + g.decor + ' sa zahodili — uprav ich v tomto formulári.');
+  }
+
+  function mdEditSubmit(v){
+    var m = mdModal();
+    if (!mdEditBase){ if (m) m.setBusy(false); return; }
+    mdEditBase.dup = mdEditDupAllow;
+    var payload = mdEditPayload(v, mdEditBase);
+    if (window.sketchup && sketchup.save_decor) sketchup.save_decor(JSON.stringify(payload));
+    else if (m) m.setBusy(false); // bez mosta by okno ostalo navzdy zamknute
+  }
+
+  function mdEditClose(){
+    var m = mdModal();
+    mdEditBase = null;
+    mdEditDupAllow = false;
+    if (m && m.isOpen()) m.close();
   }
 
   // --- formulare (create: id=null; edit: id zaznamu) ---
@@ -2028,6 +2200,40 @@
     // D-42 PR C: duplicitny kod z inline bunky — bunka OSTAVA rozpisana (server
     // neposlal refresh), dalsi flush tej istej bunky posle potvrdenie.
     flagDuplicatePatch: function(kind, id){ mdPatchDup = { kind: kind, id: id }; },
+    // --- ŠT-2c 2c-2a: vysledok editora dekoru ---------------------------
+    // Modal zatvara VYHRADNE POTVRDENY zapis (kontrakt D-15): odmietnuty
+    // necha pouzivatelovi rozpisany formular na mieste — ma opravit cislo,
+    // nie pisat celu tabulku znova.
+    editSaved: function(){
+      var m = mdModal();
+      mdEditBase = null;
+      mdEditDupAllow = false;
+      if (!m || !m.isOpen()) return;
+      m.setBusy(false, { clear: true }); // pamat rozpisu zanika az na potvrdenie
+      m.close();
+    },
+    // Vsetky chyby NARAZ, kazda pri svojom poli (rows: pri svojom riadku).
+    editErrors: function(list){
+      var m = mdModal();
+      if (!m) return;
+      m.setBusy(false);
+      m.showErrors(list || []);
+    },
+    // Duplicitny par kod+dodavatel: druhe „Uložiť" ho POTVRDI (zrkadlo
+    // formularoveho allow_duplicate_code aj inline bunky).
+    editDuplicateCode: function(){
+      mdEditDupAllow = true;
+      var m = mdModal();
+      if (m) m.setBusy(false);
+    },
+    // Katalog sa medzitym zmenil / read-only / zlyhal zapis: odomkni, hodnoty
+    // OSTAVAJU. Cerstve data uz prisli katalogovym echom.
+    editBlocked: function(){
+      var m = mdModal();
+      if (!m) return;
+      m.setBusy(false);
+      m.clearErrors();
+    },
     // D-46: server pyta potvrdenie zmeny predvolby korpusu. Select sa VRATI na
     // skutocny default (nesmie vizualne zostat na nepotvrdenom materiali) a pod
     // nim sa ukaze lista s presnym rozpisom.
@@ -2176,6 +2382,10 @@
     mdDeleteClose();
     mdRestoreClose();
     mdSgClose();
+    // Kotva D-15 zije MIMO tela sekcie (`#nxModalRoot`), takze editor dekoru by
+    // po odchode ostal visiet nad Kusovnikom. Zatvorenie hodnoty NEZAHADZUJE —
+    // pamat kostry ich podrzi do najblizsieho otvorenia.
+    mdEditClose();
     if (typeof mddClose === 'function') mddClose();
     if (typeof nxdaClose === 'function') nxdaClose();
   }
@@ -2349,7 +2559,16 @@
       // globalnu funkciu, nie cez export.
       matToolsHtml: matToolsHtml, matRenderBody: matRenderBody,
       // ŠT-2b — odchod zo sekcie zavrie modaly a zrusi bezaci Demos fetch
-      matOnLeaveSection: matOnLeaveSection };
+      matOnLeaveSection: matOnLeaveSection,
+      // ŠT-2c 2c-2a — D-69 editor dekoru. `mdEditFields`/`mdEditPayload`/
+      // `mdEditNum` su CISTE funkcie; `mdEditOpen`/`mdEditDropDirty`/`MD`
+      // potrebuju DOM a exportuju sa ZAMERNE — kontrakty „base_rev zmrazeny
+      // pri otvoreni" a „otvorenie zahodi dirty bunky" sa inak nedaju overit
+      // nicim nez klikanim (tests/js/test_st2c_editor.js).
+      mdEditFields: mdEditFields, mdEditPayload: mdEditPayload, mdEditNum: mdEditNum,
+      mdEditSheetRow: mdEditSheetRow, mdEditEdgeRow: mdEditEdgeRow,
+      mdEditOpen: mdEditOpen, mdEditDropDirty: mdEditDropDirty, mdEditKey: mdEditKey,
+      mdSetCatalog: mdSetCatalog, MD: MD };
   }
   // ŠT-2a (audit #7): `sketchup.ready('')` tu ZANIKLO. V okne Materialy bol
   // tento subor POSLEDNY a jeho `ready` znamenal „HTML je nacitane". V Studiu

@@ -152,8 +152,14 @@
       var h = '';
       if (d.label) h += '<div class="mrhead">' + esc(d.label) + '</div>';
       if (arr.length && (d.cols || []).length){
+        // Hlavicka MUSI niest TU ISTU sirkovu triedu ako bunka pod nou (review
+        // 2c-1 #8) — inak stlpec „Cena" (uzky `mshort`) sedi pod nadpisom
+        // sirokym na celu volnu sirku a tabulka sa cita krivo. Zaskrtavatko
+        // ma vlastnu (uzku) triedu z rovnakeho dovodu.
         h += '<div class="mrcols">';
-        (d.cols || []).forEach(function(c){ h += '<span>' + esc(c.label) + '</span>'; });
+        (d.cols || []).forEach(function(c){
+          h += '<span class="' + esc(colCls(c)) + '">' + esc(c.label) + '</span>';
+        });
         h += '<span class="mrgap"></span></div>';
       }
       h += '<div class="mrlist" data-nxm-list="' + key + '">';
@@ -165,7 +171,7 @@
           if (hv == null || hv === '') return;
           h += '<input type="hidden" data-nxm-col="' + esc(hk) + '" value="' + esc(hv) + '">';
         });
-        (d.cols || []).forEach(function(c){ h += rowCellHtml(c, row ? row[c.key] : ''); });
+        (d.cols || []).forEach(function(c){ h += rowCellHtml(c, row ? row[c.key] : '', row); });
         // D-78: ziadne MRTVE tlacidlo. Posledny riadok sa odobrat neda, ale
         // tlacidlo ostava zameratelne a klik POVIE DOVOD — HTML `disabled` by
         // ho vyhodilo z Tab poradia a mlcalo by.
@@ -189,16 +195,45 @@
              rowsInnerHtml(f, data) + '</div>';
     }
 
-    function rowCellHtml(c, v){
+    // Sirkova trieda stlpca — zdiela ju HLAVICKA aj bunka (review 2c-1 #8).
+    function colCls(c){
+      var d = c || {};
+      var base = d.cls || 'mrcell';
+      return d.type === 'checkbox' ? base + ' mcheckcol' : base;
+    }
+
+    // Bunka riadku. `row` je CELY riadok, lebo o tom, ci sa bunka smie
+    // editovat, rozhoduje riadok, nie stlpec: `roWhen: 'material_id'` znamena
+    // „ked riadok uz nesie ID variantu, je toto pole jeho IDENTITA a needituje
+    // sa". Server takú zmenu aj tak odmietne — UI ju len nema PROVOKOVAT
+    // (a `roTitle` povie DOVOD, vzor D-78).
+    //
+    // Zamknuta bunka je `readonly` TEXT, nie `disabled`: disabled prvok zmizne
+    // z klavesnice aj z citacky obrazovky, takze pouzivatel by sa k hodnote
+    // hrubky/sirky nedostal ani precitat. `readonly` ostava zameratelny
+    // a kopirovatelny — a `readRows` ho cita rovnako, takze server dostane
+    // nezmenenu identitu.
+    function rowCellHtml(c, v, row){
       var d = c || {};
       var k = esc(d.key);
-      var cls = ' class="' + esc(d.cls || 'mrcell') + '"';
+      var cls = ' class="' + esc(colCls(c)) + '"';
+      // Bunky nemaju `<label>` (nadpis je nad stlpcom, nie pri poli) — bez
+      // `aria-label` by citacka obrazovky hlasila len „textové pole".
+      var lbl = ' aria-label="' + esc(d.label || d.key) + '"';
+      var locked = !!(d.roWhen && row && row[d.roWhen] != null && row[d.roWhen] !== '');
+      var title = locked && d.roTitle ? ' title="' + esc(d.roTitle) + '"' : '';
+      if (locked && d.type === 'checkbox')
+        return '<input type="checkbox" data-nxm-col="' + k + '"' + cls + lbl + title +
+               ' disabled' + (v === true ? ' checked' : '') + '>';
+      if (locked)
+        return '<input type="text" data-nxm-col="' + k + '"' + cls + lbl + title +
+               ' readonly value="' + esc(v == null ? '' : v) + '">';
       if (d.type === 'select')
-        return '<select data-nxm-col="' + k + '"' + cls + '>' + optionsHtml(d.options, v) + '</select>';
+        return '<select data-nxm-col="' + k + '"' + cls + lbl + '>' + optionsHtml(d.options, v) + '</select>';
       if (d.type === 'checkbox')
-        return '<input type="checkbox" data-nxm-col="' + k + '"' + cls +
+        return '<input type="checkbox" data-nxm-col="' + k + '"' + cls + lbl +
                (v === true ? ' checked' : '') + '>';
-      return '<input type="text" data-nxm-col="' + k + '"' + cls +
+      return '<input type="text" data-nxm-col="' + k + '"' + cls + lbl +
              ' value="' + esc(v == null ? '' : v) + '"' +
              (d.placeholder ? ' placeholder="' + esc(d.placeholder) + '"' : '') + '>';
     }
@@ -243,6 +278,10 @@
         h += '<div class="mmemo" role="status"><span>Predvyplnené z rozpísaného konceptu</span>' +
              '<button type="button" class="linkbtn" data-nxm-act="memreset">Začať odznova</button></div>';
       }
+      // Zberna hlaska pre chyby, ktore sa NEDAJU priradit k poľu (celoriadkove
+      // validacie servera, chyby bez `field`). Prazdna sa nekresli (`:empty`) —
+      // markup je tu VZDY, aby `showErrors` nemusel nic vkladat pred iné uzly.
+      h += '<div class="merrtop" data-nxm-errtop="1" role="status"></div>';
       (s.fields || []).forEach(function(f){ h += fieldHtml(f); });
       if (s.note) h += '<div class="hint">' + esc(s.note) + '</div>';
       h += '</div><div class="mfoot"><span class="spacer"></span>' +
@@ -328,6 +367,85 @@
         out.push(row);
       }
       return out;
+    }
+
+    // --- CHYBY PRI POLIACH (ŠT-2c 2c-2a) ------------------------------------
+    // Server validuje CELY formular naraz a vracia [{row, field, msg}]. Modal
+    // sa pri odmietnutom zapise NEZATVARA (kontrakt D-15), takze chyba musi
+    // pristat PRI TOM POLI, ktoreho sa tyka — inak pouzivatel v dlhom
+    // formulari s desiatimi riadkami hlada, ktora cena je zla.
+    //   `row` = null    -> ploche pole (`#nxm_<field>`), hlaska pod jeho `.mrow`,
+    //   `row` = "k:idx" -> RIADOK repeatera (`k` = kluc pola), hlaska pod riadkom,
+    //   nezaraditelna   -> zberny pas navrchu tela.
+    function classHas(node, cls){
+      return String((node && node.className) || '').split(/\s+/).indexOf(cls) >= 0;
+    }
+
+    function markBad(node){
+      if (!node || !node.setAttribute) return;
+      if (!classHas(node, 'bad')) node.className = String(node.className || '') ? (node.className + ' bad') : 'bad';
+      node.setAttribute('aria-invalid', 'true');
+    }
+
+    function errNode(host){
+      if (!host || typeof document === 'undefined') return null;
+      var n = host.querySelector ? host.querySelector('.merr') : null;
+      if (n) return n;
+      n = document.createElement('div');
+      n.className = 'merr';
+      n.setAttribute('role', 'status');
+      host.appendChild(n);
+      return n;
+    }
+
+    function clearErrors(){
+      if (typeof document === 'undefined') return;
+      var r = document.getElementById(ROOT_ID);
+      if (!r || !r.querySelectorAll) return;
+      var errs = r.querySelectorAll('.merr');
+      for (var i = 0; i < errs.length; i++) errs[i].textContent = '';
+      var bad = r.querySelectorAll('.bad');
+      for (var j = 0; j < bad.length; j++){
+        bad[j].className = String(bad[j].className || '').split(/\s+/)
+          .filter(function(c){ return c && c !== 'bad'; }).join(' ');
+        if (bad[j].removeAttribute) bad[j].removeAttribute('aria-invalid');
+      }
+      var top = r.querySelector ? r.querySelector('[data-nxm-errtop]') : null;
+      if (top) top.textContent = '';
+    }
+
+    function showErrors(list){
+      if (typeof document === 'undefined') return;
+      clearErrors();
+      var r = document.getElementById(ROOT_ID);
+      if (!r) return;
+      var rest = [];
+      (list || []).forEach(function(e){
+        if (!e) return;
+        var msg = String(e.msg == null ? '' : e.msg);
+        var host = null;
+        var input = null;
+        var rowKey = (e.row == null) ? '' : String(e.row);
+        if (rowKey){
+          var parts = rowKey.split(':');
+          var box = rowsBox(parts[0]);
+          var lines = (box && box.querySelectorAll) ? box.querySelectorAll('[data-nxm-row]') : [];
+          var line = lines[Number(parts[1])];
+          if (line){
+            host = line;
+            if (e.field && line.querySelector) input = line.querySelector('[data-nxm-col="' + e.field + '"]');
+          }
+        } else if (e.field){
+          input = document.getElementById('nxm_' + e.field);
+          host = (input && input.closest) ? input.closest('.mrow') : null;
+        }
+        if (!host){ rest.push(msg); return; }
+        markBad(input);
+        var n = errNode(host);
+        if (n) n.textContent = n.textContent ? (n.textContent + ' · ' + msg) : msg;
+      });
+      var top = r.querySelector ? r.querySelector('[data-nxm-errtop]') : null;
+      if (top) top.textContent = rest.join(' · ');
     }
 
     function fieldByKey(key){
@@ -750,6 +868,7 @@
                 open: open, close: close, submit: submit,
                 isOpen: isOpen, isBusy: isBusy, setBusy: setBusy,
                 values: values, spec: spec,
+                showErrors: showErrors, clearErrors: clearErrors,
                 memory: memory, clearMemory: clearMemory };
     global.NXModal = API;
     if (typeof module !== 'undefined' && module.exports) module.exports = API;
