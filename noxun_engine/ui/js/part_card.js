@@ -53,7 +53,50 @@
     ms.className = pc.has_material_override ? 'ovr' : '';
     renderEdgeRows(pc);
     renderPartSvg(pc);
+    nxDecorLinkApply(el('pcMatLink'), nxDecorLinkState(pc.material_id));
     nxComboSync(box); // D-85: materialovy combobox + 4 comboboxy hran
+  }
+
+  // ===== ŠT-2d: preklik z karty na DEKOR v Štúdiu ===========================
+  // Karta ukazuje, AKY material dielec ma; doteraz sa nedalo zistit, CO to za
+  // dekor je (kod, ceny, pasky rodiny) — to zilo v inom okne a hladalo sa
+  // rucne. Klik na ikonu otvori Studio na sekcii Materialy PRIAMO na detaile
+  // toho dekoru (kotva = `material_id`, sekcia si ju prelozi na skupinu).
+  //
+  // ABS pasky karty sa NEPRELINKUVAVAJU: hrana ma vlastny tok (D-41 modal
+  // chybajucej pasky, picker) a druhy vstup do toho isteho by len mylil.
+  //
+  // Cista funkcia (Node test): material dielca -> stav tlacidla.
+  function nxDecorLinkState(materialId){
+    var id = String(materialId == null ? '' : materialId).trim();
+    if (!id){
+      return { enabled: false, anchor: '',
+               title: 'Dielec zatiaľ nemá rozhodnutý materiál — dekor sa nemá kde otvoriť.' };
+    }
+    return { enabled: true, anchor: id, title: 'Otvoriť dekor v Štúdiu' };
+  }
+
+  function nxDecorLinkApply(btn, st){
+    if (!btn || !st) return;
+    // `aria-disabled`, nie HTML `disabled` (D-78): tlacidlo ostava zameratelne
+    // a klik POVIE DOVOD — vypnuty prvok by mlcal a vypadol z Tab poradia.
+    if (st.enabled) btn.removeAttribute('aria-disabled');
+    else btn.setAttribute('aria-disabled', 'true');
+    btn.title = st.title;
+    btn.setAttribute('aria-label', st.title);
+  }
+
+  function nxDecorLinkGo(st){
+    if (!st) return;
+    if (!st.enabled){
+      if (typeof NX !== 'undefined' && NX && NX.setStatus) NX.setStatus(st.title, true);
+      return;
+    }
+    if (typeof openStudio === 'function') openStudio('mat', st.anchor);
+  }
+
+  function openPartDecor(){
+    nxDecorLinkGo(nxDecorLinkState(partCard ? partCard.material_id : ''));
   }
   // ===== UI-D1: ZAKLADNE HORE (kontrakt UI 2.0, sekcia Dielec) ==============
   // Rozmery dielca su VYSTUP — pocita ich korpus zo svojich rozmerov a hrubky.
@@ -634,6 +677,8 @@
   // vetva sa preskoci (vzor hardware.js).
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { nxPartBasicRows: nxPartBasicRows,
+      // ŠT-2d: deep-link na dekor (tests/js/test_st2d_kde.js) — cista funkcia
+      nxDecorLinkState: nxDecorLinkState,
       nxEdgeRotOf: nxEdgeRotOf, nxSimilarCountText: nxSimilarCountText,
       nxSimilarBtnState: nxSimilarBtnState,
       // K1 (D-108): stav segmentu „Smer dekoru" (tests/js/test_k1_smer_dekoru.js).

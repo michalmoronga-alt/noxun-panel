@@ -677,6 +677,12 @@
         // preto sa aplikuje LEN so sekciou, do ktorej patri (review #7).
         var a = (studioSec === 'bom') ? anchorFilter(ST) : null;
         if (a) bomQ = a;
+        // ŠT-2d: sekcia Materiály spotrebuje kotvu INAK — nie ako text
+        // hľadania, ale ako OTVORENIE DETAILU dekoru (deep-link z karty dielca
+        // „klik na materiál"). Rovnako JEDNORAZOVO: server ju v ďalšom pushi
+        // už neposiela, takže návrat do dlaždíc prežije refresh.
+        var ma = (studioSec === 'mat') ? anchorFilter(ST) : null;
+        if (ma && typeof matOpenAnchor === 'function') matOpenAnchor(ma);
       }
       render();
     },

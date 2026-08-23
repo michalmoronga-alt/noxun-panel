@@ -547,8 +547,131 @@
       h += mdSectionRows(sec);
     });
     if (!sections.length) h += '<div class="muted">žiadne varianty</div>';
+    h += mdWhereHtml(g, mdWhereOf(g));
     h += '</div>';
     return h;
+  }
+
+  // ============ ŠT-2d: „Kde sa používa" (schvaleny bod konceptu) ============
+  // Detail dekoru odpoveda na otazku „kde presne je tento dekor v zakazke" —
+  // vlastnik (skrinka alebo samostatna doska), ktore dielce to su a kolko ich
+  // je. „Oko" ich OZNACI V MODELI.
+  //
+  // Cisla ani texty rol si klient NERATA — cely rozpis chodí zo servera
+  // (`ST.mat.used_where`), z TOHO ISTEHO zberu ako Kusovnik. Adresa vyberu su
+  // `material_id`/`abs_id` (EFEKTIVNY material zo snapshotu), takze sa oznaci
+  // aj dielec, ktory material iba DEDI po korpuse.
+  function mdWhereOf(g){
+    return MD_USED_WHERE[mdUsageKey(g)] || null;
+  }
+
+  // Slovenske sklonovanie (cisto zobrazovacia vec klienta — ziadne cislo).
+  function mdPartsSk(n){
+    var v = Number(n) || 0;
+    if (v === 1) return '1 dielec';
+    if (v >= 2 && v <= 4) return v + ' dielce';
+    return v + ' dielcov';
+  }
+
+  // Cista funkcia (Node test): rozpis pouzitia -> HTML. Prazdny rozpis kresli
+  // priznanu hlasku — „nic tu nie je" musi byt VIDNO, inak by pouzivatel
+  // hladal chybajucu sekciu.
+  function mdWhereHtml(g, where){
+    var owners = (where && where.owners) || [];
+    var edges = (where && where.edges) || {};
+    var absIds = Object.keys(edges).filter(function(id){ return Number(edges[id]) > 0; });
+    var h = '<div class="mdsec mdwhead">Kde sa používa</div>';
+    if (!owners.length && !absIds.length){
+      return h + '<div class="muted mdwempty">Tento dekor sa v zákazke zatiaľ nepoužíva.</div>';
+    }
+    owners.forEach(function(o){
+      var roles = (o.roles || []).join(' · ');
+      h += '<div class="mdwrow"><span class="mdwn"><b>' + mdEsc(o.owner_id || '') + '</b>' +
+        // Oddelovac „·" presne ako mockup („CAB-004 · boky, dno, police").
+        (roles ? ' <span class="mdwr">· ' + mdEsc(roles) + '</span>' : '') + '</span>' +
+        '<span class="mdwq">' + mdEsc(mdPartsSk(o.parts)) + '</span>' +
+        '<span class="mdwact">' + mdWhereEyeHtml('mdWhereOwner', g.key, o.owner_id,
+                                                 'Označiť v modeli — ' + mdPartsSk(o.parts)) +
+        '</span></div>';
+    });
+    absIds.forEach(function(id){
+      var rec = (g.edges || []).filter(function(a){ return a.abs_id === id; })[0];
+      var label = rec ? edgeChipLabel(rec) : id;
+      h += '<div class="mdwrow"><span class="mdwn">Páska <b>' + mdEsc(label) + '</b></span>' +
+        '<span class="mdwq">' + mdEsc(mdPartsSk(edges[id])) + '</span>' +
+        '<span class="mdwact">' + mdWhereEyeHtml('mdWhereEdge', g.key, id,
+                                                 'Označiť dielce s touto páskou') +
+        '</span></div>';
+    });
+    return h;
+  }
+
+  function mdWhereEyeHtml(fn, key, arg, title){
+    return '<button class="mdweye" title="' + mdEsc(title) + '" aria-label="' + mdEsc(title) + '"' +
+      ' onclick="' + fn + '(' + mdEsc(JSON.stringify(key)) + ', ' + mdEsc(JSON.stringify(String(arg == null ? '' : arg))) + ')">' +
+      '<svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg></button>';
+  }
+
+  // Klik „oko": posle sa TA ISTA cesta, akou vyberá Kusovnik (`nx_select`
+  // cez relay panela) — cize s generaciou okna. Server si dielce dohlada
+  // v CERSTVOM zbere; ziadne pids z DOM sa neposielaju.
+  function mdWhereSelect(payload){
+    var st = (typeof ST === 'undefined') ? null : ST;
+    if (!st || !window.sketchup || !sketchup.nx_select) return;
+    payload.gen = st.gen || 0;
+    sketchup.nx_select(JSON.stringify(payload));
+  }
+
+  function mdWhereOwner(key, ownerId){
+    var g = mdGroupByKey(key);
+    var where = g ? mdWhereOf(g) : null;
+    var o = ((where && where.owners) || []).filter(function(x){ return String(x.owner_id) === String(ownerId); })[0];
+    if (!o) return;
+    // Adresa je zoznam `material_id`, ktore ma TENTO vlastnik z TEJTO skupiny
+    // (dekor mava viac hrubkovych variantov) — zuzeny na jeho `owner_id`.
+    mdWhereSelect({ material_key: o.material_ids || [], owner_id: o.owner_id });
+  }
+
+  function mdWhereEdge(key, absId){
+    if (!absId) return;
+    mdWhereSelect({ abs_key: absId });
+  }
+
+  // Deep-link z karty dielca/dosky (`openStudio('mat', <material_id|kluc>)`).
+  // Cista funkcia (Node test): kotva -> kluc skupiny. Tolerantna zamerne —
+  // panel posiela `material_id` (jedina identita, ktoru o materiali dielca
+  // ISTO ma), ale kluc skupiny sa prijme tiez, aby sa deep-link dal poslat
+  // aj zvnutra Studia.
+  function mdAnchorGroupKey(groups, anchor){
+    var a = String(anchor == null ? '' : anchor).trim();
+    if (!a) return null;
+    var hit = null;
+    (groups || []).forEach(function(g){
+      if (hit) return;
+      if (g.key === a || g.usage_key === a || g.gid === a) hit = g.key;
+    });
+    if (hit) return hit;
+    (groups || []).forEach(function(g){
+      if (hit) return;
+      var vs = (g.sheets || []).concat(g.edges || []);
+      for (var i = 0; i < vs.length; i++){
+        if (vs[i].material_id === a || vs[i].abs_id === a){ hit = g.key; return; }
+      }
+    });
+    return hit;
+  }
+
+  // Spotreba kotvy: otvori DETAIL dekoru. Volá ju `studio.js` PRED renderom
+  // (kotva chodi so sekciou a je JEDNORAZOVA), takze sa tu nekresli —
+  // `matRenderBody` uz nakresli detail.
+  function matOpenAnchor(anchor){
+    var key = mdAnchorGroupKey(groupCatalogByDecor(MD_CATALOG, MD_SCHEMA2), anchor);
+    if (!key) return false;
+    MD_Q = '';                       // detail nesmie prekryt cudzi filter
+    var s = mdEl('mdSearch');
+    if (s) s.value = '';
+    mdView = key;
+    return true;
   }
 
   // Riadky jednej strukturnej sekcie: blok Dosky + blok ABS (len nepradzne).
@@ -2185,6 +2308,9 @@
   // Top-level var v script tagu = window.MD v CEF; v Node require nepada na window.
   var MD_MODEL_GUID = ''; // D-42: identita modelu pre projektove predvolby (blocker 4)
   var MD_USED = {};       // D-42 PR B: {dekor => pocet dielcov v aktivnom modeli}
+  // ŠT-2d: ROZPIS toho isteho cisla — {kluc skupiny => {owners:[], edges:{}}}.
+  // Sklada ho SERVER z toho isteho zberu ako `used` (`StudioDialog#mat_used_where`).
+  var MD_USED_WHERE = {};
   var MD_CABINETS = 0;    // pocet skriniek v modeli (podtitul okna / hint sekcie)
   var MD_PROJECT = {};    // posledne projektove predvolby (pre refill selectov pri setCatalog)
   // Spolocna katalogova cast (audit FIX 13: katalogove echo NEnesie modelovy
@@ -2635,6 +2761,7 @@
     if (!m) return;
     MD_MODEL_GUID = m.model_guid || '';
     MD_USED = m.used || {};
+    MD_USED_WHERE = m.used_where || {};
     MD_PROJECT = m.project || {};
     MD_CABINETS = m.cabinets || 0;
     if (m.catalog) mdSetCatalog(m.catalog); // LEN stav — kresli az matRenderBody
@@ -2709,6 +2836,16 @@
       matToolsHtml: matToolsHtml, matRenderBody: matRenderBody,
       // ŠT-2b — odchod zo sekcie zavrie modaly a zrusi bezaci Demos fetch
       matOnLeaveSection: matOnLeaveSection,
+      // ŠT-2d — „Kde sa používa" + deep-link z karty dielca
+      // (tests/js/test_st2d_kde.js). `mdWhereHtml`/`mdPartsSk`/`mdAnchorGroupKey`
+      // su CISTE funkcie; `matOpenAnchor` a `mdWhereOwner` potrebuju stav sekcie
+      // a exportuju sa ZAMERNE — kontrakty „kotva otvori detail" a „oko posiela
+      // material_ids vlastnika" sa inak nedaju overit nicim nez klikanim.
+      mdWhereHtml: mdWhereHtml, mdPartsSk: mdPartsSk, mdAnchorGroupKey: mdAnchorGroupKey,
+      matOpenAnchor: matOpenAnchor, mdWhereOwner: mdWhereOwner, mdWhereEdge: mdWhereEdge,
+      // `matApplyState` je vstup payloadu `ST.mat` do stavu sekcie — exportuje
+      // sa, aby sa dal rozpis „Kde sa používa" overit BEZ celeho renderu okna.
+      matApplyState: matApplyState,
       // ŠT-2c 2c-2a — D-69 editor dekoru. `mdEditFields`/`mdEditPayload`/
       // `mdEditNum` su CISTE funkcie; `mdEditOpen`/`mdEditDropDirty`/`MD`
       // potrebuju DOM a exportuju sa ZAMERNE — kontrakty „base_rev zmrazeny

@@ -355,9 +355,65 @@ module Noxun
         elsif data['hw_key']
           g = bom[:hardware].find { |x| x['key'] == data['hw_key'] }
           g ? g['breakdown'].map { |b| b['owner_pid'] } : []
+        elsif data['material_key']
+          refs_by_material(bom, data)
+        elsif data['abs_key']
+          refs_by_abs(bom, data)
         else
           Array(data['pids'])
         end.compact.uniq
+      end
+
+      # --- ŠT-2d: „Kde sa používa" -> vyber dielcov v modeli -----------------
+      #
+      # Adresa vyberu je `material_id` (resp. `abs_id`), NIE nazov dekoru:
+      # zdrojom je BOM, a ten stoji na VYROBNOM SNAPSHOTE dielca — cize na
+      # EFEKTIVNOM materiali. Preto sa oznaci aj dielec, ktory material iba
+      # DEDI po korpuse (v jeho configu ziadny override nie je, ale snapshot
+      # uz nesie rozhodnute `material_id`). Textove menovky dekorov
+      # (`Materials.used_material_ids` a spol.) tuto vlastnost NEMAJU — dedene
+      # dielce by v nich chybali a pouzivatel by videl oznacenu polovicu
+      # skrinky (audit ŠT-2d #14).
+      #
+      # `material_key`/`abs_key` smie byt RETAZEC alebo POLE: jeden dekor ma
+      # spravidla viac hrubkovych variantov (18 aj 36 mm) a „Kde sa používa"
+      # sa pyta na CELU skupinu naraz. `owner_id` je nepovinne zuzenie na jeden
+      # korpus/dosku (riadok zoznamu vlastnikov).
+      def selector_ids(value)
+        Array(value).map { |v| v.to_s.strip }.reject(&:empty?).uniq
+      end
+
+      def refs_of_rows(rows, owner_id)
+        oid = owner_id.to_s
+        rows.flat_map do |r|
+          Array(row_value(r, 'refs')).filter_map do |ref|
+            next nil unless ref.is_a?(Hash)
+            next nil if !oid.empty? && ref['owner_id'].to_s != oid
+
+            ref['pid']
+          end
+        end
+      end
+
+      def refs_by_material(bom, data)
+        ids = selector_ids(data['material_key'])
+        return [] if ids.empty?
+
+        rows = Array(bom[:rows]).select { |r| ids.include?(row_value(r, 'material_id').to_s) }
+        refs_of_rows(rows, data['owner_id'])
+      end
+
+      # Paska sa hlada vo VSETKYCH STYROCH hranach riadku (L1/L2/W1/W2) —
+      # dielec s danou paskou je „pouzity" bez ohladu na to, ktora hrana to je.
+      def refs_by_abs(bom, data)
+        ids = selector_ids(data['abs_key'])
+        return [] if ids.empty?
+
+        rows = Array(bom[:rows]).select do |r|
+          edges = row_value(r, 'edges')
+          edges.is_a?(Hash) && edges.values.any? { |v| ids.include?(v.to_s) }
+        end
+        refs_of_rows(rows, data['owner_id'])
       end
 
       # --- Zber modelu (ST-1a PR B) ----------------------------------------

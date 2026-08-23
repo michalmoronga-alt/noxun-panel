@@ -212,7 +212,18 @@
     if (ms){ fillBoardMaterialSelect(ms, bc.material_id || '', true); }
     renderBoardEdgeRows(bc);
     renderBoardSvg(bc);
+    // ŠT-2d: TA ISTA cesta ako pri dielci (`nxDecorLinkState` zije v part_card.js
+    // — jedna funkcia, dva vstupne body). Doska ma vzdy konkretny material,
+    // takze tlacidlo je prakticky vzdy zive.
+    if (typeof nxDecorLinkApply === 'function'){
+      nxDecorLinkApply(el('bcMatLink'), nxDecorLinkState(bc.material_id));
+    }
     nxComboSync(box); // D-85: materialovy combobox + 4 comboboxy hran dosky
+  }
+
+  function openBoardDecor(){
+    if (typeof nxDecorLinkGo !== 'function') return;
+    nxDecorLinkGo(nxDecorLinkState(boardCard ? boardCard.material_id : ''));
   }
 
   // Material select dosky: VSETKY doskove materialy bez hrubkoveho filtra a bez

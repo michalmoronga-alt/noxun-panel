@@ -46,7 +46,7 @@
   // len TENKY pristupovy bod `budDraftMemory(kind)`. Kluc = druh pridavacky
   // ('custom' | 'appliance') — polia vlastnej polozky a spotrebica su ine,
   // spolocna pamat by ich miesala.
-  var BUD_MODAL = null;        // { kind, id } — otvoreny ⋯ modal
+  var BUD_MORE = null;         // { kind, id } — otvoreny ⋯ editor riadku (D-15 kostra)
   var BUD_FOCUS = null;        // obnova fokusu/hodnoty cez re-render
   // E-c „Prepočítať ceny": { phase:'confirm'|'run'|'report', pid, total, done,
   // label, report, single, cancelling }. Beh riadi SERVER — toto je len okno.
@@ -1315,32 +1315,47 @@
     if (window.sketchup && sketchup.price_refresh_cancel) sketchup.price_refresh_cancel('');
   }
 
-  // --- ⋯ modal (kód / adresa / poznámka) -----------------------------------
-  // VEDOME NEMIGROVANY na D-15 kostru (ŠT-1c PR B2): nie je to „pridávačka",
-  // ale editor uz existujuceho riadku — a jeho polia sa lisia podla typu
-  // polozky. Patri k D-69 rodine editorov, ktoru prinesie ŠT-2; presuvat ho
-  // teraz by znamenalo dvakrat prerabat to iste okno.
+  // --- ⋯ editor riadku (kód / adresa / poznámka) ---------------------------
+  // ŠT-2d (audit #22): PRESUNUTY na zdielanu D-15 kostru (`js/nx_modal.js`).
+  // V ŠT-1c PR B2 ostal vedome bokom — vtedy bol jediny svojho druhu a kostra
+  // este nevedela nic, co potreboval. Teraz uz v okne ziju TRI modaly na tej
+  // istej kostre (dve pridavacky rozpoctu + D-69 editor dekoru) a stvrty
+  // vlastnorucny markup by znamenal, ze jedno okno ma dva rozne modalove
+  // svety: iny Escape, iny fokus, iny scrim.
+  //
+  // ROZDIEL oproti „pridavackam": je to editor UZ EXISTUJUCEHO riadku, takze
+  // ide BEZ `memoryKey`. Pamat rozpisanych hodnot ma zmysel pri zakladani
+  // (Escape nesmie zahodit rozpisanu polozku), ale pri editore by bola pascou:
+  // predvyplnila by hodnoty pisane do INEHO riadku a pouzivatel by ich ulozil
+  // do nespravneho zaznamu. Formular sa preto VZDY plni z cerstveho payloadu.
+  //
+  // Zapis NEZATVARA okno — zatvara ho az POTVRDENIE zo servera
+  // (`NX.budgetResult('custom_update', true)`); odmietnuty zapis necha hodnoty
+  // na mieste a len odomkne tlacidlo.
 
-  function budModalHtml(){
-    if (!BUD_MODAL) return '';
-    var it = budFindItem(BUD_MODAL.kind, BUD_MODAL.id);
-    if (!it) return '';
-    var isAppl = BUD_MODAL.kind === 'appliance';
-    var h = '<div class="nxmodal" id="budModal"><div class="nxmodal-card">' +
-      '<div class="nxmodal-title">' + bEsc(it.nazov || 'Detail položky') + '</div>' +
-      '<div class="hint">Voliteľné údaje — v tabuľke sa nezobrazujú.</div>';
-    if (!isAppl){
-      h += '<div class="row"><label>Kód</label><input id="budm_kod" type="text" value="' + bEsc(it.kod || '') + '"><span class="unit"></span></div>';
-    }
-    h += '<div class="row"><label>Adresa</label><input id="budm_url" type="text" placeholder="https://…" value="' +
-      bEsc(it.url || '') + '"><span class="unit"></span></div>';
-    if (!isAppl){
-      h += '<div class="row"><label>Poznámka</label><input id="budm_pozn" type="text" value="' +
-        bEsc(it.poznamka || '') + '"><span class="unit"></span></div>';
-    }
-    h += '<div class="btnrow"><button class="primary" data-bud="modal_save">Uložiť</button>' +
-      '<button class="ghostbtn" data-bud="modal_close">Zrušiť</button></div></div></div>';
-    return h;
+  // Ciste (tests/js/test_st2d_kde.js): polozka -> polia formulara. Spotrebic
+  // ma LEN adresu — kod ani poznamku jeho zaznam nenesie (server by ich
+  // zahodil), takze sa ani nesmu pytat.
+  function budMoreFields(kind, it){
+    var r = it || {};
+    var url = { key: 'url', label: 'Adresa', value: r.url || '', placeholder: 'https://…' };
+    if (kind === 'appliance') return [url];
+    return [
+      { key: 'kod', label: 'Kód', value: r.kod || '' },
+      url,
+      { key: 'poznamka', label: 'Poznámka', value: r.poznamka || '' }
+    ];
+  }
+
+  // Ciste: polia formulara -> atributy pre server (rovnaky vzor ako
+  // `budDraftAttrs` — jedno miesto, kde sa rozhoduje, co sa odosiela).
+  function budMoreAttrs(kind, f){
+    var g = f || {};
+    var attrs = { url: g.url || '' };
+    if (kind === 'appliance') return attrs;
+    attrs.kod = g.kod || '';
+    attrs.poznamka = g.poznamka || '';
+    return attrs;
   }
 
   function budFindItem(kind, id){
@@ -1352,14 +1367,29 @@
     return (sec.rows || []).filter(function(r){ return r.id === id; })[0] || null;
   }
 
-  function budRenderModal(){
-    var old = budEl('budModal');
-    if (old && old.parentNode) old.parentNode.removeChild(old);
-    if (!BUD_MODAL) return;
-    var box = document.createElement('div');
-    box.innerHTML = budModalHtml();
-    var node = box.firstChild;
-    if (node) document.body.appendChild(node);
+  function budOpenMore(kind, id){
+    if (typeof window === 'undefined' || !window.NXModal) return;
+    var it = budFindItem(kind, id);
+    if (!it){ NX.setStatus('Položka sa nenašla — obnov okno.', true); return; }
+    BUD_MORE = { kind: kind, id: id };
+    NXModal.open({
+      title: it.nazov || 'Detail položky',
+      sub: 'voliteľné údaje · v tabuľke sa nezobrazujú',
+      okLabel: 'Uložiť',
+      fields: budMoreFields(kind, it),
+      onSubmit: function(v){ budMoreCommit(v); }
+    });
+  }
+
+  function budMoreCommit(values){
+    if (!BUD_MORE) return;
+    var op = BUD_MORE.kind === 'appliance' ? 'appliance_update' : 'custom_update';
+    budSend(op, { id: BUD_MORE.id, attrs: budMoreAttrs(BUD_MORE.kind, values || {}) });
+  }
+
+  function budCloseMore(){
+    if (typeof window !== 'undefined' && window.NXModal) NXModal.close();
+    BUD_MORE = null;
   }
 
   // --- fokus cez re-render -------------------------------------------------
@@ -1482,20 +1512,6 @@
     return String(a.nazov || '').trim() ? null : 'Názov spotrebiča je povinný.';
   }
 
-  function budModalSave(){
-    if (!BUD_MODAL) return;
-    var attrs = { url: (budEl('budm_url') || {}).value || '' };
-    if (BUD_MODAL.kind === 'custom'){
-      attrs.kod = (budEl('budm_kod') || {}).value || '';
-      attrs.poznamka = (budEl('budm_pozn') || {}).value || '';
-    }
-    var op = BUD_MODAL.kind === 'appliance' ? 'appliance_update' : 'custom_update';
-    var id = BUD_MODAL.id;
-    BUD_MODAL = null;
-    budRenderModal();
-    budSend(op, { id: id, attrs: attrs });
-  }
-
   // GH #138 P2 + ŠT-1c PR B1 (audit #6): napojenie na zivotny cyklus payloadu.
   // budget.js sa nacitava AZ ZA studio.js, takze `NX` uz existuje — obalime
   // `NX.setStudio` (uvolnenie fronty zapisov po prichode cerstveho payloadu)
@@ -1516,6 +1532,15 @@
     // s rozpisanymi hodnotami: pouzivatel ma opravit svoje cislo, nie ho
     // hladat a pisat znova.
     NX.budgetResult = function(op, ok){
+      // ŠT-2d: rovnaky zivotny cyklus ma uz aj ⋯ EDITOR riadku — je to ten
+      // isty kontrakt (zapis nezatvara, potvrdenie zatvara, odmietnutie
+      // odomyka), len iny modal.
+      if (op === 'custom_update' || op === 'appliance_update'){
+        if (!BUD_MORE) return;
+        if (ok) budCloseMore();
+        else budUnlockDraft();
+        return;
+      }
       if (op !== 'custom_add' && op !== 'appliance_add') return;
       // Review #2: zamok odoslania sa pusta v OBOCH vetvach. Pri uspechu to
       // spravi uz `budCloseDraft` (zavrety modal zamok nema), pri odmietnuti
@@ -1578,12 +1603,7 @@
           sketchup.budget_open_url(JSON.stringify({ kind: b.getAttribute('data-kind'), id: b.getAttribute('data-id') }));
         }
       } else if (a === 'more'){
-        BUD_MODAL = { kind: b.getAttribute('data-kind'), id: b.getAttribute('data-id') };
-        budRenderModal();
-      } else if (a === 'modal_close'){
-        BUD_MODAL = null; budRenderModal();
-      } else if (a === 'modal_save'){
-        budModalSave();
+        budOpenMore(b.getAttribute('data-kind'), b.getAttribute('data-id'));
       } else if (a === 'xlsx'){
         budXlsx();
       } else if (a === 'cp'){
@@ -1693,5 +1713,11 @@
       budPrEvent: budPrEvent, budPrSummary: budPrSummary, budPrSummaryText: budPrSummaryText,
       budPrDiffText: budPrDiffText, budPrProgressText: budPrProgressText,
       budPrProgressHtml: budPrProgressHtml, budPrReportHtml: budPrReportHtml,
-      budPrTitle: budPrTitle, budStaleActionHtml: budStaleActionHtml };
+      budPrTitle: budPrTitle, budStaleActionHtml: budStaleActionHtml,
+      // ŠT-2d: ⋯ editor riadku na D-15 kostre (tests/js/test_st2d_kde.js).
+      // `budMoreFields`/`budMoreAttrs` su CISTE; `budOpenMore` potrebuje DOM
+      // a exportuje sa ZAMERNE — kontrakty „bez pamate konceptu",
+      // „odmietnutie nezatvara" a „busy zamok" sa inak overit nedaju.
+      budMoreFields: budMoreFields, budMoreAttrs: budMoreAttrs,
+      budOpenMore: budOpenMore };
   }
