@@ -838,6 +838,13 @@
     var m = hwEl('hwDelModal');
     if (m) m.style.display = 'none';
     MDH_DEL = null;
+    // Review P2 #4: nahlad z Demosu NIE JE modal — zije v tele sekcie, ktore
+    // sa pri odchode UCHOVA. Bez tohto by v nom navzdy visel stav
+    // „Načítavam stránku…" (server beh uz zrusil `hw_leave`) alebo hlaska
+    // o stahovani zoznamu produktov. Vzor `matCloseModals`.
+    MDH_DEMOS = null;
+    mdhRenderDemosPreview();
+    mdhRenderDemosHits([]);
   }
 
   // Modelovy kontext sekcie z payloadu Studia (`ST.hw`). Katalog je v nom LEN
@@ -870,6 +877,13 @@
     NX.setHwCatalog = function(data){
       if (!data) return;
       mdhApplyItems(data);
+    };
+    // ZOTAVOVACIE echo setov (review P1 #1) — po ODMIETNUTOM zapise. Prijimac
+    // je ten isty ako v okne (`HWSETS.init`), takze sekcia dostane cerstvu
+    // `revision` a jej dalsi pokus uz nespadne na tom istom konflikte.
+    NX.setHwSets = function(data){
+      if (!data || typeof HWSETS === 'undefined') return;
+      HWSETS.init(data);
     };
   }
 

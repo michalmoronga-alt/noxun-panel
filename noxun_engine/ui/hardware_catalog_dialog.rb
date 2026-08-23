@@ -337,9 +337,11 @@ module Noxun
             js("MDH.demosResults(#{{ 'query' => query, 'results' => [],
                                      'refreshing' => true }.to_json})")
             DemosLookup.start_refresh do |ok, err|
+              # Review P2 #3: priznak gasne aj bez adresata (jednorazovy
+              # single-flight beh — nema ho co prekonat).
+              clear_running(target)
               next unless target_alive?(target)
 
-              clear_running(target)
               if ok
                 emit(target, 'MDH.demosRefreshDone()')
               else
@@ -372,9 +374,10 @@ module Noxun
           target = run_target
           mark_running(target, 'náhľad položky z Demosu')
           HardwareCatalog.demos_preview!(data['url'].to_s) do |res|
+            # Review P2 #3 — to iste ako pri overeni ceny.
+            clear_running(target) if @demos_gen.to_i == gen
             next unless @demos_gen.to_i == gen && target_alive?(target)
 
-            clear_running(target)
             emit(target, "MDH.demosPreview(#{res.merge('gen' => gen).to_json})")
           end
         end
@@ -383,7 +386,9 @@ module Noxun
         # zahodi dobiehajúci vysledok (inak by sa zruseny nahlad znovu otvoril).
         def handle_demos_cancel(_payload)
           bump_demos_gen
-          @section_running = nil if @client_sink
+          # Zrusenie ide TOU ISTOU cestou ako start — priznak gasne len tomu,
+          # kto ho zapalil (z okna je to no-op).
+          clear_running(run_target)
         end
 
         def handle_demos_create(payload)
@@ -424,12 +429,31 @@ module Noxun
           push_sets
         end
 
-        # LEN okno. Sekcia sety NEDOSTAVA echom: menia aj NAKUPNY zoznam
-        # (sekcia Nákup kovania), takze polovicny push by nechal cisla vedla
-        # seba rozidene — chodia preto plnym `push_state` (viz
+        # LEN okno. Po USPESNOM zapise sety sekcia NEDOSTAVA echom: menia aj
+        # NAKUPNY zoznam (sekcia Nákup kovania), takze polovicny push by nechal
+        # cisla vedla seba rozidene — chodia preto plnym `push_state` (viz
         # `after_sets_change`).
         def push_sets
           win_js("HWSETS.init(#{sets_payload.to_json})")
+        end
+
+        # ZOTAVOVACIA obnova po ODMIETNUTOM zapise (`:conflict`, `:not_found`,
+        # neznáme zlyhanie). Musi ist do OBOCH UI — a to je iny pripad než
+        # `push_sets`:
+        #   * hlaska hovori „obnovené", takze klient MUSI dostat cerstvu
+        #     `revision`. Kym ju sekcia nedostala, poslala by dalsi zapis so
+        #     STARYM odtlackom a zacyklila by sa v konfliktoch;
+        #   * `:not_found` (set uz niekto zmazal) by v sekcii neurobilo NIC —
+        #     zoznam by dalej ukazoval zaznam, ktory neexistuje.
+        # NIE JE to `after_sets_change`: nic sa NEZAPISALO, takze nakupny zoznam
+        # ani panel sa nemenia a plny push Studia by bol zbytocny prepocet
+        # kusovnika (a druhe vykreslenie setov navyse).
+        def resync_sets
+          payload = sets_payload
+          win_js("HWSETS.init(#{payload.to_json})")
+          StudioDialog.push_hw_sets(payload) if defined?(StudioDialog)
+        rescue StandardError => e
+          Engine.log_error(e, 'HardwareCatalogDialog.resync_sets')
         end
 
         def sets_payload
@@ -530,12 +554,12 @@ module Noxun
             # nesmie ticho prepisat globalnu definiciu.
             set_status("Set s identitou „#{info}“ už existuje — zmeň názov (alebo uprav existujúci set).", true)
           when :conflict
-            push_sets
+            resync_sets # P1: „obnovené" musi platit AJ pre sekciu (inak slucka konfliktov)
             set_status('Knižnica setov sa medzitým zmenila — obnovené, uprav znova.', true)
           when :invalid
             set_status(info.to_s.empty? ? 'Set sa nedá uložiť.' : info.to_s, true)
           else
-            push_sets
+            resync_sets
             set_status('Uloženie setu zlyhalo.', true)
           end
         end
@@ -548,10 +572,10 @@ module Noxun
             after_sets_change
             set_status("Set zmazaný. Projekty, ktoré ho používajú, držia vlastnú kópiu — ich súpisy sa nemenia.")
           when :conflict
-            push_sets
+            resync_sets
             set_status('Knižnica setov sa medzitým zmenila — obnovené, skús znova.', true)
           when :not_found
-            push_sets
+            resync_sets # set uz niekto zmazal — sekcia ho nesmie dalej ukazovat
           else
             set_status('Zmazanie setu zlyhalo.', true)
           end
@@ -811,9 +835,13 @@ module Noxun
           target = run_target
           mark_running(target, 'overenie ceny z Demosu')
           HardwareCatalog.check_price!(code, url: data['url'].to_s) do |res|
+            # Review P2 #3: priznak sa gasi AJ ked vysledok nikam nepojde
+            # (zavrete Studio, odchod zo sekcie) — inak by odchod po dobehnutom
+            # behu vypisal falosne „Zrušené: …". Podmienka na generaciu ostava:
+            # PREKONANY beh nesmie zhasnut priznak toho, ktory prave bezi.
+            clear_running(target) if @gen.to_i == gen
             next unless @gen.to_i == gen && target_alive?(target)
 
-            clear_running(target)
             emit(target, "MDH.priceResult(#{res.merge('code' => code, 'gen' => gen).to_json})")
           end
         end

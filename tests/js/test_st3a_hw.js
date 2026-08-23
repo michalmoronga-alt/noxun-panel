@@ -206,6 +206,14 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   const idx = SENT.findIndex(function(x){ return x[0] === 'hw_leave'; });
   ok(idx >= 0, 'odchod sa hlási SERVERU (ten ruší bežiaci fetch a povie prečo)');
   eq(ELS.hwDelModal.style.display, 'none', 'a modál potvrdenia mazania sa zavrie');
+  // Review P2 #4: náhľad z Demosu NIE JE modál — žije v tele sekcie, ktoré sa
+  // pri odchode UCHOVÁ. Bez resetu by v ňom navždy visel stav „Načítavam
+  // stránku…", hoci server beh už zrušil.
+  const leaveFn = fs.readFileSync(path.join(JS, 'hw_catalog.js'), 'utf8')
+    .match(/function hwCloseModals\(\)\{[\s\S]*?\n  \}/)[0];
+  ok(/MDH_DEMOS = null/.test(leaveFn), 'odchod zhodí rozbehnutý náhľad z Demosu');
+  ok(/mdhRenderDemosPreview\(\)/.test(leaveFn) && /mdhRenderDemosHits\(\[\]\)/.test(leaveFn),
+     'a prekreslí obe miesta, kde bol vidieť (náhľad aj zhody hľadania)');
 })();
 
 // --- 6) kolízie globálov ----------------------------------------------------

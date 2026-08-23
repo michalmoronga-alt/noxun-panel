@@ -6533,8 +6533,9 @@ module NoxunSuRunner
         ok("ŠT-1c B3: payload nesie data sekcie #{sec} (`#{key}`)", payload.key?(key))
       end
       # ŠT-2a pridala sestu sekciu `mat` (Materialy), ŠT-2b jej dala aj Demos
-      # toky a zrusila okno — zoznam je odvtedy sestpolozkovy.
-      ok('ŠT-1c B3: sekcie Studia su vsetky (bom · ctrl · buy · budget · offer · mat)',
+      # toky a zrusila okno; ŠT-3a-1 pridala siedmu `hw` (Kovanie) — okno
+      # „Katalóg kovania" zatial zije, ale navigacia don uz nevedie.
+      ok('ŠT-1c B3: sekcie Studia su vsetky (bom · ctrl · buy · budget · offer · mat · hw)',
          e::StudioDialog::SECTIONS == %w[bom ctrl buy budget offer mat hw])
     end
 

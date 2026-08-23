@@ -334,7 +334,8 @@ NxTest.test('ŠT-1c PR B3: ⚠ chip okna Vyroba zanikol spolu s oknom') do
   NxTest.refute(File.exist?(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production.html')),
                 'HTML zaniknuteho okna uz v repe nie je')
   NxTest.assert(S1B_STUDIO_RB.include?("SECTIONS = %w[bom ctrl buy budget offer mat hw]"),
-                'vsetkych pat obsahov zije ako sekcie Studia')
+                'vsetkych pat obsahov zaniknuteho okna Vyroba zije ako sekcie Studia ' \
+                '(+ `mat` zo ŠT-2a a `hw` zo ŠT-3a-1)')
 end
 
 # --- 8) UI kontrakt sekcie ---------------------------------------------------

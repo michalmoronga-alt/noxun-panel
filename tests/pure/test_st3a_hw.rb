@@ -29,6 +29,9 @@ require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog') if NxTest
 # NEPREMENUVA) — sada overuje kontrakt OBOCH modulov. Parse-time tu ziadne
 # SketchUp API nie je (vsetko je vnutri metod).
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'hardware_catalog_dialog') if NxTest.headless?
+# Sada porovnava mena akcii OBOCH sekcii (kolizia by prepisala cudzi callback),
+# takze `MaterialsDialog` potrebuje aj vtedy, ked bezi SAMOSTATNE (review P2 #7).
+require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'materials_dialog') if NxTest.headless?
 
 ST3A_STUDIO_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'studio_dialog.rb'),
                            encoding: 'UTF-8')
@@ -272,6 +275,52 @@ NxTest.test('ŠT-3a-1: `push_items` obsluhuje OBA ciele a NEDVIHA generaciu') do
   NxTest.assert(echo.include?('NX.setHwCatalog'), 'echo posiela LEN katalog do klienta')
   NxTest.refute(echo.include?('@generation'), 'a generacie sa NEDOTYKA')
   NxTest.refute(echo.include?('fresh_collect'), 'ani model neprepocitava')
+end
+
+NxTest.test('ŠT-3a-1 (review P1 #1): ZOTAVOVACIE vetvy setov obnovia OBE UI') do
+  # `hws_save_set` aj `hws_delete_set` su v SECTION_ACTIONS, takze odmietnuty
+  # zapis moze prist ZO SEKCIE. Keby sa obnovilo len okno, hlaska by tvrdila
+  # „obnovené", ale sekcia by drzala STARU `revision` — dalsi pokus by spadol
+  # na tom istom konflikte donekonecna (a `:not_found` by v nej nespravilo NIC).
+  resync = ST3A_HW_RB[/def resync_sets.*?\n        end\n/m].to_s
+  NxTest.assert(!resync.empty?, 'zotavovacia cesta ma vlastne meno (nie je to `push_sets`)')
+  NxTest.assert(resync.include?('win_js("HWSETS.init'), 'okno dostane cerstve sety')
+  NxTest.assert(resync.include?('StudioDialog.push_hw_sets(payload)'), 'a sekcia tiez')
+  code = resync.lines.reject { |l| l.strip.start_with?('#') }.join
+  NxTest.assert_equal(1, code.scan(/sets_payload/).length,
+                      'payload sa stava RAZ — druhy by znamenal druhy `HardwareSets.load`')
+  NxTest.refute(code.include?('refresh_if_open'),
+                'NIC sa nezapisalo — plny push Studia by bol zbytocny prepocet kusovnika')
+  echo = ST3A_STUDIO_RB[/def push_hw_sets\(payload = nil\).*?\n        end\n/m].to_s
+  NxTest.assert(echo.include?('NX.setHwSets'), 'echo ma vlastny prijimac')
+  NxTest.refute(echo.include?('@generation'), 'a generacie sa NEDOTYKA')
+  NxTest.assert(ST3A_HW_JS.include?('NX.setHwSets = function(data)'),
+                'klient ho vie prijat (ten isty `HWSETS.init` ako okno)')
+  # Vsetky STYRI zotavovacie vetvy musia ist novou cestou.
+  save = ST3A_HW_RB[/def handle_set_save\(payload\).*?\n        end\n/m].to_s
+  del  = ST3A_HW_RB[/def handle_set_delete\(payload\).*?\n        end\n/m].to_s
+  NxTest.assert_equal(2, save.scan(/resync_sets/).length,
+                      'save: `:conflict` aj neznáme zlyhanie obnovia obe UI')
+  NxTest.assert_equal(2, del.scan(/resync_sets/).length,
+                      'delete: `:conflict` aj `:not_found` tiez')
+  NxTest.refute(save.include?("\n            push_sets\n"), 'a stara okno-only cesta tam uz nie je')
+  NxTest.refute(del.include?("\n            push_sets\n"), 'ani v mazani')
+end
+
+NxTest.test('ŠT-3a-1 (review P2 #3): priznak beziaceho behu zhasne AJ ked vysledok nikam nepojde') do
+  # Inak by odchod zo sekcie po UZ DOBEHNUTOM behu vypisal falosne
+  # „Zrušené: …" — hlaska o nicom, ktora prepise stavovy riadok.
+  %w[handle_check_price handle_demos_preview].each do |m|
+    body = ST3A_HW_RB[/def #{m}\(payload\).*?\n        end\n/m].to_s
+    gate = body[/clear_running\(target\)[^\n]*/].to_s
+    NxTest.assert(gate.include?(' if '),
+                  "#{m}: priznak gasi LEN aktualna generacia (prekonany beh nesmie zhasnut beziaci)")
+    NxTest.assert(body.index('clear_running(target)') < body.index('next unless'),
+                  "#{m}: a gasi sa PRED guardom adresata (mrtve Studio nie je dovod nechat priznak)")
+  end
+  cancel = ST3A_HW_RB[/def handle_demos_cancel\(_payload\).*?\n        end\n/m].to_s
+  NxTest.assert(cancel.include?('clear_running(run_target)'),
+                'zrusenie gasi priznak TOU ISTOU cestou ako start (z okna je to no-op)')
 end
 
 NxTest.test('ŠT-3a-1: prepocet cien si plny push robi SAM (ziadny dvojity prepocet)') do

@@ -817,6 +817,21 @@ module Noxun
           Engine.log_error(e, 'StudioDialog.push_hw_catalog')
         end
 
+        # ZOTAVOVACIE echo setov (review P1 #1). Posiela ho VYHRADNE
+        # `HardwareCatalogDialog#resync_sets` po ODMIETNUTOM zapise — sekcia
+        # potrebuje cerstvu `revision`, inak by dalsi zapis poslala so starym
+        # odtlackom a zacyklila sa v konfliktoch. Po USPESNOM zapise chodia
+        # sety plnym `push_state` (menia aj nakupny zoznam), takze tu sa
+        # generacia NEDVIHA a kusovnik sa neprepocitava.
+        def push_hw_sets(payload = nil)
+          return unless defined?(HardwareCatalogDialog)
+
+          data = payload || HardwareCatalogDialog.sets_payload
+          js("if (window.NX && NX.setHwSets) NX.setHwSets(#{data.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.push_hw_sets')
+        end
+
         # Payload sekcie. SETY chodia VZDY (su modelovym kontextom — snapshot
         # predvolieb zije na modeli a rozhoduje o nakupnom zozname); CELY
         # KATALOG len pri prvom pushi okna, po prepnuti dokumentu a po rucnom
