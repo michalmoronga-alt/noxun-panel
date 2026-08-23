@@ -51,7 +51,7 @@
 
   // ZRKADLO `StudioDialog::SECTIONS` — autoritou whitelistu je RUBY, tento
   // zoznam len zabrani, aby z okna vyletela hodnota, ktora sekciu nepomenuva.
-  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat'];
+  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw'];
 
   // ŠT-1b (Š10): 3-stavove nastavenie kontroly hran je ZDIELANY komponent —
   // TEN ISTY markup kresli rail Inspectora (rohovy trojuholnik pri ABS ikone)
@@ -101,7 +101,11 @@
       // ŠT-2b: okno „Materiály projektu" ZANIKLO — sekcia vie všetko vrátane
       // Demos tokov a „Nahradiť UNI…", takže niet kam premosťovať.
       { id: 'mat',    ic: 'layers',   t: 'Materiály' },
-      { id: 'hw',     ic: 'hammer',   t: 'Kovanie',   bridge: 'zatiaľ vlastné okno — presun v ŠT-3' },
+      // ŠT-3a-1: Kovanie je SEKCIA (Š16 — pohľady Položky · Sety). Okno
+      // „Katalóg kovania" ešte žije kvôli trom modelovým zápisom (predvoľby
+      // setov projektu) — otvára ho premostenie Z VNÚTRA sekcie, nie
+      // navigácia. Ikona = hammer (kontrakt „Ikony navigácie").
+      { id: 'hw',     ic: 'hammer',   t: 'Kovanie' },
       { id: 'rules',  ic: 'settings', t: 'Pravidlá',  bridge: 'zatiaľ vlastné okno — presun v ŠT-3' },
       { id: 'tpl',    ic: 'star',     t: 'Šablóny',   bridge: 'zatiaľ vlastné okno — presun v ŠT-3' }
     ] },
@@ -124,7 +128,11 @@
     // ŠT-2a: hint nesie to, co v okne Materialy stal podtitul (`#mdline`) —
     // co sekcia spravuje a co je v nej GLOBALNE (katalog) vs projektove.
     mat: { t: 'Materiály',
-           hint: 'katalóg dekorov je spoločný pre všetky zákazky · predvoľby projektu platia pre túto' }
+           hint: 'katalóg dekorov je spoločný pre všetky zákazky · predvoľby projektu platia pre túto' },
+    // ŠT-3a-1 (Š16): presun okna Katalóg kovania 1:1 — redizajn a D-15
+    // pridávačky prídu s blokom KOVANIE.
+    hw: { t: 'Kovanie',
+          hint: 'katalóg položiek a sety sú spoločné pre všetky zákazky · predvoľby setov projektu zatiaľ v okne' }
   };
 
   // ---------------------------------------------------------------- helpers
@@ -671,6 +679,12 @@
             typeof matOnLeaveSection === 'function'){
           matOnLeaveSection();
         }
+        // ŠT-3a-1: to isté pre sekciu Kovanie (modal potvrdenia mazania žije
+        // mimo tela sekcie a na serveri môže bežať overenie ceny / náhľad).
+        if (studioSec === 'hw' && ST.open_section !== 'hw' &&
+            typeof hwOnLeaveSection === 'function'){
+          hwOnLeaveSection();
+        }
         studioSec = ST.open_section;
         // Kotva predvyplna hladanie KUSOVNIKA (N13 posiela ID skrinky). Pri inej
         // sekcii by potichu prestavila filter, ktory pouzivatel ani nevidí —
@@ -818,6 +832,13 @@
     // — `staleFlag` ma jedinu autoritu, tu.
     if (studioSec === 'mat'){
       if (typeof matRenderTools === 'function') matRenderTools(staleFlag);
+      else box.innerHTML = '';
+      return;
+    }
+    // ŠT-3a-1: to isté pre sekciu Kovanie — lištu kreslí `js/hw_catalog.js`
+    // (načítava sa AŽ ZA týmto súborom, preto cez `typeof`).
+    if (studioSec === 'hw'){
+      if (typeof hwRenderTools === 'function') hwRenderTools(staleFlag);
       else box.innerHTML = '';
       return;
     }
@@ -987,6 +1008,15 @@
     if (studioSec === 'mat'){
       if (typeof matRenderBody === 'function') matRenderBody();
       else box.innerHTML = '<div class="muted">Materiály sa nenačítali (js/proj_materials.js).</div>';
+      return;
+    }
+    // ŠT-3a-1: telo sekcie Kovanie si kreslí `js/hw_catalog.js` z TOHO ISTÉHO
+    // dôvodu ako Materiály (audit #2): v sekcii môže byť rozpísaný formulár
+    // novej položky, rozpísaný editor setu alebo rozpísaná bunka ceny a
+    // `NX.setStudio` (napr. po prepočte kusovníka) ich nesmie zmazať.
+    if (studioSec === 'hw'){
+      if (typeof hwRenderBody === 'function') hwRenderBody();
+      else box.innerHTML = '<div class="muted">Kovanie sa nenačítalo (js/hw_catalog.js).</div>';
       return;
     }
     if (studioSec === 'ctrl') box.innerHTML = ctrlSection();
@@ -1235,7 +1265,11 @@
                          // koľko dielcov ktorý dekor používa (katalóg je globálny
                          // a chodí echom). Hláška to musí povedať presne, inak
                          // vyzerá, že sa prepočítava katalóg.
-                         mat: 'Prepočítavam použitie dekorov v projekte…' };
+                         mat: 'Prepočítavam použitie dekorov v projekte…',
+                         // ŠT-3a-1: v Kovaní sa z modelu neprepočítava nič —
+                         // „Obnoviť" si pýta čerstvý KATALÓG a sety z disku
+                         // (mohlo ich zmeniť žijúce okno Katalóg kovania).
+                         hw: 'Načítavam čerstvý katalóg kovania a sety…' };
 
   function requestRefresh(){
     if (!window.sketchup || !sketchup.refresh_bom) return;
@@ -1399,6 +1433,10 @@
     // server (`mat_leave`), toto je jeho jediný ohlasovač.
     if (studioSec === 'mat' && id !== 'mat' && typeof matOnLeaveSection === 'function'){
       matOnLeaveSection();
+    }
+    // ŠT-3a-1: sekcia Kovanie má z rovnakých dôvodov vlastný odchodový hook.
+    if (studioSec === 'hw' && id !== 'hw' && typeof hwOnLeaveSection === 'function'){
+      hwOnLeaveSection();
     }
     studioSec = id;
     render();

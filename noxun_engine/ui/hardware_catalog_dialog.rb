@@ -9,6 +9,19 @@
 #
 # Request generation (F9): kazdy check_price nesie gen; vysledok so starym
 # gen alebo pre zavrete okno sa zahodi (bump: novy check, close).
+#
+# ŠT-3a-1: katalog ma od tejto davky DVE UI — toto okno (zije dalej, zanikne
+# v ŠT-3a-2) a SEKCIU `hw` okna ŠTÚDIO. Telo kazdej akcie ostava TU (vzor
+# audit #21 ŠT-2a: modul sa NEPREMENUVA), zmenil sa jediny detail: ADRESAT
+# odpovede.
+#
+#   * pocas synchronneho volania sekcie ho drzi `with_client(sink)`,
+#   * mimo neho ide odpoved do OKNA (`win_js`),
+#   * ASYNCHRONNY beh (overenie ceny, nahlad z Demosu) si pamata, KTO ho
+#     spustil (`run_target`): pre okno plati povodny okno-guard
+#     (`@dialog.equal?(dlg) && visible?`), pre sekciu SESSION TOKEN
+#     (`@section_session`), ktory zhasina zatvorenie Studia, prepnutie
+#     dokumentu a ODCHOD zo sekcie `hw`.
 require 'json'
 
 module Noxun
@@ -16,7 +29,153 @@ module Noxun
     module HardwareCatalogDialog
       DLG_KEY = 'noxun_engine_hw_catalog_v1'
 
+      # ŠT-3a-1: UZAVRETY whitelist akcii, ktore smie poslat SEKCIA `hw`.
+      # Klient (Studio) posiela iba MENO akcie — co sa smie zavolat, rozhoduje
+      # SERVER (HTML ani JS nie su ochrana).
+      #
+      # Su tu LEN KATALOGOVE zapisy (globalny %APPDATA% katalog + kniznica
+      # setov). Tri akcie, ktore menia MODEL — `hws_map_project`,
+      # `hws_merge_seed`, `hws_reset_project` — v tejto davke ZAMERNE CHYBAJU:
+      # ich presun (a s nim aj zanik tohto okna) je dávka ŠT-3a-2. Sekcia ich
+      # preto nekresli ako ovladace, ale ako PREMOSTENIE do tohto okna
+      # (`hw_open_window` v `studio_dialog.rb`) — vzor `MAT_BRIDGE_STATUS`
+      # zo ŠT-2a.
+      #
+      # `ready` v zozname NIE JE (a byt nemoze): Studio registruje callbacky
+      # pod TYMI ISTYMI menami, takze `ready` by prepisal jeho vlastny — okno
+      # by prestalo dostavat prvy push. Prvotny stav sekcie preto nesie
+      # `push_state` Studia pod klucom `hw` (zapadka `@hw_full_pending`,
+      # presny vzor `mat` zo ŠT-2a).
+      SECTION_ACTIONS = %w[
+        hw_search hw_create hw_patch hw_delete
+        hw_check_price hw_apply_price
+        hw_demos_search hw_demos_preview hw_demos_cancel hw_demos_create
+        hws_save_set hws_delete_set hws_map_global
+      ].freeze
+
       class << self
+        # --- ŠT-3a-1: vstup SEKCIE `hw` (vzor MaterialsDialog.dispatch) ------
+
+        # Vykona akciu katalogu v mene SEKCIE. `sink` je proc, ktory dostane
+        # hotovy JS retazec a posle ho tomu, KTO sa pytal. Volanie je
+        # synchronne, takze sink zije presne jeden callback — asynchronne
+        # pokracovanie (fetch z Demosu) uz ide cestou `run_target`.
+        def dispatch(name, payload, sink)
+          key = name.to_s
+          unless SECTION_ACTIONS.include?(key)
+            return sink.call(status_script('Neznáma akcia katalógu kovania.', true))
+          end
+
+          with_client(sink) { run_section_action(key, payload) }
+        rescue StandardError => e
+          Engine.log_error(e, "HardwareCatalogDialog.dispatch #{name}")
+          sink.call(status_script("Chyba: #{e.message}", true))
+        end
+
+        def run_section_action(key, payload)
+          case key
+          when 'hw_search'         then handle_search(payload)
+          when 'hw_create'         then handle_create(payload)
+          when 'hw_patch'          then handle_patch(payload)
+          when 'hw_delete'         then handle_delete(payload)
+          when 'hw_check_price'    then handle_check_price(payload)
+          when 'hw_apply_price'    then handle_apply_price(payload)
+          when 'hw_demos_search'   then handle_demos_search(payload)
+          when 'hw_demos_preview'  then handle_demos_preview(payload)
+          when 'hw_demos_cancel'   then handle_demos_cancel(payload)
+          when 'hw_demos_create'   then handle_demos_create(payload)
+          when 'hws_save_set'      then handle_set_save(payload)
+          when 'hws_delete_set'    then handle_set_delete(payload)
+          when 'hws_map_global'    then handle_map_global(payload)
+          end
+        end
+
+        # Presmerovanie odpovedi na cas JEDNEHO volania. `ensure` je povinne:
+        # vynimka v handleri nesmie nechat sink viset, inak by ho zdedila
+        # NASLEDUJUCA (aj asynchronna) odpoved a poslala ju do cudzieho kanala.
+        def with_client(sink)
+          prev = @client_sink
+          @client_sink = sink
+          yield
+        ensure
+          @client_sink = prev
+        end
+
+        # --- ŠT-3a-1: zivotnost dlhych behov SEKCIE --------------------------
+        #
+        # Okno ma svoj guard od V0.6 (instancia dialogu + `visible?`). Sekcia
+        # ziadnu vlastnu instanciu nema, takze jej zivotnost drzi MONOTONNY
+        # session token. Zhasina ho KAZDA udalost, po ktorej uz vysledok nema
+        # komu prist:
+        #   * zatvorenie Studia (`on_ui_closed` — ABA: nova instancia okna
+        #     NESMIE dostat eventy behu, ktory patril starej),
+        #   * prepnutie dokumentu (`on_model_changed`),
+        #   * ODCHOD zo sekcie `hw` (`cancel_runs_on_leave`).
+        def section_bump_session
+          @section_session = @section_session.to_i + 1
+        end
+
+        # Zatvorene Studio = ziadna sekcia. Beziaci fetch sa zneplatni.
+        def on_ui_closed
+          section_bump_session
+          @section_running = nil
+        rescue StandardError => e
+          Engine.log_error(e, 'HardwareCatalogDialog.on_ui_closed')
+        end
+
+        # VEDOME ROZHODNUTIE (vzor ŠT-2b): dlhy beh je viazany na SEKCIU, nie
+        # len na okno. Odchod do Kusovnika pocas overovania ceny alebo pocas
+        # nahladu z Demosu beh ZRUSI — a povie to nahlas. Nechat ho bezat na
+        # pozadi by znamenalo, ze sa vysledok vykresli do sekcie, ktoru uz
+        # nikto nepozera; pytat sa pri kazdom prepnuti by otravovalo.
+        #
+        # Hlaska ide LEN vtedy, ked naozaj nieco bezalo — inak by kazde
+        # prepnutie sekcie prepisalo stavovy riadok zbytocnou vetou.
+        def cancel_runs_on_leave
+          label = @section_running
+          section_bump_session
+          @section_running = nil
+          return if label.to_s.empty?
+
+          studio_js(status_script("Zrušené: #{label} — opustil si sekciu Kovanie.", false))
+        rescue StandardError => e
+          Engine.log_error(e, 'HardwareCatalogDialog.cancel_runs_on_leave')
+        end
+
+        # Kto si vyziadal beh — vysledok musi prist JEMU (a len kym ma kam
+        # prist). Vnutri `with_client` je to sekcia, inak okno.
+        def run_target
+          return { kind: :section, session: @section_session.to_i } if @client_sink
+
+          { kind: :window, dlg: @dialog }
+        end
+
+        def target_alive?(target)
+          if target[:kind] == :section
+            @section_session.to_i == target[:session] &&
+              defined?(StudioDialog) && StudioDialog.dialog_alive?
+          else
+            !@dialog.nil? && @dialog.equal?(target[:dlg]) && @dialog.visible?
+          end
+        end
+
+        def emit(target, script)
+          target[:kind] == :section ? studio_js(script) : win_js(script)
+        end
+
+        def emit_status(target, msg, error = false)
+          emit(target, status_script(msg, error))
+        end
+
+        # Beziaci dlhy beh SEKCIE si pamatame kvoli hlaske pri odchode.
+        def mark_running(target, label)
+          @section_running = label if target[:kind] == :section
+        end
+
+        def clear_running(target)
+          @section_running = nil if target[:kind] == :section
+        end
+
         def show
           dlg = ensure_dialog
           if dlg.visible?
@@ -105,13 +264,27 @@ module Noxun
           js("MDH.init(#{state_payload.to_json})")
         end
 
-        def push_items
-          js("MDH.setItems(#{items_payload.to_json})")
+        # ŠT-3a-1: OBA ciele naraz. Katalogovy zapis nemeni model, takze sa
+        # posiela BEZ ohladu na to, kto ho vyvolal — okno aj sekcia musia
+        # ukazovat to iste (`js` so sinkom by obslúžil len volajuceho).
+        #
+        # `refresh_studio` = plny payload Studia s `bump: false` (vzor
+        # `MaterialsDialog.after_catalog_change`): ceny kovania vstupuju do
+        # ROZPOCTU, takze sa cislo v inej sekcii naozaj meni — ale identita
+        # riadkov nie, takze rozkliknuty riadok Kusovnika ani rozrobeny export
+        # po oprave ceny NESMU zastarat. Vypina ho jediny volajuci
+        # (`price_refresh_after_proc`), ktory `push_state` robi sam — inak by
+        # sa cely kusovnik prepocital dvakrat.
+        def push_items(refresh_studio: true)
+          payload = items_payload
+          win_js("MDH.setItems(#{payload.to_json})")
+          StudioDialog.push_hw_catalog(payload) if defined?(StudioDialog)
           # D-92 (audit BLOCKER 2): sekcia Kovanie v paneli ukazuje KODY a NAZVY
           # kupovanych poloziek — po kazdej zmene katalogu ich treba obnovit,
           # inak by drzala stary nazov (alebo „mimo katalógu") az do prekliku
           # vyberu. ZIVY push (NIKDY push_selected — ten siaha na model).
           Panel.push_hardware_sets if defined?(Panel) && Panel.dialog_alive?
+          StudioDialog.refresh_if_open(bump: false) if refresh_studio && defined?(StudioDialog)
         rescue StandardError => e
           Engine.log_error(e, 'HardwareCatalogDialog.push_items')
         end
@@ -135,8 +308,15 @@ module Noxun
           }
         end
 
+        # Stavovy riadok ma v OBOCH UI ten isty prijimac (`MDH.setStatus`) —
+        # sekcia bezi na TOM ISTOM `js/hw_catalog.js` a `#status` je aj
+        # v `studio.html`. Text sklada SERVER (jedna autorita).
+        def status_script(msg, error = false)
+          "MDH.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})"
+        end
+
         def set_status(msg, error = false)
-          js("MDH.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})")
+          js(status_script(msg, error))
         end
 
         # --- V0.6 D2: Pridat z Demosu ------------------------------------------
@@ -150,15 +330,20 @@ module Noxun
           data = JSON.parse(payload.to_s)
           query = data['query'].to_s
           if DemosSitemapCache.load.nil?
-            dlg = @dialog
+            # ŠT-3a-1: beh patri TOMU, kto ho spustil — okno drzi povodny
+            # okno-guard, sekcia session token.
+            target = run_target
+            mark_running(target, 'sťahovanie zoznamu produktov Demosu')
             js("MDH.demosResults(#{{ 'query' => query, 'results' => [],
                                      'refreshing' => true }.to_json})")
             DemosLookup.start_refresh do |ok, err|
-              next unless @dialog && @dialog.equal?(dlg) && @dialog.visible?
+              next unless target_alive?(target)
+
+              clear_running(target)
               if ok
-                js("MDH.demosRefreshDone()")
+                emit(target, 'MDH.demosRefreshDone()')
               else
-                set_status("Zoznam produktov sa nepodarilo stiahnuť: #{err}", true)
+                emit_status(target, "Zoznam produktov sa nepodarilo stiahnuť: #{err}", true)
               end
             end
             return
@@ -176,13 +361,21 @@ module Noxun
 
         # Async nahlad produktu — gen guard (stary vysledok nesmie prepisat
         # novsi nahlad, zrusenie pouzivatelom ani zavrete okno).
+        #
+        # ŠT-3a-1: `@demos_gen` ostava SPOLOCNY pre okno aj sekciu — vedome.
+        # Nahlad si server odklada do JEDNEHO proposal storu, takze dva
+        # subezne nahlady (jeden v okne, druhy v sekcii) by si aj tak siahali
+        # na to iste; generacia teda spravne hovori „posledny vyhrava".
         def handle_demos_preview(payload)
           data = JSON.parse(payload.to_s)
           gen = bump_demos_gen
-          dlg = @dialog
+          target = run_target
+          mark_running(target, 'náhľad položky z Demosu')
           HardwareCatalog.demos_preview!(data['url'].to_s) do |res|
-            next unless @demos_gen.to_i == gen && @dialog && @dialog.equal?(dlg) && @dialog.visible?
-            js("MDH.demosPreview(#{res.merge('gen' => gen).to_json})")
+            next unless @demos_gen.to_i == gen && target_alive?(target)
+
+            clear_running(target)
+            emit(target, "MDH.demosPreview(#{res.merge('gen' => gen).to_json})")
           end
         end
 
@@ -190,6 +383,7 @@ module Noxun
         # zahodi dobiehajúci vysledok (inak by sa zruseny nahlad znovu otvoril).
         def handle_demos_cancel(_payload)
           bump_demos_gen
+          @section_running = nil if @client_sink
         end
 
         def handle_demos_create(payload)
@@ -220,12 +414,22 @@ module Noxun
         # Prepnutie modelu (EngineAppObserver) — tab Predvolby projektu cita
         # NOVY aktivny model; polozky katalogu su globalne (netreba refresh).
         def on_model_changed(_model)
+          # ŠT-3a-1: beziaci beh SEKCIE patril PREDOSLEMU dokumentu.
+          section_bump_session
+          @section_running = nil
+          # Sekcia dostane cerstve sety PLNYM pushom Studia — ten uz z toho
+          # isteho broadcastu robi `StudioDialog.on_model_changed`.
           return unless @dialog && @dialog.visible?
+
           push_sets
         end
 
+        # LEN okno. Sekcia sety NEDOSTAVA echom: menia aj NAKUPNY zoznam
+        # (sekcia Nákup kovania), takze polovicny push by nechal cisla vedla
+        # seba rozidene — chodia preto plnym `push_state` (viz
+        # `after_sets_change`).
         def push_sets
-          js("HWSETS.init(#{sets_payload.to_json})")
+          win_js("HWSETS.init(#{sets_payload.to_json})")
         end
 
         def sets_payload
@@ -280,11 +484,23 @@ module Noxun
         # ZIVY push ponuky do panela (NX.setHardwareSets). NIKDY push_selected:
         # ten resetuje rozpracovany formular panela a dedup-uje kopie
         # (= zmena v satelitnom okne by siahla na model).
+        # ŠT-3a-1 (oprava nalezu auditu): tato cesta volala
+        # `StudioDialog.on_model_changed(model)` — a to je vetva PREPNUTIA
+        # DOKUMENTU: prevesila observer neaktualnosti a zdvihla zapadku
+        # `@mat_full_pending`, teda po kazdom ulozeni setu preposlala CELY
+        # katalog materialov a tvarila sa, ze sa vymenil dokument. Spravna
+        # cesta je bezny refresh okna:
+        #   * zmena KNIZNICE setov (`model == nil`) — mení sa nákupný zoznam,
+        #     ale nie identita riadkov, takze `bump: false` (vzor
+        #     `push_mat_catalog` / katalogovych zapisov: rozkliknuty riadok
+        #     Kusovnika ani rozrobeny export nesmie zastarat),
+        #   * zmena PREDVOLIEB PROJEKTU (`model` je podany) — to uz je zapis
+        #     do MODELU, takze generacia sa zdvihnut MA.
         def after_sets_change(model = nil)
           push_sets
           Panel.push_hardware_sets if defined?(Panel) && Panel.dialog_alive?
           # ŠT-1c PR B3: vetva okna Vyroba tu zanikla spolu s oknom.
-          StudioDialog.on_model_changed(model) if model && defined?(StudioDialog) # ST-1a
+          StudioDialog.refresh_if_open(bump: !model.nil?) if defined?(StudioDialog) # ST-1a
         end
 
         # Hodnota mapovania z okna: 'value' = set_id String ALEBO selector Hash
@@ -460,11 +676,36 @@ module Noxun
           set_status(ok ? 'Predvoľby projektu obnovené z globálnych.' : 'Obnova zlyhala.', !ok)
         end
 
+        # ŠT-3a-1: odpoved ide TOMU, KTO sa pytal. Sink zije PRESNE jeden
+        # synchronny callback sekcie (`with_client`); mimo neho je adresatom
+        # OKNO — asynchronny beh si adresata pamata sam (`run_target`).
         def js(script)
-          return unless @dialog && @dialog.visible?
+          sink = @client_sink
+          return sink.call(script) if sink
+
+          win_js(script)
+        end
+
+        # Kanal OKNA (do ŠT-3a-1 sa volal `js`).
+        def win_js(script)
+          return false unless @dialog && @dialog.visible?
+
           @dialog.execute_script(script)
+          true
         rescue StandardError => e
           Engine.log_error(e, 'HardwareCatalogDialog.js')
+          false
+        end
+
+        # Kanal SEKCIE. `js` Studia je private (patri jeho kanalu), preto
+        # tenky verejny most `hw_js` — vzor `StudioDialog.mat_js` zo ŠT-2b.
+        def studio_js(script)
+          return false unless defined?(StudioDialog)
+
+          StudioDialog.hw_js(script)
+        rescue StandardError => e
+          Engine.log_error(e, 'HardwareCatalogDialog.studio_js')
+          false
         end
 
         # --- generation (F9) -------------------------------------------------
@@ -559,14 +800,21 @@ module Noxun
 
         # Zivy check ceny — vysledok pride async; gen + code echo strazi, aby
         # stary vysledok neprepisal detail inej polozky (F9).
+        #
+        # ŠT-3a-1: `@gen` ostava SPOLOCNY pre okno aj sekciu — server drzi
+        # JEDEN cenovy navrh per kod (`pid`), takze dve subezne overenia by
+        # si aj tak siahali na to iste. Adresata vysledku urcuje `run_target`.
         def handle_check_price(payload)
           data = JSON.parse(payload.to_s)
           code = data['code'].to_s
           gen = bump_gen
-          dlg = @dialog
+          target = run_target
+          mark_running(target, 'overenie ceny z Demosu')
           HardwareCatalog.check_price!(code, url: data['url'].to_s) do |res|
-            next unless @gen.to_i == gen && @dialog && @dialog.equal?(dlg) && @dialog.visible?
-            js("MDH.priceResult(#{res.merge('code' => code, 'gen' => gen).to_json})")
+            next unless @gen.to_i == gen && target_alive?(target)
+
+            clear_running(target)
+            emit(target, "MDH.priceResult(#{res.merge('code' => code, 'gen' => gen).to_json})")
           end
         end
 
