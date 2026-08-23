@@ -477,6 +477,23 @@ module Noxun
           StudioDialog.refresh_if_open(bump: !model.nil?) if defined?(StudioDialog) # ST-1a
         end
 
+        # ŠT-3a-3: JEDNA cesta zatvorenia operacie pre vsetky TRI modelove
+        # zapisy. Vynimka medzi `start_operation` a `commit_operation` nechavala
+        # operaciu OTVORENU — dalsi zapis do modelu by sa do nej pribalil a jeden
+        # krok Spat by vratil OBA (kontrakt „1 zmena = 1 krok Späť" by padol).
+        # Priznak je EXPLICITNY, nie dopyt na API: po `commit_operation` uz nie je
+        # co abortovat a `abort_operation` by v najhorsom pripade siahol na cudziu
+        # operaciu — preto sa rusi VYHRADNE operacia, ktoru tento handler otvoril
+        # a este nezavrel.
+        def abort_open_operation(model, state)
+          return unless model && state.is_a?(Hash) && state[:open]
+
+          state[:open] = false
+          model.abort_operation
+        rescue StandardError => e
+          Engine.log_error(e, 'HardwareCatalogDialog.abort_open_operation')
+        end
+
         # Hodnota mapovania z okna: 'value' = set_id String ALEBO selector Hash
         # (H1b vyber podla parametra); stary kluc 'set_id' ostava kompatibilny.
         # Prazdne = odmapovanie (nil). Tvar validuje VYHRADNE core parser.
@@ -562,20 +579,26 @@ module Noxun
             return set_status("Set „#{bad['name']}“ je iného typu kovania.", true) if bad
           end
           # Zapis = 1 undo krok; snapshot dostane mapping AJ definicie (B2).
+          op = { open: false }
           model.start_operation('NOXUN: Predvoľba setu kovania', true)
+          op[:open] = true
           ok = HardwareSets.set_project_mapping!(model, gt, value, set_defs)
           if ok
             model.commit_operation
+            op[:open] = false
             after_sets_change(model)
             # Editor pasiem sa zatvara AZ po uspesnom zapise (echo kluca) —
             # pri chybe ostane rozpisany na doopravenie (vzor HWSETS.saved).
             js("HWSETS.mapSaved(#{data['ui_key'].to_s.to_json})")
             set_status(mapping_status_txt(gt, value, set_defs))
           else
-            model.abort_operation
+            abort_open_operation(model, op)
             resync_sets
             set_status('Predvoľba sa nedá uložiť — sety projektu sú poškodené (tlačidlo Obnoviť).', true)
           end
+        rescue StandardError => e
+          abort_open_operation(model, op)
+          raise e
         end
 
         # „Výsuv → Atira biela H70." / „Výsuv → podľa výšky čela (2 pásma)."
@@ -617,9 +640,16 @@ module Noxun
             return set_status('Predvoľby projektu sú poškodené — použi „Obnoviť z globálnych predvolieb".', true)
           end
 
+          op = { open: false }
           model.start_operation('NOXUN: Doplnenie predvolieb setov', true)
+          op[:open] = true
           res, added_sets, added_map = HardwareSets.merge_project_sets_seed!(model)
-          res == :updated ? model.commit_operation : model.abort_operation
+          if res == :updated
+            model.commit_operation
+            op[:open] = false
+          else
+            abort_open_operation(model, op)
+          end
           # F8 (fix nalezu auditu): pri NO-OPE (`abort_operation` — projekt uz
           # ma vsetky globalne predvolby) sa NEVOLA `after_sets_change` VOBEC.
           # Nic sa nezmenilo, takze plny prepocet kusovnika by bol zbytocny
@@ -635,7 +665,11 @@ module Noxun
           set_status("Doplnené predvoľby: #{labels.join(', ')} (#{added_sets.length} " \
                      "#{added_sets.length == 1 ? 'nový set' : 'nových setov'}). Existujúce zostali.")
         rescue StandardError => e
-          model.abort_operation if model
+          # ŠT-3a-3: rusi sa LEN operacia, ktora je este otvorena. Doteraz
+          # tu bolo bezpodmienecne `abort_operation` — vynimka v `set_status`
+          # ci v `after_sets_change` (teda UZ PO commite) by tak zrusila
+          # zapis, ktory sa pouzivatelovi prave potvrdil.
+          abort_open_operation(model, op)
           raise e
         end
 
@@ -652,11 +686,26 @@ module Noxun
           # H1a: skladanie globalneho defaultu je JEDNA autorita v core
           # (global_default_state) — zvlada aj vyber setu podla parametra.
           state = HardwareSets.global_default_state
+          op = { open: false }
           model.start_operation('NOXUN: Obnova predvolieb setov', true)
+          op[:open] = true
           ok = HardwareSets.write_project_state(model, state)
-          ok ? model.commit_operation : model.abort_operation
-          after_sets_change(ok ? model : nil) # D-75: aj panel dostane novú ponuku
+          if ok
+            model.commit_operation
+            op[:open] = false
+            after_sets_change(model) # D-75: aj panel dostane novú ponuku
+          else
+            # ŠT-3a-3: NIC sa nezapisalo, takze ziadny plny push — stacilo by
+            # to len zbytocny prepocet kusovnika. Sekcia vsak MUSI dostat
+            # cerstvy stav: hlaska hovori o zlyhani a zoznam pred nou uz
+            # nemusi platit (vzor ostatnych zotavovacich vetiev).
+            abort_open_operation(model, op)
+            resync_sets
+          end
           set_status(ok ? 'Predvoľby projektu obnovené z globálnych.' : 'Obnova zlyhala.', !ok)
+        rescue StandardError => e
+          abort_open_operation(model, op)
+          raise e
         end
 
         # Odpoved ide TOMU, KTO sa pytal. Sink zije PRESNE jeden synchronny
