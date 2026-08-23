@@ -63,7 +63,9 @@ NxTest.test('ŠT-1c: tab Kovanie (a s PR B3 cele okno Vyroba) je PREC') do
   end
   NxTest.assert(S1C_STUDIO_JS.include?('function buySection'),
                 'render sekcie je v studio.js (v okne Vyroba sa volal renderHardware)')
-  NxTest.assert(S1C_STUDIO_JS.include?("t.closest('tr.hwrow')"), 'klik-select kovania zije v Studiu')
+  # `tr.hwgen`, NIE `tr.hwrow` — `.hwrow` je flex riadok kovania v panel.css
+  # a na <tr> by rozhodil stlpce (guard test_tr_flex_kolizia.rb).
+  NxTest.assert(S1C_STUDIO_JS.include?("t.closest('tr.hwgen')"), 'klik-select kovania zije v Studiu')
 end
 
 NxTest.test('ŠT-1c: styly nakupneho zoznamu sa PRESUNULI (nie skopirovali)') do
@@ -85,7 +87,7 @@ NxTest.test('ŠT-1c (review P3): sekcia Nakup nesľubuje klik tam, kde sa nic ne
                       'vsetky TRI tabulky sekcie nesu marker (sety · bez kodov · generika)')
   NxTest.assert(S1C_STUDIO_HTML.include?('.bomtab.hwtab tbody tr { cursor: default; }'),
                 'riadok sekcie standardne NEMA ruku')
-  NxTest.assert(S1C_STUDIO_HTML.include?('.bomtab.hwtab tbody tr.hwrow { cursor: pointer; }'),
+  NxTest.assert(S1C_STUDIO_HTML.include?('.bomtab.hwtab tbody tr.hwgen { cursor: pointer; }'),
                 'ruku dostane VYHRADNE riadok, ktory naozaj reaguje')
   NxTest.assert(S1C_STUDIO_HTML.include?('.bomtab.hwtab tbody tr:hover { background: none; }'),
                 'a rovnako sa vracia aj podsvietenie pri prejdeni mysou')

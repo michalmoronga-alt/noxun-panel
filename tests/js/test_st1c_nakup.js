@@ -98,9 +98,11 @@ ok(H.indexOf('SPOLU — len známe ceny (1× cena nezadaná)') >= 0,
 ok(H.indexOf('56,80 €') >= 0, 'a samotny sucet je SERVEROVE cislo');
 
 // --- 6) generika: serverove texty + klik-select ------------------------------
-ok(H.indexOf('<tr class="hwrow" data-i="0">') >= 0,
+// `hwgen`, NIE `hwrow` — `.hwrow` je v panel.css flex riadok kovania
+// Inspectora/Katalogu a <tr> s display:flex straca zarovnanie stlpcov.
+ok(H.indexOf('<tr class="hwgen" data-i="0">') >= 0,
    'riadok generiky nesie INDEX v serverovom poli (adresa pre klik-select)');
-ok(H.indexOf('<tr class="hwrow" data-i="1">') >= 0, 'a to kazdy');
+ok(H.indexOf('<tr class="hwgen" data-i="1">') >= 0, 'a to kazdy');
 ok(H.indexOf('rez 597 mm') >= 0, 'params_label zo servera sa ukaze NAMIESTO surovych key/value');
 ok(H.indexOf('angle 110') >= 0, 'bez params_label sa vypisu surove parametre');
 ok(H.indexOf('CAB-2×2 (ručne)') >= 0, 'rucny povod vlastnika je priznany');

@@ -260,17 +260,20 @@
   .bomtab tr.hwsum td { font-weight: 600; border-top: 2px solid var(--nx-border-strong); }
   /* Review P3 — ŽIADNA FALOŠNÁ AFORDANCIA. `.bomtab tbody tr` má kvôli
      Kusovníku ruku aj hover, lenže v tejto sekcii je klikateľný LEN riadok
-     generiky (`.hwrow`, označí vlastníka v modeli). Kategórie, súčet, položky
+     generiky (`.hwgen`, označí vlastníka v modeli). Kategórie, súčet, položky
      zoznamu setov, riadky mimo katalógu ani zoznam „Bez kódov" klikom nerobia
      NIČ — ruka tam sľubuje akciu, ktorá neexistuje (najhoršie pri jantárovom
      riadku, kde používateľ čaká opravu). Tabuľky sekcie preto nesú marker
      `.hwtab` a ruku dostane VÝHRADNE to, čo naozaj reaguje; Kusovník vedľa
      ostáva nedotknutý (to je pôvodné správanie zaniknutého okna Výroba, kde ruku mali
-     len `tr.bomrow` a `tr.hwrow`). */
+     len `tr.bomrow` a vtedajší `tr.hwrow`). Riadok generiky sa NESMIE volať
+     `hwrow`: tú triedu robí zdieľaný panel.css flex riadkom kovania
+     Inspectora/Katalógu a `<tr>` s `display: flex` stráca zarovnanie stĺpcov
+     s hlavičkou (guard tests/pure/test_tr_flex_kolizia.rb). */
   .bomtab.hwtab tbody tr { cursor: default; }
   .bomtab.hwtab tbody tr:hover { background: none; }
-  .bomtab.hwtab tbody tr.hwrow { cursor: pointer; }
-  .bomtab.hwtab tbody tr.hwrow:hover { background: var(--nx-select-bg-soft); }
+  .bomtab.hwtab tbody tr.hwgen { cursor: pointer; }
+  .bomtab.hwtab tbody tr.hwgen:hover { background: var(--nx-select-bg-soft); }
 
   /* ---------- ŠT-1c PR B1: sekcia ROZPOČET (Š12–Š13) ----------
      Štýly sa PRESUNULI 1:1 z production.html (tab Rozpočet zanikol) — Š12
