@@ -206,14 +206,20 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   const idx = SENT.findIndex(function(x){ return x[0] === 'hw_leave'; });
   ok(idx >= 0, 'odchod sa hlási SERVERU (ten ruší bežiaci fetch a povie prečo)');
   eq(ELS.hwDelModal.style.display, 'none', 'a modál potvrdenia mazania sa zavrie');
-  // Review P2 #4: náhľad z Demosu NIE JE modál — žije v tele sekcie, ktoré sa
-  // pri odchode UCHOVÁ. Bez resetu by v ňom navždy visel stav „Načítavam
-  // stránku…", hoci server beh už zrušil.
+  // Review P2 #4 + kolo 2 P2-2: náhľad z Demosu NIE JE modál — žije v tele
+  // sekcie, ktoré sa pri odchode UCHOVÁ. Nedokončený beh sa zhodiť MUSÍ (inak
+  // v ňom navždy visí „Načítavam stránku…", hoci server beh už zrušil), ale
+  // DOKONČENÝ náhľad zhodiť NESMIE: serverový proposal (`pid`) žije ďalej
+  // a používateľ v ňom môže mať rozpísanú kategóriu a poznámku.
   const leaveFn = fs.readFileSync(path.join(JS, 'hw_catalog.js'), 'utf8')
     .match(/function hwCloseModals\(\)\{[\s\S]*?\n  \}/)[0];
-  ok(/MDH_DEMOS = null/.test(leaveFn), 'odchod zhodí rozbehnutý náhľad z Demosu');
-  ok(/mdhRenderDemosPreview\(\)/.test(leaveFn) && /mdhRenderDemosHits\(\[\]\)/.test(leaveFn),
-     'a prekreslí obe miesta, kde bol vidieť (náhľad aj zhody hľadania)');
+  ok(/MDH_DEMOS && MDH_DEMOS\.status === 'pending'/.test(leaveFn),
+     'zhadzuje sa LEN nedokončený beh');
+  const guarded = leaveFn.slice(leaveFn.indexOf("=== 'pending'"));
+  ok(/MDH_DEMOS = null/.test(guarded) && /mdhRenderDemosPreview\(\)/.test(guarded),
+     'reset aj prekreslenie sú POD tou podmienkou, nie pred ňou');
+  ok(!/MDH_DEMOS = null/.test(leaveFn.slice(0, leaveFn.indexOf("=== 'pending'"))),
+     'a mimo nej sa náhľad nezahadzuje (rozpísané polia by prišli nazmar)');
 })();
 
 // --- 6) kolízie globálov ----------------------------------------------------

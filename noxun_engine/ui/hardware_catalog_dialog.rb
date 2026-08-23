@@ -132,10 +132,11 @@ module Noxun
         # Hlaska ide LEN vtedy, ked naozaj nieco bezalo — inak by kazde
         # prepnutie sekcie prepisalo stavovy riadok zbytocnou vetou.
         def cancel_runs_on_leave
-          label = @section_running
+          run = @section_running
           section_bump_session
           @section_running = nil
-          return if label.to_s.empty?
+          label = run.is_a?(Hash) ? run['label'].to_s : ''
+          return if label.empty?
 
           studio_js(status_script("Zrušené: #{label} — opustil si sekciu Kovanie.", false))
         rescue StandardError => e
@@ -168,12 +169,33 @@ module Noxun
         end
 
         # Beziaci dlhy beh SEKCIE si pamatame kvoli hlaske pri odchode.
+        #
+        # Review kolo 2 (P2-1): priznak nesie IDENTITU BEHU, nie len popis.
+        # `@gen` (cena) a `@demos_gen` (nahlad) su DVE nezavisle pocitadla, ale
+        # priznak je JEDEN slot — bez identity unikal na obe strany:
+        #   * DNU: zahodeny beh ceny dobehol, kym bezal nahlad z Demosu,
+        #     a zhasol CUDZI zivy priznak (odchod potom o zruseni mlcal),
+        #   * VON: beh sekcie zabity konkurencnou generaciou z okna sa nemal ako
+        #     upratat, priznak visel a odchod vypisal falosne „Zrušené: …".
+        # `mark_running` preto vracia ID behu a `clear_running` gasi LEN pri jeho
+        # zhode. Volanie BEZ id (vyslovne zrusenie pouzivatelom) zhasina to,
+        # co v sekcii prave bezi — to je jeho zmysel.
         def mark_running(target, label)
-          @section_running = label if target[:kind] == :section
+          return nil unless target[:kind] == :section
+
+          id = (@section_run_id = @section_run_id.to_i + 1)
+          @section_running = { 'label' => label.to_s, 'id' => id }
+          id
         end
 
-        def clear_running(target)
-          @section_running = nil if target[:kind] == :section
+        def clear_running(target, id = nil)
+          return unless target[:kind] == :section
+
+          run = @section_running
+          return unless run.is_a?(Hash)
+          return if id && run['id'] != id
+
+          @section_running = nil
         end
 
         def show
@@ -333,13 +355,14 @@ module Noxun
             # ŠT-3a-1: beh patri TOMU, kto ho spustil — okno drzi povodny
             # okno-guard, sekcia session token.
             target = run_target
-            mark_running(target, 'sťahovanie zoznamu produktov Demosu')
+            run_id = mark_running(target, 'sťahovanie zoznamu produktov Demosu')
             js("MDH.demosResults(#{{ 'query' => query, 'results' => [],
                                      'refreshing' => true }.to_json})")
             DemosLookup.start_refresh do |ok, err|
-              # Review P2 #3: priznak gasne aj bez adresata (jednorazovy
-              # single-flight beh — nema ho co prekonat).
-              clear_running(target)
+              # Review kolo 2 (P2-1): gasi sa PRED guardom adresata (mrtve
+              # Studio nie je dovod nechat priznak visiet) a VYHRADNE vlastny
+              # beh — medzitym mohol v sekcii zacat iny.
+              clear_running(target, run_id)
               next unless target_alive?(target)
 
               if ok
@@ -372,10 +395,13 @@ module Noxun
           data = JSON.parse(payload.to_s)
           gen = bump_demos_gen
           target = run_target
-          mark_running(target, 'náhľad položky z Demosu')
+          run_id = mark_running(target, 'náhľad položky z Demosu')
           HardwareCatalog.demos_preview!(data['url'].to_s) do |res|
-            # Review P2 #3 — to iste ako pri overeni ceny.
-            clear_running(target) if @demos_gen.to_i == gen
+            # Review kolo 2 (P2-1) — to iste ako pri overeni ceny: gasi sa
+            # podla IDENTITY behu, nie podla generacie. `@gen` a `@demos_gen`
+            # su dve pocitadla nad jednym priznakom, takze podmienka na
+            # generaciu unikala na obe strany.
+            clear_running(target, run_id)
             next unless @demos_gen.to_i == gen && target_alive?(target)
 
             emit(target, "MDH.demosPreview(#{res.merge('gen' => gen).to_json})")
@@ -386,8 +412,9 @@ module Noxun
         # zahodi dobiehajúci vysledok (inak by sa zruseny nahlad znovu otvoril).
         def handle_demos_cancel(_payload)
           bump_demos_gen
-          # Zrusenie ide TOU ISTOU cestou ako start — priznak gasne len tomu,
-          # kto ho zapalil (z okna je to no-op).
+          # Priznak gasne len tomu, kto ho zapalil (z okna je to no-op).
+          # ZAMERNE bez `run_id`: je to VYSLOVNE zrusenie pouzivatelom, takze
+          # zhasina to, co v sekcii prave bezi — nie konkretny beh.
           clear_running(run_target)
         end
 
@@ -833,13 +860,13 @@ module Noxun
           code = data['code'].to_s
           gen = bump_gen
           target = run_target
-          mark_running(target, 'overenie ceny z Demosu')
+          run_id = mark_running(target, 'overenie ceny z Demosu')
           HardwareCatalog.check_price!(code, url: data['url'].to_s) do |res|
-            # Review P2 #3: priznak sa gasi AJ ked vysledok nikam nepojde
-            # (zavrete Studio, odchod zo sekcie) — inak by odchod po dobehnutom
-            # behu vypisal falosne „Zrušené: …". Podmienka na generaciu ostava:
-            # PREKONANY beh nesmie zhasnut priznak toho, ktory prave bezi.
-            clear_running(target) if @gen.to_i == gen
+            # Review kolo 2 (P2-1): priznak sa gasi AJ ked vysledok nikam
+            # nepojde (zavrete Studio, odchod zo sekcie, prekonanie cudzou
+            # generaciou) — a gasi VYHRADNE vlastny beh (`run_id`), takze
+            # nesiahne na nahlad z Demosu, ktory medzitym zacal.
+            clear_running(target, run_id)
             next unless @gen.to_i == gen && target_alive?(target)
 
             emit(target, "MDH.priceResult(#{res.merge('code' => code, 'gen' => gen).to_json})")

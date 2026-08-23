@@ -840,11 +840,19 @@
     MDH_DEL = null;
     // Review P2 #4: nahlad z Demosu NIE JE modal — zije v tele sekcie, ktore
     // sa pri odchode UCHOVA. Bez tohto by v nom navzdy visel stav
-    // „Načítavam stránku…" (server beh uz zrusil `hw_leave`) alebo hlaska
-    // o stahovani zoznamu produktov. Vzor `matCloseModals`.
-    MDH_DEMOS = null;
-    mdhRenderDemosPreview();
-    mdhRenderDemosHits([]);
+    // „Načítavam stránku…", hoci server beh uz zrusil (`hw_leave`).
+    //
+    // Review kolo 2 (P2-2): zhadza sa LEN NEDOKONCENY beh. DOKONCENY nahlad
+    // odchodom zo sekcie nezanika — serverovy proposal (`pid`) zije dalej
+    // a pouzivatel v nom moze mat rozpisanu kategoriu a poznamku; zahodit ich
+    // by bola strata prace, nie upratanie. (Rovnaka zasada ako
+    // `matCloseModals` v `proj_materials.js`: ten modaly ZATVARA, ale ich
+    // hodnoty NEZAHADZUJE.)
+    if (MDH_DEMOS && MDH_DEMOS.status === 'pending'){
+      MDH_DEMOS = null;
+      mdhRenderDemosPreview();
+      mdhRenderDemosHits([]);
+    }
   }
 
   // Modelovy kontext sekcie z payloadu Studia (`ST.hw`). Katalog je v nom LEN

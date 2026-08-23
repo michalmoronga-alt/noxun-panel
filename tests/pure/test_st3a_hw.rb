@@ -207,7 +207,10 @@ NxTest.test('ŠT-3a-1: odchod zo sekcie POCAS behu sa priznane hlasi (a druhy uz
     define_method(:studio_js) { |script| sent << script.to_s; true }
   end
   begin
-    hw.instance_variable_set(:@section_running, 'overenie ceny z Demosu')
+    # Priznak sa zapaluje VYHRADNE cez `mark_running` (od kola 2 nesie identitu
+    # behu) — rucne nastaveny retazec by testoval tvar, ktory uz neexistuje.
+    hw.mark_running({ kind: :section, session: hw.instance_variable_get(:@section_session).to_i },
+                    'overenie ceny z Demosu')
     hw.cancel_runs_on_leave
     NxTest.assert(sent.any? { |x| x.include?('opustil si sekciu Kovanie') },
                   'odchod POCAS behu sa priznane hlasi')
@@ -307,20 +310,67 @@ NxTest.test('ŠT-3a-1 (review P1 #1): ZOTAVOVACIE vetvy setov obnovia OBE UI') d
   NxTest.refute(del.include?("\n            push_sets\n"), 'ani v mazani')
 end
 
-NxTest.test('ŠT-3a-1 (review P2 #3): priznak beziaceho behu zhasne AJ ked vysledok nikam nepojde') do
-  # Inak by odchod zo sekcie po UZ DOBEHNUTOM behu vypisal falosne
-  # „Zrušené: …" — hlaska o nicom, ktora prepise stavovy riadok.
+NxTest.test('ŠT-3a-1 (review kolo 2, P2-1): priznak behu nesie IDENTITU — cudzi beh ho nezhasne') do
+  # SLED, ktory to zachytava (grep na ` if ` ho nezachytil):
+  #   A = overenie ceny (`@gen`), B = nahlad z Demosu (`@demos_gen`).
+  #   Su to DVE nezavisle pocitadla nad JEDNYM priznakom, takze podmienka na
+  #   generaciu unikala na obe strany — zahodene A zhaslo CUDZIE zive B
+  #   (odchod potom o zruseni mlcal), a A zabite konkurencnou generaciou
+  #   z OKNA sa neupratalo (odchod vypisal falosne „Zrušené: …").
+  hw = Noxun::Engine::HardwareCatalogDialog
+  section = { kind: :section, session: hw.instance_variable_get(:@section_session).to_i }
+  window  = { kind: :window, dlg: nil }
+  running = -> { hw.instance_variable_get(:@section_running) }
+  begin
+    hw.instance_variable_set(:@section_running, nil)
+    a = hw.mark_running(section, 'overenie ceny z Demosu')
+    b = hw.mark_running(section, 'náhľad položky z Demosu')
+    NxTest.assert(!a.nil? && !b.nil? && a != b, 'kazdy beh dostane VLASTNU identitu')
+
+    # (a) UNIK DNU: dobehne zahodene A, kym B este bezi.
+    hw.clear_running(section, a)
+    NxTest.assert(running.call.is_a?(Hash) && running.call['id'] == b,
+                  'zahodeny beh A NESMIE zhasnut priznak beziaceho B')
+    NxTest.assert_equal('náhľad položky z Demosu', running.call['label'],
+                        'a hlaska pri odchode musi hovorit o B')
+
+    # (b) UNIK VON: B dobehne (aj ked ho zabila cudzia generacia) a upratie SA.
+    hw.clear_running(section, b)
+    NxTest.assert(running.call.nil?, 'vlastny beh priznak zhasne — ziadne falosne „Zrušené"')
+
+    # Vyslovne zrusenie pouzivatelom gasi bez ohladu na identitu.
+    hw.mark_running(section, 'náhľad položky z Demosu')
+    hw.clear_running(section)
+    NxTest.assert(running.call.nil?, 'zrusenie pouzivatelom zhasina to, co prave bezi')
+
+    # Beh OKNA sa priznaku sekcie NEDOTYKA (ani nezapaluje, ani nezhasina).
+    id = hw.mark_running(section, 'overenie ceny z Demosu')
+    NxTest.assert(hw.mark_running(window, 'x').nil?, 'okno si priznak sekcie nezapaluje')
+    NxTest.assert_equal(id, running.call['id'], 'a nepresvieti ten, ktory uz horí')
+    hw.clear_running(window)
+    NxTest.assert(running.call.is_a?(Hash), 'ani ho nezhasina')
+  ensure
+    hw.instance_variable_set(:@section_running, nil)
+  end
+end
+
+NxTest.test('ŠT-3a-1 (review kolo 2, P2-1): kazdy dlhy beh sekcie ma `run_id` a gasi sa PRED guardom') do
+  # Bez `run_id` by identita nemala odkial prist; bez poradia (gasit PRED
+  # guardom adresata) by mrtve Studio nechalo priznak visiet.
   %w[handle_check_price handle_demos_preview].each do |m|
     body = ST3A_HW_RB[/def #{m}\(payload\).*?\n        end\n/m].to_s
-    gate = body[/clear_running\(target\)[^\n]*/].to_s
-    NxTest.assert(gate.include?(' if '),
-                  "#{m}: priznak gasi LEN aktualna generacia (prekonany beh nesmie zhasnut beziaci)")
-    NxTest.assert(body.index('clear_running(target)') < body.index('next unless'),
-                  "#{m}: a gasi sa PRED guardom adresata (mrtve Studio nie je dovod nechat priznak)")
+    NxTest.assert(body.include?('run_id = mark_running(target'), "#{m}: beh si berie identitu")
+    NxTest.assert(body.include?('clear_running(target, run_id)'), "#{m}: a gasi VYHRADNE seba")
+    NxTest.assert(body.index('clear_running(target, run_id)') < body.index('next unless'),
+                  "#{m}: gasi sa PRED guardom adresata (mrtve Studio nie je dovod nechat priznak)")
   end
+  # `handle_demos_search` (single-flight refresh sitemapy) guard dovtedy NEMAL.
+  search = ST3A_HW_RB[/def handle_demos_search\(payload\).*?\n        end\n/m].to_s
+  NxTest.assert(search.include?('run_id = mark_running(target'), 'aj stahovanie zoznamu produktov')
+  NxTest.assert(search.include?('clear_running(target, run_id)'), 'a gasi sa rovnako')
   cancel = ST3A_HW_RB[/def handle_demos_cancel\(_payload\).*?\n        end\n/m].to_s
   NxTest.assert(cancel.include?('clear_running(run_target)'),
-                'zrusenie gasi priznak TOU ISTOU cestou ako start (z okna je to no-op)')
+                'vyslovne zrusenie ZAMERNE bez identity (z okna je to no-op)')
 end
 
 NxTest.test('ŠT-3a-1: prepocet cien si plny push robi SAM (ziadny dvojity prepocet)') do
