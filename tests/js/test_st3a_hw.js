@@ -1,4 +1,4 @@
-// ŠT-3a-1 — sekcia KOVANIE (`hw`) v okne Štúdio (klient).
+// ŠT-3a-1/3a-2 — sekcia KOVANIE (`hw`) v okne Štúdio (klient).
 //
 // Preco su to testy a nie klikanie:
 //   1. „Sekcia si kresli telo SAMA" sa da rozbit jedinym riadkom v `studio.js`
@@ -252,23 +252,23 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   });
 })();
 
-// --- 7) read-only predvoľby projektu (modelové zápisy sú v ŠT-3a-2) ---------
+// --- 7) predvoľby projektu sú v sekcii PLNOHODNOTNÉ (ŠT-3a-2) ---------------
 
 (function(){
-  // `hw_sets.js` sa v Node načítava samostatne — kontrolujeme jeho ČISTÚ
-  // funkciu a to, že read-only režim vôbec existuje a dá sa zapnúť.
+  // ŠT-3a-2: read-only režim zanikol — tri modelové zápisy sú v `SECTION_ACTIONS`,
+  // takže sekcia kreslí rovnaké ovládacie prvky ako kedysi okno.
   const HWS = require(path.join(JS, 'hw_sets.js'));
-  eq(typeof HWS.hwsSetProjReadOnly, 'function',
-     'sekcia sa vie prihlásiť do read-only režimu predvolieb projektu');
-  const opts = [{ set_id: 's1', name: 'Atira biela' }];
-  eq(HWS.hwsMappingValueText(null, opts, []), '— bez setu (ORANGE)',
-     'nenamapovaný typ sa prizná ako ORANGE, nie prázdnym riadkom');
-  eq(HWS.hwsMappingValueText('s1', opts, []), 'Atira biela', 'namapovaný set ukáže NÁZOV');
-  eq(HWS.hwsMappingValueText('s9', opts, []), 's9 (chýba)',
-     'set, ktorý knižnica už nemá, sa NEZAMLČÍ — riadok nesmie klamať');
-  const sel = { param: 'front_height', bands: [{ min: 100, max: 200, set_id: 's1' }] };
-  ok(/100–200 → Atira biela/.test(HWS.hwsMappingValueText(sel, opts, [])),
-     'výber podľa parametra sa vypíše ako čitateľný prehľad pásiem');
+  eq(typeof HWS.hwsSetProjReadOnly, 'undefined',
+     'prepínač read-only režimu už neexistuje');
+  eq(typeof HWS.hwsMappingValueText, 'undefined',
+     'a ani čítateľný výpis hodnoty bez ovládača (riadok kreslí select)');
+  // Čisté funkcie, na ktorých stojí zápis mapovania, musia žiť ďalej.
+  eq(typeof HWS.hwsBuildSelector, 'function', 'stavač selektora pásiem žije');
+  eq(typeof HWS.hwsProjDraftKeys, 'function',
+     'a rozpísané PROJEKTOVÉ pásma sa dajú zahodiť pri prepnutí dokumentu');
+  eq(HWS.hwsProjDraftKeys(['hws-map-proj|slide', 'hws-map-global|hinge']),
+     ['hws-map-proj|slide'],
+     'globálne drafty na modeli nezávisia — tie sa NEZAHADZUJÚ');
 })();
 
 // --- 8) zdrojáky: kontrakty, ktoré sa dajú overiť len čítaním ---------------
@@ -277,30 +277,30 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   const src = fs.readFileSync(path.join(JS, 'hw_catalog.js'), 'utf8');
   const sets = fs.readFileSync(path.join(JS, 'hw_sets.js'), 'utf8');
   const studio = fs.readFileSync(path.join(JS, '..', 'studio.html'), 'utf8');
-  const win = fs.readFileSync(path.join(JS, '..', 'hardware_catalog.html'), 'utf8');
 
-  ok(/!window\.NX_HW_SECTION/.test(src),
-     '`ready` sa v Štúdiu NEPOSIELA — poslal by celý payload druhýkrát');
-  ok(/sketchup\.ready\(/.test(src),
-     'ale volanie ostáva — okno „Katalóg kovania" je bez neho prázdne (žije do ŠT-3a-2)');
-  ok(win.indexOf('js/hw_catalog.js') > 0 && win.indexOf('js/hw_sets.js') > 0,
-     'okno beží na TÝCH ISTÝCH súboroch (žiadna druhá kópia obsahu)');
-  ok(!/NX_HW_SECTION/.test(win), 'a príznak sekcie v ňom nie je');
+  // ŠT-3a-2 (F6): okno zaniklo, takže `ready` už nemá druhého odosielateľa —
+  // v Štúdiu ho posiela `studio.js` (`window.onload`) a druhé volanie by
+  // prinútilo okno poslať celý payload dvakrát.
+  ok(!/^[^/\n]*\bsketchup\.ready\(/m.test(src),
+     '`ready` sa z tohto súboru už NEPOSIELA (vzor proj_materials.js po ŠT-2b)');
+  ok(!fs.existsSync(path.join(JS, '..', 'hardware_catalog.html')),
+     'hardware_catalog.html je zmazaný (dve UI nad jedným katalógom by sa rozišli)');
 
   ok(studio.indexOf('js/studio.js') < studio.indexOf('js/hw_catalog.js'),
      'hw_catalog.js sa načítava AŽ ZA studio.js (obaľuje jeho NX.setStudio)');
   ok(studio.indexOf('js/hw_sets.js') < studio.indexOf('js/hw_catalog.js'),
-     'a hw_sets.js pred ním (ten mu zapína read-only režim predvolieb)');
+     'a hw_sets.js pred ním (detail setu volá jeho funkcie)');
   ok(studio.indexOf('NX_HW_SECTION') < studio.indexOf('js/hw_catalog.js'),
-     'príznak sekcie musí byť nastavený PRED načítaním súboru');
+     'príznak sekcie ostáva ako čítateľné prihlásenie sa do režimu sekcie');
 
-  // Modelové zápisy sa do sekcie nedostali ani cez klienta: ich tlačidlá
-  // kreslí `hwsRenderProj` LEN mimo read-only režimu.
+  // Modelové zápisy sú v sekcii živé: blok „Predvoľby projektu" kreslí
+  // ovládače bez akéhokoľvek režimu a premostenie nemá kam viesť.
   const projFn = sets.match(/function hwsRenderProj\(\)\{[\s\S]*?\n  \}/)[0];
-  ok(/HWS_PROJ_RO/.test(projFn), 'blok „Predvoľby projektu" pozná read-only režim');
-  ok(projFn.indexOf('hws-merge-seed') > projFn.indexOf('HWS_PROJ_RO'),
-     'zapisovacie tlačidlá sú za vetvou režimu, nie pred ňou');
-  ok(/hws-open-window/.test(sets), 'a namiesto nich je PREMOSTENIE do okna (D-78)');
+  ok(!/HWS_PROJ_RO/.test(projFn), 'blok už žiadny read-only režim nepozná');
+  ok(/hws-merge-seed/.test(projFn) && /hws-reset-proj/.test(projFn),
+     'a kreslí OBE zapisovacie akcie priamo');
+  ok(!/hws-open-window/.test(sets), 'premostenie do okna zaniklo spolu s ním');
+  ok(!/function hwsSetTab/.test(sets), 'prepínač tabov OKNA tiež');
 })();
 
-console.log(`OK ${n} kontrol (ŠT-3a-1 sekcia Kovanie)`);
+console.log(`OK ${n} kontrol (ŠT-3a sekcia Kovanie)`);

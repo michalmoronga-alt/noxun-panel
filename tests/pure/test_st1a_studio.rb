@@ -576,7 +576,9 @@ NxTest.test('ST-1a: Studio je vo VSETKYCH refresh cestach (audit #10)') do
     'core/scale_observer.rb' => 'StudioDialog.on_model_changed(model)',
     'ui/materials_dialog.rb' => 'StudioDialog.refresh_if_open',
     'ui/supplier_settings_dialog.rb' => 'StudioDialog.refresh_if_open',
-    'ui/hardware_catalog_dialog.rb' => 'StudioDialog.on_model_changed(model)'
+    # F5 (ŠT-3a-2): polozka chytala KOMENTAR o zrusenej ceste — realna cesta
+    # obnovy Studia z tohto modulu je `refresh_if_open` (`after_sets_change`).
+    'ui/hardware_catalog_dialog.rb' => 'StudioDialog.refresh_if_open'
   }
   cesty.each do |rel, needle|
     src = File.read(File.join(NxTest::ROOT, 'noxun_engine', rel), encoding: 'UTF-8')
