@@ -152,20 +152,33 @@
       var h = '';
       if (d.label) h += '<div class="mrhead">' + esc(d.label) + '</div>';
       if (arr.length && (d.cols || []).length){
+        // Hlavicka MUSI niest TU ISTU sirkovu triedu ako bunka pod nou (review
+        // 2c-1 #8) — inak stlpec „Cena" (uzky `mshort`) sedi pod nadpisom
+        // sirokym na celu volnu sirku a tabulka sa cita krivo. Zaskrtavatko
+        // ma vlastnu (uzku) triedu z rovnakeho dovodu.
         h += '<div class="mrcols">';
-        (d.cols || []).forEach(function(c){ h += '<span>' + esc(c.label) + '</span>'; });
+        (d.cols || []).forEach(function(c){
+          h += '<span class="' + esc(colCls(c)) + '">' + esc(c.label) + '</span>';
+        });
         h += '<span class="mrgap"></span></div>';
       }
       h += '<div class="mrlist" data-nxm-list="' + key + '">';
       if (!arr.length && d.empty) h += '<div class="mrempty">' + esc(d.empty) + '</div>';
       arr.forEach(function(row){
         h += '<div class="mrline" data-nxm-row="' + key + '">';
+        // `_note` = STITOK riadku (nie hodnota — `readRows` ho necita, lebo
+        // nema `data-nxm-col`). Nesie ho zotavenie z konfliktu: riadok, ktory
+        // sa medzitym zmenil ZVONKU, musi byt VIDNO — inak by pouzivatel
+        // potvrdil zapis nad cudzou zmenou, o ktorej nevie.
+        if (row && row._note){
+          h += '<span class="mrflag" title="' + esc(row._note) + '">' + esc(row._note) + '</span>';
+        }
         (d.hidden || []).forEach(function(hk){
           var hv = row ? row[hk] : null;
           if (hv == null || hv === '') return;
           h += '<input type="hidden" data-nxm-col="' + esc(hk) + '" value="' + esc(hv) + '">';
         });
-        (d.cols || []).forEach(function(c){ h += rowCellHtml(c, row ? row[c.key] : ''); });
+        (d.cols || []).forEach(function(c){ h += rowCellHtml(c, row ? row[c.key] : '', row); });
         // D-78: ziadne MRTVE tlacidlo. Posledny riadok sa odobrat neda, ale
         // tlacidlo ostava zameratelne a klik POVIE DOVOD — HTML `disabled` by
         // ho vyhodilo z Tab poradia a mlcalo by.
@@ -189,16 +202,45 @@
              rowsInnerHtml(f, data) + '</div>';
     }
 
-    function rowCellHtml(c, v){
+    // Sirkova trieda stlpca — zdiela ju HLAVICKA aj bunka (review 2c-1 #8).
+    function colCls(c){
+      var d = c || {};
+      var base = d.cls || 'mrcell';
+      return d.type === 'checkbox' ? base + ' mcheckcol' : base;
+    }
+
+    // Bunka riadku. `row` je CELY riadok, lebo o tom, ci sa bunka smie
+    // editovat, rozhoduje riadok, nie stlpec: `roWhen: 'material_id'` znamena
+    // „ked riadok uz nesie ID variantu, je toto pole jeho IDENTITA a needituje
+    // sa". Server takú zmenu aj tak odmietne — UI ju len nema PROVOKOVAT
+    // (a `roTitle` povie DOVOD, vzor D-78).
+    //
+    // Zamknuta bunka je `readonly` TEXT, nie `disabled`: disabled prvok zmizne
+    // z klavesnice aj z citacky obrazovky, takze pouzivatel by sa k hodnote
+    // hrubky/sirky nedostal ani precitat. `readonly` ostava zameratelny
+    // a kopirovatelny — a `readRows` ho cita rovnako, takze server dostane
+    // nezmenenu identitu.
+    function rowCellHtml(c, v, row){
       var d = c || {};
       var k = esc(d.key);
-      var cls = ' class="' + esc(d.cls || 'mrcell') + '"';
+      var cls = ' class="' + esc(colCls(c)) + '"';
+      // Bunky nemaju `<label>` (nadpis je nad stlpcom, nie pri poli) — bez
+      // `aria-label` by citacka obrazovky hlasila len „textové pole".
+      var lbl = ' aria-label="' + esc(d.label || d.key) + '"';
+      var locked = !!(d.roWhen && row && row[d.roWhen] != null && row[d.roWhen] !== '');
+      var title = locked && d.roTitle ? ' title="' + esc(d.roTitle) + '"' : '';
+      if (locked && d.type === 'checkbox')
+        return '<input type="checkbox" data-nxm-col="' + k + '"' + cls + lbl + title +
+               ' disabled' + (v === true ? ' checked' : '') + '>';
+      if (locked)
+        return '<input type="text" data-nxm-col="' + k + '"' + cls + lbl + title +
+               ' readonly value="' + esc(v == null ? '' : v) + '">';
       if (d.type === 'select')
-        return '<select data-nxm-col="' + k + '"' + cls + '>' + optionsHtml(d.options, v) + '</select>';
+        return '<select data-nxm-col="' + k + '"' + cls + lbl + '>' + optionsHtml(d.options, v) + '</select>';
       if (d.type === 'checkbox')
-        return '<input type="checkbox" data-nxm-col="' + k + '"' + cls +
+        return '<input type="checkbox" data-nxm-col="' + k + '"' + cls + lbl +
                (v === true ? ' checked' : '') + '>';
-      return '<input type="text" data-nxm-col="' + k + '"' + cls +
+      return '<input type="text" data-nxm-col="' + k + '"' + cls + lbl +
              ' value="' + esc(v == null ? '' : v) + '"' +
              (d.placeholder ? ' placeholder="' + esc(d.placeholder) + '"' : '') + '>';
     }
@@ -243,6 +285,10 @@
         h += '<div class="mmemo" role="status"><span>Predvyplnené z rozpísaného konceptu</span>' +
              '<button type="button" class="linkbtn" data-nxm-act="memreset">Začať odznova</button></div>';
       }
+      // Zberna hlaska pre chyby, ktore sa NEDAJU priradit k poľu (celoriadkove
+      // validacie servera, chyby bez `field`). Prazdna sa nekresli (`:empty`) —
+      // markup je tu VZDY, aby `showErrors` nemusel nic vkladat pred iné uzly.
+      h += '<div class="merrtop" data-nxm-errtop="1" role="status"></div>';
       (s.fields || []).forEach(function(f){ h += fieldHtml(f); });
       if (s.note) h += '<div class="hint">' + esc(s.note) + '</div>';
       h += '</div><div class="mfoot"><span class="spacer"></span>' +
@@ -330,12 +376,141 @@
       return out;
     }
 
+    // --- CHYBY PRI POLIACH (ŠT-2c 2c-2a) ------------------------------------
+    // Server validuje CELY formular naraz a vracia [{row, field, msg}]. Modal
+    // sa pri odmietnutom zapise NEZATVARA (kontrakt D-15), takze chyba musi
+    // pristat PRI TOM POLI, ktoreho sa tyka — inak pouzivatel v dlhom
+    // formulari s desiatimi riadkami hlada, ktora cena je zla.
+    //   `row` = null    -> ploche pole (`#nxm_<field>`), hlaska pod jeho `.mrow`,
+    //   `row` = "k:idx" -> RIADOK repeatera (`k` = kluc pola), hlaska pod riadkom,
+    //   nezaraditelna   -> zberny pas navrchu tela.
+    function classHas(node, cls){
+      return String((node && node.className) || '').split(/\s+/).indexOf(cls) >= 0;
+    }
+
+    function markBad(node){
+      if (!node || !node.setAttribute) return;
+      if (!classHas(node, 'bad')) node.className = String(node.className || '') ? (node.className + ' bad') : 'bad';
+      node.setAttribute('aria-invalid', 'true');
+    }
+
+    function errNode(host){
+      if (!host || typeof document === 'undefined') return null;
+      var n = host.querySelector ? host.querySelector('.merr') : null;
+      if (n) return n;
+      n = document.createElement('div');
+      n.className = 'merr';
+      n.setAttribute('role', 'status');
+      host.appendChild(n);
+      return n;
+    }
+
+    function clearErrors(){
+      if (typeof document === 'undefined') return;
+      var r = document.getElementById(ROOT_ID);
+      if (!r || !r.querySelectorAll) return;
+      var errs = r.querySelectorAll('.merr');
+      for (var i = 0; i < errs.length; i++) errs[i].textContent = '';
+      var bad = r.querySelectorAll('.bad');
+      for (var j = 0; j < bad.length; j++){
+        bad[j].className = String(bad[j].className || '').split(/\s+/)
+          .filter(function(c){ return c && c !== 'bad'; }).join(' ');
+        if (bad[j].removeAttribute) bad[j].removeAttribute('aria-invalid');
+      }
+      var top = r.querySelector ? r.querySelector('[data-nxm-errtop]') : null;
+      if (top) top.textContent = '';
+    }
+
+    function showErrors(list){
+      if (typeof document === 'undefined') return;
+      clearErrors();
+      var r = document.getElementById(ROOT_ID);
+      if (!r) return;
+      var rest = [];
+      (list || []).forEach(function(e){
+        if (!e) return;
+        var msg = String(e.msg == null ? '' : e.msg);
+        var host = null;
+        var input = null;
+        var rowKey = (e.row == null) ? '' : String(e.row);
+        if (rowKey){
+          var parts = rowKey.split(':');
+          var box = rowsBox(parts[0]);
+          var lines = (box && box.querySelectorAll) ? box.querySelectorAll('[data-nxm-row]') : [];
+          var line = lines[Number(parts[1])];
+          if (line){
+            host = line;
+            if (e.field && line.querySelector) input = line.querySelector('[data-nxm-col="' + e.field + '"]');
+          }
+        } else if (e.field){
+          input = document.getElementById('nxm_' + e.field);
+          host = (input && input.closest) ? input.closest('.mrow') : null;
+        }
+        if (!host){ rest.push(msg); return; }
+        markBad(input);
+        var n = errNode(host);
+        if (n) n.textContent = n.textContent ? (n.textContent + ' · ' + msg) : msg;
+      });
+      var top = r.querySelector ? r.querySelector('[data-nxm-errtop]') : null;
+      if (top) top.textContent = rest.join(' · ');
+    }
+
     function fieldByKey(key){
       var found = null;
       ((OPEN && OPEN.spec && OPEN.spec.fields) || []).forEach(function(f){
         if (f && f.type === 'rows' && String(f.key) === String(key)) found = f;
       });
       return found;
+    }
+
+    // Pole VYCHODISKOVEJ specifikacie (to, co podal volajuci) — proti nemu sa
+    // porovnava pamat a dopĺňa sa obsah po zotaveni z konfliktu.
+    function baseFieldByKey(key){
+      var found = null;
+      ((OPEN && OPEN.base && OPEN.base.fields) || []).forEach(function(f){
+        if (f && String(f.key) === String(key)) found = f;
+      });
+      return found;
+    }
+
+    function shallow(o){
+      var out = {};
+      var k;
+      for (k in o){ if (Object.prototype.hasOwnProperty.call(o, k)) out[k] = o[k]; }
+      return out;
+    }
+
+    // POZOR: `withMemory` vracia pri prazdnej pamati TEN ISTY objekt, takze
+    // `OPEN.spec === OPEN.base` a rovnako aj ich POLIA su jeden a ten isty
+    // objekt. Zapis do „specifikacie" by potom prepisal aj VYCHODISKOVE
+    // hodnoty (a naopak) — pamat by prestala vidiet, co pouzivatel rozpisal.
+    // Pred zmenou obsahu za behu si preto spec rozdvojime.
+    function ownSpecField(key){
+      if (!OPEN) return null;
+      var f = fieldByKey(key);
+      var b = baseFieldByKey(key);
+      if (!f || f !== b) return f;
+      if (OPEN.spec === OPEN.base){
+        var copy = shallow(OPEN.base);
+        copy.fields = (OPEN.base.fields || []).slice();
+        OPEN.spec = copy;
+      }
+      var own = shallow(f);
+      OPEN.spec.fields = (OPEN.spec.fields || []).map(function(x){ return x === f ? own : x; });
+      return own;
+    }
+
+    // Vymena OBSAHU repeatera za behu (zotavenie z konfliktu — audit 2c-2a #1b):
+    // volajuci podá riadky uz zlucene (cerstvy katalog + hodnoty pouzivatela)
+    // a `opts.base` = CISTY stav zo servera, aby pamat rozpisu porovnavala
+    // proti tomu, co dnes naozaj je v katalogu, nie proti stavu spred konfliktu.
+    function setRows(key, data, opts){
+      var f = ownSpecField(key);
+      if (!f) return;
+      var b = baseFieldByKey(key);
+      if (b && opts && opts.base) b.value = opts.base;
+      f.value = data || [];
+      renderRows(f, f.value);
     }
 
     function renderRows(f, data){
@@ -489,6 +664,61 @@
     // vedla nesmie byt ticha strata rozpisaneho formulara (kontrakt D-15 z PR
     // B2). Ukladaju sa VYHRADNE polia, ktore sa lisia od defaultov (#2), takze
     // „nic som nepisal, len som okno otvoril a zavrel" pamat nezaklada.
+    // --- PAMAT RIADKOV: LEN to, co pouzivatel napisal (audit 2c-2a #1a) ------
+    // Riadok nesie aj SERVER-OWNED skryte polia (`row_rev` = odtlacok zaznamu
+    // v case otvorenia). Keby ich pamat drzala a pri dalsom otvoreni vliala
+    // spat, formular by odosielal ZASTARANY odtlacok a server by ho odmietol
+    // ako konflikt — pamat by sa stala pascou, z ktorej niet cesty von.
+    // Pamataju sa preto LEN editovatelne stlpce + `rowKey` (identita riadku,
+    // podla ktorej sa hodnoty priradia k CERSTVYM riadkom).
+    function trimRowsValue(f, rows){
+      var keep = {};
+      (f.cols || []).forEach(function(c){ keep[c.key] = true; });
+      if (f.rowKey) keep[f.rowKey] = true;
+      return (rows || []).map(function(r){
+        var out = {};
+        var k;
+        for (k in r){
+          if (Object.prototype.hasOwnProperty.call(r, k) && keep[k]) out[k] = r[k];
+        }
+        return out;
+      });
+    }
+
+    // Vliatie pamate do CERSTVYCH riadkov: parovanie podla `rowKey`.
+    //   riadok, ktory v cerstvom katalogu JE   -> prepisu sa mu LEN stlpce,
+    //   riadok z pamate BEZ identity            -> je to novy, rozpisany riadok,
+    //   riadok z pamate, ktory uz neexistuje    -> ZAHODI sa (zaznam je prec).
+    function mergeRowsMemory(f, mem){
+      var base = f.value || [];
+      var rows = mem || [];
+      var keyName = f.rowKey;
+      if (!keyName) return rows.length ? rows : base;
+      var byKey = {};
+      rows.forEach(function(r){
+        var k = r && r[keyName];
+        if (k != null && k !== '') byKey[String(k)] = r;
+      });
+      var out = base.map(function(r){
+        var k = r && r[keyName];
+        var m = (k != null && k !== '') ? byKey[String(k)] : null;
+        if (!m) return r;
+        var g = {};
+        var kk;
+        for (kk in r){ if (Object.prototype.hasOwnProperty.call(r, kk)) g[kk] = r[kk]; }
+        (f.cols || []).forEach(function(c){
+          if (Object.prototype.hasOwnProperty.call(m, c.key)) g[c.key] = m[c.key];
+        });
+        delete byKey[String(k)];
+        return g;
+      });
+      rows.forEach(function(r){
+        var k = r && r[keyName];
+        if (k == null || k === '') out.push(r); // rozpisany NOVY riadok
+      });
+      return out;
+    }
+
     function remember(){
       if (!OPEN || OPEN.memSkip) return;
       var key = OPEN.base ? OPEN.base.memoryKey : null;
@@ -499,7 +729,8 @@
       var any = false;
       Object.keys(v).forEach(function(k){
         if (sameValue(v[k], def[k])) return;
-        out[k] = v[k];
+        var f = baseFieldByKey(k);
+        out[k] = (f && f.type === 'rows') ? trimRowsValue(f, v[k]) : v[k];
         any = true;
       });
       var s = memSlot(key);
@@ -533,7 +764,9 @@
         if (!Object.prototype.hasOwnProperty.call(mem, f.key)) return f;
         var g = {}, kk;
         for (kk in f){ if (Object.prototype.hasOwnProperty.call(f, kk)) g[kk] = f[kk]; }
-        g.value = mem[f.key];
+        // Riadky sa NEPREPISUJU cele — pamat nesie len stlpce, identita a
+        // odtlacok zaznamu prichadzaju CERSTVE z katalogu (audit 2c-2a #1a).
+        g.value = (f.type === 'rows') ? mergeRowsMemory(f, mem[f.key]) : mem[f.key];
         return g;
       });
       return out;
@@ -749,7 +982,8 @@
                 rowsHtml: rowsHtml, cardCls: cardCls,
                 open: open, close: close, submit: submit,
                 isOpen: isOpen, isBusy: isBusy, setBusy: setBusy,
-                values: values, spec: spec,
+                values: values, spec: spec, setRows: setRows,
+                showErrors: showErrors, clearErrors: clearErrors,
                 memory: memory, clearMemory: clearMemory };
     global.NXModal = API;
     if (typeof module !== 'undefined' && module.exports) module.exports = API;

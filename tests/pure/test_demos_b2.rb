@@ -671,12 +671,23 @@ NxTest.test('demos b2: demos polia preziju cudzi patch (merge-safe normalize) a 
   )
   NxTest.assert_equal(:ok, st)
   fresh = MAT2.sheet('K009_PW_DTDL_18X')
-  st2, = MAT2.patch_record('sheet', 'K009_PW_DTDL_18X', { 'price_per_m2' => '21.5' },
+  # ŠT-2c: nakupne polia (cena/kod/dodavatel) datum overenia rusia, obchodny
+  # nazov nie — na nom sa preto testuje, ze cudzi patch demos polia NEZHODI.
+  st2, = MAT2.patch_record('sheet', 'K009_PW_DTDL_18X', { 'cp_nazov' => 'Buk prírodný' },
                            row_rev: MAT2.record_rev(fresh))
   NxTest.assert_equal(:ok, st2)
   after = MAT2.sheet('K009_PW_DTDL_18X')
   NxTest.assert_equal(DB2_DTDL18_URL, after['demos_url'], 'patch inej bunky vazbu nezhodil')
-  NxTest.assert(after['price_checked_at'].to_s.length > 0)
+  NxTest.assert(after['price_checked_at'].to_s.length > 0, 'patch inej bunky datum overenia nerusi')
+  # ŠT-2c 2c-2a (kontrakt save_decor, bod 9): RUCNE prepisana cena uz NIE JE
+  # overena — vazba na produkt (demos_url) ostava, datum overenia padne.
+  st3, = MAT2.patch_record('sheet', 'K009_PW_DTDL_18X', { 'price_per_m2' => '21.5' },
+                           row_rev: MAT2.record_rev(after))
+  NxTest.assert_equal(:ok, st3)
+  manual = MAT2.sheet('K009_PW_DTDL_18X')
+  NxTest.assert_close(21.5, manual['price_per_m2'], 0.001, 'rucna cena sa zapisala')
+  NxTest.assert_equal(DB2_DTDL18_URL, manual['demos_url'], 'vazba na produkt ostava')
+  NxTest.refute(manual.key?('price_checked_at'), 'rucna zmena ceny rusi datum overenia')
   # required_schema_for pozna demos polia na doskach AJ paskach
   NxTest.assert_equal(MAT2::SCHEMA_DEMOS,
                       MAT2.required_schema_for([{ 'demos_url' => 'x' }], []))

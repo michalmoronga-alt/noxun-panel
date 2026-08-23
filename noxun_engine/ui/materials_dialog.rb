@@ -43,6 +43,7 @@ module Noxun
         update_sheet delete_sheet create_duplak
         update_edge delete_edge
         add_decor_batch rename_decor set_decor_name set_decor_manufacturer set_decor_color
+        save_decor
         patch_sheet patch_edge
         delete_preflight restore_pre_schema2
         open_demos_url open_search_url
@@ -78,6 +79,7 @@ module Noxun
           when 'set_decor_name'          then handle_set_decor_name(payload)
           when 'set_decor_manufacturer'  then handle_set_decor_manufacturer(payload)
           when 'set_decor_color'         then handle_set_decor_color(payload)
+          when 'save_decor'              then handle_save_decor(payload)
           when 'patch_sheet'             then handle_patch(payload, 'sheet')
           when 'patch_edge'              then handle_patch(payload, 'edge')
           when 'delete_preflight'        then handle_delete_preflight(payload)
@@ -1188,6 +1190,65 @@ module Noxun
           after_catalog_change
           decor = data['decor'].to_s.strip
           set_status("Farba dekoru #{decor} zmenená (#{result} záznamov).")
+        end
+
+        # --- ŠT-2c 2c-2a: D-69 jednotny editor dekoru -------------------------
+        #
+        # JEDNA akcia na CELY formular „Upraviť…" (identita skupiny + riadky
+        # dosiek + riadky ABS). Guardy si tu NEROBIME: `catalog_write_ok?` by
+        # brany (read-only, schema, baseline) vyhodnotil MIMO zamku a medzi
+        # kontrolou a zapisom by sa katalog stihol zmenit. Cely kontrakt —
+        # vratane `base_rev` a `row_rev` KAZDEHO riadku — bezi POD zamkom
+        # v `Materials.save_decor` (audit ŠT-2c, body 3 a 4).
+        #
+        # Klientove prijimace su tri, aby modal vedel, CO ma urobit s rozpisanym
+        # formularom: `MD.editSaved` (zatvor), `MD.editErrors` (chyby k poliam,
+        # okno OSTAVA), `MD.editBlocked` (odomkni — hodnoty ostavaju, katalog
+        # sa medzitym obnovil).
+        def handle_save_decor(payload)
+          data = JSON.parse(payload.to_s)
+          status, info = Materials.save_decor(data)
+          info = {} unless info.is_a?(Hash)
+          case status
+          when :ok
+            after_catalog_change
+            set_status(save_decor_status(info))
+            js('MD.editSaved()')
+          when :invalid
+            # Vsetky chyby NARAZ — modal ich rozsvieti pri poliach a ostava
+            # otvoreny s hodnotami (pouzivatel ma opravit cislo, nie pisat
+            # formular znova).
+            js("MD.editErrors(#{Array(info['errors']).to_json})")
+            set_status('Formulár sa neuložil — oprav zvýraznené polia.', true)
+          when :code_conflict
+            hits = Array(info['hits'])
+            set_status("Kód „#{info['code']}“ už používa #{hits.size}× (#{hits.first(3).join(', ')}…). Ulož znova pre potvrdenie duplicity.", true)
+            js('MD.editDuplicateCode()')
+          when :stale, :conflict
+            # Katalog sa medzitym zmenil: cerstve data + hodnoty v modáli
+            # OSTAVAJU (kontrakt D-15 — odmietnuty zapis nesmie zmazat formular).
+            set_status(info['message'] || 'Katalóg sa medzitým zmenil — over hodnoty a ulož znova.', true)
+            push_catalog
+            js('MD.editBlocked()')
+          when :catalog_read_only
+            set_status(info['message'] || Materials.catalog_read_only_message, true)
+            js('MD.editBlocked()')
+          else
+            set_status(info['message'] || 'Uloženie katalógu zlyhalo.', true)
+            js('MD.editBlocked()')
+          end
+        end
+
+        def save_decor_status(info)
+          parts = []
+          created = Array(info['created'])
+          updated = Array(info['updated'])
+          parts << "#{created.size}× nový variant" unless created.empty?
+          parts << "#{updated.size}× upravený variant" unless updated.empty?
+          msg = parts.empty? ? 'Dekor uložený — bez zmien vo variantoch.' : "Dekor uložený: #{parts.join(' + ')}."
+          skipped = Array(info['skipped'])
+          msg += " Preskočené (už existujú): #{skipped.join(', ')}." unless skipped.empty?
+          msg
         end
 
         # --- D-05: sprava katalogu (Codex audit davky 2 zapracovany) ----------
