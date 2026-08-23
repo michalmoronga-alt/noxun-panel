@@ -24,7 +24,14 @@ function stubEl(id){
   const n = { id, style: {}, children: [], parentNode: null, _html: '', _attrs: {}, value: '' };
   Object.defineProperty(n, 'innerHTML', {
     get(){ return n._html; },
-    set(v){ n._html = v; n.children.forEach(function(c){ c.parentNode = null; }); n.children = []; }
+    set(v){
+      n._html = v;
+      n.children.forEach(function(c){ c.parentNode = null; });
+      // Rovnaká vernosť ako pri `textContent`: vyprázdnenie uzla zahodí aj
+      // jeho hodnotu (`<select>` bez options nemá čo vybrať).
+      if (n.children.length) n.value = '';
+      n.children = [];
+    }
   });
   Object.defineProperty(n, 'textContent', {
     get(){ return n._text || ''; },
@@ -37,9 +44,12 @@ function stubEl(id){
       // `keep` v `mdhRenderEnums`.
       if (n.children.length) n.value = '';
       n.children = [];
+      n.clears = (n.clears || 0) + 1;   // ŠT-3a-3: počítadlo prekreslení bloku
     }
   });
   n.appendChild = function(c){ c.parentNode = n; n.children.push(c); return c; };
+  // Obnova fokusu po prekreslení hľadá uzol selektorom — test si ho podstrkuáva.
+  n.querySelector = function(sel){ n.lastSel = sel; return n.queryHit || null; };
   n.cloneNode = function(){ return stubEl(id + '-clone'); };
   n.setAttribute = function(k, v){ n._attrs[k] = String(v); };
   n.getAttribute = function(k){ return Object.prototype.hasOwnProperty.call(n._attrs, k) ? n._attrs[k] : null; };
@@ -145,7 +155,10 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
     summary: {}, sheet_estimate: [], totals: {}, materials_meta: {}, edges_meta: {},
     vepo: {}, control: [], counts: {}, budget: null, mat: null,
     hw: { model_guid: 'G1', sets: null,
-          catalog: { version: '0.7.58', categories: ['závesy'], units: ['ks'],
+          // DVE hodnoty v každom zozname — s jedinou by sa nedalo rozlíšiť
+          // „zachoval pôvodnú" od „nastavil prvú" (review NOTE k #218 P1).
+          catalog: { version: '0.7.58', categories: ['závesy', 'výsuvy'],
+                     units: ['ks', 'pár'],
                      items: [{ item_code: 'A1', name_sk: 'Záves', unit: 'ks',
                                price_eur_vat: 1.2, row_rev: 'r1' }],
                      revision: 'c1', state: 'ok', state_reason: '' } },
@@ -181,13 +194,20 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   // volá `mdhRenderEnums` pri KAŽDOM plnom pushi a ten `<select>` kategórie
   // prestavia — bez zachovania hodnoty by sa rozpísanej novej položke ticho
   // prepla kategória na PRVÚ v zozname a používateľ by to zistil až po uložení.
-  eq(ELS.hn_category.children.length, 1, 'select kategórie sa naplnil z katalógu');
-  ELS.hn_category.value = 'závesy';          // používateľ vybral kategóriu
+  eq(ELS.hn_category.children.length, 2, 'select kategórie sa naplnil z katalógu');
+  eq(ELS.hn_unit.children.length, 2, 'a select MJ tiež');
+  // DRUHÁ hodnota v oboch zoznamoch: keby sa testálo prvou, „zachoval"
+  // a „nastavil prvú" by vyzerali rovnako a guard by nestrážil nič.
+  ELS.hn_category.value = 'výsuvy';         // používateľ vybral kategóriu
+  ELS.hn_unit.value = 'pár';               // a mernú jednotku
   global.NX.setStudio(payload);              // medzitým príde plný push zo servera
   H.hwRenderBody();
-  eq(ELS.hn_category.value, 'závesy',
+  eq(ELS.hn_category.value, 'výsuvy',
      'rozpísaná kategória PREŽILA push (mdhRenderEnums ju nesmie prepnúť na prvú)');
+  eq(ELS.hn_unit.value, 'pár',
+     'ŠT-3a-3: a MJ tiež — je to údaj, ktorý ide rovno do objednávky');
   ELS.hn_category.value = '';
+  ELS.hn_unit.value = '';
 })();
 
 // --- 3) prvý push si vypýta serverové poradie AŽ keď je telo v DOM ----------
@@ -316,12 +336,115 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
 
   // Modelové zápisy sú v sekcii živé: blok „Predvoľby projektu" kreslí
   // ovládače bez akéhokoľvek režimu a premostenie nemá kam viesť.
-  const projFn = sets.match(/function hwsRenderProj\(\)\{[\s\S]*?\n  \}/)[0];
+  // ŠT-3a-3: telo sa presťahovalo do `hwsRenderProjBody` (obal drží snapshot
+  // fokusu), takže kontrolujeme telo — nie obal.
+  const projFn = sets.match(/function hwsRenderProjBody\(box\)\{[\s\S]*?\n  \}/)[0];
   ok(!/HWS_PROJ_RO/.test(projFn), 'blok už žiadny read-only režim nepozná');
   ok(/hws-merge-seed/.test(projFn) && /hws-reset-proj/.test(projFn),
      'a kreslí OBE zapisovacie akcie priamo');
   ok(!/hws-open-window/.test(sets), 'premostenie do okna zaniklo spolu s ním');
   ok(!/function hwsSetTab/.test(sets), 'prepínač tabov OKNA tiež');
+})();
+
+// --- 9) ŠT-3a-3: JEDEN render setov na push (nie dva) ----------------------
+
+(function(){
+  const HWS = require(path.join(JS, 'hw_sets.js'));
+  const sets = { sets: [], global_mapping: {}, revision: 'r1', type_options: {},
+                 params: [], project: { status: 'missing', mapping: {}, sets: [] },
+                 generic_types: [{ key: 'hinge', label: 'Z\u00e1vesy' }],
+                 model_guid: 'G1', model_title: 'test' };
+
+  ELS.hwTabSets.clears = 0;
+  ELS.hwTabProj.clears = 0;
+  HWS.HWSETS.setData(sets);
+  eq(ELS.hwTabSets.clears, 0,
+     '`setData` NEKRESL\u00cd \u2014 telo sekcie kresl\u00ed `hwRenderBody` hne\u010f za n\u00edm');
+  eq(ELS.hwTabProj.clears, 0, 'a predvo\u013eby projektu tie\u017e nie');
+
+  HWS.HWSETS.render();
+  eq(ELS.hwTabSets.clears, 1, '`render` prekresl\u00ed zoznam setov PR\u00c1VE RAZ');
+  eq(ELS.hwTabProj.clears, 1, 'a predvo\u013eby projektu tie\u017e');
+
+  // `init` (data + render) ost\u00e1va pre ECHO, po ktorom u\u017e \u017eiadny render nepr\u00edde.
+  ELS.hwTabSets.clears = 0;
+  HWS.HWSETS.init(sets);
+  eq(ELS.hwTabSets.clears, 1, '`init` (echo po odmietnutom z\u00e1pise) kresl\u00ed sam');
+
+  // Zdroj\u00e1k: pln\u00fd push MUS\u00cd \u00eds\u0165 cez `setData`, inak sa kresl\u00ed dvakr\u00e1t.
+  const src = fs.readFileSync(path.join(JS, 'hw_catalog.js'), 'utf8');
+  const applyFn = src.match(/function hwApplyState\(h\)\{[\s\S]*?\n  \}/)[0];
+  ok(/HWSETS\.setData\(h\.sets\)/.test(applyFn),
+     'pln\u00fd push nastav\u00ed len D\u00c1TA (render rob\u00ed telo sekcie)');
+  ok(!/HWSETS\.init\(/.test(applyFn), 'a NEVOL\u00c1 `init` \u2014 to by bol druh\u00fd render');
+})();
+
+// --- 10) ŠT-3a-3: kurzor v editore setu prežije prekreslenie -----------------
+
+(function(){
+  const HWS = require(path.join(JS, 'hw_sets.js'));
+  // \u010cist\u00e1 \u010das\u0165: selektor mus\u00ed by\u0165 JEDNOZNA\u010cN\u00dd \u2014 ch\u00fdbaj\u00faci atrib\u00fat je s\u00fa\u010das\u0165ou
+  // identity (`:not([...])`), inak by sa fokus z po\u013ea \u010dlena vr\u00e1til do rovnomenn\u00e9ho
+  // po\u013ea v riadku radu NL.
+  const selA = HWS.hwsFocusSelector({ field: 'code', at: { 'data-hws-m': '0', 'data-hws-s': null,
+                                                           'data-hws-b': null, 'data-hws-sel': null } });
+  ok(selA.indexOf('[data-hws-field="code"]') === 0, 'selektor za\u010d\u00edna po\u013eom');
+  ok(selA.indexOf('[data-hws-m="0"]') > 0, 'nesie index \u010dlena');
+  ok(selA.indexOf(':not([data-hws-s])') > 0, 'a ch\u00fdbaj\u00face atrib\u00faty PRIZN\u00c1VA ako s\u00fa\u010das\u0165 identity');
+  ok(HWS.hwsCssEscape('hws-map-proj|hinge').indexOf('\\|') > 0,
+     'k\u013e\u00fa\u010d s `|` ide do selektora ESCAPOVAN\u00dd (inak by ho rozbil)');
+
+  // Spr\u00e1vanie: pri prekreslen\u00ed sa fokus vr\u00e1ti do uzla, ktor\u00fd selektor n\u00e1jde.
+  const live = stubEl('hwsInput');
+  live.setAttribute('data-hws-field', 'code');
+  live.setAttribute('data-hws-m', '0');
+  live.selectionStart = 2;
+  live.selectionEnd = 2;
+  const fresh = stubEl('hwsInputFresh');
+  ELS.hwTabSets.queryHit = fresh;
+  document.activeElement = live;
+  HWS.HWSETS.render();
+  ok(fresh._focused === true,
+     'po prekreslen\u00ed sa fokus vr\u00e1til do rozp\u00edsan\u00e9ho po\u013ea (kurzor nepresko\u010d\u00ed)');
+  ok(String(ELS.hwTabSets.lastSel).indexOf('data-hws-m="0"') > 0,
+     'a h\u013eadal sa PR\u00c1VE ten uzol, v ktorom pou\u017e\u00edvate\u013e p\u00edsal');
+  document.activeElement = null;
+  ELS.hwTabSets.queryHit = null;
+})();
+
+// --- 11) ŠT-3a-3: filter po založení položky (jedna pravda) ------------------
+
+(function(){
+  // Pou\u017e\u00edvate\u013e nap\u00ed\u0161e do h\u013eadania a vyberie kateg\u00f3riu \u2014 cez DELEGOVAN\u00c9
+  // listenery, presne ako v prehliada\u010di.
+  // Na `document` visia listenery VIACERYCH suborov (studio.js, hw_catalog.js,
+  // hw_sets.js) — event dostane KAZDY, presne ako v prehliadaci.
+  const fire = function(type, target){ (LISTEN[type] || []).forEach(function(fn){ fn({ target: target }); }); };
+  ok((LISTEN.input || []).length > 0 && (LISTEN.change || []).length > 0,
+     'delegovan\u00e9 listenery s\u00fa zaregistrovan\u00e9');
+  fire('input', { id: 'hwSearch', value: 'blum' });
+  fire('change', { id: 'hwCategory', value: 'z\u00e1vesy', tagName: 'SELECT',
+                   getAttribute: function(){ return null; }, hasAttribute: function(){ return false; } });
+  eq(H.hwToolsState(false).q, 'blum', 'h\u013eadanie \u017eije aj v premennej (li\u0161tu prekresl\u00ed ka\u017ed\u00fd push)');
+  eq(H.hwToolsState(false).cat, 'z\u00e1vesy', 'a filter kateg\u00f3rie tie\u017e');
+
+  H.MDH.created();
+  eq(H.hwToolsState(false).q, '',
+     'zalo\u017eenie polo\u017eky vy\u010dist\u00ed h\u013eadanie aj v PREMENNEJ (nov\u00e1 polo\u017eka mus\u00ed by\u0165 vidie\u0165)');
+  eq(H.hwToolsState(false).cat, '', 'a filter kateg\u00f3rie tie\u017e \u2014 jedna pravda s uzlom li\u0161ty');
+})();
+
+// --- 12) ŠT-3a-3: zhody Demosu sa dorovnajú pri NÁVRATE do sekcie -----------
+
+(function(){
+  const src = fs.readFileSync(path.join(JS, 'hw_catalog.js'), 'utf8');
+  const bodyFn = src.match(/function hwRenderBody\(\)\{[\s\S]*?\n  \}/)[0];
+  ok(/var entered = node\.parentNode !== box/.test(bodyFn),
+     'render tela rozli\u0161uje VSTUP do sekcie od be\u017en\u00e9ho pushu');
+  ok(/if \(entered\) mdhDemosInput\(\);/.test(bodyFn),
+     'zhody „Prida\u0165 z Demosu" sa dorovnaj\u00fa k hodnote po\u013ea LEN pri n\u00e1vrate');
+  ok(bodyFn.indexOf('if (entered) mdhDemosInput();') > bodyFn.indexOf('MDH_ORDER_PENDING'),
+     'a\u017e za vy\u017eiadan\u00edm serverov\u00e9ho poradia \u2014 nie namiesto neho');
 })();
 
 console.log(`OK ${n} kontrol (ŠT-3a sekcia Kovanie)`);

@@ -297,6 +297,51 @@ NxTest.test('ŠT-3a-1: asynchronne cesty naozaj pouzivaju `run_target`, nie `@di
                 'refresh sitemap cache je tiez dlhy beh — a jeho vysledok tiez ma adresata')
 end
 
+# --- 4b) ŠT-3a-3: undo kontrakt modelových zápisov -------------------------
+
+NxTest.test('ŠT-3a-3: vynimka medzi start_operation a commit NENECHA otvorenu operaciu') do
+  # Bez rescue ostala operacia OTVORENA — dalsi zapis do modelu by sa do nej
+  # pribalil a JEDEN krok Spat by vratil OBA. Kontrakt „1 zmena = 1 krok Spat"
+  # by tak padol na zapise, ktory s tym prvym nema nic spolocne.
+  helper = ST3A_HW_RB[/def abort_open_operation\(model, state\).*?\n        end\n/m].to_s
+  NxTest.assert(!helper.empty?, 'zatvaranie operacie ma JEDNU cestu')
+  NxTest.assert(helper.include?('state[:open]'),
+                'rusi sa VYHRADNE operacia, ktoru handler otvoril a este nezavrel')
+  NxTest.assert(helper.index('state[:open] = false') < helper.index('model.abort_operation'),
+                'priznak padne PRED abortom — opakovany rescue nesmie abortovat druhykrat')
+
+  %w[handle_map_project handle_merge_seed handle_reset_project].each do |m|
+    body = ST3A_HW_RB[/def #{m}\(payload\).*?\n        end\n/m].to_s
+    NxTest.assert(body.include?('op = { open: false }'), "#{m}: priznak otvorenej operacie")
+    NxTest.assert(body.include?('op[:open] = true'), "#{m}: zapina sa PO start_operation")
+    NxTest.assert(body.include?('op[:open] = false'), "#{m}: a gasne PO commite")
+    resc = body[/rescue StandardError => e.*/m].to_s
+    NxTest.assert(resc.include?('abort_open_operation(model, op)'),
+                  "#{m}: vynimka zavrie otvorenu operaciu")
+    NxTest.assert(body.include?('raise e'), "#{m}: chyba ide dalej (klient dostane hlasku z `cb`)")
+    code = body.lines.reject { |l| l.strip.start_with?('#') }.join
+    NxTest.refute(code.include?('model.abort_operation'),
+                  "#{m}: NIKDY priamy abort — po commite by zrusil zapis, ktory sa uz potvrdil")
+  end
+end
+
+NxTest.test('ŠT-3a-3: odmietnuty `reset_project` NEROBI plny push') do
+  body = ST3A_HW_RB[/def handle_reset_project\(payload\).*?\n        end\n/m].to_s
+  code = body.lines.reject { |l| l.strip.start_with?('#') }.join
+  NxTest.assert(code.include?('resync_sets'),
+                'sekcia dostane cerstvy stav — hlaska hovori o zlyhani a zoznam uz nemusi platit')
+  # Plny push smie byt PRAVE JEDEN a PRAVE v uspesnej vetve: `after_sets_change(nil)`
+  # by po zlyhanom zapise prepocital cely kusovnik pre nic.
+  NxTest.assert_equal(1, code.scan(/after_sets_change/).length,
+                      'plny push je v metode PRAVE RAZ')
+  NxTest.assert(code.include?('after_sets_change(model)'),
+                'a je to vetva USPECHU (model sa naozaj zmenil)')
+  # `resync_sets` je v metode DVAKRAT (guard prepnuteho dokumentu + zlyhany
+  # zapis) — obe su zotavovacie vetvy, obe patria sekcii.
+  NxTest.assert_equal(2, code.scan(/resync_sets/).length,
+                      'obe odmietnutia obnovia sekciu (prepnuty dokument aj zlyhany zapis)')
+end
+
 # --- 5) refresh cesty --------------------------------------------------------
 
 NxTest.test('ŠT-3a-1 (nalez auditu): `after_sets_change` uz NEJDE cez `on_model_changed`') do
