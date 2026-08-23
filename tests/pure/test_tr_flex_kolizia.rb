@@ -12,6 +12,12 @@
 # holym selektorom (`.trieda { ... }` — plati pre KAZDY element), sa nesmie
 # objavit na `<tr>` v markupe ziadneho okna. Ked sa to stane, treba <tr> dat
 # vlastnu triedu (vzor hwgen) alebo selektor v CSS zuzit na `div.trieda`.
+#
+# ZNAME LIMITY (slepe review #217): guard vidi len triedy pisane priamo
+# v retazci markupu. NEVIDI triedy vracane funkciou (`'<tr' + budRowClass(r)`),
+# inline ternar vnutri class atributu, riadky stavane cez DOM API
+# (document.createElement) ani vlastne <style> bloky okien — tie si kolizie
+# strazia scopovanim na vlastne triedy. Poistka kryje presny vzor incidentu.
 require_relative '../helper' unless defined?(NxTest)
 
 TRFLEX_CSS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'css', 'panel.css'), encoding: 'UTF-8')
@@ -38,14 +44,17 @@ def trflex_tr_classes(src)
   out = []
   src.scan(/<tr[^>]*?class="([^"]+)"/) { |m| out.concat(m[0].split) }
   src.scan(/<tr'\s*\+\s*\([^;]*?class="([^"]+)"/m) { |m| out.concat(m[0].split) }
-  out.uniq
+  # Len platne mena tried — pri JS konkatenacii vnutri atributu by sa sem
+  # inak dostali smetne tokeny ('+', '(r.kind', ...) a hlasky by klamali.
+  out.uniq.select { |c| c.match?(/\A[A-Za-z0-9_-]+\z/) }
 end
 
 NxTest.test('tr-flex: ziadny <tr> nenesie triedu, ktorej panel.css dava flex/grid') do
   flex = trflex_classes
-  # Poistka poistky: `.hwrow` flex riadok kovania MUSI v zozname byt — keby
-  # parser CSS nic nenasiel, test by mlcky prestal chranit.
-  NxTest.assert(flex.include?('hwrow'), "parser vidi flex triedy (naslo: #{flex.length})")
+  # Poistka poistky: keby parser CSS nic nenasiel, test by mlcky prestal
+  # chranit. Neviaze sa na konkretnu triedu — `.hwrow` sa moze legitimne
+  # zuzit na `div.hwrow` a guard musi zit dalej (k v0.7.58 parser vidi ~80).
+  NxTest.assert(flex.length >= 20, "parser vidi flex triedy panel.css (naslo: #{flex.length})")
 
   ui = File.join(NxTest::ROOT, 'noxun_engine', 'ui')
   (Dir[File.join(ui, 'js', '*.js')] + Dir[File.join(ui, '*.html')]).sort.each do |f|

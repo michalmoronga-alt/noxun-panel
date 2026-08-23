@@ -1065,6 +1065,13 @@ v `HtmlDialog.new` sú **vonkajšie** — obsah + rámik okna (Windows ≈ 16 px
 
 ### Vzory okna Štúdio (ŠT-1a)
 
+- **Trieda zo zdieľaného `panel.css` nesmie ísť na `<tr>`** (v0.7.58, PR #217).
+  Holý selektor `.trieda { display: flex; }` platí pre KAŽDÝ element — na
+  tabuľkovom riadku zruší `table-row` layout, bunky sa stanú flex položkami
+  a stĺpce sa rozídu s hlavičkou (presne to postihlo `tr.hwrow` v Nákupe
+  kovania; riadok generiky sa preto volá `tr.hwgen`). Riadkom tabuliek dávaj
+  vlastné triedy okna, alebo flex selektor v zdieľanom CSS zúž na
+  `div.trieda`. Stráži `tests/pure/test_tr_flex_kolizia.rb`.
 - **Nemigrovaná položka navigácie NIE JE `disabled` — je to PREMOSTENIE.**
   Klik otvorí okno, kde obsah dnes naozaj je, a tooltip prizná v ktorej dávke
   sa presunie sem. `aria-disabled` (vzor D-78) dostane len to, čo **nikde
