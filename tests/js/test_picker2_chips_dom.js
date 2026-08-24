@@ -102,10 +102,10 @@ const NXC = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js',
 
 // --- fixtúra: select s dekorom v 18/36/duplák + HDF 3 -----------------------
 const META = {
-  dtd18: { decor: 'Dub sonoma', type: 'DTDL', thickness: 18 },
-  dtd36: { decor: 'Dub sonoma', type: 'DTDL', thickness: 36 },
-  'duplak2:dtd18': { decor: 'Dub sonoma', type: 'DTDL', thickness: 36, duplak: true },
-  hdf3: { decor: 'Dub sonoma', type: 'HDF', thickness: 3 }
+  dtd18: { decor: 'Dub sonoma', type: 'DTDL', thickness: 18, key: 'G|Dub|DTDL' },
+  dtd36: { decor: 'Dub sonoma', type: 'DTDL', thickness: 36, key: 'G|Dub|DTDL' },
+  'duplak2:dtd18': { decor: 'Dub sonoma', type: 'DTDL', thickness: 36, duplak: true, key: 'G|Dub|DTDL' },
+  hdf3: { decor: 'Dub sonoma', type: 'HDF', thickness: 3, key: 'G|Dub|HDF' }
 };
 NXC.setVariantResolver((kind, value) => (kind === 'abs' ? null : (META[value] || null)));
 
@@ -198,6 +198,56 @@ ok(!NXC.isOpen(sel), 'a ponuka sa zavrela');
      'dotaz „36" preselektoval čip 36 (nie iba našiel riadok)');
   fire('click', { target: rowTarget, preventDefault(){}, stopPropagation(){} });
   eq(sel.value, 'dtd36', 'a Enter/klik vloží práve tú hrúbku, ktorú človek hľadal');
+})();
+
+// --- 3c) VÝSLOVNÝ dotaz prebije PREDCHÁDZAJÚCI klik na čip -----------------
+// Review #231 P2: kto klikne 18 a potom napíše „36", chce 36. Bez toho by
+// ponuka ukazovala jedno (zapamätaný čip) a Enter vložil druhé.
+(function(){
+  sel.value = 'dtd18';
+  NXC.open(sel);
+  fire('click', { target: chipTarget, preventDefault(){}, stopPropagation(){} }); // klik na 36
+  const inp3 = popNode().querySelector('input');
+  inp3.value = '18';
+  (inp3._ls.input || []).forEach(fn => fn());
+  ok(/class="cbchip on"[^>]*>18</.test(popHtml()),
+     'dotaz „18" prebil zapamätaný klik na 36');
+  fire('click', { target: rowTarget, preventDefault(){}, stopPropagation(){} });
+  eq(sel.value, 'dtd18', 'a vložilo sa to, čo ponuka ukazovala');
+})();
+
+// --- 3d) ČIPY SÚ DOSTUPNÉ Z KLÁVESNICE ------------------------------------
+// Fokus zostáva v poli hľadania a Tab ponuku zatvára, takže bez šípok
+// vľavo/vpravo by sa človek od klávesnice k hrúbkam nedostal vôbec
+// (review #231 P2). Dôkazom je to, čo Enter nakoniec VLOŽÍ.
+(function(){
+  // Klávesnicu počúva POLE HĽADANIA v ponuke (nie dokument) — tam je fokus.
+  function keyer(){
+    const ls = (popNode().querySelector('input')._ls.keydown) || [];
+    ok(ls.length > 0, 'pole hľadania počúva klávesnicu');
+    return function(name){
+      ls.forEach(fn => fn({ key: name, preventDefault(){}, stopPropagation(){} }));
+    };
+  }
+
+  sel.value = 'dtd18';
+  NXC.open(sel);
+  let key = keyer();
+  // Kurzor po otvorení stojí na riadku, ktorý select nesie — netreba naň
+  // najprv šípkou dole.
+  key('ArrowRight');                // 18 -> 36
+  key('Enter');
+  eq(sel.value, 'dtd36', 'šípka vpravo prepla hrúbku a Enter vložil práve ju');
+
+  // Na kraji sa NEcykluje — slepým stláčaním sa nedá skončiť na dupláku.
+  sel.value = 'dtd18';
+  NXC.open(sel);
+  key = keyer();
+  key('ArrowLeft');
+  key('ArrowLeft');
+  ok(NXC.isOpen(sel), 'šípky ponuku nezatvárajú');
+  key('Enter');
+  eq(sel.value, 'dtd18', 'vľavo od najtenšej hrúbky nie je nič — hodnota sa nezmenila');
 })();
 
 // --- 4) duplák sa dá vybrať IBA vedomým klikom -----------------------------

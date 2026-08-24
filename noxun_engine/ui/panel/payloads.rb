@@ -480,7 +480,18 @@ module Noxun
                        # M-C (GH #118 P2): typ + hranova uprava PD — JS zrkadlo
                        # potlacenia ABS (absUsableForSheet) ich potrebuje, inak
                        # by kompakt/postforming otvaral modal "Vytvorit pasku".
-                       'type' => s['type'] }
+                       'type' => s['type'],
+                       # PICKER-2: dekorova menovka BEZ hrubky + identita
+                       # variantovej rodiny. Vyhladavac z nich sklada jeden
+                       # riadok na dekor s hrubkami na cipoch — hranicu urcuje
+                       # KATALOG (vyrobca, struktura, format, rub), nie klient.
+                       'row_label' => sheet_row_label(s, ctx),
+                       'row_key' => Materials.variant_family_key(s) }
+              # DUPLAK z KATALOGU (review #231 P1): zdvojena doska ma bezne
+              # `material_id` a pozna sa VYHRADNE podla `source_material_id` —
+              # bez tohto priznaku by v ponuke vyzerala ako kupena hruba doska
+              # a nedala by sa najst ani hladanim „duplak".
+              base['duplak'] = true unless s['source_material_id'].to_s.strip.empty?
               base['pd_edge_subtype'] = s['pd_edge_subtype'] unless s['pd_edge_subtype'].to_s.empty?
               # UI-C1b: `uni_role` je ZRKADLO katalogoveho pola (rovnaky vzor ako
               # pd_edge_subtype) — vkladacia karta z neho vyberie UNI material
@@ -626,6 +637,17 @@ module Noxun
             out = "#{out} [#{gid}]" unless gid.empty?
           end
           out
+        end
+
+        # PICKER-2: menovka DEKORU (bez typu a hrubky) — to iste, co nesie
+        # `sheet_label` pred casťou „· TYP hrubka mm", vratane vyrobcu pri
+        # kolizii a pripony formatu/rubu. Riadok vyhladavaca zastupuje vsetky
+        # hrubky rodiny, takze menovka s hrubkou by v nom klamala; a bez
+        # vyrobcu/formatu by dva RIADKY vyzerali rovnako.
+        def sheet_row_label(s, ctx = label_ctx)
+          return sheet_label(s, ctx) if Materials.uni?(s)
+
+          "#{label_base(s, s['manufacturer'], ctx)}#{Materials.sheet_label_suffix(s)}"
         end
 
         def sheet_label(s, ctx = label_ctx)

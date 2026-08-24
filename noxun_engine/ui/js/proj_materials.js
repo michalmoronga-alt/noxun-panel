@@ -2406,8 +2406,12 @@
         if (kind === 'abs' || !value) return null;
         var rec = (MD_SHEETS || []).find(function(s){ return String(s.id) === String(value); });
         if (!rec || !rec.decor) return null;
-        return { decor: rec.decor, type: rec.type || '', thickness: rec.thickness,
-                 duplak: /^duplak[23]:/.test(String(value)) };
+        // Ten isty kontrakt ako v Inspectore: menovku riadku a hranicu
+        // zlucovania dava server (`row_label`/`row_key`), dupla poznat podla
+        // `source_material_id` — ulozeny duplak ma bezne `material_id`.
+        return { decor: rec.row_label || rec.decor, type: rec.type || '',
+                 thickness: rec.thickness, key: rec.row_key || '',
+                 duplak: !!rec.source_material_id || /^duplak[23]:/.test(String(value)) };
       });
     }
     if (NXCombo.setColorResolver){

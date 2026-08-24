@@ -33,13 +33,15 @@ const ITEMS = [
   { value: 'komp12', label: 'Dub sonoma kompakt 12', disabled: false },
   { value: 'buk18', label: 'Buk 18', disabled: false }
 ];
+// `key` = identita variantovej rodiny zo servera (`row_key`) — presne to,
+// co drzi pohromade hrubky JEDNEHO materialu.
 const META = {
-  dtd18: { decor: 'Dub sonoma', type: 'DTDL', thickness: 18 },
-  dtd36: { decor: 'Dub sonoma', type: 'DTDL', thickness: 36 },
-  'duplak2:dtd18': { decor: 'Dub sonoma', type: 'DTDL', thickness: 36, duplak: true },
-  hdf3: { decor: 'Dub sonoma', type: 'HDF', thickness: 3 },
-  komp12: { decor: 'Dub sonoma', type: 'KOMPAKT', thickness: 12 },
-  buk18: { decor: 'Buk', type: 'DTDL', thickness: 18 }
+  dtd18: { decor: 'Dub sonoma', type: 'DTDL', thickness: 18, key: 'G1|Dub|DTDL' },
+  dtd36: { decor: 'Dub sonoma', type: 'DTDL', thickness: 36, key: 'G1|Dub|DTDL' },
+  'duplak2:dtd18': { decor: 'Dub sonoma', type: 'DTDL', thickness: 36, duplak: true, key: 'G1|Dub|DTDL' },
+  hdf3: { decor: 'Dub sonoma', type: 'HDF', thickness: 3, key: 'G1|Dub|HDF' },
+  komp12: { decor: 'Dub sonoma', type: 'KOMPAKT', thickness: 12, key: 'G1|Dub|KOMPAKT' },
+  buk18: { decor: 'Buk', type: 'DTDL', thickness: 18, key: 'G1|Buk|DTDL' }
 };
 const meta = v => META[v] || null;
 
@@ -59,6 +61,35 @@ const meta = v => META[v] || null;
   ok(!rows[0].decorRow, 'položka bez metadát („dediť") ostáva samostatná');
   eq(buk.variants.length, 1, 'iný dekor sa neprilepí');
   eq(dtd.value, 'dtd18', 'riadok vkladá NAJTENŠÍ variant, nie prvý zo zoznamu');
+})();
+
+// --- 1b) HRANICA RODINY: identitu určuje KATALÓG, nie dekor + typ ----------
+// Review #231 P1: v SCHEMA 2 sa to isté číslo dekoru legálne opakuje u dvoch
+// výrobcov, tá istá skupina má viac štruktúr a typy s formátom v identite
+// (PD, zástena) sa líšia formátom alebo rubom. Keby sa také záznamy zlúčili,
+// dva čipy s ROVNAKOU hrúbkou by boli nerozlíšiteľné — a vybral by sa cudzí
+// výrobca, povrch, formát aj cena.
+(function(){
+  const items = [
+    { value: 'a18', label: '5981 MG 18', disabled: false },
+    { value: 'a36', label: '5981 MG 36', disabled: false },
+    { value: 'b18', label: '5981 BS 18', disabled: false }
+  ];
+  // Rovnaký DEKOR aj TYP, iná rodina (iný výrobca / iná štruktúra).
+  const m = { a18: { decor: '5981', type: 'DTDL', thickness: 18, key: 'MG|5981|DTDL' },
+              a36: { decor: '5981', type: 'DTDL', thickness: 36, key: 'MG|5981|DTDL' },
+              b18: { decor: '5981', type: 'DTDL', thickness: 18, key: 'BS|5981|DTDL' } };
+  const rows = nxComboDecorRows(items, v => m[v]);
+  eq(rows.length, 2, 'dve rodiny = dva riadky (nie jeden so zdvojenou 18)');
+  eq(rows[0].variants.map(v => v.value), ['a18', 'a36'], 'zlúči sa len to, čo má rovnakú identitu');
+  eq(rows[1].variants.map(v => v.value), ['b18'], 'cudzí výrobca ostáva sám');
+
+  // Bez identity (starší payload) sa padá na dekor + typ — teda na správanie
+  // spred opravy, nie na výnimku.
+  const legacy = nxComboDecorRows(items, v => {
+    const c = Object.assign({}, m[v]); delete c.key; return c;
+  });
+  eq(legacy.length, 1, 'bez `key` ostáva pôvodné zoskupenie podľa dekoru a typu');
 })();
 
 // --- 2) default podľa kontextu ----------------------------------------------
@@ -158,6 +189,28 @@ const meta = v => META[v] || null;
   eq(nxComboRowIds(rows[1]), ['dtd18', 'dtd36', 'duplak2:dtd18'],
      'riadok zastupuje VŠETKY svoje varianty');
   eq(nxComboRowIds(rows[4]), ['buk18'], 'bežná položka samu seba');
+})();
+
+// --- 6) hľadanie podľa ID a katalógový duplák -------------------------------
+(function(){
+  const rows = nxComboDecorRows(ITEMS, meta);
+  const dtd = rows[1];
+  // Pred zlúčením sa hľadalo cez `value` KAŽDEJ položky, takže dotaz na
+  // neprehľadné ID fungoval. Po zlúčení nesie riadok len hodnotu predvoleného
+  // variantu — bez `searchExtra` by taký dotaz prestal fungovať (review #231).
+  ok(nxComboHit(dtd, 'dtd36'), 'riadok sa nájde aj podľa ID nepredvoleného variantu');
+  ok(nxComboHit(dtd, 'Dub sonoma 36'), 'aj podľa jeho pôvodného labelu');
+  ok(!nxComboHit(dtd, 'buk18'), 'a cudzie ID ho nenájde');
+
+  // ULOŽENÝ duplák má bežné `material_id` (pozná sa podľa `source_material_id`,
+  // payload to zrkadlí ako `duplak`) — nesmie vyzerať ako kúpená hrubá doska.
+  const stored = nxComboDecorRows(
+    [{ value: 'x18', label: 'X 18', disabled: false }, { value: 'zx99', label: 'X duplák 36', disabled: false }],
+    v => ({ x18: { decor: 'X', type: 'DTDL', thickness: 18, key: 'K' },
+            zx99: { decor: 'X', type: 'DTDL', thickness: 36, duplak: true, key: 'K' } })[v]);
+  eq(stored[0].value, 'x18', 'uložený duplák sa nepredvolí — hoci jeho ID nič neprezrádza');
+  eq(stored[0].variants[1].value, 'zx99', 'v poradí je posledný');
+  ok(nxComboHit(stored[0], 'duplak'), 'a nájde sa hľadaním „duplák"');
 })();
 
 console.log(`OK test_picker2_chips.js — ${n} kontrol`);

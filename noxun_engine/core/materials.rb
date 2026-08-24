@@ -1001,6 +1001,27 @@ module Noxun
         out
       end
 
+      # PICKER-2 (review #231 P1): IDENTITA VARIANTOVEJ RODINY — co este JE
+      # „ten isty material v inej hrubke" a co uz je INY material.
+      #
+      # Vyhladavac zlucuje hrubkove varianty do jedneho riadku a hrubky davá na
+      # cipy. Hranicu NESMIE hadat klient: v SCHEMA 2 sa to iste cislo dekoru
+      # legalne opakuje u dvoch vyrobcov (dve skupiny), ta ista skupina moze mat
+      # viac STRUKTUR, a typy s formatom v identite (PD, zastena) sa lisia
+      # formatom alebo rubom. Keby sa take zaznamy zlucili, dva cipy s ROVNAKOU
+      # hrubkou by boli nerozlisitelne a dal by sa vybrat iny vyrobca, povrch,
+      # format aj cena — presne to, comu `sheet_label_suffix` uz raz predisiel
+      # v labeloch (GH #95 P1).
+      #
+      # UNI zaznamy sa NEZLUCUJU vobec (kazdy ma vlastnu rolu a katalogova
+      # hrubka je pri nich len pracovny default), preto dostavaju unikatny kluc.
+      def variant_family_key(s)
+        return "uni:#{s['material_id']}" if uni?(s)
+
+        [s['group_id'].to_s.strip, s['decor'].to_s.strip, s['structure'].to_s.strip,
+         s['type'].to_s.strip, sheet_label_suffix(s).strip].join("\u0000")
+      end
+
       # GH P2: kluc kvantizuje mm na 0,01 — HRANICNA dvojica (18.004 vs 18.006)
       # by sa v kluci rozisla, hoci legacy tolerancia (abs < 0.01) ju drzala ako
       # jeden variant. Duplicitne guardy preto porovnavaju kluce s toleranciou

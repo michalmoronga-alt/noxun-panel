@@ -208,8 +208,15 @@
     if (kind === 'abs' || !value) return null;
     var rec = sheetRecOf(value);
     if (!rec || !rec.decor) return null;
-    return { decor: rec.decor, type: rec.type || '', thickness: rec.thickness,
-             duplak: /^duplak[23]:/.test(String(value)) };
+    // Menovku riadku aj hranicu zlucovania (`row_key`) urcuje SERVER z katalogu
+    // — v SCHEMA 2 sa to iste cislo dekoru opakuje u dvoch vyrobcov a ta ista
+    // skupina ma viac struktur aj formatov; klient to hadat nesmie.
+    // DUPLAK ma dva tvary: virtualna ponuka (`duplak2:<zdroj>`, este nie je
+    // v katalogu) a ULOZENY zaznam s beznym `material_id`, ktory sa pozna
+    // vyhradne podla `source_material_id` (payload ho zrkadli ako `duplak`).
+    return { decor: rec.row_label || rec.decor, type: rec.type || '',
+             thickness: rec.thickness, key: rec.row_key || '',
+             duplak: rec.duplak === true || /^duplak[23]:/.test(String(value)) };
   }
 
   function nxComboUsedOf(kind){

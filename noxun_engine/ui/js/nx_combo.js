@@ -122,7 +122,7 @@
       if (!m || !m.decor) return null;
       return { decor: String(m.decor), type: String(m.type == null ? '' : m.type),
                thickness: (m.thickness == null ? null : Number(m.thickness)),
-               duplak: !!m.duplak };
+               duplak: !!m.duplak, key: String(m.key == null ? '' : m.key) };
     }
 
     // Zoskupenie položiek na dekorové riadky. `meta(value)` vracia
@@ -133,7 +133,14 @@
       (items || []).forEach(function(it){
         var m = meta ? meta(it.value) : null;
         if (!m || !m.decor || !m.type){ rows.push(it); return; }
-        var key = m.decor + '\u0000' + m.type + '\u0000' + (it.group || '');
+        // HRANICU URCUJE KATALOG (review #231 P1): `m.key` je identita
+        // variantovej rodiny zo servera (vyrobca - dekor - struktura - typ -
+        // format/rub). Samotny dekor + typ zlucuje dva ROZNE materialy
+        // s rovnakym cislom dekoru: dva cipy s rovnakou hrubkou by boli
+        // nerozlisitelne a dala by sa vybrat cudzia cena, povrch aj format.
+        // Bez identity (starsi payload) sa pada na dekor + typ, teda na
+        // spravanie spred opravy.
+        var key = (m.key || (m.decor + '\u0000' + m.type)) + '\u0000' + (it.group || '');
         var variant = { value: it.value, label: it.label, disabled: !!it.disabled,
                         thickness: m.thickness, duplak: !!m.duplak };
         if (!Object.prototype.hasOwnProperty.call(byKey, key)){
@@ -153,8 +160,14 @@
         r.variants.sort(nxComboVariantCmp);
         // Hľadanie musí nájsť riadok aj podľa hrúbky („36") a podľa slova
         // „duplák" — inak by ich zlúčenie schovalo pred vyhľadávaním.
+        // Riadok sa musi dat najst podla VSETKEHO, co zastupuje — nielen
+        // podla hrubky, ale aj podla ID a labelu KAZDEHO variantu (review #231
+        // P2). Pred zlucenim sa hladalo cez `value` kazdej polozky, takze
+        // dotaz na opaknu ID („H3303_36") fungoval; po zluceni nesie riadok len
+        // hodnotu predvoleneho variantu a bez tohto by taky dotaz prestal.
         r.searchExtra = r.variants.map(function(v){
-          return (v.thickness == null ? '' : v.thickness) + (v.duplak ? ' duplak duplák' : '');
+          return [(v.thickness == null ? '' : v.thickness), (v.duplak ? 'duplak duplák' : ''),
+                  v.value, v.label].join(' ');
         }).join(' ');
         var def = nxComboDefaultVariant(r.variants, null);
         if (def) r.value = def.value;
@@ -613,6 +626,12 @@
       if (!OPEN) return;
       if (ev.key === 'ArrowDown'){ ev.preventDefault(); move(1); }
       else if (ev.key === 'ArrowUp'){ ev.preventDefault(); move(-1); }
+      // Cipy su tlacidla, ale fokus zostava v poli hladania (Tab ponuku
+      // zatvara), takze bez tohto by sa k nim clovek od klavesnice nedostal
+      // vobec (review #231 P2). Sipky VLAVO/VPRAVO prepinaju hrubku
+      // v aktivnom riadku — Enter potom vlozi prave ju.
+      else if (ev.key === 'ArrowLeft'){ ev.preventDefault(); moveChip(-1); }
+      else if (ev.key === 'ArrowRight'){ ev.preventDefault(); moveChip(1); }
       else if (ev.key === 'Enter'){ ev.preventDefault(); if (OPEN.active >= 0) pick(OPEN.active); }
       else if (ev.key === 'Escape'){ ev.preventDefault(); var s = OPEN.sel; close(); focusTrigger(s); }
       else if (ev.key === 'Tab'){ close(); }
@@ -620,6 +639,23 @@
 
     function focusTrigger(sel){
       if (sel && sel.__nxc){ try { sel.__nxc.btn.focus(); } catch (e){} }
+    }
+
+    // Krok po cipoch aktivneho riadku. Nedostupne varianty sa preskakuju
+    // a na koncoch sa NEcykluje — inak by sa slepym stlacanim dalo skoncit
+    // na dupláku bez toho, aby to clovek zbadal.
+    function moveChip(dir){
+      if (!OPEN || OPEN.active < 0) return;
+      var row = OPEN.items[OPEN.active];
+      if (!row || !row.decorRow || !row.variants || row.variants.length < 2) return;
+      var i = -1, k;
+      for (k = 0; k < row.variants.length; k++){ if (row.variants[k].value === row.value) i = k; }
+      if (i < 0) i = 0;
+      for (k = i + dir; k >= 0 && k < row.variants.length; k += dir){
+        if (row.variants[k].disabled) continue;
+        pickChip(OPEN.active, k);
+        return;
+      }
     }
 
     function move(dir){
@@ -697,18 +733,20 @@
       rows.forEach(function(r){
         if (!r.decorRow) return;
         // Poradie je kontrakt, nie detail:
-        // 1. VEDOMÁ voľba čipu — inak by ju zahodilo najbližšie písmeno
-        //    v hľadaní (render beží po každom vstupe).
+        // 1. VÝSLOVNÝ DOTAZ O HRÚBKE má prednosť pred všetkým (review #231 P2):
+        //    kto po kliku na 18 napíše „36", chce 36. Sľub „dotaz preselektuje
+        //    to, čo Enter vloží" platí aj vtedy, keď predtým klikol na iný čip
+        //    — inak by ponuka ukazovala jedno a vložila druhé.
+        var byQ = nxComboChipFromQuery(q, r.variants);
+        if (byQ >= 0 && !r.variants[byQ].disabled){ r.value = r.variants[byQ].value; return; }
+        // 2. VEDOMÁ voľba čipu — dotaz o hrúbke nič nehovorí, takže voľba
+        //    platí ďalej; inak by ju zahodilo najbližšie písmeno v hľadaní
+        //    (render beží po každom vstupe).
         if (picked[r.key]){
           var kept = null;
           r.variants.forEach(function(v){ if (v.value === picked[r.key]) kept = v; });
           if (kept){ r.value = kept.value; return; }
         }
-        // 2. DOTAZ pred uloženou hodnotou: kto píše „36", chce 36 — aj keď
-        //    select dnes nesie 18. Inak by sa riadok síce našiel, ale Enter
-        //    by vložil starú hrúbku.
-        var byQ = nxComboChipFromQuery(q, r.variants);
-        if (byQ >= 0 && !r.variants[byQ].disabled){ r.value = r.variants[byQ].value; return; }
         // 3. Inak platí to, čo select NESIE (otvorenie ponuky nič nemení).
         var mine = null;
         r.variants.forEach(function(v){ if (v.value === cur) mine = v; });

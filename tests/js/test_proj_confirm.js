@@ -111,5 +111,15 @@ function ok(cond, msg){ n++; if (!cond) throw new Error(msg); }
      'a Inspector tiež — jeden komponent, dva hostitelia, žiadna kópia logiky');
   ok(core.indexOf("if (kind === 'abs' || !value) return null;") > -1,
      'ABS pásky sa NEZOSKUPUJÚ — hrúbka pásky je jej vlastnosť, nie variant dekoru');
+  // Review #231 P1: uložený duplák má bežné `material_id` — pozná sa výhradne
+  // podľa katalógu. Keby to oba hostiteľia čítali z tvaru ID, vyzeral by ako
+  // kúpená hrubá doska a mohol by sa aj predvoliť.
+  ok(core.indexOf('rec.duplak === true') > -1,
+     'Inspector číta duplák z katalógového príznaku, nielen z tvaru ID');
+  ok(src.indexOf('!!rec.source_material_id') > -1,
+     'Štúdio ho číta priamo zo `source_material_id` katalógového záznamu');
+  // A hranicu zlučovania nesmie hádať ani jeden z nich.
+  ok(core.indexOf('key: rec.row_key') > -1 && src.indexOf('key: rec.row_key') > -1,
+     'identitu variantovej rodiny dodáva server (`row_key`), nie klient');
   ok(combo.indexOf('nxComboPopWidth') > -1, 'a šírka ponuky je jeho vlastné pravidlo');
 })();
