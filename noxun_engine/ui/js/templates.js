@@ -23,6 +23,13 @@
   var TPL_ASKED = {};
   // identita šablóny -> DOM id práve vykreslenej dlaždice (review #225 P2).
   var TPL_DOM = {};
+  // BEŽIACI požiadavok premenovania (review #226 P2). Odpoveď servera smie
+  // siahnuť na modal LEN vtedy, keď je na obrazovke stále TEN, ktorý ju
+  // vyvolal: kým sa čaká na zámok súboru, používateľ stihne modal zavrieť
+  // (Esc) a otvoriť iný — a `renameSaved` by mu ten cudzí rozpísaný
+  // formulár ZAVREL. Token sa nastavuje pri odoslaní a KAŽDÉ otvorenie
+  // ľubovoľného modalu ho zahadzuje.
+  var TPL_REN = null;
 
   function tplEl(id){ return (typeof document === 'undefined') ? null : document.getElementById(id); }
   // Je sekcia Šablóny práve otvorená? Autoritou je `studio.js` (`studioSec`).
@@ -82,6 +89,8 @@
     // Zatvára VÝHRADNE potvrdený zápis. Zoznam dlaždíc dorazí SAMOSTATNE
     // (`TPL.init` echom po zmene knižnice), takže tu sa nič neprekresľuje.
     renameSaved: function(){
+      if (!TPL_REN) return;      // odpoveď na požiadavok, ktorý už nikto nečaká
+      TPL_REN = null;
       var m = (typeof window !== 'undefined') ? window.NXModal : null;
       if (!m || !m.isOpen()) return;
       m.setBusy(false, { clear: true });
@@ -91,6 +100,10 @@
     // odomkne sa a chyba sedí pri poli. Bez `setBusy(false)` by po prvom
     // odmietnutí ostalo „Premenovať" navždy zosednuté (isBusy).
     renameError: function(msg, field){
+      // Cudzi modal sa NEOZNACUJE chybou — hláška aj tak dorazí do stavového
+      // riadku sekcie (server ju posiela oboma kanálmi).
+      if (!TPL_REN) return;
+      TPL_REN = null;
       var m = (typeof window !== 'undefined') ? window.NXModal : null;
       if (!m || !m.isOpen()) return;
       m.setBusy(false);
@@ -335,6 +348,8 @@
       TPL.setStatus('Premenovanie potrebuje dialóg Štúdia — zavri a otvor Štúdio znova.', true);
       return;
     }
+    tplWatchModal(window.NXModal);
+    TPL_REN = null;            // nové otvorenie ruší predchádzajúci požiadavok
     window.NXModal.open({
       title: 'Premenovať šablónu',
       sub: tplRenameSub(kind, name),
@@ -342,10 +357,22 @@
       okLabel: 'Premenovať',
       fields: [{ key: 'name', label: 'Názov', value: name }],
       onSubmit: function(v){
+        TPL_REN = { kind: kind, name: name };
         tplSend('tpl_rename', { kind: kind, template: name,
                                 new_name: (v && v.name != null) ? v.name : '' });
       }
     });
+  }
+
+  // Každé otvorenie ĽUBOVOĽNÉHO modalu zahadzuje bežiaci požiadavok — vrátane
+  // znovuotvorenia toho istého premenovania (token vzniká až odoslaním).
+  // Obal sa nasadzuje LENIVO (pri prvom premenovaní), nie pri načítaní súboru:
+  // v Node testoch je `NXModal` stub, ktorý v tej chvíli ešte neexistuje.
+  function tplWatchModal(m){
+    if (!m || m.tplWatch === true || typeof m.open !== 'function') return;
+    var orig = m.open;
+    m.open = function(){ TPL_REN = null; return orig.apply(m, arguments); };
+    m.tplWatch = true;
   }
 
   function tplRenameSub(kind, name){
@@ -397,6 +424,7 @@
                        tplIsActive: tplIsActive, tplDomIdFor: tplDomIdFor,
                        tplDelete: tplDelete, tplApply: tplApply, tplCapture: tplCapture,
                        tplRename: tplRename, tplRenameSub: tplRenameSub,
+                       tplRenPending: function(){ return TPL_REN; },
                        tplRenameNote: tplRenameNote,
                        TPL: TPL };
   }

@@ -239,8 +239,11 @@ const BRD = { name: 'Pracovná doska', kind: 'board', preview_rev: null,
   eq(log[1][1][0].field, 'name', 'pri poli s menom');
   ok(open === true, 'modal OSTÁVA otvorený s rozpísaným menom');
 
-  // Server potvrdil: až teraz sa zatvára a zabúda rozpísané.
+  // Server potvrdil: až teraz sa zatvára a zabúda rozpísané. Opravené meno je
+  // NOVÝ pokus — každá odpoveď patrí práve jednému odoslaniu (review #226 P2).
   log.length = 0;
+  opened[0].onSubmit({ name: 'Klasik dolná III' });
+  eq(log.length, 0, 'druhé odoslanie samo o sebe modal nezatvára');
   T.TPL.renameSaved();
   eq(log[0], ['busy', false, true], 'potvrdenie odomkne a ZABUDNE rozpis');
   eq(log[1], ['close'], 'a zavrie modal');
@@ -252,6 +255,24 @@ const BRD = { name: 'Pracovná doska', kind: 'board', preview_rev: null,
   ok(T.tplRenameNote('cabinet').indexOf('NEMENIA') > -1,
      'korpusová: skrinky, ktoré z nej vznikli, sa premenovaním nemenia');
   ok(T.tplRenameSub('board').indexOf('Doskovú') > -1, 'a podtitul menuje druh');
+
+  // REVIEW #226 P2: odpoveď servera smie siahnuť na modal LEN vtedy, keď je
+  // na obrazovke stále TEN, ktorý ju vyvolala. Kým sa čaká na zámok súboru,
+  // používateľ stihne modal zavrieť (Esc) a otvoriť iný — a `renameSaved` by
+  // mu ten cudzí rozpísaný formulár ZAVREL.
+  opened.length = 0;
+  log.length = 0;
+  T.tplRename('cabinet', 'Klasik dolná');
+  opened[0].onSubmit({ name: 'Nové meno' });
+  ok(T.tplRenPending() !== null, 'po odoslaní beží požiadavok');
+  window.NXModal.open({ title: 'Pridať položku', fields: [], onSubmit: function(){} });
+  ok(T.tplRenPending() === null, 'otvorenie INÉHO modalu bežiaci požiadavok zahodí');
+  log.length = 0;
+  T.TPL.renameSaved();
+  eq(log, [], 'oneskorená odpoveď cudzí modal NEZATVORÍ');
+  T.TPL.renameError('Meno je obsadené.', 'name');
+  eq(log, [], 'ani mu nenalepí chybu k poľu (hláška ide do statusu sekcie)');
+  window.NXModal.close();
 
   // Bez modalu sa NIČ neposiela naslepo — na rozdiel od mazania tu nie je
   // čo poslať (nové meno existuje len vo formulári).

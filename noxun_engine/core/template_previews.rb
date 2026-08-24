@@ -330,10 +330,16 @@ module Noxun
         src = path_for(kind, old_name)
         dst = path_for(kind, new_name)
         return false unless src && dst && src != dst
-        return false unless File.file?(src)
 
+        # SIROTA NA CIELI SA MAZE VZDY — aj ked zdroj nahlad NEMA (review #226
+        # P2). Identita PNG je odvodena od MENA, takze po zmazanej sablone toho
+        # mena (alebo po prerusenom zapise) moze na cieli lezat cudzi obrazok;
+        # keby sa cistilo az za kontrolou zdroja, premenovana sablona BEZ fotky
+        # by ho zdedila a `rev_for` by ho na novej identite nasiel ako svoj.
         FileUtils.rm_f("#{dst}.new") # zvysok po padnutom `stage_then_rename`
         FileUtils.rm_f(dst)          # sirota po sablone, ktora uz neexistuje
+        return false unless File.file?(src)
+
         File.rename(src, dst)
         File.file?(dst)
       rescue StandardError => e

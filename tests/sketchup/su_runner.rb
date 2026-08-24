@@ -7598,6 +7598,7 @@ module NoxunSuRunner
   # ŠT-3c-2: ciel premenovania + tretia sablona na dokaz KOLIZIE mien.
   ST3C_CAB2 = '__SU_TEST_ST3C_CAB2__'
   ST3C_COL = '__SU_TEST_ST3C_COL__'
+  ST3C_ORP = '__SU_TEST_ST3C_ORP__'   # sablona BEZ fotky pre test siroty (review #226)
 
   # Pocet policov v korene zon — merany dokaz, ze sa skrinka naozaj prestavala
   # PODLA SABLONY (a ze undo to vratilo).
@@ -7614,7 +7615,8 @@ module NoxunSuRunner
     # tvrdil, ze data CHRANI a nic nerobi.
     @st3c_created = []
     if e::TemplateStore.find('cabinet', ST3C_CAB) || e::TemplateStore.find('board', ST3C_BRD) ||
-       e::TemplateStore.find('cabinet', ST3C_CAB2) || e::TemplateStore.find('cabinet', ST3C_COL)
+       e::TemplateStore.find('cabinet', ST3C_CAB2) || e::TemplateStore.find('cabinet', ST3C_COL) ||
+       e::TemplateStore.find('cabinet', ST3C_ORP)
       return info('ŠT-3c-1: testovacie sablony uz existuju — scenar preskoceny (chranime data)')
     end
 
@@ -7822,12 +7824,61 @@ module NoxunSuRunner
       ok('ŠT-3c-2 (N1): mazanie ZMIZNUTEJ sablony uz NEHLASI uspech',
          rec.none? { |x| x.include?('vymazaná') })
 
+      # (g8) SIROTA NA CIELI (review #226 P2): premenovanie sablony BEZ fotky
+      # na meno, na ktorom lezi osirely PNG po davno zmazanej sablone toho
+      # mena. Identita PNG je odvodena od MENA, takze bez cistenia ciela by
+      # premenovana sablona zdedila CUDZI obrazok. Kolizne meno sa najprv
+      # uvolni (fixtura kolizie (g4) uz dosluzila).
+      e::TemplateStore.delete('cabinet', ST3C_COL)
+      orphan = e::TemplatePreviews.path_for('cabinet', ST3C_COL)
+      if orphan
+        FileUtils.mkdir_p(File.dirname(orphan))
+        File.binwrite(orphan, "\x89PNG\r\n\x1A\n".b + ('x' * 64).b)
+        had_orphan = !e::TemplatePreviews.rev_for('cabinet', ST3C_COL).nil?
+        e::TemplateStore.upsert('cabinet', ST3C_ORP, { 'type' => 'lower', 'width' => 400.0 })
+        @st3c_created << ['cabinet', ST3C_ORP]
+        rec.clear
+        td.dispatch('tpl_rename', { 'kind' => 'cabinet', 'template' => ST3C_ORP,
+                                    'new_name' => ST3C_COL }.to_json, sink)
+        @st3c_created << ['cabinet', ST3C_COL]
+        ok('ŠT-3c-2 (g8): fixture — na cielovom mene lezal osirely PNG', had_orphan)
+        ok('ŠT-3c-2 (g8): premenovana sablona BEZ fotky NEZDEDILA cudzi obrazok',
+           !e::TemplateStore.find('cabinet', ST3C_COL).nil? &&
+           e::TemplatePreviews.rev_for('cabinet', ST3C_COL).nil?)
+      end
+
+      # (g9) MAZANIE, ktore zlyhalo, lebo sablona medzitym ZMIZLA (review #226
+      # P2): kontrola pred zapisom bezi MIMO zamku skladu, takze medzi nou
+      # a zamknutym mazanim ju mohla zmazat druha instancia. `delete` vtedy
+      # vrati `false` z uplne ineho dovodu nez novsia schema ci chyba disku —
+      # rozhodnut musi az pohlad PO navrate. Preteky sa simuluju stubom:
+      # sablonu NAOZAJ zmaze, ale ohlasi neuspech.
+      if e::TemplateStore.find('cabinet', ST3C_COL)
+        store = e::TemplateStore
+        store.singleton_class.send(:alias_method, :su_orig_delete, :delete)
+        store.define_singleton_method(:delete) do |k, n|
+          su_orig_delete(k, n)
+          false
+        end
+        begin
+          rec.clear
+          td.dispatch('tpl_delete', { 'kind' => 'cabinet', 'template' => ST3C_COL }.to_json, sink)
+        ensure
+          store.singleton_class.send(:alias_method, :delete, :su_orig_delete)
+          store.singleton_class.send(:remove_method, :su_orig_delete)
+        end
+        ok('ŠT-3c-2 (g9): sablona zmiznuta pocas mazania = hlaska „zmizla" + obnova zoznamu',
+           rec.any? { |x| x.include?('už v knižnici nie je') } &&
+           rec.any? { |x| x.start_with?('TPL.init(') })
+        ok('ŠT-3c-2 (g9): a NIKDY hlaska o novsej schéme/disku',
+           rec.none? { |x| x.include?('zlyhal zápis na disk') })
+      end
+
       # Naspat na povodne meno — zvysok scenara (mazanie) pracuje s nim.
       td.dispatch('tpl_rename', { 'kind' => 'cabinet', 'template' => ST3C_CAB2,
                                   'new_name' => ST3C_CAB }.to_json, sink)
       ok('ŠT-3c-2 (g): premenovanie SPAT na povodne meno prejde tiez',
          !e::TemplateStore.find('cabinet', ST3C_CAB).nil?)
-      e::TemplateStore.delete('cabinet', ST3C_COL)
 
       # --- (f) MAZANIE oboch druhov (vratane DOSKOVEJ) --------------------
       rec.clear

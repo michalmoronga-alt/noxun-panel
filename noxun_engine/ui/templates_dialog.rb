@@ -239,6 +239,10 @@ module Noxun
             # jej zlyhanie premenovanie nemeni (poradie dlazdic sa len vrati
             # na „nikdy nepouzita").
             TemplateUsage.rename(kind, old_name, new_name)
+            # Review #226 P2: vkladacia karta panela drzi zvolenu sablonu MENOM —
+            # bez prehodenia by vkladala pod starou identitou. Ide to PRED echom,
+            # aby prestavane dlazdice uz vyznacili spravnu.
+            Panel.push_template_renamed(kind, old_name, new_name)
             js('TPL.renameSaved()')
             note = if had_png && TemplatePreviews.rev_for(kind, new_name).nil?
                      ' Náhľad sa nepreniesol — odfoť ho znova.'
@@ -264,6 +268,13 @@ module Noxun
         # ho odomkne a nechá otvorený) a ZAROVEN do stavoveho riadku sekcie —
         # ked modal medzitym zanikol, pouzivatel sa aj tak dozvie, preco sa nic
         # nestalo.
+        # Sablona, ktora v kniznici uz NIE JE (druha instancia, rucny zasah):
+        # jedna hlaska a obnova zoznamu pre vsetky cesty, ktore na to prisli.
+        def template_gone(name)
+          refresh_if_open
+          set_status("Šablóna „#{name}“ už v knižnici nie je — zoznam je obnovený.")
+        end
+
         def rename_error(msg)
           js("TPL.renameError(#{msg.to_json}, 'name')")
           set_status(msg, true)
@@ -289,13 +300,17 @@ module Noxun
           # N1 (ŠT-3c-2): sablona, ktora medzitym zmizla (druha instancia, rucny
           # zasah), ma VLASTNU hlasku — sklad na nu odteraz vracia `false` a bez
           # tohto rozlisenia by pouzivatel dostal hlasku o chybe disku.
-          if TemplateStore.find(kind, name).nil?
-            refresh_if_open
-            return set_status("Šablóna „#{name}“ už v knižnici nie je — zoznam je obnovený.")
-          end
+          return template_gone(name) if TemplateStore.find(kind, name).nil?
 
           # Codex #174 P2: pri odmietnutom zapise ZIADNA hlaska o uspechu.
           unless TemplateStore.delete(kind, name)
+            # Review #226 P2: kontrola vyssie bezi MIMO zamku skladu, takze medzi
+            # nou a zamknutym mazanim mohla sablonu zmazat druha instancia —
+            # `delete` vtedy vrati `false` z UPLNE INEHO dovodu nez novsia schema
+            # ci chyba disku. Rozhoduje az pohlad PO navrate: ked uz v kniznici
+            # nie je, plati „zmizla" (aj so zoznamom nanovo).
+            return template_gone(name) if TemplateStore.find(kind, name).nil?
+
             return set_status('Šablónu sa nepodarilo vymazať — knižnica je z novšej verzie ' \
                               'Noxunu alebo zlyhal zápis na disk. Nič sa nezmenilo.', true)
           end

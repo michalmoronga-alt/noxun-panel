@@ -263,3 +263,71 @@ NxTest.test('ŠT-3c-2: vynimka pod zamkom vracia :failed, NIE `false` (B3)') do
 ensure
   st3c2_cleanup('ST3C2 I', 'ST3C2 I2') if NxTest.headless?
 end
+
+# --- review #226 (Codex P2) --------------------------------------------------
+
+NxTest.test('ŠT-3c-2 (review #226 P2): sirota na CIELI zmizne aj ked zdroj nahlad NEMA') do
+  NxTest.skip!('TemplateStore testy bezia len headless (testovaci %APPDATA%)') unless NxTest.headless?
+
+  e = Noxun::Engine
+  e::TemplateStore.reload!
+  st3c2_cleanup('ST3C2 J', 'ST3C2 J2')
+  st3c2_seed('ST3C2 J')                     # BEZ nahladu
+  dst = e::TemplatePreviews.path_for('cabinet', 'ST3C2 J2')
+  require 'fileutils'
+  FileUtils.mkdir_p(File.dirname(dst))
+  # Osirely PNG po davno zmazanej sablone toho mena — identita suboru je
+  # odvodena od MENA, takze na cieli lezi cudzi obrazok.
+  File.binwrite(dst, "\x89PNG\r\n\x1A\n".b + ('x' * 64).b)
+  NxTest.assert(!e::TemplatePreviews.rev_for('cabinet', 'ST3C2 J2').nil?, 'fixture: sirota lezi na cieli')
+
+  NxTest.assert_equal(:ok, e::TemplateStore.rename('cabinet', 'ST3C2 J', 'ST3C2 J2'))
+  NxTest.assert(e::TemplatePreviews.rev_for('cabinet', 'ST3C2 J2').nil?,
+                'premenovana sablona BEZ fotky NEZDEDILA cudzi obrazok')
+  NxTest.refute(File.file?(dst), 'a sirota je zo suboroveho systemu prec')
+ensure
+  st3c2_cleanup('ST3C2 J', 'ST3C2 J2') if NxTest.headless?
+end
+
+NxTest.test('ŠT-3c-2 (review #226 P2): mazanie rozlisi „zmizla" AZ PO navrate zo zamku') do
+  h = ST3C2_TPL_RB[/def handle_delete\(payload\).*?
+        end
+/m].to_s
+  NxTest.assert(h.scan('template_gone(name)').length == 2,
+                'obe cesty (pred zapisom aj PO odmietnutom zapise) maju hlasku „zmizla"')
+  del = h[/unless TemplateStore\.delete.*?
+          end
+/m].to_s
+  NxTest.assert(del.include?('template_gone(name) if TemplateStore.find(kind, name).nil?'),
+                'po `false` sa este RAZ pozrieme, ci sablona vobec existuje')
+  NxTest.assert(del.index('template_gone') < del.index('novšej verzie'),
+                'a hlaska o novsej schéme/disku je az POSLEDNA moznost')
+  gone = ST3C2_TPL_RB[/def template_gone\(name\).*?
+        end
+/m].to_s
+  NxTest.assert(gone.include?('refresh_if_open'), 'a zoznam sa pritom obnovi')
+end
+
+NxTest.test('ŠT-3c-2 (review #226 P2): premenovanie prehodi VOLBU vkladacej karty') do
+  h = ST3C2_TPL_RB[/def handle_rename\(payload\).*?
+        end
+/m].to_s
+  NxTest.assert(h.include?('Panel.push_template_renamed(kind, old_name, new_name)'),
+                'karta panela drzi sablonu MENOM — bez prehodenia by vkladala pod starou identitou')
+  NxTest.assert(h.index('push_template_renamed') < h.index('after_change'),
+                'prehodenie ide PRED echom, aby prestavane dlazdice vyznacili spravnu')
+  sync = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'sync.rb'),
+                   encoding: 'UTF-8')
+  m = sync[/def push_template_renamed\(kind, old_name, new_name\).*?
+        end
+/m].to_s
+  NxTest.assert(m.include?('NX.renameTemplate('), 'posiela sa vlastnym prijimacom panela')
+  NxTest.assert(m.include?('.to_json'), 'mena su serializovane (pisane pouzivatelom)')
+  bridge = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'bridge.js'),
+                     encoding: 'UTF-8')
+  r = bridge[/renameTemplate: function\(kind, oldName, newName\)\{.*?
+    \},/m].to_s
+  NxTest.assert(r.include?('NXInsert.templateName(k) !== String'),
+                'prehadzuje sa LEN zhodna volba (cudzia sa nedotkne)')
+  NxTest.assert(r.include?('NXInsert.setTemplateName(k, newName)'), 'a nastavi sa nove meno')
+end

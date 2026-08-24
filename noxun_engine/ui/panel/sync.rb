@@ -202,6 +202,17 @@ module Noxun
           js("NX.setTemplates(#{template_list(previews: true).to_json})")
         end
 
+        # ŠT-3c-2 (review #226 P2): PREMENOVANIE musí prehodiť aj to, čo má
+        # vkladacia karta panela ZVOLENÉ. Karta drží šablónu MENOM
+        # (`NXInsert.state.template` / `boardTemplate`) — samotný `push_templates`
+        # prestavia dlaždice, ale voľbu nechá na starom mene, ktoré už neexistuje:
+        # vloženie by potom išlo s neplatnou identitou (bez pečiatky použitia) a po
+        # prekreslení karty by ticho spadlo na predvolené rozmery. Volá sa PRED
+        # `push_templates`, aby prestavané dlaždice už vyznačili tú správnu.
+        def push_template_renamed(kind, old_name, new_name)
+          js("NX.renameTemplate(#{kind.to_s.to_json}, #{old_name.to_s.to_json}, "              "#{new_name.to_s.to_json})")
+        end
+
         # UI-D2: PULL kanal nahladu. Panel si vypyta PNG pre (kind, name, rev)
         # RAZ — data URI je radovo vacsie nez zvysok zoznamu a poslat ho pri
         # kazdom `push_templates` by z kazdeho refreshu spravilo stovky kB.

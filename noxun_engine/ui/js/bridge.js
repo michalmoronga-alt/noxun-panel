@@ -290,6 +290,17 @@
     // posiela server push_templates s cerstvym `used_seq`, takze sa poradie
     // „Naposledy použité“ prekresli bez restartu panela.
     setTemplates: function(list){ TEMPLATES = list || []; renderTemplateTiles(true); refreshTplModalWarn(); }, // D-14: varovanie kolizie zije aj pri otvorenom modale
+    // ŠT-3c-2 (review #226): sablonu premenovali v Studiu — karta ju drzi
+    // MENOM, takze bez tohto prehodenia by vkladala pod starou (uz neplatnou)
+    // identitou a po prekresleni by spadla na predvolene rozmery. Meni sa LEN
+    // volba, nic sa neprekresluje — dlazdice dorazia hned za tym
+    // (`push_templates`).
+    renameTemplate: function(kind, oldName, newName){
+      if (typeof NXInsert === 'undefined' || !NXInsert) return;
+      var k = (kind === 'board') ? 'board' : 'cabinet';
+      if (NXInsert.templateName(k) !== String(oldName == null ? '' : oldName)) return;
+      NXInsert.setTemplateName(k, newName);
+    },
     // UI-D2: odpoved na `nx_template_preview` — PNG nahlad JEDNEJ sablony ako
     // data URI. Meni LEN obrazok v dlazdici (ziadny render karty, ziadna
     // prestavba mriezky — vzor NX.setUsedIds); `png: null` = bez nahladu,
