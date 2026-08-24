@@ -486,7 +486,10 @@ NxTest.test('ŠT-3c-2 (kolo 2): presun PNG sa OVERUJE na disku a cesta ma contai
 
   # CONTAINMENT: keby `slug` pustil cestu von z adresara, `path_for` musi
   # vratit nil — je to posledna poistka, nie ozdoba.
-  escaped = st3c2_with_stub(e::TemplatePreviews, :file_name, ->(_k, _n) { '..\\..\\evil.png' }) do
+  # POZOR na oddelovac: `..\..` je uteka cesta LEN na Windows — na Linuxe (CI)
+  # je spatna lomka bezny znak v mene suboru, takze by cesta z adresara vobec
+  # neusla a test by NIC nedokazoval. Pouziva sa `../..`, ktora uteka VSADE.
+  escaped = st3c2_with_stub(e::TemplatePreviews, :file_name, ->(_k, _n) { '../../evil.png' }) do
     e::TemplatePreviews.path_for('cabinet', 'ST3C2 O')
   end
   NxTest.assert(escaped.nil?, 'cesta mimo adresara nahladov sa NEVYDA')
