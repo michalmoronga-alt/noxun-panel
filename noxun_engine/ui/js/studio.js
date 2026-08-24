@@ -59,7 +59,8 @@
 
   // ZRKADLO `StudioDialog::SECTIONS` — autoritou whitelistu je RUBY, tento
   // zoznam len zabrani, aby z okna vyletela hodnota, ktora sekciu nepomenuva.
-  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'rules', 'tpl'];
+  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'rules', 'tpl',
+                         'sup', 'bset', 'about'];
 
   // ŠT-1b (Š10): 3-stavove nastavenie kontroly hran je ZDIELANY komponent —
   // TEN ISTY markup kresli rail Inspectora (rohovy trojuholnik pri ABS ikone)
@@ -121,10 +122,12 @@
       { id: 'tpl',    ic: 'star',     t: 'Šablóny' }
     ] },
     { grp: 'NASTAVENIA', items: [
-      { id: 'sup',    ic: 'truck', t: 'Dodávateľ / Demos',
-        bridge: 'sadzby sú v okne Nastavenia rozpočtu, väzba na Demos v sekcii Materiály — spoja sa v ŠT-4' },
-      { id: 'bset',   ic: 'euro',  t: 'Nastavenia rozpočtu', bridge: 'zatiaľ vlastné okno — presun v ŠT-4' },
-      { id: 'about',  ic: 'info',  t: 'O plugine', bridge: 'obsah je v koliesku Inspectora' }
+      // ŠT-4a (Š19): posledné tri premostenia sa stali SEKCIAMI — okno
+      // „Nastavenia rozpočtu" (posledný satelit) zaniklo a v navigácii už
+      // nie je ani jedno premostenie.
+      { id: 'sup',    ic: 'truck', t: 'Dodávateľ / Demos' },
+      { id: 'bset',   ic: 'euro',  t: 'Nastavenia rozpočtu' },
+      { id: 'about',  ic: 'info',  t: 'O plugine' }
     ] }
   ];
 
@@ -151,7 +154,14 @@
     // ŠT-3c-1 (Š18): knižnica je spoločná pre všetky zákazky; NOVÚ šablónu
     // ukladáš v Inspectore (má po ruke označenú skrinku), tu ich spravuješ.
     tpl: { t: 'Šablóny',
-           hint: 'knižnica je spoločná pre všetky zákazky · novú uložíš v Inspectore z označenej skrinky' }
+           hint: 'knižnica je spoločná pre všetky zákazky · novú uložíš v Inspectore z označenej skrinky' },
+    // ŠT-4a (Š19). Hinty hovoria to, čo bolo v podtitule zaniknutého okna:
+    // čo je GLOBÁLNE (platí pre všetky zákazky) a čo sa mení inde.
+    sup: { t: 'Dodávateľ / Demos',
+           hint: 'aktívny dodávateľ a stav väzby na Demos · väzba sa nastavuje pri konkrétnom dekore' },
+    bset: { t: 'Nastavenia rozpočtu',
+            hint: 'sadzby, režimy a prahy · globálne pre všetky zákazky, do zákazky sa nemrazia' },
+    about: { t: 'O plugine', hint: 'to isté nájdeš v koliesku Inspectora — jeden obsah, dva vstupy' }
   };
 
   // ---------------------------------------------------------------- helpers
@@ -323,15 +333,10 @@
     return out.length ? out.join(' · ') : 'bez ABS';
   }
 
-  // Premostenia navigacie: ZRKADLO whitelistu v `StudioDialog`. Klikatelne je
-  // vsetko okrem aktivnej sekcie a polozky s `disabled`.
-  function navBridgeIds(){
-    var out = [];
-    NAV.forEach(function(g){
-      g.items.forEach(function(it){ if (it.bridge) out.push(it.id); });
-    });
-    return out;
-  }
+  // ŠT-4a: `navBridgeIds` (zrkadlo whitelistu premostení) ZANIKLO spolu
+  // s posledným satelitom — v navigácii nie je čo premosťovať. Zoznam
+  // premostených položiek zostáva v teste ako REFUTE: keby sa `bridge:`
+  // niekedy vrátilo, znamenalo by to nový satelit.
 
   // ============ ŠT-1b: sekcia KONTROLA (Š8–Š11) — CISTE funkcie ============
   // Testuje ich tests/js/test_st1b_kontrola.js (a prepinace hran/kresby sady
@@ -799,17 +804,17 @@
     NAV.forEach(function(g){
       h += '<div class="sgrp">' + esc(g.grp) + '</div>';
       g.items.forEach(function(it){
-        var on = (it.id === studioSec && !it.bridge && !it.disabled);
+        var on = (it.id === studioSec && !it.disabled);
+        // ŠT-4a: vetva premostenia zanikla — tooltip je buď dôvod neaktivity,
+        // alebo vlastný hint položky, alebo jej názov.
         var tip = it.disabled ? (it.t + ' — ' + it.disabled)
-                : (it.bridge ? (it.t + ' — ' + it.bridge)
-                : (it.hint ? (it.t + ' — ' + it.hint) : it.t));
+                : (it.hint ? (it.t + ' — ' + it.hint) : it.t);
         h += '<button type="button" class="navitem' + (on ? ' on' : '') + '"' +
              (it.disabled ? ' aria-disabled="true"' : '') +
              ' data-nav="' + esc(it.id) + '" title="' + esc(tip) + '">' +
              ico(it.ic) + '<span>' + esc(it.t) + '</span>' +
              // Š11: živé počty pri Kontrole — z counts KAŽDÉHO pushu.
-             (it.badge ? navBadgeHtml(ST ? ST.counts : null) : '') +
-             (it.bridge ? '<i class="nbridge" aria-hidden="true">↗</i>' : '') + '</button>';
+             (it.badge ? navBadgeHtml(ST ? ST.counts : null) : '') + '</button>';
       });
     });
     h += '<div class="navfoot"><button type="button" class="navitem" data-navmini' +
@@ -873,6 +878,14 @@
     // ŠT-3c-1: a pre sekciu Šablóny `js/templates.js`.
     if (studioSec === 'tpl'){
       if (typeof tplRenderTools === 'function') tplRenderTools(staleFlag);
+      else box.innerHTML = '';
+      return;
+    }
+    // ŠT-4a: tri sekcie NASTAVENÍ kreslí `js/studio_settings.js`. Lištu má len
+    // `bset` (má čo ukladať) — `sup` a `about` sú čítanie, takže prázdna lišta
+    // je poctivejšia než tlačidlá, ktoré nič nerobia (D-78).
+    if (studioSec === 'sup' || studioSec === 'bset' || studioSec === 'about'){
+      if (typeof ssRenderTools === 'function') ssRenderTools();
       else box.innerHTML = '';
       return;
     }
@@ -1067,6 +1080,14 @@
     if (studioSec === 'tpl'){
       if (typeof tplRenderBody === 'function') tplRenderBody();
       else box.innerHTML = '<div class="muted">Šablóny sa nenačítali (js/templates.js).</div>';
+      return;
+    }
+    // ŠT-4a: telo sekcií NASTAVENÍ si kreslí `js/studio_settings.js` SÁM — v `bset`
+    // môže byť ROZPÍSANÝ formulár sadzieb a `NX.setStudio` ho nesmie zmazať
+    // (plný push chodí pri každej zmene modelu, nielen pri otvorení sekcie).
+    if (studioSec === 'sup' || studioSec === 'bset' || studioSec === 'about'){
+      if (typeof ssRenderBody === 'function') ssRenderBody();
+      else box.innerHTML = '<div class="muted">Nastavenia sa nenačítali (js/studio_settings.js).</div>';
       return;
     }
     if (studioSec === 'ctrl') box.innerHTML = ctrlSection();
@@ -1365,11 +1386,6 @@
     sketchup.studio_set_vepo_opts(JSON.stringify(p));
   }
 
-  function bridgeTo(id){
-    if (!window.sketchup || !sketchup.studio_bridge) return;
-    sketchup.studio_bridge(JSON.stringify({ section: id }));
-  }
-
   // ---- ŠT-1b: akcie sekcie Kontrola -> Ruby -------------------------------
 
   // Š9: klik na nález. Posiela sa STABILNY kluc problemu (nie pids) — Ruby po
@@ -1466,7 +1482,8 @@
     var it = navItem(id);
     if (!it) return;
     if (it.disabled){ NX.setStatus(it.t + ' — ' + it.disabled, true); return; }
-    if (it.bridge){ bridgeTo(id); return; }
+    // ŠT-4a: vetva premostenia zanikla — každá položka je odteraz SEKCIA
+    // (alebo jediný `disabled` Nárezový plán vyššie).
     // ŠT-1c PR B2: klientske `goto` (položka navigácie, ktorej obsah bol ČASŤOU
     // inej sekcie) ZANIKLO spolu s náhľadom cenovej ponuky vnútri Rozpočtu —
     // `offer` je od tejto dávky plnohodnotná sekcia.
@@ -1660,7 +1677,7 @@
       sheetRows: sheetRows,
       activeCols: activeCols, cellValue: cellValue, grainLabel: grainLabel,
       absCompact: absCompact, absFull: absFull, rgbHex: rgbHex,
-      navBridgeIds: navBridgeIds, anchorFilter: anchorFilter, navItem: navItem,
+      anchorFilter: anchorFilter, navItem: navItem,
       nxModalOpen: nxModalOpen,
       // SMOKE 1A–1D: lista sekcie Kusovnik + rohove nastavenie VEPO.
       // Testy nastavuju stav cez `setBomState` (bomView/bomQ/menu) — inak by

@@ -44,7 +44,10 @@ module Noxun
       # (zhodu strazi guard test): autoritou je VZDY Ruby.
       # ŠT-3a-1 pridala KOVANIE (`hw` — druha ziva polozka skupiny KATALOGY).
       # ŠT-3b-1 pridala PRAVIDLÁ (`rules` — tretia ziva polozka skupiny KATALOGY).
-      SECTIONS = %w[bom ctrl buy budget offer mat hw rules tpl].freeze
+      # ŠT-3c-1 pridala ŠABLÓNY (`tpl`), ŠT-4a NASTAVENIA (`sup` · `bset` ·
+      # `about`) — poslednu skupinu navigacie. Tym su ZIVE VSETKY polozky
+      # okrem Narezoveho planu (faza 2) a v okne nie je uz ziadne premostenie.
+      SECTIONS = %w[bom ctrl buy budget offer mat hw rules tpl sup bset about].freeze
 
       # ŠT-2a/2b: akcie katalogu materialov, ktore smie poslat SEKCIA `mat`,
       # ziju v JEDINOM zozname — `MaterialsDialog::SECTION_ACTIONS`. Telo
@@ -58,41 +61,15 @@ module Noxun
       # ZANIKLI spolu s oknom — kusovnik, kontrola, nakup kovania, rozpocet aj
       # cenova ponuka su SEKCIAMI tohto okna, takze niet kam premostovat.
 
-      # Premostenia do satelitnych okien (KATALOGY + NASTAVENIA). Hodnota je
-      # meno modulu — volat sa smie LEN to, co je TU (klient posiela iba kluc).
-      # ŠT-2a: `mat` z tejto tabulky VYPADLO — Materialy su ZIVA sekcia tohto
-      # okna. ŠT-2b: okno „Materiály projektu" ZANIKLO uplne, takze zanikla aj
-      # jeho vlastna cesta `mat_open_window` — sekcia dnes vie VSETKO vratane
-      # Demos tokov a „Nahradiť UNI…".
-      # ŠT-3a-1: `hw` z tejto tabulky VYPADLO — Kovanie je ZIVA sekcia tohto
-      # okna. ŠT-3a-2: okno „Katalóg kovania" ZANIKLO uplne (aj s troma
-      # MODELOVYMI zapismi predvolieb setov projektu), takze zanikla aj jeho
-      # vlastna cesta `hw_open_window` — sekcia dnes vie VSETKO.
-      # ŠT-3b-1: `rules` z tejto tabulky VYPADLO — Pravidlá su ZIVA sekcia
-      # tohto okna a okno „Pravidlá kovania" ZANIKLO uplne.
-      # ŠT-3c-1: `tpl` (premostenie do okna Šablóny) ZANIKLO spolu s tym oknom
-      # — Sablony su SEKCIA tohto okna a niet kam premostovat.
-      WINDOW_BRIDGES = {
-        'sup' => 'SupplierSettingsDialog', 'bset' => 'SupplierSettingsDialog'
-      }.freeze
-
-      # ŠT-3a-2: `HW_BRIDGE_STATUS` (hlaska premostenia Z VNUTRA sekcie do okna
-      # Katalóg kovania) ZANIKLO spolu s tym oknom — niet kam premostovat.
-
-      # Slovenske hlasky premosteni — texty sklada SERVER (jedna autorita).
-      BRIDGE_STATUS = {
-        # Poctivo: „Dodávateľ / Demos" nema DNES vlastne okno. Sadzby dodavatela
-        # ziju v okne Nastavenia rozpoctu, vazba na Demos je od ŠT-2b v SEKCII
-        # Materialy TOHTO okna — spoja sa az v Š19. Status to musi povedat, inak
-        # sa otvori okno s inym nadpisom a pouzivatel si mysli, ze klikol zle.
-        'sup' => 'Otváram okno Nastavenia rozpočtu — väzba na Demos je v sekcii Materiály (spoja sa v ŠT-4).',
-        # ŠT-1c PR B1 (#20): to iste okno otvara aj ⚙ v liste sekcie Rozpocet —
-        # kontextova skratka k sadzbam, ktore rozpocet POCITAJU. Text to musi
-        # povedat, inak vyzeraju ako dve rozne nastavenia.
-        'bset' => 'Otváram Nastavenia rozpočtu — sadzby, režimy a prahy platia pre celý ' \
-                  'rozpočet (presun do Štúdia príde v dávke ŠT-4).',
-        'about' => 'O plugine nájdeš v koliesku Inspectora — otváram Inspector.'
-      }.freeze
+      # ŠT-4a: PREMOSTENIA ZANIKLI CELE — `WINDOW_BRIDGES`, `BRIDGE_STATUS`,
+      # `do_bridge` aj `bridge_window`. Nastavenia boli POSLEDNY satelit, takze
+      # niet kam premostovat: kazda polozka navigacie je odteraz bud SEKCIA
+      # tohto okna, alebo (jediny Narezovy plan) `aria-disabled` s dovodom.
+      # Predtym postupne zanikli: `mat` (ŠT-2a/2b) · `hw` (ŠT-3a) · `rules`
+      # (ŠT-3b-1) · `tpl` (ŠT-3c-1) · `PRODUCTION_BRIDGES` (ŠT-1c PR B3).
+      # Klientska strana (`bridge:` v NAV, `bridgeTo`, `.nbridge`, callback
+      # `studio_bridge`) zanikla V TEJ ISTEJ davke — most bez oboch koncov by
+      # bol mrtvy kod, ktory prezije prve „to sa este zide".
 
       # ŠT-2b: `MAT_BRIDGE_STATUS` (hlasky premostenia Z VNUTRA sekcie do okna
       # Materialy) ZANIKLO spolu s tym oknom — Demos toky aj „Nahradiť UNI…"
@@ -933,34 +910,39 @@ module Noxun
           nil
         end
 
-        # --- premostenia navigacie (audit #2) --------------------------------
-        # Klient posiela LEN meno polozky; ci sa smie otvorit a CO sa otvori,
-        # rozhoduje whitelist TU (HTML nie je ochrana).
-        def do_bridge(payload)
-          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
-          key = data['section'].to_s
-          if WINDOW_BRIDGES.key?(key)
-            mod = bridge_window(WINDOW_BRIDGES[key])
-            return set_status('Okno sa nepodarilo otvoriť (nie je načítané).', true) if mod.nil?
-
-            mod.show
-            return set_status(BRIDGE_STATUS[key])
-          end
-          if key == 'about'
-            Panel.show if defined?(Panel)
-            return set_status(BRIDGE_STATUS[key])
-          end
-          set_status('Táto sekcia zatiaľ neexistuje.', true)
+        # ŠT-4a, sekcie NASTAVENIA (`sup` · `bset` · `about`, Š19). Kanal je
+        # vzor `rules`, len JEDNODUCHSI: nastavenia su GLOBALNE (subor
+        # v %APPDATA%), takze payload nepotrebuje model — rovnako ako sablony.
+        def settings_actions
+          defined?(SupplierSettingsDialog) ? SupplierSettingsDialog::SECTION_ACTIONS : []
         end
 
-        # Meno modulu -> modul. Zoznam mien je uzavrety (`WINDOW_BRIDGES`),
-        # takze sa sem nikdy nedostane nic, co klient vymyslel.
-        def bridge_window(name)
-          return nil unless Engine.const_defined?(name)
+        def do_settings(name, payload)
+          return set_status('Nastavenia nie su nacitane.', true) unless defined?(SupplierSettingsDialog)
 
-          Engine.const_get(name)
+          SupplierSettingsDialog.dispatch(name, payload, settings_sink)
+        end
+
+        # Adresat odpovedi: TOTO okno. `SupplierSettingsDialog` posiela `SS.*`
+        # volania — sekcia ma presne tie iste prijimace, lebo bezi na TOM ISTOM
+        # `js/studio_settings.js`.
+        def settings_sink
+          ->(script) { js(script) }
+        end
+
+        # Verejny most kanala sekcie (vzor `rules_js`) — `js` je private.
+        def settings_js(script)
+          js(script)
+        end
+
+        # Payload sekcii nastaveni. Model sa NEODOVZDAVA (nastavenia su
+        # globalne); zlyhanie sa NEZAMLCUJE — sekcia dostane `nil` a povie to.
+        def settings_payload
+          return nil unless defined?(SupplierSettingsDialog)
+
+          SupplierSettingsDialog.settings_payload
         rescue StandardError => e
-          Engine.log_error(e, 'StudioDialog.bridge_window')
+          Engine.log_error(e, 'StudioDialog.settings_payload')
           nil
         end
 
@@ -1124,7 +1106,6 @@ module Noxun
           # ten isty flush handshake ako VEPO, len vlastnym kanalom Studia.
           cb(dlg, 'hw_csv_export') { |p| handle_hw_csv(p) }
           cb(dlg, 'studio_set_vepo_opts') { |p| do_set_vepo_opts(p) }
-          cb(dlg, 'studio_bridge')        { |p| do_bridge(p) }
           # ŠT-1b, sekcia KONTROLA. Klik na riadok ide uz existujucou cestou
           # `nx_select` (nesie `problem_key`); tieto callbacky su akcie riadku
           # a lista sekcie. Ziadny flush handshake — nic z toho model nemeni.
@@ -1143,7 +1124,9 @@ module Noxun
           cb(dlg, 'budget_xlsx')     { |p| handle_budget_xlsx(p) }
           cb(dlg, 'cp_xlsx')         { |p| handle_cp_xlsx(p) }
           cb(dlg, 'budget_open_url') { |p| handle_budget_url(p) }
-          cb(dlg, 'budget_settings') { |_p| ProductionCore.open_budget_settings(status: status_proc) }
+          # ŠT-4a: `budget_settings` (⚙ v liste Rozpoctu otvarala SATELIT) ZANIKLO —
+          # sadzby su SEKCIA `bset` TOHTO okna, takze prepnutie je cisto klientske
+          # (`studioGoSection('bset')`). Server o prepnuti sekcie vediet nemusi.
           # E-c: „Prepočítať ceny" — hromadne obnovenie cien z Demosu.
           cb(dlg, 'price_refresh')        { |p| handle_price_refresh(p) }
           cb(dlg, 'price_refresh_cancel') { |_p| ProductionCore.price_refresh_cancel(status: status_proc) }
@@ -1172,6 +1155,10 @@ module Noxun
           # okno „Šablóny" (`tpl_apply`/`tpl_delete`/`tpl_capture`) + vlastny
           # PNG kanal sekcie (`tpl_preview`). Telo je v `TemplatesDialog`.
           tpl_actions.each { |name| cb(dlg, name) { |p| do_tpl(name, p) } }
+          # ŠT-4a, sekcie NASTAVENIA. Mena su prefixovane `ss_` (`save`/`reload`
+          # z okna by sa zrazili s callbackmi okna aj inych sekcii). Telo je
+          # v `SupplierSettingsDialog`, sem chodi len odpoved (`settings_sink`).
+          settings_actions.each { |name| cb(dlg, name) { |p| do_settings(name, p) } }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(studio): #{msg}")
@@ -1372,6 +1359,7 @@ module Noxun
             # s transientnym `preview_rev`. Model sa nepouziva — sablony su
             # GLOBALNE. Samotne PNG chodi vlastnym PULL kanalom (`tpl_preview`).
             tpl: tpl_payload,
+            settings: settings_payload,
             # Deep-link: sekcia sa posiela PRAVE RAZ (inak by kazdy refresh
             # vratil pouzivatela tam, odkial medzitym odisiel).
             open_section: consume_pending_section,

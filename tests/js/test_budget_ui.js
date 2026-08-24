@@ -8,7 +8,9 @@
 const assert = require('assert');
 const path = require('path');
 const B = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'budget.js'));
-const S = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'supplier_settings.js'));
+// ŠT-4a: okno „Nastavenia rozpočtu" zaniklo — TIE ISTE ciste funkcie
+// (`ssBuildPatch`/`ssParse`/`ssNumText`) ziju v sekcii Studia.
+const S = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'studio_settings.js'));
 
 let passed = 0;
 function eq(a, b, msg){ assert.deepStrictEqual(a, b, msg); passed += 1; }

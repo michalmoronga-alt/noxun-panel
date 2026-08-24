@@ -44,7 +44,9 @@ NxTest.test('ŠT-1c: `buy` je SEKCIA Studia — a premostenie do okna Vyroba zan
   NxTest.assert(st::SECTIONS.include?('buy'), 'Ruby whitelist sekciu pozna')
   NxTest.refute(st.const_defined?(:PRODUCTION_BRIDGES),
                 'premostenia do okna Vyroba zanikli uplne (ŠT-1c PR B3)')
-  NxTest.assert(st::BRIDGE_STATUS['buy'].to_s.empty?, 'a s nimi aj ich hlasky')
+  # ŠT-4a: `BRIDGE_STATUS` uz NEEXISTUJE (posledny satelit zanikol), takze
+  # „nema hlasku premostenia" sa dokazuje zanikom celej konstanty.
+  NxTest.refute(st.const_defined?(:BRIDGE_STATUS), 'a s nimi aj cela tabulka hlasok')
   # Navigacia okna: polozka `buy` uz NESMIE mat `bridge` (sipka + tooltip
   # „zatiaľ v okne Výroba") — inak by tvrdila, ze obsah je inde.
   nav = S1C_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s

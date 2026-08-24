@@ -44,7 +44,7 @@ NxTest.test('ST-1a: SECTIONS je whitelist v RUBY a JS je jeho ZRKADLO') do
   # ŠT-1b pridala sekciu Kontrola (`ctrl`) — dovtedy premostenie do okna Vyroba.
   # ŠT-1c PR A pridala Nakup kovania (`buy`) — presun tabu Kovanie 1:1 (Š7).
   # ŠT-1c PR B1 pridala Rozpocet (`budget`) — POSLEDNY tab okna Vyroba.
-  NxTest.assert_equal(%w[bom ctrl buy budget offer mat hw rules tpl], rb,
+  NxTest.assert_equal(%w[bom ctrl buy budget offer mat hw rules tpl sup bset about], rb,
                       'v Studiu ziju sekcie Kusovník, Kontrola, Nákup, Rozpočet, Ponuka, Materiály, Kovanie, Pravidlá a Šablóny')
   NxTest.assert_equal(rb, js, 'JS zoznam sekcii sa nesmie rozist s Ruby autoritou')
   NxTest.assert_equal(rb, Noxun::Engine::StudioDialog::SECTIONS,
@@ -483,40 +483,36 @@ NxTest.test('SMOKE 22.8.: „Obnoviť" hlasku VZDY zhodi — nikdy vecne „Prep
                 'a pouzivatel dostane CHYBOVU hlasku, nie vecne „Prepočítavam…"')
 end
 
-# --- 5) premostenia navigacie (audit #2) -------------------------------------
+# --- 5) premostenia navigacie ZANIKLI (ŠT-4a) --------------------------------
 
-NxTest.test('ST-1a: premostenia su UZAVRETY whitelist v Ruby, klient posiela iba kluc') do
+NxTest.test('ŠT-4a: PREMOSTENIA ZANIKLI CELE — niet uz kam premostovat') do
   st = Noxun::Engine::StudioDialog
-  # ŠT-1b: `ctrl` uz NIE JE premostenie — Kontrola je ziva sekcia tohto okna.
-  # ŠT-1c PR A: to iste plati pre `buy` (Nakup kovania).
-  # ŠT-1c PR B1: a pre `budget` (Rozpocet) aj `offer` (nahlad CP je jeho
-  # sucastou) — do okna Vyroba uz NEVEDIE ZIADNA polozka navigacie.
-  # ŠT-1c PR B3: konstanta PRODUCTION_BRIDGES ZANIKLA spolu s oknom.
-  NxTest.refute(st.const_defined?(:PRODUCTION_BRIDGES),
-                'premostenia do zaniknuteho okna Vyroba uz neexistuju')
-  # ŠT-2a: `mat` (Materialy) sa pridal k zivym sekciam — okno „Materiály
-  # projektu" este zije, ale NAVIGACIA don uz nevedie (sekcia si ho otvara sama
-  # a len pre toky, ktore zatial nevie — vlastnou cestou `mat_open_window`).
-  # ŠT-3a-1: to iste pre `hw` (Kovanie) — okno „Katalóg kovania" este zije
-  # (drzi tri MODELOVE zapisy), ale navigacia don uz nevedie: otvara ho
-  # premostenie Z VNUTRA sekcie (`hw_open_window` + `HW_BRIDGE_STATUS`).
-  # ŠT-3c-1: to iste pre `tpl` (Šablóny) — okno ZANIKLO, sekcia je jedine UI.
-  %w[ctrl buy budget offer mat hw rules tpl].each do |k|
-    NxTest.assert(st::BRIDGE_STATUS[k].to_s.empty?,
-                  "#{k} je sekcia, nie premostenie — nesmie mat hlasku premostenia")
+  # Premostenie bolo docasny most do satelitu, ktory este zil. Postupne zanikli
+  # vsetky: `PRODUCTION_BRIDGES` (ŠT-1c PR B3, okno Vyroba) · `mat` (ŠT-2a/2b) ·
+  # `hw` (ŠT-3a) · `rules` (ŠT-3b-1) · `tpl` (ŠT-3c-1) a ŠT-4a odstranila
+  # POSLEDNY satelit (Nastavenia rozpoctu). Cela masineria preto zanikla —
+  # most bez oboch koncov je mrtvy kod, ktory prezije prve „to sa este zide".
+  %i[PRODUCTION_BRIDGES WINDOW_BRIDGES BRIDGE_STATUS].each do |c|
+    NxTest.refute(st.const_defined?(c), "konstanta #{c} uz neexistuje")
   end
-  NxTest.assert_equal(%w[bset sup].sort, st::WINDOW_BRIDGES.keys.sort,
-                      'satelitne okna otvaraju uz len DVE polozky navigacie (Dodávateľ a Nastavenia rozpočtu)')
-  # Kazde premostenie ma slovensku hlasku — inak by pouzivatel nevedel, PRECO
-  # sa mu otvorilo ine okno.
-  (st::WINDOW_BRIDGES.keys + ['about']).each do |k|
-    NxTest.assert(!st::BRIDGE_STATUS[k].to_s.empty?, "premostenie #{k} nema hlasku")
-  end
-  body = ST1B_STUDIO_RB[/def do_bridge.*?\n        end\n/m].to_s
-  NxTest.assert(body.include?('WINDOW_BRIDGES.key?(key)'),
-                'o cieli rozhoduje whitelist na SERVERI (HTML nie je ochrana)')
-  NxTest.assert(body.include?('Táto sekcia zatiaľ neexistuje.'),
-                'neznamy kluc sa odmietne nahlas')
+  NxTest.refute(st.respond_to?(:do_bridge), 'a ani serverova cesta `do_bridge`')
+  NxTest.refute(st.respond_to?(:bridge_window), 'ani `bridge_window`')
+  NxTest.refute(ST1B_STUDIO_RB.include?("cb(dlg, 'studio_bridge')"),
+                'callback okna zanikol tiez — klient nema co volat')
+  # Klientska strana MUSI zaniknut V TEJ ISTEJ davke, inak by navigacia volala
+  # callback, ktory neexistuje (a klik by ticho nespravil nic).
+  NxTest.refute(ST1B_STUDIO_JS.include?('sketchup.studio_bridge'),
+                'JS uz premostenie neposiela')
+  NxTest.refute(ST1B_STUDIO_JS.include?('function bridgeTo('), '`bridgeTo` zaniklo')
+  # Pozor na komentar: meno zaniknutej funkcie v NOM ostava zamerne (vysvetluje
+  # PRECO zaniklo), takze sa hlada FUNKCIA a jej export, nie retazec.
+  NxTest.refute(ST1B_STUDIO_JS.include?('function navBridgeIds('), 'aj jeho zrkadlo `navBridgeIds`')
+  NxTest.refute(ST1B_STUDIO_JS.include?('navBridgeIds:'), 'a jeho export do testov')
+  nav = ST1B_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s
+  NxTest.refute(nav.include?('bridge:'),
+                'ZIADNA polozka navigacie uz nie je premostenie — kazda je sekcia (alebo ma dovod)')
+  NxTest.refute(ST1B_STUDIO_JS.include?('nbridge'),
+                'a zmizla aj sipka ↗, ktora premostenie oznacovala')
 end
 
 NxTest.test('ST-1a: „Nárezový plán" je JEDINA neaktivna polozka a ma dovod (D-78)') do

@@ -1,5 +1,11 @@
 # frozen_string_literal: true
-# Noxun Engine — V0.6 E-b: satelitne okno NASTAVENIA (sadzby rozpoctu).
+# Noxun Engine — NASTAVENIA: serverova autorita sekcii `sup` · `bset` · `about`.
+#
+# ŠT-4a: OKNO „Nastavenia rozpočtu" ZANIKLO (posledny satelit). Modul ostal —
+# je to jedina autorita globalnych nastaveni dodavatela a NEPREMENUVA sa
+# (audit #21, vzor MaterialsDialog/RulesDialog/TemplatesDialog): premenovanie
+# by rozbilo kazdy `defined?` guard, kazdy test a kazdy odkaz v dokumentacii,
+# pricom obsah modulu sa nemeni.
 #
 # ============================ CO SA TU EDITUJE ============================
 # GLOBALNE nastavenia aktivneho dodavatela (%APPDATA%\NOXUN\Engine\
@@ -9,22 +15,34 @@
 # vsetko per zakazka drzi BudgetStore na modeli, ten sa tu NEDOTYKA.
 #
 # ============================== GUARDY ===================================
-# 1) BASELINE REVIZIA (vzor rules_dialog/materials): okno si pri otvoreni
-#    zapamata `revision` aktivneho dodavatela a posiela ju spat pri ulozeni.
-#    Ina revizia = medzitym to niekto zmenil -> zapis sa ODMIETNE a formular sa
-#    nacita nanovo (nikdy tichy prepis cudzej zmeny).
+# 1) BASELINE REVIZIA (vzor rules_dialog/materials): sekcia dostava `revision`
+#    aktivneho dodavatela a posiela ju spat pri ulozeni. Ina revizia = medzitym
+#    to niekto zmenil -> zapis sa ODMIETNE a formular sa nacita nanovo (nikdy
+#    tichy prepis cudzej zmeny). Baseline sa obnovuje AZ PRI USPESNOM zostaveni
+#    payloadu (lekcia ŠT-3b-2c2 B4) — inak by sa server a klient rozisli.
 # 2) VALIDACIA JE SERVEROVA — SupplierSettings.patch_active! je all-or-nothing
 #    (validate-all pred zapisom); HTML `disabled`/`type=number` nie su ochrana.
-# 3) Po uspesnom ulozeni sa OTVORENE okno Studio prepocita (refresh_if_open) —
-#    sadzby su vstup rozpoctu, cisla by inak ostali stare.
+# 3) Po uspesnom ulozeni sa STUDIO PREPOCITA (`refresh_studio`) — sadzby su
+#    vstup rozpoctu, cisla by inak ostali stare. Do ŠT-4a to robilo okno
+#    (`StudioDialog.refresh_if_open`); teraz je to TA ISTA cesta, len zvnutra.
 require 'json'
 
 module Noxun
   module Engine
     module SupplierSettingsDialog
-      DLG_KEY = 'noxun_engine_supplier_settings'
+      # UZAVRETY whitelist akcii, ktore smie poslat SEKCIA. Klient posiela iba
+      # MENO akcie — co sa smie zavolat, rozhoduje SERVER.
+      #
+      # `ready` v zozname NIE JE (a byt nemoze): Studio registruje callbacky pod
+      # TYMI ISTYMI menami, takze `ready` by prepisal jeho vlastny. Prvotny stav
+      # sekcie nesie `push_state` Studia pod klucom `settings`.
+      #
+      # Mena su prefixovane `ss_` — `save`/`reload` (mena z okna) su prilis
+      # vseobecne na to, aby zili vedla akcii ostatnych sekcii v JEDNOM
+      # priestore callbackov okna.
+      SECTION_ACTIONS = %w[ss_save ss_reload].freeze
 
-      # Popisky a jednotky sadzieb sluzieb — poradie = poradie v okne (zhodne
+      # Popisky a jednotky sadzieb sluzieb — poradie = poradie v sekcii (zhodne
       # s Budget::SERVICE_DEFS, aby sa nastavenie a rozpocet citali rovnako).
       RATE_LABELS = {
         'olep'           => ['Olepovanie ABS', '€/bm'],
@@ -35,100 +53,126 @@ module Noxun
       }.freeze
 
       class << self
-        def show
-          dlg = ensure_dialog
-          if dlg.visible?
-            dlg.bring_to_front
-            push_state
-          else
-            dlg.show
-          end
-          dlg
+        # --- vstup SEKCII (vzor RulesDialog.dispatch) ------------------------
+
+        def dispatch(name, payload, sink)
+          key = name.to_s
+          return sink.call(status_script('Neznáma akcia nastavení.', true)) unless SECTION_ACTIONS.include?(key)
+
+          with_client(sink) { run_section_action(key, payload) }
         rescue StandardError => e
-          Engine.log_error(e, 'SupplierSettingsDialog.show')
+          Engine.log_error(e, "SupplierSettingsDialog.dispatch #{name}")
+          sink.call(status_script("Chyba: #{e.message}", true))
         end
 
-        private
-
-        def ensure_dialog
-          return @dialog if @dialog
-
-          @dialog = UI::HtmlDialog.new(
-            dialog_title: 'Noxun Engine — Nastavenia rozpočtu',
-            preferences_key: DLG_KEY,
-            scrollable: true,
-            resizable: true,
-            # D-77: tabulky sadzieb maju stlpce € / €€ / €€€ + jednotku.
-            # Rozmery platia LEN pri prvom otvoreni — zapamatane male okno dorovna nx_fit.
-            width: 680,
-            height: 660,
-            min_width: 520,
-            min_height: 420,
-            style: UI::HtmlDialog::STYLE_DIALOG
-          )
-          @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'supplier_settings.html'))
-          register_callbacks(@dialog) # pred show!
-          @dialog.set_on_closed { @dialog = nil }
-          @dialog
-        end
-
-        def register_callbacks(dlg)
-          Engine.register_dialog_fit(dlg, 'supplier_settings') # D-77: zapamatane male okno sa dorovna
-          cb(dlg, 'ready')    { |_p| push_state }
-          cb(dlg, 'save')     { |p| handle_save(p) }
-          cb(dlg, 'reload')   { |_p| handle_reload }
-          dlg.add_action_callback('js_error') do |_ctx, msg|
-            begin
-              Engine.log("JS(settings): #{msg}")
-            rescue StandardError => e
-              Engine.log_error(e, 'settings js_error')
-            end
-            next
+        def run_section_action(key, payload)
+          case key
+          when 'ss_save'   then handle_save(payload)
+          when 'ss_reload' then handle_reload
           end
         end
 
-        def cb(dlg, name)
-          dlg.add_action_callback(name) do |_ctx, *args|
-            begin
-              yield(args.first)
-            rescue StandardError => e
-              Engine.log_error(e, "settings cb #{name}")
-              set_status("Chyba: #{e.message}", true)
-            end
-            next
-          end
+        # Presmerovanie odpovedi na cas JEDNEHO volania. `ensure` je povinne:
+        # vynimka v handleri nesmie nechat sink viset, inak by ho zdedila
+        # NASLEDUJUCA odpoved a poslala ju do cudzieho kanala.
+        def with_client(sink)
+          prev = @client_sink
+          @client_sink = sink
+          yield
+        ensure
+          @client_sink = prev
         end
 
-        # --- Ruby -> JS ------------------------------------------------------
-
-        def push_state
+        # --- payload sekcii --------------------------------------------------
+        #
+        # JEDEN payload nesie VSETKY TRI sekcie nastaveni (`sup`/`bset`/`about`):
+        # su to tri pohlady na ten isty maly dokument, takze druhy kanal by bol
+        # drahsi nez cely payload. Model sa NEODOVZDAVA — nastavenia su
+        # GLOBALNE (rovnako ako sablony).
+        def settings_payload
           sup = SupplierSettings.active
-          @baseline_revision = SupplierSettings.revision(sup)
+          rev = SupplierSettings.revision(sup)
           data = {
-            version: Engine::VERSION,
-            revision: @baseline_revision,
-            supplier: sup,
-            modes: SupplierSettings::MODES,
-            mode_labels: SupplierSettings::MODE_LABELS,
-            rate_keys: SupplierSettings::RATE_KEYS,
-            rate_labels: RATE_LABELS,
-            standard_rows: SupplierSettings.standard_rows(sup)
+            'version' => Engine::VERSION,
+            'revision' => rev,
+            'supplier' => sup,
+            'modes' => SupplierSettings::MODES,
+            'mode_labels' => SupplierSettings::MODE_LABELS,
+            'rate_keys' => SupplierSettings::RATE_KEYS,
+            'rate_labels' => RATE_LABELS,
+            'standard_rows' => SupplierSettings.standard_rows(sup),
+            'path' => SupplierSettings.path,
+            'demos' => demos_info,
+            'about' => about_info
           }
-          js("SS.init(#{data.to_json})")
+          # Baseline AZ PO uspesnom zostaveni (ŠT-3b-2c2 B4): ked telo spadne,
+          # klient si drzi STARY stav — keby si server medzitym posunul baseline,
+          # kazde ulozenie by sa uz navzdy odmietalo.
+          @baseline_revision = rev
+          data
+        rescue StandardError => e
+          Engine.log_error(e, 'SupplierSettingsDialog.settings_payload')
+          nil
         end
+
+        # Sekcia `sup` — „Dodávateľ / Demos". POCTIVO: dnes NEEXISTUJU ziadne
+        # nastavenia vazby na Demos (ziadne prihlasenie, ziadne cenove pasmo,
+        # ziadna DPH) — Demos je VEREJNY cennik a jedina jeho „nastavitelna"
+        # vec je odstup dotazov, ktory je KONSTANTA slusneho spravania
+        # (`DemosClient::CRAWL_DELAY_S`). Sekcia preto ukazuje STAV, nie
+        # vymyslene polia, a vedie tam, kde vazba naozaj zije.
+        def demos_info
+          { 'crawl_delay_s' => demos_delay, 'stale_days' => SupplierSettings.scalar(SupplierSettings.active, 'stale_days') }
+        end
+
+        def demos_delay
+          return nil unless defined?(DemosClient) && DemosClient.const_defined?(:CRAWL_DELAY_S)
+
+          DemosClient::CRAWL_DELAY_S
+        rescue StandardError
+          nil
+        end
+
+        # Sekcia `about` — „O plugine". JEDEN OBSAH, DVA VSTUPY (kontrakt Š19):
+        # markup stavia ZDIELANY `ui/js/about.js`, ktory pouziva aj koliesko
+        # Inspectora. Server dava LEN data (verzia + kde ziju nastavenia).
+        def about_info
+          { 'version' => Engine::VERSION, 'dir' => appdata_dir }
+        end
+
+        def appdata_dir
+          return SupplierSettings.dir if SupplierSettings.respond_to?(:dir)
+
+          ''
+        rescue StandardError
+          ''
+        end
+
+        # --- akcie -----------------------------------------------------------
 
         def handle_reload
           SupplierSettings.reload!
-          push_state
+          # Rozpisane hodnoty zanikaju AZ TU (klient si ich cez pushe drzi —
+          # plny push chodi pri kazdej zmene modelu, nielen po ulozeni).
+          js('SS.saved()')
+          refresh_studio
           set_status('Nastavenia načítané nanovo zo súboru.')
         end
 
-        # Ulozenie: revizia -> patch (validate-all) -> refresh okna + Vyroby.
+        # Ulozenie: revizia -> patch (validate-all) -> prepocet Studia.
         def handle_save(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           current = SupplierSettings.revision(SupplierSettings.active)
           if data['revision'].to_s != current
-            push_state
+            # Review #227 P1: klient drzi reviziu PRIPNUTU na stav, nad ktorym
+            # zacal pisat — inak by plny push reviziu omladil, zamok by presiel
+            # a cudzia zmena by zmizla bez slova. A odmietnutie MUSI rozpisane
+            # hodnoty ZAHODIT (`SS.saved()`, presne ako to robilo okno): bez toho
+            # by prezili push, prekryli cerstve cisla a DRUHY klik by ich ticho
+            # prepisal — hlaska pritom tvrdi, ze formular je nacitany nanovo.
+            # Hlaska a spravanie sa musia zhodovat (review #227 P1-2).
+            js('SS.saved()')
+            refresh_studio
             return set_status('Nastavenia sa medzitým zmenili — formulár je načítaný nanovo. ' \
                               'Skontroluj hodnoty a ulož znova.', true)
           end
@@ -138,24 +182,58 @@ module Noxun
           # prisiel o vsetky rozpisane hodnoty a videl by len hlasku. Nic sa
           # nezapisalo (patch je all-or-nothing), takze staci chybu ukazat.
           return set_status("Neuložené: #{Array(errors).join(' · ')}", true) unless ok
-          push_state
-          # Sadzby su vstup rozpoctu — otvorene ŠTÚDIO musi ukazat nove cisla.
-          # ŠT-1c PR B3: vetva okna Vyroba tu zanikla spolu s oknom.
-          StudioDialog.refresh_if_open if defined?(StudioDialog) # ST-1a
-          # ŠT-1c PR B1: rozpočet žije v sekcii Rozpočet okna ŠTÚDIO.
-          set_status('Nastavenia uložené. Rozpočet v Štúdiu je prepočítaný.')
+
+          # POTVRDENY zapis — az teraz smie klient zahodit rozpisane hodnoty.
+          js('SS.saved()')
+          # Sadzby su vstup rozpoctu — cisla Studia MUSIA byt cerstve. Je to TA
+          # ISTA refresh cesta, aku mal satelit (kontrakt „KAZDE okno s cislami
+          # zakazky je vo VSETKYCH refresh cestach"), len bezi zvnutra okna.
+          refresh_studio
+          set_status('Nastavenia uložené. Rozpočet je prepočítaný.')
+        end
+
+        # --- Ruby -> JS -------------------------------------------------------
+
+        # Prijimac `SS.*` zije v `ui/js/studio_settings.js`, `#status` je uzol
+        # `studio.html`. Text sklada SERVER (jedna autorita).
+        def status_script(msg, error = false)
+          "SS.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})"
         end
 
         def set_status(msg, error = false)
-          js("SS.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})")
+          js(status_script(msg, error))
         end
 
+        # Odpoved ide TOMU, KTO sa pytal. Sink zije PRESNE jeden synchronny
+        # callback sekcie (`with_client`); mimo neho je adresat jediny mozny:
+        # okno Studio.
         def js(script)
-          return unless @dialog && @dialog.visible?
+          sink = @client_sink
+          return sink.call(script) if sink
 
-          @dialog.execute_script(script)
+          studio_js(script)
+        end
+
+        # Kanal SEKCIE. `js` Studia je private (patri jeho kanalu), preto tenky
+        # verejny most `settings_js` — vzor `StudioDialog.rules_js`.
+        def studio_js(script)
+          return false unless defined?(StudioDialog)
+
+          StudioDialog.settings_js(script)
         rescue StandardError => e
-          Engine.log_error(e, 'SupplierSettingsDialog.js')
+          Engine.log_error(e, 'SupplierSettingsDialog.studio_js')
+          false
+        end
+
+        # Plny push Studia: sadzby menia CISLA zakazky (rozpocet, cenova
+        # ponuka), takze generacia sa ZDVIHA — nie je to mutacia rozpoctu, ale
+        # zmena vstupu vypoctu (vzor `price_refresh_after_proc`).
+        def refresh_studio(bump: true)
+          return unless defined?(StudioDialog)
+
+          StudioDialog.refresh_if_open(bump: bump)
+        rescue StandardError => e
+          Engine.log_error(e, 'SupplierSettingsDialog.refresh_studio')
         end
       end
     end

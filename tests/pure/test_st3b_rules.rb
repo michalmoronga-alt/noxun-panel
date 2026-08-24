@@ -59,9 +59,10 @@ NxTest.test('ŠT-3b-1: okno Pravidla kovania ZANIKLO — a s nim VSETKY jeho vst
   end
   NxTest.refute(ST3B_RULES_CODE.match?(/def show\b/), 'a `show` tiez')
   st = Noxun::Engine::StudioDialog
-  NxTest.refute(st::WINDOW_BRIDGES.key?('rules'),
+  NxTest.refute(st.const_defined?(:WINDOW_BRIDGES),
                 'jeden kluc nesmie byt zaroven sekcia aj premostenie')
-  NxTest.assert(st::BRIDGE_STATUS['rules'].to_s.empty?, 'a nesmie mat ani hlasku premostenia')
+  # ŠT-4a: cela tabulka hlasok premosteni ZANIKLA s poslednym satelitom.
+  NxTest.refute(st.const_defined?(:BRIDGE_STATUS), 'a nesmie existovat ani tabulka hlasok premosteni')
   nav = ST3B_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s
   item = nav[/\{ id: 'rules'.*?\},/m].to_s
   NxTest.assert(!item.empty?, 'polozka navigacie sa nasla')

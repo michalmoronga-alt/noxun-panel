@@ -199,7 +199,12 @@ eq(NX_TYPE_LABEL.upper, 'Horná', 'slovensky nazov typu zije na JEDNOM mieste');
   ok(cfg.indexOf('id="cfg_theme"') > 0, 'koliesko ma sekciu Vzhľad');
   ok(cfg.indexOf('id="cfg_series"') > 0, 'koliesko ma sekciu Rozmerové rady');
   ok(cfg.indexOf('id="cfg_about"') > 0, 'koliesko ma sekciu O plugine');
-  ok(cfg.indexOf('id="cfgVersion"') > 0, 'verzia v koliesku ide z Ruby (ziadny hardcode)');
+  // ŠT-4a: obsah „O plugine" (aj `#cfgVersion`) stavia ZDIELANY js/about.js —
+  // ten isty, ktory kresli sekciu `about` Studia (kontrakt Š19). V HTML ostal
+  // len prazdny hostitel, takze verzia sa hlada TAM, kde odteraz vznika.
+  ok(cfg.indexOf('id="cfgAbout"') > 0, 'koliesko ma hostitela pre zdielany obsah');
+  const about = fs.readFileSync(path.join(UI, 'js', 'about.js'), 'utf8');
+  ok(about.indexOf('id="cfgVersion"') > 0, 'verzia v koliesku ide z Ruby (ziadny hardcode)');
   NXDim.KEYS.forEach(function(k){
     ok(cfg.indexOf('id="ser_' + k + '"') > 0, 'editor ma pole pre rad ' + k);
   });

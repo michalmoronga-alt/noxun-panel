@@ -66,9 +66,10 @@ end
 
 NxTest.test('ŠT-3a-1: premostenie navigacie `hw` ZANIKLO, ale OKNO zije dalej') do
   st = Noxun::Engine::StudioDialog
-  NxTest.refute(st::WINDOW_BRIDGES.key?('hw'),
+  NxTest.refute(st.const_defined?(:WINDOW_BRIDGES),
                 'jeden kluc nesmie byt zaroven sekcia aj premostenie navigacie')
-  NxTest.assert(st::BRIDGE_STATUS['hw'].to_s.empty?, 'a nesmie mat ani hlasku premostenia')
+  # ŠT-4a: cela tabulka hlasok premosteni ZANIKLA s poslednym satelitom.
+  NxTest.refute(st.const_defined?(:BRIDGE_STATUS), 'a nesmie existovat ani tabulka hlasok premosteni')
   nav = ST3A_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s
   item = nav[/\{ id: 'hw'.*?\},/m].to_s
   NxTest.assert(!item.empty?, 'polozka navigacie sa nasla')
