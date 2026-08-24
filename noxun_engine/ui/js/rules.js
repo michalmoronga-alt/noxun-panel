@@ -78,6 +78,14 @@
       if (!e) return;
       e.textContent = msg;
       e.className = err ? 'err' : 'ok';
+    },
+    // ŠT-3b-2b (review #222 P1): LACNE ECHO sekcie. Odmietnutý zápis nič
+    // nezmenil, takže si nepýta plný prepočet okna — ten totiž beží cez zber
+    // modelu, a ten deduplikuje ID kópií, čiže by odmietnutý klik ZAPÍSAL do
+    // modelu (a pridal krok Späť) presne v scenári, kde hláška tvrdí opak.
+    // Kanál je ten istý payload sekcie, len bez zdvihu generácie okna.
+    setSection: function(r){
+      rdApplyState(r);
     }
   };
   if (typeof window !== 'undefined') window.RD = RD;
@@ -106,6 +114,11 @@
   // rozist (rovnaky kontrakt ako `role_label` v Kusovniku).
   function rdIco(n){ return '<svg class="ic" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; }
 
+  // Argument do `onclick` — VZDY cez JSON.stringify + escape (vzor
+  // `mdWhereEyeHtml`): nazvy skriniek a kluce dielcov su text z modelu, ktory
+  // pise pouzivatel, a surovo vlozeny by rozbil atribut aj celu sekciu.
+  function rdArg(v){ return rdEsc(JSON.stringify(String(v == null ? '' : v))); }
+
   // Jeden riadok: nazov · popis · hodnota (+ oko pri override riadku).
   function rdRowHtml(r, over){
     var h = '<div class="rdrow' + (over ? ' rdovr' : '') + '">' +
@@ -119,9 +132,17 @@
       // (owner_id, part_key), server si dielce dohladá v ČERSTVOM zbere.
       h += '<span class="rdact"><button type="button" class="rdeye" title="Označiť v modeli"' +
         ' aria-label="Označiť v modeli" onclick="rdSelectOverride(' +
-        rdEsc(JSON.stringify(String(r.owner_id == null ? '' : r.owner_id))) + ', ' +
-        rdEsc(JSON.stringify(String(r.part_key == null ? '' : r.part_key))) + ')">' +
-        rdIco('eye') + '</button></span>';
+        rdArg(r.owner_id) + ', ' + rdArg(r.part_key) + ')">' +
+        rdIco('eye') + '</button>' +
+        // ŠT-3b-2b: „vrátiť na pravidlo" (mockup Š17). Potvrdenie sa NEPYTA —
+        // poistkou je JEDEN krok Spat; otazka pred kazdym klikom by z opravy
+        // urobila obrad. Adresa riadku ide na server, ktory si skrinku dohlada
+        // podla identity (ziadne pids ani zavislost na oznaceni v modeli).
+        '<button type="button" class="rdundo" title="Vrátiť na pravidlo — jeden krok Späť to vráti"' +
+        ' aria-label="Vrátiť na pravidlo" onclick="rdResetOverride(' +
+        rdArg(r.kind) + ', ' + rdArg(r.owner_id) + ', ' + rdArg(r.part_key) + ', ' +
+        rdArg(r.generic_type) + ', ' + rdArg(r.rule_id) + ')">' +
+        rdIco('rotate-ccw') + '</button></span>';
     }
     return h + '</div>';
   }
@@ -178,6 +199,38 @@
                                                     part_key: String(partKey || '') } }));
   }
   if (typeof window !== 'undefined') window.rdSelectOverride = rdSelectOverride;
+
+  // ŠT-3b-2b: „vrátiť na pravidlo". Mena callbackov su KANALOVE konstanty
+  // (nie preklad ani domenovy text) — klient ich nesklada z dat servera,
+  // aby sa z payloadu nedalo zavolat nic ine; co sa smie zavolat, aj tak
+  // rozhoduje uzavrety whitelist na serveri.
+  var RD_RESET_ACTION = { abs: 'reset_abs_override', hw: 'reset_hw_override' };
+
+  function rdResetOverride(kind, ownerId, partKey, genericType, ruleId){
+    var name = RD_RESET_ACTION[String(kind)];
+    var st = (typeof ST === 'undefined') ? null : ST;
+    // Klik, ktorý sa nemá kam poslať, NESMIE mlčať (review #222 NOTE): riadok
+    // by ostal jantárový a používateľ by veril, že sa niečo stalo. Rozlišujú
+    // sa DVE veci — neznámy druh riadku (chyba dát) a nedostupný kanál okna.
+    if (!name){
+      RD.setStatus('Tento riadok sa vrátiť na pravidlo nedá — obnov sekciu a skús znova.', true);
+      return;
+    }
+    if (!st || typeof window === 'undefined' || !window.sketchup || !sketchup[name]){
+      RD.setStatus('Okno stratilo spojenie so SketchUpom — zavri a otvor Štúdio znova.', true);
+      return;
+    }
+    // Zapis nesie OBE identity: generaciu okna (klik zo zastaraneho zoznamu
+    // sa nesmie vykonat) a dokument (panel/sekcia z ineho .skp nesmie zapisat).
+    sketchup[name](JSON.stringify({ gen: st.gen || 0,
+                                    model_guid: (RD_META && RD_META.model_guid) || '',
+                                    owner_id: String(ownerId || ''),
+                                    part_key: String(partKey || ''),
+                                    generic_type: String(genericType || ''),
+                                    rule_id: String(ruleId || '') }));
+    RD.setStatus('Vraciam na pravidlo…', false);
+  }
+  if (typeof window !== 'undefined') window.rdResetOverride = rdResetOverride;
 
   function rdSrcLine(){
     return 'zdroj: ' + (RD_META.source === 'project'
@@ -478,7 +531,11 @@
                        // exportuju sa ZAMERNE: „push nezmaze rozpisany formular,
                        // ale jantarove riadky obnovi" sa inak overit neda.
                        rdOvrHtml: rdOvrHtml, rdAbsRulesHtml: rdAbsRulesHtml,
-                       rdRenderExtra: rdRenderExtra, rdSelectOverride: rdSelectOverride };
+                       rdRenderExtra: rdRenderExtra, rdSelectOverride: rdSelectOverride,
+                       // ŠT-3b-2b: zapisovy klik — testuje sa, ze nesie OBE
+                       // identity (generacia okna + dokument) a ze meno akcie
+                       // vybera KLIENT z uzavretej mapy, nie payload servera.
+                       rdResetOverride: rdResetOverride };
   }
   // ŠT-3b-1: `sketchup.ready('')` tu ZANIKLO. V okne „Pravidlá kovania" bol
   // tento subor POSLEDNY a jeho `ready` znamenal „HTML je nacitane"; okno

@@ -328,9 +328,10 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
      'a hint priznáva, že akcia „vrátiť na pravidlo" ešte nie je');
   ok(/#i-pencil/.test(h) && !/#i-alert/.test(h),
      'ikona je ceruzka (ručný zásah), NIE výstraha — riadok nehovorí o chybe');
-  ok(/#i-eye/.test(h), 'oko je jediná akcia riadku v tejto dávke');
-  ok(!/rotate-ccw/.test(h),
-     'akcia „vrátiť na pravidlo" tu NIE JE ani ako mŕtve tlačidlo (príde v ďalšej dávke)');
+  ok(/#i-eye/.test(h), 'oko je akcia riadku');
+  // ŠT-3b-2b: k oku pribudla šípka „vrátiť na pravidlo" — detaily nižšie
+  // v sekcii 3b-2b (adresa, obe identity, uzavretá mapa mien callbackov).
+  ok(/#i-rotate-ccw/.test(h), 'a vedľa neho šípka „vrátiť na pravidlo"');
   // Argumenty idú do `onclick` cez `JSON.stringify` + escape (vzor `mdWhereEyeHtml`)
   // — v HTML sú preto `&quot;`, nie surové úvodzovky.
   ok(/rdSelectOverride\(&quot;CAB-001&quot;, &quot;zone:z1\/shelf:1&quot;\)/.test(h),
@@ -432,4 +433,128 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
      'override kovania na skrinke posiela PRÁZDNY kľúč (server označí korpus)');
 })();
 
-console.log(`OK ${n} kontrol (ŠT-3b-1/3b-2a sekcia Pravidlá)`);
+// ============ ŠT-3b-2b: „vrátiť na pravidlo" (zápis zo sekcie) =============
+//
+// Prečo sú to testy a nie klikanie:
+//   1. Je to ZÁPIS do modelu spustený z riadku zoznamu. Klik musí niesť OBE
+//      identity (generáciu okna aj dokument) — bez nich by kliknutie do starého
+//      zoznamu prestavalo skrinku, ktorú používateľ na obrazovke ani nevidí.
+//   2. Meno callbacku vyberá KLIENT z uzavretej mapy. Keby ho skladal z dát
+//      riadku, payload by rozhodoval, ktorá serverová cesta sa zavolá.
+//   3. Riadok musí mať šípku hneď vedľa oka a tooltip, ktorý povie, že to ide
+//      vrátiť jedným krokom Späť (potvrdzovací dialóg zámerne nie je).
+
+(function(){
+  const g = { total: 1, title: 'T', note: '', more_text: '',
+              groups: [{ owner_id: 'CAB-001', title: 'CAB-001',
+                         rows: [{ kind: 'abs', owner_id: 'CAB-001', part_key: 'zone:z1/shelf:1',
+                                  label: 'Polica 1', desc: 'ručne nastavené hrany',
+                                  value: 'Predná: bez olepu' }] }] };
+  const h = R.rdOvrHtml(g);
+  ok(/#i-rotate-ccw/.test(h), 'jantárový riadok má šípku „vrátiť na pravidlo" (mockup Š17)');
+  ok(/title="Vrátiť na pravidlo[^"]*Späť/.test(h),
+     'a tooltip hovorí, že jeden krok Späť to vráti (preto sa nepýta potvrdenie)');
+  ok(h.indexOf('#i-eye') < h.indexOf('#i-rotate-ccw'),
+     'poradie akcií: najprv pozrieť, až potom meniť');
+  ok(/rdResetOverride\(&quot;abs&quot;, &quot;CAB-001&quot;, &quot;zone:z1\/shelf:1&quot;/.test(h),
+     'klik nesie DRUH riadku a jeho adresu (escapované — texty sú z modelu)');
+
+  const hw = R.rdOvrHtml({ total: 1, title: 'T', note: '', more_text: '',
+                           groups: [{ owner_id: 'CAB-002', title: 'CAB-002',
+                                      rows: [{ kind: 'hw', owner_id: 'CAB-002', part_key: '',
+                                               generic_type: 'hinge', rule_id: 'zavesy-podla-vysky',
+                                               label: 'Závesy', desc: 'ručne nastavené',
+                                               value: 'počet 6 ks' }] }] });
+  ok(/&quot;hinge&quot;, &quot;zavesy-podla-vysky&quot;/.test(hw),
+     'kovanie posiela aj TROJICU identity (dve pravidlá s rovnakým výstupom sú samostatné)');
+})();
+
+(function(){
+  SENT.length = 0;
+  global.ST = null;
+  R.rdResetOverride('abs', 'CAB-001', 'p1', '', '');
+  eq(SENT.length, 0, 'bez stavu okna sa NEZAPISUJE nič');
+
+  global.ST = { gen: 12 };
+  R.rdResetOverride('abs', 'CAB-001', 'p1', '', '');
+  eq(SENT.length, 1, 'klik posiela práve jednu žiadosť');
+  eq(SENT[0][0], 'reset_abs_override', 'ABS riadok volá ABS cestu');
+  const p = JSON.parse(SENT[0][1]);
+  eq(p.gen, 12, 'nesie generáciu okna — klik zo zastaraného zoznamu server odmietne');
+  eq(p.owner_id, 'CAB-001', 'a adresu skrinky');
+  eq(p.part_key, 'p1', 'aj dielca');
+  ok('model_guid' in p, 'a identitu dokumentu (zápis z iného .skp sa odmietne)');
+
+  SENT.length = 0;
+  R.rdResetOverride('hw', 'CAB-002', '', 'hinge', 'zavesy');
+  eq(SENT[0][0], 'reset_hw_override', 'riadok kovania volá kovaniu cestu');
+  const q = JSON.parse(SENT[0][1]);
+  eq([q.generic_type, q.rule_id], ['hinge', 'zavesy'], 's celou trojicou identity');
+  eq(q.part_key, '', 'override na skrinke posiela PRÁZDNY kľúč dielca');
+
+  SENT.length = 0;
+  R.rdResetOverride('cokolvek_ine', 'CAB-001', 'p1', '', '');
+  eq(SENT.length, 0,
+     'neznámy druh riadku NEZAVOLÁ nič — meno callbacku vyberá klient z uzavretej mapy, nie payload');
+})();
+
+// ---- ŠT-3b-2b, review #222: echo sekcie + klik, ktorý nemá kam ísť --------
+//
+// 1. Odmietnutý zápis prichádza LACNÝM ECHOM (`RD.setSection`), nie plným
+//    pushom okna — ten totiž beží cez zber modelu, ktorý prečísluje ID kópií,
+//    takže by odmietnutý klik ZAPÍSAL do modelu. Echo musí sekciu obnoviť
+//    rovnako ako plný push (vrátane jantárových riadkov).
+// 2. Klik, ktorý sa nemá kam poslať, NESMIE mlčať — riadok by ostal jantárový
+//    a používateľ by veril, že sa niečo stalo.
+
+(function(){
+  const base = { version: '0.7.64', model_guid: 'G9', source: 'project', cabinets: 1,
+                 rules: [{ kind: 'fixed', output: 'leg', enabled: true, quantity: 4,
+                           applies_to: { role: 'cabinet' } }],
+                 abs: { rows: [{ role: 'shelf', label: 'Polica', desc: 'Predná', value: '1,0 mm' }],
+                        source: 'zdroj: globálne predvoľby', hint: 'h' },
+                 overrides: { abs: { total: 1, title: 'T', note: '', more_text: '',
+                                     groups: [{ owner_id: 'CAB-007', title: 'CAB-007',
+                                                rows: [{ kind: 'abs', owner_id: 'CAB-007',
+                                                         part_key: 'p1', label: 'Polica 7',
+                                                         desc: 'ručne nastavené hrany',
+                                                         value: 'Predná: bez olepu' }] }] },
+                              hardware: { total: 0, groups: [] } } };
+  ELS.secbody.innerHTML = '';
+  R.rdApplyState(base);
+  R.rulesRenderBody();
+  ok(/Polica 7/.test(ELS.rdAbsOvr.innerHTML), 'východiskový stav sekcie je vykreslený');
+
+  // Server odmietol zápis a poslal echo s NEZMENENÝMI pravidlami, ale
+  // s obnoveným zoznamom (riadok medzitým zanikol inou cestou).
+  const echo = JSON.parse(JSON.stringify(base));
+  echo.overrides.abs = { total: 0, groups: [] };
+  R.RD.setSection(echo);
+  eq(ELS.rdAbsOvr.innerHTML, '',
+     'echo obnoví jantárové riadky rovnako ako plný push (bez neho by riadok „visel")');
+
+  // A rozpísaný formulár pravidiel pritom prežije — echo nie je re-render formulára.
+  ELS.rulesBox.innerHTML = 'ROZPÍSANÉ';
+  R.RD.setSection(echo);
+  eq(ELS.rulesBox.innerHTML, 'ROZPÍSANÉ', 'formulár kovania echo NEPREKRESLÍ');
+})();
+
+(function(){
+  SENT.length = 0;
+  ELS.status._text = '';
+  global.ST = { gen: 3 };
+  R.rdResetOverride('neznamy_druh', 'CAB-001', 'p1', '', '');
+  eq(SENT.length, 0, 'neznámy druh riadku nič nepošle');
+  ok(/nedá/.test(ELS.status.textContent), 'ale POVIE to — mlčať by znamenalo „asi sa to podarilo"');
+
+  const prevSk = global.window.sketchup;
+  global.window.sketchup = undefined;
+  global.sketchup = undefined;
+  ELS.status._text = '';
+  R.rdResetOverride('abs', 'CAB-001', 'p1', '', '');
+  ok(/spojenie/.test(ELS.status.textContent), 'a stratený kanál okna tiež');
+  global.window.sketchup = prevSk;
+  global.sketchup = prevSk;
+})();
+
+console.log(`OK ${n} kontrol (ŠT-3b-1/3b-2a/3b-2b sekcia Pravidlá)`);

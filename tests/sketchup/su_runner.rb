@@ -6999,11 +6999,21 @@ module NoxunSuRunner
     ok('ŠT-3b-1: NASADENY plugin uz NEOBSAHUJE rules.html', !File.exist?(html))
     ok('ŠT-3b-1: sekcia `rules` je v zozname sekcii Studia',
        e::StudioDialog::SECTIONS.include?('rules'))
-    ok('ŠT-3b-1: whitelist sekcie pozna PRESNE tri akcie okna',
-       rd::SECTION_ACTIONS == %w[save_rules load_global merge_seed])
+    # ŠT-3b-2b (F17): whitelist je UZAVRETY a rovnost je PRESNA — nova akcia
+    # sa doň smie dostat len vedome (kazda z nich zapisuje do modelu).
+    ok('ŠT-3b-2b: whitelist sekcie pozna PRESNE tri akcie okna + dva resety',
+       rd::SECTION_ACTIONS == %w[save_rules load_global merge_seed
+                                 reset_abs_override reset_hw_override])
 
     begin
       st3b_scenar(model, rd)
+    ensure
+      cleanup(model)
+    end
+
+    # ŠT-3b-2b: „vrátiť na pravidlo" — zapisove cesty sekcie.
+    begin
+      st3b2_scenar(model, rd)
     ensure
       cleanup(model)
     end
@@ -7151,6 +7161,224 @@ module NoxunSuRunner
       ok('ŠT-3b-1 (e): a NIC sa nezapisalo (v projekte ostala cudzia hodnota)',
          st3b_qty(model, output).to_i == 9)
       Sketchup.undo # cudzia zmena prec
+    end
+  end
+
+  # ==========================================================================
+  # ŠT-3b-2b — „VRÁTIŤ NA PRAVIDLO" (jantarove riadky sekcie Pravidlá)
+  # ==========================================================================
+  #
+  # Headless sada overi tvar payloadu a mutacie configu; TU sa meria to, co sa
+  # inak overit NEDA:
+  #   1) po klike naozaj ZMIZNE kluc `edges` z configu SKRINKY a dielec je
+  #      PRESTAVANY podla pravidla (snapshot na entite — to, co ide do vyroby),
+  #   2) je to PRESNE JEDEN krok Spat, ktory vrati override AJ geometriu,
+  #   3) kovanie: reset vrati pocet z pravidla, tiez na jeden Spat,
+  #   4) guardy: cudzi dokument, zastarana generacia okna a NEJEDNOZNACNE
+  #      `cabinet_id` (cerstva kopia pred dedup tikom) zapis ODMIETNU a
+  #      NIC v modeli nezmenia.
+
+  # Pocet OLEPENYCH hran v snapshote dielca (to, co ide do kusovnika a VEPO).
+  def st3b2_taped(part)
+    edges = (e::Store.config(part) || {})['edges']
+    return 0 unless edges.is_a?(Hash)
+
+    %w[L1 L2 W1 W2].count { |c| !edges[c].to_s.strip.empty? }
+  end
+
+  def st3b2_part_ov(inst, pkey)
+    ov = (e::Store.config(inst) || {})['part_overrides']
+    ov.is_a?(Hash) ? ov[pkey] : nil
+  end
+
+  # Vnoreny vyrobny dielec, pre ktory ma ROLA nejake ABS pravidlo (inak by sa
+  # „prestavba podla pravidla" nedala odmerat — vysledok by bol prazdny tak ci tak).
+  def st3b2_pick_part(inst)
+    inst.definition.entities.grep(Sketchup::ComponentInstance).find do |p|
+      next false unless e::Store.kind(p) == 'part'
+      next false unless e::Store.get(p, 'manufactured') == true
+
+      !e::AbsRules.thicknesses_for(e::Store.get(p, 'role').to_s).empty?
+    end
+  end
+
+  ST3B2_DECOR = 'SU ST3B2 DEKOR'
+
+  def st3b2_scenar(model, rd)
+    # Skrinka musi stat na dekore, ku ktoremu katalog MA pasku — inak by
+    # „prestavba podla pravidla" nemala co olepit a scenar by meral prazdno
+    # (prve kolo tohto testu presne tak dopadlo). Dekor sa preto doseje
+    # (vzor `sync_seed_decors` / `run_st2d`) a na konci zmaze.
+    e::Materials.load
+    sync_purge_test_decors(ST3B2_DECOR)
+    seed_ok, seed = e::Materials.add_decor_batch(
+      'batch_schema' => 3, 'decor' => ST3B2_DECOR, 'type' => 'DTDL', 'grain' => 'length',
+      'sheet_variants' => [{ 'thickness' => 18.0, 'structure' => 'PW' }],
+      'edge_variants' => [{ 'width' => 23.0, 'thickness' => 1.0, 'structure' => 'PW' }]
+    )
+    ok("ŠT-3b-2b: seed dekoru s paskou (#{seed_ok ? 'ok' : seed.inspect})", seed_ok)
+    mat = seed_ok ? Array(seed['sheets']).first.to_s : nil
+
+    inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
+                                            'height' => 720.0, 'depth' => 560.0,
+                                            'material_id' => mat })
+    return ok('ŠT-3b-2b: vlozenie skrinky pre scenar resetu', false) unless inst
+
+    cid = e::Store.get(inst, 'cabinet_id').to_s
+    part = st3b2_pick_part(inst)
+    return ok('ŠT-3b-2b: skrinka ma dielec s ABS pravidlom', false) if part.nil?
+
+    pkey = e::Store.get(part, 'part_key').to_s
+    abs_id, = e::Panel.bulk_abs_for(e::Store.config(part) || {})
+    if abs_id.nil?
+      ok('ŠT-3b-2b: picker vidi seednutu pasku k dekoru dielca', false)
+    else
+      st3b2_abs(model, rd, inst, cid, pkey, abs_id)
+    end
+    st3b2_hw(model, rd, inst, cid)
+  ensure
+    cleanup(model) # model PRED katalogom — pouzity material by sa mazat nedal
+    sync_purge_test_decors(ST3B2_DECOR)
+  end
+
+  # --- ABS: rucny olep 4 hran -> spat na pravidlo ---------------------------
+  def st3b2_abs(model, rd, inst, cid, pkey, abs_id)
+    params = e::Panel.existing_params(inst)
+    (params['part_overrides'] ||= {})[pkey] = { 'edges' => e::AbsRules.uniform_edges(abs_id) }
+    e::CabinetBuilder.rebuild(model, inst, params, op_name: 'SU-TEST st3b2 rucny olep')
+    part = e::Panel.find_part_by_role_key(inst, pkey)
+    before = st3b2_taped(part)
+    ok("ŠT-3b-2b (a): fixture — dielec ma RUCNY olep vsetkych 4 hran (#{before})", before == 4)
+
+    rec = []
+    sink = ->(script) { rec << script.to_s }
+    st3a_with_fake_studio(rec) do
+      e::StudioDialog.send(:push_state)
+      gen = e::StudioDialog.generation
+
+      # --- guardy: cudzi dokument a zastarana generacia -------------------
+      rec.clear
+      rd.dispatch('reset_abs_override',
+                  { 'gen' => gen, 'model_guid' => 'CUDZI-DOKUMENT',
+                    'owner_id' => cid, 'part_key' => pkey }.to_json, sink)
+      ok('ŠT-3b-2b (b): zapis z INEHO dokumentu sa ODMIETNE',
+         rec.any? { |x| x.include?('prepol') })
+      ok('ŠT-3b-2b (b): a NIC sa nezmenilo (override stale plati)',
+         st3b2_part_ov(inst, pkey).is_a?(Hash) && st3b2_part_ov(inst, pkey)['edges'].is_a?(Hash))
+
+      rec.clear
+      rd.dispatch('reset_abs_override',
+                  { 'gen' => gen + 99, 'model_guid' => model.guid.to_s,
+                    'owner_id' => cid, 'part_key' => pkey }.to_json, sink)
+      ok('ŠT-3b-2b (b): klik zo ZASTARANEHO zoznamu sa ODMIETNE',
+         rec.any? { |x| x.include?('prepočítal') })
+
+      # --- NEJEDNOZNACNA adresa: dve skrinky s tym istym cabinet_id -------
+      #
+      # POZOR na poradie (prve kolo tohto scenara na tom padlo): `push_state`
+      # spusta `fresh_collect`, a v nom DEDUP — kopii by hned prideli nove id
+      # a guard by nemal co odmietnut. Generacia sa vytvorenim kopie nemeni,
+      # takze sa pouzije tá, ktoru okno uz ma. Kopia sa upratuje EŠTE PRED
+      # samotnym resetom, aby `Sketchup.undo` nizsie vracal RESET, nie mazanie.
+      dup = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 400.0,
+                                             'height' => 720.0, 'depth' => 560.0 })
+      if dup
+        dup_orig = e::Store.get(dup, 'cabinet_id').to_s
+        model.start_operation('SU-TEST st3b2 duplicitne id', true)
+        e::Store.write(dup, 'cabinet_id' => cid)
+        model.commit_operation
+        rec.clear
+        rd.dispatch('reset_abs_override',
+                    { 'gen' => gen, 'model_guid' => model.guid.to_s,
+                      'owner_id' => cid, 'part_key' => pkey }.to_json, sink)
+        ok('ŠT-3b-2b (c): NEJEDNOZNACNE cabinet_id (kopia pred dedup tikom) zapis ODMIETNE',
+           rec.any? { |x| x.include?('viac kusov') })
+        ok('ŠT-3b-2b (c): a NIC sa nezapisalo — ziadna „vezmi prvu"',
+           st3b2_part_ov(inst, pkey).is_a?(Hash) && st3b2_part_ov(inst, pkey)['edges'].is_a?(Hash))
+        # Review #222 P1: odmietnutie NESMIE SIAHNUT NA MODEL. Plny push okna
+        # by v tomto momente spustil zber a v nom DEDUP — kopii by rovno pridelil
+        # nove cislo (a pridal krok Spat), kym hlaska tvrdi „nič sa nezmenilo".
+        ok("ŠT-3b-2b (c): odmietnutie kopii NEPRECISLOVALO (#{e::Store.get(dup, 'cabinet_id')})",
+           e::Store.get(dup, 'cabinet_id').to_s == cid)
+        # A merany dokaz, ze nepribudol ANI JEDEN krok Spat: prvy Spat vracia
+        # nase premenovanie kopie, nie nejaky cudzi zapis navrchu.
+        Sketchup.undo
+        ok("ŠT-3b-2b (c): a NEPRIDALO ziadny krok Spat (1x Spat vratil kopii #{dup_orig})",
+           dup.valid? && e::Store.get(dup, 'cabinet_id').to_s == dup_orig)
+        model.start_operation('SU-TEST st3b2 upratanie kopie', true)
+        dup.erase! if dup.valid?
+        model.commit_operation
+      end
+
+      # --- (d) SAM RESET: kluc zmizol + skrinka prestavana ----------------
+      rec.clear
+      e::StudioDialog.send(:push_state)
+      rd.dispatch('reset_abs_override',
+                  { 'gen' => e::StudioDialog.generation, 'model_guid' => model.guid.to_s,
+                    'owner_id' => cid, 'part_key' => pkey }.to_json, sink)
+      ok('ŠT-3b-2b (d): reset povedal VYSLEDOK (co teraz plati podla pravidla)',
+         rec.any? { |x| x.include?('späť na pravidlo') && x.include?('podľa pravidla') })
+      after_ov = st3b2_part_ov(inst, pkey)
+      ok('ŠT-3b-2b (d): kluc `edges` je z configu SKRINKY PREC',
+         after_ov.nil? || !after_ov['edges'].is_a?(Hash))
+      after_part = e::Panel.find_part_by_role_key(inst, pkey)
+      after = after_part ? st3b2_taped(after_part) : -1
+      ok("ŠT-3b-2b (d): a dielec je PRESTAVANY podla pravidla (4 -> #{after})",
+         after >= 0 && after < 4)
+
+      # --- (e) JEDEN Spat vrati override AJ geometriu ---------------------
+      Sketchup.undo
+      back_ov = st3b2_part_ov(inst, pkey)
+      ok('ŠT-3b-2b (e): 1x Spat vratil rucny override do configu',
+         back_ov.is_a?(Hash) && back_ov['edges'].is_a?(Hash))
+      back_part = e::Panel.find_part_by_role_key(inst, pkey)
+      ok('ŠT-3b-2b (e): a s nim aj GEOMETRIU (snapshot dielca ma zase 4 hrany)',
+         back_part && st3b2_taped(back_part) == 4)
+    end
+  end
+
+  # --- Kovanie: rucny pocet -> spat na pravidlo -----------------------------
+  def st3b2_hw(model, rd, inst, cid)
+    target = st3b_pick_rule(model, inst)
+    return info('ŠT-3b-2b: skrinka nema `fixed` pravidlo kovania — HW cast sa preskakuje') if target.nil?
+
+    output = target['output'].to_s
+    item = Array((e::Store.config(inst) || {})['hardware']).find { |h| st3b_hw_type(h) == output }
+    return info('ŠT-3b-2b: polozka kovania sa nenasla — HW cast sa preskakuje') if item.nil?
+
+    gt = st3b_hw_type(item)
+    rid = item['rule_id'].to_s
+    owner = item['owner_part_key']
+    base = st3b_hw_count(inst, output)
+
+    params = e::Panel.existing_params(inst)
+    params['hardware_overrides'] = [{ 'owner_part_key' => owner, 'generic_type' => gt,
+                                      'rule_id' => rid, 'quantity' => base + 5 }]
+    e::CabinetBuilder.rebuild(model, inst, params, op_name: 'SU-TEST st3b2 rucny pocet')
+    manual = st3b_hw_count(inst, output)
+    ok("ŠT-3b-2b (f): fixture — rucny pocet kovania plati (#{base} -> #{manual})", manual > base)
+
+    rec = []
+    sink = ->(script) { rec << script.to_s }
+    st3a_with_fake_studio(rec) do
+      e::StudioDialog.send(:push_state)
+      rec.clear
+      rd.dispatch('reset_hw_override',
+                  { 'gen' => e::StudioDialog.generation, 'model_guid' => model.guid.to_s,
+                    'owner_id' => cid, 'part_key' => owner.to_s,
+                    'generic_type' => gt, 'rule_id' => rid }.to_json, sink)
+      ok('ŠT-3b-2b (f): reset kovania povedal, kolko teraz dava PRAVIDLO',
+         rec.any? { |x| x.include?('späť na pravidlo') && x.include?('podľa pravidla') })
+      ok("ŠT-3b-2b (f): supis je zase z pravidla (#{manual} -> #{st3b_hw_count(inst, output)})",
+         st3b_hw_count(inst, output) == base)
+      ok('ŠT-3b-2b (f): a rucny zaznam je z configu PREC',
+         Array((e::Store.config(inst) || {})['hardware_overrides']).empty?)
+
+      Sketchup.undo
+      ok("ŠT-3b-2b (g): 1x Spat vratil rucny pocet (#{st3b_hw_count(inst, output)})",
+         st3b_hw_count(inst, output) == manual)
+      ok('ŠT-3b-2b (g): aj zaznam v configu',
+         Array((e::Store.config(inst) || {})['hardware_overrides']).length == 1)
     end
   end
 

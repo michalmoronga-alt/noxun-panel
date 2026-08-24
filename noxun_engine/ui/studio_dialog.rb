@@ -874,6 +874,15 @@ module Noxun
           js(script)
         end
 
+        # ŠT-3b-2b: VEREJNY citatel generacie okna. `@generation` je private stav
+        # KANALA okna, ale zapisove akcie SEKCIE ho potrebuju na ten isty guard,
+        # aky ma klik v Kusovniku: klik zo ZASTARANEHO zoznamu (riadok, ktory uz
+        # neplati) sa nesmie vykonat. Cita sa, nikdy nenastavuje — generaciu
+        # zdviha VYHRADNE `push_state`.
+        def generation
+          @generation.to_i
+        end
+
         # Payload sekcie. Model chodi ARGUMENTOM (lekcia F4 zo ŠT-3a-2):
         # pri prepnuti dokumentu by inak sekcia dostala pravidla STAREHO
         # dokumentu vedla kusovnika noveho.

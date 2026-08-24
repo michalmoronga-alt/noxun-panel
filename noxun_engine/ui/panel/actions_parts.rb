@@ -706,17 +706,20 @@ module Noxun
             ov = (params['part_overrides'] ||= {})
             keys.each do |k|
               key = canonical_part_key(params, k)
-              rec = ov[key] || {}
-              # Sticky remap dovody patria STARYM hranam — s prepisom olepu
-              # strácajú platnost (inak by karta ukazovala varovanie k paske,
-              # ktora tam uz nie je).
-              rec.delete('edge_warnings')
               if src_edges.is_a?(Hash) && !src_edges.empty?
+                rec = ov[key] || {}
+                # Sticky remap dovody patria STARYM hranam — s prepisom olepu
+                # strácajú platnost (inak by karta ukazovala varovanie k paske,
+                # ktora tam uz nie je).
+                rec.delete('edge_warnings')
                 rec['edges'] = JsonFileStore.deep_copy(src_edges)
+                store_override(ov, key, rec)
               else
-                rec.delete('edges')
+                # Zdroj bez vlastneho olepu = ciel sa vracia NA PRAVIDLO —
+                # a to je TO ISTE telo, ake vola akcia „vrátiť na pravidlo"
+                # v sekcii Pravidlá (audit B4, ŠT-3b-2b).
+                reset_part_edges!(params, key)
               end
-              store_override(ov, key, rec)
               total += 1
             end
             items << [target_cab, params]
@@ -747,6 +750,30 @@ module Noxun
         # Zapis/vycisti zaznam part_override pod klucom rk (prazdny zaznam sa odstrani).
         def store_override(ov, rk, rec)
           if rec.nil? || rec.empty? then ov.delete(rk) else ov[rk] = rec end
+        end
+
+        # ŠT-3b-2b: JEDINE TELO „ABS dielca SPAT NA PRAVIDLO" (audit B4).
+        # Volaju ho DVE vstupne cesty — „Použiť na podobné" s prazdnym zdrojom
+        # a akcia „vrátiť na pravidlo" v sekcii Pravidlá — a musia sa spravat
+        # ROVNAKO, inak by jedna z nich nechala v configu zvysok, ktory by dielec
+        # drzal mimo pravidla.
+        #
+        # Maze sa CELY kluc `edges` (nie porovnanie hodnot s pravidlom): pritomnost
+        # kluca JE definicia overridu, takze jeho zanik = „plati pravidlo". S nim
+        # ide prec aj `edge_warnings` — sticky dovody sticky remapu patria STARYM
+        # hranam a po navrate na pravidlo by karta varovala pred paskou, ktora
+        # tam uz nie je (rovnaka lekcia ako pri prepise olepu).
+        #
+        # NEROBI ziadny rebuild ani status — to je vec volajuceho (guardy a
+        # okenne spravanie su per vstupny bod). Vracia true, ked bolo CO mazat.
+        def reset_part_edges!(params, rk)
+          ov = (params['part_overrides'] ||= {})
+          rec = ov[rk] || {}
+          had = rec.key?('edges')
+          rec.delete('edges')
+          rec.delete('edge_warnings')
+          store_override(ov, rk, rec)
+          had
         end
 
       end

@@ -170,7 +170,10 @@ NxTest.test('UI-D1: prenasa sa LEN olep hran (material ani smer sa nedotknu)') d
                 'kopiruje sa ZAZNAM overridu hran')
   NxTest.assert(!UID1_APPLY.include?("rec['material_id']"), 'material ciela sa nemeni')
   NxTest.assert(!UID1_APPLY.include?('grain'), 'smer dekoru sa nemeni')
-  NxTest.assert(UID1_APPLY.include?("rec.delete('edges')"),
+  # ŠT-3b-2b: „vratenie na pravidlo" uz nie je vlastna kopia mazania — je to
+  # TO ISTE telo, ake vola akcia „vrátiť na pravidlo" v sekcii Pravidlá
+  # (dve kopie by sa casom rozisli a jedna by v configu nechala zvysok).
+  NxTest.assert(UID1_APPLY.include?('reset_part_edges!(params, key)'),
                 'prazdny override zdroja VRATI ciele na pravidlo (je to tiez rozhodnutie)')
   NxTest.assert(UID1_APPLY.include?("rec.delete('edge_warnings')"),
                 'sticky remap dovody patria starym hranam — s prepisom zanikaju')
