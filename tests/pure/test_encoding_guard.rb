@@ -13,7 +13,16 @@
 #      (guard by chytil sam seba, rovnako ako pri mojibake) — typicky nalez je
 #      slovenske slovo s jednym cyrilickym pismenom uprostred, vzniknute
 #      kopirovanim textu odinakial.
-# Ziadny falosny poplach: signatury su bajtove sekvencie, ktore sa v cistej
+# ZNAMY FALOSNY POPLACH (ŠT-3b-2c2): slovenske pismeno „a s dvoma bodkami"
+# (C3 84) nasledovane pismenom z Latin Extended-A — napr. slovenska cislovka
+# 5 vypisana slovom, ci „T s makcenom" za nim — trafi signaturu
+# `\xC3\x84[\xC2\xC4\xC5]` nizsie. (Doslovny priklad sem NEPATRI, guard by
+# chytil sam seba — presne to sa pri pisani tohto komentara aj stalo.)
+# Signatura sa
+# NEZUZUJE (chytila realny incident 21.7.); texty v repe pouzivaju v takom
+# pripade cislovku alebo iny tvar slova. Kto na to narazi: nie je to
+# poskodeny subor, je to hranica tohto guardu.
+# Inak ziadny falosny poplach: signatury su bajtove sekvencie, ktore sa v cistej
 # slovencine/kode nikdy nevyskytuju.
 require_relative '../helper' unless defined?(NxTest)
 

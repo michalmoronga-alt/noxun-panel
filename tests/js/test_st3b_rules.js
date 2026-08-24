@@ -624,4 +624,72 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   eq(ELS.rulesBox.innerHTML, keep, 'ani v bežnej vetve');
 })();
 
-console.log(`OK ${n} kontrol (ŠT-3b-1/3b-2a/3b-2b/3b-2c1 sekcia Pravidlá)`);
+// ---- ŠT-3b-2c2: odtlačok pravidiel (`rules_rev`) na klientovi -------------
+//
+// Klient odtlačok NIKDY nepočíta — iba ho drží a pri uložení vracia. Vlastný
+// výpočet by ani nemohol sedieť (Ruby serializuje `900.0`, JS `900`), takže by
+// server odmietal každé uloženie a nikto by nevedel prečo. Testy strážia tri
+// veci: že si ho klient uloží, že ho pošle späť, a že mu ho „Načítať globálne"
+// NEPREPÍŠE — globálne predvoľby nie sú stav projektu.
+
+(function(){
+  const base = { version: '0.7.66', model_guid: 'G7', source: 'project', cabinets: 1,
+                 rules_rev: 'abc123def456',
+                 rules: [{ kind: 'fixed', output: 'leg', enabled: true, quantity: 4,
+                           applies_to: { role: 'cabinet' } }],
+                 abs: { rows: [], source: '', hint: '' },
+                 overrides: { abs: { total: 0, groups: [] }, hardware: { total: 0, groups: [] } } };
+  ELS.secbody.innerHTML = '';
+  R.rdApplyState(base);
+  R.rulesRenderBody();
+
+  SENT.length = 0;
+  R.rdSaveRules();
+  eq(SENT.length, 1, 'uloženie odišlo');
+  const p = JSON.parse(SENT[0][1]);
+  eq(p.rules_rev, 'abc123def456', 'zápis vracia odtlačok, s ktorým bol formulár naplnený');
+  eq(p.model_guid, 'G7', 'a naďalej aj identitu dokumentu (dve nezávislé vrstvy)');
+
+  // Push s NEZMENENÝMI pravidlami, ale novým odtlačkom (server prepočítal) —
+  // klient musí prevziať ten nový, inak by ukladal so zastaraným.
+  const echo = JSON.parse(JSON.stringify(base));
+  echo.rules_rev = 'novy999';
+  R.rdApplyState(echo);
+  SENT.length = 0;
+  R.rdSaveRules();
+  eq(JSON.parse(SENT[0][1]).rules_rev, 'novy999',
+     'aj „pokojný" push (rovnaké pravidlá) odtlačok obnoví');
+
+  // „Načítať globálne" mení FORMULÁR, nie stav projektu — odtlačok ostáva.
+  R.RD.setRules([{ kind: 'fixed', output: 'leg', enabled: true, quantity: 9,
+                   applies_to: { role: 'cabinet' } }], 'global');
+  SENT.length = 0;
+  R.rdSaveRules();
+  const after = JSON.parse(SENT[0][1]);
+  eq(after.rules_rev, 'novy999',
+     '„Načítať globálne" odtlačok NEPREPÍŠE — inak by uloženie po ňom prepísalo cudziu zmenu');
+  // (Hodnoty formulára sem nekontrolujeme — `rdCollectRules` ich číta z DOM,
+  //  ktorý stub nemodeluje; ide o odtlačok, nie o obsah.)
+
+  // Starší cachovaný DOM: payload bez `rules_rev` nesmie poslať `undefined`.
+  const old = JSON.parse(JSON.stringify(base));
+  delete old.rules_rev;
+  old.rules[0].quantity = 5; // iné pravidlá => `rdApplyState` stav naozaj nasadí
+  R.rdApplyState(old);
+  SENT.length = 0;
+  R.rdSaveRules();
+  eq(JSON.parse(SENT[0][1]).rules_rev, '',
+     'chýbajúci odtlačok = prázdny reťazec (server ho tolerantne prepustí)');
+})();
+
+(function(){
+  // Odtlačok sa NIKDY nepočíta v klientovi — strážené na zdrojáku, lebo
+  // „počítaj si ho sám" je presne tá oprava, ktorú by niekto v dobrej viere
+  // spravil, keby ho v payloade nenašiel.
+  const src = fs.readFileSync(path.join(JS, 'rules.js'), 'utf8')
+                .split('\n').filter(function(l){ return l.trim().indexOf('//') !== 0; }).join('\n');
+  ok(!/sha1|SHA1|digest/i.test(src), 'žiadny vlastný hash na klientovi');
+  ok(/rules_rev: d\.rules_rev/.test(src), 'odtlačok prichádza výhradne zo servera');
+})();
+
+console.log(`OK ${n} kontrol (ŠT-3b sekcia Pravidlá — 3b-1/2a/2b/2c1/2c2)`);

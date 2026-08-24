@@ -66,6 +66,7 @@
 #   platny NL override (inak by zamok pri zmensenej hlbke ticho zmizol).
 require 'json'
 require 'fileutils'
+require 'digest' # ŠT-3b-2c2: odtlacok pravidiel (vzor HardwareCatalog.record_rev)
 
 module Noxun
   module Engine
@@ -643,6 +644,50 @@ module Noxun
           end
           r['clearance'] = r['clearance'].to_f if r.key?('clearance')
           r
+        end
+      end
+
+      # --- odtlacok pravidiel (ŠT-3b-2c2) -------------------------------------
+      #
+      # Vzor `HardwareCatalog.record_rev`: kratky hash NORMALIZOVANEHO tvaru,
+      # ktory server posle klientovi a ten mu ho pri zapise vrati. Sluzi na
+      # rozpoznanie „formular bol naplneny z INEJ verzie pravidiel".
+      #
+      # PRECO NIE JE DOST porovnanie obsahu (`@baseline_rules`): to je hashove
+      # porovnanie, teda NECITLIVE na poradie a na kluce, ktore normalizacia
+      # zjednoti. Rev je citlivy na PRESNY serializovany tvar — su to DVE
+      # vrstvy, nie nahrada (audit C2). Pocita sa VYHRADNE na serveri: klient
+      # by ten isty JSON nikdy nezostavil bajtovo rovnako (Ruby `900.0` vs
+      # JS `900`), takze klientsky vypocet by NIKDY nesedel.
+      # KANONICKY tvar (kluce zoradene) — poradie klucov v hashi je nahodny
+      # dosledok toho, odkial zaznam prisiel (JSON zo snapshotu vs. seed
+      # v kode), takze bez zoradenia by ten isty stav pravidiel dal ROZNY
+      # odtlacok a pouzivatel by dostal „pravidlá sa medzitým zmenili" za nic.
+      # Citlivost na to, na com zalezi (hodnoty, poradie PRAVIDIEL, pasma),
+      # zoradenie klucov nijako neznizuje.
+      def rules_rev(rules)
+        Digest::SHA1.hexdigest(JSON.generate(canonical_rules(rules)))[0, 12]
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareRules.rules_rev') if defined?(Engine)
+        ''
+      end
+
+      # Rekurzivne zoradenie klucov (polia si poradie DRZIA — je vyznamove).
+      #
+      # Review #224 (Codex P2): hodnota sa berie podla PRITOMNOSTI kluca, nie
+      # cez `||`. Pri `false` by totiz `value[k] || value[k.to_sym]` prepadlo na
+      # symbolovy kluc (spravidla `nil`), takze `false` a `null` by dali TEN ISTY
+      # odtlacok — a suberzna zmena takeho pola (kluce novsej verzie
+      # `normalize_rules` ZACHOVAVA) by prekĺzla cez guard.
+      def canonical_rules(value)
+        case value
+        when Hash
+          value.keys.map(&:to_s).sort.each_with_object({}) do |k, out|
+            raw = value.key?(k) ? value[k] : value[k.to_sym]
+            out[k] = canonical_rules(raw)
+          end
+        when Array then value.map { |v| canonical_rules(v) }
+        else value
         end
       end
 

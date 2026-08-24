@@ -7091,10 +7091,11 @@ module NoxunSuRunner
       r['bands'] = Array(r['bands']).reject { |b| b['max'].nil? }
     end
     hw_before = st3b_hw_count(cabinets(model).first, output) if cabinets(model).first
+    rev = st3b_rev(rec)
     rec.clear
     rd.dispatch('save_rules',
                 { 'rules' => broken, 'also_global' => false,
-                  'model_guid' => model.guid.to_s }.to_json, sink)
+                  'model_guid' => model.guid.to_s, 'rules_rev' => rev }.to_json, sink)
     ok('ŠT-3b-2c1 (b3): ulozenie pravidla BEZ pásma „všetko nad" sa ODMIETNE',
        rec.any? { |x| x.include?('neuložili') })
     # Review #223 (Codex P2): hlaska musi niest AJ identitu `rule_id` — dve
@@ -7109,6 +7110,24 @@ module NoxunSuRunner
        inst.nil? || hw_before.nil? || st3b_hw_count(inst, output) == hw_before)
   rescue StandardError => ex
     ok("ŠT-3b-2c1 (b3): scenar brany vynimka: #{ex.class}: #{ex.message}", false)
+  end
+
+  # ŠT-3b-2c2: ODTLACOK pravidiel z posledneho pushu (`NX.setStudio`) alebo
+  # echa sekcie (`RD.setSection`). Scenar sa sprava ako REALNY klient — dostane
+  # payload a pri ulozeni vrati odtlacok, ktory v nom prisiel. Bez toho by
+  # scenar simuloval „okno z predoslej verzie" a server by ho (spravne) odmietal.
+  def st3b_rev(rec)
+    push = st3a_last_push(rec)
+    rev = push && push['rules'].is_a?(Hash) ? push['rules']['rules_rev'].to_s : ''
+    return rev unless rev.empty?
+
+    line = rec.reverse.find { |x| x.to_s.start_with?('RD.setSection(') }
+    json = line.to_s[/\ARD\.setSection\((.*),\s*(?:true|false)\)\z/m, 1]
+    begin
+      JSON.parse(json.to_s)['rules_rev'].to_s
+    rescue StandardError
+      ''
+    end
   end
 
   def st3b_scenar(model, rd)
@@ -7148,10 +7167,12 @@ module NoxunSuRunner
       rules = e::HardwareRules.project_rules(model) || e::HardwareRules.load
       edited = JSON.parse(JSON.generate(rules))
       edited.each { |r| r['quantity'] = new_qty if r['output'].to_s == output && r['kind'].to_s == 'fixed' }
+      rev = st3b_rev(rec)
+      ok('ŠT-3b-2c2: payload sekcie nesie ODTLACOK pravidiel', !rev.empty?)
       rec.clear
       rd.dispatch('save_rules',
                   { 'rules' => edited, 'also_global' => false,
-                    'model_guid' => model.guid.to_s }.to_json, sink)
+                    'model_guid' => model.guid.to_s, 'rules_rev' => rev }.to_json, sink)
       ok('ŠT-3b-1 (b): ulozenie zo sekcie prebehlo a povedalo, kolko skriniek prestavalo',
          rec.any? { |x| x.include?('prestavan') })
       ok("ŠT-3b-1 (b): pravidlo je v projekte zmenene (#{base_qty} -> #{new_qty})",
@@ -7178,11 +7199,13 @@ module NoxunSuRunner
       # Stav pre dalsie kroky sa obnovi NOVYM ulozenim (programovy `redo` na
       # Windows neexistuje) — baseline musi ist nanovo, inak by ho odmietol
       # vlastny guard.
+      rec.clear
       e::StudioDialog.send(:push_state)
+      rec_rev = st3b_rev(rec)
       rec.clear
       rd.dispatch('save_rules',
                   { 'rules' => edited, 'also_global' => false,
-                    'model_guid' => model.guid.to_s }.to_json, sink)
+                    'model_guid' => model.guid.to_s, 'rules_rev' => rec_rev }.to_json, sink)
       ok("ŠT-3b-1 (b2): opakovane ulozenie stav obnovilo (#{st3b_qty(model, output)})",
          st3b_qty(model, output).to_i == new_qty)
 
@@ -7228,7 +7251,9 @@ module NoxunSuRunner
       # Formular drzi baseline z posledneho payloadu. Ked sa pravidla modelu
       # medzitym zmenia INOU cestou, ulozenie sa MUSI odmietnut — inak by
       # ticho prepisalo cudziu zmenu (a prestavalo VSETKY skrinky).
+      rec.clear
       e::StudioDialog.send(:push_state) # cerstvy baseline
+      stale_rev = st3b_rev(rec) # odtlacok, ktory klient drzi PRED cudzou zmenou
       side = JSON.parse(JSON.generate(e::HardwareRules.project_rules(model) || []))
       side.each { |r| r['quantity'] = 9 if r['output'].to_s == output && r['kind'].to_s == 'fixed' }
       model.start_operation('SU-TEST st3b cudzia zmena', true)
@@ -7237,12 +7262,67 @@ module NoxunSuRunner
       rec.clear
       rd.dispatch('save_rules',
                   { 'rules' => edited, 'also_global' => false,
-                    'model_guid' => model.guid.to_s }.to_json, sink)
+                    'model_guid' => model.guid.to_s, 'rules_rev' => stale_rev }.to_json, sink)
       ok('ŠT-3b-1 (e): zapis po CUDZEJ zmene pravidiel sa ODMIETNE s hlaskou',
          rec.any? { |x| x.include?('medzitým zmenili') })
       ok('ŠT-3b-1 (e): a NIC sa nezapisalo (v projekte ostala cudzia hodnota)',
          st3b_qty(model, output).to_i == 9)
       Sketchup.undo # cudzia zmena prec
+
+      # --- (f) ODTLACOK pravidiel (ŠT-3b-2c2) -----------------------------
+      # Baseline aj odtlacok su DVE NEZAVISLE vrstvy. Tu sa meria druha:
+      # formular posle CUDZI `rules_rev` (ako keby bol naplneny z inej verzie
+      # pravidiel) — a to musí stacit na odmietnutie, aj ked obsah baseline
+      # sedi. Bez toho by sa dalo ulozit nad zmenu, ktoru pouzivatel nevidel.
+      e::StudioDialog.send(:push_state) # cerstvy baseline AJ odtlacok
+      before_qty = st3b_qty(model, output).to_i
+      rec.clear
+      rd.dispatch('save_rules',
+                  { 'rules' => edited, 'also_global' => false,
+                    'model_guid' => model.guid.to_s,
+                    'rules_rev' => 'cudzi-odtlacok' }.to_json, sink)
+      ok('ŠT-3b-2c2 (f): zapis s CUDZIM odtlackom pravidiel sa ODMIETNE',
+         rec.any? { |x| x.include?('inej verzie') })
+      ok("ŠT-3b-2c2 (f): a NIC sa nezapisalo (v projekte ostalo #{before_qty})",
+         st3b_qty(model, output).to_i == before_qty)
+      ok('ŠT-3b-2c2 (f): odmietnutie poslalo ECHO sekcie (nie plny push okna)',
+         rec.any? { |x| x.start_with?('RD.setSection(') } &&
+         rec.none? { |x| x.start_with?('NX.setStudio(') })
+
+      # SPRAVNY odtlacok (ten, ktory server prave poslal) prejde — dokaz, ze
+      # guard neblokuje vsetko, len nesediace verzie.
+      # Echo nesie payload sekcie priamo — odtlacok sa vytiahne z posledneho
+      # `RD.setSection(<json>, <force>)`.
+      line = rec.reverse.find { |x| x.start_with?('RD.setSection(') }
+      json = line.to_s[/\ARD\.setSection\((.*),\s*(?:true|false)\)\z/m, 1]
+      fresh_rev = begin
+        JSON.parse(json.to_s)['rules_rev'].to_s
+      rescue StandardError
+        ''
+      end
+      ok('ŠT-3b-2c2 (f): sekcia dostala CERSTVY odtlacok v payloade', !fresh_rev.empty?)
+      rec.clear
+      rd.dispatch('save_rules',
+                  { 'rules' => edited, 'also_global' => false,
+                    'model_guid' => model.guid.to_s,
+                    'rules_rev' => fresh_rev }.to_json, sink)
+      ok('ŠT-3b-2c2 (f): so SPRAVNYM odtlackom ulozenie PREJDE',
+         rec.any? { |x| x.include?('prestavan') })
+
+      # Review #224 (Codex P2): klient BEZ odtlacku (okno z predoslej verzie)
+      # sa uz NETOLERUJE — baseline ho nekryje, lebo je to stav MODULU.
+      rec.clear
+      e::StudioDialog.send(:push_state)
+      before_norev = st3b_qty(model, output).to_i
+      rec.clear
+      rd.dispatch('save_rules',
+                  { 'rules' => edited, 'also_global' => false,
+                    'model_guid' => model.guid.to_s }.to_json, sink)
+      ok('ŠT-3b-2c2 (f): zapis BEZ odtlacku sa ODMIETNE (stary DOM neprepise novsie pravidla)',
+         rec.any? { |x| x.include?('predošlej verzie') })
+      ok("ŠT-3b-2c2 (f): a NIC sa nezapisalo (v projekte ostalo #{before_norev})",
+         st3b_qty(model, output).to_i == before_norev)
+      Sketchup.undo # ulozenie prec (scenar konci v povodnom stave)
     end
   end
 
