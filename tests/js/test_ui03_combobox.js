@@ -264,4 +264,58 @@ const ABS = [
   ok(html.indexOf('js/nx_combo.js?v=') >= 0, 'panel.html nacitava komponent');
 })();
 
+
+// --- PICKER-1: ŠÍRKA PONUKY (čistá funkcia, bez DOM) ------------------------
+// Michal 25.8.: „dropdown je úzky a názvy sa orezávajú" — dovtedy bola šírka
+// `max(šírka poľa, 270)`, takže v paneli sa dlhé dekory („Egger H1234 ST9 …")
+// nedali rozlíšiť. Pravidlo je odteraz: toľko, koľko okno naozaj má, orezané
+// stropom čitateľnosti, a NIKDY menej než pole.
+(function(){
+  const W = NXC.nxComboPopWidth;
+  const M = 6;   // POP_MARGIN v komponente
+
+  // Panel (~470 px) — ponuka prekryje obsahovú oblasť, nie len pole.
+  const panel = W(180, 470);
+  ok(panel > 180, 'v paneli je ponuka ŠIRŠIA než pole');
+  eq(panel, 470 - 2 * M, 'a využije celú obsahovú oblasť okna');
+
+  // Štúdio (široké okno) — strop čitateľnosti, nie celá šírka.
+  const studio = W(180, 1280);
+  ok(studio < 1280 - 2 * M, 'v širokom okne sa ponuka NEROZTIAHNE cez celé okno');
+  eq(studio, 620, 'ale ide po strop čitateľnosti (620 px)');
+  ok(studio > panel, 'a v Štúdiu je širšia než v paneli — šírka podľa MIESTA, nie konštanta');
+
+  // Úzke okno — radšej všetko, čo je, než pevných 270.
+  eq(W(180, 300), 300 - 2 * M, 'v úzkom okne sa ponuka zmestí do viewportu');
+  ok(W(180, 300) <= 300 - 2 * M, 'a NEPRETEČIE cez okraj len preto, že minimum je 270');
+  ok(W(120, 200) <= 200 - 2 * M, 'to isté pri naozaj úzkom okne');
+
+  // Široké pole (Štúdio, roztiahnutý riadok) — ponuka nikdy nie je užšia.
+  eq(W(900, 1280), 900, 'ponuka NIKDY nie je užšia než pole, nad ktorým stojí');
+
+  // Okrajové vstupy nespadnú.
+  eq(W(0, 0), 0, 'nulový viewport = nulová šírka (nič sa nekreslí)');
+  eq(W(null, undefined), 0, 'chýbajúce hodnoty nespadnú');
+  eq(W(120, 470, { max: 300, margin: 0 }), 300, 'strop aj okraj sa dajú prepísať (testovateľnosť)');
+})();
+
+
+// --- PICKER-1: pravidlo šírky sa naozaj POUŽÍVA + tooltip položky -----------
+// Čistá funkcia sama o sebe nič nezaručuje — `position()` ju musí volať. A
+// tooltip je jediná poistka pri veľmi dlhých názvoch v úzkom okne; bez neho
+// sa orezaný text nedá prečítať vôbec.
+(function(){
+  const src = fs.readFileSync(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js',
+                                        'nx_combo.js'), 'utf8');
+  const pos = src.slice(src.indexOf('function position(){'), src.indexOf('function pick(i){'));
+  ok(pos.indexOf('nxComboPopWidth(r.width, global.innerWidth)') > -1,
+     'position() berie šírku z pravidla, nie z vlastného výpočtu');
+  ok(pos.indexOf('Math.max(r.width, POP_MIN_W)') < 0,
+     'a stará šírka (max(pole, 270)) je preč');
+  const render = src.slice(src.indexOf('function render(q, jumpFirst){'), src.indexOf('function currentIndex'));
+  ok(render.indexOf("' title=\"' + esc(tip) + '\"'") > -1,
+     'položka ponuky nesie celý názov aj v tooltipe (orezaný riadok sa inak nedá prečítať)');
+  ok(render.indexOf('it.label + (it.group') > -1, 'a tooltip obsahuje aj skupinu (výrobcu)');
+})();
+
 console.log(`OK test_ui03_combobox.js — ${n} kontrol`);

@@ -35,6 +35,10 @@
     // Nikdy sa nedostanu do "naposledy pouzite" a v ponuke stoja navrchu bez hlavicky.
     var FIXED_VALUES = ['', '__inherit__'];
     var POP_MIN_W    = 270;
+    // PICKER-1: strop citatelnosti. Ponuka sa roztiahne na to, co okno naozaj
+    // ma (panel ~470 px, Štúdio aj cez 1200) — ale nie donekonecna: riadok
+    // sirsi nez toto sa uz necita, len sa po nom oci naháňajú.
+    var POP_MAX_W    = 620;
     var POP_MARGIN   = 6;
 
     // ---------------------------------------------------------------- ciste funkcie
@@ -325,6 +329,32 @@
     // zoznam poloziek z casu otvorenia; keby prezil, klik by potvrdil volbu STAREHO
     // kontextu (iná skrinka, iny katalog) do NOVEHO. Nativna rozbalovacka sa pri
     // prestavbe sprava rovnako — zavrie sa.
+    // Opak `attach`: vrati uzol do stavu, v akom sme ho nasli — tlacidlo prec,
+    // select spat na miesto obalu, obal prec, atributy zrusene. Bez toho
+    // ostane po odpojenom poli „polovicny" stav (obal + tlacidlo bez
+    // registracie) a najblizsi `attach` prida DRUHE tlacidlo do toho isteho
+    // obalu: pouzivatel vidi DVA ovladace a s kazdym dalsim katalogovym echom
+    // o jeden viac (review #230 P2).
+    //
+    // Uzol pritom NEMUSI byt v dokumente — hostitel (sekcia Studia) si telo
+    // drzi ODPOJENE a vracia ho pri navrate aj s rozpisanym formularom.
+    // Rozbalenie odpojeneho stromu je bezpecne: menime len jeho vnutro.
+    function detach(sel){
+      var c = sel && sel.__nxc;
+      if (!c) return false;
+      if (c.mo) c.mo.disconnect();
+      if (OPEN && OPEN.sel === sel) close();
+      var wrap = c.wrap;
+      if (wrap && wrap.parentNode) wrap.parentNode.insertBefore(sel, wrap);
+      else if (wrap && sel.parentNode === wrap) wrap.removeChild(sel);
+      if (c.btn && c.btn.parentNode) c.btn.parentNode.removeChild(c.btn);
+      if (wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      sel.removeAttribute('tabindex');
+      sel.removeAttribute('aria-hidden');
+      sel.__nxc = null;
+      return true;
+    }
+
     function scan(root){
       var scope = root || document;
       var list = scope.querySelectorAll ? scope.querySelectorAll('select[' + KIND_ATTR + ']') : [];
@@ -332,9 +362,10 @@
       for (var j = ATTACHED.length - 1; j >= 0; j--){
         var sel = ATTACHED[j];
         if (!document.body.contains(sel)){
-          if (sel.__nxc && sel.__nxc.mo) sel.__nxc.mo.disconnect();
-          if (OPEN && OPEN.sel === sel) close();
-          sel.__nxc = null;
+          // Review #230 P2: odregistrovat NESTACI — uzol moze byt len DOCASNE
+          // odpojeny (perzistentne telo sekcie) a vratit sa. Rozbalime ho, aby
+          // ho navrat obalil CISTO RAZ.
+          detach(sel);
           ATTACHED.splice(j, 1);
         } else {
           if (OPEN && OPEN.sel === sel) close();
@@ -461,7 +492,12 @@
         if (s.title) html += '<div class="cbsec">' + esc(s.title) + '</div>';
         s.items.forEach(function(it){
           var col = colorOf(kind, it.value);
+          // PICKER-1: cely nazov aj v tooltipe — pri velmi dlhych dekoroch
+          // (a v uzkom okne) sa riadok aj tak moze orezat a pouzivatel musi
+          // mat ako zistit, co tam naozaj stoji.
+          var tip = it.label + (it.group ? ' · ' + it.group : '');
           html += '<div class="cbopt' + (it.disabled ? ' off' : '') + '" role="option" aria-selected="false"' +
+            ' title="' + esc(tip) + '"' +
             ' data-i="' + n + '"' + (it.disabled ? ' data-off="1"' : '') + '>' +
             (col ? '<i class="sw" style="background:' + esc(col) + '"></i>' : '<i class="sw nosw"></i>') +
             '<span class="t"><b>' + markup(it.label, q) + '</b>' +
@@ -490,6 +526,27 @@
       }).join('');
     }
 
+    // PICKER-1: sirka ponuky. Pravidlo (cista funkcia, aby sa dala overit bez
+    // DOM): ponuka je taka siroka, ako je OBSAHOVA OBLAST okna (viewport minus
+    // okraje), orezana stropom citatelnosti — a NIKDY nie uzsia nez pole, nad
+    // ktorym stoji. Dovod: dnesna sirka (max(pole, 270)) v paneli orezavala
+    // dlhe nazvy dekorov na „Egger H1234 ST9 Dub…" a rozlisit dve podobne
+    // varianty sa dalo len tipovanim. Konstanta „sirka panela" by bola zla:
+    // to iste UI bezi aj v Studiu, kde je miesta viac.
+    function nxComboPopWidth(fieldW, viewportW, opts){
+      var o = opts || {};
+      var margin = (o.margin == null) ? POP_MARGIN : o.margin;
+      var minW = (o.min == null) ? POP_MIN_W : o.min;
+      var maxW = (o.max == null) ? POP_MAX_W : o.max;
+      var field = Number(fieldW) || 0;
+      var avail = (Number(viewportW) || 0) - 2 * margin;
+      if (avail < 0) avail = 0;
+      var w = Math.min(avail, maxW);          // kolko sa zmesti, ale citatelne
+      if (w < minW) w = Math.min(minW, avail); // uzke okno: radsej cele, nez nic
+      if (w < field) w = field;                // NIKDY uzsie nez pole
+      return Math.round(w);
+    }
+
     // Popup je `position: fixed` nad body — ziadny `overflow:auto` predok ho
     // neoreze (poucenie D-67 FIX 7 a D-105). Otvara sa DOLAVA (prava hrana lici
     // s triggerom, mockup), pri malo mieste dole sa preklopi nahor.
@@ -497,10 +554,8 @@
       if (!OPEN) return;
       var btn = OPEN.sel.__nxc.btn, pop = OPEN.pop;
       var r = btn.getBoundingClientRect();
-      var w = Math.max(r.width, POP_MIN_W);
-      var maxW = Math.max(160, global.innerWidth - 2 * POP_MARGIN);
-      if (w > maxW) w = maxW;
-      pop.style.width = Math.round(w) + 'px';
+      var w = nxComboPopWidth(r.width, global.innerWidth);
+      pop.style.width = w + 'px';
       var left = r.right - w;
       if (left < POP_MARGIN) left = POP_MARGIN;
       if (left + w > global.innerWidth - POP_MARGIN) left = Math.max(POP_MARGIN, global.innerWidth - POP_MARGIN - w);
@@ -575,12 +630,25 @@
       // ponuky. Bez neho komponent funguje ďalej — len s tym, co uz v pameti ma.
       setUsedRefresher: function(fn){ usedRefresher = fn; },
       rerender: rerender,
+      // PICKER-1: prekreslenie JEDNEHO pola po PROGRAMOVEJ zmene hodnoty.
+      // `change` sa vtedy nespusti (a nesmie — D-46 vracia predvolbu na
+      // povodnu hodnotu bez toho, aby to vyzeralo ako nova volba pouzivatela),
+      // takze bez tohto mostu by trigger ukazoval hodnotu, ktora uz neplati.
+      // Rovnaky most ako `sync`, len opacny: hostitel, ktory uzol vedome
+      // odpaja (perzistentne telo sekcie), ho moze rozbalit sam.
+      detach: function(sel){ return detach(sel); },
+      sync: function(sel){
+        if (!sel || !sel.__nxc) return false;
+        refresh(sel);
+        return true;
+      },
       recentOf: loadRecent,
       RECENT_MAX: RECENT_MAX,
       // ciste funkcie (Node testy)
       nxNormText: nxNormText, nxComboSections: nxComboSections, nxComboHighlight: nxComboHighlight,
       nxComboStep: nxComboStep, nxComboFirst: nxComboFirst, nxComboFlatten: nxComboFlatten,
-      nxRecentPush: nxRecentPush, nxComboIsFixed: nxComboIsFixed, nxComboHit: nxComboHit
+      nxRecentPush: nxRecentPush, nxComboIsFixed: nxComboIsFixed, nxComboHit: nxComboHit,
+      nxComboPopWidth: nxComboPopWidth
     };
     global.NXCombo = API;
     if (typeof module !== 'undefined' && module.exports) module.exports = API;

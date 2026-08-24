@@ -2363,9 +2363,61 @@
     return { key: pending.key, value: pending.value, model_guid: guid, confirm: pending };
   }
 
+  // PICKER-1: pripojenie/obnova vyhľadávača nad predvoľbami. Mimo prehliadača
+  // (Node testy) alebo kým komponent nie je načítaný sa nič nestane — polia
+  // ostanú natívnymi selectmi a všetko ostatné funguje ďalej.
+  function mdComboScan(){
+    if (typeof NXCombo === 'undefined' || !NXCombo || !NXCombo.scan) return false;
+    // Review #230 P2: telo sekcie je PERZISTENTNÝ uzol, ktorý odchod zo sekcie
+    // ODPOJÍ z dokumentu (a návrat ho aj s rozpísaným formulárom vráti). Kým je
+    // odpojené, `mdRenderAll` je no-op (`mdEl` nič nenájde) — a scan tu preto
+    // nemá čo robiť. Bez tejto brány by katalógové echo na pozadí odregistrovalo
+    // polia, ktoré sa o chvíľu vrátia.
+    if (!mdSectionAttached()) return false;
+    mdComboHooks();
+    NXCombo.scan(document);
+    return true;
+  }
+
+  // Je telo sekcie práve v dokumente? (Mimo prehliadača — Node testy — vraciame
+  // `false`: nie je čo skenovať.)
+  function mdSectionAttached(){
+    if (typeof document === 'undefined' || !document.body || !document.body.contains) return false;
+    var node = mdEl('md_body');
+    return !!(node && document.body.contains(node));
+  }
+
+  // PICKER-1: farbu štvorčeka a „Použité v projekte" dodáva komponentu HOSTITEĽ
+  // (sám žiadny katalóg nepozná). V Inspectore to robí `core.js`; v Štúdiu je
+  // zdrojom tá istá sekcia Materiály, takže ponuka vyzerá v oboch oknách
+  // rovnako — bez toho by v Štúdiu boli prázdne štvorčeky a chýbala by skupina
+  // „Použité v projekte", hoci tie dáta sekcia má.
+  var MD_COMBO_HOOKED = false;
+  function mdComboHooks(){
+    if (MD_COMBO_HOOKED || typeof NXCombo === 'undefined' || !NXCombo) return;
+    if (NXCombo.setColorResolver){
+      NXCombo.setColorResolver(function(kind, value){
+        if (kind === 'abs' || !value) return '';
+        var rec = (MD_SHEETS || []).find(function(s){ return String(s.id) === String(value); });
+        return rec && rec.color ? rgbToHex(rec.color) : '';
+      });
+    }
+    // „Použité v projekte" sa v Štúdiu ZATIAĽ nenapája: sekcia drží počty pod
+    // kľúčom DEKORU (`MD_USED`), kým komponent pýta zoznam ID dosiek — mapovanie
+    // by tu vzniklo druhý raz a pri prvej zmene kľúča by sa ticho rozišlo.
+    // Komponent bez tohto hooku funguje ďalej, len bez tej skupiny (priznané v PR).
+    MD_COMBO_HOOKED = true;
+  }
+
   function mdSetProjectSelect(key, id){
     var sel = mdEl(mdProjectSelectId(key)); // programovy zapis onchange NEspusti
     if (sel && id) sel.value = id;
+    // PICKER-1: `change` sa tu ZÁMERNE nespúšťa (D-46: vraciame predvoľbu na
+    // skutočný default, kým sa zmena nepotvrdí — nesmie to vyzerať ako nová
+    // voľba používateľa). Natívny select by sa prekreslil sám, vyhľadávač má
+    // ale VLASTNÝ trigger, takže by ukazoval hodnotu, ktorá už neplatí —
+    // preto ho treba zosynchronizovať výslovne.
+    if (sel && typeof NXCombo !== 'undefined' && NXCombo && NXCombo.sync) NXCombo.sync(sel);
   }
   function mdClearPending(){
     MD_PENDING = null;
@@ -2431,6 +2483,14 @@
     fillSelect(mdEl('md_body'), MD_SHEETS, MD_PROJECT.default_material_id);
     fillSelect(mdEl('md_front'), frontSheets(), MD_PROJECT.default_front_material_id);
     fillSelect(mdEl('md_back'), MD_SHEETS, MD_PROJECT.default_back_material_id);
+    // PICKER-1: predvoľby projektu používajú TEN ISTÝ vyhľadávač ako karta
+    // dielca a dosky (`nx_combo`) — jeden komponent, jedna pravda. Stačí
+    // atribút v HTML a toto pripojenie: `scan` nové polia pripojí a už
+    // pripojeným prekreslí trigger z čerstvých `<option>`ov (po `fillSelect`
+    // by inak ukazovali starý text). Komponent posiela `change` rovnako ako
+    // natívny select, takže D-46 potvrdzovanie aj `model_guid` guard bežia
+    // NEZMENENOU cestou.
+    mdComboScan();
     mdRenderLists(); // rozpisany formular sa NECHAVA (mdEditing drzi stav)
     if (keep){
       var sel = '.mdcell[data-kind="' + keep.kind + '"][data-id="' + keep.id + '"][data-field="' + keep.field + '"]';
