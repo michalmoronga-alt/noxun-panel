@@ -104,8 +104,10 @@ NxTest.test('ŠT-3b-1: akcie sekcie maju JEDINY whitelist a JEDINE telo') do
   NxTest.assert(rd.const_defined?(:SECTION_ACTIONS), 'whitelist zije v RulesDialog')
   actions = rd::SECTION_ACTIONS
   NxTest.assert(actions.frozen?, 'zoznam je uzavrety')
-  NxTest.assert_equal(%w[save_rules load_global merge_seed], actions,
-                      'sekcia vie PRESNE tri akcie okna — nic viac')
+  # ŠT-3b-2b: k trom akciam okna pribudli DVA zapisove resety (a nic viac —
+  # presnu rovnost strazi sada 3b-2b nizsie aj in-SU runner).
+  NxTest.assert_equal(%w[save_rules load_global merge_seed reset_abs_override reset_hw_override],
+                      actions, 'sekcia vie PRESNE tri akcie okna + dva resety — nic viac')
   NxTest.refute(actions.include?('ready'),
                 'Studio registruje callbacky pod TYMI ISTYMI menami — `ready` by prepisal jeho vlastny')
   NxTest.refute(ST3B_STUDIO_RB.include?('RULES_ACTIONS = %w['),
@@ -638,4 +640,193 @@ NxTest.test('ŠT-3b-1: cache-bust a poradie skriptov') do
                 'rules.js sa nacitava AZ ZA studio.js — obaluje jeho NX.setStudio')
   NxTest.assert(ST3B_STUDIO_HTML.index('js/hw_catalog.js') < ST3B_STUDIO_HTML.index('js/rules.js'),
                 'a za vsetkymi predoslymi obalmi (kazdy dalsi musi vidiet ten predchadzajuci)')
+end
+
+# ============================================================================
+# ŠT-3b-2b — „VRÁTIŤ NA PRAVIDLO" (zapisove cesty sekcie)
+#
+# Co tato cast strazi (a preco to klikanim neoveris):
+#   1. TELO ZAPISU je JEDNO. Keby si sekcia mazala override po svojom, jedna
+#      z ciest by casom nechala v configu zvysok (napr. `edge_warnings`) a
+#      dielec by ostal mimo pravidla — bez jedineho viditelneho priznaku.
+#   2. GUARDY STOJA PRED ZAPISOM. Zastarany klik, cudzi dokument a
+#      NEJEDNOZNACNE `cabinet_id` (cerstva kopia pred dedup tikom) musia zapis
+#      ODMIETNUT. „Vezmi prvu" by prestavala skrinku, na ktoru nikto neklikol.
+#   3. STATUS HOVORI VYSLEDOK, nie „override zrušený" — a priznava dosledky,
+#      ktore z riadku nevidno (vratenie polozky do nakupu, strateny zamok dlzky).
+#   4. VYBER SA NEMENI. Zoznam v sekcii nema s oznacenim v modeli nic spolocne;
+#      reselect by pouzivatelovi prepisal to, co ma prave oznacene.
+require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_parts') if NxTest.headless?
+require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_hardware') if NxTest.headless?
+
+ST3B2_PARTS_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_parts.rb'),
+                           encoding: 'UTF-8')
+
+def st3b2_rd_body(name)
+  ST3B_RULES_RB[/def #{Regexp.escape(name)}\b.*?\n        end\n/m].to_s
+end
+
+NxTest.test('ŠT-3b-2b (F17): whitelist je uzavrety a KAZDA akcia ma telo') do
+  actions = Noxun::Engine::RulesDialog::SECTION_ACTIONS
+  NxTest.assert_equal(%w[save_rules load_global merge_seed reset_abs_override reset_hw_override],
+                      actions, 'sekcia vie PRESNE tri akcie okna + dva resety')
+  NxTest.assert(actions.frozen?, 'zoznam ostava uzavrety')
+  run = st3b2_rd_body('run_section_action')
+  %w[reset_abs_override reset_hw_override].each do |a|
+    NxTest.assert(run.include?("when '#{a}'"), "#{a} ma telo (inak by akcia ticho nic neurobila)")
+  end
+  # Mena sa nesmu zrazit s callbackmi Studia ani s inou sekciou (ta ista brana
+  # ako pri troch povodnych akciach).
+  own = ST3B_STUDIO_RB.scan(/cb\(dlg, '([a-z_]+)'\)/).flatten
+  NxTest.assert_equal([], actions & own, 'mena akcii sa nesmu zrazit s callbackmi Studia')
+  %w[MaterialsDialog HardwareCatalogDialog].each do |mod|
+    other = Noxun::Engine.const_get(mod)::SECTION_ACTIONS
+    NxTest.assert_equal([], actions & other, "ani s akciami sekcie #{mod}")
+  end
+  runner = File.read(File.join(NxTest::ROOT, 'tests', 'sketchup', 'su_runner.rb'), encoding: 'UTF-8')
+  NxTest.assert(runner.include?('reset_abs_override reset_hw_override'),
+                'in-SU runner strazi PRESNU rovnost whitelistu — a pozna nove akcie')
+end
+
+NxTest.test('ŠT-3b-2b (B4): ABS reset ma JEDNO telo — a to telo je spravne') do
+  panel = Noxun::Engine::Panel
+  params = { 'part_overrides' => {
+    'p1' => { 'edges' => { 'L1' => 'ABS-1' }, 'edge_warnings' => [{ 'code' => 'x' }],
+              'material_id' => 'MAT-9' },
+    'p2' => { 'edges' => { 'L1' => 'ABS-1' } },
+    'p3' => { 'material_id' => 'MAT-1' }
+  } }
+  NxTest.assert(panel.reset_part_edges!(params, 'p1'), 'reset hlasi, ze bolo CO vratit')
+  rec = params['part_overrides']['p1']
+  NxTest.refute(rec.key?('edges'), 'kluc `edges` je PREC — jeho pritomnost JE definicia overridu')
+  NxTest.refute(rec.key?('edge_warnings'),
+                'a s nim aj sticky dovody — patria STARYM hranam, inak by karta varovala pred ' \
+                'paskou, ktora tam uz nie je')
+  NxTest.assert_equal('MAT-9', rec['material_id'],
+                      'INE rozhodnutia dielca (material, smer) reset NEMAZE')
+
+  panel.reset_part_edges!(params, 'p2')
+  NxTest.refute(params['part_overrides'].key?('p2'),
+                'zaznam, z ktoreho nic neostalo, zanikne (inak by v configu rastlo smetie)')
+  NxTest.refute(panel.reset_part_edges!(params, 'p3'),
+                'dielec bez rucnych hran = nie je co vratit (a nic sa nerozbije)')
+  NxTest.assert(params['part_overrides'].key?('p3'), 'a jeho ostatne rozhodnutia ostavaju')
+
+  # JEDNO telo: „Použiť na podobné" s prazdnym zdrojom sa nan napaja.
+  similar = ST3B2_PARTS_RB[/def handle_apply_edges_similar.*?\n        end\n/m].to_s
+  NxTest.assert(similar.include?('reset_part_edges!(params, key)'),
+                'druha vstupna cesta vola TO ISTE telo')
+  NxTest.refute(similar.include?("rec.delete('edges')"),
+                'a nema uz vlastnu kopiu mazania (dve kopie by sa casom rozisli)')
+  NxTest.assert(st3b2_rd_body('handle_reset_abs').include?('Panel.reset_part_edges!(params, rk)'),
+                'sekcia vola to iste telo — neduplikuje mutaciu configu')
+end
+
+NxTest.test('ŠT-3b-2b (odpoved D): kovanie reset maze CELY zaznam identity') do
+  panel = Noxun::Engine::Panel
+  all = [
+    { 'owner_part_key' => nil, 'generic_type' => 'leg', 'rule_id' => 'nohy', 'quantity' => 6 },
+    { 'owner_part_key' => 'front:F1/wing:left', 'generic_type' => 'hinge', 'rule_id' => 'zavesy',
+      'disabled' => true, 'nominal_length' => 420.0 },
+    { 'owner_part_key' => nil, 'generic_type' => 'slide', 'rule_id' => 'vysuvy', 'quantity' => 2 }
+  ]
+  out = panel.merge_override(all, 'front:F1/wing:left', 'hinge', 'zavesy', :all, nil)
+  NxTest.assert_equal(2, out.length, 'zaznam identity zanikol CELY (vsetky polia naraz)')
+  NxTest.assert(out.none? { |o| o['generic_type'] == 'hinge' }, 'a je to naozaj ten spravny')
+  NxTest.assert_equal(all[0], out[0], 'ostatne zaznamy ostali NEDOTKNUTE')
+  NxTest.assert(st3b2_rd_body('handle_reset_hw')
+                .include?('Panel.merge_override(all, owner, gt, rid, :all, nil)'),
+                'sekcia ide TOU ISTOU cestou ako reset v Inspectore (field :all)')
+end
+
+NxTest.test('ŠT-3b-2b (odpoved D): status prizna dosledky, ktore z riadku NEVIDNO') do
+  rd = Noxun::Engine::RulesDialog
+  panel = Noxun::Engine::Panel
+  # `series_value?` sa pyta pravidiel MODELU — headless ho zastupime, aby sa
+  # dalo overit SPRAVANIE hlasky (nie len jej text v zdrojaku).
+  panel.singleton_class.class_eval do
+    alias_method :nx_orig_series_value?, :series_value?
+    define_method(:series_value?) { |_model, _rid, _gt, nl| nl.to_f == 400.0 }
+  end
+  begin
+    off = rd.hw_reset_note(nil, { 'disabled' => true }, 'hinge', 'zavesy')
+    NxTest.assert(off.include?('do nákupu'),
+                  'zrusenie „vypnuté" VRACIA polozku do supisu aj nakupu — mení to cenu')
+    keep = rd.hw_reset_note(nil, { 'nominal_length' => 400.0 }, 'slide', 'vysuvy')
+    NxTest.assert_equal('', keep, 'zamok NA hodnote z radu sa da nastavit znova — niet co priznavat')
+    lost = rd.hw_reset_note(nil, { 'nominal_length' => 437.0 }, 'slide', 'vysuvy')
+    NxTest.assert(lost.include?('nenávratne'),
+                  'zamok MIMO radu sa strati nenavratne — pouzivatel to musi vediet PRED klikom')
+    NxTest.assert(lost.include?('437'), 'a hlaska menuje konkretnu dlzku')
+    both = rd.hw_reset_note(nil, { 'disabled' => true, 'nominal_length' => 437.0 }, 'slide', 'vysuvy')
+    NxTest.assert(both.include?('do nákupu') && both.include?('nenávratne'),
+                  'zaznam s viacerymi polami prizna OBA dosledky (polia su nezavisle, D-93)')
+    NxTest.assert_equal('', rd.hw_reset_note(nil, { 'quantity' => 6 }, 'leg', 'nohy'),
+                        'obycajny rucny pocet ziadny skryty dosledok nema')
+  ensure
+    panel.singleton_class.class_eval do
+      alias_method :series_value?, :nx_orig_series_value?
+      remove_method :nx_orig_series_value?
+    end
+  end
+end
+
+NxTest.test('ŠT-3b-2b (B3): guardy stoja PRED zapisom — a nejednoznacna adresa je ODMIETNUTIE') do
+  ctx = st3b2_rd_body('reset_context')
+  NxTest.assert(!ctx.empty?, 'spolocny guard existuje (jedno miesto pre obe akcie)')
+  NxTest.assert(ctx.include?("data['gen'].to_i != gen"),
+                'generacia okna — klik zo zastaraneho zoznamu sa nevykona')
+  NxTest.assert(ctx.include?('guid != model_guid(model)') && ctx.include?('!guid.empty?'),
+                'identita dokumentu, TOLERANTNE na prazdny udaj (starsi cachovany DOM)')
+  NxTest.assert(ctx.include?('cands.length > 1'), 'viac kandidatov na `cabinet_id` je vetva')
+  NxTest.assert(ctx.include?('viac kusov'), 'a povie sa to slovami, nie tichym no-op')
+  # Kod BEZ komentarov — o dedupe sa v komentari HOVORI (a musi), ale volat sa
+  # tu nesmie: otvoril by DRUHU operaciu (z jedneho kliku dva kroky Späť).
+  ctx_code = ctx.lines.reject { |l| l.strip.start_with?('#') }.join
+  NxTest.refute(ctx_code.include?('dedup'), 'dedup sa TU nespusta')
+
+  %w[handle_reset_abs handle_reset_hw].each do |m|
+    body = st3b2_rd_body(m)
+    NxTest.assert(body.index('reset_context(payload)') < body.index('rebuild_many'),
+                  "#{m}: guard je PRED prestavbou")
+    NxTest.assert(body.include?('CabinetBuilder.rebuild_many(model, [[cab, params]]'),
+                  "#{m}: prestavba je JEDNA operacia = JEDEN krok Späť")
+    NxTest.assert(body.include?('after_model_write(model)'),
+                  "#{m}: po zapise dostanu cerstve cisla OBAJA odberatelia")
+    NxTest.refute(body.include?('reselect'),
+                  "#{m}: VYBER SA NEMENI — zoznam sekcie nema s oznacenim v modeli nic spolocne")
+    NxTest.assert(body.include?('selection_note(model, had_sel)'),
+                  "#{m}: ak prestavba vyber zhodi, PRIZNA sa to")
+  end
+  rej = st3b2_rd_body('reject_reset')
+  NxTest.assert(rej.include?('refresh_studio(bump: false)'),
+                'odmietnutie nacita sekciu nanovo BEZ zdvihu generacie (nic sa nezapisalo)')
+end
+
+NxTest.test('ŠT-3b-2b (F13/F14): status hovori VYSLEDOK a odpojene dvojca sa neprehliadne') do
+  abs = st3b2_rd_body('abs_rule_result')
+  NxTest.assert(abs.include?('Store.config(part)'),
+                'vysledok sa cita zo SNAPSHOTU po prestavbe — to iste, co ide do vyroby')
+  NxTest.assert(abs.include?('podľa pravidla bez olepu'),
+                'potlaceny default (kompakt, postforming, dekor bez pasky) MA vlastnu vetu')
+  NxTest.assert(abs.include?('podľa pravidla:'), 'inak sa vymenuju hrany a hrubky')
+  twin = st3b2_rd_body('detached_twin_note')
+  NxTest.assert(twin.include?('vytiahnutý zo skrinky'),
+                'odpojene dvojca sa PRIZNA — prestavba ho neprekresli a do vystupu ide po starom')
+  NxTest.assert(st3b2_rd_body('handle_reset_abs').include?('detached_twin_note(model, cid, rk)'),
+                'a kontroluje sa pri KAZDOM ABS resete (nikdy tichy uspech)')
+  hw = st3b2_rd_body('hw_rule_result')
+  NxTest.assert(hw.include?('nepočíta nič'),
+                'ked pravidlo na skrinke negeneruje nic, povie sa to (prazdno vyzera ako chyba)')
+end
+
+NxTest.test('ŠT-3b-2b (review #221): vyber podla `rule_ref` uz nerobi zbytocny zber modelu') do
+  sel = ST3B2_PC_RB[/def do_select\(model, data, generation:, status:, repush:\).*?\n      end\n/m].to_s
+  branch = sel[/elsif data\['rule_ref'\].*?\n        else/m].to_s
+  NxTest.refute(branch.include?('fresh_collect'),
+                'vetva oka hlada podla identity — plny sken modelu (a dedup v nom) je cista rezia')
+  NxTest.assert(sel.include?("if data['problem_key']\n          collected = fresh_collect(model)"),
+                'zber sa robi AZ vo vetve, ktora ho naozaj potrebuje')
+  NxTest.assert(sel.include?('refs_for(Bom.compute(fresh_collect(model)), data)'),
+                'a vseobecna vetva ho ma dalej (BOM bez zberu neexistuje)')
 end
