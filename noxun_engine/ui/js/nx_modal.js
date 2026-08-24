@@ -291,10 +291,16 @@
       h += '<div class="merrtop" data-nxm-errtop="1" role="status"></div>';
       (s.fields || []).forEach(function(f){ h += fieldHtml(f); });
       if (s.note) h += '<div class="hint">' + esc(s.note) + '</div>';
+      // ŠT-3c-1: `danger: true` = DESTRUKTIVNE potvrdenie (mazanie). UI_DIZAJN:
+      // destruktivna akcia je `.danger`, nie zelena `.primary` — zelena hovori
+      // „pokracuj", cervena „toto uz nevratis". Default sa NEMENI: bez priznaku
+      // ostava kostra presne taka, aka bola.
+      var okCls = s.danger === true ? 'danger' : 'primary';
+      var okIco = s.danger === true ? 'trash' : 'check';
       h += '</div><div class="mfoot"><span class="spacer"></span>' +
         '<button type="button" class="ghostbtn" data-nxm-act="close">Zrušiť</button>' +
-        '<button type="button" class="primary" data-nxm-act="submit">' +
-        ico('check') + ' ' + esc(s.okLabel || 'Pridať') + '</button></div>';
+        '<button type="button" class="' + okCls + '" data-nxm-act="submit">' +
+        ico(okIco) + ' ' + esc(s.okLabel || 'Pridať') + '</button></div>';
       return h + '</div></div>';
     }
 
@@ -802,7 +808,14 @@
     function focusFirst(r){
       // Fokus do PRVEHO pola (kontrakt D-15). `setTimeout` preto, ze CEF
       // priradi fokus az po dokresleni — okamzity `focus()` by sa stratil.
-      var first = firstField(r);
+      //
+      // ŠT-3c-1 (review #225): modal BEZ POLI (ciste potvrdenie, napr. mazanie
+      // sablony) nema kam dat fokus a ten ostane na tlacidle, ktore modal
+      // otvorilo — Enter za scrimom by ho otvoril ZNOVA. Fokus vtedy dostane
+      // POTVRDZOVACIE tlacidlo v patke: klavesnicova cesta pokracuje tam, kde
+      // pouzivatel prave je.
+      var first = firstField(r) ||
+                  (r.querySelector ? r.querySelector('.mfoot [data-nxm-act="submit"]') : null);
       if (!first) return;
       try { first.focus(); } catch (e) { /* fokus nie je kriticky */ }
       setTimeout(function(){ try { first.focus(); } catch (e) {} }, 20);

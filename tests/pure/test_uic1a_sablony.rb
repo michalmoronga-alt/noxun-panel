@@ -371,31 +371,49 @@ NxTest.test('UI-C1a payload: okno Sablony dostane VYHRADNE korpusove (BLOCKER 5)
   NxTest.refute(list.any? { |t| t['kind'] == 'board' }, 'doskova sablona sa v okne neukaze')
 end
 
-NxTest.test('UI-C1a guard: zdrojak okna Sablony filtruje kind aj v serverovych akciach') do
+NxTest.test('UI-C1a guard: serverove akcie sablon vetvia na KIND (ŠT-3c-1 rozsirenie)') do
   src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog.rb'), encoding: 'UTF-8')
-  # SMOKE PACK 1: payload nesie navyse `previews: true` (riadok vie „Odfotiť"
-  # vs. „Prefotiť") — filter na kind ostava ten isty.
+  # ŠT-3c-1: sekcia ZOBRAZUJE aj doskove sablony (payload nesie oba druhy),
+  # ale APPLY ostava VYHRADNE korpusovy — doskovu sablonu na skrinku pouzit
+  # nemozno a guard je SERVEROVY (HTML nie je ochrana).
   NxTest.assert(src.include?("Panel.template_list(kind: 'cabinet', previews: true)"),
-                'payload okna je filtrovany')
+                'payload nesie korpusove sablony')
+  NxTest.assert(src.include?("Panel.template_list(kind: 'board', previews: true)"),
+                'aj doskove (sekcia ich zobrazuje — spravovat ich dovtedy nesla ziadna cesta)')
   NxTest.assert(src.include?("TemplateStore.find('cabinet', name)"), 'apply hlada len korpusove')
-  NxTest.assert(src.include?("TemplateStore.delete('cabinet', name)"), 'delete maze len korpusove')
-  # UI-D2: save odovzdava aj capture nahladu (4. pozicny argument).
-  NxTest.assert(src.include?("TemplateStore.upsert('cabinet', name, config, preview)"), 'save uklada korpusovu')
+  # MAZANIE je PRVA sprava doskovych sablon: kind chodi z klienta, ale server
+  # ho pusti LEN z uzavreteho zoznamu (`KINDS`).
+  NxTest.assert(src.include?('TemplateStore.delete(kind, name)'), 'delete maze podla PODANEHO druhu')
+  NxTest.assert(src.include?('KINDS.include?(kind)'), 'a druh musi byt z UZAVRETEHO zoznamu')
+  NxTest.assert_equal(%w[cabinet board], Noxun::Engine::TemplatesDialog::KINDS,
+                      'sekcia pozna presne dva druhy — nic viac')
+  # UKLADANIE sa do sekcie NEPRENIESLO: jedina zapisova cesta novej sablony je
+  # mini-modal Inspectora (`Panel.handle_save_template_as`) — dve cesty k tomu
+  # istemu suboru by sa casom rozisli.
+  NxTest.refute(src.include?('TemplateStore.upsert('), 'sekcia sablony NEUKLADA')
+  panel = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_templates.rb'),
+                    encoding: 'UTF-8')
+  NxTest.assert(panel.include?("TemplateStore.upsert('cabinet', name, config, preview)"),
+                'uklada Inspector — a stale s nahladom (UI-D2, 4. argument)')
 end
 
-NxTest.test('UI-C1a guard: okno Sablony vetvi na ZLYHANY zapis (Codex #174 P2)') do
-  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog.rb'), encoding: 'UTF-8')
-  NxTest.assert(src.include?("unless TemplateStore.upsert('cabinet', name, config, preview)"),
+NxTest.test('UI-C1a guard: zapis sablony vetvi na ZLYHANIE (Codex #174 P2)') do
+  # ŠT-3c-1: ukladanie je v Inspectore, mazanie v sekcii — kontrakt „ziadny
+  # falosny uspech" plati na OBOCH miestach.
+  panel = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_templates.rb'),
+                    encoding: 'UTF-8')
+  NxTest.assert(panel.include?("unless TemplateStore.upsert('cabinet', name, config, preview)"),
                 'save vetvi na navratovu hodnotu — ziadny falosny uspech')
-  NxTest.assert(src.include?("unless TemplateStore.delete('cabinet', name)"),
+  seg = panel[/unless TemplateStore\.upsert\('cabinet'.*?set_status\("Šablóna/m]
+  NxTest.assert(seg && seg.include?('return set_status('),
+                'save: pri zlyhani sa vracia chybovy status, nie hlaska o uspechu')
+
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog.rb'), encoding: 'UTF-8')
+  NxTest.assert(src.include?('unless TemplateStore.delete(kind, name)'),
                 'delete vetvi na navratovu hodnotu')
-  # after_change (hlaska o uspechu + refresh) smie bezat LEN po uspesnom zapise:
-  # v oboch vetvach musi byt medzi volanim store a after_change chybovy return.
-  %w[upsert delete].each do |op|
-    seg = src[/unless TemplateStore\.#{op}\('cabinet'.*?after_change/m]
-    NxTest.assert(seg && seg.include?('set_status(') && seg.include?('return'),
-                  "#{op}: pri zlyhani sa vracia chybovy status, nie hlaska o uspechu")
-  end
+  dseg = src[/unless TemplateStore\.delete\(kind, name\).*?after_change/m]
+  NxTest.assert(dseg && dseg.include?('set_status(') && dseg.include?('return'),
+                'delete: pri zlyhani sa vracia chybovy status, nie hlaska o uspechu')
 end
 
 # ---------------------------------------------------------------------------

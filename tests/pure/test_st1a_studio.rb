@@ -44,8 +44,8 @@ NxTest.test('ST-1a: SECTIONS je whitelist v RUBY a JS je jeho ZRKADLO') do
   # ŠT-1b pridala sekciu Kontrola (`ctrl`) — dovtedy premostenie do okna Vyroba.
   # ŠT-1c PR A pridala Nakup kovania (`buy`) — presun tabu Kovanie 1:1 (Š7).
   # ŠT-1c PR B1 pridala Rozpocet (`budget`) — POSLEDNY tab okna Vyroba.
-  NxTest.assert_equal(%w[bom ctrl buy budget offer mat hw rules], rb,
-                      'v Studiu ziju sekcie Kusovník, Kontrola, Nákup, Rozpočet, Ponuka, Materiály, Kovanie a Pravidlá')
+  NxTest.assert_equal(%w[bom ctrl buy budget offer mat hw rules tpl], rb,
+                      'v Studiu ziju sekcie Kusovník, Kontrola, Nákup, Rozpočet, Ponuka, Materiály, Kovanie, Pravidlá a Šablóny')
   NxTest.assert_equal(rb, js, 'JS zoznam sekcii sa nesmie rozist s Ruby autoritou')
   NxTest.assert_equal(rb, Noxun::Engine::StudioDialog::SECTIONS,
                       'konstanta a zdrojak hovoria to iste')
@@ -500,12 +500,13 @@ NxTest.test('ST-1a: premostenia su UZAVRETY whitelist v Ruby, klient posiela iba
   # ŠT-3a-1: to iste pre `hw` (Kovanie) — okno „Katalóg kovania" este zije
   # (drzi tri MODELOVE zapisy), ale navigacia don uz nevedie: otvara ho
   # premostenie Z VNUTRA sekcie (`hw_open_window` + `HW_BRIDGE_STATUS`).
-  %w[ctrl buy budget offer mat hw rules].each do |k|
+  # ŠT-3c-1: to iste pre `tpl` (Šablóny) — okno ZANIKLO, sekcia je jedine UI.
+  %w[ctrl buy budget offer mat hw rules tpl].each do |k|
     NxTest.assert(st::BRIDGE_STATUS[k].to_s.empty?,
                   "#{k} je sekcia, nie premostenie — nesmie mat hlasku premostenia")
   end
-  NxTest.assert_equal(%w[bset sup tpl].sort, st::WINDOW_BRIDGES.keys.sort,
-                      'satelitne okna otvaraju uz len tri polozky navigacie')
+  NxTest.assert_equal(%w[bset sup].sort, st::WINDOW_BRIDGES.keys.sort,
+                      'satelitne okna otvaraju uz len DVE polozky navigacie (Dodávateľ a Nastavenia rozpočtu)')
   # Kazde premostenie ma slovensku hlasku — inak by pouzivatel nevedel, PRECO
   # sa mu otvorilo ine okno.
   (st::WINDOW_BRIDGES.keys + ['about']).each do |k|

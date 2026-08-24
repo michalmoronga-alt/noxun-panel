@@ -145,8 +145,10 @@ module Noxun
         # Kartu s novym ID doplni observer sam (refresh_panel po dedupe).
         def push_selected(model, dedup: true)
           ScaleWatch.request_dedup(model) if dedup && defined?(ScaleWatch)
-          # V0.4.5 D2: dialog Sablony sleduje vyber (disabled stav "Pouzit na oznaceny")
-          TemplatesDialog.on_selection_changed if defined?(TemplatesDialog)
+          # ŠT-3c-1: vetva „dialog Sablony sleduje vyber" ZANIKLA spolu s oknom.
+          # Sekcia `tpl` Studia vyber NESLEDUJE (audit N27): tlacidla su vzdy
+          # aktivne a verdikt („nic nie je oznacene", „iny typ") dava SERVER
+          # pri kliku — vzor `capture_preview_for`, pravidlo D-78.
           zone = find_selected_zone(model)
           cab = find_cabinet(model)
           if cab.nil?

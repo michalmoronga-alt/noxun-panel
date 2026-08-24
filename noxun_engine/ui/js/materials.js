@@ -38,6 +38,3 @@
     if (window.sketchup && sketchup.set_cabinet_material)
       sketchup.set_cabinet_material(JSON.stringify({ which: which, value: value, cabinet_id: selectedCabId }));
   }
-  function openTemplatesDialog(){
-    if (window.sketchup && sketchup.open_templates) sketchup.open_templates('');
-  }

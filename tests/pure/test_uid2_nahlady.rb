@@ -540,14 +540,17 @@ NxTest.test('SMOKE1 guard: „Odfotiť" pyta PRAVE JEDNU oznacenu skrinku a nefo
   NxTest.assert(sel.include?("Store.kind(e) == 'cabinet'"), 'berie sa LEN priamo oznaceny korpus')
 end
 
-NxTest.test('SMOKE1 okno Sablony: „Odfotiť" ma vlastny callback a nevola upsert') do
+NxTest.test('SMOKE1 „Odfotiť": vlastna akcia sekcie, ktora NEPREPISUJE zaznam') do
+  # ŠT-3c-1: okno Sablony ZANIKLO — `tpl_capture` je odteraz AKCIA SEKCIE
+  # (uzavrety whitelist), telo aj jedina zdielana cesta fotenia ostavaju.
   rb = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog.rb'), encoding: 'UTF-8')
-  NxTest.assert(rb.include?("cb(dlg, 'tpl_capture')"), 'callback je zaregistrovany')
+  NxTest.assert(Noxun::Engine::TemplatesDialog::SECTION_ACTIONS.include?('tpl_capture'),
+                'akcia je v uzavretom whiteliste sekcie')
   body = rb[/def handle_capture.*?\n        end\n/m].to_s
-  NxTest.assert(body.include?("Panel.capture_preview_for('cabinet', name)"), 'jedna zdielana cesta')
+  NxTest.assert(body.include?('Panel.capture_preview_for('), 'jedna zdielana cesta')
   NxTest.assert_equal(false, body.include?('upsert'), 'fotenie NEPREPISUJE zaznam sablony')
 
-  js = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'templates_dialog.js'), encoding: 'UTF-8')
-  NxTest.assert(js.include?('sketchup.tpl_capture'), 'okno posiela meno sablony na server')
-  NxTest.assert(js.include?('function captureLabel'), 'riadok rozlisuje Odfotiť / Prefotiť')
+  js = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'templates.js'), encoding: 'UTF-8')
+  NxTest.assert(js.include?("tplSend('tpl_capture'"), 'sekcia posiela meno sablony na server')
+  NxTest.assert(js.include?('function tplCaptureLabel'), 'dlazdica rozlisuje Odfotiť / Prefotiť')
 end

@@ -187,7 +187,6 @@ module Noxun
           # `open_project_materials` ZANIKLO spolu s oknom Materialy — tlacidlo
           # panela ide odteraz bezným deep-linkom `openStudio('mat')`, teda
           # cestou `open_studio` nizsie (jeden whitelist sekcii, jedna cesta).
-          cb(dlg, 'open_templates')         { |_p| TemplatesDialog.show }
           cb(dlg, 'save_template_as')       { |p| handle_save_template_as(p) } # D-14 modal
           # ŠT-1c PR B3: pat relayov okna Vyroba (`open_production`,
           # `production_do_select/_export/_hw_csv/_budget/_cp`) tu ZANIKLO

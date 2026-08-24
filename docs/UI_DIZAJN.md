@@ -1123,7 +1123,11 @@ vstupný bod").
 |---|---|---|
 | hlavička | `.mhead` | `<h3>` titulok · `.msub` podtitul (kontext) · `.mx` krížik vpravo |
 | telo | `.mbody` | riadky `.mrow` = `<label>` + pole; pod nimi voliteľný `.hint` |
-| pätka | `.mfoot` | `.spacer` · **Zrušiť** (`ghostbtn`) · **zelené potvrdenie** (`primary`) |
+| pätka | `.mfoot` | `.spacer` · **Zrušiť** (`ghostbtn`) · **zelené potvrdenie** (`primary`), pri `danger: true` **červené** (`danger`) |
+
+**`danger: true` (ŠT-3c-1)** — modal, ktorý potvrdzuje niečo DESTRUKTÍVNE (mazanie), má potvrdzovacie tlačidlo v červenej rodine a s ikonou koša, nie zelené s fajkou: zelená hovorí „pokračuj", červená „toto už nevrátiš" (§ Nebezpečie / mazanie). Geometria je rovnaká ako pri `.primary` — `.mfoot .danger` má vlastné pravidlo, inak by sa ikona a text v pätke rozišli s kostrou. Bez príznaku sa nemení nič.
+
+**Modal BEZ POLÍ** (čisté potvrdenie) dostane fokus na **potvrdzovacie tlačidlo v pätke** — do tela nie je kam fokus dať a bez toho by ostal na tlačidle, ktoré modal otvorilo, takže Enter za scrimom by ho otvoril znova.
 
 Scrim je `.nxscrim` (`--nx-scrim`), karta `.nxmcard`. **Pozor:** mockup kreslí
 kartu ako `.nxmodal`, lenže `panel.css` toto meno už používa pre SCRIM starších
