@@ -15,23 +15,24 @@ Východiskový plán po UI reworku je:
 3. audit kódu a prípadný refactor/hardening **iba ak audit preukáže potrebu**,
 4. pokračovať vo funkciách.
 
-Tento priečinok obsahuje deväť hlavných kandidátov na budúce návrhové/implementačné sessions a jeden externý auditný dodatok:
+Tento priečinok obsahuje deväť hlavných kandidátov na budúce návrhové/implementačné sessions a externé auditné dodatky:
 
 1. [01_D95_PLOSNA_VYROBNA_KONTROLA.md](01_D95_PLOSNA_VYROBNA_KONTROLA.md) — plošná vizuálna kontrola projektu; pôvodný „diel po diele“ koncept sa po diskusii opúšťa.
 2. [02_ZOSTAVY_SEGMENTY.md](02_ZOSTAVY_SEGMENTY.md) — dátový a UX model zostáv/segmentov, scoped pravidiel, attachmentov, živých/spoločných prvkov a odložený Room/MagicPlan smer.
 3. [03_KOVANIE_FAZA3.md](03_KOVANIE_FAZA3.md) — univerzálnejší rule model pre automatiku kovania, výklopy a vyrábané dielce zásuviek.
-4. [04_SPOTREBICE_S1.md](04_SPOTREBICE_S1.md) — katalóg, projektové položky, väzba na skrinku/zónu, niche kontrola a rozpočet.
+4. [04_SPOTREBICE_S1.md](04_SPOTREBICE_S1.md) — katalóg, projektové položky, väzba na slot/korpus/zónu/pracovnú dosku, niche/cut-out kontrola a rozpočet.
 5. [05_SHARED_LIBRARY_UPDATE.md](05_SHARED_LIBRARY_UPDATE.md) — D-48/D-52: zdieľané firemné knižnice pre viac PC a distribúcia/updater.
 6. [06_RENDER_MR.md](06_RENDER_MR.md) — appearance/render vrstva materiálov, textúry, PBR a orientácia kresby.
 7. [07_KONSTRUKCIA_V1.md](07_KONSTRUKCIA_V1.md) — per-dielec konštrukčné odsadenia a budúce produktové typy čiel.
 8. [08_PONUKA_DOKUMENTY_CENY.md](08_PONUKA_DOKUMENTY_CENY.md) — DOCX/PDF dokumenty, manuálna cenová čerstvosť a obchodný workflow.
 9. [09_GHOST_VKLADANIE.md](09_GHOST_VKLADANIE.md) — V1-04 ghost placement: skrinka na kurzore, rotácia šípkami, floor/free Z a 4 predné anchory korpusu; obsahuje aj predbežný audit proti `main` v0.7.51. **Pravdepodobný prvý funkčný kandidát po hardeningu**, ak finálny audit nepotvrdí blokér.
 
-Doplnok k bodu 9:
+Externé auditné dodatky:
 
+- [04A_SPOTREBICE_EXTERNY_AUDIT.md](04A_SPOTREBICE_EXTERNY_AUDIT.md) — externý audit reálnych montážnych požiadaviek výrobcov + osobitné porovnanie s Winner Flex, 2020 Design a Cabinet Vision. Potvrdzuje model `špecializovaný korpus/nika → konkrétny produktový snapshot → validácia`, upozorňuje na niche/ventilation/clearance/cut-out pasce a výslovne odmieta deformovanie konkrétneho appliance assetu podľa otvoru.
 - [09A_GHOST_EXTERNY_SKETCHUP_AUDIT.md](09A_GHOST_EXTERNY_SKETCHUP_AUDIT.md) — externý audit oficiálneho SketchUp Ruby API a Developer Forum: Tool lifecycle, `InputPoint`, focus po `HtmlDialog`, Orbit `suspend/resume`, `onCancel`/Undo, `getExtents`, klávesové konvencie, world Z=0 a verziové pasce. Obsahuje aj odporúčanie **znovu potvrdiť `TAB` vs `ALT/OPTION`** pre cyklovanie 4 anchorov; nejde o automatickú zmenu schváleného UX.
 
-Dokumenty zámerne opisujú **problém, pracovnú predstavu a otázky**, nie konkrétne súbory, callbacky, API ani poradie commitov. Dokument 09 ide o krok ďalej: obsahuje predbežný audit dnešných dotknutých ciest. Dokument 09A pridáva pohľad zvonka na hostiteľské SketchUp API/UX. Ani jeden z nich stále **nie je task package**.
+Dokumenty zámerne opisujú **problém, pracovnú predstavu a otázky**, nie konkrétne súbory, callbacky, API ani poradie commitov. Dokumenty 04A a 09A pridávajú pohľad zvonka na reálne výrobné/hostiteľské obmedzenia a podobné produkty. Ani tieto dodatky **nie sú task package**.
 
 ## B · Úloha AI, model, dostupný kontext a povinné upozornenie
 
@@ -63,6 +64,8 @@ Pri výbere tém a návrhoch boli načítané najmä aktuálne dokumenty:
 
 Model mal zároveň konverzačný kontext predchádzajúcej práce na NOXUN Engine, najmä UI 2.0/Inspector/Štúdio, produkčný workflow KLINIKA, existujúcu ABS kontrolu, kontrolu smeru kresby a aktuálne smerovanie od satelitných okien k jednému Štúdiu.
 
+Pri dodatku 04A bol navyše použitý **externý pohľad mimo repozitára** — reálne montážne podklady výrobcov (najmä Bosch/BLANCO) a workflow podobných kitchen/CAD aplikácií (Winner Flex, 2020 Design, Cabinet Vision). Účelom nebolo prebrať ich architektúru, ale odhaliť technické pasce a opakujúce sa produktové vzory.
+
 Pri dodatku 09A bol navyše použitý **externý pohľad mimo repozitára** — oficiálna SketchUp Ruby API dokumentácia a relevantné SketchUp Developer Forum diskusie. Účelom nebolo priniesť hotový kód, ale odhaliť hostiteľské lifecycle/UX pasce, ktoré repo audit nemusí ukázať.
 
 Nie každý budúci modul, volací graf, observer, test ani aktuálny diff bol pri vzniku týchto dokumentov auditovaný. To je zámer — ide o podklad pre diskusiu.
@@ -77,7 +80,7 @@ Pred implementáciou konkrétnej témy musí agent minimálne:
 2. auditovať aktuálny kód a testy dotknutej domény;
 3. porovnať tento koncept s tým, čo sa odvtedy zmenilo;
 4. explicitne vyriešiť otvorené otázky uvedené v danom dokumente — auditom alebo ďalšou konverzáciou s Michalom;
-5. pri SketchUp Tool/API témach znovu overiť aktuálnu oficiálnu Ruby API dokumentáciu pre podporované verzie SketchUp;
+5. pri témach s externými výrobnými/API požiadavkami znovu overiť aktuálne primárne zdroje pre reálne používané produkty/verzie;
 6. až potom vytvoriť samostatnú špecifikáciu/task package s rozsahom, invariantmi, migráciami, testami a stop condition.
 
 Ak je koncept v konflikte s aktuálnym kódom alebo novším rozhodnutím, **aktuálna realita a novšie potvrdené rozhodnutie majú prednosť**.
@@ -87,6 +90,10 @@ Ak je koncept v konflikte s aktuálnym kódom alebo novším rozhodnutím, **akt
 Odporúčaný vstup pre AI:
 
 > „Načítaj aktuálny STAV/PLAN/ARCHITEKTURU/STANDARD a potom `SYSTEM/zdroje/next_sessions/<téma>.md`. Najprv porovnaj koncept s dnešnou realitou. Nič neimplementuj. Vypíš potvrdené body, konflikty, otvorené rozhodnutia a otázky na Michala.“
+
+Pre Spotrebiče navyše:
+
+> „Načítaj `04_SPOTREBICE_S1.md` aj `04A_SPOTREBICE_EXTERNY_AUDIT.md`. Pred task package over návrh na reálnych technických listoch aspoň 1–2 výrobkov z každej podporovanej kategórie a nestrácaj model-specific niche/cut-out/clearance/ventilation údaje.“
 
 Pre Ghost navyše:
 
