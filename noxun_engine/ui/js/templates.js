@@ -236,8 +236,8 @@
     h += tplGroupHtml('Doskové šablóny', TPL_DATA.board, 'board',
                       'Žiadne doskové šablóny.');
     h += '<div class="hint">Šablóny sú spoločné pre všetky zákazky. NOVÚ šablónu ukladáš ' +
-      'v Inspectore z označenej skrinky; tu ich spravuješ. Doskové šablóny sa dajú iba zmazať — ' +
-      'použiť a odfotiť sa dá skrinka; premenovať sa dá každá.</div>';
+      'v Inspectore z označenej skrinky; tu ich spravuješ. Premenovať a zmazať sa dá každá; ' +
+      'použiť a odfotiť sa dá len korpusová (fotka dosky by bola fotka ničoho).</div>';
     return h;
   }
 

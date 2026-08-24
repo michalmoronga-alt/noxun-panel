@@ -112,8 +112,8 @@ const BRD = { name: 'Pracovná doska', kind: 'board', preview_rev: null,
   ok(h.indexOf('Klasik dolná') > -1 && h.indexOf('Pracovná doska') > -1, 'oba druhy sa zobrazujú');
   ok(h.indexOf('Inspectore') > -1,
      'hint hovorí, KDE sa ukladá nová šablóna (v sekcii to nie je)');
-  ok(h.indexOf('premenovať sa dá každá') > -1,
-     'a hovorí, že premenovať sa dá OBOJE (ŠT-3c-2)');
+  ok(h.indexOf('Premenovať a zmazať sa dá každá') > -1,
+     'a hovorí PRAVDU o tom, čo sa s ktorým druhom dá (ŠT-3c-2)');
 
   T.tplApplyState({ cabinet: [], board: [] });
   const empty = T.tplBodyHtml();
