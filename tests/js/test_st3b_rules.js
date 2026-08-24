@@ -693,3 +693,23 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
 })();
 
 console.log(`OK ${n} kontrol (ŠT-3b sekcia Pravidlá — 3b-1/2a/2b/2c1/2c2)`);
+
+// --- TEST-1: „Úchytky" — hint PER ROLU --------------------------------------
+// Nález z prvého testu v0.8.0: pravidlá pre dvierka a pre zásuvkové čelá mali
+// JEDNU spoločnú vysvetlivku („dĺžka rezu = šírka krídla"). Pri zásuvkách to
+// klamalo (zásuvka nemá krídlo) a obe pravidlá vyzerali ako duplicita.
+(function(){
+  const d = R.rdHandleHint('drawer_front');
+  const f = R.rdHandleHint('front_door');
+  ok(d.indexOf('šírka čela') > -1, 'zásuvkové čelo hovorí o ŠÍRKE ČELA');
+  ok(d.indexOf('na čelo') > -1, 'a o kuse na čelo');
+  ok(d.indexOf('krídl') < 0, 'a NESPOMÍNA krídlo — zásuvka ho nemá');
+  ok(f.indexOf('šírka krídla') > -1, 'dvierka ostávajú pri šírke krídla');
+  ok(d !== f, 'obe roly majú RÔZNY text (inak vyzerajú ako duplicita)');
+  // Neznáma/chýbajúca rola nesmie spadnúť ani mlčať — padá na text dvierok.
+  ok(R.rdHandleHint('').indexOf('šírka krídla') > -1, 'chýbajúca rola má rozumný default');
+  ok(R.rdHandleHint(undefined).indexOf('šírka krídla') > -1, 'aj undefined');
+  [d, f].forEach(function(t){
+    ok(t.indexOf('úchytkovým profilom') > -1, 'obe naďalej hovoria, kedy pravidlo vôbec platí');
+  });
+})();

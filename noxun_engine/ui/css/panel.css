@@ -389,6 +389,12 @@
      jednoriadkovy s ellipsis (plny text uz nesie `title` riadku) a ovladace
      maju pevne, spocitatelne stopy (guard `tests/pure/test_smoke1_riadky.rb`). */
   .hwrow { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; margin: 4px 0; }
+  /* TEST-1: PRAVE ZALOZENA polozka katalogu kovania. Poradie dava server
+     (klient ho nedopĺňa), toto je len to, aby ju clovek NASIEL OCAMI —
+     jantar = „tu rozhodol clovek", rovnaky vyznam ako override riadky. */
+  .hwrow.hwnew { background: var(--nx-warn-bg-soft); border-radius: 6px;
+                 box-shadow: inset 2px 0 0 var(--nx-warn); }
+  .hwcap { font-size: 11px; padding: 6px 2px 2px; }
   /* `flex-basis: 0` je zamer: nazov berie AZ to, co po pevnych stopach ostane,
      takze nikdy netlaci ovladace von z riadku (okno Katalog kovania nizsie meni
      len grow faktor — ellipsis plati aj tam). */

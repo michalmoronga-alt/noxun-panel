@@ -52,6 +52,12 @@ module Noxun
         hws_map_project hws_merge_seed hws_reset_project
       ].freeze
 
+      # TEST-1: stropy serveroveho hladania. ZOZNAM (prazdny dotaz bez
+      # kategorie) ma VYSSI strop nez hladanie — zaklad katalogu ma byt
+      # vidiet cely, kym je to lacne; nad strop sa orezanie PRIZNA cislom.
+      SEARCH_TOP = 50
+      EMPTY_TOP = 200
+
       class << self
         # --- ŠT-3a-1: vstup SEKCIE `hw` (vzor MaterialsDialog.dispatch) ------
 
@@ -341,7 +347,7 @@ module Noxun
           case status
           when :ok
             push_items
-            js('MDH.demosCreated()')
+            js("MDH.demosCreated(#{info['item_code'].to_s.to_json})")
             set_status("Položka #{info['item_code']} pridaná z Demosu#{info['price_eur_vat'] ? ' (cena s DPH overená dnes)' : ''}.")
           when :exists
             set_status("Kód #{info} už v katalógu je — cenu obnovíš cez Overiť na existujúcej položke.", true)
@@ -740,16 +746,45 @@ module Noxun
 
         # Search je VYHRADNE serverovy (F12) — JS posiela query/kategoriu/flag
         # neaktivnych a len renderuje vratene poradie.
+        # TEST-1: dve veci, ktore zhoreli pri prvom teste v0.8.0.
+        #
+        # 1) ZAKLADNY ZOZNAM je serverovy search s PRAZDNYM dotazom. Radi sa
+        #    score -> -use_count -> kod, takze NOVA polozka (`use_count` 0)
+        #    skoncila az za koncom orezania a z UI zmizla BEZ SLOVA. Prazdny
+        #    dotaz ma preto vlastny, vyssi strop (`EMPTY_TOP`) a klient dostava
+        #    `total` — hint o orezani sa vypise pri KAZDOM orezani, aj pri
+        #    hladani (zasada „no silent caps"). Payload ostava lacny: posielaju
+        #    sa LEN kody, polozky uz klient ma.
+        #
+        # 2) `pin` = kod prave vytvorenej polozky. Poradie NADALEJ sklada
+        #    SERVER (kontrakt GH #100 P2 — JS ho nikdy nedoplna): klient len
+        #    povie, ktoru polozku prave zalozil, a server ju da NAVRCH. Bez
+        #    toho ju Michal po pridani musel hladat.
         def handle_search(payload)
           data = JSON.parse(payload.to_s)
-          results = HardwareCatalog.search(
-            HardwareCatalog.items, data['query'].to_s,
-            category: data['category'].to_s,
+          query = data['query'].to_s
+          category = data['category'].to_s
+          top = query.strip.empty? && category.strip.empty? ? EMPTY_TOP : SEARCH_TOP
+          results, total = HardwareCatalog.search_with_total(
+            HardwareCatalog.items, query,
+            category: category,
             include_inactive: data['include_inactive'] == true,
-            top: 50
+            top: top
           )
-          js("MDH.results(#{{ 'codes' => results.map { |i| i['item_code'] },
-                              'query' => data['query'].to_s }.to_json})")
+          codes = results.map { |i| i['item_code'] }
+          pin = pinned_code(data['pin'].to_s)
+          codes = ([pin] + (codes - [pin])).first(top) if pin
+          js("MDH.results(#{{ 'codes' => codes, 'query' => query,
+                              'total' => total, 'shown' => codes.length,
+                              'pin' => pin }.to_json})")
+        end
+
+        # Pin sa pusti LEN ked taka polozka v katalogu naozaj je — inak by
+        # zmiznuta (alebo vymyslena) polozka posunula poradie o prazdny riadok.
+        def pinned_code(code)
+          return nil if code.strip.empty?
+
+          HardwareCatalog.items.any? { |i| i['item_code'].to_s == code } ? code : nil
         end
 
         def handle_create(payload)
@@ -759,7 +794,9 @@ module Noxun
           when :ok
             push_items
             set_status("Položka #{info['item_code']} pridaná.")
-            js('MDH.created()')
+            # TEST-1: kod ide klientovi, aby si ho vypytal NAVRCH zoznamu
+            # (`pin`) a zvyraznil ho — inak nova polozka utopi v katalogu.
+            js("MDH.created(#{info['item_code'].to_s.to_json})")
           when :exists
             set_status("Kód #{info} už v katalógu je — kódy sú jedinečné.", true)
           when :invalid
