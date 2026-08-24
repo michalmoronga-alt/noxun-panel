@@ -291,10 +291,16 @@
       h += '<div class="merrtop" data-nxm-errtop="1" role="status"></div>';
       (s.fields || []).forEach(function(f){ h += fieldHtml(f); });
       if (s.note) h += '<div class="hint">' + esc(s.note) + '</div>';
+      // ŠT-3c-1: `danger: true` = DESTRUKTIVNE potvrdenie (mazanie). UI_DIZAJN:
+      // destruktivna akcia je `.danger`, nie zelena `.primary` — zelena hovori
+      // „pokracuj", cervena „toto uz nevratis". Default sa NEMENI: bez priznaku
+      // ostava kostra presne taka, aka bola.
+      var okCls = s.danger === true ? 'danger' : 'primary';
+      var okIco = s.danger === true ? 'trash' : 'check';
       h += '</div><div class="mfoot"><span class="spacer"></span>' +
         '<button type="button" class="ghostbtn" data-nxm-act="close">Zrušiť</button>' +
-        '<button type="button" class="primary" data-nxm-act="submit">' +
-        ico('check') + ' ' + esc(s.okLabel || 'Pridať') + '</button></div>';
+        '<button type="button" class="' + okCls + '" data-nxm-act="submit">' +
+        ico(okIco) + ' ' + esc(s.okLabel || 'Pridať') + '</button></div>';
       return h + '</div></div>';
     }
 

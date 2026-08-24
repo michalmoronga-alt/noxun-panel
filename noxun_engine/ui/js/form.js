@@ -344,7 +344,7 @@
   // `body.mode-cab #insertCard { display: none }`). Kamera by tam teda nemala
   // ako najst oznacenu skrinku a bola by to trvalo mrtva ikona (presny opak
   // pravidla „klikatelne je len to, co niekam vedie"). Akcia preto zije v okne
-  // Sablony (`js/templates_dialog.js`), kde vyber v modeli a zoznam sablon
+  // Sablony (sekcia `tpl` Studia, `js/templates.js`), kde vyber v modeli a zoznam sablon
   // existuju SUCASNE — a foti sa TOU ISTOU cestou (TemplatePreviews.capture).
   function tplTileHtml(tp, sel){
     var badge = nxTplBadge(tp);
@@ -538,7 +538,7 @@
     tplTilesBound = true;
   }
   // (saveTemplate/deleteTemplate/applyTemplateToSelected sa V0.4.5 D2 presunuli
-  //  do okna Sablony — js/templates_dialog.js; panel drzi len quick-pick vyber.)
+  //  do sekcie Sablony Studia — js/templates.js; panel drzi len quick-pick vyber.)
 
   // ===== D-32/D-33/D-39: materializacia vkladacej karty z insert STAVU =====
   // Jedina cesta, ktorou sa vkladacia karta plni (reset pri prechode do insert,

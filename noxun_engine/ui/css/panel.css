@@ -546,6 +546,41 @@
             border: 1px solid var(--nx-warnchip-border); border-radius: 6px; cursor: pointer; }
   .rdundo:hover { background: var(--nx-warn-bg); border-color: var(--nx-warn); color: var(--nx-warn-fg); }
   .rdundo .ic { width: 14px; height: 14px; }
+  /* ===== ŠT-3c-1: sekcia ŠABLÓNY v Štúdiu (Š18) =====================
+     Mockup kreslí dlaždice triedami `.tile/.tplph/.tcode/.tname/.tman` — tie
+     v pluginu neexistujú (sú to triedy prototypu) a `.tpltile` Inspectora je
+     scoped `.nx-inspector` a stavaná na 3 stĺpce v úzkom paneli. Sekcia má
+     preto VLASTNÝ blok `stpl*`: širšie okno znesie väčšie dlaždice a náhľad
+     v pomere fotky. Výhradne `--nx-*` tokeny, ikony zo spritu. */
+  .stpltiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+               gap: 8px; margin: 4px 0 10px; }
+  .stpltile { border: 1px solid var(--nx-border); border-radius: 6px; padding: 6px;
+              background: var(--nx-surface); display: flex; flex-direction: column; gap: 2px; }
+  .stpltile:hover { border-color: var(--nx-select); }
+  /* Náhľad a schéma zdieľajú TEN ISTÝ box — výška dlaždice sa nemení ani keď
+     náhľad chýba, príde neskoro alebo sa nepodarí načítať (vzor UI-D2).
+     `contain`: fotka je 3:2, box širší — `cover` by z nej nechal pruh. */
+  .stplpic { position: relative; height: 78px; border-radius: 6px; overflow: hidden;
+             background: var(--nx-surface-sunken); display: flex; align-items: center;
+             justify-content: center; }
+  .stplpic img { display: none; width: 100%; height: 78px; object-fit: contain; }
+  .stplpic.has img { display: block; }
+  .stplpic.has .stplph { display: none; }
+  .stplph { font-size: 11px; color: var(--nx-ink-faint); }
+  .stplname { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stplmeta { font-size: 11px; color: var(--nx-ink-muted); overflow: hidden;
+              text-overflow: ellipsis; white-space: nowrap; }
+  .stplact { display: flex; gap: 4px; margin-top: 3px; }
+  .stplbtn { width: 28px; padding: 3px 0; display: inline-flex; align-items: center;
+             justify-content: center; background: var(--nx-surface-sunken); color: var(--nx-ink-muted);
+             border: 1px solid var(--nx-border); border-radius: 6px; cursor: pointer; }
+  .stplbtn:hover { color: var(--nx-select-strong); border-color: var(--nx-select-accent); }
+  .stplbtn .ic { width: 14px; height: 14px; }
+  /* Mazanie je destruktívne (UI_DIZAJN) — červená rodina, nie neutrálna. */
+  .stpldel:hover { color: var(--nx-danger); border-color: var(--nx-danger-border);
+                   background: var(--nx-danger-bg); }
+  .stplempty { padding: 4px 0 8px; }
+  .stplinfo { font-size: 12px; color: var(--nx-ink-muted); }
   /* ===== V0.4.5 D1 / D-29: Inspector kostra — STICKY dvojradova hlavicka ===== */
   /* D-29 A4: kompenzacia body paddingu (10px) negativnymi marginmi — plna sirka
      bez horizontalneho scrollbaru. A5: z-index POD modalom (60), nepriehladne pozadie. */

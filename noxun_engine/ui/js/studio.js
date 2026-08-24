@@ -51,7 +51,7 @@
 
   // ZRKADLO `StudioDialog::SECTIONS` — autoritou whitelistu je RUBY, tento
   // zoznam len zabrani, aby z okna vyletela hodnota, ktora sekciu nepomenuva.
-  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'rules'];
+  var STUDIO_SECTIONS = ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'rules', 'tpl'];
 
   // ŠT-1b (Š10): 3-stavove nastavenie kontroly hran je ZDIELANY komponent —
   // TEN ISTY markup kresli rail Inspectora (rohovy trojuholnik pri ABS ikone)
@@ -109,7 +109,8 @@
       // ŠT-3b-1: Pravidlá sú SEKCIA (Š17). Okno „Pravidlá kovania" zaniklo;
       // skupina „ABS podľa roly" pribudne v ŠT-3b-2.
       { id: 'rules',  ic: 'settings', t: 'Pravidlá' },
-      { id: 'tpl',    ic: 'star',     t: 'Šablóny',   bridge: 'zatiaľ vlastné okno — presun v ŠT-3' }
+      // ŠT-3c-1: Šablóny sú SEKCIA (Š18) — okno „Šablóny" zaniklo.
+      { id: 'tpl',    ic: 'star',     t: 'Šablóny' }
     ] },
     { grp: 'NASTAVENIA', items: [
       { id: 'sup',    ic: 'truck', t: 'Dodávateľ / Demos',
@@ -138,7 +139,11 @@
     rules: { t: 'Pravidlá',
              hint: 'ABS podľa roly dielca (spoločné, len na čítanie) · kovanie podľa rozmerov — platí pre tento projekt' },
     hw: { t: 'Kovanie',
-          hint: 'katalóg položiek a sety sú spoločné pre všetky zákazky · predvoľby setov projektu zatiaľ v okne' }
+          hint: 'katalóg položiek a sety sú spoločné pre všetky zákazky · predvoľby setov projektu zatiaľ v okne' },
+    // ŠT-3c-1 (Š18): knižnica je spoločná pre všetky zákazky; NOVÚ šablónu
+    // ukladáš v Inspectore (má po ruke označenú skrinku), tu ich spravuješ.
+    tpl: { t: 'Šablóny',
+           hint: 'knižnica je spoločná pre všetky zákazky · novú uložíš v Inspectore z označenej skrinky' }
   };
 
   // ---------------------------------------------------------------- helpers
@@ -857,6 +862,12 @@
       else box.innerHTML = '';
       return;
     }
+    // ŠT-3c-1: a pre sekciu Šablóny `js/templates.js`.
+    if (studioSec === 'tpl'){
+      if (typeof tplRenderTools === 'function') tplRenderTools(staleFlag);
+      else box.innerHTML = '';
+      return;
+    }
     // Š10: lišta sekcie Kontrola nesie OBA prepínače (a nič iné — exporty
     // kontrola nemá). Jeden riadok, žiadny nový blok: vertikálny priestor
     // je vzácny a nastavenie hrán je overlay pod tlačidlom.
@@ -1039,6 +1050,15 @@
     if (studioSec === 'rules'){
       if (typeof rulesRenderBody === 'function') rulesRenderBody();
       else box.innerHTML = '<div class="muted">Pravidlá sa nenačítali (js/rules.js).</div>';
+      return;
+    }
+    // ŠT-3c-1: telo sekcie Šablóny kreslí `js/templates.js` — dôvod je iný než
+    // pri formulároch vyššie: sekcia si po vykreslení PÝTA PNG náhľady a
+    // odpovede nasadzuje do UŽ EXISTUJÚCICH dlaždíc (výmena uzla by odpojila
+    // cieľ kliku aj práve doručený obrázok).
+    if (studioSec === 'tpl'){
+      if (typeof tplRenderBody === 'function') tplRenderBody();
+      else box.innerHTML = '<div class="muted">Šablóny sa nenačítali (js/templates.js).</div>';
       return;
     }
     if (studioSec === 'ctrl') box.innerHTML = ctrlSection();
