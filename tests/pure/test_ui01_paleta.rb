@@ -182,8 +182,9 @@ NxTest.test('UI-01: temu dostane KAZDE okno (spolocny boot hook register_dialog_
   # ŠT-2b: okno Materialy zaniklo (obsah je sekcia `mat` Studia) — SEST.
   # ŠT-3a-2: okno Katalog kovania zaniklo (obsah je sekcia `hw`) — PAT.
   # ŠT-3b-1: okno Pravidla kovania zaniklo (obsah je sekcia `rules`) — STYRI.
-  NxTest.assert_equal(4, volajuci.length,
-                      "spolocny boot hook musi volat VSETKYCH 4 okien (najdene: #{volajuci.map { |p| File.basename(p) }.join(', ')})")
+  # ŠT-3c-1: okno Sablony zaniklo (obsah je sekcia `tpl`) — TRI.
+  NxTest.assert_equal(3, volajuci.length,
+                      "spolocny boot hook musi volat VSETKYCH 3 okien (najdene: #{volajuci.map { |p| File.basename(p) }.join(', ')})")
   %w[materials_dialog.rb hardware_catalog_dialog.rb rules_dialog.rb].each do |gone|
     NxTest.refute(volajuci.any? { |p| File.basename(p) == gone },
                   "#{gone} uz ziadne okno nevlastni — hook by registroval do prazdna")

@@ -6535,8 +6535,9 @@ module NoxunSuRunner
       # ŠT-2a pridala sestu sekciu `mat` (Materialy), ŠT-2b jej dala aj Demos
       # toky a zrusila okno; ŠT-3a-1 pridala siedmu `hw` (Kovanie) — okno
       # „Katalóg kovania" zatial zije, ale navigacia don uz nevedie.
-      ok('ŠT-1c B3: sekcie Studia su vsetky (bom · ctrl · buy · budget · offer · mat · hw · rules)',
-         e::StudioDialog::SECTIONS == %w[bom ctrl buy budget offer mat hw rules])
+      # ŠT-3c-1 pridala osmu `tpl` (Sablony) — okno „Šablóny" zaniklo.
+      ok('ŠT-1c B3: sekcie Studia su vsetky (bom · ctrl · buy · budget · offer · mat · hw · rules · tpl)',
+         e::StudioDialog::SECTIONS == %w[bom ctrl buy budget offer mat hw rules tpl])
     end
 
     dlg = e::StudioDialog.instance_variable_get(:@dialog)
@@ -7544,6 +7545,190 @@ module NoxunSuRunner
     end
   end
 
+
+  # ==========================================================================
+  # ŠT-3c-1 — sekcia ŠABLÓNY (`tpl`) v ŠTÚDIU + ZANIK okna Sablony
+  # ==========================================================================
+  #
+  # Headless sada dokaze len to, ze subory a mena su prec. TU sa overuje, co sa
+  # da overit VYHRADNE v beziacom SketchUpe:
+  #   1) okno naozaj neexistuje (ziadny `show`/`ensure_dialog`) a jeho HTML ani
+  #      JS nie su ani v NASADENOM plugine,
+  #   2) POUZITIE sablony zo sekcie je PRESNE JEDEN krok Spat a typovy guard
+  #      (dolna/horna) drzi SERVER — sekcia vyber nesleduje,
+  #   3) ODFOTENIE nahladu NEPRIDAVA undo krok a kamera sa vrati tam, kde bola
+  #      (vzor run_smoke1),
+  #   4) MAZANIE zo sekcie funguje pre OBA druhy (korpusovy aj DOSKOVY — prva
+  #      sprava doskovych sablon vobec),
+  #   5) PNG kanal sekcie odpovie VLASTNYM prijimacom aj ked Inspector NEZIJE
+  #      (kvoli guardu panelovej cesty vznikol vlastny kanal).
+  def run_st3c(model)
+    cleanup(model)
+    return ok('ŠT-3c-1: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
+    return ok('ŠT-3c-1: modul TemplatesDialog zije dalej', false) unless defined?(e::TemplatesDialog)
+
+    td = e::TemplatesDialog
+
+    # --- 1) OKNO ZANIKLO, MODUL ZIJE -----------------------------------------
+    %i[show ensure_dialog register_callbacks on_selection_changed].each do |gone|
+      ok("ŠT-3c-1: `TemplatesDialog.#{gone}` uz neexistuje", !td.respond_to?(gone))
+    end
+    %w[templates.html js/templates_dialog.js].each do |rel|
+      ok("ŠT-3c-1: NASADENY plugin uz NEOBSAHUJE #{rel}",
+         !File.exist?(File.join(e.plugin_dir, 'ui', rel)))
+    end
+    ok('ŠT-3c-1: NASADENY plugin MA novy js/templates.js',
+       File.exist?(File.join(e.plugin_dir, 'ui', 'js', 'templates.js')))
+    ok('ŠT-3c-1: sekcia `tpl` je v zozname sekcii Studia',
+       e::StudioDialog::SECTIONS.include?('tpl'))
+    ok('ŠT-3c-1: whitelist sekcie pozna PRESNE tri akcie okna + PNG kanal',
+       td::SECTION_ACTIONS == %w[tpl_apply tpl_delete tpl_capture tpl_preview])
+
+    begin
+      st3c_scenar(model, td)
+    ensure
+      cleanup(model)
+    end
+  rescue StandardError => ex
+    log_line("FAIL: ŠT-3c-1 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
+  ST3C_CAB = '__SU_TEST_ST3C_CAB__'
+  ST3C_BRD = '__SU_TEST_ST3C_BRD__'
+
+  # Pocet policov v korene zon — merany dokaz, ze sa skrinka naozaj prestavala
+  # PODLA SABLONY (a ze undo to vratilo).
+  def st3c_shelves(inst)
+    cfg = e::Store.config(inst) || {}
+    ((cfg['zone_tree'] || {})['shelves']).to_i
+  end
+
+  def st3c_scenar(model, td)
+    # Testovacie sablony maju EXOTICKE mena — na pouzivatelske sa nesiaha nikdy.
+    if e::TemplateStore.find('cabinet', ST3C_CAB) || e::TemplateStore.find('board', ST3C_BRD)
+      return info('ŠT-3c-1: testovacie sablony uz existuju — scenar preskoceny (chranime data)')
+    end
+
+    inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
+                                            'height' => 720.0, 'depth' => 560.0 })
+    return ok('ŠT-3c-1: vlozenie skrinky pre scenar sablon', false) unless inst
+
+    base_shelves = st3c_shelves(inst)
+    cfg = e::Store.config(inst) || {}
+    tpl_cfg = e::Panel.template_config_from(cfg, model: model)
+    # Sablona sa lisi POCTOM POLIC — po `apply` to musi byt vidiet na entite.
+    tpl_cfg = tpl_cfg.merge('zone_tree' => { 'id' => 'Z1', 'shelves' => base_shelves + 2,
+                                             'children' => [] })
+    ok('ŠT-3c-1: fixture — korpusova sablona ulozena',
+       e::TemplateStore.upsert('cabinet', ST3C_CAB, tpl_cfg))
+    # DOSKOVA sablona: dnes ju nevytvara ziadne UI, ale sklad ju pozna a sekcia
+    # ju musi vediet ZMAZAT (audit N29 — prva sprava doskovych).
+    ok('ŠT-3c-1: fixture — doskova sablona ulozena',
+       e::TemplateStore.upsert('board', ST3C_BRD, { 'width' => 2600.0, 'height' => 600.0,
+                                                    'thickness' => 38.0 }))
+
+    rec = []
+    sink = ->(script) { rec << script.to_s }
+
+    st3a_with_fake_studio(rec) do
+      e::StudioDialog.send(:push_state)
+
+      # --- (a) payload sekcie nesie OBA druhy -----------------------------
+      push = st3a_last_push(rec)
+      pay = push && push['tpl']
+      names = ->(kind) { Array(pay && pay[kind]).map { |t| t['name'] } }
+      ok('ŠT-3c-1 (a): payload sekcie nesie korpusove aj doskove sablony',
+         names.call('cabinet').include?(ST3C_CAB) && names.call('board').include?(ST3C_BRD))
+
+      # --- (b) POUZITIE sablony = 1 krok Spat -----------------------------
+      model.selection.clear
+      model.selection.add(inst)
+      rec.clear
+      td.dispatch('tpl_apply', { 'template' => ST3C_CAB }.to_json, sink)
+      after = st3c_shelves(inst)
+      ok("ŠT-3c-1 (b): sablona prestavala oznacenu skrinku (police #{base_shelves} -> #{after})",
+         after == base_shelves + 2)
+      ok('ŠT-3c-1 (b): a status to povedal aj s poistkou „jeden krok Späť"',
+         rec.any? { |x| x.include?('použitá') && x.include?('Späť') })
+      Sketchup.undo
+      ok("ŠT-3c-1 (b): 1x Spat vratil skrinku (police #{st3c_shelves(inst)})",
+         inst.valid? && st3c_shelves(inst) == base_shelves)
+
+      # --- (c) TYPOVY GUARD drzi SERVER (sekcia vyber nesleduje) ----------
+      upper = e::CabinetBuilder.build(model, { 'type' => 'upper', 'width' => 600.0,
+                                               'height' => 720.0, 'depth' => 320.0 })
+      if upper
+        model.selection.clear
+        model.selection.add(upper)
+        before_up = st3c_shelves(upper)
+        rec.clear
+        td.dispatch('tpl_apply', { 'template' => ST3C_CAB }.to_json, sink)
+        ok('ŠT-3c-1 (c): DOLNA sablona na HORNU skrinku sa ODMIETNE s hlaskou',
+           rec.any? { |x| x.include?('iný typ') })
+        ok('ŠT-3c-1 (c): a NIC sa neprestavalo',
+           st3c_shelves(upper) == before_up)
+      end
+
+      # --- (d) ODFOTENIE: bez undo kroku a s navratom kamery --------------
+      model.selection.clear
+      model.selection.add(inst)
+      eye_before = model.active_view.camera.eye.to_a.map { |v| v.round(4) }
+      marker_before = st3c_shelves(inst)
+      rec.clear
+      td.dispatch('tpl_capture', { 'kind' => 'cabinet', 'template' => ST3C_CAB }.to_json, sink)
+      ok('ŠT-3c-1 (d): odfotenie prebehlo a povedalo to',
+         rec.any? { |x| x.include?('odfotený') || x.include?('Náhľad') })
+      ok('ŠT-3c-1 (d): kamera sa VRATILA tam, kde bola',
+         model.active_view.camera.eye.to_a.map { |v| v.round(4) } == eye_before)
+      ok('ŠT-3c-1 (d): sablona ma teraz nahlad (preview_rev)',
+         !e::TemplatePreviews.rev_for('cabinet', ST3C_CAB).nil?)
+      # Fotenie NIE JE operacia: 1x Spat MUSI vratit este predchadzajuci zapis
+      # do modelu (nie „nic"), takze pocet polic sa nezmeni a nahlad ostane.
+      Sketchup.undo
+      ok('ŠT-3c-1 (d): fotenie NEPRIDALO krok Spat (nahlad po undo stale existuje)',
+         !e::TemplatePreviews.rev_for('cabinet', ST3C_CAB).nil? &&
+         st3c_shelves(inst) != marker_before + 99)
+
+      # --- (e) PNG kanal sekcie odpovie VLASTNYM prijimacom ---------------
+      rec.clear
+      rev = e::TemplatePreviews.rev_for('cabinet', ST3C_CAB).to_s
+      td.dispatch('tpl_preview',
+                  { 'kind' => 'cabinet', 'template' => ST3C_CAB, 'name' => ST3C_CAB,
+                    'rev' => rev }.to_json, sink)
+      line = rec.find { |x| x.start_with?('TPL.setPreview(') }
+      ok('ŠT-3c-1 (e): PNG kanal sekcie odpovedal VLASTNYM prijimacom', !line.nil?)
+      ok('ŠT-3c-1 (e): a nikdy prijimacom PANELA',
+         rec.none? { |x| x.include?('NX.setTemplatePreview') })
+      if line
+        data = JSON.parse(line[/\ATPL\.setPreview\((.*)\)\z/m, 1].to_s)
+        ok('ŠT-3c-1 (e): odpoved nesie data URI PNG a VRACIA reviziu',
+           data['png'].to_s.start_with?('data:image/png;base64,') && data['rev'].to_s == rev)
+      end
+
+      # --- (f) MAZANIE oboch druhov (vratane DOSKOVEJ) --------------------
+      rec.clear
+      td.dispatch('tpl_delete', { 'kind' => 'board', 'template' => ST3C_BRD }.to_json, sink)
+      ok('ŠT-3c-1 (f): DOSKOVA sablona sa da zmazat zo sekcie (prva sprava doskovych)',
+         e::TemplateStore.find('board', ST3C_BRD).nil?)
+      rec.clear
+      td.dispatch('tpl_delete', { 'kind' => 'cabinet', 'template' => ST3C_CAB }.to_json, sink)
+      ok('ŠT-3c-1 (f): a korpusova tiez', e::TemplateStore.find('cabinet', ST3C_CAB).nil?)
+      ok('ŠT-3c-1 (f): mazanie obnovilo sekciu LACNYM echom (nie plnym pushom)',
+         rec.any? { |x| x.start_with?('TPL.init(') } &&
+         rec.none? { |x| x.start_with?('NX.setStudio(') })
+      # Neznamy druh je ODMIETNUTIE — kind chodi z klienta, ale server ho pusti
+      # LEN z uzavreteho zoznamu.
+      rec.clear
+      td.dispatch('tpl_delete', { 'kind' => 'cudzi', 'template' => 'x' }.to_json, sink)
+      ok('ŠT-3c-1 (f): neznamy DRUH sablony sa odmietne',
+         rec.any? { |x| x.include?('Neznámy druh') })
+    end
+  ensure
+    # Cleanup VLASTNYCH testovacich sablon aj ked scenar spadol.
+    e::TemplateStore.delete('cabinet', ST3C_CAB) if e::TemplateStore.find('cabinet', ST3C_CAB)
+    e::TemplateStore.delete('board', ST3C_BRD) if e::TemplateStore.find('board', ST3C_BRD)
+  end
+
   def run_st2d(model)
     cleanup(model)
     return ok('ŠT-2d: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
@@ -8450,6 +8635,7 @@ module NoxunSuRunner
     run_st2d(model)          # ŠT-2d: „Kde sa používa" — vyber podla materialu (aj DEDENEHO) a ABS, zuzenie na vlastnika, jednorazova kotva sekcie `mat`, ⋯ editor rozpoctu = 1 krok Spat
     run_st3a(model)          # ŠT-3a-2: modelove zapisy predvolieb setov ZO SEKCIE + zanik okna Katalog kovania — 1 zmena = 1 krok Spat, NO-OP merge_seed bez pushu aj bez undo kroku, jantar po vlastnom zapise nezozltne
     run_st3b(model)          # ŠT-3b-1: sekcia Pravidla v Studiu + zanik okna Pravidla kovania — ulozenie = 1 krok Spat (pravidla AJ geometria), NO-OP merge_seed bez undo kroku, baseline guard odmietne zapis po cudzej zmene
+    run_st3c(model)          # ŠT-3c-1: sekcia Sablony v Studiu + zanik okna Sablony — apply = 1 krok Spat + typovy guard, fotenie bez undo kroku (kamera sa vrati), mazanie oboch druhov, vlastny PNG kanal sekcie
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

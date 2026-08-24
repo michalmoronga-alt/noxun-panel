@@ -47,8 +47,8 @@ NxTest.test('ŠT-1b: sekcia `ctrl` je v RUBY whiteliste a JS je jeho ZRKADLO') d
   shell = S1B_SHELL_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
   # ŠT-1c PR A pribudla sekcia `buy` (Nakup kovania), PR B1 sekcia `budget`
   # (Rozpocet) — zoznam musi sediet vo VSETKYCH TROCH suboroch.
-  NxTest.assert_equal(%w[bom ctrl buy budget offer mat hw rules], rb,
-                      'v Studiu ziju sekcie Kusovník, Kontrola, Nákup, Rozpočet, Ponuka, Materiály, Kovanie a Pravidlá')
+  NxTest.assert_equal(%w[bom ctrl buy budget offer mat hw rules tpl], rb,
+                      'v Studiu ziju sekcie Kusovník, Kontrola, Nákup, Rozpočet, Ponuka, Materiály, Kovanie, Pravidlá a Šablóny')
   NxTest.assert_equal(rb, js, 'zoznam v studio.js sa nesmie rozist s Ruby autoritou')
   NxTest.assert_equal(rb, shell, 'ani zrkadlo v paneli (shell.js)')
 end
@@ -333,7 +333,7 @@ NxTest.test('ŠT-1c PR B3: ⚠ chip okna Vyroba zanikol spolu s oknom') do
   # ⚠ warnpanel Inspectora (test vyssie) a semafor sekcie v Studiu.
   NxTest.refute(File.exist?(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production.html')),
                 'HTML zaniknuteho okna uz v repe nie je')
-  NxTest.assert(S1B_STUDIO_RB.include?("SECTIONS = %w[bom ctrl buy budget offer mat hw rules]"),
+  NxTest.assert(S1B_STUDIO_RB.include?("SECTIONS = %w[bom ctrl buy budget offer mat hw rules tpl]"),
                 'vsetkych pat obsahov zaniknuteho okna Vyroba zije ako sekcie Studia ' \
                 '(+ `mat` zo ŠT-2a a `hw` zo ŠT-3a-1)')
 end
