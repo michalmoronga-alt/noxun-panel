@@ -178,7 +178,9 @@ NxTest.test('ŠT-3b-1 (review P2): SERVER overuje `model_guid` Z PAYLOADU') do
                 'a porovnava sa s modelom — TOLERANTNE (prazdny udaj guard neblokuje)')
   guard = save[/if !guid\.empty\?.*?\n          end\n/m].to_s
   NxTest.assert(guard.include?('refresh_studio(bump: false)'),
-                'odmietnutie nacita formular nanovo — BEZ zdvihu generacie (nic sa nezapisalo)')
+                'PREPNUTY DOKUMENT je cudzi pre VSETKY sekcie — tu ZAMERNE ostava PLNY push ' \
+                '(echo jednej sekcie by nechalo kusovnik a rozpocet na cislach ineho projektu); ' \
+                'BEZ zdvihu generacie, lebo sa nic nezapisalo')
   NxTest.assert(save.index('guid != model_guid(model)') < save.index('rebuild_many'),
                 'guard je PRED prestavbou skriniek')
 end
@@ -186,8 +188,15 @@ end
 NxTest.test('ŠT-3b-1: odmietnuty zapis NIC nezapise a formular sa nacita nanovo') do
   save = ST3B_RULES_RB[/def handle_save\(payload\).*?\n        end\n/m].to_s
   head = save[/\A.*?baseline_valid\?\(model\).*?\n          end\n/m].to_s
-  NxTest.assert(head.include?('refresh_studio(bump: false)'),
-                'formular sa nacita nanovo PLNYM pushom — a BEZ zdvihu generacie (nic sa nezapisalo)')
+  # ŠT-3b-2c1: baseline vetva presla na LACNE ECHO sekcie — plny push okna ide
+  # cez zber modelu a ten deduplikuje ID kopii, cize ODMIETNUTY zapis by model
+  # ZMENIL (ten isty nalez ako P1 pri resete). `force: true` je tu podstatny:
+  # pravidla na modeli sa zmenili, takze rozpisany formular UZ NEPLATI a MUSI
+  # sa prekreslit — je to JEDINA vetva, kde sa rozpisane hodnoty vedome stracaju.
+  NxTest.assert(head.include?('push_section_echo(model, force: true)'),
+                'formular sa nacita nanovo ECHOM sekcie — bez dedupu a s vynutenym prekreslenim')
+  NxTest.refute(head.include?('refresh_studio'),
+                'ziadny plny push okna (jeho zber ZAPISUJE do modelu)')
   NxTest.assert(head.include?('return set_status'), 'a odmietnutie sa povie NAHLAS')
   NxTest.assert(save.index('baseline_valid?(model)') < save.index('rebuild_many'),
                 'guard je PRED prestavbou skriniek, nie za nou')
@@ -866,7 +875,8 @@ NxTest.test('ŠT-3b-2b (review P1): ODMIETNUTIE nesmie siahnut na model') do
   NxTest.refute(echo.include?('fresh_collect'),
                 'a nikdy cez `fresh_collect` (ten dedup spusta)')
   NxTest.assert(echo.include?('RD.setSection'), 'a posiela ho vlastnym prijimacom sekcie')
-  NxTest.assert(ST3B_RULES_JS.include?('setSection: function(r)'), 'ktory na klientovi existuje')
+  NxTest.assert(ST3B_RULES_JS.include?('setSection: function(r, force)'),
+                'ktory na klientovi existuje — a vie aj VYNUTIT prekreslenie formulara')
   # Dokaz, ze sa nekontroluje prazdno: `fresh_collect` dedup naozaj spusta.
   fc = ST3B2_PC_RB[/def fresh_collect\(model\).*?\n      end\n/m].to_s
   NxTest.assert(fc.include?('dedup_copies'),
@@ -968,4 +978,107 @@ NxTest.test('ŠT-3b-2b (review P2-6): dvojca sa hlada TOU ISTOU identitou ako v 
   body = st3b2_rd_body('detached_twin?')
   NxTest.assert(body.include?('twin_identity(i, cid)'),
                 'hladanie ide cez tuto identitu, nie cez surovy `part_key`')
+end
+
+# ============================================================================
+# ŠT-3b-2c1 — SERVEROVA VALIDACIA PRAVIDIEL (brana pred ulozenim)
+#
+# Co tato cast strazi (a preco to klikanim neoveris):
+#   1. Klientska `rdValidate` je LEN to, co sa da povedat bez servera. Do
+#      `handle_save` sa da dostat aj mimo nej (starsi cachovany DOM, in-SU
+#      volanie, buduci iny klient) — brana musi stat NA SERVERI.
+#   2. Vynutenie NESMIE byt v `normalize_rules`: ma dvanast volajucich a vacsina
+#      CITA (load, project_rules, evaluate, seed-merge). Keby validovala, LEGACY
+#      snapshot z .skp by sa pri CITANI ticho orezal — presne ta tichá strata
+#      dat, ktorej ma brana zabranit.
+#   3. Kriterium musi visiet na `kind`, nie na pritomnosti kluca `bands`:
+#      seedove pravidlo vysuvov nesie `bands` AJ `series` naraz.
+#   4. Klient a server musia mat ROVNAKE kriteria — inak vznikne formular,
+#      ktory sa neda ulozit a nikto nevie preco (alebo naopak diera).
+ST3B2C1_FIXTURE = JSON.parse(
+  File.read(File.join(NxTest::ROOT, 'tests', 'fixtures', 'rules_validation_parity.json'),
+            encoding: 'UTF-8')
+)
+
+NxTest.test('ŠT-3b-2c1: `rules_problems` je CISTA brana — bez IO a bez zapisu') do
+  hr = Noxun::Engine::HardwareRules
+  NxTest.assert(hr.respond_to?(:rules_problems), 'funkcia existuje')
+  body = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'hardware_rules.rb'),
+                   encoding: 'UTF-8')[/def rules_problems\(rules\).*?\n      end\n/m].to_s
+  NxTest.assert(!body.empty?, 'telo sa naslo')
+  %w[write set_project_rules JsonFileStore model.set_attribute].each do |io|
+    NxTest.refute(body.include?(io), "ziadne IO (#{io}) — je to CISTA funkcia")
+  end
+  NxTest.assert_equal([], hr.rules_problems(nil), 'nil vstup nespadne')
+  NxTest.assert_equal([], hr.rules_problems(['nie je hash']), 'ani smetie v poli')
+end
+
+NxTest.test('ŠT-3b-2c1: kriterium visi na `kind`, nie na pritomnosti kluca `bands`') do
+  hr = Noxun::Engine::HardwareRules
+  # Seedove pravidlo vysuvov nesie OBOJE — podla kluca by sa mu validovali
+  # pasma, ktore vobec nepouziva, a projekt by sa nedal ulozit.
+  seed_slide = { 'rule_id' => 'vysuvy', 'output' => 'slide', 'kind' => 'fit_series',
+                 'enabled' => true, 'series' => [400.0], 'bands' => [] }
+  NxTest.assert_equal([], hr.rules_problems([seed_slide]),
+                      'fit_series s prazdnymi `bands` je v poriadku')
+  bands_rule = { 'rule_id' => 'zavesy', 'output' => 'hinge', 'kind' => 'bands',
+                 'enabled' => true, 'bands' => [{ 'max' => 900.0, 'quantity' => 2 }] }
+  problems = hr.rules_problems([bands_rule])
+  NxTest.assert_equal(1, problems.length, 'derave pasma sa odmietnu')
+  NxTest.assert_equal('zavesy', problems.first['rule_id'], 'nalez nesie ADRESU pravidla')
+  NxTest.assert(problems.first['message'].include?('Závesy'),
+                'a hlaska ho menuje recou stolara (pri desiatich pravidlach inak nevie, co opravit)')
+  NxTest.assert(problems.first['message'].include?('všetko nad'), 'aj tym, CO chyba')
+
+  # Neznamy `kind` z NOVSEJ verzie nesmie zablokovat ulozenie (forward-compat:
+  # `normalize_rules` nezname kluce zachovava, brana ich nesmie zhodit).
+  NxTest.assert_equal([], hr.rules_problems([{ 'rule_id' => 'x', 'output' => 'handle',
+                                               'kind' => 'buduci_tvar', 'enabled' => true }]),
+                      'pravidlo novsej verzie prejde')
+end
+
+NxTest.test('ŠT-3b-2c1: CITACIE cesty ostavaju NEDOTKNUTE — validuje sa LEN pri ulozeni') do
+  hr_src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'hardware_rules.rb'),
+                     encoding: 'UTF-8')
+  norm = hr_src[/def normalize_rules\(rules\).*?\n      end\n/m].to_s
+  NxTest.refute(norm.include?('rules_problems'),
+                'normalize NEVALIDUJE — inak by sa legacy snapshot pri CITANI ticho orezal')
+  %w[ensure_project_rules! merge_project_seed! project_seed_plan set_project_rules load].each do |m|
+    body = hr_src[/def #{Regexp.escape(m)}(\(.*?\))?.*?\n      end\n/m].to_s
+    NxTest.refute(body.include?('rules_problems'),
+                  "#{m}: seed a stavba validaciu NEVOLAJU (builder nesmie odmietnut stavbu)")
+  end
+  # LEGACY snapshot sa MUSI dat precitat — validacia mu nesmie stat v ceste.
+  legacy = [{ 'rule_id' => 'zavesy', 'output' => 'hinge', 'kind' => 'bands', 'enabled' => true,
+              'bands' => [{ 'max' => 900, 'quantity' => 2 }] }]
+  read_back = Noxun::Engine::HardwareRules.normalize_rules(legacy)
+  NxTest.assert_equal(1, read_back.length, 'derave legacy pravidlo sa NACITA (a vyhodnoti)')
+  NxTest.assert_equal(1, Noxun::Engine::HardwareRules.rules_problems(read_back).length,
+                      'ale ULOZIT sa uz neda — az zapis je branou')
+
+  save = ST3B_RULES_RB[/def handle_save\(payload\).*?\n        end\n/m].to_s
+  NxTest.assert(save.include?('HardwareRules.rules_problems(rules)'), 'brana je v ceste ULOZENIA')
+  NxTest.assert(save.index('normalize_rules') < save.index('rules_problems'),
+                'a stoji AZ ZA normalizaciou — validuje sa presne to, co sa zapise')
+  NxTest.assert(save.index('rules_problems') < save.index('rebuild_many'),
+                'este PRED prestavbou skriniek')
+  reject = save[/unless problems\.empty\?.*?\n          end\n/m].to_s
+  NxTest.assert(reject.include?('return set_status'), 'odmietnutie sa povie NAHLAS')
+  NxTest.refute(reject.include?('push_section_echo') || reject.include?('refresh_studio'),
+                'a formular sa NEPREKRESLUJE — pouzivatel ma svoje hodnoty OPRAVIT, nie o ne prist')
+end
+
+NxTest.test('ŠT-3b-2c1 (PARITA): server a klient maju ROVNAKE kriteria') do
+  hr = Noxun::Engine::HardwareRules
+  cases = ST3B2C1_FIXTURE['cases']
+  NxTest.assert(cases.length >= 10, 'fixtura ma dost pripadov (inak parita nic nestrazi)')
+  cases.each do |c|
+    rules = hr.normalize_rules(c['rules'])
+    got = !hr.rules_problems(rules).empty?
+    NxTest.assert_equal(c['invalid'], got, "server: #{c['name']}")
+  end
+  # Ten isty subor cita aj JS sada — ked sa kriteria rozidu, padne prave jedna.
+  js = File.read(File.join(NxTest::ROOT, 'tests', 'js', 'test_st3b_rules.js'), encoding: 'UTF-8')
+  NxTest.assert(js.include?('rules_validation_parity.json'),
+                'JS sada cita TU ISTU fixturu (inak by parita bola len na papieri)')
 end
