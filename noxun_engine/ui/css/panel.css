@@ -513,7 +513,7 @@
   .rdnm { flex: 0 0 34%; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
   .rddesc { flex: 1 1 0; min-width: 0; color: var(--nx-ink-muted); overflow: hidden; text-overflow: ellipsis; }
   .rdval { flex: 0 0 auto; max-width: 45%; text-align: right; overflow: hidden; text-overflow: ellipsis; }
-  .rdact { flex: 0 0 32px; display: inline-flex; justify-content: flex-end; align-self: center; }
+  .rdact { flex: 0 0 62px; display: inline-flex; gap: 4px; justify-content: flex-end; align-self: center; }
   /* Ručný zásah = JANTÁR (`--nx-warn*`, UI_DIZAJN „Upozornenie / override").
      Je to ten istý jazyk, akým je override označený v Inspectore — nie semafor
      Kontroly: riadok nehovorí o chybe, ale o tom, že tu rozhodol človek. */
@@ -538,6 +538,14 @@
            border: 1px solid var(--nx-border); border-radius: 6px; cursor: pointer; }
   .rdeye:hover { color: var(--nx-select-strong); border-color: var(--nx-select-accent); }
   .rdeye .ic { width: 14px; height: 14px; }
+  /* ŠT-3b-2b: „vrátiť na pravidlo". Je to ZÁPIS do modelu, takže tlačidlo nesie
+     jantárovú rodinu riadku (nie `.danger` — nič sa nemaže nenávratne, jeden
+     krok Späť ho vráti) a je o odtieň výraznejšie než oko vedľa neho. */
+  .rdundo { width: 26px; padding: 3px 0; display: inline-flex; align-items: center; justify-content: center;
+            background: var(--nx-warn-bg-soft); color: var(--nx-warnchip-fg);
+            border: 1px solid var(--nx-warnchip-border); border-radius: 6px; cursor: pointer; }
+  .rdundo:hover { background: var(--nx-warn-bg); border-color: var(--nx-warn); color: var(--nx-warn-fg); }
+  .rdundo .ic { width: 14px; height: 14px; }
   /* ===== V0.4.5 D1 / D-29: Inspector kostra — STICKY dvojradova hlavicka ===== */
   /* D-29 A4: kompenzacia body paddingu (10px) negativnymi marginmi — plna sirka
      bez horizontalneho scrollbaru. A5: z-index POD modalom (60), nepriehladne pozadie. */
