@@ -496,7 +496,12 @@
   .rband .bmaxfill { width: 64px; display: inline-block; }
   .rband .bdel { flex: 0 0 auto; width: 26px; padding: 2px 0; }
   .rdsave { margin-top: 10px; }
-  .rdchk { display: block; font-size: 12px; color: var(--nx-ink-label); margin-bottom: 6px; }
+  /* ŠT-3b-1: checkbox „aj ako globálnu predvoľbu" sa presťahoval z pätky
+     zaniknutého okna do LIŠTY sekcie. `display:block` + spodný margin ho vo flexe
+     `.sectools` odsadával od ostatných tlačidiel — inline-flex ho zarovná na stred
+     riadku a `white-space: nowrap` mu zabráni zalomiť lištu. */
+  .rdchk { display: inline-flex; align-items: center; gap: 5px; font-size: 12px;
+           color: var(--nx-ink-label); white-space: nowrap; }
   /* ===== V0.4.5 D1 / D-29: Inspector kostra — STICKY dvojradova hlavicka ===== */
   /* D-29 A4: kompenzacia body paddingu (10px) negativnymi marginmi — plna sirka
      bez horizontalneho scrollbaru. A5: z-index POD modalom (60), nepriehladne pozadie. */

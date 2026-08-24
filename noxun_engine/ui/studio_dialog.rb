@@ -43,7 +43,8 @@ module Noxun
       # (`studio.js`, `NXShell.STUDIO_SECTIONS`) su pohodlie, nie ochrana
       # (zhodu strazi guard test): autoritou je VZDY Ruby.
       # ŠT-3a-1 pridala KOVANIE (`hw` — druha ziva polozka skupiny KATALOGY).
-      SECTIONS = %w[bom ctrl buy budget offer mat hw].freeze
+      # ŠT-3b-1 pridala PRAVIDLÁ (`rules` — tretia ziva polozka skupiny KATALOGY).
+      SECTIONS = %w[bom ctrl buy budget offer mat hw rules].freeze
 
       # ŠT-2a/2b: akcie katalogu materialov, ktore smie poslat SEKCIA `mat`,
       # ziju v JEDINOM zozname — `MaterialsDialog::SECTION_ACTIONS`. Telo
@@ -67,8 +68,10 @@ module Noxun
       # okna. ŠT-3a-2: okno „Katalóg kovania" ZANIKLO uplne (aj s troma
       # MODELOVYMI zapismi predvolieb setov projektu), takze zanikla aj jeho
       # vlastna cesta `hw_open_window` — sekcia dnes vie VSETKO.
+      # ŠT-3b-1: `rules` z tejto tabulky VYPADLO — Pravidlá su ZIVA sekcia
+      # tohto okna a okno „Pravidlá kovania" ZANIKLO uplne.
       WINDOW_BRIDGES = {
-        'rules' => 'RulesDialog', 'tpl' => 'TemplatesDialog',
+        'tpl' => 'TemplatesDialog',
         'sup' => 'SupplierSettingsDialog', 'bset' => 'SupplierSettingsDialog'
       }.freeze
 
@@ -77,7 +80,6 @@ module Noxun
 
       # Slovenske hlasky premosteni — texty sklada SERVER (jedna autorita).
       BRIDGE_STATUS = {
-        'rules' => 'Otváram okno Pravidlá kovania (presun do Štúdia príde v dávke ŠT-3).',
         'tpl' => 'Otváram okno Šablóny (presun do Štúdia príde v dávke ŠT-3).',
         # Poctivo: „Dodávateľ / Demos" nema DNES vlastne okno. Sadzby dodavatela
         # ziju v okne Nastavenia rozpoctu, vazba na Demos je od ŠT-2b v SEKCII
@@ -839,6 +841,51 @@ module Noxun
           nil
         end
 
+        # --- ŠT-3b-1: sekcia PRAVIDLÁ (`rules`) ----------------------------
+        #
+        # Presun formulára okna „Pravidlá kovania" (Š17, skupina „Kovanie podľa
+        # rozmerov"). Kanal je vzor `hw`, len JEDNODUCHSI: modul nema ziadny
+        # asynchronny beh, takze netreba session token ani odchodovy hook.
+        #
+        # Stav sekcie chodi PLNYM pushom pod klucom `rules` — ziadna zapadka
+        # (`full_pending`): pravidla su maly JSON (jednotky zaznamov, ziadne
+        # `row_rev` per polozka ako katalog), takze plny payload pri kazdom
+        # pushi je lacnejsi nez druhy kanal.
+        def rules_actions
+          defined?(RulesDialog) ? RulesDialog::SECTION_ACTIONS : []
+        end
+
+        def do_rules(name, payload)
+          return set_status('Pravidlá kovania nie sú načítané.', true) unless defined?(RulesDialog)
+
+          RulesDialog.dispatch(name, payload, rules_sink)
+        end
+
+        # Adresat odpovedi: TOTO okno. `RulesDialog` posiela `RD.*` volania —
+        # sekcia ma presne tie iste prijimace, lebo bezi na TOM ISTOM
+        # `js/rules.js`.
+        def rules_sink
+          ->(script) { js(script) }
+        end
+
+        # VEREJNY vstup pre `RulesDialog` mimo synchronneho volania sekcie
+        # (`js` je private, patri kanalu okna) — vzor `hw_js`.
+        def rules_js(script)
+          js(script)
+        end
+
+        # Payload sekcie. Model chodi ARGUMENTOM (lekcia F4 zo ŠT-3a-2):
+        # pri prepnuti dokumentu by inak sekcia dostala pravidla STAREHO
+        # dokumentu vedla kusovnika noveho.
+        def rules_payload(model)
+          return nil unless defined?(RulesDialog)
+
+          RulesDialog.rules_payload(model)
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.rules_payload')
+          nil
+        end
+
         # --- premostenia navigacie (audit #2) --------------------------------
         # Klient posiela LEN meno polozky; ci sa smie otvorit a CO sa otvori,
         # rozhoduje whitelist TU (HTML nie je ochrana).
@@ -1069,6 +1116,11 @@ module Noxun
           # sem chodi len odpoved (`hw_sink`).
           hw_actions.each { |name| cb(dlg, name) { |p| do_hw(name, p) } }
           cb(dlg, 'hw_leave')             { |p| do_hw_leave(p) }
+          # ŠT-3b-1, sekcia PRAVIDLÁ. Mena callbackov su TIE ISTE, ake
+          # pouzivalo okno „Pravidlá kovania" — presunuty JS (`js/rules.js`)
+          # tak vola presne to, co volal doteraz. Telo je v `RulesDialog`,
+          # sem chodi len odpoved (`rules_sink`).
+          rules_actions.each { |name| cb(dlg, name) { |p| do_rules(name, p) } }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(studio): #{msg}")
@@ -1259,6 +1311,10 @@ module Noxun
             # aj cely katalog poloziek. Inak katalog drzi klient a zmeny mu
             # chodia lacnym echom (`push_hw_catalog`).
             hw: hw_payload(model),
+            # ŠT-3b-1, sekcia PRAVIDLÁ: pravidla kovania projektu (alebo
+            # globalne predvolby, kym projekt vlastne nema) + pocet skriniek,
+            # ktore ulozenie prestavia. Maly JSON — chodi CELY pri kazdom pushi.
+            rules: rules_payload(model),
             # Deep-link: sekcia sa posiela PRAVE RAZ (inak by kazdy refresh
             # vratil pouzivatela tam, odkial medzitym odisiel).
             open_section: consume_pending_section,

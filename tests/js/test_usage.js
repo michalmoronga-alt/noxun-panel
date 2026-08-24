@@ -47,8 +47,10 @@ eq(usage.keyFor(elm('SELECT', { parent: frow, attrs: { onchange: 'onFrontTypeCha
   'frontRows/select:onFrontTypeChange', 'dynamicky select: prva funkcia');
 eq(usage.keyFor(elm('INPUT', { type: 'checkbox', parent: frow, attrs: { onchange: 'onField()' } })),
   'frontRows/input.checkbox:onField', 'checkbox nesie typ');
-eq(usage.keyFor(elm('BUTTON', { attrs: { onclick: 'openRulesDialog()' } })),
-  '?/button:openRulesDialog', 'bez id-predka = ?');
+// Fixture je ZAMERNE neutralne meno — `openRulesDialog` zanikol s oknom
+// „Pravidlá kovania" (ŠT-3b-1) a fixture nesmie tvrdit, ze taka funkcia zije.
+eq(usage.keyFor(elm('BUTTON', { attrs: { onclick: 'onNejakaAkcia()' } })),
+  '?/button:onNejakaAkcia', 'bez id-predka = ?');
 
 // --- clickKey: klikatelne prvky ---
 const body = elm('BODY');

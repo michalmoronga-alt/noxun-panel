@@ -6535,8 +6535,8 @@ module NoxunSuRunner
       # ŠT-2a pridala sestu sekciu `mat` (Materialy), ŠT-2b jej dala aj Demos
       # toky a zrusila okno; ŠT-3a-1 pridala siedmu `hw` (Kovanie) — okno
       # „Katalóg kovania" zatial zije, ale navigacia don uz nevedie.
-      ok('ŠT-1c B3: sekcie Studia su vsetky (bom · ctrl · buy · budget · offer · mat · hw)',
-         e::StudioDialog::SECTIONS == %w[bom ctrl buy budget offer mat hw])
+      ok('ŠT-1c B3: sekcie Studia su vsetky (bom · ctrl · buy · budget · offer · mat · hw · rules)',
+         e::StudioDialog::SECTIONS == %w[bom ctrl buy budget offer mat hw rules])
     end
 
     dlg = e::StudioDialog.instance_variable_get(:@dialog)
@@ -6966,6 +6966,191 @@ module NoxunSuRunner
       Sketchup.undo
       ok('ŠT-3a-2 (d): 1x Spat vratil predvolbu — NO-OP merge_seed nepridal krok Spat',
          st3a_mapping(model, gt).to_s == before_map.to_s)
+    end
+  end
+
+
+  # ==========================================================================
+  # ŠT-3b-1 — sekcia PRAVIDLÁ (`rules`) v ŠTÚDIU + ZANIK okna Pravidla kovania
+  # ==========================================================================
+  #
+  # Headless sada dokaze len to, ze subory a mena su prec. TU sa overuje, co sa
+  # da overit VYHRADNE v beziacom SketchUpe:
+  #   1) okno naozaj neexistuje (ziadny `show`/`ensure_dialog`) a jeho HTML nie
+  #      je ani v NASADENOM plugine,
+  #   2) ulozenie pravidiel ZO SEKCIE je PRESNE JEDEN krok Spat — a vrati
+  #      pravidla AJ geometriu naraz (`rebuild_many` s blokom),
+  #   3) NO-OP „Doplniť nové predvolené" NEMENI undo stav (merane rovnako ako
+  #      v `run_st3a`: JEDEN Spat po nom vrati stav spred ulozenia),
+  #   4) BASELINE guard: zmena pravidiel MEDZI nacitanim formulara a ulozenim
+  #      sa odmietne a NIC sa nezapise.
+  def run_st3b(model)
+    cleanup(model)
+    return ok('ŠT-3b-1: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
+    return ok('ŠT-3b-1: modul RulesDialog zije dalej', false) unless defined?(e::RulesDialog)
+
+    rd = e::RulesDialog
+
+    # --- 1) OKNO ZANIKLO, MODUL ZIJE -----------------------------------------
+    %i[show ensure_dialog register_callbacks on_model_changed].each do |gone|
+      ok("ŠT-3b-1: `RulesDialog.#{gone}` uz neexistuje", !rd.respond_to?(gone))
+    end
+    html = File.join(e.plugin_dir, 'ui', 'rules.html')
+    ok('ŠT-3b-1: NASADENY plugin uz NEOBSAHUJE rules.html', !File.exist?(html))
+    ok('ŠT-3b-1: sekcia `rules` je v zozname sekcii Studia',
+       e::StudioDialog::SECTIONS.include?('rules'))
+    ok('ŠT-3b-1: whitelist sekcie pozna PRESNE tri akcie okna',
+       rd::SECTION_ACTIONS == %w[save_rules load_global merge_seed])
+
+    begin
+      st3b_scenar(model, rd)
+    ensure
+      cleanup(model)
+    end
+  rescue StandardError => ex
+    log_line("FAIL: ŠT-3b-1 sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
+  # Typ polozky kovania v config.hardware[]. Kluc je `generic_type` (nie
+  # `type` — prva verzia tohto scenara na tom padla: pocty vysli 0 a test
+  # by tvrdil kontrakt, ktory nic nemeral).
+  def st3b_hw_type(h)
+    (h['generic_type'] || h['type']).to_s
+  end
+
+  # Pravidlo `fixed`, ktore na TEJTO skrinke naozaj nieco generuje. Nemozno
+  # brat natvrdo `leg`: nohy ma len skrinka s podstavcom, takze na inej by
+  # scenar meral prazdno (pocet 0 pred aj po zapise) a tvaril by sa zeleno.
+  def st3b_pick_rule(model, inst)
+    cfg = e::Store.config(inst) || {}
+    counts = Hash.new(0)
+    Array(cfg['hardware']).each { |h| counts[st3b_hw_type(h)] += h['quantity'].to_i }
+    rules = e::HardwareRules.project_rules(model) || e::HardwareRules.load
+    Array(rules).find do |r|
+      r['kind'].to_s == 'fixed' && r['enabled'] != false &&
+        r['quantity'].to_i.positive? && counts[r['output'].to_s].positive?
+    end
+  end
+
+  # Pocet kusov pravidla `fixed` s danym vystupom (napr. `leg` = nohy).
+  def st3b_qty(model, output)
+    rules = e::HardwareRules.project_rules(model)
+    return nil unless rules.is_a?(Array)
+
+    r = rules.find { |x| x['output'].to_s == output && x['kind'].to_s == 'fixed' }
+    r && r['quantity']
+  end
+
+  # Pocet poloziek kovania daneho typu na skrinke (z config.hardware[] —
+  # SNAPSHOT NA ENTITE, teda to, co ide do kusovnika a nakupu).
+  def st3b_hw_count(inst, output)
+    cfg = e::Store.config(inst) || {}
+    Array(cfg['hardware']).select { |h| st3b_hw_type(h) == output }
+                          .sum { |h| h['quantity'].to_i }
+  end
+
+  def st3b_scenar(model, rd)
+    inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
+                                            'height' => 720.0, 'depth' => 560.0 })
+    return ok('ŠT-3b-1: vlozenie skrinky pre scenar pravidiel', false) unless inst
+
+    rec = []
+    sink = ->(script) { rec << script.to_s }
+
+    st3a_with_fake_studio(rec) do
+      e::StudioDialog.attach_stale_observer(model)
+      e::StudioDialog.send(:push_state) # payload sekcie naplni BASELINE
+
+      # --- (a) formular dostal pravidla a pocet skriniek -------------------
+      push = st3a_last_push(rec)
+      pay = push && push['rules']
+      ok('ŠT-3b-1 (a): payload sekcie nesie pravidla, zdroj aj pocet skriniek',
+         pay.is_a?(Hash) && pay['rules'].is_a?(Array) && !pay['rules'].empty? &&
+         pay['cabinets'].to_i >= 1)
+      ok('ŠT-3b-1 (a): a identitu dokumentu (baseline guard stoji na guid)',
+         pay && pay['model_guid'].to_s == model.guid.to_s)
+
+      target = st3b_pick_rule(model, inst)
+      if target.nil?
+        ok('ŠT-3b-1: skrinka ma aspon jedno `fixed` pravidlo, ktore nieco generuje', false)
+        next
+      end
+      output = target['output'].to_s
+      base_qty = st3b_qty(model, output)
+      base_hw = st3b_hw_count(inst, output)
+      ok("ŠT-3b-1: scenar bezi nad pravidlom `#{output}` (#{base_qty} ks, na entite #{base_hw})",
+         !base_qty.nil? && base_hw.positive?)
+
+      # --- (b) ULOZENIE zo sekcie = 1 krok Spat (pravidla AJ geometria) ----
+      new_qty = base_qty.to_i + 2
+      rules = e::HardwareRules.project_rules(model) || e::HardwareRules.load
+      edited = JSON.parse(JSON.generate(rules))
+      edited.each { |r| r['quantity'] = new_qty if r['output'].to_s == output && r['kind'].to_s == 'fixed' }
+      rec.clear
+      rd.dispatch('save_rules',
+                  { 'rules' => edited, 'also_global' => false,
+                    'model_guid' => model.guid.to_s }.to_json, sink)
+      ok('ŠT-3b-1 (b): ulozenie zo sekcie prebehlo a povedalo, kolko skriniek prestavalo',
+         rec.any? { |x| x.include?('prestavan') })
+      ok("ŠT-3b-1 (b): pravidlo je v projekte zmenene (#{base_qty} -> #{new_qty})",
+         st3b_qty(model, output).to_i == new_qty)
+      # Pocet na entite NEMUSI byt rovny `quantity` (pravidlo moze emitovat
+      # na KAZDEHO vlastnika — policu, celo), ale MUSI narast: to je dokaz,
+      # ze `rebuild_many` naozaj prestaval skrinky a nezapisal len snapshot.
+      after_hw = st3b_hw_count(inst, output)
+      ok("ŠT-3b-1 (b): a PRESTAVBA sa naozaj stala — na entite #{base_hw} -> #{after_hw}",
+         after_hw > base_hw)
+
+      # --- (c) NO-OP „Doplniť nové predvolené" nemeni undo stav -----------
+      rec.clear
+      gen_before = e::StudioDialog.instance_variable_get(:@generation).to_i
+      rd.dispatch('merge_seed', '{}', sink)
+      noop = rec.any? { |x| x.include?('aktuálnom tvare') }
+      if noop
+        ok('ŠT-3b-1 (c): merge_seed nad cerstvym snapshotom je NO-OP a povie to', true)
+        ok('ŠT-3b-1 (c): NO-OP neposiela plny push (ziadny NX.setStudio)',
+           rec.none? { |x| x.start_with?('NX.setStudio(') })
+        ok('ŠT-3b-1 (c): a NEZDVIHA generaciu okna',
+           e::StudioDialog.instance_variable_get(:@generation).to_i == gen_before)
+      else
+        # Seed sa medzi verziami meni — ked je co doplnat, scenar to prizna
+        # a undo krok navyse zapocita nizsie (merany dokaz ostava platny).
+        info('ŠT-3b-1 (c): merge_seed mal co doplnit — NO-OP vetva sa v tomto ' \
+             'prostredi neoverila (seed sa lisi od projektu)')
+      end
+
+      # --- (d) JEDEN Spat vrati pravidla AJ geometriu ---------------------
+      # Toto je merany dokaz bodu (c): keby NO-OP `merge_seed` nechal vlastnu
+      # operaciu, JEDEN Spat by vratil JU a pravidlo by este stalo na novej
+      # hodnote. (redo sa na Windows netestuje — programovy `Sketchup.redo`
+      # neexistuje.)
+      if noop
+        Sketchup.undo
+        ok("ŠT-3b-1 (d): 1x Spat vratil pravidlo na #{base_qty} — NO-OP merge_seed nepridal krok Spat",
+           st3b_qty(model, output).to_i == base_qty.to_i)
+        ok('ŠT-3b-1 (d): a s nim aj GEOMETRIU (snapshot na entite je spat)',
+           inst.valid? && st3b_hw_count(inst, output) == base_hw)
+      end
+
+      # --- (e) BASELINE guard: cudzia zmena medzi nacitanim a ulozenim ----
+      # Formular drzi baseline z posledneho payloadu. Ked sa pravidla modelu
+      # medzitym zmenia INOU cestou, ulozenie sa MUSI odmietnut — inak by
+      # ticho prepisalo cudziu zmenu (a prestavalo VSETKY skrinky).
+      e::StudioDialog.send(:push_state) # cerstvy baseline
+      side = JSON.parse(JSON.generate(e::HardwareRules.project_rules(model) || []))
+      side.each { |r| r['quantity'] = 9 if r['output'].to_s == output && r['kind'].to_s == 'fixed' }
+      model.start_operation('SU-TEST st3b cudzia zmena', true)
+      e::HardwareRules.set_project_rules(model, side)
+      model.commit_operation
+      rec.clear
+      rd.dispatch('save_rules',
+                  { 'rules' => edited, 'also_global' => false,
+                    'model_guid' => model.guid.to_s }.to_json, sink)
+      ok('ŠT-3b-1 (e): zapis po CUDZEJ zmene pravidiel sa ODMIETNE s hlaskou',
+         rec.any? { |x| x.include?('medzitým zmenili') })
+      ok('ŠT-3b-1 (e): a NIC sa nezapisalo (v projekte ostala cudzia hodnota)',
+         st3b_qty(model, output).to_i == 9)
+      Sketchup.undo # cudzia zmena prec
     end
   end
 
@@ -7874,6 +8059,7 @@ module NoxunSuRunner
     run_st1c(model)          # ŠT-1c: sekcia Nákup kovania (PR A) + sekcia ROZPOCET (PR B1) — 12 mutacii = 12x jeden krok Spat, gen a guid guardy, bump:false kontrakt, XLSX guardy, meranie pushov
     run_st2d(model)          # ŠT-2d: „Kde sa používa" — vyber podla materialu (aj DEDENEHO) a ABS, zuzenie na vlastnika, jednorazova kotva sekcie `mat`, ⋯ editor rozpoctu = 1 krok Spat
     run_st3a(model)          # ŠT-3a-2: modelove zapisy predvolieb setov ZO SEKCIE + zanik okna Katalog kovania — 1 zmena = 1 krok Spat, NO-OP merge_seed bez pushu aj bez undo kroku, jantar po vlastnom zapise nezozltne
+    run_st3b(model)          # ŠT-3b-1: sekcia Pravidla v Studiu + zanik okna Pravidla kovania — ulozenie = 1 krok Spat (pravidla AJ geometria), NO-OP merge_seed bez undo kroku, baseline guard odmietne zapis po cudzej zmene
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

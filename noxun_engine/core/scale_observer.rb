@@ -556,8 +556,8 @@ module Noxun
       # AppObserver — re-attach entity/entities observerov na korpusy pri zmene modelu.
       # DOLEZITE: okrem per-instancnych observerov (attach_all) treba pripojit aj entities
       # observer (attach_entities) — bez neho nefunguju kopie ani fallback zmien.
-      # Navyse notifikuje otvorene dialogy viazane na model (RulesDialog) — formular
-      # sa nad novym aktivnym modelom nacita nanovo (Codex review PR #26, P1).
+      # Navyse notifikuje moduly viazane na model — sekcie Studia sa nad novym
+      # aktivnym modelom nacitaju nanovo (Codex review PR #26, P1).
       class EngineAppObserver < Sketchup::AppObserver
         def onNewModel(model)
           model_switched(model)
@@ -583,7 +583,11 @@ module Noxun
           # modelu, v ktorom sa zapol (zapamatany prepinac ostava, je to
           # nastavenie pocitaca).
           GrainCheck.on_model_changed(model) if defined?(GrainCheck)
-          RulesDialog.on_model_changed(model) if defined?(RulesDialog)
+          # ŠT-3b-1: vetva `RulesDialog.on_model_changed` tu ZANIKLA spolu
+          # s oknom — modul nema ZIADNY asynchronny beh (na rozdiel od
+          # katalogu kovania nizsie), takze po prepnuti dokumentu netreba nic
+          # rusit; sekciu `rules` obsluzi PLNY push Studia z toho isteho
+          # broadcastu (`rules_payload` dostane PODANY model).
           MaterialsDialog.on_model_changed(model) if defined?(MaterialsDialog)
           # ŠT-1c PR B3: okno Vyroba tu ZANIKLO — jedine okno s vlastnym
           # generacnym tokenom nad cislami zakazky je Studio.
