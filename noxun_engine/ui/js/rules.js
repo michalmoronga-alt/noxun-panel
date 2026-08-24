@@ -46,6 +46,20 @@
              shelf_pin:'Podperky', connector:'Spojky',
              wall_hanger:'Zavesenie na stenu' }[t] || t;
   }
+  // TEST-1 (Michalov test v0.8.0): pravidlá „Úchytky" sú DVE — jedno pre
+  // dvierka (`front_door`), druhé pre zásuvkové čelá (`drawer_front`) — a mali
+  // JEDNU spoločnú vysvetlivku o „šírke krídla". Pri zásuvkách to KLAMALO
+  // (zásuvka nemá krídlo) a obe pravidlá potom vyzerali ako duplicita, ktorú
+  // niekto zabudol zmazať. Hint je preto per rola; podnadpis pravidla
+  // (`rdRoleDesc`) ich rozlišoval už predtým.
+  function rdHandleHint(role){
+    var what = (role === 'drawer_front')
+      ? '1 kus na čelo, dĺžka rezu = šírka čela'
+      : '1 kus na krídlo, dĺžka rezu = šírka krídla';
+    return 'Platí len pre čelá so zapnutým úchytkovým profilom — ' + what +
+      '. Vypnutím vyššie sa profil prestane počítať.';
+  }
+
   function rdRoleDesc(r){
     // GH #126 P2: popis podla SKUTOCNYCH filtrov pravidla — cabinet pravidlo
     // moze cielit podla podopretia (nohy) ALEBO typu korpusu (Bystrica).
@@ -301,7 +315,8 @@
         html += '<div class="hint">Vyberie sa najväčšia dĺžka z radu, ktorá sa zmestí do svetlej hĺbky mínus rezerva.</div>';
       } else if (r.kind === 'part_flag_length'){
         // D-90: pravidlo bez nastavení — reaguje na príznak profilu na čele.
-        html += '<div class="hint">Platí len pre čelá so zapnutým úchytkovým profilom — 1 kus na čelo, dĺžka rezu = šírka krídla. Vypnutím vyššie sa profil prestane počítať.</div>';
+        // TEST-1: text sa líši podľa roly (dvierka vs. zásuvkové čelo).
+        html += '<div class="hint">' + rdEsc(rdHandleHint((r.applies_to || {}).role)) + '</div>';
       } else {
         html += '<div class="hint">Pravidlo novšej verzie („'+rdEsc(r.kind)+'“) — tu sa needituje, zostáva zachované.</div>';
       }
@@ -556,7 +571,7 @@
   // „push zo servera nezmaze rozpisany formular" sa inak nedal overit nicim
   // nez klikanim (rovnaky dovod ako pri `matRenderBody`).
   if (typeof module !== 'undefined' && module.exports){
-    module.exports = { rulesToolsHtml: rulesToolsHtml, rdValidate: rdValidate,
+    module.exports = { rdHandleHint: rdHandleHint, rulesToolsHtml: rulesToolsHtml, rdValidate: rdValidate,
                        rdLabel: rdLabel, rdRoleDesc: rdRoleDesc,
                        rulesRenderBody: rulesRenderBody, rdApplyState: rdApplyState,
                        rdCollectRules: rdCollectRules, RD: RD,

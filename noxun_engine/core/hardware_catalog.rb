@@ -407,6 +407,17 @@ module Noxun
       # vracaju IBA na presnu zhodu kodu — alebo s include_inactive (C-2
       # filter "zobrazit neaktivne", audit F10: inak sa nedaju najst a ozivit).
       def search(list, query, category: nil, top: 20, include_inactive: false)
+        search_with_total(list, query, category: category, top: top,
+                                       include_inactive: include_inactive).first
+      end
+
+      # TEST-1: to iste hladanie, ale vracia AJ CELKOVY POCET zhod pred
+      # orezanim (`[items, total]`). Bez neho sa nedalo poctivo povedat, ze
+      # zoznam nie je cely — a prave to zhorelo pri prvom teste v0.8.0:
+      # NOVA polozka ma `use_count` 0, takze pri radeni score -> -use_count
+      # skoncila za prvou pädesiatkou a z UI ZMIZLA BEZ SLOVA (zasada
+      # „no silent caps": kazde orezanie sa musi priznat).
+      def search_with_total(list, query, category: nil, top: 20, include_inactive: false)
         q = norm_text(query)
         cat = category.to_s.strip.upcase
         pool = list.select { |i| cat.empty? || i['category'].to_s == cat }
@@ -418,7 +429,8 @@ module Noxun
           s = score_item(i, q)
           scored << [s, -i['use_count'].to_i, i['item_code'].to_s, i] if s
         end
-        scored.sort_by { |s, uc, code, _| [-s, uc, code] }.first(top).map(&:last)
+        sorted = scored.sort_by { |s, uc, code, _| [-s, uc, code] }
+        [sorted.first(top).map(&:last), sorted.length]
       end
 
       def score_item(item, q)

@@ -458,4 +458,64 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
      'odchod zo sekcie ru\u0161\u00ed aj napl\u00e1novan\u00fd dopyt do Demosu');
 })();
 
+
+// --- TEST-1: OREZANÝ zoznam a PRÁVE ZALOŽENÁ položka (DOM, nie grep) --------
+// Nález z prvého testu v0.8.0: základný zoznam je serverový search s prázdnym
+// dotazom a stropom. Nová položka má `use_count` 0, takže vypadne za strop
+// a z UI zmizne BEZ SLOVA — Michal ju po pridaní nenašiel. Overuje sa preto
+// SPRÁVANIE renderu: hint o orezaní naozaj pribudne do zoznamu a nový riadok
+// je vizuálne odlíšený.
+(function(){
+  function listNode(){ return ELS.hwList; }
+  function texts(node){
+    return (node.children || []).map(function(c){ return c._text || ''; }).join(' | ');
+  }
+  function classes(node){
+    return (node.children || []).map(function(c){ return c.className || ''; });
+  }
+
+  const items = [];
+  for (let i = 1; i <= 3; i++){
+    items.push({ item_code: 'OLD' + i, name_sk: 'Stará ' + i, category: 'ZAVES',
+                 unit: 'ks', active: true, use_count: 10 });
+  }
+  items.push({ item_code: 'NOVA001', name_sk: 'Úplne nová', category: 'ZAVES',
+               unit: 'ks', active: true, use_count: 0 });
+  H.MDH.setItems({ items: items, state: 'ok', categories: ['ZAVES'], units: ['ks'] });
+
+  // (1) Server poslal LEN 3 zo 137 zhôd — orezanie MUSÍ byť vidieť.
+  H.MDH.results({ codes: ['OLD1', 'OLD2', 'OLD3'], query: '', total: 137, shown: 3, pin: '' });
+  ok(texts(listNode()).indexOf('Zobrazených 3 z 137') > -1,
+     'orezaný zoznam sa PRIZNÁ číslom priamo v zozname');
+  ok(classes(listNode()).some(function(c){ return c.indexOf('hwcap') > -1; }),
+     'a má vlastnú triedu (dá sa odlíšiť od položiek)');
+
+  // (2) Nič sa neorezalo = žiadny šum.
+  H.MDH.results({ codes: ['OLD1', 'OLD2', 'OLD3'], query: '', total: 3, shown: 3, pin: '' });
+  ok(texts(listNode()).indexOf('Zobrazených') < 0, 'bez orezania sa NIČ nevypisuje');
+
+  // (3) Práve založená položka: server ju dal navrch a klient ju ZVÝRAZNÍ.
+  H.MDH.results({ codes: ['NOVA001', 'OLD1', 'OLD2'], query: '', total: 4, shown: 3,
+                  pin: 'NOVA001' });
+  const cls = classes(listNode());
+  ok((cls[0] || '').indexOf('hwnew') > -1, 'prvý riadok (nová položka) je zvýraznený');
+  ok(cls.filter(function(c){ return c.indexOf('hwnew') > -1; }).length === 1,
+     'a je zvýraznený PRÁVE JEDEN riadok');
+  ok(texts(listNode()).indexOf('Zobrazených 3 z 4') > -1,
+     'a orezanie sa priznáva aj vtedy, keď je navrchu nová položka');
+
+  // (4) Bez pinu sa nezvýrazňuje nič — zvýraznenie je udalosť, nie stav zoznamu.
+  H.MDH.results({ codes: ['NOVA001', 'OLD1'], query: '', total: 2, shown: 2, pin: '' });
+  ok(classes(listNode()).every(function(c){ return c.indexOf('hwnew') < 0; }),
+     'po ďalšom hľadaní zvýraznenie zhasne');
+
+  // (5) Klient pri hľadaní posiela `pin` serveru — poradie skladá SERVER.
+  SENT.length = 0;
+  H.MDH.created('NOVA001');
+  const search = SENT.filter(function(x){ return x[0] === 'hw_search'; });
+  ok(search.length > 0, 'po založení si klient vypýta čerstvý zoznam');
+  ok(JSON.parse(search[search.length - 1][1]).pin === 'NOVA001',
+     'a povie serveru, ktorú položku má dať navrch (JS si poradie nedopĺňa sám)');
+})();
+
 console.log(`OK ${n} kontrol (ŠT-3a sekcia Kovanie)`);

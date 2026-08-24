@@ -6,7 +6,7 @@
 const assert = require('node:assert');
 const path = require('node:path');
 const { mdhFmtPrice, mdhCheckedLabel, mdhPatchPayload, mdhOrderItems,
-        mdhCreatePayload, mdhCssEscape } =
+        mdhCreatePayload, mdhCssEscape, mdhCapHint } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'hw_catalog.js'));
 
 let n = 0;
@@ -85,3 +85,15 @@ eq(mdhDemosCreatePayload(null, '', ''), { pid: '', category: '', notes: '' },
 eq(mdhRelatedLine([{ code: '106412', name: 'podložka' }, { code: '105408', name: '' }]),
    'Súvisiaci sortiment: 106412 (podložka), 105408', 'related summary');
 eq(mdhRelatedLine([]), null, 'bez related nic');
+
+// --- TEST-1: OREZANY zoznam sa PRIZNAVA (zasada „no silent caps") -----------
+// Nález z prvého testu v0.8.0: základný zoznam je serverový search s prázdnym
+// dotazom a stropom, radený `score -> -use_count -> kód`. NOVÁ položka má
+// use_count 0, takže vypadla za strop a z UI zmizla BEZ SLOVA — Michal ju po
+// pridaní nenašiel a myslel si, že sa neuložila.
+eq(mdhCapHint(137, 50), 'Zobrazených 50 z 137 položiek — hľadaj alebo filtruj kategóriou.',
+   'orezanie sa povie číslom, nie mlčaním');
+eq(mdhCapHint(12, 12), null, 'nič sa neorezalo = žiadny šum');
+eq(mdhCapHint(0, 0), null, 'prázdny katalóg nehlási orezanie');
+eq(mdhCapHint(50, 137), null, 'nezmyselné poradie (shown > total) radšej mlčí než klame');
+eq(mdhCapHint(null, null), null, 'chýbajúce čísla = nič');

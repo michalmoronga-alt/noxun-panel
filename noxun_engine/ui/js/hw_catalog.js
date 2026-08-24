@@ -8,6 +8,15 @@
 
   var MDH_ITEMS = {};   // item_code -> zaznam (s row_rev)
   var MDH_ORDER = [];   // poradie zo SERVEROVEHO searchu (F12)
+  // TEST-1: koľko zhôd server NAŠIEL vs. koľko ich POSLAL. Keď sa čísla líšia,
+  // zoznam je orezaný a MUSÍ to byť vidieť — nová položka inak zmizne bez
+  // slova (zásada „no silent caps").
+  var MDH_TOTAL = 0;
+  var MDH_SHOWN = 0;
+  // Kód práve založenej položky. Klient ho NEZARAĎUJE sám (poradie skladá
+  // server — kontrakt GH #100 P2): posiela ho v `pin` a server ju dá navrch;
+  // tu slúži už len na ZVÝRAZNENIE riadku. Zhasne pri ďalšom hľadaní.
+  var MDH_PIN = '';
   var MDH_CATS = [];
   var MDH_UNITS = [];
   var MDH_RO = false;
@@ -55,6 +64,15 @@
     patch[field] = value;
     return { code: code, patch: patch, row_rev: rowRev || '' };
   }
+  // TEST-1: text o orezanom zozname. `null` = nič sa neorezalo (a vtedy sa
+  // NIČ nevypisuje — hlásiť „zobrazených 12 z 12" je šum).
+  function mdhCapHint(total, shown){
+    var t = Number(total) || 0;
+    var sh = Number(shown) || 0;
+    if (!t || !sh || t <= sh) return null;
+    return 'Zobrazených ' + sh + ' z ' + t + ' položiek — hľadaj alebo filtruj kategóriou.';
+  }
+
   // Zoradenie poloziek podla SERVEROVEHO poradia kodov (neznamy kod sa
   // vynecha — polozka medzitym zmizla).
   function mdhOrderItems(map, codes){
@@ -87,7 +105,8 @@
     mdhSend('hw_search', {
       query: s ? (s.value || '') : HW_Q,
       category: c ? (c.value || '') : HW_CAT,
-      include_inactive: i ? !!i.checked : HW_INACTIVE
+      include_inactive: i ? !!i.checked : HW_INACTIVE,
+      pin: MDH_PIN
     });
   }
 
@@ -246,9 +265,16 @@
       list.appendChild(mdhMk('div', 'muted', 'Žiadne položky — uprav hľadanie alebo pridaj novú.'));
     }
     itemsArr.forEach(function(item){
-      list.appendChild(mdhRow(item));
+      var row = mdhRow(item);
+      // TEST-1: práve založená položka je navrchu (poradie dal server) a je
+      // VIDIEŤ — bez toho sa v katalógu stratí medzi desiatkami riadkov.
+      if (MDH_PIN && item.item_code === MDH_PIN) row.className += ' hwnew';
+      list.appendChild(row);
       if (MDH_OPEN === item.item_code) list.appendChild(mdhDetail(item));
     });
+    // TEST-1: orezanie sa PRIZNÁVA — vždy, nielen pri prázdnom dotaze.
+    var cap = mdhCapHint(MDH_TOTAL, MDH_SHOWN);
+    if (cap) list.appendChild(mdhMk('div', 'muted hwcap', cap));
     if (keepFocus){
       var sel = '.mdcell[data-hw-code="' + mdhCssEscape(keepFocus.code) +
         '"][data-hw-field="' + mdhCssEscape(keepFocus.field) + '"]';
@@ -495,7 +521,15 @@
       mdhApplyItems(data); // vratane prvotneho serveroveho poradia
     },
     setItems: function(data){ mdhApplyItems(data); },
-    results: function(data){ MDH_ORDER = data.codes || []; mdhRender(); },
+    results: function(data){
+      MDH_ORDER = data.codes || [];
+      MDH_TOTAL = data.total || MDH_ORDER.length;
+      MDH_SHOWN = data.shown || MDH_ORDER.length;
+      // Server pin potvrdí LEN keď taká položka naozaj je — zvýrazňuje sa
+      // teda to, čo je aj v zozname.
+      MDH_PIN = data.pin || '';
+      mdhRender();
+    },
     setStatus: function(msg, err){
       var e = hwEl('status');
       if (e){ e.textContent = msg; e.className = err ? 'err' : 'ok'; }
@@ -536,14 +570,17 @@
       mdhRenderDemosHits([]);
       mdhRenderDemosPreview();
     },
-    demosCreated: function(){
+    demosCreated: function(code){
       MDH_DEMOS = null;
       var i = hwEl('hn_demos');
       if (i) i.value = '';
       mdhRenderDemosPreview();
-      MDH.created();
+      MDH.created(code);   // TEST-1: kód novej položky ide ďalej (pin navrch)
     },
-    created: function(){
+    created: function(code){
+      // TEST-1: nová položka sa MUSÍ objaviť hneď. Kód si zapamätáme a
+      // `mdhSearchNow` ho pošle serveru ako `pin` — ten ju dá navrch.
+      MDH_PIN = (code == null) ? '' : String(code);
       var f = hwEl('hwNewForm');
       if (f) f.style.display = 'none';
       ['hn_code', 'hn_name', 'hn_price', 'hn_supplier', 'hn_notes'].forEach(function(id){
@@ -946,6 +983,7 @@
   if (typeof module !== 'undefined' && module.exports){
     module.exports = { mdhFmtPrice: mdhFmtPrice, mdhCheckedLabel: mdhCheckedLabel,
       mdhPatchPayload: mdhPatchPayload, mdhOrderItems: mdhOrderItems,
+      mdhCapHint: mdhCapHint,
       mdhCreatePayload: mdhCreatePayload, mdhCssEscape: mdhCssEscape,
       mdhDemosIsUrl: mdhDemosIsUrl, mdhDemosCreatePayload: mdhDemosCreatePayload,
       mdhRelatedLine: mdhRelatedLine,
