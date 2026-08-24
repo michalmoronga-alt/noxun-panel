@@ -53,7 +53,7 @@ global.window = {
   })
 };
 global.sketchup = global.window.sketchup;
-const LISTEN = { input: [], click: [] };
+const LISTEN = { input: [], click: [], focusin: [] };
 global.document = {
   activeElement: null,
   addEventListener: function(type, fn){ (LISTEN[type] || (LISTEN[type] = [])).push(fn); },
@@ -144,11 +144,11 @@ const STATE = {
 // --- 3) lišta: ukladá LEN `bset` ---------------------------------------------
 
 (function(){
-  const bset = T.ssToolsHtml('bset');
+  const bset = T.ssToolsHtml('bset', false);
   ok(/data-action="ss-save"/.test(bset), 'Nastavenia rozpočtu majú „Uložiť"');
   ok(/data-action="ss-reload"/.test(bset), 'aj „Načítať nanovo"');
-  eq(T.ssToolsHtml('sup'), '', 'Dodávateľ / Demos je ČÍTANIE — prázdna lišta (D-78)');
-  eq(T.ssToolsHtml('about'), '', 'a „O plugine" tiež');
+  eq(T.ssToolsHtml('sup', false), '', 'Dodávateľ / Demos je ČÍTANIE — prázdna lišta (D-78)');
+  eq(T.ssToolsHtml('about', false), '', 'a „O plugine" tiež');
 })();
 
 // --- 4) odoslanie + ROZPÍSANÉ hodnoty prežijú push ---------------------------
@@ -240,6 +240,55 @@ const STATE = {
   T.SS.saved();
 })();
 
+// --- 4b2) review #227 kolo 2 P1: pin sa berie UŽ PRI FOKUSE ------------------
+
+(function(){
+  // Presný sled z nálezu: používateľ FOKUSNE pole (nič nenapíše) → druhá
+  // inštancia zmení nastavenia a doráta plný push → až POTOM prvé písmeno.
+  // Fokus zmrazuje ZOBRAZENÝ obsah (telo sa neprekresľuje), takže revízia
+  // musí byť pripnutá už v tom okamihu — inak by sa nová revízia pripla
+  // k starým hodnotám a uloženie by cudziu zmenu ticho prepísalo.
+  function focus(key){
+    const t = { getAttribute: function(k){ return k === 'data-ss' ? key : null; },
+                value: '', classList: { toggle: function(){} } };
+    document.activeElement = t;
+    LISTEN.focusin.forEach(function(fn){ fn({ target: t }); });
+    return t;
+  }
+  function typeInto(t, value){
+    t.value = value;
+    LISTEN.input.forEach(function(fn){ fn({ target: t }); });
+  }
+
+  S.setStudioSection('bset');
+  T.ssApplyState(STATE);
+  T.SS.saved();
+  document.activeElement = null;
+  ok(T.ssBaseRev() === null, 'čistý štart');
+
+  const fld = focus('rate:montaz');
+  eq(T.ssBaseRev(), 'r-1', 'FOKUS pripne revíziu — nečaká sa na prvé písmeno');
+  ok(T.ssTyping() === true, 'a fokus zmrazí zobrazený obsah (telo sa neprekresľuje)');
+
+  // Cudzia zmena + plný push, kým pole drží kurzor.
+  const FRESH = JSON.parse(JSON.stringify(STATE));
+  FRESH.revision = 'r-9';
+  FRESH.supplier.rates.montaz = 99;
+  T.ssApplyState(FRESH);
+  eq(T.ssBaseRev(), 'r-1',
+     'push pin NEPREPÍŠE — obsah na obrazovke je stále ten, ktorý používateľ videl');
+
+  typeInto(fld, '15');
+  SENT.length = 0;
+  T.ssSave();
+  eq(JSON.parse(SENT[0][1]).revision, 'r-1',
+     'uloženie ide so STAROU revíziou, takže ho server ODMIETNE (žiadny tichý prepis)');
+  ok(JSON.parse(SENT[0][1]).revision !== 'r-9', 'a NIE s tou, ktorá prišla pushom');
+
+  document.activeElement = null;
+  T.SS.saved();
+})();
+
 // --- 4c) review #227 P2: zlyhaný payload sa PRIZNÁ ---------------------------
 
 (function(){
@@ -256,7 +305,10 @@ const STATE = {
      'a POVIE to — formulár, ktorý vyzerá aktuálne, ale aktuálny nie je, je horší než hláška');
   eq(ELS.secbody.children.length, 0,
      'staré hodnoty sa NEZOBRAZUJÚ — v tele nie je ani jeden uzol formulára');
-  eq(ELS.sectools.innerHTML, '', 'a nad neznámym stavom sa NEUKLADÁ (prázdna lišta)');
+  ok(ELS.sectools.innerHTML.indexOf('ss-save') < 0,
+     'nad neznámym stavom sa NEUKLADÁ (patch proti nečitateľnej revízii)');
+  ok(ELS.sectools.innerHTML.indexOf('ss-reload') > -1,
+     'ale „Načítať nanovo" OSTÁVA — jediná cesta von z prechodnej chyby disku');
 
   // Ďalší úspešný push sekciu vráti do normálu.
   NX.setStudio({ settings: STATE });

@@ -260,6 +260,13 @@
 
   // Píše používateľ práve do poľa tejto sekcie? Vtedy sa NEPREKRESĽUJE —
   // re-render by mu zobral fokus aj rozpísané číslo.
+  // Pole je pod kurzorom = používateľ ho práve upravuje, takže sa telo
+  // NEPREKRESĽUJE (re-render by zobral fokus aj rozpísané číslo). Fokus preto
+  // ZMRAZÍ zobrazený obsah — a presne kvôli tomu musí byť revízia pripnutá
+  // UŽ VTEDY (review #227 kolo 2): inak by push s cudzou zmenou vymenil
+  // `SS_STATE` pod zmrazeným obsahom a prvé písmeno by pripnulo NOVÚ revíziu
+  // k STARÝM hodnotám — uloženie by prešlo zámkom a cudziu zmenu ticho
+  // prepísalo. S pripnutím pri fokuse sa taký zápis ODMIETNE.
   function ssTyping(){
     if (typeof document === 'undefined') return false;
     var a = document.activeElement;
@@ -274,8 +281,8 @@
     // aktuálne (review #227 P2) — vrátane toho, čo tam bolo pred zlyhaním.
     if (SS_FAILED){
       box.innerHTML = '<div class="err ssfail">Nastavenia sa nepodarilo načítať ' +
-        '(chyba pri čítaní súboru). Hodnoty nižšie by nemuseli platiť, preto sa nezobrazujú — ' +
-        'skús „Obnoviť" alebo zavri a otvor Štúdio znova.</div>';
+        '(chyba pri čítaní súboru). Hodnoty by nemuseli platiť, preto sa nezobrazujú — ' +
+        'skús <b>Načítať nanovo</b> v lište sekcie.</div>';
       return;
     }
     if (!SS_STATE){ box.innerHTML = '<div class="muted">Načítavam…</div>'; return; }
@@ -288,8 +295,19 @@
 
   // Lišta: len sekcia `bset` má čo ukladať. `sup` a `about` sú čítanie —
   // prázdna lišta je poctivejšia než tlačidlá, ktoré nič nerobia (D-78).
-  function ssToolsHtml(sec){
+  // `failed` = posledný payload nedorazil. Lišta vtedy NESMIE ponúkať
+  // „Uložiť" (patch proti revízii, ktorú sa práve nedá prečítať), ale MUSÍ
+  // nechať „Načítať nanovo" — je to jediná cesta, ako sa z prechodnej chyby
+  // disku zotaviť bez zatvorenia Štúdia, a hláška v tele na ňu odkazuje
+  // (review #227 kolo 2).
+  function ssToolsHtml(sec, failed){
     if (sec !== 'bset') return '';
+    if (failed){
+      return '<span class="spacer"></span>' +
+        '<button type="button" class="ghostbtn" data-action="ss-reload"' +
+        ' title="Skúsi znova načítať súbor nastavení">' +
+        '<svg class="ic" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> Načítať nanovo</button>';
+    }
     return '<button type="button" class="ghostbtn" data-action="ss-reload"' +
       ' title="Zahodí neuložené zmeny a načíta súbor nanovo">' +
       '<svg class="ic" aria-hidden="true"><use href="#i-rotate-ccw"/></svg> Načítať nanovo</button>' +
@@ -304,7 +322,7 @@
     if (!sec || !box) return;
     // Nad neznámym stavom sa NEUKLADÁ — tlačidlo „Uložiť" by poslalo patch
     // proti revízii, ktorá sa práve nedá prečítať.
-    box.innerHTML = SS_FAILED ? '' : ssToolsHtml(sec);
+    box.innerHTML = ssToolsHtml(sec, SS_FAILED);
   }
 
   // --- patch ---------------------------------------------------------------
@@ -428,6 +446,15 @@
   }
 
   if (typeof document !== 'undefined'){
+    // Pin sa berie UŽ PRI FOKUSE — v okamihu, keď sa pole stane cieľom písania.
+    // Prvé písmeno je neskoro: medzi fokusom a ním môže doraziť push s cudzou
+    // zmenou. (Nad nerozpísaným formulárom ho `ssApplyState` zase uvoľní, takže
+    // sa pin a zobrazený obsah nemôžu rozísť.)
+    document.addEventListener('focusin', function(ev){
+      var t = ev && ev.target;
+      if (!t || !t.getAttribute || !t.getAttribute('data-ss')) return;
+      if (SS_BASE_REV === null && SS_STATE) SS_BASE_REV = SS_STATE.revision;
+    });
     document.addEventListener('input', function(ev){
       var t = ev.target;
       if (!t || !t.getAttribute) return;
@@ -461,6 +488,7 @@
                        ssRenderBody: ssRenderBody, ssRenderTools: ssRenderTools,
                        ssActive: ssActive, ssSave: ssSave, ssReload: ssReload,
                        ssBaseRev: function(){ return SS_BASE_REV; },
+                       ssTyping: ssTyping,
                        ssFailed: function(){ return SS_FAILED; },
                        SS_SECTIONS: SS_SECTIONS, SS: SS };
   }

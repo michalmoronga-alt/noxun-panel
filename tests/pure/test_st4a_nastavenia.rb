@@ -232,7 +232,7 @@ NxTest.test('ŠT-4a: `sup` NESLUBUJE nastavenia, ktore neexistuju') do
                 'namiesto toho VEDIE tam, kde vazba naozaj zije')
   NxTest.assert(sup.include?("'mat'") && sup.include?("'budget'"),
                 'do Materialov (vazba dekoru) a do Rozpoctu (prepocet cien)')
-  tools = code[/function ssToolsHtml\(sec\).*?\n  \}/m].to_s
+  tools = code[/function ssToolsHtml\(sec, failed\).*?\n  \}/m].to_s
   NxTest.assert(tools.include?("if (sec !== 'bset') return '';"),
                 'a lista je prazdna — tlacidlo, ktore nema co robit, je horsie nez ziadne (D-78)')
 end
@@ -392,8 +392,20 @@ NxTest.test('ŠT-4a (review #227 P1): ulozenie posiela PRIPNUTU reviziu, nie oml
   NxTest.assert(save.include?('(SS_BASE_REV === null) ? SS_STATE.revision : SS_BASE_REV'),
                 'a posiela JU (cerstva by nechala zamok prejst a cudziu zmenu prepisat)')
   NxTest.refute(save.include?('revision: SS_STATE.revision'), 'omladena revizia sa uz neposiela')
-  NxTest.assert(code.include?('if (SS_BASE_REV === null && SS_STATE) SS_BASE_REV = SS_STATE.revision;'),
-                'pripina sa PRVYM pismenom')
+  # Review #227 kolo 2: pin sa berie UZ PRI FOKUSE. Prve pismeno je NESKORO —
+  # fokus zmrazi zobrazeny obsah (telo sa neprekresluje), takze medzi nim
+  # a prvym pismenom moze dorazit push s cudzou zmenou; pripnutie az vtedy by
+  # priplo NOVU reviziu k STARYM hodnotam a zapis by cudziu zmenu prepisal.
+  NxTest.assert(code.include?("document.addEventListener('focusin'"),
+                'pripina sa uz pri FOKUSE pola')
+  focus_h = code[/addEventListener\('focusin'.*?
+    \}\);/m].to_s
+  NxTest.assert(focus_h.include?('SS_BASE_REV = SS_STATE.revision'), 'a naozaj pin nastavuje')
+  NxTest.assert(focus_h.include?("getAttribute('data-ss')"), 'len pre POLIA sekcie')
+  apply = code[/function ssApplyState\(s\).*?
+  \}/m].to_s
+  NxTest.refute(apply.include?('SS_BASE_REV'),
+                'a push pin NEPREPISUJE — obsah na obrazovke je stale ten, ktory pouzivatel videl')
   saved = code[/saved: function\(\).*?
     \}/m].to_s
   NxTest.assert(saved.include?('SS_BASE_REV = null'), 'potvrdenie/odmietnutie pin uvolni')
@@ -414,9 +426,16 @@ NxTest.test('ŠT-4a (review #227 P2): ZLYHANY payload sa PRIZNA, nie zamlci') do
   \}/m].to_s
   NxTest.assert(body.index('SS_FAILED') < body.index('SS_STATE'),
                 'chybovy stav sa kresli PRED formularom — stary formular nesmie ostat na obrazovke')
-  tools = code[/function ssRenderTools\(\).*?
-  \}/m].to_s
-  NxTest.assert(tools.include?('SS_FAILED ?'), 'a nad neznamym stavom sa NEUKLADA')
+  tools = code[/function ssToolsHtml\(sec, failed\).*?\n  \}/m].to_s
+  NxTest.assert(tools.include?('if (failed){'), 'lista pozna chybovy stav')
+  failed_branch = tools[/if \(failed\)\{.*?\n    \}/m].to_s
+  NxTest.refute(failed_branch.include?('ss-save'),
+                'nad neznamym stavom sa NEUKLADA (patch proti necitatelnej revizii)')
+  NxTest.assert(failed_branch.include?('ss-reload'),
+                'ale „Načítať nanovo\" OSTAVA — jedina cesta von z prechodnej chyby disku; \
+                 hlaska v tele na nu odkazuje (review #227 kolo 2)')
+  NxTest.assert(body.include?('Načítať nanovo'),
+                'a hlaska menuje TLACIDLO, ktore sekcia naozaj ma')
 end
 
 NxTest.test('ŠT-4a (review #227 P1-1): ZBALENA navigacia skryva texty') do
