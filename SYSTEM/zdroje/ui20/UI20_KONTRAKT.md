@@ -581,7 +581,7 @@ zmysle, že **mockup už nie je poslednou pravdou tam, kde tu stojí niečo iné
    satelitu, ktorý ešte žije; posledným satelitom (ŠT-4a) stratili oba konce.
 8. **`open_tab` → `NX.studioOpen` bolo hotové skôr, než prišiel plánovaný „grep naprieč repom".**
    Deep-linky sa preklápali priebežne s každým zánikom okna, takže v kóde pluginu neostal ani
-   jeden živý výskyt — meno žije len v REFUTE guardoch (test stráži, že cesta zanikla) a
+   jeden živý výskyt — meno žije len v REFUTE guarde (`tests/pure/test_uid3_klikatelnost.rb` stráži, že cesta zanikla) a
    v historických zápisoch (tu, v PLAN a v KRONIKE).
 9. **Osirotené `preferences_key` zaniknutých okien ostávajú v registri používateľa**
    (`NoxunEngineProduction`, `noxun_engine_hw_catalog_v1`, `noxun_engine_rules`,
