@@ -31,7 +31,8 @@ module Noxun
       # `ready` v zozname NIE JE (a byt nemoze): Studio registruje callbacky
       # pod TYMI ISTYMI menami, takze `ready` by prepisal jeho vlastny.
       # Prvotny stav sekcie nesie `push_state` Studia pod klucom `rules`.
-      SECTION_ACTIONS = %w[save_rules load_global merge_seed].freeze
+      SECTION_ACTIONS = %w[save_rules load_global merge_seed
+                           reset_abs_override reset_hw_override].freeze
 
       # ŠT-3b-2a: poradie rol v read-only prehlade ABS pravidiel (korpus -> cela).
       # Poradie hashu z disku by sa menilo s kazdym seed-merge, takze ho urcuje
@@ -64,6 +65,9 @@ module Noxun
           when 'save_rules'  then handle_save(payload)
           when 'load_global' then push_global
           when 'merge_seed'  then handle_merge_seed # V0.6 D1b (audit F4)
+          # ŠT-3b-2b (Š17): „vrátiť na pravidlo" pri jantarovom riadku.
+          when 'reset_abs_override' then handle_reset_abs(payload)
+          when 'reset_hw_override'  then handle_reset_hw(payload)
           end
         end
 
@@ -194,16 +198,16 @@ module Noxun
           emap = defined?(ProductionCore) ? ProductionCore.edges_map : nil
           { 'abs' => override_group(Array(man['abs']).filter_map { |o| abs_override_row(o, emap) },
                                     'Dielce s ručne nastavenými hranami',
-                                    'Tieto dielce majú hrany nastavené ručne v Inspectore — ' \
-                                    'pravidlo podľa roly sa na ne neuplatní. Vrátiť na pravidlo ' \
-                                    'jedným klikom pribudne v ďalšej dávke; dnes sa override ruší ' \
-                                    'v karte dielca (hrana → „podľa pravidla").'),
+                                    'Tieto dielce majú hrany nastavené ručne v Inspectore — pravidlo ' \
+                                    'podľa roly sa na ne neuplatní. Šípka vráti dielec na pravidlo ' \
+                                    '(všetky štyri hrany naraz; jeden krok Späť to vráti). Jednu hranu ' \
+                                    'vrátiš v karte dielca.'),
             'hardware' => override_group(Array(man['hardware']).filter_map { |o| hw_override_row(o) },
                                          'Skrinky s ručne nastaveným kovaním',
-                                         'Toto kovanie nastavil človek v Inspectore — pravidlo ' \
-                                         'podľa rozmerov sa naň neuplatní. Vrátiť na pravidlo ' \
-                                         'jedným klikom pribudne v ďalšej dávke; dnes sa override ' \
-                                         'ruší v karte Kovanie.') }
+                                         'Toto kovanie nastavil človek v Inspectore — pravidlo podľa ' \
+                                         'rozmerov sa naň neuplatní. Šípka vráti položku na pravidlo ' \
+                                         '(zruší počet, vypnutie aj zámok dĺžky naraz; jeden krok ' \
+                                         'Späť to vráti).') }
         rescue StandardError => e
           # F7: zber rucnych zasahov MUSI zlyhat sam za seba — inak by chyba
           # v jednom riadku zhodila formular pravidiel kovania vedla neho.
@@ -260,7 +264,10 @@ module Noxun
           return nil if parts.empty?
 
           name = ov['name'].to_s.strip
-          { 'owner_id' => ov['owner_id'].to_s, 'owner_name' => ov['owner_name'].to_s,
+          # `kind` = adresa ZAPISOVEJ akcie riadku (ŠT-3b-2b). Klient z neho
+          # vybera meno callbacku; co sa smie zavolat, rozhoduje whitelist.
+          { 'kind' => 'abs',
+            'owner_id' => ov['owner_id'].to_s, 'owner_name' => ov['owner_name'].to_s,
             'part_key' => ov['part_key'].to_s,
             'label' => name.empty? ? abs_role_label(role) : name,
             'desc' => 'ručne nastavené hrany',
@@ -292,8 +299,13 @@ module Noxun
           pkey = ov['owner_part_key'].to_s
           part = ov['part_name'].to_s.strip
           part = abs_role_label(ov['part_role']) if part.empty? && !ov['part_role'].to_s.empty?
-          { 'owner_id' => ov['owner_id'].to_s, 'owner_name' => ov['owner_name'].to_s,
+          { 'kind' => 'hw',
+            'owner_id' => ov['owner_id'].to_s, 'owner_name' => ov['owner_name'].to_s,
             'part_key' => pkey,
+            # Identita zaznamu je TROJICA — bez nej by sa reset nedal adresovat
+            # (dve pravidla s rovnakym vystupom na tom istom ownerovi su
+            # samostatne zaznamy).
+            'generic_type' => ov['generic_type'].to_s, 'rule_id' => ov['rule_id'].to_s,
             'label' => HardwareRules.label_for(ov['generic_type']),
             'desc' => pkey.empty? ? 'ručne nastavené na skrinke' : "ručne nastavené · #{part}",
             'value' => bits.join(' · ') }
@@ -452,6 +464,248 @@ module Noxun
           end
           set_status("Pravidlá uložené do projektu#{global_note} — prestavaných #{jobs.size} skriniek.")
           after_model_write(model)
+        end
+
+        # ============ ŠT-3b-2b: „VRÁTIŤ NA PRAVIDLO" (jantarovy riadok) =======
+        #
+        # Klik na sipku v riadku ZAHODI rucne rozhodnutie a nechá platit pravidlo.
+        # Potvrdenie sa NEPYTA — poistkou je JEDEN krok Spat (kontrakt mockupu),
+        # a otazka pred kazdym klikom by z jednoduchej opravy urobila obrad.
+        #
+        # PRECO NOVA CESTA (nalezy 14/15 auditu): zapisove cesty Inspectora stoja
+        # na OZNACENI v modeli (`find_cabinet`/`find_selected_part`) a po zapise
+        # vyber prepisu. Zoznam v sekcii ale adresuje riadok IDENTITOU
+        # (cabinet_id + part_key resp. + generic_type/rule_id) a vyber sa pri nom
+        # menit NESMIE — pouzivatel moze mat oznacene nieco uplne ine.
+        # ZDIELA sa TELO ZAPISU (`Panel.reset_part_edges!`, `Panel.merge_override`
+        # s `:all`), nie okenne guardy — tie su per vstupny bod (audit B4).
+        #
+        # SPOLOCNY VSTUPNY GUARD oboch resetov. Vrati [model, cab, data], alebo
+        # nil — a vtedy UZ POVEDAL preco a obnovil sekciu.
+        def reset_context(payload)
+          data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
+          model = Sketchup.active_model
+          return reject_reset('Žiadny aktívny model.', refresh: false) if model.nil?
+
+          # (1) GENERACIA OKNA — klik zo zastaraneho zoznamu (riadok medzitym
+          #     zanikol alebo sa presunul) sa NEVYKONA. Vzor kliku v Kusovniku.
+          gen = studio_generation
+          if !gen.nil? && gen.positive? && data['gen'].to_i != gen
+            return reject_reset('Zoznam sa medzitým prepočítal — obnovený, klikni znova.')
+          end
+
+          # (2) DOKUMENT — tolerantne na PRAZDNY udaj (starsi cachovany DOM),
+          #     nezhodne id odmietame (vzor `handle_save`).
+          guid = data['model_guid'].to_s
+          if !guid.empty? && guid != model_guid(model)
+            return reject_reset('Model sa medzitým prepol — sekcia je načítaná z tohto modelu.')
+          end
+
+          # (3) ADRESA je `cabinet_id`. Cerstva kopia skrinky moze mat este TO
+          #     ISTE id (vlastne dostane az pri dedup tiku), takze kandidatov moze
+          #     byt viac. Vtedy sa zapis ODMIETA: „vezmi prvu" by prepisala
+          #     skrinku, na ktoru pouzivatel neklikol, a spustit dedup TU by
+          #     otvorilo DRUHU operaciu — z jedneho kliku by boli dva kroky Spat.
+          cid = data['owner_id'].to_s
+          return reject_reset('Chýba identifikácia skrinky — zoznam je obnovený.') if cid.empty?
+
+          cands = cabinets(model).select { |c| Store.get(c, 'cabinet_id').to_s == cid }
+          return reject_reset("Skrinka #{cid} sa v modeli nenašla — zoznam je obnovený.") if cands.empty?
+
+          if cands.length > 1
+            return reject_reset("Skrinku #{cid} má v modeli viac kusov naraz (čerstvá kópia ešte nemá " \
+                                'vlastné číslo) — nič sa nezmenilo. Klikni raz do modelu a skús znova.')
+          end
+
+          [model, cands.first, data]
+        end
+
+        # Odmietnutie: sekcia sa nacita nanovo BEZ zdvihu generacie (nic sa
+        # nezapisalo, takze rozkliknute riadky inych sekcii maju ostat platne).
+        def reject_reset(msg, refresh: true)
+          refresh_studio(bump: false) if refresh
+          set_status(msg, true)
+          nil
+        end
+
+        # Generacia okna Studio (nil = okno nie je nacitane -> guard sa preskoci).
+        def studio_generation
+          return nil unless defined?(StudioDialog)
+
+          StudioDialog.generation
+        rescue StandardError
+          nil
+        end
+
+        # --- ABS: cely olep dielca spat na pravidlo --------------------------
+        #
+        # Maze sa CELY kluc `edges` (kontrakt mockupu — riadok je o dielci, nie
+        # o jednej hrane). Reset JEDNEJ hrany ostava v karte dielca („podľa
+        # pravidla" v rozbalovacom menu hrany).
+        def handle_reset_abs(payload)
+          ctx = reset_context(payload)
+          return if ctx.nil?
+
+          model, cab, data = ctx
+          pkey = data['part_key'].to_s
+          return reject_reset('Chýba identifikácia dielca — zoznam je obnovený.') if pkey.empty?
+
+          params = Panel.existing_params(cab)
+          rk = Panel.canonical_part_key(params, pkey)
+          ov = params['part_overrides']
+          rec = ov.is_a?(Hash) ? ov[rk] : nil
+          unless rec.is_a?(Hash) && rec['edges'].is_a?(Hash)
+            # Riadok uz neplati (niekto ho medzitym vratil inou cestou). Nie je to
+            # chyba pouzivatela — zoznam sa len obnovi.
+            refresh_studio(bump: false)
+            return set_status('Tento dielec už ručne nastavené hrany nemá — zoznam je obnovený.')
+          end
+
+          # Prestavba prekresluje VNORENE dielce. Ked v skrinke ziadny s tymto
+          # klucom nie je, nemal by co prekreslit — a hlaska o uspechu by klamala.
+          if Panel.find_part_by_role_key(cab, rk).nil?
+            return reject_reset('Dielec sa v skrinke nenašiel — zoznam je obnovený.')
+          end
+
+          had_sel = model.selection.count.positive?
+          Panel.reset_part_edges!(params, rk)
+          CabinetBuilder.rebuild_many(model, [[cab, params]], op_name: 'NOXUN: ABS spat na pravidlo')
+
+          cid = Store.get(cab, 'cabinet_id').to_s
+          who = abs_part_label(cab, rk)
+          msg = "#{cid} · #{who} — späť na pravidlo (#{abs_rule_result(cab, rk)}). " \
+                'Jeden krok Späť to vráti.'
+          msg += detached_twin_note(model, cid, rk)
+          msg += selection_note(model, had_sel)
+          set_status(msg)
+          after_model_write(model)
+        end
+
+        # VYSLEDOK, nie len „override zrušený" (F13): po prestavbe sa cita
+        # SNAPSHOT dielca — to iste, co ide do kusovnika a objednavky. Pri
+        # kompakte/postformingu (potlacene defaulty) alebo dekore bez pasky
+        # vyjde „bez olepu" a pouzivatel to vidi HNED, nie az vo vystupe.
+        def abs_rule_result(cab, rk)
+          part = Panel.find_part_by_role_key(cab, rk)
+          cfg = part ? (Store.config(part) || {}) : {}
+          edges = cfg['edges'].is_a?(Hash) ? cfg['edges'] : {}
+          role = part ? Store.get(part, 'role').to_s : ''
+          labels = AbsRules.edge_labels(role)
+          taped = AbsRules::EDGE_ORDER.reject { |c| edges[c].to_s.strip.empty? }
+          return 'podľa pravidla bez olepu' if taped.empty?
+
+          "podľa pravidla: #{taped.map { |c| "#{labels[c].to_s.downcase} #{abs_thickness_text(edges[c])}" }
+                                  .join(' · ')}"
+        end
+
+        # Hrubka pasky z katalogu; paska mimo katalogu = surove id (neklame).
+        def abs_thickness_text(abs_id)
+          rec = defined?(Materials) ? Materials.edge(abs_id) : nil
+          rec && rec['thickness'] ? "#{mm(rec['thickness'])} mm" : abs_id.to_s
+        end
+
+        def abs_part_label(cab, rk)
+          part = Panel.find_part_by_role_key(cab, rk)
+          name = part ? Store.get(part, 'name').to_s.strip : ''
+          return name unless name.empty?
+
+          role = part ? Store.get(part, 'role').to_s : ''
+          label = abs_role_label(role)
+          label.to_s.empty? ? rk : label
+        end
+
+        # F14: odpojene dvojca. Override zije v korpuse a prestavba prekresli LEN
+        # vnorene dielce — vytiahnuty dielec s tym istym klucom ostane po starom
+        # (do vystupu ide jeho vlastny snapshot). TICHY uspech by poslal do
+        # objednavky olep, ktory nikto na obrazovke nevidel.
+        def detached_twin_note(model, cid, rk)
+          return '' unless detached_twin?(model, cid, rk)
+
+          ' POZOR: rovnaký dielec je aj vytiahnutý zo skrinky — ten sa neprestaval ' \
+            'a do výstupu ide po starom.'
+        end
+
+        def detached_twin?(model, cid, rk)
+          model.entities.grep(Sketchup::ComponentInstance).any? do |i|
+            Store.kind(i) == 'part' && Store.get(i, 'cabinet_id').to_s == cid &&
+              Store.get(i, 'part_key').to_s == rk
+          end
+        rescue StandardError => e
+          Engine.log_error(e, 'RulesDialog.detached_twin?')
+          false
+        end
+
+        # Vyber sa ZAMERNE nemeni (ziadny reselect) — pouzivatel moze mat
+        # oznacene nieco uplne ine. Ked ho ale prestavba zhodila, prizna sa to.
+        def selection_note(model, had_sel)
+          had_sel && model.selection.count.zero? ? ' Výber v modeli sa prestavbou stratil.' : ''
+        end
+
+        # --- Kovanie: cely rucny zaznam spat na pravidlo ---------------------
+        #
+        # Maze sa CELY zaznam identity (owner_part_key, generic_type, rule_id) —
+        # ekvivalent `field :all` v Inspectore, teda TO ISTE telo (`merge_override`).
+        # Polia zaznamu su nezavisle (D-93), takze sa zrusia naraz vsetky: riadok
+        # hovori o polozke, nie o jednom poli.
+        def handle_reset_hw(payload)
+          ctx = reset_context(payload)
+          return if ctx.nil?
+
+          model, cab, data = ctx
+          gt = data['generic_type'].to_s
+          rid = data['rule_id'].to_s
+          return reject_reset('Chýba identifikácia položky kovania — zoznam je obnovený.') if gt.empty? || rid.empty?
+
+          owner = Panel.present_str(data['part_key'])
+          params = Panel.existing_params(cab)
+          all = params['hardware_overrides'].is_a?(Array) ? params['hardware_overrides'] : []
+          rec = all.select { |ov| Panel.ov_match?(ov, owner, gt, rid) }.last
+          if rec.nil?
+            refresh_studio(bump: false)
+            return set_status('Toto kovanie už ručne nastavené nie je — zoznam je obnovený.')
+          end
+
+          # Dosledky sa hovoria PRED tym, nez zaniknu (zaznam uz potom neexistuje).
+          note = hw_reset_note(model, rec, gt, rid)
+          had_sel = model.selection.count.positive?
+          params['hardware_overrides'] = Panel.merge_override(all, owner, gt, rid, :all, nil)
+          CabinetBuilder.rebuild_many(model, [[cab, params]], op_name: 'NOXUN: kovanie spat na pravidlo')
+
+          cid = Store.get(cab, 'cabinet_id').to_s
+          who = HardwareRules.label_for(gt)
+          msg = "#{cid} · #{who} — späť na pravidlo (#{hw_rule_result(cab, owner, gt, rid)}). " \
+                'Jeden krok Späť to vráti.'
+          msg += note
+          msg += selection_note(model, had_sel)
+          set_status(msg)
+          after_model_write(model)
+        end
+
+        # VYSLEDOK zo SNAPSHOTU po prestavbe (F13) — kolko kusov dava pravidlo.
+        # Ziadna polozka = pravidlo na tejto skrinke negeneruje nic (napr. je
+        # vypnute); povedat to treba, inak by prazdny riadok vyzeral ako chyba.
+        def hw_rule_result(cab, owner, gt, rid)
+          items = Array((Store.config(cab) || {})['hardware']).select do |h|
+            h.is_a?(Hash) && h['generic_type'].to_s == gt && h['rule_id'].to_s == rid &&
+              (owner.nil? || h['owner_part_key'].to_s == owner.to_s)
+          end
+          qty = items.sum { |h| h['quantity'].to_i }
+          qty.positive? ? "podľa pravidla: #{qty} ks" : 'podľa pravidla sa tu nepočíta nič'
+        end
+
+        # DVA dosledky, ktore pouzivatel z riadku nevidi (odpoved D auditu):
+        #   * zrusenie „vypnuté" VRACIA polozku do supisu aj do NAKUPU — mení cenu,
+        #   * zamok dlzky vysuvu MIMO dnesneho radu pravidla sa strati NENAVRATNE
+        #     (ulozit sa da uz len hodnota z radu — `series_value?`).
+        def hw_reset_note(model, rec, gt, rid)
+          out = ''
+          out += ' Položka sa vracia do súpisu aj do nákupu — mení cenu.' if rec['disabled'] == true
+          nl = rec['nominal_length']
+          if !nl.nil? && !Panel.series_value?(model, rid, gt, nl.to_f)
+            out += " Zámok dĺžky #{num(nl)} mm sa stratil nenávratne — v rade pravidla už nie je, " \
+                   'takže sa nedá zapísať znova.'
+          end
+          out
         end
 
         # ŠT-3b-1: po ZAPISE DO MODELU (ulozenie pravidiel aj doplnenie

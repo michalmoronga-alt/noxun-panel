@@ -786,11 +786,15 @@ module Noxun
           return status.call('Dáta okna sa medzitým obnovili — klikni znova.', true)
         end
 
-        collected = fresh_collect(model)
         # Nalez 4: semafor klik nesie STABILNY kluc problemu; validacia sa po
         # flushi editov PREPOCITA NANOVO a entity sa dohladaju podla identity
         # (owner_id + part_key), nie podla PID (rebuild ho meni).
+        #
+        # ŠT-3b-2b (review #221): zber sa robi AZ V TEJ VETVE, ktora ho naozaj
+        # potrebuje. Vetva `rule_ref` hlada podla identity a s BOM nerobi nic —
+        # plny sken modelu (a dedup tik v nom) bol pri nej cista rezia.
         if data['problem_key']
+          collected = fresh_collect(model)
           # GH #127 P2: klik-resolve MUSI ratat s rovnakym vstupom ako
           # push_state — bez hardware_expansion by sa stable kluce novych
           # ORANGE (hardware_unmapped/hardware_code) nikdy nenasli.
@@ -810,7 +814,7 @@ module Noxun
           # ziadny taky riadok byt nemusi (napr. vypnute kovanie).
           pids = pids_for_override(model, data['rule_ref'])
         else
-          pids = refs_for(Bom.compute(collected), data)
+          pids = refs_for(Bom.compute(fresh_collect(model)), data)
         end
         targets = pids.filter_map do |pid|
           ent = model.find_entity_by_persistent_id(pid.to_i)
