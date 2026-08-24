@@ -877,10 +877,13 @@ module Noxun
         # Payload sekcie. Model chodi ARGUMENTOM (lekcia F4 zo ŠT-3a-2):
         # pri prepnuti dokumentu by inak sekcia dostala pravidla STAREHO
         # dokumentu vedla kusovnika noveho.
-        def rules_payload(model)
+        # ŠT-3b-2a: `collected` chodi TIEZ argumentom — jantarove riadky rucnych
+        # zasahov sa citaju z UZ HOTOVEHO zberu (`manual_overrides`), takze sekcia
+        # nespusta ziadny druhy sken modelu.
+        def rules_payload(model, collected = nil)
           return nil unless defined?(RulesDialog)
 
-          RulesDialog.rules_payload(model)
+          RulesDialog.rules_payload(model, collected)
         rescue StandardError => e
           Engine.log_error(e, 'StudioDialog.rules_payload')
           nil
@@ -1314,7 +1317,9 @@ module Noxun
             # ŠT-3b-1, sekcia PRAVIDLÁ: pravidla kovania projektu (alebo
             # globalne predvolby, kym projekt vlastne nema) + pocet skriniek,
             # ktore ulozenie prestavia. Maly JSON — chodi CELY pri kazdom pushi.
-            rules: rules_payload(model),
+            # ŠT-3b-2a: navyse ABS pravidla podla roly (read-only) a jantarove
+            # riadky rucnych zasahov — tie sa citaju z UZ HOTOVEHO `collected`.
+            rules: rules_payload(model, collected),
             # Deep-link: sekcia sa posiela PRAVE RAZ (inak by kazdy refresh
             # vratil pouzivatela tam, odkial medzitym odisiel).
             open_section: consume_pending_section,

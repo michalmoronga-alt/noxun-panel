@@ -33,6 +33,17 @@ module Noxun
       # Prvotny stav sekcie nesie `push_state` Studia pod klucom `rules`.
       SECTION_ACTIONS = %w[save_rules load_global merge_seed].freeze
 
+      # ŠT-3b-2a: poradie rol v read-only prehlade ABS pravidiel (korpus -> cela).
+      # Poradie hashu z disku by sa menilo s kazdym seed-merge, takze ho urcuje
+      # SERVER; rola z novsej verzie sa NEZAMLCI — pripoji sa na koniec.
+      ABS_ROLE_ORDER = %w[side_left side_right top bottom shelf divider_v divider_h
+                          back rail_front rail_back plinth front_door drawer_front
+                          free_panel].freeze
+
+      # Strop zoznamu rucnych zasahov (F15). „Použiť na podobné" vie vyrobit
+      # desiatky riadkov naraz — nekonecny zoznam by zo sekcie spravil vypis.
+      MAX_OVERRIDE_ROWS = 40
+
       class << self
         # --- vstup SEKCIE `rules` (vzor HardwareCatalogDialog.dispatch) ------
 
@@ -85,7 +96,7 @@ module Noxun
         # Pri KAZDOM zostaveni sa obnovi BASELINE — presne to, co robil
         # `push_state` okna: formular je platny len pre stav, z ktoreho bol
         # naplneny.
-        def rules_payload(model)
+        def rules_payload(model, collected = nil)
           project = HardwareRules.project_rules(model)
           rules = project || HardwareRules.load
           @baseline_guid  = model_guid(model)
@@ -94,12 +105,212 @@ module Noxun
             'rules' => rules,
             'source' => project ? 'project' : 'global',
             'model_guid' => @baseline_guid,
-            'cabinets' => cabinets(model).size }
+            'cabinets' => cabinets(model).size,
+            # ŠT-3b-2a: druha skupina sekcie — ABS pravidla podla ROLY dielca
+            # (read-only prehlad) a jantarove riadky rucnych zasahov. Texty
+            # sklada SERVER (jedna autorita nazvov), klient nic neprekladá.
+            'abs' => abs_payload,
+            'overrides' => overrides_payload(collected) }
         rescue StandardError => e
           # Zlyhanie sa NEZAMLCUJE: sekcia ostane bez dat a jedinou stopou
           # preco je tento zaznam (rovnaka lekcia ako `mat_payload`).
           Engine.log_error(e, 'RulesDialog.rules_payload')
           nil
+        end
+
+        # ================ ŠT-3b-2a: ABS podla roly + rucne zasahy ==============
+        #
+        # Poradie skupin v sekcii: ABS NAD kovanim (mockup Š17). Skupina ABS je
+        # ZATIAL LEN NA CITANIE — editor pravidiel ABS v pluginu NEEXISTUJE
+        # (ziadne okno, ziadny formular), a hint sekcie to musi priznat; opacny
+        # dojem by posielal pouzivatela hladat nieco, co nie je (F8).
+        #
+        # ROZSAH PLATNOSTI (F9) je u kazdej skupiny INY a musi to byt vidiet:
+        # kovanie = snapshot TOHTO projektu (.skp), ABS = GLOBALNE predvolby
+        # v %APPDATA% spolocne pre vsetky zakazky. Preto ma kazda skupina
+        # vlastny riadok zdroja.
+        #
+        # Read-only prehlad pravidiel ABS. VLASTNY rescue (F7): zlyhanie citania
+        # globalneho suboru nesmie vziat cely payload — formular pravidiel
+        # kovania s nim nema nic spolocne.
+        def abs_payload
+          # N20: `AbsRules.rules` ma VEDLAJSI EFEKT (ensure_seeded zapisuje subor).
+          # Volat sa smie LEN mimo `model.start_operation` — zostavovanie payloadu
+          # ziadna operacia nie je, ale kopirovat toto volanie do zapisovacej cesty
+          # by znamenalo zapis na disk vnutri undo kroku.
+          rules = AbsRules.load
+          rules = {} unless rules.is_a?(Hash)
+          order = ABS_ROLE_ORDER + (rules.keys.map(&:to_s) - ABS_ROLE_ORDER)
+          rows = order.filter_map { |role| rules.key?(role) ? abs_rule_row(role, rules[role]) : nil }
+          { 'rows' => rows,
+            'source' => 'zdroj: globálne predvoľby (spoločné pre všetky zákazky) · ' \
+                        'zmena neprestaví už postavené skrinky',
+            'hint' => 'ABS pravidlá podľa roly zatiaľ nemajú editor — plugin ich len číta. ' \
+                      'Hrany konkrétneho dielca sa menia v Inspectore (karta dielca) a taký ' \
+                      'zásah sa nižšie ukáže ako override.' }
+        rescue StandardError => e
+          Engine.log_error(e, 'RulesDialog.abs_payload')
+          { 'rows' => [], 'source' => 'ABS pravidlá sa nepodarilo načítať.', 'hint' => '' }
+        end
+
+        # Jeden riadok pravidla. N19: pravidlo ABS je HRUBKA (1,0 / 2,0 mm), NIE
+        # konkretna paska — dekor sa dopocita z materialu dielca az pri stavbe.
+        # Riadok preto nikdy nepise nazov ani kod pasky (klamal by pri kazdej
+        # zmene materialu).
+        def abs_rule_row(role, edges)
+          labels = AbsRules.edge_labels(role)
+          map = edges.is_a?(Hash) ? edges : {}
+          present = AbsRules::EDGE_ORDER.select { |c| map[c] }
+          row = { 'role' => role.to_s, 'label' => abs_role_label(role) }
+          if present.empty?
+            return row.merge('desc' => 'bez pravidla', 'value' => 'bez olepu')
+          end
+
+          ths = present.map { |c| map[c].to_f }.uniq
+          if ths.length == 1
+            desc = present.length == AbsRules::EDGE_ORDER.length ? 'všetky štyri hrany'
+                                                                 : present.map { |c| labels[c] }.join(' · ')
+            row.merge('desc' => desc, 'value' => "#{mm(ths.first)} mm")
+          else
+            row.merge('desc' => 'rôzne hrúbky podľa hrán',
+                      'value' => present.map { |c| "#{labels[c]} #{mm(map[c].to_f)} mm" }.join(' · '))
+          end
+        end
+
+        def abs_role_label(role)
+          label = defined?(ProductionCore) ? ProductionCore.role_label(role) : ''
+          label.to_s.empty? ? role.to_s : label
+        end
+
+        # --- jantarove riadky: EXISTENCIA rozhodnutia, nie jeho spravnost -----
+        #
+        # F11: riadok NEHOVORI o tom, ci je olep spravny (to je vec KONTROLY —
+        # EdgeCheck a semafor); hovori, ze na tomto mieste rozhodol CLOVEK a
+        # pravidlo sa neuplatni. Preto ziadna ⚠, ziadna semaforova bodka a
+        # ziadny vstup do poctov Kontroly — len stitok „override".
+        def overrides_payload(collected)
+          man = collected.is_a?(Hash) ? collected[:manual_overrides] : nil
+          man = {} unless man.is_a?(Hash)
+          emap = defined?(ProductionCore) ? ProductionCore.edges_map : nil
+          { 'abs' => override_group(Array(man['abs']).filter_map { |o| abs_override_row(o, emap) },
+                                    'Dielce s ručne nastavenými hranami',
+                                    'Tieto dielce majú hrany nastavené ručne v Inspectore — ' \
+                                    'pravidlo podľa roly sa na ne neuplatní. Vrátiť na pravidlo ' \
+                                    'jedným klikom pribudne v ďalšej dávke; dnes sa override ruší ' \
+                                    'v karte dielca (hrana → „podľa pravidla").'),
+            'hardware' => override_group(Array(man['hardware']).filter_map { |o| hw_override_row(o) },
+                                         'Skrinky s ručne nastaveným kovaním',
+                                         'Toto kovanie nastavil človek v Inspectore — pravidlo ' \
+                                         'podľa rozmerov sa naň neuplatní. Vrátiť na pravidlo ' \
+                                         'jedným klikom pribudne v ďalšej dávke; dnes sa override ' \
+                                         'ruší v karte Kovanie.') }
+        rescue StandardError => e
+          # F7: zber rucnych zasahov MUSI zlyhat sam za seba — inak by chyba
+          # v jednom riadku zhodila formular pravidiel kovania vedla neho.
+          Engine.log_error(e, 'RulesDialog.overrides_payload')
+          { 'abs' => empty_override_group, 'hardware' => empty_override_group }
+        end
+
+        def empty_override_group
+          { 'total' => 0, 'groups' => [], 'more' => 0, 'title' => '', 'note' => '', 'more_text' => '' }
+        end
+
+        # Zoskupenie po SKRINKACH + strop so suhrnom (F15).
+        def override_group(rows, title, note)
+          total = rows.length
+          return empty_override_group if total.zero?
+
+          shown = rows.first(MAX_OVERRIDE_ROWS)
+          groups = []
+          shown.each do |r|
+            g = groups.find { |x| x['owner_id'] == r['owner_id'] }
+            unless g
+              g = { 'owner_id' => r['owner_id'], 'title' => owner_title(r), 'rows' => [] }
+              groups << g
+            end
+            g['rows'] << r
+          end
+          more = total - shown.length
+          { 'total' => total, 'groups' => groups, 'more' => more,
+            'title' => "#{title} (#{total})", 'note' => note,
+            'more_text' => more.zero? ? '' : "…a ďalších #{more} — zoznam je skrátený." }
+        end
+
+        def owner_title(row)
+          id = row['owner_id'].to_s
+          name = row['owner_name'].to_s.strip
+          id = 'bez identity' if id.empty?
+          name.empty? ? id : "#{id} · #{name}"
+        end
+
+        # Riadok ABS overridu. Zhrnutie sa sklada z TOHO, CO POUZIVATEL ULOZIL
+        # (kluc `edges` v configu korpusu), nie z vyriesenych hran na entite —
+        # inak by riadok tvrdil nieco ine, nez co sa da vratit.
+        def abs_override_row(ov, edges_map)
+          return nil unless ov.is_a?(Hash)
+
+          edges = ov['edges']
+          return nil unless edges.is_a?(Hash)
+
+          role = ov['role'].to_s
+          labels = AbsRules.edge_labels(role)
+          parts = AbsRules::EDGE_ORDER.select { |c| edges.key?(c) }.map do |c|
+            "#{labels[c]}: #{abs_edge_value(edges[c], edges_map)}"
+          end
+          return nil if parts.empty?
+
+          name = ov['name'].to_s.strip
+          { 'owner_id' => ov['owner_id'].to_s, 'owner_name' => ov['owner_name'].to_s,
+            'part_key' => ov['part_key'].to_s,
+            'label' => name.empty? ? abs_role_label(role) : name,
+            'desc' => 'ručne nastavené hrany',
+            'value' => parts.join(' · ') }
+        end
+
+        # Hodnota jednej hrany. Prazdna/nil = vedome „bez olepu"; paska MIMO
+        # katalogu vrati surove id (`ProductionCore.edge_label`) — radsej surove
+        # id nez vymysleny nazov.
+        def abs_edge_value(value, edges_map)
+          id = value.to_s.strip
+          return 'bez olepu' if id.empty?
+          return id unless edges_map.is_a?(Hash) && defined?(ProductionCore)
+
+          ProductionCore.edge_label(edges_map[id], id)
+        end
+
+        # Riadok overridu kovania. Zaznam nesie NEZAVISLE polia (D-93), takze
+        # riadok vypise VSETKY, ktore su nastavene — prazdny zaznam sa nekresli.
+        def hw_override_row(ov)
+          return nil unless ov.is_a?(Hash)
+
+          bits = []
+          bits << 'vypnuté — nepočíta sa do súpisu' if ov['disabled'] == true
+          bits << "počet #{ov['quantity'].to_i} ks" unless ov['quantity'].nil?
+          bits << "dĺžka #{num(ov['nominal_length'])} mm" unless ov['nominal_length'].nil?
+          return nil if bits.empty?
+
+          pkey = ov['owner_part_key'].to_s
+          part = ov['part_name'].to_s.strip
+          part = abs_role_label(ov['part_role']) if part.empty? && !ov['part_role'].to_s.empty?
+          { 'owner_id' => ov['owner_id'].to_s, 'owner_name' => ov['owner_name'].to_s,
+            'part_key' => pkey,
+            'label' => HardwareRules.label_for(ov['generic_type']),
+            'desc' => pkey.empty? ? 'ručne nastavené na skrinke' : "ručne nastavené · #{part}",
+            'value' => bits.join(' · ') }
+        end
+
+        # mm po slovensky (desatinna CIARKA). ABS hrubky su 1,0 / 2,0 — desatinne
+        # miesto sa NEZAOKRUHLUJE prec, aby sa „1,0 mm" nemylila s poctom kusov.
+        def mm(value)
+          f = value.to_f
+          format('%.1f', f).tr('.', ',')
+        end
+
+        # Rozmer v mm (dlzka vysuvu): cele cislo BEZ desatinneho miesta —
+        # „420,0 mm" by pri dlzke vyzeralo ako presnost, ktoru nikto nezadal.
+        def num(value)
+          f = value.to_f
+          (f - f.round).abs < 0.05 ? f.round.to_s : format('%.1f', f).tr('.', ',')
         end
 
         # ŠT-3b-1: identita dokumentu je `model.guid`, NIE `model.path`.

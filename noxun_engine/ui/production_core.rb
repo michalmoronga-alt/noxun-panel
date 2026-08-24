@@ -329,6 +329,23 @@ module Noxun
         out.compact.uniq
       end
 
+      # ŠT-3b-2a (F10): oko pri jantarovom riadku sekcie Pravidlá. Adresa je
+      # STABILNA DVOJICA (owner_id, part_key) — presne ta, ktorou je adresovany
+      # aj sam override; PIDy sa neposielaju (rebuild ich meni). Telo uz existuje
+      # v `pids_for_problem`, preto sa NEDUPLIKUJE: pri prazdnom `part_key` (override
+      # kovania na celej skrinke) oznaci korpus, inak jeho vnorene dielce daneho kluca.
+      # Vedomy dosledok zdielaneho tela: ak ma korpus ODPOJENE dvojca s tym istym
+      # klucom, oznaci sa tiez. Je to vyber (nic sa nezapisuje) a pouzivatelovi to
+      # ukaze OBA kusy — co je pri odpojenom dielci skor uzitocne nez matuce.
+      def pids_for_override(model, ref)
+        return [] unless ref.is_a?(Hash)
+
+        oid = ref['owner_id'].to_s
+        return [] if oid.empty?
+
+        pids_for_problem(model, { 'owner_id' => oid, 'part_key' => ref['part_key'].to_s })
+      end
+
       # D-103: klik na nalez o zhodnom umiestneni oznaci CELU skupinu (obe/vsetky
       # zhodne umiestnene skrinky ci dosky), aby pouzivatel videl, co presne mazat.
       # Identita je (dup_kind + dup_owner_ids) — zbierana zo SERVERA, klient ju
@@ -786,6 +803,12 @@ module Noxun
             return status.call('Kontrola sa medzitým zmenila — obnovené, klikni znova.', true)
           end
           pids = pids_for_problem(model, item)
+        elsif data['rule_ref']
+          # ŠT-3b-2a: oko pri jantarovom riadku sekcie Pravidlá. Vlastna vetva
+          # ZAMERNE: `refs_for` hlada v HOTOVOM bome podla klucov riadkov, kdezto
+          # override je adresovany identitou (owner_id, part_key) — v kusovniku
+          # ziadny taky riadok byt nemusi (napr. vypnute kovanie).
+          pids = pids_for_override(model, data['rule_ref'])
         else
           pids = refs_for(Bom.compute(collected), data)
         end
