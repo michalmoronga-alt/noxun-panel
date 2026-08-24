@@ -10,7 +10,8 @@
 # novy build_plan by pouzil globalne pravidla namiesto projektovych (F4).
 #
 # API (Codex F5 — collector oddeleny od cisteho vypoctu):
-#   Bom.collect(model) -> {records:, hardware:, hardware_overrides:, warnings:, cabinets:, boards:}
+#   Bom.collect(model) -> {records:, hardware:, hardware_overrides:, manual_overrides:,
+#                          cabinet_sets:, placements:, warnings:, cabinets:, boards:}
 #   Bom.compute(collected) -> {rows:, sheets:, edging:, hardware:, warnings:, summary:}
 # Headless testy krmia compute() zaznamami priamo (collect je tenky a vyzaduje SketchUp).
 #
@@ -18,6 +19,18 @@
 # a raw `hardware_overrides` (owner_id/owner_pid + disabled) — Validation.run z toho
 # stavia zoznam problemov. compute() tieto polia IGNORUJE (tvar vystupu nezmeneny,
 # BuildPlan SCHEMA nedotknuta, ziadna migracia).
+#
+# ŠT-3b-2a (audit F6/F16): `manual_overrides` = RUCNE ZASAHY POUZIVATELA sparovane
+# s REALNYMI dielcami — { 'abs' => [...], 'hardware' => [...] }. Sekcia Pravidlá
+# z nich kresli jantarove riadky. Zbiera sa v TOM ISTOM prechode z UZ nacitaneho
+# `ccfg` (ziadny druhy sken modelu) a `compute()` ho — ako ostatne aditivne kluce
+# — IGNORUJE. Kluc je aditivny: kto ho nepozna, nic nestrati.
+#   PRECO PAROVANIE (audit B2/F14): `PartKeys.migrate_overrides` zachovava kluce
+#   dielcov, ktore uz v pláne NEEXISTUJU (zmenena konstrukcia) — a `hardware_overrides`
+#   s nesediacim `owner_part_key` sa ticho neaplikuju. Taky zaznam sa preto NEKRESLI
+#   (nikto by nevedel, k comu patri); paruje sa VYHRADNE s VNORENYM vyrobnym dielcom
+#   toho isteho korpusu — override zije v korpuse a odpojene dvojca by prestavba
+#   aj tak neprekreslila.
 module Noxun
   module Engine
     module Bom
@@ -32,6 +45,7 @@ module Noxun
         records = []
         hardware = []
         hardware_overrides = []
+        manual_overrides = { 'abs' => [], 'hardware' => [] }
         cabinet_sets = {}
         warnings = []
         placements = [] # D-103: umiestnenie top-level skriniek/dosiek (zachytna siet duplicit)
@@ -60,16 +74,24 @@ module Noxun
               cabinet_sets[cid] = ccfg['hardware_sets']
             end
             Array(ccfg['warnings']).each { |w| warnings << (w.is_a?(Hash) ? w.merge('owner_id' => cid) : { 'message' => w.to_s, 'owner_id' => cid }) }
+            # ŠT-3b-2a: mapa VNORENYCH dielcov korpusu (part_key -> zaznam) sa
+            # stavia POPRI zbere — je to jediny podklad, proti ktoremu sa daju
+            # sparovat rucne zasahy (nizsie), a nestoji ziadny dalsi prechod.
+            nested = {}
             inst.definition.entities.grep(Sketchup::ComponentInstance).each do |pi|
               next unless Store.kind(pi) == 'part'
               next unless Store.get(pi, 'manufactured') == true
               next unless Store.get(pi, 'production_class').to_s == 'sheet'
-              records << record(Store.config(pi) || {}, owner_id: cid,
-                                name: Store.get(pi, 'name').to_s,
-                                part_key: Store.get(pi, 'part_key').to_s,
-                                role: Store.get(pi, 'role').to_s,
-                                pid: pi.persistent_id)
+              rec = record(Store.config(pi) || {}, owner_id: cid,
+                           name: Store.get(pi, 'name').to_s,
+                           part_key: Store.get(pi, 'part_key').to_s,
+                           role: Store.get(pi, 'role').to_s,
+                           pid: pi.persistent_id)
+              records << rec
+              key = rec['part_key'].to_s
+              nested[key] = rec unless key.empty? || nested.key?(key)
             end
+            collect_manual_overrides(manual_overrides, ccfg, cid, nested)
           when 'board'
             boards += 1
             # D-103: umiestnenie sa zbiera PRED filtrom manufactured — duplicitna
@@ -104,8 +126,59 @@ module Noxun
           end
         end
         { records: records, hardware: hardware, hardware_overrides: hardware_overrides,
+          manual_overrides: manual_overrides,
           cabinet_sets: cabinet_sets, placements: placements,
           warnings: warnings, cabinets: cabinets, boards: boards }
+      end
+
+      # ŠT-3b-2a: RUCNE ZASAHY jedneho korpusu sparovane s jeho VNORENYMI dielcami.
+      #
+      # ABS (audit B1): autorita je PRITOMNOST kluca `edges` v zazname
+      # `part_overrides[part_key]` — presne to, co zapisovacia cesta panela maze,
+      # ked sa dielec vracia „na pravidlo". POROVNANIE HODNOT by bola tretia pravda
+      # o hranach a klamalo by pri kazdej zmene katalogu; config ENTITY dielca navyse
+      # nesie VYRIESENY snapshot hran VZDY, takze ako override sa citat NESMIE.
+      #   Dosky (kind=board) tu zamerne nie su: `board_builder` uklada vyriesenu mapu
+      #   hran vzdy, takze jej pritomnost o rucnom zasahu nehovori NIC.
+      #
+      # KOVANIE: zaznam s prazdnym `owner_part_key` patri celemu korpusu (paruje sa
+      # vzdy); zaznam s konkretnym klucom LEN ked taky dielec naozaj existuje.
+      def collect_manual_overrides(out, ccfg, cid, nested)
+        # Nazov korpusu do nadpisu skupiny, aby sa dala skrinka najst aj bez
+        # klikania. MUSI to byt `display_name`, NIE `ccfg['name']`: D-100 uklada
+        # do configu LEN RUCNY nazov (nil = zivy default podla typu a sirky),
+        # takze surovy kluc je pri vacsine skriniek PRAZDNY a v zozname by ostalo
+        # hole „CAB-004". `display_name` da presne to, co pouzivatel vidi v paneli.
+        cab_name = if defined?(CabinetBuilder)
+                     CabinetBuilder.display_name(ccfg).to_s
+                   else
+                     ccfg['name'].to_s
+                   end
+        ov = ccfg['part_overrides']
+        if ov.is_a?(Hash)
+          ov.each do |pkey, rec|
+            next unless rec.is_a?(Hash) && rec['edges'].is_a?(Hash)
+            part = nested[pkey.to_s]
+            next if part.nil?
+
+            out['abs'] << { 'owner_id' => cid, 'owner_name' => cab_name, 'part_key' => pkey.to_s,
+                            'role' => part['role'].to_s, 'name' => part['name'].to_s,
+                            'pid' => part['pid'],
+                            'material_id' => part['material_id'].to_s,
+                            'edges' => rec['edges'].dup }
+          end
+        end
+        Array(ccfg['hardware_overrides']).each do |hov|
+          next unless hov.is_a?(Hash)
+
+          pkey = hov['owner_part_key'].to_s
+          part = pkey.empty? ? nil : nested[pkey]
+          next if !pkey.empty? && part.nil?
+
+          out['hardware'] << hov.merge('owner_id' => cid, 'owner_name' => cab_name,
+                                       'part_role' => part ? part['role'].to_s : '',
+                                       'part_name' => part ? part['name'].to_s : '')
+        end
       end
 
       # D-103: umiestnenie top-level NOXUN objektu pre kontrolu „dva kusy na

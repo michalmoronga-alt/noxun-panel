@@ -136,7 +136,7 @@
     // ŠT-3b-1 (Š17): zatiaľ LEN skupina „Kovanie podľa rozmerov" — hint to
     // priznáva, aby prázdne miesto po ABS skupine nevyzeralo ako chyba.
     rules: { t: 'Pravidlá',
-             hint: 'kovanie podľa rozmerov — platí pre tento projekt · ABS podľa roly dielca pribudne v ŠT-3b-2' },
+             hint: 'ABS podľa roly dielca (spoločné, len na čítanie) · kovanie podľa rozmerov — platí pre tento projekt' },
     hw: { t: 'Kovanie',
           hint: 'katalóg položiek a sety sú spoločné pre všetky zákazky · predvoľby setov projektu zatiaľ v okne' }
   };

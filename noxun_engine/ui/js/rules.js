@@ -17,6 +17,12 @@
   // ci push zo servera ma formular prekreslit — viz `rdApplyState`.
   var RD_SEED = null;
   var RD_META = { version: '', source: '', cabinets: 0 };
+  // ŠT-3b-2a: READ-ONLY casti sekcie (ABS pravidla podla roly + jantarove riadky
+  // rucnych zasahov). Ziju MIMO `RD_RULES` a mimo zapadky `RD_NEEDS_RENDER`:
+  // nie je v nich co rozpisat, takze sa prekresluju pri KAZDOM pushi zo servera
+  // (vzor `rdSrcLine`). Formulara pravidiel kovania sa nedotykaju.
+  var RD_ABS = null;
+  var RD_OVR = null;
   // Review #220 P1: „formular je vykresleny a jeho hodnoty ziju v DOM".
   // Kym plati, prekreslit ho smie UZ LEN zmena pravidiel NA MODELI — nie
   // pripojenie tela pri navrate do sekcie. Rucne hodnoty (`.rqty`, `.bmax`,
@@ -57,6 +63,7 @@
       rdSetState(data);
       RD_NEEDS_RENDER = true;
       rdRender();
+      rdRenderExtra();
     },
     setRules: function(rules, _source){
       RD_RULES = rules || [];
@@ -81,7 +88,96 @@
     RD_SEED = JSON.stringify(RD_RULES);
     RD_META = { version: d.version || '', source: d.source || '',
                 cabinets: d.cabinets || 0, model_guid: d.model_guid || '' };
+    rdSetExtra(d);
   }
+
+  // ŠT-3b-2a: read-only casti sa nasadzuju ZVLAST od formulara — chodia
+  // s KAZDYM pushom a nemaju odtlacok (nie je v nich co rozpisat).
+  function rdSetExtra(d){
+    RD_ABS = (d && d.abs) || null;
+    RD_OVR = (d && d.overrides) || null;
+  }
+
+  // ---------- ŠT-3b-2a: ABS podla roly + jantarove riadky (len citanie) ------
+  //
+  // VSETKY texty (nazvy rol, popisy pravidiel, zhrnutia overridov, hlaska
+  // o skratenom zozname) sklada SERVER — tu sa uz iba escapuju a ukladaju do
+  // riadkov. Klient nema ziadnu vlastnu tabulku prekladov, takze sa nema s cim
+  // rozist (rovnaky kontrakt ako `role_label` v Kusovniku).
+  function rdIco(n){ return '<svg class="ic" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; }
+
+  // Jeden riadok: nazov · popis · hodnota (+ oko pri override riadku).
+  function rdRowHtml(r, over){
+    var h = '<div class="rdrow' + (over ? ' rdovr' : '') + '">' +
+      '<span class="rdnm">' + rdEsc(r.label) +
+      (over ? ' <span class="rdchip">override</span>' : '') + '</span>' +
+      '<span class="rddesc">' + rdEsc(r.desc) + '</span>' +
+      '<span class="rdval">' + rdEsc(r.value) + '</span>';
+    if (over){
+      // Mockup oko v override riadku NEMA — je to vedome doplnenie: bez neho
+      // sa riadok „Polica v CAB-004" v modeli nedá nájsť. Adresa je dvojica
+      // (owner_id, part_key), server si dielce dohladá v ČERSTVOM zbere.
+      h += '<span class="rdact"><button type="button" class="rdeye" title="Označiť v modeli"' +
+        ' aria-label="Označiť v modeli" onclick="rdSelectOverride(' +
+        rdEsc(JSON.stringify(String(r.owner_id == null ? '' : r.owner_id))) + ', ' +
+        rdEsc(JSON.stringify(String(r.part_key == null ? '' : r.part_key))) + ')">' +
+        rdIco('eye') + '</button></span>';
+    }
+    return h + '</div>';
+  }
+
+  // Zoznam rucnych zasahov: zoskupeny po skrinkach, so stropom a suhrnom (F15).
+  // Prazdny zoznam nekresli NIC — vertikalny priestor sekcie je vzacny a
+  // „ziadne rucne zasahy" je normalny stav, nie informacia.
+  function rdOvrHtml(g){
+    if (!g || !g.total) return '';
+    // Ikona je CERUZKA, nie vystrazny trojuholnik (F11): riadok hovorí, že tu rozhodol človek —
+    // nie že je niečo zle. Stavy olepu hlási KONTROLA a nič z tohto zoznamu
+    // do jej počtov nevstupuje.
+    var h = '<div class="rdovrbox"><div class="rdovrh">' + rdIco('pencil') + ' ' + rdEsc(g.title) + '</div>';
+    (g.groups || []).forEach(function(grp){
+      h += '<div class="rdgrp"><div class="rdgrph">' + rdEsc(grp.title) + '</div>';
+      (grp.rows || []).forEach(function(r){ h += rdRowHtml(r, true); });
+      h += '</div>';
+    });
+    if (g.more_text) h += '<div class="rdmore">' + rdEsc(g.more_text) + '</div>';
+    if (g.note) h += '<div class="hint">' + rdEsc(g.note) + '</div>';
+    return h + '</div>';
+  }
+
+  function rdAbsRulesHtml(abs){
+    var rows = (abs && abs.rows) || [];
+    if (!rows.length) return '<div class="muted">Žiadne ABS pravidlá.</div>';
+    var h = '';
+    rows.forEach(function(r){ h += rdRowHtml(r, false); });
+    return h;
+  }
+
+  // Kresli sa pri KAZDOM pushi. Ked je telo sekcie odpojene, `rdEl` vrati null
+  // a funkcia je no-op — obsah dobehne pri navrate (`rulesRenderBody`).
+  function rdRenderExtra(){
+    var box = rdEl('rdAbsBox');
+    if (box) box.innerHTML = rdAbsRulesHtml(RD_ABS);
+    var src = rdEl('rdAbsSrc');
+    if (src) src.textContent = (RD_ABS && RD_ABS.source) || '';
+    var hint = rdEl('rdAbsHint');
+    if (hint) hint.textContent = (RD_ABS && RD_ABS.hint) || '';
+    var abs = rdEl('rdAbsOvr');
+    if (abs) abs.innerHTML = rdOvrHtml(RD_OVR && RD_OVR.abs);
+    var hw = rdEl('rdHwOvr');
+    if (hw) hw.innerHTML = rdOvrHtml(RD_OVR && RD_OVR.hardware);
+  }
+
+  // Klik na oko. Ide TOU ISTOU cestou ako vyber v Kusovniku (`nx_select` cez
+  // relay panela) a nesie generaciu okna — ziadne pids z DOM.
+  function rdSelectOverride(ownerId, partKey){
+    var st = (typeof ST === 'undefined') ? null : ST;
+    if (!st || typeof window === 'undefined' || !window.sketchup || !sketchup.nx_select) return;
+    sketchup.nx_select(JSON.stringify({ gen: st.gen || 0,
+                                        rule_ref: { owner_id: String(ownerId || ''),
+                                                    part_key: String(partKey || '') } }));
+  }
+  if (typeof window !== 'undefined') window.rdSelectOverride = rdSelectOverride;
 
   function rdSrcLine(){
     return 'zdroj: ' + (RD_META.source === 'project'
@@ -309,6 +405,9 @@
     // odpojene). Pri NAVRATE do sekcie sa NEDOTYKA — rucne hodnoty ziju
     // v DOM uzla, ktory odchodom iba vypadol z `#secbody` (review #220 P1;
     // predtym ich kazdy navrat ticho zahodil).
+    // ŠT-3b-2a: read-only casti (ABS pravidla, jantarove riadky) sa kreslia
+    // VZDY — su to cisla a texty zo servera, nie rozpisane hodnoty.
+    rdRenderExtra();
     if (RD_NEEDS_RENDER){
       rdRender();
       return;
@@ -333,9 +432,15 @@
     if (seed === RD_SEED){
       RD_META = { version: r.version || '', source: r.source || '',
                   cabinets: r.cabinets || 0, model_guid: r.model_guid || '' };
+      // ŠT-3b-2a: read-only casti sa obnovuju AJ TU — rucny zasah v Inspectore
+      // (novy override) pravidla NEMENI, takze odtlacok formulara je ten isty
+      // a riadok by sa bez tohto objavil az po prepnuti sekcie.
+      rdSetExtra(r);
+      rdRenderExtra();
       return;
     }
     rdSetState(r);
+    rdRenderExtra();
     // Pravidla NA MODELI sa zmenili — formular UZ neplati a musi sa
     // prekreslit. Ked je telo sekcie odpojene, `rdRender` je no-op
     // (`rdEl` vrati null) a priznak ostane zdvihnuty, takze prekreslenie
@@ -366,7 +471,14 @@
     module.exports = { rulesToolsHtml: rulesToolsHtml, rdValidate: rdValidate,
                        rdLabel: rdLabel, rdRoleDesc: rdRoleDesc,
                        rulesRenderBody: rulesRenderBody, rdApplyState: rdApplyState,
-                       rdCollectRules: rdCollectRules, RD: RD };
+                       rdCollectRules: rdCollectRules, RD: RD,
+                       // ŠT-3b-2a: read-only bloky — `rdOvrHtml`/`rdAbsRulesHtml` su
+                       // ciste funkcie (kontrola escapovania a stropu zoznamu),
+                       // `rdRenderExtra` + `rdSelectOverride` potrebuju DOM a
+                       // exportuju sa ZAMERNE: „push nezmaze rozpisany formular,
+                       // ale jantarove riadky obnovi" sa inak overit neda.
+                       rdOvrHtml: rdOvrHtml, rdAbsRulesHtml: rdAbsRulesHtml,
+                       rdRenderExtra: rdRenderExtra, rdSelectOverride: rdSelectOverride };
   }
   // ŠT-3b-1: `sketchup.ready('')` tu ZANIKLO. V okne „Pravidlá kovania" bol
   // tento subor POSLEDNY a jeho `ready` znamenal „HTML je nacitane"; okno
