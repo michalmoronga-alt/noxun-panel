@@ -516,6 +516,26 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   ok(search.length > 0, 'po založení si klient vypýta čerstvý zoznam');
   ok(JSON.parse(search[search.length - 1][1]).pin === 'NOVA001',
      'a povie serveru, ktorú položku má dať navrch (JS si poradie nedopĺňa sám)');
+
+  // (6) review #229 P2: žiadosť je JEDNORAZOVÁ. Bez toho by sa `pin` posielal
+  // pri KAŽDOM ďalšom hľadaní a nesúvisiaci dotaz (iný text, iná kategória,
+  // prepnuté neaktívne) by novú položku ďalej ťahal navrch a zvýrazňoval —
+  // až do znovuotvorenia okna.
+  SENT.length = 0;
+  // Používateľ prepne filter — cez DELEGOVANÝ listener, presne ako v
+  // prehliadači (kategória aj „neaktívne" idú na server HNEĎ, bez debounce).
+  const fireChange = function(target){ (LISTEN.change || []).forEach(function(fn){ fn({ target: target }); }); };
+  fireChange({ id: 'hwInactive', checked: true, tagName: 'INPUT', type: 'checkbox',
+               getAttribute: function(){ return null; }, hasAttribute: function(){ return false; } });
+  const second = SENT.filter(function(x){ return x[0] === 'hw_search'; });
+  ok(second.length >= 1, 'zmena filtra poslala nové hľadanie');
+  eq(JSON.parse(second[second.length - 1][1]).pin, '',
+     'ale UŽ BEZ žiadosti o pin — nesúvisiaci dotaz novú položku navrch neťahá (je jednorazová)');
+
+  // (7) a keď server pin nepotvrdí, zvýraznenie zhasne aj v zozname.
+  H.MDH.results({ codes: ['NOVA001', 'OLD1'], query: 'nieco ine', total: 2, shown: 2, pin: '' });
+  ok(classes(listNode()).every(function(c){ return c.indexOf('hwnew') < 0; }),
+     'nesúvisiaci dotaz už nič nezvýrazňuje');
 })();
 
 console.log(`OK ${n} kontrol (ŠT-3a sekcia Kovanie)`);

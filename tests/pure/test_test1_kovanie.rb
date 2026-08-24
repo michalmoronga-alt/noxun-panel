@@ -87,8 +87,27 @@ NxTest.test('TEST-1: PIN dava polozku navrch — ale sklada ho SERVER') do
                 'pin sa pusti LEN ked taka polozka naozaj existuje')
   NxTest.assert(pinned.include?('return nil if code.strip.empty?'), 'prazdny pin sa ignoruje')
   js = T1_HW_JS.lines.reject { |l| l.strip.start_with?('//') }.join
-  NxTest.assert(js.include?('pin: MDH_PIN'), 'klient pin posiela')
+  NxTest.assert(js.include?('pin: MDH_PIN_REQ'), 'klient pin posiela')
   NxTest.refute(js.include?('MDH_ORDER.unshift'), 'ale poradie si NEDOPLNA sam')
+  # Review #229 P2: ZIADOST je JEDNORAZOVA — inak by sa `pin` posielal pri
+  # kazdom dalsom hladani a nesuvisiaci dotaz by novu polozku dalej tahal
+  # navrch (az do znovuotvorenia okna). Su to preto DVA drziaky: ziadost
+  # (`MDH_PIN_REQ`, spotrebuje ju najblizsi dotaz) a POTVRDENE zvyraznenie
+  # (`MDH_PIN`, plati pre prave vykresleny zoznam).
+  send_fn = js[/function mdhSearchNow\(\).*?\n  \}/m].to_s
+  NxTest.assert(send_fn.include?("MDH_PIN_REQ = '';"),
+                'ziadost sa po odoslani HNED zabudne')
+  NxTest.assert(send_fn.index('pin: MDH_PIN_REQ') < send_fn.index("MDH_PIN_REQ = '';"),
+                'a to AZ PO odoslani (inak by sa nikdy neposlala)')
+  first_line = js[/created: function\(code\)\{\s*\n\s*([^\n]+)/m, 1].to_s
+  NxTest.assert(first_line.include?('MDH_PIN_REQ ='),
+                'zalozenie nastavuje ZIADOST (prvy riadok tela), nie zvyraznenie')
+  # Zvyraznenie ma JEDINEHO pisatela — odpoved servera. Keby ho nastavoval aj
+  # `created`, riadok by svietil aj vtedy, ked server pin NEPOTVRDIL.
+  writers = js.scan(/^\s*MDH_PIN = /).length
+  NxTest.assert_equal(1, writers, 'zvyraznenie nastavuje PRESNE jedno miesto (prijimac `results`)')
+  NxTest.assert(js.include?(%q(MDH_PIN = data.pin || '')),
+                'a je to odpoved servera')
 end
 
 NxTest.test('TEST-1: po zalozeni polozky ide jej KOD klientovi (obe cesty)') do

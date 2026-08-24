@@ -14,8 +14,17 @@
   var MDH_TOTAL = 0;
   var MDH_SHOWN = 0;
   // Kód práve založenej položky. Klient ho NEZARAĎUJE sám (poradie skladá
-  // server — kontrakt GH #100 P2): posiela ho v `pin` a server ju dá navrch;
-  // tu slúži už len na ZVÝRAZNENIE riadku. Zhasne pri ďalšom hľadaní.
+  // server — kontrakt GH #100 P2): pošle ho v `pin`, server ju dá navrch.
+  //
+  // Sú to ZÁMERNE DVA držiaky (review #229 P2):
+  //   `MDH_PIN_REQ` = ŽIADOSŤ a je JEDNORAZOVÁ — spotrebuje ju najbližší
+  //      dotaz a hneď sa zabudne. Bez toho by sa posielala pri KAŽDOM ďalšom
+  //      hľadaní a nesúvisiaci dotaz (iný text, iná kategória, prepnuté
+  //      neaktívne) by ďalej ukazoval a zvýrazňoval novú položku navrchu,
+  //      hoci filtru nevyhovuje — a to až do znovuotvorenia okna.
+  //   `MDH_PIN` = to, čo server POTVRDIL pre PRÁVE VYKRESLENÝ zoznam; slúži
+  //      len na zvýraznenie riadku a s ďalšou odpoveďou prirodzene zhasne.
+  var MDH_PIN_REQ = '';
   var MDH_PIN = '';
   var MDH_CATS = [];
   var MDH_UNITS = [];
@@ -106,8 +115,10 @@
       query: s ? (s.value || '') : HW_Q,
       category: c ? (c.value || '') : HW_CAT,
       include_inactive: i ? !!i.checked : HW_INACTIVE,
-      pin: MDH_PIN
+      pin: MDH_PIN_REQ
     });
+    // Žiadosť je spotrebovaná — ďalšie hľadanie už ide bez nej.
+    MDH_PIN_REQ = '';
   }
 
   function mdhSearchDebounced(){
@@ -578,9 +589,10 @@
       MDH.created(code);   // TEST-1: kód novej položky ide ďalej (pin navrch)
     },
     created: function(code){
-      // TEST-1: nová položka sa MUSÍ objaviť hneď. Kód si zapamätáme a
-      // `mdhSearchNow` ho pošle serveru ako `pin` — ten ju dá navrch.
-      MDH_PIN = (code == null) ? '' : String(code);
+      // TEST-1: nová položka sa MUSÍ objaviť hneď. Kód ide ako JEDNORAZOVÁ
+      // žiadosť do najbližšieho dotazu (`mdhSearchNow` nižšie) — server ju dá
+      // navrch. Ďalšie hľadanie už žiadosť nenesie (review #229 P2).
+      MDH_PIN_REQ = (code == null) ? '' : String(code);
       var f = hwEl('hwNewForm');
       if (f) f.style.display = 'none';
       ['hn_code', 'hn_name', 'hn_price', 'hn_supplier', 'hn_notes'].forEach(function(id){
