@@ -7769,6 +7769,11 @@ module NoxunSuRunner
       ren_params = e::Panel.existing_params(inst)
       ren_params['zone_tree'] = { 'id' => 'Z1', 'shelves' => ren_sentinel + 1, 'children' => [] }
       e::CabinetBuilder.rebuild(model, inst, ren_params, op_name: 'SU-TEST st3c rename sentinel')
+      # Review #226 NOTE 10: sentinel musi NAOZAJ zabrat — keby prestavba
+      # zlyhala, dokaz „1x Spat vratil sentinel" by porovnaval dve rovnake
+      # cisla a prezil by aj regresiu, v ktorej premenovanie krok Spat PRIDA.
+      ok("ŠT-3c-2 (g6): sentinel zapis pred premenovanim zabral (police #{ren_sentinel} -> "          "#{st3c_shelves(inst)})",
+         st3c_shelves(inst) == ren_sentinel + 1)
 
       rec.clear
       td.dispatch('tpl_rename', { 'kind' => 'cabinet', 'template' => ST3C_CAB,

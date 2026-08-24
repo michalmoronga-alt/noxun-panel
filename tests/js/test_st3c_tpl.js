@@ -256,6 +256,17 @@ const BRD = { name: 'Pracovná doska', kind: 'board', preview_rev: null,
      'korpusová: skrinky, ktoré z nej vznikli, sa premenovaním nemenia');
   ok(T.tplRenameSub('board').indexOf('Doskovú') > -1, 'a podtitul menuje druh');
 
+  // Šablóna medzitým zmizla (review #226 NOTE 3): modal sa ZAVRIE — ale bez
+  // úspechového `clear`, lebo potvrdený zápis to nebol.
+  opened.length = 0;
+  log.length = 0;
+  T.tplRename('board', 'Pracovná doska');
+  opened[0].onSubmit({ name: 'Iné meno' });
+  T.TPL.renameClosed();
+  eq(log[0], ['busy', false, false], 'odomkne, ale rozpísané NEZABÚDA (žiadny clear)');
+  eq(log[1], ['close'], 'a modal zavrie');
+  ok(open === false, 'nad neexistujúcou šablónou nič neostáva otvorené');
+
   // REVIEW #226 P2: odpoveď servera smie siahnuť na modal LEN vtedy, keď je
   // na obrazovke stále TEN, ktorý ju vyvolala. Kým sa čaká na zámok súboru,
   // používateľ stihne modal zavrieť (Esc) a otvoriť iný — a `renameSaved` by

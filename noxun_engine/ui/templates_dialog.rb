@@ -223,12 +223,6 @@ module Noxun
           return rename_error('Neznámy druh šablóny — nič sa nepremenovalo.') unless KINDS.include?(kind)
           return rename_error('Vyber šablónu na premenovanie.') if old_name.empty?
           return rename_error('Prázdny názov — šablóna sa nepremenovala.') if new_name.empty?
-          # F4: rovnake meno NIE JE chyba, ale ani zapis — subor sa nedotkne.
-          if new_name == old_name
-            js('TPL.renameSaved()')
-            return set_status('Meno sa nezmenilo.')
-          end
-
           # PNG sa presuva POD zamkom skladu; ci sa to naozaj podarilo, sa da
           # zistit len porovnanim PRED a PO (sklad vracia symbol o ZAZNAME).
           had_png = !TemplatePreviews.rev_for(kind, old_name).nil?
@@ -250,12 +244,22 @@ module Noxun
                      ''
                    end
             after_change("Šablóna premenovaná na „#{new_name}“.#{note}")
+          when :unchanged
+            # F4 + review #226 NOTE 1: rovnake meno NIE JE chyba, ale ani zapis
+            # (subor sa nedotkne). Rozhoduje o tom SKLAD — pod zamkom a az za
+            # guardmi, takze o zmiznutej sablone sa uz „hotovo" nepovie.
+            js('TPL.renameSaved()')
+            set_status('Meno sa nezmenilo.')
           when :exists
             rename_error("Šablóna „#{new_name}“ už v knižnici je — vyber iné meno.")
           when :missing
-            # Zmizla medzitym (druha instancia, rucny zasah) — zoznam sa obnovi,
+            # Zmizla medzitym (druha instancia, rucny zasah). Modal sa ZAVRIE
+            # (review #226 NOTE 3): opravovat meno sablony, ktora uz neexistuje,
+            # nie je co — otvoreny formular nad nicim by sluboval cestu, ktora
+            # nikam nevedie. Hlaska ide do statusu sekcie a zoznam sa obnovi,
             # aby pouzivatel videl, co v kniznici naozaj je.
-            rename_error("Šablóna „#{old_name}“ už v knižnici nie je — zoznam je obnovený.")
+            js('TPL.renameClosed()')
+            set_status("Šablóna „#{old_name}“ už v knižnici nie je — zoznam je obnovený.", true)
             refresh_if_open
           when :readonly
             rename_error('Knižnica šablón je z novšej verzie Noxunu — nič sa nezmenilo.')

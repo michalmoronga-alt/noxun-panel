@@ -20,6 +20,11 @@
 require_relative '../helper' unless defined?(NxTest)
 
 require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog') if NxTest.headless?
+# Sekcia po premenovani BROADCASTUJE do panela (`Panel.push_template_renamed`,
+# `Panel.push_templates`) — bez tohto modulu by handler headless spadol na
+# neznamej konstante a testy by merali vynimku, nie spravanie. `Panel.js` bez
+# ziveho dialogu nic nerobi, takze je to ciste.
+require File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'sync') if NxTest.headless?
 
 ST3C2_TPL_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'templates_dialog.rb'),
                          encoding: 'UTF-8')
@@ -27,6 +32,8 @@ ST3C2_JS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'templa
                      encoding: 'UTF-8')
 ST3C2_CORE_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'templates.rb'),
                           encoding: 'UTF-8')
+# Minimalne validne PNG pre fixtury (magic bytes + vypln nad prazdny subor).
+ST3C2_PNG = ("\x89PNG\r\n\x1A\n".b + ('x' * 64).b).freeze
 
 # Docasna sablona s CUDZIM klucom — simuluje zaznam ulozeny NOVSOU verziou.
 def st3c2_seed(name, extra = {})
@@ -92,8 +99,8 @@ NxTest.test('ŠT-3c-2: kolizia a zmiznute meno nechavaju subor BYTE-NEZMENENY') 
   NxTest.assert_equal(:missing, e::TemplateStore.rename('cabinet', 'ST3C2 neexistuje', 'ST3C2 E'),
                       'zmiznuta sablona = :missing')
   NxTest.assert_equal(snap, File.binread(e::TemplateStore.path), 'aj tu je subor netknuty')
-  NxTest.assert_equal(:ok, e::TemplateStore.rename('cabinet', 'ST3C2 C', 'ST3C2 C'),
-                      'rovnake meno je :ok bez zapisu')
+  NxTest.assert_equal(:unchanged, e::TemplateStore.rename('cabinet', 'ST3C2 C', 'ST3C2 C'),
+                      'rovnake meno ma VLASTNY vysledok a nezapisuje (NOTE 1)')
   NxTest.assert_equal(snap, File.binread(e::TemplateStore.path), 'a tiez bez dotyku suboru')
   NxTest.assert_equal(:missing, e::TemplateStore.rename('cabinet', '', 'ST3C2 E'),
                       'prazdne stare meno = :missing')
@@ -330,4 +337,246 @@ NxTest.test('ŠT-3c-2 (review #226 P2): premenovanie prehodi VOLBU vkladacej kar
   NxTest.assert(r.include?('NXInsert.templateName(k) !== String'),
                 'prehadzuje sa LEN zhodna volba (cudzia sa nedotkne)')
   NxTest.assert(r.include?('NXInsert.setTemplateName(k, newName)'), 'a nastavi sa nove meno')
+end
+
+# --- review #226 kolo 2: BEHAVIORALNE dokazy (grep uz nestaci) ---------------
+#
+# Kazdy test nizsie zabija KONKRETNU mutaciu, ktora predtym prezila: poradie
+# zapis→PNG, hlaska o nepresunutom nahlade, `max` pri kolizii peciatky,
+# overenie presunu na disku, containment cesty, obnova zoznamu pri zmiznutej
+# sablone a vsetky STYRI vlastnosti, ktore `with_entries` slubuje.
+
+# Vykona blok s docasne nahradenou modulovou metodou.
+def st3c2_with_stub(mod, name, impl)
+  sc = mod.singleton_class
+  alias_name = :"st3c2_orig_#{name}"
+  sc.send(:alias_method, alias_name, name)
+  mod.define_singleton_method(name, impl)
+  yield
+ensure
+  sc.send(:alias_method, name, alias_name)
+  sc.send(:remove_method, alias_name)
+end
+
+NxTest.test('ŠT-3c-2 (kolo 2): PNG sa hybe AZ PO zapise zoznamu — zlyhany zapis ho nechá') do
+  NxTest.skip!('TemplateStore testy bezia len headless (testovaci %APPDATA%)') unless NxTest.headless?
+
+  e = Noxun::Engine
+  e::TemplateStore.reload!
+  st3c2_cleanup('ST3C2 K', 'ST3C2 K2')
+  st3c2_seed('ST3C2 K')
+  src = e::TemplatePreviews.path_for('cabinet', 'ST3C2 K')
+  require 'fileutils'
+  FileUtils.mkdir_p(File.dirname(src))
+  File.binwrite(src, ST3C2_PNG)
+
+  # Zapis zoznamu ZLYHA (plny disk, prava): zaznam ostava na starom mene —
+  # a obrazok sa preto NESMIE pohnut. Keby sa PNG presuvalo PRED `write_list`,
+  # sablona by po neuspesnom premenovani prisla o nahlad.
+  res = st3c2_with_stub(e::TemplateStore, :write_list, ->(_list) { false }) do
+    e::TemplateStore.rename('cabinet', 'ST3C2 K', 'ST3C2 K2')
+  end
+  NxTest.assert_equal(:failed, res, 'zlyhany zapis = :failed')
+  NxTest.assert(!e::TemplatePreviews.rev_for('cabinet', 'ST3C2 K').nil?,
+                'nahlad ostal pri POVODNEJ sablone')
+  NxTest.assert(e::TemplatePreviews.rev_for('cabinet', 'ST3C2 K2').nil?,
+                'a na nove meno sa NEPRESUNUL (poradie zapis -> PNG)')
+ensure
+  st3c2_cleanup('ST3C2 K', 'ST3C2 K2') if NxTest.headless?
+end
+
+NxTest.test('ŠT-3c-2 (kolo 2): nepresunuty nahlad sa POVIE (hlaska nie je ozdoba)') do
+  NxTest.skip!('TemplateStore testy bezia len headless (testovaci %APPDATA%)') unless NxTest.headless?
+
+  e = Noxun::Engine
+  e::TemplateStore.reload!
+  st3c2_cleanup('ST3C2 L', 'ST3C2 L2')
+  st3c2_seed('ST3C2 L')
+  src = e::TemplatePreviews.path_for('cabinet', 'ST3C2 L')
+  require 'fileutils'
+  FileUtils.mkdir_p(File.dirname(src))
+  File.binwrite(src, ST3C2_PNG)
+
+  # Presun PNG zlyha (subor drzi iny proces): premenovanie je AJ TAK uspesne
+  # (zaznam uz nove meno ma), ale pouzivatel sa MUSI dozvediet, ze fotka
+  # neprisla — inak ju bude hladat.
+  got = []
+  st3c2_with_stub(e::TemplatePreviews, :rename, ->(_k, _o, _n) { false }) do
+    e::TemplatesDialog.dispatch('tpl_rename',
+                                { 'kind' => 'cabinet', 'template' => 'ST3C2 L',
+                                  'new_name' => 'ST3C2 L2' }.to_json,
+                                ->(js) { got << js.to_s })
+  end
+  NxTest.assert(!e::TemplateStore.find('cabinet', 'ST3C2 L2').nil?, 'zaznam sa premenoval')
+  NxTest.assert(got.any? { |x| x.include?('Náhľad sa nepreniesol') },
+                'a status to PRIZNAL (mutacia bez hlasky tu padne)')
+  NxTest.assert(got.any? { |x| x.include?('TPL.renameSaved()') }, 'modal sa zavrel')
+ensure
+  st3c2_cleanup('ST3C2 L', 'ST3C2 L2') if NxTest.headless?
+end
+
+NxTest.test('ŠT-3c-2 (kolo 2): zmiznuta sablona OBNOVI zoznam a modal ZAVRIE (NOTE 3)') do
+  NxTest.skip!('TemplateStore testy bezia len headless (testovaci %APPDATA%)') unless NxTest.headless?
+
+  e = Noxun::Engine
+  e::TemplateStore.reload!
+  got = []
+  e::TemplatesDialog.dispatch('tpl_rename',
+                              { 'kind' => 'cabinet', 'template' => 'ST3C2 NEEXISTUJE',
+                                'new_name' => 'ST3C2 M' }.to_json,
+                              ->(js) { got << js.to_s })
+  NxTest.assert(got.any? { |x| x.start_with?('TPL.init(') },
+                'zoznam sa OBNOVI — pouzivatel musi vidiet, co v kniznici naozaj je')
+  NxTest.assert(got.any? { |x| x.include?('TPL.renameClosed()') },
+                'a modal sa ZAVRIE — meno neexistujucej sablony nie je co opravovat')
+  NxTest.refute(got.any? { |x| x.include?('TPL.renameSaved()') }, 'nikdy nie ako uspech')
+  NxTest.assert(e::TemplateStore.find('cabinet', 'ST3C2 M').nil?, 'a nic nevzniklo')
+end
+
+NxTest.test('ŠT-3c-2 (kolo 2, NOTE 1): rovnake meno je :unchanged — a to AZ za guardmi') do
+  NxTest.skip!('TemplateStore testy bezia len headless (testovaci %APPDATA%)') unless NxTest.headless?
+
+  e = Noxun::Engine
+  e::TemplateStore.reload!
+  st3c2_cleanup('ST3C2 N')
+  st3c2_seed('ST3C2 N')
+  snap = File.binread(e::TemplateStore.path)
+  NxTest.assert_equal(:unchanged, e::TemplateStore.rename('cabinet', 'ST3C2 N', 'ST3C2 N'),
+                      'existujuca sablona s tym istym menom = :unchanged')
+  NxTest.assert_equal(snap, File.binread(e::TemplateStore.path), 'a subor sa NEDOTKOL')
+  # Skratka PRED zamkom tvrdila „hotovo" aj tam, kde sa premenovat NEDA.
+  NxTest.assert_equal(:missing, e::TemplateStore.rename('cabinet', 'ST3C2 NIET', 'ST3C2 NIET'),
+                      'neexistujuca sablona = :missing (nie falosne „hotovo")')
+  raw = JSON.parse(File.read(e::TemplateStore.path, encoding: 'UTF-8'))
+  raw['std'] = e::TemplateStore::STD + 1
+  File.write(e::TemplateStore.path, JSON.pretty_generate(raw), encoding: 'UTF-8')
+  e::TemplateStore.reload!
+  NxTest.assert_equal(:readonly, e::TemplateStore.rename('cabinet', 'ST3C2 N', 'ST3C2 N'),
+                      'a kniznica z novsej verzie = :readonly')
+ensure
+  if NxTest.headless?
+    begin
+      raw2 = JSON.parse(File.read(Noxun::Engine::TemplateStore.path, encoding: 'UTF-8'))
+      raw2['std'] = Noxun::Engine::TemplateStore::STD
+      File.write(Noxun::Engine::TemplateStore.path, JSON.pretty_generate(raw2), encoding: 'UTF-8')
+    rescue StandardError # rubocop:disable Lint/SuppressedException
+    end
+    Noxun::Engine::TemplateStore.reload!
+    st3c2_cleanup('ST3C2 N')
+  end
+end
+
+NxTest.test('ŠT-3c-2 (kolo 2): presun PNG sa OVERUJE na disku a cesta ma containment') do
+  NxTest.skip!('TemplateStore testy bezia len headless (testovaci %APPDATA%)') unless NxTest.headless?
+
+  e = Noxun::Engine
+  st3c2_cleanup('ST3C2 O', 'ST3C2 O2')
+  src = e::TemplatePreviews.path_for('cabinet', 'ST3C2 O')
+  require 'fileutils'
+  FileUtils.mkdir_p(File.dirname(src))
+  File.binwrite(src, ST3C2_PNG)
+
+  # `File.rename` „prebehne", ale na disku sa nic nestane (sietovy disk,
+  # antivirus). Bez overenia by metoda vratila true a volajuci by tvrdil,
+  # ze nahlad je na novom mene.
+  moved = st3c2_with_stub(File, :rename, ->(_a, _b) { 0 }) do
+    e::TemplatePreviews.rename('cabinet', 'ST3C2 O', 'ST3C2 O2')
+  end
+  NxTest.refute(moved, 'nepotvrdeny presun = false (nie „podarilo sa")')
+
+  # CONTAINMENT: keby `slug` pustil cestu von z adresara, `path_for` musi
+  # vratit nil — je to posledna poistka, nie ozdoba.
+  escaped = st3c2_with_stub(e::TemplatePreviews, :file_name, ->(_k, _n) { '..\\..\\evil.png' }) do
+    e::TemplatePreviews.path_for('cabinet', 'ST3C2 O')
+  end
+  NxTest.assert(escaped.nil?, 'cesta mimo adresara nahladov sa NEVYDA')
+ensure
+  st3c2_cleanup('ST3C2 O', 'ST3C2 O2') if NxTest.headless?
+end
+
+NxTest.test('ŠT-3c-2 (kolo 2): kolizia peciatky berie NOVSIE cislo (`max`)') do
+  NxTest.skip!('TemplateUsage testy bezia len headless (testovaci %APPDATA%)') unless NxTest.headless?
+
+  u = Noxun::Engine::TemplateUsage
+  u.stamp('cabinet', 'ST3C2 P')        # STARSIA peciatka
+  old_seq = u.seq_for('cabinet', 'ST3C2 P')
+  u.stamp('cabinet', 'ST3C2 P2')       # NOVSIA — pod tymto menom uz peciatka JE
+  new_seq = u.seq_for('cabinet', 'ST3C2 P2')
+  NxTest.assert(old_seq.to_i.positive? && new_seq.to_i > old_seq.to_i, 'fixture: dve peciatky')
+
+  u.rename('cabinet', 'ST3C2 P', 'ST3C2 P2')
+  NxTest.assert_equal(new_seq, u.seq_for('cabinet', 'ST3C2 P2'),
+                      'kolizia berie NOVSIE cislo — pouzitie nesmie zostarnut')
+  NxTest.assert(u.seq_for('cabinet', 'ST3C2 P').nil?, 'stary kluc zanikol')
+end
+
+NxTest.test('ŠT-3c-2 (kolo 2): `with_entries` drzi VSETKY styri slubene vlastnosti') do
+  NxTest.skip!('TemplateUsage testy bezia len headless (testovaci %APPDATA%)') unless NxTest.headless?
+
+  u = Noxun::Engine::TemplateUsage
+  # 1) NEZNAMY top-level kluc (novsia verzia) musi zapis PREZIT.
+  # 2) VADNE zaznamy sa sanitizuju (nula, text, prilis dlhy kluc).
+  # 3) `seq` je MONOTONNY aj nad rucne zmensenym suborom.
+  raw = { 'std' => Noxun::Engine::TemplateUsage::STD, 'seq' => 1,
+          'entries' => { 'cabinet:ST3C2 dobra' => 7, 'cabinet:ST3C2 nula' => 0,
+                         'cabinet:ST3C2 text' => 'ahoj',
+                         "cabinet:#{'x' * 300}" => 3 },
+          'poznamka_z_buducnosti' => { 'x' => 1 } }
+  File.write(u.path, JSON.pretty_generate(raw), encoding: 'UTF-8')
+
+  NxTest.assert(u.stamp('cabinet', 'ST3C2 Q'), 'peciatka prejde')
+  data = JSON.parse(File.read(u.path, encoding: 'UTF-8'))
+  NxTest.assert_equal({ 'x' => 1 }, data['poznamka_z_buducnosti'],
+                      'neznamy top-level kluc PREZIL (merge extras)')
+  ent = data['entries']
+  NxTest.assert(!ent.key?('cabinet:ST3C2 nula'), 'nulovy zaznam sa sanitizoval')
+  NxTest.assert(!ent.key?('cabinet:ST3C2 text'), 'aj textovy')
+  NxTest.assert(ent.keys.none? { |k| k.length > Noxun::Engine::TemplateUsage::MAX_KEY_LENGTH },
+                'aj prilis dlhy kluc')
+  NxTest.assert(data['seq'].to_i > 7, '`seq` je nad NAJVYSSOU peciatkou (monotonnost)')
+  NxTest.assert_equal(data['seq'].to_i, ent['cabinet:ST3C2 Q'].to_i, 'a nova peciatka ho drzi')
+
+  # 4) PRUNE: nad stropom zaznamov vypadnu NAJSTARSIE.
+  maxn = Noxun::Engine::TemplateUsage::MAX_ENTRIES
+  many = {}
+  (1..(maxn + 20)).each { |i| many["cabinet:ST3C2 hromada #{i}"] = i }
+  File.write(u.path, JSON.pretty_generate({ 'std' => Noxun::Engine::TemplateUsage::STD,
+                                            'seq' => maxn + 20, 'entries' => many }),
+             encoding: 'UTF-8')
+  u.stamp('cabinet', 'ST3C2 R')
+  after = JSON.parse(File.read(u.path, encoding: 'UTF-8'))['entries']
+  NxTest.assert(after.length <= maxn, "strop zaznamov plati (#{after.length} <= #{maxn})")
+  NxTest.assert(after.key?('cabinet:ST3C2 R'), 'a cerstva peciatka v nom ostala')
+  NxTest.assert(!after.key?('cabinet:ST3C2 hromada 1'), 'najstarsia vypadla')
+
+  # `with_entries` je NAOZAJ privatny (NOTE 6) — nie len slovom v komentari.
+  NxTest.assert_raise(/private method|private/) do
+    u.with_entries { |_e, _s| nil }
+  end
+end
+
+NxTest.test('ŠT-3c-2 (kolo 2): premenovanie BROADCASTUJE prehodenie volby PRED zoznamom') do
+  NxTest.skip!('TemplateStore testy bezia len headless (testovaci %APPDATA%)') unless NxTest.headless?
+
+  e = Noxun::Engine
+  e::TemplateStore.reload!
+  st3c2_cleanup('ST3C2 S', 'ST3C2 S2')
+  st3c2_seed('ST3C2 S')
+  sent = []
+  st3c2_with_stub(e::Panel, :js, ->(script) { sent << script.to_s }) do
+    e::TemplatesDialog.dispatch('tpl_rename',
+                                { 'kind' => 'cabinet', 'template' => 'ST3C2 S',
+                                  'new_name' => 'ST3C2 S2' }.to_json,
+                                ->(_js) { nil })
+  end
+  ren = sent.index { |x| x.start_with?('NX.renameTemplate(') }
+  lst = sent.index { |x| x.start_with?('NX.setTemplates(') }
+  NxTest.assert(!ren.nil?, 'panel dostal prehodenie volby vkladacej karty')
+  NxTest.assert(sent[ren].include?('"cabinet"') && sent[ren].include?('"ST3C2 S"') &&
+                sent[ren].include?('"ST3C2 S2"'),
+                'a nesie druh, STARE aj NOVE meno')
+  NxTest.assert(!lst.nil? && ren < lst,
+                'prehodenie ide PRED zoznamom — prestavane dlazdice uz vyznacia spravnu')
+ensure
+  st3c2_cleanup('ST3C2 S', 'ST3C2 S2') if NxTest.headless?
 end

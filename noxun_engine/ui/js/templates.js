@@ -96,6 +96,17 @@
       m.setBusy(false, { clear: true });
       m.close();
     },
+    // Šablóna medzitým zmizla (review #226 NOTE 3): modal sa ZAVRIE — meno
+    // neexistujúcej šablóny nie je čo opravovať. Rozpísané sa NEZABÚDA
+    // (`clear` sa nedáva): nebol to potvrdený zápis, len zánik cieľa.
+    renameClosed: function(){
+      if (!TPL_REN) return;
+      TPL_REN = null;
+      var m = (typeof window !== 'undefined') ? window.NXModal : null;
+      if (!m || !m.isOpen()) return;
+      m.setBusy(false);
+      m.close();
+    },
     // Odmietnuté premenovanie: modal OSTÁVA otvorený s rozpísaným menom,
     // odomkne sa a chyba sedí pri poli. Bez `setBusy(false)` by po prvom
     // odmietnutí ostalo „Premenovať" navždy zosednuté (isBusy).
@@ -173,7 +184,8 @@
   // --- TELO sekcie -----------------------------------------------------------
   //
   // Dlaždice v dvoch skupinách (mockup Š18): Korpusové · Doskové. Doskové sa
-  // ZOBRAZUJÚ (dnes ich nespravuje nič), ale akcie „použiť"/„odfotiť" NEMAJÚ —
+  // ZOBRAZUJÚ a od ŠT-3c-1/3c-2 sa dajú aj PREMENOVAŤ a ZMAZAŤ (dovtedy ich
+  // nespravovalo nič), ale akcie „použiť"/„odfotiť" NEMAJÚ —
   // apply je typová operácia nad skrinkou a fotka dosky by bola fotka ničoho.
   // Nezobrazujú sa ako `disabled`, ale VÔBEC (D-78: mŕtve tlačidlo bez blízkeho
   // sľubu je horšie než jeho absencia) — vedomá odchýlka od mockupu, ktorý

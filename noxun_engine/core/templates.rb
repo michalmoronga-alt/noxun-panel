@@ -189,13 +189,18 @@ module Noxun
         new_n = new_name.to_s.strip
         return :missing if old_n.empty?
         return :failed if new_n.empty?
-        return :ok if new_n == old_n
 
         res = with_lock do
           next :readonly if refuse_write('rename')
 
           list = load
           next :missing if list.none? { |t| t['kind'] == k && t['name'] == old_n }
+          # Review #226 NOTE 1: „meno sa nezmenilo" je vlastny vysledok
+          # (`:unchanged`) a rozhoduje sa AZ POD ZAMKOM, za guardmi. Skratka
+          # pred zamkom tvrdila „hotovo" aj o sablone, ktora vobec neexistuje,
+          # aj o kniznici v rezime len na citanie — teda presne v situaciach,
+          # v ktorych sa premenovat NEDA.
+          next :unchanged if new_n == old_n
           next :exists if list.any? { |t| t['kind'] == k && t['name'] == new_n }
 
           renamed = list.map do |t|
@@ -604,7 +609,7 @@ module Noxun
       # ŠT-3c-2: PRESUN peciatky pri premenovani sablony. NIE `stamp` (audit F3):
       # ten by sablone pridelil NAJVYSSIE cislo, teda by ju premenovanie povysilo
       # na „naposledy pouzitu" — poradie dlazdic by sa zmenilo za nieco, co
-      # pouzivanie vobec nie je. Prenasa sa PODVODNE cislo.
+      # pouzivanie vobec nie je. Prenasa sa POVODNE cislo.
       #
       # KOLIZIA kluca (nove meno uz peciatku ma — napr. po zmazani a znovu
       # vytvoreni) sa riesi `max`: novsie pouzitie nesmie zostarnut.
@@ -654,6 +659,10 @@ module Noxun
         end
         ok
       end
+      # Review #226 NOTE 6: „privatny" nesmie byt len slovo v komentari —
+      # `module_function` robi zo VSETKYCH metod verejne modulove metody, takze
+      # bez tohto riadku by sa dal jediny mutator suboru obist zvonku.
+      private_class_method :with_entries
 
       # Mapa { "kind:name" => poradove_cislo } — CISTE CITANIE (nikdy nezapisuje).
       def map
