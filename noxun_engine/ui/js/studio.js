@@ -15,6 +15,14 @@
 
   var ST = null;             // posledny push z Ruby
   var studioSec = 'bom';     // aktivna sekcia (ST-1a Kusovnik, ŠT-1b Kontrola)
+  // ŠT-3c-1 (review #225 P1): VEREJNY citatel aktivnej sekcie. `#secbody`
+  // a `#sectools` su ZDIELANE uzly — echo jednej sekcie do nich nesmie
+  // pisat, kym je otvorena INA (inak by ulozenie sablony z Inspectora
+  // prepisalo rozpisany formular Rozpoctu). Cita sa, nikdy nenastavuje.
+  function studioActiveSection(){ return studioSec; }
+  // LEN pre Node testy: nastavi aktivnu sekciu BEZ kreslenia okna (`render`
+  // potrebuje cely DOM). Produkcia prepina sekciu vyhradne `studioGoSection`.
+  function studioSetSectionForTest(id){ studioSec = id; }
   var bomView = 'parts';     // Š4: parts | sheets | abs
   var bomQ = '';             // Š6: text hladania
   var colMenuOpen = false;   // Š2: rozbalene okno stlpcov (cisto zobrazovacie)
@@ -1662,6 +1670,10 @@
       // (Kusovnik · Kontrola · Nakup tu, Rozpocet · Ponuka v budget.js —
       // ten si ho v Node testoch berie requirom TOHTO suboru).
       refreshBtnHtml: refreshBtnHtml, STALE_TIP: STALE_TIP,
+      // ŠT-3c-1: aktivna sekcia — sekcne subory podla nej rozhoduju, ci smu
+      // pisat do ZDIELANEHO `#secbody` (viz `TPL.init`).
+      studioActiveSection: studioActiveSection,
+      setStudioSection: studioSetSectionForTest,
       // ŠT-1b sekcia Kontrola (Š8–Š11)
       semaforHtml: semaforHtml, ctrlRows: ctrlRows, ctrlRowHtml: ctrlRowHtml,
       ctrlActionsHtml: ctrlActionsHtml, navBadgeHtml: navBadgeHtml,

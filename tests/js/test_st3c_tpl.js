@@ -194,7 +194,30 @@ const BRD = { name: 'Pracovná doska', kind: 'board', preview_rev: null,
   delete global.window.NXModal;
 })();
 
-// --- 6) lišta a kolízie globálov --------------------------------------------
+// --- 6) echo knižnice NESMIE prepísať cudziu sekciu (review #225 P1) --------
+
+(function(){
+  // `#secbody` a `#sectools` sú ZDIELANÉ uzly celého okna. Echo prichádza aj
+  // vtedy, keď je používateľ inde (uloženie šablóny z Inspectora) — a vtedy
+  // nesmie kresliť, inak by dlaždice nahradili rozpísaný formulár Rozpočtu.
+  S.setStudioSection('budget');
+  ELS.secbody.innerHTML = 'ROZPÍSANÝ ROZPOČET';
+  ELS.sectools.innerHTML = 'LIŠTA ROZPOČTU';
+  T.TPL.init({ cabinet: [CAB], board: [] });
+  eq(ELS.secbody.innerHTML, 'ROZPÍSANÝ ROZPOČET',
+     'echo knižnice NEPREPÍŠE telo cudzej sekcie');
+  eq(ELS.sectools.innerHTML, 'LIŠTA ROZPOČTU', 'ani jej lištu');
+  ok(T.tplBodyHtml().indexOf('Klasik dolná') > -1,
+     'ale STAV sa uloží — pri vstupe do sekcie sa vykreslí čerstvý');
+
+  S.setStudioSection('tpl');
+  T.TPL.init({ cabinet: [CAB], board: [] });
+  ok(ELS.secbody.innerHTML.indexOf('Klasik dolná') > -1,
+     'v otvorenej sekcii Šablóny echo kreslí normálne');
+  S.setStudioSection('bom');
+})();
+
+// --- 7) lišta a kolízie globálov --------------------------------------------
 
 (function(){
   T.tplApplyState({ cabinet: [CAB, CAB2], board: [BRD] });

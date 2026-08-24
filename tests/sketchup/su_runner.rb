@@ -7605,6 +7605,11 @@ module NoxunSuRunner
 
   def st3c_scenar(model, td)
     # Testovacie sablony maju EXOTICKE mena — na pouzivatelske sa nesiaha nikdy.
+    # Review #225 (Codex P2): upratuju sa LEN sablony, ktore vytvoril TENTO beh.
+    # Predtym `ensure` mazal obe mena vzdy — takze prerusenim zanechany zvysok
+    # (alebo rovnomenna pouzivatelska sablona) zmizol aj vtedy, ked scenar
+    # tvrdil, ze data CHRANI a nic nerobi.
+    @st3c_created = []
     if e::TemplateStore.find('cabinet', ST3C_CAB) || e::TemplateStore.find('board', ST3C_BRD)
       return info('ŠT-3c-1: testovacie sablony uz existuju — scenar preskoceny (chranime data)')
     end
@@ -7619,13 +7624,15 @@ module NoxunSuRunner
     # Sablona sa lisi POCTOM POLIC — po `apply` to musi byt vidiet na entite.
     tpl_cfg = tpl_cfg.merge('zone_tree' => { 'id' => 'Z1', 'shelves' => base_shelves + 2,
                                              'children' => [] })
-    ok('ŠT-3c-1: fixture — korpusova sablona ulozena',
-       e::TemplateStore.upsert('cabinet', ST3C_CAB, tpl_cfg))
+    cab_ok = e::TemplateStore.upsert('cabinet', ST3C_CAB, tpl_cfg)
+    @st3c_created << ['cabinet', ST3C_CAB] if cab_ok
+    ok('ŠT-3c-1: fixture — korpusova sablona ulozena', cab_ok)
     # DOSKOVA sablona: dnes ju nevytvara ziadne UI, ale sklad ju pozna a sekcia
     # ju musi vediet ZMAZAT (audit N29 — prva sprava doskovych).
-    ok('ŠT-3c-1: fixture — doskova sablona ulozena',
-       e::TemplateStore.upsert('board', ST3C_BRD, { 'width' => 2600.0, 'height' => 600.0,
-                                                    'thickness' => 38.0 }))
+    brd_ok = e::TemplateStore.upsert('board', ST3C_BRD, { 'width' => 2600.0, 'height' => 600.0,
+                                                         'thickness' => 38.0 })
+    @st3c_created << ['board', ST3C_BRD] if brd_ok
+    ok('ŠT-3c-1: fixture — doskova sablona ulozena', brd_ok)
 
     rec = []
     sink = ->(script) { rec << script.to_s }
@@ -7673,7 +7680,20 @@ module NoxunSuRunner
       model.selection.clear
       model.selection.add(inst)
       eye_before = model.active_view.camera.eye.to_a.map { |v| v.round(4) }
-      marker_before = st3c_shelves(inst)
+      # Review #225 (Codex P2): undo kontrola potrebuje MERATELNY ORIENTACNY
+      # BOD. Predtym tu stalo `!= marker + 99`, co je pravda prakticky vzdy —
+      # sada by teda prezila aj regresiu, v ktorej `tpl_capture` undo krok
+      # PRIDA. Zapiseme preto VLASTNU sentinelovu operaciu tesne pred fotenim:
+      # ked po foteni JEDEN Spat vrati JU, medzi nou a Spat ziadny dalsi krok
+      # nepribudol — a to je presne dokazovane tvrdenie.
+      sentinel_before = st3c_shelves(inst)
+      sentinel_params = e::Panel.existing_params(inst)
+      sentinel_params['zone_tree'] = { 'id' => 'Z1', 'shelves' => sentinel_before + 1,
+                                       'children' => [] }
+      e::CabinetBuilder.rebuild(model, inst, sentinel_params, op_name: 'SU-TEST st3c sentinel')
+      ok("ŠT-3c-1 (d): sentinel zapis pred fotenim (police #{sentinel_before} -> #{st3c_shelves(inst)})",
+         st3c_shelves(inst) == sentinel_before + 1)
+
       rec.clear
       td.dispatch('tpl_capture', { 'kind' => 'cabinet', 'template' => ST3C_CAB }.to_json, sink)
       ok('ŠT-3c-1 (d): odfotenie prebehlo a povedalo to',
@@ -7682,12 +7702,13 @@ module NoxunSuRunner
          model.active_view.camera.eye.to_a.map { |v| v.round(4) } == eye_before)
       ok('ŠT-3c-1 (d): sablona ma teraz nahlad (preview_rev)',
          !e::TemplatePreviews.rev_for('cabinet', ST3C_CAB).nil?)
-      # Fotenie NIE JE operacia: 1x Spat MUSI vratit este predchadzajuci zapis
-      # do modelu (nie „nic"), takze pocet polic sa nezmeni a nahlad ostane.
+      # Fotenie NIE JE operacia: 1x Spat musi vratit SENTINEL (nie fotenie).
       Sketchup.undo
-      ok('ŠT-3c-1 (d): fotenie NEPRIDALO krok Spat (nahlad po undo stale existuje)',
-         !e::TemplatePreviews.rev_for('cabinet', ST3C_CAB).nil? &&
-         st3c_shelves(inst) != marker_before + 99)
+      ok("ŠT-3c-1 (d): fotenie NEPRIDALO krok Spat — 1x Spat vratil SENTINEL " \
+         "(police #{st3c_shelves(inst)})",
+         inst.valid? && st3c_shelves(inst) == sentinel_before)
+      ok('ŠT-3c-1 (d): a nahlad po undo OSTAVA (subor mimo modelu, nie undo krok)',
+         !e::TemplatePreviews.rev_for('cabinet', ST3C_CAB).nil?)
 
       # --- (e) PNG kanal sekcie odpovie VLASTNYM prijimacom ---------------
       rec.clear
@@ -7724,9 +7745,12 @@ module NoxunSuRunner
          rec.any? { |x| x.include?('Neznámy druh') })
     end
   ensure
-    # Cleanup VLASTNYCH testovacich sablon aj ked scenar spadol.
-    e::TemplateStore.delete('cabinet', ST3C_CAB) if e::TemplateStore.find('cabinet', ST3C_CAB)
-    e::TemplateStore.delete('board', ST3C_BRD) if e::TemplateStore.find('board', ST3C_BRD)
+    # Cleanup LEN toho, co vytvoril TENTO beh (review #225 P2) — cudzia
+    # rovnomenna sablona ani zvysok po preruseni sa nemazu.
+    Array(@st3c_created).each do |kind, name|
+      e::TemplateStore.delete(kind, name) if e::TemplateStore.find(kind, name)
+    end
+    @st3c_created = []
   end
 
   def run_st2d(model)
