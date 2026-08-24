@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.7.66' unless defined?(VERSION)
+    VERSION = '0.7.67' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -478,7 +478,9 @@ module Noxun
         # zauzivana skratka, ale otvara SEKCIU Kovanie v Studiu.
         menu.add_item('Katalóg kovania') { StudioDialog.show(open_section: 'hw') }
         menu.add_item('Nastavenia rozpočtu') { SupplierSettingsDialog.show } # V0.6 E-b
-        menu.add_item('Šablóny') { TemplatesDialog.show }
+        # ŠT-3c-1: zauzivana polozka ostava, ale otvara SEKCIU Sablony v Studiu
+        # (satelitne okno Sablony zaniklo).
+        menu.add_item('Šablóny') { StudioDialog.show(open_section: 'tpl') }
 
         # Scale observer — attach na existujuce korpusy + AppObserver pre buduce modely.
         ScaleWatch.install

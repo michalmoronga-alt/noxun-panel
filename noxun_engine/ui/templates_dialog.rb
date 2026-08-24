@@ -1,14 +1,29 @@
 # frozen_string_literal: true
-# Noxun Engine — dialog "Sablony" (V0.4.5 D2). Satelitne okno (vzor RulesDialog):
-# SPRAVA sablon (ulozit oznaceny korpus / pouzit na oznaceny / vymazat) zije tu;
-# v Inspector paneli ostal len rychly vyber sablony vo vkladacej karte.
-# Handlery su PRESUNUTE z Panel (actions_templates.rb) — panel ich uz nevola;
-# merge_template logika (zachovanie part_overrides + hardware_overrides ciela)
-# sa pri presune NEMENI.
+# Noxun Engine — SERVEROVA AUTORITA SABLON.
+#
+# ŠT-3c-1: satelitne okno „Šablóny" ZANIKLO (HtmlDialog, `DLG_KEY`,
+# `templates.html`, polozka menu aj tlacidlo v paneli). Jedine UI sablon je
+# odteraz SEKCIA `tpl` v okne ŠTÚDIO. Modul sa pritom ZAMERNE NEPREMENUVA
+# (vzor audit #21 zo ŠT-2a): zaniklo OKNO, nie serverova autorita — telo
+# kazdej akcie aj vsetky guardy ziju dalej TU.
+#
+# SPRAVA sablon (pouzit na oznacenu skrinku / odfotit nahlad / zmazat) je
+# v sekcii; UKLADANIE NOVEJ sablony ostava v mini-modale Inspectora
+# (`Panel.handle_save_template_as`, UI-B3) — je to jediny vstup, ktory ma
+# oznacenu skrinku po ruke, a duplikovat ho v sekcii by znamenalo druhu
+# zapisovaciu cestu k tomu istemu suboru. Tlacidlo „Uložiť označený korpus
+# ako šablónu" zo starého okna sa preto NEPRENASA (priznane v PR).
 #
 # Sablony su GLOBALNE (%APPDATA%, TemplateStore) — nie su viazane na model,
-# preto dialog nepotrebuje refresh pri prepnuti dokumentu; "oznaceny korpus"
-# sa hlada cerstvo pri kazdej akcii.
+# preto sekcia nema `on_model_changed` a payload nepotrebuje model; „oznaceny
+# korpus" sa hlada CERSTVO pri kazdej akcii.
+#
+# VYBER (audit N27): sekcia NEMA selection observer a mat ho nebude. Okno
+# si disabled stav tlacidiel drzalo cez `Panel.push_selected` -> to zilo
+# LEN kym zil Inspector. Tlacidla su preto VZDY AKTIVNE a verdikt („nic nie
+# je oznacene", „iny typ", „oznacenych je viac") povie SERVER pri kliku —
+# vzor `Panel.capture_preview_for` a pravidlo D-78 (ziadne mrtve tlacidlo
+# bez vysvetlenia).
 #
 # H2 (D-76): sablona nesie AJ kovanie — mapovanie setov + ZMRAZENE definicie
 # (ulozenie: Panel.template_config_from s modelom; aplikacia: merge_hardware_sets
@@ -20,186 +35,181 @@ require 'json'
 module Noxun
   module Engine
     module TemplatesDialog
-      DLG_KEY = 'noxun_engine_templates'
+      # UZAVRETY whitelist akcii, ktore smie poslat SEKCIA `tpl`. Klient
+      # posiela iba MENO akcie — co sa smie zavolat, rozhoduje SERVER.
+      #
+      # `ready` v zozname NIE JE (a byt nemoze): Studio registruje callbacky
+      # pod TYMI ISTYMI menami, takze `ready` by prepisal jeho vlastny.
+      # Prvotny stav sekcie nesie `push_state` Studia pod klucom `tpl`.
+      SECTION_ACTIONS = %w[tpl_apply tpl_delete tpl_capture tpl_preview].freeze
+
+      # Druhy sablon, ktore sekcia spravuje. Kontrakt skladu je dvojica
+      # (kind, name) — kind sa preto NIKDY neberie z HTML bez kontroly.
+      KINDS = %w[cabinet board].freeze
 
       class << self
-        def show
-          dlg = ensure_dialog
-          if dlg.visible?
-            dlg.bring_to_front
-          else
-            dlg.show
-          end
-          dlg
+        # --- vstup SEKCIE `tpl` (vzor RulesDialog.dispatch) ------------------
+
+        def dispatch(name, payload, sink)
+          key = name.to_s
+          return sink.call(status_script('Neznáma akcia šablón.', true)) unless SECTION_ACTIONS.include?(key)
+
+          with_client(sink) { run_section_action(key, payload) }
         rescue StandardError => e
-          Engine.log_error(e, 'TemplatesDialog.show')
+          Engine.log_error(e, "TemplatesDialog.dispatch #{name}")
+          sink.call(status_script("Chyba: #{e.message}", true))
         end
 
-        # D-14 (Codex F3): refresh zoznamu zvonka (ulozenie sablony z panela),
-        # aby otvorene okno Sablony hned ukazalo novu polozku.
-        def refresh_if_open
-          return unless @dialog && @dialog.visible?
-          push_state
+        def run_section_action(key, payload)
+          case key
+          when 'tpl_apply'   then handle_apply(payload)
+          when 'tpl_delete'  then handle_delete(payload)
+          when 'tpl_capture' then handle_capture(payload)
+          when 'tpl_preview' then handle_preview(payload)
+          end
+        end
+
+        # Presmerovanie odpovedi na cas JEDNEHO volania. `ensure` je povinne:
+        # vynimka v handleri nesmie nechat sink viset, inak by ho zdedila
+        # NASLEDUJUCA odpoved a poslala ju do cudzieho kanala.
+        def with_client(sink)
+          prev = @client_sink
+          @client_sink = sink
+          yield
+        ensure
+          @client_sink = prev
+        end
+
+        # --- payload sekcie -------------------------------------------------
+        #
+        # Sablony su GLOBALNE, takze payload NEPOTREBUJE model (na rozdiel od
+        # ostatnych sekcii). Argument sa napriek tomu prijima kvoli jednotnemu
+        # tvaru mostov v `StudioDialog` — a ZAMERNE sa nepouziva.
+        #
+        # `previews: true` pripaja TRANSIENTNY `preview_rev` (odtlacok PNG
+        # suboru) — dlazdica podla neho vie, ci ma o obrazok vobec ziadat,
+        # a ci pisat „Odfotiť" alebo „Prefotiť". Do `templates.json` sa
+        # nezapisuje. Samotne PNG chodi VLASTNYM kanalom (`tpl_preview`).
+        def tpl_payload(_model = nil)
+          { 'version' => Engine::VERSION,
+            'cabinet' => Panel.template_list(kind: 'cabinet', previews: true),
+            'board' => Panel.template_list(kind: 'board', previews: true) }
         rescue StandardError => e
-          Engine.log_error(e, 'TemplatesDialog.refresh_if_open')
-        end
-
-        def ensure_dialog
-          return @dialog if @dialog
-
-          @dialog = UI::HtmlDialog.new(
-            dialog_title: 'Noxun Engine — Šablóny',
-            preferences_key: DLG_KEY,
-            scrollable: true,
-            resizable: true,
-            # D-77: riadok sablony nesie nazov + akcie vpravo.
-            # Rozmery platia LEN pri prvom otvoreni — zapamatane male okno dorovna nx_fit.
-            width: 460,
-            height: 540,
-            min_width: 380,
-            min_height: 360,
-            style: UI::HtmlDialog::STYLE_DIALOG
-          )
-          @dialog.set_file(File.join(Engine.plugin_dir, 'ui', 'templates.html'))
-          register_callbacks(@dialog) # pred show!
-          @dialog.set_on_closed { @dialog = nil }
-          @dialog
-        end
-
-        def register_callbacks(dlg)
-          Engine.register_dialog_fit(dlg, 'templates') # D-77: zapamatane male okno sa dorovna
-          cb(dlg, 'ready')      { |_p| push_state }
-          cb(dlg, 'tpl_apply')  { |p| handle_apply(p) }
-          cb(dlg, 'tpl_delete') { |p| handle_delete(p) }
-          cb(dlg, 'tpl_save')   { |_p| handle_save }
-          # SMOKE PACK 1 (6A): „Odfotiť" per riadok — prida nahlad k UZ ULOZENEJ
-          # sablone z PRAVE JEDNEJ oznacenej skrinky. Logika (guardy, capture,
-          # zamok) je v `Panel.capture_preview_for`; okno len vypise hlasku a
-          # obnovi zoznam (rovnaka delba ako pri apply/delete).
-          cb(dlg, 'tpl_capture') { |p| handle_capture(p) }
-          dlg.add_action_callback('js_error') do |_ctx, msg|
-            begin
-              Engine.log("JS(templates): #{msg}")
-            rescue StandardError => e
-              Engine.log_error(e, 'templates js_error')
-            end
-            next
-          end
-        end
-
-        def cb(dlg, name)
-          dlg.add_action_callback(name) do |_ctx, *args|
-            begin
-              yield(args.first)
-            rescue StandardError => e
-              Engine.log_error(e, "templates cb #{name}")
-              set_status("Chyba: #{e.message}", true)
-            end
-            next
-          end
+          # Zlyhanie sa NEZAMLCUJE: sekcia ostane bez dat a jedinou stopou
+          # preco je tento zaznam (rovnaka lekcia ako `mat_payload`).
+          Engine.log_error(e, 'TemplatesDialog.tpl_payload')
+          nil
         end
 
         # --- Ruby -> JS -----------------------------------------------------
 
-        def push_state
-          model = Sketchup.active_model
-          cab = Panel.find_cabinet(model)
-          cab_type = cab ? ((Store.config(cab) || {})['type'] || 'lower') : nil
-          data = {
-            version: Engine::VERSION,
-            # UI-C1a: okno spravuje VYHRADNE korpusove sablony — doskove sa v nom
-            # ani neukazu (payload je filtrovany a serverove akcie maju vlastny
-            # guard na kind, HTML nie je ochrana).
-            # `previews: true` (SMOKE PACK 1) — riadok podla `preview_rev` vie
-            # povedat „Odfotiť" vs. „Prefotiť"; je to TRANSIENTNY odtlacok
-            # suboru, do `templates.json` sa nezapisuje.
-            templates: Panel.template_list(kind: 'cabinet', previews: true),
-            selected_cab: cab ? Store.get(cab, 'cabinet_id') : nil,
-            selected_type: cab_type # guard: apply len na rovnaky typ (dolna/horna)
-          }
-          js("TD.init(#{data.to_json})")
+        # Stavovy riadok sekcie: prijimac `TPL.setStatus` je v tom istom
+        # `js/templates.js`, ktory sekcia nacitava, a `#status` je uzol
+        # `studio.html`. Text sklada SERVER (jedna autorita).
+        def status_script(msg, error = false)
+          "TPL.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})"
         end
 
         def set_status(msg, error = false)
-          js("TD.setStatus(#{msg.to_json}, #{error ? 'true' : 'false'})")
+          js(status_script(msg, error))
         end
 
+        # Odpoved ide TOMU, KTO sa pytal. Sink zije PRESNE jeden synchronny
+        # callback sekcie (`with_client`); mimo neho je adresat jediny mozny:
+        # okno Studio.
         def js(script)
-          return unless @dialog && @dialog.visible?
-          @dialog.execute_script(script)
+          sink = @client_sink
+          return sink.call(script) if sink
+
+          studio_js(script)
+        end
+
+        # Kanal SEKCIE. `js` Studia je private (patri jeho kanalu), preto
+        # tenky verejny most `tpl_js` — vzor `rules_js`.
+        def studio_js(script)
+          return false unless defined?(StudioDialog)
+
+          StudioDialog.tpl_js(script)
         rescue StandardError => e
-          Engine.log_error(e, 'TemplatesDialog.js')
+          Engine.log_error(e, 'TemplatesDialog.studio_js')
+          false
         end
 
-        # --- akcie (presunute z Panel actions_templates.rb) -----------------
+        # LACNE ECHO sekcie po zmene KNIZNICE (zmazanie, novy nahlad, ulozenie
+        # sablony z Inspectora). Kniznica je subor MIMO modelu, takze plny push
+        # okna (a s nim cely prepocet kusovnika a zdvih generacie) by bol drahy
+        # a zbytocny — a navyse by zneplatnil rozkliknuty riadok inej sekcie.
+        def refresh_if_open
+          pay = tpl_payload
+          js("TPL.init(#{pay.to_json})") if pay
+        rescue StandardError => e
+          Engine.log_error(e, 'TemplatesDialog.refresh_if_open')
+        end
 
-        # Ulozi OZNACENY korpus ako sablonu (nazov cez inputbox, prepis s potvrdenim).
+        # --- PNG kanal SEKCIE (audit N24/N26) --------------------------------
         #
-        # UI-D2 (Codex audit FIX 5): PORADIE je kontrakt — najprv sa potvrdi
-        # nazov a pripadny prepis, az POTOM sa z JEDNEHO snapshotu (model + cab)
-        # sklada config a foti nahlad. Do UI-D2 sa config skladal PRED
-        # inputboxom; modalne okno medzitym pusti k slovu SketchUp, takze
-        # pouzivatel mohol oznacit inu skrinku — data a obrazok by potom
-        # pochadzali z dvoch roznych skriniek.
-        def handle_save
-          model = Sketchup.active_model
-          return set_status('Najprv označ NOXUN korpus — šablóna sa ukladá z neho.', true) if
-            Panel.find_cabinet(model).nil?
+        # Panelovy `Panel.push_template_preview` sa pouzit NEDA: ma guard
+        # `dialog_alive?` INSPECTORA a odpoved posiela prijimacu panela
+        # (`NX.setTemplatePreview`). Sekcia ma preto VLASTNY callback, vlastny
+        # prijimac (`TPL.setPreview`) a vlastnu cache per revizia v kliente.
+        #
+        # PULL kanal (vzor UI-D2): data URI je radovo vacsie nez cely zoznam,
+        # takze sa posiela LEN na vyziadanie a LEN pre jednu sablonu. `rev` sa
+        # vracia SPAT nezmenene, aby si klient odpoved priradil k spravnej
+        # verzii (medzitym mohol prist novy nahlad); `png: nil` = bez nahladu,
+        # dlazdica ostane na scheme a klient si to zacachuje.
+        #
+        # Limit 64 kB + PNG magic bytes drzi `TemplatePreviews.data_uri` —
+        # tu sa NEOBCHADZA a neduplikuje.
+        def handle_preview(payload)
+          data = JSON.parse(payload.to_s)
+          kind = data['kind'].to_s
+          name = data['name'].to_s
+          return if name.empty? || !KINDS.include?(kind)
 
-          res = UI.inputbox(['Nazov sablony:'], [Panel.suggest_template_name(Panel.find_cabinet(model), {})],
-                            'Ulozit sablonu')
-          return if res == false # zrusene
-
-          name = res[0].to_s.strip
-          return set_status('Prázdny názov — zrušené.', true) if name.empty?
-
-          if TemplateStore.find('cabinet', name) &&
-             UI.messagebox("Sablona \"#{name}\" existuje. Prepisat?", MB_YESNO) != IDYES
-            return set_status('Zrušené — šablóna nezmenená.')
-          end
-
-          # CERSTVY snapshot po dialogoch: vyber sa medzitym mohol zmenit alebo
-          # zaniknut. Config aj nahlad idu z TEJTO jednej skrinky.
-          cab = Panel.find_cabinet(model)
-          return set_status('Označený korpus zmizol — šablóna neuložená.', true) if cab.nil?
-
-          # H2 (D-76): model = zdroj ZMRAZENYCH definicii setov kovania.
-          cab_cfg = Store.config(cab) || {}
-          config = Panel.template_config_from(cab_cfg, model: model)
-          hw_note = Panel.template_save_hardware_note(cab_cfg, config, model) # GH #133 P2
-          preview = TemplatePreviews.capture(model, cab)                      # UI-D2
-          # Codex #174 P2: navratovu hodnotu NIKDY neignorovat — read-only
-          # kniznica (subor z novsej verzie) alebo zlyhanie disku by inak
-          # ohlasili uspech a pouzivatel by sa spoliehal na sablonu, ktora
-          # nevznikla (rovnaky vzor ako save cesta v paneli).
-          unless TemplateStore.upsert('cabinet', name, config, preview)
-            return set_status('Šablónu sa nepodarilo zapísať — knižnica je z novšej verzie ' \
-                              'Noxunu alebo zlyhal zápis na disk. Nič sa neuložilo.', true)
-          end
-          after_change("Šablóna \"#{name}\" uložená.#{hw_note}")
+          out = { 'kind' => kind, 'name' => name, 'rev' => data['rev'].to_s,
+                  'png' => TemplatePreviews.data_uri(kind, name) }
+          js("TPL.setPreview(#{out.to_json})")
+        rescue StandardError => e
+          Engine.log_error(e, 'TemplatesDialog.handle_preview')
         end
+
+        # --- akcie ----------------------------------------------------------
 
         # SMOKE PACK 1 (6A): „Odfotiť" — prida nahlad k UZ ULOZENEJ sablone.
-        # Zaznam sa NEPREPISUJE (na rozdiel od `handle_save`), meni sa VYHRADNE
+        # Zaznam sa NEPREPISUJE (na rozdiel od ukladania), meni sa VYHRADNE
         # obrazok; vsetky guardy aj capture su v `Panel.capture_preview_for`
-        # (jedna cesta, jeden zamok). `push_state` obnovi zoznam, `Panel
-        # .push_templates` uz spravila zdielana funkcia.
+        # (jedna cesta, jeden zamok) a ten je aj autoritou hlasky.
+        #
+        # ŠT-3c-1: doskovym sablonam sa akcia v sekcii NEZOBRAZUJE (dlazdica
+        # dosky je schema, nie skrinka) — serverovy guard `kind == 'cabinet'`
+        # v `capture_preview_for` napriek tomu OSTAVA (HTML nie je ochrana).
         def handle_capture(payload)
-          name = JSON.parse(payload.to_s)['template'].to_s
-          ok, msg = Panel.capture_preview_for('cabinet', name)
+          data = JSON.parse(payload.to_s)
+          name = data['template'].to_s
+          ok, msg = Panel.capture_preview_for(data['kind'].to_s.empty? ? 'cabinet' : data['kind'].to_s, name)
           set_status(msg, !ok)
-          push_state if ok
+          refresh_if_open if ok
         end
 
+        # ŠT-3c-1: mazanie ma potvrdenie v D-15 modale KLIENTA (nx_modal) —
+        # `UI.messagebox` v callbacku HtmlDialogu sem UZ NEPATRI (audit N28:
+        # nativny modal blokuje callback a v Studiu by zamrzol cely kanal).
+        # Server preto NEPOTVRDZUJE, iba MAZE — a robi to s vlastnymi guardmi,
+        # lebo HTML nie je ochrana.
+        #
+        # KIND GUARD sa PRVY RAZ rozsiruje aj na `board` (audit N29): doskove
+        # sablony dnes nespravuje NIC a jedina cesta, ako sa zbavit omylom
+        # vzniknutej, by bola rucna uprava suboru.
         def handle_delete(payload)
-          name = JSON.parse(payload.to_s)['template'].to_s
+          data = JSON.parse(payload.to_s)
+          kind = data['kind'].to_s
+          name = data['template'].to_s
           return set_status('Vyber šablónu na vymazanie.', true) if name.empty?
-          return unless UI.messagebox("Vymazat sablonu \"#{name}\"?", MB_YESNO) == IDYES
+          return set_status('Neznámy druh šablóny — nič sa nezmazalo.', true) unless KINDS.include?(kind)
 
-          # Guard kind: okno vidi len korpusove, takze aj mazat smie len tie —
-          # rovnomenna doskova sablona sa odtialto nikdy nezmaze.
           # Codex #174 P2: pri odmietnutom zapise ZIADNA hlaska o uspechu.
-          unless TemplateStore.delete('cabinet', name)
+          unless TemplateStore.delete(kind, name)
             return set_status('Šablónu sa nepodarilo vymazať — knižnica je z novšej verzie ' \
                               'Noxunu alebo zlyhal zápis na disk. Nič sa nezmenilo.', true)
           end
@@ -214,21 +224,22 @@ module Noxun
         def handle_apply(payload)
           name = JSON.parse(payload.to_s)['template'].to_s
           # Guard kind (UI-C1a): doskovu sablonu na korpus aplikovat nemozno —
-          # hladame VYHRADNE medzi korpusovymi.
+          # hladame VYHRADNE medzi korpusovymi. Sekcia doskam tlacidlo ani
+          # nezobrazuje, ale guard je SERVEROVY a ostava.
           tpl = TemplateStore.find('cabinet', name)
           return set_status('Šablóna sa nenašla.', true) if tpl.nil?
           model = Sketchup.active_model
           cab = Panel.find_cabinet(model)
-          return set_status('Najprv označ NOXUN korpus.', true) if cab.nil?
+          return set_status('Najprv označ NOXUN korpus — šablóna sa použije naň.', true) if cab.nil?
 
-          # Typovy guard aj TU, nie len v HTML disabled (Codex PR #29): pri zavretom
-          # paneli sa zmeny vyberu nesleduju a stale enabled riadok by prestavil
-          # dolnu skrinku na hornu (ci naopak).
+          # Typovy guard aj TU, nie len v HTML disabled (Codex PR #29): sekcia
+          # vyber NESLEDUJE (audit N27 — ziadny observer), takze verdikt musi
+          # dat server pri kliku.
           cab_type = (Store.config(cab) || {})['type'] || 'lower'
           tpl_type = (tpl['config'] || {})['type'] || 'lower'
           if tpl_type != cab_type
-            push_state # obnov disabled stav podla aktualneho vyberu
-            return set_status("Šablóna je pre iný typ (#{tpl_type == 'upper' ? 'horná' : 'dolná'}) než označená skrinka — nepoužitá.", true)
+            return set_status("Šablóna je pre iný typ (#{tpl_type == 'upper' ? 'horná' : 'dolná'}) " \
+                              'než označená skrinka — nepoužitá.', true)
           end
 
           # GH #133 P2: kovanie sablony sa cita BEZSTRATOVO alebo vobec. Sablona
@@ -261,10 +272,33 @@ module Noxun
           end
           # UI-C2 (B4): legacy sablona s viac nez 3 urovnami zon sa POUZIJE, ale
           # povie sa to — orezanie stromu je zakazane.
-          set_status("Šablóna \"#{name}\" použitá na #{Store.get(cab, 'cabinet_id')}." \
-                     "#{pf ? pf[:note] : ''}#{hw_note}" \
+          set_status("Šablóna \"#{name}\" použitá na #{Store.get(cab, 'cabinet_id')}. " \
+                     "Jeden krok Späť to vráti.#{pf ? pf[:note] : ''}#{hw_note}" \
                      "#{Panel.zone_depth_note((Store.config(cab) || {})['zone_tree'])}")
-          Panel.push_selected(model)
+          after_model_write(model)
+        end
+
+        # ŠT-3c-1: po ZAPISE DO MODELU (pouzitie sablony) musia cerstve cisla
+        # dostat OBAJA odberatelia — PANEL (prestavana skrinka je vo vybere)
+        # aj ŠTÚDIO so ZDVIHOM generacie (prestavba meni kusovnik, nakupny
+        # zoznam aj rozpocet). Poradie je zavazne (vzor RulesDialog): NAJPRV
+        # panel, az potom Studio.
+        def after_model_write(model)
+          Panel.push_selected(model) if defined?(Panel)
+          return unless defined?(StudioDialog)
+
+          StudioDialog.refresh_if_open(bump: true)
+        rescue StandardError => e
+          Engine.log_error(e, 'TemplatesDialog.after_model_write')
+        end
+
+        # Po zmene KNIZNICE (nie modelu): status + echo sekcie + quick-pick
+        # v paneli. ZIADNY plny push okna — kniznica s kusovnikom nema nic
+        # spolocne (a zdvih generacie by zneplatnil rozkliknute riadky).
+        def after_change(msg)
+          set_status(msg)
+          refresh_if_open
+          Panel.push_templates
         end
 
         # H2 (D-76): zmrazenie definicii setov zo sablony do projektu. Legacy
@@ -341,22 +375,6 @@ module Noxun
             out[key] = value if parsed && parsed[1] # composite = override na dielci
           end
           out
-        end
-
-        # Po zmene kniznice: refresh dialogu + quick-pick selectu v paneli.
-        def after_change(msg)
-          set_status(msg)
-          push_state
-          Panel.push_templates
-        end
-
-        # Volane z Panel.push_selected pri kazdej zmene vyberu: disabled stav
-        # "Pouzit na oznaceny" (+ typovy guard) musi sledovat aktualny vyber.
-        def on_selection_changed
-          return unless @dialog && @dialog.visible?
-          push_state
-        rescue StandardError => e
-          Engine.log_error(e, 'TemplatesDialog.on_selection_changed')
         end
       end
     end

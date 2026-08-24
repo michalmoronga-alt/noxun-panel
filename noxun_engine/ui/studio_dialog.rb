@@ -44,7 +44,7 @@ module Noxun
       # (zhodu strazi guard test): autoritou je VZDY Ruby.
       # ŠT-3a-1 pridala KOVANIE (`hw` — druha ziva polozka skupiny KATALOGY).
       # ŠT-3b-1 pridala PRAVIDLÁ (`rules` — tretia ziva polozka skupiny KATALOGY).
-      SECTIONS = %w[bom ctrl buy budget offer mat hw rules].freeze
+      SECTIONS = %w[bom ctrl buy budget offer mat hw rules tpl].freeze
 
       # ŠT-2a/2b: akcie katalogu materialov, ktore smie poslat SEKCIA `mat`,
       # ziju v JEDINOM zozname — `MaterialsDialog::SECTION_ACTIONS`. Telo
@@ -70,8 +70,9 @@ module Noxun
       # vlastna cesta `hw_open_window` — sekcia dnes vie VSETKO.
       # ŠT-3b-1: `rules` z tejto tabulky VYPADLO — Pravidlá su ZIVA sekcia
       # tohto okna a okno „Pravidlá kovania" ZANIKLO uplne.
+      # ŠT-3c-1: `tpl` (premostenie do okna Šablóny) ZANIKLO spolu s tym oknom
+      # — Sablony su SEKCIA tohto okna a niet kam premostovat.
       WINDOW_BRIDGES = {
-        'tpl' => 'TemplatesDialog',
         'sup' => 'SupplierSettingsDialog', 'bset' => 'SupplierSettingsDialog'
       }.freeze
 
@@ -80,7 +81,6 @@ module Noxun
 
       # Slovenske hlasky premosteni — texty sklada SERVER (jedna autorita).
       BRIDGE_STATUS = {
-        'tpl' => 'Otváram okno Šablóny (presun do Štúdia príde v dávke ŠT-3).',
         # Poctivo: „Dodávateľ / Demos" nema DNES vlastne okno. Sadzby dodavatela
         # ziju v okne Nastavenia rozpoctu, vazba na Demos je od ŠT-2b v SEKCII
         # Materialy TOHTO okna — spoja sa az v Š19. Status to musi povedat, inak
@@ -886,6 +886,44 @@ module Noxun
         # Payload sekcie. Model chodi ARGUMENTOM (lekcia F4 zo ŠT-3a-2):
         # pri prepnuti dokumentu by inak sekcia dostala pravidla STAREHO
         # dokumentu vedla kusovnika noveho.
+        # ŠT-3c-1, sekcia ŠABLÓNY (Š18). Kanal je vzor `rules`, len JEDNODUCHSI:
+        # sablony su GLOBALNE (subor v %APPDATA%), takze payload nepotrebuje
+        # model, sekcia nema ziadny asynchronny beh a po prepnuti dokumentu
+        # netreba nic rusit.
+        def tpl_actions
+          defined?(TemplatesDialog) ? TemplatesDialog::SECTION_ACTIONS : []
+        end
+
+        def do_tpl(name, payload)
+          return set_status('Šablóny nie sú načítané.', true) unless defined?(TemplatesDialog)
+
+          TemplatesDialog.dispatch(name, payload, tpl_sink)
+        end
+
+        # Adresat odpovedi: TOTO okno. `TemplatesDialog` posiela `TPL.*` volania
+        # — sekcia ma presne tie iste prijimace, lebo bezi na TOM ISTOM
+        # `js/templates.js`.
+        def tpl_sink
+          ->(script) { js(script) }
+        end
+
+        # VEREJNY vstup pre `TemplatesDialog` mimo synchronneho volania sekcie
+        # (`js` je private, patri kanalu okna) — vzor `rules_js`.
+        def tpl_js(script)
+          js(script)
+        end
+
+        # Payload sekcie. Model sa NEODOVZDAVA — sablony su globalne a s
+        # dokumentom nemaju nic spolocne (jedina taka sekcia okna).
+        def tpl_payload
+          return nil unless defined?(TemplatesDialog)
+
+          TemplatesDialog.tpl_payload
+        rescue StandardError => e
+          Engine.log_error(e, 'StudioDialog.tpl_payload')
+          nil
+        end
+
         # ŠT-3b-2a: `collected` chodi TIEZ argumentom — jantarove riadky rucnych
         # zasahov sa citaju z UZ HOTOVEHO zberu (`manual_overrides`), takze sekcia
         # nespusta ziadny druhy sken modelu.
@@ -1133,6 +1171,10 @@ module Noxun
           # tak vola presne to, co volal doteraz. Telo je v `RulesDialog`,
           # sem chodi len odpoved (`rules_sink`).
           rules_actions.each { |name| cb(dlg, name) { |p| do_rules(name, p) } }
+          # ŠT-3c-1, sekcia ŠABLÓNY. Mena callbackov su TIE ISTE, ake pouzivalo
+          # okno „Šablóny" (`tpl_apply`/`tpl_delete`/`tpl_capture`) + vlastny
+          # PNG kanal sekcie (`tpl_preview`). Telo je v `TemplatesDialog`.
+          tpl_actions.each { |name| cb(dlg, name) { |p| do_tpl(name, p) } }
           dlg.add_action_callback('js_error') do |_ctx, msg|
             begin
               Engine.log("JS(studio): #{msg}")
@@ -1329,6 +1371,10 @@ module Noxun
             # ŠT-3b-2a: navyse ABS pravidla podla roly (read-only) a jantarove
             # riadky rucnych zasahov — tie sa citaju z UZ HOTOVEHO `collected`.
             rules: rules_payload(model, collected),
+            # ŠT-3c-1, sekcia ŠABLÓNY: kniznica sablon (korpusove + doskove)
+            # s transientnym `preview_rev`. Model sa nepouziva — sablony su
+            # GLOBALNE. Samotne PNG chodi vlastnym PULL kanalom (`tpl_preview`).
+            tpl: tpl_payload,
             # Deep-link: sekcia sa posiela PRAVE RAZ (inak by kazdy refresh
             # vratil pouzivatela tam, odkial medzitym odisiel).
             open_section: consume_pending_section,
