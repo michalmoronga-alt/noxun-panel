@@ -200,6 +200,18 @@
     var rec = sheetRecOf(value);
     return rec ? nxRgbHex(rec.color) : '';
   }
+  // PICKER-2: metadáta variantu pre dekorové riadky. Zdroj je TEN ISTÝ
+  // payload, z ktorého sa plnia `<option>`y (`MATERIALS.sheets` + virtuálne
+  // duplákové ponuky), takže sa nemôžu rozísť. ABS pásky sa NEZOSKUPUJÚ —
+  // hrúbka pásky je jej vlastnosť, nie variant toho istého dekoru.
+  function nxComboVariantOf(kind, value){
+    if (kind === 'abs' || !value) return null;
+    var rec = sheetRecOf(value);
+    if (!rec || !rec.decor) return null;
+    return { decor: rec.decor, type: rec.type || '', thickness: rec.thickness,
+             duplak: /^duplak[23]:/.test(String(value)) };
+  }
+
   function nxComboUsedOf(kind){
     var u = MATERIALS.used_ids || {};
     return (kind === 'abs' ? u.edges : u.sheets) || [];
@@ -214,6 +226,7 @@
   }
   if (typeof NXCombo !== 'undefined' && NXCombo){
     NXCombo.setColorResolver(nxComboColorOf);
+    NXCombo.setVariantResolver(nxComboVariantOf);
     NXCombo.setUsedResolver(nxComboUsedOf);
     NXCombo.setUsedRefresher(nxComboRequestUsed);
   }

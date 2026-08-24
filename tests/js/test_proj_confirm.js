@@ -102,5 +102,14 @@ function ok(cond, msg){ n++; if (!cond) throw new Error(msg); }
      'scan ide AŽ ZA napĺňaním (inak by trigger ukazoval staré položky)');
 
   ok(combo.indexOf('sync: function(sel){') > -1, 'komponent `sync` naozaj ponúka');
+  // PICKER-2: dekorové riadky potrebujú metadáta od HOSTITEĽA. Bez tohto
+  // napojenia by sa varianty nezoskupili a ponuka by ostala „dekor trikrát".
+  ok(src.indexOf('NXCombo.setVariantResolver(') > -1,
+     'Štúdio dodáva komponentu metadáta variantu (dekor · typ · hrúbka · duplák)');
+  const core = fs.readFileSync(path2.join(UI, 'js', 'core.js'), 'utf8');
+  ok(core.indexOf('NXCombo.setVariantResolver(nxComboVariantOf)') > -1,
+     'a Inspector tiež — jeden komponent, dva hostitelia, žiadna kópia logiky');
+  ok(core.indexOf("if (kind === 'abs' || !value) return null;") > -1,
+     'ABS pásky sa NEZOSKUPUJÚ — hrúbka pásky je jej vlastnosť, nie variant dekoru');
   ok(combo.indexOf('nxComboPopWidth') > -1, 'a šírka ponuky je jeho vlastné pravidlo');
 })();

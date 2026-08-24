@@ -344,6 +344,17 @@
   .nxcombo > select[data-nx-combo] { display: none; }
   /* Combobox preberá miesto povodneho <select>u v svojom riadku. */
   .row .nxcombo, .matrow .nxcombo, .pcmat .nxcombo, .edgerow .nxcombo { flex: 1; }
+  /* PICKER-2: cipy hrubok v dekorovom riadku ponuky. Su to OVLADACE vo
+     vnutri polozky — klik na ne vyber NEPOTVRDZUJE, len ho zuzi. */
+  .cbchips { display: inline-flex; gap: 3px; margin-left: auto; flex: 0 0 auto; }
+  .cbchip { font: inherit; font-size: 10.5px; line-height: 1; padding: 3px 6px;
+            border: 1px solid var(--nx-border-strong); border-radius: 999px;
+            background: var(--nx-surface); color: var(--nx-ink-muted); cursor: pointer; }
+  .cbchip:hover:not(:disabled) { border-color: var(--nx-select); }
+  .cbchip.on { background: var(--nx-select-bg); border-color: var(--nx-select);
+               color: var(--nx-select-strong); font-weight: 600; }
+  .cbchip.off { opacity: .45; cursor: not-allowed; }
+  .cbopt .t { min-width: 0; }
   .cbtrigger { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 6px;
                font: inherit; font-size: 12px; background: var(--nx-surface);
                border: 1px solid var(--nx-border-strong); border-radius: 6px;

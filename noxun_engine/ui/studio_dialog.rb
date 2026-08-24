@@ -618,6 +618,7 @@ module Noxun
                   'cabinets' => collected[:cabinets].to_i,
                   'model_guid' => ProductionCore.model_guid(model),
                   'used' => mat_used(collected, keys),
+                  'used_ids' => mat_used_ids(collected),
                   'used_where' => mat_used_where(collected, keys, abs_keys) }
           # Cely katalog LEN pri prvom pushi okna a po prepnuti dokumentu;
           # inak ho drzi klient a zmeny mu chodia echom.
@@ -629,6 +630,32 @@ module Noxun
           # pritom ostava zdvihnuta, takze najblizsi push katalog dosle.
           Engine.log_error(e, 'StudioDialog.mat_payload')
           nil
+        end
+
+        # PICKER-2: skupina „Použité v projekte" vo VYHĽADÁVAČI predvolieb.
+        # Vyhľadávač pýta ZOZNAM ID (rovnako ako v Inspectore), kým `used`
+        # nesie počty pod kľúčom skupiny — to sú dva rôzne tvary a mapovať
+        # jeden na druhý v kliente by znamenalo hádať. Berie sa to preto z TOHO
+        # ISTÉHO zberu (`collected[:records]`, žiadny druhý prechod modelom)
+        # a tvar je zhodný s panelovým `used_ids_payload`, takže obe okná majú
+        # jeden a ten istý klientsky hook.
+        #
+        # Na rozdiel od `used_where` sa tu dielec BEZ `owner_id` nevyhadzuje:
+        # tam ide o klikateľného vlastníka, tu o holú otázku „je tento materiál
+        # v zákazke?" — a odpojený dielec v nej je.
+        def mat_used_ids(collected)
+          sheets = {}
+          edges = {}
+          Array(collected[:records]).each do |r|
+            id = r['material_id'].to_s
+            sheets[id] = true unless id.empty?
+            e = r['edges'].is_a?(Hash) ? r['edges'] : {}
+            e.each_value do |abs_id|
+              aid = abs_id.to_s
+              edges[aid] = true unless aid.empty?
+            end
+          end
+          { 'sheets' => sheets.keys, 'edges' => edges.keys }
         end
 
         def mat_used(collected, key_by_id = nil)

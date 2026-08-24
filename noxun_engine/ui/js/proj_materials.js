@@ -2335,6 +2335,10 @@
   // ŠT-2d: ROZPIS toho isteho cisla — {kluc skupiny => {owners:[], edges:{}}}.
   // Sklada ho SERVER z toho isteho zberu ako `used` (`StudioDialog#mat_used_where`).
   var MD_USED_WHERE = {};
+  // PICKER-2: {sheets:[id], edges:[abs_id]} — ID materiálov, ktoré sú v zákazke.
+  // Ten istý tvar aj zdroj ako v Inspectore; slúži skupine „Použité v projekte"
+  // vo vyhľadávači predvolieb (`used` s počtami je iná otázka a iný kľúč).
+  var MD_USED_IDS = { sheets: [], edges: [] };
   var MD_CABINETS = 0;    // pocet skriniek v modeli (podtitul okna / hint sekcie)
   var MD_PROJECT = {};    // posledne projektove predvolby (pre refill selectov pri setCatalog)
   // Spolocna katalogova cast (audit FIX 13: katalogove echo NEnesie modelovy
@@ -2395,6 +2399,17 @@
   var MD_COMBO_HOOKED = false;
   function mdComboHooks(){
     if (MD_COMBO_HOOKED || typeof NXCombo === 'undefined' || !NXCombo) return;
+    // PICKER-2: dekorové riadky aj v Štúdiu — zdroj je `MD_SHEETS`, teda ten
+    // istý zoznam, z ktorého sa plnia predvoľby.
+    if (NXCombo.setVariantResolver){
+      NXCombo.setVariantResolver(function(kind, value){
+        if (kind === 'abs' || !value) return null;
+        var rec = (MD_SHEETS || []).find(function(s){ return String(s.id) === String(value); });
+        if (!rec || !rec.decor) return null;
+        return { decor: rec.decor, type: rec.type || '', thickness: rec.thickness,
+                 duplak: /^duplak[23]:/.test(String(value)) };
+      });
+    }
     if (NXCombo.setColorResolver){
       NXCombo.setColorResolver(function(kind, value){
         if (kind === 'abs' || !value) return '';
@@ -2402,10 +2417,15 @@
         return rec && rec.color ? rgbToHex(rec.color) : '';
       });
     }
-    // „Použité v projekte" sa v Štúdiu ZATIAĽ nenapája: sekcia drží počty pod
-    // kľúčom DEKORU (`MD_USED`), kým komponent pýta zoznam ID dosiek — mapovanie
-    // by tu vzniklo druhý raz a pri prvej zmene kľúča by sa ticho rozišlo.
-    // Komponent bez tohto hooku funguje ďalej, len bez tej skupiny (priznané v PR).
+    // PICKER-2 dorieši priznané obmedzenie PICKER-1: „Použité v projekte" už
+    // v Štúdiu JE. Nemapuje sa tu nič — server posiela hotový zoznam ID
+    // (`used_ids`) v tom istom tvare ako panel, takže tento hook je doslova ten
+    // istý jednoriadkový výber ako v `core.js`.
+    if (NXCombo.setUsedResolver){
+      NXCombo.setUsedResolver(function(kind){
+        return (kind === 'abs' ? MD_USED_IDS.edges : MD_USED_IDS.sheets) || [];
+      });
+    }
     MD_COMBO_HOOKED = true;
   }
 
@@ -2846,6 +2866,9 @@
     MD_MODEL_GUID = m.model_guid || '';
     MD_USED = m.used || {};
     MD_USED_WHERE = m.used_where || {};
+    // Zoznam ID drží aj starší payload bez `used_ids` pri živote — skupina
+    // „Použité v projekte" vtedy len chýba, ponuka funguje ďalej.
+    MD_USED_IDS = m.used_ids || { sheets: [], edges: [] };
     MD_PROJECT = m.project || {};
     MD_CABINETS = m.cabinets || 0;
     if (m.catalog) mdSetCatalog(m.catalog); // LEN stav — kresli az matRenderBody
