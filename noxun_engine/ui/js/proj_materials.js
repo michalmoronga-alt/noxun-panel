@@ -2368,9 +2368,23 @@
   // ostanú natívnymi selectmi a všetko ostatné funguje ďalej.
   function mdComboScan(){
     if (typeof NXCombo === 'undefined' || !NXCombo || !NXCombo.scan) return false;
+    // Review #230 P2: telo sekcie je PERZISTENTNÝ uzol, ktorý odchod zo sekcie
+    // ODPOJÍ z dokumentu (a návrat ho aj s rozpísaným formulárom vráti). Kým je
+    // odpojené, `mdRenderAll` je no-op (`mdEl` nič nenájde) — a scan tu preto
+    // nemá čo robiť. Bez tejto brány by katalógové echo na pozadí odregistrovalo
+    // polia, ktoré sa o chvíľu vrátia.
+    if (!mdSectionAttached()) return false;
     mdComboHooks();
     NXCombo.scan(document);
     return true;
+  }
+
+  // Je telo sekcie práve v dokumente? (Mimo prehliadača — Node testy — vraciame
+  // `false`: nie je čo skenovať.)
+  function mdSectionAttached(){
+    if (typeof document === 'undefined' || !document.body || !document.body.contains) return false;
+    var node = mdEl('md_body');
+    return !!(node && document.body.contains(node));
   }
 
   // PICKER-1: farbu štvorčeka a „Použité v projekte" dodáva komponentu HOSTITEĽ

@@ -329,6 +329,32 @@
     // zoznam poloziek z casu otvorenia; keby prezil, klik by potvrdil volbu STAREHO
     // kontextu (iná skrinka, iny katalog) do NOVEHO. Nativna rozbalovacka sa pri
     // prestavbe sprava rovnako — zavrie sa.
+    // Opak `attach`: vrati uzol do stavu, v akom sme ho nasli — tlacidlo prec,
+    // select spat na miesto obalu, obal prec, atributy zrusene. Bez toho
+    // ostane po odpojenom poli „polovicny" stav (obal + tlacidlo bez
+    // registracie) a najblizsi `attach` prida DRUHE tlacidlo do toho isteho
+    // obalu: pouzivatel vidi DVA ovladace a s kazdym dalsim katalogovym echom
+    // o jeden viac (review #230 P2).
+    //
+    // Uzol pritom NEMUSI byt v dokumente — hostitel (sekcia Studia) si telo
+    // drzi ODPOJENE a vracia ho pri navrate aj s rozpisanym formularom.
+    // Rozbalenie odpojeneho stromu je bezpecne: menime len jeho vnutro.
+    function detach(sel){
+      var c = sel && sel.__nxc;
+      if (!c) return false;
+      if (c.mo) c.mo.disconnect();
+      if (OPEN && OPEN.sel === sel) close();
+      var wrap = c.wrap;
+      if (wrap && wrap.parentNode) wrap.parentNode.insertBefore(sel, wrap);
+      else if (wrap && sel.parentNode === wrap) wrap.removeChild(sel);
+      if (c.btn && c.btn.parentNode) c.btn.parentNode.removeChild(c.btn);
+      if (wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      sel.removeAttribute('tabindex');
+      sel.removeAttribute('aria-hidden');
+      sel.__nxc = null;
+      return true;
+    }
+
     function scan(root){
       var scope = root || document;
       var list = scope.querySelectorAll ? scope.querySelectorAll('select[' + KIND_ATTR + ']') : [];
@@ -336,9 +362,10 @@
       for (var j = ATTACHED.length - 1; j >= 0; j--){
         var sel = ATTACHED[j];
         if (!document.body.contains(sel)){
-          if (sel.__nxc && sel.__nxc.mo) sel.__nxc.mo.disconnect();
-          if (OPEN && OPEN.sel === sel) close();
-          sel.__nxc = null;
+          // Review #230 P2: odregistrovat NESTACI — uzol moze byt len DOCASNE
+          // odpojeny (perzistentne telo sekcie) a vratit sa. Rozbalime ho, aby
+          // ho navrat obalil CISTO RAZ.
+          detach(sel);
           ATTACHED.splice(j, 1);
         } else {
           if (OPEN && OPEN.sel === sel) close();
@@ -607,6 +634,9 @@
       // `change` sa vtedy nespusti (a nesmie — D-46 vracia predvolbu na
       // povodnu hodnotu bez toho, aby to vyzeralo ako nova volba pouzivatela),
       // takze bez tohto mostu by trigger ukazoval hodnotu, ktora uz neplati.
+      // Rovnaky most ako `sync`, len opacny: hostitel, ktory uzol vedome
+      // odpaja (perzistentne telo sekcie), ho moze rozbalit sam.
+      detach: function(sel){ return detach(sel); },
       sync: function(sel){
         if (!sel || !sel.__nxc) return false;
         refresh(sel);

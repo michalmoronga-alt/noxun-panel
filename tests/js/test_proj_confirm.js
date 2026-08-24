@@ -89,6 +89,15 @@ function ok(cond, msg){ n++; if (!cond) throw new Error(msg); }
      'ale `change` sa NEVYVOLÁVA — vrátenie na default nie je voľba používateľa (D-46)');
 
   ok(src.indexOf('mdComboScan();') > -1, 'po naplnení options sa komponent pripojí/obnoví');
+  // Review #230 P2: telo sekcie je PERZISTENTNÝ uzol, ktorý odchod odpojí.
+  // Kým je odpojené, scan tam nemá čo robiť — katalógové echo na pozadí by
+  // inak odregistrovalo polia, ktoré sa o chvíľu vrátia.
+  const scanFn = src.slice(src.indexOf('function mdComboScan()'),
+                           src.indexOf('function mdSectionAttached'));
+  ok(scanFn.indexOf('if (!mdSectionAttached()) return false;') > -1,
+     'scan má bránu na PRIPOJENÉ telo sekcie');
+  ok(scanFn.indexOf('mdSectionAttached()') < scanFn.indexOf('NXCombo.scan(document)'),
+     'a brána stojí PRED skenom');
   ok(src.indexOf("fillSelect(mdEl('md_back')") < src.indexOf('mdComboScan();'),
      'scan ide AŽ ZA napĺňaním (inak by trigger ukazoval staré položky)');
 
