@@ -1637,7 +1637,10 @@
       // ŠT-1c PR B2: `cp_group` uz nie je KLIK (sipka v nahlade) ale PREPINAC
       // „samostatne" — jeho vetva zije v listeneri `change` nizsie.
       } else if (a === 'settings'){
-        if (window.sketchup && sketchup.budget_settings) sketchup.budget_settings('');
+        // ŠT-4a: ⚙ otvárala SATELIT „Nastavenia rozpočtu"; ten zanikol — sadzby
+        // sú sekcia `bset` TOHTO okna, takže je to čisté prepnutie sekcie
+        // (server o prepnutí vedieť nemusí, `budget_settings` zaniklo).
+        if (typeof studioGoSection === 'function') studioGoSection('bset');
       } else if (a === 'refresh'){
         budPrStart(null);
       } else if (a === 'refresh_one'){

@@ -50,9 +50,9 @@ NxTest.test('ŠT-1c B1: `budget` je SEKCIA Studia — premostenia do okna Vyroba
   # ŠT-1c PR B3: mapa premosteni do okna Vyroba ZANIKLA spolu s oknom.
   NxTest.refute(st.const_defined?(:PRODUCTION_BRIDGES),
                 'do zaniknuteho okna Vyroba uz nevedie ziadne premostenie')
-  %w[budget offer].each do |k|
-    NxTest.assert(st::BRIDGE_STATUS[k].to_s.empty?, "a s nim aj hlaska premostenia `#{k}`")
-  end
+  # ŠT-4a: `BRIDGE_STATUS` uz NEEXISTUJE — posledny satelit zanikol, takze
+  # niet kam premostovat (dokaz je v test_st1a_studio.rb).
+  NxTest.refute(st.const_defined?(:BRIDGE_STATUS), 'a s nim aj cela tabulka hlasok premosteni')
   nav = S1CB_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s
   NxTest.refute(nav.empty?, 'navigacia sa nasla')
   NxTest.assert(nav.include?("{ id: 'budget', ic: 'euro',            t: 'Rozpočet' }"),
@@ -72,7 +72,7 @@ NxTest.test('ŠT-1c B1: zrkadla whitelistu sekcii sedia vo VSETKYCH TROCH suboro
   js = S1CB_STUDIO_JS[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
   shell = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'shell.js'), encoding: 'UTF-8')
   shell_list = shell[/var STUDIO_SECTIONS = \[(.*?)\];/m, 1].to_s.scan(/'([a-z]+)'/).flatten
-  NxTest.assert_equal(%w[bom ctrl buy budget offer mat hw rules tpl], rb, 'Ruby je autorita zoznamu')
+  NxTest.assert_equal(%w[bom ctrl buy budget offer mat hw rules tpl sup bset about], rb, 'Ruby je autorita zoznamu')
   NxTest.assert_equal(rb, js, 'studio.js je jeho zrkadlo')
   NxTest.assert_equal(rb, shell_list, 'a shell.js (panel) tiez')
 end
@@ -148,9 +148,14 @@ end
 NxTest.test('ŠT-1c B1: mutacie, oba XLSX aj prepocet cien maju telo v jadre') do
   core = Noxun::Engine::ProductionCore
   %i[do_budget do_budget_xlsx do_cp_xlsx do_price_refresh price_refresh_cancel
-     budget_open_url open_budget_settings apply_budget_op].each do |m|
+     budget_open_url apply_budget_op].each do |m|
     NxTest.assert(core.respond_to?(m), "ProductionCore.#{m} existuje")
   end
+  # ŠT-4a: `open_budget_settings` ZANIKLO — ⚙ v liste Rozpoctu otvarala SATELIT
+  # „Nastavenia rozpočtu"; ten uz neexistuje a sadzby su SEKCIA `bset` TOHTO
+  # okna, takze prepnutie je cisto klientske (server o nom vediet nemusi).
+  NxTest.refute(core.respond_to?(:open_budget_settings),
+                'cesta k zaniknutemu satelitu uz v jadre nie je')
   %i[do_budget do_budget_xlsx do_cp_xlsx].each do |m|
     NxTest.assert(Noxun::Engine::StudioDialog.respond_to?(m),
                   "StudioDialog.#{m} je VEREJNY (vola ho relay z panela)")
@@ -254,12 +259,14 @@ end
 # --- 6) klamuce texty, ktore tato davka opravila -----------------------------
 
 NxTest.test('ŠT-1c B1 (#20, #22): texty uz neposielaju do okna Vyroba za rozpoctom') do
-  NxTest.assert(S1CB_SUP_RB.include?('Rozpočet v Štúdiu je prepočítaný.'),
-                'Nastavenia rozpoctu hlasia spravne okno')
+  # ŠT-4a: sadzby su SEKCIA toho isteho okna, takze hlaska uz nemenuje ziadne
+  # okno — „Rozpočet je prepočítaný." (predtym „Rozpočet v Štúdiu…", este skor
+  # „Rozpočet v okne Výroba…").
+  NxTest.assert(S1CB_SUP_RB.include?('Rozpočet je prepočítaný.'),
+                'ulozenie sadzieb povie, ze cisla su cerstve')
   NxTest.refute(S1CB_SUP_RB.include?('Rozpočet v okne Výroba'), 'stary text zanikol')
-  bset = Noxun::Engine::StudioDialog::BRIDGE_STATUS['bset'].to_s
-  NxTest.assert(bset.include?('sadzby'),
-                '⚙ v liste Rozpoctu a polozka navigacie otvaraju TO ISTE okno — text to povie')
+  NxTest.refute(S1CB_SUP_RB.include?('Rozpočet v Štúdiu je prepočítaný.'),
+                'aj ten po nom — nastavenia uz nie su ine okno')
   main = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'main.rb'), encoding: 'UTF-8')
   tip = main[/cmd_studio\.tooltip = '([^']+)'/, 1].to_s
   NxTest.refute(tip.include?('Výroba'), 'tooltip toolbaru uz neposiela do okna Vyroba')

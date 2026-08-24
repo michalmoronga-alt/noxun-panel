@@ -33,6 +33,10 @@ module Noxun
                     end
           data = {
             version: Engine::VERSION, # UI zobrazuje verziu odtialto — ziadny hardcode v HTML
+            # ŠT-4a: priecinok nastaveni pre ZDIELANY obsah „O plugine" (js/about.js).
+            # Do ŠT-4a stala cesta natvrdo v HTML — teraz ju dava server, takze sa
+            # nemoze rozist so skutocnostou (a je to TA ISTA veta v oboch vstupoch).
+            appdata_dir: about_dir,
             defaults: {
               lower: CabinetBuilder::LOWER_DEFAULTS,
               upper: CabinetBuilder::UPPER_DEFAULTS
@@ -69,6 +73,19 @@ module Noxun
             model_guid: model_guid(model)
           }
           js("NX.init(#{data.to_json})")
+        end
+
+        # ŠT-4a: priecinok, v ktorom ziju nastavenia POCITACA — jedina veta
+        # obsahu „O plugine", ktora sa da povedat NEPRESNE. Autoritou je ten isty
+        # helper, ktory pouziva sklad nastaveni; ked nie je nacitany, obsah padne
+        # na kontraktovu cestu v `js/about.js` (nikdy sa nezobrazi prazdno).
+        def about_dir
+          return SupplierSettings.dir if defined?(SupplierSettings) && SupplierSettings.respond_to?(:dir)
+
+          ''
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.about_dir')
+          ''
         end
 
         # UI-B1: stav zvyraznenia olepu pre rail. Nedostupny/nenacitany EdgeCheck

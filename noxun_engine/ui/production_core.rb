@@ -1185,15 +1185,11 @@ module Noxun
         status.call("Otváram #{url}")
       end
 
-      # ⚙ z listy sekcie Rozpocet — satelit Nastavenia (sadzby su GLOBALNE,
-      # nie per model). Kontextova skratka k tomu istemu oknu, ktore otvara aj
-      # polozka navigacie „Nastavenia rozpočtu".
-      def open_budget_settings(status:)
-        return status.call('Okno Nastavenia nie je k dispozícii.', true) unless defined?(SupplierSettingsDialog)
-
-        SupplierSettingsDialog.show
-        status.call('Otváram Nastavenia rozpočtu.')
-      end
+      # ŠT-4a: `open_budget_settings` ZANIKLO. ⚙ v liste sekcie Rozpocet otvarala
+      # SATELIT „Nastavenia rozpočtu"; ten uz neexistuje — sadzby su SEKCIA `bset`
+      # TOHTO okna, takze ⚙ je odteraz cisto klientske prepnutie sekcie
+      # (`studioGoSection('bset')`). Server o prepnuti sekcie vediet nemusi
+      # a callback `budget_settings` zanikol s nim.
 
       def fmt_eur(value)
         format('%.2f €', value.to_f).tr('.', ',')

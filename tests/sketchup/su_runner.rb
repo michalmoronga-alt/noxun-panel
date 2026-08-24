@@ -5726,13 +5726,15 @@ module NoxunSuRunner
          bud.key?('budget_section'))
       ok('ŠT-1c B3: mapa premosteni do okna Vyroba uz NEEXISTUJE',
          !e::StudioDialog.const_defined?(:PRODUCTION_BRIDGES))
-      scripts = st1c_capture(e::StudioDialog) do
-        e::StudioDialog.do_bridge({ 'section' => 'budget' }.to_json)
-      end
+      # ŠT-4a: cela masineria premosteni zanikla (posledny satelit odisiel),
+      # takze sa uz nema co volat — dokazom je ZANIK, nie odmietnuta ziadost.
+      ok('ŠT-4a: a s nou zanikli aj `WINDOW_BRIDGES`/`BRIDGE_STATUS`',
+         !e::StudioDialog.const_defined?(:WINDOW_BRIDGES) &&
+         !e::StudioDialog.const_defined?(:BRIDGE_STATUS))
+      ok('ŠT-4a: server uz nema ani cestu `do_bridge`',
+         !e::StudioDialog.respond_to?(:do_bridge))
       ok('ŠT-1c B3: a modul zaniknuteho okna Vyroba uz vobec nie je nacitany',
          !defined?(e::ProductionDialog))
-      ok('ŠT-1c B1: a server to povie nahlas (neznamy kluc = nie ticho)',
-         scripts.any? { |s| s.include?('Táto sekcia zatiaľ neexistuje') })
       ok('ŠT-1b: ziadost model nezmenila', model.entities.length == before_ents)
     end
 
@@ -6537,7 +6539,7 @@ module NoxunSuRunner
       # „Katalóg kovania" zatial zije, ale navigacia don uz nevedie.
       # ŠT-3c-1 pridala osmu `tpl` (Sablony) — okno „Šablóny" zaniklo.
       ok('ŠT-1c B3: sekcie Studia su vsetky (bom · ctrl · buy · budget · offer · mat · hw · rules · tpl)',
-         e::StudioDialog::SECTIONS == %w[bom ctrl buy budget offer mat hw rules tpl])
+         e::StudioDialog::SECTIONS == %w[bom ctrl buy budget offer mat hw rules tpl sup bset about])
     end
 
     dlg = e::StudioDialog.instance_variable_get(:@dialog)
@@ -7912,6 +7914,160 @@ module NoxunSuRunner
     @st3c_created = []
   end
 
+  # ============================ ŠT-4a: NASTAVENIA ============================
+  # Sekcie `sup` · `bset` · `about` v Studiu + ZANIK POSLEDNEHO SATELITU.
+  #
+  # Co sa tu overuje (a co headless sada nedokaze):
+  #   1) ZAPIS SADZBY naozaj PREPOCITA cisla zakazky — sadzby su vstup
+  #      rozpoctu, takze po ulozeni musi prist CERSTVY payload s inou sumou.
+  #      Headless vidi len to, ze sa vola `refresh_if_open`.
+  #   2) BASELINE REVIZIA odmietne zapis, ktory vznikol nad STARYM stavom
+  #      (druha instancia / rucny zasah do suboru) — a NIC nezapise.
+  #   3) Zanik okna je UPLNY aj v NASADENOM plugine (subory su naozaj prec).
+  #   4) Premostenia zanikli CELE (`WINDOW_BRIDGES`/`BRIDGE_STATUS`/`do_bridge`).
+  def run_st4a(model)
+    cleanup(model)
+    return ok('ŠT-4a: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
+    return ok('ŠT-4a: modul SupplierSettingsDialog zije dalej', false) unless defined?(e::SupplierSettingsDialog)
+
+    sd = e::SupplierSettingsDialog
+
+    # --- 1) OKNO ZANIKLO, MODUL ZIJE -----------------------------------------
+    %i[show ensure_dialog register_callbacks push_state].each do |gone|
+      ok("ŠT-4a: `SupplierSettingsDialog.#{gone}` uz neexistuje", !sd.respond_to?(gone))
+    end
+    %w[supplier_settings.html js/supplier_settings.js].each do |rel|
+      ok("ŠT-4a: NASADENY plugin uz NEOBSAHUJE #{rel}",
+         !File.exist?(File.join(e.plugin_dir, 'ui', rel)))
+    end
+    %w[js/studio_settings.js js/about.js].each do |rel|
+      ok("ŠT-4a: NASADENY plugin MA #{rel}", File.exist?(File.join(e.plugin_dir, 'ui', rel)))
+    end
+    ok('ŠT-4a: sekcie `sup`/`bset`/`about` su v zozname sekcii Studia',
+       %w[sup bset about].all? { |k| e::StudioDialog::SECTIONS.include?(k) })
+    ok('ŠT-4a: whitelist akcii sekcie pozna PRESNE ulozenie a nacitanie nanovo',
+       sd::SECTION_ACTIONS == %w[ss_save ss_reload])
+    # Posledny satelit odisiel — premostovat uz niet kam.
+    ok('ŠT-4a: PREMOSTENIA zanikli CELE (konstanty aj cesty)',
+       !e::StudioDialog.const_defined?(:WINDOW_BRIDGES) &&
+       !e::StudioDialog.const_defined?(:BRIDGE_STATUS) &&
+       !e::StudioDialog.respond_to?(:do_bridge) &&
+       !e::StudioDialog.respond_to?(:bridge_window))
+
+    begin
+      st4a_scenar(model, sd)
+    ensure
+      cleanup(model)
+    end
+  rescue StandardError => ex
+    log_line("FAIL: ŠT-4a sekcia vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+  end
+
+  # Sadzba, ktorou sa hybe. `montaz` je €/m² a do rozpoctu vstupuje cez plochu
+  # korpusov — zmena sa teda MUSI prejavit na sume automatickych sluzieb.
+  ST4A_RATE = 'montaz'
+
+  def st4a_scenar(model, sd)
+    # Zakazka musi mat CO ratat — bez skrinky by sa suma nezmenila a test by
+    # nedokazoval nic.
+    inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 900.0,
+                                            'height' => 720.0, 'depth' => 560.0 })
+    return ok('ŠT-4a: vlozenie skrinky pre scenar nastaveni', false) unless inst
+
+    before_doc = File.binread(e::SupplierSettings.path) if File.file?(e::SupplierSettings.path)
+    sup = e::SupplierSettings.active
+    base_rate = e::SupplierSettings.rate(sup, ST4A_RATE).to_f
+    rev = e::SupplierSettings.revision(sup)
+    ok("ŠT-4a: fixture — sadzba `#{ST4A_RATE}` je #{base_rate} a revizia sedi",
+       base_rate.positive? && !rev.to_s.empty?)
+
+    rec = []
+    sink = ->(script) { rec << script.to_s }
+
+    st3a_with_fake_studio(rec) do
+      e::StudioDialog.send(:push_state)
+
+      # --- (a) payload sekcii chodi PLNYM pushom a nepotrebuje model --------
+      push = st3a_last_push(rec)
+      pay = push && push['settings']
+      ok('ŠT-4a (a): plny push nesie stav nastaveni',
+         pay.is_a?(Hash) && pay['revision'].to_s == rev.to_s)
+      ok('ŠT-4a (a): a v nom aj data pre „O plugine" (verzia zo servera)',
+         pay.is_a?(Hash) && pay['about'].is_a?(Hash) &&
+         pay['about']['version'].to_s == e::VERSION.to_s)
+
+      # --- (b) ZAPIS SADZBY = rozpocet sa PREPOCITA ------------------------
+      # Suma automatickych sluzieb pred zmenou a po nej sa MUSI lisit — inak
+      # sadzby nie su vstupom rozpoctu a cely presun by bol len kozmeticky.
+      before_sum = st4a_services_sum(st3a_last_push(rec))
+      new_rate = (base_rate + 7.0).round(2)
+      rec.clear
+      sd.dispatch('ss_save', { 'revision' => rev,
+                               'patch' => { 'rates' => { ST4A_RATE => new_rate } } }.to_json, sink)
+      ok('ŠT-4a (b): zapis prebehol a povedal to',
+         rec.any? { |x| x.include?('Nastavenia uložené') })
+      ok('ŠT-4a (b): sklad ma NOVU sadzbu',
+         (e::SupplierSettings.rate(e::SupplierSettings.active, ST4A_RATE).to_f - new_rate).abs < 0.001)
+      ok('ŠT-4a (b): klient dostal POTVRDENIE (rozpisane hodnoty smie zahodit AZ TU)',
+         rec.any? { |x| x.include?('SS.saved()') })
+      after_sum = st4a_services_sum(st3a_last_push(rec))
+      ok("ŠT-4a (b): ROZPOCET sa prepocital (sluzby #{before_sum} -> #{after_sum})",
+         !before_sum.nil? && !after_sum.nil? && (after_sum - before_sum).abs > 0.001)
+
+      # --- (c) BASELINE REVIZIA: zapis nad STARYM stavom sa ODMIETNE -------
+      snapshot = File.binread(e::SupplierSettings.path)
+      rec.clear
+      sd.dispatch('ss_save', { 'revision' => rev,   # stara revizia (uz neplati)
+                               'patch' => { 'rates' => { ST4A_RATE => 999.0 } } }.to_json, sink)
+      ok('ŠT-4a (c): zapis nad STARYM stavom sa ODMIETNE s hlaskou',
+         rec.any? { |x| x.include?('Nastavenia sa medzitým zmenili') })
+      ok('ŠT-4a (c): a subor nastaveni je BYTE-NEZMENENY',
+         File.binread(e::SupplierSettings.path) == snapshot)
+      ok('ŠT-4a (c): sadzba ostala ta, ktoru ulozil PRVY zapis',
+         (e::SupplierSettings.rate(e::SupplierSettings.active, ST4A_RATE).to_f - new_rate).abs < 0.001)
+
+      # --- (d) ZAPIS NASTAVENI NIE JE krok Spat ----------------------------
+      # Nastavenia su subor v %APPDATA%, nie model. Sentinel: posledna modelova
+      # operacia je vlozenie skrinky, takze 1x Spat ju musi zmazat.
+      Sketchup.undo
+      ok('ŠT-4a (d): 1x Spat zmazal SKRINKU — zapis sadzieb ziadny krok Spat nepridal',
+         inst.nil? || !inst.valid?)
+      ok('ŠT-4a (d): a sadzba po undo OSTAVA (subor mimo modelu)',
+         (e::SupplierSettings.rate(e::SupplierSettings.active, ST4A_RATE).to_f - new_rate).abs < 0.001)
+
+      # --- (e) neznama akcia sa ODMIETNE nahlas ----------------------------
+      rec.clear
+      sd.dispatch('ss_vymyslena', '{}', sink)
+      ok('ŠT-4a (e): neznama akcia sekcie sa odmietne',
+         rec.any? { |x| x.include?('Neznáma akcia') })
+    end
+  ensure
+    # Sadzbu vratime na povodnu hodnotu — nastavenia su GLOBALNE a bezia nad
+    # presmerovanym %APPDATA%, ale poriadok je poriadok.
+    begin
+      if before_doc && File.file?(e::SupplierSettings.path)
+        File.binwrite(e::SupplierSettings.path, before_doc)
+        e::SupplierSettings.reload!
+      end
+    rescue StandardError => ex
+      log_line("INFO: ŠT-4a upratanie nastaveni zlyhalo: #{ex.class}: #{ex.message}")
+    end
+  end
+
+  # Medzisucet sekcie AUTOMATICKYCH SLUZIEB z payloadu Studia — to je presne to
+  # cislo, ktore sadzby menia (`Budget.section('services')`).
+  def st4a_services_sum(push)
+    bud = push && push['budget']
+    return nil unless bud.is_a?(Hash)
+
+    sec = Array(bud['sections']).find { |x| x.is_a?(Hash) && x['key'].to_s == 'services' }
+    return nil unless sec
+
+    sec['subtotal'].to_f
+  rescue StandardError
+    nil
+  end
+
   def run_st2d(model)
     cleanup(model)
     return ok('ŠT-2d: okno Studio je nacitane', false) unless defined?(e::StudioDialog)
@@ -8819,6 +8975,7 @@ module NoxunSuRunner
     run_st3a(model)          # ŠT-3a-2: modelove zapisy predvolieb setov ZO SEKCIE + zanik okna Katalog kovania — 1 zmena = 1 krok Spat, NO-OP merge_seed bez pushu aj bez undo kroku, jantar po vlastnom zapise nezozltne
     run_st3b(model)          # ŠT-3b-1: sekcia Pravidla v Studiu + zanik okna Pravidla kovania — ulozenie = 1 krok Spat (pravidla AJ geometria), NO-OP merge_seed bez undo kroku, baseline guard odmietne zapis po cudzej zmene
     run_st3c(model)          # ŠT-3c-1: sekcia Sablony v Studiu + zanik okna Sablony — apply = 1 krok Spat + typovy guard, fotenie bez undo kroku (kamera sa vrati), mazanie oboch druhov, vlastny PNG kanal sekcie
+    run_st4a(model)          # ŠT-4a: sekcie Nastavenia v Studiu + zanik POSLEDNEHO satelitu — zapis sadzby prepocita rozpocet, baseline revizia odmietne stary zapis, ziadny krok Spat
     run_async(model, nil)
   rescue StandardError => ex
     log_line("FAIL: runner vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")

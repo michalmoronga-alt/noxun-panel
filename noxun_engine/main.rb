@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.7.68' unless defined?(VERSION)
+    VERSION = '0.7.69' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -433,7 +433,7 @@ Sketchup.require 'noxun_engine/ui/panel'
 Sketchup.require 'noxun_engine/ui/rules_dialog'     # V0.4 editor pravidiel kovania
 Sketchup.require 'noxun_engine/ui/materials_dialog' # V0.4.5 D2 projektove predvolby materialov
 Sketchup.require 'noxun_engine/ui/hardware_catalog_dialog' # V0.6 C-2: okno Katalog kovania
-Sketchup.require 'noxun_engine/ui/supplier_settings_dialog' # V0.6 E-b: okno Nastavenia rozpoctu
+Sketchup.require 'noxun_engine/ui/supplier_settings_dialog' # ŠT-4a: serverova autorita sekcii Nastavenia (okno zaniklo)
 Sketchup.require 'noxun_engine/ui/templates_dialog' # V0.4.5 D2 sprava sablon
 
 module Noxun
@@ -477,7 +477,9 @@ module Noxun
         # ŠT-3a-2: okno „Katalóg kovania" zaniklo — polozka menu ostava ako
         # zauzivana skratka, ale otvara SEKCIU Kovanie v Studiu.
         menu.add_item('Katalóg kovania') { StudioDialog.show(open_section: 'hw') }
-        menu.add_item('Nastavenia rozpočtu') { SupplierSettingsDialog.show } # V0.6 E-b
+        # ŠT-4a: okno „Nastavenia rozpočtu" ZANIKLO (posledny satelit) — polozka
+        # menu ostava ako zauzivana skratka, ale otvara SEKCIU v Studiu.
+        menu.add_item('Nastavenia rozpočtu') { StudioDialog.show(open_section: 'bset') }
         # ŠT-3c-1: zauzivana polozka ostava, ale otvara SEKCIU Sablony v Studiu
         # (satelitne okno Sablony zaniklo).
         menu.add_item('Šablóny') { StudioDialog.show(open_section: 'tpl') }

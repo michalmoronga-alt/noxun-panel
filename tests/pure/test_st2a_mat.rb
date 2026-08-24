@@ -59,9 +59,10 @@ end
 
 NxTest.test('ŠT-2a: premostenie `mat` ZANIKLO — navigacia uz neotvara satelit') do
   st = Noxun::Engine::StudioDialog
-  NxTest.refute(st::WINDOW_BRIDGES.key?('mat'),
+  NxTest.refute(st.const_defined?(:WINDOW_BRIDGES),
                 'jeden kluc nesmie byt zaroven sekcia aj premostenie')
-  NxTest.assert(st::BRIDGE_STATUS['mat'].to_s.empty?, 'a nesmie mat ani hlasku premostenia')
+  # ŠT-4a: obe tabulky premosteni zanikli s POSLEDNYM satelitom.
+  NxTest.refute(st.const_defined?(:BRIDGE_STATUS), 'a nesmie existovat ani tabulka hlasok')
   nav = ST2A_STUDIO_JS[/var NAV = \[.*?\n  \];/m].to_s
   mat_item = nav[/\{ id: 'mat'.*?\},/m].to_s
   NxTest.assert(!mat_item.empty?, 'polozka navigacie sa nasla')

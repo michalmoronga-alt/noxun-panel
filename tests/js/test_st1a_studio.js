@@ -42,7 +42,7 @@ function ok(cond, msg){ n++; assert.ok(cond, msg); }
 // okna Vyroba. Zoznam je ZRKADLO `StudioDialog::SECTIONS`.
 // ŠT-2a: pribudla sekcia Materiály (`mat`) — prva ziva polozka skupiny KATALÓGY.
 // ŠT-3a-1: a Kovanie (`hw`) — druha.
-eq(S.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'rules', 'tpl'],
+eq(S.STUDIO_SECTIONS, ['bom', 'ctrl', 'buy', 'budget', 'offer', 'mat', 'hw', 'rules', 'tpl', 'sup', 'bset', 'about'],
    'v Studiu ziju sekcie Kusovník, Kontrola, Nákup kovania, Rozpočet, Cenová ponuka, Materiály, Kovanie, Pravidlá a Šablóny');
 
 // --- 2) hladanie bez diakritiky (Š6) ----------------------------------------
@@ -164,9 +164,15 @@ eq(S.rgbHex([300, -5, 12]), '#ff000c', 'hodnoty mimo rozsahu sa orezu, nie zahod
 // ŠT-3a-1: to iste `hw` (Kovanie) — okno „Katalóg kovania" este zije, ale
 // otvara ho premostenie Z VNUTRA sekcie, nie polozka navigacie.
 // ŠT-3b-1: `rules` (Pravidlá) už NIE JE premostenie — je to živá sekcia.
-eq(S.navBridgeIds().sort(),
-   ['about', 'bset', 'sup'].sort(),
-   'ZRKADLO whitelistu premosteni v StudioDialog (WINDOW_BRIDGES + about)');
+// ŠT-4a: PREMOSTENIA ZANIKLI CELE — posledny satelit (Nastavenia rozpoctu)
+// zanikol, takze niet kam premostovat. `navBridgeIds` uz neexistuje a ZIADNA
+// polozka navigacie nema `bridge:`.
+ok(typeof S.navBridgeIds === 'undefined', 'zrkadlo whitelistu premosteni ZANIKLO');
+S.NAV.forEach(function(g){
+  g.items.forEach(function(it){
+    ok(!it.bridge, `polozka „${it.t}" uz nie je premostenie (satelity zanikli vsetky)`);
+  });
+});
 
 const MAT_ITEM = S.navItem('mat');
 ok(MAT_ITEM && !MAT_ITEM.bridge && !MAT_ITEM.disabled,

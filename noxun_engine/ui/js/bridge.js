@@ -265,8 +265,13 @@
       NXInsert.setLocksFlat(data.insert_locks);
       if (data.version){
         el('verline').textContent = 'V' + data.version; // verzia z Ruby (jediny zdroj)
-        // UI-B3: tá istá verzia v koliesku (sekcia O plugine) — ziadny hardcode.
-        var cv = el('cfgVersion'); if (cv) cv.textContent = 'V' + data.version;
+        // UI-B3 + ŠT-4a: obsah kolieska („O plugine") stavia ZDIELANY js/about.js —
+        // ten isty, ktory kresli sekciu `about` Studia (kontrakt Š19: jeden obsah,
+        // dva vstupy). Verzia aj priecinok nastaveni chodia zo SERVERA, ziadny
+        // hardcode v HTML.
+        if (typeof nxAboutFill === 'function'){
+          nxAboutFill('cfgAbout', { version: data.version, dir: data.appdata_dir });
+        }
       }
       // UI-B3: nastavenia POCITACA (rozmerove rady + tema) — nie su to data
       // zakazky; menia LEN ponuky pri rozmeroch a stav prepinaca v koliesku.
