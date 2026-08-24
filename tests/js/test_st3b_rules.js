@@ -557,4 +557,71 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   global.sketchup = prevSk;
 })();
 
-console.log(`OK ${n} kontrol (ŠT-3b-1/3b-2a/3b-2b sekcia Pravidlá)`);
+// ---- ŠT-3b-2c1: parita so serverom + vynútené prekreslenie formulára --------
+//
+// 1. Kritériá klienta a servera musia byť ROVNAKÉ. Keď sa rozídu, vznikne buď
+//    formulár, ktorý sa nedá uložiť a nikto nevie prečo, alebo diera (klient
+//    pustí, server odmietne až po prestavbe). Obe strany preto čítajú TEN ISTÝ
+//    súbor prípadov — `tests/fixtures/rules_validation_parity.json`.
+// 2. `RD.setSection(payload, force)` s `force` je JEDINÁ cesta, kde sa rozpísaný
+//    formulár VEDOME zahodí: pravidlá na modeli sa medzitým zmenili, takže
+//    hodnoty vo formulári už neplatia a uložiť ich nad cudziu zmenu by bolo
+//    horšie než ich stratiť. Bez `force` platí bežný kontrakt (push formulár
+//    prežije) — a to je práve to, čo sa tu musí strážiť oboma smermi.
+
+(function(){
+  const fx = JSON.parse(fs.readFileSync(
+    path.join(__dirname, '..', 'fixtures', 'rules_validation_parity.json'), 'utf8'));
+  ok(fx.cases.length >= 10, 'fixtúra má dosť prípadov (inak parita nič nestráži)');
+  fx.cases.forEach(function(c){
+    const bad = R.rdValidate(c.rules) !== null;
+    eq(bad, c.invalid, 'klient: ' + c.name);
+  });
+})();
+
+(function(){
+  // Hláška klienta musí ADRESOVAŤ pravidlo — pri desiatich pravidlách inak
+  // používateľ nevie, ktoré opraviť (server hovorí to isté vlastným textom).
+  const msg = R.rdValidate([{ rule_id: 'zavesy', output: 'hinge', kind: 'bands', enabled: true,
+                              bands: [{ max: 900, quantity: 2 }] }]);
+  ok(/Závesy/.test(msg) && /všetko nad/.test(msg), 'klientska hláška menuje pravidlo aj to, čo chýba');
+})();
+
+(function(){
+  const base = { version: '0.7.65', model_guid: 'G5', source: 'project', cabinets: 2,
+                 rules: [{ kind: 'fixed', output: 'leg', enabled: true, quantity: 4,
+                           applies_to: { role: 'cabinet' } }],
+                 abs: { rows: [], source: '', hint: '' },
+                 overrides: { abs: { total: 0, groups: [] }, hardware: { total: 0, groups: [] } } };
+  ELS.secbody.innerHTML = '';
+  R.rdApplyState(base);
+  R.rulesRenderBody();
+
+  // (a) BEŽNÉ echo (bez `force`) rozpísaný formulár NEPREKRESLÍ.
+  ELS.rulesBox.innerHTML = 'ROZPÍSANÉ';
+  R.RD.setSection(base, false);
+  eq(ELS.rulesBox.innerHTML, 'ROZPÍSANÉ', 'echo bez `force` hodnoty vo formulári nechá');
+
+  // (b) VYNÚTENÉ echo (odmietnutý save — pravidlá na modeli sa zmenili)
+  //     formulár prekreslí, aj keď server pošle TIE ISTÉ pravidlá.
+  R.RD.setSection(base, true);
+  ok(/value="4"/.test(ELS.rulesBox.innerHTML),
+     'echo s `force` formulár prekreslí VŽDY — rozpísané hodnoty už neplatia');
+
+  // (c) …a odtlačok sa OMLADÍ: najbližší bežný push s tými istými pravidlami
+  //     už formulár prekresliť nesmie (inak by sa strácali hodnoty donekonečna).
+  ELS.rulesBox.innerHTML = 'ZNOVA ROZPÍSANÉ';
+  R.rdApplyState(base);
+  eq(ELS.rulesBox.innerHTML, 'ZNOVA ROZPÍSANÉ', 'odtlačok je omladený — ďalší push je pokojný');
+
+  // (d) Prázdny payload (server zlyhal pri zostavovaní) NESMIE vyprázdniť sekciu
+  //     ani vo `force` vetve — inak by zlyhanie servera zmazalo formulár aj
+  //     jantárové riadky a vyzeralo by to, že v projekte nič nie je.
+  const keep = ELS.rulesBox.innerHTML;
+  R.RD.setSection(null, true);
+  eq(ELS.rulesBox.innerHTML, keep, 'prázdny payload formulár nezmaže ani vo `force` vetve');
+  R.RD.setSection(undefined, false);
+  eq(ELS.rulesBox.innerHTML, keep, 'ani v bežnej vetve');
+})();
+
+console.log(`OK ${n} kontrol (ŠT-3b-1/3b-2a/3b-2b/3b-2c1 sekcia Pravidlá)`);

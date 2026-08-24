@@ -7059,6 +7059,58 @@ module NoxunSuRunner
                           .sum { |h| h['quantity'].to_i }
   end
 
+  # ŠT-3b-2c1: ulozenie pravidla `bands` BEZ pasma „všetko nad" musi SERVER
+  # odmietnut — a nesmie pritom zapisat NIC (ani snapshot, ani prestavbu).
+  def st3b_catch_all(model, rd, sink, rec, output)
+    e::StudioDialog.send(:push_state) # cerstvy baseline pre zapis
+    current = e::HardwareRules.project_rules(model) || []
+    target = current.find { |r| r['kind'].to_s == 'bands' && r['enabled'] != false }
+    if target.nil?
+      # Review #223 NOTE 5: scenar sa NESMIE preskocit len preto, ze seed sa
+      # medzi verziami zmenil — brana by ostala neoverena a sada zelena. Pravidlo
+      # si preto DOSEJEME (vzor ostatnych seedov) a assert je TVRDY.
+      target = { 'rule_id' => 'su-test-bands', 'enabled' => true,
+                 'applies_to' => { 'role' => 'front_door' }, 'output' => 'hinge',
+                 'kind' => 'bands', 'input' => 'height',
+                 'bands' => [{ 'max' => 900.0, 'quantity' => 2 }, { 'max' => nil, 'quantity' => 3 }] }
+      model.start_operation('SU-TEST st3b2c1 seed bands', true)
+      seeded = e::HardwareRules.set_project_rules(model, current + [target])
+      model.commit_operation
+      ok('ŠT-3b-2c1 (b3): scenar si `bands` pravidlo doseje (brana sa NESMIE preskocit)', seeded)
+      e::StudioDialog.send(:push_state) # baseline po seede
+      current = e::HardwareRules.project_rules(model) || []
+    end
+
+    before = JSON.generate(current)
+    broken = JSON.parse(before)
+    broken.each do |r|
+      next unless r['rule_id'] == target['rule_id']
+
+      # Prec s pasmom „všetko nad" (max == null) — presne ten tvar, ktory
+      # klientska `rdValidate` blokuje a server musi zablokovat tiez.
+      r['bands'] = Array(r['bands']).reject { |b| b['max'].nil? }
+    end
+    hw_before = st3b_hw_count(cabinets(model).first, output) if cabinets(model).first
+    rec.clear
+    rd.dispatch('save_rules',
+                { 'rules' => broken, 'also_global' => false,
+                  'model_guid' => model.guid.to_s }.to_json, sink)
+    ok('ŠT-3b-2c1 (b3): ulozenie pravidla BEZ pásma „všetko nad" sa ODMIETNE',
+       rec.any? { |x| x.include?('neuložili') })
+    # Review #223 (Codex P2): hlaska musi niest AJ identitu `rule_id` — dve
+    # pravidla smu mat rovnaky vystup a samotny nazov typu by ukazoval na obe.
+    ok('ŠT-3b-2c1 (b3): a hlaska MENUJE pravidlo TYPOM AJ IDENTITOU',
+       rec.any? { |x| x.include?(e::HardwareRules.label_for(target['output'])) &&
+                      x.include?(target['rule_id'].to_s) })
+    ok('ŠT-3b-2c1 (b3): v projekte ostali POVODNE pravidla (nic sa nezapisalo)',
+       JSON.generate(e::HardwareRules.project_rules(model) || []) == before)
+    inst = cabinets(model).first
+    ok('ŠT-3b-2c1 (b3): a skrinky sa NEPRESTAVALI',
+       inst.nil? || hw_before.nil? || st3b_hw_count(inst, output) == hw_before)
+  rescue StandardError => ex
+    ok("ŠT-3b-2c1 (b3): scenar brany vynimka: #{ex.class}: #{ex.message}", false)
+  end
+
   def st3b_scenar(model, rd)
     inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
                                             'height' => 720.0, 'depth' => 560.0 })
@@ -7110,6 +7162,36 @@ module NoxunSuRunner
       after_hw = st3b_hw_count(inst, output)
       ok("ŠT-3b-1 (b): a PRESTAVBA sa naozaj stala — na entite #{base_hw} -> #{after_hw}",
          after_hw > base_hw)
+
+      # --- (b2) BEZPODMIENECNA undo kontrola HNED PO ULOZENI --------------
+      # ŠT-3b-2c1: doteraz sa undo overovalo az v kroku (d), a to LEN ked bol
+      # `merge_seed` NO-OP. Ked sa seed lisil od projektu (co sa medzi verziami
+      # bezne stava), undo sa NEOVERILO VOBEC a sada bola zelena — kontrakt
+      # „ulozenie = JEDEN krok Spat pre pravidla AJ geometriu" tak visel na
+      # nahode. Tu je meranie bezpodmienecne, s vlastnou zalohou cisel.
+      Sketchup.undo
+      ok("ŠT-3b-1 (b2): 1x Spat vratil pravidlo na #{base_qty} (bezpodmienecne meranie)",
+         st3b_qty(model, output).to_i == base_qty.to_i)
+      ok("ŠT-3b-1 (b2): a s nim aj GEOMETRIU (na entite #{base_hw})",
+         inst.valid? && st3b_hw_count(inst, output) == base_hw)
+
+      # Stav pre dalsie kroky sa obnovi NOVYM ulozenim (programovy `redo` na
+      # Windows neexistuje) — baseline musi ist nanovo, inak by ho odmietol
+      # vlastny guard.
+      e::StudioDialog.send(:push_state)
+      rec.clear
+      rd.dispatch('save_rules',
+                  { 'rules' => edited, 'also_global' => false,
+                    'model_guid' => model.guid.to_s }.to_json, sink)
+      ok("ŠT-3b-1 (b2): opakovane ulozenie stav obnovilo (#{st3b_qty(model, output)})",
+         st3b_qty(model, output).to_i == new_qty)
+
+      # --- (b3) SERVEROVA BRANA: pravidlo bez pasma „všetko nad" ----------
+      # ŠT-3b-2c1: klientska kontrola sa da obist (starsi cachovany DOM, ine
+      # volanie) — server MUSI odmietnut sam. Deravy tvar nie je tichy (kontrola
+      # by ho ukazala ako ORANGE na kazdej skrinke), ale odmietnut ho RAZ pri
+      # ulozeni je lacnejsie nez ho riesit v celej zakazke.
+      st3b_catch_all(model, rd, sink, rec, output)
 
       # --- (c) NO-OP „Doplniť nové predvolené" nemeni undo stav -----------
       rec.clear

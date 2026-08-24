@@ -6,7 +6,13 @@
 #      pozri regex nizsie — DOSLOVNE priklady sem NEpatria, guard by chytil sam seba),
 #   2. subor obsahuje C1 kontrolne znaky U+0080..U+009F (zvysky passthrough),
 #   3. .html subor nema <meta charset="utf-8">,
-#   4. subor nie je validne UTF-8.
+#   4. subor nie je validne UTF-8,
+#   5. subor obsahuje CYRILICKY HOMOGLYF (review #223) — cyrilicke pismena su od
+#      latinskych na pohlad NEROZLISITELNE, takze prejdu ocami aj code review,
+#      ale rozbijaju grep aj porovnanie retazcov. DOSLOVNY priklad sem NEpatri
+#      (guard by chytil sam seba, rovnako ako pri mojibake) — typicky nalez je
+#      slovenske slovo s jednym cyrilickym pismenom uprostred, vzniknute
+#      kopirovanim textu odinakial.
 # Ziadny falosny poplach: signatury su bajtove sekvencie, ktore sa v cistej
 # slovencine/kode nikdy nevyskytuju.
 require_relative '../helper' unless defined?(NxTest)
@@ -25,12 +31,25 @@ NxTest.test('encoding: ziadne mojibake/C1 bajty v UI a docs suboroch + html char
   # doslovneho prikladu tu — guard by chytil sam seba).
   sig = /\xC3\xA2[\xC2\xE2]|\xC4\x82[\xCB\xC2\xC4\xC5]|\xC4\xB9[\xCB\xC2\xA0-\xBF]|\xC4\x8C\xCB\x87|\xC3\x84[\xC2\xC4\xC5]|\xC3\x85[\xC2\xC4\xC5]|\xC3\x82\xC2/n
   c1 = /\xC2[\x80-\x9F]/n
+  # ŠT-3b-2c1 (review #223 NOTE 6): CYRILIKA v slovenskom/anglickom zdrojaku je
+  # VZDY homoglyf — cyrilicke pismena su od latinskych na pohlad NEROZLISITELNE,
+  # takze prejdu ocami aj code review, ale rozbijaju hladanie, grep aj porovnanie
+  # retazcov. Prve zapnutie tohto guardu naslo TRI take zvysky v repe (komentar
+  # v part_card.js, hlaska v test_st2a_mat.js, komentar v test_k1_smer_dekoru.rb)
+  # — projekt ziadny cyrilicky text nema, takze je to bezpecny plosny zakaz.
+  # Rozsah sa pise ESCAPMI, nie znakmi — inak by guard nasiel sam seba
+  # (rovnaky dovod, preco tu nie su doslovne mojibake priklady).
+  cyr = /[\u0400-\u04FF]/
   bad = []
   targets.each do |p|
     bytes = File.binread(p)
     rel = p.sub("#{root}/", '')
     bad << "#{rel}: mojibake signatura" if bytes.match?(sig)
     bad << "#{rel}: C1 kontrolny znak (U+0080..9F)" if bytes.match?(c1)
+    text = bytes.dup.force_encoding('UTF-8')
+    if text.valid_encoding? && (hit = text[cyr])
+      bad << "#{rel}: cyrilicky homoglyf #{format('U+%04X', hit.ord)} (v SK/EN zdrojaku nema co robit)"
+    end
     begin
       bytes.dup.force_encoding('UTF-8').unicode_normalize
     rescue StandardError

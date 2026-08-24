@@ -1,0 +1,84 @@
+{
+  "_comment": [
+    "ŠT-3b-2c1 — SPOLOCNY KONTRAKT klienta a servera pre validaciu pravidiel kovania.",
+    "Cita ho Ruby sada (tests/pure/test_st3b_rules.rb -> HardwareRules.rules_problems)",
+    "aj JS sada (tests/js/test_st3b_rules.js -> rdValidate). Ked sa kriteria rozidu,",
+    "padne prave jedna z nich — a to je zmysel tohto suboru: formular, ktory klient",
+    "pusti a server odmietne, je slepa ulicka bez vysvetlenia (a naopak: to, co klient",
+    "zablokuje a server by pustil, sa neda ulozit inou cestou).",
+    "TVAR je POST-collect (to, co posiela `rdCollectRules`) a zaroven POST-normalize",
+    "(to, co validuje server) — kriteria sa porovnavaju nad ROVNAKYM vstupom.",
+    "`invalid: true` = ulozenie sa MUSI odmietnut."
+  ],
+  "cases": [
+    {
+      "name": "bands s pasmom „všetko nad\" je v poriadku",
+      "invalid": false,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
+                  "bands": [{ "max": 900.0, "quantity": 2 }, { "max": null, "quantity": 3 }] }]
+    },
+    {
+      "name": "bands BEZ pásma „všetko nad\" — rozmer nad posledným pásmom by nespadol nikam",
+      "invalid": true,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
+                  "bands": [{ "max": 900.0, "quantity": 2 }] }]
+    },
+    {
+      "name": "bands prázdne",
+      "invalid": true,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
+                  "bands": [] }]
+    },
+    {
+      "name": "VYPNUTÉ bands bez catch-all sa nekontroluje (negeneruje nič)",
+      "invalid": false,
+      "rules": [{ "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": false,
+                  "bands": [{ "max": 900.0, "quantity": 2 }] }]
+    },
+    {
+      "name": "fit_series s radom je v poriadku",
+      "invalid": false,
+      "rules": [{ "rule_id": "vysuvy", "output": "slide", "kind": "fit_series", "enabled": true,
+                  "series": [400.0, 450.0], "clearance": 10.0, "quantity": 1 }]
+    },
+    {
+      "name": "fit_series s PRÁZDNYM radom — automat nemá z čoho vybrať",
+      "invalid": true,
+      "rules": [{ "rule_id": "vysuvy", "output": "slide", "kind": "fit_series", "enabled": true,
+                  "series": [], "clearance": 10.0, "quantity": 1 }]
+    },
+    {
+      "name": "VYPNUTÝ fit_series s prázdnym radom sa nekontroluje",
+      "invalid": false,
+      "rules": [{ "rule_id": "vysuvy", "output": "slide", "kind": "fit_series", "enabled": false,
+                  "series": [] }]
+    },
+    {
+      "name": "fixed pravidlo sa netýka ani jedného kritéria",
+      "invalid": false,
+      "rules": [{ "rule_id": "nohy", "output": "leg", "kind": "fixed", "enabled": true,
+                  "quantity": 4 }]
+    },
+    {
+      "name": "pravidlo NOVŠEJ verzie (neznámy kind) sa nevalidzuje — nesmie zablokovať uloženie",
+      "invalid": false,
+      "rules": [{ "rule_id": "nieco-nove", "output": "handle", "kind": "buduci_tvar",
+                  "enabled": true, "bands": [] }]
+    },
+    {
+      "name": "fit_series pravidlo, ktoré nesie AJ bands (legacy/cudzí snapshot, zmena kind) — pásma sa nekontrolujú",
+      "invalid": false,
+      "rules": [{ "rule_id": "vysuvy", "output": "slide", "kind": "fit_series", "enabled": true,
+                  "series": [400.0], "bands": [{ "max": 900.0, "quantity": 1 }] }]
+    },
+    {
+      "name": "viac pravidiel, jedno deravé — odmietne sa uloženie CELKU",
+      "invalid": true,
+      "rules": [
+        { "rule_id": "nohy", "output": "leg", "kind": "fixed", "enabled": true, "quantity": 4 },
+        { "rule_id": "zavesy", "output": "hinge", "kind": "bands", "enabled": true,
+          "bands": [{ "max": 900.0, "quantity": 2 }] }
+      ]
+    }
+  ]
+}

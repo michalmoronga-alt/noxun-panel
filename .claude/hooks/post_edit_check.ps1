@@ -1,7 +1,8 @@
 # Claude Code PostToolUse hook (Edit|Write) — Noxun Engine.
 # Kontroluje IBA prave editovany subor: (1) ruby -c syntax pre .rb,
 # (2) encoding guard pre .rb/.js/.html/.css/.md/.ps1 — rovnake kontroly ako
-# tests/pure/test_encoding_guard.rb (valid UTF-8, mojibake signatury, C1 znaky)
+# tests/pure/test_encoding_guard.rb (valid UTF-8, mojibake signatury, C1 znaky,
+# cyrilicke homoglyfy)
 # + BOM (konvencia repa: UTF-8 BEZ BOM).
 # POZOR (vedomy kontrakt): PostToolUse subor NEVRACIA — edit uz je zapisany.
 # Hook je RYCHLA SPATNA VAZBA pre agenta (exit 2 + stderr -> agent chybu hned
@@ -64,6 +65,10 @@ if ($ext -in @('.rb', '.js', '.html', '.css', '.md', '.ps1')) {
   $c1 = (B 0xC2) + '[' + (B 0x80) + '-' + (B 0x9F) + ']'
   if ([regex]::IsMatch($latin1, $sig)) { $problems += 'mojibake signatura (double-encoding diakritiky)' }
   if ([regex]::IsMatch($latin1, $c1))  { $problems += 'C1 kontrolny znak U+0080..U+009F (zvysok zleho prekodovania)' }
+  # Cyrilika = homoglyfy latinky (PR #223 review): rozsah escapmi, aby skript
+  # nenasiel sam seba — zrkadlo tests/pure/test_encoding_guard.rb.
+  $utf8 = [System.Text.Encoding]::UTF8.GetString($bytes)
+  if ([regex]::IsMatch($utf8, '[\u0400-\u04FF]')) { $problems += 'cyrilicky znak (homoglyf latinky - U+0400..U+04FF)' }
 }
 
 if ($problems.Count -gt 0) {

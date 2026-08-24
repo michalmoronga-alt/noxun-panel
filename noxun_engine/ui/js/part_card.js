@@ -382,7 +382,7 @@
     }
     nxComboSync(box); // D-85: pregrupovane volby -> obnov popisky triggerov
   }
-  // Spat z karty dielca na skrinku (omrvinka) — Ruby oznaci korpus a poslе novy stav.
+  // Spat z karty dielca na skrinku (omrvinka) — Ruby oznaci korpus a posle novy stav.
   // Codex #168 P2 (4. kolo): callback je asynchronny, takze nesie IDENTITU toho,
   // z coho sa odchadza — dokument aj dielec. Bez toho by oneskoreny klik oznacil
   // rovnomennu skrinku v CUDZOM dokumente (ID sa naprie dokumentmi opakuju),

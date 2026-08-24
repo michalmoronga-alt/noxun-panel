@@ -431,9 +431,18 @@ module Noxun
         def handle_save(payload)
           model = Sketchup.active_model
           unless baseline_valid?(model)
-            # Formular sa nacita nanovo PLNYM pushom (nesie `rules`), takze
-            # klient uvidi, co v projekte naozaj plati.
-            refresh_studio(bump: false)
+            # Formular sa nacita nanovo — ale LACNYM ECHOM sekcie, nie plnym
+            # pushom okna (review #222 P1): plny push ide cez zber modelu a ten
+            # deduplikuje ID kopii, cize ODMIETNUTY zapis by model ZMENIL.
+            #
+            # `force: true` je tu ZAMERNE: pravidla na modeli sa medzitym
+            # zmenili, takze rozpisany formular UZ NEPLATI a MUSI sa prekreslit
+            # (aj s omladenim odtlacku). Rozpisane hodnoty sa tym VEDOME
+            # STRACAJU — presne to hovori hlaska „formulár je načítaný nanovo".
+            # Kontrakt „push nesmie stratit rozpisany formular" na TUTO vetvu
+            # NEPLATI: drzat hodnoty nad cudzim stavom by znamenalo ulozit ich
+            # nad zmenu, ktoru pouzivatel nevidel.
+            push_section_echo(model, force: true)
             return set_status('Aktívny model/pravidlá sa medzitým zmenili — formulár je načítaný nanovo. ' \
                               'Skontroluj a ulož znova.', true)
           end
@@ -446,12 +455,26 @@ module Noxun
           # DOM guard neblokuje, NEZHODNE ID ano.
           guid = data['model_guid'].to_s
           if !guid.empty? && guid != model_guid(model)
+            # Tu ZAMERNE ostava PLNY push (na rozdiel od baseline vetvy vyssie):
+            # prepnuty dokument je cudzi pre VSETKY sekcie okna, nielen pre
+            # pravidla — echo jednej sekcie by nechalo kusovnik, kontrolu aj
+            # rozpocet na cislach INEHO projektu.
             refresh_studio(bump: false)
             return set_status('Model sa medzitým prepol — pravidlá sú načítané z tohto modelu. ' \
                               'Skontroluj a ulož znova.', true)
           end
           rules = HardwareRules.normalize_rules(data['rules'])
           return set_status('Žiadne platné pravidlá — nič sa neuložilo.', true) if rules.empty?
+
+          # ŠT-3b-2c1: SERVEROVA BRANA tvaru pravidiel. Klientska `rdValidate`
+          # je len to, co sa da povedat BEZ servera — sem sa da dostat aj mimo
+          # nej (starsi cachovany DOM, in-SU volanie, buduci iny klient).
+          # Validuje sa AZ PO normalizacii: tá nevalidne pasma zahadzuje, takze
+          # sa kontroluje PRESNE to, co by sa zapisalo.
+          # FORMULAR SA NEPREKRESLUJE — pouzivatel ma svoje hodnoty OPRAVIT,
+          # nie o ne prist.
+          problems = HardwareRules.rules_problems(rules)
+          return set_status("Pravidlá sa neuložili — #{problems_text(problems)}", true) unless problems.empty?
 
           jobs = cabinets(model).map { |c| [c, CabinetBuilder.config_to_params(Store.config(c) || {})] }
           CabinetBuilder.rebuild_many(model, jobs, op_name: 'NOXUN: pravidla kovania') do
@@ -464,6 +487,18 @@ module Noxun
           end
           set_status("Pravidlá uložené do projektu#{global_note} — prestavaných #{jobs.size} skriniek.")
           after_model_write(model)
+        end
+
+        # Strop hlasky (review #223 NOTE 1): pri desiatich pokazenych pravidlach
+        # by sa stavovy riadok zmenil na odsek, ktory nikto neprecita. Vypisu sa
+        # PRVE tri (poradie = poradie pravidiel vo formulari) a zvysok sa PRIZNA
+        # poctom — pouzivatel tak vie, ze opravou prveho este nekonci.
+        MAX_PROBLEM_MESSAGES = 3
+
+        def problems_text(problems)
+          shown = problems.first(MAX_PROBLEM_MESSAGES).map { |p| p['message'] }
+          rest = problems.length - shown.length
+          rest.positive? ? "#{shown.join(' ')} …a ďalšie #{rest}." : shown.join(' ')
         end
 
         # ============ ŠT-3b-2b: „VRÁTIŤ NA PRAVIDLO" (jantarovy riadok) =======
@@ -539,12 +574,21 @@ module Noxun
         # Echo SEKCIE bez plneho pushu okna a BEZ dedupu. Prijimac `RD.setSection`
         # zije v tom istom `js/rules.js`; generacia okna sa NEZDVIHA (nic sa
         # nezapisalo, takze rozkliknute riadky inych sekcii maju ostat platne).
-        def push_section_echo(model)
+        # `force: true` = klient MUSI formular prekreslit a omladit odtlacok
+        # (vetva, kde rozpisane hodnoty UZ NEPLATIA — pravidla na modeli sa
+        # medzitym zmenili). Bez neho sa formular prekresli LEN pri zmene
+        # pravidiel, takze rozpisane hodnoty prezijú (vzor kazdeho ineho pushu).
+        #
+        # ZMENA SPRAVANIA oproti `refresh_studio` (priznane): echo ide do okna
+        # aj ked NIE JE viditelne (plny push mal `@dialog.visible?` guard).
+        # Je to lacne citanie bez zapisu do modelu a klient si tym drzi cerstvy
+        # stav aj na skrytej sekcii.
+        def push_section_echo(model, force: false)
           model ||= Sketchup.active_model
           return if model.nil?
 
           pay = rules_payload(model, Bom.collect(model))
-          js("RD.setSection(#{pay.to_json})") if pay
+          js("RD.setSection(#{pay.to_json}, #{force ? 'true' : 'false'})") if pay
         rescue StandardError => e
           # Zlyhanie echa nesmie prebit HLASKU odmietnutia — pouzivatel sa musi
           # dozvediet, PRECO sa nic nezapisalo, aj keby sa zoznam neobnovil.

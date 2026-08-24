@@ -33,8 +33,12 @@
 
   function rdEl(id){ return document.getElementById(id); }
   function rdEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  // Review #223 (NOTE 2): názvy MUSIA byť tie isté ako serverové
+  // `HardwareRules.label_for` — tá istá hláška o tom istom pravidle chodí raz
+  // z klienta (`rdValidate`) a raz zo servera (`rules_problems`), takže „Výsuvy"
+  // tu a „Výsuv" tam by bola jedna vec s dvoma menami. Zhodu stráži guard test.
   function rdLabel(t){
-    return { leg:'Nohy', hinge:'Závesy', slide:'Výsuvy', handle:'Úchytky',
+    return { leg:'Nohy', hinge:'Závesy', slide:'Výsuv', handle:'Úchytky',
              shelf_pin:'Podperky', connector:'Spojky',
              wall_hanger:'Zavesenie na stenu' }[t] || t;
   }
@@ -84,7 +88,22 @@
     // modelu, a ten deduplikuje ID kópií, čiže by odmietnutý klik ZAPÍSAL do
     // modelu (a pridal krok Späť) presne v scenári, kde hláška tvrdí opak.
     // Kanál je ten istý payload sekcie, len bez zdvihu generácie okna.
-    setSection: function(r){
+    // `force` = server hovorí, že rozpísané hodnoty UŽ NEPLATIA (pravidlá na
+    // modeli sa medzitým zmenili) — formulár sa MUSÍ prekresliť a odtlačok
+    // omladiť, inak by najbližšie „Uložiť" zapísalo hodnoty nad cudziu zmenu,
+    // ktorú používateľ nikdy nevidel. Bez `force` platí bežný kontrakt:
+    // rozpísaný formulár push prežije.
+    setSection: function(r, force){
+      // Prázdny payload (server zlyhal pri zostavovaní) NESMIE vyprázdniť
+      // sekciu — vetva `force` by inak formulár prekreslila z ničoho.
+      if (!r) return;
+      if (force){
+        rdSetState(r);
+        RD_NEEDS_RENDER = true;
+        rdRender();
+        rdRenderExtra();
+        return;
+      }
       rdApplyState(r);
     }
   };

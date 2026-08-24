@@ -347,6 +347,14 @@ Dve nezávislé vrstvy (GPT debata sekcie 16–17):
 
 Pravidlá sú **JSON dáta editovateľné cez dialóg Pravidlá kovania** (nie ručne v súbore). Michal si počty závesov / výnimky mení bez programovania.
 
+**Tvar pravidla je KONTRAKT pri ULOŽENÍ (ŠT-3b-2c1).** Zapísať sa smú len pravidlá, ktoré vedia rozhodnúť pre **každý** rozmer:
+
+- pravidlo `kind: "bands"` so `enabled != false` musí mať **neprázdne pásma a medzi nimi pásmo „všetko nad" (`max: null`)** — bez neho rozmer nad posledným pásmom nespadne do žiadneho a položka pre takú skrinku nevznikne;
+- pravidlo `kind: "fit_series"` so `enabled != false` musí mať **neprázdny rad `series`** — automat nemá z čoho vybrať (dôsledok: ručný zámok NL nad prázdnym radom už nemá ako vzniknúť);
+- **vypnuté pravidlo sa nekontroluje** (negeneruje nič) a **neznámy `kind`** z novšej verzie uloženie **neblokuje** (forward-compat: neznáme kľúče sa zachovávajú).
+
+Bránu drží **jedna čistá funkcia `HardwareRules.rules_problems`**, volaná **výhradne v zapisovacej ceste** (`RulesDialog.handle_save`, až PO `normalize_rules` — validuje sa presne to, čo sa zapíše). **Čítacie cesty ostávajú nedotknuté:** `normalize_rules`, `load`, `project_rules`, `evaluate`, seed-merge ani `ensure_project_rules!` validáciu nevolajú — starší (deravý) snapshot v .skp sa **musí dať načítať a postaviť**, len sa nedá znova uložiť bez opravy. Klientska `rdValidate` je zrkadlo tých istých kritérií; zhodu stráži spoločná fixtúra `tests/fixtures/rules_validation_parity.json` (číta ju Ruby aj JS sada). Nekompletný tvar **nie je tichý** — kusovník hlási `hardware_rule_skipped` a Kontrola ORANGE; brána existuje preto, že odmietnuť ho **raz pri uložení** je lacnejšie než ho riešiť na každej skrinke zákazky. **Žiadne automatické doplnenie catch-all** — plugin nedomýšľa počty za stolára.
+
 **Zdroje pravidiel a reprodukovateľnosť (V0.4):** rebuild číta výhradne **projektový snapshot** pravidiel (`NOXUN` dict na modeli, kľúč `hardware_rules`) — stavba je reprodukovateľná zo samotného .skp (iné PC, zmeny globálu, kópie skriniek) a undo vracia pravidlá aj geometriu naraz. Globálna knižnica `%APPDATA%\NOXUN\Engine\hardware_rules.json` je len default pre nové projekty (so seed-merge novej verzie seedov podľa `rule_id`).
 
 **Položka kovania v pláne** (BuildPlan schema 2, string kľúče kvôli JSON round-trip): `owner_part_key` (nil = korpus; inak musí existovať v parts), `generic_type` (slovník), `quantity` (1–999), `rule_id`, `variant_id` (nil vo fáze 1), `production_class: "counted"`, `manufactured: true`, `params` (napr. výška nohy, NL výsuvu), `source` (`rule`/`manual`), `rule_quantity`. Voliteľne `rule_nominal_length` (viď nižšie). **Ručné zásahy** žijú v configu korpusu ako `hardware_overrides` — identita zásahu = trojica **(owner_part_key, generic_type, rule_id)**; `quantity` prepíše počet, `disabled` položku vyradí, `nominal_length` prepíše dĺžku; šablóny korpusov zásahy zachovávajú.

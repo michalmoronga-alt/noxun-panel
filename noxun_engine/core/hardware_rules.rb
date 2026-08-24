@@ -646,6 +646,83 @@ module Noxun
         end
       end
 
+      # --- validacia pred ULOZENIM (ŠT-3b-2c1) --------------------------------
+      #
+      # CISTA funkcia (ziadne IO, ziadny zapis): co je na pravidlach take zle,
+      # ze sa to NESMIE ulozit? Vracia pole { rule_id, output, message } —
+      # prazdne pole = mozno ulozit.
+      #
+      # PRECO SAMOSTATNA FUNKCIA A NIE `normalize_rules`:
+      #   `normalize_rules` ma DVANAST volajucich a vacsina z nich CITA (load,
+      #   project_rules, evaluate, seed-merge, migracie). Keby vynucovala tieto
+      #   pravidla, LEGACY snapshot z .skp by sa pri citani ticho orezal — teda
+      #   presne ta tichá strata dat, ktorej ma validacia zabranit. Zapisova
+      #   brana preto stoji SAMOSTATNE a vola ju LEN `RulesDialog.handle_save`,
+      #   az PO normalizacii (validuje sa PRESNE to, co sa zapise).
+      #
+      # CO SA VYNUCUJE (a preco prave to):
+      #   * `kind == 'bands'` bez pasma „všetko nad" — rozmer nad poslednym
+      #     pasmom nespadne DO ZIADNEHO a polozka pre taku skrinku nevznikne.
+      #     Nie je to tiche (kusovnik hlasi `hardware_rule_skipped` a KONTROLA
+      #     to ukaze ako ORANGE), ale odmietnut deravy tvar RAZ pri ulozeni je
+      #     lacnejsie nez ORANGE na kazdej skrinke zakazky.
+      #   * `kind == 'fit_series'` s prazdnym radom — automat nema z coho vybrat.
+      #     VEDOMY DOSLEDOK: uzatvara sa tym D-93 vetva „rucny NL zamok pri
+      #     prazdnom rade" (zamok mimo radu sa aj tak uz nedal zapisat).
+      #
+      # KRITERIUM je viazane na `kind`, NIE na pritomnost kluca `bands` — a to
+      # preto, ze `kind` je JEDINA autorita toho, ktora vetva vyhodnotenia sa
+      # spusti (`evaluate` vetvi podla neho; `normalize_rules` NEZNAME kluce
+      # ZACHOVAVA kvoli forward-compat). Zaznam teda smie niest `bands` aj
+      # `series` naraz — z novsej verzie formatu, z cudzieho/legacy snapshotu
+      # alebo ako zvysok po zmene `kind` vo formulari — a validovat mu treba
+      # LEN to, co sa naozaj pouzije. Podla kluca by sa pravidlo odmietlo za
+      # pasma, ktore nikdy nepocita.
+      #
+      # VYPNUTE pravidlo (`enabled == false`) sa NEKONTROLUJE — negeneruje nic,
+      # takze deravy tvar nikoho nezasiahne (zhodne s klientskou `rdValidate`).
+      def rules_problems(rules)
+        Array(rules).filter_map do |rule|
+          next nil unless rule.is_a?(Hash)
+          next nil if rule['enabled'] == false
+
+          msg = rule_problem_message(rule)
+          next nil if msg.nil?
+
+          { 'rule_id' => rule['rule_id'].to_s, 'output' => rule['output'].to_s, 'message' => msg }
+        end
+      end
+
+      # Hlaska ADRESUJE pravidlo menom, ktore pouzivatel vidi vo formulari —
+      # inak by pri desiatich pravidlach nevedel, ktore opravit.
+      #
+      # Review #223 (Codex P2): samotny `label_for(output)` NESTACI — dve pravidla
+      # smu mat rovnaky vystup (napr. dve rozne uchytkove pravidla `handle`)
+      # a hlaska by ukazovala na obe naraz. Identitou je `rule_id`, takze ide
+      # do zatvorky za nazov.
+      def rule_problem_message(rule)
+        case rule['kind'].to_s
+        when 'bands'
+          bands = rule['bands'].is_a?(Array) ? rule['bands'] : []
+          return nil if !bands.empty? && bands.any? { |b| b.is_a?(Hash) && b['max'].nil? }
+
+          "#{rule_address(rule)} potrebuje aspoň pásmo „všetko nad“."
+        when 'fit_series'
+          series = rule['series'].is_a?(Array) ? rule['series'] : []
+          return nil unless series.empty?
+
+          "#{rule_address(rule)} potrebuje aspoň jednu dĺžku v rade."
+        end
+      end
+
+      # „Pravidlo „Výsuvy" (vysuvy-nl-podla-hlbky)" — nazov PRE CLOVEKA
+      # a za nim JEDNOZNACNA identita zaznamu.
+      def rule_address(rule)
+        rid = rule['rule_id'].to_s.strip
+        base = "Pravidlo „#{label_for(rule['output'])}“"
+        rid.empty? ? base : "#{base} (#{rid})"
+      end
+
       # Pocet vzdy Integer v <1, MAX_HW_QUANTITY>; nil pri nevalidnom vstupe.
       def clamp_qty(v)
         return nil if v.nil? || v.to_s.strip.empty?
