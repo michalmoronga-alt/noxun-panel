@@ -38,7 +38,10 @@ function stubEl(id){
   return n;
 }
 ['snav', 'sechead', 'sectools', 'secbody', 'status', 'studio',
- 'rulesBox', 'rdSrcLine', 'alsoGlobal'].forEach(function(id){ ELS[id] = stubEl(id); });
+ 'rulesBox', 'rdSrcLine', 'alsoGlobal',
+ // ŠT-3b-2a: read-only bloky sekcie (ABS pravidlá + jantárové riadky).
+ 'rdAbsBox', 'rdAbsSrc', 'rdAbsHint', 'rdAbsOvr', 'rdHwOvr'
+].forEach(function(id){ ELS[id] = stubEl(id); });
 ELS.rulesBodyTpl = stubEl('rulesBodyTpl');
 ELS.rulesBodyTpl.content = stubEl('rulesBodyTplContent');
 
@@ -288,4 +291,145 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
      'a pred odoslaním beží klientska kontrola (prestavba VŠETKÝCH skriniek nie je lacná)');
 })();
 
-console.log(`OK ${n} kontrol (ŠT-3b-1 sekcia Pravidlá)`);
+// ===================== ŠT-3b-2a: ABS + jantárové riadky =====================
+//
+// Prečo sú to testy a nie klikanie:
+//   1. Klient tu NESMIE prekladať nič vlastné — všetky texty (názvy rolí,
+//      popisy, zhrnutia olepu, hláška o skrátenom zozname) skladá server. Vlastná
+//      tabuľka v JS by sa časom rozišla so serverovou a používateľ by videl dva
+//      rôzne názvy tej istej roly.
+//   2. Ručný zásah v Inspectore PRAVIDLÁ NEMENÍ — odtlačok formulára ostáva
+//      rovnaký. Keby sa jantárové riadky kreslili len pri zmene pravidiel,
+//      nový override by sa v sekcii objavil až po prepnutí sekcie (a vyzeralo by
+//      to, že sa nič nestalo). Zároveň sa pri tom NESMIE prekresliť formulár.
+//   3. Zoznam môže mať desiatky riadkov a texty v ňom sú z modelu (názvy skriniek
+//      píše používateľ) — neescapovaný `<` by rozbil celú sekciu.
+
+// --- 8) čisté funkcie riadkov ------------------------------------------------
+
+(function(){
+  eq(R.rdOvrHtml(null), '', 'žiadne ručné zásahy = ŽIADNY blok (vertikálny priestor je vzácny)');
+  eq(R.rdOvrHtml({ total: 0, groups: [] }), '', 'ani prázdna skupina nič nekreslí');
+
+  const g = { total: 2, title: 'Dielce s ručne nastavenými hranami (2)',
+              note: 'Vrátiť na pravidlo pribudne v ďalšej dávke.',
+              more_text: '…a ďalších 3 — zoznam je skrátený.',
+              groups: [{ owner_id: 'CAB-001', title: 'CAB-001 · Dolná 600',
+                         rows: [{ owner_id: 'CAB-001', part_key: 'zone:z1/shelf:1',
+                                  label: 'Polica 1', desc: 'ručne nastavené hrany',
+                                  value: 'Predná: bez olepu' }] }] };
+  const h = R.rdOvrHtml(g);
+  ok(/rdovr/.test(h), 'riadok je JANTÁROVÝ (trieda .rdovr)');
+  ok(/class="rdchip">override</.test(h), 'a nesie štítok „override"');
+  ok(h.indexOf('Dielce s ručne nastavenými hranami (2)') >= 0, 'nadpis skupiny je zo servera');
+  ok(h.indexOf('CAB-001 · Dolná 600') >= 0, 'aj nadpis skrinky');
+  ok(h.indexOf('…a ďalších 3') >= 0, 'skrátený zoznam sa PRIZNÁ');
+  ok(h.indexOf('Vrátiť na pravidlo pribudne') >= 0,
+     'a hint priznáva, že akcia „vrátiť na pravidlo" ešte nie je');
+  ok(/#i-pencil/.test(h) && !/#i-alert/.test(h),
+     'ikona je ceruzka (ručný zásah), NIE výstraha — riadok nehovorí o chybe');
+  ok(/#i-eye/.test(h), 'oko je jediná akcia riadku v tejto dávke');
+  ok(!/rotate-ccw/.test(h),
+     'akcia „vrátiť na pravidlo" tu NIE JE ani ako mŕtve tlačidlo (príde v ďalšej dávke)');
+  // Argumenty idú do `onclick` cez `JSON.stringify` + escape (vzor `mdWhereEyeHtml`)
+  // — v HTML sú preto `&quot;`, nie surové úvodzovky.
+  ok(/rdSelectOverride\(&quot;CAB-001&quot;, &quot;zone:z1\/shelf:1&quot;\)/.test(h),
+     'oko posiela ADRESU (owner_id, part_key), nie pids z DOM');
+})();
+
+(function(){
+  // Názov skrinky píše používateľ — do HTML sa nesmie dostať surový.
+  const h = R.rdOvrHtml({ total: 1, title: 'T', note: '', more_text: '',
+                          groups: [{ owner_id: '<img>', title: '<b>zle</b>',
+                                     rows: [{ owner_id: '<img>', part_key: '"x"',
+                                              label: '<script>', desc: 'd', value: 'v' }] }] });
+  ok(!/<script>/.test(h) && /&lt;script&gt;/.test(h), 'text z modelu je escapovaný');
+  ok(!/<b>zle<\/b>/.test(h), 'aj nadpis skupiny');
+  ok(/&quot;x&quot;/.test(h) || /\\&quot;x\\&quot;/.test(h), 'a argument v onclick tiež');
+})();
+
+(function(){
+  const abs = { rows: [{ role: 'shelf', label: 'Polica', desc: 'Predná', value: '1,0 mm' }] };
+  const h = R.rdAbsRulesHtml(abs);
+  ok(h.indexOf('Polica') >= 0 && h.indexOf('1,0 mm') >= 0, 'pravidlo sa vykreslí textom zo servera');
+  ok(!/rdovr/.test(h) && !/rdchip/.test(h), 'pravidlo NIE JE jantárové — jantár patrí override riadku');
+  ok(!/#i-eye/.test(h), 'a nemá oko — pravidlo nie je miesto v modeli');
+  ok(/Žiadne ABS pravidlá/.test(R.rdAbsRulesHtml({ rows: [] })), 'prázdny prehľad to povie');
+})();
+
+// --- 9) push: jantárové riadky sa obnovia, formulár NIE ----------------------
+
+(function(){
+  const base = { version: '0.7.63', model_guid: 'G1', source: 'project', cabinets: 2,
+                 rules: [{ kind: 'fixed', output: 'leg', enabled: true, quantity: 4,
+                           applies_to: { role: 'cabinet' } }],
+                 abs: { rows: [{ role: 'shelf', label: 'Polica', desc: 'Predná', value: '1,0 mm' }],
+                        source: 'zdroj: globálne predvoľby', hint: 'ABS pravidlá nemajú editor' },
+                 overrides: { abs: { total: 0, groups: [] }, hardware: { total: 0, groups: [] } } };
+  ELS.secbody.innerHTML = '';
+  R.rdApplyState(base);
+  R.rulesRenderBody();
+  ok(/Polica/.test(ELS.rdAbsBox.innerHTML), 'ABS pravidlá sa vykreslili do vlastného uzla');
+  eq(ELS.rdAbsSrc.textContent, 'zdroj: globálne predvoľby',
+     'a skupina ABS má VLASTNÝ riadok zdroja (iný rozsah než kovanie)');
+  eq(ELS.rdAbsHint.textContent, 'ABS pravidlá nemajú editor', 'aj vlastný hint');
+  eq(ELS.rdAbsOvr.innerHTML, '', 'bez ručných zásahov sa nekreslí nič');
+
+  // Ručný zásah v Inspectore: pravidlá sú TIE ISTÉ (odtlačok sa nemení),
+  // ale pribudol override. Musí sa objaviť HNEĎ — a formulár ostať nedotknutý.
+  ELS.rulesBox.innerHTML = 'ROZPÍSANÉ';
+  const next = JSON.parse(JSON.stringify(base));
+  next.overrides.abs = { total: 1, title: 'Dielce s ručne nastavenými hranami (1)',
+                         note: '', more_text: '',
+                         groups: [{ owner_id: 'CAB-001', title: 'CAB-001',
+                                    rows: [{ owner_id: 'CAB-001', part_key: 'p1', label: 'Polica 1',
+                                             desc: 'ručne nastavené hrany', value: 'Predná: bez olepu' }] }] };
+  R.rdApplyState(next);
+  ok(/Polica 1/.test(ELS.rdAbsOvr.innerHTML),
+     'nový override sa objaví HNEĎ — aj keď sa pravidlá nezmenili');
+  eq(ELS.rulesBox.innerHTML, 'ROZPÍSANÉ',
+     'a rozpísaný formulár pravidiel kovania to NEPREKRESLILO');
+
+  // Kovanie má vlastný uzol pod svojou skupinou.
+  const hw = JSON.parse(JSON.stringify(next));
+  hw.overrides.hardware = { total: 1, title: 'Skrinky s ručne nastaveným kovaním (1)',
+                            note: '', more_text: '',
+                            groups: [{ owner_id: 'CAB-001', title: 'CAB-001',
+                                       rows: [{ owner_id: 'CAB-001', part_key: '', label: 'Nohy',
+                                                desc: 'ručne nastavené na skrinke', value: 'počet 6 ks' }] }] };
+  R.rdApplyState(hw);
+  ok(/Nohy/.test(ELS.rdHwOvr.innerHTML), 'kovanie má vlastný zoznam');
+  ok(!/Nohy/.test(ELS.rdAbsOvr.innerHTML), 'a nemieša sa s ABS');
+
+  // Zmena, ktorá príde KÝM je telo odpojené, sa dokreslí pri návrate.
+  ELS.secbody.innerHTML = '<div>Kusovník</div>';
+  const later = JSON.parse(JSON.stringify(hw));
+  later.overrides.abs.groups[0].rows[0].label = 'Polica 9';
+  R.rdApplyState(later);
+  R.rulesRenderBody();
+  ok(/Polica 9/.test(ELS.rdAbsOvr.innerHTML),
+     'návrat do sekcie dokreslí aj to, čo prišlo počas odpojenia');
+})();
+
+// --- 10) oko: tá istá cesta ako výber v Kusovníku ----------------------------
+
+(function(){
+  SENT.length = 0;
+  global.ST = null;
+  R.rdSelectOverride('CAB-001', 'p1');
+  eq(SENT.length, 0, 'bez stavu okna sa NEPOSIELA nič (starý DOM po zatvorení)');
+  global.ST = { gen: 7 };
+  R.rdSelectOverride('CAB-001', 'p1');
+  eq(SENT.length, 1, 'klik posiela práve jednu žiadosť');
+  eq(SENT[0][0], 'nx_select', 'a ide TOU ISTOU cestou ako výber v Kusovníku');
+  const p = JSON.parse(SENT[0][1]);
+  eq(p.gen, 7, 'nesie generáciu okna — starý klik server odmietne');
+  eq(p.rule_ref, { owner_id: 'CAB-001', part_key: 'p1' }, 'a adresu overridu');
+  ok(!('pids' in p), 'žiadne pids z DOM — rebuild ich mení');
+  SENT.length = 0;
+  R.rdSelectOverride('CAB-002', '');
+  eq(JSON.parse(SENT[0][1]).rule_ref.part_key, '',
+     'override kovania na skrinke posiela PRÁZDNY kľúč (server označí korpus)');
+})();
+
+console.log(`OK ${n} kontrol (ŠT-3b-1/3b-2a sekcia Pravidlá)`);

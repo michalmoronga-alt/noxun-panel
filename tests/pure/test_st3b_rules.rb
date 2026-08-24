@@ -158,7 +158,7 @@ NxTest.test('ŠT-3b-1: baseline formulara stoji na `model.guid`, NIE na `model.p
   NxTest.assert(valid.include?('model_guid(model) != @baseline_guid'), 'guard porovnava guid')
   NxTest.assert(valid.include?('current == @baseline_rules'),
                 'a ZHODU aktualnych pravidiel s baseline (chyti undo aj subeznu zmenu)')
-  pay = ST3B_RULES_RB[/def rules_payload\(model\).*?\n        end\n/m].to_s
+  pay = ST3B_RULES_RB[/def rules_payload\(model, collected = nil\).*?\n        end\n/m].to_s
   NxTest.assert(pay.include?('@baseline_guid  = model_guid(model)'),
                 'baseline sa obnovi pri KAZDOM zostaveni payloadu (vzor `push_state` okna)')
   NxTest.assert(pay.include?('@baseline_rules = rules'), 'aj s pravidlami')
@@ -226,15 +226,15 @@ end
 
 NxTest.test('ŠT-3b-1: payload sekcie chodi CELY pri kazdom pushi (bez zapadky)') do
   push = ST3B_STUDIO_RB[/def push_state\(bump: true\).*?\n        end\n/m].to_s
-  NxTest.assert(push.include?('rules: rules_payload(model)'),
-                'sekcia dostava stav plnym pushom')
+  NxTest.assert(push.include?('rules: rules_payload(model, collected)'),
+                'sekcia dostava stav plnym pushom — a HOTOVY zber (ziadny druhy sken)')
   NxTest.refute(ST3B_STUDIO_CODE.include?('@rules_full_pending'),
                 'ziadna zapadka — pravidla su maly JSON, druhy kanal by bol drahsi nez payload')
-  pay = ST3B_STUDIO_RB[/def rules_payload\(model\).*?\n        end\n/m].to_s
-  NxTest.assert(pay.include?('RulesDialog.rules_payload(model)'), 'telo je v RulesDialog')
+  pay = ST3B_STUDIO_RB[/def rules_payload\(model, collected = nil\).*?\n        end\n/m].to_s
+  NxTest.assert(pay.include?('RulesDialog.rules_payload(model, collected)'), 'telo je v RulesDialog')
   NxTest.assert(pay.include?("Engine.log_error(e, 'StudioDialog.rules_payload')"),
                 'zlyhanie payloadu sa NEZAMLCUJE')
-  rp = ST3B_RULES_RB[/def rules_payload\(model\).*?\n        end\n/m].to_s
+  rp = ST3B_RULES_RB[/def rules_payload\(model, collected = nil\).*?\n        end\n/m].to_s
   %w[rules source cabinets model_guid].each do |k|
     NxTest.assert(rp.include?("'#{k}'"), "payload nesie `#{k}`")
   end
@@ -271,12 +271,20 @@ NxTest.test('ŠT-3b-1: telo sekcie je SABLONA a lista je cista funkcia') do
                 'a listu rulesRenderTools — s jantarovym priznakom zo `staleFlag`')
 end
 
-NxTest.test('ŠT-3b-1: hint sekcie PRIZNAVA, ze ABS skupina pride v 3b-2 (D-78 duchom)') do
+NxTest.test('ŠT-3b-2a (F8): hint sekcie uz NEPOSIELA nikoho do neexistujuceho okna') do
+  # Do 3b-2a tu stal riadok „zatiaľ ich spravuje okno „Pravidlá ABS"" — take
+  # okno NIKDY neexistovalo. Hint musi hovorit PRAVDU: editor pravidiel ABS
+  # nie je, menia sa hrany konkretneho dielca v Inspectore (D-78 duchom).
   meta = ST3B_STUDIO_JS[/rules: \{ t: 'Pravidlá',.*?\},/m].to_s
-  NxTest.assert(meta.include?('ŠT-3b-2'),
-                'prazdne miesto po ABS skupine musi mat dovod, inak vyzera ako chyba')
+  NxTest.assert(meta.include?('ABS podľa roly'), 'hlavicka sekcie menuje OBE skupiny')
+  NxTest.refute(meta.include?('ŠT-3b-2'), 'a uz nesluby, ze ABS „pribudne" — je tam')
   body = ST3B_STUDIO_HTML[/<template id="rulesBodyTpl">.*?<\/template>/m].to_s
-  NxTest.assert(body.include?('ŠT-3b-2'), 'a povie to aj riadok v obsahu')
+  NxTest.refute(body.include?('Pravidlá ABS"'), 'klamlivy riadok o okne je PREC')
+  NxTest.refute(body.include?('ďalšej dávke (ŠT-3b-2)'), 'aj slub buducej davky')
+  hint = Noxun::Engine::RulesDialog.abs_payload['hint']
+  NxTest.assert(hint.include?('nemajú editor'),
+                'text hintu sklada SERVER a priznava, ze editor ABS pravidiel neexistuje')
+  NxTest.refute(hint.include?('okno'), 'a nikam do okna neposiela')
 end
 
 NxTest.test('ŠT-3b-1: rules.js je PREFIXOVANY — ziadna kolizia so `studio.js`') do
@@ -295,6 +303,303 @@ NxTest.test('ŠT-3b-1: rules.js je PREFIXOVANY — ziadna kolizia so `studio.js`
   NxTest.assert(ST3B_RULES_JS.include?('window.RD = RD'), 'a `RD` je globalny prijimac')
   NxTest.refute(ST3B_RULES_JS_CODE.include?('sketchup.ready('),
                 'okno zaniklo — `ready` posiela `studio.js` (druhe volanie by poslalo payload dvakrat)')
+end
+
+# ============================================================================
+# ŠT-3b-2a — ABS podla roly (read-only) + jantarove riadky rucnych zasahov
+#
+# Co tato cast strazi (a preco to klikanim neoveris):
+#   1. ZDROJ ABS OVERRIDU. Autorita je PRITOMNOST kluca `edges` v configu
+#      KORPUSU. Config ENTITY dielca nesie vyriesenu mapu hran VZDY — keby sa
+#      citala ona, kazdy dielec by vyzeral ako „rucne nastaveny" a zoznam by
+#      stratil vyznam.
+#   2. MRTVE KLUCE. `PartKeys.migrate_overrides` zachovava kluce dielcov, ktore
+#      uz neexistuju. Riadok bez dielca sa neda ani najst, ani vratit — musi
+#      vypadnut UZ PRI ZBERE.
+#   3. TEXTY SKLADA SERVER. Pravidlo ABS je HRUBKA, nie paska; riadok overridu
+#      hovori o ROZHODNUTI cloveka, nie o spravnosti olepu (to je vec Kontroly).
+#   4. RENDER MIMO ZAPADKY. Jantarove riadky sa musia obnovit pri KAZDOM pushi
+#      (rucny zasah v Inspectore pravidla nemeni), ale formular pravidiel
+#      kovania sa pritom NESMIE prekreslit.
+require File.join(NxTest::ROOT, 'noxun_engine', 'core', 'bom') if NxTest.headless?
+require File.join(NxTest::ROOT, 'noxun_engine', 'core', 'abs_rules') if NxTest.headless?
+require File.join(NxTest::ROOT, 'noxun_engine', 'core', 'part_keys') if NxTest.headless?
+
+ST3B2_CSS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'css', 'panel.css'),
+                      encoding: 'UTF-8')
+ST3B2_PC_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'production_core.rb'),
+                        encoding: 'UTF-8')
+
+# Vnoreny dielec tak, ako ho vidi `Bom.collect` (zaznam zo snapshotu).
+def st3b2_part(key, role, name)
+  { 'part_key' => key, 'role' => role, 'name' => name, 'pid' => 101,
+    'material_id' => 'MAT-1' }
+end
+
+NxTest.test('ŠT-3b-2a (B1): ABS override sa cita z CONFIGU KORPUSU, nie zo snapshotu dielca') do
+  nested = { 'side:left' => st3b2_part('side:left', 'side_left', 'Bok ľavý') }
+  ccfg = { 'name' => 'Dolná 600',
+           'part_overrides' => { 'side:left' => { 'edges' => { 'L1' => 'ABS-1' } } } }
+  out = { 'abs' => [], 'hardware' => [] }
+  Noxun::Engine::Bom.collect_manual_overrides(out, ccfg, 'CAB-001', nested)
+  NxTest.assert_equal(1, out['abs'].length, 'zaznam s klucom `edges` je rucny zasah')
+  row = out['abs'].first
+  NxTest.assert_equal('CAB-001', row['owner_id'], 'adresa nesie korpus')
+  NxTest.assert_equal('side:left', row['part_key'], 'a stabilny kluc dielca')
+  NxTest.assert_equal('side_left', row['role'], 'rola sa berie z REALNEHO dielca (nie z kluca)')
+
+  # Zaznam BEZ kluca `edges` (napr. len material dielca) rucnym zasahom do hran NIE JE.
+  out2 = { 'abs' => [], 'hardware' => [] }
+  Noxun::Engine::Bom.collect_manual_overrides(
+    out2, { 'part_overrides' => { 'side:left' => { 'material_id' => 'MAT-9' } } },
+    'CAB-001', nested
+  )
+  NxTest.assert_equal([], out2['abs'], 'iny override (material) hrany nezmenil — riadok nevznika')
+
+  # Zdrojak: snapshot hran ENTITY sa ako override necita NIKDY.
+  body = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'bom.rb'), encoding: 'UTF-8')[
+    /def collect_manual_overrides.*?\n      end\n/m
+  ].to_s
+  NxTest.refute(body.include?('Store.config'),
+                'zber nesiaha na config dielca — vyriesenu mapu hran nesie KAZDY dielec')
+end
+
+NxTest.test('ŠT-3b-2a (B2/F14): mrtve kluce a odpojene dvojcata sa NEKRESLIA') do
+  # Presne to, co robi migracia: kluc zmazaneho dielca v configu PREZIJE.
+  kept = Noxun::Engine::PartKeys.migrate_overrides(
+    { 'zone:z1/shelf:9' => { 'edges' => { 'L1' => 'ABS-1' } } },
+    [{ role: :shelf, part_key: 'zone:z1/shelf:1' }]
+  )
+  NxTest.assert(kept.key?('zone:z1/shelf:9'),
+                'migracia mrtvy kluc ZACHOVAVA — preto ho musi odfiltrovat az zber')
+
+  out = { 'abs' => [], 'hardware' => [] }
+  Noxun::Engine::Bom.collect_manual_overrides(
+    out, { 'part_overrides' => kept }, 'CAB-001',
+    { 'zone:z1/shelf:1' => st3b2_part('zone:z1/shelf:1', 'shelf', 'Polica 1') }
+  )
+  NxTest.assert_equal([], out['abs'],
+                      'kluc bez REALNEHO dielca sa nekresli (neda sa najst ani vratit)')
+end
+
+NxTest.test('ŠT-3b-2a: kovanie sa paruje TYM ISTYM jointom') do
+  nested = { 'front:F1/wing:left' => st3b2_part('front:F1/wing:left', 'front_door', 'Dvierka ľavé') }
+  ccfg = { 'hardware_overrides' => [
+    { 'owner_part_key' => nil, 'generic_type' => 'leg', 'rule_id' => 'nohy', 'quantity' => 6 },
+    { 'owner_part_key' => 'front:F1/wing:left', 'generic_type' => 'hinge',
+      'rule_id' => 'zavesy', 'disabled' => true },
+    { 'owner_part_key' => 'front:ZANIKLO/wing:left', 'generic_type' => 'hinge',
+      'rule_id' => 'zavesy', 'quantity' => 3 }
+  ] }
+  out = { 'abs' => [], 'hardware' => [] }
+  Noxun::Engine::Bom.collect_manual_overrides(out, ccfg, 'CAB-002', nested)
+  NxTest.assert_equal(2, out['hardware'].length,
+                      'zaznam s nesediacim `owner_part_key` sa ticho neaplikuje — ani nekresli')
+  NxTest.assert_equal('', out['hardware'][0]['owner_part_key'].to_s,
+                      'korpusovy override (bez dielca) ostava')
+  NxTest.assert_equal('Dvierka ľavé', out['hardware'][1]['part_name'],
+                      'a sparovany zaznam dostal LUDSKY nazov dielca')
+end
+
+NxTest.test('ŠT-3b-2a: zber nemutuje config a `compute()` novy kluc IGNORUJE') do
+  edges = { 'L1' => 'ABS-1' }
+  ccfg = { 'part_overrides' => { 'p1' => { 'edges' => edges } } }
+  out = { 'abs' => [], 'hardware' => [] }
+  Noxun::Engine::Bom.collect_manual_overrides(out, ccfg, 'CAB-003',
+                                              { 'p1' => st3b2_part('p1', 'shelf', 'Polica') })
+  out['abs'].first['edges']['L2'] = 'ABS-2'
+  NxTest.assert_equal({ 'L1' => 'ABS-1' }, edges, 'config korpusu sa zberom NEMENI')
+
+  computed = Noxun::Engine::Bom.compute(
+    { records: [], hardware: [], warnings: [],
+      manual_overrides: { 'abs' => [{ 'owner_id' => 'CAB-001' }], 'hardware' => [] },
+      cabinets: 1, boards: 0 }
+  )
+  NxTest.refute(computed.key?(:manual_overrides), 'vypocet kusovnika o novom kluci nevie')
+  NxTest.assert(computed.key?(:rows), 'a bezi presne ako predtym')
+end
+
+NxTest.test('ŠT-3b-2a (N19): pravidlo ABS je HRUBKA — riadok nikdy nepise pasku') do
+  rd = Noxun::Engine::RulesDialog
+  shelf = rd.abs_rule_row('shelf', { 'L1' => 1.0 })
+  NxTest.assert_equal('Polica', shelf['label'], 'nazov roly sklada SERVER (`role_label`)')
+  NxTest.assert_equal('Predná', shelf['desc'], 'popis menuje hranu recou stolara')
+  NxTest.assert_equal('1,0 mm', shelf['value'], 'hodnota je HRUBKA s desatinnou CIARKOU')
+
+  door = rd.abs_rule_row('front_door', { 'L1' => 1.0, 'L2' => 1.0, 'W1' => 1.0, 'W2' => 1.0 })
+  NxTest.assert_equal('všetky štyri hrany', door['desc'], 'olep dookola sa nevypisuje po hranach')
+  back = rd.abs_rule_row('back', {})
+  NxTest.assert_equal('bez olepu', back['value'], 'prazdne pravidlo je VEDOME „bez olepu"')
+  mixed = rd.abs_rule_row('shelf', { 'L1' => 1.0, 'L2' => 2.0 })
+  NxTest.assert(mixed['value'].include?('Predná 1,0 mm') && mixed['value'].include?('Zadná 2,0 mm'),
+                'rozne hrubky sa vypisu po hranach — nic sa nezlieva')
+
+  src = ST3B_RULES_RB[/def abs_rule_row.*?\n        end\n/m].to_s
+  NxTest.refute(src.include?('ProductionCore.edge_label') || src.include?('Materials'),
+                'pravidlo NIKDY nesiaha na katalog pasok — dekor sa dopocita az pri stavbe')
+end
+
+NxTest.test('ŠT-3b-2a: prehlad ABS pravidiel ma poradie a VLASTNY riadok zdroja (F9)') do
+  abs = Noxun::Engine::RulesDialog.abs_payload
+  roles = abs['rows'].map { |r| r['role'] }
+  NxTest.assert(roles.include?('shelf') && roles.include?('front_door'), 'vsetky roly su v prehlade')
+  NxTest.assert(roles.index('side_left') < roles.index('front_door'),
+                'poradie je dane serverom (korpus -> cela), nie nahodnym poradim hashu')
+  NxTest.assert(abs['source'].include?('globálne'),
+                'rozsah ABS je GLOBALNY — kovanie je projektove, kazda skupina ma vlastny zdroj')
+  NxTest.assert(abs['source'].include?('neprestaví'),
+                'a povie aj to, ze zmena pravidla hotove skrinky neprestavi')
+end
+
+NxTest.test('ŠT-3b-2a (F11/F15): jantarove riadky — rozhodnutie, zoskupenie, strop') do
+  rd = Noxun::Engine::RulesDialog
+  collected = { manual_overrides: {
+    'abs' => [
+      { 'owner_id' => 'CAB-001', 'owner_name' => 'Dolná 600', 'part_key' => 'p1',
+        'role' => 'shelf', 'name' => 'Polica 1', 'edges' => { 'L1' => '', 'W1' => 'ABS-X' } },
+      { 'owner_id' => 'CAB-001', 'owner_name' => 'Dolná 600', 'part_key' => 'p2',
+        'role' => 'shelf', 'name' => 'Polica 2', 'edges' => { 'L1' => 'ABS-X' } },
+      { 'owner_id' => 'CAB-002', 'owner_name' => '', 'part_key' => 'p1',
+        'role' => 'side_left', 'name' => '', 'edges' => { 'L1' => 'ABS-X' } }
+    ],
+    'hardware' => [
+      { 'owner_id' => 'CAB-001', 'owner_name' => 'Dolná 600', 'owner_part_key' => '',
+        'generic_type' => 'leg', 'rule_id' => 'nohy', 'quantity' => 6 },
+      { 'owner_id' => 'CAB-001', 'owner_name' => 'Dolná 600',
+        'owner_part_key' => 'front:F1/wing:left', 'part_name' => 'Dvierka ľavé',
+        'generic_type' => 'hinge', 'rule_id' => 'zavesy', 'disabled' => true },
+      { 'owner_id' => 'CAB-001', 'owner_name' => '', 'owner_part_key' => '',
+        'generic_type' => 'slide', 'rule_id' => 'vysuvy', 'nominal_length' => 420.0 }
+    ]
+  } }
+  pay = rd.overrides_payload(collected)
+  abs = pay['abs']
+  NxTest.assert_equal(3, abs['total'], 'spocitane su VSETKY riadky')
+  NxTest.assert_equal(2, abs['groups'].length, 'zoskupene po SKRINKACH')
+  NxTest.assert_equal('CAB-001 · Dolná 600', abs['groups'][0]['title'],
+                      'nadpis skupiny nesie id aj rucny nazov skrinky')
+  NxTest.assert_equal('CAB-002', abs['groups'][1]['title'], 'bez nazvu ostava samotne id')
+  row = abs['groups'][0]['rows'][0]
+  NxTest.assert_equal('Polica 1', row['label'], 'riadok menuje DIELEC')
+  NxTest.assert_equal('ručne nastavené hrany', row['desc'],
+                      'text hovori o ROZHODNUTI cloveka, nie o spravnosti olepu')
+  NxTest.assert(row['value'].include?('Predná: bez olepu'),
+                'prazdna hodnota je VEDOME „bez olepu" (nie „chyba")')
+  NxTest.assert(row['value'].include?('Ľavá: ABS-X'),
+                'paska mimo katalogu sa ukaze SUROVYM id — nikdy vymyslenym nazvom')
+  NxTest.assert_equal('Bok ľavý', abs['groups'][1]['rows'][0]['label'],
+                      'dielec bez nazvu ma aspon rolu')
+
+  hw = pay['hardware']
+  NxTest.assert_equal(3, hw['total'], 'kovanie ma vlastnu skupinu')
+  vals = hw['groups'][0]['rows'].map { |r| r['value'] }
+  NxTest.assert(vals.any? { |v| v.include?('počet 6 ks') }, 'rucny pocet je vidiet')
+  NxTest.assert(vals.any? { |v| v.include?('vypnuté') }, 'vypnuta polozka tiez')
+  NxTest.assert(vals.any? { |v| v == 'dĺžka 420 mm' },
+                'rucna dlzka vysuvu bez falosneho desatinneho miesta')
+  NxTest.assert(hw['groups'][0]['rows'].any? { |r| r['desc'].include?('Dvierka ľavé') },
+                'override na dielci povie, na KTOROM')
+
+  # Strop zoznamu: „Použiť na podobné" vie vyrobit desiatky riadkov naraz.
+  many = (1..(rd::MAX_OVERRIDE_ROWS + 5)).map do |i|
+    { 'owner_id' => "CAB-#{i}", 'owner_name' => '', 'part_key' => 'p1', 'role' => 'shelf',
+      'name' => "Polica #{i}", 'edges' => { 'L1' => 'ABS-X' } }
+  end
+  capped = rd.overrides_payload({ manual_overrides: { 'abs' => many, 'hardware' => [] } })['abs']
+  NxTest.assert_equal(rd::MAX_OVERRIDE_ROWS + 5, capped['total'], 'celkovy pocet sa PRIZNA')
+  NxTest.assert_equal(rd::MAX_OVERRIDE_ROWS,
+                      capped['groups'].sum { |g| g['rows'].length }, 'ale zoznam je zastropovany')
+  NxTest.assert(capped['more_text'].include?('5'), 'a zvysok povie suhrn')
+  NxTest.assert_equal('', abs['more_text'], 'kratky zoznam ziadny suhrn nema')
+end
+
+NxTest.test('ŠT-3b-2a (F7): zlyhanie zberu overridov NEZHODI formular pravidiel') do
+  rd = Noxun::Engine::RulesDialog
+  broken = Object.new
+  def broken.[](_key)
+    raise 'zber zlyhal'
+  end
+  def broken.is_a?(klass)
+    klass == Hash
+  end
+  pay = rd.overrides_payload(broken)
+  NxTest.assert_equal(0, pay['abs']['total'], 'zoznam ostane prazdny')
+  NxTest.assert_equal(0, pay['hardware']['total'], 'v oboch skupinach')
+  src = ST3B_RULES_RB[/def overrides_payload\(collected\).*?\n        end\n/m].to_s
+  NxTest.assert(src.include?('rescue StandardError'), 'ma VLASTNY rescue')
+  NxTest.assert(src.include?("Engine.log_error(e, 'RulesDialog.overrides_payload')"),
+                'a zlyhanie sa NEZAMLCUJE')
+end
+
+NxTest.test('ŠT-3b-2a (F11): riadky NEVSTUPUJU do poctov Kontroly') do
+  val = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'validation.rb'), encoding: 'UTF-8')
+  NxTest.refute(val.include?('manual_overrides'),
+                'kontrola o novom kluci nevie — jantarovy riadok nie je nalez')
+  js = ST3B_RULES_JS[/function rdOvrHtml\(g\)\{.*?\n  \}/m].to_s
+  NxTest.refute(js.include?("rdIco('alert')"), 'ziadna ⚠ — riadok nehovori o chybe')
+  NxTest.assert(js.include?("rdIco('pencil')"), 'ale o rucnom zasahu (ceruzka)')
+  NxTest.assert(js.include?('rdChip') || ST3B_RULES_JS.include?('class="rdchip"'),
+                'stitok „override" je jantarovy chip')
+end
+
+NxTest.test('ŠT-3b-2a (F10): oko ide novou vetvou (owner_id, part_key), NIE cez pids') do
+  sel = ST3B2_PC_RB[/def do_select\(model, data, generation:, status:, repush:\).*?\n      end\n/m].to_s
+  NxTest.assert(sel.include?("elsif data['rule_ref']"), 'vyber ma vlastnu vetvu')
+  NxTest.assert(sel.include?("pids_for_override(model, data['rule_ref'])"), 'a vlastny resolver')
+  NxTest.assert(sel.index("data['rule_ref']") < sel.index('refs_for(Bom.compute'),
+                'vetva je PRED vseobecnou (inak by spadla do klucov kusovnika)')
+  body = ST3B2_PC_RB[/def pids_for_override\(model, ref\).*?\n      end\n/m].to_s
+  NxTest.assert(body.include?('pids_for_problem(model,'),
+                'telo sa NEDUPLIKUJE — pouzije sa hotove hladanie podla identity')
+  NxTest.refute(body.include?("data['pids']"), 'ziadne pids z DOM (rebuild ich meni)')
+  js = ST3B_RULES_JS[/function rdSelectOverride\(ownerId, partKey\)\{.*?\n  \}/m].to_s
+  NxTest.assert(js.include?('gen: st.gen'), 'klik nesie generaciu okna (stary DOM sa odmietne)')
+  NxTest.assert(js.include?('rule_ref:'), 'a adresu overridu')
+end
+
+NxTest.test('ŠT-3b-2a (F5/N22): ABS je NAD kovanim a render NEROBI cez zapadku formulara') do
+  body = ST3B_STUDIO_HTML[/<template id="rulesBodyTpl">.*?<\/template>/m].to_s
+  NxTest.assert(body.index('ABS podľa roly dielca') < body.index('Kovanie podľa rozmerov'),
+                'poradie skupin podla mockupu — ABS NAD kovanim')
+  %w[rdAbsSrc rdAbsBox rdAbsHint rdAbsOvr rdHwOvr].each do |id|
+    NxTest.assert(body.include?(%(id="#{id}")), "novy blok ma VLASTNY uzol `#{id}`")
+  end
+  NxTest.assert(ST3B_RULES_JS.include?("RD_BODY.id = 'rulesBody'"),
+                'identita klonovaneho tela sa nestratila (uzol putuje do sekcie a spat)')
+
+  apply = ST3B_RULES_JS[/function rdApplyState\(r\)\{.*?\n  \}/m].to_s
+  early = apply[/if \(seed === RD_SEED\)\{.*?\n    \}/m].to_s
+  NxTest.assert(early.include?('rdRenderExtra()'),
+                'push s NEZMENENYMI pravidlami jantarove riadky OBNOVI (rucny zasah pravidla nemeni)')
+  NxTest.assert(apply.scan('rdRenderExtra()').length >= 2, 'a obnovi ich aj druha vetva')
+  render_extra = ST3B_RULES_JS[/function rdRenderExtra\(\)\{.*?\n  \}/m].to_s
+  NxTest.refute(render_extra.include?('RD_NEEDS_RENDER'),
+                'read-only bloky sa zapadky formulara NEDOTYKAJU')
+  NxTest.refute(render_extra.include?("rdEl('rulesBox')"), 'ani samotneho formulara')
+  body_js = ST3B_RULES_JS[/function rulesRenderBody\(\)\{.*?\n  \}/m].to_s
+  NxTest.assert(body_js.index('rdRenderExtra()') < body_js.index('if (RD_NEEDS_RENDER){'),
+                'pri navrate do sekcie sa dokresli aj to, co prislo, kym bolo telo odpojene')
+end
+
+NxTest.test('ŠT-3b-2a (F18): riadky maju VLASTNY CSS blok — tokeny, ziadne emoji') do
+  %w[.rdrow .rdovr .rdchip .rdeye .rdovrbox].each do |cls|
+    NxTest.assert(ST3B2_CSS.include?(cls), "trieda #{cls} existuje (mockupove .lrow su len prototyp)")
+  end
+  %w[.lrow .lnm .lcd .lpr .bsecbody].each do |ghost|
+    NxTest.refute(ST3B2_CSS.include?("#{ghost} "), "trieda mockupu #{ghost} sa NEDOMYSLA")
+  end
+  block = ST3B2_CSS[/\.rdrow \{.*?\.rdeye \.ic[^\n]*\n/m].to_s
+  NxTest.assert(!block.empty?, 'blok sa nasiel')
+  NxTest.refute(block.match?(/#[0-9a-fA-F]{3,6}\b/), 'ziadne natvrdo napisane farby — len --nx-* tokeny')
+  NxTest.assert(block.include?('--nx-warn-bg'), 'jantar je z rodiny --nx-warn*')
+  # Nove bloky: ikony VYHRADNE zo spritu (`<use href="#i-...">`), ziadny znak
+  # z emoji/dingbat rozsahov. (Starsi formular pravidiel ma „✕" pri pasmach —
+  # ten sa touto davkou nemeni, preto sa kontroluje LEN novy kod.)
+  new_js = ST3B_RULES_JS[/function rdIco\(n\).*?function rdSrcLine/m].to_s
+  NxTest.assert(new_js.include?('rdOvrHtml'), 'novy blok sa nasiel')
+  NxTest.refute(new_js.match?(/[\u{1F300}-\u{1FAFF}\u{2190}-\u{27BF}]/),
+                'ziadne emoji ani sipky — ikony su zo spritu')
+  NxTest.assert(new_js.include?("<use href=\"#i-'"), 'ikony sa berú zo zdieľaného spritu')
 end
 
 NxTest.test('ŠT-3b-1: cache-bust a poradie skriptov') do
