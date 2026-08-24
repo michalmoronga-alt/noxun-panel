@@ -501,14 +501,31 @@ module Noxun
           # necitlive na poradie a na kluce, ktore normalizacia zjednoti), rev je
           # citlivy na presny serializovany tvar.
           #
-          # PRAZDNY rev sa TOLERUJE (vzor `model_guid`): starsi cachovany DOM ho
-          # este neposiela a baseline tuto vetvu aj tak kryje. Odmietat ho by
-          # znamenalo, ze pouzivatel s otvorenym oknom z predoslej verzie by uz
-          # neulozil nic — a nevedel by preco.
+          # PRAZDNY rev sa NETOLERUJE (review #224, Codex P2 — a je to VEDOMA
+          # ZMENA oproti povodnemu zadaniu). Zadanie stavalo na premise, ze
+          # „baseline tuto vetvu kryje" — lenze `@baseline_*` je stav MODULU,
+          # nie klienta: kazdy push (aj ten, ktory si vyziadalo nieco ine)
+          # posunie baseline na aktualny stav modelu, takze STARY cachovany DOM
+          # by cez `baseline_valid?` presiel a prepisal by novsie pravidla
+          # SVOJIM starym formularom. Odmietnutie je pritom SAMOLIECIVE: klient
+          # dostane echo s cerstvym odtlackom, takze druhy klik uz prejde.
+          #
+          # Tolerancia ostava len na to, na co bola mysleny — kym server ziadny
+          # odtlacok nevydal (`@baseline_rev` prazdny), nema sa s cim porovnavat.
           rev = data['rules_rev'].to_s
-          if !rev.empty? && !@baseline_rev.to_s.empty? && rev != @baseline_rev.to_s
-            push_section_echo(model, force: true)
-            return set_status(rev_conflict_status, true)
+          unless @baseline_rev.to_s.empty?
+            if rev.empty?
+              # DOM z predoslej verzie pluginu prijimac echa (`RD.setSection`)
+              # este nema, takze mu netreba slubovat obnovu — hlaska hovori
+              # jedine, co naozaj pomoze.
+              push_section_echo(model, force: true)
+              return set_status('Okno je z predošlej verzie pluginu (chýba mu údaj o verzii pravidiel) — ' \
+                                'nič sa neuložilo. Zavri a otvor Štúdio znova a ulož.', true)
+            end
+            if rev != @baseline_rev.to_s
+              push_section_echo(model, force: true)
+              return set_status(rev_conflict_status, true)
+            end
           end
           rules = HardwareRules.normalize_rules(data['rules'])
           return set_status('Žiadne platné pravidlá — nič sa neuložilo.', true) if rules.empty?

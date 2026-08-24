@@ -673,9 +673,19 @@ module Noxun
       end
 
       # Rekurzivne zoradenie klucov (polia si poradie DRZIA — je vyznamove).
+      #
+      # Review #224 (Codex P2): hodnota sa berie podla PRITOMNOSTI kluca, nie
+      # cez `||`. Pri `false` by totiz `value[k] || value[k.to_sym]` prepadlo na
+      # symbolovy kluc (spravidla `nil`), takze `false` a `null` by dali TEN ISTY
+      # odtlacok — a suberzna zmena takeho pola (kluce novsej verzie
+      # `normalize_rules` ZACHOVAVA) by prekĺzla cez guard.
       def canonical_rules(value)
         case value
-        when Hash  then value.keys.map(&:to_s).sort.each_with_object({}) { |k, out| out[k] = canonical_rules(value[k] || value[k.to_sym]) }
+        when Hash
+          value.keys.map(&:to_s).sort.each_with_object({}) do |k, out|
+            raw = value.key?(k) ? value[k] : value[k.to_sym]
+            out[k] = canonical_rules(raw)
+          end
         when Array then value.map { |v| canonical_rules(v) }
         else value
         end

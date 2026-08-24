@@ -1224,11 +1224,22 @@ NxTest.test('ŠT-3b-2c2: rev je DRUHA vrstva popri baseline, nie jeho nahrada') 
   NxTest.assert(save.include?("rev = data['rules_rev'].to_s"), 'a rev je DALSI guard')
   NxTest.assert(save.index('baseline_valid?(model)') < save.index("data['rules_rev']"),
                 'baseline sa pyta prvy (je lacnejsi a chyti aj undo)')
-  NxTest.assert(save.include?('!rev.empty? && !@baseline_rev.to_s.empty? && rev != @baseline_rev.to_s'),
-                'PRAZDNY rev sa TOLERUJE — starsi cachovany DOM ho neposiela a baseline vetvu kryje')
-  guard = save[/if !rev\.empty\?.*?\n          end\n/m].to_s
-  NxTest.assert(guard.include?('push_section_echo(model, force: true)'),
-                'odmietnutie prekresli formular ECHOM (bez dedupu, s omladenim odtlacku)')
+  # Review #224 (Codex P2): PRAZDNY rev sa UZ NETOLERUJE, ked server odtlacok
+  # vydal. Povodna premisa zadania („baseline tuto vetvu kryje") NEPLATI —
+  # `@baseline_*` je stav MODULU, takze kazdy push ho posunie na aktualny stav
+  # modelu a stary cachovany DOM by cez baseline presiel a prepisal novsie
+  # pravidla. Tolerancia ostava LEN na stav, kym server ziadny odtlacok nevydal.
+  NxTest.assert(save.include?('unless @baseline_rev.to_s.empty?'),
+                'guard sa spusti, ked server odtlacok UZ vydal')
+  NxTest.assert(save.include?('if rev.empty?'),
+                'a vtedy je PRAZDNY rev DOVOD ODMIETNUTIA (nie tolerancia)')
+  NxTest.assert(save.include?('predošlej verzie pluginu'),
+                'hlaska povie, co sa deje — stare okno nema ako poslat odtlacok')
+  NxTest.assert(save.include?('Zavri a otvor Štúdio znova'),
+                'a co ma pouzivatel urobit (stary DOM prijimac echa nema)')
+  guard = save[/unless @baseline_rev\.to_s\.empty\?.*?\n          end\n/m].to_s
+  NxTest.assert(guard.scan('push_section_echo(model, force: true)').length == 2,
+                'obe odmietnutia prekreslia formular ECHOM (bez dedupu, s omladenim odtlacku)')
   NxTest.assert(save.index("data['rules_rev']") < save.index('rebuild_many'),
                 'guard je PRED prestavbou skriniek')
   valid = ST3B_RULES_RB[/def baseline_valid\?\(model\).*?\n        end\n/m].to_s
@@ -1265,4 +1276,40 @@ NxTest.test('ŠT-3b-2c2: klient odtlacok LEN drzi a vracia — nepocita ho') do
   NxTest.assert(!set_rules.empty?, 'telo `setRules` sa naslo')
   NxTest.refute(set_rules.include?('rules_rev'),
                 '„Načítať globálne" odtlacok NEPREPISUJE — inak by ulozenie po nom prepisalo cudziu zmenu')
+end
+
+NxTest.test('ŠT-3b-2c2 (review #224, Codex P2): odtlacok NESTRACA `false`') do
+  hr = Noxun::Engine::HardwareRules
+  # `normalize_rules` NEZNAME kluce zachovava (forward-compat), takze v pravidle
+  # moze zit lubovolne pole novsej verzie. Ked take pole zmeni hodnotu z `false`
+  # na `null`, MUSI sa to na odtlacku prejavit — inak by suberzna zmena
+  # prekĺzla cez guard a ticho prepisala cudziu upravu.
+  base  = [{ 'rule_id' => 'x', 'output' => 'leg', 'kind' => 'fixed',
+             'enabled' => true, 'quantity' => 4, 'buduce_pole' => false }]
+  nulled = [base.first.merge('buduce_pole' => nil)]
+  truthy = [base.first.merge('buduce_pole' => true)]
+  NxTest.assert(hr.rules_rev(base) != hr.rules_rev(nulled),
+                '`false` a `null` NIE SU to iste — odtlacok ich rozlisi')
+  NxTest.assert(hr.rules_rev(base) != hr.rules_rev(truthy), 'a `false` vs `true` tiez')
+  # A `enabled: false` (zname pole) tiez musi mat vlastny odtlacok.
+  off = [base.first.merge('enabled' => false)]
+  NxTest.assert(hr.rules_rev(base) != hr.rules_rev(off),
+                'vypnute pravidlo ma iny odtlacok nez zapnute')
+  canon = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'hardware_rules.rb'),
+                    encoding: 'UTF-8')[/def canonical_rules\(value\).*?\n      end\n/m].to_s
+  NxTest.assert(canon.include?('value.key?(k)'),
+                'hodnota sa vybera podla PRITOMNOSTI kluca, nie cez `||` (to by zhltlo `false`)')
+end
+
+NxTest.test('ŠT-3b-2c2 (review #224): odmietnutie stareho DOM je SAMOLIECIVE') do
+  # Odmietnutie neposiela pouzivatela do slepej ulicky: server pri nom vzdy
+  # posle echo s CERSTVYM odtlackom, takze klient, ktory prijimac echa MA,
+  # ma po nom vsetko, co potrebuje na uspesny druhy pokus.
+  save = ST3B_RULES_RB[/def handle_save\(payload\).*?\n        end\n/m].to_s
+  guard = save[/unless @baseline_rev\.to_s\.empty\?.*?\n          end\n/m].to_s
+  NxTest.assert(guard.index('push_section_echo') < guard.index('return set_status'),
+                'echo ide PRED hlaskou (klient dostane data aj vysvetlenie)')
+  echo = st3b2_rd_body('push_section_echo')
+  NxTest.assert(echo.include?("'rules_rev' => rev") || ST3B_RULES_RB.include?("'rules_rev' => rev"),
+                'a to echo nesie odtlacok (inak by druhy pokus dopadol rovnako)')
 end
