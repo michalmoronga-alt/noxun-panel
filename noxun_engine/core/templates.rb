@@ -154,6 +154,65 @@ module Noxun
         end
       end
 
+
+      # ŠT-3c-2: PREMENOVANIE sablony. Meni VYHRADNE meno — config, poradie
+      # v zozname, nezname kluce zaznamu ani druh sa NEDOTYKAJU.
+      #
+      # PRECO NIE `upsert` (audit B1): `upsert` stavia zaznam nanovo cez
+      # `record()`, takze by (1) ZAHODIL nezname kluce zaznamu z novsej verzie
+      # a (2) presunul zaznam NA KONIEC zoznamu — dlazdice by sa pouzivatelovi
+      # preskupili, hoci premenoval jednu. Premenovanie je preto IN-PLACE `map`
+      # nad deep-kopiou zaznamu.
+      #
+      # VSETKY GUARDY BEZIA POD JEDNYM ZAMKOM (audit B3, lekcia `save_decor`):
+      # keby sa `find` pytal mimo neho, medzi kontrolou a zapisom by druha
+      # instancia SketchUpu stihla to iste meno obsadit. `with_lock` pri vynimke
+      # vracia `false`, preto sa navratova hodnota mapuje na `:failed`.
+      #
+      # Vracia SYMBOL:
+      #   :ok       — zaznam premenovany (PNG a peciatka viz nizsie)
+      #   :missing  — pod starym menom uz sablona nie je
+      #   :exists   — nove meno uz obsadene (rovnaky druh)
+      #   :readonly — kniznica je z novsej verzie (forward guard)
+      #   :failed   — zapis zlyhal / vynimka
+      #
+      # PNG (audit F1): presuva sa AZ PO uspesnom zapise zoznamu a jeho zlyhanie
+      # NEROBI z premenovania chybu — zaznam uz nove meno ma. Stary obrazok sa
+      # pritom NEMAZE; volajuci porovna `rev_for` pred a po a povie pravdu
+      # („náhľad sa nepreniesol, odfoť ho znova").
+      #
+      # Peciatka „naposledy pouzite" sa presuva MIMO tohto zamku (`TemplateUsage
+      # .rename`, iny subor, best-effort) — volajuci ju vola po `:ok`.
+      def rename(kind, old_name, new_name)
+        k = normalize_kind(kind)
+        old_n = old_name.to_s
+        new_n = new_name.to_s.strip
+        return :missing if old_n.empty?
+        return :failed if new_n.empty?
+        return :ok if new_n == old_n
+
+        res = with_lock do
+          next :readonly if refuse_write('rename')
+
+          list = load
+          next :missing if list.none? { |t| t['kind'] == k && t['name'] == old_n }
+          next :exists if list.any? { |t| t['kind'] == k && t['name'] == new_n }
+
+          renamed = list.map do |t|
+            next t unless t['kind'] == k && t['name'] == old_n
+
+            rec = JsonFileStore.deep_copy(t)
+            rec['name'] = new_n
+            rec
+          end
+          next :failed unless write_list(renamed)
+
+          TemplatePreviews.rename(k, old_n, new_n)
+          :ok
+        end
+        res.is_a?(Symbol) ? res : :failed
+      end
+
       # PNG nahlad zije a umiera SO ZAZNAMOM — mazanie je TU (jedine miesto,
       # cez ktore zaznam mizne), nie v UI handleri.
       def delete(kind, name)
@@ -161,6 +220,11 @@ module Noxun
         n = name.to_s
         with_lock do
           next false if refuse_write('delete')
+          # N1 (ŠT-3c-2): mazanie NEEXISTUJUCEJ sablony dovtedy vratilo `true`,
+          # lebo `write_list` uspesne zapisal NEZMENENY zoznam — a UI vypisalo
+          # „Šablóna vymazaná" o niecom, co tam nebolo (napr. po zmazani z druhej
+          # instancie). Guard je POD zamkom, teda nad cerstvym stavom disku.
+          next false if find(k, n).nil?
 
           ok = write_list(load.reject { |t| t['kind'] == k && t['name'] == n })
           TemplatePreviews.delete(k, n) if ok
@@ -531,25 +595,64 @@ module Noxun
         key = key_for(kind, name)
         return false if key.nil?
 
+        with_entries { |entries, raw| s = next_seq(raw, entries); entries[key] = s; s }
+      rescue StandardError => e
+        Engine.log_error(e, 'TemplateUsage.stamp')
+        false
+      end
+
+      # ŠT-3c-2: PRESUN peciatky pri premenovani sablony. NIE `stamp` (audit F3):
+      # ten by sablone pridelil NAJVYSSIE cislo, teda by ju premenovanie povysilo
+      # na „naposledy pouzitu" — poradie dlazdic by sa zmenilo za nieco, co
+      # pouzivanie vobec nie je. Prenasa sa PODVODNE cislo.
+      #
+      # KOLIZIA kluca (nove meno uz peciatku ma — napr. po zmazani a znovu
+      # vytvoreni) sa riesi `max`: novsie pouzitie nesmie zostarnut.
+      # Bezi MIMO zamku sablon (iny subor) a je BEST-EFFORT — zlyhanie peciatky
+      # NIKDY nemeni vysledok premenovania.
+      def rename(kind, old_name, new_name)
+        old_key = key_for(kind, old_name)
+        new_key = key_for(kind, new_name)
+        return false if old_key.nil? || new_key.nil? || old_key == new_key
+
+        with_entries do |entries, raw|
+          was = entries.delete(old_key)
+          next nil if was.nil? && !entries.key?(new_key)
+
+          merged = [was, entries[new_key]].compact.max
+          entries[new_key] = merged if merged
+          # `seq` sa NEBUMPUJE — premenovanie nie je pouzitie.
+          base = raw.is_a?(Integer) && raw.positive? ? raw : 0
+          [base, entries.values.max || 0].max
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'TemplateUsage.rename')
+        false
+      end
+
+      # JEDINY mutator suboru peciatok (ŠT-3c-2). Drzi forward guard, sanitizaciu,
+      # `prune` aj zachovanie neznamych klucov na JEDNOM mieste — dva zapisovace
+      # by sa casom rozisli (a prave forward guard by v tom druhom chybal).
+      # Blok dostane `entries` (mutuje sa in-place) a ULOZENY `seq`; vrati
+      # cislo, ktore sa ma zapisat ako nove `seq`, alebo `nil` = NEZAPISOVAT.
+      def with_entries
         ok = false
         with_lock do
           data = read_existing
           std = data['std']
           if std.is_a?(Integer) && std > STD
-            Engine.log("TemplateUsage: subor ma novsiu schemu #{std} — peciatka preskocena")
+            Engine.log("TemplateUsage: subor ma novsiu schemu #{std} — zapis preskoceny")
           else
             entries = sanitize_entries(data['entries'])
-            seq = next_seq(data['seq'], entries)
-            entries[key] = seq
-            extras = data.reject { |k, _| MANAGED_KEYS.include?(k) }
-            ok = JsonFileStore.write(path, { 'std' => STD, 'seq' => seq,
-                                             'entries' => prune(entries) }.merge(extras))
+            seq = yield(entries, data['seq'])
+            unless seq.nil?
+              extras = data.reject { |k, _| MANAGED_KEYS.include?(k) }
+              ok = JsonFileStore.write(path, { 'std' => STD, 'seq' => seq,
+                                               'entries' => prune(entries) }.merge(extras))
+            end
           end
         end
         ok
-      rescue StandardError => e
-        Engine.log_error(e, 'TemplateUsage.stamp')
-        false
       end
 
       # Mapa { "kind:name" => poradove_cislo } — CISTE CITANIE (nikdy nezapisuje).

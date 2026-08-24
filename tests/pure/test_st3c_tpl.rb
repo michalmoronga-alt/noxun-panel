@@ -93,8 +93,8 @@ NxTest.test('ŠT-3c-1: akcie sekcie maju JEDINY whitelist a JEDINE telo') do
   NxTest.assert(td.const_defined?(:SECTION_ACTIONS), 'whitelist zije v TemplatesDialog')
   actions = td::SECTION_ACTIONS
   NxTest.assert(actions.frozen?, 'zoznam je uzavrety')
-  NxTest.assert_equal(%w[tpl_apply tpl_delete tpl_capture tpl_preview], actions,
-                      'tri akcie okna + VLASTNY PNG kanal sekcie — nic viac')
+  NxTest.assert_equal(%w[tpl_apply tpl_delete tpl_capture tpl_rename tpl_preview], actions,
+                      'tri akcie okna + premenovanie (ŠT-3c-2) + VLASTNY PNG kanal sekcie — nic viac')
   NxTest.refute(actions.include?('tpl_save'),
                 'ukladanie sa do sekcie NEPRENIESLO (jediny vstup je mini-modal Inspectora)')
   NxTest.refute(actions.include?('ready'),

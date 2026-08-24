@@ -77,6 +77,24 @@
       if (!d || !d.name) return;
       TPL_PNG[tplKey(d.kind, d.name, d.rev)] = d.png || null;
       tplApplyPreview(d);
+    },
+    // --- výsledok premenovania (ŠT-3c-2) ---------------------------------
+    // Zatvára VÝHRADNE potvrdený zápis. Zoznam dlaždíc dorazí SAMOSTATNE
+    // (`TPL.init` echom po zmene knižnice), takže tu sa nič neprekresľuje.
+    renameSaved: function(){
+      var m = (typeof window !== 'undefined') ? window.NXModal : null;
+      if (!m || !m.isOpen()) return;
+      m.setBusy(false, { clear: true });
+      m.close();
+    },
+    // Odmietnuté premenovanie: modal OSTÁVA otvorený s rozpísaným menom,
+    // odomkne sa a chyba sedí pri poli. Bez `setBusy(false)` by po prvom
+    // odmietnutí ostalo „Premenovať" navždy zosednuté (isBusy).
+    renameError: function(msg, field){
+      var m = (typeof window !== 'undefined') ? window.NXModal : null;
+      if (!m || !m.isOpen()) return;
+      m.setBusy(false);
+      m.showErrors([{ field: field || 'name', msg: msg }]);
     }
   };
   if (typeof window !== 'undefined') window.TPL = TPL;
@@ -170,6 +188,11 @@
         ' aria-label="' + tplEsc(tplCaptureLabel(tp)) + '"' +
         ' onclick="tplCapture(' + tplArg(tp.name) + ')">' + tplIco('camera') + '</button>';
     }
+    // Ceruzka je MIMO vetvy `isCab` (audit N6): premenovať sa dá OBOJE —
+    // doskovú šablónu dnes nepremenuje nič iné.
+    h += '<button type="button" class="stplbtn" title="Premenovať šablónu"' +
+      ' aria-label="Premenovať šablónu" onclick="tplRename(' + tplArg(kind) + ', ' +
+      tplArg(tp.name) + ')">' + tplIco('pencil') + '</button>';
     h += '<button type="button" class="stplbtn stpldel" title="Zmazať šablónu"' +
       ' aria-label="Zmazať šablónu" onclick="tplDelete(' + tplArg(kind) + ', ' + tplArg(tp.name) + ')">' +
       tplIco('trash') + '</button></span></div>';
@@ -214,7 +237,7 @@
                       'Žiadne doskové šablóny.');
     h += '<div class="hint">Šablóny sú spoločné pre všetky zákazky. NOVÚ šablónu ukladáš ' +
       'v Inspectore z označenej skrinky; tu ich spravuješ. Doskové šablóny sa dajú iba zmazať — ' +
-      'použiť a odfotiť sa dá skrinka. Premenovanie pribudne v ďalšej dávke.</div>';
+      'použiť a odfotiť sa dá skrinka; premenovať sa dá každá.</div>';
     return h;
   }
 
@@ -293,10 +316,56 @@
       : 'Knižnica je spoločná pre všetky zákazky. Skrinky, ktoré zo šablóny vznikli, sa tým NEMENIA.';
   }
 
+  // Premenovanie (ŠT-3c-2). Modal má JEDINÉ pole — predvyplnené súčasným
+  // menom, takže „preklep v mene" je oprava dvoch znakov, nie prepisovanie.
+  //
+  // KĽÚČ POĽA je `name`, ale na server ide ako `new_name`: v ostatných akciách
+  // sekcie znamená `template` meno SÚČASNÉ, a poslať nové meno pod kľúčom
+  // `name` by bola pasca na prvého, kto sa v handleri pomýli.
+  //
+  // Modal sa po odoslaní NEZATVÁRA — zatvorí ho až `TPL.renameSaved` (kontrakt
+  // D-15: o výsledku zápisu rozhoduje server). Pri odmietnutí (obsadené meno)
+  // ostáva otvorený s rozpísaným menom a chybou pri poli.
+  //
+  // Pamäť rozpísaného mena sa ZÁMERNE nepoužíva (`memoryKey` chýba): Esc je
+  // pri jednom poli jednoznačné „nechaj to tak" a pri ďalšom otvorení má
+  // používateľ vidieť meno, ktoré šablóna NAOZAJ má.
+  function tplRename(kind, name){
+    if (typeof window === 'undefined' || !window.NXModal){
+      TPL.setStatus('Premenovanie potrebuje dialóg Štúdia — zavri a otvor Štúdio znova.', true);
+      return;
+    }
+    window.NXModal.open({
+      title: 'Premenovať šablónu',
+      sub: tplRenameSub(kind, name),
+      note: tplRenameNote(kind),
+      okLabel: 'Premenovať',
+      fields: [{ key: 'name', label: 'Názov', value: name }],
+      onSubmit: function(v){
+        tplSend('tpl_rename', { kind: kind, template: name,
+                                new_name: (v && v.name != null) ? v.name : '' });
+      }
+    });
+  }
+
+  function tplRenameSub(kind, name){
+    return (kind === 'board' ? 'Doskovú šablónu' : 'Šablónu') + ' „' + name + '" premenovať:';
+  }
+
+  // Premenovanie NIE JE zmena projektov — a pri doskových šablónach navyše
+  // platí to isté ako pri mazaní: knižnica pôvodné meno sama nedoplní.
+  function tplRenameNote(kind){
+    return kind === 'board'
+      ? 'Doskové šablóny sa neobnovujú — pôvodné meno sa už NIKDY nevráti. ' +
+        'Skrinky ani dosky v projektoch sa tým nemenia.'
+      : 'Mení sa len meno v knižnici. Skrinky, ktoré zo šablóny vznikli, sa tým NEMENIA.';
+  }
+
   if (typeof window !== 'undefined'){
     window.tplApply = tplApply;
     window.tplCapture = tplCapture;
     window.tplDelete = tplDelete;
+    window.tplRename = tplRename;
   }
 
   // Modelový kontext sekcie z payloadu Štúdia (`ST.tpl`). Knižnica je globálna,
@@ -327,5 +396,7 @@
                        tplRenderTools: tplRenderTools, tplApplyState: tplApplyState,
                        tplIsActive: tplIsActive, tplDomIdFor: tplDomIdFor,
                        tplDelete: tplDelete, tplApply: tplApply, tplCapture: tplCapture,
+                       tplRename: tplRename, tplRenameSub: tplRenameSub,
+                       tplRenameNote: tplRenameNote,
                        TPL: TPL };
   }

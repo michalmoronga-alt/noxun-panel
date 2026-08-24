@@ -7581,8 +7581,8 @@ module NoxunSuRunner
        File.exist?(File.join(e.plugin_dir, 'ui', 'js', 'templates.js')))
     ok('ŠT-3c-1: sekcia `tpl` je v zozname sekcii Studia',
        e::StudioDialog::SECTIONS.include?('tpl'))
-    ok('ŠT-3c-1: whitelist sekcie pozna PRESNE tri akcie okna + PNG kanal',
-       td::SECTION_ACTIONS == %w[tpl_apply tpl_delete tpl_capture tpl_preview])
+    ok('ŠT-3c-1: whitelist sekcie pozna PRESNE tri akcie okna + premenovanie + PNG kanal',
+       td::SECTION_ACTIONS == %w[tpl_apply tpl_delete tpl_capture tpl_rename tpl_preview])
 
     begin
       st3c_scenar(model, td)
@@ -7595,6 +7595,9 @@ module NoxunSuRunner
 
   ST3C_CAB = '__SU_TEST_ST3C_CAB__'
   ST3C_BRD = '__SU_TEST_ST3C_BRD__'
+  # ŠT-3c-2: ciel premenovania + tretia sablona na dokaz KOLIZIE mien.
+  ST3C_CAB2 = '__SU_TEST_ST3C_CAB2__'
+  ST3C_COL = '__SU_TEST_ST3C_COL__'
 
   # Pocet policov v korene zon — merany dokaz, ze sa skrinka naozaj prestavala
   # PODLA SABLONY (a ze undo to vratilo).
@@ -7610,7 +7613,8 @@ module NoxunSuRunner
     # (alebo rovnomenna pouzivatelska sablona) zmizol aj vtedy, ked scenar
     # tvrdil, ze data CHRANI a nic nerobi.
     @st3c_created = []
-    if e::TemplateStore.find('cabinet', ST3C_CAB) || e::TemplateStore.find('board', ST3C_BRD)
+    if e::TemplateStore.find('cabinet', ST3C_CAB) || e::TemplateStore.find('board', ST3C_BRD) ||
+       e::TemplateStore.find('cabinet', ST3C_CAB2) || e::TemplateStore.find('cabinet', ST3C_COL)
       return info('ŠT-3c-1: testovacie sablony uz existuju — scenar preskoceny (chranime data)')
     end
 
@@ -7747,6 +7751,83 @@ module NoxunSuRunner
         ok('ŠT-3c-1 (e): odpoved nesie data URI PNG a VRACIA reviziu',
            data['png'].to_s.start_with?('data:image/png;base64,') && data['rev'].to_s == rev)
       end
+
+      # --- (g) PREMENOVANIE sablony (ŠT-3c-2) ----------------------------
+      # Premenovanie meni IDENTITU zaznamu — a od nej visi PNG (meno je v hashi
+      # suboru) aj peciatka „naposledy pouzite". Headless sada overi sklad;
+      # TU sa overuje CELA cesta sekcie vratane toho, ze sa NEZAPISUJE do modelu.
+      e::TemplateUsage.stamp('cabinet', ST3C_CAB)
+      seq_before = e::TemplateUsage.seq_for('cabinet', ST3C_CAB)
+      png_before = e::TemplatePreviews.rev_for('cabinet', ST3C_CAB)
+      ok('ŠT-3c-2 (g): fixture — sablona ma peciatku aj nahlad',
+         !seq_before.nil? && !png_before.nil?)
+
+      # Sentinel: rename NESMIE pridat krok Spat (kniznica je subor MIMO modelu).
+      ren_sentinel = st3c_shelves(inst)
+      ren_params = e::Panel.existing_params(inst)
+      ren_params['zone_tree'] = { 'id' => 'Z1', 'shelves' => ren_sentinel + 1, 'children' => [] }
+      e::CabinetBuilder.rebuild(model, inst, ren_params, op_name: 'SU-TEST st3c rename sentinel')
+
+      rec.clear
+      td.dispatch('tpl_rename', { 'kind' => 'cabinet', 'template' => ST3C_CAB,
+                                  'new_name' => ST3C_CAB2 }.to_json, sink)
+      @st3c_created << ['cabinet', ST3C_CAB2]
+      ok('ŠT-3c-2 (g1): zaznam zije pod NOVYM menom a pod starym uz nie',
+         !e::TemplateStore.find('cabinet', ST3C_CAB2).nil? &&
+         e::TemplateStore.find('cabinet', ST3C_CAB).nil?)
+      ok('ŠT-3c-2 (g2): NAHLAD sa presunul — nove meno ho ma, stare nie',
+         !e::TemplatePreviews.rev_for('cabinet', ST3C_CAB2).nil? &&
+         e::TemplatePreviews.rev_for('cabinet', ST3C_CAB).nil?)
+      ok('ŠT-3c-2 (g3): PECIATKA sa PRENIESLA s POVODNYM cislom (rename nie je pouzitie)',
+         e::TemplateUsage.seq_for('cabinet', ST3C_CAB2) == seq_before &&
+         e::TemplateUsage.seq_for('cabinet', ST3C_CAB).nil?)
+      ok('ŠT-3c-2 (g7): echo sekcie je LACNE `TPL.init`, nie plny push okna',
+         rec.any? { |x| x.start_with?('TPL.init(') } &&
+         rec.none? { |x| x.start_with?('NX.setStudio(') })
+      ok('ŠT-3c-2 (g7): a modal sa zavrel az na POTVRDENIE zo servera',
+         rec.any? { |x| x.include?('TPL.renameSaved()') } &&
+         rec.none? { |x| x.include?('TPL.renameError(') })
+      Sketchup.undo
+      ok("ŠT-3c-2 (g6): premenovanie NEPRIDALO krok Spat — 1x Spat vratil SENTINEL " \
+         "(police #{st3c_shelves(inst)})",
+         inst.valid? && st3c_shelves(inst) == ren_sentinel)
+      ok('ŠT-3c-2 (g6): a sablona sa po undo NEPREMENOVALA spat (subor mimo modelu)',
+         !e::TemplateStore.find('cabinet', ST3C_CAB2).nil?)
+
+      # KOLIZIA: druhe meno je obsadene — odmietnutie a subor BYTE-NEZMENENY.
+      col_ok = e::TemplateStore.upsert('cabinet', ST3C_COL, { 'type' => 'lower', 'width' => 450.0 })
+      @st3c_created << ['cabinet', ST3C_COL] if col_ok
+      snap = File.binread(e::TemplateStore.path)
+      rec.clear
+      td.dispatch('tpl_rename', { 'kind' => 'cabinet', 'template' => ST3C_CAB2,
+                                  'new_name' => ST3C_COL }.to_json, sink)
+      ok('ŠT-3c-2 (g4): obsadene meno = ODMIETNUTIE s hlaskou',
+         rec.any? { |x| x.include?('už v knižnici je') })
+      ok('ŠT-3c-2 (g4): a modal OSTAVA otvoreny (renameError, nie renameSaved)',
+         rec.any? { |x| x.include?('TPL.renameError(') } &&
+         rec.none? { |x| x.include?('TPL.renameSaved()') })
+      ok('ŠT-3c-2 (g4): subor sablon je BYTE-NEZMENENY',
+         File.binread(e::TemplateStore.path) == snap)
+
+      # ZMIZNUTE meno: sablona, ktora uz neexistuje, ma VLASTNU hlasku.
+      rec.clear
+      td.dispatch('tpl_rename', { 'kind' => 'cabinet', 'template' => ST3C_CAB,
+                                  'new_name' => 'nieco ine' }.to_json, sink)
+      ok('ŠT-3c-2 (g5): zmiznuta sablona = hlaska „uz v knižnici nie je" + obnova zoznamu',
+         rec.any? { |x| x.include?('už v knižnici nie je') } &&
+         rec.any? { |x| x.start_with?('TPL.init(') })
+      # To iste pri MAZANI (N1) — dovtedy `delete` hlasil uspech nad nicim.
+      rec.clear
+      td.dispatch('tpl_delete', { 'kind' => 'cabinet', 'template' => ST3C_CAB }.to_json, sink)
+      ok('ŠT-3c-2 (N1): mazanie ZMIZNUTEJ sablony uz NEHLASI uspech',
+         rec.none? { |x| x.include?('vymazaná') })
+
+      # Naspat na povodne meno — zvysok scenara (mazanie) pracuje s nim.
+      td.dispatch('tpl_rename', { 'kind' => 'cabinet', 'template' => ST3C_CAB2,
+                                  'new_name' => ST3C_CAB }.to_json, sink)
+      ok('ŠT-3c-2 (g): premenovanie SPAT na povodne meno prejde tiez',
+         !e::TemplateStore.find('cabinet', ST3C_CAB).nil?)
+      e::TemplateStore.delete('cabinet', ST3C_COL)
 
       # --- (f) MAZANIE oboch druhov (vratane DOSKOVEJ) --------------------
       rec.clear

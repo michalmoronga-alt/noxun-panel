@@ -41,7 +41,7 @@ module Noxun
       # `ready` v zozname NIE JE (a byt nemoze): Studio registruje callbacky
       # pod TYMI ISTYMI menami, takze `ready` by prepisal jeho vlastny.
       # Prvotny stav sekcie nesie `push_state` Studia pod klucom `tpl`.
-      SECTION_ACTIONS = %w[tpl_apply tpl_delete tpl_capture tpl_preview].freeze
+      SECTION_ACTIONS = %w[tpl_apply tpl_delete tpl_capture tpl_rename tpl_preview].freeze
 
       # Druhy sablon, ktore sekcia spravuje. Kontrakt skladu je dvojica
       # (kind, name) — kind sa preto NIKDY neberie z HTML bez kontroly.
@@ -65,6 +65,7 @@ module Noxun
           when 'tpl_apply'   then handle_apply(payload)
           when 'tpl_delete'  then handle_delete(payload)
           when 'tpl_capture' then handle_capture(payload)
+          when 'tpl_rename'  then handle_rename(payload)
           when 'tpl_preview' then handle_preview(payload)
           end
         end
@@ -200,6 +201,75 @@ module Noxun
           refresh_if_open if ok
         end
 
+
+        # ŠT-3c-2: PREMENOVANIE sablony. Vstup je D-15 modal s JEDNYM polom
+        # (predvyplneny nazov), takze payload nesie `new_name` — kluc `name`
+        # by bol PASCA: v ostatnych akciach sekcie znamena `template` meno
+        # SUCASNE, a zamena by ticho premenovala nieco ine.
+        #
+        # Modal sa pri ODMIETNUTI NEZATVARA (audit B4): pouzivatel ma meno
+        # opravit, nie ho pisat znova. Preto dva prijimace — `TPL.renameSaved`
+        # (zavri a zabudni rozpisane) a `TPL.renameError` (chyba k polu, modal
+        # ostava a odomkne sa). Bez toho by po prvom odmietnuti ostal modal
+        # navzdy zamknuty v `isBusy` (vzor `MD.editSaved`/`MD.editErrors`).
+        def handle_rename(payload)
+          data = JSON.parse(payload.to_s)
+          kind = data['kind'].to_s
+          old_name = data['template'].to_s
+          # F4: meno sa `strip`-uje TU aj v sklade — okrajové medzery su
+          # v mene sablony vzdy preklep, nikdy zamer.
+          new_name = data['new_name'].to_s.strip
+
+          return rename_error('Neznámy druh šablóny — nič sa nepremenovalo.') unless KINDS.include?(kind)
+          return rename_error('Vyber šablónu na premenovanie.') if old_name.empty?
+          return rename_error('Prázdny názov — šablóna sa nepremenovala.') if new_name.empty?
+          # F4: rovnake meno NIE JE chyba, ale ani zapis — subor sa nedotkne.
+          if new_name == old_name
+            js('TPL.renameSaved()')
+            return set_status('Meno sa nezmenilo.')
+          end
+
+          # PNG sa presuva POD zamkom skladu; ci sa to naozaj podarilo, sa da
+          # zistit len porovnanim PRED a PO (sklad vracia symbol o ZAZNAME).
+          had_png = !TemplatePreviews.rev_for(kind, old_name).nil?
+
+          case TemplateStore.rename(kind, old_name, new_name)
+          when :ok
+            # Peciatka „naposledy pouzite" zije v INOM subore a je best-effort —
+            # jej zlyhanie premenovanie nemeni (poradie dlazdic sa len vrati
+            # na „nikdy nepouzita").
+            TemplateUsage.rename(kind, old_name, new_name)
+            js('TPL.renameSaved()')
+            note = if had_png && TemplatePreviews.rev_for(kind, new_name).nil?
+                     ' Náhľad sa nepreniesol — odfoť ho znova.'
+                   else
+                     ''
+                   end
+            after_change("Šablóna premenovaná na „#{new_name}“.#{note}")
+          when :exists
+            rename_error("Šablóna „#{new_name}“ už v knižnici je — vyber iné meno.")
+          when :missing
+            # Zmizla medzitym (druha instancia, rucny zasah) — zoznam sa obnovi,
+            # aby pouzivatel videl, co v kniznici naozaj je.
+            rename_error("Šablóna „#{old_name}“ už v knižnici nie je — zoznam je obnovený.")
+            refresh_if_open
+          when :readonly
+            rename_error('Knižnica šablón je z novšej verzie Noxunu — nič sa nezmenilo.')
+          else
+            rename_error('Premenovanie zlyhalo (disk/práva) — nič sa nezmenilo.')
+          end
+        end
+
+        # Odmietnutie premenovania: chyba ide K POLU v otvorenom modale (klient
+        # ho odomkne a nechá otvorený) a ZAROVEN do stavoveho riadku sekcie —
+        # ked modal medzitym zanikol, pouzivatel sa aj tak dozvie, preco sa nic
+        # nestalo.
+        def rename_error(msg)
+          js("TPL.renameError(#{msg.to_json}, 'name')")
+          set_status(msg, true)
+          nil
+        end
+
         # ŠT-3c-1: mazanie ma potvrdenie v D-15 modale KLIENTA (nx_modal) —
         # `UI.messagebox` v callbacku HtmlDialogu sem UZ NEPATRI (audit N28:
         # nativny modal blokuje callback a v Studiu by zamrzol cely kanal).
@@ -215,6 +285,14 @@ module Noxun
           name = data['template'].to_s
           return set_status('Vyber šablónu na vymazanie.', true) if name.empty?
           return set_status('Neznámy druh šablóny — nič sa nezmazalo.', true) unless KINDS.include?(kind)
+
+          # N1 (ŠT-3c-2): sablona, ktora medzitym zmizla (druha instancia, rucny
+          # zasah), ma VLASTNU hlasku — sklad na nu odteraz vracia `false` a bez
+          # tohto rozlisenia by pouzivatel dostal hlasku o chybe disku.
+          if TemplateStore.find(kind, name).nil?
+            refresh_if_open
+            return set_status("Šablóna „#{name}“ už v knižnici nie je — zoznam je obnovený.")
+          end
 
           # Codex #174 P2: pri odmietnutom zapise ZIADNA hlaska o uspechu.
           unless TemplateStore.delete(kind, name)
