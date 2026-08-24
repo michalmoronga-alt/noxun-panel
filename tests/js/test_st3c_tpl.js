@@ -84,8 +84,11 @@ const BRD = { name: 'Pracovná doska', kind: 'board', preview_rev: null,
   ok(cab.indexOf('Klasik dolná') > -1 && cab.indexOf('dolná') > -1, 'názov a typ sú v dlaždici');
   ok(cab.indexOf('600×720×560') > -1, 'aj rozmery, ktoré šablóna postaví');
 
+  ok(/#i-pencil/.test(cab), 'a premenovanie (ŠT-3c-2)');
+
   const brd = T.tplTileHtml(BRD, 'board');
   ok(/#i-trash/.test(brd), 'doskovú šablónu sa dá zmazať (prvá správa doskových)');
+  ok(/#i-pencil/.test(brd), 'a premenovať tiež — ceruzka je MIMO vetvy `isCab`');
   ok(!/#i-box/.test(brd), 'ale NIE použiť — apply je operácia nad skrinkou');
   ok(!/#i-camera/.test(brd), 'ani odfotiť — dlaždica dosky je schéma, nie skrinka');
   ok(!/disabled/.test(brd), 'a nie sú tam ako mŕtve tlačidlá — vôbec tam nie sú (D-78)');
@@ -102,14 +105,15 @@ const BRD = { name: 'Pracovná doska', kind: 'board', preview_rev: null,
 // --- 2) telo sekcie: dve skupiny a poctivé prázdno ---------------------------
 
 (function(){
-  T.tplApplyState({ version: '0.7.67', cabinet: [CAB, CAB2], board: [BRD] });
+  T.tplApplyState({ version: '0.7.68', cabinet: [CAB, CAB2], board: [BRD] });
   const h = T.tplBodyHtml();
   ok(h.indexOf('Korpusové šablóny') > -1 && h.indexOf('Doskové šablóny') > -1,
      'dve skupiny podľa mockupu');
   ok(h.indexOf('Klasik dolná') > -1 && h.indexOf('Pracovná doska') > -1, 'oba druhy sa zobrazujú');
   ok(h.indexOf('Inspectore') > -1,
      'hint hovorí, KDE sa ukladá nová šablóna (v sekcii to nie je)');
-  ok(h.indexOf('Premenovanie') > -1, 'a priznáva, že premenovanie ešte nie je');
+  ok(h.indexOf('Premenovať a zmazať sa dá každá') > -1,
+     'a hovorí PRAVDU o tom, čo sa s ktorým druhom dá (ŠT-3c-2)');
 
   T.tplApplyState({ cabinet: [], board: [] });
   const empty = T.tplBodyHtml();
@@ -194,6 +198,102 @@ const BRD = { name: 'Pracovná doska', kind: 'board', preview_rev: null,
   delete global.window.NXModal;
 })();
 
+// --- 5b) premenovanie (ŠT-3c-2): modal čaká na server ----------------------
+
+(function(){
+  // Modal sa pri odmietnutí NEZATVÁRA — inak by používateľ po „meno je
+  // obsadené" písal celé meno znova. Stub preto vie aj to, čo modal robí PO
+  // odoslaní: zamkne sa (`setBusy(true)`) a odomknúť ho musí VÝSLEDOK.
+  const opened = [];
+  const log = [];
+  let open = false;
+  global.window.NXModal = {
+    open: function(spec){ opened.push(spec); open = true; },
+    close: function(){ open = false; log.push(['close']); },
+    isOpen: function(){ return open; },
+    setBusy: function(f, o){ log.push(['busy', f, !!(o && o.clear === true)]); },
+    showErrors: function(list){ log.push(['errors', list]); }
+  };
+  global.NXModal = global.window.NXModal;
+
+  SENT.length = 0;
+  T.tplRename('cabinet', 'Klasik dolná');
+  eq(SENT.length, 0, 'klik na ceruzku SÁM O SEBE nič nepremenuje');
+  eq(opened.length, 1, 'otvorí sa D-15 modal');
+  ok(opened[0].danger !== true, 'premenovanie NIE JE destruktívne (žiadne červené tlačidlo)');
+  eq(opened[0].fields.length, 1, 'a má JEDINÉ pole');
+  eq([opened[0].fields[0].key, opened[0].fields[0].value], ['name', 'Klasik dolná'],
+     'predvyplnené SÚČASNÝM menom — preklep sa opravuje, nie prepisuje');
+
+  opened[0].onSubmit({ name: 'Klasik dolná II' });
+  eq(SENT[0][0], 'tpl_rename', 'potvrdenie pošle premenovanie');
+  const p = JSON.parse(SENT[0][1]);
+  eq([p.kind, p.template, p.new_name], ['cabinet', 'Klasik dolná', 'Klasik dolná II'],
+     'nové meno ide pod `new_name` — `template` ostáva menom SÚČASNÝM');
+  eq(log.length, 0, 'a modal sa NEZATVÁRA (o výsledku rozhoduje server)');
+
+  // Server odmietol: modal ostáva, odomkne sa, chyba sedí pri poli.
+  T.TPL.renameError('Šablóna „X" už v knižnici je — vyber iné meno.', 'name');
+  eq(log[0], ['busy', false, false], 'odmietnutie ODOMKNE (inak by tlačidlo ostalo zosednuté)');
+  eq(log[1][0], 'errors', 'a ukáže chybu');
+  eq(log[1][1][0].field, 'name', 'pri poli s menom');
+  ok(open === true, 'modal OSTÁVA otvorený s rozpísaným menom');
+
+  // Server potvrdil: až teraz sa zatvára a zabúda rozpísané. Opravené meno je
+  // NOVÝ pokus — každá odpoveď patrí práve jednému odoslaniu (review #226 P2).
+  log.length = 0;
+  opened[0].onSubmit({ name: 'Klasik dolná III' });
+  eq(log.length, 0, 'druhé odoslanie samo o sebe modal nezatvára');
+  T.TPL.renameSaved();
+  eq(log[0], ['busy', false, true], 'potvrdenie odomkne a ZABUDNE rozpis');
+  eq(log[1], ['close'], 'a zavrie modal');
+  ok(open === false, 'okno je preč');
+
+  // Doskové: v poznámke musí stáť, že pôvodné meno sa nevráti (markerový seed).
+  ok(T.tplRenameNote('board').indexOf('NIKDY') > -1,
+     'dosková šablóna: pôvodné meno knižnica sama nedoplní');
+  ok(T.tplRenameNote('cabinet').indexOf('NEMENIA') > -1,
+     'korpusová: skrinky, ktoré z nej vznikli, sa premenovaním nemenia');
+  ok(T.tplRenameSub('board').indexOf('Doskovú') > -1, 'a podtitul menuje druh');
+
+  // Šablóna medzitým zmizla (review #226 NOTE 3): modal sa ZAVRIE — ale bez
+  // úspechového `clear`, lebo potvrdený zápis to nebol.
+  opened.length = 0;
+  log.length = 0;
+  T.tplRename('board', 'Pracovná doska');
+  opened[0].onSubmit({ name: 'Iné meno' });
+  T.TPL.renameClosed();
+  eq(log[0], ['busy', false, false], 'odomkne, ale rozpísané NEZABÚDA (žiadny clear)');
+  eq(log[1], ['close'], 'a modal zavrie');
+  ok(open === false, 'nad neexistujúcou šablónou nič neostáva otvorené');
+
+  // REVIEW #226 P2: odpoveď servera smie siahnuť na modal LEN vtedy, keď je
+  // na obrazovke stále TEN, ktorý ju vyvolala. Kým sa čaká na zámok súboru,
+  // používateľ stihne modal zavrieť (Esc) a otvoriť iný — a `renameSaved` by
+  // mu ten cudzí rozpísaný formulár ZAVREL.
+  opened.length = 0;
+  log.length = 0;
+  T.tplRename('cabinet', 'Klasik dolná');
+  opened[0].onSubmit({ name: 'Nové meno' });
+  ok(T.tplRenPending() !== null, 'po odoslaní beží požiadavok');
+  window.NXModal.open({ title: 'Pridať položku', fields: [], onSubmit: function(){} });
+  ok(T.tplRenPending() === null, 'otvorenie INÉHO modalu bežiaci požiadavok zahodí');
+  log.length = 0;
+  T.TPL.renameSaved();
+  eq(log, [], 'oneskorená odpoveď cudzí modal NEZATVORÍ');
+  T.TPL.renameError('Meno je obsadené.', 'name');
+  eq(log, [], 'ani mu nenalepí chybu k poľu (hláška ide do statusu sekcie)');
+  window.NXModal.close();
+
+  // Bez modalu sa NIČ neposiela naslepo — na rozdiel od mazania tu nie je
+  // čo poslať (nové meno existuje len vo formulári).
+  delete global.window.NXModal;
+  delete global.NXModal;
+  SENT.length = 0;
+  T.tplRename('cabinet', 'Klasik dolná');
+  eq(SENT.length, 0, 'bez dialógu sa premenovanie neodošle naslepo');
+})();
+
 // --- 6) echo knižnice NESMIE prepísať cudziu sekciu (review #225 P1) --------
 
 (function(){
@@ -272,4 +372,4 @@ const BRD = { name: 'Pracovná doska', kind: 'board', preview_rev: null,
   });
 })();
 
-console.log(`OK ${n} kontrol (ŠT-3c-1 sekcia Šablóny)`);
+console.log(`OK ${n} kontrol (ŠT-3c sekcia Šablóny + premenovanie)`);

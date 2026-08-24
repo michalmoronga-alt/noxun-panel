@@ -313,6 +313,40 @@ module Noxun
         false
       end
 
+      # ŠT-3c-2: PRESUN nahladu pri premenovani sablony. Meno je sucastou
+      # identity suboru (`slug` + hash z „kind:name"), takze premenovanie
+      # zaznamu bez presunu obrazka by sablonu pripravilo o fotku — a nova by
+      # sa dala ziskat uz len rucnym prefotenim.
+      #
+      # NEROBI SA RE-CAPTURE: obrazok je ten isty, meni sa len meno suboru.
+      # Postup (audit F2): odprac SIROTU na cieli -> `File.rename` (v ramci
+      # jedneho priecinka atomicky) -> OVER, ze cielovy subor naozaj vznikol.
+      # `FileUtils.mv(force: true)` sa nepouziva zamerne — pri chybe by mohol
+      # nechat ciel v polovicnom stave.
+      #
+      # Zdroj bez obrazka = `false` a NIC sa nedeje (sablona nahlad nemala).
+      # Containment obe cesty stale drzi `path_for` (nil = mimo adresara).
+      def rename(kind, old_name, new_name)
+        src = path_for(kind, old_name)
+        dst = path_for(kind, new_name)
+        return false unless src && dst && src != dst
+
+        # SIROTA NA CIELI SA MAZE VZDY — aj ked zdroj nahlad NEMA (review #226
+        # P2). Identita PNG je odvodena od MENA, takze po zmazanej sablone toho
+        # mena (alebo po prerusenom zapise) moze na cieli lezat cudzi obrazok;
+        # keby sa cistilo az za kontrolou zdroja, premenovana sablona BEZ fotky
+        # by ho zdedila a `rev_for` by ho na novej identite nasiel ako svoj.
+        FileUtils.rm_f("#{dst}.new") # zvysok po padnutom `stage_then_rename`
+        FileUtils.rm_f(dst)          # sirota po sablone, ktora uz neexistuje
+        return false unless File.file?(src)
+
+        File.rename(src, dst)
+        File.file?(dst)
+      rescue StandardError => e
+        Engine.log_error(e, 'TemplatePreviews.rename')
+        false
+      end
+
       def delete(kind, name)
         p = path_for(kind, name)
         return false unless p

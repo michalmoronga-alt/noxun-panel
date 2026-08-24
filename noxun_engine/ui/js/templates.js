@@ -23,6 +23,13 @@
   var TPL_ASKED = {};
   // identita šablóny -> DOM id práve vykreslenej dlaždice (review #225 P2).
   var TPL_DOM = {};
+  // BEŽIACI požiadavok premenovania (review #226 P2). Odpoveď servera smie
+  // siahnuť na modal LEN vtedy, keď je na obrazovke stále TEN, ktorý ju
+  // vyvolal: kým sa čaká na zámok súboru, používateľ stihne modal zavrieť
+  // (Esc) a otvoriť iný — a `renameSaved` by mu ten cudzí rozpísaný
+  // formulár ZAVREL. Token sa nastavuje pri odoslaní a KAŽDÉ otvorenie
+  // ľubovoľného modalu ho zahadzuje.
+  var TPL_REN = null;
 
   function tplEl(id){ return (typeof document === 'undefined') ? null : document.getElementById(id); }
   // Je sekcia Šablóny práve otvorená? Autoritou je `studio.js` (`studioSec`).
@@ -77,6 +84,41 @@
       if (!d || !d.name) return;
       TPL_PNG[tplKey(d.kind, d.name, d.rev)] = d.png || null;
       tplApplyPreview(d);
+    },
+    // --- výsledok premenovania (ŠT-3c-2) ---------------------------------
+    // Zatvára VÝHRADNE potvrdený zápis. Zoznam dlaždíc dorazí SAMOSTATNE
+    // (`TPL.init` echom po zmene knižnice), takže tu sa nič neprekresľuje.
+    renameSaved: function(){
+      if (!TPL_REN) return;      // odpoveď na požiadavok, ktorý už nikto nečaká
+      TPL_REN = null;
+      var m = (typeof window !== 'undefined') ? window.NXModal : null;
+      if (!m || !m.isOpen()) return;
+      m.setBusy(false, { clear: true });
+      m.close();
+    },
+    // Šablóna medzitým zmizla (review #226 NOTE 3): modal sa ZAVRIE — meno
+    // neexistujúcej šablóny nie je čo opravovať. Rozpísané sa NEZABÚDA
+    // (`clear` sa nedáva): nebol to potvrdený zápis, len zánik cieľa.
+    renameClosed: function(){
+      if (!TPL_REN) return;
+      TPL_REN = null;
+      var m = (typeof window !== 'undefined') ? window.NXModal : null;
+      if (!m || !m.isOpen()) return;
+      m.setBusy(false);
+      m.close();
+    },
+    // Odmietnuté premenovanie: modal OSTÁVA otvorený s rozpísaným menom,
+    // odomkne sa a chyba sedí pri poli. Bez `setBusy(false)` by po prvom
+    // odmietnutí ostalo „Premenovať" navždy zosednuté (isBusy).
+    renameError: function(msg, field){
+      // Cudzi modal sa NEOZNACUJE chybou — hláška aj tak dorazí do stavového
+      // riadku sekcie (server ju posiela oboma kanálmi).
+      if (!TPL_REN) return;
+      TPL_REN = null;
+      var m = (typeof window !== 'undefined') ? window.NXModal : null;
+      if (!m || !m.isOpen()) return;
+      m.setBusy(false);
+      m.showErrors([{ field: field || 'name', msg: msg }]);
     }
   };
   if (typeof window !== 'undefined') window.TPL = TPL;
@@ -142,7 +184,8 @@
   // --- TELO sekcie -----------------------------------------------------------
   //
   // Dlaždice v dvoch skupinách (mockup Š18): Korpusové · Doskové. Doskové sa
-  // ZOBRAZUJÚ (dnes ich nespravuje nič), ale akcie „použiť"/„odfotiť" NEMAJÚ —
+  // ZOBRAZUJÚ a od ŠT-3c-1/3c-2 sa dajú aj PREMENOVAŤ a ZMAZAŤ (dovtedy ich
+  // nespravovalo nič), ale akcie „použiť"/„odfotiť" NEMAJÚ —
   // apply je typová operácia nad skrinkou a fotka dosky by bola fotka ničoho.
   // Nezobrazujú sa ako `disabled`, ale VÔBEC (D-78: mŕtve tlačidlo bez blízkeho
   // sľubu je horšie než jeho absencia) — vedomá odchýlka od mockupu, ktorý
@@ -170,6 +213,11 @@
         ' aria-label="' + tplEsc(tplCaptureLabel(tp)) + '"' +
         ' onclick="tplCapture(' + tplArg(tp.name) + ')">' + tplIco('camera') + '</button>';
     }
+    // Ceruzka je MIMO vetvy `isCab` (audit N6): premenovať sa dá OBOJE —
+    // doskovú šablónu dnes nepremenuje nič iné.
+    h += '<button type="button" class="stplbtn" title="Premenovať šablónu"' +
+      ' aria-label="Premenovať šablónu" onclick="tplRename(' + tplArg(kind) + ', ' +
+      tplArg(tp.name) + ')">' + tplIco('pencil') + '</button>';
     h += '<button type="button" class="stplbtn stpldel" title="Zmazať šablónu"' +
       ' aria-label="Zmazať šablónu" onclick="tplDelete(' + tplArg(kind) + ', ' + tplArg(tp.name) + ')">' +
       tplIco('trash') + '</button></span></div>';
@@ -213,8 +261,8 @@
     h += tplGroupHtml('Doskové šablóny', TPL_DATA.board, 'board',
                       'Žiadne doskové šablóny.');
     h += '<div class="hint">Šablóny sú spoločné pre všetky zákazky. NOVÚ šablónu ukladáš ' +
-      'v Inspectore z označenej skrinky; tu ich spravuješ. Doskové šablóny sa dajú iba zmazať — ' +
-      'použiť a odfotiť sa dá skrinka. Premenovanie pribudne v ďalšej dávke.</div>';
+      'v Inspectore z označenej skrinky; tu ich spravuješ. Premenovať a zmazať sa dá každá; ' +
+      'použiť a odfotiť sa dá len korpusová (fotka dosky by bola fotka ničoho).</div>';
     return h;
   }
 
@@ -293,10 +341,70 @@
       : 'Knižnica je spoločná pre všetky zákazky. Skrinky, ktoré zo šablóny vznikli, sa tým NEMENIA.';
   }
 
+  // Premenovanie (ŠT-3c-2). Modal má JEDINÉ pole — predvyplnené súčasným
+  // menom, takže „preklep v mene" je oprava dvoch znakov, nie prepisovanie.
+  //
+  // KĽÚČ POĽA je `name`, ale na server ide ako `new_name`: v ostatných akciách
+  // sekcie znamená `template` meno SÚČASNÉ, a poslať nové meno pod kľúčom
+  // `name` by bola pasca na prvého, kto sa v handleri pomýli.
+  //
+  // Modal sa po odoslaní NEZATVÁRA — zatvorí ho až `TPL.renameSaved` (kontrakt
+  // D-15: o výsledku zápisu rozhoduje server). Pri odmietnutí (obsadené meno)
+  // ostáva otvorený s rozpísaným menom a chybou pri poli.
+  //
+  // Pamäť rozpísaného mena sa ZÁMERNE nepoužíva (`memoryKey` chýba): Esc je
+  // pri jednom poli jednoznačné „nechaj to tak" a pri ďalšom otvorení má
+  // používateľ vidieť meno, ktoré šablóna NAOZAJ má.
+  function tplRename(kind, name){
+    if (typeof window === 'undefined' || !window.NXModal){
+      TPL.setStatus('Premenovanie potrebuje dialóg Štúdia — zavri a otvor Štúdio znova.', true);
+      return;
+    }
+    tplWatchModal(window.NXModal);
+    TPL_REN = null;            // nové otvorenie ruší predchádzajúci požiadavok
+    window.NXModal.open({
+      title: 'Premenovať šablónu',
+      sub: tplRenameSub(kind, name),
+      note: tplRenameNote(kind),
+      okLabel: 'Premenovať',
+      fields: [{ key: 'name', label: 'Názov', value: name }],
+      onSubmit: function(v){
+        TPL_REN = { kind: kind, name: name };
+        tplSend('tpl_rename', { kind: kind, template: name,
+                                new_name: (v && v.name != null) ? v.name : '' });
+      }
+    });
+  }
+
+  // Každé otvorenie ĽUBOVOĽNÉHO modalu zahadzuje bežiaci požiadavok — vrátane
+  // znovuotvorenia toho istého premenovania (token vzniká až odoslaním).
+  // Obal sa nasadzuje LENIVO (pri prvom premenovaní), nie pri načítaní súboru:
+  // v Node testoch je `NXModal` stub, ktorý v tej chvíli ešte neexistuje.
+  function tplWatchModal(m){
+    if (!m || m.tplWatch === true || typeof m.open !== 'function') return;
+    var orig = m.open;
+    m.open = function(){ TPL_REN = null; return orig.apply(m, arguments); };
+    m.tplWatch = true;
+  }
+
+  function tplRenameSub(kind, name){
+    return (kind === 'board' ? 'Doskovú šablónu' : 'Šablónu') + ' „' + name + '" premenovať:';
+  }
+
+  // Premenovanie NIE JE zmena projektov — a pri doskových šablónach navyše
+  // platí to isté ako pri mazaní: knižnica pôvodné meno sama nedoplní.
+  function tplRenameNote(kind){
+    return kind === 'board'
+      ? 'Doskové šablóny sa neobnovujú — pôvodné meno sa už NIKDY nevráti. ' +
+        'Skrinky ani dosky v projektoch sa tým nemenia.'
+      : 'Mení sa len meno v knižnici. Skrinky, ktoré zo šablóny vznikli, sa tým NEMENIA.';
+  }
+
   if (typeof window !== 'undefined'){
     window.tplApply = tplApply;
     window.tplCapture = tplCapture;
     window.tplDelete = tplDelete;
+    window.tplRename = tplRename;
   }
 
   // Modelový kontext sekcie z payloadu Štúdia (`ST.tpl`). Knižnica je globálna,
@@ -327,5 +435,8 @@
                        tplRenderTools: tplRenderTools, tplApplyState: tplApplyState,
                        tplIsActive: tplIsActive, tplDomIdFor: tplDomIdFor,
                        tplDelete: tplDelete, tplApply: tplApply, tplCapture: tplCapture,
+                       tplRename: tplRename, tplRenameSub: tplRenameSub,
+                       tplRenPending: function(){ return TPL_REN; },
+                       tplRenameNote: tplRenameNote,
                        TPL: TPL };
   }
