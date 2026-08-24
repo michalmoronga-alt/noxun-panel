@@ -84,7 +84,19 @@
     // modelu, a ten deduplikuje ID kópií, čiže by odmietnutý klik ZAPÍSAL do
     // modelu (a pridal krok Späť) presne v scenári, kde hláška tvrdí opak.
     // Kanál je ten istý payload sekcie, len bez zdvihu generácie okna.
-    setSection: function(r){
+    // `force` = server hovorí, že rozpísané hodnoty UŽ NEPLATIA (pravidlá na
+    // modeli sa medzitým zmenili) — formulár sa MUSÍ prekresliť a odtlačok
+    // omladiť, inak by najbližšie „Uložiť" zapísalo hodnoty nad cudziu zmenu,
+    // ktorú používateľ nikdy nevidel. Bez `force` platí bežný kontrakt:
+    // rozpísaný formulár push prežije.
+    setSection: function(r, force){
+      if (force){
+        rdSetState(r);
+        RD_NEEDS_RENDER = true;
+        rdRender();
+        rdRenderExtra();
+        return;
+      }
       rdApplyState(r);
     }
   };

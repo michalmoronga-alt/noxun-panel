@@ -646,6 +646,65 @@ module Noxun
         end
       end
 
+      # --- validacia pred ULOZENIM (ŠT-3b-2c1) --------------------------------
+      #
+      # CISTA funkcia (ziadne IO, ziadny zapis): co je na pravidlach take zle,
+      # ze sa to NESMIE ulozit? Vracia pole { rule_id, output, message } —
+      # prazdne pole = mozno ulozit.
+      #
+      # PRECO SAMOSTATNA FUNKCIA A NIE `normalize_rules`:
+      #   `normalize_rules` ma DVANAST volajucich a vacsina z nich CITA (load,
+      #   project_rules, evaluate, seed-merge, migracie). Keby vynucovala tieto
+      #   pravidla, LEGACY snapshot z .skp by sa pri citani ticho orezal — teda
+      #   presne ta tichá strata dat, ktorej ma validacia zabranit. Zapisova
+      #   brana preto stoji SAMOSTATNE a vola ju LEN `RulesDialog.handle_save`,
+      #   az PO normalizacii (validuje sa PRESNE to, co sa zapise).
+      #
+      # CO SA VYNUCUJE (a preco prave to):
+      #   * `kind == 'bands'` bez pasma „všetko nad" — rozmer nad poslednym
+      #     pasmom nespadne DO ZIADNEHO a polozka pre taku skrinku nevznikne.
+      #     Nie je to tiche (kusovnik hlasi `hardware_rule_skipped` a KONTROLA
+      #     to ukaze ako ORANGE), ale odmietnut deravy tvar RAZ pri ulozeni je
+      #     lacnejsie nez ORANGE na kazdej skrinke zakazky.
+      #   * `kind == 'fit_series'` s prazdnym radom — automat nema z coho vybrat.
+      #     VEDOMY DOSLEDOK: uzatvara sa tym D-93 vetva „rucny NL zamok pri
+      #     prazdnom rade" (zamok mimo radu sa aj tak uz nedal zapisat).
+      #
+      # KRITERIUM je viazane na `kind`, NIE na pritomnost kluca `bands`: seedove
+      # pravidlo vysuvov nesie `bands` AJ `series` naraz, takze podla kluca by
+      # sa validovalo pravidlo, ktore pasma vobec nepouziva.
+      #
+      # VYPNUTE pravidlo (`enabled == false`) sa NEKONTROLUJE — negeneruje nic,
+      # takze deravy tvar nikoho nezasiahne (zhodne s klientskou `rdValidate`).
+      def rules_problems(rules)
+        Array(rules).filter_map do |rule|
+          next nil unless rule.is_a?(Hash)
+          next nil if rule['enabled'] == false
+
+          msg = rule_problem_message(rule)
+          next nil if msg.nil?
+
+          { 'rule_id' => rule['rule_id'].to_s, 'output' => rule['output'].to_s, 'message' => msg }
+        end
+      end
+
+      # Hlaska ADRESUJE pravidlo menom, ktore pouzivatel vidi vo formulari —
+      # inak by pri desiatich pravidlach nevedel, ktore opravit.
+      def rule_problem_message(rule)
+        case rule['kind'].to_s
+        when 'bands'
+          bands = rule['bands'].is_a?(Array) ? rule['bands'] : []
+          return nil if !bands.empty? && bands.any? { |b| b.is_a?(Hash) && b['max'].nil? }
+
+          "Pravidlo „#{label_for(rule['output'])}“ potrebuje aspoň pásmo „všetko nad“."
+        when 'fit_series'
+          series = rule['series'].is_a?(Array) ? rule['series'] : []
+          return nil unless series.empty?
+
+          "Pravidlo „#{label_for(rule['output'])}“ potrebuje aspoň jednu dĺžku v rade."
+        end
+      end
+
       # Pocet vzdy Integer v <1, MAX_HW_QUANTITY>; nil pri nevalidnom vstupe.
       def clamp_qty(v)
         return nil if v.nil? || v.to_s.strip.empty?
