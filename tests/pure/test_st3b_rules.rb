@@ -324,6 +324,8 @@ end
 require File.join(NxTest::ROOT, 'noxun_engine', 'core', 'bom') if NxTest.headless?
 require File.join(NxTest::ROOT, 'noxun_engine', 'core', 'abs_rules') if NxTest.headless?
 require File.join(NxTest::ROOT, 'noxun_engine', 'core', 'part_keys') if NxTest.headless?
+# `display_name` (D-100 živý default názvu skrinky) — nadpis skupiny riadkov.
+require File.join(NxTest::ROOT, 'noxun_engine', 'core', 'cabinet_builder') if NxTest.headless?
 
 ST3B2_CSS = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'css', 'panel.css'),
                       encoding: 'UTF-8')
@@ -362,6 +364,32 @@ NxTest.test('ŠT-3b-2a (B1): ABS override sa cita z CONFIGU KORPUSU, nie zo snap
   ].to_s
   NxTest.refute(body.include?('Store.config'),
                 'zber nesiaha na config dielca — vyriesenu mapu hran nesie KAZDY dielec')
+end
+
+NxTest.test('ŠT-3b-2a (review P2): nadpis skupiny nesie ZIVY nazov skrinky, nie holé id') do
+  # D-100: do configu sa uklada LEN RUCNY nazov (nil = zivy default podla typu
+  # a sirky). Keby zoznam cital `ccfg['name']`, mala by VACSINA skriniek
+  # v nadpise hole „CAB-004" — presne tie, ktore pouzivatel nikdy nepremenoval.
+  nested = { 'p1' => st3b2_part('p1', 'shelf', 'Polica 1') }
+  ov = { 'part_overrides' => { 'p1' => { 'edges' => { 'L1' => 'ABS-1' } } } }
+
+  auto = { 'abs' => [], 'hardware' => [] }
+  Noxun::Engine::Bom.collect_manual_overrides(
+    auto, ov.merge('type' => 'lower', 'width' => 600.0), 'CAB-004', nested
+  )
+  NxTest.assert_equal('Spodná skrinka 600', auto['abs'].first['owner_name'],
+                      'skrinka bez rucneho nazvu ma ZIVY default (to iste, co vidno v paneli)')
+
+  manual = { 'abs' => [], 'hardware' => [] }
+  Noxun::Engine::Bom.collect_manual_overrides(
+    manual, ov.merge('type' => 'lower', 'width' => 600.0, 'name' => 'Drezová'), 'CAB-004', nested
+  )
+  NxTest.assert_equal('Drezová', manual['abs'].first['owner_name'], 'rucny nazov ma prednost')
+
+  # A nadpis skupiny z neho vznikne aj s identitou (najst sa musi dat oboje).
+  pay = Noxun::Engine::RulesDialog.overrides_payload({ manual_overrides: manual })
+  NxTest.assert_equal('CAB-004 · Drezová', pay['abs']['groups'].first['title'],
+                      'nadpis skupiny = id + nazov')
 end
 
 NxTest.test('ŠT-3b-2a (B2/F14): mrtve kluce a odpojene dvojcata sa NEKRESLIA') do

@@ -144,9 +144,16 @@ module Noxun
       # KOVANIE: zaznam s prazdnym `owner_part_key` patri celemu korpusu (paruje sa
       # vzdy); zaznam s konkretnym klucom LEN ked taky dielec naozaj existuje.
       def collect_manual_overrides(out, ccfg, cid, nested)
-        # Rucny nazov korpusu (nil = zivy default) — zoznam riadkov ho pouzije
-        # v nadpise skupiny, aby sa dala skrinka najst aj bez klikania.
-        cab_name = ccfg['name'].to_s
+        # Nazov korpusu do nadpisu skupiny, aby sa dala skrinka najst aj bez
+        # klikania. MUSI to byt `display_name`, NIE `ccfg['name']`: D-100 uklada
+        # do configu LEN RUCNY nazov (nil = zivy default podla typu a sirky),
+        # takze surovy kluc je pri vacsine skriniek PRAZDNY a v zozname by ostalo
+        # hole „CAB-004". `display_name` da presne to, co pouzivatel vidi v paneli.
+        cab_name = if defined?(CabinetBuilder)
+                     CabinetBuilder.display_name(ccfg).to_s
+                   else
+                     ccfg['name'].to_s
+                   end
         ov = ccfg['part_overrides']
         if ov.is_a?(Hash)
           ov.each do |pkey, rec|
