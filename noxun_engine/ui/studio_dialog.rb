@@ -883,9 +883,6 @@ module Noxun
           @generation.to_i
         end
 
-        # Payload sekcie. Model chodi ARGUMENTOM (lekcia F4 zo ŠT-3a-2):
-        # pri prepnuti dokumentu by inak sekcia dostala pravidla STAREHO
-        # dokumentu vedla kusovnika noveho.
         # ŠT-3c-1, sekcia ŠABLÓNY (Š18). Kanal je vzor `rules`, len JEDNODUCHSI:
         # sablony su GLOBALNE (subor v %APPDATA%), takze payload nepotrebuje
         # model, sekcia nema ziadny asynchronny beh a po prepnuti dokumentu

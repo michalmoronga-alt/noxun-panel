@@ -7661,6 +7661,28 @@ module NoxunSuRunner
       ok("ŠT-3c-1 (b): 1x Spat vratil skrinku (police #{st3c_shelves(inst)})",
          inst.valid? && st3c_shelves(inst) == base_shelves)
 
+      # --- (b2) VIAC OZNACENYCH SKRINIEK = ODMIETNUTIE (review #225) -------
+      # `find_cabinet` by ticho vzal prvu — a prestavba NESPRAVNEJ skrinky je
+      # horsia nez hlaska. Akcia sa pyta „ktoru prestavat", takze odpoved musi
+      # byt jednoznacna (rovnaky guard ako fotenie).
+      second = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 450.0,
+                                                'height' => 720.0, 'depth' => 560.0 })
+      if second
+        model.selection.clear
+        model.selection.add(inst)
+        model.selection.add(second)
+        before_multi = st3c_shelves(inst)
+        rec.clear
+        td.dispatch('tpl_apply', { 'template' => ST3C_CAB }.to_json, sink)
+        ok('ŠT-3c-1 (b2): DVE oznacene skrinky = ODMIETNUTIE s hlaskou',
+           rec.any? { |x| x.include?('Označených je 2') })
+        ok('ŠT-3c-1 (b2): a NIC sa neprestavalo',
+           st3c_shelves(inst) == before_multi)
+        model.start_operation('SU-TEST st3c upratanie druhej skrinky', true)
+        second.erase! if second.valid?
+        model.commit_operation
+      end
+
       # --- (c) TYPOVY GUARD drzi SERVER (sekcia vyber nesleduje) ----------
       upper = e::CabinetBuilder.build(model, { 'type' => 'upper', 'width' => 600.0,
                                                'height' => 720.0, 'depth' => 320.0 })

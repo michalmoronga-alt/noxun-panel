@@ -217,6 +217,23 @@ const BRD = { name: 'Pracovná doska', kind: 'board', preview_rev: null,
   S.setStudioSection('bom');
 })();
 
+(function(){
+  // Review #225 P2: id dlaždice sa NESMIE robiť „očistením" mena — „Dolná 600"
+  // a „Dolné 600" by dali to isté id, náhľad by sa nakreslil na PRVÚ dlaždicu
+  // a používateľ by vyberal šablónu podľa cudzej fotky.
+  const A = { name: 'Dolná 600', kind: 'cabinet', preview_rev: 'rA', config: { type: 'lower' } };
+  const B = { name: 'Dolné 600', kind: 'cabinet', preview_rev: 'rB', config: { type: 'lower' } };
+  T.tplApplyState({ cabinet: [A, B], board: [] });
+  const h = T.tplBodyHtml();
+  const ids = (h.match(/id="tplpic-[^"]+"/g) || []);
+  eq(ids.length, 2, 'obe dlaždice majú náhľadový box');
+  ok(ids[0] !== ids[1], 'a kolízne mená majú RÔZNE DOM id');
+  ok(T.tplDomIdFor('cabinet', 'Dolná 600') !== T.tplDomIdFor('cabinet', 'Dolné 600'),
+     'mapa identita → uzol ich rozlíši tiež');
+  ok(T.tplDomIdFor('cabinet', 'Neexistuje') === null,
+     'a na neznámu šablónu sa náhľad nenakreslí nikam');
+})();
+
 // --- 7) lišta a kolízie globálov --------------------------------------------
 
 (function(){

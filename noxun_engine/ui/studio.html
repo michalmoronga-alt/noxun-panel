@@ -480,6 +480,11 @@
   .mfoot .spacer { flex: 1; }
   .mfoot .primary { display: inline-flex; align-items: center; gap: 5px; }
   .mfoot .primary .ic { width: 14px; height: 14px; }
+  /* ST-3c-1: DESTRUKTIVNE potvrdenie (`danger: true`) — ta ista geometria
+     ako `.primary` (inak by tlacidlo v patke vyskocilo z kostry), len
+     cervena rodina podla UI_DIZAJN; farby berie `.danger` z panel.css. */
+  .mfoot .danger { display: inline-flex; align-items: center; gap: 5px; }
+  .mfoot .danger .ic { width: 14px; height: 14px; }
   .mrow { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
   .mrow label { flex: 0 0 118px; font-size: 12px; color: var(--nx-ink-label); }
   .mrow input, .mrow select { flex: 1; min-width: 0; padding: 5px 7px; font: inherit; font-size: 12.5px;

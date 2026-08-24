@@ -55,6 +55,13 @@ NxTest.test('encoding: ziadne mojibake/C1 bajty v UI a docs suboroch + html char
     rel = p.sub("#{root}/", '')
     bad << "#{rel}: mojibake signatura" if bytes.match?(sig)
     bad << "#{rel}: C1 kontrolny znak (U+0080..9F)" if bytes.match?(c1)
+    # ŠT-3c-1 (review #225 P1): NUL bajt v zdrojaku spravi zo suboru BINARNY —
+    # git ho prestane diffovat a KAZDE review ho vidi ako „Bin 0 -> 0 bytes".
+    # Realny nalez: oddelovac kluca cache v `js/templates.js` bol napisany
+    # doslovnym NUL, takze hlavny klientsky subor davky bol pre review neviditelny.
+    # (Znak sa pise `0.chr` - doslovny NUL v tomto subore by chytil guard
+    #  sam seba, presne ako pri mojibake signaturach a cyrilike.)
+    bad << "#{rel}: NUL bajt (subor by bol pre git BINARNY)" if bytes.include?(0.chr.b)
     text = bytes.dup.force_encoding('UTF-8')
     if text.valid_encoding? && (hit = text[cyr])
       bad << "#{rel}: cyrilicky homoglyf #{format('U+%04X', hit.ord)} (v SK/EN zdrojaku nema co robit)"

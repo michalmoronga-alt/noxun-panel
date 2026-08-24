@@ -187,7 +187,15 @@ module Noxun
         def handle_capture(payload)
           data = JSON.parse(payload.to_s)
           name = data['template'].to_s
-          ok, msg = Panel.capture_preview_for(data['kind'].to_s.empty? ? 'cabinet' : data['kind'].to_s, name)
+          # Review #225 NOTE: druh sa validuje proti UZAVRETEMU zoznamu rovnako
+          # ako pri mazani (konzistencia — HTML nie je ochrana). Chybajuci udaj
+          # znamena korpusovu sablonu (jedine, ktore sa fotia); `capture_preview_for`
+          # si guard `kind == 'cabinet'` robi aj tak sam.
+          kind = data['kind'].to_s
+          kind = 'cabinet' if kind.empty?
+          return set_status('Neznámy druh šablóny — nič sa neodfotilo.', true) unless KINDS.include?(kind)
+
+          ok, msg = Panel.capture_preview_for(kind, name)
           set_status(msg, !ok)
           refresh_if_open if ok
         end
@@ -229,8 +237,19 @@ module Noxun
           tpl = TemplateStore.find('cabinet', name)
           return set_status('Šablóna sa nenašla.', true) if tpl.nil?
           model = Sketchup.active_model
-          cab = Panel.find_cabinet(model)
-          return set_status('Najprv označ NOXUN korpus — šablóna sa použije naň.', true) if cab.nil?
+          # Review #225: PRAVE JEDNA oznacena skrinka (vzor `capture_preview_for`).
+          # `find_cabinet` by pri viacnasobnom vybere TICHO vzal prvy korpus —
+          # a prestavba NESPRAVNEJ skrinky je horsia nez hlaska. Akcia sa pyta
+          # „ktoru skrinku prestavat", takze odpoved musi byt jednoznacna.
+          cabs = Panel.selected_cabinets(model)
+          if cabs.empty?
+            return set_status('Označ v modeli práve jednu NOXUN skrinku — šablóna sa použije na ňu.', true)
+          end
+          if cabs.length > 1
+            return set_status("Označených je #{cabs.length} skriniek — nechaj označenú práve jednu.", true)
+          end
+
+          cab = cabs.first
 
           # Typovy guard aj TU, nie len v HTML disabled (Codex PR #29): sekcia
           # vyber NESLEDUJE (audit N27 — ziadny observer), takze verdikt musi

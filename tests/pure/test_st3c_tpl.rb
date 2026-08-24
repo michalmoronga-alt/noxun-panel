@@ -163,8 +163,9 @@ NxTest.test('ŠT-3c-1 (N27): sekcia vyber NESLEDUJE — verdikt dava SERVER pri 
   NxTest.refute(pay.include?('selected_cab') || pay.include?('find_cabinet'),
                 'payload NENESIE vyber — bez observera by aj tak zastaral')
   apply = st3c_body('handle_apply')
-  NxTest.assert(apply.include?('Panel.find_cabinet(model)'), 'vyber sa hlada CERSTVO pri kliku')
-  NxTest.assert(apply.include?('Najprv označ NOXUN korpus'), 'a chybajuci vyber sa POVIE')
+  # Review #225: vyber sa cita PRIAMO a musi byt PRAVE JEDEN (detail v sade nizsie).
+  NxTest.assert(apply.include?('Panel.selected_cabinets(model)'), 'vyber sa hlada CERSTVO pri kliku')
+  NxTest.assert(apply.include?('Označ v modeli práve jednu'), 'a chybajuci vyber sa POVIE')
   NxTest.assert(apply.include?('tpl_type != cab_type'), 'typovy guard je SERVEROVY')
   NxTest.assert(apply.index('tpl_type != cab_type') < apply.index('rebuild_many'),
                 'a stoji PRED prestavbou')
@@ -197,7 +198,7 @@ NxTest.test('ŠT-3c-1 (N29): doskove sablony — zobrazit a ZMAZAT, apply/odfoti
   NxTest.assert(apply.include?("TemplateStore.find('cabinet', name)"),
                 'apply ostava VYHRADNE korpusovy (serverovy guard)')
   # Klient doskam akcie NEKRESLI (nie disabled — vobec).
-  tile = ST3C_TPL_JS[/function tplTileHtml\(tp, kind\)\{.*?\n  \}/m].to_s
+  tile = ST3C_TPL_JS[/function tplTileHtml\(tp, kind, idx\)\{.*?\n  \}/m].to_s
   NxTest.assert(tile.include?("var isCab = kind === 'cabinet'"), 'dlazdica vetvi podla druhu')
   NxTest.assert(tile.index('if (isCab)') < tile.index('stpldel'),
                 'apply a odfotit su V PODMIENKE, mazanie mimo nej (plati pre oba druhy)')
@@ -210,7 +211,7 @@ NxTest.test('ŠT-3c-1 (N32): potvrdenie doskovej hovori, ze sa uz NIKDY nevrati'
 end
 
 NxTest.test('ŠT-3c-1 (N30): „odfotiť" ma ikonu CAMERA, nie oko') do
-  tile = ST3C_TPL_JS[/function tplTileHtml\(tp, kind\)\{.*?\n  \}/m].to_s
+  tile = ST3C_TPL_JS[/function tplTileHtml\(tp, kind, idx\)\{.*?\n  \}/m].to_s
   NxTest.assert(tile.include?("tplIco('camera')"), 'fotenie = camera')
   NxTest.refute(tile.include?("tplIco('eye')"),
                 'oko v celom Studiu znamena „označ v modeli" — dva vyznamy jednej ikony su chyba')
@@ -272,4 +273,33 @@ NxTest.test('ŠT-3c-1: templates.js je PREFIXOVANY — ziadna kolizia so `studio
   NxTest.refute(ST3C_TPL_JS_CODE.include?('sketchup.ready('),
                 'okno zaniklo — `ready` posiela `studio.js`')
   NxTest.assert(ST3C_TPL_JS.include?('window.TPL = TPL'), 'a `TPL` je globalny prijimac')
+end
+
+NxTest.test('ŠT-3c-1 (review #225): apply potrebuje PRAVE JEDNU oznacenu skrinku') do
+  apply = st3c_body('handle_apply')
+  # `find_cabinet` by pri viacnasobnom vybere TICHO vzal prvy korpus — hlaska
+  # „označených je viac" by pritom nikdy neprisla a prestavala by sa skrinka,
+  # ktoru pouzivatel nemyslel. Akcia sa pyta „ktoru prestavat", takze odpoved
+  # musi byt jednoznacna (rovnaky guard ako `capture_preview_for`).
+  NxTest.assert(apply.include?('Panel.selected_cabinets(model)'),
+                'vyber sa cita PRIAMO (nie cez `find_cabinet`, ktory doriesi dielec na skrinku)')
+  NxTest.refute(apply.include?('Panel.find_cabinet(model)'), 'stara tolerantna cesta je PREC')
+  NxTest.assert(apply.include?('cabs.length > 1'), 'viacnasobny vyber ma vlastnu vetvu')
+  NxTest.assert(apply.include?('nechaj označenú práve jednu'), 'a povie sa to slovami')
+  NxTest.assert(apply.index('cabs.length > 1') < apply.index('rebuild_many'),
+                'guard stoji PRED prestavbou')
+  cap = st3c_body('handle_capture')
+  NxTest.assert(cap.include?('KINDS.include?(kind)'),
+                'fotenie validuje druh proti TOMU ISTEMU uzavretemu zoznamu ako mazanie')
+end
+
+NxTest.test('ŠT-3c-1 (review #225 P1): ziadny zdrojak nesmie byt pre git BINARNY') do
+  # NUL bajt zo suboru spravi binarku — git ho prestane diffovat a KAZDE review
+  # ho vidi ako „Bin 0 -> 0 bytes". Guard zije v `test_encoding_guard.rb`; tu sa
+  # kontroluje LEN to, ze ho niekto nezrusil (a novy klientsky subor je cisty).
+  guard = File.read(File.join(NxTest::ROOT, 'tests', 'pure', 'test_encoding_guard.rb'),
+                    encoding: 'UTF-8')
+  NxTest.assert(guard.include?('0.chr.b'), 'kontrola NUL bajtu je v encoding guarde')
+  js = File.binread(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'templates.js'))
+  NxTest.refute(js.include?(0.chr.b), 'a `js/templates.js` ho uz nema')
 end
