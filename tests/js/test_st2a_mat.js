@@ -111,7 +111,7 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
 (function(){
   const h = M.matToolsHtml({});
   ok(/class="primary" id="mdDemosAddBtn"/.test(h),
-     'lista ma JEDEN tvar bez ohladu na to, co jej kto podа — druhy rezim neexistuje');
+     'lista ma JEDEN tvar bez ohladu na to, co jej kto poda — druhy rezim neexistuje');
 })();
 
 // Jantarove „Obnoviť" je ZDIELANY markup celeho okna — sekcia ho nekresli vlastne.

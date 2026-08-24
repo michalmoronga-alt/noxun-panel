@@ -7065,7 +7065,21 @@ module NoxunSuRunner
     e::StudioDialog.send(:push_state) # cerstvy baseline pre zapis
     current = e::HardwareRules.project_rules(model) || []
     target = current.find { |r| r['kind'].to_s == 'bands' && r['enabled'] != false }
-    return info('ŠT-3b-2c1: projekt nema zapnute `bands` pravidlo — brana sa tu neoverila') if target.nil?
+    if target.nil?
+      # Review #223 NOTE 5: scenar sa NESMIE preskocit len preto, ze seed sa
+      # medzi verziami zmenil — brana by ostala neoverena a sada zelena. Pravidlo
+      # si preto DOSEJEME (vzor ostatnych seedov) a assert je TVRDY.
+      target = { 'rule_id' => 'su-test-bands', 'enabled' => true,
+                 'applies_to' => { 'role' => 'front_door' }, 'output' => 'hinge',
+                 'kind' => 'bands', 'input' => 'height',
+                 'bands' => [{ 'max' => 900.0, 'quantity' => 2 }, { 'max' => nil, 'quantity' => 3 }] }
+      model.start_operation('SU-TEST st3b2c1 seed bands', true)
+      seeded = e::HardwareRules.set_project_rules(model, current + [target])
+      model.commit_operation
+      ok('ŠT-3b-2c1 (b3): scenar si `bands` pravidlo doseje (brana sa NESMIE preskocit)', seeded)
+      e::StudioDialog.send(:push_state) # baseline po seede
+      current = e::HardwareRules.project_rules(model) || []
+    end
 
     before = JSON.generate(current)
     broken = JSON.parse(before)
@@ -7083,8 +7097,11 @@ module NoxunSuRunner
                   'model_guid' => model.guid.to_s }.to_json, sink)
     ok('ŠT-3b-2c1 (b3): ulozenie pravidla BEZ pásma „všetko nad" sa ODMIETNE',
        rec.any? { |x| x.include?('neuložili') })
-    ok('ŠT-3b-2c1 (b3): a hlaska MENUJE pravidlo (pri desiatich inak nevies, co opravit)',
-       rec.any? { |x| x.include?(e::HardwareRules.label_for(target['output'])) })
+    # Review #223 (Codex P2): hlaska musi niest AJ identitu `rule_id` — dve
+    # pravidla smu mat rovnaky vystup a samotny nazov typu by ukazoval na obe.
+    ok('ŠT-3b-2c1 (b3): a hlaska MENUJE pravidlo TYPOM AJ IDENTITOU',
+       rec.any? { |x| x.include?(e::HardwareRules.label_for(target['output'])) &&
+                      x.include?(target['rule_id'].to_s) })
     ok('ŠT-3b-2c1 (b3): v projekte ostali POVODNE pravidla (nic sa nezapisalo)',
        JSON.generate(e::HardwareRules.project_rules(model) || []) == before)
     inst = cabinets(model).first

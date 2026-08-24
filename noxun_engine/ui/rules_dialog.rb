@@ -474,9 +474,7 @@ module Noxun
           # FORMULAR SA NEPREKRESLUJE — pouzivatel ma svoje hodnoty OPRAVIT,
           # nie o ne prist.
           problems = HardwareRules.rules_problems(rules)
-          unless problems.empty?
-            return set_status("Pravidlá sa neuložili — #{problems.map { |p| p['message'] }.join(' ')}", true)
-          end
+          return set_status("Pravidlá sa neuložili — #{problems_text(problems)}", true) unless problems.empty?
 
           jobs = cabinets(model).map { |c| [c, CabinetBuilder.config_to_params(Store.config(c) || {})] }
           CabinetBuilder.rebuild_many(model, jobs, op_name: 'NOXUN: pravidla kovania') do
@@ -489,6 +487,18 @@ module Noxun
           end
           set_status("Pravidlá uložené do projektu#{global_note} — prestavaných #{jobs.size} skriniek.")
           after_model_write(model)
+        end
+
+        # Strop hlasky (review #223 NOTE 1): pri desiatich pokazenych pravidlach
+        # by sa stavovy riadok zmenil na odsek, ktory nikto neprecita. Vypisu sa
+        # PRVE tri (poradie = poradie pravidiel vo formulari) a zvysok sa PRIZNA
+        # poctom — pouzivatel tak vie, ze opravou prveho este nekonci.
+        MAX_PROBLEM_MESSAGES = 3
+
+        def problems_text(problems)
+          shown = problems.first(MAX_PROBLEM_MESSAGES).map { |p| p['message'] }
+          rest = problems.length - shown.length
+          rest.positive? ? "#{shown.join(' ')} …a ďalšie #{rest}." : shown.join(' ')
         end
 
         # ============ ŠT-3b-2b: „VRÁTIŤ NA PRAVIDLO" (jantarovy riadok) =======

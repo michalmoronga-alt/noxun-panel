@@ -66,7 +66,7 @@
                   "enabled": true, "bands": [] }]
     },
     {
-      "name": "fit_series pravidlo, ktoré nesie AJ bands (seedový tvar výsuvov) — pásma sa nekontrolujú",
+      "name": "fit_series pravidlo, ktoré nesie AJ bands (legacy/cudzí snapshot, zmena kind) — pásma sa nekontrolujú",
       "invalid": false,
       "rules": [{ "rule_id": "vysuvy", "output": "slide", "kind": "fit_series", "enabled": true,
                   "series": [400.0], "bands": [{ "max": 900.0, "quantity": 1 }] }]

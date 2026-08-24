@@ -557,7 +557,7 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   global.sketchup = prevSk;
 })();
 
-// ---- ŠT-3b-2c1: parita sервerom + vynútené prekreslenie formulára --------
+// ---- ŠT-3b-2c1: parita so serverom + vynútené prekreslenie formulára --------
 //
 // 1. Kritériá klienta a servera musia byť ROVNAKÉ. Keď sa rozídu, vznikne buď
 //    formulár, ktorý sa nedá uložiť a nikto nevie prečo, alebo diera (klient
@@ -613,6 +613,15 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
   ELS.rulesBox.innerHTML = 'ZNOVA ROZPÍSANÉ';
   R.rdApplyState(base);
   eq(ELS.rulesBox.innerHTML, 'ZNOVA ROZPÍSANÉ', 'odtlačok je omladený — ďalší push je pokojný');
+
+  // (d) Prázdny payload (server zlyhal pri zostavovaní) NESMIE vyprázdniť sekciu
+  //     ani vo `force` vetve — inak by zlyhanie servera zmazalo formulár aj
+  //     jantárové riadky a vyzeralo by to, že v projekte nič nie je.
+  const keep = ELS.rulesBox.innerHTML;
+  R.RD.setSection(null, true);
+  eq(ELS.rulesBox.innerHTML, keep, 'prázdny payload formulár nezmaže ani vo `force` vetve');
+  R.RD.setSection(undefined, false);
+  eq(ELS.rulesBox.innerHTML, keep, 'ani v bežnej vetve');
 })();
 
 console.log(`OK ${n} kontrol (ŠT-3b-1/3b-2a/3b-2b/3b-2c1 sekcia Pravidlá)`);

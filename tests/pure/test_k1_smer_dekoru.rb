@@ -128,7 +128,7 @@ NxTest.test('K1: norm_overrides pusti do configu LEN length/width') do
   NxTest.assert_equal('length', ov['a']['grain_direction'])
   NxTest.assert_equal('width', ov['b']['grain_direction'])
   NxTest.assert_equal('width', ov['g']['grain_direction'])
-  # Zaznam, z ktoreho vypadol jediny kluc, je BEZOBSAZNY a miznе cely —
+  # Zaznam, z ktoreho vypadol jediny kluc, je BEZOBSAZNY a mizne cely —
   # inak by config zbieral prazdne skrupiny po kazdom neplatnom vstupe.
   %w[c d e f].each do |k|
     NxTest.assert(!ov.key?(k), "neplatny smer (#{k}) nesmie ostat v configu")

@@ -670,9 +670,14 @@ module Noxun
       #     VEDOMY DOSLEDOK: uzatvara sa tym D-93 vetva „rucny NL zamok pri
       #     prazdnom rade" (zamok mimo radu sa aj tak uz nedal zapisat).
       #
-      # KRITERIUM je viazane na `kind`, NIE na pritomnost kluca `bands`: seedove
-      # pravidlo vysuvov nesie `bands` AJ `series` naraz, takze podla kluca by
-      # sa validovalo pravidlo, ktore pasma vobec nepouziva.
+      # KRITERIUM je viazane na `kind`, NIE na pritomnost kluca `bands` — a to
+      # preto, ze `kind` je JEDINA autorita toho, ktora vetva vyhodnotenia sa
+      # spusti (`evaluate` vetvi podla neho; `normalize_rules` NEZNAME kluce
+      # ZACHOVAVA kvoli forward-compat). Zaznam teda smie niest `bands` aj
+      # `series` naraz — z novsej verzie formatu, z cudzieho/legacy snapshotu
+      # alebo ako zvysok po zmene `kind` vo formulari — a validovat mu treba
+      # LEN to, co sa naozaj pouzije. Podla kluca by sa pravidlo odmietlo za
+      # pasma, ktore nikdy nepocita.
       #
       # VYPNUTE pravidlo (`enabled == false`) sa NEKONTROLUJE — negeneruje nic,
       # takze deravy tvar nikoho nezasiahne (zhodne s klientskou `rdValidate`).
@@ -690,19 +695,32 @@ module Noxun
 
       # Hlaska ADRESUJE pravidlo menom, ktore pouzivatel vidi vo formulari —
       # inak by pri desiatich pravidlach nevedel, ktore opravit.
+      #
+      # Review #223 (Codex P2): samotny `label_for(output)` NESTACI — dve pravidla
+      # smu mat rovnaky vystup (napr. dve rozne uchytkove pravidla `handle`)
+      # a hlaska by ukazovala na obe naraz. Identitou je `rule_id`, takze ide
+      # do zatvorky za nazov.
       def rule_problem_message(rule)
         case rule['kind'].to_s
         when 'bands'
           bands = rule['bands'].is_a?(Array) ? rule['bands'] : []
           return nil if !bands.empty? && bands.any? { |b| b.is_a?(Hash) && b['max'].nil? }
 
-          "Pravidlo „#{label_for(rule['output'])}“ potrebuje aspoň pásmo „všetko nad“."
+          "#{rule_address(rule)} potrebuje aspoň pásmo „všetko nad“."
         when 'fit_series'
           series = rule['series'].is_a?(Array) ? rule['series'] : []
           return nil unless series.empty?
 
-          "Pravidlo „#{label_for(rule['output'])}“ potrebuje aspoň jednu dĺžku v rade."
+          "#{rule_address(rule)} potrebuje aspoň jednu dĺžku v rade."
         end
+      end
+
+      # „Pravidlo „Výsuvy" (vysuvy-nl-podla-hlbky)" — nazov PRE CLOVEKA
+      # a za nim JEDNOZNACNA identita zaznamu.
+      def rule_address(rule)
+        rid = rule['rule_id'].to_s.strip
+        base = "Pravidlo „#{label_for(rule['output'])}“"
+        rid.empty? ? base : "#{base} (#{rid})"
       end
 
       # Pocet vzdy Integer v <1, MAX_HW_QUANTITY>; nil pri nevalidnom vstupe.

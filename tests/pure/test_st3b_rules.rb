@@ -992,7 +992,10 @@ end
 #      snapshot z .skp by sa pri CITANI ticho orezal — presne ta tichá strata
 #      dat, ktorej ma brana zabranit.
 #   3. Kriterium musi visiet na `kind`, nie na pritomnosti kluca `bands`:
-#      seedove pravidlo vysuvov nesie `bands` AJ `series` naraz.
+#      `kind` je jedina autorita toho, ktora vetva vyhodnotenia sa spusti,
+#      a `normalize_rules` nezname kluce ZACHOVAVA — zaznam z novsej verzie,
+#      z cudzieho snapshotu alebo po zmene `kind` vo formulari teda smie niest
+#      oba kluce naraz a validovat mu treba LEN to, co sa naozaj pouzije.
 #   4. Klient a server musia mat ROVNAKE kriteria — inak vznikne formular,
 #      ktory sa neda ulozit a nikto nevie preco (alebo naopak diera).
 ST3B2C1_FIXTURE = JSON.parse(
@@ -1062,10 +1065,37 @@ NxTest.test('ŠT-3b-2c1: CITACIE cesty ostavaju NEDOTKNUTE — validuje sa LEN p
                 'a stoji AZ ZA normalizaciou — validuje sa presne to, co sa zapise')
   NxTest.assert(save.index('rules_problems') < save.index('rebuild_many'),
                 'este PRED prestavbou skriniek')
-  reject = save[/unless problems\.empty\?.*?\n          end\n/m].to_s
+  reject = save[/return set_status\("Pravidlá sa neuložili.*?\n/m].to_s
   NxTest.assert(reject.include?('return set_status'), 'odmietnutie sa povie NAHLAS')
   NxTest.refute(reject.include?('push_section_echo') || reject.include?('refresh_studio'),
                 'a formular sa NEPREKRESLUJE — pouzivatel ma svoje hodnoty OPRAVIT, nie o ne prist')
+end
+
+NxTest.test('ŠT-3b-2c1 (review P2-2): brana ma v CELOM plugine PRAVE JEDNO volanie') do
+  # Predosla verzia tohto guardu vymenovavala citacie metody PO MENE — a prave
+  # preto neplatila: mutacia, ktora `rules_problems` zavolala v `project_rules`,
+  # presla zelena, lebo ta metoda v zozname CHYBALA. Zoznam mien sa sam nedopise;
+  # jedina spolahliva formulacia je „v celom plugine existuje PRESNE JEDNO
+  # volanie — a to v zapisovej ceste".
+  root = File.join(NxTest::ROOT, 'noxun_engine')
+  hits = []
+  Dir[File.join(root, '**', '*.rb')].sort.each do |file|
+    code = File.read(file, encoding: 'UTF-8').lines
+               .reject { |l| l.strip.start_with?('#') }.join
+    rel = file.sub("#{NxTest::ROOT}/", '').tr('\\', '/')
+    code.scan(/rules_problems/) { hits << rel }
+  end
+  in_core = hits.select { |c| c.end_with?('core/hardware_rules.rb') }
+  outside = hits.reject { |c| c.end_with?('core/hardware_rules.rb') }
+  NxTest.assert_equal(1, in_core.length,
+                      'v `hardware_rules.rb` je LEN definicia (modul sa sam nevola)')
+  NxTest.assert_equal(['noxun_engine/ui/rules_dialog.rb'], outside,
+                      'a JEDINY volajuci v celom plugine je sekcia Pravidlá (zapisova cesta)')
+  rd_code = ST3B_RULES_RB.lines.reject { |l| l.strip.start_with?('#') }.join
+  NxTest.assert_equal(1, rd_code.scan(/rules_problems/).length,
+                      'aj v nom PRESNE RAZ — nikde inde v module')
+  NxTest.assert(st3b2_rd_body('handle_save').include?('HardwareRules.rules_problems(rules)'),
+                'a je to naozaj `handle_save`')
 end
 
 NxTest.test('ŠT-3b-2c1 (PARITA): server a klient maju ROVNAKE kriteria') do
@@ -1081,4 +1111,55 @@ NxTest.test('ŠT-3b-2c1 (PARITA): server a klient maju ROVNAKE kriteria') do
   js = File.read(File.join(NxTest::ROOT, 'tests', 'js', 'test_st3b_rules.js'), encoding: 'UTF-8')
   NxTest.assert(js.include?('rules_validation_parity.json'),
                 'JS sada cita TU ISTU fixturu (inak by parita bola len na papieri)')
+end
+
+NxTest.test('ŠT-3b-2c1 (review P2-1): hlaska ADRESUJE pravidlo JEDNOZNACNE') do
+  hr = Noxun::Engine::HardwareRules
+  # Dve pravidla s TYM ISTYM vystupom su legalne (dva rozne uchytkove profily,
+  # dve pasmove pravidla na zavesy) — samotny nazov typu by ukazoval na obe.
+  rules = [
+    { 'rule_id' => 'uchytky-hlavne', 'output' => 'handle', 'kind' => 'bands',
+      'enabled' => true, 'bands' => [{ 'max' => 600.0, 'quantity' => 1 }] },
+    { 'rule_id' => 'uchytky-vysoke', 'output' => 'handle', 'kind' => 'bands',
+      'enabled' => true, 'bands' => [{ 'max' => 900.0, 'quantity' => 2 }] }
+  ]
+  msgs = hr.rules_problems(rules).map { |p| p['message'] }
+  NxTest.assert_equal(2, msgs.length, 'obe pravidla su pokazene')
+  NxTest.assert(msgs[0].include?('uchytky-hlavne') && msgs[1].include?('uchytky-vysoke'),
+                'a KAZDA hlaska nesie identitu SVOJHO pravidla (nazov typu je pri oboch rovnaky)')
+  NxTest.assert(msgs.uniq.length == 2, 'takze dve hlasky nie su na nerozoznanie')
+  NxTest.assert(msgs[0].include?('Úchytky'), 'nazov PRE CLOVEKA v hlaske ostava')
+  # Pravidlo bez `rule_id` normalizacia zahadzuje, ale brana nesmie spadnut ani
+  # na surovom vstupe (in-SU / iny klient posiela, co chce).
+  raw = hr.rules_problems([{ 'output' => 'hinge', 'kind' => 'bands', 'enabled' => true,
+                             'bands' => [] }])
+  NxTest.assert_equal(1, raw.length, 'aj zaznam bez identity sa odmietne')
+  NxTest.assert(raw.first['message'].start_with?('Pravidlo „Závesy“'),
+                'a hlaska je aspon o type (prazdna zatvorka by mätla)')
+end
+
+NxTest.test('ŠT-3b-2c1 (review NOTE 1): hlaska ma STROP — zvysok sa PRIZNA poctom') do
+  rd = Noxun::Engine::RulesDialog
+  probs = (1..7).map { |i| { 'rule_id' => "r#{i}", 'message' => "Chyba #{i}." } }
+  txt = rd.problems_text(probs)
+  NxTest.assert(txt.include?('Chyba 1.') && txt.include?('Chyba 3.'), 'prve tri sa vypisu')
+  NxTest.refute(txt.include?('Chyba 4.'), 'stvrta uz nie (stavovy riadok nie je odsek)')
+  NxTest.assert(txt.include?('a ďalšie 4'), 'ale zvysok sa PRIZNA — opravou prvej sa nekonci')
+  short = rd.problems_text(probs.first(2))
+  NxTest.assert_equal('Chyba 1. Chyba 2.', short, 'kratky zoznam ziadny suhrn nema')
+  NxTest.assert_equal('', rd.problems_text([]), 'a prazdny nic')
+end
+
+NxTest.test('ŠT-3b-2c1 (review NOTE 2): nazvy kovania su JEDNA pravda (server = sekcia)') do
+  hr = Noxun::Engine::HardwareRules
+  js = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'js', 'rules.js'), encoding: 'UTF-8')
+  map = js[/function rdLabel\(t\)\{.*?\n  \}/m].to_s
+  NxTest.assert(!map.empty?, 'klientska mapa sa nasla')
+  # Ta ista hlaska o tom istom pravidle chodi raz z klienta (`rdValidate`) a raz
+  # zo servera (`rules_problems`) — dva nazvy pre jednu vec su chyba.
+  %w[leg hinge slide handle shelf_pin connector wall_hanger].each do |gt|
+    server = hr.label_for(gt)
+    client = map[/#{gt}\s*:\s*'([^']+)'/, 1].to_s
+    NxTest.assert_equal(server, client, "nazov `#{gt}` musi byt na oboch stranach rovnaky")
+  end
 end
