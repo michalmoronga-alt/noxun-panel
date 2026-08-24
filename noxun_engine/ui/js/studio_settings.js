@@ -273,6 +273,11 @@
     return !!(a && a.getAttribute && a.getAttribute('data-ss'));
   }
 
+  function ssDirty(){
+    for (var k in SS_DIRTY){ if (Object.prototype.hasOwnProperty.call(SS_DIRTY, k)) return true; }
+    return false;
+  }
+
   function ssRenderBody(){
     var sec = ssActive();
     var box = ssEl('secbody');
@@ -428,6 +433,15 @@
       return;
     }
     SS_FAILED = false;
+    // Review #227 kolo 3: pin, ktorý NIKTO NEVYUŽIL, sa nesmie držať. Keď
+    // používateľ pole opustil bez písania, obsah sa o riadok nižšie prekreslí
+    // z ČERSTVÉHO stavu — a jeho ďalšia úprava by potom išla proti revízii,
+    // ktorú už nikde nevidí: uloženie by skončilo FALOŠNÝM konfliktom
+    // a zahodilo mu prácu. Uvoľňuje sa preto PRESNE vtedy, keď nie je čo
+    // chrániť: nič nie je rozpísané A ani jedno pole sekcie nedrží kurzor.
+    // (Kontrakt kola 2 tým ostáva: kým pole fokus MÁ, obsah je zmrazený
+    // a pin sa drží, takže cudziu zmenu nemožno ticho prepísať.)
+    if (!ssDirty() && !ssTyping()) SS_BASE_REV = null;
     SS_STATE = s;
     if (!ssActive()) return;
     ssRenderBody();

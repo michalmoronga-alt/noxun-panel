@@ -289,6 +289,77 @@ const STATE = {
   T.SS.saved();
 })();
 
+// --- 4b3) review #227 kolo 3: NEVYUŽITÝ pin sa uvoľní ------------------------
+
+(function(){
+  function focus(key){
+    const t = { getAttribute: function(k){ return k === 'data-ss' ? key : null; },
+                value: '', classList: { toggle: function(){} } };
+    document.activeElement = t;
+    LISTEN.focusin.forEach(function(fn){ fn({ target: t }); });
+    return t;
+  }
+  function typeInto(t, value){
+    t.value = value;
+    LISTEN.input.forEach(function(fn){ fn({ target: t }); });
+  }
+  function fresh(rev){
+    const F = JSON.parse(JSON.stringify(STATE));
+    F.revision = rev;
+    return F;
+  }
+
+  S.setStudioSection('bset');
+  T.ssApplyState(STATE);
+  T.SS.saved();
+  document.activeElement = null;
+
+  // (1) Fokus BEZ písania a odchod z poľa: pin nikto nevyužil, obsah sa
+  // prekreslí z čerstvého stavu — držať starú revíziu by vyrobilo FALOŠNÝ
+  // konflikt a zahodilo prácu, ktorú používateľ ešte len urobí.
+  const a = focus('rate:montaz');
+  eq(T.ssBaseRev(), 'r-1', 'fokus pripol');
+  document.activeElement = null;                   // klik inam, nič nenapísané
+  T.ssApplyState(fresh('r-9'));
+  ok(T.ssBaseRev() === null, 'nevyužitý pin sa pri čerstvom stave UVOĽNÍ');
+  const b = focus('rate:montaz');
+  typeInto(b, '21');
+  SENT.length = 0;
+  T.ssSave();
+  eq(JSON.parse(SENT[0][1]).revision, 'r-9',
+     'ďalšia úprava ide proti tomu, čo má používateľ NA OBRAZOVKE (žiadny falošný konflikt)');
+  document.activeElement = null;
+  T.SS.saved();
+
+  // (2) REGRESIA kola 2: kým pole fokus DRŽÍ, obsah je zmrazený a pin sa
+  // NEUVOĽŇUJE — inak by sa cudzia zmena dala ticho prepísať.
+  T.ssApplyState(STATE);
+  T.SS.saved();
+  const c = focus('rate:montaz');
+  T.ssApplyState(fresh('r-9'));
+  eq(T.ssBaseRev(), 'r-1', 'pod kurzorom pin ostáva (kontrakt kola 2 platí ďalej)');
+  typeInto(c, '15');
+  SENT.length = 0;
+  T.ssSave();
+  eq(JSON.parse(SENT[0][1]).revision, 'r-1', 'a uloženie ide so starou revíziou → server odmietne');
+  document.activeElement = null;
+  T.SS.saved();
+
+  // (3) ROZPÍSANÉ + odchod z poľa: pin sa NEUVOĽŇUJE ani bez kurzora —
+  // rozpísané hodnoty patria k stavu, nad ktorým vznikli.
+  T.ssApplyState(STATE);
+  T.SS.saved();
+  const d = focus('rate:montaz');
+  typeInto(d, '17');
+  document.activeElement = null;                   // klik inam s ROZPÍSANOU hodnotou
+  T.ssApplyState(fresh('r-9'));
+  eq(T.ssBaseRev(), 'r-1', 'rozpísaný formulár pin drží aj bez kurzora');
+  SENT.length = 0;
+  T.ssSave();
+  eq(JSON.parse(SENT[0][1]).revision, 'r-1', 'a ukladá sa proti stavu, nad ktorým sa písalo');
+  T.SS.saved();
+})();
+
 // --- 4c) review #227 P2: zlyhaný payload sa PRIZNÁ ---------------------------
 
 (function(){

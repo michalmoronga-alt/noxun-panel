@@ -404,8 +404,15 @@ NxTest.test('ŠT-4a (review #227 P1): ulozenie posiela PRIPNUTU reviziu, nie oml
   NxTest.assert(focus_h.include?("getAttribute('data-ss')"), 'len pre POLIA sekcie')
   apply = code[/function ssApplyState\(s\).*?
   \}/m].to_s
-  NxTest.refute(apply.include?('SS_BASE_REV'),
-                'a push pin NEPREPISUJE — obsah na obrazovke je stale ten, ktory pouzivatel videl')
+  NxTest.refute(apply.include?('SS_BASE_REV = s.revision'),
+                'push pin NEPREPISUJE — obsah na obrazovke je stale ten, ktory pouzivatel videl')
+  # Review #227 kolo 3: pin, ktory NIKTO NEVYUZIL (fokus bez pisania, potom
+  # odchod z pola), sa naopak UVOLNI — inak by dalsia uprava isla proti revizii,
+  # ktoru pouzivatel uz nikde nevidi, a skoncila by FALOSNYM konfliktom.
+  NxTest.assert(apply.include?('if (!ssDirty() && !ssTyping()) SS_BASE_REV = null;'),
+                'nevyuzity pin sa uvolni — ale LEN ked nie je co chranit')
+  NxTest.assert(apply.index('SS_BASE_REV = null') < apply.index('SS_STATE = s'),
+                'a rozhoduje sa PRED prijatim cerstveho stavu')
   saved = code[/saved: function\(\).*?
     \}/m].to_s
   NxTest.assert(saved.include?('SS_BASE_REV = null'), 'potvrdenie/odmietnutie pin uvolni')
