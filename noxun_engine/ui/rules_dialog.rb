@@ -491,14 +491,14 @@ module Noxun
           #     zanikol alebo sa presunul) sa NEVYKONA. Vzor kliku v Kusovniku.
           gen = studio_generation
           if !gen.nil? && gen.positive? && data['gen'].to_i != gen
-            return reject_reset('Zoznam sa medzitým prepočítal — obnovený, klikni znova.')
+            return reject_reset('Zoznam sa medzitým prepočítal — obnovený, klikni znova.', model)
           end
 
           # (2) DOKUMENT — tolerantne na PRAZDNY udaj (starsi cachovany DOM),
           #     nezhodne id odmietame (vzor `handle_save`).
           guid = data['model_guid'].to_s
           if !guid.empty? && guid != model_guid(model)
-            return reject_reset('Model sa medzitým prepol — sekcia je načítaná z tohto modelu.')
+            return reject_reset('Model sa medzitým prepol — sekcia je načítaná z tohto modelu.', model)
           end
 
           # (3) ADRESA je `cabinet_id`. Cerstva kopia skrinky moze mat este TO
@@ -507,10 +507,10 @@ module Noxun
           #     skrinku, na ktoru pouzivatel neklikol, a spustit dedup TU by
           #     otvorilo DRUHU operaciu — z jedneho kliku by boli dva kroky Spat.
           cid = data['owner_id'].to_s
-          return reject_reset('Chýba identifikácia skrinky — zoznam je obnovený.') if cid.empty?
+          return reject_reset('Chýba identifikácia skrinky — zoznam je obnovený.', model) if cid.empty?
 
           cands = cabinets(model).select { |c| Store.get(c, 'cabinet_id').to_s == cid }
-          return reject_reset("Skrinka #{cid} sa v modeli nenašla — zoznam je obnovený.") if cands.empty?
+          return reject_reset("Skrinka #{cid} sa v modeli nenašla — zoznam je obnovený.", model) if cands.empty?
 
           if cands.length > 1
             return reject_reset("Skrinku #{cid} má v modeli viac kusov naraz (čerstvá kópia ešte nemá " \
@@ -520,12 +520,35 @@ module Noxun
           [model, cands.first, data]
         end
 
-        # Odmietnutie: sekcia sa nacita nanovo BEZ zdvihu generacie (nic sa
-        # nezapisalo, takze rozkliknute riadky inych sekcii maju ostat platne).
-        def reject_reset(msg, refresh: true)
-          refresh_studio(bump: false) if refresh
+        # Odmietnutie: sekcia sa nacita nanovo LACNYM ECHOM — a to je tu
+        # PODSTATA, nie detail (review #222 P1).
+        #
+        # `refresh_studio` (plny push okna) totiz vedie na `fresh_collect`,
+        # a ten spusta `dedup_copies`: prepis ID kopiam JE ZAPIS DO MODELU
+        # a JE to krok Spat. Odmietnuty klik by tak model ZMENIL — a v scenari,
+        # kvoli ktoremu guard vznikol (dve skrinky s tym istym `cabinet_id`),
+        # by kopii rovno pridelil nove cislo, kym hlaska tvrdi „nič sa nezmenilo".
+        # Odmietnutie NIC nemeni, takze prepocet netreba: staci CITAJUCI zber
+        # (`Bom.collect` bez dedupu) a echo do sekcie.
+        def reject_reset(msg, model = nil, refresh: true)
+          push_section_echo(model) if refresh
           set_status(msg, true)
           nil
+        end
+
+        # Echo SEKCIE bez plneho pushu okna a BEZ dedupu. Prijimac `RD.setSection`
+        # zije v tom istom `js/rules.js`; generacia okna sa NEZDVIHA (nic sa
+        # nezapisalo, takze rozkliknute riadky inych sekcii maju ostat platne).
+        def push_section_echo(model)
+          model ||= Sketchup.active_model
+          return if model.nil?
+
+          pay = rules_payload(model, Bom.collect(model))
+          js("RD.setSection(#{pay.to_json})") if pay
+        rescue StandardError => e
+          # Zlyhanie echa nesmie prebit HLASKU odmietnutia — pouzivatel sa musi
+          # dozvediet, PRECO sa nic nezapisalo, aj keby sa zoznam neobnovil.
+          Engine.log_error(e, 'RulesDialog.push_section_echo')
         end
 
         # Generacia okna Studio (nil = okno nie je nacitane -> guard sa preskoci).
@@ -548,7 +571,7 @@ module Noxun
 
           model, cab, data = ctx
           pkey = data['part_key'].to_s
-          return reject_reset('Chýba identifikácia dielca — zoznam je obnovený.') if pkey.empty?
+          return reject_reset('Chýba identifikácia dielca — zoznam je obnovený.', model) if pkey.empty?
 
           params = Panel.existing_params(cab)
           rk = Panel.canonical_part_key(params, pkey)
@@ -556,15 +579,16 @@ module Noxun
           rec = ov.is_a?(Hash) ? ov[rk] : nil
           unless rec.is_a?(Hash) && rec['edges'].is_a?(Hash)
             # Riadok uz neplati (niekto ho medzitym vratil inou cestou). Nie je to
-            # chyba pouzivatela — zoznam sa len obnovi.
-            refresh_studio(bump: false)
+            # chyba pouzivatela — zoznam sa len obnovi. ECHOM bez dedupu: nic sa
+            # nezapisalo, takze ani model sa menit nesmie (review #222 P1).
+            push_section_echo(model)
             return set_status('Tento dielec už ručne nastavené hrany nemá — zoznam je obnovený.')
           end
 
           # Prestavba prekresluje VNORENE dielce. Ked v skrinke ziadny s tymto
           # klucom nie je, nemal by co prekreslit — a hlaska o uspechu by klamala.
           if Panel.find_part_by_role_key(cab, rk).nil?
-            return reject_reset('Dielec sa v skrinke nenašiel — zoznam je obnovený.')
+            return reject_reset('Dielec sa v skrinke nenašiel — zoznam je obnovený.', model)
           end
 
           had_sel = model.selection.count.positive?
@@ -588,13 +612,29 @@ module Noxun
         def abs_rule_result(cab, rk)
           part = Panel.find_part_by_role_key(cab, rk)
           cfg = part ? (Store.config(part) || {}) : {}
-          edges = cfg['edges'].is_a?(Hash) ? cfg['edges'] : {}
-          role = part ? Store.get(part, 'role').to_s : ''
+          abs_result_text(part ? Store.get(part, 'role').to_s : '', cfg['edges'])
+        end
+
+        # CISTA cast (review #222 P2-4): text sa sklada VYHRADNE z roly a mapy
+        # hran, takze sa da overit FIXTUROU — nie iba grepom tela. Grep by
+        # prezil aj `if false` na vetve „bez olepu".
+        #
+        # KOMPAKTNE (review NOTE): olep DOOKOLA sa nevypisuje po hranach —
+        # „všetky štyri hrany 1,0 mm" je to, co sluboval aj popis dávky;
+        # „pozdĺžna 1 1,0 mm · pozdĺžna 2 1,0 mm · …" by pri doske a vystuhach
+        # bola veta, ktoru nikto necita.
+        def abs_result_text(role, edges)
+          map = edges.is_a?(Hash) ? edges : {}
           labels = AbsRules.edge_labels(role)
-          taped = AbsRules::EDGE_ORDER.reject { |c| edges[c].to_s.strip.empty? }
+          taped = AbsRules::EDGE_ORDER.reject { |c| map[c].to_s.strip.empty? }
           return 'podľa pravidla bez olepu' if taped.empty?
 
-          "podľa pravidla: #{taped.map { |c| "#{labels[c].to_s.downcase} #{abs_thickness_text(edges[c])}" }
+          ths = taped.map { |c| abs_thickness_text(map[c]) }.uniq
+          if taped.length == AbsRules::EDGE_ORDER.length && ths.length == 1
+            return "podľa pravidla: všetky štyri hrany #{ths.first}"
+          end
+
+          "podľa pravidla: #{taped.map { |c| "#{labels[c].to_s.downcase} #{abs_thickness_text(map[c])}" }
                                   .join(' · ')}"
         end
 
@@ -625,14 +665,35 @@ module Noxun
             'a do výstupu ide po starom.'
         end
 
+        # Identita dvojcata sa cita TOU ISTOU cestou ako v paneli
+        # (`Panel.part_identity`: part_key -> legacy role_key -> part_id) —
+        # review #222 P2-6. Surovy `part_key` sam o sebe nestaci: starsi dielec
+        # ho mat nemusi a dvojca by sa NEPRIZNALO, teda presne ten tichy uspech,
+        # ktoremu ma F14 zabranit.
         def detached_twin?(model, cid, rk)
           model.entities.grep(Sketchup::ComponentInstance).any? do |i|
-            Store.kind(i) == 'part' && Store.get(i, 'cabinet_id').to_s == cid &&
-              Store.get(i, 'part_key').to_s == rk
+            next false unless Store.kind(i) == 'part'
+            next false unless Store.get(i, 'cabinet_id').to_s == cid
+
+            twin_identity(i, cid) == rk.to_s
           end
         rescue StandardError => e
           Engine.log_error(e, 'RulesDialog.detached_twin?')
           false
+        end
+
+        # Odpojeny dielec uz NIE JE v definicii korpusu, takze `part_identity`
+        # sa mu nema z coho pytat prefix — `cabinet_id` nesie sam (a je to ten
+        # isty retazec, ktory `fallback_role_key` odrezava z `part_id`).
+        def twin_identity(inst, cid)
+          key = Store.get(inst, 'part_key').to_s.strip
+          return key unless key.empty?
+
+          legacy = Store.get(inst, 'role_key').to_s.strip
+          return legacy unless legacy.empty?
+
+          pid = Store.get(inst, 'part_id').to_s
+          (!cid.empty? && pid.start_with?("#{cid}-")) ? pid[(cid.length + 1)..-1].to_s : pid
         end
 
         # Vyber sa ZAMERNE nemeni (ziadny reselect) — pouzivatel moze mat
@@ -654,14 +715,14 @@ module Noxun
           model, cab, data = ctx
           gt = data['generic_type'].to_s
           rid = data['rule_id'].to_s
-          return reject_reset('Chýba identifikácia položky kovania — zoznam je obnovený.') if gt.empty? || rid.empty?
+          return reject_reset('Chýba identifikácia položky kovania — zoznam je obnovený.', model) if gt.empty? || rid.empty?
 
           owner = Panel.present_str(data['part_key'])
           params = Panel.existing_params(cab)
           all = params['hardware_overrides'].is_a?(Array) ? params['hardware_overrides'] : []
           rec = all.select { |ov| Panel.ov_match?(ov, owner, gt, rid) }.last
           if rec.nil?
-            refresh_studio(bump: false)
+            push_section_echo(model)
             return set_status('Toto kovanie už ručne nastavené nie je — zoznam je obnovený.')
           end
 
@@ -685,11 +746,20 @@ module Noxun
         # Ziadna polozka = pravidlo na tejto skrinke negeneruje nic (napr. je
         # vypnute); povedat to treba, inak by prazdny riadok vyzeral ako chyba.
         def hw_rule_result(cab, owner, gt, rid)
-          items = Array((Store.config(cab) || {})['hardware']).select do |h|
+          hw_result_text(Array((Store.config(cab) || {})['hardware']), owner, gt, rid)
+        end
+
+        # CISTA cast (review #222 P2-4) + oprava zhody vlastnika (P2-3):
+        # porovnava sa PRESNE tak, ako to robi identita overridu
+        # (`Panel.ov_match?` cez `present_str`) — teda prazdny/chybajuci
+        # `owner_part_key` sedi LEN s korpusovym overridom. Povodne
+        # `owner.nil? || ...` pri korpusovom resete zratalo aj polozky CUDZICH
+        # dielcov a status by klamal o pocte.
+        def hw_result_text(items, owner, gt, rid)
+          qty = Array(items).select do |h|
             h.is_a?(Hash) && h['generic_type'].to_s == gt && h['rule_id'].to_s == rid &&
-              (owner.nil? || h['owner_part_key'].to_s == owner.to_s)
-          end
-          qty = items.sum { |h| h['quantity'].to_i }
+              Panel.present_str(h['owner_part_key']) == owner
+          end.sum { |h| h['quantity'].to_i }
           qty.positive? ? "podľa pravidla: #{qty} ks" : 'podľa pravidla sa tu nepočíta nič'
         end
 
@@ -718,6 +788,15 @@ module Noxun
         # v `materials_dialog.rb`): NAJPRV panel, az potom Studio — pripadny
         # dedup identity kopii je oneskoreny a jantarove „Obnoviť" by inak
         # zozltlo hned po vlastnom prepocte.
+        #
+        # PRIZNANE OBMEDZENIE (review #222 P2-2): oba refreshe idu cez zber,
+        # ktory spusta `dedup_copies`. Ked v dokumente lezi INA neupratana kopia
+        # (nie ta nasa — tu guard odmietne uz pred zapisom), dedup sa zapise
+        # AZ ZA nas commit a PRVE Ctrl+Z vrati JEHO precislovanie, nie reset.
+        # Je to ZDEDENY vzor VSETKYCH zapisov Studia (nie vlastnost tejto davky)
+        # a tato davka mechanizmus VEDOME nemeni — zmena by sa tykala kazdej
+        # zapisovej cesty okna naraz. Status preto ostava „Jeden krok Späť to
+        # vráti." (plati pre samotny reset).
         def after_model_write(model)
           Panel.push_selected(model) if defined?(Panel)
           refresh_studio(bump: true)

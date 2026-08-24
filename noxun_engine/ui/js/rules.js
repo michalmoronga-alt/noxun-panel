@@ -78,6 +78,14 @@
       if (!e) return;
       e.textContent = msg;
       e.className = err ? 'err' : 'ok';
+    },
+    // ŠT-3b-2b (review #222 P1): LACNE ECHO sekcie. Odmietnutý zápis nič
+    // nezmenil, takže si nepýta plný prepočet okna — ten totiž beží cez zber
+    // modelu, a ten deduplikuje ID kópií, čiže by odmietnutý klik ZAPÍSAL do
+    // modelu (a pridal krok Späť) presne v scenári, kde hláška tvrdí opak.
+    // Kanál je ten istý payload sekcie, len bez zdvihu generácie okna.
+    setSection: function(r){
+      rdApplyState(r);
     }
   };
   if (typeof window !== 'undefined') window.RD = RD;
@@ -201,7 +209,17 @@
   function rdResetOverride(kind, ownerId, partKey, genericType, ruleId){
     var name = RD_RESET_ACTION[String(kind)];
     var st = (typeof ST === 'undefined') ? null : ST;
-    if (!name || !st || typeof window === 'undefined' || !window.sketchup || !sketchup[name]) return;
+    // Klik, ktorý sa nemá kam poslať, NESMIE mlčať (review #222 NOTE): riadok
+    // by ostal jantárový a používateľ by veril, že sa niečo stalo. Rozlišujú
+    // sa DVE veci — neznámy druh riadku (chyba dát) a nedostupný kanál okna.
+    if (!name){
+      RD.setStatus('Tento riadok sa vrátiť na pravidlo nedá — obnov sekciu a skús znova.', true);
+      return;
+    }
+    if (!st || typeof window === 'undefined' || !window.sketchup || !sketchup[name]){
+      RD.setStatus('Okno stratilo spojenie so SketchUpom — zavri a otvor Štúdio znova.', true);
+      return;
+    }
     // Zapis nesie OBE identity: generaciu okna (klik zo zastaraneho zoznamu
     // sa nesmie vykonat) a dokument (panel/sekcia z ineho .skp nesmie zapisat).
     sketchup[name](JSON.stringify({ gen: st.gen || 0,

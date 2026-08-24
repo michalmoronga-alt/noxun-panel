@@ -7283,6 +7283,7 @@ module NoxunSuRunner
       dup = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 400.0,
                                              'height' => 720.0, 'depth' => 560.0 })
       if dup
+        dup_orig = e::Store.get(dup, 'cabinet_id').to_s
         model.start_operation('SU-TEST st3b2 duplicitne id', true)
         e::Store.write(dup, 'cabinet_id' => cid)
         model.commit_operation
@@ -7294,6 +7295,16 @@ module NoxunSuRunner
            rec.any? { |x| x.include?('viac kusov') })
         ok('ŠT-3b-2b (c): a NIC sa nezapisalo — ziadna „vezmi prvu"',
            st3b2_part_ov(inst, pkey).is_a?(Hash) && st3b2_part_ov(inst, pkey)['edges'].is_a?(Hash))
+        # Review #222 P1: odmietnutie NESMIE SIAHNUT NA MODEL. Plny push okna
+        # by v tomto momente spustil zber a v nom DEDUP — kopii by rovno pridelil
+        # nove cislo (a pridal krok Spat), kym hlaska tvrdi „nič sa nezmenilo".
+        ok("ŠT-3b-2b (c): odmietnutie kopii NEPRECISLOVALO (#{e::Store.get(dup, 'cabinet_id')})",
+           e::Store.get(dup, 'cabinet_id').to_s == cid)
+        # A merany dokaz, ze nepribudol ANI JEDEN krok Spat: prvy Spat vracia
+        # nase premenovanie kopie, nie nejaky cudzi zapis navrchu.
+        Sketchup.undo
+        ok("ŠT-3b-2b (c): a NEPRIDALO ziadny krok Spat (1x Spat vratil kopii #{dup_orig})",
+           dup.valid? && e::Store.get(dup, 'cabinet_id').to_s == dup_orig)
         model.start_operation('SU-TEST st3b2 upratanie kopie', true)
         dup.erase! if dup.valid?
         model.commit_operation

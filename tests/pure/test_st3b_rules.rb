@@ -663,7 +663,10 @@ ST3B2_PARTS_RB = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel'
                            encoding: 'UTF-8')
 
 def st3b2_rd_body(name)
-  ST3B_RULES_RB[/def #{Regexp.escape(name)}\b.*?\n        end\n/m].to_s
+  # `\b` za otaznikom (`detached_twin?`) NESEDI — hranica slova tam nie je
+  # a regex by ticho vratil prazdny retazec (test by potom strazil NIC).
+  edge = name.end_with?('?', '!') ? '' : '\b'
+  ST3B_RULES_RB[/def #{Regexp.escape(name)}#{edge}.*?\n        end\n/m].to_s
 end
 
 NxTest.test('ŠT-3b-2b (F17): whitelist je uzavrety a KAZDA akcia ma telo') do
@@ -799,25 +802,24 @@ NxTest.test('ŠT-3b-2b (B3): guardy stoja PRED zapisom — a nejednoznacna adres
                   "#{m}: ak prestavba vyber zhodi, PRIZNA sa to")
   end
   rej = st3b2_rd_body('reject_reset')
-  NxTest.assert(rej.include?('refresh_studio(bump: false)'),
-                'odmietnutie nacita sekciu nanovo BEZ zdvihu generacie (nic sa nezapisalo)')
+  NxTest.assert(rej.include?('push_section_echo(model)'),
+                'odmietnutie nacita sekciu LACNYM ECHOM — bez zdvihu generacie a bez dedupu '                 '(detail v sade „review P1" nizsie)')
 end
 
 NxTest.test('ŠT-3b-2b (F13/F14): status hovori VYSLEDOK a odpojene dvojca sa neprehliadne') do
   abs = st3b2_rd_body('abs_rule_result')
   NxTest.assert(abs.include?('Store.config(part)'),
                 'vysledok sa cita zo SNAPSHOTU po prestavbe — to iste, co ide do vyroby')
-  NxTest.assert(abs.include?('podľa pravidla bez olepu'),
-                'potlaceny default (kompakt, postforming, dekor bez pasky) MA vlastnu vetu')
-  NxTest.assert(abs.include?('podľa pravidla:'), 'inak sa vymenuju hrany a hrubky')
+  NxTest.assert(abs.include?('abs_result_text('),
+                'a SAMOTNY text sklada CISTA funkcia (meria ju fixtura v sade „review P2-4")')
   twin = st3b2_rd_body('detached_twin_note')
   NxTest.assert(twin.include?('vytiahnutý zo skrinky'),
                 'odpojene dvojca sa PRIZNA — prestavba ho neprekresli a do vystupu ide po starom')
   NxTest.assert(st3b2_rd_body('handle_reset_abs').include?('detached_twin_note(model, cid, rk)'),
                 'a kontroluje sa pri KAZDOM ABS resete (nikdy tichy uspech)')
   hw = st3b2_rd_body('hw_rule_result')
-  NxTest.assert(hw.include?('nepočíta nič'),
-                'ked pravidlo na skrinke negeneruje nic, povie sa to (prazdno vyzera ako chyba)')
+  NxTest.assert(hw.include?('hw_result_text('),
+                'pocet z pravidla sklada CISTA funkcia (fixtura v sade „review P2-3")')
 end
 
 NxTest.test('ŠT-3b-2b (review #221): vyber podla `rule_ref` uz nerobi zbytocny zber modelu') do
@@ -829,4 +831,141 @@ NxTest.test('ŠT-3b-2b (review #221): vyber podla `rule_ref` uz nerobi zbytocny 
                 'zber sa robi AZ vo vetve, ktora ho naozaj potrebuje')
   NxTest.assert(sel.include?('refs_for(Bom.compute(fresh_collect(model)), data)'),
                 'a vseobecna vetva ho ma dalej (BOM bez zberu neexistuje)')
+end
+
+# ---------------------------------------------------------------------------
+# ŠT-3b-2b — REVIEW #222, kolo 1
+#
+# Co pribudlo a PRECO to grep neuchytil:
+#   1. Odmietnuty klik MUTOVAL MODEL. Cesta odmietnutia siahala na plny push
+#      okna, ten na zber modelu a ten na dedup kopii — cize odmietnutie
+#      PRECISLOVALO skrinky a pridavalo krok Spat, kym hlaska tvrdila
+#      „nič sa nezmenilo". Testy tela guardu to nemohli vidiet: chyba bola
+#      v tom, CO robi odmietnutie POTOM.
+#   2. Hlasky boli overene len grepom zdrojaka — mutacia (`if false` na vetve
+#      „bez olepu", natvrdo vrateny pocet) presla zelena. Text sa preto sklada
+#      v CISTYCH funkciach a tie sa meraju fixturami.
+#   3. Zhoda vlastnika pri kovani nekopirovala identitu overridu (nil sedelo
+#      s cimkolvek) — korpusovy reset zratal do statusu aj polozky CUDZICH
+#      dielcov a povedal zly pocet.
+#   4. Odpojene dvojca sa hladalo len podla suroveho `part_key` — dielec, ktory
+#      ho nema (legacy `role_key`), by sa NEPRIZNAL. To je presne ten tichy
+#      uspech, ktoremu ma F14 zabranit.
+
+NxTest.test('ŠT-3b-2b (review P1): ODMIETNUTIE nesmie siahnut na model') do
+  code = ST3B_RULES_RB.lines.reject { |l| l.strip.start_with?('#') }.join
+  # Plny push okna (a teda zber + dedup) smie ostat LEN v ceste ulozenia
+  # pravidiel z 3b-1; ZAPISOVE resety a ich odmietnutia ho pouzit NESMU.
+  %w[handle_reset_abs handle_reset_hw reset_context reject_reset].each do |m|
+    body = st3b2_rd_body(m)
+    NxTest.refute(body.include?('refresh_studio'),
+                  "#{m}: ziadny plny push okna — jeho zber deduplikuje ID kopii, cize ZAPISUJE")
+  end
+  echo = st3b2_rd_body('push_section_echo')
+  NxTest.assert(echo.include?('Bom.collect(model)'), 'echo cita model PRIAMO — bez dedup tiku')
+  NxTest.refute(echo.include?('fresh_collect'),
+                'a nikdy cez `fresh_collect` (ten dedup spusta)')
+  NxTest.assert(echo.include?('RD.setSection'), 'a posiela ho vlastnym prijimacom sekcie')
+  NxTest.assert(ST3B_RULES_JS.include?('setSection: function(r)'), 'ktory na klientovi existuje')
+  # Dokaz, ze sa nekontroluje prazdno: `fresh_collect` dedup naozaj spusta.
+  fc = ST3B2_PC_RB[/def fresh_collect\(model\).*?\n      end\n/m].to_s
+  NxTest.assert(fc.include?('dedup_copies'),
+                'toto je dovod celeho pravidla — `fresh_collect` ZAPISUJE do modelu')
+  # A odmietnutie nesmie zdvihnut generaciu okna (nic sa nezapisalo).
+  NxTest.refute(st3b2_rd_body('push_section_echo').include?('bump'),
+                'echo generaciu nezdviha — rozkliknute riadky inych sekcii ostavaju platne')
+end
+
+NxTest.test('ŠT-3b-2b (review P2-4): text ABS vysledku sa MERIA, nie greppuje') do
+  rd = Noxun::Engine::RulesDialog
+  NxTest.assert_equal('podľa pravidla bez olepu', rd.abs_result_text('shelf', {}),
+                      'ziadna hrana = VEDOME bez olepu (kompakt, postforming, dekor bez pasky)')
+  NxTest.assert_equal('podľa pravidla bez olepu',
+                      rd.abs_result_text('shelf', { 'L1' => nil, 'L2' => '', 'W1' => nil, 'W2' => nil }),
+                      'prazdne hodnoty su to iste — nie „olep bez pasky"')
+  # Paska MIMO katalogu: surove id (neklame o hrubke).
+  NxTest.assert_equal('podľa pravidla: predná ABS-X', rd.abs_result_text('shelf', { 'L1' => 'ABS-X' }),
+                      'label hrany je z roly a hodnota surova, ked katalog pasku nepozna')
+  NxTest.assert_equal('podľa pravidla: ľavá ABS-X', rd.abs_result_text('front_door', { 'L1' => 'ABS-X' }),
+                      'ta ista hrana ma pri INEJ role INY nazov (L1 cela je ľavá)')
+
+  # S katalogom: hrubka v mm. `Materials.edge` sa zastupuje, aby test nezavisel
+  # od obsahu katalogu na disku.
+  mat = Noxun::Engine::Materials
+  mat.singleton_class.class_eval do
+    alias_method :nx_orig_edge, :edge
+    define_method(:edge) { |id| id.to_s.start_with?('ABS-') ? { 'thickness' => 1.0 } : nil }
+  end
+  begin
+    NxTest.assert_equal('podľa pravidla: predná 1,0 mm', rd.abs_result_text('shelf', { 'L1' => 'ABS-1' }),
+                        'hrubka sa cita z katalogu a pise s desatinnou CIARKOU')
+    all4 = { 'L1' => 'ABS-1', 'L2' => 'ABS-2', 'W1' => 'ABS-3', 'W2' => 'ABS-4' }
+    NxTest.assert_equal('podľa pravidla: všetky štyri hrany 1,0 mm', rd.abs_result_text('front_door', all4),
+                        'olep DOOKOLA je JEDNA veta — nie styri rovnake kusy textu')
+    NxTest.assert_equal('podľa pravidla: všetky štyri hrany 1,0 mm', rd.abs_result_text('free_panel', all4),
+                        'a plati to aj pre neutralne labely dosky („pozdĺžna 1 · pozdĺžna 2…")')
+    mixed = rd.abs_result_text('shelf', { 'L1' => 'ABS-1', 'L2' => 'INE' })
+    NxTest.assert(mixed.include?('predná 1,0 mm') && mixed.include?('zadná INE'),
+                  'rozne hodnoty sa vypisu PO HRANACH — zliatie by zamlcalo rozdiel')
+  ensure
+    mat.singleton_class.class_eval do
+      alias_method :edge, :nx_orig_edge
+      remove_method :nx_orig_edge
+    end
+  end
+end
+
+NxTest.test('ŠT-3b-2b (review P2-3): pocet z pravidla rata LEN polozky TOHO vlastnika') do
+  rd = Noxun::Engine::RulesDialog
+  items = [
+    { 'generic_type' => 'hinge', 'rule_id' => 'zavesy', 'owner_part_key' => nil, 'quantity' => 2 },
+    { 'generic_type' => 'hinge', 'rule_id' => 'zavesy', 'owner_part_key' => 'front:F1/wing:left',
+      'quantity' => 3 },
+    { 'generic_type' => 'hinge', 'rule_id' => 'zavesy', 'owner_part_key' => 'front:F2/wing:right',
+      'quantity' => 4 },
+    { 'generic_type' => 'hinge', 'rule_id' => 'INE', 'owner_part_key' => nil, 'quantity' => 9 },
+    { 'generic_type' => 'leg', 'rule_id' => 'zavesy', 'owner_part_key' => nil, 'quantity' => 9 }
+  ]
+  # KORPUSOVY override (owner = nil): prazdny/chybajuci kluc sedi LEN s nil —
+  # povodne `owner.nil? || ...` zratalo VSETKY tri polozky (2+3+4) a status
+  # by povedal 9 ks tam, kde pravidlo dava 2.
+  NxTest.assert_equal('podľa pravidla: 2 ks', rd.hw_result_text(items, nil, 'hinge', 'zavesy'),
+                      'korpusovy zaznam nezbiera polozky cudzich dielcov')
+  NxTest.assert_equal('podľa pravidla: 3 ks',
+                      rd.hw_result_text(items, 'front:F1/wing:left', 'hinge', 'zavesy'),
+                      'a dielcovy zaznam vidi LEN svoj dielec')
+  NxTest.assert_equal('podľa pravidla sa tu nepočíta nič',
+                      rd.hw_result_text(items, 'front:F9/wing:left', 'hinge', 'zavesy'),
+                      'ked pravidlo pre tohto vlastnika nic nedava, POVIE sa to')
+  NxTest.assert_equal('podľa pravidla sa tu nepočíta nič', rd.hw_result_text([], nil, 'hinge', 'zavesy'),
+                      'prazdny snapshot tiez (prazdny riadok by vyzeral ako chyba)')
+  # Prazdny RETAZEC je to iste co chybajuci kluc (vzor `present_str`) — inak by
+  # sa korpusovy override rozpadol na dva rozne „vlastnikov".
+  NxTest.assert_equal('podľa pravidla: 5 ks',
+                      rd.hw_result_text([{ 'generic_type' => 'leg', 'rule_id' => 'nohy',
+                                           'owner_part_key' => '', 'quantity' => 5 }],
+                                        nil, 'leg', 'nohy'),
+                      'prazdny `owner_part_key` = korpusova polozka')
+end
+
+NxTest.test('ŠT-3b-2b (review P2-6): dvojca sa hlada TOU ISTOU identitou ako v paneli') do
+  rd = Noxun::Engine::RulesDialog
+  make = lambda do |attrs|
+    ent = NxTest::FakeEntity.new
+    attrs.each { |k, v| ent.set_attribute('NOXUN', k, v) }
+    ent
+  end
+  NxTest.assert_equal('zone:z1/shelf:1',
+                      rd.twin_identity(make.call('part_key' => 'zone:z1/shelf:1'), 'CAB-001'),
+                      'novy dielec ma part_key')
+  NxTest.assert_equal('SHELF-2', rd.twin_identity(make.call('role_key' => 'SHELF-2'), 'CAB-001'),
+                      'starsi LEGACY dielec ma len role_key — a musi sa najst tiez')
+  NxTest.assert_equal('SIDE-L', rd.twin_identity(make.call('part_id' => 'CAB-001-SIDE-L'), 'CAB-001'),
+                      'najstarsi ma len part_id — prefix skrinky sa odreze (vzor `fallback_role_key`)')
+  NxTest.assert_equal('CUDZI-SIDE-L', rd.twin_identity(make.call('part_id' => 'CUDZI-SIDE-L'), 'CAB-001'),
+                      'cudzi prefix sa NEODREZAVA (nepatri tejto skrinke)')
+  NxTest.assert_equal('', rd.twin_identity(make.call({}), 'CAB-001'), 'dielec bez identity nesedi s nicim')
+  body = st3b2_rd_body('detached_twin?')
+  NxTest.assert(body.include?('twin_identity(i, cid)'),
+                'hladanie ide cez tuto identitu, nie cez surovy `part_key`')
 end

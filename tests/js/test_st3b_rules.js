@@ -498,4 +498,63 @@ function ok(c, msg){ n++; assert.ok(c, msg); }
      'neznámy druh riadku NEZAVOLÁ nič — meno callbacku vyberá klient z uzavretej mapy, nie payload');
 })();
 
+// ---- ŠT-3b-2b, review #222: echo sekcie + klik, ktorý nemá kam ísť --------
+//
+// 1. Odmietnutý zápis prichádza LACNÝM ECHOM (`RD.setSection`), nie plným
+//    pushom okna — ten totiž beží cez zber modelu, ktorý prečísluje ID kópií,
+//    takže by odmietnutý klik ZAPÍSAL do modelu. Echo musí sekciu obnoviť
+//    rovnako ako plný push (vrátane jantárových riadkov).
+// 2. Klik, ktorý sa nemá kam poslať, NESMIE mlčať — riadok by ostal jantárový
+//    a používateľ by veril, že sa niečo stalo.
+
+(function(){
+  const base = { version: '0.7.64', model_guid: 'G9', source: 'project', cabinets: 1,
+                 rules: [{ kind: 'fixed', output: 'leg', enabled: true, quantity: 4,
+                           applies_to: { role: 'cabinet' } }],
+                 abs: { rows: [{ role: 'shelf', label: 'Polica', desc: 'Predná', value: '1,0 mm' }],
+                        source: 'zdroj: globálne predvoľby', hint: 'h' },
+                 overrides: { abs: { total: 1, title: 'T', note: '', more_text: '',
+                                     groups: [{ owner_id: 'CAB-007', title: 'CAB-007',
+                                                rows: [{ kind: 'abs', owner_id: 'CAB-007',
+                                                         part_key: 'p1', label: 'Polica 7',
+                                                         desc: 'ručne nastavené hrany',
+                                                         value: 'Predná: bez olepu' }] }] },
+                              hardware: { total: 0, groups: [] } } };
+  ELS.secbody.innerHTML = '';
+  R.rdApplyState(base);
+  R.rulesRenderBody();
+  ok(/Polica 7/.test(ELS.rdAbsOvr.innerHTML), 'východiskový stav sekcie je vykreslený');
+
+  // Server odmietol zápis a poslal echo s NEZMENENÝMI pravidlami, ale
+  // s obnoveným zoznamom (riadok medzitým zanikol inou cestou).
+  const echo = JSON.parse(JSON.stringify(base));
+  echo.overrides.abs = { total: 0, groups: [] };
+  R.RD.setSection(echo);
+  eq(ELS.rdAbsOvr.innerHTML, '',
+     'echo obnoví jantárové riadky rovnako ako plný push (bez neho by riadok „visel")');
+
+  // A rozpísaný formulár pravidiel pritom prežije — echo nie je re-render formulára.
+  ELS.rulesBox.innerHTML = 'ROZPÍSANÉ';
+  R.RD.setSection(echo);
+  eq(ELS.rulesBox.innerHTML, 'ROZPÍSANÉ', 'formulár kovania echo NEPREKRESLÍ');
+})();
+
+(function(){
+  SENT.length = 0;
+  ELS.status._text = '';
+  global.ST = { gen: 3 };
+  R.rdResetOverride('neznamy_druh', 'CAB-001', 'p1', '', '');
+  eq(SENT.length, 0, 'neznámy druh riadku nič nepošle');
+  ok(/nedá/.test(ELS.status.textContent), 'ale POVIE to — mlčať by znamenalo „asi sa to podarilo"');
+
+  const prevSk = global.window.sketchup;
+  global.window.sketchup = undefined;
+  global.sketchup = undefined;
+  ELS.status._text = '';
+  R.rdResetOverride('abs', 'CAB-001', 'p1', '', '');
+  ok(/spojenie/.test(ELS.status.textContent), 'a stratený kanál okna tiež');
+  global.window.sketchup = prevSk;
+  global.sketchup = prevSk;
+})();
+
 console.log(`OK ${n} kontrol (ŠT-3b-1/3b-2a/3b-2b sekcia Pravidlá)`);
