@@ -164,6 +164,14 @@ module Noxun
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
           current = SupplierSettings.revision(SupplierSettings.active)
           if data['revision'].to_s != current
+            # Review #227 P1: klient drzi reviziu PRIPNUTU na stav, nad ktorym
+            # zacal pisat — inak by plny push reviziu omladil, zamok by presiel
+            # a cudzia zmena by zmizla bez slova. A odmietnutie MUSI rozpisane
+            # hodnoty ZAHODIT (`SS.saved()`, presne ako to robilo okno): bez toho
+            # by prezili push, prekryli cerstve cisla a DRUHY klik by ich ticho
+            # prepisal — hlaska pritom tvrdi, ze formular je nacitany nanovo.
+            # Hlaska a spravanie sa musia zhodovat (review #227 P1-2).
+            js('SS.saved()')
             refresh_studio
             return set_status('Nastavenia sa medzitým zmenili — formulár je načítaný nanovo. ' \
                               'Skontroluj hodnoty a ulož znova.', true)

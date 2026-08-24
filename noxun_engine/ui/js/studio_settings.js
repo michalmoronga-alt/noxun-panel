@@ -22,6 +22,18 @@
 
   var SS_STATE = null;   // posledný push zo servera (`ST.settings`)
   var SS_DIRTY = {};     // zmenené polia: "rate:olep" -> "0,95" (surový text)
+  // REVÍZIA, NAD KTOROU POUŽÍVATEĽ ZAČAL PÍSAŤ (review #227 P1). Plný push
+  // chodí pri každej zmene modelu a `SS_STATE.revision` s ním omladne — keby
+  // sa uložením poslala TÁ ČERSTVÁ, optimistický zámok servera by prešiel
+  // a cudziu zmenu (druhá inštancia, ručný zásah do súboru) by rozpísaný
+  // formulár TICHO PREPÍSAL. Presne to má zámok chytiť, takže sa posiela
+  // revízia PRIPNUTÁ pri prvom písmene; uvoľní ju potvrdený zápis, „Načítať
+  // nanovo" alebo vedomé potvrdenie konfliktu (`SS.conflict`).
+  var SS_BASE_REV = null;
+  // Posledný payload NEDORAZIL (server ho nevedel zostaviť — chyba disku,
+  // poškodený súbor). Sekcia to MUSÍ povedať: formulár, ktorý vyzerá aktuálne,
+  // ale aktuálny nie je, je horší než hláška (review #227 P2).
+  var SS_FAILED = false;
 
   // Sekcie, ktoré tento súbor kreslí. Autoritou zoznamu je Ruby
   // (`StudioDialog::SECTIONS`) — tu je len to, čo patrí NASTAVENIAM.
@@ -258,6 +270,14 @@
     var sec = ssActive();
     var box = ssEl('secbody');
     if (!sec || !box) return;
+    // Zlyhaný payload NESMIE nechať na obrazovke formulár, ktorý vyzerá
+    // aktuálne (review #227 P2) — vrátane toho, čo tam bolo pred zlyhaním.
+    if (SS_FAILED){
+      box.innerHTML = '<div class="err ssfail">Nastavenia sa nepodarilo načítať ' +
+        '(chyba pri čítaní súboru). Hodnoty nižšie by nemuseli platiť, preto sa nezobrazujú — ' +
+        'skús „Obnoviť" alebo zavri a otvor Štúdio znova.</div>';
+      return;
+    }
     if (!SS_STATE){ box.innerHTML = '<div class="muted">Načítavam…</div>'; return; }
     if (ssTyping()) return;
     box.innerHTML = '';
@@ -282,7 +302,9 @@
     var sec = ssActive();
     var box = ssEl('sectools');
     if (!sec || !box) return;
-    box.innerHTML = ssToolsHtml(sec);
+    // Nad neznámym stavom sa NEUKLADÁ — tlačidlo „Uložiť" by poslalo patch
+    // proti revízii, ktorá sa práve nedá prečítať.
+    box.innerHTML = SS_FAILED ? '' : ssToolsHtml(sec);
   }
 
   // --- patch ---------------------------------------------------------------
@@ -335,12 +357,17 @@
       return;
     }
     if (typeof window !== 'undefined' && window.sketchup && sketchup.ss_save){
-      sketchup.ss_save(JSON.stringify({ revision: SS_STATE.revision, patch: built.patch }));
+      // NIE `SS_STATE.revision` (tá medzitým omladla plným pushom), ale tá,
+      // nad ktorou používateľ písal — inak by zámok servera prešiel a cudzia
+      // zmena by zmizla bez slova (review #227 P1).
+      var rev = (SS_BASE_REV === null) ? SS_STATE.revision : SS_BASE_REV;
+      sketchup.ss_save(JSON.stringify({ revision: rev, patch: built.patch }));
     }
   }
 
   function ssReload(){
     SS_DIRTY = {};
+    SS_BASE_REV = null;
     if (typeof window !== 'undefined' && window.sketchup && sketchup.ss_reload) sketchup.ss_reload('');
     else ssRenderBody();
   }
@@ -354,19 +381,35 @@
       e.textContent = msg;
       e.className = err ? 'err' : 'ok';
     },
-    // POTVRDENÝ zápis (alebo načítanie nanovo): rozpísané hodnoty zanikajú AŽ
-    // TU. Čerstvý stav dorazí samostatne plným pushom Štúdia.
+    // POTVRDENÝ zápis, načítanie nanovo — a ODMIETNUTIE pre cudziu zmenu:
+    // rozpísané hodnoty zanikajú AŽ TU. Pri odmietnutí je to podstatné, nie
+    // detail: hláška hovorí „formulár je načítaný nanovo", takže rozpísané
+    // čísla nesmú prekryť tie čerstvé a druhým klikom ich ticho prepísať
+    // (review #227 P1-2). Čerstvý stav dorazí samostatne plným pushom.
     saved: function(){
       SS_DIRTY = {};
+      SS_BASE_REV = null;   // rozpis skončil — ďalší začne od čerstvej revízie
       ssRenderBody();
     }
   };
   if (typeof window !== 'undefined') window.SS = SS;
 
   // Stav sekcií z payloadu Štúdia (`ST.settings`). Rozpísané hodnoty push
-  // NEZAHADZUJE (dôvod v hlavičke súboru).
+  // NEZAHADZUJE (dôvod v hlavičke súboru) — ale revízia, s ktorou sa bude
+  // ukladať, ostáva PRIPNUTÁ na stav, nad ktorým sa začalo písať.
+  //
+  // `null` = server payload NEVEDEL zostaviť (`settings_payload` spadol na
+  // chybe disku a poslal `nil`). Vtedy sa formulár NESMIE tváriť aktuálne:
+  // sekcia prejde do chybového stavu a povie to.
   function ssApplyState(s){
-    if (!s) return;
+    if (s === null || s === undefined){
+      SS_FAILED = true;
+      if (!ssActive()) return;
+      ssRenderBody();
+      ssRenderTools();
+      return;
+    }
+    SS_FAILED = false;
     SS_STATE = s;
     if (!ssActive()) return;
     ssRenderBody();
@@ -376,7 +419,10 @@
   if (typeof window !== 'undefined' && window.NX && typeof NX.setStudio === 'function'){
     var ssPrevSetStudio = NX.setStudio;
     NX.setStudio = function(data){
-      ssApplyState(data && data.settings);
+      // Kľúč `settings` posiela `push_state` VŽDY — jeho `null` je teda
+      // SIGNÁL („nepodarilo sa"), nie „nič nové". Rozlišuje sa preto
+      // prítomnosť kľúča, nie pravdivosť hodnoty.
+      if (data && Object.prototype.hasOwnProperty.call(data, 'settings')) ssApplyState(data.settings);
       ssPrevSetStudio(data);
     };
   }
@@ -387,6 +433,8 @@
       if (!t || !t.getAttribute) return;
       var key = t.getAttribute('data-ss');
       if (!key) return;
+      // Prvé písmeno PRIPNE revíziu, nad ktorou sa formulár rozpisuje.
+      if (SS_BASE_REV === null && SS_STATE) SS_BASE_REV = SS_STATE.revision;
       SS_DIRTY[key] = t.value;
       var v = ssParse(t.value);
       t.classList.toggle('bad', typeof v === 'number' && isNaN(v));
@@ -412,5 +460,7 @@
                        ssToolsHtml: ssToolsHtml, ssApplyState: ssApplyState,
                        ssRenderBody: ssRenderBody, ssRenderTools: ssRenderTools,
                        ssActive: ssActive, ssSave: ssSave, ssReload: ssReload,
+                       ssBaseRev: function(){ return SS_BASE_REV; },
+                       ssFailed: function(){ return SS_FAILED; },
                        SS_SECTIONS: SS_SECTIONS, SS: SS };
   }

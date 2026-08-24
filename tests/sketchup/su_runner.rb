@@ -8025,6 +8025,29 @@ module NoxunSuRunner
          File.binread(e::SupplierSettings.path) == snapshot)
       ok('ŠT-4a (c): sadzba ostala ta, ktoru ulozil PRVY zapis',
          (e::SupplierSettings.rate(e::SupplierSettings.active, ST4A_RATE).to_f - new_rate).abs < 0.001)
+      ok('ŠT-4a (c): odmietnutie ZAHODILO rozpisane hodnoty (hlaska hovori „nacitany nanovo")',
+         rec.any? { |x| x.include?('SS.saved()') })
+      # Review #227 P1-2: DRUHY klik s TOU ISTOU starou reviziou sa musi odmietnut
+      # ROVNAKO — sekcia si rozpis nedrzi, takze niet co ticho prepisat.
+      rec.clear
+      sd.dispatch('ss_save', { 'revision' => rev,
+                               'patch' => { 'rates' => { ST4A_RATE => 999.0 } } }.to_json, sink)
+      ok('ŠT-4a (c): ani DRUHY pokus so starou reviziou NEPREJDE',
+         rec.any? { |x| x.include?('Nastavenia sa medzitým zmenili') })
+      ok('ŠT-4a (c): a sadzba je stale ta spravna (999 sa nikam nezapisalo)',
+         (e::SupplierSettings.rate(e::SupplierSettings.active, ST4A_RATE).to_f - new_rate).abs < 0.001)
+      ok('ŠT-4a (c): subor je BYTE-NEZMENENY aj po druhom pokuse',
+         File.binread(e::SupplierSettings.path) == snapshot)
+      # Ulozenie s CERSTVOU reviziou (to, co pouzivatel spravi po precitani
+      # hlasky) prejde — cesta von z konfliktu musi existovat.
+      fresh_rev = e::SupplierSettings.revision(e::SupplierSettings.active)
+      rec.clear
+      sd.dispatch('ss_save', { 'revision' => fresh_rev,
+                               'patch' => { 'rates' => { ST4A_RATE => (new_rate + 1.0).round(2) } } }.to_json,
+                  sink)
+      ok('ŠT-4a (c): s CERSTVOU reviziou zapis PREJDE (cesta von z konfliktu existuje)',
+         (e::SupplierSettings.rate(e::SupplierSettings.active, ST4A_RATE).to_f - (new_rate + 1.0)).abs < 0.001)
+      new_rate = (new_rate + 1.0).round(2)
 
       # --- (d) ZAPIS NASTAVENI NIE JE krok Spat ----------------------------
       # Nastavenia su subor v %APPDATA%, nie model. Sentinel: posledna modelova

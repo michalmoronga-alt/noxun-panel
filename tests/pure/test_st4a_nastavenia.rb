@@ -181,9 +181,13 @@ NxTest.test('ŠT-4a: klient kresli LEN do otvorenej sekcie a rozpisane NEZAHADZU
   saved = code[/saved: function\(\).*?\n    \}/m].to_s
   NxTest.assert(saved.include?('SS_DIRTY = {}'),
                 'rozpisane zanikaju AZ na potvrdenie servera')
-  NxTest.assert(st4a_body('handle_save').include?("js('SS.saved()')") ||
-                ST4A_SUP_RB.include?("SS.saved()"),
-                'a server to potvrdenie posiela')
+  # Review #227 P2: povodny assert bol DISJUNKCIA, ktorej druhy operand bol
+  # vzdy pravdivy (`SS.saved()` je v subore aj v komentari) — pokrytie len
+  # predstieral. Hlada sa TELO handlera, nie subor.
+  NxTest.assert(st4a_body('handle_save').include?("js('SS.saved()')"),
+                'a server to potvrdenie posiela z TELA ulozenia')
+  NxTest.assert(st4a_body('handle_reload').include?("js('SS.saved()')"),
+                'aj z tela „Načítať nanovo"')
 end
 
 NxTest.test('ŠT-4a: „O plugine" je JEDEN OBSAH s DVOMA VSTUPMI') do
@@ -339,4 +343,93 @@ ensure
     rescue StandardError # rubocop:disable Lint/SuppressedException
     end
   end
+end
+
+# --- 6) review #227: odmietacia vetva, pripnuta revizia, zbalena navigacia ---
+
+NxTest.test('ŠT-4a (review #227 P1-2): ODMIETNUTIE zahodi rozpisane A obnovi zoznam') do
+  NxTest.skip!('zapis do realneho testovacieho %APPDATA%') unless NxTest.headless?
+
+  e = Noxun::Engine
+  sd = e::SupplierSettingsDialog
+  e::SupplierSettings.reload!
+  before = File.binread(e::SupplierSettings.path)
+  rev = e::SupplierSettings.revision(e::SupplierSettings.active)
+
+  got = []
+  refreshed = []
+  st4a_with_stub(e::StudioDialog, :refresh_if_open, ->(bump: true) { refreshed << bump }) do
+    sd.dispatch('ss_save',
+                { 'revision' => "#{rev}-STARA", 'patch' => { 'rates' => { 'montaz' => 999.0 } } }.to_json,
+                ->(js) { got << js.to_s })
+  end
+  # Bez `SS.saved()` by rozpisane hodnoty push PREZILI, prekryli cerstve cisla
+  # a DRUHY klik by ich ticho prepisal — pricom hlaska tvrdi opak.
+  NxTest.assert(got.any? { |x| x.include?('SS.saved()') },
+                'odmietnutie ZAHADZUJE rozpisane hodnoty (hlaska hovori „nacitany nanovo")')
+  NxTest.assert_equal([true], refreshed, 'a formular sa naozaj nacita nanovo (plny push)')
+  NxTest.assert(got.any? { |x| x.include?('formulár je načítaný nanovo') },
+                'hlaska sedi so spravanim')
+  NxTest.assert(got.index { |x| x.include?('SS.saved()') } <
+                got.index { |x| x.include?('SS.setStatus') },
+                'poradie: najprv zahodenie rozpisu, az potom hlaska')
+  NxTest.assert_equal(before, File.binread(e::SupplierSettings.path), 'a NIC sa nezapisalo')
+ensure
+  if NxTest.headless?
+    begin
+      File.binwrite(Noxun::Engine::SupplierSettings.path, before) if before
+      Noxun::Engine::SupplierSettings.reload!
+    rescue StandardError # rubocop:disable Lint/SuppressedException
+    end
+  end
+end
+
+NxTest.test('ŠT-4a (review #227 P1): ulozenie posiela PRIPNUTU reviziu, nie omladenu') do
+  code = ST4A_JS.lines.reject { |l| l.strip.start_with?('//') }.join
+  NxTest.assert(code.include?('var SS_BASE_REV = null;'), 'klient drzi pripnutu reviziu')
+  save = code[/function ssSave\(\).*?
+  \}/m].to_s
+  NxTest.assert(save.include?('(SS_BASE_REV === null) ? SS_STATE.revision : SS_BASE_REV'),
+                'a posiela JU (cerstva by nechala zamok prejst a cudziu zmenu prepisat)')
+  NxTest.refute(save.include?('revision: SS_STATE.revision'), 'omladena revizia sa uz neposiela')
+  NxTest.assert(code.include?('if (SS_BASE_REV === null && SS_STATE) SS_BASE_REV = SS_STATE.revision;'),
+                'pripina sa PRVYM pismenom')
+  saved = code[/saved: function\(\).*?
+    \}/m].to_s
+  NxTest.assert(saved.include?('SS_BASE_REV = null'), 'potvrdenie/odmietnutie pin uvolni')
+end
+
+NxTest.test('ŠT-4a (review #227 P2): ZLYHANY payload sa PRIZNA, nie zamlci') do
+  code = ST4A_JS.lines.reject { |l| l.strip.start_with?('//') }.join
+  apply = code[/function ssApplyState\(s\).*?
+  \}/m].to_s
+  NxTest.assert(apply.include?('if (s === null || s === undefined)'),
+                '`settings: nil` je SIGNAL (server ho posiela pri zlyhani), nie „nic nove"')
+  NxTest.assert(apply.include?('SS_FAILED = true'), 'sekcia prejde do chyboveho stavu')
+  wrap = code[/NX.setStudio = function\(data\)\{.*?
+    \};/m].to_s
+  NxTest.assert(wrap.include?("hasOwnProperty.call(data, 'settings')"),
+                'rozlisuje sa PRITOMNOST kluca, nie pravdivost hodnoty')
+  body = code[/function ssRenderBody\(\).*?
+  \}/m].to_s
+  NxTest.assert(body.index('SS_FAILED') < body.index('SS_STATE'),
+                'chybovy stav sa kresli PRED formularom — stary formular nesmie ostat na obrazovke')
+  tools = code[/function ssRenderTools\(\).*?
+  \}/m].to_s
+  NxTest.assert(tools.include?('SS_FAILED ?'), 'a nad neznamym stavom sa NEUKLADA')
+end
+
+NxTest.test('ŠT-4a (review #227 P1-1): ZBALENA navigacia skryva texty') do
+  css = ST4A_STUDIO_HTML[/<style>(.*?)<\/style>/m, 1].to_s
+  NxTest.refute(css.empty?, 'styly okna sa nasli')
+  # Pravidlo MUSI byt samostatne: kym v skupine selektorov zila aj `.nbridge`,
+  # jej zmazanie (ŠT-4a) vzalo `display: none` celej skupine a zbalena
+  # navigacia zacala ukazovat nadpisy skupin aj nazvy poloziek.
+  rule = css[/\.studio\.navmini \.snav \.sgrp,\s*\.studio\.navmini \.snav \.navitem span \{([^}]*)\}/m, 1].to_s
+  NxTest.assert(rule.include?('display: none'),
+                'zbaleny rezim skryva `.sgrp` aj `.navitem span` (inak 48 px pas ukazuje texty)')
+  NxTest.refute(rule.include?('justify-content'),
+                'a NEDEDI deklaracie susedneho pravidla (presne to bola regresia)')
+  NxTest.assert(css.include?('.sectools:empty { display: none; }'),
+                'prazdna lista sekcie nezabera vysku (vertikalny priestor je vzacny)')
 end

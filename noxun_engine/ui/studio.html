@@ -19,8 +19,13 @@
   .snav { flex: 0 0 208px; background: var(--nx-bg); border-right: 1px solid var(--nx-border);
           padding: 8px 6px; overflow: auto; transition: flex-basis .12s; }
   .studio.navmini .snav { flex-basis: 48px; }
+  /* ZBALENA navigacia (48 px) ukazuje IBA ikony — nadpisy skupin a nazvy
+     poloziek sa skryvaju. Pravidlo je SAMOSTATNE zamerne: kym v skupine
+     selektorov zila aj `.nbridge` (ŠT-4a ju zmazala), zmazanie posledneho
+     riadku vzalo aj deklaraciu `display: none` a zbalena navigacia zacala
+     ukazovat vsetky texty. Strazi to guard test. */
   .studio.navmini .snav .sgrp,
-  .studio.navmini .snav .navitem span,
+  .studio.navmini .snav .navitem span { display: none; }
   .studio.navmini .navitem { justify-content: center; padding: 7px 0; }
   .sgrp { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
           color: var(--nx-ink-faint); padding: 9px 8px 3px; }
@@ -54,6 +59,9 @@
   .sectools .primary { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; }
   .sectools .ghostbtn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; }
   .sectools .ghostbtn .ic, .sectools .primary .ic { width: 14px; height: 14px; }
+  /* Sekcia BEZ akcii (`sup`, `about`) nema listu — prazdny pas by zral ~33 px
+     vertikalneho priestoru, ktory je v tomto okne vzacny (trvale UI pravidlo). */
+  .sectools:empty { display: none; }
   /* ŠT-4a — sekcie NASTAVENIA (`sup` · `bset` · `about`). Presun 1:1 zo
      zaniknutého okna: tabuľka `.ssgrid` je jeho vlastný štýl (v zdieľanom
      panel.css nikdy nebola). Trieda ide na `<table>`/`<td>`, NIKDY na `<tr>`
