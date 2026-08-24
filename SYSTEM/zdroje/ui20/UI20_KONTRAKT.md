@@ -535,8 +535,8 @@ rez podlieha bežnému schváleniu blokov):**
 - **ŠT-2** (M) sekcia **Materiály** + **D-69 editor** + D-15 komponent — okno Materiály zaniká.
 - **ŠT-3** (M) sekcie **Kovanie · Pravidlá · Šablóny** (Š16–Š18, presuny 1:1 + zjednotenie
   pravidiel) — tri okná zanikajú.
-- **ŠT-4** (S) **Nastavenia** (Š19) + upratanie: zánik zvyšných satelitov, `open_tab` →
-  `studioOpen` všade, docs.
+- ~~**ŠT-4** (S) **Nastavenia** (Š19) + upratanie: zánik zvyšných satelitov, `open_tab` →
+  `studioOpen` všade, docs.~~ — **HOTOVÉ (#227 + #228, v0.8.0)**; odchýlky v §7 nižšie.
 Každá dávka = plugin plne použiteľný; satelit zaniká až keď je jeho obsah plne v Štúdiu.
 
 ## 6 · Otvorené otázky na večernú debatu *(historické — všetky zodpovedané)*
@@ -546,3 +546,45 @@ Každá dávka = plugin plne použiteľný; satelit zaniká až keď je jeho obs
 3. Náhľad ako hlavný vizuál — áno (UI-B2).
 4. D-69 jednotný editor materiálov — SCHVÁLENÝ v ŠTÚDIO KONCEPTE (22.8., vyššie).
 5. Poradie dávok — Inspector prebehol UI-A…D; Štúdio dávky ŠT-1a…ŠT-4 vyššie.
+
+## 7 · UZÁVER FÁZY ŠTÚDIO — finálne VEDOMÉ ODCHÝLKY (24.8.2026, v0.8.0)
+
+Fáza je hotová (ŠT-1a … ŠT-4b, PR #192–#228): **dve okná** (Inspector + Štúdio s **dvanástimi
+živými sekciami**), **šesť satelitov zaniklo**. Tento zoznam je súhrn miest, kde sa
+implementácia **vedome líši od mockupu alebo od pôvodného znenia kontraktu** — každá odchýlka má
+dôvod a je zapísaná aj v `SYSTEM/archiv/KRONIKA.md` pri svojej dávke. Zoznam je záväzný v tom
+zmysle, že **mockup už nie je poslednou pravdou tam, kde tu stojí niečo iné**.
+
+1. **Šablóny (Š18) — doskovej dlaždici sa „použiť" a „odfotiť" NEZOBRAZUJE.** Mockup kreslí štyri
+   akcie na každej dlaždici; apply je typová operácia nad skrinkou a fotka dosky by bola fotka
+   ničoho. Nie sú `disabled`, ale **vôbec tam nie sú** (D-78: mŕtve tlačidlo bez blízkeho sľubu je
+   horšie než jeho absencia). Zmazať a **premenovať** sa dá každá (ŠT-3c-2).
+2. **Nastavenia (Š19) — sekcia „Dodávateľ / Demos" nemá ani jedno editovateľné pole.** Wireframe
+   sľubuje cenové pásmo, DPH a odstup dotazov; ani jedno v pluginu neexistuje — Demos je **verejný
+   cenník** (žiadne prihlásenie), firma je **neplatca DPH** (`VAT_DIVISOR` je len zobrazovací
+   prepočet) a odstup dotazov je **konštanta slušného správania** voči serveru. Väzba na Demos je
+   navyše vlastnosť konkrétneho dekoru/kovania. Sekcia preto ukazuje STAV a **vedie** tam, kde sa
+   väzba nastavuje (deep-linky do Materiálov a Rozpočtu).
+3. **„O plugine" je ZRKADLO kolieska Inspectora — bez licencií a diagnostiky.** Wireframe ich
+   spomína, ale v koliesku dnes nie sú; pridať ich by neznamenalo zrkadlo, ale **nový obsah v oboch
+   vstupoch**. Markup stavia zdieľaný `ui/js/about.js` (jeden obsah, dva vstupy) a dáta dáva server.
+4. **Exporty, ktoré neexistujú, sa SKRÝVAJÚ — nie `aria-disabled`.** Pôvodné znenie (Š5) sľubovalo
+   priznaný neaktívny ovládač; revízia 22.8. (smoke test, verdikt Michal) pravidlo **zúžila**:
+   `aria-disabled` platí len na sľub, ktorý príde **najbližšou dávkou**, ovládač visiaci celý blok
+   sa skryje. Prvý prípad: XLSX/CSV kusovníka odišli z lišty.
+5. **Nárezový plán ostáva jedinou `aria-disabled` položkou navigácie** — patrí do fázy 2 a dôvod
+   je v tooltipe. Je to jediné miesto, kde navigácia niečo nesľubuje.
+6. **Nákup kovania a Katalóg kovania sa presunuli 1:1 BEZ redizajnu** (rozhodnutie 21.8.) —
+   redizajn príde s blokom KOVANIE, keď pribudnú dáta kovania.
+7. **Premostenia zanikli CELE** (`WINDOW_BRIDGES`/`BRIDGE_STATUS`/`do_bridge`/`bridge_window`/
+   `studio_bridge`/`bridge:`/`bridgeTo`/`.nbridge`). Kontrakt ich popisoval ako dočasný most do
+   satelitu, ktorý ešte žije; posledným satelitom (ŠT-4a) stratili oba konce.
+8. **`open_tab` → `NX.studioOpen` bolo hotové skôr, než prišiel plánovaný „grep naprieč repom".**
+   Deep-linky sa preklápali priebežne s každým zánikom okna, takže v kóde pluginu neostal ani
+   jeden živý výskyt — meno žije len v REFUTE guardoch (test stráži, že cesta zanikla) a
+   v historických zápisoch (tu, v PLAN a v KRONIKE).
+9. **Osirotené `preferences_key` zaniknutých okien ostávajú v registri používateľa**
+   (`NoxunEngineProduction`, `noxun_engine_hw_catalog_v1`, `noxun_engine_rules`,
+   `noxun_engine_templates`, `noxun_engine_supplier_settings`) — je to zapamätaná veľkosť okna,
+   ktoré už neexistuje, a SketchUp ju nikdy nepoužije. Mazať cudzí register kvôli kozmetike je
+   väčšie riziko než nechať ich tam.
