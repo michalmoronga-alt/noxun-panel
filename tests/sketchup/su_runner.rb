@@ -7243,6 +7243,47 @@ module NoxunSuRunner
       ok('ŠT-3b-1 (e): a NIC sa nezapisalo (v projekte ostala cudzia hodnota)',
          st3b_qty(model, output).to_i == 9)
       Sketchup.undo # cudzia zmena prec
+
+      # --- (f) ODTLACOK pravidiel (ŠT-3b-2c2) -----------------------------
+      # Baseline aj odtlacok su DVE NEZAVISLE vrstvy. Tu sa meria druha:
+      # formular posle CUDZI `rules_rev` (ako keby bol naplneny z inej verzie
+      # pravidiel) — a to musí stacit na odmietnutie, aj ked obsah baseline
+      # sedi. Bez toho by sa dalo ulozit nad zmenu, ktoru pouzivatel nevidel.
+      e::StudioDialog.send(:push_state) # cerstvy baseline AJ odtlacok
+      before_qty = st3b_qty(model, output).to_i
+      rec.clear
+      rd.dispatch('save_rules',
+                  { 'rules' => edited, 'also_global' => false,
+                    'model_guid' => model.guid.to_s,
+                    'rules_rev' => 'cudzi-odtlacok' }.to_json, sink)
+      ok('ŠT-3b-2c2 (f): zapis s CUDZIM odtlackom pravidiel sa ODMIETNE',
+         rec.any? { |x| x.include?('inej verzie') })
+      ok("ŠT-3b-2c2 (f): a NIC sa nezapisalo (v projekte ostalo #{before_qty})",
+         st3b_qty(model, output).to_i == before_qty)
+      ok('ŠT-3b-2c2 (f): odmietnutie poslalo ECHO sekcie (nie plny push okna)',
+         rec.any? { |x| x.start_with?('RD.setSection(') } &&
+         rec.none? { |x| x.start_with?('NX.setStudio(') })
+
+      # SPRAVNY odtlacok (ten, ktory server prave poslal) prejde — dokaz, ze
+      # guard neblokuje vsetko, len nesediace verzie.
+      # Echo nesie payload sekcie priamo — odtlacok sa vytiahne z posledneho
+      # `RD.setSection(<json>, <force>)`.
+      line = rec.reverse.find { |x| x.start_with?('RD.setSection(') }
+      json = line.to_s[/\ARD\.setSection\((.*),\s*(?:true|false)\)\z/m, 1]
+      fresh_rev = begin
+        JSON.parse(json.to_s)['rules_rev'].to_s
+      rescue StandardError
+        ''
+      end
+      ok('ŠT-3b-2c2 (f): sekcia dostala CERSTVY odtlacok v payloade', !fresh_rev.empty?)
+      rec.clear
+      rd.dispatch('save_rules',
+                  { 'rules' => edited, 'also_global' => false,
+                    'model_guid' => model.guid.to_s,
+                    'rules_rev' => fresh_rev }.to_json, sink)
+      ok('ŠT-3b-2c2 (f): so SPRAVNYM odtlackom ulozenie PREJDE',
+         rec.any? { |x| x.include?('prestavan') })
+      Sketchup.undo # ulozenie prec (scenar konci v povodnom stave)
     end
   end
 

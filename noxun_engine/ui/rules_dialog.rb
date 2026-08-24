@@ -100,24 +100,39 @@ module Noxun
         # Pri KAZDOM zostaveni sa obnovi BASELINE — presne to, co robil
         # `push_state` okna: formular je platny len pre stav, z ktoreho bol
         # naplneny.
+        # ŠT-3b-2c2 (audit B4): BASELINE sa obnovuje AZ PRI USPESNOM zostaveni
+        # payloadu — na konci, nie na zaciatku. Ked telo spadne (`rescue` -> nil),
+        # klient si drzi STARY stav; keby si server medzitym posunul baseline
+        # a odtlacok, roztvorili by sa NOZNICE: server by cakal nove hodnoty,
+        # klient by posielal stare a kazde ulozenie by sa navzdy odmietalo.
         def rules_payload(model, collected = nil)
           project = HardwareRules.project_rules(model)
           rules = project || HardwareRules.load
-          @baseline_guid  = model_guid(model)
+          guid = model_guid(model)
+          rev = HardwareRules.rules_rev(rules)
+          payload = { 'version' => Engine::VERSION,
+                      'rules' => rules,
+                      'source' => project ? 'project' : 'global',
+                      'model_guid' => guid,
+                      # ŠT-3b-2c2: odtlacok pravidiel (vzor `HardwareCatalog.record_rev`).
+                      # Pocita ho VYHRADNE server a LEN z `rules` — keby siel
+                      # z celeho payloadu, zozltol by pri kazdom rucnom zasahu
+                      # v Inspectore (menia sa `overrides`, nie pravidla).
+                      'rules_rev' => rev,
+                      'cabinets' => cabinets(model).size,
+                      # ŠT-3b-2a: druha skupina sekcie — ABS pravidla podla ROLY dielca
+                      # (read-only prehlad) a jantarove riadky rucnych zasahov. Texty
+                      # sklada SERVER (jedna autorita nazvov), klient nic neprekladá.
+                      'abs' => abs_payload,
+                      'overrides' => overrides_payload(collected) }
+          @baseline_guid  = guid
           @baseline_rules = rules
-          { 'version' => Engine::VERSION,
-            'rules' => rules,
-            'source' => project ? 'project' : 'global',
-            'model_guid' => @baseline_guid,
-            'cabinets' => cabinets(model).size,
-            # ŠT-3b-2a: druha skupina sekcie — ABS pravidla podla ROLY dielca
-            # (read-only prehlad) a jantarove riadky rucnych zasahov. Texty
-            # sklada SERVER (jedna autorita nazvov), klient nic neprekladá.
-            'abs' => abs_payload,
-            'overrides' => overrides_payload(collected) }
+          @baseline_rev   = rev
+          payload
         rescue StandardError => e
           # Zlyhanie sa NEZAMLCUJE: sekcia ostane bez dat a jedinou stopou
           # preco je tento zaznam (rovnaka lekcia ako `mat_payload`).
+          # BASELINE sa pritom NEMENI (viz komentar vyssie).
           Engine.log_error(e, 'RulesDialog.rules_payload')
           nil
         end
@@ -427,6 +442,23 @@ module Noxun
 
         # --- akcie ----------------------------------------------------------
 
+        # ŠT-3b-2c2: DRUHE ZNENIE pri OPAKOVANOM konflikte odtlacku. Prvy raz
+        # je to bezna sprava „niekto to medzitym zmenil"; druhy raz za sebou
+        # uz znamena, ze sa deje nieco ine (druhe okno, ktore pravidla prepisuje,
+        # alebo neodhalena chyba) — a rovnaka veta by pouzivatela nechala tocit
+        # sa dokola. Pocitadlo sa nuluje pri KAZDOM uspesnom ulozeni.
+        def rev_conflict_status
+          @rev_conflicts = @rev_conflicts.to_i + 1
+          if @rev_conflicts > 1
+            'Pravidlá sa zmenili ZNOVA, kým si ukladal — formulár je opäť načítaný nanovo. ' \
+              'Pravdepodobne ich mení niekto/niečo iné súbežne (druhé okno, Späť/Znova); ' \
+              'skontroluj aktuálny stav a ulož až potom.'
+          else
+            'Pravidlá sa medzitým zmenili (formulár bol z inej verzie) — je načítaný nanovo. ' \
+              'Skontroluj a ulož znova.'
+          end
+        end
+
         # Ulozi pravidla do projektu + prestavia vsetky korpusy (1 undo krok).
         def handle_save(payload)
           model = Sketchup.active_model
@@ -463,6 +495,21 @@ module Noxun
             return set_status('Model sa medzitým prepol — pravidlá sú načítané z tohto modelu. ' \
                               'Skontroluj a ulož znova.', true)
           end
+          # ŠT-3b-2c2: ODTLACOK pravidiel. Klient ho iba VRACIA — dostal ho
+          # v payloade, ktorym bol formular naplneny. Je to DRUHA vrstva popri
+          # `@baseline_rules`, nie nahrada: porovnanie obsahu je hashove (a teda
+          # necitlive na poradie a na kluce, ktore normalizacia zjednoti), rev je
+          # citlivy na presny serializovany tvar.
+          #
+          # PRAZDNY rev sa TOLERUJE (vzor `model_guid`): starsi cachovany DOM ho
+          # este neposiela a baseline tuto vetvu aj tak kryje. Odmietat ho by
+          # znamenalo, ze pouzivatel s otvorenym oknom z predoslej verzie by uz
+          # neulozil nic — a nevedel by preco.
+          rev = data['rules_rev'].to_s
+          if !rev.empty? && !@baseline_rev.to_s.empty? && rev != @baseline_rev.to_s
+            push_section_echo(model, force: true)
+            return set_status(rev_conflict_status, true)
+          end
           rules = HardwareRules.normalize_rules(data['rules'])
           return set_status('Žiadne platné pravidlá — nič sa neuložilo.', true) if rules.empty?
 
@@ -485,6 +532,7 @@ module Noxun
           if data['also_global']
             global_note = HardwareRules.write(rules) ? ' + globálna predvoľba' : ' (globálny zápis zlyhal!)'
           end
+          @rev_conflicts = 0 # uspech = seria konfliktov sa konci (druhe znenie sa resetuje)
           set_status("Pravidlá uložené do projektu#{global_note} — prestavaných #{jobs.size} skriniek.")
           after_model_write(model)
         end

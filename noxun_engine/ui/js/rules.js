@@ -17,6 +17,10 @@
   // ci push zo servera ma formular prekreslit — viz `rdApplyState`.
   var RD_SEED = null;
   var RD_META = { version: '', source: '', cabinets: 0 };
+  // ŠT-3b-2c2: ODTLAČOK pravidiel zo servera (`rules_rev`). Klient ho NIKDY
+  // nepočíta — iba drží a pri uložení vracia. Vlastný výpočet by ani nemohol
+  // sedieť: Ruby serializuje `900.0`, JS `900`, takže bajtové porovnanie by
+  // zlyhalo vždy.
   // ŠT-3b-2a: READ-ONLY casti sekcie (ABS pravidla podla roly + jantarove riadky
   // rucnych zasahov). Ziju MIMO `RD_RULES` a mimo zapadky `RD_NEEDS_RENDER`:
   // nie je v nich co rozpisat, takze sa prekresluju pri KAZDOM pushi zo servera
@@ -74,6 +78,12 @@
       // „Načítať globálne predvoľby" je ZAMERNE zmena formulara, ktora este
       // NEPLATI — odtlacok sa preto NEobnovuje: najblizsi push zo servera
       // (s pravidlami projektu) by inak formular potichu prepisal spat.
+      //
+      // ŠT-3b-2c2: a z TOHO ISTEHO dovodu sa NEPREPISUJE ani `RD_META.rules_rev`.
+      // Globalne predvolby NIE SU stav projektu — keby si klient prevzal ich
+      // odtlacok, ulozenie po „Načítať globálne" by serveru tvrdilo, ze formular
+      // vznikol z aktualnych pravidiel projektu, a prepisalo by cudziu zmenu,
+      // ktora medzitym prisla. Rev ostava ten, s ktorym bol formular NAPLNENY.
       RD_NEEDS_RENDER = true;
       rdRender();
     },
@@ -114,7 +124,8 @@
     RD_RULES = d.rules || [];
     RD_SEED = JSON.stringify(RD_RULES);
     RD_META = { version: d.version || '', source: d.source || '',
-                cabinets: d.cabinets || 0, model_guid: d.model_guid || '' };
+                cabinets: d.cabinets || 0, model_guid: d.model_guid || '',
+                rules_rev: d.rules_rev || '' };
     rdSetExtra(d);
   }
 
@@ -387,7 +398,11 @@
     if (window.sketchup && sketchup.save_rules){
       sketchup.save_rules(JSON.stringify({ rules: rules,
                                            also_global: !!(chk && chk.checked),
-                                           model_guid: RD_META.model_guid || '' }));
+                                           model_guid: RD_META.model_guid || '',
+                                           // ŠT-3b-2c2: odtlačok sa iba VRACIA
+                                           // — je to ten, ktorý prišiel s dátami,
+                                           // z ktorých je formulár naplnený.
+                                           rules_rev: RD_META.rules_rev || '' }));
     }
   }
   function rdLoadGlobal(){
@@ -503,7 +518,8 @@
     var seed = JSON.stringify(r.rules || []);
     if (seed === RD_SEED){
       RD_META = { version: r.version || '', source: r.source || '',
-                  cabinets: r.cabinets || 0, model_guid: r.model_guid || '' };
+                  cabinets: r.cabinets || 0, model_guid: r.model_guid || '',
+                  rules_rev: r.rules_rev || '' };
       // ŠT-3b-2a: read-only casti sa obnovuju AJ TU — rucny zasah v Inspectore
       // (novy override) pravidla NEMENI, takze odtlacok formulara je ten isty
       // a riadok by sa bez tohto objavil az po prepnuti sekcie.
@@ -554,7 +570,11 @@
                        // ŠT-3b-2b: zapisovy klik — testuje sa, ze nesie OBE
                        // identity (generacia okna + dokument) a ze meno akcie
                        // vybera KLIENT z uzavretej mapy, nie payload servera.
-                       rdResetOverride: rdResetOverride };
+                       rdResetOverride: rdResetOverride,
+                       // ŠT-3b-2c2: ulozenie sa exportuje ZAMERNE — odtlacok
+                       // („drzim ho, nepocitam, vraciam ho spat") sa da overit
+                       // jedine tym, ze sa pozrieme, CO odchadza na server.
+                       rdSaveRules: rdSaveRules };
   }
   // ŠT-3b-1: `sketchup.ready('')` tu ZANIKLO. V okne „Pravidlá kovania" bol
   // tento subor POSLEDNY a jeho `ready` znamenal „HTML je nacitane"; okno

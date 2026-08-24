@@ -161,9 +161,18 @@ NxTest.test('ŠT-3b-1: baseline formulara stoji na `model.guid`, NIE na `model.p
   NxTest.assert(valid.include?('current == @baseline_rules'),
                 'a ZHODU aktualnych pravidiel s baseline (chyti undo aj subeznu zmenu)')
   pay = ST3B_RULES_RB[/def rules_payload\(model, collected = nil\).*?\n        end\n/m].to_s
-  NxTest.assert(pay.include?('@baseline_guid  = model_guid(model)'),
-                'baseline sa obnovi pri KAZDOM zostaveni payloadu (vzor `push_state` okna)')
+  # ŠT-3b-2c2 (audit B4): baseline sa obnovuje pri kazdom USPESNOM zostaveni
+  # payloadu — a AZ NA KONCI tela. Ked zostavenie spadne (`rescue` -> nil),
+  # klient si drzi STARY stav; posunuty baseline by roztvoril NOZNICE
+  # (server caka nove hodnoty, klient posiela stare = vecne odmietanie).
+  NxTest.assert(pay.include?('@baseline_guid  = guid'),
+                'baseline sa obnovi pri USPESNOM zostaveni payloadu')
   NxTest.assert(pay.include?('@baseline_rules = rules'), 'aj s pravidlami')
+  NxTest.assert(pay.index('payload = {') < pay.index('@baseline_guid'),
+                'a to AZ ZA telom — nikdy pred nim')
+  rescue_part = pay[/rescue StandardError.*\z/m].to_s
+  NxTest.refute(rescue_part.include?('@baseline'),
+                'rescue vetva baseline NEMENI (inak by zlyhany payload rozbil kazde dalsie ulozenie)')
   NxTest.refute(pay.include?('Sketchup.active_model'),
                 'F4: model chodi ARGUMENTOM — inak by sekcia dostala pravidla STAREHO dokumentu')
 end
@@ -1162,4 +1171,98 @@ NxTest.test('ŠT-3b-2c1 (review NOTE 2): nazvy kovania su JEDNA pravda (server =
     client = map[/#{gt}\s*:\s*'([^']+)'/, 1].to_s
     NxTest.assert_equal(server, client, "nazov `#{gt}` musi byt na oboch stranach rovnaky")
   end
+end
+
+# ============================================================================
+# ŠT-3b-2c2 — ODTLACOK PRAVIDIEL (`rules_rev`)
+#
+# Co tato cast strazi (a preco to klikanim neoveris):
+#   1. Odtlacok pocita VYHRADNE server a LEN z `rules`. Keby siel z celeho
+#      payloadu, zozltol by pri kazdom rucnom zasahu v Inspectore (menia sa
+#      `overrides`, nie pravidla) a pouzivatel by nemohol ulozit pravidla,
+#      lebo si medzitym prestavil hranu na dielci.
+#   2. Klient si ho LEN drzi. Vlastny vypocet by NIKDY nesedel (Ruby `900.0`
+#      vs JS `900`) — a mlcky by odmietal kazde ulozenie.
+#   3. „Načítať globálne" odtlacok NEPREPISUJE: globalne predvolby nie su stav
+#      projektu, takze ulozenie po nich by serveru tvrdilo, ze formular vznikol
+#      z aktualnych pravidiel — a prepisalo by cudziu zmenu.
+#   4. Baseline aj rev sa obnovuju AZ pri USPESNOM zostaveni payloadu. Zlyhane
+#      zostavenie by inak roztvorilo nozice: server by mal novy stav, klient
+#      stary, a kazde ulozenie by sa navzdy odmietalo.
+
+NxTest.test('ŠT-3b-2c2: odtlacok pocita SERVER a LEN z pravidiel') do
+  hr = Noxun::Engine::HardwareRules
+  rules = [{ 'rule_id' => 'nohy', 'output' => 'leg', 'kind' => 'fixed',
+             'enabled' => true, 'quantity' => 4 }]
+  rev = hr.rules_rev(rules)
+  NxTest.assert_equal(12, rev.length, 'kratky hash (vzor `HardwareCatalog.record_rev`)')
+  NxTest.assert_equal(rev, hr.rules_rev(rules), 'ten isty vstup = ten isty odtlacok')
+  changed = [rules.first.merge('quantity' => 5)]
+  NxTest.assert(rev != hr.rules_rev(changed), 'zmena pravidla odtlacok ZMENI')
+  # Normalizovany tvar: to iste pravidlo zapisane inak (symbol/retazec, poradie
+  # klucov) ma dat TEN ISTY odtlacok — inak by sa formular odmietal sam od seba.
+  loose = [{ 'quantity' => 4, 'kind' => 'fixed', 'output' => 'leg',
+             'enabled' => true, 'rule_id' => 'nohy' }]
+  NxTest.assert_equal(rev, hr.rules_rev(loose),
+                      'iné poradie klucov toho isteho pravidla = ten isty odtlacok')
+  NxTest.assert_equal(12, hr.rules_rev(nil).length,
+                      'nil vstup nespadne — vrati odtlacok prazdneho zoznamu')
+
+  # Payload: rev ide LEN z `rules`. Kontrolujeme ZDROJAK, lebo `rules_payload`
+  # potrebuje model — a prave zamena zdroja by bola tichá regresia.
+  pay = ST3B_RULES_RB[/def rules_payload\(model, collected = nil\).*?\n        end\n/m].to_s
+  NxTest.assert(pay.include?('rev = HardwareRules.rules_rev(rules)'),
+                'odtlacok sa pocita z PRAVIDIEL')
+  NxTest.refute(pay.include?('rules_rev(payload)') || pay.include?('rules_rev(collected)'),
+                'nikdy z celeho payloadu ani zo zberu — inak by zozltol pri zasahu v Inspectore')
+  NxTest.assert(pay.include?("'rules_rev' => rev"), 'a ide klientovi v payloade')
+end
+
+NxTest.test('ŠT-3b-2c2: rev je DRUHA vrstva popri baseline, nie jeho nahrada') do
+  save = ST3B_RULES_RB[/def handle_save\(payload\).*?\n        end\n/m].to_s
+  NxTest.assert(save.include?('baseline_valid?(model)'), 'baseline guard OSTAVA')
+  NxTest.assert(save.include?("rev = data['rules_rev'].to_s"), 'a rev je DALSI guard')
+  NxTest.assert(save.index('baseline_valid?(model)') < save.index("data['rules_rev']"),
+                'baseline sa pyta prvy (je lacnejsi a chyti aj undo)')
+  NxTest.assert(save.include?('!rev.empty? && !@baseline_rev.to_s.empty? && rev != @baseline_rev.to_s'),
+                'PRAZDNY rev sa TOLERUJE — starsi cachovany DOM ho neposiela a baseline vetvu kryje')
+  guard = save[/if !rev\.empty\?.*?\n          end\n/m].to_s
+  NxTest.assert(guard.include?('push_section_echo(model, force: true)'),
+                'odmietnutie prekresli formular ECHOM (bez dedupu, s omladenim odtlacku)')
+  NxTest.assert(save.index("data['rules_rev']") < save.index('rebuild_many'),
+                'guard je PRED prestavbou skriniek')
+  valid = ST3B_RULES_RB[/def baseline_valid\?\(model\).*?\n        end\n/m].to_s
+  NxTest.refute(valid.include?('rev'),
+                'baseline sa NEPREPISUJE revom — su to dve NEZAVISLE vrstvy')
+end
+
+NxTest.test('ŠT-3b-2c2: OPAKOVANY konflikt ma DRUHE znenie (a uspech ho nuluje)') do
+  rd = Noxun::Engine::RulesDialog
+  rd.instance_variable_set(:@rev_conflicts, 0)
+  first = rd.rev_conflict_status
+  second = rd.rev_conflict_status
+  NxTest.assert(first != second, 'druhy konflikt za sebou znie INAK')
+  NxTest.assert(first.include?('načítaný nanovo'), 'prvy hovori, co sa stalo')
+  NxTest.assert(second.include?('ZNOVA') && second.include?('súbežne'),
+                'druhy prizna, ze pravidla meni nieco ine — inak by sa pouzivatel tocil dokola')
+  save = ST3B_RULES_RB[/def handle_save\(payload\).*?\n        end\n/m].to_s
+  NxTest.assert(save.include?('@rev_conflicts = 0'), 'uspesne ulozenie seriu konfliktov ukonci')
+  NxTest.assert(save.index('@rev_conflicts = 0') > save.index('rebuild_many'),
+                'a to AZ po skutocnom zapise')
+  rd.instance_variable_set(:@rev_conflicts, 0)
+end
+
+NxTest.test('ŠT-3b-2c2: klient odtlacok LEN drzi a vracia — nepocita ho') do
+  js = ST3B_RULES_JS
+  NxTest.assert(js.include?('rules_rev: d.rules_rev'), 'rdSetState si ho ulozi z payloadu')
+  NxTest.assert(js.include?('rules_rev: RD_META.rules_rev'), 'a rdSaveRules ho vrati')
+  code = js.lines.reject { |l| l.strip.start_with?('//') }.join
+  %w[sha1 SHA1 hash( digest].each do |calc|
+    NxTest.refute(code.include?(calc), "klient odtlacok NEPOCITA (#{calc}) — Ruby a JS by sa nikdy nezhodli")
+  end
+  set_rules = js[/setRules: function\(rules, _source\)\{.*?\n    \},/m].to_s
+                .lines.reject { |l| l.strip.start_with?('//') }.join
+  NxTest.assert(!set_rules.empty?, 'telo `setRules` sa naslo')
+  NxTest.refute(set_rules.include?('rules_rev'),
+                '„Načítať globálne" odtlacok NEPREPISUJE — inak by ulozenie po nom prepisalo cudziu zmenu')
 end
