@@ -178,7 +178,7 @@ Diel 18·800×600·stojaca / PD 38·2600×600·ležiaca / Zástena 10·2600×580
 Vložiť (N11 pripravené na vkladanie na klik).
 
 **Kontraktové spresnenia z implementácie UI-C1** *(doplnené pri uzávere dávky, 18.8. — PR #174/#175/C1c;
-plné odôvodnenia v [../../archiv/KRONIKA.md](../../archiv/KRONIKA.md) a [../../../docs/ARCHITEKTURA.md](../../../docs/ARCHITEKTURA.md))*
+plné odôvodnenia v [../../archiv/KRONIKA.md](../../archiv/KRONIKA.md) a v mape modulov [../../../docs/architecture/](../../../docs/architecture/) — rozcestník [../../../docs/ARCHITEKTURA.md](../../../docs/ARCHITEKTURA.md))*
 - **Rozmery doskovej šablóny sú KANONICKÉ polia dosky** — `length`/`width`/`thickness`/`grain_direction`
   podľa STANDARD 8.3. Doska nemá „šírku a výšku" ako skrinka; zápis „18·800×600" v koncepte čítaj ako
   hrúbka · dĺžka × šírka.
