@@ -89,9 +89,21 @@ end
 # Pozaduje sa preto EXPLICITNY nadpis `### <basename>.rb` v niektorom suboru mapy
 # (povoleny je aj zdruzeny tvar `### <basename>.rb + nieco` / `### <basename>.rb — nieco`)
 # A ZAROVEN riadok v tabulke routra, aby sa modul dal najst aj z rozcestnika.
+#
+# IDENTITA MODULU JE BASENAME — konvencia nadpisov `### <basename>.rb` je tym
+# jednoducha a gerpovatelna, ale plati len dovtedy, kym su basename jednoznacne.
+# Dva rovnomenne subory v roznych priecinkoch (napr. core/client.rb popri
+# core/demos/client.rb) by sa v mape zliali do jedneho nadpisu a novy modul by
+# presiel nezdokumentovany. Kolizia sa preto detekuje VYSLOVNE (test nizsie) —
+# guard sa kvoli nej neoslabuje, riesi sa v mape.
+def nx_arch_module_paths
+  root = NxTest::ROOT.to_s.tr('\\', '/').chomp('/')
+  Dir.glob(File.join(NxTest::ROOT, 'noxun_engine', '{core,modules}', '**', '*.rb')).sort
+     .map { |p| p.tr('\\', '/').sub("#{root}/", '') }
+end
+
 def nx_arch_modules
-  Dir.glob(File.join(NxTest::ROOT, 'noxun_engine', '{core,modules}', '**', '*.rb'))
-     .map { |p| File.basename(p, '.rb') }.uniq.sort
+  nx_arch_module_paths.map { |p| File.basename(p, '.rb') }.uniq.sort
 end
 
 def nx_arch_headings
@@ -105,6 +117,18 @@ def nx_router_tokens
   File.readlines(File.join(NxTest::ROOT, 'docs', 'ARCHITEKTURA.md'), encoding: 'UTF-8')
       .map(&:rstrip).select { |l| l.start_with?('|') }
       .join("\n").scan(/`([^`]+)`/).flatten
+end
+
+NxTest.test('docs: basename modulu je jednoznacny — ziadna kolizia medzi priecinkami') do
+  paths = nx_arch_module_paths
+  NxTest.assert(paths.length > 40, "nenasiel som moduly (#{paths.length}) — zla cesta?")
+  clashes = paths.group_by { |p| File.basename(p, '.rb') }.select { |_, v| v.length > 1 }
+  detail = clashes.map { |base, v| "#{base}.rb: #{v.join(' vs ')}" }.join(' · ')
+  NxTest.assert(clashes.empty?,
+                "Kolizia basename modulov (#{detail}) — mapa docs/architecture/ rozlisuje moduly " \
+                'nadpisom `### <basename>.rb`, takze dva rovnomenne subory by sa v nej zliali a jeden ' \
+                'by presiel nezdokumentovany. Rozlis ich v mape plnou cestou (a uprav identitu v tomto ' \
+                'guarde), alebo jeden z modulov premenuj.')
 end
 
 NxTest.test('docs: kazdy modul core/ a modules/ ma vlastny nadpis v docs/architecture/') do
