@@ -1,6 +1,8 @@
 # 04 · Spotrebiče S1
 
-> **PREDIMPLEMENTAČNÝ KONCEPT — NIE TASK PACKAGE.** Pred implementáciou platí postup z [README.md](README.md).
+> Stav: KONCEPT — neimplementovať priamo · zdroj: PR #210 (23.8.2026) · auditované proti kódu: zatiaľ nie
+>
+> Pred implementáciou platí postup z [README.md](README.md).
 
 ## Kontext a cieľ
 
