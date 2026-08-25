@@ -128,37 +128,37 @@ end
 # sklada server.
 
 NxTest.test('PICKER-2: hrubky toho isteho materialu maju ROVNAKY kluc rodiny') do
-  a = P2MAT.variant_family_key(p2_sheet('material_id' => 'A', 'thickness' => 18.0))
-  b = P2MAT.variant_family_key(p2_sheet('material_id' => 'B', 'thickness' => 36.0))
+  a = P2MAT.variant_family_key(p2_sheet('material_id' => 'A', 'thickness' => 18.0), P2_SG)
+  b = P2MAT.variant_family_key(p2_sheet('material_id' => 'B', 'thickness' => 36.0), P2_SG)
   NxTest.assert_equal(a, b, 'hrubka do identity NEPATRI — je to prave to, co sa dava na cipy')
 end
 
 NxTest.test('PICKER-2: iny VYROBCA, ina STRUKTURA a iny TYP su ROZNE rodiny') do
-  base = P2MAT.variant_family_key(p2_sheet)
-  NxTest.assert(base != P2MAT.variant_family_key(p2_sheet('group_id' => 'G2')),
+  base = P2MAT.variant_family_key(p2_sheet, P2_SG)
+  NxTest.assert(base != P2MAT.variant_family_key(p2_sheet('group_id' => 'G2'), P2_SG),
                 'dva vyrobcovia s rovnakym cislom dekoru sa NESMU zlucit')
-  NxTest.assert(base != P2MAT.variant_family_key(p2_sheet('structure' => 'BS')),
+  NxTest.assert(base != P2MAT.variant_family_key(p2_sheet('structure' => 'BS'), P2_SG),
                 'ina struktura je iny povrch, nie ina hrubka')
-  NxTest.assert(base != P2MAT.variant_family_key(p2_sheet('type' => 'HDF')),
+  NxTest.assert(base != P2MAT.variant_family_key(p2_sheet('type' => 'HDF'), P2_SG),
                 'HDF nie je tensia verzia DTDL')
-  NxTest.assert(base != P2MAT.variant_family_key(p2_sheet('decor' => '5982')),
+  NxTest.assert(base != P2MAT.variant_family_key(p2_sheet('decor' => '5982'), P2_SG),
                 'iny dekor je samozrejme ina rodina')
 end
 
 NxTest.test('PICKER-2: FORMAT a RUB su sucastou identity (typy s formatom v identite)') do
   pd1 = p2_sheet('type' => 'PD', 'thickness' => 38.0, 'sheet_size' => [4100.0, 600.0])
   pd2 = p2_sheet('type' => 'PD', 'thickness' => 38.0, 'sheet_size' => [4100.0, 900.0])
-  NxTest.assert(P2MAT.variant_family_key(pd1) != P2MAT.variant_family_key(pd2),
+  NxTest.assert(P2MAT.variant_family_key(pd1, P2_SG) != P2MAT.variant_family_key(pd2, P2_SG),
                 'dva formaty PD su dva materialy — presne to riesil aj label (GH #95 P1)')
   z1 = p2_sheet('type' => 'ZASTENA', 'back_decor' => 'K552')
   z2 = p2_sheet('type' => 'ZASTENA', 'back_decor' => 'K553')
-  NxTest.assert(P2MAT.variant_family_key(z1) != P2MAT.variant_family_key(z2),
+  NxTest.assert(P2MAT.variant_family_key(z1, P2_SG) != P2MAT.variant_family_key(z2, P2_SG),
                 'iny rub zasteny je iny material')
 end
 
 NxTest.test('PICKER-2: UNI zaznamy sa NEZLUCUJU vobec') do
-  u1 = P2MAT.variant_family_key(p2_sheet('material_id' => 'U1', 'uni' => true))
-  u2 = P2MAT.variant_family_key(p2_sheet('material_id' => 'U2', 'uni' => true))
+  u1 = P2MAT.variant_family_key(p2_sheet('material_id' => 'U1', 'uni' => true), P2_SG)
+  u2 = P2MAT.variant_family_key(p2_sheet('material_id' => 'U2', 'uni' => true), P2_SG)
   NxTest.assert(u1 != u2,
                 'kazdy UNI ma vlastnu rolu a jeho hrubka je len pracovny default')
 end
@@ -167,8 +167,8 @@ NxTest.test('PICKER-2: kluc sa neda oklamat posunutim textu medzi polia') do
   # Text sa medzi polami posuva LEGALNE (2A-4b: "K009 PW"+"" vs "K009"+"PW"),
   # takze oddelovac musi byt taky, aky sa v datach nevyskytuje — inak by dva
   # rozne materialy dostali ten isty kluc a zlucili by sa do jedneho riadku.
-  a = P2MAT.variant_family_key(p2_sheet('decor' => '5981 MG', 'structure' => 'PW'))
-  b = P2MAT.variant_family_key(p2_sheet('decor' => '5981', 'structure' => 'MG PW'))
+  a = P2MAT.variant_family_key(p2_sheet('decor' => '5981 MG', 'structure' => 'PW'), P2_SG)
+  b = P2MAT.variant_family_key(p2_sheet('decor' => '5981', 'structure' => 'MG PW'), P2_SG)
   NxTest.assert(a != b,
                 'zlozky sa spajaju oddelovacom, ktory sa v datach nevyskytuje')
 end
@@ -177,10 +177,10 @@ NxTest.test('PICKER-2: OBA payloady posielaju row_label aj row_key z JEDNEHO zdr
   # Keby si kazde okno skladalo hranicu samo, ponuka by sa v Inspectore
   # a v Studiu zlucovala INAK — a nikto by si toho nevsimol, kym by sa
   # nevybral zly material.
-  NxTest.assert(P2_PAYLOADS_SRC.include?("'row_label' => sheet_row_label(s, ctx)") &&
+  NxTest.assert(P2_PAYLOADS_SRC.include?("'row_label' => sheet_row_label(s, ctx, fam)") &&
                 P2_PAYLOADS_SRC.include?("'row_key' => Materials.variant_family_key(s)"),
                 'panel posiela menovku riadku aj identitu rodiny')
-  NxTest.assert(P2_MATDLG_SRC.include?("'row_label' => Panel.sheet_row_label(s, ctx)") &&
+  NxTest.assert(P2_MATDLG_SRC.include?("'row_label' => Panel.sheet_row_label(s, ctx, fam)") &&
                 P2_MATDLG_SRC.include?("'row_key' => Materials.variant_family_key(s)"),
                 'Studio berie TIE ISTE dve metody, nekopiruje si logiku')
 end
@@ -193,4 +193,95 @@ NxTest.test('PICKER-2: ULOZENY duplak sa v payloade prizna priznakom, nie tvarom
   blok = P2_PAYLOADS_SRC[/def materials_payload.+?\n        end/m].to_s
   NxTest.assert(blok.include?("base['duplak'] = true unless s['source_material_id']"),
                 'priznak ide zo zdrojoveho materialu, nie z regexu nad ID')
+end
+
+# --- REVIEW #231 KOLO 2 ------------------------------------------------------
+
+P2_SG = Noxun::Engine::Materials::SCHEMA_GROUPS
+
+NxTest.test('PICKER-2 k2: hybridny katalog BEZ group_id nezluci dvoch vyrobcov') do
+  # Kanonicky `record_group_key` pada pri prazdnom `group_id` na dvojicu
+  # vyrobca + dekor. Hole `group_id` (prazdny retazec u oboch) by Egger 5981
+  # a Kronospan 5981 zlucilo do JEDNEJ rodiny — riadok by mal dva cipy
+  # s rovnakou hrubkou a vybral by sa cudzi vyrobca aj cena.
+  e = p2_sheet('material_id' => 'E', 'group_id' => '', 'manufacturer' => 'Egger')
+  k = p2_sheet('material_id' => 'K', 'group_id' => '', 'manufacturer' => 'Kronospan')
+  NxTest.assert(P2MAT.variant_family_key(e, P2_SG) != P2MAT.variant_family_key(k, P2_SG),
+                'bez group_id rozhoduje vyrobca — tak ako v kanonickom kluci')
+  # A dva zaznamy TOHO ISTEHO vyrobcu (18 aj 36) ostavaju jednou rodinou.
+  e36 = p2_sheet('material_id' => 'E36', 'group_id' => '', 'manufacturer' => 'Egger',
+                 'thickness' => 36.0)
+  NxTest.assert_equal(P2MAT.variant_family_key(e, P2_SG), P2MAT.variant_family_key(e36, P2_SG))
+end
+
+NxTest.test('PICKER-2 k2: kluc rodiny stoji na KANONICKEJ skupinovej identite') do
+  # Guard proti navratu vlastnej odvodeniny: keby sa `record_group_key`
+  # z kluca stratil, hybridny katalog by sa zase zlucoval (test vyssie by
+  # padol, ale toto pomenuva PRICINU).
+  blok = P2MAT.method(:variant_family_key).source_location
+  NxTest.assert(!blok.nil?, 'metoda existuje')
+  src = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'materials.rb'),
+                  encoding: 'UTF-8')
+  body = src[/def variant_family_key.*?
+      end/m].to_s
+  NxTest.assert(body.include?('record_group_key(s, schema)'),
+                'skupinovu cast berie z kanonickeho kluca')
+  NxTest.assert(!body.include?("s['group_id']"),
+                'a NIE z holeho group_id')
+end
+
+# Dekor, ktory ma v katalogu VIAC TYPOV (DTDL 18/36 · HDF 3 · kompakt 12).
+def p2_multi
+  [p2_sheet('material_id' => 'A18', 'type' => 'DTDL', 'thickness' => 18.0),
+   p2_sheet('material_id' => 'A36', 'type' => 'DTDL', 'thickness' => 36.0),
+   p2_sheet('material_id' => 'H3',  'type' => 'HDF',  'thickness' => 3.0),
+   p2_sheet('material_id' => 'K12', 'type' => 'KOMPAKT', 'thickness' => 12.0)]
+end
+
+NxTest.test('PICKER-2 k2: dekor s viacerymi TYPMI dostane rozlisujucu menovku') do
+  # Rodiny su rozdelene spravne, ale riadok nesie DEKOROVU menovku — bez
+  # rozlisenia by v ponuke stali tri riadky s IDENTICKYM menom „5981" a HDF
+  # ani kompakt by sa nedali odlisit od DTDL (jediny cip sa navyse nekresli).
+  fam = P2MAT.row_family_ctx(p2_multi, P2_SG) { |s| '5981 MG' }
+  labels = p2_multi.map { |s| P2MAT.row_label_disambiguated('5981 MG', s, fam, P2_SG) }
+  NxTest.assert_equal(labels.uniq.length, 3, 'tri rodiny = tri ROZNE menovky')
+  NxTest.assert_equal('5981 MG · DTDL', labels[0],
+                      'rodina s VIAC hrubkami nesie len typ — hrubky ukazu cipy')
+  NxTest.assert_equal(labels[0], labels[1], 'oba DTDL varianty su jeden riadok')
+  NxTest.assert_equal('5981 MG · HDF 3 mm', labels[2],
+                      'rodina s JEDINOU hrubkou ju musi povedat — cip sa nekresli')
+  NxTest.assert_equal('5981 MG · KOMPAKT 12 mm', labels[3])
+end
+
+NxTest.test('PICKER-2 k2: bezny dekor (jedna rodina) menovku NEZDLHUJE') do
+  one = [p2_sheet('material_id' => 'A18', 'thickness' => 18.0),
+         p2_sheet('material_id' => 'A36', 'thickness' => 36.0)]
+  fam = P2MAT.row_family_ctx(one, P2_SG) { |s| '5981 MG' }
+  NxTest.assert_equal('5981 MG', P2MAT.row_label_disambiguated('5981 MG', one[0], fam, P2_SG),
+                      'rozlisenie pribuda VYHRADNE pri kolizii (vzor vyrobcu v labeli)')
+  NxTest.assert_equal('5981 MG', P2MAT.row_label_disambiguated('5981 MG', one[0], nil, P2_SG),
+                      'bez kontextu (starsie volanie) ostava zaklad')
+end
+
+NxTest.test('PICKER-2 k2: kontext riadkov sa stavia RAZ a pozna hrubky rodin') do
+  fam = P2MAT.row_family_ctx(p2_multi, P2_SG) { |s| '5981 MG' }
+  key = Noxun::Engine::Materials.identity_norm('5981 MG')
+  NxTest.assert_equal(3, fam['fams'][key].length, 'tri rodiny pod jednou menovkou')
+  dtd = P2MAT.variant_family_key(p2_multi[0], P2_SG)
+  NxTest.assert_equal([18.0, 36.0], fam['ths'][dtd].sort, 'hrubky rodiny bez duplicit')
+  # UNI zaznamy do kontextu nepatria (nezlucuju sa a hrubka je pri nich len
+  # pracovny default).
+  with_uni = P2MAT.row_family_ctx(p2_multi + [p2_sheet('material_id' => 'U', 'uni' => true)],
+                                  P2_SG) { |s| '5981 MG' }
+  NxTest.assert_equal(3, with_uni['fams'][key].length, 'UNI kontext neposunul')
+end
+
+NxTest.test('PICKER-2 k2: OBA payloady posielaju menovku s kontextom riadkov') do
+  NxTest.assert(P2_PAYLOADS_SRC.include?('fam = row_fam_ctx(ctx)'),
+                'panel stavia kontext raz na payload')
+  NxTest.assert(P2_MATDLG_SRC.include?('fam = Panel.row_fam_ctx(ctx)'),
+                'Studio berie TEN ISTY kontext, nestava si vlastny')
+  blok = P2_PAYLOADS_SRC[/def sheet_row_label.+?\n        end/m].to_s
+  NxTest.assert(blok.include?('Materials.row_label_disambiguated'),
+                'rozlisenie sklada CORE — okno si ho neodvodzuje samo')
 end

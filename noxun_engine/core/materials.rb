@@ -1015,11 +1015,62 @@ module Noxun
       #
       # UNI zaznamy sa NEZLUCUJU vobec (kazdy ma vlastnu rolu a katalogova
       # hrubka je pri nich len pracovny default), preto dostavaju unikatny kluc.
-      def variant_family_key(s)
+      def variant_family_key(s, schema = catalog_schema)
         return "uni:#{s['material_id']}" if uni?(s)
 
-        [s['group_id'].to_s.strip, s['decor'].to_s.strip, s['structure'].to_s.strip,
+        # Skupinova cast je KANONICKA `record_group_key` — nie vlastna
+        # odvodenina z `group_id` (review #231 kolo 2). Hybridny katalog moze
+        # mat zaznamy BEZ `group_id` a kanonicky kluc vtedy pada na dvojicu
+        # vyrobca + dekor; hole `group_id` by ich zlucilo do jednej rodiny,
+        # takze Egger 5981 a Kronospan 5981 by skoncili v jednom riadku
+        # s dvomi nerozlisitelnymi cipmi.
+        [record_group_key(s, schema).inspect, s['decor'].to_s.strip, s['structure'].to_s.strip,
          s['type'].to_s.strip, sheet_label_suffix(s).strip].join("\u0000")
+      end
+
+      # PICKER-2 kolo 2 (P1): KONTEXT RIADKOV vyhladavaca. Pre kazdu dekorovu
+      # menovku drzi zoznam variantovych rodin a pre kazdu rodinu jej hrubky.
+      # Stavia sa RAZ na payload (vzor `Panel.label_ctx`) — otazka „treba tento
+      # riadok rozlisit?" potrebuje CELY katalog, nie jeden zaznam, a klient na
+      # nu odpovedat NEMOZE (vidi vzdy len to, co je prave v selecte).
+      # Menovku dodava volajuci blokom, lebo jej zlozenie (vyrobca pri kolizii)
+      # zije v `Panel.sheet_row_label`.
+      def row_family_ctx(sheets, schema = catalog_schema)
+        fams = {}
+        ths = {}
+        Array(sheets).each do |s|
+          next if uni?(s)
+
+          fam = variant_family_key(s, schema)
+          key = identity_norm(yield(s))
+          fams[key] ||= []
+          fams[key] << fam unless fams[key].include?(fam)
+          ths[fam] ||= []
+          t = thickness_key(s['thickness'])
+          ths[fam] << t unless ths[fam].include?(t)
+        end
+        { 'fams' => fams, 'ths' => ths }
+      end
+
+      # Rozlisujuca menovka RIADKU. Ten isty dekor v DVOCH TYPOCH (DTDL 18 ·
+      # HDF 3 · kompakt 12) su spravne DVA-TRI riadky — ale s holou dekorovou
+      # menovkou by mali ROVNAKE meno a nedalo by sa medzi nimi vybrat.
+      # Typ pribuda VYHRADNE pri kolizii (bezny katalog ostava kratky —
+      # rovnaka zasada ako vyrobca v `label_base`), hrubka len vtedy, ked ju
+      # riadok NEUKAZE cipmi (jedina v rodine); pri viacerych by menovka
+      # klamala, lebo riadok zastupuje vsetky.
+      def row_label_disambiguated(base, rec, fam, schema = catalog_schema)
+        return base if fam.nil? || uni?(rec)
+
+        key = identity_norm(base)
+        return base if (fam['fams'][key] || []).length < 2
+
+        out = "#{base} · #{rec['type']}"
+        ths = fam['ths'][variant_family_key(rec, schema)] || []
+        return out unless ths.length == 1
+
+        th = ths.first
+        "#{out} #{th == th.round ? th.round : th} mm"
       end
 
       # GH P2: kluc kvantizuje mm na 0,01 — HRANICNA dvojica (18.004 vs 18.006)

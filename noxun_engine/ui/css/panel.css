@@ -354,6 +354,8 @@
   .cbchip.on { background: var(--nx-select-bg); border-color: var(--nx-select);
                color: var(--nx-select-strong); font-weight: 600; }
   .cbchip.off { opacity: .45; cursor: not-allowed; }
+  .cbchipmsg:empty { display: none; }
+  .cbchipmsg { flex: 0 0 100%; margin-top: 2px; font-size: 10.5px; color: var(--nx-ink-muted); }
   .cbopt .t { min-width: 0; }
   .cbtrigger { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 6px;
                font: inherit; font-size: 12px; background: var(--nx-surface);

@@ -147,7 +147,9 @@ eq((html.match(/class="cbchip[ "]/g) || []).length, 3,
    'tri varianty (18 · 36 · duplák) = tri čipy');
 ok(/class="cbchip on"[^>]*>18</.test(html),
    'aktívny je 18 — korpus predvolí najtenšiu konštrukčnú, NIE duplák');
-ok(html.indexOf('>duplák<') > -1, 'duplák je pomenovaný slovom, nie číslom');
+// Duplák nesie HRÚBKU aj slovo (review #231 kolo 2): rodina môže mať ×2 aj
+// ×3 (36 aj 54 mm) a dva čipy „duplák" by boli nerozlíšiteľné.
+ok(html.indexOf('>36 duplák<') > -1, 'duplák je pomenovaný hrúbkou AJ slovom');
 const hdfPart = html.slice(html.lastIndexOf('cbopt'));
 ok(hdfPart.indexOf('cbchips') < 0, 'HDF riadok (jediná hrúbka) žiadne čipy nemá');
 
@@ -264,5 +266,73 @@ const dupChip = {
 fire('click', { target: dupChip, preventDefault(){}, stopPropagation(){} });
 fire('click', { target: rowTarget, preventDefault(){}, stopPropagation(){} });
 eq(sel.value, 'duplak2:dtd18', 'duplák sa vložil až po VEDOMOM kliku na jeho čip');
+
+// --- 6) REVIEW #231 KOLO 2: dva dupláky a nedostupný čip -------------------
+// Rodina môže mať duplák ×2 aj ×3 (36 aj 54 mm) — dva čipy so slovom
+// „duplák" by boli nerozlíšiteľné. A nedostupný variant nesmie byť mŕtve
+// tlačidlo: natívny `disabled` ho vyhodí z klávesnice a klik nemá čo povedať
+// (vzor D-78 — aria-disabled + dôvod).
+(function(){
+  const META2 = {
+    b18:  { decor: 'Buk', type: 'DTDL', thickness: 18, key: 'G|Buk|DTDL' },
+    b36:  { decor: 'Buk', type: 'DTDL', thickness: 36, key: 'G|Buk|DTDL' },
+    dup2: { decor: 'Buk', type: 'DTDL', thickness: 36, duplak: true, key: 'G|Buk|DTDL' },
+    dup3: { decor: 'Buk', type: 'DTDL', thickness: 54, duplak: true, key: 'G|Buk|DTDL' }
+  };
+  NXC.setVariantResolver((kind, value) => (kind === 'abs' ? null : (META2[value] || null)));
+
+  const sel2 = el('select');
+  sel2.setAttribute('data-nx-combo', 'decor');
+  sel2.setAttribute('data-nx-combo-ctx', 'body');
+  [['b18', 'Buk 18 mm', false],
+   ['b36', 'Buk 36 mm (nekompatibilné)', true],
+   ['dup2', 'Buk duplák 36 mm', false],
+   ['dup3', 'Buk duplák 54 mm', false]].forEach(function(row){
+    const o = el('option');
+    o.value = row[0];
+    o.textContent = row[1];
+    o.disabled = row[2];
+    sel2.appendChild(o);
+    sel2.options.push(o);
+  });
+  sel2.value = 'b18';
+  sel2.selectedIndex = 0;
+  body.appendChild(sel2);
+  NXC.scan(document);
+
+  NXC.open(sel2);
+  const h = popHtml();
+  ok(h.indexOf('>36 duplák<') > -1 && h.indexOf('>54 duplák<') > -1,
+     'duplák ×2 aj ×3 sú rozlíšiteľné — čip nesie hrúbku');
+  ok(h.indexOf('aria-disabled="true"') > -1, 'nedostupný čip je aria-disabled (D-78)');
+  ok(!/class="cbchip[^"]*"[^>]* disabled>/.test(h),
+     'a NIE natívne disabled — inak by vypadol z klávesnice');
+
+  // Klik na nedostupný čip: hodnota sa nemení a ponuka povie DÔVOD
+  // (text nesie server v labeli varianta).
+  const offChip = { closest(s){
+    if (s === '.cbchip') return { getAttribute(k){ return k === 'data-chip' ? '1' : '0'; } };
+    return null;
+  } };
+  fire('click', { target: offChip, preventDefault(){}, stopPropagation(){} });
+  eq(sel2.value, 'b18', 'nedostupný čip NEPREPÍNA');
+  ok(NXC.isOpen(sel2), 'ponuka ostáva otvorená');
+  const inp2 = popNode().querySelector('input');
+  inp2.value = 'buk';
+  (inp2._ls.input || []).forEach(fn => fn());
+  // POZOR: dôvod je aj v `title` čipu, takže hľadať ho v celom HTML by
+  // „prešlo" aj vtedy, keby klik nepovedal nič — kontroluje sa VÝHRADNE
+  // hláškový uzol riadku.
+  ok(/<span class="cbchipmsg"[^>]*>[^<]*nekompatibiln/.test(popHtml()),
+     'dôvod sa ukáže v riadku a prežije prekreslenie po písmene');
+
+  // Klávesnica nedostupný variant PRESKOČÍ (nezasekne sa na ňom).
+  sel2.value = 'b18';
+  NXC.open(sel2);
+  const ls = (popNode().querySelector('input')._ls.keydown) || [];
+  ls.forEach(fn => fn({ key: 'ArrowRight', preventDefault(){}, stopPropagation(){} }));
+  ls.forEach(fn => fn({ key: 'Enter', preventDefault(){}, stopPropagation(){} }));
+  eq(sel2.value, 'dup2', 'šípka preskočila nedostupnú 36 na najbližší použiteľný variant');
+})();
 
 console.log(`OK test_picker2_chips_dom.js — ${n} kontrol`);

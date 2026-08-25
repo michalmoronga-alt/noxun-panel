@@ -573,7 +573,7 @@
         '<div class="cbfoot"><span class="kbd">↑ ↓</span> výber ' +
         '<span class="kbd">Enter</span> potvrdí <span class="kbd">Esc</span> zavrie</div>';
       document.body.appendChild(pop);
-      OPEN = { sel: sel, pop: pop, items: [], active: -1, q: '', chip: {} };
+      OPEN = { sel: sel, pop: pop, items: [], active: -1, q: '', chip: {}, msg: {} };
       c.btn.setAttribute('aria-expanded', 'true');
 
       var inp = pop.querySelector('input');
@@ -774,19 +774,29 @@
       var out = '<span class="cbchips">';
       row.variants.forEach(function(v, i){
         var on = (v.value === row.value);
+        // NATIVNY `disabled` by cip vyhodil z klavesnice a klik by nemal co
+        // povedat — vzor D-78 (repo zasada „ziadne mrtve tlacidlo bez
+        // dovodu"): tlacidlo ostava fokusovatelne, len sa nim neda prepnut
+        // a klik dopise DOVOD (server ho ma v labeli varianta).
         out += '<button type="button" class="cbchip' + (on ? ' on' : '') +
           (v.disabled ? ' off' : '') + '" data-chip="' + i + '" data-chiprow="' + rowIndex + '"' +
-          ' title="' + esc(v.label) + '"' + (v.disabled ? ' disabled' : '') + '>' +
+          ' title="' + esc(v.label) + '"' +
+          (v.disabled ? ' aria-disabled="true"' : '') + '>' +
           esc(chipLabel(v)) + '</button>';
       });
-      return out + '</span>';
+      out += '</span><span class="cbchipmsg" data-chipmsg="' + rowIndex + '">' +
+        esc(chipMsgOf(row)) + '</span>';
+      return out;
     }
 
     // Popis čipu: hrúbka číslom, duplák slovom — „36" a „duplák 36" sú dve
     // rôzne veci a musí to byť vidieť bez tooltipu.
     function chipLabel(v){
-      if (v.duplak) return 'duplák';
-      return (v.thickness == null) ? '?' : String(v.thickness);
+      // Rodina moze mat duplak ×2 aj ×3 (36 aj 54 mm). Samotne slovo „duplák"
+      // by dalo DVA nerozlisitelne cipy, takze nesie aj hrubku (review #231
+      // kolo 2) — cislo je zo servera, slovo je jazyk komponentu.
+      var th = (v.thickness == null) ? '?' : String(v.thickness);
+      return v.duplak ? (th + ' duplák') : th;
     }
 
     function markup(text, q){
@@ -842,12 +852,27 @@
 
     // Prepnutie čipu v riadku: mení sa LEN to, čo riadok vloží. Zapisuje sa
     // do `OPEN.items`, takže ďalší Enter/klik ide na zvolený variant.
+    // Dovod, preco sa cip neda pouzit — drzi sa pod klucom riadku, takze
+    // prezije prekreslenie po pismene v hladani (rovnako ako vybrany cip).
+    function chipMsgOf(row){
+      return (OPEN && OPEN.msg && row && row.key && OPEN.msg[row.key]) || '';
+    }
+
     function pickChip(rowIndex, chipIndex){
       if (!OPEN) return;
       var row = OPEN.items[rowIndex];
       if (!row || !row.decorRow) return;
       var v = row.variants[chipIndex];
-      if (!v || v.disabled) return;
+      if (!v) return;
+      OPEN.msg = OPEN.msg || {};
+      if (v.disabled){
+        // Klik na nedostupny cip NEPREPINA, ale ani nemlci: text pise SERVER
+        // (label varianta uz nesie dovod, napr. „(nekompatibilné)").
+        if (row.key) OPEN.msg[row.key] = v.label;
+        redrawRow(rowIndex);
+        return;
+      }
+      if (row.key) delete OPEN.msg[row.key];
       row.value = v.value;
       OPEN.chip = OPEN.chip || {};
       if (row.key) OPEN.chip[row.key] = v.value;   // prežije prekreslenie po písmene
@@ -869,6 +894,8 @@
           var on = !!(v && v.value === row.value);
           chips[c].className = 'cbchip' + (on ? ' on' : '') + (v && v.disabled ? ' off' : '');
         }
+        var msg = nodes[i].querySelector('.cbchipmsg');
+        if (msg) msg.textContent = chipMsgOf(row);
         break;
       }
       paintActive();
