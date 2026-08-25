@@ -269,15 +269,32 @@ PBR editácia samotná zostáva v natívnom SketchUp Materials paneli.
 
 ---
 
-# Nástroj „pixla“
+# Nástroj „pixla“ — nízka priorita / až po sektoroch
 
-Pred implementáciou treba presne rozhodnúť význam kliku.
+Pixla patrí pod **materiálový workflow**, nie ako samostatná vysokoprioritná V1 funkcia. Aktuálne priraďovanie materiálov a per-dielec výnimky sú použiteľné; po zavedení segmentov/sektorov a scoped materiálových pravidiel môže potreba pixly ešte výrazne klesnúť. Preto sa má zaradiť **na koniec backlogu a pred implementáciou znovu overiť, či ju reálny workflow ešte potrebuje**.
 
-### Preferovaný bežný režim
+Ak sa implementuje, schválený UX je **trvalý štetec** podobný natívnej SketchUp pixle:
 
-Klik na materiál → klik na dielec → zmena **skutočného výrobného materiálu** existujúcou autoritatívnou cestou. Appearance sa zmení ako dôsledok novej production identity.
+```text
+Studio → vybraný materiál → aktivovať pixlu
+↓
+klik diel 1 → aplikovať materiál
+klik diel 2 → aplikovať materiál
+klik diel 3 → aplikovať materiál
+...
+Esc → ukončiť nástroj
+```
 
-Visual-only override je potenciálne nebezpečný, pretože model by mohol vyzerať ako iný dekor než BOM/VEPO. Preto sa nesmie pridať bez jasného samostatného UX a dôvodu.
+Klik má meniť **skutočný výrobný materiál** existujúcou autoritatívnou cestou (`part_override` alebo jej aktuálny ekvivalent). Appearance sa zmení ako dôsledok novej production identity. Visual-only override sa nemá zavádzať implicitne, pretože by mohol rozísť model od BOM/VEPO.
+
+Pixla má byť použiteľná na všetky relevantné výrobné dielce, ale musí rešpektovať **kompatibilitu materiálovej triedy/hrúbky**. Príklad: 18 mm materiál sa nesmie bez upozornenia aplikovať na 12 mm dielec. Pred implementáciou treba rozhodnúť, či nekompatibilný klik:
+
+- operáciu zablokuje s krátkym vysvetlením,
+- alebo dovolí výnimku po explicitnom potvrdení.
+
+Tichá zmena nekompatibilnej hrúbky nie je prípustná.
+
+Preferovaný pocit z nástroja má kopírovať klasickú SketchUp pixlu: kliknutý diel sa vizuálne okamžite premaluje a používateľ pokračuje ďalším klikom bez návratu do Studio. Ak sa pixla implementuje, odporúčaný kontrakt zostáva **jeden klik = jedna samostatná materiálová zmena / jeden Undo krok**.
 
 ---
 
@@ -311,6 +328,12 @@ Toto nie je implementačné poradie, iba rozdelenie scope:
 ### M-R6 · Renderer/export integrácie
 - až podľa reálneho render pipeline; appearance model sa nemá predčasne viazať na V-Ray/Enscape/iný renderer.
 
+### M-R7 · Pixla — iba ak ju prax po sektoroch stále potrebuje
+- trvalý paint mode do `Esc`,
+- production-material write path,
+- kontrola kompatibility typu/hrúbky,
+- žiadna samostatná priorita pred segmentmi/sektormi.
+
 ---
 
 # Odhad náročnosti
@@ -322,7 +345,8 @@ Po rozhodnutí použiť natívny SketchUp 2026 Materials editor sa scope výrazn
 - PBR authoring: **nízka**, pretože ho robí SketchUp,
 - nový Materials UI shell: **stredná**,
 - shared appearance library: **stredná**, využíva D-48,
-- deterministická orientácia/UV podľa výrobnej semantiky: **stredná až vyššia** a hlavná technická neznáma.
+- deterministická orientácia/UV podľa výrobnej semantiky: **stredná až vyššia** a hlavná technická neznáma,
+- pixla: **nízka až stredná**, ale jej implementačná hodnota sa má posúdiť až po sektoroch.
 
 Celá M-R vrstva je preto skôr **stredne veľký balík**, nie samostatný render engine. Najväčšia hodnota za najmenej práce je base texture + správny scale + správna orientácia; detailné PBR mapy môžu pribúdať postupne.
 
@@ -358,7 +382,8 @@ Pred task package treba všetky kritické API body znovu overiť proti aktuálne
 5. Aké sú dnešné write/read cesty materiálov a ktoré staré UI/store vrstvy treba pri reworku odstrániť alebo zjednotiť?
 6. Je `MaterialsObserver` dostatočný iba na dirty indikáciu, alebo zostane prvá verzia striktne explicit-save?
 7. Ako sa appearance revízia prejaví v už otvorenom projekte — automaticky, na vyžiadanie, alebo iba pri novom priradení?
+8. Ak sa pixla po sektoroch stále ukáže ako užitočná, má nekompatibilná hrúbka klik blokovať alebo ponúknuť explicitné potvrdenie výnimky?
 
 ## Pred implementáciou
 
-Auditovať aktuálny materiálový katalóg/decor skupiny, grain snapshot, SketchUp material assignment, part overrides, templates/previews, shared library návrh a existujúce UI pridávania/editovania materiálov. Urobiť read-only code audit a malý SketchUp 2026 technický proof-of-concept pre SKM/PBR/scale/UV. Až potom vytvoriť samostatný task package.
+Auditovať aktuálny materiálový katalóg/decor skupiny, grain snapshot, SketchUp material assignment, part overrides, templates/previews, shared library návrh a existujúce UI pridávania/editovania materiálov. Urobiť read-only code audit a malý SketchUp 2026 technický proof-of-concept pre SKM/PBR/scale/UV. **Pixlu pred jej prípadným task package znovu vyhodnotiť až po zavedení segmentov/sektorov a scoped materiálových pravidiel.** Až potom vytvoriť samostatný task package.
