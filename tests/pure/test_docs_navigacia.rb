@@ -11,6 +11,17 @@ NX_STAV_MAX_LINES = 80
 NX_STAV_SECTIONS = ['## Stav', '## Robí sa', '## Ďalší krok',
                     '## Posledné uzávery', '## Kam sa pozrieť'].freeze
 
+# Davka "Docs cleanup A" (26.8.2026): ARCHITEKTURA.md je uz LEN rozcestnik,
+# odseky modulov ziju v docs/architecture/. Router musi ostat kratky, mapa uplna.
+NX_ARCH_ROUTER_MAX_LINES = 200
+NX_ARCH_FILES = %w[
+  model-a-identita.md construction.md materials.md
+  hardware.md outputs.md ui-lifecycle.md
+].freeze
+# Dlhy riadok = necitatelny diff (jeden odsek = jeden riadok bola presne choroba,
+# ktoru tato davka liecila). Plati na router aj na mapu; SYSTEM/ je mimo rozsah.
+NX_ARCH_MAX_LINE = 400
+
 NxTest.test('docs: SYSTEM/STAV.md existuje a ma najviac 80 riadkov') do
   path = File.join(NxTest::ROOT, 'SYSTEM', 'STAV.md')
   NxTest.assert(File.exist?(path), 'SYSTEM/STAV.md chyba — je to vstupny bod kazdeho sedenia')
@@ -37,6 +48,55 @@ NxTest.test('docs: docs/ARCHITEKTURA.md existuje a je jedinym miestom architektu
   end
 end
 
+NxTest.test('docs: ARCHITEKTURA.md je ROUTER — kratky a odkazuje na docs/architecture/') do
+  arch = File.join(NxTest::ROOT, 'docs', 'ARCHITEKTURA.md')
+  lines = File.readlines(arch, encoding: 'UTF-8').length
+  NxTest.assert(lines <= NX_ARCH_ROUTER_MAX_LINES,
+                "ARCHITEKTURA.md ma #{lines} riadkov (limit #{NX_ARCH_ROUTER_MAX_LINES}) — " \
+                'odseky modulov patria do docs/architecture/, tu ostava len rozcestnik')
+  src = File.read(arch, encoding: 'UTF-8')
+  NX_ARCH_FILES.each do |name|
+    NxTest.assert(src.include?("architecture/#{name}"),
+                  "ARCHITEKTURA.md neodkazuje na architecture/#{name} — mapa by sa nedala najst")
+  end
+end
+
+NxTest.test('docs: docs/architecture/ ma vsetkych 6 suborov mapy') do
+  dir = File.join(NxTest::ROOT, 'docs', 'architecture')
+  NxTest.assert(Dir.exist?(dir), 'docs/architecture/ chyba — tam ziju odseky modulov')
+  missing = NX_ARCH_FILES.reject { |n| File.exist?(File.join(dir, n)) }
+  NxTest.assert(missing.empty?, "docs/architecture/ nema subory: #{missing.join(' · ')}")
+end
+
+# Jeden odsek na jednom obrom riadku znamena necitatelny diff a nemozne review.
+NxTest.test('docs: ARCHITEKTURA.md a docs/architecture/*.md nemaju riadok nad 400 znakov') do
+  paths = [File.join(NxTest::ROOT, 'docs', 'ARCHITEKTURA.md')] +
+          Dir.glob(File.join(NxTest::ROOT, 'docs', 'architecture', '*.md')).sort
+  offenders = []
+  paths.each do |path|
+    File.readlines(path, encoding: 'UTF-8').each_with_index do |line, i|
+      len = line.rstrip.length
+      offenders << "#{path.sub(NxTest::ROOT.to_s, '').tr('\\', '/')}:#{i + 1} (#{len})" if len > NX_ARCH_MAX_LINE
+    end
+  end
+  NxTest.assert(offenders.empty?,
+                "Riadky nad #{NX_ARCH_MAX_LINE} znakov: #{offenders.join(', ')} — " \
+                'rozbi odsek na kratsie riadky (Markdown ich spoji do jedneho odseku)')
+end
+
+# Mapa nesmie zaostat za kodom: kazdy modul core/ a modules/ musi byt niekde spomenuty.
+NxTest.test('docs: kazdy modul core/ a modules/ je spomenuty v docs/architecture/') do
+  blob = Dir.glob(File.join(NxTest::ROOT, 'docs', 'architecture', '*.md'))
+            .map { |f| File.read(f, encoding: 'UTF-8') }.join("\n").downcase
+  mods = Dir.glob(File.join(NxTest::ROOT, 'noxun_engine', '{core,modules}', '**', '*.rb'))
+            .map { |p| File.basename(p, '.rb') }.uniq.sort
+  NxTest.assert(mods.length > 40, "nenasiel som moduly (#{mods.length}) — zla cesta?")
+  missing = mods.reject { |m| blob.include?(m.downcase) }
+  NxTest.assert(missing.empty?,
+                "Moduly bez zmienky v docs/architecture/: #{missing.join(' · ')} — " \
+                'pridaj im odsek (aspon stub) do prislusneho suboru mapy')
+end
+
 # CLAUDE.md sa nacitava AUTOMATICKY kazde sedenie — architektura sa don nesmie vratit
 # (davka U3 ju presunula do docs/ARCHITEKTURA.md). Guard proti recidive.
 NxTest.test('docs: CLAUDE.md neobsahuje nadpis sekcie Architektura') do
@@ -57,7 +117,9 @@ end
 
 NxTest.test('docs: relativne odkazy v navigacnych suboroch ukazuju na existujuce subory') do
   broken = []
-  %w[CLAUDE.md docs/ARCHITEKTURA.md SYSTEM/STAV.md SYSTEM/PLAN.md SYSTEM/DOGFOODING.md].each do |name|
+  names = %w[CLAUDE.md docs/ARCHITEKTURA.md SYSTEM/STAV.md SYSTEM/PLAN.md SYSTEM/DOGFOODING.md] +
+          NX_ARCH_FILES.map { |n| "docs/architecture/#{n}" }
+  names.each do |name|
     path = File.join(NxTest::ROOT, name)
     NxTest.assert(File.exist?(path), "#{name} chyba")
     dir = File.dirname(path)
