@@ -10,6 +10,24 @@ require_relative '../helper' unless defined?(NxTest)
 NX_STAV_MAX_LINES = 80
 NX_STAV_SECTIONS = ['## Stav', '## Robí sa', '## Ďalší krok',
                     '## Posledné uzávery', '## Kam sa pozrieť'].freeze
+# Limit riadkov sam o sebe nestaci — 80 obrich riadkov je 30 kB textu, ktory sa
+# nedal precitat (presne stav pred davkou "Docs cleanup B", 26.8.2026).
+NX_STAV_MAX_BYTES = 12 * 1024
+
+# Davka "Docs cleanup B" (26.8.2026): SYSTEM/ ma vrstvy — zive docs (nizsie), zdroje/
+# (nezavazne koncepty, necitaju sa automaticky) a archiv/ (historia, append-only).
+# Mapu autorit drzi SYSTEM/README.md.
+# Zoznam je EXPLICITNY, nie glob: archiv/ a zdroje/ sa vedome nestrazia (su to
+# historicke texty, ktore sa nesmu prepisovat kvoli zalomeniu). STANDARD.md prida
+# davka C — dovtedy ma dlhe riadky. POJMY.md tiez caka na reflow.
+NX_SYSTEM_LINE_FILES = %w[
+  STAV.md PLAN.md DOGFOODING.md README.md V1_VIZIA.md VEPO_KONTRAKT.md
+].freeze
+NX_SYSTEM_MAX_LINE = 400
+
+# Koncepty v zdroje/next_sessions/ nesmu vyzerat ako zadanie — kazdy nesie status
+# riadok hned pod nadpisom. README.md priecinka je rozcestnik, nie koncept.
+NX_NEXT_SESSIONS_STATUS = '> Stav: KONCEPT'
 
 # Davka "Docs cleanup A" (26.8.2026): ARCHITEKTURA.md je uz LEN rozcestnik,
 # odseky modulov ziju v docs/architecture/. Router musi ostat kratky, mapa uplna.
@@ -28,6 +46,74 @@ NxTest.test('docs: SYSTEM/STAV.md existuje a ma najviac 80 riadkov') do
   lines = File.readlines(path, encoding: 'UTF-8').length
   NxTest.assert(lines <= NX_STAV_MAX_LINES,
                 "STAV.md ma #{lines} riadkov (limit #{NX_STAV_MAX_LINES}) — presun detaily do PLAN.md alebo archiv/KRONIKA.md")
+end
+
+NxTest.test('docs: SYSTEM/STAV.md ma najviac 12 kB') do
+  path = File.join(NxTest::ROOT, 'SYSTEM', 'STAV.md')
+  size = File.size(path)
+  NxTest.assert(size <= NX_STAV_MAX_BYTES,
+                "STAV.md ma #{size} B (limit #{NX_STAV_MAX_BYTES}) — starsie uzavery zloz do " \
+                'jedneho riadku s odkazom na archiv/KRONIKA.md, nahradeny text patri do KRONIKY')
+end
+
+NxTest.test('docs: zive SYSTEM/*.md nemaju riadok nad 400 znakov') do
+  offenders = []
+  NX_SYSTEM_LINE_FILES.each do |name|
+    path = File.join(NxTest::ROOT, 'SYSTEM', name)
+    NxTest.assert(File.exist?(path), "SYSTEM/#{name} chyba")
+    File.readlines(path, encoding: 'UTF-8').each_with_index do |line, i|
+      len = line.rstrip.length
+      offenders << "SYSTEM/#{name}:#{i + 1} (#{len})" if len > NX_SYSTEM_MAX_LINE
+    end
+  end
+  NxTest.assert(offenders.empty?,
+                "Riadky nad #{NX_SYSTEM_MAX_LINE} znakov: #{offenders.join(', ')} — " \
+                'rozbi odsek na kratsie riadky (Markdown ich spoji do jedneho odseku)')
+end
+
+# Hotovy blok patri do archivu, nie do planu. Nadpis s "KOMPLET" alebo fajkou znamena,
+# ze sa uzavrety blok v PLAN.md zabudol presunut do archiv/ROADMAP_hotove_etapy.md.
+NxTest.test('docs: PLAN.md nema nadpis hotoveho bloku (KOMPLET / fajka)') do
+  path = File.join(NxTest::ROOT, 'SYSTEM', 'PLAN.md')
+  offenders = File.read(path, encoding: 'UTF-8').lines.map(&:rstrip).select do |l|
+    l.start_with?('#') && (l.include?('KOMPLET') || l.include?("✅"))
+  end
+  NxTest.assert(offenders.empty?,
+                "PLAN.md ma nadpis hotoveho bloku (#{offenders.join(' · ')}) — presun blok plnym " \
+                'textom do SYSTEM/archiv/ROADMAP_hotove_etapy.md; PLAN drzi len nehotove veci')
+end
+
+# To iste pre zapisnik: vyriesene D-cisla ziju v archive (plny text + index), tu by
+# len duplikovali a rastli donekonecna.
+NxTest.test('docs: DOGFOODING.md nema sekciu vyriesenych') do
+  path = File.join(NxTest::ROOT, 'SYSTEM', 'DOGFOODING.md')
+  offenders = File.read(path, encoding: 'UTF-8').lines.map(&:rstrip).select do |l|
+    l.start_with?('#') && l.include?('Vyriešené')
+  end
+  NxTest.assert(offenders.empty?,
+                "DOGFOODING.md ma sekciu vyriesenych (#{offenders.join(' · ')}) — plny text aj " \
+                'index patria do SYSTEM/archiv/DOGFOODING_vyriesene.md; tu ostavaju len otvorene postrehy')
+end
+
+NxTest.test('docs: SYSTEM/README.md existuje — mapa autorit priecinka') do
+  path = File.join(NxTest::ROOT, 'SYSTEM', 'README.md')
+  NxTest.assert(File.exist?(path),
+                'SYSTEM/README.md chyba — bez mapy autorit agent nevie, ktory dokument plati na co')
+end
+
+NxTest.test('docs: kazdy koncept v zdroje/next_sessions/ nesie status riadok') do
+  dir = File.join(NxTest::ROOT, 'SYSTEM', 'zdroje', 'next_sessions')
+  NxTest.assert(Dir.exist?(dir), 'SYSTEM/zdroje/next_sessions/ chyba')
+  files = Dir.glob(File.join(dir, '*.md')).sort
+             .reject { |f| File.basename(f) == 'README.md' }
+  NxTest.assert(files.length > 5, "nenasiel som koncepty (#{files.length}) — zla cesta?")
+  missing = files.reject do |f|
+    File.readlines(f, encoding: 'UTF-8').any? { |l| l.start_with?(NX_NEXT_SESSIONS_STATUS) }
+  end
+  NxTest.assert(missing.empty?,
+                "Koncepty bez riadku '#{NX_NEXT_SESSIONS_STATUS}': " \
+                "#{missing.map { |f| File.basename(f) }.join(' · ')} — bez neho vyzera koncept " \
+                'ako zadanie a agent ho moze zacat implementovat')
 end
 
 NxTest.test('docs: STAV.md ma vsetkych 5 povinnych sekcii') do
@@ -184,7 +270,8 @@ end
 
 NxTest.test('docs: relativne odkazy v navigacnych suboroch ukazuju na existujuce subory') do
   broken = []
-  names = %w[CLAUDE.md docs/ARCHITEKTURA.md SYSTEM/STAV.md SYSTEM/PLAN.md SYSTEM/DOGFOODING.md] +
+  names = %w[CLAUDE.md docs/ARCHITEKTURA.md SYSTEM/README.md SYSTEM/STAV.md SYSTEM/PLAN.md
+             SYSTEM/DOGFOODING.md SYSTEM/V1_VIZIA.md] +
           NX_ARCH_FILES.map { |n| "docs/architecture/#{n}" }
   names.each do |name|
     path = File.join(NxTest::ROOT, name)
