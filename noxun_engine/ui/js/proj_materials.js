@@ -2406,12 +2406,15 @@
         if (kind === 'abs' || !value) return null;
         var rec = (MD_SHEETS || []).find(function(s){ return String(s.id) === String(value); });
         if (!rec || !rec.decor) return null;
-        // Ten isty kontrakt ako v Inspectore: menovku riadku a hranicu
-        // zlucovania dava server (`row_label`/`row_key`), dupla poznat podla
-        // `source_material_id` — ulozeny duplak ma bezne `material_id`.
+        // Ten isty kontrakt ako v Inspectore: menovku riadku, hranicu
+        // zlucovania (`row_label`/`row_key`) aj PRIZNAK DUPLAKA dava server.
+        // `MD_SHEETS` je ZUZENY payload (`Panel.materials_payload`) — surove
+        // `source_material_id` v nom nie je, takze citat duplak z neho by
+        // znamenalo, ze ulozeny duplak je v Studiu neviditelny (review #231
+        // kolo 3). Tvar `duplak2:` ostava pre virtualnu ponuku.
         return { decor: rec.row_label || rec.decor, type: rec.type || '',
                  thickness: rec.thickness, key: rec.row_key || '',
-                 duplak: !!rec.source_material_id || /^duplak[23]:/.test(String(value)) };
+                 duplak: rec.duplak === true || /^duplak[23]:/.test(String(value)) };
       });
     }
     if (NXCombo.setColorResolver){

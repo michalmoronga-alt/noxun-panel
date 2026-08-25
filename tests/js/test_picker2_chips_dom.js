@@ -335,4 +335,75 @@ eq(sel.value, 'duplak2:dtd18', 'duplák sa vložil až po VEDOMOM kliku na jeho 
   eq(sel2.value, 'dup2', 'šípka preskočila nedostupnú 36 na najbližší použiteľný variant');
 })();
 
+// --- 7) dotaz na ID variantu VLOŽÍ ten variant ----------------------------
+(function(){
+  // Sekcia 6 si prepla resolver na svoju fixtúru — vrátiť pôvodnú.
+  NXC.setVariantResolver((kind, value) => (kind === 'abs' ? null : (META[value] || null)));
+  sel.value = 'dtd18';
+  NXC.open(sel);
+  const inp = popNode().querySelector('input');
+  inp.value = 'dtd36';
+  (inp._ls.input || []).forEach(fn => fn());
+  ok(/class="cbchip on"[^>]*>36</.test(popHtml()), 'ponuka ukazuje hľadaný variant');
+  fire('click', { target: rowTarget, preventDefault(){}, stopPropagation(){} });
+  eq(sel.value, 'dtd36', 'a Enter/klik vloží PRÁVE JEHO, nie predvolených 18');
+})();
+
+// --- 7b) NEPREHĽADNÉ ID: dotaz musí vyhrať nad hrúbkovým pravidlom --------
+// Materiálové ID sú zámerne opaknné a môžu obsahovať číslo, ktoré patrí INEJ
+// hrúbke. Fixtúra je presne taká: `A36` je 18 mm a `B18` je 36 mm — kto napíše
+// „A36", chce A36. Bez cesty cez ID by hrúbkové pravidlo prečítalo „36"
+// a vložilo B18; keby bola tá cesta až ZA ním, dopadlo by to rovnako.
+(function(){
+  const META3 = {
+    A36: { decor: 'Orech', type: 'DTDL', thickness: 18, key: 'G|Orech|DTDL' },
+    B18: { decor: 'Orech', type: 'DTDL', thickness: 36, key: 'G|Orech|DTDL' }
+  };
+  NXC.setVariantResolver((kind, value) => (kind === 'abs' ? null : (META3[value] || null)));
+
+  const sel3 = el('select');
+  sel3.setAttribute('data-nx-combo', 'decor');
+  sel3.setAttribute('data-nx-combo-ctx', 'body');
+  [['A36', 'Orech 18 mm'], ['B18', 'Orech 36 mm']].forEach(function(row){
+    const o = el('option');
+    o.value = row[0];
+    o.textContent = row[1];
+    sel3.appendChild(o);
+    sel3.options.push(o);
+  });
+  sel3.value = 'A36';
+  sel3.selectedIndex = 0;
+  body.appendChild(sel3);
+  NXC.scan(document);
+
+  NXC.open(sel3);
+  const inp3 = popNode().querySelector('input');
+  inp3.value = 'B18';
+  (inp3._ls.input || []).forEach(fn => fn());
+  fire('click', { target: rowTarget, preventDefault(){}, stopPropagation(){} });
+  eq(sel3.value, 'B18', 'dotaz na ID vložil TEN variant, hoci číslo v ňom patrí inej hrúbke');
+
+  NXC.open(sel3);
+  const inp4 = popNode().querySelector('input');
+  inp4.value = 'A36';
+  (inp4._ls.input || []).forEach(fn => fn());
+  fire('click', { target: rowTarget, preventDefault(){}, stopPropagation(){} });
+  eq(sel3.value, 'A36', 'a naopak — ID má prednosť pred hrúbkovým čítaním dotazu');
+})();
+
+// --- 8) hláška o nedostupnom čipe má vlastný riadok (CSS) -----------------
+// `.cbchipmsg` je dieťa `.cbopt`; bez zalamovania by sedela V RIADKU za čipmi
+// a `overflow: hidden` popupu by ju orezal — dôvod je pritom to jediné, čo má
+// povedať (review #231 kolo 3).
+(function(){
+  const fs = require('node:fs');
+  const css = fs.readFileSync(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'css',
+                                        'panel.css'), 'utf8');
+  ok(/\.cbopt\s*\{[^}]*flex-wrap:\s*wrap/.test(css),
+     'riadok ponuky sa zalamuje, takže hláška ide POD čipy');
+  ok(/\.cbchipmsg\s*\{[^}]*flex:\s*0 0 100%/.test(css), 'a zaberie celú šírku riadku');
+  ok(/\.cbchipmsg\s*\{[^}]*white-space:\s*normal/.test(css),
+     'dlhý dôvod sa zalomí, nie oreže');
+})();
+
 console.log(`OK test_picker2_chips_dom.js — ${n} kontrol`);

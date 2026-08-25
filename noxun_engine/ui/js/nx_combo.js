@@ -211,6 +211,27 @@
       return best;
     }
 
+    // Dotaz -> ktorý VARIANT bol menovaný priamo (ID alebo label). Materiálové
+    // ID su zamerne neprehladne a pred zlucenim sa dal kazdy variant vybrat
+    // samostatne — dotaz „ZXQ" teda musi vlozit prave ten variant, nie
+    // predvolenu hrubku rodiny (review #231 kolo 3). Nejednoznacny dotaz
+    // (sedi na viac variantov, napr. samotny nazov dekoru) nevybera nic —
+    // radsej nechame rozhodnut hrubkove pravidlo nez hadat.
+    function nxComboVariantFromQuery(q, variants){
+      var list = variants || [];
+      var text = nxNormText(q);
+      if (!text || !list.length) return -1;
+      var exact = -1, part = -1, parts = 0;
+      for (var i = 0; i < list.length; i++){
+        if (list[i].disabled) continue;
+        var val = nxNormText(list[i].value), lab = nxNormText(list[i].label);
+        if (text === val || text === lab){ if (exact < 0) exact = i; }
+        else if (val.indexOf(text) > -1 || lab.indexOf(text) > -1){ part = i; parts++; }
+      }
+      if (exact >= 0) return exact;
+      return parts === 1 ? part : -1;
+    }
+
     // Dotaz -> ktorý čip má byť predvolený. „36" preselektuje 36 mm, „duplák"
     // duplákový variant. -1 = dotaz o hrúbke nič nehovorí.
     function nxComboChipFromQuery(q, variants){
@@ -733,13 +754,18 @@
       rows.forEach(function(r){
         if (!r.decorRow) return;
         // Poradie je kontrakt, nie detail:
-        // 1. VÝSLOVNÝ DOTAZ O HRÚBKE má prednosť pred všetkým (review #231 P2):
+        // 1. DOTAZ, KTORÝ MENUJE KONKRÉTNY VARIANT (jeho ID alebo label),
+        //    je najsilnejší: hľadanie ho vie nájsť, takže Enter musí vložiť
+        //    práve jeho — nie predvolenú hrúbku rodiny.
+        var byId = nxComboVariantFromQuery(q, r.variants);
+        if (byId >= 0){ r.value = r.variants[byId].value; return; }
+        // 2. VÝSLOVNÝ DOTAZ O HRÚBKE má prednosť pred zvyškom (review #231 P2):
         //    kto po kliku na 18 napíše „36", chce 36. Sľub „dotaz preselektuje
         //    to, čo Enter vloží" platí aj vtedy, keď predtým klikol na iný čip
         //    — inak by ponuka ukazovala jedno a vložila druhé.
         var byQ = nxComboChipFromQuery(q, r.variants);
         if (byQ >= 0 && !r.variants[byQ].disabled){ r.value = r.variants[byQ].value; return; }
-        // 2. VEDOMÁ voľba čipu — dotaz o hrúbke nič nehovorí, takže voľba
+        // 3. VEDOMÁ voľba čipu — dotaz o hrúbke nič nehovorí, takže voľba
         //    platí ďalej; inak by ju zahodilo najbližšie písmeno v hľadaní
         //    (render beží po každom vstupe).
         if (picked[r.key]){
@@ -747,11 +773,11 @@
           r.variants.forEach(function(v){ if (v.value === picked[r.key]) kept = v; });
           if (kept){ r.value = kept.value; return; }
         }
-        // 3. Inak platí to, čo select NESIE (otvorenie ponuky nič nemení).
+        // 4. Inak platí to, čo select NESIE (otvorenie ponuky nič nemení).
         var mine = null;
         r.variants.forEach(function(v){ if (v.value === cur) mine = v; });
         if (mine){ r.value = mine.value; return; }
-        // 4. A nakoniec predvoľba podľa kontextu (chrbát 3 · PD 38 · inak
+        // 5. A nakoniec predvoľba podľa kontextu (chrbát 3 · PD 38 · inak
         //    najtenšia konštrukčná; duplák nikdy).
         var def = nxComboDefaultVariant(r.variants, ctx);
         if (def) r.value = def.value;
@@ -983,7 +1009,8 @@
       nxRecentPush: nxRecentPush, nxComboIsFixed: nxComboIsFixed, nxComboHit: nxComboHit,
       nxComboDecorRows: nxComboDecorRows, nxComboDefaultVariant: nxComboDefaultVariant,
       nxComboChipFromQuery: nxComboChipFromQuery, nxComboVariantCmp: nxComboVariantCmp,
-      nxComboPopWidth: nxComboPopWidth, nxComboRowIds: nxComboRowIds
+      nxComboPopWidth: nxComboPopWidth, nxComboRowIds: nxComboRowIds,
+      nxComboVariantFromQuery: nxComboVariantFromQuery
     };
     global.NXCombo = API;
     if (typeof module !== 'undefined' && module.exports) module.exports = API;

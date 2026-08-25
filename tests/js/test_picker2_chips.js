@@ -21,7 +21,7 @@ function eq(a, b, msg){ n++; assert.deepStrictEqual(a, b, msg); }
 
 const NXC = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'nx_combo.js'));
 const { nxComboDecorRows, nxComboDefaultVariant, nxComboChipFromQuery, nxComboHit,
-        nxComboSections, nxComboRowIds } = NXC;
+        nxComboSections, nxComboRowIds, nxComboVariantFromQuery } = NXC;
 
 // --- fixtúra: dekor „Dub" v DTDL 18/36 + duplák, ten istý dekor v HDF 3 -----
 const ITEMS = [
@@ -211,6 +211,27 @@ const meta = v => META[v] || null;
   eq(stored[0].value, 'x18', 'uložený duplák sa nepredvolí — hoci jeho ID nič neprezrádza');
   eq(stored[0].variants[1].value, 'zx99', 'v poradí je posledný');
   ok(nxComboHit(stored[0], 'duplak'), 'a nájde sa hľadaním „duplák"');
+})();
+
+// --- 7) dotaz, ktorý MENUJE variant (ID alebo label) -----------------------
+// Materiálové ID sú zámerne neprehľadné a pred zlúčením sa dal každý variant
+// vybrať samostatne. Hľadanie ho riadkom nájde (searchExtra) — Enter preto
+// musí vložiť PRÁVE JEHO, nie predvolenú hrúbku rodiny (review #231 kolo 3).
+(function(){
+  const vars = [
+    { value: 'ABC18', label: 'Dub 18 mm', thickness: 18 },
+    { value: 'ZXQ',   label: 'Dub 36 mm', thickness: 36 },
+    { value: 'DUP',   label: 'Dub duplák 54 mm', thickness: 54, duplak: true }
+  ];
+  eq(nxComboVariantFromQuery('ZXQ', vars), 1, 'presné ID vyberie svoj variant');
+  eq(nxComboVariantFromQuery('zxq', vars), 1, 'bez ohľadu na veľkosť písmen');
+  eq(nxComboVariantFromQuery('Dub duplák 54 mm', vars), 2, 'presný label tiež');
+  eq(nxComboVariantFromQuery('ZX', vars), 1, 'jednoznačná časť ID stačí');
+  eq(nxComboVariantFromQuery('Dub', vars), -1,
+     'nejednoznačný dotaz nevyberá NIC — nech rozhodne hrúbkové pravidlo');
+  eq(nxComboVariantFromQuery('', vars), -1, 'prázdny dotaz nič nemení');
+  eq(nxComboVariantFromQuery('ZXQ', [{ value: 'ZXQ', label: 'x', disabled: true }]), -1,
+     'nedostupný variant sa dotazom vybrať nedá');
 })();
 
 console.log(`OK test_picker2_chips.js — ${n} kontrol`);

@@ -355,7 +355,12 @@
                color: var(--nx-select-strong); font-weight: 600; }
   .cbchip.off { opacity: .45; cursor: not-allowed; }
   .cbchipmsg:empty { display: none; }
-  .cbchipmsg { flex: 0 0 100%; margin-top: 2px; font-size: 10.5px; color: var(--nx-ink-muted); }
+  /* Bez `flex-wrap` by hlaska sedela V RIADKU za cipmi a `overflow: hidden`
+     popupu by ju orezal — dovod (koniec serveroveho labelu) je pritom to
+     jedine, co ma povedat. Zalamovanie sa zapina na `.cbopt` (kontajner). */
+  .cbopt { flex-wrap: wrap; }
+  .cbchipmsg { flex: 0 0 100%; margin-top: 2px; font-size: 10.5px; color: var(--nx-ink-muted);
+               white-space: normal; overflow-wrap: anywhere; }
   .cbopt .t { min-width: 0; }
   .cbtrigger { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 6px;
                font: inherit; font-size: 12px; background: var(--nx-surface);
