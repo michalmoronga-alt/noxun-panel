@@ -29,6 +29,9 @@
     'use strict';
 
     var KIND_ATTR   = 'data-nx-combo';       // 'decor' | 'abs'
+    // PICKER-2: kontext výberu pre PREDVOLENÚ hrúbku dekorového riadku
+    // ('body' | 'front' | 'back' | 'worktop'); chýbajúci = najtenšia konštrukčná.
+    var CTX_ATTR    = 'data-nx-combo-ctx';
     var RECENT_MAX  = 5;
     var RECENT_KEYS = { decor: 'nx_recent_decor', abs: 'nx_recent_abs' };
     // Volby, ktore NIE SU katalogove id — dedenie / "podla pravidla" / "Bez ABS".
@@ -60,7 +63,11 @@
     function nxComboHit(item, q){
       if (!q) return true;
       var n = nxNormText(q);
-      return nxNormText(item.label).indexOf(n) >= 0 || nxNormText(item.value).indexOf(n) >= 0;
+      // PICKER-2: dekorový riadok nesie aj hrúbky svojich variantov a slovo
+      // „duplák" (`searchExtra`) — inak by zlúčenie schovalo „36" pred
+      // vyhľadávaním, ktoré dovtedy fungovalo.
+      return nxNormText(item.label).indexOf(n) >= 0 || nxNormText(item.value).indexOf(n) >= 0 ||
+             (item.searchExtra ? nxNormText(item.searchExtra).indexOf(n) >= 0 : false);
     }
 
     // Rozpad textu na useky pre zvyraznenie zhody. CISTA funkcia — vracia
@@ -89,6 +96,163 @@
     // Polozka sa v ponuke objavi PRAVE RAZ (skupiny 2/3 ju zo zvysku vyberu); aby
     // sa clenenie katalogu nestratilo, nesie kazdy riadok meno svojej <optgroup>
     // ako podtitul (renderer).
+
+    // ======================= PICKER-2: RIADOK = DEKOR =======================
+    //
+    // Michal 25.8.: „ten istý dekor mám v zozname trikrát — 18, 36 a duplák —
+    // a musím sa v tom hrabať." Riadok ponuky je preto DEKOR; hrúbky toho
+    // istého TYPU dosky sú na jeho konci ako čipy (`18 | 36`).
+    //
+    // HRANICA JE TYP DOSKY, nie dekor: HDF 3 mm ani kompakt NIE SÚ „tenšia
+    // verzia" DTDL toho istého dekoru — sú to iné materiály s inou cenou aj
+    // spracovaním. Prepínač čipov preto NIKDY nesmie zmeniť typ; takéto
+    // položky ostávajú samostatnými riadkami.
+    //
+    // Výsledok voľby ostáva `material_id` KONKRÉTNEHO variantu — čip je čisto
+    // klientske zúženie výberu, serverové cesty sa nemenia (E-03: hrúbku
+    // určuje reálny materiál, nie UI).
+
+    // Metadáta variantu dodáva HOSTITEĽ (`setVariantResolver`) — komponent sám
+    // žiadny katalóg nepozná. Bez resolvera sa nič nezoskupuje a ponuka vyzerá
+    // presne ako pred PICKER-2.
+    function variantMetaOf(kind, value){
+      if (!variantResolver || nxComboIsFixed(value)) return null;
+      var m;
+      try { m = variantResolver(kind, value); } catch (e){ return null; }
+      if (!m || !m.decor) return null;
+      return { decor: String(m.decor), type: String(m.type == null ? '' : m.type),
+               thickness: (m.thickness == null ? null : Number(m.thickness)),
+               duplak: !!m.duplak, key: String(m.key == null ? '' : m.key) };
+    }
+
+    // Zoskupenie položiek na dekorové riadky. `meta(value)` vracia
+    // {decor,type,thickness,duplak} alebo null (položka ostáva samostatná).
+    // Poradie riadkov = poradie PRVÉHO výskytu (katalógové poradie sa nemení).
+    function nxComboDecorRows(items, meta){
+      var rows = [], byKey = {};
+      (items || []).forEach(function(it){
+        var m = meta ? meta(it.value) : null;
+        if (!m || !m.decor || !m.type){ rows.push(it); return; }
+        // HRANICU URCUJE KATALOG (review #231 P1): `m.key` je identita
+        // variantovej rodiny zo servera (vyrobca - dekor - struktura - typ -
+        // format/rub). Samotny dekor + typ zlucuje dva ROZNE materialy
+        // s rovnakym cislom dekoru: dva cipy s rovnakou hrubkou by boli
+        // nerozlisitelne a dala by sa vybrat cudzia cena, povrch aj format.
+        // Bez identity (starsi payload) sa pada na dekor + typ, teda na
+        // spravanie spred opravy.
+        var key = (m.key || (m.decor + '\u0000' + m.type)) + '\u0000' + (it.group || '');
+        var variant = { value: it.value, label: it.label, disabled: !!it.disabled,
+                        thickness: m.thickness, duplak: !!m.duplak };
+        if (!Object.prototype.hasOwnProperty.call(byKey, key)){
+          var row = { value: it.value, label: m.decor, group: it.group || '',
+                      disabled: !!it.disabled, variants: [variant], decorRow: true,
+                      type: m.type, key: key };
+          byKey[key] = row;
+          rows.push(row);
+          return;
+        }
+        var r = byKey[key];
+        r.variants.push(variant);
+        if (!variant.disabled) r.disabled = false;   // riadok žije, kým žije aspoň jeden variant
+      });
+      rows.forEach(function(r){
+        if (!r.decorRow) return;
+        r.variants.sort(nxComboVariantCmp);
+        // Hľadanie musí nájsť riadok aj podľa hrúbky („36") a podľa slova
+        // „duplák" — inak by ich zlúčenie schovalo pred vyhľadávaním.
+        // Riadok sa musi dat najst podla VSETKEHO, co zastupuje — nielen
+        // podla hrubky, ale aj podla ID a labelu KAZDEHO variantu (review #231
+        // P2). Pred zlucenim sa hladalo cez `value` kazdej polozky, takze
+        // dotaz na opaknu ID („H3303_36") fungoval; po zluceni nesie riadok len
+        // hodnotu predvoleneho variantu a bez tohto by taky dotaz prestal.
+        r.searchExtra = r.variants.map(function(v){
+          return [(v.thickness == null ? '' : v.thickness), (v.duplak ? 'duplak duplák' : ''),
+                  v.value, v.label].join(' ');
+        }).join(' ');
+        var def = nxComboDefaultVariant(r.variants, null);
+        if (def) r.value = def.value;
+      });
+      return rows;
+    }
+
+    // Tenšie hore, duplák VŽDY posledný (je to vedomá voľba, nie bežná hrúbka).
+    function nxComboVariantCmp(a, b){
+      if (!!a.duplak !== !!b.duplak) return a.duplak ? 1 : -1;
+      var ta = (a.thickness == null) ? 1e9 : a.thickness;
+      var tb = (b.thickness == null) ? 1e9 : b.thickness;
+      if (ta !== tb) return ta - tb;
+      return String(a.label).localeCompare(String(b.label));
+    }
+
+    // Kontext výberu -> predvolený variant. Michal 25.8.: korpus a čelá chcú
+    // najtenšiu konštrukčnú (18/19), chrbát HDF 3, pracovná doska 38 — a
+    // DUPLÁK sa nesmie predvoliť NIKDY (je to zdvojená doska za dvojnásobok,
+    // vyberá sa vedome klikom na čip).
+    function nxComboDefaultVariant(variants, ctx){
+      var list = (variants || []).filter(function(v){ return !v.disabled; });
+      if (!list.length) list = (variants || []).slice();
+      if (!list.length) return null;
+      var real = list.filter(function(v){ return !v.duplak; });
+      var pool = real.length ? real : list;   // len duplák? potom nech je aspoň niečo
+      var want = null;
+      if (ctx === 'back') want = 3;
+      else if (ctx === 'worktop') want = 38;
+      if (want != null){
+        var exact = pool.filter(function(v){ return v.thickness === want; });
+        if (exact.length) return exact[0];
+      }
+      // Bez kontextu (a pre korpus/čelá) je to NAJTENŠIA neduplákový variant —
+      // v praxi 18/19 mm, ale bez natvrdo písaného čísla: katalóg rozhoduje.
+      var best = null;
+      pool.forEach(function(v){
+        if (!best) { best = v; return; }
+        if (nxComboVariantCmp(v, best) < 0) best = v;
+      });
+      return best;
+    }
+
+    // Dotaz -> ktorý VARIANT bol menovaný priamo (ID alebo label). Materiálové
+    // ID su zamerne neprehladne a pred zlucenim sa dal kazdy variant vybrat
+    // samostatne — dotaz „ZXQ" teda musi vlozit prave ten variant, nie
+    // predvolenu hrubku rodiny (review #231 kolo 3). Nejednoznacny dotaz
+    // (sedi na viac variantov, napr. samotny nazov dekoru) nevybera nic —
+    // radsej nechame rozhodnut hrubkove pravidlo nez hadat.
+    function nxComboVariantFromQuery(q, variants){
+      var list = variants || [];
+      var text = nxNormText(q);
+      if (!text || !list.length) return -1;
+      var exact = -1, part = -1, parts = 0;
+      for (var i = 0; i < list.length; i++){
+        if (list[i].disabled) continue;
+        var val = nxNormText(list[i].value), lab = nxNormText(list[i].label);
+        if (text === val || text === lab){ if (exact < 0) exact = i; }
+        else if (val.indexOf(text) > -1 || lab.indexOf(text) > -1){ part = i; parts++; }
+      }
+      if (exact >= 0) return exact;
+      return parts === 1 ? part : -1;
+    }
+
+    // Dotaz -> ktorý čip má byť predvolený. „36" preselektuje 36 mm, „duplák"
+    // duplákový variant. -1 = dotaz o hrúbke nič nehovorí.
+    function nxComboChipFromQuery(q, variants){
+      var list = variants || [];
+      if (!list.length) return -1;
+      var text = nxNormText(q);
+      if (!text) return -1;
+      if (text.indexOf('duplak') > -1){
+        for (var d = 0; d < list.length; d++){ if (list[d].duplak) return d; }
+      }
+      var nums = text.match(/\d+([.,]\d+)?/g);
+      if (!nums) return -1;
+      for (var n = 0; n < nums.length; n++){
+        var val = parseFloat(String(nums[n]).replace(',', '.'));
+        for (var i = 0; i < list.length; i++){
+          if (list[i].thickness != null && Math.abs(list[i].thickness - val) < 0.001) return i;
+        }
+      }
+      return -1;
+    }
+
     function nxComboSections(items, q, kind, usedIds, recentIds){
       items = items || [];
       var used = {}, recent = {}, i;
@@ -99,13 +263,19 @@
       items.forEach(function(it){
         if (!nxComboHit(it, q)) return;
         if (nxComboIsFixed(it.value)) { fixed.push(it); return; }
-        if (used[it.value]) { inProject.push(it); return; }
-        if (recent[it.value]) { recents.push(it); return; }
+        // PICKER-2: dekorový riadok je „použitý", keď je použitý HOCIKTORÝ jeho
+        // variant. Porovnávať len `it.value` (predvolenú hrúbku) by znamenalo,
+        // že projekt s 36 mm by dekor v skupine „Použité v projekte" nenašiel —
+        // skupina by po zlúčení ticho vypadla.
+        var ids = nxComboRowIds(it);
+        if (ids.some(function(v){ return used[v]; })) { inProject.push(it); return; }
+        if (ids.some(function(v){ return recent[v]; })) { recents.push(it); return; }
         rest.push(it);
       });
       // Naposledy pouzite drzia poradie POUZITIA (najnovsie hore), nie katalogu.
+      // Riadok sa radí podľa svojho NAJNOVŠIEHO variantu.
       recents.sort(function(a, b){
-        return (usedIndex(recentIds, a.value) - usedIndex(recentIds, b.value));
+        return (rowRecentIndex(recentIds, a) - rowRecentIndex(recentIds, b));
       });
 
       var out = [];
@@ -114,6 +284,24 @@
       if (recents.length)   out.push({ title: 'Naposledy použité', items: recents });
       if (rest.length)      out.push.apply(out, nxComboRestSections(rest, kind));
       return out;
+    }
+
+    // Všetky ID, ktoré riadok zastupuje: bežná položka jedno, dekorový riadok
+    // všetky svoje varianty (18 · 36 · duplák).
+    function nxComboRowIds(it){
+      if (it && it.decorRow && it.variants && it.variants.length){
+        return it.variants.map(function(v){ return String(v.value); });
+      }
+      return [String(it ? it.value : '')];
+    }
+
+    function rowRecentIndex(list, it){
+      var best = 9999;
+      nxComboRowIds(it).forEach(function(v){
+        var i = usedIndex(list, v);
+        if (i < best) best = i;
+      });
+      return best;
     }
 
     function usedIndex(list, value){
@@ -186,7 +374,8 @@
 
     var ATTACHED = [];              // registrovane <select>y
     var OPEN = null;                // { sel, pop, items, active, q }
-    var colorResolver = null;       // fn(kind, value) -> css farba | ''
+    var colorResolver = null;
+    var variantResolver = null;       // fn(kind, value) -> css farba | ''
     var usedResolver = null;        // fn(kind) -> [id, …]
     var usedRefresher = null;       // fn() -> vypyta si od servera cerstve used_ids
     var docBound = false;
@@ -405,7 +594,7 @@
         '<div class="cbfoot"><span class="kbd">↑ ↓</span> výber ' +
         '<span class="kbd">Enter</span> potvrdí <span class="kbd">Esc</span> zavrie</div>';
       document.body.appendChild(pop);
-      OPEN = { sel: sel, pop: pop, items: [], active: -1, q: '' };
+      OPEN = { sel: sel, pop: pop, items: [], active: -1, q: '', chip: {}, msg: {} };
       c.btn.setAttribute('aria-expanded', 'true');
 
       var inp = pop.querySelector('input');
@@ -414,6 +603,16 @@
       inp.addEventListener('keydown', onKey);
       // Vyber MOUSEDOWN-om (D-67 FIX 4) — blur by popup zavrel skor, nez klik dopadne.
       pop.addEventListener('mousedown', function(ev){
+        // PICKER-2: klik na čip je ZÚŽENIE VÝBERU, nie výber — ponuka ostáva
+        // otvorená, aby sa dalo porovnávať ďalej.
+        var chip = ev.target && ev.target.closest ? ev.target.closest('.cbchip') : null;
+        if (chip){
+          ev.preventDefault();
+          ev.stopPropagation();
+          pickChip(parseInt(chip.getAttribute('data-chiprow'), 10),
+                   parseInt(chip.getAttribute('data-chip'), 10));
+          return;
+        }
         var row = ev.target && ev.target.closest ? ev.target.closest('.cbopt') : null;
         if (!row) return;   // klik do hladania / paticky nesmie nic vybrat
         ev.preventDefault();
@@ -448,6 +647,12 @@
       if (!OPEN) return;
       if (ev.key === 'ArrowDown'){ ev.preventDefault(); move(1); }
       else if (ev.key === 'ArrowUp'){ ev.preventDefault(); move(-1); }
+      // Cipy su tlacidla, ale fokus zostava v poli hladania (Tab ponuku
+      // zatvara), takze bez tohto by sa k nim clovek od klavesnice nedostal
+      // vobec (review #231 P2). Sipky VLAVO/VPRAVO prepinaju hrubku
+      // v aktivnom riadku — Enter potom vlozi prave ju.
+      else if (ev.key === 'ArrowLeft'){ ev.preventDefault(); moveChip(-1); }
+      else if (ev.key === 'ArrowRight'){ ev.preventDefault(); moveChip(1); }
       else if (ev.key === 'Enter'){ ev.preventDefault(); if (OPEN.active >= 0) pick(OPEN.active); }
       else if (ev.key === 'Escape'){ ev.preventDefault(); var s = OPEN.sel; close(); focusTrigger(s); }
       else if (ev.key === 'Tab'){ close(); }
@@ -455,6 +660,23 @@
 
     function focusTrigger(sel){
       if (sel && sel.__nxc){ try { sel.__nxc.btn.focus(); } catch (e){} }
+    }
+
+    // Krok po cipoch aktivneho riadku. Nedostupne varianty sa preskakuju
+    // a na koncoch sa NEcykluje — inak by sa slepym stlacanim dalo skoncit
+    // na dupláku bez toho, aby to clovek zbadal.
+    function moveChip(dir){
+      if (!OPEN || OPEN.active < 0) return;
+      var row = OPEN.items[OPEN.active];
+      if (!row || !row.decorRow || !row.variants || row.variants.length < 2) return;
+      var i = -1, k;
+      for (k = 0; k < row.variants.length; k++){ if (row.variants[k].value === row.value) i = k; }
+      if (i < 0) i = 0;
+      for (k = i + dir; k >= 0 && k < row.variants.length; k += dir){
+        if (row.variants[k].disabled) continue;
+        pickChip(OPEN.active, k);
+        return;
+      }
     }
 
     function move(dir){
@@ -477,7 +699,13 @@
     function render(q, jumpFirst){
       if (!OPEN) return;
       var sel = OPEN.sel, kind = sel.__nxc.kind;
-      var secs = nxComboSections(readItems(sel), q, kind, usedOf(kind), loadRecent(kind));
+      // PICKER-2: z položiek sa najprv stanú DEKOROVÉ RIADKY (varianty toho
+      // istého dekoru a typu dosky sa zlúčia do jedného riadku s čipmi), až
+      // potom sa delia na sekcie. Poradie je dôležité: sekcie „Použité"
+      // a „Naposledy" tak dostanú riadok, nie tri varianty za sebou.
+      var rows = nxComboDecorRows(readItems(sel), function(v){ return variantMetaOf(kind, v); });
+      applyContextDefaults(sel, rows, q);
+      var secs = nxComboSections(rows, q, kind, usedOf(kind), loadRecent(kind));
       OPEN.items = nxComboFlatten(secs);
       OPEN.q = q;
       var list = OPEN.pop.querySelector('.cblist');
@@ -501,7 +729,8 @@
             ' data-i="' + n + '"' + (it.disabled ? ' data-off="1"' : '') + '>' +
             (col ? '<i class="sw" style="background:' + esc(col) + '"></i>' : '<i class="sw nosw"></i>') +
             '<span class="t"><b>' + markup(it.label, q) + '</b>' +
-            (it.group ? '<i>' + esc(it.group) + '</i>' : '') + '</span></div>';
+            (it.group ? '<i>' + esc(it.group) + '</i>' : '') + '</span>' +
+            chipsHtml(it, n) + '</div>';
           n++;
         });
       });
@@ -512,12 +741,88 @@
       position();
     }
 
+    // Kontext výberu (`data-nx-combo-ctx`): korpus/čelá → najtenšia
+    // konštrukčná, chrbát → HDF 3, pracovná doska → 38. Dotaz má prednosť:
+    // keď človek píše „36", chce 36 — aj v korpuse.
+    //
+    // Voľba, ktorú už select NESIE, má prednosť pred oboma: prepnutý čip ani
+    // uložená hodnota sa nesmú stratiť pri prekreslení po písmene.
+    function applyContextDefaults(sel, rows, q){
+      var ctx = sel.getAttribute(CTX_ATTR) || null;
+      var cur = sel.value;
+      var picked = (OPEN && OPEN.chip) ? OPEN.chip : {};
+      rows.forEach(function(r){
+        if (!r.decorRow) return;
+        // Poradie je kontrakt, nie detail:
+        // 1. DOTAZ, KTORÝ MENUJE KONKRÉTNY VARIANT (jeho ID alebo label),
+        //    je najsilnejší: hľadanie ho vie nájsť, takže Enter musí vložiť
+        //    práve jeho — nie predvolenú hrúbku rodiny.
+        var byId = nxComboVariantFromQuery(q, r.variants);
+        if (byId >= 0){ r.value = r.variants[byId].value; return; }
+        // 2. VÝSLOVNÝ DOTAZ O HRÚBKE má prednosť pred zvyškom (review #231 P2):
+        //    kto po kliku na 18 napíše „36", chce 36. Sľub „dotaz preselektuje
+        //    to, čo Enter vloží" platí aj vtedy, keď predtým klikol na iný čip
+        //    — inak by ponuka ukazovala jedno a vložila druhé.
+        var byQ = nxComboChipFromQuery(q, r.variants);
+        if (byQ >= 0 && !r.variants[byQ].disabled){ r.value = r.variants[byQ].value; return; }
+        // 3. VEDOMÁ voľba čipu — dotaz o hrúbke nič nehovorí, takže voľba
+        //    platí ďalej; inak by ju zahodilo najbližšie písmeno v hľadaní
+        //    (render beží po každom vstupe).
+        if (picked[r.key]){
+          var kept = null;
+          r.variants.forEach(function(v){ if (v.value === picked[r.key]) kept = v; });
+          if (kept){ r.value = kept.value; return; }
+        }
+        // 4. Inak platí to, čo select NESIE (otvorenie ponuky nič nemení).
+        var mine = null;
+        r.variants.forEach(function(v){ if (v.value === cur) mine = v; });
+        if (mine){ r.value = mine.value; return; }
+        // 5. A nakoniec predvoľba podľa kontextu (chrbát 3 · PD 38 · inak
+        //    najtenšia konštrukčná; duplák nikdy).
+        var def = nxComboDefaultVariant(r.variants, ctx);
+        if (def) r.value = def.value;
+      });
+    }
+
     function currentIndex(sel){
       var v = sel.value;
       for (var i = 0; i < OPEN.items.length; i++){
         if (OPEN.items[i].value === v && !OPEN.items[i].disabled) return i;
       }
       return -1;
+    }
+
+    // PICKER-2: čipy hrúbok. Kreslia sa LEN keď má riadok viac variantov —
+    // jediná hrúbka žiadnu voľbu neponúka a čip by bol ozdoba. Aktívny čip je
+    // ten, ktorý riadok práve vloží (Enter/klik).
+    function chipsHtml(row, rowIndex){
+      if (!row.decorRow || !row.variants || row.variants.length < 2) return '';
+      var out = '<span class="cbchips">';
+      row.variants.forEach(function(v, i){
+        var on = (v.value === row.value);
+        // NATIVNY `disabled` by cip vyhodil z klavesnice a klik by nemal co
+        // povedat — vzor D-78 (repo zasada „ziadne mrtve tlacidlo bez
+        // dovodu"): tlacidlo ostava fokusovatelne, len sa nim neda prepnut
+        // a klik dopise DOVOD (server ho ma v labeli varianta).
+        out += '<button type="button" class="cbchip' + (on ? ' on' : '') +
+          (v.disabled ? ' off' : '') + '" data-chip="' + i + '" data-chiprow="' + rowIndex + '"' +
+          ' title="' + esc(v.label) + '"' +
+          (v.disabled ? ' aria-disabled="true"' : '') + '>' +
+          esc(chipLabel(v)) + '</button>';
+      });
+      out += '</span><span class="cbchipmsg" data-chipmsg="' + rowIndex + '">' +
+        esc(chipMsgOf(row)) + '</span>';
+      return out;
+    }
+
+    // Popis čipu: hrúbka číslom, duplák slovom — „36" a „duplák 36" sú dve
+    // rôzne veci a musí to byť vidieť bez tooltipu.
+    function chipLabel(v){
+      // Rodina moze mat duplak ×2 aj ×3 (36 aj 54 mm). Samotne slovo „duplák"
+      // by dalo DVA nerozlisitelne cipy, takze nesie aj hrubku (review #231
+      // kolo 2) — cislo je zo servera, slovo je jazyk komponentu.
+      var th = (v.thickness == null) ? '?' : String(v.thickness);
+      return v.duplak ? (th + ' duplák') : th;
     }
 
     function markup(text, q){
@@ -569,6 +874,57 @@
         top = Math.max(POP_MARGIN, r.top - 3 - h);
       }
       pop.style.top = Math.round(top) + 'px';
+    }
+
+    // Prepnutie čipu v riadku: mení sa LEN to, čo riadok vloží. Zapisuje sa
+    // do `OPEN.items`, takže ďalší Enter/klik ide na zvolený variant.
+    // Dovod, preco sa cip neda pouzit — drzi sa pod klucom riadku, takze
+    // prezije prekreslenie po pismene v hladani (rovnako ako vybrany cip).
+    function chipMsgOf(row){
+      return (OPEN && OPEN.msg && row && row.key && OPEN.msg[row.key]) || '';
+    }
+
+    function pickChip(rowIndex, chipIndex){
+      if (!OPEN) return;
+      var row = OPEN.items[rowIndex];
+      if (!row || !row.decorRow) return;
+      var v = row.variants[chipIndex];
+      if (!v) return;
+      OPEN.msg = OPEN.msg || {};
+      if (v.disabled){
+        // Klik na nedostupny cip NEPREPINA, ale ani nemlci: text pise SERVER
+        // (label varianta uz nesie dovod, napr. „(nekompatibilné)").
+        if (row.key) OPEN.msg[row.key] = v.label;
+        redrawRow(rowIndex);
+        return;
+      }
+      if (row.key) delete OPEN.msg[row.key];
+      row.value = v.value;
+      OPEN.chip = OPEN.chip || {};
+      if (row.key) OPEN.chip[row.key] = v.value;   // prežije prekreslenie po písmene
+      OPEN.active = rowIndex;
+      redrawRow(rowIndex);
+    }
+
+    // Prekreslí JEDEN riadok (čipy + zvýraznenie) — celý render by zahodil
+    // pozíciu scrollu aj rozpísaný dotaz.
+    function redrawRow(rowIndex){
+      if (!OPEN || !OPEN.pop) return;
+      var nodes = OPEN.pop.querySelectorAll('.cbopt');
+      for (var i = 0; i < nodes.length; i++){
+        if (parseInt(nodes[i].getAttribute('data-i'), 10) !== rowIndex) continue;
+        var chips = nodes[i].querySelectorAll('.cbchip');
+        var row = OPEN.items[rowIndex];
+        for (var c = 0; c < chips.length; c++){
+          var v = row.variants[parseInt(chips[c].getAttribute('data-chip'), 10)];
+          var on = !!(v && v.value === row.value);
+          chips[c].className = 'cbchip' + (on ? ' on' : '') + (v && v.disabled ? ' off' : '');
+        }
+        var msg = nodes[i].querySelector('.cbchipmsg');
+        if (msg) msg.textContent = chipMsgOf(row);
+        break;
+      }
+      paintActive();
     }
 
     function pick(i){
@@ -625,6 +981,9 @@
       // Hooky panela: farba stvorceka a zoznam "pouzite v projekte". Komponent
       // sam ZIADNY katalog nepozna — data mu dodava panel z MATERIALS payloadu.
       setColorResolver: function(fn){ colorResolver = fn; },
+      // PICKER-2: metadáta variantu (dekor · typ dosky · hrúbka · duplák).
+      // Bez neho sa nič nezoskupuje — ponuka vyzerá ako pred PICKER-2.
+      setVariantResolver: function(fn){ variantResolver = fn; },
       setUsedResolver: function(fn){ usedResolver = fn; },
       // Volitelny hook: ako si vypytat CERSTVE „Použité v projekte" pri otvoreni
       // ponuky. Bez neho komponent funguje ďalej — len s tym, co uz v pameti ma.
@@ -648,7 +1007,10 @@
       nxNormText: nxNormText, nxComboSections: nxComboSections, nxComboHighlight: nxComboHighlight,
       nxComboStep: nxComboStep, nxComboFirst: nxComboFirst, nxComboFlatten: nxComboFlatten,
       nxRecentPush: nxRecentPush, nxComboIsFixed: nxComboIsFixed, nxComboHit: nxComboHit,
-      nxComboPopWidth: nxComboPopWidth
+      nxComboDecorRows: nxComboDecorRows, nxComboDefaultVariant: nxComboDefaultVariant,
+      nxComboChipFromQuery: nxComboChipFromQuery, nxComboVariantCmp: nxComboVariantCmp,
+      nxComboPopWidth: nxComboPopWidth, nxComboRowIds: nxComboRowIds,
+      nxComboVariantFromQuery: nxComboVariantFromQuery
     };
     global.NXCombo = API;
     if (typeof module !== 'undefined' && module.exports) module.exports = API;

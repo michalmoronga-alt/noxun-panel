@@ -469,6 +469,7 @@ module Noxun
         # neposielaju — zrkadlo katalogovej semantiky).
         def materials_payload
           ctx = label_ctx # 2A-4b: kolizie cisla dekoru raz pre cely payload
+          fam = row_fam_ctx(ctx) # PICKER-2: kolizie DEKOROVYCH menoviek, tiez raz
           {
             'catalog_schema' => Materials.catalog_schema,
             'sheets' => Materials.sheets.map { |s|
@@ -480,7 +481,18 @@ module Noxun
                        # M-C (GH #118 P2): typ + hranova uprava PD — JS zrkadlo
                        # potlacenia ABS (absUsableForSheet) ich potrebuje, inak
                        # by kompakt/postforming otvaral modal "Vytvorit pasku".
-                       'type' => s['type'] }
+                       'type' => s['type'],
+                       # PICKER-2: dekorova menovka BEZ hrubky + identita
+                       # variantovej rodiny. Vyhladavac z nich sklada jeden
+                       # riadok na dekor s hrubkami na cipoch — hranicu urcuje
+                       # KATALOG (vyrobca, struktura, format, rub), nie klient.
+                       'row_label' => sheet_row_label(s, ctx, fam),
+                       'row_key' => Materials.variant_family_key(s) }
+              # DUPLAK z KATALOGU (review #231 P1): zdvojena doska ma bezne
+              # `material_id` a pozna sa VYHRADNE podla `source_material_id` —
+              # bez tohto priznaku by v ponuke vyzerala ako kupena hruba doska
+              # a nedala by sa najst ani hladanim „duplak".
+              base['duplak'] = true unless s['source_material_id'].to_s.strip.empty?
               base['pd_edge_subtype'] = s['pd_edge_subtype'] unless s['pd_edge_subtype'].to_s.empty?
               # UI-C1b: `uni_role` je ZRKADLO katalogoveho pola (rovnaky vzor ako
               # pd_edge_subtype) — vkladacia karta z neho vyberie UNI material
@@ -626,6 +638,33 @@ module Noxun
             out = "#{out} [#{gid}]" unless gid.empty?
           end
           out
+        end
+
+        # PICKER-2: menovka DEKORU (bez typu a hrubky) — to iste, co nesie
+        # `sheet_label` pred casťou „· TYP hrubka mm", vratane vyrobcu pri
+        # kolizii a pripony formatu/rubu. Riadok vyhladavaca zastupuje vsetky
+        # hrubky rodiny, takze menovka s hrubkou by v nom klamala; a bez
+        # vyrobcu/formatu by dva RIADKY vyzerali rovnako.
+        # Menovka RIADKU vyhladavaca: dekorovy zaklad (to iste, co nesie
+        # `sheet_label` pred castou „· TYP hrubka mm") + rozlisenie, ked ten
+        # isty dekor ma v katalogu viac typov. Rozhodnutie aj text skladania
+        # rozlisenia zije v CORE (`Materials.row_label_disambiguated`) — je to
+        # pravidlo nad katalogom, nie vlastnost okna, a takto sa da overit
+        # headless.
+        def sheet_row_label(s, ctx = label_ctx, fam = nil)
+          return sheet_label(s, ctx) if Materials.uni?(s)
+
+          Materials.row_label_disambiguated(raw_row_label(s, ctx), s, fam)
+        end
+
+        # Zaklad dekorovej menovky BEZ rozlisovania (zdiela ho ctx aj label).
+        def raw_row_label(s, ctx = label_ctx)
+          "#{label_base(s, s['manufacturer'], ctx)}#{Materials.sheet_label_suffix(s)}"
+        end
+
+        # Kontext riadkov na CELY payload (vzor `label_ctx`).
+        def row_fam_ctx(ctx = label_ctx)
+          Materials.row_family_ctx(Materials.sheets) { |s| raw_row_label(s, ctx) }
         end
 
         def sheet_label(s, ctx = label_ctx)

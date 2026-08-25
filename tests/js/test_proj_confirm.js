@@ -102,5 +102,34 @@ function ok(cond, msg){ n++; if (!cond) throw new Error(msg); }
      'scan ide AŽ ZA napĺňaním (inak by trigger ukazoval staré položky)');
 
   ok(combo.indexOf('sync: function(sel){') > -1, 'komponent `sync` naozaj ponúka');
+  // PICKER-2: dekorové riadky potrebujú metadáta od HOSTITEĽA. Bez tohto
+  // napojenia by sa varianty nezoskupili a ponuka by ostala „dekor trikrát".
+  ok(src.indexOf('NXCombo.setVariantResolver(') > -1,
+     'Štúdio dodáva komponentu metadáta variantu (dekor · typ · hrúbka · duplák)');
+  const core = fs.readFileSync(path2.join(UI, 'js', 'core.js'), 'utf8');
+  ok(core.indexOf('NXCombo.setVariantResolver(nxComboVariantOf)') > -1,
+     'a Inspector tiež — jeden komponent, dva hostitelia, žiadna kópia logiky');
+  ok(core.indexOf("if (kind === 'abs' || !value) return null;") > -1,
+     'ABS pásky sa NEZOSKUPUJÚ — hrúbka pásky je jej vlastnosť, nie variant dekoru');
+  // Review #231 P1: uložený duplák má bežné `material_id` — pozná sa výhradne
+  // podľa katalógu. Keby to oba hostiteľia čítali z tvaru ID, vyzeral by ako
+  // kúpená hrubá doska a mohol by sa aj predvoliť.
+  ok(core.indexOf('rec.duplak === true') > -1,
+     'Inspector číta duplák z katalógového príznaku, nielen z tvaru ID');
+  // Kolo 3: `MD_SHEETS` je ZÚŽENÝ payload (`Panel.materials_payload`), surové
+  // `source_material_id` v ňom NIE JE — čítať duplák z neho znamenalo, že
+  // uložený duplák je v Štúdiu neviditeľný. Oba hostitelia čítajú príznak.
+  ok(src.indexOf('rec.duplak === true') > -1,
+     'Štúdio číta duplák z toho istého príznaku ako Inspector');
+  // Pozor: `source_material_id` v tomto súbore ŽIJE ĎALEJ — správa katalógu
+  // pracuje s PLNÝMI záznamami (`MD_CATALOG`), a spomína ho aj komentár
+  // resolvera. Kontroluje sa preto presne ten VÝRAZ, ktorý duplák rozhoduje.
+  const mdDup = (src.split('\n').filter(l => l.indexOf('duplak: ') > -1)[0] || '');
+  ok(mdDup.length > 0, 'resolver variantov v Štúdiu rozhoduje o dupláku');
+  ok(mdDup.indexOf('source_material_id') < 0,
+     'a NEČÍTA pole, ktoré v jeho payloade vôbec nie je');
+  // A hranicu zlučovania nesmie hádať ani jeden z nich.
+  ok(core.indexOf('key: rec.row_key') > -1 && src.indexOf('key: rec.row_key') > -1,
+     'identitu variantovej rodiny dodáva server (`row_key`), nie klient');
   ok(combo.indexOf('nxComboPopWidth') > -1, 'a šírka ponuky je jeho vlastné pravidlo');
 })();

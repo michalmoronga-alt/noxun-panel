@@ -263,9 +263,16 @@ module Noxun
         def full_catalog_payload
           cat = Materials.load
           ctx = Panel.label_ctx # 2A-4b: kolizie cisla dekoru raz pre cely payload
+          fam = Panel.row_fam_ctx(ctx) # PICKER-2: kolizie dekorovych menoviek
           {
             'sheets' => cat['sheets'].map { |s|
-              extra = { 'label' => Panel.sheet_label(s, ctx), 'row_rev' => Materials.record_rev(s) }
+              # PICKER-2: `row_label`/`row_key` su TIE ISTE, ake dostava panel
+              # (`Panel.sheet_row_label` + `Materials.variant_family_key`) —
+              # jedna semantika, dva payloady; inak by sa ponuka v Studiu
+              # zlucovala inak nez v Inspectore.
+              extra = { 'label' => Panel.sheet_label(s, ctx), 'row_rev' => Materials.record_rev(s),
+                        'row_label' => Panel.sheet_row_label(s, ctx, fam),
+                        'row_key' => Materials.variant_family_key(s) }
               # V0.6 M-A2 (audit BLOCKER 1): dlazdica dostava VYHRADNE lokalny
               # subor z DemosImageCache — remote URL do CEF nikdy nejde (throttle
               # /allowlist by obisiel). Bez suboru = fallback farba.

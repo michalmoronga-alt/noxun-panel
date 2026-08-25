@@ -200,6 +200,25 @@
     var rec = sheetRecOf(value);
     return rec ? nxRgbHex(rec.color) : '';
   }
+  // PICKER-2: metadáta variantu pre dekorové riadky. Zdroj je TEN ISTÝ
+  // payload, z ktorého sa plnia `<option>`y (`MATERIALS.sheets` + virtuálne
+  // duplákové ponuky), takže sa nemôžu rozísť. ABS pásky sa NEZOSKUPUJÚ —
+  // hrúbka pásky je jej vlastnosť, nie variant toho istého dekoru.
+  function nxComboVariantOf(kind, value){
+    if (kind === 'abs' || !value) return null;
+    var rec = sheetRecOf(value);
+    if (!rec || !rec.decor) return null;
+    // Menovku riadku aj hranicu zlucovania (`row_key`) urcuje SERVER z katalogu
+    // — v SCHEMA 2 sa to iste cislo dekoru opakuje u dvoch vyrobcov a ta ista
+    // skupina ma viac struktur aj formatov; klient to hadat nesmie.
+    // DUPLAK ma dva tvary: virtualna ponuka (`duplak2:<zdroj>`, este nie je
+    // v katalogu) a ULOZENY zaznam s beznym `material_id`, ktory sa pozna
+    // vyhradne podla `source_material_id` (payload ho zrkadli ako `duplak`).
+    return { decor: rec.row_label || rec.decor, type: rec.type || '',
+             thickness: rec.thickness, key: rec.row_key || '',
+             duplak: rec.duplak === true || /^duplak[23]:/.test(String(value)) };
+  }
+
   function nxComboUsedOf(kind){
     var u = MATERIALS.used_ids || {};
     return (kind === 'abs' ? u.edges : u.sheets) || [];
@@ -214,6 +233,7 @@
   }
   if (typeof NXCombo !== 'undefined' && NXCombo){
     NXCombo.setColorResolver(nxComboColorOf);
+    NXCombo.setVariantResolver(nxComboVariantOf);
     NXCombo.setUsedResolver(nxComboUsedOf);
     NXCombo.setUsedRefresher(nxComboRequestUsed);
   }
