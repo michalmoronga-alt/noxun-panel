@@ -86,19 +86,29 @@ end
 
 # Mapa nesmie zaostat za kodom. Zmienka v proze NESTACI — genericke meno (napr.
 # core/report.rb) by sa nahodne trafilo do vety a modul by prekizol bez dokumentacie.
+# Kontroluju sa TRI veci: vlastny nadpis v mape, riadok v tabulke routra a
+# jednoznacnost basename napriec inventarom.
 # Pozaduje sa preto EXPLICITNY nadpis `### <basename>.rb` v niektorom suboru mapy
 # (povoleny je aj zdruzeny tvar `### <basename>.rb + nieco` / `### <basename>.rb — nieco`)
 # A ZAROVEN riadok v tabulke routra, aby sa modul dal najst aj z rozcestnika.
 #
 # IDENTITA MODULU JE BASENAME — konvencia nadpisov `### <basename>.rb` je tym
-# jednoducha a gerpovatelna, ale plati len dovtedy, kym su basename jednoznacne.
+# jednoducha a grepovatelna, ale plati len dovtedy, kym su basename jednoznacne.
 # Dva rovnomenne subory v roznych priecinkoch (napr. core/client.rb popri
 # core/demos/client.rb) by sa v mape zliali do jedneho nadpisu a novy modul by
 # presiel nezdokumentovany. Kolizia sa preto detekuje VYSLOVNE (test nizsie) —
 # guard sa kvoli nej neoslabuje, riesi sa v mape.
+#
+# INVENTAR je core/ + modules/ + ui/ — ruby moduly UI vrstvy (dialogy, domeny
+# panela, jadro vystupov) su rovnako sucastou architektury ako core; bez nich by
+# novy dialog prekizol vsetkymi tromi kontrolami (review #232 kolo 3).
+# Su to VYHRADNE .rb subory: js/html/css do inventara nepatria (mapa ich popisuje
+# v odsekoch, ale nemaju vlastne nadpisy).
+NX_ARCH_MODULE_DIRS = '{core,modules,ui}'
+
 def nx_arch_module_paths
   root = NxTest::ROOT.to_s.tr('\\', '/').chomp('/')
-  Dir.glob(File.join(NxTest::ROOT, 'noxun_engine', '{core,modules}', '**', '*.rb')).sort
+  Dir.glob(File.join(NxTest::ROOT, 'noxun_engine', NX_ARCH_MODULE_DIRS, '**', '*.rb')).sort
      .map { |p| p.tr('\\', '/').sub("#{root}/", '') }
 end
 
@@ -131,7 +141,7 @@ NxTest.test('docs: basename modulu je jednoznacny — ziadna kolizia medzi priec
                 'guarde), alebo jeden z modulov premenuj.')
 end
 
-NxTest.test('docs: kazdy modul core/ a modules/ ma vlastny nadpis v docs/architecture/') do
+NxTest.test('docs: kazdy modul core/, modules/ a ui/ ma vlastny nadpis v docs/architecture/') do
   mods = nx_arch_modules
   NxTest.assert(mods.length > 40, "nenasiel som moduly (#{mods.length}) — zla cesta?")
   headings = nx_arch_headings
@@ -144,13 +154,14 @@ NxTest.test('docs: kazdy modul core/ a modules/ ma vlastny nadpis v docs/archite
                 "#{missing.join(' · ')} — pridaj im odsek (aspon stub) do prislusneho suboru mapy")
 end
 
-NxTest.test('docs: kazdy modul core/ a modules/ je v tabulke routra ARCHITEKTURA.md') do
+NxTest.test('docs: kazdy modul core/, modules/ a ui/ je v tabulke routra ARCHITEKTURA.md') do
   tokens = nx_router_tokens
   NxTest.assert(tokens.length > 40, "router nema tabulkove riadky s modulmi (#{tokens.length})")
-  missing = nx_arch_modules.reject { |m| tokens.include?(m) }
+  # Router pise moduly raz holym menom (`units`), raz s priponou (`panel.rb`) — obe plati.
+  missing = nx_arch_modules.reject { |m| tokens.include?(m) || tokens.include?("#{m}.rb") }
   NxTest.assert(missing.empty?,
                 "Moduly chybajuce v tabulke routra docs/ARCHITEKTURA.md: #{missing.join(' · ')} — " \
-                'doplnit do riadku sekcie Core/Modules, inak sa modul z rozcestnika nedohlada')
+                'doplnit do riadku sekcie Core/Modules/UI, inak sa modul z rozcestnika nedohlada')
 end
 
 # CLAUDE.md sa nacitava AUTOMATICKY kazde sedenie — architektura sa don nesmie vratit

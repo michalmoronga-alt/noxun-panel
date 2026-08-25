@@ -490,7 +490,7 @@ vetva volá `nxDraftChanged()`.
 **Vnútro je rezervovaný slot** (bez polí, po V1). Čisté jadro testuje `tests/js/test_uic2_zony.js`, serverový a kostrový kontrakt `tests/pure/test_uic2_zony.rb`, živý model sekcia
 `run_uic2` in-SketchUp runnera.
 
-### Zónové akcie servera (ui/panel/actions_zones.rb)
+### actions_zones.rb — zónové akcie servera
 
 všetky handlery (`split_zone` · `set_zone_shelves` · `clean_zone` · `set_zone_field` · `select_zone`) prechádzajú spoločným vstupom **`zone_ctx`**, ktorý **PRÍSNE** overí identitu
 dokumentu (`model_guid`) aj skrinky (`cabinet_id`) a **formát celého `zone_id`**. ID zón sa medzi dokumentmi opakujú (`CAB-001-Z1.2` je v každom projekte), takže oneskorený
@@ -851,6 +851,66 @@ odišlo spolu s oknom (taby sa vysťahovali postupne: `rows`/`sheets`/`edging` v
 
 (`absModal` v paneli): zmena materiálu/bulk olep na dekor bez použiteľnej 1,0 pásky → „Vytvoriť a pokračovať / Bez ABS / Zrušiť". JS `absUsableExists` je len UX zrkadlo —
 **autorita je server** (flag `create_missing_abs`, kontroly PRED katalógovým zápisom); part callbacky nesú `cabinet_id` identity guard.
+
+## Súbory Inspectora — panel.rb + ui/panel/*.rb
+
+Register serverovej strany Inspectora. Kontrakty a pasce žijú v tematických odsekoch vyššie — tieto nadpisy sú rozcestník „ktorý súbor patrí ku ktorému odseku" a zároveň poistka,
+aby žiadny nový súbor nezostal mimo mapy (stráži guard test). `actions_zones.rb` má vlastný odsek vyššie („zónové akcie servera").
+
+### panel.rb
+
+Centrálne callbacky Inspectora (`Panel.*`) — vstupný bod všetkých volaní `sketchup.*` z panela. Jednotlivé kontrakty sú v odsekoch kontextov a kariet vyššie.
+
+### payloads.rb
+
+Doména panela: skladanie payloadov pre klienta. Kontrakt vkladacej karty a knižnice šablón je v odseku „Vkladacia karta — šablóny, typ a doska".
+
+### resolvers.rb
+
+Doména panela: rozlíšenie virtuálnych materiálov (`resolve_virtual_material`). Fan-out cesta po zápise do katalógu je v [materials.md](materials.md), odsek
+„materials_* — spoločný kontrakt".
+
+### selection.rb
+
+Doména panela: observery výberu a transakcií, kamera a serverové cesty zmeny výberu. Kontrakty sú v odsekoch „Observery panela", „Kontext Kovanie (UI-C4…)" a „Náhľad = kontextová
+projekcia + spodný pás (UI-B2…)".
+
+### sync.rb
+
+_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+
+### actions_board.rb
+
+_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+
+### actions_cabinet.rb
+
+_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+
+### actions_hardware.rb
+
+_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+
+### actions_materials.rb
+
+_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+
+### actions_parts.rb
+
+Doména panela: zápisové cesty karty dielca. Kontrakt a všetky guardy (dokument · cieľ zmeny · odpojenosť) sú v odseku „Karta dielca (UI-D1…)".
+
+### actions_settings.rb
+
+_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+
+### actions_templates.rb
+
+Doména panela: šablóny a ručné odfotenie náhľadu (`Panel.capture_preview_for`). Kontrakt je v odseku „Vkladacia karta — šablóny, typ a doska" a v
+[model-a-identita.md](model-a-identita.md), odsek `template_previews.rb`.
+
+### actions_usage.rb
+
+_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
 
 ## Štúdio — okno a sekcie
 
