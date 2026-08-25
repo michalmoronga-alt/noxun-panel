@@ -80,6 +80,12 @@ rátal nahrubo — rozdiel 9 mm na boku). Zrkadlo žije v `ui/js/zone_tree.js` (
 ostáva zámerne tolerantná (je to **opravná** vrstva legacy stromov), ale zapisovacia cesta tolerantná byť nesmie — `'650-36'.to_f` by ticho vyrobilo 650 a stolár iný nábytok.
 `resolve_fields` drží kumulatívny clamp zamknutých polí; `validate_split!`/`validate_shelves!` rebuild radšej **odmietnu**, než by ticho zmenšovali.
 
+### front_profiles.rb
+
+**D-90 úchytkové profily** (UKW-7): JEDINÝ zdroj konštánt — skrátenie čela (36 mm), názvy pre UI (`options` do `push_init`) a presný prierez pre vizuál (`geometry`: 83 bodov,
+19,181 × 37,419 mm). Registry je rozšíriteľný (nový profil = nový záznam); `'none'` v ňom NIE je — je to neutrál a zároveň default chýbajúceho kľúča (žiadna migrácia starých
+configov). Číta ho fronts (matematika panelu), pravidlá kovania (dĺžka rezu) aj builder (proxy geometria).
+
 ## Modules (`noxun_engine/modules/`)
 
 ### shelves.rb
@@ -94,12 +100,6 @@ police v zónach: rovnomerné rozloženie v svetlej výške (`n` políc ⇒ `n+1
 
 čelá fixed/auto s lockmi, „bez čela", krídla 1–4, **úchytkový profil na hornej hrane (D-90 — riadok drží výšku, skracuje sa PANEL; `profile_band` je podklad vizuálu aj náhľadu)**.
 
-### front_profiles.rb
-
-**D-90 úchytkové profily** (UKW-7): JEDINÝ zdroj konštánt — skrátenie čela (36 mm), názvy pre UI (`options` do `push_init`) a presný prierez pre vizuál (`geometry`: 83 bodov,
-19,181 × 37,419 mm). Registry je rozšíriteľný (nový profil = nový záznam); `'none'` v ňom NIE je — je to neutrál a zároveň default chýbajúceho kľúča (žiadna migrácia starých
-configov). Číta ho fronts (matematika panelu), pravidlá kovania (dĺžka rezu) aj builder (proxy geometria).
-
 ## Osi dielca a prekrytia v modeli
 
 ### part_faces.rb
@@ -110,7 +110,7 @@ overené proti kvádru, akceptuje sa výhradne jednoznačná zhoda). Osi dielca 
 nerozhodnuteľné). Mapovanie: L1/L2 = min/max osi ŠÍRKY, W1/W2 = min/max osi DĹŽKY, plochy kolmé na hrúbku = veľké dekorové. `BuildPlan` tvar osí validuje; `verified_axes` navyše
 kontroluje zhodu s box/prod — pri nezhode sa **nefarbí nič** (radšej žiadna farba než farba na zlej hrane).
 
-### edge_check.rb + edge_overlay.rb
+### edge_check.rb
 
 **D-104/D-105 kontrola hrán:** zvýraznenie stavu olepu priamo v modeli cez `Sketchup::Overlay` (SU 2023+, celý `edge_overlay.rb` pod guardom) — **žiadna operácia, žiadny undo krok,
 nič v .skp**, sken je read-only (žiadny dedup tik).
@@ -210,6 +210,12 @@ olepu a nesmú sa miešať).
 odpojí (zatvorenie panela `set_on_closed`, prepnutie dokumentu `Panel.on_model_switched`). Callback `nx_hover_edge` (`ui/panel/actions_parts.rb`) má **prísny guard dokumentu** ako
 `nx_edge_toggle` a **nepíše status** (hover je pohyb myšou, nie akcia). JS strana (`part_card.js`) posiela **len ZMENU** kódu hrany — inak by každý `mouseover` bežal cez most do
 Ruby.
+
+### edge_overlay.rb
+
+Súbor, v ktorom žijú triedy prekrytí (`Sketchup::Overlay`) — celý je pod guardom dostupnosti API (SU 2023+). Bývajú v ňom overlay kontroly olepu (kontrakt a pasce sú v odseku
+`edge_check.rb`), `GrainOverlay`/`GrainModelWatch` (odsek `grain_check.rb`) a `HoverEdgeOverlay` (odsek `hover_edge.rb`). Spoločné pre všetky tri: **žiadna operácia, žiadny zápis,
+žiadny undo krok, nič v .skp**.
 
 ## Observery
 

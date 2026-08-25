@@ -90,11 +90,34 @@ mutačné — odstránenie brány = pad).
 projektová predvoľba; kontrast a vedomé „bez ABS" nedotknuté). `ensure_edge_for_sheet` dovytvorí 1,0 pásku len zo štandardov AUTO_WIDTHS s presahom (katalógový zápis MIMO undo —
 vedomý kontrakt).
 
-### materials_* split — materials_catalog.rb · materials_decor.rb · materials_abs.rb · materials_demos_create.rb · materials_project.rb · materials_replace_uni.rb
+### materials_catalog.rb
 
-* split — `materials_catalog` (CRUD+batch) · `materials_decor` (skupinové operácie + `ensure_edge_for_sheet`) · `materials_abs` (picker/remap) · `materials_demos_create` (atomické
-založenie rodiny z Demosu) · `materials_project` (projektové defaulty + mapy `decor_key_by_material_id` / **`decor_key_by_abs_id`** — kľúč dekorovej skupiny pre pás „Použité v
-projekte" a rozpis „Kde sa používa"; obe SCHEMA-aware, aby počty a zoznam ukazovali na tú istú skupinu).
+Zo splitu `materials_*`: CRUD+batch.
+
+### materials_decor.rb
+
+Zo splitu `materials_*`: skupinové operácie + `ensure_edge_for_sheet`.
+
+### materials_abs.rb
+
+Zo splitu `materials_*`: picker/remap.
+
+### materials_demos_create.rb
+
+Zo splitu `materials_*`: atomické založenie rodiny z Demosu.
+
+### materials_project.rb
+
+Zo splitu `materials_*`: projektové defaulty + mapy `decor_key_by_material_id` / **`decor_key_by_abs_id`** — kľúč dekorovej skupiny pre pás „Použité v projekte" a rozpis „Kde sa
+používa"; obe SCHEMA-aware, aby počty a zoznam ukazovali na tú istú skupinu.
+
+### materials_replace_uni.rb
+
+**M-B2 „Nahradiť UNI…"** (`materials_replace_uni`): scan+čistá klasifikácia, rozpis dopadu pred potvrdením, SHA256 odtlačok plánu, all-or-nothing, 1 undo (skrinky+dosky+predvoľby).
+
+### materials_* — spoločný kontrakt (SCHEMA · UNI · duplák · Demos väzba)
+
+Kontrakt, ktorý zdieľajú `materials.rb` aj celý split `materials_*` vyššie.
 
 **SCHEMA: 2 skupiny = povinný baseline po cutoveri; markery 3 duplák · 4 zástena · 5 demos polia · 6 image_url · 7 UNI · 8 PD hranová úprava + protiťahová zástena = LAZY podľa
 OBSAHU** (`SCHEMA_CURRENT` v materials.rb). Demos väzba na zázname: `demos_url` + `price_checked_at` (cena = pohyblivá cache; `manual_demos_url` sanitize + kanonické porovnanie —
@@ -102,8 +125,6 @@ D-71).
 
 **UNI (SCHEMA 7, M-B1):** 5 rolí Korpus·Čelo·Dekor2·HDF·Doska; hrúbka záznamu je len default roly — pri stavbe dielca sa NEviaže (hrúbku určuje DIELEC; identita záznamu v katalógu
 hrúbku štandardne obsahuje); ABS/nákupné polia pre UNI zakázané server-side; semafor ORANGE „materiál neurčený".
-
-**M-B2 „Nahradiť UNI…"** (`materials_replace_uni`): scan+čistá klasifikácia, rozpis dopadu pred potvrdením, SHA256 odtlačok plánu, all-or-nothing, 1 undo (skrinky+dosky+predvoľby).
 
 **D-49 duplák automaticky:** virtuálne položky `duplak2:<id>` v selectoch tela/dielca/dosky (samostatné pole payloadu — vklad dosky a projektové selecty ich nevidia),
 `ensure_duplak_for` s guardmi (UNI/typ/kolízia s kupovanou), duplák nededí uni/demos polia.
@@ -156,11 +177,41 @@ používateľ to vidí hneď.
 
 **Pozor:** `AbsRules.rules` má vedľajší efekt zápisu (`ensure_seeded`) — volať LEN mimo `model.start_operation`.
 
-### demos/ — core/demos/*.rb (client · slug_matcher · name_search · product_parser · family · lookup · sitemap_cache · image_cache)
+### demos/ — Demos konektor (core/demos/*.rb)
 
-Demos konektor (V0.6 dávky B + M-A): `sitemap_cache` (~48k URL lokálne, watchdog refresh) · `slug_matcher` (JEDNA autorita klasifikácie typu z URL slugu — prefixy
-dtdl/mdf/kompakt/pd/abs…, digit guard článkov) · `name_search` (offline živé zhody bez diakritiky) · `client` (fetch, Crawl-delay 3 s, allowlist; `/vyhledavani` zakázané robots) ·
-`product_parser` (HTML → parametre/kód/cena s DPH/image_url; fixtures v testoch) · `family` (rodina dekoru z 1 fetchu: Dosky/ABS/Mimo systému) · `lookup` (match variantu — bound
-fetch cez `demos_url` väzbu PRED sitemap fázou, D-70; pásky = dekor v slugu, brand check len dosky) · `image_cache` (lokálna cache fotiek dekorov). Params stránok pások NIE SÚ
-autoritatívne pre identitu rodiny dosky — parser ich môže naplniť číslom dekoru VÝROBCU PÁSKY (Rehau 79098 ≠ 5981); dekor pásky sa dokazuje slugom, params sa na identitu nikdy
-nepoužijú.
+Demos konektor (V0.6 dávky B + M-A). Jednotlivé moduly konektora majú vlastné odseky nižšie.
+
+Params stránok pások NIE SÚ autoritatívne pre identitu rodiny dosky — parser ich môže naplniť číslom dekoru VÝROBCU PÁSKY (Rehau 79098 ≠ 5981); dekor pásky sa dokazuje slugom,
+params sa na identitu nikdy nepoužijú.
+
+### sitemap_cache.rb
+
+~48k URL lokálne, watchdog refresh.
+
+### slug_matcher.rb
+
+JEDNA autorita klasifikácie typu z URL slugu — prefixy dtdl/mdf/kompakt/pd/abs…, digit guard článkov.
+
+### name_search.rb
+
+offline živé zhody bez diakritiky.
+
+### client.rb
+
+fetch, Crawl-delay 3 s, allowlist; `/vyhledavani` zakázané robots.
+
+### product_parser.rb
+
+HTML → parametre/kód/cena s DPH/image_url; fixtures v testoch.
+
+### family.rb
+
+rodina dekoru z 1 fetchu: Dosky/ABS/Mimo systému.
+
+### lookup.rb
+
+match variantu — bound fetch cez `demos_url` väzbu PRED sitemap fázou, D-70; pásky = dekor v slugu, brand check len dosky.
+
+### image_cache.rb
+
+lokálna cache fotiek dekorov.

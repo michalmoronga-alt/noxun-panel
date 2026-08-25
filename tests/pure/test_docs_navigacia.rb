@@ -84,17 +84,49 @@ NxTest.test('docs: ARCHITEKTURA.md a docs/architecture/*.md nemaju riadok nad 40
                 'rozbi odsek na kratsie riadky (Markdown ich spoji do jedneho odseku)')
 end
 
-# Mapa nesmie zaostat za kodom: kazdy modul core/ a modules/ musi byt niekde spomenuty.
-NxTest.test('docs: kazdy modul core/ a modules/ je spomenuty v docs/architecture/') do
-  blob = Dir.glob(File.join(NxTest::ROOT, 'docs', 'architecture', '*.md'))
-            .map { |f| File.read(f, encoding: 'UTF-8') }.join("\n").downcase
-  mods = Dir.glob(File.join(NxTest::ROOT, 'noxun_engine', '{core,modules}', '**', '*.rb'))
-            .map { |p| File.basename(p, '.rb') }.uniq.sort
+# Mapa nesmie zaostat za kodom. Zmienka v proze NESTACI — genericke meno (napr.
+# core/report.rb) by sa nahodne trafilo do vety a modul by prekizol bez dokumentacie.
+# Pozaduje sa preto EXPLICITNY nadpis `### <basename>.rb` v niektorom suboru mapy
+# (povoleny je aj zdruzeny tvar `### <basename>.rb + nieco` / `### <basename>.rb — nieco`)
+# A ZAROVEN riadok v tabulke routra, aby sa modul dal najst aj z rozcestnika.
+def nx_arch_modules
+  Dir.glob(File.join(NxTest::ROOT, 'noxun_engine', '{core,modules}', '**', '*.rb'))
+     .map { |p| File.basename(p, '.rb') }.uniq.sort
+end
+
+def nx_arch_headings
+  Dir.glob(File.join(NxTest::ROOT, 'docs', 'architecture', '*.md')).sort.flat_map do |f|
+    File.readlines(f, encoding: 'UTF-8').map(&:rstrip).select { |l| l.start_with?('### ') }
+  end
+end
+
+# Tokeny v spatnych apostrofoch z tabulkovych riadkov routra (riadok zacina '|').
+def nx_router_tokens
+  File.readlines(File.join(NxTest::ROOT, 'docs', 'ARCHITEKTURA.md'), encoding: 'UTF-8')
+      .map(&:rstrip).select { |l| l.start_with?('|') }
+      .join("\n").scan(/`([^`]+)`/).flatten
+end
+
+NxTest.test('docs: kazdy modul core/ a modules/ ma vlastny nadpis v docs/architecture/') do
+  mods = nx_arch_modules
   NxTest.assert(mods.length > 40, "nenasiel som moduly (#{mods.length}) — zla cesta?")
-  missing = mods.reject { |m| blob.include?(m.downcase) }
+  headings = nx_arch_headings
+  missing = mods.reject do |m|
+    re = /\A### #{Regexp.escape(m)}\.rb(?:\s|\z)/
+    headings.any? { |h| h =~ re }
+  end
   NxTest.assert(missing.empty?,
-                "Moduly bez zmienky v docs/architecture/: #{missing.join(' · ')} — " \
-                'pridaj im odsek (aspon stub) do prislusneho suboru mapy')
+                "Moduly bez vlastneho nadpisu '### <meno>.rb' v docs/architecture/: " \
+                "#{missing.join(' · ')} — pridaj im odsek (aspon stub) do prislusneho suboru mapy")
+end
+
+NxTest.test('docs: kazdy modul core/ a modules/ je v tabulke routra ARCHITEKTURA.md') do
+  tokens = nx_router_tokens
+  NxTest.assert(tokens.length > 40, "router nema tabulkove riadky s modulmi (#{tokens.length})")
+  missing = nx_arch_modules.reject { |m| tokens.include?(m) }
+  NxTest.assert(missing.empty?,
+                "Moduly chybajuce v tabulke routra docs/ARCHITEKTURA.md: #{missing.join(' · ')} — " \
+                'doplnit do riadku sekcie Core/Modules, inak sa modul z rozcestnika nedohlada')
 end
 
 # CLAUDE.md sa nacitava AUTOMATICKY kazde sedenie — architektura sa don nesmie vratit

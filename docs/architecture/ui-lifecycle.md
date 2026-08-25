@@ -1333,12 +1333,17 @@ otváralo ho **premostenie v navigácii Štúdia** (uzavretý whitelist `WINDOW_
 `hardware_catalog_dialog` sety a položky (od ŠT-3a-1 `push_items`/`after_sets_change` obsluhujú OBA ciele — okno aj sekciu `hw`) · `price_refresh_after_proc` v `studio_dialog.rb`
 po prepočte cien) — okno, ktoré v niektorej chýba, zamrzne na starých číslach a používateľ to zistí až na objednávke (stráži guard test).
 
+Jednotlivé žijúce okná (každé má vlastný odsek nižšie):
+
+### production_dialog.rb — okno Výroba (ZANIKLO v ŠT-1c PR B3)
+
 **Okno Výroba (`production_dialog.rb` + `production.html` + `js/production.js`) ZANIKLO v ŠT-1c PR B3** — jeho päť obsahov (Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová
 ponuka) sú sekcie Štúdia, telá akcií žijú v `production_core.rb` a všetky vstupné body (položka menu, päť relayov panela, `productionRelay*`, deep-link na tab, vetvy v broadcastoch
 aj v refresh cestách) sú preč. Osirotený `preferences_key` `'NoxunEngineProduction'` v registri používateľa ostáva — je to zapamätaná veľkosť okna, ktoré už neexistuje, a SketchUp
 ho nikdy nepoužije (dôvod v `SYSTEM/archiv/KRONIKA.md`).
 
-Jednotlivé žijúce okná: **`rules_dialog.rb` — od ŠT-3b-1 už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `rules` Štúdia, popis ďalej v odseku `hardware_rules`) ·
+### materials_dialog.rb
+
 **`materials_dialog.rb` — od ŠT-2b už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `mat` Štúdia, popis je tu kvôli histórii): katalóg = mriežka dlaždíc podľa výrobcu + pás
 „Použité v projekte" — jediné echo je `push_catalog` BEZ scanu modelu; hľadanie názov/výrobca/kód/dodávateľ; klik na dlaždicu → detail dekoru s editovateľnými bunkami
 kód/cena/dodávateľ — patch protokol s `row_rev`, dirty bunka si baseline drží aj cez refresh, re-render neprepíše aktívny input, prázdna bunka pole VYMAŽE; batch „Nový dekor" cez
@@ -1376,12 +1381,18 @@ plnom pushi: modelový kontext sekcie (predvoľby, počty, `used`) nesie `Studio
 
 **Životný cyklus** už nehlási vlastný `set_on_closed`, ale Štúdio: `on_ui_closed` (zatvorené okno — session bump + zahodenie odloženej požiadavky), `cancel_demos_on_leave` (odchod
 zo sekcie počas behu — session bump + status) a `on_model_changed` zo `scale_observer` (prepnutý dokument), pričom `@demos_running` stráži, aby sa hláška o zrušení objavila len
-vtedy, keď naozaj niečo bežalo) · **`templates_dialog.rb` — od ŠT-3c-1 už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `tpl` Štúdia — popis nižšie v odseku `templates`;
+vtedy, keď naozaj niečo bežalo).
+
+### templates_dialog.rb
+
+**`templates_dialog.rb` — od ŠT-3c-1 už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `tpl` Štúdia — popis nižšie v odseku `templates`;
 história okna: **UI-C1a: okno spravuje VÝHRADNE korpusové šablóny** — payload je `Panel.template_list(kind: 'cabinet', previews: true)` a `find`/`upsert`/`delete`/`set_preview`
 majú vlastný `kind` guard, HTML nie je ochrana, takže doskovú šablónu sa odtiaľ nedá použiť, vymazať ani odfotiť.
 
 **SMOKE PACK 1:** riadok má tretie tlačidlo **„Odfotiť" / „Prefotiť"** (podľa `preview_rev`) — pridá k šablóne náhľad z **práve jednej označenej** skrinky bez toho, aby prepísalo
 jej dáta; je **vždy aktívne** (vzor D-78 — dôvod, prečo to teraz nejde, povie server v statuse), text namiesto ikony preto, že toto okno sprite `icons.js` nenačítava).
+
+### hardware_catalog_dialog.rb
 
 **ŠT-3a-1 — `hardware_catalog_dialog.rb` OKNO vtedy ešte ŽILO, ale prestalo byť jediným UI** *(od ŠT-3a-2 už NIE JE OKNO — ostal serverový modul; popis je tu kvôli histórii a čo sa
 zmenilo, hovorí odsek nižšie)*: obsah (položky + sety) prevzala sekcia `hw` Štúdia a modul dostal druhý vstup — uzavretý whitelist `SECTION_ACTIONS` + `dispatch(name, payload,
@@ -1433,6 +1444,10 @@ pribalil a jeden krok Späť by vrátil OBA), a bezpodmienečný `abort_operatio
 
 **Odmietnutý `reset_project` ide na `resync_sets`**, nie na plný push — nič sa nezapísalo.
 
+### rules_dialog.rb
+
+**`rules_dialog.rb` — od ŠT-3b-1 už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `rules` Štúdia, popis ďalej v odseku `hardware_rules`).
+
 **ŠT-3b-1 — `rules_dialog.rb` už NIE JE OKNO** (ostal serverový modul; obsah je sekcia `rules` Štúdia): `rules.html`, `UI::HtmlDialog`, `DLG_KEY`, `ensure_dialog`, `show`,
 `register_callbacks` aj `push_state` sú PREČ; `js` bez sinku padá na `studio_js`.
 
@@ -1444,7 +1459,11 @@ preč. Osirotený `preferences_key` `noxun_engine_rules` v registri používate�
 
 **`ui/js/rules.js` sa NEDAL presunúť 1:1** — definoval globálne `el` a `esc`, teda PRESNE tie, ktoré má `studio.js`; v spoločnom okne by si prepísali cudziu funkciu a padlo by
 niečo úplne iné než pravidlá. Celý súbor je preto prefixovaný `rd*`/`RD_*` (vzor `bud*`, `mdh*`), PRIJÍMAČE `RD.init`/`RD.setRules`/`RD.setStatus` si mená PONECHALI (jedna pravda o
-mene kanála) a `sketchup.ready` z neho zaniklo.· **`supplier_settings_dialog.rb` — od ŠT-4a už NIE JE OKNO** (ostal serverový modul; obsah sú TRI sekcie Štúdia):
+mene kanála) a `sketchup.ready` z neho zaniklo.
+
+### supplier_settings_dialog.rb
+
+**`supplier_settings_dialog.rb` — od ŠT-4a už NIE JE OKNO** (ostal serverový modul; obsah sú TRI sekcie Štúdia):
 `supplier_settings.html`, `js/supplier_settings.js`, `UI::HtmlDialog`, `DLG_KEY`, `ensure_dialog`, `show`, `register_callbacks` aj `push_state` sú PREČ a modul sa **NEPREMENÚVA**
 (audit #21).
 
@@ -1497,7 +1516,10 @@ Rozlišuje sa PRÍTOMNOSŤ kľúča `settings`, nie pravdivosť hodnoty.
 
 **⚙ v lište Rozpočtu** už neotvára okno: je to čisté klientske `studioGoSection('bset')` a serverová cesta `ProductionCore.open_budget_settings` aj callback `budget_settings`
 zanikli. Vstupný bod menu „Nastavenia rozpočtu" ostáva ako zaužívaná skratka, ale vedie na `StudioDialog.show(open_section: 'bset')`. Osirotený `preferences_key`
-`noxun_engine_supplier_settings` v registri používateľa ostáva (precedens `NoxunEngineProduction`, `noxun_engine_hw_catalog_v1`, `noxun_engine_rules`, `noxun_engine_templates`) ·
+`noxun_engine_supplier_settings` v registri používateľa ostáva (precedens `NoxunEngineProduction`, `noxun_engine_hw_catalog_v1`, `noxun_engine_rules`, `noxun_engine_templates`).
+
+### ui/js/about.js — „O plugine"
+
 **„O plugine" (`ui/js/about.js`) je JEDEN OBSAH s DVOMA VSTUPMI** (kontrakt Š19): markup stavia zdieľaný builder `nxAboutHtml(info)`, ktorý načítava panel.html aj studio.html —
 koliesko Inspectora má už len prázdneho hostiteľa `#cfgAbout` a plní ho `NX.init` (`nxAboutFill`), sekcia `about` ho plní z payloadu.
 
