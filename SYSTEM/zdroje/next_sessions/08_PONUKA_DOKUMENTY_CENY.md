@@ -2,135 +2,149 @@
 
 > **PREDIMPLEMENTAČNÝ KONCEPT — NIE TASK PACKAGE.** Pred implementáciou platí postup z [README.md](README.md).
 
-## Kontext a pôvod
+## Kontext a aktuálne rozhodnutie
 
-Po dávke E a UI 2.0 už NOXUN vie rozpočet, cenovú ponuku a automatické prepočítanie cien pri položkách napojených na Demos. Otvorená V1 vrstva zahŕňa najmä:
+Po dávke E a UI 2.0 už NOXUN vie rozpočet, cenovú ponuku a základné cenové/exportné workflowy v miere, ktorá je pre dnešnú prax **dostačujúca**.
 
-- manuálne 1-klik overenie ceny pre položky bez Demos väzby,
-- viac URL/zdrojov na jednej položke,
-- plný generátor zákazníckej cenovej ponuky do DOCX/PDF,
-- vizualizácie v dokumente,
-- prípadný režim „na faktúru“ / ďalší cenový režim,
-- širšiu rodinu dokumentov (napr. ponuka vizualizácií, preberací protokol).
+Po ďalšej produktovej diskusii bol scope vedome zúžený: **08 sa nemá rozrásť na generickú dokumentovú platformu ani na množstvo exportných formátov.** Otvorený zostáva najmä zákaznícky grafický výstup cenovej ponuky do PDF a jeho reálna potreba sa má ešte overiť s Luciou.
 
-Téma nie je iba export formátu. Je to obchodný workflow a preto sa musí navrhnúť primárne podľa reálnej práce Michala/Lucie.
+Aktuálne nie je cieľ automatizovať všetko, čo sa dá. Ak ručná práca nad jednoduchou šablónou zaberá málo času, je prijateľné ponechať časť workflowu manuálnu.
 
-## 1. Cenová čerstvosť bez Demos väzby
+---
 
-Dnešný kontrakt správne rozlišuje cenu ako pohyblivú cache s dátumom overenia. Pri Demos položkách existuje automatická cesta. Pre ostatné položky treba navrhnúť manuálny workflow, ktorý je rýchly, ale neklame.
+# Cieľová malá rodina hlavných výstupov
 
-Možný UX smer:
+Michal aktuálne očakáva približne **3–4 hlavné dokumenty/výstupy**, nie desiatky variantov:
+
+1. **Export dielov s ABS** — výrobný výstup.
+2. **Rozpočet** — interný/cenový výstup, dnes v Engine už dostatočne pokrytý.
+3. **Cenová ponuka** — zákaznícky výstup zviazaný s rozpočtom; hlavný otvorený bod je grafická PDF forma.
+4. **Nákupný zoznam** — pravdepodobný ďalší praktický výstup.
+
+Nie je zámer pridávať XLSX/CSV/DOCX/PDF a ďalšie formáty len preto, že sú technicky možné. Každý nový výstup musí mať jasný reálny workflow.
+
+---
+
+# Cenová ponuka — aktuálny smer
+
+Základ exportu cenovej ponuky a cien už v Engine existuje. Chýba najmä **pekný zákaznícky grafický výstup**.
+
+Pracovná predstava je zámerne jednoduchá:
+
+```text
+NOXUN offer/budget data
+        ↓
+jednoduchá firemná šablóna
+        ↓
+ručné alebo poloautomatické vloženie renderov
+        ↓
+finálne PDF pre zákazníka
+```
+
+Nie je zatiaľ rozhodnuté, či:
+
+- NOXUN bude generovať celý dokument automaticky,
+- alebo vytvorí iba základnú šablónu/predvyplnený dokument a Lucia doplní obrázky a text ručne.
+
+Pred implementáciou má Michal s Luciou overiť, koľko času dnes reálne zaberie vytvorenie cenovej ponuky a či plná automatizácia prináša dostatočný úžitok.
+
+Michal pred implementáciou doloží **niekoľko reálnych vzorov cenových ponúk**, aby sa mohol navrhnúť grafický layout podľa skutočnej praxe namiesto odhadu.
+
+---
+
+# Zdroj pravdy
+
+Ak vznikne automatizovaný alebo poloautomatizovaný dokument, musí čítať ten istý výsledok, ktorý používateľ vidí v sekcii Cenová ponuka/Rozpočet.
+
+Document/export vrstva nesmie vytvoriť paralelný výpočet cien.
+
+Pred exportom možno neskôr zobraziť warnings, napríklad:
+
+- staré/neoverené ceny,
+- položky bez ceny,
+- spotrebič bez konkrétneho modelu/ceny.
+
+Warnings majú primárne informovať; blokovanie exportu sa nesmie zaviesť bez konkrétneho dôvodu.
+
+---
+
+# Vizualizácie
+
+Vizualizácie budú pravdepodobne súčasťou zákazníckej cenovej ponuky, ale V1 workflow má zostať jednoduchý.
+
+Ak sa ukáže, že automatizácia má hodnotu, stačí najprv podporiť napríklad:
+
+- ručne vybrané JPG/PNG/render obrázky,
+- 1–N obrázkov vložených do šablóny,
+- jednoduché poradie alebo výber používateľom.
+
+Automatické renderovanie, SketchUp scene capture ani render pipeline nie sú podmienkou dokumentového výstupu.
+
+Ak je pre Luciu rýchlejšie doplniť obrázky ručne do pripravenej šablóny, je to pre V1 plne akceptovateľný výsledok.
+
+---
+
+# Cenová čerstvosť a URL
+
+Staršie otvorené úvahy zostávajú dostupné, ale **nie sú teraz prioritou 08**.
+
+Dnešný kontrakt správne rozlišuje cenu ako pohyblivú cache s dátumom overenia. Pri Demos položkách existuje automatická cesta. Pri ostatných položkách možno neskôr doplniť jednoduchý manuálny workflow:
 
 1. položka ukáže „cena stará / neoverená“,
 2. používateľ otvorí zdroj URL,
 3. po návrate klikne `Cena sedí` alebo `Zmeniť cenu`,
-4. až tento explicitný krok zapíše nové `price_checked_at`,
-5. samotné otvorenie URL nič nemení.
+4. až explicitný krok zapíše nové `price_checked_at`.
 
-Tým sa zachová princíp: systém nikdy netvrdí, že cenu overil, keď to používateľ nepotvrdil.
+Samotné otvorenie URL nesmie predstierať overenie ceny.
 
-## Viac URL/zdrojov
+Viac URL/zdrojov na jednej položke je tiež možný budúci smer, ale viac URL **neznamená automaticky viac paralelných cien**.
 
-Treba vyspecifikovať význam viacerých URL:
+Tieto body sa majú implementovať iba vtedy, ak reálny dogfooding ukáže, že dnešný workflow nestačí.
 
-- alternatívni dodávatelia,
-- výrobca + predajca,
-- historický vs. primárny zdroj,
-- URL konkrétneho variantu.
+---
 
-Cena má podľa V1 vízie zostať **jedna**, takže viac URL nesmie implicitne znamenať viac paralelných cenových záznamov bez nového rozhodnutia.
+# Cenové režimy
 
-## 2. Dokument zákazníckej ponuky
+Otvorený nápad „na faktúru“ / obchodná prirážka zostáva vedľajší a nemá blokovať dokumenty.
 
-DOCX/PDF generátor má z NOXUN dát vytvoriť dokument pripravený na odoslanie zákazníkovi.
+Ak sa k nemu vrátime, treba najprv oddeliť:
 
-Treba oddeliť:
+```text
+nákupná/výrobná cena
+→ obchodná prirážka
+→ zákaznícka cena
+→ DPH/daňový režim
+```
 
-### Obchodné dáta
+Nesmie vzniknúť magický multiplier bez jasného obchodného významu.
 
-- zákazka/projekt,
-- zákazník,
-- položky ponuky,
-- ceny/DPH/režim,
-- platnosť ponuky,
-- poznámky/podmienky.
+---
 
-### Prezentačné dáta
+# Čo vedome nerobíme teraz
 
-- logo/hlavička NOXUN,
-- textové sekcie,
-- obrázky/vizualizácie,
-- prípadné rozdelenie podľa miestností/sektorov,
-- podpis/kontakty.
+- generický „NOXUN Document Platform“,
+- 10–12 typov dokumentov,
+- export do každého možného formátu,
+- automatický render pipeline ako podmienku cenovej ponuky,
+- zložitý template designer,
+- automatizáciu, ktorá šetrí zanedbateľné množstvo času,
+- nový paralelný pricing engine.
 
-### Render/export engine
+---
 
-- šablóna,
-- DOCX generovanie,
-- PDF cesta,
-- stabilné rozloženie a fallback pri chýbajúcom obrázku.
+# Otvorené otázky pred implementáciou
 
-Nemá sa miešať business logika výpočtu ceny s layoutom dokumentu.
+1. Koľko času dnes Lucia reálne strávi vytvorením finálnej cenovej ponuky?
+2. Stačí jednoduchá grafická šablóna s ručným doplnením renderov, alebo má hodnotu plná automatizácia?
+3. Ako vyzerajú 2–3 reálne NOXUN cenové ponuky, ktoré majú byť vzorom?
+4. Má byť cieľom iba PDF, alebo je užitočný aj editovateľný medzikrok (napr. DOCX)?
+5. Ako presne má vyzerať nákupný zoznam a z akých existujúcich dát sa skladá?
+6. Ktoré existujúce exporty už dnes plne pokrývajú diely+ABS a rozpočet a netreba ich meniť?
 
-## Zdroj pravdy
-
-Dokument musí vždy čítať ten istý výsledok, ktorý používateľ vidí v sekcii Cenová ponuka/Rozpočet. Nemá mať vlastný paralelný výpočet súm.
-
-Pred exportom treba jasne ukázať warnings, napríklad:
-
-- staré/neoverené ceny,
-- položky bez ceny,
-- spotrebič bez konkrétneho modelu/ceny,
-- rozdiel medzi rozpočtom a zákazníckou ponukou podľa dnešného kontraktu.
-
-Warnings majú byť transparentné; blokovanie exportu je samostatné rozhodnutie a nemá sa zaviesť implicitne.
-
-## Vizualizácie
-
-Treba rozhodnúť, odkiaľ obrázky prichádzajú:
-
-- ručne vybrané súbory,
-- exportované SketchUp scenes,
-- budúci render workflow,
-- uložené attachments projektu.
-
-V1 môže byť jednoduchší: používateľ vyberie 1–N obrázkov pre dokument. Automatické generovanie renderov nie je podmienka dokumentového engine.
-
-## Cenové režimy
-
-Otvorený nápad „na faktúru“ (napr. ×1,2 podľa existujúcej praxe) sa nesmie pridať ako magický multiplier bez definície.
-
-Treba rozhodnúť:
-
-- čo multiplier znamená obchodne,
-- či ovplyvňuje celý projekt alebo iba vybrané kategórie,
-- ako sa kombinuje s DPH,
-- ako sa zobrazuje zákazníkovi,
-- či patrí medzi dnešné režimy € / €€ / €€€ alebo ide o inú os.
-
-## Rodina dokumentov
-
-Po vzniku stabilného document engine sa môže reuse-núť layout infra pre ďalšie dokumenty:
-
-- preberací protokol,
-- ponuka vizualizácií,
-- interný výrobný dokument,
-- iné firemné šablóny.
-
-Nemá sa však v prvej dávke budovať generický „document platform“ bez konkrétneho prvého dokumentu.
-
-## Otvorené otázky
-
-1. Ako dnes reálne vyzerá finálna cenová ponuka NOXUN a ktoré časti sú povinné?
-2. DOCX ako editovateľný master + PDF export, alebo generovať oba samostatne?
-3. Aký engine/library je bezpečný v SketchUp Ruby prostredí a čo má byť externý helper?
-4. Kde sa ukladajú šablóny a firemné assets — shared library?
-5. Kde sa ukladajú zákaznícke údaje a vizualizácie projektu?
-6. Ako používateľ manuálne overí cenu čo najrýchlejšie pri desiatkach položiek?
-7. Ako sa modelujú viaceré URL bez rozbitia existujúceho single-price kontraktu?
-8. Je „na faktúru“ cenový režim, daňový režim alebo obchodná prirážka?
-9. Ktoré warnings iba upozornia a ktoré, ak vôbec nejaké, blokujú export?
+---
 
 ## Pred implementáciou
 
-Auditovať dnešný budget/offer payload, XLSX export, price refresh, `price_checked_at`, Demos/manual položky, Studio offer UI a shared library plán. Pred návrhom DOCX/PDF si od Michala/Lucie vyžiadať reálny vzor dokumentu a reálny workflow od rozpočtu po odoslanie zákazníkovi.
+Auditovať dnešný budget/offer payload, existujúce exporty, price refresh a Studio offer UI. Pred návrhom PDF/DOCX workflowu si od Michala/Lucie vyžiadať reálne vzory cenových ponúk a reálny časový workflow od hotového rozpočtu po odoslanie zákazníkovi.
+
+**Preferovať najmenšie riešenie, ktoré odstráni reálnu manuálnu bolesť.** Ak jednoduchá šablóna postačuje, nebudovať plný document engine.
