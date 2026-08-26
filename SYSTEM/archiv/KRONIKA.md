@@ -17,6 +17,30 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1b-1 · OPTIMISTICKÝ ZÁMOK NASTAVENÍ — brána A bloku 1b (27.8.2026):** vetva `fix/1b1-settings-zamok`, **v0.8.6**. Dávka spláca dlh priznaný v review **#227 kolo 4** (PLAN blok 1b,
+  odrážka A) a je to **oprava chýb**, teda vedomá zmena správania — nie refaktor. Klientske + serverové hláškovacie cesty; **žiadna modelová zapisovacia cesta** (nastavenia sú JSON
+  store v `%APPDATA%`), preto sa in-SketchUp beh nekonal.
+  **(1) Stratená editácia — čo bolo zle:** uvoľnenie nevyužitého pinu revízie žilo LEN v `ssApplyState`, takže cestu **bez pushu** nepokrývalo. Sled: fokus nezmeneného poľa (pin
+  sa berie už pri fokuse) → cudzia zmena a plný push (telo je pod kurzorom zmrazené, pin ostáva) → odchod zo sekcie a návrat (`studioGoSection` → `render` → `renderBody`, žiadny
+  nový push) → sekcia ukáže ČERSTVÉ hodnoty so STARÝM pinom → uloženie skončí **falošným konfliktom** a `SS.saved()` rozpísanú prácu zahodí. **Čo platí teraz:** pin sa uvoľňuje
+  v `ssRenderBody` — na jedinom riadku, kde sa telo naozaj prekresľuje z čerstvého stavu, takže pokrýva OBE cesty (push aj navigáciu). *Zamietnutá alternatíva `blur`:* pri presune
+  fokusu medzi dvoma poľami sekcie by `blur` pin uvoľnil a následný `focusin` by pripol ČERSTVÚ revíziu k obsahu, ktorý je na obrazovke stále STARÝ (zmrazený) — presne regresia
+  kontraktu kola 2 (tichý prepis cudzej zmeny). **Vedľajší zisk v dôkazoch:** podmienka je zámerne len `!ssDirty()` (sme za strážou `ssTyping()`), takže mutácia „presuň uvoľnenie
+  pred stráž", ktorá bola predtým sémanticky ekvivalentná a držal ju len tvarový guard, dnes **padá behaviorálne**.
+  **(2) Klamlivý status — čo bolo zle:** `handle_save` ignoroval návratovú hodnotu `refresh_studio`, takže pri zlyhanom plnom pushi (výnimka pri zostavovaní payloadu, `execute_script`
+  do okna bez `ready`) hláška aj tak tvrdila „Rozpočet je prepočítaný." — a keďže `SS.saved()` už rozpis zahodil, na obrazovke ostali staré čísla. Zápis do súboru pritom prebehol.
+  **Čo platí teraz:** `refresh_studio` vracia BOOLEAN „klient to naozaj dostal" (zavreté okno aj zachytená výnimka = `false`) a hlášku vetví `refresh_and_report`: pri zlyhaní
+  červené „Nastavenia sú ULOŽENÉ, ale rozpočet sa NEPREPOČÍTAL — čísla v okne môžu byť staré. Klikni na Obnoviť." To isté sa dorovnalo aj v **odmietacej** vetve (tvrdila „formulár
+  je načítaný nanovo") a v **`handle_reload`** — je to tá istá lož o obsahu okna. *Zamietnutá alternatíva „samostatné echo nastavení":* potrebovalo by nový klientsky prijímač
+  a čísla rozpočtu by aj tak ostali staré, takže by hláška klamala ďalej.
+  **Testy: 1917 headless** (2 nové sady prípadov v `test_st4a_nastavenia.rb` — behaviorálna vetva zlyhaného prepočtu + tvar `refresh_studio`) · **69 JS sád** (dve nové sekcie
+  v `test_st4a_settings.js`, obe na úrovni DOM: návrat do sekcie a zmrazenie tela pod kurzorom). **Mutačne overené — 6 mutácií, každá zhodila práve svoj test:** pin sa neuvoľní ·
+  presun uvoľnenia späť do `ssApplyState` (presne predfixový stav — padne nový navigačný test aj tvarový guard) · uvoľnenie pred stráž `ssTyping()` · uvoľnenie bez `!ssDirty()`
+  · `refresh_and_report` ignoruje výsledok · `refresh_studio` vracia vždy `true` · odmietacia vetva bez vetvenia.
+  **Slabšie dôkazy z odrážky A — stav:** `ssTyping` má odteraz DOM dôkaz (zmrazený obsah po pushi ostane byte-nedotknutý, bez kurzora ten istý push telo prekreslí), takže grep už
+  nie je jediná stráž; mutácia poradia pin-release sa z „tvarovej" stala „behaviorálnou". Tvarové guardy sa PONECHALI ako druhá vrstva (miesto uvoľnenia a poradie voči
+  `box.innerHTML`), lebo hovoria PREČO je riadok tam, kde je.
+
 - **HARDENING SEKVENCIA + V1 CHECKLIST + AUDIT PODKLAD (26.8.2026 neskorý večer):** docs dávka bez zmeny kódu (v0.8.5 ostáva). Z debaty Michal × Fable o pokračovaní: **(1) PLAN dostal bloky 1c AUDIT KÓDU (read-only, traja audítori — externý Codex + Fable + slepý subagent — spoločný podklad `zdroje/AUDIT_2026-08_podklad.md`, výstup register nálezov R-čísel s väzbou na blokovanú funkciu) · 1d REFAKTOR Z REGISTRA (malé dávky; štrukturálny refaktor = správanie sa nemení, oprava chyby/hardening = explicitná testom podložená zmena správania; rieši sa len výrobné riziko a ponechaný V1 rozsah; dávka bez menovanej funkcie alebo dlhu sa nerobí) · 1e PLÁNOVACIA DÁVKA (task packages zo zliatych konceptov 01–09A + PLANu; šablóna s povinným scope OUT a smoke checklistom)** — poradie: 1b → 1c → 1d → 1e → GHOST → KOVANIE. **(2) V1_VIZIA §1 je odteraz odškrtávací checklist** (hotový je bod 3 Materiály; bod 6 Výstupy je čiastočný — odškrtne sa až s manuálnym 1-klik overením ceny, zvyškom V1-03) a **„Mimo V1" sa rozšírilo** (Michal potvrdil Fable návrh): plné zostavy/segmenty · plná appearance vrstva + pixla · ponuka DOCX/PDF · G-Disk sync D-48 (updater D-52 ostáva) · sektorová kontrola · typy čiel ako konfigurátor (ostáva cenová položka) · kovanie fáza 3 geometria. **(3) Deľba limitov (Michal):** dôležité veci Fable · core kód Opus · review/audit/sweep Codex (limitu dosť + reset v zálohe) · mechanické úlohy pod dozorom pilotne Antigravity/Gemini — kvalitu držia brány (guardy, testy, review), nie dôvera v model.
 
 - **PICKER-3 — DOROBENIE VYHĽADÁVAČA MATERIÁLOV (26.8.2026):** vetva `fix/picker3`, **v0.8.4 → v0.8.5**. Uzatvára päť nálezov, ktoré review #231 (kolo 3) našlo a ktoré sa **odčlenili

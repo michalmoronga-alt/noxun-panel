@@ -115,12 +115,17 @@ end
 
 NxTest.test('ŠT-4a: ulozenie sadzieb PREPOCITA Studio (kontrakt refresh ciest)') do
   save = st4a_body('handle_save')
-  NxTest.assert(save.include?('refresh_studio'), 'po uspesnom zapise sa Studio prepocita')
-  # `refresh_studio` je aj v guarde revizie (formular sa nacita nanovo), preto
-  # sa poradie meria na POSLEDNOM vyskyte — tom v uspesnej vetve.
-  NxTest.assert(save.index('patch_active!') < save.rindex('refresh_studio'),
+  # Dlh 1b-A: `handle_save` uz nevola `refresh_studio` priamo — ide cez
+  # `refresh_and_report`, ktory podla VYSLEDKU prepoctu vetvi hlasku. Cesta
+  # prepoctu je ta ista, len sa uz nepotvrdzuje nieco, co neprebehlo.
+  NxTest.assert(save.include?('refresh_and_report'), 'po uspesnom zapise sa Studio prepocita')
+  NxTest.assert(st4a_body('refresh_and_report').include?('refresh_studio'),
+                'a `refresh_and_report` naozaj prepocitava (nie je to len hlaska)')
+  # `refresh_and_report` je aj v guarde revizie (formular sa nacita nanovo),
+  # preto sa poradie meria na POSLEDNOM vyskyte — tom v uspesnej vetve.
+  NxTest.assert(save.index('patch_active!') < save.rindex('refresh_and_report'),
                 'v uspesnej vetve az PO zapise (nie pred nim)')
-  NxTest.assert(save.rindex("js('SS.saved()')") < save.rindex('refresh_studio'),
+  NxTest.assert(save.rindex("js('SS.saved()')") < save.rindex('refresh_and_report'),
                 'a potvrdenie klientovi ide pred prepoctom (rozpisane sa zahadzuju len po zapise)')
   refresh = st4a_body('refresh_studio')
   NxTest.assert(refresh.include?('StudioDialog.refresh_if_open(bump: bump)'),
@@ -128,7 +133,7 @@ NxTest.test('ŠT-4a: ulozenie sadzieb PREPOCITA Studio (kontrakt refresh ciest)'
   NxTest.assert(refresh.include?('bump: true'),
                 'generacia sa ZDVIHA — zmenil sa VSTUP vypoctu, nie rozpocet sam')
   reload = st4a_body('handle_reload')
-  NxTest.assert(reload.include?('refresh_studio'), 'nacitanie nanovo prepocita rovnako')
+  NxTest.assert(reload.include?('refresh_and_report'), 'nacitanie nanovo prepocita rovnako')
 end
 
 NxTest.test('ŠT-4a: BASELINE REVIZIA prezila presun do sekcie') do
@@ -384,6 +389,97 @@ ensure
   end
 end
 
+# --- 6b) dlh 1b-A: hlaska nesmie potvrdzovat prepocet, ktory neprebehol ------
+
+NxTest.test('ŠT-4a (dlh 1b-A): ZLYHANY prepocet sa PRIZNA — „uložené áno, prepočet nie"') do
+  NxTest.skip!('zapis do realneho testovacieho %APPDATA%') unless NxTest.headless?
+
+  e = Noxun::Engine
+  sd = e::SupplierSettingsDialog
+  e::SupplierSettings.reload!
+  before = File.binread(e::SupplierSettings.path)
+  rev = e::SupplierSettings.revision(e::SupplierSettings.active)
+  base = e::SupplierSettings.rate(e::SupplierSettings.active, 'montaz').to_f
+  NxTest.assert(base.positive?, 'fixture: sadzba existuje')
+
+  # Plny push NEDORAZIL: okno este neohlasilo `ready` alebo `push_state` spadol
+  # — `refresh_if_open` vtedy vracia `false`/`nil`. Zapis do SUBORU uz pritom
+  # prebehol a `SS.saved()` uz rozpis zahodil, takze na obrazovke ostanu STARE
+  # cisla. Kym sa navratova hodnota ignorovala, hlaska tvrdila opak.
+  got = []
+  st4a_with_stub(e::StudioDialog, :refresh_if_open, ->(bump: true) { bump && nil }) do
+    sd.dispatch('ss_save',
+                { 'revision' => rev,
+                  'patch' => { 'rates' => { 'montaz' => (base + 2.0).round(2) } } }.to_json,
+                ->(js) { got << js.to_s })
+  end
+  NxTest.assert_close(base + 2.0, e::SupplierSettings.rate(e::SupplierSettings.active, 'montaz').to_f,
+                      0.001, 'zapis do suboru PREBEHOL — zlyhal LEN prepocet okna')
+  NxTest.refute(got.any? { |x| x.include?('Rozpočet je prepočítaný') },
+                'hlaska NEPOTVRDZUJE prepocet, ktory neprebehol')
+  NxTest.assert(got.any? { |x| x.include?('ULOŽENÉ') && x.include?('NEPREPOČÍTAL') },
+                'povie oboje: subor ulozeny ANO, prepocet NIE')
+  # Review #238 P2-1: „Obnoviť" v sekcii `bset` NIE JE (lista ma len „Načítať
+  # nanovo" a „Uložiť"), preto hlaska musi POSLAT tam, kde to tlacidlo zije —
+  # inak clovek siahne po „Načítať nanovo" a pride o rozpisane hodnoty. Test
+  # drzi PRESNE znenie, aby nebetonoval nepravdu.
+  NxTest.assert(got.any? { |x| x.include?('Otvor sekciu Rozpočet a klikni na Obnoviť.') },
+                'a povie, co s tym — menom tlacidla AJ sekciou, v ktorej to tlacidlo naozaj je')
+  NxTest.assert(got.any? { |x| x.start_with?('SS.setStatus') && x.end_with?('true)') },
+                'zlyhanie je CERVENE (nie tichy zeleny status)')
+
+  # Ta ista cesta s FUNGUJUCIM pushom potvrdzuje prepocet — vetva sa naozaj
+  # vetvi podla vysledku, nie podla toho, ze sa `refresh_studio` zavolal.
+  got.clear
+  rev2 = e::SupplierSettings.revision(e::SupplierSettings.active)
+  st4a_with_stub(e::StudioDialog, :refresh_if_open, ->(bump: true) { bump }) do
+    sd.dispatch('ss_save',
+                { 'revision' => rev2,
+                  'patch' => { 'rates' => { 'montaz' => (base + 4.0).round(2) } } }.to_json,
+                ->(js) { got << js.to_s })
+  end
+  NxTest.assert(got.any? { |x| x.include?('Rozpočet je prepočítaný') },
+                'ked push dorazi, potvrdenie plati')
+
+  # ODMIETACIA vetva tvrdi to iste o obsahu okna („formulár je načítaný
+  # nanovo") — a plati pre nu ten isty zaver.
+  got.clear
+  st4a_with_stub(e::StudioDialog, :refresh_if_open, ->(bump: true) { bump && false }) do
+    sd.dispatch('ss_save',
+                { 'revision' => "#{rev}-STARA", 'patch' => { 'rates' => { 'montaz' => 999.0 } } }.to_json,
+                ->(js) { got << js.to_s })
+  end
+  NxTest.refute(got.any? { |x| x.include?('formulár je načítaný nanovo') },
+                'ani odmietnutie netvrdi nacitanie, ktore sa nepodarilo')
+  NxTest.assert(got.any? { |x| x.include?('NIČ neuložilo') && x.include?('Načítať nanovo') },
+                'namiesto toho povie, ze sa nic neulozilo a kde je cesta von')
+ensure
+  if NxTest.headless?
+    begin
+      File.binwrite(Noxun::Engine::SupplierSettings.path, before) if before
+      Noxun::Engine::SupplierSettings.reload!
+    rescue StandardError # rubocop:disable Lint/SuppressedException
+    end
+  end
+end
+
+NxTest.test('ŠT-4a (dlh 1b-A): `refresh_studio` vracia BOOLEAN, nie „zavolalo sa"') do
+  save = st4a_body('handle_save')
+  NxTest.refute(save.match?(/^\s*refresh_studio\s*$/),
+                'vysledok prepoctu sa uz NEZAHADZUJE (bol to zdroj klamlivej hlasky)')
+  NxTest.assert(st4a_body('handle_reload').include?('refresh_and_report'),
+                'aj „Načítať nanovo" vetvi hlasku podla vysledku')
+  rep = st4a_body('refresh_and_report')
+  NxTest.assert(rep.include?('if refresh_studio'), 'hlaska sa vetvi podla NAVRATOVEJ hodnoty')
+  ref = st4a_body('refresh_studio')
+  NxTest.assert(ref.include?('return false unless defined?(StudioDialog)'),
+                'nedostupne Studio = prepocet NEPREBEHOL (nie `nil`, ktory sa da prehliadnut)')
+  NxTest.assert(ref.include?('StudioDialog.refresh_if_open(bump: bump) ? true : false'),
+                'a vysledok pushu sa preklada na boolean')
+  NxTest.assert(ref[/rescue StandardError.*/m].to_s.include?('false'),
+                'zachytena vynimka je tiez „neprebehlo"')
+end
+
 NxTest.test('ŠT-4a (review #227 P1): ulozenie posiela PRIPNUTU reviziu, nie omladenu') do
   code = ST4A_JS.lines.reject { |l| l.strip.start_with?('//') }.join
   NxTest.assert(code.include?('var SS_BASE_REV = null;'), 'klient drzi pripnutu reviziu')
@@ -406,13 +502,21 @@ NxTest.test('ŠT-4a (review #227 P1): ulozenie posiela PRIPNUTU reviziu, nie oml
   \}/m].to_s
   NxTest.refute(apply.include?('SS_BASE_REV = s.revision'),
                 'push pin NEPREPISUJE — obsah na obrazovke je stale ten, ktory pouzivatel videl')
-  # Review #227 kolo 3: pin, ktory NIKTO NEVYUZIL (fokus bez pisania, potom
-  # odchod z pola), sa naopak UVOLNI — inak by dalsia uprava isla proti revizii,
-  # ktoru pouzivatel uz nikde nevidi, a skoncila by FALOSNYM konfliktom.
-  NxTest.assert(apply.include?('if (!ssDirty() && !ssTyping()) SS_BASE_REV = null;'),
-                'nevyuzity pin sa uvolni — ale LEN ked nie je co chranit')
-  NxTest.assert(apply.index('SS_BASE_REV = null') < apply.index('SS_STATE = s'),
-                'a rozhoduje sa PRED prijatim cerstveho stavu')
+  # Review #227 kolo 3 + dlh 1b-A: pin, ktory NIKTO NEVYUZIL (fokus bez
+  # pisania, potom odchod z pola), sa naopak UVOLNI — inak by dalsia uprava
+  # isla proti revizii, ktoru pouzivatel uz nikde nevidi, a skoncila by
+  # FALOSNYM konfliktom. Miesto uvolnenia je `ssRenderBody`, nie `ssApplyState`:
+  # pin patri k OBSAHU NA OBRAZOVKE, a ten sa prekresluje aj BEZ pushu
+  # (navrat do sekcie cez `studioGoSection` → `render` → `renderBody`).
+  NxTest.refute(apply.include?('SS_BASE_REV = null'),
+                'uvolnenie pinu uz NEZIJE v ceste pushu (navigacii by uslo)')
+  body = code[/function ssRenderBody\(\).*?\n  \}/m].to_s
+  NxTest.assert(body.include?('if (!ssDirty()) SS_BASE_REV = null;'),
+                'nevyuzity pin uvolnuje prekreslenie tela — ale LEN ked nie je co chranit')
+  NxTest.assert(body.index('if (ssTyping()) return;') < body.index('SS_BASE_REV = null'),
+                'a AZ ZA strazou `ssTyping()` — pod kurzorom je obsah zmrazeny a pin sa drzi')
+  NxTest.assert(body.index('SS_BASE_REV = null') < body.index("box.innerHTML = '';"),
+                'uvolnenie patri k TOMU prekresleniu, ktore sa o riadok nizsie naozaj deje')
   saved = code[/saved: function\(\).*?
     \}/m].to_s
   NxTest.assert(saved.include?('SS_BASE_REV = null'), 'potvrdenie/odmietnutie pin uvolni')

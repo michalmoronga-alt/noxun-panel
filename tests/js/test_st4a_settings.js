@@ -360,6 +360,114 @@ const STATE = {
   T.SS.saved();
 })();
 
+// --- 4b4) dlh 1b-A: zastaraný pin NEPREŽIJE návrat do sekcie -----------------
+
+(function(){
+  function focus(key){
+    const t = { getAttribute: function(k){ return k === 'data-ss' ? key : null; },
+                value: '', classList: { toggle: function(){} } };
+    document.activeElement = t;
+    LISTEN.focusin.forEach(function(fn){ fn({ target: t }); });
+    return t;
+  }
+  function typeInto(t, value){
+    t.value = value;
+    LISTEN.input.forEach(function(fn){ fn({ target: t }); });
+  }
+  function fresh(rev){
+    const F = JSON.parse(JSON.stringify(STATE));
+    F.revision = rev;
+    return F;
+  }
+
+  // STRATA ROZPÍSANEJ PRÁCE (dlh z #227 kolo 4). Uvoľnenie nevyužitého pinu
+  // žilo LEN v `ssApplyState`, takže cestu BEZ pushu — odchod zo sekcie
+  // a návrat (`studioGoSection` → `render` → `renderBody`) — nepokrývalo:
+  // sekcia ukázala ČERSTVÉ hodnoty, ale ukladala proti STAREJ revízii,
+  // server to odmietol ako konflikt a `SS.saved()` editáciu zahodil.
+  S.setStudioSection('bset');
+  T.ssApplyState(STATE);
+  T.SS.saved();
+  document.activeElement = null;
+
+  focus('rate:montaz');
+  eq(T.ssBaseRev(), 'r-1', 'fokus pripne revíziu obsahu, ktorý má používateľ pred sebou');
+
+  T.ssApplyState(fresh('r-9'));            // cudzia zmena, kým pole drží kurzor
+  eq(T.ssBaseRev(), 'r-1', 'pod kurzorom je obsah zmrazený a pin sa drží (kontrakt kola 2)');
+
+  // Odchod a NÁVRAT — žiadny nový push, len prekreslenie z navigácie.
+  S.setStudioSection('bom');
+  document.activeElement = null;           // pole zaniklo aj s telom sekcie
+  ELS.secbody.innerHTML = 'KUSOVNÍK';
+  S.setStudioSection('bset');
+  T.ssRenderBody();                        // presne to, čo robí `render()`
+  ok(ELS.secbody.children.length > 0 && ELS.secbody.innerHTML === '',
+     'sekcia sa po návrate prekreslila z ČERSTVÉHO stavu');
+  ok(T.ssBaseRev() === null,
+     'a zastaraný pin padol s tým prekreslením — pin patrí k obsahu na obrazovke');
+
+  const f = focus('rate:montaz');
+  typeInto(f, '21');
+  SENT.length = 0;
+  T.ssSave();
+  eq(JSON.parse(SENT[0][1]).revision, 'r-9',
+     'úprava po návrate ide proti tomu, čo je NA OBRAZOVKE — žiadny falošný konflikt a žiadna zahodená editácia');
+  document.activeElement = null;
+  T.SS.saved();
+
+  // ROZPÍSANÉ hodnoty pin držia aj cez navigáciu: patria k stavu, nad ktorým
+  // vznikli, takže konflikt nad nimi je PRAVDIVÝ (nie falošný).
+  T.ssApplyState(STATE);
+  T.SS.saved();
+  const d = focus('rate:montaz');
+  typeInto(d, '17');
+  document.activeElement = null;
+  S.setStudioSection('bom');
+  S.setStudioSection('bset');
+  T.ssRenderBody();
+  eq(T.ssBaseRev(), 'r-1', 'rozpísaný formulár si pin drží aj po návrate do sekcie');
+  T.SS.saved();
+})();
+
+// --- 4b5) DOM dôkaz: kým je pole pod kurzorom, telo sa NEPREKRESĽUJE ---------
+
+(function(){
+  // Doteraz to držal len grep na prítomnosť `ssTyping()` v `ssRenderBody`.
+  // Tu sa to meria na uzle: zmrazený obsah po pushi zostane NEDOTKNUTÝ, bez
+  // kurzora ten istý push telo prekreslí.
+  function focus(key){
+    const t = { getAttribute: function(k){ return k === 'data-ss' ? key : null; },
+                value: '', classList: { toggle: function(){} } };
+    document.activeElement = t;
+    LISTEN.focusin.forEach(function(fn){ fn({ target: t }); });
+    return t;
+  }
+  function fresh(rev){
+    const F = JSON.parse(JSON.stringify(STATE));
+    F.revision = rev;
+    return F;
+  }
+
+  S.setStudioSection('bset');
+  T.ssApplyState(STATE);
+  T.SS.saved();
+  document.activeElement = null;
+
+  ELS.secbody.innerHTML = 'ZMRAZENÝ FORMULÁR';
+  focus('rate:montaz');
+  T.ssApplyState(fresh('r-9'));
+  eq(ELS.secbody.innerHTML, 'ZMRAZENÝ FORMULÁR',
+     'push NEPREPÍŠE telo, do ktorého sa práve píše (vzal by fokus aj rozpísané číslo)');
+  eq(ELS.secbody.children.length, 0, 'a nepribudne ani jeden uzol formulára');
+
+  document.activeElement = null;
+  T.ssApplyState(fresh('r-9'));
+  ok(ELS.secbody.innerHTML === '' && ELS.secbody.children.length > 0,
+     'bez kurzora ten istý push telo prekreslí (zmrazenie platí LEN pod kurzorom)');
+  T.SS.saved();
+})();
+
 // --- 4c) review #227 P2: zlyhaný payload sa PRIZNÁ ---------------------------
 
 (function(){

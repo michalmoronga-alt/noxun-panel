@@ -25,6 +25,9 @@
 # 3) Po uspesnom ulozeni sa STUDIO PREPOCITA (`refresh_studio`) — sadzby su
 #    vstup rozpoctu, cisla by inak ostali stare. Do ŠT-4a to robilo okno
 #    (`StudioDialog.refresh_if_open`); teraz je to TA ISTA cesta, len zvnutra.
+#    HLASKA SA VETVI PODLA VYSLEDKU prepoctu (`refresh_and_report`, dlh 1b-A):
+#    zapis do suboru a obnova obrazovky su DVE veci a hlaska nesmie potvrdzovat
+#    tu druhu, ked neprebehla.
 require 'json'
 
 module Noxun
@@ -155,8 +158,11 @@ module Noxun
           # Rozpisane hodnoty zanikaju AZ TU (klient si ich cez pushe drzi —
           # plny push chodi pri kazdej zmene modelu, nielen po ulozeni).
           js('SS.saved()')
-          refresh_studio
-          set_status('Nastavenia načítané nanovo zo súboru.')
+          # Aj tu sa menuje TLACIDLO, ktore v sekcii je (review #238 P3-3) —
+          # vseobecne „skús to znova" clovek nema kam kliknut.
+          refresh_and_report('Nastavenia načítané nanovo zo súboru.',
+                             'Nastavenia sa načítali zo súboru, ale okno sa nepodarilo obnoviť — ' \
+                             'hodnoty na obrazovke môžu byť staré. Klikni na Načítať nanovo.')
         end
 
         # Ulozenie: revizia -> patch (validate-all) -> prepocet Studia.
@@ -172,9 +178,14 @@ module Noxun
             # prepisal — hlaska pritom tvrdi, ze formular je nacitany nanovo.
             # Hlaska a spravanie sa musia zhodovat (review #227 P1-2).
             js('SS.saved()')
-            refresh_studio
-            return set_status('Nastavenia sa medzitým zmenili — formulár je načítaný nanovo. ' \
-                              'Skontroluj hodnoty a ulož znova.', true)
+            # Aj TATO hlaska tvrdi vysledok prepoctu („formulár je načítaný
+            # nanovo"), takze sa vetvi rovnako ako potvrdzujuca (dlh 1b-A).
+            return refresh_and_report('Nastavenia sa medzitým zmenili — formulár je načítaný nanovo. ' \
+                                      'Skontroluj hodnoty a ulož znova.',
+                                      'Nastavenia sa medzitým zmenili, takže sa NIČ neuložilo — ' \
+                                      'a formulár sa nepodarilo načítať nanovo. Klikni na ' \
+                                      '„Načítať nanovo" a hodnoty zadaj znova.',
+                                      ok_error: true)
           end
           patch = data['patch'].is_a?(Hash) ? data['patch'] : {}
           ok, errors = SupplierSettings.patch_active!(patch)
@@ -188,8 +199,17 @@ module Noxun
           # Sadzby su vstup rozpoctu — cisla Studia MUSIA byt cerstve. Je to TA
           # ISTA refresh cesta, aku mal satelit (kontrakt „KAZDE okno s cislami
           # zakazky je vo VSETKYCH refresh cestach"), len bezi zvnutra okna.
-          refresh_studio
-          set_status('Nastavenia uložené. Rozpočet je prepočítaný.')
+          # A ked ZLYHA, hlaska to MUSI povedat: zapis do suboru uz prebehol,
+          # `SS.saved()` uz rozpis zahodil, takze na obrazovke ostanu STARE
+          # cisla — „Rozpočet je prepočítaný." by nad nimi bolo klamstvo.
+          # Hlaska smie menovat LEN tlacidlo, ktore v sekcii NAOZAJ je (review
+          # #238 P2-1): lista `bset` ma „Načítať nanovo" a „Uložiť" — „Obnoviť"
+          # zije v sekcii Rozpocet. Bez tej navigacie by clovek siahol po
+          # „Načítať nanovo", ktore rozpisane hodnoty ZAHADZUJE.
+          refresh_and_report('Nastavenia uložené. Rozpočet je prepočítaný.',
+                             'Nastavenia sú ULOŽENÉ, ale rozpočet sa NEPREPOČÍTAL — ' \
+                             'čísla Rozpočtu môžu byť staré. Otvor sekciu Rozpočet ' \
+                             'a klikni na Obnoviť.')
         end
 
         # --- Ruby -> JS -------------------------------------------------------
@@ -225,15 +245,37 @@ module Noxun
           false
         end
 
+        # Prepocet + hlaska, ktora sa VETVI podla jeho VYSLEDKU (dlh 1b-A).
+        #
+        # Kazda hlaska tohto modulu tvrdi nieco o OBSAHU OKNA („Rozpočet je
+        # prepočítaný.", „formulár je načítaný nanovo") — a to obstara az plny
+        # push. Ten moze zlyhat (vynimka pri zostaveni payloadu, `execute_script`
+        # do este nepripraveneho okna) a vtedy je jedina pravda: subor je
+        # zapisany, obrazovka nie. Kym sa navratova hodnota ignorovala, hlaska
+        # potvrdzovala prepocet, ktory neprebehol.
+        #
+        # `ok_error` je pre pripad, ked je aj USPESNA vetva cervena
+        # (odmietnutie cudzou zmenou) — zlyhanie prepoctu je cervene vzdy.
+        def refresh_and_report(ok_msg, fail_msg, ok_error: false)
+          return set_status(ok_msg, ok_error) if refresh_studio
+
+          set_status(fail_msg, true)
+        end
+
         # Plny push Studia: sadzby menia CISLA zakazky (rozpocet, cenova
         # ponuka), takze generacia sa ZDVIHA — nie je to mutacia rozpoctu, ale
         # zmena vstupu vypoctu (vzor `price_refresh_after_proc`).
+        #
+        # Vracia BOOLEAN „klient to naozaj dostal": `refresh_if_open` vracia
+        # vysledok `push_state` (teda `js`), `nil` pri zavretom okne a `nil` pri
+        # zachytenej vynimke. Volajuci sa podla toho rozhoduje, co smie tvrdit.
         def refresh_studio(bump: true)
-          return unless defined?(StudioDialog)
+          return false unless defined?(StudioDialog)
 
-          StudioDialog.refresh_if_open(bump: bump)
+          StudioDialog.refresh_if_open(bump: bump) ? true : false
         rescue StandardError => e
           Engine.log_error(e, 'SupplierSettingsDialog.refresh_studio')
+          false
         end
       end
     end
