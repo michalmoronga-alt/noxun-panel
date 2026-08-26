@@ -9,6 +9,9 @@
 je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md). Čísla ostatných
 blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
 
+**Poradie najbližších blokov (rozhodol Michal 26.8.2026, po veľkom teste v0.8.4):**
+**PICKER-3 → 1b STABILIZAČNÁ REVÍZIA → GHOST VKLADANIE → KOVANIE** (pred KOVANÍM USER-debata o setoch).
+
 ### PICKER-3 · dorobenie vyhľadávača materiálov
 
 **Odčlenené z PR #231 podľa pravidla 3 kôl (25.8.)** — kolo 3 Codex review prinieslo osem
@@ -72,6 +75,25 @@ použiteľný), ale všetko je pomenované, aby sa to nestratilo.
   nedostupný**. Od **#227** review robí Codex, takže #227 aj #228 sú mimo sweepu. Keď má Codex kapacitu, prejsť tie PR spätne — nie kvôli nedôvere v subagenta (chytil o. i. spiacu mínu duplicitných
   kódov), ale preto, že je to iný pohľad na dávky, ktoré medzitým tvoria základ celej fázy.
 
+### GHOST VKLADANIE (V1-04 — zaradené Michalom 26.8.2026, po bloku 1b)
+
+Vkladanie skrinky na klik: skrinka visí na kurzore ako ghost, klik umiestni. **Podklad (NEZÁVÄZNÝ koncept,
+auditovaný proti v0.7.51):** [zdroje/next_sessions/09_GHOST_VKLADANIE.md](zdroje/next_sessions/09_GHOST_VKLADANIE.md)
++ externý SketchUp audit [09A](zdroje/next_sessions/09A_GHOST_EXTERNY_SKETCHUP_AUDIT.md) (Tool/InputPoint lifecycle, Orbit suspend/resume, Undo/onCancel, getExtents, klávesové pasce).
+Koncept obsahuje aj **nedorozhodnuté voľby** (napr. Tab vs. Alt/Option, počiatočný Z režim) — nie je to schválený kontrakt ani task package (vrstva `zdroje/`, [README.md](README.md)).
+**Pred implementáciou POVINNÉ:** finálny read-only audit proti aktuálnemu mainu + načítanie STAV/PLAN/ARCHITEKTÚRA/STANDARD;
+sporné body potvrdiť auditom alebo debatou s Michalom. **Záväzné znenie vznikne až v zadaní dávky** a zapíše sa sem do PLANu.
+
+### KOVANIE (zaradené Michalom 26.8.2026, po bloku GHOST VKLADANIE)
+
+**Predpoklad štartu: USER-debata s Michalom o setoch** (podklad sa pripraví pred debatou; dáta v [zdroje/SEED_KATALOG_2026-07.md](zdroje/SEED_KATALOG_2026-07.md) §2,
+nezáväzný koncept [zdroje/next_sessions/03_KOVANIE_FAZA3.md](zdroje/next_sessions/03_KOVANIE_FAZA3.md)).
+
+- **Redizajn katalógu a setov — z prvého testu v0.8.0 (Michal 24.8.):** **D-109** pomer člena setu „1 ks na N nôh" (príchyt soklovej lišty — dnes len per unit/owner, pomer sa musí dopočítať ručne)
+  · **D-110** pridávanie kovaní je neprehľadné (formulár dole pod zoznamom, poradie polí nesedí s dodávateľským listom; *časť „nová položka nie je vidieť" vyriešená v TEST-1, PR #229*) · **D-111** výber
+  setu podľa výšky sokla je schovaný v Predvoľbách projektu, hoci ho človek hľadá pri vkladaní skrinky. Plné znenia v [DOGFOODING.md](DOGFOODING.md).
+- **Kovanie fáza 3:** výklopy podľa hmotnosti čela (C-05 — generic_type lift + AVENTOS tabuľky, hustoty z M-C ako SNAPSHOT do modelu) · výplne šuflíkov ako vyrábané dielce (V1-05 — Atira dno+chrbát, Quadro/Tandem; vzorce dodá Michal) · smer otvárania a typ závesu · hmotnostné Blum tabuľky · automatika počtu nôh podľa šírky · „Použiť na podobné".
+
 ### 2 · KONTROLA + VÝROBA
 
 **Cieľ:** dotiahnuť krížovú kontrolu zákazky pred odoslaním do výroby a výrobné výstupy.
@@ -98,14 +120,11 @@ použiteľný), ale všetko je pomenované, aby sa to nestratilo.
   20.8.: zapísať na neskôr — malo sa riešiť „s okruhom rozpočtu vo fáze ŠTÚDIO"; fáza ŠTÚDIO je uzavretá (v0.8.0) a D-106 v nej NEBOLO spravené, takže sa presúva sem — inak by otvorená požiadavka ostala
   visieť v zatvorenom bloku (review #228).*
 
-- **Z prvého testu v0.8.0 (Michal 24.8.) — do redizajnu katalógu a setov:** **D-109** pomer člena setu „1 ks na N nôh" (príchyt soklovej lišty — dnes len per unit/owner, pomer sa musí dopočítať ručne)
-  · **D-110** pridávanie kovaní je neprehľadné (formulár dole pod zoznamom, poradie polí nesedí s dodávateľským listom; *časť „nová položka nie je vidieť" vyriešená v TEST-1, PR #229*) · **D-111** výber
-  setu podľa výšky sokla je schovaný v Predvoľbách projektu, hoci ho človek hľadá pri vkladaní skrinky. Plné znenia v [DOGFOODING.md](DOGFOODING.md).
-- **Kovanie fáza 3:** výklopy podľa hmotnosti čela (C-05 — generic_type lift + AVENTOS tabuľky, hustoty z M-C ako SNAPSHOT do modelu) · výplne šuflíkov ako vyrábané dielce (V1-05 — Atira dno+chrbát, Quadro/Tandem) · smer otvárania a typ závesu · hmotnostné Blum tabuľky · automatika počtu nôh podľa šírky · „Použiť na podobné".
+- *(Kovanie — D-109/D-110/D-111 aj fáza 3 — sa 26.8. vyčlenilo do vlastného bloku **KOVANIE** vyššie.)*
 - **Spotrebiče S1** (V1-02) — katalóg, položky projektu s väzbou na skrinku, kontrola niche semaforom, sekcia v rozpočte.
 - **Ceny a dokumenty ponuky** (vedome odložené z dávky E): manuálne 1-klik overenie ceny pre položky BEZ väzby na Demos a viac URL na položke (zvyšok V1-03) · plný generátor cenovej ponuky do DOCX/PDF so šablónou a vizualizáciami · prepínač „na faktúru" (×1,2, kandidát na štvrtý cenový režim) · rodina dokumentov okolo ponuky (ponuka vizualizácií, preberací protokol).
 - **Konštrukcia:** per-dielec odsadenia vpredu/vzadu pre strop/dno/boky (V1-01, chladničkový komín) · typy čiel lakované / frézované / sklo-Al rám (V1-07) · balík V0.4.8 z [archiv/06_PANEL_NASTAVENIA_navrh.md](archiv/06_PANEL_NASTAVENIA_navrh.md) — rohové spoje dna a stropu per strana, chrbát s poldrážkou, „bez dielca" varianty s validáciou, per-dielec hrúbky a odsadenia.
-- **Vkladanie na klik** (V1-04 fáza 1) — skrinka visí na kurzore, klik umiestni.
+- *(Vkladanie na klik — V1-04 — sa 26.8. vyčlenilo do vlastného bloku **GHOST VKLADANIE** vyššie.)*
 - **D-10 · Presúvanie a úprava čiel priamo v náhľade** — ako drag priečok.
 - **V1.0 zostavy:** spájanie a zarovnávanie korpusov (čelné/zadné hrany, pripájacie body, snaper logika) · soklová lišta v celku pre segment · obklady a krycie prvky segmentu vrátane pilastra
   (priznaný vs. skrytý) · pracovné a horné krycie dosky na označený segment · migrácia a oprava starých modelov · test na kompletnej reálnej zákazke. *(Sem patrí aj to, čo V0.4.7 vedome neobsahovalo:
@@ -135,7 +154,7 @@ použiteľný), ale všetko je pomenované, aby sa to nestratilo.
 - **Interact pre čelá** — dráhy otvárania, klik = otvorenie, merač kolízií pri otvorení (dáta máme: origin čiel na hrane pántu; typ pántu určuje dráhu).
 - Náhľad povýšiť na „otvárací náhľad" panela so zobrazovaním zvolených elementov.
 - **Injecting dát do knižníc v dávkach** (kódy, materiály, kovania, spotrebiče, vybavenie) — architektúru pripraviť skôr.
-- Zásuvkové bloky (dočasne DC Atira most) · vnútorné vybavenie (koše, tyče) · doplnky (LED, gola) · dĺžkové materiály naplno · odpojený režim UI · výkresy a etikety · CNC.
+- Zásuvkové bloky **na novom štandarde** (DC „Atira most" ZAVRETÝ 26.8.2026 — §12 bod C2, KRONIKA) · vnútorné vybavenie (koše, tyče) · doplnky (LED, gola) · dĺžkové materiály naplno · odpojený režim UI · výkresy a etikety · CNC.
 - Pracovné dosky ako súčasť dekorovej skupiny — dátovo pripravené cez `sheet_variants` (D-42); doriešiť, keď si to prax vypýta.
 - Odložené Demos prefixy: `hpdb` · `hrdb`/`hrll` · `dverny-plast` · `perfectsense`/`dtl`/`eurolight`/`lam` · `mdfd` (dyhovaná MDF).
 
