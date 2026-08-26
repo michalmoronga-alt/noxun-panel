@@ -46,6 +46,8 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
   **existujúce záznamy neprepisujú** — pribúdať však pribúda priebežne, presne ako káže
   checklist uzáveru v CLAUDE.md: záznam dávky navrch KRONIKY, vyriešené D-číslo navrch
   indexu v DOGFOODING_vyriesene.md, hotový blok plným textom do ROADMAP_hotove_etapy.md.
+  Jediná výnimka z neprepisovania: záznam **práve prebiehajúcej dávky** sa smie dorovnávať
+  až do jej mergu (napr. keď review zmení výsledný stav, ktorý záznam opisuje).
 
 ## Pravidlá — strážené guardmi
 

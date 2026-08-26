@@ -65,7 +65,8 @@ použiteľný), ale všetko je pomenované, aby sa to nestratilo.
 
 **F · UI dlhy po zaniknutom bloku UI 2.0** — otvorené postrehy, ktoré blok UI 2.0 nevyriešil a ktoré po jeho archivácii (26.8.) ostali bez bloku. Zaradenie je **mechanické, nie prioritizačné**
   (poradie určí Michal): **D-27** rýchle zobraziť/skryť tagy z panela · **D-51** štandard veľkostí okien a tlačidiel. Plné znenia sú v [DOGFOODING.md](DOGFOODING.md), skupina **„UI dlhy — k bloku 1b"**;
-  do tej istej skupiny patrí aj **výklop ako samostatný typ čela** (bez D-čísla) a otvorené **D-106** / **D-107**, ktoré však majú vlastné zaradenie (D-106 blok 4, D-107 zásobník po V1).
+  do tej istej skupiny patrí aj **výklop ako samostatný typ čela** (bez D-čísla). Otvorené **D-106** / **D-107** sem pôvodne patrili tiež, dnes žijú vo svojich skupinách podľa zaradenia:
+  D-106 v skupine V1 DOTIAHNUTIE (blok 4), D-107 v skupine Po V1 — zásobník.
 
 **E · Post-hoc Codex sweep #186–#226.** Rozsah je JEDNO číslo naprieč STAV, PLAN aj KRONIKOU a znamená presne toto: **dávky, ktorých primárnym reviewerom bol slepý subagent, lebo Codex bol 21.–24.8.
   nedostupný**. Od **#227** review robí Codex, takže #227 aj #228 sú mimo sweepu. Keď má Codex kapacitu, prejsť tie PR spätne — nie kvôli nedôvere v subagenta (chytil o. i. spiacu mínu duplicitných

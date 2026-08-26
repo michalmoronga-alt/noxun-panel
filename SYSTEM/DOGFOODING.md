@@ -12,7 +12,8 @@
 *(Blok **1 · UI 2.0** je od v0.8.0 hotový a jeho plný text žije v
 [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md). Postrehy nižšie sa v ňom
 nevyriešili, takže od 26.8.2026 visia na bloku **1b · STABILIZAČNÁ REVÍZIA**, odrážka **F**
-v [PLAN.md](PLAN.md) — menovite **D-27** a **D-51**.)*
+v [PLAN.md](PLAN.md) — menovite **D-27**, **D-51** a položka „výklop ako samostatný typ čela"
+(bez D-čísla).)*
 
 - **D-51 · Štandard veľkostí okien a tlačidiel** (Michal 31.7. večer) — zjednotiť šírky, rozmery a rozmiestnenie naprieč oknami (panel, Materiály, Výroba, Pravidlá, Šablóny) — dohodnúť konkrétne
   hodnoty do UI_DIZAJN.md **pred prvým testovaním Lucie („skúška ohňom")**. *Stav: ČIASTOČNE — UI-B1 (PR #168) zaviedol mechaniku aj tabuľku rozmerov okien v UI_DIZAJN.md a vyplnil riadok Inspectora
