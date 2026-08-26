@@ -26,9 +26,11 @@ otvorené dlhy: [../DOGFOODING.md](../DOGFOODING.md) a blok 1b v [../PLAN.md](..
 ## Prioritné osi (od budúcich funkcií dozadu)
 
 1. **Observery · undo · Tool lifecycle** *(pripravuje GHOST — najcennejšia os)*: `core/scale_observer.rb`,
-   dedup tick, disciplína `start_operation/commit`, správanie pri viacerých otvorených modeloch (Windows MDI),
-   pasce z konceptu `09A` (Orbit suspend/resume, onCancel/undo, focus, getExtents). Otázka: čo dnes bráni
-   bezpečne pridať `Sketchup::Tool`, ktorý kreslí ghost a zapisuje až na klik?
+   dedup tick, disciplína `start_operation/commit`, viac otvorených dokumentov — POZOR na platformu:
+   zdieľaný proces s prepínaním dokumentov je **macOS** scenár (guardy v `scale_observer.rb:149-150, 194-200, 382-383`),
+   Windows drží jeden dokument na proces — audituj obe vetvy oddelene. Pasce z konceptu `09A`
+   (Orbit suspend/resume, onCancel/undo, focus, getExtents). Otázka: čo dnes bráni bezpečne pridať
+   `Sketchup::Tool`, ktorý kreslí ghost a zapisuje až na klik?
 2. **Dátový model setov kovania** *(pripravuje D-109/KOVANIE)*: `core/hardware_sets.rb`, `hardware_rules.rb`,
    `config.hardware[]` — znesie schéma člena setu pomer „1 ks na N nôh" bez rozbitia výstupov a cien?
    Kde presne treba šev?

@@ -5,7 +5,9 @@
 ## 1 · Čo znamená „V1 hotové"
 
 **Kompletná reálna zákazka od návrhu po objednávky BEZ opustenia pluginu a BEZ ručného dopočítavania.**
-Odškrtávací checklist (V1 je hotové, keď je odškrtnuté všetko; stav dopĺňajú uzávery dávok):
+Odškrtávací checklist — **súhrn, nie úplný výpočet**: autoritou rozsahu každého bodu sú položky
+označené „V1 rozsah" v blokoch [PLAN.md](PLAN.md). **Bod sa odškrtáva, až keď je jeho V1 rozsah
+v PLANe prázdny**; V1 je hotové, keď je odškrtnuté všetko. Stav dopĺňajú uzávery dávok.
 
 1. [ ] **Návrh:** vloženie skriniek na klik (GHOST) → zostava vrátane skriniek so spotrebičmi; šablóny s kovaním = opakované typy na 1 klik. *(Zarovnanie a snap k susedom rieši blok „V1.0 zostavy" — snaper logika sa preberá DO pluginu, žiadny externý plugin; plné segmenty/attachments sú mimo V1.)*
 2. [ ] **Konštrukcia:** korpusy vrátane per-dielec odsadení (vzduchové komíny, špeciály — V1-01), výstuhy správne v interiéri (hotové, D-80), sokel/nohy podľa výšky (hotové, D-79),
