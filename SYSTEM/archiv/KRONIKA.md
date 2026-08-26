@@ -17,6 +17,32 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1b-2 · CHARAKTERIZAČNÉ IN-SU SCENÁRE observer/Undo/multi-model — brána H bloku 1b (27.8.2026):** vetva `test/1b2-charakterizacne-scenare`, **VERZIA SA NEBUMPUJE** — pribudli
+  výhradne testy, kód pluginu je bajt po bajte ten istý (v0.8.6). Zmysel dávky je poistka, nie funkcia: **kým sa v bloku 1d siahne na buildery a observery, musí byť napísané, čo
+  robia dnes.** Bez toho by sa každý neskorší refaktor obhajoval slovami „veď to funguje rovnako" a nikto by to nevedel overiť.
+  **Čo pribudlo:** sekcia `run_char` v `tests/sketchup/su_runner.rb` (registrovaná do async reťaze vzorom `run_stale`, runner sa NEREFAKTOROVAL — jeho 9 000 riadkov sú nález pre
+  1c), **34 nových assertov** v šiestich scenároch: **CH1** kópia skrinky · **CH2** `*N` násobenie (3 kópie v jednej operácii) · **CH3** Undo reťaz · **CH4** prerušenie operácie ·
+  **CH5** scale nástrojom Mierka · **CH6** prepnutie modelu (Windows vetva). Scenáre bežia cez REÁLNY debounce tick observera, nie cez priame volanie dedupu.
+  **Čo sa tým zafixovalo (dnešné správanie, nie návrh nového):** kópia dostáva vlastné `cabinet_id`, vlastnú definíciu (`make_unique`) a prepočítané `part_id`; `part_key` ostáva
+  ROLOU (množina dielcov kópie = množina originálu). Config kópie je **zhodný s originálom až na odvodené `zones[].id`**, ktoré idú s novým `cabinet_id`, kým `stable_id` — kľúč,
+  na ktorom visia overridy — ostáva; to bol jediný rozdiel, ktorý prvý beh našiel, a test sa preto formuluje presne takto (pôvodné očakávanie „config je bit po bite rovnaký" bolo
+  nesprávne, nie kód). `*3` násobenie dá štyri identity a **žiadne zdieľané `part_id` v celom modeli**; jedno Undo vráti celú dávku naraz (dedup sa lepí na paste krok).
+  Absorpcia scale **nepridáva vlastný undo krok** — druhé Undo odstráni celé vloženie. Prerušenie operácie nenechá torzo ani osirotenú definíciu `NOXUN Korpus …` a výnimka sa
+  neprehĺta. Výsledok scale sa **dielec po dielci** rovná tomu, čo postaví regenerate na tie isté rozmery (referenčná skrinka sa stavia PRVÁ, takže záverečné Undo meria presne
+  scale). Trojnásobná aktivácia toho istého dokumentu je idempotentná, prekrytia nezhasína a nerobí undo krok.
+  **Čo sa spustiť NEDÁ a je zapísané ako MANUÁLNY scenár** (plné znenie postupu je priamo v INFO riadkoch behu, aby ho testujúci našiel tam, kde ho potrebuje): **(a) Znova
+  (Ctrl+Y) po scale** — `send_action('editRedo')` na tomto Windows builde vráti `false` a nespraví nič (Ruby API nemá na Windows spoľahlivú redo akciu, otvorený bod v PLANe, blok
+  3 STABILITA); vetva sa kvalifikuje ÚČINKOM, nie návratovou hodnotou — lekcia D-101. **(b) Dva otvorené dokumenty naraz** — Windows drží jeden dokument na proces (SDI), takže je
+  to macOS scenár; automaticky sa overuje aspoň DÁTOVÁ ŠTRUKTÚRA guardov (`@requested` je množina per dokument, `scale_observer.rb:149-150, 194-200`), samotné prepnutie ostáva
+  manuálne.
+  **Mutačné overenie (3 zámerné poškodenia v jednom behu):** kópia vytvorená v `ScaleWatch` guarde (observer ju nevidí) zhodila 6 assertov identity v CH1/CH2/CH6 · referenčná
+  skrinka postavená na inú výšku zhodila porovnanie CH5 dielec po dielci · `abort_operation` prepísané na `commit_operation` zhodilo všetky tri asserty CH4b. Spolu **11 cielených
+  FAIL** — testy teda naozaj merajú to, čo tvrdia.
+  **Nález na kandidáta do registra 1c:** `@stable_transforms` v `scale_observer.rb` je klúčovaná `[model.object_id, entityID]` a **nikto z nej nemaže** — po zmazaní skriniek aj po
+  prepnutí dokumentu v nej záznamy ostávajú navždy (v plnom behu 115 záznamov). Nie je to výrobné riziko (hygiena/pamäť), preto ide do registra, nie do hotfixu; dnešné správanie
+  test zafixoval a priznal INFO riadkom.
+  **Testy:** headless **1917 PASS / 0 FAIL** · plný in-SketchUp beh **1003 PASS / 0 FAIL / 0 SKIP** (predtým 969 — celý prírastok je táto sada).
+
 - **1b-1 · OPTIMISTICKÝ ZÁMOK NASTAVENÍ — brána A bloku 1b (27.8.2026):** vetva `fix/1b1-settings-zamok`, **v0.8.6**. Dávka spláca dlh priznaný v review **#227 kolo 4** (PLAN blok 1b,
   odrážka A) a je to **oprava chýb**, teda vedomá zmena správania — nie refaktor. Klientske + serverové hláškovacie cesty; **žiadna modelová zapisovacia cesta** (nastavenia sú JSON
   store v `%APPDATA%`), preto sa in-SketchUp beh nekonal.

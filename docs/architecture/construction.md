@@ -29,6 +29,9 @@ modely sú platné a ich otvorenie nezapisuje nič. Ďalej: regenerate; vizuál 
 false — zdroj pravdy súpisu je VÝHRADNE `config.hardware[]` korpusu). Profil: definícia per (profil, dĺžka) `NOXUN_PROFILE_<ID>_L<dĺžka>` s recykláciou podľa mena + odtlačok
 `PROFILE_GEOM_REV` (zmena obrysu prekreslí staré definície), kotva = zadná rovina čela (Y 0) a vrch PÔVODNÉHO čela.
 
+**Prerušenie stavby je charakterizované** (`CH4`, sekcia `run_char` in-SketchUp sady — detail v odseku `scale_observer.rb`): výnimka vnútri `build`/`rebuild` ide cez `abort_safely`
+a v modeli nesmie ostať torzo ani osirotená definícia `NOXUN Korpus …`; výnimka sa **neprehĺta** — volajúci sa o nej dozvie.
+
 ### board_builder.rb
 
 samostatná doska (V0.4.7): `kind: board`, id BRD-xxx, rola `free_panel`, config = superset dielca korpusu (kusovník/VEPO majú jeden svet); materiál snapshot z katalógu, hrúbka VŽDY
@@ -227,4 +230,13 @@ Súbor, v ktorom žijú triedy prekrytí (`Sketchup::Overlay`) — celý je pod 
 
 **Stabilná transformácia** (`@stable_transforms`, z nej `reject_scale` obnovuje polohu) sa aktualizuje po každej úspešnej absorpcii, presune **aj po úspešnom commite orientačnej
 zmeny** (`Panel.handle_set_board_orientation` volá `remember_transform`) — bez toho by najbližší odmietnutý scale vrátil dosku do polohy PRED otočením, kým config už nesie novú
-orientáciu. `EngineAppObserver` notifikuje dialógy viazané na model (File>New/Open/Activate).
+orientáciu. Kľúč je `[model.object_id, entityID]` a **nikto z cache nemaže** — záznamy zmazaných entít aj starých dokumentov v nej ostávajú (charakterizované, nie schválené: fixuje
+to `CH6`, kandidát do registra 1c). `EngineAppObserver` notifikuje dialógy viazané na model (File>New/Open/Activate).
+
+**CHARAKTERIZAČNÁ SADA `CHAR` (dávka 1b-2, brána H bloku 1b):** `tests/sketchup/su_runner.rb`, sekcia `run_char` zapojená do async reťaze (vzor `run_stale`) — 34 assertov, ktoré
+zapisujú, čo observer a buildery **DNES** robia, aby mal neskorší hardening (blok 1d) a GHOST Tool vrstva pevnú pôdu. Pokrýva: kópiu skrinky (vlastná identita, config prežije celý
+až na odvodené `zones[].id`, ktoré idú s novým `cabinet_id`, kým `stable_id` ostáva), `*N` násobenie (žiadne zdieľané `part_id`), Undo reťaz (absorpcia nepridá vlastný krok),
+prerušenie operácie (sonda nad `build_into` = zlyhanie už po `definitions.add`/`clear!` + ručný `abort_operation`), scale nástrojom Mierka porovnaný **dielec po dielci** s výstupom
+regenerate a Windows vetvu prepnutia modelu (idempotentný re-attach, dátová štruktúra multi-model guardov). **Padnutý `CHAR` test neznamená „oprav test", ale „správanie sa zmenilo
+— povedz prečo".** Dve vetvy sa na Windows spustiť nedajú a sú zapísané ako MANUÁLNE scenáre priamo v INFO riadkoch behu: **Znova (Ctrl+Y)** po scale (Ruby API nemá na Windows
+spoľahlivú redo akciu — PLAN blok 3) a **dva otvorené dokumenty naraz** (macOS; Windows drží jeden dokument na proces, guardy sú `scale_observer.rb:149-150, 194-200, 382-383`).
