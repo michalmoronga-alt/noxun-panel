@@ -170,8 +170,9 @@ gola_profile · hinge · slide · leg · handle · shelf_pin · connector · fre
     "position": [0.0, 0.0, 0.0],
     "width": 764.0, "height": 680.0, "depth": 520.0,
     "state": "occupied",
-    "allowed_modules": ["shelf", "divider_h", "drawer_block", "front_door"],
-    "modules": ["CAB-014-M1"]
+    "shelves": 1,
+    "allowed_modules": ["shelf", "divider_v", "divider_h", "drawer_block", "front_door"],
+    "modules": []
   }
 }
 ```
@@ -423,7 +424,9 @@ nie samostatné nastavenie čela, a rovnakou cestou príde aj odlišná škára 
 **Generický objekt = vizuálna PROXY:** entita nesie `kind: hardware`, ale `production_class: "none"` a `manufactured: false` (+ `config.proxy: true`).
 **Zdroj pravdy súpisu kovania je výhradne `config.hardware[]` korpusu** — závesy a výsuvy geometriu nemajú vôbec, takže počty musia mať jeden domov;
 keby proxy niesla `counted/true`, kusovník iterujúci entity by kategórie s vizuálom započítal druhýkrát.
-(Príklad `counted/true` entity v 8.2 platí pre samostatné hardware entity bez proxy vzťahu — proxy ňou nikdy nie je; dnes ju nič nevytvára.)
+(Príklad `counted/true` entity v 8.2 je **rezervovaný tvar** pre samostatné hardware entity bez proxy vzťahu — proxy ňou nikdy nie je.
+Dnes ju **nič nevytvára a zberná cesta `Bom.collect` ju nepozná** (zbiera top-level `cabinet` a `board`, kovanie berie výhradne z `config.hardware[]`),
+takže kým sa zber nedoplní, taká entita by sa do výstupov nedostala.)
 
 **Vŕtanie a presné pozície kovania sú MIMO scope V1** — riešia sa len počty, typy a kódy.
 
@@ -911,8 +914,9 @@ Možnosti:
   **žiadny klient si nič neprepočítava.** Vykonateľná podoba: [`core/budget.rb`](../noxun_engine/core/budget.rb) + sadzby a režimy [`core/supplier_settings.rb`](../noxun_engine/core/supplier_settings.rb).
 - **Cenová ponuka je VIEW nad hotovým payloadom rozpočtu** — jej súčet sa **na cent rovná** súčtu rozpočtu (dorovnávací riadok „nábytková zostava" je automatický zvyšok).
   Proti interným pojmom (sadzby, €/bm, počty platní, nákupné kódy, `material_id`) stojí **trojvrstvová obrana**: do dokumentu idú len whitelistované polia
-  a `clean_label` odstráni kódy a ID-podobné tokeny; hotový hárok ešte prejde blocklistom, ale ten nález **hlási a neblokuje** (rovnaký kontrakt ako KONTROLA pri VEPO) —
-  ručne napísaný text s interným pojmom teda prejde a ohlási sa v statuse a logu. Vykonateľná podoba: [`core/cp_export.rb`](../noxun_engine/core/cp_export.rb).
+  a `clean_label` odstráni kódy a ID-podobné tokeny; hotový hárok ešte prejde blocklistom, ale ten nález **hlási a neblokuje** (rovnaký kontrakt ako KONTROLA pri VEPO).
+  Ručne napísaný text s interným pojmom teda do súboru prejde a **ohlási sa v statuse okna — trvalý záznam o ňom nevzniká**.
+  Vykonateľná podoba: [`core/cp_export.rb`](../noxun_engine/core/cp_export.rb).
 - **Sadzby sa do zákazky NEMRAZIA** — rozpočet je pohyblivý obraz cien, nie výrobný snapshot. V modeli žijú len veci per zákazka (režim, overridy, násobky, vlastné položky); sadzby sú globálne nastavenie dodávateľa.
 - **DPH sa nepripočítava.** Firma je neplatca, katalógové ceny sú konečné a prepočet „bez DPH" je len zobrazenie, nikdy základ výpočtu.
 - **Neznáma cena sa NIKDY nenahradí nulou** — riadok ju prizná, medzisúčet je len zo známych cien a súhrn nahlas povie, že nie je úplný.

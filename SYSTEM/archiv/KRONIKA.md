@@ -28,6 +28,11 @@
   Review kolo 1 tu opravilo dve prehnané tvrdenia: firewall cenovej ponuky **negarantuje**, že interný pojem neprejde — tretia vrstva (blocklist nad hotovým hárkom)
   nález **hlási a neblokuje**, presne ako KONTROLA pri VEPO (`core/cp_export.rb` kontrakt 2, `ui/production_core.rb` `do_cp_xlsx`), takže ručne napísaný text s interným
   pojmom sa exportuje a len sa ohlási; a pri službách **množstvá počíta engine z kusovníka a odhadu platní**, zo sadzieb dodávateľa berie ceny (nie množstvá).
+  Kolo 3 to dotiahlo ešte o krok: prvá oprava sľubovala ohlásenie „v statuse **aj v logu**", ale `do_cp_xlsx` posiela `cp_warnings` **výhradne do status callbacku**
+  (`StudioDialog.set_status`, teda text v okne) a `Engine.log` nevolá vôbec — jediné logovanie na tej ceste je `Engine.log_error` v `rescue` vetve pre výnimky.
+  Kontrakt preto hovorí **status-only: „trvalý záznam nevzniká"**. **Nález pre budúcu dávku:** blokový komentár nad `do_cp_xlsx`
+  (`ui/production_core.rb`, „ale ide do statusu aj do logu") tvrdí to isté nepravdivo — komentár sa tu vedome neopravoval, lebo zásah do `.rb` súboru
+  by z dokumentačnej dávky spravil dávku s bumpom verzie a prepisom všetkých `?v=`.
   **(2) `role_key`.** Tabuľka atribútov ho volala „dočasný alias; časom zanikne" — proroctvo. Dnes ho **buildery korpusu aktívne zapisujú** na každý dielec s hodnotou `part_key`
   (`core/cabinet_builder.rb`, `resolve_part` + `Store.write`) — `board_builder` ho nepíše —, čítacia cesta ho berie ako **fallback pre staršie modely**
   (`ui/panel/payloads.rb`, `part_identity`) a jeho meno nesie aj **legacy UI protokol** (payload `role_key` s hodnotou `part_key`).
@@ -45,6 +50,13 @@
   nie je v `noxun_engine/` ani v testoch nikde, `overlay` existuje len ako `back_mode` chrbta a ako `Sketchup::Overlay`; `modules/fronts.rb` pozná len `gap`/`gap_top`/
   `gap_bottom`/`gap_sides`. Obe polia sú preto z príkladu **vyhodené** (entita `kind: module` je aj tak rezervovaná, žiadne dáta sa nemenia). Namiesto zrušeného sľubu
   „doplnia sa pri kovaní, viď sekcia 12" nesie §6.2 riadok **„Prekrytie čiel (`overlay`) určí typ pántu — pribudne s fázou kovania 2"** a §5.3 naň odkazuje.
+  Codex kolo 3 našlo **rovnaký rozpor aj v kanonickom príklade zóny** (§2.5): perzistoval `"modules": ["CAB-014-M1"]` a nemal `shelves`, hoci §5.1 hovorí opak.
+  Príklad je zrovnaný so živou schémou `Zones.zone_config_from_flat` — pribudlo `"shelves": 1` (kľúč, z ktorého sa odvodzuje `state: "occupied"`), `modules` je `[]`
+  a do `allowed_modules` pribudol chýbajúci `divider_v` (kód ich vydáva päť). Pôvodný tvar príkladu: `"allowed_modules": ["shelf", "divider_h", "drawer_block", "front_door"]`,
+  `"modules": ["CAB-014-M1"]`, bez `shelves`. Príklad `kind: module` hneď pod ním ostáva ako rezervovaný tvar, len naň už zóna neukazuje.
+  Kolo 3 doladilo aj §6.3: veta o `counted/true` entite hovorila len „dnes ju nič nevytvára", čo zamlčalo, že by aj tak ticho vypadla —
+  `Bom.collect` zbiera top-level `cabinet` a `board` a kovanie berie výhradne z `config.hardware[]`, žiadnu vetvu pre samostatnú `kind: hardware` entitu nemá.
+  Kontrakt to teraz volá **rezervovaným tvarom** a priznáva, že kým sa zber nedoplní, taká entita by sa do výstupov nedostala.
   **(5) Zaniknuté okná.** Kontrakt na troch miestach posielal do okien, ktoré fázou ŠTÚDIO zanikli: „dialóg Pravidlá kovania" → **sekcia Pravidlá v Štúdiu**,
   „stav ukazuje okno Materiály" → **sekcia Materiály v Štúdiu**, „znamienko ručného zásahu žije v okne Výroba" → v UI.
   **(6) Prechodná poistka OCL** („zostáva nainštalovaný na krížovú validáciu prvých zákaziek, po zhode sa odstaví") z §11 zmizla — podmienka bola splnená 20.7.2026
