@@ -29,10 +29,9 @@ Posledný uzavretý blok bol **Docs cleanup** (posledný PR **#234**); správani
 
 ## Ďalší krok
 
-**MICHAL VEČER — najprv INSTALL z čerstvého mainu** (`INSTALL_noxun_engine.ps1`), potom test. Netestovaných je **PICKER-2** (PR #231 — jeden riadok na dekor, hrúbky ako čipy, duplák len vedomým klikom) a **8 dávok fázy ŠTÚDIO** (#220 … #227).
-**Plné testovacie checklisty ku každej z nich sú v [archiv/KRONIKA.md](archiv/KRONIKA.md)** (záznam „Docs cleanup B", sekcia prenesených checklistov) — sem sa už nekopírujú, aby STAV ostal krátky.
+**VEĽKÝ TEST JE HOTOVÝ (26.8. večer):** v0.8.4 nainštalovaná, **PICKER-2 aj všetkých 8 dávok fázy ŠTÚDIO (#220–#227) prešlo — všetko PASS, žiadny nález**; Michal vecne potvrdil aj ABS defaulty rolí. Záznam v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 
-**Potom podľa [PLAN.md](PLAN.md):** dorobenie vyhľadávača **PICKER-3** (osem nálezov z kola 3 review #231, z toho bod E je návrhová zmena) · **stabilizačná revízia** (blok 1b — dlhy fázy ŠTÚDIO; od začiatku produkcie naostro sa ešte nekonala) · potom blok **KOVANIE** (D-109 · D-110 · D-111 z prvého testu v0.8.0).
+**Poradie ďalšej práce (rozhodol Michal 26.8.):** dorobenie vyhľadávača **PICKER-3** (osem nálezov z kola 3 review #231, z toho bod E je návrhová zmena) · **stabilizačná revízia** (blok 1b — dlhy fázy ŠTÚDIO) · **GHOST VKLADANIE** (V1-04, koncept 09 v [zdroje/next_sessions/](zdroje/next_sessions/) — pred implementáciou povinný finálny read-only audit) · až potom blok **KOVANIE** (najprv USER-debata o setoch). Dávky štartujú na Michalovo „štartuj".
 
 ## Posledné uzávery
 

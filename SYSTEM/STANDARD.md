@@ -834,7 +834,7 @@ Záväzné princípy dosky:
 - **Autoritatívny výrobný záznam pre výstupy (V0.5) je snapshot na entite** — pri dielcoch korpusu ho builder zapisuje z plánu po `resolve_part` (finálny materiál/ABS), pri doskách ho zapisuje `BoardBuilder` priamo. `BuildPlan` je **plán stavby korpusu** (medzikrok) — dosky v ňom nie sú; per-dielec kontrakt (`BuildPlan.validate_part!`) je však spoločný validátor oboch.
 - **Kusovník V0.5 zbiera entity `manufactured: true` jednotne** (`kind: part` aj `kind: board`) a agreguje **výhradne podľa výrobných polí** (`material_id` + rozmery + `edges` + `grain_direction`); `quantity` sa sčítava. `id`, `part_key`, `name` ani `engine_version` do agregačného kľúča nepatria.
 - **Materiál dosky je snapshot** — vždy konkrétny **katalógový** záznam (predvyplnený z projektového defaultu pri vložení, žiadne živé dedenie) a **hrúbka sa riadi materiálom** (nie je voľný rozmer). Legacy výnimka „neznámy materiál smie prejsť" platí len pre staré korpusy, na dosky sa neprenáša.
-- **Hrany**: `edges` je vždy kompletná mapa L1/L2/W1/W2; kľúč s `null` = vedome bez ABS. Default pri vložení: pravidlo roly `free_panel` (seed: 1 pozdĺžna hrana 1,0 mm). Doska nemá override vrstvu (`part_overrides`) — config na entite je priamo zdroj pravdy.
+- **Hrany**: `edges` je vždy kompletná mapa L1/L2/W1/W2; kľúč s `null` = vedome bez ABS. Default pri vložení: pravidlo roly `free_panel` (seed: 1 pozdĺžna hrana **triedy jednotka** — viď 7.5; rozhodnuté 26.8.2026). Doska nemá override vrstvu (`part_overrides`) — config na entite je priamo zdroj pravdy.
 - **Pole `attachment` (väzba dosky na vlastníka) v configu NIE JE** — absencia poľa = voľná doska (`mode: free`). Pribudne aditívne s prvou inteligentnou rolou
   (`cover_side`…) a už teraz preň platí: vlastník sa odkazuje výhradne cez `id` (+ `part_key`), **nikdy `persistentId`**; po zmazaní vlastníka doska prežíva a degraduje na voľnú.
 
@@ -929,9 +929,7 @@ Zámerne nerozhodnuté — overia sa na prototype/V1 v SketchUpe (SkAgent), nie 
 
 1. **Presné origin konvencie pre všetky typy modulov** (❓ osnova 3). Korpus, dielec a rotačné čelo sú určené (sekcia 3.2); originy zásuvkových blokov, priečok a doplnkov overiť na prototype.
 2. **Správanie pri zmene rozmeru korpusu s obsadenými zónami** (❓ osnova 5): auto-prepočet detí, kedy resize zakázať/limitovať (princíp `LARGEST/SMALLEST` — min/max rozmery pre kovanie).
-3. **C2 migračný most** — existujúce DC childy (napr. Atira šuflíky) dočasne ako čierne skrinky (scale+redraw). Ich vnútorné `parent!` vzorce mimo pôvodnej skrinky nebežia —
-   rozmery im dáva zóna (Ruby). Rozsah a trvanie mosta sa spresní pri prvej vlne childov.
-4. **Spájanie a zarovnávanie korpusov v zostave** (Michal, 15.7.2026): default = zarovnanie **čelných hrán** (hĺbky korpusov môžu byť rozdielne); voliteľne zarovnanie **zadných hrán**.
+3. **Spájanie a zarovnávanie korpusov v zostave** (Michal, 15.7.2026): default = zarovnanie **čelných hrán** (hĺbky korpusov môžu byť rozdielne); voliteľne zarovnanie **zadných hrán**.
    Koncept jednoduchých **pripájacích bodov (kotiev)** na korpuse — vrátane špeciálnych situácií: rohová skrinka sa nepája priamo na rohový styk
    (potrebný dištančný/rohový princíp — viď foto reálnej kuchyne). Existujúca logika prisúvania v `snaper` (compute_gap v lokálnom ráme cieľa) je kandidát na prevzatie.
    Rieši sa na reálnych zostavách — postrehy budú jasnejšie z klikania.

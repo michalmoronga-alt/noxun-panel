@@ -19,7 +19,7 @@
 - **Variant** — konkrétny záznam v dekorovej skupine: doska = typ+hrúbka (DTDL 18, PD 38…), ABS = šírka+hrúbka (22/1,0)
 - **Snapshot** — výrobný záznam materiálu/ABS uložený NA entite (autorita — štandard 8.3); katalóg je len zdroj pri výbere
 - **BuildPlan** — záväzný kontrakt plánu stavby (SCHEMA 2) — geometria, kusovník aj VEPO čítajú TEN ISTÝ plán
-- **Semafor** — kontrolný zoznam RED/ORANGE v okne Výroba (RED nikdy neblokuje export)
+- **Semafor** — kontrolný zoznam RED/ORANGE v sekcii Kontrola v Štúdiu (RED nikdy neblokuje export)
 - **Proxy kovania** — vizuál (nohy, úchytkový profil) v modeli; NIE je zdroj pravdy — súpis číta VÝHRADNE `config.hardware[]`
 - **Úchytkový profil (UKW)** — hliníkový profil nasunutý na hranu čela namiesto úchytky (UKW-7 = 19,181 × 37,419 mm, tyče 3000/3500 mm, 7 farieb).
   Čelo sa kvôli nemu **skracuje o 36 mm**, riadok čiel si výšku drží — profil je jeho súčasť. Rez = šírka krídla, každé krídlo má vlastný kus.

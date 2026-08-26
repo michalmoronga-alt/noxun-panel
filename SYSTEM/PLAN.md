@@ -9,6 +9,9 @@
 je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md). Čísla ostatných
 blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
 
+**Poradie najbližších blokov (rozhodol Michal 26.8.2026, po veľkom teste v0.8.4):**
+**PICKER-3 → 1b STABILIZAČNÁ REVÍZIA → GHOST VKLADANIE → KOVANIE** (pred KOVANÍM USER-debata o setoch).
+
 ### PICKER-3 · dorobenie vyhľadávača materiálov
 
 **Odčlenené z PR #231 podľa pravidla 3 kôl (25.8.)** — kolo 3 Codex review prinieslo osem
@@ -71,6 +74,14 @@ použiteľný), ale všetko je pomenované, aby sa to nestratilo.
 **E · Post-hoc Codex sweep #186–#226.** Rozsah je JEDNO číslo naprieč STAV, PLAN aj KRONIKOU a znamená presne toto: **dávky, ktorých primárnym reviewerom bol slepý subagent, lebo Codex bol 21.–24.8.
   nedostupný**. Od **#227** review robí Codex, takže #227 aj #228 sú mimo sweepu. Keď má Codex kapacitu, prejsť tie PR spätne — nie kvôli nedôvere v subagenta (chytil o. i. spiacu mínu duplicitných
   kódov), ale preto, že je to iný pohľad na dávky, ktoré medzitým tvoria základ celej fázy.
+
+### GHOST VKLADANIE (V1-04 — zaradené Michalom 26.8.2026, po bloku 1b)
+
+Vkladanie skrinky na klik: skrinka visí na kurzore ako ghost, klik umiestni. Schválený UX kontrakt
+a predbežný audit sú v koncepte **[zdroje/next_sessions/09_GHOST_VKLADANIE.md](zdroje/next_sessions/09_GHOST_VKLADANIE.md)**
++ externý SketchUp audit **[09A](zdroje/next_sessions/09A_GHOST_EXTERNY_SKETCHUP_AUDIT.md)** (Tool/InputPoint lifecycle, Orbit suspend/resume, Undo/onCancel, getExtents, klávesové pasce).
+**Pred implementáciou POVINNÉ:** finálny read-only audit proti aktuálnemu mainu + načítanie STAV/PLAN/ARCHITEKTÚRA/STANDARD
+(koncept NIE JE task package — pravidlo z README konceptov). Sporné body potvrdiť auditom alebo debatou s Michalom.
 
 ### 2 · KONTROLA + VÝROBA
 
