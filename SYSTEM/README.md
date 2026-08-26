@@ -34,6 +34,11 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
   seed podklady. **Nečítať automaticky** — otvárajú sa, len keď na ne živý dokument
   výslovne pošle. Koncepty v [zdroje/next_sessions/](zdroje/next_sessions/) nesú status
   riadok `> Stav: KONCEPT` a **neimplementujú sa priamo** (najprv návrh + audit proti kódu).
+  **VÝNIMKA — [zdroje/ui20/UI20_KONTRAKT.md](zdroje/ui20/UI20_KONTRAKT.md) je ZÁVÄZNÝ
+  kontrakt** (slovný zdroj pravdy UI 2.0 vrátane sekcie ŠTÚDIO KONCEPT a §7 vedomých
+  odchýlok); odkazujú naň `docs/UI_DIZAJN.md`, `docs/architecture/ui-lifecycle.md` aj
+  [STAV.md](STAV.md). Býva tu z historických dôvodov a **zostáva tu** — je to jediný
+  záväzný súbor vo vrstve `zdroje/`, všetko ostatné v nej je podklad, nie autorita.
 - **[archiv/](archiv/)** — história a uzavreté rozhodnutia: [KRONIKA.md](archiv/KRONIKA.md)
   (záznam každej dávky), [ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md) (plné
   texty hotových blokov a etáp), [DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md)
@@ -46,12 +51,16 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
   `zdroje/` sa cituje ako podklad; záväzné znenie patrí do STANDARD, PLAN alebo docs.
 - **Hotový blok nesmie zostať v PLAN.** Uzavretý blok ide plným textom do
   `archiv/ROADMAP_hotove_etapy.md`; v PLAN ostávajú len nehotové veci a trvalé pravidlá.
-  (Guard: PLAN nesmie mať nadpis bloku s „KOMPLET" ani „✅".)
+  (Guard: PLAN nesmie mať nadpis bloku s „KOMPLET", „HOTOVÉ" ani „✅" — bez ohľadu na
+  veľkosť písmen; „nehotové" je v poriadku.)
 - **DOGFOODING drží len otvorené postrehy.** Vyriešené idú plným textom do
   `archiv/DOGFOODING_vyriesene.md` a **index vyriešených je tam tiež** — nie tu.
 - **STAV je krátky** (max 80 riadkov a 12 kB) a má stabilnú kostru piatich sekcií.
   Nahradený text ide odsekom navrch „Záznamy dávok" v `archiv/KRONIKA.md`.
 - **Žiadny riadok nad 400 znakov** v živých docs — jeden odsek na jednom obrom riadku
   znamená nečitateľný diff a nemožné review. (Archív a zdroje sa nestrážia.)
+  **Dočasná výnimka:** [STANDARD.md](STANDARD.md) (20 dlhých riadkov) a
+  [POJMY.md](POJMY.md) (22) v guarde zatiaľ **nie sú** — reflow v **dávke C
+  (STANDARD refresh)**, potom sa oba pridajú do zoznamu.
 - **Po každej väčšej otestovanej dávke sa docs aktualizujú** podľa **checklistu uzáveru
   dávky** v [../CLAUDE.md](../CLAUDE.md) — nie „niekedy neskôr", ale v tej istej dávke.

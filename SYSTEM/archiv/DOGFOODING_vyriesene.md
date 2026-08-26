@@ -1,6 +1,6 @@
 # Dogfooding — archív vyriešených postrehov (plné texty)
 
-> **ARCHÍV (založené 24.7.2026 pri uzávere V0.5).** Živý zápisník [../DOGFOODING.md](../DOGFOODING.md) drží len otvorené body a jednoriadkový index — tu sú plné texty vyriešených D-čísel (rozhodnutia, príčiny, PR) a záznam smoke testu s VEPO validáciou. Číslovanie D-xx je trvalé, nerecykluje sa. Uzavreté a historické SEKCIE zápisníka (priebežné stavy, 2A migračná mapa, hardening V0.5, seed, zodpovedané otázky) sú vedľa v [DOGFOODING_historia.md](DOGFOODING_historia.md).
+> **ARCHÍV (založené 24.7.2026 pri uzávere V0.5; index sem prišiel 26.8.2026 dávkou Docs cleanup B).** Vyriešené postrehy žijú **celé tu**: najprv **jednoriadkový index** (sekcia nižšie), pod ním **plné texty** (rozhodnutia, príčiny, PR) a záznam smoke testu s VEPO validáciou. Živý zápisník [../DOGFOODING.md](../DOGFOODING.md) drží **len otvorené** postrehy — index v ňom už nie je (stráži guard). Číslovanie D-xx je trvalé, nerecykluje sa. Uzavreté a historické SEKCIE zápisníka (priebežné stavy, 2A migračná mapa, hardening V0.5, seed, zodpovedané otázky) sú vedľa v [DOGFOODING_historia.md](DOGFOODING_historia.md).
 
 ## Index vyriešených (jeden riadok na D-číslo, najnovšie hore)
 

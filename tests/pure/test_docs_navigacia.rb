@@ -71,12 +71,16 @@ NxTest.test('docs: zive SYSTEM/*.md nemaju riadok nad 400 znakov') do
                 'rozbi odsek na kratsie riadky (Markdown ich spoji do jedneho odseku)')
 end
 
-# Hotovy blok patri do archivu, nie do planu. Nadpis s "KOMPLET" alebo fajkou znamena,
-# ze sa uzavrety blok v PLAN.md zabudol presunut do archiv/ROADMAP_hotove_etapy.md.
-NxTest.test('docs: PLAN.md nema nadpis hotoveho bloku (KOMPLET / fajka)') do
+# Hotovy blok patri do archivu, nie do planu. Nadpis s "KOMPLET", "HOTOVE" alebo fajkou
+# znamena, ze sa uzavrety blok v PLAN.md zabudol presunut do archiv/ROADMAP_hotove_etapy.md.
+# Slovnik repa pozna obe slova, preto sa chytaju obe — a case-insensitive, lebo nadpisy
+# ich pisu raz verzalkami, raz normalne. Negativny lookbehind na "ne" je nutny: "nehotove"
+# je opak a v pláne je legitimne (review #233 P2).
+NX_PLAN_DONE_RE = /(?<!ne)hotov[éeo]|komplet|✅/.freeze
+NxTest.test('docs: PLAN.md nema nadpis hotoveho bloku (KOMPLET / HOTOVE / fajka)') do
   path = File.join(NxTest::ROOT, 'SYSTEM', 'PLAN.md')
   offenders = File.read(path, encoding: 'UTF-8').lines.map(&:rstrip).select do |l|
-    l.start_with?('#') && (l.include?('KOMPLET') || l.include?("✅"))
+    l.start_with?('#') && l.downcase.match?(NX_PLAN_DONE_RE)
   end
   NxTest.assert(offenders.empty?,
                 "PLAN.md ma nadpis hotoveho bloku (#{offenders.join(' · ')}) — presun blok plnym " \
@@ -107,13 +111,28 @@ NxTest.test('docs: kazdy koncept v zdroje/next_sessions/ nesie status riadok') d
   files = Dir.glob(File.join(dir, '*.md')).sort
              .reject { |f| File.basename(f) == 'README.md' }
   NxTest.assert(files.length > 5, "nenasiel som koncepty (#{files.length}) — zla cesta?")
+  # Status musi byt PRVY obsahovy riadok hned pod H1 — nie kdekolvek v subore.
+  # Riadok schovany na konci dlheho dokumentu nikto necita, a prave to ma zabranit
+  # tomu, aby sa koncept precital ako zadanie (review #233 P2).
   missing = files.reject do |f|
-    File.readlines(f, encoding: 'UTF-8').any? { |l| l.start_with?(NX_NEXT_SESSIONS_STATUS) }
+    lines = File.readlines(f, encoding: 'UTF-8').map(&:rstrip)
+    h1 = lines.index { |l| l.start_with?('# ') }
+    next false if h1.nil? # chybajuci H1 hlasi test nizsie
+
+    first = lines[(h1 + 1)..].to_a.find { |l| !l.strip.empty? }
+    first.to_s.start_with?(NX_NEXT_SESSIONS_STATUS)
   end
   NxTest.assert(missing.empty?,
-                "Koncepty bez riadku '#{NX_NEXT_SESSIONS_STATUS}': " \
-                "#{missing.map { |f| File.basename(f) }.join(' · ')} — bez neho vyzera koncept " \
-                'ako zadanie a agent ho moze zacat implementovat')
+                "Koncepty, ktorym '#{NX_NEXT_SESSIONS_STATUS}' nie je PRVY riadok pod nadpisom: " \
+                "#{missing.map { |f| File.basename(f) }.join(' · ')} — status patri hned pod H1, " \
+                'inak vyzera koncept ako zadanie a agent ho moze zacat implementovat')
+
+  # H1 je podmienkou guardu vyssie — bez neho by sa status nemal k comu vztiahnut.
+  no_h1 = files.reject do |f|
+    File.readlines(f, encoding: 'UTF-8').any? { |l| l.start_with?('# ') }
+  end
+  NxTest.assert(no_h1.empty?,
+                "Koncepty bez H1 nadpisu: #{no_h1.map { |f| File.basename(f) }.join(' · ')}")
 end
 
 NxTest.test('docs: STAV.md ma vsetkych 5 povinnych sekcii') do

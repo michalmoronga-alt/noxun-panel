@@ -8,7 +8,7 @@
 > [dizajnovy_listok.html](dizajnovy_listok.html) (paleta, logo, dizajnové rozhodnutia).
 >
 > Podklad pre klikateľný mockup a večernú debatu. Vstupy: [UI_VIZIA](../../archiv/UI_VIZIA_2026-07.md) ·
-> merač D-25 ([odpočet](../MERAC_D25_odpocet_2026-08.md)) · V1_VIZIA §6 ·
+> merač D-25 ([odpočet](../MERAC_D25_odpocet_2026-08.md)) · [V1_VIZIA §6](../../archiv/V1_VIZIA_priebeh_2026-08.md) *(od 26.8.2026 v archíve)* ·
 > PLAN blok UI 2.0 · [UI_DIZAJN](../../../docs/UI_DIZAJN.md). Rozsah schválil Michal 13.8.:
 > **štúdio okno so VŠETKÝMI satelitmi + PLNÝ redizajn Inspectora**; D-26 (režimy) sa rozhodne
 > až nad mockupom; OCL vzory navrhuje agent, Michal škrtá/dopĺňa.
