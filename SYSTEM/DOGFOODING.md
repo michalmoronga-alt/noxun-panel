@@ -35,14 +35,6 @@ zaradenie priamo v texte položky.)*
   s vysvetlením**, lebo rola `flap` (kanonická v STANDARD §2.4, ale nikde nepoužitá) potrebuje vlastnú cestu cez **builder, ABS pravidlá, kusovník a VEPO** — to je zmena dátového kontraktu, teda vlastná
   dávka s Codex auditom a in-SU behom. *Stav: OTVORENÉ — malá dávka „výklop ako rola flap"; kovanie AVENTOS ostáva ručné (POJMY.md: výklopy sa negenerujú, plný model je fáza 3).*
 
-- **D-109 · Pomer člena setu „1 ks na N nôh"** (Michal 24.8., prvý test v0.8.0) — set kovania vie dnes počítať člena len **per unit** (na kus) alebo **per owner** (na skrinku). Chýba pomer typu „**1
-  príchyt sokla na 4 nohy**": pri príchytoch soklovej lišty sa počet neviaže na skrinku ani na jednotlivú nohu, ale na ich **počet**. Dnes sa to musí dopočítať ručne — a práve to má set robiť za
-  človeka. *(Nefixované v TEST-1: mení dátový model setu, patrí do bloku KOVANIE.)*
-- **D-110 · Pridávanie kovaní je neprehľadné** (Michal 24.8., prvý test v0.8.0) — formulár novej položky je **dole pod zoznamom**, poradie polí nezodpovedá tomu, ako človek údaje prepisuje z
-  dodávateľského listu, a po uložení sa položka stratí v zozname. *(Časť — aby nová položka bola hneď vidieť a orezanie zoznamu sa priznalo — vyriešená v TEST-1, PR #229; REDIZAJN formulára a zoradenia
-  patrí do bloku KOVANIE.)*
-- **D-111 · Výber setu podľa výšky sokla je schovaný** (Michal 24.8., prvý test v0.8.0) — predvoľba, ktorý set kovania sa použije podľa výšky sokla, žije v **Predvoľbách projektu** v sekcii Kovanie. Je to nastavenie, ktoré človek hľadá pri **vkladaní skrinky**, nie v katalógu — dnes ho nájde len ten, kto vie, že tam je. *(UX, blok KOVANIE.)*
-
 ## KONTROLA + VÝROBA
 
 - **D-94 · Traceability v celkovom súpise kovania — rozklik položky na miesta použitia** (Michal 9.8., test kovania na reálnej zákazke) — nákupný zoznam v okne Výroba povie „357695 × 12", ale nie
@@ -73,6 +65,15 @@ zaradenie priamo v texte položky.)*
   cenový režim · **rodina dokumentov** okolo ponuky (ponuka 3D vizualizácií, preberací protokol). *(Piaty kus tej istej odkladovej sady — EN DANIELI textový export — je v skupine KONTROLA + VÝROBA.)*
   *Stav: čaká na prax — vytiahne sa, keď si to reálna zákazka vypýta.*
 - **D-10 · Presúvanie/úprava čiel priamo v náhľade** (ako drag priečok). *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
+- **Kovanie — z prvého testu v0.8.0 (Michal 24.8.), v PLANe blok 4 „redizajn katalógu a setov":**
+- **D-109 · Pomer člena setu „1 ks na N nôh"** (Michal 24.8., prvý test v0.8.0) — set kovania vie dnes počítať člena len **per unit** (na kus) alebo **per owner** (na skrinku). Chýba pomer typu „**1
+  príchyt sokla na 4 nohy**": pri príchytoch soklovej lišty sa počet neviaže na skrinku ani na jednotlivú nohu, ale na ich **počet**. Dnes sa to musí dopočítať ručne — a práve to má set robiť za
+  človeka. *(Nefixované v TEST-1: mení dátový model setu, patrí do bloku KOVANIE.)*
+- **D-110 · Pridávanie kovaní je neprehľadné** (Michal 24.8., prvý test v0.8.0) — formulár novej položky je **dole pod zoznamom**, poradie polí nezodpovedá tomu, ako človek údaje prepisuje z
+  dodávateľského listu, a po uložení sa položka stratí v zozname. *(Časť — aby nová položka bola hneď vidieť a orezanie zoznamu sa priznalo — vyriešená v TEST-1, PR #229; REDIZAJN formulára a zoradenia
+  patrí do bloku KOVANIE.)*
+- **D-111 · Výber setu podľa výšky sokla je schovaný** (Michal 24.8., prvý test v0.8.0) — predvoľba, ktorý set kovania sa použije podľa výšky sokla, žije v **Predvoľbách projektu** v sekcii Kovanie. Je
+  to nastavenie, ktoré človek hľadá pri **vkladaní skrinky**, nie v katalógu — dnes ho nájde len ten, kto vie, že tam je. *(UX, blok KOVANIE.)*
 
 ## RENDER M-R
 

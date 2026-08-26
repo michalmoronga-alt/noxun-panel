@@ -42,8 +42,10 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
 - **[archiv/](archiv/)** — história a uzavreté rozhodnutia: [KRONIKA.md](archiv/KRONIKA.md)
   (záznam každej dávky), [ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md) (plné
   texty hotových blokov a etáp), [DOGFOODING_vyriesene.md](archiv/DOGFOODING_vyriesene.md)
-  (index + plné texty vyriešených D-čísel), staršie analýzy a vízie. Archív je
-  **append-only** — nič sa v ňom neprepisuje.
+  (index + plné texty vyriešených D-čísel), staršie analýzy a vízie. V archíve sa
+  **existujúce záznamy neprepisujú** — pribúdať však pribúda priebežne, presne ako káže
+  checklist uzáveru v CLAUDE.md: záznam dávky navrch KRONIKY, vyriešené D-číslo navrch
+  indexu v DOGFOODING_vyriesene.md, hotový blok plným textom do ROADMAP_hotove_etapy.md.
 
 ## Pravidlá — strážené guardmi
 

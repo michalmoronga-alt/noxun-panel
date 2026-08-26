@@ -76,7 +76,8 @@ end
 # Slovnik repa pozna obe slova, preto sa chytaju obe — a case-insensitive, lebo nadpisy
 # ich pisu raz verzalkami, raz normalne. Hranica je ZACIATOK SLOVA (rovnaky idiom ako
 # NX_DOG_DONE_RE nizsie): "nehotove" je opak a v plane je legitimne (review #233 P2).
-NX_PLAN_DONE_RE = /(?<![[:alpha:]])(?:hotov[éeo]|komplet)|✅/.freeze
+# Chyta sa cela rodina tvarov hotov- (HOTOVE/HOTOVO/HOTOVA/HOTOVY — review #233 kolo 4).
+NX_PLAN_DONE_RE = /(?<![[:alpha:]])(?:hotov[áéeoý]|komplet)|✅/.freeze
 NxTest.test('docs: PLAN.md nema nadpis hotoveho bloku (KOMPLET / HOTOVE / fajka)') do
   path = File.join(NxTest::ROOT, 'SYSTEM', 'PLAN.md')
   offenders = File.read(path, encoding: 'UTF-8').lines.map(&:rstrip).select do |l|
