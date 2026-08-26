@@ -24,14 +24,8 @@ vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
 ## Robí sa
 
-**BLOK DOCS CLEANUP — upratovanie dokumentácie.** Docs sú pamäť agentov; cieľom je, aby mal každý živý dokument JEDNU rolu, história bola v archíve a pravidlá strážili guardy.
-Správanie pluginu sa nemení — dávka B však siahla na **jeden komentár v `ui/js/studio.js`** (odkaz na presunutý dokument), takže podľa pravidiel repa nesie **bump patch v0.8.3 → v0.8.4** aj prepis všetkých `?v=`.
-
-- **A — HOTOVÁ** (PR **#232**, 26.8.): mapa modulov sa rozdelila z jedného 260 kB súboru do `docs/architecture/` (6 tematických súborov, rozcestník ostal v `docs/ARCHITEKTURA.md`). Nové guardy: **žiadny riadok nad 400 znakov** a **pokrytie modulov** — každý ruby modul `core/`, `modules/` aj `ui/` musí mať vlastný nadpis `### <meno>.rb`, riadok v tabuľke rozcestníka a jednoznačné meno súboru.
-- **B — TÁTO DÁVKA** (26.8.): to isté upratanie pre `SYSTEM/` — nová mapa autorít [README.md](README.md), STAV prepísaný nakrátko, hotový blok UI 2.0 a index vyriešených
-  D-čísel do archívu, vízie do archívu, koncepty v `zdroje/next_sessions/` označené statusom, guardy rozšírené (veľkosť STAV, dĺžka riadku, „hotové veci patria do archívu").
-  **v0.8.4** — bump si vyžiadala oprava jedného komentára v `studio.js` z review kola 2.
-- **C — NASLEDUJE:** refresh [STANDARD.md](STANDARD.md) (má ešte dlhé riadky, preto sa do guardu dĺžky pridáva až dávkou C).
+**Nič nebeží — čaká sa na Michalov pokyn, ktorým blokom sa pokračuje** ([PLAN.md](PLAN.md)).
+Posledný uzavretý blok bol **Docs cleanup** (posledný PR **#234**); správanie pluginu sa ním nemenilo, verzia ostáva **v0.8.4**.
 
 ## Ďalší krok
 
@@ -42,7 +36,8 @@ Správanie pluginu sa nemení — dávka B však siahla na **jeden komentár v `
 
 ## Posledné uzávery
 
-- **Docs cleanup A — mapa modulov rozdelená na 6 súborov** + guardy dĺžky riadku a pokrytia modulov — PR **#232** (26.8.), bez zmeny kódu pluginu
+- **BLOK DOCS CLEANUP KOMPLET (26.8.)** — **C: refresh STANDARD.md** (zastarané tvrdenia opravené proti kódu, reflow, guard dĺžky bez výnimiek) PR **#234**, bez zmeny kódu pluginu ·
+  **B: upratané `SYSTEM/`** (mapa autorít, archív, guardy) PR **#233**, v0.8.4 · **A: mapa modulov rozdelená na 6 súborov** + guardy dĺžky riadku a pokrytia modulov PR **#232**
 - **PICKER-2 — riadok je dekor, hrúbka je čip** (zoskupenie v rámci rovnakého typu dosky, predvoľba podľa kontextu, duplák nikdy sám) — PR **#231**, v0.8.3 · pred ním **PICKER-1 — jeden vyhľadávač aj v Predvoľbách projektu** — PR **#230**, v0.8.2 (25.8.)
 - **TEST-1 — prvé nálezy z testu v0.8.0 naostro** (nová položka katalógu je hneď vidieť, orezanie zoznamu sa priznáva číslom, vysvetlivka úchytiek podľa roly) — PR **#229**, v0.8.1 (24.8.)
 - **ŠT-4b — UZÁVER FÁZY ŠTÚDIO** (docs + minor bump **v0.8.0**, plný uzáver fázy v KRONIKE, PLAN blok 1b s dlhmi) — PR **#228** (24.8.)

@@ -66,9 +66,8 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
   Nahradený text ide odsekom navrch „Záznamy dávok" v `archiv/KRONIKA.md`.
 - **Žiadny riadok nad 400 znakov** v živých docs — jeden odsek na jednom obrom riadku
   znamená nečitateľný diff a nemožné review. (Archív a zdroje sa nestrážia.)
-  **Dočasná výnimka:** [STANDARD.md](STANDARD.md) (20 dlhých riadkov) a
-  [POJMY.md](POJMY.md) (22) v guarde zatiaľ **nie sú** — reflow v **dávke C
-  (STANDARD refresh)**, potom sa oba pridajú do zoznamu.
+  Platí na **všetky** živé dokumenty vrátane [STANDARD.md](STANDARD.md) a [POJMY.md](POJMY.md).
+
 ## Pravidlá — procesné (guard ich NEstráži)
 
 *(Nedajú sa overiť testom — drží ich dohoda a review. Nepredstieraj, že ich niečo stráži.)*
