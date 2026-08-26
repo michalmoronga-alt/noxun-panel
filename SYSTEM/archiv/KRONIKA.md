@@ -49,7 +49,9 @@
   JSON príklad `kind: module` (§2.5) ďalej perzistoval polia `"overlay": "full"` a `"gap_between": 3.0`, ktoré §5.3 vyhlasuje za neexistujúce. Overené v kóde — `gap_between`
   nie je v `noxun_engine/` ani v testoch nikde, `overlay` existuje len ako `back_mode` chrbta a ako `Sketchup::Overlay`; `modules/fronts.rb` pozná len `gap`/`gap_top`/
   `gap_bottom`/`gap_sides`. Obe polia sú preto z príkladu **vyhodené** (entita `kind: module` je aj tak rezervovaná, žiadne dáta sa nemenia). Namiesto zrušeného sľubu
-  „doplnia sa pri kovaní, viď sekcia 12" nesie §6.2 riadok **„Prekrytie čiel (`overlay`) určí typ pántu — pribudne s fázou kovania 2"** a §5.3 naň odkazuje.
+  „doplnia sa pri kovaní, viď sekcia 12" nesie §6.2 vlastný riadok o prekrytí a §5.3 naň odkazuje. Jeho znenie opravilo **review kolo 2**: prvá verzia sľubovala
+  „pribudne s **fázou kovania 2**", lenže taký milník už neexistuje — fáza kovania 2 je hotová. Kontrakt preto hovorí len **„dnes neimplementované, pribudne
+  s budúcou prácou na kovaní"** a **zaradenie do bloku výslovne necháva na [PLAN.md](../PLAN.md)** — poradie a rozsah práce určuje Michal, nie štandard.
   Codex kolo 3 našlo **rovnaký rozpor aj v kanonickom príklade zóny** (§2.5): perzistoval `"modules": ["CAB-014-M1"]` a nemal `shelves`, hoci §5.1 hovorí opak.
   Príklad je zrovnaný so živou schémou `Zones.zone_config_from_flat` — pribudlo `"shelves": 1` (kľúč, z ktorého sa odvodzuje `state: "occupied"`), `modules` je `[]`
   a do `allowed_modules` pribudol chýbajúci `divider_v` (kód ich vydáva päť). Pôvodný tvar príkladu: `"allowed_modules": ["shelf", "divider_h", "drawer_block", "front_door"]`,
