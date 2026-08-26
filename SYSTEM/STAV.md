@@ -24,27 +24,20 @@ vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
 ## Robí sa
 
-**BLOK DOCS CLEANUP JE KOMPLET** (A **#232** · B **#233** · C — tento PR, 26.8.). Docs sú pamäť agentov; každý živý dokument má teraz JEDNU rolu, história žije v archíve a pravidlá strážia guardy.
-
-- **A** — mapa modulov sa rozdelila z jedného 260 kB súboru do `docs/architecture/` (6 tematických súborov, rozcestník ostal v `docs/ARCHITEKTURA.md`) + guardy dĺžky riadku a pokrytia modulov.
-- **B** — to isté pre `SYSTEM/`: mapa autorít [README.md](README.md), STAV nakrátko, hotové bloky a index vyriešených D-čísel do archívu, koncepty so statusom. **v0.8.4** (oprava komentára v `studio.js`).
-- **C** — **obsahový refresh [STANDARD.md](STANDARD.md):** kontrakt hovorí, ČO PLATÍ DNES. Opravené zastarané tvrdenia (ceny — rozpočet aj cenová ponuka existujú;
-  `role_key` je živý kompatibilitný alias, nie proroctvo o zániku; zaniknuté okná nahradené sekciami Štúdia), rozhodnuté „otvorené body" vyriešené, stav implementácie prepísaný
-  na bezčasové pravidlá. Reflow STANDARD + POJMY (žiadny riadok nad 400 znakov) a **koniec výnimiek** — guard dĺžky platí na všetky živé docs. **Bez zmeny kódu, teda bez bumpu.**
-  Podrobný zoznam zmien v kontrakte: záznam „Docs cleanup C" v [archiv/KRONIKA.md](archiv/KRONIKA.md).
+**Nič nebeží — čaká sa na Michalov pokyn, ktorým blokom sa pokračuje** ([PLAN.md](PLAN.md)).
+Posledný uzavretý blok bol **Docs cleanup** (posledný PR **#234**); správanie pluginu sa ním nemenilo, verzia ostáva **v0.8.4**.
 
 ## Ďalší krok
 
 **MICHAL VEČER — najprv INSTALL z čerstvého mainu** (`INSTALL_noxun_engine.ps1`), potom test. Netestovaných je **PICKER-2** (PR #231 — jeden riadok na dekor, hrúbky ako čipy, duplák len vedomým klikom) a **8 dávok fázy ŠTÚDIO** (#220 … #227).
 **Plné testovacie checklisty ku každej z nich sú v [archiv/KRONIKA.md](archiv/KRONIKA.md)** (záznam „Docs cleanup B", sekcia prenesených checklistov) — sem sa už nekopírujú, aby STAV ostal krátky.
 
-**Ďalší blok podľa [PLAN.md](PLAN.md) čaká na Michalovo „štartuj": stabilizačná revízia** (blok 1b — dlhy fázy ŠTÚDIO; od začiatku produkcie naostro sa ešte nekonala).
-Popri nej: dorobenie vyhľadávača **PICKER-3** (osem nálezov z kola 3 review #231, z toho bod E je návrhová zmena) · potom blok **KOVANIE** (D-109 · D-110 · D-111 z prvého testu v0.8.0).
+**Potom podľa [PLAN.md](PLAN.md):** dorobenie vyhľadávača **PICKER-3** (osem nálezov z kola 3 review #231, z toho bod E je návrhová zmena) · **stabilizačná revízia** (blok 1b — dlhy fázy ŠTÚDIO; od začiatku produkcie naostro sa ešte nekonala) · potom blok **KOVANIE** (D-109 · D-110 · D-111 z prvého testu v0.8.0).
 
 ## Posledné uzávery
 
-- **Docs cleanup C — refresh STANDARD.md** (zastarané tvrdenia opravené proti kódu, reflow, guard dĺžky bez výnimiek) — tento PR (26.8.), bez zmeny kódu pluginu
-- **Docs cleanup B — upratané `SYSTEM/`** (mapa autorít, archív, guardy) — PR **#233**, v0.8.4 · **Docs cleanup A — mapa modulov rozdelená na 6 súborov** + guardy — PR **#232** (26.8.)
+- **BLOK DOCS CLEANUP KOMPLET (26.8.)** — **C: refresh STANDARD.md** (zastarané tvrdenia opravené proti kódu, reflow, guard dĺžky bez výnimiek) PR **#234**, bez zmeny kódu pluginu ·
+  **B: upratané `SYSTEM/`** (mapa autorít, archív, guardy) PR **#233**, v0.8.4 · **A: mapa modulov rozdelená na 6 súborov** + guardy dĺžky riadku a pokrytia modulov PR **#232**
 - **PICKER-2 — riadok je dekor, hrúbka je čip** (zoskupenie v rámci rovnakého typu dosky, predvoľba podľa kontextu, duplák nikdy sám) — PR **#231**, v0.8.3 · pred ním **PICKER-1 — jeden vyhľadávač aj v Predvoľbách projektu** — PR **#230**, v0.8.2 (25.8.)
 - **TEST-1 — prvé nálezy z testu v0.8.0 naostro** (nová položka katalógu je hneď vidieť, orezanie zoznamu sa priznáva číslom, vysvetlivka úchytiek podľa roly) — PR **#229**, v0.8.1 (24.8.)
 - **ŠT-4b — UZÁVER FÁZY ŠTÚDIO** (docs + minor bump **v0.8.0**, plný uzáver fázy v KRONIKE, PLAN blok 1b s dlhmi) — PR **#228** (24.8.)

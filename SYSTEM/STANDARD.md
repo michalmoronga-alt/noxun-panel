@@ -82,7 +82,7 @@ Základný layout (ploché kľúče, čítané často):
 | `manufactured` | Bool | ide do výroby? (explicitne, nie podľa typu entity) |
 | `production_class` | String | `sheet` / `linear` / `counted` / `reference` / `none` (viď sekcia 8) |
 | `name` | String | ľudský názov dielca („Bok ľavý") — kusovník a VEPO čítajú názov odtiaľto, nie z `config` |
-| `role_key` | String | kompatibilitný alias `part_key` — buildery ho zapisujú s rovnakou hodnotou a čítacia cesta ho berie ako fallback pre staršie modely; kanonická identita je `part_key` |
+| `role_key` | String | kompatibilitný alias `part_key` — buildery korpusu ho zapisujú s rovnakou hodnotou (doska ho nepíše), čítacia cesta ho berie ako fallback pre staršie modely a jeho meno nesie aj legacy UI protokol; kanonická identita je `part_key` |
 | `config` | JSON string | celá konfigurácia entity (rozmery, konštrukcia, zóny, hrany, materiál…) |
 
 Zložité veci (rozmery + konštrukcia korpusu, zoznam hrán dielca, delenie čiel) žijú v `config` ako JSON string. Dôvod: SketchUp dictionary je plochý kľúč→hodnota; JSON je jediný spoľahlivý spôsob, ako niesť vnorenú štruktúru bez desiatok kľúčov.
@@ -190,8 +190,7 @@ gola_profile · hinge · slide · leg · handle · shelf_pin · connector · fre
   "config": {
     "zone_id": "CAB-014-Z1",
     "wings": 2,
-    "overlay": "full",
-    "gap_top": 2.0, "gap_bottom": 2.0, "gap_between": 3.0,
+    "gap_top": 2.0, "gap_bottom": 2.0,
     "handle": "gola",
     "opening": "left_right",
     "parts": ["CAB-014-DOOR-L", "CAB-014-DOOR-R"],
@@ -332,7 +331,7 @@ Zóna nesie `allowed_modules` — čo do nej smie. Modul pri vklade dostane rozm
 
 `auto` čelá si rovnomerne rozdelia zvyšnú výšku; `wings: "auto"` = 2 krídla nad 600 mm šírky otvoru.
 **Škáry sú konfigurovateľné** (`gap` medzi čelami, `gap_top`/`gap_bottom`/`gap_sides` po obvode).
-Prekrytie korpusu (`overlay`) ani odlišná škára medzi krídlami (`gap_between`) v konfigurácii čiel **nie sú** — prekrytie určuje typ pántu, preto patria k pravidlám kovania (sekcia 6).
+Prekrytie korpusu (`overlay`) ani odlišná škára medzi krídlami (`gap_between`) v konfigurácii čiel **nie sú** — prekrytie určuje typ pántu, preto **pribudnú s fázou kovania 2** (viď 6.2).
 
 `items[].type` nadobúda `door` · `drawer_front` · `none` (D-18 „Bez čela"): riadok `none` drží výšku v rade presne ako čelo (fixed/auto/lock, rovnaká matematika),
 ale panel sa negeneruje = otvorená nika v rade čiel.
@@ -412,6 +411,9 @@ Globálna knižnica `%APPDATA%\NOXUN\Engine\hardware_rules.json` je len default 
 
 **Fáza 2 — mapovanie na konkrétny katalógový kód.** Na konci projektu (alebo raz v nastaveniach) sa flag `hinge` namapuje na konkrétny kód (`Blum 71B3550`). **Mapovanie sa ukladá a nabudúce prebehne automaticky.**
 
+**Prekrytie čiel (`overlay`) určí typ pántu — pribudne s fázou kovania 2.** Dovtedy ho konfigurácia čiel nenesie (5.3): prekrytie korpusu je dôsledok zvoleného kovania,
+nie samostatné nastavenie čela, a rovnakou cestou príde aj odlišná škára medzi krídlami (`gap_between`).
+
 ### 6.3 Fyzická reprezentácia: 1 generický objekt + virtuálne varianty
 
 - V modeli je **najviac 1 generický fyzický objekt na kategóriu** (`hinge`, `slide`, `leg`) — slúži na vizuál, pozíciu a ako základ budúcich vylepšení.
@@ -421,7 +423,7 @@ Globálna knižnica `%APPDATA%\NOXUN\Engine\hardware_rules.json` je len default 
 **Generický objekt = vizuálna PROXY:** entita nesie `kind: hardware`, ale `production_class: "none"` a `manufactured: false` (+ `config.proxy: true`).
 **Zdroj pravdy súpisu kovania je výhradne `config.hardware[]` korpusu** — závesy a výsuvy geometriu nemajú vôbec, takže počty musia mať jeden domov;
 keby proxy niesla `counted/true`, kusovník iterujúci entity by kategórie s vizuálom započítal druhýkrát.
-(Príklad `counted/true` entity v 8.2 platí pre samostatné hardware entity bez proxy vzťahu — proxy ňou nikdy nie je.)
+(Príklad `counted/true` entity v 8.2 platí pre samostatné hardware entity bez proxy vzťahu — proxy ňou nikdy nie je; dnes ju nič nevytvára.)
 
 **Vŕtanie a presné pozície kovania sú MIMO scope V1** — riešia sa len počty, typy a kódy.
 
@@ -662,9 +664,13 @@ Každý plošný dielec nesie hrany **per strana** ako dáta (nezávislé od viz
 - Výnimky pravidlami: hrúbka < prah → nič; rola v zozname výnimiek → nič.
 - Ručný override per dielec vždy víťazí.
 
+Vykonateľná podoba pravidiel ABS (defaulty rolí, resolver obchodnej hrúbky, picker šírky): [`core/abs_rules.rb`](../noxun_engine/core/abs_rules.rb).
+
 > **Priradenie strán L1/L2/W1/W2 na plochy kvádra dielca sa NIKDY neodvodzuje z hodnôt rozmerov** (dva rovnaké rozmery sú nerozhodnuteľné) — je to explicitný údaj deskriptora
 > `axes: { length:, width:, thickness: }`, ktorý zapisuje ten, kto box stavia. Keď osi chýbajú alebo nesedia s rozmermi, mapovanie sa **neháda** (radšej žiadna farba než farba na zlej hrane).
-> Vykonateľná podoba kontraktu: [`noxun_engine/core/part_faces.rb`](../noxun_engine/core/part_faces.rb).
+> **Vedomá legacy výnimka (D-104):** deskriptor s osami žije len v pláne, na entite uložený nie je — kontrola olepov nad **už postavenou** zákazkou preto osi odvodí
+> z **ROLY** dielca a overí ich proti skutočnému kvádru; platí **výhradne jednoznačná zhoda** (nula alebo dve zhody = `nil` a dielec sa nezvýrazní), takže to nie je
+> zakázané hádanie z hodnôt rozmerov. Vykonateľná podoba kontraktu: [`noxun_engine/core/part_faces.rb`](../noxun_engine/core/part_faces.rb).
 
 ### 7.6 ABS vizuálny režim (samostatný modul)
 
@@ -894,8 +900,8 @@ Možnosti:
 - **Súpis ABS** — podľa ABS variantu, dĺžka v **bm**.
 - **Súpis kovania** — podľa katalógového kódu, počet **ks** (z flagov → mapovanie fáza 2).
 - **Celkový sumár** — kusovník + m² + bm + ks + súčet cien materiálu/ABS/kovania.
-- **Rozpočet zákazky** — materiál, ABS, kovanie, **služby** (olepovanie, porez, lepenie duplákov, opracovanie PD, montáž — množstvá počíta engine zo sadzieb dodávateľa),
-  štandardné koncové riadky s násobkom, vlastné položky, spotrebiče a zaokrúhlenie konečnej sumy.
+- **Rozpočet zákazky** — materiál, ABS, kovanie, **služby** (olepovanie, porez, lepenie duplákov, opracovanie PD, montáž — množstvá počíta engine z kusovníka
+  a odhadu platní, ceny berie zo sadzieb dodávateľa), štandardné koncové riadky s násobkom, vlastné položky, spotrebiče a zaokrúhlenie konečnej sumy.
 - **Cenová ponuka pre zákazníka** — pohľad NAD rozpočtom, nie druhý výpočet.
 - **VEPO CSV** — presne podľa `VEPO_KONTRAKT.md` (stĺpce `nazov;dlzka;hrana_pozdlz;sirka;hrana_naprieč;hrubka;pocet_ks;material`, oddeľovač `;`, úvodzovky, `—`/`=` kódy hrán dopočítané z L1/L2/W1/W2, normalizácia hrúbok 18/36, slug názvy súborov `<projekt>_<material>_<hrubka>.csv`). Priamo z dielcov, **bez OCL medzikroku**.
 
@@ -903,9 +909,10 @@ Možnosti:
 
 - **Autorita výpočtu je rozpočet.** Je to čistá funkcia (BOM + katalógy + stav zákazky + nastavenia dodávateľa → payload); UI ju len zobrazuje a export ju číta 1:1 —
   **žiadny klient si nič neprepočítava.** Vykonateľná podoba: [`core/budget.rb`](../noxun_engine/core/budget.rb) + sadzby a režimy [`core/supplier_settings.rb`](../noxun_engine/core/supplier_settings.rb).
-- **Cenová ponuka je VIEW nad hotovým payloadom rozpočtu** — jej súčet sa **na cent rovná** súčtu rozpočtu (dorovnávací riadok „nábytková zostava" je automatický zvyšok),
-  do zákazníckeho dokumentu idú len whitelistované polia a interné pojmy (sadzby, €/bm, počty platní, nákupné kódy, `material_id`) sa doň **nikdy** nedostanú.
-  Vykonateľná podoba: [`core/cp_export.rb`](../noxun_engine/core/cp_export.rb).
+- **Cenová ponuka je VIEW nad hotovým payloadom rozpočtu** — jej súčet sa **na cent rovná** súčtu rozpočtu (dorovnávací riadok „nábytková zostava" je automatický zvyšok).
+  Proti interným pojmom (sadzby, €/bm, počty platní, nákupné kódy, `material_id`) stojí **trojvrstvová obrana**: do dokumentu idú len whitelistované polia
+  a `clean_label` odstráni kódy a ID-podobné tokeny; hotový hárok ešte prejde blocklistom, ale ten nález **hlási a neblokuje** (rovnaký kontrakt ako KONTROLA pri VEPO) —
+  ručne napísaný text s interným pojmom teda prejde a ohlási sa v statuse a logu. Vykonateľná podoba: [`core/cp_export.rb`](../noxun_engine/core/cp_export.rb).
 - **Sadzby sa do zákazky NEMRAZIA** — rozpočet je pohyblivý obraz cien, nie výrobný snapshot. V modeli žijú len veci per zákazka (režim, overridy, násobky, vlastné položky); sadzby sú globálne nastavenie dodávateľa.
 - **DPH sa nepripočítava.** Firma je neplatca, katalógové ceny sú konečné a prepočet „bez DPH" je len zobrazenie, nikdy základ výpočtu.
 - **Neznáma cena sa NIKDY nenahradí nulou** — riadok ju prizná, medzisúčet je len zo známych cien a súhrn nahlas povie, že nie je úplný.
