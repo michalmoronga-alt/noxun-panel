@@ -10,31 +10,8 @@ je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md). Čísla o
 blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
 
 **Poradie najbližších blokov (rozhodol Michal 26.8.2026, po veľkom teste v0.8.4):**
-**PICKER-3 → 1b STABILIZAČNÁ REVÍZIA → GHOST VKLADANIE → KOVANIE** (pred KOVANÍM USER-debata o setoch).
-
-### PICKER-3 · dorobenie vyhľadávača materiálov
-
-**Odčlenené z PR #231 podľa pravidla 3 kôl (25.8.)** — kolo 3 Codex review prinieslo osem
-vecných nálezov; **ship-blockery sa opravili v #231**, zvyšok je tu. Dôvod rezu: bod **E**
-je **návrhová zmena** (kontext výberu má radiť aj riadky medzi sebou), a tá si zaslúži
-vlastný návrh + review, nie ďalšiu iteráciu v dobiehajúcom PR — doťahovačky idú s ňou,
-aby sa okruh riešil naraz. Poradie určí Michal; nič z toho nie je blokujúce (vyhľadávač je
-použiteľný), ale všetko je pomenované, aby sa to nestratilo.
-
-- **A · Virtuálne dupláky v kontexte menovky riadku** (`noxun_engine/ui/panel/payloads.rb`, comment **3848691739**, P2). Kontext `row_fam_ctx` vidí len `Materials.sheets`, takže rodinu s jednou
-  kúpenou hrúbkou plus virtuálnou ponukou `duplak2:` označí za jednovariantnú a server pošle menovku „Dekor · DTDL 18 mm". Klient potom na ten istý riadok pridá čip `36 duplák` — a po jeho výbere
-  menovka riadku ďalej tvrdí 18 mm. Fix: postaviť kontext s virtuálnymi variantmi, alebo hrúbku v menovke potlačiť vždy, keď riadok čipy dostane.
-- **B · Normalizovať VŠETKY zložky kľúča rodiny** (`noxun_engine/core/materials.rb`, comment **3848691741**, P2). Kanonická je zatiaľ len skupinová časť; `decor`, `structure`, `type` a prípona idú v
-  surovom orezanom tvare. Katalógový kontrakt pritom identity typu a štruktúry porovnáva **bez ohľadu na veľkosť písmen**, takže `DTDL`/`dtdl` alebo `ST9`/`st9` dostanú rôzne kľúče a dekor sa v ponuke
-  zjaví ako **dva riadky**. Fix: skladať rodinu z normalizovaných zložiek (ideálne z kanonickej identity dosky bez hrúbky).
-- **C · Dotaz „54 duplák" musí trafiť SVOJ duplák** (`noxun_engine/ui/js/nx_combo.js`, comment **3848691744**, P2). Keď má rodina duplák ×2 aj ×3, slovo „duplák" v dotaze vráti **prvý** duplák (spravidla 36 mm) ešte pred prečítaním čísla. Riadok sa nájde, ale Enter vloží iný duplák, než dotaz menoval. Fix: pri slovnom dotaze najprv hľadať zhodu hrúbky medzi duplákmi a až potom padať na prvý.
-- **D · Dôvod nedostupného čipu aj z KLÁVESNICE** (`noxun_engine/ui/js/nx_combo.js`, comment **3848691758**, P2). Po prechode na `aria-disabled` je čip fokusovateľný, ale jediná klávesová cesta (šípky
-  vľavo/vpravo) nedostupné varianty **preskakuje** a `Tab` ponuku zatvára — človek od klávesnice sa teda k vysvetleniu, ktoré myš dostane klikom, nedostane. Fix: pustiť fokus do tlačidiel čipov, alebo
-  dať klávesovú akciu, ktorá na nedostupnom čipe zastane a dôvod oznámi.
-- **E · KONTEXT VÝBERU MÁ RADIŤ AJ RIADKY (návrhová zmena)** (`noxun_engine/ui/js/nx_combo.js`, comment **3848691761**, P2 — vecne najväčší). Kontext (`back` → 3 mm, `worktop` → 38) sa dnes uplatňuje
-  **vnútri** už rozdelenej rodiny, takže nevie uprednostniť riadok HDF 3 pred riadkom DTDL 18 toho istého dekoru. V Štúdiu je `md_back` naplnený **všetkými** doskami bez zakázania nechrbtových
-  variantov: po napísaní dekoru je prvý zhodný riadok spravidla DTDL, jeho predvoľba je 18 mm a Enter ju vloží — hoci kontext „chrbát" sľubuje HDF 3. Fix: kontext musí riadky **radiť alebo filtrovať**
-  predtým, než sa vyberie aktívny riadok, nielen hľadať 3 mm vnútri každého z nich.
+**1b STABILIZAČNÁ REVÍZIA → GHOST VKLADANIE → KOVANIE** (pred KOVANÍM USER-debata o setoch).
+*(Blok **PICKER-3** je hotový — v0.8.5, 26.8.2026; plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok v [archiv/KRONIKA.md](archiv/KRONIKA.md).)*
 
 ### 1b · STABILIZAČNÁ REVÍZIA (dlhy fázy ŠTÚDIO — pred blokom KOVANIE)
 

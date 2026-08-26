@@ -17,6 +17,32 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **PICKER-3 — DOROBENIE VYHĽADÁVAČA MATERIÁLOV (26.8.2026):** vetva `fix/picker3`, **v0.8.4 → v0.8.5**. Uzatvára päť nálezov, ktoré review #231 (kolo 3) našlo a ktoré sa **odčlenili
+  podľa pravidla 3 kôl** — nie preto, že by boli malé, ale preto, že bod E je návrhová zmena a zaslúžil si vlastné review. **Bump je PATCH, nie minor: PICKER-3 je dočistenie PR
+  #231 vyčlenené procesným rezom, nie etapa.** Serverová strana (`core/materials.rb`, `ui/panel/payloads.rb`): **(A) kontext dekorových menoviek vidí aj VIRTUÁLNE dupláky** —
+  `Materials.row_family_ctx` čítal len `Materials.sheets`, takže rodina s jednou kúpenou hrúbkou a ponukou „(duplák ×2)" platila za jednovariantnú a menovka riadku tvrdila
+  „… 18 mm", hoci riadok dostal druhý čip a po jeho výbere vložil 36 mm; nový parameter `virtual:` (pole `[zdroj, hrúbka]`) berie panel z **tej istej autority ako `duplak_offers`**
+  (`duplak_offer_sources(2)`), aby sa dva zdroje nemohli rozísť. *Zamietnutá alternatíva „potlač hrúbku vždy, keď riadok dostane čipy": server nevie, ktoré varianty v konkrétnom
+  selecte prežijú hrúbkové filtre D-45, takže by o tom musel rozhodovať klient orezávaním serverového textu — presný opak kontraktu „hranicu určuje katalóg".* **(B) kľúč
+  variantovej rodiny sa skladá z KANONICKÝCH zložiek** — kanonická bola len skupinová časť, kým dekor, štruktúra, typ a prípona formátu/rubu išli v surovom orezanom tvare; katalóg
+  pritom typ aj štruktúru porovnáva case-insensitive, takže `DTDL`/`dtdl` a `ST9`/`st9` dostali rôzne kľúče a jeden dekor sa v ponuke rozpadol na dva riadky s rovnakou menovkou.
+  Skupinová časť ostáva **presne kanonická** (`record_group_key` aj so symbolovými značkami): v SCHEMA 1 je surový dekor súčasťou katalógovej identity, takže normalizovať ho tam by
+  zlúčilo to, čo katalóg drží oddelene. Klientska strana (`ui/js/nx_combo.js`): **(C) „54 duplák" trafí SVOJ duplák** — slovo sa čítalo skôr než číslo, takže rodina s duplákom ×2
+  aj ×3 vrátila vždy prvý (36) a Enter vložil iný materiál za iné peniaze; pri slovnom dotaze sa teraz najprv hľadá zhoda hrúbky medzi duplákmi. **(D) dôvod nedostupného čipu je
+  dosiahnuteľný aj z KLÁVESNICE** — šípky ho ticho preskakovali a `Tab` ponuku zatvára, takže človek od klávesnice sa k vysvetleniu, ktoré myš dostane klikom, nedostal vôbec; prvé
+  stlačenie na nedostupnom čipe **zastane a dôvod oznámi** (hláška je `role="status" aria-live="polite"`), druhé v tom istom smere pokračuje — zastavenie bez pokračovania by bolo
+  zaseknutie. **(E) KONTEXT VÝBERU RADÍ AJ RIADKY** (návrhová zmena): kontext (`back` → 3 mm, `worktop` → 38) sa dovtedy uplatňoval len vnútri už rozdelenej rodiny, takže
+  v Štúdiu (`md_back` je naplnený všetkými doskami) po napísaní dekoru vyhral riadok DTDL a Enter vložil 18 mm chrbát. Riešenie má dve časti: **stabilné radenie** riadkov s
+  kontextovou hrúbkou navrch (beží pred delením na sekcie, takže sa uplatní vnútri každej z nich a členstvo v „Použité v projekte" sa nemení) a **kurzorové pravidlo** „riadok
+  s hrúbkou, ktorú dotaz MENUJE → riadok podľa kontextu → prvý vyberateľný" — samotné radenie by nestačilo, lebo sekcie „Použité v projekte" a „Naposledy použité" stoja nad
+  katalógom. *Zamietnuté: FILTROVAŤ nekontextové riadky — 18 mm chrbát je nezvyklý, nie zakázaný, a filter by legitímnu voľbu schoval (v tomto repe semafor varuje, nikdy
+  neblokuje).* Prvý stupeň kurzora sa pýta **dát, nie tvaru dotazu**: číslo dekoru („K018", „H3303") hrúbku nemenuje, kým „18" so zhodným variantom áno — inak by kontext vypadol
+  pri každom kódovom dotaze. **Testy: 1915 headless** (nová sada `test_picker3_rodina.rb`) · **69 JS sád** (nové `test_picker3_kontext.js` a `test_picker3_kontext_dom.js`,
+  klávesová sekcia v `test_picker2_chips_dom.js` prepísaná na nové správanie); in-SketchUp beh sa nekonal — dávka nemá ani jednu modelovú zapisovaciu cestu. **Mutačne overené:
+  12 mutácií, každá zhodila práve svoj test** (vrátane DOM úrovne: čo Enter naozaj vloží v poli pre chrbát, a že dôvod nedostupného čipu prežije prekreslenie). Dve mutácie počas
+  práce **PRESLI** a vynútili si opravu: normalizácia prípony menovky nemala test (doplnený prípad rubu zásteny) a prvý návrh „výslovný dotaz vypína kontext úplne" sa dal zmutovať
+  bez pádu — pri rozbore sa ukázalo, že by dotaz „3" v poli pre chrbát zhoršil poradie, takže pravidlo prešlo do kurzora a globálny vypínač zanikol.
+
 - **VEĽKÝ TEST v0.8.4 + ROZHODNUTIA (26.8.2026 večer):** docs dávka bez zmeny kódu. **Michal otestoval naraz PICKER-2 (PR #231) a všetkých 8 dávok fázy ŠTÚDIO (#220–#227) podľa prenesených checklistov — VŠETKO PASS, žiadny nález**; vecne potvrdil aj defaulty „ABS podľa roly dielca" (sedia s reálnym olepovaním). Tým sú checklisty z veľkého testu uzavreté a v0.8.4 je nainštalovaná a overená naostro. **Rozhodnutia z toho istého sedenia (kolá 4–5):** **(1) Poradie blokov: PICKER-3 → 1b STABILIZAČNÁ REVÍZIA → GHOST VKLADANIE (V1-04, koncept 09 + 09A; pred implementáciou povinný finálny read-only audit) → KOVANIE** (pred ním USER-debata o setoch) — zapísané v PLAN aj STAV. **(2) ABS default zjednotený:** §8.3 už nehovorí doslovne „1,0 mm", ale „trieda jednotka" — presne ako §7.5; rozpor, ktorý dávka Docs cleanup C priznala ako otázku pre Michala, je rozhodnutý. **(3) §12 bod „C2 migračný most" ZAVRETÝ bez implementácie** — v kóde ani v PLANe niet stopy a DC sa prerobia na nový štandard. Pôvodné znenie bodu (kvôli histórii): *„existujúce DC childy (napr. Atira šuflíky) dočasne ako čierne skrinky (scale+redraw). Ich vnútorné `parent!` vzorce mimo pôvodnej skrinky nebežia — rozmery im dáva zóna (Ruby). Rozsah a trvanie mosta sa spresní pri prvej vlne childov."* Otvorené body §12 sú tým tri. **(4) Bod „resize s obsadenými zónami" ostáva otvorený** (min/max rady pre kovanie pribudnú s blokom KOVANIE). **(5) POJMY heslo „Semafor"** opravené na sekciu Kontrola v Štúdiu (okno Výroba zaniklo). **(6) Provenančné značky (V0.x, D-xx, K1…) v STANDARDe OSTÁVAJÚ** — sú to krížové odkazy do histórie, nie tvrdenia o stave; žiadny sweep sa nechystá.
 
 - **DOCS CLEANUP C — STANDARD HOVORÍ, ČO PLATÍ DNES (26.8.2026):** vetva `docs/standard-refresh`, **bez zmeny kódu pluginu, teda bez bumpu VERSION** (v0.8.4 ostáva).

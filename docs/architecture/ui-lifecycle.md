@@ -91,7 +91,8 @@ osirelý obal s tlačidlom a návrat by ten istý select obalil **druhýkrát** 
 prípona formátu a rubu; UNI záznamy dostávajú unikátny kľúč, teda sa nezlučujú vôbec) a posiela ju v oboch payloadoch ako **`row_key`** spolu s dekorovou menovkou **`row_label`**
 (`Panel.sheet_row_label` — to isté, čo nesie `sheet_label` pred časťou „· TYP hrúbka mm", vrátane výrobcu pri kolízii). Skupinovú časť kľúča dáva **kanonická `record_group_key`**,
 nie holé `group_id`: hybridný katalóg môže mať záznamy bez `group_id` a kanonický kľúč vtedy padá na dvojicu výrobca + dekor — s holým `group_id` by Egger 5981 a Kronospan 5981
-skončili v jednej rodine (review #231 kolo 2).
+skončili v jednej rodine (review #231 kolo 2). **Kanonické sú VŠETKY zložky kľúča, nielen skupinová** (PICKER-3): katalógový kontrakt porovnáva typ aj štruktúru bez ohľadu na
+veľkosť písmen, takže `DTDL`/`dtdl` a `ST9`/`st9` v surovom tvare dávali **dva riadky s rovnakou menovkou**. Detail kľúča žije v [materials.md](materials.md).
 
 Dekor + typ na hranicu **NESTAČÍ**: v SCHEMA 2 sa to isté číslo dekoru legálne opakuje u dvoch výrobcov, tá istá skupina má viac štruktúr a typy s formátom v identite (PD, zástena)
 sa líšia formátom alebo rubom — zlúčené by dali **dva čipy s rovnakou hrúbkou**, nerozlíšiteľné, s cudzou cenou aj povrchom (tá istá pasca, ktorej `sheet_label_suffix` predišiel v
@@ -101,7 +102,10 @@ labeloch, GH #95 P1). Bez `row_key` (starší payload) sa padá na dekor + typ. 
 identické meno — a jednovariantný riadok čipy vôbec nekreslí, takže by sa nedali odlíšiť. Rozhoduje o tom **`Materials.row_label_disambiguated`** nad kontextom
 `Materials.row_family_ctx` (postavený RAZ na payload, vzor `label_ctx`): pri kolízii dekorovej menovky pribudne **typ**, a **hrúbka len vtedy, keď ju riadok neukáže čipmi** (jediná
 v rodine) — pri viacerých by menovka klamala. Pravidlo žije v CORE, nie v okne: je to rozhodnutie nad celým katalógom (jeden záznam naň neodpovie) a klient ho spraviť **nemôže** —
-vidí vždy len to, čo je práve v selecte.
+vidí vždy len to, čo je práve v selecte. **Kontext počíta aj s VIRTUÁLNYMI duplákmi** (PICKER-3, parameter `virtual:` — panel ich berie z tej istej autority ako `duplak_offers`):
+ponuka `duplak2:` v `Materials.sheets` nie je, takže rodina s jednou kúpenou hrúbkou platila za jednovariantnú a menovka tvrdila „… 18 mm" aj potom, čo riadok dostal čip
+„36 duplák" a po jeho výbere vložil 36. *(Zvažovaná alternatíva „potlač hrúbku vždy, keď riadok dostane čipy" padla: server nevie, ktoré varianty v konkrétnom selecte prežijú
+hrúbkové filtre D-45, takže by o tom musel rozhodovať klient orezávaním serverového textu.)*
 
 Zoskupenie robí čistá `nxComboDecorRows(items, meta)`; metadáta variantu (`decor · type · thickness · duplak`) dodáva **hostiteľ** cez `setVariantResolver` — komponent žiadny
 katalóg nepozná, takže bez resolvera vyzerá ponuka presne ako pred PICKER-2 (Inspector: `nxComboVariantOf` nad `sheetRecOf`; Štúdio: nad `MD_SHEETS`; **ABS sa nezoskupuje** —
@@ -111,12 +115,25 @@ hrúbka pásky je jej vlastnosť, nie variant dekoru).
 `material_id`**, ktorý sa pozná VÝHRADNE podľa `source_material_id` — payload ho preto zrkadlí ako `duplak` (panel) a **Príznak čítajú OBAJA hostitelia rovnako** (`rec.duplak ===
 true`): `MD_SHEETS` v Štúdiu je ZÚŽENÝ `Panel.materials_payload`, v ktorom surové `source_material_id` nie je — čítať duplák z neho znamenalo, že uložený duplák je v Štúdiu
 neviditeľný (review #231, kolá 1 a 3). Bez príznaku by vyzeral ako kúpená hrubá doska, nedal by sa nájsť hľadaním „duplák" a mohol by sa aj predvoliť. Čip duplákov nesie **aj
-hrúbku** („36 duplák" / „54 duplák") — rodina môže mať duplák ×2 aj ×3 a dva čipy so samotným slovom by boli nerozlíšiteľné (review #231 kolo 2).
+hrúbku** („36 duplák" / „54 duplák") — rodina môže mať duplák ×2 aj ×3 a dva čipy so samotným slovom by boli nerozlíšiteľné (review #231 kolo 2). **A rovnako to musí čítať aj
+HĽADANIE** (PICKER-3): pri slovnom dotaze sa najprv hľadá zhoda hrúbky **medzi duplákmi** a až potom sa padá na prvý — inak „54 duplák" preselektovalo 36 mm (slovo sa čítalo skôr
+než číslo) a Enter vložil iný materiál za iné peniaze.
 
 **Predvolená hrúbka je vec KONTEXTU** (`data-nx-combo-ctx` na selecte: `body`/`front` → najtenšia konštrukčná podľa katalógu, nie natvrdo 18 · `back` → 3 · `worktop` → 38;
 chýbajúca kontextová hrúbka = najtenšia konštrukčná, **žiadne hádanie „najbližšej hrubšej"**), a **duplák sa nepredvolí NIKDY** — ani keď je v riadku najtenší, ani keď sedí na
 kontextovú hrúbku: je to zdvojená doska za dvojnásobok a vyberá sa **vedomým klikom na čip**. Poradie prednosti pri kreslení riadku: **dotaz menujúci konkrétny variant (jeho ID
 alebo label) → výslovný dotaz o hrúbke → kliknutý čip → hodnota, ktorú select nesie → kontext**.
+
+**PICKER-3 (E): KONTEXT RADÍ AJ RIADKY, nielen hrúbky vnútri riadku.** Dovtedy vedel vybrať hrúbku v rodine, ale nie uprednostniť riadok HDF 3 pred riadkom DTDL 18 toho istého
+dekoru — a `md_back` v Štúdiu je naplnený **všetkými** doskami, takže po napísaní dekoru vyhral DTDL a Enter vložil 18 mm chrbát. Dve časti, obe čisté funkcie: `nxComboSortByCtx`
+(**stabilné** radenie podľa `nxComboCtxRank` — riadok s kontextovou hrúbkou má rank 0, ostatné 1; beží **pred delením na sekcie**, takže sa uplatní vnútri každej z nich a členstvo
+v „Použité v projekte" sa nemení; **sekcia „Naposledy použité" dostáva `ctx` až do `nxComboSections`** — svoje poradie si prepisuje podľa čerstvosti, takže bez toho by v nej
+kontext ticho zanikol a hore by stála naposledy použitá DTDL 18. Čerstvosť je tam tie-breaker **medzi rovnocennými**, review #236 kolo 1) a `nxComboFirstCtx(items, ctx, q)` = kam sadne **kurzor** po dopísaní dotazu: **riadok s hrúbkou, ktorú dotaz MENUJE → riadok podľa kontextu →
+prvý vyberateľný**. Samotné radenie by nestačilo — sekcie „Použité v projekte" a „Naposledy použité" stoja NAD katalógom, takže bez kurzorového pravidla by Enter v poli pre chrbát
+vložil použitú DTDL 18. Prvý stupeň drží sľub PICKER-2 „výslovný dotaz > kontext" aj o poschodie vyššie a **pýta sa dát, nie tvaru dotazu**: číslo dekoru („K018", „H3303") hrúbku
+nemenuje, kým „18" so zhodným variantom áno; nedostupný variant riadok nevytiahne. Bez kontextovej hrúbky (`body`, `front`, ABS, chýbajúci atribút) sa **poradie servera nemení ani
+o riadok**. *(Zamietnuté: FILTROVAŤ nekontextové riadky — 18 mm chrbát je nezvyklý, nie zakázaný, a filter by legitímnu voľbu schoval; v tomto repe semafor varuje, nikdy
+neblokuje.)*
 
 Prvý stupeň (`nxComboVariantFromQuery`) pribudol v review kole 3: materiálové ID sú zámerne neprehľadné a pred zlúčením sa dal každý variant vybrať samostatne, takže dotaz „ZXQ"
 musí vložiť **práve ten** variant — nie predvolenú hrúbku rodiny; ID pritom môže obsahovať číslo patriace inej hrúbke, preto stojí **pred** hrúbkovým čítaním. Nejednoznačný dotaz
@@ -135,7 +152,10 @@ ale klik **dopíše dôvod** pod čipy (`.cbchipmsg`, text je serverový label v
 by hláška sedela za čipmi a `overflow: hidden` popupu by ju orezal) a dôvod prežije prekreslenie po písmene rovnako ako vybraný čip.
 
 **Z klávesnice sa čipy ovládajú šípkami vľavo/vpravo** (`moveChip`): fokus zostáva v poli hľadania a `Tab` ponuku zatvára, takže bez toho by boli tlačidlá čipov pre klávesnicu
-nedosiahnuteľné (review #231 P2). Nedostupné varianty sa preskakujú a na krajoch sa **necyklí** — slepým stláčaním sa nedá skončiť na dupláku.
+nedosiahnuteľné (review #231 P2). Na krajoch sa **necyklí** — slepým stláčaním sa nedá skončiť na dupláku. **Nedostupný variant sa už NEPRESKAKUJE ticho** (PICKER-3 D): prvé
+stlačenie na ňom **zastane a dôvod oznámi** (`announceChip` — text je serverový label varianta, hláška je `role="status" aria-live="polite"`, takže ju čítačka prečíta bez presunu
+fokusu), druhé v tom istom smere pokračuje ďalej. Bez toho sa človek od klávesnice k vysvetleniu, ktoré myš dostane klikom, nedostal vôbec — a zastavenie bez pokračovania by bolo
+zaseknutie. Úspešné prepnutie čipu pamäť „už odznelo" vynuluje.
 
 **Výsledkom voľby je `material_id` KONKRÉTNEHO variantu** — čip je čisto klientske zúženie, `change` ide tou istou cestou ako natívny výber, takže serverové cesty ani kontrakt E-03
 (hrúbku určuje reálny materiál) sa nemenia. Tým **zaniklo vedomé obmedzenie PICKER-1**: skupina „Použité v projekte" je aj v Štúdiu — nemapuje sa nič, server posiela hotový zoznam
@@ -143,8 +163,9 @@ ID (`StudioDialog#mat_used_ids` → `mat.used_ids`, tvar zhodný s panelovým `u
 **UŽ zozbieraný kusovník** (`collected[:records]`, žiadny druhý prechod modelom — presne to, čo ŠT-2a raz odstránilo) a na rozdiel od `used_where` sa dielec **bez `owner_id`
 nevyhadzuje**: tam ide o klikateľného vlastníka, tu o otázku „je tento materiál v zákazke?".
 
-Testy: `tests/js/test_picker2_chips.js` (zoskupenie, defaulty, dotaz, skupiny), `tests/js/test_picker2_chips_dom.js` (čipy v otvorenej ponuke, klik, potvrdenie),
-`tests/pure/test_picker2_used_ids.rb`.
+Testy: `tests/js/test_picker2_chips.js` (zoskupenie, defaulty, dotaz, skupiny), `tests/js/test_picker2_chips_dom.js` (čipy v otvorenej ponuke, klik, potvrdenie, klávesnica),
+`tests/js/test_picker3_kontext.js` (rank · stabilné radenie · kurzor · duplák podľa hrúbky), `tests/js/test_picker3_kontext_dom.js` (čo Enter naozaj vloží v poli pre chrbát),
+`tests/pure/test_picker2_used_ids.rb`, `tests/pure/test_picker3_rodina.rb`.
 
 ### D-15 modal — zdieľaná kostra „pridávačiek" (ui/js/nx_modal.js, ŠT-1c PR B2)
 

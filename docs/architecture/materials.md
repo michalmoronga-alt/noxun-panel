@@ -84,6 +84,21 @@ dávkou" a jediná stará, vedome potvrdená duplicita kód+dodávateľ by zablo
 `create` jediný možný guard a je potrebný: ten istý dekor mohol medzitým založiť niekto iný. Testy: `tests/pure/test_st2c_save_decor.rb` + `tests/pure/test_st2c_create.rb` (obe
 mutačné — odstránenie brány = pad).
 
+#### PICKER-2/3 — identita variantovej rodiny pre vyhľadávač
+
+`variant_family_key` · `row_family_ctx` · `row_label_disambiguated` — odpoveď na otázku **„čo ešte JE ten istý materiál v inej hrúbke"**. Vyhľadávač (`ui/js/nx_combo.js`) z nej
+skladá jeden riadok na dekor s hrúbkami na čipoch; hranicu **nesmie hádať klient** — vidí vždy len to, čo je práve v selecte. Kľúč = **kanonická identita dosky BEZ hrúbky**:
+skupinová časť z `record_group_key` + `identity_norm` nad dekorom, štruktúrou, typom a príponou formátu/rubu (`sheet_label_suffix`). Zložky sú kanonické **všetky** (PICKER-3): typ
+aj štruktúru porovnáva katalógový kontrakt case-insensitive, takže `DTDL`/`dtdl` a `ST9`/`st9` sú ten istý materiál a v surovom tvare dávali dva riadky s rovnakou menovkou.
+Skupinová časť ostáva presne kanonická **aj so symbolovými značkami** — v SCHEMA 1 je surový dekor súčasťou katalógovej identity, takže normalizovať ho tam by zlúčilo to, čo
+katalóg drží oddelene. UNI záznamy dostávajú unikátny kľúč (nezlučujú sa vôbec). Medzery sa neodstraňujú: `ST9` a `ST 9` sú dva zápisy (od preklepov je `decor_conflict`).
+
+`row_family_ctx(sheets, schema, virtual:)` je kontext pre CELÝ payload (vzor `Panel.label_ctx`): pre každú dekorovú menovku zoznam rodín, pre každú rodinu jej hrúbky. Nad ním
+`row_label_disambiguated` pridáva **typ** pri kolízii menovky a **hrúbku len vtedy, keď ju riadok neukáže čipmi**. Parameter `virtual:` (PICKER-3, pole `[zdroj, hrúbka]`) nesie
+hrúbky, ktoré riadok zastupuje, hoci v katalógu ešte nie sú — **virtuálne dupláky `duplak2:` (D-49)**; bez nich rodina s jednou kúpenou hrúbkou platila za jednovariantnú a menovka
+tvrdila „… 18 mm", hoci riadok dostal čip „36 duplák" a po jeho výbere vložil 36. Panel ich berie z tej istej autority ako `duplak_offers` (`duplak_offer_sources(2)`), aby sa oba
+zdroje nemohli rozísť. Testy: `tests/pure/test_picker3_rodina.rb` (aj opačný smer — že sa nezlialo nič reálne rôzne), `tests/pure/test_picker2_used_ids.rb`.
+
 #### Remap ABS
 
 `remap_edges` + `CabinetBuilder.remap_part_edge_overrides!` — ručné ABS zladené s dekorom nasledujú materiál pri KAŽDEJ zmene (dielec cez old_overrides snapshot / korpus /

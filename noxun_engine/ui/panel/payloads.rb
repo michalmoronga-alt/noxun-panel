@@ -663,8 +663,26 @@ module Noxun
         end
 
         # Kontext riadkov na CELY payload (vzor `label_ctx`).
+        # PICKER-3 (A): kontext musi vidiet aj VIRTUALNE duplakove ponuky —
+        # v `Materials.sheets` nie su (su vlastnym polom payloadu), ale
+        # vyhladavac ich lepi na riadok ZDROJA ako dalsi cip. Bez nich by
+        # rodina s jednou kupenou hrubkou platila za jednovariantnu a menovka
+        # riadku by tvrdila „… 18 mm" aj potom, co riadok dostane cip „36
+        # duplák" (review #231 kolo 3).
         def row_fam_ctx(ctx = label_ctx)
-          Materials.row_family_ctx(Materials.sheets) { |s| raw_row_label(s, ctx) }
+          Materials.row_family_ctx(Materials.sheets, virtual: duplak_virtual_variants) do |s|
+            raw_row_label(s, ctx)
+          end
+        end
+
+        # Hrubky, ktore riadok zastupuje NAVYSE oproti katalogu: [zdroj, hrubka]
+        # pre kazdu virtualnu ponuku „(duplák ×2)". Zdroj rozhoduje o rodine,
+        # hrubka je zdvojena — presne to, co posiela `duplak_offers`.
+        def duplak_virtual_variants
+          Materials.duplak_offer_sources(2).map { |s| [s, (s['thickness'].to_f * 2).round(2)] }
+        rescue StandardError => e
+          Engine.log_error(e, 'duplak_virtual_variants')
+          []
         end
 
         def sheet_label(s, ctx = label_ctx)

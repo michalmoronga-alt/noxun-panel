@@ -326,13 +326,32 @@ eq(sel.value, 'duplak2:dtd18', 'duplák sa vložil až po VEDOMOM kliku na jeho 
   ok(/<span class="cbchipmsg"[^>]*>[^<]*nekompatibiln/.test(popHtml()),
      'dôvod sa ukáže v riadku a prežije prekreslenie po písmene');
 
-  // Klávesnica nedostupný variant PRESKOČÍ (nezasekne sa na ňom).
+  // PICKER-3 (D): DÔVOD MUSÍ BYŤ DOSIAHNUTEĽNÝ AJ Z KLÁVESNICE.
+  // Myš sa k nemu dostane klikom, ale šípky nedostupný variant dovtedy
+  // TICHO preskakovali a Tab ponuku zatvára — človek od klávesnice tak nemal
+  // ako zistiť, prečo tam ten čip je. Prvé stlačenie preto na ňom ZASTANE
+  // a dôvod povie, druhé ide ďalej (žiadne zaseknutie).
   sel2.value = 'b18';
   NXC.open(sel2);
   const ls = (popNode().querySelector('input')._ls.keydown) || [];
-  ls.forEach(fn => fn({ key: 'ArrowRight', preventDefault(){}, stopPropagation(){} }));
-  ls.forEach(fn => fn({ key: 'Enter', preventDefault(){}, stopPropagation(){} }));
-  eq(sel2.value, 'dup2', 'šípka preskočila nedostupnú 36 na najbližší použiteľný variant');
+  const key = name => ls.forEach(fn => fn({ key: name, preventDefault(){}, stopPropagation(){} }));
+  key('ArrowRight');
+  eq(sel2.value, 'b18', 'prvá šípka na nedostupnom čipe hodnotu NEMENÍ');
+  // Stub uzly z `innerHTML` nevyrába, takže cielené prekreslenie riadku sa
+  // v ňom neprejaví — dôvod si vyžiadame plným renderom (písmeno v hľadaní),
+  // čo zároveň overí, že hláška prekreslenie PREŽIJE.
+  const inp3 = popNode().querySelector('input');
+  inp3.value = 'buk';
+  (inp3._ls.input || []).forEach(fn => fn());
+  ok(/class="cbchip on"[^>]*>18</.test(popHtml()),
+     'čip sa neprepol — kurzor stojí na tom, čo riadok vloží');
+  ok(/<span class="cbchipmsg"[^>]*>[^<]*nekompatibiln/.test(popHtml()),
+     'ZASTAVILA sa a povedala DÔVOD (z klávesnice je to jediný kanál)');
+  ok(/<span class="cbchipmsg"[^>]*aria-live="polite"/.test(popHtml()),
+     'hláška je aria-live — čítačka ju ohlási bez presunu fokusu');
+  key('ArrowRight');
+  key('Enter');
+  eq(sel2.value, 'dup2', 'druhé stlačenie pokračuje na najbližší použiteľný variant');
 })();
 
 // --- 7) dotaz na ID variantu VLOŽÍ ten variant ----------------------------
