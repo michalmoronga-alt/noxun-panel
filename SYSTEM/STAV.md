@@ -18,7 +18,7 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.6:** **1917 headless** · 69 JS sád · posledný plný in-SketchUp beh **1003 PASS / 0 FAIL / 0 SKIP** (dávka 1b-2 — prírastok +34 je charakterizačná sada `CHAR`).
+**Testy k v0.8.6:** **1917 headless** · 69 JS sád · posledný plný in-SketchUp beh **1011 PASS / 0 FAIL / 0 SKIP** (dávka 1b-2 — prírastok +42 je charakterizačná sada `CHAR`).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom (audit pred kódom + review pred mergom, 15 kôl). Od **#227** review robí zase Codex, takže **post-hoc sweep sa týka presne #186–#226** ([PLAN.md](PLAN.md), blok 1b/E).
 

@@ -29,8 +29,15 @@ modely sú platné a ich otvorenie nezapisuje nič. Ďalej: regenerate; vizuál 
 false — zdroj pravdy súpisu je VÝHRADNE `config.hardware[]` korpusu). Profil: definícia per (profil, dĺžka) `NOXUN_PROFILE_<ID>_L<dĺžka>` s recykláciou podľa mena + odtlačok
 `PROFILE_GEOM_REV` (zmena obrysu prekreslí staré definície), kotva = zadná rovina čela (Y 0) a vrch PÔVODNÉHO čela.
 
-**Prerušenie stavby je charakterizované** (`CH4`, sekcia `run_char` in-SketchUp sady — detail v odseku `scale_observer.rb`): výnimka vnútri `build`/`rebuild` ide cez `abort_safely`
-a v modeli nesmie ostať torzo ani osirotená definícia `NOXUN Korpus …`; výnimka sa **neprehĺta** — volajúci sa o nej dozvie.
+**PRERUŠENIE STAVBY** (`abort_safely`): výnimka kdekoľvek vnútri `build`/`rebuild` ruší CELÚ operáciu a **neprehĺta sa** — volajúci sa o nej dozvie. Rollback vracia geometriu
+(inštanciu aj definície dielcov) **a zároveň modelové atribúty**, teda aj projektové snapshoty kovania, ktoré `build_into` cestou `HardwareRules.ensure_project_rules!` /
+`HardwareSets.ensure_project_state!` stihol zapísať — preto sa smú volať len vnútri operácie volajúceho. Zafixované scenárom `CH4` (`run_char`; sonda necháva `build_into` dobehnúť
+celé a hodí výnimku až nad hotovým torzom, inak by test kontroloval prázdnu definíciu).
+
+**KÓPIA A `*N` NÁSOBENIE** sú zafixované `CH1`/`CH2` tej istej sady: kópia dostáva vlastné `cabinet_id`, vlastnú definíciu (`make_unique`) a prepočítané `part_id`, kým `part_key`
+ostáva ROLOU. Config prežije kopírovanie kompletný **až na odvodenú identitu zón** — `zone_tree` skladá z `cabinet_id` polia `id` aj `parent`; trvalým kľúčom je `stable_id`
+(= `node_id` stromu), lebo cez `PartKeys.zone` vstupuje do `part_key`, ktorým sú kľúčované `part_overrides` (`migrate_overrides`). Po `*N` musí kusovník ukázať násobené množstvo —
+násobenie sa meria až vo výrobnom výstupe, nie na počte inštancií.
 
 ### board_builder.rb
 
@@ -233,10 +240,9 @@ zmeny** (`Panel.handle_set_board_orientation` volá `remember_transform`) — be
 orientáciu. Kľúč je `[model.object_id, entityID]` a **nikto z cache nemaže** — záznamy zmazaných entít aj starých dokumentov v nej ostávajú (charakterizované, nie schválené: fixuje
 to `CH6`, kandidát do registra 1c). `EngineAppObserver` notifikuje dialógy viazané na model (File>New/Open/Activate).
 
-**CHARAKTERIZAČNÁ SADA `CHAR` (dávka 1b-2, brána H bloku 1b):** `tests/sketchup/su_runner.rb`, sekcia `run_char` zapojená do async reťaze (vzor `run_stale`) — 34 assertov, ktoré
-zapisujú, čo observer a buildery **DNES** robia, aby mal neskorší hardening (blok 1d) a GHOST Tool vrstva pevnú pôdu. Pokrýva: kópiu skrinky (vlastná identita, config prežije celý
-až na odvodené `zones[].id`, ktoré idú s novým `cabinet_id`, kým `stable_id` ostáva), `*N` násobenie (žiadne zdieľané `part_id`), Undo reťaz (absorpcia nepridá vlastný krok),
-prerušenie operácie (sonda nad `build_into` = zlyhanie už po `definitions.add`/`clear!` + ručný `abort_operation`), scale nástrojom Mierka porovnaný **dielec po dielci** s výstupom
-regenerate a Windows vetvu prepnutia modelu (idempotentný re-attach, dátová štruktúra multi-model guardov). **Padnutý `CHAR` test neznamená „oprav test", ale „správanie sa zmenilo
-— povedz prečo".** Dve vetvy sa na Windows spustiť nedajú a sú zapísané ako MANUÁLNE scenáre priamo v INFO riadkoch behu: **Znova (Ctrl+Y)** po scale (Ruby API nemá na Windows
-spoľahlivú redo akciu — PLAN blok 3) a **dva otvorené dokumenty naraz** (macOS; Windows drží jeden dokument na proces, guardy sú `scale_observer.rb:149-150, 194-200, 382-383`).
+**Charakterizované sadou `CHAR`** (`tests/sketchup/su_runner.rb`, `run_char` — dávka 1b-2, brána H bloku 1b; zapisuje DNEŠNÉ správanie, aby mal hardening bloku 1d a GHOST Tool
+vrstva pevnú pôdu): absorpcia scale je **jeden** undo krok a nepridáva vlastný (`CH3`, `CH5`); dedup kópie aj `*N` násobenia sa lepí na paste krok, takže jedno Undo vráti celú
+dávku (`CH1`, `CH2`); aktivácia **toho istého** dokumentu prekrytia NEzhasína (guard `same_model?`), kým udalosť o dokumente s iným `guid` ich zhasnúť MUSÍ (`CH6`). **Padnutý
+`CHAR` test neznamená „oprav test", ale „správanie sa zmenilo — povedz prečo".** Dve vetvy sa na Windows spustiť nedajú a sú zapísané ako MANUÁLNE scenáre priamo v INFO riadkoch
+behu: **Znova (Ctrl+Y)** po scale (Ruby API nemá na Windows spoľahlivú redo akciu — PLAN blok 3) a **dva otvorené dokumenty naraz** (macOS; Windows drží jeden dokument na proces —
+guardy `scale_observer.rb:149-150, 194-200, 382-383`, ich dátovú štruktúru `CH6` overuje aspoň priamo).
