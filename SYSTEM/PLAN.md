@@ -9,8 +9,9 @@
 je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md). Čísla ostatných
 blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
 
-**Poradie najbližších blokov (rozhodol Michal 26.8.2026, po veľkom teste v0.8.4):**
-**1b STABILIZAČNÁ REVÍZIA → GHOST VKLADANIE → KOVANIE** (pred KOVANÍM USER-debata o setoch).
+**Poradie najbližších blokov (rozhodol Michal 26.8.2026, doplnené v ten istý večer o hardening sekvenciu):**
+**1b STABILIZAČNÁ REVÍZIA → 1c AUDIT KÓDU → 1d REFAKTOR Z REGISTRA → 1e PLÁNOVACIA DÁVKA (task packages) → GHOST VKLADANIE → KOVANIE**
+(pred KOVANÍM USER-debata o setoch). Zmysel sekvencie: audit a refaktor **pripravujú pôdu presne pre naplánované funkcie** a doťahujú staré dlhy — až potom nové funkcie.
 *(Blok **PICKER-3** je hotový — v0.8.5, 26.8.2026; plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok v [archiv/KRONIKA.md](archiv/KRONIKA.md).)*
 
 ### 1b · STABILIZAČNÁ REVÍZIA (dlhy fázy ŠTÚDIO — pred blokom KOVANIE)
@@ -52,7 +53,37 @@ blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
   nedostupný**. Od **#227** review robí Codex, takže #227 aj #228 sú mimo sweepu. Keď má Codex kapacitu, prejsť tie PR spätne — nie kvôli nedôvere v subagenta (chytil o. i. spiacu mínu duplicitných
   kódov), ale preto, že je to iný pohľad na dávky, ktoré medzitým tvoria základ celej fázy.
 
-### GHOST VKLADANIE (V1-04 — zaradené Michalom 26.8.2026, po bloku 1b)
+### 1c · AUDIT KÓDU (read-only — po 1b; rozhodnuté 26.8.2026 večer)
+
+**Cieľ:** pripraviť plugin na naplánované funkcie a pomenovať všetky nedorobky. **Žiadny kód sa nemení** — výstupom je
+**register nálezov** (nový súbor `SYSTEM/AUDIT_REGISTER.md`, štýl DOGFOODINGu: R-číslo · závažnosť P1–P3 · vrstva ·
+súbor · **ktorú naplánovanú funkciu blokuje** · návrh riešenia). Audit, ktorý rovno opravuje, sa nedá kontrolovať.
+
+- **Tri nezávislé pohľady:** externý Codex audit (spúšťa Michal; podklad: [zdroje/AUDIT_2026-08_podklad.md](zdroje/AUDIT_2026-08_podklad.md))
+  · vlastný prechod (Fable) · slepý subagent. Nálezy sa zlejú do jedného registra s dedupom.
+- **Prioritné osi auditu** (od budúcich funkcií dozadu): observery/undo/Tool lifecycle (→ GHOST) · dátový model setov kovania
+  (→ D-109/KOVANIE) · `ui/production_core.rb` — jadro výstupov v UI vrstve (→ Ponuka/plošná kontrola) · payload kontrakty a identita ·
+  perzistencia, `std` verzie, migrácie (→ shared library) · zjednotenie UI vzorov na nx_modal/nx_combo · 12 stub odsekov architektúry.
+- **Mimo záberu** (zapísané aj v podklade): prepisovanie funkčných builderov a zapisovacích ciest · hromadné premenovania ·
+  vizuál Inspectora/Štúdia · predčasné abstrakcie pre neschválené funkcie (attachment/segmenty) · výkon bez merania.
+
+### 1d · REFAKTOR/HARDENING Z REGISTRA (po 1c)
+
+Register sa vyprázdňuje **malými dávkami** (malé PR > obrie PR), každá s jasným „správanie sa nemení":
+zoradené podľa závažnosti × blokovanej funkcie. In-SU testy povinné pri builderoch/observeroch; mutačné overenie štandard.
+Nálezy z reálnej výroby majú stále prednosť (Pravidlo pre postrehy). Refaktor dávka, ktorá nevie povedať,
+ktorú naplánovanú funkciu pripravuje alebo ktorý dlh spláca, sa nerobí.
+
+### 1e · PLÁNOVACIA DÁVKA — task packages (po 1d)
+
+Zliať koncepty [zdroje/next_sessions/](zdroje/next_sessions/) 01–09A + zvyšné bloky PLANu do jedného backlogu →
+roztriediť do **kódových a logických blokov** → každému určiť **prioritu · náročnosť · závislosti · či mení dátový kontrakt**
+(→ audit-povinnosť) → z blokov spraviť **task packages**. Package = plný blok v PLANe (autorita); koncept ostáva podkladom.
+**Šablóna package (povinné polia):** cieľ · scope IN · **scope OUT** (čo dávka vedome NErobí) · dotknuté dáta/kontrakt →
+audit áno/nie · testy a DoD · riziká · smoke checklist pre Michala · checklist uzáveru. Každý package si na štarte
+spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom packages preberajú sekvenčne bez ďalšieho plánovania.
+
+### GHOST VKLADANIE (V1-04 — zaradené Michalom 26.8.2026, po bloku 1e)
 
 Vkladanie skrinky na klik: skrinka visí na kurzore ako ghost, klik umiestni. **Podklad (NEZÁVÄZNÝ koncept,
 auditovaný proti v0.7.51):** [zdroje/next_sessions/09_GHOST_VKLADANIE.md](zdroje/next_sessions/09_GHOST_VKLADANIE.md)

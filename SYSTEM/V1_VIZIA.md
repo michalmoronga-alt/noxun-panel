@@ -4,17 +4,18 @@
 
 ## 1 · Čo znamená „V1 hotové"
 
-**Kompletná reálna zákazka od návrhu po objednávky BEZ opustenia pluginu a BEZ ručného dopočítavania:**
+**Kompletná reálna zákazka od návrhu po objednávky BEZ opustenia pluginu a BEZ ručného dopočítavania.**
+Odškrtávací checklist (V1 je hotové, keď je odškrtnuté všetko; stav dopĺňajú uzávery dávok):
 
-1. **Návrh:** vloženie skriniek na klik → zostava (kuchyňa/vstavaná skriňa/obývačka) vrátane skriniek so spotrebičmi; šablóny s kovaním = opakované typy na 1 klik.
-2. **Konštrukcia:** korpusy vrátane per-dielec odsadení (vzduchové komíny, špeciály), výstuhy správne v interiéri, sokel/nohy podľa výšky.
-3. **Materiály:** katalóg z Demosu, skupinové farby/textúry, prefarbovanie klikom; ABS automatika so semaforom.
-4. **Kovanie:** sety s automatikou (nohy podľa sokla, bočnice podľa výšky čela, výklopy podľa hmotnosti čela), per-čelo overridy, výplne šuflíkov vo výťaži.
-5. **Spotrebiče:** katalóg + položky projektu, kontrola niche, ceny v ponuke.
-6. **Výstupy:** VEPO CSV, kusovník, nákupný zoznam kovania CSV, **rozpočet — všetko spolu s cenami** (materiál po tabuliach, ABS bm, kovanie, spotrebiče, sadzby služieb) = cenová ponuka pre zákazníka.
-7. **Dvaja používatelia:** Michal (konštrukcia/výroba) aj **Lucia (vizualizácie + cenové ponuky)** — render vzhľad z katalógu, zrozumiteľné UI, žiadne „vedieť kde čo je".
+1. [ ] **Návrh:** vloženie skriniek na klik (GHOST) → zostava vrátane skriniek so spotrebičmi; šablóny s kovaním = opakované typy na 1 klik. *(Zostava = ručné zarovnanie + snaper; plné segmenty sú mimo V1.)*
+2. [ ] **Konštrukcia:** korpusy vrátane per-dielec odsadení (vzduchové komíny, špeciály — V1-01), výstuhy správne v interiéri (hotové, D-80), sokel/nohy podľa výšky (hotové, D-79).
+3. [x] **Materiály:** katalóg z Demosu, skupinové farby, ABS automatika so semaforom, vyhľadávač s kontextom *(hotové — Materiály 2.0 + PICKER-1/2/3)*; quick-win textúry z Demos fotky ostávajú v bode 7.
+4. [ ] **Kovanie:** sety s automatikou (nohy hotové D-79, bočnice hotové D-81; pomer 1:N = D-109), per-čelo overridy, výplne šuflíkov **vo výťaži — fáza A** (vzorce dodá Michal). *(Plná geometria výplní a výklopový model = mimo V1.)*
+5. [ ] **Spotrebiče:** katalóg + položky projektu, kontrola niche semaforom, ceny v rozpočte (S1).
+6. [x] **Výstupy:** VEPO CSV, kusovník, nákup kovania, rozpočet s cenami, XLSX cenová ponuka *(hotové — dávky E + fáza ŠTÚDIO)*; dotiahnuť len manuálne 1-klik overenie ceny (zvyšok V1-03).
+7. [ ] **Dvaja používatelia:** Michal aj **Lucia** — quick-win render (Demos fotka ako textúra), jednoduchý updater (D-52), zrozumiteľné UI *(Inspector+Štúdio hotové)*.
 
-**Mimo V1 (vedome):** zásuvkové bloky DC, rohové/špeciálne typy korpusov, CNC/výkresy, plná automatika niche→zóny, fyzické telá spotrebičov (kubusy), výrezy/otvory v dielcoch, umývačkový/digestorový modul ako typ.
+**Mimo V1 (vedome; rozšírené 26.8.2026 po debate s Michalom):** zásuvkové bloky (na novom štandarde), rohové/špeciálne typy korpusov, CNC/výkresy, plná automatika niche→zóny, fyzické telá spotrebičov (kubusy), výrezy/otvory v dielcoch, umývačkový/digestorový modul ako typ · **plné zostavy/segmenty s attachments** (koncept 02) · **plná appearance vrstva a nástroj pixla** (koncept 06) · **ponuka DOCX/PDF s vizualizáciami** (koncept 08 — XLSX ponuka stačí na milník) · **G-Disk sync knižníc D-48** (updater D-52 ostáva; katalógy zatiaľ export/import ručne) · **sektorová kontrola** (koncept 01 — toggle/presety plošnej kontroly ostávajú) · **typy čiel ako konfigurátor** (V1-07 — vo V1 len čelo ako cenová položka s dodávateľom, cena/m²) · **kovanie fáza 3 geometria** (výklopy plný model, výplne fáza B).
 
 ## 2 · Princípy (nemenné)
 
