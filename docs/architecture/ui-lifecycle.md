@@ -1562,7 +1562,7 @@ omladne, takže bez pinu by zámok prešiel a cudzia zmena (druhá inštancia, r
 
 **Pin sa berie UŽ PRI FOKUSE poľa** (`focusin`), nie pri prvom písmene (review #227 kolo 2): fokus ZMRAZÍ zobrazený obsah (telo sa neprekresľuje), takže push, ktorý medzitým
 dorazí, vymení `SS_STATE` pod starými hodnotami — pripnutie až pri prvom písmene by teda pripútalo NOVÚ revíziu k STARÉMU obsahu a zápis by prešiel. Push pin **neprepisuje**;
-uvoľní ho `SS.saved()` (potvrdenie, odmietnutie, reload) — **a tiež každé prekreslenie tela, ktoré pin NIKTO NEVYUŽIL** (review #227 kolo 3, dorovnané dávkou 1b-1): keď nie je
+uvoľní ho `SS.saved()` (potvrdenie, odmietnutie, reload) — **a tiež prekreslenie tela z čerstvého stavu, keď pin NIKTO NEVYUŽIL** (review #227 kolo 3, dorovnané dávkou 1b-1): keď nie je
 nič rozpísané, obsah sa prekreslí z čerstvého stavu, takže držať starú revíziu by znamenalo **falošný konflikt** nad hodnotami, ktoré používateľ vidí — a zahodenú prácu
 (`SS.saved()` rozpis pri odmietnutí zahadzuje). Kontrakt kola 2 tým ostáva nedotknutý: **pod kurzorom je obsah zmrazený a pin sa drží**, takže cudziu zmenu nemožno ticho prepísať.
 

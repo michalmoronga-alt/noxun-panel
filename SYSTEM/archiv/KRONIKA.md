@@ -35,7 +35,7 @@
   a čísla rozpočtu by aj tak ostali staré, takže by hláška klamala ďalej.
   **Testy: 1917 headless** (2 nové sady prípadov v `test_st4a_nastavenia.rb` — behaviorálna vetva zlyhaného prepočtu + tvar `refresh_studio`) · **69 JS sád** (dve nové sekcie
   v `test_st4a_settings.js`, obe na úrovni DOM: návrat do sekcie a zmrazenie tela pod kurzorom). **Mutačne overené — 6 mutácií, každá zhodila práve svoj test:** pin sa neuvoľní ·
-  presun uvoľnenia späť do `ssApplyState` (presne predfixový stav — padne LEN nový navigačný test, ostatné prejdú) · uvoľnenie pred stráž `ssTyping()` · uvoľnenie bez `!ssDirty()`
+  presun uvoľnenia späť do `ssApplyState` (presne predfixový stav — padne nový navigačný test aj tvarový guard) · uvoľnenie pred stráž `ssTyping()` · uvoľnenie bez `!ssDirty()`
   · `refresh_and_report` ignoruje výsledok · `refresh_studio` vracia vždy `true` · odmietacia vetva bez vetvenia.
   **Slabšie dôkazy z odrážky A — stav:** `ssTyping` má odteraz DOM dôkaz (zmrazený obsah po pushi ostane byte-nedotknutý, bez kurzora ten istý push telo prekreslí), takže grep už
   nie je jediná stráž; mutácia poradia pin-release sa z „tvarovej" stala „behaviorálnou". Tvarové guardy sa PONECHALI ako druhá vrstva (miesto uvoľnenia a poradie voči

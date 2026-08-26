@@ -158,9 +158,11 @@ module Noxun
           # Rozpisane hodnoty zanikaju AZ TU (klient si ich cez pushe drzi —
           # plny push chodi pri kazdej zmene modelu, nielen po ulozeni).
           js('SS.saved()')
+          # Aj tu sa menuje TLACIDLO, ktore v sekcii je (review #238 P3-3) —
+          # vseobecne „skús to znova" clovek nema kam kliknut.
           refresh_and_report('Nastavenia načítané nanovo zo súboru.',
                              'Nastavenia sa načítali zo súboru, ale okno sa nepodarilo obnoviť — ' \
-                             'hodnoty na obrazovke môžu byť staré. Skús to znova.')
+                             'hodnoty na obrazovke môžu byť staré. Klikni na Načítať nanovo.')
         end
 
         # Ulozenie: revizia -> patch (validate-all) -> prepocet Studia.
@@ -200,9 +202,14 @@ module Noxun
           # A ked ZLYHA, hlaska to MUSI povedat: zapis do suboru uz prebehol,
           # `SS.saved()` uz rozpis zahodil, takze na obrazovke ostanu STARE
           # cisla — „Rozpočet je prepočítaný." by nad nimi bolo klamstvo.
+          # Hlaska smie menovat LEN tlacidlo, ktore v sekcii NAOZAJ je (review
+          # #238 P2-1): lista `bset` ma „Načítať nanovo" a „Uložiť" — „Obnoviť"
+          # zije v sekcii Rozpocet. Bez tej navigacie by clovek siahol po
+          # „Načítať nanovo", ktore rozpisane hodnoty ZAHADZUJE.
           refresh_and_report('Nastavenia uložené. Rozpočet je prepočítaný.',
                              'Nastavenia sú ULOŽENÉ, ale rozpočet sa NEPREPOČÍTAL — ' \
-                             'čísla v okne môžu byť staré. Klikni na „Obnoviť".')
+                             'čísla Rozpočtu môžu byť staré. Otvor sekciu Rozpočet ' \
+                             'a klikni na Obnoviť.')
         end
 
         # --- Ruby -> JS -------------------------------------------------------

@@ -419,8 +419,12 @@ NxTest.test('ŠT-4a (dlh 1b-A): ZLYHANY prepocet sa PRIZNA — „uložené áno
                 'hlaska NEPOTVRDZUJE prepocet, ktory neprebehol')
   NxTest.assert(got.any? { |x| x.include?('ULOŽENÉ') && x.include?('NEPREPOČÍTAL') },
                 'povie oboje: subor ulozeny ANO, prepocet NIE')
-  NxTest.assert(got.any? { |x| x.include?('Obnoviť') },
-                'a povie, co s tym (menom tlacidla, nie vseobecne)')
+  # Review #238 P2-1: „Obnoviť" v sekcii `bset` NIE JE (lista ma len „Načítať
+  # nanovo" a „Uložiť"), preto hlaska musi POSLAT tam, kde to tlacidlo zije —
+  # inak clovek siahne po „Načítať nanovo" a pride o rozpisane hodnoty. Test
+  # drzi PRESNE znenie, aby nebetonoval nepravdu.
+  NxTest.assert(got.any? { |x| x.include?('Otvor sekciu Rozpočet a klikni na Obnoviť.') },
+                'a povie, co s tym — menom tlacidla AJ sekciou, v ktorej to tlacidlo naozaj je')
   NxTest.assert(got.any? { |x| x.start_with?('SS.setStatus') && x.end_with?('true)') },
                 'zlyhanie je CERVENE (nie tichy zeleny status)')
 
