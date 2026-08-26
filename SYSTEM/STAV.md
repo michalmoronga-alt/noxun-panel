@@ -34,9 +34,10 @@ Posledný uzavretý blok bol **PICKER-3** (dorobenie vyhľadávača materiálov)
 **PICKER-3 je HOTOVÝ** (v0.8.5) — vyhľadávač materiálov je dorobený: virtuálny duplák už menovku riadku neklame, `DTDL`/`dtdl` nedá dva riadky, „54 duplák" trafí svoj duplák,
 dôvod nedostupného čipu sa dá vypočuť aj z klávesnice a **kontext poľa radí aj riadky** (v poli pre chrbát idú 3 mm navrch a Enter vloží HDF, nie DTDL 18).
 
-**Poradie ďalšej práce (rozhodol Michal 26.8.):** **stabilizačná revízia** (blok 1b — dlhy fázy ŠTÚDIO) · **GHOST VKLADANIE** (V1-04, koncept 09
-v [zdroje/next_sessions/](zdroje/next_sessions/) — pred implementáciou povinný finálny read-only audit) · až potom blok **KOVANIE** (najprv USER-debata o setoch).
-Dávky štartujú na Michalovo „štartuj".
+**Poradie ďalšej práce (Michal 26.8., večer doplnená hardening sekvencia):** **1b stabilizačná revízia** → **1c AUDIT KÓDU** (read-only;
+traja audítori, podklad [zdroje/AUDIT_2026-08_podklad.md](zdroje/AUDIT_2026-08_podklad.md), výstup register nálezov) → **1d refaktor z registra** →
+**1e plánovacia dávka** (task packages zo všetkých konceptov) → **GHOST VKLADANIE** → **KOVANIE** (najprv USER-debata o setoch).
+V1 rozsah zoštíhlený — checklist v [V1_VIZIA.md](V1_VIZIA.md). Dávky štartujú na Michalovo „štartuj".
 
 ## Posledné uzávery
 
