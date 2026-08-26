@@ -18,10 +18,12 @@ NX_STAV_MAX_BYTES = 12 * 1024
 # (nezavazne koncepty, necitaju sa automaticky) a archiv/ (historia, append-only).
 # Mapu autorit drzi SYSTEM/README.md.
 # Zoznam je EXPLICITNY, nie glob: archiv/ a zdroje/ sa vedome nestrazia (su to
-# historicke texty, ktore sa nesmu prepisovat kvoli zalomeniu). STANDARD.md prida
-# davka C — dovtedy ma dlhe riadky. POJMY.md tiez caka na reflow.
+# historicke texty, ktore sa nesmu prepisovat kvoli zalomeniu).
+# Davka "Docs cleanup C" (26.8.2026) doplnila STANDARD.md a POJMY.md — po
+# reflowe uz ziadny zivy dokument v SYSTEM/ nema vynimku.
 NX_SYSTEM_LINE_FILES = %w[
   STAV.md PLAN.md DOGFOODING.md README.md V1_VIZIA.md VEPO_KONTRAKT.md
+  STANDARD.md POJMY.md
 ].freeze
 NX_SYSTEM_MAX_LINE = 400
 
