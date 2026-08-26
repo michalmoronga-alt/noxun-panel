@@ -45,16 +45,19 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
   (index + plné texty vyriešených D-čísel), staršie analýzy a vízie. Archív je
   **append-only** — nič sa v ňom neprepisuje.
 
-## Pravidlá (strážia ich guardy v `tests/pure/test_docs_navigacia.rb`)
+## Pravidlá — strážené guardmi
 
-- **Živý dokument nesmie odkazovať na zdrojový koncept ako na autoritu.** Podklad zo
-  `zdroje/` sa cituje ako podklad; záväzné znenie patrí do STANDARD, PLAN alebo docs.
+*(Guardy sú v `tests/pure/test_docs_navigacia.rb`; padnú v CI, nie pri čítaní.)*
+
 - **Hotový blok nesmie zostať v PLAN.** Uzavretý blok ide plným textom do
   `archiv/ROADMAP_hotove_etapy.md`; v PLAN ostávajú len nehotové veci a trvalé pravidlá.
   (Guard: PLAN nesmie mať nadpis bloku s „KOMPLET", „HOTOVÉ" ani „✅" — bez ohľadu na
   veľkosť písmen; „nehotové" je v poriadku.)
 - **DOGFOODING drží len otvorené postrehy.** Vyriešené idú plným textom do
   `archiv/DOGFOODING_vyriesene.md` a **index vyriešených je tam tiež** — nie tu.
+  (Guard: DOGFOODING nesmie mať nadpis s „Vyriešené" ani „Zavreté".)
+- **Každý koncept v `zdroje/next_sessions/`** nesie riadok `> Stav: KONCEPT` ako **prvý
+  obsahový riadok hneď pod H1** — nie kdekoľvek v súbore.
 - **STAV je krátky** (max 80 riadkov a 12 kB) a má stabilnú kostru piatich sekcií.
   Nahradený text ide odsekom navrch „Záznamy dávok" v `archiv/KRONIKA.md`.
 - **Žiadny riadok nad 400 znakov** v živých docs — jeden odsek na jednom obrom riadku
@@ -62,5 +65,15 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
   **Dočasná výnimka:** [STANDARD.md](STANDARD.md) (20 dlhých riadkov) a
   [POJMY.md](POJMY.md) (22) v guarde zatiaľ **nie sú** — reflow v **dávke C
   (STANDARD refresh)**, potom sa oba pridajú do zoznamu.
+## Pravidlá — procesné (guard ich NEstráži)
+
+*(Nedajú sa overiť testom — drží ich dohoda a review. Nepredstieraj, že ich niečo stráži.)*
+
+- **Živý dokument neberie podklad zo `zdroje/` ako autoritu.** Odkazovať naň je v poriadku
+  a PLAN to legitímne robí (seed podklady, merač D-25, mockupy) — **odkaz nie je autorita**.
+  Záväzné znenie patrí do [STANDARD.md](STANDARD.md), [PLAN.md](PLAN.md) alebo `docs/`.
+  Testom sa to overiť nedá: rozdiel medzi „citujem podklad" a „stojím na ňom" je vo význame
+  vety, nie v tvare odkazu. Jediná výnimka vo vrstve `zdroje/` je menovite uvedený
+  `ui20/UI20_KONTRAKT.md` (vyššie).
 - **Po každej väčšej otestovanej dávke sa docs aktualizujú** podľa **checklistu uzáveru
   dávky** v [../CLAUDE.md](../CLAUDE.md) — nie „niekedy neskôr", ale v tej istej dávke.

@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.8.3 · 25.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.8.4 · 26.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -18,17 +18,19 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.3:** 1894 headless · 67 JS sád · posledný plný in-SketchUp beh **969 PASS / 0 FAIL** (vetva #227; novšie dávky boli klientske alebo dokumentačné).
+**Testy k v0.8.4:** **1906 headless** · 67 JS sád · posledný plný in-SketchUp beh **969 PASS / 0 FAIL** (vetva #227; novšie dávky boli klientske alebo dokumentačné).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom (audit pred kódom + review pred mergom, 15 kôl). Od **#227** review robí zase Codex, takže **post-hoc sweep sa týka presne #186–#226** ([PLAN.md](PLAN.md), blok 1b/E).
 
 ## Robí sa
 
-**BLOK DOCS CLEANUP — upratovanie dokumentácie, bez zmeny kódu pluginu.** Docs sú pamäť agentov; cieľom je, aby mal každý živý dokument JEDNU rolu, história bola v archíve a pravidlá strážili guardy.
+**BLOK DOCS CLEANUP — upratovanie dokumentácie.** Docs sú pamäť agentov; cieľom je, aby mal každý živý dokument JEDNU rolu, história bola v archíve a pravidlá strážili guardy.
+Správanie pluginu sa nemení — dávka B však siahla na **jeden komentár v `ui/js/studio.js`** (odkaz na presunutý dokument), takže podľa pravidiel repa nesie **bump patch v0.8.3 → v0.8.4** aj prepis všetkých `?v=`.
 
 - **A — HOTOVÁ** (PR **#232**, 26.8.): mapa modulov sa rozdelila z jedného 260 kB súboru do `docs/architecture/` (6 tematických súborov, rozcestník ostal v `docs/ARCHITEKTURA.md`). Nové guardy: **žiadny riadok nad 400 znakov** a **pokrytie modulov** — každý ruby modul `core/`, `modules/` aj `ui/` musí mať vlastný nadpis `### <meno>.rb`, riadok v tabuľke rozcestníka a jednoznačné meno súboru.
 - **B — TÁTO DÁVKA** (26.8.): to isté upratanie pre `SYSTEM/` — nová mapa autorít [README.md](README.md), STAV prepísaný nakrátko, hotový blok UI 2.0 a index vyriešených
   D-čísel do archívu, vízie do archívu, koncepty v `zdroje/next_sessions/` označené statusom, guardy rozšírené (veľkosť STAV, dĺžka riadku, „hotové veci patria do archívu").
+  **v0.8.4** — bump si vyžiadala oprava jedného komentára v `studio.js` z review kola 2.
 - **C — NASLEDUJE:** refresh [STANDARD.md](STANDARD.md) (má ešte dlhé riadky, preto sa do guardu dĺžky pridáva až dávkou C).
 
 ## Ďalší krok

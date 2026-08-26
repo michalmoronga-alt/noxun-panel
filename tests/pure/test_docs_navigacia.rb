@@ -74,9 +74,9 @@ end
 # Hotovy blok patri do archivu, nie do planu. Nadpis s "KOMPLET", "HOTOVE" alebo fajkou
 # znamena, ze sa uzavrety blok v PLAN.md zabudol presunut do archiv/ROADMAP_hotove_etapy.md.
 # Slovnik repa pozna obe slova, preto sa chytaju obe — a case-insensitive, lebo nadpisy
-# ich pisu raz verzalkami, raz normalne. Negativny lookbehind na "ne" je nutny: "nehotove"
-# je opak a v pláne je legitimne (review #233 P2).
-NX_PLAN_DONE_RE = /(?<!ne)hotov[éeo]|komplet|✅/.freeze
+# ich pisu raz verzalkami, raz normalne. Hranica je ZACIATOK SLOVA (rovnaky idiom ako
+# NX_DOG_DONE_RE nizsie): "nehotove" je opak a v plane je legitimne (review #233 P2).
+NX_PLAN_DONE_RE = /(?<![[:alpha:]])(?:hotov[éeo]|komplet)|✅/.freeze
 NxTest.test('docs: PLAN.md nema nadpis hotoveho bloku (KOMPLET / HOTOVE / fajka)') do
   path = File.join(NxTest::ROOT, 'SYSTEM', 'PLAN.md')
   offenders = File.read(path, encoding: 'UTF-8').lines.map(&:rstrip).select do |l|
@@ -88,11 +88,17 @@ NxTest.test('docs: PLAN.md nema nadpis hotoveho bloku (KOMPLET / HOTOVE / fajka)
 end
 
 # To iste pre zapisnik: vyriesene D-cisla ziju v archive (plny text + index), tu by
-# len duplikovali a rastli donekonecna.
-NxTest.test('docs: DOGFOODING.md nema sekciu vyriesenych') do
+# len duplikovali a rastli donekonecna. Slovnik repa pozna "vyriesene" aj "zavrete"
+# (D-26 je "ZAVRETE bez implementacie"), preto sa chytaju obe a case-insensitive.
+#
+# Hranica je ZACIATOK SLOVA, nie holy include: je to silnejsie nez lookbehind na "ne"
+# a chyta obe pasce naraz — "nevyriesene" (opak) aj "uzavretom" (v ktorom je "zavreto"
+# ako podretazec). Oboje je legitimny text nadpisu (review #233 kolo 2 P2).
+NX_DOG_DONE_RE = /(?<![[:alpha:]])(?:vyriešen|zavret)/.freeze
+NxTest.test('docs: DOGFOODING.md nema sekciu vyriesenych (Vyriesene / Zavrete)') do
   path = File.join(NxTest::ROOT, 'SYSTEM', 'DOGFOODING.md')
   offenders = File.read(path, encoding: 'UTF-8').lines.map(&:rstrip).select do |l|
-    l.start_with?('#') && l.include?('Vyriešené')
+    l.start_with?('#') && l.downcase.match?(NX_DOG_DONE_RE)
   end
   NxTest.assert(offenders.empty?,
                 "DOGFOODING.md ma sekciu vyriesenych (#{offenders.join(' · ')}) — plny text aj " \

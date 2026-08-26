@@ -7,11 +7,13 @@
 > **Postrehy Michala sa píšu HNEĎ**, hocikedy a na hociktorú tému — zaradenie robí agent (plné pravidlo: [PLAN.md](PLAN.md), sekcia „Pravidlo pre postrehy").
 > **Kde je zvyšok:** história zápisníka (priebežné stavy, 2A migračná mapa, hardening a sedenia V0.5, priebeh seedu, zodpovedané otázky) → [archiv/DOGFOODING_historia.md](archiv/DOGFOODING_historia.md) · odpočet merača D-25 → [zdroje/MERAC_D25_odpocet_2026-08.md](zdroje/MERAC_D25_odpocet_2026-08.md) · história dávok → [archiv/KRONIKA.md](archiv/KRONIKA.md).
 
-## UI 2.0 — štúdio okno a výbery (zvyšky po uzavretom bloku)
+## UI dlhy — k bloku 1b (STABILIZAČNÁ REVÍZIA)
 
-*(Blok **1 · UI 2.0** je od v0.8.0 uzavretý a jeho plný text žije v
-[archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md). Tieto postrehy sa v ňom
-nevyriešili — čakajú na zaradenie do niektorého z otvorených blokov [PLAN.md](PLAN.md).)*
+*(Blok **1 · UI 2.0** je od v0.8.0 hotový a jeho plný text žije v
+[archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md). Postrehy nižšie sa v ňom
+nevyriešili, takže od 26.8.2026 visia na bloku **1b · STABILIZAČNÁ REVÍZIA**, odrážka **F**
+v [PLAN.md](PLAN.md) — menovite **D-27** a **D-51**. **D-106** a **D-107** majú vlastné
+zaradenie priamo v texte položky.)*
 
 - **D-51 · Štandard veľkostí okien a tlačidiel** (Michal 31.7. večer) — zjednotiť šírky, rozmery a rozmiestnenie naprieč oknami (panel, Materiály, Výroba, Pravidlá, Šablóny) — dohodnúť konkrétne
   hodnoty do UI_DIZAJN.md **pred prvým testovaním Lucie („skúška ohňom")**. *Stav: ČIASTOČNE — UI-B1 (PR #168) zaviedol mechaniku aj tabuľku rozmerov okien v UI_DIZAJN.md a vyplnil riadok Inspectora

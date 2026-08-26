@@ -63,6 +63,10 @@ použiteľný), ale všetko je pomenované, aby sa to nestratilo.
 - **`material_id` v ABS zázname zberu je mŕtve pole** (`bom.rb`) — použiť alebo vyhodiť.
 - **Duplicita s Kontrolou pri vypnutom kovaní** (ORANGE nález + jantárový riadok) — VEDOMÁ, formulácie držať oddelené (rozhodnutie vs. správnosť).
 
+**F · UI dlhy po zaniknutom bloku UI 2.0** — otvorené postrehy, ktoré blok UI 2.0 nevyriešil a ktoré po jeho archivácii (26.8.) ostali bez bloku. Zaradenie je **mechanické, nie prioritizačné**
+  (poradie určí Michal): **D-27** rýchle zobraziť/skryť tagy z panela · **D-51** štandard veľkostí okien a tlačidiel. Plné znenia sú v [DOGFOODING.md](DOGFOODING.md), skupina **„UI dlhy — k bloku 1b"**;
+  do tej istej skupiny patrí aj **výklop ako samostatný typ čela** (bez D-čísla) a otvorené **D-106** / **D-107**, ktoré však majú vlastné zaradenie (D-106 blok 4, D-107 zásobník po V1).
+
 **E · Post-hoc Codex sweep #186–#226.** Rozsah je JEDNO číslo naprieč STAV, PLAN aj KRONIKOU a znamená presne toto: **dávky, ktorých primárnym reviewerom bol slepý subagent, lebo Codex bol 21.–24.8.
   nedostupný**. Od **#227** review robí Codex, takže #227 aj #228 sú mimo sweepu. Keď má Codex kapacitu, prejsť tie PR spätne — nie kvôli nedôvere v subagenta (chytil o. i. spiacu mínu duplicitných
   kódov), ale preto, že je to iný pohľad na dávky, ktoré medzitým tvoria základ celej fázy.

@@ -293,7 +293,8 @@
     return 'bez smeru';
   }
 
-  // ABS kompakt „L1:1 · W1:2" s tooltipom plneho znenia (UI_VIZIA riadok 15).
+  // ABS kompakt „L1:1 · W1:2" s tooltipom plneho znenia — polozka „Kusovnik
+  // (zoskupene dielce)" v tabulke UI_VIZIA (SYSTEM/archiv/UI_VIZIA_2026-07.md).
   //
   // Kody hran ostavaju KANONICKE (L1/L2/W1/W2) a ZAMERNE sa neprekladaju na
   // „predná/zadná/ľavá/pravá": ten isty kod znamena pri kazdej role INU fyzicku

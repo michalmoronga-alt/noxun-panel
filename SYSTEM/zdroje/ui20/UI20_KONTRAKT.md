@@ -35,7 +35,7 @@
 - **Hover akcie riadku** (ikony vpravo pri hoveri: označ v modeli · uprav · detail) — šetria
   stĺpce, tabuľka ostáva čistá.
 - **Voliteľné stĺpce tabuľky** (prepínač stĺpcov v rohu — Lucia nepotrebuje vidieť to, čo Michal).
-- **ABS kompakt v stĺpci** („P:1 · L:2" štýl z UI_VIZIA riadok 15) s tooltipom plného znenia.
+- **ABS kompakt v stĺpci** („P:1 · L:2" štýl z položky **„Kusovník (zoskupené dielce)"** v tabuľke [UI_VIZIA](../../archiv/UI_VIZIA_2026-07.md)) s tooltipom plného znenia.
 - **Tlačiteľné etikety dielcov** — v mockupe len ako položka exportov (placeholder, po V1).
 - **Sekcia = vlastný obsah + vlastné nástroje hore** (OCL má per-tab toolbar) — náš vzor:
   lišta sekcie s primárnou akciou vľavo a exportmi vpravo.
