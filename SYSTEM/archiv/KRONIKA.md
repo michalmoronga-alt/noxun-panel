@@ -17,6 +17,42 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1b-2 · CHARAKTERIZAČNÉ IN-SU SCENÁRE observer/Undo/multi-model — brána H bloku 1b (27.8.2026):** vetva `test/1b2-charakterizacne-scenare`, **VERZIA SA NEBUMPUJE** — pribudli
+  výhradne testy, kód pluginu je bajt po bajte ten istý (v0.8.6). Zmysel dávky je poistka, nie funkcia: **kým sa v bloku 1d siahne na buildery a observery, musí byť napísané, čo
+  robia dnes.** Bez toho by sa každý neskorší refaktor obhajoval slovami „veď to funguje rovnako" a nikto by to nevedel overiť.
+  **Čo pribudlo:** sekcia `run_char` v `tests/sketchup/su_runner.rb` (registrovaná do async reťaze vzorom `run_stale`, runner sa NEREFAKTOROVAL — jeho 9 000 riadkov sú nález pre
+  1c), **42 nových assertov** v šiestich scenároch: **CH1** kópia skrinky · **CH2** `*N` násobenie (3 kópie v jednej operácii) · **CH3** Undo reťaz · **CH4** prerušenie operácie ·
+  **CH5** scale nástrojom Mierka · **CH6** prepnutie modelu (Windows vetva). Scenáre bežia cez REÁLNY debounce tick observera, nie cez priame volanie dedupu.
+  **Čo sa tým zafixovalo (dnešné správanie, nie návrh nového):** kópia dostáva vlastné `cabinet_id`, vlastnú definíciu (`make_unique`) a prepočítané `part_id`; `part_key` ostáva
+  ROLOU (množina dielcov kópie = množina originálu). Config kópie je **zhodný s originálom až na ODVODENÚ IDENTITU ZÓN** — `zone_tree.walk` skladá z `cabinet_id` polia `id`
+  **aj `parent`**; trvalým kľúčom je `stable_id` (= `node_id` stromu), lebo cez `PartKeys.zone` vstupuje do `part_key`, ktorým sú kľúčované `part_overrides`. Fixture je preto
+  ROZDELENÁ skrinka — na nedelenej je `parent` všade `nil` a invariant by sa nemal na čom zlomiť. (Pôvodné očakávanie „config je bit po bite rovnaký" bolo nesprávne, nie kód —
+  našiel to prvý beh; že tam patrí aj `parent`, našlo slepé review #239.) `*3` násobenie dá štyri identity, **žiadne zdieľané `part_id`** a **kusovník hlásiaci štyri kusy každého
+  dielca** — násobenie sa meria až vo výrobnom výstupe, nie na počte inštancií. Jedno Undo vráti celú dávku naraz (dedup sa lepí na paste krok). Absorpcia scale **nepridáva
+  vlastný undo krok** a jej výsledok sa **dielec po dielci** rovná tomu, čo postaví regenerate na tie isté rozmery (referenčná skrinka sa stavia PRVÁ, takže záverečné Undo meria
+  presne scale). **Prerušenie operácie** ruší celé torzo: sonda necháva `build_into` dobehnúť CELÉ (dielce aj projektové snapshoty kovania) a hodí výnimku až nad hotovým torzom,
+  takže sa dá overiť rollback geometrie, definícií dielcov **aj modelových atribútov** — po aborte nie sú v projekte ani snapshoty `hardware_rules`/`hardware_sets`, hoci ich tá
+  istá cesta pri úspešnom commite preukázateľne zapíše (kontrolná vzorka v CH4b). Prekrytia sa v CH6 **naozaj zapínajú**, takže platí obojstranne: aktivácia toho istého dokumentu
+  ich nezhasína (guard `same_model?`), kým udalosť o dokumente s iným `guid` ich zhasnúť musí.
+  **Čo sa spustiť NEDÁ a je zapísané ako MANUÁLNY scenár** (plné znenie postupu je priamo v INFO riadkoch behu, aby ho testujúci našiel tam, kde ho potrebuje): **(a) Znova
+  (Ctrl+Y) po scale** — `send_action('editRedo')` na tomto Windows builde vráti `false` a nespraví nič (Ruby API nemá na Windows spoľahlivú redo akciu, otvorený bod v PLANe, blok
+  3 STABILITA); vetva sa kvalifikuje ÚČINKOM, nie návratovou hodnotou — lekcia D-101. **(b) Dva otvorené dokumenty naraz** — Windows drží jeden dokument na proces (SDI), takže je
+  to macOS scenár; automaticky sa overuje aspoň DÁTOVÁ ŠTRUKTÚRA guardov (`@requested` je množina per dokument, `scale_observer.rb:149-150, 194-200`), samotné prepnutie ostáva
+  manuálne.
+  **Slepé review #239 (jedno kolo, merge nebol blokovaný) našlo dve VÁKUOVÉ miesta** a obe sú opravené: **(1)** CH6 porovnávalo dva VYPNUTÉ overlaye (`false == false`), takže by
+  prešlo, aj keby `model_switched` prekrytia tvrdo zhasínal — dnes sa najprv zapnú a overujú sa OBE vetvy guardu; **(2)** sonda CH4 raisla na prvom riadku `build_into`, takže
+  v modeli bola len prázdna definícia a assert cez počet skriniek bol tautológia (inštancia sa pridáva až PO `build_into`) — dnes sonda stavia celé torzo vrátane snapshotov. Ďalej
+  sa upravili tri nadnesené štítky (zmizol assert merajúci vlastný setup, „v celom modeli" je dnes „medzi dielcami všetkých štyroch skriniek", „trojnásobný re-attach je
+  idempotentný" je dnes „opakovaná aktivácia dedup nerozbije" — počet observerov sa nemeria) a formulácia o `stable_id` sa spresnila na skutočnú cestu cez `PartKeys.zone`.
+  **Mutačné overenie (2 behy, 7 zámerných poškodení):** prvé kolo — kópia vytvorená v `ScaleWatch` guarde zhodila 6 assertov identity · referenčná skrinka na inú výšku zhodila
+  porovnanie CH5 · `abort_operation` → `commit_operation` zhodilo tri asserty CH4b (**11 FAIL**). Druhé kolo nad opravenými assertmi — aktivácia dokumentu prerobená na vypínaciu
+  cestu zhodila CH6 („prekrytia nezhasínajú" hlási `false/false`) · sonda vrátená do vákuového tvaru zhodila „sonda naozaj postavila torzo" · fixture bez priečky zhodila
+  `parent` vetvu CH1 · dve kópie namiesto troch zhodili kusovníkový assert (`3/6/3/3` namiesto `4/8/4/4`) — **6 FAIL**, každý presne na svojom mieste.
+  **Nález na kandidáta do registra 1c:** `@stable_transforms` v `scale_observer.rb` je kľúčovaná `[model.object_id, entityID]` a **nikto z nej nemaže** — po zmazaní skriniek aj po
+  prepnutí dokumentu v nej záznamy ostávajú navždy (v plnom behu cez 100 záznamov). Nie je to výrobné riziko (hygiena/pamäť), preto ide do registra, nie do hotfixu; dnešné
+  správanie test zafixoval a priznal INFO riadkom.
+  **Testy:** headless **1917 PASS / 0 FAIL** · 69 JS sád · plný in-SketchUp beh **1011 PASS / 0 FAIL / 0 SKIP** (predtým 969 — celý prírastok je táto sada).
+
 - **1b-1 · OPTIMISTICKÝ ZÁMOK NASTAVENÍ — brána A bloku 1b (27.8.2026):** vetva `fix/1b1-settings-zamok`, **v0.8.6**. Dávka spláca dlh priznaný v review **#227 kolo 4** (PLAN blok 1b,
   odrážka A) a je to **oprava chýb**, teda vedomá zmena správania — nie refaktor. Klientske + serverové hláškovacie cesty; **žiadna modelová zapisovacia cesta** (nastavenia sú JSON
   store v `%APPDATA%`), preto sa in-SketchUp beh nekonal.

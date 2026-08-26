@@ -67,6 +67,14 @@
 #        -> interne undo nastroja MUSI odstranit kopiu (ziadna zombie) -> pole 4 kopii
 #        = presne 5 dosiek s 5 ID na 5 roznych miestach; S6b = zachytna siet v KONTROLE
 #        (Bom.collect placements -> Validation duplicate_position -> klik oznaci obe)
+#     CHAR (davka 1b-2, BRANA H bloku 1b): CHARAKTERIZACNA sada — zapisuje, co
+#        kod DNES robi, PRED hardeningom builderov/observerov (blok 1d) a pred
+#        GHOST Tool vrstvou. CH1 kopia skrinky · CH2 `*N` nasobenie · CH3 Undo
+#        retaz (vetva Znova = MANUALNY scenar) · CH4 prerusenie operacie (sonda
+#        nad `build_into` + rucny abort_operation) · CH5 scale nastrojom Mierka
+#        = presne regenerate vystup · CH6 prepnutie modelu, WINDOWS vetva
+#        (macOS multi-dokument je zdokumentovany MANUALNY scenar). Padnuty CHAR
+#        test NEZNAMENA „oprav test", ale „spravanie sa zmenilo — povedz preco".
 #
 # Cistenie: kazdy scenar maze svoje korpusy v ScaleWatch.guard (inak by debounce
 # timer po skonceni testu vykonal dedup/prune nekontrolovane) + purge_unused.
@@ -8311,6 +8319,549 @@ module NoxunSuRunner
     sync_purge_test_decors(ST2D_DECOR)
   end
 
+  # ===========================================================================
+  # 1b-2 / BRANA H: CHARAKTERIZACNA sada observer / Undo / prepnutie modelu
+  # ===========================================================================
+  # ZAMER (PLAN.md, blok 1b, odrazka H): zapisat, co kod DNES robi — PRED
+  # akymkolvek hardeningom builderov a observerov (blok 1d) a pred GHOST Tool
+  # vrstvou. Ziadny scenar tu NIE JE navrhom noveho spravania: ak je dnesne
+  # spravanie sporne, test ho aj tak zafixuje a podozrenie ide do registra 1c.
+  # Padnuty CHAR test preto NEZNAMENA „oprav test" — znamena „spravanie sa
+  # zmenilo, povedz PRECO a ci to bolo zamerne".
+  #
+  #   CH1 KOPIA skrinky (Ctrl+C/V) nad ROZDELENOU skrinkou — vlastna identita;
+  #       config prezije KOMPLETNY az na ODVODENU identitu zon (`id` a pri
+  #       vnorenej zone aj `parent`), ktora ide s novym cabinet_id, kym
+  #       `stable_id` (vstupuje do `PartKeys.zone`, teda do `part_key`, ktorym
+  #       su klucovane `part_overrides`) ostava; part_key ostava rolou, part_id
+  #       sa prepocita, 1x Undo vrati kopiu celu.
+  #   CH2 `*N` NASOBENIE (3 kopie v JEDNEJ operacii) — tri vlastne identity,
+  #       ziadne zdielane part_id v modeli, 1x Undo vrati celu davku.
+  #   CH3 UNDO RETAZ: postav -> scale -> Undo -> Undo (absorpcia NEPRIDALA
+  #       vlastny krok). Vetva ZNOVA je na Windows cez Ruby API nespolahliva
+  #       (PLAN, blok 3 STABILITA) — kvalifikuje sa UCINKOM a bez ucinku ostava
+  #       MANUALNYM scenarom (presny postup v INFO riadku scenara).
+  #   CH4 PRERUSENIE OPERACIE — sonda necha `build_into` dobehnut CELE (dielce
+  #       aj projektove snapshoty kovania) a az potom hodi vynimku, takze
+  #       `abort_safely` rusi SKUTOCNE TORZO; plus rucny `abort_operation`
+  #       uprostred pouzivatelovej kopie. Overuje sa rollback geometrie
+  #       (definicie dielcov), instancii AJ modelovych atributov, a ze
+  #       prerusenie nenecha undo krok navyse.
+  #   CH5 SCALE nastrojom Mierka (simulovany transformaciou) — absorpcia je
+  #       PRESNE to, co by postavil regenerate: porovnanie dielec po dielci
+  #       s referencnou skrinkou postavenou rovno na cielove rozmery; a je to
+  #       JEDEN undo krok.
+  #   CH6 PREPNUTIE MODELU — WINDOWS vetva. Windows drzi JEDEN dokument na
+  #       proces (SDI), takze realne prepnutie dvoch dokumentov sa tu spustit
+  #       NEDA a je zapisane ako MANUALNY scenar (INFO na konci CH6). Spustitelne
+  #       je: prekrytia sa ZAPNU a overi sa OBOJE — aktivacia toho isteho
+  #       dokumentu ich nezhasina (guard `same_model?` drzi), kym udalost
+  #       o dokumente s INYM `guid` ich zhasnut MUSI; dalej ze opakovana
+  #       aktivacia dedup nerozbije a nerobi undo krok, a datova struktura
+  #       multi-model guardov (`scale_observer.rb:149-150, 194-200`).
+  #
+  # Kroky sa pripajaju do TEJ ISTEJ async retaze ako S1–S6 (vzor `run_stale`),
+  # aby scenare bezali cez REALNY debounce tick observera, nie cez priame
+  # volanie dedupu.
+
+  # NOXUN atributy, ktore kopia dedi pri Ctrl+C/V (skrinka).
+  CHAR_ATTRS = %w[std kind id cabinet_id template_id role part_key_schema
+                  manufactured production_class config].freeze
+
+  def char_parts(inst)
+    return [] unless inst && inst.valid?
+    inst.definition.entities.grep(Sketchup::ComponentInstance)
+        .select { |i| e::Store.kind(i) == 'part' }
+  end
+
+  # Vyrobny odtlacok skrinky: part_key -> [rozmery boxu, lokalny origin].
+  # Porovnava sa dielec po dielci — „rovnaka sirka korpusu" nie je dokaz, ze
+  # sa prepocitali aj DETI.
+  def char_geo(inst)
+    char_parts(inst).each_with_object({}) do |p, h|
+      b = p.definition.bounds
+      o = p.transformation.origin
+      h[e::Store.get(p, 'part_key').to_s] =
+        [mm(b.width).round(2), mm(b.height).round(2), mm(b.depth).round(2),
+         mm(o.x).round(2), mm(o.y).round(2), mm(o.z).round(2)]
+    end
+  end
+
+  # Config BEZ ODVODENEJ identity zon. `zone_tree.walk` sklada z `cabinet_id`
+  # DVE polia: `id` (`CAB-002-Z1`) a pri vnorenej zone aj `parent`
+  # (`CAB-002-Z1`) — obe sa pri kopii legitimne menia. Trvalym klucom zony je
+  # `stable_id` (= `node_id` stromu): vstupuje do `PartKeys.zone`, a teda do
+  # `part_key`, ktorym su klucovane `part_overrides` (`cabinet_builder.rb`
+  # `migrate_overrides`) aj zaznamy zberu. Vsetko ostatne musi kopirovanie
+  # prezit nedotknute.
+  def char_cfg_wo_zone_identity(cfg)
+    c = e::JsonFileStore.deep_copy(cfg || {})
+    Array(c['zones']).each do |z|
+      next unless z.is_a?(Hash)
+      z.delete('id')
+      z.delete('parent')
+    end
+    c
+  end
+
+  # POZOR na rozsah: zbiera part_id LEN z dielcov KORPUSOV (samostatne dosky
+  # maju vlastnu identitu `BRD-xxx` a v CHAR scenaroch nevystupuju).
+  def char_part_ids(model)
+    out = []
+    cabinets(model).each { |c| char_parts(c).each { |p| out << e::Store.get(p, 'part_id').to_s } }
+    out
+  end
+
+  # Simulacia pouzivatelskeho Ctrl+C/V (aj `*N`): nove instancie ZDIELANEJ
+  # definicie + zdedene NOXUN atributy v JEDNEJ operacii BEZ guardu, takze
+  # observer ich vidi presne tak ako kopiu z ruky pouzivatela.
+  def char_copy(model, inst, offsets, op_name)
+    model.start_operation(op_name, true)
+    copies = Array(offsets).map do |dx|
+      tr = inst.transformation * Geom::Transformation.translation(e::Units.vector(dx, 0, 0))
+      c = model.entities.add_instance(inst.definition, tr)
+      CHAR_ATTRS.each { |k| v = e::Store.get(inst, k); c.set_attribute('NOXUN', k, v) unless v.nil? }
+      c
+    end
+    model.commit_operation
+    copies
+  end
+
+  # Sonda CH4 (review #239, P2-2): `build_into` sa vykona CELY — postavi vsetky
+  # dielce do `cdef` a zapise projektove snapshoty (`HardwareRules
+  # .ensure_project_rules!`, `HardwareSets.ensure_project_state!`) — a AZ POTOM
+  # hodi vynimku. Tym je v otvorenej operacii SKUTOCNE TORZO (geometria aj
+  # modelove atributy), takze `abort_safely` ma co vratit; sonda, ktora by
+  # raisla na prvom riadku, by testovala prazdnu definiciu a nic nedokazala.
+  # Instaluje sa a odstranuje VZDY v jednom kroku (begin/ensure) — sonda, ktora
+  # prezije FAIL, by rozbila cely zvysok behu.
+  def char_probe_note(entities_built)
+    @char_probe_built = entities_built
+  end
+
+  def char_probe_built
+    @char_probe_built
+  end
+
+  def char_install_build_probe
+    return if e::CabinetBuilder.singleton_class.method_defined?(:nx_char_orig_build_into)
+    char_probe_note(nil)
+    e::CabinetBuilder.singleton_class.send(:alias_method, :nx_char_orig_build_into, :build_into)
+    e::CabinetBuilder.define_singleton_method(:build_into) do |*args, **kw|
+      nx_char_orig_build_into(*args, **kw) # cele torzo: dielce + projektove snapshoty
+      cdef = args[1]
+      NoxunSuRunner.char_probe_note(cdef.entities.length) if cdef.respond_to?(:entities)
+      raise 'CHAR sonda: simulovane zlyhanie PO postaveni dielcov (torzo v otvorenej operacii)'
+    end
+  end
+
+  def char_remove_build_probe
+    return unless e::CabinetBuilder.singleton_class.method_defined?(:nx_char_orig_build_into)
+    e::CabinetBuilder.singleton_class.send(:alias_method, :build_into, :nx_char_orig_build_into)
+    e::CabinetBuilder.singleton_class.send(:remove_method, :nx_char_orig_build_into)
+  end
+
+  # Zastupca CUDZIEHO dokumentu. Guard `same_model?` v EdgeCheck aj GrainCheck
+  # porovnava `guid`, takze na spustenie VYPINACEJ vetvy staci objekt s inym
+  # guidom — `disable!` pracuje s ulozenym `@model` (skutocnym dokumentom),
+  # nie s tymto objektom.
+  class CharForeignModel
+    def guid
+      'CHAR-FOREIGN-GUID'
+    end
+  end
+
+  def run_char(model, state, steps)
+    # --- CH1: KOPIA SKRINKY -------------------------------------------------
+    steps << [0.5, lambda do
+      cleanup(model)
+      inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 640.0,
+                                              'height' => 700.0, 'depth' => 490.0 })
+      cid = e::Store.get(inst, 'cabinet_id').to_s
+      # FIXTURE S PRIECKOU (review #239, P3-3): na NEDELENEJ skrinke ma strom
+      # jedinu korenovu zonu a `parent` je vsade nil — invariant „identita zije
+      # len v odvodenych poliach zony" by sa nemal na com zlomit. Delenie prida
+      # vnorene zony, ktorych `parent` je tiez odvodeny z cabinet_id.
+      e::Panel.select_only(model, inst)
+      e::Panel.handle_split_zone({ 'zone_id' => "#{cid}-Z1", 'axis' => 'v', 'count' => 2,
+                                   'model_guid' => e::Panel.model_guid(model),
+                                   'cabinet_id' => cid }.to_json)
+      inst = e::Panel.find_cabinet_by_id(model, cid)
+      state[:ch1] = inst
+      state[:ch1_cid] = cid
+      state[:ch1_cfg] = e::JsonFileStore.deep_copy(e::Store.config(inst) || {})
+      ok('CH1 fixture: skrinka je ROZDELENA, takze strom nesie aj vnorene zony s `parent`',
+         Array(state[:ch1_cfg]['zones']).any? { |z| !z['parent'].nil? })
+      state[:ch1_keys] = char_parts(inst).map { |p| e::Store.get(p, 'part_key').to_s }.sort
+      state[:ch1_pids] = char_parts(inst).map { |p| e::Store.get(p, 'part_id').to_s }.sort
+      state[:ch1_copy] = char_copy(model, inst, [800.0], 'SU-TEST CH1 user copy').first
+    end]
+    steps << [SETTLE, lambda do
+      orig = state[:ch1]
+      cp = state[:ch1_copy]
+      new_cid = cp && cp.valid? ? e::Store.get(cp, 'cabinet_id').to_s : nil
+      ok("CH1: kopia dostala VLASTNU identitu (#{state[:ch1_cid]} -> #{new_cid}) a original si drzi svoju",
+         !new_cid.nil? && new_cid != state[:ch1_cid] &&
+         orig && orig.valid? && e::Store.get(orig, 'cabinet_id').to_s == state[:ch1_cid])
+      cp_cfg = cp && cp.valid? ? (e::Store.config(cp) || {}) : {}
+      ok('CH1: config kopie je ZHODNY s originalom az na ODVODENU identitu zon (`id` + `parent`) — rozmery, materialy, ABS, kovanie aj part_overrides prezili kopirovanie',
+         char_cfg_wo_zone_identity(cp_cfg) == char_cfg_wo_zone_identity(state[:ch1_cfg]))
+      cp_zones = Array(cp_cfg['zones'])
+      or_zones = Array(state[:ch1_cfg]['zones'])
+      ok("CH1: `id` AJ `parent` zon sli s NOVYM cabinet_id, `stable_id` (vstupuje do part_key, teda do klucov part_overrides) ostal (#{cp_zones.map { |z| z['id'] }.join(', ')})",
+         !cp_zones.empty? &&
+         cp_zones.map { |z| z['stable_id'] } == or_zones.map { |z| z['stable_id'] } &&
+         cp_zones.map { |z| z['id'] } != or_zones.map { |z| z['id'] } &&
+         cp_zones.all? { |z| z['id'].to_s.start_with?(new_cid.to_s) } &&
+         cp_zones.any? { |z| !z['parent'].nil? } &&
+         cp_zones.select { |z| z['parent'] }.all? { |z| z['parent'].to_s.start_with?(new_cid.to_s) })
+      cp_keys = char_parts(cp).map { |p| e::Store.get(p, 'part_key').to_s }.sort
+      cp_pids = char_parts(cp).map { |p| e::Store.get(p, 'part_id').to_s }.sort
+      ok("CH1: part_key je ROLA — mnozina dielcov kopie je rovnaka ako originalu (#{cp_keys.length} dielcov)",
+         !cp_keys.empty? && cp_keys == state[:ch1_keys])
+      ok("CH1: part_id sa prepocitali pod NOVYM cid — ziadny prienik s originalom (#{(cp_pids & state[:ch1_pids]).inspect})",
+         !cp_pids.empty? && (cp_pids & state[:ch1_pids]).empty?)
+      ok('CH1: kopia ma VLASTNU definiciu (make_unique) — uprava jednej neprepise druhu',
+         cp && cp.valid? && orig && orig.valid? && cp.definition != orig.definition)
+      Sketchup.undo
+    end]
+    steps << [SETTLE, lambda do
+      cp = state[:ch1_copy]
+      gone = cp.nil? || !cp.valid?
+      cids = cabinets(model).map { |i| e::Store.get(i, 'cabinet_id').to_s }
+      ok("CH1: 1x Undo vratil kopiu CELU — ziadne torzo s novym ID (kopia prec=#{gone}, korpusy: #{cids.sort.join(', ')})",
+         gone && cids == [state[:ch1_cid]])
+      state[:ch1_after] = cids.sort
+    end]
+    steps << [SETTLE, lambda do
+      # Prazdny krok je TU ZAMER: po Undo uz observer NESMIE nic dorobit —
+      # ziadny oneskoreny tik, ktory by kopiu vzkriesil alebo pridal krok.
+      cids = cabinets(model).map { |i| e::Store.get(i, 'cabinet_id').to_s }.sort
+      ok("CH1: po Undo uz ziadny oneskoreny tik do modelu nesiahol (korpusy: #{cids.join(', ')})",
+         cids == state[:ch1_after])
+      cleanup(model)
+    end]
+
+    # --- CH2: `*N` NASOBENIE SKRINKY ---------------------------------------
+    steps << [0.5, lambda do
+      inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
+                                              'height' => 720.0, 'depth' => 510.0 })
+      state[:ch2] = inst
+      state[:ch2_cid] = e::Store.get(inst, 'cabinet_id').to_s
+      # Kusovnik JEDNEJ skrinky = referencia: po `*3` musi kazdy riadok narast
+      # PRESNE 4x. To meria vyrobny dosledok nasobenia (styri kusy v objednavke),
+      # nie moj vlastny setup.
+      state[:ch2_rows] = bom_rows(model)
+      state[:ch2_copies] = char_copy(model, inst, [700.0, 1400.0, 2100.0],
+                                     'SU-TEST CH2 user copy array *3')
+    end]
+    steps << [SETTLE, lambda do
+      cabs = cabinets(model)
+      cids = cabs.map { |i| e::Store.get(i, 'cabinet_id').to_s }
+      pids = char_part_ids(model)
+      ok("CH2: `*3` nasobenie — 4 skrinky so 4 VLASTNYMI identitami (#{cids.sort.join(', ')})",
+         cabs.length == 4 && cids.uniq.length == 4 && cids.include?(state[:ch2_cid]))
+      ok("CH2: medzi dielcami VSETKYCH styroch skriniek nie je ani jedno zdielane part_id (#{pids.length} dielcov, #{pids.uniq.length} unikatnych)",
+         !pids.empty? && pids.uniq.length == pids.length)
+      # Kusovnik: rovnake riadky, kazdy s presne 4-nasobnym mnozstvom.
+      strip = lambda { |r| r.reject { |k, _| k == 'quantity' } }
+      before = Array(state[:ch2_rows]).map { |r| [strip.call(r), r['quantity'].to_i] }
+      after = bom_rows(model).map { |r| [strip.call(r), r['quantity'].to_i] }
+      ok("CH2: kusovnik hlasi styri kusy kazdeho dielca — nasobenie dorazilo do VYROBY (#{before.length} riadkov, mnozstva #{before.map(&:last).join('/')} -> #{after.map(&:last).join('/')})",
+         !before.empty? && after.length == before.length &&
+         after.zip(before).all? { |(ka, qa), (kb, qb)| ka == kb && qa == qb * 4 })
+      Sketchup.undo
+    end]
+    steps << [SETTLE, lambda do
+      cids = cabinets(model).map { |i| e::Store.get(i, 'cabinet_id').to_s }
+      ok("CH2: 1x Undo vratil CELU davku kopii naraz — dedup sa prilepil na paste krok (ostalo: #{cids.sort.join(', ')})",
+         cids == [state[:ch2_cid]])
+      cleanup(model)
+    end]
+
+    # --- CH3: UNDO / REDO RETAZ --------------------------------------------
+    steps << [0.5, lambda do
+      inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
+                                              'height' => 720.0, 'depth' => 510.0 })
+      state[:ch3] = inst
+      state[:ch3_geo] = char_geo(inst)
+      model.start_operation('SU-TEST CH3 user scale', true)
+      inst.transformation = inst.transformation * Geom::Transformation.scaling(ORIGIN, 1.5, 1.0, 1.0)
+      model.commit_operation
+    end]
+    steps << [SETTLE, lambda do
+      inst = state[:ch3]
+      cfg = e::Store.config(inst) || {}
+      clean = e::ScaleWatch.scale_factors(inst.transformation).nil?
+      bb = inst.definition.bounds
+      ok("CH3: scale sa absorboval do configu (600 -> #{cfg['width']}), transformacia je cista (#{clean})",
+         (cfg['width'].to_f - 900.0).abs < 0.01 && clean)
+      ok("CH3: GEOMETRIA sla s datami — definicia je siroka #{mm(bb.width).round(1)} mm",
+         (mm(bb.width) - 900.0).abs <= TOL)
+      state[:ch3_scaled_geo] = char_geo(inst)
+      Sketchup.undo
+    end]
+    steps << [SETTLE, lambda do
+      inst = state[:ch3]
+      alive = inst && inst.valid?
+      cfg = alive ? (e::Store.config(inst) || {}) : {}
+      clean = alive && e::ScaleWatch.scale_factors(inst.transformation).nil?
+      ok("CH3: 1x Undo vratil scale AJ absorpciu naraz (sirka #{cfg['width']}, transform cisty=#{clean})",
+         (cfg['width'].to_f - 600.0).abs < 0.01 && clean)
+      ok('CH3: po Undo su DATA a GEOMETRIA opat konzistentne — dielec po dielci ako pred scale',
+         alive && char_geo(inst) == state[:ch3_geo])
+      # ZNOVA: kvalifikuje sa UCINKOM, nie navratovou hodnotou (`send_action`
+      # vracia na Windows true aj ked nespravi nic — lekcia D-101).
+      state[:ch3_redo_sent] = Sketchup.send_action('editRedo')
+    end]
+    steps << [SETTLE, lambda do
+      inst = state[:ch3]
+      alive = inst && inst.valid?
+      cfg = alive ? (e::Store.config(inst) || {}) : {}
+      w = cfg['width'].to_f
+      if state[:ch3_redo_sent] && (w - 900.0).abs < 0.01
+        ok('CH3 ZNOVA: Redo vratilo scale aj absorpciu naraz a data zodpovedaju geometrii',
+           alive && char_geo(inst) == state[:ch3_scaled_geo])
+        Sketchup.undo # vrat sa na 600 — dalsi krok meria „ziadny krok navyse"
+      else
+        info("CH3 ZNOVA: Ruby API redo na tejto platforme NEVYKONALO (send_action prijate=#{state[:ch3_redo_sent].inspect}, " \
+             "sirka #{cfg['width']}) — vetva Znova ostava MANUALNYM scenarom.")
+        info('CH3 MANUALNY SCENAR (Znova po scale): 1) otvor _dev/ENGINEtests.skp, 2) vloz dolnu skrinku 600x720x510, ' \
+             '3) nastrojom Mierka ju potiahni v X na ~900 a pockaj, kym panel ukaze novu sirku, 4) Ctrl+Z — musi sa vratit ' \
+             '600 mm AJ cista transformacia naraz, 5) Ctrl+Y — musi sa vratit 900 mm AJ prepocitane dielce naraz, ' \
+             '6) este raz Ctrl+Z a Ctrl+Z — druhy krok odstrani CELU skrinku (absorpcia nema vlastny krok).')
+      end
+    end]
+    steps << [SETTLE, lambda do
+      Sketchup.undo # 2. Undo: keby absorpcia bola VLASTNY krok, vratil by ju
+    end]
+    steps << [SETTLE, lambda do
+      ok("CH3: absorpcia NEPRIDALA vlastny undo krok — 2. Undo odstranilo CELE vlozenie (#{cabinets(model).length} korpusov)",
+         cabinets(model).empty?)
+      cleanup(model)
+    end]
+
+    # --- CH4: PRERUSENIE OPERACIE ------------------------------------------
+    steps << [0.5, lambda do
+      # VYCHODISKO: projektove snapshoty kovania sa ZMAZU, aby ich prerusena
+      # stavba musela naozaj zapisat (`ensure_*` je pri existujucom snapshote
+      # no-op a rollback by sa nemal na com ukazat). Snapshoty sa vratia samy
+      # pri najblizsej uspesnej stavbe v CH4b — zapisu sa z globalnej kniznice,
+      # ktora je v behu izolovana do testovacieho %APPDATA%.
+      e::ScaleWatch.guard do
+        model.start_operation('SU-TEST CH4 reset projektovych snapshotov', true)
+        model.set_attribute(e::Store::DICT, e::HardwareRules::MODEL_KEY, '')
+        model.set_attribute(e::Store::DICT, e::HardwareSets::MODEL_KEY, '')
+        model.commit_operation
+      end
+      rules_before = e::HardwareRules.project_rules(model)
+      sets_before = e::HardwareSets.project_state_status(model).first
+      ok("CH4a vychodisko: projekt je BEZ snapshotov kovania (pravidla #{rules_before.inspect}, sety #{sets_before.inspect})",
+         rules_before.nil? && sets_before == :missing)
+
+      before_cabs = cabinets(model).length
+      before_defs = model.definitions.map { |d| d.name.to_s }
+      before_defs_n = model.definitions.length
+      raised = false
+      begin
+        char_install_build_probe
+        begin
+          e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
+                                           'height' => 720.0, 'depth' => 510.0 })
+        rescue StandardError
+          raised = true
+        end
+      ensure
+        char_remove_build_probe
+      end
+      ok('CH4a: zlyhanie PO postaveni dielcov sa NEPREHLTLO — volajuci sa o nom dozvie', raised)
+      ok("CH4a: sonda naozaj postavila TORZO, az potom zlyhala (#{char_probe_built.inspect} entit v definicii korpusu)",
+         char_probe_built.to_i.positive?)
+      ok("CH4a: rollback vratil aj DEFINICIE dielcov — ich pocet je na vychodiskovej hodnote (#{model.definitions.length} vs. #{before_defs_n})",
+         model.definitions.length == before_defs_n)
+      leftovers = (model.definitions.map { |d| d.name.to_s } - before_defs)
+                  .select { |n| n.start_with?('NOXUN Korpus') }
+      ok("CH4a: prerusena stavba nenechala ani OSIROTENU definiciu korpusu (#{leftovers.inspect})",
+         leftovers.empty?)
+      ok("CH4a: v modeli nepribudla ziadna instancia korpusu (#{cabinets(model).length}, pred #{before_cabs})",
+         cabinets(model).length == before_cabs)
+      # JADRO P2-2: rollback musi vratit aj MODELOVE ATRIBUTY, nielen geometriu.
+      rules_after = e::HardwareRules.project_rules(model)
+      sets_after = e::HardwareSets.project_state_status(model).first
+      ok("CH4a: rollback zrusil aj PROJEKTOVE SNAPSHOTY kovania, ktore stavba stihla zapisat (pravidla #{rules_after.inspect}, sety #{sets_after.inspect})",
+         rules_after.nil? && sets_after == :missing)
+      ok('CH4a: sonda nad `build_into` je odstranena — zvysok behu bezi nad produkcnym kodom',
+         !e::CabinetBuilder.singleton_class.method_defined?(:nx_char_orig_build_into))
+
+      # CH4b: rucny abort_operation UPROSTRED pouzivatelovej kopie.
+      inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
+                                              'height' => 720.0, 'depth' => 510.0 })
+      state[:ch4] = inst
+      state[:ch4_cid] = e::Store.get(inst, 'cabinet_id').to_s
+      state[:ch4_defs] = model.definitions.length
+      # KONTROLNA VZORKA k CH4a: ta ista cesta, ked DOBEHNE, snapshoty naozaj
+      # zapise — bez tohto by „po aborte tam nie su" mohlo znamenat aj „nikdy
+      # sa tam nedostanu".
+      ok("CH4b kontrola: USPESNA stavba projektove snapshoty kovania ZAPISALA (pravidla #{!e::HardwareRules.project_rules(model).nil?}, sety #{e::HardwareSets.project_state_status(model).first.inspect})",
+         !e::HardwareRules.project_rules(model).nil? &&
+         e::HardwareSets.project_state_status(model).first == :ok)
+      model.start_operation('SU-TEST CH4 prerusena kopia', true)
+      tr = inst.transformation * Geom::Transformation.translation(e::Units.vector(900, 0, 0))
+      copy = model.entities.add_instance(inst.definition, tr)
+      CHAR_ATTRS.each { |k| v = e::Store.get(inst, k); copy.set_attribute('NOXUN', k, v) unless v.nil? }
+      state[:ch4_copy] = copy
+      model.abort_operation
+    end]
+    steps << [SETTLE, lambda do
+      copy = state[:ch4_copy]
+      cids = cabinets(model).map { |i| e::Store.get(i, 'cabinet_id').to_s }
+      ok("CH4b: abort_operation zmazal rozostavanu kopiu — ziadna osirotena NOXUN entita (korpusy: #{cids.sort.join(', ')})",
+         (copy.nil? || !copy.valid?) && cids == [state[:ch4_cid]])
+      ok("CH4b: prerusena operacia nenafukla definicie (#{model.definitions.length} vs. #{state[:ch4_defs]})",
+         model.definitions.length == state[:ch4_defs])
+      Sketchup.undo
+    end]
+    steps << [SETTLE, lambda do
+      ok("CH4b: prerusena operacia NENECHALA undo krok — 1x Undo odstranilo cele vlozenie skrinky (#{cabinets(model).length} korpusov)",
+         cabinets(model).empty?)
+      cleanup(model)
+    end]
+
+    # --- CH5: SCALE NASTROJOM MIERKA = REGENERATE VYSTUP --------------------
+    steps << [0.5, lambda do
+      # REFERENCIA sa stavia PRVA (zaroven tym drzi undo stack v poradi
+      # [ref][A][scale+absorpcia], takze zaverecne 1x Undo meria presne scale).
+      ref = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 720.0,
+                                             'height' => 792.0, 'depth' => 510.0 })
+      state[:ch5_ref] = ref
+      state[:ch5_ref_geo] = char_geo(ref)
+      a = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
+                                           'height' => 720.0, 'depth' => 510.0 })
+      state[:ch5] = a
+      state[:ch5_geo] = char_geo(a)
+      # Nastroj Mierka simulovane: X = sirka, Z = vyska (lokalne osi korpusu).
+      model.start_operation('SU-TEST CH5 user scale tool', true)
+      a.transformation = a.transformation * Geom::Transformation.scaling(ORIGIN, 1.2, 1.0, 1.1)
+      model.commit_operation
+    end]
+    steps << [SETTLE, lambda do
+      a = state[:ch5]
+      cfg = e::Store.config(a) || {}
+      clean = e::ScaleWatch.scale_factors(a.transformation).nil?
+      ok("CH5: absorpcia prevzala OBE osi (600x720 -> #{cfg['width']}x#{cfg['height']}), hlbka drzi (#{cfg['depth']}), transform cisty=#{clean}",
+         (cfg['width'].to_f - 720.0).abs < 0.01 && (cfg['height'].to_f - 792.0).abs < 0.01 &&
+         (cfg['depth'].to_f - 510.0).abs < 0.01 && clean)
+      geo = char_geo(a)
+      ref_geo = state[:ch5_ref_geo]
+      diff = (geo.keys | ref_geo.keys).reject { |k| geo[k] == ref_geo[k] }
+      ok("CH5: vysledok scale sa DIELEC PO DIELCI rovna tomu, co postavi regenerate na tie iste rozmery (#{geo.length} dielcov, rozdiely: #{diff.inspect})",
+         !geo.empty? && diff.empty?)
+      Sketchup.undo
+    end]
+    steps << [SETTLE, lambda do
+      a = state[:ch5]
+      alive = a && a.valid?
+      cfg = alive ? (e::Store.config(a) || {}) : {}
+      ok("CH5: scale nastrojom Mierka je JEDEN undo krok — 1x Undo vratilo rozmery aj deti (#{cfg['width']}x#{cfg['height']})",
+         (cfg['width'].to_f - 600.0).abs < 0.01 && (cfg['height'].to_f - 720.0).abs < 0.01 &&
+         alive && char_geo(a) == state[:ch5_geo])
+      ok('CH5: referencna skrinka ostala scale nedotknuta (absorpcia siahla len na svoj korpus)',
+         state[:ch5_ref] && state[:ch5_ref].valid? &&
+         char_geo(state[:ch5_ref]) == state[:ch5_ref_geo])
+      cleanup(model)
+    end]
+
+    # --- CH6: PREPNUTIE MODELU (WINDOWS vetva) ------------------------------
+    steps << [0.5, lambda do
+      obs = e::ScaleWatch.instance_variable_get(:@app_observer)
+      state[:ch6_obs] = obs
+      ok('CH6: EngineAppObserver je nainstalovany — bez neho by prepnutie dokumentu nikto nezachytil',
+         !obs.nil?)
+      inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
+                                              'height' => 720.0, 'depth' => 510.0 })
+      state[:ch6] = inst
+      state[:ch6_cid] = e::Store.get(inst, 'cabinet_id').to_s
+      # PREKRYTIA SA MUSIA NAOZAJ ZAPNUT (review #239, P2-1): `model_switched`
+      # vola `EdgeCheck.on_model_changed`, co je VYPINACIA cesta — porovnavat
+      # dva vypnute stavy by nic nedokazalo (assert by presiel aj keby aktivacia
+      # overlay tvrdo zhasinala).
+      e::EdgeCheck.enable!(model)
+      e::GrainCheck.enable!(model)
+      edge_on = e::EdgeCheck.active?(model)
+      grain_on = e::GrainCheck.active?(model)
+      ok("CH6 vychodisko: obe prekrytia su ZAPNUTE (hrany #{edge_on}, kresba #{grain_on})",
+         edge_on && grain_on)
+      # Windows = jeden dokument na proces, takze jedina realne spustitelna
+      # udalost je AKTIVACIA TOHO ISTEHO dokumentu.
+      3.times { obs.onActivateModel(model) } if obs
+      ok("CH6: aktivacia TOHO ISTEHO dokumentu prekrytia NEZHASINA — guard `same_model?` drzi (hrany #{e::EdgeCheck.active?(model)}, kresba #{e::GrainCheck.active?(model)})",
+         e::EdgeCheck.active?(model) && e::GrainCheck.active?(model))
+      # ...a teraz DRUHA strana toho isteho guardu: udalost o CUDZOM dokumente
+      # (iny `guid`) prekrytia zhasnut MUSI — overlay patri modelu, v ktorom sa
+      # zapol. Na Windows sa druhy dokument otvorit neda, ale guard sa rozhoduje
+      # PODLA GUID, takze vypinacia vetva sa da spustit presne a bez neho.
+      foreign = CharForeignModel.new
+      e::EdgeCheck.on_model_changed(foreign)
+      e::GrainCheck.on_model_changed(foreign)
+      ok("CH6: udalost o CUDZOM dokumente prekrytia ZHASNE (hrany #{e::EdgeCheck.active?(model)}, kresba #{e::GrainCheck.active?(model)})",
+         !e::EdgeCheck.active?(model) && !e::GrainCheck.active?(model))
+      state[:ch6_copy] = char_copy(model, inst, [800.0], 'SU-TEST CH6 user copy po re-attachi').first
+    end]
+    steps << [SETTLE, lambda do
+      cids = cabinets(model).map { |i| e::Store.get(i, 'cabinet_id').to_s }
+      # POZOR na rozsah tvrdenia: toto NEMERIA pocet navesenych observerov —
+      # meria vysledok, ze opakovany re-attach dedup NEROZBIJE (kopia dostane
+      # jednu novu identitu, nie ziadnu a nie dve).
+      ok("CH6: opakovana aktivacia dokumentu dedup NEROZBIJE — kopia dostala PRAVE JEDNU novu identitu (#{cids.sort.join(', ')})",
+         cids.length == 2 && cids.uniq.length == 2 && cids.include?(state[:ch6_cid]))
+      Sketchup.undo
+    end]
+    steps << [SETTLE, lambda do
+      cids = cabinets(model).map { |i| e::Store.get(i, 'cabinet_id').to_s }
+      ok("CH6: re-attach nepridal ZIADNY undo krok — 1x Undo vratilo kopiu celu (#{cids.sort.join(', ')})",
+         cids == [state[:ch6_cid]])
+      # MULTI-MODEL GUARD (scale_observer.rb:149-150 a 194-200) je macOS vetva:
+      # ziadosti o opravu identity sa drzia ako MNOZINA MODELOV, aby sa dva
+      # dokumenty v jednom debounce okne neprepisali. Druhy dokument sa na
+      # Windows otvorit neda, takze sa overuje DATOVA STRUKTURA — a hned sa
+      # upratuje (vratane `@last_model`), aby tick nedostal cudzi objekt.
+      foreign = Object.new
+      e::ScaleWatch.request_dedup(model)
+      e::ScaleWatch.request_dedup(foreign)
+      keys = (e::ScaleWatch.instance_variable_get(:@requested) || {}).keys
+      e::ScaleWatch.instance_variable_set(:@requested, {})
+      e::ScaleWatch.instance_variable_set(:@last_model, model)
+      ok("CH6: ziadosti o dedup su MNOZINA per dokument — druhy dokument neprepise prvy (#{keys.length} zaznamov)",
+         keys.length == 2 && keys.include?(model.object_id) && keys.include?(foreign.object_id))
+      state[:ch6_st_before] = (e::ScaleWatch.instance_variable_get(:@stable_transforms) || {}).length
+    end]
+    steps << [SETTLE, lambda do
+      before = state[:ch6_st_before]
+      # Poistka: prekrytia po scenari zhasnute (uz ich zhasla vetva cudzieho
+      # dokumentu; `disable!` je idempotentne a chrani pred FAIL v strede).
+      e::EdgeCheck.disable!
+      e::GrainCheck.disable!
+      cleanup(model)
+      st = (e::ScaleWatch.instance_variable_get(:@stable_transforms) || {}).length
+      # CHARAKTERIZACIA, NIE SCHVALENIE: cache stabilnych transformacii je
+      # klucovana [model.object_id, entityID] a NIKTO z nej nemaze. Po zmazani
+      # skriniek (a po prepnuti dokumentu) v nej zaznamy ostavaju navzdy.
+      ok("CH6: cache stabilnych transformacii PREZIJE zmazanie entit — dnes sa neupratuje (#{before} -> #{st})",
+         st >= before)
+      info('CH6: cache `@stable_transforms` (scale_observer.rb) rastie a nema ciasteciu cestu — ' \
+           'kandidat do registra 1c (hygiena/pamat, nie vyrobne riziko).')
+      info('CH6 MANUALNY SCENAR (prepnutie dvoch dokumentov): na Windows sa spustit NEDA — SketchUp drzi ' \
+           'JEDEN dokument na proces (SDI), viac otvorenych dokumentov naraz je macOS scenar; guardy, ktore to ' \
+           'riesia, su v scale_observer.rb:149-150, 194-200 a 382-383. Postup na macOS (alebo na Windows cez ' \
+           'File > Open v tom istom okne, co je iba ciastkova nahrada): 1) v dokumente A zapni Zvyraznenie hran ' \
+           'a vloz skrinku, 2) otvor dokument B — overlay dokumentu A musi ZHASNUT a Studio aj rail musia hlasit ' \
+           'vypnute, 3) v B vloz skrinku a sprav kopiu — musi dostat vlastne ID (observery sa pripojili na B), ' \
+           '4) prepni sa spat na A — Inspector aj Studio musia ukazovat cisla dokumentu A, nie B, ' \
+           '5) v A sprav kopiu a hned prepni na B — dedup tick nesmie siahnut do B (mnozina ziadostí per dokument).')
+      cleanup(model)
+    end]
+  end
+
   def run_async(model, done)
     state = {}
     steps = []
@@ -8879,6 +9430,11 @@ module NoxunSuRunner
       state[:s6_dump] = origins
       cleanup(model)
     end]
+
+    # 1b-2 / BRANA H: charakterizacna sada observer / Undo / prepnutie modelu.
+    # Registruje sa TU (vzor `run_stale`) — kroky idu do TEJ ISTEJ retaze, aby
+    # scenare bezali cez realny debounce tick, nie cez priame volanie dedupu.
+    run_char(model, state, steps)
 
     # S6b: zachytna siet v KONTROLE — ked uz dva kusy na jednom mieste vzniknu
     # (starsi projekt, paste-in-place), semafor ich MUSI ukazat. Overuje CELU

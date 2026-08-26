@@ -18,16 +18,17 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.6:** **1917 headless** · 69 JS sád · posledný plný in-SketchUp beh **969 PASS / 0 FAIL** (vetva #227; novšie dávky boli klientske alebo dokumentačné).
+**Testy k v0.8.6:** **1917 headless** · 69 JS sád · posledný plný in-SketchUp beh **1011 PASS / 0 FAIL / 0 SKIP** (dávka 1b-2 — prírastok +42 je charakterizačná sada `CHAR`).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom (audit pred kódom + review pred mergom, 15 kôl). Od **#227** review robí zase Codex, takže **post-hoc sweep sa týka presne #186–#226** ([PLAN.md](PLAN.md), blok 1b/E).
 
 ## Robí sa
 
-**Beží blok 1b · STABILIZAČNÁ REVÍZIA** ([PLAN.md](PLAN.md)). **Dávka 1b-1 je hotová** (odrážka **A** — optimistický zámok Nastavení, v0.8.6):
-zastaraný pin už neprežije návrat do sekcie (koniec stratených editácií) a status po uložení už netvrdí prepočet, ktorý neprebehol.
-**Ďalej z bloku 1b:** brána **G** („Obnoviť" = čisté čítanie, pred ďalšou kontrolou nad ním) · brána **H** (charakterizačné in-SU scenáre observer/Undo — POVINNE pred blokom 1d)
-· **E** post-hoc Codex sweep #186–#226 · staré dlhy **B/D/F** (neblokujúce). Poradie určuje Michal. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
+**Beží blok 1b · STABILIZAČNÁ REVÍZIA** ([PLAN.md](PLAN.md)). Hotové sú **dve z troch brán**: **1b-1** (odrážka **A** — optimistický zámok Nastavení, v0.8.6; zastaraný pin
+už neprežije návrat do sekcie a status po uložení netvrdí prepočet, ktorý neprebehol) a **1b-2** (odrážka **H** — charakterizačné in-SU scenáre; kópia, `*N`, Undo, prerušenie
+operácie, scale a prepnutie modelu sú zapísané testami, takže **blok 1d už smie siahnuť na buildery a observery**; Ctrl+Y a dva dokumenty naraz ostávajú manuálne).
+**Ďalej z bloku 1b:** posledná brána **G** („Obnoviť" = čisté čítanie, pred ďalšou kontrolou nad ním) · **E** post-hoc Codex sweep #186–#226 · staré dlhy **B/D/F** (neblokujúce).
+Poradie určuje Michal. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
 
@@ -43,6 +44,7 @@ V1 rozsah zoštíhlený — checklist v [V1_VIZIA.md](V1_VIZIA.md). Dávky štar
 
 ## Posledné uzávery
 
+- **1b-2 — charakterizačné in-SU scenáre** (brána H: kópia · `*N` · Undo · prerušenie operácie · scale = regenerate · prepnutie modelu; +34 assertov, bez zmeny kódu) — 27.8.
 - **1b-1 — optimistický zámok Nastavení** (zastaraný pin nezostane po návrate do sekcie; status hovorí pravdu, keď prepočet zlyhá) — v0.8.6 (27.8.)
 - **PICKER-3 — dorobenie vyhľadávača** (virtuálny duplák v menovke, kanonický kľúč rodiny, „54 duplák", dôvod čipu z klávesnice, **kontext radí aj riadky**) — v0.8.5 (26.8.)
 - **BLOK DOCS CLEANUP KOMPLET (26.8.)** — **C: refresh STANDARD.md** (zastarané tvrdenia opravené proti kódu, reflow, guard dĺžky bez výnimiek) PR **#234**, bez zmeny kódu pluginu ·

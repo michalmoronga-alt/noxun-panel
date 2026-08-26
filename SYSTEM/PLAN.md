@@ -19,7 +19,8 @@ blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
 **Cieľ:** doplatiť dlhy, ktoré fáza ŠTÚDIO vedome odložila, a spraviť refactory, na ktoré počas presunov nebol priestor.
 *(Stabilizačná revízia sa od začiatku produkcie naostro (20.8.) ešte NEKONALA — patrí pred ďalšie nové funkcie.)* Poradie určí Michal.
 Staré dlhy B–F nie sú blokujúce pre bežnú prácu; **P0 odrážky A, G a H sú BRÁNY** — **A (možná STRATA rozpísanej editácie) je HOTOVÁ** (dávka 1b-1, v0.8.6, 27.8.),
-H musí prebehnúť pred akýmkoľvek zásahom do builderov/observerov (teda pred blokom 1d) a G pred tým, než sa na „Obnoviť" postaví ďalšia kontrola.
+**H (charakterizačné in-SU scenáre) je HOTOVÁ** (dávka 1b-2, 27.8. — cesta k builderom/observerom pre blok 1d je tým otvorená),
+G musí prebehnúť pred tým, než sa na „Obnoviť" postaví ďalšia kontrola.
 
 **A · Optimistický zámok nastavení (dlh z #227, kolo 4) — ✅ VYRIEŠENÉ dávkou 1b-1, v0.8.6 (27.8.2026).**
 Obe chyby aj obidva slabšie dôkazy sú vybavené: pin sa uvoľňuje v `ssRenderBody` (pokrýva push aj návrat do sekcie — koniec falošných konfliktov a stratených editácií)
@@ -54,9 +55,11 @@ obyčajné „Obnoviť" dnes môže popri čítaní OPRAVIŤ duplicitné identit
 Oddeliť read-only snapshot od opravy: musí byť jasné, kedy sa iba číta a kedy sa model opravuje (oprava = vedomá akcia s vlastným Undo krokom).
 Pred fixom overiť nález proti v0.8.5.
 
-**H · Charakterizačné in-SU scenáre observer/Undo/multi-model (P0 z externého auditu kolo 0):**
-PRED akýmkoľvek zásahom do `core/scale_observer.rb` / builderov zapísať charakterizačné scenáre do in-SU sady: copy, *N, Undo/Redo,
-prepnutie modelu, prerušenie operácie. Žiadny prepis — scenáre fixujú dnešné správanie, aby mal neskorší hardening (1d) a GHOST pevnú pôdu.
+**H · Charakterizačné in-SU scenáre observer/Undo/multi-model — ✅ VYRIEŠENÉ dávkou 1b-2 (27.8.2026, bez bumpu verzie — pribudli len testy).**
+Sekcia `run_char` v in-SU sade: **42 assertov** v šiestich scenároch (kópia · `*N` · Undo reťaz · prerušenie operácie · scale = regenerate výstup · prepnutie modelu, Windows vetva),
+overené 7 zámernými mutáciami v dvoch kolách (11 + 6 cielených FAIL). **Dva scenáre sa na Windows spustiť nedajú a sú zapísané ako MANUÁLNE** priamo v INFO riadkoch behu: Znova
+(Ctrl+Y) po scale a dva otvorené dokumenty naraz (macOS). Brána je splnená — **blok 1d smie siahnuť na buildery a observery.** Plný záznam (čo presne sa zafixovalo, nálezy slepého
+review #239, mutácie, kandidát do registra): [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-2**.
 
 **E · Post-hoc Codex sweep #186–#226.** Rozsah je JEDNO číslo naprieč STAV, PLAN aj KRONIKOU a znamená presne toto: **dávky, ktorých primárnym reviewerom bol slepý subagent, lebo Codex bol 21.–24.8.
   nedostupný**. Od **#227** review robí Codex, takže #227 aj #228 sú mimo sweepu. Keď má Codex kapacitu, prejsť tie PR spätne — nie kvôli nedôvere v subagenta (chytil o. i. spiacu mínu duplicitných
