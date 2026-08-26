@@ -58,8 +58,9 @@
 
 > **Presunuté z [../PLAN.md](../PLAN.md) 26.8.2026** (dávka Docs cleanup B) — plný pôvodný
 > text bloku vrátane zadania, implementačných dávok a vedomých odchýlok. PLAN drží od tejto
-> dávky už len nehotové bloky. Otvorená časť, ktorá z bloku ostala (**PICKER-3**), žije
-> ďalej v PLAN; dlhy fázy ŠTÚDIO sú v jeho bloku **1b · STABILIZAČNÁ REVÍZIA**.
+> dávky už len nehotové bloky. Otvorená časť, ktorá z bloku ostala (**PICKER-3**), je od
+> 26.8.2026 hotová — jej plný text je na konci tohto súboru; dlhy fázy ŠTÚDIO sú v bloku
+> **1b · STABILIZAČNÁ REVÍZIA** v živom PLAN.
 > Text sa nemenil — upravené sú výhradne relatívne cesty odkazov (súbor leží o úroveň nižšie)
 > a polohové slovo „nižšie" pri bloku 1b, ktoré po presune ukazovalo do prázdna (teraz odkaz na živý PLAN).
 
@@ -110,3 +111,30 @@ satelit zaniká až po plnej náhrade):
 *(Z vízie V1 sú v koncepte zapracované: header ako prístup ku všetkému UX-02 → UI-B1 · karta Zóna so smerovými ikonami UX-06 → UI-C2 · polia šírkou podľa obsahu UX-03 → UI-B1/UI-C.)*
 
 *(Seed katalógu ako krok je ZRUŠENÝ (Michal 10.8.) — katalóg rastie sám prácou na zákazkách; skutočný problém „nájsť materiál aj v malom zozname" rieši D-85 — **hotová 18.8. (PR #167)**. Podklad kódov a cien ostáva v [zdroje/SEED_KATALOG_2026-07.md](../zdroje/SEED_KATALOG_2026-07.md).)*
+
+## PICKER-3 · dorobenie vyhľadávača materiálov — HOTOVÉ (v0.8.5, 26.8.2026)
+
+*(Plný text bloku tak, ako stál v [../PLAN.md](../PLAN.md) pred uzáverom — presunutý, nie skopírovaný.
+Výsledok, rozhodnutia a zamietnuté alternatívy pri bodoch A a E sú v [KRONIKA.md](KRONIKA.md).)*
+
+**Odčlenené z PR #231 podľa pravidla 3 kôl (25.8.)** — kolo 3 Codex review prinieslo osem
+vecných nálezov; **ship-blockery sa opravili v #231**, zvyšok je tu. Dôvod rezu: bod **E**
+je **návrhová zmena** (kontext výberu má radiť aj riadky medzi sebou), a tá si zaslúži
+vlastný návrh + review, nie ďalšiu iteráciu v dobiehajúcom PR — doťahovačky idú s ňou,
+aby sa okruh riešil naraz. Poradie určí Michal; nič z toho nie je blokujúce (vyhľadávač je
+použiteľný), ale všetko je pomenované, aby sa to nestratilo.
+
+- **A · Virtuálne dupláky v kontexte menovky riadku** (`noxun_engine/ui/panel/payloads.rb`, comment **3848691739**, P2). Kontext `row_fam_ctx` vidí len `Materials.sheets`, takže rodinu s jednou
+  kúpenou hrúbkou plus virtuálnou ponukou `duplak2:` označí za jednovariantnú a server pošle menovku „Dekor · DTDL 18 mm". Klient potom na ten istý riadok pridá čip `36 duplák` — a po jeho výbere
+  menovka riadku ďalej tvrdí 18 mm. Fix: postaviť kontext s virtuálnymi variantmi, alebo hrúbku v menovke potlačiť vždy, keď riadok čipy dostane.
+- **B · Normalizovať VŠETKY zložky kľúča rodiny** (`noxun_engine/core/materials.rb`, comment **3848691741**, P2). Kanonická je zatiaľ len skupinová časť; `decor`, `structure`, `type` a prípona idú v
+  surovom orezanom tvare. Katalógový kontrakt pritom identity typu a štruktúry porovnáva **bez ohľadu na veľkosť písmen**, takže `DTDL`/`dtdl` alebo `ST9`/`st9` dostanú rôzne kľúče a dekor sa v ponuke
+  zjaví ako **dva riadky**. Fix: skladať rodinu z normalizovaných zložiek (ideálne z kanonickej identity dosky bez hrúbky).
+- **C · Dotaz „54 duplák" musí trafiť SVOJ duplák** (`noxun_engine/ui/js/nx_combo.js`, comment **3848691744**, P2). Keď má rodina duplák ×2 aj ×3, slovo „duplák" v dotaze vráti **prvý** duplák (spravidla 36 mm) ešte pred prečítaním čísla. Riadok sa nájde, ale Enter vloží iný duplák, než dotaz menoval. Fix: pri slovnom dotaze najprv hľadať zhodu hrúbky medzi duplákmi a až potom padať na prvý.
+- **D · Dôvod nedostupného čipu aj z KLÁVESNICE** (`noxun_engine/ui/js/nx_combo.js`, comment **3848691758**, P2). Po prechode na `aria-disabled` je čip fokusovateľný, ale jediná klávesová cesta (šípky
+  vľavo/vpravo) nedostupné varianty **preskakuje** a `Tab` ponuku zatvára — človek od klávesnice sa teda k vysvetleniu, ktoré myš dostane klikom, nedostane. Fix: pustiť fokus do tlačidiel čipov, alebo
+  dať klávesovú akciu, ktorá na nedostupnom čipe zastane a dôvod oznámi.
+- **E · KONTEXT VÝBERU MÁ RADIŤ AJ RIADKY (návrhová zmena)** (`noxun_engine/ui/js/nx_combo.js`, comment **3848691761**, P2 — vecne najväčší). Kontext (`back` → 3 mm, `worktop` → 38) sa dnes uplatňuje
+  **vnútri** už rozdelenej rodiny, takže nevie uprednostniť riadok HDF 3 pred riadkom DTDL 18 toho istého dekoru. V Štúdiu je `md_back` naplnený **všetkými** doskami bez zakázania nechrbtových
+  variantov: po napísaní dekoru je prvý zhodný riadok spravidla DTDL, jeho predvoľba je 18 mm a Enter ju vloží — hoci kontext „chrbát" sľubuje HDF 3. Fix: kontext musí riadky **radiť alebo filtrovať**
+  predtým, než sa vyberie aktívny riadok, nielen hľadať 3 mm vnútri každého z nich.

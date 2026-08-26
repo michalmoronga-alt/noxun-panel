@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.8.4 · 26.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.8.5 · 26.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -18,25 +18,29 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.4:** **1906 headless** · 67 JS sád · posledný plný in-SketchUp beh **969 PASS / 0 FAIL** (vetva #227; novšie dávky boli klientske alebo dokumentačné).
+**Testy k v0.8.5:** **1915 headless** · 69 JS sád · posledný plný in-SketchUp beh **969 PASS / 0 FAIL** (vetva #227; novšie dávky boli klientske alebo dokumentačné).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom (audit pred kódom + review pred mergom, 15 kôl). Od **#227** review robí zase Codex, takže **post-hoc sweep sa týka presne #186–#226** ([PLAN.md](PLAN.md), blok 1b/E).
 
 ## Robí sa
 
 **Nič nebeží — čaká sa na Michalov pokyn, ktorým blokom sa pokračuje** ([PLAN.md](PLAN.md)).
-Posledný uzavretý blok bol **Docs cleanup** (posledný PR **#234**); správanie pluginu sa ním nemenilo, verzia ostáva **v0.8.4**.
+Posledný uzavretý blok bol **PICKER-3** (dorobenie vyhľadávača materiálov) — **v0.8.5**, klientska + payloadová zmena, žiadna modelová zapisovacia cesta.
 
 ## Ďalší krok
 
 **VEĽKÝ TEST JE HOTOVÝ (26.8. večer):** v0.8.4 nainštalovaná, **PICKER-2 aj všetkých 8 dávok fázy ŠTÚDIO (#220–#227) prešlo — všetko PASS, žiadny nález**; Michal vecne potvrdil aj ABS defaulty rolí. Záznam v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 
-**Poradie ďalšej práce (rozhodol Michal 26.8.):** dorobenie vyhľadávača **PICKER-3** (osem nálezov z kola 3 review #231, z toho bod E je návrhová zmena) ·
-**stabilizačná revízia** (blok 1b — dlhy fázy ŠTÚDIO) · **GHOST VKLADANIE** (V1-04, koncept 09 v [zdroje/next_sessions/](zdroje/next_sessions/) —
-pred implementáciou povinný finálny read-only audit) · až potom blok **KOVANIE** (najprv USER-debata o setoch). Dávky štartujú na Michalovo „štartuj".
+**PICKER-3 je HOTOVÝ** (v0.8.5) — vyhľadávač materiálov je dorobený: virtuálny duplák už menovku riadku neklame, `DTDL`/`dtdl` nedá dva riadky, „54 duplák" trafí svoj duplák,
+dôvod nedostupného čipu sa dá vypočuť aj z klávesnice a **kontext poľa radí aj riadky** (v poli pre chrbát idú 3 mm navrch a Enter vloží HDF, nie DTDL 18).
+
+**Poradie ďalšej práce (rozhodol Michal 26.8.):** **stabilizačná revízia** (blok 1b — dlhy fázy ŠTÚDIO) · **GHOST VKLADANIE** (V1-04, koncept 09
+v [zdroje/next_sessions/](zdroje/next_sessions/) — pred implementáciou povinný finálny read-only audit) · až potom blok **KOVANIE** (najprv USER-debata o setoch).
+Dávky štartujú na Michalovo „štartuj".
 
 ## Posledné uzávery
 
+- **PICKER-3 — dorobenie vyhľadávača** (virtuálny duplák v menovke, kanonický kľúč rodiny, „54 duplák", dôvod čipu z klávesnice, **kontext radí aj riadky**) — v0.8.5 (26.8.)
 - **BLOK DOCS CLEANUP KOMPLET (26.8.)** — **C: refresh STANDARD.md** (zastarané tvrdenia opravené proti kódu, reflow, guard dĺžky bez výnimiek) PR **#234**, bez zmeny kódu pluginu ·
   **B: upratané `SYSTEM/`** (mapa autorít, archív, guardy) PR **#233**, v0.8.4 · **A: mapa modulov rozdelená na 6 súborov** + guardy dĺžky riadku a pokrytia modulov PR **#232**
 - **PICKER-2 — riadok je dekor, hrúbka je čip** (zoskupenie v rámci rovnakého typu dosky, predvoľba podľa kontextu, duplák nikdy sám) — PR **#231**, v0.8.3 · pred ním **PICKER-1 — jeden vyhľadávač aj v Predvoľbách projektu** — PR **#230**, v0.8.2 (25.8.)
