@@ -331,7 +331,7 @@ Zóna nesie `allowed_modules` — čo do nej smie. Modul pri vklade dostane rozm
 
 `auto` čelá si rovnomerne rozdelia zvyšnú výšku; `wings: "auto"` = 2 krídla nad 600 mm šírky otvoru.
 **Škáry sú konfigurovateľné** (`gap` medzi čelami, `gap_top`/`gap_bottom`/`gap_sides` po obvode).
-Prekrytie korpusu (`overlay`) ani odlišná škára medzi krídlami (`gap_between`) v konfigurácii čiel **nie sú** — prekrytie určuje typ pántu, preto **pribudnú s fázou kovania 2** (viď 6.2).
+Prekrytie korpusu (`overlay`) ani odlišná škára medzi krídlami (`gap_between`) v konfigurácii čiel **nie sú** — prekrytie určuje typ pántu, preto patria k budúcej práci na kovaní (viď 6.2; zaradenie určí PLAN).
 
 `items[].type` nadobúda `door` · `drawer_front` · `none` (D-18 „Bez čela"): riadok `none` drží výšku v rade presne ako čelo (fixed/auto/lock, rovnaká matematika),
 ale panel sa negeneruje = otvorená nika v rade čiel.
@@ -411,7 +411,7 @@ Globálna knižnica `%APPDATA%\NOXUN\Engine\hardware_rules.json` je len default 
 
 **Fáza 2 — mapovanie na konkrétny katalógový kód.** Na konci projektu (alebo raz v nastaveniach) sa flag `hinge` namapuje na konkrétny kód (`Blum 71B3550`). **Mapovanie sa ukladá a nabudúce prebehne automaticky.**
 
-**Prekrytie čiel (`overlay`) určí typ pántu — pribudne s fázou kovania 2.** Dovtedy ho konfigurácia čiel nenesie (5.3): prekrytie korpusu je dôsledok zvoleného kovania,
+**Prekrytie čiel (`overlay`) určí typ pántu — dnes neimplementované, pribudne s budúcou prácou na kovaní (zaradenie do bloku určí PLAN).** Dovtedy ho konfigurácia čiel nenesie (5.3): prekrytie korpusu je dôsledok zvoleného kovania,
 nie samostatné nastavenie čela, a rovnakou cestou príde aj odlišná škára medzi krídlami (`gap_between`).
 
 ### 6.3 Fyzická reprezentácia: 1 generický objekt + virtuálne varianty
