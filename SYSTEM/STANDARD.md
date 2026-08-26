@@ -1,12 +1,19 @@
 # Noxun Component Standard v1.0 (15.7.2026, potvrdený praxou — premenovaný z draftu 24.7.2026)
 
-> Záväzný kontrakt dátového modelu a princípov nového SketchUp plugin systému pre nábytkárstvo na mieru (korpusy, čelá, kovanie, ABS, výstupy). Nadväzuje na `archiv/00_VIZIA_povodna.md`, uzamknuté rozhodnutia z `archiv/01_STANDARD_osnova.md`, analýzu `archiv/02_ANALYZA_korpus_dc_vs_ruby.md`, VEPO kontrakt `VEPO_KONTRAKT.md` a technické pasce v `docs/DC_PRAVIDLA.md`. Štandard bol overený implementáciou V0.1–V0.5 (vrátane krížovej validácie VEPO výstupov s OCL flow 20.7.2026) a z „draftu" sa stal potvrdeným kontraktom.
+> Záväzný kontrakt dátového modelu a princípov nového SketchUp plugin systému pre nábytkárstvo na mieru (korpusy, čelá, kovanie, ABS, výstupy).
+> Nadväzuje na `archiv/00_VIZIA_povodna.md`, uzamknuté rozhodnutia z `archiv/01_STANDARD_osnova.md`, analýzu `archiv/02_ANALYZA_korpus_dc_vs_ruby.md`,
+> VEPO kontrakt `VEPO_KONTRAKT.md` a technické pasce v `docs/DC_PRAVIDLA.md`.
+> Štandard bol overený implementáciou V0.1–V0.5 (vrátane krížovej validácie VEPO výstupov s OCL flow 20.7.2026) a z „draftu" sa stal potvrdeným kontraktom.
+>
+> **Tento dokument hovorí, čo PLATÍ.** Kedy a ktorou dávkou pravidlo vzniklo, patrí do [archiv/KRONIKA.md](archiv/KRONIKA.md) — nie sem.
 
 ---
 
 ## 0. Účel a záväznosť
 
-**Prečo tento dokument existuje.** Každý doterajší plugin (KOVANIE, DC Control, OCL adaptéry, vepo_exporter) riešil kúsok toho istého problému znova, lebo neexistoval jeden spoločný kontrakt: čo je skrinka, čo je dielec, aké nesie dáta, v akých jednotkách, ako sa počítajú hrany a kovanie. Tento štandard je ten kontrakt. Všetky moduly nového systému (generátor korpusov, panel na pripájanie childov, kovania engine, ABS editor, výstupy) sa musia riadiť ním.
+**Prečo tento dokument existuje.** Každý doterajší plugin (KOVANIE, DC Control, OCL adaptéry, vepo_exporter) riešil kúsok toho istého problému znova,
+lebo neexistoval jeden spoločný kontrakt: čo je skrinka, čo je dielec, aké nesie dáta, v akých jednotkách, ako sa počítajú hrany a kovanie.
+Tento štandard je ten kontrakt. Všetky moduly nového systému (generátor korpusov, panel na pripájanie childov, kovania engine, ABS editor, výstupy) sa musia riadiť ním.
 
 **Čo je záväzné.** Sekcie 1–11 sú kontrakt: dátový model, identita, jednotky, hierarchia, výrobné triedy. Kto ich poruší, rozbije interoperabilitu modulov. Sekcia 12 „Otvorené body" sú veci zámerne nechané na prototyp/V1 — tie sa NErozhodujú od stola, overia sa v SketchUpe cez SkAgent na reálnych dielcoch.
 
@@ -41,7 +48,10 @@ Definície pojmov:
 
 - **Zostava** — logické zoskupenie korpusov (kuchynský rad). Vo V1 len organizačná úroveň, bez vlastnej geometrie.
 - **Korpus** — skrinka. Nositeľ konfigurácie. Nie monolitický „master so všetkými variantmi", ale **obálka + konštrukcia + zóny + rozhrania** (viď sekcia 4).
-- **Zóna (slot)** — adresovateľné pole vnútra korpusu: celé vnútro, alebo časť medzi policami/priečkami. Má rozmery, pozíciu, stav (voľná/obsadená), zoznam povolených modulov. Vzniká a zaniká delením. **Vizualizácia:** polopriehľadný ghost box na tagu **`Noxun/Zóny`** — vypnutie tagu = neviditeľné; geometria zón nikdy nejde do kusovníka (viď sekcia 8, `manufactured: false`). (Historický tag `NOXUN_SLOTY` z prvých prototypov bol migrovaný — nové moduly ho nesmú vytvárať.)
+- **Zóna (slot)** — adresovateľné pole vnútra korpusu: celé vnútro, alebo časť medzi policami/priečkami. Má rozmery, pozíciu, stav (voľná/obsadená), zoznam povolených modulov.
+  Vzniká a zaniká delením. **Vizualizácia:** polopriehľadný ghost box na tagu **`Noxun/Zóny`** — vypnutie tagu = neviditeľné;
+  geometria zón nikdy nejde do kusovníka (viď sekcia 8, `manufactured: false`).
+  (Historický tag `NOXUN_SLOTY` z prvých prototypov bol migrovaný — nové moduly ho nesmú vytvárať.)
 - **Modul / child** — funkčný prvok vložený do zóny (čelo, polica, priečka, zásuvkový blok, vnútorné vybavenie, doplnok). Zo zóny dostane rozmery, pridá vlastné pravidlá (škáry, presahy, odsadenia).
 - **Dielec** — fyzický kus materiálu na výrobu. Vždy samostatný SketchUp komponent s NOXUN metadátami. Zdroj kusovníka.
 - **Virtuálna položka** — kovanie a spotrebný materiál, ktoré sa počítajú do súpisu, ale nemajú výrobnú geometriu. Fyzicky ich zastupuje najviac 1 generický objekt na kategóriu (viď sekcia 6).
@@ -72,7 +82,7 @@ Základný layout (ploché kľúče, čítané často):
 | `manufactured` | Bool | ide do výroby? (explicitne, nie podľa typu entity) |
 | `production_class` | String | `sheet` / `linear` / `counted` / `reference` / `none` (viď sekcia 8) |
 | `name` | String | ľudský názov dielca („Bok ľavý") — kusovník a VEPO čítajú názov odtiaľto, nie z `config` |
-| `role_key` | String | dočasný alias `part_key` pre panel (kompatibilita V0.3.2; časom zanikne) |
+| `role_key` | String | kompatibilitný alias `part_key` — buildery ho zapisujú s rovnakou hodnotou a čítacia cesta ho berie ako fallback pre staršie modely; kanonická identita je `part_key` |
 | `config` | JSON string | celá konfigurácia entity (rozmery, konštrukcia, zóny, hrany, materiál…) |
 
 Zložité veci (rozmery + konštrukcia korpusu, zoznam hrán dielca, delenie čiel) žijú v `config` ako JSON string. Dôvod: SketchUp dictionary je plochý kľúč→hodnota; JSON je jediný spoľahlivý spôsob, ako niesť vnorenú štruktúru bez desiatok kľúčov.
@@ -92,7 +102,9 @@ Dáta konkrétnej skrinky sú na **inštancii**. Definícia komponentu môže ni
 
 **Väzba na konkrétny dielec = `cabinet_id` + `part_key`.** `role` určuje kategóriu dielca a používa sa na pravidlá či hromadný výber podobných dielcov. Názov, renderovací suffix ani runtime handle nie sú dátová identita.
 
-**Owner-scope pravidlo (V0.4.7):** `part_key` je stabilná identita dielca **v rámci vlastníka**. Vlastníkom je korpus (`cabinet_id` + `part_key`, prefixy `cabinet/`, `zone:`, `front:`) alebo samostatná doska (`id` dosky + konštantný `part_key` `board/main`, prefix `board/`). Unikátnosť naprieč modelom dáva vždy dvojica vlastník + kľúč — preto sa konštantný `board/main` nikdy nevaliduje v spoločnom pláne viacerých dosiek.
+**Owner-scope pravidlo (V0.4.7):** `part_key` je stabilná identita dielca **v rámci vlastníka**.
+Vlastníkom je korpus (`cabinet_id` + `part_key`, prefixy `cabinet/`, `zone:`, `front:`) alebo samostatná doska (`id` dosky + konštantný `part_key` `board/main`, prefix `board/`).
+Unikátnosť naprieč modelom dáva vždy dvojica vlastník + kľúč — preto sa konštantný `board/main` nikdy nevaliduje v spoločnom pláne viacerých dosiek.
 
 - **`persistentId`** používame len na **navigáciu v rámci session** („prejdi na objekt", zvýrazni v modeli) — stabilný počas života entity, ale rebuildom zaniká. Nikdy nie ako trvalý cudzí kľúč v dátach.
 - **Názvy komponentov** nie sú identita ani rola. Poučenie: `_name` „Pbok" vs. definícia „Lbok#1" — parsovanie názvov je zdroj chýb.
@@ -196,7 +208,9 @@ gola_profile · hinge · slide · leg · handle · shelf_pin · connector · fre
 
 ### 3.1 Jednotky — mm ako Float, jeden svet
 
-**Všetky NOXUN dáta (JSON aj atribúty) sú v milimetroch ako Float.** Žiadne palce, žiadne cm, žiadny SketchUp `Length` v uložených dátach. SketchUp interne počíta v palcoch — prevod na `Length` sa deje **len na jedinom mieste v kóde**, na hranici, keď Ruby kreslí geometriu (`mm → Length` pri stavaní, `Length → mm` pri prípadnom čítaní bboxu). Uhly sú v **stupňoch** (Float).
+**Všetky NOXUN dáta (JSON aj atribúty) sú v milimetroch ako Float.** Žiadne palce, žiadne cm, žiadny SketchUp `Length` v uložených dátach.
+SketchUp interne počíta v palcoch — prevod na `Length` sa deje **len na jedinom mieste v kóde**, na hranici, keď Ruby kreslí geometriu
+(`mm → Length` pri stavaní, `Length → mm` pri prípadnom čítaní bboxu). Uhly sú v **stupňoch** (Float).
 
 Toto je zásadný rozdiel oproti DC svetu, kde bežali tri jednotkové svety naraz (uložené palce / vzorce cm / zobrazenie mm) a spôsobovali chyby ako `18 → 457 mm`. Nový systém má **jeden svet: mm Float.**
 
@@ -223,7 +237,10 @@ Toto je invariant a jeden z hlavných dôvodov existencie štandardu:
 - **Výrobné rozmery** dielca (`length`, `width`, `thickness`), **hrany** (L1/L2/W1/W2) a **smer dekoru** (`grain_direction`) sa určujú z **konfigurácie dielca**, nikdy z bounding boxu a nikdy z otočenia skrinky v miestnosti.
 - Keď používateľ otočí skrinku o 90° v pôdoryse, kusovník, hrany a dekor sa **nesmú zmeniť**. Rotácia je vec umiestnenia v modeli, nie výrobných dát.
 - `grain_direction`: `"length"` / `"width"` / `"none"` — smer dekoru vzhľadom na výrobný rozmer dielca (nie vzhľadom na os modelu). Explicitný atribút, nie odvodený z natočenia textúry ani z pomeru rozmerov (štvorcový dielec je nerozhodnuteľný).
-- **Rotácia dielca kvôli kresbe je vec VÝSTUPU, nie modelu** (K1, v0.7.23). Snapshot dielca nesie **geometrické** rozmery + `grain_direction`; výmenu `dĺžka ↔ šírka` **spolu s výmenou dvojíc hrán** `L↔W` robí výhradne export do VEPO (`VepoExport.oriented`) a zrkadlovo kontrola nárezu (`Validation.fits_on_sheet?`). Rovnaká výmena sa **nikdy nesmie zopakovať** na inom mieste reťazca — dvojitý swap by dielec objednal v pôvodnej orientácii. Bežné metre ABS sú voči otočeniu **invariantné** (tá istá fyzická hrana), a to je zároveň krížová kontrola, či niekde druhý swap nevznikol.
+- **Rotácia dielca kvôli kresbe je vec VÝSTUPU, nie modelu** (K1). Snapshot dielca nesie **geometrické** rozmery + `grain_direction`;
+  výmenu `dĺžka ↔ šírka` **spolu s výmenou dvojíc hrán** `L↔W` robí výhradne export do VEPO (`VepoExport.oriented`) a zrkadlovo kontrola nárezu (`Validation.fits_on_sheet?`).
+  Rovnaká výmena sa **nikdy nesmie zopakovať** na inom mieste reťazca — dvojitý swap by dielec objednal v pôvodnej orientácii.
+  Bežné metre ABS sú voči otočeniu **invariantné** (tá istá fyzická hrana), a to je zároveň krížová kontrola, či niekde druhý swap nevznikol.
 
 Poučenie: v OCL sa opakovane zamieňala šírka s hrúbkou pri rotovaných dielcoch. Keď rozmery kladie Ruby z konfigurácie, tento problém nevzniká.
 
@@ -274,7 +291,9 @@ Korpus **vypočíta a nesie** (v `config`, ako cache — zdroj pravdy zostáva r
 
 Zóna je dátová štruktúra: rozmery (svetlé), pozícia v korpuse, stav (`free`/`occupied`), zoznam povolených modulov. Vloženie modulu = zápis do konfigurácie + rebuild — nie ručné modelovanie. Presne ArchiWood/CabMaker princíp (ktorý DC nepoužíva).
 
-> **Stav implementácie (V0.2–V0.3):** entity `kind: module` zatiaľ neexistujú — police žijú ako počet `shelves` priamo na zóne a čelá ako config `fronts` na korpuse. Config ghost zóny preto nesie aj kľúč `shelves` a `state` sa odvodzuje z počtu políc (`modules` je zatiaľ vždy prázdne pole). Naplní sa s príchodom skutočných modulov (V0.4+, zásuvkové bloky a kovanie).
+> **Entity `kind: module` neexistujú.** Police žijú ako počet `shelves` priamo na zóne a čelá ako config `fronts` na korpuse.
+> Config ghost zóny preto nesie aj kľúč `shelves`, `state` sa odvodzuje z počtu políc a `modules` je vždy prázdne pole.
+> Pole `modules` sa naplní až vtedy, keď skutočné moduly (zásuvkové bloky) vzniknú — dovtedy je to rezervované miesto v kontrakte, nie chýbajúce dáta.
 
 **Delenie:** priečka alebo polica rozdelí zónu na nové zóny — **rekurzívne**, vzniká strom priestorov. Napr. horizontálna priečka rozdelí zónu na hornú a dolnú; každá je ďalej deliteľná.
 
@@ -293,7 +312,9 @@ Zóna nesie `allowed_modules` — čo do nej smie. Modul pri vklade dostane rozm
 
 ### 5.3 Čelá — samostatná kategória s lockmi
 
-Čelá nie sú len „dvere". Zahŕňajú: jednokrídlové/dvojkrídlové dvierka, zásuvkové čelá, výklopy, posuvné čelá, pevné krycie panely, falošné čelá, rámové a bezúchytkové riešenia. Čelný modul rieši: typ, počet, delenie, medzery, prekrytie korpusu, materiál, ABS, smer otvárania, úchytky, požiadavky na kovanie. **Geometria čela, spôsob otvárania a konkrétne kovanie sú oddelené.**
+Čelá nie sú len „dvere". Zahŕňajú: jednokrídlové/dvojkrídlové dvierka, zásuvkové čelá, výklopy, posuvné čelá, pevné krycie panely, falošné čelá, rámové a bezúchytkové riešenia.
+Čelný modul rieši: typ, počet, delenie, medzery, prekrytie korpusu, materiál, ABS, smer otvárania, úchytky, požiadavky na kovanie.
+**Geometria čela, spôsob otvárania a konkrétne kovanie sú oddelené.**
 
 **Delenie na výšku: FIXNÉ + AUTO s lockmi** (Blum-konfigurátor princíp). Jedno čelo zamknem na fixnú výšku, ostatné sa dopočítajú automaticky zo zvyšku po odčítaní zamknutých + škár. Kanonický config (tak ho ukladá `Fronts.normalize_config` — pole sa volá **`items`**, poradie odspodu, F1 dole):
 
@@ -309,9 +330,15 @@ Zóna nesie `allowed_modules` — čo do nej smie. Modul pri vklade dostane rozm
 }
 ```
 
-`auto` čelá si rovnomerne rozdelia zvyšnú výšku; `wings: "auto"` = 2 krídla nad 600 mm šírky otvoru. **Škáry sú konfigurovateľné** (`gap` medzi čelami, `gap_top`/`gap_bottom`/`gap_sides` po obvode). Prekrytia korpusu (`overlay`) a odlišná škára medzi krídlami (`gap_between`) zatiaľ nie sú implementované — doplnia sa pri kovaní (typ pántu určuje prekrytie), viď sekcia 12.
+`auto` čelá si rovnomerne rozdelia zvyšnú výšku; `wings: "auto"` = 2 krídla nad 600 mm šírky otvoru.
+**Škáry sú konfigurovateľné** (`gap` medzi čelami, `gap_top`/`gap_bottom`/`gap_sides` po obvode).
+Prekrytie korpusu (`overlay`) ani odlišná škára medzi krídlami (`gap_between`) v konfigurácii čiel **nie sú** — prekrytie určuje typ pántu, preto patria k pravidlám kovania (sekcia 6).
 
-`items[].type` nadobúda `door` · `drawer_front` · `none` (D-18 „Bez čela"): riadok `none` drží výšku v rade presne ako čelo (fixed/auto/lock, rovnaká matematika), ale panel sa negeneruje = otvorená nika v rade čiel. Medzery voči susedom ostávajú ako pri skutočnom čele (reálny otvor je opticky väčší o susedné škáry — vedomé rozhodnutie); `wings` je pre `none` neutrálne 1. Bez dielca nevzniká kovanie ani položka kusovníka/VEPO. **POZOR:** štruktúrovaný `items[].type: "none"` ≠ legacy STRING config `fronts: "none"` (V0.1/V0.2 — znamená žiadne čelá, normalizuje sa na prázdne `items`).
+`items[].type` nadobúda `door` · `drawer_front` · `none` (D-18 „Bez čela"): riadok `none` drží výšku v rade presne ako čelo (fixed/auto/lock, rovnaká matematika),
+ale panel sa negeneruje = otvorená nika v rade čiel.
+Medzery voči susedom ostávajú ako pri skutočnom čele (reálny otvor je opticky väčší o susedné škáry — vedomé rozhodnutie); `wings` je pre `none` neutrálne 1.
+Bez dielca nevzniká kovanie ani položka kusovníka/VEPO.
+**POZOR:** štruktúrovaný `items[].type: "none"` ≠ legacy STRING config `fronts: "none"` (V0.1/V0.2 — znamená žiadne čelá, normalizuje sa na prázdne `items`).
 
 ---
 
@@ -326,7 +353,10 @@ Dve nezávislé vrstvy (GPT debata sekcie 16–17):
 
 ### 6.2 Two-phase: generický flag → katalógový kód
 
-**Fáza 1 — generický flag z pravidiel.** Pri stavbe/prestavbe korpusu plánovač pridelí generické položky (`hinge`, `slide`, `leg`…) s množstvom z pravidiel v JSON (implementované V0.4, `core/hardware_rules.rb`). Žiadny univerzálny výpočtový jazyk — malý katalóg Ruby **vzorov (`kind`)** parametrizovaných JSON pravidlami: `fixed` (pevný počet), `bands` (pásma podľa vstupu, max vrátane), `fit_series` (najväčšia hodnota radu ≤ vstup − rezerva; výsledok v `params.nominal_length`). Príklad (počet závesov podľa výšky krídla):
+**Fáza 1 — generický flag z pravidiel.** Pri stavbe/prestavbe korpusu plánovač pridelí generické položky (`hinge`, `slide`, `leg`…) s množstvom z pravidiel v JSON;
+vykonateľná podoba pravidiel je `core/hardware_rules.rb`. Žiadny univerzálny výpočtový jazyk — malý katalóg Ruby **vzorov (`kind`)** parametrizovaných JSON pravidlami:
+`fixed` (pevný počet), `bands` (pásma podľa vstupu, max vrátane), `fit_series` (najväčšia hodnota radu ≤ vstup − rezerva; výsledok v `params.nominal_length`).
+Príklad (počet závesov podľa výšky krídla):
 
 ```json
 {
@@ -345,7 +375,7 @@ Dve nezávislé vrstvy (GPT debata sekcie 16–17):
 }
 ```
 
-Pravidlá sú **JSON dáta editovateľné cez dialóg Pravidlá kovania** (nie ručne v súbore). Michal si počty závesov / výnimky mení bez programovania.
+Pravidlá sú **JSON dáta editovateľné cez sekciu Pravidlá v Štúdiu** (nie ručne v súbore). Michal si počty závesov / výnimky mení bez programovania.
 
 **Tvar pravidla je KONTRAKT pri ULOŽENÍ (ŠT-3b-2c1).** Zapísať sa smú len pravidlá, ktoré vedia rozhodnúť pre **každý** rozmer:
 
@@ -353,11 +383,23 @@ Pravidlá sú **JSON dáta editovateľné cez dialóg Pravidlá kovania** (nie r
 - pravidlo `kind: "fit_series"` so `enabled != false` musí mať **neprázdny rad `series`** — automat nemá z čoho vybrať (dôsledok: ručný zámok NL nad prázdnym radom už nemá ako vzniknúť);
 - **vypnuté pravidlo sa nekontroluje** (negeneruje nič) a **neznámy `kind`** z novšej verzie uloženie **neblokuje** (forward-compat: neznáme kľúče sa zachovávajú).
 
-Bránu drží **jedna čistá funkcia `HardwareRules.rules_problems`**, volaná **výhradne v zapisovacej ceste** (`RulesDialog.handle_save`, až PO `normalize_rules` — validuje sa presne to, čo sa zapíše). **Čítacie cesty ostávajú nedotknuté:** `normalize_rules`, `load`, `project_rules`, `evaluate`, seed-merge ani `ensure_project_rules!` validáciu nevolajú — starší (deravý) snapshot v .skp sa **musí dať načítať a postaviť**, len sa nedá znova uložiť bez opravy. Klientska `rdValidate` je zrkadlo tých istých kritérií; zhodu stráži spoločná fixtúra `tests/fixtures/rules_validation_parity.json` (číta ju Ruby aj JS sada). Nekompletný tvar **nie je tichý** — kusovník hlási `hardware_rule_skipped` a Kontrola ORANGE; brána existuje preto, že odmietnuť ho **raz pri uložení** je lacnejšie než ho riešiť na každej skrinke zákazky. **Žiadne automatické doplnenie catch-all** — plugin nedomýšľa počty za stolára.
+Bránu drží **jedna čistá funkcia `HardwareRules.rules_problems`**, volaná **výhradne v zapisovacej ceste** (`RulesDialog.handle_save`, až PO `normalize_rules` — validuje sa presne to, čo sa zapíše).
+**Čítacie cesty ostávajú nedotknuté:** `normalize_rules`, `load`, `project_rules`, `evaluate`, seed-merge ani `ensure_project_rules!` validáciu nevolajú —
+starší (deravý) snapshot v .skp sa **musí dať načítať a postaviť**, len sa nedá znova uložiť bez opravy.
+Klientska `rdValidate` je zrkadlo tých istých kritérií; zhodu stráži spoločná fixtúra `tests/fixtures/rules_validation_parity.json` (číta ju Ruby aj JS sada).
+Nekompletný tvar **nie je tichý** — kusovník hlási `hardware_rule_skipped` a Kontrola ORANGE;
+brána existuje preto, že odmietnuť ho **raz pri uložení** je lacnejšie než ho riešiť na každej skrinke zákazky.
+**Žiadne automatické doplnenie catch-all** — plugin nedomýšľa počty za stolára.
 
-**Zdroje pravidiel a reprodukovateľnosť (V0.4):** rebuild číta výhradne **projektový snapshot** pravidiel (`NOXUN` dict na modeli, kľúč `hardware_rules`) — stavba je reprodukovateľná zo samotného .skp (iné PC, zmeny globálu, kópie skriniek) a undo vracia pravidlá aj geometriu naraz. Globálna knižnica `%APPDATA%\NOXUN\Engine\hardware_rules.json` je len default pre nové projekty (so seed-merge novej verzie seedov podľa `rule_id`).
+**Zdroje pravidiel a reprodukovateľnosť:** rebuild číta výhradne **projektový snapshot** pravidiel (`NOXUN` dict na modeli, kľúč `hardware_rules`) —
+stavba je reprodukovateľná zo samotného .skp (iné PC, zmeny globálu, kópie skriniek) a undo vracia pravidlá aj geometriu naraz.
+Globálna knižnica `%APPDATA%\NOXUN\Engine\hardware_rules.json` je len default pre nové projekty (so seed-merge novej verzie seedov podľa `rule_id`).
 
-**Položka kovania v pláne** (BuildPlan schema 2, string kľúče kvôli JSON round-trip): `owner_part_key` (nil = korpus; inak musí existovať v parts), `generic_type` (slovník), `quantity` (1–999), `rule_id`, `variant_id` (nil vo fáze 1), `production_class: "counted"`, `manufactured: true`, `params` (napr. výška nohy, NL výsuvu), `source` (`rule`/`manual`), `rule_quantity`. Voliteľne `rule_nominal_length` (viď nižšie). **Ručné zásahy** žijú v configu korpusu ako `hardware_overrides` — identita zásahu = trojica **(owner_part_key, generic_type, rule_id)**; `quantity` prepíše počet, `disabled` položku vyradí, `nominal_length` prepíše dĺžku; šablóny korpusov zásahy zachovávajú.
+**Položka kovania v pláne** (BuildPlan schema 2, string kľúče kvôli JSON round-trip): `owner_part_key` (nil = korpus; inak musí existovať v parts), `generic_type` (slovník),
+`quantity` (1–999), `rule_id`, `variant_id` (nil vo fáze 1), `production_class: "counted"`, `manufactured: true`, `params` (napr. výška nohy, NL výsuvu),
+`source` (`rule`/`manual`), `rule_quantity`. Voliteľne `rule_nominal_length` (viď nižšie).
+**Ručné zásahy** žijú v configu korpusu ako `hardware_overrides` — identita zásahu = trojica **(owner_part_key, generic_type, rule_id)**;
+`quantity` prepíše počet, `disabled` položku vyradí, `nominal_length` prepíše dĺžku; šablóny korpusov zásahy zachovávajú.
 
 **Ručná nominálna dĺžka výsuvu (D-93, V0.5.61).** Pole `nominal_length` v zázname `hardware_overrides` (Float mm > 0) je **zámok**: samotná **existencia platného poľa** znamená „drží sa ručná hodnota", žiadny ďalší príznak neexistuje. Pravidlá kontraktu:
 
@@ -365,7 +407,8 @@ Bránu drží **jedna čistá funkcia `HardwareRules.rules_problems`**, volaná 
 - Položka po zámku nesie `params.nominal_length` = ručná hodnota, `source: "manual"` a **`rule_nominal_length`** = hodnota, ktorú by dal automat. Kľúč existuje **len** pri ručnej dĺžke; `null` = automat nevie (do svetlej hĺbky sa nezmestí žiadna dĺžka radu).
 - **Pravidlo `fit_series` emituje položku aj vtedy, keď automat nevyberie nič**, pokiaľ zámok existuje — inak by ručná dĺžka pri zmenšení hĺbky ticho zmizla. Nezmestiteľná ručná dĺžka = ORANGE build warning `hardware_manual_no_fit` (nikdy neblokuje).
 - **Zapisovať sa smie len hodnota z aktuálneho radu pravidla** (presná zhoda, projektový snapshot). Už uložená hodnota mimo radu (rad sa medzitým upravil) sa **nikdy nemaže** — zobrazí sa ako „(mimo radu)" a odomknúť sa dá vždy.
-- **Nákupný CSV kontrakt sa nemení.** Znamienko ručného zásahu žije v okne Výroba: nákupný riadok nesie `manual_quantity` + hotový slovenský text `manual_note`, breakdown v kusovníku `rule_nominal_length` + `manual_note`.
+- **Nákupný CSV kontrakt sa nemení.** Znamienko ručného zásahu žije v UI: nákupný riadok nesie `manual_quantity` + hotový slovenský text `manual_note`,
+  breakdown v kusovníku `rule_nominal_length` + `manual_note`.
 
 **Fáza 2 — mapovanie na konkrétny katalógový kód.** Na konci projektu (alebo raz v nastaveniach) sa flag `hinge` namapuje na konkrétny kód (`Blum 71B3550`). **Mapovanie sa ukladá a nabudúce prebehne automaticky.**
 
@@ -375,7 +418,10 @@ Bránu drží **jedna čistá funkcia `HardwareRules.rules_problems`**, volaná 
 - Na generický objekt sa viaže **ľubovoľne veľa virtuálnych variantov** (konkrétni výrobcovia/kódy) — **čisto dátovo** v katalógu, bez ďalšej geometrie.
 - Skrutky/spojky = čisto virtuálne (žiadna geometria).
 
-**Generický objekt = vizuálna PROXY (spresnené V0.4, Codex audit):** entita nesie `kind: hardware`, ale `production_class: "none"` a `manufactured: false` (+ `config.proxy: true`). **Zdroj pravdy súpisu kovania je výhradne `config.hardware[]` korpusu** — závesy a výsuvy geometriu nemajú vôbec, takže počty musia mať jeden domov; keby proxy niesla `counted/true`, kusovník iterujúci entity by kategórie s vizuálom započítal druhýkrát. (Príklad `counted/true` entity v 8.2 zostáva ako koncept pre samostatné hardware entity bez proxy vzťahu — V0.4 ho nepoužíva.)
+**Generický objekt = vizuálna PROXY:** entita nesie `kind: hardware`, ale `production_class: "none"` a `manufactured: false` (+ `config.proxy: true`).
+**Zdroj pravdy súpisu kovania je výhradne `config.hardware[]` korpusu** — závesy a výsuvy geometriu nemajú vôbec, takže počty musia mať jeden domov;
+keby proxy niesla `counted/true`, kusovník iterujúci entity by kategórie s vizuálom započítal druhýkrát.
+(Príklad `counted/true` entity v 8.2 platí pre samostatné hardware entity bez proxy vzťahu — proxy ňou nikdy nie je.)
 
 **Vŕtanie a presné pozície kovania sú MIMO scope V1** — riešia sa len počty, typy a kódy.
 
@@ -387,9 +433,17 @@ Bránu drží **jedna čistá funkcia `HardwareRules.rules_problems`**, volaná 
 
 Materiál nie je SketchUp textúra. Je to katalógový záznam. Rozlišujeme (SCHEMA 2 — dávka 2A, 30.7.2026):
 
-- **Skupina (dekor)** — **identita skupiny = výrobca + číslo dekoru** (Kronospan·K009, Egger·H1180); `decor_name` („Dub Halifax prírodný") je len ZOBRAZOVACIA vlastnosť skupiny — jej oprava/preklad identitu nemení. Interná kotva skupiny je stabilné **`group_id`** — nesú ho dosky AJ ABS pásky (výrobca je len na skupine; samotné číslo nestačí — rovnaké číslo dvoch výrobcov sú dve rôzne skupiny). Pre vlastné/neznačkové materiály je „číslo" ľubovoľný názov („Biela korpus").
-- **Variant** — samostatný výrobný materiál a samostatný kusovník. **Identita variantu dosky = skupina + typ + hrúbka + štruktúra povrchu** (`structure` — ST9, PW, FP, MG…; voliteľná, trimovaná, porovnávaná case-insensitive s normalizovanými medzerami). **Pre typ PD navyše formát** (`sheet_size` ako usporiadaná dvojica dĺžka×šírka) — F800 PD 38 4100×600 a 4100×920 sú dva varianty. `K009/DTDL/18/PW` a `K009/DTDL/16/PW` sú dva varianty; `5981/DTDL/18/MG` a `5981/DTDL/18/BS` tiež (rovnaké rozmery, iný povrch).
-- **Typ** — dvojvrstvový: **kanonické typy** (DTDL · MDF · HDF · PD · Zástena · Kompakt) žijú v Ruby registri s parametrami (default formát, ponuka hrúbok, hranová logika, kandidát pre telo korpusu) + **„iný"** = voľný string s generickým správaním. Identita typu je case-insensitive. **Kompaktná doska = výhradne kanonický typ `Kompakt`** (nikdy „PD s podtypom kompakt" — jedno kódovanie); PD podtypy hranovej úpravy sú len **postforming | ABS rovná hrana**.
+- **Skupina (dekor)** — **identita skupiny = výrobca + číslo dekoru** (Kronospan·K009, Egger·H1180); `decor_name` („Dub Halifax prírodný") je len ZOBRAZOVACIA vlastnosť skupiny —
+  jej oprava/preklad identitu nemení. Interná kotva skupiny je stabilné **`group_id`** — nesú ho dosky AJ ABS pásky
+  (výrobca je len na skupine; samotné číslo nestačí — rovnaké číslo dvoch výrobcov sú dve rôzne skupiny).
+  Pre vlastné/neznačkové materiály je „číslo" ľubovoľný názov („Biela korpus").
+- **Variant** — samostatný výrobný materiál a samostatný kusovník. **Identita variantu dosky = skupina + typ + hrúbka + štruktúra povrchu**
+  (`structure` — ST9, PW, FP, MG…; voliteľná, trimovaná, porovnávaná case-insensitive s normalizovanými medzerami).
+  **Pre typ PD navyše formát** (`sheet_size` ako usporiadaná dvojica dĺžka×šírka) — F800 PD 38 4100×600 a 4100×920 sú dva varianty.
+  `K009/DTDL/18/PW` a `K009/DTDL/16/PW` sú dva varianty; `5981/DTDL/18/MG` a `5981/DTDL/18/BS` tiež (rovnaké rozmery, iný povrch).
+- **Typ** — dvojvrstvový: **kanonické typy** (DTDL · MDF · HDF · PD · Zástena · Kompakt) žijú v Ruby registri s parametrami
+  (default formát, ponuka hrúbok, hranová logika, kandidát pre telo korpusu) + **„iný"** = voľný string s generickým správaním. Identita typu je case-insensitive.
+  **Kompaktná doska = výhradne kanonický typ `Kompakt`** (nikdy „PD s podtypom kompakt" — jedno kódovanie); PD podtypy hranovej úpravy sú len **postforming | ABS rovná hrana**.
 
 Záznam variantu:
 
@@ -415,7 +469,12 @@ Záznam variantu:
 
 Kusovník podľa materiálov sa delí podľa **material_id (variant) + hrúbka**.
 
-**Nemennosť ID a migrácia (2A):** `material_id`/`abs_id` sú **opaque a navždy nemenné** (modely sa viažu výhradne na ne — snapshot na entite drží ID, štandard 8.3); legacy ID s vloženou štruktúrou v texte sa NEparsujú. Nové ID zahŕňajú skupinu+štruktúru (+formát pri PD) len pre čitateľnosť. Migrácia na SCHEMA 2 beží raz: **nemenná záloha** `materials.pre-schema-2.json` (mimo bežného `.bak`, ktorý sa prepisuje) → transformácia podľa **explicitnej mapy** (heuristika len fallback s reportom) → atomický zápis so schema markerom. **Čo i len jedna nerozhodnuteľná položka = atomický NO-OP celej migrácie** (katalóg sa NEnahradí ani čiastočne — žiadny hybridný stav; report vypíše, čo treba rozhodnúť); mutácie zo starých okien server po migrácii odmieta (`catalog_schema` v payloade).
+**Nemennosť ID a migrácia (2A):** `material_id`/`abs_id` sú **opaque a navždy nemenné** (modely sa viažu výhradne na ne — snapshot na entite drží ID, štandard 8.3);
+legacy ID s vloženou štruktúrou v texte sa NEparsujú. Nové ID zahŕňajú skupinu+štruktúru (+formát pri PD) len pre čitateľnosť.
+Migrácia na SCHEMA 2 beží raz: **nemenná záloha** `materials.pre-schema-2.json` (mimo bežného `.bak`, ktorý sa prepisuje) → transformácia podľa **explicitnej mapy**
+(heuristika len fallback s reportom) → atomický zápis so schema markerom.
+**Čo i len jedna nerozhodnuteľná položka = atomický NO-OP celej migrácie** (katalóg sa NEnahradí ani čiastočne — žiadny hybridný stav; report vypíše, čo treba rozhodnúť);
+mutácie zo starých okien server po migrácii odmieta (`catalog_schema` v payloade).
 
 **Daňový základ cien (ZMENA 31.7.2026, Michal — ruší rozhodnutie z 29.7.):**
 katalóg eviduje ceny **S DPH, presne ako ich zobrazuje Demos** (90 % zdrojov);
@@ -427,7 +486,12 @@ prepočíta ×1,23. Ceny sú **pohyblivá cache** — katalóg drží väzbu na 
 testovacieho katalógu sa pri seede 2.0 preveria/nahradia — tax-basis marker sa
 nezavádza (jednotný základ = s DPH).
 
-**Boot cutover (2A-4b):** migráciu spúšťa **každý štart SketchUpu** (`Materials.boot_cutover!` z main.rb vo vlastnom chránenom bloku — zlyhanie nikdy nezhodí inicializáciu; žiadny modálny dialóg, výsledok ide do logu a stav ukazuje okno Materiály). Poradie: jednorazový **hold flag** `migration_hold.json` (zapisuje ho rollback `restore_pre_schema2!`) sa skonzumuje a migrácia sa RAZ preskočí (ďalší štart už migruje normálne) → posúdenie katalógu (obnova primáru z `.bak`; poškodený/hybridný/novší katalóg = **read-only režim** mutácií do opravy) → marker < 2 = ostrá migrácia (`:undecidable` = katalóg beží ďalej legacy dual-mode, mutácie sa NEzamykajú). Čerstvá inštalácia sa **seeduje natívne v SCHEMA 2** (nikdy nemigruje).
+**Boot cutover (2A-4b):** migráciu spúšťa **každý štart SketchUpu** (`Materials.boot_cutover!` z main.rb vo vlastnom chránenom bloku — zlyhanie nikdy nezhodí inicializáciu;
+žiadny modálny dialóg, výsledok ide do logu a stav ukazuje sekcia Materiály v Štúdiu).
+Poradie: jednorazový **hold flag** `migration_hold.json` (zapisuje ho rollback `restore_pre_schema2!`) sa skonzumuje a migrácia sa RAZ preskočí (ďalší štart už migruje normálne) →
+posúdenie katalógu (obnova primáru z `.bak`; poškodený/hybridný/novší katalóg = **read-only režim** mutácií do opravy) →
+marker < 2 = ostrá migrácia (`:undecidable` = katalóg beží ďalej legacy dual-mode, mutácie sa NEzamykajú).
+Čerstvá inštalácia sa **seeduje natívne v SCHEMA 2** (nikdy nemigruje).
 
 **Dodávateľské polia (D-42):** `code` (dodávateľský/katalógový kód) a `supplier`
 (jeden **preferovaný** dodávateľ — vedomé rozhodnutie, žiadne pole ponúk) sú
@@ -526,7 +590,9 @@ Napr.: projekt `K009_PW_DTDL_18` → korpus zdedí → police zdedia → jedna p
 - **Povolené kľúče záznamu:** `material_id` · `grain_direction` · `edges` · `edge_warnings` (interné, sticky dôvody remapu ABS). Čokoľvek iné sa pri normalizácii configu **zahodí** — vrstva je uzavretý enum, nie voľný priestor.
 - **Chýbajúci kľúč = DEDENIE**, nikdy „prázdna hodnota". Preto sú staré modely bez `grain_direction` platné a ich otvorenie **nesmie nič zapísať, nič prestavať a nesmie vyrobiť krok Späť**.
 - **`grain_direction` (K1 / D-108, v0.7.23):** povolené hodnoty overridu sú **len `"length"` a `"width"`**. `"none"` sa nenastavuje — „bez smeru" je vlastnosť materiálu, nie rozhodnutie o dielci. **Neznáma hodnota sa odmietne** (zápisová cesta vráti chybu, čítacia ju zahodí) — nikdy tichý fallback, výrobné dáta by klamali o tom, čo používateľ zvolil.
-- **Efektívny smer = `override || materiál`, s jedinou výnimkou:** keď materiál dielca smer **nemá** (`grain: "none"` — jednofarebný dekor, UNI, materiál mimo katalógu), override sa **IGNORUJE** (výsledok `"none"`), ale **NEMAŽE sa**. Otáčať kresbu, ktorá neexistuje, by bola lož; zmazanie by pri dočasnej zmene materiálu zahodilo rozhodnutie používateľa. Po návrate dekorového materiálu override znovu platí.
+- **Efektívny smer = `override || materiál`, s jedinou výnimkou:** keď materiál dielca smer **nemá** (`grain: "none"` — jednofarebný dekor, UNI, materiál mimo katalógu),
+  override sa **IGNORUJE** (výsledok `"none"`), ale **NEMAŽE sa**. Otáčať kresbu, ktorá neexistuje, by bola lož;
+  zmazanie by pri dočasnej zmene materiálu zahodilo rozhodnutie používateľa. Po návrate dekorového materiálu override znovu platí.
 - **Výsledok sa materializuje RAZ** — pri stavbe do snapshotu dielca (8.2/8.3). Výstupy (kusovník, VEPO, kontrola nárezu, ABS) čítajú **výhradne snapshot**, nikdy živý katalóg ani `part_overrides`; preto odpojený dielec aj stará zákazka nesú presne to, s čím sa objednávali.
 
 ### 7.3 Výrobný materiál = zdroj pravdy; plochy = vizuál
@@ -596,7 +662,9 @@ Každý plošný dielec nesie hrany **per strana** ako dáta (nezávislé od viz
 - Výnimky pravidlami: hrúbka < prah → nič; rola v zozname výnimiek → nič.
 - Ručný override per dielec vždy víťazí.
 
-> Presné mapovanie strán L1/L2/W1/W2 pri rôznych rotáciách dielca je otvorený bod — sekcia 12.
+> **Priradenie strán L1/L2/W1/W2 na plochy kvádra dielca sa NIKDY neodvodzuje z hodnôt rozmerov** (dva rovnaké rozmery sú nerozhodnuteľné) — je to explicitný údaj deskriptora
+> `axes: { length:, width:, thickness: }`, ktorý zapisuje ten, kto box stavia. Keď osi chýbajú alebo nesedia s rozmermi, mapovanie sa **neháda** (radšej žiadna farba než farba na zlej hrane).
+> Vykonateľná podoba kontraktu: [`noxun_engine/core/part_faces.rb`](../noxun_engine/core/part_faces.rb).
 
 ### 7.6 ABS vizuálny režim (samostatný modul)
 
@@ -629,7 +697,9 @@ Výrobný stav je **explicitne v metadátach** (`production_class` + `manufactur
 
 Podľa sekcie 2.1: **ploché kľúče = identita, názov a filtre; všetko rozmerové a výrobné žije v `config` (JSON string)** — tak to ukladá aj engine (`NOXUN/config`). Exportéry čítajú rozmery VÝHRADNE z `config`; názov dielca z plochého kľúča `name`.
 
-> **Vykonateľná podoba kontraktu (V0.3.4):** tvar plánu stavby — deskriptor dielca, `warnings[]`, `hardware[]`, verzia schémy a validátor — je záväzne definovaný v kóde: [`noxun_engine/core/build_plan.rb`](../noxun_engine/core/build_plan.rb) (`BuildPlan.validate!` beží pri každom pláne). Pri rozpore detailov platí kód + jeho testy (`tests/pure/test_build_plan.rb`); tento dokument drží princípy.
+> **Vykonateľná podoba kontraktu:** tvar plánu stavby — deskriptor dielca, `warnings[]`, `hardware[]`, verzia schémy a validátor — je záväzne definovaný v kóde:
+> [`noxun_engine/core/build_plan.rb`](../noxun_engine/core/build_plan.rb) (`BuildPlan.validate!` beží pri každom pláne).
+> Pri rozpore detailov platí kód + jeho testy (`tests/pure/test_build_plan.rb`); tento dokument drží princípy.
 
 ```json
 {
@@ -706,7 +776,9 @@ Geometria, kusovník aj exporty sú **rôzne reprezentácie toho istého dátov�
 
 ### 8.3 Samostatná doska (`kind: board`) — V0.4.7
 
-Samostatný výrobný dielec **bez korpusu** (krycia doska, blenda, výplň, atypický prírez). Top-level ComponentInstance s vlastnou definíciou (`NOXUN Doska BRD-001`), identita `BRD-001` (sekvencia ako CAB), `part_key` konštantne `board/main` (owner-scope, viď 2.3). Na rozdiel od korpusu (`reference`/`manufactured: false` — kontajner) je doska **priamo výrobná položka**: `manufactured: true`, `production_class: sheet`.
+Samostatný výrobný dielec **bez korpusu** (krycia doska, blenda, výplň, atypický prírez).
+Top-level ComponentInstance s vlastnou definíciou (`NOXUN Doska BRD-001`), identita `BRD-001` (sekvencia ako CAB), `part_key` konštantne `board/main` (owner-scope, viď 2.3).
+Na rozdiel od korpusu (`reference`/`manufactured: false` — kontajner) je doska **priamo výrobná položka**: `manufactured: true`, `production_class: sheet`.
 
 ```json
 {
@@ -739,12 +811,23 @@ Samostatný výrobný dielec **bez korpusu** (krycia doska, blenda, výplň, aty
 Záväzné princípy dosky:
 
 - **Config dosky = superset configu dielca korpusu** — rovnaké výrobné polia (`quantity`/`length`/`width`/`thickness`/`material_id`/`grain_direction`/`edges`), navyše `engine_version`/`name`/`role` pre round-trip editácie a `orientation` pre umiestnenie (nižšie). Výstupy čítajú názov a rolu z **plochých** kľúčov (2.1), nie z configu.
-- **`orientation` je údaj UMIESTNENIA, nie výrobný údaj** (V0.7, UI-C1c). Enum: `"leziaca"` (default) · `"stojaca"` · `"na_stenu"`. **Chýbajúci alebo prázdny kľúč = `"leziaca"`** (dosky vložené pred V0.7 sú platné a nemenia sa); **explicitná neznáma hodnota je CHYBA** — builder ju odmietne rovnako ako neznámu rolu, žiadna tichá preklasifikácia (config z novšej verzie nesmie stratiť význam v staršom plugine). Realizuje sa **výhradne transformáciou inštancie** — geometria v definícii ostáva ležiaca (dĺžka X, šírka Y, hrúbka Z), takže **výrobné rozmery, `edges`, `grain_direction`, osi deskriptora ani agregácia kusovníka a VEPO sa orientáciou NEMENIA** (je to ten istý invariant ako 3.3 „rotácia nemení výrobné dáta"); do agregačného kľúča kusovníka pole **nepatrí**. Zmena orientácie je **delta** nad súčasnou transformáciou (`T × O_old⁻¹ × O_new`), takže ručné otočenie používateľa prežije a pole eviduje **len pluginom aplikovanú** orientáciu. `"na_stenu"` má dnes zhodnú maticu ako `"stojaca"` — je to údaj umiestnenia so sémantikou (zadná plocha pri stene; budúce prisatie/elevácia), rozlišuje sa **poľom, nikdy bounding boxom**.
+- **`orientation` je údaj UMIESTNENIA, nie výrobný údaj** (UI-C1c). Enum: `"leziaca"` (default) · `"stojaca"` · `"na_stenu"`.
+  **Chýbajúci alebo prázdny kľúč = `"leziaca"`** (dosky vložené pred zavedením poľa sú platné a nemenia sa);
+  **explicitná neznáma hodnota je CHYBA** — builder ju odmietne rovnako ako neznámu rolu, žiadna tichá preklasifikácia
+  (config z novšej verzie nesmie stratiť význam v staršom plugine).
+  Realizuje sa **výhradne transformáciou inštancie** — geometria v definícii ostáva ležiaca (dĺžka X, šírka Y, hrúbka Z), takže
+  **výrobné rozmery, `edges`, `grain_direction`, osi deskriptora ani agregácia kusovníka a VEPO sa orientáciou NEMENIA**
+  (je to ten istý invariant ako 3.3 „rotácia nemení výrobné dáta"); do agregačného kľúča kusovníka pole **nepatrí**.
+  Zmena orientácie je **delta** nad súčasnou transformáciou (`T × O_old⁻¹ × O_new`), takže ručné otočenie používateľa prežije
+  a pole eviduje **len pluginom aplikovanú** orientáciu.
+  `"na_stenu"` má zhodnú maticu ako `"stojaca"` — je to údaj umiestnenia so sémantikou (zadná plocha pri stene; budúce prisatie/elevácia),
+  rozlišuje sa **poľom, nikdy bounding boxom**.
 - **Autoritatívny výrobný záznam pre výstupy (V0.5) je snapshot na entite** — pri dielcoch korpusu ho builder zapisuje z plánu po `resolve_part` (finálny materiál/ABS), pri doskách ho zapisuje `BoardBuilder` priamo. `BuildPlan` je **plán stavby korpusu** (medzikrok) — dosky v ňom nie sú; per-dielec kontrakt (`BuildPlan.validate_part!`) je však spoločný validátor oboch.
 - **Kusovník V0.5 zbiera entity `manufactured: true` jednotne** (`kind: part` aj `kind: board`) a agreguje **výhradne podľa výrobných polí** (`material_id` + rozmery + `edges` + `grain_direction`); `quantity` sa sčítava. `id`, `part_key`, `name` ani `engine_version` do agregačného kľúča nepatria.
 - **Materiál dosky je snapshot** — vždy konkrétny **katalógový** záznam (predvyplnený z projektového defaultu pri vložení, žiadne živé dedenie) a **hrúbka sa riadi materiálom** (nie je voľný rozmer). Legacy výnimka „neznámy materiál smie prejsť" platí len pre staré korpusy, na dosky sa neprenáša.
 - **Hrany**: `edges` je vždy kompletná mapa L1/L2/W1/W2; kľúč s `null` = vedome bez ABS. Default pri vložení: pravidlo roly `free_panel` (seed: 1 pozdĺžna hrana 1,0 mm). Doska nemá override vrstvu (`part_overrides`) — config na entite je priamo zdroj pravdy.
-- **`attachment` zatiaľ neexistuje** — absencia poľa = voľná doska (`mode: free`). Pole pribudne aditívne s prvou inteligentnou rolou (`cover_side`…); vlastník sa bude odkazovať výhradne cez `id` (+ `part_key`), nikdy `persistentId`; po zmazaní vlastníka doska prežíva a degraduje na voľnú.
+- **Pole `attachment` (väzba dosky na vlastníka) v configu NIE JE** — absencia poľa = voľná doska (`mode: free`). Pribudne aditívne s prvou inteligentnou rolou
+  (`cover_side`…) a už teraz preň platí: vlastník sa odkazuje výhradne cez `id` (+ `part_key`), **nikdy `persistentId`**; po zmazaní vlastníka doska prežíva a degraduje na voľnú.
 
 ---
 
@@ -811,11 +894,21 @@ Možnosti:
 - **Súpis ABS** — podľa ABS variantu, dĺžka v **bm**.
 - **Súpis kovania** — podľa katalógového kódu, počet **ks** (z flagov → mapovanie fáza 2).
 - **Celkový sumár** — kusovník + m² + bm + ks + súčet cien materiálu/ABS/kovania.
+- **Rozpočet zákazky** — materiál, ABS, kovanie, **služby** (olepovanie, porez, lepenie duplákov, opracovanie PD, montáž — množstvá počíta engine zo sadzieb dodávateľa),
+  štandardné koncové riadky s násobkom, vlastné položky, spotrebiče a zaokrúhlenie konečnej sumy.
+- **Cenová ponuka pre zákazníka** — pohľad NAD rozpočtom, nie druhý výpočet.
 - **VEPO CSV** — presne podľa `VEPO_KONTRAKT.md` (stĺpce `nazov;dlzka;hrana_pozdlz;sirka;hrana_naprieč;hrubka;pocet_ks;material`, oddeľovač `;`, úvodzovky, `—`/`=` kódy hrán dopočítané z L1/L2/W1/W2, normalizácia hrúbok 18/36, slug názvy súborov `<projekt>_<material>_<hrubka>.csv`). Priamo z dielcov, **bez OCL medzikroku**.
 
-**Žiadne marže, žiadne DPH, žiadna cena práce** — možno neskôr. Cenotvorba je len súčet materiálu/ABS/kovania.
+### 11.3 Peniaze — jeden výpočet, dva pohľady
 
-> Prechodná poistka: OCL zostáva nainštalovaný len na **krížovú validáciu** prvých zákaziek (porovnať náš kusovník s OCL výstupom); po zhode sa odstaví. Nie je to prispôsobovanie sa OCL, je to test správnosti.
+- **Autorita výpočtu je rozpočet.** Je to čistá funkcia (BOM + katalógy + stav zákazky + nastavenia dodávateľa → payload); UI ju len zobrazuje a export ju číta 1:1 —
+  **žiadny klient si nič neprepočítava.** Vykonateľná podoba: [`core/budget.rb`](../noxun_engine/core/budget.rb) + sadzby a režimy [`core/supplier_settings.rb`](../noxun_engine/core/supplier_settings.rb).
+- **Cenová ponuka je VIEW nad hotovým payloadom rozpočtu** — jej súčet sa **na cent rovná** súčtu rozpočtu (dorovnávací riadok „nábytková zostava" je automatický zvyšok),
+  do zákazníckeho dokumentu idú len whitelistované polia a interné pojmy (sadzby, €/bm, počty platní, nákupné kódy, `material_id`) sa doň **nikdy** nedostanú.
+  Vykonateľná podoba: [`core/cp_export.rb`](../noxun_engine/core/cp_export.rb).
+- **Sadzby sa do zákazky NEMRAZIA** — rozpočet je pohyblivý obraz cien, nie výrobný snapshot. V modeli žijú len veci per zákazka (režim, overridy, násobky, vlastné položky); sadzby sú globálne nastavenie dodávateľa.
+- **DPH sa nepripočítava.** Firma je neplatca, katalógové ceny sú konečné a prepočet „bez DPH" je len zobrazenie, nikdy základ výpočtu.
+- **Neznáma cena sa NIKDY nenahradí nulou** — riadok ju prizná, medzisúčet je len zo známych cien a súhrn nahlas povie, že nie je úplný.
 
 ---
 
@@ -823,14 +916,16 @@ Možnosti:
 
 Zámerne nerozhodnuté — overia sa na prototype/V1 v SketchUpe (SkAgent), nie od stola:
 
-1. **Presné mapovanie hrán L1/L2/W1/W2 pri rotácii dielca** (❓ osnova 7). Princíp je uzamknutý: hrany per strana, nezávislé od rotácie skrinky. Otvorený je konkrétny algoritmus priradenia strán pri natočených/zrkadlených dielcoch — otestovať na reálnych dielcoch skôr, než sa uzamkne.
-2. **Detailná schéma pravidiel** kovania a ABS (formát `bands`/výnimiek). Princíp (JSON v knižnici pravidiel + editačný panel, two-phase) je uzamknutý; presná štruktúra polí sa doladí pri stavbe panela.
-3. **Presné origin konvencie pre všetky typy modulov** (❓ osnova 3). Korpus, dielec a rotačné čelo sú určené (sekcia 3.2); originy zásuvkových blokov, priečok a doplnkov overiť na prototype.
-4. **Správanie pri zmene rozmeru korpusu s obsadenými zónami** (❓ osnova 5): auto-prepočet detí, kedy resize zakázať/limitovať (princíp `LARGEST/SMALLEST` — min/max rozmery pre kovanie).
-5. **Ghost zón** — vizuálne demo v SketchUpe (🔶 osnova 1) potvrdí opacity, farby, správanie prepínača tagu `Noxun/Zóny`. (Potvrdené V0.2b/c — ghosty fungujú, tag migrovaný z NOXUN_SLOTY.)
-6. **C2 migračný most** — existujúce DC childy (napr. Atira šuflíky) dočasne ako čierne skrinky (scale+redraw). Ich vnútorné `parent!` vzorce mimo pôvodnej skrinky nebežia — rozmery im dáva zóna (Ruby). Rozsah a trvanie mosta sa spresní pri prvej vlne childov.
-7. **Spájanie a zarovnávanie korpusov v zostave** (Michal, 15.7.2026): default = zarovnanie **čelných hrán** (hĺbky korpusov môžu byť rozdielne); voliteľne zarovnanie **zadných hrán**. Koncept jednoduchých **pripájacích bodov (kotiev)** na korpuse — vrátane špeciálnych situácií: rohová skrinka sa nepája priamo na rohový styk (potrebný dištančný/rohový princíp — viď foto reálnej kuchyne). Existujúca logika prisúvania v `snaper` (compute_gap v lokálnom ráme cieľa) je kandidát na prevzatie. Rieši sa PO V0 na reálnych zostavách — postrehy budú jasnejšie z klikania.
+1. **Presné origin konvencie pre všetky typy modulov** (❓ osnova 3). Korpus, dielec a rotačné čelo sú určené (sekcia 3.2); originy zásuvkových blokov, priečok a doplnkov overiť na prototype.
+2. **Správanie pri zmene rozmeru korpusu s obsadenými zónami** (❓ osnova 5): auto-prepočet detí, kedy resize zakázať/limitovať (princíp `LARGEST/SMALLEST` — min/max rozmery pre kovanie).
+3. **C2 migračný most** — existujúce DC childy (napr. Atira šuflíky) dočasne ako čierne skrinky (scale+redraw). Ich vnútorné `parent!` vzorce mimo pôvodnej skrinky nebežia —
+   rozmery im dáva zóna (Ruby). Rozsah a trvanie mosta sa spresní pri prvej vlne childov.
+4. **Spájanie a zarovnávanie korpusov v zostave** (Michal, 15.7.2026): default = zarovnanie **čelných hrán** (hĺbky korpusov môžu byť rozdielne); voliteľne zarovnanie **zadných hrán**.
+   Koncept jednoduchých **pripájacích bodov (kotiev)** na korpuse — vrátane špeciálnych situácií: rohová skrinka sa nepája priamo na rohový styk
+   (potrebný dištančný/rohový princíp — viď foto reálnej kuchyne). Existujúca logika prisúvania v `snaper` (compute_gap v lokálnom ráme cieľa) je kandidát na prevzatie.
+   Rieši sa na reálnych zostavách — postrehy budú jasnejšie z klikania.
 
 ### Mimo scope štandardu v1 (nie „otvorené" — zámerne vynechané)
 
-Vŕtacie pozície a CNC rastre kovania • nesting / nárezové plány • cena práce • automatické výkresy • cloud • rohové a atypické korpusy • šikmé/zakrivené dielce • kompletný kuchynský CAD. K týmto sa systém dostane, až keď jadro (štandard → referenčný korpus → childy → kovania → výstupy) stojí a je overené.
+Vŕtacie pozície a CNC rastre kovania • nesting / nárezové plány • automatické výkresy • cloud • rohové a atypické korpusy • šikmé/zakrivené dielce • kompletný kuchynský CAD.
+K týmto sa systém dostane, až keď jadro (štandard → referenčný korpus → childy → kovania → výstupy) stojí a je overené.
