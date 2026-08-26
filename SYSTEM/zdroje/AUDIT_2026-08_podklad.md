@@ -56,8 +56,10 @@ Ktorú naplánovanú funkciu to blokuje / ktorý dlh spláca (alebo „hygiena")
 Návrh riešenia (1–2 vety) + odhad náročnosti S/M/L
 ```
 
-P1 = ohrozuje výrobu/ceny alebo zablokuje GHOST/KOVANIE · P2 = treba pred príslušnou funkciou ·
-P3 = hygiena, môže počkať. **Nálezy bez dôkazu z kódu sa nezaraďujú.**
+**P0 = AKTÍVNA chyba výroby/cien alebo strata dát — nečaká na register:** eskaluje sa okamžite ako samostatná
+hotfix dávka (štýl bloku 1b), do registra sa zapíše len pointer s výsledkom · P1 = ohrozuje výrobu/ceny alebo
+zablokuje GHOST/KOVANIE · P2 = treba pred príslušnou funkciou · P3 = hygiena, môže počkať.
+**Nálezy bez dôkazu z kódu sa nezaraďujú.**
 
 ## Mimo záberu (nálezy z týchto oblastí sa NEprijímajú)
 

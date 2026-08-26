@@ -16,7 +16,10 @@ blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
 
 ### 1b · STABILIZAČNÁ REVÍZIA (dlhy fázy ŠTÚDIO — pred blokom KOVANIE)
 
-**Cieľ:** doplatiť dlhy, ktoré fáza ŠTÚDIO vedome odložila, a spraviť refactory, na ktoré počas presunov nebol priestor. *(Stabilizačná revízia sa od začiatku produkcie naostro (20.8.) ešte NEKONALA — patrí pred ďalšie nové funkcie.)* Poradie určí Michal; nič z toho nie je blokujúce pre prácu, ale všetko je pomenované, aby sa to nestratilo.
+**Cieľ:** doplatiť dlhy, ktoré fáza ŠTÚDIO vedome odložila, a spraviť refactory, na ktoré počas presunov nebol priestor.
+*(Stabilizačná revízia sa od začiatku produkcie naostro (20.8.) ešte NEKONALA — patrí pred ďalšie nové funkcie.)* Poradie určí Michal.
+Staré dlhy A–F nie sú blokujúce pre bežnú prácu; **P0 odrážky G a H sú BRÁNY** — H musí prebehnúť pred akýmkoľvek zásahom
+do builderov/observerov (teda pred blokom 1d) a G pred tým, než sa na „Obnoviť" postaví ďalšia kontrola.
 
 **A · Optimistický zámok nastavení (dlh z #227, kolo 4 — Codex, priznané v PR threadoch):**
 - **Zastaraný pin prežije návrat do sekcie.** Uvoľnenie nevyužitého pinu je LEN v `ssApplyState`, takže cestu cez `studioGoSection` (prekreslenie BEZ nového pushu) nepokrýva: fokus nezmeneného poľa →
@@ -78,10 +81,11 @@ súbor · **ktorú naplánovanú funkciu blokuje** · návrh riešenia). Audit, 
 
 ### 1d · REFAKTOR/HARDENING Z REGISTRA (po 1c)
 
-Register sa vyprázdňuje **malými dávkami** (malé PR > obrie PR), každá s jasným „správanie sa nemení":
-zoradené podľa závažnosti × blokovanej funkcie. In-SU testy povinné pri builderoch/observeroch; mutačné overenie štandard.
-Nálezy z reálnej výroby majú stále prednosť (Pravidlo pre postrehy). Refaktor dávka, ktorá nevie povedať,
-ktorú naplánovanú funkciu pripravuje alebo ktorý dlh spláca, sa nerobí.
+Register sa vyprázdňuje **malými dávkami** (malé PR > obrie PR), zoradené podľa závažnosti × blokovanej funkcie.
+Pravidlo podľa druhu dávky: **štrukturálny refaktor = „správanie sa nemení"** (presun zodpovednosti, testy to dokazujú);
+**oprava chyby/hardening = explicitná, testom podložená ZMENA správania** (v PR pomenovaná: čo bolo zle → čo platí teraz).
+In-SU testy povinné pri builderoch/observeroch; mutačné overenie štandard. Nálezy z reálnej výroby majú stále prednosť
+(Pravidlo pre postrehy). Dávka, ktorá nevie povedať, ktorú naplánovanú funkciu pripravuje alebo ktorý dlh spláca, sa nerobí.
 
 ### 1e · PLÁNOVACIA DÁVKA — task packages (po 1d)
 
