@@ -31,7 +31,9 @@ Posledný uzavretý blok bol **Docs cleanup** (posledný PR **#234**); správani
 
 **VEĽKÝ TEST JE HOTOVÝ (26.8. večer):** v0.8.4 nainštalovaná, **PICKER-2 aj všetkých 8 dávok fázy ŠTÚDIO (#220–#227) prešlo — všetko PASS, žiadny nález**; Michal vecne potvrdil aj ABS defaulty rolí. Záznam v [archiv/KRONIKA.md](archiv/KRONIKA.md).
 
-**Poradie ďalšej práce (rozhodol Michal 26.8.):** dorobenie vyhľadávača **PICKER-3** (osem nálezov z kola 3 review #231, z toho bod E je návrhová zmena) · **stabilizačná revízia** (blok 1b — dlhy fázy ŠTÚDIO) · **GHOST VKLADANIE** (V1-04, koncept 09 v [zdroje/next_sessions/](zdroje/next_sessions/) — pred implementáciou povinný finálny read-only audit) · až potom blok **KOVANIE** (najprv USER-debata o setoch). Dávky štartujú na Michalovo „štartuj".
+**Poradie ďalšej práce (rozhodol Michal 26.8.):** dorobenie vyhľadávača **PICKER-3** (osem nálezov z kola 3 review #231, z toho bod E je návrhová zmena) ·
+**stabilizačná revízia** (blok 1b — dlhy fázy ŠTÚDIO) · **GHOST VKLADANIE** (V1-04, koncept 09 v [zdroje/next_sessions/](zdroje/next_sessions/) —
+pred implementáciou povinný finálny read-only audit) · až potom blok **KOVANIE** (najprv USER-debata o setoch). Dávky štartujú na Michalovo „štartuj".
 
 ## Posledné uzávery
 
