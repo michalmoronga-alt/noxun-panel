@@ -15,7 +15,13 @@ Odškrtávací checklist (V1 je hotové, keď je odškrtnuté všetko; stav dop�
 6. [x] **Výstupy:** VEPO CSV, kusovník, nákup kovania, rozpočet s cenami, XLSX cenová ponuka *(hotové — dávky E + fáza ŠTÚDIO)*; dotiahnuť len manuálne 1-klik overenie ceny (zvyšok V1-03).
 7. [ ] **Dvaja používatelia:** Michal aj **Lucia** — quick-win render (Demos fotka ako textúra), jednoduchý updater (D-52), zrozumiteľné UI *(Inspector+Štúdio hotové)*.
 
-**Mimo V1 (vedome; rozšírené 26.8.2026 po debate s Michalom):** zásuvkové bloky (na novom štandarde), rohové/špeciálne typy korpusov, CNC/výkresy, plná automatika niche→zóny, fyzické telá spotrebičov (kubusy), výrezy/otvory v dielcoch, umývačkový/digestorový modul ako typ · **plné zostavy/segmenty s attachments** (koncept 02) · **plná appearance vrstva a nástroj pixla** (koncept 06) · **ponuka DOCX/PDF s vizualizáciami** (koncept 08 — XLSX ponuka stačí na milník) · **G-Disk sync knižníc D-48** (updater D-52 ostáva; katalógy zatiaľ export/import ručne) · **sektorová kontrola** (koncept 01 — toggle/presety plošnej kontroly ostávajú) · **typy čiel ako konfigurátor** (V1-07 — vo V1 len čelo ako cenová položka s dodávateľom, cena/m²) · **kovanie fáza 3 geometria** (výklopy plný model, výplne fáza B).
+**Mimo V1 (vedome; rozšírené 26.8.2026 po debate s Michalom):** zásuvkové bloky (na novom štandarde), rohové/špeciálne typy korpusov, CNC/výkresy,
+plná automatika niche→zóny, fyzické telá spotrebičov (kubusy), výrezy/otvory v dielcoch, umývačkový/digestorový modul ako typ ·
+**plné zostavy/segmenty s attachments** (koncept 02) · **plná appearance vrstva a nástroj pixla** (koncept 06) ·
+**ponuka DOCX/PDF s vizualizáciami** (koncept 08 — XLSX ponuka stačí na milník) · **G-Disk sync knižníc D-48** (updater D-52 ostáva;
+katalógy zatiaľ export/import ručne) · **sektorová kontrola** (koncept 01 — toggle/presety plošnej kontroly ostávajú) ·
+**typy čiel ako konfigurátor** (V1-07 — vo V1 len čelo ako cenová položka s dodávateľom, cena/m²) ·
+**kovanie fáza 3 geometria** (výklopy plný model, výplne fáza B).
 
 ## 2 · Princípy (nemenné)
 
