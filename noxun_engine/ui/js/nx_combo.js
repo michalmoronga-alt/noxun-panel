@@ -343,7 +343,12 @@
       return -1;
     }
 
-    function nxComboSections(items, q, kind, usedIds, recentIds){
+    // `ctx` (PICKER-3, review #236 kolo 1): kontextové radenie z `nxComboSortByCtx`
+    // platí VNÚTRI KAŽDEJ sekcie — a sekcia „Naposledy použité" si poradie
+    // prepisuje podľa čerstvosti, takže bez tohto parametra by práve v nej
+    // kontext zanikol (HDF 3 aj DTDL v recents → hore ostane novšia DTDL, hoci
+    // pole je pre chrbát). Čerstvosť preto rozhoduje až MEDZI ROVNOCENNÝMI.
+    function nxComboSections(items, q, kind, usedIds, recentIds, ctx){
       items = items || [];
       var used = {}, recent = {}, i;
       for (i = 0; i < (usedIds || []).length; i++) used[String(usedIds[i])] = true;
@@ -363,9 +368,12 @@
         rest.push(it);
       });
       // Naposledy pouzite drzia poradie POUZITIA (najnovsie hore), nie katalogu.
-      // Riadok sa radí podľa svojho NAJNOVŠIEHO variantu.
+      // Riadok sa radí podľa svojho NAJNOVŠIEHO variantu — ale AŽ PO kontexte:
+      // v poli pre chrbát stojí chrbtová hrúbka nad novšou nechrbtovou, inak by
+      // sa kontextové radenie práve v tejto sekcii ticho stratilo.
       recents.sort(function(a, b){
-        return (rowRecentIndex(recentIds, a) - rowRecentIndex(recentIds, b));
+        return (nxComboCtxRank(a, ctx) - nxComboCtxRank(b, ctx)) ||
+               (rowRecentIndex(recentIds, a) - rowRecentIndex(recentIds, b));
       });
 
       var out = [];
@@ -825,7 +833,7 @@
       // `front`, ABS, chýbajúci atribút) sa poradie nemení vôbec.
       var ctx = sel.getAttribute(CTX_ATTR) || null;
       rows = nxComboSortByCtx(rows, ctx);
-      var secs = nxComboSections(rows, q, kind, usedOf(kind), loadRecent(kind));
+      var secs = nxComboSections(rows, q, kind, usedOf(kind), loadRecent(kind), ctx);
       OPEN.items = nxComboFlatten(secs);
       OPEN.q = q;
       var list = OPEN.pop.querySelector('.cblist');

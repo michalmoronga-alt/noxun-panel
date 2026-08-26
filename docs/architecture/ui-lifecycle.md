@@ -127,7 +127,8 @@ alebo label) → výslovný dotaz o hrúbke → kliknutý čip → hodnota, ktor
 **PICKER-3 (E): KONTEXT RADÍ AJ RIADKY, nielen hrúbky vnútri riadku.** Dovtedy vedel vybrať hrúbku v rodine, ale nie uprednostniť riadok HDF 3 pred riadkom DTDL 18 toho istého
 dekoru — a `md_back` v Štúdiu je naplnený **všetkými** doskami, takže po napísaní dekoru vyhral DTDL a Enter vložil 18 mm chrbát. Dve časti, obe čisté funkcie: `nxComboSortByCtx`
 (**stabilné** radenie podľa `nxComboCtxRank` — riadok s kontextovou hrúbkou má rank 0, ostatné 1; beží **pred delením na sekcie**, takže sa uplatní vnútri každej z nich a členstvo
-v „Použité v projekte" sa nemení) a `nxComboFirstCtx(items, ctx, q)` = kam sadne **kurzor** po dopísaní dotazu: **riadok s hrúbkou, ktorú dotaz MENUJE → riadok podľa kontextu →
+v „Použité v projekte" sa nemení; **sekcia „Naposledy použité" dostáva `ctx` až do `nxComboSections`** — svoje poradie si prepisuje podľa čerstvosti, takže bez toho by v nej
+kontext ticho zanikol a hore by stála naposledy použitá DTDL 18. Čerstvosť je tam tie-breaker **medzi rovnocennými**, review #236 kolo 1) a `nxComboFirstCtx(items, ctx, q)` = kam sadne **kurzor** po dopísaní dotazu: **riadok s hrúbkou, ktorú dotaz MENUJE → riadok podľa kontextu →
 prvý vyberateľný**. Samotné radenie by nestačilo — sekcie „Použité v projekte" a „Naposledy použité" stoja NAD katalógom, takže bez kurzorového pravidla by Enter v poli pre chrbát
 vložil použitú DTDL 18. Prvý stupeň drží sľub PICKER-2 „výslovný dotaz > kontext" aj o poschodie vyššie a **pýta sa dát, nie tvaru dotazu**: číslo dekoru („K018", „H3303") hrúbku
 nemenuje, kým „18" so zhodným variantom áno; nedostupný variant riadok nevytiahne. Bez kontextovej hrúbky (`body`, `front`, ABS, chýbajúci atribút) sa **poradie servera nemení ani

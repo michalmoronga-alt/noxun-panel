@@ -21,7 +21,7 @@ function eq(a, b, msg){ n++; assert.deepStrictEqual(a, b, msg); }
 
 const NXC = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'nx_combo.js'));
 const { nxComboChipFromQuery, nxComboDecorRows, nxComboCtxThickness, nxComboCtxRank,
-        nxComboSortByCtx, nxComboFirstCtx } = NXC;
+        nxComboSortByCtx, nxComboFirstCtx, nxComboSections } = NXC;
 
 // --- C) duplák ×2 aj ×3: slovo NESTAČÍ --------------------------------------
 (function(){
@@ -106,6 +106,29 @@ const rowsOf = () => nxComboDecorRows(ITEMS, v => META[v] || null);
   const many = [{ value: 'a' }, { value: 'b' }, { value: 'c' }];
   eq(nxComboSortByCtx(many, 'back').map(r => r.value), ['a', 'b', 'c'],
      'stabilné radenie: rovnaký rank = pôvodné poradie');
+})();
+
+// --- E3b) sekcia „Naposledy použité" si kontext NEPREBIJE -----------------
+// Review #236 kolo 1: radenie beží pred delením na sekcie, ale recents si
+// poradie prepisujú podľa ČERSTVOSTI — bez kontextu ako primárneho kritéria
+// by práve v tejto sekcii kontext ticho zanikol a v poli pre chrbát by hore
+// stála novšia DTDL 18. Fixtúra je presne taká: DTDL bola použitá NESKÔR.
+(function(){
+  const rows = nxComboSortByCtx(rowsOf(), 'back');
+  const secs = nxComboSections(rows, '', 'decor', [], ['dtd18', 'hdf3'], 'back');
+  const rec = secs.filter(s => s.title === 'Naposledy použité')[0];
+  ok(!!rec, 'obe rodiny sedia v „Naposledy použité"');
+  eq(rec.items.map(r => r.value), ['hdf3', 'dtd18'],
+     'chrbtová 3 mm je hore, hoci DTDL bola použitá naposledy');
+  // Bez kontextu (korpus) rozhoduje čerstvosť tak ako dovtedy.
+  const secs2 = nxComboSections(rowsOf(), '', 'decor', [], ['dtd18', 'hdf3'], 'body');
+  eq(secs2.filter(s => s.title === 'Naposledy použité')[0].items.map(r => r.value),
+     ['dtd18', 'hdf3'], 'bez kontextovej hrúbky drží sekcia poradie POUŽITIA');
+  // A medzi ROVNOCENNÝMI (obe kontextu vyhovujú / obe nie) je čerstvosť
+  // jediné kritérium — kontext nesmie poradie použitia prehádzať.
+  const secs3 = nxComboSections(rowsOf(), '', 'decor', [], ['buk18', 'dtd18'], 'back');
+  eq(secs3.filter(s => s.title === 'Naposledy použité')[0].items.map(r => r.value),
+     ['buk18', 'dtd18'], 'dva nekontextové riadky si poradie použitia držia');
 })();
 
 // --- E4) kurzor: prvý riadok, ktorý kontextu VYHOVUJE ----------------------

@@ -91,7 +91,17 @@ global.document = {
 };
 global.window = { innerWidth: 1200, innerHeight: 800, document: global.document,
                   addEventListener(){}, removeEventListener(){} };
-global.localStorage = { getItem(){ return null; }, setItem(){}, removeItem(){} };
+// „Naposledy použité" číta komponent z localStorage — test si ho vie nastaviť
+// (RECENT drží zoznam ID, najnovšie prvé).
+let RECENT = null;
+// POZOR: komponent číta `localStorage` cez svoj `global` — a tým je v Node
+// práve `window` (posledný riadok nx_combo.js), nie `globalThis`. Bez tohto
+// riadku by boli „Naposledy použité" vždy prázdne a test by tichlo prešiel
+// naprázdno.
+global.localStorage = global.window.localStorage = {
+  getItem(){ return RECENT ? JSON.stringify(RECENT) : null; },
+  setItem(){}, removeItem(){}
+};
 global.Event = function(type){ this.type = type; };
 
 const NXC = require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'nx_combo.js'));
@@ -179,6 +189,25 @@ const kod = mkSelect('back', ['k18', 'k3']);
   press('Enter');
   eq(back.value, 'hdf3', 'kurzor aj tak sadol na kontextový riadok');
   USED = [];
+})();
+
+// --- 2b) ani sekcia „Naposledy použité" kontext neprebije ----------------
+// Tá sekcia si poradie prepisuje podľa ČERSTVOSTI (review #236 kolo 1):
+// bez kontextu ako primárneho kritéria by hore stála naposledy použitá
+// DTDL 18 a Enter by ju v poli pre chrbát vložil.
+(function(){
+  USED = [];
+  RECENT = ['dtd18', 'hdf3'];   // DTDL použitá NESKÔR než HDF
+  back.value = 'dtd18';
+  NXC.open(back);
+  type('dub');
+  const html = popHtml();
+  ok(html.indexOf('Naposledy použité') > -1, 'obe rodiny sedia v „Naposledy použité"');
+  ok(html.indexOf('Dub · HDF') < html.indexOf('Dub · DTDL'),
+     'chrbtová 3 mm je v sekcii hore, hoci DTDL bola použitá naposledy');
+  press('Enter');
+  eq(back.value, 'hdf3', 'a Enter vložil HDF 3');
+  RECENT = null;
 })();
 
 // --- 3) VÝSLOVNÝ dotaz o hrúbke kontext odstaví ---------------------------
