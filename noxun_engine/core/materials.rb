@@ -1024,8 +1024,18 @@ module Noxun
         # vyrobca + dekor; hole `group_id` by ich zlucilo do jednej rodiny,
         # takze Egger 5981 a Kronospan 5981 by skoncili v jednom riadku
         # s dvomi nerozlisitelnymi cipmi.
-        [record_group_key(s, schema).inspect, s['decor'].to_s.strip, s['structure'].to_s.strip,
-         s['type'].to_s.strip, sheet_label_suffix(s).strip].join("\u0000")
+        # PICKER-3 (B): KANONICKE su VSETKY zlozky, nielen skupinova. Katalogovy
+        # kontrakt (`sheet_identity_key`) porovnava typ aj strukturu cez
+        # `identity_norm`, takze `DTDL`/`dtdl` a `ST9`/`st9` su pre katalog TEN
+        # ISTY material — v surovom orezanom tvare vsak dostali dva ROZNE kluce
+        # a jeden dekor sa v ponuke rozpadol na DVA riadky s rovnakou menovkou.
+        # Skupinova cast ostava PRESNE kanonicka (`record_group_key` aj so
+        # svojimi symbolovymi znackami): v SCHEMA 1 je SUROVY dekor sucastou
+        # katalogovej identity, takze normalizovat ho tu by zlucilo to, co
+        # katalog drzi oddelene.
+        [record_group_key(s, schema).inspect, identity_norm(s['decor']),
+         identity_norm(s['structure']), identity_norm(s['type']),
+         identity_norm(sheet_label_suffix(s))].join("\u0000")
       end
 
       # PICKER-2 kolo 2 (P1): KONTEXT RIADKOV vyhladavaca. Pre kazdu dekorovu
@@ -1035,7 +1045,14 @@ module Noxun
       # nu odpovedat NEMOZE (vidi vzdy len to, co je prave v selecte).
       # Menovku dodava volajuci blokom, lebo jej zlozenie (vyrobca pri kolizii)
       # zije v `Panel.sheet_row_label`.
-      def row_family_ctx(sheets, schema = catalog_schema)
+      # PICKER-3 (A): `virtual` = hrubky, ktore riadok ZASTUPUJE, hoci v katalogu
+      # este nie su — virtualne duplakove ponuky `duplak2:<zdroj>` (D-49).
+      # Pole dvojic [zdrojovy zaznam, hrubka]. Bez nich by rodina s jednou
+      # kupenou hrubkou a virtualnym duplakom platila za jednovariantnu
+      # a menovka riadku by tvrdila „… 18 mm", hoci riadok dostane cip „36
+      # duplák" a po jeho vybere vlozi 36. Do `fams` sa nepridava nic: virtualny
+      # duplak patri do rodiny svojho ZDROJA, ktora tam uz je.
+      def row_family_ctx(sheets, schema = catalog_schema, virtual: nil)
         fams = {}
         ths = {}
         Array(sheets).each do |s|
@@ -1047,6 +1064,14 @@ module Noxun
           fams[key] << fam unless fams[key].include?(fam)
           ths[fam] ||= []
           t = thickness_key(s['thickness'])
+          ths[fam] << t unless ths[fam].include?(t)
+        end
+        Array(virtual).each do |(src, thickness)|
+          next if src.nil? || uni?(src)
+
+          fam = variant_family_key(src, schema)
+          ths[fam] ||= []
+          t = thickness_key(thickness)
           ths[fam] << t unless ths[fam].include?(t)
         end
         { 'fams' => fams, 'ths' => ths }
