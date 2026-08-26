@@ -10,7 +10,8 @@ Odškrtávací checklist (V1 je hotové, keď je odškrtnuté všetko; stav dop�
 1. [ ] **Návrh:** vloženie skriniek na klik (GHOST) → zostava vrátane skriniek so spotrebičmi; šablóny s kovaním = opakované typy na 1 klik. *(Zarovnanie a snap k susedom rieši blok „V1.0 zostavy" — snaper logika sa preberá DO pluginu, žiadny externý plugin; plné segmenty/attachments sú mimo V1.)*
 2. [ ] **Konštrukcia:** korpusy vrátane per-dielec odsadení (vzduchové komíny, špeciály — V1-01), výstuhy správne v interiéri (hotové, D-80), sokel/nohy podľa výšky (hotové, D-79).
 3. [x] **Materiály:** katalóg z Demosu, skupinové farby, ABS automatika so semaforom, vyhľadávač s kontextom *(hotové — Materiály 2.0 + PICKER-1/2/3)*; quick-win textúry z Demos fotky ostávajú v bode 7.
-4. [ ] **Kovanie:** sety s automatikou (nohy hotové D-79, bočnice hotové D-81; pomer 1:N = D-109), per-čelo overridy, výplne šuflíkov **vo výťaži — fáza A** (vzorce dodá Michal). *(Plná geometria výplní a výklopový model = mimo V1.)*
+4. [ ] **Kovanie:** sety s automatikou (nohy hotové D-79, bočnice hotové D-81; pomer 1:N = D-109; automatika počtu nôh podľa šírky), výklopy ako **cenové zaradenie podľa hmotnosti** (C-05),
+   smer otvárania a typ závesu, per-čelo overridy + „Použiť na podobné", výplne šuflíkov **vo výťaži — fáza A** (vzorce dodá Michal). *(Plná geometria výplní a výklopový model = mimo V1.)*
 5. [ ] **Spotrebiče:** katalóg + položky projektu, kontrola niche semaforom, ceny v rozpočte (S1).
 6. [ ] **Výstupy:** VEPO CSV, kusovník, nákup kovania, rozpočet s cenami, XLSX cenová ponuka *(hotové — dávky E + fáza ŠTÚDIO)*; **ostáva manuálne 1-klik overenie ceny (zvyšok V1-03)** — odškrtnúť až s ním.
 7. [ ] **Dvaja používatelia:** Michal aj **Lucia** — quick-win render (Demos fotka ako textúra), jednoduchý updater (D-52), zrozumiteľné UI *(Inspector+Štúdio hotové)*.
