@@ -1,8 +1,9 @@
 # Externý audit — kolo 0 (Michalov Codex audit, dodaný 26.8.2026)
 
 > Vrstva `zdroje/` — podklad, nie autorita. Vznikol PRED cieleným podkladom [AUDIT_2026-08_podklad.md](AUDIT_2026-08_podklad.md)
-> (Michal ho mal vypracovaný vopred, je všeobecnejší). Nálezy sa v bloku 1c zlejú do registra spolu s ďalšími
-> dvomi pohľadmi. Posúdenie užitočnosti (Fable, 26.8.) je v závere.
+> (Michal ho mal vypracovaný vopred, je všeobecnejší). **Toto kolo 0 NIE JE jeden z troch pohľadov bloku 1c** —
+> je to predbežný vstup do registra. Všetci traja audítori 1c (externý Codex · Fable · slepý subagent) bežia
+> až s jednotným podkladom; externý Codex sa teda spustí ZNOVA s briefom. Posúdenie užitočnosti (Fable, 26.8.) je v závere.
 
 ## Kandidáti na refactor/hardening (verbatim)
 

@@ -49,6 +49,15 @@ blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
   do tej istej skupiny patrí aj **výklop ako samostatný typ čela** (bez D-čísla). Otvorené **D-106** / **D-107** sem pôvodne patrili tiež, dnes žijú vo svojich skupinách podľa zaradenia:
   D-106 v skupine V1 DOTIAHNUTIE (blok 4), D-107 v skupine Po V1 — zásobník.
 
+**G · „Obnoviť" = čisté čítanie (P0 z externého auditu kolo 0, [zdroje/AUDIT_2026-08_externy_kolo0.md](zdroje/AUDIT_2026-08_externy_kolo0.md)):**
+`ui/production_core.rb:447` · `ui/studio_dialog.rb:1272` — obyčajné „Obnoviť" dnes môže popri čítaní OPRAVIŤ duplicitné identity a vyrobiť Undo operáciu.
+Oddeliť read-only snapshot od opravy: musí byť jasné, kedy sa iba číta a kedy sa model opravuje (oprava = vedomá akcia s vlastným Undo krokom).
+Pred fixom overiť nález proti v0.8.5.
+
+**H · Charakterizačné in-SU scenáre observer/Undo/multi-model (P0 z externého auditu kolo 0):**
+PRED akýmkoľvek zásahom do `core/scale_observer.rb` / builderov zapísať charakterizačné scenáre do in-SU sady: copy, *N, Undo/Redo,
+prepnutie modelu, prerušenie operácie. Žiadny prepis — scenáre fixujú dnešné správanie, aby mal neskorší hardening (1d) a GHOST pevnú pôdu.
+
 **E · Post-hoc Codex sweep #186–#226.** Rozsah je JEDNO číslo naprieč STAV, PLAN aj KRONIKOU a znamená presne toto: **dávky, ktorých primárnym reviewerom bol slepý subagent, lebo Codex bol 21.–24.8.
   nedostupný**. Od **#227** review robí Codex, takže #227 aj #228 sú mimo sweepu. Keď má Codex kapacitu, prejsť tie PR spätne — nie kvôli nedôvere v subagenta (chytil o. i. spiacu mínu duplicitných
   kódov), ale preto, že je to iný pohľad na dávky, ktoré medzitým tvoria základ celej fázy.
@@ -63,7 +72,7 @@ súbor · **ktorú naplánovanú funkciu blokuje** · návrh riešenia). Audit, 
   · vlastný prechod (Fable) · slepý subagent. Nálezy sa zlejú do jedného registra s dedupom.
 - **Prioritné osi auditu** (od budúcich funkcií dozadu): observery/undo/Tool lifecycle (→ GHOST) · dátový model setov kovania
   (→ D-109/KOVANIE) · `ui/production_core.rb` — jadro výstupov v UI vrstve (→ Ponuka/plošná kontrola) · payload kontrakty a identita ·
-  perzistencia, `std` verzie, migrácie (→ shared library) · zjednotenie UI vzorov na nx_modal/nx_combo · 12 stub odsekov architektúry.
+  perzistencia, `std` verzie, migrácie (→ shared library) · zjednotenie UI vzorov na nx_modal/nx_combo · VŠETKY aktuálne stub odseky architektúry (k 26.8. ich je 19; zoznam grepom, detail v podklade).
 - **Mimo záberu** (zapísané aj v podklade): prepisovanie funkčných builderov a zapisovacích ciest · hromadné premenovania ·
   vizuál Inspectora/Štúdia · predčasné abstrakcie pre neschválené funkcie (attachment/segmenty) · výkon bez merania.
 
