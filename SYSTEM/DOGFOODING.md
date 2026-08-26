@@ -12,8 +12,7 @@
 *(Blok **1 · UI 2.0** je od v0.8.0 hotový a jeho plný text žije v
 [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md). Postrehy nižšie sa v ňom
 nevyriešili, takže od 26.8.2026 visia na bloku **1b · STABILIZAČNÁ REVÍZIA**, odrážka **F**
-v [PLAN.md](PLAN.md) — menovite **D-27** a **D-51**. **D-106** a **D-107** majú vlastné
-zaradenie priamo v texte položky.)*
+v [PLAN.md](PLAN.md) — menovite **D-27** a **D-51**.)*
 
 - **D-51 · Štandard veľkostí okien a tlačidiel** (Michal 31.7. večer) — zjednotiť šírky, rozmery a rozmiestnenie naprieč oknami (panel, Materiály, Výroba, Pravidlá, Šablóny) — dohodnúť konkrétne
   hodnoty do UI_DIZAJN.md **pred prvým testovaním Lucie („skúška ohňom")**. *Stav: ČIASTOČNE — UI-B1 (PR #168) zaviedol mechaniku aj tabuľku rozmerov okien v UI_DIZAJN.md a vyplnil riadok Inspectora
@@ -21,16 +20,6 @@ zaradenie priamo v texte položky.)*
 - **D-27 · Rýchle zobraziť/skryť tagy z panela** (Michal 19.7. večer) — mini prepínače priamo v paneli (Čelá 👁 · Chrbát 👁 …) v logike Ghost checkboxu, nech sa nepreklikáva do SketchUp Tags. *Stav:
   OTVORENÉ. UI-B2 (PR #169) priniesla chipy vrstiev v spodnom páse náhľadu — tie však prepínajú vrstvy **náhľadu**, nie tagy modelu; samotné D-27 (viditeľnosť v modeli, vzor checkbox „Zobraziť zóny
   (ghost) v modeli") čaká na vlastnú dávku.*
-- **D-106 · Predbežná cena korpusu v informačnom stĺpci Základných** (Michal 20.8., smoke test Inspector reworku) — pri návrhu skrinky chýba **orientačný náklad**: koľko tá skrinka zhruba stojí ešte
-  predtým, než sa robí rozpočet celej zákazky. Údaj by stál v **informačnom stĺpci sektora Základné** (vedľa „Materiál m²", teda **žiadny nový riadok navyše**) ako text **„≈ X €"** so značkou odhadu a s
-  **tooltipom rozpadu** (materiál: plocha × cena tabule · ABS: bm × cena · kovanie: ks × cena). Dáta existujú — je to tá istá cesta, ktorou počíta tab Rozpočet (`budget`, `sheet_estimate`,
-  `hardware_catalog` ceny); ide o **odvodené čítanie**, nič sa nezapisuje. Pravidlá, ktoré platia: chýbajúca cena **nikdy nula**, ale priznaný odhad (D-61); je to **výstup, nie vstup** (text, nie pole).
-  *Stav: OTVORENÉ — zapísať na neskôr (Michal 20.8.: „zapísať na neskôr"). Zaradenie: fáza ŠTÚDIO / bloky okolo rozpočtu — dovtedy sa nerobí.*
-- **D-107 · Izolácia objektu pred fotením náhľadu šablóny** (Michal 20.8., smoke test) — náhľad šablóny je dnes **kontextová fotografia** aktuálneho pohľadu dorámovaná na skrinku (UI-D2), takže do nej
-  môže zasahovať okolitá geometria. Želanie: pred capture **dočasne skryť zvyšok modelu** a odfotiť skrinku samú. Prečo to nie je „malá zmena": skrývanie/odkrývanie geometrie je **zápis do modelu**
-  (viditeľnosť entít, tagy), teda undo kroky, observery a riziko, že po zlyhaní ostane model rozbitý — presne tomu sa UI-D2 vedome vyhla. *Stav: OTVORENÉ, **nízka priorita / vysoká náročnosť** (Michal
-  20.8.). Zaradenie: [PLAN.md](PLAN.md) → „Po V1 — zásobník". Medzitým platí náhrada: **ručné „Odfotiť" v okne Šablóny** (SMOKE PACK 1) — Michal si skrinku naaranžuje a izoluje sám a odfotí ju, kedy
-  chce.*
 - **Výklop ako samostatný typ čela** *(bez D-čísla — vzišlo z kontraktu UI 2.0, otvorené dávkou UI-C3, 19.8.)* — kontrakt žiada výklop v ponuke typov čela. UI-C3 ho tam **dala len ako neaktívnu voľbu
   s vysvetlením**, lebo rola `flap` (kanonická v STANDARD §2.4, ale nikde nepoužitá) potrebuje vlastnú cestu cez **builder, ABS pravidlá, kusovník a VEPO** — to je zmena dátového kontraktu, teda vlastná
   dávka s Codex auditom a in-SU behom. *Stav: OTVORENÉ — malá dávka „výklop ako rola flap"; kovanie AVENTOS ostáva ručné (POJMY.md: výklopy sa negenerujú, plný model je fáza 3).*
@@ -64,6 +53,11 @@ zaradenie priamo v texte položky.)*
   „Prepočítať ceny" preskočí) · **plný generátor cenovej ponuky do DOCX/PDF** so šablónou a vizualizáciami (dnes je výstup XLSX) · prepínač **„na faktúru"** (×1,2 — vzor ADAMČÍK), kandidát na štvrtý
   cenový režim · **rodina dokumentov** okolo ponuky (ponuka 3D vizualizácií, preberací protokol). *(Piaty kus tej istej odkladovej sady — EN DANIELI textový export — je v skupine KONTROLA + VÝROBA.)*
   *Stav: čaká na prax — vytiahne sa, keď si to reálna zákazka vypýta.*
+- **D-106 · Predbežná cena korpusu v informačnom stĺpci Základných** (Michal 20.8., smoke test Inspector reworku) — pri návrhu skrinky chýba **orientačný náklad**: koľko tá skrinka zhruba stojí ešte
+  predtým, než sa robí rozpočet celej zákazky. Údaj by stál v **informačnom stĺpci sektora Základné** (vedľa „Materiál m²", teda **žiadny nový riadok navyše**) ako text **„≈ X €"** so značkou odhadu a s
+  **tooltipom rozpadu** (materiál: plocha × cena tabule · ABS: bm × cena · kovanie: ks × cena). Dáta existujú — je to tá istá cesta, ktorou počíta tab Rozpočet (`budget`, `sheet_estimate`,
+  `hardware_catalog` ceny); ide o **odvodené čítanie**, nič sa nezapisuje. Pravidlá, ktoré platia: chýbajúca cena **nikdy nula**, ale priznaný odhad (D-61); je to **výstup, nie vstup** (text, nie pole).
+  *Stav: OTVORENÉ — zapísať na neskôr (Michal 20.8.: „zapísať na neskôr"). Zaradenie: [PLAN.md](PLAN.md) blok 4 (bloky okolo rozpočtu) — dovtedy sa nerobí.*
 - **D-10 · Presúvanie/úprava čiel priamo v náhľade** (ako drag priečok). *Stav: nápad, D-08 hotové — môže sa rozpracovať.*
 - **Kovanie — z prvého testu v0.8.0 (Michal 24.8.), v PLANe blok 4 „redizajn katalógu a setov":**
 - **D-109 · Pomer člena setu „1 ks na N nôh"** (Michal 24.8., prvý test v0.8.0) — set kovania vie dnes počítať člena len **per unit** (na kus) alebo **per owner** (na skrinku). Chýba pomer typu „**1
@@ -88,3 +82,11 @@ zaradenie priamo v texte položky.)*
 - **D-20 · Quick actions — bezpečný move plugin** (Michal 19.7., „pre budúceho Michala a Fable, keď bude základ top 😉") — zlúčiť funkčné pluginy noxun_mower + Snaper do jedného toolbar pluginu (rýchly
   pohyb, kopírovanie, rotácie, prisunutie na doraz). **Známy poznatok:** mower „rýchla kópia skrinky vedľa" vytvorí kópiu LEN ako geometriu — bez NOXUN identity kabinetu (kópia mimo observer/dedup
   flow). Pri stavbe quick actions kopírovanie prerobiť tak, aby kópia prešla štandardným dedup tickom (plná identita + config). *Stav: budúcnosť (po V1 / pri zostavách).*
+
+## Po V1 — zásobník
+
+- **D-107 · Izolácia objektu pred fotením náhľadu šablóny** (Michal 20.8., smoke test) — náhľad šablóny je dnes **kontextová fotografia** aktuálneho pohľadu dorámovaná na skrinku (UI-D2), takže do nej
+  môže zasahovať okolitá geometria. Želanie: pred capture **dočasne skryť zvyšok modelu** a odfotiť skrinku samú. Prečo to nie je „malá zmena": skrývanie/odkrývanie geometrie je **zápis do modelu**
+  (viditeľnosť entít, tagy), teda undo kroky, observery a riziko, že po zlyhaní ostane model rozbitý — presne tomu sa UI-D2 vedome vyhla. *Stav: OTVORENÉ, **nízka priorita / vysoká náročnosť** (Michal
+  20.8.). Zaradenie: [PLAN.md](PLAN.md) → „Po V1 — zásobník". Medzitým platí náhrada: **ručné „Odfotiť" v okne Šablóny** (SMOKE PACK 1) — Michal si skrinku naaranžuje a izoluje sám a odfotí ju, kedy
+  chce.*
