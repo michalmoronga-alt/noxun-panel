@@ -27,8 +27,9 @@
   // sa uložením poslala TÁ ČERSTVÁ, optimistický zámok servera by prešiel
   // a cudziu zmenu (druhá inštancia, ručný zásah do súboru) by rozpísaný
   // formulár TICHO PREPÍSAL. Presne to má zámok chytiť, takže sa posiela
-  // revízia PRIPNUTÁ pri prvom písmene; uvoľní ju potvrdený zápis, „Načítať
-  // nanovo" alebo vedomé potvrdenie konfliktu (`SS.conflict`).
+  // revízia PRIPNUTÁ pri fokuse poľa; uvoľní ju odpoveď servera (`SS.saved()`
+  // — potvrdenie, odmietnutie aj „Načítať nanovo") a KAŽDÉ prekreslenie tela
+  // z čerstvého stavu nad nerozpísaným formulárom (`ssRenderBody`, dlh 1b-A).
   var SS_BASE_REV = null;
   // Posledný payload NEDORAZIL (server ho nevedel zostaviť — chyba disku,
   // poškodený súbor). Sekcia to MUSÍ povedať: formulár, ktorý vyzerá aktuálne,
@@ -292,6 +293,21 @@
     }
     if (!SS_STATE){ box.innerHTML = '<div class="muted">Načítavam…</div>'; return; }
     if (ssTyping()) return;
+    // PIN ŽIJE PRESNE TAK DLHO, AKO OBSAH, NAD KTORÝM VZNIKOL (dlh 1b-A).
+    // Tento riadok je JEDINÉ miesto, kde sa nevyužitý pin uvoľňuje, lebo
+    // hneď pod ním je JEDINÉ miesto, kde sa telo prekresľuje z čerstvého
+    // `SS_STATE` — a to platí pre OBE cesty: plný push (`ssApplyState`)
+    // aj prekreslenie z NAVIGÁCIE (`studioGoSection` → `render` →
+    // `renderBody`), ktoré nový push neprináša. Kým bola kontrola len
+    // v `ssApplyState`, prežil zastaraný pin odchod zo sekcie a návrat do
+    // nej: sekcia ukázala čerstvé hodnoty, ale uloženie skončilo FALOŠNÝM
+    // konfliktom a `SS.saved()` rozpísanú prácu zahodil.
+    // Podmienka je LEN `!ssDirty()`, a je to zámerné: sme UŽ ZA strážou
+    // `ssTyping()` o riadok vyššie (pod kurzorom sa sem nedôjde, obsah
+    // ostáva zmrazený a pin sa drží — kontrakt review #227 kolo 2). Keby
+    // niekto tú stráž presunul alebo zrušil, uvoľní sa pin pod kurzorom
+    // a padne test „pod kurzorom pin ostáva".
+    if (!ssDirty()) SS_BASE_REV = null;
     box.innerHTML = '';
     if (sec === 'bset') ssRenderBsetInto(box);
     else if (sec === 'sup') ssRenderSupInto(box);
@@ -433,15 +449,11 @@
       return;
     }
     SS_FAILED = false;
-    // Review #227 kolo 3: pin, ktorý NIKTO NEVYUŽIL, sa nesmie držať. Keď
-    // používateľ pole opustil bez písania, obsah sa o riadok nižšie prekreslí
-    // z ČERSTVÉHO stavu — a jeho ďalšia úprava by potom išla proti revízii,
-    // ktorú už nikde nevidí: uloženie by skončilo FALOŠNÝM konfliktom
-    // a zahodilo mu prácu. Uvoľňuje sa preto PRESNE vtedy, keď nie je čo
-    // chrániť: nič nie je rozpísané A ani jedno pole sekcie nedrží kurzor.
-    // (Kontrakt kola 2 tým ostáva: kým pole fokus MÁ, obsah je zmrazený
-    // a pin sa drží, takže cudziu zmenu nemožno ticho prepísať.)
-    if (!ssDirty() && !ssTyping()) SS_BASE_REV = null;
+    // Review #227 kolo 3: pin, ktorý NIKTO NEVYUŽIL, sa nesmie držať —
+    // uvoľňuje ho ale `ssRenderBody` (dlh 1b-A), lebo pin patrí k OBSAHU
+    // NA OBRAZOVKE, nie k príchodu payloadu. Tu by kontrola pokryla len
+    // cestu pushu; prekreslenie z navigácie by jej ušlo a zastaraný pin by
+    // prežil návrat do sekcie (falošný konflikt → zahodená editácia).
     SS_STATE = s;
     if (!ssActive()) return;
     ssRenderBody();
@@ -462,8 +474,9 @@
   if (typeof document !== 'undefined'){
     // Pin sa berie UŽ PRI FOKUSE — v okamihu, keď sa pole stane cieľom písania.
     // Prvé písmeno je neskoro: medzi fokusom a ním môže doraziť push s cudzou
-    // zmenou. (Nad nerozpísaným formulárom ho `ssApplyState` zase uvoľní, takže
-    // sa pin a zobrazený obsah nemôžu rozísť.)
+    // zmenou. (Nad nerozpísaným formulárom ho pri najbližšom prekreslení tela
+    // zase uvoľní `ssRenderBody`, takže sa pin a zobrazený obsah nemôžu rozísť
+    // — ani po odchode zo sekcie a návrate do nej.)
     document.addEventListener('focusin', function(ev){
       var t = ev && ev.target;
       if (!t || !t.getAttribute || !t.getAttribute('data-ss')) return;
