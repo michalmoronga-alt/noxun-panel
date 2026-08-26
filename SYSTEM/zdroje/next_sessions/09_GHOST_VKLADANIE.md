@@ -1,6 +1,8 @@
 # 09 · Ghost vkladanie skriniek / V1-04
 
-> **PREDIMPLEMENTAČNÝ KONCEPT + PREDBEŽNÝ AUDIT — NIE TASK PACKAGE.**
+> Stav: KONCEPT — neimplementovať priamo · zdroj: PR #210 (23.8.2026) · auditované proti kódu: zatiaľ nie
+>
+> **Predimplementačný koncept + predbežný audit — nie task package.**
 >
 > Pravdepodobný kandidát na **prvú funkčnú dávku po uzavretí UI 2.0 a následnom hardeningu**, ak finálny audit nepotvrdí blokujúci problém. Pred implementáciou stále platí povinný postup z [README.md](README.md).
 

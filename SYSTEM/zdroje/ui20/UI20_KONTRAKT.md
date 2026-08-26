@@ -7,8 +7,8 @@
 > záväzná vizuálna referencia; nahrádza debatný [mockup_ui20.html](mockup_ui20.html)) ·
 > [dizajnovy_listok.html](dizajnovy_listok.html) (paleta, logo, dizajnové rozhodnutia).
 >
-> Podklad pre klikateľný mockup a večernú debatu. Vstupy: [UI_VIZIA](../../UI_VIZIA.md) ·
-> merač D-25 ([odpočet](../MERAC_D25_odpocet_2026-08.md)) · V1_VIZIA §6 ·
+> Podklad pre klikateľný mockup a večernú debatu. Vstupy: [UI_VIZIA](../../archiv/UI_VIZIA_2026-07.md) ·
+> merač D-25 ([odpočet](../MERAC_D25_odpocet_2026-08.md)) · [V1_VIZIA §6](../../archiv/V1_VIZIA_priebeh_2026-08.md) *(od 26.8.2026 v archíve)* ·
 > PLAN blok UI 2.0 · [UI_DIZAJN](../../../docs/UI_DIZAJN.md). Rozsah schválil Michal 13.8.:
 > **štúdio okno so VŠETKÝMI satelitmi + PLNÝ redizajn Inspectora**; D-26 (režimy) sa rozhodne
 > až nad mockupom; OCL vzory navrhuje agent, Michal škrtá/dopĺňa.
@@ -35,7 +35,7 @@
 - **Hover akcie riadku** (ikony vpravo pri hoveri: označ v modeli · uprav · detail) — šetria
   stĺpce, tabuľka ostáva čistá.
 - **Voliteľné stĺpce tabuľky** (prepínač stĺpcov v rohu — Lucia nepotrebuje vidieť to, čo Michal).
-- **ABS kompakt v stĺpci** („P:1 · L:2" štýl z UI_VIZIA riadok 15) s tooltipom plného znenia.
+- **ABS kompakt v stĺpci** („P:1 · L:2" štýl z položky **„Kusovník (zoskupené dielce)"** v tabuľke [UI_VIZIA](../../archiv/UI_VIZIA_2026-07.md)) s tooltipom plného znenia.
 - **Tlačiteľné etikety dielcov** — v mockupe len ako položka exportov (placeholder, po V1).
 - **Sekcia = vlastný obsah + vlastné nástroje hore** (OCL má per-tab toolbar) — náš vzor:
   lišta sekcie s primárnou akciou vľavo a exportmi vpravo.

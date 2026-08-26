@@ -3,6 +3,8 @@
 > **STATUS: PREDIMPLEMENTAČNÝ DISKUSNÝ BALÍK — NIE IMPLEMENTAČNÝ PLÁN ANI TASK PACKAGE.**
 >
 > Tento priečinok zhromažďuje témy, ktoré majú po uzavretí UI 2.0 slúžiť ako vstup do ďalších návrhových sessions. Žiadny dokument v tomto priečinku sám osebe neoprávňuje agenta začať implementáciu.
+>
+> **Každý dokument okrem tohto README nesie hneď pod nadpisom status riadok `> Stav: KONCEPT — neimplementovať priamo …`** (zavedené dávkou Docs cleanup B, 26.8.2026; stráži ho guard `tests/pure/test_docs_navigacia.rb`). Časť „auditované proti kódu" sa prepíše, keď koncept prejde auditom proti aktuálnemu repu.
 
 ## A · Čo tu preberáme, ako dokumenty vznikli a čo riešia
 

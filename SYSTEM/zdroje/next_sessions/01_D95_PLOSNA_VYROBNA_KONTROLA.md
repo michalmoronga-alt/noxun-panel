@@ -1,6 +1,8 @@
 # 01 · D-95 — Plošná výrobná kontrola projektu
 
-> **PREDIMPLEMENTAČNÝ KONCEPT — NIE TASK PACKAGE.** Pred implementáciou platí postup z [README.md](README.md): aktuálny audit + vyriešenie otvorených bodov.
+> Stav: KONCEPT — neimplementovať priamo · zdroj: PR #210 (23.8.2026) · auditované proti kódu: zatiaľ nie
+>
+> Pred implementáciou platí postup z [README.md](README.md): aktuálny audit + vyriešenie otvorených bodov.
 
 ## Kontext a pôvod
 

@@ -1,6 +1,8 @@
 # 09A · Ghost vkladanie — externý SketchUp API/UX audit
 
-> **DOPLNKOVÝ PREDIMPLEMENTAČNÝ AUDIT — NIE TASK PACKAGE.**
+> Stav: KONCEPT — neimplementovať priamo · zdroj: PR #210 (23.8.2026) · auditované proti kódu: zatiaľ nie
+>
+> **Doplnkový predimplementačný audit — nie task package.**
 >
 > Tento dokument dopĺňa [09_GHOST_VKLADANIE.md](09_GHOST_VKLADANIE.md) o pohľad mimo repozitára: oficiálnu SketchUp Ruby API dokumentáciu a praktické poznatky z SketchUp Developer Forum. Účelom je upozorniť implementačného agenta na pasce, ktoré read-only audit repa nemusí odhaliť. Konkrétny kód, triedy a implementačné rozhodnutia má po hardeningu znovu overiť agent proti aktuálnemu repu a aktuálnej podporovanej verzii SketchUp.
 

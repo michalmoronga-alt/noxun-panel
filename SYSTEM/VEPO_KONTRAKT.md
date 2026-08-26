@@ -36,4 +36,6 @@ Pôvodný reťazec: OCL export CSV (BOM UTF-8, oddeľovač `;` alebo `,` auto-de
 
 ## Čo z toho vyplýva pre dátový model dielca v novom systéme
 
-Dielec musí niesť minimálne: **názov, dĺžka, šírka, hrúbka (reálna aj obchodná), počet, materiál (názov pre VEPO), hrany 4× samostatne (l1, l2, w1, w2 — nie len súhrnný kód!), príznak rotácie/orientácie dekoru**. Súhrnné kódy `—`/`=` sa DOPOČÍTAJÚ pri exporte — v modeli držíme plné info per strana (lebo `—` nevie povedať KTORÁ strana; pre CNC a kusovník to potrebujeme presne). **Rozmery v exporte = hotové rozmery bez úprav** — ABS hrúbky sa NIKDY neodratávajú (robí to VEPO); plné per-strana info o hranách ostáva v modeli pre budúce CNC/nárezové výstupy.
+Dielec musí niesť minimálne: **názov, dĺžka, šírka, hrúbka (reálna aj obchodná), počet, materiál (názov pre VEPO), hrany 4× samostatne (l1, l2, w1, w2 — nie len súhrnný kód!), príznak
+  rotácie/orientácie dekoru**. Súhrnné kódy `—`/`=` sa DOPOČÍTAJÚ pri exporte — v modeli držíme plné info per strana (lebo `—` nevie povedať KTORÁ strana; pre CNC a kusovník to potrebujeme presne).
+  **Rozmery v exporte = hotové rozmery bez úprav** — ABS hrúbky sa NIKDY neodratávajú (robí to VEPO); plné per-strana info o hranách ostáva v modeli pre budúce CNC/nárezové výstupy.

@@ -1,6 +1,8 @@
 # 04A · Spotrebiče S1 — externý audit výrobcov a podobných aplikácií
 
-> **EXTERNÝ PREDIMPLEMENTAČNÝ AUDIT — NIE TASK PACKAGE.**
+> Stav: KONCEPT — neimplementovať priamo · zdroj: PR #210 (23.8.2026) · auditované proti kódu: zatiaľ nie
+>
+> **Externý predimplementačný audit — nie task package.**
 >
 > Tento dokument dopĺňa [04_SPOTREBICE_S1.md](04_SPOTREBICE_S1.md). Nezavádza automaticky nové V1 požiadavky. Zachytáva montážne pasce z reálnych podkladov výrobcov a vzory z podobných kitchen/CAD aplikácií, ktoré má implementačný audit vedome preveriť.
 
