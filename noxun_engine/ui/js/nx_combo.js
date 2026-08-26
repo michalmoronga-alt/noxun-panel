@@ -194,9 +194,7 @@
       if (!list.length) return null;
       var real = list.filter(function(v){ return !v.duplak; });
       var pool = real.length ? real : list;   // len duplák? potom nech je aspoň niečo
-      var want = null;
-      if (ctx === 'back') want = 3;
-      else if (ctx === 'worktop') want = 38;
+      var want = nxComboCtxThickness(ctx);
       if (want != null){
         var exact = pool.filter(function(v){ return v.thickness === want; });
         if (exact.length) return exact[0];
@@ -209,6 +207,81 @@
         if (nxComboVariantCmp(v, best) < 0) best = v;
       });
       return best;
+    }
+
+    // ===================== PICKER-3 (E): KONTEXT RADÍ AJ RIADKY =============
+    //
+    // Kontext (`back` → 3 mm, `worktop` → 38) sa dovtedy uplatňoval LEN vnútri
+    // už rozdelenej rodiny — vedel vybrať hrúbku v riadku, ale nevedel
+    // uprednostniť riadok HDF 3 pred riadkom DTDL 18 toho istého dekoru.
+    // V Štúdiu je `md_back` naplnený VŠETKÝMI doskami, takže po napísaní dekoru
+    // bol prvý zhodný riadok spravidla DTDL a Enter vložil 18 mm — hoci pole
+    // sľubuje chrbát.
+    //
+    // Riešenie je RADENIE, nie filtrovanie: riadky s kontextovou hrúbkou idú
+    // navrch (stabilne, katalógové poradie sa medzi rovnocennými nemení)
+    // a kurzor po dopísaní dotazu sadá na PRVÝ kontextový riadok. Filter by
+    // legitímne voľby SCHOVAL — chrbát z 18 mm je nezvyklý, nie zakázaný,
+    // a semafor v tomto repe varuje, nikdy neblokuje.
+    var CTX_THICKNESS = { back: 3, worktop: 38 };
+
+    function nxComboCtxThickness(ctx){
+      var w = CTX_THICKNESS[String(ctx == null ? '' : ctx)];
+      return (w == null) ? null : w;
+    }
+
+    // 0 = riadok kontextovú hrúbku PONÚKA, 1 = neponúka. Bez kontextu (a pre
+    // položky, o ktorých komponent nič nevie — fixné voľby, ABS, katalóg bez
+    // resolvera) je to 0, takže poradie ostáva presne katalógové.
+    // Duplák sa neráta: je to vedomá voľba klikom, nie kontextová predvoľba.
+    function nxComboCtxRank(row, ctx){
+      var want = nxComboCtxThickness(ctx);
+      if (want == null || !row || !row.decorRow || !row.variants) return 0;
+      for (var i = 0; i < row.variants.length; i++){
+        var v = row.variants[i];
+        if (v.disabled || v.duplak) continue;
+        if (v.thickness != null && Math.abs(v.thickness - want) < 0.001) return 0;
+      }
+      return 1;
+    }
+
+    // STABILNÉ radenie riadkov podľa kontextu. Robí sa PRED delením na sekcie,
+    // takže sa uplatní vnútri každej z nich a členstvo v „Použité v projekte"
+    // ani „Naposledy použité" sa nemení — kontext je preferencia, nie filter.
+    function nxComboSortByCtx(rows, ctx){
+      var list = (rows || []).slice();
+      if (nxComboCtxThickness(ctx) == null) return list;
+      return list.map(function(r, i){ return { r: r, i: i, rank: nxComboCtxRank(r, ctx) }; })
+        .sort(function(a, b){ return (a.rank - b.rank) || (a.i - b.i); })
+        .map(function(x){ return x.r; });
+    }
+
+    // Kam sadne KURZOR po dopísaní dotazu. Poradie prednosti je to isté ako
+    // vnútri riadku (`applyContextDefaults`), len o poschodie vyššie:
+    //   1. riadok, ktorý má PRÁVE tú hrúbku, ktorú dotaz menuje — kto napíše
+    //      „18" do poľa pre chrbát, chce 18 (a kto napíše „3", dostane 3,
+    //      hoci číslo 3 sedí aj v cudzom ID),
+    //   2. riadok, ktorý vyhovuje KONTEXTU poľa,
+    //   3. prvý vyberateľný vôbec.
+    // Samotné radenie na krok 2 nestačí: sekcie „Použité v projekte"
+    // a „Naposledy použité" stoja NAD katalógom, takže bez tohto by kurzor
+    // sadol na použitú DTDL 18 aj v poli pre chrbát.
+    function nxComboFirstCtx(list, ctx, q){
+      var rows = list || [], i, r;
+      if (q){
+        for (i = 0; i < rows.length; i++){
+          r = rows[i];
+          if (r.disabled || !r.decorRow || !r.variants) continue;
+          var c = nxComboChipFromQuery(q, r.variants);
+          if (c >= 0 && !r.variants[c].disabled) return i;
+        }
+      }
+      if (nxComboCtxThickness(ctx) != null){
+        for (i = 0; i < rows.length; i++){
+          if (!rows[i].disabled && nxComboCtxRank(rows[i], ctx) === 0) return i;
+        }
+      }
+      return nxComboFirst(rows);
     }
 
     // Dotaz -> ktorý VARIANT bol menovaný priamo (ID alebo label). Materiálové
@@ -239,11 +312,28 @@
       if (!list.length) return -1;
       var text = nxNormText(q);
       if (!text) return -1;
-      if (text.indexOf('duplak') > -1){
-        for (var d = 0; d < list.length; d++){ if (list[d].duplak) return d; }
-      }
       var nums = text.match(/\d+([.,]\d+)?/g);
-      if (!nums) return -1;
+      if (text.indexOf('duplak') > -1){
+        // PICKER-3 (C): rodina moze mat duplák ×2 aj ×3 (36 aj 54 mm). Slovo
+        // „duplák" preto NESTACI — najprv sa medzi duplákmi hlada HRUBKA
+        // z dotazu, a az ked ju dotaz nemenuje (alebo taky duplák nie je),
+        // pada sa na prvy. Bez toho by „54 duplák" ukazalo aj vlozilo 36:
+        // slovo sa cita skor nez cislo a clovek dostane iny material, nez
+        // menoval — pri dvojnasobnej cene je to draha tichá zámena.
+        var dups = [];
+        for (var d = 0; d < list.length; d++){ if (list[d].duplak) dups.push(d); }
+        if (dups.length){
+          var hit = nxComboThicknessHit(dups.map(function(i){ return list[i]; }), nums);
+          return hit >= 0 ? dups[hit] : dups[0];
+        }
+      }
+      return nxComboThicknessHit(list, nums);
+    }
+
+    // Prvý variant zo zoznamu, ktorého hrúbka sedí na niektoré číslo v dotaze.
+    // -1 = dotaz o hrúbke nič nehovorí (alebo taká hrúbka v zozname nie je).
+    function nxComboThicknessHit(list, nums){
+      if (!nums || !nums.length) return -1;
       for (var n = 0; n < nums.length; n++){
         var val = parseFloat(String(nums[n]).replace(',', '.'));
         for (var i = 0; i < list.length; i++){
@@ -662,9 +752,15 @@
       if (sel && sel.__nxc){ try { sel.__nxc.btn.focus(); } catch (e){} }
     }
 
-    // Krok po cipoch aktivneho riadku. Nedostupne varianty sa preskakuju
-    // a na koncoch sa NEcykluje — inak by sa slepym stlacanim dalo skoncit
-    // na dupláku bez toho, aby to clovek zbadal.
+    // Krok po cipoch aktivneho riadku. Na koncoch sa NEcykluje — inak by sa
+    // slepym stlacanim dalo skoncit na dupláku bez toho, aby to clovek zbadal.
+    //
+    // PICKER-3 (D): nedostupny variant sa uz NEPRESKAKUJE ticho. Mys sa
+    // k dovodu dostane klikom (`pickChip`), ale sipky ho predtym preskakovali
+    // a `Tab` ponuku zatvara — clovek od klavesnice tak nemal ako zistit,
+    // PRECO tam ten cip je. Prve stlacenie na nedostupnom cipe teda ZASTANE
+    // a dovod oznami (zapise ho do `.cbchipmsg`, ktora je `aria-live`), druhe
+    // v tom istom smere ide dalej. Ziadne zaseknutie a ziadne mlcanie.
     function moveChip(dir){
       if (!OPEN || OPEN.active < 0) return;
       var row = OPEN.items[OPEN.active];
@@ -673,10 +769,29 @@
       for (k = 0; k < row.variants.length; k++){ if (row.variants[k].value === row.value) i = k; }
       if (i < 0) i = 0;
       for (k = i + dir; k >= 0 && k < row.variants.length; k += dir){
-        if (row.variants[k].disabled) continue;
+        if (row.variants[k].disabled){
+          if (announceChip(OPEN.active, k)) return;
+          continue;
+        }
         pickChip(OPEN.active, k);
         return;
       }
+    }
+
+    // Oznami dovod nedostupneho cipu. `true` = prave sme ho povedali (krok
+    // klavesnice tu zastane); `false` = uz bol povedany, pokracuj dalej.
+    function announceChip(rowIndex, chipIndex){
+      var row = OPEN.items[rowIndex];
+      var v = row && row.variants ? row.variants[chipIndex] : null;
+      if (!v || !row.key) return false;      // starsi payload bez identity rodiny
+      OPEN.said = OPEN.said || {};
+      var mark = row.key + '|' + chipIndex;
+      if (OPEN.said[mark]) return false;
+      OPEN.said[mark] = true;
+      OPEN.msg = OPEN.msg || {};
+      OPEN.msg[row.key] = v.label;
+      redrawRow(rowIndex);
+      return true;
     }
 
     function move(dir){
@@ -705,6 +820,11 @@
       // a „Naposledy" tak dostanú riadok, nie tri varianty za sebou.
       var rows = nxComboDecorRows(readItems(sel), function(v){ return variantMetaOf(kind, v); });
       applyContextDefaults(sel, rows, q);
+      // PICKER-3 (E): kontext radí aj RIADKY, nielen hrúbky vnútri riadku —
+      // v poli pre chrbát idú dosky s 3 mm navrch. Bez kontextu (`body`,
+      // `front`, ABS, chýbajúci atribút) sa poradie nemení vôbec.
+      var ctx = sel.getAttribute(CTX_ATTR) || null;
+      rows = nxComboSortByCtx(rows, ctx);
       var secs = nxComboSections(rows, q, kind, usedOf(kind), loadRecent(kind));
       OPEN.items = nxComboFlatten(secs);
       OPEN.q = q;
@@ -735,8 +855,11 @@
         });
       });
       list.innerHTML = html;
-      OPEN.active = jumpFirst ? nxComboFirst(OPEN.items) : currentIndex(sel);
-      if (OPEN.active < 0) OPEN.active = nxComboFirst(OPEN.items);
+      // Kurzor: pri písaní na prvú zhodu, ktorá KONTEXTU vyhovuje (PICKER-3 E
+      // — inak by Enter v poli pre chrbát vložil DTDL 18 z prvej sekcie);
+      // pri otvorení stojí na hodnote, ktorú select nesie.
+      OPEN.active = jumpFirst ? nxComboFirstCtx(OPEN.items, ctx, q) : currentIndex(sel);
+      if (OPEN.active < 0) OPEN.active = nxComboFirstCtx(OPEN.items, ctx, q);
       paintActive();
       position();
     }
@@ -810,8 +933,11 @@
           (v.disabled ? ' aria-disabled="true"' : '') + '>' +
           esc(chipLabel(v)) + '</button>';
       });
-      out += '</span><span class="cbchipmsg" data-chipmsg="' + rowIndex + '">' +
-        esc(chipMsgOf(row)) + '</span>';
+      // PICKER-3 (D): dovod je `aria-live` — z klavesnice je to JEDINY kanal,
+      // ktorym sa clovek dozvie, preco sa cip neda prepnut (mys ma aspon
+      // tooltip a kurzor). `polite` necha docitat rozpisany dotaz.
+      out += '</span><span class="cbchipmsg" role="status" aria-live="polite"' +
+        ' data-chipmsg="' + rowIndex + '">' + esc(chipMsgOf(row)) + '</span>';
       return out;
     }
 
@@ -899,6 +1025,9 @@
         return;
       }
       if (row.key) delete OPEN.msg[row.key];
+      // Uspesne prepnutie zahadza aj pamat „tento dovod uz odznel" — dalsi
+      // prechod sipkami cez ten isty nedostupny cip ho zase povie.
+      OPEN.said = {};
       row.value = v.value;
       OPEN.chip = OPEN.chip || {};
       if (row.key) OPEN.chip[row.key] = v.value;   // prežije prekreslenie po písmene
@@ -1010,7 +1139,12 @@
       nxComboDecorRows: nxComboDecorRows, nxComboDefaultVariant: nxComboDefaultVariant,
       nxComboChipFromQuery: nxComboChipFromQuery, nxComboVariantCmp: nxComboVariantCmp,
       nxComboPopWidth: nxComboPopWidth, nxComboRowIds: nxComboRowIds,
-      nxComboVariantFromQuery: nxComboVariantFromQuery
+      nxComboVariantFromQuery: nxComboVariantFromQuery,
+      // PICKER-3 (E): kontext radí aj riadky — čisté funkcie na overenie
+      // poradia bez DOM (rank · stabilné radenie · kurzor · „dotaz menuje
+      // hrúbku, kontext ide bokom").
+      nxComboCtxThickness: nxComboCtxThickness, nxComboCtxRank: nxComboCtxRank,
+      nxComboSortByCtx: nxComboSortByCtx, nxComboFirstCtx: nxComboFirstCtx
     };
     global.NXCombo = API;
     if (typeof module !== 'undefined' && module.exports) module.exports = API;
