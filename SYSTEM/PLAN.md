@@ -18,18 +18,13 @@ blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
 
 **Cieľ:** doplatiť dlhy, ktoré fáza ŠTÚDIO vedome odložila, a spraviť refactory, na ktoré počas presunov nebol priestor.
 *(Stabilizačná revízia sa od začiatku produkcie naostro (20.8.) ešte NEKONALA — patrí pred ďalšie nové funkcie.)* Poradie určí Michal.
-Staré dlhy B–F nie sú blokujúce pre bežnú prácu; **P0 odrážky A, G a H sú BRÁNY** — A je možná STRATA rozpísanej editácie
-(externý audit ju radí ako prvý P0, ide ako prvá dávka bloku), H musí prebehnúť pred akýmkoľvek zásahom
-do builderov/observerov (teda pred blokom 1d) a G pred tým, než sa na „Obnoviť" postaví ďalšia kontrola.
+Staré dlhy B–F nie sú blokujúce pre bežnú prácu; **P0 odrážky A, G a H sú BRÁNY** — **A (možná STRATA rozpísanej editácie) je HOTOVÁ** (dávka 1b-1, v0.8.6, 27.8.),
+H musí prebehnúť pred akýmkoľvek zásahom do builderov/observerov (teda pred blokom 1d) a G pred tým, než sa na „Obnoviť" postaví ďalšia kontrola.
 
-**A · Optimistický zámok nastavení (dlh z #227, kolo 4 — Codex, priznané v PR threadoch):**
-- **Zastaraný pin prežije návrat do sekcie.** Uvoľnenie nevyužitého pinu je LEN v `ssApplyState`, takže cestu cez `studioGoSection` (prekreslenie BEZ nového pushu) nepokrýva: fokus nezmeneného poľa →
-  cudzia zmena a push (prekreslenie potlačené, pin ostáva) → odchod zo sekcie a návrat → sekcia ukáže čerstvé hodnoty so starým pinom → uloženie skončí falošným konfliktom a `SS.saved()` editáciu
-  zahodí. **Dôsledok: stratená editácia, nie prepísané dáta.** Fix: uvoľniť nevyužitý pin aj pri prekreslení z navigácie, alebo na `blur`.
-- **Status potvrdzuje prepočet, ktorý nemusel prebehnúť** (`supplier_settings_dialog.rb`, cesta `handle_save`). Návratová hodnota `refresh_studio` sa ignoruje; keď plný push po zápise zlyhá (výnimka
-  pri počítaní payloadu, neúspešné `execute_script`), hláška aj tak tvrdí „Rozpočet je prepočítaný." — a keďže `SS.saved()` už rozpis zahodil, formulár aj čísla môžu ostať viditeľne staré. Zápis do
-  súboru pritom prebehol, klame len hláška. Fix: vetviť podľa výsledku refreshu, alebo poslať samostatné echo nastavení.
-- **Slabšie dôkazy:** `ssTyping` (neprekresľovať, kým používateľ píše) je overený grepom, nie DOM testom (`document.activeElement` sa v Node stube nedá vyrobiť dôveryhodne); mutácia „presun uvoľnenia pinu ZA prijatie stavu" je sémanticky ekvivalentná, drží ju len tvarový guard na poradie.
+**A · Optimistický zámok nastavení (dlh z #227, kolo 4) — ✅ VYRIEŠENÉ dávkou 1b-1, v0.8.6 (27.8.2026).**
+Obe chyby aj obidva slabšie dôkazy sú vybavené: pin sa uvoľňuje v `ssRenderBody` (pokrýva push aj návrat do sekcie — koniec falošných konfliktov a stratených editácií)
+a hláška sa vetví podľa výsledku prepočtu (`refresh_and_report`; zlyhanie povie „uložené áno, prepočet nie"). `ssTyping` má DOM dôkaz, mutácia poradia pin-release padá
+behaviorálne. Plný záznam — čo bolo zle → čo platí, zamietnuté alternatívy, 6 mutácií: [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-1** (27.8.2026).
 
 **B · Sekcia Šablóny (backlog z review #225):**
 - **PNG kanál nemá retry.** `TPL_ASKED` sa pri stratenej odpovedi nemaže (dlaždica ostane navždy na schéme) a formulácia v ARCHITEKTURE naznačuje retry, ktorý neexistuje; `rev` odpovede sa neporovnáva s dlaždicou.

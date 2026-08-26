@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.8.5 · 26.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.8.6 · 27.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -18,14 +18,16 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.5:** **1915 headless** · 69 JS sád · posledný plný in-SketchUp beh **969 PASS / 0 FAIL** (vetva #227; novšie dávky boli klientske alebo dokumentačné).
+**Testy k v0.8.6:** **1917 headless** · 69 JS sád · posledný plný in-SketchUp beh **969 PASS / 0 FAIL** (vetva #227; novšie dávky boli klientske alebo dokumentačné).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom (audit pred kódom + review pred mergom, 15 kôl). Od **#227** review robí zase Codex, takže **post-hoc sweep sa týka presne #186–#226** ([PLAN.md](PLAN.md), blok 1b/E).
 
 ## Robí sa
 
-**Nič nebeží — čaká sa na Michalov pokyn, ktorým blokom sa pokračuje** ([PLAN.md](PLAN.md)).
-Posledný uzavretý blok bol **PICKER-3** (dorobenie vyhľadávača materiálov) — **v0.8.5**, klientska + payloadová zmena, žiadna modelová zapisovacia cesta.
+**Beží blok 1b · STABILIZAČNÁ REVÍZIA** ([PLAN.md](PLAN.md)). **Dávka 1b-1 je hotová** (odrážka **A** — optimistický zámok Nastavení, v0.8.6):
+zastaraný pin už neprežije návrat do sekcie (koniec stratených editácií) a status po uložení už netvrdí prepočet, ktorý neprebehol.
+**Ďalej z bloku 1b:** brána **G** („Obnoviť" = čisté čítanie, pred ďalšou kontrolou nad ním) · brána **H** (charakterizačné in-SU scenáre observer/Undo — POVINNE pred blokom 1d)
+· **E** post-hoc Codex sweep #186–#226 · staré dlhy **B/D/F** (neblokujúce). Poradie určuje Michal. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
 
@@ -41,6 +43,7 @@ V1 rozsah zoštíhlený — checklist v [V1_VIZIA.md](V1_VIZIA.md). Dávky štar
 
 ## Posledné uzávery
 
+- **1b-1 — optimistický zámok Nastavení** (zastaraný pin nezostane po návrate do sekcie; status hovorí pravdu, keď prepočet zlyhá) — v0.8.6 (27.8.)
 - **PICKER-3 — dorobenie vyhľadávača** (virtuálny duplák v menovke, kanonický kľúč rodiny, „54 duplák", dôvod čipu z klávesnice, **kontext radí aj riadky**) — v0.8.5 (26.8.)
 - **BLOK DOCS CLEANUP KOMPLET (26.8.)** — **C: refresh STANDARD.md** (zastarané tvrdenia opravené proti kódu, reflow, guard dĺžky bez výnimiek) PR **#234**, bez zmeny kódu pluginu ·
   **B: upratané `SYSTEM/`** (mapa autorít, archív, guardy) PR **#233**, v0.8.4 · **A: mapa modulov rozdelená na 6 súborov** + guardy dĺžky riadku a pokrytia modulov PR **#232**

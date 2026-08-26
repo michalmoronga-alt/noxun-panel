@@ -1562,11 +1562,15 @@ omladne, takže bez pinu by zámok prešiel a cudzia zmena (druhá inštancia, r
 
 **Pin sa berie UŽ PRI FOKUSE poľa** (`focusin`), nie pri prvom písmene (review #227 kolo 2): fokus ZMRAZÍ zobrazený obsah (telo sa neprekresľuje), takže push, ktorý medzitým
 dorazí, vymení `SS_STATE` pod starými hodnotami — pripnutie až pri prvom písmene by teda pripútalo NOVÚ revíziu k STARÉMU obsahu a zápis by prešiel. Push pin **neprepisuje**;
-uvoľní ho `SS.saved()` (potvrdenie, odmietnutie, reload) — **a tiež príchod čerstvého stavu, keď pin NIKTO NEVYUŽIL** (review #227 kolo 3): nič nie je rozpísané A ani jedno pole
-sekcie nedrží kurzor. Vtedy sa obsah aj tak prekreslí z čerstvého stavu, takže držať starú revíziu by znamenalo **falošný konflikt** nad hodnotami, ktoré používateľ vidí — a
-zahodenú prácu. Kontrakt kola 2 tým ostáva nedotknutý: **pod kurzorom je obsah zmrazený a pin sa drží**, takže cudziu zmenu nemožno ticho prepísať.
+uvoľní ho `SS.saved()` (potvrdenie, odmietnutie, reload) — **a tiež každé prekreslenie tela, ktoré pin NIKTO NEVYUŽIL** (review #227 kolo 3, dorovnané dávkou 1b-1): keď nie je
+nič rozpísané, obsah sa prekreslí z čerstvého stavu, takže držať starú revíziu by znamenalo **falošný konflikt** nad hodnotami, ktoré používateľ vidí — a zahodenú prácu
+(`SS.saved()` rozpis pri odmietnutí zahadzuje). Kontrakt kola 2 tým ostáva nedotknutý: **pod kurzorom je obsah zmrazený a pin sa drží**, takže cudziu zmenu nemožno ticho prepísať.
 
-Poradie v `ssApplyState` je preto: rozhodni o pine → prijmi stav → prekresli.
+**Uvoľňuje sa v `ssRenderBody`, nie v `ssApplyState`** (oprava dlhu 1b-A, PLAN blok 1b odrážka A): pin patrí k OBSAHU NA OBRAZOVKE, a ten sa prekresľuje aj **bez nového pushu** —
+odchod zo sekcie a návrat cez `studioGoSection` → `render` → `renderBody`. Kým kontrola žila v ceste pushu, prežil zastaraný pin práve túto cestu (fokus nezmeneného poľa → cudzia
+zmena a push, prekreslenie potlačené → odchod a návrat) a sekcia potom ukazovala čerstvé hodnoty, ale ukladala proti starej revízii: **falošný konflikt a stratená editácia**.
+Miesto uvoľnenia je **jedno jediné** — riadok tesne pred `box.innerHTML = ''`, teda za strážou `ssTyping()`; podmienka je preto len `!ssDirty()`. Je to zámerné: posun uvoľnenia
+PRED tú stráž (predtým sémanticky ekvivalentná mutácia, ktorú držal len tvarový guard) dnes zhodí behaviorálny test „pod kurzorom pin ostáva".
 
 **Odmietnutie rozpísané hodnoty ZAHADZUJE** (`SS.saved()` pred `refresh_studio` — presne ako to robilo okno): bez toho by prežili push, prekryli čerstvé čísla a druhý klik by ich
 ticho prepísal, hoci hláška hovorí „formulár je načítaný nanovo" — hláška a správanie sa musia zhodovať; baseline sa obnovuje **až pri úspešnom zostavení payloadu** (lekcia
@@ -1576,6 +1580,13 @@ ticho prepísal, hoci hláška hovorí „formulár je načítaný nanovo" — h
 
 **Po úspešnom zápise sa Štúdio PREPOČÍTA** so zdvihom generácie — sadzby sú **vstup** rozpočtu, nie jeho mutácia; in-SU dôkaz je zmena súčtu automatických služieb, nie prítomnosť
 volania.
+
+**Hláška sa VETVÍ podľa výsledku prepočtu** (`refresh_and_report`, oprava dlhu 1b-A): zápis do súboru a obnova obrazovky sú DVE veci. Plný push môže zlyhať (výnimka pri
+zostavovaní payloadu, `execute_script` do okna, ktoré ešte neohlásilo `ready`) a keďže `SS.saved()` už rozpis zahodil, na obrazovke vtedy ostanú STARÉ čísla — „Rozpočet je
+prepočítaný." by nad nimi bolo klamstvo. Zlyhanie preto povie pravdu („Nastavenia sú ULOŽENÉ, ale rozpočet sa NEPREPOČÍTAL… klikni na Obnoviť") a je červené. To isté platí pre
+**odmietaciu** vetvu (tvrdí „formulár je načítaný nanovo") aj pre **`handle_reload`**. `refresh_studio` preto vracia BOOLEAN „klient to naozaj dostal" — nedostupné `StudioDialog`,
+zavreté okno aj zachytená výnimka sú `false`. *Zamietnutá alternatíva: samostatné echo nastavení po zápise — potrebovalo by nový klientsky prijímač a čísla rozpočtu by aj tak
+ostali staré, takže by hláška o „prepočítanom rozpočte" klamala ďalej.*
 
 **JEDEN payload nesie všetky tri sekcie** (`sup`/`bset`/`about`) — sú to tri pohľady na ten istý malý dokument a model nepotrebujú (globálne, ako šablóny).
 
