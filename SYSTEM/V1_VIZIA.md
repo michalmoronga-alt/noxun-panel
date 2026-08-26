@@ -21,7 +21,7 @@
 - **Jednoduchosť > funkcie** (Lucia kompas). Automatika navrhuje, používateľ rozhoduje; semafor varuje, NIKDY neblokuje.
 - **Nastav raz, používaj navždy:** šablóny (s kovaním), sety, predvoľby projektu, rady (nohy/bočnice/výklopy) — systém vyberá z radu, override na výnimky.
 - **Snapshot na entite = autorita** (štandard 8.3); katalógy sú živé, projekt je reprodukovateľný z .skp.
-- **Ceny = pohyblivá cache s dátumom overenia** — nikdy „zamrznuté ticho" (kap. 5).
+- **Ceny = pohyblivá cache s dátumom overenia** — nikdy „zamrznuté ticho" (detail v [archiv/V1_VIZIA_priebeh_2026-08.md](archiv/V1_VIZIA_priebeh_2026-08.md), kap. 5).
 - **Vertikálny priestor panela vzácny**; žiadne emoji v UI, Lucide ikony, tokeny --nx-*.
 
 ## Kde je zvyšok

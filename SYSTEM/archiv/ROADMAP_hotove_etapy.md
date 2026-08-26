@@ -60,11 +60,12 @@
 > text bloku vrátane zadania, implementačných dávok a vedomých odchýlok. PLAN drží od tejto
 > dávky už len nehotové bloky. Otvorená časť, ktorá z bloku ostala (**PICKER-3**), žije
 > ďalej v PLAN; dlhy fázy ŠTÚDIO sú v jeho bloku **1b · STABILIZAČNÁ REVÍZIA**.
-> Text sa nemenil — upravené sú výhradne relatívne cesty odkazov (súbor leží o úroveň nižšie).
+> Text sa nemenil — upravené sú výhradne relatívne cesty odkazov (súbor leží o úroveň nižšie)
+> a polohové slovo „nižšie" pri bloku 1b, ktoré po presune ukazovalo do prázdna (teraz odkaz na živý PLAN).
 
 ### 1 · UI 2.0 — štúdio okno a výbery — ✅ KOMPLET (v0.8.0, 24.8.2026)
 
-**HOTOVO — CELÝ BLOK.** Inspector rework (UI-A…UI-D) aj fáza ŠTÚDIO (ŠT-1a…ŠT-4b, PR #192–#228) sú v maine: plugin má **dve okná** (Inspector + Štúdio s **dvanástimi živými sekciami**), **šesť satelitov zaniklo** (Výroba · Materiály projektu · Katalóg kovania · Pravidlá kovania · Šablóny · Nastavenia rozpočtu) a s posledným z nich aj celá mašinéria premostení. Plný uzáver fázy vrátane ustálených architektonických vzorov je v [archiv/KRONIKA.md](KRONIKA.md); dlhy fázy sú v bloku **1b · STABILIZAČNÁ REVÍZIA** nižšie. Pôvodné zadanie bloku ostáva zapísané kvôli histórii.
+**HOTOVO — CELÝ BLOK.** Inspector rework (UI-A…UI-D) aj fáza ŠTÚDIO (ŠT-1a…ŠT-4b, PR #192–#228) sú v maine: plugin má **dve okná** (Inspector + Štúdio s **dvanástimi živými sekciami**), **šesť satelitov zaniklo** (Výroba · Materiály projektu · Katalóg kovania · Pravidlá kovania · Šablóny · Nastavenia rozpočtu) a s posledným z nich aj celá mašinéria premostení. Plný uzáver fázy vrátane ustálených architektonických vzorov je v [archiv/KRONIKA.md](KRONIKA.md); dlhy fázy sú v bloku **1b · STABILIZAČNÁ REVÍZIA** v živom [PLAN.md](../PLAN.md). Pôvodné zadanie bloku ostáva zapísané kvôli histórii.
 
 **Cieľ:** satelitné okná → jedno štúdio okno s toolbarom a bočnou navigáciou; výber materiálu/ABS na jeden klik namiesto scrollovania. **Koncept Inspectora je uzavretý** (Michal, 18.8.2026) — záväzný slovný kontrakt je [zdroje/ui20/UI20_KONTRAKT.md](../zdroje/ui20/UI20_KONTRAKT.md) (sekcie „SCHVÁLENÉ ROZHODNUTIA" a „FINÁLNY KONCEPT INSPECTOR C") a vizuálna referencia mockupy vedľa neho: [Inspector C v16](../zdroje/ui20/mockup_inspector_c.html) · [štúdio okno](../zdroje/ui20/mockup_ui20.html) · [dizajnový lístok](../zdroje/ui20/dizajnovy_listok.html); implementácia ide po dávkach nižšie. Podklad: merač používania D-25 (materiály/ABS vyše 400 interakcií, taby 287×, satelitné okná 234×) a [UI_VIZIA.md](UI_VIZIA_2026-07.md); cieľový obraz v [V1_VIZIA_priebeh_2026-08.md](V1_VIZIA_priebeh_2026-08.md) §6 *(§6 sa 26.8.2026 presunul zo živého `V1_VIZIA.md` sem)*.
 
