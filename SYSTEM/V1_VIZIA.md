@@ -7,12 +7,12 @@
 **Kompletná reálna zákazka od návrhu po objednávky BEZ opustenia pluginu a BEZ ručného dopočítavania.**
 Odškrtávací checklist (V1 je hotové, keď je odškrtnuté všetko; stav dopĺňajú uzávery dávok):
 
-1. [ ] **Návrh:** vloženie skriniek na klik (GHOST) → zostava vrátane skriniek so spotrebičmi; šablóny s kovaním = opakované typy na 1 klik. *(Zostava = ručné zarovnanie + snaper; plné segmenty sú mimo V1.)*
+1. [ ] **Návrh:** vloženie skriniek na klik (GHOST) → zostava vrátane skriniek so spotrebičmi; šablóny s kovaním = opakované typy na 1 klik. *(Zarovnanie a snap k susedom rieši blok „V1.0 zostavy" — snaper logika sa preberá DO pluginu, žiadny externý plugin; plné segmenty/attachments sú mimo V1.)*
 2. [ ] **Konštrukcia:** korpusy vrátane per-dielec odsadení (vzduchové komíny, špeciály — V1-01), výstuhy správne v interiéri (hotové, D-80), sokel/nohy podľa výšky (hotové, D-79).
 3. [x] **Materiály:** katalóg z Demosu, skupinové farby, ABS automatika so semaforom, vyhľadávač s kontextom *(hotové — Materiály 2.0 + PICKER-1/2/3)*; quick-win textúry z Demos fotky ostávajú v bode 7.
 4. [ ] **Kovanie:** sety s automatikou (nohy hotové D-79, bočnice hotové D-81; pomer 1:N = D-109), per-čelo overridy, výplne šuflíkov **vo výťaži — fáza A** (vzorce dodá Michal). *(Plná geometria výplní a výklopový model = mimo V1.)*
 5. [ ] **Spotrebiče:** katalóg + položky projektu, kontrola niche semaforom, ceny v rozpočte (S1).
-6. [x] **Výstupy:** VEPO CSV, kusovník, nákup kovania, rozpočet s cenami, XLSX cenová ponuka *(hotové — dávky E + fáza ŠTÚDIO)*; dotiahnuť len manuálne 1-klik overenie ceny (zvyšok V1-03).
+6. [ ] **Výstupy:** VEPO CSV, kusovník, nákup kovania, rozpočet s cenami, XLSX cenová ponuka *(hotové — dávky E + fáza ŠTÚDIO)*; **ostáva manuálne 1-klik overenie ceny (zvyšok V1-03)** — odškrtnúť až s ním.
 7. [ ] **Dvaja používatelia:** Michal aj **Lucia** — quick-win render (Demos fotka ako textúra), jednoduchý updater (D-52), zrozumiteľné UI *(Inspector+Štúdio hotové)*.
 
 **Mimo V1 (vedome; rozšírené 26.8.2026 po debate s Michalom):** zásuvkové bloky (na novom štandarde), rohové/špeciálne typy korpusov, CNC/výkresy,

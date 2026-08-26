@@ -11,10 +11,11 @@ objednávajú REÁLNE zákazky (chyby vo výrobe/cenách = najvyššia priorita)
 (dve okná: Inspector + Štúdio, šesť satelitov zaniklo). **Cieľ auditu: pripraviť kód na už NAPLÁNOVANÉ
 funkcie a pomenovať všetky nedorobky** — nie navrhovať nové funkcie ani prepisovať, čo funguje.
 
-Naplánované funkcie, pre ktoré audit pripravuje pôdu (poradie: [../PLAN.md](../PLAN.md)):
-**GHOST vkladanie** (Tool na kurzore, koncepty `next_sessions/09` + `09A`) → **KOVANIE** (redizajn setov,
-D-109 pomer 1:N mení dátový model setu) → spotrebiče S1 · plošná kontrola D-95 · ponuka/DOCX ·
-shared library (D-48/D-52) · render M-R (koncepty `next_sessions/01–08`).
+Naplánované funkcie, pre ktoré audit pripravuje pôdu — poradie blokov je AUTORITATÍVNE v [../PLAN.md](../PLAN.md)
+(tu len výťah): **GHOST vkladanie** (Tool na kurzore, koncepty `next_sessions/09` + `09A`) → **KOVANIE**
+(redizajn setov, D-109 pomer 1:N mení dátový model setu) → **KONTROLA + VÝROBA** (plošná kontrola D-95, exporty) →
+**STABILITA** → **V1 DOTIAHNUTIE** (spotrebiče S1, ceny/ponuka) → **RENDER M-R**; priebežne INFRA
+(shared library D-48/D-52). Pri konflikte poradia platí PLAN.
 
 ## Povinné čítanie pred auditom
 
@@ -39,9 +40,10 @@ otvorené dlhy: [../DOGFOODING.md](../DOGFOODING.md) a blok 1b v [../PLAN.md](..
 5. **Perzistencia a migrácie** *(pripravuje shared library)*: JSON store + `.bak`, pole `std` (verzia štandardu
    na entite), otváranie starých zákaziek — kde chýba migračná cesta alebo verzia formátu katalógov v `%APPDATA%`.
 6. **UI vzory**: kde ešte žijú inline drafty/ad-hoc modály namiesto `nx_modal`/`nx_combo`; duplicity v JS moduloch.
-7. **Dokumentačné diery**: 12 modulov so stub odsekom „(zatiaľ nezdokumentované)" v `docs/architecture/`
-   (budget_store · cp_export · debug · vepo_export · xlsx_writer · bom · budget · sheet_estimate · price_refresh ·
-   supplier_settings · hardware_sets · usage_stats) — pri každom aspoň kostru kontraktu.
+7. **Dokumentačné diery**: VŠETKY odseky so stub textom „zatiaľ nezdokumentované" v `docs/architecture/` —
+   zoznam si odvoď grepom (`grep -rn "zatiaľ nezdokumentované" docs/architecture/`), k 26.8.2026 ich je **19**
+   (o. i. budget_store, cp_export, vepo_export, xlsx_writer, sheet_estimate, price_refresh, hardware_sets,
+   usage_stats, `ui/panel/sync.rb` a šesť `ui/panel/actions_*`) — pri každom aspoň kostra kontraktu.
 
 ## Formát výstupu (záväzný pre všetkých troch audítorov)
 
