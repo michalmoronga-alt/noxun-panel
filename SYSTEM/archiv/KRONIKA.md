@@ -17,6 +17,31 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1b-7 · KONIEC TICHÉHO NÁVRATU STAREJ CENY DEKORU (27.8.2026, v0.8.10):** dve platné P2 z post-hoc sweepu (#212 · nálezy **#8** a **#9**) mali **jeden koreň** — stará hodnota
+  z formulára sa spájala s **čerstvým** `row_rev`, takže optimistický zámok prestal chrániť to, čo má chrániť, a *Uložiť* ticho vrátilo cenu, ktorú medzitým priniesla
+  „Aktualizovať z Demosu". Spúšťačom bol **bežný pracovný postup**, nie súbeh: otvor editor dekoru → oprav jednu hodnotu → **Esc** → aktualizuj ceny → otvor ten istý dekor →
+  **Ulož**. Chyba nemala **žiadne** varovanie — a katalóg sú ceny reálnych objednávok, takže sa prejaví až na faktúre.
+
+  **Oprava je na jednom mieste koreňa: pamätá a prelieva sa už len bunka, ktorej sa používateľ naozaj dotkol.** `trimRowsValue(f, rows, baseRows)` v `nx_modal.js` odloží do pamäte
+  iba bunky líšiace sa od východiskového riadku a ku každej pridá **`_base`** = hodnotu, proti ktorej ich používateľ písal; `mdEditRefresh` v `proj_materials.js` porovnáva rovnako
+  proti novému **`NXModal.baseRows(key)`**. Netknutá bunka tým vždy dostane **čerstvú** hodnotu z katalógu. To je aj vedomá **zmena správania** oproti PR #212, ktorú fixoval
+  existujúci test (`test_st2c_editor.js`): kód, ktorého sa používateľ nedotkol, sa po zotavení z konfliktu už neprepisuje jeho starým — pretože práve to bola tá tichá strata.
+
+  **Čo nemá jednoznačnú odpoveď, sa nerozhoduje ticho.** Keď tú istú bunku zmenil používateľ **aj** katalóg, riadok dostane **`_conflict`** a pod ním sa rozvinie pás *tvoja ×
+  v katalógu* s dvoma tlačidlami („Prevziať z katalógu" / „Ponechať moju"); **`submit` s nerozhodnutou kolíziou zápis nepustí** a `editBlocked` má pre tento prípad vlastnú hlášku,
+  ktorá pýta rozhodnutie namiesto „ulož znova". Kolízia **prežije Esc** (`withMemory` vracia `{base, spec}` a v `base` pri kolízii ostáva **stará** hodnota) — inak by stačilo okno
+  zavrieť a otvoriť a tichý prepis by sa vrátil; rozhodnutie naopak východisko posunie, takže sa tá istá otázka nepýta donekonečna. Cesta von ostáva „Začať odznova" (`memReset`
+  kreslí z `OPEN.orig`, teda z čerstvého katalógu).
+
+  **Dve pasce, ktoré si dávka vypýtala.** (1) Rozhodovacie tlačidlá **nesmú** niesť `data-nxm-col` — `readRows` číta každý taký uzol v riadku a prázdna `value` tlačidla vymazala
+  hodnotu bunky (chytil to test, atribút je preto `data-nxm-confcol`). (2) Štítky riadku musia žiť v **stave** (`OPEN.flags`, kľúč = hodnota `rowKey`), nie v DOM: kontajner sa pri
+  každom `+`/`−` prekresľuje z `readRows`, takže jedno pridanie riadku by inak zhaslo pás kolízie aj staré `_note` a zápis by prešiel bez rozhodnutia. Kolízna bunka má vlastnú
+  triedu **`conf`**, nie `bad` — `bad` maže `clearErrors` pri každom kole serverovej validácie.
+
+  **Testy:** nová JS sada `tests/js/test_1b7_kolizia_buniek.js` (57 kontrol, DOM úroveň nad `minidom.js`) + upravený scenár 5b v `test_st2c_editor.js`; 70 JS sád zelených,
+  headless 1952/0. **Mutačné overenie 5/5** — vypnutý dirty-tracking v pamäti · kolízia bez označenia · varovanie bez blokovania zápisu · `mdEditRefresh` prelieva všetky stĺpce ·
+  štítky mimo stavu; každá mutácia zhodila práve svoj test. **Codex review kolo je odložené** (usage limit do 23:26) — PR nesie `@codex review`.
+
 - **1b-E · POST-HOC SWEEP KOMPLET — dávky #186–#226 majú spätné Codex review (27.8.2026):** odrážka **E** bloku 1b je uzavretá. Docs dávka, **kód pluginu sa nezmenil o riadok**
   (VERSION ostáva **0.8.9**). Sweep vznikol preto, že Codex bol **21.–24.8. nedostupný** a PR **#186–#226** prešli bránou so slepým subagentom (audit pred kódom + review pred
   mergom, **15 kôl**); od #227 review robí zase Codex, takže rozsah bol presne tento úsek. Prešiel v **dvoch nezávislých častiach**, ktoré sa navzájom kontrolujú.

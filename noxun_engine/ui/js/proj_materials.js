@@ -1167,12 +1167,27 @@
     else if (m) m.setBusy(false); // bez mosta by okno ostalo navzdy zamknute
   }
 
+  // Porovnanie jednej bunky formulara (DOM vracia pri zaskrtavatku BOOLEAN,
+  // inde RETAZEC; katalogovy riadok podava `mdEditSheetRow`/`mdEditEdgeRow`).
+  function mdSameCell(a, b){
+    if (a === true || a === false || b === true || b === false) return (a === true) === (b === true);
+    return String(a == null ? '' : a) === String(b == null ? '' : b);
+  }
+
   // (P1 #1b) ZOTAVENIE Z KONFLIKTU. Po `:stale` prichadza CERSTVY katalog —
   // editor z neho prekresli riadky, ZACHOVA hodnoty, ktore pouzivatel rozpisal,
   // OMLADI baseline a riadky zmenene zvonku viditelne oznaci. Bez toho by
   // formular drzal stare `row_rev` a KAZDY dalsi pokus by skoncil rovnako:
   // konflikt by nemal cestu von a pouzivatelovi by ostalo len zavriet okno
   // a napisat vsetko znova.
+  //
+  // PRELIEVAJU SA LEN BUNKY, KTORYCH SA POUZIVATEL DOTKOL (1b-7, sweep #8).
+  // Predtym sa do cerstveho riadku vliali VSETKY editovatelne stlpce stareho
+  // formulara — aj tie, ktore pouzivatel nikdy nepisal. Riadok si pritom nesie
+  // CERSTVY `row_rev` a `base_rev` sa omladi, takze dalsie „Uložiť" preslo cez
+  // OBA zamky a ticho vratilo cenu/kod/format, ktory medzitym prisiel zvonku.
+  // Bunka, ktoru zmenil pouzivatel AJ katalog, sa teraz oznaci ako KOLIZIA:
+  // modal ukaze obe hodnoty a bez rozhodnutia zapis nepusti.
   function mdEditRefresh(){
     var m = mdModal();
     if (!m || !m.isOpen() || !mdEditBase) return false;
@@ -1199,23 +1214,49 @@
         var id = r[idk];
         if (id) mine[id] = r;
       });
+      // Vychodisko, proti ktoremu pouzivatel pisal — bez neho sa „dotkol sa
+      // bunky" od „bunka len nesie katalogovu hodnotu" odlisit NEDA.
+      var was0 = {};
+      (m.baseRows(key) || []).forEach(function(r){
+        var id = r && r[idk];
+        if (id) was0[id] = r;
+      });
+      var nextBase = [];
       var merged = (f.value || []).map(function(r){
         var was = mine[r[idk]];
+        var wb = was0[r[idk]];
         var out = {};
         var k;
         for (k in r){ if (Object.prototype.hasOwnProperty.call(r, k)) out[k] = r[k]; }
         if (!was){
           out._note = 'pribudlo mimo editora';
           touched = true;
+          nextBase.push(r);
           return out;
         }
+        var conf = null;
+        var bo = null;
         cols.forEach(function(c){
-          if (Object.prototype.hasOwnProperty.call(was, c)) out[c] = was[c];
+          // Bez vychodiska (nemalo by nastat) drzime stare spravanie: radsej
+          // zachovat rozpisanu hodnotu, nez ju pouzivatelovi zmazat.
+          if (wb && mdSameCell(was[c], wb[c])) return;
+          if (!Object.prototype.hasOwnProperty.call(was, c)) return;
+          out[c] = was[c];
+          if (!wb || mdSameCell(wb[c], r[c])) return;
+          // Bunku zmenil pouzivatel AJ katalog — rozhodnutie patri pouzivatelovi.
+          conf = conf || {};
+          conf[c] = r[c];
+          bo = bo || (function(){ var o = {}, kk;
+                                  for (kk in r){ if (Object.prototype.hasOwnProperty.call(r, kk)) o[kk] = r[kk]; }
+                                  return o; })();
+          bo[c] = wb[c];
         });
+        if (conf) out._conflict = conf;
         if (String(was.row_rev || '') !== String(r.row_rev || '')){
           out._note = 'zmenené mimo editora';
           touched = true;
         }
+        nextBase.push(bo || r);
         delete mine[r[idk]];
         return out;
       });
@@ -1223,11 +1264,14 @@
       // s id, ktore uz v katalogu nie su, sa zahadzuju — zaznam je prec.
       (cur[key] || []).forEach(function(r){ if (!r[idk]) merged.push(r); });
       if (Object.keys(mine).length) touched = true;
-      m.setRows(key, merged, { base: f.value });
+      // Baseline pri NEROZHODNUTEJ kolizii ostava STARY (`bo`) — inak by sa
+      // kolizia po zatvoreni okna stratila a tichy prepis by sa vratil.
+      m.setRows(key, merged, { base: nextBase });
     });
     mdEditBase.rev = MD_REV;
     mdEditDupSnap = null; // cerstve riadky = iny obsah, stary suhlas neplati
-    return { ok: true, touched: touched };
+    return { ok: true, touched: touched,
+             conflicts: (typeof m.conflicts === 'function') ? m.conflicts() : 0 };
   }
 
   function mdEditClose(){
@@ -2611,6 +2655,14 @@
         // Pri zakladani sa NEDOROVNAVA nic (v katalogu ziadny nas riadok
         // nie je) — hlaska „riadky sme dorovnali" by klamala.
         MD.setStatus('Katalóg sa medzitým zmenil — skús uložiť znova.', true);
+        return;
+      }
+      if (res.conflicts){
+        // 1b-7: tá istá bunka sa zmenila u pouzivatela AJ v katalogu. Zapis
+        // sa nedá pustit, kym sa nerozhodne — hlaska preto pyta ROZHODNUTIE,
+        // nie „ulož znova".
+        MD.setStatus('Katalóg sa medzitým zmenil — pri ' + res.conflicts +
+                     ' hodnotách rozhodni, ktorá platí (tvoja × z katalógu), až potom ulož.', true);
         return;
       }
       MD.setStatus(res.touched

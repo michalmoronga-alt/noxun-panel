@@ -31,7 +31,7 @@
     'use strict';
 
     var ROOT_ID = 'nxModalRoot';
-    // Otvoreny modal: { base, spec, trigger, busy, memSkip }.
+    // Otvoreny modal: { base, spec, trigger, busy, memSkip, flags }.
     //   `base` = specifikacia, ako ju PODAL volajuci (cize VYCHODISKOVE hodnoty),
     //   `spec` = to iste, ale s vliatou pamatou rozpisanych hodnot.
     // `trigger` je uzol, na ktory sa vracia fokus po zatvoreni. Naraz zije
@@ -56,6 +56,16 @@
     // Pamataju sa LEN polia, ktore sa lisia od VYCHODISKOVYCH hodnot (`base`):
     // predvolba v rozbalovacom poli ani „Počet = 1" nie su nic, co by
     // pouzivatel rozpisal, takze pamat nezakladaju.
+    //
+    // PAMATA SA PO BUNKACH, NIE PO CELYCH RIADKOCH (1b-7, sweep #8/#9). Riadok
+    // nesie aj hodnoty, ktorych sa pouzivatel NEDOTKOL; keby ich pamat drzala
+    // a pri dalsom otvoreni vliala do CERSTVEHO riadku, vratila by cenu, ktoru
+    // medzitym zmenil katalog (napr. „Aktualizovať z Demosu") — a to potichu,
+    // lebo `row_rev` by pritom ostal cerstvy a optimisticky zamok by prekazku
+    // nevidel. Zapamata sa preto LEN bunka, ktora sa lisi od VYCHODISKOVEHO
+    // riadku, a k nej `_base` = hodnota, proti ktorej ju pouzivatel pisal.
+    // Podla `_base` sa pri dalsom otvoreni pozna KOLIZIA (katalog zmenil tu
+    // istu bunku) — tá sa pouzivatelovi UKAZE a pyta rozhodnutie.
     var MEM = {};
 
     function esc(s){
@@ -185,8 +195,12 @@
         h += '<button type="button" class="mrdel' + (locked ? ' off' : '') + '"' +
              ' data-nxm-act="rowdel"' + (locked ? ' aria-disabled="true"' : '') +
              ' title="' + esc(locked ? note : 'Odobrať riadok') + '"' +
-             ' aria-label="Odobrať riadok">' + ico('trash') + '</button>' +
-             '</div>';
+             ' aria-label="Odobrať riadok">' + ico('trash') + '</button>';
+        // Pas kolizie je POSLEDNY v riadku a zalamuje sa pod neho — hlavicka
+        // stlpcov ani sirky buniek sa tym nemenia (vertikalny priestor mini
+        // len tam, kde naozaj treba rozhodnut).
+        h += confHtml(d, row);
+        h += '</div>';
       });
       h += '</div>';
       h += '<div class="mrnote" role="status"></div>';
@@ -200,6 +214,56 @@
       var key = esc((f || {}).key);
       return '<div class="mrows" id="nxmr_' + key + '" data-nxm-rows="' + key + '">' +
              rowsInnerHtml(f, data) + '</div>';
+    }
+
+    // --- KOLIZIA BUNKY (1b-7) -------------------------------------------------
+    // `_conflict` = { stlpec: hodnota, ktora je DNES v katalogu }. Rozdiel proti
+    // `_note` je zasadny: `_note` len HLASI, ze sa riadok zmenil, kolizia PYTA
+    // ROZHODNUTIE — a kym ho nedostane, `submit` zapis NEPUSTI. Bez toho by
+    // pouzivatel ulozil svoju starsiu hodnotu cez cerstvu cenu z katalogu a nikde
+    // by to nesvietilo (sweep #8/#9 — cenove P2).
+    function hasConf(row, key){
+      return !!(row && row._conflict &&
+                Object.prototype.hasOwnProperty.call(row._conflict, key));
+    }
+
+    // Hodnota bunky do VETY (nie do inputu): boolean je „áno/nie", prazdno je
+    // pomlcka — „× v katalógu „"" by pouzivatelovi nepovedalo nic.
+    function cellText(c, v){
+      if (v === true) return 'áno';
+      if (v === false) return 'nie';
+      var s = String(v == null ? '' : v);
+      return s === '' ? '—' : s;
+    }
+
+    function rawVal(v){
+      if (v === true) return 'true';
+      if (v === false) return 'false';
+      return String(v == null ? '' : v);
+    }
+
+    function confHtml(f, row){
+      var conf = row && row._conflict;
+      if (!conf) return '';
+      var items = '';
+      (f.cols || []).forEach(function(c){
+        if (!Object.prototype.hasOwnProperty.call(conf, c.key)) return;
+        // POZOR: NIE `data-nxm-col` — `readRows` cita VSETKY uzly s tym
+        // atributom v riadku a tlacidlo (s prazdnou `value`) by prepisalo
+        // hodnotu bunky na prazdno. Rozhodovacie tlacidlo ma vlastne meno.
+        var cat = ' data-nxm-confcol="' + esc(c.key) + '" data-nxm-val="' + esc(rawVal(conf[c.key])) + '"';
+        items += '<span class="mrconfitem"><b>' + esc(c.label || c.key) + '</b> ' +
+                 'tvoja „' + esc(cellText(c, row[c.key])) + '" × ' +
+                 'v katalógu „' + esc(cellText(c, conf[c.key])) + '"' +
+                 '<button type="button" class="linkbtn" data-nxm-act="conftake"' + cat +
+                 '>Prevziať z katalógu</button>' +
+                 '<button type="button" class="linkbtn" data-nxm-act="confkeep"' + cat +
+                 '>Ponechať moju</button></span>';
+      });
+      if (!items) return '';
+      return '<div class="mrconf" role="status"><span class="mrconfmsg">' +
+             'Zmenené v katalógu, kým si písal — rozhodni, ktorá hodnota platí:</span>' +
+             items + '</div>';
     }
 
     // Sirkova trieda stlpca — zdiela ju HLAVICKA aj bunka (review 2c-1 #8).
@@ -223,12 +287,18 @@
     function rowCellHtml(c, v, row){
       var d = c || {};
       var k = esc(d.key);
-      var cls = ' class="' + esc(colCls(c)) + '"';
+      // 1b-7: bunka v KOLIZII (pouzivatel ju zmenil a katalog tiez) nesie
+      // vlastnu triedu `conf` — NIE `bad`. `bad` patri serverovym chybam
+      // a `clearErrors` ho pri kazdom novom kole validacie zmaze; kolizia
+      // musi svietit dovtedy, kym ju pouzivatel NEROZHODNE.
+      var conf = hasConf(row, d.key);
+      var cls = ' class="' + esc(colCls(c) + (conf ? ' conf' : '')) + '"';
       // Bunky nemaju `<label>` (nadpis je nad stlpcom, nie pri poli) — bez
       // `aria-label` by citacka obrazovky hlasila len „textové pole".
       var lbl = ' aria-label="' + esc(d.label || d.key) + '"';
       var locked = !!(d.roWhen && row && row[d.roWhen] != null && row[d.roWhen] !== '');
-      var title = locked && d.roTitle ? ' title="' + esc(d.roTitle) + '"' : '';
+      var title = locked && d.roTitle ? ' title="' + esc(d.roTitle) + '"'
+                : (conf ? ' title="Hodnota sa medzitým zmenila v katalógu — rozhodni pod riadkom."' : '');
       if (locked && d.type === 'checkbox')
         return '<input type="checkbox" data-nxm-col="' + k + '"' + cls + lbl + title +
                ' disabled' + (v === true ? ' checked' : '') + '>';
@@ -479,6 +549,14 @@
       return found;
     }
 
+    // VYCHODISKOVE riadky repeatera — to, proti comu pouzivatel pisal. Volajuci
+    // ich potrebuje pri zotaveni z konfliktu, aby vedel odlisit bunku, ktorej sa
+    // dotkol, od bunky, ktora len nesie katalogovú hodnotu (1b-7).
+    function baseRows(key){
+      var b = baseFieldByKey(key);
+      return (b && b.value) ? b.value : [];
+    }
+
     function shallow(o){
       var out = {};
       var k;
@@ -516,13 +594,108 @@
       var b = baseFieldByKey(key);
       if (b && opts && opts.base) b.value = opts.base;
       f.value = data || [];
+      if (OPEN) OPEN.flags[key] = flagsOfRows(f, f.value);
       renderRows(f, f.value);
+    }
+
+    // --- STITKY RIADKOV ZIJU V STAVE, NIE LEN V DOM (1b-7) --------------------
+    // `_note` („zmenené mimo editora") a `_conflict` (rozhodnutie o bunke) sa
+    // vykresluju z riadku, ale kontajner sa prekresluje z `readRows` — a ten
+    // cita LEN bunky. Bez tohto registra by kazde „+ riadok", odobranie riadku
+    // alebo rozhodnutie o jednej bunke ZHASLO stitky vsetkych ostatnych: pas
+    // kolizie by zmizol a zapis by prebehol bez rozhodnutia.
+    // Kluc je HODNOTA `rowKey` (identita zaznamu), nie poradie — katalog radi
+    // varianty podla hrubky a poradie sa medzi echami mení.
+    function flagsOfRows(f, rows){
+      var m = {};
+      if (!f || !f.rowKey) return m;
+      (rows || []).forEach(function(r){
+        if (!r) return;
+        var k = r[f.rowKey];
+        if (k == null || k === '') return;
+        var e = null;
+        if (r._note){ e = e || {}; e.note = r._note; }
+        if (r._conflict && Object.keys(r._conflict).length){ e = e || {}; e.conflict = r._conflict; }
+        if (e) m[String(k)] = e;
+      });
+      return m;
+    }
+
+    function applyFlags(f, rows){
+      var st = (OPEN && OPEN.flags && OPEN.flags[f.key]) || null;
+      return (rows || []).map(function(r){
+        var g = shallow(r);
+        delete g._note;
+        delete g._conflict;
+        var k = f.rowKey ? (r || {})[f.rowKey] : null;
+        var e = (st && k != null && k !== '') ? st[String(k)] : null;
+        if (e && e.note) g._note = e.note;
+        if (e && e.conflict) g._conflict = e.conflict;
+        return g;
+      });
+    }
+
+    // Pocet NEROZHODNUTYCH koliznych buniek naprieč celym formularom.
+    function conflictCount(){
+      var n = 0;
+      var fl = (OPEN && OPEN.flags) || {};
+      Object.keys(fl).forEach(function(fk){
+        var m = fl[fk] || {};
+        Object.keys(m).forEach(function(rk){
+          var c = m[rk] && m[rk].conflict;
+          if (c) n += Object.keys(c).length;
+        });
+      });
+      return n;
     }
 
     function renderRows(f, data){
       var box = rowsBox(f.key);
       if (!box) return;
-      box.innerHTML = rowsInnerHtml(f, data);
+      box.innerHTML = rowsInnerHtml(f, applyFlags(f, data));
+    }
+
+    // Rozhodnutie o jednej koliznej bunke. OBE cesty posuvaju VYCHODISKOVU
+    // hodnotu na tú, ktorú pouzivatel prave videl — inak by sa tá istá kolizia
+    // po zatvoreni a otvoreni vratila donekonecna.
+    //   „Prevziať z katalógu" -> do pola ide katalogova hodnota,
+    //   „Ponechať moju"       -> pole ostava, ale uz je to VEDOME rozhodnutie.
+    function confResolve(btn, take){
+      if (!OPEN || typeof document === 'undefined' || !btn || !btn.closest) return;
+      var line = btn.closest('[data-nxm-row]');
+      if (!line) return;
+      var key = line.getAttribute('data-nxm-row');
+      var col = btn.getAttribute('data-nxm-confcol');
+      var cat = btn.getAttribute('data-nxm-val');
+      var f = fieldByKey(key);
+      if (!f || !col) return;
+      var idNode = f.rowKey && line.querySelector
+        ? line.querySelector('[data-nxm-col="' + f.rowKey + '"]') : null;
+      var rk = idNode ? String(idNode.value == null ? '' : idNode.value) : '';
+      var cell = line.querySelector ? line.querySelector('[data-nxm-col="' + col + '"]') : null;
+      var isCheck = !!(cell && cell.getAttribute('type') === 'checkbox');
+      var catVal = isCheck ? (cat === 'true') : String(cat == null ? '' : cat);
+      if (take && cell){
+        if (isCheck) cell.checked = catVal === true;
+        else cell.value = catVal;
+      }
+      // VYCHODISKOVA hodnota sa posuva na katalogovu — pamat si tak zapamata
+      // dirty stav proti tomu, co uz pouzivatel videl.
+      var b = baseFieldByKey(key);
+      if (b && rk && f.rowKey){
+        (b.value || []).forEach(function(r){
+          if (r && String(r[f.rowKey] == null ? '' : r[f.rowKey]) === rk) r[col] = catVal;
+        });
+      }
+      var m = OPEN.flags[key];
+      var e = m ? m[rk] : null;
+      if (e && e.conflict){
+        delete e.conflict[col];
+        if (!Object.keys(e.conflict).length) delete e.conflict;
+        if (!e.note && !e.conflict) delete m[rk];
+      }
+      OPEN.memSkip = false; // rozhodnutie je zásah do formulara, nie cudzi zapis
+      renderRows(f, readRows(key));
     }
 
     // Vysvetlenie pri zamknutom „−" (D-78: dovod patri na obrazovku, nie do
@@ -653,6 +826,14 @@
       return true;
     }
 
+    // Porovnanie JEDNEJ bunky. `readRows` vracia pri zaskrtavatku BOOLEAN
+    // a inde RETAZEC; vychodiskovy riadok podava volajuci — porovnavat sa musia
+    // oba tvary, inak by sa kazda bunka javila ako zmenena.
+    function sameCell(a, b){
+      if (a === true || a === false || b === true || b === false) return (a === true) === (b === true);
+      return String(a == null ? '' : a) === String(b == null ? '' : b);
+    }
+
     function sameValue(a, b){
       var aArr = a && typeof a.forEach === 'function';
       var bArr = b && typeof b.forEach === 'function';
@@ -677,52 +858,109 @@
     // ako konflikt — pamat by sa stala pascou, z ktorej niet cesty von.
     // Pamataju sa preto LEN editovatelne stlpce + `rowKey` (identita riadku,
     // podla ktorej sa hodnoty priradia k CERSTVYM riadkom).
-    function trimRowsValue(f, rows){
-      var keep = {};
-      (f.cols || []).forEach(function(c){ keep[c.key] = true; });
-      if (f.rowKey) keep[f.rowKey] = true;
-      return (rows || []).map(function(r){
-        var out = {};
-        var k;
-        for (k in r){
-          if (Object.prototype.hasOwnProperty.call(r, k) && keep[k]) out[k] = r[k];
+    //
+    // A z tych stlpcov uz LEN TIE, KTORE POUZIVATEL NAOZAJ ZMENIL (1b-7, sweep
+    // #9). Predtym sa po prvej zmene v ktoromkolvek riadku zapamatala CELA
+    // tabulka a pri dalsom otvoreni sa vliala do cerstveho katalogu — cena,
+    // ktora medzitym prisla zvonku, tak zmizla bez slova. Ku kazdej zapamatanej
+    // bunke ide `_base` = hodnota, proti ktorej ju pouzivatel pisal; podla nej
+    // sa neskor pozna KOLIZIA. `_base` sa nikdy nevykresluje ani neodosiela —
+    // `readRows` cita vyhradne uzly s `data-nxm-col`.
+    function trimRowsValue(f, rows, baseRows){
+      var cols = (f.cols || []).map(function(c){ return c.key; });
+      var keyName = f.rowKey;
+      var byKey = {};
+      if (keyName){
+        (baseRows || []).forEach(function(r){
+          var k = r && r[keyName];
+          if (k != null && k !== '') byKey[String(k)] = r;
+        });
+      }
+      var out = [];
+      (rows || []).forEach(function(r){
+        var k = keyName ? (r || {})[keyName] : null;
+        var isNew = (k == null || k === '');
+        var b = isNew ? null : byKey[String(k)];
+        // NOVY riadok (bez identity) je cely pouzivatelov — a rovnako riadok,
+        // ku ktoremu vychodisko chyba: tam sa dirty urcit NEDA, takze radsej
+        // drzime vsetko (strata rozpisu je horsia nez zbytocne vliatie).
+        if (isNew || !b){
+          var whole = {};
+          cols.forEach(function(c){
+            if (Object.prototype.hasOwnProperty.call(r, c)) whole[c] = r[c];
+          });
+          if (keyName && !isNew) whole[keyName] = k;
+          out.push(whole);
+          return;
         }
-        return out;
+        var val = null, bas = null;
+        cols.forEach(function(c){
+          if (sameCell((r || {})[c], b[c])) return;
+          val = val || {};
+          bas = bas || {};
+          val[c] = r[c];
+          bas[c] = b[c];
+        });
+        if (!val) return;              // riadok bez zmeny sa NEPAMATA vobec
+        val[keyName] = k;
+        val._base = bas;
+        out.push(val);
       });
+      return out;
     }
 
     // Vliatie pamate do CERSTVYCH riadkov: parovanie podla `rowKey`.
-    //   riadok, ktory v cerstvom katalogu JE   -> prepisu sa mu LEN stlpce,
+    //   riadok, ktory v cerstvom katalogu JE   -> prepisu sa mu LEN ZMENENE bunky,
     //   riadok z pamate BEZ identity            -> je to novy, rozpisany riadok,
     //   riadok z pamate, ktory uz neexistuje    -> ZAHODI sa (zaznam je prec).
+    //
+    // Vracia `{ rows, base }`: `base` je vychodisko pre dalsie porovnanie —
+    // pri NEROZHODNUTEJ kolizii v nom ostava STARA hodnota, aby sa kolizia po
+    // zatvoreni a otvoreni okna nestratila (inak by stacil jeden Escape
+    // a tichy prepis by sa vratil).
     function mergeRowsMemory(f, mem){
       var base = f.value || [];
       var rows = mem || [];
       var keyName = f.rowKey;
-      if (!keyName) return rows.length ? rows : base;
+      if (!keyName) return { rows: rows.length ? rows : base, base: base };
       var byKey = {};
       rows.forEach(function(r){
         var k = r && r[keyName];
         if (k != null && k !== '') byKey[String(k)] = r;
       });
+      var baseOut = [];
       var out = base.map(function(r){
         var k = r && r[keyName];
         var m = (k != null && k !== '') ? byKey[String(k)] : null;
-        if (!m) return r;
-        var g = {};
-        var kk;
-        for (kk in r){ if (Object.prototype.hasOwnProperty.call(r, kk)) g[kk] = r[kk]; }
+        if (!m){ baseOut.push(r); return r; }
+        var g = shallow(r);
+        var bo = null;
+        var conf = null;
+        var mb = m._base || {};
         (f.cols || []).forEach(function(c){
-          if (Object.prototype.hasOwnProperty.call(m, c.key)) g[c.key] = m[c.key];
+          if (!Object.prototype.hasOwnProperty.call(m, c.key)) return;
+          g[c.key] = m[c.key];
+          if (!Object.prototype.hasOwnProperty.call(mb, c.key)) return;
+          if (sameCell(mb[c.key], r[c.key])) return;
+          // Katalog zmenil TU ISTU bunku — pouzivatel musi rozhodnut.
+          conf = conf || {};
+          conf[c.key] = r[c.key];
+          bo = bo || shallow(r);
+          bo[c.key] = mb[c.key];
         });
+        if (conf) g._conflict = conf;
+        baseOut.push(bo || r);
         delete byKey[String(k)];
         return g;
       });
       rows.forEach(function(r){
         var k = r && r[keyName];
-        if (k == null || k === '') out.push(r); // rozpisany NOVY riadok
+        if (k != null && k !== '') return;
+        var n = shallow(r);              // rozpisany NOVY riadok
+        delete n._base;
+        out.push(n);
       });
-      return out;
+      return { rows: out, base: baseOut };
     }
 
     function remember(){
@@ -736,7 +974,15 @@
       Object.keys(v).forEach(function(k){
         if (sameValue(v[k], def[k])) return;
         var f = baseFieldByKey(k);
-        out[k] = (f && f.type === 'rows') ? trimRowsValue(f, v[k]) : v[k];
+        if (f && f.type === 'rows'){
+          var trimmed = trimRowsValue(f, v[k], f.value || []);
+          // Prazdny vysledok znamena „ziadna bunka sa nelisi" — pamat by potom
+          // len rozsvietila pas „predvyplnené z konceptu" bez jedineho rozpisu.
+          if (!trimmed.length) return;
+          out[k] = trimmed;
+        } else {
+          out[k] = v[k];
+        }
         any = true;
       });
       var s = memSlot(key);
@@ -758,24 +1004,41 @@
 
     // Zapamätane hodnoty sa vlievaju do POLI specifikacie — volajuci teda
     // nemusi o pamati vediet vobec. `fromMemory` rozsvieti info pas.
+    //
+    // Vracia `{ base, spec }`: pri NEROZHODNUTEJ kolizii sa lisia — `spec` ma
+    // hodnotu pouzivatela, `base` STARE vychodisko, proti ktoremu pisal. Bez
+    // toho rozdielu by sa kolizia po zatvoreni okna „zahojila" tym, ze by
+    // vychodiskom bola uz cerstva katalogova hodnota (a zapis by presiel ticho).
     function withMemory(s){
       dropForeign(s.memoryKey);
       var mem = memory(s.memoryKey);
-      if (!mem) return s;
-      var out = {}, k;
-      for (k in s){ if (Object.prototype.hasOwnProperty.call(s, k)) out[k] = s[k]; }
+      if (!mem) return { base: s, spec: s };
+      var out = shallow(s);
+      var baseOut = shallow(s);
+      var baseFields = (s.fields || []).slice();
       out.fromMemory = true;
-      out.fields = (s.fields || []).map(function(f){
+      out.fields = (s.fields || []).map(function(f, i){
         if (!f || f.type === 'group') return f;
         if (!Object.prototype.hasOwnProperty.call(mem, f.key)) return f;
-        var g = {}, kk;
-        for (kk in f){ if (Object.prototype.hasOwnProperty.call(f, kk)) g[kk] = f[kk]; }
-        // Riadky sa NEPREPISUJU cele — pamat nesie len stlpce, identita a
-        // odtlacok zaznamu prichadzaju CERSTVE z katalogu (audit 2c-2a #1a).
-        g.value = (f.type === 'rows') ? mergeRowsMemory(f, mem[f.key]) : mem[f.key];
+        var g = shallow(f);
+        if (f.type === 'rows'){
+          // Riadky sa NEPREPISUJU cele — pamat nesie len ZMENENE bunky,
+          // identita a odtlacok zaznamu prichadzaju CERSTVE z katalogu
+          // (audit 2c-2a #1a + 1b-7).
+          var r = mergeRowsMemory(f, mem[f.key]);
+          g.value = r.rows;
+          if (r.base !== f.value){
+            var bf = shallow(f);
+            bf.value = r.base;
+            baseFields[i] = bf;
+          }
+        } else {
+          g.value = mem[f.key];
+        }
         return g;
       });
-      return out;
+      baseOut.fields = baseFields;
+      return { base: baseOut, spec: out };
     }
 
     // „Začať odznova" — pas z pamate ponuka CESTU VON: formular sa prekresli
@@ -783,11 +1046,17 @@
     function memReset(){
       if (!OPEN || typeof document === 'undefined') return;
       clearMemory(OPEN.base ? OPEN.base.memoryKey : null);
-      OPEN.spec = OPEN.base;
+      // VYCHODISKO je to, co podal volajuci (`orig`), NIE `base`: pri
+      // nerozhodnutej kolizii drzi `base` zamerne STARU hodnotu, aby sa kolizia
+      // nestratila — „Začať odznova" ale znamena „daj mi cisty cerstvy katalóg".
+      OPEN.spec = OPEN.orig;
+      OPEN.base = OPEN.orig;
       OPEN.memSkip = true;
+      // Vychodiskove hodnoty su cerstvy katalog — niet co rozhodovat.
+      OPEN.flags = {};
       var r = document.getElementById(ROOT_ID);
       if (!r) return;
-      r.innerHTML = modalHtml(OPEN.base);
+      r.innerHTML = modalHtml(OPEN.orig);
       focusFirst(r);
     }
 
@@ -839,8 +1108,14 @@
       close(); // dva modaly naraz su vzdy chyba navrhu
       warnDupKeys(s);
       var eff = withMemory(s);
-      OPEN = { base: s, spec: eff, trigger: trigger, busy: false, memSkip: false };
-      r.innerHTML = modalHtml(eff);
+      OPEN = { orig: s, base: eff.base, spec: eff.spec, trigger: trigger,
+               busy: false, memSkip: false, flags: {} };
+      // Stitky (kolizie z pamate) musia zit v STAVE — prekreslenie kontajnera
+      // ich z DOM neprecita spat.
+      (eff.spec.fields || []).forEach(function(f){
+        if (f && f.type === 'rows') OPEN.flags[f.key] = flagsOfRows(f, f.value);
+      });
+      r.innerHTML = modalHtml(eff.spec);
       focusFirst(r);
     }
 
@@ -862,6 +1137,16 @@
       var s = OPEN && OPEN.spec;
       if (!s) return;
       if (OPEN.busy) return; // review #2: druhy Enter/klik sa ZAHADZUJE
+      // 1b-7: NEROZHODNUTA KOLIZIA ZAPIS NEPUSTI. Tichy prepis cerstvej ceny
+      // starou hodnotou z formulara je cenova chyba, ktora sa v katalogu
+      // realnych objednavok uz nijak neprejavi — tu je jedine miesto, kde sa
+      // da zastavit.
+      if (conflictCount() > 0){
+        showErrors([{ msg: 'Niektoré hodnoty sa medzitým zmenili v katalógu. ' +
+                           'Pri každej označenej bunke rozhodni „Prevziať z katalógu" alebo ' +
+                           '„Ponechať moju" — až potom sa dá uložiť.' }]);
+        return;
+      }
       var v = values();
       remember();            // hodnoty su zapamatane PRED odoslanim
       setBusy(true);
@@ -927,6 +1212,8 @@
           if (a === 'submit') submit();
           else if (a === 'rowadd') rowAdd(act.getAttribute('data-nxm-rows'));
           else if (a === 'rowdel') rowDel(act);
+          else if (a === 'conftake') confResolve(act, true);
+          else if (a === 'confkeep') confResolve(act, false);
           else if (a === 'memreset') memReset();
           else if (a === 'close') close();
           // Ziadny catch-all: neznama akcia MLCKY ZATVARALA modal a rozpisany
@@ -997,7 +1284,11 @@
                 isOpen: isOpen, isBusy: isBusy, setBusy: setBusy,
                 values: values, spec: spec, setRows: setRows,
                 showErrors: showErrors, clearErrors: clearErrors,
-                memory: memory, clearMemory: clearMemory };
+                memory: memory, clearMemory: clearMemory,
+                // 1b-7: volajuci potrebuje vediet, PROTI COMU pouzivatel pisal
+                // (zotavenie z konfliktu prelieva len ZMENENE bunky), a ci
+                // este ostava nerozhodnuta kolizia.
+                baseRows: baseRows, conflicts: conflictCount };
     global.NXModal = API;
     if (typeof module !== 'undefined' && module.exports) module.exports = API;
   })(typeof window !== 'undefined' ? window : globalThis);
