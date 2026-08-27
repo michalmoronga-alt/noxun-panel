@@ -293,9 +293,15 @@ let editRoot = null;
   M.mdSetCatalog(fresh);
   M.MD.editBlocked();
   ok(DOC.querySelector('.mrflag'), 'riadok zmeneny ZVONKU je VIDNO (jantárový štítok)');
+  // 1b-7 (sweep #8): pouzivatel prepisal LEN cenu — kod sa nedotkol. Do
+  // formulara preto patri CERSTVA katalogova hodnota kodu. Do 1b-7 sa sem
+  // prelial jeho stary kod „A18" spolu s CERSTVYM `row_rev`, takze druhy
+  // Save presiel cez oba zamky a cudziu zmenu ticho prepisal.
   eq(DOC.querySelectorAll('[data-nxm-row="sheets"]')[0]
-       .querySelector('[data-nxm-col="code"]').value, 'A18',
-     'kod ostal ten, ktory ma pouzivatel v ruke (jeho hodnota sa neprepisuje potichu)');
+       .querySelector('[data-nxm-col="code"]').value, 'CUDZI',
+     'bunka, ktorej sa pouzivatel NEDOTKOL, dostane cerstvu hodnotu z katalogu');
+  eq(DOC.querySelector('.mrconf'), null,
+     'a ziadna kolizia — sporna je len bunka, ktoru zmenili OBAJA');
 
   SENT.length = 0;
   dispatch(DOC.querySelector('[data-nxm-act="submit"]'), 'click');

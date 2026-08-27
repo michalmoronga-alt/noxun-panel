@@ -19,8 +19,8 @@ blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
 **Cieľ:** doplatiť dlhy, ktoré fáza ŠTÚDIO vedome odložila, a spraviť refactory, na ktoré počas presunov nebol priestor.
 *(Stabilizačná revízia sa od začiatku produkcie naostro (20.8.) ešte NEKONALA — patrí pred ďalšie nové funkcie.)* Poradie určí Michal.
 Staré dlhy B–F nie sú blokujúce pre bežnú prácu (**B a D vybavené dávkou 1b-4, v0.8.8, 27.8.**; **sweep E je HOTOVÝ, 27.8.**; z písmen ostáva už len **F**;
-mimo písmen vybavená aj **1b-6a** — názov zákazky prežije prvé uloženie, v0.8.9, 27.8. — a mimo písmen ostávajú otvorené tri: **1b-7** (tichý návrat starej ceny dekoru — cenová P2 zo sweepu,
-najbližšia kódová dávka) · **1b-6b** (hlavičky skupín materiálov, tiež zo sweepu) · **1b-6c** (zámok nad `vepo_settings.json`, druhá časť delenia #243, audit-povinná));
+mimo písmen vybavené aj **1b-6a** — názov zákazky prežije prvé uloženie, v0.8.9, 27.8. — a **1b-7** — koniec tichého návratu starej ceny dekoru, v0.8.10, 27.8.;
+mimo písmen ostávajú otvorené dve: **1b-6b** (hlavičky skupín materiálov, zo sweepu) · **1b-6c** (zámok nad `vepo_settings.json`, druhá časť delenia #243, audit-povinná));
 **P0 odrážky A, G a H sú BRÁNY a VŠETKY TRI SÚ HOTOVÉ** — **A** (možná STRATA rozpísanej editácie) dávkou 1b-1, v0.8.6, 27.8. ·
 **H** (charakterizačné in-SU scenáre) dávkou 1b-2, 27.8. — cesta k builderom/observerom pre blok 1d je tým otvorená; sadu `CHAR` **dorovnala dávka 1b-5** (27.8., test-only) po
 post-hoc Codex kole na #239: štyri asserty boli zelené, ale merali slabšiu veličinu, než tvrdili · **G** („Obnoviť" = čisté čítanie) dávkou 1b-3, v0.8.7, 27.8. —
@@ -85,14 +85,13 @@ nezväčšila. **Východisko:** commit `0311095` z vetvy `fix/1b6-nazov-projektu
 (nielen pre mapu názvov — `save_merge_18_36` a štyri zápisy `last_dir` píšu ten istý súbor) · `rescue` okolo **celej** zamknutej úpravy, aby zlyhanie `.lock` neuniklo ako výnimka ·
 návrat **čerstvej** hodnoty zo zamknutej migrácie. Zmena sa dotýka koncepcie zápisu súboru nastavení ⇒ **audit-povinná** (`codex-audit` pred implementáciou).
 
-**1b-7 · Tichý návrat starej ceny dekoru — ⏳ OTVORENÉ (cenová P2 zo sweepu, najbližšia kódová dávka).** Dva nálezy s jedným koreňom: `ui/js/proj_materials.js:1205–1219` (zotavenie
-z konfliktu preleje do čerstvého riadku **všetky** stĺpce starého formulára) a `ui/js/nx_modal.js:680–724` (pamäť rozpísaných riadkov si po prvej zmene uloží **celú** tabuľku).
-V oboch prípadoch sa stará hodnota formulára spojí s **čerstvým** `row_rev`, takže optimistický zámok prestane chrániť. **Scenár, ktorý to spustí bežnou prácou:** otvor editor dekoru →
-oprav hodnotu → **Esc** → „Aktualizovať z Demosu" → otvor ten istý dekor → **Ulož** ⇒ nová cena z Demosu je preč a **nikde to nesvieti**. Oprava patrí na jedno miesto: pamätať a prelievať
-len bunky, ktoré používateľ naozaj zmenil, a pri kolízii ukázať dvojicu *tvoja hodnota × hodnota v katalógu*.
+**1b-7 · Tichý návrat starej ceny dekoru — ✅ VYRIEŠENÉ, v0.8.10 (27.8.2026).** Obe P2 zo sweepu (#212 · nálezy #8 a #9) mali jeden koreň — stará hodnota formulára sa spájala
+s **čerstvým** `row_rev`, takže optimistický zámok prestal chrániť. Pamäť aj zotavenie z konfliktu dnes prelievajú **len bunky, ktorých sa používateľ naozaj dotkol**, a keď tú istú
+hodnotu zmenil aj katalóg, formulár ukáže dvojicu *tvoja × v katalógu* a **bez rozhodnutia neuloží**. Plný záznam (vrátane vedomej zmeny správania oproti #212 a dvoch pascí, ktoré
+si to vypýtalo): [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-7**.
 
 **E · Post-hoc Codex sweep #186–#226 — ✅ HOTOVÝ (27.8.2026).** Dávky, ktoré 21.–24.8. prešli bránou so slepým subagentom, majú spätné Codex review; rozsah je uzavretý.
-Otvorené nálezy z neho už majú vlastné dávky (**1b-7**, **1b-6b**) a jedna otázka ide do auditu **1c**. Kandidáti do registra 1c žijú v [zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md).
+Otvorené nálezy z neho dostali vlastné dávky (**1b-7** — hotová, v0.8.10; **1b-6b** — otvorená) a jedna otázka ide do auditu **1c**. Kandidáti do registra 1c žijú v [zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md).
 Plný záznam — metodika, čísla, bilancia slepých kôl a poučenie: [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**.
 
 ### 1c · AUDIT KÓDU (read-only — po 1b; rozhodnuté 26.8.2026 večer)

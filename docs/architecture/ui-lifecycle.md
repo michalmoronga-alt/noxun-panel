@@ -247,9 +247,34 @@ Riadky dostali **`rowKey`** (kľúč identity riadku) — pamäť rozpísaného 
 server-owned skryté polia (`row_rev`) z pamäte nikdy nevyliezajú späť, inak by formulár odosielal zastaraný odtlačok a zápis by sa **už nikdy nepodaril** (`trimRowsValue` +
 `mergeRowsMemory`; riadok, ktorý v čerstvom katalógu nie je, sa z pamäte zahodí).
 
+**PAMÄŤ JE PO BUNKÁCH, NIE PO RIADKOCH (1b-7, sweep #9 — cenové P2).** Do 1b-7 stačila jedna zmenená bunka na to, aby si pamäť odložila **všetky** editovateľné stĺpce **všetkých**
+riadkov; pri ďalšom otvorení sa vliali do čerstvého katalógu a `row_rev` pritom ostal čerstvý — optimistický zámok teda prekážku nevidel a *Uložiť* **ticho vrátilo cenu, ktorú
+medzitým priniesla „Aktualizovať z Demosu"**. Reálny scenár: otvor editor → oprav jednu hodnotu → **Esc** → aktualizuj ceny → otvor ten istý dekor → Ulož. Dnes `trimRowsValue(f,
+rows, baseRows)` odloží **iba bunku, ktorá sa líši od východiskového riadku**, a ku každej pridá **`_base`** = hodnota, proti ktorej ju používateľ písal (`sameCell` porovnáva
+boolean aj reťazec); riadok bez zmeny sa nepamätá vôbec. `_base` sa nikdy nevykresľuje ani neodosiela — `readRows` číta výhradne uzly s `data-nxm-col`.
+
+**KOLÍZIA BUNKY sa nerieši ticho.** Keď `mergeRowsMemory` zistí, že tú istú bunku zmenil používateľ **aj** katalóg (`_base` ≠ čerstvá hodnota **a zároveň** výsledky sa naozaj líšia
+— zhodná hodnota na oboch stranách kolízia nie je), riadok dostane **`_conflict`** = `{stĺpec: hodnota v katalógu}`: bunka sa označí triedou **`conf`** (nie `bad` — tú `clearErrors`
+pri každom kole serverovej validácie zhasne), dostane `title` aj `aria-invalid` vo **všetkých** vetvách `rowCellHtml` a pod riadkom sa rozvinie pás **`.mrconf`** s dvojicou *tvoja ×
+v katalógu* a dvoma rozhodnutiami — **„Prevziať z katalógu"** / **„Ponechať moju"**. **`submit` s nerozhodnutou kolíziou zápis NEPUSTÍ** (`conflictCount()` > 0 → hláška do
+`.merrtop`, `onSubmit` sa nevolá, zámok sa nezapína). Rozhodovacie tlačidlá nesú **`data-nxm-confcol`**, nie `data-nxm-col` — `readRows` číta každý taký uzol v riadku a prázdna
+`value` tlačidla by hodnotu bunky vymazala.
+
+**VÝCHODISKOVÉ RIADKY (`base`) SÚ VŽDY ČERSTVÝ KATALÓG.** Prvá verzia opravy 1b-7 do nich pri kolízii ukladala starú hodnotu, aby kolízia prežila Esc — lenže z `base` kreslí aj
+„Začať odznova", takže reset nakreslil **starú hodnotu s čerstvým `row_rev`** a nasledujúci zápis prešiel cez oba zámky (P1 interného review kola 1). „Proti čomu používateľ písal"
+preto žije v **stave**: riadok ho nesie ako `_wrote` len do `flagsOfRows`, ktorý ho uloží do `OPEN.flags[pole][rowKey].wrote`, a `remember()` ho odtiaľ berie ako `_base`
+zapamätanej bunky. Vďaka tomu nerozhodnutá kolízia **prežije Esc**, rozhodnutie ju **zahodí** (odteraz sa písalo proti hodnote, ktorú používateľ videl — a tou je už `base`), do
+`base` sa **nikdy nič nezapisuje** a `memReset` z neho dostane presne to, čo je dnes v katalógu — vrátane riadkov, ktoré doniesol `setRows` po zotavení z konfliktu.
+
+**Štítky riadku žijú v STAVE `OPEN.flags`, nie v DOM** (`flagsOfRows`/`applyFlags`, kľúč = hodnota `rowKey`): kontajner sa pri každom `+`/`−` prekresľuje z `readRows`, ktorý číta
+len bunky — bez registra by jedno pridanie riadku zhaslo pás kolízie aj štítky `_note` a zápis by prešiel bez rozhodnutia. Stav sa preto musí **synchronizovať s obrazovkou**:
+`conflictCount()` počíta výhradne nad `readRows` a `rowDel` navyše volá `syncFlags(key)` — inak by zmazanie kolízneho riadku nechalo zámok zápisu visieť na bunke, ktorú už nemá
+kto rozhodnúť (P2 interného review; v zotavovacej ceste tam ani nie je „Začať odznova", takže jediným východiskom by bolo zavrieť okno).
+
 **`setRows(key, rows, {base})`** vymieňa obsah repeatera za behu (zotavenie z konfliktu) — pozor, `withMemory` vracia pri prázdnej pamäti TEN ISTÝ objekt, takže `spec` aj `base`
 zdieľajú polia; `ownSpecField` ich pred zápisom rozdvojí, inak by sa hodnoty používateľa prepísali východiskovými. Riadok smie niesť **`_note`** = štítok (nie hodnota — `readRows`
-ho nečíta), ktorým sa označí záznam zmenený ZVONKU. Pribudlo aj **`showErrors([{row, field, msg}])`/`clearErrors()`**: server validuje CELÝ formulár naraz a modal sa pri odmietnutí
+ho nečíta), ktorým sa označí záznam zmenený ZVONKU. Volajúci si vie vypýtať **`baseRows(key)`** (proti čomu používateľ písal) a **`conflicts()`** (počet nerozhodnutých buniek).
+Pribudlo aj **`showErrors([{row, field, msg}])`/`clearErrors()`**: server validuje CELÝ formulár naraz a modal sa pri odmietnutí
 NEZATVÁRA, takže hláška musí pristáť pri tom poli, ktorého sa týka — `row = null` ide pod `.mrow` plochého poľa, `"<kľúč>:<index>"` pod príslušný `.mrline`, nezaraditeľná do
 zberného pásu `.merrtop` navrchu tela; každé ďalšie volanie predošlé chyby PREPÍŠE.
 
@@ -1446,6 +1471,15 @@ celý kontrakt vrátane `base_rev` a `row_rev` každého riadku beží POD zámk
 formulárom: `MD.editSaved` (zavri + zahoď pamäť), `MD.editErrors` (chyby k poliam, okno OSTÁVA), `MD.editBlocked` (odomkni, hodnoty ostávajú **a riadky sa dorovnajú z čerstvého
 katalógu** — baseline omladne, riadky zmenené zvonku dostanú štítok, takže „ulož znova“ je splniteľné; bez toho by konflikt nemal cestu von) + `MD.editDuplicateCode` (druhé
 „Uložiť“ potvrdí duplicitu kódu)).
+
+**`mdEditRefresh` prelieva LEN bunky, ktorých sa používateľ dotkol (1b-7, sweep #8 — cenové P2).** Do 1b-7 kopírovalo zotavenie z konfliktu do čerstvého katalógového riadku
+**všetky** editovateľné stĺpce starého formulára — aj tie, ktoré používateľ nikdy nepísal. Riadok si pritom nesie **čerstvý `row_rev`** (`row_rev` je v `hidden`, nie v `cols`)
+a `mdEditBase.rev` omladne, takže ďalšie *Uložiť* prešlo cez **oba** zámky a **ticho vrátilo cenu/kód/formát, ktorý medzitým prišiel zvonku** — štítok „zmenené mimo editora"
+síce svietil, ale čerstvú hodnotu neukázal. Dnes sa každá bunka porovná s **`NXModal.baseRows(key)`** (východisko, proti ktorému používateľ písal, `mdSameCell`): netknutá bunka
+dostane **čerstvú** hodnotu, zmenená si nechá používateľovu, a bunka zmenená **oboma** (a naozaj na inú hodnotu) ide do modalu ako **kolízia** (`_conflict` + `_wrote`) — pás *tvoja × v katalógu* s rozhodnutím a
+zablokovaným zápisom. `setRows` dostáva ako `base` **čerstvé katalógové riadky** — stará hodnota ide výhradne do stavu modalu (`_wrote`), lebo z `base` kreslí „Začať odznova"
+a stará hodnota s čerstvým `row_rev` by prebehla cez oba zámky (P1 interného review). `editBlocked` má pre kolíziu **vlastnú hlášku**, ktorá pýta rozhodnutie namiesto „ulož
+znova". Testy: `tests/js/test_1b7_kolizia_buniek.js`.
 
 **Adresát odpovede:** `with_client(sink)` presmeruje `js` na volajúceho **na čas jedného synchrónneho volania** (`ensure` je povinné — visiaci sink by zdedila nasledujúca, aj
 asynchrónna odpoveď); **mimo neho ide všetko do Štúdia** (`studio_js` → `StudioDialog.mat_js`, tenký verejný most, lebo kanálové `js` Štúdia je private). Práve na tom stojí Demos:
