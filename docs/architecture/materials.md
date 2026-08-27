@@ -161,6 +161,13 @@ zakázaný; párová stránka sa s ním nezhoduje).
 
 **D-74:** name_search labely formátované (`abs_dims_hint`/`sheet_dims_hint` s dedup-sufix heuristikami, consumed kontrakt) + `open_search_url` (sanitize server).
 
+**Medziprocesový zámok `with_catalog_lock`:** blokujúci `flock(LOCK_EX)` nad **sidecar súborom** `materials.lock` v `Materials.dir` — nikdy nie nad samotným `materials.json`,
+ktorého `rename` by zámok stratil; `test_dir_override` presmeruje aj zámok, takže izolované testy nesúťažia so živým katalógom. Je **reentrantný** (hĺbkový počítadlo): druhý
+`flock` toho istého súboru cez ďalší handle by sa v JEDNOM procese zablokoval sám o seba, a mutátory držia zámok cez `load + write_unlocked`. **Od 1b-6c sa nezískaný zámok
+neprehliada** — `flock` vracia `false`, keď ho filesystem nepodporuje, a tichým pokračovaním by kritická sekcia bežala BEZ zámku; namiesto toho letí `IOError` a volajúci sa
+rozhodne (zápis nastavení ho preloží na `false`, viď `production_core` v [outputs.md](outputs.md)). Ten istý zámok používa aj zápis **`vepo_settings.json`** — je to ten istý
+priečinok a **jeden širší zámok** nevyrobí poradie dvoch zámkov ani riziko zaseknutia; kritické sekcie sú v ms a **nikdy sa cez ne nedrží modálne okno**.
+
 ### materials_migration.rb
 
 **2A-2: jednorazová migrácia katalógu na SCHEMA 2** (štandard §7.1): `migrate_to_schema2!` — surové čítanie, kanonická mapa (heuristika len fallback s reportom), deterministický

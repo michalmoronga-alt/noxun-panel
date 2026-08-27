@@ -445,31 +445,35 @@ ensure
 end
 
 NxTest.test('1b-6c: zamknuta migracia vrati CERSTVU hodnotu cesty (kolo 3 #243)') do
-  # Druha instancia pomenuje TU ISTU cestu tesne po nasom predzamkovom citani.
-  # Migracia jej nazov spravne zachova — ale keby `project_name` cital dalej
-  # zo stareho odtlacku, export by sa aj tak volal podla .skp suboru.
+  # Cesta uz svoj nazov MA a druha instancia ho PREMENUJE tesne po nasom
+  # predzamkovom citani. Migracia jej nazov spravne zachova — ale keby
+  # `project_name` cital dalej zo stareho odtlacku, export by odisiel pod
+  # nazvom, ktory uz v subore nikto nema.
   NxTest.skip!('vyzaduje headless sandbox nastaveni') unless NxTest.headless?
   core = Noxun::Engine::ProductionCore
   mats = Noxun::Engine::Materials
+  cesta = 'c:/zakazky/cerstva-hodnota.skp'
   m = Struct.new(:path, :guid).new('', 'GUID-CERSTVA')
   orig = mats.method(:with_catalog_lock)
   begin
     core.save_project_name(m, 'Rozrobena')
+    core.update_project_names { |map| map.merge(cesta => 'Stary nazov') }
     m.path = 'C:/Zakazky/Cerstva-hodnota.skp'
     m.guid = 'GUID-CERSTVA-2'
     mats.define_singleton_method(:with_catalog_lock) do |&blk|
-      ST1B_OTHER_INSTANCE.call('c:/zakazky/cerstva-hodnota.skp', 'Meno z druhej instancie')
+      ST1B_OTHER_INSTANCE.call(cesta, 'Premenovane v druhej instancii')
       orig.call(&blk)
     end
-    NxTest.assert_equal('Meno z druhej instancie', core.project_name(m),
+    NxTest.assert_equal('Premenovane v druhej instancii', core.project_name(m),
                         'citanie vratilo hodnotu spod zamku, nie odtlacok spred neho')
   ensure
     mats.define_singleton_method(:with_catalog_lock, orig)
   end
+  NxTest.assert_equal('Premenovane v druhej instancii', core.project_names[cesta],
+                      'a migracia cudzi nazov neprepisala rozrobenym')
 ensure
   core.update_project_names do |map|
-    %w[guid:GUID-CERSTVA guid:GUID-CERSTVA-2 c:/zakazky/cerstva-hodnota.skp]
-      .each { |k| map.delete(k) }
+    %W[guid:GUID-CERSTVA guid:GUID-CERSTVA-2 #{cesta}].each { |k| map.delete(k) }
     map
   end
 end
