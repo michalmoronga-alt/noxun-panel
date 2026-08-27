@@ -51,7 +51,8 @@
   objaví hodnota PREDCHÁDZAJÚCEJ sondy, nie `nil` (v mutačnom behu to dalo falošný FAIL `CH4c`). Porovnáva sa preto proti **menu vlastnej sondy** („už to nie je moja").
 
   **Výsledok:** plný in-SketchUp beh **1036 PASS / 0 FAIL / 0 SKIP** (bolo 1022 — **+14 assertov**: `CH1` +2, `CH2` +2, `CH4c` +8, `CH6` +2). Headless **1947** a 69 JS sád
-  bez zmeny (dávka sa kódu pluginu nedotkla). Mutačné behy: **5** (jeden s pôvodným runnerom = dôkaz slepoty, štyri s novým = dôkaz záchytu).
+  bez zmeny (dávka sa kódu pluginu nedotkla). Mutačné behy: **5** (jeden s pôvodným runnerom = dôkaz slepoty — ten beh niesol mutácie 1–3 SÚČASNE,
+  preto tri tvrdenia „starý assert ostal zelený" pochádzajú z jedného behu; štyri behy s novým runnerom = dôkaz záchytu, po jednej mutácii).
 
 - **1b-4 · DROBNOSTI SEKCIÍ ŠABLÓNY (B) A PRAVIDLÁ (D) — odrážky B a D bloku 1b (27.8.2026):** vetva `fix/1b4-sablony-pravidla-drobnosti`, v0.8.7 → **v0.8.8**. Osem NOTE-level dlhov
   z review #221/#222/#225, ktoré vtedy neblokovali a boli vedome odložené. Žiadny z nich sa neprejaví novým tlačidlom — všetky sú o tom, aby UI **nehovorilo nepravdu** a aby
