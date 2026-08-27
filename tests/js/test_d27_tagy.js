@@ -152,6 +152,13 @@ function state(rows, hidden){
   ok(tagPart.indexOf('data-tagkey') >= 0, 'fokus sa vracia podla identity riadku');
   ok(tagPart.indexOf('function nxTagFocusKey') >= 0, 'zapamatanie fokusu ma vlastnu funkciu');
   ok(tagPart.indexOf('back.focus()') >= 0, 'a fokus sa po prekresleni naozaj vracia');
+  // Review #249 kolo 2: nad railom nesmu stat DVE prekryte okna naraz.
+  ok(tagPart.indexOf('nxCloseEdgeMenu()') >= 0,
+     'otvorenie okna tagov zhasne rohove nastavenie ABS');
+  const edgePart = shell.slice(shell.indexOf('function onEdgeMenuToggle'),
+                               shell.indexOf('function onEdgeMenuOption'));
+  ok(edgePart.indexOf('nxCloseTagMenu()') >= 0,
+     'a otvorenie rohu ABS recipročne zhasne okno tagov');
 
   const actions = fs.readFileSync(path.join(ROOT, 'noxun_engine', 'ui', 'js', 'actions.js'), 'utf8');
   ok(actions.indexOf('sketchup.nx_tag_visible') >= 0,

@@ -705,6 +705,9 @@
     var more = el('railAbsMore');
     if (more && more.getAttribute('aria-disabled') === 'true') return;
     var open = !nxEdgeMenuOpen();
+    // D-27 (review #249 kolo 2): druhe rohove/railove okno musi zhasnut —
+    // obe su `position: absolute` nad railom a prekryli by sa.
+    if (open) nxCloseTagMenu();
     nxRenderEdgeMenu(open);
     // Aby na obrazovke nikdy neboli DVE kopie tych istych prepinacov: otvorenie
     // tu zavrie rozbalovacie okno v otvorenom ŠTÚDIU (a naopak).
@@ -775,9 +778,16 @@
   // Okno sa otvara VZDY — aj v modeli bez tagov, kde vetou povie, ze vzniknu
   // s prvou skrinkou (review #249 P2: zamknute tlacidlo by to vysvetlenie
   // schovalo do bubliny).
+  //
+  // Review #249 kolo 2: klik na tlacidlo ZASTAVUJE bublanie (inak by okno
+  // zavrel document listener v tom istom kliku), takze rohove nastavenie ABS
+  // by pri nom neyzhaslo a DVE prekryte okna by stali nad railom naraz.
+  // Zatvara sa preto VYSLOVNE — a recipročne to robi aj roh ABS.
   function onTagMenuToggle(ev){
     if (ev && ev.stopPropagation) ev.stopPropagation();
-    nxRenderTagMenu(!nxTagMenuOpen());
+    var open = !nxTagMenuOpen();
+    if (open) nxCloseEdgeMenu();
+    nxRenderTagMenu(open);
   }
 
   // Prepnutie jedneho tagu. Klient posiela LEN identitu + kluc + boolean;

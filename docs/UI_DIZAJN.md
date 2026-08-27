@@ -1081,6 +1081,11 @@ prepínajú, čo panel *kreslí*, toto mení, čo je vidieť *v modeli*.
   status to povie („Kreslenie prepnuté na Untagged").
 - **Zatvára klik mimo a Escape**, fokus sa vracia na tlačidlo (vzor warnpanelu
   a rohového nastavenia ABS). Vlastný kľúč merača: `rail:tagy`.
+- **Nad railom nikdy nestoja dve okná naraz.** Otvorenie okna tagov zhasne
+  rohové nastavenie ABS a naopak — klik na spúšťač **zastavuje bublanie**
+  (inak by ho document listener v tom istom kliku zavrel), takže druhé okno
+  sa musí zavrieť **výslovne**; spoliehať sa na „klik mimo" tu nestačí
+  (review #249).
 - **Prekreslenie otvoreného okna nesmie zhodiť fokus.** Server po každom
   prepnutí pošle čerstvý stav a okno sa prekreslí celé (`outerHTML`), takže
   klávesnicový používateľ by po každom prepnutí z ponuky vypadol. Riadok preto
