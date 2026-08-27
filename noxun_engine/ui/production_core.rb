@@ -742,15 +742,14 @@ module Noxun
       # v hlavicke aj v supise Platni vlastne miesto). Dve hrubky toho isteho
       # dekoru — najbeznejsi pripad zakazky — preto ziadne rozlisenie
       # nedostanu a ich hlavicky ostavaju kratke.
-      MATERIAL_LABEL_LEVELS = %i[row full id].freeze
-
+      #
       # `ctx` = kontext kolizie vyrobcov. Sentinel `:panel` znamena „postav ho
       # AZ pri prvej kolizii" — bezna zakazka tak katalog kvoli hlavickam
       # necita vobec; test si moze podstrcit vlastny kontext.
       def material_labels(ids, smap, ctx = :panel)
         labels = {}
         Array(ids).each { |id| labels[id] = material_label(smap[id], id) }
-        MATERIAL_LABEL_LEVELS.each do |level|
+        %i[row full id].each do |level|
           amb = ambiguous_label_ids(labels) { |id| meta_thickness_key(smap[id]) }
           break if amb.empty?
 
