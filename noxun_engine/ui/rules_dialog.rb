@@ -210,8 +210,18 @@ module Noxun
         def overrides_payload(collected)
           man = collected.is_a?(Hash) ? collected[:manual_overrides] : nil
           man = {} unless man.is_a?(Hash)
-          emap = defined?(ProductionCore) ? ProductionCore.edges_map : nil
-          { 'abs' => override_group(Array(man['abs']).filter_map { |o| abs_override_row(o, emap) },
+          abs = Array(man['abs'])
+          # 1b-4 (D1): katalog ABS pasok sa stava LENIVO — `ProductionCore.edges_map`
+          # je cely `Materials.edges` prehodeny do mapy a bezal pri KAZDOM pushi
+          # okna, aj ked rucny zasah do hran nemal ani jeden dielec (bezny stav
+          # zakazky). Mapa sluzi VYHRADNE na preklad `abs_id` -> nazov pasky
+          # v riadkoch nizsie, takze bez riadkov nie je co prekladat.
+          # (Duplicitu s `control_payload`/`budget_payload`/`edges_meta` to
+          # NEODSTRANUJE — tie mapu potrebuju vzdy a zdielanie jednej instancie
+          # naprie celym pushom je zasah do kontraktu vystupov, teda vlastna
+          # davka; toto je len „neplat za nic".)
+          emap = (abs.empty? || !defined?(ProductionCore)) ? nil : ProductionCore.edges_map
+          { 'abs' => override_group(abs.filter_map { |o| abs_override_row(o, emap) },
                                     'Dielce s ručne nastavenými hranami',
                                     'Tieto dielce majú hrany nastavené ručne v Inspectore — pravidlo ' \
                                     'podľa roly sa na ne neuplatní. Šípka vráti dielec na pravidlo ' \
@@ -235,11 +245,21 @@ module Noxun
         end
 
         # Zoskupenie po SKRINKACH + strop so suhrnom (F15).
+        #
+        # 1b-4 (D3): riadky sa RADIA a az potom sa aplikuje strop. Doteraz sa
+        # brali v poradi, v akom ich vratil `Bom.collect`, teda v poradi entit
+        # v modeli — vlozenie ci zmazanie hocijakej skrinky preto preskladalo
+        # zoznam a pri viac nez `MAX_OVERRIDE_ROWS` zasahoch aj VYMENILO, ktore
+        # riadky su este vidno a ktore uz len v suhrne „…a ďalších N".
+        # Radenie je uplne a stabilne (posledny kluc je poradove cislo), takze
+        # DVA riadky s rovnakou identitou ostavaju OBA a v pevnom poradi —
+        # zdvojenie riadkov pri duplicitnej identite je samostatny kandidat
+        # registra (KRONIKA 1b-3) a tato zmena ho ani nerobi, ani neskryva.
         def override_group(rows, title, note)
           total = rows.length
           return empty_override_group if total.zero?
 
-          shown = rows.first(MAX_OVERRIDE_ROWS)
+          shown = sort_override_rows(rows).first(MAX_OVERRIDE_ROWS)
           groups = []
           shown.each do |r|
             g = groups.find { |x| x['owner_id'] == r['owner_id'] }
@@ -253,6 +273,27 @@ module Noxun
           { 'total' => total, 'groups' => groups, 'more' => more,
             'title' => "#{title} (#{total})", 'note' => note,
             'more_text' => more.zero? ? '' : "…a ďalších #{more} — zoznam je skrátený." }
+        end
+
+        # Poradie riadkov: skrinka -> dielec -> polozka. `sort_by` v Ruby NIE JE
+        # stabilny, preto je posledny kluc PORADOVE CISLO — bez neho by dva
+        # riadky s rovnakym klucom mohli medzi behmi preskakovat.
+        def sort_override_rows(rows)
+          rows.each_with_index.sort_by { |r, i| override_sort_key(r) + [i] }.map(&:first)
+        end
+
+        def override_sort_key(row)
+          [owner_sort_key(row['owner_id']), row['part_key'].to_s,
+           row['generic_type'].to_s, row['rule_id'].to_s, row['label'].to_s]
+        end
+
+        # Identity su `CAB-001` / `BRD-007` — cislo sa radi ako CISLO, inak by
+        # `CAB-1000` skoncilo pred `CAB-999`. Kluc ma VZDY rovnaky tvar
+        # [prefix, cislo, cely retazec], aby sa dal porovnat s hocijakym inym.
+        def owner_sort_key(id)
+          s = id.to_s
+          m = s.match(/\A(.*?)(\d+)\z/)
+          m ? [m[1], m[2].to_i, s] : [s, -1, s]
         end
 
         def owner_title(row)
@@ -305,10 +346,7 @@ module Noxun
         def hw_override_row(ov)
           return nil unless ov.is_a?(Hash)
 
-          bits = []
-          bits << 'vypnuté — nepočíta sa do súpisu' if ov['disabled'] == true
-          bits << "počet #{ov['quantity'].to_i} ks" unless ov['quantity'].nil?
-          bits << "dĺžka #{num(ov['nominal_length'])} mm" unless ov['nominal_length'].nil?
+          bits = hw_override_bits(ov)
           return nil if bits.empty?
 
           pkey = ov['owner_part_key'].to_s
@@ -324,6 +362,31 @@ module Noxun
             'label' => HardwareRules.label_for(ov['generic_type']),
             'desc' => pkey.empty? ? 'ručne nastavené na skrinke' : "ručne nastavené · #{part}",
             'value' => bits.join(' · ') }
+        end
+
+        # 1b-4 (D2): riadok vypisuje VITAZA, nie vsetko, co je v zazname ulozene.
+        # Polia zaznamu su sice NEZAVISLE (D-93), ale NEPLATIA naraz:
+        # `HardwareRules.apply_overrides` polozku pri `disabled` zahodi (`next nil`)
+        # este PRED prepisom poctu aj dlzky, takze „vypnuté · počet 6 ks" tvrdilo,
+        # ze sa nieco pocita — a pritom sa nepocitalo nic. Ulozene, ale neuplatnene
+        # polia sa NEZAMLCUJU (sipka „vrátiť na pravidlo" zrusi aj ich), len sa
+        # priznaju v zatvorke.
+        INERT_NOTE = { 'q'  => ' (uložený počet sa neuplatní)',
+                       'nl' => ' (uložená dĺžka sa neuplatní)',
+                       'qnl' => ' (uložený počet ani dĺžka sa neuplatnia)' }.freeze
+
+        def hw_override_bits(ov)
+          return [disabled_bit(ov)] if ov['disabled'] == true
+
+          bits = []
+          bits << "počet #{ov['quantity'].to_i} ks" unless ov['quantity'].nil?
+          bits << "dĺžka #{num(ov['nominal_length'])} mm" unless ov['nominal_length'].nil?
+          bits
+        end
+
+        def disabled_bit(ov)
+          key = (ov['quantity'].nil? ? '' : 'q') + (ov['nominal_length'].nil? ? '' : 'nl')
+          "vypnuté — nepočíta sa do súpisu#{INERT_NOTE[key]}"
         end
 
         # mm po slovensky (desatinna CIARKA). ABS hrubky su 1,0 / 2,0 — desatinne
