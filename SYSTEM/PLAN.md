@@ -18,7 +18,8 @@ blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
 
 **Cieľ:** doplatiť dlhy, ktoré fáza ŠTÚDIO vedome odložila, a spraviť refactory, na ktoré počas presunov nebol priestor.
 *(Stabilizačná revízia sa od začiatku produkcie naostro (20.8.) ešte NEKONALA — patrí pred ďalšie nové funkcie.)* Poradie určí Michal.
-Staré dlhy B–F nie sú blokujúce pre bežnú prácu; **P0 odrážky A, G a H sú BRÁNY a VŠETKY TRI SÚ HOTOVÉ** — **A** (možná STRATA rozpísanej editácie) dávkou 1b-1, v0.8.6, 27.8. ·
+Staré dlhy B–F nie sú blokujúce pre bežnú prácu (**B a D vybavené dávkou 1b-4, v0.8.8, 27.8.**; ostáva **F** a sweep **E**);
+**P0 odrážky A, G a H sú BRÁNY a VŠETKY TRI SÚ HOTOVÉ** — **A** (možná STRATA rozpísanej editácie) dávkou 1b-1, v0.8.6, 27.8. ·
 **H** (charakterizačné in-SU scenáre) dávkou 1b-2, 27.8. — cesta k builderom/observerom pre blok 1d je tým otvorená · **G** („Obnoviť" = čisté čítanie) dávkou 1b-3, v0.8.7, 27.8. —
 na „Obnoviť" sa teraz smie postaviť ďalšia kontrola (plošná kontrola D-95 má garanciu, že zapnutie kontroly nemení model ani Undo).
 
@@ -27,22 +28,23 @@ Obe chyby aj obidva slabšie dôkazy sú vybavené: pin sa uvoľňuje v `ssRende
 a hláška sa vetví podľa výsledku prepočtu (`refresh_and_report`; zlyhanie povie „uložené áno, prepočet nie"). `ssTyping` má DOM dôkaz, mutácia poradia pin-release padá
 behaviorálne. Plný záznam — čo bolo zle → čo platí, zamietnuté alternatívy, 6 mutácií: [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-1** (27.8.2026).
 
-**B · Sekcia Šablóny (backlog z review #225):**
-- **PNG kanál nemá retry.** `TPL_ASKED` sa pri stratenej odpovedi nemaže (dlaždica ostane navždy na schéme) a formulácia v ARCHITEKTURE naznačuje retry, ktorý neexistuje; `rev` odpovede sa neporovnáva s dlaždicou.
-- **Burst pri vstupe do sekcie** — `tpl_preview` ide na každú šablónu naraz (~64 kB × N); pri raste knižnice doplniť lazy gating.
-- **`tpl_payload` beží v KAŽDOM plnom pushi** (`TemplateStore.load` + `File.stat` + celý `config` per šablóna), hoci dlaždica potrebuje len typ a rozmery — orezať payload alebo ho podmieniť otvorenou sekciou.
-- **`refresh_if_open` už nekontroluje „if open"** (guard je od #225 na klientovi) — meno klame, premenovať.
+**B · Sekcia Šablóny (backlog z review #225) — ✅ VYRIEŠENÉ dávkou 1b-4, v0.8.8 (27.8.2026).**
+Všetky štyri: PNG kanál má **retry po timeoute** (`TPL_ASKED` drží čas, nie `true`) a odpoveď sa nasadí len na dlaždicu s **tou istou revíziou** · dotazy idú **po dávkach**
+(4 na prechod, vzhľad nezmenený) · `tpl_payload` je **orezaný na tvar dlaždice** (uzavretý zoznam kľúčov + `usage: false`; podmieniť ho otvorenou sekciou sa nedá a je
+zdôvodnené prečo) · echo sa volá **`push_library_echo`** (okenné `StudioDialog.refresh_if_open` si meno drží právom). Plný záznam — čo bolo zle → čo platí, zamietnuté
+alternatívy, mutácie: [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-4**.
 
 *(Sekcia „C · Kovanie" tu bola omylom: všetkých šesť položiek — rozdelenie „nastav dáta"/„kresli", kurzor v editore setu, jednotný `abort_open_operation`, odmietnutý reset cez `resync_sets`, čistenie
   `HW_Q`/`HW_CAT` v `MDH.created`, lepkavá MJ `#hn_unit` aj zhody Demosu po návrate do sekcie — opravila **mini dávka ŠT-3a-3 (PR #219, v0.7.61)**. Zoznam pochádzal z NÁVRHU tej dávky, nie z jej
   výsledku. Overené v kóde pri review #228; nič otvorené v ňom nezostalo.)*
 
-**D · Sekcia Pravidlá (NOTE z review #221/#222, nefixnuté vedome):**
-- **`edges_map` sa stavia pri každom pushi** aj pri prázdnych ABS overridoch a duplicitne s `control_payload` — lenivo, alebo prevziať od volajúceho.
-- **Záznam `disabled` + `quantity`** vypisuje obe hodnoty, hoci `disabled` víťazí.
-- **`override_group` neradí** — poradie jantárových riadkov je nestabilné pri vložení/zmazaní skrinky (strop F15 platí).
-- **`material_id` v ABS zázname zberu je mŕtve pole** (`bom.rb`) — použiť alebo vyhodiť.
-- **Duplicita s Kontrolou pri vypnutom kovaní** (ORANGE nález + jantárový riadok) — VEDOMÁ, formulácie držať oddelené (rozhodnutie vs. správnosť).
+**D · Sekcia Pravidlá (NOTE z review #221/#222) — ✅ VYRIEŠENÉ dávkou 1b-4, v0.8.8 (27.8.2026).**
+`edges_map` sa stavia **lenivo** (bez ABS riadkov zákazka za katalóg pások neplatí; duplicita s `control_payload`/`budget_payload`/`edges_meta` **zostáva priznaná** — zdieľanie
+jednej inštancie naprieč pushom je zásah do kontraktu výstupov, kandidát pre register 1c) · riadok pri `disabled` vypisuje **víťaza** a uložené neuplatnené polia prizná v zátvorke ·
+`override_group` **radí** (skrinka → dielec → položka, číslo ako číslo, **pred stropom**) a **nededuplikuje**, takže kandidátovi „zdvojené riadky pri duplicitnej identite"
+(KRONIKA 1b-3) nekoliduje · mŕtve `material_id` **aj `pid`** sú zo záznamu zberu **preč**. Plný záznam: [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-4**.
+*(Otvorená ostáva jediná položka pôvodného zoznamu a je VEDOMÁ:* **duplicita s Kontrolou pri vypnutom kovaní** *— ORANGE nález + jantárový riadok hovoria o dvoch rôznych veciach
+(správnosť vs. rozhodnutie) a formulácie sa držia oddelené.)*
 
 **F · UI dlhy po zaniknutom bloku UI 2.0** — otvorené postrehy, ktoré blok UI 2.0 nevyriešil a ktoré po jeho archivácii (26.8.) ostali bez bloku. Zaradenie je **mechanické, nie prioritizačné**
   (poradie určí Michal): **D-27** rýchle zobraziť/skryť tagy z panela · **D-51** štandard veľkostí okien a tlačidiel. Plné znenia sú v [DOGFOODING.md](DOGFOODING.md), skupina **„UI dlhy — k bloku 1b"**;

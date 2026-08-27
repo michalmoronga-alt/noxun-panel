@@ -181,10 +181,16 @@ module Noxun
             part = nested[pkey.to_s]
             next if part.nil?
 
+            # 1b-4 (D4): zaznam nesie PRESNE to, z coho sa kresli jantarovy
+            # riadok. `material_id` aj `pid` boli MRTVE polia — `abs_override_row`
+            # ich necita a citat ich ani nema z coho: riadok hovori o rozhodnuti
+            # cloveka (nie o materiali) a adresa „oka" je zamerne IDENTITA
+            # (owner_id + part_key), nie persistent_id („žiadne pids z DOM",
+            # `rdSelectOverride` v `js/rules.js`). Pole, ktore nikto necita,
+            # zvadza buduci kod postavit sa na nu — a `pid` by to bola priam
+            # pozvanka obist prave tu identitnu cestu.
             out['abs'] << { 'owner_id' => cid, 'owner_name' => cab_name, 'part_key' => pkey.to_s,
                             'role' => part['role'].to_s, 'name' => part['name'].to_s,
-                            'pid' => part['pid'],
-                            'material_id' => part['material_id'].to_s,
                             'edges' => rec['edges'].dup }
           end
         end

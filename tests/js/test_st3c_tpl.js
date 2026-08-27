@@ -155,6 +155,186 @@ const BRD = { name: 'Pracovná doska', kind: 'board', preview_rev: null,
      'zmena revízie si vypýta nový obrázok');
 })();
 
+// --- 3b) PNG kanál: dávkovanie, retry a zhoda revízie (1b-4) ----------------
+
+(function(){
+  // B2: pri vstupe do sekcie išiel dotaz na KAŽDÚ šablónu naraz. Data URI má
+  // strop 64 kB, takže knižnica s 20 šablónami znamenala ~1,3 MB cez most
+  // v jednom nádychu. Ide preto najviac 4 dotazy na prechod.
+  const many = [];
+  for (let i = 0; i < 10; i++){
+    many.push({ name: 'Šablóna ' + i, kind: 'cabinet', preview_rev: 'v' + i,
+                config: { type: 'lower' } });
+  }
+  T.tplCancelAsk();
+  SENT.length = 0;
+  T.tplApplyState({ cabinet: many, board: [] });
+  T.tplRenderBody();
+  eq(SENT.filter(function(x){ return x[0] === 'tpl_preview'; }).length, 4,
+     'prvá dávka pošle NAJVIAC 4 dotazy — zvyšok si vypýta ďalšia');
+
+  // Druhý prechod (časovač dávky) doplní ďalšiu štvoricu — a NEPÝTA sa znova
+  // na tie, ktoré už bežia.
+  SENT.length = 0;
+  T.tplRenderBody();
+  const second = SENT.filter(function(x){ return x[0] === 'tpl_preview'; });
+  eq(second.length, 4, 'ďalšia dávka berie ďalšie štyri');
+  eq(JSON.parse(second[0][1]).name, 'Šablóna 4', 'a začína tam, kde prvá skončila');
+  T.tplCancelAsk();
+})();
+
+(function(){
+  // Review #241 P3-1: po ODCHODE zo sekcie musí dávkovanie STÍCHNUŤ. Časovač sa
+  // testuje tak, že sa zachytí jeho callback (stub `setTimeout`) a zavolá ručne —
+  // inak by sada musela byť asynchrónna a merala by hodiny, nie správanie.
+  const realSet = global.setTimeout;
+  const realClear = global.clearTimeout;
+  let tick = null;
+  let scheduled = 0;
+  global.setTimeout = function(fn){ tick = fn; scheduled++; return { id: 1 }; };
+  global.clearTimeout = function(){ tick = null; };
+  // Vyvolanie tiku tak, ako by ho vyvolal prehliadač: handle je spotrebovaný,
+  // takže „naplánoval si ďalší?" sa dá zmerať počítadlom, nie zvyškom premennej.
+  const fire = function(){ const fn = tick; tick = null; scheduled = 0; fn(); };
+  try {
+    const many = [];
+    for (let i = 0; i < 10; i++){
+      many.push({ name: 'Odchod ' + i, kind: 'cabinet', preview_rev: 'o' + i,
+                  config: { type: 'lower' } });
+    }
+    S.setStudioSection('tpl');
+    SENT.length = 0;
+    T.tplApplyState({ cabinet: many, board: [] });
+    T.tplRenderBody();
+    eq(SENT.filter(function(x){ return x[0] === 'tpl_preview'; }).length, 4, 'prvá dávka odišla');
+    ok(typeof tick === 'function', 'a ďalšia dávka je naplánovaná (zvyšok ešte čaká)');
+
+    // Používateľ odišiel do Rozpočtu — tik sa má vzdať.
+    S.setStudioSection('budget');
+    SENT.length = 0;
+    fire();
+    eq(SENT.filter(function(x){ return x[0] === 'tpl_preview'; }).length, 0,
+       'mimo sekcie časovač NEPOSIELA nič — most patrí tomu, čo používateľ práve robí');
+    eq(scheduled, 0, 'a reťaz sa NEOBNOVUJE — žiadny ďalší tik sa neplánuje');
+
+    // Návrat do sekcie dávkovanie korektne obnoví — cez normálne prekreslenie.
+    S.setStudioSection('tpl');
+    SENT.length = 0;
+    T.tplRenderBody();
+    eq(SENT.filter(function(x){ return x[0] === 'tpl_preview'; }).length, 4,
+       'po návrate sa dávkovanie rozbehne ďalej');
+    ok(scheduled > 0, 'a znova si naplánuje pokračovanie');
+
+    // A v OTVORENEJ sekcii tik posiela ďalej — brána nesmie zabiť dávkovanie samo.
+    SENT.length = 0;
+    fire();
+    eq(SENT.filter(function(x){ return x[0] === 'tpl_preview'; }).length, 2,
+       'v otvorenej sekcii tik doberie zvyšok knižnice (10 šablón = 4 + 4 + 2)');
+  } finally {
+    global.setTimeout = realSet;
+    global.clearTimeout = realClear;
+    S.setStudioSection('bom');
+    T.tplCancelAsk();
+  }
+})();
+
+(function(){
+  // ČISTÉ JADRO (bez DOM, bez mosta): pravidlá plánu sa dajú zmerať priamo.
+  const data = { cabinet: [{ name: 'A', preview_rev: 'r1' },
+                           { name: 'B', preview_rev: null },
+                           { name: 'C', preview_rev: 'r1' }],
+                 board: [{ name: 'D', preview_rev: 'r9' }] };
+  let plan = T.tplPreviewPlan(data, {}, {}, 1000, 10);
+  eq(plan.ask.length, 3, 'šablóna bez revízie sa nepýta VÔBEC (náhľad nemá)');
+  eq(plan.rest, 0, 'a s dosť veľkým limitom nič neostáva');
+
+  plan = T.tplPreviewPlan(data, {}, {}, 1000, 2);
+  eq([plan.ask.length, plan.rest], [2, 1], 'limit dávky drží zvyšok na neskôr');
+
+  // Záporná odpoveď je TIEŽ odpoveď — inak by sa panel pýtal donekonečna.
+  const cache = {};
+  cache[JSON.stringify(['cabinet', 'A', 'r1'])] = null;
+  plan = T.tplPreviewPlan(data, cache, {}, 1000, 10);
+  eq(plan.ask.length, 2, 'zacachované „náhľad nemám" nový dotaz nevyvolá');
+  eq(plan.apply.length, 1, 'ale do plánu nasadenia patrí (dlaždica ostane pri schéme)');
+
+  // B1: STRATENÁ odpoveď. Kým beží, nepýtame sa; po timeoute áno — bez toho
+  // by dlaždica ostala na schéme NAVŽDY (jednosmerná značka `true`).
+  const asked = {};
+  asked[JSON.stringify(['cabinet', 'A', 'r1'])] = 1000;
+  eq(T.tplPreviewPlan(data, {}, asked, 1500, 10).ask.length, 2, 'bežiaci dotaz sa neopakuje');
+  eq(T.tplPreviewPlan(data, {}, asked, 1500, 10).pending, 1, 'a plán ho prizná ako rozpracovaný');
+  eq(T.tplPreviewPlan(data, {}, asked, 1000 + 8000 + 1, 10).ask.length, 3,
+     'po timeoute sa stratená odpoveď vypýta ZNOVA');
+})();
+
+(function(){
+  // B1 (celá cesta): odpoveď nikdy nedorazí -> po timeoute ide dotaz znova.
+  const realNow = Date.now;
+  let clock = 100000;
+  Date.now = function(){ return clock; };
+  try {
+    T.tplCancelAsk();
+    SENT.length = 0;
+    T.tplApplyState({ cabinet: [Object.assign({}, CAB, { preview_rev: 'rCLOCK' })], board: [] });
+    T.tplRenderBody();
+    eq(SENT.filter(function(x){ return x[0] === 'tpl_preview'; }).length, 1, 'dotaz odišiel');
+
+    SENT.length = 0;
+    clock += 1000;
+    T.tplRenderBody();
+    eq(SENT.filter(function(x){ return x[0] === 'tpl_preview'; }).length, 0,
+       'o sekundu neskôr sa NEOPAKUJE — odpoveď môže byť ešte na ceste');
+
+    SENT.length = 0;
+    clock += 9000;
+    T.tplRenderBody();
+    eq(SENT.filter(function(x){ return x[0] === 'tpl_preview'; }).length, 1,
+       'po timeoute sa dlaždica o obrázok prihlási znova (inak by ostala na schéme navždy)');
+  } finally {
+    Date.now = realNow;
+    T.tplCancelAsk();
+  }
+})();
+
+(function(){
+  // B1: bez mosta do Ruby sa NESMIE nič označiť za „vypýtané" — inak by revízia
+  // ostala navždy v rozpracovaných a žiadosť by neodišla nikdy.
+  const bridge = global.window.sketchup;
+  delete global.window.sketchup;
+  global.sketchup = undefined;
+  T.tplCancelAsk();
+  T.tplApplyState({ cabinet: [{ name: 'Bez mosta', kind: 'cabinet', preview_rev: 'rX',
+                                config: { type: 'lower' } }], board: [] });
+  T.tplRenderBody();
+  global.window.sketchup = bridge;
+  global.sketchup = bridge;
+  SENT.length = 0;
+  T.tplRenderBody();
+  eq(SENT.filter(function(x){ return x[0] === 'tpl_preview'; }).length, 1,
+     'keď sa most vráti, dotaz odíde — pokus bez mosta sa nezapočítal');
+  T.tplCancelAsk();
+})();
+
+(function(){
+  // B1: odpoveď patrí REVÍZII. Kým sa čakalo na disk, šablónu niekto prefotil
+  // (nová `preview_rev`) — starý obrázok by ukazoval tvar, ktorý už nevznikne.
+  ELS['tplpic-cabinet-0'] = stubEl('tplpic-cabinet-0');
+  ELS['tplpic-cabinet-0']._img = stubEl('img');
+  T.tplCancelAsk();
+  T.tplApplyState({ cabinet: [Object.assign({}, CAB, { preview_rev: 'rNOVA' })], board: [] });
+  T.tplRenderBody();
+  ELS['tplpic-cabinet-0'].className = 'stplpic';
+  T.TPL.setPreview({ kind: 'cabinet', name: 'Klasik dolná', rev: 'rSTARA',
+                     png: 'data:image/png;base64,ZZ' });
+  eq(ELS['tplpic-cabinet-0'].className, 'stplpic',
+     'odpoveď na STARÚ revíziu sa na dlaždicu nenasadí');
+  T.TPL.setPreview({ kind: 'cabinet', name: 'Klasik dolná', rev: 'rNOVA',
+                     png: 'data:image/png;base64,YY' });
+  eq(ELS['tplpic-cabinet-0'].className, 'stplpic has', 'odpoveď na TÚ revíziu áno');
+  T.tplCancelAsk();
+})();
+
 // --- 4) akcie -> server ------------------------------------------------------
 
 (function(){

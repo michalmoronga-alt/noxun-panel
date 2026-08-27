@@ -562,6 +562,146 @@ NxTest.test('ŠT-3b-2a (F11/F15): jantarove riadky — rozhodnutie, zoskupenie, 
   NxTest.assert_equal('', abs['more_text'], 'kratky zoznam ziadny suhrn nema')
 end
 
+# --- 1b-4: drobnosti sekcie Pravidlá (D1–D4) --------------------------------
+
+NxTest.test('1b-4 (D2): pri `disabled` vypisuje riadok VITAZA, nie vsetky ulozene hodnoty') do
+  rd = Noxun::Engine::RulesDialog
+  base = { 'owner_id' => 'CAB-001', 'owner_name' => 'Dolná 600', 'owner_part_key' => '',
+           'generic_type' => 'hinge', 'rule_id' => 'zavesy' }
+
+  # Polia zaznamu su NEZAVISLE (D-93), ale neplatia naraz: `apply_overrides`
+  # polozku pri `disabled` zahodi este PRED prepisom poctu aj dlzky.
+  both = rd.hw_override_row(base.merge('disabled' => true, 'quantity' => 6))
+  NxTest.refute(both['value'].include?('počet 6 ks'),
+                'pocet, ktory sa nikdy nepouzije, sa netvari ako platny')
+  NxTest.assert(both['value'].start_with?('vypnuté — nepočíta sa do súpisu'),
+                'vitazom je vypnutie')
+  NxTest.assert(both['value'].include?('uložený počet sa neuplatní'),
+                'ale ulozena hodnota sa NEZAMLCI — sipka „vrátiť na pravidlo" zrusi aj ju')
+
+  all3 = rd.hw_override_row(base.merge('disabled' => true, 'quantity' => 6,
+                                       'nominal_length' => 420.0))
+  NxTest.assert(all3['value'].include?('ani dĺžka sa neuplatnia'), 'plati to aj pre dlzku')
+  NxTest.refute(all3['value'].include?('420'), 'a zamknuta dlzka sa tiez nevypisuje ako platna')
+
+  only = rd.hw_override_row(base.merge('disabled' => true))
+  NxTest.assert_equal('vypnuté — nepočíta sa do súpisu', only['value'],
+                      'holé vypnutie ziadnu zatvorku nema')
+
+  # ZAPNUTY zaznam sa nemeni ani o znak.
+  live = rd.hw_override_row(base.merge('quantity' => 6, 'nominal_length' => 420.0))
+  NxTest.assert_equal('počet 6 ks · dĺžka 420 mm', live['value'],
+                      'bez `disabled` platia obe hodnoty a vypisuju sa obe')
+  NxTest.assert_equal(nil, rd.hw_override_row(base), 'bezobsazny zaznam sa nekresli')
+
+  # A je to ZRKADLO spravania buildera, nie nazor UI.
+  hr = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'core', 'hardware_rules.rb'),
+                 encoding: 'UTF-8')[/def apply_overrides.*?\n      end\n/m].to_s
+  NxTest.assert(hr.index("next nil if ov['disabled'] == true") < hr.index('clamp_qty'),
+                'builder polozku pri `disabled` zahodi PRED prepisom poctu — `disabled` vitazi')
+end
+
+NxTest.test('1b-4 (D3): poradie jantarovych riadkov je DETERMINISTICKE') do
+  rd = Noxun::Engine::RulesDialog
+  rows = [
+    { 'owner_id' => 'CAB-010', 'owner_name' => '', 'part_key' => 'p1', 'role' => 'shelf',
+      'name' => 'Polica', 'edges' => { 'L1' => 'ABS-X' } },
+    { 'owner_id' => 'CAB-002', 'owner_name' => '', 'part_key' => 'p2', 'role' => 'shelf',
+      'name' => 'Polica B', 'edges' => { 'L1' => 'ABS-X' } },
+    { 'owner_id' => 'CAB-002', 'owner_name' => '', 'part_key' => 'p1', 'role' => 'shelf',
+      'name' => 'Polica A', 'edges' => { 'L1' => 'ABS-X' } }
+  ]
+  order = lambda do |list|
+    pay = rd.overrides_payload({ manual_overrides: { 'abs' => list, 'hardware' => [] } })
+    pay['abs']['groups'].flat_map { |g| g['rows'].map { |r| [r['owner_id'], r['part_key']] } }
+  end
+  want = [%w[CAB-002 p1], %w[CAB-002 p2], %w[CAB-010 p1]]
+  NxTest.assert_equal(want, order.call(rows), 'radi sa skrinka -> dielec')
+  NxTest.assert_equal(want, order.call(rows.reverse),
+                      'a INE poradie zberu (vlozena/zmazana skrinka) da TEN ISTY zoznam')
+  NxTest.assert_equal(want, order.call(rows.rotate), 'v akomkolvek poradi')
+
+  # Cislo v identite sa radi ako CISLO: `CAB-1000` patri ZA `CAB-999`.
+  big = [{ 'owner_id' => 'CAB-1000', 'owner_name' => '', 'part_key' => 'p1', 'role' => 'shelf',
+           'name' => 'A', 'edges' => { 'L1' => 'ABS-X' } },
+         { 'owner_id' => 'CAB-999', 'owner_name' => '', 'part_key' => 'p1', 'role' => 'shelf',
+           'name' => 'B', 'edges' => { 'L1' => 'ABS-X' } }]
+  NxTest.assert_equal([%w[CAB-999 p1], %w[CAB-1000 p1]], order.call(big),
+                      'inak by tisica skrinka skocila pred devatstodevadesiatu deviatu')
+
+  # STROP sa aplikuje AZ PO radeni — inak by o tom, ktore riadky vidno,
+  # rozhodovalo poradie entit v modeli.
+  many = (1..(rd::MAX_OVERRIDE_ROWS + 3)).map do |i|
+    { 'owner_id' => format('CAB-%03d', i), 'owner_name' => '', 'part_key' => 'p1',
+      'role' => 'shelf', 'name' => "Polica #{i}", 'edges' => { 'L1' => 'ABS-X' } }
+  end
+  shown = lambda do |list|
+    pay = rd.overrides_payload({ manual_overrides: { 'abs' => list, 'hardware' => [] } })
+    pay['abs']['groups'].flat_map { |g| g['rows'].map { |r| r['owner_id'] } }
+  end
+  NxTest.assert_equal(shown.call(many), shown.call(many.shuffle),
+                      'zastropovany zoznam ukazuje TIE ISTE riadky bez ohladu na poradie zberu')
+  NxTest.assert_equal('CAB-001', shown.call(many.shuffle).first, 'a zacina od prvej skrinky')
+
+  # Duplicitna identita (kandidat registra, KRONIKA 1b-3) sa radenim NEMENI:
+  # dva riadky ostavaju DVA a maju pevne poradie.
+  dup = [rows[1], rows[1].merge('name' => 'Kópia')]
+  pay = rd.overrides_payload({ manual_overrides: { 'abs' => dup, 'hardware' => [] } })
+  NxTest.assert_equal(2, pay['abs']['total'],
+                      'radenie riadky NEDEDUPLIKUJE — zdvojenie pri duplicitnej identite je ' \
+                      'samostatny nalez a tato zmena ho ani nerobi, ani neskryva')
+end
+
+NxTest.test('1b-4 (D1): katalog ABS pasok sa stava LENIVO') do
+  rd = Noxun::Engine::RulesDialog
+  src = ST3B_RULES_RB[/def overrides_payload\(collected\).*?\n        end\n/m].to_s
+  NxTest.assert(src.include?('abs.empty? ||'),
+                'prazdny zoznam ABS overridov katalog pasok NEPOTREBUJE')
+  NxTest.refute(src.match?(/^\s+emap = defined\?\(ProductionCore\) \? ProductionCore\.edges_map : nil$/),
+                'bezpodmienecne volanie je PREC (beralo sa pri KAZDOM pushi okna)')
+
+  # Behavioralne: bez ABS riadkov sa `edges_map` nezavola ANI RAZ.
+  calls = 0
+  pc = Noxun::Engine::ProductionCore
+  sc = pc.singleton_class
+  sc.send(:alias_method, :orig_edges_map_1b4, :edges_map)
+  pc.define_singleton_method(:edges_map) { calls += 1; {} }
+  begin
+    rd.overrides_payload({ manual_overrides: { 'abs' => [], 'hardware' => [
+      { 'owner_id' => 'CAB-001', 'owner_part_key' => '', 'generic_type' => 'leg',
+        'rule_id' => 'nohy', 'quantity' => 4 }
+    ] } })
+    NxTest.assert_equal(0, calls, 'zakazka bez rucnych hran za katalog pasok NEPLATI')
+
+    rd.overrides_payload({ manual_overrides: { 'abs' => [
+      { 'owner_id' => 'CAB-001', 'owner_name' => '', 'part_key' => 'p1', 'role' => 'shelf',
+        'name' => 'Polica', 'edges' => { 'L1' => 'ABS-X' } }
+    ], 'hardware' => [] } })
+    NxTest.assert_equal(1, calls, 'prvy ABS riadok si ho vypyta — a PRAVE RAZ pre cely zoznam')
+  ensure
+    sc.send(:alias_method, :edges_map, :orig_edges_map_1b4)
+    sc.send(:remove_method, :orig_edges_map_1b4)
+  end
+end
+
+NxTest.test('1b-4 (D4): zaznam ABS overridu nenesie MRTVE polia') do
+  nested = { 'p1' => st3b2_part('p1', 'shelf', 'Polica 1') }
+  out = { 'abs' => [], 'hardware' => [] }
+  Noxun::Engine::Bom.collect_manual_overrides(
+    out, { 'part_overrides' => { 'p1' => { 'edges' => { 'L1' => 'ABS-1' } } } }, 'CAB-001', nested
+  )
+  row = out['abs'].first
+  NxTest.assert_equal(%w[owner_id owner_name part_key role name edges], row.keys,
+                      'zaznam nesie PRESNE to, z coho sa kresli jantarovy riadok')
+  NxTest.refute(row.key?('material_id'),
+                'material riadok nikdy nevypisal — hovori o ROZHODNUTI cloveka, nie o materiali')
+  NxTest.refute(row.key?('pid'),
+                'a persistent_id uz vobec: adresa „oka" je ZAMERNE identita (owner_id + part_key)')
+  js = ST3B_RULES_JS[/function rdSelectOverride\(ownerId, partKey\)\{.*?\n  \}/m].to_s
+  NxTest.assert(js.include?('rule_ref'), 'klient posiela identitu…')
+  NxTest.refute(js.include?('pid'), '…a ziadne pids — mrtve pole by k nim len zvadzalo')
+end
+
 NxTest.test('ŠT-3b-2a (F7): zlyhanie zberu overridov NEZHODI formular pravidiel') do
   rd = Noxun::Engine::RulesDialog
   broken = Object.new

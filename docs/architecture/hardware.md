@@ -38,6 +38,20 @@ model ZMENILO — od 1b-3 už neplatí: zber je čisté čítanie. Echo ostáva,
 ten ho má vždy); dosky sú mimo (`board_builder` mapu hrán vždy doresolvuje, prítomnosť nič nehovorí). Zber ide v jednom prechode `Bom.collect` (`manual_overrides`, vlastný `rescue`
 — nesmie zhodiť formulár), riadky sú **zoskupené po skrinkách so stropom** `MAX_OVERRIDE_ROWS` a súhrnom.
 
+**Štyri pravidlá riadku, ktoré ustálila 1b-4:**
+- **PORADIE JE DETERMINISTICKÉ a RADÍ SA PRED STROPOM** (`sort_override_rows`: skrinka → dielec → položka, posledný kľúč je poradové číslo, lebo `sort_by` v Ruby nie je stabilné).
+  Dovtedy sa riadky brali v poradí entít v modeli, takže vloženie či zmazanie hocijakej skrinky zoznam preskladalo — a pri viac než `MAX_OVERRIDE_ROWS` zásahoch aj **vymenilo,
+  ktoré riadky ešte vidno**. Číslo v identite (`CAB-1000` vs. `CAB-999`) sa radí ako číslo. Radenie **nededuplikuje**: dva riadky s rovnakou identitou ostávajú dva (zdvojenie pri
+  duplicitnej identite je samostatný kandidát registra, KRONIKA 1b-3).
+- **`disabled` VÍŤAZÍ, takže riadok vypisuje víťaza** (`hw_override_bits`). Polia záznamu sú nezávislé (D-93), ale neplatia naraz: `HardwareRules.apply_overrides` položku pri
+  `disabled` zahodí (`next nil`) ešte PRED prepisom počtu aj dĺžky, takže „vypnuté · počet 6 ks" tvrdilo, že sa niečo počíta. Uložené, ale neuplatnené polia sa **nezamlčujú** —
+  priznajú sa v zátvorke („uložený počet sa neuplatní"), lebo šípka „vrátiť na pravidlo" zruší aj ich.
+- **Katalóg ABS pások sa stavia LENIVO:** `ProductionCore.edges_map` (celý `Materials.edges` do mapy) slúži VÝHRADNE na preklad `abs_id` → názov pásky v ABS riadkoch, takže sa
+  volá až keď taký riadok existuje — bez ručných hrán zákazka za mapu neplatí. *(Duplicitu s `control_payload`/`budget_payload`/`edges_meta` to neodstraňuje — tie mapu potrebujú
+  vždy a zdieľanie jednej inštancie naprieč celým pushom je zásah do kontraktu výstupov, teda vlastná dávka.)*
+- **Záznam nesie PRESNE to, z čoho sa riadok kreslí.** `material_id` a `pid` v ABS zázname boli mŕtve polia: riadok hovorí o rozhodnutí človeka (nie o materiáli) a adresa „oka" je
+  zámerne IDENTITA (`owner_id` + `part_key`), nikdy persistent_id — „žiadne pids z DOM" (`rdSelectOverride`). Pole, ktoré nikto nečíta, zvádza budúci kód postaviť sa naň.
+
 **ŠT-3b-2b — „VRÁTIŤ NA PRAVIDLO" (zápis):** šípka v jantárovom riadku zahodí ručné rozhodnutie a nechá platiť pravidlo; potvrdenie sa NEPÝTA (poistkou je JEDEN krok Späť, kontrakt
 mockupu). Akcie `reset_abs_override` · `reset_hw_override` sú v uzavretom `SECTION_ACTIONS` (presnú rovnosť stráži aj in-SU runner).
 

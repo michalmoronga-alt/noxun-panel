@@ -17,6 +17,80 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1b-4 · DROBNOSTI SEKCIÍ ŠABLÓNY (B) A PRAVIDLÁ (D) — odrážky B a D bloku 1b (27.8.2026):** vetva `fix/1b4-sablony-pravidla-drobnosti`, v0.8.7 → **v0.8.8**. Osem NOTE-level dlhov
+  z review #221/#222/#225, ktoré vtedy neblokovali a boli vedome odložené. Žiadny z nich sa neprejaví novým tlačidlom — všetky sú o tom, aby UI **nehovorilo nepravdu** a aby
+  **neplatilo za nič**. Codex audit pred implementáciou sa **nekonal a nemusel** (risk-based pravidlo: žiadny dátový kontrakt .skp, žiadna schéma, migrácia ani observer/undo —
+  UI vrstva a payloady). In-SketchUp beh sa **nespúšťal a je to vedomé:** dávka sa nedotkla builderov, observerov ani undo ciest ani o riadok.
+
+  **B1 · PNG KANÁL NEMAL RETRY.** *Čo bolo zle:* `TPL_ASKED` v `js/templates.js` držal `true` **navždy**, takže **stratená odpoveď** (výnimka v `handle_preview`, okno zaniknuté
+  presne v okamihu odpovede) nechala dlaždicu **navždy na schéme** — a znovu sa nepýtal nikto, ani po návrate do sekcie. Značka sa navyše zapisovala **pred** kontrolou mosta do
+  Ruby, takže sekcia otvorená skôr, než most existoval, si revíziu odpísala bez jediného odoslaného dotazu. A tretia vec: `TPL.setPreview` cachoval podľa `rev`, ale nasadzoval podľa
+  `(kind, name)` — **odpoveď na starú revíziu prekryla dlaždicu, ktorá už ukazovala novú** (prefotená šablóna). Formulácia v ARCHITEKTÚRE pritom naznačovala retry, ktorý
+  neexistoval („bráni opakovaným dotazom, **kým odpoveď nedorazila**"). *Čo platí:* `TPL_ASKED` drží **čas odoslania**; po `TPL_ASK_TIMEOUT_MS` (8 s) sa dotaz smie zopakovať,
+  značka vzniká **výhradne keď dotaz naozaj odišiel** (rovnaké pravidlo je pomenované v panelovom `refreshTemplatePreviews` — sekcia ho len dodržala), odpoveď maže značku (ďalej
+  rozhoduje cache, aj záporná) a **nasadí sa len na dlaždicu s tou istou revíziou** (`TPL_DOM` nesie od tejto dávky aj `rev`).
+
+  **B2 · BURST PRI VSTUPE DO SEKCIE.** *Čo bolo zle:* `tpl_preview` išiel na **každú** šablónu naraz. Data URI má strop 64 kB, takže knižnica s 20 šablónami znamenala ~1,3 MB cez
+  most v jednom nádychu — pri raste knižnice by sa to len zhoršovalo. *Čo platí:* najviac **4 dotazy na prechod**, ďalšia dávka o 120 ms; rozhoduje čisté jadro
+  `tplPreviewPlan(data, cache, asked, now, limit)` (vzor `nxTplPreviewPlan` vo `form.js`). **Rozmery ani rozloženie sa nemenia** (dlaždica má obrázok aj schému v tom istom boxe —
+  UI-D2), ale **zmena je pozorovateľná v čase:** piata a ďalšia dlaždica drží schému o 120–600 ms dlhšie a fotka sa doplní o chvíľu neskôr. Je to vedomá výmena — krátke domaľovanie
+  za koniec megabajtového nárazu na most pri každom vstupe do sekcie. *Zamietnutá alternatíva:* gating podľa **viditeľnosti** (IntersectionObserver / `getBoundingClientRect`) — je
+  to presnejšie, ale potrebuje scroll listener, dotiahnutie po scrollovaní a v Node testoch stub geometrie; dávkovanie dá ten istý efekt s jednou čistou funkciou a bez druhého
+  zdroja pravdy o tom, čo je „vidieť".
+
+  **B3 · `tpl_payload` V KAŽDOM PLNOM PUSHI.** *Čo bolo zle:* payload sekcie sa skladá pri **každom** plnom pushi okna (každý prepočet kusovníka, každý zápis rozpočtu, každá zmena
+  katalógu) a posielal **celý záznam šablóny** — vrátane `zone_tree`, `fronts`, `hardware_sets` a **zmrazených definícií setov**, čo je jeho najväčšia časť. Dlaždica z toho kreslí
+  meno, typ, tri rozmery a náhľad. *Čo platí:* `tile_row` prepustí **uzavretý zoznam kľúčov** `TILE_CONFIG_KEYS` (`type · width · height · depth`) a nič viac — nový kľúč záznamu
+  (ďalší blok kovania) tak nemôže ticho nafúknuť každý push. Zoznam sa navyše pýta s **`usage: false`** (nový nepovinný parameter `Panel.template_list`, default `true` = panel sa
+  nemení): poradie „Naposledy použité" kreslí len vkladacia karta, takže sekcii odpadá aj celé čítanie `TemplateUsage`. Celý záznam si vyzdvihne až akcia, ktorá ho potrebuje —
+  `handle_apply` číta zo skladu, nie z payloadu. **Klient sa dorovnal v tom istom commite** (zo zvyšku configu nečítal nič). *Zamietnutá alternatíva:* **podmieniť payload otvorenou
+  sekciou** — nedá sa: server o otvorenej sekcii nevie NIC (guard je od #225 na klientovi) a kontrakt „okno zaniká — modul žije" znamená, že `push_state` posiela všetky sekcie
+  naraz; zaviesť serverovú evidenciu otvorenej sekcie by bola druhá pravda o stave okna presne toho druhu, ktorý #225 odstránil.
+
+  **B4 · `refresh_if_open` UŽ NEKONTROLOVALO „if open".** *Čo bolo zle:* meno sľubovalo guard, ktorý v tele nie je od #225 (a byť nemôže — otvorenosť sekcie posudzuje klient,
+  lebo `#secbody`/`#sectools` sú zdieľané uzly okna). Priznané to bolo už v KRONIKE ŠT-3c-2 s tým, že sa premenuje v stabilizačnej revízii. *Čo platí:*
+  **`TemplatesDialog.push_library_echo`** — meno hovorí, čo sa deje (pošle sa echo knižnice). Premenovala sa **výhradne metóda**; modul ostáva `TemplatesDialog` (vzor „okno zaniká,
+  modul žije"). Okenné `StudioDialog.refresh_if_open` si meno **drží** — tam sa `@dialog.visible?` naozaj testuje, a guard sady to odteraz merajú oboma smermi.
+
+  **D1 · `edges_map` PRI KAŽDOM PUSHI.** *Čo bolo zle:* `overrides_payload` staval `ProductionCore.edges_map` (celý `Materials.edges` prehodený do mapy) **bezpodmienečne** — aj pri
+  zákazke bez jediného ručného zásahu do hrán, čo je bežný stav. *Čo platí:* mapa sa stavia **lenivo**, až keď existuje aspoň jeden ABS riadok (slúži výhradne na preklad `abs_id` →
+  názov pásky). **Duplicita s `control_payload` / `budget_payload` / `edges_meta` ZOSTÁVA a je priznaná v architektúre:** tie mapu potrebujú vždy a zdieľanie jednej inštancie
+  naprieč celým pushom je zásah do kontraktu výstupov — vlastná dávka, kandidát pre register 1c. Toto je len „neplať za nič".
+
+  **D2 · RIADOK VYPISOVAL OBE HODNOTY, HOCI `disabled` VÍŤAZÍ.** *Čo bolo zle:* záznam s `disabled: true` **aj** `quantity` vypísal „vypnuté — nepočíta sa do súpisu · počet 6 ks",
+  teda tvrdil, že sa niečo počíta. `HardwareRules.apply_overrides` pritom položku pri `disabled` zahodí (`next nil`) **ešte pred** prepisom počtu aj dĺžky. *Čo platí:* riadok
+  vypisuje **víťaza** a uložené, ale neuplatnené polia **nezamlčí** — prizná ich v zátvorke („uložený počet sa neuplatní" / „uložený počet ani dĺžka sa neuplatnia"), lebo šípka
+  „vrátiť na pravidlo" zruší aj ich. Test je **zrkadlom správania buildera**, nie názorom UI: overuje, že `next nil if disabled` naozaj stojí pred `clamp_qty`.
+
+  **D3 · `override_group` NERADIL.** *Čo bolo zle:* riadky sa brali v poradí, v akom ich vrátil `Bom.collect`, teda **v poradí entít v modeli** — vloženie či zmazanie hocijakej
+  skrinky zoznam preskladalo, a pri viac než `MAX_OVERRIDE_ROWS` zásahoch **vymenilo, ktoré riadky ešte vidno** a ktoré už len v súhrne „…a ďalších N". *Čo platí:*
+  `sort_override_rows` radí **skrinka → dielec → položka**, číslo v identite ako **číslo** (`CAB-1000` patrí za `CAB-999`) a posledným kľúčom je **poradové číslo**, lebo `sort_by`
+  v Ruby nie je stabilné. **Radí sa PRED stropom** — inak by o viditeľnosti riadkov ďalej rozhodovalo poradie entít. **Radenie nededuplikuje:** dva riadky s rovnakou identitou
+  ostávajú dva a v pevnom poradí — zdvojenie jantárových riadkov pri **duplicitnej identite** je samostatný kandidát registra (tento súbor, záznam 1b-3, P3-5) a táto zmena ho ani
+  nerobí, ani neskrýva; test to fixuje explicitne, aby si to budúci refaktor nepomýlil.
+
+  **D4 · MŔTVE POLIA ZÁZNAMU ABS OVERRIDU — ZISTENÉ A VYHODENÉ.** Otázka zadania znela „použiť alebo vyhodiť". Odpoveď: `material_id` v zázname `collect_manual_overrides`
+  **nečítal nikto** — `abs_override_row` ho nepozerá a pozerať ani nemá prečo (riadok hovorí o **rozhodnutí človeka**, nie o materiáli; materiál dielca patrí do Kusovníka a karty
+  dielca). Pri tom istom čítaní vyšlo najavo, že **rovnako mŕtvy je aj `pid`** — a ten je horší než neškodný: adresa „oka" je v tejto sekcii **zámerne identita**
+  (`owner_id` + `part_key`, „žiadne pids z DOM" priamo v `rdSelectOverride`), takže pole s persistent_id by bolo pozvánkou obísť práve tú identitnú cestu. **Vyhodené sú obe** a
+  test fixuje presnú množinu kľúčov záznamu. *(Rozšírenie nad znenie zadania je vedomé a zdôvodnené: nechať jedno mŕtve pole vedľa druhého by ten istý NOTE otvorilo znova.)*
+
+  **TESTY:** **1947 headless** (+7 sád: orezaný payload **behaviorálne** cez stub skladu · uzavretý zoznam kľúčov dlaždice · zánik starého mena echa · poradie riadkov meraný troma
+  poradiami vstupu vrátane stropu a `shuffle` · lenivosť `edges_map` stubom s počítadlom · víťaz v riadku · kľúče záznamu) · **69 JS sád**, z toho `test_st3c_tpl.js` **+26 kontrol**
+  (dávka, timeout retry s riadeným `Date.now`, značka bez mosta, zhoda revízie na DOM, čisté jadro `tplPreviewPlan`). **MUTAČNE OVERENÝCH 12 zásahov** — každý zhodil práve tú sadu,
+  ktorá ho má chytiť: retry po timeoute · zhoda revízie · značka ASKED bez mosta · limit dávky · orezanie payloadu · `usage: false` · premenovanie echa · lenivý `edges_map` ·
+  víťaz `disabled` · radenie riadkov · číslo v identite ako číslo · mŕtve polia späť.
+
+  **REVIEW #241, kolo 1 (slepý subagent) — merge OK, žiadny P1/P2, tri lacné P3 opravené:** **(P3-1)** *dávkovanie prežilo odchod zo sekcie.* Časovač B2 tikal ďalej aj potom, čo bol
+  používateľ v Rozpočte — pri veľkej knižnici niekoľko sekúnd cudzej prevádzky na moste popri jeho práci (odpovede sa síce bezpečne zahodili, ale platiť za ne netreba). Callback
+  `tplScheduleAsk` sa odteraz pýta `tplIsActive()`, mimo sekcie **nič neposiela a reťaz neobnovuje**; návrat dávkovanie obnoví normálnou cestou. Test vyvolá tik ručne (stub
+  `setTimeout`), takže meria správanie, nie hodiny — a overuje **obe** strany brány (mimo sekcie ticho, v sekcii pokračovanie). Mutačne overené. **(P3-2)** formulácia tohto záznamu
+  („vzhľad sa nemenil ani o pixel") bola **silnejšia než pravda** — rozloženie sa naozaj nemení, ale piata a ďalšia dlaždica drží schému o 120–600 ms dlhšie; znenie je zosúladené
+  s komentárom v `templates.js` aj s večerným checklistom v STAV. **(P3-3)** `bom.rb` sa v dávke menil, ale jeho odsek v `outputs.md` ostával stub — doplnený kontrakt zberu
+  (aditívne kľúče majú každý svojho čitateľa; **záznam nesie presne to, čo jeho čitateľ číta**) s odkazom na `hardware.md`, kde detail jantárových riadkov žije.
+  **(P3-4 NERIEŠENÝ — vedomá zmena):** strop `MAX_OVERRIDE_ROWS` (40) po deterministickom radení ukazuje inú štyridsiatku než predtým. To je práve ten účel: dovtedy o viditeľnosti
+  rozhodovalo poradie entít v modeli. Testy 1947 headless · 69 JS sád (`test_st3c_tpl.js` **+7 kontrol**, spolu 159).
+
 - **1b-3 · „OBNOVIŤ" = ČISTÉ ČÍTANIE — brána G bloku 1b (27.8.2026):** vetva `fix/1b3-obnovit-ciste-citanie`, v0.8.6 → **v0.8.7**. P0 z externého auditu (kolo 0). **Nález platil**
   a je dokázaný mutačne: keď sa oprava vráti do čítacej cesty, in-SketchUp scenár `CH7` ukáže, že po obyčajnom čítaní `Sketchup.undo` vráti **prečíslovanie ID**, nie predchádzajúcu
   operáciu používateľa.
