@@ -126,7 +126,9 @@ guardy ostávajú.
 by zablokovali celý kanál okna (audit N28); text doskovej hovorí, že sa už NIKDY nevráti (knižnica ju sama nedoplní).
 
 **Refresh má DVE cesty:** `apply` mení MODEL ⇒ `Panel.push_selected` + plný push Štúdia `bump: true`; zmena KNIŽNICE (zmazanie, nový náhľad, uloženie z Inspectora) ⇒ **lacné echo
-sekcie** `refresh_if_open` (`TPL.init`) + `Panel.push_templates`, bez zdvihu generácie — knižnica s kusovníkom nesúvisí.
+sekcie** `push_library_echo` (`TPL.init`) + `Panel.push_templates`, bez zdvihu generácie — knižnica s kusovníkom nesúvisí. *(Echo sa do 1b-4 volalo `refresh_if_open` a meno KLAMALO
+— žiadne „if open" v tele nie je a byť nemôže: server o otvorenej sekcii nevie NIC, guard je od #225 na klientovi. Okenné `StudioDialog.refresh_if_open` si meno drží, tam sa
+viditeľnosť okna naozaj testuje.)*
 
 **Echo je STAVOVÉ, kým sekcia nie je otvorená** (review #225 P1): `#secbody` a `#sectools` sú ZDIEĽANÉ uzly celého okna, takže `TPL.init` kreslí len keď `studioActiveSection() ===
 'tpl'` — inak by uloženie šablóny z Inspectora prepísalo rozpísaný formulár Rozpočtu (a navigácia by pritom ukazovala Rozpočet). Autoritou aktívnej sekcie je `studio.js`; ostatné
@@ -245,8 +247,24 @@ nad **nedotknutým** súborom.
 
 **ŠT-3c-1 — sekcia `tpl` má VLASTNÝ PNG kanál:** panelový `Panel.push_template_preview` sa použiť NEDAL — má guard `dialog_alive?` INSPECTORA a odpoveď posiela prijímaču panela
 (`NX.setTemplatePreview`), takže v Štúdiu by náhľady chodili len kým je otvorený Inspector. Sekcia preto má vlastný callback `tpl_preview`, vlastný prijímač `TPL.setPreview` a
-vlastnú cache per revízia v klientovi (pýta sa RAZ na `preview_rev`; `TPL_ASKED` bráni opakovaným dotazom, kým odpoveď nedorazila — sekcia sa prekresľuje pri každom pushi Štúdia).
+vlastnú cache per revízia v klientovi (pýta sa RAZ na `preview_rev`, **záporná odpoveď sa cachuje tiež** — inak by sa sekcia pýtala donekonečna).
 Limit **64 kB + PNG magic bytes** drží naďalej `TemplatePreviews.data_uri` — obchádzať ani duplikovať sa NESMIE.
+
+**Kanál je od 1b-4 DÁVKOVANÝ a má RETRY** (rozhoduje čisté jadro `tplPreviewPlan(data, cache, asked, now, limit)`, Node testy):
+- **`TPL_ASKED` drží ČAS odoslania, nie `true`.** Jednosmerná značka znamenala, že **stratená odpoveď** (výnimka v handleri, okno zaniknuté v okamihu odpovede) nechala dlaždicu
+  **navždy na schéme** — po `TPL_ASK_TIMEOUT_MS` (8 s) sa dotaz smie zopakovať. Značka vzniká **výhradne keď dotaz naozaj odišiel**: bez mosta do Ruby by revízia ostala „vypýtaná"
+  a nepožiadal by o ňu už nikto (tá istá pasca je pomenovaná aj v panelovom `refreshTemplatePreviews`).
+- **Najviac `TPL_ASK_BATCH` (4) dotazov na prechod**, ďalšia dávka o `TPL_ASK_GAP_MS`. Data URI má strop 64 kB, takže knižnica s 20 šablónami znamenala **~1,3 MB cez most v jednom
+  nádychu** pri vstupe do sekcie. Vzhľad sa tým nemení — dlaždica bez obrázka kreslí schému presne ako predtým, len sa fotka doplní o chvíľu neskôr.
+- **Odpoveď sa nasadí LEN na dlaždicu s TOU ISTOU revíziou** — mapa `TPL_DOM` (identita → uzol) nesie od 1b-4 aj `rev`. Kým sa čakalo na disk, mohla prísť nová knižnica
+  (prefotená šablóna = nová `preview_rev`) a starý obrázok by ukazoval tvar, ktorý šablóna už nepostaví.
+
+**Payload sekcie je OREZANÝ NA TVAR DLAŽDICE (1b-4):** `tpl_payload` beží v **KAŽDOM plnom pushi** okna (každý prepočet kusovníka, každý zápis rozpočtu), a dlaždica z celého
+záznamu kreslí len meno, typ, tri rozmery a náhľad. `tile_row` preto prepustí **uzavretý zoznam kľúčov** `TILE_CONFIG_KEYS` (`type · width · height · depth`) a zvyšok configu
+(`zone_tree`, `fronts`, `hardware_sets`, `hardware_set_defs`, materiály — jeho najväčšia časť) do okna **nejde**; celý záznam si vyzdvihne až akcia, ktorá ho naozaj potrebuje
+(`handle_apply` číta zo skladu, nie z payloadu). Zoznam sa pýta s **`usage: false`** — poradie „Naposledy použité" kreslí len panel, takže sekcia nepotrebuje ani čítanie
+`TemplateUsage`. **Podmieniť payload otvorenou sekciou sa NEDÁ** (server o otvorenej sekcii nevie a `push_state` posiela všetky sekcie naraz), orezanie je preto jediná cesta, ktorá
+nezavedie druhú pravdu.
 
 **ŠT-3c-2 — `rename(kind, old, new)`:** meno je súčasťou identity súboru (`slug` + hash z „kind:name"), takže premenovanie záznamu bez presunu obrázka by šablónu pripravilo o fotku
 a novú by sa dalo získať už len ručným prefotením.

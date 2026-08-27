@@ -60,7 +60,7 @@ module Noxun
           end
 
           push_templates                       # quick-pick v paneli
-          TemplatesDialog.refresh_if_open      # Codex F3: zivy sync satelitu
+          TemplatesDialog.push_library_echo    # Codex F3: zivy sync sekcie `tpl`
           set_status("Šablóna \"#{name}\" uložená do knižnice.#{type_note}#{hw_note}")
         end
 

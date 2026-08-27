@@ -20,8 +20,26 @@
   // zoznam, takže sa pýta LEN raz na revíziu; `null` = server povedal „náhľad
   // nemá" a znovu sa už nepýtame (vzor UI-D2 vo vkladacej karte).
   var TPL_PNG = {};
+  // ROZPRACOVANÉ dotazy: kľúč revízie -> čas odoslania (ms). NIE `true` —
+  // dávka 1b-4 (B1): jednosmerná značka znamenala, že STRATENÁ odpoveď
+  // (výnimka v handleri, zavreté okno v okamihu odpovede) nechala dlaždicu
+  // NAVŽDY na schéme; po `TPL_ASK_TIMEOUT_MS` sa dotaz smie zopakovať.
+  // Značka vzniká VÝHRADNE vtedy, keď dotaz naozaj odišiel (bez mosta do Ruby
+  // by revízia ostala „vypýtaná" a nikto by o ňu nepožiadal — vzor
+  // `refreshTemplatePreviews` v `form.js`).
   var TPL_ASKED = {};
-  // identita šablóny -> DOM id práve vykreslenej dlaždice (review #225 P2).
+  var TPL_ASK_TIMEOUT_MS = 8000;
+  // Dávkovanie (1b-4, B2): pri vstupe do sekcie išiel dotaz na KAŽDÚ šablónu
+  // naraz (data URI má strop 64 kB × počet šablón v jednom nádychu). Ide preto
+  // najviac `TPL_ASK_BATCH` dotazov na prechod a zvyšok si vypýta ďalšia dávka.
+  // Vzhľad sa tým NEMENÍ — dlaždica bez obrázka kreslí schému, presne ako
+  // predtým, len sa fotka doplní o chvíľu neskôr.
+  var TPL_ASK_BATCH = 4;
+  var TPL_ASK_GAP_MS = 120;
+  var TPL_ASK_TIMER = null;
+  // identita šablóny -> { id: DOM id, rev: revízia práve vykreslenej dlaždice }
+  // (review #225 P2 + 1b-4 B1: revízia je tu preto, aby sa oneskorená odpoveď
+  // nenasadila na dlaždicu, ktorá už ukazuje NOVŠIU verziu šablóny).
   var TPL_DOM = {};
   // BEŽIACI požiadavok premenovania (review #226 P2). Odpoveď servera smie
   // siahnuť na modal LEN vtedy, keď je na obrazovke stále TEN, ktorý ju
@@ -82,7 +100,11 @@
     // priradiť k správnej verzii — medzitým mohol prísť nový náhľad.
     setPreview: function(d){
       if (!d || !d.name) return;
-      TPL_PNG[tplKey(d.kind, d.name, d.rev)] = d.png || null;
+      var key = tplKey(d.kind, d.name, d.rev);
+      TPL_PNG[key] = d.png || null;
+      // Odpoveď dorazila — záznam „beží" je vybavený. Ďalej rozhoduje CACHE
+      // (aj záporná), takže sa o tú istú revíziu už nikto nepýta.
+      delete TPL_ASKED[key];
       tplApplyPreview(d);
     },
     // --- výsledok premenovania (ŠT-3c-2) ---------------------------------
@@ -125,9 +147,17 @@
 
   // Náhľad sa nasadí do UŽ VYKRESLENEJ dlaždice (nevymieňa sa uzol — klik by
   // stratil cieľ). Bez náhľadu ostáva schéma, presne ako vo vkladacej karte.
+  //
+  // 1b-4 (B1): odpoveď patrí REVÍZII, ktorú si dlaždica vypýtala. Kým sa čakalo
+  // na disk, mohla prísť nová knižnica (prefotená šablóna = nová `preview_rev`)
+  // — nasadiť starý obrázok by znamenalo, že používateľ vidí fotku tvaru, ktorý
+  // šablóna už nepostaví. Nesúlad revízie = odpoveď sa zahodí (v cache ostáva
+  // pod svojím kľúčom, takže sa o ňu nikto nepýta znova).
   function tplApplyPreview(d){
-    var id = tplDomIdFor(d.kind, d.name);
-    var box = id ? tplEl('tplpic-' + id) : null;
+    var rec = tplDomFor(d.kind, d.name);
+    if (!rec) return;
+    if (String(d.rev == null ? '' : d.rev) !== String(rec.rev == null ? '' : rec.rev)) return;
+    var box = tplEl('tplpic-' + rec.id);
     if (!box) return;
     var img = box.querySelector ? box.querySelector('img') : null;
     if (!d.png || !img){ return; }
@@ -140,9 +170,13 @@
   // dlaždice by mali TO ISTÉ id a náhľad by sa nakreslil na prvú z nich.
   // Používateľ by potom vyberal šablónu podľa cudzej fotky. Id je preto
   // PORADOVÉ a mapa `TPL_DOM` (plnená pri kreslení) drží presné priradenie
-  // identity → uzol.
+  // identity → uzol (a od 1b-4 aj jeho revíziu).
   function tplDomIdAt(kind, idx){ return String(kind || '') + '-' + idx; }
-  function tplDomIdFor(kind, name){ return TPL_DOM[tplKey(kind, name, '')] || null; }
+  function tplDomFor(kind, name){ return TPL_DOM[tplKey(kind, name, '')] || null; }
+  function tplDomIdFor(kind, name){
+    var rec = tplDomFor(kind, name);
+    return rec ? rec.id : null;
+  }
 
   // --- LIŠTA sekcie — čistá funkcia (Node test) ------------------------------
   // Okno malo v lište „Uložiť označený korpus ako šablónu"; sem sa NEPRENÁŠA
@@ -196,7 +230,7 @@
     var type = cfg.type || 'lower';
     var dims = tplDims(cfg);
     var id = tplDomIdAt(kind, idx == null ? 0 : idx);
-    TPL_DOM[tplKey(kind, tp.name, '')] = id;
+    TPL_DOM[tplKey(kind, tp.name, '')] = { id: id, rev: tp.preview_rev };
     var h = '<div class="stpltile" data-kind="' + tplEsc(kind) + '" data-name="' + tplEsc(tp.name) + '">' +
       '<div class="stplpic" id="tplpic-' + tplEsc(id) + '">' +
       (tp.preview_rev ? '<img alt="">' : '') +
@@ -273,25 +307,72 @@
     tplRequestPreviews();
   }
 
+  // ČISTÉ JADRO rozhodovania (Node testy, vzor `nxTplPreviewPlan` vo `form.js`):
+  // z knižnice, cache a mapy rozpracovaných dotazov povie, ktorým dlaždiciam sa
+  // dá nasadiť už známy obrázok (`apply`), na ktoré sa má TERAZ poslať dotaz
+  // (`ask`, najviac `limit`), koľko ich ostalo na ďalšiu dávku (`rest`) a na
+  // koľko odpovedí sa práve čaká (`pending`). Pravidlá:
+  //   * dlaždica bez `preview_rev` = šablóna náhľad NEMÁ -> nič (ani dotaz),
+  //   * kľúč v cache (aj s hodnotou `null` = záporná odpoveď) -> žiadny dotaz,
+  //   * dotaz odoslaný pred menej než `TPL_ASK_TIMEOUT_MS` -> beží, počká sa;
+  //     starší sa považuje za STRATENÝ a pýta sa znova (1b-4 B1).
+  // `asked` sa TU NEPLNÍ — značku smie zapísať len ten, kto dotaz naozaj odoslal.
+  function tplPreviewPlan(data, cache, asked, now, limit){
+    var out = { apply: [], ask: [], rest: 0, pending: 0 };
+    ['cabinet', 'board'].forEach(function(kind){
+      ((data && data[kind]) || []).forEach(function(tp){
+        if (!tp || !tp.name || !tp.preview_rev) return;
+        var key = tplKey(kind, tp.name, tp.preview_rev);
+        if (Object.prototype.hasOwnProperty.call(cache, key)){
+          out.apply.push({ kind: kind, name: tp.name, rev: tp.preview_rev, png: cache[key] });
+          return;
+        }
+        var sent = asked[key];
+        if (typeof sent === 'number' && (now - sent) < TPL_ASK_TIMEOUT_MS){ out.pending++; return; }
+        if (out.ask.length >= limit){ out.rest++; return; }
+        out.ask.push({ kind: kind, name: tp.name, rev: tp.preview_rev, key: key });
+      });
+    });
+    return out;
+  }
+
+  function tplNow(){
+    return (typeof Date !== 'undefined' && Date.now) ? Date.now() : 0;
+  }
+
+  function tplCancelAsk(){
+    if (TPL_ASK_TIMER == null) return;
+    if (typeof clearTimeout === 'function') clearTimeout(TPL_ASK_TIMER);
+    TPL_ASK_TIMER = null;
+  }
+
+  // Ďalší prechod. Krátka pauza = ešte je čo pýtať (dávkovanie), dlhá = čaká sa
+  // len na odpovede a je to POISTKA proti stratenej odpovedi. V Node testoch by
+  // čakajúci časovač držal proces nažive — `unref` je preto povinný (v prehliadači
+  // metóda neexistuje a vetva sa preskočí).
+  function tplScheduleAsk(ms){
+    if (typeof setTimeout !== 'function') return;
+    tplCancelAsk();
+    TPL_ASK_TIMER = setTimeout(function(){ TPL_ASK_TIMER = null; tplRequestPreviews(); }, ms);
+    if (TPL_ASK_TIMER && typeof TPL_ASK_TIMER.unref === 'function') TPL_ASK_TIMER.unref();
+  }
+
   // PNG sa pýta AŽ PO vykreslení a LEN pre dlaždice, ktoré náhľad majú a ešte
   // ho v cache nemajú. Odpoveď sa nasadí do už existujúceho uzla.
   function tplRequestPreviews(){
+    tplCancelAsk();
     if (!TPL_DATA) return;
-    ['cabinet', 'board'].forEach(function(kind){
-      (TPL_DATA[kind] || []).forEach(function(tp){
-        if (!tp.preview_rev) return;
-        var key = tplKey(kind, tp.name, tp.preview_rev);
-        if (Object.prototype.hasOwnProperty.call(TPL_PNG, key)){
-          tplApplyPreview({ kind: kind, name: tp.name, rev: tp.preview_rev, png: TPL_PNG[key] });
-          return;
-        }
-        if (TPL_ASKED[key]) return;
-        TPL_ASKED[key] = true;
-        if (typeof window !== 'undefined' && window.sketchup && sketchup.tpl_preview){
-          sketchup.tpl_preview(JSON.stringify({ kind: kind, name: tp.name, rev: tp.preview_rev }));
-        }
-      });
+    var plan = tplPreviewPlan(TPL_DATA, TPL_PNG, TPL_ASKED, tplNow(), TPL_ASK_BATCH);
+    plan.apply.forEach(tplApplyPreview);
+    // Bez mosta do Ruby sa do `TPL_ASKED` NESMIE nič zapísať — záznam by ostal
+    // navždy „vypýtaný" a žiadosť by neodišla nikdy (vzor `form.js`).
+    if (typeof window === 'undefined' || !window.sketchup || !sketchup.tpl_preview) return;
+    plan.ask.forEach(function(d){
+      TPL_ASKED[d.key] = tplNow();
+      sketchup.tpl_preview(JSON.stringify({ kind: d.kind, name: d.name, rev: d.rev }));
     });
+    if (plan.rest > 0) return tplScheduleAsk(TPL_ASK_GAP_MS);
+    if (plan.ask.length + plan.pending > 0) tplScheduleAsk(TPL_ASK_TIMEOUT_MS);
   }
 
   // --- akcie -> Ruby ---------------------------------------------------------
@@ -424,12 +505,14 @@
   }
 
   // Node testy (tests/js/test_st3c_tpl.js) — ČISTÉ funkcie bez DOM
-  // (`tplToolsHtml`, `tplTileHtml`, `tplBodyHtml`, `tplDeleteNote`) +
-  // `tplRenderBody`/`TPL`, ktoré DOM potrebujú a exportujú sa ZÁMERNE:
-  // „doskám sa akcie nezobrazujú" a „PNG sa pýta raz na revíziu" sa inak
-  // overiť nedá ničím než klikaním.
+  // (`tplToolsHtml`, `tplTileHtml`, `tplBodyHtml`, `tplDeleteNote`,
+  // `tplPreviewPlan`) + `tplRenderBody`/`TPL`, ktoré DOM potrebujú a exportujú
+  // sa ZÁMERNE: „doskám sa akcie nezobrazujú" a „PNG sa pýta raz na revíziu" sa
+  // inak overiť nedá ničím než klikaním. `tplCancelAsk` je pre testy povinný —
+  // bez zrušenia časovača dávky by sada nedobehla.
   if (typeof module !== 'undefined' && module.exports){
-    module.exports = { tplToolsHtml: tplToolsHtml, tplTileHtml: tplTileHtml,
+    module.exports = { tplPreviewPlan: tplPreviewPlan, tplCancelAsk: tplCancelAsk,
+                       tplToolsHtml: tplToolsHtml, tplTileHtml: tplTileHtml,
                        tplBodyHtml: tplBodyHtml, tplDeleteNote: tplDeleteNote,
                        tplDeleteSub: tplDeleteSub, tplRenderBody: tplRenderBody,
                        tplRenderTools: tplRenderTools, tplApplyState: tplApplyState,

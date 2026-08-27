@@ -749,7 +749,9 @@ viesť.
 payload `Panel.template_list` posiela panelu **celú knižnicu** — každý záznam nesie `kind` (`cabinet` | `board`) a `used_seq` (poradové číslo posledného použitia, `nil` = nikdy;
 číslo dopĺňa `TemplateUsage.map`, do súboru šablón sa nikdy nezapisuje). Filter podľa druhu robí **klient aj server**: dlaždice panela (`NXInsert.templatesForType` /
 `templateGroups` nad čistou `templateKind`) aj správa šablón; **sekcia `tpl` Štúdia si od ŠT-3c-1 pýta OBA druhy** (`template_list(kind: 'cabinet')` + `kind: 'board'`, aby sa
-doskové dali aspoň zmazať) a druh vetví akcie: apply/odfotiť len `cabinet`, mazanie oba — serverové guardy nad `KINDS` ostávajú.
+doskové dali aspoň zmazať) a druh vetví akcie: apply/odfotiť len `cabinet`, mazanie oba — serverové guardy nad `KINDS` ostávajú. **`usage:` (1b-4)** rozhoduje, či sa k záznamom
+dopočíta `used_seq`: default `true` (panel z neho skladá „Naposledy použité"), sekcia Štúdia si pýta `usage: false` — poradie nekreslí a `TemplateUsage.map` je ďalšie čítanie
+súboru v každom pushi okna.
 
 **Insert payload nesie identitu použitej šablóny** (`template_kind` + `template_name` — korpus aj doska): `Panel.take_template_ref!` ich z payloadu **odstráni ešte pred builderom**
 (do configu skrinky ani dosky nepatria) a `stamp_template_used` po úspešnom vložení záznam **znovu nájde**, overí druh a opečiatkuje — medzitým zmazaná alebo prepísaná šablóna =

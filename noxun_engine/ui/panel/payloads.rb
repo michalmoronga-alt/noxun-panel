@@ -441,12 +441,20 @@ module Noxun
         # kanalom: panel si ho vypyta zvlast (`nx_template_preview`).
         # Okno Sablony nahlady nekresli, preto ich ani nedostava (default false
         # setri `File.stat` pri kazdom refreshi).
-        def template_list(kind: nil, previews: false)
-          seq = TemplateUsage.map
+        # `usage:` (1b-4, B3) — `used_seq` potrebuje LEN vkladacia karta panela
+        # („Naposledy použité"). Sekcia `tpl` Studia poradie nekresli, a kedze
+        # `TemplateUsage.map` je DALSIE citanie suboru z %APPDATA%, pyta si
+        # zoznam s `usage: false`. Default ostava `true` — panelova cesta sa
+        # nemeni ani o riadok.
+        def template_list(kind: nil, previews: false, usage: true)
+          seq = usage ? TemplateUsage.map : nil
           TemplateStore.load.each_with_object([]) do |t, out|
             next if kind && t['kind'] != kind
 
-            rec = t.merge('used_seq' => seq["#{t['kind']}:#{t['name']}"])
+            # `dup` aj v druhej vetve: kontrakt „zaznam sa NEMUTUJE" plati pre
+            # obe cesty rovnako (merge vracia novy hash, holy zaznam by bol
+            # POVODNY objekt zo skladu).
+            rec = seq ? t.merge('used_seq' => seq["#{t['kind']}:#{t['name']}"]) : t.dup
             rec = rec.merge('preview_rev' => TemplatePreviews.rev_for(t['kind'], t['name'])) if previews
             out << rec
           end

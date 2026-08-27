@@ -312,7 +312,7 @@ NxTest.test('ŠT-3c-2 (review #226 P2): mazanie rozlisi „zmizla" AZ PO navrate
   gone = ST3C2_TPL_RB[/def template_gone\(name\).*?
         end
 /m].to_s
-  NxTest.assert(gone.include?('refresh_if_open'), 'a zoznam sa pritom obnovi')
+  NxTest.assert(gone.include?('push_library_echo'), 'a zoznam sa pritom obnovi')
 end
 
 NxTest.test('ŠT-3c-2 (review #226 P2): premenovanie prehodi VOLBU vkladacej karty') do

@@ -376,10 +376,11 @@ NxTest.test('UI-C1a guard: serverove akcie sablon vetvia na KIND (ŠT-3c-1 rozsi
   # ŠT-3c-1: sekcia ZOBRAZUJE aj doskove sablony (payload nesie oba druhy),
   # ale APPLY ostava VYHRADNE korpusovy — doskovu sablonu na skrinku pouzit
   # nemozno a guard je SERVEROVY (HTML nie je ochrana).
-  NxTest.assert(src.include?("Panel.template_list(kind: 'cabinet', previews: true)"),
-                'payload nesie korpusove sablony')
-  NxTest.assert(src.include?("Panel.template_list(kind: 'board', previews: true)"),
-                'aj doskove (sekcia ich zobrazuje — spravovat ich dovtedy nesla ziadna cesta)')
+  # 1b-4 (B3): payload sa stava cez `tile_rows(kind)` — dva druhy, jedno telo.
+  NxTest.assert(src.include?("{ 'cabinet' => tile_rows('cabinet'), 'board' => tile_rows('board') }"),
+                'payload nesie korpusove AJ doskove sablony (sekcia oba druhy zobrazuje)')
+  NxTest.assert(src.include?('Panel.template_list(kind: kind, previews: true, usage: false)'),
+                'a zoznam si pyta s nahladmi, ale BEZ poradia „naposledy použité" (kresli ho panel)')
   NxTest.assert(src.include?("TemplateStore.find('cabinet', name)"), 'apply hlada len korpusove')
   # MAZANIE je PRVA sprava doskovych sablon: kind chodi z klienta, ale server
   # ho pusti LEN z uzavreteho zoznamu (`KINDS`).

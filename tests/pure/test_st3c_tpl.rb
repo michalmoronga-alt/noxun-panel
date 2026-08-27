@@ -189,7 +189,7 @@ end
 
 NxTest.test('ŠT-3c-1 (N29): doskove sablony — zobrazit a ZMAZAT, apply/odfotit nie') do
   pay = st3c_body('tpl_payload')
-  NxTest.assert(pay.include?("kind: 'cabinet'") && pay.include?("kind: 'board'"),
+  NxTest.assert(pay.include?("tile_rows('cabinet')") && pay.include?("tile_rows('board')"),
                 'payload nesie OBA druhy — doskove sa v sekcii ZOBRAZUJU')
   del = st3c_body('handle_delete')
   NxTest.assert(del.include?('TemplateStore.delete(kind, name)'),
@@ -232,17 +232,91 @@ NxTest.test('ŠT-3c-1: ZAPIS DO MODELU a zmena KNIZNICE maju RÔZNY refresh') do
   NxTest.assert(amw.index('Panel.push_selected') < amw.index('StudioDialog'),
                 'poradie: NAJPRV panel, az potom Studio')
   ch = st3c_body('after_change')
-  NxTest.assert(ch.include?('refresh_if_open'), 'zmena KNIZNICE ide LACNYM echom sekcie')
+  NxTest.assert(ch.include?('push_library_echo'), 'zmena KNIZNICE ide LACNYM echom sekcie')
   NxTest.refute(ch.include?('bump'), 'bez zdvihu generacie — kniznica s kusovnikom nesuvisi')
   NxTest.assert(ch.include?('Panel.push_templates'), 'a quick-pick v paneli dostane novy zoznam')
-  echo = st3c_body('refresh_if_open')
+  echo = st3c_body('push_library_echo')
   NxTest.assert(echo.include?('TPL.init'), 'echo posiela payload sekcie')
   NxTest.refute(echo.include?('push_state'), 'nikdy plny push okna')
   # A panel po ulozeni sablony vola PRAVE toto echo.
   at = File.read(File.join(NxTest::ROOT, 'noxun_engine', 'ui', 'panel', 'actions_templates.rb'),
                  encoding: 'UTF-8')
-  NxTest.assert(at.include?('TemplatesDialog.refresh_if_open'),
+  NxTest.assert(at.include?('TemplatesDialog.push_library_echo'),
                 'ulozenie sablony z Inspectora obnovi sekciu')
+end
+
+# 1b-4 (B4): meno `refresh_if_open` KLAMALO — ziadne „if open" v tele nebolo
+# a byt nemoze (server o otvorenej sekcii nevie, guard je od #225 na klientovi).
+# Guard je nad CELYM modulom, nie nad jednym volanim: keby sa meno vratilo
+# hocikde v `TemplatesDialog`, cita sa znova ako „posle sa to len do otvorenej
+# sekcie" — a to je presne to nedorozumenie, ktore dávka odstranila.
+NxTest.test('1b-4 (B4): `TemplatesDialog` uz nema vlastne `refresh_if_open`') do
+  td = Noxun::Engine::TemplatesDialog
+  NxTest.assert(td.respond_to?(:push_library_echo), 'echo kniznice ma nove meno')
+  NxTest.refute(td.respond_to?(:refresh_if_open),
+                'stare meno v module NEEXISTUJE — nie je to alias, je to premenovanie')
+  own = ST3C_TPL_CODE.gsub('StudioDialog.refresh_if_open', '')
+  NxTest.refute(own.include?('refresh_if_open'),
+                'a v tele modulu ostava `refresh_if_open` UZ LEN ako volanie na StudioDialog')
+  # Studio si svoje `refresh_if_open` ponechava — TAM sa „if open" naozaj testuje.
+  st = ST3C_STUDIO_RB[/def refresh_if_open\(bump: true\).*?\n        end\n/m].to_s
+  NxTest.assert(st.include?('@dialog.visible?'),
+                'okenna metoda si meno zasluzi — pyta sa, ci okno naozaj zije')
+end
+
+# 1b-4 (B3): payload sekcie bezi v KAZDOM plnom pushi okna, takze nesie PRESNE
+# tvar dlazdice a nic viac. Test je BEHAVIORALNY (stub skladu), nie grepovy —
+# grep by neuvidel, ze do okna prenikol dalsi kluc configu.
+def st3c_with_stub(mod, name, impl)
+  sc = mod.singleton_class
+  alias_name = :"st3c_orig_#{name}"
+  sc.send(:alias_method, alias_name, name)
+  mod.define_singleton_method(name, impl)
+  yield
+ensure
+  sc.send(:alias_method, name, alias_name)
+  sc.send(:remove_method, alias_name)
+end
+
+NxTest.test('1b-4 (B3): payload sekcie je OREZANY na tvar dlazdice') do
+  e = Noxun::Engine
+  full = { 'kind' => 'cabinet', 'name' => 'Klasik dolná', 'used_seq' => 7, 'preview_rev' => 'r1',
+           'config' => { 'type' => 'lower', 'width' => 600.0, 'height' => 720.0, 'depth' => 560.0,
+                         'zone_tree' => { 'id' => 'z1', 'children' => [1, 2, 3] },
+                         'fronts' => [{ 'kind' => 'door' }],
+                         'hardware_sets' => { 'hinge' => 'SET-1' },
+                         'hardware_set_defs' => { 'SET-1' => { 'items' => [1, 2] } },
+                         'material_id' => 'MAT-9' } }
+  asked = []
+  st3c_with_stub(e::Panel, :template_list, lambda { |kind: nil, previews: false, usage: true|
+    asked << [kind, previews, usage]
+    kind == 'cabinet' ? [full] : []
+  }) do
+    pay = e::TemplatesDialog.tpl_payload
+    NxTest.assert_equal(%w[cabinet board], pay.keys, 'payload nesie PRESNE dva druhy')
+    row = pay['cabinet'].first
+    NxTest.assert_equal(%w[name preview_rev config], row.keys,
+                        'dlazdica dostava meno, nahlad a config — nic viac')
+    NxTest.assert_equal(%w[type width height depth], row['config'].keys,
+                        'a z configu LEN to, co dlazdica kresli (typ + tri rozmery)')
+    NxTest.assert_equal(600.0, row['config']['width'], 'rozmery su nedotknute')
+    NxTest.refute(row.key?('used_seq'),
+                  'poradie „naposledy použité" kresli panel, nie sekcia')
+    NxTest.assert_equal([['cabinet', true, false], ['board', true, false]], asked,
+                        'oba druhy s nahladmi a BEZ citania `TemplateUsage`')
+  end
+end
+
+NxTest.test('1b-4 (B3): chybajuci rozmer sa NEDOMYSLA a cudzi kluc sa NEPREPUSTI') do
+  e = Noxun::Engine
+  rec = { 'name' => 'Doska', 'preview_rev' => nil,
+          'config' => { 'width' => 2600.0, 'novy_kluc_z_buducej_verzie' => 'x' } }
+  row = e::TemplatesDialog.tile_row(rec)
+  NxTest.assert_equal({ 'width' => 2600.0 }, row['config'],
+                      'prazdne rozmery sa nedoplnaju nulou (dlazdica ich vynecha) a neznamy ' \
+                      'kluc do okna neprejde — inak by kazde rozsirenie zaznamu ticho ' \
+                      'nafuklo KAZDY push')
+  NxTest.assert_equal(nil, row['preview_rev'], 'sablona bez nahladu ho nesie ako nil (kresli schemu)')
 end
 
 NxTest.test('ŠT-3c-1: payload sekcie chodi plnym pushom a NEPOTREBUJE model') do

@@ -47,6 +47,10 @@ module Noxun
       # (kind, name) — kind sa preto NIKDY neberie z HTML bez kontroly.
       KINDS = %w[cabinet board].freeze
 
+      # 1b-4 (B3): jedine kluce configu, ktore DLAZDICA sekcie kresli
+      # (typ + tri rozmery). Zvysok zaznamu do okna nikdy nesiel na nic.
+      TILE_CONFIG_KEYS = %w[type width height depth].freeze
+
       class << self
         # --- vstup SEKCIE `tpl` (vzor RulesDialog.dispatch) ------------------
 
@@ -91,15 +95,47 @@ module Noxun
         # suboru) — dlazdica podla neho vie, ci ma o obrazok vobec ziadat,
         # a ci pisat „Odfotiť" alebo „Prefotiť". Do `templates.json` sa
         # nezapisuje. Samotne PNG chodi VLASTNYM kanalom (`tpl_preview`).
+        #
+        # 1b-4 (B3): payload je OREZANY NA TVAR DLAZDICE. Bezi v KAZDOM plnom
+        # pushi okna (kazdy prepocet kusovnika, kazdy zapis rozpoctu), a dlazdica
+        # z celeho zaznamu kresli len meno, druh/typ, tri rozmery a nahlad —
+        # zvysok configu (`zone_tree`, `fronts`, `hardware_sets`,
+        # `hardware_set_defs`, materialy) je pritom jeho NAJVACSIA cast a do okna
+        # nikdy nedosiel na nic. Cely zaznam si pyta az akcia, ktora ho naozaj
+        # potrebuje (`handle_apply` cita zo skladu, nie z payloadu).
+        # Podmienit payload OTVORENOU sekciou sa NEDA: server nevie, ktora sekcia
+        # je v okne otvorena (guard je od #225 na klientovi) a kontrakt „okno
+        # zanika — modul zije" znamena, ze `push_state` posiela VSETKY sekcie
+        # naraz; orezanie je preto jedina cesta, ktora nezavedie druhu pravdu.
+        # `usage: false` — poradie „Naposledy pouzite" kresli LEN panel, takze
+        # sekcia nepotrebuje ani citanie `TemplateUsage`.
+        # `version` sa nepripaja: plny push okna ho nesie na najvyssej urovni.
         def tpl_payload(_model = nil)
-          { 'version' => Engine::VERSION,
-            'cabinet' => Panel.template_list(kind: 'cabinet', previews: true),
-            'board' => Panel.template_list(kind: 'board', previews: true) }
+          { 'cabinet' => tile_rows('cabinet'), 'board' => tile_rows('board') }
         rescue StandardError => e
           # Zlyhanie sa NEZAMLCUJE: sekcia ostane bez dat a jedinou stopou
           # preco je tento zaznam (rovnaka lekcia ako `mat_payload`).
           Engine.log_error(e, 'TemplatesDialog.tpl_payload')
           nil
+        end
+
+        # Jeden druh sablon v tvare dlazdice.
+        def tile_rows(kind)
+          Panel.template_list(kind: kind, previews: true, usage: false).map { |t| tile_row(t) }
+        end
+
+        # Tvar DLAZDICE. Kluce su UZAVRETY zoznam — keby sa posielal cely
+        # `config`, kazdy novy kluc zaznamu (napr. dalsi blok kovania) by ticho
+        # nafukoval kazdy push okna a nikto by si toho nevsimol.
+        # Prazdna hodnota sa NEDOPLNA (dlazdica chybajuci rozmer nekresli —
+        # `tplDims` vynechava padnute hodnoty).
+        def tile_row(rec)
+          cfg = rec['config'].is_a?(Hash) ? rec['config'] : {}
+          { 'name' => rec['name'].to_s,
+            'preview_rev' => rec['preview_rev'],
+            'config' => TILE_CONFIG_KEYS.each_with_object({}) do |k, out|
+              out[k] = cfg[k] unless cfg[k].nil?
+            end }
         end
 
         # --- Ruby -> JS -----------------------------------------------------
@@ -140,11 +176,20 @@ module Noxun
         # sablony z Inspectora). Kniznica je subor MIMO modelu, takze plny push
         # okna (a s nim cely prepocet kusovnika a zdvih generacie) by bol drahy
         # a zbytocny — a navyse by zneplatnil rozkliknuty riadok inej sekcie.
-        def refresh_if_open
+        #
+        # 1b-4 (B4): metoda sa do 1b-4 volala `refresh_if_open` a to meno
+        # KLAMALO — ziadne „if open" tu uz od #225 nie je. Otvorenost sekcie
+        # posudzuje KLIENT (`tplIsActive` v `js/templates.js`): ked je pouzivatel
+        # inde, `TPL.init` stav iba ULOZI a nekresli, lebo `#secbody`/`#sectools`
+        # su ZDIELANE uzly celeho okna. Server o otvorenej sekcii nevie NIC a
+        # vediet nemusi — meno teraz hovori to, co sa naozaj deje: posle sa echo.
+        # (Menuje sa VYHRADNE metoda; modul `TemplatesDialog` ostava — vzor
+        # „okno zanika, modul zije".)
+        def push_library_echo
           pay = tpl_payload
           js("TPL.init(#{pay.to_json})") if pay
         rescue StandardError => e
-          Engine.log_error(e, 'TemplatesDialog.refresh_if_open')
+          Engine.log_error(e, 'TemplatesDialog.push_library_echo')
         end
 
         # --- PNG kanal SEKCIE (audit N24/N26) --------------------------------
@@ -198,7 +243,7 @@ module Noxun
 
           ok, msg = Panel.capture_preview_for(kind, name)
           set_status(msg, !ok)
-          refresh_if_open if ok
+          push_library_echo if ok
         end
 
 
@@ -260,7 +305,7 @@ module Noxun
             # aby pouzivatel videl, co v kniznici naozaj je.
             js('TPL.renameClosed()')
             set_status("Šablóna „#{old_name}“ už v knižnici nie je — zoznam je obnovený.", true)
-            refresh_if_open
+            push_library_echo
           when :readonly
             rename_error('Knižnica šablón je z novšej verzie Noxunu — nič sa nezmenilo.')
           else
@@ -275,7 +320,7 @@ module Noxun
         # Sablona, ktora v kniznici uz NIE JE (druha instancia, rucny zasah):
         # jedna hlaska a obnova zoznamu pre vsetky cesty, ktore na to prisli.
         def template_gone(name)
-          refresh_if_open
+          push_library_echo
           set_status("Šablóna „#{name}“ už v knižnici nie je — zoznam je obnovený.")
         end
 
@@ -413,7 +458,7 @@ module Noxun
         # spolocne (a zdvih generacie by zneplatnil rozkliknute riadky).
         def after_change(msg)
           set_status(msg)
-          refresh_if_open
+          push_library_echo
           Panel.push_templates
         end
 
