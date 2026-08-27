@@ -24,10 +24,14 @@ module Noxun
 
       # --- VEPO nastavenia (V0.5 C) ---------------------------------------
 
-      # Fallback na defaulty pri poskodenom subore (audit F9) — export nikdy
-      # nesmie zablokovat okno kvoli nastaveniam.
+      def vepo_settings_path
+        File.join(Materials.dir, VEPO_SETTINGS_FILE)
+      end
+
+      # CITANIE pre okno: fallback na defaulty pri poskodenom subore (audit F9)
+      # — export nikdy nesmie zablokovat okno kvoli nastaveniam.
       def vepo_settings
-        path = File.join(Materials.dir, VEPO_SETTINGS_FILE)
+        path = vepo_settings_path
         return {} unless JsonFileStore.available?(path)
         data = JsonFileStore.read(path)
         data.is_a?(Hash) ? data : {}
@@ -35,16 +39,93 @@ module Noxun
         {}
       end
 
+      # CITANIE pre ZAPIS — tu sa chyba prehltnut NESMIE (1b-6c, audit #1).
+      # Lenive `{}` z NEPRECITATELNEHO suboru by sa zlucilo s novymi `attrs` a
+      # zapis by zmazal `project_names`, `merge_18_36` aj `last_dir` — teda
+      # presne tie zaznamy, ktore ma zamok chranit. Chybajuci subor (ani `.bak`)
+      # je legitimny prazdny stav; existujuci, ale neprecitatelny ci nie-Hash
+      # obsah je CHYBA: vyleti do rescue zapisovych dveri a NEZAPISE sa nic.
+      # (`JsonFileStore` si zalohu skusi sam — sem sa dostane az ked padnu obe.)
+      def vepo_settings_for_write
+        path = vepo_settings_path
+        return {} unless JsonFileStore.available?(path)
+        data = JsonFileStore.read(path)
+        raise IOError, "#{VEPO_SETTINGS_FILE}: obsah nie je objekt" unless data.is_a?(Hash)
+
+        data
+      end
+
+      # --- 1b-6c: JEDINE DVERE k zapisu do vepo_settings.json ---------------
+      #
+      # Subor je nastavenie POCITACA a ma SIESTICH zapisovatelov (`merge_18_36`,
+      # 4x `last_dir`, mapa `project_names`). Dve instancie SketchUpu zdielaju
+      # jeden `%APPDATA%`, takze read-modify-write nad ODTLACKOM vedel prepisat
+      # to, co medzitym zapisala tá druhá — a pri mape nazvov islo o cely
+      # zaznam zakazky. `JsonFileStore` riesi atomicitu (tmp+rename, `.bak`),
+      # NIE subeh.
+      #
+      # Preto kazdy zapis ide cez tieto dvere: MEDZIPROCESOVY zamok
+      # (`Materials.with_catalog_lock` — jediny sidecar `.lock` nad TYM ISTYM
+      # priecinkom, reentrantny, kriticke sekcie su v ms; dva samostatne zamky
+      # by len vyrobili poradie a s nim riziko zaseknutia) + citanie suboru
+      # NANOVO vnutri zamku (`reload!` zhodi sekundovu cache, bez ktorej by
+      # cerstvy zapis druhej instancie nebolo vidiet). Blok dostane CERSTVE
+      # nastavenia a vrati hash na zlucenie; `nil` znamena „netreba nic zapisat"
+      # (bez zbytocneho pretocenia `.bak`).
+      #
+      # Cela zamknuta uprava je v rescue (kolo 3 #243): aj zlyhanie `.lock`
+      # (prava profilu, I/O) je len zalogovany `false`, nikdy vynimka do okna
+      # ci exportu. Kontext logu nesie FAZU (lock/read/block/write), aby sa
+      # chyba disku nezliala s chybou v odovzdanom bloku.
+      def update_vepo_settings
+        phase = 'lock'
+        Materials.with_catalog_lock do
+          phase = 'read'
+          JsonFileStore.reload!(vepo_settings_path)
+          fresh = vepo_settings_for_write
+          phase = 'block'
+          attrs = yield(fresh)
+          next true if attrs.nil?
+
+          phase = 'write'
+          JsonFileStore.write(vepo_settings_path, fresh.merge(attrs))
+          true
+        end
+      rescue StandardError => e
+        Engine.log_error(e, "ProductionCore.update_vepo_settings(#{phase})")
+        false
+      end
+
+      # Zapis nezavislych klucov (`last_dir`, `merge_18_36`) — hodnota nezavisi
+      # od toho, co v subore uz je, takze staci zlucenie nad cerstvym citanim.
       # Vracia TRUE/FALSE (review #243 P2-1): migracia nazvu zakazky musi
       # vediet, ci zapis naozaj presiel — pri zamknutom subore alebo plnom
-      # disku sa nesmie zahodit jedina stopa na stary kluc. Pad sa aj tak len
-      # zaloguje: nastavenia nikdy nezhodia okno.
+      # disku sa nesmie zahodit jedina stopa na stary kluc.
+      #
+      # MAPU NAZVOV tadeto zapisat NEDA (1b-6c, audit #4): odovzdany odtlacok
+      # mapy by cerstvu mapu prepisal cely a zamok by chranil len top-level
+      # zlucenie. Na to su `update_project_names` — a strazi to aj guard test.
       def save_vepo_settings(attrs)
-        path = File.join(Materials.dir, VEPO_SETTINGS_FILE)
-        JsonFileStore.write(path, vepo_settings.merge(attrs))
+        if attrs.is_a?(Hash) && attrs.key?(PROJECT_NAMES_KEY)
+          Engine.log_error(ArgumentError.new("#{PROJECT_NAMES_KEY} sa zapisuje len cez update_project_names"),
+                           'ProductionCore.save_vepo_settings')
+          return false
+        end
+
+        update_vepo_settings { attrs }
+      end
+
+      # Cerstve nastavenia pre EXPORT (1b-6c, audit #3): sekundova cache
+      # `JsonFileStore` by dala nazov zakazky alebo prepinac 18/36 spred zmeny
+      # v druhej instancii — a hotovy CSV/XLSX sa dalsim citanim uz nezahoji.
+      # Zamok sa tu zamerne NEBERIE: exportna cesta otvara MODALNE okno vyberu
+      # suboru a drzat cez neho medziprocesovy zamok by druhu instanciu blokoval
+      # dovtedy, kym pouzivatel kliká. Roztrhnute citanie nehrozi (tmp+rename),
+      # riziko je len zastaralost — a tu zhodi prave `reload!`.
+      def refresh_vepo_settings
+        JsonFileStore.reload!(vepo_settings_path)
         true
-      rescue StandardError => e
-        Engine.log_error(e, 'ProductionCore.save_vepo_settings')
+      rescue StandardError
         false
       end
 
@@ -209,6 +290,20 @@ module Noxun
         v.is_a?(Hash) ? v : {}
       end
 
+      # Atomicka uprava MAPY nazvov (1b-6c). Blok dostane CERSTVU mapu precitanu
+      # vnutri zamku a vrati upravenu; `nil` = netreba nic zapisat. Bez toho by
+      # sa mapa menila nad odtlackom a zapis jednej instancie by zmazal zakazku
+      # pomenovanu v druhej. Vracia uspech zapisu (false aj ked sa nepodarilo
+      # vziat zamok — volajuci si vtedy MUSI nechat most na dalsi pokus).
+      def update_project_names
+        update_vepo_settings do |settings|
+          names = settings[PROJECT_NAMES_KEY]
+          names = names.is_a?(Hash) ? names.dup : {}
+          fresh = yield(names)
+          fresh.nil? ? nil : { PROJECT_NAMES_KEY => fresh }
+        end
+      end
+
       # Stabilna identita zakazky pre nastavenia POCITACA. Windows nerozlisuje
       # velkost pismen ani smer lomitka, takze „C:\Zakazky\Klinika.skp" a
       # „c:/zakazky/klinika.skp" musia dat TEN ISTY kluc.
@@ -274,10 +369,12 @@ module Noxun
         key = project_key(model)
         map = project_names
         # Kluce sedenia sa spotrebuju pri PRVOM citani s platnou cestou — aj
-        # ked cesta uz nazov ma (review #243 P2-2).
+        # ked cesta uz nazov ma (review #243 P2-2). Ked migracia bezala, vracia
+        # CERSTVU platnu hodnotu kluca (1b-6c): odtlacok spred zamku uz mohol
+        # byt zastaraly a export by sa pomenoval podla .skp suboru napriek tomu,
+        # ze v subore je spravny nazov (kolo 3 #243).
         adopted = adopt_session_name(model, key, map)
-        saved = map[key]
-        saved = adopted if saved.to_s.strip.empty?
+        saved = adopted.nil? ? map[key] : adopted
         s = saved.to_s.strip
         s.empty? ? default_project_name(model) : s
       end
@@ -299,26 +396,43 @@ module Noxun
       def adopt_session_name(model, key, map)
         return nil if key.to_s.empty? || session_key?(key)
 
+        # LACNA PREDBEZNA OTAZKA nad uz precitanou mapou: nemat co upratat je
+        # bezny stav KAZDEHO citania a to sa nesmie platit zamkom.
         aliases = session_keys_for(model)
-        stale = aliases.select { |k| map.key?(k) }
-        return nil if stale.empty? && remembered_session_key(model).empty?
+        return nil if aliases.none? { |k| map.key?(k) } && remembered_session_key(model).empty?
 
-        hit = stale.find { |k| !map[k].to_s.strip.empty? }
-        # Zaznam na ceste ma prednost — nikdy sa neprepisuje rozrobenym nazvom.
-        name = map[key].to_s.strip.empty? && hit ? map[hit].to_s.strip : ''
-        ok = stale.empty? || migrate_session_keys(model, key, name, stale, map)
+        # PREDZAMKOVY FALLBACK (1b-6c, audit #2): ked sa `.lock` nepodari vziat,
+        # blok pod zamkom sa NIKDY nevykona — bez fallbacku by vsetky styri
+        # exporty dostali meno .skp suboru namiesto zakazky. Cerstva hodnota
+        # fallback prepise az vtedy, ked blok naozaj bezal.
+        name = effective_project_name(map, key, aliases)
+        fresh = nil
+        ok = update_project_names do |names|
+          stale = aliases.select { |k| names.key?(k) }
+          # Rozhodnutie (ktory kluc sedenia nesie nazov, ci ma cesta prednost)
+          # patri DOVNUTRA zamku — nad zastaranym odtlackom by mohlo prepisat
+          # nazov, ktory medzitym zapisala druha instancia.
+          fresh = effective_project_name(names, key, stale)
+          next nil if stale.empty? # niet co upratat = ziadny zapis
+
+          stale.each { |k| names.delete(k) }
+          names[key] = fresh unless fresh.empty? || fresh == default_project_name(model)
+          names
+        end
+        name = fresh unless fresh.nil?
         forget_session_key(model) if ok
         name.empty? ? nil : name
       end
 
-      # Zapis migracie: kluce sedenia zanikaju, adoptovany nazov sadne na cestu
-      # (zhodny s defaultom sa nezapisuje — rovnako ako pri `save_project_name`).
-      # Vracia uspech zapisu.
-      def migrate_session_keys(model, key, name, stale, map)
-        moved = map.dup
-        stale.each { |k| moved.delete(k) }
-        moved[key] = name unless name.empty? || name == default_project_name(model)
-        save_vepo_settings(PROJECT_NAMES_KEY => moved)
+      # Nazov, ktory pre KLUC plati nad danou mapou: zaznam na ceste ma
+      # PREDNOST (rozrobeny nazov ho nikdy neprepise), inak sa adoptuje nazov
+      # spod prveho neprazdneho kluca sedenia.
+      def effective_project_name(map, key, aliases)
+        own = map[key].to_s.strip
+        return own unless own.empty?
+
+        hit = aliases.find { |k| !map[k].to_s.strip.empty? }
+        hit ? map[hit].to_s.strip : ''
       end
 
       # Zapis nazvu. Prazdna hodnota (aj hodnota zhodna s defaultom) zaznam
@@ -335,15 +449,19 @@ module Noxun
         return project_name(model) if key.empty?
 
         s = name.to_s.strip[0, PROJECT_NAME_MAX].to_s.strip
-        map = project_names.dup
-        session_keys_for(model).each { |k| map.delete(k) unless k == key }
         stored = !(s.empty? || s == default_project_name(model))
-        if stored
-          map[key] = s
-        else
-          map.delete(key)
+        aliases = session_keys_for(model)
+        # Cita a zapisuje POD ZAMKOM nad CERSTVOU mapou (1b-6c) — inak by zapis
+        # z jednej instancie zmazal zakazku pomenovanu v druhej.
+        ok = update_project_names do |map|
+          aliases.each { |k| map.delete(k) unless k == key }
+          if stored
+            map[key] = s
+          else
+            map.delete(key)
+          end
+          map
         end
-        ok = save_vepo_settings(PROJECT_NAMES_KEY => map)
         if stored && session_key?(key)
           remember_session_key(model, key)
         elsif ok
@@ -927,6 +1045,7 @@ module Noxun
           return status.call('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
         end
 
+        refresh_vepo_settings # 1b-6c: nazov aj 18/36 z CERSTVEHO suboru
         settings = vepo_settings
         last = settings['last_dir']
         start_dir = last.is_a?(String) && File.directory?(last) ? last : nil
@@ -1009,6 +1128,7 @@ module Noxun
           return status.call('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
         end
 
+        refresh_vepo_settings # 1b-6c: nazov zakazky z CERSTVEHO suboru
         collected = fresh_collect(model)
         exp = hardware_expansion(model, collected)
         return status.call('Nákupný zoznam sa nedá zostaviť (pozri Ruby konzolu).', true) if exp.nil?
@@ -1478,6 +1598,7 @@ module Noxun
           return status.call('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
         end
 
+        refresh_vepo_settings # 1b-6c: nazov zakazky z CERSTVEHO suboru
         collected = fresh_collect(model)
         bom = Bom.compute(collected)
         budget = budget_payload(model, bom, collected)
@@ -1522,6 +1643,7 @@ module Noxun
           return status.call('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
         end
 
+        refresh_vepo_settings # 1b-6c: nazov zakazky z CERSTVEHO suboru
         collected = fresh_collect(model)
         bom = Bom.compute(collected)
         smap = sheets_map

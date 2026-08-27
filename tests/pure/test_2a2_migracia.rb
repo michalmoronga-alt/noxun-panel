@@ -508,6 +508,26 @@ NxTest.test('2A-2: zamok je reentrantny (vnorene volanie sa nezablokuje samo o s
   end
 end
 
+NxTest.test('1b-6c: NEZISKANY zamok je CHYBA, nie ticha praca bez zamku') do
+  # `flock` vracia false, ked sa zamok nepodari vziat (filesystem ho
+  # nepodporuje). Ticho pokracovat by znamenalo, ze zamknuta uprava bezi BEZ
+  # zamku — a vsetky zaruky suboru nastaveni (1b-6c) by boli len zdanlive.
+  NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
+  a2_with_catalog(a2_fixture_bytes) do
+    orig = File.instance_method(:flock)
+    begin
+      File.define_method(:flock) { |_op| false }
+      ran = false
+      NxTest.assert_raise('zamok') { A2MAT.with_catalog_lock { ran = true } }
+      NxTest.refute(ran, 'kriticka sekcia sa BEZ zamku vobec nespustila')
+    ensure
+      File.define_method(:flock, orig)
+    end
+    NxTest.assert_equal(:ok_zamok, A2MAT.with_catalog_lock { :ok_zamok },
+                        'po obnove sa zamok berie normalne')
+  end
+end
+
 NxTest.test('2A-2: retype vyzaduje aj zdrojovy dekor (GH P1 2. kolo) — premenovany zaznam = undecidable') do
   NxTest.skip!('katalogove testy bezia len headless') unless NxTest.headless?
   original = a2_variant { |d| a2_sheet_of(d, 'HALIFAX_TABAKOVY_PD_DTDL_38')['decor'] = 'Premenovany dekor PD' }

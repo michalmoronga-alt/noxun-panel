@@ -137,10 +137,10 @@ NxTest.test('1b-6a: Ctrl+S meni CESTU aj GUID — nazov zadany pred ulozenim to 
                   'guid zaznam po migracii zanikol — inak by v subore rastli mrtve kluce')
   ensure
     core.save_project_name(m, '')
-    map = core.project_names.dup
-    map.delete('guid:GUID-UNTITLED')
-    map.delete('guid:GUID-PO-ULOZENI')
-    core.save_vepo_settings(Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY => map)
+    core.update_project_names do |map|
+      %w[guid:GUID-UNTITLED guid:GUID-PO-ULOZENI].each { |k| map.delete(k) }
+      map
+    end
   end
 end
 
@@ -160,9 +160,10 @@ NxTest.test('1b-6a: zmigrovany nazov drzi aj po RESTARTE (nie len v pamati seden
                         'zaznam prezil v subore, nie len v pamati sedenia')
   ensure
     core.save_project_name(m, '')
-    map = core.project_names.dup
-    %w[guid:GUID-RESTART guid:GUID-RESTART-2].each { |k| map.delete(k) }
-    core.save_vepo_settings(Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY => map)
+    core.update_project_names do |map|
+      %w[guid:GUID-RESTART guid:GUID-RESTART-2].each { |k| map.delete(k) }
+      map
+    end
   end
 end
 
@@ -181,9 +182,10 @@ NxTest.test('1b-6a: rozrobeny nazov NEZDEDI cudzia zakazka (most plati len pre t
                         'a rozrobenej zakazke sa nazov citanim inej nestratil')
   ensure
     core.save_project_name(rozrobena, '')
-    map = core.project_names.dup
-    map.delete('guid:GUID-ROZROBENA')
-    core.save_vepo_settings(Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY => map)
+    core.update_project_names do |map|
+      map.delete('guid:GUID-ROZROBENA')
+      map
+    end
   end
 end
 
@@ -213,9 +215,10 @@ NxTest.test('1b-6a (review #243 P2-1): zlyhany zapis migracie NESMIE zahodit mos
                   'a zaznam uz sedi na ceste')
   ensure
     core.save_project_name(m, '')
-    map = core.project_names.dup
-    %w[guid:GUID-ZAMKNUTY guid:GUID-ZAMKNUTY-2].each { |k| map.delete(k) }
-    core.save_vepo_settings(Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY => map)
+    core.update_project_names do |map|
+      %w[guid:GUID-ZAMKNUTY guid:GUID-ZAMKNUTY-2].each { |k| map.delete(k) }
+      map
+    end
   end
 end
 
@@ -243,10 +246,11 @@ NxTest.test('1b-6a (review #243 P2-2): nazov na ceste ma PREDNOST a most sa aj t
   ensure
     core.save_project_name(stara, '')
     core.save_project_name(m, '')
-    map = core.project_names.dup
-    %w[guid:GUID-ROZROBENA-2 guid:GUID-ROZROBENA-3 guid:GUID-ROZROBENA-4
-       c:/zakazky/stara.skp c:/zakazky/cerstva.skp].each { |k| map.delete(k) }
-    core.save_vepo_settings(Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY => map)
+    core.update_project_names do |map|
+      %w[guid:GUID-ROZROBENA-2 guid:GUID-ROZROBENA-3 guid:GUID-ROZROBENA-4
+         c:/zakazky/stara.skp c:/zakazky/cerstva.skp].each { |k| map.delete(k) }
+      map
+    end
   end
 end
 
@@ -265,19 +269,324 @@ NxTest.test('1b-6a: prepis nazvu PO ulozeni zmaze aj zaznam spred ulozenia') do
     NxTest.refute(map.key?('guid:GUID-PREPIS'), 'kluc spred ulozenia zanikol')
   ensure
     core.save_project_name(m, '')
-    map = core.project_names.dup
-    %w[guid:GUID-PREPIS guid:GUID-PREPIS-2].each { |k| map.delete(k) }
-    core.save_vepo_settings(Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY => map)
+    core.update_project_names do |map|
+      %w[guid:GUID-PREPIS guid:GUID-PREPIS-2].each { |k| map.delete(k) }
+      map
+    end
   end
 end
 
 NxTest.test('ST-1a: nazov projektu je nastavenie POCITACA — nikdy sa nezapisuje do modelu') do
   body = ST1B_CORE_RB[/def save_project_name.*?\n      end\n/m].to_s
   NxTest.assert(!body.empty?, 'zapis ma vlastnu funkciu')
-  NxTest.assert(body.include?('save_vepo_settings'),
+  # 1b-6c: zapis ide cez `update_project_names` (zamok + cerstva mapa), ktore
+  # pod kapotou vola zapisove dvere — cielom je stale %APPDATA%, nie .skp.
+  NxTest.assert(body.include?('update_project_names'),
+                'zapisuje sa cez zamknutu upravu mapy nazvov, nie do modelu')
+  door = ST1B_CORE_RB[/def update_vepo_settings.*?\n      end\n/m].to_s
+  NxTest.assert(door.include?('JsonFileStore.write(vepo_settings_path'),
                 'zapisuje sa do %APPDATA% (vepo_settings.json), nie do .skp')
   NxTest.refute(body.include?('start_operation'), 'ziadna operacia = ziadny krok Spat')
   NxTest.refute(body.include?('Store.'), 'ziadny zapis do NOXUN dictionary modelu')
+end
+
+# --- 1b-6c: vepo_settings.json pod JEDNYM medziprocesovym zamkom -------------
+#
+# Dve instancie SketchUpu zdielaju jeden %APPDATA%. Kym sa subor menil
+# read-modify-write nad odtlackom, vedel zapis jednej instancie zmazat zaznam,
+# ktory prave zapisala druha — pri mape nazvov islo o CELU zakazku.
+
+# Zapis „druhej instancie": pise do suboru PRIAMO — iny proces nase dvere
+# nepozna a v teste by ich volanie zvnutra podstrceneho zamku islo do rekurzie.
+# Pouziva sa presne MEDZI nasim citanim a nasim zapisom.
+ST1B_OTHER_INSTANCE = lambda do |key, name|
+  core = Noxun::Engine::ProductionCore
+  store = Noxun::Engine::JsonFileStore
+  store.reload!(core.vepo_settings_path)
+  data = core.vepo_settings
+  names = data[Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY]
+  names = names.is_a?(Hash) ? names.dup : {}
+  names[key] = name
+  store.write(core.vepo_settings_path,
+              data.merge(Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY => names))
+end
+
+# Upratanie testovacieho kluca zo suboru nastaveni (mimo mapy nazvov).
+ST1B_FORGET_SETTING = lambda do |*keys|
+  core = Noxun::Engine::ProductionCore
+  store = Noxun::Engine::JsonFileStore
+  store.reload!(core.vepo_settings_path)
+  data = core.vepo_settings.dup
+  keys.each { |k| data.delete(k) }
+  store.write(core.vepo_settings_path, data)
+end
+
+NxTest.test('1b-6c: KAZDY zapisovatel suboru berie zamok a cita NANOVO') do
+  # Statiky guard: keby si `save_merge_18_36` alebo niektory zapis `last_dir`
+  # sahal na `JsonFileStore.write` sam, zamok by chranil len mapu nazvov a
+  # subeh by zmigrovany nazov aj tak stratil (kolo 3 #243).
+  door = ST1B_CORE_RB[/def update_vepo_settings.*?\n      end\n/m].to_s
+  NxTest.assert(door.include?('Materials.with_catalog_lock'),
+                'zapisove dvere berú medziprocesovy zamok')
+  NxTest.assert(door.include?('JsonFileStore.reload!'),
+                'a citaju subor NANOVO — sekundova cache by zapis druhej instancie skryla')
+  NxTest.assert(door.include?('rescue StandardError'),
+                'cela zamknuta uprava je v rescue — zlyhanie .lock nesmie uniknut ako vynimka')
+  writes = ST1B_CORE_RB.scan(/JsonFileStore\.write\(vepo_settings_path/).length
+  NxTest.assert_equal(1, writes, 'do suboru nastaveni zapisuje JEDINE miesto')
+end
+
+NxTest.test('1b-6c: mapu nazvov cez save_vepo_settings zapisat NEDA (obchadzka zamku)') do
+  # Zamok chrani len top-level zlucenie: odovzdany ODTLACOK mapy by cerstvu
+  # mapu prepisal cely a strata nazvov by sa vratila spolocnymi dverami.
+  NxTest.skip!('vyzaduje headless sandbox nastaveni') unless NxTest.headless?
+  core = Noxun::Engine::ProductionCore
+  key = 'c:/zakazky/obchadzka.skp'
+  begin
+    core.update_project_names { |map| map.merge(key => 'Zakazka v subore') }
+    NxTest.refute(core.save_vepo_settings(core::PROJECT_NAMES_KEY => {}),
+                  'zapis mapy tadeto je odmietnuty')
+    NxTest.assert_equal('Zakazka v subore', core.project_names[key],
+                        'a mapa v subore ostala nedotknuta')
+  ensure
+    core.update_project_names do |map|
+      map.delete(key)
+      map
+    end
+  end
+end
+
+NxTest.test('1b-6c: zapis last_dir NEZMAZE nazov, ktory medzitym zapisala druha instancia') do
+  # Klasicky subeh: druha instancia si po nasom citani pomenuje zakazku a my
+  # zapiseme `last_dir` — bez zamku a cerstveho citania by sme jej zaznam
+  # prepisali nasim odtlackom.
+  NxTest.skip!('vyzaduje headless sandbox nastaveni') unless NxTest.headless?
+  core = Noxun::Engine::ProductionCore
+  mats = Noxun::Engine::Materials
+  key = 'c:/zakazky/druha-lastdir.skp'
+  orig = mats.method(:with_catalog_lock)
+  begin
+    mats.define_singleton_method(:with_catalog_lock) do |&blk|
+      # „Druha instancia" stihne zapisat PRESNE medzi nasim citanim a zapisom.
+      ST1B_OTHER_INSTANCE.call(key, 'Druha instancia')
+      orig.call(&blk)
+    end
+    NxTest.assert(core.save_vepo_settings('last_dir' => 'C:/Export'), 'nas zapis presiel')
+  ensure
+    mats.define_singleton_method(:with_catalog_lock, orig)
+  end
+  NxTest.assert_equal('Druha instancia', core.project_names[key],
+                      'zaznam druhej instancie nas zapis last_dir prezil')
+  NxTest.assert_equal('C:/Export', core.vepo_settings['last_dir'], 'a nas kluc sadol')
+ensure
+  core.update_project_names do |map|
+    map.delete(key)
+    map
+  end
+  ST1B_FORGET_SETTING.call('last_dir')
+end
+
+NxTest.test('1b-6c: prepinac 18/36 nezmaze zaznam druhej instancie') do
+  # Druhy zapisovatel toho isteho suboru — rovnaka pasca ako pri `last_dir`.
+  NxTest.skip!('vyzaduje headless sandbox nastaveni') unless NxTest.headless?
+  core = Noxun::Engine::ProductionCore
+  mats = Noxun::Engine::Materials
+  key = 'c:/zakazky/druha-merge.skp'
+  orig = mats.method(:with_catalog_lock)
+  begin
+    mats.define_singleton_method(:with_catalog_lock) do |&blk|
+      ST1B_OTHER_INSTANCE.call(key, 'Druha instancia')
+      orig.call(&blk)
+    end
+    NxTest.refute(core.save_merge_18_36(false), 'prepinac sa zapisal')
+  ensure
+    mats.define_singleton_method(:with_catalog_lock, orig)
+  end
+  NxTest.assert_equal('Druha instancia', core.project_names[key],
+                      'zaznam druhej instancie prezil aj zapis prepinaca')
+ensure
+  core.save_merge_18_36(true)
+  core.update_project_names do |map|
+    map.delete(key)
+    map
+  end
+end
+
+NxTest.test('1b-6c: migracia nazvu nezmaze zakazku pomenovanu v druhej instancii') do
+  # To iste nad MAPOU: keby migracia zapisovala odtlacok z citania, prepisala
+  # by cely `project_names` a zakazka z druheho okna by zmizla.
+  NxTest.skip!('vyzaduje headless sandbox nastaveni') unless NxTest.headless?
+  core = Noxun::Engine::ProductionCore
+  mats = Noxun::Engine::Materials
+  m = Struct.new(:path, :guid).new('', 'GUID-SUBEH')
+  orig = mats.method(:with_catalog_lock)
+  begin
+    core.save_project_name(m, 'Nasa zakazka')
+    m.path = 'C:/Zakazky/Nasa.skp'
+    m.guid = 'GUID-SUBEH-2'
+    mats.define_singleton_method(:with_catalog_lock) do |&blk|
+      ST1B_OTHER_INSTANCE.call('c:/zakazky/druha.skp', 'Druha instancia')
+      orig.call(&blk)
+    end
+    NxTest.assert_equal('Nasa zakazka', core.project_name(m), 'nasa migracia prebehla')
+  ensure
+    mats.define_singleton_method(:with_catalog_lock, orig)
+  end
+  map = core.project_names
+  NxTest.assert_equal('Druha instancia', map['c:/zakazky/druha.skp'],
+                      'zaznam druhej instancie migraciu prezil')
+  NxTest.assert_equal('Nasa zakazka', map['c:/zakazky/nasa.skp'], 'a nas sadol na cestu')
+ensure
+  core.update_project_names do |map|
+    %w[guid:GUID-SUBEH guid:GUID-SUBEH-2 c:/zakazky/druha.skp c:/zakazky/nasa.skp]
+      .each { |k| map.delete(k) }
+    map
+  end
+end
+
+NxTest.test('1b-6c: zamknuta migracia vrati CERSTVU hodnotu cesty (kolo 3 #243)') do
+  # Druha instancia pomenuje TU ISTU cestu tesne po nasom predzamkovom citani.
+  # Migracia jej nazov spravne zachova — ale keby `project_name` cital dalej
+  # zo stareho odtlacku, export by sa aj tak volal podla .skp suboru.
+  NxTest.skip!('vyzaduje headless sandbox nastaveni') unless NxTest.headless?
+  core = Noxun::Engine::ProductionCore
+  mats = Noxun::Engine::Materials
+  m = Struct.new(:path, :guid).new('', 'GUID-CERSTVA')
+  orig = mats.method(:with_catalog_lock)
+  begin
+    core.save_project_name(m, 'Rozrobena')
+    m.path = 'C:/Zakazky/Cerstva-hodnota.skp'
+    m.guid = 'GUID-CERSTVA-2'
+    mats.define_singleton_method(:with_catalog_lock) do |&blk|
+      ST1B_OTHER_INSTANCE.call('c:/zakazky/cerstva-hodnota.skp', 'Meno z druhej instancie')
+      orig.call(&blk)
+    end
+    NxTest.assert_equal('Meno z druhej instancie', core.project_name(m),
+                        'citanie vratilo hodnotu spod zamku, nie odtlacok spred neho')
+  ensure
+    mats.define_singleton_method(:with_catalog_lock, orig)
+  end
+ensure
+  core.update_project_names do |map|
+    %w[guid:GUID-CERSTVA guid:GUID-CERSTVA-2 c:/zakazky/cerstva-hodnota.skp]
+      .each { |k| map.delete(k) }
+    map
+  end
+end
+
+NxTest.test('1b-6c: zlyhanie zamku je len FALSE — a export dostane spravny nazov') do
+  # `.lock` sa neda otvorit (prava profilu, I/O). Vynimka by vyletela do okna
+  # aj do exportu; a keby sa nazov pocital az pod zamkom, prve citanie po
+  # ulozeni by vratilo meno .skp suboru namiesto zakazky (audit 1b-6c #2).
+  NxTest.skip!('vyzaduje headless sandbox nastaveni') unless NxTest.headless?
+  core = Noxun::Engine::ProductionCore
+  mats = Noxun::Engine::Materials
+  m = Struct.new(:path, :guid).new('', 'GUID-BEZ-ZAMKU')
+  orig = mats.method(:with_catalog_lock)
+  begin
+    core.save_project_name(m, 'Zakazka bez zamku')
+    m.path = 'C:/Zakazky/BezZamku.skp'
+    m.guid = 'GUID-BEZ-ZAMKU-2'
+    mats.define_singleton_method(:with_catalog_lock) do |&_blk|
+      raise Errno::EACCES, 'materials.lock (test)'
+    end
+    NxTest.refute(core.save_vepo_settings('last_dir' => 'C:/Nezapise'),
+                  'zapis pri nedostupnom zamku vracia FALSE, nevyhadzuje')
+    NxTest.assert_equal('Zakazka bez zamku', core.project_name(m),
+                        'citanie aj tak dava spravny nazov (fallback spred zamku)')
+  ensure
+    mats.define_singleton_method(:with_catalog_lock, orig)
+  end
+  NxTest.assert_equal('Zakazka bez zamku', core.project_name(m),
+                      'most prezil, takze migracia sa zopakuje hned ako zamok pojde')
+ensure
+  core.save_project_name(m, '')
+  core.update_project_names do |map|
+    %w[guid:GUID-BEZ-ZAMKU guid:GUID-BEZ-ZAMKU-2 c:/zakazky/bezzamku.skp]
+      .each { |k| map.delete(k) }
+    map
+  end
+end
+
+NxTest.test('1b-6c: NEPRECITATELNY subor nastavenia NEPREPISE (audit #1)') do
+  # Lenive `{}` z chybneho citania by sa zlucilo s novymi `attrs` a zapis by
+  # zmazal `project_names`, `merge_18_36` aj `last_dir` — teda presne to, co
+  # ma zamok chranit. Chybne citanie preto zastavi zapis.
+  NxTest.skip!('vyzaduje headless sandbox nastaveni') unless NxTest.headless?
+  core = Noxun::Engine::ProductionCore
+  store = Noxun::Engine::JsonFileStore
+  key = 'c:/zakazky/poskodeny.skp'
+  begin
+    core.update_project_names { |map| map.merge(key => 'Zakazka pred poskodenim') }
+    orig_read = store.method(:read)
+    orig_write = store.method(:write)
+    writes = 0
+    begin
+      store.define_singleton_method(:read) { |*_a, **_k| raise IOError, 'poskodeny subor (test)' }
+      store.define_singleton_method(:write) { |*a| writes += 1; orig_write.call(*a) }
+      NxTest.refute(core.save_vepo_settings('last_dir' => 'C:/Export'),
+                    'zapis nad neprecitatelnym suborom sa NEUDEJE')
+      # Nie-Hash obsah (platny JSON, zly tvar) je rovnaka pasca.
+      store.define_singleton_method(:read) { |*_a, **_k| [] }
+      NxTest.refute(core.save_vepo_settings('last_dir' => 'C:/Export'),
+                    'ani nad obsahom, ktory nie je objekt')
+      NxTest.assert_equal(0, writes, 'do suboru sa nezapisalo NIC')
+    ensure
+      store.define_singleton_method(:read, orig_read)
+      store.define_singleton_method(:write, orig_write)
+    end
+    NxTest.assert_equal('Zakazka pred poskodenim', core.project_names[key],
+                        'povodny obsah suboru ostal cely')
+  ensure
+    core.update_project_names do |map|
+      map.delete(key)
+      map
+    end
+  end
+end
+
+NxTest.test('1b-6c: zamok blokuje DRUHY PROCES (nie len monkeypatch)') do
+  # Jediny sposob, ako na Windows overit, ze `flock` naozaj serializuje dve
+  # instancie: druhy OS proces si vezme ten isty sidecar `.lock`, drzi ho a az
+  # POTOM zapise. Nas zapis musi pockat a jeho zaznam precitat.
+  NxTest.skip!('vyzaduje headless sandbox nastaveni') unless NxTest.headless?
+  core = Noxun::Engine::ProductionCore
+  dir = Noxun::Engine::Materials.dir
+  FileUtils.mkdir_p(dir)
+  ready = File.join(dir, 'druhy_proces.ready')
+  FileUtils.rm_f(ready)
+  script = <<~RUBY
+    require 'json'
+    dir, ready = ARGV
+    path = File.join(dir, 'vepo_settings.json')
+    File.open(File.join(dir, 'materials.lock'), 'a') do |f|
+      f.flock(File::LOCK_EX)
+      data = File.exist?(path) ? JSON.parse(File.binread(path)) : {}
+      File.binwrite(ready, 'ok')
+      sleep 1.2 # kriticka sekcia druhej instancie
+      data['druhy_proces'] = 'X'
+      tmp = path + '.tmp-child'
+      File.binwrite(tmp, JSON.pretty_generate(data))
+      File.rename(tmp, path)
+      f.flock(File::LOCK_UN)
+    end
+  RUBY
+  pid = Process.spawn(RbConfig.ruby, '-e', script, dir, ready)
+  begin
+    deadline = Time.now + 15
+    sleep 0.05 until File.exist?(ready) || Time.now > deadline
+    NxTest.assert(File.exist?(ready), 'druhy proces zamok drzi')
+    NxTest.assert(core.save_vepo_settings('last_dir' => 'C:/Po-zamku'), 'nas zapis presiel')
+  ensure
+    Process.waitpid(pid)
+    FileUtils.rm_f(ready)
+  end
+  settings = core.vepo_settings
+  NxTest.assert_equal('X', settings['druhy_proces'],
+                      'nas zapis pockal na druhy proces a jeho zaznam nechal zit')
+  NxTest.assert_equal('C:/Po-zamku', settings['last_dir'], 'a nas kluc sadol')
+ensure
+  ST1B_FORGET_SETTING.call('druhy_proces', 'last_dir')
 end
 
 NxTest.test('ST-1a: model bez akejkolvek identity dostane DEFAULT (nema sa kam zapisat)') do
