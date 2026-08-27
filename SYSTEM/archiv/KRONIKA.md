@@ -48,6 +48,13 @@
   `adopt_session_name` preč) → padla sada „drží aj po reštarte" a assert o migrácii; *(3)* most bez kontroly identity (adoptuje posledný záznam) → padla sada „cudzia zákazka
   nezdedí rozrobený názov". Každá mutácia zhodila práve tú vlastnosť, ktorú testuje jej sada.
 
+  **Review #243, kolo 1 — dve P2, obe platné a obe o TOM ISTOM: kedy sa most smie spotrebovať.** *(1) Zlyhaný zápis migrácie zahodil most.* `save_vepo_settings` pád len zaloguje,
+  takže pri zamknutom súbore alebo plnom disku dalo správny názov **len to jedno čítanie** a najbližší export písal zase meno `.skp`. Odteraz `save_vepo_settings` vracia
+  **`true`/`false`** a most sa zahadzuje až po úspešnom zápise — migrácia sa zopakuje, len čo zápis prejde. *(2) Kľúč sedenia prežil uloženie do súboru, ktorý už názov mal.*
+  Adopcia sa dovtedy spúšťala len vtedy, keď cesta záznam nemala; rozpísaný názov tak ostal v mape živý a pri „Uložiť ako" na čerstvú cestu by sa vynoril tam. Odteraz sa kľúče
+  sedenia pri prvom čítaní s platnou cestou spotrebujú **vždy**, pričom **záznam na ceste má prednosť** a rozpísaný názov ho neprepíše. Obe opravy majú vlastnú sadu a vlastnú
+  mutáciu (most spotrebovaný aj po zlyhanom zápise · adopcia preskočená, keď cesta názov má) — headless po kole: **1952 PASS / 0 FAIL**.
+
 - **1b-5 · DOROVNANIE CHARAKTERIZAČNEJ SADY `CHAR` — post-hoc Codex kolo na zmergovanom PR #239 (27.8.2026):** vetva `test/1b5-char-dorovnanie`, **TEST-ONLY** (kód pluginu sa
   nezmenil o riadok, VERSION ostáva **0.8.8**). Sada `CHAR` je BRÁNA pre blok 1d a GHOST Tool — na jej zelenej farbe stojí povolenie siahnuť na buildery a observery. Codex
   po mergi #239 našiel **štyri P2**, ktorých spoločný menovateľ je „assert je zelený, ale nemeria to, čo tvrdí". Preto sa to riešilo hneď, samostatnou dávkou.

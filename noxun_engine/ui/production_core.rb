@@ -35,11 +35,17 @@ module Noxun
         {}
       end
 
+      # Vracia TRUE/FALSE (review #243 P2-1): migracia nazvu zakazky musi
+      # vediet, ci zapis naozaj presiel — pri zamknutom subore alebo plnom
+      # disku sa nesmie zahodit jedina stopa na stary kluc. Pad sa aj tak len
+      # zaloguje: nastavenia nikdy nezhodia okno.
       def save_vepo_settings(attrs)
         path = File.join(Materials.dir, VEPO_SETTINGS_FILE)
         JsonFileStore.write(path, vepo_settings.merge(attrs))
+        true
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.save_vepo_settings')
+        false
       end
 
       # --- VEPO labely materialov ------------------------------------------
@@ -267,32 +273,52 @@ module Noxun
       def project_name(model)
         key = project_key(model)
         map = project_names
+        # Kluce sedenia sa spotrebuju pri PRVOM citani s platnou cestou — aj
+        # ked cesta uz nazov ma (review #243 P2-2).
+        adopted = adopt_session_name(model, key, map)
         saved = map[key]
-        saved = adopt_session_name(model, key, map) if saved.to_s.strip.empty?
+        saved = adopted if saved.to_s.strip.empty?
         s = saved.to_s.strip
         s.empty? ? default_project_name(model) : s
       end
 
-      # Prechod NEULOZENY→ULOZENY (1b-6a). Najde nazov pod klucom sedenia a
-      # HNED ho presunie na cestu; nahradne kluce zanikaju, aby v subore
-      # nerastli mrtve zaznamy. Migracia je nutna — bez nej by nazov zil len
-      # do konca sedenia (v pamati) a po restarte SketchUpu by sa aj tak
-      # stratil. Zapisuje sa VYHRADNE do nastaveni pocitaca (vepo_settings.json),
-      # do modelu nikdy; ked nie je co adoptovat, nezapisuje sa vobec.
+      # Prechod NEULOZENY→ULOZENY (1b-6a). Kluce sedenia sa pri prvom citani s
+      # platnou cestou VZDY spotrebuju:
+      #   * ked cesta este nazov NEMA, presunie sa nan nazov spod kluca sedenia
+      #     (bez toho by nazov zil len do konca sedenia a restart by ho zmazal);
+      #   * ked uz nazov MA, ma PREDNOST a zaznamy sedenia sa len upracu —
+      #     inak by rozrobeny nazov neskor sadol na uplne inu cestu (Ulozit ako)
+      #     a mrtvy `guid:` kluc by v subore ostal navzdy (review #243 P2-2).
+      # Vracia adoptovany nazov, inak nil.
+      #
+      # Zapisuje sa VYHRADNE do nastaveni pocitaca (vepo_settings.json), do
+      # modelu nikdy; ked nie je co upratat, nezapisuje sa vobec. Most sa
+      # zahadzuje AZ ked zapis naozaj presiel (review #243 P2-1) — zlyhany zapis
+      # (zamknuty subor, plny disk) by inak zmazal jedinu stopu na stary kluc a
+      # nazov by sa po dalsom refreshi aj tak stratil.
       def adopt_session_name(model, key, map)
         return nil if key.to_s.empty? || session_key?(key)
 
         aliases = session_keys_for(model)
-        hit = aliases.find { |k| !map[k].to_s.strip.empty? }
-        return nil unless hit
+        stale = aliases.select { |k| map.key?(k) }
+        return nil if stale.empty? && remembered_session_key(model).empty?
 
-        name = map[hit].to_s.strip
+        hit = stale.find { |k| !map[k].to_s.strip.empty? }
+        # Zaznam na ceste ma prednost — nikdy sa neprepisuje rozrobenym nazvom.
+        name = map[key].to_s.strip.empty? && hit ? map[hit].to_s.strip : ''
+        ok = stale.empty? || migrate_session_keys(model, key, name, stale, map)
+        forget_session_key(model) if ok
+        name.empty? ? nil : name
+      end
+
+      # Zapis migracie: kluce sedenia zanikaju, adoptovany nazov sadne na cestu
+      # (zhodny s defaultom sa nezapisuje — rovnako ako pri `save_project_name`).
+      # Vracia uspech zapisu.
+      def migrate_session_keys(model, key, name, stale, map)
         moved = map.dup
-        aliases.each { |k| moved.delete(k) }
-        moved[key] = name unless name == default_project_name(model)
+        stale.each { |k| moved.delete(k) }
+        moved[key] = name unless name.empty? || name == default_project_name(model)
         save_vepo_settings(PROJECT_NAMES_KEY => moved)
-        forget_session_key(model)
-        name
       end
 
       # Zapis nazvu. Prazdna hodnota (aj hodnota zhodna s defaultom) zaznam
@@ -317,10 +343,12 @@ module Noxun
         else
           map.delete(key)
         end
-        save_vepo_settings(PROJECT_NAMES_KEY => map)
+        ok = save_vepo_settings(PROJECT_NAMES_KEY => map)
         if stored && session_key?(key)
           remember_session_key(model, key)
-        else
+        elsif ok
+          # Most sa zahadzuje len po USPESNOM zapise (review #243 P2-1) —
+          # inak by po zlyhanom zapise zmizla jedina stopa na stary kluc.
           forget_session_key(model)
         end
         project_name(model)
