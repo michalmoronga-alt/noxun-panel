@@ -50,6 +50,9 @@ function state(rows, hidden){
   ok(h.indexOf('tgmenu open') >= 0, 'otvorene okno ma triedu open');
   ok(h.indexOf('id="railTagsMenu"') >= 0, 'okno ma svoje id');
   ok(h.indexOf("onTagOption('cela', this.checked)") >= 0, 'klik posiela KLUC, nie meno tagu');
+  // Review #249 P3: identita riadku pre vratenie FOKUSU po prekresleni okna.
+  ok(h.indexOf('data-tagkey="cela"') >= 0, 'riadok nesie identitu pre navrat fokusu');
+  eq((h.match(/data-tagkey=/g) || []).length, 2, 'kazdy riadok ma svoju identitu');
   no(M.menuHtml(st, false, {}).indexOf(' open"') >= 0, 'zatvorene okno triedu open nema');
 })();
 
@@ -65,13 +68,13 @@ function state(rows, hidden){
 // --- 2) ikona raily -----------------------------------------------------------
 (function(){
   const empty = M.railState(state([]));
-  eq(empty.available, false, 'bez NOXUN tagov nie je co prepinat');
+  eq(empty.empty, true, 'bez NOXUN tagov je zoznam prazdny');
   eq(empty.on, false, 'a ikona nesvieti');
   eq(empty.icon, 'eye', 'zakladna ikona je oko');
-  ok(empty.tip.indexOf('nie sú NOXUN tagy') >= 0, 'bublina povie PRECO je neaktivna (D-78)');
+  ok(empty.tip.indexOf('nie sú NOXUN tagy') >= 0, 'bublina to povie aj z hoveru');
 
   const allOn = M.railState(state([row('cela', 'Čelá', true), row('dosky', 'Dosky', true)]));
-  eq(allOn.available, true, 'tagy su — da sa prepinat');
+  eq(allOn.empty, false, 'tagy su');
   eq(allOn.on, false, 'ked je vsetko vidno, ikona nesvieti');
   eq(allOn.icon, 'eye', 'a ostava oko');
 
@@ -79,6 +82,14 @@ function state(rows, hidden){
   eq(some.on, true, 'nieco je skryte — ikona svieti („nevidis vsetko")');
   eq(some.icon, 'eye-off', 'a prepne sa na preskrtnute oko');
   ok(some.tip.indexOf('skrytých je 1 z 2') >= 0, 'bublina nesie POCET zo servera');
+
+  // Review #249 P2: prazdny model tlacidlo NEZAMYKA — okno sa otvori a vysvetli.
+  const shell = fs.readFileSync(path.join(ROOT, 'noxun_engine', 'ui', 'js', 'shell.js'), 'utf8');
+  const tagPart0 = shell.slice(shell.indexOf('D-27: OKNO VIDITELNOSTI TAGOV'),
+                               shell.indexOf('K2/D-87: to iste pre KONTROLU KRESBY'));
+  no(tagPart0.indexOf("setAttribute('aria-disabled'") >= 0,
+     'tlacidlo tagov sa nezosedne — inak by bolo vysvetlenie prazdneho zoznamu nedosiahnutelne');
+  no(tagPart0.indexOf("getAttribute('aria-disabled')") >= 0, 'a klik sa neodmieta');
 })();
 
 (function(){
@@ -137,6 +148,10 @@ function state(rows, hidden){
   ok(tagPart.length > 500, 'cast raily s tagmi sa nasla');
   no(tagPart.indexOf('localStorage') >= 0, 'viditelnost tagu patri modelu, nie prehliadacu');
   no(tagPart.indexOf('start_operation') >= 0, 'klient o operaciach nerozhoduje');
+  // Review #249 P3: fokus prezije prekreslenie otvoreneho okna.
+  ok(tagPart.indexOf('data-tagkey') >= 0, 'fokus sa vracia podla identity riadku');
+  ok(tagPart.indexOf('function nxTagFocusKey') >= 0, 'zapamatanie fokusu ma vlastnu funkciu');
+  ok(tagPart.indexOf('back.focus()') >= 0, 'a fokus sa po prekresleni naozaj vracia');
 
   const actions = fs.readFileSync(path.join(ROOT, 'noxun_engine', 'ui', 'js', 'actions.js'), 'utf8');
   ok(actions.indexOf('sketchup.nx_tag_visible') >= 0,

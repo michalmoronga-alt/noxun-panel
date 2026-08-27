@@ -34,21 +34,25 @@
     }
 
     // Stav ikony v raile. Ciste rozhodovanie (Node testy) — DOM nasadzuje shell.
-    //   available — v modeli je aspon jeden NOXUN tag (inak sa neda co prepnut)
-    //   on        — nieco je skryte (ikona sa rozsvieti: „pozor, nevidis vsetko")
-    //   icon      — sprite kluc (`eye` / `eye-off`), ziadna nova kresba
+    //   empty — v modeli nie je ani jeden NOXUN tag
+    //   on    — nieco je skryte (ikona sa rozsvieti: „pozor, nevidis vsetko")
+    //   icon  — sprite kluc (`eye` / `eye-off`), ziadna nova kresba
+    //
+    // Review #249 P2: tlacidlo sa NEZOSEDNE ani pri prazdnom modeli — okno sa
+    // otvori a VETOU povie, ze tagy vzniknu s prvou skrinkou. Zamknute tlacidlo
+    // by tu vysvetlenie schovalo do bubliny (a `tgempty` by bolo nedosiahnutelne).
     function railState(st){
       var rows = rowsOf(st);
       var hidden = hiddenCount(st);
       if (!rows.length){
-        return { available: false, on: false, icon: 'eye',
+        return { empty: true, on: false, icon: 'eye',
                  tip: 'Viditeľnosť tagov — v modeli zatiaľ nie sú NOXUN tagy' };
       }
       if (hidden > 0){
-        return { available: true, on: true, icon: 'eye-off',
+        return { empty: false, on: true, icon: 'eye-off',
                  tip: 'Viditeľnosť tagov — skrytých je ' + hidden + ' z ' + rows.length };
       }
-      return { available: true, on: false, icon: 'eye',
+      return { empty: false, on: false, icon: 'eye',
                tip: 'Viditeľnosť tagov v modeli (Čelá · Chrbát · …)' };
     }
 
@@ -74,7 +78,11 @@
       rows.forEach(function(r){
         var key = String(r && r.key != null ? r.key : '');
         var on = r && r.visible === true;
-        h += '<label class="tgopt"><input type="checkbox"' + (on ? ' checked' : '') +
+        // `data-tagkey` nesie identitu riadku — po prekresleni okna sa podla nej
+        // vracia FOKUS na prave prepnuty checkbox (review #249 P3: klavesnicovy
+        // pouzivatel by inak po kazdom prepnuti z ponuky vypadol).
+        h += '<label class="tgopt"><input type="checkbox" data-tagkey="' + esc(key) + '"' +
+             (on ? ' checked' : '') +
              ' onchange="' + fn + '(\'' + esc(key) + '\', this.checked)">' +
              '<span>' + esc(r && r.label) + '</span>';
         if (r && r.folder_hidden === true){

@@ -1060,8 +1060,9 @@ prepínajú, čo panel *kreslí*, toto mení, čo je vidieť *v modeli*.
   dávka nepridala žiadnu novú kresbu.
 - **Ponúkajú sa LEN tagy, ktoré v modeli sú** (D-78 — mŕtve tlačidlo je horšie
   než žiadne). Prázdny zoznam sa **prizná vetou** („vzniknú s prvou skrinkou
-  alebo doskou"), nie prázdnym oknom; bez tagov je tlačidlo `aria-disabled`
-  s vysvetlením v bubline (nikdy HTML `disabled`).
+  alebo doskou"), nie prázdnym oknom — a **tlačidlo sa preto nezosedne ani
+  v prázdnom modeli**: zamknuté by to vysvetlenie schovalo do bubliny
+  (review #249). Neaktívne je len to, čo naozaj nemá čo robiť.
 - **Skrytý priečinok tagov sa prizná.** Tag môže byť zapnutý a napriek tomu
   neviditeľný, keď je skrytý jeho priečinok — riadok vtedy nesie jantárovú
   poznámku „priečinok skrytý". Priečinok sa **nikdy nezapína automaticky**
@@ -1080,6 +1081,11 @@ prepínajú, čo panel *kreslí*, toto mení, čo je vidieť *v modeli*.
   status to povie („Kreslenie prepnuté na Untagged").
 - **Zatvára klik mimo a Escape**, fokus sa vracia na tlačidlo (vzor warnpanelu
   a rohového nastavenia ABS). Vlastný kľúč merača: `rail:tagy`.
+- **Prekreslenie otvoreného okna nesmie zhodiť fokus.** Server po každom
+  prepnutí pošle čerstvý stav a okno sa prekreslí celé (`outerHTML`), takže
+  klávesnicový používateľ by po každom prepnutí z ponuky vypadol. Riadok preto
+  nesie `data-tagkey` a fokus sa po prekreslení vráti na ten istý checkbox
+  (review #249). Platí pre každý overlay, ktorý sa prekresľuje zo servera.
 - **Známe obmedzenie (priznané):** tag skrytý priamo v natívnom okne Tags sa
   v paneli prejaví až pri najbližšom pushi (otvorenie panela, zmena výberu,
   Späť/Znova) — `LayersObserver` dávka vedome nepridáva.

@@ -41,7 +41,8 @@ module Noxun
           before = tag_row(tags_state(model), key)
           state = Engine.set_tag_visible(key, value, model)
           model.active_view.invalidate if model.active_view
-          set_status(tag_toggle_status(state, before, key, value))
+          msg, err = tag_toggle_status(state, before, key, value)
+          set_status(msg, err)
         end
 
         # Riadok tagu zo stavu (alebo nil, ked tag v modeli nie je).
@@ -55,18 +56,31 @@ module Noxun
         # Potvrdenie SKLADA SERVER — a hovori pravdu aj vtedy, ked sa nestalo
         # nic (tag v modeli nie je) alebo ked skrytie posunulo kreslenie
         # (SketchUp aktivny tag skryt nenecha — robime to vedome, Codex F7).
+        #
+        # Review #249 P2: uspech sa hlasi az podla VYSLEDNEHO STAVU, nie podla
+        # toho, co si klient pytal. Ked zapis do modelu zlyhal (`Tags.write`
+        # operaciu abortuje a vrati nezmeneny stav), riadok drzi opacnu
+        # viditelnost — vtedy je to CHYBA, nie potvrdenie.
+        # Vracia dvojicu [sprava, chyba?].
         def tag_toggle_status(state, before, key, value)
           row = tag_row(state, key)
-          return 'Tento tag v modeli zatiaľ nie je — nič sa nezmenilo.' if row.nil? && before.nil?
+          return ['Tento tag v modeli zatiaľ nie je — nič sa nezmenilo.', false] if row.nil? && before.nil?
 
           label = (row || before)['label']
-          if row && row['folder_hidden'] && value
-            return "#{label}: tag je zapnutý, ale jeho priečinok tagov je skrytý — v modeli ho vidno nebude."
+          return ["#{label}: tag sa nepodarilo prepnúť — v modeli sa nič nezmenilo.", true] if row.nil?
+
+          unless (row['visible'] == true) == value
+            return ["#{label}: tag sa nepodarilo prepnúť — v modeli sa nič nezmenilo.", true]
+          end
+
+          if row['folder_hidden'] && value
+            return ["#{label}: tag je zapnutý, ale jeho priečinok tagov je skrytý — " \
+                    'v modeli ho vidno nebude.', false]
           end
 
           msg = value ? "#{label} — zobrazené v modeli." : "#{label} — skryté v modeli."
           msg += ' Kreslenie prepnuté na Untagged (skrytý tag nemôže byť aktívny).' if state.is_a?(Hash) && state['active_reset']
-          msg
+          [msg, false]
         end
 
         # D-14: ulozenie OZNACENEHO korpusu ako sablony priamo z panela (in-panel

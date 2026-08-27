@@ -201,6 +201,20 @@ NxTest.test('D-27: potvrdenie sklada SERVER a prizna aj to, ze sa nestalo nic') 
   NxTest.assert(s.include?("state['active_reset']"), 'presun kreslenia sa prizna')
 end
 
+# Review #249 P2: uspech sa hlasi podla VYSLEDNEHO stavu, nie podla toho, co si
+# klient pytal — zlyhany zapis (abortovana operacia) by inak potvrdil zmenu,
+# ktora sa nestala.
+NxTest.test('D-27: status potvrdi zmenu az podla VYSLEDNEHO stavu tagu') do
+  s = D27_ACT[/def tag_toggle_status.*?\n        end\n/m].to_s
+  NxTest.assert(s.include?("(row['visible'] == true) == value"),
+                'porovnava sa skutocna viditelnost so ziadanou hodnotou')
+  NxTest.assert(s.include?('nepodarilo prepnúť'), 'zlyhanie zapisu sa povie nahlas')
+  NxTest.assert(s.scan(/, true\]/).length >= 2, 'a hlasi sa ako CHYBA, nie ako potvrdenie')
+  h = D27_ACT[/def handle_tag_visible.*?\n        end\n/m].to_s
+  NxTest.assert(h.include?('msg, err = tag_toggle_status'), 'handler vetvi aj priznak chyby')
+  NxTest.assert(h.include?('set_status(msg, err)'), 'a posiela ho do statusu')
+end
+
 # --- 6) stav chodi s kazdym pushom -------------------------------------------
 
 NxTest.test('D-27: viditelnost tagov chodi PULL pri otvoreni aj s KAZDYM pushom vyberu') do

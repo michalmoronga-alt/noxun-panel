@@ -737,13 +737,31 @@
 
   // Jedno miesto, kde sa meni obsah aj viditelnost — `aria-expanded` tak
   // hovori pravdu bez ohladu na to, ktora cesta okno zavrela.
+  //
+  // Review #249 P3: prekreslenie cez `outerHTML` znici zafokusovany checkbox,
+  // takze klavesnicovy pouzivatel po KAZDOM prepnuti z ponuky vypadol. Fokus sa
+  // preto pred prekreslenim ZAPAMATA (podla `data-tagkey` riadku) a po nom
+  // vrati — bez toho, aby si panel drzal akykolvek stav navyse.
+  function nxTagFocusKey(){
+    var a = document.activeElement;
+    if (!a || !a.getAttribute) return '';
+    var m = nxTagMenuNode();
+    if (!m || !m.contains(a)) return '';
+    return a.getAttribute('data-tagkey') || '';
+  }
+
   function nxRenderTagMenu(open){
     var m = nxTagMenuNode();
     if (!m || !window.NXTagMenu) return;
+    var keep = open === true ? nxTagFocusKey() : '';
     m.outerHTML = NXTagMenu.menuHtml(nxTagState, open === true,
                                      { fn: 'onTagOption', id: 'railTagsMenu' });
     var btn = el('railTagy');
     if (btn) btn.setAttribute('aria-expanded', open === true ? 'true' : 'false');
+    if (!keep) return;
+    var fresh = nxTagMenuNode();
+    var back = fresh ? fresh.querySelector('input[data-tagkey="' + keep + '"]') : null;
+    if (back){ try { back.focus(); } catch (err) {} }
   }
 
   function nxCloseTagMenu(){
@@ -754,10 +772,11 @@
   // Klik na ikonu. Bublanie sa zastavuje z rovnakeho dovodu ako pri rohu ABS:
   // okno zatvara KLIK MIMO (delegacia na document), takze klik na tlacidlo by
   // ho inak v tom istom kliku otvoril a hned zavrel.
+  // Okno sa otvara VZDY — aj v modeli bez tagov, kde vetou povie, ze vzniknu
+  // s prvou skrinkou (review #249 P2: zamknute tlacidlo by to vysvetlenie
+  // schovalo do bubliny).
   function onTagMenuToggle(ev){
     if (ev && ev.stopPropagation) ev.stopPropagation();
-    var btn = el('railTagy');
-    if (btn && btn.getAttribute('aria-disabled') === 'true') return;
     nxRenderTagMenu(!nxTagMenuOpen());
   }
 
@@ -780,11 +799,9 @@
     var n = el('railTagy');
     if (n && s){
       n.classList.toggle('on', s.on);
-      n.setAttribute('aria-disabled', s.available ? 'false' : 'true');
       if (window.NXIcons && NXIcons.set) NXIcons.set(n, s.icon);
       var tip = el('railTagyTip');
       if (tip) tip.textContent = s.tip;
-      if (!s.available) nxCloseTagMenu();
     }
     // Otvorene okno drzi ZIVY stav — prekresli ho.
     if (nxTagMenuOpen()) nxRenderTagMenu(true);
