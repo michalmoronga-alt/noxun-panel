@@ -18,18 +18,20 @@
 ## Záznamy dávok (najnovšie hore)
 
 - **1b-E · POST-HOC SWEEP KOMPLET — dávky #186–#226 majú spätné Codex review (27.8.2026):** odrážka **E** bloku 1b je uzavretá. Docs dávka, **kód pluginu sa nezmenil o riadok**
-  (VERSION ostáva **0.8.9**). Sweep vznikol preto, že Codex bol **21.–24.8. nedostupný** a PR **#186–#226** prešli bránou so slepým subagentom; od #227 review robí zase Codex,
-  takže rozsah bol presne tento úsek. Prešiel v **dvoch nezávislých častiach**, ktoré sa navzájom kontrolujú.
+  (VERSION ostáva **0.8.9**). Sweep vznikol preto, že Codex bol **21.–24.8. nedostupný** a PR **#186–#226** prešli bránou so slepým subagentom (audit pred kódom + review pred
+  mergom, **15 kôl**); od #227 review robí zase Codex, takže rozsah bol presne tento úsek. Prešiel v **dvoch nezávislých častiach**, ktoré sa navzájom kontrolujú.
 
   **Časť 1 — sweep diffov (čerstvý Codex pohľad na zmergovaný kód).** Metóda: `gh pr diff` → filtrovanie na kód pluginu (`noxun_engine/**`) → dávky po 3–5 PR do lokálneho **Codex CLI**
-  (read-only prompt, doména výroba nábytku + cenotvorba) → **každý nález overený proti dnešnému `main`** s dôkazom `súbor:riadok`. Posledná session spracovala **34 PR** — 27 kódových
-  v siedmich dávkach (B1–B7) a 7 docs/test PR, ktoré sa `noxun_engine/` vôbec nedotkli. Spolu s pilotnou session (12 PR) je bilancia **29 nálezov: 18 vyriešených · 1 zaniknutý ·
-  10 stále platných** (3 aktuálne P2, zvyšok P3). Overovanie proti dnešnému stromu bolo nevyhnutné: fáza ŠTÚDIO medzitým zrušila šesť satelitných okien, takže veľká časť starých ciest
-  fyzicky neexistuje — bez tohto kroku by sweep hlásil nálezy nad kódom, ktorý v repe nie je.
+  (read-only prompt, doména výroba nábytku + cenotvorba) → **každý nález overený proti dnešnému `main`** s dôkazom `súbor:riadok`. Sada #186–#226 má **41 PR** a prešla v dvoch
+  session, ktoré sa čiastočne prekrývali: pilotná zobrala 12 PR, hlavná **34 PR** (#191, #193, #195, #197–#226 a navyše #240) — z nich 27 kódových v siedmich dávkach (B1–B7)
+  a 7 docs/test PR, ktoré sa `noxun_engine/` vôbec nedotkli. Bilancia oboch: **29 nálezov: 18 vyriešených · 1 zaniknutý · 10 stále platných** (3 aktuálne P2, zvyšok P3) — z desiatich
+  platných je **sedem** z hlavnej session (sekcia **A** zoznamu kandidátov) a **tri** z pilotnej (tam sú ako **C4, C5, C7**). Overovanie proti dnešnému stromu bolo nevyhnutné: fáza
+  ŠTÚDIO medzitým zrušila šesť satelitných okien, takže veľká časť starých ciest fyzicky neexistuje — bez tohto kroku by sweep hlásil nálezy nad kódom, ktorý v repe nie je.
 
   **Časť 2 — triáž historických review threadov.** Cez GraphQL `reviewThreads` sa pre #186–#226 vybrali thready, ktoré **nikdy nedostali odpoveď** (`isResolved == false`, práve jeden
   komentár, autor `chatgpt-codex-connector`): zo 66 threadov ich bolo **54**. Verdikt: **34 zaniknutých/vyriešených**, **18 unikátnych platných** (dva páry duplicít) — **P1 = 0 · P2 = 2 ·
-  P3 = 16**. Obe P2 sú zaradené: názov zákazky pred prvým uložením je **vyriešený dávkou 1b-6a** (PR #244), nerozlíšiteľné hlavičky skupín materiálov sú dávka **1b-6b**.
+  P3 = 16**. *(To „P1 = 0" platí pre thready; dve reálne P1 spomenuté nižšie sú z časti 1, teda z diffov.)* Obe P2 sú zaradené: názov zákazky pred prvým uložením je **vyriešený dávkou
+  1b-6a** (PR #244), nerozlíšiteľné hlavičky skupín materiálov sú dávka **1b-6b** — otvorených z tejto osemnástky je teda **17**.
 
   **Tri platné P2 pre orchestrátora.** *(1) + (2) Tichý návrat starej ceny dekoru* — dva nálezy s jedným koreňom: `ui/js/proj_materials.js:1205–1219` (zotavenie z konfliktu preleje do
   čerstvého katalógového riadku **všetky** editovateľné stĺpce starého formulára, aj tie, ktorých sa používateľ nedotkol) a `ui/js/nx_modal.js:680–724` (pamäť rozpísaných riadkov si po

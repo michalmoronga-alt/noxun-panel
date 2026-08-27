@@ -74,8 +74,10 @@ starým guid kľúčom sa už nedal nájsť. Prvý pokus (**PR #243**) išiel do
 táto dávka je jeho **úzky re-rez**. Plný záznam — príbeh delenia, riešenie, zamietnuté alternatívy, 5 mutácií: [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-6a**.
 
 **1b-6b · Hlavičky skupín materiálov sú nerozlíšiteľné — ⏳ OTVORENÉ (P2 z triáže Codex threadov, PR #193 nález #33).** Menovka skupiny vo výstupoch sa skladá len z dekoru, štruktúry
-a názvu (`ui/production_core.rb:664–671`), takže záznamy líšiace sa **výrobcom, typom, formátom či rubom** dostanú v kusovníku a v nákupe **identickú hlavičku** — dve rôzne dosky vyzerajú
-ako jedna položka. Kolízny aparát v repe existuje (`core/materials.rb:991`), ale výstupy ho nepoužívajú. Je to údaj, podľa ktorého sa objednáva — preto patrí medzi najbližšie kódové dávky.
+a názvu dekoru (`ui/production_core.rb` → `material_label`, dnes `:780–787`), takže záznamy líšiace sa **výrobcom, typom, formátom či rubom** dostanú v kusovníku a v nákupe **identickú
+hlavičku** — dve rôzne dosky vyzerajú ako jedna položka. **Ako to predviesť:** dva varianty toho istého dekoru, ktoré sa líšia len výrobcom (alebo len formátom platne) → v Kusovníku
+majú rovnaký nadpis skupiny a v nákupe rovnaký riadok. Kolízny aparát v repe už existuje a rieši presne toto (`core/materials.rb` → `sheet_label_suffix`, `:991` — pripája formát a rub
+do menovky variantu pre selecty), ale výstupy ho nepoužívajú. Je to údaj, podľa ktorého sa objednáva — preto patrí medzi najbližšie kódové dávky.
 
 **1b-6c · Zápis `vepo_settings.json` pod jedným zámkom — ⏳ OTVORENÉ (druhá časť delenia #243).** Dve inštancie SketchUpu zdieľajú jeden `%APPDATA%`, ale mapa `project_names`
 sa mení **read-modify-write nad odtlačkom**, takže zápis z jednej inštancie vie zmazať zákazku pomenovanú v druhej. **Nie je to regresia — `main` to má odjakživa**, dávka 1b-6a to
@@ -102,8 +104,11 @@ pointer na okamžitú hotfix dávku s výsledkom — nečaká v registri)** / P1
 
 - **Tri nezávislé pohľady:** externý Codex audit (spúšťa Michal; podklad: [zdroje/AUDIT_2026-08_podklad.md](zdroje/AUDIT_2026-08_podklad.md))
   · vlastný prechod (Fable) · slepý subagent. Nálezy sa zlejú do jedného registra s dedupom.
-- **Vstup, ktorý už čaká:** [zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md) — otvorené nálezy z post-hoc sweepu #186–#226 (7 zo sweepu diffov, 18 z triáže
-  review threadov, 13 ďalších z bloku 1b), každý s adresou v kóde. **Prvý krok bloku 1c je preliať tento zoznam do registra** (dedup a overenie proti vtedajšiemu `main` sú popísané na konci súboru).
+- **Vstup, ktorý už čaká:** [zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md) — nálezy z post-hoc sweepu #186–#226: sekcia **A** 7 z hlavnej session sweepu ·
+  sekcia **B** 18 z triáže review threadov (*z toho B1 je už vyriešené, otvorených 17*) · sekcia **C** 13 ďalších z bloku 1b (*C4 a C5 sú tiež už vyriešené*). Každý má adresu v kóde.
+  **Prvý krok bloku 1c je preliať tento zoznam do registra**, v tomto poradí: **(1)** dedup (známe zhody sú v zozname vymenované) → **(2)** vyradiť to, čo je medzitým hotové alebo
+  už má dávku → **(3)** overiť proti vtedajšiemu `main` (čísla riadkov sú k `0070697`, `ui/production_core.rb` sa medzitým posunul) → **(4)** až potom priradiť R-číslo, závažnosť,
+  vrstvu a blokovanú funkciu.
 - **Prioritné osi auditu** (od budúcich funkcií dozadu): observery/undo/Tool lifecycle (→ GHOST) · dátový model setov kovania
   (→ D-109/KOVANIE) · `ui/production_core.rb` — jadro výstupov v UI vrstve (→ Ponuka/plošná kontrola) · payload kontrakty a identita ·
   perzistencia, `std` verzie, migrácie (→ shared library) · zjednotenie UI vzorov na nx_modal/nx_combo · VŠETKY aktuálne stub odseky architektúry (k 26.8. ich je 19; zoznam grepom, detail v podklade).

@@ -9,22 +9,28 @@
 > `_dev/`. V čistom klone repa neexistujú, takže bez tohto zoznamu by sa dala z KRONIKY obnoviť len bilancia, nie samotné nálezy
 > (nález review #245 P2). Tu je preto **vecný obsah** všetkých otvorených kandidátov — v skratke, ale s adresou v kóde.
 >
-> **Súbory riadkov nižšie sú stav k `main` @ `3e1cdf8` (v0.8.9).** Pri audite treba každý nález znova overiť proti vtedajšiemu `main`
-> — presne to bola najdrahšia lekcia sweepu (fáza ŠTÚDIO zrušila šesť okien a časť starých ciest fyzicky neexistuje).
+> **Čísla riadkov sú stav k `main` @ `0070697` (v0.8.8) — to bola základňa sweepu, nie dnešný `main`.** Platí to hlavne pre
+> `ui/production_core.rb`, ktorý PR #244 posunul o ~116 riadkov: v tomto súbore sa orientuj podľa **mena metódy**, nie podľa čísla
+> (dnešné pozície kľúčových metód: `fresh_collect` `:591` · `dup_id_suffix` `:661` · `material_label` `:780` · `cp_warnings` `:1461` ·
+> `project_name` `:273` · `save_vepo_settings` `:42`). Pri audite treba každý nález **znova overiť proti vtedajšiemu `main`** — presne to
+> bola najdrahšia lekcia sweepu (fáza ŠTÚDIO zrušila šesť okien a časť starých ciest fyzicky neexistuje).
 
 ---
 
 ## A · Stále platné nálezy zo sweepu diffov (spätný Codex pohľad na zmergovaný kód)
 
+Sedem nálezov nižšie je z **hlavnej session** sweepu (34 PR). Bilancia „10 stále platných" v KRONIKE je **7 + 3 z pilotnej session** —
+tie tri sú nižšie ako **C4**, **C5** a **C7**, lebo prišli iným kanálom. Nič sa teda nestratilo, len sú v inej sekcii.
+
 | # | Sev. | Nález | Súbor:riadok | Zaradenie |
 |---|---|---|---|---|
 | A1 | **P2** | Zotavenie z konfliktu (`mdEditRefresh`) preleje do čerstvého katalógového riadku **všetky** editovateľné stĺpce starého formulára — aj tie, ktorých sa používateľ nedotkol. Čerstvý `row_rev` ostáva, `base_rev` sa omladí, takže ďalší Save prejde cez oba zámky a **ticho vráti cenu / kód / formát, ktorý medzitým prišiel zvonku**. Odznak „zmenené mimo editora" neukáže čerstvú hodnotu ani neponúkne „prevziať z katalógu". | `ui/js/proj_materials.js:1205–1219` (dôkaz `:1211–1213`, `:1216`, `:1227`) | dávka **1b-7** |
 | A2 | **P2** | Pamäť rozpísaných riadkov (`trimRowsValue`) si po prvej zmene v ktoromkoľvek riadku uloží **všetky editovateľné stĺpce všetkých riadkov**; `mergeRowsMemory` ich pri ďalšom otvorení vlije do čerstvých riadkov a ponechá im čerstvý `row_rev` → uložením sa vráti stará cena, hoci katalóg medzitým dostal novú. **Bez akéhokoľvek varovania.** Pamäť sa maže len pri ÚSPEŠNOM uložení. | `ui/js/nx_modal.js:680–724` (dôkaz `:680–691`, `:698–724`, `:728–747`, `clearMemory` `:609–618`) | dávka **1b-7** |
-| A3 | **P2** | Export s duplicitnou identitou **dobehne s podpočítaným kovaním**: expanzia setov deduplikuje členov účtovaných na `owner_id`, takže dva kusy so spoločným ID dostanú jednu sadu. CSV kovania / XLSX rozpočtu / XLSX ponuky sa **zapíšu** a varovanie príde až v statuse PO zápise. Vedomý kompromis dávky 1b-3 (#240), nie regresia. | `ui/production_core.rb:475` (+ `:816`, `:1282`, `:1331`, komentár `:512–518`) | **otázka pre audit 1c**: dokončiť export, alebo najprv vyžiadať dedup tik? |
+| A3 | **P2** | Export s duplicitnou identitou **dobehne s podpočítaným kovaním**: expanzia setov deduplikuje členov účtovaných na `owner_id`, takže dva kusy so spoločným ID dostanú jednu sadu. CSV kovania / XLSX rozpočtu / XLSX ponuky sa **zapíšu** a varovanie príde až v statuse PO zápise. Vedomý kompromis dávky 1b-3 (#240), nie regresia. | `ui/production_core.rb` → `fresh_collect` (vtedy `:475`, dnes `:591`; komentár s priznaným kompromisom hneď pod ňou) | **otázka pre audit 1c**: dokončiť export, alebo najprv vyžiadať dedup tik? |
 | A4 | P3 | Filtrovaný Kusovník ukazuje pri odfiltrovaných riadkoch celoprojektové súčty — `totalRow` sa síce pri filtri prepne na počítadlo, ale skupinové medzisúčty sú serverové a pohľady **Platne** aj **ABS** tlačia `ST.totals` bez ohľadu na filter (vrátane prázdneho zoznamu). | `ui/js/studio.js:242`, `:1276–1281`, `:1310` | ≡ B6 nižšie (jeden nález, dva zdroje) |
 | A5 | P3 | Zelené číslo semaforu Kontroly: menovateľ je skutočný počet skriniek, čitateľ `dirty` sa počíta LEN z ID prítomných v `placements` → skrinka bez placementu (prázdne ID, degenerované rozmery) sa nikdy nezaráta ako špinavá, čiže je vždy „čistá". Komentár rozdiel zdrojov priznáva, ale tento dôsledok nerieši. | `core/validation.rb:708–719` (komentár `:695–700`) | ≡ B10 nižšie |
 | A6 | P3 | `BUD_MORE.sent = true` sa nastaví PRED `budSend`, ktorý však zápis môže len **zaradiť do fronty**. Korelácia v `NX.budgetResult` je len podľa názvu operácie, takže **skorší** inline `custom_update` zavrie ⋯ modal ako „uložené" ešte predtým, než sa náš zápis odoslal; odmietnutý zaradený zápis potom stratí hodnoty. Korelovať podľa vlastného tokenu zápisu, nie podľa mena operácie. | `ui/js/budget.js:1394–1396`, fronta `:1447`, korelácia `:1560–1567` | register 1c |
-| A7 | P3 | `dup_id_suffix` aj `cp_warnings` zahadzujú `kind` z `Validation.duplicate_identities` a hlásia „kovanie účtované na vlastníka sa započíta len raz" **aj pre duplicitné DOSKY**, ktoré žiadnu expanziu kovania nemajú → falošné varovanie nad korektným nákupom. Riešiť spolu s C6 (zjednotenie znenia do jednej privátnej metódy) a pritom rozlíšiť `kind`. | `ui/production_core.rb:545–553` · `:1349–1356` | register 1c |
+| A7 | P3 | `dup_id_suffix` aj `cp_warnings` zahadzujú `kind` z `Validation.duplicate_identities` a hlásia „kovanie účtované na vlastníka sa započíta len raz" **aj pre duplicitné DOSKY**, ktoré žiadnu expanziu kovania nemajú → falošné varovanie nad korektným nákupom. Riešiť spolu s C6 (zjednotenie znenia do jednej privátnej metódy) a pritom rozlíšiť `kind`. | `ui/production_core.rb` → `dup_id_suffix` (vtedy `:545–553`, dnes `:661–670`) · `cp_warnings` (vtedy `:1349–1356`, dnes `:1461`) | register 1c |
 
 ---
 
@@ -35,8 +41,8 @@ Rozdelenie po dnešnej severity: **P1 = 0 · P2 = 2 · P3 = 16.**
 
 | # | Sev. | Nález | Súbor:riadok | Vrstva / stav |
 |---|---|---|---|---|
-| B1 | **P2** | Názov projektu zadaný pred prvým uložením sa po Ctrl+S stratí — všetky štyri exporty spadnú na názov `.skp`. Test to maskoval rovnakým guid. | `ui/production_core.rb:206–215` · test `tests/pure/test_st1a_studio.rb:113–114` | **VYRIEŠENÉ** dávkou 1b-6a (PR #244, v0.8.9) |
-| B2 | **P2** | Hlavičky skupín materiálov sú nerozlíšiteľné pri záznamoch líšiacich sa výrobcom/typom/formátom/rubom; kolízny aparát v repe existuje, ale výstupy ho nepoužívajú. | `ui/production_core.rb:664–671` (vs. `core/materials.rb:991`) | dávka **1b-6b** |
+| B1 | **P2** | Názov projektu zadaný pred prvým uložením sa po Ctrl+S stratí — všetky štyri exporty spadnú na názov `.skp`. Test to maskoval rovnakým guid. | `ui/production_core.rb` → `project_name` (dnes `:273`) · test `tests/pure/test_st1a_studio.rb` | **VYRIEŠENÉ** dávkou 1b-6a (PR #244, v0.8.9) |
+| B2 | **P2** | Hlavičky skupín materiálov sú nerozlíšiteľné pri záznamoch líšiacich sa výrobcom/typom/formátom/rubom; kolízny aparát v repe existuje, ale výstupy ho nepoužívajú. | `ui/production_core.rb` → `material_label` (vtedy `:664–671`, dnes `:780–787`) — vs. kolízny aparát `core/materials.rb` → `sheet_label_suffix` (`:991`) | dávka **1b-6b** |
 | B3 | P3 | Mŕtvy hardware override sa v sekcii Pravidlá kreslí ako aktívne ručné rozhodnutie (zberač kontroluje len existenciu dielca, nie zhodu so živým pravidlom). | `core/bom.rb:197–207` (vs. `core/hardware_rules.rb:562`) | model/výstupy |
 | B4 | P3 | UNI katalógová hrúbka sa publikuje ako hrúbka skupiny/nákupného riadku, hoci je len default roly. | `ui/production_core.rb:583` · `ui/js/studio.js:1147`, `:1268` | výstupy |
 | B5 | P3 | Zdrojový materiál duplákov (len v `sheet_estimate`) sa v Platniach kreslí ako holé ID bez hrúbky a farby. | `ui/production_core.rb:574–586` · `ui/js/studio.js:1224–1268` | výstupy |
@@ -48,7 +54,7 @@ Rozdelenie po dnešnej severity: **P1 = 0 · P2 = 2 · P3 = 16.**
 | B11 | P3 | `GrainCheck.restore!` pri otvorení Štúdia nerozposiela stav → rail Inspectora tvrdí opak reality. | `ui/studio_dialog.rb:161–167` · `core/grain_check.rb:367–373` | UI |
 | B12 | P3 | Jantárové override riadky sa po zápise z Inspectora neobnovia (prídu až s plným `push_state`). *Kolízia so zámerným ručným refreshom Štúdia — je to rozhodnutie o kontrakte okna, nie bugfix.* | `ui/panel/actions_parts.rb`, `ui/panel/actions_hardware.rb` | UI |
 | B13 | P3 | Poznámka „pravidlo podľa roly sa neuplatní" je pri čiastočnom override nepresná — nemenované hrany pravidlo držia ďalej. | `ui/rules_dialog.rb:226–228` | UI text |
-| B14 | P3 | `vepo_settings.json` read-modify-write bez medziprocesového zámku. | `ui/production_core.rb:38–43` · `core/json_file_store.rb` | perzistencia · rieši dávka **1b-6c** |
+| B14 | P3 | `vepo_settings.json` read-modify-write bez medziprocesového zámku. | `ui/production_core.rb` → `save_vepo_settings` (dnes `:42–43`) · `core/json_file_store.rb` | perzistencia · rieši dávka **1b-6c** |
 | B15 | P3 | Scroll sekcie neprežije prepnutie — kontrakt §67 to vyžaduje (`renderStudio` prepisuje spoločný kontajner bez uloženia `scrollTop`). | `ui/js/studio.js` (žiadny `scrollTop`) · `UI20_KONTRAKT.md:67` | UI |
 | B16 | P3 | D-87 nemá vlastný `### ` nadpis, jeho text je vnorený do sekcie D-50. | `archiv/DOGFOODING_vyriesene.md:114–135` | docs |
 | B17 | P3 | Odložený XLSX/CSV export kusovníka nemá v PLANe vlastníka (kontrakt sľubuje „vlastnú dávku"). | `SYSTEM/PLAN.md` | plán |
@@ -56,15 +62,18 @@ Rozdelenie po dnešnej severity: **P1 = 0 · P2 = 2 · P3 = 16.**
 
 ---
 
-## C · Ďalší kandidáti zozbieraní počas bloku 1b (mimo sweepu)
+## C · Ďalší kandidáti zozbieraní počas bloku 1b (mimo hlavnej session sweepu)
+
+**C4, C5 a C7 sú tie tri nálezy z pilotnej session**, ktoré dopĺňajú sekciu A na bilanciu „10 stále platných".
+Zvyšok sú postrehy z dávok a review kôl bloku 1b.
 
 | # | Nález | Zdroj |
 |---|---|---|
 | C1 | `@stable_transforms` v `core/scale_observer.rb` sa nikdy neupratuje — kľúč `[model.object_id, entityID]`, žiadna delete cesta; 115 záznamov v plnom behu. Hygiena/pamäť. | dávka 1b-2 |
 | C2 | Beh sady `CHAR` skončí s vymazanými projektovými snapshotmi kovania (`Sketchup.undo` odundoval zápis z CH4b) — neškodné, patrí komentárový riadok do `run_char`. | review #239 |
 | C3 | Globálny teardown vo `walk` rescue nepozná `EdgeCheck`/`GrainCheck.disable!` — pri FAIL uprostred CH6 by overlaye ostali zapnuté; pri rozšírení `CHAR` pridať k `d101_teardown`/`stale_teardown`. | review #239 |
-| C4 | Historický nezodpovedaný P1 z #186 (21.8.): async edge/material callback môže zapísať po odznačení dielca — **overiť proti aktuálnemu `main`** (session token a zámky ho možno riešia). | pilotný sweep |
-| C5 | Historický nezodpovedaný P2 z #186 (21.8.): výmena náhľadu šablóny prepíše starý súbor pred stagingom — **overiť proti `main`** (stagovanie `stage_then_rename` už existuje). | pilotný sweep |
+| C4 | Historický nezodpovedaný P1 z #186 (21.8.): async edge/material callback môže zapísať po odznačení dielca. **Triáž threadov ho medzitým uzavrela ako VYRIEŠENÝ** — `ui/panel/actions_parts.rb` → `part_target_error` (commit `e83abe4`, PR #187) odmieta obe cesty pri prázdnom výbere. Ostáva len ako záznam, nie ako úloha. | pilotný sweep |
+| C5 | Historický nezodpovedaný P2 z #186 (21.8.): výmena náhľadu šablóny prepíše starý súbor pred stagingom. **Triáž ho tiež uzavrela ako VYRIEŠENÝ** — `core/template_previews.rb` → `stage_then_rename` (ten istý commit `e83abe4`): pri zlyhaní ostáva starý náhľad nedotknutý. | pilotný sweep |
 | C6 | Znenie varovania o duplicite je v kóde **dvakrát** (`dup_id_suffix` + `cp_warnings`) — pri budúcej zmene wordingu zjednotiť do jednej privátnej metódy. Riešiť spolu s A7. | review #240 |
 | C7 | Prechody stavu kresby sa nebroadcastujú pri kombináciách otvorenia/zatvorenia okien (`restore_grain_check` / `GrainCheck.disable!`). **Nález je nad starou hlavou — okno Výroba zaniklo**; overiť, či ekvivalentná cesta existuje v Štúdiu (broadcaster v `main.rb`). | sweep #189 · ≡ B11 |
 | C8 | `CH4c`: chýba východiskový assert sondy pred `Sketchup.undo` (vákuové riziko; v behu ho kryje CH1) — doplniť pri najbližšom dotyku `CHAR`. | review #242 |
@@ -79,6 +88,6 @@ Rozdelenie po dnešnej severity: **P1 = 0 · P2 = 2 · P3 = 16.**
 ## Ako sa to prelieva do registra 1c
 
 1. **Dedup najprv, potom R-čísla.** Známe zhody: A4 ≡ B6 · A5 ≡ B10 · A7 ≡ C6 · B11 ≡ C7 · B14 ≡ C13.
-2. **Vyradiť to, čo je medzitým hotové** — B1 je vyriešené (1b-6a), A1/A2 a B2 majú dávky (1b-7, 1b-6b), B14/C13 má dávku (1b-6c).
-3. **Overiť proti vtedajšiemu `main`** — hlavne C4, C5 a C7, ktoré sú nálezy nad starým stromom.
+2. **Vyradiť to, čo je medzitým hotové** — B1 je vyriešené (1b-6a), C4 a C5 sú vyriešené (commit `e83abe4`), A1/A2 a B2 majú dávky (1b-7, 1b-6b), B14/C13 má dávku (1b-6c). Otvorených z triáže je teda **17 z 18**.
+3. **Overiť proti vtedajšiemu `main`** — hlavne C7 (nález nad starým stromom, okno Výroba zaniklo) a všetky citácie do `ui/production_core.rb`.
 4. Až potom priradiť **závažnosť, vrstvu a blokovanú funkciu** podľa šablóny registra ([../PLAN.md](../PLAN.md), blok 1c).
