@@ -15,8 +15,10 @@ Kontrolný semafor a zdieľané čisté jadro výstupov zákazky. Kontrakt plán
 — len keď volajúci dodá ABS katalóg cez `edges:`) · ORANGE = čelo/voľná doska bez ABS „skontroluj" / vypnuté kovanie (owner_part_key identita) / build warnings / **`duplicate_identity`
 (1b-3): dva top-level kusy toho istého druhu so ZHODNÝM ID** — kópia, ktorej ešte nikto nepridelil vlastnú identitu. Hlása ID, počet kusov aj výrobný dôsledok (záznamy oboch kusov
 majú rovnaké `owner_id`, takže expanzia setov s `per: 'owner'` započíta položku LEN RAZ — do objednávky by šlo menej kovania). Vstup je `identities:` z `Bom.collect` (jeden záznam na
-INŠTANCIU; `nil` = kontrola sa preskočí, vzor `placements:`), klik-adresa je zdieľaná s D-103 (`dup_kind` + `dup_owner_ids` → `pids_for_duplicate`). **Nikdy sa nič neopravuje** —
-oprava patrí zápisovej ceste (`fresh_collect` nižšie). JEDINÝ kanonický
+INŠTANCIU; `nil` = kontrola sa preskočí, vzor `placements:`), klik-adresa je zdieľaná s D-103 (`dup_kind` + `dup_owner_ids` → `pids_for_duplicate`). Dôsledok sa hovorí **podmienene**
+(precedens `CAT_MATERIAL`): zliatie vlastníkov v kusovníku platí vždy, podpočítané kovanie len pri sete s členom účtovaným na vlastníka. **Nikdy sa nič neopravuje** — oprava patrí
+zápisovej ceste (`fresh_collect` nižšie). Kritérium má **jeden zdroj**: verejná `Validation.duplicate_identities(identities)` → `[[kind, id, počet], …]`, z ktorej stavia nálezy
+Kontroly **aj** varovanie statusu exportov, ktoré `Validation.run` nevolajú (odsek `production_core.rb`). JEDINÝ kanonický
 zoznam; deterministický dedup + counts VÝHRADNE zo servera; sekcia KONTROLA v Štúdiu s klik-selectom cez stabilnú identitu a fallbackom na vlastníka; sekcia KONTROLA vo VEPO LOGu;
 **RED nikdy neblokuje export**.
 
@@ -50,7 +52,14 @@ pribudnúť krok Späť; platí to pre „Obnoviť", `push_state`, klik-select a
 nepripustí volanie `dedup_copies` (formulácia nad priečinkom, nie nad zoznamom mien metód). *Do 1b-3 tu bežal dedup tik — vznikol 19.7.2026 (GH #48 P2) ako zrkadlo vtedajšieho
 `Panel.push_selected`, ktorý dedup tiež vykonával priamo; ten sa toho 9.8. vzdal (D-103) a od vtedy opravu len ŽIADA u observera, kým čítacia cesta si ju držala ďalej. Obyčajné
 „Obnoviť" tak potichu prečíslovalo ID kópií a pridalo krok Späť.* **Oprava identity žije výhradne v ZÁPISOVEJ ceste:** dedup tik `ScaleWatch` po kopírovaní (transparentný ku kroku
-používateľa) a `Panel.push_selected` po zápise z panela (`ScaleWatch.request_dedup`). Kým oprava nedobehne, duplicitnú identitu **prizná Kontrola** (`duplicate_identity`, ORANGE).
+používateľa) a `Panel.push_selected` po zápise z panela (`ScaleWatch.request_dedup`). Kým oprava nedobehne, duplicitnú identitu **prizná Kontrola** (`duplicate_identity`, ORANGE). Guard preto zakazuje v tomto module
+**aj token `request_dedup`** (oneskorená oprava je stále oprava) a pripúšťa `Panel.push_selected` výhradne s `dedup: false`; to isté platí pre `studio_dialog.rb`.
+
+**Nález v Kontrole však NESTAČÍ (review #240 P2-1):** kto klikne „Nákupný zoznam kovania", sa do Kontroly nepozerá — a práve to CSV ide dodávateľovi. Exporty, ktoré `Validation.run`
+nevolajú, preto skladajú vlastné varovanie: **`dup_id_suffix(collected)`** (strop tri ID + „a ďalšie N", vzor `control_suffix`) ide do statusu `do_hw_csv` a `do_budget_xlsx`
+a **zároveň farbí status na varovanie**. **Cenová ponuka sufix NEMÁ** — má vlastný zoznam dôvodov `cp_warnings` (GH #139: jeden zoznam, ktorý riadi aj farbu), takže duplicita ide do
+neho; jeho posledný parameter `collected` je nepovinný (legacy volanie nič nemení). **VEPO sufix nemá tiež** — `Validation.run` volá, takže nález už nesie `control_suffix` aj sekcia
+KONTROLA vo VEPO LOGu.
 `do_select` navyše pozná príznak **`focus_inspector`** (ceruzka riadku Kusovníka, Š3): po výbere zdvihne Inspector cez `Panel.bring_to_front` — **nikdy ho neotvára**, výber sa tým
 nemení a do modelu sa nezapisuje nič.
 

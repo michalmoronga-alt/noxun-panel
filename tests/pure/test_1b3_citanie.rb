@@ -270,6 +270,13 @@ NxTest.test('1b-3 status: cenova ponuka ma varovanie v SVOJOM zozname dovodov (n
   NxTest.assert(w.first.include?('CAB-007') && w.first.include?('vlastníka'), w.first)
   # bez duplicity a bez `collected` (legacy volanie) sa nemeni NIC
   NxTest.assert_equal(0, pc.cp_warnings({}, {}, []).length)
+  # …a export jej zber NAOZAJ ODOVZDA. Bez tohto assertu prejde mutacia
+  # „vynechaj stvrty argument" zelena: `collected` je nepovinne, takze CP by
+  # o duplicite mlcalo a nic by nespadlo.
+  body = Nx1b3Fix.pc_src[/def do_cp_xlsx\(model, data, generation:, status:, repush:\).*?\n      rescue StandardError/m].to_s
+  NxTest.refute(body.empty?, 'do_cp_xlsx sa nasla')
+  NxTest.assert(body.include?('cp_warnings(cp, budget, hits, collected)'),
+                'zoznam dovodov dostava CERSTVY zber, nie prazdno')
 end
 
 NxTest.test('1b-3 status: VEPO sufix NEDOSTAVA — nalez uz nesie `control_suffix` a LOG') do

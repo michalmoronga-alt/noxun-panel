@@ -34,8 +34,10 @@
   zápise z panela (`ScaleWatch.request_dedup`). Táto dávka teda nič nepresúva, len **prestala robiť to isté aj pri čítaní**. **ZAMIETNUTÉ ALTERNATÍVY:** (1) *nechať `fresh_collect`
   volať `ScaleWatch.request_dedup`* — čítanie by síce neotvorilo operáciu samo, ale model by sa aj tak o 0,2 s neskôr zmenil; záruka „zapnutie kontroly nemení model ani Undo"
   (kvôli ktorej brána G vznikla, plošná kontrola D-95) by neplatila. (2) *nová akcia „Opraviť identity" v Kontrole* — nové UI nad rámec nutnosti; duplicita sa v praxi opraví pri
-  prvom zásahu do modelu a nález to hovorí. Ak Michal usúdi, že tlačidlo chce, je to samostatná drobná dávka. (3) *nález ako RED* — zamietnuté: RED aj ORANGE export rovnako
-  neblokujú, a sesterský D-103 `duplicate_position` (rovnako výrobne nebezpečný) je ORANGE; dve váhy pre ten istý druh problému by mätli.
+  prvom zásahu do modelu a nález to hovorí. Ak Michal usúdi, že tlačidlo chce, je to samostatná drobná dávka. (3) *nález ako RED* — zamietnuté, a dôvod je vecný (nie „obe rovnako
+  neblokujú" — závažnosť riadi VIDITEĽNOSŤ, badge navigácie a farbu semafora): **duplicitná identita blikne po KAŽDOM bežnom kopírovaní**, lebo kópia má vlastné ID až po debounce
+  tiku (0,2 s). Červený badge po každom Ctrl+V by semafor znehodnotil — používateľ by sa ho naučil ignorovať a prestal by vidieť aj skutočné RED nálezy. Stav, ktorý sa sám opraví do
+  sekundy, patrí do ORANGE; sesterský D-103 `duplicate_position` je z tej istej rodiny.
   **ZDROJ DUPLICITNÝCH ID (odpoveď na otázku zadania):** duplicitné ID v bežnej práci **vznikajú legitímne a krátkodobo** — kópia (Ctrl+C/V, Move+Ctrl, `*N`) dedí NOXUN atribúty
   vrátane ID a vlastné dostane až v debounce tiku observera (0,2 s). To nie je chyba, len okno. **Samostatný nález nie je**, ale je tu **dlhodobý stav, ktorý stojí za zápis:** model
   uložený s duplikátmi (kópia vznikla, keď plugin nebežal / observer bol odvesený) ostane duplicitný, kým doň niekto nesiahne — odteraz to Kontrola aspoň prizná. To je aj **jediná
@@ -55,6 +57,27 @@
   NEZMENÍ (duplikáty ostanú) a tlačidlo aj tak nezožltne. **Vedľajší poznatok z prvého behu:** fixtúra `stale_copy_cabinet` vyrába kópiu v `ScaleWatch.guard`, takže ju observer
   nikdy nevidí — duplikát v tom scenári neopraví nikto (a je to tak správne, je to fixtúra čítacej cesty); že opravu naozaj robí zápisová cesta, merajú `CH1`/`CH2` a `CH7`.
   **Codex audit pred implementáciou sa NEKONAL** — Codex bol na limite; pravidlo repa (ohlás a pokračuj) + záchranná sieť charakterizačnej sady `CHAR` z dávky 1b-2.
+  **REVIEW #240, kolo 1 (slepý subagent) — jeden blokujúci nález a tri dorovnania:** **(P2-1, blokoval merge)** *exporty o duplicitnej identite MLČALI.* `do_hw_csv` (nákupný zoznam
+  kovania), `do_budget_xlsx` a `do_cp_xlsx` `Validation.run` vôbec nevolajú, takže používateľ so starým `.skp` odoslal **objednávku s chýbajúcim per-owner kovaním bez jediného
+  slova** — nález svietil len v Kontrole, kam sa pri exporte nikto nepozerá. Presne tá trieda tichej výrobnej chyby, kvôli ktorej má produkcia naostro najvyššiu prioritu. Nákupný
+  zoznam a XLSX rozpočtu dostali sufix `dup_id_suffix` (vzor `control_suffix`, strop tri ID + „a ďalšie N"), ktorý **zároveň farbí status na varovanie** — zelené „uložené" nad
+  skresleným číslom je horšie než žiadne. **Cenová ponuka ide do SVOJHO zoznamu dôvodov `cp_warnings`** (GH #139: jeden zoznam, ktorý riadi aj farbu statusu) — privesený sufix by
+  tam bol druhá pravda. **VEPO sufix nedostáva a je to zdôvodnené v kóde:** `Validation.run` volá, takže nález je v `control_suffix` aj v sekcii KONTROLA vo VEPO LOGu; druhé znenie
+  tej istej veci v jednom statuse je hluk. Kritérium duplicity má **jeden zdroj** — nová verejná `Validation.duplicate_identities`, z ktorej stavia nálezy Kontroly aj status
+  exportov (dve implementácie toho istého kritéria by sa časom rozišli). **(P3-2)** hláška tvrdila dôsledok **bezpodmienečne**, hoci podpočítané kovanie nastane len pri sete
+  s členom účtovaným na vlastníka; znenie je odteraz „kovanie účtované na vlastníka (napr. TipOn) sa započíta len raz" (precedens `CAT_MATERIAL`) — hláška, ktorá raz klamala, sa
+  prestane čítať. **(P3-3)** guard by **obišla práve tá alternatíva, ktorú dávka zamietla**: `ScaleWatch.request_dedup` z čítania by prešiel, hoci oneskorená oprava je stále oprava;
+  `request_dedup` je odteraz zakázaný token v `production_core.rb` aj `studio_dialog.rb` a `push_selected` tam smie ísť **výhradne** s `dedup: false` (východzie `true` je tá istá
+  žiadosť inou cestou). `ui/panel/*` ostáva legitímny — tam je to zápisová reakcia. **(P3-4)** dorovnané prežité assert hlášky v `test_stale_obnovit.rb`. **(P3-6)** prepísané
+  zdôvodnenie ORANGE (vyššie) — pôvodný argument „RED aj ORANGE neblokujú" bol slabý, závažnosť riadi viditeľnosť.
+  **Testy po kole 1: 1940 headless** (+8) · 69 JS sád · in-SketchUp **NESPÚŠŤANÝ ZNOVA a je to vedomé:** kolo sa dotklo výhradne **textu statusu v callbacku** a guardov nad
+  zdrojákom — `fresh_collect`, buildery, observery ani `CH7`/`CHAR` sa nezmenili ani o riadok, takže plný beh by meral to isté, čo posledný (1022 PASS / 0 FAIL). Statusy sú kryté
+  headless testami, ktoré ich **merajú** (volajú `dup_id_suffix` a `cp_warnings` priamo), nie greppujú. **Mutačne overené 4 ďalšie zásahy** (`request_dedup` v `fresh_collect` ·
+  `request_dedup` v `push_state` Štúdia · vypnutý sufix v `do_hw_csv` · `dup_id_suffix` vždy prázdny) — plus **piaty, ktorý odhalil dieru v mojom vlastnom teste**: vynechanie
+  `collected` z `cp_warnings` prešlo zelené, lebo argument je nepovinný a test volal metódu len priamo; pribudol assert, že `do_cp_xlsx` zber naozaj odovzdáva.
+  **KANDIDÁT DO REGISTRA 1c (P3-5, TU SA NERIEŠI):** pri duplicitnej identite **sekcia Pravidlá zdvojí jantárové riadky** — `collect_manual_overrides` beží per INŠTANCIA, kým
+  `override_group` zoskupuje per `owner_id`, takže `total` sa zdvojnásobí. Zápis je chránený (guard „nejednoznačné `cabinet_id` = odmietnutie"), takže to nie je výrobné riziko, len
+  zavádzajúci počet — a je to ten istý koreň ako tento nález, nie nová chyba.
 
 - **1b-2 · CHARAKTERIZAČNÉ IN-SU SCENÁRE observer/Undo/multi-model — brána H bloku 1b (27.8.2026):** vetva `test/1b2-charakterizacne-scenare`, **VERZIA SA NEBUMPUJE** — pribudli
   výhradne testy, kód pluginu je bajt po bajte ten istý (v0.8.6). Zmysel dávky je poistka, nie funkcia: **kým sa v bloku 1d siahne na buildery a observery, musí byť napísané, čo
