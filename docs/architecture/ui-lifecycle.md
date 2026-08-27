@@ -1231,11 +1231,9 @@ hooky: commit · undo · redo · abort; trieda je pod guardom `defined?(Sketchup
 (vzor `Panel.request_txn_refresh`).
 
 **Jadro riešenia je POROVNANIE EPOCH:** `push_state` si ukladá `@pushed_epoch = @epoch` **až na konci** (po `fresh_collect`, a len keď payload naozaj odošiel) — transakcie, ktoré
-spustil **sám prepočet okna** (dedup kópií vo `fresh_collect`, zápis rozpočtu s `bump: false`), sú tým už započítané a flush ich **pohltí sám**; žiadne volacie miesto nepotrebuje
-výnimku ani „suspend" prepínač. *(In-SketchUp beh 22.8.: pri dedupe vo `fresh_collect` ukázalo počítadlo **0 vstupov** do handlera — **dôvod nie je overený** (dedup beží ako
-normálna netransparentná operácia, takže udalosť by prísť mala) a poistka porovnania epoch platí bez ohľadu naň.
-
-Tvrdý dôkaz pohltenia vlastného ticku dáva **zápis rozpočtu**: tam observer vstup preukázateľne dostal a signál napriek tomu neprišiel.)* Flush posiela `NX.markStale()` len pri
+spustil **sám prepočet okna**, sú tým už započítané a flush ich **pohltí sám**; žiadne volacie miesto nepotrebuje výnimku ani „suspend" prepínač. *(Od 1b-3 má prepočet okna už len
+JEDEN taký zdroj — zápis rozpočtu s `bump: false`. Druhým býval dedup kópií vo `fresh_collect`; ten zanikol, lebo čítanie do modelu nezapisuje, a in-SketchUp scenár `STALE (c)`
+odvtedy meria opak: „Obnoviť" nad modelom s duplikátmi model NEZMENÍ a tlačidlo aj tak nezožltne.)* Flush posiela `NX.markStale()` len pri
 `@epoch > @pushed_epoch`, so **živým oknom** a **dvojitým guardom dokumentu** (`txn_model_ok?` — overuje sa v callbacku aj znova v timeri, dokument sa môže prepnúť medzi udalosťou
 a timerom).
 
@@ -1458,7 +1456,7 @@ sekcie, plus `Panel.push_materials`, `EdgeCheck.invalidate!` a plný payload Št
 plnom pushi: modelový kontext sekcie (predvoľby, počty, `used`) nesie `StudioDialog#mat_payload` z už zozbieraného kusovníka (review ŠT-2a #4).
 
 **Dve cesty menia MODEL** (projektová predvoľba, apply „Nahradiť UNI…") — obe volajú `refresh_studio_after_model_write` (plný push **so zdvihom** generácie) zámerne **až za
-`Panel.push_selected`**: prípadný dedup identity kópií je oneskorený a jantárové „Obnoviť" by inak zožltlo hneď po prepočte.
+`Panel.push_selected`**: dedup identity kópií, ktorý si panel vyžiada u observera, je oneskorený a jantárové „Obnoviť" by inak zožltlo hneď po prepočte.
 
 **Životný cyklus** už nehlási vlastný `set_on_closed`, ale Štúdio: `on_ui_closed` (zatvorené okno — session bump + zahodenie odloženej požiadavky), `cancel_demos_on_leave` (odchod
 zo sekcie počas behu — session bump + status) a `on_model_changed` zo `scale_observer` (prepnutý dokument), pričom `@demos_running` stráži, aby sa hláška o zrušení objavila len

@@ -18,9 +18,9 @@ blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
 
 **Cieľ:** doplatiť dlhy, ktoré fáza ŠTÚDIO vedome odložila, a spraviť refactory, na ktoré počas presunov nebol priestor.
 *(Stabilizačná revízia sa od začiatku produkcie naostro (20.8.) ešte NEKONALA — patrí pred ďalšie nové funkcie.)* Poradie určí Michal.
-Staré dlhy B–F nie sú blokujúce pre bežnú prácu; **P0 odrážky A, G a H sú BRÁNY** — **A (možná STRATA rozpísanej editácie) je HOTOVÁ** (dávka 1b-1, v0.8.6, 27.8.),
-**H (charakterizačné in-SU scenáre) je HOTOVÁ** (dávka 1b-2, 27.8. — cesta k builderom/observerom pre blok 1d je tým otvorená),
-G musí prebehnúť pred tým, než sa na „Obnoviť" postaví ďalšia kontrola.
+Staré dlhy B–F nie sú blokujúce pre bežnú prácu; **P0 odrážky A, G a H sú BRÁNY a VŠETKY TRI SÚ HOTOVÉ** — **A** (možná STRATA rozpísanej editácie) dávkou 1b-1, v0.8.6, 27.8. ·
+**H** (charakterizačné in-SU scenáre) dávkou 1b-2, 27.8. — cesta k builderom/observerom pre blok 1d je tým otvorená · **G** („Obnoviť" = čisté čítanie) dávkou 1b-3, v0.8.7, 27.8. —
+na „Obnoviť" sa teraz smie postaviť ďalšia kontrola (plošná kontrola D-95 má garanciu, že zapnutie kontroly nemení model ani Undo).
 
 **A · Optimistický zámok nastavení (dlh z #227, kolo 4) — ✅ VYRIEŠENÉ dávkou 1b-1, v0.8.6 (27.8.2026).**
 Obe chyby aj obidva slabšie dôkazy sú vybavené: pin sa uvoľňuje v `ssRenderBody` (pokrýva push aj návrat do sekcie — koniec falošných konfliktov a stratených editácií)
@@ -49,11 +49,12 @@ behaviorálne. Plný záznam — čo bolo zle → čo platí, zamietnuté altern
   do tej istej skupiny patrí aj **výklop ako samostatný typ čela** (bez D-čísla). Otvorené **D-106** / **D-107** sem pôvodne patrili tiež, dnes žijú vo svojich skupinách podľa zaradenia:
   D-106 v skupine V1 DOTIAHNUTIE (blok 4), D-107 v skupine Po V1 — zásobník.
 
-**G · „Obnoviť" = čisté čítanie (P0 z externého auditu kolo 0, [zdroje/AUDIT_2026-08_externy_kolo0.md](zdroje/AUDIT_2026-08_externy_kolo0.md)):**
-`ui/production_core.rb:447` (`fresh_collect`) · `ui/studio_dialog.rb` cesta `do_refresh_bom` → `push_state` → `ProductionCore.fresh_collect` (~469–475 a ~1299–1303) —
-obyčajné „Obnoviť" dnes môže popri čítaní OPRAVIŤ duplicitné identity a vyrobiť Undo operáciu; oddeliť treba OBE volacie miesta.
-Oddeliť read-only snapshot od opravy: musí byť jasné, kedy sa iba číta a kedy sa model opravuje (oprava = vedomá akcia s vlastným Undo krokom).
-Pred fixom overiť nález proti v0.8.5.
+**G · „Obnoviť" = čisté čítanie — ✅ VYRIEŠENÉ dávkou 1b-3, v0.8.7 (27.8.2026).**
+Nález (P0 z externého auditu kolo 0, [zdroje/AUDIT_2026-08_externy_kolo0.md](zdroje/AUDIT_2026-08_externy_kolo0.md)) **platil** a je dokázaný mutačne.
+`fresh_collect` je odteraz `Bom.collect` a nič viac — čítanie (refresh, `push_state`, klik-select, všetky štyri exporty) do modelu nezapisuje a nepridáva krok Späť;
+stráži to guard nad CELOU UI vrstvou. Duplicitnú identitu Kontrola **prizná** (ORANGE `duplicate_identity` — hovorí aj výrobný dôsledok), opravu robí výhradne
+zápisová cesta (dedup tik observera, `Panel.push_selected`). Zaniklo tým aj obmedzenie z review #222 P2-2. Plný záznam — prečo oprava v čítacej ceste vznikla,
+zamietnuté alternatívy, 6 headless + 1 in-SU mutácia, in-SU scenár `CH7`: [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-3**.
 
 **H · Charakterizačné in-SU scenáre observer/Undo/multi-model — ✅ VYRIEŠENÉ dávkou 1b-2 (27.8.2026, bez bumpu verzie — pribudli len testy).**
 Sekcia `run_char` v in-SU sade: **42 assertov** v šiestich scenároch (kópia · `*N` · Undo reťaz · prerušenie operácie · scale = regenerate výstup · prepnutie modelu, Windows vetva),

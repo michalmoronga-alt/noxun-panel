@@ -242,7 +242,9 @@ to `CH6`, kandidát do registra 1c). `EngineAppObserver` notifikuje dialógy via
 
 **Charakterizované sadou `CHAR`** (`tests/sketchup/su_runner.rb`, `run_char` — dávka 1b-2, brána H bloku 1b; zapisuje DNEŠNÉ správanie, aby mal hardening bloku 1d a GHOST Tool
 vrstva pevnú pôdu): absorpcia scale je **jeden** undo krok a nepridáva vlastný (`CH3`, `CH5`); dedup kópie aj `*N` násobenia sa lepí na paste krok, takže jedno Undo vráti celú
-dávku (`CH1`, `CH2`); aktivácia **toho istého** dokumentu prekrytia NEzhasína (guard `same_model?`), kým udalosť o dokumente s iným `guid` ich zhasnúť MUSÍ (`CH6`). **Padnutý
+dávku (`CH1`, `CH2`); aktivácia **toho istého** dokumentu prekrytia NEzhasína (guard `same_model?`), kým udalosť o dokumente s iným `guid` ich zhasnúť MUSÍ (`CH6`); **od 1b-3 (brána
+G) je `ScaleWatch` — spolu s `Panel.push_selected` → `request_dedup` — JEDINÁ cesta, ktorá dedup vykonáva: čítacie cesty okien identitu neopravujú, len ju priznajú v Kontrole
+(`CH7`, guard `tests/pure/test_1b3_citanie.rb`).** **Padnutý
 `CHAR` test neznamená „oprav test", ale „správanie sa zmenilo — povedz prečo".** Dve vetvy sa na Windows spustiť nedajú a sú zapísané ako MANUÁLNE scenáre priamo v INFO riadkoch
 behu: **Znova (Ctrl+Y)** po scale (Ruby API nemá na Windows spoľahlivú redo akciu — PLAN blok 3) a **dva otvorené dokumenty naraz** (macOS; Windows drží jeden dokument na proces —
 guardy `scale_observer.rb:149-150, 194-200, 382-383`, ich dátovú štruktúru `CH6` overuje aspoň priamo).
