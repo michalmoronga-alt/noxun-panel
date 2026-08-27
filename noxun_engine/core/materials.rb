@@ -462,7 +462,12 @@ module Noxun
         end
         FileUtils.mkdir_p(dir)
         File.open(catalog_lock_path, 'a') do |f|
-          f.flock(File::LOCK_EX)
+          # 1b-6c (audit #5): `flock` vracia FALSE, ked sa zamok nepodari vziat
+          # (napr. filesystem ho nepodporuje). Ticho pokracovat by znamenalo,
+          # ze zamknuta uprava bezi BEZ zamku a zaruka je len zdanliva —
+          # volajuci sa o tom musi dozvediet vynimkou.
+          raise IOError, 'zamok katalogu sa nepodarilo ziskat' unless f.flock(File::LOCK_EX)
+
           @catalog_lock_depth = 1
           begin
             yield

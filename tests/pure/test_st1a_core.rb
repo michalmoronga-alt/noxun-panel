@@ -45,7 +45,10 @@ NxTest.test('ST-1a: telo presunutych metod zije v Core (a nikde inde druhykrat)'
   # kopie toho isteho vypoctu — presne to, comu dávka predchadza.
   fingerprints = {
     'vepo_settings' => 'JsonFileStore.available?(path)',
-    'save_vepo_settings' => 'JsonFileStore.write(path,',
+    # 1b-6c: zapis prebral `update_vepo_settings` (zamok + cerstve citanie);
+    # `save_vepo_settings` je jeho tenky obal pre nezavisle kluce.
+    'save_vepo_settings' => 'update_vepo_settings { attrs }',
+    'update_vepo_settings' => 'JsonFileStore.write(vepo_settings_path,',
     'vepo_materials' => 'labeled = Materials.sheets.map',
     'vepo_base_label' => "s['back_decor']",
     'vepo_disambiguate' => 'groups_per = labeled.group_by',

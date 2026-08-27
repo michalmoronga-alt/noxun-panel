@@ -20,7 +20,7 @@ blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
 *(Stabilizačná revízia sa od začiatku produkcie naostro (20.8.) ešte NEKONALA — patrí pred ďalšie nové funkcie.)* Poradie určí Michal.
 Staré dlhy B–F nie sú blokujúce pre bežnú prácu (**B a D vybavené dávkou 1b-4, v0.8.8, 27.8.**; **sweep E je HOTOVÝ, 27.8.**; z písmen ostáva už len **F**;
 mimo písmen vybavené aj **1b-6a** — názov zákazky prežije prvé uloženie, v0.8.9, 27.8. — · **1b-7** — koniec tichého návratu starej ceny dekoru, v0.8.10, 27.8. — a **1b-6b** —
-rozlíšené hlavičky materiálov, v0.8.11, 27.8.; mimo písmen ostáva otvorená jediná: **1b-6c** (zámok nad `vepo_settings.json`, druhá časť delenia #243, audit-povinná));
+rozlíšené hlavičky materiálov, v0.8.11, 27.8. — a **1b-6c** — zámok nad `vepo_settings.json`, v0.8.12, 28.8.; mimo písmen tak neostáva nič otvorené);
 **P0 odrážky A, G a H sú BRÁNY a VŠETKY TRI SÚ HOTOVÉ** — **A** (možná STRATA rozpísanej editácie) dávkou 1b-1, v0.8.6, 27.8. ·
 **H** (charakterizačné in-SU scenáre) dávkou 1b-2, 27.8. — cesta k builderom/observerom pre blok 1d je tým otvorená; sadu `CHAR` **dorovnala dávka 1b-5** (27.8., test-only) po
 post-hoc Codex kole na #239: štyri asserty boli zelené, ale merali slabšiu veličinu, než tvrdili · **G** („Obnoviť" = čisté čítanie) dávkou 1b-3, v0.8.7, 27.8. —
@@ -79,11 +79,11 @@ Výstupy teraz používajú **ten istý kolízny aparát ako Inspector**: bez ko
 → poistka `[id]`); to isté dostal súpis ABS pások. Plný záznam — rozhodnutie o kolíznom kľúči, zamietnuté alternatívy, 2 mutácie:
 [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-6b**.
 
-**1b-6c · Zápis `vepo_settings.json` pod jedným zámkom — ⏳ OTVORENÉ (druhá časť delenia #243).** Dve inštancie SketchUpu zdieľajú jeden `%APPDATA%`, ale mapa `project_names`
-sa mení **read-modify-write nad odtlačkom**, takže zápis z jednej inštancie vie zmazať zákazku pomenovanú v druhej. **Nie je to regresia — `main` to má odjakživa**, dávka 1b-6a to
-nezväčšila. **Východisko:** commit `0311095` z vetvy `fix/1b6-nazov-projektu` (ostáva na GitHube) + **všetky tri nálezy kola 3** z #243: zámok pre **KAŽDÉHO** zapisovateľa súboru
-(nielen pre mapu názvov — `save_merge_18_36` a štyri zápisy `last_dir` píšu ten istý súbor) · `rescue` okolo **celej** zamknutej úpravy, aby zlyhanie `.lock` neuniklo ako výnimka ·
-návrat **čerstvej** hodnoty zo zamknutej migrácie. Zmena sa dotýka koncepcie zápisu súboru nastavení ⇒ **audit-povinná** (`codex-audit` pred implementáciou).
+**1b-6c · Zápis `vepo_settings.json` pod jedným zámkom — ✅ VYRIEŠENÉ, v0.8.12 (28.8.2026).** Druhá a posledná časť delenia #243: šesť zapisovateľov jedného súboru nastavení
+(`save_merge_18_36`, štyri zápisy `last_dir`, mapa `project_names`) ide odteraz cez **jedny zamknuté dvere** — medziprocesový zámok + čítanie súboru nanovo vnútri neho, takže dve
+inštancie SketchUpu si už nemažú nastavenia ani mená zákaziek. Povinný `codex-audit` pridal do návrhu dva BLOCKERY (striktné čítanie v zápisovej ceste · názov aj pri nedostupnom
+zámku) a tri opravy; overené aj **reálnym dvojprocesovým testom** `flocku`. Plný záznam — nálezy auditu, päť mutácií, vedomé odklady do 1c:
+[archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-6c**.
 
 **1b-7 · Tichý návrat starej ceny dekoru — ✅ VYRIEŠENÉ, v0.8.10 (27.8.2026).** Obe P2 zo sweepu (#212 · nálezy #8 a #9) mali jeden koreň — stará hodnota formulára sa spájala
 s **čerstvým** `row_rev`, takže optimistický zámok prestal chrániť. Pamäť aj zotavenie z konfliktu dnes prelievajú **len bunky, ktorých sa používateľ naozaj dotkol**, a keď tú istú

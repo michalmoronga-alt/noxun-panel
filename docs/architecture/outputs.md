@@ -82,11 +82,25 @@ platnou cestou **vždy** — aj keď cesta už svoj názov má: ten **má predno
 takže sa migrácia zopakuje hneď, ako zápis prejde (review #243 P2-1). Zápisová cesta upratuje to isté
 (`save_project_name` maže VŠETKY kľúče sedenia zákazky, nielen ten podľa aktuálneho guid). Most **nie je zakázaný okenný stav**: nie je to stav okna ani medzivýsledok výpočtu, ale
 údaj o dokumente, ktorý sa z modelu po uložení prečítať nedá — obe okná z neho čítajú to isté a nemajú si ho ako prepísať; je to konštanta (nie `@ivar`) aj kvôli guard testu, ktorý
-tu inštančné premenné nepripúšťa, a je zhora ohraničená (`SESSION_BRIDGE_MAX`). **Známa medzera (dávka 1b-6c):** mapa sa mení read-modify-write **bez medziprocesového zámku**, takže
-pri dvoch bežiacich inštanciách SketchUpu vie zápis jednej prepísať zákazku pomenovanú v druhej — platí to o celom `vepo_settings.json` (`save_merge_18_36`, `last_dir`), nielen o
-mape názvov. Prázdna hodnota **aj hodnota zhodná s defaultom zmaže záznam**, takže sa pomenovanie vráti
+tu inštančné premenné nepripúšťa, a je zhora ohraničená (`SESSION_BRIDGE_MAX`). Prázdna hodnota **aj hodnota zhodná s defaultom zmaže záznam**, takže sa pomenovanie vráti
 na názov `.skp` a premenovanie súboru sa v okne prejaví samo. Číta ho **všetky štyri exporty** (VEPO, CSV kovania, XLSX rozpočtu, XLSX cenovej ponuky) — z DOM sa `project`
 **prestal posielať**, inak by dve okná mali dve pravdy a tá istá zákazka by sa v dvoch výstupoch volala inak. `merge_18_36` ostáva globálny a číta sa rovnakou cestou.
+
+**Zápis `vepo_settings.json` má JEDNY dvere (1b-6c):** súbor je nastavenie POČÍTAČA so **šiestimi zapisovateľmi** — `save_merge_18_36`, štyri zápisy `last_dir` (VEPO, CSV kovania,
+XLSX rozpočtu, XLSX cenovej ponuky) a mapa `project_names` — a menil sa read-modify-write **bez medziprocesového zámku**. Dve inštancie SketchUpu zdieľajú jeden `%APPDATA%`, takže
+zápis jednej vedel zmazať zákazku pomenovanú v druhej; `JsonFileStore` rieši **atomicitu** (tmp+rename, `.bak`), **nie súbeh** — a jeho sekundová cache navyše skryje čerstvý zápis
+suseda. Každý zápis preto ide cez **`update_vepo_settings`**: `Materials.with_catalog_lock` (jeden sidecar `.lock` nad tým istým priečinkom, reentrantný — detail v
+[materials.md](materials.md)) + čítanie súboru **nanovo vnútri zámku** (`JsonFileStore.reload!`); blok dostane čerstvé nastavenia a vráti hash na zlúčenie, `nil` = netreba
+zapisovať. **Čítania sa nezamykajú** (hot push panela by zámok platil zbytočne), ale **štyri exporty si na začiatku vypýtajú čerstvý súbor** (`refresh_vepo_settings`) — hotový
+CSV/XLSX sa už ďalším čítaním nezahojí. Zámok sa cez export **zámerne nedrží**: cesta otvára modálny `savepanel` a druhá inštancia by čakala, kým používateľ klikne.
+
+**Štyri pravidlá tých dverí, každé zaplatené nálezom auditu:** *(1)* zápisová cesta číta **strikto** (`vepo_settings_for_write`) — lenivé `{}` z neprečítateľného súboru by sa
+zlúčilo s novými `attrs` a zmazalo `project_names`, `merge_18_36` aj `last_dir`; chýbajúci súbor je legitímne prázdno, existujúci a nečitateľný (alebo nie-Hash) **zastaví zápis**.
+*(2)* Celá zamknutá úprava je v `rescue` — aj zlyhanie `.lock` je len zalogovaný `false` (kontext logu nesie **fázu** lock/read/block/write), nikdy výnimka do okna či exportu.
+*(3)* Mapu názvov cez `save_vepo_settings` **zapísať nejde** (odovzdaný odtlačok by čerstvú mapu prepísal celú) — na to je `update_project_names`, ktoré blok kŕmi čerstvou mapou;
+stráži to guard test. *(4)* Názov sa počíta **aj pred zámkom**: keď sa `.lock` nedá vziať, blok pod ním nikdy nebeží, a bez tohto fallbacku by všetky štyri exporty dostali meno
+`.skp` súboru namiesto zákazky. Keď blok **bežal**, `project_name` vracia **čerstvú** hodnotu spod zámku (`effective_project_name` nad čerstvou mapou) — inak by sa export
+pomenoval podľa `.skp` napriek tomu, že súbor už drží správny názov (review #243, kolo 3).
 
 **`materials_meta`/`edges_meta` (audit #4)** sú kontrakt skupín Kusovníka: per `material_id` (resp. `abs_id`) label, katalógová farba ako **pole `[r,g,b]`** (nie CSS reťazec —
 prevod robí klient, ktorý farbu kreslí), hrúbka a príznak UNI; materiál mimo katalógu sa pomenuje **svojím ID** a farbu nedostane (radšej žiadna vzorka než náhodná).

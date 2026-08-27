@@ -5524,13 +5524,15 @@ module NoxunSuRunner
            core.project_name(model) == core.default_project_name(model))
       ensure
         # Testovaci zaznam po sebe upratame — je to realny %APPDATA% subor.
-        map = core.project_names.dup
-        if original.nil?
-          map.delete(key)
-        else
-          map[key] = original
+        # Mapa sa meni VYHRADNE cez zamknute dvere (1b-6c).
+        core.update_project_names do |map|
+          if original.nil?
+            map.delete(key)
+          else
+            map[key] = original
+          end
+          map
         end
-        core.save_vepo_settings(e::ProductionCore::PROJECT_NAMES_KEY => map)
       end
     end
 

@@ -17,6 +17,36 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1b-6c · ZÁPIS `vepo_settings.json` MÁ JEDNY ZAMKNUTÉ DVERE (28.8.2026, v0.8.12):** druhá a posledná časť delenia zatvoreného PR #243. Súbor nastavení POČÍTAČA má **šiestich
+  zapisovateľov** — `save_merge_18_36`, štyri zápisy `last_dir` a mapa `project_names` — a menil sa read-modify-write **nad odtlačkom**. Dve inštancie SketchUpu zdieľajú jeden
+  `%APPDATA%`, takže zápis jednej vedel zmazať zákazku pomenovanú v druhej; `JsonFileStore` rieši atomicitu (tmp+rename, `.bak`), **nie súbeh**, a jeho sekundová cache navyše skryje
+  čerstvý zápis suseda. **Nebola to regresia** — `main` to mal odjakživa, dávka 1b-6a riziko len sprístupnila aj čítacej ceste (lenivá migrácia).
+
+  **Riešenie.** Každý zápis ide cez `update_vepo_settings`: `Materials.with_catalog_lock` + `JsonFileStore.reload!` a čítanie súboru **nanovo vnútri zámku**; blok dostane čerstvé
+  nastavenia a vráti hash na zlúčenie (`nil` = nič sa nezapisuje). `save_vepo_settings` je jeho tenký obal pre nezávislé kľúče, mapu názvov mení výhradne `update_project_names`.
+  **Zámok je ten istý ako katalógový** (`materials.lock`, ten istý priečinok, reentrantný) — dva samostatné zámky by len vyrobili poradie a s ním riziko zaseknutia; audit to
+  výslovne potvrdil ako správnu voľbu.
+
+  **Čo do návrhu pridal `codex-audit` (2 BLOCKER, 3 FIX, 2 NOTE — všetky zapracované).** *(1)* Zápisová cesta musí čítať **strikto**: lenivé `{}` z neprečítateľného súboru by sa
+  zlúčilo s novými `attrs` a zmazalo `project_names`, `merge_18_36` aj `last_dir` — teda presne to, čo mal zámok chrániť. *(2)* Keď sa `.lock` nedá vziať, blok pod ním **nikdy
+  nebeží** — bez predzámkového fallbacku by prvé čítanie po uložení vrátilo meno `.skp` súboru a exporty by odišli zle pomenované; názov sa preto počíta aj pred zámkom a čerstvá
+  hodnota ho prepíše len vtedy, keď blok skutočne prebehol. *(3)* Odomknuté čítanie je na hranici exportu nebezpečné (hotový CSV/XLSX sa už nezahojí) — štyri exporty si na začiatku
+  vypýtajú čerstvý súbor; zámok sa cez ne **zámerne nedrží**, lebo cesta otvára modálny `savepanel`. *(4)* `save_vepo_settings` ostal obchádzkou pre celú mapu názvov — odovzdaný
+  odtlačok by čerstvú mapu prepísal celý, takže kľúč mapy tadeto **odmieta**. *(5)* `flock` vracia `false`, keď zámok nedostane; ticho pokračovať znamenalo bežať bez zámku, teraz
+  letí `IOError`. NOTE k šírke `rescue` sa premietol do **fázy v kontexte logu** (lock/read/block/write).
+
+  **Plus tretie kolo review #243** (kvôli ktorému sa PR zatváral): zamknutá migrácia vracia **čerstvú** hodnotu kľúča — inak sa export pomenoval podľa `.skp` napriek tomu, že súbor
+  už držal správny názov.
+
+  **Testy: 1974 headless PASS.** Nové sady: súbeh pre **každého** zapisovateľa (mapa · `last_dir` · `merge_18_36`), čerstvá hodnota z migrácie, zlyhanie zámku (`false`, nie výnimka,
+  a názov aj tak správny), poškodený súbor bez jediného zápisu, odmietnutá obchádzka mapy — a **reálny dvojprocesový test**: druhý `ruby` proces drží ten istý sidecar `.lock` a
+  zapisuje až po 1,2 s, takže sa overuje samotný Windows `flock`, nie monkeypatch. **Päť mutácií, každá zhodila práve svoj test:** zámok vypnutý · `save_merge_18_36` mimo dverí ·
+  `rescue` prehltne aj úspech · lenivé čítanie v zápisovej ceste · `project_name` číta odtlačok spred zámku. *(Prvý pokus o mutáciu „čerstvá hodnota" nezhodil nič — test bol slabý,
+  lebo cesta v ňom ešte nemala vlastný názov; scenár sa prepísal na premenovanie tej istej cesty druhou inštanciou.)*
+
+  **Register kandidátov:** položka **C13/B14** v `zdroje/SWEEP_2026-08_kandidati.md` je tým vybavená. Otvorené z okolia témy ostávajú **C10** (vlastné stabilné ID zákazky namiesto
+  kaskády cesta/guid/most), **C11** (čítacia cesta so zápisom nastavení) a **C12** (migrácia už pri uložení = observer, audit-povinné) — všetky tri sú vedomé odklady pre blok 1c.
+
 - **1b-6b · HLAVIČKY MATERIÁLOVÝCH SKUPÍN SA PRI KOLÍZII ROZLÍŠIA (27.8.2026, v0.8.11):** P2 z triáže Codex threadov (PR #193, nález **#33**). Menovka skupiny Kusovníka aj riadok
   súpisu **Platní** sa skladali len z dekoru, štruktúry a názvu (`ProductionCore.material_label`), takže dva **rôzne výrobné materiály** — iný výrobca, typ, formát platne alebo rub
   zásteny — mali **identickú hlavičku**. Podľa nej sa objednáva: dve nerozlíšiteľné hlavičky znamenajú riziko, že sa kúpi iný výrobca alebo formát. Panel taký problém nikdy nemal —

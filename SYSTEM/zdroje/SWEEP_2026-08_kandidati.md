@@ -54,7 +54,7 @@ Rozdelenie po dnešnej severity: **P1 = 0 · P2 = 2 · P3 = 16.**
 | B11 | P3 | `GrainCheck.restore!` pri otvorení Štúdia nerozposiela stav → rail Inspectora tvrdí opak reality. | `ui/studio_dialog.rb:161–167` · `core/grain_check.rb:367–373` | UI |
 | B12 | P3 | Jantárové override riadky sa po zápise z Inspectora neobnovia (prídu až s plným `push_state`). *Kolízia so zámerným ručným refreshom Štúdia — je to rozhodnutie o kontrakte okna, nie bugfix.* | `ui/panel/actions_parts.rb`, `ui/panel/actions_hardware.rb` | UI |
 | B13 | P3 | Poznámka „pravidlo podľa roly sa neuplatní" je pri čiastočnom override nepresná — nemenované hrany pravidlo držia ďalej. | `ui/rules_dialog.rb:226–228` | UI text |
-| B14 | P3 | `vepo_settings.json` read-modify-write bez medziprocesového zámku. | `ui/production_core.rb` → `save_vepo_settings` (dnes `:42–43`) · `core/json_file_store.rb` | perzistencia · rieši dávka **1b-6c** |
+| B14 | P3 | `vepo_settings.json` read-modify-write bez medziprocesového zámku. **VYRIEŠENÉ dávkou 1b-6c** (v0.8.12). | `ui/production_core.rb` → `update_vepo_settings` · `core/json_file_store.rb` | perzistencia · hotové |
 | B15 | P3 | Scroll sekcie neprežije prepnutie — kontrakt §67 to vyžaduje (`renderStudio` prepisuje spoločný kontajner bez uloženia `scrollTop`). | `ui/js/studio.js` (žiadny `scrollTop`) · `UI20_KONTRAKT.md:67` | UI |
 | B16 | P3 | D-87 nemá vlastný `### ` nadpis, jeho text je vnorený do sekcie D-50. | `archiv/DOGFOODING_vyriesene.md:114–135` | docs |
 | B17 | P3 | Odložený XLSX/CSV export kusovníka nemá v PLANe vlastníka (kontrakt sľubuje „vlastnú dávku"). | `SYSTEM/PLAN.md` | plán |
@@ -81,7 +81,7 @@ Zvyšok sú postrehy z dávok a review kôl bloku 1b.
 | C10 | **Identita zákazky je trojitá** — normalizovaná cesta + `guid:` kľúč sedenia + most v pamäti procesu. Zvážiť vlastné stabilné ID zákazky v NOXUN dictionary, ktoré by celú kaskádu zrušilo. *Zásah do dátového kontraktu ⇒ vlastná dávka.* | PR #243 |
 | C11 | `ProductionCore.project_name` je **čítanie, ktoré v prechode neuložený→uložený zapisuje nastavenia** — vzor „čítacia cesta s vedľajším účinkom", ktorý sa už raz vypomstil (dávka 1b-3). | PR #243 |
 | C12 | Migrácia názvu „už pri uložení, nie až pri prvom čítaní" by chcela save lifecycle callback = observer, teda **audit-povinnú** zmenu — vedome neopravené v #243. | PR #243 |
-| C13 | `vepo_settings.json` má **viacero zapisovateľov bez medziprocesového zámku** (`save_merge_18_36`, 4× `last_dir`) — plánovaná dávka **1b-6c**: východisko commit `0311095` na vetve `fix/1b6-nazov-projektu` + tri nálezy kola 3 z #243 (zámok pre každého zapisovateľa · `rescue` okolo celej zamknutej úpravy · návrat čerstvej hodnoty zo zamknutej migrácie). | PR #243 · ≡ B14 |
+| C13 | `vepo_settings.json` mal **viacero zapisovateľov bez medziprocesového zámku** (`save_merge_18_36`, 4× `last_dir`). **VYRIEŠENÉ dávkou 1b-6c** (v0.8.12, 28.8.): jedny zamknuté dvere `update_vepo_settings` + mapa názvov výhradne cez `update_project_names`; všetky tri nálezy kola 3 z #243 sú zapracované. Ostáva len ako záznam. | PR #243 · ≡ B14 |
 | C14 | **Menovky materiálov sú v `core/` ešte dvakrát** — `core/budget.rb` → `sheet_label` (riadok rozpočtu aj XLSX: dekor + typ + hrúbka, bez výrobcu a rubu) a `core/cp_export.rb` → `material_label` (zákaznícka ponuka; `cp_nazov` má prednosť, fallback skladá vlastný text). Dávka **1b-6b** ich vedome nechala: sú v `core/`, kam panelový aparát (`Panel.label_ctx`) nedosiahne — zjednotenie znamená presun kolízneho aparátu do `Materials`. Rozpočet je nákupný dokument, takže dvaja výrobcovia toho istého čísla v ňom majú dodnes identický riadok. | dávka 1b-6b |
 
 ---
@@ -89,6 +89,6 @@ Zvyšok sú postrehy z dávok a review kôl bloku 1b.
 ## Ako sa to prelieva do registra 1c
 
 1. **Dedup najprv, potom R-čísla.** Známe zhody: A4 ≡ B6 · A5 ≡ B10 · A7 ≡ C6 · B11 ≡ C7 · B14 ≡ C13.
-2. **Vyradiť to, čo je medzitým hotové** — B1 je vyriešené (1b-6a), **B2 je vyriešené (1b-6b, v0.8.11)**, A1/A2 sú vyriešené (1b-7, v0.8.10), C4 a C5 sú vyriešené (commit `e83abe4`), B14/C13 má dávku (1b-6c). Otvorených z triáže je teda **16 z 18**.
+2. **Vyradiť to, čo je medzitým hotové** — B1 je vyriešené (1b-6a), **B2 je vyriešené (1b-6b, v0.8.11)**, A1/A2 sú vyriešené (1b-7, v0.8.10), C4 a C5 sú vyriešené (commit `e83abe4`), **B14/C13 je vyriešené (1b-6c, v0.8.12)**. Otvorených z triáže je teda **15 z 18**.
 3. **Overiť proti vtedajšiemu `main`** — hlavne C7 (nález nad starým stromom, okno Výroba zaniklo) a všetky citácie do `ui/production_core.rb`.
 4. Až potom priradiť **závažnosť, vrstvu a blokovanú funkciu** podľa šablóny registra ([../PLAN.md](../PLAN.md), blok 1c).
