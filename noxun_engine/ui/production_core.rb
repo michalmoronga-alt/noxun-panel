@@ -692,9 +692,11 @@ module Noxun
         ids = []
         Array(bom[:rows]).each { |r| ids << row_value(r, 'material_id').to_s }
         Array(bom[:sheets]).each { |s| ids << row_value(s, 'material_id').to_s }
-        ids.reject(&:empty?).uniq.each_with_object({}) do |id, out|
+        ids = ids.reject(&:empty?).uniq
+        labels = material_labels(ids, smap)
+        ids.each_with_object({}) do |id, out|
           sheet = smap[id]
-          out[id] = { 'label' => material_label(sheet, id),
+          out[id] = { 'label' => labels[id],
                       'color' => catalog_color(sheet),
                       'th' => sheet ? sheet['thickness'].to_f : nil,
                       'uni' => !sheet.nil? && Materials.uni?(sheet) }
@@ -705,17 +707,117 @@ module Noxun
       # paska patri. Bez toho by supis pasok ukazoval len `abs_id`.
       def edges_meta(bom)
         emap = edges_map || {}
-        Array(bom[:edging]).each_with_object({}) do |e, out|
-          id = row_value(e, 'abs_id').to_s
-          next if id.empty? || out.key?(id)
-
+        ids = Array(bom[:edging]).map { |e| row_value(e, 'abs_id').to_s }.reject(&:empty?).uniq
+        labels = edge_labels(ids, emap)
+        ids.each_with_object({}) do |id, out|
           rec = emap[id]
-          out[id] = { 'label' => edge_label(rec, id), 'color' => catalog_color(rec),
+          out[id] = { 'label' => labels[id], 'color' => catalog_color(rec),
                       'decor' => rec ? rec['decor'].to_s : '',
                       'th' => rec ? rec['thickness'].to_f : nil,
                       'width' => (rec && rec['width'] ? rec['width'].to_f : nil),
                       'code' => rec ? rec['code'].to_s : '' }
         end
+      end
+
+      # --- 1b-6b: hlavicka skupiny materialov musi byt JEDNOZNACNA ----------
+      #
+      # `material_label` je LUDSKY nazov dekoru (cislo struktura nazov) — dva
+      # ROZNE vyrobne materialy (iny vyrobca, typ, format platne alebo rub
+      # zasteny) z neho dostanu ROVNAKY text. Podla tychto hlaviciek sa v Studiu
+      # OBJEDNAVA (Kusovnik, Platne), takze dve nerozlisitelne hlavicky su
+      # vyrobne riziko: objedna sa iny vyrobca, format alebo rub.
+      #
+      # Rozlisenie sa pridava LEN PRI REALNEJ KOLIZII (zasada `label_base` aj
+      # `vepo_disambiguate` — bezna zakazka ostava kratka) a NEVYMYSLA si vlastny
+      # text: eskaluje na TU ISTU menovku, aku kresli Inspector, takze panel
+      # a vystupy nemozu mat dve pravdy o tom, ako sa material vola.
+      #   1. `Panel.raw_row_label` — vyrobca pri kolizii (`label_base`) + pripona
+      #      formatu/rubu (`Materials.sheet_label_suffix`, GH #95 P1),
+      #   2. `Panel.sheet_label`   — navyse typ a hrubka (ten isty dekor v dvoch
+      #      typoch: DTDL 18 vs kompakt 18),
+      #   3. `[material_id]`       — poistka (vzor VEPO: dva materialy sa nesmu
+      #      zliat do jednej hlavicky ani vtedy, ked katalog obsahuje nezmysel).
+      #
+      # KOLIZNY KLUC je to, co riadok skupiny UKAZE: menovka + hrubka (hrubka ma
+      # v hlavicke aj v supise Platni vlastne miesto). Dve hrubky toho isteho
+      # dekoru — najbeznejsi pripad zakazky — preto ziadne rozlisenie
+      # nedostanu a ich hlavicky ostavaju kratke.
+      MATERIAL_LABEL_LEVELS = %i[row full id].freeze
+
+      # `ctx` = kontext kolizie vyrobcov. Sentinel `:panel` znamena „postav ho
+      # AZ pri prvej kolizii" — bezna zakazka tak katalog kvoli hlavickam
+      # necita vobec; test si moze podstrcit vlastny kontext.
+      def material_labels(ids, smap, ctx = :panel)
+        labels = {}
+        Array(ids).each { |id| labels[id] = material_label(smap[id], id) }
+        MATERIAL_LABEL_LEVELS.each do |level|
+          amb = ambiguous_label_ids(labels) { |id| meta_thickness_key(smap[id]) }
+          break if amb.empty?
+
+          ctx = panel_label_ctx if ctx == :panel
+          amb.each { |id| labels[id] = escalated_material_label(smap[id], id, labels[id], level, ctx) }
+        end
+        labels
+      end
+
+      # ABS pasky maju ten isty problem v mensom: `edge_label` nesie dekor
+      # a rozmery, ale nie strukturu ani vyrobcu — dve pasky toho isteho cisla
+      # v dvoch strukturach su v supise nerozlisitelne. Eskalacia je panelovy
+      # `abs_label` (struktura + vyrobca pri kolizii + „univ.") a poistka `[id]`.
+      def edge_labels(ids, emap, ctx = :panel)
+        labels = {}
+        Array(ids).each { |id| labels[id] = edge_label(emap[id], id) }
+        %i[full id].each do |level|
+          amb = ambiguous_label_ids(labels) { |id| meta_thickness_key(emap[id]) }
+          break if amb.empty?
+
+          ctx = panel_label_ctx if ctx == :panel
+          amb.each { |id| labels[id] = escalated_edge_label(emap[id], id, labels[id], level, ctx) }
+        end
+        labels
+      end
+
+      # ID, ktorych zobrazeny riadok (menovka + hrubka z bloku) je nerozlisitelny
+      # od ineho ID. Menovky sa porovnavaju `identity_norm` — rovnako ako kluce
+      # `Panel.label_ctx`, takze rozdiel iba vo velkosti pismen nie je rozdiel.
+      def ambiguous_label_ids(labels)
+        labels.keys.group_by { |id| [Materials.identity_norm(labels[id]), yield(id)] }
+              .values.select { |g| g.length > 1 }.flatten
+      end
+
+      def meta_thickness_key(rec)
+        rec.is_a?(Hash) ? Materials.thickness_key(rec['thickness']) : nil
+      end
+
+      # Kontext kolizie vyrobcov z panela. Nikdy nezhodi payload — bez kontextu
+      # su menovky presne dnesne (SCHEMA 1 ho nema tiez).
+      def panel_label_ctx
+        return nil unless defined?(Panel) && Panel.respond_to?(:label_ctx)
+
+        Panel.label_ctx
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.panel_label_ctx')
+        nil
+      end
+
+      def escalated_material_label(rec, id, current, level, ctx)
+        return "#{current} [#{id}]" if level == :id
+        return current unless rec.is_a?(Hash)
+
+        level == :row ? Panel.raw_row_label(rec, ctx) : Panel.sheet_label(rec, ctx)
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.escalated_material_label')
+        "#{current} [#{id}]"
+      end
+
+      def escalated_edge_label(rec, id, current, level, ctx)
+        return "#{current} [#{id}]" if level == :id
+        return current unless rec.is_a?(Hash)
+
+        Panel.abs_label(rec, ctx)
+      rescue StandardError => e
+        Engine.log_error(e, 'ProductionCore.escalated_edge_label')
+        "#{current} [#{id}]"
       end
 
       # --- ST-1a (Š2): volitelny stlpec „Rola" ------------------------------
