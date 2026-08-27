@@ -55,6 +55,13 @@
   sedenia pri prvom čítaní s platnou cestou spotrebujú **vždy**, pričom **záznam na ceste má prednosť** a rozpísaný názov ho neprepíše. Obe opravy majú vlastnú sadu a vlastnú
   mutáciu (most spotrebovaný aj po zlyhanom zápise · adopcia preskočená, keď cesta názov má) — headless po kole: **1952 PASS / 0 FAIL**.
 
+  **Review #243, kolo 2 — dve ďalšie P2.** *(1) Súbeh dvoch SketchUp inštancií nad jedným `%APPDATA%`.* Mapa `project_names` sa upravovala klasickým read-modify-write nad
+  **odtlačkom**, takže zápis z jednej inštancie vedel zmazať zákazku pomenovanú v druhej — a lenivá migrácia to riziko rozšírila aj na čítaciu cestu. Odteraz ide **každá** úprava
+  mapy cez `update_project_names`: medziprocesový zámok (`Materials.with_catalog_lock`) + **čítanie mapy nanovo vnútri zámku** (`JsonFileStore.reload!` zhodí sekundovú cache).
+  Zámok sa berie, až keď je čo zapísať — bežné čítanie ho neplatí. *(2) Migrácia „už pri uložení, nie až pri prvom čítaní"* (Codex chcel save lifecycle callback) — **vedome
+  neopravené**: znamenalo by to observer, a to je audit-povinná zmena mimo rozsahu tejto opravy. Diera je úzka (pomenovať, uložiť a zavrieť SketchUp bez jediného refreshu či
+  exportu) a most medzitým drží; zapísané ako kandidát do registra 1c. Mutácia kola 2: mapa čítaná PRED zámkom → padla sada o súbehu. Headless po kole: **1953 PASS / 0 FAIL**.
+
 - **1b-5 · DOROVNANIE CHARAKTERIZAČNEJ SADY `CHAR` — post-hoc Codex kolo na zmergovanom PR #239 (27.8.2026):** vetva `test/1b5-char-dorovnanie`, **TEST-ONLY** (kód pluginu sa
   nezmenil o riadok, VERSION ostáva **0.8.8**). Sada `CHAR` je BRÁNA pre blok 1d a GHOST Tool — na jej zelenej farbe stojí povolenie siahnuť na buildery a observery. Codex
   po mergi #239 našiel **štyri P2**, ktorých spoločný menovateľ je „assert je zelený, ale nemeria to, čo tvrdí". Preto sa to riešilo hneď, samostatnou dávkou.

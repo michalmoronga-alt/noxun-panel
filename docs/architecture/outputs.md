@@ -79,7 +79,10 @@ dokument rozrobený názov zdediť nemôže, Windows SketchUp pri File > New/Ope
 (`adopt_session_name`) a most sa spotrebuje; **bez migrácie** by názov žil len do konca sedenia a po reštarte by sa stratil aj tak. Kľúče sedenia sa spotrebujú pri prvom čítaní s
 platnou cestou **vždy** — aj keď cesta už svoj názov má: ten **má prednosť** a rozpísaný názov ho neprepíše, ale musí zaniknúť, inak by sa o pár minút vynoril pri „Uložiť ako" na
 čerstvej ceste (review #243 P2-2). Most sa zahadzuje **až po úspešnom zápise** — `save_vepo_settings` vracia `true`/`false` a pri zamknutom súbore či plnom disku ostáva most nažive,
-takže sa migrácia zopakuje hneď, ako zápis prejde (review #243 P2-1). Zápisová cesta upratuje to isté
+takže sa migrácia zopakuje hneď, ako zápis prejde (review #243 P2-1). **Každá úprava mapy `project_names` (zápis mena aj lenivá migrácia) ide cez `update_project_names`:** beží
+pod medziprocesovým zámkom (`Materials.with_catalog_lock` — jediný zámok nad tým istým priečinkom, reentrantný) a mapu číta **vnútri zámku nanovo** (`JsonFileStore.reload!` zhodí
+sekundovú cache). Bez toho by dve SketchUp inštancie nad jedným `%APPDATA%` prepísali celú mapu odtlačkom a zákazka pomenovaná v druhom okne by zmizla (review #243, kolo 2). Zámok
+sa berie až keď je čo zapísať — bežné čítanie má pred ním lacnú otázku nad už načítanou mapou. Zápisová cesta upratuje to isté
 (`save_project_name` maže VŠETKY kľúče sedenia zákazky, nielen ten podľa aktuálneho guid). Most **nie je zakázaný okenný stav**: nie je to stav okna ani medzivýsledok výpočtu, ale
 údaj o dokumente, ktorý sa z modelu po uložení prečítať nedá — obe okná z neho čítajú to isté a nemajú si ho ako prepísať; je to konštanta (nie `@ivar`) aj kvôli guard testu, ktorý
 tu inštančné premenné nepripúšťa, a je zhora ohraničená (`SESSION_BRIDGE_MAX`). Prázdna hodnota **aj hodnota zhodná s defaultom zmaže záznam**, takže sa pomenovanie vráti

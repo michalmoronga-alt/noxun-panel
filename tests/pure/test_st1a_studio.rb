@@ -250,6 +250,42 @@ NxTest.test('1b-6a (review #243 P2-2): nazov na ceste ma PREDNOST a most sa aj t
   end
 end
 
+NxTest.test('1b-6a (review #243 kolo 2): migracia nezmaze nazov, ktory medzitym zapisala druha instancia') do
+  # Dve SketchUp instancie zdielaju jeden %APPDATA%. Keby migracia zapisovala
+  # ODTLACOK mapy z ciatania, prepisala by cely `project_names` a zakazka
+  # pomenovana v druhom okne by zmizla. Preto uprava bezi pod medziprocesovym
+  # zamkom a mapa sa vnutri zamku cita NANOVO.
+  NxTest.skip!('vyzaduje headless sandbox nastaveni') unless NxTest.headless?
+  core = Noxun::Engine::ProductionCore
+  mats = Noxun::Engine::Materials
+  m = Struct.new(:path, :guid).new('', 'GUID-SUBEH')
+  orig = mats.method(:with_catalog_lock)
+  begin
+    core.save_project_name(m, 'Nasa zakazka')
+    m.path = 'C:/Zakazky/Nasa.skp'
+    m.guid = 'GUID-SUBEH-2'
+    # Druha instancia stihne zapisat PRESNE medzi nasim citanim a nasim zapisom.
+    mats.define_singleton_method(:with_catalog_lock) do |&blk|
+      map = core.project_names.dup
+      map['c:/zakazky/druha.skp'] = 'Druha instancia'
+      core.save_vepo_settings(Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY => map)
+      orig.call(&blk)
+    end
+    NxTest.assert_equal('Nasa zakazka', core.project_name(m), 'nasa migracia prebehla')
+  ensure
+    mats.define_singleton_method(:with_catalog_lock, orig)
+  end
+  map = core.project_names
+  NxTest.assert_equal('Druha instancia', map['c:/zakazky/druha.skp'],
+                      'zaznam druhej instancie migraciu prezil')
+  NxTest.assert_equal('Nasa zakazka', map['c:/zakazky/nasa.skp'], 'a nas sadol na cestu')
+ensure
+  clean = core.project_names.dup
+  %w[guid:GUID-SUBEH guid:GUID-SUBEH-2 c:/zakazky/druha.skp c:/zakazky/nasa.skp]
+    .each { |k| clean.delete(k) }
+  core.save_vepo_settings(Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY => clean)
+end
+
 NxTest.test('1b-6a: prepis nazvu PO ulozeni zmaze aj zaznam spred ulozenia') do
   # Zapisova cesta musi upratat to iste, co citacia — inak by po prvom
   # premenovani ulozenej zakazky ostal v subore mrtvy guid kluc.
@@ -274,8 +310,16 @@ end
 NxTest.test('ST-1a: nazov projektu je nastavenie POCITACA — nikdy sa nezapisuje do modelu') do
   body = ST1B_CORE_RB[/def save_project_name.*?\n      end\n/m].to_s
   NxTest.assert(!body.empty?, 'zapis ma vlastnu funkciu')
-  NxTest.assert(body.include?('save_vepo_settings'),
+  # 1b-6a (review #243 kolo 2): zapis ide cez `update_project_names` (zamok +
+  # cerstva mapa), ktory pod kapotou vola `save_vepo_settings` — cielom je stale
+  # %APPDATA%, nie .skp.
+  NxTest.assert(body.include?('update_project_names'),
+                'zapisuje sa cez upravu mapy nazvov, nie do modelu')
+  upd = ST1B_CORE_RB[/def update_project_names.*?\n      end\n/m].to_s
+  NxTest.assert(upd.include?('save_vepo_settings'),
                 'zapisuje sa do %APPDATA% (vepo_settings.json), nie do .skp')
+  NxTest.assert(upd.include?('Materials.with_catalog_lock') && upd.include?('JsonFileStore.reload!'),
+                'uprava mapy bezi pod medziprocesovym zamkom a cita mapu nanovo')
   NxTest.refute(body.include?('start_operation'), 'ziadna operacia = ziadny krok Spat')
   NxTest.refute(body.include?('Store.'), 'ziadny zapis do NOXUN dictionary modelu')
 end

@@ -26,8 +26,12 @@ module Noxun
 
       # Fallback na defaulty pri poskodenom subore (audit F9) — export nikdy
       # nesmie zablokovat okno kvoli nastaveniam.
+      def vepo_settings_path
+        File.join(Materials.dir, VEPO_SETTINGS_FILE)
+      end
+
       def vepo_settings
-        path = File.join(Materials.dir, VEPO_SETTINGS_FILE)
+        path = vepo_settings_path
         return {} unless JsonFileStore.available?(path)
         data = JsonFileStore.read(path)
         data.is_a?(Hash) ? data : {}
@@ -40,7 +44,7 @@ module Noxun
       # disku sa nesmie zahodit jedina stopa na stary kluc. Pad sa aj tak len
       # zaloguje: nastavenia nikdy nezhodia okno.
       def save_vepo_settings(attrs)
-        path = File.join(Materials.dir, VEPO_SETTINGS_FILE)
+        path = vepo_settings_path
         JsonFileStore.write(path, vepo_settings.merge(attrs))
         true
       rescue StandardError => e
@@ -209,6 +213,23 @@ module Noxun
         v.is_a?(Hash) ? v : {}
       end
 
+      # Atomicka uprava mapy nazvov (review #243, kolo 2). Dve SketchUp
+      # instancie zdielaju JEDEN `%APPDATA%`, takze read-modify-write nad celou
+      # mapou vie prepisat zaznam, ktory medzitym zapisala tá druhá. Uprava
+      # preto bezi pod MEDZIPROCESOVYM zamkom (`Materials.with_catalog_lock` —
+      # jediny zamok nad tym istym priecinkom, reentrantny, kriticke sekcie su
+      # v ms) a mapa sa vnutri zamku cita NANOVO: `JsonFileStore.reload!` zhodi
+      # sekundovu cache, bez ktorej by cerstvy zapis druhej instancie nebolo
+      # vidiet. Blok dostane CERSTVU kopiu mapy a vrati upravenu; `nil` znamena
+      # „netreba nic zapisat". Vracia uspech zapisu.
+      def update_project_names
+        Materials.with_catalog_lock do
+          JsonFileStore.reload!(vepo_settings_path)
+          fresh = yield(project_names.dup)
+          fresh.nil? ? true : save_vepo_settings(PROJECT_NAMES_KEY => fresh)
+        end
+      end
+
       # Stabilna identita zakazky pre nastavenia POCITACA. Windows nerozlisuje
       # velkost pismen ani smer lomitka, takze „C:\Zakazky\Klinika.skp" a
       # „c:/zakazky/klinika.skp" musia dat TEN ISTY kluc.
@@ -299,26 +320,34 @@ module Noxun
       def adopt_session_name(model, key, map)
         return nil if key.to_s.empty? || session_key?(key)
 
+        # LACNA PREDBEZNA OTAZKA nad uz precitanou mapou: nemat co upratat je
+        # bezny stav KAZDEHO citania, a to sa nesmie platit zamkom.
         aliases = session_keys_for(model)
-        stale = aliases.select { |k| map.key?(k) }
-        return nil if stale.empty? && remembered_session_key(model).empty?
+        return nil if aliases.none? { |k| map.key?(k) } && remembered_session_key(model).empty?
 
-        hit = stale.find { |k| !map[k].to_s.strip.empty? }
-        # Zaznam na ceste ma prednost — nikdy sa neprepisuje rozrobenym nazvom.
-        name = map[key].to_s.strip.empty? && hit ? map[hit].to_s.strip : ''
-        ok = stale.empty? || migrate_session_keys(model, key, name, stale, map)
+        name = ''
+        ok = migrate_session_keys(model, key, aliases) { |n| name = n }
         forget_session_key(model) if ok
         name.empty? ? nil : name
       end
 
-      # Zapis migracie: kluce sedenia zanikaju, adoptovany nazov sadne na cestu
-      # (zhodny s defaultom sa nezapisuje — rovnako ako pri `save_project_name`).
-      # Vracia uspech zapisu.
-      def migrate_session_keys(model, key, name, stale, map)
-        moved = map.dup
-        stale.each { |k| moved.delete(k) }
-        moved[key] = name unless name.empty? || name == default_project_name(model)
-        save_vepo_settings(PROJECT_NAMES_KEY => moved)
+      # Rozhodnutie AJ zapis migracie — oboje nad CERSTVOU mapou pod zamkom
+      # (review #243 kolo 2): kluce sedenia zanikaju a adoptovany nazov sadne na
+      # cestu (zhodny s defaultom sa nezapisuje, rovnako ako pri
+      # `save_project_name`). Adoptovany nazov odovzdava bloku. Vracia uspech.
+      def migrate_session_keys(model, key, aliases)
+        update_project_names do |fresh|
+          stale = aliases.select { |k| fresh.key?(k) }
+          hit = stale.find { |k| !fresh[k].to_s.strip.empty? }
+          # Zaznam na ceste ma prednost — nikdy sa neprepisuje rozrobenym nazvom.
+          name = fresh[key].to_s.strip.empty? && hit ? fresh[hit].to_s.strip : ''
+          yield(name)
+          next nil if stale.empty? # niet co upratat = ziadny zapis
+
+          stale.each { |k| fresh.delete(k) }
+          fresh[key] = name unless name.empty? || name == default_project_name(model)
+          fresh
+        end
       end
 
       # Zapis nazvu. Prazdna hodnota (aj hodnota zhodna s defaultom) zaznam
@@ -335,15 +364,19 @@ module Noxun
         return project_name(model) if key.empty?
 
         s = name.to_s.strip[0, PROJECT_NAME_MAX].to_s.strip
-        map = project_names.dup
-        session_keys_for(model).each { |k| map.delete(k) unless k == key }
         stored = !(s.empty? || s == default_project_name(model))
-        if stored
-          map[key] = s
-        else
-          map.delete(key)
+        aliases = session_keys_for(model)
+        # Cita a zapisuje POD ZAMKOM nad cerstvou mapou (review #243 kolo 2) —
+        # inak by zapis z jednej instancie zmazal zakazku pomenovanu v druhej.
+        ok = update_project_names do |fresh|
+          aliases.each { |k| fresh.delete(k) unless k == key }
+          if stored
+            fresh[key] = s
+          else
+            fresh.delete(key)
+          end
+          fresh
         end
-        ok = save_vepo_settings(PROJECT_NAMES_KEY => map)
         if stored && session_key?(key)
           remember_session_key(model, key)
         elsif ok
