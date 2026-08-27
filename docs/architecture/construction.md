@@ -32,12 +32,18 @@ false — zdroj pravdy súpisu je VÝHRADNE `config.hardware[]` korpusu). Profil
 **PRERUŠENIE STAVBY** (`abort_safely`): výnimka kdekoľvek vnútri `build`/`rebuild` ruší CELÚ operáciu a **neprehĺta sa** — volajúci sa o nej dozvie. Rollback vracia geometriu
 (inštanciu aj definície dielcov) **a zároveň modelové atribúty**, teda aj projektové snapshoty kovania, ktoré `build_into` cestou `HardwareRules.ensure_project_rules!` /
 `HardwareSets.ensure_project_state!` stihol zapísať — preto sa smú volať len vnútri operácie volajúceho. Zafixované scenárom `CH4` (`run_char`; sonda necháva `build_into` dobehnúť
-celé a hodí výnimku až nad hotovým torzom, inak by test kontroloval prázdnu definíciu).
+celé a hodí výnimku až nad hotovým torzom, inak by test kontroloval prázdnu definíciu). **Obe cesty sú prejdené zvlášť:** `CH4a` = `build` (čerstvá definícia, žiadna živá
+inštancia) · `CH4c` = `rebuild` nad **živou** skrinkou, kde `rebuild_in_operation` robí `cdef.entities.clear!` **pred** stavbou, takže v okamihu výnimky je definícia
+používateľovho korpusu prázdna — scenár overuje, že sa vráti inštancia, config, geometria dielec po dielci aj transformácia a že zlyhaná prestavba nenechá krok Späť
+(kvalifikované sondou undo stacku, nie počtom korpusov). Bez `CH4c` by rollback špecifický pre `rebuild` mohol používateľovi korpus vygumovať pri zelenej bráne.
 
 **KÓPIA A `*N` NÁSOBENIE** sú zafixované `CH1`/`CH2` tej istej sady: kópia dostáva vlastné `cabinet_id`, vlastnú definíciu (`make_unique`) a prepočítané `part_id`, kým `part_key`
 ostáva ROLOU. Config prežije kopírovanie kompletný **až na odvodenú identitu zón** — `zone_tree` skladá z `cabinet_id` polia `id` aj `parent`; trvalým kľúčom je `stable_id`
 (= `node_id` stromu), lebo cez `PartKeys.zone` vstupuje do `part_key`, ktorým sú kľúčované `part_overrides` (`migrate_overrides`). Po `*N` musí kusovník ukázať násobené množstvo —
-násobenie sa meria až vo výrobnom výstupe, nie na počte inštancií.
+násobenie sa meria až vo výrobnom výstupe, nie na počte inštancií. **`CH2` ide VERNOU sekvenciou nástroja, nie skratkou:** najprv jedna Move+Ctrl kópia vo vlastnej commitnutej
+operácii → spracovanie observerom → **interné Undo nástroja** (kópia musí zmiznúť CELÁ) → až potom pole troch kópií v jednej operácii. Skok rovno na tri kópie by neodhalil, že
+dedup po tej prvej kópii pridal vlastný undo krok — vtedy interné undo trafí jeho, kópia prežije ako „zombie" a pole k nej pridá ďalšiu skrinku (živá chyba D-103; pre dosky to
+meria `async S6`).
 
 ### board_builder.rb
 
@@ -238,11 +244,15 @@ Súbor, v ktorom žijú triedy prekrytí (`Sketchup::Overlay`) — celý je pod 
 **Stabilná transformácia** (`@stable_transforms`, z nej `reject_scale` obnovuje polohu) sa aktualizuje po každej úspešnej absorpcii, presune **aj po úspešnom commite orientačnej
 zmeny** (`Panel.handle_set_board_orientation` volá `remember_transform`) — bez toho by najbližší odmietnutý scale vrátil dosku do polohy PRED otočením, kým config už nesie novú
 orientáciu. Kľúč je `[model.object_id, entityID]` a **nikto z cache nemaže** — záznamy zmazaných entít aj starých dokumentov v nej ostávajú (charakterizované, nie schválené: fixuje
-to `CH6`, kandidát do registra 1c). `EngineAppObserver` notifikuje dialógy viazané na model (File>New/Open/Activate).
+to `CH6`, kandidát do registra 1c). `CH6` maže **mimo `ScaleWatch.guard`**, teda skutočnou erase cestou: v guarde `notify_erase` okamžite vracia, takže mazanie cez testovací
+`cleanup` by prežitie záznamu „dokázalo" aj vtedy, keby cache upratoval erase observer — scenár preto vloží vlastnú operáciu s `erase!`, počká na debounce a kontroluje **konkrétny
+kľúč**, nie len počet. `EngineAppObserver` notifikuje dialógy viazané na model (File>New/Open/Activate).
 
 **Charakterizované sadou `CHAR`** (`tests/sketchup/su_runner.rb`, `run_char` — dávka 1b-2, brána H bloku 1b; zapisuje DNEŠNÉ správanie, aby mal hardening bloku 1d a GHOST Tool
 vrstva pevnú pôdu): absorpcia scale je **jeden** undo krok a nepridáva vlastný (`CH3`, `CH5`); dedup kópie aj `*N` násobenia sa lepí na paste krok, takže jedno Undo vráti celú
-dávku (`CH1`, `CH2`); aktivácia **toho istého** dokumentu prekrytia NEzhasína (guard `same_model?`), kým udalosť o dokumente s iným `guid` ich zhasnúť MUSÍ (`CH6`); **od 1b-3 (brána
+dávku (`CH1`, `CH2`); **oneskorený tik po Undo nepridá krok Späť — a meria sa to sondou undo stacku** (pomenovaná operácia so známym modelovým atribútom, položená pred meraný
+úsek; keď ju ďalšie Späť odstráni, medzitým nikto nič nekomitol). Zhodný zoznam `cabinet_id` na tento dôkaz NESTAČÍ: netransparentný prune/dedup tik commitne operáciu bez zmeny
+identít (`CH1`, `CH4c`); aktivácia **toho istého** dokumentu prekrytia NEzhasína (guard `same_model?`), kým udalosť o dokumente s iným `guid` ich zhasnúť MUSÍ (`CH6`); **od 1b-3 (brána
 G) je `ScaleWatch` — spolu s `Panel.push_selected` → `request_dedup` — JEDINÁ cesta, ktorá dedup vykonáva: čítacie cesty okien identitu neopravujú, len ju priznajú v Kontrole
 (`CH7`, guard `tests/pure/test_1b3_citanie.rb`).** **Padnutý
 `CHAR` test neznamená „oprav test", ale „správanie sa zmenilo — povedz prečo".** Dve vetvy sa na Windows spustiť nedajú a sú zapísané ako MANUÁLNE scenáre priamo v INFO riadkoch

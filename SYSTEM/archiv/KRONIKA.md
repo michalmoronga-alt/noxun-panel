@@ -17,6 +17,42 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1b-5 · DOROVNANIE CHARAKTERIZAČNEJ SADY `CHAR` — post-hoc Codex kolo na zmergovanom PR #239 (27.8.2026):** vetva `test/1b5-char-dorovnanie`, **TEST-ONLY** (kód pluginu sa
+  nezmenil o riadok, VERSION ostáva **0.8.8**). Sada `CHAR` je BRÁNA pre blok 1d a GHOST Tool — na jej zelenej farbe stojí povolenie siahnuť na buildery a observery. Codex
+  po mergi #239 našiel **štyri P2**, ktorých spoločný menovateľ je „assert je zelený, ale nemeria to, čo tvrdí". Preto sa to riešilo hneď, samostatnou dávkou.
+
+  **Prečo sa vôbec dá mať zelený a slepý test.** Všetky štyri nálezy sú jeden vzor: **dôkaz sa opieral o veličinu, ktorá sa pri regresii nezmení.** Zhodný zoznam `cabinet_id`
+  nedokáže, že nikto nekomitol operáciu. `st >= before` nad cache nedokáže, že cache prežila mazanie, keď sa mazalo v guarde, kde erase observer okamžite vracia. A scenár, ktorý
+  preskočí prvú fázu nástroja, nemôže odhaliť chybu, ktorá v tej prvej fáze vzniká. Každé zosilnenie preto **mení meranú veličinu**, nie prísnosť čísla.
+
+  **1 · `CH2` teraz ide VERNOU sekvenciou `*N`, nie skratkou.** *Čo bolo zle:* scenár skákal rovno na tri kópie v jednej operácii. Reálne `*N` však najprv položí a **commitne
+  jednu** Move+Ctrl kópiu, observer ju spracuje, a až keď používateľ dopíše `*3`, nástroj svoju operáciu **prepíše** (interné Undo + pole nanovo). *Čo platí:* obe fázy sa
+  prechádzajú — po prvej kópii sa overí vlastné ID, potom interné Undo a tvrdý assert „kópia zmizla CELÁ, žiadna zombie", až potom pole troch. *Mutačný dôkaz:* dedup
+  netransparentný pre jednu čerstvú duplicitu (`cabinet_builder.rb`, `trans = fresh_ids ? (dups.length > 1) : transparent`) — **starý `CH2` ostal celý zelený**, nový padol na
+  fáze 1 a fáza 2 ukázala presne živú chybu D-103: **5 skriniek namiesto 4 a kusovník 5/10/5/5 namiesto 4/8/4/4**.
+
+  **2 · `CH6` maže MIMO `ScaleWatch.guard`.** *Čo bolo zle:* cleanup mazal v guarde, kde `notify_erase` okamžite vracia — assert nad `@stable_transforms` by ostal zelený, aj keby
+  cache upratoval erase observer; meral len to, že si test sám potlačil lifecycle. *Čo platí:* scenár si najprv dokáže, že kľúč `[model.object_id, entityID]` v cache **je**, potom
+  spraví vlastnú operáciu s `erase!` **bez guardu** (presne ako Delete z ruky), počká na debounce a kontroluje **ten konkrétny kľúč**, nie len počet. *Mutačný dôkaz:*
+  `notify_erase` čistí cache — **starý assert zelený**, nový padol.
+
+  **3 · Oneskorený tik po Undo sa kvalifikuje UNDO STACKOM, nie zoznamom ID.** *Čo bolo zle:* `CH1` po Undo porovnával iba `cabinet_id`; netransparentný prune/dedup tik commitne
+  operáciu **bez zmeny identít** a test by prešiel. *Čo platí:* pribudla **sonda undo stacku** (`char_push_stack_probe` — pomenovaná operácia, ktorej jediný účinok je známy
+  modelový atribút, položená pred meraný úsek; keď ju ďalšie Späť odstráni, medzitým nikto nič nekomitol). *Mutačný dôkaz:* `prune_ghosts` netransparentný **a zapisujúci**
+  (samotná netransparentnosť nestačí — prázdna operácia na stack nesadne) — **starý assert „žiadny oneskorený tik" ostal zelený**, nová sonda padla.
+
+  **4 · `CH4c` — rollback prestavby ŽIVEJ skrinky.** *Čo bolo zle:* text architektúry tvrdil, že `CH4` charakterizuje `build` **aj** `rebuild`, pritom sonda išla len cez `build`
+  (čerstvá definícia, žiadna živá inštancia). Pritom `rebuild` má ostrejšiu cenu zlyhania: `rebuild_in_operation` robí `cdef.entities.clear!` **pred** stavbou, takže v okamihu
+  výnimky je definícia používateľovho korpusu prázdna. *Čo platí:* nový scenár nad živou skrinkou charakterizuje, čo ostane — inštancia, `cabinet_id`, config (ani čiastočný zápis
+  novej šírky), geometria dielec po dielci, počet definícií, transformácia **a** pozícia v undo stacku. *Mutačný dôkaz:* `abort_safely` v `rebuild` nahradený commitom torza —
+  padli asserty geometrie aj undo pozície, nič iné v behu sa nepohlo. Tvrdenie v `construction.md` sa **nezúžilo, ale doložilo**.
+
+  **Vedľajší nález z mutačného kola:** prvá verzia sondy porovnávala atribút proti `nil`. To je krehké — kľúč je jeden a prepisujú ho všetky sondy behu, takže po Späť sa v ňom
+  objaví hodnota PREDCHÁDZAJÚCEJ sondy, nie `nil` (v mutačnom behu to dalo falošný FAIL `CH4c`). Porovnáva sa preto proti **menu vlastnej sondy** („už to nie je moja").
+
+  **Výsledok:** plný in-SketchUp beh **1036 PASS / 0 FAIL / 0 SKIP** (bolo 1022 — **+14 assertov**: `CH1` +2, `CH2` +2, `CH4c` +8, `CH6` +2). Headless **1947** a 69 JS sád
+  bez zmeny (dávka sa kódu pluginu nedotkla). Mutačné behy: **5** (jeden s pôvodným runnerom = dôkaz slepoty, štyri s novým = dôkaz záchytu).
+
 - **1b-4 · DROBNOSTI SEKCIÍ ŠABLÓNY (B) A PRAVIDLÁ (D) — odrážky B a D bloku 1b (27.8.2026):** vetva `fix/1b4-sablony-pravidla-drobnosti`, v0.8.7 → **v0.8.8**. Osem NOTE-level dlhov
   z review #221/#222/#225, ktoré vtedy neblokovali a boli vedome odložené. Žiadny z nich sa neprejaví novým tlačidlom — všetky sú o tom, aby UI **nehovorilo nepravdu** a aby
   **neplatilo za nič**. Codex audit pred implementáciou sa **nekonal a nemusel** (risk-based pravidlo: žiadny dátový kontrakt .skp, žiadna schéma, migrácia ani observer/undo —

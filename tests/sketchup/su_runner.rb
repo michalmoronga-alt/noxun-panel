@@ -8342,9 +8342,13 @@ module NoxunSuRunner
   #       vnorenej zone aj `parent`), ktora ide s novym cabinet_id, kym
   #       `stable_id` (vstupuje do `PartKeys.zone`, teda do `part_key`, ktorym
   #       su klucovane `part_overrides`) ostava; part_key ostava rolou, part_id
-  #       sa prepocita, 1x Undo vrati kopiu celu.
-  #   CH2 `*N` NASOBENIE (3 kopie v JEDNEJ operacii) — tri vlastne identity,
-  #       ziadne zdielane part_id v modeli, 1x Undo vrati celu davku.
+  #       sa prepocita, 1x Undo vrati kopiu celu a oneskoreny tik uz NEPRIDA
+  #       undo krok (kvalifikovane sondou stacku, nie zhodnym zoznamom ID).
+  #   CH2 `*N` NASOBENIE VERNOU SEKVENCIOU NASTROJA — faza 1: jedna Move+Ctrl
+  #       kopia, observer ju spracuje, nastroj svoju operaciu ODUNDUJE (kopia
+  #       musi zmiznut CELA, ziadna zombie); faza 2: pole 3 kopii v JEDNEJ
+  #       operacii — tri vlastne identity, ziadne zdielane part_id, kusovnik
+  #       hlasi 4x mnozstvo, 1x Undo vrati celu davku.
   #   CH3 UNDO RETAZ: postav -> scale -> Undo -> Undo (absorpcia NEPRIDALA
   #       vlastny krok). Vetva ZNOVA je na Windows cez Ruby API nespolahliva
   #       (PLAN, blok 3 STABILITA) — kvalifikuje sa UCINKOM a bez ucinku ostava
@@ -8352,9 +8356,11 @@ module NoxunSuRunner
   #   CH4 PRERUSENIE OPERACIE — sonda necha `build_into` dobehnut CELE (dielce
   #       aj projektove snapshoty kovania) a az potom hodi vynimku, takze
   #       `abort_safely` rusi SKUTOCNE TORZO; plus rucny `abort_operation`
-  #       uprostred pouzivatelovej kopie. Overuje sa rollback geometrie
-  #       (definicie dielcov), instancii AJ modelovych atributov, a ze
-  #       prerusenie nenecha undo krok navyse.
+  #       uprostred pouzivatelovej kopie (CH4b) a ROLLBACK PRESTAVBY ZIVEJ
+  #       skrinky (CH4c — `rebuild` maze definiciu PRED stavbou, takze zlyhanie
+  #       hrozi vygumovanim pouzivatelovho korpusu). Overuje sa rollback
+  #       geometrie (definicie dielcov), instancii, configu AJ modelovych
+  #       atributov, a ze prerusenie nenecha undo krok navyse.
   #   CH5 SCALE nastrojom Mierka (simulovany transformaciou) — absorpcia je
   #       PRESNE to, co by postavil regenerate: porovnanie dielec po dielci
   #       s referencnou skrinkou postavenou rovno na cielove rozmery; a je to
@@ -8365,8 +8371,9 @@ module NoxunSuRunner
   #       je: prekrytia sa ZAPNU a overi sa OBOJE — aktivacia toho isteho
   #       dokumentu ich nezhasina (guard `same_model?` drzi), kym udalost
   #       o dokumente s INYM `guid` ich zhasnut MUSI; dalej ze opakovana
-  #       aktivacia dedup nerozbije a nerobi undo krok, a datova struktura
-  #       multi-model guardov (`scale_observer.rb:149-150, 194-200`).
+  #       aktivacia dedup nerozbije a nerobi undo krok, datova struktura
+  #       multi-model guardov (`scale_observer.rb:149-150, 194-200`) a ze cache
+  #       `@stable_transforms` prezije REALNE (neguardnute) zmazanie entity.
   #
   # Kroky sa pripajaju do TEJ ISTEJ async retaze ako S1–S6 (vzor `run_stale`),
   # aby scenare bezali cez REALNY debounce tick observera, nie cez priame
@@ -8469,6 +8476,35 @@ module NoxunSuRunner
     e::CabinetBuilder.singleton_class.send(:remove_method, :nx_char_orig_build_into)
   end
 
+  # SONDA UNDO STACKU (review #239 post-hoc, P2-3). Problem: „ID sa nezmenili"
+  # NIE JE dokaz, ze nikto nic nekomitol — netransparentny prune/dedup tik moze
+  # pridat operaciu BEZ toho, aby na ID siahol, a assert nad zoznamom korpusov
+  # ostane zeleny. Sonda polozi na stack POMENOVANU operaciu, ktorej JEDINY
+  # ucinok je znamy atribut na modeli; ked ju nasledne `Sketchup.undo` odstrani,
+  # bola este stale VRCHOLOM stacku — teda medzitym nikto nic nekomitol. Keby
+  # tik pridal svoju operaciu, undo by trafilo JU a atribut by v modeli OSTAL.
+  # Bezi v `ScaleWatch.guard` (vzor `char_forge_dup`), aby si priprava sonda
+  # sama nenaplanovala tik, ktory ma merat.
+  #
+  # POROVNAVA SA PROTI MENU SONDY, NIE PROTI `nil`: kluc je jeden a prepisuju ho
+  # vsetky sondy behu, takze po Späť sa v nom objavi hodnota PREDCHADZAJUCEJ
+  # sondy (nie nil), ak nejaka v modeli zostala. „Uz to nie je MOJA sonda" je
+  # presne to, co dokazuje, ze Späť odstranilo prave ju.
+  CHAR_STACK_KEY = 'su_test_char_stack_probe'.freeze
+
+  def char_push_stack_probe(model, name)
+    e::ScaleWatch.guard do
+      model.start_operation(name, true)
+      model.set_attribute(e::Store::DICT, CHAR_STACK_KEY, name)
+      model.commit_operation
+    end
+    name
+  end
+
+  def char_stack_probe(model)
+    model.get_attribute(e::Store::DICT, CHAR_STACK_KEY)
+  end
+
   # Zastupca CUDZIEHO dokumentu. Guard `same_model?` v EdgeCheck aj GrainCheck
   # porovnava `guid`, takze na spustenie VYPINACEJ vetvy staci objekt s inym
   # guidom — `disable!` pracuje s ulozenym `@model` (skutocnym dokumentom),
@@ -8502,6 +8538,10 @@ module NoxunSuRunner
          Array(state[:ch1_cfg]['zones']).any? { |z| !z['parent'].nil? })
       state[:ch1_keys] = char_parts(inst).map { |p| e::Store.get(p, 'part_key').to_s }.sort
       state[:ch1_pids] = char_parts(inst).map { |p| e::Store.get(p, 'part_id').to_s }.sort
+      # Sonda undo stacku sa kladie TESNE PRED kopiu — stack je potom
+      # [vlozenie][delenie][SONDA][kopia]. Zaverecny krok scenara ju odundovanim
+      # pouzije ako dokaz, ze po Undo kopie uz nikto NIC nekomitol.
+      state[:ch1_probe] = char_push_stack_probe(model, 'SU-TEST CH1 sonda undo stacku')
       state[:ch1_copy] = char_copy(model, inst, [800.0], 'SU-TEST CH1 user copy').first
     end]
     steps << [SETTLE, lambda do
@@ -8547,10 +8587,33 @@ module NoxunSuRunner
       cids = cabinets(model).map { |i| e::Store.get(i, 'cabinet_id').to_s }.sort
       ok("CH1: po Undo uz ziadny oneskoreny tik do modelu nesiahol (korpusy: #{cids.join(', ')})",
          cids == state[:ch1_after])
+      # KVALIFIKACIA CEZ UNDO STACK (review #239 post-hoc, P2-3): zhodne ID su
+      # slaby dokaz — netransparentny prune/dedup tik po Undo by commitol
+      # operaciu BEZ zmeny ID a assert vyssie by presiel. Sonda polozena pred
+      # kopiu musi byt po Undo kopie STALE vrcholom stacku: ked ju dalsie Undo
+      # odstrani, medzitym nikto nic nekomitol. Meria sa HNED (undo je
+      # synchronne), rovnako ako v CH7.
+      ok("CH1 vychodisko sondy: sonda undo stacku je v modeli (#{char_stack_probe(model).inspect})",
+         char_stack_probe(model) == state[:ch1_probe])
+      Sketchup.undo
+      probe = char_stack_probe(model)
+      cids2 = cabinets(model).map { |i| e::Store.get(i, 'cabinet_id').to_s }.sort
+      ok("CH1: oneskoreny tik NEPRIDAL undo krok — dalsie Späť odstranilo SONDU (v modeli uz " \
+         "#{probe.inspect}), nie cudziu operaciu; skrinka stoji (#{cids2.join(', ')})",
+         probe != state[:ch1_probe] && cids2 == [state[:ch1_cid]])
       cleanup(model)
     end]
 
     # --- CH2: `*N` NASOBENIE SKRINKY ---------------------------------------
+    # VERNA SEKVENCIA NASTROJA (review #239 post-hoc, P2-1): `*N` NIE JE „tri
+    # kopie naraz". Nastroj Presun najprv polozi a COMMITNE jednu Move+Ctrl
+    # kopiu, observer ju spracuje (dedup jej pridelí vlastne ID) — a az ked
+    # pouzivatel dopise `*3`, nastroj svoju operaciu PREPISE: interne Undo +
+    # pole kopii nanovo. Keby sa dedup po tej PRVEJ kopii prilepil ako vlastny
+    # undo krok, interne undo by trafilo JEHO, kopia by prezila a pole by k nej
+    # pridalo dalsiu skrinku (4+1 = 5 skriniek, dvojity dielec vo vystupoch —
+    # presne ziva chyba D-103, ktoru pre DOSKY meria `async S6`). Skok rovno na
+    # tri kopie tuto regresiu neodhali, preto sa prechadzaju OBE fazy.
     steps << [0.5, lambda do
       inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
                                               'height' => 720.0, 'depth' => 510.0 })
@@ -8560,7 +8623,29 @@ module NoxunSuRunner
       # PRESNE 4x. To meria vyrobny dosledok nasobenia (styri kusy v objednavke),
       # nie moj vlastny setup.
       state[:ch2_rows] = bom_rows(model)
-      state[:ch2_copies] = char_copy(model, inst, [700.0, 1400.0, 2100.0],
+      # FAZA 1: jedna Move+Ctrl kopia vo VLASTNEJ commitnutej operacii.
+      state[:ch2_first] = char_copy(model, inst, [700.0], 'SU-TEST CH2 user move+ctrl copy').first
+    end]
+    steps << [SETTLE, lambda do
+      cp = state[:ch2_first]
+      new_cid = cp && cp.valid? ? e::Store.get(cp, 'cabinet_id').to_s : nil
+      ok("CH2 faza 1 (Move+Ctrl): prva kopia dostala VLASTNE ID este pred dopisanim `*3` " \
+         "(#{state[:ch2_cid]} -> #{new_cid})",
+         !new_cid.nil? && new_cid != state[:ch2_cid] && cabinets(model).length == 2)
+      # ...a teraz nastroj svoju operaciu PREPISUJE: interne Undo pred polozenim pola.
+      Sketchup.undo
+    end]
+    steps << [SETTLE, lambda do
+      cp = state[:ch2_first]
+      gone = cp.nil? || !cp.valid?
+      cids = cabinets(model).map { |i| e::Store.get(i, 'cabinet_id').to_s }
+      # JADRO FAZY 1: interne undo nastroja musi trafit KOPIU, nie dedup —
+      # inak tu ostane „zombie" a pole ju uz nikdy neodstrani.
+      ok("CH2 faza 1: interne Undo nasobenia odstranilo prvu kopiu CELU — dedup sa neprilepil " \
+         "ako vlastny krok, ziadna zombie (kopia prec=#{gone}, korpusy: #{cids.sort.join(', ')})",
+         gone && cids == [state[:ch2_cid]])
+      # FAZA 2: nastroj polozi pole troch kopii v JEDNEJ operacii.
+      state[:ch2_copies] = char_copy(model, state[:ch2], [700.0, 1400.0, 2100.0],
                                      'SU-TEST CH2 user copy array *3')
     end]
     steps << [SETTLE, lambda do
@@ -8735,6 +8820,73 @@ module NoxunSuRunner
       cleanup(model)
     end]
 
+    # --- CH4c: ROLLBACK PRESTAVBY ZIVEJ SKRINKY ----------------------------
+    # Review #239 post-hoc, P2-4: CH4a ide cez `build`, kde je definicia CERSTVA
+    # a bez zivej instancie — o `rebuild` nehovori nic. Pritom prave rebuild ma
+    # ostrejsiu cenu zlyhania: `rebuild_in_operation` najprv spravi
+    # `cdef.entities.clear!` a az POTOM stavia, takze v okamihu vynimky je
+    # definicia POUZIVATELOVEJ skrinky PRAZDNA. Ked by rollback nezabral,
+    # zlyhana prestavba by pouzivatelovi korpus vygumovala. Scenar to prechadza
+    # nad ZIVOU skrinkou a charakterizuje, co ostane: instancia, config,
+    # geometria definicie, transformacia aj pozicia v undo stacku.
+    steps << [0.5, lambda do
+      inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
+                                              'height' => 720.0, 'depth' => 510.0 })
+      state[:ch4c] = inst
+      state[:ch4c_cid] = e::Store.get(inst, 'cabinet_id').to_s
+      state[:ch4c_cfg] = e::JsonFileStore.deep_copy(e::Store.config(inst) || {})
+      state[:ch4c_geo] = char_geo(inst)
+      state[:ch4c_ents] = inst.definition.entities.length
+      state[:ch4c_defs] = model.definitions.length
+      state[:ch4c_tr] = inst.transformation.to_a.dup
+      state[:ch4c_probe] = char_push_stack_probe(model, 'SU-TEST CH4c sonda undo stacku')
+      params = e::CabinetBuilder.config_to_params(state[:ch4c_cfg]).merge('width' => 900.0)
+      raised = false
+      begin
+        char_install_build_probe
+        begin
+          e::CabinetBuilder.rebuild(model, inst, params, op_name: 'SU-TEST CH4c prerusena prestavba')
+        rescue StandardError
+          raised = true
+        end
+      ensure
+        char_remove_build_probe
+      end
+      ok('CH4c: zlyhanie PRESTAVBY zivej skrinky sa NEPREHLTLO — volajuci sa o nom dozvie', raised)
+      alive = inst && inst.valid?
+      ok("CH4c: skrinka PREZILA — `clear!` definicie sa vratil, pouzivatel o korpus neprisiel (#{state[:ch4c_cid]})",
+         alive && e::Store.get(inst, 'cabinet_id').to_s == state[:ch4c_cid] &&
+         cabinets(model).length == 1)
+      cfg_now = alive ? e::JsonFileStore.deep_copy(e::Store.config(inst) || {}) : {}
+      ok("CH4c: config je NEDOTKNUTY — z prestavby na 900 mm sa nezapisalo ANI CIASTOCNE " \
+         "(sirka #{cfg_now['width'].inspect})",
+         alive && cfg_now == state[:ch4c_cfg])
+      ok("CH4c: GEOMETRIA definicie je dielec po dielci ako pred prestavbou " \
+         "(#{alive ? char_geo(inst).length : 0} dielcov, entit #{alive ? inst.definition.entities.length : 0} " \
+         "vs. #{state[:ch4c_ents]})",
+         alive && char_geo(inst) == state[:ch4c_geo] &&
+         inst.definition.entities.length == state[:ch4c_ents])
+      ok("CH4c: rollback nenafukol definicie (#{model.definitions.length} vs. #{state[:ch4c_defs]})",
+         model.definitions.length == state[:ch4c_defs])
+      ok('CH4c: transformacia skrinky ostala povodna — rollback nesiahol ani na polohu',
+         alive && inst.transformation.to_a == state[:ch4c_tr])
+      # UNDO POZICIA: prerusena prestavba NESMIE nechat krok Späť. Sonda polozena
+      # tesne pred nou musi byt stale VRCHOLOM stacku — ked ju 1x Späť odstrani,
+      # medzitym sa na stack nic nepridalo. Meria sa HNED (undo je synchronne).
+      Sketchup.undo
+      probe_after = char_stack_probe(model)
+      ok("CH4c: prerusena prestavba NENECHALA undo krok — 1x Späť odstranilo SONDU (v modeli uz " \
+         "#{probe_after.inspect}), skrinka stoji (#{cabinets(model).length} korpusov)",
+         probe_after != state[:ch4c_probe] && cabinets(model).length == 1)
+    end]
+    steps << [SETTLE, lambda do
+      inst = state[:ch4c]
+      ok('CH4c: ani po ustaleni nikto skrinku nedorobil — data aj geometria drzia',
+         inst && inst.valid? && char_geo(inst) == state[:ch4c_geo] &&
+         e::JsonFileStore.deep_copy(e::Store.config(inst) || {}) == state[:ch4c_cfg])
+      cleanup(model)
+    end]
+
     # --- CH5: SCALE NASTROJOM MIERKA = REGENERATE VYSTUP --------------------
     steps << [0.5, lambda do
       # REFERENCIA sa stavia PRVA (zaroven tym drzi undo stack v poradi
@@ -8841,21 +8993,46 @@ module NoxunSuRunner
       e::ScaleWatch.instance_variable_set(:@last_model, model)
       ok("CH6: ziadosti o dedup su MNOZINA per dokument — druhy dokument neprepise prvy (#{keys.length} zaznamov)",
          keys.length == 2 && keys.include?(model.object_id) && keys.include?(foreign.object_id))
-      state[:ch6_st_before] = (e::ScaleWatch.instance_variable_get(:@stable_transforms) || {}).length
     end]
     steps << [SETTLE, lambda do
-      before = state[:ch6_st_before]
       # Poistka: prekrytia po scenari zhasnute (uz ich zhasla vetva cudzieho
       # dokumentu; `disable!` je idempotentne a chrani pred FAIL v strede).
       e::EdgeCheck.disable!
       e::GrainCheck.disable!
-      cleanup(model)
-      st = (e::ScaleWatch.instance_variable_get(:@stable_transforms) || {}).length
+      inst = state[:ch6]
+      key = inst && inst.valid? ? e::ScaleWatch.transform_key(inst) : nil
+      st = e::ScaleWatch.instance_variable_get(:@stable_transforms) || {}
+      state[:ch6_key] = key
+      state[:ch6_st_before] = st.length
+      # Bez tohto vychodiska by zaverecny assert nemal co merat: „kluc je v cache"
+      # sa musi dokazat PRED mazanim, inak by „ostal tam" platilo aj o kluci,
+      # ktory tam nikdy nebol.
+      ok("CH6 vychodisko: skrinka MA zaznam v cache stabilnych transformacii (kluc #{key.inspect}, " \
+         "#{st.length} zaznamov)",
+         !key.nil? && st.key?(key))
+      # REALNE POUZIVATELSKE ZMAZANIE, MIMO `ScaleWatch.guard` (review #239
+      # post-hoc, P2-2): `notify_erase` v guarde OKAMZITE vracia, takze mazanie
+      # cez `cleanup` ziadnu erase cestu nespusti — assert by ostal zeleny, aj
+      # keby cache niekto cez erase observer upratoval, a meral by len to, ze si
+      # test sam potlacil lifecycle. Tu ide erase presne tak, ako ho spravi
+      # pouzivatel klavesou Delete: vlastna operacia, observer BEZ guardu.
+      model.start_operation('SU-TEST CH6 pouzivatelske zmazanie skrinky', true)
+      inst.erase! if inst && inst.valid?
+      model.commit_operation
+    end]
+    steps << [SETTLE, lambda do
+      before = state[:ch6_st_before]
+      key = state[:ch6_key]
+      st = e::ScaleWatch.instance_variable_get(:@stable_transforms) || {}
       # CHARAKTERIZACIA, NIE SCHVALENIE: cache stabilnych transformacii je
-      # klucovana [model.object_id, entityID] a NIKTO z nej nemaze. Po zmazani
-      # skriniek (a po prepnuti dokumentu) v nej zaznamy ostavaju navzdy.
-      ok("CH6: cache stabilnych transformacii PREZIJE zmazanie entit — dnes sa neupratuje (#{before} -> #{st})",
-         st >= before)
+      # klucovana [model.object_id, entityID] a NIKTO z nej nemaze — ani erase
+      # observer po REALNOM zmazani entity. Zaznamy zmazanych entit (a starych
+      # dokumentov) v nej ostavaju navzdy.
+      ok("CH6: cache stabilnych transformacii PREZIJE REALNE zmazanie entity — po Delete a ustaleni " \
+         "debounce je zaznam #{key.inspect} STALE v nej (#{before} -> #{st.length})",
+         !key.nil? && st.key?(key) && st.length >= before)
+      ok('CH6: skrinka je z modelu naozaj prec — mazanie bezalo, nie je to prazdny assert',
+         cabinets(model).empty?)
       info('CH6: cache `@stable_transforms` (scale_observer.rb) rastie a nema ciasteciu cestu — ' \
            'kandidat do registra 1c (hygiena/pamat, nie vyrobne riziko).')
       info('CH6 MANUALNY SCENAR (prepnutie dvoch dokumentov): na Windows sa spustit NEDA — SketchUp drzi ' \

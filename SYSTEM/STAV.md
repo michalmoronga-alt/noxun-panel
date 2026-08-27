@@ -18,7 +18,7 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.8:** **1947 headless** · 69 JS sád · posledný plný in-SketchUp beh **1022 PASS / 0 FAIL / 0 SKIP** (dávka 1b-3, scenár `CH7`; 1b-4 sa builderov ani observerov nedotkla).
+**Testy k v0.8.8:** **1947 headless** · 69 JS sád · posledný plný in-SketchUp beh **1036 PASS / 0 FAIL / 0 SKIP** (dávka **1b-5** — dorovnanie sady `CHAR`, +14 assertov).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom (audit pred kódom + review pred mergom, 15 kôl). Od **#227** review robí zase Codex, takže **post-hoc sweep sa týka presne #186–#226** ([PLAN.md](PLAN.md), blok 1b/E).
 
@@ -26,7 +26,7 @@ vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
 **Beží blok 1b · STABILIZAČNÁ REVÍZIA** ([PLAN.md](PLAN.md)). **Všetky tri brány sú HOTOVÉ:** **1b-1** (odrážka **A** — optimistický zámok Nastavení, v0.8.6; zastaraný pin už
 neprežije návrat do sekcie a status po uložení netvrdí prepočet, ktorý neprebehol) · **1b-2** (odrážka **H** — charakterizačné in-SU scenáre; kópia, `*N`, Undo, prerušenie operácie,
-scale a prepnutie modelu sú zapísané testami, takže **blok 1d už smie siahnuť na buildery a observery**; Ctrl+Y a dva dokumenty naraz ostávajú manuálne) · **1b-3** (odrážka **G** —
+scale a prepnutie modelu sú zapísané testami, takže **blok 1d už smie siahnuť na buildery a observery**; Ctrl+Y a dva dokumenty naraz ostávajú manuálne; sadu **dorovnala dávka 1b-5** — štyri asserty merali slabšiu veličinu, než tvrdili) · **1b-3** (odrážka **G** —
 **„Obnoviť" už do modelu nezapisuje**; duplicitné ID sa miesto tichej opravy priznajú oranžovým riadkom Kontroly, opravu robí len reálny zásah do modelu).
 **Staré dlhy B a D sú vybavené** dávkou **1b-4** (v0.8.8). **Ďalej z bloku 1b:** **F** (UI dlhy — **D-27** tagy z panela · **D-51** štandard veľkostí okien · výklop ako
 samostatný typ čela) · **E** post-hoc Codex sweep #186–#226.
