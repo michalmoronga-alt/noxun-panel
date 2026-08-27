@@ -70,7 +70,21 @@ Späť).
 rástli mŕtve záznamy (nález review P1). Normalizácia je `\`→`/` + `downcase` (Windows nerozlišuje ani veľkosť písmen, ani smer lomítka).
 
 **Neuložený model cestu nemá** a dostane náhradný kľúč `guid:<guid>`, ktorý platí len v rámci sedenia; čítanie naň padá ako na záložku (pomenoval som Untitled a potom ho uložil) a
-**prvý zápis s platnou cestou ho zmigruje** — záznam sadne na cestu a guid kľúč sa zmaže. Prázdna hodnota **aj hodnota zhodná s defaultom zmaže záznam**, takže sa pomenovanie vráti
+**prvý zápis s platnou cestou ho zmigruje** — záznam sadne na cestu a guid kľúč sa zmaže.
+
+**Ctrl+S ale mení cestu AJ guid NARAZ (1b-6a):** po prvom uložení sa záznam pod *starým* guid kľúčom z modelu už nedá nájsť — záložka hľadala `guid:<nový guid>` a našla prázdno,
+takže názov zadaný pred prvým uložením sa ticho stratil a všetky štyri exporty sa pomenovali podľa `.skp` súboru namiesto zákazky (výrobná P2). Most drží **pamäť procesu**
+`SESSION_KEY_BRIDGE` (`object_id` modelu → posledný kľúč sedenia, pod ktorým sa názov zapísal), overená **identitou objektu** (`equal?`, čisté porovnanie referencií) — cudzí
+dokument rozrobený názov zdediť nemôže, Windows SketchUp pri File > New/Open model zničí a vytvorí nový. Prvé čítanie po uložení záznam **adoptuje a hneď zmigruje na cestu**
+(`adopt_session_name`) a most sa spotrebuje; **bez migrácie** by názov žil len do konca sedenia a po reštarte by sa stratil aj tak. Kľúče sedenia sa spotrebujú pri prvom čítaní s
+platnou cestou **vždy** — aj keď cesta už svoj názov má: ten **má prednosť** a rozpísaný názov ho neprepíše, ale musí zaniknúť, inak by sa o pár minút vynoril pri „Uložiť ako" na
+čerstvej ceste (review #243 P2-2). Most sa zahadzuje **až po úspešnom zápise** — `save_vepo_settings` vracia `true`/`false` a pri zamknutom súbore či plnom disku ostáva most nažive,
+takže sa migrácia zopakuje hneď, ako zápis prejde (review #243 P2-1). Zápisová cesta upratuje to isté
+(`save_project_name` maže VŠETKY kľúče sedenia zákazky, nielen ten podľa aktuálneho guid). Most **nie je zakázaný okenný stav**: nie je to stav okna ani medzivýsledok výpočtu, ale
+údaj o dokumente, ktorý sa z modelu po uložení prečítať nedá — obe okná z neho čítajú to isté a nemajú si ho ako prepísať; je to konštanta (nie `@ivar`) aj kvôli guard testu, ktorý
+tu inštančné premenné nepripúšťa, a je zhora ohraničená (`SESSION_BRIDGE_MAX`). **Známa medzera (dávka 1b-6c):** mapa sa mení read-modify-write **bez medziprocesového zámku**, takže
+pri dvoch bežiacich inštanciách SketchUpu vie zápis jednej prepísať zákazku pomenovanú v druhej — platí to o celom `vepo_settings.json` (`save_merge_18_36`, `last_dir`), nielen o
+mape názvov. Prázdna hodnota **aj hodnota zhodná s defaultom zmaže záznam**, takže sa pomenovanie vráti
 na názov `.skp` a premenovanie súboru sa v okne prejaví samo. Číta ho **všetky štyri exporty** (VEPO, CSV kovania, XLSX rozpočtu, XLSX cenovej ponuky) — z DOM sa `project`
 **prestal posielať**, inak by dve okná mali dve pravdy a tá istá zákazka by sa v dvoch výstupoch volala inak. `merge_18_36` ostáva globálny a číta sa rovnakou cestou.
 

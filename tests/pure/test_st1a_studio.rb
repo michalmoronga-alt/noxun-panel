@@ -78,7 +78,8 @@ end
 NxTest.test('ST-1a: nazov projektu zije v ProductionCore (mapa project_names)') do
   core = Noxun::Engine::ProductionCore
   %i[project_names project_name save_project_name merge_18_36 save_merge_18_36
-     project_key project_session_key normalize_project_path].each do |m|
+     project_key project_session_key normalize_project_path
+     session_keys_for remembered_session_key adopt_session_name].each do |m|
     NxTest.assert(core.respond_to?(m), "ProductionCore neodpoveda na #{m}")
   end
   NxTest.assert_equal('project_names', Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY,
@@ -108,28 +109,164 @@ NxTest.test('ST-1a (review P1): klucom je CESTA, nie model.guid — guid sa meni
   end
 end
 
-NxTest.test('ST-1a (review P1): neulozeny model ma NAHRADNY kluc a pri ulozeni sa ZMIGRUJE') do
+NxTest.test('1b-6a: Ctrl+S meni CESTU aj GUID — nazov zadany pred ulozenim to musi prezit') do
+  # VYROBNA P2: pomenuj zakazku v Studiu, kym model este nie je ulozeny, potom
+  # Ctrl+S. SketchUp pri ulozeni NARAZ prida cestu a ZMENI guid, takze zaznam
+  # ostal viset pod klucom `guid:<STARY guid>` a vsetky styri exporty sa
+  # pomenovali podla .skp suboru namiesto zakazky.
+  #
+  # Simulacia musi menit TEN ISTY objekt modelu (SketchUp iny nevytvara) —
+  # dva samostatne Structy s rovnakym guid, ktore tu stali do 1b-6a, chybu
+  # MASKOVALI, lebo zmenu guid vobec nepredviedli.
   core = Noxun::Engine::ProductionCore
-  untitled = Struct.new(:path, :guid).new('', 'GUID-UNTITLED')
-  saved = Struct.new(:path, :guid).new('C:/Zakazky/Nova.skp', 'GUID-UNTITLED')
+  m = Struct.new(:path, :guid).new('', 'GUID-UNTITLED')
   begin
-    NxTest.assert_equal('guid:GUID-UNTITLED', core.project_key(untitled),
+    NxTest.assert_equal('guid:GUID-UNTITLED', core.project_key(m),
                         'neulozeny model ma kluc sedenia (plati len dovtedy, kym sa neulozi)')
-    core.save_project_name(untitled, 'Rozrobena zakazka')
-    NxTest.assert_equal('Rozrobena zakazka', core.project_name(untitled))
-    # Ctrl+S: model teraz MA cestu. Zaznam sedenia je zaloha, takze nazov drzi.
-    NxTest.assert_equal('Rozrobena zakazka', core.project_name(saved),
-                        'po ulozeni sa nazov nestrati (citanie padne na kluc sedenia)')
-    # Prvy zapis s platnou cestou zaznam PRESUNIE a guid kluc zmaze.
-    core.save_project_name(saved, 'Rozrobena zakazka')
+    core.save_project_name(m, 'Rozrobena zakazka')
+    NxTest.assert_equal('Rozrobena zakazka', core.project_name(m))
+    # Ctrl+S na TOM ISTOM modeli: pribudla cesta a guid je INY.
+    m.path = 'C:/Zakazky/Nova.skp'
+    m.guid = 'GUID-PO-ULOZENI'
+    NxTest.assert_equal('Rozrobena zakazka', core.project_name(m),
+                        'zmena guid pri prvom ulozeni nesmie nazov zakazky zahodit')
     map = core.project_names
-    NxTest.assert(map.key?('c:/zakazky/nova.skp'), 'zaznam sadol na cestu')
+    NxTest.assert(map.key?('c:/zakazky/nova.skp'),
+                  'citanie zaznam ZMIGROVALO na cestu (inak by zil len do konca sedenia)')
     NxTest.refute(map.key?('guid:GUID-UNTITLED'),
                   'guid zaznam po migracii zanikol — inak by v subore rastli mrtve kluce')
   ensure
-    core.save_project_name(saved, '')
+    core.save_project_name(m, '')
     map = core.project_names.dup
     map.delete('guid:GUID-UNTITLED')
+    map.delete('guid:GUID-PO-ULOZENI')
+    core.save_vepo_settings(Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY => map)
+  end
+end
+
+NxTest.test('1b-6a: zmigrovany nazov drzi aj po RESTARTE (nie len v pamati sedenia)') do
+  # Most neulozeny→ulozeny zije v pamati procesu. Keby migracia nezapisala
+  # zaznam na cestu, po restarte SketchUpu (= novy objekt modelu, prazdna
+  # pamat) by sa nazov aj tak stratil. Test preto cita CUDZIM objektom.
+  core = Noxun::Engine::ProductionCore
+  m = Struct.new(:path, :guid).new('', 'GUID-RESTART')
+  begin
+    core.save_project_name(m, 'Klinika Ruzinov')
+    m.path = 'C:/Zakazky/Restart.skp'
+    m.guid = 'GUID-RESTART-2'
+    core.project_name(m) # prve citanie po ulozeni = migracia na cestu
+    po_restarte = Struct.new(:path, :guid).new('C:/Zakazky/Restart.skp', 'GUID-INY-BEH')
+    NxTest.assert_equal('Klinika Ruzinov', core.project_name(po_restarte),
+                        'zaznam prezil v subore, nie len v pamati sedenia')
+  ensure
+    core.save_project_name(m, '')
+    map = core.project_names.dup
+    %w[guid:GUID-RESTART guid:GUID-RESTART-2].each { |k| map.delete(k) }
+    core.save_vepo_settings(Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY => map)
+  end
+end
+
+NxTest.test('1b-6a: rozrobeny nazov NEZDEDI cudzia zakazka (most plati len pre ten isty model)') do
+  # Most je viazany na IDENTITU objektu modelu. Keby sa adoptoval „posledny
+  # rozrobeny nazov", staci otvorit iny subor a jeho vyrobne vystupy by sa
+  # volali podla cudzej zakazky.
+  core = Noxun::Engine::ProductionCore
+  rozrobena = Struct.new(:path, :guid).new('', 'GUID-ROZROBENA')
+  cudzia = Struct.new(:path, :guid).new('C:/Zakazky/Ine.skp', 'GUID-CUDZIA')
+  begin
+    core.save_project_name(rozrobena, 'Zakazka A')
+    NxTest.assert_equal('Ine', core.project_name(cudzia),
+                        'iny dokument dostane nazov zo svojho suboru, nie rozrobeny nazov')
+    NxTest.assert_equal('Zakazka A', core.project_name(rozrobena),
+                        'a rozrobenej zakazke sa nazov citanim inej nestratil')
+  ensure
+    core.save_project_name(rozrobena, '')
+    map = core.project_names.dup
+    map.delete('guid:GUID-ROZROBENA')
+    core.save_vepo_settings(Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY => map)
+  end
+end
+
+NxTest.test('1b-6a (review #243 P2-1): zlyhany zapis migracie NESMIE zahodit most') do
+  # Zamknuty subor / plny disk: `save_vepo_settings` pad len zaloguje. Keby sa
+  # most spotreboval aj tak, nazov by dal spravne LEN toto jedno citanie a
+  # najblizsi export by uz zase pisal meno .skp suboru.
+  NxTest.skip!('vyzaduje headless sandbox nastaveni') unless NxTest.headless?
+  core = Noxun::Engine::ProductionCore
+  store = Noxun::Engine::JsonFileStore
+  m = Struct.new(:path, :guid).new('', 'GUID-ZAMKNUTY')
+  begin
+    core.save_project_name(m, 'Zamknuta zakazka')
+    m.path = 'C:/Zakazky/Zamknuta.skp'
+    m.guid = 'GUID-ZAMKNUTY-2'
+    orig = store.method(:write)
+    begin
+      store.define_singleton_method(:write) { |*_a| raise IOError, 'disk full (test)' }
+      NxTest.assert_equal('Zamknuta zakazka', core.project_name(m),
+                          'aj pri zlyhanom zapise dava citanie spravny nazov')
+    ensure
+      store.define_singleton_method(:write, orig)
+    end
+    NxTest.assert_equal('Zamknuta zakazka', core.project_name(m),
+                        'most prezil, takze migracia sa zopakuje hned ako zapis prejde')
+    NxTest.assert(core.project_names.key?('c:/zakazky/zamknuta.skp'),
+                  'a zaznam uz sedi na ceste')
+  ensure
+    core.save_project_name(m, '')
+    map = core.project_names.dup
+    %w[guid:GUID-ZAMKNUTY guid:GUID-ZAMKNUTY-2].each { |k| map.delete(k) }
+    core.save_vepo_settings(Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY => map)
+  end
+end
+
+NxTest.test('1b-6a (review #243 P2-2): nazov na ceste ma PREDNOST a most sa aj tak spotrebuje') do
+  # Ulozenie do suboru, ktory uz svoj nazov ma (napr. prepis starej zakazky):
+  # rozrobeny nazov ho NESMIE prepisat — ale kluc sedenia musi zaniknut, inak
+  # by sa ten nazov o par minut vynoril pri „Ulozit ako" na cerstvej ceste.
+  core = Noxun::Engine::ProductionCore
+  stara = Struct.new(:path, :guid).new('C:/Zakazky/Stara.skp', 'GUID-STARA')
+  m = Struct.new(:path, :guid).new('', 'GUID-ROZROBENA-2')
+  begin
+    core.save_project_name(stara, 'Stara zakazka')
+    core.save_project_name(m, 'Rozrobena zakazka')
+    m.path = 'C:/Zakazky/Stara.skp'
+    m.guid = 'GUID-ROZROBENA-3'
+    NxTest.assert_equal('Stara zakazka', core.project_name(m),
+                        'zaznam na ceste sa rozrobenym nazvom neprepisuje')
+    NxTest.refute(core.project_names.key?('guid:GUID-ROZROBENA-2'),
+                  'kluc sedenia sa spotreboval aj ked sa nic neadoptovalo')
+    # „Ulozit ako" na cerstvu cestu: rozrobeny nazov uz nesmie nikde ozit.
+    m.path = 'C:/Zakazky/Cerstva.skp'
+    m.guid = 'GUID-ROZROBENA-4'
+    NxTest.assert_equal('Cerstva', core.project_name(m),
+                        'cerstva cesta dostane nazov zo suboru, nie stary rozrobeny nazov')
+  ensure
+    core.save_project_name(stara, '')
+    core.save_project_name(m, '')
+    map = core.project_names.dup
+    %w[guid:GUID-ROZROBENA-2 guid:GUID-ROZROBENA-3 guid:GUID-ROZROBENA-4
+       c:/zakazky/stara.skp c:/zakazky/cerstva.skp].each { |k| map.delete(k) }
+    core.save_vepo_settings(Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY => map)
+  end
+end
+
+NxTest.test('1b-6a: prepis nazvu PO ulozeni zmaze aj zaznam spred ulozenia') do
+  # Zapisova cesta musi upratat to iste, co citacia — inak by po prvom
+  # premenovani ulozenej zakazky ostal v subore mrtvy guid kluc.
+  core = Noxun::Engine::ProductionCore
+  m = Struct.new(:path, :guid).new('', 'GUID-PREPIS')
+  begin
+    core.save_project_name(m, 'Prve meno')
+    m.path = 'C:/Zakazky/Prepis.skp'
+    m.guid = 'GUID-PREPIS-2'
+    NxTest.assert_equal('Druhe meno', core.save_project_name(m, 'Druhe meno'))
+    map = core.project_names
+    NxTest.assert_equal('Druhe meno', map['c:/zakazky/prepis.skp'], 'zaznam sadol na cestu')
+    NxTest.refute(map.key?('guid:GUID-PREPIS'), 'kluc spred ulozenia zanikol')
+  ensure
+    core.save_project_name(m, '')
+    map = core.project_names.dup
+    %w[guid:GUID-PREPIS guid:GUID-PREPIS-2].each { |k| map.delete(k) }
     core.save_vepo_settings(Noxun::Engine::ProductionCore::PROJECT_NAMES_KEY => map)
   end
 end

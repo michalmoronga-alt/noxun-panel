@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.8.8 · 27.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.8.9 · 27.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -18,7 +18,7 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.8:** **1947 headless** · 69 JS sád · posledný plný in-SketchUp beh **1036 PASS / 0 FAIL / 0 SKIP** (dávka **1b-5** — dorovnanie sady `CHAR`, +14 assertov).
+**Testy k v0.8.9:** **1952 headless** · 69 JS sád · posledný plný in-SketchUp beh **1036 PASS / 0 FAIL / 0 SKIP** (dávka **1b-5** — dorovnanie sady `CHAR`, +14 assertov).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom (audit pred kódom + review pred mergom, 15 kôl). Od **#227** review robí zase Codex, takže **post-hoc sweep sa týka presne #186–#226** ([PLAN.md](PLAN.md), blok 1b/E).
 
@@ -28,8 +28,8 @@ vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 neprežije návrat do sekcie a status po uložení netvrdí prepočet, ktorý neprebehol) · **1b-2** (odrážka **H** — charakterizačné in-SU scenáre; kópia, `*N`, Undo, prerušenie operácie,
 scale a prepnutie modelu sú zapísané testami, takže **blok 1d už smie siahnuť na buildery a observery**; Ctrl+Y a dva dokumenty naraz ostávajú manuálne; sadu **dorovnala dávka 1b-5** — štyri asserty merali slabšiu veličinu, než tvrdili) · **1b-3** (odrážka **G** —
 **„Obnoviť" už do modelu nezapisuje**; duplicitné ID sa miesto tichej opravy priznajú oranžovým riadkom Kontroly, opravu robí len reálny zásah do modelu).
-**Staré dlhy B a D sú vybavené** dávkou **1b-4** (v0.8.8). **Ďalej z bloku 1b:** **F** (UI dlhy — **D-27** tagy z panela · **D-51** štandard veľkostí okien · výklop ako
-samostatný typ čela) · **E** post-hoc Codex sweep #186–#226.
+**Staré dlhy B a D sú vybavené** dávkou **1b-4** (v0.8.8); mimo písmen vybavená aj **1b-6a** — názov zákazky zadaný pred prvým uložením prežije Ctrl+S (v0.8.9). **Ďalej z bloku 1b:** **F** (UI dlhy — **D-27** tagy z panela · **D-51** štandard veľkostí okien · výklop ako
+samostatný typ čela) · **E** post-hoc Codex sweep #186–#226 · **1b-6c** (zámok nad `vepo_settings.json` — druhá časť rozdeleného PR #243, audit-povinná).
 Poradie určuje Michal. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
@@ -42,9 +42,9 @@ konceptov) → **GHOST VKLADANIE** → **KOVANIE** (najprv USER-debata o setoch)
 
 ## Posledné uzávery
 
-- **1b-4 — drobnosti sekcií Šablóny a Pravidlá** (odrážky B + D: PNG retry a dávkovanie, orezaný payload šablón, `push_library_echo`; lenivý katalóg pások, víťaz pri vypnutej
-  položke, stabilné poradie jantárových riadkov, mŕtve polia preč) — v0.8.8 (27.8.) · **Michal večer:** v Štúdiu → **Šablóny** sa fotky dlaždíc majú doplniť po chvíli (nie naraz)
-  a **všetky**; v **Pravidlách** má poradie jantárových riadkov ostať rovnaké aj po vložení/zmazaní skrinky a pri ručne **vypnutej** položke kovania má riadok hovoriť „vypnuté".
+- **1b-6a — názov zákazky prežije prvé uloženie** (dovtedy sa po Ctrl+S všetky štyri exporty pomenovali podľa `.skp` súboru; nález z post-hoc triáže #193; úzky re-rez po zatvorení PR #243 pravidlom 3 kôl — zámok ostáva na **1b-6c**) — v0.8.9 (27.8.) · **Michal večer:** nový model → v Štúdiu napíš názov zákazky → Ctrl+S → VEPO export sa musí volať podľa zákazky.
+- **1b-4 — drobnosti sekcií Šablóny a Pravidlá** (odrážky B + D: PNG retry a dávkovanie, orezaný payload šablón, `push_library_echo`; lenivý katalóg pások, víťaz pri vypnutej položke, stabilné poradie jantárových riadkov, mŕtve polia preč) — v0.8.8 (27.8.) · **Michal večer:** v Štúdiu → **Šablóny** sa fotky dlaždíc majú doplniť po chvíli (nie naraz) a **všetky**;
+  v **Pravidlách** má poradie jantárových riadkov ostať rovnaké aj po vložení/zmazaní skrinky a pri ručne **vypnutej** položke kovania má riadok hovoriť „vypnuté".
 - **1b-3 — „Obnoviť" = čisté čítanie** (brána G: zber už nespúšťa dedup; duplicitné ID sa priznajú ORANGE riadkom Kontroly aj s výrobným dôsledkom, oprava = zápisová cesta) — v0.8.7 (27.8.) · **Michal večer:** v Štúdiu klikni „Obnoviť" a skús Späť — zoznam krokov sa refreshom nesmie meniť; po skopírovaní skrinky môže na okamih blysnúť oranžový riadok „Skrinky s ID … sú v modeli 2×".
 - **1b-2 — charakterizačné in-SU scenáre** (brána H: kópia · `*N` · Undo · prerušenie operácie · scale = regenerate · prepnutie modelu; +34 assertov, bez zmeny kódu) — 27.8.
 - **1b-1 — optimistický zámok Nastavení** (zastaraný pin nezostane po návrate do sekcie; status hovorí pravdu, keď prepočet zlyhá) — v0.8.6 (27.8.)
