@@ -50,10 +50,12 @@
   regresie, ktorý vidno až z druhej strany diffu, mu unikol dvakrát. Druhé poučenie je o rozsahu: post-hoc sweep má zmysel len s **overením proti dnešnému `main`**, inak generuje nálezy
   nad neexistujúcim kódom.
 
-  **Kde žijú plné podklady (a prečo nie sú v repe).** Verdikty všetkých 34 PR s dôkazmi (`_dev/sweep_verdikty_2026-08-27.md`), triáž 54 threadov (`_dev/sweep_triaz_historicke.md`)
-  a zoznam kandidátov do registra (`_dev/register_1c_seeds.md`, 17 položiek) sú v **gitignorovanom `_dev/`** — sú to pracovné výstupy sweepu, nie živá dokumentácia, a ich životnosť končí
-  založením registra. **Preto je tento záznam v KRONIKE jediné, čo z nich prežije do repa**, a preto nesie čísla aj mená nálezov. Kandidáti (17 zo seedov + 16 P3 z triáže, s čiastočným
-  prekryvom) sa **preleju do `SYSTEM/AUDIT_REGISTER.md`** hneď, ako ho blok **1c** založí; dovtedy sa nesmú stratiť z dohľadu — pri štarte 1c je prvým krokom prečítať tie tri súbory.
+  **Kde žijú podklady — a prečo museli do repa.** Pracovné výstupy sweepu (verdikty 34 PR s dôkazmi, triáž 54 threadov, zoznam seedov) vznikli v **gitignorovanom `_dev/`**, takže
+  v čistom klone repa neexistujú. Prvý tvar tejto dávky posielal blok 1c práve tam — a **review #245 to oprávnene zamietlo ako P2**: z KRONIKY sa dá obnoviť bilancia, nie samotné nálezy,
+  takže iný počítač či iný agent by odovzdávku nemal odkiaľ vziať. Vecný obsah všetkých otvorených kandidátov je preto **v repe** ako
+  [zdroje/SWEEP_2026-08_kandidati.md](../zdroje/SWEEP_2026-08_kandidati.md) — 7 platných zo sweepu diffov (**A**), 18 platných z triáže (**B**), 13 ďalších kandidátov nazbieraných počas
+  bloku 1b (**C**), každý s adresou v kóde a s vyznačeným dedupom. Pri štarte bloku **1c** sa tento zoznam preleje do `SYSTEM/AUDIT_REGISTER.md`. **Trvalé poučenie:** odovzdávka medzi
+  blokmi nesmie visieť na gitignorovanom priečinku — `_dev/` je pracovný stôl, nie archív.
 
 - **1b-6a · NÁZOV ZÁKAZKY ZADANÝ PRED PRVÝM ULOŽENÍM (výrobná P2, v0.8.9, 27.8.2026):** vetva `fix/1b6a-nazov-projektu-v2` — **úzky re-rez zatvoreného PR #243**.
   Nález pochádza z **post-hoc triáže Codex threadov** (PR #193, nález #30 ≡ #42), overený proti `main` @ 0070697.

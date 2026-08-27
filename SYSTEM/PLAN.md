@@ -89,12 +89,9 @@ V oboch prípadoch sa stará hodnota formulára spojí s **čerstvým** `row_rev
 oprav hodnotu → **Esc** → „Aktualizovať z Demosu" → otvor ten istý dekor → **Ulož** ⇒ nová cena z Demosu je preč a **nikde to nesvieti**. Oprava patrí na jedno miesto: pamätať a prelievať
 len bunky, ktoré používateľ naozaj zmenil, a pri kolízii ukázať dvojicu *tvoja hodnota × hodnota v katalógu*.
 
-**E · Post-hoc Codex sweep #186–#226 — ✅ HOTOVÝ (27.8.2026).** Rozsah bol JEDNO číslo naprieč STAV, PLAN aj KRONIKOU: **dávky, ktorých primárnym reviewerom bol slepý subagent, lebo Codex
-bol 21.–24.8. nedostupný** (#227 a #228 už review od Codexu majú, do sweepu nepatrili). Prešiel v dvoch častiach. **(1) Sweep diffov:** posledná session spracovala **34 PR** — 27 kódových cez
-Codex CLI v siedmich dávkach, 7 docs/test PR bez kódu pluginu; spolu s pilotnou session je to **29 nálezov: 18 vyriešených · 1 zaniknutý · 10 stále platných** (3 aktuálne P2, zvyšok P3).
-**(2) Triáž historických threadov:** 54 nezodpovedaných Codex threadov → 34 zaniknutých/vyriešených, **18 unikátnych platných** (2× P2, 16× P3).
-**Čo z toho ostáva otvorené:** **1b-7** tichý návrat starej ceny dekoru · **1b-6b** hlavičky skupín materiálov · export s duplicitnou identitou = otázka pre audit **1c**;
-kandidáti do registra 1c čakajú na založenie `SYSTEM/AUDIT_REGISTER.md`. Plný záznam — čísla, oba P2, bilancia slepých kôl a poučenie: [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**.
+**E · Post-hoc Codex sweep #186–#226 — ✅ HOTOVÝ (27.8.2026).** Dávky, ktoré 21.–24.8. prešli bránou so slepým subagentom, majú spätné Codex review; rozsah je uzavretý.
+Otvorené nálezy z neho už majú vlastné dávky (**1b-7**, **1b-6b**) a jedna otázka ide do auditu **1c**. Kandidáti do registra 1c žijú v [zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md).
+Plný záznam — metodika, čísla, bilancia slepých kôl a poučenie: [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**.
 
 ### 1c · AUDIT KÓDU (read-only — po 1b; rozhodnuté 26.8.2026 večer)
 
@@ -105,6 +102,8 @@ pointer na okamžitú hotfix dávku s výsledkom — nečaká v registri)** / P1
 
 - **Tri nezávislé pohľady:** externý Codex audit (spúšťa Michal; podklad: [zdroje/AUDIT_2026-08_podklad.md](zdroje/AUDIT_2026-08_podklad.md))
   · vlastný prechod (Fable) · slepý subagent. Nálezy sa zlejú do jedného registra s dedupom.
+- **Vstup, ktorý už čaká:** [zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md) — otvorené nálezy z post-hoc sweepu #186–#226 (7 zo sweepu diffov, 18 z triáže
+  review threadov, 13 ďalších z bloku 1b), každý s adresou v kóde. **Prvý krok bloku 1c je preliať tento zoznam do registra** (dedup a overenie proti vtedajšiemu `main` sú popísané na konci súboru).
 - **Prioritné osi auditu** (od budúcich funkcií dozadu): observery/undo/Tool lifecycle (→ GHOST) · dátový model setov kovania
   (→ D-109/KOVANIE) · `ui/production_core.rb` — jadro výstupov v UI vrstve (→ Ponuka/plošná kontrola) · payload kontrakty a identita ·
   perzistencia, `std` verzie, migrácie (→ shared library) · zjednotenie UI vzorov na nx_modal/nx_combo · VŠETKY aktuálne stub odseky architektúry (k 26.8. ich je 19; zoznam grepom, detail v podklade).
