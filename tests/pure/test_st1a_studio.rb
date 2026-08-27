@@ -346,6 +346,11 @@ NxTest.test('1b-6c: mapu nazvov cez save_vepo_settings zapisat NEDA (obchadzka z
     core.update_project_names { |map| map.merge(key => 'Zakazka v subore') }
     NxTest.refute(core.save_vepo_settings(core::PROJECT_NAMES_KEY => {}),
                   'zapis mapy tadeto je odmietnuty')
+    # Review #248: symbolovy kluc by guard obisiel a JSON by z neho spravil ten
+    # isty retazec — pri parsovani vyhra druhy vyskyt a odtlacok mapy prepise
+    # cerstvu mapu napriek zamku.
+    NxTest.refute(core.save_vepo_settings(:project_names => {}),
+                  'ani v symbolovej podobe')
     NxTest.assert_equal('Zakazka v subore', core.project_names[key],
                         'a mapa v subore ostala nedotknuta')
   ensure

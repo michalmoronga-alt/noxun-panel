@@ -106,7 +106,10 @@ module Noxun
       # mapy by cerstvu mapu prepisal cely a zamok by chranil len top-level
       # zlucenie. Na to su `update_project_names` — a strazi to aj guard test.
       def save_vepo_settings(attrs)
-        if attrs.is_a?(Hash) && attrs.key?(PROJECT_NAMES_KEY)
+        # Kluc sa porovnava v RETAZCOVEJ podobe (review #248): `:project_names`
+        # by presiel a JSON by z neho spravil ten isty kluc — pri parsovani by
+        # vyhral druhy vyskyt a odtlacok mapy by cerstvu mapu aj tak prepisal.
+        if attrs.is_a?(Hash) && attrs.keys.any? { |k| k.to_s == PROJECT_NAMES_KEY }
           Engine.log_error(ArgumentError.new("#{PROJECT_NAMES_KEY} sa zapisuje len cez update_project_names"),
                            'ProductionCore.save_vepo_settings')
           return false
