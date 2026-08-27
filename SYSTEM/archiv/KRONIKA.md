@@ -59,6 +59,13 @@
   bloku 1b (**C**), každý s adresou v kóde a s vyznačeným dedupom. Pri štarte bloku **1c** sa tento zoznam preleje do `SYSTEM/AUDIT_REGISTER.md`. **Trvalé poučenie:** odovzdávka medzi
   blokmi nesmie visieť na gitignorovanom priečinku — `_dev/` je pracovný stôl, nie archív.
 
+  **Vedomá odchýlka procesu na tejto dávke (PR #245).** Kolo 1 review urobil Codex a našiel **dve P2** (odovzdávka v gitignorovanom `_dev/` · hotová odrážka držaná v živom PLANe) —
+  obe opravené. Na **kolo 2 už Codex kapacitu nemal** („You have reached your Codex usage limits for code reviews", tri pokusy s `@codex review`), takže druhé kolo odbehol **slepý
+  reviewer subagent** — ten istý záložný postup, ktorý repo použilo 21.–24.8. Našiel **2 × P2** (rozpor „10 platných" vs. sedem riadkov v tabuľke · čísla riadkov `production_core.rb`
+  proti základni sweepu, nie proti dnešnému `main`, lebo PR #244 súbor posunul o ~116 riadkov) a **osem P3** — všetky vybavené. Merge teda prešiel bránou **CI zelené + zastupujúce
+  kolo**, nie plnou Codex bránou. Je to obhájiteľné práve preto, že dávka je **čisto dokumentačná** (nula riadkov kódu pluginu) — na výrobnej dávke by sa čakalo na reset limitu,
+  presne podľa poučenia o dvoch P1 vyššie.
+
 - **1b-6a · NÁZOV ZÁKAZKY ZADANÝ PRED PRVÝM ULOŽENÍM (výrobná P2, v0.8.9, 27.8.2026):** vetva `fix/1b6a-nazov-projektu-v2` — **úzky re-rez zatvoreného PR #243**.
   Nález pochádza z **post-hoc triáže Codex threadov** (PR #193, nález #30 ≡ #42), overený proti `main` @ 0070697.
 
