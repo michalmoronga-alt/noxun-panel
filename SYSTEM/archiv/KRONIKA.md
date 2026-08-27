@@ -17,6 +17,55 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1b-E · POST-HOC SWEEP KOMPLET — dávky #186–#226 majú spätné Codex review (27.8.2026):** odrážka **E** bloku 1b je uzavretá. Docs dávka, **kód pluginu sa nezmenil o riadok**
+  (VERSION ostáva **0.8.9**). Sweep vznikol preto, že Codex bol **21.–24.8. nedostupný** a PR **#186–#226** prešli bránou so slepým subagentom (audit pred kódom + review pred
+  mergom, **15 kôl**); od #227 review robí zase Codex, takže rozsah bol presne tento úsek. Prešiel v **dvoch nezávislých častiach**, ktoré sa navzájom kontrolujú.
+
+  **Časť 1 — sweep diffov (čerstvý Codex pohľad na zmergovaný kód).** Metóda: `gh pr diff` → filtrovanie na kód pluginu (`noxun_engine/**`) → dávky po 3–5 PR do lokálneho **Codex CLI**
+  (read-only prompt, doména výroba nábytku + cenotvorba) → **každý nález overený proti dnešnému `main`** s dôkazom `súbor:riadok`. Sada #186–#226 má **41 PR** a prešla v dvoch
+  session, ktoré sa čiastočne prekrývali: pilotná zobrala 12 PR, hlavná **34 PR** (#191, #193, #195, #197–#226 a navyše #240) — z nich 27 kódových v siedmich dávkach (B1–B7)
+  a 7 docs/test PR, ktoré sa `noxun_engine/` vôbec nedotkli. Bilancia oboch: **29 nálezov: 18 vyriešených · 1 zaniknutý · 10 stále platných** (3 aktuálne P2, zvyšok P3) — z desiatich
+  platných je **sedem** z hlavnej session (sekcia **A** zoznamu kandidátov) a **tri** z pilotnej (tam sú ako **C4, C5, C7**). Overovanie proti dnešnému stromu bolo nevyhnutné: fáza
+  ŠTÚDIO medzitým zrušila šesť satelitných okien, takže veľká časť starých ciest fyzicky neexistuje — bez tohto kroku by sweep hlásil nálezy nad kódom, ktorý v repe nie je.
+
+  **Časť 2 — triáž historických review threadov.** Cez GraphQL `reviewThreads` sa pre #186–#226 vybrali thready, ktoré **nikdy nedostali odpoveď** (`isResolved == false`, práve jeden
+  komentár, autor `chatgpt-codex-connector`): zo 66 threadov ich bolo **54**. Verdikt: **34 zaniknutých/vyriešených**, **18 unikátnych platných** (dva páry duplicít) — **P1 = 0 · P2 = 2 ·
+  P3 = 16**. *(To „P1 = 0" platí pre thready; dve reálne P1 spomenuté nižšie sú z časti 1, teda z diffov.)* Obe P2 sú zaradené: názov zákazky pred prvým uložením je **vyriešený dávkou
+  1b-6a** (PR #244), nerozlíšiteľné hlavičky skupín materiálov sú dávka **1b-6b** — otvorených z tejto osemnástky je teda **17**.
+
+  **Tri platné P2 pre orchestrátora.** *(1) + (2) Tichý návrat starej ceny dekoru* — dva nálezy s jedným koreňom: `ui/js/proj_materials.js:1205–1219` (zotavenie z konfliktu preleje do
+  čerstvého katalógového riadku **všetky** editovateľné stĺpce starého formulára, aj tie, ktorých sa používateľ nedotkol) a `ui/js/nx_modal.js:680–724` (pamäť rozpísaných riadkov si po
+  prvej zmene v ktoromkoľvek riadku uloží **celú** tabuľku). V oboch prípadoch sa stará hodnota formulára spojí s **čerstvým** `row_rev`, takže optimistický zámok prestane chrániť to,
+  čo má chrániť. Spúšťacím scenárom je bežný pracovný postup — *otvor editor dekoru → oprav hodnotu → **Esc** → „Aktualizovať z Demosu" → otvor ten istý dekor → **Ulož*** ⇒ nová cena
+  z Demosu je preč a **nikde to nesvieti**. Zaradené ako **1b-7**, najbližšia kódová dávka; oprava patrí na jedno miesto (pamätať len skutočne zmenené bunky a pri kolízii ukázať dvojicu
+  *tvoja hodnota × hodnota v katalógu*). *(3) Export s duplicitnou identitou dobehne s podpočítaným kovaním* (`ui/production_core.rb:475`) — odkedy je zber čisté čítanie, expanzia setov
+  deduplikuje členov účtovaných na `owner_id`, takže dva kusy so spoločným ID dostanú jednu sadu; CSV kovania aj oba XLSX sa **zapíšu** a varovanie príde až v statuse PO zápise. **Nie je
+  to regresia z nedbanlivosti, ale vedomý kompromis dávky 1b-3** (#240) — alternatívou bol zápis do modelu počas čítania, čo bola pôvodná chyba. Otvorená otázka pre audit **1c** znie:
+  *má sa export s duplicitnou identitou vôbec dokončiť, alebo si najprv vyžiadať dedup tik a počkať naň?*
+
+  **Bilancia slepých kôl — čo sweep naozaj ukázal.** Väčšinu nálezov si blok **vyliečil sám**: opravu takmer vždy priniesla nasledujúca dávka toho istého bloku (#219 opravila štyri
+  nálezy z #216/#218, #224 opravila #220, #241 opravilo #221 aj #225, #240 opravilo jeden nález z #193 a jeden úplne zrušilo). Cena za slepé kolá je ale merateľná: **dve reálne P1 sa
+  dostali do `main` a boli používateľsky viditeľné.** *(a) #205* — premenovanie `el()` → `mdEl()` rozbilo `demos_diff.js`, takže modal „Aktualizovať z Demosu" padal na
+  `ReferenceError: el is not defined` hneď pri otvorení; kódy a ceny Demosu sa nedali skontrolovať ani obnoviť a stav žil od **v0.7.45** až po opravu v #206. *(b) #218* — plný push Štúdia
+  ticho prepol **mernú jednotku** rozpísanej položky kovania na prvú v zozname; uložením išla zlá MJ do katalógu, teda do nákupu aj do cien (opravené v #219). Obe sú dávno opravené.
+  **Poučenie:** slepý subagent je použiteľná náhrada v núdzi (chytil o. i. spiacu mínu duplicitných kódov), ale **na výrobných dávkach je Codex brána nenahraditeľná** — presne ten typ
+  regresie, ktorý vidno až z druhej strany diffu, mu unikol dvakrát. Druhé poučenie je o rozsahu: post-hoc sweep má zmysel len s **overením proti dnešnému `main`**, inak generuje nálezy
+  nad neexistujúcim kódom.
+
+  **Kde žijú podklady — a prečo museli do repa.** Pracovné výstupy sweepu (verdikty 34 PR s dôkazmi, triáž 54 threadov, zoznam seedov) vznikli v **gitignorovanom `_dev/`**, takže
+  v čistom klone repa neexistujú. Prvý tvar tejto dávky posielal blok 1c práve tam — a **review #245 to oprávnene zamietlo ako P2**: z KRONIKY sa dá obnoviť bilancia, nie samotné nálezy,
+  takže iný počítač či iný agent by odovzdávku nemal odkiaľ vziať. Vecný obsah všetkých otvorených kandidátov je preto **v repe** ako
+  [zdroje/SWEEP_2026-08_kandidati.md](../zdroje/SWEEP_2026-08_kandidati.md) — 7 platných zo sweepu diffov (**A**), 18 platných z triáže (**B**), 13 ďalších kandidátov nazbieraných počas
+  bloku 1b (**C**), každý s adresou v kóde a s vyznačeným dedupom. Pri štarte bloku **1c** sa tento zoznam preleje do `SYSTEM/AUDIT_REGISTER.md`. **Trvalé poučenie:** odovzdávka medzi
+  blokmi nesmie visieť na gitignorovanom priečinku — `_dev/` je pracovný stôl, nie archív.
+
+  **Vedomá odchýlka procesu na tejto dávke (PR #245).** Kolo 1 review urobil Codex a našiel **dve P2** (odovzdávka v gitignorovanom `_dev/` · hotová odrážka držaná v živom PLANe) —
+  obe opravené. Na **kolo 2 už Codex kapacitu nemal** („You have reached your Codex usage limits for code reviews", tri pokusy s `@codex review`), takže druhé kolo odbehol **slepý
+  reviewer subagent** — ten istý záložný postup, ktorý repo použilo 21.–24.8. Našiel **2 × P2** (rozpor „10 platných" vs. sedem riadkov v tabuľke · čísla riadkov `production_core.rb`
+  proti základni sweepu, nie proti dnešnému `main`, lebo PR #244 súbor posunul o ~116 riadkov) a **osem P3** — všetky vybavené. Merge teda prešiel bránou **CI zelené + zastupujúce
+  kolo**, nie plnou Codex bránou. Je to obhájiteľné práve preto, že dávka je **čisto dokumentačná** (nula riadkov kódu pluginu) — na výrobnej dávke by sa čakalo na reset limitu,
+  presne podľa poučenia o dvoch P1 vyššie.
+
 - **1b-6a · NÁZOV ZÁKAZKY ZADANÝ PRED PRVÝM ULOŽENÍM (výrobná P2, v0.8.9, 27.8.2026):** vetva `fix/1b6a-nazov-projektu-v2` — **úzky re-rez zatvoreného PR #243**.
   Nález pochádza z **post-hoc triáže Codex threadov** (PR #193, nález #30 ≡ #42), overený proti `main` @ 0070697.
 

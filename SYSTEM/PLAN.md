@@ -18,8 +18,9 @@ blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
 
 **Cieľ:** doplatiť dlhy, ktoré fáza ŠTÚDIO vedome odložila, a spraviť refactory, na ktoré počas presunov nebol priestor.
 *(Stabilizačná revízia sa od začiatku produkcie naostro (20.8.) ešte NEKONALA — patrí pred ďalšie nové funkcie.)* Poradie určí Michal.
-Staré dlhy B–F nie sú blokujúce pre bežnú prácu (**B a D vybavené dávkou 1b-4, v0.8.8, 27.8.**; ostáva **F** a sweep **E**;
-mimo písmen vybavená aj **1b-6a** — názov zákazky prežije prvé uloženie, v0.8.9, 27.8. — a mimo písmen ostáva otvorená **1b-6c**, zámok nad `vepo_settings.json`);
+Staré dlhy B–F nie sú blokujúce pre bežnú prácu (**B a D vybavené dávkou 1b-4, v0.8.8, 27.8.**; **sweep E je HOTOVÝ, 27.8.**; z písmen ostáva už len **F**;
+mimo písmen vybavená aj **1b-6a** — názov zákazky prežije prvé uloženie, v0.8.9, 27.8. — a mimo písmen ostávajú otvorené tri: **1b-7** (tichý návrat starej ceny dekoru — cenová P2 zo sweepu,
+najbližšia kódová dávka) · **1b-6b** (hlavičky skupín materiálov, tiež zo sweepu) · **1b-6c** (zámok nad `vepo_settings.json`, druhá časť delenia #243, audit-povinná));
 **P0 odrážky A, G a H sú BRÁNY a VŠETKY TRI SÚ HOTOVÉ** — **A** (možná STRATA rozpísanej editácie) dávkou 1b-1, v0.8.6, 27.8. ·
 **H** (charakterizačné in-SU scenáre) dávkou 1b-2, 27.8. — cesta k builderom/observerom pre blok 1d je tým otvorená; sadu `CHAR` **dorovnala dávka 1b-5** (27.8., test-only) po
 post-hoc Codex kole na #239: štyri asserty boli zelené, ale merali slabšiu veličinu, než tvrdili · **G** („Obnoviť" = čisté čítanie) dávkou 1b-3, v0.8.7, 27.8. —
@@ -72,15 +73,27 @@ VEPO, CSV kovania aj oba XLSX pomenované podľa `.skp` súboru namiesto zákazk
 starým guid kľúčom sa už nedal nájsť. Prvý pokus (**PR #243**) išiel do tretieho kola opráv a bol podľa **pravidla 3 kôl** zatvorený a rozdelený — do `main` z neho nešlo nič;
 táto dávka je jeho **úzky re-rez**. Plný záznam — príbeh delenia, riešenie, zamietnuté alternatívy, 5 mutácií: [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-6a**.
 
+**1b-6b · Hlavičky skupín materiálov sú nerozlíšiteľné — ⏳ OTVORENÉ (P2 z triáže Codex threadov, PR #193 nález #33).** Menovka skupiny vo výstupoch sa skladá len z dekoru, štruktúry
+a názvu dekoru (`ui/production_core.rb` → `material_label`, dnes `:780–787`), takže záznamy líšiace sa **výrobcom, typom, formátom či rubom** dostanú v kusovníku a v nákupe **identickú
+hlavičku** — dve rôzne dosky vyzerajú ako jedna položka. **Ako to predviesť:** dva varianty toho istého dekoru, ktoré sa líšia len výrobcom (alebo len formátom platne) → v Kusovníku
+majú rovnaký nadpis skupiny a v nákupe rovnaký riadok. Kolízny aparát v repe už existuje a rieši presne toto (`core/materials.rb` → `sheet_label_suffix`, `:991` — pripája formát a rub
+do menovky variantu pre selecty), ale výstupy ho nepoužívajú. Je to údaj, podľa ktorého sa objednáva — preto patrí medzi najbližšie kódové dávky.
+
 **1b-6c · Zápis `vepo_settings.json` pod jedným zámkom — ⏳ OTVORENÉ (druhá časť delenia #243).** Dve inštancie SketchUpu zdieľajú jeden `%APPDATA%`, ale mapa `project_names`
 sa mení **read-modify-write nad odtlačkom**, takže zápis z jednej inštancie vie zmazať zákazku pomenovanú v druhej. **Nie je to regresia — `main` to má odjakživa**, dávka 1b-6a to
 nezväčšila. **Východisko:** commit `0311095` z vetvy `fix/1b6-nazov-projektu` (ostáva na GitHube) + **všetky tri nálezy kola 3** z #243: zámok pre **KAŽDÉHO** zapisovateľa súboru
 (nielen pre mapu názvov — `save_merge_18_36` a štyri zápisy `last_dir` píšu ten istý súbor) · `rescue` okolo **celej** zamknutej úpravy, aby zlyhanie `.lock` neuniklo ako výnimka ·
 návrat **čerstvej** hodnoty zo zamknutej migrácie. Zmena sa dotýka koncepcie zápisu súboru nastavení ⇒ **audit-povinná** (`codex-audit` pred implementáciou).
 
-**E · Post-hoc Codex sweep #186–#226.** Rozsah je JEDNO číslo naprieč STAV, PLAN aj KRONIKOU a znamená presne toto: **dávky, ktorých primárnym reviewerom bol slepý subagent, lebo Codex bol 21.–24.8.
-  nedostupný**. Od **#227** review robí Codex, takže #227 aj #228 sú mimo sweepu. Keď má Codex kapacitu, prejsť tie PR spätne — nie kvôli nedôvere v subagenta (chytil o. i. spiacu mínu duplicitných
-  kódov), ale preto, že je to iný pohľad na dávky, ktoré medzitým tvoria základ celej fázy.
+**1b-7 · Tichý návrat starej ceny dekoru — ⏳ OTVORENÉ (cenová P2 zo sweepu, najbližšia kódová dávka).** Dva nálezy s jedným koreňom: `ui/js/proj_materials.js:1205–1219` (zotavenie
+z konfliktu preleje do čerstvého riadku **všetky** stĺpce starého formulára) a `ui/js/nx_modal.js:680–724` (pamäť rozpísaných riadkov si po prvej zmene uloží **celú** tabuľku).
+V oboch prípadoch sa stará hodnota formulára spojí s **čerstvým** `row_rev`, takže optimistický zámok prestane chrániť. **Scenár, ktorý to spustí bežnou prácou:** otvor editor dekoru →
+oprav hodnotu → **Esc** → „Aktualizovať z Demosu" → otvor ten istý dekor → **Ulož** ⇒ nová cena z Demosu je preč a **nikde to nesvieti**. Oprava patrí na jedno miesto: pamätať a prelievať
+len bunky, ktoré používateľ naozaj zmenil, a pri kolízii ukázať dvojicu *tvoja hodnota × hodnota v katalógu*.
+
+**E · Post-hoc Codex sweep #186–#226 — ✅ HOTOVÝ (27.8.2026).** Dávky, ktoré 21.–24.8. prešli bránou so slepým subagentom, majú spätné Codex review; rozsah je uzavretý.
+Otvorené nálezy z neho už majú vlastné dávky (**1b-7**, **1b-6b**) a jedna otázka ide do auditu **1c**. Kandidáti do registra 1c žijú v [zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md).
+Plný záznam — metodika, čísla, bilancia slepých kôl a poučenie: [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**.
 
 ### 1c · AUDIT KÓDU (read-only — po 1b; rozhodnuté 26.8.2026 večer)
 
@@ -91,6 +104,11 @@ pointer na okamžitú hotfix dávku s výsledkom — nečaká v registri)** / P1
 
 - **Tri nezávislé pohľady:** externý Codex audit (spúšťa Michal; podklad: [zdroje/AUDIT_2026-08_podklad.md](zdroje/AUDIT_2026-08_podklad.md))
   · vlastný prechod (Fable) · slepý subagent. Nálezy sa zlejú do jedného registra s dedupom.
+- **Vstup, ktorý už čaká:** [zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md) — nálezy z post-hoc sweepu #186–#226: sekcia **A** 7 z hlavnej session sweepu ·
+  sekcia **B** 18 z triáže review threadov (*z toho B1 je už vyriešené, otvorených 17*) · sekcia **C** 13 ďalších z bloku 1b (*C4 a C5 sú tiež už vyriešené*). Každý má adresu v kóde.
+  **Prvý krok bloku 1c je preliať tento zoznam do registra**, v tomto poradí: **(1)** dedup (známe zhody sú v zozname vymenované) → **(2)** vyradiť to, čo je medzitým hotové alebo
+  už má dávku → **(3)** overiť proti vtedajšiemu `main` (čísla riadkov sú k `0070697`, `ui/production_core.rb` sa medzitým posunul) → **(4)** až potom priradiť R-číslo, závažnosť,
+  vrstvu a blokovanú funkciu.
 - **Prioritné osi auditu** (od budúcich funkcií dozadu): observery/undo/Tool lifecycle (→ GHOST) · dátový model setov kovania
   (→ D-109/KOVANIE) · `ui/production_core.rb` — jadro výstupov v UI vrstve (→ Ponuka/plošná kontrola) · payload kontrakty a identita ·
   perzistencia, `std` verzie, migrácie (→ shared library) · zjednotenie UI vzorov na nx_modal/nx_combo · VŠETKY aktuálne stub odseky architektúry (k 26.8. ich je 19; zoznam grepom, detail v podklade).
