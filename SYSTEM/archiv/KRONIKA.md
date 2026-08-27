@@ -17,6 +17,40 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **F/D-27 · TAGY MODELU SA PREPÍNAJÚ Z PANELA (28.8.2026, v0.8.13):** odrážka **F** bloku 1b, postreh **D-27** (Michal 19.7.). V raile Inspectora pribudla **ikona oka**, ktorá
+  otvorí zoznam NOXUN tagov modelu (Korpus · Chrbát · Čelá · Vnútro · Kovanie · Dosky · Zóny) a jedným klikom ich zobrazí alebo skryje — bez chodenia do natívneho okna Tags.
+
+  **Prečo práve rail.** Vertikálny priestor panela je vzácny, takže dávka nesmela pridať riadok do obsahu: rail je **už existujúci** ľavý stĺpec a zoznam je **overlay**
+  (`position: absolute`), takže sa výška obsahu jeho otvorením nemení. Zamietnuté alternatívy: nový rad v sektore Náhľad (stál by riadok) a rozšírenie chipov vrstiev z UI-B2
+  (zlialo by dva rôzne významy — čo panel *kreslí* vs. čo je vidieť *v modeli* — do jedného ovládača). Tlačidlo **nemá rohový trojuholník**: nemá vlastnú hlavnú akciu, jeho
+  jedinou akciou je otvoriť okno. Vzor §5.11 UI_DIZAJN sa o tento protipól doplnil aj s mechanickou pascou — obal `.railfly` kreslí trojuholník **každému** `.railbtn` v sebe,
+  takže také tlačidlo potrebuje vlastný obal (`.railmenu`).
+
+  **Undo semantika — vedomé rozhodnutie.** Viditeľnosť tagu **je súčasť .skp**, na rozdiel od zvýraznenia hrán (D-104/D-105) a kontroly kresby (K2/D-87), ktoré kreslia
+  `Sketchup::Overlay` NAD modelom a žiadny krok Späť nerobia. Preto sa zapisuje v `start_operation`/`commit_operation` = **jeden klik, jeden krok Späť** (s abort vetvou —
+  výnimka nesmie nechať otvorenú transakciu). Klik, ktorý nič nemení (už platná hodnota, odmietnutý guard, neexistujúci tag), **operáciu vôbec neotvorí**: prázdny krok Späť je
+  horší než žiadny. Skrytie **aktívneho** tagu prepne kreslenie na Untagged vedome a v tej istej operácii (SketchUp to inak spraví sám a ticho) a status to povie.
+
+  **Jeden stav, dva ovládače.** Checkbox „Zobraziť zóny (ghost) v modeli" hovorí o tom istom tagu, preto ide **tou istou serverovou cestou** (`nx_tag_visible`, kľúč `zony`) a
+  nasadzuje ho ten istý push. Tým **zanikol** callback `toggle_zones` (posielal holý reťazec **bez identity dokumentu** — oneskorený klik vedel prepnúť tag v cudzom modeli),
+  handler `handle_toggle_zones`, pole `zones_visible` v init payloade aj `Zones.set_visible`. Nový modul `core/tags.rb` si mená tagov **nekopíruje** — číta ich za behu
+  z konštánt builderov (guard test stráži, že v ňom nie je ani jeden literál).
+
+  **Bokom opravená stará tichá chyba.** Zvýraznenie hrán aj kontrola kresby kreslili nad dielcami, ktorých tag je skrytý — plôšky a čiary teda viseli nad prázdnom. Bránka je
+  v zdieľanom prechode `EdgeCheck.each_part`, takže platí pre obe kontroly naraz. **Ukázala sa hneď v praxi:** testovací model `ENGINEtests.skp` mal tag čiel skrytý z ručnej
+  práce, takže sekcia `K2` po zavedení bránky kreslila 0 čiar. In-SketchUp runner preto viditeľnosť tagov dielcov **pred behom dorovná a nahlási to** — beh nesmie závisieť od
+  toho, čo si fixtúra nesie vo svojom .skp.
+
+  **Codex audit návrhu (11 nálezov, 4 BLOCKER) — všetko zapracované PRED kódom:** stav musí chodiť pri **každom** `push_selected` (inak by Späť/Znova a prepnutie dokumentu
+  nechali ikonu aj checkbox na opačnom stave než model) · checkbox zón musí ísť novou cestou, inak guardy neplatia · `state` číta **aj legacy `NOXUN_SLOTY`**, inak staršia
+  zákazka tag „nenájde" · operácia potrebuje abort vetvu · `.railfly` pasca · **skrytý priečinok tagov** sa priznáva (tag je zapnutý, no vidieť ho aj tak nie je).
+
+  **Vedomé obmedzenia (priznané):** tag skrytý priamo v natívnom okne Tags sa prejaví až pri najbližšom pushi (`LayersObserver` sa nepridáva) · tag, ktorému zmizli všetky
+  dielce, ostáva v ponuke (počítanie použitia = rekurzívny sken modelu pri každom pushi).
+
+  **Testy:** +24 headless (`test_d27_tagy.rb`, mutačne overené) · +1 JS sada (`test_d27_tagy.js`, 53 assertov) · in-SketchUp sekcia `run_d27` (21 assertov). Plný text postrehu:
+  [DOGFOODING_vyriesene.md](DOGFOODING_vyriesene.md).
+
 - **1b-6c · ZÁPIS `vepo_settings.json` MÁ JEDNY ZAMKNUTÉ DVERE (28.8.2026, v0.8.12):** druhá a posledná časť delenia zatvoreného PR #243. Súbor nastavení POČÍTAČA má **šiestich
   zapisovateľov** — `save_merge_18_36`, štyri zápisy `last_dir` a mapa `project_names` — a menil sa read-modify-write **nad odtlačkom**. Dve inštancie SketchUpu zdieľajú jeden
   `%APPDATA%`, takže zápis jednej vedel zmazať zákazku pomenovanú v druhej; `JsonFileStore` rieši atomicitu (tmp+rename, `.bak`), **nie súbeh**, a jeho sekundová cache navyše skryje

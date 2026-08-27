@@ -5312,6 +5312,233 @@ module NoxunSuRunner
     cleanup(model)
   end
 
+  # --- D-27: viditelnost NOXUN tagov modelu z panela --------------------------
+  # Davka ZAPISUJE DO MODELU (viditelnost tagu je sucast .skp), takze headless
+  # sada na nu nestaci. Overuje sa presne to rizikove:
+  #   * prepnutie je PRESNE JEDEN krok Spat (a Spat ho naozaj vrati),
+  #   * odmietnuty klik (cudzi dokument, neznamy kluc, nebooleovska hodnota,
+  #     neexistujuci tag) NEZAPISE nic a NEOTVORI ziadnu operaciu,
+  #   * legacy tag zon (NOXUN_SLOTY) sa da prepnut tiez,
+  #   * skrytie AKTIVNEHO tagu presunie kreslenie a je to STALE jeden krok,
+  #   * checkbox ghost zon a okno tagov maju JEDEN stav,
+  #   * stav chodi do panela pri kazdom pushi vyberu,
+  #   * kontrola hran nekresli nad skrytym tagom.
+  D27_PARAMS = { 'type' => 'lower', 'width' => 900.0, 'height' => 720.0, 'depth' => 560.0,
+                 'thickness' => 18.0, 'floor_height' => 100.0 }.freeze
+
+  def d27_layer(model, key)
+    e::Tags.layer_of(model, key)
+  end
+
+  def d27_visible?(model, key)
+    lay = d27_layer(model, key)
+    lay ? lay.visible? : nil
+  end
+
+  def d27_row(model, key)
+    (e::Tags.state(model)['rows'] || []).find { |r| r['key'] == key }
+  end
+
+  # Marker = posledna REALNA operacia. Ked po nom 1x Spat vrati MARKER, klik
+  # medzitym ziadnu operaciu neotvoril; ked marker PREZIJE, klik krokom bol.
+  # Musi to byt entita, ktora sama od seba nezanikne — PRAZDNA skupina sa
+  # v SketchUpe cisti sama, takze by `valid?` klamalo oboma smermi (nalez
+  # z prveho behu tejto sekcie).
+  def d27_marker(model, bag)
+    model.start_operation('D-27 marker', true)
+    cp = model.entities.add_cpoint(ORIGIN)
+    model.commit_operation
+    bag << cp
+    cp
+  end
+
+  def d27_clear_markers(model, bag)
+    live = bag.select { |c| c.respond_to?(:valid?) && c.valid? }
+    return if live.empty?
+
+    model.start_operation('D-27 cleanup markers', true)
+    live.each(&:erase!)
+    model.commit_operation
+  rescue StandardError
+    nil
+  end
+
+  # D-27 (nalez z prveho behu): testovaci model si NESIE viditelnost tagov zo
+  # svojho .skp — v ENGINEtests.skp bol tag ciel z rucnej prace SKRYTY. Odkedy
+  # kontrola hran a kresby skryte dielce preskakuju (branka `EdgeCheck.drawable?`),
+  # je to stav, ktory MENI vysledok inych sekcii (K2 kreslila 0 ciar). Beh preto
+  # zacina na definovanom stole: tagy DIELCOV su viditelne.
+  # Tag ZON sa zamerne nedorovnava — jeho default je VYPNUTY (D-04).
+  def normalize_tags(model)
+    return unless defined?(e::Tags)
+
+    hidden = (e::Tags.state(model)['rows'] || [])
+             .reject { |r| r['visible'] || r['key'] == 'zony' }
+             .map { |r| r['key'] }
+    return if hidden.empty?
+
+    hidden.each { |k| e::Tags.set_visible(model, k, true) }
+    info("tagy: v testovacom modeli boli SKRYTE (#{hidden.join(', ')}) — pred behom zobrazene")
+  rescue StandardError => ex
+    info("tagy: dorovnanie viditelnosti zlyhalo (#{ex.class}) — pokracujem")
+  end
+
+  def run_d27(model)
+    cleanup(model)
+    markers = []
+    begin
+      guid = e::Panel.model_guid(model)
+
+      # 1) tagy vznikaju STAVBOU a register ponuka LEN tie, ktore su v modeli
+      inst = e::CabinetBuilder.build(model, D27_PARAMS)
+      return ok('D-27: vlozenie korpusu', false) unless inst
+
+      st = e::Tags.state(model)
+      keys = st['rows'].map { |r| r['key'] }
+      ok("D-27: po stavbe je tag korpusu v registri (#{keys.join(', ')})", keys.include?('korpus'))
+      ok('D-27: register ponuka LEN tagy, ktore su v modeli (D-78)',
+         st['rows'].all? { |r| !d27_layer(model, r['key']).nil? })
+      # Definovany stol: scenar si viditelnost NASTAVI (model si ju nesie z .skp).
+      e::Tags.set_visible(model, 'cela', true)
+      ok('D-27: nastavenie viditelnosti pred scenarom platí', d27_visible?(model, 'cela') == true)
+
+      # 2) PREPNUTIE Z PANELA: skryje tag a je to PRESNE JEDEN krok Spat
+      marker = d27_marker(model, markers)
+      e::Panel.handle_tag_visible({ 'model_guid' => guid, 'key' => 'cela',
+                                    'value' => false }.to_json)
+      ok('D-27: klik z panela SKRYL tag Čelá', d27_visible?(model, 'cela') == false)
+      ok('D-27: a stav to hlasi (hidden > 0)', e::Tags.state(model)['hidden'].to_i.positive?)
+      Sketchup.undo
+      ok('D-27: 1x Spat vratil viditelnost (prepnutie JE krok Spat) a marker prezil',
+         d27_visible?(model, 'cela') == true && marker.valid?)
+
+      # 3) OPAKOVANY klik s TOU ISTOU hodnotou neotvori prazdnu operaciu
+      marker2 = d27_marker(model, markers)
+      e::Panel.handle_tag_visible({ 'model_guid' => guid, 'key' => 'cela',
+                                    'value' => true }.to_json)
+      Sketchup.undo
+      ok('D-27: klik BEZ zmeny hodnoty NIE JE krok Spat (1x Spat vratilo marker)',
+         !marker2.valid? && d27_visible?(model, 'cela') == true)
+
+      # 4) GUARDY: cudzi dokument, neznamy kluc, nebooleovska hodnota
+      marker3 = d27_marker(model, markers)
+      e::Panel.handle_tag_visible({ 'model_guid' => 'CUDZI-GUID', 'key' => 'cela',
+                                    'value' => false }.to_json)
+      ok('D-27: klik z INEHO dokumentu tag NESKRYJE (guard dokumentu)',
+         d27_visible?(model, 'cela') == true)
+      e::Panel.handle_tag_visible({ 'key' => 'cela', 'value' => false }.to_json)
+      ok('D-27: klik BEZ identity dokumentu sa odmietne (prisny guard)',
+         d27_visible?(model, 'cela') == true)
+      e::Panel.handle_tag_visible({ 'model_guid' => guid, 'key' => 'cudzi',
+                                    'value' => false }.to_json)
+      ok('D-27: neznamy kluc nic nezmeni (whitelist je na serveri)',
+         d27_visible?(model, 'cela') == true)
+      e::Panel.handle_tag_visible({ 'model_guid' => guid, 'key' => 'cela',
+                                    'value' => 'false' }.to_json)
+      ok('D-27: retazec "false" sa NEBERIE ako boolean (v Ruby je pravdivy)',
+         d27_visible?(model, 'cela') == true)
+      Sketchup.undo
+      ok('D-27: ziadny odmietnuty klik neotvoril operaciu (1x Spat vratilo marker)',
+         !marker3.valid?)
+
+      # 5) SKRYTIE AKTIVNEHO TAGU: kreslenie sa presunie, stale JEDEN krok
+      lay = d27_layer(model, 'korpus')
+      if lay && model.respond_to?(:active_layer=)
+        marker4 = d27_marker(model, markers)
+        model.active_layer = lay
+        e::Panel.handle_tag_visible({ 'model_guid' => guid, 'key' => 'korpus',
+                                      'value' => false }.to_json)
+        ok('D-27: skryty aktivny tag uz nie je aktivny (kreslenie ide na Untagged)',
+           d27_visible?(model, 'korpus') == false && model.active_layer != lay)
+        Sketchup.undo
+        ok('D-27: 1x Spat vratil aj viditelnost aj kreslenie (jedna operacia)',
+           d27_visible?(model, 'korpus') == true && marker4.valid?)
+        model.active_layer = model.layers[0]
+      else
+        info('D-27: aktivny tag sa v tomto SketchUpe nastavit neda — cast preskocena')
+      end
+
+      # 6) ZONY: checkbox ghost zon a okno tagov maju JEDEN stav
+      zrow = d27_row(model, 'zony')
+      if zrow
+        e::Panel.handle_tag_visible({ 'model_guid' => guid, 'key' => 'zony',
+                                      'value' => true }.to_json)
+        ok('D-27: ghost zony sa zapinaju TOU ISTOU cestou ako ostatne tagy',
+           e::Zones.visible?(model) == true && d27_row(model, 'zony')['visible'] == true)
+        e::Panel.handle_tag_visible({ 'model_guid' => guid, 'key' => 'zony',
+                                      'value' => false }.to_json)
+        ok('D-27: Zones.visible? a register hovoria to iste',
+           e::Zones.visible?(model) == false && d27_row(model, 'zony')['visible'] == false)
+      else
+        info('D-27: tag zon v modeli nie je — cast so zonami preskocena')
+      end
+
+      # 7) LEGACY tag zon (NOXUN_SLOTY) sa da prepnut tiez
+      e::Zones.remove_ghost(model, e::Store.get(inst, 'cabinet_id')) if e::Zones.respond_to?(:remove_ghost)
+      old_name = e::Zones::OLD_TAG
+      model.start_operation('D-27 legacy tag', true)
+      cur = model.layers[e::Zones::TAG]
+      cur.name = old_name if cur
+      model.commit_operation
+      if model.layers[old_name]
+        e::Panel.handle_tag_visible({ 'model_guid' => guid, 'key' => 'zony',
+                                      'value' => true }.to_json)
+        ok('D-27: LEGACY tag zon (NOXUN_SLOTY) sa da prepnut z panela tiez',
+           model.layers[old_name].visible? == true)
+        model.start_operation('D-27 legacy tag back', true)
+        model.layers[old_name].name = e::Zones::TAG
+        model.commit_operation
+      else
+        info('D-27: legacy tag sa nepodarilo pripravit — cast preskocena')
+      end
+
+      # 8) STAV CHODI DO PANELA pri KAZDOM pushi vyberu (Spat/Znova, prepnutie
+      #    dokumentu aj obycajna zmena vyberu idu tou istou cestou)
+      rec = []
+      install_js_recorder(rec)
+      begin
+        e::Panel.push_selected(model, dedup: false)
+      ensure
+        remove_js_recorder
+      end
+      ok('D-27: push vyberu nesie aj viditelnost tagov (bez neho by Spat nechal ikonu inak)',
+         rec.any? { |s| s.include?('NX.setTags(') })
+
+      # 9) OVERLAYE NEKRESLIA nad SKRYTYM tagom. Meria sa PRIAMO prechod
+      #    modelom (`EdgeCheck.each_part`) — je zdielany kontrolou hran aj
+      #    kontrolou kresby, takze branka plati pre obe naraz a vysledok
+      #    nezavisi od katalogu ani od nastavenia stavov olepu.
+      all = 0
+      e::EdgeCheck.each_part(model) { |_ent, _tr, _own| all += 1 }
+      e::Panel.handle_tag_visible({ 'model_guid' => guid, 'key' => 'korpus',
+                                    'value' => false }.to_json)
+      hidden_n = 0
+      e::EdgeCheck.each_part(model) { |_ent, _tr, _own| hidden_n += 1 }
+      ok("D-27: prechod dielcami preskoci SKRYTY tag (#{all} -> #{hidden_n})",
+         all.positive? && hidden_n < all)
+      e::Panel.handle_tag_visible({ 'model_guid' => guid, 'key' => 'korpus',
+                                    'value' => true }.to_json)
+      back = 0
+      e::EdgeCheck.each_part(model) { |_ent, _tr, _own| back += 1 }
+      ok('D-27: po zobrazeni tagu su dielce v prechode znova', back == all)
+    ensure
+      remove_js_recorder
+      begin
+        model.active_layer = model.layers[0] if model.respond_to?(:active_layer=)
+      rescue StandardError
+        nil
+      end
+      d27_clear_markers(model, markers) # markery su REALNE entity — nesmu ostat v modeli
+      cleanup(model)
+      normalize_tags(model) # dalsie sekcie musia zacinat na viditelnych tagoch
+    end
+    ok('D-27: cleanup (model prazdny)', cabinets(model).empty? && boards(model).empty?)
+  rescue StandardError => ex
+    remove_js_recorder
+    log_line("FAIL: D-27 vynimka: #{ex.class}: #{ex.message} @ #{Array(ex.backtrace).first}")
+    cleanup(model)
+  end
+
   def run_smoke1(model)
     cleanup(model)
     tp = e::TemplatePreviews
@@ -9823,6 +10050,7 @@ module NoxunSuRunner
     end
     log_line("INFO: verzia pluginu #{Noxun::Engine::VERSION}, model '#{File.basename(model.path.to_s)}'")
     cleanup(model) # cisty stol (zvysky z predoslych behov)
+    normalize_tags(model) # D-27: a definovana viditelnost tagov dielcov
     # Opakovany beh v TOM ISTOM okne (MCP replay): predosly beh mohol cez
     # observer/push_state zdvihnut generation counter okna — klik testy
     # posielaju gen 0 a stale guard by ich falosne odmietol (nalez 30.7.:
@@ -9857,6 +10085,7 @@ module NoxunSuRunner
     run_uid1(model)          # UI-D1: dielec — „Použiť na podobné" (zapis do viacerych dielcov, 1 undo) + „Označiť v modeli"
     run_k1(model)            # K1/D-108: smer dekoru per dielec — 1 undo, geometria a D-88 nedotknute, VEPO otocene
     run_k2(model)            # K2/D-87: kresba smeru v modeli — lifecycle overlayu, ziadny undo krok, otocenie po prestavbe
+    run_d27(model)           # D-27: viditelnost tagov z panela — 1 klik = 1 krok Spat, guardy bez zapisu, legacy tag zon, aktivny tag, overlay nad skrytym
     run_uid2(model)          # UI-D2: PNG nahlady sablon — capture, KOMPLETNA obnova kamery (persp. aj orto), ziadny undo krok
     run_smoke1(model)        # SMOKE PACK 1 (6A): rucne odfotenie nahladu k ULOZENEJ sablone — guardy vyberu, ziadny undo krok
     run_st1a(model)          # ST-1a: okno Studio — deep-link sekcie, kusovnik zo ziveho modelu, klik-select bez undo kroku, serverovy nazov projektu

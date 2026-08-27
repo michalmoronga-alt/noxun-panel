@@ -41,7 +41,10 @@ module Noxun
               lower: CabinetBuilder::LOWER_DEFAULTS,
               upper: CabinetBuilder::UPPER_DEFAULTS
             },
-            zones_visible: Zones.visible?(model),
+            # D-27: viditelnost NOXUN tagov v modeli — JEDEN stav pre okno
+            # tagov v raile aj pre checkbox „Zobraziť zóny (ghost)". Samostatne
+            # pole `zones_visible` tym zaniklo (dva zdroje jednej pravdy).
+            tags: tags_state,
             # UI-D2 (Codex #181 P1): aj PRVY payload nesie `preview_rev` — inak by
             # panel po otvoreni povazoval vsetky sablony za bezobrazkove, o nahlad
             # by si nepovedal a fotky by naskocili az po nesuvisiacom push_templates.
@@ -123,6 +126,33 @@ module Noxun
           Engine.log_error(e, 'Panel.close_edge_menu')
         end
 
+        # D-27: viditelnost NOXUN tagov v modeli. CISTE CITANIE (`Tags.state`
+        # nikdy netvori ani neprepina tag). Nenacitany modul = prazdny stav,
+        # panel sa tym nezhodi — okno tagov je vtedy proste prazdne.
+        def tags_state(model = nil)
+          return { 'rows' => [], 'hidden' => 0 } unless defined?(Tags)
+
+          Tags.state(model || Sketchup.active_model)
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.tags_state')
+          { 'rows' => [], 'hidden' => 0 }
+        end
+
+        # Protajsok `push_edge_check`. Vola ho `Engine.broadcast_tags` (klik
+        # v okne tagov aj checkbox ghost zon) a KAZDY `push_selected` — tag
+        # sa da skryt aj natívnym oknom Tags a vratit cez Späť/Znova, o com
+        # by sa panel inak nedozvedel (Codex audit BLOCKER 1).
+        # `dialog_alive?` sa tu NEKONTROLUJE zamerne (rovnaky dovod ako pri
+        # `push_part_card`): stav tagov je citanie siedmich vrstiev, teda
+        # lacnejsie nez guard sam, samotne odoslanie uz strazi `js` — a guard
+        # navyse robil metodu nepozorovatelnou pre in-SketchUp testy.
+        def push_tags(state = nil)
+          st = state || tags_state
+          js("if (window.NX && NX.setTags) NX.setTags(#{st.to_json});")
+        rescue StandardError => e
+          Engine.log_error(e, 'Panel.push_tags')
+        end
+
         # K2/D-87: stav kontroly smeru kresby pre rail. Nedostupny/nenacitany
         # GrainCheck (SketchUp bez Overlay API) = ikona zosedne, panel sa tym
         # nezhodi. Cisla sklada VYHRADNE server (`GrainCheck.ui_state`).
@@ -162,6 +192,12 @@ module Noxun
         # Kartu s novym ID doplni observer sam (refresh_panel po dedupe).
         def push_selected(model, dedup: true)
           ScaleWatch.request_dedup(model) if dedup && defined?(ScaleWatch)
+          # D-27 (Codex audit BLOCKER 1): viditelnost tagov chodi s KAZDYM
+          # pushom vyberu — tou istou cestou bezi Späť/Znova (D-101),
+          # prepnutie dokumentu aj obycajna zmena vyberu. Bez toho by po
+          # vratení skrytia ostala ikona raily, okno tagov aj checkbox zon
+          # na opacnom stave, nez je v modeli.
+          push_tags(tags_state(model))
           # ŠT-3c-1: vetva „dialog Sablony sleduje vyber" ZANIKLA spolu s oknom.
           # Sekcia `tpl` Studia vyber NESLEDUJE (audit N27): tlacidla su vzdy
           # aktivne a verdikt („nic nie je oznacene", „iny typ") dava SERVER

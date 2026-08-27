@@ -489,7 +489,9 @@ sektoroch**. Vizuálna referencia je `SYSTEM/zdroje/ui20/mockup_inspector_c.html
   rámik + krížik) → **funkčná sekcia** (ABS kontrola hrán **s rohovým flyoutom** —
   klik na ikonu prepína zvýraznenie, klik na pravý dolný roh otvorí **3-stavové
   nastavenie**, to isté, aké má Štúdio (vzor §5.11); pod ňou **Kontrola
-  kresby** — obyčajný toggle bez šípky, nie je čo nastavovať) → dole **koliesko**
+  kresby** — obyčajný toggle bez šípky, nie je čo nastavovať; a pod ňou
+  **Viditeľnosť tagov** (D-27, v0.8.13) — ikona `eye`, ktorá **otvára okno**
+  so zoznamom NOXUN tagov modelu: §5.13) → dole **koliesko**
   (Nastavenia Inspectora) a **Štúdio**. Aktívny kontext je teal, funkčné ikony sú
   tlmené a rozsvietia sa až po zapnutí. **Funkčný prepínač, ktorý má druhý domov
   (Štúdio), NIKDY nemá druhý stav:** rail aj okno volajú tú istú serverovú
@@ -601,9 +603,9 @@ Zásady kreslenia:
 - Chipy sú `<button>` s `aria-disabled` (nie HTML `disabled`) — ostávajú
   fokusovateľné a nesú vysvetlenie (vzor D-78 / rail).
 
-> **D-27 (rýchle zobraziť/skryť) tým NIE JE uzavreté:** chipy prepínajú vrstvy
-> **náhľadu**, nie tagy modelu. Modelové tagy Čelá/Chrbát ostávajú na neskôr
-> (vzor je checkbox „Zobraziť zóny (ghost) v modeli").
+> **Chipy vrstiev NIE SÚ tagy modelu:** prepínajú vrstvy **náhľadu** (kreslenia
+> v paneli). Viditeľnosť tagov v MODELI rieši **D-27** — okno tagov v raile
+> (sekcia 5.1, v0.8.13); sú to dve rôzne veci a nesmú sa zlievať.
 
 ### 5.3 Základné — dva stĺpce, rozmerové rady a koliesko (UI-B3)
 
@@ -1020,6 +1022,13 @@ hrán). Pravidlá vzoru:
   otvorenie na jednom mieste ostatné zavrie.
 - **Flyout dostane len tlačidlo, ktoré naozaj má čo nastavovať.** „Kontrola
   kresby" ostáva obyčajný toggle bez trojuholníka — prázdny flyout by klamal.
+  **Opačný prípad je „Viditeľnosť tagov" (D-27, §5.13): tlačidlo nemá vlastnú
+  hlavnú akciu, jeho JEDINÁ akcia je otvoriť okno** — vtedy roh nevzniká vôbec
+  (trojuholník znamená „okrem toho, čo tlačidlo robí, je tu ešte nastavenie")
+  a `aria-haspopup`/`aria-expanded` nesie **samotné tlačidlo**. Pozor na
+  mechaniku: trojuholník kreslí obal `.railfly` **každému** `.railbtn` v sebe,
+  takže také tlačidlo potrebuje **vlastný obal** (`.railmenu`) — nestačí
+  nepoužiť `.railcorner`.
 - **Vzor platí aj pre TEXTOVÉ tlačidlo v lište sekcie (ŠT-1b).** „Zvýrazniť
   hrany" v lište sekcie Kontrola (Štúdio) nesie ten istý rohový trojuholník ako
   ikona v raile: znamienko je `::after` pseudo-prvok tlačidla (po zapnutí dedí
@@ -1029,6 +1038,51 @@ hrán). Pravidlá vzoru:
   samotné okno nastavenia je zdieľaný komponent** — líši sa iba polohovacou
   triedou (`.ecmenu-rail` vs. `.ecmenu-studio`). Split tlačidlo s chevronom
   (pôvodná podoba v okne Výroba) tým **zaniklo** — jeden vzor, nie dva.
+
+### 5.13 Viditeľnosť tagov modelu v raile (D-27, v0.8.13)
+
+Rýchle „zobraz/skry" SketchUp **tagov modelu** priamo z panela — Čelá · Chrbát ·
+Korpus · Vnútro · Kovanie · Dosky · Zóny (ghost) — aby sa nemuselo preklikávať
+do natívneho okna Tags. **Nie sú to chipy vrstiev náhľadu z UI-B2** (§5.2): tie
+prepínajú, čo panel *kreslí*, toto mení, čo je vidieť *v modeli*.
+
+- **Miesto: rail, funkčná sekcia, pod „Kontrolou kresby".** Je to **jedna ikona
+  v už existujúcom ľavom stĺpci** a zoznam je **overlay** vedľa nej — v obsahu
+  panela nepribudol ani jeden riadok (trvalé pravidlo „vertikálny priestor je
+  vzácny"). Alternatívy padli: nový rad v sektore Náhľad by stál riadok navyše
+  a rozšíriť chipy vrstiev by zlialo dva rôzne významy do jedného ovládača.
+- **Celé tlačidlo otvára okno** — nemá vlastnú hlavnú akciu, takže **nemá rohový
+  trojuholník** (§5.11) a `aria-haspopup`/`aria-expanded` nesie samo. Obal je
+  vlastný `.railmenu`, nie `.railfly`.
+- **Stav ikony hovorí „nevidíš všetko":** kým je všetko viditeľné, ikona je
+  tlmená `eye`; keď je čokoľvek skryté, rozsvieti sa (`.on`) a prepne na
+  `eye-off`, bublina povie **koľko z koľkých**. Obe ikony sú už v sprite —
+  dávka nepridala žiadnu novú kresbu.
+- **Ponúkajú sa LEN tagy, ktoré v modeli sú** (D-78 — mŕtve tlačidlo je horšie
+  než žiadne). Prázdny zoznam sa **prizná vetou** („vzniknú s prvou skrinkou
+  alebo doskou"), nie prázdnym oknom; bez tagov je tlačidlo `aria-disabled`
+  s vysvetlením v bubline (nikdy HTML `disabled`).
+- **Skrytý priečinok tagov sa prizná.** Tag môže byť zapnutý a napriek tomu
+  neviditeľný, keď je skrytý jeho priečinok — riadok vtedy nesie jantárovú
+  poznámku „priečinok skrytý". Priečinok sa **nikdy nezapína automaticky**
+  (môže obsahovať cudzie tagy).
+- **Jeden stav, dva ovládače.** Checkbox „Zobraziť zóny (ghost) v modeli"
+  hovorí o tom istom tagu (`Noxun/Zóny`), preto ide **tou istou serverovou
+  cestou** a nasadzuje ho **ten istý push** — panel si nedrží vlastnú kópiu ani
+  jedného (vzor „materiál čiel v dvoch ovládačoch", §5.7).
+- **Je to zápis do modelu, nie overlay.** Na rozdiel od ABS kontroly a kontroly
+  kresby (kreslia NAD modelom, žiadny krok Späť — D-103/D-104/D-105) sa
+  viditeľnosť tagu **ukladá do .skp**: jeden klik = **jeden krok Späť**. Klik,
+  ktorý nič nezmení (už platná hodnota, odmietnutý guard), operáciu **vôbec
+  neotvorí** — prázdny krok Späť je horší než žiadny.
+- **Skrytie aktívneho tagu sa prizná.** SketchUp aktívny tag skryť nenechá a
+  prepne kreslenie sám; robíme to preto **vedome, v tej istej operácii** a
+  status to povie („Kreslenie prepnuté na Untagged").
+- **Zatvára klik mimo a Escape**, fokus sa vracia na tlačidlo (vzor warnpanelu
+  a rohového nastavenia ABS). Vlastný kľúč merača: `rail:tagy`.
+- **Známe obmedzenie (priznané):** tag skrytý priamo v natívnom okne Tags sa
+  v paneli prejaví až pri najbližšom pushi (otvorenie panela, zmena výberu,
+  Späť/Znova) — `LayersObserver` dávka vedome nepridáva.
 
 ### D-51: štandard rozmerov okien (UI-B1)
 

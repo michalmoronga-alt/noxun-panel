@@ -7,7 +7,7 @@ module Noxun
   module Engine
     PLUGIN_DIR = File.dirname(__FILE__)
     # VERSION definuje loader (noxun_engine.rb); tu len fallback pri samostatnom reloade.
-    VERSION = '0.8.12' unless defined?(VERSION)
+    VERSION = '0.8.13' unless defined?(VERSION)
 
     def self.plugin_dir
       PLUGIN_DIR
@@ -303,6 +303,34 @@ module Noxun
       log_error(e, 'Engine.broadcast_grain_check')
     end
 
+    # --- D-27: zdielane prepnutie VIDITELNOSTI TAGU MODELU ------------------
+    # JEDINE miesto, kde sa viditelnost tagu prepina — volaju ho OBA vstupne
+    # body: okno tagov v raile Inspectora aj checkbox „Zobraziť zóny (ghost)
+    # v modeli" (cez `Zones.set_visible`). Dva vstupy nesmu mat dva stavy ani
+    # dve undo semantiky.
+    # Na rozdiel od kontroly hran a kresby (overlay NAD modelom, ziadny zapis)
+    # je viditelnost tagu ULOZENA V .skp — `Tags.set_visible` ju preto zapisuje
+    # v operacii = JEDEN krok Spat.
+    def self.set_tag_visible(key, value, model = nil)
+      return nil unless defined?(Tags)
+
+      state = Tags.set_visible(model || Sketchup.active_model, key, value)
+      broadcast_tags(state)
+      state
+    rescue StandardError => e
+      log_error(e, 'Engine.set_tag_visible')
+      nil
+    end
+
+    # Prijemca je zatial jeden (Inspector), ale zobrazuje stav na DVOCH
+    # miestach (okno tagov v raile + checkbox ghost zon) — preto ide stav
+    # broadcastom a panel si ziadnu vlastnu kopiu nedrzi.
+    def self.broadcast_tags(state = nil)
+      Panel.push_tags(state) if defined?(Panel)
+    rescue StandardError => e
+      log_error(e, 'Engine.broadcast_tags')
+    end
+
     # Validation proc bezi pri KAZDOM prekresleni UI — musi byt lacny a nesmie
     # nikdy vyhodit vynimku (zlyhanie by SketchUp opakoval donekonecna).
     def self.toolbar_state(&block)
@@ -405,6 +433,7 @@ Sketchup.require 'noxun_engine/core/scale_observer'
 Sketchup.require 'noxun_engine/core/placement'      # V0.4.7b umiestnovanie (top-level cabinet+board)
 Sketchup.require 'noxun_engine/core/cabinet_builder'
 Sketchup.require 'noxun_engine/core/board_builder' # V0.4.7 samostatna doska
+Sketchup.require 'noxun_engine/core/tags'          # D-27 viditelnost tagov modelu (po builderoch — cita ich konstanty mien)
 Sketchup.require 'noxun_engine/core/templates'
 Sketchup.require 'noxun_engine/core/template_previews' # UI-D2: PNG nahlady sablon (subor vedla templates.json)
 Sketchup.require 'noxun_engine/core/bom'           # V0.5 A kusovnik/supisy zo snapshotov

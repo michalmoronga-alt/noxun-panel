@@ -114,4 +114,19 @@
       if (more){ try { more.focus(); } catch (e) {} }
     });
   }
-  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupHoverEdge(); setupFieldEditorDelegation(); setupTemplateTiles(); bindHwOwnerHover(); bindWarnPanel(); bindEdgeMenu(); nxComboSync(); document.body.setAttribute('data-insert-kind', getInsertKind()); nxShellApply(); if (window.sketchup && sketchup.ready) sketchup.ready(); };
+  // D-27: okno viditelnosti tagov v raile. TEN ISTY vzor ako `bindEdgeMenu`
+  // vyssie — zatvara ho klik mimo a Escape, fokus sa vracia na tlacidlo.
+  function bindTagMenu(){
+    var box = document.getElementById('railTagyBox'); if (!box) return;
+    // Klik VNUTRI okna (checkbox) sa k documentu nedostane — inak by sa okno
+    // zavrelo skor, nez prepnutie doleti k svojmu handleru.
+    box.addEventListener('click', function(ev){ ev.stopPropagation(); });
+    document.addEventListener('click', function(){ nxCloseTagMenu(); });
+    document.addEventListener('keydown', function(ev){
+      if (ev.key !== 'Escape' || !nxTagMenuOpen()) return;
+      nxCloseTagMenu();
+      var btn = document.getElementById('railTagy');
+      if (btn){ try { btn.focus(); } catch (e) {} }
+    });
+  }
+  window.onload = function(){ bindDetails(); bindExprFields(); setupPreviewDelegation(); setupPartSvgDelegation(); setupBoardSvgDelegation(); setupHoverEdge(); setupFieldEditorDelegation(); setupTemplateTiles(); bindHwOwnerHover(); bindWarnPanel(); bindEdgeMenu(); bindTagMenu(); nxComboSync(); document.body.setAttribute('data-insert-kind', getInsertKind()); nxShellApply(); if (window.sketchup && sketchup.ready) sketchup.ready(); };

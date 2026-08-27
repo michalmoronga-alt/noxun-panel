@@ -381,6 +381,22 @@ druhé (`nx_edge_menu_open` / `edge_menu_open` → `Engine.close_edge_menu(sourc
 pre smer kresby (`nx_grain_toggle` → `Engine.toggle_grain_check`, pull `grain_check`, push `NX.setGrainCheck`, prisvietenie z čistej `NXShell.grainRail`); detail je v odseku
 **grain_check**.
 
+**Tretia funkčná položka je od v0.8.13 „Viditeľnosť tagov" (D-27)** — `railTagy` v obale `.railmenu`, ikona `eye`/`eye-off`, kľúč merača `rail:tagy`. **Nie je to toggle:** celé
+tlačidlo otvára **okno so zoznamom NOXUN tagov modelu** (`#railTagsMenu`, overlay pri raile — v obsahu panela nepribudol žiadny riadok), preto **nemá rohový trojuholník** a
+`aria-haspopup`/`aria-expanded` nesie samo; obal **nesmie** byť `.railfly` (ten kreslí `::after` trojuholník každému `.railbtn` v sebe). Markup kreslí čistý modul
+`ui/js/tag_menu.js` (`NXTagMenu.menuHtml` / `railState` / `togglePayload`) — **vlastný malý markup, nie zdieľaný `edge_menu.js`** (iné nastavenie; UI_DIZAJN §5.11: zdieľa sa zóna
+a správanie, obsah len keď je to to isté nastavenie).
+
+Cesta zápisu: `nx_tag_visible` → `Panel.handle_tag_visible` (**prísny guard dokumentu** + whitelist `Tags::KEYS` + **výslovný boolean**; odmietnutie nezapíše nič a len obnoví stav)
+→ zdieľaná `Engine.set_tag_visible` → `Tags.set_visible` (**jedna operácia = jeden krok Späť**, viditeľnosť tagu je zápis do .skp) → `broadcast_tags` → `Panel.push_tags`. Stav
+chodí **pull** v `push_init` (pole `tags`) a **pushom pri každom `push_selected`** — Späť/Znova (D-101), prepnutie dokumentu aj zmena výberu idú tou istou cestou, inak by ikona,
+okno aj checkbox ostali na opačnom stave než model. `LayersObserver` dávka **vedome nepridáva**: skrytie priamo v natívnom okne Tags sa prejaví až pri najbližšom pushi.
+
+**Jeden stav, dva ovládače:** checkbox „Zobraziť zóny (ghost) v modeli" (`#zonesChk`, sektor Náhľad) hovorí o tom istom tagu (`Noxun/Zóny`) — ide **tou istou** cestou s kľúčom
+`zony` a nasadzuje ho **ten istý** `nxApplyTags`. Preto zanikol callback `toggle_zones` (posielal holý reťazec bez identity dokumentu), handler `handle_toggle_zones`, pole
+`zones_visible` v `push_init` aj `Zones.set_visible`. Okno zatvára klik mimo a Escape (`bindTagMenu` v `boot.js`, vzor `bindEdgeMenu`). Detail modulu je v odseku **tags.rb**
+(`docs/architecture/construction.md`), UI vzor v `docs/UI_DIZAJN.md` §5.13. Testy: `tests/pure/test_d27_tagy.rb`, `tests/js/test_d27_tagy.js`, in-SketchUp sekcia `run_d27`.
+
 **Sektory sú `<details data-key="s1…s4">`** (zbalenie v `localStorage`, prežije echo aj zatvorenie panela); **viditeľnosť S2/S3 rozhoduje čistá funkcia `NXShell.sectorVis(mode,
 ctx)`** — Základné a Materiály sú vlastnosti SKRINKY a patria kontextu **Korpus** (+ vkladanie), v Zónach/Čelách/Kovaní ich nahrádza **tenký kontextový riadok `#ctxNote`** so
 súhrnom skrinky a preklikom cez `setViewContext('korpus')`; CSS pravidlá nad `#secBasic`/`#secMat` sú **zrkadlom** tejto funkcie (UI-B1 dala do CSS mapu len pre režim výberu a
@@ -925,7 +941,11 @@ projekcia + spodný pás (UI-B2…)".
 
 ### sync.rb
 
-_(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
+Doména panela: **všetky pushe Ruby → JS** (`push_init`, `push_selected`, `push_templates`, `push_materials`, `push_part_card`, `set_status`) + identita dokumentu (`model_guid`) a
+malé echo kanály funkčných prepínačov raily (`push_edge_check`, `push_grain_check`, `push_tags`). Zásada: **echo push nesmie prekresliť rozpísaný formulár** — preto majú
+katalógové a stavové zmeny vlastné úzke kanály namiesto `push_init`. Od v0.8.13 nesie **`push_selected` aj `push_tags(tags_state(model))`** (D-27): tou istou cestou beží
+Späť/Znova, prepnutie dokumentu aj zmena výberu, takže bez toho by okno tagov, ikona raily a checkbox ghost zón ostali na opačnom stave než model. Pole `zones_visible`
+v `push_init` tým zaniklo — zóny sú riadok v `tags`.
 
 ### actions_board.rb
 
@@ -954,7 +974,8 @@ _(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
 ### actions_templates.rb
 
 Doména panela: šablóny a ručné odfotenie náhľadu (`Panel.capture_preview_for`). Kontrakt je v odseku „Vkladacia karta — šablóny, typ a doska" a v
-[model-a-identita.md](model-a-identita.md), odsek `template_previews.rb`.
+[model-a-identita.md](model-a-identita.md), odsek `template_previews.rb`. Od v0.8.13 tu žije aj **`handle_tag_visible`** (D-27) — jediný handler viditeľnosti NOXUN tagov pre OBA
+ovládače (okno tagov v raile aj checkbox ghost zón); vystriedal `handle_toggle_zones`.
 
 ### actions_usage.rb
 

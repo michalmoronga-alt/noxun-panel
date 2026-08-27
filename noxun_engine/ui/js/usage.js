@@ -37,8 +37,11 @@
                     // kontrole (3-stavove nastavenie). Vlastny kluc vedla
                     // `rail:abs` — merac povie, ci sa stavy olepu naozaj
                     // prestavuju z panela, alebo len zo Studia.
+                    // D-27: `rail:tagy` = okno viditelnosti NOXUN tagov. Vlastny
+                    // kluc — merac povie, ci sa tagy naozaj prepinaju z panela,
+                    // alebo sa aj nadalej chodi do natívneho okna Tags.
                     'rail:zrusit', 'rail:abs', 'rail:abs-nastavenie', 'rail:kresba',
-                    'rail:nastavenia', 'rail:studio',
+                    'rail:tagy', 'rail:nastavenia', 'rail:studio',
                     'pv:kamera', 'pv:fit',
                     'pv:vrstva:zony', 'pv:vrstva:cela', 'pv:vrstva:kovanie', 'pv:vrstva:olep',
                     'rad:sirka', 'rad:vyska', 'rad:hlbka', 'rad:sokel', 'rad:vyska_cela',

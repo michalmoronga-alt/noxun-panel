@@ -1,5 +1,6 @@
 # frozen_string_literal: true
-# Noxun Engine - Panel: toggle ghost zon. Sprava sablon (save/delete/apply/merge)
+# Noxun Engine - Panel: viditelnost NOXUN tagov modelu (D-27; patri sem aj
+# checkbox „Zobraziť zóny (ghost)" — je to ten isty tag). Sprava sablon (save/delete/apply/merge)
 # sa V0.4.5 D2 PRESUNULA do samostatneho okna TemplatesDialog (ui/templates_dialog.rb)
 # — v paneli ostal len rychly vyber sablony vo vkladacej karte (form.js).
 # Cast modulu Panel (reopen) - zdiela ivary cez class << self.
@@ -7,12 +8,65 @@ module Noxun
   module Engine
     module Panel
       class << self
-        def handle_toggle_zones(val)
+        # --- D-27: viditelnost NOXUN tagov v modeli ---------------------------
+        # JEDEN handler pre OBA vstupne body: okno tagov v raile Inspectora aj
+        # checkbox „Zobraziť zóny (ghost) v modeli" (kluc `zony`) — druhy
+        # ovladac nad tym istym tagom nesmie mat vlastnu cestu ani vlastnu
+        # undo semantiku.
+        #
+        # SERVEROVE GUARDY (HTML nie je ochrana, vzor `handle_edge_option`):
+        #   * IDENTITA DOKUMENTU — callback HtmlDialogu je asynchronny; bez
+        #     prisnej zhody by klik po prepnuti dokumentu skryl tag v CUDZOM
+        #     modeli (lekcia Codex #168 P2). Prazdny guid = okno bez dobehnuteho
+        #     NX.init, nie „stary klient".
+        #   * WHITELIST KLUCA (`Tags::KEYS`) a VYSLOVNY boolean — retazec
+        #     "false" je v Ruby pravdivy, preto sa porovnava `== true`.
+        # Zapis samotny robi ZDIELANA `Engine.set_tag_visible`, ktora prepne
+        # tag v JEDNEJ operacii (= jeden krok Späť) a rozposle novy stav.
+        def handle_tag_visible(payload)
+          data = parse(payload)
           model = Sketchup.active_model
-          visible = truthy?(val)
-          Zones.set_visible(model, visible)
+          key = data['key'].to_s
+          value = data['value']
+
+          unless data['model_guid'].to_s == model_guid(model)
+            push_tags
+            return set_status('Model sa medzitým prepol — stav obnovený, klikni znova.', true)
+          end
+          unless Tags::KEYS.include?(key) && (value == true || value == false)
+            push_tags
+            return set_status('Neznámy tag — v modeli sa nič nezmenilo.', true)
+          end
+
+          before = tag_row(tags_state(model), key)
+          state = Engine.set_tag_visible(key, value, model)
           model.active_view.invalidate if model.active_view
-          set_status(visible ? 'Ghost zony zapnute.' : 'Ghost zony vypnute.')
+          set_status(tag_toggle_status(state, before, key, value))
+        end
+
+        # Riadok tagu zo stavu (alebo nil, ked tag v modeli nie je).
+        def tag_row(state, key)
+          rows = state.is_a?(Hash) ? state['rows'] : nil
+          return nil unless rows.is_a?(Array)
+
+          rows.find { |r| r.is_a?(Hash) && r['key'].to_s == key.to_s }
+        end
+
+        # Potvrdenie SKLADA SERVER — a hovori pravdu aj vtedy, ked sa nestalo
+        # nic (tag v modeli nie je) alebo ked skrytie posunulo kreslenie
+        # (SketchUp aktivny tag skryt nenecha — robime to vedome, Codex F7).
+        def tag_toggle_status(state, before, key, value)
+          row = tag_row(state, key)
+          return 'Tento tag v modeli zatiaľ nie je — nič sa nezmenilo.' if row.nil? && before.nil?
+
+          label = (row || before)['label']
+          if row && row['folder_hidden'] && value
+            return "#{label}: tag je zapnutý, ale jeho priečinok tagov je skrytý — v modeli ho vidno nebude."
+          end
+
+          msg = value ? "#{label} — zobrazené v modeli." : "#{label} — skryté v modeli."
+          msg += ' Kreslenie prepnuté na Untagged (skrytý tag nemôže byť aktívny).' if state.is_a?(Hash) && state['active_reset']
+          msg
         end
 
         # D-14: ulozenie OZNACENEHO korpusu ako sablony priamo z panela (in-panel

@@ -12,15 +12,12 @@
 *(Blok **1 · UI 2.0** je od v0.8.0 hotový a jeho plný text žije v
 [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md). Postrehy nižšie sa v ňom
 nevyriešili, takže od 26.8.2026 visia na bloku **1b · STABILIZAČNÁ REVÍZIA**, odrážka **F**
-v [PLAN.md](PLAN.md) — menovite **D-27**, **D-51** a položka „výklop ako samostatný typ čela"
-(bez D-čísla).)*
+v [PLAN.md](PLAN.md) — dnes už len **D-51** a položka „výklop ako samostatný typ čela"
+(bez D-čísla); **D-27 je vyriešené** dávkou F/D-27, v0.8.13.)*
 
 - **D-51 · Štandard veľkostí okien a tlačidiel** (Michal 31.7. večer) — zjednotiť šírky, rozmery a rozmiestnenie naprieč oknami (panel, Materiály, Výroba, Pravidlá, Šablóny) — dohodnúť konkrétne
   hodnoty do UI_DIZAJN.md **pred prvým testovaním Lucie („skúška ohňom")**. *Stav: ČIASTOČNE — UI-B1 (PR #168) zaviedol mechaniku aj tabuľku rozmerov okien v UI_DIZAJN.md a vyplnil riadok Inspectora
   (obsah 470 × 810). Riadky satelitných okien sa doplnia, keď ich prevezme Štúdio.*
-- **D-27 · Rýchle zobraziť/skryť tagy z panela** (Michal 19.7. večer) — mini prepínače priamo v paneli (Čelá 👁 · Chrbát 👁 …) v logike Ghost checkboxu, nech sa nepreklikáva do SketchUp Tags. *Stav:
-  OTVORENÉ. UI-B2 (PR #169) priniesla chipy vrstiev v spodnom páse náhľadu — tie však prepínajú vrstvy **náhľadu**, nie tagy modelu; samotné D-27 (viditeľnosť v modeli, vzor checkbox „Zobraziť zóny
-  (ghost) v modeli") čaká na vlastnú dávku.*
 - **Výklop ako samostatný typ čela** *(bez D-čísla — vzišlo z kontraktu UI 2.0, otvorené dávkou UI-C3, 19.8.)* — kontrakt žiada výklop v ponuke typov čela. UI-C3 ho tam **dala len ako neaktívnu voľbu
   s vysvetlením**, lebo rola `flap` (kanonická v STANDARD §2.4, ale nikde nepoužitá) potrebuje vlastnú cestu cez **builder, ABS pravidlá, kusovník a VEPO** — to je zmena dátového kontraktu, teda vlastná
   dávka s Codex auditom a in-SU behom. *Stav: OTVORENÉ — malá dávka „výklop ako rola flap"; kovanie AVENTOS ostáva ručné (POJMY.md: výklopy sa negenerujú, plný model je fáza 3).*

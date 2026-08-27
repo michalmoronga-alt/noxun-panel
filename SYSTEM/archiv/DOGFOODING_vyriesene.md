@@ -9,6 +9,8 @@
 > Živý zápisník drží už len **otvorené** postrehy. Nový vyriešený postreh = plný text do
 > sekcie „Vyriešené (plné texty)" nižšie **a** jeden riadok navrch tohto indexu.
 
+- **D-27** **tagy modelu sa prepínajú priamo z panela** — v raile Inspectora pribudla ikona **oka**, ktorá otvorí zoznam NOXUN tagov (Korpus · Chrbát · Čelá · Vnútro · Kovanie · Dosky · Zóny) a jedným klikom ich v modeli zobrazí alebo skryje; do natívneho okna Tags sa už kvôli tomu chodiť nemusí. Ikona sa **rozsvieti a povie počet**, keď je niečo skryté („nevidíš všetko"), ponúka **len tagy, ktoré v modeli naozaj sú**, a keď tag blokuje skrytý priečinok tagov, prizná to. Jeden klik = **jeden krok Späť** (viditeľnosť tagu je súčasť .skp, na rozdiel od zvýraznenia hrán a kresby, ktoré sa kreslia nad modelom); klik, ktorý nič nemení, prázdny krok Späť nevyrobí. Checkbox „Zobraziť zóny (ghost)" hovorí o tom istom tagu, takže ide **tou istou cestou** a oba ovládače ukazujú jeden stav. Bokom sa opravila stará tichá chyba: zvýraznenie hrán a kontrola kresby už **nekreslia nad skrytými dielcami** — PR #249 (v0.8.13)
+
 - **D-69** **jednotný editor materiálov — KOMPLET**: dekor sa upravuje aj zakladá **tým istým formulárom** (identita → dosky → ABS pásky), rovnaké polia bez ohľadu na vstupný bod. „Upraviť…" v detaile (PR #212) a „Pridať ručne" v lište (mode `create`) idú JEDNOU atomickou zapisovacou cestou `Materials.save_decor` — buď sa uloží celý formulár, alebo nič. Preset-čipy pri zakladaní zanikli; formulár s čipmi ostal len ako **„+ variant"** pre zástenu a pracovnú dosku (majú ďalšie povinné údaje) — PR #208 + #212 + #213
 
 - **D-15** UX vzor „pridávačiek" ako **modal** — jedna kostra (titulok · polia · zelené potvrdenie · Esc/klik vedľa · fokus v prvom poli) schválená v ŠTÚDIO KONCEPTE; zdieľaný komponent
@@ -92,6 +94,38 @@ Testy 1–7, 9, 11: **PASS** · test 10 merač: **PASS** (súbor sa plní, len p
 **Test 8 — krížová validácia VEPO (2 kolá):** Prvé kolo odhalilo **koncepčnú chybu exportu** — odpočítaval hrúbku ABS, ale do VEPO sa zadávajú HOTOVÉ rozmery (systém si ABS odratáva sám z kódov hrán). Chybný predpoklad bol priamo v štandarde (build_plan) — **opravený kód aj dokumenty (PR #58)**. Druhé kolo (TEST 1, po fixe): **26 = 26 dielcov, materiálové skupiny sedia, presné zhody na dvierkach, pilastri, zásuvkovom čele, pracovnej doske 36, HDF chrbtoch aj výstuhách.** Zvyšné delty vysvetlené rozdielnym NASTAVENÍM korpusov (stará DC kuchyňa: dielce −3 mm hĺbka = chrbát v drážke vs. test naložený; polica hlbšia o 7; iné zadané výšky zásuvkových čiel 302/145 vs 300/150) — žiadna chyba exportu. Potvrdené aj: korpus štandard ABS 1 mm; medzery starej kuchyne 0/5/3/2 (nastaviteľné v D-07 poliach). **VEPO export V0.5-C = VALIDOVANÝ, krížová validácia s OCL flow splnená.** Bonus: starý vepo_exporter má bug v názve LOGu (`LOG_#{proj}.txt`).
 
 ## Vyriešené (plné texty)
+
+### D-27 — Rýchle zobraziť/skryť tagy z panela (vyriešené 28.8.2026, dávka F/D-27: PR #249, v0.8.13)
+
+**Pôvodné znenie (Michal 19.7. večer):** mini prepínače priamo v paneli (Čelá 👁 · Chrbát 👁 …) v logike Ghost checkboxu, nech sa nepreklikáva do SketchUp Tags.
+*Medzistav:* UI-B2 (PR #169) priniesla chipy vrstiev v spodnom páse náhľadu — tie však prepínajú vrstvy **náhľadu**, nie tagy modelu; samotné D-27 (viditeľnosť v modeli, vzor
+checkbox „Zobraziť zóny (ghost) v modeli") čakalo na vlastnú dávku.
+
+**Riešenie — kde to žije:** v raile Inspectora, vo funkčnej sekcii pod „Kontrolou kresby", pribudla **jedna ikona** (`eye`), ktorá otvorí **overlay zoznam** NOXUN tagov modelu.
+Umiestnenie je vedomé: rail je už existujúci ľavý stĺpec a okno je `position: absolute`, takže **v obsahu panela nepribudol ani jeden riadok** (trvalé pravidlo „vertikálny priestor
+je vzácny"). Zvažované alternatívy padli — nový rad v sektore Náhľad by stál riadok navyše a rozšírenie chipov vrstiev by zlialo dva rôzne významy (čo panel *kreslí* vs. čo je
+vidieť *v modeli*) do jedného ovládača. Tlačidlo **nemá rohový trojuholník**: nemá vlastnú hlavnú akciu, jeho jedinou akciou je otvoriť okno (doplnené do UI_DIZAJN §5.11 ako
+protipól pravidla „flyout len tam, kde je čo nastavovať"). Ikona je tlmená, kým je všetko vidieť; keď je čokoľvek skryté, **rozsvieti sa, prepne na `eye-off` a bublina povie počet**.
+
+**Čo dávka priniesla navyše (a prečo):** *(a)* **jeden zdroj stavu pre dva ovládače** — checkbox „Zobraziť zóny (ghost)" hovorí o tom istom tagu (`Noxun/Zóny`), takže ide tou istou
+serverovou cestou; zanikol callback `toggle_zones` (posielal holý reťazec **bez identity dokumentu** — oneskorený klik vedel prepnúť tag v cudzom modeli), pole `zones_visible`
+v init payloade aj `Zones.set_visible`. *(b)* **Undo semantika:** viditeľnosť tagu sa ukladá do .skp, takže sa zapisuje v `start_operation`/`commit_operation` = **jeden krok Späť**
+(na rozdiel od `edge_check`/`grain_check`, ktoré kreslia overlay nad modelom — D-103/D-104/D-105); klik, ktorý nič nemení, operáciu vôbec neotvorí. *(c)* **Skrytie aktívneho tagu**
+prepne kreslenie na Untagged vedome a v tej istej operácii (SketchUp to inak spraví sám a ticho) a status to povie. *(d)* **Opravená stará tichá chyba:** zvýraznenie hrán a
+kontrola kresby kreslili aj nad dielcami, ktorých tag bol skrytý — plôšky a čiary teda viseli nad prázdnom. Bránka je v zdieľanom prechode `EdgeCheck.each_part`, takže platí pre
+obe kontroly naraz; hneď sa aj ukázala v praxi (testovací model mal tag čiel skrytý z ručnej práce, in-SketchUp sekcia `K2` po zavedení bránky kreslila 0 čiar — runner preto pred
+behom viditeľnosť tagov dielcov dorovnáva a hlási to).
+
+**Rozhodnutia z Codex auditu návrhu (11 nálezov, 4 BLOCKER — všetky zapracované):** stav chodí do panela **pri každom `push_selected`**, nielen pri kliku (inak by Späť/Znova a
+prepnutie dokumentu nechali ikonu aj checkbox na opačnom stave než model) · checkbox zón musí ísť novou cestou s `model_guid` a striktným booleanom, inak by guardy neplatili ·
+`state` číta **aj legacy tag `NOXUN_SLOTY`**, inak by staršia zákazka tag „nenašla" · operácia má **abort vetvu** · `.railfly` obal kreslí trojuholník každému tlačidlu v sebe,
+preto vlastný `.railmenu` · **skrytý priečinok tagov** sa priznáva jantárovou poznámkou (tag je zapnutý, no vidieť ho aj tak nie je).
+
+**Vedomé obmedzenia (priznané v PR aj v dokumentácii):** tag skrytý priamo v natívnom okne Tags sa v paneli prejaví až pri najbližšom pushi — `LayersObserver` dávka nepridáva ·
+tag, ktorému zmizli všetky dielce, ostáva v ponuke (počítanie použitia by znamenalo rekurzívny sken modelu pri každom pushi).
+
+**Testy:** `tests/pure/test_d27_tagy.rb` (24 guardov, mutačne overené), `tests/js/test_d27_tagy.js` (53 assertov), in-SketchUp sekcia `run_d27` (jeden krok Späť, odmietnutia bez
+operácie, legacy tag, aktívny tag, jeden stav pre dva ovládače, prechod dielcami nad skrytým tagom).
 
 ### D-69 — Jednotný editor materiálov (vyriešené 23.8.2026, dávka ŠT-2c: PR #208 + #212 + #213, v0.7.55)
 
