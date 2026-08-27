@@ -39,10 +39,17 @@ module Nx1b3Fix
     File.read(path, encoding: 'UTF-8').lines.reject { |l| l.strip.start_with?('#') }
   end
 
-  def hits(path)
+  def hits(path, token = 'dedup_copies')
     code_lines(path).each_with_index
-                    .select { |l, _i| l.include?('dedup_copies') }
+                    .select { |l, _i| l.include?(token) }
                     .map { |l, i| "#{File.basename(path)}:#{i + 1}: #{l.strip}" }
+  end
+
+  # Jadro vystupov + okno Studio = cesty, ktore CITAJU. Panel (`ui/panel/*`) tu
+  # zamerne NIE JE: `push_selected` s vychodzim `dedup: true` je jeho ZAPISOVA
+  # reakcia a `request_dedup` je tam legitimny.
+  def read_paths
+    [File.join(ROOT, 'ui', 'production_core.rb'), File.join(ROOT, 'ui', 'studio_dialog.rb')]
   end
 
   def ident(id, kind: 'cabinet')
@@ -69,6 +76,29 @@ NxTest.test('1b-3 GUARD: v celej UI vrstve nie je ANI JEDNO volanie `dedup_copie
   found = Nx1b3Fix.ui_files.flat_map { |p| Nx1b3Fix.hits(p) }
   NxTest.assert(found.empty?,
                 "citacie cesty okien nesmu menit model — najdene: #{found.join(' | ')}")
+end
+
+# Review 1b-3 P3-3: guard na `dedup_copies` by NEZACHYTIL zamietnutu alternativu
+# — „citanie si dedup len VYZIADA u observera" (`ScaleWatch.request_dedup`).
+# Model by sa vtedy zmenil o 0,2 s neskor a garancia „zapnutie kontroly nemeni
+# model ani Undo" (kvoli ktorej brana G vznikla) by neplatila. Preto sa v jadre
+# vystupov a v okne Studio zakazuje AJ ten token — a `push_selected` tam smie ist
+# VYHRADNE s `dedup: false` (vychodzie `true` je ta ista ziadost inou cestou).
+NxTest.test('1b-3 GUARD: citacie cesty si dedup ani NEVYZIADAJU (`request_dedup`)') do
+  found = Nx1b3Fix.read_paths.flat_map { |p| Nx1b3Fix.hits(p, 'request_dedup') }
+  NxTest.assert(found.empty?,
+                'oneskorena oprava je stale oprava — model by sa po citani zmenil: ' \
+                "#{found.join(' | ')}")
+end
+
+NxTest.test('1b-3 GUARD: `push_selected` v citacich cestach ide VZDY s `dedup: false`') do
+  bad = Nx1b3Fix.read_paths.flat_map { |p| Nx1b3Fix.hits(p, 'push_selected(') }
+                .reject { |l| l.include?('dedup: false') }
+  NxTest.assert(bad.empty?,
+                "vychodzie `dedup: true` ziada opravu u observera: #{bad.join(' | ')}")
+  # dokaz, ze sa nekontroluje prazdno — nejake volanie tam naozaj je
+  calls = Nx1b3Fix.read_paths.flat_map { |p| Nx1b3Fix.hits(p, 'push_selected(') }
+  NxTest.assert(calls.length.positive?, 'jadro vyber po klik-selecte naozaj obnovuje')
 end
 
 NxTest.test('1b-3 GUARD: dedup ostava VYHRADNE v zapisovej ceste (buildery + observer)') do
@@ -186,6 +216,69 @@ NxTest.test('1b-3: vysledok je DETERMINISTICKY — nezavisi od poradia entit v m
   a = f.dups(f.run(base)).map { |i| i['stable_key'] }
   b = f.dups(f.run(base.reverse)).map { |i| i['stable_key'] }
   NxTest.assert_equal(a, b)
+end
+
+# --- 3. VAROVANIE V STATUSE EXPORTOV (review P2-1) --------------------------
+#
+# Nalez v Kontrole NESTACI: pouzivatel, ktory klikne „Nákupný zoznam kovania",
+# sa do Kontroly nepozera — a prave to CSV ide dodavatelovi. Texty sa preto
+# MERAJU (nie greppuju): `dup_id_suffix` aj `cp_warnings` su volatelne priamo.
+
+NxTest.test('1b-3 status: pri duplicitnej identite dostane export VAROVANIE s ID aj dosledkom') do
+  pc = Noxun::Engine::ProductionCore
+  s = pc.dup_id_suffix({ identities: [{ 'kind' => 'cabinet', 'id' => 'CAB-001' }] * 2 })
+  NxTest.refute(s.empty?, 'sufix vznikol')
+  NxTest.assert(s.include?('CAB-001'), "ID v sufixe: #{s}")
+  NxTest.assert(s.include?('vlastníka'), "dosledok v sufixe: #{s}")
+  NxTest.assert(s.include?('Kontrolu'), "kam sa pozriet: #{s}")
+end
+
+NxTest.test('1b-3 status: bez duplicity je sufix PRAZDNY (ziadny hluk v beznom exporte)') do
+  pc = Noxun::Engine::ProductionCore
+  NxTest.assert_equal('', pc.dup_id_suffix({ identities: [{ 'kind' => 'cabinet', 'id' => 'CAB-001' },
+                                                          { 'kind' => 'cabinet', 'id' => 'CAB-002' }] }))
+  NxTest.assert_equal('', pc.dup_id_suffix({}))
+  NxTest.assert_equal('', pc.dup_id_suffix(nil))
+end
+
+NxTest.test('1b-3 status: strop na tri ID + „a ďalšie N" (stavovy riadok nie je odsek)') do
+  pc = Noxun::Engine::ProductionCore
+  ids = %w[CAB-001 CAB-002 CAB-003 CAB-004 CAB-005]
+  recs = ids.flat_map { |i| [{ 'kind' => 'cabinet', 'id' => i }] * 2 }
+  s = pc.dup_id_suffix({ identities: recs })
+  NxTest.assert(s.include?('CAB-003'), s)
+  NxTest.refute(s.include?('CAB-004'), "stvrte ID sa uz nevypisuje: #{s}")
+  NxTest.assert(s.include?('a ďalšie 2'), "zvysok sa PRIZNA cislom: #{s}")
+end
+
+NxTest.test('1b-3 status: nakupny zoznam kovania aj rozpocet sufix REALNE pouzivaju') do
+  src = Nx1b3Fix.pc_src
+  %w[do_hw_csv do_budget_xlsx].each do |m|
+    body = src[/def #{m}\(model, data, generation:, status:, repush:\).*?\n      rescue StandardError/m].to_s
+    NxTest.refute(body.empty?, "#{m} sa nasla")
+    NxTest.assert(body.include?('dup_id_suffix('), "#{m}: varovanie sa sklada")
+    NxTest.assert(body.include?('!dup.empty?'),
+                  "#{m}: a farbi status — zelene „hotovo\" nad skreslenym cislom je horsie nez ziadne")
+  end
+end
+
+NxTest.test('1b-3 status: cenova ponuka ma varovanie v SVOJOM zozname dovodov (nie ako sufix)') do
+  pc = Noxun::Engine::ProductionCore
+  dups = { identities: [{ 'kind' => 'cabinet', 'id' => 'CAB-007' }] * 2 }
+  w = pc.cp_warnings({}, {}, [], dups)
+  NxTest.assert_equal(1, w.length, w.inspect)
+  NxTest.assert(w.first.include?('CAB-007') && w.first.include?('vlastníka'), w.first)
+  # bez duplicity a bez `collected` (legacy volanie) sa nemeni NIC
+  NxTest.assert_equal(0, pc.cp_warnings({}, {}, []).length)
+end
+
+NxTest.test('1b-3 status: VEPO sufix NEDOSTAVA — nalez uz nesie `control_suffix` a LOG') do
+  src = Nx1b3Fix.pc_src
+  body = src[/def do_export\(model, data, generation:, status:, repush:\).*?\n      rescue StandardError/m].to_s
+  NxTest.refute(body.empty?, 'do_export sa nasla')
+  NxTest.refute(body.include?('dup_id_suffix('), 'ziadne druhe znenie tej istej veci v jednom statuse')
+  NxTest.assert(body.include?('control_suffix('), 'ale KONTROLA v statuse je — a nalez je v jej poctoch')
+  NxTest.assert(body.include?('validation: control'), 'a ide aj do sekcie KONTROLA vo VEPO LOGu')
 end
 
 NxTest.test('1b-3: `Bom.add_identity` zapisuje jeden zaznam na INSTANCIU a prazdne ID zahadzuje') do

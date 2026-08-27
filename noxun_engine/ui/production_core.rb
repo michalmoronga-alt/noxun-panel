@@ -525,6 +525,34 @@ module Noxun
         end
       end
 
+      # 1b-3 (review P2-1): VAROVANIE O DUPLICITNEJ IDENTITE do statusu exportov,
+      # ktore `Validation.run` NEVOLAJU — nakupny zoznam kovania a XLSX rozpoctu.
+      # Prave ich cisla su duplicitou skreslene (zaznamy oboch kusov maju rovnaky
+      # `owner_id`, takze clen setu uctovany na vlastnika sa zapocita raz), takze
+      # pouzivatel by inak odoslal objednavku BEZ SLOVA — nalez by svietil len
+      # v Kontrole, kam sa pri exporte nepozera.
+      #
+      # KDE SUFIX NIE JE a preco:
+      #   * VEPO export — `Validation.run` vola, takze nalez uz ide do
+      #     `control_suffix` (pocet ORANGE) AJ do sekcie KONTROLA vo VEPO LOGu.
+      #     Druhe znenie tej istej veci v jednom statuse by len robilo hluk.
+      #   * XLSX cenovej ponuky — ma VLASTNY zoznam dovodov (`cp_warnings`,
+      #     GH #139: jeden zoznam, ktory riadi aj farbu statusu), takze duplicita
+      #     patri DO NEHO, nie ako priveseny sufix.
+      #
+      # Strop na tri ID + „a ďalšie N" (vzor hlasky validacie pravidiel): stavovy
+      # riadok nie je odsek.
+      def dup_id_suffix(collected)
+        dups = Validation.duplicate_identities(Array(collected.is_a?(Hash) ? collected[:identities] : nil))
+        return '' if dups.empty?
+
+        ids = dups.map { |_kind, id, _n| id }
+        shown = ids.first(3).join(', ')
+        more = ids.length > 3 ? " a ďalšie #{ids.length - 3}" : ''
+        " · POZOR: v modeli sú kusy so spoločným ID (#{shown}#{more}) — kovanie účtované na " \
+          'vlastníka (napr. TipOn) sa započíta len raz; pozri Kontrolu.'
+      end
+
       # Suhrn KONTROLY do statusu okna/exportu (nalez 6: RED neblokuje export).
       def control_suffix(control)
         c = control.is_a?(Hash) ? (control['counts'] || {}) : {}
@@ -764,7 +792,8 @@ module Noxun
           return status.call('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
         end
 
-        exp = hardware_expansion(model, fresh_collect(model))
+        collected = fresh_collect(model)
+        exp = hardware_expansion(model, collected)
         return status.call('Nákupný zoznam sa nedá zostaviť (pozri Ruby konzolu).', true) if exp.nil?
 
         if Array(exp['rows']).empty? && Array(exp['unmapped']).empty?
@@ -784,9 +813,10 @@ module Noxun
         save_vepo_settings('last_dir' => File.dirname(target))
         n = Array(exp['rows']).length
         un = Array(exp['unmapped']).length
+        dup = dup_id_suffix(collected)
         status.call("Nákupný zoznam: #{n} položiek" \
-                    "#{un.positive? ? " + #{un} nemapovaných (v CSV aj KONTROLE)" : ''} → #{target}",
-                    un.positive?)
+                    "#{un.positive? ? " + #{un} nemapovaných (v CSV aj KONTROLE)" : ''} → #{target}#{dup}",
+                    un.positive? || !dup.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_hw_csv')
         status.call("Export zlyhal: #{e.message}", true)
@@ -1249,8 +1279,10 @@ module Noxun
         save_vepo_settings('last_dir' => File.dirname(target))
         totals = budget['totals'] || {}
         miss = totals['unknown_count_in_total'].to_i
+        dup = dup_id_suffix(collected)
         status.call("Rozpočet uložený: #{fmt_eur(totals['total'])} → #{target}" \
-                    "#{miss.positive? ? " · #{miss} riadkov bez ceny sa nezapočítalo" : ''}", miss.positive?)
+                    "#{miss.positive? ? " · #{miss} riadkov bez ceny sa nezapočítalo" : ''}#{dup}",
+                    miss.positive? || !dup.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_budget_xlsx')
         status.call("Export rozpočtu zlyhal: #{e.message}", true)
@@ -1296,7 +1328,7 @@ module Noxun
         hits = CpExport.firewall_hits(CpXlsx.text_cells(sheets))
         XlsxWriter.write_book(target, sheets, now: now)
         save_vepo_settings('last_dir' => File.dirname(target))
-        warnings = cp_warnings(cp, budget, hits)
+        warnings = cp_warnings(cp, budget, hits, collected)
         status.call(cp_status(cp, spec, target, warnings), !warnings.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_cp_xlsx')
@@ -1306,10 +1338,22 @@ module Noxun
       # GH #139 P1/P2: JEDEN zoznam dovodov, preco zakaznicky dokument NIE JE
       # v poriadku — rozhoduje aj o farbe statusu, aby sa zelene „uložené"
       # nikdy neobjavilo nad podhodnotenou alebo zápornou sumou.
-      def cp_warnings(cp, budget, hits)
+      # 1b-3 (review P2-1): `collected` je nepovinne — duplicitna identita je
+      # dalsi dovod, preco cena ponuky nemusi sediet (kovanie uctovane na
+      # vlastnika sa zapocita raz), takze patri do TOHO ISTEHO zoznamu, nie do
+      # zvlastneho sufixu: rozhoduje aj o farbe statusu.
+      def cp_warnings(cp, budget, hits, collected = nil)
         c = cp.is_a?(Hash) ? cp : {}
         totals = budget.is_a?(Hash) && budget['totals'].is_a?(Hash) ? budget['totals'] : {}
         out = []
+        dups = Validation.duplicate_identities(Array(collected.is_a?(Hash) ? collected[:identities] : nil))
+        unless dups.empty?
+          ids = dups.map { |_kind, id, _n| id }
+          shown = ids.first(3).join(', ')
+          more = ids.length > 3 ? " a ďalšie #{ids.length - 3}" : ''
+          out << "v modeli sú kusy so spoločným ID (#{shown}#{more}) — kovanie účtované na " \
+                 'vlastníka (napr. TipOn) sa započíta len raz; pozri Kontrolu'
+        end
         miss = totals['unknown_count_in_total'].to_i
         if miss.positive?
           out << "#{miss} riadkov rozpočtu nemá cenu — suma ponuky je PODHODNOTENÁ " \

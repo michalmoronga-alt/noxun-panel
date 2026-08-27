@@ -454,7 +454,17 @@ module Noxun
       # setov kovania s `per: 'owner'` (napr. TipOn na dvierka) zapocita polozku
       # LEN RAZ. Tichy nalez by poslal do objednavky menej kovania.
       def check_identities(identities, items)
-        return unless identities.is_a?(Array)
+        duplicate_identities(identities).each { |kind, id, n| items << duplicate_id_item(kind, id, n) }
+      end
+
+      # ID, ktore si deli viac ako jeden kus -> [[kind, id, pocet], ...],
+      # deterministicky zoradene. VEREJNE a je to JEDINY zdroj: nalezy Kontroly
+      # z toho stavia `check_identities`, varovanie statusu exportov, ktore
+      # `Validation.run` vobec nevolaju (nakupny zoznam kovania, XLSX rozpoctu
+      # a cenovej ponuky — review 1b-3 P2-1), si ho pyta priamo. Dve nezavisle
+      # implementacie toho isteho kriteria by sa casom rozisli.
+      def duplicate_identities(identities)
+        return [] unless identities.is_a?(Array)
 
         counts = {}
         identities.each do |rec|
@@ -468,18 +478,23 @@ module Noxun
         end
         counts.select { |_k, n| n > 1 }
               .sort_by { |(kind, id), _n| [kind, id] }
-              .each { |(kind, id), n| items << duplicate_id_item(kind, id, n) }
+              .map { |(kind, id), n| [kind, id, n] }
       end
 
       # Adresa klik-selectu je TA ISTA ako pri D-103 (`dup_kind` + `dup_owner_ids`),
       # takze `pids_for_duplicate` sa znovupouziva bez jedineho riadku navyse —
       # klik oznaci VSETKY kusy, ktore si ID delia.
+      # Dosledok sa hovori PODMIENENE (review 1b-3 P3-2, precedens CAT_MATERIAL):
+      # zliatie vlastnikov v kusovniku plati vzdy, ale podpocitane kovanie LEN
+      # vtedy, ked ma set clena uctovaneho na vlastnika. Bezpodmienecne tvrdenie
+      # by pri sete bez takeho clena klamalo — a hlaska, ktora raz klamala, sa
+      # prestane citat.
       def duplicate_id_item(kind, id, count)
         cab = kind == 'cabinet'
         noun = cab ? 'Skrinky' : 'Dosky'
         follow = if cab
-                   'Kusovník ich zlieva do jedného vlastníka a kovanie viazané na dvierka ' \
-                   'sa započíta len raz.'
+                   'Kusovník ich zlieva do jedného vlastníka a kovanie účtované na vlastníka ' \
+                   '(napr. TipOn) sa započíta len raz.'
                  else
                    'Kusovník ich zlieva do jedného vlastníka.'
                  end
