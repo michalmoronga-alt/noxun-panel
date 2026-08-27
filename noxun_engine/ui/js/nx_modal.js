@@ -635,6 +635,9 @@
       return m;
     }
 
+    // `flagsOfRows` sa NIKDY nesmie volať nad výstupom `applyFlags`/`readRows` —
+    // `applyFlags` maže `_wrote`, conflict by prežil bez baseline a tichý prepis
+    // by sa vrátil.
     function applyFlags(f, rows){
       var st = (OPEN && OPEN.flags && OPEN.flags[f.key]) || null;
       return (rows || []).map(function(r){

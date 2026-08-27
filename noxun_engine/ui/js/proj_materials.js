@@ -2660,8 +2660,13 @@
         // 1b-7: tá istá bunka sa zmenila u pouzivatela AJ v katalogu. Zapis
         // sa nedá pustit, kym sa nerozhodne — hlaska preto pyta ROZHODNUTIE,
         // nie „ulož znova".
-        MD.setStatus('Katalóg sa medzitým zmenil — pri ' + res.conflicts +
-                     ' hodnotách rozhodni, ktorá platí (tvoja × z katalógu), až potom ulož.', true);
+        // Jedna kolizna bunka je NAJCASTEJSI pripad — „pri 1 hodnotách" by
+        // svietilo v stavovom pase pri kazdom beznom konflikte. Lokal mnozneho
+        // cisla je „hodnotách" pre kazde N >= 2, takze staci dvojica tvarov.
+        var cn = res.conflicts;
+        MD.setStatus('Katalóg sa medzitým zmenil — pri ' + cn +
+                     (cn === 1 ? ' hodnote' : ' hodnotách') +
+                     ' rozhodni, ktorá platí (tvoja × z katalógu), až potom ulož.', true);
         return;
       }
       MD.setStatus(res.touched
