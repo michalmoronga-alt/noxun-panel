@@ -18,7 +18,8 @@ blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
 
 **Cieľ:** doplatiť dlhy, ktoré fáza ŠTÚDIO vedome odložila, a spraviť refactory, na ktoré počas presunov nebol priestor.
 *(Stabilizačná revízia sa od začiatku produkcie naostro (20.8.) ešte NEKONALA — patrí pred ďalšie nové funkcie.)* Poradie určí Michal.
-Staré dlhy B–F nie sú blokujúce pre bežnú prácu (**B a D vybavené dávkou 1b-4, v0.8.8, 27.8.**; ostáva **F** a sweep **E**);
+Staré dlhy B–F nie sú blokujúce pre bežnú prácu (**B a D vybavené dávkou 1b-4, v0.8.8, 27.8.**; ostáva **F** a sweep **E**;
+mimo písmen vybavená aj **1b-6a** — názov zákazky prežije prvé uloženie, v0.8.9, 27.8.);
 **P0 odrážky A, G a H sú BRÁNY a VŠETKY TRI SÚ HOTOVÉ** — **A** (možná STRATA rozpísanej editácie) dávkou 1b-1, v0.8.6, 27.8. ·
 **H** (charakterizačné in-SU scenáre) dávkou 1b-2, 27.8. — cesta k builderom/observerom pre blok 1d je tým otvorená; sadu `CHAR` **dorovnala dávka 1b-5** (27.8., test-only) po
 post-hoc Codex kole na #239: štyri asserty boli zelené, ale merali slabšiu veličinu, než tvrdili · **G** („Obnoviť" = čisté čítanie) dávkou 1b-3, v0.8.7, 27.8. —
@@ -64,6 +65,11 @@ Sekcia `run_char` v in-SU sade: **42 assertov** v šiestich scenároch (kópia �
 overené 7 zámernými mutáciami v dvoch kolách (11 + 6 cielených FAIL). **Dva scenáre sa na Windows spustiť nedajú a sú zapísané ako MANUÁLNE** priamo v INFO riadkoch behu: Znova
 (Ctrl+Y) po scale a dva otvorené dokumenty naraz (macOS). Brána je splnená — **blok 1d smie siahnuť na buildery a observery.** Plný záznam (čo presne sa zafixovalo, nálezy slepého
 review #239, mutácie, kandidát do registra): [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-2**.
+
+**1b-6a · Názov zákazky sa po prvom uložení strácal — ✅ VYRIEŠENÉ, v0.8.9 (27.8.2026).** Nález nemá písmeno ani D-číslo: pochádza z **post-hoc triáže Codex threadov**
+(PR #193, nález #30 ≡ #42) — teda z toho, čo odrážka **E** systematicky doťahuje. **Výrobná P2:** kto pomenoval zákazku v Štúdiu skôr, než model prvý raz uložil, dostal po Ctrl+S
+VEPO, CSV kovania aj oba XLSX pomenované podľa `.skp` súboru namiesto zákazky (dáta boli správne, meno nie) — SketchUp pri uložení mení cestu **aj guid** naraz, takže záznam pod
+starým guid kľúčom sa už nedal nájsť. Plný záznam — riešenie, zamietnuté alternatívy, 3 mutácie: [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-6a**.
 
 **E · Post-hoc Codex sweep #186–#226.** Rozsah je JEDNO číslo naprieč STAV, PLAN aj KRONIKOU a znamená presne toto: **dávky, ktorých primárnym reviewerom bol slepý subagent, lebo Codex bol 21.–24.8.
   nedostupný**. Od **#227** review robí Codex, takže #227 aj #228 sú mimo sweepu. Keď má Codex kapacitu, prejsť tie PR spätne — nie kvôli nedôvere v subagenta (chytil o. i. spiacu mínu duplicitných

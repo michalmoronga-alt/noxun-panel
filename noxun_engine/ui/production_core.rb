@@ -171,6 +171,32 @@ module Noxun
       # platnou cestou sa zaznam ZMIGRUJE na cestu a guid zaznam zanikne.
       PROJECT_NAMES_KEY = 'project_names'
       PROJECT_NAME_MAX = 120 # strop proti nezmyslu z JS (nazov ide do mena suboru)
+      SESSION_KEY_PREFIX = 'guid:'
+
+      # --- 1b-6a: most medzi klucom sedenia a cestou ------------------------
+      #
+      # Ctrl+S urobi DVE veci NARAZ: model dostane cestu a SketchUp mu ZMENI
+      # guid. Nazov zadany pred prvym ulozenim preto lezi pod klucom
+      # `guid:<STARY guid>` a z ulozeneho modelu sa uz neda odvodit — zalozka
+      # „skus kluc sedenia" (ST-1a) hlada `guid:<NOVY guid>` a najde prazdno.
+      # Dosledok bol tichy VYROBNY prusvih: po prvom ulozeni sa VEPO, CSV
+      # kovania aj oba XLSX pomenovali podla .skp suboru namiesto zakazky.
+      #
+      # Most je preto v PAMATI PROCESU: object_id modelu => posledny kluc
+      # sedenia, pod ktorym sa nazov zapisal. Identita sa NEVERI slepo — zaznam
+      # plati len ked ide o TEN ISTY Ruby objekt (`equal?` je cisto porovnanie
+      # referencii, nesiaha do SketchUpu ani na zatvorenom dokumente); Windows
+      # SketchUp pri File > New/Open model ZNIci a vytvori novy, takze cudzia
+      # zakazka rozrobeny nazov zdedit nemoze. Pri prvom pouziti sa most
+      # SPOTREBUJE a zaznam sa ZMIGRUJE na cestu, takze prezije aj restart.
+      #
+      # Preco to NIE JE zakazany okenny stav (kontrakt v hlavicke modulu):
+      # nie je to stav okna ani medzivysledok vypoctu, ale udaj o DOKUMENTE,
+      # ktory sa z modelu po ulozeni preukazatelne precitat neda. Obe okna z
+      # neho citaju TO ISTE, takze si ho nemaju ako prepisat. Konstanta (nie
+      # `@ivar`) aj kvoli guard testu, ktory tu instancne premenne nepripusta.
+      SESSION_KEY_BRIDGE = {}
+      SESSION_BRIDGE_MAX = 32 # strop proti rastu pri mnohych rozrobenych oknach
 
       def project_names
         v = vepo_settings[PROJECT_NAMES_KEY]
@@ -189,7 +215,41 @@ module Noxun
       # cesty a pri prvom ulozeni zmigrovat.
       def project_session_key(model)
         guid = model_guid(model)
-        guid.empty? ? '' : "guid:#{guid}"
+        guid.empty? ? '' : "#{SESSION_KEY_PREFIX}#{guid}"
+      end
+
+      # Kluc je nahradny (sedenie), nie cesta. Normalizovana cesta zacina
+      # pismenom disku alebo lomitkom — s prefixom sa nikdy nezhodne.
+      def session_key?(key)
+        key.to_s.start_with?(SESSION_KEY_PREFIX)
+      end
+
+      def remember_session_key(model, key)
+        return unless model && session_key?(key)
+
+        SESSION_KEY_BRIDGE.delete(model.object_id)
+        SESSION_KEY_BRIDGE[model.object_id] = { ref: model, key: key.to_s }
+        SESSION_KEY_BRIDGE.shift while SESSION_KEY_BRIDGE.length > SESSION_BRIDGE_MAX
+      end
+
+      def forget_session_key(model)
+        SESSION_KEY_BRIDGE.delete(model.object_id) if model
+      end
+
+      # Kluc sedenia, pod ktorym sa nazov TOHTO dokumentu naposledy zapisal,
+      # kym este nemal cestu. Prazdny retazec = nic sa nepamata.
+      def remembered_session_key(model)
+        entry = model ? SESSION_KEY_BRIDGE[model.object_id] : nil
+        return '' unless entry.is_a?(Hash) && entry[:ref].equal?(model)
+
+        entry[:key].to_s
+      end
+
+      # Vsetky nahradne kluce, pod ktorymi moze lezat nazov TEJTO zakazky:
+      # aktualny guid (ked sa este nezmenil) + zapamatany kluc spred ulozenia.
+      def session_keys_for(model)
+        [project_session_key(model), remembered_session_key(model)]
+          .map(&:to_s).reject(&:empty?).uniq
       end
 
       # Primarny kluc: cesta, ak zakazka existuje na disku; inak sedenie.
@@ -200,41 +260,69 @@ module Noxun
 
       # Ulozeny nazov, inak default zo suboru zakazky.
       #
-      # Ked uz zakazka MA cestu, ale zaznam pod nou este nie je, skusi sa este
-      # kluc sedenia — to je presne stav „pomenoval som neulozeny model a potom
-      # ho ulozil". Bez tejto zalozky by sa nazov pri Ctrl+S stratil.
+      # Ked uz zakazka MA cestu, ale zaznam pod nou este nie je, skusia sa
+      # nahradne kluce sedenia — to je presne stav „pomenoval som neulozeny
+      # model a potom ho ulozil". Bez tejto zalozky by sa nazov pri Ctrl+S
+      # stratil a vyrobne subory by niesli meno .skp suboru.
       def project_name(model)
+        key = project_key(model)
         map = project_names
-        saved = map[project_key(model)]
-        if saved.to_s.strip.empty?
-          session = project_session_key(model)
-          saved = map[session] unless session.empty? || session == project_key(model)
-        end
+        saved = map[key]
+        saved = adopt_session_name(model, key, map) if saved.to_s.strip.empty?
         s = saved.to_s.strip
         s.empty? ? default_project_name(model) : s
+      end
+
+      # Prechod NEULOZENY→ULOZENY (1b-6a). Najde nazov pod klucom sedenia a
+      # HNED ho presunie na cestu; nahradne kluce zanikaju, aby v subore
+      # nerastli mrtve zaznamy. Migracia je nutna — bez nej by nazov zil len
+      # do konca sedenia (v pamati) a po restarte SketchUpu by sa aj tak
+      # stratil. Zapisuje sa VYHRADNE do nastaveni pocitaca (vepo_settings.json),
+      # do modelu nikdy; ked nie je co adoptovat, nezapisuje sa vobec.
+      def adopt_session_name(model, key, map)
+        return nil if key.to_s.empty? || session_key?(key)
+
+        aliases = session_keys_for(model)
+        hit = aliases.find { |k| !map[k].to_s.strip.empty? }
+        return nil unless hit
+
+        name = map[hit].to_s.strip
+        moved = map.dup
+        aliases.each { |k| moved.delete(k) }
+        moved[key] = name unless name == default_project_name(model)
+        save_vepo_settings(PROJECT_NAMES_KEY => moved)
+        forget_session_key(model)
+        name
       end
 
       # Zapis nazvu. Prazdna hodnota (aj hodnota zhodna s defaultom) zaznam
       # ZMAZE — pomenovanie sa vtedy vrati na nazov .skp suboru a premenovanie
       # suboru sa v okne prejavi samo. Vracia nazov, ktory PLATI po zapise.
       #
-      # MIGRACIA: ked zakazka uz ma cestu, zaznam pod klucom sedenia (guid) sa
-      # pri kazdom zapise ZAHADZUJE — jeho ulohu prebrala cesta a guid by po
-      # dalsom ulozeni aj tak prestal sediet.
+      # MIGRACIA: ked zakazka uz ma cestu, zaznamy pod klucmi sedenia (aktualny
+      # guid AJ zapamatany kluc spred ulozenia) sa pri kazdom zapise ZAHADZUJU
+      # — ich ulohu prebrala cesta a guid by po dalsom ulozeni aj tak prestal
+      # sediet. Pri NEULOZENOM modeli sa naopak kluc sedenia zapamata, aby ho
+      # citanie po Ctrl+S nasiel (1b-6a).
       def save_project_name(model, name)
         key = project_key(model)
         return project_name(model) if key.empty?
 
         s = name.to_s.strip[0, PROJECT_NAME_MAX].to_s.strip
         map = project_names.dup
-        session = project_session_key(model)
-        map.delete(session) if !session.empty? && session != key
-        if s.empty? || s == default_project_name(model)
-          map.delete(key)
-        else
+        session_keys_for(model).each { |k| map.delete(k) unless k == key }
+        stored = !(s.empty? || s == default_project_name(model))
+        if stored
           map[key] = s
+        else
+          map.delete(key)
         end
         save_vepo_settings(PROJECT_NAMES_KEY => map)
+        if stored && session_key?(key)
+          remember_session_key(model, key)
+        else
+          forget_session_key(model)
+        end
         project_name(model)
       end
 
