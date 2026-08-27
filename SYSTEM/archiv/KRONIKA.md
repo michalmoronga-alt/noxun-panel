@@ -17,6 +17,30 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1b-6b · HLAVIČKY MATERIÁLOVÝCH SKUPÍN SA PRI KOLÍZII ROZLÍŠIA (27.8.2026, v0.8.11):** P2 z triáže Codex threadov (PR #193, nález **#33**). Menovka skupiny Kusovníka aj riadok
+  súpisu **Platní** sa skladali len z dekoru, štruktúry a názvu (`ProductionCore.material_label`), takže dva **rôzne výrobné materiály** — iný výrobca, typ, formát platne alebo rub
+  zásteny — mali **identickú hlavičku**. Podľa nej sa objednáva: dve nerozlíšiteľné hlavičky znamenajú riziko, že sa kúpi iný výrobca alebo formát. Panel taký problém nikdy nemal —
+  kolízny aparát (`Panel.label_base` + `Materials.sheet_label_suffix`, GH #95 P1) je v repe od 2B-2, len ho **výstupy nevolali**.
+
+  **Riešenie: žiadna nová logika, len ten istý aparát.** `materials_meta` a `edges_meta` skladajú menovky cez `material_labels`/`edge_labels` — kolízny pás v štýle
+  `vepo_disambiguate`: **bez kolízie je výsledok bajtovo dnešný text**, pri kolízii sa eskaluje na PANELOVÚ menovku, stupeň po stupni: `Panel.raw_row_label` (výrobca pri kolízii +
+  prípona formátu/rubu) → `Panel.sheet_label` (navyše typ a hrúbka — ten istý dekor v DTDL aj v kompakte) → poistka `[material_id]` (vzor VEPO: dve hlavičky sa nesmú zliať ani nad
+  nezmyselným katalógom). Pásky eskalujú na `Panel.abs_label` (štruktúra + výrobca). Panel a výstupy tak nemôžu mať dve pravdy o tom, ako sa materiál volá.
+
+  **Kľúčové rozhodnutie — čo je vlastne „kolízia".** Kolízny kľúč je **to, čo riadok skupiny UKÁŽE: menovka + hrúbka**, nie samotná menovka. Hrúbka má v hlavičke aj v súpise Platní
+  vlastné miesto (`th`), takže najbežnejší prípad zákazky — jeden dekor v dvoch hrúbkach — rozlíšenie **nedostane** a hlavičky ostávajú krátke. Zamietnuté alternatívy: *(a)* prípona
+  vždy (deterministické texty, ale šum v každej bežnej zákazke a duplicitná hrúbka v hlavičke), *(b)* prevziať `vepo_base_label`, ktorý typ nesie vždy (zmenil by VŠETKY hlavičky
+  a rozišiel by hlavičku s tým, čo kreslí Inspector), *(c)* presunúť celý kolízny aparát z panela do `Materials` (správne dlhodobo, ale je to refaktor kontraktu menoviek —
+  patrí do bloku 1d, nie do P2 fixu). Kontext výrobcov (`Panel.label_ctx`) sa stavia **až pri prvej kolízii**, takže nekolízna zákazka kvôli hlavičkám katalóg nečíta vôbec.
+
+  **Rozpočet a cenová ponuka zostali vedome nedotknuté:** `Budget.sheet_label` a `CpExport.material_label` žijú v `core/`, kam panelový aparát nedosiahne (načítavajú sa pred UI
+  vrstvou) — sú zapísané ako kandidát **C14** v [../zdroje/SWEEP_2026-08_kandidati.md](../zdroje/SWEEP_2026-08_kandidati.md).
+
+  **Testy:** nová sada `tests/pure/test_1b6b_hlavicky.rb` — **12 scenárov** (nekolízna zákazka bajtovo nezmenená · rozdiel len v hrúbke nie je kolízia · výrobca · formát · rub · dva
+  typy · poistka `[id]` · nekolidujúci sused ostáva ticho · zhoda s panelom · ABS). Overené **2 mutáciami**: „prípona sa neaplikuje nikdy" zhodila 5 testov, „eskaluje sa vždy,
+  nielen pri kolízii" zhodilo 8 — každá práve svoje. Headless **1964 PASS**. Prívesok mimo témy dávky: jednoriadkový assert na **singulár** hlášky kolízie („pri 1 hodnote")
+  v sade `tests/js/test_1b7_kolizia_buniek.js` (84 kontrol).
+
 - **1b-7 · KONIEC TICHÉHO NÁVRATU STAREJ CENY DEKORU (27.8.2026, v0.8.10):** dve platné P2 z post-hoc sweepu (#212 · nálezy **#8** a **#9**) mali **jeden koreň** — stará hodnota
   z formulára sa spájala s **čerstvým** `row_rev`, takže optimistický zámok prestal chrániť to, čo má chrániť, a *Uložiť* ticho vrátilo cenu, ktorú medzitým priniesla
   „Aktualizovať z Demosu". Spúšťačom bol **bežný pracovný postup**, nie súbeh: otvor editor dekoru → oprav jednu hodnotu → **Esc** → aktualizuj ceny → otvor ten istý dekor →

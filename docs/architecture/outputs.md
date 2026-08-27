@@ -91,6 +91,17 @@ na názov `.skp` a premenovanie súboru sa v okne prejaví samo. Číta ho **vš
 **`materials_meta`/`edges_meta` (audit #4)** sú kontrakt skupín Kusovníka: per `material_id` (resp. `abs_id`) label, katalógová farba ako **pole `[r,g,b]`** (nie CSS reťazec —
 prevod robí klient, ktorý farbu kreslí), hrúbka a príznak UNI; materiál mimo katalógu sa pomenuje **svojím ID** a farbu nedostane (radšej žiadna vzorka než náhodná).
 
+**Menovka skupiny musí byť JEDNOZNAČNÁ (1b-6b, triáž #33):** `material_label` je len ľudský názov dekoru (číslo + štruktúra + názov), takže dva **rôzne výrobné materiály** —
+iný výrobca, typ, formát platne alebo rub zásteny — z neho dostali identickú hlavičku, a práve podľa nej sa v Štúdiu objednáva. Menovky preto skladá `material_labels`
+(resp. `edge_labels` pre pásky) **kolíznym pásom**: bez kolízie je výsledok bajtovo dnešný text (bežná zákazka žiadny šum navyše nedostane), pri kolízii sa eskaluje na
+**panelovú menovku** — `Panel.raw_row_label` (výrobca pri kolízii cez `label_base` + prípona formátu/rubu `Materials.sheet_label_suffix`) → `Panel.sheet_label` (navyše typ
+a hrúbka: ten istý dekor v DTDL aj kompakte) → poistka `[material_id]` (vzor VEPO: dve hlavičky sa nesmú zliať ani nad nezmyselným katalógom); pásky eskalujú na
+`Panel.abs_label` (štruktúra + výrobca pri kolízii). **Žiadna vlastná logika menoviek vo výstupoch** — panel a výstupy nesmú mať dve pravdy o tom, ako sa materiál volá.
+**Kolízny kľúč je to, čo riadok skupiny UKÁŽE: menovka + hrúbka** (hrúbka má v hlavičke aj v súpise Platní vlastné miesto), takže dve hrúbky toho istého dekoru — najbežnejší
+prípad zákazky — rozlíšenie nedostanú. Kontext kolízie výrobcov (`Panel.label_ctx`) sa stavia **až pri prvej kolízii** (sentinel `:panel`), takže nekolízna zákazka kvôli
+hlavičkám katalóg nečíta vôbec; jeho zlyhanie sa len zaloguje a menovky ostanú dnešné. Stráži to `tests/pure/test_1b6b_hlavicky.rb`. *Rozpočet a cenová ponuka majú vlastné
+menovky (`Budget.sheet_label`, `CpExport.material_label`) — sú v `core/`, kam panelový aparát nedosiahne, a ostávajú kandidátom pre audit 1c.*
+
 **`rows_with_roles`** dopĺňa voliteľný stĺpec „Rola" **read-only obohatením** — záznamy sa zoskupia TÝM ISTÝM `Bom.row_key`, akým vznikli riadky, pretože pridať rolu do kľúča
 agregácie by zmenilo kusovník **aj VEPO** (a párovanie beží cez Ruby hash: kľúč riadku je POLE, v JSON by sa už nespárovalo). SK názvy rolí sú `ROLE_LABELS` — jedna autorita, JS
 žiadny preklad enumu nemá.

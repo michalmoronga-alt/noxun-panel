@@ -231,6 +231,8 @@ const KEY = 'g:GRP1';
   ok(DOC.querySelector('.mrflag'), 'stitok „zmenené mimo editora" ostava vidiet');
   ok(String(STATUS.textContent).indexOf('rozhodni') > -1,
      'a hlaska pyta ROZHODNUTIE, nie „ulož znova"');
+  ok(String(STATUS.textContent).indexOf('pri 1 hodnote') > -1,
+     'jedna kolizna bunka (najcastejsi pripad) ma SINGULAR — nie „pri 1 hodnotách"');
 
   SENT.length = 0;
   submit();

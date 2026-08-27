@@ -42,7 +42,7 @@ Rozdelenie po dnešnej severity: **P1 = 0 · P2 = 2 · P3 = 16.**
 | # | Sev. | Nález | Súbor:riadok | Vrstva / stav |
 |---|---|---|---|---|
 | B1 | **P2** | Názov projektu zadaný pred prvým uložením sa po Ctrl+S stratí — všetky štyri exporty spadnú na názov `.skp`. Test to maskoval rovnakým guid. | `ui/production_core.rb` → `project_name` (dnes `:273`) · test `tests/pure/test_st1a_studio.rb` | **VYRIEŠENÉ** dávkou 1b-6a (PR #244, v0.8.9) |
-| B2 | **P2** | Hlavičky skupín materiálov sú nerozlíšiteľné pri záznamoch líšiacich sa výrobcom/typom/formátom/rubom; kolízny aparát v repe existuje, ale výstupy ho nepoužívajú. | `ui/production_core.rb` → `material_label` (vtedy `:664–671`, dnes `:780–787`) — vs. kolízny aparát `core/materials.rb` → `sheet_label_suffix` (`:991`) | dávka **1b-6b** |
+| B2 | **P2** | Hlavičky skupín materiálov sú nerozlíšiteľné pri záznamoch líšiacich sa výrobcom/typom/formátom/rubom; kolízny aparát v repe existuje, ale výstupy ho nepoužívajú. | `ui/production_core.rb` → `material_label` (vtedy `:664–671`) — vs. kolízny aparát `core/materials.rb` → `sheet_label_suffix` (`:991`) | **VYRIEŠENÉ** dávkou 1b-6b (v0.8.11) — zvyšok menoviek v `core/` je nový kandidát **C14** |
 | B3 | P3 | Mŕtvy hardware override sa v sekcii Pravidlá kreslí ako aktívne ručné rozhodnutie (zberač kontroluje len existenciu dielca, nie zhodu so živým pravidlom). | `core/bom.rb:197–207` (vs. `core/hardware_rules.rb:562`) | model/výstupy |
 | B4 | P3 | UNI katalógová hrúbka sa publikuje ako hrúbka skupiny/nákupného riadku, hoci je len default roly. | `ui/production_core.rb:583` · `ui/js/studio.js:1147`, `:1268` | výstupy |
 | B5 | P3 | Zdrojový materiál duplákov (len v `sheet_estimate`) sa v Platniach kreslí ako holé ID bez hrúbky a farby. | `ui/production_core.rb:574–586` · `ui/js/studio.js:1224–1268` | výstupy |
@@ -82,12 +82,13 @@ Zvyšok sú postrehy z dávok a review kôl bloku 1b.
 | C11 | `ProductionCore.project_name` je **čítanie, ktoré v prechode neuložený→uložený zapisuje nastavenia** — vzor „čítacia cesta s vedľajším účinkom", ktorý sa už raz vypomstil (dávka 1b-3). | PR #243 |
 | C12 | Migrácia názvu „už pri uložení, nie až pri prvom čítaní" by chcela save lifecycle callback = observer, teda **audit-povinnú** zmenu — vedome neopravené v #243. | PR #243 |
 | C13 | `vepo_settings.json` má **viacero zapisovateľov bez medziprocesového zámku** (`save_merge_18_36`, 4× `last_dir`) — plánovaná dávka **1b-6c**: východisko commit `0311095` na vetve `fix/1b6-nazov-projektu` + tri nálezy kola 3 z #243 (zámok pre každého zapisovateľa · `rescue` okolo celej zamknutej úpravy · návrat čerstvej hodnoty zo zamknutej migrácie). | PR #243 · ≡ B14 |
+| C14 | **Menovky materiálov sú v `core/` ešte dvakrát** — `core/budget.rb` → `sheet_label` (riadok rozpočtu aj XLSX: dekor + typ + hrúbka, bez výrobcu a rubu) a `core/cp_export.rb` → `material_label` (zákaznícka ponuka; `cp_nazov` má prednosť, fallback skladá vlastný text). Dávka **1b-6b** ich vedome nechala: sú v `core/`, kam panelový aparát (`Panel.label_ctx`) nedosiahne — zjednotenie znamená presun kolízneho aparátu do `Materials`. Rozpočet je nákupný dokument, takže dvaja výrobcovia toho istého čísla v ňom majú dodnes identický riadok. | dávka 1b-6b |
 
 ---
 
 ## Ako sa to prelieva do registra 1c
 
 1. **Dedup najprv, potom R-čísla.** Známe zhody: A4 ≡ B6 · A5 ≡ B10 · A7 ≡ C6 · B11 ≡ C7 · B14 ≡ C13.
-2. **Vyradiť to, čo je medzitým hotové** — B1 je vyriešené (1b-6a), C4 a C5 sú vyriešené (commit `e83abe4`), A1/A2 a B2 majú dávky (1b-7, 1b-6b), B14/C13 má dávku (1b-6c). Otvorených z triáže je teda **17 z 18**.
+2. **Vyradiť to, čo je medzitým hotové** — B1 je vyriešené (1b-6a), **B2 je vyriešené (1b-6b, v0.8.11)**, A1/A2 sú vyriešené (1b-7, v0.8.10), C4 a C5 sú vyriešené (commit `e83abe4`), B14/C13 má dávku (1b-6c). Otvorených z triáže je teda **16 z 18**.
 3. **Overiť proti vtedajšiemu `main`** — hlavne C7 (nález nad starým stromom, okno Výroba zaniklo) a všetky citácie do `ui/production_core.rb`.
 4. Až potom priradiť **závažnosť, vrstvu a blokovanú funkciu** podľa šablóny registra ([../PLAN.md](../PLAN.md), blok 1c).

@@ -19,8 +19,8 @@ blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
 **Cieľ:** doplatiť dlhy, ktoré fáza ŠTÚDIO vedome odložila, a spraviť refactory, na ktoré počas presunov nebol priestor.
 *(Stabilizačná revízia sa od začiatku produkcie naostro (20.8.) ešte NEKONALA — patrí pred ďalšie nové funkcie.)* Poradie určí Michal.
 Staré dlhy B–F nie sú blokujúce pre bežnú prácu (**B a D vybavené dávkou 1b-4, v0.8.8, 27.8.**; **sweep E je HOTOVÝ, 27.8.**; z písmen ostáva už len **F**;
-mimo písmen vybavené aj **1b-6a** — názov zákazky prežije prvé uloženie, v0.8.9, 27.8. — a **1b-7** — koniec tichého návratu starej ceny dekoru, v0.8.10, 27.8.;
-mimo písmen ostávajú otvorené dve: **1b-6b** (hlavičky skupín materiálov, zo sweepu) · **1b-6c** (zámok nad `vepo_settings.json`, druhá časť delenia #243, audit-povinná));
+mimo písmen vybavené aj **1b-6a** — názov zákazky prežije prvé uloženie, v0.8.9, 27.8. — · **1b-7** — koniec tichého návratu starej ceny dekoru, v0.8.10, 27.8. — a **1b-6b** —
+rozlíšené hlavičky materiálov, v0.8.11, 27.8.; mimo písmen ostáva otvorená jediná: **1b-6c** (zámok nad `vepo_settings.json`, druhá časť delenia #243, audit-povinná));
 **P0 odrážky A, G a H sú BRÁNY a VŠETKY TRI SÚ HOTOVÉ** — **A** (možná STRATA rozpísanej editácie) dávkou 1b-1, v0.8.6, 27.8. ·
 **H** (charakterizačné in-SU scenáre) dávkou 1b-2, 27.8. — cesta k builderom/observerom pre blok 1d je tým otvorená; sadu `CHAR` **dorovnala dávka 1b-5** (27.8., test-only) po
 post-hoc Codex kole na #239: štyri asserty boli zelené, ale merali slabšiu veličinu, než tvrdili · **G** („Obnoviť" = čisté čítanie) dávkou 1b-3, v0.8.7, 27.8. —
@@ -73,11 +73,11 @@ VEPO, CSV kovania aj oba XLSX pomenované podľa `.skp` súboru namiesto zákazk
 starým guid kľúčom sa už nedal nájsť. Prvý pokus (**PR #243**) išiel do tretieho kola opráv a bol podľa **pravidla 3 kôl** zatvorený a rozdelený — do `main` z neho nešlo nič;
 táto dávka je jeho **úzky re-rez**. Plný záznam — príbeh delenia, riešenie, zamietnuté alternatívy, 5 mutácií: [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-6a**.
 
-**1b-6b · Hlavičky skupín materiálov sú nerozlíšiteľné — ⏳ OTVORENÉ (P2 z triáže Codex threadov, PR #193 nález #33).** Menovka skupiny vo výstupoch sa skladá len z dekoru, štruktúry
-a názvu dekoru (`ui/production_core.rb` → `material_label`, dnes `:780–787`), takže záznamy líšiace sa **výrobcom, typom, formátom či rubom** dostanú v kusovníku a v nákupe **identickú
-hlavičku** — dve rôzne dosky vyzerajú ako jedna položka. **Ako to predviesť:** dva varianty toho istého dekoru, ktoré sa líšia len výrobcom (alebo len formátom platne) → v Kusovníku
-majú rovnaký nadpis skupiny a v nákupe rovnaký riadok. Kolízny aparát v repe už existuje a rieši presne toto (`core/materials.rb` → `sheet_label_suffix`, `:991` — pripája formát a rub
-do menovky variantu pre selecty), ale výstupy ho nepoužívajú. Je to údaj, podľa ktorého sa objednáva — preto patrí medzi najbližšie kódové dávky.
+**1b-6b · Hlavičky skupín materiálov sú nerozlíšiteľné — ✅ VYRIEŠENÉ, v0.8.11 (27.8.2026).** P2 z triáže Codex threadov (PR #193, nález #33): menovka skupiny sa skladala len
+z dekoru, štruktúry a názvu, takže záznamy líšiace sa **výrobcom, typom, formátom či rubom** mali v Kusovníku aj v súpise Platní **identickú hlavičku** — a podľa nej sa objednáva.
+Výstupy teraz používajú **ten istý kolízny aparát ako Inspector**: bez kolízie sa hlavička nemení, pri kolízii sa eskaluje na panelovú menovku (výrobca → formát/rub → typ a hrúbka
+→ poistka `[id]`); to isté dostal súpis ABS pások. Plný záznam — rozhodnutie o kolíznom kľúči, zamietnuté alternatívy, 2 mutácie:
+[archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-6b**.
 
 **1b-6c · Zápis `vepo_settings.json` pod jedným zámkom — ⏳ OTVORENÉ (druhá časť delenia #243).** Dve inštancie SketchUpu zdieľajú jeden `%APPDATA%`, ale mapa `project_names`
 sa mení **read-modify-write nad odtlačkom**, takže zápis z jednej inštancie vie zmazať zákazku pomenovanú v druhej. **Nie je to regresia — `main` to má odjakživa**, dávka 1b-6a to
