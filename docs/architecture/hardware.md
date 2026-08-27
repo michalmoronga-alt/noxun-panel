@@ -27,8 +27,8 @@ predvoľbu" navýše zapíše `%APPDATA%` knižnicu (preferencia, NIE súčasť 
 
 **BASELINE guard formulára stojí na `model.guid`** (ŠT-3b-1; predtým `model.path`, ktorý dva NEULOŽENÉ modely nerozlíši — oba majú prázdny path) **+ zhoda aktuálnych pravidiel
 modelu s baseline** (chytí undo snapshotu aj súbežnú zmenu inou cestou); baseline sa obnovuje pri KAžDOM zostavení payloadu. Odmietnutý zápis NIC nezapíše; **od ŠT-3b-2c1 sa
-formulár načíta nanovo LACNÝM ECHOM sekcie** (`push_section_echo(force: true)`), nie plným `bump: false` pushom — ten ide cez zber modelu s dedupom, takže odmietnutie by model
-zmenilo.
+formulár načíta nanovo LACNÝM ECHOM sekcie** (`push_section_echo(force: true)`), nie plným `bump: false` pushom. *(Pôvodný dôvod — plný push deduplikoval ID kópií, takže odmietnutie
+model ZMENILO — od 1b-3 už neplatí: zber je čisté čítanie. Echo ostáva, lebo je lacné a nezdvíha generáciu okna.)*
 
 **NO-OP „Doplniť nové predvolené" nerobí ŽiADEN push** (lekcia F8 zo ŠT-3a-2).
 
@@ -96,21 +96,20 @@ ho úspešné uloženie) — rovnaká veta druhýkrát by používateľa nechala
 **Audit B4:** `rules_payload` obnovuje baseline aj odtlačok **až na konci úspešného zostavenia**; keby ich posunul pred telom, `rescue → nil` by roztvorilo nožnice (server nový
 stav, klient starý ⇒ večné odmietanie), preto `rescue` vetva baseline nemení. Schéma .skp sa nemení a žiadna migrácia nie je — odtlačok žije len v payloade okna.
 
-**Dva vedomé zostatky — v ŠT-3b-2c2 POSÚDENÉ a PONECHANÉ:** (1) guid-mismatch repush ide cez `refresh_studio` → `fresh_collect` → **dedup**. Ponechané zámerne: prepnutý dokument
-zneplatní VŠETKY sekcie okna, takže echo jednej nestačí, a „plný push bez dedupu" by znamenal druhú verziu `push_state` pre všetky sekcie a všetky zapisovacie cesty Štúdia naraz —
-patrí to do stabilizačnej revízie, nie do dávky o pravidlách. Dedup pritom beží nad AKTÍVNYM dokumentom (tým, na ktorý sa používateľ práve pozerá), teda rovnako ako pri každom inom
-refreshi. (2) Echo obnoví LEN sekciu pravidiel — ostatné sekcie po konflikte ostávajú na svojich číslach; sú však stále platné (nič sa nezapísalo) a keby ich zmenila iná cesta, tá
+**Dva vedomé zostatky z ŠT-3b-2c2:** (1) guid-mismatch repush ide cez `refresh_studio` → `fresh_collect` — **a to je od 1b-3 (stabilizačná revízia, brána G) neškodné: zber už dedup
+nespúšťa, takže plný push okna model nemení.** Zostatok tým zanikol. (2) Echo obnoví LEN sekciu pravidiel — ostatné sekcie po konflikte ostávajú na svojich číslach; sú však stále platné (nič sa nezapísalo) a keby ich zmenila iná cesta, tá
 po sebe pushne sama, prípadne to prizná jantárové „Obnoviť".
 
 **F14:** existencia odpojeného dvojčaťa sa prizná statusom (prestavba ho neprekreslí — do výstupu ide po starom), nikdy tichý úspech; identita dvojčaťa ide **cez `twin_identity`
 (part_key → legacy role_key → part_id bez prefixu skrinky)**, nie cez surový `part_key` — inak by sa legacy dielec neprizná.
 
-**ODMIETNUTIE NESIAHA NA MODEL (review #222):** repush odmietnutého kliku ide **lacným echom sekcie** (`push_section_echo` → `Bom.collect` bez dedupu → `RD.setSection`), NIE plným
-pushom okna — ten beží cez `fresh_collect`, ktorý spúšťa `dedup_copies`, takže by odmietnutý klik prečísloval ID kópií a pridal krok Späť presne v scenári, kde hláška tvrdí opak.
-Texty statusov skladajú ČISTÉ funkcie `abs_result_text` / `hw_result_text` (fixtúrami merateľné; zhoda vlastníka pri kovaní je `present_str`-semantika ako `ov_match?`).
+**ODMIETNUTIE NESIAHA NA MODEL (review #222):** repush odmietnutého kliku ide **lacným echom sekcie** (`push_section_echo` → `Bom.collect` → `RD.setSection`), NIE plným pushom okna.
+*Historicky to bola otázka správnosti — plný push šiel cez `fresh_collect` a ten cez `dedup_copies`, takže odmietnutý klik prečísloval ID kópií a pridal krok Späť presne v scenári,
+kde hláška tvrdí opak. Od 1b-3 je čítacia cesta čistá, takže ostáva len dôvod ceny: prepočítavať celý kusovník a rozpočet za klik, ktorý nič nezmenil, je zbytočné.* Texty statusov skladajú ČISTÉ funkcie `abs_result_text` / `hw_result_text` (fixtúrami merateľné; zhoda vlastníka pri kovaní je `present_str`-semantika ako `ov_match?`).
 
-**Priznané obmedzenie:** refresh PO zápise ide cez zber, takže iná neupratná kópia v dokumente môže dedup položiť NAD commit a prvé Ctrl+Z vráti jeho prečíslovanie — zdedený vzor
-všetkých zapisovacích ciest Štúdia, táto dávka ho vedome nemení.
+**Obmedzenie priznané v #222 je od 1b-3 VYRIEŠENÉ:** refresh po zápise už cez `dedup_copies` nejde, takže iná neupratná kópia v dokumente nemôže vložiť svoje prečíslovanie NAD náš
+commit — prvé Ctrl+Z vracia reset, presne ako status sľubuje. `Panel.push_selected` si dedup naďalej **vyžiada** u observera (`request_dedup`) a ten ho urobí **transparentne**, takže
+samostatný vrchol undo stacku z neho nevznikne.
 
 ### hardware_catalog.rb
 

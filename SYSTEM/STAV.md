@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.8.6 · 27.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.8.7 · 27.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -18,16 +18,17 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.6:** **1917 headless** · 69 JS sád · posledný plný in-SketchUp beh **1011 PASS / 0 FAIL / 0 SKIP** (dávka 1b-2 — prírastok +42 je charakterizačná sada `CHAR`).
+**Testy k v0.8.7:** **1940 headless** · 69 JS sád · posledný plný in-SketchUp beh **1022 PASS / 0 FAIL / 0 SKIP** (dávka 1b-3 — pribudol scenár `CH7` „Obnoviť je čisté čítanie").
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom (audit pred kódom + review pred mergom, 15 kôl). Od **#227** review robí zase Codex, takže **post-hoc sweep sa týka presne #186–#226** ([PLAN.md](PLAN.md), blok 1b/E).
 
 ## Robí sa
 
-**Beží blok 1b · STABILIZAČNÁ REVÍZIA** ([PLAN.md](PLAN.md)). Hotové sú **dve z troch brán**: **1b-1** (odrážka **A** — optimistický zámok Nastavení, v0.8.6; zastaraný pin
-už neprežije návrat do sekcie a status po uložení netvrdí prepočet, ktorý neprebehol) a **1b-2** (odrážka **H** — charakterizačné in-SU scenáre; kópia, `*N`, Undo, prerušenie
-operácie, scale a prepnutie modelu sú zapísané testami, takže **blok 1d už smie siahnuť na buildery a observery**; Ctrl+Y a dva dokumenty naraz ostávajú manuálne).
-**Ďalej z bloku 1b:** posledná brána **G** („Obnoviť" = čisté čítanie, pred ďalšou kontrolou nad ním) · **E** post-hoc Codex sweep #186–#226 · staré dlhy **B/D/F** (neblokujúce).
+**Beží blok 1b · STABILIZAČNÁ REVÍZIA** ([PLAN.md](PLAN.md)). **Všetky tri brány sú HOTOVÉ:** **1b-1** (odrážka **A** — optimistický zámok Nastavení, v0.8.6; zastaraný pin už
+neprežije návrat do sekcie a status po uložení netvrdí prepočet, ktorý neprebehol) · **1b-2** (odrážka **H** — charakterizačné in-SU scenáre; kópia, `*N`, Undo, prerušenie operácie,
+scale a prepnutie modelu sú zapísané testami, takže **blok 1d už smie siahnuť na buildery a observery**; Ctrl+Y a dva dokumenty naraz ostávajú manuálne) · **1b-3** (odrážka **G** —
+**„Obnoviť" už do modelu nezapisuje**; duplicitné ID sa miesto tichej opravy priznajú oranžovým riadkom Kontroly, opravu robí len reálny zásah do modelu).
+**Ďalej z bloku 1b:** **E** post-hoc Codex sweep #186–#226 · staré dlhy **B/D/F** (neblokujúce).
 Poradie určuje Michal. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
@@ -44,6 +45,7 @@ V1 rozsah zoštíhlený — checklist v [V1_VIZIA.md](V1_VIZIA.md). Dávky štar
 
 ## Posledné uzávery
 
+- **1b-3 — „Obnoviť" = čisté čítanie** (brána G: zber už nespúšťa dedup; duplicitné ID sa priznajú ORANGE riadkom Kontroly aj s výrobným dôsledkom, oprava = zápisová cesta) — v0.8.7 (27.8.) · **Michal večer:** v Štúdiu klikni „Obnoviť" a skús Späť — zoznam krokov sa refreshom nesmie meniť; po skopírovaní skrinky môže na okamih blysnúť oranžový riadok „Skrinky s ID … sú v modeli 2×".
 - **1b-2 — charakterizačné in-SU scenáre** (brána H: kópia · `*N` · Undo · prerušenie operácie · scale = regenerate · prepnutie modelu; +34 assertov, bez zmeny kódu) — 27.8.
 - **1b-1 — optimistický zámok Nastavení** (zastaraný pin nezostane po návrate do sekcie; status hovorí pravdu, keď prepočet zlyhá) — v0.8.6 (27.8.)
 - **PICKER-3 — dorobenie vyhľadávača** (virtuálny duplák v menovke, kanonický kľúč rodiny, „54 duplák", dôvod čipu z klávesnice, **kontext radí aj riadky**) — v0.8.5 (26.8.)

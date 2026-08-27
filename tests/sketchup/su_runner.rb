@@ -3356,12 +3356,17 @@ module NoxunSuRunner
       st = state[:stale]
       ok("STALE (b): tri rychle commity = 3 udalosti, ale JEDEN signal (vstupov #{st[:txn]}, signalov #{st[:mark]})",
          st[:txn] == 3 && st[:mark] == 1)
-      # (c) VLASTNY TICK PREPOCTU: model s duplicitnou kopiou. `fresh_collect`
-      # v pushi spusti `dedup_copies` = REALNA operacia = commit — a ten NESMIE
-      # nechat tlacidlo jantarove hned po tom, co ho pouzivatel stlacil.
+      # (c) OBNOVIŤ NAD MODELOM S DUPLICITNOU KOPIOU.
+      #
+      # VEDOMA ZMENA SCENARA (davka 1b-3, brana G bloku 1b): do 1b-3 tu bezal
+      # vo `fresh_collect` `dedup_copies`, takze scenar meral „vlastny tick
+      # prepoctu sa pohlti" a FIXOVAL tym spravanie, ze CITANIE zapisuje do
+      # modelu. Od 1b-3 je zber cisty, takze sa meria OPAK: prepocet okna model
+      # NEZMENI (duplikaty ostanu) — a tlacidlo aj tak nezozltne, lebo ziadnu
+      # vlastnu transakciu neotvoril.
       # Priprava aj prepocet bezia v JEDNOM kroku ZAMERNE: medzi krokmi sa
       # dostane k slovu debounce timer ScaleWatchu a kopiu by dedupol on —
-      # potom by uz `fresh_collect` nemal co robit a scenar by meral prazdno.
+      # potom by uz nebolo nad cim merat.
       inst = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
                                               'height' => 720.0, 'depth' => 510.0 })
       state[:stale_cab] = inst
@@ -3369,29 +3374,32 @@ module NoxunSuRunner
       dups_before = e::Ids.duplicate_cabinets(model).length
       ok("STALE (c): pripraveny model s duplicitnou kopiou (duplikatov #{dups_before})",
          dups_before.positive?)
+      state[:stale_dups_before] = dups_before
       stale_reset(st)
       e::StudioDialog.do_refresh_bom # presne to, co robi tlacidlo „Obnoviť"
-      # Merane HNED — dokaz, ze operaciu otvoril PRAVE prepocet okna, nie
-      # debounce timer ScaleWatchu medzi krokmi.
+      # Merane HNED — po ustaleni uz duplikat opravi debounce timer ScaleWatchu
+      # (zapisova cesta) a rozlisenie by sa rozmazalo.
       state[:stale_dups_after] = e::Ids.duplicate_cabinets(model).length
       state[:stale_txn_sync] = st[:txn]
+      state[:stale_push_sync] = st[:push]
+      state[:stale_mark_sync] = st[:mark]
     end]
     steps << [SETTLE, lambda do
       st = state[:stale]
-      ok('STALE (c): dedup kopii prebehol PRIAMO v prepocte okna (vlastna operacia vo `fresh_collect`) — ' \
-         "duplikatov po prepocte #{state[:stale_dups_after]}",
-         state[:stale_dups_after].zero?)
-      # POZOROVANIE, NIE KONTRAKT: v behu 22.8. tu pocitadlo ukazalo 0 vstupov,
-      # hoci dedup bezi ako NORMALNA (netransparentna) operacia a udalost by
-      # prist mala — DOVOD NIE JE OVERENY, preto to ostava INFO a nie `ok`
-      # s ocakavanou hodnotou (zafixovat neoverene cislo by znamenalo, ze test
-      # zacne padat, ked sa spravanie API vysvetli alebo zmeni).
-      # TVRDY dokaz pohltenia vlastneho ticku je scenar (d) nizsie: tam observer
-      # vstup PREUKAZATELNE dostal (txn > 0) a signal aj tak neprisiel.
+      ok('STALE (c): Obnoviť nad modelom s duplikatmi NESIAHLO na model — duplikatov ' \
+         "#{state[:stale_dups_before]} -> #{state[:stale_dups_after]} (citanie neopravuje)",
+         state[:stale_dups_after] == state[:stale_dups_before])
       info("STALE (c): vstupov do handlera pocas prepoctu #{state[:stale_txn_sync]}, po ustaleni #{st[:txn]}")
-      ok('STALE (c): Obnoviť nad modelom s duplikatmi NEZOZLTLO tlacidlo — vlastny tick sa pohltil ' \
-         "(pushov #{st[:push]}, signalov #{st[:mark]})",
-         st[:push].positive? && st[:mark].zero?)
+      ok('STALE (c): a tlacidlo nezozltlo — prepocet ziadnu vlastnu transakciu neotvoril ' \
+         "(pushov #{state[:stale_push_sync]}, signalov #{state[:stale_mark_sync]})",
+         state[:stale_push_sync].positive? && state[:stale_mark_sync].zero?)
+      # POZOR na rozsah tvrdenia: fixtura `stale_copy_cabinet` vyraba kopiu
+      # v `ScaleWatch.guard`, takze observer ju NIKDY neuvidel a duplikat lezi
+      # v modeli dalej. Prave preto je to dobra fixtura na CITACIU cestu.
+      # Ze opravu naozaj spravi ZAPISOVA cesta, meria CH1/CH2 (realna kopia ->
+      # observer) a CH7 (vedoma oprava = jeden krok Späť).
+      info("STALE (c): duplikat v modeli ostava (#{e::Ids.duplicate_cabinets(model).length}) — " \
+           'fixtura je guardnuta, takze opravu nema kto spustit; to je zamer scenara.')
       # (d) MUTACIA ROZPOCTU: zapis do modelu (1 krok Spat) + vlastny repush.
       stale_reset(st)
       e::StudioDialog.do_budget({ 'op' => 'mode', 'mode' => 'vysoky',
@@ -8858,6 +8866,131 @@ module NoxunSuRunner
            'vypnute, 3) v B vloz skrinku a sprav kopiu — musi dostat vlastne ID (observery sa pripojili na B), ' \
            '4) prepni sa spat na A — Inspector aj Studio musia ukazovat cisla dokumentu A, nie B, ' \
            '5) v A sprav kopiu a hned prepni na B — dedup tick nesmie siahnut do B (mnozina ziadostí per dokument).')
+      cleanup(model)
+    end]
+
+    run_char_g(model, state, steps)
+  end
+
+  # UMELA duplicitna identita BEZ pridania entity: druhej skrinke sa prepise ID
+  # na ID prvej vo VLASTNEJ pomenovanej operacii (= samostatny krok Späť, o ktory
+  # sa scenar opiera). Bezi to v `ScaleWatch.guard` ZAMERNE: zapis do atributu
+  # inak vyvola `onChangeEntity` a debounce tik observera by duplicitu opravil
+  # skor, nez sa stihne zmerat citacia cesta — merali by sme prazdno (rovnaka
+  # pasca, aku popisuje scenar STALE (c)). Guard sa tyka LEN pripravy fixtury;
+  # samotna kontrola aj oprava potom bezia nad PRODUKCNYM kodom.
+  def char_forge_dup(model, victim, cid)
+    e::ScaleWatch.guard do
+      model.start_operation('SU-TEST CH7 duplicitna identita', true)
+      e::Store.write(victim, { 'id' => cid, 'cabinet_id' => cid })
+      model.commit_operation
+    end
+  end
+
+  def char_cids(model)
+    cabinets(model).map { |i| e::Store.get(i, 'cabinet_id').to_s }.sort
+  end
+
+  # --- CH7: „OBNOVIŤ" JE CISTE CITANIE (brana G bloku 1b, davka 1b-3) -------
+  #
+  # CO SA MERIA: ze zber pre kusovnik/semafor/exporty (`ProductionCore.fresh_collect`)
+  # nad modelom s duplicitnou identitou NESIAHNE na model a NEPRIDA krok Späť —
+  # a ze duplicitu miesto tichej opravy PRIZNA Kontrola. Do 1b-3 tu bezal
+  # `dedup_copies`, takze obycajne „Obnoviť" ID prepisalo a undo stack narastol.
+  # Druha polovica scenara meria VEDOMU OPRAVU: jedna pomenovana operacia,
+  # po nej cisty model, 1x Späť ju cele vrati.
+  def run_char_g(model, state, steps)
+    steps << [0.5, lambda do
+      cleanup(model)
+      a = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 600.0,
+                                           'height' => 720.0, 'depth' => 510.0 })
+      b = e::CabinetBuilder.build(model, { 'type' => 'lower', 'width' => 800.0,
+                                           'height' => 720.0, 'depth' => 510.0 })
+      state[:ch7_a] = a
+      state[:ch7_b] = b
+      state[:ch7_cid] = e::Store.get(a, 'cabinet_id').to_s
+      state[:ch7_bcid] = e::Store.get(b, 'cabinet_id').to_s
+      char_forge_dup(model, b, state[:ch7_cid])
+    end]
+    steps << [SETTLE, lambda do
+      dups = e::Ids.duplicate_cabinets(model).length
+      ok("CH7 vychodisko: v modeli su DVE skrinky s ID #{state[:ch7_cid]} a observer si sam nic nenaplanoval " \
+         "(duplikatov #{dups})", dups == 1 && char_cids(model) == [state[:ch7_cid]] * 2)
+      # ---- CITANIE: presne to, cim ide „Obnoviť", push_state aj kazdy export.
+      before = char_cids(model)
+      col = e::ProductionCore.fresh_collect(model)
+      e::Bom.compute(col)
+      ctrl = e::ProductionCore.control_payload(col)
+      state[:ch7_ids_after_read] = char_cids(model)
+      state[:ch7_dups_after_read] = e::Ids.duplicate_cabinets(model).length
+      state[:ch7_item] = Array(ctrl['items']).find { |i| i['category'] == e::Validation::CAT_DUP_ID }
+      ok("CH7: zber + kusovnik + Kontrola NESIAHLI na model — ID ostali #{state[:ch7_ids_after_read].join(', ')} " \
+         "(duplikatov stale #{state[:ch7_dups_after_read]})",
+         state[:ch7_ids_after_read] == before && state[:ch7_dups_after_read] == 1)
+      it = state[:ch7_item]
+      ok("CH7: duplicita sa PRIZNA v Kontrole ako ORANGE (#{it && it['stable_key']})",
+         !it.nil? && it['severity'] == 'orange' &&
+         it['message_sk'].to_s.include?(state[:ch7_cid]) &&
+         it['dup_owner_ids'] == [state[:ch7_cid]])
+      ok('CH7: nalez sa NIKDY nestane RED — semafor varuje, export neblokuje',
+         Array(ctrl['items']).none? { |i| i['category'] == e::Validation::CAT_DUP_ID && i['severity'] == 'red' })
+      # klik na nalez oznaci OBA kusy (adresa je zdielana s D-103)
+      state[:ch7_pids] = e::ProductionCore.pids_for_problem(model, it) if it
+      ok("CH7: klik na nalez oznaci OBA kusy, ktore si ID delia (#{Array(state[:ch7_pids]).length} entit)",
+         Array(state[:ch7_pids]).length == 2)
+      # ---- UNDO STACK: 1x Späť MUSI vratit NASU pripravnu operaciu.
+      # Meria sa HNED (undo je synchronne) — po ustaleni by uz do modelu mohol
+      # siahnut debounce tik observera a rozlisenie by sa rozmazalo.
+      Sketchup.undo
+      cids = char_cids(model)
+      # Keby citanie pridalo krok, Späť by vratilo JEHO precislovanie a ID by
+      # v modeli ostali duplicitne. Rozlisenie je jednoznacne, nie „vakuove".
+      ok("CH7: 1x Späť po citani vratilo PREDCHADZAJUCU operaciu (prepis ID), nie ziadnu opravu — " \
+         "citanie undo stack NEZMENILO (#{cids.join(', ')})",
+         cids == [state[:ch7_bcid], state[:ch7_cid]].sort &&
+         e::Ids.duplicate_cabinets(model).length.zero?)
+    end]
+    steps << [SETTLE, lambda do
+      cids = char_cids(model)
+      ok("CH7: ani po ustaleni nikto nic nedorobil — obe skrinky maju svoje ID (#{cids.join(', ')})",
+         cids == [state[:ch7_bcid], state[:ch7_cid]].sort)
+      # ---- VEDOMA OPRAVA: znovu duplicita, tentoraz ju opravi ZAPISOVA cesta.
+      b = state[:ch7_b]
+      char_forge_dup(model, b, state[:ch7_cid]) if b && b.valid?
+    end]
+    steps << [SETTLE, lambda do
+      before = e::Ids.duplicate_cabinets(model).length
+      changed = Array(e::CabinetBuilder.dedup_copies(model))
+      cids = char_cids(model)
+      ok("CH7 oprava: vedoma akcia zapisu pridelila kopii VLASTNE ID (#{before} duplikatov -> " \
+         "#{e::Ids.duplicate_cabinets(model).length}, skrinky #{cids.join(', ')})",
+         before == 1 && changed.length == 1 && cids.length == 2 && cids.uniq.length == 2)
+      ok('CH7 oprava: v modeli ostali PRAVE DVE skrinky — nic sa nezdvojilo ani nezmizlo',
+         cabinets(model).length == 2)
+      ctrl = e::ProductionCore.control_payload(e::ProductionCore.fresh_collect(model))
+      ok('CH7 oprava: po nej uz Kontrola o duplicitnej identite MLCI',
+         Array(ctrl['items']).none? { |i| i['category'] == e::Validation::CAT_DUP_ID })
+      # JEDEN pomenovany krok Späť: meria sa HNED, kym do modelu nesiahol
+      # debounce tik, ktory oprava sama naplanovala (jej commit je zmena entity).
+      Sketchup.undo
+      after = char_cids(model)
+      ok("CH7 oprava: bola to JEDNA operacia — 1x Späť vratil precislovanie CELE (#{after.join(', ')})",
+         after == [state[:ch7_cid]] * 2)
+    end]
+    steps << [SETTLE, lambda do
+      # CHARAKTERIZACIA: po Späť lezi v modeli duplicita znova a NIKTO ju
+      # neopravi — fixtura vznikla v `ScaleWatch.guard`, takze observer o nej
+      # nikdy nevedel a citacia cesta uz na model nesiaha. Presne to je stav,
+      # do ktoreho sa realne dostane model otvoreny s uz ulozenymi duplikatmi:
+      # Kontrola ho PRIZNA a oprava pride az pri prvom zasahu do modelu.
+      # Ze realna kopia opravu dostane, meria CH1 a CH2.
+      info("CH7: stav po ustaleni (duplikatov #{e::Ids.duplicate_cabinets(model).length}) — " \
+           'nikto necakane nezasiahol; oprava patri VYHRADNE zapisovej ceste.')
+      info('CH7 MANUALNY SCENAR (bez umeleho zasahu do ID): 1) v _dev/ENGINEtests.skp vloz skrinku, ' \
+           '2) skopiruj ju Ctrl+C/Ctrl+V a NECHAJ ju byt — do 0,2 s jej observer pridelí vlastné ID ' \
+           '(to je zapisova cesta a je v poriadku), 3) v Studiu klikaj „Obnoviť" a sleduj Späť: ' \
+           'zoznam krokov sa refreshom NESMIE menit. Zmysel CH7 je zmerat presne ten druhy bod bez ' \
+           'zavodu s debounce timerom, preto si duplicitu vyraba zapisom do atributu.')
       cleanup(model)
     end]
   end

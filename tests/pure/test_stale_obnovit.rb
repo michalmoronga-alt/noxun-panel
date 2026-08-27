@@ -84,7 +84,8 @@ NxTest.test('STALE: flush posiela markStale LEN ked je epocha NOVSIA nez pushnut
   NxTest.assert(body.include?('return unless @dialog && @dialog.visible?'),
                 'do zavreteho okna sa neposiela nic')
   NxTest.assert(body.include?('return unless @epoch.to_i > @pushed_epoch.to_i'),
-                'JADRO: vlastne ticky okna (dedup kopii, zapis rozpoctu) sa pohltia samy')
+                'JADRO: vlastne ticky okna (od 1b-3 uz len zapis rozpoctu — zber nezapisuje) ' \
+                'sa pohltia samy')
   NxTest.assert(body.include?('NX.markStale'), 'a klientovi ide JEDINY jednoduchy signal')
   # Guard sa overuje DVAKRAT (v callbacku aj v flushi) — dokument sa moze
   # prepnut medzi udalostou a timerom.
@@ -102,8 +103,8 @@ NxTest.test('STALE: push_state si epochu uklada AZ PO zbere a LEN po odoslani') 
   collect_at = push.index('ProductionCore.fresh_collect(model)')
   mark_at = push.index('@pushed_epoch = @epoch.to_i if sent')
   NxTest.assert(!collect_at.nil? && !mark_at.nil? && collect_at < mark_at,
-                'zapis epochy je AZ ZA `fresh_collect` — inak by vlastny dedup kopii ' \
-                'nechal tlacidlo vecne jantarove')
+                'zapis epochy je AZ ZA `fresh_collect` — poradie ostava zavazne aj po 1b-3 ' \
+                '(zber uz sam nezapisuje, ale zapis rozpoctu v tom istom pushi hej)')
 end
 
 # --- 3) lifecycle: attach / detach / prepnutie dokumentu ---------------------

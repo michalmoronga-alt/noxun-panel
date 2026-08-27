@@ -292,7 +292,12 @@ module Noxun
         # D-103 (Codex audit FIX 4): nalez „dva kusy na jednom mieste" ma VLASTNU
         # adresu — presne tie top-level objekty daneho druhu. Vseobecna vetva nizsie
         # by pri korpuse pribalila aj odpojene dielce s tym istym cabinet_id.
-        return pids_for_duplicate(model, item) if item['category'].to_s == Validation::CAT_DUPLICATE
+        # 1b-3: nalez „dva kusy s tym istym ID" ma adresu v TOM ISTOM tvare
+        # (`dup_kind` + `dup_owner_ids`), takze telo sa zdiela — klik oznaci VSETKY
+        # kusy, ktore si ID delia. Vseobecna vetva by pri korpuse pribalila aj
+        # odpojene dielce s tym istym cabinet_id.
+        dup_cats = [Validation::CAT_DUPLICATE, Validation::CAT_DUP_ID]
+        return pids_for_duplicate(model, item) if dup_cats.include?(item['category'].to_s)
 
         oid = item['owner_id'].to_s
         pkey = item['part_key'].to_s
@@ -444,13 +449,30 @@ module Noxun
 
       # --- Zber modelu (ST-1a PR B) ----------------------------------------
 
-      # Cerstvy RAW zber s dedup tickom (Codex GH #48 P2: cerstve kopie mozu
-      # zdielat ID — rovnaky sync tick ako push_selected, inak BOM zlieva
-      # vlastnikov a klik-select je nejednoznacny). JEDEN collect pre kusovnik,
-      # semafor aj VEPO (nalez 5) — compute/Validation citaju TEN ISTY zber.
+      # Cerstvy RAW zber. JEDEN collect pre kusovnik, semafor aj VEPO (nalez 5) —
+      # compute/Validation citaju TEN ISTY zber.
+      #
+      # ZAVAZNY KONTRAKT (1b-3, brana G bloku 1b): TOTO JE CISTE CITANIE.
+      # Nesmie sa odtialto zapisat do modelu, otvorit operacia ani pribudnut krok
+      # Späť — plati to pre refresh, `push_state`, klik-select AJ vsetky styri
+      # exporty. Strazi to guard test (`tests/pure/test_1b3_citanie.rb`), ktory
+      # v celej UI vrstve nepripusti volanie `dedup_copies`.
+      #
+      # CO TU BOLO A PRECO JE TO PREC: od 19.7.2026 (Codex GH #48 P2) tu bezal
+      # dedup tik — `CabinetBuilder.dedup_copies` + `BoardBuilder.dedup_copies`.
+      # Vzniklo to ako ZRKADLO vtedajsieho `Panel.push_selected`, ktory dedup tiez
+      # vykonaval PRIAMO. Lenze `push_selected` sa toho 9.8.2026 vzdal (D-103:
+      # netransparentna operacia v selection evente rozbijala `*N` nasobenie) a od
+      # vtedy opravu uz len ZIADA u observera — kym citacia cesta si ju drzala
+      # dalej. Obycajne „Obnoviť" teda potichu prepisovalo ID kopiam a pridavalo
+      # krok Späť.
+      #
+      # KDE ZIJE OPRAVA DNES: vo VLASTNEJ ZAPISOVEJ CESTE — `ScaleWatch` (dedup tik
+      # po kopirovani, transparentne k pouzivatelovmu kroku) a `Panel.push_selected`
+      # po zapise z panela (`ScaleWatch.request_dedup`). Kym oprava nedobehne,
+      # duplicitna identita sa PRIZNAVA v Kontrole (`Validation::CAT_DUP_ID`)
+      # — semafor varuje, nic neblokuje a nic sa nemeni za chrbtom.
       def fresh_collect(model)
-        CabinetBuilder.dedup_copies(model) if defined?(CabinetBuilder)
-        BoardBuilder.dedup_copies(model) if defined?(BoardBuilder)
         Bom.collect(model)
       end
 
@@ -501,6 +523,34 @@ module Noxun
           g.merge('label' => HardwareRules.label_for(g['generic_type'] || g[:generic_type]),
                   'params_label' => HardwareRules.params_label(g['params'] || g[:params]))
         end
+      end
+
+      # 1b-3 (review P2-1): VAROVANIE O DUPLICITNEJ IDENTITE do statusu exportov,
+      # ktore `Validation.run` NEVOLAJU — nakupny zoznam kovania a XLSX rozpoctu.
+      # Prave ich cisla su duplicitou skreslene (zaznamy oboch kusov maju rovnaky
+      # `owner_id`, takze clen setu uctovany na vlastnika sa zapocita raz), takze
+      # pouzivatel by inak odoslal objednavku BEZ SLOVA — nalez by svietil len
+      # v Kontrole, kam sa pri exporte nepozera.
+      #
+      # KDE SUFIX NIE JE a preco:
+      #   * VEPO export — `Validation.run` vola, takze nalez uz ide do
+      #     `control_suffix` (pocet ORANGE) AJ do sekcie KONTROLA vo VEPO LOGu.
+      #     Druhe znenie tej istej veci v jednom statuse by len robilo hluk.
+      #   * XLSX cenovej ponuky — ma VLASTNY zoznam dovodov (`cp_warnings`,
+      #     GH #139: jeden zoznam, ktory riadi aj farbu statusu), takze duplicita
+      #     patri DO NEHO, nie ako priveseny sufix.
+      #
+      # Strop na tri ID + „a ďalšie N" (vzor hlasky validacie pravidiel): stavovy
+      # riadok nie je odsek.
+      def dup_id_suffix(collected)
+        dups = Validation.duplicate_identities(Array(collected.is_a?(Hash) ? collected[:identities] : nil))
+        return '' if dups.empty?
+
+        ids = dups.map { |_kind, id, _n| id }
+        shown = ids.first(3).join(', ')
+        more = ids.length > 3 ? " a ďalšie #{ids.length - 3}" : ''
+        " · POZOR: v modeli sú kusy so spoločným ID (#{shown}#{more}) — kovanie účtované na " \
+          'vlastníka (napr. TipOn) sa započíta len raz; pozri Kontrolu.'
       end
 
       # Suhrn KONTROLY do statusu okna/exportu (nalez 6: RED neblokuje export).
@@ -742,7 +792,8 @@ module Noxun
           return status.call('V paneli sú neplatné polia (červené) — oprav ich a exportuj znova.', true)
         end
 
-        exp = hardware_expansion(model, fresh_collect(model))
+        collected = fresh_collect(model)
+        exp = hardware_expansion(model, collected)
         return status.call('Nákupný zoznam sa nedá zostaviť (pozri Ruby konzolu).', true) if exp.nil?
 
         if Array(exp['rows']).empty? && Array(exp['unmapped']).empty?
@@ -762,9 +813,10 @@ module Noxun
         save_vepo_settings('last_dir' => File.dirname(target))
         n = Array(exp['rows']).length
         un = Array(exp['unmapped']).length
+        dup = dup_id_suffix(collected)
         status.call("Nákupný zoznam: #{n} položiek" \
-                    "#{un.positive? ? " + #{un} nemapovaných (v CSV aj KONTROLE)" : ''} → #{target}",
-                    un.positive?)
+                    "#{un.positive? ? " + #{un} nemapovaných (v CSV aj KONTROLE)" : ''} → #{target}#{dup}",
+                    un.positive? || !dup.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_hw_csv')
         status.call("Export zlyhal: #{e.message}", true)
@@ -800,7 +852,8 @@ module Noxun
           # ORANGE (hardware_unmapped/hardware_code) nikdy nenasli.
           item = Validation.run(collected, sheets: sheets_map, edges: edges_map,
                                 hardware_expansion: hardware_expansion(model, collected),
-                                placements: collected[:placements])['items']
+                                placements: collected[:placements],
+                                identities: collected[:identities])['items']
                            .find { |it| it['stable_key'] == data['problem_key'] }
           if item.nil?
             repush.call
@@ -861,7 +914,8 @@ module Noxun
         smap = sheets || sheets_map
         control = Validation.run(collected, sheets: smap, edges: edges_map,
                                  hardware_expansion: hardware_expansion,
-                                 placements: collected[:placements])
+                                 placements: collected[:placements],
+                                 identities: collected[:identities])
         return control unless budget.is_a?(Hash)
 
         Validation.with_budget(control, budget['budget_check'])
@@ -1225,8 +1279,10 @@ module Noxun
         save_vepo_settings('last_dir' => File.dirname(target))
         totals = budget['totals'] || {}
         miss = totals['unknown_count_in_total'].to_i
+        dup = dup_id_suffix(collected)
         status.call("Rozpočet uložený: #{fmt_eur(totals['total'])} → #{target}" \
-                    "#{miss.positive? ? " · #{miss} riadkov bez ceny sa nezapočítalo" : ''}", miss.positive?)
+                    "#{miss.positive? ? " · #{miss} riadkov bez ceny sa nezapočítalo" : ''}#{dup}",
+                    miss.positive? || !dup.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_budget_xlsx')
         status.call("Export rozpočtu zlyhal: #{e.message}", true)
@@ -1272,7 +1328,7 @@ module Noxun
         hits = CpExport.firewall_hits(CpXlsx.text_cells(sheets))
         XlsxWriter.write_book(target, sheets, now: now)
         save_vepo_settings('last_dir' => File.dirname(target))
-        warnings = cp_warnings(cp, budget, hits)
+        warnings = cp_warnings(cp, budget, hits, collected)
         status.call(cp_status(cp, spec, target, warnings), !warnings.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_cp_xlsx')
@@ -1282,10 +1338,22 @@ module Noxun
       # GH #139 P1/P2: JEDEN zoznam dovodov, preco zakaznicky dokument NIE JE
       # v poriadku — rozhoduje aj o farbe statusu, aby sa zelene „uložené"
       # nikdy neobjavilo nad podhodnotenou alebo zápornou sumou.
-      def cp_warnings(cp, budget, hits)
+      # 1b-3 (review P2-1): `collected` je nepovinne — duplicitna identita je
+      # dalsi dovod, preco cena ponuky nemusi sediet (kovanie uctovane na
+      # vlastnika sa zapocita raz), takze patri do TOHO ISTEHO zoznamu, nie do
+      # zvlastneho sufixu: rozhoduje aj o farbe statusu.
+      def cp_warnings(cp, budget, hits, collected = nil)
         c = cp.is_a?(Hash) ? cp : {}
         totals = budget.is_a?(Hash) && budget['totals'].is_a?(Hash) ? budget['totals'] : {}
         out = []
+        dups = Validation.duplicate_identities(Array(collected.is_a?(Hash) ? collected[:identities] : nil))
+        unless dups.empty?
+          ids = dups.map { |_kind, id, _n| id }
+          shown = ids.first(3).join(', ')
+          more = ids.length > 3 ? " a ďalšie #{ids.length - 3}" : ''
+          out << "v modeli sú kusy so spoločným ID (#{shown}#{more}) — kovanie účtované na " \
+                 'vlastníka (napr. TipOn) sa započíta len raz; pozri Kontrolu'
+        end
         miss = totals['unknown_count_in_total'].to_i
         if miss.positive?
           out << "#{miss} riadkov rozpočtu nemá cenu — suma ponuky je PODHODNOTENÁ " \

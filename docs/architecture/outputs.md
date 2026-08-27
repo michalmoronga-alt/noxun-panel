@@ -12,7 +12,13 @@ Kontrolný semafor a zdieľané čisté jadro výstupov zákazky. Kontrakt plán
 ### validation.rb
 
 **kontrolný semafor (V0.5-D):** RED = materiál mimo katalógu / hrúbkový drift / nezmestí sa na platňu (s rešpektom smeru dekoru) / ABS páska hrany mimo katalógu (2A-2 `abs_missing`
-— len keď volajúci dodá ABS katalóg cez `edges:`) · ORANGE = čelo/voľná doska bez ABS „skontroluj" / vypnuté kovanie (owner_part_key identita) / build warnings. JEDINÝ kanonický
+— len keď volajúci dodá ABS katalóg cez `edges:`) · ORANGE = čelo/voľná doska bez ABS „skontroluj" / vypnuté kovanie (owner_part_key identita) / build warnings / **`duplicate_identity`
+(1b-3): dva top-level kusy toho istého druhu so ZHODNÝM ID** — kópia, ktorej ešte nikto nepridelil vlastnú identitu. Hlása ID, počet kusov aj výrobný dôsledok (záznamy oboch kusov
+majú rovnaké `owner_id`, takže expanzia setov s `per: 'owner'` započíta položku LEN RAZ — do objednávky by šlo menej kovania). Vstup je `identities:` z `Bom.collect` (jeden záznam na
+INŠTANCIU; `nil` = kontrola sa preskočí, vzor `placements:`), klik-adresa je zdieľaná s D-103 (`dup_kind` + `dup_owner_ids` → `pids_for_duplicate`). Dôsledok sa hovorí **podmienene**
+(precedens `CAT_MATERIAL`): zliatie vlastníkov v kusovníku platí vždy, podpočítané kovanie len pri sete s členom účtovaným na vlastníka. **Nikdy sa nič neopravuje** — oprava patrí
+zápisovej ceste (`fresh_collect` nižšie). Kritérium má **jeden zdroj**: verejná `Validation.duplicate_identities(identities)` → `[[kind, id, počet], …]`, z ktorej stavia nálezy
+Kontroly **aj** varovanie statusu exportov, ktoré `Validation.run` nevolajú (odsek `production_core.rb`). JEDINÝ kanonický
 zoznam; deterministický dedup + counts VÝHRADNE zo servera; sekcia KONTROLA v Štúdiu s klik-selectom cez stabilnú identitu a fallbackom na vlastníka; sekcia KONTROLA vo VEPO LOGu;
 **RED nikdy neblokuje export**.
 
@@ -30,7 +36,7 @@ resolvery** klik→entita (`pids_for_problem` vrátane fallbacku na vlastníka p
 `material_key`/`abs_key` s nepovinným `owner_id`, ktoré hľadajú dielce podľa **efektívneho materiálu z BOM** pre „Kde sa používa"; detail v odseku sekcie MATERIÁLY; **od ŠT-3b-2a
 `pids_for_override`** — oko pri jantárovom riadku sekcie Pravidlá adresuje dvojicou **(owner_id, part_key)** a **znovupoužíva telo `pids_for_problem`** [prázdny kľúč = celý
 korpus]; vetva `rule_ref` v `do_select` je vlastná zámerne — override v kusovníku vlastný riadok mať nemusí, napr. vypnuté kovanie; od ŠT-3b-2b beží **bez `fresh_collect`** — hľadá
-podľa identity, takže plný sken modelu aj dedup tik v ňom boli čistá réžia).
+podľa identity, takže plný sken modelu bol čistá réžia).
 
 **ZÁVÄZNÝ kontrakt modulu: žiadny okenný stav** — `@dialog`, `@generation` ani `@pending_*` sem nepatria (dve okná nad jedným jadrom by si ich prepisovali); stráži to guard test,
 ktorý v `production_core.rb` nepripustí ani jednu inštančnú premennú. Do ŠT-1c PR B3 si `ProductionDialog` ponechával **tenké obaly s pôvodnými menami, signatúrami AJ
@@ -41,9 +47,19 @@ privátnosťou** (aby bol refactor bez zmeny správania); s oknom zanikli a vola
 vlastným stavom, takže okno odovzdáva svoj kontext **explicitne** (`generation:` — token guardu B4 · `status:` — lambda do TOHO okna · `repush:` — „obnov, ak žiješ"). Dva takmer
 rovnaké exporty by sa časom rozišli a rozdiel by sa ukázal až na výrobnom výstupe.
 
-**Pozor — `fresh_collect` NIE JE úplne read-only:** volá `CabinetBuilder.dedup_copies` / `BoardBuilder.dedup_copies`, ktoré pri nájdenej kópii so zdieľaným ID otvoria **reálnu
-operáciu** (a teda krok Späť). Je to **prevzaté správanie okna Výroba** — dedup tik musí bežať pred zberom, inak BOM zlieva vlastníkov a klik-select je nejednoznačný (GH #48 P2).
-Bežná zákazka bez čerstvých kópií nevyrobí nič; keď kópie sú, undo krok patrí dedupu, nie výberu (in-SketchUp `run_st1a` overuje, že klik sám o sebe žiadny krok nepridá).
+**`fresh_collect` JE ČISTÉ ČÍTANIE (1b-3, brána G bloku 1b) — telo je `Bom.collect(model)` a nič viac.** Z tejto cesty sa **nesmie** zapísať do modelu, otvoriť operácia ani
+pribudnúť krok Späť; platí to pre „Obnoviť", `push_state`, klik-select aj všetky štyri exporty. Stráži to guard test `tests/pure/test_1b3_citanie.rb`, ktorý v **celej UI vrstve**
+nepripustí volanie `dedup_copies` (formulácia nad priečinkom, nie nad zoznamom mien metód). *Do 1b-3 tu bežal dedup tik — vznikol 19.7.2026 (GH #48 P2) ako zrkadlo vtedajšieho
+`Panel.push_selected`, ktorý dedup tiež vykonával priamo; ten sa toho 9.8. vzdal (D-103) a od vtedy opravu len ŽIADA u observera, kým čítacia cesta si ju držala ďalej. Obyčajné
+„Obnoviť" tak potichu prečíslovalo ID kópií a pridalo krok Späť.* **Oprava identity žije výhradne v ZÁPISOVEJ ceste:** dedup tik `ScaleWatch` po kopírovaní (transparentný ku kroku
+používateľa) a `Panel.push_selected` po zápise z panela (`ScaleWatch.request_dedup`). Kým oprava nedobehne, duplicitnú identitu **prizná Kontrola** (`duplicate_identity`, ORANGE). Guard preto zakazuje v tomto module
+**aj token `request_dedup`** (oneskorená oprava je stále oprava) a pripúšťa `Panel.push_selected` výhradne s `dedup: false`; to isté platí pre `studio_dialog.rb`.
+
+**Nález v Kontrole však NESTAČÍ (review #240 P2-1):** kto klikne „Nákupný zoznam kovania", sa do Kontroly nepozerá — a práve to CSV ide dodávateľovi. Exporty, ktoré `Validation.run`
+nevolajú, preto skladajú vlastné varovanie: **`dup_id_suffix(collected)`** (strop tri ID + „a ďalšie N", vzor `control_suffix`) ide do statusu `do_hw_csv` a `do_budget_xlsx`
+a **zároveň farbí status na varovanie**. **Cenová ponuka sufix NEMÁ** — má vlastný zoznam dôvodov `cp_warnings` (GH #139: jeden zoznam, ktorý riadi aj farbu), takže duplicita ide do
+neho; jeho posledný parameter `collected` je nepovinný (legacy volanie nič nemení). **VEPO sufix nemá tiež** — `Validation.run` volá, takže nález už nesie `control_suffix` aj sekcia
+KONTROLA vo VEPO LOGu.
 `do_select` navyše pozná príznak **`focus_inspector`** (ceruzka riadku Kusovníka, Š3): po výbere zdvihne Inspector cez `Panel.bring_to_front` — **nikdy ho neotvára**, výber sa tým
 nemení a do modelu sa nezapisuje nič.
 
@@ -105,6 +121,10 @@ Kontrakt stráži `tests/pure/test_st1a_core.rb`, `tests/pure/test_st1a_studio.r
 _(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
 
 Zber modelu a agregácia riadkov kusovníka (`Bom.collect`, `Bom.compute`, `Bom.row_key`); správanie je popísané v odsekoch, ktoré ho volajú.
+
+**`identities` (1b-3):** `collect` nesie popri `placements` aj **jeden záznam na INŠTANCIU** top-level skrinky/dosky (`{kind, id}`, prázdne ID sa zahadzuje) — z toho `Validation`
+robí nález `duplicate_identity`. Kľúč je **aditívny** (kto ho nepozná, nič nestratí), zbiera sa v tom istom prechode a `compute()` ho ignoruje; pri doskách sa — rovnako ako
+`placements` — plní **pred** filtrom `manufactured`, lebo zdieľané ID je chyba identity aj pri dočasne nevyrábanej doske.
 
 ### sheet_estimate.rb
 

@@ -18,6 +18,10 @@ JEDINÉ miesto mm↔Length konverzií.
 
 identifikátory entít (CAB-xxx, BRD-xxx).
 
+**`duplicates_of` / `duplicate_cabinets` / `duplicate_boards`** vracajú NOVŠIE inštancie (vyšší `entityID`) zdieľajúce ID — pôvodná si identitu podrží (STANDARD §2.3/§9.3: kópia
+dostane nové id). **Od 1b-3 (brána G bloku 1b) ich číta výhradne ZÁPISOVÁ cesta** — dedup tik `ScaleWatch` a `Panel.push_selected` → `request_dedup`. Čítacie cesty okien identitu
+NEOPRAVUJÚ: duplicitu zbiera `Bom.collect` do kľúča `identities` a Kontrola ju prizná ako ORANGE `duplicate_identity` (detail v [outputs.md](outputs.md)).
+
 ### store.rb
 
 prístup k `NOXUN` dictionary.
