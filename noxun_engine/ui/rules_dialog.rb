@@ -464,8 +464,11 @@ module Noxun
           model = Sketchup.active_model
           unless baseline_valid?(model)
             # Formular sa nacita nanovo — ale LACNYM ECHOM sekcie, nie plnym
-            # pushom okna (review #222 P1): plny push ide cez zber modelu a ten
-            # deduplikuje ID kopii, cize ODMIETNUTY zapis by model ZMENIL.
+            # pushom okna (review #222 P1). Povodny dovod (plny push deduplikoval
+            # ID kopii, takze ODMIETNUTY zapis model ZMENIL) od 1b-3 UZ NEPLATI —
+            # zber je ciste citanie. Echo ostava, lebo je LACNE a nezdviha
+            # generaciu okna: nic sa nezapisalo, takze rozkliknute riadky inych
+            # sekcii maju ostat platne.
             #
             # `force: true` je tu ZAMERNE: pravidla na modeli sa medzitym
             # zmenili, takze rozpisany formular UZ NEPLATI a MUSI sa prekreslit
@@ -620,16 +623,15 @@ module Noxun
           [model, cands.first, data]
         end
 
-        # Odmietnutie: sekcia sa nacita nanovo LACNYM ECHOM — a to je tu
-        # PODSTATA, nie detail (review #222 P1).
+        # Odmietnutie: sekcia sa nacita nanovo LACNYM ECHOM (review #222 P1).
         #
-        # `refresh_studio` (plny push okna) totiz vedie na `fresh_collect`,
-        # a ten spusta `dedup_copies`: prepis ID kopiam JE ZAPIS DO MODELU
-        # a JE to krok Spat. Odmietnuty klik by tak model ZMENIL — a v scenari,
-        # kvoli ktoremu guard vznikol (dve skrinky s tym istym `cabinet_id`),
-        # by kopii rovno pridelil nove cislo, kym hlaska tvrdi „nič sa nezmenilo".
-        # Odmietnutie NIC nemeni, takze prepocet netreba: staci CITAJUCI zber
-        # (`Bom.collect` bez dedupu) a echo do sekcie.
+        # HISTORIA, aby to nikto „nezjednodusil" spat: do 1b-3 viedol plny push
+        # okna cez `fresh_collect` na `dedup_copies`, takze ODMIETNUTY klik model
+        # ZMENIL a pridal krok Spat — presne v scenari, kvoli ktoremu guard vznikol
+        # (dve skrinky s tym istym `cabinet_id`), kym hlaska tvrdila „nič sa
+        # nezmenilo". Od 1b-3 je uz KAZDA citacia cesta okna cista, takze toto
+        # riziko zaniklo. Echo ostava ako LACNEJSIA cesta: odmietnutie nic
+        # nezmenilo, takze prepocitavat cely kusovnik a rozpocet netreba.
         def reject_reset(msg, model = nil, refresh: true)
           push_section_echo(model) if refresh
           set_status(msg, true)
@@ -898,14 +900,15 @@ module Noxun
         # dedup identity kopii je oneskoreny a jantarove „Obnoviť" by inak
         # zozltlo hned po vlastnom prepocte.
         #
-        # PRIZNANE OBMEDZENIE (review #222 P2-2): oba refreshe idu cez zber,
-        # ktory spusta `dedup_copies`. Ked v dokumente lezi INA neupratana kopia
-        # (nie ta nasa — tu guard odmietne uz pred zapisom), dedup sa zapise
-        # AZ ZA nas commit a PRVE Ctrl+Z vrati JEHO precislovanie, nie reset.
-        # Je to ZDEDENY vzor VSETKYCH zapisov Studia (nie vlastnost tejto davky)
-        # a tato davka mechanizmus VEDOME nemeni — zmena by sa tykala kazdej
-        # zapisovej cesty okna naraz. Status preto ostava „Jeden krok Späť to
-        # vráti." (plati pre samotny reset).
+        # OBMEDZENIE PRIZNANE V review #222 P2-2 JE OD 1b-3 VYRIESENE: refresh
+        # Studia uz cez `dedup_copies` nejde (zber je ciste citanie), takze
+        # neupratana kopia lezica inde v dokumente uz NEMOZE vlozit svoje
+        # precislovanie ZA nas commit. Prve Ctrl+Z vracia reset, presne ako
+        # status („Jeden krok Späť to vráti.") hovori. `Panel.push_selected` si
+        # dedup nadalej VYZIADA u observera (`request_dedup`) — to je zapisova
+        # cesta a bezna reakcia na zapis z panela, nie sucast citania; observer
+        # ju navyse robi TRANSPARENTNE, takze splynie s nasim krokom a ziadny
+        # samostatny vrchol undo stacku z nej nevznikne.
         def after_model_write(model)
           Panel.push_selected(model) if defined?(Panel)
           refresh_studio(bump: true)

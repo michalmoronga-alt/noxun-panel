@@ -65,6 +65,11 @@ module Noxun
       # Typicky pozostatok po `*N` nasobeni kopii; nikdy sa nic nemaze automaticky
       # (paste-in-place je legitimny krok pouzivatela) — len sa ukaze a da vybrat.
       CAT_DUPLICATE   = 'duplicate_position'
+      # ORANGE — 1b-3: dva top-level kusy so ZHODNYM ID (kopia, ktorej este nikto
+      # nepridelil vlastnu identitu). Do 1b-3 to „Obnoviť" potichu opravovalo —
+      # zapisovalo do modelu a robilo krok Späť pri obycajnom CITANI. Odteraz sa to
+      # PRIZNA a opravu spusti az realna akcia zapisu (observer / zapis z panela).
+      CAT_DUP_ID      = 'duplicate_identity'
 
       # Tolerancie zhody umiestnenia. Artefakt nasobenia lezi PRESNE na tom istom
       # mieste (rovnaka transformacia), preto su prahy tesne — cielom je NULA
@@ -115,7 +120,11 @@ module Noxun
       # placements (D-103): [{kind, owner_id, origin[3] mm, axes[9] normalizovane,
       #   size[3] mm}] z Bom.collect. nil = kontrola sa cela preskoci (legacy
       #   volania a existujuce testy bez zmeny spravania; vzor edges:).
-      def run(collected, sheets: {}, edges: nil, hardware_expansion: nil, placements: nil)
+      # identities (1b-3): [{kind, id}] z Bom.collect — jeden zaznam na INSTANCIU.
+      #   nil = kontrola sa cela preskoci (legacy volania a headless testy bez
+      #   identit; vzor placements:).
+      def run(collected, sheets: {}, edges: nil, hardware_expansion: nil, placements: nil,
+              identities: nil)
         collected = {} unless collected.is_a?(Hash)
         smap = sheets.is_a?(Hash) ? sheets : {}
         emap = edges.is_a?(Hash) ? edges : nil
@@ -136,6 +145,7 @@ module Noxun
         Array(collected[:hardware_overrides]).each { |ov| check_hardware(ov, items) }
         check_hardware_expansion(hardware_expansion, items)
         check_placements(placements, items)
+        check_identities(identities, items)
         Array(collected[:warnings]).each { |w| check_build(w, items, uni_parts) }
         items = sort_items(dedup(items))
         # ŠT-1b (Š8): MENOVATEL zeleneho cisla je SKUTOCNY pocet skriniek zo
@@ -424,6 +434,62 @@ module Noxun
           'message_sk' => "#{noun} #{items_txt} stoja na rovnakom mieste — pravdepodobne " \
                           'duplikát z kopírovania; skontroluj a prebytočnú zmaž.',
           'stable_key' => "#{CAT_DUPLICATE}|#{kind}|#{ids.join(',')}" }
+      end
+
+      # --- 1b-3: dva kusy s tym istym ID ------------------------------------
+
+      # ORANGE: viac top-level NOXUN objektov ROVNAKEHO druhu so ZHODNYM ID.
+      # Typicky cerstva kopia, ktorej observer este nestihol pridelit vlastnu
+      # identitu (dedup tik ma 0,2 s debounce) — alebo kopia, ktora vznikla
+      # v case, ked plugin nebezal.
+      #
+      # PRECO SA TO IBA PRIZNAVA (brana G bloku 1b): do 1b-3 to opravovalo samo
+      # „Obnoviť" — a teda obycajne CITANIE zapisovalo do modelu a robilo krok
+      # Späť. Oprava patri VYHRADNE zapisovej ceste (observer po kopirovani,
+      # `Panel.push_selected` po zapise z panela); kontrola je od toho, aby to
+      # ukazala, nie aby to potichu prestavala.
+      #
+      # DOSLEDOK V CISLACH sa hovori NAHLAS: zaznamy oboch kusov maju rovnake
+      # `owner_id`, takze kusovnik ich zlieva do jedneho vlastnika a expanzia
+      # setov kovania s `per: 'owner'` (napr. TipOn na dvierka) zapocita polozku
+      # LEN RAZ. Tichy nalez by poslal do objednavky menej kovania.
+      def check_identities(identities, items)
+        return unless identities.is_a?(Array)
+
+        counts = {}
+        identities.each do |rec|
+          next unless rec.is_a?(Hash)
+
+          kind = rec['kind'].to_s
+          id = rec['id'].to_s
+          next if kind.empty? || id.empty?
+
+          counts[[kind, id]] = (counts[[kind, id]] || 0) + 1
+        end
+        counts.select { |_k, n| n > 1 }
+              .sort_by { |(kind, id), _n| [kind, id] }
+              .each { |(kind, id), n| items << duplicate_id_item(kind, id, n) }
+      end
+
+      # Adresa klik-selectu je TA ISTA ako pri D-103 (`dup_kind` + `dup_owner_ids`),
+      # takze `pids_for_duplicate` sa znovupouziva bez jedineho riadku navyse —
+      # klik oznaci VSETKY kusy, ktore si ID delia.
+      def duplicate_id_item(kind, id, count)
+        cab = kind == 'cabinet'
+        noun = cab ? 'Skrinky' : 'Dosky'
+        follow = if cab
+                   'Kusovník ich zlieva do jedného vlastníka a kovanie viazané na dvierka ' \
+                   'sa započíta len raz.'
+                 else
+                   'Kusovník ich zlieva do jedného vlastníka.'
+                 end
+        { 'severity' => ORANGE, 'category' => CAT_DUP_ID,
+          'owner_id' => id, 'part_key' => nil, 'hw_key' => nil,
+          'dup_kind' => kind, 'dup_owner_ids' => [id],
+          'message_sk' => "#{noun} s ID #{id} sú v modeli #{count}× — kópia ešte nedostala " \
+                          "vlastné ID. #{follow} Identita sa opraví pri najbližšom zásahu " \
+                          'do modelu (posuň kópiu alebo ju uprav v Inspectore).',
+          'stable_key' => "#{CAT_DUP_ID}|#{kind}|#{id}" }
       end
 
       # --- kontroly kovania a stavby ----------------------------------------

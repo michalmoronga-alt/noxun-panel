@@ -251,9 +251,11 @@ module Noxun
 
         # POROVNANIE EPOCH je jadro celej veci: transakcie, ktore spustil SAM
         # prepocet okna, su v `@pushed_epoch` uz zapocitane (`push_state` si ju
-        # uklada AZ PO zbere) — dedup kopii vo `fresh_collect` ani zapis
-        # rozpoctu teda tlacidlo nezozltia. Preto ziadne volacie miesto
-        # nepotrebuje vynimku ani „suspend" prepinac.
+        # uklada AZ PO zbere) — zapis rozpoctu teda tlacidlo nezozltne. Preto
+        # ziadne volacie miesto nepotrebuje vynimku ani „suspend" prepinac.
+        # (Od 1b-3 uz `fresh_collect` ziadnu vlastnu transakciu neotvara vobec —
+        # zber je cisté citanie; porovnanie epoch tym stratilo JEDEN zo svojich
+        # dvoch zdrojov self-tikov, druhy — rozpocet — ostava.)
         def flush_stale(model)
           return unless txn_model_ok?(model)
           return unless @dialog && @dialog.visible?
@@ -1402,7 +1404,7 @@ module Noxun
           attach_stale_observer(model) if @observer_model && @observer_model != model
           sent = js("NX.setStudio(#{data.to_json})")
           # EPOCHA „co uz je v okne". Uklada sa AZ TU — po `fresh_collect`
-          # (ten sam vie otvorit operaciu: dedup kopii) aj po zapise rozpoctu,
+          # (od 1b-3 uz ciste citanie) aj po zapise rozpoctu,
           # takze vlastne ticky okna sa pohltia a tlacidlo po vlastnom
           # prepocte NEZOZLTNE. A LEN ked payload naozaj odosiel (review #6):
           # co klient nedostal, to v okne aktualne nie je.

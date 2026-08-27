@@ -292,7 +292,12 @@ module Noxun
         # D-103 (Codex audit FIX 4): nalez „dva kusy na jednom mieste" ma VLASTNU
         # adresu — presne tie top-level objekty daneho druhu. Vseobecna vetva nizsie
         # by pri korpuse pribalila aj odpojene dielce s tym istym cabinet_id.
-        return pids_for_duplicate(model, item) if item['category'].to_s == Validation::CAT_DUPLICATE
+        # 1b-3: nalez „dva kusy s tym istym ID" ma adresu v TOM ISTOM tvare
+        # (`dup_kind` + `dup_owner_ids`), takze telo sa zdiela — klik oznaci VSETKY
+        # kusy, ktore si ID delia. Vseobecna vetva by pri korpuse pribalila aj
+        # odpojene dielce s tym istym cabinet_id.
+        dup_cats = [Validation::CAT_DUPLICATE, Validation::CAT_DUP_ID]
+        return pids_for_duplicate(model, item) if dup_cats.include?(item['category'].to_s)
 
         oid = item['owner_id'].to_s
         pkey = item['part_key'].to_s
@@ -444,13 +449,30 @@ module Noxun
 
       # --- Zber modelu (ST-1a PR B) ----------------------------------------
 
-      # Cerstvy RAW zber s dedup tickom (Codex GH #48 P2: cerstve kopie mozu
-      # zdielat ID — rovnaky sync tick ako push_selected, inak BOM zlieva
-      # vlastnikov a klik-select je nejednoznacny). JEDEN collect pre kusovnik,
-      # semafor aj VEPO (nalez 5) — compute/Validation citaju TEN ISTY zber.
+      # Cerstvy RAW zber. JEDEN collect pre kusovnik, semafor aj VEPO (nalez 5) —
+      # compute/Validation citaju TEN ISTY zber.
+      #
+      # ZAVAZNY KONTRAKT (1b-3, brana G bloku 1b): TOTO JE CISTE CITANIE.
+      # Nesmie sa odtialto zapisat do modelu, otvorit operacia ani pribudnut krok
+      # Späť — plati to pre refresh, `push_state`, klik-select AJ vsetky styri
+      # exporty. Strazi to guard test (`tests/pure/test_1b3_citanie.rb`), ktory
+      # v celej UI vrstve nepripusti volanie `dedup_copies`.
+      #
+      # CO TU BOLO A PRECO JE TO PREC: od 19.7.2026 (Codex GH #48 P2) tu bezal
+      # dedup tik — `CabinetBuilder.dedup_copies` + `BoardBuilder.dedup_copies`.
+      # Vzniklo to ako ZRKADLO vtedajsieho `Panel.push_selected`, ktory dedup tiez
+      # vykonaval PRIAMO. Lenze `push_selected` sa toho 9.8.2026 vzdal (D-103:
+      # netransparentna operacia v selection evente rozbijala `*N` nasobenie) a od
+      # vtedy opravu uz len ZIADA u observera — kym citacia cesta si ju drzala
+      # dalej. Obycajne „Obnoviť" teda potichu prepisovalo ID kopiam a pridavalo
+      # krok Späť.
+      #
+      # KDE ZIJE OPRAVA DNES: vo VLASTNEJ ZAPISOVEJ CESTE — `ScaleWatch` (dedup tik
+      # po kopirovani, transparentne k pouzivatelovmu kroku) a `Panel.push_selected`
+      # po zapise z panela (`ScaleWatch.request_dedup`). Kym oprava nedobehne,
+      # duplicitna identita sa PRIZNAVA v Kontrole (`Validation::CAT_DUP_ID`)
+      # — semafor varuje, nic neblokuje a nic sa nemeni za chrbtom.
       def fresh_collect(model)
-        CabinetBuilder.dedup_copies(model) if defined?(CabinetBuilder)
-        BoardBuilder.dedup_copies(model) if defined?(BoardBuilder)
         Bom.collect(model)
       end
 
@@ -800,7 +822,8 @@ module Noxun
           # ORANGE (hardware_unmapped/hardware_code) nikdy nenasli.
           item = Validation.run(collected, sheets: sheets_map, edges: edges_map,
                                 hardware_expansion: hardware_expansion(model, collected),
-                                placements: collected[:placements])['items']
+                                placements: collected[:placements],
+                                identities: collected[:identities])['items']
                            .find { |it| it['stable_key'] == data['problem_key'] }
           if item.nil?
             repush.call
@@ -861,7 +884,8 @@ module Noxun
         smap = sheets || sheets_map
         control = Validation.run(collected, sheets: smap, edges: edges_map,
                                  hardware_expansion: hardware_expansion,
-                                 placements: collected[:placements])
+                                 placements: collected[:placements],
+                                 identities: collected[:identities])
         return control unless budget.is_a?(Hash)
 
         Validation.with_budget(control, budget['budget_check'])

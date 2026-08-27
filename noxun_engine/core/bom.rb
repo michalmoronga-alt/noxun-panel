@@ -11,7 +11,7 @@
 #
 # API (Codex F5 — collector oddeleny od cisteho vypoctu):
 #   Bom.collect(model) -> {records:, hardware:, hardware_overrides:, manual_overrides:,
-#                          cabinet_sets:, placements:, warnings:, cabinets:, boards:}
+#                          cabinet_sets:, placements:, identities:, warnings:, cabinets:, boards:}
 #   Bom.compute(collected) -> {rows:, sheets:, edging:, hardware:, warnings:, summary:}
 # Headless testy krmia compute() zaznamami priamo (collect je tenky a vyzaduje SketchUp).
 #
@@ -49,6 +49,11 @@ module Noxun
         cabinet_sets = {}
         warnings = []
         placements = [] # D-103: umiestnenie top-level skriniek/dosiek (zachytna siet duplicit)
+        # 1b-3: IDENTITA kazdej top-level skrinky/dosky — jeden zaznam na INSTANCIU.
+        # Dve instancie s tym istym ID = duplicitna identita (kopia pred dedup tikom).
+        # Zber je CISTE CITANIE: zaznamenava sa, NEOPRAVUJE sa (oprava = observer,
+        # pozri komentar `fresh_collect` v production_core.rb).
+        identities = []
         cabinets = 0
         boards = 0
         model.entities.grep(Sketchup::ComponentInstance).each do |inst|
@@ -57,6 +62,7 @@ module Noxun
             cabinets += 1
             cid = Store.get(inst, 'cabinet_id').to_s
             add_placement(placements, inst, 'cabinet', cid)
+            add_identity(identities, 'cabinet', cid)
             ccfg = Store.config(inst) || {}
             Array(ccfg['hardware']).each { |h| hardware << h.merge('owner_id' => cid, 'owner_pid' => inst.persistent_id) }
             # V0.5 D (nalez 2): RAW hardware_overrides — disabled:true polozka je
@@ -97,6 +103,9 @@ module Noxun
             # D-103: umiestnenie sa zbiera PRED filtrom manufactured — duplicitna
             # doska je duplicitna aj ked sa (docasne) nevyraba.
             add_placement(placements, inst, 'board', Store.get(inst, 'id').to_s)
+            # 1b-3: identita sa zbiera TIEZ pred filtrom manufactured — zdielane ID
+            # je chyba identity aj vtedy, ked sa doska (docasne) nevyraba.
+            add_identity(identities, 'board', Store.get(inst, 'id').to_s)
             next unless Store.get(inst, 'manufactured') == true
             bcfg = Store.config(inst) || {}
             bid = Store.get(inst, 'id').to_s
@@ -127,8 +136,19 @@ module Noxun
         end
         { records: records, hardware: hardware, hardware_overrides: hardware_overrides,
           manual_overrides: manual_overrides,
-          cabinet_sets: cabinet_sets, placements: placements,
+          cabinet_sets: cabinet_sets, placements: placements, identities: identities,
           warnings: warnings, cabinets: cabinets, boards: boards }
+      end
+
+      # 1b-3: jeden zaznam na INSTANCIU (nie na ID) — pocet zaznamov s tym istym
+      # ID je presne pocet instancii, ktore si ho delia. Prazdne ID sa zahadzuje:
+      # „bez ID" je ina chyba (poskodeny objekt) a dva take kusy nie su duplicitna
+      # identita. Ziadny SketchUp objekt sa neuklada — zaznam je cisty JSON tvar.
+      def add_identity(out, kind, id)
+        s = id.to_s.strip
+        return if s.empty?
+
+        out << { 'kind' => kind.to_s, 'id' => s }
       end
 
       # ŠT-3b-2a: RUCNE ZASAHY jedneho korpusu sparovane s jeho VNORENYMI dielcami.

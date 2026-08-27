@@ -845,7 +845,7 @@ NxTest.test('ŠT-3b-2b (review #221): vyber podla `rule_ref` uz nerobi zbytocny 
   sel = ST3B2_PC_RB[/def do_select\(model, data, generation:, status:, repush:\).*?\n      end\n/m].to_s
   branch = sel[/elsif data\['rule_ref'\].*?\n        else/m].to_s
   NxTest.refute(branch.include?('fresh_collect'),
-                'vetva oka hlada podla identity — plny sken modelu (a dedup v nom) je cista rezia')
+                'vetva oka hlada podla identity — plny sken modelu je cista rezia')
   NxTest.assert(sel.include?("if data['problem_key']\n          collected = fresh_collect(model)"),
                 'zber sa robi AZ vo vetve, ktora ho naozaj potrebuje')
   NxTest.assert(sel.include?('refs_for(Bom.compute(fresh_collect(model)), data)'),
@@ -871,26 +871,36 @@ end
 #      ho nema (legacy `role_key`), by sa NEPRIZNAL. To je presne ten tichy
 #      uspech, ktoremu ma F14 zabranit.
 
+# VEDOMA UPRAVA (davka 1b-3, brana G bloku 1b): posledny assert tejto sady
+# vyzadoval OPAK dnesneho stavu — trval na tom, ze `fresh_collect` obsahuje
+# `dedup_copies`, teda ze CITANIE zapisuje do modelu. Bola to „dokazova" poistka
+# proti kontrole prazdna (aby refutacie vyssie nemerali nic), lenze fixovala
+# prave to spravanie, ktore brana G ruší. Nahrada meria TU ISTU vec z druhej
+# strany: `fresh_collect` `dedup_copies` NESMIE obsahovat — a to je odteraz
+# strazene vlastnou sadou `test_1b3_citanie.rb` nad CELOU UI vrstvou.
+# Refutacie plneho pushu v zapisovych cestach OSTAVAJU — ich dovod sa len zmenil
+# zo „zapisuje do modelu" na „zbytocne drahy a zdvihol by generaciu okna".
 NxTest.test('ŠT-3b-2b (review P1): ODMIETNUTIE nesmie siahnut na model') do
   code = ST3B_RULES_RB.lines.reject { |l| l.strip.start_with?('#') }.join
-  # Plny push okna (a teda zber + dedup) smie ostat LEN v ceste ulozenia
-  # pravidiel z 3b-1; ZAPISOVE resety a ich odmietnutia ho pouzit NESMU.
+  # Plny push okna smie ostat LEN v ceste ulozenia pravidiel z 3b-1; ZAPISOVE
+  # resety a ich odmietnutia ho pouzit NESMU (cely prepocet okna + zdvih
+  # generacie za odmietnuty klik, ktory nic nezmenil).
   %w[handle_reset_abs handle_reset_hw reset_context reject_reset].each do |m|
     body = st3b2_rd_body(m)
     NxTest.refute(body.include?('refresh_studio'),
-                  "#{m}: ziadny plny push okna — jeho zber deduplikuje ID kopii, cize ZAPISUJE")
+                  "#{m}: ziadny plny push okna — odmietnutie nic nezmenilo, prepocet je zbytocny")
   end
   echo = st3b2_rd_body('push_section_echo')
-  NxTest.assert(echo.include?('Bom.collect(model)'), 'echo cita model PRIAMO — bez dedup tiku')
-  NxTest.refute(echo.include?('fresh_collect'),
-                'a nikdy cez `fresh_collect` (ten dedup spusta)')
+  NxTest.assert(echo.include?('Bom.collect(model)'), 'echo cita model PRIAMO')
   NxTest.assert(echo.include?('RD.setSection'), 'a posiela ho vlastnym prijimacom sekcie')
   NxTest.assert(ST3B_RULES_JS.include?('setSection: function(r, force)'),
                 'ktory na klientovi existuje — a vie aj VYNUTIT prekreslenie formulara')
-  # Dokaz, ze sa nekontroluje prazdno: `fresh_collect` dedup naozaj spusta.
+  # 1b-3: dokaz, ze sa nekontroluje prazdno, ide odteraz OPACNE — citacia cesta
+  # je cista a musi taka ostat.
   fc = ST3B2_PC_RB[/def fresh_collect\(model\).*?\n      end\n/m].to_s
-  NxTest.assert(fc.include?('dedup_copies'),
-                'toto je dovod celeho pravidla — `fresh_collect` ZAPISUJE do modelu')
+  NxTest.assert(fc.include?('Bom.collect(model)'), '`fresh_collect` naozaj zbiera model')
+  NxTest.refute(fc.include?('dedup_copies'),
+                'a robi UZ LEN to — ziadny dedup, ziadny zapis pri citani (brana G, 1b-3)')
   # A odmietnutie nesmie zdvihnut generaciu okna (nic sa nezapisalo).
   NxTest.refute(st3b2_rd_body('push_section_echo').include?('bump'),
                 'echo generaciu nezdviha — rozkliknute riadky inych sekcii ostavaju platne')
