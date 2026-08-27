@@ -17,6 +17,37 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1b-6a · NÁZOV ZÁKAZKY ZADANÝ PRED PRVÝM ULOŽENÍM (výrobná P2, v0.8.9, 27.8.2026):** vetva `fix/1b6-nazov-projektu`. Nález pochádza z **post-hoc triáže Codex threadov**
+  (PR #193, nález #30 ≡ #42), overený proti `main` @ 0070697.
+
+  **Čo bolo zle.** Kto v Štúdiu pomenoval zákazku skôr, než model prvý raz uložil, a potom dal Ctrl+S, dostal VEPO, CSV kovania, XLSX rozpočtu aj XLSX cenovej ponuky pomenované
+  podľa `.skp` súboru — nie podľa zákazky. Dáta vo výstupoch boli správne, meno nie; a je to meno, pod ktorým súbor odchádza do výroby a dodávateľovi. Príčina: neuložený model
+  cestu nemá, takže názov sa zapíše pod náhradný kľúč `guid:<guid>`. **Ctrl+S ale zmení cestu AJ guid naraz** (SketchUp guid je „verzia uloženia", nie identita dokumentu — repo si
+  to na dvoch miestach samo píše), takže záložka „skús kľúč sedenia" hľadala `guid:<NOVÝ guid>` a našla prázdno. Diera bola presne v prechode **neuložený → uložený**; review #193
+  P1, ktorý kľúč prerobil z guidu na normalizovanú cestu, ju zavrel len z jednej strany.
+
+  **Prečo to testy nechytili.** `tests/pure/test_st1a_studio.rb` dával stavu „untitled" aj stavu „saved" **ten istý** `GUID-UNTITLED` a boli to dva samostatné Structy. Test teda
+  zmenu guid pri uložení vôbec nepredviedol a zelený ostal aj s chybou — vzor „assert je zelený, ale nemeria to, čo tvrdí" (rovnaký menovateľ ako dávka 1b-5). Nová verzia mení
+  **ten istý objekt** (`m.path=`, `m.guid=`), lebo presne to robí SketchUp — iný model pri uložení nevzniká.
+
+  **Čo platí teraz.** Most medzi kľúčom sedenia a cestou drží **pamäť procesu** `SESSION_KEY_BRIDGE` (`object_id` modelu → posledný kľúč sedenia, pod ktorým sa názov zapísal),
+  overená **identitou objektu** (`equal?`). Prvé čítanie po uložení názov **adoptuje a hneď zmigruje na cestu** (`adopt_session_name`), most sa spotrebuje a mŕtve `guid:` kľúče
+  zaniknú; zápisová cesta upratuje to isté. Do modelu sa nezapisuje nič a nepribúda krok Späť — názov ostáva nastavením POČÍTAČA (`vepo_settings.json`).
+
+  **Zamietnuté alternatívy.** *(1) Zapísať názov do `.skp`* — vyriešilo by to prenos medzi počítačmi, ale je to zásah do dátového kontraktu a kroku Späť; ak sa raz urobí, tak
+  vedome a vlastnou dávkou, nie ako vedľajší účinok opravy mena súboru. *(2) `AppObserver` na `onSaveModel`* — funguje, ale pridáva observer do lifecycle (audit-povinné) kvôli
+  údaju, ktorý sa dá doriešiť lenivo pri čítaní. *(3) Adoptovať „posledný rozrobený názov" bez identity* — najjednoduchšie a najnebezpečnejšie: otvorenie iného súboru by mu
+  natiahlo cudzí názov zákazky. Práve to stráži tretí test. *(4) Nechať most len v pamäti bez migrácie na cestu* — názov by zomrel s reštartom SketchUpu.
+
+  **Prečo to nie je porušenie kontraktu modulu.** `production_core.rb` zakazuje **okenný stav** (`@dialog`, `@generation`, `@pending_*`) a guard test v ňom nepripustí ani jednu
+  inštančnú premennú. Most nie je stav okna ani medzivýsledok výpočtu — je to údaj o **dokumente**, ktorý sa z modelu po uložení preukázateľne prečítať nedá; obe okná z neho
+  čítajú to isté a nemajú si ho ako prepísať. Preto je to konštanta (nie `@ivar`), ohraničená `SESSION_BRIDGE_MAX`.
+
+  **Testy:** headless **1950 PASS / 0 FAIL** (+3 sady; JS ani in-SU sa netýka — nesiahalo sa na `ui/js` ani na observery). **Mutačné overenie (3):** *(1)* most vypnutý
+  (`session_keys_for` vráti len aktuálny guid) → padli tri nové sady vrátane hlavnej „Ctrl+S mení cestu aj guid"; *(2)* adopcia bez zápisu (`save_vepo_settings` v
+  `adopt_session_name` preč) → padla sada „drží aj po reštarte" a assert o migrácii; *(3)* most bez kontroly identity (adoptuje posledný záznam) → padla sada „cudzia zákazka
+  nezdedí rozrobený názov". Každá mutácia zhodila práve tú vlastnosť, ktorú testuje jej sada.
+
 - **1b-5 · DOROVNANIE CHARAKTERIZAČNEJ SADY `CHAR` — post-hoc Codex kolo na zmergovanom PR #239 (27.8.2026):** vetva `test/1b5-char-dorovnanie`, **TEST-ONLY** (kód pluginu sa
   nezmenil o riadok, VERSION ostáva **0.8.8**). Sada `CHAR` je BRÁNA pre blok 1d a GHOST Tool — na jej zelenej farbe stojí povolenie siahnuť na buildery a observery. Codex
   po mergi #239 našiel **štyri P2**, ktorých spoločný menovateľ je „assert je zelený, ale nemeria to, čo tvrdí". Preto sa to riešilo hneď, samostatnou dávkou.
