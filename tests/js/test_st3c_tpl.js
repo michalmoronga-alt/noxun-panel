@@ -184,6 +184,61 @@ const BRD = { name: 'Pracovná doska', kind: 'board', preview_rev: null,
 })();
 
 (function(){
+  // Review #241 P3-1: po ODCHODE zo sekcie musí dávkovanie STÍCHNUŤ. Časovač sa
+  // testuje tak, že sa zachytí jeho callback (stub `setTimeout`) a zavolá ručne —
+  // inak by sada musela byť asynchrónna a merala by hodiny, nie správanie.
+  const realSet = global.setTimeout;
+  const realClear = global.clearTimeout;
+  let tick = null;
+  let scheduled = 0;
+  global.setTimeout = function(fn){ tick = fn; scheduled++; return { id: 1 }; };
+  global.clearTimeout = function(){ tick = null; };
+  // Vyvolanie tiku tak, ako by ho vyvolal prehliadač: handle je spotrebovaný,
+  // takže „naplánoval si ďalší?" sa dá zmerať počítadlom, nie zvyškom premennej.
+  const fire = function(){ const fn = tick; tick = null; scheduled = 0; fn(); };
+  try {
+    const many = [];
+    for (let i = 0; i < 10; i++){
+      many.push({ name: 'Odchod ' + i, kind: 'cabinet', preview_rev: 'o' + i,
+                  config: { type: 'lower' } });
+    }
+    S.setStudioSection('tpl');
+    SENT.length = 0;
+    T.tplApplyState({ cabinet: many, board: [] });
+    T.tplRenderBody();
+    eq(SENT.filter(function(x){ return x[0] === 'tpl_preview'; }).length, 4, 'prvá dávka odišla');
+    ok(typeof tick === 'function', 'a ďalšia dávka je naplánovaná (zvyšok ešte čaká)');
+
+    // Používateľ odišiel do Rozpočtu — tik sa má vzdať.
+    S.setStudioSection('budget');
+    SENT.length = 0;
+    fire();
+    eq(SENT.filter(function(x){ return x[0] === 'tpl_preview'; }).length, 0,
+       'mimo sekcie časovač NEPOSIELA nič — most patrí tomu, čo používateľ práve robí');
+    eq(scheduled, 0, 'a reťaz sa NEOBNOVUJE — žiadny ďalší tik sa neplánuje');
+
+    // Návrat do sekcie dávkovanie korektne obnoví — cez normálne prekreslenie.
+    S.setStudioSection('tpl');
+    SENT.length = 0;
+    T.tplRenderBody();
+    eq(SENT.filter(function(x){ return x[0] === 'tpl_preview'; }).length, 4,
+       'po návrate sa dávkovanie rozbehne ďalej');
+    ok(scheduled > 0, 'a znova si naplánuje pokračovanie');
+
+    // A v OTVORENEJ sekcii tik posiela ďalej — brána nesmie zabiť dávkovanie samo.
+    SENT.length = 0;
+    fire();
+    eq(SENT.filter(function(x){ return x[0] === 'tpl_preview'; }).length, 2,
+       'v otvorenej sekcii tik doberie zvyšok knižnice (10 šablón = 4 + 4 + 2)');
+  } finally {
+    global.setTimeout = realSet;
+    global.clearTimeout = realClear;
+    S.setStudioSection('bom');
+    T.tplCancelAsk();
+  }
+})();
+
+(function(){
   // ČISTÉ JADRO (bez DOM, bez mosta): pravidlá plánu sa dajú zmerať priamo.
   const data = { cabinet: [{ name: 'A', preview_rev: 'r1' },
                            { name: 'B', preview_rev: null },

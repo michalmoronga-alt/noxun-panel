@@ -255,7 +255,11 @@ Limit **64 kB + PNG magic bytes** drží naďalej `TemplatePreviews.data_uri` �
   **navždy na schéme** — po `TPL_ASK_TIMEOUT_MS` (8 s) sa dotaz smie zopakovať. Značka vzniká **výhradne keď dotaz naozaj odišiel**: bez mosta do Ruby by revízia ostala „vypýtaná"
   a nepožiadal by o ňu už nikto (tá istá pasca je pomenovaná aj v panelovom `refreshTemplatePreviews`).
 - **Najviac `TPL_ASK_BATCH` (4) dotazov na prechod**, ďalšia dávka o `TPL_ASK_GAP_MS`. Data URI má strop 64 kB, takže knižnica s 20 šablónami znamenala **~1,3 MB cez most v jednom
-  nádychu** pri vstupe do sekcie. Vzhľad sa tým nemení — dlaždica bez obrázka kreslí schému presne ako predtým, len sa fotka doplní o chvíľu neskôr.
+  nádychu** pri vstupe do sekcie. Rozmery ani rozloženie sa tým nemenia (obrázok aj schéma zdieľajú ten istý box — UI-D2), ale piata a ďalšia dlaždica drží schému o niečo dlhšie a
+  fotka sa doplní o chvíľu neskôr; je to vedomá výmena.
+- **Časovač dávky sa pri ODCHODE zo sekcie zastaví** (review #241 P3-1): callback `tplScheduleAsk` sa pýta `tplIsActive()` a mimo sekcie **nič neposiela a reťaz neobnovuje** —
+  inak by pri veľkej knižnici bežala cudzia prevádzka na moste popri práci používateľa v inej sekcii. Návrat do sekcie dávkovanie obnoví normálnou cestou (`tplRenderBody` →
+  `tplRequestPreviews`); rozpracované dotazy medzitým vypršia timeoutom, takže sa o ne sekcia prihlási znova.
 - **Odpoveď sa nasadí LEN na dlaždicu s TOU ISTOU revíziou** — mapa `TPL_DOM` (identita → uzol) nesie od 1b-4 aj `rev`. Kým sa čakalo na disk, mohla prísť nová knižnica
   (prefotená šablóna = nová `preview_rev`) a starý obrázok by ukazoval tvar, ktorý šablóna už nepostaví.
 

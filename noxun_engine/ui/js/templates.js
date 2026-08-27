@@ -350,10 +350,22 @@
   // len na odpovede a je to POISTKA proti stratenej odpovedi. V Node testoch by
   // čakajúci časovač držal proces nažive — `unref` je preto povinný (v prehliadači
   // metóda neexistuje a vetva sa preskočí).
+  //
+  // Review #241 P3-1: časovač sa pri odchode zo sekcie ZASTAVÍ. Bez tejto brány
+  // by dávkovanie bežalo ďalej aj potom, čo je používateľ v Rozpočte — pri veľkej
+  // knižnici je to niekoľko sekúnd cudzej prevádzky na moste popri jeho práci
+  // (odpovede by sa síce bezpečne zahodili, ale platiť za ne netreba). Reťaz sa
+  // NEOBNOVUJE tu: návrat do sekcie kreslí `tplRenderBody`, ktorý si
+  // `tplRequestPreviews` zavolá sám — a rozpracované dotazy medzitým vypršia
+  // timeoutom, takže sa o ne sekcia prihlási znova.
   function tplScheduleAsk(ms){
     if (typeof setTimeout !== 'function') return;
     tplCancelAsk();
-    TPL_ASK_TIMER = setTimeout(function(){ TPL_ASK_TIMER = null; tplRequestPreviews(); }, ms);
+    TPL_ASK_TIMER = setTimeout(function(){
+      TPL_ASK_TIMER = null;
+      if (!tplIsActive()) return;
+      tplRequestPreviews();
+    }, ms);
     if (TPL_ASK_TIMER && typeof TPL_ASK_TIMER.unref === 'function') TPL_ASK_TIMER.unref();
   }
 

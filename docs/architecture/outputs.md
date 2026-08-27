@@ -122,6 +122,13 @@ _(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
 
 Zber modelu a agregácia riadkov kusovníka (`Bom.collect`, `Bom.compute`, `Bom.row_key`); správanie je popísané v odsekoch, ktoré ho volajú.
 
+**Zber je JEDEN prechod modelu a jeho aditívne kľúče majú KAŽDÝ svojho čitateľa** — `collect` popri `records`/`hardware` vracia aj `hardware_overrides`, `manual_overrides`,
+`cabinet_sets`, `placements`, `identities` a `warnings`; `compute()` ich **ignoruje** (tvar výstupu ani SCHEMA `.skp` sa nimi nemenia), číta ich `Validation.run` a payloady sekcií.
+Pravidlo, ktoré z toho platí pre každý ďalší zásah: **záznam nesie presne to, čo jeho čitateľ naozaj číta.** Pole bez čitateľa je pozvánka pre budúci kód postaviť sa naň — preto
+z `manual_overrides['abs']` v 1b-4 vypadli `material_id` aj `pid` (adresa jantárového riadku je zámerne identita `owner_id` + `part_key`, nikdy persistent_id). Detail kontraktu
+jantárových riadkov — čo je zdrojom ABS overridu, ako sa páruje kovanie a v akom poradí sa riadky kreslia — žije v [hardware.md](hardware.md), odsek `hardware_rules.rb`
+(sekcia ŠT-3b-2a a štyri pravidlá riadku z 1b-4).
+
 **`identities` (1b-3):** `collect` nesie popri `placements` aj **jeden záznam na INŠTANCIU** top-level skrinky/dosky (`{kind, id}`, prázdne ID sa zahadzuje) — z toho `Validation`
 robí nález `duplicate_identity`. Kľúč je **aditívny** (kto ho nepozná, nič nestratí), zbiera sa v tom istom prechode a `compute()` ho ignoruje; pri doskách sa — rovnako ako
 `placements` — plní **pred** filtrom `manufactured`, lebo zdieľané ID je chyba identity aj pri dočasne nevyrábanej doske.

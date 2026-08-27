@@ -32,10 +32,11 @@
 
   **B2 · BURST PRI VSTUPE DO SEKCIE.** *Čo bolo zle:* `tpl_preview` išiel na **každú** šablónu naraz. Data URI má strop 64 kB, takže knižnica s 20 šablónami znamenala ~1,3 MB cez
   most v jednom nádychu — pri raste knižnice by sa to len zhoršovalo. *Čo platí:* najviac **4 dotazy na prechod**, ďalšia dávka o 120 ms; rozhoduje čisté jadro
-  `tplPreviewPlan(data, cache, asked, now, limit)` (vzor `nxTplPreviewPlan` vo `form.js`). **Vzhľad sa nemenil ani o pixel** — dlaždica bez obrázka kreslí schému presne ako
-  predtým, len sa fotka doplní o chvíľu neskôr. *Zamietnutá alternatíva:* gating podľa **viditeľnosti** (IntersectionObserver / `getBoundingClientRect`) — je to presnejšie, ale
-  potrebuje scroll listener, dotiahnutie po scrollovaní a v Node testoch stub geometrie; dávkovanie dá ten istý efekt s jednou čistou funkciou a bez druhého zdroja pravdy o tom,
-  čo je „vidieť".
+  `tplPreviewPlan(data, cache, asked, now, limit)` (vzor `nxTplPreviewPlan` vo `form.js`). **Rozmery ani rozloženie sa nemenia** (dlaždica má obrázok aj schému v tom istom boxe —
+  UI-D2), ale **zmena je pozorovateľná v čase:** piata a ďalšia dlaždica drží schému o 120–600 ms dlhšie a fotka sa doplní o chvíľu neskôr. Je to vedomá výmena — krátke domaľovanie
+  za koniec megabajtového nárazu na most pri každom vstupe do sekcie. *Zamietnutá alternatíva:* gating podľa **viditeľnosti** (IntersectionObserver / `getBoundingClientRect`) — je
+  to presnejšie, ale potrebuje scroll listener, dotiahnutie po scrollovaní a v Node testoch stub geometrie; dávkovanie dá ten istý efekt s jednou čistou funkciou a bez druhého
+  zdroja pravdy o tom, čo je „vidieť".
 
   **B3 · `tpl_payload` V KAŽDOM PLNOM PUSHI.** *Čo bolo zle:* payload sekcie sa skladá pri **každom** plnom pushi okna (každý prepočet kusovníka, každý zápis rozpočtu, každá zmena
   katalógu) a posielal **celý záznam šablóny** — vrátane `zone_tree`, `fronts`, `hardware_sets` a **zmrazených definícií setov**, čo je jeho najväčšia časť. Dlaždica z toho kreslí
@@ -79,6 +80,16 @@
   (dávka, timeout retry s riadeným `Date.now`, značka bez mosta, zhoda revízie na DOM, čisté jadro `tplPreviewPlan`). **MUTAČNE OVERENÝCH 12 zásahov** — každý zhodil práve tú sadu,
   ktorá ho má chytiť: retry po timeoute · zhoda revízie · značka ASKED bez mosta · limit dávky · orezanie payloadu · `usage: false` · premenovanie echa · lenivý `edges_map` ·
   víťaz `disabled` · radenie riadkov · číslo v identite ako číslo · mŕtve polia späť.
+
+  **REVIEW #241, kolo 1 (slepý subagent) — merge OK, žiadny P1/P2, tri lacné P3 opravené:** **(P3-1)** *dávkovanie prežilo odchod zo sekcie.* Časovač B2 tikal ďalej aj potom, čo bol
+  používateľ v Rozpočte — pri veľkej knižnici niekoľko sekúnd cudzej prevádzky na moste popri jeho práci (odpovede sa síce bezpečne zahodili, ale platiť za ne netreba). Callback
+  `tplScheduleAsk` sa odteraz pýta `tplIsActive()`, mimo sekcie **nič neposiela a reťaz neobnovuje**; návrat dávkovanie obnoví normálnou cestou. Test vyvolá tik ručne (stub
+  `setTimeout`), takže meria správanie, nie hodiny — a overuje **obe** strany brány (mimo sekcie ticho, v sekcii pokračovanie). Mutačne overené. **(P3-2)** formulácia tohto záznamu
+  („vzhľad sa nemenil ani o pixel") bola **silnejšia než pravda** — rozloženie sa naozaj nemení, ale piata a ďalšia dlaždica drží schému o 120–600 ms dlhšie; znenie je zosúladené
+  s komentárom v `templates.js` aj s večerným checklistom v STAV. **(P3-3)** `bom.rb` sa v dávke menil, ale jeho odsek v `outputs.md` ostával stub — doplnený kontrakt zberu
+  (aditívne kľúče majú každý svojho čitateľa; **záznam nesie presne to, čo jeho čitateľ číta**) s odkazom na `hardware.md`, kde detail jantárových riadkov žije.
+  **(P3-4 NERIEŠENÝ — vedomá zmena):** strop `MAX_OVERRIDE_ROWS` (40) po deterministickom radení ukazuje inú štyridsiatku než predtým. To je práve ten účel: dovtedy o viditeľnosti
+  rozhodovalo poradie entít v modeli. Testy 1947 headless · 69 JS sád (`test_st3c_tpl.js` **+7 kontrol**, spolu 159).
 
 - **1b-3 · „OBNOVIŤ" = ČISTÉ ČÍTANIE — brána G bloku 1b (27.8.2026):** vetva `fix/1b3-obnovit-ciste-citanie`, v0.8.6 → **v0.8.7**. P0 z externého auditu (kolo 0). **Nález platil**
   a je dokázaný mutačne: keď sa oprava vráti do čítacej cesty, in-SketchUp scenár `CH7` ukáže, že po obyčajnom čítaní `Sketchup.undo` vráti **prečíslovanie ID**, nie predchádzajúcu
