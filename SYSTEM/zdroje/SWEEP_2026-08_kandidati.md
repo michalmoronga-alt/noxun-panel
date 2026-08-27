@@ -2,8 +2,8 @@
 
 > **Stav: ZDROJ — surový zoznam nálezov, NIE zadanie.** Nič z tohto sa neimplementuje priamo odtiaľto.
 > Je to **odovzdávka pre blok 1c AUDIT KÓDU**: pri jeho štarte sa tieto položky preleju (s dedupom a s R-číslami)
-> do `SYSTEM/AUDIT_REGISTER.md`. Príbeh, metodika a bilancia sweepu sú v [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**;
-> zaradenie do dávok drží [PLAN.md](PLAN.md).
+> do `SYSTEM/AUDIT_REGISTER.md`. Príbeh, metodika a bilancia sweepu sú v [../archiv/KRONIKA.md](../archiv/KRONIKA.md), záznam **1b-E**;
+> zaradenie do dávok drží [../PLAN.md](../PLAN.md).
 >
 > **Prečo je tento súbor v repe:** pracovné výstupy sweepu (plné verdikty, dôkazy `súbor:riadok`, triáž threadov) žili v gitignorovanom
 > `_dev/`. V čistom klone repa neexistujú, takže bez tohto zoznamu by sa dala z KRONIKY obnoviť len bilancia, nie samotné nálezy
@@ -81,4 +81,4 @@ Rozdelenie po dnešnej severity: **P1 = 0 · P2 = 2 · P3 = 16.**
 1. **Dedup najprv, potom R-čísla.** Známe zhody: A4 ≡ B6 · A5 ≡ B10 · A7 ≡ C6 · B11 ≡ C7 · B14 ≡ C13.
 2. **Vyradiť to, čo je medzitým hotové** — B1 je vyriešené (1b-6a), A1/A2 a B2 majú dávky (1b-7, 1b-6b), B14/C13 má dávku (1b-6c).
 3. **Overiť proti vtedajšiemu `main`** — hlavne C4, C5 a C7, ktoré sú nálezy nad starým stromom.
-4. Až potom priradiť **závažnosť, vrstvu a blokovanú funkciu** podľa šablóny registra ([PLAN.md](PLAN.md), blok 1c).
+4. Až potom priradiť **závažnosť, vrstvu a blokovanú funkciu** podľa šablóny registra ([../PLAN.md](../PLAN.md), blok 1c).
