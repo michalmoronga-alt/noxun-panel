@@ -82,7 +82,9 @@ platnou cestou **vždy** — aj keď cesta už svoj názov má: ten **má predno
 takže sa migrácia zopakuje hneď, ako zápis prejde (review #243 P2-1). Zápisová cesta upratuje to isté
 (`save_project_name` maže VŠETKY kľúče sedenia zákazky, nielen ten podľa aktuálneho guid). Most **nie je zakázaný okenný stav**: nie je to stav okna ani medzivýsledok výpočtu, ale
 údaj o dokumente, ktorý sa z modelu po uložení prečítať nedá — obe okná z neho čítajú to isté a nemajú si ho ako prepísať; je to konštanta (nie `@ivar`) aj kvôli guard testu, ktorý
-tu inštančné premenné nepripúšťa, a je zhora ohraničená (`SESSION_BRIDGE_MAX`). Prázdna hodnota **aj hodnota zhodná s defaultom zmaže záznam**, takže sa pomenovanie vráti
+tu inštančné premenné nepripúšťa, a je zhora ohraničená (`SESSION_BRIDGE_MAX`). **Známa medzera (dávka 1b-6c):** mapa sa mení read-modify-write **bez medziprocesového zámku**, takže
+pri dvoch bežiacich inštanciách SketchUpu vie zápis jednej prepísať zákazku pomenovanú v druhej — platí to o celom `vepo_settings.json` (`save_merge_18_36`, `last_dir`), nielen o
+mape názvov. Prázdna hodnota **aj hodnota zhodná s defaultom zmaže záznam**, takže sa pomenovanie vráti
 na názov `.skp` a premenovanie súboru sa v okne prejaví samo. Číta ho **všetky štyri exporty** (VEPO, CSV kovania, XLSX rozpočtu, XLSX cenovej ponuky) — z DOM sa `project`
 **prestal posielať**, inak by dve okná mali dve pravdy a tá istá zákazka by sa v dvoch výstupoch volala inak. `merge_18_36` ostáva globálny a číta sa rovnakou cestou.
 

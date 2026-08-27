@@ -17,8 +17,15 @@
 
 ## Záznamy dávok (najnovšie hore)
 
-- **1b-6a · NÁZOV ZÁKAZKY ZADANÝ PRED PRVÝM ULOŽENÍM (výrobná P2, v0.8.9, 27.8.2026):** vetva `fix/1b6-nazov-projektu`. Nález pochádza z **post-hoc triáže Codex threadov**
-  (PR #193, nález #30 ≡ #42), overený proti `main` @ 0070697.
+- **1b-6a · NÁZOV ZÁKAZKY ZADANÝ PRED PRVÝM ULOŽENÍM (výrobná P2, v0.8.9, 27.8.2026):** vetva `fix/1b6a-nazov-projektu-v2` — **úzky re-rez zatvoreného PR #243**.
+  Nález pochádza z **post-hoc triáže Codex threadov** (PR #193, nález #30 ≡ #42), overený proti `main` @ 0070697.
+
+  **Prečo re-rez: pravidlo 3 kôl v praxi (a čo z toho platí do budúcna).** Prvý pokus (PR #243) išiel do **tretieho kola opráv** (kolo 1: 2 × P2 · kolo 2: 2 × P2 · kolo 3: 3 × P2)
+  a bol podľa pravidla 3 kôl **zatvorený a rozdelený** — nálezy boli platné, chybný bol REZ. Dávka začala ako úzka výrobná oprava pomenovania, ale kolo 2 ju oprávnene dotlačilo
+  k **medziprocesovému zámku nad `vepo_settings.json`**, čím sa z opravy mena stala zmena koncepcie zápisu celého súboru nastavení; kolo 3 to potvrdilo (pod zámkom bola len mapa
+  názvov, kým `save_merge_18_36` a štyri zápisy `last_dir` píšu ten istý súbor bez zámku). **Poučenie:** keď review dotlačí dávku k zásahu do iného konceptu, ako je jej nadpis,
+  je to signál na REZ, nie na ďalšie kolo. Do `main` z #243 nešlo nič; vetva `fix/1b6-nazov-projektu` ostáva na GitHube ako zdroj pre 1b-6c. Táto dávka je **časť 1 delenia**:
+  commity `47d4e81` + `3187331` (oprava + obe P2 z kola 1), **bez zámkovej časti** (`0311095`).
 
   **Čo bolo zle.** Kto v Štúdiu pomenoval zákazku skôr, než model prvý raz uložil, a potom dal Ctrl+S, dostal VEPO, CSV kovania, XLSX rozpočtu aj XLSX cenovej ponuky pomenované
   podľa `.skp` súboru — nie podľa zákazky. Dáta vo výstupoch boli správne, meno nie; a je to meno, pod ktorým súbor odchádza do výroby a dodávateľovi. Príčina: neuložený model
@@ -43,17 +50,26 @@
   inštančnú premennú. Most nie je stav okna ani medzivýsledok výpočtu — je to údaj o **dokumente**, ktorý sa z modelu po uložení preukázateľne prečítať nedá; obe okná z neho
   čítajú to isté a nemajú si ho ako prepísať. Preto je to konštanta (nie `@ivar`), ohraničená `SESSION_BRIDGE_MAX`.
 
-  **Testy:** headless **1950 PASS / 0 FAIL** (+3 sady; JS ani in-SU sa netýka — nesiahalo sa na `ui/js` ani na observery). **Mutačné overenie (3):** *(1)* most vypnutý
-  (`session_keys_for` vráti len aktuálny guid) → padli tri nové sady vrátane hlavnej „Ctrl+S mení cestu aj guid"; *(2)* adopcia bez zápisu (`save_vepo_settings` v
-  `adopt_session_name` preč) → padla sada „drží aj po reštarte" a assert o migrácii; *(3)* most bez kontroly identity (adoptuje posledný záznam) → padla sada „cudzia zákazka
-  nezdedí rozrobený názov". Každá mutácia zhodila práve tú vlastnosť, ktorú testuje jej sada.
-
-  **Review #243, kolo 1 — dve P2, obe platné a obe o TOM ISTOM: kedy sa most smie spotrebovať.** *(1) Zlyhaný zápis migrácie zahodil most.* `save_vepo_settings` pád len zaloguje,
-  takže pri zamknutom súbore alebo plnom disku dalo správny názov **len to jedno čítanie** a najbližší export písal zase meno `.skp`. Odteraz `save_vepo_settings` vracia
+  **Prevzaté z kola 1 review #243 — dve P2, obe platné a obe o TOM ISTOM: kedy sa most smie spotrebovať.** *(1) Zlyhaný zápis migrácie zahodil most.* `save_vepo_settings` pád len
+  zaloguje, takže pri zamknutom súbore alebo plnom disku dalo správny názov **len to jedno čítanie** a najbližší export písal zase meno `.skp`. Odteraz `save_vepo_settings` vracia
   **`true`/`false`** a most sa zahadzuje až po úspešnom zápise — migrácia sa zopakuje, len čo zápis prejde. *(2) Kľúč sedenia prežil uloženie do súboru, ktorý už názov mal.*
   Adopcia sa dovtedy spúšťala len vtedy, keď cesta záznam nemala; rozpísaný názov tak ostal v mape živý a pri „Uložiť ako" na čerstvú cestu by sa vynoril tam. Odteraz sa kľúče
-  sedenia pri prvom čítaní s platnou cestou spotrebujú **vždy**, pričom **záznam na ceste má prednosť** a rozpísaný názov ho neprepíše. Obe opravy majú vlastnú sadu a vlastnú
-  mutáciu (most spotrebovaný aj po zlyhanom zápise · adopcia preskočená, keď cesta názov má) — headless po kole: **1952 PASS / 0 FAIL**.
+  sedenia pri prvom čítaní s platnou cestou spotrebujú **vždy**, pričom **záznam na ceste má prednosť** a rozpísaný názov ho neprepíše.
+
+  **Vedomé odchýlky (delenie #243) — ani jedna nie je nová diera, obe sú zapísané.** *(1) Súbeh dvoch inštancií SketchUpu nad `vepo_settings.json`* — mapa `project_names` sa mení
+  read-modify-write nad odtlačkom, takže zápis z jednej inštancie vie zmazať zákazku pomenovanú v druhej. **Tento stav má aj `main` pred touto dávkou** a dávka ho nezväčšuje;
+  rieši ho samostatná dávka **1b-6c** (východisko commit `0311095` + tri nálezy kola 3 z #243: zámok pre KAŽDÉHO zapisovateľa súboru, nielen pre mapu názvov · `rescue` okolo celej
+  zamknutej úpravy, aby zlyhanie `.lock` neuniklo ako výnimka · návrat **čerstvej** hodnoty zo zamknutej migrácie). *(2) Migrácia až pri prvom čítaní, nie pri uložení* — riešenie
+  „už pri uložení" vyžaduje **save lifecycle observer**, teda audit-povinnú zmenu; diera je úzka (pomenovať, uložiť a zavrieť SketchUp bez jediného refreshu či exportu) a most ju
+  v rámci sedenia kryje. Obe sú **kandidáti do registra 1c** spolu s tretím: identita zákazky je dnes trojitá (cesta + `guid:` kľúč sedenia + most v pamäti procesu) — stojí za
+  zváženie vlastné stabilné ID zákazky; a `project_name` je čítanie, ktoré v prechode neuložený→uložený **zapisuje** nastavenia.
+
+  **Testy:** headless **1952 PASS / 0 FAIL** (base `main` 1947, **+5**; JS ani in-SU sa netýka — nesiahalo sa na `ui/js` ani na observery). **Mutačné overenie (5) — každá zhodila
+  práve tú vlastnosť, ktorú stráži jej sada:** *(1)* most vypnutý (`session_keys_for` vráti len aktuálny guid) → 5 FAIL, vrátane hlavnej „Ctrl+S mení cestu aj guid"; *(2)* adopcia
+  bez zápisu (`migrate_session_keys` nezapisuje) → 4 FAIL, vrátane „drží aj po reštarte"; *(3)* most bez kontroly identity (adoptuje posledný záznam) → 1 FAIL: „cudzia zákazka
+  nezdedí rozrobený názov"; *(4)* most spotrebovaný aj po ZLYHANOM zápise → 1 FAIL: „zlyhaný zápis migrácie NESMIE zahodiť most"; *(5)* adopcia preskočená, keď cesta už názov má →
+  1 FAIL: „názov na ceste má PREDNOSŤ a most sa aj tak spotrebuje". **Metodika:** päť samostatných headless behov, v každom **práve jedna** mutácia zdrojáka
+  `production_core.rb` a hneď po behu návrat na originál (bajt po bajte) — žiadne dve mutácie naraz, takže priradenie „mutácia → sada" je jednoznačné.
 
 - **1b-5 · DOROVNANIE CHARAKTERIZAČNEJ SADY `CHAR` — post-hoc Codex kolo na zmergovanom PR #239 (27.8.2026):** vetva `test/1b5-char-dorovnanie`, **TEST-ONLY** (kód pluginu sa
   nezmenil o riadok, VERSION ostáva **0.8.8**). Sada `CHAR` je BRÁNA pre blok 1d a GHOST Tool — na jej zelenej farbe stojí povolenie siahnuť na buildery a observery. Codex

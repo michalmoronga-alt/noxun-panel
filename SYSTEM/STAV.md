@@ -29,7 +29,7 @@ neprežije návrat do sekcie a status po uložení netvrdí prepočet, ktorý ne
 scale a prepnutie modelu sú zapísané testami, takže **blok 1d už smie siahnuť na buildery a observery**; Ctrl+Y a dva dokumenty naraz ostávajú manuálne; sadu **dorovnala dávka 1b-5** — štyri asserty merali slabšiu veličinu, než tvrdili) · **1b-3** (odrážka **G** —
 **„Obnoviť" už do modelu nezapisuje**; duplicitné ID sa miesto tichej opravy priznajú oranžovým riadkom Kontroly, opravu robí len reálny zásah do modelu).
 **Staré dlhy B a D sú vybavené** dávkou **1b-4** (v0.8.8); mimo písmen vybavená aj **1b-6a** — názov zákazky zadaný pred prvým uložením prežije Ctrl+S (v0.8.9). **Ďalej z bloku 1b:** **F** (UI dlhy — **D-27** tagy z panela · **D-51** štandard veľkostí okien · výklop ako
-samostatný typ čela) · **E** post-hoc Codex sweep #186–#226.
+samostatný typ čela) · **E** post-hoc Codex sweep #186–#226 · **1b-6c** (zámok nad `vepo_settings.json` — druhá časť rozdeleného PR #243, audit-povinná).
 Poradie určuje Michal. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
@@ -42,7 +42,7 @@ konceptov) → **GHOST VKLADANIE** → **KOVANIE** (najprv USER-debata o setoch)
 
 ## Posledné uzávery
 
-- **1b-6a — názov zákazky prežije prvé uloženie** (dovtedy sa po Ctrl+S všetky štyri exporty pomenovali podľa `.skp` súboru; nález z post-hoc triáže #193) — v0.8.9 (27.8.) · **Michal večer:** nový model → v Štúdiu napíš názov zákazky → Ctrl+S → VEPO export sa musí volať podľa zákazky.
+- **1b-6a — názov zákazky prežije prvé uloženie** (dovtedy sa po Ctrl+S všetky štyri exporty pomenovali podľa `.skp` súboru; nález z post-hoc triáže #193; úzky re-rez po zatvorení PR #243 pravidlom 3 kôl — zámok ostáva na **1b-6c**) — v0.8.9 (27.8.) · **Michal večer:** nový model → v Štúdiu napíš názov zákazky → Ctrl+S → VEPO export sa musí volať podľa zákazky.
 - **1b-4 — drobnosti sekcií Šablóny a Pravidlá** (odrážky B + D: PNG retry a dávkovanie, orezaný payload šablón, `push_library_echo`; lenivý katalóg pások, víťaz pri vypnutej položke, stabilné poradie jantárových riadkov, mŕtve polia preč) — v0.8.8 (27.8.) · **Michal večer:** v Štúdiu → **Šablóny** sa fotky dlaždíc majú doplniť po chvíli (nie naraz) a **všetky**;
   v **Pravidlách** má poradie jantárových riadkov ostať rovnaké aj po vložení/zmazaní skrinky a pri ručne **vypnutej** položke kovania má riadok hovoriť „vypnuté".
 - **1b-3 — „Obnoviť" = čisté čítanie** (brána G: zber už nespúšťa dedup; duplicitné ID sa priznajú ORANGE riadkom Kontroly aj s výrobným dôsledkom, oprava = zápisová cesta) — v0.8.7 (27.8.) · **Michal večer:** v Štúdiu klikni „Obnoviť" a skús Späť — zoznam krokov sa refreshom nesmie meniť; po skopírovaní skrinky môže na okamih blysnúť oranžový riadok „Skrinky s ID … sú v modeli 2×".
