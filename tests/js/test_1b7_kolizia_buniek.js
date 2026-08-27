@@ -274,4 +274,154 @@ const KEY = 'g:GRP1';
   NXModal.close();
 })();
 
+// ===== 7) „Začať odznova" PO zotaveni z konfliktu kresli CERSTVY KATALOG =====
+//
+// P1 interneho review kola 1. Prva verzia opravy schovavala „proti comu
+// pouzivatel pisal" do VYCHODISKOVYCH riadkov, aby kolizia prezila Esc — lenze
+// z tych istych riadkov kresli „Začať odznova". Reset teda nakreslil STARU
+// hodnotu s CERSTVYM `row_rev` a nasledny zapis presiel cez OBA zamky: presne
+// ten tichy prepis, ktory davka rusi, len o jedno kliknutie dalej.
+//
+// Scenar berie OBE polia naraz, lebo kazde zlyhavalo inak:
+//   `sheets` = pole S PAMATOU  -> reset kreslil snimku z casu OTVORENIA
+//                                 (stary `row_rev` => konflikt bez cesty von),
+//   `edges`  = pole BEZ PAMATE -> jeho objekt bol zdielany, takze `setRows`
+//                                 prepisal aj to, z coho reset kresli.
+function catE(rev, over){
+  const s0 = Object.assign({
+    material_id: 'S18', group_id: 'GRP1', decor: 'H3303', decor_name: 'Dub Halifax',
+    manufacturer: 'Egger', type: 'DTDL', thickness: 18, structure: 'ST10',
+    color: [200, 180, 150], code: 'A18', price_per_m2: 18.4, row_rev: 'r18', label: 'x'
+  }, (over && over.s0) || {});
+  const e0 = Object.assign({
+    abs_id: 'E22', group_id: 'GRP1', decor: 'H3303', width: 22, thickness: 1,
+    structure: 'ST10', color: [200, 180, 150], code: 'B22', price_per_bm: 0.8, row_rev: 'e22'
+  }, (over && over.e0) || {});
+  return { catalog_rev: rev, catalog_schema: 9, catalog_state: 'ok',
+           materials: { sheets: [] }, catalog: { sheets: [s0], edges: [e0] } };
+}
+function erow(idx, col){
+  return DOC.querySelectorAll('[data-nxm-row="edges"]')[idx]
+            .querySelector('[data-nxm-col="' + col + '"]');
+}
+
+(function(){
+  NXModal.clearMemory('mat:edit:GRP1');
+  M.mdSetCatalog(catE('B1'));
+  M.mdEditOpen(KEY);
+  cell(0, 'code').value = 'MOJ-KOD';        // pamat vznikne LEN pre `sheets`
+  NXModal.close();
+
+  M.mdSetCatalog(catE('B2'));
+  M.mdEditOpen(KEY);
+  ok(DOC.querySelector('[data-nxm-act="memreset"]'), 'formular je z konceptu');
+  erow(0, 'price_per_bm').value = '1,50';   // zmena v poli BEZ pamate
+  submit();
+
+  // Server odmietol; medzitym sa zmenili OBE polia (Demos + cudzia ruka).
+  M.mdSetCatalog(catE('B3', { s0: { price_per_m2: 25, row_rev: 'r18NEW' },
+                              e0: { price_per_bm: 0.99, row_rev: 'e22NEW' } }));
+  M.MD.editBlocked();
+  ok(DOC.querySelector('.mrconf'), 'ABS cena je v kolizii');
+
+  dispatch(DOC.querySelector('[data-nxm-act="memreset"]'), 'click');
+  eq(NXModal.conflicts(), 0, '„Začať odznova" koncept aj koliziu ruší');
+  eq(cell(0, 'price_per_m2').value, '25', 'sheets: reset kresli CERSTVU cenu…');
+  eq(cell(0, 'row_rev').value, 'r18NEW', '…a CERSTVY odtlacok (nie snimku z otvorenia)');
+  eq(cell(0, 'code').value, 'A18',
+     '…a rozpisany kod je PREC — „Začať odznova" kresli KATALOG, nie formular');
+  eq(erow(0, 'price_per_bm').value, '0,99', 'edges: reset kresli CERSTVU cenu…');
+  eq(erow(0, 'row_rev').value, 'e22NEW', '…a CERSTVY odtlacok');
+  eq(DOC.querySelector('.mmemo'), null, 'pas konceptu zhasol');
+
+  SENT.length = 0;
+  submit();
+  eq(SENT.length, 1, 'zapis po resete odide');
+  eq(SENT[0].sheets[0].price_per_m2, '25',
+     'P1: NIE stara cena s cerstvym row_rev — zamok by ju bol prepustil');
+  eq(SENT[0].edges[0].price_per_bm, '0,99', 'to iste v poli bez pamate');
+  eq(SENT[0].edges[0].row_rev, 'e22NEW');
+  M.MD.editSaved();
+})();
+
+// ===== 8) ZMAZANIE KOLIZNEHO RIADKU ODBLOKUJE ULOZIT =========================
+//
+// P2 interneho review. Stitky ziju v stave, takze zmazany riadok v nom ostaval
+// visiet: pas kolizie na obrazovke nebol, ale `submit` blokoval zapis hlaskou
+// o „označenej bunke". V zotavovacej ceste (bez pamate) neexistuje ani
+// „Začať odznova" — slepa ulicka, z ktorej vedie len zatvorenie okna.
+(function(){
+  NXModal.clearMemory('mat:edit:GRP1');
+  M.mdSetCatalog(catalog('I1'));
+  M.mdEditOpen(KEY);
+  cell(0, 'price_per_m2').value = '88,00';
+  submit();
+  M.mdSetCatalog(catalog('I2', { s0: { price_per_m2: 11, row_rev: 'r18h' } }));
+  M.MD.editBlocked();
+  ok(DOC.querySelector('.mrconf'), 'kolizia svieti (cesta BEZ pamate)');
+  eq(DOC.querySelector('[data-nxm-act="memreset"]'), null,
+     'a „Začať odznova" tu NIE JE — o to horsia by bola slepa ulicka');
+
+  rows()[0].querySelector('[data-nxm-act="rowdel"]');
+  dispatch(rows()[0].querySelector('[data-nxm-act="rowdel"]'), 'click');
+  eq(DOC.querySelector('.mrconf'), null, 'kolizny riadok je prec…');
+  eq(NXModal.conflicts(), 0, '…a s nim aj poziadavka na rozhodnutie');
+  SENT.length = 0;
+  submit();
+  eq(SENT.length, 1, 'zapis uz nie je blokovany bunkou, ktora neexistuje');
+  M.MD.editSaved();
+})();
+
+// ===== 9) ZHODNA HODNOTA NIE JE KOLIZIA ======================================
+//
+// P3-3: pytat sa „tvoja 22,5 × v katalogu 22,5" je otazka bez obsahu.
+(function(){
+  NXModal.clearMemory('mat:edit:GRP1');
+  M.mdSetCatalog(catalog('J1'));
+  M.mdEditOpen(KEY);
+  cell(0, 'price_per_m2').value = '22,5';
+  NXModal.close();
+  M.mdSetCatalog(catalog('J2', { s0: { price_per_m2: 22.5, row_rev: 'r18i' } }));
+  M.mdEditOpen(KEY);
+  eq(DOC.querySelector('.mrconf'), null,
+     'pouzivatel aj katalog dospeli k TEJ ISTEJ hodnote — niet o com rozhodovat');
+  eq(NXModal.conflicts(), 0);
+  SENT.length = 0;
+  submit();
+  eq(SENT.length, 1, 'a zapis ide rovno');
+  M.MD.editSaved();
+
+  // To iste v ceste zotavenia z konfliktu (`mdEditRefresh`).
+  NXModal.clearMemory('mat:edit:GRP1');
+  M.mdSetCatalog(catalog('J3'));
+  M.mdEditOpen(KEY);
+  cell(0, 'price_per_m2').value = '13,5';
+  submit();
+  M.mdSetCatalog(catalog('J4', { s0: { price_per_m2: 13.5, row_rev: 'r18j' } }));
+  M.MD.editBlocked();
+  eq(DOC.querySelector('.mrconf'), null, 'to iste pri zotaveni z konfliktu');
+  eq(NXModal.conflicts(), 0);
+  M.MD.editSaved();
+})();
+
+// ===== 10) KOLIZNA BUNKA TO POVIE AJ CITACKE OBRAZOVKY =======================
+//
+// P3-4: farebny okraj je informacia len pre toho, kto ho vidi.
+(function(){
+  NXModal.clearMemory('mat:edit:GRP1');
+  M.mdSetCatalog(catalog('K1'));
+  M.mdEditOpen(KEY);
+  cell(0, 'price_per_m2').value = '66,00';
+  NXModal.close();
+  M.mdSetCatalog(catalog('K2', { s0: { price_per_m2: 9, row_rev: 'r18k' } }));
+  M.mdEditOpen(KEY);
+  const c = cell(0, 'price_per_m2');
+  ok(String(c.className).indexOf('conf') > -1, 'bunka je oznacena triedou');
+  ok(String(c.getAttribute('title') || '').indexOf('zmenila v katalógu') > -1,
+     'a povie DOVOD v tooltipe (nielen v zamknutych vetvach)');
+  eq(c.getAttribute('aria-invalid'), 'true', 'aj citacke obrazovky');
+  NXModal.clearMemory('mat:edit:GRP1');
+  NXModal.close();
+})();
+
 console.log('OK test_1b7_kolizia_buniek.js — ' + n + ' kontrol');

@@ -1221,7 +1221,6 @@
         var id = r && r[idk];
         if (id) was0[id] = r;
       });
-      var nextBase = [];
       var merged = (f.value || []).map(function(r){
         var was = mine[r[idk]];
         var wb = was0[r[idk]];
@@ -1231,11 +1230,10 @@
         if (!was){
           out._note = 'pribudlo mimo editora';
           touched = true;
-          nextBase.push(r);
           return out;
         }
         var conf = null;
-        var bo = null;
+        var wrote = null;
         cols.forEach(function(c){
           // Bez vychodiska (nemalo by nastat) drzime stare spravanie: radsej
           // zachovat rozpisanu hodnotu, nez ju pouzivatelovi zmazat.
@@ -1243,20 +1241,19 @@
           if (!Object.prototype.hasOwnProperty.call(was, c)) return;
           out[c] = was[c];
           if (!wb || mdSameCell(wb[c], r[c])) return;
+          // Zhodny vysledok NIE JE kolizia (review P3-3).
+          if (mdSameCell(was[c], r[c])) return;
           // Bunku zmenil pouzivatel AJ katalog — rozhodnutie patri pouzivatelovi.
           conf = conf || {};
           conf[c] = r[c];
-          bo = bo || (function(){ var o = {}, kk;
-                                  for (kk in r){ if (Object.prototype.hasOwnProperty.call(r, kk)) o[kk] = r[kk]; }
-                                  return o; })();
-          bo[c] = wb[c];
+          wrote = wrote || {};
+          wrote[c] = wb[c];
         });
-        if (conf) out._conflict = conf;
+        if (conf){ out._conflict = conf; out._wrote = wrote; }
         if (String(was.row_rev || '') !== String(r.row_rev || '')){
           out._note = 'zmenené mimo editora';
           touched = true;
         }
-        nextBase.push(bo || r);
         delete mine[r[idk]];
         return out;
       });
@@ -1264,9 +1261,11 @@
       // s id, ktore uz v katalogu nie su, sa zahadzuju — zaznam je prec.
       (cur[key] || []).forEach(function(r){ if (!r[idk]) merged.push(r); });
       if (Object.keys(mine).length) touched = true;
-      // Baseline pri NEROZHODNUTEJ kolizii ostava STARY (`bo`) — inak by sa
-      // kolizia po zatvoreni okna stratila a tichy prepis by sa vratil.
-      m.setRows(key, merged, { base: nextBase });
+      // VYCHODISKO je CERSTVY katalog — aj pri kolizii. Stara hodnota, proti
+      // ktorej pouzivatel pisal, ide do stavu modalu (`_wrote`), nie do
+      // vychodiskovych riadkov: z tych kresli „Začať odznova" a stara hodnota
+      // s cerstvym `row_rev` by prebehla cez oba zamky (interne review P1).
+      m.setRows(key, merged, { base: f.value });
     });
     mdEditBase.rev = MD_REV;
     mdEditDupSnap = null; // cerstve riadky = iny obsah, stary suhlas neplati
