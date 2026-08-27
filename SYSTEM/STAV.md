@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.8.10 · 27.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.8.11 · 27.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -18,7 +18,7 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.10:** **1952 headless** · 70 JS sád · posledný plný in-SketchUp beh **1036 PASS / 0 FAIL / 0 SKIP** (dávka **1b-5** — dorovnanie sady `CHAR`, +14 assertov).
+**Testy k v0.8.11:** **1964 headless** · 70 JS sád · posledný plný in-SketchUp beh **1036 PASS / 0 FAIL / 0 SKIP** (dávka **1b-5** — dorovnanie sady `CHAR`, +14 assertov).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom. **Post-hoc sweep je od 27.8. HOTOVÝ** (34 PR cez Codex CLI + triáž 54 nezodpovedaných threadov): dve reálne P1 slepým kolám ušli a týždeň žili v `main`, obe sú dávno opravené — [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**.
 
@@ -28,8 +28,8 @@ vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 neprežije návrat do sekcie a status po uložení netvrdí prepočet, ktorý neprebehol) · **1b-2** (odrážka **H** — charakterizačné in-SU scenáre; kópia, `*N`, Undo, prerušenie operácie,
 scale a prepnutie modelu sú zapísané testami, takže **blok 1d už smie siahnuť na buildery a observery**; Ctrl+Y a dva dokumenty naraz ostávajú manuálne; sadu **dorovnala dávka 1b-5** — štyri asserty merali slabšiu veličinu, než tvrdili) · **1b-3** (odrážka **G** —
 **„Obnoviť" už do modelu nezapisuje**; duplicitné ID sa miesto tichej opravy priznajú oranžovým riadkom Kontroly, opravu robí len reálny zásah do modelu).
-**Staré dlhy B a D sú vybavené** dávkou **1b-4** (v0.8.8), **sweep E je hotový** (27.8.); mimo písmen vybavené aj **1b-6a** (názov zákazky prežije Ctrl+S, v0.8.9) a **1b-7** (tichý návrat starej ceny dekoru, v0.8.10).
-**Ďalej z bloku 1b:** **1b-6b** (nerozlíšiteľné hlavičky skupín materiálov) · **1b-6c** (zámok nad `vepo_settings.json`, audit-povinná) · **F** (UI dlhy — **D-27** · **D-51** · výklop ako samostatný typ čela).
+**Staré dlhy B a D sú vybavené** dávkou **1b-4** (v0.8.8), **sweep E je hotový** (27.8.); mimo písmen vybavené aj **1b-6a** (názov zákazky prežije Ctrl+S, v0.8.9), **1b-7** (tichý návrat starej ceny dekoru, v0.8.10) a **1b-6b** (rozlíšené hlavičky materiálov, v0.8.11).
+**Ďalej z bloku 1b:** **1b-6c** (zámok nad `vepo_settings.json`, audit-povinná) · **F** (UI dlhy — **D-27** · **D-51** · výklop ako samostatný typ čela).
 Poradie určuje Michal. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
