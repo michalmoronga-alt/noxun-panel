@@ -705,6 +705,9 @@
     var more = el('railAbsMore');
     if (more && more.getAttribute('aria-disabled') === 'true') return;
     var open = !nxEdgeMenuOpen();
+    // D-27 (review #249 kolo 2): druhe rohove/railove okno musi zhasnut —
+    // obe su `position: absolute` nad railom a prekryli by sa.
+    if (open) nxCloseTagMenu();
     nxRenderEdgeMenu(open);
     // Aby na obrazovke nikdy neboli DVE kopie tych istych prepinacov: otvorenie
     // tu zavrie rozbalovacie okno v otvorenom ŠTÚDIU (a naopak).
@@ -719,6 +722,106 @@
     if (!window.NXEdgeMenu) return;
     sketchup.nx_edge_option(JSON.stringify(
       NXEdgeMenu.optionPayload({ model_guid: nxModelGuid }, key, value)));
+  }
+
+  // ===== D-27: OKNO VIDITELNOSTI TAGOV MODELU (rail) ========================
+  // Tretia funkcna polozka raily. NEMA rohovy trojuholnik — nie je to „toggle
+  // + nastavenie" (vzor §5.11), cele tlacidlo otvara okno so zoznamom tagov.
+  // Panel si ZIADNY vlastny stav nedrzi: posledny serverovy stav sa pamata LEN
+  // preto, aby sa otvorene okno dalo prekreslit (kazdy push ho cely prepise).
+  var nxTagState = null;
+
+  function nxTagMenuNode(){ return el('railTagsMenu'); }
+
+  function nxTagMenuOpen(){
+    var m = nxTagMenuNode();
+    return !!(m && m.classList && m.classList.contains('open'));
+  }
+
+  // Jedno miesto, kde sa meni obsah aj viditelnost — `aria-expanded` tak
+  // hovori pravdu bez ohladu na to, ktora cesta okno zavrela.
+  //
+  // Review #249 P3: prekreslenie cez `outerHTML` znici zafokusovany checkbox,
+  // takze klavesnicovy pouzivatel po KAZDOM prepnuti z ponuky vypadol. Fokus sa
+  // preto pred prekreslenim ZAPAMATA (podla `data-tagkey` riadku) a po nom
+  // vrati — bez toho, aby si panel drzal akykolvek stav navyse.
+  function nxTagFocusKey(){
+    var a = document.activeElement;
+    if (!a || !a.getAttribute) return '';
+    var m = nxTagMenuNode();
+    if (!m || !m.contains(a)) return '';
+    return a.getAttribute('data-tagkey') || '';
+  }
+
+  function nxRenderTagMenu(open){
+    var m = nxTagMenuNode();
+    if (!m || !window.NXTagMenu) return;
+    var keep = open === true ? nxTagFocusKey() : '';
+    m.outerHTML = NXTagMenu.menuHtml(nxTagState, open === true,
+                                     { fn: 'onTagOption', id: 'railTagsMenu' });
+    var btn = el('railTagy');
+    if (btn) btn.setAttribute('aria-expanded', open === true ? 'true' : 'false');
+    if (!keep) return;
+    var fresh = nxTagMenuNode();
+    var back = fresh ? fresh.querySelector('input[data-tagkey="' + keep + '"]') : null;
+    if (back){ try { back.focus(); } catch (err) {} }
+  }
+
+  function nxCloseTagMenu(){
+    if (!nxTagMenuOpen()) return;
+    nxRenderTagMenu(false);
+  }
+
+  // Klik na ikonu. Bublanie sa zastavuje z rovnakeho dovodu ako pri rohu ABS:
+  // okno zatvara KLIK MIMO (delegacia na document), takze klik na tlacidlo by
+  // ho inak v tom istom kliku otvoril a hned zavrel.
+  // Okno sa otvara VZDY — aj v modeli bez tagov, kde vetou povie, ze vzniknu
+  // s prvou skrinkou (review #249 P2: zamknute tlacidlo by to vysvetlenie
+  // schovalo do bubliny).
+  //
+  // Review #249 kolo 2: klik na tlacidlo ZASTAVUJE bublanie (inak by okno
+  // zavrel document listener v tom istom kliku), takze rohove nastavenie ABS
+  // by pri nom neyzhaslo a DVE prekryte okna by stali nad railom naraz.
+  // Zatvara sa preto VYSLOVNE — a recipročne to robi aj roh ABS.
+  function onTagMenuToggle(ev){
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    var open = !nxTagMenuOpen();
+    if (open) nxCloseEdgeMenu();
+    nxRenderTagMenu(open);
+  }
+
+  // Prepnutie jedneho tagu. Klient posiela LEN identitu + kluc + boolean;
+  // whitelist, striktny boolean aj samotny zapis (jedna operacia = jeden krok
+  // Späť) rozhoduje server, ktory potom rozposle novy stav.
+  function onTagOption(key, value){
+    if (!window.sketchup || !sketchup.nx_tag_visible) return;
+    if (!window.NXTagMenu) return;
+    sketchup.nx_tag_visible(JSON.stringify(
+      NXTagMenu.togglePayload({ model_guid: nxModelGuid }, key, value)));
+  }
+
+  // Nasadenie serveroveho stavu. JEDEN stav, DVA ovladace: ikona raily s oknom
+  // a checkbox „Zobraziť zóny (ghost) v modeli" (kluc `zony`) — panel nema
+  // vlastnu kopiu ani jedneho.
+  function nxApplyTags(st){
+    nxTagState = st || null;
+    var s = window.NXTagMenu ? NXTagMenu.railState(st) : null;
+    var n = el('railTagy');
+    if (n && s){
+      n.classList.toggle('on', s.on);
+      if (window.NXIcons && NXIcons.set) NXIcons.set(n, s.icon);
+      var tip = el('railTagyTip');
+      if (tip) tip.textContent = s.tip;
+    }
+    // Otvorene okno drzi ZIVY stav — prekresli ho.
+    if (nxTagMenuOpen()) nxRenderTagMenu(true);
+    var chk = el('zonesChk');
+    if (chk){
+      var row = null;
+      var rows = (st && st.rows) || [];
+      for (var i = 0; i < rows.length; i++){ if (rows[i] && rows[i].key === 'zony') row = rows[i]; }
+      chk.checked = !!(row && row.visible === true);
+    }
   }
 
   // K2/D-87: to iste pre KONTROLU KRESBY. Rozhodovanie je v CISTEJ funkcii

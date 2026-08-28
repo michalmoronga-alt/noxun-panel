@@ -115,7 +115,11 @@ module Noxun
           cb(dlg, 'set_zone_field') { |p| handle_set_zone_field(p) } # V0.2c split lock (rozmer pola)
           cb(dlg, 'select_zone')    { |p| handle_select_zone(p) }    # V0.2c obojsmerna sync nahladu
           cb(dlg, 'clean_zone')     { |p| handle_clean_zone(p) }
-          cb(dlg, 'toggle_zones')   { |p| handle_toggle_zones(p) }
+          # D-27: viditelnost NOXUN tagov v modeli — okno tagov v raile AJ
+          # checkbox „Zobraziť zóny (ghost)" (kluc `zony`). Callback `toggle_zones`
+          # tym ZANIKOL: posielal len holy retazec bez identity dokumentu, takze
+          # oneskoreny klik vedel prepnut tag v cudzom modeli.
+          cb(dlg, 'nx_tag_visible') { |p| handle_tag_visible(p) }
           # V0.3 materialy + ABS (materialy TEJTO skrinky; projektove = MaterialsDialog)
           cb(dlg, 'set_cabinet_material') { |p| handle_set_cabinet_material(p) } # korpusovy override
           cb(dlg, 'set_part_material')    { |p| handle_set_part_material(p) }    # per-dielec override

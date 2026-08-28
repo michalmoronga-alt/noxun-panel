@@ -12,7 +12,7 @@
      Vsetky nove CSS pravidla kostry visia pod nou, aby panel.css ostal
      bezpecne zdielatelny so satelitnymi oknami. -->
 <script>document.documentElement.className = 'nx-inspector';</script>
-<link rel="stylesheet" href="css/panel.css?v=0.8.12">
+<link rel="stylesheet" href="css/panel.css?v=0.8.13">
 
 <!-- ===== RAIL (A9: staticke ID pre merac D-25) =============================
      Kontexty su platne LEN nad oznacenym korpusom — pri dielci/doske/vkladani
@@ -55,6 +55,18 @@
        body). Jednoduchy toggle bez sipky: nie je co nastavovat. Ziadny zapis do
        modelu — kresli sa OVERLAY nad nim (lekcia D-103). -->
   <button type="button" id="railKresba" data-nx-usage="rail:kresba" class="railbtn fn" onclick="onGrainCheckToggle()" aria-pressed="false" aria-label="Kontrola kresby"><svg class="ic" aria-hidden="true"><use href="#i-grain"/></svg><span class="railtip" id="railKresbaTip">Kontrola smeru kresby (zapnúť/vypnúť)</span></button>
+  <!-- D-27: VIDITELNOST TAGOV MODELU (Čelá · Chrbát · …) — tretia funkcna
+       polozka raily. Vertikalny priestor panela je vzacny, preto NOVY RIADOK
+       v obsahu nevznikol: je to jedna ikona v uz existujucom lavom stlpci
+       a zoznam je OVERLAY vedla nej (`position: absolute`, vzor .ecmenu-rail).
+       BEZ rohoveho trojuholnika — nie je to „toggle + nastavenie" (§5.11),
+       cele tlacidlo otvara okno; obal je preto vlastny `.railmenu`, NIE
+       `.railfly` (ten kresli trojuholnik kazdemu `.railbtn` v sebe).
+       Ikona sa rozsvieti (`eye-off`), ked je nieco skryte — „nevidis vsetko". -->
+  <div class="railmenu" id="railTagyBox">
+    <button type="button" id="railTagy" data-nx-usage="rail:tagy" class="railbtn fn" onclick="onTagMenuToggle(event)" aria-expanded="false" aria-haspopup="true" aria-label="Viditeľnosť tagov v modeli"><svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg><span class="railtip" id="railTagyTip">Viditeľnosť tagov v modeli (Čelá · Chrbát · …)</span></button>
+    <div class="tgmenu" id="railTagsMenu"></div>
+  </div>
   <span class="railgap"></span>
   <div class="raildiv"></div>
   <button type="button" id="railCfg" data-nx-usage="rail:nastavenia" class="railbtn" onclick="onInspectorSettings()" aria-label="Nastavenia Inspectora"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg><span class="railtip">Nastavenia Inspectora — téma, rozmerové rady, o plugine</span></button>
@@ -102,6 +114,9 @@
            v kontexte Cela pribudol klik na celo, zonova cast sa mimo Zon skryva -->
       <div class="pvhint"><span class="ph-zones">Klik na zónu = výber (police, delenie) · ťahaj priečku = posun (magnet 1/4 · 1/2 · 3/4, Alt ho vypne) · </span><span class="ph-fronts">Klik na čelo = jeho riadok v zozname · </span>Ctrl+koliesko = zoom · ťahaj plochu = posun pohľadu</div>
       <div class="zoneline">
+        <!-- D-27: TEN ISTY tag (`Noxun/Zóny`), aky ponuka okno tagov v raile —
+             preto aj TA ISTA serverova cesta (`nx_tag_visible`, kluc `zony`)
+             a ten isty stav; panel si tu ziadnu kopiu nedrzi. -->
         <input id="zonesChk" type="checkbox" onchange="toggleZones()">
         <label for="zonesChk">Zobraziť zóny (ghost) v modeli</label>
       </div>
@@ -821,40 +836,41 @@
      musi existovat pred prvym renderom aj pred ready), boot posledny (onload + ready).
      Obycajne skript tagy (NIE type=module) — inline onclick handlery vyzaduju globalne funkcie.
      ?v= cache-busting: CEF cachuje externe subory, pri bumpe verzie aktualizovat. -->
-<script src="js/errors.js?v=0.8.12"></script>
+<script src="js/errors.js?v=0.8.13"></script>
 <!-- D-77 / A7: minimalna OBSAHOVA velkost okna pri otvoreni. UI-B1 stanovil
      jednu pravdu sirky Inspectora — 470 px OBSAHU (rail 44 + karta). Vyska 810
      pokryva nahlad + dva rozbalene sektory. Dorovnava sa oboma smermi, raz pri
      nacitani a nikdy nad plochu obrazovky (js/win_fit.js). -->
 <script>window.NX_FIT_MIN = { w: 470, h: 810 };</script>
-<script src="js/win_fit.js?v=0.8.12"></script>
-<script src="js/icons.js?v=0.8.12"></script>
+<script src="js/win_fit.js?v=0.8.13"></script>
+<script src="js/icons.js?v=0.8.13"></script>
 <!-- ŠT-4a: zdieľaný obsah „O plugine" (rovnaký súbor načítava aj studio.html). -->
-<script src="js/about.js?v=0.8.12"></script>
+<script src="js/about.js?v=0.8.13"></script>
 <!-- D-85 (UI-03): zdielany combobox. Musi byt PRED core/part/board — tie ho pri
      renderi kariet volaju (NXCombo.scan). Sam na nikom nezavisi (ikony si berie
      defenzivne cez NXIcons, ak sprite existuje). -->
-<script src="js/nx_combo.js?v=0.8.12"></script>
+<script src="js/nx_combo.js?v=0.8.13"></script>
 <!-- v0.7.28: ZDIELANE 3-stavove nastavenie kontroly hran (rohovy trojuholnik pri
      ABS kontrole v raile). TEN ISTY subor nacitava aj okno Studio — jeden markup,
      jeden stav. Musi byt PRED shell.js (rohove okno kresli NXEdgeMenu). -->
-<script src="js/edge_menu.js?v=0.8.12"></script>
-<script src="js/core.js?v=0.8.12"></script>
-<script src="js/expr.js?v=0.8.12"></script>
-<script src="js/insert_state.js?v=0.8.12"></script>
-<script src="js/form.js?v=0.8.12"></script>
-<script src="js/zone_tree.js?v=0.8.12"></script>
-<script src="js/preview.js?v=0.8.12"></script>
+<script src="js/edge_menu.js?v=0.8.13"></script>
+<script src="js/tag_menu.js?v=0.8.13"></script>
+<script src="js/core.js?v=0.8.13"></script>
+<script src="js/expr.js?v=0.8.13"></script>
+<script src="js/insert_state.js?v=0.8.13"></script>
+<script src="js/form.js?v=0.8.13"></script>
+<script src="js/zone_tree.js?v=0.8.13"></script>
+<script src="js/preview.js?v=0.8.13"></script>
 <!-- UI-B1: kostra Inspectora — stavovy stroj vyber x kontext, rail, sektory. -->
-<script src="js/shell.js?v=0.8.12"></script>
-<script src="js/actions.js?v=0.8.12"></script>
+<script src="js/shell.js?v=0.8.13"></script>
+<script src="js/actions.js?v=0.8.13"></script>
 <!-- UI-B3: nastavenia Inspectora (koliesko) + rozmerove rady N6. Musi byt PRED
      bridge.js (NX.setUiSettings volá nxApplyUiSettings) a za core.js (el/esc). -->
-<script src="js/settings.js?v=0.8.12"></script>
-<script src="js/bridge.js?v=0.8.12"></script>
-<script src="js/materials.js?v=0.8.12"></script>
-<script src="js/part_card.js?v=0.8.12"></script>
-<script src="js/board_card.js?v=0.8.12"></script>
-<script src="js/hardware.js?v=0.8.12"></script>
-<script src="js/usage.js?v=0.8.12"></script>
-<script src="js/boot.js?v=0.8.12"></script>
+<script src="js/settings.js?v=0.8.13"></script>
+<script src="js/bridge.js?v=0.8.13"></script>
+<script src="js/materials.js?v=0.8.13"></script>
+<script src="js/part_card.js?v=0.8.13"></script>
+<script src="js/board_card.js?v=0.8.13"></script>
+<script src="js/hardware.js?v=0.8.13"></script>
+<script src="js/usage.js?v=0.8.13"></script>
+<script src="js/boot.js?v=0.8.13"></script>

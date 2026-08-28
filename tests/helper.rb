@@ -157,6 +157,8 @@ unless NxTest::IN_SKETCHUP
     core/usage_stats
     core/cabinet_builder
     core/board_builder
+    core/zones
+    core/tags
     core/bom
     core/vepo_export
     core/sheet_estimate

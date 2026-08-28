@@ -285,7 +285,11 @@
       // nesu ju identity guardy asynchronnych callbackov panela.
       if (typeof nxSetModelGuid === 'function') nxSetModelGuid(data.model_guid);
       refreshMaterialFilters(); // (projektove predvolby zobrazuje sekcia Materialy v Studiu)
-      el('zonesChk').checked = !!data.zones_visible;
+      // D-27: viditelnost NOXUN tagov v modeli — PULL pri otvoreni panela
+      // (vzor `edge_check`/`grain_check`), dalsie zmeny chodia pushom.
+      // Nasadzuje sa RAZ na dve miesta: ikona raily s oknom tagov a checkbox
+      // „Zobraziť zóny (ghost)" — samostatne pole `zones_visible` tym zaniklo.
+      if (typeof nxApplyTags === 'function') nxApplyTags(data.tags);
       // V0.4.7c: uz oznacena DOSKA pri otvoreni panela (selected_kind z Ruby)
       if (data.selected_kind === 'board' && data.selected){ setType('lower'); setDefaults('lower'); currentZoneTree = defaultTree(); renderTemplateTiles(true); NX.loadBoard(data.selected); }
       else if (data.selected){ NX.loadSelected(data.selected); }
@@ -575,7 +579,11 @@
     // K2/D-87: stav kontroly smeru kresby do raily. JEDEN zdroj stavu — ten
     // isty kanal pouziva ŠTÚDIO, takze prepnutie na jednom mieste je hned
     // vidiet aj na druhom (a naopak). Panel si nic nedrzi ani neprepocitava.
-    setGrainCheck: function(state){ if (typeof nxApplyGrainCheck === 'function') nxApplyGrainCheck(state); }
+    setGrainCheck: function(state){ if (typeof nxApplyGrainCheck === 'function') nxApplyGrainCheck(state); },
+    // D-27: viditelnost NOXUN tagov v modeli. Chodi po KAZDOM pushi vyberu
+    // (Späť/Znova, prepnutie dokumentu, zmena vyberu) aj po kazdom prepnuti —
+    // panel si ziadnu vlastnu kopiu stavu nedrzi.
+    setTags: function(state){ if (typeof nxApplyTags === 'function') nxApplyTags(state); }
   };
 
   // UI-B3: informacny stlpec Zakladnych. Texty sklada cista funkcia nxCabInfo

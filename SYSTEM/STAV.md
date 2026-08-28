@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.8.12 · 28.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.8.13 · 28.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -18,7 +18,7 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.12:** **1974 headless** · 70 JS sád · posledný plný in-SketchUp beh **1036 PASS / 0 FAIL / 0 SKIP** (dávka **1b-5** — dorovnanie sady `CHAR`, +14 assertov).
+**Testy k v0.8.13:** **1998 headless** · 71 JS sád · posledný plný in-SketchUp beh **1057 PASS / 0 FAIL / 0 SKIP** (dávka **F/D-27** — nová sekcia `run_d27`, +21 assertov).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom. **Post-hoc sweep je od 27.8. HOTOVÝ** (34 PR cez Codex CLI + triáž 54 nezodpovedaných threadov): dve reálne P1 slepým kolám ušli a týždeň žili v `main`, obe sú dávno opravené — [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**.
 
@@ -29,7 +29,7 @@ neprežije návrat do sekcie a status po uložení netvrdí prepočet, ktorý ne
 scale a prepnutie modelu sú zapísané testami, takže **blok 1d už smie siahnuť na buildery a observery**; Ctrl+Y a dva dokumenty naraz ostávajú manuálne; sadu **dorovnala dávka 1b-5** — štyri asserty merali slabšiu veličinu, než tvrdili) · **1b-3** (odrážka **G** —
 **„Obnoviť" už do modelu nezapisuje**; duplicitné ID sa miesto tichej opravy priznajú oranžovým riadkom Kontroly, opravu robí len reálny zásah do modelu).
 **Staré dlhy B a D sú vybavené** dávkou **1b-4** (v0.8.8), **sweep E je hotový** (27.8.); mimo písmen vybavené aj **1b-6a** (názov zákazky prežije Ctrl+S, v0.8.9), **1b-7** (tichý návrat starej ceny dekoru, v0.8.10) a **1b-6b** (rozlíšené hlavičky materiálov, v0.8.11) a **1b-6c** (zámok nad `vepo_settings.json`, v0.8.12).
-**Ďalej z bloku 1b:** **F** (UI dlhy — **D-27** · **D-51** · výklop ako samostatný typ čela).
+**Z odrážky F je hotové D-27** (tagy modelu sa prepínajú z panela, v0.8.13) — **ostáva D-51** (štandard veľkostí okien a tlačidiel) a výklop ako samostatný typ čela.
 Poradie určuje Michal. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
@@ -42,6 +42,7 @@ konceptov) → **GHOST VKLADANIE** → **KOVANIE** (najprv USER-debata o setoch)
 
 ## Posledné uzávery
 
+- **F/D-27 — tagy modelu z panela** (ikona oka v raile → zoznam NOXUN tagov; klik = jeden krok Späť; checkbox ghost zón ide tou istou cestou; kontroly už nekreslia nad skrytým) — v0.8.13 (28.8.) · **Michal večer:** skry v raile **Čelá** — musia zmiznúť, ikona sa rozsvieti, **Ctrl+Z** ich vráti; skús to aj so zapnutou ABS kontrolou (nad skrytým nesmie ostať plôška).
 - **1b-7 — koniec tichého návratu starej ceny dekoru** (editor prelieva už len bunky, ktorých si sa dotkol; pri strete ukáže *tvoja × v katalógu* a bez rozhodnutia neuloží) — v0.8.10 (27.8.) · **Michal večer:** oprav cenu dekoru, daj **Esc**, spusti „Aktualizovať z Demosu", otvor ten istý dekor — nová cena musí ostať.
 - **1b-E — POST-HOC SWEEP KOMPLET** (odrážka E bloku 1b: 34 PR spätne cez Codex CLI + triáž 54 nezodpovedaných threadov; 29 nálezov — 18 vyriešených, 1 zaniknutý, 10 platných) — bez zmeny kódu (27.8.) · **z toho vzišli otvorené dávky 1b-7 a 1b-6b**; kandidáti pre blok 1c sú v [zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md).
 - **1b-6a + 1b-6c — meno zákazky (delenie PR #243)**: názov prežije prvé uloženie (v0.8.9) a `vepo_settings.json` má **jedny zamknuté dvere** (v0.8.12 — dve inštancie SketchUpu si už nemažú nastavenia ani mená) · **Michal večer:** nový model → napíš názov zákazky → Ctrl+S → VEPO sa musí volať podľa zákazky.
@@ -52,8 +53,7 @@ konceptov) → **GHOST VKLADANIE** → **KOVANIE** (najprv USER-debata o setoch)
 - **BLOK DOCS CLEANUP KOMPLET (26.8.)** — **C: refresh STANDARD.md** (zastarané tvrdenia opravené proti kódu, reflow, guard dĺžky bez výnimiek) PR **#234**, bez zmeny kódu pluginu ·
   **B: upratané `SYSTEM/`** (mapa autorít, archív, guardy) PR **#233**, v0.8.4 · **A: mapa modulov rozdelená na 6 súborov** + guardy dĺžky riadku a pokrytia modulov PR **#232**
 - **PICKER-2 — riadok je dekor, hrúbka je čip** (zoskupenie v rámci rovnakého typu dosky, predvoľba podľa kontextu, duplák nikdy sám) — PR **#231**, v0.8.3 · pred ním **PICKER-1 — jeden vyhľadávač aj v Predvoľbách projektu** — PR **#230**, v0.8.2 (25.8.)
-- **TEST-1 — prvé nálezy z testu v0.8.0 naostro** (nová položka katalógu je hneď vidieť, orezanie zoznamu sa priznáva číslom, vysvetlivka úchytiek podľa roly) — PR **#229**, v0.8.1 (24.8.)
-- **ŠT-4b — UZÁVER FÁZY ŠTÚDIO** (docs + minor bump **v0.8.0**, plný uzáver fázy v KRONIKE, PLAN blok 1b s dlhmi) — PR **#228** (24.8.)
+- **TEST-1 — prvé nálezy z testu v0.8.0 naostro** (PR **#229**, v0.8.1) · **ŠT-4b — UZÁVER FÁZY ŠTÚDIO** (docs + minor bump **v0.8.0**, plný uzáver v KRONIKE) — PR **#228** (24.8.)
 - **ŠT-4a — Nastavenia ako sekcie, ZANIKOL POSLEDNÝ SATELIT** (s oknom zanikla aj celá mašinéria premostení) — PR **#227**, v0.7.69 (24.8.)
 - **ŠT-3c — Šablóny sekciou + zánik okna Šablóny** (#225) a **premenovanie šablóny** vrátane presunu fotky a poradia (#226)
 - **ŠT-3a/3b — Kovanie a Pravidlá sekciami + zánik oboch okien** (#216 · #218 · #219 · #220) · ABS podľa roly, jantárové riadky a „vrátiť na pravidlo" (#221 · #222) · serverová validácia pravidiel a odtlačok proti tichému prepisu (#223 · #224)

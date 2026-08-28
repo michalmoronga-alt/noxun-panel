@@ -135,13 +135,12 @@ module Noxun
       end
 
       # --- viditelnost tagu ---------------------------------------------------
-
-      def set_visible(model, visible)
-        migrate_tag(model)
-        tag = model.layers[TAG] || model.layers.add(TAG)
-        tag.visible = visible ? true : false
-        tag.visible?
-      end
+      #
+      # D-27: vlastny `set_visible` tu ZANIKOL. Viditelnost tagu `Noxun/Zóny`
+      # prepina — rovnako ako viditelnost ostatnych NOXUN tagov — zdielana
+      # cesta `Tags.set_visible` (`Engine.set_tag_visible`, kluc `zony`).
+      # Dva ovladace nad jednym tagom (checkbox „Zobraziť zóny (ghost)"
+      # a okno tagov v raile) nesmu mat dva stavy ani dve undo semantiky.
 
       # D-04: bez tagu (cerstvy model) je default VYPNUTE.
       def visible?(model)

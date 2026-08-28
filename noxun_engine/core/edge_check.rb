@@ -265,11 +265,13 @@ module Noxun
       # TOP-LEVEL vlastnik] (korpus pri vnorenom dielci, inak entita sama).
       def each_part(model)
         model.entities.grep(Sketchup::ComponentInstance).each do |inst|
+          next unless drawable?(inst)
+
           case Store.kind(inst)
           when 'cabinet'
             base = inst.transformation
             inst.definition.entities.grep(Sketchup::ComponentInstance).each do |pi|
-              yield(pi, base * pi.transformation, inst) if sheet_part?(pi)
+              yield(pi, base * pi.transformation, inst) if sheet_part?(pi) && drawable?(pi)
             end
           when 'board'
             yield(inst, inst.transformation, inst) if Store.get(inst, 'manufactured') == true
@@ -277,6 +279,24 @@ module Noxun
             yield(inst, inst.transformation, inst) if sheet_part?(inst)
           end
         end
+      end
+
+      # D-27 (Codex audit F5): co v modeli NEVIDNO, to sa nesmie zvyraznovat.
+      # Odkedy sa tagy prepinaju priamo z panela, je skrytie `Noxun/Čelá` bezny
+      # pohyb — bez tejto branky by nad zmiznutymi celami ostali visiet ABS
+      # plosky (a ciary smeru kresby, ktora ide TOU ISTOU cestou `each_part`).
+      # Pozera sa na vlastne skrytie entity aj na jej tag; skryty PRIECINOK
+      # tagov riesi `Tags.folder_hidden?` (tag sam je vtedy `visible?`).
+      def drawable?(ent)
+        return false if ent.respond_to?(:hidden?) && ent.hidden?
+
+        lay = ent.respond_to?(:layer) ? ent.layer : nil
+        return true if lay.nil?
+        return false unless lay.visible?
+
+        !(defined?(Tags) && Tags.folder_hidden?(lay))
+      rescue StandardError
+        true
       end
 
       def sheet_part?(ent)

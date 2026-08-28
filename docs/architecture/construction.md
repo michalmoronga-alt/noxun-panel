@@ -74,6 +74,32 @@ top-level umiestňovanie
 
 ghost boxy (predvolene VYPNUTÉ, klik na zóny cez 2D náhľad; ghost skupiny žijú PRIAMO v `model.entities`, takže holý počet entít modelu sa zónovou zmenou legitímne mení).
 
+**Vlastný `set_visible` tu od D-27 (v0.8.13) NIE JE** — viditeľnosť tagu `Noxun/Zóny` prepína spoločná cesta `Tags.set_visible` (nižšie), tá istá, akou sa prepínajú ostatné NOXUN
+tagy. Dva ovládače nad jedným tagom (checkbox „Zobraziť zóny (ghost) v modeli" v sektore Náhľad a okno tagov v raile) tak nemajú ani dva stavy, ani dve undo semantiky. `visible?`
+ostáva (číta `TAG` aj legacy `OLD_TAG`) a `migrate_tag` beží ďalej pri stavbe ghostov.
+
+### tags.rb
+
+**D-27 (v0.8.13): viditeľnosť NOXUN tagov modelu z panela.** Modul tagy **netvorí ani nepremenúva** — tvoria ich buildery (`CabinetBuilder.part_tag` / `hardware_tag`,
+`BoardBuilder.board_tag`, `Zones.sync_ghost`); vie ich iba **nájsť a prepnúť**. Sedem kľúčov (`ROWS`: korpus · chrbat · cela · vnutro · kovanie · dosky · zony) a **mená sa čítajú
+za behu z konštánt builderov** (`const_defined?` guard) — v module nie je opísaný ani jeden reťazec, takže premenovanie tagu v builderi sa sem premietne samo.
+
+`state(model)` je **čisté čítanie** (žiadna operácia, žiadny zápis): riadky **len za tagy, ktoré v modeli naozaj sú** (D-78 — mŕtve tlačidlo je horšie než žiadne), každý s `visible`
+(vlastná viditeľnosť) a `folder_hidden` (nadradený **priečinok tagov** je skrytý — tag je zapnutý, no vidieť ho aj tak nie je; priečinok sa nikdy nezapína automaticky, môže niesť
+cudzie tagy). `hidden` = počet tagov, ktoré v modeli nevidno — podľa neho svieti ikona v raile.
+
+`set_visible(model, key, visible)` je **jediná zapisovacia cesta**: whitelist kľúča (`KEYS`), výslovný boolean, a keďže **viditeľnosť tagu sa ukladá do .skp** (na rozdiel od
+`edge_check`/`grain_check`, ktoré kreslia overlay NAD modelom — lekcia D-103), beží v `start_operation`/`commit_operation` = **presne jeden krok Späť**, s **abort vetvou** (výnimka
+nesmie nechať otvorenú transakciu). Keď sa nič nemení (neznámy kľúč, tag neexistuje, hodnota už platí), **operácia sa vôbec neotvorí** — v ponuke Späť nepribudne prázdny krok.
+Dve vedomé výnimky: tag `Noxun/Zóny` sa **smie založiť z panela** (`CREATABLE_KEYS` — checkbox ghost zón to vedel aj pred D-27; v modeli bez ghostov tag ešte neexistuje a bez toho
+by sa checkbox po kliknutí vracal späť), a pre ten istý kľúč sa **tolerantne číta aj legacy `Zones::OLD_TAG`** (`NOXUN_SLOTY`), inak by staršia zákazka tag „nenašla". Skrytie
+**aktívneho** tagu prepne kreslenie na Untagged **vedome a v tej istej operácii** (SketchUp to inak spraví sám a ticho) a vráti to v `active_reset` — panel to povie v statuse.
+
+Server je jediný zdroj stavu: `Engine.set_tag_visible` → `broadcast_tags` → `Panel.push_tags`; PULL pri otvorení panela (`push_init` pole `tags`) a push pri **každom**
+`push_selected` (Späť/Znova, prepnutie dokumentu, zmena výberu — tag sa dá skryť aj natívnym oknom Tags). **Známe obmedzenie:** buildery tag po zmazaní všetkých jeho dielcov
+nerušia, takže v ponuke môže ostať tag bez geometrie; počítanie použitia by znamenalo rekurzívny sken modelu pri každom pushi. Testy: `tests/pure/test_d27_tagy.rb`,
+`tests/js/test_d27_tagy.js`, in-SketchUp sekcia `run_d27`.
+
 ### zone_tree.rb
 
 strom zón (štandard §1 a §5), čisto výpočtový modul (mm Float). Uzol = `{ id, generation, split, shelves, children }`; delenie `split = { axis, count, cuts[] }`, `cuts[i] = { size,

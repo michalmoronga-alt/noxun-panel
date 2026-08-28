@@ -883,6 +883,29 @@
      otvara sa tam, kam pouzivatel klikol. `.crail` nema overflow, takze
      absolutne pozicovany potomok smie presahovat doprava nad obsah panela. */
   .nx-inspector .ecmenu-rail { top: -6px; left: 40px; z-index: 60; }
+  /* --- D-27: OKNO VIDITELNOSTI TAGOV MODELU -------------------------------
+     Vlastny obal (`.railmenu`), NIE `.railfly`: ten kresli rohovy trojuholnik
+     kazdemu `.railbtn` v sebe a tu by klamal — tlacidlo nema „druhu akciu",
+     cele otvara okno (UI_DIZAJN §5.11). Okno je OVERLAY pri raile, teda
+     rovnaka poloha ako `.ecmenu-rail`; vertikalny priestor panela sa jeho
+     otvorenim nemeni. */
+  .nx-inspector .railmenu { position: relative; flex: 0 0 auto; display: inline-flex; }
+  .nx-inspector .tgmenu { display: none; position: absolute; top: -6px; left: 40px; z-index: 60;
+            min-width: 208px; background: var(--nx-surface); border: 1px solid var(--nx-border);
+            border-radius: 8px; box-shadow: 0 4px 14px var(--nx-modal-shadow); padding: 5px 0; }
+  .nx-inspector .tgmenu.open { display: block; }
+  .nx-inspector .tgmenu .mgrp { font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+            color: var(--nx-ink-faint); padding: 2px 12px 4px; }
+  .nx-inspector .tgopt { display: flex; align-items: center; gap: 8px; padding: 4px 12px;
+            font-size: 12px; color: var(--nx-ink-label); cursor: pointer; }
+  .nx-inspector .tgopt:hover { background: var(--nx-select-bg-soft); }
+  .nx-inspector .tgopt input { accent-color: var(--nx-select); margin: 0; }
+  .nx-inspector .tgopt > span { flex: 1; }
+  /* Skryty PRIECINOK tagov = tag je zapnuty, ale vidiet ho aj tak nie je.
+     Jantarova rodina (upozornenie), nie stavova ani ABS. */
+  .nx-inspector .tgopt .tgnote { font-weight: 400; font-size: 11px; color: var(--nx-warnchip-fg); }
+  .nx-inspector .tgempty { padding: 2px 12px 6px; font-size: 11.5px; color: var(--nx-ink-muted);
+            max-width: 208px; }
   /* Bublina s popisom — rail je uzky, nazov kontextu sa don nezmesti. */
   .nx-inspector .railtip { position: absolute; left: 40px; top: 50%; transform: translateY(-50%);
             background: var(--nx-ink); color: var(--nx-on-accent); font-size: 11px; font-weight: 400;
