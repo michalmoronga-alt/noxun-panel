@@ -171,7 +171,11 @@ Tri veci, ktoré samotné obalenie zámkom NEVYRIEŠILO a preto majú vlastnú m
 - **kontrola revízie je AŽ POD zámkom** — kým sedela pred ním, druhá inštancia stihla medzi ňou a zápisom uložiť svoje a my sme to zmazali s hláškou „uložené";
 - **`load_with_revision`** — payload sekcie berie knižnicu aj jej revíziu z JEDNÉHO stavu súboru; kým to boli dve volania, cudzí zápis medzi nimi vyrobil payload so STARÝMI
   setmi a NOVOU revíziou, taký formulár prešiel guardom a prepísal zmenu, ktorú používateľ nikdy nevidel;
-- **`set_global_mapping!` má odteraz tiež revíziu** (`:ok` / `:conflict` / `false`) — dve otvorené okná meniace ten istý typ kovania si predvoľbu inak ticho prepísali;
+- **`set_global_mapping!` má odteraz tiež revíziu** (`:ok` / `:conflict` / `false`) — dve otvorené okná meniace ten istý typ kovania si predvoľbu inak ticho prepísali. Editor
+  pásiem si revíziu **PRIPÍNA pri otvorení** (`hwsPinRev`) a Uložiť posiela ju, nie čerstvú: rozpísaný draft plný push zámerne prežíva, takže omladená revízia by guard urobila
+  slepým presne v scenári, na ktorý je (lekcia #227 P1). Priamy výber zo selectu draft nemá a používa aktuálnu — select prekresľuje každý push spolu s ňou. A **konflikt je jediný
+  prípad, kedy sa rozpísaný editor ZAHADZUJE** (`HWSETS.mapConflict`, po čerstvom payloade sekcie): s pripnutou zastaranou revíziou by každý ďalší klik konfliktoval donekonečna,
+  hoci hláška sľubuje „obnovené, vyber znova". Pri `:invalid` a zlyhanom zápise editor rozpísaný ZOSTÁVA (hodnoty sa majú opraviť, nie stratiť);
 - **`ensure_seeded` kontroluje dvakrát** (rýchlo, a potom ešte raz pod zámkom) — oneskorený seeder by inak naslepo prepísal seedom reálnu zmenu, ktorú medzitým niekto uložil.
 
 Zámok, ktorý sa nepodarí vziať, je **IOError** — každá zapisovacia cesta ho premení na svoj NEÚSPEŠNÝ výsledok (`false` / `:write_failed`), nikdy na tichý úspech, a seed-merge
