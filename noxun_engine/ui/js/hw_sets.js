@@ -222,6 +222,18 @@
     mapSaved: function(key){
       if (key) delete HWS_SEL[key];
       hwsRenderProj();
+    },
+    // R-08 (review #258 kolo 2, P2): KONFLIKT revízie je jediný prípad, keď sa
+    // rozpísaný editor pásiem ZAHODIŤ MUSÍ. Draft si revíziu PRIPÍNA pri
+    // otvorení; keby po odmietnutí ostal otvorený, každý ďalší klik na
+    // „Uložiť výber" by poslal tú istú zastaranú revíziu a konfliktoval by
+    // donekonečna — hoci hláška tvrdí „obnovené, vyber znova". Zahodenie
+    // draftu je zároveň jediné poctivé správanie: knižnica sa medzitým
+    // zmenila, takže pásma poskladané nad starým stavom už nemusia dávať
+    // zmysel (rovnaká logika ako `SS.saved()` pri konflikte Nastavení).
+    mapConflict: function(key){
+      if (key) delete HWS_SEL[key];
+      hwsRenderProj();
     }
   };
 

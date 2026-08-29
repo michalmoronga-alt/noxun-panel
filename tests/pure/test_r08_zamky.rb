@@ -497,6 +497,29 @@ NxTest.test('R-08 (mutacia): seedovanie ma DVOJITY check a rescue nehlasi uspech
   end
 end
 
+NxTest.test('R-08 (review #258 kolo 2): konflikt globalneho mapovania ZAHODI rozpisany editor pasiem') do
+  # Draft editora pasiem si reviziu PRIPINA pri otvoreni a plny push ho
+  # ZAMERNE nechava zit. Keby po odmietnuti ostal otvoreny, kazdy dalsi klik
+  # na „Ulozit vyber" by poslal TU ISTU zastaranu reviziu a konfliktoval by
+  # donekonecna — hoci hlaska tvrdi „obnovene, vyber znova".
+  r = NxR08
+  door = r.body('ui/hardware_catalog_dialog.rb', 'handle_map_global', 8)
+  NxTest.assert(!door.empty?, 'telo `handle_map_global` sa naslo')
+  conflict = door.index('status == :conflict')
+  NxTest.assert(conflict, 'konfliktova vetva existuje')
+  NxTest.assert(door.index('HWSETS.mapConflict').to_i > conflict,
+                'a v nej sa rozpisany editor pasiem ZAHADZUJE')
+  NxTest.assert(door.index('after_sets_change').to_i < conflict,
+                'sekcia sa najprv obnovi cerstvym payloadom, az potom sa draft zahodi')
+  js = r.src('ui/js/hw_sets.js')
+  NxTest.assert(js.include?('mapConflict: function(key)'), 'klient prijimac ma')
+  NxTest.assert(js[/mapConflict: function\(key\)\{.*?\n    \}/m].to_s.include?('delete HWS_SEL[key]'),
+                'a naozaj draft zahadza (nie len prekresluje)')
+  # Pripnutie revizie (kolo 1, P1) — bez neho by bola cela vetva zbytocna.
+  NxTest.assert(js.include?('hwsPinRev('), 'draft si reviziu pripina pri otvoreni')
+  NxTest.assert(js.include?('hwsMapRev(pinnedRev'), 'a Ulozit posiela PRIPNUTU, nie cerstvu')
+end
+
 NxTest.test('R-08 (mutacia): vsetkych pat katalogov zdiela priecinok Materials') do
   # Mutacia „zamok inde nez data": kym si tri moduly ratali `dir` samy,
   # `test_dir_override` presmeroval zamok do sandboxu, ale zapis ostal

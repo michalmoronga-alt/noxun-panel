@@ -632,14 +632,22 @@ module Noxun
         # R-08 (audit 1d #5): aj globalna predvolba nesie REVIZIU kniznice —
         # dve otvorene okna menajuce ten isty typ kovania by si ju inak ticho
         # prepisali. Nesulad = `:conflict`: sekcia sa obnovi (`after_sets_change`
-        # posiela cerstvy payload) a editor pasiem ostane rozpisany, aby sa
-        # vyber dal zopakovat nad TYM, co je v subore naozaj.
+        # posiela cerstvy payload) a rozpisany editor pasiem sa ZAHODI
+        # (`HWSETS.mapConflict`).
+        #
+        # Review #258 kolo 2 (P2): editor sa tu — na rozdiel od `:invalid` —
+        # rozpisany NECHAT NESMIE. Draft si reviziu PRIPINA pri otvoreni, takze
+        # kazdy dalsi klik na „Ulozit vyber" by poslal TU ISTU zastaranu
+        # reviziu a konfliktoval by donekonecna, hoci hlaska tvrdi „obnovene,
+        # vyber znova". Po zahodeni sa editor otvori nad CERSTVOU kniznicou
+        # a pripne si jej reviziu.
         def handle_map_global(payload)
           data = JSON.parse(payload.to_s)
           status = HardwareSets.set_global_mapping!(data['generic_type'].to_s, mapping_value(data),
                                                     revision: data['revision'].to_s)
           after_sets_change
           if status == :conflict
+            js("HWSETS.mapConflict(#{data['ui_key'].to_s.to_json})")
             return set_status('Knižnica setov sa medzitým zmenila — obnovené, vyber znova.', true)
           end
 
