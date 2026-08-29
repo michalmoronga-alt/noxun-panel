@@ -1052,8 +1052,9 @@ module Noxun
           end
           next if code.nil?
           m_qty = m['qty'].to_i
+          per_owner = m['per'] == 'owner'
           total =
-            if m['per'] == 'owner'
+            if per_owner
               # audit B3: 1x na (korpus, vlastnik, set, kod) — druhe pravidlo
               # s rovnakym vlastnikom TipOn nezdvoji.
               key = [it['owner_id'].to_s, it['owner_part_key'].to_s, sid, code].join('|')
@@ -1063,7 +1064,7 @@ module Noxun
             else
               qty * m_qty
             end
-          add_row(rows, code, total, it, sid, lookup)
+          add_row(rows, code, total, it, sid, lookup, per_owner)
         end
       end
 
@@ -1098,14 +1099,22 @@ module Noxun
         end
       end
 
-      def add_row(rows, code, quantity, it, sid, lookup)
+      # `per_owner` (review #252 P2): zdroj priznava, ci mnozstvo prislo od clena
+      # UCTOVANEHO NA VLASTNIKA. Ma presne jedneho citatela a bez neho by nemal
+      # ako vzniknut: brana exportov (`ProductionCore.dup_partition`) potrebuje
+      # vediet, ci duplicitne ID skrinky NAOZAJ podpocita objednavku. Dedup
+      # `per: 'owner'` je jediny mechanizmus, ktory to sposobi — skrinka, ktorej
+      # sety maju len cleny `per: 'unit'`, sa spocita spravne aj pri zdielanom
+      # ID, a blokovat jej export by bolo zbytocne. Kluc je ADITIVNY (kto ho
+      # nepozna, nic nestrati) a zapisuje sa LEN ked je pravdivy.
+      def add_row(rows, code, quantity, it, sid, lookup, per_owner = false)
         # GH #126 P2: identita kodu je case-insensitive (kontrakt katalogu) —
         # agregacny kluc kanonicky, zobrazuje sa prvy videny zapis.
         row = rows[code.downcase] ||= { 'code' => code, 'quantity' => 0, 'sources' => [],
                                         'manual_quantity' => 0 }
         row['quantity'] += quantity
         note_manual(row, it, quantity)
-        row['sources'] << {
+        src = {
           'cabinet_id' => it['owner_id'].to_s,
           'owner_part_key' => (it['owner_part_key'].nil? ? nil : it['owner_part_key'].to_s),
           'generic_type' => it['generic_type'].to_s,
@@ -1113,6 +1122,8 @@ module Noxun
           'set_id' => sid,
           'quantity' => quantity
         }
+        src['per_owner'] = true if per_owner
+        row['sources'] << src
         row_join(row, lookup)
       end
 

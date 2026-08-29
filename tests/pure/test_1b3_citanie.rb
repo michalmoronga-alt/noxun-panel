@@ -238,35 +238,37 @@ end
 # duplicitna DOSKA, ktora kovanie nema. Rozdelenie na dva texty je zamerne:
 # doska nesmie dostat nepravdivu vetu o kovani.
 
-NxTest.test('1b-3 status: duplicitna DOSKA dostane VAROVANIE s ID — a MLCI o kovani') do
+NxTest.test('1b-3 status: NEBLOKUJUCA duplicita dostane VAROVANIE s ID — a MLCI o kovani') do
   pc = Noxun::Engine::ProductionCore
-  s = pc.dup_id_suffix({ identities: [{ 'kind' => 'board', 'id' => 'BRD-001' }] * 2 })
+  s = pc.dup_id_suffix([['board', 'BRD-001', 2]])
   NxTest.refute(s.empty?, 'sufix vznikol')
   NxTest.assert(s.include?('BRD-001'), "ID v sufixe: #{s}")
   NxTest.assert(s.include?('zlieva do jedného vlastníka'), "dosledok v sufixe: #{s}")
   NxTest.assert(s.include?('Kontrolu'), "kam sa pozriet: #{s}")
-  NxTest.refute(s.include?('kovanie'), "doska o kovani nehovori: #{s}")
+  NxTest.refute(s.include?('kovanie'), "bez owner clena sa o kovani nehovori: #{s}")
 end
 
-NxTest.test('1b-3 status: duplicitna SKRINKA sa uz do sufixu NEDOSTANE (zastavi ju brana)') do
+NxTest.test('1b-3 status: SKRINKA so zliatym kovanim sa uz do sufixu NEDOSTANE (zastavi ju brana)') do
   pc = Noxun::Engine::ProductionCore
-  NxTest.assert_equal('', pc.dup_id_suffix({ identities: [{ 'kind' => 'cabinet', 'id' => 'CAB-001' }] * 2 }),
+  col = { identities: [{ 'kind' => 'cabinet', 'id' => 'CAB-001' }] * 2 }
+  exp = { 'rows' => [{ 'code' => 'TIPON', 'sources' => [{ 'cabinet_id' => 'CAB-001',
+                                                          'per_owner' => true }] }] }
+  blocking, warn = pc.dup_partition(col, exp)
+  NxTest.assert_equal(['CAB-001'], blocking.map { |_k, id, _n| id })
+  NxTest.assert_equal('', pc.dup_id_suffix(warn),
                       'varovanie pod hotovym suborom bolo neskoro — dnes subor nevznikne')
 end
 
 NxTest.test('1b-3 status: bez duplicity je sufix PRAZDNY (ziadny hluk v beznom exporte)') do
   pc = Noxun::Engine::ProductionCore
-  NxTest.assert_equal('', pc.dup_id_suffix({ identities: [{ 'kind' => 'board', 'id' => 'BRD-001' },
-                                                          { 'kind' => 'board', 'id' => 'BRD-002' }] }))
-  NxTest.assert_equal('', pc.dup_id_suffix({}))
+  NxTest.assert_equal('', pc.dup_id_suffix([]))
   NxTest.assert_equal('', pc.dup_id_suffix(nil))
 end
 
 NxTest.test('1b-3 status: strop na tri ID + „a ďalšie N" (stavovy riadok nie je odsek)') do
   pc = Noxun::Engine::ProductionCore
-  ids = %w[BRD-001 BRD-002 BRD-003 BRD-004 BRD-005]
-  recs = ids.flat_map { |i| [{ 'kind' => 'board', 'id' => i }] * 2 }
-  s = pc.dup_id_suffix({ identities: recs })
+  dups = %w[BRD-001 BRD-002 BRD-003 BRD-004 BRD-005].map { |i| ['board', i, 2] }
+  s = pc.dup_id_suffix(dups)
   NxTest.assert(s.include?('BRD-003'), s)
   NxTest.refute(s.include?('BRD-004'), "stvrte ID sa uz nevypisuje: #{s}")
   NxTest.assert(s.include?('a ďalšie 2'), "zvysok sa PRIZNA cislom: #{s}")
@@ -285,20 +287,19 @@ end
 
 NxTest.test('1b-3 status: cenova ponuka ma varovanie v SVOJOM zozname dovodov (nie ako sufix)') do
   pc = Noxun::Engine::ProductionCore
-  dups = { identities: [{ 'kind' => 'board', 'id' => 'BRD-007' }] * 2 }
-  w = pc.cp_warnings([], dups)
+  w = pc.cp_warnings([], [['board', 'BRD-007', 2]])
   NxTest.assert_equal(1, w.length, w.inspect)
   NxTest.assert(w.first.include?('BRD-007'), w.first)
-  NxTest.refute(w.first.include?('kovanie'), "doska o kovani nehovori ani v CP: #{w.first}")
-  # bez duplicity a bez `collected` (legacy volanie) sa nemeni NIC
+  NxTest.refute(w.first.include?('kovanie'), "bez owner clena sa o kovani nehovori ani v CP: #{w.first}")
+  # bez duplicity (a bez volitelnych argumentov) sa nemeni NIC
   NxTest.assert_equal(0, pc.cp_warnings([]).length)
-  # …a export jej zber NAOZAJ ODOVZDA. Bez tohto assertu prejde mutacia
-  # „vynechaj druhy argument" zelena: `collected` je nepovinne, takze CP by
+  # …a export jej NEBLOKUJUCE duplicity NAOZAJ ODOVZDA. Bez tohto assertu prejde
+  # mutacia „vynechaj druhy argument" zelena: je nepovinny, takze CP by
   # o duplicite mlcalo a nic by nespadlo.
   body = Nx1b3Fix.pc_src[/def do_cp_xlsx\(model, data, generation:, status:, repush:\).*?\n      rescue StandardError/m].to_s
   NxTest.refute(body.empty?, 'do_cp_xlsx sa nasla')
-  NxTest.assert(body.include?('cp_warnings(hits, collected, unpriced)'),
-                'zoznam dovodov dostava CERSTVY zber, nie prazdno')
+  NxTest.assert(body.include?('cp_warnings(hits, warn_dups, unpriced)'),
+                'zoznam dovodov dostava CERSTVE duplicity, nie prazdno')
 end
 
 NxTest.test('1b-3 status: VEPO sufix NEDOSTAVA — nalez uz nesie `control_suffix` a LOG') do

@@ -785,12 +785,56 @@ module Noxun
       #
       # Strop na tri ID + „a ďalšie N" (vzor hlasky validacie pravidiel): stavovy
       # riadok nie je odsek.
-      def dup_id_suffix(collected)
-        dups = Validation.duplicate_plain_ids(identities_of(collected))
-        return '' if dups.empty?
+      def dup_id_suffix(dups)
+        return '' if Array(dups).empty?
 
-        " · POZOR: v modeli sú dosky so spoločným ID (#{dup_ids_text(dups)}) — kusovník ich " \
+        " · POZOR: v modeli sú kusy so spoločným ID (#{dup_ids_text(dups)}) — kusovník ich " \
           'zlieva do jedného vlastníka; pozri Kontrolu.'
+      end
+
+      # --- review #252 P2: BLOKUJE LEN SKUTOCNA KOLIZIA -----------------------
+      #
+      # Duplicitne ID skrinky podpocita objednavku IBA vtedy, ked ma jej set
+      # clena `per: 'owner'` — ten sa deduplikuje klucom z `owner_id`
+      # (`HardwareSets.expand_members`), takze dve fyzicke skrinky dostanu napr.
+      # TipOn raz. Skrinka, ktorej sety maju len cleny `per: 'unit'` (napr.
+      # klasicky zaves), sa spocita SPRAVNE aj pri zdielanom ID — zastavit jej
+      # export by znamenalo brat pouzivatelovi platny vystup bez dovodu.
+      # Dosledok je teda PODMIENENY presne tak, ako ho popisuje odsek
+      # `validation.rb` v docs/architecture/outputs.md.
+      #
+      # -> [blokujuce, varovacie] — obe v tvare `Validation.duplicate_identities`.
+      # Do varovacich patri VSETKO ostatne (dosky aj skrinky bez owner clena):
+      # kusovnik ich zlieva do jedneho vlastnika, takze sa musia priznat, ale
+      # zapis suboru nezastavia a NIKDY nedostanu vetu o kovani.
+      #
+      # NEZNAMA EXPANZIA = BLOKUJE. Ked sa expanzia nedala zostavit, kolizia sa
+      # nedokaze ani vyvratit — pri objednavke je bezpecnejsie zastavit.
+      def dup_partition(collected, expansion)
+        ident = identities_of(collected)
+        cabs = Validation.duplicate_owner_ids(ident)
+        others = Validation.duplicate_plain_ids(ident)
+        return [[], others] if cabs.empty?
+
+        merged = owner_scoped_cabinet_ids(expansion)
+        blocking, harmless = cabs.partition { |_kind, id, _n| merged.nil? || merged[id] }
+        [blocking, (harmless + others).sort_by { |kind, id, _n| [kind, id] }]
+      end
+
+      # ID skriniek, ktorym expanzia pridelila aspon jedneho clena uctovaneho
+      # na vlastnika. `nil` = expanziu nemame (chyba katalogu/setov).
+      def owner_scoped_cabinet_ids(expansion)
+        return nil unless expansion.is_a?(Hash)
+
+        out = {}
+        Array(expansion['rows']).each do |row|
+          next unless row.is_a?(Hash)
+
+          Array(row['sources']).each do |src|
+            out[src['cabinet_id'].to_s] = true if src.is_a?(Hash) && src['per_owner']
+          end
+        end
+        out
       end
 
       # Jedno citanie `identities` zo zberu pre vsetkych, co kriterium duplicit
@@ -848,13 +892,13 @@ module Noxun
       # zastavilo vyrobu (audit to hovori vyslovne).
       #
       # Volajuci posiela LEN to, co sa jeho vystupu tyka:
-      #   `collected:` — nakupny CSV, rozpocet aj ponuka (zliati vlastnici),
-      #   `cp:`        — LEN ponuka (zaporna zostava, nesulad s rozpoctom).
+      #   `dups:` — BLOKUJUCA polovica `dup_partition` (nakupny CSV, rozpocet
+      #             aj ponuka); varovacia polovica sem NEPATRI,
+      #   `cp:`   — LEN ponuka (zaporna zostava, nesulad s rozpoctom).
       # -> [dovod, ...]; prazdne pole = zapis smie prebehnut.
-      def export_blockers(collected: nil, cp: nil)
+      def export_blockers(dups: [], cp: nil)
         out = []
-        dups = Validation.duplicate_owner_ids(identities_of(collected))
-        unless dups.empty?
+        unless Array(dups).empty?
           out << "v modeli sú skrinky so spoločným ID (#{dup_ids_text(dups)}) — kovanie účtované " \
                  'na vlastníka (napr. TipOn) by sa započítalo len raz; oprav ich v sekcii Kontrola'
         end
@@ -1286,7 +1330,9 @@ module Noxun
 
         # P0-HF-02: FINALNA BRANA PRED VYBEROM SUBORU. Zliati vlastnici =
         # podpocitane kovanie; toto CSV ide dodavatelovi, takze nesmie vzniknut.
-        blockers = export_blockers(collected: collected)
+        # Blokuje LEN skutocna kolizia (review #252 P2) — rozhoduje expanzia.
+        blocking_dups, warn_dups = dup_partition(collected, exp)
+        blockers = export_blockers(dups: blocking_dups)
         return status.call(export_blocked_status(blockers), true) unless blockers.empty?
 
         # audit #1: nazov projektu je SERVEROVA autorita (jeden nazov pre
@@ -1302,7 +1348,7 @@ module Noxun
         save_vepo_settings('last_dir' => File.dirname(target))
         n = Array(exp['rows']).length
         un = Array(exp['unmapped']).length
-        dup = dup_id_suffix(collected)
+        dup = dup_id_suffix(warn_dups)
         status.call("Nákupný zoznam: #{n} položiek" \
                     "#{un.positive? ? " + #{un} nemapovaných (v CSV aj KONTROLE)" : ''} → #{target}#{dup}",
                     un.positive? || !dup.empty?)
@@ -1753,14 +1799,18 @@ module Noxun
         refresh_vepo_settings # 1b-6c: nazov zakazky z CERSTVEHO suboru
         collected = fresh_collect(model)
         bom = Bom.compute(collected)
-        budget = budget_payload(model, bom, collected)
+        # Expanzia sa pocita RAZ a odovzda sa rozpoctu (inak by ju zostavil
+        # sam) — brana z nej cita, ci duplicitne ID naozaj zlieva vlastnikov.
+        hw_exp = hardware_expansion(model, collected)
+        budget = budget_payload(model, bom, collected, nil, hw_exp)
         return status.call('Rozpočet sa nepodarilo zostaviť (pozri Ruby konzolu).', true) if budget.nil?
 
         # P0-HF-01/02: FINALNA CENOVA BRANA PRED VYBEROM SUBORU — dve vetvy.
         # TVRDA (zliati vlastnici kovania) zapis nepusti nikdy; POTVRDITELNA
         # (riadky bez ceny) ho zastavi prvykrat a druhy klik ju s potvrdenim
         # prejde. Varovanie pod hotovym harkom bolo v oboch pripadoch neskoro.
-        blockers = export_blockers(collected: collected)
+        blocking_dups, warn_dups = dup_partition(collected, hw_exp)
+        blockers = export_blockers(dups: blocking_dups)
         return status.call(export_blocked_status(blockers), true) unless blockers.empty?
 
         unpriced = export_confirmations(budget: budget)
@@ -1784,7 +1834,7 @@ module Noxun
         # priznat (STANDARD §11.3) — a status ostava cerveny.
         note = export_confirmed_notes(unpriced)
         warn = note.empty? ? '' : " · POZOR: #{note.join(' · ')}"
-        dup = dup_id_suffix(collected)
+        dup = dup_id_suffix(warn_dups)
         status.call("Rozpočet uložený: #{fmt_eur(totals['total'])} → #{target}#{warn}#{dup}",
                     !warn.empty? || !dup.empty?)
       rescue StandardError => e
@@ -1830,7 +1880,8 @@ module Noxun
         # FIREWALL interných pojmov branou NIE JE (STANDARD §11.3: hlasi
         # a neblokuje) — vyhodnocuje sa az nad hotovym harkom a ide do
         # `cp_warnings`.
-        blockers = export_blockers(collected: collected, cp: cp)
+        blocking_dups, warn_dups = dup_partition(collected, hw_exp)
+        blockers = export_blockers(dups: blocking_dups, cp: cp)
         return status.call(export_blocked_status(blockers), true) unless blockers.empty?
 
         unpriced = export_confirmations(budget: budget)
@@ -1849,7 +1900,7 @@ module Noxun
         hits = CpExport.firewall_hits(CpXlsx.text_cells(sheets))
         XlsxWriter.write_book(target, sheets, now: now)
         save_vepo_settings('last_dir' => File.dirname(target))
-        warnings = cp_warnings(hits, collected, unpriced)
+        warnings = cp_warnings(hits, warn_dups, unpriced)
         status.call(cp_status(cp, spec, target, warnings), !warnings.empty?)
       rescue StandardError => e
         Engine.log_error(e, 'ProductionCore.do_cp_xlsx')
@@ -1871,13 +1922,14 @@ module Noxun
       #   * INTERNE POJMY z firewallu — STANDARD §11.3 to ma vyslovne ako
       #     „hlasi a neblokuje" (rucne napisany text sa da opravit a exportovat
       #     znova, cena tym nie je zla),
-      #   * duplicitna DOSKA — kovanie nema, cize cena ponuky sedi; kusovnik ju
-      #     vsak s dvojnickou zlieva, takze sa to prizna (nikdy textom o kovani).
-      def cp_warnings(hits, collected = nil, confirmed = [])
+      #   * NEBLOKUJUCA duplicita — doska (kovanie nema) alebo skrinka, ktorej
+      #     sety nemaju clena uctovaneho na vlastnika (review #252 P2): cena
+      #     ponuky sedi, ale kusovnik ich s dvojnickou zlieva, takze sa to
+      #     prizna — nikdy textom o kovani.
+      def cp_warnings(hits, dups = [], confirmed = [])
         out = export_confirmed_notes(confirmed)
-        dups = Validation.duplicate_plain_ids(identities_of(collected))
-        unless dups.empty?
-          out << "v modeli sú dosky so spoločným ID (#{dup_ids_text(dups)}) — kusovník ich " \
+        unless Array(dups).empty?
+          out << "v modeli sú kusy so spoločným ID (#{dup_ids_text(dups)}) — kusovník ich " \
                  'zlieva do jedného vlastníka; pozri Kontrolu'
         end
         unless Array(hits).empty?

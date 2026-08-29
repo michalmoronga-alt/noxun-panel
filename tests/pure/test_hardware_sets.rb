@@ -149,6 +149,21 @@ NxTest.test('hw sety: expand — per owner TipOn 1x na dvierka, dedup cez dve pr
   NxTest.assert_equal(2, NxSets.row(res2, '250831')['quantity'], 'ine dvierka = druhy TipOn')
 end
 
+# review #252 P2: brana exportov musi vediet ROZLISIT, ci duplicitne ID skrinky
+# naozaj podpocita objednavku — a to sposobi VYHRADNE dedup clena `per: 'owner'`.
+# Bez tohto priznaku by sa blokoval aj export zakazky, ktora ma len `per: 'unit'`
+# cleny a spocita sa spravne aj pri zdielanom ID.
+NxTest.test('hw sety: zdroj riadku PRIZNAVA, ci clen bol uctovany NA VLASTNIKA (`per_owner`)') do
+  st = NxSets.state
+  st['mapping']['hinge'] = 'zaves-p2o'
+  res = HWS.expand([NxSets.hinge_item('quantity' => 3)], st, catalog: NxSets.catalog)
+  owner = NxSets.row(res, '250831')['sources'].first
+  unit  = NxSets.row(res, '245723')['sources'].first
+  NxTest.assert_equal(true, owner['per_owner'], 'TipOn (per: owner) je oznaceny')
+  NxTest.assert_equal(nil, unit['per_owner'], 'per: unit clen priznak NEMA (kluc je aditivny)')
+  NxTest.assert_equal(owner['cabinet_id'], unit['cabinet_id'], 'obe z tej istej skrinky')
+end
+
 NxTest.test('hw sety: expand — rad podla NL, presny kluc, sused NIKDY (F10)') do
   res = HWS.expand([NxSets.slide_item(470.0)], NxSets.state, catalog: NxSets.catalog)
   NxTest.assert_equal(1, NxSets.row(res, '357696')['quantity'], 'NL 470 -> 357696')

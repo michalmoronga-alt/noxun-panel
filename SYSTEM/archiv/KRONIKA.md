@@ -44,15 +44,18 @@
   **VEPO bránu nedostáva** — audit ho výslovne vyníma: je to rezací výstup, nie cena ani objednávka, duplicitná identita jeho čísla neskresľuje a chybné riadky vyhadzuje sám do
   LOGu. Blokovať ho bez samostatného dôkazu by len zastavilo výrobu.
 
-  **Predikát musí rozlíšiť skrinku od dosky.** Zliatie vlastníkov podpočíta kovanie len pri **skrinkách**; doska kovanie nemá, takže export nezastaví — kusovník ju však
-  s dvojníčkou zlieva, preto sa prizná ako neblokujúce varovanie. Do 29.8. `dup_id_suffix` aj `cp_warnings` `kind` zahadzovali a vetu o kovaní tvrdili aj nad doskou (seedy **A7**
-  a **C6** sweepu — oba touto dávkou vyriešené, rovnako ako **A3**). Kritérium má jeden zdroj vo `validation.rb`: `duplicate_owner_ids` (blokuje) a `duplicate_plain_ids` (varuje)
-  sú dva pohľady na tú istú `duplicate_identities` a tá istá podmienka rozhoduje aj o znení nálezu Kontroly.
+  **Zastaviť smie len SKUTOČNÁ kolízia.** Objednávku podpočíta výhradne dedup člena `per: 'owner'`, takže blokovať sa smie len duplicitné ID **skrinky, ktorej sety taký člen
+  naozaj pridelili**. Doska kovanie nemá a skrinka so samými `per: 'unit'` členmi (klasický záves) sa spočíta správne aj pri zdieľanom ID — obe idú len do neblokujúceho varovania
+  („kusovník ich zlieva do jedného vlastníka"), nikdy s vetou o kovaní. Do 29.8. `dup_id_suffix` aj `cp_warnings` `kind` zahadzovali a vetu o kovaní tvrdili aj nad doskou (seedy
+  **A7** a **C6** sweepu — oba touto dávkou vyriešené, rovnako ako **A3**). *Prvé kolo blokovalo každú duplicitnú skrinku a **review #252 P2** na to upozornilo: dôsledok je podľa
+  vlastnej dokumentácie PODMIENENÝ. Odvtedy podklad nesie expanzia sama (`add_row` značí zdroj príznakom `per_owner`) a `dup_partition` z nej rozdelí duplicity na blokujúce
+  a varovacie; **neznáma expanzia blokuje** — kolíziu nemožno ani dokázať, ani vyvrátiť, a pri objednávke je bezpečnejšie zastaviť.*
 
   **Testovanie:** nová sada `tests/pure/test_p0hf_brany.rb` meria pri každom dôvode **prázdny priečinok** (nie text statusu) a zároveň to, že sa `savepanel` ani neotvoril; nová JS
   sada `tests/js/test_p0hf_potvrdenie.js` stráži dvojkrokový klik, viazanie potvrdenia na počet a zrušenie potvrdenia pri čerstvom payloade. Mutačné overenie: vypnutie brány pre
-  CSV · pre ponuku · potvrdzovacia vetva, ktorá nikdy nezastaví · predikát nerozlišujúci dosku — každá zhodila práve svoje testy. **2026 headless · 72 JS sád.** In-SketchUp beh
-  netreba (žiadne buildery ani observery). PR **#252**, jedno kolo review (1× P1).
+  CSV · pre ponuku · potvrdzovacia vetva, ktorá nikdy nezastaví · predikát nerozlišujúci dosku · neviazané potvrdenie · chýbajúci repush · brána blokujúca každú duplicitnú skrinku ·
+  expanzia bez `per_owner` — každá zhodila práve svoje testy. **2031 headless · 72 JS sád.** In-SketchUp beh netreba (žiadne buildery ani observery). PR **#252**, dve kolá review
+  (1× P1, 1× P2).
 
 - **F/D-27 · TAGY MODELU SA PREPÍNAJÚ Z PANELA (28.8.2026, v0.8.13):** odrážka **F** bloku 1b, postreh **D-27** (Michal 19.7.). V raile Inspectora pribudla **ikona oka**, ktorá
   otvorí zoznam NOXUN tagov modelu (Korpus · Chrbát · Čelá · Vnútro · Kovanie · Dosky · Zóny) a jedným klikom ich zobrazí alebo skryje — bez chodenia do natívneho okna Tags.

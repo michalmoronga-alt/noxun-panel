@@ -71,8 +71,21 @@ module NxP0
       'cp_preview' => cp(cp_over) }
   end
 
-  def hw_exp
-    { 'rows' => [{ 'code' => 'TIPON', 'quantity' => 2, 'sources' => [] }], 'unmapped' => [] }
+  # Expanzia kovania. `owner_ids` = skrinky, ktorym set pridelil clena
+  # UCTOVANEHO NA VLASTNIKA (`per: 'owner'`) — prave a len tie moze zdielane ID
+  # podpocitat, takze prave a len ony smu export zastavit (review #252 P2).
+  # Prazdny zoznam = zakazka ma len cleny `per: 'unit'` (napr. klasicky zaves).
+  def hw_exp(owner_ids = [])
+    srcs = Array(owner_ids).map { |id| { 'cabinet_id' => id, 'quantity' => 1, 'per_owner' => true } }
+    { 'rows' => [{ 'code' => 'TIPON', 'quantity' => 2, 'sources' => srcs }], 'unmapped' => [] }
+  end
+
+  # Vsetky ID skriniek zo zberu — predvolba pre `base_stubs`: bezna zakazka
+  # kovanie uctovane na vlastnika MA (TipOn na dvierkach).
+  def cabinet_ids(col)
+    Array(col.is_a?(Hash) ? col[:identities] : nil)
+      .select { |r| r.is_a?(Hash) && r['kind'] == 'cabinet' }
+      .map { |r| r['id'].to_s }.uniq
   end
 
   # --- stubbing ------------------------------------------------------------
@@ -138,8 +151,8 @@ module NxP0
   # Spolocne stuby pre vsetky tri cenove/nakupne exporty.
   # POZOR: telo lambdy sa cez `define_method` viaze na ProductionCore — vsetko,
   # co ma vratit, musi byt LOKALNA premenna zachytena TU, nie volanie na NxP0.
-  def base_stubs(col, bud)
-    exp = hw_exp
+  def base_stubs(col, bud, owner_ids = nil)
+    exp = hw_exp(owner_ids.nil? ? cabinet_ids(col) : owner_ids)
     { refresh_vepo_settings: ->(*_a) {},
       vepo_settings: ->(*_a) { {} },
       save_vepo_settings: ->(*_a) { true },
@@ -158,43 +171,81 @@ end
 # --- 1. PREDIKAT ------------------------------------------------------------
 
 NxTest.test('P0-HF: cista zakazka nema ZIADNY dovod na zastavenie (brana nemeri prazdno)') do
-  NxTest.assert_equal([], NxP0::PC.export_blockers(collected: NxP0.collected, cp: NxP0.cp))
+  blocking, warn = NxP0::PC.dup_partition(NxP0.collected, NxP0.hw_exp)
+  NxTest.assert_equal([], blocking)
+  NxTest.assert_equal([], warn)
+  NxTest.assert_equal([], NxP0::PC.export_blockers(dups: blocking, cp: NxP0.cp))
   NxTest.assert_equal([], NxP0::PC.export_confirmations(budget: NxP0.budget))
   # bez argumentov (legacy volanie / vystup, ktoreho sa brana netyka) tiez nic
   NxTest.assert_equal([], NxP0::PC.export_blockers)
   NxTest.assert_equal([], NxP0::PC.export_confirmations)
 end
 
-NxTest.test('P0-HF-02: duplicitna SKRINKA je dovod — hovori ID, dosledok aj KDE to opravit') do
-  b = NxP0::PC.export_blockers(collected: NxP0.collected(NxP0.ident('CAB-001')))
+NxTest.test('P0-HF-02: duplicitna SKRINKA s kovanim NA VLASTNIKA je dovod — ID, dosledok aj KDE opravit') do
+  col = NxP0.collected(NxP0.ident('CAB-001'))
+  blocking, warn = NxP0::PC.dup_partition(col, NxP0.hw_exp(['CAB-001']))
+  NxTest.assert_equal([['cabinet', 'CAB-001', 2]], blocking)
+  NxTest.assert_equal([], warn)
+  b = NxP0::PC.export_blockers(dups: blocking)
   NxTest.assert_equal(1, b.length, b.inspect)
   NxTest.assert(b.first.include?('CAB-001'), b.first)
   NxTest.assert(b.first.include?('kovanie'), "dosledok pre objednavku: #{b.first}")
   NxTest.assert(b.first.include?('Kontrola'), "kam ist opravit: #{b.first}")
 end
 
+# --- review #252 P2: dosledok je PODMIENENY ---------------------------------
+#
+# Zliatie vlastnikov podpocita objednavku IBA cez clena `per: 'owner'`. Skrinka,
+# ktorej sety maju len cleny `per: 'unit'` (klasicky zaves), sa spocita spravne
+# aj pri zdielanom ID — zastavit jej export by bolo brat platny vystup bez dovodu.
+
+NxTest.test('P0-HF-02: duplicitna skrinka BEZ kovania na vlastnika NEBLOKUJE — len varuje') do
+  col = NxP0.collected(NxP0.ident('CAB-004'))
+  blocking, warn = NxP0::PC.dup_partition(col, NxP0.hw_exp) # ziadny `per_owner` zdroj
+  NxTest.assert_equal([], blocking, 'cislo objednavky je spravne, takze niet co zastavovat')
+  NxTest.assert_equal([['cabinet', 'CAB-004', 2]], warn, 'ale kusovnik ich zlieva — prizna sa')
+  s = NxP0::PC.dup_id_suffix(warn)
+  NxTest.assert(s.include?('CAB-004'), s)
+  NxTest.refute(s.include?('kovanie'), "bez owner clena sa o kovani NEHOVORI: #{s}")
+end
+
+NxTest.test('P0-HF-02: blokuje LEN tu skrinku, ktora owner clena naozaj ma') do
+  col = NxP0.collected(NxP0.ident('CAB-005') + NxP0.ident('CAB-006'))
+  blocking, warn = NxP0::PC.dup_partition(col, NxP0.hw_exp(['CAB-006']))
+  NxTest.assert_equal(['CAB-006'], blocking.map { |_k, id, _n| id })
+  NxTest.assert_equal(['CAB-005'], warn.map { |_k, id, _n| id })
+end
+
+NxTest.test('P0-HF-02: NEZNAMA expanzia blokuje (koliziu nemozno vyvratit)') do
+  col = NxP0.collected(NxP0.ident('CAB-007'))
+  blocking, = NxP0::PC.dup_partition(col, nil)
+  NxTest.assert_equal(['CAB-007'], blocking.map { |_k, id, _n| id },
+                      'pri objednavke je bezpecnejsie zastavit, nez hadat')
+end
+
 NxTest.test('P0-HF-02: duplicitna DOSKA NEBLOKUJE — a nikdy nedostane text o kovani') do
-  ids = NxP0.collected(NxP0.ident('BRD-001', kind: 'board'))
-  NxTest.assert_equal([], NxP0::PC.export_blockers(collected: ids),
-                      'doska kovanie nema, takze podpocet objednavky nehrozi')
+  col = NxP0.collected(NxP0.ident('BRD-001', kind: 'board'))
+  blocking, warn = NxP0::PC.dup_partition(col, NxP0.hw_exp(['BRD-001']))
+  NxTest.assert_equal([], blocking, 'doska kovanie nema, takze podpocet objednavky nehrozi')
   # ...ale prizna sa ako NEBLOKUJUCE varovanie — bez vety o kovani
-  s = NxP0::PC.dup_id_suffix(ids)
+  s = NxP0::PC.dup_id_suffix(warn)
   NxTest.refute(s.empty?, 'nalez sa neprehltne')
   NxTest.refute(s.include?('kovanie'), s)
 end
 
 NxTest.test('P0-HF-02: mix skrinka + doska — blokuje LEN skrinka, doska ostava vo varovani') do
   col = NxP0.collected(NxP0.ident('CAB-002') + NxP0.ident('BRD-002', kind: 'board'))
-  b = NxP0::PC.export_blockers(collected: col)
+  blocking, warn = NxP0::PC.dup_partition(col, NxP0.hw_exp(['CAB-002']))
+  b = NxP0::PC.export_blockers(dups: blocking)
   NxTest.assert_equal(1, b.length, b.inspect)
   NxTest.assert(b.first.include?('CAB-002'), b.first)
   NxTest.refute(b.first.include?('BRD-002'), "doska do blokujuceho dovodu nepatri: #{b.first}")
-  NxTest.assert(NxP0::PC.dup_id_suffix(col).include?('BRD-002'), 'doska je vo varovani')
+  NxTest.assert(NxP0::PC.dup_id_suffix(warn).include?('BRD-002'), 'doska je vo varovani')
 end
 
 NxTest.test('P0-HF-01: riadok bez ceny je POTVRDITELNY dovod, nie tvrdy blok (STANDARD §11.3)') do
   # rozpracovany rozpocet MUSI ostat exportovatelny — preto NIE `export_blockers`
-  NxTest.assert_equal([], NxP0::PC.export_blockers(collected: NxP0.collected, cp: NxP0.cp))
+  NxTest.assert_equal([], NxP0::PC.export_blockers(dups: [], cp: NxP0.cp))
   c = NxP0::PC.export_confirmations(budget: NxP0.budget(miss: 3))
   NxTest.assert_equal(1, c.length, c.inspect)
   NxTest.assert(c.first.include?('3 riadkov'), c.first)
@@ -435,6 +486,19 @@ if NxTest.headless?
       NxTest.assert_equal([], files, 'objednavka s podpoctom nesmie vzniknut')
       NxTest.assert_equal([], calls)
       NxTest.assert(err && msg.include?('CAB-005') && msg.include?('TipOn'), msg)
+    end
+  end
+
+  NxTest.test('P0-HF-02: duplicitna skrinka BEZ owner clena nakupny CSV NEZASTAVI (review #252 P2)') do
+    NxP0.in_tmp do |dir|
+      # zakazka ma len cleny `per: 'unit'` (klasicky zaves) — cislo objednavky
+      # je spravne aj pri zdielanom ID, takze zastavit ju by bolo bez dovodu
+      stubs = NxP0.base_stubs(NxP0.collected(NxP0.ident('CAB-005')), NxP0.budget, [])
+      msg, err, files, = NxP0.run_export(:do_hw_csv, stubs, dir, 'kovanie.csv')
+      NxTest.assert_equal(['kovanie.csv'], files, 'platny vystup sa brat nesmie')
+      NxTest.assert(err, 'ale kusovnik ich zlieva — status varuje')
+      NxTest.assert(msg.include?('CAB-005'), msg)
+      NxTest.refute(msg.include?('kovanie účtované'), "a NEtvrdi podpocet kovania: #{msg}")
     end
   end
 
