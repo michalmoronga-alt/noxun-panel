@@ -95,6 +95,15 @@ bez revision) — dve inštancie SketchUpu si prepíšu zmeny. Materials/Templat
 (1b-6c) už sidecar flock vzor MAJÚ. [E:R-06]
 **Návrh:** zjednotiť na `lock → fresh read → revision check/merge → atomic write` (vzor 1b-6c/`materials.lock`);
 začať setmi a pravidlami kovania. **Odhad: M.**
+**✅ dávkou 1d/R-08 (PR #258, v0.8.16)** — všetkých 5 súborov: každý zápis (vrátane `ensure_seeded` a seed-merge v `load`)
+beží pod zdieľaným sidecar zámkom `materials.lock`, pod ním sa číta NANOVO a merge sa PREPOČÍTA; kontrola revízie sa
+presunula DOVNÚTRA zámku (`save_set!`, `delete_set!`, a nová revízia aj v `patch_active!` — dovtedy len v okne).
+Codex audit návrhu pridal 5 blockerov, ktoré sú zapracované: **dir všetkých 5 modulov = `Materials.dir`** (zámok a dáta
+v jednom priečinku aj pod `test_dir_override` — in-SU test dovtedy menil ŽIVÉ ABS/kovanie pravidlá) · **dvojitý check
+v `ensure_seeded`** (oneskorený seeder neprepíše cudziu zmenu) · **`HardwareSets.load_with_revision`** (knižnica a revízia
+z JEDNÉHO stavu súboru — dovtedy payload spájal staré sety s novou revíziou) · **revízia aj pre globálne mapovanie setov**
+(`:ok`/`:conflict`/`false`). **Zvyšok priznaný ako R-35** (úplná náhrada bez revízie: globálne pravidlá kovania a rozmerové
+rady). Testy `tests/pure/test_r08_zamky.rb` (16 scenárov vrátane reálneho dvojprocesového `flock`; 9 mutácií overených).
 
 ### R-09 · P3 · core · `hardware_sets.rb:325` · `hardware_rules.rb:216`
 `seed_version` sa stampuje konštantou → starší plugin ju ZNÍŽI a novší znova doseje zámerne zmazané seed
@@ -248,6 +257,16 @@ rôznym `owner_part_key` majú správne množstvá a brána ich napriek tomu zas
 (falošne pozitívne, len v už ORANGE-označenom stave). Návrh opravy je v threade #252.
 **Návrh:** označovať `owner_id` až pri reálnom preskoku duplikátu. **S.**
 
+### R-35 · P2 · core/ui · `core/hardware_rules.rb:write` + `core/dim_series.rb:set` (+ ich okná)
+Zvyšok po R-08 (z Codex auditu dávky 1d/R-08, nálezy #3 a #6): tieto dva súbory sa zapisujú ako **ÚPLNÁ NÁHRADA
+obsahu** — okno Pravidlá posiela CELÉ pole pravidiel („aj ako globálna predvoľba"), panel posiela CELÝ objekt
+rozmerových radov, a **ani jeden z nich nemá revíziu**. Medziprocesový zámok z R-08 ich zápisy serializuje (a chráni
+pred preplietaním so seed-merge cestou), ale dve súbežne otvorené okná sa nad nimi stále prebíjajú „posledný vyhráva"
+— prvá zmena zanikne bez slova. Nejde teda o dieru v zámku, ale o chýbajúci **optimistický zámok v UI kontrakte**.
+**Návrh:** vzor, ktorý sety aj nastavenia dodávateľa už majú — `global_revision` (SHA odtlačok súboru) do payloadu
+sekcie → klient ju posiela späť → porovnanie POD zámkom → `:conflict` a načítanie formulára nanovo. Pri rozmerových
+radoch je alternatíva zápis PO KĽÚČOCH (rad je nezávislý per rozmer), ktorý revíziu nepotrebuje. **Odhad: S/M.**
+
 ## Vyriešené počas bloku 1b/1c (záznam — nevybavovať)
 
 B1 názov projektu (1b-6a, #244) · B2 hlavičky materiálov (1b-6b, #247) · A1/A2 tichý návrat ceny dekoru
@@ -257,8 +276,8 @@ B1 názov projektu (1b-6a, #244) · B2 hlavičky materiálov (1b-6b, #247) · A1
 
 1. **P0 hotfix** (✅ #252) → 2. **pred GHOST:** R-01+R-04 → R-02 → R-03 *(GHOST package upresňuje: tvrdý
 blocker je len R-03 — GHOST smie na Windows štartovať hneď po ňom; R-01 je macOS vetva, R-02 je na Windows P3
-a R-04 je platformovo nezávislá hygiena — všetky tri sa dorobia v 1d nezávisle od GHOST štartu)* → 3. **pred KOVANÍM:** R-06 brána (S, hneď) ·
-R-07 · R-08 · potom R-05 (+R-06 plný) ako D-109 šev → 4. **pred D-95/VÝROBOU:** R-17, R-16, R-22, po etapách R-15 →
+a R-04 je platformovo nezávislá hygiena — všetky tri sa dorobia v 1d nezávisle od GHOST štartu)* → 3. **pred KOVANÍM:** ~~R-06 brána~~ (✅) ·
+R-07 · ~~R-08~~ (✅) · potom R-05 (+R-06 plný) ako D-109 šev → 4. **pred D-95/VÝROBOU:** R-17, R-16, R-22, po etapách R-15 →
 5. **perzistencia:** R-11 → R-12 → R-14 (R-13 po rozhodnutí Michala) → 6. **UI/hygiena:** R-23.1 Escape (S,
 hocikedy) · R-18 · zvyšok podľa kapacity. R-32 kostry priebežne pred každým zásahom.
 

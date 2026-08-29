@@ -240,6 +240,21 @@ _(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_
 
 Globálne nastavenia dodávateľa (sadzby, režimy €/€€/€€€, prah veku cien); UI je v [ui-lifecycle.md](ui-lifecycle.md), odsek o sekciách `sup`/`bset`/`about`.
 
+**Zápis pod medziprocesovým zámkom a revízia v JADRE (1d/R-08).** `patch_active!` je klasický „prečítaj → uprav → zapíš" nad `%APPDATA%\NOXUN\Engine\supplier_settings.json`
+a kontrola revízie sedela **len v okne** (`supplier_settings_dialog.handle_save`) — medzi ňou a naším zápisom stihla druhá inštancia SketchUpu uložiť svoje sadzby a náš zápis ich
+zmazal, pričom okno hlásilo „Nastavenia uložené". Od tejto dávky beží celé čítanie, kontrola revízie aj zápis **pod jedným zdieľaným sidecar zámkom** `materials.lock`
+(`Materials.with_catalog_lock` — mechanika a dôvod jedného zámku sú v [hardware.md](hardware.md), odsek `hardware_sets.rb`) nad **čerstvo prečítaným** súborom; to isté platí pre
+seed-merge v `load` a pre `ensure_seeded` (dvojitý check — rýchly a ešte raz pod zámkom).
+
+- `patch_active!(patch, revision = nil)` vracia **`[ok, [chyby], status]`** so `status` z `:ok | :invalid | :conflict | :write_failed`. Tretí prvok je **aditívny**, doterajšie
+  `ok, errors = ...` funguje ďalej. `revision` je **pozičný, nie kľúčový** parameter zámerne: metóda sa bežne volá s bezzátvorkovým hashom (`patch_active!('rates' => {...})`)
+  a Ruby 3 by taký hash pri existencii kwargs poslal do nich — z volania by zmizol povinný `patch`.
+- Okno kontroluje revíziu **naďalej aj u seba** (lacno, kvôli hláške a rozpísanému formuláru) a obe vetvy konfliktu končia v tej istej obsluhe `reject_stale` — jedna hláška,
+  jedno správanie (`SS.saved()` + načítanie formulára nanovo).
+- `write` vracia **presný výsledok** `JsonFileStore.write`, nie bezpodmienečné `true` — write guard z R-11 bude vedieť zápis odmietnuť **bez výnimky** a bezpodmienečné `true` by
+  odmietnutie hlásilo ako uložené.
+- `dir` sa pýta `Materials.dir`, aby zámok a dáta boli vždy v jednom priečinku (aj pod `test_dir_override`).
+
 ### vepo_export.rb
 
 _(zatiaľ nezdokumentované — doplniť pri najbližšom zásahu)_

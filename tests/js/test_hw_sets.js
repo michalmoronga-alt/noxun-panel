@@ -7,7 +7,8 @@ const assert = require('node:assert');
 const path = require('node:path');
 const { hwsSlug, hwsSetsForType, hwsMemberSummary, hwsBuildSetPayload,
         hwsEditStateFrom, hwsNum, hwsParamLabel, hwsBandsSummary, hwsBuildBands,
-        hwsSelectorFrom, hwsBuildSelector, hwsProjDraftKeys } =
+        hwsSelectorFrom, hwsBuildSelector, hwsProjDraftKeys,
+        hwsPinRev, hwsMapRev } =
   require(path.join(__dirname, '..', '..', 'noxun_engine', 'ui', 'js', 'hw_sets.js'));
 
 // Slovnik parametrov posiela server (HardwareSets::PARAM_OPTIONS).
@@ -170,5 +171,23 @@ eq(hwsProjDraftKeys(['hws-map-proj|slide', 'hws-map-global|leg', 'hws-map-proj|l
    ['hws-map-proj|slide', 'hws-map-proj|leg'],
    'prepnutie modelu zahodi len projektove drafty, globalne (kniznicne) ostanu');
 eq(hwsProjDraftKeys([]), [], 'ziadne drafty');
+
+// --- 1d/R-08 (review #258 P1): draft editora pasiem si PRIPNE reviziu -------
+// Rozpisany draft plny push ZAMERNE prezije. Keby sa pri Ulozit poslala
+// CERSTVA revizia, serverovy guard by presiel nad stavom, ktory pouzivatel
+// nikdy nevidel — a mapovanie druhej instancie by ticho zmizlo.
+const draft = hwsPinRev({ param: 'height', rows: [{ min: '', max: '', set_id: '' }] }, 'rev-A');
+eq(draft.rev, 'rev-A', 'draft si drzi reviziu z chvile otvorenia');
+eq(hwsMapRev(draft.rev, 'rev-B'), 'rev-A', 'push omladil kniznicu, ale posiela sa PRIPNUTA revizia');
+eq(hwsMapRev(undefined, 'rev-B'), 'rev-B', 'bez draftu (priamy vyber zo selectu) plati aktualna revizia');
+eq(hwsMapRev(null, 'rev-B'), 'rev-B', 'chybajuca pripnuta hodnota = aktualna');
+eq(hwsMapRev('', 'rev-B'), '', 'PRIPNUTA prazdna sa NEDOPLNA cerstvou (bola by to ta ista slepota)');
+eq(hwsMapRev(undefined, undefined), '', 'ziadna revizia = prazdny retazec (server odmietne)');
+// Pripnuta revizia NESMIE presiaknut do payloadu mapovania (je to klientsky
+// stav draftu, nie hodnota mapovania).
+eq(Object.keys(hwsBuildSelector(hwsPinRev({ param: 'height', rows: [{ min: '', max: '900', set_id: 'a' }] }, 'rev-A'))).sort(),
+   ['bands', 'param'],
+   'server dostava CISTY selector — `rev` v nom nie je');
+eq(hwsPinRev(null, 'rev-A'), null, 'null draft je bezpecny');
 
 console.log(`OK — test_hw_sets.js: ${n} testov preslo`);

@@ -55,6 +55,11 @@ mm chytá preklep „140,5"), **celé mm** (desatinná bodka sa zaokrúhli, **č
 Chýbajúci aj poškodený súbor = predvolená sada (nikdy výnimka); **zlyhanie zápisu vracia `nil`** — volajúci to musí povedať nahlas, tichý fallback by ohlásil úspech, ktorý sa
 nestal (to isté platí pre `Engine.set_ui_theme`). Modul o modeli nevie — rad je len **ponuka**, zápis hodnoty ide existujúcou cestou poľa v paneli.
 
+**1d/R-08:** `set` beží pod tým istým zdieľaným sidecar zámkom ako ostatné katalógy priečinka (`Materials.with_catalog_lock`, `materials.lock` — mechanika v
+[hardware.md](hardware.md), odsek `hardware_sets.rb`); nezískaný zámok skončí ako `nil`, teda ako každé iné zlyhanie zápisu. **Priznaný zvyšok:** rad je ÚPLNÁ NÁHRADA — panel
+posiela celý objekt a súbor nemá revíziu, takže dve otvorené okná sa nad ním stále prebíjajú „posledný vyhráva". Zámok ich zápisy len SERIALIZUJE; revízia + konfliktová vetva sú
+UI kontrakt a register ich vedie ako **R-35**.
+
 ## Knižnica šablón
 
 ### templates.rb

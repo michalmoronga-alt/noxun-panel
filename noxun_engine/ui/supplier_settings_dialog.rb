@@ -165,30 +165,44 @@ module Noxun
                              'hodnoty na obrazovke môžu byť staré. Klikni na Načítať nanovo.')
         end
 
+        # Odmietnutie ZASTARANEHO formulara (revizia nesedi).
+        #
+        # Review #227 P1: klient drzi reviziu PRIPNUTU na stav, nad ktorym zacal
+        # pisat — inak by plny push reviziu omladil, zamok by presiel a cudzia
+        # zmena by zmizla bez slova. A odmietnutie MUSI rozpisane hodnoty
+        # ZAHODIT (`SS.saved()`, presne ako to robilo okno): bez toho by prezili
+        # push, prekryli cerstve cisla a DRUHY klik by ich ticho prepisal —
+        # hlaska pritom tvrdi, ze formular je nacitany nanovo. Hlaska a
+        # spravanie sa musia zhodovat (review #227 P1-2).
+        def reject_stale
+          js('SS.saved()')
+          # Aj TATO hlaska tvrdi vysledok prepoctu („formulár je načítaný
+          # nanovo"), takze sa vetvi rovnako ako potvrdzujuca (dlh 1b-A).
+          refresh_and_report('Nastavenia sa medzitým zmenili — formulár je načítaný nanovo. ' \
+                             'Skontroluj hodnoty a ulož znova.',
+                             'Nastavenia sa medzitým zmenili, takže sa NIČ neuložilo — ' \
+                             'a formulár sa nepodarilo načítať nanovo. Klikni na ' \
+                             '„Načítať nanovo" a hodnoty zadaj znova.',
+                             ok_error: true)
+        end
+
         # Ulozenie: revizia -> patch (validate-all) -> prepocet Studia.
+        # R-08: revizia sa od tejto davky kontroluje DVA razy — tu (lacne, kvoli
+        # hlaske a rozpisanemu formularu) a este raz POD medziprocesovym zamkom
+        # v `patch_active!`. Kontrola tu sama o sebe nestacila: medzi nou a
+        # zapisom stihla druha instancia svoje sadzby ulozit a nas zapis ich
+        # zmazal, hoci okno hlasilo uspech. Obe vetvy konfliktu preto koncia
+        # v tej istej obsluhe (`reject_stale`) — jedna hlaska, jedno spravanie.
         def handle_save(payload)
           data = payload.is_a?(Hash) ? payload : JSON.parse(payload.to_s)
-          current = SupplierSettings.revision(SupplierSettings.active)
-          if data['revision'].to_s != current
-            # Review #227 P1: klient drzi reviziu PRIPNUTU na stav, nad ktorym
-            # zacal pisat — inak by plny push reviziu omladil, zamok by presiel
-            # a cudzia zmena by zmizla bez slova. A odmietnutie MUSI rozpisane
-            # hodnoty ZAHODIT (`SS.saved()`, presne ako to robilo okno): bez toho
-            # by prezili push, prekryli cerstve cisla a DRUHY klik by ich ticho
-            # prepisal — hlaska pritom tvrdi, ze formular je nacitany nanovo.
-            # Hlaska a spravanie sa musia zhodovat (review #227 P1-2).
-            js('SS.saved()')
-            # Aj TATO hlaska tvrdi vysledok prepoctu („formulár je načítaný
-            # nanovo"), takze sa vetvi rovnako ako potvrdzujuca (dlh 1b-A).
-            return refresh_and_report('Nastavenia sa medzitým zmenili — formulár je načítaný nanovo. ' \
-                                      'Skontroluj hodnoty a ulož znova.',
-                                      'Nastavenia sa medzitým zmenili, takže sa NIČ neuložilo — ' \
-                                      'a formulár sa nepodarilo načítať nanovo. Klikni na ' \
-                                      '„Načítať nanovo" a hodnoty zadaj znova.',
-                                      ok_error: true)
-          end
+          rev = data['revision'].to_s
+          return reject_stale if rev != SupplierSettings.revision(SupplierSettings.active)
+
           patch = data['patch'].is_a?(Hash) ? data['patch'] : {}
-          ok, errors = SupplierSettings.patch_active!(patch)
+          ok, errors, status = SupplierSettings.patch_active!(patch, rev)
+          # Cudzia zmena, ktora prisla AZ po lacnej kontrole vyssie (zachytil ju
+          # az zamok) — rovnaka odpoved ako pri nej.
+          return reject_stale if status == :conflict
           # Pri chybe sa formular ZAMERNE NEnacitava nanovo — pouzivatel by
           # prisiel o vsetky rozpisane hodnoty a videl by len hlasku. Nic sa
           # nezapisalo (patch je all-or-nothing), takze staci chybu ukazat.

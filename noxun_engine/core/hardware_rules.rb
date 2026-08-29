@@ -155,13 +155,29 @@ module Noxun
 
       # --- globalna kniznica (%APPDATA%) — default pre nove projekty ----------
 
+      # R-08 (audit 1d #1): zdielany %APPDATA%/NOXUN/Engine — TA ISTA cesta,
+      # akou ju pocita Materials (+ test_dir_override). Kym si ju modul ratal
+      # sam, `test_dir_override` presmeroval zamok do sandboxu, ale zapis
+      # ostal v ZIVOM %APPDATA% — izolovany in-SU test tak upravoval realne
+      # pravidla pouzivatela a zamok nechranil nic. V produkcii je vysledok
+      # bajt na bajt rovnaky.
       def dir
+        return Materials.dir if defined?(Materials) && Materials.respond_to?(:dir)
+
         base = ENV['APPDATA'] || Dir.tmpdir
         File.join(base, 'NOXUN', 'Engine')
       end
 
       def path
         File.join(dir, FILE)
+      end
+
+      # R-08: jeden sidecar zamok (`materials.lock`) pre VSETKY katalogy v tom
+      # istom priecinku — vzor 1b-6c. Reentrantny; `flock`, ktory sa nepodari
+      # vziat, vyhodi IOError a kazda zapisova cesta ho rescue-uje do svojho
+      # NEUSPESNEHO vysledku. Citanie bez zapisu sa nezamyka.
+      def with_catalog_lock(&blk)
+        Materials.with_catalog_lock(&blk)
       end
 
       # Nacita globalnu kniznicu ako normalizovane pole pravidiel. Poskodeny/chybajuci
@@ -171,17 +187,40 @@ module Noxun
       # projektovy snapshot sa NIKDY nemeni sam (reprodukovatelnost stavby z .skp).
       def load
         ensure_seeded
-        doc = JsonFileStore.read(path, copy: false)
-        rules = doc.is_a?(Hash) ? doc['rules'] : nil
-        return deep_copy(SEED_RULES) unless rules.is_a?(Array)
-        merged, changed = merge_seed(normalize_rules(rules), doc['seed_version'].to_i)
-        if changed && write(merged)
-          Engine.log('hardware rules: globalna kniznica doplnena o nove default pravidla') if defined?(Engine)
-        end
-        merged
+        merged, changed = read_rules
+        return merged unless changed
+        persist_seed_merge!(merged)
       rescue StandardError => e
         Engine.log_error(e, 'HardwareRules.load') if defined?(Engine)
         deep_copy(SEED_RULES)
+      end
+
+      # CISTE citanie + seed-merge BEZ zapisu -> [pravidla, changed].
+      def read_rules
+        doc = JsonFileStore.read(path, copy: false)
+        rules = doc.is_a?(Hash) ? doc['rules'] : nil
+        return [deep_copy(SEED_RULES), false] unless rules.is_a?(Array)
+        merge_seed(normalize_rules(rules), doc['seed_version'].to_i)
+      end
+
+      # R-08 (audit 1d #2/#10): seed-merge je READ-MODIFY-WRITE. Pod zamkom sa
+      # subor cita NANOVO (cache JsonFileStore ma 1 s okno) a merge sa
+      # PREPOCITA — inak by sa zapisal odtlacok spred zamku a zmena druhej
+      # instancie by zanikla. Ked seed doplnila medzitym uz ona, `changed` je
+      # false a nezapisuje sa. Zlyhany zamok/citanie vrati predzamkovy
+      # kandidat (nikdy holy seed).
+      def persist_seed_merge!(fallback)
+        with_catalog_lock do
+          JsonFileStore.reload!(path)
+          fresh, changed = read_rules
+          if changed && write(fresh) && defined?(Engine)
+            Engine.log('hardware rules: globalna kniznica doplnena o nove default pravidla')
+          end
+          fresh
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareRules.persist_seed_merge!') if defined?(Engine)
+        fallback
       end
 
       # Doplni seed pravidla, ktore v kniznici chybaju (podla rule_id), a
@@ -212,14 +251,32 @@ module Noxun
         shapes.any? { |s| normalize_rules([s]).first == norm }
       end
 
+      # R-08 (audit 1d #1): rychly check ostava (hot cesta), ale ZAPIS seedu ide
+      # az po DRUHOM checku POD zamkom — inak by oneskoreny seeder prepisal
+      # realnu zmenu, ktoru medzitym ulozila druha instancia.
       def ensure_seeded
         return if JsonFileStore.available?(path)
-        write(deep_copy(SEED_RULES))
+        with_catalog_lock do
+          next true if JsonFileStore.available?(path)
+          write(deep_copy(SEED_RULES))
+        end
+      rescue StandardError => e
+        Engine.log_error(e, 'HardwareRules.ensure_seeded') if defined?(Engine)
+        false
       end
 
+      # POZOR (R-08, priznany zvysok): toto je UPLNA NAHRADA obsahu suboru —
+      # okno Pravidla posiela CELE pole. Zamok zapisy SERIALIZUJE (a chrani
+      # ich pred prepletenim so seed-merge cestou), ale dve okna, ktore si
+      # pravidla nacitali sucasne, sa stale prebijaju „posledny vyhrava";
+      # globalna kniznica pravidiel nema reviziu. Register to vedie ako
+      # samostatnu polozku (R-35) — doriesi ju davka, ktora prinesie reviziu
+      # do payloadu sekcie a konfliktovu vetvu okna.
       def write(rules)
-        JsonFileStore.write(path, { 'std' => STD, 'seed_version' => SEED_VERSION,
-                                    'rules' => normalize_rules(rules) })
+        with_catalog_lock do
+          JsonFileStore.write(path, { 'std' => STD, 'seed_version' => SEED_VERSION,
+                                      'rules' => normalize_rules(rules) })
+        end
       rescue StandardError => e
         Engine.log_error(e, 'HardwareRules.write') if defined?(Engine)
         false

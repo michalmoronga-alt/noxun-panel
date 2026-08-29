@@ -407,12 +407,17 @@ module Noxun
         # dokumentu vedla kusovnika noveho (broadcast prepnutia moze prist
         # skor, nez sa `Sketchup.active_model` prepne).
         def sets_payload(model = Sketchup.active_model)
-          lib = HardwareSets.load
+          # R-08 (audit 1d #4): kniznica a jej revizia musia pochadzat z TOHO
+          # ISTEHO stavu suboru. Kym sa citali dvoma volaniami, cudzi zapis
+          # medzi nimi vyrobil payload so STARYMI setmi a NOVOU reviziou —
+          # taky formular presiel guardom a prepisal zmenu, ktoru pouzivatel
+          # nikdy nevidel.
+          lib, revision = HardwareSets.load_with_revision
           status, state = HardwareSets.project_state_status(model)
           {
             'sets' => lib['sets'],
             'global_mapping' => lib['mapping'],
-            'revision' => HardwareSets.revision,
+            'revision' => revision,
             # H1b (audit BLOCKER 1): ponuku per typ sklada SERVER cez
             # HardwareSets.set_options — pre set_id, ktore projekt uz pouziva,
             # vyhrava definicia zo SNAPSHOTU (podla nej sa nakupuje), takze
@@ -624,10 +629,29 @@ module Noxun
           "#{label} → #{(set_defs || []).first&.fetch('name', value) || value}."
         end
 
+        # R-08 (audit 1d #5): aj globalna predvolba nesie REVIZIU kniznice —
+        # dve otvorene okna menajuce ten isty typ kovania by si ju inak ticho
+        # prepisali. Nesulad = `:conflict`: sekcia sa obnovi (`after_sets_change`
+        # posiela cerstvy payload) a rozpisany editor pasiem sa ZAHODI
+        # (`HWSETS.mapConflict`).
+        #
+        # Review #258 kolo 2 (P2): editor sa tu — na rozdiel od `:invalid` —
+        # rozpisany NECHAT NESMIE. Draft si reviziu PRIPINA pri otvoreni, takze
+        # kazdy dalsi klik na „Ulozit vyber" by poslal TU ISTU zastaranu
+        # reviziu a konfliktoval by donekonecna, hoci hlaska tvrdi „obnovene,
+        # vyber znova". Po zahodeni sa editor otvori nad CERSTVOU kniznicou
+        # a pripne si jej reviziu.
         def handle_map_global(payload)
           data = JSON.parse(payload.to_s)
-          ok = HardwareSets.set_global_mapping!(data['generic_type'].to_s, mapping_value(data))
+          status = HardwareSets.set_global_mapping!(data['generic_type'].to_s, mapping_value(data),
+                                                    revision: data['revision'].to_s)
           after_sets_change
+          if status == :conflict
+            js("HWSETS.mapConflict(#{data['ui_key'].to_s.to_json})")
+            return set_status('Knižnica setov sa medzitým zmenila — obnovené, vyber znova.', true)
+          end
+
+          ok = status == :ok
           js("HWSETS.mapSaved(#{data['ui_key'].to_s.to_json})") if ok
           set_status(ok ? 'Globálna predvoľba uložená (platí pre nové projekty).' : 'Globálna predvoľba sa nedá uložiť — skontroluj pásma a sety.', !ok)
         end

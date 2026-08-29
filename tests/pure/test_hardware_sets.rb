@@ -553,10 +553,13 @@ NxTest.test('hw sety D1b: save_set!/delete_set! — revision guard, typ nemenny,
                                revision: HWS.revision, create: true)
   NxTest.assert_equal(:exists, status, 'create NIKDY neprepise existujucu identitu (GH#127 P2)')
   NxTest.assert_equal('moj-set', info)
-  NxTest.assert_equal(true, HWS.set_global_mapping!('hinge', 'moj-set'))
+  # 1d/R-08: vracia STAV (:ok / :conflict / false), nie holy boolean.
+  NxTest.assert_equal(:ok, HWS.set_global_mapping!('hinge', 'moj-set'))
   NxTest.assert_equal('moj-set', HWS.load['mapping']['hinge'])
   NxTest.assert_equal(false, HWS.set_global_mapping!('hinge', 'set-co-nie-je'),
                       'mapovanie len na existujuci set spravneho typu')
+  NxTest.assert_equal(:conflict, HWS.set_global_mapping!('hinge', 'moj-set', revision: 'stara'),
+                      'stara revizia kniznice = conflict aj pri GLOBALNOM mapovani')
   status, = HWS.delete_set!('moj-set', revision: HWS.revision)
   NxTest.assert_equal(:ok, status)
   NxTest.assert_equal(nil, HWS.load['mapping']['hinge'],
