@@ -602,6 +602,14 @@ module Noxun
               # H2 (D-76): set zo sablony vs. vlastna definicia projektu — radsej
               # NIC ako tichy zly hardver (kody ineho typu kovania).
               "#{label} (#{where}): set „#{sid}“ je v projekte iného typu kovania — vyber set nanovo."
+            when 'length_unsupported'
+              # R-06 (brana 1d): cena dlzkoveho kovania je za METER — nasobit ju
+              # poctom KUSOV by dalo nespravne peniaze v nakupe aj v ponuke.
+              # Veta preto povie AJ rozmer (co objednat) AJ co s tym.
+              cut = u['params_label'].to_s.strip
+              cut_txt = cut.empty? ? '' : " (#{cut})"
+              "#{label} (#{where}): položka#{cut_txt} sa reže na dĺžku, ale set „#{sid}“ počíta kusy — " \
+                'nie je nacenená. Dĺžkové kovanie sa zatiaľ do setu mapovať nedá — objednaj ho ručne.'
             else
               "#{label} (#{where}) nemá priradený set — kovanie je bez kódov (nenacenené)."
             end

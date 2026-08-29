@@ -429,6 +429,12 @@ module Noxun
             # handle/connector v ponuke NEskryvame — pravidla ich sice
             # negeneruju (uchytky mimo D — Michal 2.8.), ale set sa da
             # pripravit dopredu; expanzia bez poloziek aj tak nic nespravi.
+            # R-06 (brana 1d): typ `handle` sa TU nezakazuje ani po nej —
+            # kusova uchytka je legitimne mapovanie a zakaz typu by ju vzal
+            # tiez. Nebezpecna je len polozka, ktora sa REZE NA DLZKU
+            # (uchytkovy profil D-90), a tu zastavi SERVEROVA brana v
+            # HardwareSets.expand — plati aj pre sety ulozene v starsom .skp,
+            # kam by kontrola v editore nedosiahla.
             'generic_types' => BuildPlan::GENERIC_TYPES.map { |gt|
               { 'key' => gt, 'label' => HardwareRules.label_for(gt) }
             },

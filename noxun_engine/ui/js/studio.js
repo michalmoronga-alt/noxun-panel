@@ -492,7 +492,10 @@
           var reason = u.reason_sk || ('bez kódov (' + (u.reason || '?') + ')');
           // D-90: 'params_label' („rez 597 mm") zo servera — bez neho by pri
           // dĺžkovom kovaní nebolo v zozname vidieť, aký rozmer objednať.
-          if (u.params_label) reason += ' · ' + u.params_label;
+          // Review #256 P2: niektoré dôvody si rozmer nesú UŽ VO VETE (R-06
+          // `length_unsupported` ho tam má, aby ho videl aj panel, ktorý
+          // params_label nepripája) — vtedy sa NEpridáva druhýkrát.
+          if (u.params_label && reason.indexOf(u.params_label) === -1) reason += ' · ' + u.params_label;
           h += '<tr class="hwmiss"><td>' + esc(u.generic_type) + '</td>'
              + '<td>' + esc(u.cabinet_id + (u.owner_part_key ? ' · ' + u.owner_part_key : '')) + '</td>'
              + '<td>' + num(u.quantity) + '</td><td>' + esc(reason) + '</td></tr>';

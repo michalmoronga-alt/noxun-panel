@@ -17,6 +17,26 @@
 
 ## Záznamy dávok (najnovšie hore)
 
+- **1d/R-06a · BRÁNA: DĹŽKOVÉ KOVANIE SA UŽ NENACENÍ AKO KUSY (29.8.2026, v0.8.15):** prvá vybavená položka registra bloku 1d (**R-06**, P1, slepý subagent S-05). Expanzia setov
+  vedela vždy len **kusy** — `subtotal = cena × počet` — ale úchytkový profil (D-90) sa **reže na dĺžku** a jeho katalógová cena je **za meter**; `cut_length_mm` sa v
+  `hardware_sets.rb` nečítalo nikde. Držal to len seed (typ `handle` nemapovaný), pričom editor setov typ `handle` ponúka a katalóg pozná MJ „m" — **prvé uloženie takého setu by
+  bola aktívna cenová chyba** v nákupnom CSV, v rozpočte aj v cenovej ponuke. Produkcia je od 20.8. naostro, preto brána hneď.
+
+  **Rozsah je vedome „S" (brána, nie nový režim).** Položka s kladnou `cut_length_mm` sa v `expand` do naceneného riadku nedostane — vydá ORANGE dôvod **`length_unsupported`** so
+  **rozmerom** („rez 597 mm", sekcia NEMAPOVANÉ ho už nesie od D-90) a s vetou, ktorá povie prečo aj čo s tým. Tú istú bránu má **`explain`** — panel a súpis sa nesmú rozísť, inak
+  by panel rozpísal kódy s cenou za meter pri položke, ktorá v nákupe vôbec nevznikne. **Poradie kontrol:** `set_missing` a `set_type_mismatch` majú prednosť (sú konkrétnejšie).
+  Rozpočet a CP čítajú tie isté `rows`, takže sa k položke nedostanú bez ďalšieho zásahu. Názov kľúča dostal jedinú autoritu — `HardwareRules::LENGTH_PARAM`.
+
+  **Prečo len JEDNA brána a prečo serverová.** Zvažovaný zákaz typu `handle` v editore setov sa **neurobil**: kusová úchytka je legitímne mapovanie a zákaz typu by ju vzal tiež
+  (editor ju ponúka zámerne — komentár z GH #127 P2), navyše by kontrola v editore **nedosiahla na sety už uložené v staršom `.skp`**. Serverová brána v `expand` je úzka (jediná
+  podmienka = kladná dĺžka rezu) a platí pre každý zdroj setu. **Plný režim `per: 'length'`** (Σ mm, MJ „m") ostáva pri **R-05** v bloku KOVANIE a bránu smie stlmiť **až tá istá
+  dávka**, ktorá prinesie dĺžkovú materializáciu — inak by sa položka vrátila presne do kusového násobenia.
+
+  **Testy:** nová sada `tests/pure/test_r06_dlzkova_brana.rb` (7 scenárov: riadok nevznikne · dôvod je v `UNMAPPED_REASONS` · kusové položky **bajtovo** nedotknuté · bránu spúšťa
+  LEN kladná dĺžka rezu (nula, záporná, nečíslo, NL výsuvu prejdú) · rozmer v krátkom dôvode, v semafore aj v CSV · rozpočet a CP položku nenacenia · `explain` bez členov).
+  **3 mutácie, každá zhodila práve svoje testy:** brána vypnutá v `expand` (4 pády) · brána chytá aj kusové položky (4 pády R-06 + 2 staršie sady = dôkaz, že kusová cesta je
+  chránená aj mimo tejto dávky) · dôvod bez rozmeru (2 pády). In-SketchUp beh netreba — dávka je čistá funkcia bez geometrie, observerov a undo.
+
 - **P0-HF · FINÁLNE BRÁNY PRED ZÁPISOM CENOVÝCH A NÁKUPNÝCH EXPORTOV (29.8.2026, v0.8.14):** dva **P0** nálezy externého Codex auditu bloku 1c
   (`SYSTEM/zdroje/AUDIT_2026-08_externy_codex.md`, P0-HF-01 a P0-HF-02) mali jeden spoločný koreň: **systém poznal chybný finálny výstup a napriek tomu ho uložil.** XLSX rozpočtu
   aj cenovej ponuky sa zapísali na disk a AŽ POTOM sa vyhodnotilo, že riadky nemajú cenu, že „Nábytková zostava" vyšla záporná alebo že suma nesedí s rozpočtom; nákupný CSV
