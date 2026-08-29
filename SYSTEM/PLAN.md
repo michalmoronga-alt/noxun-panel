@@ -121,14 +121,67 @@ roztriediť do **kódových a logických blokov** → každému určiť **priori
 audit áno/nie · testy a DoD · riziká · smoke checklist pre Michala · checklist uzáveru. Každý package si na štarte
 spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom packages preberajú sekvenčne bez ďalšieho plánovania.
 
-### GHOST VKLADANIE (V1-04 — zaradené Michalom 26.8.2026, po bloku 1e)
+### GHOST VKLADANIE (V1-04) — TASK PACKAGE (1e, zapísané 29.8.2026; štart na Michalovo „štartuj")
 
-Vkladanie skrinky na klik: skrinka visí na kurzore ako ghost, klik umiestni. **Podklad (NEZÁVÄZNÝ koncept,
-auditovaný proti v0.7.51):** [zdroje/next_sessions/09_GHOST_VKLADANIE.md](zdroje/next_sessions/09_GHOST_VKLADANIE.md)
-+ externý SketchUp audit [09A](zdroje/next_sessions/09A_GHOST_EXTERNY_SKETCHUP_AUDIT.md) (Tool/InputPoint lifecycle, Orbit suspend/resume, Undo/onCancel, getExtents, klávesové pasce).
-Koncept obsahuje aj **nedorozhodnuté voľby** (napr. Tab vs. Alt/Option, počiatočný Z režim) — nie je to schválený kontrakt ani task package (vrstva `zdroje/`, [README.md](README.md)).
-**Pred implementáciou POVINNÉ:** finálny read-only audit proti aktuálnemu mainu + načítanie STAV/PLAN/ARCHITEKTÚRA/STANDARD;
-sporné body potvrdiť auditom alebo debatou s Michalom. **Záväzné znenie vznikne až v zadaní dávky** a zapíše sa sem do PLANu.
+**Cieľ:** vloženie skrinky tam, kde sa používateľ pozerá — po „Vložiť" visí ghost skrinky na kurzore,
+klik ju položí ako jednu reálnu CAB v jednom Undo kroku. Koniec hľadania skriniek položených cez `next_x`
+mimo pohľadu. Podklady: koncepty [09](zdroje/next_sessions/09_GHOST_VKLADANIE.md) + [09A](zdroje/next_sessions/09A_GHOST_EXTERNY_SKETCHUP_AUDIT.md)
+(externý SketchUp audit) — package z nich preberá SCHVÁLENÝ kontrakt a uzatvára otvorené voľby nižšie.
+
+**Predpoklady (PRED štartom, poradie z [AUDIT_REGISTER.md](AUDIT_REGISTER.md)):** dávky **R-01+R-04**
+(multi-model observer) → **R-02** (model_guid guard zapisovacích handlerov vrátane insertu) → **R-03**
+(šev `prepare_insert` + `build(..., transform:)` — NAJVÄČŠIA prípravná dávka, odhad L). Bez R-03 package neštartuje.
+
+**Scope IN:** SketchUp `Tool` (ghost = čistá viewport grafika cez `draw(view)`, `InputPoint` inference,
+`getExtents` pre kreslenie mimo bounds) · PlacementSession viazaná na `model_guid` (prepnutie dokumentu = cancel,
+NIKDY cross-document insert) · rotácia ←/→ o 90° okolo aktívneho anchoru · 4 anchory na PREDNEJ rovine KORPUSU
+(nie čiel; presné súradnice per konštrukčný variant určí implementačný audit proti BuildPlanu) · Z režimy:
+↓ floor lock = world Z=0 v koreňovom ráme (nie drawing axes, nie face pod kurzorom — funguje aj v prázdnom modeli
+cez ray×rovina) a ↑ free Z (plný inference point) · commit = `prepare_insert` snapshot → `build(transform:)`
++ hardware freeze v TEJ ISTEJ operácii → select novej CAB → push → template usage stamp až PO úspechu ·
+Escape/onCancel/Undo počas ghostu = 0 mutácií modelu, 0 Undo krokov · Orbit/Pan suspend/resume drží session ·
+`Sketchup.focus` po štarte z HtmlDialogu (klávesy fungujú bez extra kliku) · status bar nápoveda · po vložení
+tool KONČÍ (žiadny repeat) a Inspector pokračuje editáciou novej CAB.
+
+**Scope OUT (vedome NErobí):** „vložiť vedľa vybranej" · snap k NOXUN korpusom · attachment/segmenty ·
+auto-orientácia podľa steny · repeat-placement · ďalšie anchor body · 2D HUD/overlay framework ·
+zmena `insert_copy` a board placementu · náhrada `Placement.next_x` (ostáva fallback pre programatické cesty).
+
+**UZAVRETÉ VOĽBY package (Michal potvrdí pri „štartuj", inak platia tieto):** (1) cyklovanie anchorov =
+**Alt/Option** (odporúčanie externého auditu 09A — konvencia SketchUp Move gripov; TAB má verziové/fokusové pasce);
+status bar text sa prispôsobí. (2) Počiatočný Z režim: **dolný korpus štartuje vo floor lock; horný korpus
+štartuje vo free Z s ghost predvýškou `UPPER_HANG_Z`** (dnešných 1400 sa nezachováva potichu — je to len
+štartovacia poloha ghostu, klik rozhodne). (3) Klávesy ← → ↑ ↓ Tool vedome preberá od inference locku POČAS
+aktívneho ghostu; spotrebúvajú sa LEN klávesy, ktoré ghost vlastní.
+
+**Dotknuté dáta/kontrakt → AUDIT: ÁNO (codex-audit pred implementáciou povinný).** Nový modul (Tool) + zásah
+do insert lifecycle; dátový kontrakt entít sa NEMENÍ (CAB vzniká štandardným builderom), ale Tool lifecycle
+je observer-citlivá oblasť. Implementačný audit navyše MUSÍ uzavrieť: presné anchor súradnice pre
+under_sides/between_sides/upper a atypy · `onCancel` reasons pre podporované SU verzie · arrow-key ownership.
+
+**Testy a DoD:** headless — čistá transform matematika (4 rotácie × 4 anchory; anchor ostáva na inference bode
+po rotácii; floor/free prechody nemenia X/Y; Escape v každom stave = nulový zápis). **In-SU POVINNÉ** (sekcia
+`run_ghost`): pred klikom 0 NOXUN entít · klik = presne 1 CAB na očakávanom transforme · 1× Ctrl+Z vráti celé ·
+nová CAB označená v Inspectore · lower aj upper · šablóna s materiálmi/kovaním + zámky karty · usage stamp len
+po úspechu · floor na Z=0 aj pri otočených axes · free Z na bode s nenulovým Z · ghost ďaleko mimo bounds
+(getExtents) · prázdny model bez podlahovej face · Undo počas ghostu · prepnutie dokumentu = bezpečný cancel ·
+regresie: programatický `build` cez fallback, ScaleWatch/dedup nevyrobí druhú CAB ani extra Undo. Mutačné
+overenie štandard. DoD = všetky scenáre zelené + smoke checklist Michala prejde.
+
+**Riziká:** Tool lifecycle (focus z CEF, onCancel/Undo, suspend/resume) — najväčšie, kryté in-SU scenármi ·
+arrow-key ownership vs natívny inference · geometria anchorov pri atypických konštrukciách (uzavrie audit) ·
+SU verzie (pixely/klávesy — držať ghost čisto 3D). Rez dávky: Tool + session v JEDNEJ dávke, R-03 šev PREDTÝM
+samostatne — nikdy nie jeden obrí PR.
+
+**Smoke checklist pre Michala (po nasadení):** 1) „Vložiť" → ghost visí na kurzore a šípky fungujú HNEĎ (bez
+kliku do modelu). 2) ←/→ točí okolo kotvy, Alt prepína kotvy, ↓ drží skrinku na zemi, ↑ ju pustí do výšky.
+3) Klik položí skrinku presne tam, kde bol ghost; jeden Ctrl+Z ju celú vráti. 4) Esc nič nevloží a nič nepribudne
+v Undo. 5) Počas ghostu si zorbituj pohľad kolieskom — ghost prežije. 6) Skús aj horný korpus a šablónu s kovaním.
+
+**Checklist uzáveru:** bump patch + `?v=` → testy (headless + JS ak UI + **plný in-SU beh**) → docs
+(`construction.md` odsek Tool/PlacementSession + `ui-lifecycle.md` insert cesta + ARCHITEKTURA router riadok) →
+STAV/KRONIKA/PLAN (package sa preklopí na ✅ s výsledkom) → D-čísla: žiadne (V1-04 je z V1_VIZIA checklistu —
+odškrtnúť bod 4).
 
 ### KOVANIE (zaradené Michalom 26.8.2026, po bloku GHOST VKLADANIE)
 
