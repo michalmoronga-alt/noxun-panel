@@ -45,7 +45,13 @@ const HS = {
   ],
   unmapped: [
     { generic_type: 'rail', cabinet_id: 'CAB-2', owner_part_key: 'front-1', quantity: 1,
-      reason_sk: 'set nemá kód pre túto dĺžku', params_label: 'rez 597 mm' }
+      reason_sk: 'set nemá kód pre túto dĺžku', params_label: 'rez 597 mm' },
+    // R-06 (review #256 P2): dôvod, ktorý si rozmer nesie UŽ VO VETE — rozmer
+    // sa NESMIE zopakovať druhýkrát na konci riadku.
+    { generic_type: 'handle', cabinet_id: 'CAB-3', owner_part_key: 'front-2', quantity: 1,
+      reason_sk: 'set „profil-ukw“ počíta kusy, ale položka sa reže na dĺžku (rez 812 mm)'
+                 + ' — dĺžkové kovanie sa zatiaľ do setu mapovať nedá',
+      params_label: 'rez 812 mm' }
   ],
   summary: { total_eur_vat: 56.8, unknown_prices: 1 }
 };
@@ -85,9 +91,13 @@ ok(H.indexOf('nie je v katalógu kovania') >= 0, 'a v nazve to prizna');
 
 // --- 4) jantarove (nekompletne) riadky ---------------------------------------
 ok(H.indexOf('<tr class="hwmiss">') >= 0, 'polozka mimo katalogu je jantarovy riadok');
-ok(H.indexOf('Bez kódov (1)') >= 0, 'zoznam bez kodov nesie POCET zo servera');
+ok(H.indexOf('Bez kódov (2)') >= 0, 'zoznam bez kodov nesie POCET zo servera');
 ok(H.indexOf('set nemá kód pre túto dĺžku · rez 597 mm') >= 0,
    'dovod aj rozmer skladá SERVER (D-90: bez rozmeru sa neda objednat)');
+// R-06 (review #256 P2): rozmer JE v riadku, ale PRAVE RAZ
+ok(H.indexOf('rez 812 mm') >= 0, 'rozmer dlzkovej polozky v riadku je');
+ok(H.indexOf('rez 812 mm') === H.lastIndexOf('rez 812 mm'),
+   'a NIE JE tam dvakrat (dovod si ho nesie sam — pripajat ho znova by riadok zdvojil)');
 ok(H.indexOf('CAB-2 · front-1') >= 0, 'a vidno, na ktorom dielci to visi');
 ok(H.indexOf('sekcii Kontrola') >= 0,
    'odkaz vedie do SEKCIE Kontrola (od ŠT-1b je to sekcia tohto okna, nie tab Vyroby)');
