@@ -5,7 +5,7 @@
 
 ## Stav
 
-**v0.8.14 · 29.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
+**v0.8.15 · 29.8.2026.** Plugin má **dve okná**: **Inspector** (čo je označené a čo s tým) a **Štúdio** (celá zákazka na jednom mieste)
 s **dvanástimi živými sekciami** — Kusovník · Kontrola · Nákup kovania · Rozpočet · Cenová ponuka · Materiály · Kovanie · Pravidlá · Šablóny · Dodávateľ/Demos · Nastavenia rozpočtu · O plugine.
 Jediná neaktívna položka navigácie je **Nárezový plán** (fáza 2, dôvod v tooltipe).
 
@@ -18,7 +18,7 @@ Nálezy z reálnej výroby a chyby v cenách majú preto **najvyššiu prioritu 
 (okno zaniká — modul žije · uzavretý whitelist akcií · session token · echo vs. plný push · optimistický zámok) sú v [archiv/KRONIKA.md](archiv/KRONIKA.md),
 vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
-**Testy k v0.8.14:** **2031 headless** · 72 JS sád · posledný plný in-SketchUp beh **1057 PASS / 0 FAIL / 0 SKIP** (dávka **F/D-27** — nová sekcia `run_d27`, +21 assertov).
+**Testy k v0.8.15:** **2038 headless** · 72 JS sád · posledný plný in-SketchUp beh **1057 PASS / 0 FAIL / 0 SKIP** (dávka **F/D-27** — nová sekcia `run_d27`, +21 assertov).
 
 > **Poznámka k procesu:** Codex review bol 21.–24.8. **nedostupný** — PR **#186–#226** prešli bránou so slepým subagentom. **Post-hoc sweep je od 27.8. HOTOVÝ** (34 PR cez Codex CLI + triáž 54 nezodpovedaných threadov): dve reálne P1 slepým kolám ušli a týždeň žili v `main`, obe sú dávno opravené — [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**.
 
@@ -27,7 +27,7 @@ vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 **Blok 1b · STABILIZAČNÁ REVÍZIA je prakticky uzavretý** ([PLAN.md](PLAN.md)): brány A/G/H hotové (1b-1/2/3), dlhy B+D (1b-4), sweep E, mimo písmen 1b-6a/6b/6c aj 1b-7, z F je hotové D-27 —
 **ostáva len D-51** (štandard veľkostí okien — čaká na Michalove hodnoty) a výklop ako typ čela (ide cez task package 1e).
 **Blok 1c · AUDIT KÓDU je HOTOVÝ (29.8.)** — traja audítori zliati do **[AUDIT_REGISTER.md](AUDIT_REGISTER.md)** (2×P0 + 33 položiek + poradie pre 1d + 2 rozhodnutia Michala);
-**oba P0 sú vybavené dávkou P0-HF** (v0.8.14 — finálne brány pred zápisom exportov). **Beží: 1e PLÁNOVACIA DÁVKA** (task packages z konceptov — priorita do 2.9.).
+**oba P0 sú vybavené dávkou P0-HF** (v0.8.14) a **beží blok 1d** (prvá položka registra hotová: R-06 brána). **Beží aj 1e PLÁNOVACIA DÁVKA** (task packages, priorita do 2.9.).
 **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
@@ -38,9 +38,10 @@ Michal ju rozoberie v samostatnom okne). V1 rozsah zoštíhlený — checklist v
 
 ## Posledné uzávery
 
-- **P0-HF — finálne brány pred zápisom exportov** (chybný XLSX/CSV už nevznikne: **tvrdo** sa zastaví záporná „Nábytková zostava", nesúlad ponuky s rozpočtom a zliate ID
-  skriniek; **riadky bez ceny** sa zastavia na prvý klik a druhým sa dajú vedome potvrdiť — STANDARD §11.3) — v0.8.14 (29.8.) · **Michal večer:** v Rozpočte nechaj riadok bez
-  ceny a daj „XLSX rozpočet" — **nesmie sa nič uložiť**; hláška ponúkne druhý klik, po ňom sa súbor uloží a status musí PRIZNAŤ, že suma je podhodnotená.
+- **1d/R-06a — dĺžkové kovanie sa už nenacení ako kusy** (úchytkový profil rezaný na dĺžku sa cez set nedostane do nákupu ani do ponuky — vydá oranžový riadok Kontroly
+  s rozmerom „rez 597 mm"; kusové kovanie sa nemení) — v0.8.15 (29.8.) · **Michal večer:** namapuj úchytkový profil na set — nesmie sa objaviť v Nákupe ani v Rozpočte.
+- **P0-HF — finálne brány pred zápisom exportov** (chybný XLSX/CSV už nevznikne: **tvrdo** sa zastaví záporná „Nábytková zostava", nesúlad ponuky s rozpočtom a zliate ID skriniek;
+  **riadky bez ceny** až po druhom, vedomom kliku — STANDARD §11.3) — v0.8.14 (29.8.) · **Michal večer:** riadok bez ceny + „XLSX rozpočet" = prvý klik neuloží nič, druhý PRIZNÁ podhodnotenú sumu.
 - **1c — AUDIT KÓDU KOMPLET** (traja audítori → [AUDIT_REGISTER.md](AUDIT_REGISTER.md); Codex review #250 korigoval samotný audit — kontrakt STANDARD §11.3 má prednosť pred audítorom) — 29.8., bez zmeny kódu.
 - **F/D-27 — tagy modelu z panela** (ikona oka v raile → zoznam NOXUN tagov; klik = jeden krok Späť; checkbox ghost zón ide tou istou cestou; kontroly už nekreslia nad skrytým) — v0.8.13 (28.8.) ·
   **Michal večer:** skry v raile **Čelá** — musia zmiznúť, ikona sa rozsvieti, **Ctrl+Z** ich vráti; skús to aj so zapnutou ABS kontrolou (nad skrytým nesmie ostať plôška).

@@ -75,6 +75,10 @@ nemapovaný) — jedno uloženie setu = aktívna cenová chyba. [S-05]
 **Návrh:** brána HNEĎ (ORANGE `length_unsupported` pri `cut_length_mm` + kusový set; **S**) · plný `per: 'length'`
 (Σ cut_length_mm, MJ m) v tej istej dávke ako R-05 — rovnaká agregačná fáza (**M**). Kým nie je jedno z toho,
 `handle` sa nesmie mapovať.
+**✅ brána dávkou 1d/R-06a (PR #256, v0.8.15)** — `expand` aj `explain` položku s `cut_length_mm` odklonia do ORANGE
+`length_unsupported` (rozmer v texte), rozpočet ani CP ju nenacenia; editor typ `handle` NEzakazuje (kusová úchytka je
+legitímna, a brána v editore by nedosiahla na sety v staršom .skp). **Plný `per: 'length'` ostáva s R-05** a smie bránu
+stlmiť až tá istá dávka, ktorá prinesie dĺžkovú materializáciu.
 
 ### R-07 · P1 · core · `core/hardware_sets.rb:96-97, 241-255, 314-330, 536-537, 611-629, 1388-1408, 1529-1535`
 Globálna knižnica setov: `load` `std` NEČÍTA, `write` stampuje vždy `std: 1` aj pri obsahu vyžadujúcom 2 (marker

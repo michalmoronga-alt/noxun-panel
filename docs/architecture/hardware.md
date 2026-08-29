@@ -158,3 +158,15 @@ Sety kovania + projektový snapshot predvolieb na modeli; zmienky sú v odsekoch
 fyzické skrinky so zdieľaným `cabinet_id` dostanú položku raz namiesto dvakrát** — a teda jediný dôvod, prečo duplicitná identita smie zastaviť nákupný/cenový export. Aby to brána
 vedela rozhodnúť namiesto hádania, `add_row` značí zdroj riadku príznakom **`per_owner`**: kľúč je **aditívny**, zapisuje sa **len keď je pravdivý**, a má presne jedného čitateľa —
 `ProductionCore.dup_partition` ([outputs.md](outputs.md)). Bez neho by sa blokoval aj export zákazky, ktorá má samé `per: 'unit'` členy a spočíta sa správne aj so zdieľaným ID.
+
+**Brána dĺžkového kovania (1d/R-06a, v0.8.15).** Expanzia setu vie **len kusy** (`PER_KINDS` = `unit`/`owner`, subtotal = `cena × počet`), ale položka úchytkového profilu (D-90)
+nesie **dĺžku rezu** v `params['cut_length_mm']` a jej katalógová cena je **za meter**. Takú položku preto `expand` do naceneného riadku **nepustí**: predikát
+**`length_unsupported?`** (jediná podmienka = kladná `cut_length_mm`; názov kľúča drží `HardwareRules::LENGTH_PARAM`, hardware_sets si ho neopisuje) ju odkloní do
+**ORANGE `length_unsupported`**, teda do sekcie NEMAPOVANÉ, ktorá už rozmer nesie. Poradie kontrol je zámerné — `set_missing` a `set_type_mismatch` majú prednosť (sú
+konkrétnejšie), brána stojí až za nimi. **`explain` má tú istú bránu** (panel a súpis sa nesmú rozísť — inak by panel rozpísal kódy s cenou za meter pri položke, ktorá v nákupe
+nevznikne). Rozpočet aj cenová ponuka čítajú tie isté `rows`, takže sa k položke nedostanú. Text hovorí **prečo, aký rozmer a čo s tým** (`unmapped_reason_sk` +
+`Validation.check_hardware_expansion`), rozmer berie z jediného zdroja `params_label`.
+
+Brána je **serverová zámerne**: kontrola v editore setov by nedosiahla na sety už uložené v staršom `.skp`. Typ `handle` sa v editore **nezakazuje** — kusová úchytka je legitímne
+mapovanie a zákaz typu by ju vzal tiež; nebezpečná je len položka s dĺžkou rezu. **Plný režim `per: 'length'`** (Σ mm, MJ „m") patrí k R-05 v bloku KOVANIE a bránu smie stlmiť
+**až tá istá dávka**, ktorá prinesie dĺžkovú materializáciu — inak sa položka vráti presne do kusového násobenia.
