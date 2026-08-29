@@ -129,17 +129,20 @@ mimo pohľadu. Podklady: koncepty [09](zdroje/next_sessions/09_GHOST_VKLADANIE.m
 — package z nich preberá SCHVÁLENÝ kontrakt a uzatvára otvorené voľby nižšie.
 
 **Predpoklady ([AUDIT_REGISTER.md](AUDIT_REGISTER.md)):** TVRDÝ blocker je **R-03** (šev `prepare_insert` +
-`build(..., transform:)` — najväčšia prípravná dávka, odhad L; bez nej package neštartuje). **R-01+R-04** a
-**R-02** sú macOS-vetvové: odporúčané pred štartom, pre Windows-only prevádzku neblokujú — guard identity
-dokumentu pre INSERT cestu je aj tak scope IN tejto dávky (session na `model_guid`).
+`build(..., transform:)` — najväčšia prípravná dávka, odhad L; bez nej package neštartuje). **R-01** a **R-02**
+sú macOS-vetvové (pre Windows-only prevádzku neblokujú — guard identity dokumentu pre INSERT cestu je aj tak
+scope IN tejto dávky); **R-04** je hygiena bez platformového kvalifikátora a ide spolu s R-01. Odchýlka od
+poradia registra je zapísaná aj v ňom.
 
 **Scope IN:** SketchUp `Tool` — ghost = čistá viewport grafika cez `draw(view)` s **čitateľnou prednou stranou
 a VIDITEĽNÝM aktívnym anchorom** (bez toho sa prepínanie kotiev nedá kontrolovať), `InputPoint` inference,
 `getExtents` pre kreslenie mimo bounds · PlacementSession viazaná na `model_guid` (prepnutie dokumentu = cancel,
 NIKDY cross-document insert) · rotácia ←/→ o 90° okolo aktívneho anchoru · 4 anchory na PREDNEJ rovine KORPUSU
 (nie čiel; presné súradnice per konštrukčný variant určí implementačný audit proti BuildPlanu) · **Z režimy:
-↓ = VÝŠKOVÝ ZÁMOK TYPU** (dolný korpus: základňa na world Z=0; horný korpus: základňa na `UPPER_HANG_Z` —
-zámok drží Z bez ohľadu na inference; world rám, nie drawing axes; funguje aj v prázdnom modeli cez ray×rovina)
+↓ = VÝŠKOVÝ ZÁMOK TYPU** (LOKÁLNY PLACEMENT ORIGIN korpusu — presne to, čo dnes kladie translácia buildera:
+dolný na world Z=0, horný na `UPPER_HANG_Z` —
+zámok drží Z bez ohľadu na inference; world rám, nie drawing axes; X/Y sa v zámku berie z ray×ROVINA ZÁMKU —
+pri dolnej Z=0, pri hornej Z=`UPPER_HANG_Z`, aby ghost sedel pod kurzorom; funguje aj v prázdnom modeli)
 **a ↑ = free Z** (plný inference point) — **oba typy ŠTARTUJÚ v zámku svojej domácej výšky** (zachováva dnešné
 správanie: horná pristane na 1400, kým používateľ vedome nestlačí ↑) · commit VŽDY top-level v koreňovom ráme
 (`ensure_root_context` vzor buildera — aj keď je používateľ v nested edit kontexte; in-SU scenár povinný) ·
@@ -197,9 +200,8 @@ a vloženie, keď si v editácii skupiny (skrinka musí skončiť top-level).
 **Checklist uzáveru (blok GHOST sa uzatvára CELÝ):** **bump MINOR** (uzáver bloku podľa CLAUDE.md) + `?v=` →
 testy (headless + JS ak UI + **plný in-SU beh**) → docs (`construction.md` odsek Tool/PlacementSession +
 `ui-lifecycle.md` insert cesta + ARCHITEKTURA router riadok) → STAV/KRONIKA → **blok presunúť plným textom do
-[archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md)** (v PLANe neostáva) → V1_VIZIA **bod 1**:
-odškrtnúť LEN pod-položku „vloženie skriniek na klik" — bod sa celý NEodškrtáva (V1 rozsah bodu ešte nie je
-v PLANe prázdny).
+[archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md)** (v PLANe neostáva) → V1_VIZIA **bod 1 ostáva `[ ]`**
+(rozsah bodu nie je prázdny — zostavy); hotovosť GHOST-u zaznamená KRONIKA a presun bloku do archívu.
 
 ### KOVANIE (zaradené Michalom 26.8.2026, po bloku GHOST VKLADANIE)
 
@@ -257,17 +259,21 @@ nezáväzný koncept [zdroje/next_sessions/03_KOVANIE_FAZA3.md](zdroje/next_sess
 
 - **V1 rozsah — quick-win = TASK PACKAGE „M-R FOTO" (1e, zapísané 29.8.2026, rev. po slepom review #254; štart na „štartuj"):**
   **Cieľ:** dielce v modeli nesú REÁLNU fotku dekoru namiesto plnej farby — vizualizácie bez exportu (V1_VIZIA bod 7).
-  **Scope IN:** čistý selektor `Materials.texture_path_for(material_id)` (headless testovateľný — vzor `color_of`):
-  vráti lokálnu cache cestu fotky dekoru, ak existuje a je validná (`core/demos/image_cache.rb`; `image_url` žije
-  na SHEET zázname — SCHEMA_IMAGE, `family.rb` ho rozkopíruje zo skupinovej URL; ŽIADNY „group" objekt neexistuje).
+  **Scope IN:** čistý TROJSTAVOVÝ selektor `Materials.texture_state_for(material_id)` (headless — vzor `color_of`):
+  `[:none]` = záznam fotku nemá (UNI, duplák, zástena, legacy) → farba · `[:missing]` = záznam má `image_url`,
+  ale lokálny súbor chýba/je nevalidný → existujúca textúra v modeli sa DRŽÍ · `[:path, cesta]` = aplikuj/over
+  kľúč (`core/demos/image_cache.rb`; `image_url` žije na SHEET zázname — SCHEMA_IMAGE, `family.rb` ho rozkopíruje
+  zo skupinovej URL; ŽIADNY „group" objekt neexistuje). Kľúč-attribute zároveň rozlišuje textúru položenú
+  pluginom od RUČNE namaľovanej používateľom — ručných sa plugin NIKDY nedotýka.
   `ensure_su_material`: pri dostupnej cache textúra + fixná mierka rapportu (šírka ≈ 600 mm, doladí vizuálny test);
   **identita textúry sa pamätá vlastným kľúčom** (napr. attribute na SU materiáli: basename+veľkosť súboru —
   `Texture#filename` po reopene NIE JE stabilný) a prepis sa robí LEN pri zmene kľúča; **farba sa pri materiáli
   s textúrou NENASTAVUJE** (color na textúre = tónovanie fotky!) a color write aj bez textúry len pri reálnej
   zmene (dnešný bezpodmienečný `mt.color=` sa guarduje — rebuild nesmie špiniť model).
   **KĽÚČOVÉ pravidlo pre stroj BEZ cache (Lucia): textúra sa NIKDY neprepisuje na farbu len preto, že cache
-  chýba** — existujúca textúra v uloženom modeli sa DRŽÍ (fallback na farbu platí len pre materiál, ktorý textúru
-  nikdy nemal). Bez tohto by prestavba na druhom PC ticho vyzliekla model z fotiek.
+  chýba** (`:missing`) — existujúca textúra v uloženom modeli sa DRŽÍ. Bez tohto by prestavba na druhom PC ticho
+  vyzliekla model z fotiek. PÁROVÁ cesta odstránenia: keď záznam `image_url` STRATÍ (`:none` po zmene katalógu)
+  alebo budúci vypínač textúry vypne, pluginová textúra (podľa kľúča) sa ZLOŽÍ na farbu — ručné textúry nie.
   **STANDARD §7.1:** mŕtve pole `texture` na zázname variantu (deklarované, nikde neimplementované — zrkadlo
   R-13) sa touto dávkou zo STANDARDU VYŠKRTNE; zdroj textúry je runtime cache z `image_url`, žiadne nové pole.
   **Scope OUT:** PBR/appearance vrstva · knižnica vzhľadov · orientácia textúry podľa smeru dekoru dielca
@@ -275,10 +281,10 @@ nezáväzný koncept [zdroje/next_sessions/03_KOVANIE_FAZA3.md](zdroje/next_sess
   dovtedy Lucia fotky NEuvidí pri dekoroch zakladaných u Michala — PRIZNANÉ obmedzenie, nie chyba) · UNI,
   dupláky (36 z 2×18), zásteny s `back_decor` a legacy záznamy = fallback farba (priznať v smoke, model bude
   zmiešaný fotka/farba).
-  **Audit: ÁNO-lite** — dávka škrtá pole zo STANDARDU (kontraktová zmena, hoci mŕtva) a dotýka sa cesty volanej
-  builderami; codex-audit pred implementáciou spustiť s týmto úzkym rozsahom.
-  **Testy a DoD:** headless — `texture_path_for` (s fotkou/bez, poškodený súbor = nil, UNI/duplák/zástena = nil)
-  + kľúč identity textúry; **in-SU sekcia POVINNÁ** (cesta sa volá z builderov): rebuild s textúrou nevyrába
+  **Audit: ÁNO (úzky rozsah)** — škrt poľa zo STANDARDU (kontraktová zmena, hoci mŕtva) + dotyk cesty volanej
+  builderami; codex-audit pred implementáciou spustiť presne s týmto rozsahom.
+  **Testy a DoD:** headless — `texture_state_for` (`:path` s fotkou · `:missing` pri poškodenom/chýbajúcom súbore
+  · `:none` pre UNI/duplák/zástenu/legacy) + kľúč identity textúry; **in-SU sekcia POVINNÁ** (cesta sa volá z builderov): rebuild s textúrou nevyrába
   extra Undo, nemení BOM, neprepisuje textúru pri nezmenenom kľúči, model bez cache textúry DRŽÍ; mutácie min. 3
   (texture vždy/nikdy · prepis pri chýbajúcej cache · color na textúre). VEPO/kusovník/rozpočet BAJTOVO nezmenené.
   **Riziká:** veľkosť .skp (textúry sa vkladajú — smoke porovná na zákazke KLINIKA) · výkon pri mnohých

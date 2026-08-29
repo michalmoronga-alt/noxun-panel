@@ -251,7 +251,8 @@ B1 názov projektu (1b-6a, #244) · B2 hlavičky materiálov (1b-6b, #247) · A1
 
 ## Odporúčané poradie pre 1d (zhoda [E] aj [F/S])
 
-1. **P0 hotfix** (beží) → 2. **pred GHOST:** R-01+R-04 → R-02 → R-03 → 3. **pred KOVANÍM:** R-06 brána (S, hneď) ·
+1. **P0 hotfix** (✅ #252) → 2. **pred GHOST:** R-01+R-04 → R-02 → R-03 *(GHOST package upresňuje: tvrdý
+blocker je len R-03; R-01/R-02 sú macOS vetva a Windows-only prevádzku neblokujú)* → 3. **pred KOVANÍM:** R-06 brána (S, hneď) ·
 R-07 · R-08 · potom R-05 (+R-06 plný) ako D-109 šev → 4. **pred D-95/VÝROBOU:** R-17, R-16, R-22, po etapách R-15 →
 5. **perzistencia:** R-11 → R-12 → R-14 (R-13 po rozhodnutí Michala) → 6. **UI/hygiena:** R-23.1 Escape (S,
 hocikedy) · R-18 · zvyšok podľa kapacity. R-32 kostry priebežne pred každým zásahom.
