@@ -56,8 +56,8 @@ počiatočný Z režim, Orbit suspend/resume, onCancel, getExtents) — idú do 
 
 ### R-05 · P1 · core · `core/hardware_sets.rb:1042-1117, 1188-1220` + `core/validation.rb:585-601`
 Pomer „1 ks na N nôh" (D-109) sa do schémy nezmestí: `expand` nemá agregačnú fázu (člen sa materializuje per
-položka — per-skrinka zaokrúhlenie by dalo zlé počty), rozsah zaokrúhľovania nie je definovaný (D-109 = per
-zákazka, ceil) a `ceil` rozbije invariant `Σ sources.quantity == row.quantity`, na ktorom stojí D-94 aj ORANGE
+položka, pomer sa z jednej položky vyčísliť nedá), rozsah zaokrúhľovania nie je nikde definovaný a zaokrúhlenie
+(`ceil`) rozbije invariant `Σ sources.quantity == row.quantity`, na ktorom stojí D-94 aj ORANGE
 `validation.rb:588`. `explain` (panel) by ukázal číslo, ktoré v nákupe nevznikne. [E:R-04 + S-01 + S-02 + S-04]
 **Návrh:** rozdeliť `expand` na zbernú (emisné deskriptory + akumulácia bázy) a materializačnú fázu bez zmeny
 podpisu; pomerový zdroj vlastný tvar (`basis_quantity` + `ratio`), invariant priznať „len unit/owner"; `explain`
