@@ -80,6 +80,11 @@ module Noxun
 
       KINDS = %w[fixed bands fit_series part_flag_length].freeze
 
+      # D-90: kluc dlzky rezu v params polozky. JEDINA autorita nazvu — cita ho
+      # `flag_length_params` (zapis), `params_label` (text) aj brana dlzkoveho
+      # kovania v HardwareSets (R-06). Ziadna vrstva si string nesmie opisat.
+      LENGTH_PARAM = 'cut_length_mm'
+
       # Kontextove kluce povolene ako input/params_from_context (dokumentacia tvaru ctx).
       CONTEXT_KEYS = %w[width height depth floor_height available_depth
                         available_height available_width].freeze
@@ -526,7 +531,7 @@ module Noxun
         return {} if prof.nil?
         v = pd[:prod].is_a?(Hash) ? pd[:prod][:width] : nil
         return {} unless v.is_a?(Numeric) && v.to_f.finite? && v.to_f.positive?
-        { 'cut_length_mm' => v.to_f.round(2), 'profile' => prof }
+        { LENGTH_PARAM => v.to_f.round(2), 'profile' => prof }
       end
 
       # D-90 (audit F5): SERVEROVY format params pre zobrazenie — „rez 597 mm".
@@ -535,7 +540,7 @@ module Noxun
       # navyse.
       def params_label(params)
         return nil unless params.is_a?(Hash)
-        v = params['cut_length_mm'] || params[:cut_length_mm]
+        v = params[LENGTH_PARAM] || params[LENGTH_PARAM.to_sym]
         return nil unless v.is_a?(Numeric) && v.to_f.finite? && v.to_f.positive?
         "rez #{fmt_mm(v)} mm"
       end

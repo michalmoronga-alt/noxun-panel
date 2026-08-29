@@ -102,12 +102,17 @@ module Noxun
       FILE         = 'hardware_sets.json'
       MODEL_KEY    = 'hardware_sets' # kluc snapshotu v NOXUN dict na modeli
 
+      # Uctovanie clena setu. Obe hodnoty su KUSOVE — expand vie iba nasobit
+      # kusy. Dlzkove uctovanie (suma mm, MJ „m") tu ZATIAL NIE JE; kym
+      # nepride (R-05/R-06 v bloku KOVANIE), drzi hranicu brana
+      # `length_unsupported?` nizsie.
       PER_KINDS = %w[unit owner].freeze
 
       # Dovody nemapovanej polozky (ORANGE) — jediny kanonicky zoznam; texty
       # semaforu mapuje Validation.check_hardware_expansion.
       UNMAPPED_REASONS = %w[no_set set_missing set_type_mismatch nl_missing
-                            param_band_missing selector_unresolved].freeze
+                            param_band_missing selector_unresolved
+                            length_unsupported].freeze
 
       # H1b: parametre, podla ktorych sa daju stavat pasma clena (param_bands)
       # a selector mapovania. JEDINA autorita ponuky pre UI — okno Katalog
@@ -482,6 +487,14 @@ module Noxun
           "set „#{sid}“ v projekte chýba"
         when 'set_type_mismatch'
           "set „#{sid}“ v projekte je iného typu kovania"
+        when 'length_unsupported'
+          # R-06: ROZMER patri do textu — bez neho by z hlasky nebolo vidiet,
+          # aku dlzku profilu treba objednat rucne. Zdroj rozmeru je jediny
+          # (params_label = „rez 597 mm"), nikdy sa tu neformatuje nanovo.
+          cut = u['params_label'].to_s.strip
+          base = "set „#{sid}“ počíta kusy, ale položka sa reže na dĺžku"
+          base += " (#{cut})" unless cut.empty?
+          "#{base} — dĺžkové kovanie sa zatiaľ do setu mapovať nedá"
         else
           'typ nemá priradený set'
         end
@@ -980,6 +993,14 @@ module Noxun
             unmapped << unmapped_entry(it, sid, 'set_type_mismatch')
             next
           end
+          # R-06 (brana 1d): dlzkove kovanie (uchytkovy profil D-90 nesie rez
+          # v params) sa cez KUSOVY set nacenit NESMIE — cena katalogu je za
+          # meter a subtotal by ju vynasobil poctom KUSOV. Radsej NIC (ORANGE
+          # s rozmerom, sekcia NEMAPOVANE) nez zle peniaze v nakupe a v ponuke.
+          if length_unsupported?(it)
+            unmapped << unmapped_entry(it, sid, 'length_unsupported')
+            next
+          end
           expand_members(it, set, qty, rows, unmapped, owner_seen, lookup)
         end
         finalize(rows, unmapped)
@@ -1037,6 +1058,20 @@ module Noxun
         v = params[param]
         return nil unless v.is_a?(Numeric) && v.to_f.finite?
         v.to_f
+      end
+
+      # R-06 (brana 1d): polozka sa REZE NA DLZKU — nesie kladnu dlzku rezu
+      # v params['cut_length_mm'] (nazov kluca je autorita HardwareRules,
+      # hardware_sets si ho neopisuje). Kazdy set vie dnes iba KUSY (PER_KINDS),
+      # takze taka polozka sa cez set nacenit nesmie.
+      # Polozka BEZ dlzky rezu (kusova uchytka, panty, nohy, vysuvy s NL) tu
+      # NIKDY nespadne — predikat je jedina podmienka brany a je uzky.
+      # POZOR pri plnom rezime (R-05/R-06): brana sa smie stlmit az v TEJ ISTEJ
+      # davke, ktora prinesie dlzkovu materializaciu (Σ mm, MJ „m") — inak by
+      # sa polozka vratila do kusoveho nasobenia, teda presne do tejto chyby.
+      def length_unsupported?(it)
+        cut = numeric_param(it, HardwareRules::LENGTH_PARAM)
+        !cut.nil? && cut.positive?
       end
 
       def expand_members(it, set, qty, rows, unmapped, owner_seen, lookup)
@@ -1302,6 +1337,13 @@ module Noxun
         out['set_name'] = set['name']
         if set['generic_type'].to_s != gt
           out['problems'] << unmapped_reason_sk(unmapped_entry(it, sid, 'set_type_mismatch'))
+          return out
+        end
+        # R-06 (brana 1d): TA ISTA brana ako v expand — panel a supis sa nesmu
+        # rozist. Bez nej by panel rozpisal kody s cenou za meter pri polozke,
+        # ktora v nakupe vobec nevznikne.
+        if length_unsupported?(it)
+          out['problems'] << unmapped_reason_sk(unmapped_entry(it, sid, 'length_unsupported'))
           return out
         end
         explain_members(it, set, sid, (lookup || catalog_lookup(catalog)), out)
