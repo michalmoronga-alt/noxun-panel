@@ -22,7 +22,7 @@ NX_STAV_MAX_BYTES = 12 * 1024
 # Davka "Docs cleanup C" (26.8.2026) doplnila STANDARD.md a POJMY.md — po
 # reflowe uz ziadny zivy dokument v SYSTEM/ nema vynimku.
 NX_SYSTEM_LINE_FILES = %w[
-  STAV.md PLAN.md DOGFOODING.md README.md V1_VIZIA.md VEPO_KONTRAKT.md
+  STAV.md PLAN.md DOGFOODING.md README.md V1_VIZIA.md VEPO_KONTRAKT.md AUDIT_REGISTER.md
   STANDARD.md POJMY.md
 ].freeze
 NX_SYSTEM_MAX_LINE = 400

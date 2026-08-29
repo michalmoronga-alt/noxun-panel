@@ -22,6 +22,7 @@ Na otázku **„prečo je to takto?"** sa nečíta nič z hora — na to je [arc
 | [STAV.md](STAV.md) | dnešok: verzia, hotové, rozrobené, ďalší krok | história (tá je v KRONIKE) |
 | [PLAN.md](PLAN.md) | budúcnosť: bloky prác, zásobník, trvalé pravidlá | záznam hotových blokov |
 | [DOGFOODING.md](DOGFOODING.md) | **otvorené** postrehy z praxe, plné znenie | zoznam vyriešeného |
+| [AUDIT_REGISTER.md](AUDIT_REGISTER.md) | zásobník nálezov auditu 1c pre blok 1d (R-čísla, priority, poradie) | plán blokov ani história auditu |
 | [STANDARD.md](STANDARD.md) | záväzný dátový kontrakt (dictionary, roly, mm Float) | návod na UI |
 | [VEPO_KONTRAKT.md](VEPO_KONTRAKT.md) | formát výstupu do VEPO | ostatné výstupy |
 | [POJMY.md](POJMY.md) | glosár + trvalé fakty stolárskej domény | plán ani stav |
