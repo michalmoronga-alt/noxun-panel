@@ -105,6 +105,11 @@ pointer na okamžitú hotfix dávku s výsledkom — nečaká v registri)** / P1
 
 - **Tri nezávislé pohľady:** externý Codex audit (spúšťa Michal; podklad: [zdroje/AUDIT_2026-08_podklad.md](zdroje/AUDIT_2026-08_podklad.md))
   · vlastný prechod (Fable) · slepý subagent. Nálezy sa zlejú do jedného registra s dedupom.
+- **PRVÝ AUDÍTOR ODOVZDAL (29.8.2026):** `zdroje/AUDIT_2026-08_externy_codex.md` (prichádza vlastným PR #250) — **2× P0** (chybný cenový/nákupný export sa najprv zapíše
+  a až potom varuje) a **11 nálezov R-01…R-11** pre register. **Oba P0 sú HOTOVÉ dávkou P0-HF** (v0.8.14, PR #251) — presne podľa pravidla vyššie: P0 nečaká v registri, ostáva
+  v ňom len pointer na hotfix. **Dávka zároveň prepísala vedomé rozhodnutie 1b-3** („export dobehne + červený status") a **korigovala samotný audit**: plošný tvrdý blok pri
+  chýbajúcej cene by porušil [STANDARD.md](STANDARD.md) §11.3 (rozpracovaný rozpočet musí ostať exportovateľný), takže chýbajúca cena je **potvrdzovaný**, nie tvrdý dôvod —
+  detail v [archiv/KRONIKA.md](archiv/KRONIKA.md). *Poučenie pre zvyšok 1c: nález auditu sa pred implementáciou overuje proti STANDARDU, nie preberá doslova.*
 - **Vstup, ktorý už čaká:** [zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md) — nálezy z post-hoc sweepu #186–#226: sekcia **A** 7 z hlavnej session sweepu ·
   sekcia **B** 18 z triáže review threadov (*z toho B1 je už vyriešené, otvorených 17*) · sekcia **C** 13 ďalších z bloku 1b (*C4 a C5 sú tiež už vyriešené*). Každý má adresu v kóde.
   **Prvý krok bloku 1c je preliať tento zoznam do registra**, v tomto poradí: **(1)** dedup (známe zhody sú v zozname vymenované) → **(2)** vyradiť to, čo je medzitým hotové alebo

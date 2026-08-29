@@ -20,7 +20,9 @@ INŠTANCIU; `nil` = kontrola sa preskočí, vzor `placements:`), klik-adresa je 
 zápisovej ceste (`fresh_collect` nižšie). Kritérium má **jeden zdroj**: verejná `Validation.duplicate_identities(identities)` → `[[kind, id, počet], …]`, z ktorej stavia nálezy
 Kontroly **aj** varovanie statusu exportov, ktoré `Validation.run` nevolajú (odsek `production_core.rb`). JEDINÝ kanonický
 zoznam; deterministický dedup + counts VÝHRADNE zo servera; sekcia KONTROLA v Štúdiu s klik-selectom cez stabilnú identitu a fallbackom na vlastníka; sekcia KONTROLA vo VEPO LOGu;
-**RED nikdy neblokuje export**.
+**RED nikdy neblokuje export** — semafor varuje, nezastavuje. *(Jedinou výnimkou v celom repe je finálny zápis súboru s cenou alebo objednávkou: `duplicate_identities` má od P0-HF
+dva verejné pohľady — `duplicate_owner_ids` (len `KIND_CABINET`, zlieva vlastníkov kovania → **zastaví zápis**, odsek `production_core.rb`) a `duplicate_plain_ids` (zvyšok →
+len varovanie). Podmienka je tá istá, aká rozhoduje o znení nálezu v `duplicate_id_item`, takže sa hláška a brána nemôžu rozísť.)*
 
 ### production_core.rb — zdieľané čisté jadro výstupov zákazky (ŠT-1a PR A)
 
@@ -60,6 +62,35 @@ nevolajú, preto skladajú vlastné varovanie: **`dup_id_suffix(collected)`** (s
 a **zároveň farbí status na varovanie**. **Cenová ponuka sufix NEMÁ** — má vlastný zoznam dôvodov `cp_warnings` (GH #139: jeden zoznam, ktorý riadi aj farbu), takže duplicita ide do
 neho; jeho posledný parameter `collected` je nepovinný (legacy volanie nič nemení). **VEPO sufix nemá tiež** — `Validation.run` volá, takže nález už nesie `control_suffix` aj sekcia
 KONTROLA vo VEPO LOGu.
+
+**FINÁLNA BRÁNA PRED ZÁPISOM SÚBORU (P0-HF, externý Codex audit 29.8.2026).** Spoločný koreň oboch P0 nálezov bol jeden: **systém poznal chybný finálny výstup a napriek tomu ho
+uložil.** Rozpočet aj cenová ponuka sa zapísali na disk a AŽ POTOM sa vyhodnotilo, že riadky nemajú cenu, že „Nábytková zostava" vyšla záporná alebo že suma nesedí s rozpočtom;
+nákupný CSV rovnako vznikol aj nad zliatymi vlastníkmi kovania. Súbor, ktorý už existuje, sa dá odoslať dodávateľovi aj zákazníkovi — červený status pod ním prišiel neskoro. Brána
+sa volá **pred `savepanel`** (picker sa pri chybe ani neotvorí) a má **dve vetvy**, ktorých rozdiel je záväzný:
+
+*(1) TVRDÁ — `export_blockers(collected:, cp:)`.* Stavy, ktoré sú VŽDY chyba a **nedajú sa potvrdiť**: duplicitné ID **skrinky** (`collected:` — CSV kovania, rozpočet, ponuka),
+záporná „Nábytková zostava" a nesúlad ponuky s rozpočtom (`cp:` — len ponuka). Nedáva zmysel poslať dodávateľovi objednávku, o ktorej vieme, že je podpočítaná. Hláška
+`export_blocked_status` musí povedať **oboje**: že súbor NEVZNIKOL (inak ho používateľ ide hľadať na disk) a **prečo + kde to opraviť**.
+
+*(2) POTVRDITEĽNÁ — `export_confirmations(budget:)`.* Dnes jediný dôvod: **riadky bez ceny**. STANDARD §11.3 hovorí, že neznáma cena sa NIKDY nenahradí nulou, ale má sa **priznať**
+(„medzisúčet je len zo známych cien a súhrn nahlas povie, že nie je úplný") — **rozpracovaný rozpočet je legitímny stav zákazky** a plošný tvrdý blok by používateľovi bral výstup,
+na ktorý má právo (nález Codex review PR #250 proti auditu). Default je teda zastavené, ale **cesta von existuje**: `export_confirm_status` ponúkne druhý klik, ten pošle
+`confirm_unpriced` a hotový súbor podhodnotenie **prizná v statuse** (`export_confirmed_notes`; status ostáva červený). **Potvrdenie overuje SERVER** (`export_confirmed?` — presne
+`true`, nie „true"), takže starý DOM ani cudzí volajúci nemajú ako podhodnotený súbor vyrobiť ticho; klient (`budNeedsConfirm` v `js/budget.js`, dva nezávislé kľúče pre rozpočet
+a ponuku) je len UX a jeho ozbrojenie **ruší každý čerstvý payload** (`NX.setStudio` → `budDisarm`) — potvrdenie platí pre čísla, ktoré používateľ videl.
+
+**Je to VEDOMÉ PREVRÁTENIE rozhodnutia dávky 1b-3** („export dobehne + červený status"), ktoré charakterizoval `tests/pure/test_1b3_citanie.rb`. Rozdiel je v predmete: 1b-3 riešila
+**nález Kontroly** (varovanie o modeli), táto brána **číslo v hotovom platnom dokumente**. Semafor sa nemení — **KONTROLA naďalej len varuje a nikdy neblokuje** (RED nezastaví ani
+VEPO); výnimka platí VÝHRADNE pre finálny zápis súboru s cenou alebo objednávkou. **VEPO bránu nedostáva** (audit ho výslovne vyníma): je to rezací výstup, nie cena ani objednávka,
+duplicitná identita jeho čísla neskresľuje a chybné riadky vyhadzuje sám do LOGu — blokovať ho bez samostatného dôkazu by len zastavilo výrobu. **Firewall interných pojmov bránou
+tiež nie je** (STANDARD §11.3: hlási a neblokuje) a počíta sa až nad hotovým hárkom.
+
+**Predikát MUSÍ rozlíšiť skrinku od dosky.** Kovanie účtované na vlastníka (`per: 'owner'`) podpočíta len zliatie **skriniek** — doska kovanie nemá, takže objednávke nehrozí nič
+a export ju nezastaví; kusovník ju však s dvojníčkou zlieva, preto sa prizná ako **neblokujúce** varovanie. `dup_id_suffix` aj `cp_warnings` preto od P0-HF hovoria **len o doskách**
+a vetu o kovaní nemajú (do 29.8. `kind` zahadzovali a tvrdili ju aj nad doskou — seed A7 sweepu). Kritérium má **jeden zdroj** v `validation.rb`: `duplicate_owner_ids`
+(blokuje) a `duplicate_plain_ids` (varuje) sú dva pohľady na tú istú `duplicate_identities`. Tvrdé dôvody tým **vypadli z `cp_warnings`** — jeden dôvod žije v jednom zozname,
+dva zoznamy o tej istej veci by sa časom rozišli; `cp_warnings(hits, collected, confirmed)` drží už len firewall, duplicitnú dosku a **potvrdené** riadky bez ceny. Kontrakt strážia
+`tests/pure/test_p0hf_brany.rb` (pri každom dôvode sa meria **prázdny priečinok**, nie text statusu) a `tests/js/test_p0hf_potvrdenie.js` (dvojkrokový klik).
 `do_select` navyše pozná príznak **`focus_inspector`** (ceruzka riadku Kusovníka, Š3): po výbere zdvihne Inspector cez `Panel.bring_to_front` — **nikdy ho neotvára**, výber sa tým
 nemení a do modelu sa nezapisuje nič.
 
