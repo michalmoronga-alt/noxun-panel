@@ -219,7 +219,40 @@ nezáväzný koncept [zdroje/next_sessions/03_KOVANIE_FAZA3.md](zdroje/next_sess
 
 **Cieľ:** dotiahnuť krížovú kontrolu zákazky pred odoslaním do výroby a výrobné výstupy.
 
-- **D-94 · Traceability v súpise kovania** — rozklik nákupného riadku na skrinky a čelá, z ktorých vznikol (dáta `sources` už existujú) + klik-select v modeli.
+- **D-94 · TASK PACKAGE „NÁKUP S PÔVODOM" (1e, zapísané 30.8.2026, rev. po slepom review #255; štart na „štartuj"):**
+  **Cieľ:** riadok Nákupu kovania sa dá rozkliknúť na skrinky/čelá, z ktorých vznikol, a klik označí vlastníka
+  v modeli — koniec pátrania „prečo kupujem 14 závesov".
+  **Scope IN:** rozklik riadku sekcie Nákup kovania (Štúdio) — INLINE pod riadkom (vertikálny priestor!), vzor
+  `<details>` s pamäťou otvorenia (`budget.js` + `boot.js` — rozklik PREŽIJE push/prekreslenie sekcie). Zdroje
+  SÚ už v payloade (overené: `add_row` → `finalize` → `hardware_expansion` → payload Štúdia — server sa nemení
+  okrem obohatenia nižšie). Zobrazenie ZOSKUPENÉ per skrinka (jedna skrinka = jeden riadok so súčtom; položky
+  vnútri), s ĽUDSKÝMI názvami dielcov — `PartKeys.human_label` (D-92) skladá SERVER: `hardware_expansion`
+  obohatí zdroje o hotový text (surový `owner_part_key` Michalovo „prečo" nerieši); `fronts` pre `human_label`
+  dodá ADITÍVNY kľúč zberu `fronts_by_cabinet` v `Bom.collect` (číta existujúce `ccfg['front_items']`, nič
+  nezapisuje; bez neho by čelá — vlajkový prípad závesov — skončili so surovým id). Klik na zdroj = existujúca
+  select mašinéria s NOVOU adresou: `source_ref` = IDENTITA (`cabinet_id` + `owner_part_key`), resolver = vzor
+  `rule_ref`/`pids_for_override` (zvláda aj `owner_part_key = nil` → označí celý korpus) + `focus_inspector:
+  true`; klikateľné je OBOJE — riadok skrinky (`owner_part_key` nil → celý korpus) aj vnútorná položka
+  (konkrétne čelo/dielec); **pids z DOM sú ZAKÁZANÉ** (mŕtva legacy vetva sa neoživuje — Codex GH #48 P2: pids po flushi zomreli).
+  **Scope OUT:** zmena výpočtu množstiev · traceability NEMAPOVANÝCH nad rámec dnešného textu · pomerové členy
+  (po D-109 vlastný tvar zdroja — invariant `Σ sources.quantity == row.quantity` platí len pre unit/owner,
+  register R-05; package ho NEbetónuje) · export rozkliku do CSV.
+  **Audit:** ÁNO (úzky rozsah: aditívny kľúč `fronts_by_cabinet` v zdieľanom `Bom.collect` kontrakte —
+  BOM/validácia/rozpočet/exporty ho zdieľajú; zvyšok je čítanie + existujúci resolver s novou adresou).
+  **Testy a DoD:** headless — tvar zdrojov v payloade (unit aj owner, viac skriniek, doska bez kovania) +
+  **regresný strážca invariantu `Σ sources.quantity == row.quantity` nad `HardwareSets.expand`** (čistá
+  funkcia; stráži pôdu pre D-109) + human_label obohatenie; JS DOM — rozklik renderuje zoskupené zdroje bez
+  server dotazu, prežije push, klik posiela `source_ref`; in-SU smoke — klik na zdroj označí správnu skrinku
+  a Inspector ju otvorí. Mutácie min. 3 (zdroje z nesprávneho riadku · klik bez identity · invariant).
+  **Riziká:** veľkosť payloadu pri veľkej zákazke (human_label texty — merať; prípadne lenivý kanál à la TPL
+  PNG) · duplicitná identita (zdroje pri ORANGE stave zobraziť, neblokovať — tvrdé brány rieši P0-2/#252).
+  **Smoke pre Michala:** v Nákupe rozklikni závesy → vidíš skrinky s ľudskými názvami dielcov a počtami;
+  klik na skrinku ju označí v modeli a Inspector ju otvorí; klik na konkrétne čelo označí len to čelo;
+  súčet zdrojov sedí s riadkom; rozklikni, zmeň
+  niečo v modeli, „Obnoviť" — rozklik ostane otvorený.
+  **Checklist uzáveru:** bump patch + `?v=` → testy → outputs.md + **hardware.md** (obohatenie expansion) +
+  ui-lifecycle.md odseky na mieste → STAV/KRONIKA/PLAN → D-94 do DOGFOODING_vyriesene (plný text + riadok
+  navrch indexu).
 - **D-95 · Režim krížovej kontroly „diel po diele"** — riadený prechod zákazkou s odškrtávaním, stav uložený v zákazke; rozšírenie na rozmery a kovanie, šípky smeru dekoru, X-ray. *(Vizuálny základ pre olep už stojí: D-104 + D-105.)*
 - **EN DANIELI textový export** výrobného zadania — supplier-agnostický výstup, vedome odložený z dávky E.
 - **Nárezový plán fáza 2** — guillotine, kerf, orezky, orientácia dekoru; vlastná heuristika v čistom Ruby (OpenCutList je GPL — algoritmus áno, kód nie), kontrakt D-19 pripravený.
@@ -305,7 +338,51 @@ nezáväzný koncept [zdroje/next_sessions/03_KOVANIE_FAZA3.md](zdroje/next_sess
 **Cieľ:** aby plugin a knižnice fungovali na dvoch pracoviskách (Michal + Lucia).
 
 - *(**D-48 · Zdieľaná knižnica pre 2 PC** je od 26.8. MIMO V1 — presunutá do zásobníka Po V1; katalógy sa dovtedy zdieľajú ručne export/importom.)*
-- **D-52 · Tlačidlo „Aktualizovať" (auto-update pluginu) — V1 rozsah samostatne:** jednoklikový update (distribučný kanál jednoducho — napr. zdieľaný priečinok), BEZ väzby na D-48 sync.
+- **D-52 · TASK PACKAGE „AKTUALIZOVAŤ JEDNÝM KLIKOM" (1e, zapísané 30.8.2026, rev. po slepom review #255; štart na „štartuj"):**
+  **Cieľ:** Lucia aj Michal zaktualizujú plugin bez kopírovania súborov — tlačidlo v sekcii O plugine Štúdia.
+  BEZ väzby na D-48 sync.
+  **Scope IN:** cesta k distribučnému priečinku = VLASTNÝ malý JSON v %APPDATA% (JsonFileStore + .bak; NIE
+  SupplierSettings — nepatrí pod jeho revízny zámok), pole na zadanie cesty priamo v sekcii About pri tlačidle — POD `data-ss` guardom (rozpísaná cesta nesmie
+  zmiznúť pushom — trieda chyby z #227) a s vlastným uložením (Enter/mini-tlačidlo; About VEDOME nemá SS lištu
+  ani revízny zámok) ·
+  **tlačidlo a stavový riadok LEN v sekcii About ŠTÚDIA** — markup `about.js` je zrkadlo pre koliesko Inspectora
+  (JEDEN OBSAH, DVA VSTUPY), updater časť sa renderuje výhradne pre štúdiový vstup (v koliesku sa neobjaví;
+  mŕtve tlačidlo = D-78). Toto je VEDOMÁ odchýlka od zapísaného rozhodnutia „sup/about sú čítanie" — pomenovať
+  v PR aj docs · kontrola verzie pri otvorení sekcie číta VÝHRADNE hlavičku `noxun_engine.rb` zo zdroja (jedno malé
+  čítanie, žiadne skenovanie stromu; krátky timeout a chybová hláška — sieťový share nesmie zamraziť SketchUp) · **formát balíka = kópia
+  repa** (`noxun_engine.rb` + strom `noxun_engine/`) · **jednotka atomicity = CELÝ strom, každý krok s
+  definovaným rollbackom**: (1) staging kompletného balíka do `noxun_engine.new` (kópia, nie rename — share
+  môže streamovať useknuté) → (2) **validácia STAGED stromu** (počty a veľkosti súborov proti zdroju; VERSION
+  sa parsuje zo STAGED `noxun_engine.rb` — autorita — a krížovo proti staged `main.rb`; nesúlad/chýbajúce =
+  koniec, `.new` sa uprace, nič sa nemenilo) → (3) `noxun_engine` → `noxun_engine.old` (zlyhanie → uprac
+  `.new`, koniec bez zmeny) → (4) `.new` → `noxun_engine` (zlyhanie → vráť `.old` späť) → (5) loader TIEŽ cez
+  staging: `noxun_engine.rb.new` → rename (zlyhanie → vráť celý swap, `.old` strom späť — NOVÝ strom so STARÝM
+  loaderom nesmie ostať: `main.rb` fallback by hlásil starú verziu nad novým kódom) → (6) `.old` sa maže až po
+  úspechu všetkých krokov; zvyšky `.old`/`.new` po páde uprace ďalší beh (vzor zametania template_previews).
+  Swap zároveň prirodzene ZRKADLÍ (osirené súbory zaniknú s `.old` — vzor INSTALL, ŠT-2b) · `stage_then_rename`
+  je VZOR, nie volateľná funkcia (privátna, PNG-špecifická) · **trojstav verzií:** novšia = tlačidlo aktívne; ROVNAKÁ = neaktívne („aktuálna");
+  STARŠIA = aktívne s potvrdením „ideš na staršiu verziu" (priznaný downgrade, žiadny ďalší guard) ·  po úspechu hláška
+  „Reštartuj SketchUp" — ŽIADEN auto-reload za behu (pasca observerov) ani auto-check na pozadí.
+  **Scope OUT:** G-Disk sync knižníc (D-48, mimo V1) · podpisovanie balíka · auto-update na pozadí.
+  **Audit: ÁNO** — dávka pridáva NOVÝ MODUL (updater) a zapisuje do živého Plugins priečinka (CLAUDE.md:
+  nový modul = codex-audit povinný; rozsah auditu: atomicita swapu + validácia balíka).
+  **Testy a DoD:** headless — čistý core modul updater BEZ `Sketchup.*` pri načítaní, cesty ako parametre
+  (`find_support_file` len v UI vrstve): porovnanie verzií (novšia/rovnaká/staršia), validácia STAGED stromu
+  (chýbajúci/useknutý súbor, nesúlad VERSION medzi staged noxun_engine.rb a main.rb = odmietnuť bez zmeny),
+  swap logika so simulovaným zlyhaním KAŽDÉHO z krokov 3–5 (pôvodný strom aj loader sa vrátia, zmiešaný stav
+  nevznikne, zvyšky po páde uprace ďalší beh); ručný smoke = reálny update z priečinka.
+  Mutácie min. 3 (swap bez stagingu · úspech hlásený pri zlyhaní · zmiešaný stav prežije).
+  **Riziká:** rename priečinka za behu — najpravdepodobnejší držiteľ handle nie je `.rb` (Ruby po načítaní
+  zatvára), ale CEF s otvoreným HtmlDialogom nad `ui/*`; PREDPOKLAD updatu: updater pred swapom ZAVRIE Štúdio
+  aj Inspector a pri zlyhaní rename povie presnú hlášku (overiť v audite) · antivírus/zámky na zdieľanom disku (chyby hlásiť, nikdy ticho) · nedostupný share
+  pri otvorení sekcie (timeout, nie zamrznutie).
+  **Smoke pre Michala:** nastav cestu na priečinok s novšou kópiou → About ukáže dostupnú verziu →
+  Aktualizovať → reštart → nová verzia beží a v Plugins nie sú osirené staré súbory; priečinok s pokazeným
+  balíkom → hláška, stará verzia beží ďalej; koliesko Inspectora tlačidlo NEukazuje.
+  **Checklist uzáveru:** bump patch + `?v=` → testy → **nový odsek modulu updater v
+  `docs/architecture/ui-lifecycle.md`** (vstupný bod je sekcia About; core helper popísať tamtiež; R-32 vzor:
+  overiť proti kódu) + ARCHITEKTURA router riadok → STAV/KRONIKA/PLAN → D-52 do DOGFOODING_vyriesene
+  (plný text + riadok navrch indexu).
 - **D-20 · Quick actions — bezpečný move plugin** — zlúčiť noxun_mower + Snaper do jedného toolbaru; kopírovanie musí prejsť štandardným dedup tickom (dnes vzniká kópia bez NOXUN identity).
 
 ## Po V1 — zásobník (nezaradené, nestratiť)
