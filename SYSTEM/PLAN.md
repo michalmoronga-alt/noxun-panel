@@ -9,9 +9,10 @@
 je v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md). Čísla ostatných
 blokov sa kvôli odkazom v STAV a KRONIKE neprečíslúvajú.)*
 
-**Poradie najbližších blokov (rozhodol Michal 26.8.2026, doplnené v ten istý večer o hardening sekvenciu):**
-**1b STABILIZAČNÁ REVÍZIA → 1c AUDIT KÓDU → 1d REFAKTOR Z REGISTRA → 1e PLÁNOVACIA DÁVKA (task packages) → GHOST VKLADANIE → KOVANIE**
-(pred KOVANÍM USER-debata o setoch). Zmysel sekvencie: audit a refaktor **pripravujú pôdu presne pre naplánované funkcie** a doťahujú staré dlhy — až potom nové funkcie.
+**Poradie najbližších blokov (rozhodol Michal 26.8.2026; revízia 27.8.2026 — kvôli koncu MAX plánu 2.9. sa 1e predsunulo pred 1d):**
+**1b STABILIZAČNÁ REVÍZIA → 1c AUDIT KÓDU → 1e PLÁNOVACIA DÁVKA (task packages) → 1d REFAKTOR Z REGISTRA (beží súbežne s 1e cez subagentov a pokračuje aj po 2.9.) → GHOST VKLADANIE → KOVANIE**
+(pred KOVANÍM USER-debata o setoch). Zmysel sekvencie: audit a refaktor **pripravujú pôdu presne pre naplánované funkcie** a doťahujú staré dlhy — až potom nové funkcie;
+1e ide skôr, lebo kvalitné packages sú podmienkou, aby implementáciu 1d a ďalších blokov zvládli agenti bez Fable.
 *(Blok **PICKER-3** je hotový — v0.8.5, 26.8.2026; plný text v [archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md), výsledok v [archiv/KRONIKA.md](archiv/KRONIKA.md).)*
 
 ### 1b · STABILIZAČNÁ REVÍZIA (dlhy fázy ŠTÚDIO — pred blokom KOVANIE)
@@ -96,32 +97,12 @@ si to vypýtalo): [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-7**.
 Otvorené nálezy z neho dostali vlastné dávky (**1b-7** — hotová, v0.8.10; **1b-6b** — otvorená) a jedna otázka ide do auditu **1c**. Kandidáti do registra 1c žijú v [zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md).
 Plný záznam — metodika, čísla, bilancia slepých kôl a poučenie: [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam **1b-E**.
 
-### 1c · AUDIT KÓDU (read-only — po 1b; rozhodnuté 26.8.2026 večer)
+*(Blok **1c · AUDIT KÓDU** je uzavretý (29.8.2026) — traja audítori (externý Codex · Fable · slepý subagent) sa zliali
+do **[AUDIT_REGISTER.md](AUDIT_REGISTER.md)**: 2× P0 — **✅ HOTOVÉ dávkou P0-HF, PR #252, v0.8.14** (exportné brány; vrátane korekcie samotného auditu proti STANDARD §11.3 — *poučenie: nález auditu sa pred implementáciou overuje proti STANDARDU, nie preberá doslova*) — + 33 položiek R-01–R-33
++ odporúčané poradie pre 1d + 2 otvorené rozhodnutia Michala (R-13 `std` na entite · R-30 jantárové riadky). Plný pôvodný text bloku:
+[archiv/ROADMAP_hotove_etapy.md](archiv/ROADMAP_hotove_etapy.md); záznam s bilanciou: [archiv/KRONIKA.md](archiv/KRONIKA.md), záznam 1c.)*
 
-**Cieľ:** pripraviť plugin na naplánované funkcie a pomenovať všetky nedorobky. **Žiadny kód sa nemení** — výstupom je
-**register nálezov** (nový súbor `SYSTEM/AUDIT_REGISTER.md`, štýl DOGFOODINGu: R-číslo · závažnosť **P0 (len ako
-pointer na okamžitú hotfix dávku s výsledkom — nečaká v registri)** / P1–P3 · vrstva · súbor ·
-**ktorú naplánovanú funkciu blokuje** · návrh riešenia). Audit, ktorý rovno opravuje, sa nedá kontrolovať.
-
-- **Tri nezávislé pohľady:** externý Codex audit (spúšťa Michal; podklad: [zdroje/AUDIT_2026-08_podklad.md](zdroje/AUDIT_2026-08_podklad.md))
-  · vlastný prechod (Fable) · slepý subagent. Nálezy sa zlejú do jedného registra s dedupom.
-- **PRVÝ AUDÍTOR ODOVZDAL (29.8.2026):** `zdroje/AUDIT_2026-08_externy_codex.md` (prichádza vlastným PR #250) — **2× P0** (chybný cenový/nákupný export sa najprv zapíše
-  a až potom varuje) a **11 nálezov R-01…R-11** pre register. **Oba P0 sú HOTOVÉ dávkou P0-HF** (v0.8.14, PR #252) — presne podľa pravidla vyššie: P0 nečaká v registri, ostáva
-  v ňom len pointer na hotfix. **Dávka zároveň prepísala vedomé rozhodnutie 1b-3** („export dobehne + červený status") a **korigovala samotný audit**: plošný tvrdý blok pri
-  chýbajúcej cene by porušil [STANDARD.md](STANDARD.md) §11.3 (rozpracovaný rozpočet musí ostať exportovateľný), takže chýbajúca cena je **potvrdzovaný**, nie tvrdý dôvod —
-  detail v [archiv/KRONIKA.md](archiv/KRONIKA.md). *Poučenie pre zvyšok 1c: nález auditu sa pred implementáciou overuje proti STANDARDU, nie preberá doslova.*
-- **Vstup, ktorý už čaká:** [zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md) — nálezy z post-hoc sweepu #186–#226: sekcia **A** 7 z hlavnej session sweepu ·
-  sekcia **B** 18 z triáže review threadov (*z toho B1 je už vyriešené, otvorených 17*) · sekcia **C** 13 ďalších z bloku 1b (*C4 a C5 sú tiež už vyriešené*). Každý má adresu v kóde.
-  **Prvý krok bloku 1c je preliať tento zoznam do registra**, v tomto poradí: **(1)** dedup (známe zhody sú v zozname vymenované) → **(2)** vyradiť to, čo je medzitým hotové alebo
-  už má dávku → **(3)** overiť proti vtedajšiemu `main` (čísla riadkov sú k `0070697`, `ui/production_core.rb` sa medzitým posunul) → **(4)** až potom priradiť R-číslo, závažnosť,
-  vrstvu a blokovanú funkciu.
-- **Prioritné osi auditu** (od budúcich funkcií dozadu): observery/undo/Tool lifecycle (→ GHOST) · dátový model setov kovania
-  (→ D-109/KOVANIE) · `ui/production_core.rb` — jadro výstupov v UI vrstve (→ Ponuka/plošná kontrola) · payload kontrakty a identita ·
-  perzistencia, `std` verzie, migrácie (→ shared library) · zjednotenie UI vzorov na nx_modal/nx_combo · VŠETKY aktuálne stub odseky architektúry (k 26.8. ich je 19; zoznam grepom, detail v podklade).
-- **Mimo záberu** (zapísané aj v podklade): prepisovanie funkčných builderov a zapisovacích ciest · hromadné premenovania ·
-  vizuál Inspectora/Štúdia · predčasné abstrakcie pre neschválené funkcie (attachment/segmenty) · výkon bez merania.
-
-### 1d · REFAKTOR/HARDENING Z REGISTRA (po 1c)
+### 1d · REFAKTOR/HARDENING Z REGISTRA (po 1c; **zásobník = [AUDIT_REGISTER.md](AUDIT_REGISTER.md)**, poradie dávok = sekcia „Odporúčané poradie" v ňom)
 
 V 1d sa rieši **len to, čo je výrobné riziko alebo blokuje PONECHANÝ V1 rozsah** — nálezy viažuce sa výhradne na po-V1 témy
 (DOCX/PDF renderer, G-Disk sync…) ostávajú v registri zaradené na neskôr, pred V1 sa pre ne nerefaktoruje.
@@ -131,7 +112,7 @@ Pravidlo podľa druhu dávky: **štrukturálny refaktor = „správanie sa nemen
 In-SU testy povinné pri builderoch/observeroch; mutačné overenie štandard. Nálezy z reálnej výroby majú stále prednosť
 (Pravidlo pre postrehy). Dávka, ktorá nevie povedať, ktorú naplánovanú funkciu pripravuje alebo ktorý dlh spláca, sa nerobí.
 
-### 1e · PLÁNOVACIA DÁVKA — task packages (po 1d)
+### 1e · PLÁNOVACIA DÁVKA — task packages (po 1c, súbežne s 1d — revízia poradia 27.8.2026)
 
 Zliať koncepty [zdroje/next_sessions/](zdroje/next_sessions/) 01–09A + zvyšné bloky PLANu do jedného backlogu →
 roztriediť do **kódových a logických blokov** → každému určiť **prioritu · náročnosť · závislosti · či mení dátový kontrakt**

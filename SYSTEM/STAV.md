@@ -24,27 +24,26 @@ vedomé odchýlky v `zdroje/ui20/UI20_KONTRAKT.md` §7.
 
 ## Robí sa
 
-**BEŽÍ AUDIT 1c** — prvý z troch audítorov (externý Codex) odovzdal nálezy do `zdroje/AUDIT_2026-08_externy_codex.md`. Jeho **dva P0** boli vybavené mimo poradia dávkou **P0-HF**
-(v0.8.14): finálne brány pred zápisom cenových a nákupných exportov. Zvyšok nálezov (R-01…R-11) čaká na zlúčenie do spoločného registra.
-
-**Blok 1b · STABILIZAČNÁ REVÍZIA** ([PLAN.md](PLAN.md)). **Všetky tri brány sú HOTOVÉ:** **1b-1** (**A** — optimistický zámok Nastavení, v0.8.6) · **1b-2** (**H** — charakterizačné
-in-SU scenáre pre kópiu, `*N`, Undo, prerušenie operácie, scale a prepnutie modelu, takže **blok 1d už smie siahnuť na buildery a observery**; Ctrl+Y a dva dokumenty naraz ostávajú
-manuálne, sadu dorovnala **1b-5**) · **1b-3** (**G** — „Obnoviť" už do modelu nezapisuje). **Staré dlhy B a D** vybavila **1b-4** (v0.8.8), **sweep E je hotový** (27.8.); mimo
-písmen aj **1b-6a** (v0.8.9), **1b-7** (v0.8.10), **1b-6b** (v0.8.11) a **1b-6c** (v0.8.12). **Z odrážky F je hotové D-27** (v0.8.13) — **ostáva D-51** (štandard veľkostí okien
-a tlačidiel) a výklop ako samostatný typ čela. Poradie určuje Michal. **Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
+**Blok 1b · STABILIZAČNÁ REVÍZIA je prakticky uzavretý** ([PLAN.md](PLAN.md)): brány A/G/H hotové (1b-1/2/3), dlhy B+D (1b-4), sweep E, mimo písmen 1b-6a/6b/6c aj 1b-7, z F je hotové D-27 —
+**ostáva len D-51** (štandard veľkostí okien — čaká na Michalove hodnoty) a výklop ako typ čela (ide cez task package 1e).
+**Blok 1c · AUDIT KÓDU je HOTOVÝ (29.8.)** — traja audítori zliati do **[AUDIT_REGISTER.md](AUDIT_REGISTER.md)** (2×P0 + 33 položiek + poradie pre 1d + 2 rozhodnutia Michala);
+**oba P0 sú vybavené dávkou P0-HF** (v0.8.14 — finálne brány pred zápisom exportov). **Beží: 1e PLÁNOVACIA DÁVKA** (task packages z konceptov — priorita do 2.9.).
+**Drž limity dávok:** malé PR, pravidlo 3 kôl, in-SU pri builderoch/observeroch.
 
 ## Ďalší krok
 
-**Poradie ďalšej práce (Michal 26.8., večer doplnená hardening sekvencia):** **1b stabilizačná revízia** → **1c AUDIT KÓDU** (read-only; traja audítori, podklad
-[zdroje/AUDIT_2026-08_podklad.md](zdroje/AUDIT_2026-08_podklad.md), výstup register nálezov) → **1d refaktor z registra** → **1e plánovacia dávka** (task packages zo všetkých
-konceptov) → **GHOST VKLADANIE** → **KOVANIE** (najprv USER-debata o setoch). V1 rozsah zoštíhlený — checklist v [V1_VIZIA.md](V1_VIZIA.md). Dávky štartujú na Michalovo „štartuj".
+**Poradie ďalšej práce (Michal 26.8. + úprava 27.8. kvôli koncu MAX plánu 2.9.):** ~~1b~~ → ~~1c audit~~ → **1e plánovacia dávka** (task packages — Fable priorita do 2.9.)
+→ **1d refaktor z [AUDIT_REGISTER.md](AUDIT_REGISTER.md)** (beží súbežne cez subagentov, pokračuje aj po 2.9.) → **GHOST VKLADANIE** → **KOVANIE** (najprv USER-debata o setoch,
+Michal ju rozoberie v samostatnom okne). V1 rozsah zoštíhlený — checklist v [V1_VIZIA.md](V1_VIZIA.md).
 
 ## Posledné uzávery
 
 - **P0-HF — finálne brány pred zápisom exportov** (chybný XLSX/CSV už nevznikne: **tvrdo** sa zastaví záporná „Nábytková zostava", nesúlad ponuky s rozpočtom a zliate ID
   skriniek; **riadky bez ceny** sa zastavia na prvý klik a druhým sa dajú vedome potvrdiť — STANDARD §11.3) — v0.8.14 (29.8.) · **Michal večer:** v Rozpočte nechaj riadok bez
   ceny a daj „XLSX rozpočet" — **nesmie sa nič uložiť**; hláška ponúkne druhý klik, po ňom sa súbor uloží a status musí PRIZNAŤ, že suma je podhodnotená.
-- **F/D-27 — tagy modelu z panela** (ikona oka v raile → zoznam NOXUN tagov; klik = jeden krok Späť; checkbox ghost zón ide tou istou cestou; kontroly už nekreslia nad skrytým) — v0.8.13 (28.8.) · **Michal večer:** skry v raile **Čelá** — musia zmiznúť, ikona sa rozsvieti, **Ctrl+Z** ich vráti; skús to aj so zapnutou ABS kontrolou (nad skrytým nesmie ostať plôška).
+- **1c — AUDIT KÓDU KOMPLET** (traja audítori → [AUDIT_REGISTER.md](AUDIT_REGISTER.md); Codex review #250 korigoval samotný audit — kontrakt STANDARD §11.3 má prednosť pred audítorom) — 29.8., bez zmeny kódu.
+- **F/D-27 — tagy modelu z panela** (ikona oka v raile → zoznam NOXUN tagov; klik = jeden krok Späť; checkbox ghost zón ide tou istou cestou; kontroly už nekreslia nad skrytým) — v0.8.13 (28.8.) ·
+  **Michal večer:** skry v raile **Čelá** — musia zmiznúť, ikona sa rozsvieti, **Ctrl+Z** ich vráti; skús to aj so zapnutou ABS kontrolou (nad skrytým nesmie ostať plôška).
 - **1b-7 — koniec tichého návratu starej ceny dekoru** (editor prelieva už len bunky, ktorých si sa dotkol; pri strete ukáže *tvoja × v katalógu* a bez rozhodnutia neuloží) — v0.8.10 (27.8.) · **Michal večer:** oprav cenu dekoru, daj **Esc**, spusti „Aktualizovať z Demosu", otvor ten istý dekor — nová cena musí ostať.
 - **1b-E — POST-HOC SWEEP KOMPLET** (34 PR spätne cez Codex CLI + triáž 54 threadov; 29 nálezov, 10 platných) — kandidáti pre 1c v [zdroje/SWEEP_2026-08_kandidati.md](zdroje/SWEEP_2026-08_kandidati.md)
 - **1b-6a + 1b-6c — meno zákazky (delenie PR #243)**: názov prežije prvé uloženie (v0.8.9) a `vepo_settings.json` má **jedny zamknuté dvere** (v0.8.12 — dve inštancie SketchUpu si už nemažú nastavenia ani mená) · **Michal večer:** nový model → napíš názov zákazky → Ctrl+S → VEPO sa musí volať podľa zákazky.
