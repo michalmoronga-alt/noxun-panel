@@ -219,7 +219,27 @@ nezáväzný koncept [zdroje/next_sessions/03_KOVANIE_FAZA3.md](zdroje/next_sess
 
 **Cieľ:** dotiahnuť krížovú kontrolu zákazky pred odoslaním do výroby a výrobné výstupy.
 
-- **D-94 · Traceability v súpise kovania** — rozklik nákupného riadku na skrinky a čelá, z ktorých vznikol (dáta `sources` už existujú) + klik-select v modeli.
+- **D-94 · TASK PACKAGE „NÁKUP S PÔVODOM" (1e, zapísané 30.8.2026; štart na „štartuj"):**
+  **Cieľ:** riadok Nákupu kovania sa dá rozkliknúť na skrinky/čelá, z ktorých vznikol, a klik označí vlastníka
+  v modeli — koniec pátrania „prečo kupujem 14 závesov".
+  **Scope IN:** rozklik riadku sekcie Nákup kovania (Štúdio) — INLINE pod riadkom (vertikálny priestor!) sa
+  rozbalí zoznam zdrojov z existujúceho poľa `sources` (cabinet_id · owner_part_key · množstvo za zdroj);
+  klik na zdroj = existujúca klik-select cesta (`do_select` cez persistent id — vzor Kusovníka/Kontroly,
+  ŽIADNA nová selekčná mašinéria); rozklik je čisté čítanie payloadu (zdroje sa do buy payloadu doplnia bez
+  zdvihu generácie, ak tam ešte nie sú).
+  **Scope OUT:** zmena výpočtu množstiev · traceability NEMAPOVANÝCH nad rámec dnešného textu · pomerové členy
+  (po D-109 vlastný tvar zdroja — package NEsmie zabetónovať „sources ≡ rozklik": invariant platí len pre
+  unit/owner, register R-05) · export rozkliku do CSV.
+  **Audit:** NIE (čítanie + existujúca select cesta; kontrakt sa nemení).
+  **Testy a DoD:** headless — tvar zdrojov v payloade (unit aj owner, viac skriniek, doska bez kovania);
+  JS DOM — rozklik renderuje zdroje bez server dotazu, klik posiela správny identifikátor; in-SU smoke —
+  klik na zdroj označí správnu skrinku. Mutácie min. 2 (zdroje z nesprávneho riadku · klik bez identity).
+  **Riziká:** veľkosť payloadu pri veľkej zákazke (zdroje už v dátach sú — merať; prípadne lenivý kanál à la
+  TPL PNG) · duplicitná identita (zdroje pri ORANGE stave zobraziť, neblokovať — tvrdé brány rieši P0-2/#252).
+  **Smoke pre Michala:** v Nákupe rozklikni závesy → vidíš skrinky s počtami; klik na skrinku ju označí
+  v modeli a Inspector ju otvorí; súčet zdrojov sedí s riadkom.
+  **Checklist uzáveru:** bump patch + `?v=` → testy → outputs.md/ui-lifecycle.md odseky na mieste →
+  STAV/KRONIKA/PLAN → D-94 do DOGFOODING_vyriesene (plný text + riadok do indexu).
 - **D-95 · Režim krížovej kontroly „diel po diele"** — riadený prechod zákazkou s odškrtávaním, stav uložený v zákazke; rozšírenie na rozmery a kovanie, šípky smeru dekoru, X-ray. *(Vizuálny základ pre olep už stojí: D-104 + D-105.)*
 - **EN DANIELI textový export** výrobného zadania — supplier-agnostický výstup, vedome odložený z dávky E.
 - **Nárezový plán fáza 2** — guillotine, kerf, orezky, orientácia dekoru; vlastná heuristika v čistom Ruby (OpenCutList je GPL — algoritmus áno, kód nie), kontrakt D-19 pripravený.
@@ -305,7 +325,28 @@ nezáväzný koncept [zdroje/next_sessions/03_KOVANIE_FAZA3.md](zdroje/next_sess
 **Cieľ:** aby plugin a knižnice fungovali na dvoch pracoviskách (Michal + Lucia).
 
 - *(**D-48 · Zdieľaná knižnica pre 2 PC** je od 26.8. MIMO V1 — presunutá do zásobníka Po V1; katalógy sa dovtedy zdieľajú ručne export/importom.)*
-- **D-52 · Tlačidlo „Aktualizovať" (auto-update pluginu) — V1 rozsah samostatne:** jednoklikový update (distribučný kanál jednoducho — napr. zdieľaný priečinok), BEZ väzby na D-48 sync.
+- **D-52 · TASK PACKAGE „AKTUALIZOVAŤ JEDNÝM KLIKOM" (1e, zapísané 30.8.2026; štart na „štartuj"):**
+  **Cieľ:** Lucia aj Michal zaktualizujú plugin bez kopírovania súborov — tlačidlo v sekcii O plugine.
+  BEZ väzby na D-48 sync.
+  **Scope IN:** cesta k distribučnému priečinku v Nastaveniach (JSON v %APPDATA% + .bak vzor); sekcia
+  O plugine ukáže „nainštalovaná v0.X.Y · dostupná v0.X.Z" (z VERSION v balíku; formát balíka = kópia repa:
+  `noxun_engine.rb` + `noxun_engine/`); tlačidlo „Aktualizovať" skopíruje balík do Plugins VÝHRADNE cez
+  staging + rename (vzor `stage_then_rename` — nikdy priamy prepis za behu; pri zlyhaní ostáva pôvodná
+  inštalácia nedotknutá) a po úspechu hláška „Reštartuj SketchUp" — ŽIADEN auto-reload za behu (pasca
+  observerov) ani auto-check na pozadí (kontrola len pri otvorení sekcie).
+  **Scope OUT:** G-Disk sync knižníc (D-48, mimo V1) · downgrade guard nad rámec priznania verzie ·
+  podpisovanie balíka · auto-update na pozadí.
+  **Audit:** NIE pre dátový kontrakt; kritický bod pre review = zápis do živého Plugins priečinka
+  (staging + rename + restart je povinný dizajn, nie voľba).
+  **Testy a DoD:** headless — porovnanie verzií, validácia balíka (chýbajúci VERSION/main.rb = odmietnuť),
+  staging s poškodeným cieľom (pôvodná inštalácia prežije); ručný smoke = reálny update z priečinka.
+  Mutácie min. 2 (kópia bez stagingu · úspech hlásený pri zlyhaní).
+  **Riziká:** bežiaci SketchUp drží súbory (staging per súbor + rollback + hláška) · antivírus/zámky na
+  zdieľanom disku (chyby hlásiť, nikdy ticho).
+  **Smoke pre Michala:** nastav cestu na priečinok s novšou kópiou → O plugine ukáže dostupnú verziu →
+  Aktualizovať → reštart → nová verzia beží; priečinok s pokazeným balíkom → hláška, stará verzia beží ďalej.
+  **Checklist uzáveru:** bump patch + `?v=` → testy → ui-lifecycle.md + NOVÝ odsek modulu updater (R-32 vzor:
+  overiť proti kódu) + ARCHITEKTURA router riadok → STAV/KRONIKA/PLAN → D-52 do DOGFOODING_vyriesene.
 - **D-20 · Quick actions — bezpečný move plugin** — zlúčiť noxun_mower + Snaper do jedného toolbaru; kopírovanie musí prejsť štandardným dedup tickom (dnes vzniká kópia bez NOXUN identity).
 
 ## Po V1 — zásobník (nezaradené, nestratiť)
