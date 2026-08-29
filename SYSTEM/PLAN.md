@@ -128,7 +128,9 @@ spraví krátky read-only audit proti aktuálnemu mainu. Agenti si potom package
 **Cieľ:** vloženie skrinky tam, kde sa používateľ pozerá — po „Vložiť" visí ghost skrinky na kurzore,
 klik ju položí ako jednu reálnu CAB v jednom Undo kroku. Koniec hľadania skriniek položených cez `next_x`
 mimo pohľadu. Podklady: koncepty [09](zdroje/next_sessions/09_GHOST_VKLADANIE.md) + [09A](zdroje/next_sessions/09A_GHOST_EXTERNY_SKETCHUP_AUDIT.md)
-— package z nich preberá SCHVÁLENÝ kontrakt a uzatvára otvorené voľby nižšie.
+— package z nich preberá schválený kontrakt s JEDNOU vedomou zmenou: ↓ pre horný korpus drží
+`UPPER_HANG_Z`, nie podlahu (09 mal floor lock pre oba typy; zámok typu zachováva dnešné správanie buildera).
+Otvorené voľby uzatvára nižšie.
 
 **Predpoklady ([AUDIT_REGISTER.md](AUDIT_REGISTER.md)):** TVRDÝ blocker je **R-03** (šev `prepare_insert` +
 `build(..., transform:)` — najväčšia prípravná dávka, odhad L; bez nej package neštartuje). **R-01** a **R-02**
@@ -187,6 +189,8 @@ bezpečný cancel · **nested edit context → commit top-level so správnym tra
 „Vložiť" počas session · regresie: programatický `build` cez fallback, ScaleWatch/dedup nevyrobí druhú CAB ani
 extra Undo. Mutačné overenie štandard. DoD = všetky scenáre zelené + smoke checklist Michala prejde.
 
+**Odhad náročnosti: L** (po R-03; Tool + session + in-SU sada). Poradie cyklu anchorov určí implementácia
+(kandidát z 09: ľavý spodný → pravý spodný → pravý horný → ľavý horný).
 **Riziká:** Tool lifecycle (focus z CEF, onCancel/Undo, suspend/resume) — najväčšie, kryté in-SU scenármi ·
 Alt na Windows (overí audit, fallback TAB) · geometria anchorov pri atypických konštrukciách (uzavrie audit) ·
 SU verzie (pixely/klávesy — držať ghost čisto 3D). Rez dávky: Tool + session v JEDNEJ dávke, R-03 šev PREDTÝM
@@ -294,10 +298,15 @@ nezáväzný koncept [zdroje/next_sessions/03_KOVANIE_FAZA3.md](zdroje/next_sess
 
 - **V1 rozsah — quick-win = TASK PACKAGE „M-R FOTO" (1e, zapísané 29.8.2026, rev. po slepom review #254; štart na „štartuj"):**
   **Cieľ:** dielce v modeli nesú REÁLNU fotku dekoru namiesto plnej farby — vizualizácie bez exportu (V1_VIZIA bod 7).
-  **Scope IN:** čistý TROJSTAVOVÝ selektor `Materials.texture_state_for(material_id)` (headless — vzor `color_of`):
-  `[:none]` = záznam fotku nemá (UNI, duplák, zástena, legacy) → farba · `[:missing]` = záznam má `image_url`,
-  ale lokálny súbor chýba/je nevalidný → existujúca textúra v modeli sa DRŽÍ · `[:path, cesta]` = aplikuj/over
-  kľúč (`core/demos/image_cache.rb`; `image_url` žije na SHEET zázname — SCHEMA_IMAGE, `family.rb` ho rozkopíruje
+  **Scope IN:** čistý TROJSTAVOVÝ selektor `Materials.texture_state_for(material_id)` (headless — vzor `color_of`).
+  POZOR (nález GLM review po #254, overený v kóde): `:none` sa NESMIE odvodzovať z neprítomnosti `image_url` —
+  duplák URL DEDÍ zo zdroja (`duplak_record_from` ju nereject-uje) a `finalize_create` ju rozkopíruje na všetky
+  sheet záznamy vrátane zásten. Selektor rozhoduje HIERARCHICKY: (1) UNI (`uni: true`) → `[:none]` bez ohľadu na URL · (2) záznam BEZ
+  `image_url` (legacy, alebo bežný materiál, ktorému URL z katalógu UBUDLA) → `[:none]` — toto je cesta, ktorou
+  párové pravidlo odstránenia textúry reálne funguje · (3) duplák a zástena fotku LEGITÍMNE MAJÚ (URL dedia) (duplák = ten istý dekor, fotka je vizuálne správna;
+  zástena = fotka predného dekoru, rub je priznané obmedzenie fázy 2) · `[:missing]` = URL áno, lokálny súbor
+  chýba/nevalidný → existujúca textúra v modeli sa DRŽÍ · `[:path, cesta]` = aplikuj/over kľúč (apply/verify
+  je NOVÁ práca dávky — `image_cache` má dnes len fetch/validáciu/uloženie) (`core/demos/image_cache.rb`; `image_url` žije na SHEET zázname — SCHEMA_IMAGE, `family.rb` ho rozkopíruje
   zo skupinovej URL; ŽIADNY „group" objekt neexistuje). Kľúč-attribute zároveň rozlišuje textúru položenú
   pluginom od RUČNE namaľovanej používateľom — ručných sa plugin NIKDY nedotýka.
   `ensure_su_material`: pri dostupnej cache textúra + fixná mierka rapportu (šírka ≈ 600 mm, doladí vizuálny test);
@@ -313,13 +322,14 @@ nezáväzný koncept [zdroje/next_sessions/03_KOVANIE_FAZA3.md](zdroje/next_sess
   R-13) sa touto dávkou zo STANDARDU VYŠKRTNE; zdroj textúry je runtime cache z `image_url`, žiadne nové pole.
   **Scope OUT:** PBR/appearance vrstva · knižnica vzhľadov · orientácia textúry podľa smeru dekoru dielca
   (fáza 2 D-28) · pixla (V1-06) · sťahovanie fotiek (lazy re-fetch pre druhé PC = kandidát k D-48/zásobník;
-  dovtedy Lucia fotky NEuvidí pri dekoroch zakladaných u Michala — PRIZNANÉ obmedzenie, nie chyba) · UNI,
-  dupláky (36 z 2×18), zásteny s `back_decor` a legacy záznamy = fallback farba (priznať v smoke, model bude
-  zmiešaný fotka/farba).
+  dovtedy Lucia fotky NEuvidí pri dekoroch zakladaných u Michala — PRIZNANÉ obmedzenie, nie chyba) · UNI a legacy
+  záznamy = fallback farba; rub zásteny s vlastnou textúrou = fáza 2 (model môže byť zmiešaný fotka/farba —
+  priznať v smoke).
   **Audit: ÁNO (úzky rozsah)** — škrt poľa zo STANDARDU (kontraktová zmena, hoci mŕtva) + dotyk cesty volanej
   builderami; codex-audit pred implementáciou spustiť presne s týmto rozsahom.
-  **Testy a DoD:** headless — `texture_state_for` (`:path` s fotkou · `:missing` pri poškodenom/chýbajúcom súbore
-  · `:none` pre UNI/duplák/zástenu/legacy) + kľúč identity textúry; **in-SU sekcia POVINNÁ** (cesta sa volá z builderov): rebuild s textúrou nevyrába
+  **Testy a DoD:** headless — `texture_state_for` (`:path` s fotkou vrátane DUPLÁKU so zdedenou URL a zásteny
+  · `:missing` pri poškodenom/chýbajúcom súbore · `:none` pre UNI aj pri zdedenej URL · `:none` pre bežný záznam
+  po STRATE URL — hierarchia typ→URL, nikdy len URL) + kľúč identity textúry; **in-SU sekcia POVINNÁ** (cesta sa volá z builderov): rebuild s textúrou nevyrába
   extra Undo, nemení BOM, neprepisuje textúru pri nezmenenom kľúči, model bez cache textúry DRŽÍ; mutácie min. 3
   (texture vždy/nikdy · prepis pri chýbajúcej cache · color na textúre). VEPO/kusovník/rozpočet BAJTOVO nezmenené.
   **Riziká:** veľkosť .skp (textúry sa vkladajú — smoke porovná na zákazke KLINIKA) · výkon pri mnohých

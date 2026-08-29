@@ -73,7 +73,7 @@ v [PLAN.md](PLAN.md) — dnes už len **D-51** a položka „výklop ako samosta
 
 ## RENDER M-R
 
-- **D-28 · Textúry materiálov (render)** (Michal 19.7. večer) — *Stav: **ZLÚČENÉ do dávky M-R** (roadmapa „Materiály — dokončenie", 2.8.): texture_path + render vlastnosti + „Uložiť vzhľad do knižnice" + mierka rapportu; fáza 2 orientácia podľa smeru dekoru. Zaradenie: po dávke D, pred UI 2.0 (Luciina priorita).*
+- **D-28 · Textúry materiálov (render)** (Michal 19.7. večer) — *Stav: **ZLÚČENÉ do dávky M-R** (roadmapa „Materiály — dokončenie", 2.8.): texture_path + render vlastnosti + „Uložiť vzhľad do knižnice" + mierka rapportu; fáza 2 orientácia podľa smeru dekoru. Zaradenie: blok 5 M-R v PLAN.md (fotku rieši package M-R FOTO; knižnica vzhľadov/PBR/orientácia = odrážka D-28 bloku 5) (Luciina priorita).*
 
 ## INFRA
 
